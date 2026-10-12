@@ -191,6 +191,29 @@ export function zahlungsarten(hof: { acceptsOnline: boolean; stripeAccountReady:
   ]
 }
 
+// ─── Kontaktdaten des Hofs (Nr. 60) ─────────────────────────────────────────
+
+/**
+ * Steht in „Zahlung & Kontakt" an Stelle der Telefonnummer (Mockups
+ * web/mobil-k2-hofseite-ohne-telefon). Telefon und E-Mail des Hofs bekommt
+ * die Kundin mit der Bestellung: in der Kasse vor dem Kaufknopf, auf
+ * Bestätigung und Bestellseite („Hof erreichen") und in der Bestätigungsmail.
+ */
+export const KONTAKT_NACH_DEM_KAUF = 'Fragen zu deiner Bestellung? Die Telefonnummer des Hofs steht in deiner Bestellbestätigung.'
+
+/**
+ * Der Hof ohne Telefon und E-Mail — für die Hofseite, BEVOR er an die
+ * Client-Komponente geht: Was dort ankommt, steht in den Seitendaten, auch
+ * wenn nichts es zeigt. Die Abfrage (getPublicFarm) behält beide, weil die
+ * Kasse sie vor dem Kaufknopf nennt.
+ */
+export function entferneKontaktdaten<T extends { phone: string; email: string }>(hof: T): Omit<T, 'phone' | 'email'> {
+  const ohne: Partial<T> = { ...hof }
+  delete ohne.phone
+  delete ohne.email
+  return ohne as Omit<T, 'phone' | 'email'>
+}
+
 // ─── Servicegebühr (E4) ─────────────────────────────────────────────────────
 
 /**

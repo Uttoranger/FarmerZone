@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useSyncExternalStore } from 'react'
 import { nanoid } from 'nanoid'
 import type { WarenkorbPosition } from '@/schemas/warenkorb-speicher'
 import {
@@ -19,7 +19,6 @@ export type Warenkorb = {
   items: CartItem[]
   count: number
   total: number
-  sessionId: string
   isHydrated: boolean
   addItem: (product: Omit<CartItem, 'quantity'>, qty?: number) => Promise<{ ok: boolean; error?: string }>
   updateQuantity: (productId: string, qty: number) => Promise<{ ok: boolean; error?: string }>
@@ -27,40 +26,66 @@ export type Warenkorb = {
   clearCart: () => void
 }
 
+const KEIN_KORB: CartItem[] = []
+
+// Korb und Sitzung liegen im localStorage, den es erst im Browser gibt. Server
+// und Hydration lesen „kein Speicher" (undefined) und rendern den leeren Korb,
+// danach liest React den Speicher — wie früher der Effekt, ohne setState
+// darin. Abonniert wird nichts: Der Hook lädt einmal je Hof und führt den Korb
+// dann selbst, Schreiben aus anderen Tabs übernimmt er nicht (wie bisher).
+function nichtsAbonnieren(): () => void {
+  return () => {}
+}
+function korbImBrowser(): string | null {
+  return localStorage.getItem(WARENKORB_SCHLUESSEL)
+}
+function keinSpeicher(): undefined {
+  return undefined
+}
+
+/** Die Kennung, an der die Reservierungen hängen — beim ersten Mal angelegt, bleibt über Seitenaufrufe. */
+function sitzungsKennung(): string {
+  let sid = localStorage.getItem(SITZUNG_SCHLUESSEL)
+  if (!sid) {
+    sid = nanoid()
+    localStorage.setItem(SITZUNG_SCHLUESSEL, sid)
+  }
+  return sid
+}
+
 /**
  * Der Warenkorb eines Hofs. `farmSlug` wird mitgespeichert, damit das
  * Warenkorb-Symbol der Kopfzeile auf anderen Seiten zu diesem Hof führt.
  */
 export function useCart(farmId: string, farmSlug: string): Warenkorb {
-  const [items, setItems] = useState<CartItem[]>([])
-  const [sessionId, setSessionId] = useState('')
-  const [isHydrated, setIsHydrated] = useState(false)
-
-  useEffect(() => {
-    // Session ID (persists across page loads for reservation tracking)
-    let sid = localStorage.getItem(SITZUNG_SCHLUESSEL)
-    if (!sid) {
-      sid = nanoid()
-      localStorage.setItem(SITZUNG_SCHLUESSEL, sid)
-    }
-    setSessionId(sid)
-
+  const roh = useSyncExternalStore<string | null | undefined>(nichtsAbonnieren, korbImBrowser, keinSpeicher)
+  const isHydrated = roh !== undefined
+  // Der Korb gehört zu genau einem Hof. Wechselt der Hof, wird beim Rendern
+  // neu geladen (Zustand bei neuen Props anpassen), nicht in einem Effekt.
+  // Danach ist dieser Zustand die Anzeige, der Speicher nur die Ablage:
+  // Scheitert das Schreiben (privates Fenster), stimmt die Anzeige trotzdem.
+  const [korb, setKorb] = useState<{ farmId: string; farmSlug: string; items: CartItem[] } | null>(null)
+  if (isHydrated && (korb?.farmId !== farmId || korb.farmSlug !== farmSlug)) {
     // Beschädigter oder fremder Korb ergibt einen leeren — kein Fehler, den
     // die Kundin sehen müsste (leseWarenkorb prüft mit Zod).
-    const gespeichert = leseWarenkorb(localStorage.getItem(WARENKORB_SCHLUESSEL))
-    const geladen = positionenFuer(gespeichert, farmId)
-    setItems(geladen)
+    setKorb({ farmId, farmSlug, items: positionenFuer(leseWarenkorb(roh), farmId) })
+  }
+  const items = korb?.farmId === farmId && korb.farmSlug === farmSlug ? korb.items : KEIN_KORB
+
+  useEffect(() => {
+    // Die Sitzung entsteht wie bisher beim ersten Besuch eines Hofs.
+    sitzungsKennung()
     // Ein Korb von vor der Kopfzeile kennt den Slug nicht — nachtragen, damit
     // das Warenkorb-Symbol auf anderen Seiten zu diesem Hof führt.
+    const gespeichert = leseWarenkorb(localStorage.getItem(WARENKORB_SCHLUESSEL))
+    const geladen = positionenFuer(gespeichert, farmId)
     if (gespeichert && !gespeichert.farmSlug && geladen.length > 0) {
       schreibeWarenkorb({ farmId, farmSlug, items: geladen })
     }
-
-    setIsHydrated(true)
   }, [farmId, farmSlug])
 
   function persist(next: CartItem[]) {
-    setItems(next)
+    setKorb({ farmId, farmSlug, items: next })
     schreibeWarenkorb({ farmId, farmSlug, items: next })
   }
 
@@ -74,7 +99,7 @@ export function useCart(farmId: string, farmSlug: string): Warenkorb {
     const res = await fetch('/api/reserve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ productId: product.productId, quantity: totalQty, sessionId }),
+      body: JSON.stringify({ productId: product.productId, quantity: totalQty, sessionId: sitzungsKennung() }),
     })
 
     if (!res.ok) {
@@ -100,7 +125,7 @@ export function useCart(farmId: string, farmSlug: string): Warenkorb {
     const res = await fetch('/api/reserve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ productId, quantity: qty, sessionId }),
+      body: JSON.stringify({ productId, quantity: qty, sessionId: sitzungsKennung() }),
     })
 
     if (res.ok) {
@@ -119,12 +144,12 @@ export function useCart(farmId: string, farmSlug: string): Warenkorb {
   }
 
   function clearCart() {
-    setItems([])
+    setKorb({ farmId, farmSlug, items: [] })
     leereWarenkorb()
   }
 
   const count = warenkorbAnzahl(items)
   const total = items.reduce((s, i) => s + i.price * i.quantity, 0)
 
-  return { items, count, total, sessionId, isHydrated, addItem, updateQuantity, removeItem, clearCart }
+  return { items, count, total, isHydrated, addItem, updateQuantity, removeItem, clearCart }
 }

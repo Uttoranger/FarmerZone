@@ -13,7 +13,6 @@ import {
   MessageCircle,
   Navigation,
   PauseCircle,
-  Phone,
   Share2,
   ShoppingBasket,
   Sprout,
@@ -88,6 +87,14 @@ import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
 
 type ReorderItem = { productId: string; productName: string; quantity: number }
 
+/**
+ * Der Hof, wie die Hofseite ihn bekommt: ohne Telefon und E-Mail (Nr. 60,
+ * Mockups web/mobil-k2-hofseite-ohne-telefon). Beide kommen erst mit der
+ * Bestellung — in der Kasse vor dem Kaufknopf, danach auf Bestätigung und
+ * Bestellseite. page.tsx entfernt sie auf dem Server (entferneKontaktdaten).
+ */
+export type HofseiteHof = Omit<PublicFarm, 'phone' | 'email'>
+
 const ANLASS: Record<string, { label: string; symbol: LucideIcon }> = {
   FRESH_PRODUCT: { label: 'Frisches Produkt', symbol: Leaf },
   NEW_SEASON: { label: 'Neue Saison', symbol: CalendarDays },
@@ -117,7 +124,7 @@ export function HofseiteKunde({
   ansicht,
   jetzt,
 }: {
-  farm: PublicFarm
+  farm: HofseiteHof
   activeStatus: ActiveStatusPost | null
   reorderItems?: ReorderItem[]
   ansicht: Pick<SeitenAnsicht, 'art' | 'kaufen'>
@@ -195,8 +202,7 @@ export function HofseiteKunde({
     '@type': 'LocalBusiness',
     name: farm.name,
     description: farm.description,
-    telephone: farm.phone,
-    email: farm.email,
+    // Ohne telephone und email (Nr. 60): Die Nummer gibt es erst nach dem Kauf.
     address: {
       '@type': 'PostalAddress',
       streetAddress: farm.address,
@@ -229,17 +235,11 @@ export function HofseiteKunde({
           <EmptyState
             symbol={Sprout}
             titel="Dieser Hof richtet gerade seinen Shop ein"
-            satz="Schau bald wieder vorbei – oder ruf direkt am Hof an."
+            satz="Schau bald wieder vorbei."
             aktion={
-              <>
-                <a href={`tel:${farm.phone}`} className={UMRISS_KNOPF}>
-                  <Phone className="size-4" strokeWidth={1.7} aria-hidden="true" />
-                  Anrufen
-                </a>
-                <Link href="/hoefe" className={UMRISS_KNOPF}>
-                  Andere Höfe entdecken
-                </Link>
-              </>
+              <Link href="/hoefe" className={UMRISS_KNOPF}>
+                Andere Höfe entdecken
+              </Link>
             }
           />
         </div>
@@ -373,10 +373,6 @@ export function HofseiteKunde({
           </div>
 
           <div className="flex gap-2 pt-3.5 md:shrink-0 md:gap-2.5 md:pt-0 md:pb-1.5">
-            <a href={`tel:${farm.phone}`} className={cn(UMRISS_KNOPF, 'flex-1 md:flex-none')}>
-              <Phone className="size-4" strokeWidth={1.7} aria-hidden="true" />
-              Anrufen
-            </a>
             <a href={kartenLink} target="_blank" rel="noopener noreferrer" className={cn(UMRISS_KNOPF, 'flex-1 md:flex-none')}>
               <Navigation className="size-4" strokeWidth={1.7} aria-hidden="true" />
               Anfahrt

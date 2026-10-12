@@ -44,6 +44,7 @@ import {
   type HofNavPunkt,
   type HofNeuPunkt,
 } from '@/lib/bauern-navigation'
+import type { TarifZeileDaten } from '@/lib/konditionen'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { BottomNav, BottomNavLink, BottomNavMitte, bottomNavEintragKlassen, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
@@ -63,6 +64,7 @@ import {
 import { ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
 import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
 import { NEU_SYMBOL } from '@/components/hofbereich/neu-symbol'
+import { TarifZeile } from '@/components/hofbereich/tarif-zeile'
 
 /*
  * Die Shell des Hofbereichs im neuen Design (Gate 2). Ordnung, aktive Punkte
@@ -72,7 +74,9 @@ import { NEU_SYMBOL } from '@/components/hofbereich/neu-symbol'
  * mobil-h3-heute-mit-teilen-karte und mobil-h5-mehr-auswertung-region-mein-hof.
  * Am Handy seit Nr. 49 (Register N3) abweichend vom Mockup: „Mein Hof" steht
  * in der Leiste (öffnet Produkte, aktiv nach hofHandyAriaAktuell), das
- * Mehr-Blatt beginnt ohne Hofkarte mit „Verkauf und Kunden".
+ * Mehr-Blatt beginnt ohne Hofkarte. Seit Nr. 61 steht oben im Mehr-Blatt die
+ * Gruppe „Dein Tarif" und unten in der Seitenleiste vor der Person die
+ * Tarif-Zeile (TarifZeile; Zustand und Texte als Prop vom Server).
  *
  * Die Shell setzt data-design="neu" und damit die Tokens des Design-Systems
  * für das ganze Dokument. Noch nutzt sie keine Route (kein Big Bang): Der
@@ -104,6 +108,12 @@ export type HofShellProps = {
   isAdmin: boolean
   /** Offene Bestellungen und Meldungen, die auf den Betreiber warten. */
   zahlen?: { bestellungen?: number; admin?: number }
+  /**
+   * Die Tarif-Zeile, fertig vom Server (baueTarifZeile über ladeTarifZeile) —
+   * die Shell rechnet nichts mit der Zeit. null oder weggelassen: keine Zeile
+   * (Hofladen; die Vorschau unter /intern).
+   */
+  tarifZeile?: TarifZeileDaten | null
   /**
    * Nur für die Vorschau unter /intern: ersetzt das echte Abmelden, damit der
    * Admin vor der Vorschau angemeldet bleibt. Echte Routen lassen es weg.
@@ -227,7 +237,16 @@ function NeuInhalt({ punkt }: { punkt: HofNeuPunkt }) {
   )
 }
 
-export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbmelden, children }: HofShellProps): React.JSX.Element {
+export function HofShell({
+  hofName,
+  hofSlug,
+  personName,
+  isAdmin,
+  zahlen,
+  tarifZeile,
+  onAbmelden,
+  children,
+}: HofShellProps): React.JSX.Element {
   const pathname = usePathname()
   const router = useRouter()
   const nav = hofNavigation({ isAdmin })
@@ -361,7 +380,12 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
               ))}
             </SidebarGruppe>
 
-            <div className="mt-auto flex flex-col gap-1 border-t border-border pt-3">
+            {tarifZeile && (
+              <div className="mt-auto pt-4">
+                <TarifZeile daten={tarifZeile} ziel={nav.tarif.ziel} ort="seitenleiste" />
+              </div>
+            )}
+            <div className={cn('flex flex-col gap-1 border-t border-border pt-3', tarifZeile ? 'mt-3' : 'mt-auto')}>
               <PersonZeile name={personName} />
               <SidebarGruppe>
                 {nav.unten.map((punkt) => (
@@ -468,6 +492,14 @@ export function HofShell({ hofName, hofSlug, personName, isAdmin, zahlen, onAbme
                     Schließen
                   </SheetClose>
                 </div>
+                {tarifZeile && (
+                  <div role="group" aria-label={nav.tarif.titel} className="flex flex-col gap-2 pb-1">
+                    <p aria-hidden="true" className="px-0.5 pt-1 text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase">
+                      {nav.tarif.titel}
+                    </p>
+                    <TarifZeile daten={tarifZeile} ziel={nav.tarif.ziel} ort="blatt" onNavigate={schliessen} />
+                  </div>
+                )}
                 <p aria-hidden="true" className="px-0.5 pt-1 text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase">
                   {VERKAUF_UND_KUNDEN_TITEL}
                 </p>

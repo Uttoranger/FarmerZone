@@ -40,7 +40,7 @@ vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: vi.fn() }))
 vi.mock('@/server/queries/orders', () => ({ getOpenOrdersCount: vi.fn() }))
 vi.mock('@/server/queries/farm', () => ({ getFarmBannerState: vi.fn() }))
-vi.mock('@/server/queries/admin', () => ({ isAdminUser: vi.fn() }))
+vi.mock('@/server/queries/admin', () => ({ isAdminUser: vi.fn(), ladeGruendungBis: vi.fn() }))
 vi.mock('@/server/queries/meldung', () => ({ zaehleZuEntscheiden: vi.fn() }))
 
 import { prisma } from '@/lib/prisma'
@@ -50,7 +50,7 @@ import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getOpenOrdersCount } from '@/server/queries/orders'
 import { getFarmBannerState } from '@/server/queries/farm'
-import { isAdminUser } from '@/server/queries/admin'
+import { isAdminUser, ladeGruendungBis } from '@/server/queries/admin'
 import { zaehleZuEntscheiden } from '@/server/queries/meldung'
 import { ladeHofbereich } from '@/server/hofbereich'
 
@@ -77,6 +77,7 @@ function vorratsAbfragen(): number {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(ladeGruendungBis).mockResolvedValue(null)
   vi.mocked(prisma.order.findMany).mockResolvedValue([] as never)
   vi.mocked(prisma.order.findFirst).mockResolvedValue(null as never)
   vi.mocked(prisma.order.count).mockResolvedValue(0 as never)
@@ -152,7 +153,7 @@ describe('ladeHofbereich — die Zahlen des Layouts nebeneinander', () => {
     vi.mocked(getFarmForUser).mockResolvedValue({ id: 'hof-1', name: 'Testhof', slug: 'testhof', logoUrl: null } as never)
   }
 
-  it('startet offene Bestellungen, Balken und Admin-Recht gleichzeitig', async () => {
+  it('startet offene Bestellungen, Balken, Admin-Recht und Tarif-Zeile gleichzeitig', async () => {
     angemeldet()
     const offen = aufgeschoben<number>()
     const balken = aufgeschoben<null>()
@@ -168,6 +169,10 @@ describe('ladeHofbereich — die Zahlen des Layouts nebeneinander', () => {
     expect(getOpenOrdersCount).toHaveBeenCalledWith('hof-1')
     expect(getFarmBannerState).toHaveBeenCalledWith('nutzer-1')
     expect(isAdminUser).toHaveBeenCalledWith('nutzer-1')
+    // Nr. 61: Die Tarif-Zeile (Tarif und Produkte im Shop) läuft daneben, nicht danach.
+    expect(prisma.farm.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'hof-1' } }))
+    // Nr. 62: das wirksame Gründungs-Ende (EIN Lader) ebenso.
+    expect(ladeGruendungBis).toHaveBeenCalledWith({ id: 'hof-1' })
 
     offen.loese(3)
     balken.loese(null)

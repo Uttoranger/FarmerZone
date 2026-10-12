@@ -4,13 +4,15 @@
  * Die Aussage: Übersicht und Konditionen lesen nur den Hof des angemeldeten
  * Besitzers (ownerId), zählen nur aktive Abholzeiten als Angebot, geben die
  * Stripe-Kennung nicht weiter (nur „Konto da") und reichen Geldsätze als
- * Text weiter — so, wie die Spalten sie gespeichert haben.
+ * Text weiter — so, wie die Spalten sie gespeichert haben. Seit Nr. 61 zählen
+ * Konditionen und Tarif-Zeile nur Produkte im Shop und aktive Abholzeiten des
+ * eigenen Hofs (gefilterte Zählung in derselben Abfrage).
  */
 import { describe, it, expect, afterEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
-import { ladeEinstellungenUebersicht, ladeKonditionenHof } from '@/server/queries/einstellungen'
+import { ladeEinstellungenUebersicht, ladeKonditionenHof, ladeTarifStand } from '@/server/queries/einstellungen'
 import { einstellungenBereiche } from '@/lib/hof-einstellungen'
-import { erstelleHof, raeumeAuf } from './setup/basis'
+import { erstelleHof, erstelleProdukt, raeumeAuf } from './setup/basis'
 
 afterEach(async () => {
   await raeumeAuf()
@@ -71,6 +73,26 @@ describe('Einstellungen — nur der eigene Hof', () => {
       serviceFeeMinCents: 60,
       serviceFeeActiveFrom: giltAb,
       platformFeePercent: '0',
+      gruendungBis: null,
+      produkteImShop: 0,
+      abholzeitenJeWoche: 7,
     })
+  })
+
+  it('Konditionen und Tarif-Zeile zählen nur Produkte im Shop und aktive Abholzeiten des eigenen Hofs (Nr. 61)', async () => {
+    const { farm, owner } = await erstelleHof()
+    const fremd = await erstelleHof()
+    await erstelleProdukt(farm.id)
+    await erstelleProdukt(farm.id)
+    const ausgeblendet = await erstelleProdukt(farm.id)
+    await prisma.product.update({ where: { id: ausgeblendet.id }, data: { isAvailable: false } })
+    await erstelleProdukt(fremd.farm.id)
+    const [erste] = await prisma.pickupSlot.findMany({ where: { farmId: farm.id }, orderBy: { dayOfWeek: 'asc' } })
+    await prisma.pickupSlot.update({ where: { id: erste.id }, data: { isActive: false } })
+
+    expect(await ladeKonditionenHof(owner.id)).toMatchObject({ produkteImShop: 2, abholzeitenJeWoche: 6 })
+    // Nr. 62: Der Stand trägt das wirksame Gründungs-Ende — hier null, der Hof steht hinter den Höfen des Seeds (kein Platz).
+    expect(await ladeTarifStand(farm.id)).toEqual({ tarif: null, produkteImShop: 2, gruendungBis: null })
+    expect(await ladeTarifStand('int-gibt-es-nicht')).toEqual({ tarif: null, produkteImShop: 0, gruendungBis: null })
   })
 })

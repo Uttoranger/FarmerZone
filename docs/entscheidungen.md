@@ -59,6 +59,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Begründung:** Preismodell aus der Excel.
 - **Dateien:** `src/lib/konditionen.ts` (#179); Schema-Felder `Farm.tarif` und `Monatsabrechnung` (#169); die Abrechnung folgt mit Gate 8.
 - **Übergang:** siehe K1. Bis die Abrechnung gebaut ist, gilt die Freischaltung im Admin weiter.
+- **Ergänzung (12.10.2026, Freigabe Lauf 10):** Ohne Wahl gilt Hoftor. Hofladen gibt es nur nach aktiver Wahl mit SEPA-Mandat; keine automatische Umstellung, keine Abbuchung ohne Wahl. Der Tarif-Hinweis ist eine Statuszeile ohne Preis; der Preis steht nur auf „Deine Konditionen", nach dem Nutzen und mit Bedingungen.
 
 ### E7 · Kunden-Anmeldung mit Code (02.10.2026)
 - **Entscheidung:** Kundinnen melden sich mit einem Code aus der E-Mail an (Better Auth `emailOTP`). Das gilt für die freiwillige Kunden-Anmeldung und für „Bestellungen finden". Höfe bleiben bei E-Mail und Passwort.
@@ -157,6 +158,10 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Begründung:** In Lauf 6 entstanden Code-Konflikte zwischen unabhängigen PRs, die erst beim Mergen sichtbar wurden; der Sammel-PR (#211) hat sie mit grünen Tests aufgelöst.
 - **Dateien:** `docs/nachtlauf.md` Abschnitt 4.
 
+### G4 · Bausteinverzeichnis und Regelvorschläge (12.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 10):** `docs/ai/BAUSTEINE.md` wird aus dem Code erzeugt (`pnpm bausteine`), nie von Hand geschrieben; ein Test hält es aktuell; vor jeder neuen Datei, Komponente oder Funktion wird es gelesen. Fehler, die wiederkommen können, werden bevorzugt durch eine Prüfung verhindert (Test, Lint, Hook), sonst durch eine Textregel am richtigen Ort. Agenten schlagen Regeln vor, der Mensch gibt frei; neue Regeln tragen Herkunft und Datum. Jeder fünfte Lauf (10, 15, …) beginnt mit einer Regel-Inventur: überholte, doppelte oder durch Tests abgedeckte Regeln werden zum Streichen vorgeschlagen, nicht selbst gestrichen.
+- **Umsetzung:** Nr. 58 (freigabe.md §14).
+
 ## F – Freigaben nach der Umsetzung
 
 ### F1 · Mockup-Abweichungen Nr. 03, 05 und 07–17 (06.10.2026)
@@ -229,6 +234,12 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Dateien:** `src/lib/konditionen.ts`, `/fuer-hoefe`, `/konditionen`, Registrieren-Link, `src/app/admin/admin-farm-list.tsx`, `src/lib/gruendungshof.ts`.
 - **Datum:** **1. Februar 2027** (festgelegt am 06.10.2026, uttoranger im Chat). Damit ist 17d freigegeben (freigabe.md §8).
 - **Stand:** umgesetzt in 17d.
+
+### K2 · Gründungs-Enddatum je Hof (12.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 10):** Gründungshöfe gelten als Hofladen ohne Grundgebühr bis zu einem Enddatum; Standard 31.12.2027, je Hof im Admin änderbar, auch für die bestehenden Testhöfe. Danach gilt die normale Regel (E6-Ergänzung). Vor einer Änderung des Standards werden bestehende Zusagen je Hof festgeschrieben (eigene Migration mit Freigabe). Der Satz „danach dauerhaft 3 %" verschwindet aus jeder Anzeige.
+- **Verhältnis zu anderen Einträgen:** entscheidet O7 (Variante b); ergänzt E6 und K1.
+- **Migration (freigegeben, Wortlaut):** „Nr. 62 darf eine Expand-Migration anlegen: neue Spalte Farm.gruendungBis vom Typ DATE, nullable, ohne Default, ohne Backfill und ohne andere Schema-Änderung. Erzeugt mit prisma migrate diff; Produktion bekommt sie nur über vercel-build beim Merge."
+- **Umsetzung:** Nr. 61 und 62 (freigabe.md §14).
 
 ---
 
@@ -303,6 +314,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Begründung:** Befund vom 10.10.2026: Online-Bestellungen aus der Testzeit zählen als Umsatz bzw. Gebühr; dieselbe Zuordnung steht an mehreren Stellen (Auswertung und Verkäufe samt Jahressumme für die Umsatzgrenze, Admin-Finanzen, Admin-Hofliste, Heute, Kunden-Umsätze).
 - **Verhältnis zu anderen Einträgen:** ergänzt Z2 (Live-Schaltung durch den Menschen); Bestellungen, Beträge, Checkout, Webhook, Erstattung und Storno bleiben unverändert.
 - **Dateien:** eine Regel in `src/lib/` (Prüfung, Prisma-Where, Prisma.sql-Baustein), Auswertung, Verkäufe, Admin-Finanzen, Admin-Hofliste, Heute, Kunden; `docs/betrieb/stripe-live.md`; Umsetzung Nr. 55 (freigabe.md §13).
+- **Ergänzung (12.10.2026, Freigabe Lauf 10):** Bestellzahlen zeigen Testbestellungen nirgends mit – Auswertung, Admin-Hofliste und Kundenansicht zählen gleich. Umsetzung Nr. 65 (freigabe.md §14).
 
 ---
 
@@ -340,6 +352,10 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
   - Bestehende Abonnenten bleiben vorerst unverändert; ihre Zahl steht im Morgenbericht, den Umgang mit ihnen entscheidet der Mensch.
 - **Begründung:** Bisher nur einfaches Opt-in (O3).
 - **Dateien:** Abo-Anmeldung, Mailversand der Beiträge und Benachrichtigungen; Umsetzung Nr. 38 (freigabe.md §11), Migration nur Expand, falls nötig.
+
+### S16 · `trustedOrigins` ohne Muster (12.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 10):** Ein Wert von `NEXT_PUBLIC_APP_URL` mit „*" oder „?" gilt als ungültig (bleibt roh, Warnung); ein https-Wert mit fremdem Host (nicht farmerzone.at/www) wird angenommen, löst aber in der Produktion eine Sentry-Warnung ohne den Wert aus.
+- **Umsetzung:** Nr. 64 (freigabe.md §14).
 
 ---
 
@@ -403,6 +419,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Begründung:** Befund vom 10.10.2026: Hofseite wird an zwei Orten bearbeitet (Mein Hof, Mein Auftritt); am Handy steht der Umschalter erst unter der Checkliste, „Bearbeiten" zeigt die alte Ansicht mit Stiften (O2).
 - **Verhältnis zu anderen Einträgen:** entscheidet O2.
 - **Dateien:** Mein Hof (`farm-page-client.tsx`, `hofseite-editor.tsx`, `seitenkopf.tsx`), Mein Auftritt (`settings/appearance/`, `server/actions/appearance.ts`), `src/lib/hof-einstellungen.ts`; Umsetzung Nr. 49 und 50 (freigabe.md §13).
+- **Ergänzung (12.10.2026, Freigabe Lauf 10):** `saveAppearanceAction` schreibt nur die mitgeschickten Felder; `farmValues` nur, wenn sie mitkommen. Das Adress-Formular in Mein Hof schickt die Adresse als Ganzes (Land, Breite, Länge mit). Umsetzung Nr. 65 (freigabe.md §14).
 
 ### N5 · Hofseite unter lg, Reiter Übersicht (10.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 9):**
@@ -423,8 +440,9 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 | O3 | S11 Double-Opt-in | **Entschieden, siehe S11** (Freigabe Lauf 7, Umsetzung Nr. 38). Offen bleibt die Frage, ob „Nochmal bestellen" in der Abholbereit-Mail Werbung ist. |
 | O4 | AGB / Nutzungsbedingungen | Werden separat erstellt — **NICHT anfassen** (bestätigt 07.10.2026). Bis dahin gibt es beim Registrieren keinen Zustimmungs-Haken. |
 | O5 | Rückruf anfordern | **Entfällt (07.10.2026, uttoranger).** Schema `RueckrufAnfrage` wird nicht gebaut. Ersatz bleibt „E-Mail schreiben". |
-| O6 | Kachelquelle der Karten (10.10.2026) | OSM direkt, basemap.at oder ein Anbieter mit Schlüssel. Ein Wechsel ändert die Datenschutzerklärung. **Nicht bauen**; Nr. 52 legt nur einen Vorschlag in den Bericht. |
-| O7 | Gründungszusage (10.10.2026) | Der Freischalt-Dialog im Admin (`GRUENDUNGS_KONDITIONEN`, `src/lib/gruendungshof.ts`) verspricht „keine Plattformgebühr bis 31.12.2029, danach dauerhaft 3 %". Das passt nicht zu E6 und K1. Der Mensch entscheidet; der Text bleibt. |
+| O6 | Kachelquelle der Karten (10.10.2026) | OSM direkt, basemap.at oder ein Anbieter mit Schlüssel. Ein Wechsel ändert die Datenschutzerklärung. **Nicht bauen**; Nr. 52 legt nur einen Vorschlag in den Bericht. Stand 12.10.2026: weiter offen; der Vorschlag aus Bericht 52 steht. |
+| O7 | Gründungszusage (10.10.2026) | **Entschieden durch K2 (12.10.2026, Freigabe Lauf 10).** Bisher: Der Freischalt-Dialog im Admin (`GRUENDUNGS_KONDITIONEN`, `src/lib/gruendungshof.ts`) verspricht „keine Plattformgebühr bis 31.12.2029, danach dauerhaft 3 %". Das passt nicht zu E6 und K1. Der Mensch entscheidet; der Text bleibt. |
+| O8 | Produkte über der Grenze ab 1.2.2027 (12.10.2026) | **Entschieden 12.10.2026 (uttoranger, Freigabe Lauf 10), Bau in Gate 8 / Lauf 11:** Der Hof wählt die 3 sichtbaren Produkte, die übrigen ruhen, nichts wird gelöscht; ohne Wahl bleiben die 3 zuletzt verkauften sichtbar; Vorwarnung per Mail im Jänner 2027. |
 
 ---
 
@@ -435,3 +453,5 @@ Stand Lauf 7 (uttoranger): Die Punkte aus Lauf 6 sind entschieden und eingeplant
 Stand Lauf 8 (uttoranger, 08.10.2026): N1, N2, Z2 und Z3 sind entschieden und in Nr. 41–48 eingeplant (freigabe.md §12). „Testmodus je Hof" (Z3) bleibt eine Option für später und ist nicht beauftragt. Die Stripe-Live-Schaltung macht der Mensch ganz am Schluss (Z2); kein Lauf schaltet um.
 
 Stand Lauf 9 (uttoranger, 10.10.2026): N3, N4, N5 und Z4 sind entschieden und in Nr. 49–57 eingeplant (freigabe.md §13). O6 (Kachelquelle) und O7 (Gründungszusage) sind offen und werden nicht gebaut. Die Live-Schaltung samt `STRIPE_LIVE_AB` macht der Mensch als letzten Schritt.
+
+Stand Lauf 10 (uttoranger, 12.10.2026): G4, K2, S16 und die Ergänzungen zu E6 („ohne Wahl Hoftor"), Z4 („Bestellzahl ohne Testbestellungen") und N4 („die Server-Action schreibt nur mitgeschickte Felder") sind entschieden und in Nr. 58–65 eingeplant (freigabe.md §14). O8 (Produkte über der Grenze ab 1.2.2027) ist entschieden, der Bau folgt in Gate 8 / Lauf 11; O6 (Kachelquelle) bleibt offen und wird nicht gebaut. Lint gehört zur Abschlussprüfung (Nr. 63): 0 Fehler vor jedem Commit, der Stop-Hook prüft es ab Lauf 11. Die Mockup-Abweichungen aus den Berichten 49–54 und ebee305 (Reihenfolge der Liste „Bearbeiten") sind freigegeben (freigabe.md §13, Nachtrag). Vorgemerkt für Lauf 11: ein dauerhaftes Admin-Protokoll (S12) als Tabelle (braucht eine Migration). Die Live-Schaltung samt `STRIPE_LIVE_AB` macht der Mensch als letzten Schritt.

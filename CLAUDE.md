@@ -32,7 +32,7 @@ Solo-Entwickler, ein Pilothof. **Produktivsystem mit echten Bestellungen und ech
   Nicht Teil von `pnpm test`, nicht Teil des Stop-Hooks; in der CI ein eigener Job.
 
 **Vor jedem Commit verpflichtend:** `pnpm typecheck && pnpm lint && pnpm test`.
-Kein Commit mit rotem Typecheck oder roten Tests. Keine Ausnahme, auch nicht "nur ein Formatfehler".
+Kein Commit mit rotem Typecheck, rotem Lint (Fehler; Warnungen dürfen bleiben) oder roten Tests. Keine Ausnahme, auch nicht "nur ein Formatfehler".
 
 ---
 
@@ -94,6 +94,7 @@ Vor Codeänderungen lesen — nicht raten:
 | `docs/ai/CODING_STANDARDS.md` | Bei **jeder** Codeänderung |
 | `docs/ai/TESTING_GUIDELINES.md` | Bei jedem Test, bei jeder Änderung an getestetem Code |
 | `docs/ai/DESIGN_SYSTEM.md` | Bei **jeder** UI-Änderung: Tokens, Themes, Komponenten, Zustände |
+| `docs/ai/BAUSTEINE.md` | Vor jeder neuen Datei, Komponente oder Funktion: gibt es das schon? Nach dem Stichwort durchsuchen (erzeugt mit `pnpm bausteine`, nie von Hand) |
 | `docs/entscheidungen.md` | Vor jeder Arbeit, die eine Entscheidung berührt (Redesign, Geld, Konto, Konditionen): was entschieden und was offen ist |
 | `docs/umsetzungsprompt.md` | Bei Arbeit am Redesign: Reihenfolge, Gates, Parallelisierung, Definition of Done |
 | `docs/mockups/README.md` | Vor dem Bau oder Umbau eines Screens: welches Mockup gilt |
@@ -155,7 +156,7 @@ Eine Regel hier widerlegt? **Nicht heimlich abweichen** — melden.
 - **Gefährliche Befehle werden blockiert** (`prisma db push`, Force-Push,
   `.env` committen, Push auf `main`, Push aller Branches mit `--all`/`--mirror`,
   `npm install`).
-- **Ein Zug endet nicht bei rotem Typecheck oder roten Tests.**
+- **Ein Zug endet nicht bei rotem Typecheck, rotem Lint oder roten Tests.**
 
 Das ist Absicht. Nicht umgehen, sondern beheben. Konfiguration: `.claude/settings.json`.
 

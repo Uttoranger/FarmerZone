@@ -44,7 +44,7 @@ import {
   zahlungsGebuehrText,
   type ZahlungsBetrag,
 } from '@/lib/kasse'
-import { CODE_ZAHLUNG_NICHT_MOEGLICH } from '@/lib/stripe-konto'
+import { CODE_ZAHLUNG_NICHT_MOEGLICH, KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
 import { EMAIL_MAX, NOTIZ_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
 import { cn } from '@/lib/utils'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
@@ -53,6 +53,7 @@ import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
 import { StripeZahlung } from './stripe-payment'
+import { AngabenZumHof, hofAdresse, type AngabenHof } from './angaben-zum-hof'
 import {
   AbholWahl,
   AktionsLeiste,
@@ -574,50 +575,37 @@ export function CheckoutForm({
           </div>
         }
         uebersicht={
-          <UebersichtKarte
-            betraege={betraege}
-            gebuehrText={gebuehrText}
-            reservierung={
-              bestellungAngelegt ? null : (
-                <ReservierungsHinweis
-                  stand={stand}
-                  schritt="formular"
-                  onNeuPruefen={() => void pruefeKorb(cart, sessionId)}
-                  prueftGerade={prueftKorb}
-                />
-              )
+          <KassenAbschluss
+            hof={farm}
+            uebersicht={
+              <UebersichtKarte
+                betraege={betraege}
+                gebuehrText={gebuehrText}
+                reservierung={
+                  bestellungAngelegt ? null : (
+                    <ReservierungsHinweis
+                      stand={stand}
+                      schritt="formular"
+                      onNeuPruefen={() => void pruefeKorb(cart, sessionId)}
+                      prueftGerade={prueftKorb}
+                    />
+                  )
+                }
+                fehler={
+                  fehler && (
+                    <div role="alert">
+                      <Hinweiskarte ton="orange">{fehler}</Hinweiskarte>
+                    </div>
+                  )
+                }
+              />
             }
-            fehler={
-              fehler && (
-                <div role="alert">
-                  <Hinweiskarte ton="orange">{fehler}</Hinweiskarte>
-                </div>
-              )
-            }
-          >
-            <AktionsLeiste>
-              <button
-                type="submit"
-                disabled={isPending || kacheln.length === 0 || zahlarten.length === 0}
-                aria-busy={isPending}
-                className={KNOPF_GRUEN}
-              >
-                {isPending ? (
-                  <>
-                    <Loader2 className="size-5 animate-spin" aria-hidden="true" />
-                    Wird gesendet …
-                  </>
-                ) : bestellungAngelegt || paymentMethod === 'ONLINE' ? (
-                  `Weiter zur Zahlung · ${gesamt}`
-                ) : (
-                  // Vor Ort ist dieser Knopf der verbindliche Abschluss: die
-                  // Zahlungspflicht steht deshalb auf dem Knopf selbst.
-                  `Zahlungspflichtig bestellen · ${gesamt}`
-                )}
-              </button>
-              <p className={HINWEIS}>{fussnote}</p>
-            </AktionsLeiste>
-          </UebersichtKarte>
+            online={bestellungAngelegt || paymentMethod === 'ONLINE'}
+            wirdGesendet={isPending}
+            gesperrt={isPending || kacheln.length === 0 || zahlarten.length === 0}
+            gesamt={gesamt}
+            fussnote={fussnote}
+          />
         }
       >
         {bestellungAngelegt && (
@@ -639,7 +627,7 @@ export function CheckoutForm({
               </div>
               {kacheln.length === 0 ? (
                 <p className="text-[13.5px] text-muted-foreground">
-                  Gerade gibt es keine Abholtermine. Frag am besten direkt beim Hof nach.
+                  Gerade gibt es keine Abholtermine. {KONTAKT_UNTER_ANGABEN_ZUM_HOF}
                 </p>
               ) : (
                 <AbholWahl kacheln={kacheln} feld={form.register('pickupSlotKey')} fehler={fehlerAm.pickupSlotKey?.message} />
@@ -770,7 +758,7 @@ export function CheckoutForm({
             </h2>
             {zahlarten.length === 0 ? (
               <p className="text-[13.5px] text-muted-foreground">
-                Bei diesem Hof kannst du gerade nicht bestellen. Frag am besten direkt beim Hof nach.
+                Bei diesem Hof kannst du gerade nicht bestellen. {KONTAKT_UNTER_ANGABEN_ZUM_HOF}
               </p>
             ) : (
               <ZahlartWahl zahlarten={zahlarten} feld={form.register('paymentMethod')} fehler={fehlerAm.paymentMethod?.message} />
@@ -788,9 +776,57 @@ export function CheckoutForm({
   )
 }
 
-/** „Feldweg 1, 4910 Ried" — die Abholadresse des Hofs. */
-function hofAdresse(farm: Pick<PublicFarm, 'address' | 'postalCode' | 'city'>): string {
-  return [farm.address, [farm.postalCode, farm.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+/**
+ * Der Abschluss der Kasse (Nr. 60, Mockups web/mobil-k3-kasse-angaben-zum-hof):
+ * Übersicht, Angaben zum Hof, Kaufknopf — in dieser Reihenfolge, online wie
+ * bar. So stehen Name, Anschrift, Telefon und E-Mail des Verkäufers vor dem
+ * Knopf, mit dem die Kundin bestellt (§ 4 Abs. 1 Z 2 und 3 FAGG). Am Handy
+ * ist der Knopf die feste Leiste unten; im Quelltext steht er nach den
+ * Angaben, ab 768 px auch sichtbar darunter. Die Knopftexte sind die von Nr. 12.
+ */
+export function KassenAbschluss({
+  hof,
+  uebersicht,
+  online,
+  wirdGesendet,
+  gesperrt,
+  gesamt,
+  fussnote,
+}: {
+  hof: AngabenHof
+  /** Die Übersicht mit Frist, Beträgen und einem Fehler der Anfrage. */
+  uebersicht: React.ReactNode
+  /** Online gewählt oder die Bestellung steht schon — dann geht es weiter zur Zahlung. */
+  online: boolean
+  wirdGesendet: boolean
+  gesperrt: boolean
+  /** Der Gesamtbetrag, fertig formatiert. */
+  gesamt: string
+  fussnote: string
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-3.5">
+      {uebersicht}
+      <AngabenZumHof hof={hof} />
+      <AktionsLeiste>
+        <button type="submit" disabled={gesperrt} aria-busy={wirdGesendet} className={KNOPF_GRUEN}>
+          {wirdGesendet ? (
+            <>
+              <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+              Wird gesendet …
+            </>
+          ) : online ? (
+            `Weiter zur Zahlung · ${gesamt}`
+          ) : (
+            // Vor Ort ist dieser Knopf der verbindliche Abschluss: die
+            // Zahlungspflicht steht deshalb auf dem Knopf selbst.
+            `Zahlungspflichtig bestellen · ${gesamt}`
+          )}
+        </button>
+        <p className={HINWEIS}>{fussnote}</p>
+      </AktionsLeiste>
+    </div>
+  )
 }
 
 /** Ein beschriftetes Feld mit Fehler darunter. */

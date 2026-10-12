@@ -6,6 +6,8 @@ import { getOpenOrdersCount } from '@/server/queries/orders'
 import { getFarmBannerState } from '@/server/queries/farm'
 import { isAdminUser } from '@/server/queries/admin'
 import { zaehleZuEntscheiden } from '@/server/queries/meldung'
+import { ladeTarifStand } from '@/server/queries/einstellungen'
+import { baueTarifZeile, type TarifZeileDaten } from '@/lib/konditionen'
 
 /**
  * Was jedes Layout des Hofbereichs braucht — für das Bestandslayout
@@ -29,6 +31,18 @@ export type Hofbereich = {
   isAdmin: boolean
   /** Meldungen, die auf den Betreiber warten — 0 für jeden Hof. */
   zuEntscheiden: number
+  /** Die Tarif-Zeile der HofShell, fertig berechnet (Nr. 61); null = keine Zeile (Hofladen). */
+  tarifZeile: TarifZeileDaten | null
+}
+
+/**
+ * Die Tarif-Zeile eines Hofs (Nr. 61) — Zustand und Texte auf dem Server,
+ * die HofShell zeigt sie nur. Für `(hof)/layout.tsx` (über ladeHofbereich)
+ * und Einrichten, das die HofShell selbst trägt.
+ */
+export async function ladeTarifZeile(farmId: string, jetzt: Date): Promise<TarifZeileDaten | null> {
+  // Der Stand trägt das wirksame Gründungs-Ende mit (ladeGruendungBis, Nr. 62).
+  return baueTarifZeile(await ladeTarifStand(farmId), jetzt)
 }
 
 export async function ladeHofbereich(): Promise<Hofbereich> {
@@ -43,7 +57,7 @@ export async function ladeHofbereich(): Promise<Hofbereich> {
 
   // Unabhängig voneinander, also nebeneinander (Nachtlauf Nr. 31) — vorher
   // vier Rundreisen zur Datenbank hintereinander vor jeder Hof-Seite.
-  const [offeneBestellungen, bannerState, { isAdmin, zuEntscheiden }] = await Promise.all([
+  const [offeneBestellungen, bannerState, { isAdmin, zuEntscheiden }, tarifZeile] = await Promise.all([
     getOpenOrdersCount(hof.id),
     getFarmBannerState(session.user.id),
     // Menüpunkt „Admin" nur für den Betreiber — frisch aus der DB, nicht aus der Sitzung.
@@ -52,6 +66,7 @@ export async function ladeHofbereich(): Promise<Hofbereich> {
       // Die Zählabfrage nur für den Betreiber — kein Hof bezahlt dafür.
       zuEntscheiden: admin ? await zaehleZuEntscheiden() : 0,
     })),
+    ladeTarifZeile(hof.id, new Date()),
   ])
 
   // Reihenfolge wie bei der Server-Prüfung: stillgelegt sticht „wartet auf Freigabe".
@@ -62,5 +77,5 @@ export async function ladeHofbereich(): Promise<Hofbereich> {
         ? { art: 'wartet', farmId: bannerState.id, farmName: bannerState.name, country: bannerState.country }
         : null
 
-  return { hof, personName: session.user.name ?? '', offeneBestellungen, balken, isAdmin, zuEntscheiden }
+  return { hof, personName: session.user.name ?? '', offeneBestellungen, balken, isAdmin, zuEntscheiden, tarifZeile }
 }

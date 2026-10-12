@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { formatEuro } from '@/lib/format'
 import { renderStatusBodyWithChip } from '@/lib/status-body'
+import { MAILABSTAND_TAGE } from '@/lib/beitrag-mailabstand'
+import { tageSeit } from '@/lib/hof-kunden'
 import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
 import { kundinAdresse } from '@/lib/mein-hof-ansicht'
 import { meldeGespeichertAnsehen } from '@/components/mein-hof/gespeichert-ansehen'
@@ -44,6 +46,9 @@ interface Props {
   emailCount: number
   whatsAppCount: number
   recentEmailSentAt: string | null
+  // Zeitpunkt der Seite (ISO, vom Server) — „vor n Tagen" rechnet nie mit der
+  // Uhr des Browsers, sonst wichen Server- und Browser-HTML ab (CODING_STANDARDS §2).
+  jetzt: string
   farmSlug: string
   // Vorlage-Muster (nachlese-6): Alt-Status als Startwerte — danach verhält
   // sich der Wizard exakt wie eine neue Erstellung (neuer Status, heutiges
@@ -93,7 +98,7 @@ function Stepper({ step }: { step: number }) {
   )
 }
 
-export function StatusNewClient({ products, emailCount, whatsAppCount, recentEmailSentAt, prefill }: Props) {
+export function StatusNewClient({ products, emailCount, whatsAppCount, recentEmailSentAt, jetzt, prefill }: Props) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [step, setStep] = useState(1)
@@ -124,10 +129,8 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
   const [sendWhatsApp, setSendWhatsApp] = useState(false)
   const [sendWhatsAppStatus, setSendWhatsAppStatus] = useState(false)
 
-  const recentEmailDaysAgo = recentEmailSentAt
-    ? Math.floor((Date.now() - new Date(recentEmailSentAt).getTime()) / (1000 * 60 * 60 * 24))
-    : null
-  const emailBlocked = recentEmailDaysAgo !== null && recentEmailDaysAgo < 7
+  const recentEmailDaysAgo = recentEmailSentAt ? tageSeit(recentEmailSentAt, new Date(jetzt)) : null
+  const emailBlocked = recentEmailDaysAgo !== null && recentEmailDaysAgo < MAILABSTAND_TAGE
 
   // A3: validate step 1 on click, show field errors instead of silent disabled
   function handleTryNext() {
@@ -416,7 +419,7 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
                 title="Per E-Mail an Abonnenten"
                 subtitle={
                   emailBlocked
-                    ? `Du hast vor ${recentEmailDaysAgo} Tagen bereits E-Mails versendet (Limit: 1× pro 7 Tage)`
+                    ? `Du hast vor ${recentEmailDaysAgo} Tagen bereits E-Mails versendet (Limit: 1× pro ${MAILABSTAND_TAGE} Tage)`
                     : emailCount > 0
                       ? `${emailCount} ${emailCount === 1 ? 'Kunde hat' : 'Kunden haben'} E-Mail-Updates abonniert`
                       : 'Noch keine Abonnenten'

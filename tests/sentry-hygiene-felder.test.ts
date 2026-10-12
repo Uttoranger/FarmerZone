@@ -839,21 +839,21 @@ describe('Nr. 56, Nachbesserung Runde 1 — Befunde der Prüfung', () => {
   it('die Telefon-Regel setzt nicht mitten in Zahlen und Kennungen an — Zeitstempel und cuid bleiben, echte Nummern fallen', () => {
     // Vorher hatte sie links keine Grenze: „2026-10-10 20:02:00" wurde zu
     // „2[telefon entfernt]:02:00", eine cuid mit „0" und acht Ziffern zerbrach.
-    for (const text of ['Zeit 2026-10-10 20:02:00', 'Kennung clx0123456789abcdefghijklmn']) {
+    for (const text of ['Zeit 2026-10-10 20:02:00', 'Kennung clx0123456789abcdefghijkl']) {
       expect(fehlertext(text), text).toBe(text)
       expect(nachricht(text), text).toBe(text)
     }
     // Eine UUID bleibt im Fehlertext ganz (in der Nachricht fällt sie als lange Kennung, wie bisher).
     expect(fehlertext('Anfrage 550e8400-e29b-41d4-a716-0123456789ab')).toBe('Anfrage 550e8400-e29b-41d4-a716-0123456789ab')
     // In einer Adresse fällt die cuid als langes Pfadsegment (URL-Regel), nicht zerbrochen als Nummer.
-    expect(fehlertext('Fehler /api/farms/clx0123456789abcdefghijklmn/products')).toBe('Fehler /api/farms/[kennung entfernt]/products')
+    expect(fehlertext('Fehler /api/farms/clx0123456789abcdefghijkl/products')).toBe('Fehler /api/farms/[kennung entfernt]/products')
     const nummern: [string, string][] = [
       ['Rückruf +43 664 123 4567', 'Rückruf [telefon entfernt]'],
       ['Tel.:0664/1234567', 'Tel.:[telefon entfernt]'],
       ['unter (0664) 1234567 erreichbar', 'unter [telefon entfernt] erreichbar'],
       ['Nummer:+436641234567', 'Nummer:[telefon entfernt]'],
       ['Abruf /customers/06641234567', 'Abruf /customers/[telefon entfernt]'],
-      // Auch direkt an einem Wort — nur eine Ziffernfolge, die auf BEIDEN Seiten an Buchstaben klebt, ist eine Kennung.
+      // Auch direkt an einem Wort — eine Kennung erkennt die Regel seit Nr. 64 an ihrer Form (cuid, UUID), nicht an den Rändern.
       ['Rückruf-0664 1234567', 'Rückruf-[telefon entfernt]'],
       ['Tel0664 1234567', 'Tel[telefon entfernt]'],
       ['tel_06641234567', 'tel_[telefon entfernt]'],
@@ -889,7 +889,7 @@ describe('Nr. 56, Nachbesserung Runde 2 — Befunde der Nachprüfung', () => {
     }
     expect(adresse('/kontakt/Ruf%2006641234567')).toBe('https://farmerzone.at/kontakt/Ruf%20[telefon entfernt]')
     // Gegenproben: Zeitstempel, cuid und UUID bleiben, auch nach einem Escape.
-    for (const text of ['Zeit%202026-10-10%2020:02:00', 'Kennung%20clx0123456789abcdefghijklmn', 'Anfrage%20550e8400-e29b-41d4-a716-0123456789ab']) {
+    for (const text of ['Zeit%202026-10-10%2020:02:00', 'Kennung%20clx0123456789abcdefghijkl', 'Anfrage%20550e8400-e29b-41d4-a716-0123456789ab']) {
       expect(fehlertext(text), text).toBe(text)
     }
   })
@@ -963,7 +963,7 @@ describe('Nr. 56, Nachbesserung Runde 2 — Befunde der Nachprüfung', () => {
       expect(e.exception?.values?.[0].value, roh).toBe(sauber)
     }
     // Gegenproben wie im Fehlertext: „und/oder", Brüche, Pfade ohne Token; eine cuid ohne Adresse bleibt.
-    for (const text of ['und/oder, 3/4 und 1/2', 'Fehler beim Laden von /hoefe?seite=2&kat=EIER', 'Kennung clx0123456789abcdefghijklmn']) {
+    for (const text of ['und/oder, 3/4 und 1/2', 'Fehler beim Laden von /hoefe?seite=2&kat=EIER', 'Kennung clx0123456789abcdefghijkl']) {
       expect(nachricht(text), text).toBe(text)
     }
   })
@@ -1080,7 +1080,7 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     }
     expect(adresse('/kontakt/Ruf%252006641234567')).toBe('https://farmerzone.at/kontakt/Ruf%2520[telefon entfernt]')
     // Gegenproben: Zeitstempel und Kennungen nach einem doppelt kodierten Escape bleiben.
-    for (const text of ['Zeit%25202026-10-10%252020:02:00', 'Kennung%2520clx0123456789abcdefghijklmn']) {
+    for (const text of ['Zeit%25202026-10-10%252020:02:00', 'Kennung%2520clx0123456789abcdefghijkl']) {
       expect(fehlertext(text), text).toBe(text)
     }
   })
@@ -1298,5 +1298,217 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     let vier = '/reset?token=abc123'
     for (let i = 0; i < 4; i++) vier = encodeURIComponent(vier)
     expect(adresse(`/login?next=${vier}`)).toBe('https://farmerzone.at/login?next=%2Freset')
+  })
+})
+
+describe('Nr. 64 — Telefon-Regel: Nummern auch an Wörtern, cuid und UUID an ihrer Form', () => {
+  const fehlertext = (wert: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: wert }] } })).exception?.values?.[0].value
+  const nachricht = (wert: string) => bereinigeEreignis(ereignis({ message: wert })).message
+  const adresse = (pfad: string) => bereinigeEreignis(ereignis({ request: { url: `https://farmerzone.at${pfad}` } })).request?.url
+  const extraText = (wert: string) => (bereinigeEreignis(ereignis({ extra: { text: wert } })).extra as { text?: string } | undefined)?.text
+  // Eine cuid wie aus Prisma (c und 24 Zeichen) mit „0" und acht Ziffern am Stück; UUIDs, in denen
+  // eine Gruppe mit führender 0 samt den folgenden Ziffern wie eine Nummer aussieht.
+  const CUID = 'cmg8x012345678abcdefghijk'
+  const UUIDS = ['01234567-89ab-cdef-0123-456789abcdef', '550e8400-e29b-41d4-a716-012345678901', '550e8400-e29b-41d4-0123-456789012345']
+
+  it('eine Nummer, die an Buchstabe, „_" oder „-" klebt oder mit „+" hinter einer Ziffer steht, fällt — in Fehlertext, Nachricht, extra und Pfad', () => {
+    // Bis Nr. 64 zählte eine links klebende Ziffernfolge nur, wenn sie rechts frei
+    // endete, und ein „+" hinter einer Ziffer nie: Die Grenzen schonten Kennungen.
+    const faelle: [string, string][] = [
+      ['Telefon06641234567Adresse', 'Telefon[telefon entfernt]Adresse'],
+      ['Hof_06641234567_foto.jpg', 'Hof_[telefon entfernt]_foto.jpg'],
+      ['10:30+436641234567', '10:30[telefon entfernt]'],
+      ['Ruf-06641234567x', 'Ruf-[telefon entfernt]x'],
+      ['anna1+436641234567x', 'anna1[telefon entfernt]x'],
+    ]
+    for (const [roh, sauber] of faelle) {
+      expect(fehlertext(roh), roh).toBe(sauber)
+      expect(nachricht(roh), roh).toBe(sauber)
+      expect(extraText(roh), roh).toBe(sauber)
+    }
+    expect(adresse('/bilder/Hof_06641234567_foto.jpg')).toBe('https://farmerzone.at/bilder/Hof_[telefon entfernt]_foto.jpg')
+    // Ein Segment ab 24 Zeichen fällt weiter ganz — die Nummer zerteilt es nicht vorher.
+    expect(adresse('/x/Telefon06641234567Adresse')).toBe('https://farmerzone.at/x/[kennung entfernt]')
+  })
+
+  it('cuid und UUID bleiben ganz, auch nach Escape, Klammer oder „_" — erkannt an der Form, nicht an den Rändern', () => {
+    for (const text of [`Hof ${CUID} fehlt`, `Hof_${CUID}.jpg`, `Kennung%20${CUID}`, `Kennung%2520${CUID}`, `farmId=${CUID}`]) {
+      expect(fehlertext(text), text).toBe(text)
+      expect(nachricht(text), text).toBe(text)
+    }
+    // Im Fehlertext bleibt die UUID ganz (in der Nachricht fällt sie als lange Kennung, wie bisher).
+    for (const uuid of UUIDS) {
+      for (const text of [`Bestellung ${uuid}`, `Bestellung (${uuid})`, `Bestellung %20${uuid}`, `Bestellung-${uuid}-alt`, `Bestellung ${uuid.toUpperCase()}`]) {
+        expect(fehlertext(text), text).toBe(text)
+      }
+    }
+  })
+
+  it('Gegenproben: neben einer Kennung fällt die Nummer weiter, und was nur fast eine Kennung ist, schützt keine Nummer', () => {
+    expect(fehlertext(`Hof ${CUID} 0664 1234567`)).toBe(`Hof ${CUID} [telefon entfernt]`)
+    expect(fehlertext(`${UUIDS[0]}-06641234567`)).toBe(`${UUIDS[0]}-[telefon entfernt]`)
+    expect(fehlertext(`${UUIDS[0]}+436641234567`)).toBe(`${UUIDS[0]}[telefon entfernt]`)
+    // Endet die Kennung auf eine Ziffer und geht dahinter eine Nummer weiter, fällt beides wie vor
+    // Nr. 64 — sonst schützte die Form eine Nummer, die in ihr beginnt (`…-012345678901-0664…`).
+    expect(fehlertext(`${UUIDS[1]}-06641234567`)).toBe('550e8400-e29b-41d4-a716-[telefon entfernt]')
+    expect(fehlertext(`${UUIDS[1]} 43 664 1234567`)).toBe('550e8400-e29b-41d4-a716-[telefon entfernt]')
+    // 26 Zeichen (keine cuid), eine UUID mit zu langer letzter Gruppe, ein Großbuchstabe in der cuid.
+    expect(fehlertext(`Hof ${CUID}x`)).toBe('Hof cmg8x[telefon entfernt]abcdefghijkx')
+    expect(fehlertext(`Bestellung ${UUIDS[1]}2`)).toBe('Bestellung 550e8400-e29b-41d4-a716-[telefon entfernt]')
+    expect(fehlertext('Hof cmg8x012345678abcdefghijK')).toBe('Hof cmg8x[telefon entfernt]abcdefghijK')
+  })
+})
+
+describe('Nr. 64 — Abfragen: beide Lesarten auf dem unveränderten Text, Bereiche vereinigt', () => {
+  const adresse = (pfad: string) => bereinigeEreignis(ereignis({ request: { url: `https://farmerzone.at${pfad}` } })).request?.url
+  const abfrage = (qs: string) => bereinigeEreignis(ereignis({ request: { query_string: qs } })).request?.query_string
+  const fehlertext = (wert: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: wert }] } })).exception?.values?.[0].value
+  const nachricht = (wert: string) => bereinigeEreignis(ereignis({ message: wert })).message
+  const spanAdresse = (url: string) =>
+    (bereinigeEreignis(ereignis({ type: 'transaction', spans: [{ data: { 'url.full': url } }] })) as unknown as { spans: Array<{ data: Record<string, unknown> }> })
+      .spans[0].data['url.full']
+  /** Alles, was in einem Feld noch von der Rufnummer zu lesen ist — auch kodiert. */
+  const rest = (text: string | undefined) => decodeURIComponent((text ?? '').replace(/\+/g, ' ')).match(/0664|987|65 43|9876543/g)
+
+  it('keine Ziffer der Rufnummer bleibt, wenn die Plus-Lesart nur einen Teil von ihr nimmt — in Adresse, Abfrage, Span, Fehlertext und Nachricht', () => {
+    // Vorher ersetzte die Plus-Lesart zuerst („+2026-10-10+0664" bzw.
+    // „+987+65+43+(0664"), und im Rest sah die zerlegte Lesart keine Nummer mehr:
+    // „…[telefon entfernt]%2F9876543", „%280664%29[telefon entfernt]%2F9876543".
+    const faelle: [string, string][] = [
+      ['q=Abholung%3A+2026-10-10+0664%2F9876543', 'q=Abholung%3A%5Btelefon+entfernt%5D'],
+      ['q=(0664)+987+65+43+(0664%2F9876543', 'q=%5Btelefon+entfernt%5D'],
+    ]
+    for (const [roh, sauber] of faelle) {
+      expect(adresse(`/hoefe?${roh}`), roh).toBe(`https://farmerzone.at/hoefe?${sauber}`)
+      expect(abfrage(roh), roh).toBe(sauber)
+      expect(spanAdresse(`https://farmerzone.at/hoefe?${roh}`), roh).toBe(`https://farmerzone.at/hoefe?${sauber}`)
+      for (const text of [nachricht(`Abruf https://farmerzone.at/hoefe?${roh} gescheitert`), nachricht(`/hoefe?${roh}`)]) {
+        expect(rest(text), `${roh} → ${text}`).toBeNull()
+      }
+    }
+    // Eine relative Adresse im Text endet an „)" (Restrisiko seit Nr. 56) — ohne Klammer liest sie die ganze Abfrage.
+    for (const text of [fehlertext(`Abruf /hoefe?${faelle[0][0]} gescheitert`), nachricht(`Abruf /hoefe?${faelle[0][0]} gescheitert`)]) {
+      expect(rest(text), text).toBeNull()
+    }
+  })
+
+  it('eine Nummer mit rohem „+" vorn und %20 als Trenner fällt', () => {
+    // Die rohe Lesart las %20 nicht als Trenner, die zerlegte sah kein „+" mehr.
+    expect(adresse('/hoefe?q=+43%20664%209876543')).toBe('https://farmerzone.at/hoefe?q=%5Btelefon+entfernt%5D')
+    expect(abfrage('q=+43%20664%209876543&seite=2')).toBe('q=%5Btelefon+entfernt%5D&seite=2')
+    expect(rest(nachricht('Abruf /hoefe?q=+43%20664%209876543 gescheitert'))).toBeNull()
+  })
+
+  it('Gegenproben: ein „+" an einem Wort bleibt ein Leerzeichen, Pfad und übrige Parameter bleiben lesbar', () => {
+    expect(adresse('/suche?q=Artikel+12345678&seite=2')).toBe('https://farmerzone.at/suche?q=Artikel+12345678&seite=2')
+    expect(adresse('/suche?q=Abholung+10%3A30+Uhr')).toBe('https://farmerzone.at/suche?q=Abholung+10%3A30+Uhr')
+    expect(adresse('/x?next=%2Fkunden%2Fkundin%40example.com&a=1')).toBe('https://farmerzone.at/x?next=%2Fkunden%2F%5Be-mail+entfernt%5D&a=1')
+  })
+})
+
+describe('Nr. 64 — Zuweisungen: Schlüssel hinter einem Wert, Nummern im Wert und hinter einer Adresse', () => {
+  const fehlertext = (wert: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: wert }] } })).exception?.values?.[0].value
+  const adresse = (pfad: string) => bereinigeEreignis(ereignis({ request: { url: `https://farmerzone.at${pfad}` } })).request?.url
+  const span = (teil: object) =>
+    (bereinigeEreignis(ereignis({ type: 'transaction', spans: [teil] })) as unknown as { spans: Array<{ description?: string; data?: Record<string, unknown> }> }).spans[0]
+  const spanAdresse = (url: string) => span({ data: { 'url.full': url } }).data?.['url.full']
+  const beschreibung = (text: string) => span({ description: text }).description
+  /** Was von der Rufnummer 0664 987 65 43 noch zu lesen ist — auch kodiert. */
+  const rest = (text: string | undefined) => decodeURIComponent((text ?? '').replace(/\+/g, ' ')).match(/664|987|65 43|6543/g)
+  const UUID = '550e8400-e29b-41d4-a716-446655440000'
+
+  it('ein Schlüssel zählt, wenn sein Wert hinter dem Wert davor beginnt — auch in einem Bearer-Token und im Pfad', () => {
+    // Vorher zählte kein Schlüssel im Wert eines anderen und keiner in einem Bearer-Token mit „=":
+    // „Bearer [entfernt]%2Fgeheim-123", „token: [entfernt] geheim-123".
+    expect(spanAdresse('https://farmerzone.at/x/Bearer token=%2Fgeheim-123')).toBe('https://farmerzone.at/x/Bearer [entfernt]')
+    expect(spanAdresse(`https://farmerzone.at/x/token: ${UUID}]secret: geheim-123`)).toBe('https://farmerzone.at/x/token: [entfernt] [entfernt]')
+    // Gegenprobe: Der Schlüssel am Ende eines Tokens nimmt seinen Wert, der Code bleibt beim Code-Platzhalter.
+    expect(fehlertext('Bearer otp: 123456 und Bearer token=geheim-123')).toBe('Bearer [entfernt]: [code entfernt] und Bearer [entfernt]')
+  })
+
+  it('eine Nummer, die in einem Wert beginnt, fällt ganz — auch mit „+" als Trenner, wie die Abfrage sie danach liest', () => {
+    // Vorher blieb „664 9876543": Der Wert endete am Leerzeichen, die Telefon-Regel sah dahinter keine Nummer.
+    expect(adresse('/x?q=token%3A%20012012%2B43%20664%209876543')).toBe('https://farmerzone.at/x?q=token%3A+%5Bentfernt%5D')
+    const weiter = adresse('/x?next=%2Fx%3Fq%3Dtoken%3A%20otp%3A%20012012%2B43%20664%209876543')
+    expect(rest(weiter), weiter).toBeNull()
+  })
+
+  it('in einer Span-Beschreibung fällt der Rest einer Nummer, die in der Adresse beginnt und hinter ihr weitergeht', () => {
+    // Die Adresse endet am Leerraum; vorher sah die Telefon-Regel im Rest dahinter keine Nummer mehr.
+    for (const text of [
+      'GET https://farmerzone.at/x?q=token=2021-10-12+43 (664) 987-6543',
+      'GET https://farmerzone.at/x?q=token=abc0664 987 65 43 ok',
+      'GET https://farmerzone.at/x?a=106&s=06 64 987 65 43',
+    ]) {
+      expect(rest(beschreibung(text)), text).toBeNull()
+    }
+    // Gegenproben: Nimmt die Telefon-Regel die Nummer danach ganz, bleibt es dabei; ohne Nummer bleibt alles.
+    expect(beschreibung('GET https://farmerzone.at/x?q=Tel+0664 987 6543')).toBe('GET https://farmerzone.at/x?q=Tel[telefon entfernt]')
+    expect(beschreibung('GET https://farmerzone.at/x/0664 9876543')).toBe('GET https://farmerzone.at/x/[telefon entfernt]')
+    expect(beschreibung('GET https://farmerzone.at/hoefe?seite=2 200 OK')).toBe('GET https://farmerzone.at/hoefe?seite=2 200 OK')
+  })
+
+  it('kodiert die bereinigte Adresse den Anfang der Nummer neu, fällt die Nummer ganz — in Nachricht, Fehlertext und Span-Beschreibung', () => {
+    // Vorher musste der Anfang unverändert am Ende der Adresse stehen; neu kodiert blieb er: „?q=%280043 [telefon entfernt]".
+    const text = 'Abruf https://farmerzone.at/x?q=(0043 664 9876543 fertig'
+    const sauber = 'Abruf https://farmerzone.at/x?q=%28[telefon entfernt] fertig'
+    expect(bereinigeEreignis(ereignis({ message: text })).message).toBe(sauber)
+    expect(fehlertext(text)).toBe(sauber)
+    expect(beschreibung(text)).toBe(sauber)
+  })
+
+  it('reicht eine E-Mail-Adresse in den Rest der Nummer, fällt der Rest trotzdem', () => {
+    // Die E-Mail-Regel läuft vor der Telefon-Regel und nähme die Ziffern als Teil vor dem @ — vorher blieb „664".
+    const text = 'Abruf https://farmerzone.at/x?q=(0043 664 9876543xq%40example.com fertig'
+    for (const sauber of [bereinigeEreignis(ereignis({ message: text })).message, fehlertext(text), beschreibung(text)]) {
+      expect(rest(sauber), sauber).toBeNull()
+      expect(sauber).not.toMatch(/xq|example/)
+    }
+  })
+})
+
+describe('Nr. 64, Runde 1 — Nummern an Wörtern in Abfragewerten von Adressen im Text', () => {
+  const nachricht = (wert: string) => bereinigeEreignis(ereignis({ message: wert })).message
+  const fehlertext = (wert: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: wert }] } })).exception?.values?.[0].value
+  const extraText = (wert: string) => (bereinigeEreignis(ereignis({ extra: { text: wert } })).extra as { text?: string } | undefined)?.text
+  const brotkrume = (wert: string) => bereinigeEreignis(ereignis({ breadcrumbs: [{ category: 'console', message: wert }] })).breadcrumbs?.[0].message
+  const adresse = (url: string) => bereinigeEreignis(ereignis({ request: { url } })).request?.url
+  const beschreibung = (text: string) =>
+    (bereinigeEreignis(ereignis({ type: 'transaction', spans: [{ description: text }] })) as unknown as { spans: Array<{ description?: string }> }).spans[0]
+      .description
+
+  it('eine Nummer mit „/" oder Leerzeichen an einem Wort fällt in Nachricht, extra, Brotkrume, Fehlertext und Span-Beschreibung wie in request.url', () => {
+    // Vorher bereinigten diese Felder die Adresse ohne Nachlese, und die Nachlese am Schluss sah nur
+    // den neu kodierten Wert: „Hof_0664%2F1234567_foto.jpg" — dort sind „%2F" und „+" keine Trenner.
+    const datei = 'https://farmerzone.at/x?f=Hof_0664%2F1234567_foto.jpg'
+    const datei_sauber = 'https://farmerzone.at/x?f=Hof_%5Btelefon+entfernt%5D_foto.jpg'
+    expect(adresse(datei)).toBe(datei_sauber)
+    for (const feld of [nachricht, extraText, brotkrume]) expect(feld(`Abruf ${datei} gescheitert`)).toBe(`Abruf ${datei_sauber} gescheitert`)
+    expect(fehlertext('Abruf /x?f=Telefon0664%201234567Adresse gescheitert')).toBe('Abruf /x?f=Telefon%5Btelefon+entfernt%5DAdresse gescheitert')
+    expect(beschreibung('GET https://farmerzone.at/x?f=Telefon0664%201234567Adresse')).toBe('GET https://farmerzone.at/x?f=Telefon%5Btelefon+entfernt%5DAdresse')
+    // Auch im Pfad einer Adresse, die selbst ein Abfragewert ist: Er wird mit dem Wert neu kodiert.
+    expect(nachricht('Abruf https://farmerzone.at/login?next=%2Fbilder%2FHof_0664%201234567_x gescheitert')).toBe(
+      'Abruf https://farmerzone.at/login?next=%2Fbilder%2FHof_%5Btelefon+entfernt%5D_x gescheitert'
+    )
+  })
+
+  it('der Rest einer Nummer hinter einer Adresse zerteilt kein Wort, das eine spätere Regel ganz nimmt', () => {
+    // Fehlertext: Die Adresse endet an „)", die Zuweisungs-Regel liest den Wert danach darüber hinweg —
+    // ein Platzhalter für den Rest beendete ihn sonst an seinem Leerzeichen („[entfernt] entfernt]").
+    expect(fehlertext('Fehler bei /token=(0664)+987+65+43 weiter')).toBe('Fehler bei /token=[entfernt] weiter')
+    // Freitext: Beginnt mit dem Rest eine lange Kennung, fällt sie mit ihm, statt dass ihr Ende stehen bleibt.
+    expect(nachricht('Abruf https://farmerzone.at/x?q=token=%280664%29%2098765430043 664 9876543abcdefghijklmnopqrstuvwxy weiter')).toBe(
+      'Abruf https://farmerzone.at/x?q=token%3D%5Bentfernt%5D [telefon entfernt] weiter'
+    )
+  })
+
+  it('Gegenprobe: eine lange Kennung im Abfragewert fällt weiter ganz, die Nachlese zerteilt sie nicht vorher', () => {
+    // Ohne Trenner steht die Nummer neu kodiert unverändert da — sie bleibt der Nachlese am Schluss, nach der Regel der langen Kennung.
+    expect(nachricht('Abruf https://farmerzone.at/x?v=abcdef0123456789abcdef0123456789ab gescheitert')).toBe(
+      'Abruf https://farmerzone.at/x?v=[kennung entfernt] gescheitert'
+    )
+    expect(nachricht('Abruf https://farmerzone.at/x?f=Hof_06641234567_foto.jpg gescheitert')).toBe(
+      'Abruf https://farmerzone.at/x?f=Hof_[telefon entfernt]_foto.jpg gescheitert'
+    )
   })
 })

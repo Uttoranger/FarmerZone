@@ -178,7 +178,7 @@ describe('fasseKundinZusammen', () => {
     ])
   })
 
-  it('Testzahlungen (online vor dem Stichtag, Register Z4) zählen nicht zum Umsatz — bar davor schon, die Bestellzahl bleibt', () => {
+  it('Testzahlungen (online vor dem Stichtag, Register Z4) zählen weder zum Umsatz noch zur Bestellzahl — bar davor schon', () => {
     const stichtag = vor(10)
     const bestellungen = [
       bestellung({ paymentMethod: 'ONLINE', betragCents: 2500, createdAt: vor(20) }), // Testzahlung
@@ -187,9 +187,43 @@ describe('fasseKundinZusammen', () => {
     ]
     const k = fasseKundinZusammen(bestellungen, null, JETZT, stichtag)
     expect(k.umsatzCents).toBe(2000)
-    expect(k.orderCount).toBe(3)
-    // Ohne Stichtag wie bisher: alles zählt.
-    expect(fasseKundinZusammen(bestellungen, null, JETZT, null).umsatzCents).toBe(4500)
+    // Wie Auswertung und Admin-Hofliste (Z4, Ergänzung Lauf 10) — und der Status hängt an dieser Zahl.
+    expect(k.orderCount).toBe(2)
+    expect(k).toMatchObject({ isStammkunde: false, status: 'Diesen Monat aktiv' })
+    // Ohne Stichtag wie bisher: alles zählt, drei Bestellungen sind eine Stammkundin.
+    expect(fasseKundinZusammen(bestellungen, null, JETZT, null)).toMatchObject({ umsatzCents: 4500, orderCount: 3, isStammkunde: true, status: 'Stammkunde' })
+  })
+
+  it('nur Testzahlungen: keine gezählte Bestellung — kein Status, in keinem Filter; Zeitpunkte und Liste bleiben', () => {
+    const stichtag = vor(1)
+    const bestellungen = [
+      bestellung({ paymentMethod: 'ONLINE', betragCents: 2500, createdAt: vor(20) }),
+      bestellung({ paymentMethod: 'ONLINE', betragCents: 800, createdAt: vor(5) }),
+    ]
+    const k = fasseKundinZusammen(bestellungen, null, JETZT, stichtag)
+    expect(k).toMatchObject({ orderCount: 0, umsatzCents: 0, status: null, isStammkunde: false, isDiesenMonatAktiv: false, isLangeNichtGesehen: false, isNeu: false })
+    // Wann zuletzt bestellt wurde, zeigt die Seite weiter (die Bestellungen selbst stehen in der Liste).
+    expect(k.daysSinceLastOrder).toBe(5)
+  })
+
+  it('die Zahl aller Bestellungen nimmt Testzahlungen mit — so viele stehen in der Liste der Kundin (Kundendetail „N weitere …")', () => {
+    const bestellungen = [
+      bestellung({ paymentMethod: 'ONLINE', createdAt: vor(20) }), // Testzahlung
+      bestellung({ paymentMethod: 'ONSITE_CASH', createdAt: vor(15) }),
+      bestellung({ paymentMethod: 'ONLINE', createdAt: vor(5) }), // nach dem Stichtag
+    ]
+    expect(fasseKundinZusammen(bestellungen, null, JETZT, vor(10))).toMatchObject({ orderCount: 2, alleBestellungen: 3 })
+    expect(fasseKundinZusammen(bestellungen, null, JETZT, null)).toMatchObject({ orderCount: 3, alleBestellungen: 3 })
+  })
+
+  it('der Status zählt ab der ersten gezählten Bestellung: nach einer Testzahlung ist die erste echte Kundin „Neu"', () => {
+    const k = fasseKundinZusammen(
+      [bestellung({ paymentMethod: 'ONLINE', createdAt: vor(30) }), bestellung({ paymentMethod: 'ONSITE_CASH', createdAt: vor(3) })],
+      null,
+      JETZT,
+      vor(10)
+    )
+    expect(k).toMatchObject({ orderCount: 1, isNeu: true, status: 'Neu' })
   })
 
   it('Neuigkeiten: an, sobald E-Mail oder WhatsApp eingewilligt ist', () => {
@@ -261,6 +295,8 @@ function kunde(teil: Partial<CustomerSummary> & { kundeId: string }): CustomerSu
     customerName: 'Erika Mustermann',
     customerPhone: '',
     orderCount: 1,
+    // Ohne Testzahlungen sind es dieselben — wer orderCount setzt, bekommt sie mit.
+    alleBestellungen: teil.orderCount ?? 1,
     umsatzCents: 1000,
     firstOrderDate: vor(100).toISOString(),
     lastOrderDate: vor(5).toISOString(),
@@ -410,13 +446,15 @@ describe('Abfragen nur für den eigenen Hof', () => {
     const liste = await getCustomersForFarm('hof-a', JETZT, stichtag)
     expect(db.order.findMany.mock.calls[0][0].select.paymentMethod).toBe(true)
     expect(liste[0].umsatzCents).toBe(1950)
-    expect(liste[0].orderCount).toBe(3)
+    expect(liste[0].orderCount).toBe(2)
 
     const detail = await getCustomerDetail('hof-a', ['erika@example.com'], JETZT, stichtag)
     expect(db.order.findMany.mock.calls[1][0].select.paymentMethod).toBe(true)
     expect(detail?.umsatzCents).toBe(1950)
-    // Die Liste der letzten Bestellungen bleibt vollständig — nur der Umsatz zählt anders.
+    expect(detail?.orderCount).toBe(2)
+    // Die Liste der letzten Bestellungen bleibt vollständig — nur Umsatz und Bestellzahl zählen anders.
     expect(detail?.recentOrders).toHaveLength(3)
+    expect(detail?.alleBestellungen).toBe(3)
   })
 
   it('Kennung: sucht nur unter den Bestellungen des eigenen Hofs, eine Kennung eines fremden Hofs findet nichts', async () => {
@@ -671,6 +709,14 @@ describe('Kundendetail', () => {
     expect(html).toContain('9 weitere Bestellungen findest du unter Bestellungen bei')
     expect(html).toMatch(/href="\/orders"[^>]*>Noch offen</)
     expect(html).toMatch(/href="\/orders\?filter=erledigt"[^>]*>Erledigt</)
+  })
+
+  it('mit Testzahlungen: „N weitere" zählt alle Bestellungen der Liste, die Kennzahl nur die gezählten (Register Z4)', () => {
+    // 7 Bestellungen, davon 3 Testzahlungen: 4 gezählt, 5 Zeilen, 2 nicht gezeigt.
+    const kunde = detail({ orderCount: 4, alleBestellungen: 7, recentOrders: detail().recentOrders.slice(0, 7) })
+    const html = renderToStaticMarkup(createElement(KundenDetail, { kunde, jetzt: JETZT }))
+    expect(html).toContain('2 weitere Bestellungen findest du unter Bestellungen bei')
+    expect(html).toMatch(/<dt[^>]*>Bestellungen<\/dt><dd[^>]*>4<\/dd>/)
   })
 
   it('ohne Telefon: kein Anrufen und kein WhatsApp, E-Mail bleibt', () => {

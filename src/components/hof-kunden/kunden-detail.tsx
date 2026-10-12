@@ -35,7 +35,7 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
   const marke = kundenMarke(kunde.status)
   const telefon = kunde.customerPhone.trim()
   const gezeigt = kunde.recentOrders.slice(0, GEZEIGTE_BESTELLUNGEN)
-  const rest = weitereBestellungen(kunde.orderCount, gezeigt.length)
+  const rest = weitereBestellungen(kunde.alleBestellungen, gezeigt.length)
   const abo = kunde.isSubscribed ? kunde.subscription : null
 
   return (

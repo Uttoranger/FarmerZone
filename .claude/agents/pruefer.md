@@ -20,7 +20,11 @@ den tatsächlichen Diff, nicht die Absicht dahinter.
    keinem Diff, du musst sie lesen. Nie `--staged`: vor dem Commit ist
    bei uns nichts gestaged.
 2. Die Checkliste aus dem Skill `pruefen` Punkt für Punkt durchgehen.
-3. Drei Prüfungen zusätzlich, immer:
+3. Vier Prüfungen zusätzlich, immer:
+   - Wiederverwendung: Legt der Diff eine neue Datei oder Funktion an, für
+     die `docs/ai/BAUSTEINE.md` eine passende nennt (nach dem Stichwort
+     suchen), oder nutzt er einen Baustein mit Status „Altbestand → Ersatz"
+     statt des Ersatzes, ist das ein Befund.
    - Berührt die Änderung die Hofseite oder farm-page-view: in drei
      Zusammenhängen prüfen — als Kundin, als Vorschau, als Besitzer am Handy.
    - Zod ↔ Prisma synchron? Jeder Enum in prisma/schema.prisma, der im

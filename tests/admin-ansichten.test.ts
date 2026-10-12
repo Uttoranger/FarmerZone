@@ -7,6 +7,10 @@
  *  - Die Betriebsnummer steht als Nummer da, ohne Prüfvermerk (E9).
  *  - Lange Namen tragen den vollen Text im `title`.
  *  - Leer-Zustände mit Ausweg; Meldungstext mit Markup bleibt Text.
+ *  - Gründungshof bis (Nr. 62): Tabelle und Karte zeigen das wirksame Ende mit
+ *    „Standard" bzw. „abweichend", der Dialog den Stand, der Freischalt-Dialog
+ *    die Zusage K2 mit dem Standard. Dialoge ohne Portal (BestellDialog
+ *    ersetzt): offen steht der Inhalt im HTML, geschlossen fehlt er.
  */
 import { describe, it, expect, vi } from 'vitest'
 import { createElement, type ReactNode } from 'react'
@@ -28,17 +32,26 @@ vi.mock('@/server/actions/admin', () => ({
   revokeFarmApprovalAction: vi.fn(),
   rejectFarmAction: vi.fn(),
   setServiceFeeAction: vi.fn(),
+  setzeGruendungBisAction: vi.fn(),
   triageMeldungAction: vi.fn(),
+}))
+vi.mock('@/components/hof-bestellungen/bestell-dialog', () => ({
+  BestellDialog: ({ offen, titel, unterzeile, children }: { offen: boolean; titel: string; unterzeile?: string; children?: ReactNode }) =>
+    offen ? createElement('section', { 'aria-label': titel }, createElement('h2', null, titel), unterzeile, children) : null,
+  DialogFehler: ({ text }: { text: string | null }) => (text ? createElement('p', null, text) : null),
 }))
 
 import { HoefeAnsicht, type AdminHof } from '@/components/admin/hoefe-ansicht'
 import { MeldungListe } from '@/components/admin/briefkasten-teile'
+import { HofAktionDialog } from '@/components/admin/hof-aktion-dialog'
+import { GruendungBisDialog } from '@/components/admin/gruendung-bis-dialog'
 import { adminHofZeile, FREISCHALTUNG_STRIPE_OFFEN_TEXT, type HofRohdaten } from '@/lib/admin-hoefe'
+import { GRUENDUNG_BIS_STANDARD, gruendungsKonditionenText, type GruendungAnzeige } from '@/lib/gruendungshof'
 
 const JETZT = new Date('2026-10-07T10:00:00+02:00')
 const LEER = { produkte: 0, fotos: 0, abholzeiten: 0, hatBeschreibung: false, hatLogo: false }
 
-function hof(ueber: Partial<HofRohdaten>, platz: number | null = null): AdminHof {
+function hof(ueber: Partial<HofRohdaten>, platz: number | null = null, gruendung: GruendungAnzeige | null = null): AdminHof {
   const roh: HofRohdaten = {
     id: 'farm_1',
     name: 'Hof Test',
@@ -62,7 +75,7 @@ function hof(ueber: Partial<HofRohdaten>, platz: number | null = null): AdminHof
     sepaErteilt: false,
     ...ueber,
   }
-  return { ...adminHofZeile(roh, { gruendungsplatz: platz, maxPlaetze: 12 }, JETZT), aktivitaet: { ...LEER, produkte: 2 } }
+  return { ...adminHofZeile(roh, { gruendungsplatz: platz, maxPlaetze: 12 }, JETZT), aktivitaet: { ...LEER, produkte: 2 }, gruendung }
 }
 
 function render(hoefe: AdminHof[]): string {
@@ -133,6 +146,64 @@ describe('Höfe und Freischaltung', () => {
 
   it('der Satz zur Servicegebühr steht unter der Liste', () => {
     expect(render([])).toContain('Gilt nur für neue Bestellungen')
+  })
+})
+
+describe('Gründungshof bis (Nr. 62, Register K2)', () => {
+  const STANDARD: GruendungAnzeige = { bisTag: '2027-12-31', bisText: '31.\u00a0Dezember 2027', abweichend: false }
+  const EIGENES: GruendungAnzeige = { bisTag: '2028-06-30', bisText: '30.\u00a0Juni 2028', abweichend: true }
+  const online = { approvedAt: JETZT, stripeBereit: true }
+
+  it('Tabelle und Karte zeigen das wirksame Ende mit „Standard" bzw. „abweichend"', () => {
+    const html = render([hof({ ...online, name: 'Sonnhof' }, 1, STANDARD), hof({ ...online, id: 'farm_2', name: 'Moorhof' }, 2, EIGENES)])
+    expect(html).toContain('>Gründungshof bis</th>')
+    // Je einmal in der Tabelle und einmal in der Karte.
+    expect(html.match(/31\.\u00a0Dezember 2027/g)).toHaveLength(2)
+    expect(html.match(/Standard<\/span>/g)).toHaveLength(2)
+    expect(html.match(/30\.\u00a0Juni 2028/g)).toHaveLength(2)
+    expect(html.match(/abweichend<\/span>/g)).toHaveLength(2)
+    expect(html).toContain('Gründungshof bis Moorhof')
+  })
+
+  it('Gegenprobe: ohne Gründungsplatz kein Datum, keine Marke und nichts zu ändern', () => {
+    const html = render([hof({ ...online, name: 'Sonnhof' }, 13)])
+    expect(html).not.toMatch(/Standard<\/span>|abweichend<\/span>|Gründungshof bis Sonnhof/)
+    expect(html).toContain('kein Gründungsplatz')
+  })
+
+  it('der Freischalt-Dialog nennt die Zusage K2 mit dem Standard-Ende — ohne „dauerhaft" und ohne Prozent', () => {
+    const html = renderToStaticMarkup(
+      createElement(HofAktionDialog, { aktion: { hof: hof({ stripeBereit: true }), art: 'approve' }, vergebenePlaetze: 3, onClose: () => {} })
+    )
+    expect(html).toContain('Gründungshof Nr. 4')
+    expect(html).toContain(gruendungsKonditionenText(GRUENDUNG_BIS_STANDARD))
+    expect(html).toContain('31.\u00a0Dezember 2027')
+    expect(html).not.toMatch(/dauerhaft|\d\s?%/)
+  })
+
+  it('Gegenprobe: alle Plätze vergeben — keine Zusage im Freischalt-Dialog', () => {
+    const html = renderToStaticMarkup(
+      createElement(HofAktionDialog, { aktion: { hof: hof({ stripeBereit: true }), art: 'approve' }, vergebenePlaetze: 12, onClose: () => {} })
+    )
+    expect(html).toContain('Alle 12 Gründungsplätze sind vergeben')
+    expect(html).not.toContain(gruendungsKonditionenText(GRUENDUNG_BIS_STANDARD))
+  })
+
+  it('der Dialog zeigt den Stand: eigenes Datum vorbelegt, mit „Auf Standard zurücksetzen"', () => {
+    const html = renderToStaticMarkup(createElement(GruendungBisDialog, { hof: { id: 'farm_2', name: 'Moorhof', gruendung: EIGENES }, onClose: () => {} }))
+    expect(html).toContain('Moorhof')
+    expect(html).toContain('30.\u00a0Juni 2028')
+    expect(html).toContain('value="2028-06-30"')
+    expect(html).toContain('Auf Standard zurücksetzen')
+    expect(html).toContain('Leer = Standard (31.\u00a0Dezember 2027)')
+    // Die Rückfrage K1 erscheint erst bei einem früheren Tag.
+    expect(html).not.toContain('Nur mit Zustimmung des Hofs (K1)')
+  })
+
+  it('Gegenprobe: beim Standard bleibt das Feld leer und es gibt nichts zurückzusetzen', () => {
+    const html = renderToStaticMarkup(createElement(GruendungBisDialog, { hof: { id: 'farm_1', name: 'Sonnhof', gruendung: STANDARD }, onClose: () => {} }))
+    expect(html).toContain('value=""')
+    expect(html).not.toContain('Auf Standard zurücksetzen')
   })
 })
 

@@ -13,6 +13,16 @@ import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { triageEingabeSchema } from '@/schemas/meldung'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
 import { FREISCHALTUNG_GEAENDERT_TEXT, freischaltSperre } from '@/lib/admin-hoefe'
+import {
+  GRUENDUNG_BIS_GEAENDERT,
+  GRUENDUNG_BIS_UNGUELTIG,
+  GRUENDUNG_BIS_VERGANGEN,
+  GRUENDUNG_BIS_ZUSTIMMUNG_FEHLT,
+  gruendungBisSchema,
+} from '@/schemas/gruendungshof'
+import { bestimmeGruendungBis, bildeGruendungBis, verkuerztGruendung } from '@/lib/gruendungshof'
+import { kalendertagInWien } from '@/lib/wiener-tag'
+import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
 
 function revalidateAll(slug: string) {
   revalidatePath('/admin')
@@ -246,6 +256,79 @@ export async function setServiceFeeAction(
   revalidatePath('/admin')
   revalidatePath(`/${farm.slug}`)
   revalidatePath(`/${farm.slug}/checkout`)
+  return {}
+}
+
+/** Für das Protokoll: der Tag der Spalte oder „Standard" (null). */
+function tagOderStandard(datum: Date | null): string {
+  return datum ? kalendertagInWien(datum) : 'Standard'
+}
+
+/**
+ * Gründungs-Enddatum eines Hofs einstellen (Register K2, Nr. 62): ein
+ * Kalendertag ab heute oder leer = Standard (null). Ein früheres Ende als das
+ * bisher WIRKSAME — auch das Zurücksetzen auf einen früheren Standard — nur
+ * mit `bestaetigt` aus dem Dialog: Zugesagte Konditionen ändern sich nur mit
+ * Zustimmung des Hofs (K1). Wirksam ist das Datum nur mit Gründungsplatz
+ * (bestimmeGruendungBis); ohne Platz gibt es keine Zusage zu verkürzen.
+ *
+ * Protokoll außerhalb der Produktion wie setServiceFeeAction, dazu der alte
+ * Wert (S12: wer, wann, alt → neu) — keine Personendaten. Ein dauerhaftes
+ * Protokoll braucht eine Tabelle (Lauf 11).
+ */
+export async function setzeGruendungBisAction(
+  farmId: string,
+  eingabe: { gruendungBis: unknown; bestaetigt: unknown }
+): Promise<{ error?: string }> {
+  const guard = await verlangeAdminAktion()
+  if ('error' in guard) return { error: guard.error }
+
+  const jetzt = new Date()
+  const parsed = gruendungBisSchema(jetzt).safeParse(eingabe)
+  if (!parsed.success) {
+    // Nach außen nur eigene Sätze (Nr. 35) — ohne Objekt oder mit falschem
+    // Haken stünde sonst Zods englischer Standardtext im Dialog.
+    const erste = parsed.error.issues[0]
+    if (erste?.path[0] === 'gruendungBis') {
+      return { error: erste.message === GRUENDUNG_BIS_VERGANGEN ? GRUENDUNG_BIS_VERGANGEN : GRUENDUNG_BIS_UNGUELTIG }
+    }
+    return { error: EINSTELLUNG_UNGUELTIG }
+  }
+
+  // VOR dem Schreiben gelesen: der alte Wert fürs Protokoll und das bisher
+  // wirksame Datum für die Zustimmungs-Regel.
+  const [farm, hoefe] = await Promise.all([
+    prisma.farm.findUnique({ where: { id: farmId }, select: { slug: true, gruendungBis: true } }),
+    ladeHoefeFuerGruendung(),
+  ])
+  if (!farm) return { error: 'Hof nicht gefunden.' }
+
+  const neu = parsed.data.gruendungBis === null ? null : bildeGruendungBis(parsed.data.gruendungBis)
+  const bisher = bestimmeGruendungBis({ id: farmId, gruendungBis: farm.gruendungBis }, hoefe)
+  const kuenftig = bestimmeGruendungBis({ id: farmId, gruendungBis: neu }, hoefe)
+  if (verkuerztGruendung(bisher, kuenftig) && !parsed.data.bestaetigt) return { error: GRUENDUNG_BIS_ZUSTIMMUNG_FEHLT }
+
+  // Bedingt schreiben, nicht blind: Die Zustimmungs-Regel beruht auf dem
+  // Lesestand oben. Hat ein zweiter Tab das Ende inzwischen verschoben, trifft
+  // das Schreiben nichts — sonst könnte ein späteres Ende ohne Haken still
+  // verkürzt werden.
+  const { count } = await prisma.farm.updateMany({
+    where: { id: farmId, gruendungBis: farm.gruendungBis },
+    data: { gruendungBis: neu },
+  })
+  if (count === 0) return { error: GRUENDUNG_BIS_GEAENDERT }
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(
+      `[DEV] Gründungshof bis geändert: ${jetzt.toISOString()} admin=${guard.userId} farm=${farmId} ` +
+        `alt=${tagOderStandard(farm.gruendungBis)} neu=${tagOderStandard(neu)} bestaetigt=${parsed.data.bestaetigt}`
+    )
+  }
+
+  revalidatePath('/admin')
+  revalidatePath('/settings/konditionen')
+  // Die Übersicht der Einstellungen nennt den Gründungshof in ihrer Zeile mit.
+  revalidatePath('/settings')
   return {}
 }
 

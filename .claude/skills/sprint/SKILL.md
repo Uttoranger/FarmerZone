@@ -24,6 +24,7 @@ Lies jetzt, nicht aus dem Gedächtnis:
 - `docs/ai/TECH_STACK.md` — wenn eine Bibliothek oder eine Version im Spiel ist
 - `docs/ai/TESTING_GUIDELINES.md` — wenn Tests entstehen oder sich ändern
 - bestehenden Code im betroffenen Bereich, um sein Muster zu übernehmen
+- `docs/ai/BAUSTEINE.md` — das Bausteinverzeichnis (erzeugt, nicht am Stück lesen): nach dem Stichwort der Aufgabe durchsuchen (`grep -i`), bevor eine neue Datei, Komponente oder Funktion entsteht. Was dort steht, wird benutzt oder additiv erweitert; bei „Altbestand → Ersatz" gilt der Ersatz.
 
 Widerspricht der Auftrag einer Regel: **stopp, frag nach.** Nicht stillschweigend entscheiden.
 
@@ -45,6 +46,10 @@ Branch: <name>
 ## Betroffen
 - src/... — was
 
+## Wiederverwendet / Neu, weil
+- Wiederverwendet: <Treffer aus BAUSTEINE.md> — wofür
+- Neu, weil: <neue Datei oder Funktion> — warum kein Treffer passt
+
 ## Schritte
 - [ ] 1. ...
 - [ ] 2. ...
@@ -53,7 +58,7 @@ Branch: <name>
 - ...
 ```
 
-Nach jedem Schritt abhaken. Am Ende löschen.
+Nach jedem Schritt abhaken. Am Ende löschen — der Abschnitt „Wiederverwendet / Neu, weil" kommt vorher als eine Zeile „Wiederverwendet: … / Neu, weil: …" in den PR-Text (auch bei höchstens zwei Dateien, wo es keine `TASK.md` gibt).
 Bei offenen Fragen, die den Bau blockieren: **erst fragen, dann bauen.**
 
 ### 4. Umsetzen
@@ -85,6 +90,7 @@ beauftragt, gehört auch dessen Zeile `Behebt Meldung: <id>` in den PR — `gepl
 - neues Muster oder geänderte Konvention → passende Datei in `docs/ai/`
 - neue Abhängigkeit → `TECH_STACK.md`
 - abgeschlossener Sprint, Fachregel, Entscheidung → `DEVELOPMENT.md`
+- Datei, Komponente oder Export unter `src/components`, `src/lib` oder `src/server` hinzugefügt, umbenannt oder entfernt, oder ein Kopfkommentar geändert → `pnpm bausteine` ausführen und `docs/ai/BAUSTEINE.md` mitcommitten (sonst schlägt `tests/bausteine-verzeichnis.test.ts` an)
 
 Nicht "später". Jetzt.
 
@@ -97,5 +103,6 @@ Dann anhalten und berichten:
 3. Welche Annahme du getroffen hast, falls etwas unklar war
 4. Wie der Mensch es testet: konkrete URL, konkrete Schritte, konkrete Erwartung
 5. Welche `.md` du mit angepasst hast
+6. Regelvorschlag, nur wenn dir eine Regel fehlte, dich behinderte oder ein Fehler wiederkommen kann: Ursache, Gegenmaßnahme, Ort. Vorrang hat eine Prüfung (Test, Lint, Hook) vor einer Textregel; eine Textregel gehört an den passenden Ort. Eingetragen wird erst nach Freigabe durch den Menschen, mit Herkunft und Datum.
 
 Danach warte auf Antwort. Beginne keine neue Aufgabe von selbst.

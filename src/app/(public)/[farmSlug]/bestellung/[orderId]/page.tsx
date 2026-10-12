@@ -17,6 +17,7 @@ import {
   KNOPF_GRUEN,
   KNOPF_RAHMEN,
 } from '@/components/bestaetigung/bestaetigung-teile'
+import { HofErreichen } from '@/components/bestaetigung/hof-erreichen'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 
 /**
@@ -101,7 +102,9 @@ export default async function BestellungPage({ params, searchParams }: Props) {
       pickupTimeStart: true,
       pickupTimeEnd: true,
       farm: {
-        select: { slug: true, name: true, address: true, postalCode: true, city: true, archivedAt: true },
+        // Telefon und E-Mail für „Hof erreichen" (Nr. 60) — gelesen erst
+        // hinter der Signatur oben, nie über die Bestellnummer.
+        select: { slug: true, name: true, address: true, postalCode: true, city: true, phone: true, email: true, archivedAt: true },
       },
       items: {
         select: {
@@ -211,6 +214,9 @@ export default async function BestellungPage({ params, searchParams }: Props) {
             </a>
           </section>
         )}
+
+        {/* Nach dem Kauf: der Weg zum Hof, wenn etwas dazwischenkommt — wie die Abholung nicht bei storniert. */}
+        {!storniert && <HofErreichen telefon={order.farm.phone} email={order.farm.email} />}
 
         {/* Dieselben Zeilen wie auf der Bestätigungsseite — aus dem Snapshot der Bestellung. */}
         <BestellPositionen positionen={positionen} summen={order} zahlung={`${zahlung.art} · ${zahlung.zustand}`} />

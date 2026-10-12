@@ -51,7 +51,7 @@ vi.mock('@/server/actions/farm', () => ({
   holeAdresseZumPunkt: vi.fn(),
 }))
 // Das Hof-Profil speichert seit Nr. 50 Runde 1 über den Speicherweg der Abschnitte (abschnitt-speichern.ts).
-vi.mock('@/server/actions/appearance', () => ({ ladeAuftrittStand: vi.fn(), saveAppearanceAction: vi.fn() }))
+vi.mock('@/server/actions/appearance', () => ({ saveAppearanceAction: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ signOut: vi.fn() }))
 
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
@@ -251,16 +251,8 @@ describe('Speichern auf den Einstellungs-Unterseiten (Quelltext)', () => {
     expect(aufruf, `${funktion}: nachSpeichern`).toBeGreaterThan(pruefung)
   })
 
-  it('Hof-Profil: speichert nur, was seit dem Laden geändert wurde, über den frischen Stand (speichereProfil)', () => {
-    const profil = rumpf(quelle('src/components/settings/profile-form.tsx'), 'onSubmit')
-    expect(profil).toContain('const satz = await speichernOhneWurf(() => speichereProfil(geaendertSeitLaden(anfang, data)))')
-    // Der Maßstab: der Stand beim Laden, Feld für Feld durch das Schema (tests/abschnitt-stand.test.ts).
-    expect(quelle('src/components/settings/profile-form.tsx')).toContain(
-      'const [anfang] = useState<ProfileFormData>(() => profilWieImSchema(schema, startwerte))'
-    )
-    // Gegenprobe: das ganze Formular vom Laden ginge nicht mehr direkt an die Aktion.
-    expect(quelle('src/components/settings/profile-form.tsx')).not.toMatch(/updateProfile\(/)
-  })
+  // Was das Hof-Profil beim Speichern schickt (nur Geändertes, über speichereProfil), prüft seit Nr. 65
+  // tests/hof-profil-absenden.test.ts mit echtem Absenden statt mit Textvergleichen.
 
   it('der Fehlerweg kehrt vorher zurück bzw. steht im anderen Zweig — kein Sprung bei einem Fehler', () => {
     const profil = rumpf(quelle('src/components/settings/profile-form.tsx'), 'onSubmit')

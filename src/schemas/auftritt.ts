@@ -7,6 +7,11 @@ import { LEITSPRUCH_MAX, UEBER_UNS_MAX, WERT_UNTERTITEL_MAX, ZU_LANG } from '@/l
  * weil die Abschnitte von Mein Hof (components/mein-hof/abschnitt-formulare.tsx,
  * seit Nr. 50 unter lg im Blatt, ab lg im Editor) ihre Felder mit `.pick()`
  * bzw. mit den Grenzen daraus prüfen — eine Regel, nicht zwei Abschriften.
+ *
+ * Jedes Feld ist freiwillig, und keins hat einen Standard (Register N4,
+ * Ergänzung Lauf 10): Die Aktion schreibt nur, was mitkommt. Ein Standard
+ * (etwa [] für die Abschnitte) schriebe ein Feld, das der Abschnitt gar nicht
+ * geschickt hat, und setzte den Stand eines anderen Tabs zurück.
  */
 
 /** Höchstens so viele Werte stehen auf der Hofseite (wie bisher in Mein Auftritt). */
@@ -43,8 +48,8 @@ export const appearanceSchema = z.object({
   bannerValue: z.string().nullable().optional(),
   bannerUrl: z.string().url().nullable().optional(),
   logoUrl: z.string().url().nullable().optional(),
-  sectionsConfig: z.array(sectionConfigSchema).default([]),
-  farmValues: z.array(farmValueSchema).max(WERTE_MAX, WERTE_ZU_VIELE),
+  sectionsConfig: z.array(sectionConfigSchema).optional(),
+  farmValues: z.array(farmValueSchema).max(WERTE_MAX, WERTE_ZU_VIELE).optional(),
 })
 
 export type AppearanceSaveInput = z.infer<typeof appearanceSchema>

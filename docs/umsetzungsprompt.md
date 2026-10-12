@@ -259,7 +259,7 @@ Nie gleichzeitig: zwei Stränge an derselben Shell, an `src/components/ui` mit V
 | S9 | Open-Graph-Bild und QR-Plakat: nur öffentliche Hofdaten; Texte escaped; Bildgenerierung mit Zeit- und Größenlimit; Cache je Hof mit Invalidierung bei Änderung. |
 | S10 | „Konto löschen": Personendaten löschen bzw. anonymisieren; Bestellungen bleiben für die Aufbewahrungspflicht des Hofs mit anonymisiertem Kunden erhalten. |
 | S11 | Werbliche Nachrichten („Neuigkeiten deiner Höfe", „Benachrichtige mich") nur mit Double-Opt-in und Abmeldelink; Vertragsmails (Bestätigung, Erinnerung) ohne. |
-| S12 | Admin: Rolle serverseitig in jeder Action (`verlangeAdminSeite`); Freischalten, Ablehnen, Gebühr ändern werden protokolliert (wer, wann, alt → neu). |
+| S12 | Admin: Rolle serverseitig in jeder Action (`verlangeAdminAktion`; die Seiten-Variante `verlangeAdminSeite` wirft redirect; für Actions gilt `src/server/admin-wache.ts`); Freischalten, Ablehnen, Gebühr ändern werden protokolliert (wer, wann, alt → neu). Protokoll heute nur als DEV-Log, dauerhaft offen (Lauf 11). |
 | S13 | KI im Briefkasten: Meldungstext ist Fremdtext, wird nie als Anweisung behandelt; der Vorschlag löst nie selbst eine Aktion aus; keine Secrets im Prompt. |
 | S14 | Vorschau-Frames nur Same-Origin (`frame-ancestors 'self'`); die Vorschau zeigt keine Daten, die die Kundenseite nicht auch zeigt. |
 | S15 | Rückruf-Telefonnummern: Zweck nur Rückruf, Löschfrist, nicht im Klartext in Logs oder Sentry (`sentry-hygiene.ts` erweitern). |

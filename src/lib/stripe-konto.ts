@@ -147,6 +147,20 @@ export function neuEinrichtenSchluessel(farmId: string, altesKonto: string, jetz
 }
 
 /**
+ * Der Name der Karte mit Verkäufer, Anschrift, Telefon und E-Mail des Hofs
+ * über dem Kaufknopf der Kasse (components/checkout/angaben-zum-hof.tsx,
+ * Nr. 60). Hier, weil auch die Antwort des Checkouts auf sie verweist.
+ */
+export const ANGABEN_ZUM_HOF_TITEL = 'Angaben zum Hof'
+
+/**
+ * Der Ausweg, wo die Kasse nicht weiterkommt — kein Abholtermin, keine
+ * Zahlart, Online-Zahlung gesperrt (Nr. 60): Die Kontaktdaten stehen in
+ * derselben Kasse, statt „frag beim Hof nach" ohne Nummer.
+ */
+export const KONTAKT_UNTER_ANGABEN_ZUM_HOF = `Die Kontaktdaten des Hofs stehen unter „${ANGABEN_ZUM_HOF_TITEL}“.`
+
+/**
  * Antwort des Checkouts, wenn Stripe das Konto des Hofs nicht kennt. Kein
  * „versuch es später": Online kommt bei diesem Hof erst zurück, wenn er
  * Stripe neu einrichtet. Ohne Barzahlung verspricht der Satz sie nicht.
@@ -154,7 +168,7 @@ export function neuEinrichtenSchluessel(farmId: string, altesKonto: string, jetz
 export function hofKontoUnbekanntText(barMoeglich: boolean): string {
   return barMoeglich
     ? 'Online-Zahlung ist bei diesem Hof gerade nicht möglich. Bitte wähle Bar bei Abholung.'
-    : 'Online-Zahlung ist bei diesem Hof gerade nicht möglich. Frag am besten direkt beim Hof nach.'
+    : `Online-Zahlung ist bei diesem Hof gerade nicht möglich. ${KONTAKT_UNTER_ANGABEN_ZUM_HOF}`
 }
 
 /** Was der Hof sieht (Einstellungen → Zahlung): Titel und Satz der Hinweiskarte, Knopf. */

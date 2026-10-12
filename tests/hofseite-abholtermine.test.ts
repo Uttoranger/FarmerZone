@@ -20,7 +20,6 @@ const JETZT = new Date(2026, 6, 22, 10, 0, 0).toISOString()
 const HOF: SeitenspalteHof = {
   id: 'farm-1',
   slug: 'hof-test',
-  phone: '+43 660 0000000',
   address: 'Feldweg 1',
   postalCode: '4910',
   city: 'Beispieldorf',

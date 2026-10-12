@@ -261,6 +261,48 @@ describe('Bestellseite — die Signatur wird an der Seite selbst durchgesetzt', 
   })
 })
 
+describe('Bestellseite — „Hof erreichen" nur hinter der Signatur (Nr. 60, S1)', () => {
+  const KONTAKT = { phone: '+43 660 0000000', email: 'hof@example.com' }
+  const mitKontakt = (teil: Record<string, unknown> = {}) => bestellung({ farm: { ...bestellung().farm, ...KONTAKT }, ...teil })
+
+  it('gültige Signatur: Satz, Nummer und E-Mail des Hofs, Anrufen (tel:) und E-Mail (mailto:)', async () => {
+    findUnique.mockResolvedValue(mitKontakt() as never)
+    const text = await seite('order-1', bestellSignatur('order-1'))
+    expect(text).toContain('Hof erreichen')
+    expect(text).toContain('Kommst du später oder kannst du nicht kommen? Sag dem Hof kurz Bescheid.')
+    expect(text).toContain(KONTAKT.phone)
+    expect(text).toContain(KONTAKT.email)
+    const links = await seitenLinks('order-1', bestellSignatur('order-1'))
+    expect(links).toContainEqual({ href: `tel:${KONTAKT.phone}`, text: 'Anrufen' })
+    expect(links).toContainEqual({ href: `mailto:${KONTAKT.email}`, text: 'E-Mail' })
+  })
+
+  it('Telefon und E-Mail des Hofs stehen in der Abfrage, die erst nach der Signatur läuft', async () => {
+    findUnique.mockResolvedValue(mitKontakt() as never)
+    await seite('order-1', bestellSignatur('order-1'))
+    expect(findUnique).toHaveBeenCalledTimes(1)
+    expect(findUnique.mock.calls[0][0]).toMatchObject({ select: { farm: { select: { phone: true, email: true } } } })
+  })
+
+  it('falsche oder fehlende Signatur: kein „Hof erreichen", keine Nummer — und keine Abfrage', async () => {
+    findUnique.mockResolvedValue(mitKontakt() as never)
+    for (const s of ['f'.repeat(64), undefined]) {
+      const text = await seite('order-1', s)
+      expect(text).not.toContain('Hof erreichen')
+      expect(text).not.toContain(KONTAKT.phone)
+      expect(text).not.toContain(KONTAKT.email)
+    }
+    expect(findUnique).not.toHaveBeenCalled()
+  })
+
+  it('storniert: keine Karte, wie die Abholung — Gegenprobe: die Bestellung steht da', async () => {
+    findUnique.mockResolvedValue(mitKontakt({ status: 'CANCELLED' }) as never)
+    const text = await seite('order-1', bestellSignatur('order-1'))
+    expect(text).toContain('HM-2611-A4F2')
+    expect(text).not.toContain('Hof erreichen')
+  })
+})
+
 describe('Bestellseite — der Ausweg bei ungültigem Link führt zur Hofübersicht', () => {
   /**
    * Ohne gültigen Link ist nicht einmal der Hof bestätigt: Der Ausweg führt

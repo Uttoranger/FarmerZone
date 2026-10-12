@@ -20,6 +20,7 @@ den richtigen Fehler gefunden hast, und verhindert, dass er wiederkommt.
 ### 1. Verstehen, nicht raten
 
 - Lies den betroffenen Code, bevor du etwas änderst.
+- Durchsuche `docs/ai/BAUSTEINE.md` nach dem Stichwort, bevor du für den Fix eine neue Datei oder Funktion anlegst: Was es schon gibt, wird genutzt oder erweitert.
 - Finde die **Ursache**, nicht die Stelle, an der es auffällt.
 - Nenne mir in einem Satz, was du für die Ursache hältst, bevor du reparierst.
 - Unsicher zwischen zwei Ursachen? Sag es und frag, statt beide zu "reparieren".
@@ -54,6 +55,8 @@ und mach weiter.
 
 ### 5. Berichten
 
+Haben sich Dateien oder Exporte unter `src/components`, `src/lib` oder `src/server` geändert: `pnpm bausteine` ausführen und `docs/ai/BAUSTEINE.md` mitcommitten.
+
 Behebt die Änderung eine Meldung aus dem Briefkasten: direkt nach dem Öffnen des PR
 `pnpm briefkasten geplant <id> --pr <nr>` (die Nummer gibt es erst mit dem PR), im PR-Body je
 Meldung die Zeile `Behebt Meldung: <id>`. Nur Art FEHLER. ERLEDIGT setzt das Deployment, nie ein Agent.
@@ -65,5 +68,6 @@ beauftragt, gehört auch dessen Zeile `Behebt Meldung: <id>` in den PR — `gepl
 3. Welcher Test ihn jetzt fängt
 4. Was dir nebenbei aufgefallen ist und **nicht** repariert wurde
 5. Wie ich es selbst nachprüfe
+6. Regelvorschlag, wenn der Fehler wiederkommen kann: Ursache, Gegenmaßnahme, Ort. Vorrang hat eine Prüfung (Test, Lint, Hook) vor einer Textregel; eine Textregel gehört an den passenden Ort. Eingetragen wird erst nach Freigabe durch den Menschen, mit Herkunft und Datum.
 
 Dann STOPP.

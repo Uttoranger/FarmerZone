@@ -9,7 +9,9 @@
  *  - Übersicht: acht Bereiche, die es gibt (keine Benachrichtigungen), jedes
  *    Ziel eine echte Seite; Status-Punkt aus derselben Liste wie Mein Hof.
  *  - Konditionen: Texte aus konditionen.ts (Übergang K1, Bar-Ausnahme B1),
- *    das Rechenbeispiel aus berechneServicegebuehr mit den Sätzen des Hofs.
+ *    das Rechenbeispiel aus berechneServicegebuehr mit den Sätzen des Hofs;
+ *    seit Nr. 61 (Fassung 2) „Dein Stand", Hoftor „kostenlos", der Preis von
+ *    Hofladen erst nach den Leistungen, der Vergleich „Heute / Im Hoftor".
  *  - Darstellung: vier Zustände, Punkt mit Text für Screenreader, lange
  *    Zeilen mit title, keine Farbwerte.
  */
@@ -33,13 +35,14 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
 }))
 
-const db = vi.hoisted(() => ({ farm: { findUnique: vi.fn() } }))
+const db = vi.hoisted(() => ({ farm: { findUnique: vi.fn(), findMany: vi.fn() } }))
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
 
 import {
   BETRIEBSNUMMER_ANKER,
   RECHENBEISPIEL_WARENPREIS_CENTS,
   TON_TEXT,
+  baueKonditionenSeite,
   einstellungenBereiche,
   zahlungHinweis,
   konditionenRechenbeispiel,
@@ -55,11 +58,22 @@ import {
   ONLINE_GEBUEHR_ABGETRENNT_SATZ,
   ONLINE_GEBUEHR_MIT_PROVISION_SATZ,
   barGebuehrSepaSatz,
+  DEIN_STAND_STARTPHASE,
+  HOFTOR_ABHOLZEITEN_JE_WOCHE,
+  HOFTOR_PRODUKTE,
+  IM_MONAT,
+  KOSTENLOS,
+  MONATSABRECHNUNG_TEILE,
   MONATSABRECHNUNG_TEXT,
+  OHNE_WAHL_SATZ,
+  PREIS_BEDINGUNGEN,
+  TARIF_MARKE,
+  TARIF_WAHL_SATZ,
   TARIFE,
   TARIFE_AB,
-  TARIFE_AB_TEXT,
+  VERGLEICH_TEXT,
   BAR_SERVICEGEBUEHR_AB,
+  tarifText,
 } from '@/lib/konditionen'
 import { formatEuro } from '@/lib/format'
 import { ladeKonditionenHof } from '@/server/queries/einstellungen'
@@ -80,6 +94,12 @@ function quelle(pfad: string): string {
 const VOR_STICHTAG = new Date('2026-10-06T10:00:00Z')
 const NACH_STICHTAG = new Date(TARIFE_AB.getTime() + 24 * 3600 * 1000)
 const LANG = 'Biohof am Sonnenhang mit Hofladen, Bauernbrot aus dem Holzofen und Eiern vom Freiland'
+/** Eine DATE-Spalte kommt aus Prisma als UTC-Mitternacht des Tages (wie in tests/tarif-zeile.test.ts). */
+const BIS_SILVESTER_2027 = new Date('2027-12-31T00:00:00.000Z')
+/** Die Zusage eines Gründungshofs (K2), wörtlich wie in der Freigabe für Nr. 62. */
+const ZUSAGE_2027 = 'Hofladen ohne Grundgebühr bis 31. Dezember 2027. Danach gelten die normalen Tarife – ohne Wahl Hoftor, kostenlos.'
+/** Das geschützte Leerzeichen nach dem Tag ist Satz, nicht Wortlaut. */
+const normal = (text: string): string => text.replace(/ /g, ' ')
 
 function stand(teil: Partial<HofseiteStand> = {}): HofseiteStand {
   return {
@@ -125,6 +145,7 @@ function daten(teil: Partial<EinstellungenDaten> = {}, standTeil: Partial<Hofsei
     betriebsnummer: 'AT 1234567',
     betriebsstatus: 'PRIMAERPRODUKTION',
     tarif: null,
+    gruendungBis: null,
     isPaused: false,
     stillgelegt: false,
     teilenMomenteAus: false,
@@ -139,6 +160,10 @@ function hof(teil: Partial<KonditionenHof> = {}): KonditionenHof {
     serviceFeeMinCents: 50,
     serviceFeeActiveFrom: new Date('2026-01-01T00:00:00Z'),
     platformFeePercent: '0',
+    gruendungBis: null,
+    // Wie im Mockup v2: 9 Produkte im Shop, 3 Abholzeiten je Woche.
+    produkteImShop: 9,
+    abholzeitenJeWoche: 3,
     ...teil,
   }
 }
@@ -350,12 +375,22 @@ describe('einstellungenBereiche', () => {
     expect(bereich(einstellungenBereiche(daten({ stillgelegt: true }), VOR_STICHTAG), 'konto')).toMatchObject({ ton: 'offen' })
   })
 
-  it('Konditionen: ohne Tarif der Übergang (K1), mit Tarif vor dem Stichtag „ab …", nie als heute fällig', () => {
-    expect(konditionenZeile(null, VOR_STICHTAG)).toContain('In der Startphase kostenlos.')
-    expect(konditionenZeile(null, VOR_STICHTAG)).toContain(TARIFE_AB_TEXT)
-    const laden = TARIFE.find((t) => t.id === 'HOFLADEN')!
-    expect(konditionenZeile('HOFLADEN', VOR_STICHTAG)).toBe(`${laden.name} · ${laden.preis} / Monat ab ${TARIFE_AB_TEXT}`)
-    expect(konditionenZeile('HOFLADEN', NACH_STICHTAG)).toBe(`${laden.name} · ${laden.preis} / Monat`)
+  it('Konditionen: der Stand aus derselben Regel wie die Tarif-Zeile, nie ein Preis — Hofladen nur mit Namen (E6-Ergänzung)', () => {
+    const ohne = { tarif: null, gruendungBis: null }
+    expect(normal(konditionenZeile(ohne, VOR_STICHTAG))).toBe('Startphase: kostenlos · bis 31. Jänner 2027')
+    // Vor dem Stichtag gilt die Startphase auch nach einer Wahl — wie in der Tarif-Zeile.
+    expect(konditionenZeile({ ...ohne, tarif: 'HOFLADEN' }, VOR_STICHTAG)).toBe(konditionenZeile(ohne, VOR_STICHTAG))
+    expect(normal(konditionenZeile({ ...ohne, gruendungBis: BIS_SILVESTER_2027 }, NACH_STICHTAG))).toBe(
+      'Gründungshof · ohne Grundgebühr bis 31. Dezember 2027'
+    )
+    expect(konditionenZeile(ohne, NACH_STICHTAG)).toBe('Hoftor · kostenlos')
+    expect(konditionenZeile({ ...ohne, tarif: 'HOFLADEN' }, NACH_STICHTAG)).toBe('Hofladen')
+  })
+
+  it('die Zeile nimmt den Gründungshof aus den Daten der Übersicht (gruendungBis, ab Nr. 62 gesetzt) — grauer Punkt, keine Warnfarbe', () => {
+    const b = bereich(einstellungenBereiche(daten({ gruendungBis: BIS_SILVESTER_2027 }), VOR_STICHTAG), 'konditionen')
+    expect(normal(b.zeile)).toBe('Gründungshof · ohne Grundgebühr bis 31. Dezember 2027')
+    expect(b.ton).toBe('neutral')
   })
 })
 
@@ -431,7 +466,10 @@ describe('ladeKonditionenHof', () => {
       serviceFeeMinCents: 50,
       serviceFeeActiveFrom: null,
       platformFeePercent: { toString: () => '0.00' },
+      _count: { products: 4, pickupSlots: 2 },
     })
+    // Kein freigeschalteter Hof in der Platzliste: kein Gründungsplatz, kein Ende (Nr. 62).
+    db.farm.findMany.mockResolvedValue([])
     const ergebnis = await ladeKonditionenHof('nutzer-1')
     expect(db.farm.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { ownerId: 'nutzer-1' } }))
     expect(ergebnis).toEqual({
@@ -440,6 +478,10 @@ describe('ladeKonditionenHof', () => {
       serviceFeeMinCents: 50,
       serviceFeeActiveFrom: null,
       platformFeePercent: '0.00',
+      // Das wirksame Ende prüft tests/gruendung-bis-lader.test.ts; was gezählt wird, tests/integration/einstellungen.int.test.ts.
+      gruendungBis: null,
+      produkteImShop: 4,
+      abholzeitenJeWoche: 2,
     })
     db.farm.findUnique.mockResolvedValueOnce(null)
     expect(await ladeKonditionenHof('niemand')).toBeNull()
@@ -471,20 +513,133 @@ describe('Übersicht gerendert', () => {
   })
 })
 
+describe('baueKonditionenSeite — Stand, Karten, Vergleich (Nr. 61)', () => {
+  const marken = (seite: ReturnType<typeof baueKonditionenSeite>) => seite.karten.map((k) => [k.id, k.marke?.text ?? null])
+
+  it('ohne Wahl vor dem Stichtag: „Gilt automatisch" für Hoftor, „Wenn du mehr brauchst" für Hofladen', () => {
+    const seite = baueKonditionenSeite(hof(), VOR_STICHTAG)
+    expect(seite.zustand).toBe('startphase')
+    expect(marken(seite)).toEqual([
+      ['HOFTOR', TARIF_MARKE.automatisch],
+      ['HOFLADEN', TARIF_MARKE.mehr],
+    ])
+    expect(seite.karten[0]).toMatchObject({ kostenlos: true, satz: OHNE_WAHL_SATZ, preis: null })
+    expect(seite.karten[1]).toMatchObject({
+      kostenlos: false,
+      satz: null,
+      preis: { betrag: `${tarifText('HOFLADEN').preis} ${IM_MONAT}`, bedingungen: PREIS_BEDINGUNGEN, wahl: TARIF_WAHL_SATZ },
+    })
+  })
+
+  it('„Dein Tarif" nur nach Wahl; mit Hofladen gilt Hoftor nicht mehr automatisch, die Wahl ist getroffen', () => {
+    const seite = baueKonditionenSeite(hof({ tarif: 'HOFLADEN' }), NACH_STICHTAG)
+    expect(marken(seite)).toEqual([
+      ['HOFTOR', null],
+      ['HOFLADEN', TARIF_MARKE.gewaehlt],
+    ])
+    expect(seite.karten[0].satz).toBeNull()
+    expect(seite.karten[1].preis?.wahl).toBeNull()
+  })
+
+  it('ein Gründungshof bekommt kein „Gilt automatisch" — für ihn gilt bis zu seinem Tag Hofladen ohne Grundgebühr (K2)', () => {
+    const seite = baueKonditionenSeite(hof({ gruendungBis: new Date('2027-12-31T00:00:00.000Z') }), VOR_STICHTAG)
+    expect(seite.zustand).toBe('gruendungshof')
+    expect(seite.karten[0].marke).toBeNull()
+    expect(seite.karten[0].satz).toBeNull()
+  })
+
+  it('ein Gründungshof sieht in „Dein Stand" seine Zusage mit Datum statt der Startphase (K2) — ohne Preis', () => {
+    const seite = baueKonditionenSeite(hof({ gruendungBis: BIS_SILVESTER_2027 }), VOR_STICHTAG)
+    expect(seite.stand?.titel).toBe('Gründungshof')
+    expect((seite.stand?.saetze ?? []).map((satz) => normal(satz.map((t) => t.text).join('')))).toEqual([ZUSAGE_2027])
+    // Gegenprobe: ohne Datum bleibt der Stand der Startphase.
+    expect(baueKonditionenSeite(hof(), VOR_STICHTAG).stand).toBe(DEIN_STAND_STARTPHASE)
+  })
+
+  it('Tagesgrenze in Wien: am Tag des Datums noch Gründungshof, ab Mitternacht in Wien wieder die Startphase', () => {
+    // Winter: Wien ist UTC+1 — der 1. Jänner beginnt um 23:00 UTC des Vortags.
+    const gruender = hof({ gruendungBis: new Date('2026-12-31T00:00:00.000Z') })
+    expect(baueKonditionenSeite(gruender, new Date('2026-12-31T22:59:59.999Z')).stand?.titel).toBe('Gründungshof')
+    expect(baueKonditionenSeite(gruender, new Date('2026-12-31T23:00:00.000Z')).stand).toBe(DEIN_STAND_STARTPHASE)
+  })
+
+  it('Stand und Vergleich nur vor dem Stichtag — der Vergleich mit den Zahlen des Hofs neben den Grenzen von Hoftor', () => {
+    const vorher = baueKonditionenSeite(hof({ produkteImShop: 9, abholzeitenJeWoche: 3 }), VOR_STICHTAG)
+    expect(vorher.stand).toBe(DEIN_STAND_STARTPHASE)
+    expect(vorher.vergleich).toEqual([
+      { label: VERGLEICH_TEXT.produkte, heute: 9, hoftor: HOFTOR_PRODUKTE },
+      { label: VERGLEICH_TEXT.abholzeiten, heute: 3, hoftor: HOFTOR_ABHOLZEITEN_JE_WOCHE },
+    ])
+    const nachher = baueKonditionenSeite(hof(), NACH_STICHTAG)
+    expect(nachher.stand).toBeNull()
+    expect(nachher.vergleich).toBeNull()
+  })
+})
+
 describe('Konditionen gerendert', () => {
   const markup = html(createElement(KonditionenAnsicht, { hof: hof(), jetzt: VOR_STICHTAG }))
+  /** Ohne Tags und mit normalen Leerzeichen — für Sätze, in denen die Seite Teile hervorhebt. */
+  const text = (h: string): string => h.replace(/<[^>]+>/g, '').replace(/\u00a0/g, ' ').replace(/&quot;/g, '"')
 
-  it('Übergang K1 wörtlich, beide Tarife mit Preis, Monatsabrechnung, Rechenbeispiel', () => {
+  it('Übergang K1 wörtlich, beide Tarife (Hoftor „kostenlos", Hofladen mit Preis), Monatsabrechnung, Rechenbeispiel', () => {
     expect(markup.match(/<h1\b/g)).toHaveLength(1)
     expect(markup).toContain(KONDITIONEN_UEBERGANG)
-    for (const t of TARIFE) {
-      expect(markup).toContain(t.name)
-      expect(markup).toContain(t.preis)
-    }
-    expect(markup).toContain(MONATSABRECHNUNG_TEXT)
+    for (const t of TARIFE) expect(markup).toContain(t.name)
+    expect(markup).toContain(`>${KOSTENLOS}<`)
+    expect(markup).toContain(`${tarifText('HOFLADEN').preis} ${IM_MONAT}`)
+    expect(text(markup)).toContain(text(MONATSABRECHNUNG_TEXT))
+    // „nur wenn du Hofladen gewählt hast" steht fett da (Mockup v2).
+    for (const teil of MONATSABRECHNUNG_TEILE.filter((t) => t.betont)) expect(markup).toMatch(new RegExp(`<strong[^>]*>${teil.text}</strong>`))
     expect(markup).toContain(BAR_OHNE_GEBUEHR_SATZ.replace(/"/g, '&quot;'))
     expect(markup).toContain('href="/settings"')
     expect(markup).toContain('href="/konditionen"')
+  })
+
+  it('der Preis steht erst nach den Leistungen — in der Karte von Hofladen und auf der Seite (E6-Ergänzung)', () => {
+    const preis = `${tarifText('HOFLADEN').preis} ${IM_MONAT}`
+    const stelle = markup.indexOf(preis)
+    for (const leistung of tarifText('HOFLADEN').leistungen.filter((l) => !l.includes('€'))) {
+      expect(markup.indexOf(leistung), leistung).toBeGreaterThan(-1)
+      expect(markup.indexOf(leistung), leistung).toBeLessThan(stelle)
+    }
+    // Kein Preis vor den Leistungen: Der erste Euro-Betrag der Seite steht in einer Leistung oder danach.
+    const ersteLeistung = markup.indexOf(tarifText('HOFTOR').leistungen[0])
+    expect(markup.indexOf('€')).toBeGreaterThan(ersteLeistung)
+    expect(markup).toContain(PREIS_BEDINGUNGEN)
+    expect(markup.indexOf(TARIF_WAHL_SATZ)).toBeGreaterThan(stelle)
+  })
+
+  it('„Dein Stand" mit drei Sätzen vor den Tarifen, darunter der Übergang K1; der Vergleich mit den Zahlen des Hofs', () => {
+    expect(markup).toContain('Dein Stand')
+    expect(markup).toContain(DEIN_STAND_STARTPHASE.titel)
+    for (const satz of DEIN_STAND_STARTPHASE.saetze) {
+      expect(text(markup)).toContain(text(satz.map((t) => t.text).join('')))
+    }
+    expect(markup.indexOf(DEIN_STAND_STARTPHASE.titel)).toBeLessThan(markup.indexOf(KONDITIONEN_UEBERGANG))
+    expect(markup.indexOf(KONDITIONEN_UEBERGANG)).toBeLessThan(markup.indexOf('id="tarife-titel"'))
+    expect(markup).toContain(VERGLEICH_TEXT.titel)
+    expect(markup).toMatch(/<th scope="row"[^>]*>Produkte im Shop<\/th><td[^>]*>9<\/td><td[^>]*>3<\/td>/)
+    expect(markup).toMatch(/<th scope="row"[^>]*>Abholzeiten pro Woche<\/th><td[^>]*>3<\/td><td[^>]*>1<\/td>/)
+    expect(text(markup)).toContain('gelöscht wird nichts')
+  })
+
+  it('nach dem Stichtag: kein „Dein Stand" und kein Vergleich, der Übergang K1 bleibt als Hinweis', () => {
+    const nachher = html(createElement(KonditionenAnsicht, { hof: hof(), jetzt: NACH_STICHTAG }))
+    expect(nachher).not.toContain('Dein Stand')
+    expect(nachher).not.toContain(VERGLEICH_TEXT.titel)
+    expect(nachher).toContain(KONDITIONEN_UEBERGANG)
+    expect(nachher).toContain('data-slot="hinweiskarte"')
+  })
+
+  it('Gründungshof: „Dein Stand" zeigt die Zusage mit Datum, darunter den Übergang K1 — vor den Tarifen, ohne Preis', () => {
+    const gruender = html(createElement(KonditionenAnsicht, { hof: hof({ gruendungBis: BIS_SILVESTER_2027 }), jetzt: VOR_STICHTAG }))
+    expect(gruender).toContain('Dein Stand')
+    expect(gruender).toMatch(/<h2[^>]*>Gründungshof<\/h2>/)
+    const stand = text(gruender.slice(gruender.indexOf('Dein Stand'), gruender.indexOf('id="tarife-titel"')))
+    expect(stand).not.toContain(DEIN_STAND_STARTPHASE.titel)
+    expect(stand.indexOf(ZUSAGE_2027)).toBeGreaterThan(-1)
+    expect(stand.indexOf(ZUSAGE_2027)).toBeLessThan(stand.indexOf(text(KONDITIONEN_UEBERGANG)))
+    expect(stand).not.toMatch(/€|%/)
   })
 
   it('kein „Dein Tarif", solange der Hof keinen gewählt hat; mit Tarif steht er da', () => {

@@ -10,7 +10,7 @@ import { buildMapsUrl } from '@/lib/customer-links'
 import { formatEuro, mitAnzahl } from '@/lib/format'
 import { warenkorbAnzahl } from '@/lib/warenkorb-speicher'
 import { useWarenkorbVomHof } from '@/lib/use-warenkorb-kopf'
-import { korbBetraege, type Zahlungsart } from '@/lib/hofseite-kunde'
+import { KONTAKT_NACH_DEM_KAUF, korbBetraege, type Zahlungsart } from '@/lib/hofseite-kunde'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -34,7 +34,6 @@ import { futterVerantwortungImKorb, type FutterAbgabe } from '@/lib/futter-regis
 export type SeitenspalteHof = {
   id: string
   slug: string
-  phone: string
   address: string
   postalCode: string
   city: string
@@ -139,14 +138,13 @@ export function HofseiteSeitenspalte({
               {z.text}
             </li>
           ))}
-          <li>
-            <a href={`tel:${hof.phone}`} className={cn(ZEILE, 'min-h-11 w-fit rounded-md hover:underline', FOKUS_RAHMEN)}>
-              <Phone className={SYMBOL} strokeWidth={1.7} aria-hidden="true" />
-              <span className="sr-only">Anrufen: </span>
-              {hof.phone}
-            </a>
-          </li>
         </ul>
+        {/* Keine Nummer vor dem Kauf (Nr. 60, Mockups web/mobil-k2-hofseite-ohne-telefon):
+            Telefon und E-Mail des Hofs stehen in Kasse, Bestätigung und Bestellseite. */}
+        <p className="flex items-start gap-2.5 rounded-xl bg-muted px-3 py-2.5 text-[13px] leading-[1.45] text-muted-foreground">
+          <Phone className={cn(SYMBOL, 'mt-px')} strokeWidth={1.7} aria-hidden="true" />
+          {KONTAKT_NACH_DEM_KAUF}
+        </p>
         {gebuehrKurz && (
           <p className="border-t border-border pt-2.5 text-xs leading-normal text-muted-foreground">{gebuehrKurz}</p>
         )}

@@ -18,6 +18,7 @@ import {
 import { hoefeAnsichtAus } from '@/schemas/admin-hoefe'
 import { aktivitaetsTeile, istOhneInhalt, AKTIVITAET_LEER, type FarmAktivitaet } from '@/lib/farm-aktivitaet'
 import { DE_ADMIN_KLAERUNG, LAND_LABEL } from '@/lib/laender'
+import { GRUENDUNG_BIS_MARKE, GRUENDUNG_BIS_TITEL, KEIN_GRUENDUNGSPLATZ, type GruendungAnzeige } from '@/lib/gruendungshof'
 import { HOFNAME_MAX } from '@/lib/eingabegrenzen'
 import { mitAnzahl } from '@/lib/format'
 import type { MeldungTon } from '@/lib/meldung'
@@ -37,8 +38,10 @@ import { KARTE, KICKER, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE } from '@/components/ho
 import { HofKachel, SEITEN_TITEL } from './admin-teile'
 import { HofAktionDialog, type HofAktion } from './hof-aktion-dialog'
 import { ServicegebuehrDialog } from './servicegebuehr-dialog'
+import { GruendungBisDialog, type GruendungsHof } from './gruendung-bis-dialog'
 
-export type AdminHof = AdminHofZeile & { aktivitaet: FarmAktivitaet }
+/** `gruendung`: das wirksame Gründungs-Ende (Nr. 62), null ohne Gründungsplatz. */
+export type AdminHof = AdminHofZeile & { aktivitaet: FarmAktivitaet; gruendung: GruendungAnzeige | null }
 
 export type NeueMeldung = { id: string; art: string; artTon: MeldungTon; titel: string }
 
@@ -69,6 +72,7 @@ export function HoefeAnsicht({
   const [suche, setSuche] = useState(ansicht.suche)
   const [aktion, setAktion] = useState<HofAktion | null>(null)
   const [gebuehrHof, setGebuehrHof] = useState<AdminHof | null>(null)
+  const [gruendungHof, setGruendungHof] = useState<GruendungsHof | null>(null)
 
   const wartende = hoefe.filter((h) => h.status.id === 'wartet')
   const zahlen = zaehleHofFilter(hoefe)
@@ -181,8 +185,8 @@ export function HoefeAnsicht({
           />
         ) : (
           <>
-            <Tabelle hoefe={liste} onGebuehr={setGebuehrHof} onAktion={setAktion} />
-            <Karten hoefe={liste} onGebuehr={setGebuehrHof} onAktion={setAktion} />
+            <Tabelle hoefe={liste} onGebuehr={setGebuehrHof} onGruendung={setGruendungHof} onAktion={setAktion} />
+            <Karten hoefe={liste} onGebuehr={setGebuehrHof} onGruendung={setGruendungHof} onAktion={setAktion} />
           </>
         )}
 
@@ -193,6 +197,7 @@ export function HoefeAnsicht({
 
       <HofAktionDialog aktion={aktion} vergebenePlaetze={vergebenePlaetze} onClose={() => setAktion(null)} />
       <ServicegebuehrDialog hof={gebuehrHof} onClose={() => setGebuehrHof(null)} />
+      <GruendungBisDialog hof={gruendungHof} onClose={() => setGruendungHof(null)} />
     </div>
   )
 }
@@ -299,11 +304,46 @@ function NeuImBriefkasten({ meldungen }: { meldungen: NeueMeldung[] }): React.JS
 type ZeilenProps = {
   hoefe: AdminHof[]
   onGebuehr: (hof: AdminHof) => void
+  onGruendung: (hof: GruendungsHof) => void
   onAktion: (a: HofAktion) => void
 }
 
+/** „Standard" oder „abweichend" neben dem wirksamen Ende. */
+function gruendungMarke(gruendung: GruendungAnzeige): string {
+  return gruendung.abweichend ? GRUENDUNG_BIS_MARKE.abweichend : GRUENDUNG_BIS_MARKE.standard
+}
+
+/** Die Zelle „Gründungshof bis": Datum, darunter die Marke, daneben „ändern" — ohne Platz ein Strich. */
+function GruendungZelle({ hof, onGruendung }: { hof: AdminHof; onGruendung: (hof: GruendungsHof) => void }): React.JSX.Element {
+  const gruendung = hof.gruendung
+  if (!gruendung) {
+    return (
+      <>
+        <span aria-hidden="true">–</span>
+        <span className="sr-only">{KEIN_GRUENDUNGSPLATZ}</span>
+      </>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {/* Mindestbreite des längsten Datums („31. Dezember 2027"), damit „ändern" in jeder Zeile gleich steht. */}
+      <span className="flex min-w-32 flex-col leading-tight">
+        <span className="text-foreground">{gruendung.bisText}</span>
+        <span className={cn('text-[12px]', LEISE)}>{gruendungMarke(gruendung)}</span>
+      </span>
+      <button
+        type="button"
+        onClick={() => onGruendung({ id: hof.id, name: hof.name, gruendung })}
+        className={cn('min-h-11 rounded-full px-2 text-[13px] font-medium text-status-fertig hover:bg-muted', FOKUS_RAHMEN)}
+      >
+        ändern<span className="sr-only"> ({GRUENDUNG_BIS_TITEL} {hof.name})</span>
+      </button>
+    </span>
+  )
+}
+
 /** Ab 1024 px: die Tabelle aus dem Mockup. */
-function Tabelle({ hoefe, onGebuehr, onAktion }: ZeilenProps): React.JSX.Element {
+function Tabelle({ hoefe, onGebuehr, onGruendung, onAktion }: ZeilenProps): React.JSX.Element {
   const kopf = 'px-3.5 py-2.5 text-left text-[11px] font-semibold tracking-[0.1em] whitespace-nowrap text-muted-foreground uppercase'
   return (
     <div className={cn(KARTE, 'hidden overflow-hidden lg:block')}>
@@ -318,6 +358,9 @@ function Tabelle({ hoefe, onGebuehr, onAktion }: ZeilenProps): React.JSX.Element
             </th>
             <th scope="col" className={kopf}>
               Platz
+            </th>
+            <th scope="col" className={kopf}>
+              {GRUENDUNG_BIS_TITEL}
             </th>
             <th scope="col" className={kopf}>
               Servicegebühr
@@ -351,6 +394,9 @@ function Tabelle({ hoefe, onGebuehr, onAktion }: ZeilenProps): React.JSX.Element
                 <StatusBadge status={hof.status.ton}>{hof.status.text}</StatusBadge>
               </td>
               <td className="px-3.5 py-2.5 whitespace-nowrap tabular-nums">{hof.gruendungsplatz !== null ? `#${hof.gruendungsplatz}` : '–'}</td>
+              <td className="px-3.5 py-1.5 whitespace-nowrap">
+                <GruendungZelle hof={hof} onGruendung={onGruendung} />
+              </td>
               <td className="px-3.5 py-2.5 whitespace-nowrap">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="rounded-lg border border-border px-2 py-0.5 tabular-nums" title={hof.satzLang}>
@@ -387,7 +433,7 @@ function Tabelle({ hoefe, onGebuehr, onAktion }: ZeilenProps): React.JSX.Element
 }
 
 /** Unter 1024 px: je Hof eine Karte (nichts scrollt quer). */
-function Karten({ hoefe, onGebuehr, onAktion }: ZeilenProps): React.JSX.Element {
+function Karten({ hoefe, onGebuehr, onGruendung, onAktion }: ZeilenProps): React.JSX.Element {
   return (
     <ul className="flex flex-col gap-3 lg:hidden">
       {hoefe.map((hof) => (
@@ -431,9 +477,34 @@ function Karten({ hoefe, onGebuehr, onAktion }: ZeilenProps): React.JSX.Element 
               Gebühr ändern
             </button>
           </div>
+          {hof.gruendung && <GruendungKartenZeile hof={hof} gruendung={hof.gruendung} onGruendung={onGruendung} />}
         </li>
       ))}
     </ul>
+  )
+}
+
+/** Karte am Handy: die Zeile „Gründungshof bis" mit Datum, Marke und „Ende ändern" (nur mit Platz). */
+function GruendungKartenZeile({
+  hof,
+  gruendung,
+  onGruendung,
+}: {
+  hof: AdminHof
+  gruendung: GruendungAnzeige
+  onGruendung: (hof: GruendungsHof) => void
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2.5">
+      {/* Beschriftung über dem Datum: In einer Zeile bräche „Ende ändern" bei 390 px unter den Text. */}
+      <p className="min-w-0 text-[13px] text-foreground">
+        <span className={cn('block', LEISE)}>{GRUENDUNG_BIS_TITEL}</span>
+        {gruendung.bisText} <span className={LEISE}>{`· ${gruendungMarke(gruendung)}`}</span>
+      </p>
+      <button type="button" onClick={() => onGruendung({ id: hof.id, name: hof.name, gruendung })} className={KNOPF_RAHMEN}>
+        Ende ändern<span className="sr-only"> ({GRUENDUNG_BIS_TITEL} {hof.name})</span>
+      </button>
+    </div>
   )
 }
 

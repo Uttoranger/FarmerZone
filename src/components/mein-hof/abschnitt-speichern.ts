@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/nextjs'
-import { ladeAuftrittStand, saveAppearanceAction } from '@/server/actions/appearance'
+import { saveAppearanceAction } from '@/server/actions/appearance'
 import { ladeProfilStand, updateProfile } from '@/server/actions/farm'
-import { ABSCHNITT_SPEICHERN_TEXT, auftrittMitTeil, profilMitTeil, type AuftrittTeil, type ProfilTeil } from '@/lib/abschnitt-stand'
+import { ABSCHNITT_SPEICHERN_TEXT, bereiteAuftrittVor, profilMitTeil, type AuftrittTeil, type ProfilTeil } from '@/lib/abschnitt-stand'
 import { BEZEICHNER, befundVon, istNetzfehler } from '@/lib/upload-diagnose'
 
 /*
@@ -10,18 +10,22 @@ import { BEZEICHNER, befundVon, istNetzfehler } from '@/lib/upload-diagnose'
  * Bausteinen. Keine zweite Speicherlogik: gespeichert wird über die
  * bestehenden Aktionen saveAppearanceAction und updateProfile.
  *
- * Beide schreiben bei jedem Aufruf mehr als das eine Feld. Darum liest jeder
- * Abschnitt direkt vor dem Speichern den frischen Stand vom Server und ändert
- * nur sein eigenes Feld (lib/abschnitt-stand.ts) — der Stand aus den Props der
- * Seite schriebe nach einem anderen Abschnitt alte Werte zurück, solange
- * router.refresh() noch läuft.
+ * saveAppearanceAction schreibt seit Nr. 65 nur, was mitkommt (Register N4,
+ * Ergänzung Lauf 10): Ein Abschnitt des Auftritts schickt nur seinen Teil
+ * und liest vorher nichts — so setzt er auch den Abschnitt eines zweiten Tabs
+ * nicht zurück. updateProfile schreibt weiter das ganze Profil; darum liest
+ * ein Abschnitt des Profils direkt vor dem Speichern den frischen Stand vom
+ * Server und ändert nur sein eigenes Feld (lib/abschnitt-stand.ts) — der
+ * Stand aus den Props der Seite schriebe nach einem anderen Abschnitt alte
+ * Werte zurück, solange router.refresh() noch läuft.
  *
- * Lesen und Schreiben laufen nacheinander, nie verschränkt: Zwei Abschnitte,
- * die zugleich speichern (ein zweiter Tipp, ein schneller Wechsel), läsen
- * sonst beide den alten Stand, und der zweite überschriebe den ersten. Die
- * Kette gilt für dieses Browserfenster; zwei Tabs oder zwei Geräte zugleich
- * bleiben ein Wettlauf zwischen Lesen und Schreiben
- * (tests/integration/auftritt-abschnitte.int.test.ts, Bericht Nr. 50).
+ * Die Speicherungen eines Fensters laufen nacheinander, nie verschränkt:
+ * Zwei Profil-Abschnitte, die zugleich speichern (ein zweiter Tipp, ein
+ * schneller Wechsel), läsen sonst beide den alten Stand, und der zweite
+ * überschriebe den ersten. Die Kette gilt für dieses Browserfenster; beim
+ * Profil bleiben zwei Tabs oder zwei Geräte zugleich ein Wettlauf zwischen
+ * Lesen und Schreiben (tests/integration/auftritt-abschnitte.int.test.ts,
+ * Bericht Nr. 50), beim Auftritt nicht mehr (Nr. 65).
  *
  * Ein Fehler hält die Kette nicht an — der Aufrufer bekommt ihn trotzdem, das
  * nächste Speichern läuft und liest frisch. Hängt ein Speichern (Funkloch, die
@@ -107,13 +111,9 @@ export async function speichernOhneWurf(speichern: () => Promise<{ error?: strin
   }
 }
 
-/** Speichert einen Teil des Auftritts (Leitspruch und Gründungsjahr, Über uns, Werte, Abschnitte). */
+/** Speichert einen Teil des Auftritts (Leitspruch und Gründungsjahr, Über uns, Werte, Abschnitte) — nur diesen Teil. */
 export function speichereAuftritt(teil: AuftrittTeil): Promise<{ error?: string }> {
-  return nacheinander(async () => {
-    const frisch = await ladeAuftrittStand()
-    if ('error' in frisch) return { error: frisch.error }
-    return saveAppearanceAction(auftrittMitTeil(frisch.stand, teil))
-  })
+  return nacheinander(() => saveAppearanceAction(bereiteAuftrittVor(teil)))
 }
 
 /** Speichert einen Teil des Profils (Name und Kurzbeschreibung, Adresse, Kontakt). */

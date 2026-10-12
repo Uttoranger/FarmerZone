@@ -10,8 +10,14 @@
  *    am gerenderten seitenkopf.tsx; der Bestandskopf fiel mit /status weg.)
  *  - „Hofseite ansehen" in der Seitenleiste entfällt ab lg.
  *  - Die Bausteine speichern nur über die vorhandenen Aktionen aus farm.ts,
- *    appearance.ts und farm-photos.ts — jeder Abschnitt mit frischem Stand
- *    (abschnitt-speichern.ts); keine zweite Speicherlogik.
+ *    appearance.ts und farm-photos.ts — über abschnitt-speichern.ts; keine
+ *    zweite Speicherlogik.
+ *  - Wache über ganz src/ (Nr. 65, Syntaxbaum von TypeScript):
+ *    saveAppearanceAction nur aus speichereAuftritt, updateProfile nur aus
+ *    speichereProfil (beide in abschnitt-speichern.ts) — auch nicht unter
+ *    anderem Namen, über einen Namensraum, einen dynamischen Import oder aus
+ *    der eigenen Aktionsdatei heraus. Gegenproben zeigen, dass jede Suche
+ *    anschlägt.
  *  - Die Vorschau ist die echte Hofseite im Vorschau-Modus — Handy (390 px)
  *    oder Web (1440 px) in EINEM iframe, der Maßstab gerechnet, nie hart
  *    codiert; die Markierung geht nur an den eigenen Ursprung.
@@ -20,8 +26,9 @@
  *    das Overlay mit Titel und Umschalter.
  */
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { join, relative } from 'node:path'
+import ts from 'typescript'
 import { hofseiteStand } from '@/lib/hofseite-fortschritt'
 
 const quelltext = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
@@ -88,25 +95,39 @@ describe('Editor und Bausteine', () => {
     expect([...aktionen].toSorted()).toEqual(['appearance', 'farm', 'farm-photos'])
     // Editor und Liste selbst rufen keine Aktion.
     for (const text of [editor, liste]) expect(text).not.toMatch(/from '@\/server\/actions\//)
-    // Auftritt und Profil speichert NUR abschnitt-speichern.ts — die Formulare gehen über speichereAuftritt/speichereProfil.
-    for (const pfad of BAUSTEINE.filter((p) => !p.endsWith('abschnitt-speichern.ts'))) {
-      expect(quelltext(pfad), pfad).not.toMatch(/\b(?:saveAppearanceAction|updateProfile)\(|import \{[^}]*\b(?:saveAppearanceAction|updateProfile)\b/)
-    }
+    // Auftritt und Profil speichert NUR abschnitt-speichern.ts — die Formulare gehen über speichereAuftritt/speichereProfil
+    // (die Wache über ganz src/ steht unten: „saveAppearanceAction und updateProfile nur aus abschnitt-speichern.ts").
     expect(formulare.match(/speichereAuftritt\(/g)?.length).toBeGreaterThanOrEqual(4)
     expect(formulare.match(/speichereProfil\(/g)?.length).toBe(3)
   })
 
-  it('jeder Abschnitt liest vor dem Speichern den frischen Stand und ändert nur sein Feld', () => {
-    expect(speichern).toMatch(/const frisch = await ladeAuftrittStand\(\)[\s\S]*?saveAppearanceAction\(auftrittMitTeil\(frisch\.stand, teil\)\)/)
+  it('der Auftritt schickt nur seinen Teil (Nr. 65); das Profil liest vorher den frischen Stand und ändert nur sein Feld', () => {
+    expect(speichern).toContain('return nacheinander(() => saveAppearanceAction(bereiteAuftrittVor(teil)))')
+    // Gegenprobe: Der Auftritt liest keinen Stand mehr, um fremde Felder mitzuschreiben.
+    expect(speichern).not.toMatch(/ladeAuftrittStand|auftrittMitTeil/)
     expect(speichern).toMatch(/const frisch = await ladeProfilStand\(\)[\s\S]*?updateProfile\(profilMitTeil\(frisch\.profil, teil\)\)/)
     // Nacheinander, nie verschränkt (tests/integration/auftritt-abschnitte.int.test.ts prüft den Zustand).
     expect(speichern.match(/return nacheinander\(/g)).toHaveLength(2)
   })
 
+  it('Adress-Formular: die Adresse als Ganzes, nach geänderter Straße „Standort auf der Karte prüfen" (Nr. 65, Register N4)', () => {
+    const adresse = formulare.slice(formulare.indexOf('export function AdresseForm'), formulare.indexOf('type KontaktDaten'))
+    // Land und Kartenpunkt vom Laden gehen mit (bereiteAdresseVor, tests/abschnitt-stand.test.ts) ...
+    expect(adresse).toContain('speichereProfil(bereiteAdresseVor(einstellungen, daten))')
+    // ... und der Hinweis hängt an der einen Regel, Text und Ziel aus einer Quelle.
+    expect(adresse).toContain('brauchtKartenpruefung(einstellungen, strasse)')
+    expect(adresse).toContain('KARTENPUNKT_PRUEFEN.text')
+    expect(adresse).toContain('href={KARTENPUNKT_PRUEFEN.href}')
+    // Gegenprobe: nur Straße, PLZ und Ort direkt an speichereProfil (bis Nr. 65) steht nicht mehr da.
+    expect(adresse).not.toContain('speichereProfil(daten)')
+    expect(adresse).not.toContain('href="/settings/profile"')
+  })
+
   it('schickt Logo und Titelbild nicht mit — die haben eigene Aktionen', () => {
     const stand = quelltext('src/lib/abschnitt-stand.ts')
-    const basis = stand.slice(stand.indexOf('export function auftrittBasis'), stand.indexOf('export function auftrittStandAus'))
-    expect(basis).not.toMatch(/bannerType|bannerUrl|bannerValue|logoUrl/)
+    const teil = stand.slice(stand.indexOf('export function bereiteAuftrittVor'), stand.indexOf('export type ProfilQuelle'))
+    expect(teil).toContain('anfrage.tagline')
+    expect(teil).not.toMatch(/bannerType|bannerUrl|bannerValue|logoUrl/)
   })
 
   it('prüft die Felder mit den Schemas der Aktionen selbst, nicht mit einer Abschrift', () => {
@@ -247,3 +268,101 @@ function standOhnePunkt() {
     sectionsConfig: [],
   }
 }
+
+// ─── Wache über ganz src/ (Nr. 65) ─────────────────────────────────────────
+
+const SRC = join(process.cwd(), 'src')
+const SPEICHERWEG = 'components/mein-hof/abschnitt-speichern.ts'
+
+/** Jede Aktion: wo sie steht und aus welcher Funktion des Speicherwegs allein sie gerufen wird. */
+const AKTIONEN: Record<string, { datei: string; nurAus: string }> = {
+  saveAppearanceAction: { datei: 'server/actions/appearance.ts', nurAus: 'speichereAuftritt' },
+  updateProfile: { datei: 'server/actions/farm.ts', nurAus: 'speichereProfil' },
+}
+
+type Fund = { datei: string; zeile: number; name: string }
+
+function tsDateien(ordner: string): string[] {
+  return readdirSync(ordner).flatMap((name) => {
+    const pfad = join(ordner, name)
+    if (statSync(pfad).isDirectory()) return tsDateien(pfad)
+    return /\.(ts|tsx)$/.test(name) ? [pfad] : []
+  })
+}
+
+function umschliessendeFunktion(knoten: ts.Node): string | null {
+  for (let k: ts.Node | undefined = knoten.parent; k; k = k.parent) {
+    if (ts.isFunctionDeclaration(k) && k.name) return k.name.text
+  }
+  return null
+}
+
+/**
+ * Jede Stelle, an der eine der zwei Aktionen vorkommt, außer ihrer Definition
+ * und dem einen Aufruf im Speicherweg. Gesucht wird der Name als Bezeichner
+ * (Import, auch umbenannt; Namensraum `a.updateProfile`; Zerlegung eines
+ * dynamischen Imports) und als Text in eckigen Klammern (`a['updateProfile']`).
+ */
+function findeAktionsaufrufe(datei: string, text: string): Fund[] {
+  const quelle = ts.createSourceFile(datei, text, ts.ScriptTarget.Latest, true, datei.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+  const funde: Fund[] = []
+  function erlaubt(knoten: ts.Identifier): boolean {
+    const aktion = AKTIONEN[knoten.text]
+    const eltern = knoten.parent
+    if (datei === aktion.datei && ts.isFunctionDeclaration(eltern) && eltern.name === knoten) return true
+    if (datei !== SPEICHERWEG) return false
+    if (ts.isImportSpecifier(eltern) && !eltern.propertyName) return true
+    return ts.isCallExpression(eltern) && eltern.expression === knoten && umschliessendeFunktion(knoten) === aktion.nurAus
+  }
+  function besuche(knoten: ts.Node): void {
+    // Object.hasOwn statt `in`: `in` fände auch toString und andere Namen aus Object.prototype.
+    const name =
+      ts.isIdentifier(knoten) && Object.hasOwn(AKTIONEN, knoten.text)
+        ? knoten.text
+        : ts.isElementAccessExpression(knoten) && ts.isStringLiteralLike(knoten.argumentExpression) && Object.hasOwn(AKTIONEN, knoten.argumentExpression.text)
+          ? knoten.argumentExpression.text
+          : null
+    if (name && !(ts.isIdentifier(knoten) && erlaubt(knoten))) {
+      funde.push({ datei, zeile: quelle.getLineAndCharacterOfPosition(knoten.getStart(quelle)).line + 1, name })
+    }
+    ts.forEachChild(knoten, besuche)
+  }
+  besuche(quelle)
+  return funde
+}
+
+describe('saveAppearanceAction und updateProfile nur aus abschnitt-speichern.ts (Wache über ganz src/, Nr. 65)', () => {
+  it(
+    'kein Fund in src/: jede Aktion steht einmal und wird nur aus ihrer Funktion im Speicherweg gerufen',
+    () => {
+      // Liest und parst jede Datei unter src/ — eigenes Limit nur für diesen Fall (TESTING_GUIDELINES §4).
+      const funde = tsDateien(SRC).flatMap((pfad) => findeAktionsaufrufe(relative(SRC, pfad).split('\\').join('/'), readFileSync(pfad, 'utf8')))
+      expect(funde).toEqual([])
+      // Gegenprobe am echten Speicherweg: Die erlaubten Stellen gibt es wirklich.
+      const speicherweg = quelltext(`src/${SPEICHERWEG}`)
+      expect(speicherweg).toMatch(/export function speichereAuftritt\([\s\S]*?saveAppearanceAction\(/)
+      expect(speicherweg).toMatch(/export function speichereProfil\([\s\S]*?updateProfile\(/)
+    },
+    30_000
+  )
+
+  it('Gegenproben: jede Umgehung schlägt an', () => {
+    const namen = (datei: string, text: string) => findeAktionsaufrufe(datei, text).map((f) => f.name)
+    // Direkt aus einem Formular, auch umbenannt.
+    expect(namen('components/settings/profile-form.tsx', "import { updateProfile } from '@/server/actions/farm'\nupdateProfile(daten)")).toEqual(['updateProfile', 'updateProfile'])
+    expect(namen('app/(hof)/x/page.tsx', "import { updateProfile as speichern } from '@/server/actions/farm'")).toEqual(['updateProfile'])
+    // Über einen Namensraum, einen dynamischen Import oder eckige Klammern.
+    expect(namen('components/x.tsx', "import * as a from '@/server/actions/appearance'\na.saveAppearanceAction({})")).toEqual(['saveAppearanceAction'])
+    expect(namen('components/x.tsx', "const { updateProfile: u } = await import('@/server/actions/farm')")).toEqual(['updateProfile'])
+    expect(namen('components/x.tsx', "a['saveAppearanceAction']({})")).toEqual(['saveAppearanceAction'])
+    // Aus der eigenen Aktionsdatei heraus, an der Kette vorbei.
+    expect(namen('server/actions/farm.ts', 'export async function updateProfile() {}\nexport async function andere() { return updateProfile(x) }')).toEqual(['updateProfile'])
+    // Im Speicherweg, aber aus der falschen Funktion oder umbenannt.
+    expect(namen(SPEICHERWEG, 'export function speichereAuftritt() { return updateProfile(x) }')).toEqual(['updateProfile'])
+    expect(namen(SPEICHERWEG, 'function hilfe() { return saveAppearanceAction(x) }')).toEqual(['saveAppearanceAction'])
+    expect(namen(SPEICHERWEG, "import { saveAppearanceAction as s } from '@/server/actions/appearance'")).toEqual(['saveAppearanceAction'])
+    // Erlaubt: Definition, Import und der Aufruf aus der eigenen Funktion des Speicherwegs.
+    expect(namen('server/actions/appearance.ts', 'export async function saveAppearanceAction() {}')).toEqual([])
+    expect(namen(SPEICHERWEG, "import { updateProfile } from '@/server/actions/farm'\nexport function speichereProfil() { return nacheinander(async () => updateProfile(y)) }")).toEqual([])
+  })
+})
