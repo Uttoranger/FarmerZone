@@ -410,6 +410,21 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['lange Folge aus Schrägstrichen und http als Nachricht', { message: 'x /' + 'http/'.repeat(N / 3) }],
     ['viele Plus-Nummern-Anfänge in einer Abfrage', { request: { url: 'https://farmerzone.at/?' + 'a=+0&'.repeat(N / 5) } }],
     ['viele @ in einer Abfrage', { request: { url: 'https://farmerzone.at/?q=' + 'a@'.repeat(N) } }],
+    // Nacharbeit nach Runde 2: Werte hinter Leerraum vorab.
+    ['viele Codes mit Bindestrich als Nachricht', { message: 'code-123456,'.repeat(N / 4) }],
+    ['viele Codes in einer Abfrage als Nachricht', { message: 'Abruf https://farmerzone.at/x?' + 'otp=123456&'.repeat(N / 4) }],
+    ['viele Codes hinter Leerraum im Fehlertext', { exception: { values: [{ value: 'otp: 123456 '.repeat(N / 4) }] } }],
+    ['viele Werte mit Adresse als Nachricht', { message: 'token: (/x?a=1&s=b) '.repeat(N / 8) }],
+    ['Bearer vor langen Wörtern mit Schrägstrichen', { exception: { values: [{ value: ('Bearer ' + 'a/'.repeat(N / 10) + ' ').repeat(5) }] } }],
+    ['viele Bearer mit Adresse in extra', { extra: { text: 'Bearer /x?s=1 '.repeat(N / 6) } }],
+    ['Wert vor einem Wort aus vielen Schlüsseln', { message: 'token: /' + ',token:a'.repeat(N / 4) }],
+    ['Wert aus einer langen Nummer', { message: 'token: 0' + '1 '.repeat(N) }],
+    ['viele Paare im Pfad', { request: { url: 'https://farmerzone.at/x' + '&s=1&a=2'.repeat(N / 4) } }],
+    ['viele Werte mit Ziffern dahinter', { message: ('token: a1 ' + '1 '.repeat(50)).repeat(N / 100) }],
+    ['viele Adressen mit Nummern dahinter im Fehlertext', { exception: { values: [{ value: ' /a?s=0664 1234567'.repeat(N / 20) }] } }],
+    ['Bearer vor einer langen E-Mail-Adresse', { message: 'Bearer kundin@' + 'a'.repeat(2 * N) }],
+    ['viele Codes nach Schrägstrich', { message: 'code /123456?s=1 '.repeat(N / 10) }],
+    ['viele Werte mit Adresse in den Ziffern dahinter', { extra: { text: 'token: a1 (/1?s=2 '.repeat(N / 10) } }],
   ]
 
   for (const [name, teil] of lang) {
@@ -1081,6 +1096,8 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
       ['Abruf /api/og?url=https://farmerzone.at/x&s=abc123sig gescheitert', 'Abruf /api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx gescheitert'],
       ['Abruf /api/og?url=https://farmerzone.at/x&reorder=abc123 gescheitert', 'Abruf /api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx gescheitert'],
       ['Abruf /api/og?url=https://farmerzone.at/x&pathname=hof/foto.jpg gescheitert', 'Abruf /api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx gescheitert'],
+      // Ein Wert, der selbst eine absolute Adresse ist, fällt mit seinem Schlüssel.
+      ['Abruf /x?a=1&token=https://farmerzone.at/abc123 weg', 'Abruf /x?a=1 weg'],
       ['Abruf /proxy/https://farmerzone.at/x?f[a]=1&reorder=abc123 weg', 'Abruf /proxy/https://farmerzone.at/x?f%5Ba%5D=1 weg'],
       [`Wert =/https://farmerzone.at/x?q='a'&s=abc123sig weg`, 'Wert =/https://farmerzone.at/x?q=%27a%27 weg'],
     ]
@@ -1096,7 +1113,7 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
   it('ein Geheimnis hinter Leerraum fällt, auch wenn sein Schlüsselwort an einer Adresse hängt — in Nachricht, Brotkrume, extra und Fehlertext', () => {
     // Liest eine Adresse das Schlüsselwort mit (bis zum Leerraum), steht es danach
     // kodiert in ihr (%22Bearer, token%3A) — die Regeln danach sahen es nicht mehr,
-    // der Wert dahinter blieb. Jetzt fällt er vorab (vorabHinterLeerraum).
+    // der Wert dahinter blieb. Jetzt fällt er vorab (ersetzeVorab).
     const faelle = [
       'Fetch {"u":"/api/og?url=https://farmerzone.at/x","h":"Bearer abc123def456ghi"}',
       'Fetch [["url","/api/og?url=https://farmerzone.at/x"],["authorization","Bearer abc123def456ghi"]]',
@@ -1114,7 +1131,7 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
         expect(ergebnis ?? '', roh).not.toMatch(/abc123def456|123456|Sommer@2024/)
       }
     }
-    // Der Vorab-Ersatz verschiebt keine Adressgrenze: Steht im Wort ein „/" oder „:", fällt es ganz.
+    // Der Vorab-Ersatz verschiebt keine Adressgrenze: Beginnt im Wert eine Adresse, fällt das ganze Wort.
     for (const roh of [
       'Weiter redirect_token: (/x?a=1&s=abc123sig) weg',
       'Weiter redirect_token: «/x?a=1&s=abc123sig» weg',
@@ -1130,17 +1147,102 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     }
     expect(nachricht('Weiter: Bearer /x?s=abc123sig weg')).toBe('Weiter: Bearer [entfernt] weg')
     expect(nachricht('Fehler code /123456?s=abc123sig weg')).toBe('Fehler code /[code entfernt] weg')
-    // Ohne „/" und „:" im Wort fällt nur der Wert, Anführungszeichen und Klammern dahinter bleiben.
+    // Ohne Adresse im Wert fällt nur der Wert, Anführungszeichen und Klammern dahinter bleiben.
     expect(fehlertext('Invalid prisma.session.findFirst() invocation: { where: { token: "abc123def456" } }')).toBe(
       'Invalid prisma.session.findFirst() invocation: { where: { token: "[entfernt]" } }'
     )
     expect(nachricht(faelle[0])).toBe('Fetch {"u":"/api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx%22%2C%22h%22%3A%22Bearer [entfernt]"}')
     expect(fehlertext(faelle[3])).toBe('Abruf /api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx%2Ctoken%3A [entfernt] weg')
-    // Gegenproben: Ein Wert, der selbst eine Adresse ist, liest die URL-Regel (ihre Parameter fallen dort);
+    // Gegenproben: Ein Wert, der selbst eine Adresse ist, fällt mit der ganzen Adresse;
     // ein Code und eine E-Mail-Adresse als Wert behalten ihren Platzhalter.
     expect(nachricht('redirect_token: /x?a=1&s=abc123sig weg')).toBe('redirect_token: [entfernt] weg')
     expect(nachricht('otp: 905173 abgelehnt')).toBe('otp: [code entfernt] abgelehnt')
     expect(nachricht('Passwort: kundin@example.com, token=[entfernt]')).toBe('Passwort: [e-mail entfernt], token=[entfernt]')
+  })
+
+  it('vorab fällt der Wert, kein Schlüssel — auch der Wert eines Schlüssels im selben Wort fällt', () => {
+    // Der Ersatz bis zum Leerraum nahm den nächsten Schlüssel mit, und dessen Wert
+    // hinter dem Leerraum blieb stehen. Jetzt lesen alle Regeln den unveränderten
+    // Text, ihre Bereiche werden danach zusammengelegt.
+    const faelle: [string, string][] = [
+      ['Fehler token: abc,password: geheimB weg', 'Fehler token: [entfernt],password: [entfernt] weg'],
+      ['Login fehlgeschlagen password: Sommer2024,token: geheimA weg', 'Login fehlgeschlagen password: [entfernt],token: [entfernt] weg'],
+      ['Fehler Bearer abc,token: geheimC weg', 'Fehler Bearer [entfernt],token: [entfernt] weg'],
+      ['Fehler Bearer abc,code: 482913 weg', 'Fehler Bearer [entfernt],code: [code entfernt] weg'],
+      ['Fehler code 111222,token: geheimD weg', 'Fehler code [code entfernt],token: [entfernt] weg'],
+      ['Fehler redirect_token: /konto,sig: geheimF weg', 'Fehler redirect_token: [entfernt] [entfernt] weg'],
+      ['Fehler token: a,token: wertB,token: c weg', 'Fehler token: [entfernt],token: [entfernt],token: [entfernt] weg'],
+      ['Fehler password: kundin@example.com,token: geheimI weg', 'Fehler password: [e-mail entfernt],token: [entfernt] weg'],
+      ['{"token": "abc","password": "geheimE"}', '{"token": "[entfernt]","password": "[entfernt]"}'],
+      // Eine Nummer hinter dem Wert verliert ihren Anfang nicht.
+      ['Fehler token: abc,tel:+43 664 9876543 weg', 'Fehler token: [entfernt],tel:[telefon entfernt] weg'],
+      ['Fehler Bearer x/y,+43 664 9876543 weg', 'Fehler Bearer [entfernt],[telefon entfernt] weg'],
+      ['Fehler token: "a/b","telefon":"+43 664 9876543"', 'Fehler token: "[entfernt]","telefon":"[telefon entfernt]"'],
+      // Ist der ganze Wert eine Nummer, nimmt ihn deren Regel, auch über den Leerraum hinweg.
+      ['Fehler token: 0664 1234567 weg', 'Fehler token: [telefon entfernt] weg'],
+      // Beginnt im Wert eine Nummer, fällt sie bis zu ihrem Ende mit — auch eine, die die
+      // Telefon-Regel erst sähe, wenn die E-Mail-Adresse davor gefallen ist.
+      ['Fehler token: «0664 9876543 weg', 'Fehler token: [entfernt] weg'],
+      ['Fehler password: xgeheimP=+43 664 9876543', 'Fehler password: [entfernt]'],
+      ['Fehler sig: kundin@example.com0664 9876543sig weg', 'Fehler sig: [entfernt] weg'],
+      ['Fehler token: geheimQ1 /664/12345?s=abc123sig weg', 'Fehler token: [entfernt] weg'],
+      ['Fehler token: x(0664) 1234567 weg', 'Fehler token: [entfernt] weg'],
+      // Ein Code nimmt die Zahl dahinter nicht mit.
+      ['Fehler code: 123456 3 Versuche', 'Fehler code: [code entfernt] 3 Versuche'],
+      // Hängt am Bearer-Token ein „@", fällt die E-Mail-Adresse mit.
+      ['Fehler Bearer kundin@example.com weg', 'Fehler Bearer [entfernt] weg'],
+      // Ein Schlüssel direkt hinter der Nummer behält seinen Wert nicht.
+      ['Fehler token: x+43 664 9876543token: geheimG weg', 'Fehler token: [entfernt] [entfernt] weg'],
+      ['Fehler oauth2token=geheimH weg', 'Fehler oauth2token=[entfernt] weg'],
+    ]
+    for (const [roh, sauber] of faelle) {
+      expect(nachricht(roh), roh).toBe(sauber)
+      expect(extraText(roh), roh).toBe(sauber)
+      expect(brotkrume(roh), roh).toBe(sauber)
+      expect(fehlertext(roh), roh).toBe(sauber)
+    }
+    for (const ergebnis of [nachricht('Fehler code 111222/x,+43 664 9876543 weg'), fehlertext('Fehler code 111222/x,+43 664 9876543 weg')]) {
+      expect(ergebnis).not.toMatch(/111222|664|9876543/)
+    }
+    // Gegenproben: Eine Adresse hinter dem Wert bleibt lesbar; eine Nummer, die nur den
+    // Anfang des Werts deckt, nimmt ihn nicht mit; ein Code am Schlüssel in einer Adresse
+    // fällt mit dieser (sein Platzhalter mit Leerzeichen schnitte sie sonst entzwei).
+    expect(nachricht('Fehler token: abc,/hof/x?seite=2 weg')).toBe('Fehler token: [entfernt],/hof/x?seite=2 weg')
+    expect(nachricht('Fehler token: 06641234567geheimT weg')).toBe('Fehler token: [entfernt] weg')
+    expect(fehlertext('Fehler token: 06641234567geheimT weg')).toBe('Fehler token: [entfernt] weg')
+    expect(nachricht('Abruf /x?code=123456&s=abc123sig weg')).toBe('Abruf /x weg')
+    expect(nachricht('Abruf https://farmerzone.at/x?code=123456&s=abc123sig weg')).toBe('Abruf https://farmerzone.at/x weg')
+    // Hinter einem Schlüsselwort ohne „=" am Ende einer Adresse fällt der Code vorab.
+    expect(nachricht('Login https://farmerzone.at/konto&a=1&otp 123456 abgelaufen')).toBe(
+      'Login https://farmerzone.at/konto&a=1&otp [code entfernt] abgelaufen'
+    )
+  })
+
+  it('ein Wert hinter Leerraum fällt auch, wenn eine Adresse mit Abfrage davor sein Schlüsselwort mitliest', () => {
+    const faelle = [
+      '{"u":"https://farmerzone.at/x?a=1","token": "abc123def456"}',
+      '{"u":"https://farmerzone.at/x?a=1","h":"Bearer abc123def456ghi"}',
+      'Fehler https://farmerzone.at/x?a=1,code: 123456 weg',
+      '{"u":"/x?a=1","code": 123456}',
+      '{"u":"/x?a=1","h":"Bearer /9j4AAQgeheim"}',
+      'Fehler /x?a=1,token: /9j4AAQgeheim weg',
+      'Fehler https://farmerzone.at/x?a=1,token: (/y?s=abc123sig) weg',
+      'Fehler /x?a=1&otp 123456 weg',
+      // Hängt am Code oder an der Nummer noch etwas, fällt der ganze Wert schon vorab.
+      'Fehler /x?a=1,otp: 905173-geheimO weg',
+      'Fehler /x?a=1,token: 06641234567geheimT weg',
+      'Fehler /x?a=1,token: geheimQ1 /664/12345?s=abc123sig weg',
+      // Eine Nummer, die in einer Adresse beginnt und dahinter weitergeht, fällt ganz,
+      // auch wenn in der Adresse ihr Anfang mit einem heiklen Paar fällt.
+      'Link https://farmerzone.at/x&s=0664 1234567 weg',
+      'Link https://farmerzone.at/x?s=x-0664 1234567 weg',
+      'Fehler code /482913 nach sig: code /123456 weg',
+    ]
+    for (const roh of faelle) {
+      for (const ergebnis of [nachricht(roh), extraText(roh), brotkrume(roh), fehlertext(roh)]) {
+        expect(ergebnis ?? '', roh).not.toMatch(/abc123|123456|905173|6641234567|9j4AAQ|geheim|12345/)
+      }
+    }
   })
 
   it('ein Abfragewert, der nach der letzten Runde noch kodiert ist, fällt ganz', () => {

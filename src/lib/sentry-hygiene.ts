@@ -496,15 +496,17 @@ const ZUWEISUNG_WERT = /[^\s&,;"'<>]*/y
 
 /** Ist ein Teil des Schlüssels ein geheimes Wort? Teile trennen „_", „-" und
  *  der Wechsel zu einem Großbuchstaben (Runde 1: access_token, reset-token,
- *  resetToken, XMLToken, x-api-key). Ein Wort, das nur so anfängt oder endet
- *  (tokenizer, Apfelessig), ist kein Teil — vorher galt nur der Anfang eines
- *  Worts, und „access_token=…" blieb stehen. */
+ *  resetToken, XMLToken, x-api-key), seit der Nacharbeit nach Runde 2 auch
+ *  der von Ziffern zu Buchstaben (oauth2token; ein Schlüssel direkt hinter
+ *  einer Nummer, „…4567token: …", die vorab mit einem Wert fällt). Ein Wort,
+ *  das nur so anfängt oder endet (tokenizer, Apfelessig), ist kein Teil —
+ *  vorher galt nur der Anfang eines Worts, und „access_token=…" blieb stehen. */
 function istGeheimerSchluessel(schluessel: string): boolean {
   // Vorfilter: Steckt keines der Wörter auch nur als Teil darin, ist der
   // Schlüssel nie geheim — der häufige Fall, ohne Zerlegen.
   if (!GEHEIMES_WORT_IRGENDWO.test(schluessel)) return false
   const teile = schluessel
-    .replace(/([a-z0-9])(?=[A-Z])|([A-Z])(?=[A-Z][a-z])/g, '$1$2_')
+    .replace(/([a-z0-9])(?=[A-Z])|([A-Z])(?=[A-Z][a-z])|(\d)(?=[a-z])/g, '$1$2$3_')
     .toLowerCase()
     .split(/[_-]+/)
   return teile.some((teil, i) => GEHEIMES_WORT.has(teil) || (teil === 'api' && teile[i + 1] === 'key'))
@@ -520,38 +522,30 @@ function istGeheimerSchluessel(schluessel: string): boolean {
  * Platzhalter, nicht jeder Wert mit „[" (Runde 1: sonst blieb
  * „token=[abc123]" stehen); hängt etwas daran, fällt der ganze Wert.
  */
-function ersetzeZuweisungen(text: string, nurHinterLeerraum = false): string {
+function ersetzeZuweisungen(text: string): string {
   let ergebnis = ''
   let ende = 0
   for (const treffer of text.matchAll(ZUWEISUNG_KANDIDAT)) {
     if (treffer.index < ende || !istGeheimerSchluessel(treffer[1])) continue
-    // Vorab (vorabHinterLeerraum): nur ein Wert hinter Leerraum.
-    if (nurHinterLeerraum && !/\s/.test(treffer[2])) continue
     const wertAnfang = treffer.index + treffer[0].length
-    EIGENER_PLATZHALTER.lastIndex = wertAnfang
-    const nachPlatzhalter = EIGENER_PLATZHALTER.test(text) ? EIGENER_PLATZHALTER.lastIndex : wertAnfang
-    ZUWEISUNG_WERT.lastIndex = nachPlatzhalter
-    ZUWEISUNG_WERT.test(text)
-    let wertEnde = ZUWEISUNG_WERT.lastIndex
-    if (nurHinterLeerraum) {
-      // Steht im Wort ein „/" oder „:", könnte darin eine Adresse beginnen — dann fällt das
-      // ganze Wort bis zum Leerraum, so verschiebt der Ersatz keine Adressgrenze. Sonst nur
-      // der Wert; eine E-Mail-Adresse als ganzer Wert bleibt für die E-Mail-Regel.
-      BIS_LEERRAUM.lastIndex = nachPlatzhalter
-      BIS_LEERRAUM.test(text)
-      if (/[/:]/.test(text.slice(nachPlatzhalter, BIS_LEERRAUM.lastIndex))) wertEnde = BIS_LEERRAUM.lastIndex
-      else if (wertEnde > nachPlatzhalter && ersetzeEmails(text.slice(nachPlatzhalter, wertEnde)) === '[e-mail entfernt]') continue
-    }
-    // Kein Wert, oder er ist genau ein eigener Platzhalter: stehen lassen.
-    if (wertEnde === wertAnfang || (nachPlatzhalter > wertAnfang && wertEnde === nachPlatzhalter)) continue
+    const wertEnde = zuweisungsEnde(text, wertAnfang)
+    if (wertEnde === -1) continue
     ergebnis += `${text.slice(ende, wertAnfang)}[entfernt]`
     ende = wertEnde
   }
   return ergebnis + text.slice(ende)
 }
 
-/** Der Rest eines Worts bis zum nächsten Leerraum, klebend. */
-const BIS_LEERRAUM = /\S*/y
+/** Wo der Wert einer Zuweisung ab `wertAnfang` endet — -1, wenn er stehen
+ *  bleibt: Es gibt keinen, oder er ist genau ein eigener Platzhalter. */
+function zuweisungsEnde(text: string, wertAnfang: number): number {
+  EIGENER_PLATZHALTER.lastIndex = wertAnfang
+  const nachPlatzhalter = EIGENER_PLATZHALTER.test(text) ? EIGENER_PLATZHALTER.lastIndex : wertAnfang
+  ZUWEISUNG_WERT.lastIndex = nachPlatzhalter
+  ZUWEISUNG_WERT.test(text)
+  const wertEnde = ZUWEISUNG_WERT.lastIndex
+  return wertEnde === wertAnfang || (nachPlatzhalter > wertAnfang && wertEnde === nachPlatzhalter) ? -1 : wertEnde
+}
 
 const BEARER_MUSTER = /\bBearer\s+[A-Za-z0-9._~+/=-]+/g
 
@@ -586,48 +580,161 @@ function entferneIps(text: string): string {
  * oder ab „/"), gilt die URL-Regel (Pfad-Token, heikle Parameter, Blob-Pfad);
  * sonst die Text-Regel samt eingebetteter Adressen — seit Nr. 56, Runde 2,
  * relativ mit derselben Grenze wie im Fehlertext, absolut (auch in einer
- * relativen) bis zum Leerraum (ADRESSE_IM_FREITEXT): Vorher blieb
+ * relativen) bis zum Leerraum (ADRESSE_IM_FREITEXT), Werte hinter Leerraum
+ * vorab (ersetzeVorab): Vorher blieb
  * „Fehler bei /login?next=%2F…%3Ftoken%3D…" in Nachricht, Brotkrume und extra
  * stehen, im Fehlertext fiel der Token.
  * IP-Adressen fallen zuerst — sonst hielte die Telefon-Regel eine lange IPv4
  * für eine Nummer.
  */
 function bereinigeFreitext(text: string): string {
-  const ohneIp = vorabHinterLeerraum(entferneIps(text))
+  const ohneIp = entferneIps(text)
   if (/^(?:https?:\/\/|\/)\S*$/i.test(ohneIp)) return bereinigeUrl(ohneIp)
-  const mitAdressen = bereinigeText(ohneIp.replace(ADRESSE_IM_FREITEXT, (adresse) => bereinigeUrl(adresse)))
+  const vorab = ersetzeVorab(ohneIp, ADRESSE_IM_FREITEXT)
+  const mitAdressen = bereinigeText(vorab.replace(ADRESSE_IM_FREITEXT, (adresse) => bereinigeUrl(adresse)))
   const ohneZuweisung = ersetzeZuweisungen(mitAdressen.replace(BEARER_MUSTER, 'Bearer [entfernt]'))
   return ohneZuweisung.replace(LANGE_KENNUNG_MUSTER, '[kennung entfernt]')
 }
 
-/** Vorab (vorabHinterLeerraum): „Bearer" und sein Token — steht im Wort ein „/"
- *  oder „:" (dort könnte eine Adresse beginnen), das ganze Wort bis zum Leerraum. */
-const BEARER_VORAB = /\bBearer\s+(?:\S*[/:]\S*|[A-Za-z0-9._~+/=-]+)/g
+/** „Bearer" vor einem Token (ersetzeVorab). */
+const BEARER_VORAB = /\bBearer\s+(?=[A-Za-z0-9._~+/=-])/g
 
-/** Vorab: ein Code, ebenso mit dem ganzen Wort, wenn darin „/" oder „:" steht. */
-const ANMELDECODE_VORAB = /\b(code|otp|anmeldecode)(\W{1,3})(?:\d{6}\b\S*[/:]\S*|\d{6}\b)/gi
+/** Ein Bearer-Token wie in BEARER_MUSTER, klebend. */
+const BEARER_TOKEN = /[A-Za-z0-9._~+/=-]+/y
+
+/** Der Rest eines Worts bis zum Leerraum, klebend. */
+const BIS_LEERRAUM = /\S*/y
+
+/** Weitere Ziffern einer Nummer hinter Trennern wie in TELEFON_MUSTER, klebend. */
+const ZIFFERN_REST = /(?:[\s/\-.()]{1,3}\d)(?:[\s/\-.()]{0,3}\d)*/y
+
+/** Wo eine Adresse beginnen kann: wie in ADRESSE_IM_FREITEXT und ADRESSE_IM_FEHLERTEXT. */
+const ADRESS_ANFANG = /https?:\/\/|(?<![\p{L}\p{N}\p{M}_/.~%-])\//iu
 
 /**
- * Geheimnisse, deren Wert hinter Leerraum steht — „Bearer …", „token: …",
- * „code: 123456" —, fallen vor den Adressen (Nacharbeit nach Runde 2). Liest
- * eine Adresse ihr Schlüsselwort mit (`…/x","h":"Bearer`, bis zum Leerraum),
- * steht es danach kodiert in ihr (`%22Bearer`, `token%3A`), und die Regeln
- * danach sähen es nicht mehr, während der Wert dahinter stehen bliebe.
- * Steht im Wort des Werts ein „/" oder „:", fällt vorab das ganze Wort bis
- * zum Leerraum: Keine Adresse reicht über Leerraum, also verschiebt der
- * Ersatz keine Grenze (`Bearer /x?s=…`, `token: (/x?a=1&s=…)`). Ohne „/"
- * und „:" kann im Rest keine Adresse beginnen; dann fällt nur der Wert, und
- * Anführungszeichen und Klammern dahinter bleiben (`token: "[entfernt]" }`).
- * Ein Code, vor dem ein „/" steht (`code /123456?s=…`), gehört zu einer
- * Adresse — ihn nimmt die Regel nach den Adressen.
+ * Das Ende eines Werts aus ersetzeVorab. Beginnt in ihm eine Adresse, fällt
+ * das ganze Wort bis zum Leerraum: Endete der Ersatz am Wert, blieben die
+ * übrigen Parameter der Adresse stehen (`token: (/x?a=1&s=…)`,
+ * `Bearer https://…?a=(1)&s=…`), und über Leerraum reicht keine Adresse.
+ * Vor dem Wert steht Leerraum oder ein Trenner, an dem keine beginnt — so
+ * liest ADRESS_ANFANG das Wort wie die Durchgänge danach.
  */
-function vorabHinterLeerraum(text: string): string {
-  const ohneCode = text
-    .replace(BEARER_VORAB, 'Bearer [entfernt]')
-    .replace(ANMELDECODE_VORAB, (treffer, wort: string, trenner: string) =>
-      /\s/.test(trenner) && !trenner.includes('/') ? `${wort}${trenner}[code entfernt]` : treffer
-    )
-  return ersetzeZuweisungen(ohneCode, true)
+function endeMitAdresse(text: string, anfang: number, ende: number): number {
+  const wort = wortEnde(text, anfang)
+  const adresse = text.slice(anfang, wort).search(ADRESS_ANFANG)
+  return adresse !== -1 && anfang + adresse < ende ? wort : ende
+}
+
+/** Das Ende des Worts ab `stelle`. */
+function wortEnde(text: string, stelle: number): number {
+  BIS_LEERRAUM.lastIndex = stelle
+  BIS_LEERRAUM.test(text)
+  return BIS_LEERRAUM.lastIndex
+}
+
+/**
+ * Werte hinter Leerraum fallen vor den Adressen (Nacharbeit nach Runde 2):
+ * „Bearer …", „code: 123456", „token: …". Liest eine Adresse davor ihr
+ * Schlüsselwort mit — sie reicht bis zum Leerraum (`…?a=1,"h":"Bearer`) —,
+ * steht es danach kodiert in ihr (`%22Bearer`, `token%3A`): Die Regeln
+ * danach sähen es nicht mehr, und der Wert dahinter bliebe. Ein Wert ohne
+ * Leerraum vor sich liegt in derselben Adresse wie sein Schlüssel; den nimmt
+ * die URL-Regel.
+ *
+ * Es fällt der Wert, kein Schlüssel davor: Nähme der Ersatz einen mit, bliebe
+ * dessen Wert stehen (`token: abc,password: geheim`). Beginnt im Wert eine
+ * Adresse, fällt das Wort mit (endeMitAdresse). Eine Telefonnummer reicht über
+ * Leerraum: Beginnt sie im Wert, fällt sie bis zu ihrem Ende mit; beginnt sie
+ * in einer Adresse und geht dahinter weiter (`…&s=0664 1234567`), fällt ihr
+ * Rest hinter der Adresse — fiele in der Adresse ihr Anfang (heikler
+ * Parameter), sähe die Telefon-Regel im Rest keine Nummer mehr. Alle Regeln
+ * lesen den unveränderten Text, ihre Bereiche werden danach zusammengelegt —
+ * so nimmt auch ein Wort, das fällt, keinem Schlüssel darin seinen Wert
+ * hinter dem Leerraum. Linear: Nummern und Adressen werden je einmal gesucht,
+ * jede Regel setzt je Treffer einmal an, und jedes Wort liest sie höchstens
+ * einmal.
+ */
+function ersetzeVorab(text: string, adressen: RegExp): string {
+  const nummern = [...text.matchAll(TELEFON_MUSTER)]
+  /** Die Nummer, die als letzte vor `stelle` beginnt — Nummern überlappen nicht. */
+  const nummerVor = (stelle: number) => {
+    let links = 0
+    let rechts = nummern.length
+    while (links < rechts) {
+      const mitte = (links + rechts) >> 1
+      if (nummern[mitte].index < stelle) links = mitte + 1
+      else rechts = mitte
+    }
+    return links > 0 ? nummern[links - 1] : undefined
+  }
+  const bereiche: { anfang: number; ende: number; ersatz: string }[] = []
+  /** Ein Wert ab `anfang`, mit Adresse und Nummer, die in ihm beginnen. Ist er
+   *  ganz eine Nummer, nimmt ihn deren Regel, mit ihrem Platzhalter. Endet ein
+   *  Geheimnis (`ziffernRest`) auf eine Ziffer, fallen die Ziffern dahinter mit:
+   *  Ob eine Nummer dort beginnt, sieht die Telefon-Regel oft erst, wenn vorher
+   *  eine E-Mail-Adresse gefallen ist (`kundin@example.com0664 1234567`). */
+  const wert = (anfang: number, ende: number, ersatz: string, ziffernRest = true) => {
+    const bis = endeMitAdresse(text, anfang, ende)
+    const nummer = nummerVor(bis)
+    const nummerEnde = nummer === undefined || nummer.index < anfang ? bis : nummer.index + nummer[0].length
+    if (nummer?.index === anfang && nummerEnde >= bis) return
+    let ganz = Math.max(bis, nummerEnde)
+    if (ziffernRest && /\d/.test(text[ganz - 1])) {
+      ZIFFERN_REST.lastIndex = ganz
+      if (ZIFFERN_REST.test(text)) ganz = ZIFFERN_REST.lastIndex
+    }
+    // Beginnt in den Ziffern dahinter eine Adresse (` /664/1?s=…`), fällt ihr Wort mit.
+    const adresse = text.slice(bis, ganz).search(/(?<=[\s()])\//)
+    bereiche.push({ anfang, ende: adresse === -1 ? ganz : wortEnde(text, bis + adresse), ersatz })
+  }
+  // Die Codes zuerst: Bei „otp: 123456" greifen Code und Zuweisung gleich
+  // weit, und der Code-Platzhalter bleibt (die Sortierung unten ist stabil).
+  for (const treffer of text.matchAll(ANMELDECODE_MUSTER)) {
+    const trenner = treffer[2]
+    if (!/\s/.test(trenner)) continue
+    const anfang = treffer.index + treffer[1].length + trenner.length
+    // Mit „/" davor beginnt eine Adresse (`code /123456?s=…`): Das Wort fällt mit,
+    // sonst schnitte der Platzhalter sie hinter dem Code entzwei.
+    wert(anfang, trenner.includes('/') ? wortEnde(text, anfang) : treffer.index + treffer[0].length, '[code entfernt]', false)
+  }
+  for (const treffer of text.matchAll(BEARER_VORAB)) {
+    const anfang = treffer.index + treffer[0].length
+    BEARER_TOKEN.lastIndex = anfang
+    BEARER_TOKEN.test(text)
+    // Hängt am Token ein „@", ist er der Anfang einer E-Mail-Adresse: Das Wort fällt mit.
+    const ende = text[BEARER_TOKEN.lastIndex] === '@' ? wortEnde(text, anfang) : BEARER_TOKEN.lastIndex
+    wert(anfang, ende, '[entfernt]')
+  }
+  for (const treffer of text.matchAll(ZUWEISUNG_KANDIDAT)) {
+    if (!/\s/.test(treffer[2]) || !istGeheimerSchluessel(treffer[1])) continue
+    const anfang = treffer.index + treffer[0].length
+    const ende = zuweisungsEnde(text, anfang)
+    // Ist der ganze Wert eine E-Mail-Adresse, nimmt ihn deren Regel — auch ohne Schlüssel.
+    if (ende === -1 || ersetzeEmails(text.slice(anfang, ende)) === '[e-mail entfernt]') continue
+    wert(anfang, ende, '[entfernt]')
+  }
+  for (const adresse of text.matchAll(adressen)) {
+    const ende = adresse.index + adresse[0].length
+    const nummer = nummerVor(ende)
+    if (nummer === undefined || nummer.index < adresse.index) continue
+    // Das Zeichen, an dem die Adresse endet, bleibt — so bleibt auch ihre Grenze.
+    let rest = ende + 1
+    while (rest < nummer.index + nummer[0].length && /\s/.test(text[rest])) rest++
+    if (rest < nummer.index + nummer[0].length) bereiche.push({ anfang: rest, ende: nummer.index + nummer[0].length, ersatz: '[telefon entfernt]' })
+  }
+  // Ein Bereich, der vor dem Ende des vorigen beginnt, liegt in ihm: In einem
+  // Wort beginnen zwei Werte nur am selben Ort (otp: 123456) — dann zuerst der
+  // längere, „otp: 905173-abc" fällt als Wert —, und der Rest einer Nummer
+  // hinter einer Adresse endet, wo die Nummer endet.
+  bereiche.sort((a, b) => a.anfang - b.anfang || b.ende - a.ende)
+  let ergebnis = ''
+  let ende = 0
+  for (const bereich of bereiche) {
+    if (bereich.anfang < ende) continue
+    ergebnis += text.slice(ende, bereich.anfang) + bereich.ersatz
+    ende = bereich.ende
+  }
+  return ergebnis + text.slice(ende)
 }
 
 /** Adressen in einem Fehlertext (Nr. 56): absolut (https://…, auch groß
@@ -650,7 +757,9 @@ const ADRESSE_IM_FEHLERTEXT =
  *  relativen Adresse eine absolute (/api/og?url=https://…), liest die
  *  relative sie mit, bis zum Leerraum: Endete sie davor, landeten die
  *  übrigen Parameter der äußeren Abfrage im Pfad der absoluten, und „&s=…"
- *  blieb. Die Vorschau prüft je Zeichen acht Zeichen, das bleibt linear.
+ *  blieb. Ein Schlüsselwort, das sie so mitliest und dessen Wert hinter
+ *  Leerraum steht, hat ersetzeVorab vorher genommen. Die Vorschau prüft je
+ *  Zeichen acht Zeichen, das bleibt linear.
  *  Im Fehlertext bleibt die engere Grenze: Dort stehen Adressen oft in
  *  Klammern oder JSON, und der Text danach hilft beim Beheben. */
 const ADRESSE_IM_FREITEXT =
@@ -668,7 +777,8 @@ const ADRESSE_IM_FREITEXT =
  * (Prisma: token: "…", Runde 1); einer ganz ohne Schlüssel bleibt.
  */
 function bereinigeFehlertext(text: string): string {
-  const mitAdressen = bereinigeText(vorabHinterLeerraum(text).replace(ADRESSE_IM_FEHLERTEXT, (adresse) => bereinigeUrl(adresse)))
+  const vorab = ersetzeVorab(text, ADRESSE_IM_FEHLERTEXT)
+  const mitAdressen = bereinigeText(vorab.replace(ADRESSE_IM_FEHLERTEXT, (adresse) => bereinigeUrl(adresse)))
   return ersetzeZuweisungen(mitAdressen.replace(BEARER_MUSTER, 'Bearer [entfernt]'))
 }
 
