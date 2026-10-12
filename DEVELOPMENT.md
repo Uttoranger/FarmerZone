@@ -4956,7 +4956,7 @@ Auftrag freigabe.md §15 „67" (Register T5, W1, T6, Teilen (d)). Keine Migrati
 - **Daten erst auf Wunsch:** `ladeTeilenFensterBeitragAction` (nur lesen, Hof aus der Sitzung, Besitz in der WHERE-Klausel); die Liste lädt nicht für jeden Beitrag ein Fenster vorab.
 - **„WhatsApp" in der Zeile:** sobald jemand geöffnet bekam (`whatsappGetippt`), nicht mehr nach `sentViaWhatsApp`; `publishStatusPost` setzt weder `sentViaWhatsApp` noch `whatsappRecipientCount` (Spalten bleiben, Expand/Contract).
 - **Befund aus Nr. 69, behoben hier:** `ladeTeilenVorschau` rechnete die Prüfsumme `v` ohne Produktfotos, die Bild-Route mit — bei Höfen mit eigenem Foto lag das Open-Graph-Bild deshalb nur 60 s im CDN. Jetzt liest `ladeTeilenBildQuelle` die Fotos mit, und beide bilden die Held-Kandidaten gleich (`istEigenesBild`).
-- **Offen:** Die Bild-Route nimmt im Beitrag-Modus die verknüpften Produkte vor `?p=` — ein Umschalten unter „Im Bild" ändert das Bild dann nicht, solange ein verknüpftes Produkt kaufbar ist (Route gehört Nr. 69).
+- **Runde 1 – `?p=` vor den verknüpften Produkten:** Die Bild-Route nahm im Beitrag-Modus die verknüpften Produkte vor `?p=`; das Fenster zeigte dann eine andere Auswahl als das geteilte Bild. Jetzt gilt `p` zuerst (Entscheidung des Dirigenten, abweichend vom Wortlaut der Freigabe „69"): Das Fenster belegt `p` mit den verknüpften Produkten vor, ohne `p` (geteilte Bildadresse) gelten die verknüpften, ohne beides der Standard.
 
 ## Nützliche Befehle
 
