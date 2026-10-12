@@ -35,7 +35,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
 }))
 
-const db = vi.hoisted(() => ({ farm: { findUnique: vi.fn() } }))
+const db = vi.hoisted(() => ({ farm: { findUnique: vi.fn(), findMany: vi.fn() } }))
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
 
 import {
@@ -468,6 +468,8 @@ describe('ladeKonditionenHof', () => {
       platformFeePercent: { toString: () => '0.00' },
       _count: { products: 4, pickupSlots: 2 },
     })
+    // Kein freigeschalteter Hof in der Platzliste: kein Gründungsplatz, kein Ende (Nr. 62).
+    db.farm.findMany.mockResolvedValue([])
     const ergebnis = await ladeKonditionenHof('nutzer-1')
     expect(db.farm.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { ownerId: 'nutzer-1' } }))
     expect(ergebnis).toEqual({
@@ -476,7 +478,7 @@ describe('ladeKonditionenHof', () => {
       serviceFeeMinCents: 50,
       serviceFeeActiveFrom: null,
       platformFeePercent: '0.00',
-      // Nr. 61: Gründungshöfe erst mit Nr. 62; was gezählt wird, prüft tests/integration/einstellungen.int.test.ts.
+      // Das wirksame Ende prüft tests/gruendung-bis-lader.test.ts; was gezählt wird, tests/integration/einstellungen.int.test.ts.
       gruendungBis: null,
       produkteImShop: 4,
       abholzeitenJeWoche: 2,

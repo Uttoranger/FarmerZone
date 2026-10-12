@@ -3,6 +3,7 @@ import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 import type { EinstellungenDaten, KonditionenHof } from '@/lib/hof-einstellungen'
 import type { TarifId } from '@/lib/konditionen'
 import { getFarmSettings, getOwnerFarm } from './farm'
+import { ladeGruendungBis } from './admin'
 
 /**
  * Was die Übersicht der Einstellungen (/settings, Nachtlauf Nr. 22d) über den
@@ -14,13 +15,14 @@ import { getFarmSettings, getOwnerFarm } from './farm'
  * null heißt „kein Hof" (das Layout schickt dann schon nach /onboarding).
  */
 export async function ladeEinstellungenUebersicht(ownerId: string): Promise<EinstellungenDaten | null> {
-  const [hof, farm, einstellungen] = await Promise.all([
+  const [hof, farm, einstellungen, gruendungBis] = await Promise.all([
     prisma.farm.findUnique({
       where: { ownerId },
       select: { stripeAccountId: true, acceptsOnline: true, tarif: true, archivedAt: true, teilenMomenteAus: true },
     }),
     getOwnerFarm(ownerId),
     getFarmSettings(ownerId),
+    ladeGruendungBis({ ownerId }),
   ])
   if (!hof || !farm || !einstellungen) return null
 
@@ -42,8 +44,8 @@ export async function ladeEinstellungenUebersicht(ownerId: string): Promise<Eins
     betriebsnummer: einstellungen.betriebsnummer,
     betriebsstatus: einstellungen.betriebsstatus,
     tarif: hof.tarif,
-    // Gründungshöfe erkennt erst Nr. 62 (Farm.gruendungBis und Platzvergabe).
-    gruendungBis: null,
+    // Das wirksame Ende (K2, Nr. 62): mit Gründungsplatz Spalte oder Standard, sonst null.
+    gruendungBis,
     isPaused: einstellungen.isPaused,
     stillgelegt: hof.archivedAt !== null,
     teilenMomenteAus: hof.teilenMomenteAus,
@@ -61,17 +63,20 @@ const IM_SHOP_WHERE = { isAvailable: true } as const
  * Abholzeiten — gezählt in derselben Abfrage.
  */
 export async function ladeKonditionenHof(ownerId: string): Promise<KonditionenHof | null> {
-  const hof = await prisma.farm.findUnique({
-    where: { ownerId },
-    select: {
-      tarif: true,
-      serviceFeePercent: true,
-      serviceFeeMinCents: true,
-      serviceFeeActiveFrom: true,
-      platformFeePercent: true,
-      _count: { select: { products: { where: IM_SHOP_WHERE }, pickupSlots: { where: { isActive: true } } } },
-    },
-  })
+  const [hof, gruendungBis] = await Promise.all([
+    prisma.farm.findUnique({
+      where: { ownerId },
+      select: {
+        tarif: true,
+        serviceFeePercent: true,
+        serviceFeeMinCents: true,
+        serviceFeeActiveFrom: true,
+        platformFeePercent: true,
+        _count: { select: { products: { where: IM_SHOP_WHERE }, pickupSlots: { where: { isActive: true } } } },
+      },
+    }),
+    ladeGruendungBis({ ownerId }),
+  ])
   if (!hof) return null
   return {
     tarif: hof.tarif,
@@ -79,15 +84,15 @@ export async function ladeKonditionenHof(ownerId: string): Promise<KonditionenHo
     serviceFeeMinCents: hof.serviceFeeMinCents,
     serviceFeeActiveFrom: hof.serviceFeeActiveFrom,
     platformFeePercent: hof.platformFeePercent.toString(),
-    // Gründungshöfe erkennt erst Nr. 62 (Farm.gruendungBis und Platzvergabe).
-    gruendungBis: null,
+    // Das wirksame Ende (K2, Nr. 62): mit Gründungsplatz Spalte oder Standard, sonst null.
+    gruendungBis,
     produkteImShop: hof._count.products,
     abholzeitenJeWoche: hof._count.pickupSlots,
   }
 }
 
-/** Was die Tarif-Zeile der HofShell über den Hof braucht (Nr. 61). */
-export type TarifStand = { tarif: TarifId | null; produkteImShop: number }
+/** Was die Tarif-Zeile der HofShell über den Hof braucht (Nr. 61; das wirksame Gründungs-Ende seit Nr. 62). */
+export type TarifStand = { tarif: TarifId | null; produkteImShop: number; gruendungBis: Date | null }
 
 /**
  * Tarif und Produkte im Shop für die Tarif-Zeile — EINE Abfrage, weil jede
@@ -95,11 +100,14 @@ export type TarifStand = { tarif: TarifId | null; produkteImShop: number }
  * zwischen Sitzung und Abfrage nicht mehr gibt, zählt wie einer ohne Tarif.
  */
 export async function ladeTarifStand(farmId: string): Promise<TarifStand> {
-  const hof = await prisma.farm.findUnique({
-    where: { id: farmId },
-    select: { tarif: true, _count: { select: { products: { where: IM_SHOP_WHERE } } } },
-  })
-  return { tarif: hof?.tarif ?? null, produkteImShop: hof?._count.products ?? 0 }
+  const [hof, gruendungBis] = await Promise.all([
+    prisma.farm.findUnique({
+      where: { id: farmId },
+      select: { tarif: true, _count: { select: { products: { where: IM_SHOP_WHERE } } } },
+    }),
+    ladeGruendungBis({ id: farmId }),
+  ])
+  return { tarif: hof?.tarif ?? null, produkteImShop: hof?._count.products ?? 0, gruendungBis }
 }
 
 /**

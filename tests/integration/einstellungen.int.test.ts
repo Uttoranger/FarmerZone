@@ -91,7 +91,8 @@ describe('Einstellungen — nur der eigene Hof', () => {
     await prisma.pickupSlot.update({ where: { id: erste.id }, data: { isActive: false } })
 
     expect(await ladeKonditionenHof(owner.id)).toMatchObject({ produkteImShop: 2, abholzeitenJeWoche: 6 })
-    expect(await ladeTarifStand(farm.id)).toEqual({ tarif: null, produkteImShop: 2 })
-    expect(await ladeTarifStand('int-gibt-es-nicht')).toEqual({ tarif: null, produkteImShop: 0 })
+    // Nr. 62: Der Stand trägt das wirksame Gründungs-Ende — hier null, der Hof steht hinter den Höfen des Seeds (kein Platz).
+    expect(await ladeTarifStand(farm.id)).toEqual({ tarif: null, produkteImShop: 2, gruendungBis: null })
+    expect(await ladeTarifStand('int-gibt-es-nicht')).toEqual({ tarif: null, produkteImShop: 0, gruendungBis: null })
   })
 })

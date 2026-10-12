@@ -41,9 +41,8 @@ export type Hofbereich = {
  * und Einrichten, das die HofShell selbst trägt.
  */
 export async function ladeTarifZeile(farmId: string, jetzt: Date): Promise<TarifZeileDaten | null> {
-  const stand = await ladeTarifStand(farmId)
-  // Gründungshöfe erkennt erst Nr. 62 (Farm.gruendungBis und Platzvergabe) — bis dahin null.
-  return baueTarifZeile({ ...stand, gruendungBis: null }, jetzt)
+  // Der Stand trägt das wirksame Gründungs-Ende mit (ladeGruendungBis, Nr. 62).
+  return baueTarifZeile(await ladeTarifStand(farmId), jetzt)
 }
 
 export async function ladeHofbereich(): Promise<Hofbereich> {

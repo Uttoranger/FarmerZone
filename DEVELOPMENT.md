@@ -4877,6 +4877,16 @@ Auftrag freigabe.md §14 „61" (Register E6-Ergänzung, K1, K2, O8). Keine Migr
 - **Runde 1 (Gründungshof für Nr. 62 vorbereitet):** „Dein Stand" zeigt einem Gründungshof Titel und Zusage mit Datum (`baueGruendungsZusage`, Wortlaut der Freigabe für Nr. 62) — sonst sähe er oben nur die allgemeine Startphase statt seiner Zusage. Die Zeile „Konditionen und Tarif" der Übersicht kommt aus derselben Regel: Vorher stand dort ohne Tarif immer der Übergang (auch nach dem Stichtag und für Gründungshöfe) und mit Tarif ein Preis außerhalb von „Deine Konditionen" (gegen die E6-Ergänzung).
 - **Offen:** „Dein Stand" für die Zeit nach dem Stichtag samt Tarif-Wahl (Gate 8, O8); `KonditionenLaden` zeigt noch die Form von Fassung 1.
 
+## Gründungs-Enddatum je Hof (Nachtlauf Nr. 62, Oktober 2026)
+
+Auftrag freigabe.md §14 „62" (Register K2, K1, S12). Eine Migration (freigegeben), kein neues Paket.
+
+- **Migration `20261012120000_gruendung_bis`:** nur `Farm.gruendungBis DATE`, nullable, ohne Default und ohne Backfill — erzeugt mit `prisma migrate diff` gegen das Schema von main, von Hand um `lock_timeout` und `IF NOT EXISTS` ergänzt. null heißt Standard; so ändert die Migration an keinem Hof etwas, und der alte Code im Deploy-Fenster schreibt weiter ohne die Spalte.
+- **Fachregel (`gruendungshof.ts`):** Das Ende gilt nur mit Gründungsplatz (Platz ≤ 12); ohne eigenes Datum der Standard 31.12.2027. Die alte Zusage „bis 31.12.2029, danach dauerhaft 3 %" ist samt `GRUENDUNGSPHASE_ENDE`, Provision und den unbenutzten Textbausteinen weg; der Freischalt-Dialog nimmt den Satz aus `baueGruendungsZusage` (konditionen.ts).
+- **Warum ein Lader mit eigener schmaler Abfrage:** Der Admin rechnete die Plätze bisher nur aus `getAdminFarms` (alle Höfe mit E-Mail und Monatsspalten). Die Tarif-Zeile läuft vor jeder Seite des Hofbereichs; dafür ist die Liste zu schwer und trüge Personendaten. `ladeHoefeFuerGruendung` liest nur Kennung, Inhaber, Freigabe, Anlage, Stilllegung und das Datum; der eigene Hof steckt darin, also eine Abfrage je Stelle.
+- **Warum „früher" am wirksamen Datum hängt:** Eine Zusage verkürzt auch, wer ein eigenes späteres Datum auf einen früheren Standard zurücksetzt. Deshalb vergleicht die Action das bisher wirksame mit dem künftig wirksamen Ende, nicht die Spalten — und schreibt bedingt auf den gelesenen Stand, damit ein zweiter Tab die Zustimmungs-Regel nicht unterläuft.
+- **Protokoll (S12):** nur das DEV-Log wie bei der Servicegebühr, jetzt mit altem Wert. Ein dauerhaftes Protokoll braucht eine Tabelle (Lauf 11).
+
 ## Nützliche Befehle
 
 ```bash
