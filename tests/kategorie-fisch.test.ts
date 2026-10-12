@@ -113,7 +113,7 @@ describe('Kategorie FISCH — Illustration', () => {
 
   it('liefert /categories/fisch.webp, sobald die Datei da ist — und fragt genau diesen Pfad ab', () => {
     const gesehen: string[] = []
-    const pfad = categoryImagePath('FISCH', (p) => {
+    const pfad = categoryImagePath('FISCH', null, (p) => {
       gesehen.push(p)
       return true
     })
@@ -122,12 +122,12 @@ describe('Kategorie FISCH — Illustration', () => {
   })
 
   it('fällt ohne Datei auf null zurück (Rückfall statt gebrochenem Bild)', () => {
-    expect(categoryImagePath('FISCH', () => false)).toBeNull()
+    expect(categoryImagePath('FISCH', null, () => false)).toBeNull()
   })
 
   it('die noch fehlenden Kategorien haben bereits ihren Dateinamen — Bild nur noch ablegen', () => {
     for (const kategorie of NOCH_OHNE_DATEI) {
-      expect(categoryImagePath(kategorie, () => true)).toBe(
+      expect(categoryImagePath(kategorie, null, () => true)).toBe(
         `/categories/${kategorie.toLowerCase()}.webp`
       )
     }
@@ -135,7 +135,7 @@ describe('Kategorie FISCH — Illustration', () => {
 
   it('alle Kategorien haben eine Zuordnung — keine läuft ins Leere', () => {
     for (const kategorie of PRODUCT_CATEGORY_VALUES) {
-      expect(categoryImagePath(kategorie as ProductCategoryValue, () => true)).toMatch(
+      expect(categoryImagePath(kategorie as ProductCategoryValue, null, () => true)).toMatch(
         /^\/categories\/[a-z]+(?:-[a-z]+)*\.webp$/
       )
     }

@@ -139,12 +139,18 @@ describe('kaeuferVorschau — die Karte „So sehen Käufer dein Produkt" aus de
     expect(kaeuferVorschau({ name: 'Eier', price: 0.01, unit: 'STUECK', unitSize: null }, OHNE_BILD).price).toBe(0.01)
   })
 
-  it('ohne Foto die Illustration der Kategorie, ohne beides kein Bild; keine Gebindegröße bleibt null', () => {
+  it('ohne Foto die Illustration der Kategorie, ohne beides „Sonstiges" wie im Shop; keine Gebindegröße bleibt null', () => {
     const ohneFoto = kaeuferVorschau({ name: 'Honig', price: 9, unit: 'G', unitSize: undefined }, { foto: null, kategorie: 'HONIG' })
     expect(ohneFoto.imageUrl).toBeNull()
     expect(ohneFoto.categoryImageUrl).toBe('/categories/honig.webp')
     expect(ohneFoto.unitSize).toBeNull()
-    expect(kaeuferVorschau({ name: 'Honig', price: 9, unit: 'G', unitSize: null }, OHNE_BILD).categoryImageUrl).toBeNull()
+    expect(kaeuferVorschau({ name: 'Honig', price: 9, unit: 'G', unitSize: null }, OHNE_BILD).categoryImageUrl).toBe('/categories/sonstiges.webp')
+  })
+
+  it('mit Unterkategorie die Illustration der Unterkategorie, ohne eigene die der Kategorie (Register I1, Nr. 74)', () => {
+    const werte = { name: 'Honig', price: 9, unit: 'G', unitSize: null }
+    expect(kaeuferVorschau(werte, { foto: null, kategorie: 'HONIG', unterkategorie: 'WALDHONIG' }).categoryImageUrl).toBe('/categories/honig/waldhonig.webp')
+    expect(kaeuferVorschau(werte, { foto: null, kategorie: 'EIER', unterkategorie: 'EIER_BIO' }).categoryImageUrl).toBe('/categories/eier.webp')
   })
 })
 

@@ -4935,6 +4935,17 @@ Auftrag freigabe.md §14 „62" (Register K2, K1, S12). Eine Migration (freigege
 - **Warum „früher" am wirksamen Datum hängt:** Eine Zusage verkürzt auch, wer ein eigenes späteres Datum auf einen früheren Standard zurücksetzt. Deshalb vergleicht die Action das bisher wirksame mit dem künftig wirksamen Ende, nicht die Spalten — und schreibt bedingt auf den gelesenen Stand, damit ein zweiter Tab die Zustimmungs-Regel nicht unterläuft.
 - **Protokoll (S12):** nur das DEV-Log wie bei der Servicegebühr, jetzt mit altem Wert. Ein dauerhaftes Protokoll braucht eine Tabelle (Lauf 11).
 
+## Illustrationen verdrahtet (Nachtlauf Nr. 74, Oktober 2026)
+
+Auftrag freigabe.md §15 „74" (Register I1). Keine Migration, kein neues Paket, keine Bilder (die 114 Dateien lagen schon da).
+
+- **Fachregel:** Ein Produkt ohne Foto zeigt die Illustration seiner Unterkategorie, sonst die seiner Kategorie, sonst „Sonstiges“ (auch ohne Kategorie). Die Kette steht rein in `illustrationPfad` (`taxonomie.ts`); `categoryImagePath` fragt je Stufe das Dateisystem. Unterkategorien ohne eigenes Bild (Eier-Haltungsformen, Futter-Altlast) stehen in `OHNE_EIGENE_ILLUSTRATION`; der Typ von `UNTERKATEGORIE_BILD_SLUG` verlangt für jede Unterkategorie genau eines von beidem.
+- **Warum ein Paar Kategorie/Unterkategorie geprüft wird:** Der Ordner einer Unterkategorie ist der ihrer Kategorie. Ein Paar wie Milch/Rind gilt nicht als Unterkategorie, sondern fällt auf die Kategorie zurück — nie ein Pfad ins Leere.
+- **Verdrahtung:** Die Produktkacheln bekommen ihre Adresse in den Abfragen (`products.ts`, `farm.ts`), nicht im `product-grid.tsx`; dort ändert sich nichts. Startseite und „Für Höfe“ zeigen weiter die Kategorie. Das Teilen-Bild bleibt bei der Kategorie (die Route reicht keine Unterkategorie), nimmt aber dieselbe Kette. Die Käufer-Vorschau im Produktdialog kann die Unterkategorie schon aufnehmen (`kaeuferVorschau`), bekommt sie vom Dialog aber noch nicht.
+- **Prüfskript `pnpm illustrationen`:** 57 Farbdateien und 57 Schwarzweiß-Dateien — da, WebP, 1024 × 1024, höchstens 80 KB, äußere 8 Pixel einfarbig (Creme bzw. Weiß, ±6). Eigener CI-Schritt neben dem Lint. Die vorhandenen Dateien weichen am Rand höchstens um 4 ab.
+- **Datei-Tracing:** Gemessen mit `next build`: Alle 37 Routenpakete mit Zugriff auf `process.cwd()/public` tragen die Illustrationen samt Unterordnern in der `.nft.json`; die Teilen-Bild-Route trägt sie zusätzlich ausdrücklich ein (`**`).
+- **Aus der Prüfung von 69:** Die Attrappe des Teilen-Bild-Laders wertet Umleitungssperre und Zeitlimit aus; ein Strom einer Fehlerseite wird abgebrochen; eine nicht ladbare Illustration geht mit Klasse und bereinigter Nachricht nach Sentry, nicht mit dem Pfad der Datei.
+
 ## Nützliche Befehle
 
 ```bash
@@ -4944,6 +4955,7 @@ pnpm db:seed          # Testdaten laden (nur Dev-DB)
 pnpm db:studio        # Prisma Studio öffnen
 pnpm db:generate      # Prisma Client generieren
 pnpm test:integration # Integrationstests gegen echtes Postgres (braucht .env.test)
+pnpm illustrationen   # Illustrationen unter public/categories prüfen (Maße, Größe, Rand)
 pnpm briefkasten export   # Briefkasten als Markdown (nur lesend; Leseroute oder TRIAGE_DATABASE_URL)
 ```
 

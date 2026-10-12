@@ -48,6 +48,12 @@ jobs:
         continue-on-error: true
         run: pnpm lint
 
+      - name: Illustrationen prüfen
+        # Eigener Schritt statt Teil des Lints: Der Lint ist nicht blockierend,
+        # diese Prüfung schon (WebP, 1024 × 1024, höchstens 80 KB, einfarbiger
+        # Rand — scripts/illustrationen.ts, Register I1).
+        run: pnpm illustrationen
+
       - name: Typecheck
         run: pnpm typecheck
 

@@ -125,7 +125,7 @@ export async function getProductsForFarm(farmId: string): Promise<ProductData[]>
         }
       : null,
     abgabe: p.abgabe,
-    categoryImageUrl: categoryImagePath(p.category),
+    categoryImageUrl: categoryImagePath(p.category, p.subcategory),
     countsTowardLimit: p.countsTowardLimit,
     ...zuProduktDto({ price: p.price, unitSize: p.unitSize }),
     vatRate: Number(p.vatRate),
