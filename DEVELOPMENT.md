@@ -4910,7 +4910,7 @@ Auftrag freigabe.md §14 „59" (Mockups web-/mobil-k0-startseite-karte-region).
 
 - **Fachregel:** Die Hofseite zeigt Telefon und E-Mail des Hofs nicht mehr (kein „Anrufen", kein `tel:`, nichts im JSON-LD); an der Stelle steht der Hinweis auf die Bestellbestätigung. Die Kundin bekommt beide mit der Bestellung: in der Kasse vor dem Kaufknopf („Angaben zum Hof (dein Vertragspartner)"), danach auf Bestätigung und Bestellseite („Hof erreichen") und weiter in den Mails (`farmPhone`, unverändert).
 - **Warum vor dem Kaufknopf:** Die Kundin kauft direkt beim Hof; Name, Anschrift, Telefon und E-Mail des Verkäufers muss sie vor ihrer Bestellung sehen (§ 4 Abs. 1 Z 2 und 3 FAGG) — online wie bar, in beiden Breiten. `KassenAbschluss` legt die Reihenfolge Übersicht → Angaben → Kaufknopf fest; Online-Kunden sehen die Angaben vor „Weiter zur Zahlung", der Zahlungsschritt wiederholt sie nicht.
-- **Seitendaten:** Was eine Client-Komponente bekommt, steht im Quelltext der Seite, auch ungezeigt. Deshalb entfernt die Hofseite `phone` und `email` auf dem Server (`entferneKontaktdaten`), nicht `getPublicFarm` — die Kasse liest dieselbe Abfrage. Die Produktseite reicht den Hof weiter ganz durch (Nacharbeit, Bericht 60).
+- **Seitendaten:** Was eine Client-Komponente bekommt, steht im Quelltext der Seite, auch ungezeigt. Deshalb entfernt die Hofseite `phone` und `email` auf dem Server (`entferneKontaktdaten`), nicht `getPublicFarm` — die Kasse liest dieselbe Abfrage. Die Produktseite reichte den Hof zunächst ganz durch (Nacharbeit, Bericht 60); seit Nr. 70 entfernt sie beide ebenso.
 - **Zugang:** Bestätigung und Bestellseite lesen Telefon und E-Mail erst nach der Signaturprüfung (S1); „Bestellungen finden" führt nur über signierte Links dorthin, die Bestellnummer öffnet nichts.
 - **Sackgassen:** „… oder ruf direkt am Hof an" und „Frag am besten direkt beim Hof nach" gibt es nicht mehr; die Kasse verweist mit `KONTAKT_UNTER_ANGABEN_ZUM_HOF` auf die Angaben in derselben Kasse.
 
@@ -4934,6 +4934,14 @@ Auftrag freigabe.md §14 „62" (Register K2, K1, S12). Eine Migration (freigege
 - **Warum ein Lader mit eigener schmaler Abfrage:** Der Admin rechnete die Plätze bisher nur aus `getAdminFarms` (alle Höfe mit E-Mail und Monatsspalten). Die Tarif-Zeile läuft vor jeder Seite des Hofbereichs; dafür ist die Liste zu schwer und trüge Personendaten. `ladeHoefeFuerGruendung` liest nur Kennung, Inhaber, Freigabe, Anlage, Stilllegung und das Datum; der eigene Hof steckt darin, also eine Abfrage je Stelle.
 - **Warum „früher" am wirksamen Datum hängt:** Eine Zusage verkürzt auch, wer ein eigenes späteres Datum auf einen früheren Standard zurücksetzt. Deshalb vergleicht die Action das bisher wirksame mit dem künftig wirksamen Ende, nicht die Spalten — und schreibt bedingt auf den gelesenen Stand, damit ein zweiter Tab die Zustimmungs-Regel nicht unterläuft.
 - **Protokoll (S12):** nur das DEV-Log wie bei der Servicegebühr, jetzt mit altem Wert. Ein dauerhaftes Protokoll braucht eine Tabelle (Lauf 11).
+
+## Nacharbeit Lauf 10: Produktseite ohne Kontaktdaten, Port in der Host-Prüfung (Nachtlauf Nr. 70, Oktober 2026)
+
+Auftrag freigabe.md §15 „70" (Register S16, E8). Keine Schema-Änderung, keine Migration, kein neues Paket, keine Bilder.
+
+- **Produktseite:** `produkt/[id]/page.tsx` gibt den Hof über `entferneKontaktdaten` an `ProduktdetailKunde`, dessen Prop `farm` jetzt `HofseiteHof` ist. Telefon und E-Mail standen vorher in den Seitendaten jeder öffentlichen Produktseite, obwohl die Hofseite sie seit Nr. 60 nicht mehr trägt; sichtbar waren sie dort nie. Metadaten und Sichtbarkeitsprüfung der Seite lesen weiter den vollen Hof auf dem Server.
+- **Warum ein Test und nicht der Typ:** Der volle Hof ist an `HofseiteHof` zuweisbar (Zusatzfelder sind bei Zuweisungen erlaubt), ein vergessenes `entferneKontaktdaten` bricht den Typecheck also nicht. Der Test liest die Props der Client-Komponente im Baum der Seite (Schlüssel auf jeder Tiefe und Werte), für Kundinnen und in der Vorschau des Hofs; die Gegenprobe zeigt, dass die Suche am vollen Hof anschlägt und Name, Anschrift, Abholzeiten und Produkte ankommen.
+- **Host-Prüfung (S16):** Für `NEXT_PUBLIC_APP_URL` in der Produktion zählt ein Wert mit Port als fremder Host (`istEchteHerkunft`: echter Host und kein Port). `https://farmerzone.at:8443` gilt weiter als Herkunft, meldet sich aber mit `WARNUNG_APP_URL_FREMDER_HOST`: Better Auth vergleicht Herkünfte genau, der Browser der echten Seite sendet keinen Port, die Anmeldung bräche still. Der Standard-Port 443 fällt schon im URL-Parser weg; die Prüfung der Vorschau (`pruefeAdresse`) blieb, wie sie war.
 
 ## Nützliche Befehle
 

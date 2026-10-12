@@ -17,6 +17,8 @@
  *  - Schild nach E9, Kennzeichnung zugeklappt mit „laut Angabe des Hofs",
  *    „Gleich mit abholen", kein „Merken".
  *  - Pausiert: kein Kaufknopf, Hinweis.
+ *  - Telefon und E-Mail des Hofs gehen nicht an die Client-Komponente (Nr. 70,
+ *    wie die Hofseite seit Nr. 60): Die Props enthalten sie auch verschachtelt nicht.
  *  - Beide Themes: nur Tokens in allen Dateien der Route.
  * Je Aussage eine Gegenprobe, dass die Suche das Merkmal auch findet.
  */
@@ -53,6 +55,7 @@ vi.mock('@/server/hofseite-vorschau', () => ({ ladeHofseiteGeteilt: vi.fn() }))
 import ProduktSeite, { generateMetadata } from '@/app/(public)/[farmSlug]/produkt/[id]/page'
 import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
 import { KundeShell, type KundeShellProps } from '@/components/shells/kunde-shell'
+import { ProduktdetailKunde } from '@/components/produktdetail/produktdetail-kunde'
 import type { PublicFarm, PublicFutter, PublicProduct } from '@/server/queries/farm'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
 
@@ -332,5 +335,60 @@ describe('lange Namen', () => {
     const farm = { ...HOF, products: HOF.products.map((p) => (p.id === 'p_1kg' ? { ...p, name: lang } : p)) }
     const html = await seite('p_1kg', {}, farm)
     expect(html).toMatch(new RegExp(`<h1[^>]*break-words[^>]*>${lang}</h1>`))
+  })
+})
+
+describe('Telefon und E-Mail des Hofs gehen nicht an die Client-Komponente (Nr. 70)', () => {
+  // Wie tests/telefon-nach-kauf.test.ts für die Hofseite: Was die Seite an die
+  // Client-Komponente reicht, steht in den Seitendaten — auch ungezeigt.
+  const VORSCHAU: SeitenAnsicht = { art: 'vorschau', noindex: true, kaufen: false }
+
+  /** Das Element der Client-Komponente im Baum der Seite — ohne Komponenten aufzurufen. */
+  function findeElement(knoten: unknown, typ: unknown): { props: Record<string, unknown> } | null {
+    if (knoten == null || typeof knoten !== 'object') return null
+    if (Array.isArray(knoten)) {
+      for (const kind of knoten) {
+        const fund = findeElement(kind, typ)
+        if (fund) return fund
+      }
+      return null
+    }
+    const element = knoten as { type?: unknown; props?: Record<string, unknown> }
+    if (!element.props) return null
+    if (element.type === typ) return { props: element.props }
+    return findeElement(element.props.children, typ)
+  }
+
+  /** Jeder Schlüssel in Objekten und Listen, auf jeder Tiefe. */
+  function alleSchluessel(wert: unknown): string[] {
+    if (wert == null || typeof wert !== 'object') return []
+    if (Array.isArray(wert)) return wert.flatMap(alleSchluessel)
+    return Object.entries(wert as Record<string, unknown>).flatMap(([name, innen]) => [name, ...alleSchluessel(innen)])
+  }
+
+  async function seitenProps(ansicht: SeitenAnsicht): Promise<Record<string, unknown>> {
+    stelleBereit(HOF, ansicht)
+    const fund = findeElement(await rufe('p_5kg'), ProduktdetailKunde)
+    if (!fund) throw new Error('ProduktdetailKunde fehlt im Baum der Seite')
+    return fund.props
+  }
+
+  it('die Props tragen weder phone noch email, auch nicht verschachtelt — für Kundinnen und in der Vorschau', async () => {
+    for (const ansicht of [KUNDIN, VORSCHAU]) {
+      const props = await seitenProps(ansicht)
+      expect(alleSchluessel(props), ansicht.art).not.toContain('phone')
+      expect(alleSchluessel(props), ansicht.art).not.toContain('email')
+      expect(JSON.stringify(props), ansicht.art).not.toContain(HOF.phone)
+      expect(JSON.stringify(props), ansicht.art).not.toContain(HOF.email)
+    }
+  })
+
+  it('Gegenprobe: die Suche schlägt am vollen Hof an, und der Hof kommt an — Name, Anschrift, Abholzeiten, Produkte', async () => {
+    expect(alleSchluessel({ farm: HOF })).toEqual(expect.arrayContaining(['phone', 'email']))
+    expect(JSON.stringify({ farm: HOF })).toContain(HOF.phone)
+    const farm = (await seitenProps(KUNDIN)).farm as Record<string, unknown>
+    expect(farm).toMatchObject({ id: 'farm_test', slug: 'hof-test', name: 'Hof Test', address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf' })
+    expect(farm.pickupSlots).toEqual(HOF.pickupSlots)
+    expect(farm.products).toHaveLength(HOF.products.length)
   })
 })
