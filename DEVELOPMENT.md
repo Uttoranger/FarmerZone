@@ -4906,6 +4906,14 @@ Auftrag freigabe.md §14 „59" (Mockups web-/mobil-k0-startseite-karte-region).
 - **Handy (Runde 1):** Erst lag die Karte am Handy im Foto-Kopf, ohne Überschrift — eine Mockup-Abweichung ohne Begründung (Fund des pruefers). Jetzt endet der Kopf vor ihr, darunter ein eigener Abschnitt auf dem Seitengrund: „Höfe in deiner Region", Karte, Knopf. Die Karte bleibt dort hell wie im dunklen Mockup; der Fokus ist dort der normale Ring, weil Weiß auf dem hellen Seitengrund verschwände.
 - **Beschriftungen:** Ein Name steht nur dort, wo er Rand, Pins und anderen Namen ausweicht, sonst gar nicht; das Schild E55 entfällt so im Browser (es läge unter „Karte öffnen").
 
+## Telefonnummer erst nach dem Kauf (Nachtlauf Nr. 60, Oktober 2026)
+
+- **Fachregel:** Die Hofseite zeigt Telefon und E-Mail des Hofs nicht mehr (kein „Anrufen", kein `tel:`, nichts im JSON-LD); an der Stelle steht der Hinweis auf die Bestellbestätigung. Die Kundin bekommt beide mit der Bestellung: in der Kasse vor dem Kaufknopf („Angaben zum Hof (dein Vertragspartner)"), danach auf Bestätigung und Bestellseite („Hof erreichen") und weiter in den Mails (`farmPhone`, unverändert).
+- **Warum vor dem Kaufknopf:** Die Kundin kauft direkt beim Hof; Name, Anschrift, Telefon und E-Mail des Verkäufers muss sie vor ihrer Bestellung sehen (§ 4 Abs. 1 Z 2 und 3 FAGG) — online wie bar, in beiden Breiten. `KassenAbschluss` legt die Reihenfolge Übersicht → Angaben → Kaufknopf fest; Online-Kunden sehen die Angaben vor „Weiter zur Zahlung", der Zahlungsschritt wiederholt sie nicht.
+- **Seitendaten:** Was eine Client-Komponente bekommt, steht im Quelltext der Seite, auch ungezeigt. Deshalb entfernt die Hofseite `phone` und `email` auf dem Server (`entferneKontaktdaten`), nicht `getPublicFarm` — die Kasse liest dieselbe Abfrage. Die Produktseite reicht den Hof weiter ganz durch (Nacharbeit, Bericht 60).
+- **Zugang:** Bestätigung und Bestellseite lesen Telefon und E-Mail erst nach der Signaturprüfung (S1); „Bestellungen finden" führt nur über signierte Links dorthin, die Bestellnummer öffnet nichts.
+- **Sackgassen:** „… oder ruf direkt am Hof an" und „Frag am besten direkt beim Hof nach" gibt es nicht mehr; die Kasse verweist mit `KONTAKT_UNTER_ANGABEN_ZUM_HOF` auf die Angaben in derselben Kasse.
+
 ## Nützliche Befehle
 
 ```bash

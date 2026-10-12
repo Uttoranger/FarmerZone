@@ -156,6 +156,48 @@ describe('Bestätigungsseite — Zugang nur mit Signatur', () => {
   })
 })
 
+describe('Bestätigungsseite — „Hof erreichen" nur hinter der Signatur (Nr. 60, S1)', () => {
+  const KONTAKT = { phone: '+43 660 0000000', email: 'hof@example.com' }
+  // Bar bestätigt: Die Bestellung steht, die Abholkarte erscheint.
+  const steht = (teil: Record<string, unknown> = {}) =>
+    bestellung({ status: 'CONFIRMED', farm: { ...bestellung().farm, ...KONTAKT }, ...teil })
+
+  it('Bestellung steht: Satz, Nummer und E-Mail des Hofs', async () => {
+    findUnique.mockResolvedValue(steht() as never)
+    const text = await seite({ sig: GUELTIG })
+    expect(text).toContain('Hof erreichen')
+    expect(text).toContain('Kommst du später oder kannst du nicht kommen? Sag dem Hof kurz Bescheid.')
+    expect(text).toContain(KONTAKT.phone)
+    expect(text).toContain(KONTAKT.email)
+  })
+
+  it('Telefon und E-Mail des Hofs stehen in der Abfrage der Bestellung, die erst nach der Signatur läuft', async () => {
+    findUnique.mockResolvedValue(steht() as never)
+    await seite({ sig: GUELTIG })
+    const mitHof = findUnique.mock.calls.map(([frage]) => frage).find((frage) => 'farm' in (frage.select ?? {}))
+    expect(mitHof).toMatchObject({ select: { farm: { select: { phone: true, email: true } } } })
+  })
+
+  it('ohne oder mit falscher Signatur: kein „Hof erreichen", keine Nummer — und keine Abfrage', async () => {
+    findUnique.mockResolvedValue(steht() as never)
+    for (const suche of [{}, { sig: 'f'.repeat(64) }]) {
+      const text = await seite(suche)
+      expect(text).not.toContain('Hof erreichen')
+      expect(text).not.toContain(KONTAKT.phone)
+      expect(text).not.toContain(KONTAKT.email)
+    }
+    expect(findUnique).not.toHaveBeenCalled()
+  })
+
+  it('bar noch nicht bestätigt: keine Karte — erst, wenn die Bestellung steht', async () => {
+    findUnique.mockResolvedValue(steht({ status: 'PENDING_CONFIRMATION' }) as never)
+    const text = await seite({ sig: GUELTIG })
+    expect(text).toContain('HT-0210-A4F2')
+    expect(text).not.toContain('Hof erreichen')
+    expect(text).not.toContain(KONTAKT.phone)
+  })
+})
+
 describe('Bestätigungsseite — Zustand nur aus der Datenbank', () => {
   it('?confirmed=true bei unbestätigter Bestellung zeigt nicht „bestätigt"', async () => {
     const text = await seite({ sig: GUELTIG, confirmed: 'true' })

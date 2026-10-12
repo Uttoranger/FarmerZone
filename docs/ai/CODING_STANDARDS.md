@@ -69,6 +69,7 @@ Bei **jeder** Codeänderung lesen.
 - `Decimal` und `Date` nicht roh übergeben.
 - `Decimal` → in der Query in `string` oder bereits formatiert wandeln.
 - `Date` → `toISOString()` oder fertig formatiert.
+- **Was eine Seite nicht zeigen darf, geht nicht an eine Client-Komponente** — auch nicht ungezeigt: Props stehen in den Seitendaten. Die Server-Seite entfernt solche Felder vorher und typisiert die Komponente ohne sie, nie die gemeinsame Abfrage (Vorbild: Telefon und E-Mail des Hofs auf der Hofseite, `entferneKontaktdaten` und `HofseiteHof`, Nr. 60).
 - **Kein `Date.now()`/`new Date()` beim Rendern einer Client-Komponente**, deren Ausgabe davon abhängt („vor 3 Stunden", Gebührensatz ab Stichtag, Abholtage): Die Seite bestimmt den Zeitpunkt einmal auf dem Server und reicht ihn als ISO-Text durch (`jetzt`, Vorbild `/[farmSlug]/page.tsx` → `HofseiteKunde`) — sonst weichen Server und Browser ab (Hydration-Fehler).
 
 ---

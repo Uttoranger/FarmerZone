@@ -26,6 +26,7 @@ import {
   FristHinweis,
   StatusSchritte,
 } from '@/components/bestaetigung/bestaetigung-teile'
+import { HofErreichen } from '@/components/bestaetigung/hof-erreichen'
 import { HofTeilenKarte } from '@/components/bestaetigung/hof-teilen-karte'
 import { NeuigkeitenKarte } from '@/components/bestaetigung/neuigkeiten-karte'
 import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
@@ -109,6 +110,9 @@ async function getOrder(orderId: string) {
           address: true,
           city: true,
           postalCode: true,
+          // Für „Hof erreichen" (Nr. 60) — getOrder läuft erst nach der Signaturprüfung.
+          phone: true,
+          email: true,
           archivedAt: true,
         },
       },
@@ -203,6 +207,9 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
             kalenderHref={bloecke.kalender ? kalenderPfad(farmSlug, order.id) : null}
           />
         )}
+
+        {/* Telefon und E-Mail des Hofs erst nach dem Kauf (Nr. 60): mit der Abholkarte, also wenn die Bestellung läuft. */}
+        {bloecke.abholkarte && <HofErreichen telefon={order.farm.phone} email={order.farm.email} />}
 
         {schritte && <StatusSchritte schritte={schritte} />}
 
