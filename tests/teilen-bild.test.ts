@@ -686,6 +686,19 @@ describe('GET /[farmSlug]/opengraph-image — Beitrag-Modus (Register T6)', () =
     expect(imBild().produkte.map((e) => e.id)).toEqual(['honig'])
   })
 
+  // Nachbesserung Runde 1 (Nr. 67): Das Fenster zeigt die Auswahl „Im Bild" und belegt sie mit den
+  // verknüpften Produkten vor — das geteilte Bild muss ihr folgen, sonst teilt der Hof abgewählte Produkte.
+  it.each([
+    ['p schlägt die verknüpften Produkte (Auswahl im Fenster)', '&p=eier,brot', ['honig'], ['eier', 'brot']],
+    ['ohne p die verknüpften Produkte (geteilte Bildadresse)', '', ['honig'], ['honig']],
+    ['ohne p und ohne kaufbares verknüpftes Produkt der Standard', '', ['gibt-es-nicht'], ['eier', 'honig', 'brot']],
+  ])('Beitrag-Modus: %s', async (_fall, p, verknuepft, erwartet) => {
+    beitragLesen.mockResolvedValueOnce(beitrag({ linkedProductIds: verknuepft }) as never)
+    const res = await aufruf(`?b=${BEITRAG_ID}${p}`)
+    expect(res.status).toBe(200)
+    expect(imBild().produkte.map((e) => e.id)).toEqual(erwartet)
+  })
+
   it('Fotos nur aus dem eigenen Speicher und dem Pfad dieses Hofs; sonst Illustration und kein Foto-Held', async () => {
     vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_testspeicher_geheim')
     try {

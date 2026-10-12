@@ -6,12 +6,14 @@ import { toast } from 'sonner'
 import {
   Camera,
   Check,
+  CircleCheck,
   CircleFadingPlus,
   Copy,
   Download,
   Mail,
   MessageCircle,
   Printer,
+  Send,
   Share2,
   Users,
   type LucideIcon,
@@ -21,14 +23,19 @@ import { Sheet, SheetBlatt, SheetDescription, SheetTitle } from '@/components/ui
 import { Segment } from '@/components/ui/segment'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
-import { TEILEN_ZAEHLUNG_HINWEIS, teilenBildPfad, teilenLink, type TeilenBildFormat } from '@/lib/teilen-kanal'
+import { teilenBildPfad, type TeilenBildFormat } from '@/lib/teilen-kanal'
 import { TEILEN_BILD_PRODUKTE_MAX } from '@/lib/teilen-bild'
+import { WHATSAPP_VERSAND_TEXT } from '@/lib/whatsapp-versand'
 import {
+  anfangsAuswahl,
+  BEITRAG_TEILEN_TEXT,
   FENSTER_KANAELE,
+  fensterFussnote,
   kanalZiel,
-  PLAKAT_PFAD,
+  linkMitKanal,
+  orangerKnopf,
+  plakatPfad,
   schalteAuswahl,
-  startAuswahl,
   type TeilenFensterDaten,
 } from '@/lib/teilen-fenster'
 import { cn } from '@/lib/utils'
@@ -39,6 +46,13 @@ import { cn } from '@/lib/utils'
  * Ab 768 px Dialog mit Bild links und Text, Auswahl, Link und Kanälen rechts
  * (darunter bis 1024 px untereinander), am Handy ein Blatt mit dem
  * Teilen-Menü des Telefons als Hauptknopf.
+ *
+ * Seit Nr. 67 mit Beitrag-Modus (Register T5; Mockups web-h4-beitrag-teilen,
+ * mobil-h4-beitrag-teilen): Titel „Beitrag teilen" mit Unterzeile, als erste
+ * Karte die WhatsApp-Abonnentinnen (W1) mit dem einzigen orangen Knopf, Link
+ * auf den Reiter „Beiträge", die Produkte des Beitrags vorbelegt, kein Plakat.
+ * Am Handy zeigt das Blatt wie im Mockup keine Auswahl „Im Bild" — das Bild
+ * zeigt die Produkte des Beitrags.
  *
  * Das Bild ist das echte Teilen-Bild (/[farmSlug]/opengraph-image) — dieselbe
  * Grafik wie die Vorschau im Chat. Was ins Bild darf, entscheidet der Server
@@ -56,6 +70,7 @@ const KNOPF_ORANGE = cn(
   FOKUS_RAHMEN
 )
 const UEBERSCHRIFT = 'text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase'
+const TEXT_LINK = 'font-semibold text-status-fertig underline-offset-2 hover:underline'
 
 const KANAL_SYMBOL: Record<(typeof FENSTER_KANAELE)[number]['kanal'], LucideIcon> = {
   wa: MessageCircle,
@@ -112,14 +127,21 @@ export function TeilenFenster({
 }): React.JSX.Element {
   const breit = useMindestbreite(768)
   const textId = useId()
+  const kartenId = useId()
   const [format, setFormat] = useState<TeilenBildFormat>('quadrat')
-  const [gewaehlt, setGewaehlt] = useState<string[]>(() => startAuswahl(daten.auswahl))
+  const [gewaehlt, setGewaehlt] = useState<string[]>(() => anfangsAuswahl(daten))
   const [text, setText] = useState(daten.textVorschlag)
   const [bildLaedt, setBildLaedt] = useState(true)
   const [bildFehler, setBildFehler] = useState(false)
   const bildDatei = useRef<File | null>(null)
 
-  const bildUrl = teilenBildPfad(daten.slug, { format, auswahl: gewaehlt })
+  const beitrag = daten.art === 'beitrag' ? daten : null
+  const orange = orangerKnopf(daten, breit)
+  const plakat = plakatPfad(daten)
+  // Ohne `version`, also nur kurz im Zwischenspeicher: Ein deaktivierter oder
+  // abgelaufener Beitrag gibt so gleich „nicht gefunden", statt mit passender
+  // Prüfsumme bis zu zwei Tage im CDN zu stehen.
+  const bildUrl = teilenBildPfad(daten.slug, { format, auswahl: gewaehlt, beitrag: beitrag?.beitragId ?? null })
   const dateiName = `${daten.slug}-${format === 'story' ? 'status' : 'beitrag'}.png`
 
   // Das Bild für das Teilen-Menü schon jetzt holen: Das Menü des Telefons
@@ -183,7 +205,7 @@ export function TeilenFenster({
   }
 
   async function teileUeberKanal(kanal: (typeof FENSTER_KANAELE)[number]['kanal']): Promise<void> {
-    const ziel = kanalZiel(kanal, { basis: daten.basis, slug: daten.slug, text, hofName: daten.hofName })
+    const ziel = kanalZiel(kanal, { link: daten.link, text, hofName: daten.hofName })
     if (ziel.art === 'oeffnen') {
       window.open(ziel.href, '_blank', 'noopener,noreferrer')
       return
@@ -191,12 +213,20 @@ export function TeilenFenster({
     await teileMitBild(ziel.text, ziel.link)
   }
 
-  const linkKopieren = () => void kopiere(teilenLink(daten.basis, daten.slug, 'link'), 'Link kopiert')
+  const linkKopieren = () => void kopiere(linkMitKanal(daten.link, 'link'), 'Link kopiert')
   // Das Menü des Telefons kennt den gewählten Kanal nicht — der Link zählt als „Link".
   const telefonTeilen = () => {
-    const link = teilenLink(daten.basis, daten.slug, 'link')
+    const link = linkMitKanal(daten.link, 'link')
     void teileMitBild(text.trim() ? `${text.trim()}\n${link}` : link, link)
   }
+
+  const unterzeile = (kurz: boolean) =>
+    beitrag && (
+      <>
+        <CircleCheck className="size-4 shrink-0 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
+        <span className="min-w-0">{BEITRAG_TEILEN_TEXT.unterzeile(beitrag.email?.anzahl ?? null, kurz)}</span>
+      </>
+    )
 
   const vorschau = (
     <div className="flex flex-col items-center gap-3">
@@ -218,7 +248,7 @@ export function TeilenFenster({
           <img
             key={bildUrl}
             src={bildUrl}
-            alt={`Teilen-Bild von ${daten.hofName}`}
+            alt={beitrag ? `Teilen-Bild zum Beitrag „${beitrag.titel}"` : `Teilen-Bild von ${daten.hofName}`}
             className="size-full object-cover"
             onLoad={() => setBildLaedt(false)}
             onError={() => {
@@ -233,6 +263,38 @@ export function TeilenFenster({
         Bild herunterladen
       </a>
     </div>
+  )
+
+  // Die erste Karte im Beitrag-Modus (W1): nur mit Abonnentinnen, mit dem einzigen orangen Knopf.
+  const abonnentinnenKarte = beitrag?.abonnentinnen && beitrag.versandPfad && (
+    <section aria-labelledby={kartenId} className="flex flex-col gap-2.5 rounded-2xl border border-accent bg-accent/12 p-3.5">
+      <div className="flex items-center gap-2.5">
+        <span aria-hidden="true" className="flex size-[34px] shrink-0 items-center justify-center rounded-[10px] bg-accent/20 text-status-fertig">
+          <MessageCircle className="size-[18px]" strokeWidth={1.7} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 id={kartenId} className="text-[14.5px] font-semibold text-foreground">
+            {BEITRAG_TEILEN_TEXT.abonnentinnen}
+          </h3>
+          <p className="text-[12.5px] text-muted-foreground">{BEITRAG_TEILEN_TEXT.abonnentinnenZeile(beitrag.abonnentinnen.anzahl)}</p>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2.5 md:flex-row md:items-center">
+        <div className="flex min-w-0 flex-1 items-center gap-2 text-[12.5px] text-muted-foreground">
+          <span aria-hidden="true" className="h-[5px] flex-1 overflow-hidden rounded-full bg-muted">
+            <span
+              className="block h-full rounded-full bg-status-fertig"
+              style={{ width: `${(beitrag.abonnentinnen.geoeffnet / beitrag.abonnentinnen.anzahl) * 100}%` }}
+            />
+          </span>
+          <span className="whitespace-nowrap">{WHATSAPP_VERSAND_TEXT.stand(beitrag.abonnentinnen.geoeffnet, beitrag.abonnentinnen.anzahl)}</span>
+        </div>
+        <Link href={beitrag.versandPfad} className={cn(KNOPF_ORANGE, 'w-full md:w-auto')}>
+          <Send className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+          {BEITRAG_TEILEN_TEXT.verschicken}
+        </Link>
+      </div>
+    </section>
   )
 
   const textFeld = (
@@ -253,13 +315,14 @@ export function TeilenFenster({
     </div>
   )
 
+  const ohneFoto = new Set(beitrag?.ohneFoto ?? [])
   const imBild = (
     <fieldset className="flex flex-col gap-1.5">
       <legend className={cn(UEBERSCHRIFT, 'mb-1.5')}>Im Bild</legend>
       {daten.auswahl.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">
           Noch keine Produkte im Shop – das Bild zeigt deinen Hof und die Abholzeit.{' '}
-          <Link href="/products" className="font-semibold text-status-fertig underline-offset-2 hover:underline">
+          <Link href="/products" className={TEXT_LINK}>
             Produkt anlegen
           </Link>
         </p>
@@ -284,10 +347,25 @@ export function TeilenFenster({
               >
                 {an && <Check className="size-3.5 shrink-0 text-status-fertig" strokeWidth={2} aria-hidden="true" />}
                 <span className="min-w-0 truncate">{e.ausverkauft ? `${e.name} – ausverkauft` : e.name}</span>
+                {ohneFoto.has(e.id) && (
+                  <>
+                    <Camera className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+                    <span className="sr-only">, {BEITRAG_TEILEN_TEXT.ohneFoto}</span>
+                  </>
+                )}
               </button>
             )
           })}
         </div>
+      )}
+      {beitrag && beitrag.vorbelegt.length > 0 && <p className="text-xs text-muted-foreground">{BEITRAG_TEILEN_TEXT.vorbelegt}</p>}
+      {ohneFoto.size > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {BEITRAG_TEILEN_TEXT.mitFoto} –{' '}
+          <Link href="/products" className={TEXT_LINK}>
+            {BEITRAG_TEILEN_TEXT.fotoHinzufuegen}
+          </Link>
+        </p>
       )}
     </fieldset>
   )
@@ -310,7 +388,7 @@ export function TeilenFenster({
     </div>
   )
 
-  const kanaele = (mitHauptknopf: boolean) => (
+  const kanaele = (
     <div className="flex flex-col gap-1.5">
       <span className={UEBERSCHRIFT}>Teilen über</span>
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
@@ -321,21 +399,25 @@ export function TeilenFenster({
               key={kanal}
               type="button"
               onClick={() => void teileUeberKanal(kanal)}
-              // Ein Hauptknopf je Ansicht: im Web WhatsApp (Mockup), am Handy das Teilen-Menü.
-              className={cn(kanal === 'wa' && mitHauptknopf ? KNOPF_ORANGE : KNOPF_RAHMEN, 'justify-start')}
+              // Ein Hauptknopf je Ansicht (orangerKnopf): im Web WhatsApp, außer die Abonnentinnen-Karte trägt ihn.
+              className={cn(kanal === 'wa' && orange === 'whatsapp' ? KNOPF_ORANGE : KNOPF_RAHMEN, 'justify-start')}
             >
               <Symbol className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
               <span className="min-w-0 truncate">{label}</span>
             </button>
           )
         })}
-        <Link href={PLAKAT_PFAD} className={cn(KNOPF_RAHMEN, 'justify-start')}>
-          <Printer className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-          <span className="min-w-0 truncate">Plakat drucken</span>
-        </Link>
+        {plakat && (
+          <Link href={plakat} className={cn(KNOPF_RAHMEN, 'justify-start')}>
+            <Printer className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+            <span className="min-w-0 truncate">Plakat drucken</span>
+          </Link>
+        )}
       </div>
     </div>
   )
+
+  const fussnote = <p className="text-xs leading-normal text-muted-foreground">{fensterFussnote(daten)}</p>
 
   if (breit) {
     return (
@@ -344,15 +426,22 @@ export function TeilenFenster({
           <div className="flex flex-col gap-7 lg:flex-row">
             <div>{vorschau}</div>
             <div className="flex min-w-0 flex-1 flex-col gap-3.5">
-              <DialogTitle className="font-heading text-2xl font-semibold">Hof teilen</DialogTitle>
-              <DialogDescription className="sr-only">
-                Bild und Text für deine Kunden – über WhatsApp, Facebook, Instagram, E-Mail oder als Plakat.
-              </DialogDescription>
+              <div className="flex flex-col gap-1">
+                <DialogTitle className="font-heading text-2xl font-semibold">{beitrag ? BEITRAG_TEILEN_TEXT.titel : 'Hof teilen'}</DialogTitle>
+                {beitrag ? (
+                  <DialogDescription className="flex items-center gap-1.5 text-[13px] text-muted-foreground">{unterzeile(false)}</DialogDescription>
+                ) : (
+                  <DialogDescription className="sr-only">
+                    Bild und Text für deine Kunden – über WhatsApp, Facebook, Instagram, E-Mail oder als Plakat.
+                  </DialogDescription>
+                )}
+              </div>
+              {abonnentinnenKarte}
               {textFeld}
               {imBild}
               {linkZeile}
-              {kanaele(true)}
-              <p className="text-xs leading-normal text-muted-foreground">{TEILEN_ZAEHLUNG_HINWEIS}</p>
+              {kanaele}
+              {fussnote}
             </div>
           </div>
         </DialogContent>
@@ -363,19 +452,26 @@ export function TeilenFenster({
   return (
     <Sheet open={offen} onOpenChange={onOffenChange}>
       <SheetBlatt>
-        <SheetTitle className="font-heading text-lg font-semibold">Teilen</SheetTitle>
-        <SheetDescription className="sr-only">Bild und Text über das Teilen-Menü deines Telefons.</SheetDescription>
+        <div className="flex flex-col gap-1">
+          <SheetTitle className="font-heading text-lg font-semibold">{beitrag ? BEITRAG_TEILEN_TEXT.titel : 'Teilen'}</SheetTitle>
+          {beitrag ? (
+            <SheetDescription className="flex items-center gap-1.5 text-[13px] text-muted-foreground">{unterzeile(true)}</SheetDescription>
+          ) : (
+            <SheetDescription className="sr-only">Bild und Text über das Teilen-Menü deines Telefons.</SheetDescription>
+          )}
+        </div>
         {vorschau}
+        {abonnentinnenKarte}
         {textFeld}
-        {imBild}
-        <button type="button" onClick={telefonTeilen} className={cn(KNOPF_ORANGE, 'w-full')}>
+        {!beitrag && imBild}
+        <button type="button" onClick={telefonTeilen} className={cn(orange === 'telefon' ? KNOPF_ORANGE : KNOPF_RAHMEN, 'w-full')}>
           <Share2 className="size-4" strokeWidth={1.7} aria-hidden="true" />
-          Teilen
+          {beitrag ? BEITRAG_TEILEN_TEXT.telefon : 'Teilen'}
         </button>
         <p className="text-center text-xs text-muted-foreground">Das Teilen-Menü deines Telefons – WhatsApp und Co. sind schon drin.</p>
         {linkZeile}
-        {kanaele(false)}
-        <p className="text-xs leading-normal text-muted-foreground">{TEILEN_ZAEHLUNG_HINWEIS}</p>
+        {kanaele}
+        {fussnote}
       </SheetBlatt>
     </Sheet>
   )

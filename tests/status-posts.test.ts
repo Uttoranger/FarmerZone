@@ -68,7 +68,6 @@ const beitrag = (mehr: Record<string, unknown> = {}) => ({
   anlass: 'FRESH_PRODUCT',
   showOnFarmPage: true,
   sendEmail: false,
-  sendWhatsApp: false,
   ...mehr,
 })
 
@@ -273,6 +272,18 @@ describe('publishStatusPost — Zod', () => {
 
   it('kein Objekt → Satz statt Absturz', async () => {
     expect((await publishStatusPost(null as never)).error).toBe('Da stimmt etwas mit dem Beitrag nicht. Lade die Seite neu und versuch es noch einmal.')
+  })
+})
+
+describe('publishStatusPost — kein WhatsApp-Häkchen mehr (Register T5, Nr. 67)', () => {
+  it('ein mitgeschicktes sendWhatsApp verwirft das Schema: keine Abonnentinnen-Abfrage, nichts eingefroren', async () => {
+    const antwort = await publishStatusPost(beitrag({ sendWhatsApp: true }) as never)
+    expect(antwort).toEqual({ postId: 'post_1', emailCount: 0 })
+    expect(prisma.customerFarmSubscription.findMany).not.toHaveBeenCalled()
+    // W1: Die Tipp-Liste liest die Abonnentinnen beim Öffnen — beim Veröffentlichen wird nichts gesetzt.
+    const daten = sp.create.mock.calls[0][0].data
+    expect(daten).not.toHaveProperty('sentViaWhatsApp')
+    expect(daten).not.toHaveProperty('whatsappRecipientCount')
   })
 })
 

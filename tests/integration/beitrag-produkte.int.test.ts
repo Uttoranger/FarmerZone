@@ -36,7 +36,6 @@ const beitrag = (linkedProductIds: string[]) => ({
   anlass: 'FRESH_PRODUCT' as const,
   showOnFarmPage: true,
   sendEmail: false,
-  sendWhatsApp: false,
   linkedProductIds,
 })
 

@@ -30,6 +30,7 @@ vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))
 vi.mock('@/server/actions/status-posts', () => ({ expireStatusPost: vi.fn(), deleteStatusPost: vi.fn() }))
+vi.mock('@/server/actions/teilen-fenster', () => ({ ladeTeilenFensterBeitragAction: vi.fn() }))
 vi.mock('next/image', () => ({
   default: (props: { src: string; alt: string }) => createElement('img', { src: props.src, alt: props.alt }),
 }))
@@ -81,8 +82,8 @@ describe('Beiträge-Übersicht', () => {
     isActive: false,
     isDraft: false,
     publishedAt: null,
+    showOnFarmPage: true,
     sentViaEmail: false,
-    sentViaWhatsApp: false,
     emailRecipientCount: 0,
     whatsappGetippt: [],
   }
@@ -119,14 +120,15 @@ describe('Beiträge-Übersicht', () => {
   it('„vor …" vom übergebenen Zeitpunkt, und wohin der Beitrag ging', () => {
     const eintrag = (q: Partial<BeitragQuelle>) => beitraegeUebersicht([{ ...basis, ...q }], jetzt, 0).gruppen[0].eintraege[0]
     expect(eintrag({ isActive: true, publishedAt: '2026-10-06T07:00:00.000Z' }).zeile).toBe('vor 3 Stunden · Nur auf der Hofseite')
-    expect(eintrag({ publishedAt: '2026-10-04T09:00:00.000Z', sentViaWhatsApp: true }).zeile).toBe('vor 2 Tagen · Hofseite und WhatsApp')
+    // W1/T5: „WhatsApp", sobald jemand geöffnet bekam — ein Häkchen beim Veröffentlichen gibt es nicht mehr.
+    expect(eintrag({ publishedAt: '2026-10-04T09:00:00.000Z', whatsappGetippt: ['abo-1'] }).zeile).toBe('vor 2 Tagen · Hofseite und WhatsApp')
   })
 
   it('F6 (22e): „N per E-Mail" steht wieder in der Zeile — die Zahl der Empfänger wie auf der alten Karte', () => {
     const eintrag = (q: Partial<BeitragQuelle>) => beitraegeUebersicht([{ ...basis, ...q }], jetzt, 0).gruppen[0].eintraege[0]
     const vor2Tagen = '2026-10-04T09:00:00.000Z'
     expect(eintrag({ publishedAt: vor2Tagen, sentViaEmail: true, emailRecipientCount: 12 }).zeile).toBe('vor 2 Tagen · Hofseite und 12 per E-Mail')
-    expect(eintrag({ publishedAt: vor2Tagen, sentViaEmail: true, sentViaWhatsApp: true, emailRecipientCount: 1 }).zeile).toBe(
+    expect(eintrag({ publishedAt: vor2Tagen, sentViaEmail: true, whatsappGetippt: ['abo-1'], emailRecipientCount: 1 }).zeile).toBe(
       'vor 2 Tagen · Hofseite, 1 per E-Mail und WhatsApp'
     )
     // Tausender wie überall über formatZahl.
@@ -262,8 +264,8 @@ describe('Reiter „Beiträge"', () => {
               isActive: true,
               isDraft: false,
               publishedAt: jetzt,
+              showOnFarmPage: true,
               sentViaEmail: true,
-              sentViaWhatsApp: false,
               emailRecipientCount: 7,
               whatsappGetippt: [],
             },

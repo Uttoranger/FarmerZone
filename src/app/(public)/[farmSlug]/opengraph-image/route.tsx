@@ -89,7 +89,11 @@ export async function GET(
     hof: quelle.hof,
     produkte: quelle.produkte,
     slots: quelle.slots,
-    auswahl: teilenBildAuswahl(quelle.produkte, quelle.hof, [beitrag?.linkedProductIds, p]),
+    // p zuerst (Nr. 67, Runde 1): Das Teilen-Fenster zeigt die Auswahl „Im Bild"
+    // und belegt sie im Beitrag-Modus mit den verknüpften Produkten vor — das
+    // geteilte Bild folgt dem, was der Hof dort sieht. Ohne p (eine geteilte
+    // Bildadresse) die verknüpften Produkte, ohne beides der Standard.
+    auswahl: teilenBildAuswahl(quelle.produkte, quelle.hof, [p, beitrag?.linkedProductIds]),
     adresse: hofAdresse(APP_URL, quelle.hof.slug).anzeige,
     jetzt,
     beitrag,

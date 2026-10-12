@@ -4983,6 +4983,17 @@ Auftrag freigabe.md §15 „68“ (in der Freigabe „F7“, im Register F8). Ke
 - **Reihenfolge:** `publishedAt` absteigend, bei gleicher Zeit die Kennung. Sonst könnte ein Beitrag zwischen zwei Aufrufen über die Grenze von fünf springen.
 - **Vorschau:** „So sieht’s die Kundin“ in Mein Hof ist ein iframe derselben Route (`?vorschau=1`) und bekommt die Liste von selbst; `hofseite-vorschau.ts` lädt keine Beiträge und blieb unverändert.
 
+## Beitrag teilen = ein Fenster (Nachtlauf Nr. 67, Oktober 2026)
+
+Auftrag freigabe.md §15 „67" (Register T5, W1, T6, Teilen (d)). Keine Migration, kein neues Paket.
+
+- **Ein Weg statt drei:** Die Häkchen „Per WhatsApp an Abonnenten" und „Als WhatsApp-Status-Bild teilen" fallen weg (das zweite versprach einen Download, den es nie gab). Nach dem Veröffentlichen öffnet sich das Teilen-Fenster im Beitrag-Modus; die WhatsApp-Abonnentinnen sind dort die erste Karte und führen in die Tipp-Liste (W1). E-Mail bleibt ein Häkchen.
+- **Nur auf der Hofseite:** Fenster und „Teilen" im Reiter gibt es nur für Beiträge, die ins Bild dürfen (`beitragDarfInsBild`: veröffentlicht, auf der Hofseite, nicht abgelaufen) — Bild (`?b=`) und Link (`?reiter=beitraege`) zeigen ihn sonst nicht. Ohne Hofseite bleibt nach dem Veröffentlichen der Toast; kommt das Fenster nicht (Netz), ebenfalls — der Beitrag ist dann trotzdem veröffentlicht.
+- **Daten erst auf Wunsch:** `ladeTeilenFensterBeitragAction` (nur lesen, Hof aus der Sitzung, Besitz in der WHERE-Klausel); die Liste lädt nicht für jeden Beitrag ein Fenster vorab.
+- **„WhatsApp" in der Zeile:** sobald jemand geöffnet bekam (`whatsappGetippt`), nicht mehr nach `sentViaWhatsApp`; `publishStatusPost` setzt weder `sentViaWhatsApp` noch `whatsappRecipientCount` (Spalten bleiben, Expand/Contract).
+- **Befund aus Nr. 69, behoben hier:** `ladeTeilenVorschau` rechnete die Prüfsumme `v` ohne Produktfotos, die Bild-Route mit — bei Höfen mit eigenem Foto lag das Open-Graph-Bild deshalb nur 60 s im CDN. Jetzt liest `ladeTeilenBildQuelle` die Fotos mit, und beide bilden die Held-Kandidaten gleich (`istEigenesBild`).
+- **Runde 1 – `?p=` vor den verknüpften Produkten:** Die Bild-Route nahm im Beitrag-Modus die verknüpften Produkte vor `?p=`; das Fenster zeigte dann eine andere Auswahl als das geteilte Bild. Jetzt gilt `p` zuerst (Entscheidung des Dirigenten, abweichend vom Wortlaut der Freigabe „69"): Das Fenster belegt `p` mit den verknüpften Produkten vor, ohne `p` (geteilte Bildadresse) gelten die verknüpften, ohne beides der Standard.
+
 ## Nützliche Befehle
 
 ```bash
