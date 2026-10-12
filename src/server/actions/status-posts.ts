@@ -2,6 +2,7 @@
 
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
+import { Prisma } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
@@ -14,7 +15,7 @@ import {
   BEITRAG_PRODUKT_FREMD,
   beitragIdSchema,
   beitragVeroeffentlichenSchema,
-  whatsAppGezaehltSchema,
+  whatsAppGetipptSchema,
   type BeitragVeroeffentlichenEingabe,
 } from '@/schemas/status-post'
 
@@ -25,6 +26,7 @@ import {
  */
 const NICHT_ANGEMELDET = 'Bitte melde dich neu an.'
 const BEITRAG_WEG = 'Diesen Beitrag gibt es nicht mehr. Lade die Seite neu.'
+const ABONNENTIN_WEG = 'Diese Person bekommt deine WhatsApp-Nachrichten nicht mehr. Lade die Seite neu.'
 const UNERWARTET = {
   veroeffentlichen: 'Wir konnten den Beitrag gerade nicht veröffentlichen. Bitte versuch es noch einmal.',
   deaktivieren: 'Wir konnten den Beitrag gerade nicht deaktivieren. Bitte versuch es noch einmal.',
@@ -192,19 +194,45 @@ export async function publishStatusPost(
  * schrieb per ID allein — zwei Schritte, wo einer reicht.
  */
 
-export async function markWhatsAppSent(postId: string, count: number): Promise<{ error?: string }> {
-  const geprueft = whatsAppGezaehltSchema.safeParse({ postId, count })
+/**
+ * „Geöffnet" je Person setzen oder zurücksetzen (Register W1, Nr. 66; ersetzt
+ * markWhatsAppSent, das eine Zahl aus dem Browser speicherte). EINE Anweisung
+ * ohne Lesen-dann-Schreiben: array_remove/array_append rechnen auf der Zeile,
+ * die Postgres beim Schreiben sperrt — zwei Tabs verlieren nichts, und
+ * Hinzufügen nimmt ein vorhandenes Vorkommen erst heraus (idempotent).
+ * whatsappSentCount wird gleich der Länge mitgeschrieben, damit Bestand und
+ * alter Code im Deploy-Fenster stimmen (Contract später). Besitz in der
+ * WHERE-Klausel: der Beitrag über { id, farmId }, das Abonnement über farmId —
+ * eine fremde Abonnements-ID landet nie in der Liste. Zurück geht die Liste,
+ * wie sie danach in der Datenbank steht.
+ */
+export async function setzeWhatsAppGetippt(
+  postId: string,
+  subscriptionId: string,
+  geoeffnet: boolean
+): Promise<{ ok: true; getippt: string[] } | { error: string }> {
+  const geprueft = whatsAppGetipptSchema.safeParse({ postId, subscriptionId, geoeffnet })
   if (!geprueft.success) return { error: EINGABE_UNGUELTIG }
+  const { postId: beitrag, subscriptionId: abo } = geprueft.data
 
   try {
     const farm = await angemeldeterHof()
     if (!farm) return { error: NICHT_ANGEMELDET }
-    const { count: getroffen } = await prisma.statusPost.updateMany({
-      where: { id: geprueft.data.postId, farmId: farm.id },
-      data: { whatsappSentCount: geprueft.data.count },
-    })
-    if (getroffen === 0) return { error: BEITRAG_WEG }
-    return {}
+    const ohne = Prisma.sql`array_remove(COALESCE("whatsappGetippt", ARRAY[]::TEXT[]), ${abo}::text)`
+    const liste = geprueft.data.geoeffnet ? Prisma.sql`array_append(${ohne}, ${abo}::text)` : ohne
+    const zeilen = await prisma.$queryRaw<{ whatsappGetippt: string[] }[]>(Prisma.sql`
+      UPDATE "StatusPost"
+      SET "whatsappGetippt" = ${liste},
+          "whatsappSentCount" = cardinality(${liste}),
+          "updatedAt" = now() AT TIME ZONE 'UTC'
+      WHERE "id" = ${beitrag} AND "farmId" = ${farm.id}
+        AND EXISTS (SELECT 1 FROM "CustomerFarmSubscription" WHERE "id" = ${abo} AND "farmId" = ${farm.id})
+      RETURNING "whatsappGetippt"`)
+    const [zeile] = zeilen
+    if (zeile) return { ok: true, getippt: zeile.whatsappGetippt }
+    // Nichts geschrieben — nachgesehen wird nur noch für den richtigen Satz.
+    const eigenerBeitrag = await prisma.statusPost.count({ where: { id: beitrag, farmId: farm.id } })
+    return { error: eigenerBeitrag === 0 ? BEITRAG_WEG : ABONNENTIN_WEG }
   } catch (err) {
     meldeFehler('whatsapp', err)
     return { error: UNERWARTET.whatsapp }
