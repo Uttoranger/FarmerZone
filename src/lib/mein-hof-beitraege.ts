@@ -102,7 +102,7 @@ function aktionen(b: BeitragQuelle, gruppe: BeitragGruppeId, whatsappAbonnentinn
     deaktivieren: gruppe === 'aktiv',
     vorlage: gruppe === 'vergangen' ? `/status/new?from=${b.id}` : null,
     whatsapp:
-      gruppe !== 'entwuerfe' && b.sentViaWhatsApp && whatsappAbonnentinnen > getippt
+      gruppe !== 'entwuerfe' && whatsappAbonnentinnen > getippt
         ? { href: `/status/${b.id}/send-whatsapp`, text: WHATSAPP_VERSAND_TEXT.knopf(getippt, whatsappAbonnentinnen) }
         : null,
   }
