@@ -59,7 +59,8 @@ export type Umgebung = {
    * wie *.vercel.app. In der Produktion steht ein ungültiger Wert von
    * NEXT_PUBLIC_APP_URL aber roh hier (nie leer, siehe produktionsAdresse) —
    * trägt er „*" oder „?", liest Better Auth ihn als Muster. Er meldet sich
-   * als Warnung (WARNUNG_APP_URL_UNGUELTIG).
+   * als Warnung (WARNUNG_APP_URL_UNGUELTIG, mit „*" oder „?"
+   * WARNUNG_APP_URL_MUSTER; Register S16).
    */
   trustedOrigins: readonly string[]
   /**
@@ -171,21 +172,29 @@ export function httpsHerkunft(wert: string | undefined): string | null {
   return herkunftAus(url)
 }
 
+/** „*" oder „?" im Wert: Better Auth läse ihn in trustedOrigins als Muster (Register S16). */
+const MUSTER_ZEICHEN = /[*?]/
+
 /**
  * NEXT_PUBLIC_APP_URL in der Produktion (Nr. 56) — anders als in der Vorschau
  * wird hier bereinigt statt abgelehnt, denn einen Ersatz gibt es nicht:
  * - eine https-Adresse mit gültigem Host wird zur reinen Herkunft — Pfad,
- *   Abfrage, Anker, Zugangsdaten und der Schrägstrich am Ende fallen weg
- *   (Better Auth vergleicht Herkünfte genau, Links in Mails hängen ihren Pfad
- *   an, und Zugangsdaten gehören in keinen Link);
- * - jeder andere Wert bleibt roh, NIE leer: Ein leerer Wert ließe APP_URL auf
- *   localhost fallen und mit ihr jeden Link in Mails. Er meldet sich als
+ *   Anker, Zugangsdaten und der Schrägstrich am Ende fallen weg (Better Auth
+ *   vergleicht Herkünfte genau, Links in Mails hängen ihren Pfad an, und
+ *   Zugangsdaten gehören in keinen Link); ein fremder Host gilt auch, meldet
+ *   sich aber (bestimmeUmgebung, Register S16);
+ * - ein Wert mit „*" oder „?" ist ungültig, auch wenn sich eine Herkunft lesen
+ *   ließe (Register S16, Nr. 64): Wer ein Muster einträgt, meint keine Adresse —
+ *   bereinigt zu „https://farmerzone.at" sähe der Fehler aus wie keiner;
+ * - jeder ungültige Wert bleibt roh, NIE leer: Ein leerer Wert ließe APP_URL
+ *   auf localhost fallen und mit ihr jeden Link in Mails. Er meldet sich als
  *   Warnung (bestimmeUmgebung);
  * - nichts eingetragen: null.
  */
 export function produktionsAdresse(wert: string | undefined): { herkunft: string } | { roh: string } | null {
   const roh = bereinigt(wert)
   if (!roh) return null
+  if (MUSTER_ZEICHEN.test(roh)) return { roh }
   const url = alsUrl(roh)
   const herkunft = url ? herkunftAus(url) : null
   return herkunft ? { herkunft } : { roh }
@@ -434,6 +443,11 @@ export const WARNUNG_LIVE_IN_VORSCHAU =
 export const WARNUNG_APP_URL_UNGUELTIG =
   'NEXT_PUBLIC_APP_URL ist keine reine https-Adresse — Anmeldung und Links in Mails nehmen den Wert, wie er ist.'
 export const WARNUNG_APP_URL_FEHLT = 'NEXT_PUBLIC_APP_URL fehlt — Links in Mails führen auf localhost.'
+/** Register S16: ein Wert mit „*" oder „?" (roh, für Better Auth ein Muster). */
+export const WARNUNG_APP_URL_MUSTER =
+  'NEXT_PUBLIC_APP_URL enthält „*" oder „?" — Better Auth liest den Wert als Muster, Anmeldung und Links in Mails nehmen ihn, wie er ist.'
+/** Register S16: eine https-Herkunft, die nicht die echte Seite ist — angenommen, aber gemeldet. */
+export const WARNUNG_APP_URL_FREMDER_HOST = `NEXT_PUBLIC_APP_URL zeigt nicht auf ${PRODUKTION_HOST} — Anmeldung und Links in Mails führen auf eine andere Adresse.`
 
 export function bestimmeUmgebung(werte: UmgebungsWerte): Umgebung {
   const art = umgebungsArt(werte)
@@ -470,7 +484,8 @@ export function bestimmeUmgebung(werte: UmgebungsWerte): Umgebung {
     case 'produktion': {
       // Nur die eingetragene Adresse, seit Nr. 56 als bereinigte Herkunft
       // (ein ungültiger Wert roh, siehe produktionsAdresse — mit „*" oder „?"
-      // darin ist er für Better Auth ein Muster). Fehlt sie, gibt
+      // darin ist er für Better Auth ein Muster; ein fremder Host gilt, meldet
+      // sich aber, Register S16). Fehlt sie, gibt
       // es KEINEN Ersatz — eine geratene Herkunft wäre ein Sicherheitsloch,
       // kein Komfort. Eine Vercel-Adresse kommt auch hier nie dazu.
       trustedOrigins = produktion ? ['herkunft' in produktion ? produktion.herkunft : produktion.roh] : []
@@ -513,7 +528,8 @@ export function bestimmeUmgebung(werte: UmgebungsWerte): Umgebung {
   }
   if (art === 'produktion') {
     if (!produktion) warnungen.push(WARNUNG_APP_URL_FEHLT)
-    else if ('roh' in produktion) warnungen.push(WARNUNG_APP_URL_UNGUELTIG)
+    else if ('roh' in produktion) warnungen.push(MUSTER_ZEICHEN.test(produktion.roh) ? WARNUNG_APP_URL_MUSTER : WARNUNG_APP_URL_UNGUELTIG)
+    else if (!istEchterHost(new URL(produktion.herkunft).hostname)) warnungen.push(WARNUNG_APP_URL_FREMDER_HOST)
     if (datenbank === 'dev') warnungen.push('Produktion läuft gegen die Dev-Datenbank.')
     if (stripe === 'test') warnungen.push('Stripe TEST in Produktion — keine echten Zahlungen möglich.')
     // Ohne Connect-Endpunkt kommt account.updated nie an: Sperrt Stripe ein

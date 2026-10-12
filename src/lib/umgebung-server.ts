@@ -75,8 +75,10 @@ let warnungenGemeldet = false
 let stichtagZukunftGemeldet = false
 
 /**
- * Widersprüche in Produktion (Dev-Datenbank, Stripe test) gehen nicht ins
- * Banner — Kundinnen sehen nie eines — sondern als Warnung an Sentry.
+ * Widersprüche in Produktion (Dev-Datenbank, Stripe test, seit Register S16
+ * auch ein fremder Host oder ein Muster in NEXT_PUBLIC_APP_URL) gehen nicht ins
+ * Banner — Kundinnen sehen nie eines — sondern als Warnung an Sentry, ohne den
+ * Wert.
  * Ohne DSN ist Sentry nicht initialisiert und der Aufruf ein No-op; schlägt
  * er dennoch fehl, bleibt es folgenlos.
  *
