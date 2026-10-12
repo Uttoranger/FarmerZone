@@ -307,7 +307,7 @@ Farbschema.
 
 ### Was dem Modus NICHT folgt
 Fotos und Hof-Banner werden nicht abgedunkelt. Schleier über Fotos, weiße
-Schrift auf Fotos, Kartenkacheln samt Pins und Gruppen-Pins (siehe `hoefe-karte.tsx`), die
+Schrift auf Fotos, Kartenkacheln samt Pins und Gruppen-Pins (siehe `hoefe-karte.tsx`), die Karte der Region auf der Startseite (`RegionsKarte`, nur Tokens, die im neuen Design in beiden Themes gleich sind), die
 Bildmarke und fremde Markenfarben (WhatsApp-Grün, Stripes Eingabemaske) bleiben,
 wie sie sind. Wo das so ist, gehört ein Kommentar daneben, der es begründet.
 Ausnahme: Die Kategorie-Illustrationen (`public/categories/`) sind keine Fotos,
