@@ -12,15 +12,23 @@
  *    der vereinbarten Form gelesen.
  *  - Die Seite lädt den Hof nur über den Lader und setzt noindex; im
  *    Vorschau-Modus bestellt der Kaufknopf nichts und legt keinen Korb an.
+ *  - Die Spalten des Editors am breiten Bildschirm (editorSpalten, Register
+ *    N7): höchstens 2 000 px, die Vorschau nie breiter als die Seite (1 440 px),
+ *    die Liste 400 bis 560 px neben Web, höchstens 720 px neben Handy.
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { BEREIT_TYP, MARKIERUNG_TYP, markierungSchema } from '@/schemas/hofseite-vorschau'
 import {
+  EDITOR_ABSTAND,
+  EDITOR_BREITE_MAX,
+  EDITOR_LISTE_HANDY_MAX,
+  EDITOR_LISTE_WEB_MAX,
   VORSCHAU_KAUF_HINWEIS,
   VORSCHAU_SEITENBREITE,
   VORSCHAU_WEB_MINDESTBREITE,
+  editorSpalten,
   korbErlaubt,
   leseBereit,
   leseMarkierung,
@@ -134,6 +142,55 @@ describe('Maßstab und Gerät der Vorschau', () => {
 
   it('die Seitenbreiten sind die der Mockups', () => {
     expect(VORSCHAU_SEITENBREITE).toEqual({ handy: 390, web: 1440 })
+  })
+})
+
+describe('editorSpalten — die Spalten des Editors am breiten Bildschirm (Register N7)', () => {
+  const BREITEN = [1280, 1600, 1920, 2560, 3500]
+
+  it('Web: die Vorschau bekommt, was neben der schmalsten Liste frei ist, nie mehr als die Seite breit ist; die Liste den Rest', () => {
+    expect(editorSpalten(1280, 'web')).toEqual({ liste: 400, vorschau: 848 })
+    expect(editorSpalten(1600, 'web')).toEqual({ liste: 400, vorschau: 1168 })
+    expect(editorSpalten(1920, 'web')).toEqual({ liste: 448, vorschau: 1440 })
+    // Über 2 000 px wächst nichts mehr — das Paar bleibt gleich breit und steht zentriert.
+    expect(editorSpalten(2560, 'web')).toEqual({ liste: 528, vorschau: 1440 })
+    expect(editorSpalten(3500, 'web')).toEqual({ liste: 528, vorschau: 1440 })
+  })
+
+  it('Web: Liste, Abstand und Vorschau füllen die Gesamtbreite (bis 2 000 px), und die Grenzen halten bei jeder Breite', () => {
+    const grenzen = { vorschauMax: VORSCHAU_SEITENBREITE.web, listeMin: VORSCHAU_BEARBEITUNG_BREITE, listeMax: EDITOR_LISTE_WEB_MAX }
+    for (let breite = 832; breite <= 3500; breite += 8) {
+      const { liste, vorschau } = editorSpalten(breite, 'web')
+      expect(liste + EDITOR_ABSTAND + vorschau, `Summe bei ${breite} px`).toBe(Math.min(breite, EDITOR_BREITE_MAX))
+      expect(vorschau, `Vorschau bei ${breite} px`).toBeLessThanOrEqual(grenzen.vorschauMax)
+      expect(liste, `Liste bei ${breite} px`).toBeGreaterThanOrEqual(grenzen.listeMin)
+      expect(liste, `Liste bei ${breite} px`).toBeLessThanOrEqual(grenzen.listeMax)
+    }
+  })
+
+  it('Handy: die Vorschau hat ihre feste Spalte (320 px, ab xl 360 px), die Liste den Rest bis höchstens 720 px', () => {
+    for (const breite of BREITEN) {
+      expect(editorSpalten(breite, 'handy')).toEqual({ liste: 720, vorschau: 320 })
+      expect(editorSpalten(breite, 'handy', true)).toEqual({ liste: 720, vorschau: 360 })
+    }
+    // Schmaler gibt die Liste nach, nie die Vorschau.
+    expect(editorSpalten(696, 'handy')).toEqual({ liste: 344, vorschau: 320 })
+    expect(editorSpalten(952, 'handy', true)).toEqual({ liste: 560, vorschau: 360 })
+  })
+
+  it('Handy: das Paar passt in die Gesamtbreite und ist nie breiter als 2 000 px, die Liste nie breiter als 720 px', () => {
+    for (let breite = 696; breite <= 3500; breite += 8) {
+      for (const breit of [false, true]) {
+        const { liste, vorschau } = editorSpalten(breite, 'handy', breit)
+        expect(liste + EDITOR_ABSTAND + vorschau, `Summe bei ${breite} px`).toBeLessThanOrEqual(Math.min(breite, EDITOR_BREITE_MAX))
+        expect(liste, `Liste bei ${breite} px`).toBeLessThanOrEqual(EDITOR_LISTE_HANDY_MAX)
+      }
+    }
+  })
+
+  it('nie eine negative Breite — auch nicht, wo die Fläche für nichts reicht', () => {
+    expect(editorSpalten(0, 'web')).toEqual({ liste: 400, vorschau: 0 })
+    expect(editorSpalten(0, 'handy')).toEqual({ liste: 0, vorschau: 320 })
   })
 })
 

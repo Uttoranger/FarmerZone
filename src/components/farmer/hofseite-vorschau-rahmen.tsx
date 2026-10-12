@@ -54,9 +54,10 @@ const GERAETE: { id: VorschauGeraet; label: string; Symbol: typeof Smartphone }[
  * Breite und Höhe eines Elements, live per ResizeObserver — 0, solange nichts
  * gemessen ist. Das Element kommt über die Callback-Ref: Im Overlay hängt es
  * erst nach dem Portal des Dialogs im Dokument, eine Objekt-Ref wäre beim
- * ersten Effekt noch leer und die Fläche bliebe für immer 0 × 0.
+ * ersten Effekt noch leer und die Fläche bliebe für immer 0 × 0. Der Editor
+ * misst damit auch seine Gesamtbreite (hofseite-editor.tsx, `editorSpalten`).
  */
-function useElementGroesse(): { ref: (el: HTMLElement | null) => void; breite: number; hoehe: number } {
+export function useElementGroesse(): { ref: (el: HTMLElement | null) => void; breite: number; hoehe: number } {
   const [el, setEl] = useState<HTMLElement | null>(null)
   const [groesse, setGroesse] = useState({ breite: 0, hoehe: 0 })
   useEffect(() => {

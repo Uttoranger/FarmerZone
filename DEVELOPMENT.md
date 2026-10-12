@@ -4935,6 +4935,16 @@ Auftrag freigabe.md §14 „62" (Register K2, K1, S12). Eine Migration (freigege
 - **Warum „früher" am wirksamen Datum hängt:** Eine Zusage verkürzt auch, wer ein eigenes späteres Datum auf einen früheren Standard zurücksetzt. Deshalb vergleicht die Action das bisher wirksame mit dem künftig wirksamen Ende, nicht die Spalten — und schreibt bedingt auf den gelesenen Stand, damit ein zweiter Tab die Zustimmungs-Regel nicht unterläuft.
 - **Protokoll (S12):** nur das DEV-Log wie bei der Servicegebühr, jetzt mit altem Wert. Ein dauerhaftes Protokoll braucht eine Tabelle (Lauf 11).
 
+## Mein Hof am breiten Bildschirm (Nachtlauf Nr. 73, Oktober 2026)
+
+Auftrag freigabe.md §15 „73“ (Register N7, in der Freigabe „D3“). Keine Migration, kein neues Paket, keine neue Datei unter `src/`.
+
+- **Befund:** Der Reiter Hofseite (ab lg) hatte keine Höchstbreite. Ab etwa 2 200 px Fensterbreite blieb rechts der Web-Vorschau Leere (sie war nie breiter als 1 440 px, die Liste fest 400 px), am Handy wurde die Liste über 2 000 px breit. Die Regeln mit ihren Zahlen stehen in DESIGN_SYSTEM „Mein Hof“.
+- **Eine Rechnung statt drei:** Vorher standen die Breiten verteilt — Klassen (320/360 px, Abstand), eine `calc()` im Editor und die 400 px in `hofseite-vorschau.ts`. Jetzt rechnet `editorSpalten(gesamtbreite, modus, breit)` allein; der Editor misst seine Breite und setzt sie. Im Web-Modus sieht bis 2 200 px Fensterbreite alles aus wie vorher, im Handy-Modus bis 1 440 px; erst darüber greifen die Grenzen (im Browser nachgemessen bei 1 024 bis 2 560 px, nichts läuft über).
+- **Warum ein Gerüst bis zur ersten Messung:** Der Server kennt die Breite nicht. Ohne Gerüst sprängen Liste und Vorschau beim Hydrieren (Handy-Spalte 320 → 360 px ab xl). Das Gerüst ist die Handy-Regel in CSS; seine Zahlen koppelt ein Test an die Konstanten. Der Abstand ist jetzt überall 32 px (unter xl vorher 24 px) — eine Zahl statt zwei.
+- **Der Hinweis, wo Produkte liegen,** steht am Ende der Liste als leiser Link auf `/products`. Er steht zusätzlich weiter rechts in der Reiterleiste des Kopfs: Der Auftrag nannte `seitenkopf.tsx`, dort steht er aber nicht, sondern in `reiter-leiste.tsx` (außerhalb der Dateigrenzen von Nr. 73; drei Tests halten ihn dort fest).
+- **Offen:** Den Hinweis aus `reiter-leiste.tsx` entfernen (und die drei Tests in `mein-hof-umschalter.test.ts` und `bauern-navigation.test.ts` nachziehen). Der Kopf (Karte und Reiter) bleibt am breiten Bildschirm volle Breite und steht links und rechts über den Editor hinaus.
+
 ## Nützliche Befehle
 
 ```bash
