@@ -4994,6 +4994,16 @@ Auftrag freigabe.md §15 „67" (Register T5, W1, T6, Teilen (d)). Keine Migrati
 - **Befund aus Nr. 69, behoben hier:** `ladeTeilenVorschau` rechnete die Prüfsumme `v` ohne Produktfotos, die Bild-Route mit — bei Höfen mit eigenem Foto lag das Open-Graph-Bild deshalb nur 60 s im CDN. Jetzt liest `ladeTeilenBildQuelle` die Fotos mit, und beide bilden die Held-Kandidaten gleich (`istEigenesBild`).
 - **Runde 1 – `?p=` vor den verknüpften Produkten:** Die Bild-Route nahm im Beitrag-Modus die verknüpften Produkte vor `?p=`; das Fenster zeigte dann eine andere Auswahl als das geteilte Bild. Jetzt gilt `p` zuerst (Entscheidung des Dirigenten, abweichend vom Wortlaut der Freigabe „69"): Das Fenster belegt `p` mit den verknüpften Produkten vor, ohne `p` (geteilte Bildadresse) gelten die verknüpften, ohne beides der Standard.
 
+## Titelbild im Hochformat (Nachtlauf Nr. 72, Oktober 2026)
+
+Auftrag freigabe.md §15 „72“ (in der Freigabe „B2“, im Register N6). Keine Migration, kein neues Paket.
+
+- **Anlass und Entscheidung:** Ein Handyfoto im Hochformat (3000 × 4000) wurde auf die Breite der Hofseite gezogen und auf 300 px Höhe beschnitten — am Computer blieb ein schmaler, unscharfer Streifen (Screenshot der Projektleitung, 12.10.2026). Jetzt steht ein Titelbild, das höher als breit ist, ab 768 px ganz da, vor einer unscharfen, abgedunkelten Kopie desselben Fotos; am Handy bleibt der Beschnitt mit Fokuspunkt. Querformat und Verlauf ohne Foto sehen aus wie vorher.
+- **Maße nur im Browser:** Hochgeladen wird über `api/upload/verarbeiten` (sharp), die Maße werden nicht gespeichert — eine Migration dafür gab es nicht. Der Browser liest sie, sobald das Bild geladen ist (`onLoad`, `naturalWidth`/`naturalHeight`). Bis dahin gilt der Beschnitt: Querformat springt nie, ein Hochformat wechselt einmal nach dem Laden (am Handy unsichtbar). Vormerkung Lauf 12: Maße beim Hochladen speichern (Expand-Migration, eigene Freigabe) — dann entfällt der Wechsel.
+- **Zwei Bilder, eine Datei:** Kopie und ganzes Foto haben dasselbe `sizes`, also dieselbe Adresse; in einer frischen Browsersitzung bei 390 px kam nur eine Anfrage, auch wenn die Kopie dort verborgen ist (`hidden md:block`).
+- **Mein Hof:** Unter der Vorschau steht bei Hochformat ein ruhiger Satz (kein Blocker). Er erscheint, solange das Foto ein Hochformat ist — nicht nur direkt nach dem Hochladen: Die Maße kommen aus der Vorschau, einen Zustand „gerade hochgeladen“ gibt es dort nicht, und der Hinweis erklärt auch später, warum die Hofseite am Computer so aussieht.
+- **Herausgelöst:** Das Titelbild steht nicht mehr in `hofseite-kunde.tsx`, sondern in `components/hofseite/titelbild.tsx`; die Regel dazu (Hochformat ja/nein, Satz, Maße lesen) in `src/lib/titelbild.ts`.
+
 ## Nützliche Befehle
 
 ```bash
