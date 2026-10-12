@@ -7,7 +7,7 @@ import { verifyReorderToken } from '@/lib/reorder-token'
 import { prisma } from '@/lib/prisma'
 import { hofVorschaubild } from '@/lib/vorschaubild'
 import { teilenVorschauText } from '@/lib/teilen-bild'
-import { ueberUnsText } from '@/lib/hofseite-kunde'
+import { entferneKontaktdaten, ueberUnsText } from '@/lib/hofseite-kunde'
 import { ladeTeilenVorschau } from '@/server/queries/teilen-bild'
 import type { Suchparameter } from '@/lib/ansichts-modus'
 import { nachbestellToken } from '@/schemas/nachbestellung'
@@ -131,7 +131,9 @@ export default async function FarmPage({ params, searchParams }: Props) {
   return (
     <KundeShellMitSitzung>
       <FarmPageView
-        farm={farm}
+        // Telefon und E-Mail erst nach dem Kauf (Nr. 60): Sie bleiben hier auf
+        // dem Server und stehen so nicht in den Seitendaten der Client-Komponente.
+        farm={entferneKontaktdaten(farm)}
         activeStatus={activeStatus}
         reorderItems={reorderItems}
         ansicht={ansicht}

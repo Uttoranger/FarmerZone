@@ -27,11 +27,10 @@ import { useEffect, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Camera, Check, MoveVertical } from 'lucide-react'
 import { toast } from 'sonner'
-import type { PublicFarm } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import { updateFarmBannerAction } from '@/server/actions/appearance'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
-import { HofseiteKunde } from '@/components/hofseite/hofseite-kunde'
+import { HofseiteKunde, type HofseiteHof } from '@/components/hofseite/hofseite-kunde'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
 
 // ── Titelbild: Knöpfe für Mein Hof ────────────────────────────────────────────
@@ -203,7 +202,8 @@ export function CoverFocusAdjust({
 type ReorderItem = { productId: string; productName: string; quantity: number }
 
 type Props = {
-  farm: PublicFarm
+  /** Der Hof ohne Telefon und E-Mail (Nr. 60) — page.tsx entfernt beide auf dem Server. */
+  farm: HofseiteHof
   activeStatus: ActiveStatusPost | null
   reorderItems?: ReorderItem[]
   /**

@@ -65,6 +65,7 @@ const KASSE_DATEIEN = [
   'src/components/checkout/stripe-payment.tsx',
   'src/components/checkout/kasse-teile.tsx',
   'src/components/checkout/kasse-skelett.tsx',
+  'src/components/checkout/angaben-zum-hof.tsx',
   'src/lib/kasse.ts',
   'src/app/(public)/[farmSlug]/checkout/page.tsx',
   'src/app/(public)/[farmSlug]/checkout/loading.tsx',

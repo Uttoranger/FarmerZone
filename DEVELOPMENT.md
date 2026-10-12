@@ -4866,6 +4866,14 @@ Auftrag freigabe.md §13 „56" (Sicherheitspfad, Nachprüfung). Keine Schema-Ä
   - Rückschritt aus Runde 2: In Nachricht, Brotkrume und extra endete eine absolute Adresse an „]", „)" und Anführungszeichen, und „&reorder=…" oder „&s=…" dahinter blieb. Dort reichen absolute Adressen wieder bis zum Leerraum wie auf main (`ADRESSE_IM_FREITEXT`); seit 48a3820 liest eine relative Adresse eine eingebettete absolute mit (`/api/og?url=https://…`). 5dce1f4 ließ sie davor enden; dann landeten bei einer absoluten ohne „?" die übrigen Parameter der äußeren Abfrage in deren Pfad, und „&s=…" blieb. Im Fehlertext bleibt die engere Grenze aus Runde 1: Dort stehen Adressen oft in Klammern oder JSON, und der Text dahinter hilft beim Beheben; auf main gab es dort gar keine URL-Regel.
   - Ein Abfragewert, der sich nach der letzten Dekodier-Runde noch ändert, fällt ganz; fünffach kodiert blieb der Token vorher kodiert stehen.
 
+## Telefonnummer erst nach dem Kauf (Nachtlauf Nr. 60, Oktober 2026)
+
+- **Fachregel:** Die Hofseite zeigt Telefon und E-Mail des Hofs nicht mehr (kein „Anrufen", kein `tel:`, nichts im JSON-LD); an der Stelle steht der Hinweis auf die Bestellbestätigung. Die Kundin bekommt beide mit der Bestellung: in der Kasse vor dem Kaufknopf („Angaben zum Hof (dein Vertragspartner)"), danach auf Bestätigung und Bestellseite („Hof erreichen") und weiter in den Mails (`farmPhone`, unverändert).
+- **Warum vor dem Kaufknopf:** Die Kundin kauft direkt beim Hof; Name, Anschrift, Telefon und E-Mail des Verkäufers muss sie vor ihrer Bestellung sehen (§ 4 Abs. 1 Z 2 und 3 FAGG) — online wie bar, in beiden Breiten. `KassenAbschluss` legt die Reihenfolge Übersicht → Angaben → Kaufknopf fest; Online-Kunden sehen die Angaben vor „Weiter zur Zahlung", der Zahlungsschritt wiederholt sie nicht.
+- **Seitendaten:** Was eine Client-Komponente bekommt, steht im Quelltext der Seite, auch ungezeigt. Deshalb entfernt die Hofseite `phone` und `email` auf dem Server (`entferneKontaktdaten`), nicht `getPublicFarm` — die Kasse liest dieselbe Abfrage. Die Produktseite reicht den Hof weiter ganz durch (Nacharbeit, Bericht 60).
+- **Zugang:** Bestätigung und Bestellseite lesen Telefon und E-Mail erst nach der Signaturprüfung (S1); „Bestellungen finden" führt nur über signierte Links dorthin, die Bestellnummer öffnet nichts.
+- **Sackgassen:** „… oder ruf direkt am Hof an" und „Frag am besten direkt beim Hof nach" gibt es nicht mehr; die Kasse verweist mit `KONTAKT_UNTER_ANGABEN_ZUM_HOF` auf die Angaben in derselben Kasse.
+
 ## Nützliche Befehle
 
 ```bash
