@@ -384,6 +384,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 ### S16 · `trustedOrigins` ohne Muster (12.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 10):** Ein Wert von `NEXT_PUBLIC_APP_URL` mit „*" oder „?" gilt als ungültig (bleibt roh, Warnung); ein https-Wert mit fremdem Host (nicht farmerzone.at/www) wird angenommen, löst aber in der Produktion eine Sentry-Warnung ohne den Wert aus.
 - **Umsetzung:** Nr. 64 (freigabe.md §14).
+- **Ergänzung (12.10.2026, Freigabe Lauf 11):** Ein Wert mit Port (z. B. `https://farmerzone.at:8443`) gilt als fremder Host und löst dieselbe Warnung aus; sonst ändert sich nichts. Umsetzung Nr. 70 (freigabe.md §15).
 
 ---
 
