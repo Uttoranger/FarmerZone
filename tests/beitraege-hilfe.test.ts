@@ -6,7 +6,7 @@
  * Beweist:
  *  - Der Reiter „Beiträge" kann alles, was /status konnte: Deaktivieren (nur
  *    aktiv), Löschen (immer, mit Rückfrage), Als Vorlage (nur vergangen),
- *    WhatsApp fortsetzen (nur, wenn noch Nachrichten offen sind).
+ *    „WhatsApp · n von m" (Register W1: nur, solange heutige Abonnentinnen offen sind).
  *  - /status leitet auf den Reiter um (alte Links funktionieren), „Neuer
  *    Beitrag" und „WhatsApp fortsetzen" liegen unter (hof) und führen nach
  *    dem Speichern zurück in den Reiter.
@@ -67,10 +67,11 @@ const basis: BeitragQuelle = {
   sentViaEmail: false,
   sentViaWhatsApp: false,
   emailRecipientCount: 0,
-  whatsappSentCount: 0,
-  whatsappRecipientCount: 0,
+  whatsappGetippt: [],
 }
-const eintrag = (q: Partial<BeitragQuelle>) => beitraegeUebersicht([{ ...basis, ...q }], jetzt).gruppen[0].eintraege[0]
+/** `abonnentinnen`: die heutigen WhatsApp-Abonnentinnen des Hofs (Register W1, m in „n von m"). */
+const eintrag = (q: Partial<BeitragQuelle>, abonnentinnen = 0) =>
+  beitraegeUebersicht([{ ...basis, ...q }], jetzt, abonnentinnen).gruppen[0].eintraege[0]
 
 describe('Beiträge: Aktionen je Eintrag (E12, was /status konnte)', () => {
   it('aktiv: Deaktivieren, keine Vorlage', () => {
@@ -86,18 +87,26 @@ describe('Beiträge: Aktionen je Eintrag (E12, was /status konnte)', () => {
   })
 
   it('Entwurf: weder Deaktivieren noch Vorlage noch WhatsApp', () => {
-    const e = eintrag({ isDraft: true, publishedAt: null, sentViaWhatsApp: true, whatsappRecipientCount: 3 })
+    const e = eintrag({ isDraft: true, publishedAt: null, sentViaWhatsApp: true }, 3)
     expect(e.aktionen).toEqual({ deaktivieren: false, vorlage: null, whatsapp: null })
   })
 
-  it('WhatsApp fortsetzen nur, solange noch Nachrichten offen sind — mit Stand im Text', () => {
-    expect(eintrag({ sentViaWhatsApp: true, whatsappSentCount: 2, whatsappRecipientCount: 5 }).aktionen.whatsapp).toEqual({
-      href: '/status/b1/send-whatsapp',
-      text: 'WhatsApp fortsetzen · 2 von 5',
-    })
-    // Gegenprobe: alle verschickt bzw. nie per WhatsApp → nichts fortzusetzen.
-    expect(eintrag({ sentViaWhatsApp: true, whatsappSentCount: 5, whatsappRecipientCount: 5 }).aktionen.whatsapp).toBeNull()
-    expect(eintrag({ sentViaWhatsApp: false, whatsappSentCount: 0, whatsappRecipientCount: 5 }).aktionen.whatsapp).toBeNull()
+  it('W1: „WhatsApp · n von m" — n wer geöffnet bekam, m die heutigen Abonnentinnen, solange m > n', () => {
+    // vergangen (basis) und aktiv zeigen den Knopf gleich.
+    for (const q of [{}, { isActive: true, publishedAt: jetzt }]) {
+      expect(eintrag({ ...q, sentViaWhatsApp: true, whatsappGetippt: ['a', 'b'] }, 5).aktionen.whatsapp).toEqual({
+        href: '/status/b1/send-whatsapp',
+        text: 'WhatsApp · 2 von 5',
+      })
+    }
+    // Die heutige Zahl zählt, nicht die beim Veröffentlichen: kam jemand dazu, ist wieder etwas offen.
+    expect(eintrag({ sentViaWhatsApp: true, whatsappGetippt: ['a', 'b'] }, 3).aktionen.whatsapp?.text).toBe('WhatsApp · 2 von 3')
+  })
+
+  it('W1: kein Knopf, wenn alle geöffnet sind, ohne Abonnentinnen oder nie per WhatsApp', () => {
+    expect(eintrag({ sentViaWhatsApp: true, whatsappGetippt: ['a', 'b'] }, 2).aktionen.whatsapp).toBeNull()
+    expect(eintrag({ sentViaWhatsApp: true, whatsappGetippt: [] }, 0).aktionen.whatsapp).toBeNull()
+    expect(eintrag({ sentViaWhatsApp: false, whatsappGetippt: [] }, 5).aktionen.whatsapp).toBeNull()
   })
 })
 
@@ -107,9 +116,10 @@ describe('Reiter „Beiträge" (gerendert)', () => {
       uebersicht: beitraegeUebersicht(
         [
           { ...basis, id: 'a1', title: 'Spargel ab heute', isActive: true, publishedAt: jetzt },
-          { ...basis, id: 'v1', title: 'Kürbisse', sentViaWhatsApp: true, whatsappSentCount: 1, whatsappRecipientCount: 4 },
+          { ...basis, id: 'v1', title: 'Kürbisse', sentViaWhatsApp: true, whatsappGetippt: ['a'] },
         ],
-        jetzt
+        jetzt,
+        4
       ),
     })
   )
@@ -120,7 +130,7 @@ describe('Reiter „Beiträge" (gerendert)', () => {
     expect(html).toContain('Deaktivieren')
     expect(html).toContain('href="/status/new?from=v1"')
     expect(html).toContain('href="/status/v1/send-whatsapp"')
-    expect(html).toContain('WhatsApp fortsetzen · 1 von 4')
+    expect(html).toContain('WhatsApp · 1 von 4')
     expect(html.match(/>Löschen</g)).toHaveLength(2)
     expect(html).not.toContain('href="/status"')
   })

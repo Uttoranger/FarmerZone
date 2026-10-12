@@ -4935,6 +4935,17 @@ Auftrag freigabe.md §14 „62" (Register K2, K1, S12). Eine Migration (freigege
 - **Warum „früher" am wirksamen Datum hängt:** Eine Zusage verkürzt auch, wer ein eigenes späteres Datum auf einen früheren Standard zurücksetzt. Deshalb vergleicht die Action das bisher wirksame mit dem künftig wirksamen Ende, nicht die Spalten — und schreibt bedingt auf den gelesenen Stand, damit ein zweiter Tab die Zustimmungs-Regel nicht unterläuft.
 - **Protokoll (S12):** nur das DEV-Log wie bei der Servicegebühr, jetzt mit altem Wert. Ein dauerhaftes Protokoll braucht eine Tabelle (Lauf 11).
 
+## WhatsApp an Abonnentinnen: ehrlich, je Person, fortsetzbar (Nachtlauf Nr. 66, Oktober 2026)
+
+Auftrag freigabe.md §15 „66" (Register W1). Eine Migration (freigegeben), kein neues Paket.
+
+- **Befund:** Die Tipp-Liste markierte eine Person eine Sekunde nach dem Tipp als „Gesendet" (`setTimeout`), ohne zu wissen, ob WhatsApp überhaupt aufging; gespeichert wurde nur eine Zahl aus dem Browser (`markWhatsAppSent`), beim Fortsetzen galten wieder alle als offen, und die Zahl konnte über die Empfängerzahl wachsen.
+- **Migration `20261012200000_whatsapp_getippt`:** nur `StatusPost.whatsappGetippt TEXT[]`, nullable, Default `ARRAY[]::TEXT[]` (steht seit Postgres 11 nur im Katalog), kein Backfill — erzeugt mit `prisma migrate diff`, von Hand um `lock_timeout` und `IF NOT EXISTS` ergänzt. Bestandsbeiträge lesen [].
+- **Warum eine Anweisung:** Zwei Tabs (Handy und Rechner) tippen gleichzeitig. Lesen-dann-Schreiben verlor in der Gegenprobe drei von sechs Tipps; `array_remove`/`array_append` auf der gesperrten Zeile verliert keinen.
+- **Warum „verlassen und zurück":** Nur die Rückkehr in den Browser zeigt, dass WhatsApp vorn war. Ein Fokus ohne vorheriges Verlassen (etwa ein Tipp, der nichts öffnete) zählt nicht.
+- **Zähler:** `whatsappSentCount` wird gleich der Listenlänge mitgeschrieben (Bestand, alter Code im Deploy-Fenster); `whatsappRecipientCount` bleibt eingefroren und wird nicht mehr gelesen — Contract mit eigener Freigabe.
+- **Offen:** `publishStatusPost` setzt `sentViaWhatsApp` weiter nur, wenn beim Veröffentlichen schon Abonnentinnen da waren (Nr. 67); n im Knopf zählt auch Kennungen von inzwischen Abgemeldeten (die Liste selbst nicht).
+
 ## Nützliche Befehle
 
 ```bash

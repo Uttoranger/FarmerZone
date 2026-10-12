@@ -3,7 +3,6 @@ import {
   BEITRAG_PRODUKTE_MAX,
   BEITRAG_TEXT_MAX,
   BEITRAG_TITEL_MAX,
-  BEITRAG_WHATSAPP_MAX,
   BILD_URL_MAX,
 } from '@/lib/eingabegrenzen'
 
@@ -59,8 +58,13 @@ export const BEITRAG_PRODUKT_FREMD =
 
 export type BeitragVeroeffentlichenEingabe = z.input<typeof beitragVeroeffentlichenSchema>
 
-/** „Per WhatsApp verschickt": wie viele Abonnentinnen bisher angetippt sind. */
-export const whatsAppGezaehltSchema = z.object({
-  postId: beitragIdSchema,
-  count: z.number().int().min(0).max(BEITRAG_WHATSAPP_MAX),
+/**
+ * „Geöffnet" je Person setzen oder zurücksetzen (Register W1, Nr. 66):
+ * Beitrag und Abonnement sind Prisma-Kennungen (cuid), mehr kommt nicht aus
+ * dem Browser — keine Zahl, die Zahl folgt aus der gespeicherten Liste.
+ */
+export const whatsAppGetipptSchema = z.object({
+  postId: z.cuid(),
+  subscriptionId: z.cuid(),
+  geoeffnet: z.boolean(),
 })
