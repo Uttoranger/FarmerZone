@@ -17,6 +17,8 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { formatEuro } from '@/lib/format'
 import { renderStatusBodyWithChip } from '@/lib/status-body'
 import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
+import { kundinAdresse } from '@/lib/mein-hof-ansicht'
+import { meldeGespeichertAnsehen } from '@/components/mein-hof/gespeichert-ansehen'
 
 type Anlass = 'FRESH_PRODUCT' | 'NEW_SEASON' | 'PROMOTION' | 'ANNOUNCEMENT'
 
@@ -168,7 +170,19 @@ export function StatusNewClient({ products, emailCount, whatsAppCount, recentEma
         if (showOnFarmPage) parts.push('auf der Hof-Seite')
         if (sendEmail && !emailBlocked && (res.emailCount ?? 0) > 0)
           parts.push(`${res.emailCount} E-Mails versendet`)
-        toast.success(`Beitrag veröffentlicht${parts.length ? ' — ' + parts.join(', ') : ''}`)
+        const meldung = `Beitrag veröffentlicht${parts.length ? ' — ' + parts.join(', ') : ''}`
+        if (showOnFarmPage) {
+          // „Gespeichert · Ansehen" (Nr. 49, Register N4): „Ansehen" führt in
+          // den Reiter mit „So sieht’s die Kundin" — die Hofseite auf dem
+          // Reiter Beiträge. Ab lg bleibt der bisherige Toast.
+          meldeGespeichertAnsehen({
+            abschnitt: 'beitraege',
+            beschreibung: meldung,
+            onAnsehen: () => router.push(kundinAdresse('beitraege')),
+          })
+        } else {
+          toast.success(meldung)
+        }
         // Direkt in den Reiter — /status leitet seit Nr. 22e ohnehin dorthin um.
         router.push(BEITRAEGE_HREF)
       }

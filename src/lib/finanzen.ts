@@ -18,7 +18,7 @@
  * (monatsschluesselInWien) — eine Bestellung am 30. September um 23:30 Uhr
  * Wien ist 21:30 UTC und gehört in den September.
  */
-import { formatEuro } from '@/lib/format'
+import { MONAT_KURZ, formatEuro } from '@/lib/format'
 import {
   barOhneServicegebuehr,
   centsAlsEuro,
@@ -33,6 +33,7 @@ import {
   type Monatsschluessel,
   type Zahlungsart,
 } from '@/lib/servicegebuehr'
+import { istTestzahlung } from '@/lib/testzahlung'
 
 // ─── Kosten ──────────────────────────────────────────────────────────────────
 
@@ -187,6 +188,9 @@ export type EinnahmenTopf = 'eingezogen' | 'geschuldet' | 'erwartet' | 'keiner'
  *    Neue Barbestellungen tragen dort keine Gebühr, und die Gebühr älterer
  *    Barbestellungen wird nicht eingezogen — die Plattform erwartet aus
  *    ihnen nichts, sie zählen auch nicht als „Bestellung mit Einnahme".
+ *    Ebenso eine Testzahlung (`istTestzahlung`, Register Z4): online vor dem
+ *    Stichtag der Live-Schaltung — dort floss kein echtes Geld. Ohne
+ *    Stichtag (`stripeLiveAb` null) gibt es keine, alles wie vor Nr. 55.
  * 2. Online UND bezahlt → eingezogen. Nicht `status = 'PAID'`: Der
  *    Bestellstatus wandert weiter (CONFIRMED → READY → PICKED_UP), der
  *    Zahlungsstatus bleibt PAID.
@@ -206,11 +210,14 @@ export type EinnahmenTopf = 'eingezogen' | 'geschuldet' | 'erwartet' | 'keiner'
  * (src/server/queries/admin.ts, monatsSpaltenJeHof) — rohes SQL kann keine
  * TypeScript-Funktion rufen. Wer hier etwas ändert, ändert es dort mit, sonst
  * zeigen /admin und /admin/finanzen für denselben Monat verschiedene Zahlen.
+ * Die Testzahlungen nimmt dort derselbe Baustein heraus
+ * (`ohneTestzahlungenSql`, src/lib/testzahlung.ts).
  */
-export function topfVonBestellung(bestellung: BestellungFuerFinanzen): EinnahmenTopf {
+export function topfVonBestellung(bestellung: BestellungFuerFinanzen, stripeLiveAb: Date | null): EinnahmenTopf {
   if (bestellung.status === 'CANCELLED') return 'keiner'
   if (gebuehrEntfallen(bestellung)) return 'keiner'
   if (barOhneServicegebuehr(bestellung.paymentMethod, bestellung.createdAt)) return 'keiner'
+  if (istTestzahlung(bestellung, stripeLiveAb)) return 'keiner'
   if (bestellung.paymentMethod === 'ONLINE' && bestellung.paymentStatus === 'PAID') {
     return 'eingezogen'
   }
@@ -219,6 +226,56 @@ export function topfVonBestellung(bestellung: BestellungFuerFinanzen): Einnahmen
   }
   if (bestellung.status === 'NOT_PICKED_UP') return 'keiner'
   return 'erwartet'
+}
+
+/**
+ * Was ein Monat der Plattform gebracht hat: `gezaehltCents`, `bestellungen`
+ * und die Provision in `einnahmenImMonat` — auf der Finanzseite Verlauf,
+ * Schnitt und Kacheln, in der Auswertung die „Servicegebühren dieses Monats"
+ * (`SERVICEGEBUEHREN_TOEPFE`). Daran misst sich auch die Hinweiszeile
+ * (Register Z4): dieselbe Liste, keine zweite.
+ */
+export const GEZAEHLTE_TOEPFE: readonly EinnahmenTopf[] = ['eingezogen', 'geschuldet']
+
+/** Was die Finanzseite für den gewählten Monat zeigt: dazu „erwartet" (nur dort, nicht im Verlauf). */
+export const TOEPFE_IM_GEWAEHLTEN_MONAT: readonly EinnahmenTopf[] = [...GEZAEHLTE_TOEPFE, 'erwartet']
+
+/**
+ * Lässt eine gezeigte Zahl eine Testzahlung aus (Register Z4) — gibt es unter
+ * diesen Bestellungen eine, die ohne die Regel in einem der gezeigten Töpfe läge?
+ * Dann steht leise, dass Testzahlungen nicht mitgezählt sind. Ohne Stichtag
+ * nie; eine stornierte Testzahlung allein zählt nicht, die zählte ohnehin nicht.
+ * `toepfe`: was die Seite für diese Bestellungen zeigt — ohne Vorgabe, damit
+ * jeder Aufrufer sie aus derselben Liste nimmt wie die Anzeige
+ * (`GEZAEHLTE_TOEPFE`, `TOEPFE_IM_GEWAEHLTEN_MONAT`, `SERVICEGEBUEHREN_TOEPFE`).
+ */
+export function testzahlungenBetroffen(
+  bestellungen: readonly BestellungFuerFinanzen[],
+  stripeLiveAb: Date | null,
+  toepfe: readonly EinnahmenTopf[]
+): boolean {
+  return bestellungen.some((b) => istTestzahlung(b, stripeLiveAb) && toepfe.includes(topfVonBestellung(b, null)))
+}
+
+/**
+ * Die Hinweiszeile der Finanzseite (Register Z4, Nachbesserung Runde 2):
+ * Die Vormonate zeigen nur, was sie gebracht haben (Verlauf und Schnitt aus
+ * `gezaehltCents`), der gewählte Monat dazu „erwartet". Eine offene
+ * Testzahlung in einem älteren Monat fehlt deshalb in keiner gezeigten Zahl
+ * und bringt keine Zeile; eine bezahlte fehlt im Verlauf und bringt sie.
+ * `bestellungen`: die der gezeigten Monate, wie `getFinanzen` sie lädt.
+ */
+export function finanzseiteLaesstTestzahlungenAus(
+  bestellungen: readonly BestellungFuerFinanzen[],
+  gewaehlterMonat: Monatsschluessel,
+  stripeLiveAb: Date | null
+): boolean {
+  const imGewaehlten = bestellungen.filter((b) => monatsschluesselInWien(b.createdAt) === gewaehlterMonat)
+  const davor = bestellungen.filter((b) => monatsschluesselInWien(b.createdAt) !== gewaehlterMonat)
+  return (
+    testzahlungenBetroffen(imGewaehlten, stripeLiveAb, TOEPFE_IM_GEWAEHLTEN_MONAT) ||
+    testzahlungenBetroffen(davor, stripeLiveAb, GEZAEHLTE_TOEPFE)
+  )
 }
 
 export type EinnahmenMonat = {
@@ -252,28 +309,27 @@ const EINNAHMEN_LEER: EinnahmenMonat = {
  *
  * Gezählt wird ausschließlich die Servicegebühr aus dem Snapshot; die
  * Provision läuft daneben mit, weil sie im Pilot 0 ist und die Seite sie nur
- * zeigt, wenn etwas drinsteht.
+ * zeigt, wenn etwas drinsteht. Testzahlungen (online vor `stripeLiveAb`,
+ * Register Z4) zählen nirgends.
  */
 export function einnahmenImMonat(
   bestellungen: readonly BestellungFuerFinanzen[],
-  monat: Monatsschluessel
+  monat: Monatsschluessel,
+  stripeLiveAb: Date | null
 ): EinnahmenMonat {
   const ergebnis: EinnahmenMonat = { ...EINNAHMEN_LEER }
 
   for (const b of bestellungen) {
     if (monatsschluesselInWien(b.createdAt) !== monat) continue
     const gebuehr = Math.max(0, Math.round(b.serviceFeeCents))
+    const topf = topfVonBestellung(b, stripeLiveAb)
 
-    switch (topfVonBestellung(b)) {
+    switch (topf) {
       case 'eingezogen':
         ergebnis.eingezogenCents += gebuehr
-        ergebnis.bestellungen++
-        ergebnis.provisionCents += Math.max(0, Math.round(b.provisionCents))
         break
       case 'geschuldet':
         ergebnis.geschuldetCents += gebuehr
-        ergebnis.bestellungen++
-        ergebnis.provisionCents += Math.max(0, Math.round(b.provisionCents))
         break
       case 'erwartet':
         ergebnis.erwartetCents += gebuehr
@@ -282,9 +338,14 @@ export function einnahmenImMonat(
       case 'keiner':
         break
     }
+    // Was der Monat gebracht hat — aus derselben Liste, an der die Hinweiszeile misst.
+    if (GEZAEHLTE_TOEPFE.includes(topf)) {
+      ergebnis.gezaehltCents += gebuehr
+      ergebnis.bestellungen++
+      ergebnis.provisionCents += Math.max(0, Math.round(b.provisionCents))
+    }
   }
 
-  ergebnis.gezaehltCents = ergebnis.eingezogenCents + ergebnis.geschuldetCents
   return ergebnis
 }
 
@@ -384,6 +445,19 @@ export function monatKurz(monat: Monatsschluessel): string {
     year: '2-digit',
     timeZone: 'Europe/Vienna',
   })
+}
+
+/**
+ * Die Achse am Handy (seit Nr. 54): nur der Monat, „Sep". Bei bis zu zwölf
+ * Säulenpaaren in 390 px passt „Sep. 26" nicht unter eine Säule. Eindeutig
+ * bleibt er trotzdem — das Diagramm zeigt höchstens zwölf Monate, jeder Name
+ * kommt darin höchstens einmal vor; das Jahr steht im Kopf der Seite.
+ * Fester Wortlaut (MONAT_KURZ aus format.ts) statt Intl „short": Je nach
+ * ICU-Stand stünde dort „Sep" oder „Sep.", „Jul" oder „Juli". Der Schlüssel
+ * ist schon der Kalendermonat — keine Zeitzone im Spiel.
+ */
+export function monatOhneJahr(monat: Monatsschluessel): string {
+  return MONAT_KURZ[Number(monat.slice(5, 7)) - 1] ?? monat
 }
 
 export const EINNAHMEN_ONLINE_LABEL = 'Servicegebühr, online'

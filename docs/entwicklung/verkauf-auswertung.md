@@ -93,8 +93,8 @@ Rahmen; die Zahl oben vergleicht fair.
 
 ## Offen
 
-- `getDashboardStats` (`src/server/queries/dashboard.ts`) rechnet noch in
-  Serverzeit — seit Heute ungenutzt, nicht angefasst.
+- ~~`getDashboardStats` (`src/server/queries/dashboard.ts`) rechnet noch in
+  Serverzeit — seit Heute ungenutzt, nicht angefasst.~~ Entfallen mit Nr. 55.
 - Menge bei manuellen Verkäufen eines Produkts mit Gebinde (z. B. 2 kg):
   eingetragen wird in der Einheit (kg). Wer dort Gebinde zählt, sieht in „Was
   lief am besten" eine zu kleine Menge — nur Anzeige, kein Geld.

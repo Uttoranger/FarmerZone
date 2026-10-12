@@ -12,13 +12,17 @@
  * nicht, was in Fehlertexten und URLs schon drinsteht).
  *
  * Die heiklen Träger, jeder einzeln getestet (tests/beobachtbarkeit.test.ts):
- * - Fehlertexte und Brotkrumen: E-Mail-Adressen, Telefonnummern.
+ * - Fehlertexte und Brotkrumen: E-Mail-Adressen (seit Nr. 56 auch mit
+ *   Buchstaben jeder Schrift und mehrfach kodiert, %2540), Telefonnummern;
+ *   im Fehlertext seit Nr. 56 auch Adressen mit Token, relativ wie absolut.
  * - URLs, auch im PFAD, nicht nur in der Query: /customers/<kundin@…> legt
  *   die Kunden-E-Mail (%40-kodiert) in den Pfad, /api/orders/confirm/<token>
  *   und /<hof>/bestaetigen/<token> (Bar-Bestätigung, H3) einen gültigen
  *   Einmal-Token — Query-Filter allein reicht nicht. In der Query fallen
  *   heikle Parameter nach NAMEN, und seit Nr. 47 werden die Werte der übrigen
- *   dekodiert bereinigt (?q=kundin@… stand sonst %40-kodiert da).
+ *   dekodiert bereinigt (?q=kundin@… stand sonst %40-kodiert da); seit
+ *   Nr. 56 (Runde 1) gilt für eine Adresse in einem Wert (?next=/…?token=…)
+ *   wieder die URL-Regel, und ein Anker mit „=" fällt wie eine Query.
  * - request-Daten: Cookies, Authorization, Referer (trägt die volle
  *   Vorgänger-URL), der POST-Körper (data) komplett.
  * - contexts.nextjs.request_path: von onRequestError roh angehängt.
@@ -81,25 +85,56 @@ export function ermittleUmgebung(
  * ansetzt und jedes Mal bis zu ihrem Ende liest, braucht dafür Sekunden.
  */
 
-/** Ein Zeichen des lokalen Teils einer E-Mail-Adresse (vor dem @). */
-const EMAIL_LOKAL = /[A-Za-z0-9._%+-]/
+/** Ein Zeichen des lokalen Teils einer E-Mail-Adresse (vor dem @):
+ *  Buchstaben und Ziffern jeder Schrift, dazu . _ % + - (Nr. 56: vorher nur
+ *  A–Z, bei „jürgen@…" blieb „jü" stehen). \p{M} nimmt zerlegt geschriebene
+ *  Umlaute mit (u + Trema). */
+const EMAIL_LOKAL = /[\p{L}\p{N}\p{M}._%+-]/u
 
 /** Die Domain einer E-Mail-Adresse, ab dem Zeichen nach dem @ (klebend:
- *  lastIndex setzt ersetzeEmails). */
-const EMAIL_DOMAIN = /[A-Za-z0-9.-]+\.[A-Za-z]{2,}/y
+ *  lastIndex setzt ersetzeEmails): Teile aus Buchstaben und Ziffern jeder
+ *  Schrift (Nr. 56: eine Domain mit Umlaut fiel vorher gar nicht), „-" und
+ *  kodierten Bytes eines Nicht-ASCII-Zeichens — so steht ein Umlaut in einer
+ *  Adresse (%C3%BC), nach einer zweiten Kodierung %25C3%25BC (Nr. 56, Runde 1:
+ *  sonst blieb eine doppelt kodierte Adresse mit Umlaut in der Domain ganz
+ *  stehen); am Ende eine Endung aus mindestens zwei Buchstaben. Nur die Bytes
+ *  %80–%FF, auch mehrfach kodiert: Ein kodiertes @ oder „." (%40, %2540,
+ *  %2E) und ein % ohne solches Byte gehören nie zur Domain, sonst setzte das
+ *  kodierte Muster darunter quadratisch an. */
+const EMAIL_DOMAIN =
+  /(?:[\p{L}\p{N}\p{M}.-]|%(?:25)*[89A-Fa-f][0-9A-Fa-f])+\.(?:[\p{L}\p{M}]|%(?:25)*[89A-Fa-f][0-9A-Fa-f]){2,}/uy
 
-/** Dieselben Adressen URL-kodiert (%40 statt @) — so stehen sie im Pfad.
- *  Angesetzt wird nur am Anfang einer Zeichenfolge (Lookbehind), sonst wäre
- *  das Muster quadratisch. Das Ergebnis bleibt gleich: %40 gehört selbst zu
- *  den Zeichen des lokalen Teils, der Treffer ab dem Anfang nimmt schon das
- *  letzte passende %40 der Folge — ein späterer Anfang fände nichts mehr. */
-const EMAIL_KODIERT_MUSTER = /(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+%40[A-Za-z0-9.-]+\.[A-Za-z]{2,}/gi
+/** Dieselben Adressen URL-kodiert (%40 statt @) — so stehen sie im Pfad —,
+ *  seit Nr. 56 auch mehrfach kodiert (%2540: das % des %40 noch einmal
+ *  kodiert, etwa in einer Weiterleitung, die eine schon kodierte Adresse
+ *  weiterträgt). Angesetzt wird nur am Anfang einer Zeichenfolge
+ *  (Lookbehind), sonst wäre das Muster quadratisch. Das Ergebnis bleibt
+ *  gleich: %40 und %2540 gehören selbst zu den Zeichen des lokalen Teils, der
+ *  Treffer ab dem Anfang nimmt schon das letzte passende der Folge — ein
+ *  späterer Anfang fände nichts mehr. Linear bleibt es, weil ein Byte der
+ *  Domain (%(25)*[89A-F]…) nie ein Trenner %(25)*40 sein kann: Jeder Versuch
+ *  endet spätestens am nächsten Trenner. */
+const EMAIL_KODIERT_MUSTER =
+  /(?<![\p{L}\p{N}\p{M}._%+-])[\p{L}\p{N}\p{M}._%+-]+%(?:25)*40(?:[\p{L}\p{N}\p{M}.-]|%(?:25)*[89A-Fa-f][0-9A-Fa-f])+\.(?:[\p{L}\p{M}]|%(?:25)*[89A-Fa-f][0-9A-Fa-f]){2,}/giu
 
 /** Telefonnummern: +43 664 123 4567, 0664/1234567, (0664) 1234567 … — eine
  *  führende +/0/(0-Gruppe und danach mindestens sieben weitere Ziffern mit
  *  üblichen Trennzeichen (höchstens drei am Stück). Bewusst konservativ:
- *  Datumsangaben (01.09.2026), Uhrzeiten und Postleitzahlen bleiben stehen. */
-const TELEFON_MUSTER = /(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}/g
+ *  Datumsangaben (01.09.2026), Uhrzeiten und Postleitzahlen bleiben stehen.
+ *  Nie mitten in einer Zahl, und eine Ziffernfolge, die links an einem
+ *  Buchstaben, „_" oder „-" klebt, nur, wenn sie rechts frei endet (Nr. 56,
+ *  Runde 1): vorher wurde „2026-10-10 20:02:00" zu „2[telefon entfernt]:02:00",
+ *  und eine Kennung mit „0" und acht Ziffern darin (cuid, UUID) zerbrach.
+ *  „Rückruf-0664 1234567" und „Tel0664 …" fallen weiter. Ein Prozent-Escape
+ *  links (%20, %22, %28 …) ist eine freie Grenze wie ein Leerzeichen (Runde 2:
+ *  „Ruf%2006641234567" — das Escape endet auf eine Ziffer, und die Nummer
+ *  blieb stehen), auch mehrfach kodiert (%2520, Nacharbeit nach Runde 2).
+ *  Linear: Die Vorschau ganz vorn lässt jede Stelle sofort fallen, an der
+ *  keine Nummer beginnt — erst dann liest der Rückblick eine %25-Kette, und
+ *  die gehört zu höchstens zwei Anfängen. Angesetzt wird nur am Anfang einer
+ *  Ziffernfolge, die Vorschau liest sie einmal. */
+const TELEFON_MUSTER =
+  /(?=(?:\+|\(?0)\d)(?:(?<=%(?:25)*[0-9A-Fa-f]{2})|(?<!\d)(?:(?<![A-Za-z_-])|(?=(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}(?!\w))))(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}/g
 
 /** Query-Parameter, deren NAME auf Geheimnisse oder Personenbezug deutet.
  *  `pathname` gehört dazu: Die Blob-SDK-Aufrufe tragen darin den Blob-Pfad
@@ -177,20 +212,34 @@ function istIpSpanAttribut(schluessel: string): boolean {
   return HEADER_ATTRIBUT_PRAEFIX.test(schluessel) && istIpHeader(schluessel.replace(HEADER_ATTRIBUT_PRAEFIX, ''))
 }
 
+/** Wie viele Code-Einheiten das Zeichen vor `stelle` belegt: zwei bei einem
+ *  Zeichen außerhalb der Grundebene (Ersatzpaar), sonst eins. Nie über
+ *  `grenze` hinaus. */
+function breiteDavor(text: string, stelle: number, grenze: number): 1 | 2 {
+  const tief = text.charCodeAt(stelle - 1)
+  const hoch = text.charCodeAt(stelle - 2)
+  return stelle - 2 >= grenze && tief >= 0xdc00 && tief <= 0xdfff && hoch >= 0xd800 && hoch <= 0xdbff ? 2 : 1
+}
+
 /**
  * E-Mail-Adressen in freiem Text — dasselbe Ergebnis wie
- * `text.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, …)`, aber
- * linear: Jener Regex setzte in einer langen Folge ohne @ an jeder Stelle neu
- * an (100 000 Zeichen: rund 7 Sekunden). Hier wird von jedem @ aus gesucht —
+ * `text.replace(/[\p{L}\p{N}\p{M}._%+-]+@<EMAIL_DOMAIN>/gu, …)`, aber linear:
+ * Jener Regex setzte in einer langen Folge ohne @ an jeder Stelle neu an
+ * (100 000 Zeichen: rund 7 Sekunden). Hier wird von jedem @ aus gesucht —
  * nach links der lokale Teil, höchstens bis zum Ende des vorigen Treffers
- * (dort setzte auch der Regex wieder an), nach rechts die Domain.
+ * (dort setzte auch der Regex wieder an), nach rechts die Domain. Nach links
+ * zählt jedes Zeichen ganz, auch eines außerhalb der Grundebene (Nr. 56).
  */
 function ersetzeEmails(text: string): string {
   let ergebnis = ''
   let ende = 0
   for (let at = text.indexOf('@'); at !== -1; at = text.indexOf('@', Math.max(at + 1, ende))) {
     let anfang = at
-    while (anfang > ende && EMAIL_LOKAL.test(text[anfang - 1])) anfang--
+    while (anfang > ende) {
+      const breite = breiteDavor(text, anfang, ende)
+      if (!EMAIL_LOKAL.test(text.slice(anfang - breite, anfang))) break
+      anfang -= breite
+    }
     if (anfang === at) continue
     EMAIL_DOMAIN.lastIndex = at + 1
     if (!EMAIL_DOMAIN.test(text)) continue
@@ -207,25 +256,135 @@ function bereinigeText(text: string): string {
     .replace(ANMELDECODE_MUSTER, '$1$2[code entfernt]')
 }
 
+/** Eine Nummer mit „+" vorn in der rohen Lesart: nur mit freiem linken Rand
+ *  — kein Buchstabe, keine Ziffer, kein „_" und kein „+" davor, oder ein
+ *  Escape („tel:+43…", „Ruf,+43…", „(+43)…", „%22+43…"). Ein „+" an einem
+ *  Wort ist dort meist ein Leerzeichen („Artikel+12345678" bleibt). Die
+ *  weiteren „+" gelten als Trenner („+43+664+1234567": das erste ein Plus,
+ *  die übrigen Leerzeichen). Linear: Angesetzt wird nur an einem „+", der
+ *  Rückblick liest höchstens drei Zeichen. */
+const PLUS_NUMMER_ROH = /(?:(?<=%[0-9A-Fa-f]{2})|(?<![\p{L}\p{N}\p{M}_+]))\+\d(?:[\s/\-.()+]{0,3}\d){7,}/gu
+
+/** Die rohe Lesart einer Abfrage (bereinigeQuery): nur die Regeln, für die
+ *  ein „+" als Plus zählt — Adressen mit @ und Nummern mit „+" vorn. Nummern
+ *  mit 0 vorn und kodierte Adressen (%40) liest die zerlegte Lesart; in der
+ *  rohen hielte das kodierte Muster „%2Fkunden%2F…" für den Teil vor dem @
+ *  und nähme den Pfad mit. Der Preis: Vor einem rohen @ zählt ein mit „+"
+ *  angehängtes Wort zur Adresse („Hallo+kundin@…" fällt ganz), und ein
+ *  kodierter Pfad davor ebenso — sicher, aber nicht mehr lesbar. Ein Treffer
+ *  reicht nie über „&" oder „=" hinaus. */
+function bereinigePlusLesart(text: string): string {
+  return ersetzeEmails(text).replace(PLUS_NUMMER_ROH, '[telefon entfernt]')
+}
+
 /**
  * Entfernt heikle Parameter aus einem Query-String ('a=1&token=x' → 'a=1')
  * und bereinigt Namen und Werte der übrigen DEKODIERT — sonst stünde
  * „?q=kundin@…" als „q=kundin%40…" weiter da (Nr. 47). Die Regel ist dieselbe
- * wie für den Pfad (E-Mail, Telefon, Code); strukturierte Felder geben die
- * Freitext-Regel mit (bereinigeQueryText).
+ * wie für den Pfad (E-Mail, Telefon, Code), für Werte dazu die aus
+ * bereinigeAbfrageWert; strukturierte Felder nehmen die Freitext-Regel
+ * (`freitext`, bereinigeQueryText).
+ *
+ * Nummern und Adressen mit „+" liest sie zweimal (Nacharbeit nach Runde 2):
+ * roh, bevor URLSearchParams die Abfrage zerlegt — dort ist ein „+" ein Plus
+ * („tel=+43…", „kundin+shop@…", bereinigePlusLesart) —, und danach in jedem
+ * Wert, in dem ein „+" ein Leerzeichen ist („tel=0664+1234567"). Mit nur
+ * einer Lesart blieb die andere Nummer stehen; die Abfrage einer Adresse in
+ * einem Wert (?next=/x?tel=…) läuft so wie eine eigene.
  */
-function bereinigeQuery(query: string, regel: (text: string) => string = bereinigeText): string {
+function bereinigeQuery(query: string, freitext = false, tiefe = 0): string {
+  const regel = freitext ? bereinigeFreitext : bereinigeText
   const sauber = new URLSearchParams()
-  new URLSearchParams(query).forEach((wert, name) => {
-    if (!HEIKLE_PARAMETER.test(name)) sauber.append(regel(name), regel(wert))
+  // Ob ein Name heikel ist, entscheidet auch die unveränderte Zerlegung
+  // („token@example.com=…" hieße sonst „[e-mail entfernt]"). Beide haben
+  // dieselben Paare in derselben Reihenfolge: Kein Treffer und kein
+  // Platzhalter enthält „&" oder „=".
+  const namenRoh = [...new URLSearchParams(query).keys()]
+  let paar = 0
+  new URLSearchParams(bereinigePlusLesart(query)).forEach((wert, name) => {
+    const nameRoh = namenRoh[paar++] ?? name
+    if (HEIKLE_PARAMETER.test(name) || HEIKLE_PARAMETER.test(nameRoh)) return
+    sauber.append(regel(name), freitext ? bereinigeFreitext(weiterDekodiert(wert)) : bereinigeAbfrageWert(wert, tiefe))
   })
   return sauber.toString()
 }
 
-/** Bereinigt den Pfad-Teil: E-Mails (roh und kodiert), Telefonnummern und
- *  undurchsichtige Kennungs-Segmente. */
+/** Ein Abfragewert, der selbst eine Adresse ist: ab „/" oder mit Schema. */
+const ADRESS_WERT = /^(?:https?:\/\/|\/)/i
+
+/** Bis zu dieser Tiefe werden Adressen in Abfragewerten bereinigt
+ *  (?next=/…?next=/…); eine noch tiefere fällt ganz. Jede Ebene liest den Rest
+ *  noch einmal — ohne Grenze wäre die Laufzeit quadratisch. */
+const MAX_ADRESS_TIEFE = 3
+
+const ADRESSE_ERSATZ = '[adresse entfernt]'
+
+/** Eine Folge von %XX-Escapes. */
+const ESCAPE_FOLGE = /(?:%[0-9A-Fa-f]{2})+/g
+
+/** Eine Folge von Escapes dekodiert; ist sie kein gültiges UTF-8 („%3D%C3"),
+ *  nur ihre ASCII-Zeichen (die Trenner „=", „/", „?"), die übrigen Bytes
+ *  bleiben, wie sie sind. */
+function dekodiereFolge(folge: string): string {
+  try {
+    return decodeURIComponent(folge)
+  } catch {
+    return folge.replace(/%[0-7][0-9A-Fa-f]/g, (escape) => decodeURIComponent(escape))
+  }
+}
+
+/** Dekodiert jede Folge von Escapes für sich — decodeURIComponent würfe
+ *  sonst für den ganzen Text. */
+function dekodiereFehlertolerant(text: string): string {
+  return text.replace(ESCAPE_FOLGE, dekodiereFolge)
+}
+
+/** Ersatz für einen Abfragewert, der tiefer kodiert ist, als geprüft wird. */
+const WERT_ERSATZ = '[entfernt]'
+
+/**
+ * Ein Abfragewert, so oft weiter dekodiert, wie er sich ändert — höchstens
+ * MAX_ADRESS_TIEFE-mal (Nr. 56, Runde 2). URLSearchParams dekodiert einmal;
+ * ein doppelt kodierter Wert (?next=%252Freset-password%253Ftoken%253D…, wie
+ * ihn eine Weiterleitung erzeugt, die einen kodierten Wert noch einmal kodiert)
+ * stand danach als „%2Freset-password%3Ftoken%3D…" da: keine Adresse, keine
+ * Zuweisung, und der Token blieb. Ändert er sich nach der letzten Runde noch,
+ * fällt er ganz (Nacharbeit nach Runde 2: fünffach kodiert blieb der Token
+ * kodiert stehen) — was nicht ganz gelesen ist, geht nicht mit.
+ */
+function weiterDekodiert(wert: string): string {
+  let text = wert
+  for (let runde = 0; runde < MAX_ADRESS_TIEFE; runde++) {
+    const weiter = dekodiereFehlertolerant(text)
+    if (weiter === text) return text
+    text = weiter
+  }
+  return dekodiereFehlertolerant(text) === text ? text : WERT_ERSATZ
+}
+
+/**
+ * Ein Wert einer Abfrage in einer Adresse (Nr. 56, Runde 1). Ist er selbst
+ * eine Adresse (?next=/reset-password?token=…, ?callbackUrl=https://…), gilt
+ * für ihn die URL-Regel — vorher wurde er nur neu kodiert, und sein Token
+ * blieb kodiert stehen (next=%2Freset-password%3Ftoken%3D…). Vorher fallen im
+ * dekodierten Wert „token=…" und „Bearer …" (auch ohne Adresse:
+ * ?next=reset?token=…). Beides prüft die ganz dekodierte Form (weiterDekodiert,
+ * Runde 2); ein „+" darin liest die Abfrage der Adresse in beiden Lesarten
+ * (bereinigeQuery). Strukturierte Felder brauchen den Rest nicht: Ihre Freitext-Regel
+ * nimmt Adressen und Zuweisungen selbst.
+ */
+function bereinigeAbfrageWert(wert: string, tiefe: number): string {
+  const ohneZuweisung = ersetzeZuweisungen(weiterDekodiert(wert).replace(BEARER_MUSTER, 'Bearer [entfernt]'))
+  if (!ADRESS_WERT.test(ohneZuweisung)) return bereinigeText(ohneZuweisung)
+  return tiefe < MAX_ADRESS_TIEFE ? bereinigeUrl(ohneZuweisung, tiefe + 1) : ADRESSE_ERSATZ
+}
+
+/** Bereinigt den Pfad-Teil: E-Mails (roh und kodiert), Telefonnummern,
+ *  Zuweisungen wie „;token=…" oder „%23token=…" (Nr. 56, Runde 2: vorher
+ *  prüfte die URL-Regel den Pfad nicht darauf) und undurchsichtige
+ *  Kennungs-Segmente. */
 function bereinigePfad(pfad: string): string {
-  const segmente = bereinigeText(pfad).split('/')
+  const segmente = ersetzeZuweisungen(bereinigeText(pfad)).split('/')
   return segmente
     .map((segment, i) => {
       if (KENNUNG_SEGMENT_MUSTER.test(segment)) return '[kennung entfernt]'
@@ -241,25 +400,40 @@ function bereinigePfad(pfad: string): string {
     .join('/')
 }
 
-/** Bereinigt eine volle URL: Pfad UND Query. Alles ab dem ERSTEN ? zählt als
- *  Query — auch ein weiteres ? darin (URLSearchParams nimmt es als Wertteil). */
-function bereinigeUrl(url: string): string {
+/** Bereinigt eine volle URL: Pfad, Query und Anker. Alles ab dem ERSTEN #
+ *  ist der Anker (wie im Browser), davor alles ab dem ERSTEN ? die Query —
+ *  auch ein weiteres ? darin (URLSearchParams nimmt es als Wertteil).
+ *  `tiefe` zählt Adressen in Abfragewerten (bereinigeAbfrageWert). */
+function bereinigeUrl(url: string, tiefe = 0): string {
   // Blob-Speicher-URLs tragen den Geräte-Dateinamen im Pfad — dort ist
   // nichts Diagnostisches zu holen, der ganze Rest fällt weg.
   if (/^https?:\/\/[^/?]*\bblob\.vercel-storage\.com/i.test(url)) {
     return `${url.split('/').slice(0, 3).join('/')}/[pfad entfernt]`
   }
-  const trenner = url.indexOf('?')
-  if (trenner === -1) return bereinigePfad(url)
-  const pfad = bereinigePfad(url.slice(0, trenner))
-  const sauber = bereinigeQuery(url.slice(trenner + 1))
-  return sauber ? `${pfad}?${sauber}` : pfad
+  const raute = url.indexOf('#')
+  const ohneAnker = raute === -1 ? url : url.slice(0, raute)
+  const anker = raute === -1 ? '' : bereinigeAnker(url.slice(raute + 1), tiefe)
+  const trenner = ohneAnker.indexOf('?')
+  const pfad = bereinigePfad(trenner === -1 ? ohneAnker : ohneAnker.slice(0, trenner))
+  const query = trenner === -1 ? '' : bereinigeQuery(ohneAnker.slice(trenner + 1), false, tiefe)
+  return `${pfad}${query ? `?${query}` : ''}${anker ? `#${anker}` : ''}`
+}
+
+/** Der Anker einer Adresse (Nr. 56, Runde 1): Mit „=" trägt er Parameter wie
+ *  eine Query (#token=…, so legen manche Anmeldewege den Token ab) und fällt
+ *  wie sie; sonst gilt die Regel des Pfads (#abschnitt bleibt). Ein kodiertes
+ *  „=" (%3D) zählt wie ein rohes (Runde 2: #token%3D… galt als Pfad und
+ *  blieb) — dann wird der Anker vorher dekodiert. */
+function bereinigeAnker(anker: string, tiefe: number): string {
+  const mitTrennern = anker.includes('=') ? anker : dekodiereFehlertolerant(anker)
+  return mitTrennern.includes('=') ? bereinigeQuery(mitTrennern, false, tiefe) : bereinigePfad(anker)
 }
 
 /** Bereinigt URLs, die IN einem Text stecken (Span-Beschreibungen wie
- *  „GET https://…?token=…"), danach den Text selbst. */
+ *  „GET https://…?token=…", seit Nr. 56 Runde 1 auch groß geschrieben),
+ *  danach den Text selbst. */
 function bereinigeTextMitUrls(text: string): string {
-  return bereinigeText(text.replace(/https?:\/\/\S+/g, (url) => bereinigeUrl(url)))
+  return bereinigeText(text.replace(/https?:\/\/\S+/gi, (url) => bereinigeUrl(url)))
 }
 
 /** Span-Attribute: IP-Träger fallen ganz weg, Query und URLs werden
@@ -297,9 +471,81 @@ const IPV4_MUSTER = /\b(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\.(?:25[0-5]|2[0-4]
 const IPV6_MUSTER =
   /(?<![\w:])(?=[0-9a-f:]*::|(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4})(?=[0-9a-f:]*[0-9a-f])[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}(?![\w:])/gi
 
-/** „token=…", „secret: …" — Zuweisungen in freiem Text, auch ohne Adresse
- *  davor. `code` fehlt bewusst: „code=P2002" ist ein Prisma-Fehlercode. */
-const ZUWEISUNG_MUSTER = /\b(token|secret|passwor[dt]|otp|signatur|signature|sig|api[_-]?key|authorization)(\s*[=:]\s*)[^\s&,;"'<>]+/gi
+/** Ein Schlüssel vor „=" oder „:" — die ganze Folge aus Wortzeichen und „-"
+ *  (ersetzeZuweisungen); ob er geheim ist, entscheidet istGeheimerSchluessel.
+ *  Anführungszeichen um Schlüssel und Wert gehören zum Trenner (Runde 1):
+ *  Prisma schreibt `token: "…"`, JSON `"access_token":"…"` — vorher beendete
+ *  das Zeichen den Wert, bevor er anfing. Backticks nicht: In ihnen nennt
+ *  Prisma Felder („Argument `token`: Invalid value …"). Ein Prozent-Escape
+ *  davor ist eine Grenze wie ein Leerzeichen (Runde 2: in „Fehler%20token=…"
+ *  hieß der Schlüssel sonst „20token"); mitten in einem Escape beginnt keiner. */
+const ZUWEISUNG_KANDIDAT = /(?:(?<=%[0-9A-Fa-f]{2})|(?<![\w-])(?:(?<!%)|(?![0-9A-Fa-f]{2})))([\w-]+)(["']?\s*[=:]\s*["']?)/g
+
+/** Wörter, die einen Schlüssel geheim machen. `code` fehlt bewusst:
+ *  „code=P2002" ist ein Prisma-Fehlercode. */
+const GEHEIMES_WORT = new Set(['token', 'secret', 'passwort', 'password', 'otp', 'signatur', 'signature', 'sig', 'apikey', 'authorization'])
+
+/** Jedes Wort aus GEHEIMES_WORT enthält eines davon (api: apikey, api_key). */
+const GEHEIMES_WORT_IRGENDWO = /token|secret|passwor[dt]|otp|sig|api|authorization/i
+
+/** Ein Platzhalter dieser Datei („[entfernt]", „[code entfernt]" …), klebend. */
+const EIGENER_PLATZHALTER = /\[[a-z -]{0,12}entfernt\]/iy
+
+/** Ein Wert bis zum nächsten Trenner, klebend. */
+const ZUWEISUNG_WERT = /[^\s&,;"'<>]*/y
+
+/** Ist ein Teil des Schlüssels ein geheimes Wort? Teile trennen „_", „-" und
+ *  der Wechsel zu einem Großbuchstaben (Runde 1: access_token, reset-token,
+ *  resetToken, XMLToken, x-api-key), seit der Nacharbeit nach Runde 2 auch
+ *  der von Ziffern zu Buchstaben (oauth2token; ein Schlüssel direkt hinter
+ *  einer Nummer, „…4567token: …", die vorab mit einem Wert fällt). Ein Wort,
+ *  das nur so anfängt oder endet (tokenizer, Apfelessig), ist kein Teil —
+ *  vorher galt nur der Anfang eines Worts, und „access_token=…" blieb stehen. */
+function istGeheimerSchluessel(schluessel: string): boolean {
+  // Vorfilter: Steckt keines der Wörter auch nur als Teil darin, ist der
+  // Schlüssel nie geheim — der häufige Fall, ohne Zerlegen.
+  if (!GEHEIMES_WORT_IRGENDWO.test(schluessel)) return false
+  const teile = schluessel
+    .replace(/([a-z0-9])(?=[A-Z])|([A-Z])(?=[A-Z][a-z])|(\d)(?=[a-z])/g, '$1$2$3_')
+    .toLowerCase()
+    .split(/[_-]+/)
+  return teile.some((teil, i) => GEHEIMES_WORT.has(teil) || (teil === 'api' && teile[i + 1] === 'key'))
+}
+
+/**
+ * „token=…", „secret: …" — Zuweisungen in freiem Text, auch ohne Adresse
+ * davor: Der Wert bis zum nächsten Trenner fällt. Linear: Jeder Schlüssel
+ * wird einmal gefunden und eingeteilt, jeder Wert einmal gelesen; Schlüssel in
+ * einem schon ersetzten Wert zählen nicht mehr. Ist der ganze Wert schon ein
+ * Platzhalter dieser Datei („otp: [code entfernt]"), bleibt er stehen — sonst
+ * würde daraus „otp: [entfernt] entfernt]" (Nr. 56). Nur ein eigener
+ * Platzhalter, nicht jeder Wert mit „[" (Runde 1: sonst blieb
+ * „token=[abc123]" stehen); hängt etwas daran, fällt der ganze Wert.
+ */
+function ersetzeZuweisungen(text: string): string {
+  let ergebnis = ''
+  let ende = 0
+  for (const treffer of text.matchAll(ZUWEISUNG_KANDIDAT)) {
+    if (treffer.index < ende || !istGeheimerSchluessel(treffer[1])) continue
+    const wertAnfang = treffer.index + treffer[0].length
+    const wertEnde = zuweisungsEnde(text, wertAnfang)
+    if (wertEnde === -1) continue
+    ergebnis += `${text.slice(ende, wertAnfang)}[entfernt]`
+    ende = wertEnde
+  }
+  return ergebnis + text.slice(ende)
+}
+
+/** Wo der Wert einer Zuweisung ab `wertAnfang` endet — -1, wenn er stehen
+ *  bleibt: Es gibt keinen, oder er ist genau ein eigener Platzhalter. */
+function zuweisungsEnde(text: string, wertAnfang: number): number {
+  EIGENER_PLATZHALTER.lastIndex = wertAnfang
+  const nachPlatzhalter = EIGENER_PLATZHALTER.test(text) ? EIGENER_PLATZHALTER.lastIndex : wertAnfang
+  ZUWEISUNG_WERT.lastIndex = nachPlatzhalter
+  ZUWEISUNG_WERT.test(text)
+  const wertEnde = ZUWEISUNG_WERT.lastIndex
+  return wertEnde === wertAnfang || (nachPlatzhalter > wertAnfang && wertEnde === nachPlatzhalter) ? -1 : wertEnde
+}
 
 const BEARER_MUSTER = /\bBearer\s+[A-Za-z0-9._~+/=-]+/g
 
@@ -332,16 +578,250 @@ function entferneIps(text: string): string {
 /**
  * Ein Text aus einem strukturierten Feld. Ist er ganz eine Adresse (absolut
  * oder ab „/"), gilt die URL-Regel (Pfad-Token, heikle Parameter, Blob-Pfad);
- * sonst die Text-Regel samt eingebetteter Adressen. IP-Adressen fallen
- * zuerst — sonst hielte die Telefon-Regel eine lange IPv4 für eine Nummer.
+ * sonst die Text-Regel samt eingebetteter Adressen — seit Nr. 56, Runde 2,
+ * relativ mit derselben Grenze wie im Fehlertext, absolut (auch in einer
+ * relativen) bis zum Leerraum (ADRESSE_IM_FREITEXT), Werte hinter Leerraum
+ * vorab (ersetzeVorab): Vorher blieb
+ * „Fehler bei /login?next=%2F…%3Ftoken%3D…" in Nachricht, Brotkrume und extra
+ * stehen, im Fehlertext fiel der Token.
+ * IP-Adressen fallen zuerst — sonst hielte die Telefon-Regel eine lange IPv4
+ * für eine Nummer.
  */
 function bereinigeFreitext(text: string): string {
   const ohneIp = entferneIps(text)
   if (/^(?:https?:\/\/|\/)\S*$/i.test(ohneIp)) return bereinigeUrl(ohneIp)
-  return bereinigeTextMitUrls(ohneIp)
-    .replace(BEARER_MUSTER, 'Bearer [entfernt]')
-    .replace(ZUWEISUNG_MUSTER, '$1$2[entfernt]')
-    .replace(LANGE_KENNUNG_MUSTER, '[kennung entfernt]')
+  const vorab = ersetzeVorab(ohneIp, ADRESSE_IM_FREITEXT)
+  const mitAdressen = bereinigeText(vorab.replace(ADRESSE_IM_FREITEXT, (adresse) => bereinigeUrl(adresse)))
+  const ohneZuweisung = ersetzeZuweisungen(mitAdressen.replace(BEARER_MUSTER, 'Bearer [entfernt]'))
+  return ohneZuweisung.replace(LANGE_KENNUNG_MUSTER, '[kennung entfernt]')
+}
+
+/** „Bearer" vor einem Token (ersetzeVorab), auch direkt hinter Ziffern wie
+ *  die Schlüssel (istGeheimerSchluessel): `…4567Bearer …` sahen die Regeln danach
+ *  erst, wenn die Nummer gefallen war — vorab fiel sie aber womöglich schon mit
+ *  einem anderen Wert. */
+const BEARER_VORAB = /(?:\b|(?<=\d))Bearer\s+(?=[A-Za-z0-9._~+/=-])/g
+
+/** ANMELDECODE_MUSTER für ersetzeVorab, ebenso auch direkt hinter Ziffern. */
+const ANMELDECODE_VORAB = /(?:\b|(?<=\d))(code|otp|anmeldecode)(\W{1,3})\d{6}\b/gi
+
+/** Ein Bearer-Token wie in BEARER_MUSTER, klebend. */
+const BEARER_TOKEN = /[A-Za-z0-9._~+/=-]+/y
+
+/** Der Rest eines Worts bis zum Leerraum, klebend. */
+const BIS_LEERRAUM = /\S*/y
+
+/** Weitere Ziffern einer Nummer hinter Trennern wie in TELEFON_MUSTER, klebend. */
+const ZIFFERN_REST = /(?:[\s/\-.()]{1,3}\d)(?:[\s/\-.()]{0,3}\d)*/y
+
+/** Ein „/" nach Leerraum oder Klammer: Dort beginnt in Ziffern eine Adresse. */
+const ADRESSE_IN_ZIFFERN = /(?<=[\s()])\//g
+
+/** TELEFON_MUSTER, klebend: Setzt die Telefon-Regel an dieser Stelle an? */
+const TELEFON_KLEBEND = new RegExp(TELEFON_MUSTER.source, 'y')
+
+/** Wo eine Adresse beginnen kann: wie in ADRESSE_IM_FREITEXT und ADRESSE_IM_FEHLERTEXT. */
+const ADRESS_ANFANG = /https?:\/\/|(?<![\p{L}\p{N}\p{M}_/.~%-])\//iu
+
+/**
+ * Das Ende eines Werts aus ersetzeVorab. Beginnt in ihm eine Adresse, fällt
+ * das ganze Wort bis zum Leerraum: Endete der Ersatz am Wert, blieben die
+ * übrigen Parameter der Adresse stehen (`token: (/x?a=1&s=…)`,
+ * `Bearer https://…?a=(1)&s=…`), und über Leerraum reicht keine Adresse.
+ * Vor dem Wert steht Leerraum oder ein Trenner, an dem keine beginnt — so
+ * liest ADRESS_ANFANG das Wort wie die Durchgänge danach.
+ */
+function endeMitAdresse(text: string, anfang: number, ende: number): number {
+  const wort = wortEnde(text, anfang)
+  const adresse = text.slice(anfang, wort).search(ADRESS_ANFANG)
+  return adresse !== -1 && anfang + adresse < ende ? wort : ende
+}
+
+/** Das Ende des Worts ab `stelle`. */
+function wortEnde(text: string, stelle: number): number {
+  BIS_LEERRAUM.lastIndex = stelle
+  BIS_LEERRAUM.test(text)
+  return BIS_LEERRAUM.lastIndex
+}
+
+/**
+ * Werte hinter Leerraum fallen vor den Adressen (Nacharbeit nach Runde 2):
+ * „Bearer …", „code: 123456", „token: …". Liest eine Adresse davor ihr
+ * Schlüsselwort mit — sie reicht bis zum Leerraum (`…?a=1,"h":"Bearer`) —,
+ * steht es danach kodiert in ihr (`%22Bearer`, `token%3A`): Die Regeln
+ * danach sähen es nicht mehr, und der Wert dahinter bliebe. Ein Wert ohne
+ * Leerraum vor sich liegt in derselben Adresse wie sein Schlüssel; den nimmt
+ * die URL-Regel.
+ *
+ * Es fällt der Wert, kein Schlüssel davor: Nähme der Ersatz einen mit, bliebe
+ * dessen Wert stehen (`token: abc,password: geheim`). Beginnt im Wert eine
+ * Adresse, fällt das Wort mit (endeMitAdresse). Eine Telefonnummer reicht über
+ * Leerraum: Beginnt sie im Wert, fällt sie bis zu ihrem Ende mit; beginnt sie
+ * in einer Adresse und geht dahinter weiter (`…?s=0664 1234567`), fällt ihr
+ * Rest hinter der Adresse, wenn ihr Anfang dort mit einem heiklen Parameter
+ * fällt — sonst sähe die Telefon-Regel im Rest keine Nummer mehr. Alle Regeln
+ * lesen den unveränderten Text, ihre Bereiche werden danach zusammengelegt —
+ * so nimmt auch ein Wort, das fällt, keinem Schlüssel darin seinen Wert
+ * hinter dem Leerraum. Linear: Nummern und Adressen werden je einmal gesucht,
+ * jede Regel setzt je Treffer einmal an, jedes Wort liest sie höchstens
+ * einmal, und eine Adresse, über deren Ende eine Nummer reicht, wird einmal
+ * mehr bereinigt.
+ */
+function ersetzeVorab(text: string, adressen: RegExp): string {
+  const nummern = [...text.matchAll(TELEFON_MUSTER)]
+  /** Die Nummer, die als letzte vor `stelle` beginnt — Nummern überlappen nicht. */
+  const nummerVor = (stelle: number) => {
+    let links = 0
+    let rechts = nummern.length
+    while (links < rechts) {
+      const mitte = (links + rechts) >> 1
+      if (nummern[mitte].index < stelle) links = mitte + 1
+      else rechts = mitte
+    }
+    return links > 0 ? nummern[links - 1] : undefined
+  }
+  const bereiche: { anfang: number; ende: number; ersatz: string }[] = []
+  /** Ein Wert ab `anfang`, mit Adresse und Nummer, die in ihm beginnen. Ist er
+   *  ganz eine Nummer, nimmt ihn deren Regel, mit ihrem Platzhalter. Endet ein
+   *  Geheimnis (`ziffernRest`) auf eine Ziffer, fallen die Ziffern dahinter mit:
+   *  Ob eine Nummer dort beginnt, sieht die Telefon-Regel oft erst, wenn vorher
+   *  eine E-Mail-Adresse gefallen ist (`kundin@example.com0664 1234567`). Der
+   *  Bereich wächst, bis nichts mehr dazukommt — in dem, was er dazunimmt, kann
+   *  wieder eine Nummer oder Adresse beginnen. Jede Runde liest nur das neue Stück. */
+  const wert = (anfang: number, ende: number, ersatz: string, ziffernRest = true, nummerAb = anfang) => {
+    const bis = endeMitAdresse(text, anfang, ende)
+    const erste = nummerVor(bis)
+    if (erste !== undefined && erste.index >= nummerAb && erste.index <= anfang && erste.index + erste[0].length >= bis) return
+    let ganz = bis
+    for (;;) {
+      let neu = ganz
+      const nummer = nummerVor(neu)
+      if (nummer !== undefined && nummer.index >= nummerAb) neu = Math.max(neu, nummer.index + nummer[0].length)
+      if (ziffernRest && /\d/.test(text[neu - 1])) {
+        ZIFFERN_REST.lastIndex = neu
+        if (ZIFFERN_REST.test(text)) neu = ZIFFERN_REST.lastIndex
+      }
+      // Beginnt im neuen Stück eine Adresse (` /664/1?s=…`), fällt ihr Wort mit — das
+      // der letzten, es reicht am weitesten (` /1 /2?s=…`).
+      const von = Math.max(bis, ganz - 1)
+      let adresse = -1
+      for (const anfangAdresse of text.slice(von, neu).matchAll(ADRESSE_IN_ZIFFERN)) adresse = anfangAdresse.index
+      if (adresse !== -1) neu = Math.max(neu, wortEnde(text, von + adresse))
+      // Klebt am Ende ein „/" — davor steht dann eine Ziffer, nach der keine Adresse
+      // beginnt —, begänne hinter dem Platzhalter eine, die vorher keine war
+      // (`…6543/x?s=0664 …`): Das Wort fällt mit.
+      if (text[neu] === '/') neu = wortEnde(text, neu)
+      if (neu === ganz) break
+      ganz = neu
+    }
+    bereiche.push({ anfang, ende: ganz, ersatz })
+  }
+  // Die Codes zuerst: Bei „otp: 123456" greifen Code und Zuweisung; reichen
+  // beide gleich weit, bleibt der Code-Platzhalter (die Sortierung unten ist stabil).
+  for (const treffer of text.matchAll(ANMELDECODE_VORAB)) {
+    const trenner = treffer[2]
+    if (!/\s/.test(trenner)) continue
+    const anfang = treffer.index + treffer[1].length + trenner.length
+    // Mit „/" davor beginnt eine Adresse (`code /123456?s=…`): Das Wort fällt mit,
+    // sonst schnitte der Platzhalter sie hinter dem Code entzwei. Beginnt schon
+    // im Trenner eine Nummer (`code: +436641 987654`), nimmt sie deren Regel.
+    const ende = trenner.includes('/') ? wortEnde(text, anfang) : treffer.index + treffer[0].length
+    wert(anfang, ende, '[code entfernt]', false, treffer.index + treffer[1].length)
+  }
+  for (const treffer of text.matchAll(BEARER_VORAB)) {
+    const anfang = treffer.index + treffer[0].length
+    BEARER_TOKEN.lastIndex = anfang
+    BEARER_TOKEN.test(text)
+    // Hängt am Token ein „@", ist er der Anfang einer E-Mail-Adresse: Das Wort fällt mit.
+    const ende = text[BEARER_TOKEN.lastIndex] === '@' ? wortEnde(text, anfang) : BEARER_TOKEN.lastIndex
+    wert(anfang, ende, '[entfernt]')
+  }
+  for (const treffer of text.matchAll(ZUWEISUNG_KANDIDAT)) {
+    if (!/\s/.test(treffer[2]) || !istGeheimerSchluessel(treffer[1])) continue
+    const anfang = treffer.index + treffer[0].length
+    const ende = zuweisungsEnde(text, anfang)
+    // Ist der ganze Wert eine E-Mail-Adresse, nimmt ihn deren Regel — auch ohne Schlüssel.
+    if (ende === -1 || ersetzeEmails(text.slice(anfang, ende)) === '[e-mail entfernt]') continue
+    wert(anfang, ende, '[entfernt]')
+  }
+  for (const adresse of text.matchAll(adressen)) {
+    const ende = adresse.index + adresse[0].length
+    const nummer = nummerVor(ende)
+    if (nummer === undefined || nummer.index < adresse.index) continue
+    const nummerEnde = nummer.index + nummer[0].length
+    // Bleibt ihr Anfang am Ende der bereinigten Adresse stehen und setzt die
+    // Telefon-Regel dort an (`?tel=0664`, auch hinter einem neu kodierten
+    // `tel%3A`), nimmt sie danach die ganze Nummer. Nur die Zeichen zu
+    // vergleichen genügt nicht: `?a=106&s=06 64 …` endet bereinigt zufällig
+    // auch auf „06", aber mitten in einer Zahl setzt die Regel nicht an.
+    if (nummerEnde <= ende) continue
+    const bereinigt = bereinigeUrl(adresse[0])
+    const anfangDerNummer = text.slice(nummer.index, ende)
+    TELEFON_KLEBEND.lastIndex = bereinigt.length - anfangDerNummer.length
+    if (bereinigt.endsWith(anfangDerNummer) && TELEFON_KLEBEND.test(bereinigt + text.slice(ende, nummerEnde))) continue
+    // Das Zeichen, an dem die Adresse endet, bleibt — so bleibt auch ihre Grenze.
+    let rest = ende + 1
+    while (rest < nummerEnde && /\s/.test(text[rest])) rest++
+    if (rest < nummerEnde) bereiche.push({ anfang: rest, ende: nummerEnde, ersatz: '[telefon entfernt]' })
+  }
+  // Ein Bereich, der vor dem Ende des vorigen beginnt, liegt in ihm: In einem
+  // Wort beginnen zwei Werte nur am selben Ort (otp: 123456) — dann zuerst der
+  // längere, „otp: 905173-abc" fällt als Wert —, und der Rest einer Nummer
+  // hinter einer Adresse endet, wo die Nummer endet.
+  bereiche.sort((a, b) => a.anfang - b.anfang || b.ende - a.ende)
+  let ergebnis = ''
+  let ende = 0
+  for (const bereich of bereiche) {
+    if (bereich.anfang < ende) continue
+    ergebnis += text.slice(ende, bereich.anfang) + bereich.ersatz
+    ende = bereich.ende
+  }
+  return ergebnis + text.slice(ende)
+}
+
+/** Adressen in einem Fehlertext (Nr. 56): absolut (https://…, auch groß
+ *  geschrieben) oder relativ ab „/". Eine relative beginnt nie direkt nach
+ *  einem Buchstaben oder einer Ziffer jeder Schrift, nach „_", „/", „.", „~",
+ *  „%" oder „-" — so werden „und/oder", „3/4" und „localhost:3000/…" keine
+ *  Adresse; nach Doppelpunkt, Komma, Klammer oder Anführungszeichen schon
+ *  (Runde 1: vorher nur am Anfang, nach Leerraum, ( [ < " ' ` und „="; „bei:/api/…"
+ *  blieb stehen). Leerraum, Anführungszeichen (auch typografische) und
+ *  schließende Klammern beenden sie. Linear: Jede Stelle wird höchstens
+ *  einmal gelesen. */
+const ADRESSE_IM_FEHLERTEXT =
+  /https?:\/\/[^\s"'`<>)\]«»„“”‚‘’]+|(?<![\p{L}\p{N}\p{M}_/.~%-])\/[^\s"'`<>)\]«»„“”‚‘’]*/giu
+
+/** Adressen in Nachricht, Brotkrume und extra (bereinigeFreitext): relativ
+ *  wie im Fehlertext, absolut aber bis zum Leerraum wie bereinigeTextMitUrls
+ *  (Nacharbeit nach Runde 2) — „]", „)" und Anführungszeichen stehen in
+ *  Adressen (?f[a]=1, ?utm=(herbst)); endete die Adresse dort, sah die
+ *  URL-Regel „&reorder=…" oder „&s=…" dahinter nicht mehr. Steckt in einer
+ *  relativen Adresse eine absolute (/api/og?url=https://…), liest die
+ *  relative sie mit, bis zum Leerraum: Endete sie davor, landeten die
+ *  übrigen Parameter der äußeren Abfrage im Pfad der absoluten, und „&s=…"
+ *  blieb. Liest sie so ein Schlüsselwort mit, dessen Wert hinter Leerraum
+ *  steht, hat ersetzeVorab diesen Wert vorher genommen. Die Vorschau prüft je
+ *  Zeichen acht Zeichen, das bleibt linear.
+ *  Im Fehlertext bleibt die engere Grenze: Dort stehen Adressen oft in
+ *  Klammern oder JSON, und der Text danach hilft beim Beheben. */
+const ADRESSE_IM_FREITEXT =
+  /https?:\/\/\S+|(?<![\p{L}\p{N}\p{M}_/.~%-])\/(?:(?!https?:\/\/)[^\s"'`<>)\]«»„“”‚‘’])*(?:https?:\/\/\S*)?/giu
+
+/**
+ * Der Fehlertext (exception.value): E-Mail, Telefon und Code wie bisher, seit
+ * Nr. 56 auch Adressen mit Token — relativ wie absolut (Bericht 47: „Link
+ * /reset-password?token=…" blieb stehen) — mit der URL-Regel, dazu
+ * „token=…" und „Bearer …". IP-Adressen bleiben (Adresse des
+ * Datenbank-Servers, Nr. 37), ebenso lange Kennungen ohne Adresse:
+ * Fehlertexte von Next.js und Prisma tragen technische Kennungen (etwa die
+ * einer Server Action, Chunk-Namen beim Nachladen), die beim Beheben helfen.
+ * Ein Token mit Schlüssel fällt trotzdem, auch in Anführungszeichen
+ * (Prisma: token: "…", Runde 1); einer ganz ohne Schlüssel bleibt.
+ */
+function bereinigeFehlertext(text: string): string {
+  const vorab = ersetzeVorab(text, ADRESSE_IM_FEHLERTEXT)
+  const mitAdressen = bereinigeText(vorab.replace(ADRESSE_IM_FEHLERTEXT, (adresse) => bereinigeUrl(adresse)))
+  return ersetzeZuweisungen(mitAdressen.replace(BEARER_MUSTER, 'Bearer [entfernt]'))
 }
 
 /**
@@ -354,7 +834,7 @@ function bereinigeFreitext(text: string): string {
 function bereinigeQueryText(text: string): string {
   // Bis zum ersten „=" ohne Leerraum, danach ohne Leerraum — so setzt das
   // Muster nur einmal an (`^\S*=\S*$` probierte jedes „=" durch: quadratisch).
-  return /^[^\s=]*=\S*$/.test(text) ? bereinigeQuery(text, bereinigeFreitext) : bereinigeFreitext(text)
+  return /^[^\s=]*=\S*$/.test(text) ? bereinigeQuery(text, true) : bereinigeFreitext(text)
 }
 
 /** Heikel ist ein Schlüssel nach Namen, als IP-Träger oder wenn er selbst
@@ -416,6 +896,19 @@ function entferneFrameVariablen(werte: unknown): void {
 }
 
 /**
+ * Ein Ereignis ohne die Daten der Anfrage (Adresse samt Abfrage, Kopfzeilen
+ * mit Referer) und ohne Brotkrumen — als Event-Prozessor für Meldungen, die
+ * nur sagen, DASS etwas geschah, auf einer Seite, deren Adresse Suchtext
+ * trägt (/hoefe?q=…, Nr. 56). Die URL-Regel ließe Suchwörter stehen: Sie
+ * kennt nur E-Mail, Telefon, Code und heikle Parameternamen.
+ */
+export function ohneAnfrage<E extends SentryEvent>(event: E): E {
+  delete event.request
+  delete event.breadcrumbs
+  return event
+}
+
+/**
  * Der zentrale Filter — läuft auf Server, Edge und im Browser, für
  * FEHLER-Ereignisse (beforeSend) wie für TRANSAKTIONEN (beforeSendTransaction).
  * Entfernt, was der Kopfkommentar aufzählt; verwirft nie ein Ereignis —
@@ -470,7 +963,7 @@ function minimalEreignis<E extends SentryEvent>(event: E): E {
         values: [
           {
             ...(typeof typ === 'string' ? { type: bereinigeText(typ) } : {}),
-            ...(typeof wert === 'string' ? { value: bereinigeText(wert) } : {}),
+            ...(typeof wert === 'string' ? { value: bereinigeFehlertext(wert) } : {}),
           },
         ],
       }
@@ -485,7 +978,7 @@ function minimalEreignis<E extends SentryEvent>(event: E): E {
 function bereinigeVollstaendig<E extends SentryEvent>(event: E): E {
   // Die Nachricht trägt dasselbe wie logentry (captureMessage, Konsole) —
   // deshalb dieselbe Freitext-Regel. Nur der Fehlertext (exception.value)
-  // behält IP-Adressen, siehe Kopfkommentar.
+  // behält IP-Adressen und lange Kennungen, siehe bereinigeFehlertext.
   if (typeof event.message === 'string') event.message = bereinigeFreitext(event.message)
   else if (event.message !== undefined) delete event.message
 
@@ -498,7 +991,7 @@ function bereinigeVollstaendig<E extends SentryEvent>(event: E): E {
   if (Array.isArray(ausnahmen)) {
     for (const ausnahme of ausnahmen) {
       if (istObjekt(ausnahme) && typeof ausnahme.value === 'string') {
-        ausnahme.value = bereinigeText(ausnahme.value)
+        ausnahme.value = bereinigeFehlertext(ausnahme.value)
       }
     }
   }

@@ -14,9 +14,11 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   holeAdresseZumPunkt,
   sucheHofStandort,
-  updateProfile,
   type ProfileFormData,
 } from '@/server/actions/farm'
+import { speichereProfil, speichernOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
+import { DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
+import { geaendertSeitLaden, profilWieImSchema } from '@/lib/abschnitt-stand'
 import type { FarmSettings } from '@/server/queries/farm'
 import {
   HINWEIS_ADRESSE_UEBERNOMMEN,
@@ -33,17 +35,23 @@ import {
   type Land,
 } from '@/lib/laender'
 import type { KartenZiel } from '@/components/settings/standort-karte'
+import { KarteLaedt } from '@/components/karte/karte-laedt'
+import { STANDORT_KARTE_RAHMEN } from '@/components/karte/karten-masse'
 import { BETRIEBSNUMMER_ANKER, BETRIEBSSTATUS, BETRIEBSSTATUS_VALUES, type BetriebsstatusValue } from '@/lib/taxonomie'
 import { profilBearbeitenSchema } from '@/schemas/hofprofil'
 import { EMAIL_MAX, HOFNAME_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
 import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speichern'
-import { EINSTELLUNG_MEIN_AUFTRITT, einstellungsWeg } from '@/lib/bauern-navigation'
+import { HOFSEITE_HREF, HOFSEITE_WEG } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
 
-// Nur clientseitig: Leaflet greift beim Import auf window zu.
-const StandortKarte = dynamic(() => import('@/components/settings/standort-karte'), { ssr: false })
+// Nur clientseitig: Leaflet greift beim Import auf window zu. Bis die Karte
+// da ist, steht der Platzhalter in ihrer Größe (Nr. 52) — nichts springt.
+const StandortKarte = dynamic(() => import('@/components/settings/standort-karte'), {
+  ssr: false,
+  loading: () => <KarteLaedt className={STANDORT_KARTE_RAHMEN} />,
+})
 
 /** Obergrenzen je Feld — dieselben, die updateProfile prüft (src/lib/eingabegrenzen.ts). */
 const GRENZE: Partial<Record<keyof ProfileFormData, number>> = {
@@ -58,6 +66,9 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
   // Nach dem Speichern zurück zur Übersicht (Register N1, Nr. 44).
   const nachSpeichern = useNachSpeichern()
   const [sucheLaeuft, setSucheLaeuft] = useState(false)
+  // Ein Fehler beim Speichern steht im Formular über dem Knopf, die Eingabe
+  // bleibt — wie in den Formularen von Mein Hof (DESIGN_SYSTEM).
+  const [speicherFehler, setSpeicherFehler] = useState<string | null>(null)
   // Die ruhige Zeile über der Karte: anfangs der Start-Hinweis (solange kein
   // Punkt gespeichert ist), danach das Vorwärts-Ergebnis oder die
   // Übernahme-Zeile der Rückwärtssuche.
@@ -89,25 +100,33 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
     () => profilBearbeitenSchema({ name: farm.name, ownerName: farm.ownerName, phone: farm.phone }),
     [farm.name, farm.ownerName, farm.phone]
   )
+  // Der Stand beim Laden: Startwerte des Formulars und Maßstab dafür, was
+  // dieses Formular ändert (geaendertSeitLaden, siehe onSubmit).
+  const startwerte: ProfileFormData = {
+    name: farm.name,
+    ownerName: farm.ownerName,
+    description: farm.description,
+    address: farm.address,
+    postalCode: farm.postalCode,
+    city: farm.city,
+    phone: farm.phone,
+    email: farm.email,
+    country: startLand,
+    latitude: farm.latitude,
+    longitude: farm.longitude,
+    betriebsnummer: farm.betriebsnummer,
+    betriebsstatus: farm.betriebsstatus,
+  }
+  // Einmal, Feld für Feld so, wie das Schema ihn ausgibt (Ränder,
+  // Kleinschreibung, leer → null) — sonst zählte ein unverändertes Feld als
+  // geändert. Hält ein Altwert das Schema nicht ein, bleibt nur dieses Feld,
+  // wie es geladen wurde (profilWieImSchema).
+  const [anfang] = useState<ProfileFormData>(() => profilWieImSchema(schema, startwerte))
   const { register, handleSubmit, getValues, setValue, control, formState: { errors } } = useForm<ProfileFormData>({
     // Cast wie im Produktformular: Die Vorverarbeitung (leer → null) macht den
     // Eingabetyp des Schemas zu unknown; der Ausgabetyp ist ProfileFormData.
     resolver: zodResolver(schema) as Resolver<ProfileFormData>,
-    defaultValues: {
-      name: farm.name,
-      ownerName: farm.ownerName,
-      description: farm.description,
-      address: farm.address,
-      postalCode: farm.postalCode,
-      city: farm.city,
-      phone: farm.phone,
-      email: farm.email,
-      country: startLand,
-      latitude: farm.latitude,
-      longitude: farm.longitude,
-      betriebsnummer: farm.betriebsnummer,
-      betriebsstatus: farm.betriebsstatus,
-    },
+    defaultValues: startwerte,
   })
   // Der Hilfesatz folgt dem gewählten Status — welche Nummer gehört hierher?
   const [status, setStatus] = useState<BetriebsstatusValue | null>(farm.betriebsstatus)
@@ -126,13 +145,20 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
     // (Nr. 44), und der gesuchte Punkt käme in einer ausgehängten Seite an —
     // gespeichert wären still die alten Koordinaten.
     if (sucheLaeuft) return
+    setSpeicherFehler(null)
     startTransition(async () => {
-      const res = await updateProfile(data)
-      if (res.error) {
-        toast.error(res.error)
-      } else {
-        nachSpeichern('Profil gespeichert')
+      // Nur, was hier seit dem Laden geändert wurde, über den frischen Stand
+      // vom Server — derselbe Weg wie die Abschnitte von Mein Hof. Ein älterer
+      // Tab schriebe sonst Name, Adresse oder Kontakt aus Mein Hof zurück.
+      // speichernOhneWurf: Eine gescheiterte Anfrage (Netz weg, Aktion nach
+      // einem Deploy unbekannt) ginge sonst an die Fehlergrenze, und die
+      // Eingabe wäre weg.
+      const satz = await speichernOhneWurf(() => speichereProfil(geaendertSeitLaden(anfang, data)))
+      if (satz) {
+        setSpeicherFehler(satz)
+        return
       }
+      nachSpeichern('Profil gespeichert')
     })
   }
 
@@ -326,15 +352,19 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         </button>
 
         {/* Die Karte dauerhaft unter den Adressfeldern — beide Richtungen:
-            Die Suche fährt die Karte, das Schieben füllt die Adresse. */}
-        <StandortKarte
-          start={start}
-          ziel={ziel}
-          hinweis={hinweis}
-          kandidaten={kandidaten}
-          onMitteVerschoben={punktGewaehlt}
-          onAdresseAnfrage={adresseVomPunkt}
-        />
+            Die Suche fährt die Karte, das Schieben füllt die Adresse. Die
+            ruhige Zeile darüber steht hier statt in der Karte: Sie ist schon da,
+            während die Karte nachlädt, und schiebt danach nichts mehr. */}
+        <div>
+          {hinweis && <p className="mb-2 text-xs text-muted-foreground">{hinweis}</p>}
+          <StandortKarte
+            start={start}
+            ziel={ziel}
+            kandidaten={kandidaten}
+            onMitteVerschoben={punktGewaehlt}
+            onAdresseAnfrage={adresseVomPunkt}
+          />
+        </div>
       </div>
 
       <div className="bg-card rounded-xl border border-border p-4 space-y-4">
@@ -385,15 +415,18 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
       <p className="text-sm text-muted-foreground">
         Logo und Titelbild verwaltest du unter{' '}
         {/* Ein Link im Satz (Nr. 44), grün wie jeder Link im Fließtext. Das
-            Polster macht ihn 44 px hoch, die Gegen-Ränder halten die Zeile ruhig. */}
+            Polster macht ihn 44 px hoch, die Gegen-Ränder halten die Zeile ruhig.
+            Seit Nr. 50 in Mein Hof (Register N4), vorher „Mein Auftritt". */}
         <Link
-          href={EINSTELLUNG_MEIN_AUFTRITT.href}
+          href={HOFSEITE_HREF}
           className={cn('-my-3 inline-block rounded-md py-3 font-medium text-brand-text underline underline-offset-2', FOKUS_RAHMEN)}
         >
-          {einstellungsWeg(EINSTELLUNG_MEIN_AUFTRITT)}
+          {HOFSEITE_WEG}
         </Link>{' '}
         — dort lädst du Bilder direkt vom Gerät hoch.
       </p>
+
+      <DialogFehler text={speicherFehler} />
 
       {/* Wartet, solange „Auf der Karte suchen" läuft — sonst ginge der neue Standort verloren (siehe onSubmit). */}
       <Button

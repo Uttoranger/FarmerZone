@@ -8,7 +8,8 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { getUmsatzAuswertung, getYtdRevenue } from '@/server/queries/analytics'
 import { getKennzahlen, getServicegebuehrenMonat } from '@/server/queries/auswertung'
 import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
-import { grenzeStand, servicegebuehrenSaetze, teilenKarte, teilenZeitraumAus, umsatzKartenTitel } from '@/lib/auswertung'
+import { testzahlungenHinweisFuerHof } from '@/server/queries/testzahlungen'
+import { auswertungSummen, grenzeStand, servicegebuehrenSaetze, teilenKarte, teilenZeitraumAus } from '@/lib/auswertung'
 import { umsatzfenster, type Periode, type Periodenfenster } from '@/lib/umsatz'
 import { PROCESSING_REVENUE_LIMIT, limitProgress } from '@/lib/revenue-limit'
 import { formatEuro } from '@/lib/format'
@@ -57,6 +58,14 @@ export default async function AnalyticsPage({
   const jetzt = new Date()
   const pf = umsatzfenster(periode, jetzt, zurueck)
 
+  let daten: Awaited<ReturnType<typeof ladeAuswertung>> | null = null
+  try {
+    daten = await ladeAuswertung(farm.id, periode, zurueck, pf, jetzt)
+  } catch (err) {
+    // Nur Bereich und Hof — keine Personendaten.
+    Sentry.captureException(err, { tags: { bereich: 'auswertung', seite: 'uebersicht' }, extra: { farmId: farm.id } })
+  }
+
   const kopf = (
     <header>
       <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Auswertung</h1>
@@ -66,16 +75,12 @@ export default async function AnalyticsPage({
           Region
         </Link>
       </p>
+      {/* Leise, nur wenn der Stichtag Bestellungen dieser Seite betrifft (Register Z4). */}
+      {daten?.testzahlungenHinweis && (
+        <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">{daten.testzahlungenHinweis}</p>
+      )}
     </header>
   )
-
-  let daten: Awaited<ReturnType<typeof ladeAuswertung>> | null = null
-  try {
-    daten = await ladeAuswertung(farm.id, periode, zurueck, pf, jetzt)
-  } catch (err) {
-    // Nur Bereich und Hof — keine Personendaten.
-    Sentry.captureException(err, { tags: { bereich: 'auswertung', seite: 'uebersicht' }, extra: { farmId: farm.id } })
-  }
 
   const grenzeText = formatEuro(PROCESSING_REVENUE_LIMIT, 0)
   // Das Wiener Kalenderjahr, wie die Grenzwert-Summe (getYtdRevenue).
@@ -90,7 +95,6 @@ export default async function AnalyticsPage({
       <TeilenWirkungKarte karte={teilenKarte(daten.wirkung)} zeitraum={daten.umsatz.zeitraum} />
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
         <UmsatzKarte
-          titel={umsatzKartenTitel(periode)}
           zeitraum={daten.umsatz.zeitraum}
           summeCent={daten.umsatz.summeCent}
           vergleich={daten.umsatz.vergleich}
@@ -129,14 +133,19 @@ export default async function AnalyticsPage({
   )
 }
 
-/** Alles für die Seite in einem Zug — nur Abfragen, keine Darstellung (Fehler fängt die Seite). */
+/**
+ * Alles für die Seite in einem Zug — nur Abfragen, keine Darstellung (Fehler
+ * fängt die Seite). Den Stichtag der Live-Schaltung (Register Z4) bringen die
+ * Abfragen selbst mit (src/lib/umgebung-server.ts).
+ */
 async function ladeAuswertung(farmId: string, periode: Periode, zurueck: number, pf: Periodenfenster, jetzt: Date) {
-  const [umsatz, ytdRevenue, kennzahlen, wirkung, gebuehren] = await Promise.all([
+  const [umsatz, ytdRevenue, kennzahlen, wirkung, gebuehren, testzahlungenHinweis] = await Promise.all([
     getUmsatzAuswertung(farmId, periode, zurueck, jetzt),
     getYtdRevenue(farmId, jetzt),
     getKennzahlen(farmId, pf),
     getTeilenWirkung(farmId, teilenZeitraumAus(pf)),
     getServicegebuehrenMonat(farmId, jetzt),
+    testzahlungenHinweisFuerHof(farmId, auswertungSummen(pf, jetzt)),
   ])
-  return { umsatz, ytdRevenue, kennzahlen, wirkung, gebuehren, grenze: limitProgress(ytdRevenue) }
+  return { umsatz, ytdRevenue, kennzahlen, wirkung, gebuehren, grenze: limitProgress(ytdRevenue), testzahlungenHinweis }
 }

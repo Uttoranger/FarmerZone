@@ -7,17 +7,19 @@
 import { describe, it, expect } from 'vitest'
 import {
   SERVICEGEBUEHREN_ERKLAERUNG,
+  SERVICEGEBUEHREN_TOEPFE,
   abholtageDesFensters,
+  auswertungSummen,
   grenzeStand,
   kennzahlen,
   servicegebuehrenImMonat,
   servicegebuehrenSaetze,
   teilenKarte,
   teilenZeitraumAus,
-  umsatzKartenTitel,
   zahlartZeile,
 } from '@/lib/auswertung'
-import { einnahmenImMonat, type BestellungFuerFinanzen } from '@/lib/finanzen'
+import { GEZAEHLTE_TOEPFE, einnahmenImMonat, topfVonBestellung, type BestellungFuerFinanzen } from '@/lib/finanzen'
+import { monatsschluesselInWien } from '@/lib/servicegebuehr'
 import { BAR_GEBUEHR_SEPA_SATZ, BAR_OHNE_GEBUEHR_SATZ, BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
 import { umsatzfenster } from '@/lib/umsatz'
 import { fasseTeilenWirkungZusammen } from '@/lib/teilen-wirkung'
@@ -43,7 +45,8 @@ describe('Servicegebühren dieses Monats — gespeicherte Beträge, Abrechnungsr
   it('online bezahlt zählt mit dem gespeicherten Betrag, egal welcher Bestellstatus danach', () => {
     const summe = servicegebuehrenImMonat(
       [bestellung({ serviceFeeCents: 53 }), bestellung({ status: 'CONFIRMED', serviceFeeCents: 50 }), bestellung({ status: 'READY', serviceFeeCents: 61 })],
-      OKTOBER
+      OKTOBER,
+      null
     )
     expect(summe).toEqual({ monat: OKTOBER, onlineCents: 164, onlineAnzahl: 3, vorOrtCents: 0, vorOrtAnzahl: 0, summeCents: 164 })
   })
@@ -56,7 +59,8 @@ describe('Servicegebühren dieses Monats — gespeicherte Beträge, Abrechnungsr
         bestellung({ status: 'NOT_PICKED_UP', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeCents: 90 }),
         bestellung({ status: 'PENDING_CONFIRMATION', paymentStatus: 'PENDING', serviceFeeCents: 99 }),
       ],
-      OKTOBER
+      OKTOBER,
+      null
     )
     expect(summe.summeCents).toBe(0)
     expect(summe.onlineAnzahl + summe.vorOrtAnzahl).toBe(0)
@@ -65,7 +69,8 @@ describe('Servicegebühren dieses Monats — gespeicherte Beträge, Abrechnungsr
   it('B1: bar vor dem Stichtag zählt nie — auch nicht eine ältere Barbestellung, die noch eine Gebühr trägt', () => {
     const summe = servicegebuehrenImMonat(
       [bestellung({ paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeCents: 75 })],
-      OKTOBER
+      OKTOBER,
+      null
     )
     expect(summe.vorOrtCents).toBe(0)
     expect(summe.vorOrtAnzahl).toBe(0)
@@ -78,7 +83,8 @@ describe('Servicegebühren dieses Monats — gespeicherte Beträge, Abrechnungsr
         bestellung({ createdAt: nachStichtag, paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeCents: 55 }),
         bestellung({ createdAt: nachStichtag, status: 'READY', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeCents: 60 }),
       ],
-      monat
+      monat,
+      null
     )
     expect(summe).toMatchObject({ vorOrtCents: 55, vorOrtAnzahl: 1, onlineCents: 0, summeCents: 55 })
   })
@@ -88,13 +94,14 @@ describe('Servicegebühren dieses Monats — gespeicherte Beträge, Abrechnungsr
     const fruehOktober = new Date('2026-09-30T22:30:00Z') // 00:30 Wien am 1.10.
     const summe = servicegebuehrenImMonat(
       [bestellung({ createdAt: spaetSeptember, serviceFeeCents: 11 }), bestellung({ createdAt: fruehOktober, serviceFeeCents: 22 })],
-      OKTOBER
+      OKTOBER,
+      null
     )
     expect(summe.onlineCents).toBe(22)
   })
 
   it('rechnet ganzzahlig in Cent; negative oder krumme Werte verfälschen die Summe nicht', () => {
-    const summe = servicegebuehrenImMonat([bestellung({ serviceFeeCents: -5 }), bestellung({ serviceFeeCents: 50 })], OKTOBER)
+    const summe = servicegebuehrenImMonat([bestellung({ serviceFeeCents: -5 }), bestellung({ serviceFeeCents: 50 })], OKTOBER, null)
     expect(summe.onlineCents).toBe(50)
     expect(Number.isInteger(summe.summeCents)).toBe(true)
   })
@@ -112,8 +119,8 @@ describe('Servicegebühren — dieselbe Zahl wie /admin/finanzen (Register F6)',
       bestellung({ paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeCents: 75 }),
       bestellung({ createdAt: new Date('2026-09-30T21:30:00Z'), serviceFeeCents: 11 }),
     ]
-    const hof = servicegebuehrenImMonat(gemischt, OKTOBER)
-    const admin = einnahmenImMonat(gemischt, OKTOBER)
+    const hof = servicegebuehrenImMonat(gemischt, OKTOBER, null)
+    const admin = einnahmenImMonat(gemischt, OKTOBER, null)
     expect(hof.onlineCents).toBe(admin.eingezogenCents)
     expect(hof.vorOrtCents).toBe(admin.geschuldetCents)
     expect(hof.summeCents).toBe(admin.gezaehltCents)
@@ -125,13 +132,100 @@ describe('Servicegebühren — dieselbe Zahl wie /admin/finanzen (Register F6)',
       bestellung({ createdAt: nachStichtag, status: 'READY', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeCents: 60 }),
       bestellung({ createdAt: nachStichtag, serviceFeeCents: 40 }),
     ]
-    const hofMaerz = servicegebuehrenImMonat(spaeter, '2027-03')
-    const adminMaerz = einnahmenImMonat(spaeter, '2027-03')
+    const hofMaerz = servicegebuehrenImMonat(spaeter, '2027-03', null)
+    const adminMaerz = einnahmenImMonat(spaeter, '2027-03', null)
     expect([hofMaerz.onlineCents, hofMaerz.vorOrtCents, hofMaerz.summeCents]).toEqual([
       adminMaerz.eingezogenCents,
       adminMaerz.geschuldetCents,
       adminMaerz.gezaehltCents,
     ])
+  })
+})
+
+describe('Servicegebühren — welche Töpfe die Karte zählt, steht an einer Stelle (Nachbesserung Runde 2)', () => {
+  it('SERVICEGEBUEHREN_TOEPFE sind die gezählten Töpfe der Finanzseite — dieselbe Konstante', () => {
+    expect(SERVICEGEBUEHREN_TOEPFE).toBe(GEZAEHLTE_TOEPFE)
+    expect([...SERVICEGEBUEHREN_TOEPFE]).toEqual(['eingezogen', 'geschuldet'])
+  })
+
+  it('die Karte zählt genau die Bestellungen des Monats, deren Topf darin liegt', () => {
+    const gemischt = [
+      bestellung({ serviceFeeCents: 53 }),
+      bestellung({ status: 'READY', serviceFeeCents: 61 }),
+      bestellung({ status: 'CANCELLED', serviceFeeCents: 70 }),
+      bestellung({ status: 'PENDING_CONFIRMATION', paymentStatus: 'PENDING', serviceFeeCents: 99 }),
+      bestellung({ createdAt: nachStichtag, paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeCents: 55 }),
+      bestellung({ createdAt: nachStichtag, status: 'READY', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeCents: 60 }),
+    ]
+    for (const monat of [OKTOBER, '2027-03'] as const) {
+      const gezaehlt = gemischt.filter(
+        (b) => monatsschluesselInWien(b.createdAt) === monat && SERVICEGEBUEHREN_TOEPFE.includes(topfVonBestellung(b, null))
+      )
+      const karte = servicegebuehrenImMonat(gemischt, monat, null)
+      expect(karte.onlineAnzahl + karte.vorOrtAnzahl, monat).toBe(gezaehlt.length)
+      expect(karte.summeCents, monat).toBe(gezaehlt.reduce((s, b) => s + b.serviceFeeCents, 0))
+    }
+  })
+})
+
+describe('Servicegebühren — Testzahlungen zählen nicht (Register Z4, Nr. 55)', () => {
+  // Erfundener Stichtag mitten im Oktober: online davor ist eine Testzahlung.
+  const STICHTAG = new Date('2026-10-12T21:00:00+02:00')
+  const davor = new Date(STICHTAG.getTime() - 1)
+  const danach = new Date(STICHTAG.getTime() + 1)
+  const oktober = [
+    bestellung({ createdAt: davor, serviceFeeCents: 53 }), // Testzahlung
+    bestellung({ createdAt: danach, serviceFeeCents: 61 }), // echt
+    bestellung({ createdAt: davor, paymentMethod: 'ONSITE_CARD', paymentStatus: 'PENDING', serviceFeeCents: 75 }), // vor Ort, echt
+  ]
+
+  it('online vor dem Stichtag fehlt in „Online bezahlt", vor Ort zählt weiter', () => {
+    expect(servicegebuehrenImMonat(oktober, OKTOBER, STICHTAG)).toEqual({
+      monat: OKTOBER,
+      onlineCents: 61,
+      onlineAnzahl: 1,
+      vorOrtCents: 75,
+      vorOrtAnzahl: 1,
+      summeCents: 136,
+    })
+  })
+
+  it('Hof und Betreiber sehen auch mit Stichtag dieselbe Zahl', () => {
+    const hof = servicegebuehrenImMonat(oktober, OKTOBER, STICHTAG)
+    const admin = einnahmenImMonat(oktober, OKTOBER, STICHTAG)
+    expect([hof.onlineCents, hof.vorOrtCents, hof.summeCents, hof.onlineAnzahl + hof.vorOrtAnzahl]).toEqual([
+      admin.eingezogenCents,
+      admin.geschuldetCents,
+      admin.gezaehltCents,
+      admin.bestellungen,
+    ])
+  })
+
+  it('ohne Stichtag zählt die Online-Bestellung wie bisher', () => {
+    expect(servicegebuehrenImMonat(oktober, OKTOBER, null).onlineCents).toBe(114)
+  })
+})
+
+describe('auswertungSummen — daran misst sich die Hinweiszeile (Register Z4, Nachbesserung Runde 1)', () => {
+  const jetzt = new Date('2026-11-18T09:00:00Z') // Mittwoch
+
+  it('Umsatz: Balken samt Vorperiode und das Wiener Jahr der Grenzkarte; dazu der Monat der Servicegebühren', () => {
+    const pf = umsatzfenster('woche', jetzt)
+    const summen = auswertungSummen(pf, jetzt)
+    expect(summen.umsatz).toEqual([
+      { von: pf.vergleichGanz.von, bis: pf.aktuell.bis },
+      umsatzfenster('jahr', jetzt).aktuell,
+    ])
+    expect(summen.gebuehrenMonat?.von.toISOString()).toBe('2026-10-31T23:00:00.000Z')
+    expect(summen.gebuehrenMonat?.bis.toISOString()).toBe('2026-11-30T23:00:00.000Z')
+  })
+
+  it('ein älteres Jahr: Balkenfenster und laufendes Jahr bleiben zwei Fenster — die Lücke dazwischen zählt nicht', () => {
+    const pf = umsatzfenster('jahr', jetzt, 3) // 2023 mit Vorjahr 2022
+    const [balken, jahr] = auswertungSummen(pf, jetzt).umsatz
+    expect(balken.von.toISOString()).toBe('2021-12-31T23:00:00.000Z')
+    expect(balken.bis.toISOString()).toBe('2023-12-31T22:59:59.999Z')
+    expect(jahr.von.toISOString()).toBe('2025-12-31T23:00:00.000Z')
   })
 })
 
@@ -233,9 +327,8 @@ describe('Grenze und Titel', () => {
     expect(grenzeStand(95, '€ 55.000').hinweis).toContain('€ 55.000')
   })
 
-  it('Titel der Umsatzkarte je Zeitraum', () => {
-    expect(umsatzKartenTitel('woche')).toBe('Umsatz pro Tag')
-    expect(umsatzKartenTitel('monat')).toBe('Umsatz pro Woche')
-    expect(umsatzKartenTitel('jahr')).toBe('Umsatz pro Monat')
+  it('die Umsatzkarte trägt in jedem Zeitraum denselben Titel „Mit Hofladen" — umsatzKartenTitel gibt es nicht mehr (Nr. 53)', async () => {
+    const modul: Record<string, unknown> = await import('@/lib/auswertung')
+    expect(modul.umsatzKartenTitel).toBeUndefined()
   })
 })

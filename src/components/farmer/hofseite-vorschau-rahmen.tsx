@@ -2,11 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUpRight, Maximize2, Monitor, Smartphone, X } from 'lucide-react'
-import { MARKIERUNG_TYP, type HofseiteZeileId } from '@/schemas/hofseite-vorschau'
+import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 import {
   VORSCHAU_HANDY_HOEHE,
   VORSCHAU_SEITENBREITE,
-  leseBereit,
   vorschauAdresse,
   vorschauLink,
   vorschauMassstab,
@@ -15,6 +14,7 @@ import {
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { useVorschauMarkierung } from '@/components/farmer/use-vorschau-markierung'
 
 /**
  * Die Vorschau im Editor ab lg: die echte öffentliche Hofseite im
@@ -32,11 +32,8 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
  * öffnet „Web" das Overlay (der Editor sagt mit `webInlineMoeglich`, was geht).
  *
  * `stand` steckt in der Adresse: Jedes Speichern zählt hoch, der Rahmen lädt
- * neu. Die geöffnete Zeile geht per postMessage an den Rahmen — nur an den
- * eigenen Ursprung. Nach jedem Laden meldet sich die Seite im Rahmen „bereit"
- * (components/farm/vorschau-im-rahmen.tsx), und die Markierung geht noch
- * einmal hin: Ein Neuladen verliert sie, und das `load`-Ereignis des iframes
- * käme womöglich vor ihrem Empfänger.
+ * neu. Die geöffnete Zeile geht per postMessage an den Rahmen
+ * (useVorschauMarkierung — derselbe Weg wie „So sieht’s die Kundin" unter lg).
  */
 
 /** Schirmbreite des Handyrahmens im Panel — 304 px in einem 320-px-Rahmen. */
@@ -131,18 +128,7 @@ function VorschauSeite({
     rahmen.current?.contentWindow?.location.replace(vorschauAdresse(slug, stand))
   }, [slug, stand, anfang])
 
-  useEffect(() => {
-    const sende = () =>
-      rahmen.current?.contentWindow?.postMessage({ typ: MARKIERUNG_TYP, abschnitt: markiert }, window.location.origin)
-    // Nur die eigene Seite im eigenen Rahmen darf „bereit" sagen.
-    const beiNachricht = (ereignis: MessageEvent) => {
-      if (ereignis.source !== rahmen.current?.contentWindow) return
-      if (leseBereit(ereignis, window.location.origin)) sende()
-    }
-    sende()
-    window.addEventListener('message', beiNachricht)
-    return () => window.removeEventListener('message', beiNachricht)
-  }, [markiert])
+  useVorschauMarkierung(rahmen, markiert)
 
   const breite = VORSCHAU_SEITENBREITE[geraet]
   return (

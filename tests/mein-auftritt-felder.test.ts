@@ -1,9 +1,11 @@
 /**
- * „Mein Auftritt" (/settings/appearance, Nr. 32, Morgenbericht Lauf 5 §5):
- * Die Eingabefelder (Bildunterschrift, Beschreibung eines Werts) und der
- * Knopf „Logo hochladen" waren 32 bzw. 36 px hoch — unter dem Touch-Ziel von
- * 44 px (DESIGN_SYSTEM). Wie bei Abholzeiten und Hofprofil (Nr. 22d) nur per
- * Klasse gehoben; die Basiskomponente `Input` bleibt unverändert.
+ * Die Felder der Abschnitte von Mein Hof — früher „Mein Auftritt"
+ * (/settings/appearance, Nr. 32, Morgenbericht Lauf 5 §5), seit Nr. 50 die
+ * Bausteine in Mein Hof (bild-bausteine.tsx, abschnitt-formulare.tsx), unter lg
+ * im Blatt von unten: Die Eingabefelder (Bildunterschrift, Beschreibung eines
+ * Werts, Leitspruch, Name, Adresse, Kontakt) und der Knopf „Logo hochladen"
+ * sind Touch-Ziele von mindestens 44 px (DESIGN_SYSTEM). Nur per Klasse
+ * gehoben; die Basiskomponente `Input` bleibt unverändert.
  *
  * Quelltext-Prüfung mit Gegenprobe (TESTING_GUIDELINES: Architektur-Regel am
  * Quelltext): Jedes einzeilige Feld trägt eine Höhe von mindestens 44 px.
@@ -12,37 +14,44 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 
-const QUELLE = readFileSync(join(process.cwd(), 'src/app/(hof)/settings/appearance/appearance-client.tsx'), 'utf8')
+const BILDER = readFileSync(join(process.cwd(), 'src/components/mein-hof/bild-bausteine.tsx'), 'utf8')
+const FORMULARE = readFileSync(join(process.cwd(), 'src/components/mein-hof/abschnitt-formulare.tsx'), 'utf8')
+const QUELLE = `${BILDER}\n${FORMULARE}`
 const INPUT = readFileSync(join(process.cwd(), 'src/components/ui/input.tsx'), 'utf8')
 
 /** Höhen-Klassen unter 44 px (Tailwind: h-1 … h-10, size-…, min-h-…). */
 const ZU_NIEDRIG = /(?:^|\s)(?:min-)?h-(?:[1-9]|10)(?:\.5)?(?=\s|$)/
 
 /**
- * Die className-Werte aller `<input … />` (nur Zeichenketten-Literale). Bis
- * `/>`, nicht bis zum ersten `>` — ein `onChange={(e) => …}` steht davor.
+ * Die className-Werte aller `<input … />` und `<Input … />` (nur
+ * Zeichenketten-Literale). Bis `/>`, nicht bis zum ersten `>` — ein
+ * `onChange={(e) => …}` steht davor.
  */
 function feldKlassen(quelle: string): string[] {
-  const bloecke = quelle.match(/<input\b[\s\S]*?\/>/g) ?? []
+  const bloecke = quelle.match(/<[iI]nput\b[\s\S]*?\/>/g) ?? []
   return bloecke.map((b) => /className="([^"]*)"/.exec(b)?.[1] ?? '')
 }
 
-describe('Mein Auftritt — Felder mindestens 44 px', () => {
+describe('Mein Hof (früher Mein Auftritt) — Felder mindestens 44 px', () => {
   it('jedes Eingabefeld hat eine Höhe von mindestens 44 px', () => {
-    const felder = feldKlassen(QUELLE).filter((k) => k !== '' && !k.includes('hidden'))
-    expect(felder.length).toBeGreaterThanOrEqual(4)
+    const felder = feldKlassen(QUELLE).filter((k) => !k.includes('hidden'))
+    // Ein Feld ohne Klasse fiele auf 36 px zurück (Basiskomponente).
+    expect(felder).not.toContain('')
+    expect(felder.length).toBeGreaterThanOrEqual(9)
     for (const k of felder) {
       expect(k, k).not.toMatch(ZU_NIEDRIG)
       expect(k, k).toMatch(/(?:^|\s)(?:min-)?h-(?:11|12|14)(?=\s|$)/)
     }
   })
 
-  it('„Logo hochladen" ist mindestens 44 px hoch', () => {
-    // Der Knopf öffnet die Dateiauswahl (openFilePicker) — seine Klasse direkt danach.
-    const logo = /onClick=\{openFilePicker\}[\s\S]*?className="([^"]*)"/.exec(QUELLE)?.[1]
-    expect(logo).toBeDefined()
-    expect(logo).not.toMatch(ZU_NIEDRIG)
-    expect(logo).toMatch(/(?:^|\s)min-h-11(?=\s|$)/)
+  it('„Logo hochladen" und „Fotos hinzufügen" sind mindestens 44 px hoch', () => {
+    // Die Knöpfe öffnen die Dateiauswahl (openFilePicker) — ihre Klasse direkt danach.
+    const knoepfe = [...BILDER.matchAll(/onClick=\{openFilePicker\}[\s\S]*?className=\{cn\(\s*'([^']*)'/g)].map((m) => m[1])
+    expect(knoepfe).toHaveLength(2)
+    for (const k of knoepfe) {
+      expect(k).not.toMatch(ZU_NIEDRIG)
+      expect(k).toMatch(/(?:^|\s)min-h-11(?=\s|$)/)
+    }
   })
 
   it('Gegenprobe: die Suche erkennt 32- und 36-px-Felder', () => {

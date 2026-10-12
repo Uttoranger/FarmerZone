@@ -5,15 +5,20 @@
  * Beweist: Das Preisfeld heißt je nach Gebinde anders; die Vorschau zeigt,
  * was Kundinnen sehen; die Rückfrage kommt nur, wenn der Preis nach dem
  * Setzen einer Gebindegröße beim alten Einheitspreis geblieben ist.
+ * Seit Nr. 51: Die Karte „So sehen Käufer dein Produkt" entsteht aus Foto,
+ * Name, Preis und Einheit; ein leerer oder ungültiger Preis gibt keinen Betrag.
  */
 import { describe, it, expect } from 'vitest'
 import {
   preisFeldLabel,
   kundenVorschau,
+  kaeuferVorschau,
+  gueltigerPreis,
   paketpreisFraglich,
   paketpreisAntworten,
   PAKETPREIS_FRAGE,
 } from '@/components/products/produkt-preis'
+import { KAEUFER_VORSCHAU } from '@/lib/hofseite-kunde'
 
 describe('preisFeldLabel', () => {
   it('ohne Gebinde: Preis je Einheit', () => {
@@ -100,5 +105,61 @@ describe('paketpreisAntworten', () => {
 
   it('ohne Gebinde bleibt der Preis, wie er ist', () => {
     expect(paketpreisAntworten(50, 'KG', null).paketpreis).toBe(50)
+  })
+})
+
+describe('kaeuferVorschau — die Karte „So sehen Käufer dein Produkt" aus den Formularwerten (Nr. 51)', () => {
+  const OHNE_BILD = { foto: null, kategorie: null }
+
+  it('übernimmt Foto, Name, Preis und Einheit', () => {
+    expect(
+      kaeuferVorschau({ name: '  Bergkäse ', price: 12.9, unit: 'KG', unitSize: 0.5 }, { foto: 'blob:foto', kategorie: 'MILCH' })
+    ).toEqual({
+      name: 'Bergkäse',
+      imageUrl: 'blob:foto',
+      categoryImageUrl: '/categories/milch.webp',
+      price: 12.9,
+      unit: 'KG',
+      unitSize: 0.5,
+    })
+  })
+
+  it('ohne Namen ein ruhiger Platzhalter', () => {
+    expect(kaeuferVorschau({ name: '   ', price: 3, unit: 'STUECK', unitSize: null }, OHNE_BILD).name).toBe(KAEUFER_VORSCHAU.name)
+  })
+
+  it('ein leerer oder ungültiger Preis ergibt keinen Betrag — die Karte zeigt dann den Platzhalter, nie „NaN" oder „€ 0,00"', () => {
+    for (const price of [Number.NaN, 0, -1, 4.505, Number.POSITIVE_INFINITY, null]) {
+      expect(kaeuferVorschau({ name: 'Eier', price, unit: 'STUECK', unitSize: null }, OHNE_BILD).price, String(price)).toBeNull()
+    }
+  })
+
+  it('der Preis gilt nach derselben Regel wie beim Speichern (preisZahl): größer 0, höchstens zwei Nachkommastellen', () => {
+    expect(kaeuferVorschau({ name: 'Eier', price: 4.55, unit: 'STUECK', unitSize: null }, OHNE_BILD).price).toBe(4.55)
+    expect(kaeuferVorschau({ name: 'Eier', price: 0.01, unit: 'STUECK', unitSize: null }, OHNE_BILD).price).toBe(0.01)
+  })
+
+  it('ohne Foto die Illustration der Kategorie, ohne beides kein Bild; keine Gebindegröße bleibt null', () => {
+    const ohneFoto = kaeuferVorschau({ name: 'Honig', price: 9, unit: 'G', unitSize: undefined }, { foto: null, kategorie: 'HONIG' })
+    expect(ohneFoto.imageUrl).toBeNull()
+    expect(ohneFoto.categoryImageUrl).toBe('/categories/honig.webp')
+    expect(ohneFoto.unitSize).toBeNull()
+    expect(kaeuferVorschau({ name: 'Honig', price: 9, unit: 'G', unitSize: null }, OHNE_BILD).categoryImageUrl).toBeNull()
+  })
+})
+
+describe('gueltigerPreis — derselbe Maßstab wie beim Speichern (Nr. 51, Runde 1)', () => {
+  it('gibt den Preis nur zurück, wenn er preisZahl besteht', () => {
+    expect(gueltigerPreis(4.5)).toBe(4.5)
+    expect(gueltigerPreis(0.01)).toBe(0.01)
+    for (const price of [Number.NaN, 0, -2, 4.505, Number.POSITIVE_INFINITY, null]) {
+      expect(gueltigerPreis(price), String(price)).toBeNull()
+    }
+  })
+
+  it('die Käufer-Vorschau nimmt genau diesen Preis', () => {
+    for (const price of [Number.NaN, 0, 4.505, 4.5, 12.9]) {
+      expect(kaeuferVorschau({ name: 'x', price, unit: 'STUECK', unitSize: null }, { foto: null, kategorie: null }).price).toBe(gueltigerPreis(price))
+    }
   })
 })

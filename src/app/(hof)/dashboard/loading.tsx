@@ -1,14 +1,19 @@
 /*
  * Ladeansicht von „Heute" (Nachtlauf Nr. 17). Die HofShell steht durch das
  * Layout, gewartet wird nur auf den Inhalt. Gleiche Maße wie die fertige
- * Seite: Kopf (h1 + Datum), drei Kennzahlen, darunter die Packliste mit
- * Kopfzeile und drei Zeilen; ab 1280 px rechts die Seitenspalte (360 px),
- * darunter als Raster. Nur, was sicher kommt — Stripe-Hinweis, Teilen-Karte
- * und Erste Schritte hängen von den Daten ab und fehlen hier.
+ * Seite: Kopf (h1 + Datum), drei Kennzahlen (unter 1024 px 2 + 1, Nr. 53),
+ * darunter die Packliste mit Kopfzeile und drei Zeilen; ab 1280 px rechts die
+ * Seitenspalte (360 px), darunter als Raster. Nur, was sicher kommt —
+ * Stripe-Hinweis, Teilen-Karte und „Zu tun" hängen von den Daten ab und
+ * fehlen hier.
  *
  * Farbstaffelung im neuen Design: bg-border für Überschriften, bg-muted für
  * Zweitzeilen und Flächen.
  */
+
+// Höhen von der fertigen Seite abgenommen (Nr. 53, 320–390, 768, ab 1024 px): die beiden Zahlen, dann der Betrag über beide Spalten.
+const KENNZAHL_FORM = ['h-20 md:h-[97px]', 'h-20 md:h-[97px]', 'col-span-2 h-[98px] md:h-[117px] lg:col-span-1']
+
 export default function HeuteLaden(): React.JSX.Element {
   return (
     <div className="mx-auto w-full max-w-6xl animate-pulse px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10" aria-busy="true">
@@ -17,12 +22,12 @@ export default function HeuteLaden(): React.JSX.Element {
           <div className="h-8 w-28 rounded-lg bg-border md:h-9" />
           <div className="mt-2 h-4 w-52 rounded bg-muted" />
         </div>
-        {/* Wie Kennzahlen: drei Spalten; Höhen von der fertigen Seite abgenommen (360/390, 768, ab 1024 px). */}
-        <div className="grid grid-cols-3 gap-2.5 md:gap-4">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-[106px] rounded-2xl border border-border bg-card p-3 md:h-[124px] md:p-4 lg:h-[117px]">
-              <div className="h-3 w-3/4 rounded bg-muted" />
-              <div className="mt-3 h-6 w-1/2 rounded bg-border" />
+        {/* Wie Kennzahlen: unter 1024 px 2 + 1, ab 1024 px drei nebeneinander. */}
+        <div className="grid grid-cols-2 gap-2.5 md:gap-4 lg:grid-cols-3">
+          {KENNZAHL_FORM.map((form, i) => (
+            <div key={i} className={`rounded-2xl border border-border bg-card p-3 md:p-4 lg:h-[117px] ${form}`}>
+              <div className="h-3 w-3/4 max-w-28 rounded bg-muted" />
+              <div className="mt-3 h-6 w-1/2 max-w-24 rounded bg-border" />
             </div>
           ))}
         </div>

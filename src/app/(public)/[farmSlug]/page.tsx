@@ -7,6 +7,7 @@ import { verifyReorderToken } from '@/lib/reorder-token'
 import { prisma } from '@/lib/prisma'
 import { hofVorschaubild } from '@/lib/vorschaubild'
 import { teilenVorschauText } from '@/lib/teilen-bild'
+import { ueberUnsText } from '@/lib/hofseite-kunde'
 import { ladeTeilenVorschau } from '@/server/queries/teilen-bild'
 import type { Suchparameter } from '@/lib/ansichts-modus'
 import { nachbestellToken } from '@/schemas/nachbestellung'
@@ -44,7 +45,9 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const robots = ansicht.noindex ? { robots: { index: false, follow: false } } : {}
   if (!farm) return { title: 'Hof nicht gefunden', ...robots }
 
-  const desc = (farm.aboutText ?? farm.description).slice(0, 155)
+  // Dieselbe Regel wie „Über uns“ auf der Seite: Ein geleerter eigener Text
+  // ('' aus dem Formular „Auftritt“) fällt auf die Kurzbeschreibung zurück.
+  const desc = (ueberUnsText(farm) ?? '').slice(0, 155)
   // Das Teilen-Bild (Gate 7) — ist es nicht ladbar, bleibt die Seite und
   // nimmt das Bild der Startseite; der Fehler geht nur nach Sentry.
   const vorschau = await ladeTeilenVorschauOhneRisiko(farm.slug)
@@ -131,7 +134,6 @@ export default async function FarmPage({ params, searchParams }: Props) {
         farm={farm}
         activeStatus={activeStatus}
         reorderItems={reorderItems}
-        ownerMode={false}
         ansicht={ansicht}
         jetzt={jetzt.toISOString()}
       />

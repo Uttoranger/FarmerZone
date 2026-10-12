@@ -61,7 +61,12 @@ export default async function FehlerMeldenPage({
       <UnterseitenKopf zeileImBrowser={false} />
       <div className="lg:flex lg:items-start lg:gap-8">
         <div className="flex min-w-0 flex-col gap-3.5 lg:w-[640px] lg:shrink-0">
-          <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Hilfe und Rückmeldung</h1>
+          {/* Am Handy trägt die feste Leiste den Namen schon („← Hilfe und Rückmeldung", Elternseite = derselbe
+              Punkt). Die h1 gleichen Wortlauts steht dort nur für den Screenreader, ab 768 px sichtbar wie im
+              Web-Mockup (Nr. 56, Bericht 44). */}
+          <h1 className="sr-only font-heading text-2xl font-semibold text-foreground md:not-sr-only md:text-[26px]">
+            Hilfe und Rückmeldung
+          </h1>
           <p className="text-sm leading-normal text-muted-foreground">
             Etwas klemmt, du wünschst dir etwas oder hast eine Frage? Schreib uns – wir lesen alles.
           </p>

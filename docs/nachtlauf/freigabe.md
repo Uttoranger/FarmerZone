@@ -430,3 +430,276 @@ Stand laut status.md auf docs/lauf8 (70d5a80): 41, 42, 43, 44, 47 fertig (#221, 
 4. Morgenbericht nach §4.
 
 Hat diese Sitzung den Arbeitsstand von 45/46 nicht mehr: beide neu von origin/main nach §12 umsetzen und das im Morgenbericht vermerken.
+
+## 13. Lauf 9 (uttoranger, im Chat erteilt, 10.10.2026)
+
+Nachtlauf 9 – Freigabe (uttoranger, im Chat erteilt, 10.10.2026)
+
+Arbeite als Dirigent nach docs/nachtlauf.md (§2 Regeln, §4 Ablauf je Gate, §5 Stoppen, §6 Morgenbericht). Dieser Text ist die Freigabe. Zuerst der Doku-PR (Branch docs/lauf9 von main), er enthält:
+- diesen Text wörtlich als §13 „Lauf 9" in docs/nachtlauf/freigabe.md;
+- in docs/nachtlauf.md §3 die Zeilen 49–57 und Sammel 9, dazu „Reihenfolge in Lauf 9" mit den Stapel-Ausnahmen aus §1 unten;
+- in docs/entscheidungen.md:
+  - neu N3, N4, N5 und Z4 (unten);
+  - Vermerke: E12 „ergänzt durch N3"; O2 „entschieden durch N4"; F4 „Online-Zahlung einrichten nur noch im Kasten (Nr. 53); Kennzahlen 2 + 1 bis 1024 px";
+  - neue offene Punkte O6 (Kachelquelle) und O7 (Gründungszusage);
+- in docs/nachtlauf/status.md: 41–48 und Sammel 8 auf „gemergt (#229)".
+
+Stand: main = 90cff24 (#229 Lauf 8 gemergt, Produktion READY). Vorschau und Produktion laufen mit Stripe im Testmodus; kein Lauf schaltet um. Der Probelauf (probelauf-checkliste.md) kommt erst nach diesem Lauf, an test.farmerzone.at.
+
+Reicht das Budget nicht: Die Reihenfolge in §1 ist die Priorität. Nicht begonnene Nummern bleiben für Lauf 10 und stehen so im Morgenbericht.
+
+### Ausgangslage (geprüft 10.10.2026, nur lesend, lokaler Build von 90cff24 mit Seed-Daten)
+- Hof-Unterleiste (nur unter md, ui/bottom-nav.tsx): Heute · Bestellungen · Neu · Produkte · Mehr (HOF_HANDY_LEISTE, bauern-navigation.ts). Mein Hof liegt nur im Mehr-Blatt. Ab md gibt es die Seitenleiste.
+- Mein Hof unter lg (farm-page/page.tsx):
+  - oben der Seitenkopf mit dem Knopf „Kundenansicht ↗", der einen neuen Tab öffnet (components/mein-hof/seitenkopf.tsx);
+  - darunter die Checkliste;
+  - erst darunter der Umschalter „Bearbeiten | Kundenansicht" (ui/segment.tsx in farm-page-client.tsx). „Kundenansicht" ist dort die echte Hofseite im iframe, „Bearbeiten" die alte FarmPageView mit Stiften (altes Aussehen, O2).
+- Mein Hof ab lg: Liste mit Formularen je Abschnitt plus echte Vorschau Handy/Web (hofseite-editor.tsx, hofseite-vorschau-rahmen.tsx).
+- Mein Auftritt (settings/appearance/appearance-client.tsx): Logo, Titelbild, Tagline, Gründungsjahr, Über uns, Werte, Bereiche, Galerie; Vorschau im neuen Tab.
+  - saveAppearanceAction (server/actions/appearance.ts) schreibt IMMER alle Felder: tagline, foundedYear, aboutText, sectionsConfig, und farmValues werden gelöscht und neu angelegt.
+  - Ein Formular mit nur einem Teil der Felder löscht den Rest. hofseite-editor.tsx umgeht das mit auftrittBasis.
+- „Über uns": hofseite-kunde.tsx (Z. 231) zeigt aboutText ?? description, die Checkliste (hofseite-fortschritt.ts Z. 152) prüft nur aboutText. Die Checkliste meldet „fehlt", obwohl Kundinnen einen Text sehen.
+- Produkt-Dialog Lebensmittel (products/product-dialog.tsx): keine Käufer-Vorschau. Futter (KaeuferVorschau, E9-Schild) und Brennholz haben eine eigene.
+- Hofseite unter lg, Reiter Übersicht: Fotos und Produkte erst nach Abholung, Zahlung und Anfahrt (Mockup mobil-k2-hofseite).
+- Karte /hoefe am Handy (Bewertung 66/100), gemessen bei 390 × 844:
+  - Die Karte (h-[60vh]) endet bei 850 px, die Unterleiste der KundeShell beginnt bei 775 px. Karussell-Karte samt „Zum Hof" und „Tippe einen Hof an" liegen darunter.
+  - Beim Öffnen fällt die Fläche bis zum Laden zusammen (next/dynamic ohne loading in hoefe-client.tsx), dann springt die Karte herein.
+  - Nummern-Pins überdecken sich in der Übersicht (Seed: 2/4/22, 10/11, 16/17, 19/20).
+  - Querformat 844 × 390: ~100 px Karte sichtbar, 9 von 21 Pins, kein Neu-Einpassen.
+  - Die Attribution „Leaflet | © OpenStreetMap-Mitwirkende" deckt oben fast die ganze Breite.
+- Karte im Browser (82/100): Pins überdecken sich; nach Größenwechsel bleibt der Ausschnitt stehen (1100 px: 19 von 21 Pins). Leaflet misst nur beim Start und bei window-resize. Standortkarte (settings/standort-karte.tsx, über profile-form.tsx) ohne Lade-Platzhalter.
+- Heute am Handy: acht Karten, „Online-Zahlung einrichten" dreimal (Kasten, Erste Schritte, Hofseite-Fortschritt).
+- Auswertung: „Warenumsatz € 0" neben „Umsatz pro Tag € 206".
+- Admin am Handy: /admin/meldungen 565 px, /admin/finanzen 661 px breit.
+- Ohne KundeShell bzw. altes Design: /[farmSlug]/bestellung/[orderId], der Kopf von /[farmSlug]/bestaetigen/[token], /konditionen, /impressum, /datenschutz, /problem-melden, die not-found-Seiten ohne Shell, /forgot-password, /reset-password.
+  - /reset-password trägt den Token in der Adresse, hat aber weder no-referrer noch noindex.
+- Datenschutzerklärung:
+  - #210 (Nr. 33, Branch nacht/2026-10-07/33-datenschutz, Stand 07.10.) ist noch Entwurf.
+  - Auf main nennt sie den Knopf „In meiner Nähe", er heißt „Standort nutzen".
+  - Es fehlen der Double-Opt-in (#217, 46) und der Rate-Limit-Zähler (#218, Bericht 40).
+- Sentry JAVASCRIPT-NEXTJS-9 (09.10. 20:02 UTC): GET /hoefe, EAUTHTIMEOUT auch nach der Wiederholung (Nr. 47). Ob die Fehleranzeige ausgeliefert wurde, ist nicht erkennbar.
+- Online-Bestellungen aus der Testzeit zählen als Umsatz bzw. Gebühr (stripe-live.md §10). Dieselbe Zuordnung steht an mehreren Stellen:
+  - umsatzBestellungWhere: Auswertung und Verkäufe samt Jahressumme für die Umsatzgrenze;
+  - topfVonBestellung (lib/finanzen.ts): Admin-Finanzen;
+  - rohes SQL monatsSpaltenJeHof (server/queries/admin.ts): Admin-Hofliste;
+  - Heute und Kunden-Umsätze.
+
+### Entscheidungen (mit diesem Start freigegeben; ins Register)
+- N3 · Mein Hof in der Handy-Leiste (ergänzt N1 und E12):
+  - Unter md heißt die Leiste Heute · Bestellungen · Neu · Mein Hof · Mehr. Mein Hof hat dort die Reiter Produkte · Hofseite · Beiträge.
+  - Ein Tipp auf „Mein Hof" öffnet Produkte, damit der Vorrat ein Tipp bleibt.
+  - Die Route /products bleibt. Der Leistenpunkt „Mein Hof" ist aktiv auf /products*, /farm-page* und /status*.
+  - Ab md bleiben Seitenleiste und Reiter wie heute (Hofseite | Beiträge).
+- N4 · Hofseite an EINEM Ort bearbeiten (entscheidet O2):
+  - Alles, was Kundinnen auf der Hofseite sehen, wird in Mein Hof bearbeitet. Mein Auftritt zieht dorthin; /settings/appearance leitet auf /farm-page um.
+  - Unter lg steht der Umschalter „Bearbeiten · So sieht's die Kundin" ganz oben. „So sieht's die Kundin" ist die echte Hofseite in der App, kein neuer Tab.
+  - „Bearbeiten" ist eine Liste der Abschnitte mit Blatt von unten. Die alte FarmPageView mit Stiften entfällt dort.
+  - Nach dem Speichern auf den Reitern Hofseite und Beiträge erscheint „Gespeichert · Ansehen".
+- N5 · Hofseite unter lg, Reiter Übersicht:
+  - Unter dem Kopf zuerst das Schaufenster: ein Fotostreifen und bis zu vier Produkte, dazu „Alle Produkte (n)".
+  - Danach unverändert: Nächste Abholung mit Abholzeiten, Zahlung & Kontakt, Über uns, Anfahrt; der Mini-Korb bleibt, wo er ist.
+  - Ab lg unverändert.
+- Z4 · Testzahlungen aus Auswertungen:
+  - Online-Bestellungen, die vor dem Zeitpunkt in der Server-Variable STRIPE_LIVE_AB angelegt wurden, zählen nicht als Umsatz und nicht als Servicegebühr. Barbestellungen zählen immer.
+  - Ohne Variable bleibt alles wie heute.
+  - Abweichend von stripe-live.md §10 (Konstante) eine Variable: Zur Live-Schaltung ist dann keine Code-Änderung nötig. Den Wert setzt der Mensch.
+- Offen, NICHT bauen:
+  - O6 · Kachelquelle der Karten: OSM direkt, basemap.at oder ein Anbieter mit Schlüssel. Ein Wechsel ändert die Datenschutzerklärung.
+  - O7 · Gründungszusage: Der Freischalt-Dialog im Admin (GRUENDUNGS_KONDITIONEN, lib/gruendungshof.ts) verspricht „keine Plattformgebühr bis 31.12.2029, danach dauerhaft 3 %". Das passt nicht zu E6 und K1. Der Mensch entscheidet; der Text bleibt.
+
+### §1 Warteschlange (fest, zugleich Priorität)
+49 → 52 → 50 (auf 49) → 55 → 53 (auf 55) → 51 → 54 → 56 → 57 (Entwurf) → Sammel-PR (Haltepunkt).
+- Jede Nummer: Branch nacht/2026-10-10/<nr>-<kurz> von origin/main, ein PR.
+- Ausnahmen: 50 von Branch 49, 53 von Branch 55, 57 siehe dort.
+
+#### 49 Mein Hof in der Leiste und Kundensicht (N3, N4 Teil 1)
+- bauern-navigation.ts:
+  - eigener Leistenpunkt „Mein Hof" (href /products) mit eigener Aktiv-Regel nur für die Leiste; die Seitenleiste bleibt unberührt;
+  - „Mein Hof" verlässt das Mehr-Blatt, „Produkte" kommt NICHT hinein (HOF_MEHR entsprechend);
+  - die Reiter über MEIN_HOF_REITER_HOFBEREICH erweitern, keine zweite Liste; MEIN_HOF_HINWEIS anpassen;
+  - Tests: Aktiv-Zustand bei gleicher Länge, Mehr-Blatt, Seitenleiste unverändert.
+- Reiterleiste Produkte · Hofseite · Beiträge als EIN Baustein, unter md auf /products, /farm-page und /farm-page?reiter=beitraege.
+- Umschalter: den bestehenden Segment-Umschalter aus farm-page-client.tsx nach ganz oben unter den Seitenkopf ziehen, beim Scrollen sichtbar.
+  - Beschriftung „Bearbeiten · So sieht's die Kundin".
+  - Die Kundenansicht bleibt das bestehende iframe der echten Hofseite (vorschauLink, volle Breite, Maßstab 1), keine zweite Darstellung.
+  - Unter lg schaltet „Kundenansicht" im Seitenkopf auf diese Ansicht. Ein leiser Link „In neuem Tab öffnen" bleibt.
+  - Auf Produkte zeigt „So sieht's die Kundin" den Reiter Produkte der Hofseite im iframe.
+- „Gespeichert · Ansehen" nur auf den Reitern Hofseite und Beiträge; Produkte behält den Teilen-Moment aus Nr. 30. „Ansehen" schaltet um und springt zum Abschnitt. Dafür die vorhandene Markierung (MARKIERUNG_TYP, schemas/hofseite-vorschau.ts) mitnutzen.
+- „Über uns": EINE Funktion in src/lib/, die hofseite-kunde.tsx und hofseite-fortschritt.ts nutzen. Regel: aboutText getrimmt, leer = null, dann description.
+  - Tests: null, Leerzeichen, gefüllt.
+  - Die Folge für den Prozentwert in Heute im Bericht nennen.
+- Mockup-Abweichungen (mobil-h1-mein-hof, mobil-h5-mehr-auswertung-region-mein-hof): wie hier beschrieben, je mit Bild.
+- Abnahme (390 px): „Mein Hof" in der Leiste öffnet Produkte; zwei Tipps bis zur Kundenansicht der Hofseite; kein neuer Tab. Bei 800 px: Seitenleiste wie vorher, keine Reiter „Produkte".
+
+#### 52 Karte (/hoefe, Standortkarte im Hof-Profil, Region)
+- Handy-Kartenmodus (/hoefe?ansicht=karte, unter lg):
+  - Titel und Unterzeile ausblenden. Oben EINE Zeile Suche · Filter · Liste zeigen.
+  - Darunter die Karte bis genau zur Oberkante der Kunden-Unterleiste (die gibt es nur unter md; von md bis lg bis zum Fensterrand): 100dvh minus Kopf, Werkzeugzeile, Unterleiste und env(safe-area-inset-bottom). Maße aus einer Quelle (KundeShell).
+  - Karussell und „Tippe einen Hof an" liegen sichtbar über der Unterleiste.
+  - Querformat: Die Karte füllt mindestens 70 % der sichtbaren Höhe.
+  - Das Mockup zeigt den Kartenmodus nicht → DESIGN_SYSTEM.
+- Laden: Platzhalter in Kartengröße („Karte lädt …", Token-Farben) für hoefe-karte und standort-karte. umfeld-karte ist ein Adapter um HoefeKarte; umfeld-anzeige hat schon einen. Kein Zusammenfallen, kein Springen.
+- Größenwechsel: EIN gemeinsamer Hook für beide Leaflet-Stellen.
+  - ResizeObserver am Kartencontainer ruft map.invalidateSize().
+  - Solange die Nutzerin weder verschoben noch gezoomt hat, wird die Übersicht neu eingepasst (fitBounds), auch beim Drehen.
+  - Standortkarte: Der feste Pin bleibt die echte Kartenmitte.
+- Überlappende Pins:
+  - Reine Funktion in lib/hoefe-anzeige.ts mit Tests: Pins, die sich bei der aktuellen Zoomstufe überdecken, werden ein Gruppen-Pin mit Anzahl. Ein Tipp zoomt hinein; bei maximaler Zoomstufe leicht auffächern.
+  - KEIN neues Paket (Regel 4).
+  - Die Nummern der Liste bleiben. Der Gruppen-Pin heißt für Screenreader „3 Höfe".
+- Attribution:
+  - Leaflet-Präfix weg (setPrefix(false)). „© OpenStreetMap-Mitwirkende" mit Link bleibt sichtbar (OSM-Pflicht).
+  - Polster oben, damit kein Pin darunter liegt.
+- Kachelquelle, helle Kacheln im Dunkelmodus und Pin-Farben bleiben (O6).
+- Im Bericht ein Vorschlag zu O6: OSM-Kachelrichtlinie; basemap.at (laut Betreiber kostenlos auch kommerziell, CC BY, nur Österreich); Anbieter mit Schlüssel. Jeweils mit der Folge für die Datenschutzerklärung.
+- Abnahme im Bericht (agent-browser; die Messungen brauchen keine Kacheln, nie gezielt gegen tile.openstreetmap.org messen):
+  - Unterkante der Karussell-Karte ≤ Oberkante der Unterleiste bei 390 × 844, 375 × 667 und 360 × 740;
+  - Querformat 844 × 390;
+  - Seitenhöhe beim Öffnen der Karte unverändert;
+  - keine überlappenden Pin-Nummern in der Übersicht der Seed-Daten;
+  - 1440 und 1100 px: alle Pins nach dem Größenwechsel sichtbar.
+
+#### 50 Mein Auftritt zieht in Mein Hof (N4 Teil 2) – gestapelt auf 49; Datenpfad, Nachprüfung
+- „Bearbeiten" unter lg: Liste der Abschnitte in der Reihenfolge der Hofseite.
+  - Zeilen: die bestehenden Fortschrittszeilen (hofseite-fortschritt.ts) plus neue Zeilen für Tagline/Gründungsjahr und Werte.
+  - Jede Zeile zeigt den Stand (fertig/fehlt) und „Bearbeiten"; bearbeitet wird in einem Blatt von unten.
+  - Neue Zeilen-IDs auch in die Zod-Aufzählung (schemas/hofseite-vorschau.ts).
+- Bausteine: die vorhandenen Formulare je Abschnitt aus hofseite-editor.tsx. Neu herauslösen nur Tagline, Gründungsjahr und Werte aus appearance-client.tsx. Ab lg nutzt hofseite-editor.tsx dieselben Bausteine.
+- Speichern: Jeder Abschnitt speichert über auftrittBasis mit frischem Stand und dieselben Server Actions, keine zweite Speicherlogik.
+  - Test (Integration): Speichern eines Abschnitts lässt alle anderen Felder unverändert, auch tagline, foundedYear, aboutText, sectionsConfig und farmValues.
+- /settings/appearance leitet auf /farm-page um; Lesezeichen bleiben gültig.
+  - Die Zeile „Mein Auftritt" in den Einstellungen bleibt als Link auf Mein Hof.
+  - Verweise anpassen: lib/hof-einstellungen.ts, EINSTELLUNG_FUER_ZEILE, revalidatePath in appearance.ts, Verweis im Hof-Profil.
+- Bild-Upload unverändert (image-upload.tsx, HEIC-Regel, WebP).
+- Kartenform ohne eigenen Schatten (DESIGN_SYSTEM: Fläche mit Rand); die oklch-Schattenfarbe aus appearance-client.tsx fällt weg.
+- Abnahme: am Handy Logo, Titelbild und ein Galeriefoto ändern, speichern, unter „So sieht's die Kundin" sehen. Danach dasselbe ab lg. Kein anderes Feld hat sich geändert.
+
+#### 55 Testzahlungen aus Auswertungen (Z4; Geld-Anzeige, Nachprüfung)
+- EINE Regel aus einer Quelle (src/lib/), in drei Formen: Prüfung istTestzahlung(order), Prisma-Where und Prisma.sql-Baustein für rohes SQL. Regel: Zahlart online UND createdAt < STRIPE_LIVE_AB.
+- Diese Stellen nutzen sie, keine zweite Stelle:
+  - umsatzBestellungWhere (Auswertung, Verkäufe samt Jahressumme für die Umsatzgrenze);
+  - topfVonBestellung (Admin-Finanzen);
+  - monatsSpaltenJeHof (Admin-Hofliste);
+  - Heute;
+  - Kunden-Umsätze (paymentMethod dort mitladen).
+- getDashboardStats: prüfen, ob noch genutzt. Ungenutzt → löschen, sonst über die Regel.
+- Tests:
+  - Quelltext-Wache wie bei optInEmail;
+  - /admin und /admin/finanzen zählen gleich;
+  - ohne Variable ist das Ergebnis gleich zu heute.
+- STRIPE_LIVE_AB:
+  - ISO-Zeitpunkt MIT Zeitzone, nur serverseitig gelesen; die Funktionen bekommen den Stichtag als Parameter (rein, testbar).
+  - Ungültig oder ohne Zeitzone → ignoriert, Sentry-Warnung höchstens einmal je Instanz (Muster NEXT_PUBLIC_TESTUMGEBUNG_URL, umgebung-server.ts).
+- Hinweiszeile: Ist die Variable gesetzt und betrifft sie Bestellungen, steht in Auswertung, Verkäufe und Admin-Finanzen leise „Testzahlungen vor dem <Datum> sind nicht mitgezählt."
+- Bestellungen, Beträge, Checkout, Webhook, Erstattung und Storno unverändert. Keine Migration.
+- docs/betrieb/stripe-live.md:
+  - Schritt 4 um STRIPE_LIVE_AB ergänzen: nur Production, Wert = Beginn des Redeploys aus Schritt 8, mit Zeitzone.
+  - Hinweis: Online-Bestellungen im Bau-Fenster sind noch Testzahlungen und würden mitgezählt. Darum ruhige Stunde (§0), danach Admin → Finanzen prüfen.
+  - §10 auf „umgesetzt (Nr. 55, Variable statt Konstante)".
+
+#### 53 Heute, Auswertung, Verkäufe – gestapelt auf 55
+- Heute:
+  - Der Stripe-Kasten bleibt der eine Hinweis oben (F4, 45).
+  - „Erste Schritte" und Hofseite-Fortschritt werden EINE Liste „Zu tun" (lib/erste-schritte.ts, hofseite-fortschritt.ts, ChecklisteKompakt): jede Aufgabe einmal; was der Kasten zeigt, nicht noch einmal; Erledigtes verschwindet.
+  - Kennzahlen 2 + 1 bis 1024 px. „Heute eingenommen" bleibt (45).
+- Auswertung: „Warenumsatz" und „Umsatz pro Tag" werden zu „Über FarmerZone" (Bestellungen) und „Mit Hofladen" (mit Direktverkäufen). Nicht „Gesamt" (F6); Texte aus einer Quelle.
+- Verkäufe bleiben beim Wortlaut aus F6 („Dieses Jahr (für die Umsatzgrenze)"); der gebundene Satz in tests/fachwort-wache.test.ts bleibt.
+- Nur Beschriftung und Anordnung. Die Rechnung (lib/umsatz.ts, lib/heute.ts, Queries) bleibt bis auf 55 unverändert; alle Betrags-Tests grün.
+- Abnahme mit zwei Seed-Höfen: neu ohne Stripe und fertig eingerichtet. Kartenzahl auf Heute am Handy vorher/nachher im Bericht; „Online-Zahlung einrichten" höchstens einmal.
+
+#### 51 Hofseite: Schaufenster zuerst (N5) und Käufer-Vorschau Lebensmittel
+- Hofseite unter lg nach N5. Fotos als Streifen-Variante von HofseiteFotos (heute ein Raster bis 6), Produkte über die echte ProduktKarte (hofseite/produkt-karte.tsx).
+  - Anzahl je Breite statt UEBERSICHT_PRODUKTE für alle; ab lg unverändert.
+  - „Alle Produkte (n)" wechselt in den Reiter Produkte.
+  - Ohne Fotos fällt der Streifen weg, ohne Produkte das Schaufenster.
+- Produkt-Dialog Lebensmittel: „So sehen Käufer dein Produkt" mit der echten ProduktKarte, ohne Link und ohne Korb, live aus den Formularwerten (Foto, Name, Preis, Einheit).
+  - Futter (KaeuferVorschau mit E9-Schild, Mockup web-h2-neues-futter) und Brennholz bleiben, wie sie sind.
+- Fokusrahmen am Akkordeon im Produkt-Dialog nach DESIGN_SYSTEM richten.
+- Beträge, Preislogik und Server-Prüfung unverändert.
+
+#### 54 Admin am Handy und alte Seiten ins neue Design (Sicherheitspfad, Nachprüfung)
+- /admin/meldungen und /admin/finanzen bei 390 px ohne seitliches Wischen.
+  - Zeilen umbrechen, Diagramm an die Breite anpassen, Tabellen als Karten oder mit Querscrollen nur im eigenen Kasten.
+  - Im Bericht scrollWidth aller Admin-Seiten bei 390 px.
+- In die KundeShell bzw. die Fokus-Variante (wie /register und /verify):
+  - /[farmSlug]/bestellung/[orderId], der Kopf von /[farmSlug]/bestaetigen/[token];
+  - /konditionen, /impressum, /problem-melden;
+  - die not-found-Seiten ohne Shell;
+  - /forgot-password und /reset-password.
+  - Seiten mit eigenem Mockup (fehler-404-*, fehler-500-problem-melden-kunde) nach diesem Mockup.
+- /datenschutz NICHT, das kommt in 57.
+- Signierte Links, Token-Prüfung, Referrer-Policy (next.config.ts) und noindex (Seiten-Metadaten) bleiben unverändert; Test, dass sie weiter gelten.
+- /reset-password bekommt no-referrer und noindex wie /verify (Token in der Adresse).
+- Alten Kopf entfernen, wenn ihn nichts mehr nutzt.
+
+#### 56 Altlasten Lauf 8 §6 und Kleinkram (Sicherheitspfad, Nachprüfung)
+- sentry-hygiene.ts: E-Mail-Muster auch mit Nicht-ASCII-Zeichen; doppelt kodierte Adressen (%2540); Token in relativer Adresse in exception.value (Bericht 47). Ein Test je Fall.
+- tests/integration/bargebuehr.int.test.ts: auf den Mail-Nachlauf warten statt zu früh zu prüfen.
+- trustedOrigins in der Produktion: NEXT_PUBLIC_APP_URL als bereinigte https-Origin übernehmen.
+  - Ist der Wert ungültig: Rohwert behalten und Sentry-Warnung, NIE leeren. Ein leerer Wert ließe APP_URL auf localhost fallen.
+  - Tests.
+  - Die Vercel-Adresse der Produktion bleibt, wie sie ist.
+- /hoefe: Wird HoefeFehler wirklich ausgeliefert, eine Sentry-Warnung mit Tag sichtbar=ja, höchstens einmal je Instanz und 10 Minuten.
+- /fehler-melden: Name nicht doppelt (44).
+- Feldhinweise „Steht auf dem Sackanhänger" in product-dialog.tsx und futter-formular.tsx für eigene Ernte passend ergänzen. E10-Pflichttexte nicht umformulieren.
+
+#### 57 Datenschutzerklärung, Nachtrag (Entwurf; nicht im Sammel-PR)
+- Zuerst origin/main in nacht/2026-10-07/33-datenschutz mergen (DEVELOPMENT.md: beide Seiten behalten) und pushen; das aktualisiert #210. Dann 57 von diesem Branch abzweigen. PR als Entwurf mit Basis = dieser Branch.
+- Nachtragen:
+  - Neuigkeiten: Anmeldung auf der Bestätigungsseite, nur E-Mail, Double-Opt-in per Klick, Ein-Klick-Abmeldung mit List-Unsubscribe; WhatsApp ohne neuen Einstieg.
+  - Umkreissuche: Knopf „Standort nutzen".
+  - Rate-Limit-Zähler: HMAC aus IP, E-Mail oder Sitzung, bis etwa 25 Stunden; Satzvorschlag Bericht 40.
+  - Sentry ohne IP (#215).
+  - Kartenkacheln: Stand prüfen.
+- /datenschutz im selben Entwurf ins neue Design.
+- Im Bericht eine Tabelle Aussage → Stelle im Code zum Gegenlesen; offene Rechtsfragen als Liste. Nichts erfinden, keine Rechtsberatung.
+
+#### Sammel-PR (Haltepunkt)
+- integration/lauf9 von main; Doku-PR und 49, 52, 50, 55, 53, 51, 54, 56 per git merge --no-ff in dieser Reihenfolge. 57 nicht.
+- Erwartete Konflikte:
+  - bauern-navigation.ts, Mein Hof und hofseite-fortschritt.ts (49/50/53);
+  - hofseite-kunde.tsx (49/51);
+  - Auswertung, Heute und Admin-Finanzen (55/53/54);
+  - hoefe-client.tsx (52);
+  - DEVELOPMENT.md.
+  - Doku: beide Seiten behalten. Code: sauber zusammenführen, jede Auflösung im PR-Text begründen.
+- Auf dem Gesamtstand, als eigener Commit im Sammel-PR: docs/nachtlauf/probelauf-checkliste.md.
+  - §0, §1 und §10: Ort nur noch test.farmerzone.at; die Branch-Adresse von integration/lauf8 und der Aufräumteil dazu entfallen.
+  - Abläufe an die Texte aus 49–55 anpassen.
+- typecheck, lint, test und test:integration auf dem Gesamtstand grün. Entwürfe nicht aufnehmen.
+
+### §2 Regeln
+- Vor jeder Nummer origin/main hineinholen.
+- Migrationen: keine. Entsteht eine: STOPP für diese Nummer, melden, nächste Nummer.
+- Keine neuen Pakete.
+- Nie Produktion, nie Live-Schlüssel, keine schreibenden Aufrufe an Stripe, Resend, Vercel, Supabase oder DNS.
+- Mockup-Abweichungen nur wie in 49–54 beschrieben, jede im Bericht mit Bild.
+- Nachprüfung des Fix-Commits bei 50, 54, 55 und 56.
+- Keine Personendaten in Berichten; Hof-Angaben nur als Anzahl.
+
+### §3 Checkliste je PR (im PR-Text abhaken)
+- [ ] Register und Freigabe decken den Inhalt ab
+- [ ] origin/main vor dem Push hineingeholt
+- [ ] pnpm typecheck, pnpm lint (kein neuer Befund), pnpm test grün
+- [ ] pnpm test:integration grün, wenn Datenbank oder Geld berührt
+- [ ] Migration: nein
+- [ ] Geld nur als Int-Cent bzw. Decimal, Beträge nur serverseitig
+- [ ] Keine Personendaten oder Secrets in Code, Logs, Tests
+- [ ] Bilder 390, 375 und 1440 px vorher/nachher, beide Themes, im Bericht
+- [ ] Axe ohne Fehler, Touch-Ziele ≥ 44 px, neue Seiten mit loading.tsx
+- [ ] Texte aus einer Quelle, Deutsch, per Du
+- [ ] tester und pruefer gelaufen, Befunde erledigt oder begründet
+- [ ] Entwurf, wenn eine Vorbedingung offen ist
+
+### §4 Morgenbericht (morgenbericht-<datum>-lauf9.md)
+- Je PR: Vorschau-Link, Migration nein, Basis. Sammel-PR mit Konfliktauflösungen.
+- Nicht begonnene Nummern.
+- Bilderstrecke „Handy vorher/nachher" (390 px): Mein Hof (Bearbeiten und „So sieht's die Kundin"), Produkt anlegen mit Vorschau, Hofseite oben, Karte mit gewähltem Hof, Heute, Auswertung, Admin-Finanzen.
+- Messwerte der Karte aus 52 als Tabelle.
+- „Für dich zu tun":
+  - Freigaben (Mockup-Abweichungen);
+  - #210 und 57 lesen;
+  - NEXT_PUBLIC_APP_URL in Production vor dem Merge von 56 prüfen;
+  - Testumgebung einrichten, danach Probelauf nach Checkliste;
+  - Entscheidungen O6 und O7;
+  - als letzter Schritt die Live-Schaltung samt STRIPE_LIVE_AB.

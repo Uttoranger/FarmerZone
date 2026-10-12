@@ -26,6 +26,7 @@ import {
 import {
   FUTTER_BESTAETIGUNG_TEXT,
   KENNZEICHNUNG_ERKLAERUNG,
+  KENNZEICHNUNG_FELDHINWEIS,
   KENNZEICHNUNG_FUNDORT,
   KENNZEICHNUNG_TITEL,
   gebindeSperre,
@@ -449,7 +450,7 @@ export function FutterFormular({
               <p className="text-xs text-muted-foreground">
                 {kennzeichnung.futtermittelart
                   ? FUTTERMITTELART_ERKLAERUNG[kennzeichnung.futtermittelart as FuttermittelartValue]
-                  : 'Steht auf dem Sackanhänger, meist direkt über der Zusammensetzung.'}
+                  : KENNZEICHNUNG_FELDHINWEIS.futtermittelart}
               </p>
             </>
           )}
@@ -484,7 +485,7 @@ export function FutterFormular({
         <Feld
           feld="kennzeichnung.zusammensetzung"
           label="Zusammensetzung"
-          hilfe="Steht auf dem Sackanhänger. Bei Mischfutter die Einzelfuttermittel in absteigender Reihenfolge."
+          hilfe={KENNZEICHNUNG_FELDHINWEIS.zusammensetzung}
           fehler={fehler['kennzeichnung.zusammensetzung']}
         >
           <Textarea
@@ -498,7 +499,7 @@ export function FutterFormular({
         <Feld
           feld="kennzeichnung.analytischeBestandteile"
           label="Analytische Bestandteile"
-          hilfe="Steht auf dem Sackanhänger unter „Analytische Bestandteile“ (Rohprotein, Rohfaser, Rohfett, Rohasche …)."
+          hilfe={KENNZEICHNUNG_FELDHINWEIS.analytischeBestandteile}
           fehler={fehler['kennzeichnung.analytischeBestandteile']}
         >
           <Textarea

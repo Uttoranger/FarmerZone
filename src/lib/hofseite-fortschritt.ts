@@ -1,15 +1,24 @@
 /**
- * Der Hofseiten-Editor im Browser (components/farmer/hofseite-editor.tsx):
- * welche Zeilen er zeigt, was jede über den Hof sagt, was fertig ist und was
- * fehlt. Rein und ohne Datenbank prüfbar (tests/hofseite-fortschritt.test.ts).
+ * Die Abschnitte der Hofseite in Mein Hof — ab lg der Editor
+ * (components/farmer/hofseite-editor.tsx), unter lg seit Nr. 50 die Liste
+ * „Bearbeiten" (components/mein-hof/abschnitte-liste.tsx): welche Zeilen es
+ * gibt, was jede über den Hof sagt, was fertig ist und was fehlt. Rein und
+ * ohne Datenbank prüfbar (tests/hofseite-fortschritt.test.ts).
  *
  * EINE Liste für Fortschritt, Zeilentexte und die Markierung in der Vorschau —
- * die Erste-Schritte-Karte (erste-schritte.ts) zählt gröber und nur für neue
+ * die Ersten Schritte (erste-schritte.ts) zählen gröber und nur für neue
  * Höfe; hier zählt jeder Teil der Hofseite, den der Hof selbst füllen kann.
+ * Leitspruch/Gründungsjahr und Werte (Nr. 50, aus dem früheren „Mein
+ * Auftritt") stehen als freiwillige Zeilen dabei: Sie zeigen ihren Stand,
+ * zählen aber weder zum Fortschritt noch in den Satz — „11 von 11" bleibt
+ * für Heute, Einrichten, Einstellungen und Mein Hof dieselbe Zahl.
+ * Auf Heute stehen die offenen Zeilen mit den Ersten Schritten in der einen
+ * Liste „Zu tun" (zuTun, seit Nr. 53) — die freiwilligen nicht.
  */
 import type { SchildFarbe } from '@/lib/mein-hof'
-import { titelbildFoto } from '@/lib/mein-hof'
+import { HOFSEITE_HREF, titelbildFoto } from '@/lib/mein-hof'
 import { formatSlotTime, type WeeklySlot } from '@/lib/pickup-days'
+import { ueberUnsText } from '@/lib/hofseite-kunde'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 
 export type HofseiteGruppeId = 'auftritt' | 'abholen-bezahlen' | 'sichtbarkeit'
@@ -37,6 +46,11 @@ export type HofseiteStand = {
   email: string
   isPaused: boolean
   sektionen: readonly { key: string; visible: boolean; order?: number }[]
+  /** Leitspruch unter dem Hofnamen (Farm.tagline). */
+  tagline: string | null
+  foundedYear: number | null
+  /** Die Titel der Werte, in ihrer Reihenfolge. */
+  werte: readonly string[]
 }
 
 export type HofseiteZeile = {
@@ -48,6 +62,8 @@ export type HofseiteZeile = {
   fertig: boolean
   /** Ein Wort statt des Häkchens („Fehlt", „Pausiert"); null = Häkchen. */
   marke: { text: string; farbe: SchildFarbe } | null
+  /** Zählt nicht zum Fortschritt (Leitspruch/Gründungsjahr, Werte — Nr. 50). */
+  freiwillig: boolean
 }
 
 export type HofseiteGruppe = {
@@ -83,7 +99,29 @@ export const ABSCHNITT_LABEL: Record<string, string> = {
   products: 'Produkte',
 }
 
+/**
+ * Der Name jeder Zeile — eine Quelle für Liste, Editor, Blatt und für die
+ * Meldung, wenn ein gespeicherter Wert das Speichern sperrt (abschnitt-stand.ts).
+ */
+export const ZEILE_TITEL: Record<HofseiteZeileId, string> = {
+  titelbild: 'Titelbild',
+  logo: 'Logo',
+  name: 'Name und Kurzbeschreibung',
+  tagline: 'Leitspruch und Gründungsjahr',
+  'ueber-uns': 'Über uns',
+  werte: 'Werte',
+  fotos: 'Fotos',
+  adresse: 'Adresse und Standort',
+  abholzeiten: 'Abholzeiten',
+  zahlung: 'Zahlungsarten',
+  kontakt: 'Kontakt',
+  bestellungen: 'Bestellungen',
+  abschnitte: 'Abschnitte der Hofseite',
+}
+
 const FEHLT = { text: 'Fehlt', farbe: 'bernstein' } as const
+/** Freiwilliges fehlt leise: grau statt bernstein — es ist kein offener Punkt. */
+const FEHLT_FREIWILLIG = { text: 'Fehlt', farbe: 'grau' } as const
 
 const WOCHENTAG_KURZ = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
 const WOCHE_AB_MONTAG = [1, 2, 3, 4, 5, 6, 0]
@@ -106,11 +144,21 @@ function einzeilig(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
 }
 
+/** „„Frisch vom Feld“ · seit 1987" — Leitspruch und Gründungsjahr in einer Zeile. */
+function leitspruchWert(leitspruch: string, jahr: number | null): string {
+  if (leitspruch && jahr !== null) return `„${leitspruch}“ · seit ${jahr}`
+  if (leitspruch) return `„${leitspruch}“`
+  if (jahr !== null) return `Seit ${jahr} · noch kein Leitspruch`
+  return 'Freiwillig — ein kurzer Satz unter deinem Hofnamen und seit wann es den Hof gibt'
+}
+
 function zeilen(stand: HofseiteStand): HofseiteZeile[] {
   const titelbild = titelbildFoto(stand) !== null
   const logo = (stand.logoUrl ?? '').trim().length > 0
   const beschreibung = einzeilig(stand.description)
-  const ueberUns = einzeilig(stand.aboutText ?? '')
+  // Dieselbe Regel wie die Hofseite (Nr. 49): ohne eigenen Text zählt die Kurzbeschreibung.
+  const ueberUns = einzeilig(ueberUnsText(stand) ?? '')
+  const leitspruch = einzeilig(stand.tagline ?? '')
   const online = stand.acceptsOnline && stand.stripeAccountReady
   const kontakt = stand.phone.trim().length > 0 && stand.email.trim().length > 0
   const sichtbar = stand.sektionen
@@ -121,46 +169,50 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
   const zeile = (
     id: HofseiteZeileId,
     gruppe: HofseiteGruppeId,
-    titel: string,
     wert: string,
     fertig: boolean,
     marke: HofseiteZeile['marke'] = fertig ? null : FEHLT
-  ): HofseiteZeile => ({ id, gruppe, titel, wert, fertig, marke })
+  ): HofseiteZeile => ({ id, gruppe, titel: ZEILE_TITEL[id], wert, fertig, marke, freiwillig: false })
+  const freiwillig = (id: HofseiteZeileId, wert: string, fertig: boolean): HofseiteZeile => ({
+    ...zeile(id, 'auftritt', wert, fertig, fertig ? null : FEHLT_FREIWILLIG),
+    freiwillig: true,
+  })
 
   return [
     zeile(
       'titelbild',
       'auftritt',
-      'Titelbild',
       titelbild ? 'Foto gesetzt · Ausschnitt anpassbar' : 'Farbverlauf — ein eigenes Foto wirkt persönlicher',
       titelbild
     ),
     zeile(
       'logo',
       'auftritt',
-      'Logo',
       logo ? 'Logo gesetzt' : 'Fehlt — macht deinen Hof auf einen Blick erkennbar',
       logo
     ),
     zeile(
       'name',
       'auftritt',
-      'Name und Kurzbeschreibung',
       beschreibung ? `${stand.name} · ${beschreibung}` : `${stand.name} — Kurzbeschreibung fehlt`,
       beschreibung.length > 0
     ),
-    zeile('ueber-uns', 'auftritt', 'Über uns', ueberUns || 'Noch kein Text', ueberUns.length > 0),
+    freiwillig('tagline', leitspruchWert(leitspruch, stand.foundedYear), leitspruch.length > 0),
+    zeile('ueber-uns', 'auftritt', ueberUns || 'Noch kein Text', ueberUns.length > 0),
+    freiwillig(
+      'werte',
+      stand.werte.length > 0 ? stand.werte.join(' · ') : 'Freiwillig — bis zu 4, etwa Regional oder Saisonal',
+      stand.werte.length > 0
+    ),
     zeile(
       'fotos',
       'auftritt',
-      'Fotos',
       stand.fotos === 0 ? 'Noch keine Fotos' : stand.fotos === 1 ? '1 Foto' : `${stand.fotos} Fotos`,
       stand.fotos > 0
     ),
     zeile(
       'adresse',
       'abholen-bezahlen',
-      'Adresse und Standort',
       `${stand.address}, ${stand.postalCode} ${stand.city} · ${
         stand.hatKoordinaten ? 'auf der Karte gesetzt' : 'Standort auf der Karte fehlt'
       }`,
@@ -169,7 +221,6 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
     zeile(
       'abholzeiten',
       'abholen-bezahlen',
-      'Abholzeiten',
       stand.abholzeiten.length > 0
         ? abholzeitenKurz(stand.abholzeiten)
         : 'Noch keine — erst dann können Kunden bestellen',
@@ -183,7 +234,6 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
     zeile(
       'zahlung',
       'abholen-bezahlen',
-      'Zahlungsarten',
       online ? 'Online mit Karte · vor Ort bar und mit Karte' : 'Vor Ort bar und mit Karte · Online-Zahlung noch nicht eingerichtet',
       true,
       online ? null : { text: 'Online fehlt', farbe: 'bernstein' }
@@ -191,7 +241,6 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
     zeile(
       'kontakt',
       'abholen-bezahlen',
-      'Kontakt',
       kontakt ? `${stand.phone} · ${stand.email}` : 'Telefon oder E-Mail fehlt',
       kontakt
     ),
@@ -199,12 +248,11 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
     zeile(
       'bestellungen',
       'sichtbarkeit',
-      'Bestellungen',
       stand.isPaused ? 'Pausiert — Kunden können gerade nicht bestellen' : 'Nimmt Bestellungen an — pausieren möglich',
       true,
       stand.isPaused ? { text: 'Pausiert', farbe: 'bernstein' } : null
     ),
-    zeile('abschnitte', 'sichtbarkeit', 'Abschnitte der Hofseite', sichtbar.join(' · '), true),
+    zeile('abschnitte', 'sichtbarkeit', sichtbar.join(' · '), true),
   ]
 }
 
@@ -221,13 +269,15 @@ export function hofseiteFortschritt(stand: HofseiteStand): HofseiteFortschritt {
     titel: GRUPPEN_TITEL[id],
     zeilen: alle.filter((z) => z.gruppe === id),
   }))
-  const fehlend = alle.filter((z) => !z.fertig).map((z) => z.titel)
-  const erledigt = alle.length - fehlend.length
+  // Freiwillige Zeilen zählen nicht — sonst sänke der Prozentwert jedes Hofs ohne Leitspruch.
+  const gezaehlt = alle.filter((z) => !z.freiwillig)
+  const fehlend = gezaehlt.filter((z) => !z.fertig).map((z) => z.titel)
+  const erledigt = gezaehlt.length - fehlend.length
   return {
     gruppen,
     erledigt,
-    gesamt: alle.length,
-    prozent: Math.round((erledigt / alle.length) * 100),
+    gesamt: gezaehlt.length,
+    prozent: Math.round((erledigt / gezaehlt.length) * 100),
     fehlend,
     satz:
       fehlend.length === 0
@@ -240,7 +290,9 @@ export function hofseiteFortschritt(stand: HofseiteStand): HofseiteFortschritt {
  * Der Stand aus den Daten, wie die Seite sie lädt: die Hofseite des Besitzers
  * (getOwnerFarm — Abholzeiten dort nur aktive) und der Kartenpunkt aus den
  * Einstellungen (getFarmSettings). Reine Abbildung, damit die Seite nichts
- * selbst entscheidet.
+ * selbst entscheidet. Leitspruch, Gründungsjahr und Werte darf ein Aufrufer
+ * weglassen (Heute lädt sie nicht): Sie zählen nicht zum Fortschritt, die
+ * Zahl bleibt dieselbe.
  */
 export function hofseiteStand(
   hof: {
@@ -261,6 +313,9 @@ export function hofseiteStand(
     email: string
     isPaused: boolean
     sectionsConfig: readonly { key: string; visible: boolean; order?: number }[]
+    tagline?: string | null
+    foundedYear?: number | null
+    farmValues?: readonly { title: string }[]
   },
   standort: { latitude: number | null; longitude: number | null }
 ): HofseiteStand {
@@ -283,19 +338,27 @@ export function hofseiteStand(
     email: hof.email,
     isPaused: hof.isPaused,
     sektionen: hof.sectionsConfig,
+    tagline: hof.tagline ?? null,
+    foundedYear: hof.foundedYear ?? null,
+    werte: (hof.farmValues ?? []).map((w) => w.title),
   }
 }
 
 /**
- * Wohin die Vorschau springt, wenn eine Zeile offen ist: das Element mit
- * `data-abschnitt` auf der Hofseite. Mehrere Zeilen teilen sich ein Ziel —
- * Logo, Name und Adresse stehen alle auf dem Titelbild.
+ * Wohin die Vorschau springt, wenn eine Zeile offen ist (bzw. nach
+ * „Gespeichert · Ansehen"): das Element mit `data-abschnitt` auf der
+ * Hofseite. Mehrere Zeilen teilen sich ein Ziel — Logo, Name, Leitspruch und
+ * Adresse stehen alle auf dem Titelbild; Gründungsjahr und Werte in der Karte
+ * „Über uns" (seit Nr. 50 mit eigenem Ziel `ueberuns`; vorher sprang „Über
+ * uns" zum Titelbild).
  */
 export const ZIEL_ABSCHNITT: Record<HofseiteZeileId, string> = {
   titelbild: 'titelbild',
   logo: 'titelbild',
   name: 'titelbild',
-  'ueber-uns': 'titelbild',
+  tagline: 'titelbild',
+  'ueber-uns': 'ueberuns',
+  werte: 'ueberuns',
   fotos: 'fotos',
   adresse: 'titelbild',
   abholzeiten: 'abholung',
@@ -306,22 +369,60 @@ export const ZIEL_ABSCHNITT: Record<HofseiteZeileId, string> = {
 }
 
 /**
- * Wo ein Punkt der Liste in den bestehenden Einstellungen bearbeitet wird —
- * für die Checkliste am Handy (components/mein-hof/checkliste-kompakt.tsx),
- * deren fehlende Punkte dorthin verlinken. Ab lg öffnen dieselben Punkte ihr
- * Formular direkt in der Zeile (hofseite-editor.tsx). Jedes Ziel ist eine
- * Seite unter src/app/(hof)/settings (tests/mein-hof-seite.test.ts).
+ * Wo ein Punkt der Liste außerhalb von Mein Hof bearbeitet wird — die
+ * Übersicht der Einstellungen (lib/hof-einstellungen.ts) ordnet damit die
+ * fehlenden Punkte ihren Zeilen zu („Hofdaten", „Mein Auftritt"), und „Zu
+ * tun" auf Heute (zuTun in erste-schritte.ts, seit Nr. 53) verlinkt dorthin.
+ * Was früher „Mein Auftritt" war (/settings/appearance), liegt seit Nr. 50 in
+ * Mein Hof selbst (Register N4); in Mein Hof öffnet jede Zeile ihr Formular
+ * direkt — ab lg in der Zeile, darunter im Blatt. Jedes Ziel ist eine Seite
+ * unter src/app/(hof) (tests/mein-hof-seite.test.ts).
  */
 export const EINSTELLUNG_FUER_ZEILE: Record<HofseiteZeileId, string> = {
-  titelbild: '/settings/appearance',
-  logo: '/settings/appearance',
+  titelbild: HOFSEITE_HREF,
+  logo: HOFSEITE_HREF,
   name: '/settings/profile',
-  'ueber-uns': '/settings/appearance',
-  fotos: '/settings/appearance',
+  tagline: HOFSEITE_HREF,
+  'ueber-uns': HOFSEITE_HREF,
+  werte: HOFSEITE_HREF,
+  fotos: HOFSEITE_HREF,
   adresse: '/settings/profile',
   abholzeiten: '/settings/pickup-slots',
   zahlung: '/settings/payments',
   kontakt: '/settings/profile',
   bestellungen: '/settings/pause',
-  abschnitte: '/settings/appearance',
+  abschnitte: HOFSEITE_HREF,
+}
+
+/**
+ * Die Zeilen in der Reihenfolge, in der ihre Abschnitte auf der Hofseite am
+ * Handy stehen (hofseite-kunde.tsx, von oben nach unten): Titelbild mit Name,
+ * Leitspruch und Adresse, der Hinweis bei Pause, die Reiter, das Schaufenster
+ * mit dem Fotostreifen (Register N5, Nr. 51), dann die Seitenspalte
+ * (Abholung, Zahlung und Kontakt) und Über uns mit Gründungsjahr und Werten.
+ * So liest sich die Liste „Bearbeiten" unter lg wie die Seite, die die Kundin
+ * sieht (Nr. 50). Maßstab ist die Übersicht mit Produkten: Ohne Produkte gibt
+ * es kein Schaufenster, die Fotos stehen dann als Raster nach Über uns. Ab lg
+ * bleiben die Gruppen des Editors.
+ */
+export const HOFSEITE_REIHENFOLGE: readonly HofseiteZeileId[] = [
+  'titelbild',
+  'logo',
+  'name',
+  'tagline',
+  'adresse',
+  'bestellungen',
+  'abschnitte',
+  'fotos',
+  'abholzeiten',
+  'zahlung',
+  'kontakt',
+  'ueber-uns',
+  'werte',
+]
+
+/** Die Zeilen des Fortschritts in der Reihenfolge der Hofseite (HOFSEITE_REIHENFOLGE). */
+export function zeilenWieAufDerHofseite(fortschritt: HofseiteFortschritt): HofseiteZeile[] {
+  const alle = fortschritt.gruppen.flatMap((g) => g.zeilen)
+  return HOFSEITE_REIHENFOLGE.flatMap((id) => alle.filter((z) => z.id === id))
 }

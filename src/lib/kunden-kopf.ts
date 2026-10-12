@@ -20,12 +20,8 @@ export type KundenSeite =
   | { art: 'checkout'; hofSlug: string }
   /** Produktseite /[hof]/produkt/[id] (Nr. 11) — zurück zu allen Produkten des Hofs. */
   | { art: 'produkt'; hofSlug: string }
-  | { art: 'bestaetigung'; hofSlug: string }
-  | { art: 'bestellung'; hofSlug: string }
-  /** Bestellverfolgung mit ungültigem Link: nicht einmal der Hof ist bestätigt. */
-  | { art: 'bestellung-ungueltig' }
   | { art: 'hofuebersicht' }
-  /** Impressum, Datenschutz, Konditionen, Problem melden. */
+  /** Seit Nr. 54 nur noch der Datenschutz (zieht mit Nr. 57 in die KundeShell). */
   | { art: 'info' }
 
 export type KopfForm = {
@@ -38,8 +34,8 @@ export type KopfForm = {
   /**
    * Das Warenkorb-Symbol (Handy-Leiste und Browser-Kopfzeile). Auf der
    * Hofseite nicht — dort sitzt der Warenkorb-Knopf unten, wie bei den
-   * Vorbildern. In Checkout, Bestätigung und Bestellverfolgung nicht — dort
-   * ist der Warenkorb gerade der Inhalt der Seite oder schon eine Bestellung.
+   * Vorbildern. Im Checkout nicht — dort ist der Warenkorb gerade der Inhalt
+   * der Seite.
    */
   warenkorb: boolean
   /** Browser: unter der Kopfzeile ein Rückweg-Link, wo die Kopfzeile selbst keinen hat. */
@@ -52,13 +48,7 @@ export function kopfForm(seite: KundenSeite): KopfForm {
     case 'hofseite':
     case 'produkt':
     case 'checkout':
-    case 'bestaetigung':
-    case 'bestellung':
       return { zurueck, warenkorb: false, rueckwegZeile: true }
-    case 'bestellung-ungueltig':
-      // Kein Hof, zu dem eine Rückweg-Zeile führen könnte — die Kopfzeile
-      // führt zur Hofübersicht.
-      return { zurueck, warenkorb: false, rueckwegZeile: false }
     case 'hofuebersicht':
     case 'info':
       // Im Browser führen „FarmerZone" und „Höfe entdecken" schon zurück.
@@ -79,12 +69,12 @@ export type Rueckweg = {
  * Kam der Kunde von einer eigenen Seite (`vorgaengerEigen`), geht es im
  * Verlauf dorthin zurück. Sonst — geteilter Link, neuer Tab, Suche — zum
  * übergeordneten Ort: von der Hofseite zur Hofübersicht (im angezeigten
- * Bereich), von Checkout, Bestätigung und Bestellverfolgung zur Hofseite, von
- * der Hofübersicht zur Startseite.
+ * Bereich), vom Checkout zur Hofseite, von der Hofübersicht zur Startseite.
  *
- * Bestätigung und Bestellverfolgung gehen NIE über den Verlauf: Nach der
- * Zahlung stehen dort Stripe und die Bank, und die Bestellverfolgung wird aus
- * einer Mail geöffnet.
+ * Bestätigung, Bestellseite und Bar-Bestätigung stehen seit Nr. 13 bzw. 54 in
+ * der KundeShell bzw. der Fokus-Shell; ihr Weg hinaus ist dort ein fester
+ * Link, nie der Verlauf (ARCHITECTURE §4) — die Tests dazu stehen bei den
+ * Seiten (tests/bestellverfolgung-zugang.test.ts, alte-seiten-neues-design).
  */
 export function rueckweg(seite: KundenSeite, vorgaengerEigen: boolean): Rueckweg {
   switch (seite.art) {
@@ -96,11 +86,6 @@ export function rueckweg(seite: KundenSeite, vorgaengerEigen: boolean): Rueckweg
       return { href: `/${seite.hofSlug}?${REITER_PARAMETER}=produkte`, verlauf: vorgaengerEigen }
     case 'checkout':
       return { href: `/${seite.hofSlug}`, verlauf: vorgaengerEigen }
-    case 'bestaetigung':
-    case 'bestellung':
-      return { href: `/${seite.hofSlug}`, verlauf: false }
-    case 'bestellung-ungueltig':
-      return { href: '/hoefe', verlauf: false }
     case 'hofuebersicht':
       return { href: '/', verlauf: vorgaengerEigen }
     case 'info':

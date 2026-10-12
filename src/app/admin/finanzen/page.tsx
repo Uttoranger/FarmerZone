@@ -72,7 +72,13 @@ export default async function AdminFinanzenPage({
   return (
     <div className={cn(ADMIN_RAHMEN, 'flex flex-col gap-5')}>
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h1 className={SEITEN_TITEL}>Finanzen</h1>
+        <div className="min-w-0">
+          <h1 className={SEITEN_TITEL}>Finanzen</h1>
+          {/* Leise, nur wenn eine gezeigte Zahl eine Testzahlung auslässt (finanzseiteLaesstTestzahlungenAus, Register Z4). */}
+          {daten.testzahlungenHinweis && (
+            <p className={cn('mt-1 text-[12.5px] leading-snug', LEISE)}>{daten.testzahlungenHinweis}</p>
+          )}
+        </div>
         {/* Links statt Knöpfe: Der Monat steht in der Adresse, also ist er
             teilbar und der Zurück-Pfeil des Browsers tut das Richtige. */}
         <nav aria-label="Monat wählen" className="flex items-center gap-1.5">
@@ -97,7 +103,10 @@ export default async function AdminFinanzenPage({
         />
       </dl>
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)]">
+      {/* grid-cols-1 = eine Spalte minmax(0, 1fr): Ohne sie wüchse die eine Spalte
+          unter lg mit dem längsten nicht umbrechenden Text (Kostenposten mit
+          Notiz) — bei 390 px wischte die Seite seitlich (Nr. 54). */}
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)]">
         <section aria-labelledby="traegt-titel" className={cn(KARTE, 'flex flex-col gap-4 p-4 md:p-[18px]')}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 id="traegt-titel" className="font-heading text-[17px] font-semibold text-foreground">

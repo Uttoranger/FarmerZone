@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { stripeStartGesperrt } from '@/lib/stripe-modus'
 import {
   PRODUKTION_ADRESSE,
+  WARNUNG_APP_URL_FEHLT,
+  WARNUNG_APP_URL_UNGUELTIG,
   WARNUNG_LIVE_IN_VORSCHAU,
   bannerZeilen,
   bestimmeUmgebung,
@@ -10,6 +12,10 @@ import {
   httpsHerkunft,
   istDevDatenbank,
   istTestDatenbank,
+  leseStripeLiveAb,
+  produktionsAdresse,
+  STICHTAG_ZUKUNFT_GRENZE_MS,
+  stichtagWeitInDerZukunft,
   zeigtAufGehostetesProjekt,
   type UmgebungsWerte,
 } from '@/lib/umgebung'
@@ -465,7 +471,7 @@ describe('httpsHerkunft — nur eine reine https-Adresse', () => {
 })
 
 describe('bestimmeUmgebung — eigene Adresse der Vorschau (Register Z3)', () => {
-  it('Produktion unverändert: nur NEXT_PUBLIC_APP_URL, so wie sie steht — auch ohne https', () => {
+  it('Produktion: nur NEXT_PUBLIC_APP_URL — ohne https so, wie sie steht (bereinigt wird seit Nr. 56 nur eine https-Adresse)', () => {
     expect(bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_TESTUMGEBUNG_URL: TESTUMGEBUNG }).trustedOrigins).toEqual([
       'https://farmerzone.example',
     ])
@@ -600,5 +606,246 @@ describe('bestimmeUmgebung — Link zur Testumgebung (Register Z3)', () => {
     const u = bestimmeUmgebung({ ...STAGING, NEXT_PUBLIC_TESTUMGEBUNG_URL: TESTUMGEBUNG })
     expect(u.testumgebungUrl).toBeNull()
     expect(u.warnungen).toEqual([])
+  })
+})
+
+// ─── Stichtag der Live-Schaltung STRIPE_LIVE_AB (Register Z4, Nr. 55) ────────
+// Nur ein ISO-Zeitpunkt MIT Zeitzone gilt. Alles andere wird ignoriert —
+// Testzahlungen zählen dann weiter mit wie vor Nr. 55 — und meldet sich wie
+// NEXT_PUBLIC_TESTUMGEBUNG_URL: Produktion an Sentry, Vorschau und lokal im Banner.
+const OHNE_ZEITZONE = 'STRIPE_LIVE_AB hat keine Zeitzone (etwa +01:00 am Ende) — die Variable gilt nicht, Testzahlungen zählen mit.'
+const UNGUELTIG = 'STRIPE_LIVE_AB ist kein gültiger Zeitpunkt (Form 2026-11-02T21:00:00+01:00) — die Variable gilt nicht, Testzahlungen zählen mit.'
+
+describe('leseStripeLiveAb — nur ein Zeitpunkt mit Zeitzone', () => {
+  it('liest Z und Versatz als denselben Zeitpunkt, mit und ohne Sekunden und Millisekunden', () => {
+    const erwartet = Date.UTC(2026, 10, 2, 20, 0, 0)
+    for (const wert of [
+      '2026-11-02T21:00:00+01:00',
+      '2026-11-02T20:00:00Z',
+      '2026-11-02T21:00+01:00',
+      '2026-11-02T15:00:00.000-05:00',
+      '  2026-11-02T21:00:00+01:00  ',
+    ]) {
+      expect(leseStripeLiveAb(wert), wert).toEqual({ ab: new Date(erwartet) })
+    }
+    expect(leseStripeLiveAb('2026-11-02T21:00:00.5+01:00')).toEqual({ ab: new Date(erwartet + 500) })
+  })
+
+  it('fehlt die Variable oder ist sie leer, gibt es keinen Stichtag und kein Problem', () => {
+    expect(leseStripeLiveAb(undefined)).toBeNull()
+    expect(leseStripeLiveAb('')).toBeNull()
+    expect(leseStripeLiveAb('   ')).toBeNull()
+  })
+
+  it('erkennt einen Zeitpunkt ohne Zeitzone — Vercel rechnet in UTC, Wien wäre ein bis zwei Stunden daneben', () => {
+    for (const wert of ['2026-11-02T21:00:00', '2026-11-02T21:00', '2026-11-02', '2026-11-02 21:00:00']) {
+      expect(leseStripeLiveAb(wert), wert).toEqual({ problem: 'ohne-zeitzone' })
+    }
+  })
+
+  it('lehnt Unlesbares und unmögliche Kalenderwerte ab, statt sie umzurechnen', () => {
+    for (const wert of [
+      'morgen',
+      '1730577600',
+      '02.11.2026 21:00',
+      '2026-13-01T00:00:00Z',
+      '2026-02-30T12:00:00+01:00',
+      '2026-11-31T12:00:00+01:00',
+      '2026-11-02T24:00:00+01:00',
+      '2026-11-02T21:60:00+01:00',
+      '2026-11-02T21:00:60+01:00',
+      '2026-11-02T21:00:00+15:00',
+      '2026-11-02T21:00:00+01:60',
+      '2026-11-02T21:00:00+0100',
+      '2026-11-02t21:00:00z',
+      '2026-11-02T21:00:00+01:00 Wien',
+    ]) {
+      expect(leseStripeLiveAb(wert), wert).toEqual({ problem: 'ungueltig' })
+    }
+  })
+
+  it('nimmt nur Zeitzonen der Erde: −12:00 bis +14:00', () => {
+    expect(leseStripeLiveAb('2026-11-02T09:00:00-12:00')).toEqual({ ab: new Date('2026-11-02T21:00:00Z') })
+    expect(leseStripeLiveAb('2026-11-03T11:00:00+14:00')).toEqual({ ab: new Date('2026-11-02T21:00:00Z') })
+    for (const wert of ['2026-11-02T09:00:00-12:01', '2026-11-02T09:00:00-13:00', '2026-11-02T09:00:00-14:00', '2026-11-03T11:00:00+14:01']) {
+      expect(leseStripeLiveAb(wert), wert).toEqual({ problem: 'ungueltig' })
+    }
+  })
+
+  it('kennt den Schalttag', () => {
+    expect(leseStripeLiveAb('2028-02-29T12:00:00+01:00')).toEqual({ ab: new Date(Date.UTC(2028, 1, 29, 11)) })
+    expect(leseStripeLiveAb('2027-02-29T12:00:00+01:00')).toEqual({ problem: 'ungueltig' })
+  })
+})
+
+describe('stichtagWeitInDerZukunft — mehr als 24 Stunden voraus meldet sich (Nachbesserung Runde 1)', () => {
+  const jetzt = new Date('2026-11-02T18:00:00Z')
+
+  it('ein falsches Jahr liegt weit in der Zukunft', () => {
+    expect(stichtagWeitInDerZukunft(new Date('2062-11-02T20:00:00Z'), jetzt)).toBe(true)
+  })
+
+  it('genau 24 Stunden voraus noch nicht, eine Millisekunde mehr schon', () => {
+    expect(STICHTAG_ZUKUNFT_GRENZE_MS).toBe(24 * 60 * 60 * 1000)
+    expect(stichtagWeitInDerZukunft(new Date(jetzt.getTime() + STICHTAG_ZUKUNFT_GRENZE_MS), jetzt)).toBe(false)
+    expect(stichtagWeitInDerZukunft(new Date(jetzt.getTime() + STICHTAG_ZUKUNFT_GRENZE_MS + 1), jetzt)).toBe(true)
+  })
+
+  it('wenige Stunden voraus (Beginn des Redeploys), jetzt, vorbei oder kein Stichtag: kein Fehler', () => {
+    expect(stichtagWeitInDerZukunft(new Date(jetzt.getTime() + 3 * 60 * 60 * 1000), jetzt)).toBe(false)
+    expect(stichtagWeitInDerZukunft(jetzt, jetzt)).toBe(false)
+    expect(stichtagWeitInDerZukunft(new Date('2026-10-01T00:00:00Z'), jetzt)).toBe(false)
+    expect(stichtagWeitInDerZukunft(null, jetzt)).toBe(false)
+  })
+})
+
+describe('bestimmeUmgebung — Stichtag STRIPE_LIVE_AB (Register Z4)', () => {
+  it('ohne Variable kein Stichtag und keine Warnung — alles wie vor Nr. 55', () => {
+    for (const werte of [PRODUKTION, PREVIEW, LOKAL]) {
+      const u = bestimmeUmgebung(werte)
+      expect(u.stripeLiveAb).toBeNull()
+      expect(u.warnungen).toEqual([])
+    }
+  })
+
+  it('reicht einen gültigen Zeitpunkt als Date durch, ohne Warnung', () => {
+    const u = bestimmeUmgebung({ ...PRODUKTION, STRIPE_LIVE_AB: '2026-11-02T21:00:00+01:00' })
+    expect(u.stripeLiveAb).toEqual(new Date('2026-11-02T20:00:00Z'))
+    expect(u.warnungen).toEqual([])
+  })
+
+  it('ignoriert einen Wert ohne Zeitzone und warnt — in Produktion wie in Vorschau und lokal', () => {
+    for (const werte of [PRODUKTION, PREVIEW, LOKAL]) {
+      const u = bestimmeUmgebung({ ...werte, STRIPE_LIVE_AB: '2026-11-02T21:00:00' })
+      expect(u.stripeLiveAb).toBeNull()
+      expect(u.warnungen).toEqual([OHNE_ZEITZONE])
+    }
+  })
+
+  it('ignoriert einen ungültigen Wert und warnt, ohne den Wert zu nennen', () => {
+    const u = bestimmeUmgebung({ ...PRODUKTION, STRIPE_LIVE_AB: '2026-02-30T12:00:00+01:00' })
+    expect(u.stripeLiveAb).toBeNull()
+    expect(u.warnungen).toEqual([UNGUELTIG])
+    expect(u.warnungen.join(' ')).not.toContain('2026-02-30')
+  })
+})
+
+// ─── NEXT_PUBLIC_APP_URL in der Produktion (Nr. 56, Lauf 8 §6) ───────────────
+// Bis Nr. 56 übernahm die Produktion den Wert roh: Ein Schrägstrich am Ende,
+// ein Pfad oder eine Abfrage standen so in trustedOrigins, in baseURL und in
+// jedem Link einer Mail. Jetzt die bereinigte https-Herkunft. Ein ungültiger
+// Wert bleibt roh — NIE leer, APP_URL fiele sonst auf localhost — und meldet
+// sich als Warnung (Produktion: an Sentry, einmal je Instanz, ohne den Wert).
+
+describe('produktionsAdresse — NEXT_PUBLIC_APP_URL in der Produktion (Nr. 56)', () => {
+  it('macht aus einer https-Adresse die reine Herkunft: klein, ohne Pfad, Abfrage, Anker, Zugangsdaten und Schrägstrich am Ende', () => {
+    for (const [wert, herkunft] of [
+      ['https://farmerzone.example', 'https://farmerzone.example'],
+      ['https://FarmerZone.example/', 'https://farmerzone.example'],
+      ['  https://farmerzone.example/  ', 'https://farmerzone.example'],
+      ['https://farmerzone.example/pfad/tiefer?x=1#anker', 'https://farmerzone.example'],
+      ['https://farmerzone.example.', 'https://farmerzone.example'],
+      ['https://farmerzone.example:8443/', 'https://farmerzone.example:8443'],
+      ['https://farmerzone.example:443', 'https://farmerzone.example'],
+      ['https://nutzer:passwort@farmerzone.example', 'https://farmerzone.example'],
+    ] as const) {
+      expect(produktionsAdresse(wert), wert).toEqual({ herkunft })
+    }
+  })
+
+  it('behält einen ungültigen Wert roh (nur ohne Ränder) — kein https oder kein gültiger Host', () => {
+    for (const wert of [
+      'http://farmerzone.example',
+      'http://localhost:3000',
+      'farmerzone.example',
+      'ftp://farmerzone.example',
+      'https://*.farmerzone.example',
+      'https://farmerzone.example..',
+      'https://far mer.example',
+      'keine adresse',
+    ]) {
+      expect(produktionsAdresse(`  ${wert} `), wert).toEqual({ roh: wert })
+    }
+  })
+
+  it('ohne Wert: null — kein Ersatz', () => {
+    expect(produktionsAdresse(undefined)).toBeNull()
+    expect(produktionsAdresse('')).toBeNull()
+    expect(produktionsAdresse('   ')).toBeNull()
+  })
+})
+
+describe('bestimmeUmgebung — Produktion nimmt NEXT_PUBLIC_APP_URL als bereinigte Herkunft (Nr. 56)', () => {
+  it('bereinigt die Adresse für vertraute Herkünfte und appUrl — ohne Warnung', () => {
+    const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_APP_URL: 'https://FarmerZone.example/start?x=1' })
+    expect(u.trustedOrigins).toEqual(['https://farmerzone.example'])
+    expect(u.appUrl).toBe('https://farmerzone.example')
+    expect(u.warnungen).toEqual([])
+  })
+
+  it('ein ungültiger Wert bleibt roh — nie leer, sonst fiele APP_URL auf localhost — und meldet sich ohne den Wert', () => {
+    const wert = 'http://farmerzone.example/geheim-123'
+    const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_APP_URL: wert })
+    expect(u.trustedOrigins).toEqual([wert])
+    expect(u.appUrl).toBe(wert)
+    expect(u.warnungen).toEqual([WARNUNG_APP_URL_UNGUELTIG])
+    expect(u.warnungen.join(' ')).not.toMatch(/farmerzone|geheim/)
+  })
+
+  it('auch ein Wert mit „*" bleibt roh — Better Auth liest ihn als Muster; gewollt (nie leer), er meldet sich als Warnung (Runde 1)', () => {
+    // Hält fest, was der Kommentar zu trustedOrigins sagt: Erzeugt wird nie
+    // ein Platzhalter, aber ein eingetragener steht roh da.
+    const wert = 'https://*.farmerzone.example'
+    const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_APP_URL: wert })
+    expect(u.trustedOrigins).toEqual([wert])
+    expect(u.warnungen).toEqual([WARNUNG_APP_URL_UNGUELTIG])
+  })
+
+  it('fehlt der Wert, bleibt es ohne Ersatz — mit Warnung', () => {
+    const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_APP_URL: '  ' })
+    expect(u.trustedOrigins).toEqual([])
+    expect(u.appUrl).toBeNull()
+    expect(u.warnungen).toEqual([WARNUNG_APP_URL_FEHLT])
+  })
+
+  it('die Vercel-Adresse der Produktion bleibt, wie sie ist: eingetragen angenommen, nie aus VERCEL_URL ergänzt', () => {
+    const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_APP_URL: 'https://farmer-zone-beispiel.vercel.app/' })
+    expect(u.trustedOrigins).toEqual(['https://farmer-zone-beispiel.vercel.app'])
+    expect(u.trustedOrigins).not.toContain(`https://${PRODUKTION.VERCEL_URL}`)
+    expect(u.warnungen).toEqual([])
+  })
+
+  it('Vorschau und lokal: keine Warnung zur Adresse der Produktion', () => {
+    expect(bestimmeUmgebung({ ...PREVIEW, NEXT_PUBLIC_APP_URL: undefined }).warnungen).toEqual([])
+    expect(bestimmeUmgebung({ ...LOKAL, NEXT_PUBLIC_APP_URL: 'http://farmerzone.example' }).warnungen).toEqual([])
+  })
+})
+
+describe('Produktion: die Warnung zu NEXT_PUBLIC_APP_URL geht an Sentry (Nr. 56)', () => {
+  it('höchstens einmal je Instanz und ohne den Wert; APP_URL behält den Rohwert', async () => {
+    // Frisch geladen: Umgebung und „schon gemeldet" leben auf Modulebene (umgebung-server.ts).
+    vi.resetModules()
+    vi.doMock('@sentry/nextjs', () => ({ captureMessage: vi.fn() }))
+    vi.doMock('@/lib/env', () => ({
+      env: {
+        VERCEL_ENV: 'production',
+        NEXT_PUBLIC_APP_URL: 'http://farmerzone.example/geheim-123',
+        DATABASE_URL: FREMDE_DB,
+        STRIPE_SECRET_KEY: 'sk_live_abc',
+        STRIPE_CONNECT_WEBHOOK_SECRET: 'whsec_connect_platzhalter',
+      },
+    }))
+    const server = await import('@/lib/umgebung-server')
+    const sentry = await import('@sentry/nextjs')
+
+    expect(server.UMGEBUNG.trustedOrigins).toEqual(['http://farmerzone.example/geheim-123'])
+    expect(server.APP_URL).toBe('http://farmerzone.example/geheim-123')
+    server.meldeUmgebungsWarnungen()
+    server.meldeUmgebungsWarnungen()
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(1)
+    const [satz, stufe] = vi.mocked(sentry.captureMessage).mock.calls[0]
+    expect(satz).toContain(WARNUNG_APP_URL_UNGUELTIG)
+    expect(stufe).toBe('warning')
+    expect(String(satz)).not.toMatch(/farmerzone\.example|geheim/)
   })
 })

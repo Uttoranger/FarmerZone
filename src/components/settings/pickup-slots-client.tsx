@@ -62,16 +62,19 @@ function sortSlots(list: Slot[]): Slot[] {
 }
 
 /**
- * Die Abholzeiten — unter /settings/pickup-slots und im Hofseiten-Editor ab lg
- * (components/farmer/hofseite-editor.tsx), der über `onGespeichert` nach jeder
- * Änderung seine Vorschau neu lädt.
+ * Die Abholzeiten — unter /settings/pickup-slots und in Mein Hof (ab lg im
+ * Editor, unter lg seit Nr. 50 im Blatt), das über `onGespeichert` nach jeder
+ * Änderung Vorschau bzw. Seite neu lädt. `meldeErfolg` ersetzt dort den
+ * eigenen Toast durch „Gespeichert · Ansehen" (unter lg).
  */
 export function PickupSlotsClient({
   initialSlots,
   onGespeichert,
+  meldeErfolg,
 }: {
   initialSlots: Slot[]
   onGespeichert?: () => void
+  meldeErfolg?: () => void
 }): React.JSX.Element {
   const router = useRouter()
   const [slots, setSlots] = useState(initialSlots)
@@ -125,7 +128,8 @@ export function PickupSlotsClient({
         setForm(prevForm)
         toast.error(res.error)
       } else {
-        toast.success('Abholzeit hinzugefügt')
+        if (meldeErfolg) meldeErfolg()
+        else toast.success('Abholzeit hinzugefügt')
         router.refresh()
         onGespeichert?.()
       }
@@ -142,7 +146,8 @@ export function PickupSlotsClient({
         setSlots(prev)
         toast.error(res.error)
       } else {
-        toast.success('Abholzeit gelöscht')
+        if (meldeErfolg) meldeErfolg()
+        else toast.success('Abholzeit gelöscht')
         router.refresh()
         onGespeichert?.()
       }

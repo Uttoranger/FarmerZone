@@ -4,6 +4,8 @@ import type { FarmAktivitaet } from '@/lib/farm-aktivitaet'
 import { alsLand, type Land } from '@/lib/laender'
 import { monatsgrenzenWien } from '@/lib/servicegebuehr'
 import { BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
+import { ohneTestzahlungenSql } from '@/lib/testzahlung'
+import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
 import { nummerAnzeige } from '@/lib/admin-hoefe'
 
@@ -20,6 +22,8 @@ import { nummerAnzeige } from '@/lib/admin-hoefe'
  *                       keine Gebühr, ältere werden nicht eingezogen) — dieselbe
  *                       Regel wie `barOhneServicegebuehr` in finanzen.ts.
  *   gebuehrEntfallenCents  entfallen (nicht abgeholt oder storniert)
+ * Testzahlungen (online vor dem Stichtag der Live-Schaltung, Register Z4)
+ * zählen in keiner Spalte — wie in topfVonBestellung, wo sie „keiner" sind.
  */
 export type AdminMonatsSpalten = {
   bestellungen: number
@@ -86,9 +90,11 @@ export async function isAdminUser(userId: string): Promise<boolean> {
  * Bedingungen als FILTER-Klauseln. Ein aggregate() je Hof wäre ein N+1, das
  * mit jeder Bot-Anmeldung teurer würde. Typisiert über Prisma.sql (gebundene
  * Parameter, kein String-Zusammenbau). Höfe ohne Bestellung im Monat fehlen
- * im Ergebnis und bekommen die Nullzeile.
+ * im Ergebnis und bekommen die Nullzeile. Die Testzahlungen nimmt der
+ * Baustein aus der EINEN Regel heraus (`ohneTestzahlungenSql`,
+ * src/lib/testzahlung.ts) — ohne Stichtag ist er TRUE.
  */
-async function monatsSpaltenJeHof(von: Date, bis: Date): Promise<Map<string, AdminMonatsSpalten>> {
+async function monatsSpaltenJeHof(von: Date, bis: Date, stripeLiveAb: Date | null): Promise<Map<string, AdminMonatsSpalten>> {
   const zeilen = await prisma.$queryRaw<
     Array<{ farmId: string; bestellungen: number; online: number; bar: number; entfallen: number }>
   >(Prisma.sql`
@@ -111,6 +117,7 @@ async function monatsSpaltenJeHof(von: Date, bis: Date): Promise<Map<string, Adm
       ), 0)::int AS "entfallen"
     FROM "Order"
     WHERE "createdAt" >= ${von} AND "createdAt" < ${bis}
+      AND ${ohneTestzahlungenSql(Prisma.sql, stripeLiveAb)}
     GROUP BY "farmId"
   `)
 
@@ -140,8 +147,14 @@ async function monatsSpaltenJeHof(von: Date, bis: Date): Promise<Map<string, Adm
  *
  * Die Monatsspalten laufen als ZWEITE Abfrage parallel dazu (Promise.all) —
  * zwei Abfragen insgesamt, unabhängig von der Zahl der Höfe.
+ *
+ * `stripeLiveAb`: Stichtag der Live-Schaltung (Register Z4); Standard ist die
+ * Variable des Servers, Tests geben ihn mit.
  */
-export async function getAdminFarms(jetzt: Date = new Date()): Promise<AdminFarmRow[]> {
+export async function getAdminFarms(
+  jetzt: Date = new Date(),
+  stripeLiveAb: Date | null = STRIPE_LIVE_AB
+): Promise<AdminFarmRow[]> {
   const monat = monatsgrenzenWien(jetzt)
 
   const [farms, spalten] = await Promise.all([
@@ -175,7 +188,7 @@ export async function getAdminFarms(jetzt: Date = new Date()): Promise<AdminFarm
       },
       orderBy: { createdAt: 'desc' },
     }),
-    monatsSpaltenJeHof(monat.von, monat.bis),
+    monatsSpaltenJeHof(monat.von, monat.bis, stripeLiveAb),
   ])
 
   const rows = farms.map((f) => ({

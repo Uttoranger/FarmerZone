@@ -101,6 +101,10 @@ function stand(teil: Partial<HofseiteStand> = {}): HofseiteStand {
     email: 'hof@example.com',
     isPaused: false,
     sektionen: [{ key: 'about', visible: true, order: 0 }],
+    // Freiwillig (Nr. 50): leer, und trotzdem fehlt nichts.
+    tagline: null,
+    foundedYear: null,
+    werte: [],
     ...teil,
   }
 }
@@ -173,14 +177,25 @@ describe('Routen in der HofShell', () => {
     expect(existsSync(join(process.cwd(), 'src/app/(hof)/konditionen'))).toBe(false)
   })
 
-  it('die Unterseiten behalten Wege und Sicherheit: Stripe nur über die bestehenden Actions, Bild-Uploads über den Editor-Baustein', () => {
+  it('die Unterseiten behalten Wege und Sicherheit: Stripe nur über die bestehenden Actions, Bild-Uploads über die Bausteine von Mein Hof', () => {
     const zahlung = quelle('src/app/(hof)/settings/payments/payments-actions.tsx')
     expect(zahlung).toContain("from '@/server/actions/stripe-connect'")
     for (const action of ['createConnectAccount', 'createOnboardingLink', 'checkConnectStatus']) expect(zahlung).toContain(action)
-    expect(quelle('src/components/farmer/hofseite-editor.tsx')).toContain("from '@/app/(hof)/settings/appearance/appearance-client'")
-    // Die Bestandsliste der Farbliterale wandert mit der Datei, sie wächst nicht.
-    expect(quelle('eslint.config.mjs')).toContain("'src/app/(hof)/settings/appearance/appearance-client.tsx'")
+    // Seit Nr. 50 liegen Logo und Fotos in Mein Hof (bild-bausteine.tsx); Mein Auftritt leitet nur noch um.
+    const bilder = quelle('src/components/mein-hof/bild-bausteine.tsx')
+    expect(bilder).toContain("from '@/components/shared/image-upload'")
+    expect(existsSync(join(process.cwd(), 'src/app/(hof)/settings/appearance/appearance-client.tsx'))).toBe(false)
+    // Die Bestandsliste der Farbliterale schrumpft mit: Die Datei ist weg, ihre Nachfolger brauchen keine Ausnahme.
+    expect(quelle('eslint.config.mjs')).not.toContain('appearance-client')
+    expect(quelle('eslint.config.mjs')).not.toContain('components/mein-hof')
     expect(quelle('eslint.config.mjs')).not.toContain('(farmer)/settings')
+  })
+
+  it('/settings/appearance leitet auf Mein Hof um (Register N4) — 307 wie /status, Ladeansicht des Ziels', () => {
+    const seite = quelle('src/app/(hof)/settings/appearance/page.tsx')
+    expect(seite).toMatch(/redirect\(EINSTELLUNG_MEIN_AUFTRITT\.href\)/)
+    expect(seite).not.toMatch(/permanentRedirect\(/)
+    expect(quelle('src/app/(hof)/settings/appearance/loading.tsx')).toContain("from '../../farm-page/loading'")
   })
 })
 
@@ -243,7 +258,7 @@ describe('einstellungenBereiche', () => {
     expect(liste.map((b) => b.titel).join(' ')).not.toMatch(/Benachrichtigung|SEPA-Mandat/)
   })
 
-  it('jedes Ziel ist eine echte Seite unter (hof)/settings', () => {
+  it('jedes Ziel ist eine echte Seite unter (hof) — Mein Auftritt seit Nr. 50 in Mein Hof', () => {
     for (const b of einstellungenBereiche(daten(), VOR_STICHTAG)) {
       const pfad = b.href.split('#')[0]
       expect(existsSync(join(process.cwd(), `src/app/(hof)${pfad}/page.tsx`)), b.href).toBe(true)
@@ -258,6 +273,12 @@ describe('einstellungenBereiche', () => {
     expect(bereich(liste, 'zahlung')).toMatchObject({ ton: 'fertig' })
     expect(bereich(liste, 'zahlung').zeile).toContain('Online-Zahlung über Stripe aktiv')
     expect(bereich(liste, 'konto').ton).toBe('fertig')
+  })
+
+  it('Mein Auftritt führt nach Mein Hof; Leitspruch und Werte sind freiwillig und fehlen dort nie (Nr. 50)', () => {
+    const b = bereich(einstellungenBereiche(daten({}, { tagline: null, foundedYear: null, werte: [] }), VOR_STICHTAG), 'auftritt')
+    expect(b).toMatchObject({ titel: 'Mein Auftritt', href: '/farm-page', ton: 'fertig' })
+    expect(b.zeile).not.toMatch(/Leitspruch|Werte/)
   })
 
   it('was fehlt, kommt aus derselben Liste wie Mein Hof — orange mit „Es fehlt"', () => {

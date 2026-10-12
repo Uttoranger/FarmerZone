@@ -4,6 +4,15 @@
  */
 
 /**
+ * Die Adresse von Mein Hof, Reiter Hofseite — EINE Quelle. Hier statt in der
+ * Navigation (bauern-navigation.ts gibt sie weiter): Die Liste der Abschnitte
+ * (hofseite-fortschritt.ts) braucht sie für ihre Ziele und steht über die
+ * Markierung auch im Bündel der Hofseite für Kundinnen — die Navigation des
+ * Hofbereichs gehört dort nicht hinein.
+ */
+export const HOFSEITE_HREF = '/farm-page'
+
+/**
  * Ersatz-Titelbild, wenn ein Hof noch kein Foto hochgeladen hat. Bildersatz,
  * kein Anstrich — die Verläufe folgen dem Modus bewusst nicht. Eine Quelle für
  * die Hofseite (farm-page-view.tsx) und den Streifen im Kopf.

@@ -20,7 +20,7 @@ import { hofInitialen } from '@/lib/hof-initialen'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
 
 /**
- * Das mobile Hofkarten-Karussell am unteren Kartenrand (nur Karten-Reiter
+ * Das mobile Hofkarten-Karussell am unteren Kartenrand (nur Kartenmodus
  * unterhalb lg). Reines Scroll-Snap, KEIN Karussell-Paket: horizontales
  * Scrollen mit einer Karte je Rastpunkt; die Snap-Erkennung (welche Karte
  * ist zentriert?) ist die reine Funktion zentrierterIndex.
@@ -65,8 +65,9 @@ export default function HoefeKarussell({
   suchbegriffe?: string[]
   /** Nach dem Snappen: dieser Hof ist jetzt zentriert. */
   onZentriert: (slug: string) => void
-  /** Lässt den Aufrufer die HÖHE des Bandes messen — die Karte hält ihre
-   *  Pins darüber frei (fitBounds-Polster in hoefe-client.tsx). */
+  /** Lässt den Aufrufer die HÖHE des Bandes messen — solange ein Hof gewählt
+   *  ist, landet sein Pin darüber, und die Übersicht hält Platz dafür frei
+   *  (polsterUnten in hoefe-karte.tsx). */
   bandRef?: (el: HTMLDivElement | null) => void
 }) {
   const band = useRef<HTMLDivElement>(null)
@@ -129,7 +130,10 @@ export default function HoefeKarussell({
       <div
         ref={band}
         onScroll={beimScrollen}
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-[calc(50%-130px)] pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 [scrollbar-width:none]"
+        // Unten: unter md frei vom erhobenen Warenkorb-Knopf der Unterleiste
+        // (--kunde-ueberstand aus der KundeShell, Nr. 52); ab md endet die Karte
+        // am Fensterrand, dort zählt der Home-Indicator.
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-[calc(50%-130px)] pt-2 pb-[calc(var(--kunde-ueberstand)+0.5rem)] [scrollbar-width:none] md:pb-[max(0.75rem,env(safe-area-inset-bottom))]"
       >
         {hoefe.map((hof) => (
           <article
@@ -191,8 +195,11 @@ export default function HoefeKarussell({
               </div>
             </div>
 
+            {/* Niedrige Fenster (Handy quer, Nr. 52): ohne Kategorien und
+                Produktzeilen — sonst wäre die Karte höher als die Landkarte
+                darunter und ihr Kopf abgeschnitten. */}
             {hof.kategorien.length > 0 && (
-              <p className="mt-2 flex flex-wrap gap-1">
+              <p className="mt-2 flex flex-wrap gap-1 [@media(max-height:500px)]:hidden">
                 {hof.kategorien.slice(0, 3).map((k) => (
                   <span key={k} className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-foreground">
                     {KATEGORIE_LABEL[k]}
@@ -212,10 +219,12 @@ export default function HoefeKarussell({
                 darf um höchstens zwei Zeilen wachsen (gemessen: 110 px = 2 ×
                 (48 + 6)). Die Restzahl steht auf der Hofkarte der Liste, wo
                 Platz dafür ist; hier fräße sie eine dritte Zeile. */}
-            {(() => {
-              const vorschau = waehleVorschauImBereich(hof, bereich, gewaehlteKategorien, 2, suchbegriffe)
-              return <HoefeProduktzeilen produkte={vorschau.produkte} weitere={0} />
-            })()}
+            <div className="[@media(max-height:500px)]:hidden">
+              {(() => {
+                const vorschau = waehleVorschauImBereich(hof, bereich, gewaehlteKategorien, 2, suchbegriffe)
+                return <HoefeProduktzeilen produkte={vorschau.produkte} weitere={0} />
+              })()}
+            </div>
 
             {/* Seit Nr. 09 in den Zustandsfarben des neuen Designs (/hoefe
                 steht in der KundeShell): Termin grün, Pause orange — als

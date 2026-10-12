@@ -108,6 +108,9 @@ const LADEANSICHTEN: ReadonlyArray<{ zweck: string; datei: string; teile?: reado
   { zweck: 'Bestellbestätigung', datei: 'src/app/(public)/[farmSlug]/confirm/[orderId]/loading.tsx' },
   { zweck: 'Bestellverfolgung', datei: 'src/app/(public)/[farmSlug]/bestellung/[orderId]/loading.tsx' },
   { zweck: 'Bar-Bestätigung per Knopf', datei: 'src/app/(public)/[farmSlug]/bestaetigen/[token]/loading.tsx' },
+  // Nr. 54: „Problem melden" wartet als einzige Infoseite wirklich auf den
+  // Server (Sitzung) und zeigt seither die Form ihrer Karte.
+  { zweck: 'Problem melden', datei: 'src/app/(public)/problem-melden/loading.tsx' },
 ]
 
 /** Der Quelltext einer Ladeansicht samt der Bauteile, die sie rendert. */
@@ -115,14 +118,18 @@ function ansichtsText({ datei, teile }: { datei: string; teile?: readonly string
   return [datei, ...(teile ?? [])].map(liesDatei).join('\n')
 }
 
-/** Die vier Seiten, die bei einem Fehler oder einer falschen Adresse erscheinen. */
+/** Die vier Seiten, die bei einem Fehler oder einer falschen Adresse erscheinen, samt ihren Ansichten. */
 const FEHLERSEITEN = [
   'src/app/not-found.tsx',
   'src/app/(public)/[farmSlug]/not-found.tsx',
+  'src/components/shared/nicht-gefunden-ansicht.tsx',
   'src/app/error.tsx',
   'src/app/global-error.tsx',
   'src/components/shared/fehler-ansicht.tsx',
 ] as const
+
+/** Die gemeinsame Ansicht beider 404 (seit Nr. 54, Mockups fehler-404-*). */
+const NICHT_GEFUNDEN_ANSICHT = 'src/components/shared/nicht-gefunden-ansicht.tsx'
 
 describe('Ladeansichten — jede öffentliche Route, die auf Daten wartet, zeigt eine', () => {
   for (const ansicht of LADEANSICHTEN) {
@@ -152,9 +159,13 @@ describe('Ladeansichten — jede öffentliche Route, die auf Daten wartet, zeigt
   it('bringt die Kopfleiste in ihrer echten Höhe mit — die Gruppe hat kein Layout', () => {
     // Die Kundenseiten rendern ihre Kopfleiste selbst (56 px, ab md 64).
     // Fehlt sie im Skeleton, springt die Seite beim Umschalten um ihre Höhe.
-    // Die Kasse steht seit Nr. 12 in der Fokus-Shell: deren Kopf ist 52 px
-    // hoch (ab md 64) — der Platzhalter hat genau diese Maße.
-    const FOKUS_SHELL = new Set(['src/app/(public)/[farmSlug]/checkout/loading.tsx'])
+    // Die Kasse steht seit Nr. 12 in der Fokus-Shell, die Bar-Bestätigung
+    // seit Nr. 54: deren Kopf ist 52 px hoch (ab md 64) — der Platzhalter hat
+    // genau diese Maße.
+    const FOKUS_SHELL = new Set([
+      'src/app/(public)/[farmSlug]/checkout/loading.tsx',
+      'src/app/(public)/[farmSlug]/bestaetigen/[token]/loading.tsx',
+    ])
     for (const ansicht of LADEANSICHTEN) {
       expect(liesDatei(ansicht.datei), `${ansicht.zweck} ohne Kopfleisten-Platzhalter`).toMatch(
         FOKUS_SHELL.has(ansicht.datei) ? /h-\[52px\][^"]*md:h-16/ : /h-14[^"]*md:h-16/
@@ -349,17 +360,24 @@ describe('404 — „Diese Seite gibt es nicht (mehr)"', () => {
 
     expect(text).toContain('ZUR_STARTSEITE')
     expect(text).toContain('HOEFE_ENTDECKEN')
-    expect(text).toMatch(/href="\/"/)
-    expect(text).toMatch(/href="\/hoefe"/)
+    // Seit Nr. 54 zeichnet die gemeinsame Ansicht (Mockups fehler-404-*): Die
+    // Seite gibt die Wege hinein — zuerst die Startseite, dann die Höfe.
+    expect(text).toContain('<NichtGefundenAnsicht')
+    expect(text).toMatch(/haupt=\{\{ href: '\/', text: ZUR_STARTSEITE \}\}/)
+    expect(text).toMatch(/neben=\{\{ href: '\/hoefe', text: HOEFE_ENTDECKEN \}\}/)
+    const ansicht = liesDatei(NICHT_GEFUNDEN_ANSICHT)
+    expect(ansicht).toMatch(/<Link href=\{haupt\.href\}/)
+    expect(ansicht).toMatch(/<Link href=\{neben\.href\}/)
     // Das Suchfeld ist ein GET-Formular auf die Hofübersicht und braucht kein
     // JavaScript; den Parameter prüft dort leseHoefeFilter.
-    expect(text).toMatch(/<form action="\/hoefe" method="get"/)
-    expect(text).toContain('SUCHTEXT_PARAMETER')
+    expect(ansicht).toMatch(/<form action="\/hoefe" method="get"/)
+    expect(ansicht).toContain('SUCHTEXT_PARAMETER')
   })
 
   it('zeigt kein Emoji mehr', () => {
     // Vorher: eine Weizen-Ähre als einzige Illustration.
     expect(PIKTOGRAMM.test(liesDatei(datei))).toBe(false)
+    expect(PIKTOGRAMM.test(liesDatei(NICHT_GEFUNDEN_ANSICHT))).toBe(false)
   })
 
   it('schickt niemanden mehr in den Hof-Login', () => {
@@ -382,6 +400,9 @@ describe('404 der Hofseite — ein stillgelegter Hof sieht aus wie ein unbekannt
     expect(text).toContain('HOF_NICHT_GEFUNDEN_TITEL')
     expect(text).toContain('HOF_NICHT_GEFUNDEN_TEXT')
     expect(text).toContain('HOEFE_ENTDECKEN')
+    // Der grüne Weg ist hier die Hofübersicht, die Startseite der zweite.
+    expect(text).toMatch(/haupt=\{\{ href: '\/hoefe', text: HOEFE_ENTDECKEN \}\}/)
+    expect(text).toMatch(/neben=\{\{ href: '\/', text: ZUR_STARTSEITE \}\}/)
     expect(PIKTOGRAMM.test(text)).toBe(false)
   })
 })

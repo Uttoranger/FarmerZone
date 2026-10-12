@@ -1,4 +1,5 @@
 import { formatEuro } from '@/lib/format'
+import { monatOhneJahr } from '@/lib/finanzen'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { cn } from '@/lib/utils'
 import type { FinanzenVerlaufPunkt } from '@/server/queries/finanzen'
@@ -13,6 +14,10 @@ import type { FinanzenVerlaufPunkt } from '@/server/queries/finanzen'
  * Farbwerte in JavaScript (wie die Umsatzbalken der Auswertung). Die Höhe ist
  * nur Darstellung (Anteil am größten Wert, aus ganzen Cent); die Zahlen stehen
  * für Screenreader als Tabelle daneben.
+ *
+ * Am Handy (seit Nr. 54) passt es sich der Breite an: Die Säulen teilen sich
+ * die Breite (flex-1, min-w-0), unter 640 px mit kleinerem Abstand, und die
+ * Achse nennt nur den Monat („Sep" statt „Sep. 26", monatOhneJahr).
  */
 export function FinanzenDiagramm({ punkte }: { punkte: FinanzenVerlaufPunkt[] }): React.JSX.Element {
   const alleNull = punkte.every((p) => p.einnahmenCents === 0 && p.kostenCents === 0)
@@ -30,7 +35,7 @@ export function FinanzenDiagramm({ punkte }: { punkte: FinanzenVerlaufPunkt[] })
 
   return (
     <div>
-      <div aria-hidden="true" className="flex h-44 items-end gap-2 border-b border-border md:gap-4">
+      <div aria-hidden="true" className="flex h-44 items-end gap-1 border-b border-border sm:gap-2 md:gap-4">
         {punkte.map((p) => (
           <div key={p.monat} className="flex h-full min-w-0 flex-1 items-end justify-center gap-1">
             <span className="w-full max-w-[18px] rounded-t-[3px] bg-accent" style={{ height: hoehe(p.einnahmenCents) }} />
@@ -38,10 +43,11 @@ export function FinanzenDiagramm({ punkte }: { punkte: FinanzenVerlaufPunkt[] })
           </div>
         ))}
       </div>
-      <div aria-hidden="true" className="mt-1.5 flex gap-2 md:gap-4">
+      <div aria-hidden="true" className="mt-1.5 flex gap-1 sm:gap-2 md:gap-4">
         {punkte.map((p) => (
-          <span key={p.monat} className="min-w-0 flex-1 truncate text-center text-[11.5px] text-muted-foreground">
-            {p.kurz}
+          <span key={p.monat} className="min-w-0 flex-1 truncate text-center text-[11px] text-muted-foreground sm:text-[11.5px]">
+            <span className="sm:hidden">{monatOhneJahr(p.monat)}</span>
+            <span className="hidden sm:inline">{p.kurz}</span>
           </span>
         ))}
       </div>

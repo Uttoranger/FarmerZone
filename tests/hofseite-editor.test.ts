@@ -3,13 +3,15 @@
  * Node-Umgebung nichts rendert (TESTING_GUIDELINES §1).
  *
  * Beweist:
- *  - /farm-page zeigt unter lg die alte Hofseite mit Stiften und ab lg den
- *    Editor — der Kopf steht nur einmal.
+ *  - /farm-page zeigt unter lg die Liste „Bearbeiten" (seit Nr. 50, vorher
+ *    die alte Hofseite mit Stiften) und ab lg den Editor — der Kopf steht nur
+ *    einmal; beide nehmen dieselben Bausteine (AbschnittInhalt).
  *  - (Die zwei Fassungen des Kopfs prüft seit Nr. 22e tests/mein-hof-seite.test.ts
  *    am gerenderten seitenkopf.tsx; der Bestandskopf fiel mit /status weg.)
  *  - „Hofseite ansehen" in der Seitenleiste entfällt ab lg.
- *  - Der Editor speichert nur über die vorhandenen Aktionen aus farm.ts und
- *    appearance.ts — keine neue Server-Aktion.
+ *  - Die Bausteine speichern nur über die vorhandenen Aktionen aus farm.ts,
+ *    appearance.ts und farm-photos.ts — jeder Abschnitt mit frischem Stand
+ *    (abschnitt-speichern.ts); keine zweite Speicherlogik.
  *  - Die Vorschau ist die echte Hofseite im Vorschau-Modus — Handy (390 px)
  *    oder Web (1440 px) in EINEM iframe, der Maßstab gerechnet, nie hart
  *    codiert; die Markierung geht nur an den eigenen Ursprung.
@@ -27,16 +29,21 @@ const quelltext = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf
 describe('/farm-page', () => {
   const seite = quelltext('src/app/(hof)/farm-page/page.tsx')
 
-  it('unter lg Checkliste und die alte Hofseite, ab lg der Editor', () => {
-    expect(seite).toMatch(/<div className="lg:hidden">[\s\S]*?<ChecklisteKompakt fortschritt=\{fortschritt\} \/>[\s\S]*?<FarmPageClient/)
+  it('unter lg die Liste „Bearbeiten" (Nr. 50), ab lg der Editor — beide mit denselben Daten', () => {
+    expect(seite).toMatch(
+      /<div className="lg:hidden">[\s\S]*?<h1 className="sr-only">Hofseite bearbeiten<\/h1>\s*<AbschnitteListe fortschritt=\{fortschritt\} hof=\{hof\} einstellungen=\{einstellungen\} auftritt=\{auftritt\} \/>/
+    )
+    // Die alte Hofseite mit Stiften und die Checkliste sind dort entfallen (Register N4).
+    expect(seite).not.toMatch(/FarmPageClient|ChecklisteKompakt|FarmPageView/)
+    expect(seite).toContain('<HofseiteEditor fortschritt={fortschritt} hof={hof} einstellungen={einstellungen} auftritt={auftritt} />')
     // Ab lg trägt der Editor-Block die H1 der Seite — nur für Screenreader; sichtbar ist der Hofname im Kopf.
     expect(seite).toMatch(/<div className="hidden px-8 pb-12 lg:block">[\s\S]*?<h1 className="sr-only">Hofseite bearbeiten<\/h1>\s*<HofseiteEditor/)
   })
 
   it('der Kopf steht genau einmal je Reiter', () => {
     // Zwei Zweige, die sich ausschließen: Beiträge kehrt vorher zurück.
-    const beitraege = seite.slice(seite.indexOf("if (reiter === 'beitraege')"), seite.indexOf('const [activeStatus'))
-    const hofseite = seite.slice(seite.indexOf('const [activeStatus'))
+    const beitraege = seite.slice(seite.indexOf("if (reiter === 'beitraege')"), seite.indexOf('const [kopf, beitraegeZahl'))
+    const hofseite = seite.slice(seite.indexOf('const [kopf, beitraegeZahl'))
     expect(beitraege.match(/<MeinHofSeitenkopf [^>]*aktiv="beitraege"/g)).toHaveLength(1)
     expect(hofseite.match(/<MeinHofSeitenkopf /g)).toHaveLength(1)
     expect(hofseite).toMatch(/<MeinHofSeitenkopf [^>]*aktiv="hofseite"/)
@@ -56,39 +63,73 @@ describe('Seitenleiste', () => {
   })
 })
 
-describe('Editor', () => {
+describe('Editor und Bausteine', () => {
   const editor = quelltext('src/components/farmer/hofseite-editor.tsx')
+  const liste = quelltext('src/components/mein-hof/abschnitte-liste.tsx')
+  const formulare = quelltext('src/components/mein-hof/abschnitt-formulare.tsx')
+  const speichern = quelltext('src/components/mein-hof/abschnitt-speichern.ts')
+  const BAUSTEINE = [
+    'src/components/farmer/hofseite-editor.tsx',
+    'src/components/mein-hof/abschnitte-liste.tsx',
+    'src/components/mein-hof/abschnitt-inhalt.tsx',
+    'src/components/mein-hof/abschnitt-formulare.tsx',
+    'src/components/mein-hof/bild-bausteine.tsx',
+    'src/components/mein-hof/abschnitt-speichern.ts',
+  ]
 
-  it('speichert nur über die vorhandenen Aktionen', () => {
-    const aktionen = [...editor.matchAll(/from '@\/server\/actions\/([a-z-]+)'/g)].map((m) => m[1])
-    expect(aktionen.toSorted()).toEqual(['appearance', 'farm'])
+  it('Editor ab lg und Blatt unter lg öffnen denselben Baustein je Zeile', () => {
+    expect(editor).toMatch(/<AbschnittInhalt[\s\S]*?darstellung="zeile"/)
+    expect(liste).toMatch(/<AbschnittInhalt[\s\S]*?darstellung="blatt"/)
+    for (const text of [editor, liste]) expect(text).toContain("from '@/components/mein-hof/abschnitt-inhalt'")
   })
 
-  it('reicht das ganze Profil und den ganzen Auftritt mit — die Zeile ändert nur ihre Felder', () => {
-    expect(editor).toContain('updateProfile({ ...profilBasis(einstellungen), ...teil })')
-    expect(editor).toMatch(/saveAppearanceAction\(\{ \.\.\.auftrittBasis\(auftritt\), aboutText/)
-    expect(editor).toMatch(/saveAppearanceAction\(\{ \.\.\.auftrittBasis\(auftritt\), sectionsConfig/)
+  it('speichert nur über die vorhandenen Aktionen — keine neue Aktion, keine zweite Speicherlogik', () => {
+    const aktionen = new Set(BAUSTEINE.flatMap((pfad) => [...quelltext(pfad).matchAll(/from '@\/server\/actions\/([a-z-]+)'/g)].map((m) => m[1])))
+    expect([...aktionen].toSorted()).toEqual(['appearance', 'farm', 'farm-photos'])
+    // Editor und Liste selbst rufen keine Aktion.
+    for (const text of [editor, liste]) expect(text).not.toMatch(/from '@\/server\/actions\//)
+    // Auftritt und Profil speichert NUR abschnitt-speichern.ts — die Formulare gehen über speichereAuftritt/speichereProfil.
+    for (const pfad of BAUSTEINE.filter((p) => !p.endsWith('abschnitt-speichern.ts'))) {
+      expect(quelltext(pfad), pfad).not.toMatch(/\b(?:saveAppearanceAction|updateProfile)\(|import \{[^}]*\b(?:saveAppearanceAction|updateProfile)\b/)
+    }
+    expect(formulare.match(/speichereAuftritt\(/g)?.length).toBeGreaterThanOrEqual(4)
+    expect(formulare.match(/speichereProfil\(/g)?.length).toBe(3)
   })
 
-  it('schickt Logo und Titelbild nicht mit — die lädt der Editor über eigene Aktionen, die Props wären veraltet', () => {
-    const basis = editor.slice(editor.indexOf('function auftrittBasis'), editor.indexOf('// ── Formular-Bausteine'))
+  it('jeder Abschnitt liest vor dem Speichern den frischen Stand und ändert nur sein Feld', () => {
+    expect(speichern).toMatch(/const frisch = await ladeAuftrittStand\(\)[\s\S]*?saveAppearanceAction\(auftrittMitTeil\(frisch\.stand, teil\)\)/)
+    expect(speichern).toMatch(/const frisch = await ladeProfilStand\(\)[\s\S]*?updateProfile\(profilMitTeil\(frisch\.profil, teil\)\)/)
+    // Nacheinander, nie verschränkt (tests/integration/auftritt-abschnitte.int.test.ts prüft den Zustand).
+    expect(speichern.match(/return nacheinander\(/g)).toHaveLength(2)
+  })
+
+  it('schickt Logo und Titelbild nicht mit — die haben eigene Aktionen', () => {
+    const stand = quelltext('src/lib/abschnitt-stand.ts')
+    const basis = stand.slice(stand.indexOf('export function auftrittBasis'), stand.indexOf('export function auftrittStandAus'))
     expect(basis).not.toMatch(/bannerType|bannerUrl|bannerValue|logoUrl/)
   })
 
   it('prüft die Felder mit den Schemas der Aktionen selbst, nicht mit einer Abschrift', () => {
-    expect(editor).toContain("from '@/schemas/hofprofil'")
-    expect(editor).toContain("from '@/schemas/auftritt'")
+    expect(formulare).toContain("from '@/schemas/hofprofil'")
+    expect(formulare).toContain("from '@/schemas/auftritt'")
     // Name und Kontakt haben Obergrenzen — dort das Bearbeiten-Schema mit dem
     // gezeigten Stand, damit ein zu langer Altwert das Speichern nicht sperrt.
-    expect(editor.match(/profileSchema\.pick\(/g)).toHaveLength(1)
-    expect(editor.match(/profilBearbeitenSchema\(bestandVon\(einstellungen\)\)\.pick\(/g)).toHaveLength(2)
-    expect(editor).toContain('appearanceSchema.pick({ aboutText: true })')
-    expect(editor).not.toMatch(/z\.object\(/)
+    expect(formulare.match(/profileSchema\.pick\(/g)).toHaveLength(1)
+    expect(formulare.match(/profilBearbeitenSchema\(bestandVon\(einstellungen\)\)\.pick\(/g)).toHaveLength(2)
+    expect(formulare).toContain('appearanceSchema.pick({ aboutText: true })')
+    expect(formulare).toContain('appearanceSchema.pick({ farmValues: true })')
+    expect(formulare).toContain('zodResolver(leitspruchFormularSchema)')
+    expect(formulare).not.toMatch(/z\.object\(/)
   })
 
   it('nur eine Zeile offen zugleich, und die geht an die Vorschau', () => {
-    expect(editor).toContain("setOffen((jetzt) => (jetzt === zeile.id ? null : zeile.id))")
+    expect(editor).toContain('setOffen((jetzt) => (jetzt === id ? null : id))')
     expect(editor).toMatch(/<HofseiteVorschauRahmen\s+slug=\{hof\.slug\}\s+stand=\{stand\}\s+markiert=\{offen\}/)
+  })
+
+  it('solange ein Foto hochlädt, bleiben Zeile und Blatt offen (CODING_STANDARDS §8)', () => {
+    expect(editor).toMatch(/function umschalten\(id: HofseiteZeileId\) \{\s*if \(hochladen\) return/)
+    expect(liste).toMatch(/if \(!auf && !hochladenJetzt\.current\) setzeOffen\(null\)/)
   })
 
   it('Web neben der Bearbeitung nur ab der Mindestbreite; die Bearbeitung behält ihre Mindestbreite aus der Regel', () => {
@@ -126,18 +167,27 @@ describe('Vorschau-Rahmen', () => {
     expect(rahmen).toContain('ausloeser.current = document.activeElement instanceof HTMLElement ? document.activeElement : null')
   })
 
+  // Die Markierung geht seit Nr. 49 über EINEN Hook — für diesen Rahmen und „So sieht’s die Kundin" unter lg.
+  const markierung = quelltext('src/components/farmer/use-vorschau-markierung.ts')
+  const kundin = quelltext('src/components/mein-hof/mein-hof-ansicht.tsx')
+
   it('der erste Stand im src, jeder weitere per location.replace; die Markierung nur an den eigenen Ursprung', () => {
     // Sonst legte jedes Speichern einen Eintrag im Browserverlauf an.
     expect(rahmen).toMatch(/src=\{vorschauAdresse\(slug, anfang\)\}/)
     expect(rahmen).toContain('location.replace(vorschauAdresse(slug, stand))')
-    expect(rahmen.match(/postMessage\([^)]*window\.location\.origin\)/g)).toHaveLength(1)
-    expect(rahmen).not.toMatch(/postMessage\([^)]*'\*'/)
+    expect(markierung.match(/postMessage\([^)]*window\.location\.origin\)/g)).toHaveLength(1)
+    for (const text of [rahmen, markierung, kundin]) expect(text).not.toMatch(/postMessage\([^)]*'\*'/)
+    // Beide Rahmen nehmen den Hook, keiner schickt selbst.
+    for (const text of [rahmen, kundin]) {
+      expect(text).toContain('useVorschauMarkierung(rahmen, markiert)')
+      expect(text).not.toContain('postMessage(')
+    }
   })
 
   it('schickt die Markierung nach dem Laden noch einmal — auf die Bereit-Meldung der eigenen Seite, nicht auf onLoad', () => {
-    expect(rahmen).not.toContain('onLoad=')
-    expect(rahmen).toContain('leseBereit(ereignis, window.location.origin)')
-    expect(rahmen).toContain('ereignis.source !== rahmen.current?.contentWindow')
+    for (const text of [rahmen, kundin]) expect(text).not.toContain('onLoad=')
+    expect(markierung).toContain('leseBereit(ereignis, window.location.origin)')
+    expect(markierung).toContain('ereignis.source !== rahmen.current?.contentWindow')
     const empfaenger = quelltext('src/components/farm/vorschau-im-rahmen.tsx')
     expect(empfaenger).toMatch(/window\.parent\.postMessage\(\{ typ: BEREIT_TYP \}, window\.location\.origin\)/)
     // Das eigene Fenster scrollen, nicht scrollIntoView — das zöge die Editor-Seite mit.

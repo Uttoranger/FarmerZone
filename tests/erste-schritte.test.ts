@@ -6,8 +6,9 @@
  *  - Jeder Punkt hängt an genau der Bedingung, die er behauptet — einzeln
  *    geprüft, damit eine vertauschte Zuordnung auffällt.
  *  - Die Reihenfolge liegt fest (sie ist die Arbeitsreihenfolge).
- *  - Ist alles erledigt, sagt `anzeigen` false — die Karte verschwindet
- *    vollständig statt ein „Alles erledigt" stehen zu lassen.
+ *  - Ist alles erledigt, ist jeder Schritt erledigt; ein einziger offener
+ *    genügt, damit wieder etwas offen ist. Ob die Karte „Zu tun" dann steht
+ *    oder ganz verschwindet, entscheidet zuTun (tests/zu-tun.test.ts).
  *  - Weggeklickt wird über einen Cookie mit der Hof-ID: nur genau diese ID
  *    blendet aus; dann kommt statt der Karte die Zeile zum Einblenden, und
  *    ist alles erledigt, keins von beiden.
@@ -26,7 +27,7 @@ import {
   ersteSchritteDaten,
   type ErsteSchritteDaten,
 } from '@/lib/erste-schritte'
-import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ } from '@/lib/konditionen'
+import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 
 /** Ein Hof direkt nach der Registrierung: nichts eingerichtet. */
 const FRISCH: ErsteSchritteDaten = {
@@ -50,26 +51,28 @@ const FERTIG: ErsteSchritteDaten = {
   zahlungBereit: true,
 }
 
+/** Die erledigten bzw. offenen Schritte, als IDs in Listenreihenfolge. */
+const erledigte = (daten: ErsteSchritteDaten) => ersteSchritte(daten).filter((s) => s.erledigt).map((s) => s.id)
+const offene = (daten: ErsteSchritteDaten) => ersteSchritte(daten).filter((s) => !s.erledigt).map((s) => s.id)
+
 /** Status eines einzelnen Punktes, kurz abgefragt. */
 function statusVon(daten: ErsteSchritteDaten, id: string): boolean {
-  const schritt = ersteSchritte(daten).schritte.find((s) => s.id === id)
+  const schritt = ersteSchritte(daten).find((s) => s.id === id)
   if (!schritt) throw new Error(`Schritt ${id} gibt es nicht`)
   return schritt.erledigt
 }
 
 describe('frisch registrierter Hof', () => {
-  it('steht bei 0 von 5 und zeigt die Karte', () => {
-    const ergebnis = ersteSchritte(FRISCH)
+  it('steht bei 0 von 5 — alle Punkte offen', () => {
+    const schritte = ersteSchritte(FRISCH)
 
-    expect(ergebnis.erledigt).toBe(0)
-    expect(ergebnis.gesamt).toBe(5)
-    expect(ergebnis.prozent).toBe(0)
-    expect(ergebnis.anzeigen).toBe(true)
-    expect(ergebnis.schritte.every((s) => !s.erledigt)).toBe(true)
+    expect(schritte).toHaveLength(5)
+    expect(erledigte(FRISCH)).toEqual([])
+    expect(schritte.every((s) => !s.erledigt)).toBe(true)
   })
 
   it('gibt jedem offenen Punkt ein Ziel und einen Nutzen-Satz', () => {
-    for (const schritt of ersteSchritte(FRISCH).schritte) {
+    for (const schritt of ersteSchritte(FRISCH)) {
       expect(schritt.href.startsWith('/')).toBe(true)
       expect(schritt.titel.length).toBeGreaterThan(0)
       expect(schritt.nutzen.length).toBeGreaterThan(0)
@@ -79,7 +82,7 @@ describe('frisch registrierter Hof', () => {
 
 describe('Reihenfolge', () => {
   it('liegt fest: Profil, Auftritt, Produkt, Abholzeiten, Zahlung', () => {
-    expect(ersteSchritte(FRISCH).schritte.map((s) => s.id)).toEqual([
+    expect(ersteSchritte(FRISCH).map((s) => s.id)).toEqual([
       'profil',
       'auftritt',
       'produkt',
@@ -91,8 +94,8 @@ describe('Reihenfolge', () => {
   it('bleibt gleich, egal was schon erledigt ist', () => {
     const gemischt = ersteSchritte({ ...FRISCH, produkte: 3, zahlungBereit: true })
 
-    expect(gemischt.schritte.map((s) => s.id)).toEqual(
-      ersteSchritte(FRISCH).schritte.map((s) => s.id)
+    expect(gemischt.map((s) => s.id)).toEqual(
+      ersteSchritte(FRISCH).map((s) => s.id)
     )
   })
 })
@@ -125,67 +128,58 @@ describe('einzelne Bedingungen', () => {
   })
 
   it('Online-Zahlung hängt an der Stripe-Bereitschaft und ist Pflicht, nicht optional (Register Z1)', () => {
-    const zahlung = ersteSchritte(FRISCH).schritte.find((s) => s.id === 'zahlung')
+    const zahlung = ersteSchritte(FRISCH).find((s) => s.id === 'zahlung')
 
-    expect(zahlung?.optional).toBe(false)
+    // Ein Schritt wie jeder andere: offen, solange Stripe nicht bereit ist —
+    // ohne „(optional)" und ohne Ausweg „geht auch ohne".
+    expect(zahlung?.titel).toBe(ONLINE_ZAHLUNG_EINRICHTEN_TITEL)
     expect(zahlung?.nutzen).toBe(ONLINE_ZAHLUNG_EINRICHTEN_SATZ)
+    expect(`${zahlung?.titel} ${zahlung?.nutzen}`).not.toMatch(/optional|auch ohne/i)
     expect(statusVon(FRISCH, 'zahlung')).toBe(false)
     expect(statusVon({ ...FRISCH, zahlungBereit: true }, 'zahlung')).toBe(true)
   })
 
-  it('kein Schritt ist optional, keiner sagt „geht auch ohne"', () => {
-    const schritte = ersteSchritte(FRISCH).schritte
+  it('kein Schritt ist optional, keiner sagt „geht auch ohne" — es gibt kein Merkmal „optional" mehr', () => {
+    const schritte = ersteSchritte(FRISCH)
 
-    expect(schritte.filter((s) => s.optional)).toEqual([])
-    expect(schritte.map((s) => s.nutzen).join(' ')).not.toMatch(/auch ohne/)
+    expect(schritte.map((s) => `${s.titel} ${s.nutzen}`).join(' ')).not.toMatch(/optional|auch ohne/i)
+    for (const schritt of schritte) expect(Object.keys(schritt).sort()).toEqual(['erledigt', 'href', 'id', 'nutzen', 'titel'])
   })
 })
 
 describe('Zwischenstände', () => {
-  it('zählt eine Kombination richtig und rechnet den Anteil aus', () => {
+  it('zählt eine Kombination richtig: drei von fünf erledigt, genau die richtigen', () => {
     // Profil (Beschreibung + Kartenpunkt), Produkt und Abholzeiten erledigt —
     // Auftritt und Zahlung offen
-    const ergebnis = ersteSchritte({
+    const daten = {
       ...FRISCH,
       hatBeschreibung: true,
       hatKoordinaten: true,
       produkte: 2,
       aktiveAbholzeiten: 1,
-    })
+    }
 
-    expect(ergebnis.erledigt).toBe(3)
-    expect(ergebnis.prozent).toBe(60)
-    expect(ergebnis.anzeigen).toBe(true)
-    expect(ergebnis.schritte.filter((s) => s.erledigt).map((s) => s.id)).toEqual([
-      'profil',
-      'produkt',
-      'abholzeiten',
-    ])
+    expect(erledigte(daten)).toEqual(['profil', 'produkt', 'abholzeiten'])
+    expect(offene(daten)).toEqual(['auftritt', 'zahlung'])
   })
 
-  it('hält die Karte, solange nur noch die Zahlung offen ist', () => {
-    const ergebnis = ersteSchritte({ ...FERTIG, zahlungBereit: false })
-
-    expect(ergebnis.erledigt).toBe(4)
-    expect(ergebnis.prozent).toBe(80)
-    expect(ergebnis.anzeigen).toBe(true)
+  it('nur noch die Zahlung offen: vier von fünf erledigt', () => {
+    expect(erledigte({ ...FERTIG, zahlungBereit: false })).toHaveLength(4)
+    expect(offene({ ...FERTIG, zahlungBereit: false })).toEqual(['zahlung'])
   })
 })
 
 describe('vollständig eingerichteter Hof', () => {
-  it('blendet die Karte aus, statt „alles erledigt" stehen zu lassen', () => {
-    const ergebnis = ersteSchritte(FERTIG)
-
-    expect(ergebnis.erledigt).toBe(5)
-    expect(ergebnis.prozent).toBe(100)
-    expect(ergebnis.anzeigen).toBe(false)
+  it('jeder Schritt ist erledigt — „Zu tun" hat aus den Ersten Schritten nichts mehr', () => {
+    expect(erledigte(FERTIG)).toHaveLength(5)
+    expect(offene(FERTIG)).toEqual([])
   })
 
-  it('reicht genau ein offener Punkt, damit die Karte wieder erscheint', () => {
+  it('genau ein offener Punkt genügt, damit wieder etwas offen ist', () => {
     // Zum Beispiel, wenn der Bauer sein letztes Produkt löscht
-    expect(ersteSchritte({ ...FERTIG, produkte: 0 }).anzeigen).toBe(true)
-    expect(ersteSchritte({ ...FERTIG, aktiveAbholzeiten: 0 }).anzeigen).toBe(true)
-    expect(ersteSchritte({ ...FERTIG, hatLogo: false }).anzeigen).toBe(true)
+    expect(offene({ ...FERTIG, produkte: 0 })).toEqual(['produkt'])
+    expect(offene({ ...FERTIG, aktiveAbholzeiten: 0 })).toEqual(['abholzeiten'])
+    expect(offene({ ...FERTIG, hatLogo: false })).toEqual(['auftritt'])
   })
 })
 
@@ -228,8 +222,9 @@ describe('ausblenden über den Cookie', () => {
   })
 
   it('Karte, solange offen und nicht weggeklickt; weggeklickt die Zeile; fertig nichts', () => {
-    const offen = ersteSchritte(FRISCH)
-    const fertig = ersteSchritte(FERTIG)
+    // Die Liste „Zu tun" sagt, ob etwas offen ist (zuTun → anzeigen).
+    const offen = { anzeigen: true }
+    const fertig = { anzeigen: false }
     expect(ersteSchritteAnzeige(offen, false)).toBe('karte')
     expect(ersteSchritteAnzeige(offen, true)).toBe('zeile')
     expect(ersteSchritteAnzeige(fertig, false)).toBe('nichts')
@@ -248,10 +243,11 @@ describe('ausblenden über den Cookie', () => {
     expect(action).toContain('maxAge: ERSTE_SCHRITTE_AUS_DAUER_S')
     expect(action).toContain("revalidatePath('/dashboard')")
     // Seit Nr. 17 liegt Heute in (hof); ob die Karte kommt, reicht die Seite an heuteAufbau weiter.
+    // Seit Nr. 53 blendet derselbe Cookie die eine Liste „Zu tun" aus.
     const seite = readFileSync(join(process.cwd(), 'src/app/(hof)/dashboard/page.tsx'), 'utf8')
     expect(seite).toContain('cookieJar.get(ERSTE_SCHRITTE_AUS_COOKIE)?.value')
-    expect(seite).toContain("ersteSchritte: ersteSchritteZeigen === 'karte'")
-    expect(seite).toContain("ersteSchritteZeigen === 'zeile' && (")
+    expect(seite).toContain("zuTun: zuTunZeigen === 'karte'")
+    expect(seite).toContain("zuTunZeigen === 'zeile' && (")
     expect(seite).not.toContain('localStorage')
   })
 })

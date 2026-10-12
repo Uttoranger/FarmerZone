@@ -19,7 +19,7 @@ import { VORSCHAU_KAUF_HINWEIS, korbErlaubt } from '@/lib/hofseite-vorschau'
 import { produktZustand, streifenText, type ProduktZustand } from '@/lib/produkt-sichtbarkeit'
 import { ImShopSchalter } from '@/components/products/im-shop-schalter'
 import { kartenZustand, kategorieAbschnitte, zeigeKaufknopf } from '@/lib/bereiche-anzeige'
-import { mengeAbgelehntText, oeffnetKorbHier, uebersichtProdukte } from '@/lib/hofseite-kunde'
+import { SCHAUFENSTER_PRODUKTE, mengeAbgelehntText, oeffnetKorbHier, stehtNurAmHandy, uebersichtProdukte } from '@/lib/hofseite-kunde'
 import { bereichAusParameter } from '@/schemas/hoefe-filter'
 import type { AnzeigeBereich } from '@/lib/taxonomie'
 import type { PublicProduct } from '@/server/queries/farm'
@@ -47,8 +47,9 @@ type Props = {
   /** Shop pausiert: Kauf-Schaltflächen sind tot (Durchsetzung liegt am Server). */
   isPaused?: boolean
   /**
-   * Wechselt in die Kundenansicht. Kommt von farm-page-client.tsx, wo `mode`
-   * lebt — der Zustand floss bisher nur nach unten, für diesen Knopf braucht es
+   * Wechselt in die Kundenansicht — aus dem Bearbeitungsmodus der Hofseite
+   * (bis Nr. 49 aus farm-page-client.tsx, wo `mode` lebte; seit Nr. 50 ohne
+   * Aufrufer). Der Zustand floss nur nach unten, für diesen Knopf brauchte es
    * den Rückweg.
    */
   onVorschau?: () => void
@@ -77,13 +78,19 @@ type Props = {
    * in der Vorschau des Hofs die Vorschau davon). Ohne Angabe die Produktseite.
    */
   produktLink?: (id: string) => string
+  /**
+   * Platz unter den Produkten, damit die Korb-Leiste unter lg das letzte
+   * nicht verdeckt. Aus im Schaufenster der Übersicht (Register N5): Dort
+   * folgen noch Abholung, Zahlung und Über uns — der Platz stünde mitten auf
+   * der Seite; das Seitenende hält ihn über das Polster von Seite und Shell frei.
+   */
+  platzUnten?: boolean
 }
 
 
 // Produktpreise kommen aus src/lib/format.ts (formatGrundpreis + Grundpreis-
 // Zeile), damit Hofübersicht, Warenkorb und Bauern-Bereich dieselbe Schreib-
-// weise zeigen. Nur die Warenkorb-Summe nutzt noch formatEuro aus
-// preis-format.ts (Altlast, Symbol hinten).
+// weise zeigen. Die Warenkorb-Summe nimmt formatEuro aus derselben Datei.
 
 function SeasonBadge({ start, end }: { start: number; end: number }) {
   const s = MONTH_SHORT[start - 1]
@@ -496,6 +503,7 @@ export function ProductGrid({
   springeZu = null,
   onGesprungen,
   produktLink = (id) => produktPfad(farmSlug, id),
+  platzUnten = true,
 }: Props) {
   const isEditMode = ownerMode && mode !== 'preview'
   // EINE Regel für jeden Weg in den Korb (Kaufknopf, Nachbestell-Link,
@@ -728,9 +736,14 @@ export function ProductGrid({
             }
           />
         ) : teil === 'auswahl' ? (
+          // Das Schaufenster (Register N5): am Handy bis zu vier Zeilen, ab md
+          // eine Reihe aus drei Kacheln, ab lg wie bisher — die Anzahl je
+          // Breite über Klassen (stehtNurAmHandy), nie gemessen.
           <ul className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-2 xl:grid-cols-3">
-            {uebersichtProdukte(displayProducts, isPaused).map((p) => (
-              <li key={p.id}>{karte(p)}</li>
+            {uebersichtProdukte(displayProducts, isPaused, SCHAUFENSTER_PRODUKTE).map((p, i) => (
+              <li key={p.id} className={stehtNurAmHandy(i) ? 'md:hidden' : undefined}>
+                {karte(p)}
+              </li>
             ))}
           </ul>
         ) : (
@@ -854,7 +867,7 @@ export function ProductGrid({
         </button>
       )}
       {/* Platz unter dem Inhalt, damit die Leiste das letzte Produkt nicht verdeckt. */}
-      {korbLeiste && <div aria-hidden="true" className="h-24 lg:hidden" />}
+      {korbLeiste && platzUnten && <div aria-hidden="true" className="h-24 lg:hidden" />}
 
       {/* Cart sheet — in der Vorschau des Hofs gibt es keinen Korb. */}
       {mitKorb && (

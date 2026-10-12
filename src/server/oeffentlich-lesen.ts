@@ -1,6 +1,12 @@
 import * as Sentry from '@sentry/nextjs'
-import { WIEDERHOLUNG_PAUSE_MS, istVerbindungsabbruch, verbindungsUrsache } from '@/lib/verbindungsfehler'
+import {
+  WIEDERHOLUNG_PAUSE_MS,
+  fehleranzeigeMeldungFaellig,
+  istVerbindungsabbruch,
+  verbindungsUrsache,
+} from '@/lib/verbindungsfehler'
 import { bereinigeFehlerText } from '@/lib/upload-diagnose'
+import { ohneAnfrage } from '@/lib/sentry-hygiene'
 
 /*
  * Eine Wiederholung für öffentliche Lesepfade (Nr. 47) — Regel und Erkennung
@@ -69,4 +75,61 @@ export async function leseOeffentlichMitWiederholung<T>(
     if (istVerbindungsabbruch(zweiter)) meldeVerbindungsabbruch(lesepfad, zweiter)
     throw zweiter
   }
+}
+
+// ─── Die Fehleranzeige wird ausgeliefert (Nr. 56) ──────────────────────────
+
+/**
+ * Wann diese Instanz zuletzt gemeldet hat, dass die Fehleranzeige
+ * ausgeliefert wurde, und wie oft seither still. Modul-Zustand: auf Vercel je
+ * warmer Instanz, ein Kaltstart beginnt neu — „je Instanz" ist die Zusage.
+ */
+export type FehleranzeigeMeldungen = { letzteMeldungMs: number | null; unterdrueckt: number }
+
+/** Ein frischer Stand — der Modul-Zustand unten, und für Tests ein eigener je „Instanz". */
+export function neueFehleranzeigeMeldungen(): FehleranzeigeMeldungen {
+  return { letzteMeldungMs: null, unterdrueckt: 0 }
+}
+
+const FEHLERANZEIGEN_DIESER_INSTANZ = neueFehleranzeigeMeldungen()
+
+/** Der feste Satz der Meldung — ohne Personendaten, ohne Suchtext. */
+export const FEHLERANZEIGE_MELDUNG = 'Öffentliche Hofliste: Fehleranzeige ausgeliefert'
+
+/**
+ * Die Seite liefert ihre Fehleranzeige statt der Liste aus: eine Warnung mit
+ * Tag `sichtbar=ja`, höchstens einmal je Instanz und zehn Minuten
+ * (`fehleranzeigeMeldungFaellig`); die nächste nennt, wie oft die Anzeige
+ * dazwischen still kam. Der Fehler selbst geht wie bisher getrennt nach
+ * Sentry — diese Meldung sagt nur, dass ihn eine Kundin zu sehen bekam.
+ *
+ * Ohne Anfrage-Daten und Brotkrumen (`ohneAnfrage`): Die Adresse von /hoefe
+ * trägt den Suchtext (?q=…). Scheitert Sentry, bleibt es still — die
+ * Fehleranzeige steht ohnehin. `jetzt` und `meldungen` geben nur Tests mit.
+ * Gibt zurück, ob eine Meldung fällig war.
+ */
+export function meldeFehleranzeige(
+  bereich: string,
+  jetzt: Date = new Date(),
+  meldungen: FehleranzeigeMeldungen = FEHLERANZEIGEN_DIESER_INSTANZ
+): boolean {
+  if (!fehleranzeigeMeldungFaellig(meldungen.letzteMeldungMs, jetzt.getTime())) {
+    meldungen.unterdrueckt += 1
+    return false
+  }
+  const unterdruecktSeitLetzterMeldung = meldungen.unterdrueckt
+  meldungen.letzteMeldungMs = jetzt.getTime()
+  meldungen.unterdrueckt = 0
+  try {
+    Sentry.captureMessage(FEHLERANZEIGE_MELDUNG, (scope) =>
+      scope
+        .setLevel('warning')
+        .setTags({ bereich, sichtbar: 'ja' })
+        .setExtra('unterdruecktSeitLetzterMeldung', unterdruecktSeitLetzterMeldung)
+        .addEventProcessor(ohneAnfrage)
+    )
+  } catch {
+    // Telemetrie scheitert leise — die Fehleranzeige steht ohnehin.
+  }
+  return true
 }

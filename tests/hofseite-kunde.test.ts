@@ -16,8 +16,15 @@
  *  - Gebührenhinweis (E4) aus der Hofeinstellung über berechneServicegebuehr.
  *  - Der Warenkorb-Anker öffnet den Korb nur auf der eigenen Hofseite.
  *  - Abholzeiten je Wochentag, Montag zuerst.
+ *  - „Über uns" (Nr. 49): EINE Regel für Hofseite und Checkliste — der
+ *    eigene Text ohne Ränder, leer zählt nicht, dann die Kurzbeschreibung.
+ *  - Schaufenster unter lg (Register N5, Nr. 51): bis zu vier Produkte aus
+ *    derselben Auswahl, die vierte nur am Handy, „Alle Produkte (n)" mit der
+ *    Zahl des Reiters; ohne Produkte kein Schaufenster.
  */
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   BRENNMATERIAL_ABSCHNITT_ANKER,
   FUTTER_ABSCHNITT_ANKER,
@@ -27,18 +34,24 @@ import {
   zeigeKaufknopf,
 } from '@/lib/bereiche-anzeige'
 import {
+  SCHAUFENSTER_PRODUKTE,
+  UEBERSICHT_PRODUKTE,
   aktiverReiter,
+  alleProdukteText,
   gebuehrHinweis,
   hofseiteReiter,
   korbBetraege,
   mengeAbgelehntText,
   oeffnetKorbHier,
   reiterAdresse,
+  stehtNurAmHandy,
   stepperObergrenze,
+  ueberUnsText,
   uebersichtProdukte,
   verfuegbarText,
   vorWieLange,
   zahlungsarten,
+  zeigeSchaufenster,
 } from '@/lib/hofseite-kunde'
 import { abholzeitenJeWochentag } from '@/lib/pickup-days'
 import { servicegebuehrSatz } from '@/lib/servicegebuehr'
@@ -136,6 +149,35 @@ describe('uebersichtProdukte — das Schaufenster der Übersicht', () => {
   it('„N verfügbar" zählt, was man in den Korb legen kann — pausiert nichts', () => {
     expect(verfuegbarText([ware('a', 0), ware('b', 3), ware('c', 2)], false)).toBe('2 verfügbar')
     expect(verfuegbarText([ware('b', 3)], true)).toBeNull()
+  })
+})
+
+describe('Schaufenster unter lg (Register N5, Nr. 51)', () => {
+  const ware = (name: string, stock: number) => ({ name, stock, isAvailable: true })
+
+  it('bis zu vier Produkte — die Auswahl bleibt uebersichtProdukte: Kaufbares zuerst, in der Reihenfolge des Hofs', () => {
+    const liste = [ware('a', 0), ware('b', 3), ware('c', 0), ware('d', 9), ware('e', 1), ware('f', 2)]
+    expect(SCHAUFENSTER_PRODUKTE).toBe(4)
+    expect(uebersichtProdukte(liste, false, SCHAUFENSTER_PRODUKTE).map((x) => x.name)).toEqual(['b', 'd', 'e', 'f'])
+    // Reicht das Kaufbare nicht, füllt Ausverkauftes auf — wie bisher.
+    expect(uebersichtProdukte([ware('a', 0), ware('b', 3)], false, SCHAUFENSTER_PRODUKTE).map((x) => x.name)).toEqual(['b', 'a'])
+  })
+
+  it('Anzahl je Breite: am Handy alle vier, ab md die ersten drei — ab lg wie bisher UEBERSICHT_PRODUKTE', () => {
+    expect(UEBERSICHT_PRODUKTE).toBe(3)
+    expect([0, 1, 2, 3].map(stehtNurAmHandy)).toEqual([false, false, false, true])
+  })
+
+  it('„Alle Produkte (n)" nennt dieselbe Zahl wie der Reiter Produkte', () => {
+    expect(alleProdukteText(12)).toBe('Alle Produkte (12)')
+    expect(hofseiteReiter({ produktAnzahl: 12, hatBeitrag: false })[1]?.label).toBe('Produkte · 12')
+  })
+
+  it('ein Schaufenster nur in der Übersicht und nur mit Produkten', () => {
+    expect(zeigeSchaufenster('uebersicht', 3)).toBe(true)
+    expect(zeigeSchaufenster('uebersicht', 0)).toBe(false)
+    expect(zeigeSchaufenster('produkte', 3)).toBe(false)
+    expect(zeigeSchaufenster('beitraege', 3)).toBe(false)
   })
 })
 
@@ -318,5 +360,46 @@ describe('vorWieLange — rechnet vom übergebenen Zeitpunkt, nicht von der Uhr 
     expect(vorWieLange('2026-10-01T23:00:00.000Z', jetzt)).toBe('vor 9 Stunden')
     expect(vorWieLange('2026-10-01T08:00:00.000Z', jetzt)).toBe('vor 1 Tag')
     expect(vorWieLange('2026-09-30T08:00:00.000Z', jetzt)).toBe('vor 2 Tagen')
+  })
+})
+
+describe('ueberUnsText — was Kundinnen unter „Über uns" lesen (Nr. 49)', () => {
+  const beschreibung = 'Gemüse und Eier aus Musterdorf'
+
+  it('ohne eigenen Text (null): die Kurzbeschreibung', () => {
+    expect(ueberUnsText({ aboutText: null, description: beschreibung })).toBe(beschreibung)
+  })
+
+  it('nur Leerzeichen und Umbrüche zählen nicht: die Kurzbeschreibung', () => {
+    expect(ueberUnsText({ aboutText: '   ', description: beschreibung })).toBe(beschreibung)
+    expect(ueberUnsText({ aboutText: ' \n\t ', description: beschreibung })).toBe(beschreibung)
+    expect(ueberUnsText({ aboutText: '', description: beschreibung })).toBe(beschreibung)
+  })
+
+  it('gefüllt: der eigene Text ohne Ränder, Umbrüche darin bleiben', () => {
+    expect(ueberUnsText({ aboutText: '  Seit drei Generationen.\nAlles aus eigener Hand.  ', description: beschreibung })).toBe(
+      'Seit drei Generationen.\nAlles aus eigener Hand.'
+    )
+  })
+
+  it('weder Text noch Kurzbeschreibung: null — dann gibt es nichts zu zeigen', () => {
+    expect(ueberUnsText({ aboutText: null, description: '' })).toBeNull()
+    expect(ueberUnsText({ aboutText: ' ', description: '  ' })).toBeNull()
+    expect(ueberUnsText({ aboutText: null, description: '  Kurz  ' })).toBe('Kurz')
+  })
+
+  it('Hofseite, ihre Metadaten und die Checkliste nehmen dieselbe Funktion — keine eigene Fassung daneben', () => {
+    // Die Metadaten (Suchmaschinen, Teilen-Vorschau) prüft tests/hofseite-metadaten.test.ts auch am Ergebnis.
+    for (const pfad of [
+      'src/components/hofseite/hofseite-kunde.tsx',
+      'src/app/(public)/[farmSlug]/page.tsx',
+      'src/lib/hofseite-fortschritt.ts',
+    ]) {
+      const text = readFileSync(join(process.cwd(), pfad), 'utf8')
+      expect(text, pfad).toContain('ueberUnsText(')
+      expect(text, pfad).not.toMatch(/aboutText\s*\?\?/)
+    }
+    // Gegenprobe: die Suche erkennt die alte Fassung.
+    expect('(farm.aboutText ?? farm.description).trim()').toMatch(/aboutText\s*\?\?/)
   })
 })

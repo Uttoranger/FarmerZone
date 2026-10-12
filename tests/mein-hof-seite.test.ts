@@ -8,7 +8,8 @@
  *    Ungültiges fällt still auf „Hofseite".
  *  - Die Beiträge-Übersicht ordnet Aktiv · Entwürfe · Vergangen, rechnet „vor
  *    …" vom übergebenen Zeitpunkt und sagt, wo ein Beitrag hinging.
- *  - Jede Zeile der Checkliste hat ein Ziel in den bestehenden Einstellungen,
+ *  - Jede Zeile der Liste hat ein Ziel außerhalb von Mein Hof (Einstellungen)
+ *    bzw. Mein Hof selbst (seit Nr. 50 alles aus dem früheren „Mein Auftritt"),
  *    und das Ziel gibt es als Seite.
  *  - /farm-page liegt in der Routengruppe (hof) mit der HofShell; das
  *    Bauern-Layout bleibt bei der Bestandsnavigation (kein Big Bang).
@@ -46,8 +47,9 @@ import type { MeinHofKopfDaten } from '@/server/queries/farm'
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
 describe('Reiter in der Adresse (E12)', () => {
-  it('Hofseite ohne Parameter, Beiträge mit ?reiter=beitraege — beide auf /farm-page', () => {
+  it('Hofseite ohne Parameter, Beiträge mit ?reiter=beitraege — beide auf /farm-page; davor Produkte auf /products (N3)', () => {
     expect(MEIN_HOF_REITER_HOFBEREICH.map((r) => [r.id, r.label, r.href])).toEqual([
+      ['produkte', 'Produkte', '/products'],
       ['hofseite', 'Hofseite', '/farm-page'],
       ['beitraege', 'Beiträge', '/farm-page?reiter=beitraege'],
     ])
@@ -137,13 +139,15 @@ describe('Beiträge-Übersicht', () => {
   })
 })
 
-describe('Checkliste: Ziele in den bestehenden Einstellungen', () => {
-  it('jede Zeile hat ein Ziel, und das Ziel ist eine Seite unter /settings', () => {
+describe('Liste: Ziele in den Einstellungen bzw. in Mein Hof', () => {
+  it('jede Zeile hat ein Ziel, und das Ziel ist eine Seite unter (hof): eine Einstellungsseite oder Mein Hof (Nr. 50)', () => {
     for (const id of hofseiteZeileIdSchema.options) {
       const ziel = EINSTELLUNG_FUER_ZEILE[id]
-      expect(ziel, id).toMatch(/^\/settings\/[a-z-]+$/)
+      expect(ziel, id).toMatch(/^\/settings\/[a-z-]+$|^\/farm-page$/)
       expect(existsSync(join(process.cwd(), `src/app/(hof)${ziel}/page.tsx`)), ziel).toBe(true)
     }
+    // Kein Ziel ist mehr die Umleitung /settings/appearance.
+    expect(Object.values(EINSTELLUNG_FUER_ZEILE)).not.toContain('/settings/appearance')
   })
 
   it('Gegenprobe: ein erfundenes Ziel gibt es nicht', () => {
@@ -181,15 +185,18 @@ describe('/farm-page in der HofShell', () => {
     expect(seite).toMatch(/reiter === 'beitraege'/)
     expect(seite).toContain('<BeitraegeReiter')
     expect(seite).toContain('<HofseiteEditor')
-    expect(seite).toContain('<FarmPageClient')
+    expect(seite).toContain('<AbschnitteListe')
   })
 
   it('die Vorschau ist die echte Hofseite: Rahmen und Kundenansicht nehmen vorschauLink/vorschauAdresse', () => {
     const rahmen = quelle('src/components/farmer/hofseite-vorschau-rahmen.tsx')
     expect(rahmen).toMatch(/<iframe[\s\S]*?src=\{vorschauAdresse\(slug, anfang\)\}/)
     expect(rahmen).not.toMatch(/FarmPageView|HofseiteKunde/)
-    const kunde = quelle('src/components/farmer/farm-page-client.tsx')
-    expect(kunde).toMatch(/<iframe[\s\S]*?src=\{vorschauLink\(farm\.slug\)\}/)
+    // „So sieht’s die Kundin" (Nr. 49): dasselbe iframe für alle Reiter, Adresse über vorschauLink.
+    const kunde = quelle('src/components/mein-hof/mein-hof-ansicht.tsx')
+    expect(kunde).toMatch(/<iframe[\s\S]*?src=\{adresse\}/)
+    expect(kunde).toContain('kundenAnsichtAdresse(slug, reiter)')
+    expect(kunde).not.toMatch(/FarmPageView|HofseiteKunde/)
   })
 })
 
@@ -287,10 +294,12 @@ describe('Tokens statt Farbwerte', () => {
     'src/components/mein-hof/seitenkopf.tsx',
     'src/components/mein-hof/beitraege-reiter.tsx',
     'src/components/mein-hof/beitrag-zeile.tsx',
-    'src/components/mein-hof/checkliste-kompakt.tsx',
+    'src/components/mein-hof/abschnitte-liste.tsx',
+    'src/components/mein-hof/abschnitt-inhalt.tsx',
+    'src/components/mein-hof/abschnitt-formulare.tsx',
+    'src/components/mein-hof/bild-bausteine.tsx',
     'src/components/farmer/hofseite-editor.tsx',
     'src/components/farmer/hofseite-vorschau-rahmen.tsx',
-    'src/components/farmer/farm-page-client.tsx',
     'src/app/(hof)/layout.tsx',
     'src/app/(hof)/farm-page/page.tsx',
     'src/app/(hof)/farm-page/loading.tsx',
@@ -343,8 +352,8 @@ describe('Bestandsteile im Geltungsbereich', () => {
     for (const name of bestand) expect(block, name).toMatch(new RegExp(`${name}: [^;]*var\\(--(fz-|muted)`))
   })
 
-  it('die Hofseite mit Stiften und die Formulare des Editors stehen im Geltungsbereich', () => {
-    expect(quelle('src/components/farmer/farm-page-client.tsx')).toMatch(/<div data-app-palette="neu">\s*<FarmPageView/)
+  it('die Bausteine der Abschnitte stehen im Geltungsbereich — im Editor und im Blatt (das in <body> hängt)', () => {
+    expect(quelle('src/components/mein-hof/abschnitt-inhalt.tsx')).toMatch(/<div data-app-palette="neu">\{inhalt\(\)\}<\/div>/)
     expect(quelle('src/components/farmer/hofseite-editor.tsx')).toContain('data-app-palette="neu"')
   })
 })

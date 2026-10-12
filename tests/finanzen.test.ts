@@ -22,6 +22,10 @@ import {
   kostenImMonat,
   kostenSummeImMonat,
   monateBis,
+  GEZAEHLTE_TOEPFE,
+  TOEPFE_IM_GEWAEHLTEN_MONAT,
+  finanzseiteLaesstTestzahlungenAus,
+  testzahlungenBetroffen,
   topfVonBestellung,
   type BestellungFuerFinanzen,
   type KostenpostenFuerRechnung,
@@ -172,7 +176,7 @@ function bestellung(felder: Partial<BestellungFuerFinanzen> = {}): BestellungFue
 describe('topfVonBestellung', () => {
   it('legt eine bezahlte Online-Bestellung in „eingezogen", egal wie weit der Status ist', () => {
     for (const status of ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY', 'PICKED_UP']) {
-      expect(topfVonBestellung(bestellung({ status }))).toBe('eingezogen')
+      expect(topfVonBestellung(bestellung({ status }), null)).toBe('eingezogen')
     }
   })
 
@@ -186,7 +190,8 @@ describe('topfVonBestellung', () => {
     ] as const) {
       expect(
         topfVonBestellung(
-          bestellung({ paymentMethod, createdAt, paymentStatus: 'PENDING', status: 'PICKED_UP' })
+          bestellung({ paymentMethod, createdAt, paymentStatus: 'PENDING', status: 'PICKED_UP' }),
+          null
         )
       ).toBe('geschuldet')
     }
@@ -195,7 +200,8 @@ describe('topfVonBestellung', () => {
   it('legt eine noch offene Online-Bestellung in „erwartet", nicht in „eingezogen"', () => {
     expect(
       topfVonBestellung(
-        bestellung({ paymentStatus: 'PENDING', status: 'PENDING_CONFIRMATION' })
+        bestellung({ paymentStatus: 'PENDING', status: 'PENDING_CONFIRMATION' }),
+        null
       )
     ).toBe('erwartet')
   })
@@ -208,25 +214,27 @@ describe('topfVonBestellung', () => {
           createdAt: new Date('2027-02-15T10:00:00.000Z'),
           paymentStatus: 'PENDING',
           status: 'READY',
-        })
+        }),
+        null
       )
     ).toBe('erwartet')
   })
 
   it('zählt eine stornierte Bestellung nirgends — auch wenn sie bezahlt war', () => {
-    expect(topfVonBestellung(bestellung({ status: 'CANCELLED' }))).toBe('keiner')
+    expect(topfVonBestellung(bestellung({ status: 'CANCELLED' }), null)).toBe('keiner')
   })
 
   it('zählt eine entfallene Gebühr nirgends', () => {
     expect(
-      topfVonBestellung(bestellung({ serviceFeeRefundedAt: new Date('2026-09-20T08:00:00Z') }))
+      topfVonBestellung(bestellung({ serviceFeeRefundedAt: new Date('2026-09-20T08:00:00Z') }), null)
     ).toBe('keiner')
   })
 
   it('zählt „nicht abgeholt" bei Vor-Ort-Zahlung nirgends — da kommt nichts mehr', () => {
     expect(
       topfVonBestellung(
-        bestellung({ paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', status: 'NOT_PICKED_UP' })
+        bestellung({ paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', status: 'NOT_PICKED_UP' }),
+        null
       )
     ).toBe('keiner')
   })
@@ -235,7 +243,7 @@ describe('topfVonBestellung', () => {
     // Grenzfall mit Absicht: Die Erstattung ist nicht durch (refundedAt null),
     // das Geld liegt also bei der Plattform. Es zu verschweigen wäre falscher.
     expect(
-      topfVonBestellung(bestellung({ status: 'NOT_PICKED_UP', serviceFeeRefundedAt: null }))
+      topfVonBestellung(bestellung({ status: 'NOT_PICKED_UP', serviceFeeRefundedAt: null }), null)
     ).toBe('eingezogen')
   })
 })
@@ -262,7 +270,7 @@ describe('einnahmenImMonat', () => {
       bestellung({ serviceFeeCents: 600, serviceFeeRefundedAt: new Date('2026-09-20T08:00:00Z') }), // nirgends
     ]
 
-    const e = einnahmenImMonat(alle, '2026-09')
+    const e = einnahmenImMonat(alle, '2026-09', null)
 
     expect(e.eingezogenCents).toBe(300)
     expect(e.geschuldetCents).toBe(300)
@@ -275,7 +283,7 @@ describe('einnahmenImMonat', () => {
   it('zählt dasselbe Geld nie in zwei Töpfen', () => {
     // Eine bezahlte Online-Bestellung im Status READY steckt in „eingezogen"
     // und darf nicht zusätzlich als „erwartet" erscheinen.
-    const e = einnahmenImMonat([bestellung({ status: 'READY', serviceFeeCents: 49 })], '2026-09')
+    const e = einnahmenImMonat([bestellung({ status: 'READY', serviceFeeCents: 49 })], '2026-09', null)
     expect(e.eingezogenCents).toBe(49)
     expect(e.erwartetCents).toBe(0)
     expect(e.offeneBestellungen).toBe(0)
@@ -286,7 +294,7 @@ describe('einnahmenImMonat', () => {
       bestellung({ createdAt: new Date('2026-08-15T10:00:00.000Z'), serviceFeeCents: 111 }),
       bestellung({ createdAt: new Date('2026-09-15T10:00:00.000Z'), serviceFeeCents: 222 }),
     ]
-    expect(einnahmenImMonat(alle, '2026-09').eingezogenCents).toBe(222)
+    expect(einnahmenImMonat(alle, '2026-09', null).eingezogenCents).toBe(222)
   })
 
   it('nimmt die Provision nur aus gezählten Bestellungen mit', () => {
@@ -295,11 +303,11 @@ describe('einnahmenImMonat', () => {
       bestellung({ status: 'CANCELLED', serviceFeeCents: 49, provisionCents: 900 }),
       bestellung({ paymentStatus: 'PENDING', status: 'READY', provisionCents: 700 }),
     ]
-    expect(einnahmenImMonat(alle, '2026-09').provisionCents).toBe(100)
+    expect(einnahmenImMonat(alle, '2026-09', null).provisionCents).toBe(100)
   })
 
   it('gibt für einen Monat ohne Bestellung lauter Nullen', () => {
-    const e = einnahmenImMonat([bestellung()], '2026-10')
+    const e = einnahmenImMonat([bestellung()], '2026-10', null)
     expect(e).toMatchObject({
       eingezogenCents: 0,
       geschuldetCents: 0,
@@ -317,8 +325,8 @@ describe('einnahmenImMonat', () => {
         createdAt: new Date('2026-09-30T23:30:00.000Z'),
         serviceFeeCents: 77,
       })
-      expect(einnahmenImMonat([spaet], '2026-09').eingezogenCents).toBe(0)
-      expect(einnahmenImMonat([spaet], '2026-10').eingezogenCents).toBe(77)
+      expect(einnahmenImMonat([spaet], '2026-09', null).eingezogenCents).toBe(0)
+      expect(einnahmenImMonat([spaet], '2026-10', null).eingezogenCents).toBe(77)
     })
 
     it('zählt eine Bestellung am letzten Tag um 21:30 UTC noch in ihren Monat', () => {
@@ -327,8 +335,8 @@ describe('einnahmenImMonat', () => {
         createdAt: new Date('2026-09-30T21:30:00.000Z'),
         serviceFeeCents: 77,
       })
-      expect(einnahmenImMonat([knapp], '2026-09').eingezogenCents).toBe(77)
-      expect(einnahmenImMonat([knapp], '2026-10').eingezogenCents).toBe(0)
+      expect(einnahmenImMonat([knapp], '2026-09', null).eingezogenCents).toBe(77)
+      expect(einnahmenImMonat([knapp], '2026-10', null).eingezogenCents).toBe(0)
     })
 
     it('zählt im Winter genauso, obwohl Wien dann nur eine Stunde vor UTC liegt', () => {
@@ -337,8 +345,8 @@ describe('einnahmenImMonat', () => {
         createdAt: new Date('2026-12-31T23:30:00.000Z'),
         serviceFeeCents: 55,
       })
-      expect(einnahmenImMonat([silvester], '2026-12').eingezogenCents).toBe(0)
-      expect(einnahmenImMonat([silvester], '2027-01').eingezogenCents).toBe(55)
+      expect(einnahmenImMonat([silvester], '2026-12', null).eingezogenCents).toBe(0)
+      expect(einnahmenImMonat([silvester], '2027-01', null).eingezogenCents).toBe(55)
     })
   })
 })
@@ -474,5 +482,128 @@ describe('kostendeckungSatz', () => {
   it('fordert zum Eintragen auf, wenn keine Kosten hinterlegt sind', () => {
     const satz = kostendeckungSatz({ ...basis, brauchtBestellungen: 0 })
     expect(satz).toContain('keine Kosten eingetragen')
+  })
+})
+
+// ─── Testzahlungen (Register Z4, Nr. 55) ─────────────────────────────────────
+
+describe('Testzahlungen — online vor dem Stichtag zählt nicht als Servicegebühr', () => {
+  // Erfundener Stichtag im März 2027 — nach dem SEPA-Start (B1), damit auch
+  // Barbestellungen eine Gebühr tragen und „bar zählt immer" sichtbar wird.
+  const STICHTAG = new Date('2027-03-10T21:00:00+01:00')
+  const DAVOR = new Date(STICHTAG.getTime() - 1)
+  const DANACH = new Date(STICHTAG.getTime() + 1)
+
+  it('legt eine bezahlte Online-Bestellung vor dem Stichtag in keinen Topf, ab dem Stichtag in „eingezogen"', () => {
+    expect(topfVonBestellung(bestellung({ createdAt: DAVOR }), STICHTAG)).toBe('keiner')
+    expect(topfVonBestellung(bestellung({ createdAt: STICHTAG }), STICHTAG)).toBe('eingezogen')
+    expect(topfVonBestellung(bestellung({ createdAt: DANACH }), STICHTAG)).toBe('eingezogen')
+  })
+
+  it('erwartet aus einer offenen Online-Bestellung vor dem Stichtag nichts mehr', () => {
+    expect(
+      topfVonBestellung(bestellung({ createdAt: DAVOR, paymentStatus: 'PENDING', status: 'PENDING_CONFIRMATION' }), STICHTAG)
+    ).toBe('keiner')
+  })
+
+  it('bar und Karte beim Hof vor dem Stichtag bleiben geschuldet — das Geld ist echt', () => {
+    for (const paymentMethod of ['ONSITE_CASH', 'ONSITE_CARD'] as const) {
+      expect(
+        topfVonBestellung(bestellung({ createdAt: DAVOR, paymentMethod, paymentStatus: 'PENDING', status: 'PICKED_UP' }), STICHTAG)
+      ).toBe('geschuldet')
+    }
+  })
+
+  it('zählt die Testzahlungen eines Monats weder als Einnahme noch als Bestellung noch als offen', () => {
+    const maerz = [
+      bestellung({ createdAt: DAVOR, serviceFeeCents: 100, provisionCents: 30 }), // Testzahlung
+      bestellung({ createdAt: DAVOR, paymentStatus: 'PENDING', status: 'READY', serviceFeeCents: 40 }), // Testzahlung, offen
+      bestellung({ createdAt: DANACH, serviceFeeCents: 200, provisionCents: 10 }), // echt online
+      bestellung({ createdAt: DAVOR, paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', status: 'PICKED_UP', serviceFeeCents: 70 }), // echt bar
+    ]
+
+    expect(einnahmenImMonat(maerz, '2027-03', STICHTAG)).toEqual({
+      eingezogenCents: 200,
+      geschuldetCents: 70,
+      erwartetCents: 0,
+      provisionCents: 10,
+      bestellungen: 2,
+      offeneBestellungen: 0,
+      gezaehltCents: 270,
+    })
+  })
+
+  it('betrifft der Stichtag die Bestellungen? Nur, wenn eine Testzahlung sonst gezählt hätte', () => {
+    const alle = TOEPFE_IM_GEWAEHLTEN_MONAT
+    expect(testzahlungenBetroffen([bestellung({ createdAt: DAVOR })], STICHTAG, alle)).toBe(true)
+    expect(testzahlungenBetroffen([bestellung({ createdAt: DAVOR, paymentStatus: 'PENDING', status: 'READY' })], STICHTAG, alle)).toBe(true)
+    // Storniert zählte sie ohnehin nicht; danach ist es keine Testzahlung; bar ist echt.
+    expect(testzahlungenBetroffen([bestellung({ createdAt: DAVOR, status: 'CANCELLED' })], STICHTAG, alle)).toBe(false)
+    expect(testzahlungenBetroffen([bestellung({ createdAt: DANACH })], STICHTAG, alle)).toBe(false)
+    expect(
+      testzahlungenBetroffen(
+        [bestellung({ createdAt: DAVOR, paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', status: 'PICKED_UP' })],
+        STICHTAG,
+        alle
+      )
+    ).toBe(false)
+    expect(testzahlungenBetroffen([bestellung({ createdAt: DAVOR })], null, alle)).toBe(false)
+    expect(testzahlungenBetroffen([], STICHTAG, alle)).toBe(false)
+  })
+
+  it('nur die gezeigten Töpfe zählen: ohne „erwartet" betrifft eine offene Testzahlung nichts', () => {
+    const offen = bestellung({ createdAt: DAVOR, paymentStatus: 'PENDING', status: 'PENDING_CONFIRMATION' })
+    const bezahlt = bestellung({ createdAt: DAVOR, status: 'CONFIRMED' })
+    expect(testzahlungenBetroffen([offen], STICHTAG, GEZAEHLTE_TOEPFE)).toBe(false)
+    expect(testzahlungenBetroffen([bezahlt], STICHTAG, GEZAEHLTE_TOEPFE)).toBe(true)
+    expect(testzahlungenBetroffen([offen], STICHTAG, TOEPFE_IM_GEWAEHLTEN_MONAT)).toBe(true)
+  })
+
+  it('die Töpfe aus einer Quelle (Runde 2): gezaehltCents und bestellungen zählen genau GEZAEHLTE_TOEPFE, der gewählte Monat zeigt dazu „erwartet"', () => {
+    expect([...GEZAEHLTE_TOEPFE]).toEqual(['eingezogen', 'geschuldet'])
+    expect([...TOEPFE_IM_GEWAEHLTEN_MONAT]).toEqual([...GEZAEHLTE_TOEPFE, 'erwartet'])
+    const maerz = [
+      bestellung({ createdAt: DANACH, serviceFeeCents: 200, provisionCents: 10 }), // eingezogen
+      bestellung({ createdAt: DANACH, paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', status: 'PICKED_UP', serviceFeeCents: 70 }), // geschuldet
+      bestellung({ createdAt: DANACH, paymentStatus: 'PENDING', status: 'READY', serviceFeeCents: 40 }), // erwartet
+      bestellung({ createdAt: DANACH, status: 'CANCELLED', serviceFeeCents: 90 }), // keiner
+    ]
+    const gezaehlt = maerz.filter((b) => GEZAEHLTE_TOEPFE.includes(topfVonBestellung(b, null)))
+    const monat = einnahmenImMonat(maerz, '2027-03', null)
+    expect(monat.gezaehltCents).toBe(gezaehlt.reduce((s, b) => s + b.serviceFeeCents, 0))
+    expect(monat.bestellungen).toBe(gezaehlt.length)
+    expect(monat).toMatchObject({ gezaehltCents: 270, bestellungen: 2, provisionCents: 10, erwartetCents: 40, offeneBestellungen: 1 })
+  })
+
+  it('Finanzseite (Runde 2): Vormonate zählen nur eingezogen und geschuldet, der gewählte Monat dazu „erwartet"', () => {
+    const februar = new Date('2027-02-10T10:00:00+01:00')
+    const offenImFebruar = bestellung({ createdAt: februar, paymentStatus: 'PENDING', status: 'PENDING_CONFIRMATION' })
+    const offenImMaerz = bestellung({ createdAt: DAVOR, paymentStatus: 'PENDING', status: 'PENDING_CONFIRMATION' })
+    const bezahltImFebruar = bestellung({ createdAt: februar, status: 'CONFIRMED' })
+
+    // Offen im Vormonat: Verlauf und Schnitt zählen nur Gezähltes — keine Zeile.
+    expect(finanzseiteLaesstTestzahlungenAus([offenImFebruar], '2027-03', STICHTAG)).toBe(false)
+    // Offen im gewählten Monat: „erwartet" steht auf der Seite — Zeile.
+    expect(finanzseiteLaesstTestzahlungenAus([offenImFebruar, offenImMaerz], '2027-03', STICHTAG)).toBe(true)
+    // Bezahlt im Vormonat: fehlt im Verlauf und im Schnitt — Zeile.
+    expect(finanzseiteLaesstTestzahlungenAus([bezahltImFebruar], '2027-03', STICHTAG)).toBe(true)
+    // Wird der Februar gewählt, zeigt er „erwartet" selbst.
+    expect(finanzseiteLaesstTestzahlungenAus([offenImFebruar], '2027-02', STICHTAG)).toBe(true)
+    // Ohne Stichtag nie; storniert zählte ohnehin nicht.
+    expect(finanzseiteLaesstTestzahlungenAus([bezahltImFebruar, offenImMaerz], '2027-03', null)).toBe(false)
+    expect(finanzseiteLaesstTestzahlungenAus([bestellung({ createdAt: DAVOR, status: 'CANCELLED' })], '2027-03', STICHTAG)).toBe(false)
+  })
+
+  it('ohne Stichtag ist das Ergebnis dasselbe wie heute — als gäbe es keine Testzahlung', () => {
+    const maerz = [
+      bestellung({ createdAt: DAVOR, serviceFeeCents: 100, provisionCents: 30 }),
+      bestellung({ createdAt: DAVOR, paymentStatus: 'PENDING', status: 'READY', serviceFeeCents: 40 }),
+      bestellung({ createdAt: DANACH, serviceFeeCents: 200, provisionCents: 10 }),
+      bestellung({ createdAt: DAVOR, paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', status: 'PICKED_UP', serviceFeeCents: 70 }),
+    ]
+    const vorAllen = new Date('2020-01-01T00:00:00Z')
+
+    expect(einnahmenImMonat(maerz, '2027-03', null)).toEqual(einnahmenImMonat(maerz, '2027-03', vorAllen))
+    expect(einnahmenImMonat(maerz, '2027-03', null)).toMatchObject({ eingezogenCents: 300, erwartetCents: 40, bestellungen: 3 })
   })
 })

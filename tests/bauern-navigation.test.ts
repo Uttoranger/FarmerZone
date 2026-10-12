@@ -7,7 +7,14 @@
  *  - Browser: dieselbe Ordnung als Leiste, mit „Produkte" zwischen
  *    Bestellungen und Mein Hof; „Neu" dort mit genau zwei Einträgen.
  *  - „Mein Hof" ist auf Hofseite, Beiträge und den /status-Unterseiten aktiv;
- *    beide Reiter liegen auf /farm-page; Produkte trägt den Kopf nicht mehr.
+ *    Hofseite und Beiträge liegen auf /farm-page; Produkte trägt den Kopf
+ *    nicht, ist aber seit Nr. 49 (Register N3) unter md der erste Reiter —
+ *    EINE Liste (MEIN_HOF_REITER_HOFBEREICH), der Hinweis steht genau dort,
+ *    wo der Reiter fehlt.
+ *  - HofShell am Handy (N3): „Mein Hof" in der Leiste öffnet Produkte und gilt
+ *    auf /products, /farm-page und /status; eigene Aktiv-Regel nur für die
+ *    Leiste (gleich lange Treffer wie „Produkte" der Seitenleiste), das
+ *    Mehr-Blatt ohne Mein Hof und ohne Produkte, die Seitenleiste unverändert.
  *  - Aktiv ist der längste passende Punkt; „Mehr" für alles, was im Blatt liegt.
  *  - „Hilfe und Rückmeldung" ist EIN Punkt nach /meldungen, aktiv auch auf
  *    /fehler-melden; „Meine Meldungen" trägt den Knopf „+ Neue Meldung",
@@ -39,16 +46,20 @@ import {
   fuerNutzer,
   hofAktiverPunkt,
   hofAriaAktuell,
+  hofHandyAktiverPunkt,
+  hofHandyAriaAktuell,
   hofMehrAktiv,
   hofNavigation,
+  PRODUKTE_HREF,
   HOF_NEU_TITEL,
   mehrAktiv,
   elternseite,
   zielNachSpeichern,
-  einstellungsWeg,
   EINSTELLUNG_KONTO,
   EINSTELLUNG_MEIN_AUFTRITT,
   GESPEICHERT_TEXT,
+  HOFSEITE_HREF,
+  HOFSEITE_WEG,
 } from '@/lib/bauern-navigation'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
@@ -132,26 +143,44 @@ describe('Reihenfolge', () => {
 })
 
 describe('Mein Hof', () => {
-  it('Reiter: Hofseite (Standard) · Beiträge, beide auf /farm-page — Produkte ist keiner mehr', () => {
-    expect(MEIN_HOF_REITER_HOFBEREICH.map((r) => [r.label, r.href])).toEqual([
-      ['Hofseite', '/farm-page'],
-      ['Beiträge', BEITRAEGE_HREF],
+  it('Reiter (N3): Produkte (nur unter md) · Hofseite (Standard) · Beiträge — EINE Liste', () => {
+    expect(MEIN_HOF_REITER_HOFBEREICH.map((r) => [r.id, r.label, r.href, r.nurUnterMd === true])).toEqual([
+      ['produkte', 'Produkte', '/products', true],
+      ['hofseite', 'Hofseite', '/farm-page', false],
+      ['beitraege', 'Beiträge', BEITRAEGE_HREF, false],
     ])
-    // Der Punkt „Mein Hof" führt zum ersten Reiter und gilt auch für /status und seine Unterseiten.
-    expect(HAUPT.find((p) => p.id === 'mein-hof')?.href).toBe(MEIN_HOF_REITER_HOFBEREICH[0].href)
+    // Der Punkt „Mein Hof" der Seitenleiste führt zur Hofseite und gilt auch für /status und seine Unterseiten.
+    expect(HAUPT.find((p) => p.id === 'mein-hof')?.href).toBe('/farm-page')
     expect(HAUPT.find((p) => p.id === 'mein-hof')?.auchAktivAuf).toEqual(['/status'])
-    expect(MEIN_HOF_HINWEIS).toContain('Produkte')
+    // Der Reiter „Produkte" ist dieselbe Seite wie der Punkt „Produkte" — keine zweite Adresse.
+    expect(HAUPT.find((p) => p.id === 'produkte')?.href).toBe(PRODUKTE_HREF)
+    expect(PRODUKTE_HREF).toBe('/products')
   })
 
-  it('der Kopf sitzt über beiden Reitern, mit genau ihrem Reiter und parallel geladenen Daten', () => {
+  it('der Hinweis nennt den Platz von Produkte ab md — aus dem Reiter „Produkte", nicht abgeschrieben', () => {
+    const produkte = MEIN_HOF_REITER_HOFBEREICH.find((r) => r.id === 'produkte')
+    expect(produkte?.nurUnterMd).toBe(true)
+    expect(MEIN_HOF_HINWEIS).toBe('Produkte verwaltest du links unter „Produkte“.')
+    expect(MEIN_HOF_HINWEIS).toContain(`„${produkte?.label}“`)
+  })
+
+  it('der Kopf sitzt über Hofseite und Beiträge, mit genau ihrem Reiter und parallel geladenen Daten', () => {
     // /status trägt seit Nr. 22e keinen Kopf mehr — es leitet in den Reiter um.
     expect(quelle(hofSeite('/status'))).toContain('redirect(BEITRAEGE_HREF)')
     const meinHof = quelle(hofSeite('/farm-page'))
-    for (const reiter of MEIN_HOF_REITER_HOFBEREICH) {
+    const aufFarmPage = MEIN_HOF_REITER_HOFBEREICH.filter((r) => r.id !== 'produkte')
+    // Gegenprobe: genau die beiden Reiter auf /farm-page.
+    expect(aufFarmPage.map((r) => r.id)).toEqual(['hofseite', 'beitraege'])
+    for (const reiter of aufFarmPage) {
       expect(reiter.href.split('?')[0]).toBe('/farm-page')
       expect(meinHof, reiter.id).toMatch(new RegExp(`<MeinHofSeitenkopf[^>]*aktiv="${reiter.id}"`))
     }
     expect(meinHof).toContain('getMeinHofKopf(session.user.id)')
+  })
+
+  it('Produkte trägt die Reiterleiste als ersten Reiter — nur unter md, ab md bleibt die Seite, wie sie war', () => {
+    const seite = quelle('src/app/(hof)/products/page.tsx')
+    expect(seite).toMatch(/<MeinHofReiterLeiste[^>]*aktiv="produkte"[^>]*nurUnterMd/)
   })
 
   it('Produkte trägt den Kopf nicht, sondern eine eigene Überschrift', () => {
@@ -161,11 +190,16 @@ describe('Mein Hof', () => {
     expect(seite).toMatch(/<h1[^>]*>Produkte<\/h1>/)
   })
 
-  it('die Reiterleiste trägt den Hinweis und keine Produktzahl', () => {
-    const kopf = quelle('src/components/mein-hof/seitenkopf.tsx')
-    const nav = kopf.slice(kopf.indexOf('<nav aria-label="Mein Hof"'), kopf.indexOf('</nav>'))
+  it('die Reiterleiste ist EIN Baustein mit dem Hinweis und ohne Produktzahl; der Kopf nimmt ihn', () => {
+    const leiste = quelle('src/components/mein-hof/reiter-leiste.tsx')
+    const nav = leiste.slice(leiste.indexOf('<nav'), leiste.indexOf('</nav>'))
     expect(nav).toContain('{MEIN_HOF_HINWEIS}')
+    expect(nav).toContain('MEIN_HOF_REITER_HOFBEREICH.map(')
     expect(nav).not.toContain('produktZahl')
+    const kopf = quelle('src/components/mein-hof/seitenkopf.tsx')
+    expect(kopf).toContain('<MeinHofReiterLeiste')
+    // Keine zweite Reiterleiste im Kopf.
+    expect(kopf).not.toContain('MEIN_HOF_REITER_HOFBEREICH.map(')
   })
 
   it('Unterseiten von /status (z. B. „Neuer Beitrag") bekommen den Kopf nicht', () => {
@@ -361,20 +395,28 @@ describe('HofShell: Seitenleiste', () => {
 })
 
 describe('HofShell: Handy', () => {
-  it('Unterleiste: Heute · Bestellungen · Plus · Produkte · Mehr', () => {
+  it('Unterleiste (N3): Heute · Bestellungen · Plus · Mein Hof · Mehr', () => {
     const leiste = hofNavigation({ isAdmin: false }).handyLeiste
     expect(leiste.map((p) => (p.art === 'punkt' ? p.punkt.label : p.art))).toEqual([
       'Heute',
       'Bestellungen',
       'neu',
-      'Produkte',
+      'Mein Hof',
       'mehr',
     ])
   })
 
-  it('„Mehr": Mein Hof, Kunden, Verkäufe, Auswertung, Region, Einstellungen, Hilfe und Rückmeldung, Admin', () => {
+  it('„Mein Hof" in der Leiste öffnet Produkte — der Vorrat bleibt ein Tipp — und gilt für alle drei Reiter', () => {
+    const leiste = hofNavigation({ isAdmin: false }).handyLeiste
+    const meinHof = leiste.flatMap((p) => (p.art === 'punkt' && p.punkt.id === 'mein-hof' ? [p.punkt] : []))[0]
+    expect(meinHof?.href).toBe(PRODUKTE_HREF)
+    expect(meinHof?.auchAktivAuf).toEqual(['/farm-page', '/status'])
+    // Ein eigener Punkt: In der Seitenleiste führt „Mein Hof" weiter zur Hofseite.
+    expect(HAUPT.find((p) => p.id === 'mein-hof')?.href).toBe('/farm-page')
+  })
+
+  it('„Mehr" (N3): Kunden, Verkäufe, Auswertung, Region, Einstellungen, Hilfe und Rückmeldung, Admin — ohne Mein Hof und ohne Produkte', () => {
     expect(hofNavigation({ isAdmin: true }).mehr.map((p) => p.label)).toEqual([
-      'Mein Hof',
       'Kunden',
       'Verkäufe',
       'Auswertung',
@@ -383,20 +425,45 @@ describe('HofShell: Handy', () => {
       'Hilfe und Rückmeldung',
       'Admin',
     ])
+    const ziele = hofNavigation({ isAdmin: true }).mehr.map((p) => p.href)
+    expect(ziele).not.toContain('/products')
+    expect(ziele).not.toContain('/farm-page')
     expect(hofNavigation({ isAdmin: false }).mehr.map((p) => p.id)).not.toContain('admin')
   })
 
-  it('Web und Handy bekommen dieselben Einträge — jeder Punkt der Seitenleiste steckt in Leiste oder „Mehr", als derselbe Eintrag', () => {
+  it('Web und Handy haben dieselben Ziele — keins nur am Handy, keins doppelt; die Hofseite ist am Handy der Reiter von „Mein Hof"', () => {
+    const hofseite = MEIN_HOF_REITER_HOFBEREICH.find((r) => r.id === 'hofseite')?.href
+    // Der Reiter „Hofseite" ist genau das Ziel von „Mein Hof" in der Seitenleiste.
+    expect(hofseite).toBe(HAUPT.find((p) => p.id === 'mein-hof')?.href)
     for (const isAdmin of [false, true]) {
       const nav = hofNavigation({ isAdmin })
       const web = [...nav.haupt, ...nav.verkaufUndKunden, ...nav.unten]
-      const handy = [
-        ...nav.handyLeiste.flatMap((p) => (p.art === 'punkt' ? [p.punkt] : [])),
-        ...nav.mehr,
-      ]
-      expect(handy.map((p) => p.id).sort()).toEqual(web.map((p) => p.id).sort())
-      for (const punkt of handy) expect(web).toContainEqual(punkt)
+      const leiste = nav.handyLeiste.flatMap((p) => (p.art === 'punkt' ? [p.punkt] : []))
+      const handy = [...leiste, ...nav.mehr]
+      const webZiele = web.map((p) => p.href)
+      const handyZiele = handy.map((p) => p.href)
+      // Kein Eintrag doppelt — weder als Punkt noch als Ziel, auf keiner Seite.
+      expect(new Set(webZiele).size, 'Seitenleiste').toBe(webZiele.length)
+      expect(new Set(handyZiele).size, 'Leiste und Mehr-Blatt').toBe(handyZiele.length)
+      expect(new Set(handy.map((p) => p.id)).size).toBe(handy.length)
+      // Dieselbe Menge an Zielen. Einzige, benannte Ausnahme (N3): „Mein Hof" der
+      // Leiste öffnet Produkte, die Hofseite liegt dort im Reiter. Kein Ziel steht nur am Handy.
+      expect(new Set([...handyZiele, hofseite])).toEqual(new Set(webZiele))
+      expect(webZiele.filter((ziel) => !handyZiele.includes(ziel))).toEqual([hofseite])
+      expect(handyZiele.filter((ziel) => !webZiele.includes(ziel))).toEqual([])
+      // Die Punkte des Mehr-Blatts sind dieselben Einträge wie in der Seitenleiste.
+      for (const punkt of nav.mehr) expect(web).toContainEqual(punkt)
     }
+  })
+
+  it('Gegenprobe: ein Ziel nur am Handy oder ein doppelter Eintrag fiele auf', () => {
+    const nav = hofNavigation({ isAdmin: false })
+    const webZiele = [...nav.haupt, ...nav.verkaufUndKunden, ...nav.unten].map((p) => p.href)
+    const handyZiele = [...nav.handyLeiste.flatMap((p) => (p.art === 'punkt' ? [p.punkt] : [])), ...nav.mehr].map((p) => p.href)
+    const nurHandy = [...handyZiele, '/nur-am-handy']
+    expect(nurHandy.filter((ziel) => !webZiele.includes(ziel))).toEqual(['/nur-am-handy'])
+    const doppelt = [...handyZiele, handyZiele[0]]
+    expect(new Set(doppelt).size).not.toBe(doppelt.length)
   })
 })
 
@@ -415,13 +482,79 @@ describe('HofShell: aktive Punkte', () => {
     expect(hofAktiverPunkt(pfad)).toBe(id)
   })
 
-  it('„Mehr" leuchtet für alles im Mehr-Blatt, nicht für die Leiste', () => {
-    for (const pfad of ['/farm-page', '/status', '/customers', '/region', '/settings', '/meldungen']) {
+  it('„Mehr" leuchtet für alles im Mehr-Blatt, nicht für die Leiste — Mein Hof und Produkte gehören seit N3 zur Leiste', () => {
+    for (const pfad of ['/customers', '/customers/abc', '/region', '/settings', '/settings/profile', '/meldungen', '/analytics/umfeld', '/admin']) {
       expect(hofMehrAktiv(pfad), pfad).toBe(true)
     }
-    for (const pfad of ['/dashboard', '/orders', '/products', '/onboarding']) {
+    for (const pfad of ['/dashboard', '/orders', '/products', '/farm-page', '/status', '/status/new', '/onboarding']) {
       expect(hofMehrAktiv(pfad), pfad).toBe(false)
     }
+  })
+
+  it.each([
+    ['/dashboard', 'heute'],
+    ['/orders/abc', 'bestellungen'],
+    ['/products', 'mein-hof'],
+    ['/farm-page', 'mein-hof'],
+    ['/status', 'mein-hof'],
+    ['/status/new', 'mein-hof'],
+    ['/status/xyz/send-whatsapp', 'mein-hof'],
+    ['/customers', 'kunden'],
+    ['/region', 'region'],
+    ['/settings/teilen', 'einstellungen'],
+  ])('Handy: %s → %s (eigene Regel der Leiste)', (pfad, id) => {
+    expect(hofHandyAktiverPunkt(pfad)).toBe(id)
+  })
+
+  it('Handy: kein Treffer über ein Namenspräfix hinweg und keiner ohne Punkt', () => {
+    expect(hofHandyAktiverPunkt('/productsx')).toBeNull()
+    expect(hofHandyAktiverPunkt('/farm-pages')).toBeNull()
+    expect(hofHandyAktiverPunkt('/onboarding')).toBeNull()
+  })
+
+  it('Aktiv-Zustand bei gleicher Länge: /products trifft „Produkte" der Seitenleiste und „Mein Hof" der Leiste mit demselben Ziel — jede Liste entscheidet für sich', () => {
+    const nav = hofNavigation({ isAdmin: false })
+    const produkte = nav.haupt.find((p) => p.id === 'produkte')
+    const meinHofSeitenleiste = nav.haupt.find((p) => p.id === 'mein-hof')
+    const meinHofLeiste = nav.handyLeiste.flatMap((p) => (p.art === 'punkt' && p.punkt.id === 'mein-hof' ? [p.punkt] : []))[0]
+    // Gegenprobe: beide Punkte haben wirklich dasselbe Ziel, also gleich lange Treffer.
+    expect(produkte?.href).toBe(meinHofLeiste?.href)
+    // Seitenleiste unverändert: Produkte ist die Seite, Mein Hof nicht.
+    expect(produkte && hofAriaAktuell('/products', produkte)).toBe('page')
+    expect(meinHofSeitenleiste && hofAriaAktuell('/products', meinHofSeitenleiste)).toBeUndefined()
+    expect(hofAktiverPunkt('/products')).toBe('produkte')
+    // Leiste: Mein Hof ist die Seite; „Produkte" gibt es am Handy nicht als Punkt.
+    expect(meinHofLeiste && hofHandyAriaAktuell('/products', meinHofLeiste)).toBe('page')
+    for (const pfad of ['/products', '/farm-page', '/status/new', '/dashboard', '/customers']) {
+      expect(hofHandyAktiverPunkt(pfad), pfad).not.toBe('produkte')
+    }
+  })
+
+  it("Leiste: 'page' auf /products, 'true' auf den Reitern der Hofseite und den Unterseiten von /status", () => {
+    const meinHofLeiste = hofNavigation({ isAdmin: false }).handyLeiste.flatMap((p) =>
+      p.art === 'punkt' && p.punkt.id === 'mein-hof' ? [p.punkt] : []
+    )[0]
+    expect(meinHofLeiste).toBeDefined()
+    if (!meinHofLeiste) return
+    expect(hofHandyAriaAktuell('/products', meinHofLeiste)).toBe('page')
+    expect(hofHandyAriaAktuell('/farm-page', meinHofLeiste)).toBe('true')
+    expect(hofHandyAriaAktuell('/status/new', meinHofLeiste)).toBe('true')
+    expect(hofHandyAriaAktuell('/dashboard', meinHofLeiste)).toBeUndefined()
+  })
+
+  it('die Seitenleiste bleibt, wie sie war: Produkte und Mein Hof getrennt, Mein Hof auf /farm-page und /status', () => {
+    const nav = hofNavigation({ isAdmin: false })
+    expect(nav.haupt.map((p) => [p.id, p.href])).toEqual([
+      ['heute', '/dashboard'],
+      ['bestellungen', '/orders'],
+      ['produkte', '/products'],
+      ['mein-hof', '/farm-page'],
+    ])
+    expect(hofAktiverPunkt('/farm-page')).toBe('mein-hof')
+    expect(hofAktiverPunkt('/status/new')).toBe('mein-hof')
+    const meinHof = nav.haupt.find((p) => p.id === 'mein-hof')
+    expect(meinHof && hofAriaAktuell('/farm-page', meinHof)).toBe('page')
+    expect(meinHof && hofAriaAktuell('/status/new', meinHof)).toBe('true')
   })
 
   it("aria-current: 'page' auf der Zielseite, 'true' auf Unterseiten", () => {
@@ -555,9 +688,20 @@ describe('zielNachSpeichern — Einstellungs-Unterseiten führen zur Übersicht 
 
 describe('Einstellungs-Unterseiten mit Namen außerhalb der Übersicht', () => {
   it('Mein Auftritt und Konto und Sicherheit: Name und Ziel an einer Stelle, das Ziel ist eine echte Seite', () => {
-    expect(EINSTELLUNG_MEIN_AUFTRITT).toEqual({ label: 'Mein Auftritt', href: '/settings/appearance' })
+    // Seit Nr. 50 (Register N4) führt „Mein Auftritt" in Mein Hof, Reiter Hofseite.
+    expect(EINSTELLUNG_MEIN_AUFTRITT).toEqual({ label: 'Mein Auftritt', href: '/farm-page' })
     expect(EINSTELLUNG_KONTO).toEqual({ label: 'Konto und Sicherheit', href: '/settings/account' })
     for (const ziel of [EINSTELLUNG_MEIN_AUFTRITT, EINSTELLUNG_KONTO]) expect(hofSeite(ziel.href)).toContain('(hof)')
-    expect(einstellungsWeg(EINSTELLUNG_MEIN_AUFTRITT)).toBe('Einstellungen → Mein Auftritt')
+  })
+
+  it('die Adresse der Hofseite gibt es einmal: Reiter, Punkt „Mein Hof" und Mein Auftritt nehmen sie', () => {
+    expect(HOFSEITE_HREF).toBe('/farm-page')
+    expect(MEIN_HOF_REITER_HOFBEREICH.find((r) => r.id === 'hofseite')?.href).toBe(HOFSEITE_HREF)
+    expect(EINSTELLUNG_MEIN_AUFTRITT.href).toBe(HOFSEITE_HREF)
+    expect(quelle('src/lib/bauern-navigation.ts').match(/'\/farm-page'/g) ?? []).toHaveLength(0)
+  })
+
+  it('der Weg in Worten für das Hof-Profil: „Mein Hof → Hofseite" aus den Namen von Punkt und Reiter', () => {
+    expect(HOFSEITE_WEG).toBe('Mein Hof → Hofseite')
   })
 })

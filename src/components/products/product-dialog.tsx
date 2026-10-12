@@ -96,6 +96,9 @@ import {
   formatBestand,
 } from '@/lib/format'
 import { KategorieSheet } from './kategorie-sheet'
+import { LebensmittelVorschau } from './lebensmittel-vorschau'
+import { produktBereich } from '@/lib/produkte-hof'
+import { KAEUFER_VORSCHAU } from '@/lib/hofseite-kunde'
 import type { NeuBereich } from '@/schemas/url-auftrag'
 import { FUTTER_ANLEGEN_HREF } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
@@ -104,6 +107,7 @@ import {
   FUTTER_BESTAETIGUNG_NEU,
   FUTTER_BESTAETIGUNG_TEXT,
   KENNZEICHNUNG_ERKLAERUNG,
+  KENNZEICHNUNG_FELDHINWEIS,
   KENNZEICHNUNG_FUNDORT,
   KENNZEICHNUNG_LOESCHEN_TITEL,
   KENNZEICHNUNG_VERWEIS,
@@ -112,6 +116,7 @@ import {
 } from '@/lib/futter-registrierung'
 import {
   gewichtFrage,
+  gueltigerPreis,
   inhaltZeile,
   kundenVorschau,
   nettoAutomatisch,
@@ -297,8 +302,12 @@ function zusammenfassung(abschnitt: Abschnitt, w: ProductFormData): string {
     case 'grunddaten':
       return w.category ? formatKategorie(w.category, w.subcategory) : 'Noch keine Kategorie'
     case 'preis': {
-      const preis = Number.isFinite(w.price) ? w.price : 0
-      const teile = [formatGrundpreis(preis, w.unit, w.unitSize), `${Number.isFinite(w.stock) ? w.stock : 0} auf Lager`]
+      // Ohne gültigen Preis derselbe ruhige Satz wie die Käufer-Vorschau statt „€ 0,00" (Nr. 51).
+      const preis = gueltigerPreis(w.price)
+      const teile = [
+        preis === null ? KAEUFER_VORSCHAU.preisFehlt : formatGrundpreis(preis, w.unit, w.unitSize),
+        `${Number.isFinite(w.stock) ? w.stock : 0} auf Lager`,
+      ]
       if (!w.isAvailable) teile.push(NICHT_IM_SHOP_IM_SATZ)
       return teile.join(' · ')
     }
@@ -1161,7 +1170,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                                   />
                                 </div>
                                 <FormDescription className="text-xs">
-                                  Durchschnittsgewicht, wie auf dem Sackanhänger oder Lieferschein.
+                                  {KENNZEICHNUNG_FELDHINWEIS.gewicht}
                                 </FormDescription>
                                 <FormMessage />
                               </FormItem>
@@ -1638,7 +1647,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                                   <FormDescription className="text-xs">
                                     {field.value
                                       ? FUTTERMITTELART_ERKLAERUNG[field.value]
-                                      : 'Steht auf dem Sackanhänger, meist direkt über der Zusammensetzung.'}
+                                      : KENNZEICHNUNG_FELDHINWEIS.futtermittelart}
                                   </FormDescription>
                                 </>
                               )}
@@ -1682,7 +1691,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                                 })}
                               </div>
                               <FormDescription className="text-xs">
-                                Steht als „Alleinfuttermittel für …" oder „Ergänzungsfuttermittel für …" auf dem Anhänger.
+                                {KENNZEICHNUNG_FELDHINWEIS.tierarten}
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
@@ -1704,7 +1713,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                                 />
                               </FormControl>
                               <FormDescription className="text-xs">
-                                Steht auf dem Sackanhänger. Bei Mischfutter die Einzelfuttermittel in absteigender Reihenfolge.
+                                {KENNZEICHNUNG_FELDHINWEIS.zusammensetzung}
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
@@ -1726,7 +1735,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                                 />
                               </FormControl>
                               <FormDescription className="text-xs">
-                                Steht auf dem Sackanhänger unter „Analytische Bestandteile" (Rohprotein, Rohfaser, Rohfett, Rohasche …).
+                                {KENNZEICHNUNG_FELDHINWEIS.analytischeBestandteile}
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
@@ -1880,6 +1889,22 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                   </AccordionItem>
                 )}
               </Accordion>
+
+              {/* „So sehen Käufer dein Produkt" (Nr. 51): nur für Lebensmittel —
+                  Futter und Brennmaterial haben ihre eigene Vorschau im eigenen
+                  Formular. Der Bereich kommt aus derselben Regel wie die Filter
+                  auf /products (produktBereich). Live aus dem Formular; gerechnet
+                  wird nichts, die Karte formatiert selbst. */}
+              {produktBereich(category) === 'lebensmittel' && (
+                <LebensmittelVorschau
+                  name={werte.name}
+                  price={werte.price}
+                  unit={werte.unit}
+                  unitSize={werte.unitSize}
+                  foto={previewUrl}
+                  kategorie={category}
+                />
+              )}
             </div>
 
             {/* Fuß: fest am unteren Rand als eigene Flex-Zone — kein sticky, keine

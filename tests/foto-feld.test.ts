@@ -96,14 +96,18 @@ describe('Verdrahtung in den Bauteilen', () => {
   })
 
   it('hängt die Galerie nach einem neuen Foto nicht neu auf', () => {
-    // Der key-Wechsel baute GallerySection nach JEDEM hinzugefügten Foto neu
+    // Der key-Wechsel baute die Galerie nach JEDEM hinzugefügten Foto neu
     // auf — mitten in einer Serie, deren restliche Fotos noch am ausgehängten
-    // Feld hingen. Die Reihenfolge stellt der Effekt auf farm.farmPhotos
-    // richtig; ein Neuaufbau ist dafür nicht nötig.
-    const text = quelltext('src/components/farm/farm-page-view.tsx')
-
-    expect(text).not.toContain('key={`gallery-')
-    expect(text).not.toContain('onPhotoAdded')
+    // Feld hingen. Seit Nr. 50 Runde 1 gibt es nur noch die Galerie von Mein
+    // Hof (bild-bausteine.tsx, eingehängt in abschnitt-inhalt.tsx); sie hält
+    // ihre Fotos selbst und hängt nach einem Foto nicht neu ein.
+    for (const pfad of ['src/components/mein-hof/bild-bausteine.tsx', 'src/components/mein-hof/abschnitt-inhalt.tsx']) {
+      const text = quelltext(pfad)
+      expect(text, pfad).not.toMatch(/key=\{`gallery-|<GallerySection[^>]*\bkey=/)
+      expect(text, pfad).not.toContain('onPhotoAdded')
+    }
+    // Gegenprobe: Die Suche erkennt den alten Neuaufbau.
+    expect('<GallerySection key={photos.length} initialPhotos={fotos} />').toMatch(/<GallerySection[^>]*\bkey=/)
   })
 
   it('lässt die Datei-Felder der Meldung stehen, auch wenn ein Bildschirmfoto ankommt', () => {

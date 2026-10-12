@@ -12,7 +12,7 @@ import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { wienerZeitpunkt } from '@/lib/fristen'
 import { formatSlotTime } from '@/lib/pickup-days'
 import { hofZustand } from '@/lib/mein-hof'
-import { summeCent, type UmsatzBuchung } from '@/lib/umsatz'
+import { summeCent, UMSATZ_TEXT, type UmsatzBuchung } from '@/lib/umsatz'
 import { onlineZahlungPausiert } from '@/lib/stripe-konto'
 
 // ─── Tage ───────────────────────────────────────────────────────────────────
@@ -410,13 +410,14 @@ export const HEUTE_ABHOLEN = 'Heute abholen'
  * „€ 178" — die Zahl zählt nur offene Abholungen, der Betrag dagegen die
  * heute abgeholten Bestellungen UND die Direktverkäufe (Hofladen, Markt …,
  * umsatzHeuteCent). Jetzt sagt jede Kennzahl, was sie zählt; der Zusatz steht
- * unter dem Betrag.
+ * unter dem Betrag — dasselbe Wort wie die Umsatzkarte der Auswertung
+ * (UMSATZ_TEXT, Nr. 53).
  */
 export const KENNZAHL_TEXT = {
   abholen: HEUTE_ABHOLEN,
   packen: 'Noch zu packen',
   eingenommen: 'Heute eingenommen',
-  eingenommenMit: 'mit Hofladen',
+  eingenommenMit: UMSATZ_TEXT.mitHofladenKlein,
 } as const
 
 /** Der Leerzustand der Packliste — auch der des Filters „Heute abholen" in Bestellungen. */
@@ -617,15 +618,7 @@ export function teilenSatz(angebot: readonly string[], fenster: NaechstesFenster
 
 // ─── Aufbau ─────────────────────────────────────────────────────────────────
 
-export type HeuteBlock =
-  | 'stripe'
-  | 'packliste'
-  | 'teilen'
-  | 'braucht-dich'
-  | 'erste-schritte'
-  | 'naechste-abholung'
-  | 'woche'
-  | 'hofseite'
+export type HeuteBlock = 'stripe' | 'packliste' | 'teilen' | 'braucht-dich' | 'zu-tun' | 'naechste-abholung' | 'woche'
 
 /**
  * Welche Blöcke wo stehen (freigabe.md §12 Nr. 45). Oben höchstens EIN Kasten
@@ -636,21 +629,22 @@ export type HeuteBlock =
  * Runde 1). Die Hauptspalte beginnt immer mit der Packliste (Gate 5:
  * „Packliste zuerst"), direkt darunter die kompakte Teilen-Zeile — nur bei
  * sichtbarem Hof (heuteHofSichtbar) —, dann „Braucht dich". Die Seitenspalte
- * steht am Handy unter der Hauptspalte.
+ * steht am Handy unter der Hauptspalte und beginnt mit „Zu tun" (Nr. 53):
+ * EINE Liste statt „Erste Schritte" oben und „Deine Hofseite" unten — direkt
+ * nach „Braucht dich", was noch einzurichten ist, danach die Zahlen.
  */
 export function heuteAufbau({
   stripeHinweis,
   teilen,
-  ersteSchritte,
+  zuTun,
 }: {
   stripeHinweis: boolean
   teilen: boolean
-  ersteSchritte: boolean
+  zuTun: boolean
 }): { oben: HeuteBlock[]; haupt: HeuteBlock[]; seite: HeuteBlock[] } {
   const oben: HeuteBlock[] = stripeHinweis ? ['stripe'] : []
   const haupt: HeuteBlock[] = teilen ? ['packliste', 'teilen', 'braucht-dich'] : ['packliste', 'braucht-dich']
-  const seite: HeuteBlock[] = ersteSchritte ? ['erste-schritte'] : []
-  seite.push('naechste-abholung', 'woche', 'hofseite')
+  const seite: HeuteBlock[] = zuTun ? ['zu-tun', 'naechste-abholung', 'woche'] : ['naechste-abholung', 'woche']
   return { oben, haupt, seite }
 }
 

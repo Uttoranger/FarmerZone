@@ -125,7 +125,7 @@ pnpm test:integration                        # Integration (braucht .env.test)
 | Jede Zod-Schema-Datei | `register-schema.test.ts` |
 | Jeder Geldweg | `checkout-totals.test.ts`, `servicegebuehr-checkout.test.ts` |
 | Jede Berechtigungsentscheidung | `farm-approval.test.ts`, `bestellverfolgung-zugang.test.ts` |
-| Jeder Token-/Signaturweg | `geheimnis.test.ts` |
+| Jeder Token-/Signaturweg — ein „Token nur hier"-Test zählt die Stellen im Syntaxbaum von TypeScript (kein Regex-Kommentarfilter: der hielt `//host` für einen Kommentar), mit einer Gegenprobe je Leckweg, auch für Wege ohne den Namen des Tokens (`document.URL`) | `geheimnis.test.ts`, `alte-seiten-neues-design.test.ts` |
 | Jeder behobene Bug | ein Test, der ihn vorher gefangen hätte |
 | Jede Migration gegen das Deploy-Fenster | `migrationen-wache.test.ts` |
 | Jede Architektur-Regel, die sich am Quelltext prüfen lässt (wer was einbindet, wo ein Parameter gelesen wird) — mit Gegenprobe, dass die Suche anschlägt | `hofseite-einmal.test.ts`, `design-tokens.test.ts` |
@@ -161,6 +161,7 @@ Alles, was Netz, DB oder Request-Kontext braucht.
 **Dynamische Importe greifen genauso** — `vi.mock('@/lib/email')` gilt auch für `await import('@/lib/email')` (ARCHITECTURE §4 „Schwere Module nur dynamisch"). Nur der Zeitpunkt verschiebt sich: Ein Nachlauf (`nachDerAntwort`) ruft die Versandfunktion erst, nachdem der Import aufgelöst ist — also nach dem Ende der Action. Deshalb:
 - „Mail ging raus": `await vi.waitFor(() => expect(sendX).toHaveBeenCalledWith(…))`.
 - „Keine Mail": vorher `await vi.dynamicImportSettled()` — sonst ist „nicht aufgerufen" nur zu früh geprüft und immer wahr.
+- Liest der Nachlauf vor dem Versand noch aus der Datenbank (Integrationsschicht), reicht `vi.waitFor` mit seiner Grenze unter Last nicht sicher: Der Test sammelt den Nachlauf (`vi.mock('@/lib/nach-der-antwort')` mit einer Liste), prüft „noch keine Mail" und arbeitet ihn dann selbst ab — ohne Pause und ohne Zeitgrenze, und zugleich der Beweis, dass die Mail nicht im Antwortpfad liegt (Vorbild `tests/integration/bargebuehr.int.test.ts`, seit Nr. 56; `anmeldecode.int.test.ts`).
 
 **`@/lib/stripe` ist ein Stellvertreter (seit Nr. 42):** Der Client entsteht erst beim ersten Gebrauch (Modus-Wache, Register Z2). Wer Stripe-Wege prüft, mockt weiter `@/lib/stripe` mit `{ stripe: { … } }` — daran ändert sich nichts. Wer die Wache selbst prüft, mockt das Paket `stripe` (eine Attrappe, die ihre Konstruktor-Aufrufe zählt) und lädt `@/lib/stripe` je Fall frisch: `vi.resetModules()` plus `vi.doMock('@/lib/umgebung-server' …)`/`vi.doMock('@/lib/env' …)` mit den Werten des Falls, denn Client und „schon gemeldet“ leben auf Modulebene (Vorbild `tests/stripe-client-wache.test.ts`). Die Umgebung dafür entsteht aus `bestimmeUmgebung(werte)` — so wie im Betrieb, mit `vercelProduktion` —, nicht als handgebautes `{ art, stripe }`. Eine gesperrte Wache an einem gemockten Client spielt ein Getter auf der Eigenschaft nach, der einen Fehler mit dem Namen `MODUS_SPERRE` wirft (Vorbild `tests/webhook.test.ts`). Stripe-Fehler in Tests baut das SDK selbst, ohne Netz: `new Stripe.errors.StripeInvalidRequestError({ code: 'resource_missing', … })`.
 
@@ -188,6 +189,7 @@ steht:
   Stripe-Aufruf, dazu: keine Bestellung und unveränderter Bestand.
 
 Der Nachlauf läuft außerhalb des Requests (`src/lib/nach-der-antwort.ts`), also
+gesammelt und selbst abgearbeitet (§3) oder
 `await vi.waitFor(...)` statt sofort behaupten.
 
 Zweite Sicherung neben den Mocks: `vitest.integration.config.ts` setzt
@@ -210,7 +212,7 @@ in einen ungültigen Schlüssel statt in echtes Geld.
 - **Schwere Module echt importieren** (z. B. `@/lib/email` mit React und allen Vorlagen): einmal je Datei in `beforeAll` mit eigenem Timeout (`30_000`), nie in jedem Test. Ein kalter Import im Test zählt gegen das 5-s-Limit und reißt es, sobald parallel gearbeitet wird. `vi.resetModules()` nur, wo ein Modul Umgebungswerte auf Modulebene liest oder dort veränderlichen Zustand hält (etwa einen gemerkten Abruf) — dann ebenfalls in `beforeAll`, eine Instanz je Variante (Vorbild: `tests/email-sendraw.test.ts`, `tests/upload-ursache.test.ts`). Das Testlimit nie global anheben.
 - **Statische Wachen, die ganz `src/` lesen und parsen** (TypeScript-Parser über jede Datei): eigenes Limit `30_000` nur an genau diesem `it`, mit einem Satz, warum. Eine Wache, die nur wenige Dateien liest, bleibt beim Standard.
 - **Laufzeit-Tests gegen quadratische Muster** (Regex, Schleifen über Fremdtext) messen mit `performance.now()` gegen eine großzügige Grenze (Vorbild `tests/sentry-hygiene-felder.test.ts`: 500 ms für Millisekunden-Arbeit). Das ist die eine erlaubte Abhängigkeit von der Uhr: Gemessen wird die Dauer, nie ein Datum.
-- **Modul-Zustand, den Tests gegeneinander verschieben würden** (gemerkte Meldungen, Bremsen): Die Funktion nimmt den Zustand als optionalen letzten Parameter, die Aufrufer lassen ihn weg; jeder Test gibt einen frischen mit (Vorbild `neueBremsMeldungen` in `tests/bremse-datenbank.test.ts`), die Zeit als Parameter. Die Verdrahtung mit dem Zustand des Moduls prüft EIN frisch geladenes Modul (`vi.resetModules()` in `beforeAll`, die Attrappen danach ebenfalls neu importieren).
+- **Modul-Zustand, den Tests gegeneinander verschieben würden** (gemerkte Meldungen, Bremsen): Die Funktion nimmt den Zustand als optionalen letzten Parameter, die Aufrufer lassen ihn weg; jeder Test gibt einen frischen mit (Vorbild `neueBremsMeldungen` in `tests/bremse-datenbank.test.ts`), die Zeit als Parameter. Die Verdrahtung mit dem Zustand des Moduls prüft EIN frisch geladenes Modul (`vi.resetModules()` in `beforeAll`, die Attrappen danach ebenfalls neu importieren). `vi.resetModules()` leert das Register der Mocks nicht: Attrappen aus `vi.mock` bleiben dieselben Funktionen — wer je Fall frisch lädt, leert vorher ihre Aufrufe (`vi.clearAllMocks()`, Vorbild `tests/hoefe-fehleranzeige.test.ts`).
 
 ### Immer mitprüfen
 - Grenzfälle: 0, leer, `null`, exakt an der Frist, ein Millisekunde davor und danach.

@@ -115,6 +115,7 @@ Nach der Freigabe: hier in die Tabelle eintragen.
 - **Kein Dateisystem-Schreibzugriff.** Uploads gehen an Vercel Blob.
 - **Kalte Starts.** Nichts Teures auf Modulebene ausführen.
 - **Env-Variablen** ausschließlich über `@/lib/env` (Zod-validiert). Nie `process.env.X` direkt lesen — Ausnahmen: `NODE_ENV` und die Build-Konfiguration `next.config.ts` (läuft vor der App, `SENTRY_AUTH_TOKEN`).
+- **Der Stichtag der Live-Schaltung** (`STRIPE_LIVE_AB`, Register Z4) ausschließlich über `@/lib/umgebung-server` (`STRIPE_LIVE_AB`): Nur dort wird `env.STRIPE_LIVE_AB` gelesen, geprüft rein in `leseStripeLiveAb` (`@/lib/umgebung`). Reine Regeln bekommen ihn als Parameter, an den Browser geht nur der fertige Hinweis-Satz.
 - **Die Adresse der App** (`APP_URL`) und die Umgebung (`UMGEBUNG`: produktion / preview / lokal) ausschließlich über `@/lib/umgebung-server`. Nie `NEXT_PUBLIC_APP_URL` selbst lesen, nie `?? 'http://localhost:3000'` in einer Datei — in Previews ist die Variable nicht gesetzt (Ausnahme seit Nr. 43: die Testumgebung, Branch `staging`, dort nur geprüft als https-Adresse), und genau dieser Ersatz hat dort den Login zerstört. Die Entscheidung selbst ist rein und getestet: `@/lib/umgebung`. Im Browser gibt es die Adresse nur als Prop vom Server (Vorbild: `onboarding/page.tsx`), nie über `process.env`.
 
 ---

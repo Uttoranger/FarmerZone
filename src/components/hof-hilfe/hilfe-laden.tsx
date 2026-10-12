@@ -21,7 +21,8 @@ export function MeldungAbgebenLaden(): React.JSX.Element {
       <UnterseitenKopfLaden mitTitel={false} zeileImBrowser={false} />
       <div className="animate-pulse lg:flex lg:items-start lg:gap-8" aria-busy="true">
         <div className="flex min-w-0 flex-col gap-3.5 lg:w-[640px] lg:shrink-0">
-          <div className="h-8 w-64 rounded-lg bg-border" />
+          {/* Der Titel erst ab 768 px — am Handy trägt die Leiste den Namen (Nr. 56). */}
+          <div className="hidden h-8 w-64 rounded-lg bg-border md:block" />
           <div className="h-4 w-full max-w-md rounded bg-muted" />
           <div className="mt-1 h-3 w-28 rounded bg-muted" />
           <div className="grid gap-2 sm:grid-cols-3">

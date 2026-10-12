@@ -6,7 +6,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
 import { centsAlsEuro, einheitLabel, formatEuro, formatZahl } from '@/lib/format'
 import { zahlartZeile, type GrenzeStand, type Kennzahlen, type TeilenKarte as TeilenKarteDaten } from '@/lib/auswertung'
-import type { Balken, KanalAnteil, Periode, TopProdukt, Vergleichssatz } from '@/lib/umsatz'
+import { UMSATZ_TEXT, type Balken, type KanalAnteil, type Periode, type TopProdukt, type Vergleichssatz } from '@/lib/umsatz'
 import { AUSWERTUNG_MAX_ZURUECK, auswertungHref } from '@/schemas/auswertung'
 import { TEILEN_ZAEHLUNG_HINWEIS } from '@/lib/teilen-kanal'
 import { cn } from '@/lib/utils'
@@ -92,7 +92,12 @@ function Kachel({ titel, wert, satz }: { titel: string; wert: string; satz: stri
   )
 }
 
-/** Vier Kennzahlen des gewählten Zeitraums (Mockup: Warenumsatz · Bestellungen · Ø Bestellung · Nicht abgeholt). */
+/**
+ * Vier Kennzahlen des gewählten Zeitraums: Über FarmerZone · Bestellungen ·
+ * Ø Bestellung · Nicht abgeholt. Im Mockup heißt die erste „Warenumsatz" —
+ * neben „€ 206" in der Umsatzkarte stand dann „€ 0" ohne Erklärung. Seit
+ * Nr. 53 sagen beide, was sie zählen (UMSATZ_TEXT): hier nur Bestellungen.
+ */
 export function KennzahlenReihe({ k, zeitraum }: { k: Kennzahlen; zeitraum: string }): React.JSX.Element {
   return (
     <section aria-labelledby="auswertung-kennzahlen">
@@ -101,7 +106,7 @@ export function KennzahlenReihe({ k, zeitraum }: { k: Kennzahlen; zeitraum: stri
       </h2>
       {/* Eine Beschreibungsliste; jede Kachel ist eine Gruppe aus dt und dd (div in dl ist erlaubt). */}
       <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kachel titel="Warenumsatz" wert={euroGanz(k.warenCents)} satz={`${zeitraum} · abgeholte Bestellungen`} />
+        <Kachel titel={UMSATZ_TEXT.ueberFarmerzone} wert={euroGanz(k.warenCents)} satz={`${zeitraum} · abgeholte Bestellungen`} />
         <Kachel titel="Bestellungen" wert={formatZahl(k.bestellungen)} satz={zahlartZeile(k) ?? 'noch keine abgeholt'} />
         <Kachel titel="Ø Bestellung" wert={k.durchschnittCents === null ? '–' : euro(k.durchschnittCents)} satz="Warenpreis" />
         <Kachel titel="Nicht abgeholt" wert={formatZahl(k.nichtAbgeholt)} satz="kostenlos für dich" />
@@ -157,8 +162,12 @@ export function TeilenWirkungKarte({ karte, zeitraum }: { karte: TeilenKarteDate
 
 // ─── Umsatz mit Balken ──────────────────────────────────────────────────────
 
+/**
+ * Umsatz mit Balken — Bestellungen UND eingetragene Verkäufe, deshalb „Mit
+ * Hofladen" (UMSATZ_TEXT, Nr. 53; vorher „Umsatz pro Tag/Woche/Monat"). Wie
+ * fein die Balken sind, sagen ihre Beschriftungen.
+ */
 export function UmsatzKarte({
-  titel,
   zeitraum,
   summeCent,
   vergleich,
@@ -166,7 +175,6 @@ export function UmsatzKarte({
   balken,
   vergleichLabel,
 }: {
-  titel: string
   zeitraum: string
   summeCent: number
   vergleich: Vergleichssatz
@@ -179,7 +187,7 @@ export function UmsatzKarte({
     <section aria-labelledby="auswertung-umsatz" className={cn(KARTE, 'flex flex-col gap-3 px-4 py-4 md:px-[18px]')}>
       <div className="flex flex-wrap items-baseline gap-x-2.5">
         <h2 id="auswertung-umsatz" className={KARTEN_TITEL}>
-          {titel}
+          {UMSATZ_TEXT.mitHofladen}
         </h2>
         <span className={cn('text-[12.5px] sm:ml-auto', LEISE)}>{zeitraum}</span>
       </div>

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'
 import { wienKalendertag } from '@/lib/kalender'
 import {
   UEBERFAELLIG_EINZELN,
@@ -31,7 +32,7 @@ import {
 import { auswerten, umsatzfenster } from '@/lib/umsatz'
 import { umsatzBuchungen } from '@/server/queries/umsatz'
 import { statusReminder } from '@/lib/dashboard-hints'
-import { ersteSchritte, ersteSchritteDaten, type ErsteSchritteErgebnis } from '@/lib/erste-schritte'
+import { ersteSchritte, ersteSchritteDaten, zuTun, type ZuTun } from '@/lib/erste-schritte'
 import { bestellSummen } from '@/lib/servicegebuehr'
 import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 import { DEFAULT_SECTIONS, type SectionConfig } from '@/server/queries/appearance'
@@ -67,7 +68,11 @@ export type Heute = {
   brauchtDich: BrauchtDichEintrag[]
   woche: Wochenvergleich
   wochenBalken: WochenBalken[]
-  ersteSchritte: ErsteSchritteErgebnis
+  /**
+   * „Zu tun" (Nr. 53): Erste Schritte und die Liste der Hofseite als EINE
+   * Liste — ohne das, was der Stripe-Kasten oben schon sagt (zuTun).
+   */
+  zuTun: ZuTun
   wartetAufFreigabe: boolean
   /**
    * Der Hof will online kassieren, Stripe lässt es gerade nicht zu — dann der
@@ -77,6 +82,12 @@ export type Heute = {
   /** Freigeschaltet ohne fertiges Stripe (Register Z1, stripeEinrichtenHinweis): Hinweis „Online-Zahlung einrichten". */
   stripeEinrichten: boolean
   /**
+   * Steht oben der Stripe-Kasten („pausiert" oder „einrichten", nie beide)?
+   * EINMAL hier berechnet: Dieselbe Antwort stellt den Kasten (heuteAufbau)
+   * und nimmt die Online-Zahlung aus „Zu tun" (zuTun).
+   */
+  stripeImKasten: boolean
+  /**
    * Was Teilen-Karte und Freischaltungs-Moment brauchen — sichtbar = öffentlich
    * UND nicht pausiert (heuteHofSichtbar); teilenMomenteAus = der Hof hat die
    * Teilen-Momente abgeschaltet (Nr. 30, freischaltMomentMoeglich).
@@ -84,14 +95,14 @@ export type Heute = {
   hof: { sichtbar: boolean; approvedAt: Date | null; teilenMomenteAus: boolean }
   /** Bis zu drei Produkte im Shop mit Bestand, in der Reihenfolge des Hofs. */
   angebot: string[]
-  /** „Deine Hofseite": dieselbe Rechnung wie die Checkliste in Mein Hof. */
-  hofseite: { prozent: number; satz: string; fertig: boolean }
 }
 
 export async function getHeute(
   farmId: string,
   jetzt: Date = new Date(),
-  freigabe: Promise<void> = Promise.resolve()
+  freigabe: Promise<void> = Promise.resolve(),
+  // Stichtag der Live-Schaltung (Register Z4): Testzahlungen davor sind kein Umsatz.
+  stripeLiveAb: Date | null = STRIPE_LIVE_AB
 ): Promise<Heute> {
   const { heute } = abholtage(jetzt)
   // Dieselbe Regel wie Verkauf und Auswertung: src/lib/umsatz.ts.
@@ -160,7 +171,7 @@ export async function getHeute(
         // Die Buchungen von Montag der Vorwoche bis jetzt: daraus Woche, Vorwoche
         // bis zum selben Zeitpunkt, die Tagesbalken und „Umsatz heute" — alles
         // nach derselben Regel wie Verkauf und Auswertung (auswerten, summeCent).
-        umsatzBuchungen(farmId, { von: wochenfenster.vergleich.von, bis: wochenfenster.aktuell.bis }),
+        umsatzBuchungen(farmId, { von: wochenfenster.vergleich.von, bis: wochenfenster.aktuell.bis }, stripeLiveAb),
         // Einstiegs-Checkliste, Hofseiten-Stand, Zustand und Abholzeiten in einem Zugriff.
         prisma.farm.findUnique({
           where: { id: farmId },
@@ -233,6 +244,12 @@ export async function getHeute(
         )
       )
     : null
+  // „pausiert" (Notbremse) oder „einrichten" (Register Z1) — nie beide; der eine
+  // Kasten oben auf der Seite (heuteAufbau) und der Grund, die Online-Zahlung
+  // nicht noch einmal in „Zu tun" zu nennen.
+  const onlinePausiert = hof ? onlinePausiertDaten(hof) : null
+  const stripeEinrichten = hof ? stripeEinrichtenHinweis(hof) : false
+  const stripeImKasten = onlinePausiert !== null || stripeEinrichten
 
   return {
     abholungen: zeilen,
@@ -251,11 +268,15 @@ export async function getHeute(
     }),
     woche: wochenvergleich(auswertung.summeCent, auswertung.vergleichCent),
     wochenBalken: wochenBalken(auswertung.balken, jetzt),
-    ersteSchritte: ersteSchritte(ersteSchritteDaten(hof, { produkte, aktiveAbholzeiten: slots.length })),
+    // Was der Kasten oben zeigt, steht nicht noch einmal in der Liste (F4, Vermerk 10.10.2026).
+    zuTun: fortschritt
+      ? zuTun(ersteSchritte(ersteSchritteDaten(hof, { produkte, aktiveAbholzeiten: slots.length })), fortschritt, { stripeImKasten })
+      : { aufgaben: [], anzeigen: false },
     wartetAufFreigabe: hof?.approvedAt == null,
     // „nur bar bei Abholung" nur bei sichtbarem Hof, der bar annimmt (onlinePausiertDaten, Nr. 45 Runde 2).
-    onlinePausiert: hof ? onlinePausiertDaten(hof) : null,
-    stripeEinrichten: hof ? stripeEinrichtenHinweis(hof) : false,
+    onlinePausiert,
+    stripeEinrichten,
+    stripeImKasten,
     hof: {
       sichtbar: hof ? heuteHofSichtbar(hof) : false,
       approvedAt: hof?.approvedAt ?? null,
@@ -263,8 +284,5 @@ export async function getHeute(
       teilenMomenteAus: hof?.teilenMomenteAus ?? true,
     },
     angebot: angebot.map((p) => p.name),
-    hofseite: fortschritt
-      ? { prozent: fortschritt.prozent, satz: fortschritt.satz, fertig: fortschritt.fehlend.length === 0 }
-      : { prozent: 0, satz: '', fertig: false },
   }
 }

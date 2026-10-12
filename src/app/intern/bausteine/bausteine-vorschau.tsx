@@ -32,6 +32,7 @@ import { Zaehler } from '@/components/ui/zaehler'
 import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
+import { KarteLaedt } from '@/components/karte/karte-laedt'
 import { SHELL_VARIANTEN } from './shell/[variante]/varianten'
 import { HOF_NEU_KNOPF, HOF_NEU_KNOPF_NAME } from '@/lib/bauern-navigation'
 
@@ -217,6 +218,10 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
             <Hinweiskarte ton="orange" symbol={Info} titel="Online-Zahlung pausiert">
               Kundinnen können gerade nur bar bei Abholung bezahlen.
             </Hinweiskarte>
+          </Abschnitt>
+
+          <Abschnitt id="karte-laedt" titel="Karte lädt" satz="Platzhalter beider Karten, solange die Kartenbibliothek nachlädt — in der Größe der Karte, kein Spinner.">
+            <KarteLaedt className="h-[160px] rounded-2xl border border-border" />
           </Abschnitt>
 
           <Abschnitt id="leer" titel="EmptyState" satz="Symbol, ein Satz und immer ein Ausweg.">

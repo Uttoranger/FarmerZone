@@ -146,8 +146,9 @@ describe('Kategorie FISCH — Illustration', () => {
     const warnung = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     for (const kategorie of PRODUCT_CATEGORY_VALUES) {
-      // Die Zuordnung selbst steht in product-image.ts (CATEGORY_SLUGS) — seit
-      // „Marke und Startseite" mit eigenen Futter-Bildern (heu-stroh, …).
+      // Die Zuordnung selbst steht seit Nr. 51 in taxonomie.ts (KATEGORIE_BILD_SLUG,
+      // in product-image.ts als CATEGORY_SLUGS) — seit „Marke und Startseite"
+      // mit eigenen Futter-Bildern (heu-stroh, …).
       const slug = CATEGORY_SLUGS[kategorie]
       const datei = path.join(process.cwd(), 'public', 'categories', `${slug}.webp`)
       const erwartet = fs.existsSync(datei) ? `/categories/${slug}.webp` : null

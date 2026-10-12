@@ -2,6 +2,8 @@
 
 **Status Nr. 48: erledigt (Checkliste).** Stand 08.10.2026, Nachtlauf 8. Auftrag: `freigabe.md` §12 „48", Abläufe aus §11 „34".
 
+**Angepasst im Sammel-PR Lauf 9** (Stand 12.10.2026, `freigabe.md` §13 „Sammel-PR"): Ort ist nur noch test.farmerzone.at, die Branch-Adresse von `integration/lauf8` und ihr Aufräumteil sind entfallen. Die Abläufe folgen den Texten aus Nr. 49–55 (Bestellseite, Hof-Profil, Testzahlungen, Produktdialog), dazu Abschnitt 9a für das Neue am Handy.
+
 Nr. 48 sollte die zwölf Abläufe aus Nr. 34 selbst durchspielen. Aus der Nacht-Sitzung waren aber weder die Vorschau noch die Stripe-Schnittstelle erreichbar. Deshalb gehst du die Abläufe hier selbst durch, am Handy und im Browser. Fehler, die du findest, werden danach als 48a, 48b … behoben, jeder mit einem Test, der den Fehler zeigt.
 
 **Grundregeln**
@@ -23,6 +25,7 @@ Inhalt:
 - 7 Unbekanntes Hof-Konto (Nr. 42)
 - 8 Testbetrieb-Hinweise (Nr. 42)
 - 9 Kasse, Neuigkeiten und Kundensicht (Nr. 46)
+- 9a Hofbereich, Hofseite und Karte am Handy (Nr. 49–55)
 - 10 Abschluss und Aufräumen
 - 11 Ergebnis
 
@@ -32,7 +35,7 @@ Inhalt:
 
 | | |
 |---|---|
-| Ort | `https://test.farmerzone.at`, sobald die Testumgebung nach `docs/betrieb/testumgebung.md` (Nr. 43) steht. Bis dahin die Branch-Adresse des Sammel-PR: `https://farmer-zone-git-integration-lauf8-bierbaron.vercel.app`. Die genaue Adresse steht im PR unter „Vorschau". Unten heißt diese Adresse kurz **Ort**. |
+| Ort | `https://test.farmerzone.at`, die Testumgebung nach `docs/betrieb/testumgebung.md` (Nr. 43). Sie steht, bevor der Probelauf beginnt. Unten heißt diese Adresse kurz **Ort**. |
 | Zugang | Nur mit Vercel-Anmeldung. Du arbeitest mit **drei getrennten Browserprofilen** oder drei Browsern: **Hof**, **Admin** und **Kundin**. Fenster desselben Profils teilen sich die Anmeldung: Meldest du dich dort als Admin an, ist der Testhof abgemeldet. Jedes Profil braucht seine eigene Vercel-Anmeldung, sonst zeigt Vercel nur seine Anmeldeseite. Der Browser am Handy ist ein weiteres Profil und braucht sie ebenfalls. |
 | Daten | Die Entwicklungsdatenbank, nie die Produktion. |
 | Stripe | Testmodus. Auch das Stripe-Dashboard öffnest du im Testmodus. |
@@ -62,9 +65,8 @@ Bei Vercel gibt es heute EINE Gruppe `STRIPE_*`-Variablen. Vorschau und Produkti
 
 - [ ] **test.farmerzone.at:** Endpunkt, Weg an der Vercel-Sperre vorbei und Signing Secret nach `docs/betrieb/testumgebung.md`, Schritt 5. Dazu `STRIPE_WEBHOOK_SECRET` nur für den Branch `staging` (Schritt 3), dann `staging` neu deployen.
   - Lies dort auch, was das Geheimnis für die Vercel-Sperre kann: Es öffnet alle geschützten Deployments des Projekts.
-- [ ] **Branch-Adresse von `integration/lauf8`**, solange es test.farmerzone.at nicht gibt: dieselben Schritte. Nur ist die Branch-Adresse die Adresse des Endpunkts, und die Variable gilt für den Branch `integration/lauf8` statt `staging`.
   - Die Ereignisse sind dieselben wie bei Endpunkt A in `docs/betrieb/stripe-live.md`, Schritt 3.
-  - Danach `integration/lauf8` neu deployen: Deployments → neuestes Deployment des Branch → Redeploy. Variablen wirken erst im nächsten Deployment.
+  - Neu deployen heißt: Deployments → neuestes Deployment des Branch → Redeploy. Variablen wirken erst im nächsten Deployment.
 - [ ] Den bestehenden Eintrag `STRIPE_WEBHOOK_SECRET` für Production fasst du nicht an.
 - [ ] Prüfung nach der ersten Zahlung (Ablauf 1a): Stripe zeigt beim Endpunkt der Testumgebung die Zustellung mit Antwort 200. Eine 401 heißt: Vercel-Sperre. Eine 400 heißt: falsches Secret.
 
@@ -95,6 +97,9 @@ Testhof heißt hier ein Hof der Entwicklungsdatenbank, der nur zum Testen da ist
   - **Die Adresse der Kundin des Probelaufs muss deshalb in `TEST_EMPFAENGER` stehen.** Die Variable gilt nur für den Branch (`docs/betrieb/testumgebung.md`, Schritt 3). Nimm dafür eine eigene Adresse, die Mails empfängt.
   - Betreiber-Mails, etwa „Erstattung offen", kommen in der Testumgebung nur an, wenn auch die Support-Adresse (`SUPPORT_EMAIL`) in `TEST_EMPFAENGER` steht.
   - Ohne `RESEND_API_KEY` verschickt die Testumgebung gar nichts. Dann kommt auch der Code für Ablauf 10 nicht an.
+- [ ] **Testzahlungen (Nr. 55):** Bei Vercel gilt `STRIPE_LIVE_AB` höchstens für Production, nie für den Branch `staging`. Du siehst nur Namen und Geltungsbereich an, den Wert nie.
+  - Sonst zählen Online-Bestellungen vor dem Stichtag als Testzahlung: Heute, Auswertung und Finanzen lassen sie aus, und die Finanzen-Haken unten stimmen nicht.
+  - Erkennbar ist das an der Zeile „Testzahlungen vor dem … sind nicht mitgezählt." unter den Zahlen. In der Testumgebung darf sie nicht erscheinen.
 - [ ] Admin → Finanzen, aktueller Monat: notier „Servicegebühr, online" als **S** und „Servicegebühr, vor Ort bezahlt" als **V**. In der Entwicklungsdatenbank liegen schon andere Bestellungen. Geprüft wird deshalb nur der Unterschied.
 
 ## 3. Beträge auf einen Blick
@@ -164,6 +169,7 @@ Erwartet:
 - [ ] Übersicht vor dem Bezahlen: „Warenpreis" € 17,30, „Servicegebühr · 5 %, mind. € 0,50" € 0,87, „Gesamt" € 18,17. Im Zahlungsschritt nennt die Kasse die Uhrzeit, bis zu der die Ware reserviert ist.
 - [ ] Unter dem Knopf steht „Abholung Sa, 10. Okt, 09:00–12:00 Uhr · Bezahlung sicher über Stripe", mit dem gewählten Termin. Die Kasse hat keinen Haken und keinen Abschnitt „Neuigkeiten vom Hof" (Abschnitt 9).
 - [ ] Bestätigungsseite: erst kurz „Zahlung wird geprüft", noch ohne die Karte „Neuigkeiten vom Hof per E-Mail". Nach dem Neuladen „Danke, deine Bestellung ist da!", jetzt mit der Karte. Der Schritt „Bezahlt" ist erreicht. Die Kundin bekommt eine Mail.
+- [ ] Unter den Positionen stehen „Servicegebühr" € 0,87 und als letzte Zeile „Online · Bezahlt" mit € 18,17. Seit Nr. 54 gibt es dort keine Zeile „Zwischensumme"; Zahlart und Stand stehen statt „Gesamt".
 - [ ] Hof → Bestellungen → A. A steht unter dem Filter „Noch offen", der gewählt ist, wenn die Seite aufgeht:
   - Der Betragskasten zeigt „Online bezahlt" und € 18,17.
   - Darunter steht „Warenpreis € 17,30 + Servicegebühr € 0,87 – die Gebühr ist online einbehalten."
@@ -258,6 +264,7 @@ Erwartet:
 - [ ] Die Übersicht hat keine Zeile Servicegebühr: „Warenpreis" € 9,80, „Gesamt" € 9,80.
 - [ ] Die Kasse hat keinen Haken bei Bar und keinen Abschnitt „Neuigkeiten vom Hof" (Nr. 46). Unter dem Knopf steht „Abholung Sa, 10. Okt, 09:00–12:00 Uhr · Du zahlst bar beim Abholen", mit dem gewählten Termin.
 - [ ] Bestätigungsseite: „Fast geschafft – bitte bestätige per E-Mail". Darunter steht die Karte „Neuigkeiten vom Hof per E-Mail", weil eine offene Barbestellung bis zu ihrer Frist zählt. Getestet wird sie in Abschnitt 9.
+  - Die letzte Zeile der Bestellung heißt „Bar bei Abholung · Noch offen", mit € 9,80. Eine Zeile Servicegebühr gibt es nicht (Nr. 54).
 - [ ] Seite hinter dem Link: „Bestellung bei … bestätigen" mit „Bitte bestätige bis … – erst dann packt der Hof für dich." Die Positionen stehen da, **eine Zeile Servicegebühr nicht**, Summe € 9,80.
 - [ ] Hof → Bestellungen → E: „Bar zu kassieren € 9,80", darunter „Warenpreis € 9,80", ohne Satz zur Monatsabrechnung.
 - [ ] Stripe: nichts. Admin → Finanzen: S und V unverändert.
@@ -416,6 +423,7 @@ Schritte: B → „Nicht abgeholt", im Dialog „Nicht abgeholt" bestätigen.
 - [ ] „Heute eingenommen" ist um € 19,60 gestiegen. Das ist der Warenpreis von A nach Ablauf 7 (€ 9,80) plus der von E (€ 9,80).
   - Es zählt, was heute abgeholt wurde, ohne Servicegebühr.
   - B zählt nicht, denn B wurde nicht abgeholt.
+  - Die Kennzahl heißt „Heute eingenommen · mit Hofladen": Verkäufe, die du im Hofladen einträgst, zählen mit. Im Probelauf trägst du keine ein.
 
 **Ergebnis Ablauf 9**
 
@@ -459,6 +467,7 @@ Schritte:
 
 Erwartet:
 
+- [ ] Beim Ausfüllen zeigt „So sehen Käufer dein Produkt" die Karte, wie sie auf der Hofseite steht: Bild, Name, Preis und Einheit. Solange der Preis fehlt, steht dort „Preis fehlt noch" statt „€ 0,00" (Nr. 51).
 - [ ] Nach dem Veröffentlichen erscheint „Test-Marmelade ist online" mit „Kunden sehen es ab jetzt auf deiner Hofseite. Sag ihnen Bescheid?". Darunter stehen „Teilen", „Nicht jetzt" und „Fragt nur einmal pro Produkt. Abschalten unter Einstellungen."
 - [ ] Das Teilen-Fenster zeigt ein Bild mit der Wahl „Beitrag 1:1" oder „Status 9:16", die Kanäle WhatsApp, WhatsApp-Status, Facebook, Instagram und E-Mail sowie „Plakat drucken".
 - [ ] „Kopieren" meldet „Link kopiert". Der Link endet auf `<hof-slug>?k=link`, der WhatsApp-Link auf `?k=wa`.
@@ -524,7 +533,7 @@ Am Handy oder bei 390 px Breite. Zuerst im Profil **Kundin** (abgemeldet), dann 
 Am Handy oder bei 390 px Breite, im Profil **Hof**.
 
 - [ ] Einstellungen → Hof-Profil: Oben steht eine feste Leiste „← Einstellungen". Beim Scrollen bleibt sie stehen, die Karte läuft darunter durch.
-- [ ] Ganz unten ist „Einstellungen → Mein Auftritt" ein Link auf `/settings/appearance`.
+- [ ] Unter den Feldern steht „Logo und Titelbild verwaltest du unter Mein Hof → Hofseite". Der Link führt nach Mein Hof (`/farm-page`, seit Nr. 50); `/settings/appearance` leitet dorthin um.
 - [ ] Zurück im Hof-Profil etwas Harmloses ändern, etwa einen Satz in der Beschreibung, und „Profil speichern" tippen. Es erscheint der Toast „Gespeichert", danach die Übersicht `/settings`.
 - [ ] Ausnahme Abholzeiten: Nach dem Speichern bleibt die Seite offen.
 - [ ] Bestellungen → eine Bestellung: Leiste „← Bestellungen". Kunden → eine Kundin: Leiste „← Kunden".
@@ -646,6 +655,54 @@ Die Bremse nicht absichtlich auslösen: Tipp den Knopf je Bestellung nur einmal.
 - [ ] Fehler: ______
 - [ ] ausgelassen, weil: ______
 
+## 9a. Hofbereich, Hofseite und Karte am Handy (Nr. 49–55)
+
+Am Handy oder bei 390 px Breite. Die Wörter stammen aus dem Code des Sammel-PR Lauf 9. Die Beträge ändern Nr. 49–55 nicht.
+
+**Mein Hof** (Profil Hof, Nr. 49 und 50):
+
+- [ ] Die Unterleiste zeigt Heute · Bestellungen · Neu · Mein Hof · Mehr. „Mein Hof" öffnet die Produkte, oben stehen die Reiter Produkte · Hofseite · Beiträge.
+- [ ] Reiter „Hofseite": Unter dem Kopf steht der Umschalter „Bearbeiten | So sieht’s die Kundin". Er bleibt beim Scrollen oben stehen.
+- [ ] „Bearbeiten": eine Karte „Zu n von 11 fertig", darunter alle Abschnitte als Karten, je mit Stand und „Bearbeiten ›".
+  - Die Reihenfolge ist die der Hofseite am Handy.
+  - Leitspruch und Gründungsjahr sowie Werte tragen „Fehlt" in Grau und zählen nicht mit.
+- [ ] „Bearbeiten ›" öffnet ein Blatt von unten. Etwas Harmloses ändern, etwa den Leitspruch, dann „Speichern".
+  - Es erscheint „Gespeichert" mit „Ansehen".
+  - „Ansehen" schaltet auf „So sieht’s die Kundin" und zeigt den Abschnitt.
+- [ ] Zwei Tabs mit Mein Hof bzw. dem Hof-Profil: Was du im einen speicherst, setzt der andere beim Speichern nicht zurück, solange ihr nicht im selben Augenblick speichert (Restrisiko, Bericht 50).
+
+**Hofseite** (Profil Kundin, Nr. 51):
+
+- [ ] In der Übersicht steht unter dem Kopf zuerst das Schaufenster: der Fotostreifen (nur mit Fotos), bis zu vier Produkte und „Alle Produkte (n)".
+- [ ] Danach folgen Nächste Abholung, Zahlung & Kontakt, Anfahrt und Über uns. Ohne Produkte gibt es kein Schaufenster.
+- [ ] „Alle Produkte (n)" wechselt in den Reiter Produkte.
+
+**Karte** (Profil Kundin, `/hoefe?ansicht=karte`, Nr. 52):
+
+- [ ] Oben eine Zeile mit „Ort oder Produkt", Filter und „Liste", darunter die Karte bis zur Unterleiste. Vor der Karte steht kurz „Karte lädt …", nichts springt.
+- [ ] Liegen Höfe übereinander, steht ein Punkt „n Höfe"; ein Tipp zoomt hinein. Ohne Auswahl steht „Tippe einen Hof an".
+- [ ] Ein Tipp auf einen Hof zeigt unten seine Karte mit „Zum Hof".
+- [ ] Handy quer: Die Karte füllt den Platz zwischen Kopf und Unterleiste, nichts liegt hinter der Unterleiste.
+- [ ] Profil Hof, Hof-Profil: Die Standortkarte zeigt erst „Karte lädt …". Handy drehen, dann „Profil speichern": Adresse und Kartenpunkt bleiben, wie sie waren.
+
+**Heute und Auswertung** (Profil Hof, Nr. 53):
+
+- [ ] Heute zeigt EINE Liste „Zu tun". Erledigtes verschwindet; ist alles erledigt, verschwindet die Liste.
+- [ ] Was der Kasten oben zeigt („Online-Zahlung einrichten"), steht nicht noch einmal in der Liste. Leitspruch und Werte stehen nie darin.
+- [ ] Auswertung: Die Kennzahl heißt „Über FarmerZone", die Umsatzkarte „Mit Hofladen".
+
+**Admin und Seiten im neuen Kopf** (Profil Admin bzw. Kundin, Nr. 54):
+
+- [ ] Admin → Finanzen und Admin → Briefkasten: kein seitliches Wischen.
+- [ ] `/impressum`, `/konditionen` und `/problem-melden` stehen im Kopf der übrigen öffentlichen Seiten.
+- [ ] Eine unbekannte Adresse unter dem Ort zeigt die Seite „nicht gefunden" mit „Höfe entdecken".
+
+**Ergebnis Abschnitt 9a**
+
+- [ ] bestanden
+- [ ] Fehler: ______
+- [ ] ausgelassen, weil: ______
+
 ## 10. Abschluss und Aufräumen
 
 - [ ] Stripe → Webhooks → Endpunkt der Produktion: Alle Zustellungen aus dem Probelauf haben 200, ohne Wiederholungen.
@@ -655,11 +712,7 @@ Die Bremse nicht absichtlich auslösen: Tipp den Knopf je Bestellung nur einmal.
   - Die bekannte Warnung „Umgebung widersprüchlich: Stripe TEST in Produktion … Kein STRIPE_CONNECT_WEBHOOK_SECRET …" kommt einmal je Kaltstart und gehört nicht dazu.
 - [ ] Sentry, Umgebung preview: höchstens die Warnung aus Abschnitt 7.
 - [ ] Die Kennung aus Abschnitt 7 ist zurückgesetzt bzw. neu eingerichtet.
-- [ ] Wurde nur auf der Branch-Adresse von `integration/lauf8` getestet:
-  - den Endpunkt dieser Adresse in Stripe löschen,
-  - die Branch-Variablen `STRIPE_WEBHOOK_SECRET` und `TEST_EMPFAENGER` dieses Branch löschen,
-  - das Geheimnis für den Vercel-Schutz neu erzeugen, falls es nur für den Probelauf gedacht war.
-  - Für test.farmerzone.at bleibt alles stehen.
+- [ ] Endpunkt, Branch-Variablen und das Geheimnis für den Vercel-Schutz von test.farmerzone.at bleiben stehen; sie gehören zur Testumgebung.
 - [ ] Testbestellungen und Testhof bleiben in der Entwicklungsdatenbank, die Zahlungen im Stripe-Testmodus. Beides stört nicht.
 
 ## 11. Ergebnis
@@ -685,3 +738,4 @@ Diese Tabelle kommt in den Morgenbericht bzw. als Kommentar in den Sammel-PR.
 | Abschnitt 7 | Unbekanntes Hof-Konto (Nr. 42) | | |
 | Abschnitt 8 | Testbetrieb-Hinweise (Nr. 42) | | |
 | Abschnitt 9 | Kasse, Neuigkeiten und Kundensicht (Nr. 46) | | |
+| Abschnitt 9a | Hofbereich, Hofseite und Karte am Handy (Nr. 49–55) | | |
