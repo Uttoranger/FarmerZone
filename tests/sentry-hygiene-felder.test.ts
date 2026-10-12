@@ -1212,7 +1212,7 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
       expect(ergebnis).not.toMatch(/111222|664|9876543/)
     }
     // Eine Nummer mit „ / " hinter einem Wert, der auf eine Ziffer endet (Nachprüfung von c8fb2fb):
-    // Das „/" darin beginnt keine Adresse, der Bereich reicht bis zum Ende der Nummer.
+    // Der Bereich reicht bis zum Ende der Nummer, auch wenn darin eine Adresse beginnt.
     for (const roh of [
       'Anmeldung otp: 482913 0664 / 9876543 abgelehnt',
       'Fehler token: abc1 0664 / 987 65 43 weg',
@@ -1224,9 +1224,12 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
       'Fehler token: x1 9876543/x?a=1&s=0664 98 76 543 weg',
       'Fehler password: 4829130664 9876543/x?a=1&s=0664 98 76 543 weg',
       'Fehler code: Bearer 482913 /0abcx0664 / 98 76 5431',
+      // Beginnen im neuen Stück zwei Adressen, fällt das Wort der letzten (Nachprüfung von ecb5b26).
+      'Fehler Bearer x1 /1 /2?s=SEKa9876543 weg',
+      'Fehler Bearer abc1 0664 / 9876543 /12?s=SEKa weg',
     ]) {
       for (const ergebnis of [nachricht(roh), extraText(roh), brotkrume(roh), fehlertext(roh)]) {
-        expect(ergebnis ?? '', roh).not.toMatch(/9876543|987 65 43|987654|98 76 543|482913/)
+        expect(ergebnis ?? '', roh).not.toMatch(/9876543|987 65 43|987654|98 76 543|482913|SEKa/)
       }
     }
     // Gegenproben: Eine Adresse hinter dem Wert bleibt lesbar; eine Nummer, die nur den
@@ -1243,6 +1246,10 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     expect(nachricht('Link /x?tel=0664987 6543 weg')).toBe('Link /x?tel=[telefon entfernt] weg')
     expect(fehlertext('Link /x?tel=0664 1234567 weg')).toBe('Link /x?tel=[telefon entfernt] weg')
     expect(nachricht('Link /x?s=0664 1234567 weg')).toBe('Link /x [telefon entfernt] weg')
+    // Endet die bereinigte Adresse nur zufällig auf dieselben Ziffern, zählt das nicht.
+    for (const ergebnis of [nachricht('Link /x?a=106&s=06 64 9876543 weg'), fehlertext('Link /x?a=106&s=06 64 9876543 weg')]) {
+      expect(ergebnis).not.toMatch(/9876543/)
+    }
     // Hinter einem Schlüsselwort ohne „=" am Ende einer Adresse fällt der Code vorab.
     expect(nachricht('Login https://farmerzone.at/konto&a=1&otp 123456 abgelaufen')).toBe(
       'Login https://farmerzone.at/konto&a=1&otp [code entfernt] abgelaufen'

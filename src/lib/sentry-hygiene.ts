@@ -614,6 +614,9 @@ const BIS_LEERRAUM = /\S*/y
 /** Weitere Ziffern einer Nummer hinter Trennern wie in TELEFON_MUSTER, klebend. */
 const ZIFFERN_REST = /(?:[\s/\-.()]{1,3}\d)(?:[\s/\-.()]{0,3}\d)*/y
 
+/** Ein „/" nach Leerraum oder Klammer: Dort beginnt in Ziffern eine Adresse. */
+const ADRESSE_IN_ZIFFERN = /(?<=[\s()])\//g
+
 /** Wo eine Adresse beginnen kann: wie in ADRESSE_IM_FREITEXT und ADRESSE_IM_FEHLERTEXT. */
 const ADRESS_ANFANG = /https?:\/\/|(?<![\p{L}\p{N}\p{M}_/.~%-])\//iu
 
@@ -695,9 +698,11 @@ function ersetzeVorab(text: string, adressen: RegExp): string {
         ZIFFERN_REST.lastIndex = neu
         if (ZIFFERN_REST.test(text)) neu = ZIFFERN_REST.lastIndex
       }
-      // Beginnt im neuen Stück eine Adresse (` /664/1?s=…`), fällt ihr Wort mit.
+      // Beginnt im neuen Stück eine Adresse (` /664/1?s=…`), fällt ihr Wort mit — das
+      // der letzten, es reicht am weitesten (` /1 /2?s=…`).
       const von = Math.max(bis, ganz - 1)
-      const adresse = text.slice(von, neu).search(/(?<=[\s()])\//)
+      let adresse = -1
+      for (const anfangAdresse of text.slice(von, neu).matchAll(ADRESSE_IN_ZIFFERN)) adresse = anfangAdresse.index
       if (adresse !== -1) neu = Math.max(neu, wortEnde(text, von + adresse))
       // Klebt am Ende ein „/" — davor steht dann eine Ziffer, nach der keine Adresse
       // beginnt —, begänne hinter dem Platzhalter eine, die vorher keine war
@@ -741,9 +746,10 @@ function ersetzeVorab(text: string, adressen: RegExp): string {
     const nummer = nummerVor(ende)
     if (nummer === undefined || nummer.index < adresse.index) continue
     const nummerEnde = nummer.index + nummer[0].length
-    // Bleibt ihr Anfang in der bereinigten Adresse stehen (`?tel=0664`), nimmt
-    // die Telefon-Regel danach die ganze Nummer.
-    if (nummerEnde <= ende || bereinigeUrl(adresse[0]).endsWith(text.slice(nummer.index, ende))) continue
+    // Bleibt ihr Anfang samt dem Zeichen davor in der bereinigten Adresse stehen
+    // (`?tel=0664`), nimmt die Telefon-Regel danach die ganze Nummer. Das Zeichen
+    // davor zählt mit: `?a=106&s=06 64 …` endet bereinigt zufällig auch auf „06".
+    if (nummerEnde <= ende || bereinigeUrl(adresse[0]).endsWith(text.slice(nummer.index - 1, ende))) continue
     // Das Zeichen, an dem die Adresse endet, bleibt — so bleibt auch ihre Grenze.
     let rest = ende + 1
     while (rest < nummerEnde && /\s/.test(text[rest])) rest++
