@@ -4943,6 +4943,14 @@ Auftrag freigabe.md §15 „70" (Register S16, E8). Keine Schema-Änderung, kein
 - **Warum ein Test und nicht der Typ:** Der volle Hof ist an `HofseiteHof` zuweisbar (Zusatzfelder sind bei Zuweisungen erlaubt), ein vergessenes `entferneKontaktdaten` bricht den Typecheck also nicht. Der Test liest die Props der Client-Komponente im Baum der Seite (Schlüssel auf jeder Tiefe und Werte), für Kundinnen und in der Vorschau des Hofs; die Gegenprobe zeigt, dass die Suche am vollen Hof anschlägt und Name, Anschrift, Abholzeiten und Produkte ankommen.
 - **Host-Prüfung (S16):** Für `NEXT_PUBLIC_APP_URL` in der Produktion zählt ein Wert mit Port als fremder Host (`istEchteHerkunft`: echter Host und kein Port). `https://farmerzone.at:8443` gilt weiter als Herkunft, meldet sich aber mit `WARNUNG_APP_URL_FREMDER_HOST`: Better Auth vergleicht Herkünfte genau, der Browser der echten Seite sendet keinen Port, die Anmeldung bräche still. Der Standard-Port 443 fällt schon im URL-Parser weg; die Prüfung der Vorschau (`pruefeAdresse`) blieb, wie sie war.
 
+## Nachbestell-Link: alle Produkte in den Korb (Nachtlauf Nr. 71, Oktober 2026)
+
+Fehler aus Bericht 63 (Nacharbeit), behoben nach `/fix`. Kein neues Paket, keine Migration.
+
+- **Ursache:** `addItem` rechnete mit `items` aus dem Render, aus dem die Funktion stammt. Der Nachbestell-Effekt im Produktraster ruft es in einer Schleife mit `await` aus EINEM Render auf; jeder Aufruf setzte auf denselben leeren Korb auf, Anzeige und Speicher behielten nur das letzte Produkt. `/api/reserve` hatte aber jedes reserviert — die übrigen hielten Bestand bis zum Ablauf der Frist (15 Minuten) für niemanden fest. Dasselbe Produkt zweimal hintereinander reservierte nur die zweite Menge statt der Summe.
+- **Fix (`use-cart.ts`):** Der Hook merkt sich den Stand der letzten Änderung (`useRef`); `persist` bekommt die Änderung als Updater (`vorher => …`) und schreibt Zustand und Speicher mit demselben Stand, `addItem` liest die vorhandene Menge von dort. Kein Updater im React-Zustand: Der darf nichts schreiben, und `schreibeWarenkorb` meldet jede Änderung per Ereignis an die Kopfzeile — mitten im Rendern hieße das ein Update einer fremden Komponente. Reservierung je Position, Reihenfolge, Fehlerbild und „ein anderer Hof ersetzt den Korb" bleiben; der Effekt im Produktraster ist unverändert.
+- **Test:** `tests/use-cart.test.ts` mit einem Hook-Prüfstand ohne DOM (TESTING_GUIDELINES §1), der auch den echten Nachbestell-Effekt laufen lässt.
+
 ## Nützliche Befehle
 
 ```bash
