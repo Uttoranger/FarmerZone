@@ -1027,8 +1027,18 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     expect(adresse('/hoefe?q=frische+eier&seite=2')).toBe('https://farmerzone.at/hoefe?q=frische+eier&seite=2')
     expect(adresse('/login?info=%252B436641234567')).toBe('https://farmerzone.at/login?info=%5Btelefon+entfernt%5D')
     expect(adresse('/x?ziel=%2Fkunden%2Fanna%2540example.org')).toBe('https://farmerzone.at/x?ziel=%2Fkunden%2F%5Be-mail+entfernt%5D')
-    // Roh zählt ein „+" vorn nur mit freiem linken Rand als Nummer — an einem Wort ist es ein Leerzeichen.
+    // Roh zählt ein „+" vorn nur mit freiem linken Rand als Nummer — auch nach Satzzeichen;
+    // an einem Wort oder einer Zahl ist es ein Leerzeichen.
+    for (const [roh, sauber] of [
+      ['/go?to=tel:+436641234567', '/go?to=tel%3A%5Btelefon+entfernt%5D'],
+      ['/x?q=Ruf,+436641234567', '/x?q=Ruf%2C%5Btelefon+entfernt%5D'],
+      ['/x?q=(+43)6641234567', '/x?q=%28%5Btelefon+entfernt%5D'],
+      ['/api/og?url=https://farmerzone.at/anruf/tel:+436641234567', '/api/og?url=https%3A%2F%2Ffarmerzone.at%2Fanruf%2Ftel%3A%5Btelefon+entfernt%5D'],
+    ]) {
+      expect(adresse(roh), roh).toBe(`https://farmerzone.at${sauber}`)
+    }
     expect(adresse('/x?q=Artikel+12345678')).toBe('https://farmerzone.at/x?q=Artikel+12345678')
+    expect(adresse('/x?q=12+345678901')).toBe('https://farmerzone.at/x?q=12+345678901')
     expect(adresse('/x?q=a%0912345678')).toBe('https://farmerzone.at/x?q=a%0912345678')
     // Der Preis der rohen Lesart (sichere Richtung): Ein mit „+" angehängtes Wort zählt zur Adresse.
     expect(adresse('/x?q=Hallo+kundin@example.com')).toBe('https://farmerzone.at/x?q=%5Be-mail+entfernt%5D')
@@ -1079,6 +1089,33 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     }
     // Gegenprobe: eine relative Adresse endet weiter an der Klammer.
     expect(nachricht('Abruf (/x?a=1#token=abc123) gescheitert')).toBe('Abruf (/x?a=1) gescheitert')
+  })
+
+  it('ein Geheimnis hinter Leerraum fällt, auch wenn sein Schlüsselwort an einer Adresse hängt — in Nachricht, Brotkrume, extra und Fehlertext', () => {
+    // Liest eine Adresse das Schlüsselwort mit (bis zum Leerraum), steht es danach
+    // kodiert in ihr (%22Bearer, token%3A) — die Regeln danach sahen es nicht mehr,
+    // der Wert dahinter blieb. Jetzt fällt er vorab (vorabHinterLeerraum).
+    const faelle = [
+      'Fetch {"u":"/api/og?url=https://farmerzone.at/x","h":"Bearer abc123def456ghi"}',
+      'Fetch [["url","/api/og?url=https://farmerzone.at/x"],["authorization","Bearer abc123def456ghi"]]',
+      'Fetch {"u":"/api/og?url=https://farmerzone.at/x","code": 123456}',
+      'Abruf /api/og?url=https://farmerzone.at/x,token: abc123def456 weg',
+      '{"u":"/api/og?url=https://farmerzone.at/x","token": "abc123def456"}',
+      'Fetch {"url":"https://farmerzone.at/x","headers":{"authorization":"Bearer abc123def456ghi"}}',
+      'Login /api/auth?callbackUrl=https://farmerzone.at/konto&otp 123456 abgelaufen',
+    ]
+    for (const roh of faelle) {
+      for (const ergebnis of [nachricht(roh), extraText(roh), brotkrume(roh), fehlertext(roh)]) {
+        expect(ergebnis ?? '', roh).not.toMatch(/abc123def456|123456/)
+      }
+    }
+    expect(nachricht(faelle[0])).toBe('Fetch {"u":"/api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx%22%2C%22h%22%3A%22Bearer [entfernt]"}')
+    expect(fehlertext(faelle[3])).toBe('Abruf /api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx%2Ctoken%3A [entfernt] weg')
+    // Gegenproben: Ein Wert, der selbst eine Adresse ist, liest die URL-Regel (ihre Parameter fallen dort);
+    // ein Code und eine E-Mail-Adresse als Wert behalten ihren Platzhalter.
+    expect(nachricht('redirect_token: /x?a=1&s=abc123sig weg')).toBe('redirect_token: [entfernt] weg')
+    expect(nachricht('otp: 905173 abgelehnt')).toBe('otp: [code entfernt] abgelehnt')
+    expect(nachricht('Passwort: kundin@example.com, token=[entfernt]')).toBe('Passwort: [e-mail entfernt], token=[entfernt]')
   })
 
   it('ein Abfragewert, der nach der letzten Runde noch kodiert ist, fällt ganz', () => {

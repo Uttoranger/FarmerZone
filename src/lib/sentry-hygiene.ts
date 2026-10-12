@@ -257,11 +257,13 @@ function bereinigeText(text: string): string {
 }
 
 /** Eine Nummer mit „+" vorn in der rohen Lesart: nur mit freiem linken Rand
- *  (Anfang, „=", „&", „/", „?", „#", „;" oder ein Escape) — ein „+" an einem
+ *  — kein Buchstabe, keine Ziffer, kein „_" und kein „+" davor, oder ein
+ *  Escape („tel:+43…", „Ruf,+43…", „(+43)…", „%22+43…"). Ein „+" an einem
  *  Wort ist dort meist ein Leerzeichen („Artikel+12345678" bleibt). Die
  *  weiteren „+" gelten als Trenner („+43+664+1234567": das erste ein Plus,
- *  die übrigen Leerzeichen). Linear: Angesetzt wird nur an einem „+". */
-const PLUS_NUMMER_ROH = /(?<=^|[=&/?#;]|%[0-9A-Fa-f]{2})\+\d(?:[\s/\-.()+]{0,3}\d){7,}/g
+ *  die übrigen Leerzeichen). Linear: Angesetzt wird nur an einem „+", der
+ *  Rückblick liest höchstens drei Zeichen. */
+const PLUS_NUMMER_ROH = /(?:(?<=%[0-9A-Fa-f]{2})|(?<![\p{L}\p{N}\p{M}_+]))\+\d(?:[\s/\-.()+]{0,3}\d){7,}/gu
 
 /** Die rohe Lesart einer Abfrage (bereinigeQuery): nur die Regeln, für die
  *  ein „+" als Plus zählt — Adressen mit @ und Nummern mit „+" vorn. Nummern
@@ -518,12 +520,14 @@ function istGeheimerSchluessel(schluessel: string): boolean {
  * Platzhalter, nicht jeder Wert mit „[" (Runde 1: sonst blieb
  * „token=[abc123]" stehen); hängt etwas daran, fällt der ganze Wert.
  */
-function ersetzeZuweisungen(text: string): string {
+function ersetzeZuweisungen(text: string, nurHinterLeerraum = false): string {
   let ergebnis = ''
   let ende = 0
   for (const treffer of text.matchAll(ZUWEISUNG_KANDIDAT)) {
     if (treffer.index < ende || !istGeheimerSchluessel(treffer[1])) continue
     const wertAnfang = treffer.index + treffer[0].length
+    // Vorab (vorabHinterLeerraum): nur ein Wert hinter Leerraum, der selbst keine Adresse ist — die liest danach die URL-Regel.
+    if (nurHinterLeerraum && (!/\s/.test(treffer[2]) || /^(?:\/|https?:)/i.test(text.slice(wertAnfang, wertAnfang + 6)))) continue
     EIGENER_PLATZHALTER.lastIndex = wertAnfang
     const nachPlatzhalter = EIGENER_PLATZHALTER.test(text) ? EIGENER_PLATZHALTER.lastIndex : wertAnfang
     ZUWEISUNG_WERT.lastIndex = nachPlatzhalter
@@ -531,6 +535,8 @@ function ersetzeZuweisungen(text: string): string {
     const wertEnde = ZUWEISUNG_WERT.lastIndex
     // Kein Wert, oder er ist genau ein eigener Platzhalter: stehen lassen.
     if (wertEnde === wertAnfang || (nachPlatzhalter > wertAnfang && wertEnde === nachPlatzhalter)) continue
+    // Eine E-Mail-Adresse als Wert sieht hinter Leerraum später die E-Mail-Regel, roh.
+    if (nurHinterLeerraum && text.slice(wertAnfang, wertEnde).includes('@')) continue
     ergebnis += `${text.slice(ende, wertAnfang)}[entfernt]`
     ende = wertEnde
   }
@@ -577,11 +583,28 @@ function entferneIps(text: string): string {
  * für eine Nummer.
  */
 function bereinigeFreitext(text: string): string {
-  const ohneIp = entferneIps(text)
+  const ohneIp = vorabHinterLeerraum(entferneIps(text))
   if (/^(?:https?:\/\/|\/)\S*$/i.test(ohneIp)) return bereinigeUrl(ohneIp)
   const mitAdressen = bereinigeText(ohneIp.replace(ADRESSE_IM_FREITEXT, (adresse) => bereinigeUrl(adresse)))
   const ohneZuweisung = ersetzeZuweisungen(mitAdressen.replace(BEARER_MUSTER, 'Bearer [entfernt]'))
   return ohneZuweisung.replace(LANGE_KENNUNG_MUSTER, '[kennung entfernt]')
+}
+
+/**
+ * Geheimnisse, deren Wert hinter Leerraum steht — „Bearer …", „token: …",
+ * „code: 123456" —, fallen vor den Adressen (Nacharbeit nach Runde 2). Liest
+ * eine Adresse ihr Schlüsselwort mit (`…/x","h":"Bearer`, bis zum Leerraum),
+ * steht es danach kodiert in ihr (`%22Bearer`, `token%3A`), und die Regeln
+ * danach sähen es nicht mehr, während der Wert dahinter stehen bliebe. Die
+ * Struktur der Adressen ändert das nicht: Der Ersatz beginnt erst hinter
+ * Leerraum, wo jede Adresse endet; ein Wert, der selbst eine Adresse ist,
+ * bleibt für die URL-Regel.
+ */
+function vorabHinterLeerraum(text: string): string {
+  const ohneCode = text
+    .replace(BEARER_MUSTER, 'Bearer [entfernt]')
+    .replace(ANMELDECODE_MUSTER, (treffer, wort: string, trenner: string) => (/\s/.test(trenner) ? `${wort}${trenner}[code entfernt]` : treffer))
+  return ersetzeZuweisungen(ohneCode, true)
 }
 
 /** Adressen in einem Fehlertext (Nr. 56): absolut (https://…, auch groß
@@ -622,7 +645,7 @@ const ADRESSE_IM_FREITEXT =
  * (Prisma: token: "…", Runde 1); einer ganz ohne Schlüssel bleibt.
  */
 function bereinigeFehlertext(text: string): string {
-  const mitAdressen = bereinigeText(text.replace(ADRESSE_IM_FEHLERTEXT, (adresse) => bereinigeUrl(adresse)))
+  const mitAdressen = bereinigeText(vorabHinterLeerraum(text).replace(ADRESSE_IM_FEHLERTEXT, (adresse) => bereinigeUrl(adresse)))
   return ersetzeZuweisungen(mitAdressen.replace(BEARER_MUSTER, 'Bearer [entfernt]'))
 }
 
