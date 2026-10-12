@@ -87,6 +87,9 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 62 | Gründungs-Enddatum je Hof (K2, Migration) | gemergt (#250) | `nacht/2026-10-12/62-gruendung-bis` | #248 | 61 | gestapelt auf #245; Migration wie freigegeben; zwei volle Prüfdurchgänge ohne Blocker; test:integration 43/387 | 12.10.2026 |
 | Sammel 10 | Sammel-PR Lauf 10 | gemergt (#250) | `integration/lauf10` | #250 | main | Doku-PR und 63, 58, 64, 65, 59, 60, 61, 62 per --no-ff in §14-Reihenfolge; `pnpm bausteine` als eigener Commit; Konflikte nur in DEVELOPMENT.md; typecheck, lint 0/7, test 6871, test:integration 397 grün; Migration aus 62 | 12.10.2026 |
 | 70 | Nacharbeit Lauf 10: Produktseite ohne Kontaktdaten, Port in der Host-Prüfung (E8, S16) | fertig, PR offen | `nacht/2026-10-12/70-produktseite-port` | #252 | main | tester grün; pruefer ohne Blocker; 3 Sollte unter Nacharbeit (zwei Doku-Sätze, Namen im Test) | 12.10.2026 |
-| 71 | Nachbestell-Link: alle Produkte in den Korb | läuft | `nacht/2026-10-12/71-nachbestell-korb` | – | main | – | 12.10.2026 |
+| 71 | Nachbestell-Link: alle Produkte in den Korb | fertig, PR offen | `nacht/2026-10-12/71-nachbestell-korb` | #253 | main | tester grün; pruefer ohne Blocker; 2 Sollte unter Nacharbeit (Name, Testfall updateQuantity/removeItem) | 12.10.2026 |
+| 73 | Mein Hof am breiten Bildschirm (N7) | läuft | `nacht/2026-10-12/73-mein-hof-breit` | – | main | – | 12.10.2026 |
+| 68 | Hofseite: alle aktiven Beiträge (F8) | läuft | `nacht/2026-10-12/68-hofseite-beitraege` | – | 66 | gestapelt auf 66 | 12.10.2026 |
+| 67 | Beitrag teilen = ein Fenster (T5) | läuft | `nacht/2026-10-12/67-beitrag-teilen` | – | 69 (+ 66) | von 69, 66 per Merge-Commit hereingeholt | 12.10.2026 |
 | 66 | WhatsApp an Abonnentinnen: ehrlich, je Person, fortsetzbar (W1, Migration) | läuft | `nacht/2026-10-12/66-whatsapp-geoeffnet` | – | main | – | 12.10.2026 |
 | 69 | Teilen-Bild neu: Marktkarte, Foto-Held, QR nur in der Story (T6) | läuft | `nacht/2026-10-12/69-teilen-bild` | – | main | – | 12.10.2026 |
