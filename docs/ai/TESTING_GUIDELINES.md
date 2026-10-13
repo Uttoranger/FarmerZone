@@ -140,6 +140,10 @@ ohne Datenbank) — sie läuft bei `pnpm test` und damit im Stop-Hook. Sie schl�
 bei `ADD COLUMN … NOT NULL` ohne `DEFAULT` an; begründete Ausnahmen tragen einen
 `-- EXPAND-CONTRACT:`-Marker (Regel: `ARCHITECTURE.md` §5).
 
+- Jeder `use-*`-Hook, der nach einem `await` Zustand ändert, bekommt einen Prüfstand-Test „zwei Aufrufe aus demselben Render" (Regelvorschlag 71, Lauf 11; freigegeben 13.10.2026).
+- Client-Komponenten unter `src/app/(hof)` stehen unter einer Quelltext-Wache: keine Zeitschaltung, keine Zustell-Sätze, keine Action im setState-Updater (Vorbild `tests/whatsapp-versand.test.ts`, Ausweitung auf alle (hof)-Clients mit Nr. 75; Regelvorschlag 66, Lauf 11; freigegeben 13.10.2026).
+- Prüfsummen (etwa die Version eines Bilds in der Adresse) nur über die echte Route testen, nicht über eine im Test nachgebaute Berechnung (Regelvorschlag 67, Lauf 11; freigegeben 13.10.2026).
+
 ### Nicht testen
 - Prisma selbst, Next.js selbst, Stripe selbst.
 - Reine Darstellung (Klassennamen, Reihenfolge von JSX).

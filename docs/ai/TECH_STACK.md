@@ -85,6 +85,8 @@ Stand: 2026-09. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 | Bausteinverzeichnis | `pnpm bausteine` (`scripts/bausteine.ts`, `tsx` + die Compiler-API des vorhandenen `typescript`, nur Syntaxbaum) erzeugt `docs/ai/BAUSTEINE.md` | Von Hand gepflegte Liste, zweites Parser-Paket (ts-morph, acorn), Zeitstempel in der Datei |
 | Illustrationen prüfen | `pnpm illustrationen` (`scripts/illustrationen.ts`, `tsx` + das vorhandene `sharp`) prüft `public/categories/`: WebP, 1024 × 1024, höchstens 80 KB, einfarbiger Rand; eigener CI-Schritt neben dem Lint, nicht Teil von `build` (Register I1) | Prüfung von Hand, ein weiteres Bildpaket |
 
+Nach dem Build sucht ein CI-Schritt in der Trace-Datei der Hofseite eine Unterkategorie-Datei; fehlt sie, wird die CI rot (sonst fehlen Illustrationen in Produktion still, wenn `assetExists` umgebaut wird). Den Schritt baut Nr. 75 (Regelvorschlag 74, Lauf 11; freigegeben 13.10.2026).
+
 ---
 
 ## 3. Verbotene Muster

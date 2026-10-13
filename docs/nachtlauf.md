@@ -133,6 +133,16 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 73 | Mein Hof am breiten Bildschirm | `freigabe.md` §15 | N7 |
 | 74 | Illustrationen verdrahten (gestapelt auf 69) | `freigabe.md` §15 | I1 |
 | Sammel 11 | Sammel-PR `integration/lauf11` | `freigabe.md` §15 | G3, G4 |
+| 75 | Nacharbeit Lauf 11: Bildroute und WhatsApp-Liste absichern, Kleinigkeiten aus 66–74 | `freigabe.md` §16 | W1, T5, T6 |
+| 76 | Teilen-Bild als JPEG | `freigabe.md` §16 | T7 |
+| 77 | Wortliste in DESIGN_SYSTEM mit Test | `freigabe.md` §16 | N8 |
+| 78 | Begriffe abräumen (gestapelt auf 77) | `freigabe.md` §16 | N8 |
+| 79 | Bedeutungsfarben als Tokens, Baustein Marke | `freigabe.md` §16 | G5 |
+| 80 | Leerzustände aus EmptyState (gestapelt auf 78) | `freigabe.md` §16 | N9 |
+| 81 | Telefonnummern einheitlich anzeigen (gestapelt auf 75) | `freigabe.md` §16 | N8 |
+| 82 | Kasse glätten | `freigabe.md` §16 | N10, N2 |
+| 83 | Heute: Reihenfolge und leeres „Braucht dich" (gestapelt auf 80) | `freigabe.md` §16 | N11 |
+| Sammel 12 | Sammel-PR `integration/lauf12` | `freigabe.md` §16 | G3, G4 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
@@ -166,6 +176,13 @@ Höchstens drei Umsetzer gleichzeitig. Nie zwei Nummern an derselben Code-Datei 
 
 Höchstens drei Umsetzer gleichzeitig. Nie zwei Nummern an derselben Code-Datei (Dateigrenzen in `freigabe.md` §15).
 
+**Reihenfolge in Lauf 12** (`freigabe.md` §16, Haltepunkt Sammel-PR): 75 ∥ 77 ∥ 76 → 78 ∥ 82 ∥ 79 sobald Plätze frei sind → 80 ∥ 81 → 83 → Sammel-PR. Die Branches:
+- 75, 77, 76, 82 und 79 zweigen von `origin/main` ab.
+- 78 zweigt vom Branch der Nr. 77 ab, 80 vom Branch der Nr. 78, 83 vom Branch der Nr. 80; 81 zweigt vom Branch der Nr. 75 ab.
+- Ist 77 nach zwei Runden nicht fertig, entfällt 78, und 80 zweigt von `origin/main` ab.
+
+Höchstens drei Umsetzer gleichzeitig. Nie zwei Nummern an derselben Code-Datei (Dateigrenzen in `freigabe.md` §16).
+
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 
 Gate 9 (Ende-zu-Ende mit dem Pilothof) läuft **nie** im Nachtlauf.
@@ -196,7 +213,7 @@ Der Lauf beginnt bei der ersten Nummer, die in `status.md` nicht als „fertig" 
 
 Gilt seit Lauf 10 (`freigabe.md` §14 §0); geht §4 vor, wo es abweicht (Bilder: §4 Schritt 3).
 
-1. Lesemappe statt Volltext. Der Dirigent gibt jedem Umsetzer: den Text seiner Nummer, die Ausgangslage (Dateien mit Textankern), die Mockup-Dateien, docs/ai/CODING_STANDARDS.md und docs/ai/TESTING_GUIDELINES.md ganz, von ARCHITECTURE.md (129 KB) und DESIGN_SYSTEM.md (108 KB) nur die in der Nummer genannten Abschnitte, aus entscheidungen.md und umsetzungsprompt.md nur die genannten Einträge, das Bausteinverzeichnis docs/ai/BAUSTEINE.md (Lauf 10: ab Nr. 59 aus 58). Weiteres sucht der Umsetzer gezielt mit Grep; keine der großen Dateien wird am Stück gelesen. CLAUDE.md liest jeder Agent ohnehin.
+1. Lesemappe statt Volltext. Der Dirigent gibt jedem Umsetzer: den Text seiner Nummer, die Ausgangslage (Dateien mit Textankern), die Mockup-Dateien, docs/ai/CODING_STANDARDS.md und docs/ai/TESTING_GUIDELINES.md ganz, von ARCHITECTURE.md (129 KB) und DESIGN_SYSTEM.md (108 KB) nur die in der Nummer genannten Abschnitte, aus entscheidungen.md und umsetzungsprompt.md nur die genannten Einträge, das Bausteinverzeichnis docs/ai/BAUSTEINE.md (Lauf 10: ab Nr. 59 aus 58). Weiteres sucht der Umsetzer gezielt mit Grep; keine der großen Dateien wird am Stück gelesen. CLAUDE.md liest jeder Agent ohnehin. Beim Schreiben einer Freigabe je Textkonstante und je neuem Bezeichner einmal grep -rn über src/ und tests/; alle Fundstellen gehören in die Dateigrenzen. (Regelvorschlag 73 aus Lauf 11, freigegeben 13.10.2026)
 2. Tests gezielt. Nach jedem Schritt: pnpm typecheck und pnpm vitest related --run <geänderte Quelldateien>; der Dirigent gibt dem tester diesen Modus und die Dateiliste ausdrücklich mit („nur typecheck und vitest related, kein lint, kein voller Lauf"). Vor JEDEM Commit der volle Lauf pnpm typecheck && pnpm lint && pnpm test (CLAUDE.md §1); deshalb Commits sparsam: ein Commit je Umsetzung, ein Commit je Runde, WIP-Commits nur beim Stopp nach §5. pnpm test:integration nur bei Nummern, für die die Freigabe es nennt (Lauf 10: 62), und auf dem Sammel-PR. Gemessen am 11.10.: voller Testlauf 2:48 min, typecheck 0:57, lint 0:44, related je nach Datei 0:30–1:40.
 3. Prüfen in Runden, nicht alles neu. Nach einer Nachbesserung bekommt der pruefer im Aufruf den Bereich git diff <zuletzt geprüfter Commit>..HEAD und seine eigenen Befunde; nur das prüft er. Ein zweiter voller Durchgang über den Gesamt-Diff nur bei Nummern, die die Freigabe als Kaufstrecke, Admin-Action/Migration, Sicherheits- oder Datenpfad nennt (Lauf 10: 60, 62, 64, 65); bei allen anderen keiner (Lauf 10: 58, 59, 61, 63).
 4. Runden nur für Blocker. Blocker = Sicherheit oder Geld, Datenkonsistenz, Typisierung, rote Tests, Mockup-Abweichung ohne Begründung, Regelverstoß aus CLAUDE.md §2. Sollte = Stil, Teststärke, Doku, Benennung. Sollte-Befunde behebt der Umsetzer nur, wenn sie Dateien betreffen, die er in derselben Runde ohnehin anfasst; sonst stehen sie im Bericht unter „Nacharbeit" und gesammelt im Morgenbericht. Kein Durchgang nur für Teststärke oder Stil (Lauf 9, Nr. 54 Runde 2). Das ist für den Nachtlauf die Ausnahme von sprint Schritt 5; der Dirigent gibt die Zuordnung dem pruefer mit.
