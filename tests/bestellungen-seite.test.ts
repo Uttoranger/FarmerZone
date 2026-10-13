@@ -188,7 +188,7 @@ describe('Seite', () => {
     const ereignis = bereinigeEreignis({
       message: 'Fehler beim Code 481234 für kundin@example.com',
       request: {
-        url: 'https://farmerzone.example/bestellungen',
+        url: 'https://plattform.example/bestellungen',
         cookies: { 'fz-bestellungen': keks },
         headers: { cookie: `fz-bestellungen=${keks}` },
         data: { email: 'kundin@example.com', code: '481234' },

@@ -57,12 +57,12 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
   it('entfernt E-Mails auch aus dem URL-PFAD — roh und %40-kodiert (Kunden-Route)', () => {
     const e = bereinigeEreignis(
       ereignis({
-        request: { url: 'https://farmerzone.at/customers/kunde%40beispiel.at' },
+        request: { url: 'https://agrilo.at/customers/kunde%40beispiel.at' },
         breadcrumbs: [{ data: { from: '/customers/kunde@beispiel.at', to: '/orders' } }],
       })
     )
 
-    expect(e.request?.url).toBe('https://farmerzone.at/customers/[e-mail entfernt]')
+    expect(e.request?.url).toBe('https://agrilo.at/customers/[e-mail entfernt]')
     expect(e.breadcrumbs?.[0].data?.from).toBe('/customers/[e-mail entfernt]')
     expect(e.breadcrumbs?.[0].data?.to).toBe('/orders')
   })
@@ -70,23 +70,23 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
   it('entfernt undurchsichtige Kennungs-Segmente aus dem Pfad (Bestätigungs-Token)', () => {
     const e = bereinigeEreignis(
       ereignis({
-        request: { url: 'https://farmerzone.at/api/orders/confirm/V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k' },
+        request: { url: 'https://agrilo.at/api/orders/confirm/V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k' },
       })
     )
 
-    expect(e.request?.url).toBe('https://farmerzone.at/api/orders/confirm/[kennung entfernt]')
+    expect(e.request?.url).toBe('https://agrilo.at/api/orders/confirm/[kennung entfernt]')
   })
 
   it('entfernt den Token der Bar-Bestätigung (/{hof}/bestaetigen/{token}) — Seite und Brotkrume', () => {
     const e = bereinigeEreignis(
       ereignis({
-        request: { url: 'https://farmerzone.at/hof-test/bestaetigen/V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k' },
+        request: { url: 'https://agrilo.at/hof-test/bestaetigen/V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k' },
         breadcrumbs: [{ data: { from: '/hof-test/bestaetigen/V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k', to: '/hof-test' } }],
         contexts: { nextjs: { request_path: '/hof-test/bestaetigen/V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k' } },
       })
     )
 
-    expect(e.request?.url).toBe('https://farmerzone.at/hof-test/bestaetigen/[kennung entfernt]')
+    expect(e.request?.url).toBe('https://agrilo.at/hof-test/bestaetigen/[kennung entfernt]')
     expect(e.breadcrumbs?.[0].data?.from).toBe('/hof-test/bestaetigen/[kennung entfernt]')
     expect((e.contexts?.nextjs as { request_path: string }).request_path).toBe('/hof-test/bestaetigen/[kennung entfernt]')
   })
@@ -94,19 +94,19 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
   it('der Token nach /bestaetigen/ und /api/orders/confirm/ fällt auch, wenn er kurz ist — die Route entscheidet, nicht die Länge', () => {
     const e = bereinigeEreignis(
       ereignis({
-        request: { url: 'https://farmerzone.at/hof-test/bestaetigen/kurz-123?x=1' },
+        request: { url: 'https://agrilo.at/hof-test/bestaetigen/kurz-123?x=1' },
         breadcrumbs: [{ data: { url: '/api/orders/confirm/kurz-123' } }],
       })
     )
 
-    expect(e.request?.url).toBe('https://farmerzone.at/hof-test/bestaetigen/[kennung entfernt]?x=1')
+    expect(e.request?.url).toBe('https://agrilo.at/hof-test/bestaetigen/[kennung entfernt]?x=1')
     expect(e.breadcrumbs?.[0].data?.url).toBe('/api/orders/confirm/[kennung entfernt]')
   })
 
   it('kurze Pfadteile anderer Routen bleiben lesbar — Gegenprobe', () => {
-    const e = bereinigeEreignis(ereignis({ request: { url: 'https://farmerzone.at/hof-test/bestellung/abc' } }))
+    const e = bereinigeEreignis(ereignis({ request: { url: 'https://agrilo.at/hof-test/bestellung/abc' } }))
 
-    expect(e.request?.url).toBe('https://farmerzone.at/hof-test/bestellung/abc')
+    expect(e.request?.url).toBe('https://agrilo.at/hof-test/bestellung/abc')
   })
 
   it('dampft Blob-Speicher-URLs auf den Ursprung ein — der Pfad trägt den Geräte-Dateinamen', () => {
@@ -151,14 +151,14 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
       ereignis({
         request: {
           headers: {
-            Referer: 'https://farmerzone.at/reset-password?token=abc',
+            Referer: 'https://agrilo.at/reset-password?token=abc',
             accept: 'text/html',
           },
         },
       })
     )
 
-    expect(e.request?.headers?.Referer).toBe('https://farmerzone.at/reset-password')
+    expect(e.request?.headers?.Referer).toBe('https://agrilo.at/reset-password')
     expect(e.request?.headers?.accept).toBe('text/html')
   })
 
@@ -188,9 +188,9 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
         type: 'transaction',
         spans: [
           {
-            description: 'GET https://farmerzone.at/unsubscribe?token=xyz',
+            description: 'GET https://agrilo.at/unsubscribe?token=xyz',
             data: {
-              'url.full': 'https://farmerzone.at/unsubscribe?token=xyz&seite=1',
+              'url.full': 'https://agrilo.at/unsubscribe?token=xyz&seite=1',
               'url.query': 'token=xyz&seite=1',
               'http.response.status_code': 200,
             },
@@ -201,8 +201,8 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
 
     const span = (e as unknown as { spans: Array<{ description: string; data: Record<string, unknown> }> })
       .spans[0]
-    expect(span.description).toBe('GET https://farmerzone.at/unsubscribe')
-    expect(span.data['url.full']).toBe('https://farmerzone.at/unsubscribe?seite=1')
+    expect(span.description).toBe('GET https://agrilo.at/unsubscribe')
+    expect(span.data['url.full']).toBe('https://agrilo.at/unsubscribe?seite=1')
     expect(span.data['url.query']).toBe('seite=1')
     expect(span.data['http.response.status_code']).toBe(200)
   })
@@ -261,13 +261,13 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
     const e = bereinigeEreignis(
       ereignis({
         request: {
-          url: 'https://farmerzone.at/login?token=abc&seite=2',
+          url: 'https://agrilo.at/login?token=abc&seite=2',
           query_string: 'magic_token=xyz&code=123&email=a@b.at&seite=2',
         },
       })
     )
 
-    expect(e.request?.url).toBe('https://farmerzone.at/login?seite=2')
+    expect(e.request?.url).toBe('https://agrilo.at/login?seite=2')
     expect(e.request?.query_string).toBe('seite=2')
   })
 
@@ -279,13 +279,13 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
           // (bestell-link.ts), reorder trägt den selbsttragenden
           // Nachbestell-Token. `^s$` darf dabei NICHT Wörter treffen, die
           // bloß ein s enthalten (seite, sortierung).
-          url: 'https://farmerzone.at/hof/bestellung/abc?s=deadbeef&seite=2',
+          url: 'https://agrilo.at/hof/bestellung/abc?s=deadbeef&seite=2',
           query_string: 's=deadbeef&reorder=xyz.abc&seite=2&sortierung=neu',
         },
       })
     )
 
-    expect(e.request?.url).toBe('https://farmerzone.at/hof/bestellung/abc?seite=2')
+    expect(e.request?.url).toBe('https://agrilo.at/hof/bestellung/abc?seite=2')
     expect(e.request?.query_string).toBe('seite=2&sortierung=neu')
   })
 
@@ -295,13 +295,13 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
         request: {
           // sig öffnet /{hof}/confirm/{id} mit Name und E-Mail der Kundin
           // (bestell-link.ts, bestaetigungsPfad) — ein Zugangsgeheimnis.
-          url: 'https://farmerzone.at/hof/confirm/abc?sig=deadbeef&redirect_status=succeeded',
+          url: 'https://agrilo.at/hof/confirm/abc?sig=deadbeef&redirect_status=succeeded',
           query_string: 'sig=deadbeef&redirect_status=succeeded',
         },
       })
     )
 
-    expect(e.request?.url).toBe('https://farmerzone.at/hof/confirm/abc?redirect_status=succeeded')
+    expect(e.request?.url).toBe('https://agrilo.at/hof/confirm/abc?redirect_status=succeeded')
     expect(e.request?.query_string).toBe('redirect_status=succeeded')
   })
 
@@ -309,14 +309,14 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
     const e = bereinigeEreignis(
       ereignis({
         request: {
-          url: 'https://farmerzone.at/upload?art=logo&token=x',
+          url: 'https://agrilo.at/upload?art=logo&token=x',
           query_string: { token: 'x', art: 'logo' },
         },
       })
     )
 
     expect(e.request?.query_string).toBeUndefined()
-    expect(e.request?.url).toBe('https://farmerzone.at/upload?art=logo')
+    expect(e.request?.url).toBe('https://agrilo.at/upload?art=logo')
   })
 
   it('verliert bei einem zweiten ? in der URL nichts Harmloses', () => {
@@ -361,7 +361,7 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
         message: 'Anmeldung fehlgeschlagen für kundin@example.com mit Code 481234',
         exception: { values: [{ value: 'otp: 905173 abgelehnt' }] },
         request: {
-          url: 'https://farmerzone.at/api/auth/sign-in/email-otp?otp=481234&seite=2',
+          url: 'https://agrilo.at/api/auth/sign-in/email-otp?otp=481234&seite=2',
           query_string: 'otp=481234&seite=2',
         },
         breadcrumbs: [{ message: 'Anmeldecode 112233 eingegeben', data: { url: '/account/login?otp=112233' } }],
@@ -370,7 +370,7 @@ describe('bereinigeEreignis — der beforeSend-Filter', () => {
 
     expect(e.message).toBe('Anmeldung fehlgeschlagen für [e-mail entfernt] mit Code [code entfernt]')
     expect(e.exception?.values?.[0].value).toBe('otp: [code entfernt] abgelehnt')
-    expect(e.request?.url).toBe('https://farmerzone.at/api/auth/sign-in/email-otp?seite=2')
+    expect(e.request?.url).toBe('https://agrilo.at/api/auth/sign-in/email-otp?seite=2')
     expect(e.request?.query_string).toBe('seite=2')
     expect(e.breadcrumbs?.[0].message).toBe('Anmeldecode [code entfernt] eingegeben')
     expect(e.breadcrumbs?.[0].data?.url).toBe('/account/login')
@@ -409,9 +409,9 @@ describe('bereinigeEreignis — keine IP-Adressen (Nr. 37)', () => {
       ereignis({
         user: { id: 'farm_1', ip_address: '203.0.113.7' },
         request: {
-          url: 'https://farmerzone.at/orders',
+          url: 'https://agrilo.at/orders',
           headers: { ...IP_HEADER, accept: 'text/html', 'user-agent': 'Testbrowser/1.0' },
-          env: { REMOTE_ADDR: '203.0.113.7', SERVER_NAME: 'farmerzone.at' },
+          env: { REMOTE_ADDR: '203.0.113.7', SERVER_NAME: 'agrilo.at' },
         },
       })
     )
@@ -445,7 +445,7 @@ describe('bereinigeEreignis — keine IP-Adressen (Nr. 37)', () => {
               'http.request.header.x_forwarded_for': '203.0.113.7',
               'http.request.header.x_vercel_proxied_for': '203.0.113.7',
               'http.request.header.accept': 'text/html',
-              'url.full': 'https://farmerzone.at/reset-password?token=abc&seite=1',
+              'url.full': 'https://agrilo.at/reset-password?token=abc&seite=1',
               'http.response.status_code': 200,
             },
           },
@@ -474,7 +474,7 @@ describe('bereinigeEreignis — keine IP-Adressen (Nr. 37)', () => {
     expect(wurzel).toEqual({
       'http.request.header.accept': 'text/html',
       // Der Wurzel-Span trägt dieselbe rohe Adresse wie request.url — gleiche Regel.
-      'url.full': 'https://farmerzone.at/reset-password?seite=1',
+      'url.full': 'https://agrilo.at/reset-password?seite=1',
       'http.response.status_code': 200,
     })
     const span = (e as unknown as { spans: Array<{ data: Record<string, unknown> }> }).spans[0]
@@ -485,23 +485,23 @@ describe('bereinigeEreignis — keine IP-Adressen (Nr. 37)', () => {
   it('Gegenprobe: Ereignisse ohne IP bleiben unverändert in Gestalt — Server-Adresse und Methode bleiben', () => {
     const e = bereinigeEreignis(
       ereignis({
-        request: { method: 'POST', headers: { host: 'farmerzone.at', 'content-type': 'text/plain' } },
-        spans: [{ data: { 'server.address': 'farmerzone.at', 'http.request.method': 'POST' } }],
+        request: { method: 'POST', headers: { host: 'agrilo.at', 'content-type': 'text/plain' } },
+        spans: [{ data: { 'server.address': 'agrilo.at', 'http.request.method': 'POST' } }],
       })
     )
 
     expect(e.request).toEqual({
       method: 'POST',
-      headers: { host: 'farmerzone.at', 'content-type': 'text/plain' },
+      headers: { host: 'agrilo.at', 'content-type': 'text/plain' },
     })
     const span = (e as unknown as { spans: Array<{ data: Record<string, unknown> }> }).spans[0]
-    expect(span.data).toEqual({ 'server.address': 'farmerzone.at', 'http.request.method': 'POST' })
+    expect(span.data).toEqual({ 'server.address': 'agrilo.at', 'http.request.method': 'POST' })
   })
 
   it('wirft nie bei verquerer Gestalt — und lässt dabei keine IP durch', () => {
     const ip = '203.0.113.7'
     const verquer: object[] = [
-      { request: { headers: { Referer: ['https://farmerzone.at/a', ip], 'X-Real-IP': ip } } },
+      { request: { headers: { Referer: ['https://agrilo.at/a', ip], 'X-Real-IP': ip } } },
       { request: { headers: { referer: 42, 'x-forwarded-for': ip } } },
       { request: { headers: `X-Forwarded-For: ${ip}` } },
       { request: { headers: [['x-forwarded-for', ip]] } },
@@ -536,7 +536,7 @@ describe('bereinigeEreignis — keine IP-Adressen (Nr. 37)', () => {
       message: 'Rückruf an hof@beispiel.at gescheitert',
       exception: { values: [{ type: 'TypeError', value: 'kaputt bei hof@beispiel.at' }] },
       user: { id: 'farm_1', ip_address: '203.0.113.7' },
-      breadcrumbs: [{ data: { url: 'https://farmerzone.at/?token=abc' } }],
+      breadcrumbs: [{ data: { url: 'https://agrilo.at/?token=abc' } }],
       extra: { kundin: 'hof@beispiel.at' },
       tags: { ip: '203.0.113.7' },
       contexts: { nextjs: { request_path: '/customers/hof@beispiel.at' } },

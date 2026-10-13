@@ -17,7 +17,7 @@ import { SERVICEGEBUEHR_STANDARD_MIND_CENTS, SERVICEGEBUEHR_STANDARD_PROZENT } f
 const adressPruefungJeIp = createRateLimiter({ max: ADRESS_PRUEFUNG_MAX_PRO_MINUTE })
 
 /**
- * Ist die Adresse farmerzone.at/<slug> zum Hofnamen noch frei? Für die
+ * Ist die Hofadresse (Domain/<slug>) zum Hofnamen noch frei? Für die
  * Vorschau unter dem Hofnamen (HofAdresseVorschau) auf Registrieren und
  * Einrichten — öffentlich, ohne Anmeldung, daher abgesichert (Nr. 17c):
  *

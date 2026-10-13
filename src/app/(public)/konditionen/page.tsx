@@ -26,11 +26,12 @@ import {
   INFOSEITE_TITEL,
 } from '@/components/shared/infoseite-stil'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: 'Konditionen für Höfe — FarmerZone',
+  title: `Konditionen für Höfe — ${MARKE}`,
   description:
-    `Was FarmerZone kostet: ${STARTPHASE_SATZ} ${TARIFE_AB_SATZ} ` +
+    `Was ${MARKE} kostet: ${STARTPHASE_SATZ} ${TARIFE_AB_SATZ} ` +
     `${TARIFE.map((t) => `${t.name} ${t.preis} ${PRO_MONAT}`).join(', ')}. ` +
     `Die Servicegebühr von ${SERVICEGEBUEHR_SATZ_TEXT} zahlt der Kunde.`,
 }
@@ -40,7 +41,7 @@ export const metadata: Metadata = {
 // stünde der Satz nach dem Stichtag bis zum nächsten Deploy da.
 export const revalidate = 3600
 
-const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Mein Hof auf FarmerZone')}`
+const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent(`Mein Hof auf ${MARKE}`)}`
 
 // Der Startseiten-CTA verspricht das Gründungshof-Angebot — bisher konnte man
 // es nirgends nachlesen. Diese Seite ist die Nachlese-Stelle.

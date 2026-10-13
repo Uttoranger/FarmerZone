@@ -91,7 +91,7 @@ async function fahreFetch(handler: FetchHandler, request: Request): Promise<Resp
 function teilenPost(dateien: File[]): Request {
   const formular = new FormData()
   for (const datei of dateien) formular.append('foto', datei)
-  return new Request('https://farmerzone.at/teilen', { method: 'POST', body: formular })
+  return new Request('https://agrilo.at/teilen', { method: 'POST', body: formular })
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
@@ -167,14 +167,14 @@ describe('Der echte sw.js gegen die echte Lese-Seite', () => {
     // zurück in die Stale-Client-Falle.
     const handler = ladeServiceWorker(speicher)
 
-    expect(await fahreFetch(handler, new Request('https://farmerzone.at/teilen'))).toBeNull()
+    expect(await fahreFetch(handler, new Request('https://agrilo.at/teilen'))).toBeNull()
     expect(
-      await fahreFetch(handler, new Request('https://farmerzone.at/dashboard'))
+      await fahreFetch(handler, new Request('https://agrilo.at/dashboard'))
     ).toBeNull()
     expect(
       await fahreFetch(
         handler,
-        new Request('https://farmerzone.at/api/upload/verarbeiten', { method: 'POST', body: '{}' })
+        new Request('https://agrilo.at/api/upload/verarbeiten', { method: 'POST', body: '{}' })
       )
     ).toBeNull()
   })

@@ -9,8 +9,9 @@ import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
 import { berechneMailabstandBeginn } from '@/lib/beitrag-mailabstand'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { StatusNewClient } from './status-new-client'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'Neuer Beitrag — FarmerZone' }
+export const metadata: Metadata = { title: `Neuer Beitrag — ${MARKE}` }
 
 export const dynamic = 'force-dynamic'
 

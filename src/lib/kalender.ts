@@ -8,6 +8,7 @@
 // muss, das übernimmt der Kalender des Telefons.
 
 import { wienerMitternacht } from '@/lib/servicegebuehr'
+import { MARKE } from '@/lib/marke'
 
 /** RFC-5545-TEXT: Rückstrich, Strichpunkt, Beistrich und Zeilenumbruch
  *  werden maskiert — sonst zerfiele z. B. „Ried, Hauptplatz 1" in Felder.
@@ -157,11 +158,13 @@ export function erzeugeIcs(eintrag: KalenderEintrag): string {
   const zeilen = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//FarmerZone//Bestellverfolgung//DE',
+    `PRODID:-//${MARKE}//Bestellverfolgung//DE`,
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     ...VTIMEZONE_WIEN,
     'BEGIN:VEVENT',
+    // Der Suffix bleibt beim alten Namen (Register M1, technisch): Kalender erkennen
+    // einen Eintrag an der UID — ein neuer Suffix legte eingetragene Abholungen doppelt an.
     `UID:abholung-${eintrag.kennung}@farmerzone`,
     `DTSTAMP:${stempel}`,
     `DTSTART;TZID=Europe/Vienna:${wienerZeit(eintrag.datum, eintrag.beginn)}`,

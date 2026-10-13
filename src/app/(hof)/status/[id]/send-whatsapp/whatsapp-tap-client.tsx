@@ -21,6 +21,7 @@ import {
   type Abonnentin,
   type Rueckkehr,
 } from '@/lib/whatsapp-versand'
+import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
 
 interface Props {
   postId: string
@@ -32,7 +33,7 @@ interface Props {
   getippt: string[]
 }
 
-const APP_URL = typeof window !== 'undefined' ? window.location.origin : 'https://farmerzone.at'
+const APP_URL = typeof window !== 'undefined' ? window.location.origin : PRODUKTION_ADRESSE
 
 /**
  * Register W1: „Tippen" merkt sich die Person; als geöffnet gespeichert wird

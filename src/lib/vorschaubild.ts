@@ -17,6 +17,7 @@
 import { titelbildFoto } from '@/lib/mein-hof'
 import { teilenBildPfad } from '@/lib/teilen-kanal'
 import { TEILEN_BILD_MASSE, TEILEN_BILD_TYP } from '@/lib/teilen-bild'
+import { MARKE } from '@/lib/marke'
 
 export type Vorschaubild = { url: string; type?: string; width?: number; height?: number; alt: string }
 
@@ -24,7 +25,7 @@ export const STARTSEITE_VORSCHAUBILD = {
   url: '/og/startseite.jpg',
   width: 1200,
   height: 630,
-  alt: 'FarmerZone — Lebensmittel und Futter direkt vom Hof',
+  alt: `${MARKE} — Lebensmittel und Futter direkt vom Hof`,
 } as const satisfies Vorschaubild
 
 /**

@@ -19,6 +19,7 @@ import {
   neueServicegebuehrCents,
   type ArtikelFehltBestellung,
 } from '@/lib/artikel-fehlt'
+import { MARKE } from '@/lib/marke'
 
 /** Eier € 4,50 + Brot € 5,80 = € 10,30, Gebühr 5 % aufgerundet = € 0,52. */
 function bestellung(abweichend: Partial<ArtikelFehltBestellung> = {}): ArtikelFehltBestellung {
@@ -238,7 +239,7 @@ describe('artikelFehltZeilen — was der Dialog vor dem Speichern zeigt', () => 
       neu: { text: 'Von deiner nächsten Auszahlung abgezogen', betrag: '€ 5,80' },
       saetze: [
         'Artikel € 5,80 + Servicegebühr € 0,02 – die Gebühr gilt nur noch für € 4,50 Ware.',
-        'Das ist genau der Preis des fehlenden Artikels. Den Unterschied bei der Servicegebühr erstattet FarmerZone.',
+        `Das ist genau der Preis des fehlenden Artikels. Den Unterschied bei der Servicegebühr erstattet ${MARKE}.`,
       ],
     })
   })

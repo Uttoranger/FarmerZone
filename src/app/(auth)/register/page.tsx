@@ -6,9 +6,10 @@ import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { RegisterForm } from './register-form'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: 'Hof registrieren — FarmerZone',
+  title: `Hof registrieren — ${MARKE}`,
 }
 
 // Die Seite ist eine Server-Komponente, damit der signierte Zeitstempel BEIM

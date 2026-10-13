@@ -8,8 +8,9 @@ import { ladeKonditionenHof } from '@/server/queries/einstellungen'
 import { KonditionenAnsicht } from '@/components/hof-einstellungen/konditionen-ansicht'
 import { EinstellungenFehler } from '@/components/hof-einstellungen/einstellungen-fehler'
 import { EINSTELLUNGEN_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'Konditionen — FarmerZone' }
+export const metadata: Metadata = { title: `Konditionen — ${MARKE}` }
 
 export const dynamic = 'force-dynamic'
 

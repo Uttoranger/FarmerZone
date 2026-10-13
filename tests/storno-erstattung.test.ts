@@ -6,7 +6,7 @@
  * reverse_transfer. Die Zahlung ist eine Destination Charge auf dem
  * Plattformkonto (src/app/api/checkout/route.ts) — Stripe zahlt die
  * Erstattung dann ganz aus dem Plattformsaldo, und der Hof behält das Geld,
- * das ihm überwiesen wurde. FarmerZone trug den Warenpreis.
+ * das ihm überwiesen wurde. Die Plattform trug den Warenpreis.
  *
  * Geldfluss der Zahlung (Stripe: „if no amount is set, the full amount is
  * transferred"; die Gebühr geht als application_fee vom Hof an die Plattform):
@@ -16,7 +16,7 @@
  * Vollerstattung: reverse_transfer holt die GANZE Überweisung zurück („reversed
  * proportionally to the amount being refunded"), refund_application_fee gibt
  * die GANZE Gebühr an den Hof zurück. Nur beides zusammen ergibt: Der Hof gibt
- * genau seinen Warenpreis zurück, die Servicegebühr erstattet FarmerZone.
+ * genau seinen Warenpreis zurück, die Servicegebühr erstattet die Plattform.
  *
  * Beweist, Stripe gemockt — mit der Idempotenz echter Schlüssel:
  *  - Vollerstattung mit reverse_transfer und refund_application_fee, Schlüssel
@@ -34,6 +34,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { MARKE } from '@/lib/marke'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
@@ -347,7 +348,7 @@ describe('stornoGeldSaetze — was der Hof im Storno-Dialog liest', () => {
   it('online bezahlt: wer was zurückbekommt und was von der Auszahlung abgezogen wird', () => {
     expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONLINE', betraege: MIT_GEBUEHR })).toEqual([
       'Anna Muster bekommt zurück: € 25,50 (Warenpreis + Servicegebühr)',
-      'Von deiner nächsten Auszahlung abgezogen: € 24,00 – genau der Warenpreis. Die Servicegebühr erstattet FarmerZone.',
+      `Von deiner nächsten Auszahlung abgezogen: € 24,00 – genau der Warenpreis. Die Servicegebühr erstattet ${MARKE}.`,
     ])
   })
 
@@ -362,7 +363,7 @@ describe('stornoGeldSaetze — was der Hof im Storno-Dialog liest', () => {
   it('mit Provision stimmt der Satz zur Zahl', () => {
     const mitProvision = { ...MIT_GEBUEHR, vomHofCents: 2280, provisionCents: 120 }
     expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONLINE', betraege: mitProvision })[1]).toBe(
-      'Von deiner nächsten Auszahlung abgezogen: € 22,80 – der Warenpreis ohne die Provision. Die Servicegebühr erstattet FarmerZone.'
+      `Von deiner nächsten Auszahlung abgezogen: € 22,80 – der Warenpreis ohne die Provision. Die Servicegebühr erstattet ${MARKE}.`
     )
   })
 

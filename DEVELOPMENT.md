@@ -5086,6 +5086,16 @@ Auftrag freigabe.md §16 „83“ (Register N11), gestapelt auf 80. Keine Migrat
 - **Reihenfolge:** Die Hauptspalte von Heute läuft Packliste, Braucht dich, Teilen (`heuteAufbau`). Vorher stand die Teilen-Zeile (seit Nr. 45 kompakt unter der Packliste) vor „Braucht dich“ — eine Einladung zum Teilen schob eine überfällige Abholung nach unten. Dringend steht jetzt vor freiwillig.
 - **Leeres „Braucht dich“:** Ohne Eintrag keine Karte mehr, sondern die leise Zeile „Nichts braucht dich heute.“ (`BRAUCHT_DICH_LEER` in `src/lib/heute.ts`, gedämpft und ohne Rahmen wie „Zu tun einblenden“); vorher eine ganze Karte mit „Alles erledigt.“. Mit Einträgen bleibt die Karte, wie sie war. Kein Mockup zeigt „Braucht dich“, die Bilder im Bericht 83 sind die Vorlage.
 
+## Agrilo – Name und Domain (Nachtlauf 13, Nr. 91, Oktober 2026)
+
+Register M1: Die Plattform heißt Agrilo, die Produktionsdomain ist agrilo.at. Repo „FarmerZone“, Vercel-Projekt „farmer-zone“ und farmer-zone.vercel.app bleiben technische Namen.
+
+- **Eine Stelle für den Namen:** `MARKE` und `MARKE_TEAM` in `src/lib/marke.ts` (nicht verwechseln mit `marke-art.ts`, Register G5). Seitentitel, Wortmarke, Manifest, Mails, Teilen-Bild, Rechtstexte und Hilfetexte nehmen den Namen von dort; in Mails steht ein Satz mit dem Namen als eine Vorlage, weil react-email Textteile sonst mit `<!-- -->` trennt.
+- **Eine Stelle für die Domain:** `PRODUKTION_HOST` in `src/lib/umgebung.ts` (rein, auch im Browser verwendbar). Daraus: `PRODUKTION_ADRESSE` (Ersatzadresse in Stripe-Connect, Mails, WhatsApp-Seite, Nominatim-Kennung), die drei Kontaktadressen in `src/lib/support.ts` und die Adresstexte („Wird zu deiner Adresse: …“, Für Höfe). Die alte Domain gilt in der Produktion seitdem als fremder Host und meldet sich (`WARNUNG_APP_URL_FREMDER_HOST`).
+- **Wache:** `tests/marke-name-wache.test.ts` – kein alter Name in `src/`, `tests/`, `public/` außer der Ausnahmeliste (technische Schlüssel im Browser-Speicher, Nachrichtentypen, Kalender-UID, Repo-Name, Name der lokalen Test-Datenbank, die Gegenprobe zur alten Domain); der Name nur in `marke.ts`, die Domain unter `src/` nur in `umgebung.ts`.
+- **Offen:** Das Vorschaubild der Startseite (`public/og/startseite.jpg`) zeigt noch Schriftzug und F-Symbol des alten Namens, die App-Symbole (`public/icons/*`, `src/app/apple-icon.png`) ein „F“ – neu zeichnen ist nicht beauftragt.
+- **Cutover (Projektleitung, nicht der Lauf; Freigabe Lauf 13 §2):** VOR dem Merge des Sammel-PRs in Vercel (Production) NEXT_PUBLIC_APP_URL und BETTER_AUTH_URL auf https://agrilo.at und EMAIL_FROM auf „Agrilo <noreply@agrilo.at>“ setzen, Resend „verified“ abwarten; NACH dem Merge farmerzone.at und www.farmerzone.at in Vercel auf 308 → agrilo.at stellen, in Stripe (Sandbox) Webhook-Adresse, Payment-Method-Domain und Connect-Profil auf agrilo.at, test.agrilo.at dem Branch staging zuweisen. Wird der Sammel-PR ohne die Variablen gemergt, schlägt die Anmeldung in der Produktion fehl.
+
 ## Nützliche Befehle
 
 ```bash

@@ -51,7 +51,7 @@ export function kopfForm(seite: KundenSeite): KopfForm {
       return { zurueck, warenkorb: false, rueckwegZeile: true }
     case 'hofuebersicht':
     case 'info':
-      // Im Browser führen „FarmerZone" und „Höfe entdecken" schon zurück.
+      // Im Browser führen der Name und „Höfe entdecken" schon zurück.
       return { zurueck, warenkorb: true, rueckwegZeile: false }
   }
 }

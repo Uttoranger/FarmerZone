@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { NextRequest } from 'next/server'
 import { stripStatusVariables } from '@/lib/status-body'
 import { hofInitialen } from '@/lib/hof-initialen'
+import { MARKE } from '@/lib/marke'
 
 export const runtime = 'nodejs'
 
@@ -153,7 +154,7 @@ export async function GET(
               >
                 {post.farm.name}
               </div>
-              <div style={{ fontSize: '28px', color: '#5C6F65' }}>via FarmerZone</div>
+              <div style={{ fontSize: '28px', color: '#5C6F65' }}>{`via ${MARKE}`}</div>
             </div>
           </div>
         </div>

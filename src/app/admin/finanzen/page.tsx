@@ -21,8 +21,9 @@ import { KARTE, KICKER, LEISE } from '@/components/hof-bestellungen/stil'
 import { ADMIN_RAHMEN, AdminFehler, SEITEN_TITEL } from '@/components/admin/admin-teile'
 import { DiagrammLegende, FinanzenDiagramm } from './finanzen-diagramm'
 import { KostenListe } from './kosten-liste'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'Finanzen — Admin — FarmerZone' }
+export const metadata: Metadata = { title: `Finanzen — Admin — ${MARKE}` }
 // Die Seite zeigt Geld und wird selten aufgerufen — nie aus einem Cache.
 export const dynamic = 'force-dynamic'
 

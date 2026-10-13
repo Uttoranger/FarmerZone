@@ -5,6 +5,7 @@ import { formatiereTelefon } from '@/lib/telefon-anzeige'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { HINWEIS } from './kasse-teile'
+import { MARKE } from '@/lib/marke'
 
 /*
  * „Angaben zum Hof (dein Vertragspartner)" in der Kasse — EINE Komponente für
@@ -61,7 +62,7 @@ export function AngabenZumHof({ hof }: { hof: AngabenHof }): React.JSX.Element {
           </div>
         ))}
       </dl>
-      <p className={cn(HINWEIS, 'mt-2')}>Du kaufst direkt beim Hof. FarmerZone vermittelt die Bestellung.</p>
+      <p className={cn(HINWEIS, 'mt-2')}>Du kaufst direkt beim Hof. {MARKE} vermittelt die Bestellung.</p>
     </details>
   )
 }

@@ -1,5 +1,5 @@
 /**
- * „Leg FarmerZone auf den Startbildschirm" — die kleine Karte ganz unten auf
+ * Die Karte „auf den Startbildschirm legen" — die kleine Karte ganz unten auf
  * Heute (Nachtlauf Nr. 41, Register N1).
  *
  * Beweist:
@@ -23,6 +23,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { STARTBILDSCHIRM_KARTE, laeuftAlsApp } from '@/lib/startbildschirm'
 import { StartbildschirmAnleitung, StartbildschirmKarte, anzeigeImBrowser } from '@/components/heute/startbildschirm-karte'
 import manifest from '@/app/manifest'
+import { MARKE } from '@/lib/marke'
 
 const quelle = (pfad: string): string => readFileSync(join(process.cwd(), pfad), 'utf8')
 /** Sätze zählen: Satzzeichen am Ende, außerhalb von Anführungszeichen. */
@@ -30,7 +31,7 @@ const saetze = (text: string): number => (text.replace(/„[^“]*“/g, 'X').ma
 
 describe('Texte aus einer Quelle', () => {
   it('der Titel steht wie in der Freigabe', () => {
-    expect(STARTBILDSCHIRM_KARTE.titel).toBe('Mit einem Tipp in deinem Hof: Leg FarmerZone auf den Startbildschirm')
+    expect(STARTBILDSCHIRM_KARTE.titel).toBe(`Mit einem Tipp in deinem Hof: Leg ${MARKE} auf den Startbildschirm`)
   })
 
   it('iPhone und Android, je genau zwei Sätze', () => {

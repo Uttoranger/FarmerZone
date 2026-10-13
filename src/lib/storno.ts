@@ -18,13 +18,14 @@
  */
 import { formatEuro } from '@/lib/format'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
+import { MARKE } from '@/lib/marke'
 
 export type StornoBetraege = {
   /** Was die Kundin zurückbekommt: Warenpreis + Servicegebühr. */
   erstattetCents: number
   /** Was von der nächsten Auszahlung des Hofs abgezogen wird: Warenpreis − Provision. */
   vomHofCents: number
-  /** Die Servicegebühr — sie erstattet FarmerZone. */
+  /** Die Servicegebühr — sie erstattet die Plattform. */
   servicegebuehrCents: number
   /** Die Provision (im Pilot 0) — der Hof hat sie nie bekommen, er gibt sie nicht zurück. */
   provisionCents: number
@@ -87,7 +88,7 @@ export function stornoGeldSaetze(eingabe: {
   const abgezogen =
     `Von deiner nächsten Auszahlung abgezogen: ${formatEuro(centsAlsEuro(betraege.vomHofCents))} – ` +
     (betraege.provisionCents > 0 ? 'der Warenpreis ohne die Provision.' : 'genau der Warenpreis.') +
-    (mitGebuehr ? ' Die Servicegebühr erstattet FarmerZone.' : '')
+    (mitGebuehr ? ` Die Servicegebühr erstattet ${MARKE}.` : '')
   return [zurueck, abgezogen]
 }
 

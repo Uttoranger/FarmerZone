@@ -10,6 +10,7 @@ import { unitSuffix } from '@/lib/order-line'
 import { barZuKassierenCents, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { abholtage, abholWhere, datumLang } from '@/lib/heute'
+import { MARKE } from '@/lib/marke'
 
 export const dynamic = 'force-dynamic'
 
@@ -195,7 +196,7 @@ export default async function PrintPacklistPage() {
 
         {/* Print footer */}
         <div className="mt-10 pt-4 border-t border-gray-200 text-xs text-gray-300 text-center">
-          Gedruckt am {new Date().toLocaleString('de-AT')} · FarmerZone
+          Gedruckt am {new Date().toLocaleString('de-AT')} · {MARKE}
         </div>
       </div>
     </div>

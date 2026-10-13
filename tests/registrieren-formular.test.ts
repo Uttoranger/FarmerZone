@@ -151,7 +151,7 @@ describe('RegisterForm — gerendert', () => {
   const html = renderToStaticMarkup(createElement(RegisterForm, { formToken: 'token' }))
 
   it('Felder nach Mockup: Hofname mit Adresse, ein Name, E-Mail, Passwort mit Stärke', () => {
-    for (const text of ['Name deines Hofs', 'Wird zu deiner Adresse: farmerzone.at/dein-hof', 'Dein Name', 'E-Mail', 'Passwort', 'Konto erstellen']) {
+    for (const text of ['Name deines Hofs', 'Wird zu deiner Adresse: agrilo.at/dein-hof', 'Dein Name', 'E-Mail', 'Passwort', 'Konto erstellen']) {
       expect(html).toContain(text)
     }
     expect(html).toContain('Mindestens 8 Zeichen, mit Groß- und Kleinbuchstaben und einer Zahl.')

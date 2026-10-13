@@ -1,13 +1,16 @@
 // Support-Kontakt: eine Quelle für die Betreiber-Adresse und die daraus
 // gebauten mailto-Links. Ändert sich die Adresse, ändert sie sich hier —
-// nicht in jeder Seite einzeln.
+// nicht in jeder Seite einzeln. Die Domain kommt aus PRODUKTION_HOST
+// (Register M1), sie steht nicht noch einmal hier.
 
-export const SUPPORT_EMAIL = 'support@farmerzone.at'
+import { PRODUKTION_HOST } from '@/lib/umgebung'
+
+export const SUPPORT_EMAIL = `support@${PRODUKTION_HOST}`
 
 // Öffentliche Kontaktstellen der Rechtstexte. Alle drei Postfächer werden
 // über Cloudflare-Email-Routing empfangen und an den Betreiber weitergeleitet.
-export const KONTAKT_EMAIL = 'kontakt@farmerzone.at'
-export const DATENSCHUTZ_EMAIL = 'datenschutz@farmerzone.at'
+export const KONTAKT_EMAIL = `kontakt@${PRODUKTION_HOST}`
+export const DATENSCHUTZ_EMAIL = `datenschutz@${PRODUKTION_HOST}`
 
 type SupportMailOptions = {
   subject: string

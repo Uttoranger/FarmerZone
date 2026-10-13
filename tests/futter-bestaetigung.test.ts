@@ -28,6 +28,7 @@ import {
   futterVerantwortungImKorb,
   type FutterStand,
 } from '@/lib/futter-registrierung'
+import { MARKE } from '@/lib/marke'
 
 describe('Wortlaute aus E10a', () => {
   it('der Haken sagt genau den Satz aus dem Register', () => {
@@ -44,7 +45,7 @@ describe('Wortlaute aus E10a', () => {
 
   it('der Kundenhinweis und der Zusatz für Betriebe sagen genau die Sätze aus dem Register', () => {
     expect(KUNDEN_VERANTWORTUNG).toBe(
-      'Die Angaben zu Registrierung und Kennzeichnung stammen vom Hof. Der Hof ist für ihre Richtigkeit verantwortlich; FarmerZone vermittelt nur und prüft die Angaben nicht.'
+      `Die Angaben zu Registrierung und Kennzeichnung stammen vom Hof. Der Hof ist für ihre Richtigkeit verantwortlich; ${MARKE} vermittelt nur und prüft die Angaben nicht.`
     )
     expect(BETRIEB_VERANTWORTUNG).toBe('Als Betrieb bist du für den bestimmungsgemäßen Einsatz verantwortlich.')
   })
@@ -278,7 +279,7 @@ describe('EINE Quelle für die Futter-Texte (E10a)', () => {
   it.each([
     ['Haken', 'nach dem Futtermittelgesetz bestraft'],
     ['Kopfhinweis', 'keine Rechtsberatung'],
-    ['Kundenhinweis', 'FarmerZone vermittelt nur'],
+    ['Kundenhinweis', 'vermittelt nur und prüft die Angaben nicht'],
     ['Zusatz Betriebe', 'bestimmungsgemäßen Einsatz'],
     ['BAES-Adresse', 'baes.gv.at'],
   ])('%s (%s) steht nur in der Quelle', (_name, stueck) => {

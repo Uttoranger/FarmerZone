@@ -426,7 +426,7 @@ describe('Tab-Titel und Seitentitel der Unterseiten', () => {
   // /settings/appearance leitet seit Nr. 50 nur noch um — ohne eigenen Tab-Titel und Kopf.
   it.each(['profile', 'pickup-slots', 'pause', 'account', 'teilen'])('/settings/%s: der Tab nimmt dieselbe Schreibweise wie der Kopf', (seite) => {
     const text = quelle(`src/app/(hof)/settings/${seite}/page.tsx`)
-    const tab = text.match(/title: `\$\{([A-Za-z_.]+)\} — FarmerZone`/)
+    const tab = text.match(/title: `\$\{([A-Za-z_.]+)\} — \$\{MARKE\}`/)
     expect(tab, seite).not.toBeNull()
     const quelleDesTitels = tab?.[1] ?? ''
     expect(text, seite).toContain(`{${quelleDesTitels}}`)

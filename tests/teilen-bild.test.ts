@@ -159,7 +159,7 @@ describe('welche Produkte ins Bild dürfen', () => {
       produkte: [produkt('eier')],
       slots: [{ dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }],
       auswahl: null,
-      adresse: 'farmerzone.at/hof-test',
+      adresse: 'agrilo.at/hof-test',
       jetzt: JETZT,
     })
     expect(daten.produkte).toEqual([])
@@ -192,7 +192,7 @@ describe('Fremdtext im Bild', () => {
       produkte: [produkt('x', { name: '"><img src=x onerror=alert(1)>' })],
       slots: [],
       auswahl: null,
-      adresse: 'farmerzone.at/hof-test',
+      adresse: 'agrilo.at/hof-test',
       jetzt: JETZT,
     })
     expect(daten.hofName).toBe('<script>alert(1)</script> Hof')
@@ -205,7 +205,7 @@ describe('Fremdtext im Bild', () => {
       produkte: [produkt('x', { name: '"><img src=x onerror=alert(1)>' })],
       slots: [],
       auswahl: null,
-      adresse: 'farmerzone.at/hof-test',
+      adresse: 'agrilo.at/hof-test',
       jetzt: JETZT,
     })
     const html = renderToStaticMarkup(createElement(TeilenBildGrafik, { daten, format: 'quadrat', qr: qrPfad('https://x.at/hof-test?k=qr'), bilder: OHNE_BILDER }))
@@ -221,7 +221,7 @@ describe('Fremdtext im Bild', () => {
       produkte: [],
       slots: [],
       auswahl: null,
-      adresse: 'farmerzone.at/hof-test',
+      adresse: 'agrilo.at/hof-test',
       jetzt: JETZT,
     })
     const html = renderToStaticMarkup(createElement(TeilenBildGrafik, { daten, format: 'story', qr: qrPfad('https://x.at'), bilder: OHNE_BILDER }))
@@ -237,7 +237,7 @@ describe('Daten, Text und Prüfsumme', () => {
       produkte: [produkt('eier', { name: 'Freilandeier' })],
       slots: [{ dayOfWeek: 6, startTime: '09:00', endTime: '12:00' }],
       auswahl: null,
-      adresse: 'farmerzone.at/hof-test',
+      adresse: 'agrilo.at/hof-test',
       jetzt: JETZT,
     })
     expect(daten).toMatchObject({ hofName: 'Hof Test', ort: 'Teststadt', abholung: 'Abholung Samstag, 9–12 Uhr' })
@@ -252,7 +252,7 @@ describe('Daten, Text und Prüfsumme', () => {
       produkte: [produkt('a'), produkt('b')],
       slots: [],
       auswahl: null,
-      adresse: 'farmerzone.at/hof-test',
+      adresse: 'agrilo.at/hof-test',
       jetzt: JETZT,
     }
     const vorher = teilenBildVersion(teilenBildDaten(eingabe))
@@ -301,11 +301,11 @@ describe('Daten, Text und Prüfsumme', () => {
 
 describe('QR-Code', () => {
   it('ein Pfad aus Rechtecken, gleich für gleiche Adresse', () => {
-    const a = qrPfad('https://farmerzone.at/hof-test?k=qr')
+    const a = qrPfad('https://agrilo.at/hof-test?k=qr')
     expect(a.groesse).toBeGreaterThanOrEqual(21)
     expect(a.pfad).toMatch(/^(M\d+ \d+h\d+v1h-\d+z)+$/)
-    expect(qrPfad('https://farmerzone.at/hof-test?k=qr')).toEqual(a)
-    expect(qrPfad('https://farmerzone.at/anderer-hof?k=qr').pfad).not.toBe(a.pfad)
+    expect(qrPfad('https://agrilo.at/hof-test?k=qr')).toEqual(a)
+    expect(qrPfad('https://agrilo.at/anderer-hof?k=qr').pfad).not.toBe(a.pfad)
   })
 })
 
@@ -533,7 +533,7 @@ describe('Beitrag im Bild (Register T6, Nr. 69)', () => {
   })
 
   it('Anlass als Wort, Titel und Text gereinigt in den Daten; ohne Beitrag fehlt das Feld', () => {
-    const eingabe = { hof: HOF, produkte: [produkt('eier')], slots: [], auswahl: null, adresse: 'farmerzone.at/hof-test', jetzt: JETZT }
+    const eingabe = { hof: HOF, produkte: [produkt('eier')], slots: [], auswahl: null, adresse: 'agrilo.at/hof-test', jetzt: JETZT }
     const daten = teilenBildDaten({ ...eingabe, beitrag: { anlass: 'NEW_SEASON', title: '<b>Spargel</b>​ ist da', body: 'Ab heute. Täglich frisch. Bis Juni.' } })
     expect(daten.beitrag).toEqual({ anlass: 'Neue Saison', titel: '<b>Spargel</b> ist da', text: 'Ab heute. Täglich frisch.' })
     expect(teilenBildDaten({ ...eingabe, beitrag: null })).not.toHaveProperty('beitrag')
@@ -554,7 +554,7 @@ describe('Beitrag im Bild (Register T6, Nr. 69)', () => {
   })
 
   it('die Prüfsumme nimmt Beitrag und Fotos auf; ohne beides bleibt sie die der Metadaten der Hofseite', () => {
-    const eingabe = { hof: HOF, produkte: [produkt('eier')], slots: [], auswahl: null, adresse: 'farmerzone.at/hof-test', jetzt: JETZT }
+    const eingabe = { hof: HOF, produkte: [produkt('eier')], slots: [], auswahl: null, adresse: 'agrilo.at/hof-test', jetzt: JETZT }
     const ohne = teilenBildVersion(teilenBildDaten(eingabe))
     expect(teilenBildVersion(teilenBildDaten({ ...eingabe, beitrag: null }), [])).toBe(ohne)
     const mit = teilenBildVersion(teilenBildDaten({ ...eingabe, beitrag: { anlass: 'PROMOTION', title: 'Aktion', body: 'Text.' } }))
@@ -570,10 +570,10 @@ describe('Grafik: QR nur in der Story, Foto-Held mit Foto (Register T6)', () => 
     produkte: [produkt('eier', { name: 'Freilandeier' })],
     slots: [{ dayOfWeek: 6, startTime: '09:00', endTime: '12:00' }],
     auswahl: null,
-    adresse: 'farmerzone.at/hof-test',
+    adresse: 'agrilo.at/hof-test',
     jetzt: JETZT,
   })
-  const qr = qrPfad('https://farmerzone.at/hof-test?k=qr')
+  const qr = qrPfad('https://agrilo.at/hof-test?k=qr')
   const MIT_FOTO: GeladeneBilder = { produkte: { eier: 'data:image/jpeg;base64,RUND' }, held: 'data:image/jpeg;base64,HELD', ersatz: false }
   const zeichne = (format: 'quadrat' | 'story', bilder: GeladeneBilder) =>
     renderToStaticMarkup(createElement(TeilenBildGrafik, { daten, format, qr, bilder }))
@@ -586,7 +586,7 @@ describe('Grafik: QR nur in der Story, Foto-Held mit Foto (Register T6)', () => 
       // Gegenprobe: Dieselbe Grafik zeichnet beide Merkmale in der Story.
       const story = zeichne('story', bilder)
       expect(story).toContain(qr.pfad)
-      expect(story).toContain('Code scannen oder farmerzone.at/hof-test')
+      expect(story).toContain('Code scannen oder agrilo.at/hof-test')
     }
   })
 

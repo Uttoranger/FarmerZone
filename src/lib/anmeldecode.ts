@@ -4,7 +4,7 @@
  *
  * Der Ablauf selbst gehört Better Auth (emailOTP-Plugin, src/lib/auth.ts):
  * Code erzeugen, gehasht in der Verification-Tabelle ablegen, prüfen, Sitzung
- * anlegen. Hier steht, was FarmerZone dabei festlegt — Länge, Laufzeit,
+ * anlegen. Hier steht, was die Plattform dabei festlegt — Länge, Laufzeit,
  * Versuche, Bremsen, wer einen Code bekommt, was die Kundin bei einem Fehler
  * liest und wohin es danach geht. Das Formular (components/anmelden/
  * kunde-code-formular.tsx) und „Bestellungen finden" (Nr. 14) lesen dieselben
@@ -216,7 +216,7 @@ const PRUEF_URSPRUNG = 'https://farmerzone.invalid'
 /**
  * Wohin es nach der Anmeldung mit Code geht. Nur ein eigener, relativer Pfad
  * — sonst wäre die Anmeldeseite ein Sprungbrett auf fremde Seiten (offene
- * Weiterleitung, beliebt für Phishing: „melde dich auf farmerzone.at an" und
+ * Weiterleitung, beliebt für Phishing: „melde dich auf unserer Seite an" und
  * landet woanders). Abgelehnt wird alles, was nicht mit genau einem „/"
  * beginnt, Rückstriche und Steuerzeichen trägt, kodiert mit „//" beginnt,
  * NACH dem Auflösen von „." und „.." mit „//" beginnt oder in die

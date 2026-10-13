@@ -18,8 +18,9 @@ import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellunge
 import { ADMIN_RAHMEN, AdminFehler } from '@/components/admin/admin-teile'
 import { TriageForm, type TriageWerte } from './triage-form'
 import { KiVorschlag } from './ki-vorschlag'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'Meldung — Admin — FarmerZone' }
+export const metadata: Metadata = { title: `Meldung — Admin — ${MARKE}` }
 export const dynamic = 'force-dynamic'
 
 function uhrzeit(d: Date): string {

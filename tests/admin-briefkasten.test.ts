@@ -72,7 +72,7 @@ describe('Status-Filter', () => {
 describe('Zeile „woher"', () => {
   const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'
   it('Hof, Pfad ohne Abfrage, Gerät in Worten', () => {
-    expect(herkunftZeile({ hofName: 'Hof Test', customerEmail: null, seiteUrl: 'https://farmerzone.example/products?suche=karotte', userAgent: ua })).toBe(
+    expect(herkunftZeile({ hofName: 'Hof Test', customerEmail: null, seiteUrl: 'https://plattform.example/products?suche=karotte', userAgent: ua })).toBe(
       'Hof Test · /products · Safari, iPhone'
     )
   })

@@ -6,8 +6,9 @@ import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getStatusPostForWhatsApp } from '@/server/queries/status-posts'
 import { WhatsAppTapClient } from './whatsapp-tap-client'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'WhatsApp versenden — FarmerZone' }
+export const metadata: Metadata = { title: `WhatsApp versenden — ${MARKE}` }
 
 export const dynamic = 'force-dynamic'
 

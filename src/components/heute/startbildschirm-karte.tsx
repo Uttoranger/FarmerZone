@@ -5,7 +5,7 @@ import { Smartphone } from 'lucide-react'
 import { STARTBILDSCHIRM_KARTE, laeuftAlsApp } from '@/lib/startbildschirm'
 
 /*
- * „Leg FarmerZone auf den Startbildschirm" — ganz unten auf Heute, nur im
+ * Die Karte „auf den Startbildschirm legen" — ganz unten auf Heute, nur im
  * Browser, nicht in der installierten App (Register N1, Nachtlauf Nr. 41).
  * Texte und Regel: src/lib/startbildschirm.ts.
  *

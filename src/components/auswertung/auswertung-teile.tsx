@@ -94,7 +94,7 @@ function Kachel({ titel, wert, satz }: { titel: string; wert: string; satz: stri
 }
 
 /**
- * Vier Kennzahlen des gewählten Zeitraums: Über FarmerZone · Bestellungen ·
+ * Vier Kennzahlen des gewählten Zeitraums: über die Plattform · Bestellungen ·
  * Ø Bestellung · Nicht abgeholt. Im Mockup heißt die erste „Warenumsatz" —
  * neben „€ 206" in der Umsatzkarte stand dann „€ 0" ohne Erklärung. Seit
  * Nr. 53 sagen beide, was sie zählen (UMSATZ_TEXT): hier nur Bestellungen.
@@ -107,7 +107,7 @@ export function KennzahlenReihe({ k, zeitraum }: { k: Kennzahlen; zeitraum: stri
       </h2>
       {/* Eine Beschreibungsliste; jede Kachel ist eine Gruppe aus dt und dd (div in dl ist erlaubt). */}
       <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kachel titel={UMSATZ_TEXT.ueberFarmerzone} wert={euroGanz(k.warenCents)} satz={`${zeitraum} · abgeholte Bestellungen`} />
+        <Kachel titel={UMSATZ_TEXT.ueberPlattform} wert={euroGanz(k.warenCents)} satz={`${zeitraum} · abgeholte Bestellungen`} />
         <Kachel titel="Bestellungen" wert={formatZahl(k.bestellungen)} satz={zahlartZeile(k) ?? 'noch keine abgeholt'} />
         <Kachel titel="Ø Bestellung" wert={k.durchschnittCents === null ? '–' : euro(k.durchschnittCents)} satz="Warenpreis" />
         <Kachel titel="Nicht abgeholt" wert={formatZahl(k.nichtAbgeholt)} satz="kostenlos für dich" />

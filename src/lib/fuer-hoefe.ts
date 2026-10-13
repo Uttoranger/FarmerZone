@@ -8,6 +8,7 @@
  * Farm.isPaused) — keine Zusage darüber hinaus.
  */
 import { ONLINE_ZAHLUNG_START_KURZ, ONLINE_ZAHLUNG_START_SCHRITT, SERVICEGEBUEHR_SATZ_TEXT, mitBarAusnahme } from '@/lib/konditionen'
+import { PRODUKTION_HOST } from '@/lib/umgebung'
 
 export type Vorteil = { titel: string; text: string; kurz: string }
 
@@ -70,7 +71,7 @@ export const FUER_HOEFE_FRAGEN: readonly Frage[] = [
     frage: 'Brauche ich eine eigene Website?',
     antwort:
       // „mit QR-Code für den Hofladen" (Mockup) erst mit Gate 7 (Nr. 21).
-      'Nein. Du bekommst eine eigene Hofseite unter farmerzone.at/dein-hof – zum Teilen per Link oder WhatsApp.',
+      `Nein. Du bekommst eine eigene Hofseite unter ${PRODUKTION_HOST}/dein-hof – zum Teilen per Link oder WhatsApp.`,
   },
   {
     frage: 'Wie kommt das Geld zu mir?',

@@ -10,9 +10,10 @@ import { getStripeReadiness } from '@/server/queries/farm'
 import { VerkaeufeAnsicht } from '@/components/hof-verkaeufe/verkaeufe-ansicht'
 import { VerkaeufeFehler } from '@/components/hof-verkaeufe/verkaeufe-fehler'
 import { VERKAEUFE_RAHMEN } from '@/components/hof-verkaeufe/verkaeufe-laden'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: 'Verkäufe — FarmerZone',
+  title: `Verkäufe — ${MARKE}`,
 }
 
 export const dynamic = 'force-dynamic'

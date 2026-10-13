@@ -459,7 +459,7 @@ describe('Nachbesserung 1: nach dem Anlegen gilt der Betrag des Servers', () => 
 })
 
 describe('bestaetigungMitStatus — Rückleitung, wenn die Zahlung schon durch ist', () => {
-  const HIER = 'https://farmerzone.example'
+  const HIER = 'https://plattform.example'
 
   it('hängt redirect_status an einen signierten Pfad an', () => {
     expect(bestaetigungMitStatus('/hof-test/confirm/o1?sig=abc', HIER, 'processing')).toBe('/hof-test/confirm/o1?sig=abc&redirect_status=processing')

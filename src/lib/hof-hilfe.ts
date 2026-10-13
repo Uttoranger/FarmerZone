@@ -144,7 +144,7 @@ export function geraetKurz(userAgent: string): string {
   return teile.length > 0 ? teile.join(', ') : 'Unbekanntes Gerät'
 }
 
-/** Die Seite ohne Herkunft („/orders?filter=heute") — die Herkunft ist immer FarmerZone. */
+/** Die Seite ohne Herkunft („/orders?filter=heute") — die Herkunft ist immer die eigene Seite. */
 export function seiteKurz(url: string): string {
   const roh = url.trim()
   if (roh === '') return '–'

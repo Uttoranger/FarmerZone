@@ -21,6 +21,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { MARKE } from '@/lib/marke'
 
 vi.mock('@/lib/prisma', () => ({ prisma: {} }))
 vi.mock('@/server/hofseite-vorschau', () => ({ ladeHofseiteGeteilt: vi.fn() }))
@@ -183,7 +184,7 @@ describe('Kasse: die Angaben zum Hof stehen vor dem Kaufknopf', () => {
     expect(html).toMatch(/<details[^>]*\bopen=""/)
     expect(html).toContain('Angaben zum Hof (dein Vertragspartner)')
     for (const angabe of ANGABEN) expect(html, angabe).toContain(angabe)
-    expect(html).toContain('Du kaufst direkt beim Hof. FarmerZone vermittelt die Bestellung.')
+    expect(html).toContain(`Du kaufst direkt beim Hof. ${MARKE} vermittelt die Bestellung.`)
   })
 
   function abschluss(online: boolean): string {

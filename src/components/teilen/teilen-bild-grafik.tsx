@@ -3,6 +3,7 @@ import { TEILEN_BILD_MASSE, type TeilenBildDaten, type TeilenBildEintrag } from 
 import type { TeilenBildFormat } from '@/lib/teilen-kanal'
 import type { QrPfad } from '@/lib/qr-code'
 import type { GeladeneBilder } from '@/lib/teilen-bild-quellen'
+import { MARKE } from '@/lib/marke'
 
 /*
  * Das Teilen-Bild als Satori-Grafik (next/og; Register T6, Nr. 69; Mockups
@@ -131,7 +132,7 @@ function Marke({ m, aufFoto }: { m: Mass; aufFoto: boolean }): React.JSX.Element
           <path d="M8 1C3 5 2 10 4 14c1 2 3 3 4 3s3-1 4-3c2-4 1-9-4-13Z" fill={farbe} />
         </svg>
       </div>
-      <div style={{ display: 'flex' }}>FarmerZone</div>
+      <div style={{ display: 'flex' }}>{MARKE}</div>
     </div>
   )
 }

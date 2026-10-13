@@ -5,6 +5,7 @@
  * die Reset-URL an den Versand. Nur das Resend-SDK ist gemockt — kein Netzwerk.
  */
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
+import { MARKE } from '@/lib/marke'
 
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
@@ -47,7 +48,7 @@ describe('sendPasswordResetEmail', () => {
     expect(sendMock).toHaveBeenCalledOnce()
     const call = sendMock.mock.calls[0][0]
     expect(call.to).toBe('bauer@example.com')
-    expect(call.subject).toBe('Passwort zurücksetzen · FarmerZone')
+    expect(call.subject).toBe(`Passwort zurücksetzen · ${MARKE}`)
     expect(call.html).toContain(url)
   })
 

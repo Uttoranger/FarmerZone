@@ -5,9 +5,10 @@ import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { TEXTKNOPF } from '@/components/anmelden/stil'
 import { cn } from '@/lib/utils'
 import { NeuesPasswortFormular } from './neues-passwort-formular'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: 'Neues Passwort — FarmerZone',
+  title: `Neues Passwort — ${MARKE}`,
   // Der Link aus der Mail trägt einen gültigen Token (?token=) — wie /verify:
   // nie in einen Suchindex; next.config.ts setzt dazu no-referrer und
   // X-Robots-Tag (Nr. 54).
@@ -32,7 +33,7 @@ export default function ResetPasswordPage(): React.JSX.Element {
         <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 md:p-6">
           <div>
             <h2 className="font-heading text-[22px] leading-tight font-semibold text-foreground md:text-2xl">Neues Passwort wählen</h2>
-            <p className="mt-1 text-[14px] leading-normal text-muted-foreground">Für dein FarmerZone-Konto.</p>
+            <p className="mt-1 text-[14px] leading-normal text-muted-foreground">Für dein {MARKE}-Konto.</p>
           </div>
           {/* useSearchParams verlangt beim Prerendern eine Suspense-Grenze */}
           <Suspense fallback={null}>

@@ -24,6 +24,7 @@ import { join, relative } from 'node:path'
 import type { OrderStatus } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
 import ts from 'typescript'
+import { MARKE } from '@/lib/marke'
 
 // Die Seiten binden Client-Formulare ein; für die Metadaten zählt nur der Export.
 vi.mock('@/lib/auth-client', () => ({ authClient: {}, signIn: {}, signOut: vi.fn(), useSession: () => ({ data: null }) }))
@@ -134,7 +135,7 @@ describe('Seiten mit Token in der Adresse bleiben aus dem Suchindex (Metadaten)'
 
   it('/problem-melden bleibt noindex; /forgot-password trägt keinen Token und hat nur einen Titel', () => {
     expect(problemMeta.robots).toEqual({ index: false, follow: false })
-    expect(vergessenMeta.title).toBe('Passwort vergessen — FarmerZone')
+    expect(vergessenMeta.title).toBe(`Passwort vergessen — ${MARKE}`)
     expect(vergessenMeta.robots).toBeUndefined()
   })
 

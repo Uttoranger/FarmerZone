@@ -264,7 +264,7 @@ export async function ladeTeilenFensterBeitrag(farmId: string, postId: string, j
 export type PlakatDaten = {
   hofName: string
   ort: string
-  /** „farmerzone.at/hof-test" — gedruckt unter dem Code. */
+  /** Host und Pfad ohne https:// (Domain/hof-test) — gedruckt unter dem Code. */
   adresse: string
   /** Die statische Hofseiten-Adresse mit `?k=qr` — Inhalt des QR-Codes. */
   link: string

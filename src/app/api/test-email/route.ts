@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendRaw } from '@/lib/email'
+import { MARKE } from '@/lib/marke'
 
 // GET /api/test-email?to=adresse@example.com
 // Diagnose-Route für den E-Mail-Versand — nur in der lokalen Entwicklung aktiv.
@@ -15,12 +16,12 @@ export async function GET(request: NextRequest) {
   }
 
   const html = `
-    <h1>FarmerZone Test-E-Mail</h1>
+    <h1>${MARKE} Test-E-Mail</h1>
     <p>Diese Mail wurde um <strong>${new Date().toLocaleString('de-AT')}</strong> gesendet.</p>
     <p>Wenn du diese Mail siehst, funktioniert der E-Mail-Versand korrekt.</p>
   `
 
-  const result = await sendRaw(to, `FarmerZone Test-E-Mail ${new Date().toISOString()}`, html)
+  const result = await sendRaw(to, `${MARKE} Test-E-Mail ${new Date().toISOString()}`, html)
 
   // Gesperrt (Register Z3): Lokal geht Post nur an TEST_EMPFAENGER und
   // @example.com — dann ist nichts verschickt, und die Antwort sagt das.

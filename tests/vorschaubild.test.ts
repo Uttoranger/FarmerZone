@@ -17,6 +17,7 @@ import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { STARTSEITE_VORSCHAUBILD, hofTitelbildVorschau, hofVorschaubild, metadatenBasis } from '@/lib/vorschaubild'
+import { MARKE } from '@/lib/marke'
 
 const wurzel = process.cwd()
 
@@ -38,7 +39,7 @@ describe('Startseite', () => {
     const datei = join(wurzel, 'public', STARTSEITE_VORSCHAUBILD.url)
     expect(existsSync(datei)).toBe(true)
     expect(jpegGroesse(datei)).toBe(`${STARTSEITE_VORSCHAUBILD.width}x${STARTSEITE_VORSCHAUBILD.height}`)
-    expect(STARTSEITE_VORSCHAUBILD.alt).toBe('FarmerZone — Lebensmittel und Futter direkt vom Hof')
+    expect(STARTSEITE_VORSCHAUBILD.alt).toBe(`${MARKE} — Lebensmittel und Futter direkt vom Hof`)
   })
 })
 

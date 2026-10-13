@@ -16,6 +16,7 @@ import { leseGeteilteFotos, leereGeteilteFotos } from '@/lib/teilen-ablage'
 import { updateFarmBannerAction } from '@/server/actions/appearance'
 import { addFarmPhotoAction } from '@/server/actions/farm-photos'
 import { EINSTELLUNG_MEIN_AUFTRITT } from '@/lib/bauern-navigation'
+import { MARKE } from '@/lib/marke'
 
 type Ziel = 'banner' | 'gallery'
 
@@ -151,7 +152,7 @@ export function TeilenClient({
           Geteilte Fotos
         </h1>
         <p className="text-sm text-muted-foreground mb-6">
-          Fotos, die du aus der Galerie an FarmerZone teilst, landen hier.
+          Fotos, die du aus der Galerie an {MARKE} teilst, landen hier.
         </p>
 
         {/* Ablage wird gelesen */}
@@ -162,9 +163,9 @@ export function TeilenClient({
           <div className="rounded-2xl bg-card p-6 shadow-sm">
             <ImageIcon className="size-6 text-muted-foreground mb-3" aria-hidden="true" />
             <p className="text-sm leading-relaxed text-foreground">
-              Gerade wurde nichts geteilt. So geht’s: FarmerZone über das Browser-Menü als
+              Gerade wurde nichts geteilt. So geht’s: {MARKE} über das Browser-Menü als
               App installieren, dann in der Galerie ein Foto wählen und über „Teilen“ an
-              FarmerZone schicken — das funktioniert auch mit Cloud-Fotos, bei denen der
+              {MARKE} schicken — das funktioniert auch mit Cloud-Fotos, bei denen der
               Datei-Picker scheitert.
             </p>
             <Link

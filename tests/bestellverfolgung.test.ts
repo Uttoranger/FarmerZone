@@ -119,7 +119,7 @@ describe('Kalendereintrag (ICS)', () => {
   const EINTRAG = {
     titel: 'Abholung Hof Müller',
     ort: 'Dorfstraße 12, 4910 Ried im Innkreis',
-    beschreibung: 'Bestellung HM-2611-A4F2\nhttps://farmerzone.at/hof-mueller/bestellung/o1?s=abc',
+    beschreibung: 'Bestellung HM-2611-A4F2\nhttps://agrilo.at/hof-mueller/bestellung/o1?s=abc',
     datum: '2026-09-04',
     beginn: '14:00',
     ende: '16:00',

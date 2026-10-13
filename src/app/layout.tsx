@@ -9,6 +9,7 @@ import { RueckwegMerker } from '@/components/shared/rueckweg-merker'
 import { UMGEBUNG, ZEIGE_UMGEBUNGSBANNER } from '@/lib/umgebung-server'
 import { metadatenBasis } from '@/lib/vorschaubild'
 import './globals.css'
+import { MARKE } from '@/lib/marke'
 
 const geist = Geist({
   variable: '--font-geist-sans',
@@ -53,7 +54,7 @@ export function generateMetadata(): Metadata {
     // oder ungültig, bleibt es bei Nexts eigener Vercel-Adresse.
     metadataBase: metadatenBasis(UMGEBUNG.appUrl),
     title: {
-      default: `${TITEL_PRAEFIX}FarmerZone`,
+      default: `${TITEL_PRAEFIX}${MARKE}`,
       template: `${TITEL_PRAEFIX}%s`,
     },
     description: 'Regionale Lebensmittel direkt vom Bauern',

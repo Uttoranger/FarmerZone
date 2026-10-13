@@ -8,9 +8,10 @@ import { getCustomersForFarm, type CustomerSummary } from '@/server/queries/cust
 import { KundenAnsicht } from '@/components/hof-kunden/kunden-ansicht'
 import { KundenFehler } from '@/components/hof-kunden/kunden-fehler'
 import { KUNDEN_RAHMEN } from '@/components/hof-kunden/kunden-laden'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: 'Kunden — FarmerZone',
+  title: `Kunden — ${MARKE}`,
 }
 
 export const dynamic = 'force-dynamic'

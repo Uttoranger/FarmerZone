@@ -41,6 +41,7 @@
 // Reine Zuordnung ohne DOM, damit sie ohne Browser prüfbar ist.
 
 import type { KartenGrund } from '@/lib/foto-wege'
+import { MARKE } from '@/lib/marke'
 
 export type BildFehlerArt = 'lesen' | 'format' | 'server' | 'heic' | 'kein-foto'
 
@@ -92,7 +93,7 @@ function mitKennung(text: string, buchstabe: 'E' | 'L' | 'D' | 'F' | 'H' | 'K' |
  */
 export const IMAGE_READ_ERROR = mitKennung(
   'Dieses Foto kann von hier nicht gelesen werden — das passiert bei Cloud-Alben. Wähle es ' +
-    'über ‚Aus Dateien‘, nimm es neu auf, oder teile es aus der Galerie direkt an FarmerZone.',
+    `über ‚Aus Dateien‘, nimm es neu auf, oder teile es aus der Galerie direkt an ${MARKE}.`,
   'L'
 )
 
@@ -124,7 +125,7 @@ export const IMAGE_READ_PERMISSION_ERROR = mitKennung(
  */
 export const IMAGE_READ_UNCLEAR_ERROR = mitKennung(
   'Dieses Foto konnte nicht gelesen werden. Wähle es über ‚Aus Dateien‘, nimm es neu auf, ' +
-    'oder teile es aus der Galerie direkt an FarmerZone.',
+    `oder teile es aus der Galerie direkt an ${MARKE}.`,
   'D'
 )
 

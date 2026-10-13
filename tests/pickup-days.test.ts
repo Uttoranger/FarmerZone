@@ -124,9 +124,9 @@ describe('buildMapsUrl / buildShareData', () => {
   })
 
   it('Share-Daten enthalten Hofname und URL', () => {
-    const data = buildShareData('Hof Müller', 'https://farmerzone.at/hof-mueller')
+    const data = buildShareData('Hof Müller', 'https://agrilo.at/hof-mueller')
     expect(data.title).toBe('Hof Müller')
-    expect(data.url).toBe('https://farmerzone.at/hof-mueller')
+    expect(data.url).toBe('https://agrilo.at/hof-mueller')
     expect(data.text).toContain('Hof Müller')
   })
 })

@@ -61,7 +61,7 @@ function meldung(overrides: Partial<Daten> = {}): Daten {
   return {
     art: 'FEHLER',
     text: 'Die Abholzeiten lassen sich nicht speichern, es kommt keine Meldung.',
-    seiteUrl: 'https://farmerzone.at/settings',
+    seiteUrl: 'https://agrilo.at/settings',
     userAgent: 'Mozilla/5.0 (iPhone)',
     viewport: '375x667',
     website: '',
@@ -319,7 +319,7 @@ describe('meldungAbsenden — Betreiber-Mail', () => {
         kurznummer: NEUE_ID.slice(0, 8),
         farmName: 'Biohof Sonnleitner',
         diagKennung: 'S71',
-        seiteUrl: 'https://farmerzone.at/settings',
+        seiteUrl: 'https://agrilo.at/settings',
         viewport: '375x667',
       })
     )
@@ -350,7 +350,7 @@ describe('meldungAbsenden — Zuordnung', () => {
       art: 'FEHLER',
       farmId: 'farm_1',
       customerEmail: null,
-      seiteUrl: 'https://farmerzone.at/settings',
+      seiteUrl: 'https://agrilo.at/settings',
       userAgent: 'Mozilla/5.0 (iPhone)',
       viewport: '375x667',
     })

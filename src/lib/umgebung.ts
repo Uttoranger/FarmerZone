@@ -7,7 +7,7 @@
  * steht deshalb an EINER Stelle, was die Umgebung ist, welche Adressen ihr
  * gehören und ob Datenbank und Stripe zur Umgebung passen.
  *
- * Testumgebung (Register Z3, Nr. 43): test.farmerzone.at ist eine Vorschau
+ * Testumgebung (Register Z3, Nr. 43): test.agrilo.at ist eine Vorschau
  * des Branches staging mit eigener Adresse in NEXT_PUBLIC_APP_URL. In der
  * Vorschau gilt diese Adresse nur als reine https-Adresse und nie als die
  * der echten Seite. Die Produktion nimmt sie seit Nr. 56 als bereinigte
@@ -110,9 +110,12 @@ function bereinigt(wert: string | undefined): string | undefined {
   return t ? t : undefined
 }
 
-/** Der Host der echten Seite. Kein Geheimnis: Er steht auf jedem Plakat, in
- *  jeder Hofadresse (farmerzone.at/<hof>) und in der Support-Adresse. */
-const PRODUKTION_HOST = 'farmerzone.at'
+/** Der Host der echten Seite (Register M1) — die EINE Stelle der
+ *  Produktionsdomain. Kein Geheimnis: Er steht auf jedem Plakat, in jeder
+ *  Hofadresse (agrilo.at/<hof>) und in den Kontaktadressen, die
+ *  src/lib/support.ts daraus baut. Rein und ohne Einbindungen, darum auch im
+ *  Browser verwendbar. */
+export const PRODUKTION_HOST = 'agrilo.at'
 
 /**
  * Die Adresse der echten Seite (Register Z3) — Ziel von „Zur echten Seite"
@@ -132,7 +135,7 @@ function istEchterHost(host: string | null): boolean {
 /**
  * Ist diese (fertig normalisierte) Herkunft die echte Seite — mit oder ohne
  * www, aber ohne Port? Better Auth vergleicht Herkünfte genau: Der Browser auf
- * der echten Seite sendet `https://farmerzone.at`, eine Herkunft mit Port träfe
+ * der echten Seite sendet `https://agrilo.at`, eine Herkunft mit Port träfe
  * er nie, und die Anmeldung bräche still (Register S16, Nr. 70). Der
  * Standard-Port 443 fällt schon im URL-Parser weg.
  */
@@ -161,14 +164,14 @@ function herkunftAus(url: URL): string | null {
   // Ein Punkt am Ende meint denselben Host — eine Schreibweise für Links.
   const host = url.hostname.endsWith('.') ? url.hostname.slice(0, -1) : url.hostname
   // Nur nichtleere Labels aus a–z, 0–9 und „-": Bleibt nach dem Normalisieren
-  // ein Punkt am Ende („farmerzone.at.."), ist es keine Herkunft (Nr. 43,
+  // ein Punkt am Ende („agrilo.at.."), ist es keine Herkunft (Nr. 43,
   // Runde 2). Ebenso fällt „*" heraus — WHATWG-URL ließe den Platzhalter stehen.
   if (!/^[a-z0-9-]+(\.[a-z0-9-]+)*$/.test(host)) return null
   return `https://${host}${url.port ? `:${url.port}` : ''}`
 }
 
 /**
- * Eine reine https-Herkunft wie „https://test.farmerzone.at" — oder null.
+ * Eine reine https-Herkunft wie „https://test.agrilo.at" — oder null.
  *
  * Nur Schema, Host und Port: kein Pfad, keine Abfrage, kein Anker, keine
  * Zugangsdaten — sonst null (die Vorschau nimmt dann ihre Vercel-Adresse).
@@ -198,7 +201,7 @@ const MUSTER_ZEICHEN = /[*?]/
  *   Seite mit Port;
  * - ein Wert mit „*" oder „?" ist ungültig, auch wenn sich eine Herkunft lesen
  *   ließe (Register S16, Nr. 64): Wer ein Muster einträgt, meint keine Adresse —
- *   bereinigt zu „https://farmerzone.at" sähe der Fehler aus wie keiner;
+ *   bereinigt zu „https://agrilo.at" sähe der Fehler aus wie keiner;
  * - jeder ungültige Wert bleibt roh, NIE leer: Ein leerer Wert ließe APP_URL
  *   auf localhost fallen und mit ihr jeden Link in Mails. Er meldet sich als
  *   Warnung (bestimmeUmgebung);
@@ -220,7 +223,7 @@ type AdressPruefung = { herkunft: string } | { problem: 'keine-https-adresse' | 
  *
  * Erst normalisieren, dann prüfen (Nr. 43, Runde 2): Geprüft wird die Herkunft,
  * die tatsächlich benutzt würde. Vorher lief die Prüfung auf dem Rohwert, und
- * „https://farmerzone.at.." kam als „https://farmerzone.at." durch — die echte
+ * „https://agrilo.at.." kam als „https://agrilo.at." durch — die echte
  * Seite mit Punkt am Ende.
  */
 function pruefeAdresse(wert: string | undefined): AdressPruefung {
@@ -474,7 +477,7 @@ export function bestimmeUmgebung(werte: UmgebungsWerte): Umgebung {
   switch (art) {
     case 'preview': {
       // Die eigene Adresse der Testumgebung zuerst (Register Z3): Beim Branch
-      // staging steht dort https://test.farmerzone.at, und Links in Mails,
+      // staging steht dort https://test.agrilo.at, und Links in Mails,
       // Stripe-Rücksprünge und Better Auth sollen dorthin führen. Nur eine
       // reine https-Adresse und nie die echte Seite — wäre die Variable für
       // alle Vorschauen angelegt, schickte sonst jede Vorschau ihre Links in

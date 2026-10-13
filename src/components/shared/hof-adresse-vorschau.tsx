@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react'
 import { checkSlugAvailability } from '@/server/actions/onboarding'
 import { generateSlug } from '@/lib/slug'
 import { frageAdresseAb, type AdressStand } from '@/lib/hof-adresse'
+import { PRODUKTION_HOST } from '@/lib/umgebung'
 
 /**
- * „Wird zu deiner Adresse: farmerzone.at/…" unter dem Hofnamen — auf
- * Registrieren und Einrichten (Nr. 15). Ob die Adresse frei ist, fragt
- * dieselbe Aktion wie bisher Einrichten, 400 ms nach dem letzten Tastendruck.
+ * „Wird zu deiner Adresse: <Domain>/…" unter dem Hofnamen — auf
+ * Registrieren und Einrichten (Nr. 15); die Domain kommt aus PRODUKTION_HOST
+ * (Register M1). Ob die Adresse frei ist, fragt dieselbe Aktion wie bisher
+ * Einrichten, 400 ms nach dem letzten Tastendruck.
  * Nur ein Hinweis: createFarm hängt bei einem vergebenen Namen ohnehin eine
  * Zahl an.
  */
@@ -36,14 +38,14 @@ export function HofAdresseVorschau({ hofname, id }: { hofname: string; id: strin
   return (
     <p id={id} className="mt-1.5 text-[12.5px] break-words text-muted-foreground">
       {!slug ? (
-        'Wird zu deiner Adresse: farmerzone.at/dein-hof'
+        `Wird zu deiner Adresse: ${PRODUKTION_HOST}/dein-hof`
       ) : frei === false ? (
         <span className="text-status-offen">
-          farmerzone.at/{slug} ist schon vergeben – du bekommst eine Adresse mit Zahl dahinter, oder du wählst einen
+          {PRODUKTION_HOST}/{slug} ist schon vergeben – du bekommst eine Adresse mit Zahl dahinter, oder du wählst einen
           anderen Namen.
         </span>
       ) : (
-        <>Wird zu deiner Adresse: farmerzone.at/{slug}</>
+        <>Wird zu deiner Adresse: {PRODUKTION_HOST}/{slug}</>
       )}
     </p>
   )

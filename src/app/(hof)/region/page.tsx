@@ -15,8 +15,9 @@ import { REGION_RAHMEN, RegionKopf } from '@/components/region/region-kopf'
 import { RegionFehler, StandortFehlt } from '@/components/region/region-zustaende'
 import { FutterKaufenAnsicht } from '@/components/region/futter-kaufen-ansicht'
 import { UmfeldAnzeige } from '@/components/analytics/umfeld-anzeige'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'Region — FarmerZone' }
+export const metadata: Metadata = { title: `Region — ${MARKE}` }
 
 export const dynamic = 'force-dynamic'
 

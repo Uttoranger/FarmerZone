@@ -43,6 +43,7 @@ import { PROCESSING_REVENUE_LIMIT, sumCountedRevenue } from '@/lib/revenue-limit
 import { FUTTER_FEHLER } from '@/schemas/product'
 import { ABSCHNITT_TITEL } from '@/components/products/produkt-abschnitte'
 import { BETRIEBSSTATUS, futtermittelartenFuer } from '@/lib/taxonomie'
+import { MARKE } from '@/lib/marke'
 
 const WURZEL = process.cwd()
 
@@ -90,11 +91,13 @@ const KENNZEICHNUNG_ERLAUBT: Erlaubt[] = [
   { datei: 'src/lib/futter-registrierung.ts', text: KENNZEICHNUNG_TITEL, grund: 'der eine Name des Abschnitts' },
   { datei: 'src/lib/futter-registrierung.ts', text: KENNZEICHNUNG_ERKLAERUNG, grund: 'der erklärende Satz am Anfang des Abschnitts' },
   { datei: 'src/lib/futter-registrierung.ts', text: FUTTER_BESTAETIGUNG_TEXT, grund: 'Pflicht-Haken aus E10a, wörtlich' },
-  { datei: 'src/lib/futter-registrierung.ts', text: KUNDEN_VERANTWORTUNG, grund: 'Hinweis für Kundinnen aus E10a, wörtlich' },
+  // Bis zum Namen der Plattform: Der Satz ist eine Vorlage mit MARKE (Register M1), ihr erster Teil trägt das Fachwort.
+  { datei: 'src/lib/futter-registrierung.ts', text: KUNDEN_VERANTWORTUNG.split(MARKE)[0].trim(), grund: 'Hinweis für Kundinnen aus E10a, wörtlich' },
   { datei: 'src/components/produktdetail/produktdetail-teile.tsx', text: 'Kennzeichnung', grund: 'Produktseite für Kundinnen, kein Hofbereich' },
   {
     datei: 'src/app/(public)/impressum/page.tsx',
-    text: /^FarmerZone stellt ausschließlich die technische Plattform zur Verfügung\. Für die Beschreibung, Qualität, Kennzeichnung und Lieferung /,
+    // Der Satz beginnt mit dem Namen (MARKE, Register M1) — der JSX-Text erst danach.
+    text: /^stellt ausschließlich die technische Plattform zur Verfügung\. Für die Beschreibung, Qualität, Kennzeichnung und Lieferung /,
     grund: 'Rechtstext',
   },
   {

@@ -21,6 +21,7 @@ import { join } from 'node:path'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
+import { MARKE } from '@/lib/marke'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
@@ -55,12 +56,12 @@ describe('Regeln', () => {
   })
 
   it('die Links passen zum Weg: Hof /login und /forgot-password, Kundin nur /account/login', () => {
-    expect(registrierungsHinweisZiele('passwort', 'https://farmerzone.example')).toEqual({
-      anmelden: 'https://farmerzone.example/login',
-      passwortZuruecksetzen: 'https://farmerzone.example/forgot-password',
+    expect(registrierungsHinweisZiele('passwort', 'https://plattform.example')).toEqual({
+      anmelden: 'https://plattform.example/login',
+      passwortZuruecksetzen: 'https://plattform.example/forgot-password',
     })
-    expect(registrierungsHinweisZiele('code', 'https://farmerzone.example')).toEqual({
-      anmelden: 'https://farmerzone.example/account/login',
+    expect(registrierungsHinweisZiele('code', 'https://plattform.example')).toEqual({
+      anmelden: 'https://plattform.example/account/login',
       passwortZuruecksetzen: null,
     })
   })
@@ -69,22 +70,22 @@ describe('Regeln', () => {
 describe('Mail an das bestehende Konto', () => {
   function html(weg: 'passwort' | 'code'): string {
     return renderToStaticMarkup(
-      createElement(RegistrierungHinweisEmail, { weg, ...registrierungsHinweisZiele(weg, 'https://farmerzone.example') })
+      createElement(RegistrierungHinweisEmail, { weg, ...registrierungsHinweisZiele(weg, 'https://plattform.example') })
     )
   }
 
   it('Hof: sagt, was passiert ist, mit beiden Auswegen (anmelden, Passwort zurücksetzen)', () => {
     const text = html('passwort')
-    expect(text).toContain('jemand wollte sich mit deiner E-Mail-Adresse bei FarmerZone registrieren')
-    expect(text).toContain('href="https://farmerzone.example/login"')
-    expect(text).toContain('href="https://farmerzone.example/forgot-password"')
+    expect(text).toContain(`jemand wollte sich mit deiner E-Mail-Adresse bei ${MARKE} registrieren`)
+    expect(text).toContain('href="https://plattform.example/login"')
+    expect(text).toContain('href="https://plattform.example/forgot-password"')
     expect(text).toContain('Passwort zurücksetzen')
     expect(text).toContain('kannst du diese E-Mail ignorieren')
   })
 
   it('Kundin: Anmelden mit Code, kein Passwort-Link', () => {
     const text = html('code')
-    expect(text).toContain('href="https://farmerzone.example/account/login"')
+    expect(text).toContain('href="https://plattform.example/account/login"')
     expect(text).toContain('Code')
     expect(text).not.toContain('forgot-password')
     expect(text).not.toContain('Passwort zurücksetzen')
@@ -92,9 +93,10 @@ describe('Mail an das bestehende Konto', () => {
 
   it('der Versand nennt die Adresse nicht im Betreff', () => {
     const email = quelle('src/lib/email.ts')
-    const zeile = email.split('\n').find((z) => z.includes("'Jemand wollte sich mit deiner Adresse registrieren · FarmerZone'"))
+    const zeile = email.split('\n').find((z) => z.includes('`Jemand wollte sich mit deiner Adresse registrieren · '))
     expect(zeile).toBeDefined()
-    expect(zeile).not.toMatch(/\$\{/)
+    // Eingesetzt wird nur der Name der Plattform (Register M1), nie etwas aus der Anfrage.
+    expect(zeile?.replace(/\$\{MARKE\}/g, '')).not.toMatch(/\$\{/)
   })
 })
 

@@ -9,8 +9,9 @@ import { MELDUNG_ART_LABEL, STATUS_ZU_ENTSCHEIDEN } from '@/lib/meldung'
 import { MELDUNG_ART_TON } from '@/lib/hof-hilfe'
 import { HoefeAnsicht, type AdminHof, type NeueMeldung } from '@/components/admin/hoefe-ansicht'
 import { ADMIN_RAHMEN, AdminFehler } from '@/components/admin/admin-teile'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'Admin — FarmerZone' }
+export const metadata: Metadata = { title: `Admin — ${MARKE}` }
 export const dynamic = 'force-dynamic'
 
 /** So viele Meldungen zeigt „Neu im Briefkasten" am Handy — der Rest steht im Briefkasten. */

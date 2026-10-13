@@ -1,6 +1,6 @@
 /**
- * Die Testumgebung test.farmerzone.at (Register Z3, Nachtlauf Nr. 43) — die
- * Regeln für Oberfläche und Post, rein, ohne process.env
+ * Die Testumgebung (Register Z3, Nachtlauf Nr. 43; Adresse test. vor der
+ * Domain aus PRODUKTION_HOST) — die Regeln für Oberfläche und Post, rein, ohne process.env
  * (tests/testumgebung.test.ts).
  *
  * In der Produktion gibt es keinen Umschalter zwischen Test und Live (Z3).

@@ -42,7 +42,7 @@ const fehlertext = (text: (laenge: number) => string, wiederholungen = 1): Fall 
 const nachricht = (text: (laenge: number) => string, wiederholungen = 1): Fall => ({ text, ereignis: (t) => ({ message: t }), wiederholungen })
 const adresse = (text: (laenge: number) => string, wiederholungen = 1): Fall => ({
   text,
-  ereignis: (t) => ({ request: { url: `https://farmerzone.at/hoefe?q=${t}` } }),
+  ereignis: (t) => ({ request: { url: `https://agrilo.at/hoefe?q=${t}` } }),
   wiederholungen,
 })
 const span = (daten: (t: string) => object) => (text: (laenge: number) => string, wiederholungen = 1): Fall => ({
@@ -90,7 +90,7 @@ const FAELLE: [string, Fall][] = [
   // Dicht an dicht: Verglichen jede Nummer jeden Bereich der Plus-Lesart, wüchse es quadratisch (Verhältnis 15).
   ['bereinigeQuery: dichte Plus-Nummern', adresse((n) => wiederhole(',+06649876543', n), 2)],
   // Jeder Schlüssel steht am Ende des Werts davor und zählt: Jeder Wert wird trotzdem nur einmal gelesen.
-  ['ersetzeZuweisungen: ein Schlüssel am Ende jedes Werts', span((t) => ({ data: { 'url.full': `https://farmerzone.at/x/${t}` } }))((n) => wiederhole('token: x]secret: 0664 98765 ', n))],
+  ['ersetzeZuweisungen: ein Schlüssel am Ende jedes Werts', span((t) => ({ data: { 'url.full': `https://agrilo.at/x/${t}` } }))((n) => wiederhole('token: x]secret: 0664 98765 ', n))],
   ['Span-Beschreibung: Nummern über das Ende vieler Adressen', span((t) => ({ description: t }))((n) => wiederhole('GET https://x.example/a?q=token=1+43 664 9876543 ', n))],
   // Runde 1: Jede Adresse wird dekodiert gelesen, ob eine Nummer über ihr Ende reicht.
   ['Span-Beschreibung: Nummern, die erst dekodiert über das Ende vieler Adressen reichen',

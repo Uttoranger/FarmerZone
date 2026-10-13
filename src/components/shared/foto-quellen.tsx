@@ -23,6 +23,7 @@ import {
 } from '@/lib/foto-wege'
 import { bereiteGeraeteAuskunftVor, geraeteAuskunft } from '@/lib/upload-meldung'
 import type { UploadZweck } from '@/lib/upload-pfade'
+import { MARKE } from '@/lib/marke'
 
 /**
  * Zwei Knöpfe zum Foto: „Foto wählen" und „Foto aufnehmen" — und dahinter
@@ -85,7 +86,7 @@ function ersteAuswahl(): { weg: AuswahlWeg; wahl: WegWahl } {
   return ersterWeg({ android: istAndroid(), gemerkt: leseFotoWeg(browserSpeicher()) })
 }
 
-/** Läuft die Seite als installierte App? Nur dort ist Teilen an FarmerZone möglich. */
+/** Läuft die Seite als installierte App? Nur dort ist Teilen an die App möglich. */
 function istInstalliert(): boolean {
   if (typeof window === 'undefined') return false
   return (
@@ -330,15 +331,15 @@ export function useFotoQuellen({
             {karte.hinweis === 'teilen' && (
               <p className="flex items-start gap-3 px-4 py-3 text-sm text-muted-foreground">
                 <Share2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                <span>Oder in der Galerie: Teilen → FarmerZone</span>
+                <span>Oder in der Galerie: Teilen → {MARKE}</span>
               </p>
             )}
             {karte.hinweis === 'installieren' && (
               <p className="flex items-start gap-3 px-4 py-3 text-sm text-muted-foreground">
                 <Share2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                 <span>
-                  Oder installiere FarmerZone als App (Browser-Menü → „Zum Startbildschirm hinzufügen“). Dann
-                  kannst du Fotos aus der Galerie direkt an FarmerZone teilen.
+                  Oder installiere {MARKE} als App (Browser-Menü → „Zum Startbildschirm hinzufügen“). Dann
+                  kannst du Fotos aus der Galerie direkt an {MARKE} teilen.
                 </span>
               </p>
             )}

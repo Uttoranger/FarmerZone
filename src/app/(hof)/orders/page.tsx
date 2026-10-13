@@ -7,9 +7,10 @@ import { getBestellungenSeite, getHofBestellDetail } from '@/server/queries/orde
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { hofBestellFilterAus } from '@/schemas/hof-bestellungen'
 import { BestellungenAnsicht } from '@/components/hof-bestellungen/bestellungen-ansicht'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: 'Bestellungen — FarmerZone',
+  title: `Bestellungen — ${MARKE}`,
 }
 
 export const dynamic = 'force-dynamic'

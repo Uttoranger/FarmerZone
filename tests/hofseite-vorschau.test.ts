@@ -42,18 +42,18 @@ import {
 const quelltext = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
 describe('verlaesstRahmen — welcher Klick im Rahmen einen neuen Tab öffnet', () => {
-  const HIER = 'https://farmerzone.example/hof-test?vorschau=1&stand=2'
+  const HIER = 'https://plattform.example/hof-test?vorschau=1&stand=2'
   const link = (href: string, target = '') => ({ href, target })
 
   it('andere Seiten des eigenen Ursprungs und fremde Seiten verlassen den Rahmen', () => {
     expect(verlaesstRahmen(link('/impressum'), HIER)).toBe(true)
-    expect(verlaesstRahmen(link('https://farmerzone.example/hof-test/bestellung/abc'), HIER)).toBe(true)
+    expect(verlaesstRahmen(link('https://plattform.example/hof-test/bestellung/abc'), HIER)).toBe(true)
     expect(verlaesstRahmen(link('https://karten.example/?q=hof'), HIER)).toBe(true)
   })
 
   it('Anker und andere Bereiche derselben Seite bleiben im Rahmen', () => {
     expect(verlaesstRahmen(link('#fotos'), HIER)).toBe(false)
-    expect(verlaesstRahmen(link('https://farmerzone.example/hof-test#warenkorb'), HIER)).toBe(false)
+    expect(verlaesstRahmen(link('https://plattform.example/hof-test#warenkorb'), HIER)).toBe(false)
     expect(verlaesstRahmen(link('/hof-test?bereich=futter'), HIER)).toBe(false)
   })
 
@@ -79,7 +79,7 @@ describe('korbErlaubt', () => {
 })
 
 describe('Markierung', () => {
-  const URSPRUNG = 'https://farmerzone.example'
+  const URSPRUNG = 'https://plattform.example'
   const nachricht = { typ: MARKIERUNG_TYP, abschnitt: 'fotos' }
 
   it('liest die Kennung vom eigenen Ursprung', () => {
@@ -100,7 +100,7 @@ describe('Markierung', () => {
 })
 
 describe('Bereit-Meldung', () => {
-  const URSPRUNG = 'https://farmerzone.example'
+  const URSPRUNG = 'https://plattform.example'
 
   it('gilt nur vom eigenen Ursprung und nur in der vereinbarten Form', () => {
     expect(leseBereit({ origin: URSPRUNG, data: { typ: BEREIT_TYP } }, URSPRUNG)).toBe(true)
