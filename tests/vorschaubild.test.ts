@@ -43,9 +43,10 @@ describe('Startseite', () => {
 })
 
 describe('Hofseite', () => {
-  it('seit Nr. 21 das Teilen-Bild im Format 1:1, mit Prüfsumme in der Adresse (Gate 7)', () => {
+  it('seit Nr. 21 das Teilen-Bild im Format 1:1, mit Prüfsumme in der Adresse (Gate 7), als JPEG (Register T7)', () => {
     expect(hofVorschaubild({ name: 'Hof Test', slug: 'hof-test' }, 'abc123')).toEqual({
       url: '/hof-test/opengraph-image?v=abc123',
+      type: 'image/jpeg',
       width: 1080,
       height: 1080,
       alt: 'Hof Test – frisch diese Woche',

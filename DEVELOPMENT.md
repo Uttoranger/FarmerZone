@@ -5015,6 +5015,15 @@ Auftrag freigabe.md §15 „74" (Register I1). Keine Migration, kein neues Paket
 - **Datei-Tracing:** Gemessen mit `next build`: Alle 37 Routenpakete mit Zugriff auf `process.cwd()/public` tragen die Illustrationen samt Unterordnern in der `.nft.json`; die Teilen-Bild-Route trägt sie zusätzlich ausdrücklich ein (`**`).
 - **Aus der Prüfung von 69:** Die Attrappe des Teilen-Bild-Laders wertet Umleitungssperre und Zeitlimit aus; ein Strom einer Fehlerseite wird abgebrochen; eine nicht ladbare Illustration geht mit Klasse und bereinigter Nachricht nach Sentry, nicht mit dem Pfad der Datei.
 
+## Teilen-Bild als JPEG (Nachtlauf Nr. 76, Oktober 2026)
+
+Auftrag freigabe.md §16 „76“ (Register T7). Keine Migration, kein neues Paket.
+
+- **Warum:** Ein PNG mit Foto wiegt 1,2–1,4 MB, und WhatsApp zeigt Link-Vorschauen über rund 300 KB oft nicht. Satori zeichnet weiter ein PNG, `sharp` macht daraus im selben `try` das JPEG (Qualität 82, mozjpeg); ein Fehler dort ist der 503-Pfad. Die Regel — Typ und Endung nur aus `TEILEN_BILD_TYP` — steht in ARCHITECTURE, „Vorschaubild und Icons“.
+- **Gemessen (die sechs Bilder aus 69, 1080 px):** ohne Foto 58–83 KB (PNG 130–206 KB), mit Foto 107–118 KB (PNG 1,16–1,44 MB), alle unter dem Ziel von 300 KB. mozjpeg kostet etwa 0,1–0,2 s je neu gezeichnetem Bild (ohne 0,02 s) und spart etwa 8–16 %; mit passender Prüfsumme liegt das Bild einen Tag im CDN.
+- **QR in der Story:** maschinell geprüft — die Modulmatrix aus `qrcode` gegen die Helligkeit des JPEG an den Modulmitten: 0 von 841 Modulen abweichend, dunkelstes Hell 243, hellstes Dunkel 38–40. Ein Handy-Scan steht aus.
+- **Aus der Umsetzung:** Zwei bestehende Tests ersetzten `next/og` mit Text als Körper; das ergibt nun 503. Sie liefern ein echtes PNG (ein Bildpunkt).
+
 ## Nützliche Befehle
 
 ```bash
