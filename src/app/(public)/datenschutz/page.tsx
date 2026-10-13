@@ -2,8 +2,9 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { KundenKopf } from '@/components/shared/kunden-kopf'
 import { DATENSCHUTZ_EMAIL } from '@/lib/support'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'Datenschutz — FarmerZone' }
+export const metadata: Metadata = { title: `Datenschutz — ${MARKE}` }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -27,7 +28,7 @@ export default function DatenschutzPage() {
           <Section title="1. Verantwortliche Stelle">
             <p>
               Verantwortlich für die Datenverarbeitung auf dieser Plattform ist der Betreiber von
-              FarmerZone (Kontaktdaten siehe Impressum).
+              {MARKE} (Kontaktdaten siehe Impressum).
             </p>
             <p>
               Kontakt für Datenschutzanfragen:{' '}
@@ -48,7 +49,7 @@ export default function DatenschutzPage() {
             <p className="mt-3"><strong className="text-foreground">Zahlungsdaten:</strong></p>
             <p>
               Kreditkarten- und Bankdaten werden ausschließlich von Stripe verarbeitet und gespeichert.
-              FarmerZone speichert keine vollständigen Zahlungsdaten — nur eine anonymisierte
+              {MARKE} speichert keine vollständigen Zahlungsdaten — nur eine anonymisierte
               Bestätigungs-ID.
             </p>
             <p className="mt-3"><strong className="text-foreground">Technisch notwendige Daten:</strong></p>

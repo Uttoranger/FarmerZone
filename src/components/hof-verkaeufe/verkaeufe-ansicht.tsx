@@ -26,6 +26,7 @@ import { BestellDialog, DialogFehler } from '@/components/hof-bestellungen/beste
 import { KARTE, KICKER, KNOPF_ORANGE, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
 import { VerkaufDialog } from './verkauf-dialog'
 import { cn } from '@/lib/utils'
+import { MARKE } from '@/lib/marke'
 
 /*
  * Verkäufe in der HofShell (Gate 8 „Code ohne Mockup", Nachtlauf Nr. 22b) —
@@ -94,7 +95,7 @@ export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeRead
           {/* Fachwort mit einem Satz erklärt (Nr. 45). */}
           <p className={cn('mt-1 text-[12px] leading-snug', LEISE)}>{UMSATZGRENZE_ERKLAERUNG}</p>
         </div>
-        <Kennzahl titel="Online bezahlt" betrag={overview.weekOnline} satz="Über FarmerZone bezahlte, abgeholte Bestellungen." />
+        <Kennzahl titel="Online bezahlt" betrag={overview.weekOnline} satz={`Über ${MARKE} bezahlte, abgeholte Bestellungen.`} />
         <Kennzahl titel="Bar kassiert" betrag={overview.weekBar} satz="Vor Ort kassierte Abholungen plus deine Direktverkäufe." />
       </section>
 

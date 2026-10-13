@@ -8,8 +8,9 @@ import { getMeldungenFuerHof } from '@/server/queries/meldung'
 import { meldungZeilen, type MeldungZeile } from '@/lib/hof-hilfe'
 import { MeineMeldungen } from '@/components/hof-hilfe/meine-meldungen'
 import { MELDUNGEN_RAHMEN } from '@/components/hof-hilfe/hilfe-laden'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'Meine Meldungen — FarmerZone' }
+export const metadata: Metadata = { title: `Meine Meldungen — ${MARKE}` }
 
 export const dynamic = 'force-dynamic'
 

@@ -8,8 +8,9 @@ import { ladeEinstellungenUebersicht } from '@/server/queries/einstellungen'
 import { EinstellungenUebersicht } from '@/components/hof-einstellungen/einstellungen-uebersicht'
 import { EinstellungenFehler } from '@/components/hof-einstellungen/einstellungen-fehler'
 import { EINSTELLUNGEN_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'Einstellungen — FarmerZone' }
+export const metadata: Metadata = { title: `Einstellungen — ${MARKE}` }
 
 export const dynamic = 'force-dynamic'
 

@@ -29,8 +29,9 @@ import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { LEISE } from '@/components/hof-bestellungen/stil'
 import { ADMIN_RAHMEN, AdminFehler, SEITEN_TITEL } from '@/components/admin/admin-teile'
 import { MeldungListe, Wunschliste, type BriefkastenZeile, type WunschBuendel } from '@/components/admin/briefkasten-teile'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'Briefkasten — Admin — FarmerZone' }
+export const metadata: Metadata = { title: `Briefkasten — Admin — ${MARKE}` }
 export const dynamic = 'force-dynamic'
 
 /** Mehr zeigt die Liste nie auf einmal (getMeldungenFuerAdmin). */

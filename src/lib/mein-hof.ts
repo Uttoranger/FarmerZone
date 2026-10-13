@@ -95,7 +95,7 @@ export function hofZustand(hof: {
 
 /**
  * Die Adresse der Hofseite, wie der Kopf sie zeigt: Host und Slug, ohne
- * Protokoll („farmerzone.at/muellerhof"). Ein Bauer liest eine Adresse, kein
+ * Protokoll (Domain/muellerhof). Ein Bauer liest eine Adresse, kein
  * „https://". Die vollständige Adresse (zum Öffnen und Kopieren) bleibt
  * daneben; ein ungültiger appUrl fällt auf den rohen Wert zurück.
  */

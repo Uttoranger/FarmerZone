@@ -9,10 +9,11 @@ import { KUNDE_ID_MUSTER, alteKundenAdresse } from '@/lib/kunden-id'
 import { KundenDetail } from '@/components/hof-kunden/kunden-detail'
 import { KundenFehler } from '@/components/hof-kunden/kunden-fehler'
 import { KUNDEN_RAHMEN } from '@/components/hof-kunden/kunden-laden'
+import { MARKE } from '@/lib/marke'
 
 // Kein Name im Titel: Der Tab-Titel landet im Verlauf und in der Statistik.
 export const metadata: Metadata = {
-  title: 'Kundin — FarmerZone',
+  title: `Kundin — ${MARKE}`,
 }
 
 export const dynamic = 'force-dynamic'

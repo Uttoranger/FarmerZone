@@ -6,11 +6,12 @@ import { getFarmSettings } from '@/server/queries/farm'
 import { PickupSlotsClient } from '@/components/settings/pickup-slots-client'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
+import { MARKE } from '@/lib/marke'
 
 /** Titel der Seite — für den Kopf und den Tab, eine Schreibweise. */
 const TITEL = 'Abholzeiten'
 
-export const metadata: Metadata = { title: `${TITEL} — FarmerZone` }
+export const metadata: Metadata = { title: `${TITEL} — ${MARKE}` }
 
 /*
  * Abholzeiten in der HofShell (Nachtlauf Nr. 22d): dieselbe Liste und dieselben

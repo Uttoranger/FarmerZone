@@ -51,7 +51,7 @@ function ereignis(teil: object): ErrorEvent {
 const neuFehlertext = (text: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: text }] } })).exception?.values?.[0].value ?? ''
 
 function neuWert(roh: string): string {
-  const url = bereinigeEreignis(ereignis({ request: { url: `https://farmerzone.at/hoefe?q=${roh}&seite=2` } })).request?.url ?? ''
+  const url = bereinigeEreignis(ereignis({ request: { url: `https://agrilo.at/hoefe?q=${roh}&seite=2` } })).request?.url ?? ''
   const abfrage = new URL(url).searchParams
   // Die übrigen Parameter bleiben — sonst wäre der Vergleich leer gelaufen.
   if (abfrage.get('seite') !== '2') return `kaputt: ${url}`
@@ -187,10 +187,10 @@ type Feld = 'Span-Beschreibung' | 'Adresse' | 'query_string' | 'Fehlertext' | 'N
 
 function neuFeld(feld: Feld, text: string): string {
   if (feld === 'Span-Beschreibung') {
-    const span = bereinigeEreignis(ereignis({ type: 'transaction', spans: [{ description: `GET https://farmerzone.at/x?q=${text}` }] }))
+    const span = bereinigeEreignis(ereignis({ type: 'transaction', spans: [{ description: `GET https://agrilo.at/x?q=${text}` }] }))
     return (span as unknown as { spans: Array<{ description: string }> }).spans[0].description
   }
-  if (feld === 'Adresse') return bereinigeEreignis(ereignis({ request: { url: `https://farmerzone.at/hoefe?q=${text}` } })).request?.url ?? ''
+  if (feld === 'Adresse') return bereinigeEreignis(ereignis({ request: { url: `https://agrilo.at/hoefe?q=${text}` } })).request?.url ?? ''
   if (feld === 'query_string') {
     const abfrage = bereinigeEreignis(ereignis({ request: { query_string: `q=${text}` } })).request?.query_string
     return typeof abfrage === 'string' ? abfrage : ''
@@ -216,13 +216,13 @@ describe('Nr. 64, Runde 1 — die Rückschritte aus dem Vollvergleich gegen den 
       ['Adresse', '+43 664 9876543token: (xq%40example.com%2B436649876543cka0120120120abcdefghij120664%209876543&q=', 7],
       ['query_string', '+43 664 9876543token: (xq%40example.com%2B436649876543cka0120120120abcdefghij120664%209876543&q=', 7],
       ['Span-Beschreibung', 'token=0664%2098765430664-987 65 43(/%22', 0],
-      ['Span-Beschreibung', '%C3%A4token=Telefonhttps://farmerzone.at/hoefe?q=0664%2098765430664-987 65 43(0664)+987+65+43', 7],
+      ['Span-Beschreibung', '%C3%A4token=Telefonhttps://agrilo.at/hoefe?q=0664%2098765430664-987 65 43(0664)+987+65+43', 7],
       ['Span-Beschreibung', 'token=xq%2540example.com%2B436649876543Artikel0664%2F9876543otp: 012012%2520.%2B436649876543', 12],
       ['Span-Beschreibung', 'token=%280664%29%2098765430043 664 9876543xq.kundin@example.com%3Axq%2Bshop%40example.com', 0],
       ['Span-Beschreibung', '+43+664+98765430664%2098765430664 9876543%2FTel012#q=', 0],
       ['Span-Beschreibung', 'token=10664%2098765430664 9876543', 0],
       ['Fehlertext', 'Abruf /x?q=token=10664%2098765430664 9876543 weiter', 0],
-      ['Nachricht', 'Abruf https://farmerzone.at/x?q=token=%280664%29%2098765430043 664 9876543 weiter', 0],
+      ['Nachricht', 'Abruf https://agrilo.at/x?q=token=%280664%29%2098765430043 664 9876543 weiter', 0],
       // Aus dem Vollvergleich nach der ersten Behebung: Eine Lesart mit „+" als Trenner las die Nummer
       // weiter, als die Regel am Schluss sie nimmt, und ein Platzhalter für den Rest zerteilte einen Wert
       // oder eine lange Kennung, die eine spätere Regel ganz nahm (in der letzten Zeile ließ auch main
@@ -232,9 +232,9 @@ describe('Nr. 64, Runde 1 — die Rückschritte aus dem Vollvergleich gegen den 
       ['Fehlertext', '/token=(0664)+987+65+43%2B43%20664%209876543%3Aä:0664/9876543&q=', 0],
       ['Nachricht', '%3A:#q=/x/0664%2520987%252065430664 9876543cka0120120120abcdefghij120664/9876543', 20],
       // Die lange Kennung, mit der der Rest fällt, endet, wo E-Mail- oder Telefon-Regel ansetzen — die laufen vorher.
-      ['Nachricht', 'https://farmerzone.at/hoefe?q=(0664) 987654301201201-abcd-ef01-2012-012012012012xq@example.com', 3],
-      ['Nachricht', 'Abholungxhttps://farmerzone.at/hoefe?q=%280664%29%2098765430043 664 9876543cka0120120120abcdefghijkl0664/9876543', 3],
-      ['Nachricht', 'xq@b%C3%A4ckerei.examplehttps://farmerzone.at/hoefe?q=(0664) 9876543pi_2Nk0120120120aBcDeF0043 664 9876543', 3],
+      ['Nachricht', 'https://agrilo.at/hoefe?q=(0664) 987654301201201-abcd-ef01-2012-012012012012xq@example.com', 3],
+      ['Nachricht', 'Abholungxhttps://agrilo.at/hoefe?q=%280664%29%2098765430043 664 9876543cka0120120120abcdefghijkl0664/9876543', 3],
+      ['Nachricht', 'xq@b%C3%A4ckerei.examplehttps://agrilo.at/hoefe?q=(0664) 9876543pi_2Nk0120120120aBcDeF0043 664 9876543', 3],
       // Ein „+" in einer Adresse der Plus-Lesart beendet keinen Wert; lange Kennung und Nachlese werden vereinigt.
       ['Adresse', 'Bearer  %20/otp: 012012otp: 012012xq+shop@example.com10:200664%209876543', 7],
       ['Nachricht', '/x/01201201-abcd-ef01-2012-012012012012+43 (664) 987-654301201201-ABCD-EF01-2012-ABCDEF012012%C3%A4pi_2Nk0120120120aBcDeF', 0],

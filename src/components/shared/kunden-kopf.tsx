@@ -14,6 +14,7 @@ import { eigenerVorgaengerJetzt, merkeHinauf } from '@/components/shared/rueckwe
 import { ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
 import { Wortmarke } from '@/components/shared/wortmarke'
 import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet'
+import { MARKE } from '@/lib/marke'
 
 /**
  * Wie weit ein Sprungziel der Hofseite (Übersicht, Fotos, Produkte, Kategorien)
@@ -32,16 +33,16 @@ export const SPRUNGZIEL_OHNE_KOPF = 'scroll-mt-14'
  *
  * HANDY (unter md): eine klebende Leiste, 56 px, auf jeder Kundenseite von
  * Anfang an — auch auf der Hofseite, dort ÜBER dem Titelbild. Links Zurück
- * (wo es woanders hinführt als nach Hause) und das F-Icon mit „FarmerZone"
+ * (wo es woanders hinführt als nach Hause) und das F-Icon mit dem Namen
  * als Weg zur Startseite, rechts der Warenkorb, „Anmelden" bzw. mit
  * Hof-Sitzung „Mein Hof" (Register N1, kopfKnopf) und das Menü. Hell/Dunkel
  * steht im Menü-Blatt. Kundenseiten haben keine Leiste unten; diese eine
  * Leiste trägt alle Wege, die im Browser die Kopfzeile trägt. Auf der
  * Hofseite erscheint in der Mitte der Hofname, sobald die Überschrift aus dem
- * Blick ist — dann tritt das Wort „FarmerZone" zurück und nur das F-Icon
+ * Blick ist — dann tritt der Name zurück und nur das F-Icon
  * bleibt als Weg nach Hause.
  *
- * BROWSER (ab md): eine Kopfzeile, 64 px — FarmerZone, Höfe entdecken, Für
+ * BROWSER (ab md): eine Kopfzeile, 64 px — Name, Höfe entdecken, Für
  * Höfe, „Anmelden" bzw. „Mein Hof", Warenkorb. Wo sie selbst nicht
  * zurückführt (Hofseite, Bestellweg), steht darunter ein Rückweg-Link.
  *
@@ -93,7 +94,7 @@ export function KundenKopf({
             {form.zurueck && <ZurueckKnopf seite={seite} />}
             <Link
               href="/"
-              aria-label="FarmerZone — zur Startseite"
+              aria-label={`${MARKE} — zur Startseite`}
               className={`flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg px-0.5 ${FOKUS}`}
             >
               <FIcon />
@@ -104,7 +105,7 @@ export function KundenKopf({
                 <span
                   className={`whitespace-nowrap font-heading text-base font-bold text-brand-text ${korbInLeiste ? WORT_PLATZ.mitKorb : WORT_PLATZ.ohneKorb}`}
                 >
-                  FarmerZone
+                  {MARKE}
                 </span>
               )}
             </Link>
@@ -131,7 +132,7 @@ export function KundenKopf({
       {/* ── Browser ── */}
       <header className="sticky top-0 z-40 hidden h-16 border-b border-border bg-card print:hidden md:block">
         <div className="mx-auto flex h-full max-w-6xl items-center gap-8 px-6">
-          <Link href="/" aria-label="FarmerZone — zur Startseite" className={`rounded-md ${FOKUS}`}>
+          <Link href="/" aria-label={`${MARKE} — zur Startseite`} className={`rounded-md ${FOKUS}`}>
             <Wortmarke />
           </Link>
           <nav aria-label="Hauptnavigation" className="flex flex-1 items-center gap-6">
@@ -173,7 +174,7 @@ const FOKUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:rin
 const TEXTLINK = 'rounded-md text-sm font-medium text-foreground/80 transition-colors hover:text-foreground'
 
 /**
- * Ab welcher Breite das Wort „FarmerZone" in der Handy-Leiste steht — darunter
+ * Ab welcher Breite der Name in der Handy-Leiste steht — darunter
  * liefe die Leiste seitlich über. Gemessen mit Zurück, kompaktem Wort (99 px),
  * „Anmelden" und Menü: 336,5 px, mit Warenkorb 380,5 px; je rund 8 px Luft für
  * abweichende Schriftbreiten. Bei 390 px steht das Wort also immer.

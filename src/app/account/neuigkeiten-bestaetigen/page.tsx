@@ -8,9 +8,10 @@ import { ladeAboBestaetigung } from '@/server/abo-anmeldung'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/bestaetigung/bestaetigung-teile'
 import { AboBestaetigenKarte } from '@/components/abo-bestaetigung/bestaetigen-karte'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: `${ABO_TEXT.seitenTitel} — FarmerZone`,
+  title: `${ABO_TEXT.seitenTitel} — ${MARKE}`,
   // Der Link trägt einen gültigen Token (next.config.ts setzt dazu no-referrer).
   robots: { index: false, follow: false },
 }

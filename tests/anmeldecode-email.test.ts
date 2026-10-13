@@ -15,6 +15,7 @@
  * Nur das Resend-SDK ist gemockt — kein Netzwerk.
  */
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
+import { MARKE } from '@/lib/marke'
 
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
@@ -58,7 +59,7 @@ describe('sendAnmeldeCodeEmail', () => {
   it('schickt an die Adresse, mit deutschem Betreff ohne Code', async () => {
     const { aufruf, ergebnis } = await versende()
     expect(aufruf.to).toBe('kundin@example.com')
-    expect(aufruf.subject).toBe('Dein Anmeldecode für FarmerZone')
+    expect(aufruf.subject).toBe(`Dein Anmeldecode für ${MARKE}`)
     expect(aufruf.subject).not.toMatch(/\d{6}/)
     expect(ergebnis.id).toBe('email_1')
   })
@@ -101,7 +102,7 @@ describe('sendBestellCodeEmail', () => {
   it('Betreff nennt die Bestellungen, nicht den Code', async () => {
     const { aufruf, ergebnis } = await versendeBestellCode()
     expect(aufruf.to).toBe('kundin@example.com')
-    expect(aufruf.subject).toBe('Dein Code für deine Bestellungen · FarmerZone')
+    expect(aufruf.subject).toBe(`Dein Code für deine Bestellungen · ${MARKE}`)
     expect(aufruf.subject).not.toMatch(/\d{6}/)
     expect(ergebnis.id).toBe('email_1')
   })

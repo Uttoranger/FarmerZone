@@ -12,8 +12,9 @@ import { DruckenKnopf } from '@/components/teilen/drucken-knopf'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'QR-Plakat — FarmerZone' }
+export const metadata: Metadata = { title: `QR-Plakat — ${MARKE}` }
 
 export const dynamic = 'force-dynamic'
 

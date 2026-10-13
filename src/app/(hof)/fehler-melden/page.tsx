@@ -13,8 +13,9 @@ import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { MeldungAbgeben } from '@/components/hof-hilfe/meldung-abgeben'
 import { HilfeSeitenspalte } from '@/components/hof-hilfe/hilfe-seitenspalte'
 import { MELDEN_RAHMEN } from '@/components/hof-hilfe/hilfe-laden'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'Problem melden — FarmerZone' }
+export const metadata: Metadata = { title: `Problem melden — ${MARKE}` }
 
 export const dynamic = 'force-dynamic'
 
@@ -50,7 +51,7 @@ export default async function FehlerMeldenPage({
   }
 
   const mailto = supportMailto({
-    subject: 'Frage zu FarmerZone',
+    subject: `Frage zu ${MARKE}`,
     anliegen: 'Meine Frage:',
     farmSlug: farm.slug,
   })

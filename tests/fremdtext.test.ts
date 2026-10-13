@@ -38,7 +38,7 @@ const BASIS: ExportMeldung = {
   status: 'NEU',
   text: 'Harmloser Text.',
   createdAt: new Date('2026-09-20T10:00:00Z'),
-  seiteUrl: 'https://farmerzone.at/orders',
+  seiteUrl: 'https://agrilo.at/orders',
   userAgent: 'Mozilla/5.0 (iPhone)',
   viewport: '375x667',
   diagKennung: null,
@@ -225,14 +225,14 @@ describe('Daten, die die App nicht verlassen', () => {
   })
 
   it('von der Seite nur der Pfad: kein Host, keine Parameter, kein Fragment, höchstens 120 Zeichen', () => {
-    expect(seitenPfad('https://farmerzone.at/orders?token=geheim&mail=a@example.com#oben')).toBe('/orders')
+    expect(seitenPfad('https://agrilo.at/orders?token=geheim&mail=a@example.com#oben')).toBe('/orders')
     expect(seitenPfad('//fremd.example.org/weg')).toBe('/weg')
     expect(seitenPfad('/settings')).toBe('/settings')
     expect(seitenPfad('')).toBe('–')
     // Eine E-Mail im Pfad — auch kodiert — verlässt die App nicht.
-    expect(seitenPfad('https://farmerzone.at/kunden/max.mustermann@example.org/x')).toBe('/kunden/(E-Mail)/x')
-    expect(seitenPfad('https://farmerzone.at/kunden/max%40example.org')).toBe('/kunden/(E-Mail)')
-    expect(Array.from(seitenPfad(`https://farmerzone.at/${'a'.repeat(300)}`))).toHaveLength(120)
+    expect(seitenPfad('https://agrilo.at/kunden/max.mustermann@example.org/x')).toBe('/kunden/(E-Mail)/x')
+    expect(seitenPfad('https://agrilo.at/kunden/max%40example.org')).toBe('/kunden/(E-Mail)')
+    expect(Array.from(seitenPfad(`https://agrilo.at/${'a'.repeat(300)}`))).toHaveLength(120)
   })
 
   it('Browserangabe höchstens 80 Zeichen', () => {

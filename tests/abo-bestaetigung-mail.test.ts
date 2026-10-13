@@ -11,6 +11,7 @@
  *    Transaktionsmail (Bestätigung, Anmeldecode, Bestellung) bekommt sie.
  */
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
+import { MARKE } from '@/lib/marke'
 
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
@@ -47,7 +48,7 @@ function gesendet(): { to: string; subject: string; html: string; headers?: Reco
   return sendMock.mock.calls[0]![0] as { to: string; subject: string; html: string; headers?: Record<string, string> }
 }
 
-const LINK = 'https://farmerzone.example/account/neuigkeiten-bestaetigen?token=abc.def'
+const LINK = 'https://plattform.example/account/neuigkeiten-bestaetigen?token=abc.def'
 const ABMELDE_TOKEN = 'xyz.123'
 
 describe('Bestätigungsmail', () => {
@@ -69,7 +70,7 @@ describe('Bestätigungsmail', () => {
     const mail = gesendet()
     expect(mail.html).not.toContain('unsubscribe')
     expect(mail.html).not.toContain('Benachrichtigungen verwalten')
-    expect(mail.subject).toBe('Bitte bestätige deine Anmeldung · FarmerZone')
+    expect(mail.subject).toBe(`Bitte bestätige deine Anmeldung · ${MARKE}`)
   })
 
   it('Gegenprobe: ein Hofname mit HTML wird nicht als HTML eingesetzt', async () => {

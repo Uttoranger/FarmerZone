@@ -16,9 +16,10 @@ import { BeitraegeReiter } from '@/components/mein-hof/beitraege-reiter'
 import { AbschnitteListe } from '@/components/mein-hof/abschnitte-liste'
 import type { AbschnittHof } from '@/components/mein-hof/abschnitt-inhalt'
 import { MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: 'Mein Hof — FarmerZone',
+  title: `Mein Hof — ${MARKE}`,
 }
 
 export const dynamic = 'force-dynamic'

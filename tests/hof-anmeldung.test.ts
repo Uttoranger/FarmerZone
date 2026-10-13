@@ -26,6 +26,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { MARKE } from '@/lib/marke'
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/impressum',
@@ -85,7 +86,7 @@ describe('KundenKopf — Seiten, die noch nicht in der KundeShell stehen', () =>
     expect(tag).toMatch(/\b(min-)?h-11\b/)
     expect(tag).not.toMatch(/\bhidden\b/)
     // Rechts vom Logo, vor dem Menü.
-    expect(handy.indexOf('href="/login"')).toBeGreaterThan(handy.indexOf('FarmerZone'))
+    expect(handy.indexOf('href="/login"')).toBeGreaterThan(handy.indexOf(MARKE))
     expect(handy.indexOf('href="/login"')).toBeLessThan(handy.indexOf('Menü öffnen'))
   })
 
@@ -118,8 +119,8 @@ describe('KundenKopf — Seiten, die noch nicht in der KundeShell stehen', () =>
     expect(handy + browser).not.toContain('Mein Hof')
   })
 
-  // Nachbesserung 1: Bei 390 px steht „FarmerZone" in jedem Kopf; zurück tritt es nur auf schmaleren Handys.
-  it('das Wort „FarmerZone" tritt nie bei 390 px oder breiter zurück', () => {
+  // Nachbesserung 1: Bei 390 px steht der Name in jedem Kopf; zurück tritt er nur auf schmaleren Handys.
+  it('der Name tritt nie bei 390 px oder breiter zurück', () => {
     const schwellen = ['src/components/shared/kunden-kopf.tsx', 'src/components/shells/kunde-shell.tsx'].flatMap((datei) =>
       [...ohneKommentare(quelle(datei)).matchAll(/max-\[(\d+)px\]:hidden/g)].map((t) => Number(t[1]))
     )

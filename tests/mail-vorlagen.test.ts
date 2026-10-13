@@ -262,7 +262,7 @@ describe('Neue-Bestellung-Mail an den Hof (Vorlage new-order-notification.tsx)',
 
 describe('„Bestätige deine E-Mail" (S3, Nr. 17b)', () => {
   it('ein Knopf auf /verify mit dem Token — nie Better Auths GET-Pfad, ohne Emojis, Betreff ohne Link', async () => {
-    await email.sendEmailBestaetigung('neu@example.com', 'https://farmerzone.example/verify?token=kopf.inhalt.signatur')
+    await email.sendEmailBestaetigung('neu@example.com', 'https://plattform.example/verify?token=kopf.inhalt.signatur')
     const { html, text, subject } = zuletzt()
     expect(text).toContain('Bestätige deine E-Mail-Adresse')
     expect(text).toContain('24 Stunden')

@@ -40,11 +40,11 @@ async function meldeUeberClient(mitOhneAnfrage: boolean): Promise<string> {
     isolationScope.setSDKProcessingMetadata({
       normalizedRequest: {
         method: 'GET',
-        url: `https://farmerzone.at/hoefe?q=${SUCHTEXT}`,
+        url: `https://agrilo.at/hoefe?q=${SUCHTEXT}`,
         query_string: `q=${SUCHTEXT}`,
         headers: {
-          host: 'farmerzone.at',
-          referer: `https://farmerzone.at/hoefe?q=${SUCHE_IM_REFERER}`,
+          host: 'agrilo.at',
+          referer: `https://agrilo.at/hoefe?q=${SUCHE_IM_REFERER}`,
           'x-forwarded-for': IP,
           'user-agent': 'Vitest',
         },

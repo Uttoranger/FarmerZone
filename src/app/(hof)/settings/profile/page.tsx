@@ -6,11 +6,12 @@ import { getFarmSettings } from '@/server/queries/farm'
 import { ProfileForm } from '@/components/settings/profile-form'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
+import { MARKE } from '@/lib/marke'
 
 /** Titel der Seite — für den Kopf und den Tab, eine Schreibweise. */
 const TITEL = 'Hof-Profil'
 
-export const metadata: Metadata = { title: `${TITEL} — FarmerZone` }
+export const metadata: Metadata = { title: `${TITEL} — ${MARKE}` }
 
 /*
  * Hof-Profil in der HofShell (Nachtlauf Nr. 22d): gleiches Formular, gleiche

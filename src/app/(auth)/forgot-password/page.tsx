@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { PasswortVergessenFormular } from './passwort-vergessen-formular'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'Passwort vergessen — FarmerZone' }
+export const metadata: Metadata = { title: `Passwort vergessen — ${MARKE}` }
 
 /**
  * „Passwort vergessen?" in der Fokus-Shell (seit Nr. 54) — wie /register und

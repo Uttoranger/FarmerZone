@@ -74,9 +74,9 @@ describe('hofZustand', () => {
 
 describe('hofAdresse', () => {
   it('zeigt Host und Slug ohne Protokoll, kopiert wird die ganze Adresse', () => {
-    expect(hofAdresse('https://farmerzone.at', 'muellerhof')).toEqual({
-      anzeige: 'farmerzone.at/muellerhof',
-      url: 'https://farmerzone.at/muellerhof',
+    expect(hofAdresse('https://agrilo.at', 'muellerhof')).toEqual({
+      anzeige: 'agrilo.at/muellerhof',
+      url: 'https://agrilo.at/muellerhof',
     })
   })
 

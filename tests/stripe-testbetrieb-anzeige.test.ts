@@ -227,7 +227,7 @@ describe('TESTBETRIEB entsteht aus bestimmeUmgebung', () => {
     vi.resetModules()
     vi.doUnmock('@/lib/umgebung-server')
     vi.doMock('@/lib/env', () => ({
-      env: { VERCEL_ENV: werte.VERCEL_ENV, STRIPE_SECRET_KEY: werte.STRIPE_SECRET_KEY, NEXT_PUBLIC_APP_URL: 'https://farmerzone.example' },
+      env: { VERCEL_ENV: werte.VERCEL_ENV, STRIPE_SECRET_KEY: werte.STRIPE_SECRET_KEY, NEXT_PUBLIC_APP_URL: 'https://plattform.example' },
     }))
     vi.stubEnv('NODE_ENV', werte.NODE_ENV)
     const { TESTBETRIEB } = await import('@/lib/umgebung-server')

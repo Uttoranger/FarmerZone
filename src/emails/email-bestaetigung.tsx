@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Text } from '@react-email/components'
 import { EmailLayout, h1, bodyText, mutedText, Knopf, KnopfReihe } from './_layout'
+import { MARKE } from '@/lib/marke'
 
 export interface EmailBestaetigungProps {
   /** Vollständige Adresse von /verify mit dem signierten Token (bestaetigungsPfad). */
@@ -26,8 +27,7 @@ export function EmailBestaetigungEmail({ url, stunden }: EmailBestaetigungProps)
       <Text style={bodyText}>
         Hallo,
         <br />
-        schön, dass du deinen Hof bei FarmerZone einrichtest. Bitte bestätige noch kurz, dass diese
-        E-Mail-Adresse dir gehört. Öffne dazu den Link und tippe auf der Seite auf „E-Mail bestätigen“.
+        {`schön, dass du deinen Hof bei ${MARKE} einrichtest. Bitte bestätige noch kurz, dass diese E-Mail-Adresse dir gehört.`} Öffne dazu den Link und tippe auf der Seite auf „E-Mail bestätigen“.
       </Text>
 
       <KnopfReihe>
@@ -43,7 +43,7 @@ export function EmailBestaetigungEmail({ url, stunden }: EmailBestaetigungProps)
         neuen schicken lassen.
       </Text>
       <Text style={mutedText}>
-        Du hast dich nicht bei FarmerZone registriert? Dann kannst du diese E-Mail einfach ignorieren.
+        {`Du hast dich nicht bei ${MARKE} registriert? Dann kannst du diese E-Mail einfach ignorieren.`}
       </Text>
     </EmailLayout>
   )

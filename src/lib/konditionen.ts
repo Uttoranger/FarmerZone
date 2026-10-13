@@ -11,7 +11,7 @@
  * Die einzige Regel, `bestimmeTarifZustand` (Nr. 61), sagt nur, welchen Stand
  * Tarif-Zeile und „Deine Konditionen" zeigen.
  *
- * Übergang (Register K1, Nachtlauf 17d): In der Startphase ist FarmerZone
+ * Übergang (Register K1, Nachtlauf 17d): In der Startphase ist die Plattform
  * kostenlos, die Tarife gelten erst ab `TARIFE_AB`. Jede Seite, die Tarife
  * zeigt, nennt dazu `KONDITIONEN_UEBERGANG` — das Datum steht nur hier.
  *

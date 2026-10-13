@@ -32,14 +32,14 @@ describe('Adressen', () => {
 
   it('ein Token mit Sonderzeichen wird kodiert — nie ein zweiter Parameter durch den Token', () => {
     expect(einKlickAbmeldePfad('a&b=c')).toBe('/api/abmelden?token=a%26b%3Dc')
-    expect(new URL(einKlickAbmeldePfad('a&b=c'), 'https://farmerzone.example').searchParams.get('token')).toBe('a&b=c')
+    expect(new URL(einKlickAbmeldePfad('a&b=c'), 'https://plattform.example').searchParams.get('token')).toBe('a&b=c')
   })
 })
 
 describe('Kopfzeilen einer werblichen Mail (RFC 2369 und RFC 8058)', () => {
   it('List-Unsubscribe in spitzen Klammern mit der vollen Adresse, List-Unsubscribe-Post für den Ein-Klick', () => {
-    expect(listUnsubscribeKoepfe('https://farmerzone.example', TOKEN)).toEqual({
-      'List-Unsubscribe': `<https://farmerzone.example/api/abmelden?token=${TOKEN}>`,
+    expect(listUnsubscribeKoepfe('https://plattform.example', TOKEN)).toEqual({
+      'List-Unsubscribe': `<https://plattform.example/api/abmelden?token=${TOKEN}>`,
       'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
     })
   })

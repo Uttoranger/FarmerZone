@@ -69,12 +69,12 @@ describe('validateEnv', () => {
       VERCEL_ENV: 'preview',
       VERCEL_URL: 'app-abc.vercel.app',
       VERCEL_BRANCH_URL: '   ',
-      NEXT_PUBLIC_APP_URL: 'https://farmerzone.example',
+      NEXT_PUBLIC_APP_URL: 'https://plattform.example',
     })
     expect(env.VERCEL_ENV).toBe('preview')
     expect(env.VERCEL_URL).toBe('app-abc.vercel.app')
     expect(env.VERCEL_BRANCH_URL).toBeUndefined()
-    expect(env.NEXT_PUBLIC_APP_URL).toBe('https://farmerzone.example')
+    expect(env.NEXT_PUBLIC_APP_URL).toBe('https://plattform.example')
   })
 
   // Register Z3 (Nr. 43): Beide Variablen sind optional. Ihre Form prüfen
@@ -86,10 +86,10 @@ describe('validateEnv', () => {
     expect(validateEnv({ ...complete, TEST_EMPFAENGER: '  ' }).TEST_EMPFAENGER).toBeUndefined()
     const env = validateEnv({
       ...complete,
-      NEXT_PUBLIC_TESTUMGEBUNG_URL: 'https://test.farmerzone.example',
+      NEXT_PUBLIC_TESTUMGEBUNG_URL: 'https://test.plattform.example',
       TEST_EMPFAENGER: 'tester@example.org, zweite@example.org',
     })
-    expect(env.NEXT_PUBLIC_TESTUMGEBUNG_URL).toBe('https://test.farmerzone.example')
+    expect(env.NEXT_PUBLIC_TESTUMGEBUNG_URL).toBe('https://test.plattform.example')
     expect(env.TEST_EMPFAENGER).toBe('tester@example.org, zweite@example.org')
   })
 

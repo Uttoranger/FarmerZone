@@ -6,9 +6,10 @@ import { MeldungForm } from '@/components/shared/meldung-form'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { generateFormToken } from '@/lib/form-token'
 import { KENNUNG_PARAMETER, bereinigeKennung } from '@/lib/fehlerseite'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: 'Problem melden — FarmerZone',
+  title: `Problem melden — ${MARKE}`,
   robots: { index: false, follow: false },
 }
 

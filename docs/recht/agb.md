@@ -1,4 +1,4 @@
-# Allgemeine Geschäftsbedingungen (AGB) von FarmerZone
+# Allgemeine Geschäftsbedingungen (AGB) von Agrilo
 
 **Entwurf, Stand 13. Oktober 2026 – Fassung 0.9. Vor der Veröffentlichung anwaltlich prüfen lassen (siehe Hinweise am Ende).**
 
@@ -6,12 +6,12 @@
 
 ## Kurz erklärt (kein Teil der AGB)
 
-- FarmerZone ist ein Marktplatz: Du kaufst **direkt beim Hof**, FarmerZone verkauft nichts selbst.
+- Agrilo ist ein Marktplatz: Du kaufst **direkt beim Hof**, Agrilo verkauft nichts selbst.
 - Du bestellst online, zahlst online oder bar und holst **am Hof** ab.
 - Beim Online-Bezahlen kommt eine **Servicegebühr** dazu (5 %, mindestens 0,50 €, einmal je Bestellung). Du siehst sie, bevor du bestellst.
 - **Frische Lebensmittel** kannst du nicht zurückgeben – das steht so im Gesetz. Vor der Abholung kannst du stornieren, dann bekommst du alles zurück.
-- Höfe sind **Unternehmen**. Sie sind für ihre Ware verantwortlich; FarmerZone für die Plattform und die Zahlungsabwicklung.
-- Höfe nutzen FarmerZone im Tarif **Hoftor (0 €)** oder **Hofladen (19 € im Monat, monatlich kündbar)**.
+- Höfe sind **Unternehmen**. Sie sind für ihre Ware verantwortlich; Agrilo für die Plattform und die Zahlungsabwicklung.
+- Höfe nutzen Agrilo im Tarif **Hoftor (0 €)** oder **Hofladen (19 € im Monat, monatlich kündbar)**.
 
 ---
 
@@ -19,9 +19,9 @@
 
 ### 1. Wer wir sind, wofür diese AGB gelten
 
-1.1 FarmerZone wird betrieben von **[Betreiber laut Impressum, Rechtsform, Anschrift, E-Mail]** („FarmerZone“, „wir“). Alle Angaben nach § 5 ECG stehen im [Impressum](/impressum).
+1.1 Agrilo wird betrieben von **[Betreiber laut Impressum, Rechtsform, Anschrift, E-Mail]** („Agrilo“, „wir“). Alle Angaben nach § 5 ECG stehen im [Impressum](/impressum).
 
-1.2 Diese AGB gelten für die Nutzung von farmerzone.at und der dazugehörigen Dienste durch **Kundinnen und Kunden** (Teil B) und durch **Höfe** (Teil C). Teil A und Teil D gelten für alle.
+1.2 Diese AGB gelten für die Nutzung von agrilo.at und der dazugehörigen Dienste durch **Kundinnen und Kunden** (Teil B) und durch **Höfe** (Teil C). Teil A und Teil D gelten für alle.
 
 1.3 Abweichende Bedingungen eines Hofs gelten nur für den Kaufvertrag zwischen Hof und Kundschaft, wenn der Hof sie beim Angebot ausdrücklich nennt, und nur, soweit sie dem Gesetz entsprechen. Für die Nutzung der Plattform gelten ausschließlich diese AGB.
 
@@ -29,17 +29,17 @@
 
 1.5 Wir sprechen alle mit „du“ an. Das ist unser Stil, kein Zeichen von Unverbindlichkeit.
 
-### 2. Was FarmerZone ist – und was nicht
+### 2. Was Agrilo ist – und was nicht
 
-2.1 FarmerZone ist eine **Vermittlungsplattform** (Online-Marktplatz). Höfe stellen Lebensmittel, Futtermittel und Brennmaterial ein; Kundinnen und Kunden bestellen und holen am Hof ab.
+2.1 Agrilo ist eine **Vermittlungsplattform** (Online-Marktplatz). Höfe stellen Lebensmittel, Futtermittel und Brennmaterial ein; Kundinnen und Kunden bestellen und holen am Hof ab.
 
-2.2 **Der Kaufvertrag kommt ausschließlich zwischen dem Hof und der Kundin bzw. dem Kunden zustande.** FarmerZone ist nicht Verkäuferin, nicht Vertreterin des Hofs und nicht Vertragspartnerin des Kaufvertrags. Das sagen wir dir in der Kasse vor dem Bestellen noch einmal ausdrücklich (§ 4a Abs. 2 FAGG).
+2.2 **Der Kaufvertrag kommt ausschließlich zwischen dem Hof und der Kundin bzw. dem Kunden zustande.** Agrilo ist nicht Verkäuferin, nicht Vertreterin des Hofs und nicht Vertragspartnerin des Kaufvertrags. Das sagen wir dir in der Kasse vor dem Bestellen noch einmal ausdrücklich (§ 4a Abs. 2 FAGG).
 
-2.3 Alle Höfe auf FarmerZone handeln nach ihrer eigenen Erklärung gegenüber uns als **Unternehmer** (land- und forstwirtschaftliche Betriebe oder Gewerbebetriebe). Deshalb gelten für Käufe das Konsumentenschutzgesetz und das Fern- und Auswärtsgeschäfte-Gesetz (§ 4a Abs. 1 Z 2 FAGG). Wir prüfen diese Erklärung auf Plausibilität, aber nicht amtlich.
+2.3 Alle Höfe auf Agrilo handeln nach ihrer eigenen Erklärung gegenüber uns als **Unternehmer** (land- und forstwirtschaftliche Betriebe oder Gewerbebetriebe). Deshalb gelten für Käufe das Konsumentenschutzgesetz und das Fern- und Auswärtsgeschäfte-Gesetz (§ 4a Abs. 1 Z 2 FAGG). Wir prüfen diese Erklärung auf Plausibilität, aber nicht amtlich.
 
 2.4 **So sind die Pflichten verteilt** (§ 4a Abs. 1 Z 4 FAGG):
 
-| Der Hof | FarmerZone |
+| Der Hof | Agrilo |
 |---|---|
 | Angebot, Preis, Beschreibung, Pflichtangaben zu Lebensmitteln, Futtermitteln und Brennmaterial | Betrieb der Plattform (Hofseiten, Bestellung, Postfach) |
 | Ware, Menge, Qualität, Hygiene, Kühlkette | Zahlungsabwicklung über unseren Zahlungsdienstleister Stripe |
@@ -47,7 +47,7 @@
 | Gewährleistung, Rücktritt, Reklamation, Rückzahlung des Warenpreises | Rückzahlung der Servicegebühr |
 | Rechnung, Steuern, Registrierkasse | Hilfe bei Fragen zur Bestellung |
 
-2.5 FarmerZone hat keinen Einfluss auf Verfügbarkeit, Qualität und Rechtmäßigkeit der Angebote und prüft sie nicht vorab. Wir entfernen Angebote, wenn wir von Rechtsverstößen erfahren (Punkt 5).
+2.5 Agrilo hat keinen Einfluss auf Verfügbarkeit, Qualität und Rechtmäßigkeit der Angebote und prüft sie nicht vorab. Wir entfernen Angebote, wenn wir von Rechtsverstößen erfahren (Punkt 5).
 
 ### 3. Reihenfolge der Höfe und Angebote
 
@@ -77,13 +77,13 @@
 
 ### 6. Rechte an Inhalten
 
-6.1 Deine Inhalte bleiben deine. Du räumst FarmerZone das einfache, unentgeltliche, räumlich unbeschränkte Recht ein, sie für den Betrieb der Plattform zu nutzen: anzuzeigen, zu speichern, technisch zu bearbeiten (verkleinern, zuschneiden), als Vorschaubild, Teilen-Bild und QR-Plakat aufzubereiten und in der Suche zu zeigen. Das Recht endet, wenn du den Inhalt löschst, mit Ausnahme von Kopien in Sicherungen und in bereits erstellten Belegen.
+6.1 Deine Inhalte bleiben deine. Du räumst Agrilo das einfache, unentgeltliche, räumlich unbeschränkte Recht ein, sie für den Betrieb der Plattform zu nutzen: anzuzeigen, zu speichern, technisch zu bearbeiten (verkleinern, zuschneiden), als Vorschaubild, Teilen-Bild und QR-Plakat aufzubereiten und in der Suche zu zeigen. Das Recht endet, wenn du den Inhalt löschst, mit Ausnahme von Kopien in Sicherungen und in bereits erstellten Belegen.
 
 6.2 Du versicherst, dass du die nötigen Rechte an deinen Inhalten hast, insbesondere an Fotos, auf denen Personen zu sehen sind.
 
 ### 7. Verfügbarkeit und Weiterentwicklung
 
-7.1 FarmerZone läuft im **Pilotbetrieb**. Wir arbeiten an der Plattform, bauen Funktionen aus und nehmen Wartungen vor. Eine bestimmte Verfügbarkeit sichern wir nicht zu; wir bemühen uns, Ausfälle kurz zu halten und anzukündigen.
+7.1 Agrilo läuft im **Pilotbetrieb**. Wir arbeiten an der Plattform, bauen Funktionen aus und nehmen Wartungen vor. Eine bestimmte Verfügbarkeit sichern wir nicht zu; wir bemühen uns, Ausfälle kurz zu halten und anzukündigen.
 
 7.2 Wir dürfen Funktionen ändern, ergänzen oder einstellen. Wesentliche Einschränkungen kündigen wir Höfen mindestens 30 Tage vorher an.
 
@@ -111,7 +111,7 @@
 
 9.1 Die Preise legt der Hof fest. Sie verstehen sich in Euro inklusive Umsatzsteuer. Bei Produkten nach Gewicht oder Menge zeigt die Kasse den Grundpreis und die bestellte Menge.
 
-9.2 Zusätzlich zum Warenpreis fällt bei Online-Zahlung eine **Servicegebühr an FarmerZone** an: **5 % des Warenwerts, auf den nächsten ganzen Cent aufgerundet, mindestens 0,50 €, einmal je Bestellung.** Sie steht vor dem Absenden in der Kasse. Die Servicegebühr ist das Entgelt für die Vermittlung und die Zahlungsabwicklung; sie zahlst du an FarmerZone, nicht an den Hof.
+9.2 Zusätzlich zum Warenpreis fällt bei Online-Zahlung eine **Servicegebühr an Agrilo** an: **5 % des Warenwerts, auf den nächsten ganzen Cent aufgerundet, mindestens 0,50 €, einmal je Bestellung.** Sie steht vor dem Absenden in der Kasse. Die Servicegebühr ist das Entgelt für die Vermittlung und die Zahlungsabwicklung; sie zahlst du an Agrilo, nicht an den Hof.
 
 9.3 Ob bei Barzahlung eine Servicegebühr anfällt, steht in der Kasse und auf [/konditionen](/konditionen). Derzeit entfällt sie bei Barzahlung.
 
@@ -119,7 +119,7 @@
 
 ### 10. Bezahlen
 
-10.1 **Online**: Karte, Apple Pay, Google Pay oder EPS über unseren Zahlungsdienstleister **Stripe Payments Europe, Ltd.** Der Warenpreis geht an den Hof, die Servicegebühr an FarmerZone. Deine Zahlungsdaten verarbeitet Stripe; wir sehen sie nicht.
+10.1 **Online**: Karte, Apple Pay, Google Pay oder EPS über unseren Zahlungsdienstleister **Stripe Payments Europe, Ltd.** Der Warenpreis geht an den Hof, die Servicegebühr an Agrilo. Deine Zahlungsdaten verarbeitet Stripe; wir sehen sie nicht.
 
 10.2 **Bar bei Abholung**: Du zahlst beim Hof. Der Hof kann die Barzahlung ausschließen; dann steht in der Kasse nur die Online-Zahlung.
 
@@ -131,7 +131,7 @@
 
 11.2 Mit der Übergabe am Hof geht die Gefahr für die Ware auf dich über. Prüfe die Ware bei der Übergabe und sag dem Hof sofort, wenn etwas nicht passt.
 
-11.3 Holst du die Ware **nicht ab**, kann der Hof die Bestellung nach Ende des Abholtermins stornieren. Bei Barzahlung entsteht dir dann kein Anspruch auf die Ware; bei Online-Zahlung bekommst du den Warenpreis zurück, wenn der Hof die Ware anderweitig verwenden kann – das entscheidet der Hof nach dem Gesetz. Wer wiederholt bestellt und nicht abholt, kann von FarmerZone von weiteren Bestellungen ausgeschlossen werden (Punkt 5.3).
+11.3 Holst du die Ware **nicht ab**, kann der Hof die Bestellung nach Ende des Abholtermins stornieren. Bei Barzahlung entsteht dir dann kein Anspruch auf die Ware; bei Online-Zahlung bekommst du den Warenpreis zurück, wenn der Hof die Ware anderweitig verwenden kann – das entscheidet der Hof nach dem Gesetz. Wer wiederholt bestellt und nicht abholt, kann von Agrilo von weiteren Bestellungen ausgeschlossen werden (Punkt 5.3).
 
 ### 12. Rücktritt vom Kaufvertrag (Fernabsatz)
 
@@ -146,9 +146,9 @@ Ob ein Rücktrittsrecht besteht, hängt also von der Ware ab. Haltbare Produkte 
 
 12.3 Den Rücktritt erklärst du gegenüber dem **Hof** (seine Angaben stehen in deiner Bestellung) – formlos oder mit dem Muster-Formular im Anhang. Du kannst ihn auch an uns schicken; wir leiten ihn an den Hof weiter und bestätigen dir den Eingang.
 
-12.4 Nach einem wirksamen Rücktritt erstattet der Hof den Warenpreis spätestens binnen 14 Tagen; FarmerZone erstattet die Servicegebühr. Bei Online-Zahlung läuft beides über Stripe auf dein Zahlungsmittel. Die Ware bringst du unverzüglich, spätestens binnen 14 Tagen, zum Hof zurück; die Kosten der Rückgabe trägst du.
+12.4 Nach einem wirksamen Rücktritt erstattet der Hof den Warenpreis spätestens binnen 14 Tagen; Agrilo erstattet die Servicegebühr. Bei Online-Zahlung läuft beides über Stripe auf dein Zahlungsmittel. Die Ware bringst du unverzüglich, spätestens binnen 14 Tagen, zum Hof zurück; die Kosten der Rückgabe trägst du.
 
-12.5 Die Vermittlungsleistung von FarmerZone (Servicegebühr) ist mit der Bestätigung der Bestellung vollständig erbracht. Du stimmst dem ausdrücklich zu und nimmst zur Kenntnis, dass du insoweit kein Rücktrittsrecht hast (§ 18 Abs. 1 Z 1 FAGG). Das betrifft nur die Gebühr für eine ausgeführte Bestellung – bei jedem Storno vor der Abholung und bei jedem Rücktritt bekommst du die Servicegebühr trotzdem zurück (Punkt 13).
+12.5 Die Vermittlungsleistung von Agrilo (Servicegebühr) ist mit der Bestätigung der Bestellung vollständig erbracht. Du stimmst dem ausdrücklich zu und nimmst zur Kenntnis, dass du insoweit kein Rücktrittsrecht hast (§ 18 Abs. 1 Z 1 FAGG). Das betrifft nur die Gebühr für eine ausgeführte Bestellung – bei jedem Storno vor der Abholung und bei jedem Rücktritt bekommst du die Servicegebühr trotzdem zurück (Punkt 13).
 
 ### 13. Stornieren vor der Abholung
 
@@ -160,11 +160,11 @@ Ob ein Rücktrittsrecht besteht, hängt also von der Ware ab. Haltbare Produkte 
 
 ### 14. Gewährleistung und Reklamation
 
-14.1 Für die Ware haftet der **Hof** nach den gesetzlichen Gewährleistungsregeln (§§ 922 ff. ABGB, Verbrauchergewährleistungsgesetz). FarmerZone übernimmt keine Gewährleistung für Waren.
+14.1 Für die Ware haftet der **Hof** nach den gesetzlichen Gewährleistungsregeln (§§ 922 ff. ABGB, Verbrauchergewährleistungsgesetz). Agrilo übernimmt keine Gewährleistung für Waren.
 
-14.2 Wende dich mit einer Reklamation an den Hof (Adresse und Telefonnummer stehen in deiner Bestellung). Kommst du nicht weiter, hilft dir FarmerZone über „Problem melden“ oder per E-Mail; wir können vermitteln, aber nicht anstelle des Hofs entscheiden.
+14.2 Wende dich mit einer Reklamation an den Hof (Adresse und Telefonnummer stehen in deiner Bestellung). Kommst du nicht weiter, hilft dir Agrilo über „Problem melden“ oder per E-Mail; wir können vermitteln, aber nicht anstelle des Hofs entscheiden.
 
-### 15. Nachrichten von Höfen und von FarmerZone
+### 15. Nachrichten von Höfen und von Agrilo
 
 15.1 Neuigkeiten eines Hofs (per E-Mail oder WhatsApp) bekommst du nur, wenn du dich dafür angemeldet hast. Du kannst dich jederzeit über den Link in jeder Nachricht oder beim Hof abmelden.
 
@@ -188,7 +188,7 @@ Ob ein Rücktrittsrecht besteht, hängt also von der Ware ab. Haltbare Produkte 
 
 17.2 **Startphase:** Bis zum dort genannten Stichtag ist alles kostenlos. Gründungshöfe laufen bis zu dem Datum, das in ihren Konditionen steht, als Hofladen ohne Grundgebühr.
 
-17.3 Die **Servicegebühr** zahlt die Kundschaft an FarmerZone (Punkt 9). Vom Warenpreis behält FarmerZone im Pilotbetrieb nichts ein; eine Provision würden wir mindestens 30 Tage vorher ankündigen und in den Konditionen nennen.
+17.3 Die **Servicegebühr** zahlt die Kundschaft an Agrilo (Punkt 9). Vom Warenpreis behält Agrilo im Pilotbetrieb nichts ein; eine Provision würden wir mindestens 30 Tage vorher ankündigen und in den Konditionen nennen.
 
 17.4 Die Grundgebühr des Hofladens rechnen wir monatlich ab; die Zahlungsart (zum Beispiel SEPA-Lastschrift) und die Fälligkeit stehen in den Konditionen. Bei Zahlungsverzug dürfen wir den Tarif nach Mahnung mit 14 Tagen Frist auf Hoftor zurücksetzen.
 
@@ -198,37 +198,37 @@ Ob ein Rücktrittsrecht besteht, hängt also von der Ware ab. Haltbare Produkte 
 
 18.1 Du bietest nur Waren an, die du **selbst erzeugst oder rechtmäßig vertreibst**, und beschreibst sie richtig und vollständig: Bezeichnung, Preis inkl. USt, Menge oder Gewicht, bei Lebensmitteln die vorgeschriebenen Angaben vor dem Kauf (insbesondere Allergene, Zutaten, Herkunft, soweit vorgeschrieben – Art. 14 Verordnung (EU) 1169/2011). Du bist Lebensmittelunternehmer im Sinne des Lebensmittelrechts.
 
-18.2 **Futtermittel:** Du bist für Registrierung und Kennzeichnung nach dem Futtermittelrecht verantwortlich (LFBIS-Nummer, Meldung an die zuständige Behörde). Die Nummern, die du einträgst, zeigt FarmerZone so an, wie du sie angibst; wir prüfen sie nicht.
+18.2 **Futtermittel:** Du bist für Registrierung und Kennzeichnung nach dem Futtermittelrecht verantwortlich (LFBIS-Nummer, Meldung an die zuständige Behörde). Die Nummern, die du einträgst, zeigt Agrilo so an, wie du sie angibst; wir prüfen sie nicht.
 
 18.3 **Brennmaterial:** Angaben zu Holzart, Trocknung, Menge und Einheit müssen stimmen.
 
-18.4 Du pflegst **Abholzeiten**, die du einhalten kannst, und übergibst bestellte Ware zum Abholtermin in der bestellten Menge und Qualität. Kannst du eine Bestellung nicht erfüllen, stornierst du sie so früh wie möglich mit Angabe des Grunds; FarmerZone erstattet die Servicegebühr, du den Warenpreis (bei Online-Zahlung automatisch über Stripe).
+18.4 Du pflegst **Abholzeiten**, die du einhalten kannst, und übergibst bestellte Ware zum Abholtermin in der bestellten Menge und Qualität. Kannst du eine Bestellung nicht erfüllen, stornierst du sie so früh wie möglich mit Angabe des Grunds; Agrilo erstattet die Servicegebühr, du den Warenpreis (bei Online-Zahlung automatisch über Stripe).
 
 18.5 Du hältst Hygiene, Kühlkette und alle Vorschriften ein, die für deine Waren gelten, holst nötige Bewilligungen ein und stellst Rechnungen oder Belege nach deinen steuerlichen Pflichten (Belegerteilung, Registrierkasse) selbst aus. Steuern und Abgaben auf deine Umsätze sind deine Sache.
 
-18.6 Du erfüllst gegenüber der Kundschaft die gesetzlichen Pflichten eines Unternehmers im Fernabsatz: Rücktrittsrecht (Punkt 12), Gewährleistung (Punkt 14), Informationspflichten. FarmerZone stellt dir dafür die Texte und Abläufe zur Verfügung (Bestellbestätigung, Rücktrittsbelehrung, Storno-Weg).
+18.6 Du erfüllst gegenüber der Kundschaft die gesetzlichen Pflichten eines Unternehmers im Fernabsatz: Rücktrittsrecht (Punkt 12), Gewährleistung (Punkt 14), Informationspflichten. Agrilo stellt dir dafür die Texte und Abläufe zur Verfügung (Bestellbestätigung, Rücktrittsbelehrung, Storno-Weg).
 
-18.7 Du stellst FarmerZone von Ansprüchen Dritter frei, die daraus entstehen, dass du diese Pflichten schuldhaft verletzt hast, und ersetzt die notwendigen Kosten der Rechtsverteidigung.
+18.7 Du stellst Agrilo von Ansprüchen Dritter frei, die daraus entstehen, dass du diese Pflichten schuldhaft verletzt hast, und ersetzt die notwendigen Kosten der Rechtsverteidigung.
 
 ### 19. Zahlungsabwicklung über Stripe
 
-19.1 Für die Online-Zahlung schließt du einen Vertrag mit Stripe (Stripe Connect). Die Zahlungen der Kundschaft gehen auf dein Stripe-Konto; FarmerZone zieht die Servicegebühr (und eine allfällige, vorher angekündigte Provision) als Plattformgebühr ein. Auszahlungen an dein Bankkonto nimmt Stripe nach seinen Bedingungen vor.
+19.1 Für die Online-Zahlung schließt du einen Vertrag mit Stripe (Stripe Connect). Die Zahlungen der Kundschaft gehen auf dein Stripe-Konto; Agrilo zieht die Servicegebühr (und eine allfällige, vorher angekündigte Provision) als Plattformgebühr ein. Auszahlungen an dein Bankkonto nimmt Stripe nach seinen Bedingungen vor.
 
 19.2 Erstattungen bei Storno, Rücktritt oder fehlenden Artikeln laufen über Stripe; der erstattete Warenpreis wird von deinem Stripe-Guthaben oder deiner nächsten Auszahlung abgezogen. Reicht das nicht, stellen wir dir den Betrag in Rechnung.
 
-19.3 Barzahlungen kassierst du selbst; FarmerZone wickelt sie nicht ab und haftet nicht dafür.
+19.3 Barzahlungen kassierst du selbst; Agrilo wickelt sie nicht ab und haftet nicht dafür.
 
 ### 20. Postfach, Rundschreiben, E-Mails
 
-20.1 FarmerZone schreibt dir über das **Postfach** in der App: Neues zur Plattform, Hinweise zu deinen Angeboten, Abrechnung, Rechtliches. Du kannst jede Nachricht beantworten.
+20.1 Agrilo schreibt dir über das **Postfach** in der App: Neues zur Plattform, Hinweise zu deinen Angeboten, Abrechnung, Rechtliches. Du kannst jede Nachricht beantworten.
 
-20.2 Nachrichten, die den **Betrieb deines Hofs auf FarmerZone** betreffen (etwa fehlende Pflichtangaben, Abrechnung, Änderungen dieser AGB), schicken wir dir zusätzlich per E-Mail an die Adresse deines Kontos. Das ist Teil der Vertragsdurchführung und braucht keine Einwilligung. Werbung für Dritte verschicken wir nicht.
+20.2 Nachrichten, die den **Betrieb deines Hofs auf Agrilo** betreffen (etwa fehlende Pflichtangaben, Abrechnung, Änderungen dieser AGB), schicken wir dir zusätzlich per E-Mail an die Adresse deines Kontos. Das ist Teil der Vertragsdurchführung und braucht keine Einwilligung. Werbung für Dritte verschicken wir nicht.
 
 ### 21. Reihenfolge, Daten, Beschwerden (Verordnung (EU) 2019/1150)
 
 21.1 **Reihenfolge:** Wie Höfe und Angebote gereiht werden, steht in Punkt 3. Du kannst die Reihung nicht kaufen und wir bevorzugen keinen Hof – auch keinen, an dem wir beteiligt wären.
 
-21.2 **Daten:** Du siehst die Daten deiner eigenen Bestellungen (Name, E-Mail, Telefon und Notiz der Kundschaft, soweit angegeben) und deine Auswertungen. FarmerZone sieht alle Daten, die beim Betrieb der Plattform anfallen, und nutzt sie für den Betrieb, die Abrechnung und die Verbesserung der Plattform; Näheres in der [Datenschutzerklärung](/datenschutz). Nach dem Ende deiner Nutzung bleiben Bestell- und Abrechnungsdaten so lange gespeichert, wie das Gesetz es verlangt (Punkt 22.4).
+21.2 **Daten:** Du siehst die Daten deiner eigenen Bestellungen (Name, E-Mail, Telefon und Notiz der Kundschaft, soweit angegeben) und deine Auswertungen. Agrilo sieht alle Daten, die beim Betrieb der Plattform anfallen, und nutzt sie für den Betrieb, die Abrechnung und die Verbesserung der Plattform; Näheres in der [Datenschutzerklärung](/datenschutz). Nach dem Ende deiner Nutzung bleiben Bestell- und Abrechnungsdaten so lange gespeichert, wie das Gesetz es verlangt (Punkt 22.4).
 
 21.3 **Einschränkung, Sperre, Kündigung:** Schränken wir dein Konto ein oder sperren es, nennen wir dir die Gründe und die Tatsachen, auf die wir uns stützen (Punkt 5.3). Eine Kündigung durch uns kündigen wir mindestens 30 Tage vorher an – außer bei Rechtsverstößen, wiederholten Verstößen gegen diese AGB oder gesetzlichen Pflichten, die uns zum sofortigen Handeln zwingen.
 
@@ -254,19 +254,19 @@ Kauft ein Hof bei einem anderen Hof (zum Beispiel Futter), gelten die Punkte 8 b
 
 ## Teil D – Für alle: Haftung, Änderungen, Streit
 
-### 24. Haftung von FarmerZone
+### 24. Haftung von Agrilo
 
-24.1 FarmerZone haftet unbeschränkt für Schäden aus der Verletzung von Leben, Körper oder Gesundheit, bei Vorsatz und grober Fahrlässigkeit sowie nach dem Produkthaftungsgesetz.
+24.1 Agrilo haftet unbeschränkt für Schäden aus der Verletzung von Leben, Körper oder Gesundheit, bei Vorsatz und grober Fahrlässigkeit sowie nach dem Produkthaftungsgesetz.
 
 24.2 Bei leichter Fahrlässigkeit haften wir nur für die Verletzung wesentlicher Vertragspflichten (Pflichten, die den Vertrag prägen und auf die du vertrauen darfst), und nur für den vorhersehbaren, vertragstypischen Schaden. Gegenüber Verbraucherinnen und Verbrauchern gilt das nur, soweit § 6 KSchG es zulässt.
 
-24.3 FarmerZone haftet nicht für Waren der Höfe, deren Beschreibung, Qualität oder Rechtmäßigkeit, für die Erfüllung von Kaufverträgen und nicht für Inhalte, die Nutzerinnen und Nutzer einstellen (§§ 16 ff. ECG). Punkt 24.1 bleibt unberührt.
+24.3 Agrilo haftet nicht für Waren der Höfe, deren Beschreibung, Qualität oder Rechtmäßigkeit, für die Erfüllung von Kaufverträgen und nicht für Inhalte, die Nutzerinnen und Nutzer einstellen (§§ 16 ff. ECG). Punkt 24.1 bleibt unberührt.
 
 24.4 Für Ausfälle der Plattform, die wir nicht zu vertreten haben (höhere Gewalt, Störungen bei Dienstleistern, Angriffe von außen), haften wir nicht.
 
 ### 25. Datenschutz
 
-Wie wir personenbezogene Daten verarbeiten, steht in der [Datenschutzerklärung](/datenschutz). Höfe sind für die Daten ihrer Kundschaft, die sie über FarmerZone erhalten, selbst Verantwortliche im Sinne der DSGVO und nutzen sie nur für die Abwicklung der Bestellung und, bei Einwilligung, für Neuigkeiten.
+Wie wir personenbezogene Daten verarbeiten, steht in der [Datenschutzerklärung](/datenschutz). Höfe sind für die Daten ihrer Kundschaft, die sie über Agrilo erhalten, selbst Verantwortliche im Sinne der DSGVO und nutzen sie nur für die Abwicklung der Bestellung und, bei Einwilligung, für Neuigkeiten.
 
 ### 26. Änderungen dieser AGB
 
@@ -288,7 +288,7 @@ Wie wir personenbezogene Daten verarbeiten, steht in der [Datenschutzerklärung]
 
 28.1 Es gilt **österreichisches Recht** unter Ausschluss des UN-Kaufrechts. Für Verbraucherinnen und Verbraucher mit gewöhnlichem Aufenthalt in einem anderen EU-Staat gelten zusätzlich die zwingenden Verbraucherschutzvorschriften dieses Staates.
 
-28.2 Für Klagen gegen Verbraucherinnen und Verbraucher gilt § 14 KSchG (Gericht am Wohnsitz oder Beschäftigungsort in Österreich). Für Streitigkeiten mit Höfen und anderen Unternehmern ist das sachlich zuständige Gericht am Sitz von FarmerZone zuständig.
+28.2 Für Klagen gegen Verbraucherinnen und Verbraucher gilt § 14 KSchG (Gericht am Wohnsitz oder Beschäftigungsort in Österreich). Für Streitigkeiten mit Höfen und anderen Unternehmern ist das sachlich zuständige Gericht am Sitz von Agrilo zuständig.
 
 ### 29. Schluss
 
@@ -300,7 +300,7 @@ Wie wir personenbezogene Daten verarbeiten, steht in der [Datenschutzerklärung]
 
 ## Anhang: Muster-Rücktrittsformular (für Verbraucherinnen und Verbraucher)
 
-*(Wenn du vom Kaufvertrag zurücktreten willst, fülle dieses Formular aus und schicke es an den Hof – seine Angaben stehen in deiner Bestellung. Du kannst es auch an FarmerZone schicken, wir leiten es weiter.)*
+*(Wenn du vom Kaufvertrag zurücktreten willst, fülle dieses Formular aus und schicke es an den Hof – seine Angaben stehen in deiner Bestellung. Du kannst es auch an Agrilo schicken, wir leiten es weiter.)*
 
 An: [Name und Adresse des Hofs, E-Mail laut Bestellung]
 
@@ -318,7 +318,7 @@ Datum:
 ## Hinweise für die anwaltliche Prüfung (kein Teil der AGB)
 
 1. **Vertragsschluss bei Barzahlung (8.4):** Die Fassung setzt voraus, dass die Kundschaft die Bestellung per E-Mail-Link bestätigt und der Hof sie nicht gesondert annimmt. Passt das zum tatsächlichen Ablauf? Alternativ: Vertrag mit Absenden der Bestellung, Bestätigung nur Information.
-2. **Servicegebühr als eigene Leistung (9.2, 12.5):** FarmerZone zieht die Gebühr von der Kundschaft ein (Stripe application fee). Damit besteht ein eigener Dienstleistungsvertrag mit der Kundschaft (Fernabsatz, § 18 Abs. 1 Z 1 FAGG). Die Zustimmung zur sofortigen Ausführung muss in der Kasse ausdrücklich eingeholt werden (Satz unter dem Kaufknopf). Zu prüfen: Formulierung, und ob die Gebühr bei Nichtabholung ohne Storno einbehalten werden darf (heute: wird nicht erstattet).
+2. **Servicegebühr als eigene Leistung (9.2, 12.5):** Agrilo zieht die Gebühr von der Kundschaft ein (Stripe application fee). Damit besteht ein eigener Dienstleistungsvertrag mit der Kundschaft (Fernabsatz, § 18 Abs. 1 Z 1 FAGG). Die Zustimmung zur sofortigen Ausführung muss in der Kasse ausdrücklich eingeholt werden (Satz unter dem Kaufknopf). Zu prüfen: Formulierung, und ob die Gebühr bei Nichtabholung ohne Storno einbehalten werden darf (heute: wird nicht erstattet).
 3. **§ 4a FAGG:** Punkt 2.2 (Vertragspartner) und 3 (Reihung) müssen auch in der Oberfläche stehen – in der Kasse („Angaben zum Hof (dein Vertragspartner)“ gibt es bereits) und auf der Hofübersicht (Reihenfolge: Hinweistext nachrüsten).
 4. **P2B-Verordnung:** Punkte 5.3, 7.2, 17.3, 21, 26.3 decken Art. 3, 4, 5, 7, 9 und 11 ab. Als Kleinunternehmen sind wir von Art. 11 (Beschwerdestelle) und 12 (Mediation) befreit, bieten Beschwerden trotzdem an. Zu prüfen: Fristen (15/30 Tage) und Kündigungsgründe.
 5. **DSA:** Punkte 5.2–5.4 (Melden, Begründen, keine Durchsuchung). Als Kleinstunternehmen sind wir von den meisten Pflichten befreit; Art. 14 (AGB-Transparenz), 16 und 17 gelten.

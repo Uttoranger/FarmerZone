@@ -1,7 +1,7 @@
 /**
  * Servicegebühr — die Gebühr, die die KUNDIN auf den Warenpreis zahlt.
  *
- * Preismodell des Betreibers (Stand 16.09.2026): FarmerZone verrechnet die
+ * Preismodell des Betreibers (Stand 16.09.2026): Die Plattform verrechnet die
  * Gebühr automatisch, der Hof behält immer 100 % Warenpreis. Online wird sie
  * bei der Zahlung einbehalten (application_fee_amount, /api/checkout); bar
  * kassiert der Hof Warenpreis plus Gebühr und schuldet die Gebühr der späteren

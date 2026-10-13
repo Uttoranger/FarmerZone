@@ -43,7 +43,7 @@ import { STRIPE_MARKE_TEXT, ZUR_ECHTEN_SEITE } from '@/lib/testumgebung'
 const WURZEL = process.cwd()
 const quelle = (datei: string): string => readFileSync(join(WURZEL, datei), 'utf8')
 const ohneKommentare = (text: string): string => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
-const TESTUMGEBUNG = 'https://test.farmerzone.example'
+const TESTUMGEBUNG = 'https://test.plattform.example'
 
 afterEach(() => {
   zustand.umgebung = null
@@ -140,7 +140,7 @@ describe('Umgebungsbanner: „Zur echten Seite"', () => {
   })
 
   it('Gegenprobe: in der Produktion gibt es weder Balken noch Link', () => {
-    expect(banner(bestimmeUmgebung({ NODE_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://farmerzone.example' }))).toEqual({
+    expect(banner(bestimmeUmgebung({ NODE_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://plattform.example' }))).toEqual({
       balken: '',
       link: '',
     })
@@ -199,7 +199,7 @@ describe('Marke und Adresse entstehen auf dem Server', () => {
   it('Produktion mit Live-Schlüssel und Variable: „Stripe Live" und der Link', async () => {
     const w = await serverWerte({
       VERCEL_ENV: 'production',
-      NEXT_PUBLIC_APP_URL: 'https://farmerzone.example',
+      NEXT_PUBLIC_APP_URL: 'https://plattform.example',
       STRIPE_SECRET_KEY: 'sk_live_erfunden',
       NEXT_PUBLIC_TESTUMGEBUNG_URL: TESTUMGEBUNG,
     })
@@ -208,7 +208,7 @@ describe('Marke und Adresse entstehen auf dem Server', () => {
   })
 
   it('Produktion im Testbetrieb ohne Variable: „Stripe Test", kein Link', async () => {
-    const w = await serverWerte({ VERCEL_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://farmerzone.example', STRIPE_SECRET_KEY: 'sk_test_erfunden' })
+    const w = await serverWerte({ VERCEL_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://plattform.example', STRIPE_SECRET_KEY: 'sk_test_erfunden' })
     expect(w.STRIPE_MARKE).toEqual({ text: 'Stripe Test', ton: 'offen' })
     expect(w.TESTUMGEBUNG_URL).toBeNull()
   })

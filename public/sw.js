@@ -1,5 +1,5 @@
 /*
- * FarmerZone Service Worker — AUSSCHLIESSLICH das Teilen-Ziel (Web Share
+ * Service Worker der App — AUSSCHLIESSLICH das Teilen-Ziel (Web Share
  * Target). Mehr nicht, und das ist eine bewusste Grenze:
  *
  * Dieser Service Worker cached NIEMALS App-Assets oder Seiten und fängt

@@ -28,9 +28,10 @@ import { getTeilenFensterDaten } from '@/server/queries/teilen-bild'
 import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
 import { letzteTage, teilenWirkungSatz } from '@/lib/teilen-wirkung'
 import { cn } from '@/lib/utils'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: 'Heute — FarmerZone',
+  title: `Heute — ${MARKE}`,
 }
 
 /*
@@ -156,7 +157,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
             <ErsteSchritteSchalter richtung="ein" />
           </p>
         )}
-        {/* Ganz unten (Register N1): „Leg FarmerZone auf den Startbildschirm" —
+        {/* Ganz unten (Register N1): die Karte „auf den Startbildschirm legen" —
             nur im Browser, nicht in der installierten App; das entscheidet die
             Karte selbst nach dem Mounten. */}
         <StartbildschirmKarte />

@@ -24,6 +24,7 @@ import { wienerMitternacht, centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { CHANNEL_LABELS } from '@/schemas/manual-sale'
 import { ohneTestzahlungenWhere, testzahlungWhere } from '@/lib/testzahlung'
+import { MARKE } from '@/lib/marke'
 
 export type Periode = 'woche' | 'monat' | 'jahr'
 
@@ -466,14 +467,14 @@ export function topProdukte(posten: ProduktPosten[], anzahl = 3): TopProdukt[] {
 /**
  * Wie die Seiten sagen, was eine Umsatzzahl zählt (freigabe.md §13 Nr. 53) —
  * EINE Quelle, damit dasselbe Wort auf Heute und in der Auswertung dasselbe
- * heißt. „Über FarmerZone" zählt nur abgeholte Bestellungen, „Mit Hofladen"
+ * heißt. „Über MARKE" zählt nur abgeholte Bestellungen, „Mit Hofladen"
  * dazu die eingetragenen Direktverkäufe (Hofladen, Markt, …) — so stehen
  * „€ 0" und „€ 206" nebeneinander, ohne sich zu widersprechen. Nie „Gesamt":
  * Die Summe ist nicht der ganze Umsatz des Hofs (Register F6). Nur Wörter,
  * an der Rechnung oben ändert sich nichts.
  */
 export const UMSATZ_TEXT = {
-  ueberFarmerzone: 'Über FarmerZone',
+  ueberPlattform: `Über ${MARKE}`,
   mitHofladen: 'Mit Hofladen',
   /** Unter einem Betrag, klein: „€ 178 · mit Hofladen" (Kennzahl auf Heute). */
   mitHofladenKlein: 'mit Hofladen',

@@ -226,9 +226,9 @@ describe('meldeFehleranzeige — die Seite liefert ihre Fehleranzeige aus (Nr. 5
     const ereignis: Record<string, unknown> = {
       message: FEHLERANZEIGE_MELDUNG,
       request: {
-        url: 'https://farmerzone.at/hoefe?q=Musterhof+Bio',
+        url: 'https://agrilo.at/hoefe?q=Musterhof+Bio',
         query_string: 'q=Musterhof+Bio',
-        headers: { referer: 'https://farmerzone.at/hoefe?q=Musterhof' },
+        headers: { referer: 'https://agrilo.at/hoefe?q=Musterhof' },
       },
       breadcrumbs: [{ category: 'navigation', data: { from: '/hoefe?q=Musterhof' } }],
       tags: { bereich: 'hoefe-entdecken', sichtbar: 'ja' },

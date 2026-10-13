@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Text } from '@react-email/components'
 import { EmailLayout, h1, bodyText, mutedText, Knopf, KnopfReihe } from './_layout'
+import { MARKE } from '@/lib/marke'
 
 export interface RegistrierungHinweisProps {
   /** Wie sich das Konto anmeldet — Höfe mit Passwort, Kundinnen mit Code. */
@@ -20,13 +21,12 @@ export interface RegistrierungHinweisProps {
  */
 export function RegistrierungHinweisEmail({ weg, anmelden, passwortZuruecksetzen }: RegistrierungHinweisProps) {
   return (
-    <EmailLayout previewText="Zu deiner E-Mail-Adresse gibt es schon ein Konto bei FarmerZone">
+    <EmailLayout previewText={`Zu deiner E-Mail-Adresse gibt es schon ein Konto bei ${MARKE}`}>
       <Text style={h1}>Zu deiner Adresse gibt es schon ein Konto</Text>
       <Text style={bodyText}>
         Hallo,
         <br />
-        jemand wollte sich mit deiner E-Mail-Adresse bei FarmerZone registrieren. Zu dieser Adresse gibt es aber schon
-        ein Konto.
+        {`jemand wollte sich mit deiner E-Mail-Adresse bei ${MARKE} registrieren. Zu dieser Adresse gibt es aber schon ein Konto.`}
       </Text>
       {weg === 'passwort' ? (
         <Text style={bodyText}>Warst du das? Dann melde dich an. Hast du dein Passwort vergessen, setze es zurück.</Text>

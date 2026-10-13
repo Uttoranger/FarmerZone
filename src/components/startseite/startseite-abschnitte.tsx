@@ -18,6 +18,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { SchonDabei } from '@/components/shared/schon-dabei'
 import { Wortmarke } from '@/components/shared/wortmarke'
 import { Kicker } from '@/components/startseite/kicker'
+import { MARKE } from '@/lib/marke'
 
 /*
  * Die Abschnitte der Startseite unter „Höfe in deiner Nähe", in der Reihenfolge
@@ -338,7 +339,7 @@ export function Fragen({ jetzt }: { jetzt: Date }): React.JSX.Element {
 
 const FUSS_SPALTEN = [
   {
-    titel: 'FarmerZone',
+    titel: MARKE,
     links: [
       { href: hoefeAdresse(), text: 'Höfe entdecken' },
       { href: '/#so-funktionierts', text: 'So funktioniert’s' },
@@ -373,7 +374,7 @@ export function StartseiteFuss({ jahr }: { jahr: number }): React.JSX.Element {
           <p className="text-[13px] leading-normal text-muted-foreground">
             Regional einkaufen, direkt beim Hof abholen. Aus Österreich, für Österreich.
           </p>
-          <p className="text-xs text-muted-foreground">© {jahr} FarmerZone</p>
+          <p className="text-xs text-muted-foreground">© {jahr} {MARKE}</p>
         </div>
         <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:flex md:gap-[70px]">
           {FUSS_SPALTEN.map((spalte) => (

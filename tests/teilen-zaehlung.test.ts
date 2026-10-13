@@ -69,8 +69,8 @@ describe('Kanäle und Link', () => {
   )
 
   it('der Link ist die Hofseite mit genau ?k=', () => {
-    expect(teilenLink('https://farmerzone.at', 'hof-test', 'qr')).toBe('https://farmerzone.at/hof-test?k=qr')
-    expect(teilenLink('https://farmerzone.at/', 'hof-test', 'wa-status')).toBe('https://farmerzone.at/hof-test?k=wa-status')
+    expect(teilenLink('https://agrilo.at', 'hof-test', 'qr')).toBe('https://agrilo.at/hof-test?k=qr')
+    expect(teilenLink('https://agrilo.at/', 'hof-test', 'wa-status')).toBe('https://agrilo.at/hof-test?k=wa-status')
   })
 
   it('der Tag ist der Wiener Kalendertag (kurz nach Mitternacht in Wien = schon der neue Tag)', () => {

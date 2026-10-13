@@ -283,7 +283,7 @@ describe('„Hof teilen" teilt die öffentliche Hofseite', () => {
 
   it('geteilt wird origin + Slug — ohne Pfad der Bestellung, ohne Parameter', async () => {
     const share = vi.fn().mockResolvedValue(undefined)
-    vi.stubGlobal('window', { location: { origin: 'https://farmerzone.example', href: `https://farmerzone.example/hof-test/confirm/order-1?sig=${GUELTIG}` } })
+    vi.stubGlobal('window', { location: { origin: 'https://plattform.example', href: `https://plattform.example/hof-test/confirm/order-1?sig=${GUELTIG}` } })
     vi.stubGlobal('navigator', { share, clipboard: { writeText: vi.fn() } })
     const { teileHof } = await import('@/components/shared/hof-teilen')
 
@@ -291,7 +291,7 @@ describe('„Hof teilen" teilt die öffentliche Hofseite', () => {
 
     expect(share).toHaveBeenCalledTimes(1)
     const geteilt = share.mock.calls[0][0] as { url: string; text: string }
-    expect(geteilt.url).toBe('https://farmerzone.example/hof-test')
+    expect(geteilt.url).toBe('https://plattform.example/hof-test')
     // Gegenprobe zur Adresse, auf der die Kundin gerade steht.
     expect(JSON.stringify(geteilt)).not.toContain(GUELTIG)
     expect(JSON.stringify(geteilt)).not.toContain('confirm')

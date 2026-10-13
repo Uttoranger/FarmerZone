@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Text, Link, Img } from '@react-email/components'
 import { EmailLayout, h1, bodyText, ctaButton, MAIL_FARBE } from './_layout'
+import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
 
 const ANLASS_LABEL: Record<string, string> = {
   FRESH_PRODUCT: 'Frisches Produkt',
@@ -37,7 +38,7 @@ export function StatusUpdateEmail({
   anlass,
   photoUrl,
   unsubscribeUrl,
-  appUrl = 'https://farmerzone.at',
+  appUrl = PRODUKTION_ADRESSE,
 }: StatusUpdateEmailProps) {
   const farmUrl = `${appUrl}/${farmSlug}`
   const anlassLabel = ANLASS_LABEL[anlass] ?? 'Mitteilung'

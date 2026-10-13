@@ -1,7 +1,7 @@
 name: Staging nachziehen
 
 # Hält den Branch staging auf dem Stand von main (Register Z3, Nr. 43). Vercel
-# baut staging als Vorschau unter test.farmerzone.at — die Testumgebung zeigt
+# baut staging als Vorschau unter test.agrilo.at — die Testumgebung zeigt
 # so immer, was gerade live ist. Einrichtung: docs/betrieb/testumgebung.md.
 #
 # SICHERHEIT

@@ -10,7 +10,7 @@
  *  - Routen liegen unter (hof), (farmer)/analytics gibt es nicht mehr,
  *  - die Karten rendern nur mit Tokens, ohne Lastschrift vor dem Stichtag,
  *    ohne Zahl oder Datum im Quelltext der Servicegebühren,
- *  - seit Nr. 53 heißen die beiden Umsatzzahlen „Über FarmerZone"
+ *  - seit Nr. 53 heißen die beiden Umsatzzahlen „Über MARKE"
  *    (Bestellungen) und „Mit Hofladen" (mit Direktverkäufen), aus EINER
  *    Quelle (UMSATZ_TEXT) — nie „Gesamt" (Register F6).
  */
@@ -19,6 +19,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { MARKE } from '@/lib/marke'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
@@ -45,6 +46,12 @@ import { BAR_OHNE_GEBUEHR_SATZ, BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 const gibt = (pfad: string) => existsSync(join(process.cwd(), pfad))
+
+
+/** Selbst geschriebene Umsatzwörter — der Name auch als Vorlage mit MARKE (Register M1). */
+const SELBST_GESCHRIEBEN = new RegExp(
+  `['"\`]Über (${MARKE}|\\$\\{MARKE\\})|['"\`>]\\s*Mit Hofladen|['"\`]mit Hofladen|Warenumsatz|Umsatz pro (Tag|Woche|Monat)|umsatzKartenTitel`
+)
 
 describe('Adresse von /region', () => {
   it('Reiter: „futter" oder Standard „preise"; Unsinn und Listen fallen still zurück', () => {
@@ -182,9 +189,9 @@ describe('Karten im neuen Design', () => {
     expect(html).not.toMatch(/Lastschrift|SEPA|Grundgebühr|Vor Ort bezahlt/)
   })
 
-  it('Kennzahl „Über FarmerZone" zählt die abgeholten Bestellungen — kein „Warenumsatz" mehr (Nr. 53)', () => {
+  it(`Kennzahl „Über ${MARKE}" zählt die abgeholten Bestellungen — kein „Warenumsatz" mehr (Nr. 53)`, () => {
     const html = renderToStaticMarkup(createElement(KennzahlenReihe, { k: kennzahlen([], 0), zeitraum: 'Diese Woche' }))
-    expect(html).toMatch(new RegExp(`<dt[^>]*>${UMSATZ_TEXT.ueberFarmerzone}</dt>`))
+    expect(html).toMatch(new RegExp(`<dt[^>]*>${UMSATZ_TEXT.ueberPlattform}</dt>`))
     expect(html).toContain('Diese Woche · abgeholte Bestellungen')
     expect(html).not.toMatch(/Warenumsatz|Gesamt/)
   })
@@ -207,21 +214,21 @@ describe('Karten im neuen Design', () => {
   })
 
   it('Texte aus EINER Quelle: Auswertung und Heute nehmen UMSATZ_TEXT, keine Seite schreibt die Wörter selbst', () => {
-    expect(UMSATZ_TEXT).toEqual({ ueberFarmerzone: 'Über FarmerZone', mitHofladen: 'Mit Hofladen', mitHofladenKlein: 'mit Hofladen' })
+    expect(UMSATZ_TEXT).toEqual({ ueberPlattform: `Über ${MARKE}`, mitHofladen: 'Mit Hofladen', mitHofladenKlein: 'mit Hofladen' })
     // „Heute eingenommen · mit Hofladen" ist dasselbe Wort wie die Umsatzkarte der Auswertung.
     expect(KENNZAHL_TEXT.eingenommenMit).toBe(UMSATZ_TEXT.mitHofladenKlein)
     const teile = quelle('src/components/auswertung/auswertung-teile.tsx')
-    expect(teile).toContain('UMSATZ_TEXT.ueberFarmerzone')
+    expect(teile).toContain('UMSATZ_TEXT.ueberPlattform')
     expect(teile).toContain('UMSATZ_TEXT.mitHofladen')
     for (const datei of ['src/components/auswertung/auswertung-teile.tsx', 'src/app/(hof)/analytics/page.tsx', 'src/components/heute/heute-teile.tsx', 'src/lib/heute.ts', 'src/lib/auswertung.ts']) {
       const text = quelle(datei).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
-      expect(text, datei).not.toMatch(/['"`]Über FarmerZone|['"`>]\s*Mit Hofladen|['"`]mit Hofladen|Warenumsatz|Umsatz pro (Tag|Woche|Monat)|umsatzKartenTitel/)
+      expect(text, datei).not.toMatch(SELBST_GESCHRIEBEN)
     }
   })
 
   it('Gegenprobe: die Suche nach selbst geschriebenen Wörtern schlägt an', () => {
-    const suche = /['"`]Über FarmerZone|['"`>]\s*Mit Hofladen|['"`]mit Hofladen|Warenumsatz|Umsatz pro (Tag|Woche|Monat)|umsatzKartenTitel/
-    for (const text of ["titel=\"Warenumsatz\"", "'Umsatz pro Tag'", "<h2>Mit Hofladen</h2>", "eingenommenMit: 'mit Hofladen'", "titel=\"Über FarmerZone\""]) {
+    const suche = SELBST_GESCHRIEBEN
+    for (const text of ["titel=\"Warenumsatz\"", "'Umsatz pro Tag'", "<h2>Mit Hofladen</h2>", "eingenommenMit: 'mit Hofladen'", `titel="Über ${MARKE}"`, `titel={\`Über \${MARKE}\`}`]) {
       expect(text).toMatch(suche)
     }
     expect('UMSATZ_TEXT.mitHofladen').not.toMatch(suche)

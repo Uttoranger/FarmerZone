@@ -9,9 +9,10 @@ import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { ProdukteAnsicht } from '@/components/produkte/produkte-ansicht'
 import { MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
 import { MeinHofReiterLeiste } from '@/components/mein-hof/reiter-leiste'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: 'Produkte — FarmerZone',
+  title: `Produkte — ${MARKE}`,
 }
 
 /*

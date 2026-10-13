@@ -114,7 +114,7 @@ type TeilenFensterGrund = {
   slug: string
   /** Der geteilte Link ohne Kürzel (APP_URL): die Hofseite, im Beitrag-Modus ihr Reiter „Beiträge". */
   link: string
-  /** So steht der Link im Feld: „farmerzone.at/hof-test" bzw. „farmerzone.at/hof-test?reiter=beitraege". */
+  /** So steht der Link im Feld: Host und Pfad ohne https:// (Domain/hof-test bzw. Domain/hof-test?reiter=beitraege). */
   adresse: string
   auswahl: TeilenAuswahlEintrag[]
   textVorschlag: string

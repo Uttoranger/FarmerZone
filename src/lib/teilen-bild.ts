@@ -234,7 +234,7 @@ export type TeilenBildDaten = {
    * gesehen, „morgen" stimmte dann nicht mehr. null wie `abholung`.
    */
   abholTermin: string | null
-  /** „farmerzone.at/hof-test" — so steht die Adresse im Bild. */
+  /** Host und Pfad ohne https:// (Domain/hof-test) — so steht die Adresse im Bild. */
   adresse: string
   /** Nur im Beitrag-Modus; sonst fehlt das Feld (die Prüfsumme bleibt dann wie ohne Beitrag). */
   beitrag?: TeilenBildBeitrag

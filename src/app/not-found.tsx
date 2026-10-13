@@ -7,9 +7,10 @@ import {
 } from '@/lib/fehlerseite'
 import { NichtGefundenAnsicht } from '@/components/shared/nicht-gefunden-ansicht'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: 'Seite nicht gefunden — FarmerZone',
+  title: `Seite nicht gefunden — ${MARKE}`,
   robots: { index: false, follow: false },
 }
 

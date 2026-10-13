@@ -206,7 +206,7 @@ describe('Kopf und Reiter (neues Design)', () => {
   const kopf: MeinHofKopfDaten = {
     name: 'Hof Test',
     slug: 'hof-test',
-    adresse: { anzeige: 'farmerzone.at/hof-test', url: 'https://farmerzone.at/hof-test' },
+    adresse: { anzeige: 'agrilo.at/hof-test', url: 'https://agrilo.at/hof-test' },
     logoUrl: null,
     titelbildUrl: null,
     bannerValue: null,
@@ -238,7 +238,7 @@ describe('Kopf und Reiter (neues Design)', () => {
       ...kopf,
       zustand: { art: 'wartet', schild: { text: 'Noch nicht freigegeben', farbe: 'grau' }, oeffentlich: false },
     })
-    expect(html).not.toContain('href="https://farmerzone.at/hof-test"')
+    expect(html).not.toContain('href="https://agrilo.at/hof-test"')
     expect(html).not.toContain('Teilen')
     expect(html).toContain('data-status="neutral"')
     // Die Vorschau sieht der Besitzer auch vor der Freigabe (ansichtsModus).

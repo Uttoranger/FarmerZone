@@ -7,8 +7,9 @@ import { teilenMomenteAn, TEILEN_MOMENTE_SATZ, TEILEN_MOMENTE_TITEL } from '@/li
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 import { TeilenMomenteSchalter } from '@/components/hof-einstellungen/teilen-momente-schalter'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: `${TEILEN_MOMENTE_TITEL} — FarmerZone` }
+export const metadata: Metadata = { title: `${TEILEN_MOMENTE_TITEL} — ${MARKE}` }
 export const dynamic = 'force-dynamic'
 
 /*

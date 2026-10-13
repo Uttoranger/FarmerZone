@@ -11,9 +11,10 @@ import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { EmptyState } from '@/components/ui/empty-state'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: 'Produkt nicht gefunden — FarmerZone',
+  title: `Produkt nicht gefunden — ${MARKE}`,
   robots: { index: false, follow: false },
 }
 
