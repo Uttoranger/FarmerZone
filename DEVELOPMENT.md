@@ -5096,6 +5096,17 @@ Register M1: Die Plattform heißt Agrilo, die Produktionsdomain ist agrilo.at. R
 - **Offen:** Das Vorschaubild der Startseite (`public/og/startseite.jpg`) zeigt noch Schriftzug und F-Symbol des alten Namens, die App-Symbole (`public/icons/*`, `src/app/apple-icon.png`) ein „F“ – neu zeichnen ist nicht beauftragt.
 - **Cutover (Projektleitung, nicht der Lauf; Freigabe Lauf 13 §2):** VOR dem Merge des Sammel-PRs in Vercel (Production) NEXT_PUBLIC_APP_URL und BETTER_AUTH_URL auf https://agrilo.at und EMAIL_FROM auf „Agrilo <noreply@agrilo.at>“ setzen, Resend „verified“ abwarten; NACH dem Merge farmerzone.at und www.farmerzone.at in Vercel auf 308 → agrilo.at stellen, in Stripe (Sandbox) Webhook-Adresse, Payment-Method-Domain und Connect-Profil auf agrilo.at, test.agrilo.at dem Branch staging zuweisen. Wird der Sammel-PR ohne die Variablen gemergt, schlägt die Anmeldung in der Produktion fehl.
 
+## Titelbild am Computer (Nachtlauf 13, Nr. 89, Oktober 2026)
+
+Register N13 (ergänzt N6 und N7), Auftrag freigabe.md §17 „89“. Keine Migration, kein neues Paket.
+
+- **Anlass und Entscheidung:** Bei 2 560 px Breite war die Fläche 8,5-mal so breit wie hoch (300 px ab 768 px, volle Breite ohne Obergrenze), und ein quadratisches oder 4:3-Foto zeigte nur einen Streifen aus der Mitte (Bildschirmfoto der Projektleitung, 13.10.2026). Jetzt wächst die Fläche mit der Breite — 220 px am Handy, 300 ab 768, 360 ab 1 280, 420 ab 1 536 —, rechnet mit höchstens 1 920 px, und ein Foto, das weniger als 1,5-mal so breit wie hoch ist (Quadrat, Hochformat, 4:3), steht ab 768 px ganz. Nur ein Querformat ab 3:2 füllt die Fläche mit Fokuspunkt, wie vorher.
+- **Eine Regel an einer Stelle:** `titelbildDarstellung` in `src/lib/titelbild.ts` (Konstante `TITELBILD_GANZ_UNTER` = 1,5; vorher „ganz“ nur bei höher als breit). Die Grenze ist hart: genau 3:2 bleibt beim Beschnitt, was nach dem Verkleinern knapp darunter liegt, steht ganz. Der Satz unter der Vorschau in Mein Hof folgt derselben Regel und lautet „Quadrat oder Hochformat – …“ (Wortlaut aus dem Register); er erscheint damit auch bei einem 4:3-Foto, das ein Querformat ist.
+- **Eine Kopie, nicht zwei:** Die unscharfe Kopie ist EINE Lage über die volle Breite des Rahmens hinter dem Kasten (`max-w-[1920px]`), nicht eine im Kasten und eine für die Ränder: Zwei Kopien mit verschiedenem Maßstab ergäben über 1 920 px eine Naht an der Kastenkante. Bei `ganz` ist sie ab 768 px sichtbar, bei `beschnitt` nur ab 1 920 px (dort füllt sie die Ränder). Die Werte stammen aus dem Mockup: Weichzeichner 28 px, 20 px über den Rahmen hinaus, Tönung 45 %. Ohne den Überstand schimmerte die Fläche des Rahmens durch die halbdurchsichtige Kante des Weichzeichners (im Bild gemessen: oben und unten ein hellerer Streifen, mit Überstand weg).
+- **Weicher Wechsel statt Sprung:** Die Kopie steht immer im Baum und blendet nach dem Laden über `transition-opacity` ein (500 ms, bei reduzierter Bewegung ohne Übergang); die Rahmenhöhe ist fest, das Layout springt nicht. Gemessen im Dev-Server: Deckkraft 0 → 1 in 500 ms. Das Foto selbst wechselt von füllend auf ganz ohne Übergang (`object-fit` lässt sich nicht überblenden).
+- **Eine Zahl, drei Stellen:** Die 1 920 stehen als Klasse im Kasten (Tailwind liest nur ganze Klassen), in `TITELBILD_SIZES` und in `TITELBILD_BREITE_MAX`; `tests/titelbild.test.ts` hält sie zusammen.
+- **Offen:** Maße beim Hochladen speichern (Migration, eigene Freigabe) — dann könnte der Server sofort richtig rendern, und der Wechsel nach dem Laden entfiele.
+
 ## Nützliche Befehle
 
 ```bash
