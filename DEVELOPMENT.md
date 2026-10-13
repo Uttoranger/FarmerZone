@@ -5023,6 +5023,15 @@ Auftrag freigabe.md §15 „74" (Register I1). Keine Migration, kein neues Paket
 - **Mein Hof breit:** Die Web-Vorschau ist höchstens 1 408 px breit, damit die Liste bei voller Editorbreite ihre 560 px bekommt (`EDITOR_LISTE_WEB_MAX` griff vorher nie: 2 000 − 32 − 1 440 = 528). `useElementGroesse` liegt in `src/lib/use-element-groesse.ts`.
 - **Kleinkram:** `aktuellePositionen` in `use-cart.ts` samt Prüfstand-Test für Funktionen aus einem alten Render; Prüfskript der Illustrationen meldet beschädigte Pixel als FEHLER-Zeile; der Test „jede Unterkategorie" läuft über alle Werte des Enums; die Fünfer-Grenze der Hofseiten-Beiträge prüft auch die schnelle Suite; `findeElement` liegt einmal in `tests/element-suche.ts`; CI sucht nach dem Build in der Trace-Datei der Hofseite eine Unterkategorie-Datei.
 
+## Wortliste: ein Wort je Sache (Nachtlauf Nr. 77, Oktober 2026)
+
+Auftrag freigabe.md §16 „77“ (Register N8). Keine Migration, kein neues Paket, kein Nutzertext geändert (das macht Nr. 78).
+
+- **Anlass:** Für dieselbe Sache standen mehrere Wörter in den Texten („Zeitfenster“ neben „Abholtermin“, „Bestand“ neben „Vorrat“, „Status posten“ neben „Neuer Beitrag“, „Hilfe und Rückmeldung“ neben „Problem melden“). Die Tabelle steht in `docs/ai/DESIGN_SYSTEM.md` (Abschnitt „Wortliste“); `tests/wortliste.test.ts` liest ihre Spalte „nicht“ und sucht die Wörter im Syntaxbaum, damit Kommentare und Bezeichner nicht zählen.
+- **Wort statt Wortverbindung:** „Status“, „Post“ und „Neuigkeit“ stehen als einzelne Wörter in der Tabelle. Eine Liste von Verbindungen wie „Status posten“ hätte die Sätze von heute gefunden, nicht den nächsten („Dein Status“ und „Status-Foto“ standen neben „Status posten“). Dafür stehen elf Texte, in denen „Status“ etwas anderes meint (Bestellung, Zahlung, Freischaltung, Meldung, Spaltenkopf, WhatsApp-Funktion), mit Grund in der Ausnahmeliste des Tests. „Neuigkeiten“ (Mehrzahl, der Name der Anmeldung bei einem Hof) trifft die Wortgrenze nicht; „per Post“ ist als Wendung erlaubt.
+- **Käufer:** Heute steht „Käufer“ in keinem Text für die Futter-Käuferarten, sondern für die Kundschaft („So sehen Käufer dein Futter“). Darum steht es in der Spalte „nicht“ der beiden Kunden-Zeilen; der Rechtstext im Impressum bleibt wörtlich (Ausnahme).
+- **Arbeitsliste:** `OFFEN_BIS_78` im Test hält die 38 Fundstellen von heute fest (Stand f367433). Sie greift über Datei, Wort und Text, nicht über die Zeile, weil andere Nummern im Sammel-PR die Zeilen verschieben. Nr. 78 stellt um, streicht die Einträge und macht aus dem `it.skip('OFFEN_BIS_78 ist leer …')` ein `it`. Einträge mit `nummer` liegen in Dateien anderer Nummern dieses Laufs und gehen über den Dirigenten.
+
 ## Nützliche Befehle
 
 ```bash

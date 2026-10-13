@@ -87,6 +87,33 @@ Alle Farben kommen aus CSS-Custom-Properties auf `:root`, umgeschaltet über `da
 - **Fachwörter im Hofbereich (seit Nr. 45, freigabe.md §12):** „Primärproduktion", „Umsatzgrenze", „Kennzeichnung" und „USP" stehen nie allein. Entweder steht ein Alltagswort da („Eigene Ernte (Primärproduktion)") oder ein Satz daneben erklärt das Wort (`UMSATZGRENZE_ERKLAERUNG` unter der Jahressumme der Verkäufe, `KENNZEICHNUNG_ERKLAERUNG` als erster Satz des Abschnitts „Kennzeichnung"); USP immer ausgeschrieben, `USP_AUSGESCHRIEBEN` („Unternehmensserviceportal (USP)"). Ein erklärender Satz sagt nur, was der Code tut, ohne eigene Rechtsaussage. Pflichttexte aus dem Register (E10a) bleiben wörtlich und bekommen höchstens einen erklärenden Satz daneben. Ein Abschnitt hat EINEN Namen: „Kennzeichnung" kommt aus `KENNZEICHNUNG_TITEL`, Verweise darauf aus `KENNZEICHNUNG_VERWEIS` („im Abschnitt „Kennzeichnung“"), nie ein zweiter Name für dasselbe; ein Satz über die Angaben stimmt auch für Heu aus eigener Ernte (kein Sackanhänger). `tests/fachwort-wache.test.ts` prüft jede Zeichenkette unter `src/`; ein neuer Text mit „Kennzeichnung" braucht einen Eintrag mit Grund (je Text, nicht je Datei).
 - **Texte der Basiskomponenten sind deutsch**, auch der Screenreader-Text („Schließen", nie „Close"). Eine übernommene shadcn-Vorlage wird im selben Zug übersetzt; Standardtexte einer Bibliothek werden über ihre Optionen gesetzt (sonner: `containerAriaLabel`, `closeButtonAriaLabel`). `tests/schliessen-text.test.ts` prüft beides.
 
+## Wortliste
+
+Für jede Sache gibt es in Nutzertexten genau ein Wort (Register N8): in Beschriftungen, Sätzen, Fehlermeldungen, E-Mails und Nachrichten. Bezeichner im Code, Routen und Datenbankfelder behalten ihren Namen (`stock`, `/status`, `/fehler-melden`). Ein neuer oder geänderter Text nimmt nur die Wörter der Spalte „Wort“; ein weiterer Eintrag kommt nur über eine Freigabe.
+
+| Sache | Wort | nicht | Beispiel |
+|---|---|---|---|
+| Zeiten, die der Hof zum Abholen anbietet | Abholzeiten | Zeitfenster, Abholslot | „Trag deine Abholzeiten ein.“ |
+| Termin, den die Kundin gewählt hat | Abholtermin | Zeitfenster, Abholslot | „Bitte wähle einen Abholtermin.“ |
+| Wie viel von einem Produkt da ist | Vorrat | Bestand, Lagerstand, Lager | „Wir konnten den Vorrat nicht speichern.“ |
+| Was ein Hof auf seiner Hofseite und an seine Abonnentinnen schreibt | Beitrag | Status, Post, Neuigkeit | „Neuer Beitrag“ |
+| Die Liste dieser Beiträge (Reiter in Mein Hof und auf der Hofseite) | Beiträge | | „Beiträge · 2“ |
+| Tür für Fehler, Wünsche und Fragen, bei Kundschaft und Höfen | Problem melden | Hilfe und Rückmeldung, Fehler melden | „Problem melden“ (die Übersicht des Hofs heißt weiter „Meine Meldungen“) |
+| Kundschaft in Beschriftungen, Reitern und Kennzahlen | Kunden | Käufer, Käufern | „Kunden“, „12 Kunden“ |
+| Kundschaft in ganzen Sätzen | die Kundin, deine Kundinnen | Käufer, Käufern | „Sag deinen Kundinnen Bescheid.“ |
+| Käuferart beim Futter | Käufer | | „Käuferart: Betrieb oder privat“ |
+| Telefonnummer in der Anzeige | Ländercode, Leerzeichen nach der Vorwahl, dann Gruppen zu drei oder vier Ziffern; gespeichert bleibt die Eingabe | | „+43 660 000 0000“ |
+| Kategorie für Holz und Hackschnitzel (Register E11) | Brennmaterial | | „Neues Brennmaterial“ |
+| Startseite des Hofbereichs | Heute | | „Heute“ in Leiste und Seitenleiste |
+| Bereich, in dem der Hof Produkte, Hofseite und Beiträge pflegt | Mein Hof | | „Zu Mein Hof“ |
+| Die öffentliche Seite des Hofs | Hofseite | | „Auf der Hofseite zeigen“ |
+| Hof oder Beitrag weitergeben | Teilen | | „Teilen“, „Teilen-Bild“ |
+| Gebühr, die die Kundin zum Warenpreis zahlt (Register E4) | Servicegebühr | | „zzgl. Servicegebühr“ |
+
+- **Prüfung:** `tests/wortliste.test.ts` liest die Spalte „nicht“ und sucht jedes Wort in jeder Zeichenkette und jedem JSX-Text unter `src/` — mit Wortgrenzen und in der Schreibweise der Tabelle („Bestand“ trifft weder „Lagerbestand“ noch „bestand“). Kommentare, Bezeichner und Server-Logs (`console.*`) zählen nicht. Wo ein Wort in anderem Sinn richtig ist, steht der Text mit Grund in der Ausnahmeliste im Test: je Text, nicht je Datei, ohne Zeilennummer.
+- **„Status“, „Post“, „Neuigkeit“ meinen den Beitrag als Sache.** Der Status einer Bestellung, Zahlung, Freischaltung oder Meldung bleibt „Status“, ebenso der Name der WhatsApp-Funktion „Status“; „Neuigkeiten“ (Mehrzahl) ist der Name der Anmeldung bei einem Hof. Solche Texte stehen als Ausnahme im Test, ebenso ein Text über die Käuferart (Betrieb, privat) beim Futter, der „Käufer“ sagt.
+- **Nicht maschinell geprüft** sind die Zeilen ohne Wort in „nicht“ und die Stilregel „Kunden“ in Beschriftungen gegen „die Kundin“ in Sätzen; sie gelten beim Schreiben und im Review. „Brennholz“ steht nicht in „nicht“, weil es der Name einer Art in der Kategorie „Brennmaterial“ ist (Register E11).
+
 ## Navigation (AppShells)
 
 - Zwei Shells, je Welt eine; Seiten hängen nur Inhalt ein, Navigation wird nie pro Seite dupliziert.
