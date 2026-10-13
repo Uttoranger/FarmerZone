@@ -146,7 +146,7 @@ describe('fasseKundinZusammen', () => {
   it('Name und Telefon aus der letzten Bestellung, Tage ab der letzten, erste und letzte als ISO', () => {
     const k = fasseKundinZusammen(
       [
-        bestellung({ customerName: 'Neuer Name', customerPhone: '+43 660 1111111', createdAt: vor(3) }),
+        bestellung({ customerName: 'Neuer Name', customerPhone: '+43 664 0000000', createdAt: vor(3) }),
         bestellung({ customerName: 'Alter Name', createdAt: vor(50) }),
       ],
       null,
@@ -154,7 +154,7 @@ describe('fasseKundinZusammen', () => {
       null
     )
     expect(k.customerName).toBe('Neuer Name')
-    expect(k.customerPhone).toBe('+43 660 1111111')
+    expect(k.customerPhone).toBe('+43 664 0000000')
     expect(k.daysSinceLastOrder).toBe(3)
     expect(k.firstOrderDate).toBe(vor(50).toISOString())
     expect(k.lastOrderDate).toBe(vor(3).toISOString())
@@ -314,7 +314,7 @@ function kunde(teil: Partial<CustomerSummary> & { kundeId: string }): CustomerSu
 
 const LISTE: CustomerSummary[] = [
   kunde({ kundeId: 'aaaaaaaaaaaaaaaa', customerName: 'Zita Beispiel', orderCount: 5, umsatzCents: 2000, isStammkunde: true, status: 'Stammkunde', firstOrderDate: vor(300).toISOString() }),
-  kunde({ kundeId: 'bbbbbbbbbbbbbbbb', customerName: 'Anton Muster', customerPhone: '+43 660 1234567', orderCount: 1, umsatzCents: 9000, isNeu: true, status: 'Neu', firstOrderDate: vor(2).toISOString(), lastOrderDate: vor(2).toISOString(), daysSinceLastOrder: 2 }),
+  kunde({ kundeId: 'bbbbbbbbbbbbbbbb', customerName: 'Anton Muster', customerPhone: '+43 676 0000000', orderCount: 1, umsatzCents: 9000, isNeu: true, status: 'Neu', firstOrderDate: vor(2).toISOString(), lastOrderDate: vor(2).toISOString(), daysSinceLastOrder: 2 }),
   kunde({ kundeId: 'cccccccccccccccc', customerName: 'Berta Probe', customerEmail: 'berta.probe@example.com', orderCount: 2, umsatzCents: 500, isLangeNichtGesehen: true, isDiesenMonatAktiv: false, status: 'Lange nicht gesehen', lastOrderDate: vor(90).toISOString(), daysSinceLastOrder: 90 }),
 ]
 
@@ -325,7 +325,7 @@ describe('Filter, Suche, Sortierung', () => {
 
   it('Suche in Name, Telefon und E-Mail, ohne Rücksicht auf Groß-/Kleinschreibung', () => {
     expect(passtZurKundenSuche(LISTE[0], 'zITA')).toBe(true)
-    expect(passtZurKundenSuche(LISTE[1], '1234')).toBe(true)
+    expect(passtZurKundenSuche(LISTE[1], '676 0000')).toBe(true)
     expect(passtZurKundenSuche(LISTE[2], 'BERTA.PROBE@')).toBe(true)
     expect(passtZurKundenSuche(LISTE[0], 'berta')).toBe(false)
     expect(passtZurKundenSuche(LISTE[0], '   ')).toBe(true)
@@ -516,7 +516,7 @@ describe('Ansicht /customers — vier Zustände, lange Namen, Tokens', () => {
 
   it('gefüllt: Kopf, Filter mit Zahlen, Suche, Sortierung, Zeilen mit Link und Anrufen; langer Name im title', () => {
     const html = renderToStaticMarkup(
-      createElement(KundenAnsicht, { kunden: [...LISTE, kunde({ kundeId: 'dddddddddddddddd', customerName: LANG, customerPhone: '+43 660 7654321', isSubscribed: true })] })
+      createElement(KundenAnsicht, { kunden: [...LISTE, kunde({ kundeId: 'dddddddddddddddd', customerName: LANG, customerPhone: '+43 699 0000000', isSubscribed: true })] })
     )
     expect(LANG.length).toBe(80)
     expect(html).toContain('<h1')
@@ -530,7 +530,7 @@ describe('Ansicht /customers — vier Zustände, lange Namen, Tokens', () => {
     expect(html).toContain('href="/customers/aaaaaaaaaaaaaaaa"')
     expect(html).toContain(`title="${LANG}"`)
     expect(html).toContain(`aria-label="${LANG} anrufen"`)
-    expect(html).toContain('href="tel:+43 660 7654321"')
+    expect(html).toContain('href="tel:+43 699 0000000"')
     expect(html).toContain('bekommt Neuigkeiten')
     expect(html).toContain('€ 90,00')
     expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgb\(|green-|amber-|purple-|blue-/)
@@ -672,7 +672,7 @@ describe('Kundendetail', () => {
 
   function detail(teil: Partial<CustomerDetail> = {}): CustomerDetail {
     return {
-      ...kunde({ kundeId: 'aaaaaaaaaaaaaaaa', customerName: LANG, customerPhone: '+43 660 7654321', orderCount: 14, umsatzCents: 12345, status: 'Stammkunde', isStammkunde: true, isSubscribed: true, topProducts: [{ name: 'Eier', count: 12 }] }),
+      ...kunde({ kundeId: 'aaaaaaaaaaaaaaaa', customerName: LANG, customerPhone: '+43 664 0000000', orderCount: 14, umsatzCents: 12345, status: 'Stammkunde', isStammkunde: true, isSubscribed: true, topProducts: [{ name: 'Eier', count: 12 }] }),
       recentOrders: Array.from({ length: 10 }, (_, i) => ({
         id: `order-${i}`,
         orderNumber: `FZ-${i}`,
@@ -691,10 +691,10 @@ describe('Kundendetail', () => {
     expect(html).toContain('<h1')
     expect(html).toContain(`title="${LANG}"`)
     expect(html).toContain('Stammkunde')
-    expect(html).toContain('href="tel:+436607654321"')
-    expect(html).toContain('+43 660 765 4321')
-    expect(html).not.toContain('660 7654321')
-    expect(html).toContain('href="https://wa.me/436607654321"')
+    expect(html).toContain('href="tel:+436640000000"')
+    expect(html).toContain('+43 664 000 0000')
+    expect(html).not.toContain('664 0000000')
+    expect(html).toContain('href="https://wa.me/436640000000"')
     expect(html).toContain('href="mailto:aaaaaaaaaaaaaaaa@example.com"')
     expect(html).toContain('€ 123,45')
     expect(html).toContain('Eier')
@@ -730,18 +730,31 @@ describe('Kundendetail', () => {
   })
 
   it('die Nummer steht einheitlich da, wie auch immer sie eingegeben wurde — Anrufen wählt sie mit +43, WhatsApp dieselbe (N8)', () => {
-    const html = renderToStaticMarkup(createElement(KundenDetail, { kunde: detail({ customerPhone: '(0660) 765-43 21' }), jetzt: JETZT }))
-    expect(html).toContain('href="tel:+436607654321"')
-    expect(html).toContain('+43 660 765 4321')
-    expect(html).not.toContain('(0660)')
-    expect(html).toContain('href="https://wa.me/436607654321"')
+    const html = renderToStaticMarkup(createElement(KundenDetail, { kunde: detail({ customerPhone: '(0699) 000-00 00' }), jetzt: JETZT }))
+    expect(html).toContain('href="tel:+436990000000"')
+    expect(html).toContain('+43 699 000 0000')
+    expect(html).not.toContain('(0699)')
+    expect(html).toContain('href="https://wa.me/436990000000"')
   })
 
-  it('eine Nummer ohne Ziffer ist keine: kein Anrufen, kein WhatsApp, dafür der Hinweis', () => {
+  it('eine Nummer ohne Ziffer ist keine: kein Anrufen, kein WhatsApp, dafür der Hinweis — die Eingabe bleibt trotzdem zu lesen', () => {
     const html = renderToStaticMarkup(createElement(KundenDetail, { kunde: detail({ customerPhone: 'keine Angabe' }), jetzt: JETZT }))
     expect(html).not.toContain('href="tel:')
     expect(html).not.toContain('wa.me')
     expect(html).toContain('Keine Telefonnummer')
+    expect(html.slice(html.indexOf('id="kundin-kontakt"'))).toContain('keine Angabe')
+  })
+
+  it('eine Nummer mit Ziffern, die sich nicht lesen lässt (zwei Nummern, ein Zusatz): die Eingabe steht als Text da — kein Anrufen, kein WhatsApp ohne Nummer, kein falscher Hinweis (N8)', () => {
+    // Das Checkout-Schema lässt jeden Text von 4 bis TELEFON_MAX Zeichen zu.
+    for (const eingabe of ['0660 0000000 / 0664 0000000', '0660 0000000 ab 18 Uhr']) {
+      const html = renderToStaticMarkup(createElement(KundenDetail, { kunde: detail({ customerPhone: eingabe }), jetzt: JETZT }))
+      expect(html.slice(html.indexOf('id="kundin-kontakt"')), eingabe).toContain(eingabe)
+      expect(html, eingabe).not.toContain('href="tel:')
+      expect(html, eingabe).not.toContain('wa.me')
+      expect(html, eingabe).not.toContain('Keine Telefonnummer')
+      expect(html, eingabe).toContain('mailto:')
+    }
   })
 
   it('ohne Einwilligung keine Karte „Neuigkeiten"', () => {

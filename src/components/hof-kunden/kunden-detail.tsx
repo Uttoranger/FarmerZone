@@ -35,9 +35,12 @@ const KNOPF_ORANGE =
 export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: Date }): React.JSX.Element {
   const marke = kundenMarke(kunde.status)
   const telefon = kunde.customerPhone.trim()
-  // Ohne Ziffer in der Nummer gibt es weder Anruf noch WhatsApp (Nr. 75, Nr. 81).
+  // Anrufen und WhatsApp gibt es nur für eine Nummer, die sich lesen lässt (Nr. 75, Nr. 81): Aus zwei Nummern in einem Feld
+  // oder einem Zusatz wie „ab 18 Uhr“ würde ein Link eine andere Nummer wählen, als dort steht. Die Eingabe steht dann als Text in „Kontakt“.
   const anrufen = telefonLink(telefon)
-  const whatsApp = whatsAppLink(telefon)
+  const whatsApp = anrufen ? whatsAppLink(telefon) : null
+  // Der Hinweis gilt nur, wenn gar keine Nummer dasteht („keine Angabe“) — sonst wäre er falsch neben der Nummer in „Kontakt“.
+  const keineNummer = !/\d/.test(telefon)
   const gezeigt = kunde.recentOrders.slice(0, GEZEIGTE_BESTELLUNGEN)
   const rest = weitereBestellungen(kunde.alleBestellungen, gezeigt.length)
   const abo = kunde.isSubscribed ? kunde.subscription : null
@@ -87,7 +90,7 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
               E-Mail
             </a>
           </div>
-          {!anrufen && !whatsApp && <p className={cn('text-[13px]', LEISE)}>Keine Telefonnummer hinterlegt – du erreichst sie per E-Mail.</p>}
+          {keineNummer && <p className={cn('text-[13px]', LEISE)}>Keine Telefonnummer hinterlegt – du erreichst sie per E-Mail.</p>}
         </header>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
@@ -146,11 +149,18 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
               <h2 id="kundin-kontakt" className={KICKER}>
                 Kontakt
               </h2>
-              {anrufen && (
+              {anrufen ? (
                 <a href={anrufen} className={cn('inline-flex min-h-11 w-fit items-center gap-2 rounded-md text-[14px] font-medium text-status-fertig hover:underline', FOKUS_RAHMEN)}>
                   <Phone className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
                   {formatiereTelefon(telefon)}
                 </a>
+              ) : (
+                telefon !== '' && (
+                  <p className="flex min-h-11 items-center gap-2 text-[14px] font-medium">
+                    <Phone className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{formatiereTelefon(telefon)}</span>
+                  </p>
+                )
               )}
               <a href={`mailto:${kunde.customerEmail}`} className={cn('inline-flex min-h-11 min-w-0 items-center gap-2 rounded-md text-[14px] font-medium break-all text-status-fertig hover:underline', FOKUS_RAHMEN)}>
                 <Mail className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />

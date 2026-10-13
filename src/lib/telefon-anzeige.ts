@@ -110,14 +110,12 @@ export function formatiereTelefon(eingabe: string): string {
 
 /**
  * Der Link zum Anrufen: `tel:+436600000000`, aus denselben Ziffern, die die
- * Anzeige zeigt. Lässt sich die Eingabe nicht eindeutig lesen, wählt der Link wie
- * bisher ihre Ziffern — nur sie, nie ein Sonderzeichen. Ohne Ziffer (oder mit mehr,
- * als eine Nummer haben kann) gibt es keinen Link.
+ * Anzeige zeigt. Lässt sich die Eingabe nicht eindeutig lesen (zwei Nummern in
+ * einem Feld, „ab 18 Uhr“, keine oder zu viele Ziffern), gibt es keinen Link: Er
+ * wählte sonst eine andere Nummer, als dort steht. Wer den Link weglässt, zeigt
+ * die Nummer als Text — `formatiereTelefon` gibt die Eingabe dann unverändert zurück.
  */
 export function telefonLink(eingabe: string): string | null {
   const nummer = liesNummer(eingabe)
-  if (nummer) return `tel:+${nummer.land}${nummer.national}`
-  const ziffern = eingabe.replace(/\D/g, '')
-  if (ziffern === '' || ziffern.length > MAX_ZIFFERN) return null
-  return `tel:${eingabe.trim().startsWith('+') ? '+' : ''}${ziffern}`
+  return nummer ? `tel:+${nummer.land}${nummer.national}` : null
 }

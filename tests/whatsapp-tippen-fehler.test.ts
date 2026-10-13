@@ -72,7 +72,7 @@ import { WHATSAPP_VERSAND_TEXT, type Abonnentin } from '@/lib/whatsapp-versand'
 import { WhatsAppTapClient } from '@/app/(hof)/status/[id]/send-whatsapp/whatsapp-tap-client'
 
 const ANNA: Abonnentin = { id: 'cabo00000000000000000001', name: 'Anna Muster', phone: '+43 660 0000000' }
-const BERTA: Abonnentin = { id: 'cabo00000000000000000002', name: 'Berta Muster', phone: '+43 660 0000001' }
+const BERTA: Abonnentin = { id: 'cabo00000000000000000002', name: 'Berta Muster', phone: '+43 664 0000000' }
 const PROPS = { postId: 'cpost0000000000000000001', title: 'Neue Eier', body: 'Frisch gelegt.', farmSlug: 'hof-test' }
 
 type Knoten = { type?: unknown; key?: unknown; props?: Record<string, unknown> }

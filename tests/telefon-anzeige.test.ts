@@ -5,8 +5,10 @@
  * „+43 660 000 0000" — führende 0, 0043, vorhandener Ländercode, Klammern,
  * Bindestriche und Schrägstriche. Was sich nicht eindeutig lesen lässt, kommt
  * unverändert zurück, nie leer. Der tel:-Link entsteht aus denselben Ziffern,
- * ohne Ziffer gibt es keinen. Alle Nummern sind erfunden. Gespeichert bleibt
- * die Eingabe — hier gibt es keinen Schreibweg.
+ * die die Anzeige zeigt; wo sich die Nummer nicht lesen lässt, gibt es keinen —
+ * er würde sonst eine andere Nummer wählen, als dort steht. Alle Nummern sind
+ * erfunden, ihr Teilnehmerteil besteht aus Nullen. Gespeichert bleibt die
+ * Eingabe — hier gibt es keinen Schreibweg.
  *
  * Dazu eine Wache am Quelltext: Wer einen tel:-Link braucht, nimmt
  * `telefonLink`; die Stellen, die noch von Hand bauen, stehen in einer Liste,
@@ -37,24 +39,24 @@ const LESBAR: ReadonlyArray<readonly [string, string]> = [
   // Ohne 0 und ohne +43 (Screenshot 12.10.): eine Mobil-Vorwahl ist eindeutig
   ['660 0000000', '+43 660 000 0000'],
   ['43 660 0000000', '+43 660 000 0000'],
-  ['+43 664 123 4567', '+43 664 123 4567'],
+  ['+43 664 000 0000', '+43 664 000 0000'],
   // Der Rest in Dreier- und Vierergruppen
-  ['0664 123456', '+43 664 123 456'],
-  ['0676 12345678', '+43 676 1234 5678'],
+  ['0664 000000', '+43 664 000 000'],
+  ['0676 00000000', '+43 676 0000 0000'],
   // Festnetz: Wien einstellig, die kurzen Städte dreistellig, sonst vier Stellen
-  ['06212 1234', '+43 6212 1234'],
-  ['+43 6212 1234', '+43 6212 1234'],
-  ['01 2345678', '+43 1 234 5678'],
-  ['0316 123456', '+43 316 123 456'],
+  ['06212 0000', '+43 6212 0000'],
+  ['+43 6212 0000', '+43 6212 0000'],
+  ['01 0000000', '+43 1 000 0000'],
+  ['0316 000000', '+43 316 000 000'],
   ['0662 0000000', '+43 662 000 0000'],
   ['0732 000000', '+43 732 000 000'],
   ['0512 0000000', '+43 512 000 0000'],
   ['02742 000000', '+43 2742 000 000'],
-  ['07752 12345', '+43 7752 12345'],
+  ['07752 00000', '+43 7752 00000'],
   // Ein vorhandener Ländercode bleibt
-  ['+49 151 12345678', '+49 151 1234 5678'],
-  ['0049 151 12345678', '+49 151 1234 5678'],
-  ['+421 905 123456', '+421 905 123 456'],
+  ['+49 151 00000000', '+49 151 0000 0000'],
+  ['0049 151 00000000', '+49 151 0000 0000'],
+  ['+421 905 000000', '+421 905 000 000'],
 ]
 
 /** Was sich nicht eindeutig lesen lässt: kommt so zurück, wie es war. */
@@ -69,7 +71,7 @@ const UNLESBAR: readonly string[] = [
   '+0660 0000000',
   '0660 0000000 (Büro)',
   '0660 0000000 ab 18 Uhr',
-  '0660 0000000 / 0660 1111111',
+  '0660 0000000 / 0664 0000000',
   '0660#0000000',
   '+43 660 000 0000 0000 0000',
 ]
@@ -106,13 +108,15 @@ const LINKS: ReadonlyArray<readonly [string, string | null]> = [
   ['0043 660 0000000', 'tel:+436600000000'],
   ['660 0000000', 'tel:+436600000000'],
   ['+43 660 0000000', 'tel:+436600000000'],
-  ['06212 1234', 'tel:+4362121234'],
-  ['+49 151 12345678', 'tel:+4915112345678'],
-  // Nicht eindeutig lesbar, aber mit Ziffern: wie bisher wählt der Link die Ziffern — nur sie, nie ein Sonderzeichen
-  ['0660 0000000 (Büro)', 'tel:06600000000'],
-  ['12345', 'tel:12345'],
-  ['+43 660 abc 0000000', 'tel:+436600000000'],
-  // Ohne Ziffer (oder mit mehr, als eine Nummer haben kann) gibt es keinen Link
+  ['06212 0000', 'tel:+4362120000'],
+  ['+49 151 00000000', 'tel:+4915100000000'],
+  // Nicht eindeutig lesbar, auch wenn Ziffern darin stehen: kein Link — er wählte sonst eine andere Nummer, als angezeigt wird
+  ['0660 0000000 (Büro)', null],
+  ['0660 0000000 ab 18 Uhr', null],
+  ['0660 0000000 / 0664 0000000', null],
+  ['+43 660 abc 0000000', null],
+  ['12345', null],
+  // Ohne Ziffer (oder mit mehr, als eine Nummer haben kann) erst recht nicht
   ['keine Angabe', null],
   ['', null],
   ['---', null],
@@ -125,10 +129,10 @@ describe('telefonLink', () => {
     expect(telefonLink(eingabe)).toBe(erwartet)
   })
 
-  it('in die Adresse gehen nur Ziffern und ein führendes Plus — nichts, was die Eingabe sonst enthielt', () => {
+  it('in die Adresse gehen nur ein Plus und Ziffern — nichts, was die Eingabe sonst enthielt', () => {
     for (const eingabe of [...LESBAR.map(([e]) => e), ...UNLESBAR, '0660 0000000"><b>', "0660 0000000'; x"]) {
       const link = telefonLink(eingabe)
-      if (link !== null) expect(link, eingabe).toMatch(/^tel:\+?\d+$/)
+      if (link !== null) expect(link, eingabe).toMatch(/^tel:\+\d+$/)
     }
   })
 

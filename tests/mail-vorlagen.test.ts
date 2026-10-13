@@ -76,7 +76,7 @@ function bestellung(teil: Partial<import('@/lib/email').OrderForEmail> = {}): im
       address: 'Feldweg 1',
       city: 'Beispieldorf',
       postalCode: '4910',
-      phone: '+43 660 1111111',
+      phone: '+43 664 0000000',
       slug: 'hof-beispiel',
     },
     items: [
@@ -239,7 +239,7 @@ describe('Abholbereit-Mail (Vorlage pickup-reminder.tsx)', () => {
     expect(text).toContain('HT-0210-A4F2')
     expect(text).toContain('15:00–18:00 Uhr')
     expect(links(html).some((u) => u.hostname === 'www.google.com')).toBe(true)
-    expect(html).toContain('href="tel:+43 660 1111111"')
+    expect(html).toContain('href="tel:+43 664 0000000"')
   })
 })
 

@@ -357,10 +357,13 @@ describe('Bestellung im Detail: die Nummer der Kundin', () => {
     expect(html).not.toContain('0660 0000000')
   })
 
-  it('eine Nummer ohne Ziffer: kein Anrufen-Link, die Karte „Kundin“ steht trotzdem da', () => {
-    const html = ansicht('keine Angabe')
-    expect(html).not.toContain('href="tel:')
-    expect(html).not.toContain('anrufen"')
-    expect(html).toContain('id="kundin-order-1"')
+  it('eine Nummer, die sich nicht lesen lässt, steht als Text da: kein Anrufen-Link, die Eingabe der Kundin bleibt für den Hof zu lesen (N8)', () => {
+    // Das Checkout-Schema lässt jeden Text von 4 bis TELEFON_MAX Zeichen zu — auch zwei Nummern oder „keine Angabe“.
+    for (const eingabe of ['0660 0000000 / 0664 0000000', '0660 0000000 ab 18 Uhr', 'keine Angabe']) {
+      const html = ansicht(eingabe)
+      expect(html, eingabe).not.toContain('href="tel:')
+      expect(html, eingabe).not.toContain('anrufen"')
+      expect(html.slice(html.indexOf('id="kundin-order-1"')), eingabe).toContain(eingabe)
+    }
   })
 })

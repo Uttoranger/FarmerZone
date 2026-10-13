@@ -16,8 +16,8 @@ import { KARTE, KNOPF_RAHMEN } from '@/components/bestaetigung/bestaetigung-teil
  *
  * Ohne Nummer bzw. Adresse (die Hof-E-Mail ist im Onboarding freiwillig)
  * entfallen Zeile und Knopf; ohne beides die ganze Karte. Die Nummer steht
- * einheitlich da (N8); steht keine Ziffer darin, bleibt die Eingabe sichtbar,
- * aber ohne „Anrufen“.
+ * einheitlich da (N8); lässt sie sich nicht lesen (keine Ziffer, zwei Nummern),
+ * bleibt die Eingabe sichtbar, aber ohne „Anrufen“.
  */
 export function HofErreichen({ telefon, email }: { telefon: string; email: string }): React.JSX.Element | null {
   if (!telefon && !email) return null

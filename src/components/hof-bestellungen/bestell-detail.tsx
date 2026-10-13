@@ -388,11 +388,19 @@ function Kundin({ bestellung }: { bestellung: HofBestellDetail }): React.JSX.Ele
       </h3>
       <p className="text-[14.5px] font-semibold break-words">{kunde.name}</p>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13.5px]">
-        {anrufen && (
+        {anrufen ? (
           <a href={anrufen} className={cn('inline-flex min-h-11 items-center gap-1.5 rounded-md font-medium text-status-fertig hover:underline', FOKUS_RAHMEN)}>
             <Phone className="size-4" strokeWidth={1.7} aria-hidden="true" />
             {formatiereTelefon(kunde.telefon)}
           </a>
+        ) : (
+          // Eine Nummer, die sich nicht lesen lässt (zwei Nummern, „ab 18 Uhr“), steht als Text da: Die Eingabe der Kundin soll der Hof sehen, auch ohne Link.
+          kunde.telefon.trim() !== '' && (
+            <span className="inline-flex min-h-11 min-w-0 items-center gap-1.5 font-medium">
+              <Phone className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+              <span className="min-w-0 [overflow-wrap:anywhere]">{formatiereTelefon(kunde.telefon)}</span>
+            </span>
+          )
         )}
         {bestellung.erinnernUrl && (
           <a
