@@ -6,7 +6,7 @@ import { loeseOrtAuf, type OrtsTreffer } from '@/server/actions/hoefe'
 import type { Bezugspunkt } from '@/lib/hofuebersicht'
 import { erkenneOrtseingabe, hinweisMehrere } from '@/lib/geokodierung'
 import { SUCHFELD_TEXT, standortIstUngenau, standortUngefaehrText } from '@/lib/hoefe-entdecken'
-import { BEZEICHNER, befundVon, istNetzfehler } from '@/lib/upload-diagnose'
+import { BEZEICHNER, fehlerKlasse, istNetzfehler } from '@/lib/upload-diagnose'
 
 /**
  * Der Bezugspunkt der Umkreissuche auf /hoefe: eigener Standort oder ein
@@ -91,14 +91,17 @@ export type Ortssuche = {
 
 /**
  * Meldet eine gescheiterte Ortsauflösung (Aktion nach einem Deploy unbekannt,
- * Serverfehler) an Sentry: fester Text und Fehlerklasse, nie der getippte Text
- * (Vorbild meldeGescheitertesLaden in components/teilen/beitrag-teilen.tsx);
- * ein Netzabbruch ist nur eine Brotkrume. Wirft nie — die Kundin behält ihre
+ * Serverfehler) an Sentry: fester Text und Fehlerklasse (Vorbild
+ * meldeGescheitertesLaden in components/teilen/beitrag-teilen.tsx), aber anders
+ * als dort keine Fehlermeldung, auch keine bereinigte: Sie kann den getippten
+ * Text in anderer Schreibweise zitieren, und die Bereinigung erkennt nur seine
+ * wörtliche. Die Funktion bekommt den Text darum gar nicht erst. Ein
+ * Netzabbruch ist nur eine Brotkrume. Wirft nie — die Kundin behält ihre
  * Produktsuche auch, wenn Sentry selbst scheitert.
  */
-function meldeGescheiterteOrtssuche(fehler: unknown, text: string): void {
+function meldeGescheiterteOrtssuche(fehler: unknown): void {
   try {
-    const { klasse, meldung } = befundVon(fehler, [text])
+    const klasse = fehlerKlasse(fehler)
     const name = BEZEICHNER.test(klasse) ? klasse : 'Unbekannt'
     if (istNetzfehler(fehler)) {
       Sentry.addBreadcrumb({ category: 'ortssuche', level: 'warning', message: 'Ortssuche: Verbindung abgebrochen', data: { klasse: name } })
@@ -106,7 +109,7 @@ function meldeGescheiterteOrtssuche(fehler: unknown, text: string): void {
     }
     const ereignis = new Error('Ortssuche: Auflösen gescheitert')
     ereignis.name = name
-    Sentry.captureException(ereignis, { level: 'error', tags: { bereich: 'ortssuche', klasse: name }, extra: { fehlertext: meldung } })
+    Sentry.captureException(ereignis, { level: 'error', tags: { bereich: 'ortssuche', klasse: name } })
   } catch {
     // Absichtlich leer: Telemetrie scheitert leise, die Kundin behält ihre Produktsuche.
   }
@@ -130,7 +133,7 @@ export function useOrtssuche({
   ankunftsText?: string
   /** Der Ankunftstext ist abgearbeitet — die Seite vergisst ihn, ein neuer Aufbau des Felds löst nichts mehr aus. */
   onAnkunftErledigt?: () => void
-  /** Die Auflösung ist durch (Treffer, keiner oder gescheitert) — die Seite vermerkt in der Adresse, dass der Text abgesendet UND aufgelöst ist. */
+  /** Die Auflösung ist durch (Treffer, keiner oder gescheitert) — die Seite vermerkt in der Adresse, dass der Text abgesendet UND aufgelöst ist. Nicht mehr, wenn die Kundin /hoefe inzwischen verlassen hat. */
   onAnkunftAufgeloest?: () => void
 }): Ortssuche {
   const [hinweis, setHinweis] = useState<string | null>(null)
@@ -144,15 +147,20 @@ export function useOrtssuche({
   // Antwort nicht überfahren werden — in beide Richtungen.
   const laufNr = useRef(0)
   const ankunftBegonnen = useRef(false)
+  // Ob die Seite noch steht: Die Antwort der Ortssuche kann kommen, nachdem die Kundin /hoefe verlassen hat (Ankunfts-Effekt unten).
+  const montiert = useRef(true)
 
   const verwerfeWaechter = () => {
     if (waechter.current) clearTimeout(waechter.current)
     waechter.current = null
   }
 
-  // Kein Geister-Zeitgeber nach dem Abbau (Hausstandard).
+  // Kein Geister-Zeitgeber nach dem Abbau (Hausstandard); derselbe Abbau meldet späten Antworten, dass die Seite weg ist (montiert).
   useEffect(() => {
+    // Beim Aufbau wieder auf true: Im Entwicklungsmodus baut React jeden Effekt einmal ab und gleich wieder auf — ohne das gälte die Seite dort für immer als verlassen.
+    montiert.current = true
     return () => {
+      montiert.current = false
       if (waechter.current) clearTimeout(waechter.current)
     }
   }, [])
@@ -281,7 +289,7 @@ export function useOrtssuche({
     } catch (fehler) {
       // Ein Wurf ginge an die Fehlergrenze — und seit dem Auflösen beim Ankommen endete jede Suche von der
       // Startseite auf der Fehlerseite. Für die Kundin ist es „kein Treffer"; Sentry sieht die Art, nie den Text.
-      meldeGescheiterteOrtssuche(fehler, text)
+      meldeGescheiterteOrtssuche(fehler)
       treffer = []
     }
     if (laufNr.current !== meinLauf) return
@@ -328,7 +336,11 @@ export function useOrtssuche({
     const meinLauf = ++laufNr.current
     starteAufloesung(async () => {
       await loeseAuf(ankunftsText.trim(), meinLauf)
-      onAnkunftAufgeloest?.()
+      // Die Antwort kann kommen, nachdem die Kundin /hoefe verlassen hat (Tipp auf einen Hof, während die Ortssuche noch läuft). Dann
+      // gehört die Adresse einer anderen Seite, und der Vermerk schriebe sie mit dem Pfad von /hoefe um: Neuladen oder Teilen landete
+      // auf /hoefe. Auch ein nur neu aufgebautes Feld (Karte ↔ Liste) vermerkt dann nichts; ein späteres Neuladen löst den Text noch
+      // einmal auf — eine Anfrage mehr, sonst nichts.
+      if (montiert.current) onAnkunftAufgeloest?.()
     })
   })
 

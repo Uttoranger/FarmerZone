@@ -419,7 +419,6 @@ describe('Ein Suchfeld „Ort oder Produkt" plus „Standort nutzen" (Nr. 46)', 
     expect(client).toContain('onAnkunftAufgeloest={() => schreibeUrl(leseHoefeFilter(new URLSearchParams(window.location.search)))}')
     // Gegenprobe: der alte Weg (jedes q der Adresse ist ein Ankunftstext) steht nicht mehr da.
     expect(client).not.toContain('useState(filter.suchtext)')
-    expect('const [ankunftsText, setAnkunftsText] = useState(filter.suchtext)').toContain('useState(filter.suchtext)')
     expect(client).not.toMatch(/HoefeUmkreis|hoefe-umkreis/)
     // Gegenprobe: das Muster erkennt den alten Einbau.
     expect('import HoefeUmkreis from \'@/components/hoefe/hoefe-umkreis\'').toMatch(/HoefeUmkreis|hoefe-umkreis/)

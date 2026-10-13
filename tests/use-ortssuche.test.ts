@@ -5,7 +5,9 @@
  * Ohne DOM (TESTING_GUIDELINES §1) spielt ein kleiner Prüfstand die Hooks von
  * React nach, so weit es hier zählt: Zustand je Aufrufstelle, neues Rendern
  * nach einer Änderung von außen (danach, nicht mitten im Aufruf), Effekte nach
- * dem Rendern. Die Browser-Ortung ist eine Attrappe, deren Rückrufe der Test
+ * dem Rendern, der Abbau beim Verlassen der Seite (danach rendert nichts mehr)
+ * und der Entwicklungsmodus (jeder Effekt einmal ab und gleich wieder auf). Die
+ * Browser-Ortung ist eine Attrappe, deren Rückrufe der Test
  * selbst auslöst; die Ortsauflösung (`loeseOrtAuf`) ist gemockt, ihre Antworten
  * hält der Test in der Hand. Zeitgeber sind falsch (vi.useFakeTimers).
  *
@@ -17,16 +19,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const pruefstand = vi.hoisted(() => {
   type Setzer<T> = (wert: T | ((vorher: T) => T)) => void
-  type Effekt = { deps: readonly unknown[] | undefined; aufraeumen: void | (() => void) }
+  type Effekt = { deps: readonly unknown[] | undefined; wirkung: () => void | (() => void); aufraeumen: void | (() => void) }
   let zellen: unknown[] = []
   let faellig: Array<() => void> = []
   let zeiger = 0
   let rendernd = false
   let schmutzig = false
   let geplant = false
+  let abgebaut = false
   let komponente: () => unknown = () => null
 
   function geaendert(): void {
+    // Wie React: Ein abgebauter Baum rendert nicht mehr, auch wenn eine späte Antwort noch Zustand setzt.
+    if (abgebaut) return
     schmutzig = true
     if (rendernd || geplant) return
     // Wie React: Eine Änderung von außen rendert danach, nicht mitten im Aufruf.
@@ -38,6 +43,7 @@ const pruefstand = vi.hoisted(() => {
   }
 
   function rendere(): void {
+    if (abgebaut) return
     for (let runde = 1; ; runde++) {
       if (runde > 25) throw new Error('Der Prüfstand rendert ohne Ende.')
       schmutzig = false
@@ -56,6 +62,10 @@ const pruefstand = vi.hoisted(() => {
     for (const lauf of laeufe) lauf()
   }
 
+  function effekte(): Effekt[] {
+    return zellen.filter((zelle): zelle is Effekt => typeof (zelle as Partial<Effekt> | undefined)?.wirkung === 'function')
+  }
+
   function gleich(a: readonly unknown[] | undefined, b: readonly unknown[] | undefined): boolean {
     return a !== undefined && b !== undefined && a.length === b.length && a.every((d, k) => Object.is(d, b[k]))
   }
@@ -64,8 +74,20 @@ const pruefstand = vi.hoisted(() => {
     starte(neu: () => unknown): void {
       zellen = []
       geplant = false
+      abgebaut = false
       komponente = neu
       rendere()
+    },
+    /** Baut die Komponente ab, wie React beim Verlassen der Seite: Die Aufräumfunktionen aller Effekte laufen, danach rendert nichts mehr. */
+    baueAb(): void {
+      abgebaut = true
+      for (const effekt of effekte()) if (typeof effekt.aufraeumen === 'function') effekt.aufraeumen()
+    },
+    /** Wie React im Entwicklungsmodus (StrictMode): Gleich nach dem Aufbau wird jeder Effekt einmal abgebaut und wieder aufgebaut. */
+    strengerModus(): void {
+      const alle = effekte()
+      for (const effekt of alle) if (typeof effekt.aufraeumen === 'function') effekt.aufraeumen()
+      for (const effekt of alle) effekt.aufraeumen = effekt.wirkung()
     },
     /** Rendert neu, ohne dass sich etwas geändert hat — wie ein Elternteil, der neu rendert. */
     erneut(): void {
@@ -97,7 +119,7 @@ const pruefstand = vi.hoisted(() => {
       if (alt && gleich(alt.deps, deps)) return
       faellig.push(() => {
         if (typeof alt?.aufraeumen === 'function') alt.aufraeumen()
-        zellen[i] = { deps, aufraeumen: wirkung() }
+        zellen[i] = { deps, wirkung, aufraeumen: wirkung() }
       })
     },
     useTransition(): [boolean, (rueckruf: () => void) => void] {
@@ -494,9 +516,10 @@ describe('Ortssuche — die Auflösung scheitert (Verbindung weg, Aktion nach ei
     expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
   })
 
-  it('Sentry bekommt Klasse und festen Text, nie den getippten Text — auch nicht aus der Fehlermeldung', async () => {
+  it('Sentry bekommt Klasse und festen Text, nie den getippten Text und nie die Fehlermeldung — die könnte ihn anders geschrieben zitieren', async () => {
     const getippt = 'Musterhausen'
-    loeseOrtAuf.mockRejectedValue(new TypeError(`Cannot read properties of undefined (reading 'lat') bei ${getippt}`))
+    // Die Meldung zitiert den Text kleingeschrieben: Die wörtliche Bereinigung (bereinigeFehlerText) erkennt ihn so nicht.
+    loeseOrtAuf.mockRejectedValue(new TypeError(`Cannot read properties of undefined (reading 'lat') bei ${getippt.toLowerCase()}`))
     starte()
     hook.ortSuchen(getippt)
     await zuRuhe()
@@ -506,11 +529,13 @@ describe('Ortssuche — die Auflösung scheitert (Verbindung weg, Aktion nach ei
     const [ereignis, kontext] = sentry.captureException.mock.calls[0]
     expect(ereignis.name).toBe('TypeError')
     expect(ereignis.message).toBe('Ortssuche: Auflösen gescheitert')
-    expect(kontext.tags).toEqual({ bereich: 'ortssuche', klasse: 'TypeError' })
+    // Sonst nichts: kein `extra`, das die Fehlermeldung (bereinigt oder nicht) trüge.
+    expect(kontext).toEqual({ level: 'error', tags: { bereich: 'ortssuche', klasse: 'TypeError' } })
     const gesendet = JSON.stringify(sentry.captureException.mock.calls[0], (_schluessel, wert) =>
       wert instanceof Error ? { name: wert.name, message: wert.message } : wert
     )
-    expect(gesendet).not.toContain(getippt)
+    expect(gesendet).not.toMatch(new RegExp(getippt, 'i'))
+    expect(gesendet).not.toContain('Cannot read')
     expect(sentry.addBreadcrumb).not.toHaveBeenCalled()
   })
 
@@ -605,6 +630,41 @@ describe('Ankunft mit Suchtext — die Kundin hat abgesendet (Startseite, Kopfze
     // Einmal: ein weiteres Rendern löst nichts mehr aus und meldet nichts mehr.
     pruefstand.erneut()
     await zuRuhe()
+    expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
+  })
+
+  it('Abbau vor der Antwort: kein Vermerk — die Adresse gehört dann einer anderen Seite (Gegenprobe: ohne Abbau genau einer)', async () => {
+    // Tipp auf einen Hof, während die Ortssuche noch läuft: /hoefe ist weg, die Antwort kommt erst danach. Der Vermerk schriebe mit dem
+    // Pfad von /hoefe die Adresse der Hofseite um — Neuladen oder Teilen landete auf /hoefe.
+    const antworten: Array<(orte: unknown[]) => void> = []
+    loeseOrtAuf.mockImplementation(() => new Promise((weiter) => antworten.push(weiter)))
+    starte('Ried')
+    await zuRuhe()
+    expect(loeseOrtAuf).toHaveBeenCalledTimes(1)
+
+    pruefstand.baueAb()
+    antworten[0]([])
+    await zuRuhe()
+    expect(beiAnkunftAufgeloest).not.toHaveBeenCalled()
+
+    // Gegenprobe: derselbe Ablauf ohne Abbau — der Vermerk kommt, genau einmal.
+    starte('Ried')
+    await zuRuhe()
+    antworten[1]([])
+    await zuRuhe()
+    expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
+  })
+
+  it('im Entwicklungsmodus (React baut jeden Effekt einmal ab und gleich wieder auf) zählt die Seite weiter als eingebaut — der Vermerk kommt, der Text geht einmal hinaus', async () => {
+    let antwort: (orte: unknown[]) => void = () => {}
+    loeseOrtAuf.mockImplementationOnce(() => new Promise((weiter) => (antwort = weiter)))
+    starte('Ried')
+    pruefstand.strengerModus()
+    await zuRuhe()
+
+    antwort([])
+    await zuRuhe()
+    expect(loeseOrtAuf).toHaveBeenCalledTimes(1)
     expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
   })
 
