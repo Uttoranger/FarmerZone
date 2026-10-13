@@ -9,7 +9,6 @@ import {
   AGB_ANHANG,
   AGB_ANHANG_ANKER,
   AGB_KURZ_ERKLAERT,
-  AGB_SEITE_TEXT,
   AGB_TEILE,
   agbAnker,
   agbTeilAnker,
@@ -17,6 +16,7 @@ import {
   type AgbPunkt,
   type AgbTeil,
 } from '@/lib/rechtstexte/agb'
+import { AGB_SEITE_TEXT } from '@/lib/rechtstexte/agb-einbindung'
 
 /*
  * Die Teile der Seite /agb (Register O4), gezeichnet aus den Daten in

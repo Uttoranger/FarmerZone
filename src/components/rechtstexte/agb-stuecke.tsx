@@ -36,7 +36,13 @@ export function AgbStuecke({
             return <em key={i}>{stueck.text}</em>
           case 'link':
             return (
-              <Link key={i} href={stueck.ziel} target={neuerTab ? '_blank' : undefined} className={linkKlasse}>
+              <Link
+                key={i}
+                href={stueck.ziel}
+                target={neuerTab ? '_blank' : undefined}
+                rel={neuerTab ? 'noopener noreferrer' : undefined}
+                className={linkKlasse}
+              >
                 {stueck.text}
               </Link>
             )

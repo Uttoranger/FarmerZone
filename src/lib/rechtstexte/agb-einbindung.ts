@@ -1,8 +1,9 @@
 /**
  * Wo und wie die AGB eingebunden werden (Register O4, geändert 13.10.2026):
  * die kurzen Sätze mit Link in Registrierung, Kasse und Bestellbestätigung,
- * der Link in den Fußzeilen und der Satz zur Reihenfolge auf /hoefe. Der Text
- * der AGB selbst steht in src/lib/rechtstexte/agb.ts.
+ * der Link in den Fußzeilen und der Satz zur Reihenfolge auf /hoefe, dazu die
+ * Wörter der Seite /agb um den Vertragstext herum. Der Text der AGB selbst
+ * steht in src/lib/rechtstexte/agb.ts.
  *
  * Einbezogen werden die AGB bei Höfen und Kundschaft mit einem Satz und einem
  * Link, nie mit einem Haken. Die Kundin stimmt in der Kasse zu, dass die
@@ -20,6 +21,17 @@ export const AGB_PFAD = '/agb'
 
 /** So heißt der Link in Fußzeilen, Sätzen und der Mail. */
 export const AGB_LINK_TEXT = 'AGB'
+
+/**
+ * Die Wörter der Seite /agb um den Vertragstext herum: Knopf und Überschrift des
+ * Inhaltsverzeichnisses. Sie stehen hier und nicht bei den AGB, weil agb.ts als
+ * wörtlicher Rechtstext von der Wortliste ausgenommen ist — Bedienwörter gehören
+ * unter die Wache.
+ */
+export const AGB_SEITE_TEXT = {
+  drucken: 'Drucken/Speichern',
+  inhalt: 'Inhalt',
+} as const
 
 const KONDITIONEN_PFAD = '/konditionen'
 

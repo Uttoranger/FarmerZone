@@ -137,7 +137,8 @@ function findeVerbotene(quelltext: string, verbote: Verbot[], datei = 'schnipsel
  * Ganze Dateien, deren Wortlaut kein Lauf ändert: Rechtstexte, die die Projektleitung nach
  * anwaltlicher Prüfung freigibt (Register O4). Eine Ausnahme je Datei statt je Text — ein
  * Absatz mehr in der Quelle soll nicht an dieser Wache scheitern; jeder Text außerhalb der
- * Datei wird weiter geprüft.
+ * Datei wird weiter geprüft. Hierher gehört nur wörtlicher Rechtstext, nie ein Bedienwort der
+ * Seite (Knopf, Überschrift): AGB_SEITE_TEXT steht darum in agb-einbindung.ts, unter der Wache.
  */
 type AusnahmeDatei = { datei: string; grund: string }
 const AUSNAHME_DATEIEN: AusnahmeDatei[] = [

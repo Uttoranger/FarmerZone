@@ -97,7 +97,8 @@ describe('Kasse: der Satz unter dem Kaufknopf', () => {
       })
     )
 
-  const SATZ = `Es gelten die <a href="/agb" target="_blank"`
+  // Ein neuer Tab trägt rel: Die geöffnete Seite kommt weder an window.opener noch erfährt sie den Referrer.
+  const SATZ = `Es gelten die <a href="/agb" target="_blank" rel="noopener noreferrer"`
 
   for (const [art, knopf] of [
     ['online', 'Weiter zur Zahlung · € 14,91'],
@@ -242,10 +243,11 @@ describe('Die Sätze: eine Quelle', () => {
 
   it('Registrierung: AGB und Konditionen für Höfe, beide als Link in neuem Tab', () => {
     expect(html(REGISTRIERUNG_AGB_SATZ, true)).toMatch(
-      /^<p>Mit der Registrierung stimmst du den <a href="\/agb" target="_blank"[^>]*>AGB<\/a> und den <a href="\/konditionen" target="_blank"[^>]*>Konditionen für Höfe<\/a> zu\.<\/p>$/
+      /^<p>Mit der Registrierung stimmst du den <a href="\/agb" target="_blank" rel="noopener noreferrer"[^>]*>AGB<\/a> und den <a href="\/konditionen" target="_blank" rel="noopener noreferrer"[^>]*>Konditionen für Höfe<\/a> zu\.<\/p>$/
     )
-    // Gegenprobe: Ohne neuen Tab fehlt target.
+    // Gegenprobe: Ohne neuen Tab fehlen target und rel.
     expect(html(REGISTRIERUNG_AGB_SATZ)).not.toContain('target=')
+    expect(html(REGISTRIERUNG_AGB_SATZ)).not.toContain('rel=')
   })
 
   it('Kasse und Mail nennen den Namen nur über MARKE — und den Hof als Vertragspartner', () => {

@@ -58,7 +58,7 @@ const GESAMT_LABEL: Record<MailZahlart, string> = {
  * folgen deshalb der Zahlart — eine bar bestätigte Bestellung ist nicht
  * „bezahlt". Vertragsmail ohne Werbung (S11): kein „Nochmal bestellen".
  */
-export function OrderConfirmationEmail({ appUrl = PRODUKTION_ADRESSE, ...p }: OrderConfirmationProps) {
+export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Element {
   const mitGebuehr = (p.serviceFee ?? 0) > 0
   const satz =
     p.zahlart === 'online'
@@ -98,7 +98,7 @@ export function OrderConfirmationEmail({ appUrl = PRODUKTION_ADRESSE, ...p }: Or
           typeof stueck === 'string' ? (
             stueck
           ) : (
-            <Link key={i} href={`${appUrl}${stueck.ziel}`} style={textLink}>
+            <Link key={i} href={`${p.appUrl ?? PRODUKTION_ADRESSE}${stueck.ziel}`} style={textLink}>
               {stueck.text}
             </Link>
           )

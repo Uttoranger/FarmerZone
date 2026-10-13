@@ -247,6 +247,8 @@ export default function DatenschutzPage() {
             </p>
           </Section>
 
+          {/* Zusagen nach Register N12 und AGB 20.2 (Fassung 0.9); Mail-Regel aus Nr. 87.
+              Ändert sich eine davon, ändert sich dieser Abschnitt mit. */}
           <Section title="Postfach">
             <p>
               Wir schreiben Höfen über das Postfach in der App, zum Beispiel zur Abrechnung oder zu

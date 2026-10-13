@@ -8,7 +8,8 @@ import {
   KurzErklaert,
   TeilAbschnitt,
 } from '@/components/rechtstexte/agb-ansicht'
-import { AGB_SEITE_TEXT, AGB_STAND_VERMERK, AGB_TEILE, AGB_TITEL } from '@/lib/rechtstexte/agb'
+import { AGB_STAND_VERMERK, AGB_TEILE, AGB_TITEL } from '@/lib/rechtstexte/agb'
+import { AGB_SEITE_TEXT } from '@/lib/rechtstexte/agb-einbindung'
 import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = { title: `AGB — ${MARKE}` }
@@ -22,7 +23,7 @@ export const metadata: Metadata = { title: `AGB — ${MARKE}` }
  * Stand-Vermerk „Entwurf". Abrufen, speichern und ausdrucken muss man sie
  * jederzeit können (§ 11 ECG): daher der Knopf, der den Druckdialog öffnet.
  */
-export default function AgbPage() {
+export default function AgbPage(): React.JSX.Element {
   return (
     <KundeShellMitSitzung>
       <div className={INFOSEITE_SPALTE}>

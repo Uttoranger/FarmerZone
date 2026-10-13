@@ -534,8 +534,8 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 ## src/lib/rechtstexte
 
-- src/lib/rechtstexte/agb-einbindung.ts · AGB_LINK_TEXT, AGB_PFAD, KASSE_AGB_SATZ, MAIL_AGB_ZEILE, REGISTRIERUNG_AGB_SATZ, REIHENFOLGE_HINWEIS · Wo und wie die AGB eingebunden werden (Register O4, geändert 13.10.2026): die kurzen Sätze mit Link in Registrierung, Kasse und Bestellbestätigung, der Link in den Fußzeilen und der Satz zur … · genutzt
-- src/lib/rechtstexte/agb.ts · AGB_ANHANG, AGB_ANHANG_ANKER, AGB_KURZ_ERKLAERT, AGB_SEITE_TEXT, AGB_STAND_VERMERK, AGB_TEILE, AGB_TITEL, agbAnker, agbTeilAnker, type AgbAnhang, type AgbBlock, type AgbKurzErklaert, type AgbPunkt, type AgbTeil · Die AGB als Daten (Register O4, Nr. 90) — der Text von /agb. · genutzt
+- src/lib/rechtstexte/agb-einbindung.ts · AGB_LINK_TEXT, AGB_PFAD, AGB_SEITE_TEXT, KASSE_AGB_SATZ, MAIL_AGB_ZEILE, REGISTRIERUNG_AGB_SATZ, REIHENFOLGE_HINWEIS · Wo und wie die AGB eingebunden werden (Register O4, geändert 13.10.2026): die kurzen Sätze mit Link in Registrierung, Kasse und Bestellbestätigung, der Link in den Fußzeilen und der Satz zur … · genutzt
+- src/lib/rechtstexte/agb.ts · AGB_ANHANG, AGB_ANHANG_ANKER, AGB_KURZ_ERKLAERT, AGB_STAND_VERMERK, AGB_TEILE, AGB_TITEL, agbAnker, agbTeilAnker, type AgbAnhang, type AgbBlock, type AgbKurzErklaert, type AgbPunkt, type AgbTeil · Die AGB als Daten (Register O4, Nr. 90) — der Text von /agb. · genutzt
 - src/lib/rechtstexte/stuecke.ts · BETREIBER, E_MAIL, PLATZHALTER_ANGABE, fett, kursiv, link, mail, type AgbLink, type AgbPlatzhalter, type AgbStueck, type SatzMitLinks · Textstücke für Rechtstexte und die Sätze, die auf sie verweisen (Register O4): Klartext, Fett, Kursiv, Link, Mail-Adresse und die zwei Platzhalter des AGB-Entwurfs. · genutzt
 
 ## src/server

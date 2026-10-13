@@ -22,7 +22,10 @@
  * Als wörtlicher Rechtstext steht die Datei in den Ausnahmen der Wachen, die
  * jeden Text unter src/ lesen: der Wortliste (je Datei, AUSNAHME_DATEIEN), der
  * Fachwort-Wache („Kennzeichnung“, Punkt 18.2) und der Wache gegen ein zweites
- * Exemplar der Konditionen („Startphase“, Punkt 17.2).
+ * Exemplar der Konditionen („Startphase“, Punkt 17.2). Darum steht hier nur
+ * Rechtstext: Die Wörter der Seite drumherum (Knopf, Überschrift des
+ * Verzeichnisses) stehen als AGB_SEITE_TEXT in agb-einbindung.ts, wo die Wachen
+ * sie lesen.
  */
 import { MARKE } from '@/lib/marke'
 import { PRODUKTION_HOST } from '@/lib/umgebung'
@@ -72,12 +75,6 @@ export const AGB_ANHANG_ANKER = 'anhang'
 export function agbTeilAnker(id: AgbTeil['id']): string {
   return `teil-${id}`
 }
-
-/** Die Wörter der Seite um den Vertragstext herum: Knopf und Überschrift des Inhaltsverzeichnisses. */
-export const AGB_SEITE_TEXT = {
-  drucken: 'Drucken/Speichern',
-  inhalt: 'Inhalt',
-} as const
 
 export const AGB_TITEL = `Allgemeine Geschäftsbedingungen (AGB) von ${MARKE}`
 

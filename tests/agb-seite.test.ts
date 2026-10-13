@@ -30,7 +30,8 @@ vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
 }))
 
 import AgbPage, { metadata } from '@/app/(public)/agb/page'
-import { AGB_ANHANG, AGB_SEITE_TEXT, AGB_STAND_VERMERK, AGB_TEILE, AGB_TITEL } from '@/lib/rechtstexte/agb'
+import { AGB_ANHANG, AGB_STAND_VERMERK, AGB_TEILE, AGB_TITEL } from '@/lib/rechtstexte/agb'
+import { AGB_SEITE_TEXT } from '@/lib/rechtstexte/agb-einbindung'
 import { KONTAKT_EMAIL } from '@/lib/support'
 import { MARKE } from '@/lib/marke'
 
