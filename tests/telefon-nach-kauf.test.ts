@@ -69,6 +69,7 @@ import { HofErreichen } from '@/components/bestaetigung/hof-erreichen'
 import { KONTAKT_NACH_DEM_KAUF } from '@/lib/hofseite-kunde'
 import { KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
+import { findeElement } from './element-suche'
 
 const WURZEL = process.cwd()
 const lade = vi.mocked(ladeHofseiteGeteilt)
@@ -102,22 +103,7 @@ const HOF: PublicFarm = {
 const JETZT = '2026-10-02T08:00:00.000Z'
 const KUNDIN = { art: 'kundin' as const, kaufen: true }
 
-/** Das Element der Client-Komponente im Baum der Seite — ohne Komponenten aufzurufen. */
-function findeElement(knoten: unknown, typ: unknown): { props: Record<string, unknown> } | null {
-  if (knoten == null || typeof knoten !== 'object') return null
-  if (Array.isArray(knoten)) {
-    for (const kind of knoten) {
-      const fund = findeElement(kind, typ)
-      if (fund) return fund
-    }
-    return null
-  }
-  const element = knoten as { type?: unknown; props?: Record<string, unknown> }
-  if (!element.props) return null
-  if (element.type === typ) return { props: element.props }
-  return findeElement(element.props.children, typ)
-}
-
+/** Die Props der Client-Komponente im Baum der Seite — ohne Komponenten aufzurufen. */
 async function seitenProps(art: 'kundin' | 'vorschau'): Promise<Record<string, unknown>> {
   lade.mockResolvedValue({ farm: HOF, ansicht: { art, noindex: art === 'vorschau', kaufen: art === 'kundin' } })
   const baum = await FarmPage({ params: Promise.resolve({ farmSlug: 'hof-test' }), searchParams: Promise.resolve({}) })

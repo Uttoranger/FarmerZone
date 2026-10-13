@@ -29,7 +29,7 @@ export function useBildmasse(quelle: string | null): {
   beimLaden: (ereignis: SyntheticEvent<HTMLImageElement>) => void
 } {
   const [gelesen, setGelesen] = useState<{ quelle: string; masse: TitelbildMasse } | null>(null)
-  const masse = quelle !== null && gelesen?.quelle === quelle ? gelesen.masse : null
+  const masse = gelesen?.quelle === quelle ? gelesen.masse : null
 
   function beimLaden(ereignis: SyntheticEvent<HTMLImageElement>): void {
     const gemessen = leseBildmasse(ereignis.currentTarget)
@@ -63,7 +63,7 @@ export function TitelbildBilder({
 
   return (
     <>
-      {/* Die Kopie steht VOR dem Foto im Baum: So bleibt das vordere Bild beim Wechsel an seiner Stelle und wird nicht neu aufgebaut. */}
+      {/* Die Kopie steht VOR dem Foto im Baum: Beide liegen absolut übereinander (fill), und ohne z-index malt das spätere Geschwister obenauf — so liegt das ganze Foto über der Kopie. */}
       {ganz && (
         <>
           <Image

@@ -188,8 +188,9 @@ steht, gilt weiter, mit diesen Änderungen:
   Am Handy behält die Leiste ihre fünf Plätze; Produkte steht oben im
   Mehr-Blatt (`NUR_IM_MEHR`), und `/products` zählt für „Mehr" als aktiv.
   „Mein Hof" hat nur noch die Reiter Hofseite | Beiträge
-  (`MEIN_HOF_REITER`), kompakt links, rechts ab md der Hinweis
-  `MEIN_HOF_HINWEIS`. `/products` hat einen eigenen Kopf (H1 „Produkte",
+  (`MEIN_HOF_REITER`), kompakt links. Der Hinweis `MEIN_HOF_HINWEIS` stand
+  damals rechts ab md; seit Nr. 73 steht er am Ende der Liste im Editor
+  (Register N7). `/products` hat einen eigenen Kopf (H1 „Produkte",
   Zahl) statt des Mein-Hof-Kopfs; `zaehleProdukte` ist weg.
 - **Neu-Knopf** (`farmer-nav.tsx`): Radius 13 px, linksbündig mit Plus,
   Chevron rechts (dreht bei offenem Menü), 1-px-Rand und innere Unterkante im

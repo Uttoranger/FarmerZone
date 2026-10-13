@@ -22,6 +22,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   OHNE_EIGENE_ILLUSTRATION,
   PRODUCT_CATEGORY_VALUES,
+  PRODUCT_SUBCATEGORY_VALUES,
   UNTERKATEGORIE_BILD_SLUG,
   ZUGEORDNETE_UNTERKATEGORIEN,
   illustrationPfad,
@@ -37,7 +38,8 @@ describe('Zuordnung der Illustrationen zu den Unterkategorien', () => {
   const ausnahmen: readonly string[] = OHNE_EIGENE_ILLUSTRATION
 
   it('jede Unterkategorie hat ein Bild ODER steht in der Ausnahmeliste — nie beides, nie keins', () => {
-    for (const l2 of ZUGEORDNETE_UNTERKATEGORIEN) {
+    // Über ALLE Werte des Enums, nicht nur die zugeordneten (Nr. 75): Eine neue L2 ohne Bild und ohne Ausnahme fiele sonst durch.
+    for (const l2 of PRODUCT_SUBCATEGORY_VALUES) {
       expect(mitBild.includes(l2) !== ausnahmen.includes(l2), l2).toBe(true)
     }
   })
@@ -136,6 +138,17 @@ describe('Prüfskript (pnpm illustrationen)', () => {
         .webp({ lossless: true, effort: 0 })
         .toBuffer()
       expect(await pruefeBild(gross, 'farbe')).toEqual(expect.arrayContaining([expect.stringMatching(/^\d+ KB, erlaubt sind höchstens 80 KB$/)]))
+    })
+
+    it('Kopf lesbar, Pixel nicht (Datei beschädigt): ein Grund statt eines Abbruchs ohne FEHLER-Zeile (Nr. 75)', async () => {
+      const muster = Buffer.alloc(1024 * 1024 * 3)
+      for (let i = 0; i < muster.length; i++) muster[i] = (i * 7919) % 251
+      const gut = await sharp(muster, { raw: { width: 1024, height: 1024, channels: 3 } }).webp({ quality: 50 }).toBuffer()
+      // Auf ein Zehntel gekürzt (unter 80 KB), die Längen im RIFF-Kopf passend gemacht: Maße und Format lesen sich, die Pixel nicht.
+      const kaputt = Buffer.from(gut.subarray(0, Math.floor(gut.length / 10) & ~1))
+      kaputt.writeUInt32LE(kaputt.length - 8, 4)
+      kaputt.writeUInt32LE(kaputt.length - 20, 16)
+      expect(await pruefeBild(kaputt, 'farbe')).toEqual(['Pixel nicht lesbar (Datei beschädigt)'])
     })
 
     it('keine Bilddatei: sagt das', async () => {

@@ -173,7 +173,7 @@ function ProductImageArea({
     <div className="relative flex-shrink-0 group" style={{ height: 170, background: 'var(--app-chip)' }}>
       {fileInput}
 
-      {/* Dimmed image wrapper — imageUrl ?? Kategoriebild ?? Sand-Platzhalter */}
+      {/* Gedimmter Bildrahmen — Foto ?? Illustration (Unterkategorie, sonst Kategorie, sonst „Sonstiges", categoryImageUrl) ?? Sand-Platzhalter */}
       <div className="absolute inset-0" style={{ opacity: dim }}>
         {(product.imageUrl ?? product.categoryImageUrl) ? (
           <Image

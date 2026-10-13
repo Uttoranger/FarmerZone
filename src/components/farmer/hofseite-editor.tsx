@@ -38,7 +38,8 @@ import { AbschnittInhalt, SOFORT_GESPEICHERT, type AbschnittHof } from '@/compon
 import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { schildTon } from '@/lib/mein-hof'
-import { HofseiteVorschauRahmen, useElementGroesse } from '@/components/farmer/hofseite-vorschau-rahmen'
+import { HofseiteVorschauRahmen } from '@/components/farmer/hofseite-vorschau-rahmen'
+import { useElementGroesse } from '@/lib/use-element-groesse'
 import { cn } from '@/lib/utils'
 
 /*

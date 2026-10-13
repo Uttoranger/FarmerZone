@@ -137,10 +137,12 @@ export function meinHofReiterAus(wert: string | string[] | undefined): MeinHofRe
 }
 
 /**
- * Der Hinweis rechts neben den Reitern ab md — genau dort, wo der Reiter
- * „Produkte" fehlt (`nurUnterMd`): Ab md hat Produkte seinen Punkt in der
- * Seitenleiste. Wortlaut wie im Mockup web-h1-mein-hof-vorschau-handy, der
- * Name kommt aus dem Reiter (seit Nr. 49, Register N3).
+ * Der Hinweis, wo Produkte liegen: Ab md fehlt der Reiter „Produkte"
+ * (`nurUnterMd`), er hat seinen Punkt in der Seitenleiste. Seit Nr. 73 steht
+ * der Satz leise am Ende der Liste im Editor (hofseite-editor.tsx, Register
+ * N7), nicht mehr rechts neben den Reitern. Wortlaut wie im Mockup
+ * web-h1-mein-hof-vorschau-handy, der Name kommt aus dem Reiter (seit Nr. 49,
+ * Register N3).
  */
 export const MEIN_HOF_HINWEIS = `${meinHofReiter('produkte').label} verwaltest du links unter „${meinHofReiter('produkte').label}“.`
 

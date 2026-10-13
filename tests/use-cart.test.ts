@@ -265,6 +265,23 @@ describe('useCart: Aufrufe hintereinander aus demselben Render', () => {
     expect(reservierungen()).toEqual([[EIER.id, 1], [EIER.id, 3]])
     expect(inhalt(korb().items)).toEqual([[EIER.id, 3]])
   })
+
+  it('ändert und entfernt mit Funktionen aus einem alten Render — beide Änderungen bleiben (Nr. 75)', async () => {
+    pruefstand.starte(NurKorb)
+    const { addItem } = korb()
+    await addItem(position(EIER), 1)
+    await addItem(position(MEHL), 1)
+    await pruefstand.zuRuhe()
+
+    // Zwei Aufrufe aus EINEM Render: Der zweite muss auf dem ersten aufsetzen, nicht auf `items` dieses Renders.
+    const { updateQuantity, removeItem } = korb()
+    expect(await updateQuantity(EIER.id, 4)).toEqual({ ok: true })
+    removeItem(MEHL.id)
+    await pruefstand.zuRuhe()
+
+    expect(inhalt(korb().items)).toEqual([[EIER.id, 4]])
+    expect(gespeichert()).toEqual({ farmId: HOF_ID, inhalt: [[EIER.id, 4]] })
+  })
 })
 
 describe('Nachbestell-Link im Produktraster', () => {

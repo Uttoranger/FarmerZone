@@ -6,6 +6,7 @@ import { Prisma } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
+import { whatsAppAbonnentinSql } from '@/server/queries/status-posts'
 import { generateUnsubscribeToken } from '@/lib/unsubscribe'
 import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
 import * as Sentry from '@sentry/nextjs'
@@ -183,10 +184,11 @@ export async function publishStatusPost(
 }
 
 /*
- * Die drei Aktionen auf einem bestehenden Beitrag prüfen den Besitz IM
- * Schreiben (Nr. 32): `updateMany`/`deleteMany` mit `{ id, farmId }` und
- * `count`. Vorher fragte ein `findFirst` den Besitz ab und ein zweiter Aufruf
- * schrieb per ID allein — zwei Schritte, wo einer reicht.
+ * Die Aktionen auf einem bestehenden Beitrag prüfen den Besitz IM Schreiben
+ * (Nr. 32): „geöffnet" (setzeWhatsAppGetippt) in EINER SQL-Anweisung mit
+ * Besitz in der WHERE-Klausel, deaktivieren und löschen über
+ * `updateMany`/`deleteMany` mit `{ id, farmId }` und `count`. Vorher fragte
+ * ein `findFirst` den Besitz ab und ein zweiter Aufruf schrieb per ID allein.
  */
 
 /**
@@ -197,9 +199,11 @@ export async function publishStatusPost(
  * Hinzufügen nimmt ein vorhandenes Vorkommen erst heraus (idempotent).
  * whatsappSentCount wird gleich der Länge mitgeschrieben, damit Bestand und
  * alter Code im Deploy-Fenster stimmen (Contract später). Besitz in der
- * WHERE-Klausel: der Beitrag über { id, farmId }, das Abonnement über farmId —
- * eine fremde Abonnements-ID landet nie in der Liste. Zurück geht die Liste,
- * wie sie danach in der Datenbank steht.
+ * WHERE-Klausel: der Beitrag über { id, farmId }, das Abonnement über farmId
+ * und dieselbe Regel wie die Tipp-Liste (WhatsApp-Häkchen, Nummer nicht leer;
+ * whatsAppAbonnentinSql, Nr. 75) — eine fremde Abonnements-ID oder eine
+ * E-Mail-Abonnentin landet nie in der Liste. Zurück geht die Liste, wie sie
+ * danach in der Datenbank steht.
  */
 export async function setzeWhatsAppGetippt(
   postId: string,
@@ -221,10 +225,16 @@ export async function setzeWhatsAppGetippt(
           "whatsappSentCount" = cardinality(${liste}),
           "updatedAt" = now() AT TIME ZONE 'UTC'
       WHERE "id" = ${beitrag} AND "farmId" = ${farm.id}
-        AND EXISTS (SELECT 1 FROM "CustomerFarmSubscription" WHERE "id" = ${abo} AND "farmId" = ${farm.id})
+        AND EXISTS (SELECT 1 FROM "CustomerFarmSubscription" WHERE "id" = ${abo} AND ${whatsAppAbonnentinSql(farm.id)})
       RETURNING "whatsappGetippt"`)
     const [zeile] = zeilen
-    if (zeile) return { ok: true, getippt: zeile.whatsappGetippt }
+    if (zeile) {
+      // Der Knopf „WhatsApp · n von m" im Reiter „Beiträge" und die Tipp-Liste
+      // unter /status zeigen sonst aus dem Router-Cache den alten Stand (Nr. 75).
+      revalidatePath('/farm-page')
+      revalidatePath('/status', 'layout')
+      return { ok: true, getippt: zeile.whatsappGetippt }
+    }
     // Nichts geschrieben — nachgesehen wird nur noch für den richtigen Satz.
     const eigenerBeitrag = await prisma.statusPost.count({ where: { id: beitrag, farmId: farm.id } })
     return { error: eigenerBeitrag === 0 ? BEITRAG_WEG : ABONNENTIN_WEG }

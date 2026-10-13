@@ -3,7 +3,9 @@
  * serverseitig gerendert (TESTING_GUIDELINES §1) und am Quelltext geprüft:
  *
  *  - Reiterleiste: EIN Baustein, Produkte · Hofseite · Beiträge als Links mit
- *    aria-current; „Produkte" nur unter md, an seiner Stelle ab md der Hinweis.
+ *    aria-current; „Produkte" nur unter md (ab md hat Produkte seinen Punkt in
+ *    der Seitenleiste; der Hinweis dazu steht seit Nr. 73 am Ende der Liste
+ *    im Editor, Register N7).
  *  - Umschalter „Bearbeiten · So sieht’s die Kundin": Bearbeiten zeigt den
  *    Inhalt, die Kundenansicht das iframe der echten Hofseite (passender
  *    Reiter, vorschauLink) mit dem leisen Link „In neuem Tab öffnen"; die Wahl
