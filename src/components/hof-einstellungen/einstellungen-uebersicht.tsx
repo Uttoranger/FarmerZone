@@ -62,7 +62,7 @@ export function EinstellungenUebersicht({ bereiche }: { bereiche: readonly Einst
       <div className="mt-2">
         <Link href="/meldungen" className={KNOPF_RAHMEN}>
           <LifeBuoy className="size-4" strokeWidth={1.7} aria-hidden="true" />
-          Hilfe und Rückmeldung
+          Problem melden
         </Link>
       </div>
     </div>

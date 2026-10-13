@@ -198,7 +198,7 @@ export function BrennmaterialFormular({
         />
       </Feld>
 
-      <Abschnitt id="brenn-angaben" titel="Holz-Angaben" satz="Die drei Fragen, die jeder Käufer stellt.">
+      <Abschnitt id="brenn-angaben" titel="Holz-Angaben" satz="Die drei Fragen, die jede Kundin stellt.">
         <div className="flex flex-col gap-2" data-feld="art">
           <p id="brenn-art" className="text-[13px] font-medium text-foreground">
             Art
@@ -430,7 +430,7 @@ export function BrennmaterialFormular({
 
       <section aria-labelledby="brenn-vorschau" className="flex flex-col gap-2 rounded-2xl border border-border bg-muted/40 p-4">
         <h3 id="brenn-vorschau" className="text-[11px] font-semibold tracking-[1px] text-muted-foreground uppercase">
-          So sehen Käufer dein Holz
+          So sehen Kunden dein Holz
         </h3>
         <p className="font-heading text-lg font-semibold break-words text-foreground">{name.trim() || 'Dein Brennmaterial'}</p>
         <p className="text-xs text-muted-foreground">{vorschauZeile}</p>

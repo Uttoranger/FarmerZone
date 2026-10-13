@@ -5,7 +5,7 @@
  * Beweist: Das Preisfeld heißt je nach Gebinde anders; die Vorschau zeigt,
  * was Kundinnen sehen; die Rückfrage kommt nur, wenn der Preis nach dem
  * Setzen einer Gebindegröße beim alten Einheitspreis geblieben ist.
- * Seit Nr. 51: Die Karte „So sehen Käufer dein Produkt" entsteht aus Foto,
+ * Seit Nr. 51: Die Karte „So sehen Kunden dein Produkt" entsteht aus Foto,
  * Name, Preis und Einheit; ein leerer oder ungültiger Preis gibt keinen Betrag.
  */
 import { describe, it, expect } from 'vitest'
@@ -108,7 +108,7 @@ describe('paketpreisAntworten', () => {
   })
 })
 
-describe('kaeuferVorschau — die Karte „So sehen Käufer dein Produkt" aus den Formularwerten (Nr. 51)', () => {
+describe('kaeuferVorschau — die Karte „So sehen Kunden dein Produkt" aus den Formularwerten (Nr. 51)', () => {
   const OHNE_BILD = { foto: null, kategorie: null }
 
   it('übernimmt Foto, Name, Preis und Einheit', () => {

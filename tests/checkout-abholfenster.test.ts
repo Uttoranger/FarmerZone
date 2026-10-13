@@ -120,7 +120,7 @@ async function erwarteAbgelehnt(res: Response, code: string): Promise<void> {
   expect(res.status).toBe(409)
   const body = await res.json()
   expect(body.code).toBe(code)
-  expect(body.error).toBe('Dieses Zeitfenster ist leider nicht mehr verfügbar – bitte wähle ein anderes.')
+  expect(body.error).toBe('Dieser Abholtermin ist leider nicht mehr verfügbar – bitte wähle einen anderen.')
   expect(productUpdateMany).not.toHaveBeenCalled()
   expect(orderCreate).not.toHaveBeenCalled()
 }

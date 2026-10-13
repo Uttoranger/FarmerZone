@@ -103,7 +103,7 @@ export function HofseiteSeitenspalte({
               </li>
             ))}
           </ul>
-          <p className="text-xs text-muted-foreground">Dein Zeitfenster wählst du beim Bestellen.</p>
+          <p className="text-xs text-muted-foreground">Deinen Abholtermin wählst du beim Bestellen.</p>
         </section>
       )}
 

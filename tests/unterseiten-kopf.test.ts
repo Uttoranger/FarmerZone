@@ -158,7 +158,7 @@ describe('UnterseitenKopf im Browser und Titel', () => {
   })
 
   it('/fehler-melden: am Handy steht der Name nur einmal — die Leiste trägt ihn, die h1 gleichen Wortlauts nur für den Screenreader (Nr. 56)', () => {
-    // Bericht 44: „← Hilfe und Rückmeldung" in der Leiste und darunter die h1 „Hilfe und Rückmeldung".
+    // Bericht 44: „← Problem melden" in der Leiste und darunter die h1 „Problem melden".
     const seite = quelle('src/app/(hof)/fehler-melden/page.tsx')
     const h1 = seite.match(/<h1 className="([^"]+)">([^<]+)<\/h1>/)
     expect(h1?.[2].trim()).toBe(elternseite('/fehler-melden')?.name)
@@ -175,7 +175,7 @@ describe('UnterseitenKopf im Browser und Titel', () => {
     const melden = kopf('/fehler-melden', { zeileImBrowser: false })
     expect(melden.match(/<a /g)).toHaveLength(1)
     expect(melden).toContain('href="/meldungen"')
-    expect(melden).toContain('>Hilfe und Rückmeldung</span>')
+    expect(melden).toContain('>Problem melden</span>')
   })
 
   it('nur Tokens, keine Farbwerte', () => {

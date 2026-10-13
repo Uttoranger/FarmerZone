@@ -417,7 +417,7 @@ function ProductCard({
                 erfährt, was die Kundin stattdessen liest. */}
             {zustand.art === 'ausverkauft' && (
               <p className="px-1 pb-1.5 text-[11px] leading-snug" style={{ color: 'var(--app-ink-faint)' }}>
-                {'Bestand 0 — Kunden sehen \u201eAusverkauft\u201c'}
+                {'Vorrat 0 — deine Kundinnen sehen \u201eAusverkauft\u201c'}
               </p>
             )}
           </div>
@@ -439,7 +439,7 @@ function ProductCard({
                 className="flex-1 flex items-center justify-center gap-1.5 py-[11px] rounded-lg text-[13px] font-semibold border transition-colors hover:bg-muted"
                 style={{ borderColor: 'var(--border)', color: 'var(--brand-text)', background: 'var(--card)' }}
               >
-                Lager
+                Vorrat
               </Link>
             </div>
           ) : canBuy ? (

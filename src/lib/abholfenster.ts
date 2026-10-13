@@ -26,7 +26,7 @@ import { ABHOL_VORLAUF_TAGE } from '@/lib/pickup-days'
 export const CODE_ABHOLFENSTER_UNGUELTIG = 'ABHOLFENSTER_UNGUELTIG'
 export const CODE_ABHOLFENSTER_VOLL = 'ABHOLFENSTER_VOLL'
 export const ABHOLFENSTER_NICHT_VERFUEGBAR =
-  'Dieses Zeitfenster ist leider nicht mehr verfügbar – bitte wähle ein anderes.'
+  'Dieser Abholtermin ist leider nicht mehr verfügbar – bitte wähle einen anderen.'
 
 /**
  * Ein wöchentliches Fenster, wie der Hof es eingetragen hat. Die öffentliche

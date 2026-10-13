@@ -337,15 +337,15 @@ export function formatGebinde(unit: string, unitSize?: number | { toString(): st
 }
 
 /**
- * Das Label des Bestandsfelds: ohne Gebinde die Einheit („Bestand (kg)",
- * „Bestand (Stück)"), mit Gebinde zählt der Bestand Pakete („Bestand (Pakete)").
+ * Das Label des Vorratsfelds: ohne Gebinde die Einheit („Vorrat (kg)",
+ * „Vorrat (Stück)"), mit Gebinde zählt der Vorrat Pakete („Vorrat (Pakete)").
  */
 export function bestandLabel(unit: string, unitSize?: number | { toString(): string } | null): string {
   // Ballen und Big Bags zählen Gebinde; ihr Gewicht steht in der Kennzeichnung.
-  if (istGrossgebindeEinheit(unit)) return `Bestand (${einheitLabel(unit, 2)})`
+  if (istGrossgebindeEinheit(unit)) return `Vorrat (${einheitLabel(unit, 2)})`
   const size = gebindeGroesse(unitSize)
-  if (size && size !== 1) return 'Bestand (Pakete)'
-  return `Bestand (${einheitLabel(unit)})`
+  if (size && size !== 1) return 'Vorrat (Pakete)'
+  return `Vorrat (${einheitLabel(unit)})`
 }
 
 /**

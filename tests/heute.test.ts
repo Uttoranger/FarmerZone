@@ -304,10 +304,10 @@ describe('brauchtDich', () => {
   it('Status-Erinnerung nur, wenn fällig', () => {
     expect(brauchtDich({ ...LEER, statusErinnerung: null })).toEqual([])
     expect(brauchtDich({ ...LEER, statusErinnerung: 9 })).toEqual([
-      { art: 'status', text: 'Seit 9 Tagen kein neuer Status', href: '/status/new' },
+      { art: 'status', text: 'Seit 9 Tagen kein neuer Beitrag', href: '/status/new' },
     ])
     expect(brauchtDich({ ...LEER, statusErinnerung: 'never' })[0].text).toBe(
-      'Noch kein Status — erzähl deinen Kunden, was es gibt'
+      'Noch kein Beitrag — erzähl deinen Kundinnen, was es gibt'
     )
   })
 

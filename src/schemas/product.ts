@@ -312,7 +312,7 @@ const produktFelder = z.object({
   vatRate: mwstZahl,
   unit: z.enum(PRODUCT_UNIT_VALUES),
   unitSize: optionalPositiveNumber,
-  stock: z.coerce.number().int().min(0, 'Bestand kann nicht negativ sein').default(0),
+  stock: z.coerce.number().int().min(0, 'Der Vorrat kann nicht negativ sein.').default(0),
   isAvailable: z.boolean().default(true),
   allergens: z.array(z.string()).default([]),
   requiresCool: z.boolean().default(false),

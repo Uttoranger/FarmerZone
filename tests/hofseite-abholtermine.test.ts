@@ -50,7 +50,7 @@ describe('Nächste Abholung: Termine als Text mit Datum', () => {
     expect(abschnitt).toContain('Sa, 25. Juli')
     expect(abschnitt).toContain('Mi, 29. Juli')
     expect(abschnitt).toContain('15–18 Uhr')
-    expect(abschnitt).toContain('Dein Zeitfenster wählst du beim Bestellen.')
+    expect(abschnitt).toContain('Deinen Abholtermin wählst du beim Bestellen.')
   })
 
   it('keine Knopf-Optik: kein Rahmen, keine grüne Fläche, kein Knopf oder Link in den Zeilen', () => {

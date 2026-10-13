@@ -133,7 +133,7 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, abonnentinnen
 
           {/* Preview */}
           <div className="bg-muted rounded-xl p-4 mb-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Dein Status</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Dein Beitrag</p>
             <p className="text-sm font-semibold text-foreground">{title}</p>
             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{body}</p>
           </div>

@@ -5041,6 +5041,16 @@ Auftrag freigabe.md §16 „76“ (Register T7). Keine Migration, kein neues Pak
 - **QR in der Story:** maschinell geprüft — die Modulmatrix aus `qrcode` gegen die Helligkeit des JPEG an den Modulmitten: 0 von 841 Modulen abweichend, dunkelstes Hell 243, hellstes Dunkel 38–40. Ein Handy-Scan steht aus.
 - **Aus der Umsetzung:** Zwei bestehende Tests ersetzten `next/og` mit Text als Körper; das ergibt nun 503. Sie liefern ein echtes PNG (ein Bildpunkt).
 
+## Begriffe abräumen (Nachtlauf Nr. 78, Oktober 2026)
+
+Auftrag freigabe.md §16 „78“ (Register N8), gestapelt auf 77. Keine Migration, kein neues Paket.
+
+- **Stand:** Alle 38 Fundstellen aus `OFFEN_BIS_78` stehen auf dem Wort der Wortliste, die Liste ist leer, der Test „OFFEN_BIS_78 ist leer“ läuft statt `it.skip`. Jede Stelle einzeln, kein Massenersatz. Bericht 78 zählt je Wort.
+- **Hof-Tür:** Der Punkt unten in Leiste und Seitenleiste, die Zeile in den Einstellungen und das Formular auf `/fehler-melden` heißen „Problem melden“. Ziel `/meldungen` und Seitentitel „Meine Meldungen“ bleiben. Der Satz nach dem Absenden (`MeldungForm`) verweist auf „Meine Meldungen“, weil dort der Stand steht — „Problem melden“ stünde auf einer Seite, die selbst so heißt.
+- **Abholtermin:** Wo die Kundin wählt (Startseite, Hofseite, Fehlertext der Kasse), steht „Abholtermin“. Die Zeile unter „Höfe in deiner Nähe“ nennt keine Wahl und sagt „am Hof abholen“.
+- **Kunden:** Überschriften sagen „Kunden“ (Vorbild „so sehen Kunden deine Hofseite“), Sätze „die Kundin“ und „deine Kundinnen“. „Käufer“ steht nur noch im Rechtstext des Impressums (Ausnahme im Test).
+- **Mockups:** Sie tragen die alten Wörter noch („Hilfe und Rückmeldung“ in 27 Dateien, „So sehen Käufer dein Futter“, „Dein Zeitfenster …“). Die Entscheidung N8 geht vor; die Mockups bleiben unverändert.
+
 ## Nützliche Befehle
 
 ```bash
