@@ -17,7 +17,7 @@ const LESBAR = /^\+?[\d\s()./-]+$/
 
 /**
  * Ohne 0, 00 und + ist nur eine Mobil-Vorwahl (65x–69x) eindeutig österreichisch
- * — so tippen Höfe ihre Nummer oft („664 1234567“, auch „43 664 …“). Bei Festnetz
+ * — so tippen Höfe ihre Nummer oft („664 0000000“, auch „43 664 …“). Bei Festnetz
  * ohne 0 würde geraten.
  */
 const MOBIL_OHNE_NULL = /^(?:43)?6[5-9]\d/
