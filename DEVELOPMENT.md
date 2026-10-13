@@ -5043,6 +5043,13 @@ Auftrag freigabe.md §16 „80“ (Register N9), gestapelt auf 78. Keine Migrati
 - **Bleibt eine Zeile (Art B) oder ist kein Leerzustand (Art C):** Die Einordnung aller Stellen steht als Liste `AUSNAHMEN` mit Grund in `tests/leerzustaende-wache.test.ts`; eine neue Stelle fällt dort auf.
 - **Wortlaut:** Die Zeile „Noch keine — erst dann können Kundinnen bestellen“ sagt jetzt „Kundinnen“ (N8: ganze Sätze).
 
+## Heute: Reihenfolge und leeres „Braucht dich“ (Nachtlauf Nr. 83, Oktober 2026)
+
+Auftrag freigabe.md §16 „83“ (Register N11), gestapelt auf 80. Keine Migration, kein neues Paket.
+
+- **Reihenfolge:** Die Hauptspalte von Heute läuft Packliste, Braucht dich, Teilen (`heuteAufbau`). Vorher stand die Teilen-Zeile (seit Nr. 45 kompakt unter der Packliste) vor „Braucht dich“ — eine Einladung zum Teilen schob eine überfällige Abholung nach unten. Dringend steht jetzt vor freiwillig.
+- **Leeres „Braucht dich“:** Ohne Eintrag keine Karte mehr, sondern die leise Zeile „Nichts braucht dich heute.“ (`BRAUCHT_DICH_LEER` in `src/lib/heute.ts`, gedämpft und ohne Rahmen wie „Zu tun einblenden“); vorher eine ganze Karte mit „Alles erledigt.“. Mit Einträgen bleibt die Karte, wie sie war. Kein Mockup zeigt „Braucht dich“, die Bilder im Bericht 83 sind die Vorlage.
+
 ## Nützliche Befehle
 
 ```bash
