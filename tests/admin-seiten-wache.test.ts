@@ -30,7 +30,7 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', () => ({
-  prisma: { user: { findUnique: vi.fn() }, farm: { count: vi.fn() }, meldung: { count: vi.fn() } },
+  prisma: { user: { findUnique: vi.fn() }, farm: { count: vi.fn() }, meldung: { count: vi.fn() }, $queryRaw: vi.fn() },
 }))
 
 import { ladeAdminbereich } from '@/server/adminbereich'
@@ -109,12 +109,13 @@ const SEITE = { modul: '@/server/admin-wache', exportName: 'verlangeAdminSeite',
 const SEITEN = [...seiten(ADMIN)]
 
 describe('jede Seite unter /admin', () => {
-  it('es gibt die vier Seiten — sonst bewiese der Rest nichts', () => {
+  it('es gibt die fünf Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach; /admin/meldungen leitet um und prüft trotzdem)', () => {
     expect(SEITEN.map((p) => relative(ADMIN, p).split(sep).join('/')).sort()).toEqual([
       'finanzen/page.tsx',
       'meldungen/[id]/page.tsx',
       'meldungen/page.tsx',
       'page.tsx',
+      'postfach/page.tsx',
     ])
   })
 
@@ -159,11 +160,14 @@ describe('ladeAdminbereich — Verhalten', () => {
   const userFindUnique = vi.mocked(prisma.user.findUnique)
   const farmCount = vi.mocked(prisma.farm.count)
   const meldungCount = vi.mocked(prisma.meldung.count)
+  // zaehleUngelesenTeam (Postfach, Nr. 87): Fäden mit ungelesener Antwort eines Hofs.
+  const ungelesenTeam = vi.mocked(prisma.$queryRaw)
 
   beforeEach(() => {
     vi.clearAllMocks()
     farmCount.mockResolvedValue(2 as never)
     meldungCount.mockResolvedValue(3 as never)
+    ungelesenTeam.mockResolvedValue([{ anzahl: 4 }] as never)
   })
 
   it('ohne Anmeldung: zum Login, nichts gezählt', async () => {
@@ -171,6 +175,7 @@ describe('ladeAdminbereich — Verhalten', () => {
     await expect(ladeAdminbereich()).rejects.toThrow('REDIRECT:/login')
     expect(farmCount).not.toHaveBeenCalled()
     expect(meldungCount).not.toHaveBeenCalled()
+    expect(ungelesenTeam).not.toHaveBeenCalled()
   })
 
   it('angemeldet ohne Recht: 404, nichts gezählt — auch wenn die Session isAdmin behauptet', async () => {
@@ -179,14 +184,15 @@ describe('ladeAdminbereich — Verhalten', () => {
     await expect(ladeAdminbereich()).rejects.toThrow('NOT_FOUND')
     expect(farmCount).not.toHaveBeenCalled()
     expect(meldungCount).not.toHaveBeenCalled()
+    expect(ungelesenTeam).not.toHaveBeenCalled()
   })
 
-  it('Admin ohne Hof: Name und Zähler — wartende Höfe und Meldungen zu entscheiden, kein Weg zum Hof', async () => {
+  it('Admin ohne Hof: Name und Zähler — wartende Höfe; am Postfach Meldungen zu entscheiden plus ungelesene Antworten (N12), kein Weg zum Hof', async () => {
     getSession.mockResolvedValue({ user: { id: 'u1' } } as never)
     userFindUnique
       .mockResolvedValueOnce({ isAdmin: true } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
-    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, zahlen: { hoefe: 2, briefkasten: 3 } })
+    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, zahlen: { hoefe: 2, briefkasten: 3 + 4 } })
     expect(farmCount).toHaveBeenCalledWith({ where: { approvedAt: null } })
   })
 

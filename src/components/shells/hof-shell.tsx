@@ -11,6 +11,7 @@ import {
   Compass,
   Eye,
   Home,
+  Inbox,
   LifeBuoy,
   LogOut,
   MoreHorizontal,
@@ -86,6 +87,8 @@ import { TarifZeile } from '@/components/hofbereich/tarif-zeile'
 const SYMBOL: Record<HofNavId, LucideIcon> = {
   heute: CalendarCheck,
   bestellungen: ReceiptText,
+  // Ein Eingangsfach: Hier kommt an, was das Team schreibt (Register N12).
+  postfach: Inbox,
   produkte: Package,
   'mein-hof': Home,
   kunden: Users,
@@ -106,8 +109,8 @@ export type HofShellProps = {
   personName: string
   /** Frisch aus der Datenbank (isAdminUser), nie aus der Sitzung. */
   isAdmin: boolean
-  /** Offene Bestellungen und Meldungen, die auf den Betreiber warten. */
-  zahlen?: { bestellungen?: number; admin?: number }
+  /** Offene Bestellungen, ungelesene Fäden im Postfach (N12) und Meldungen, die auf den Betreiber warten. */
+  zahlen?: { bestellungen?: number; postfach?: number; admin?: number }
   /**
    * Die Tarif-Zeile, fertig vom Server (baueTarifZeile über ladeTarifZeile) —
    * die Shell rechnet nichts mit der Zeit. null oder weggelassen: keine Zeile
@@ -124,11 +127,13 @@ export type HofShellProps = {
 
 function zahlFuer(punkt: HofNavPunkt, zahlen: HofShellProps['zahlen']): number | undefined {
   if (punkt.zahl === 'bestellungen') return zahlen?.bestellungen
+  if (punkt.zahl === 'postfach') return zahlen?.postfach
   if (punkt.zahl === 'admin') return zahlen?.admin
   return undefined
 }
 
 function zahlWofuer(punkt: HofNavPunkt): string {
+  if (punkt.zahl === 'postfach') return 'ungelesene Nachrichten'
   return punkt.zahl === 'admin' ? 'Meldungen zu entscheiden' : 'offene Bestellungen'
 }
 
@@ -302,6 +307,10 @@ export function HofShell({
   // Das Mehr-Blatt liegt über der Leiste; sie bleibt sichtbar und bedienbar.
   const ueberDerLeiste = 'bottom-[calc(68px+env(safe-area-inset-bottom))] max-h-[calc(100dvh-68px-env(safe-area-inset-bottom)-1rem)] pb-4'
 
+  // Hauptpunkte ohne Platz in der Leiste stehen ganz oben im Blatt — seit Nr. 87 das Postfach (Register N12).
+  const hauptImMehr = nav.mehr.filter((p) => nav.haupt.some((h) => h.id === p.id))
+  // „Mehr" trägt den Zähler des Postfachs mit, solange dort Ungelesenes liegt (Mockup system-h0-navigation-postfach).
+  const postfachImMehr = hauptImMehr.find((p) => p.zahl === 'postfach')
   const vukImMehr = nav.mehr.filter((p) => nav.verkaufUndKunden.some((v) => v.id === p.id))
   const untenImMehr = nav.mehr.filter((p) => nav.unten.some((u) => u.id === p.id))
 
@@ -482,7 +491,16 @@ export function HofShell({
           return (
             <Sheet key="mehr" open={offen === 'mehr'} onOpenChange={wechsle('mehr')}>
               <SheetTrigger aria-current={!offen && hofMehrAktiv(pathname) ? 'true' : undefined} className={bottomNavEintragKlassen(mehrAktiv)}>
-                <MoreHorizontal className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
+                <span className="relative">
+                  <MoreHorizontal className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
+                  {postfachImMehr && (
+                    <Zaehler
+                      anzahl={zahlFuer(postfachImMehr, zahlen)}
+                      wofuer={zahlWofuer(postfachImMehr)}
+                      className="absolute -top-1.5 -right-2.5 h-4 min-w-4 px-1 text-[9.5px]"
+                    />
+                  )}
+                </span>
                 <span>Mehr</span>
               </SheetTrigger>
               <SheetBlatt className={ueberDerLeiste}>
@@ -492,6 +510,21 @@ export function HofShell({
                     Schließen
                   </SheetClose>
                 </div>
+                {hauptImMehr.length > 0 && (
+                  <ListGruppe>
+                    {hauptImMehr.map((punkt) => (
+                      <ListRow
+                        key={punkt.id}
+                        titel={punkt.label}
+                        symbol={SYMBOL[punkt.id]}
+                        href={punkt.href}
+                        aktuell={hofHandyAriaAktuell(pathname, punkt)}
+                        ende={<Zaehler anzahl={zahlFuer(punkt, zahlen)} wofuer={zahlWofuer(punkt)} />}
+                        onNavigate={schliessen}
+                      />
+                    ))}
+                  </ListGruppe>
+                )}
                 {tarifZeile && (
                   <div role="group" aria-label={nav.tarif.titel} className="flex flex-col gap-2 pb-1">
                     <p aria-hidden="true" className="px-0.5 pt-1 text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase">

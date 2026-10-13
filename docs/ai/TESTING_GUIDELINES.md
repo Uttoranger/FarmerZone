@@ -142,7 +142,7 @@ bei `ADD COLUMN … NOT NULL` ohne `DEFAULT` an; begründete Ausnahmen tragen ei
 `-- EXPAND-CONTRACT:`-Marker (Regel: `ARCHITECTURE.md` §5).
 
 - Jeder `use-*`-Hook, der nach einem `await` Zustand ändert, bekommt einen Prüfstand-Test „zwei Aufrufe aus demselben Render" (Regelvorschlag 71, Lauf 11; freigegeben 13.10.2026).
-- Client-Komponenten unter `src/app/(hof)` stehen unter einer Quelltext-Wache: keine Zeitschaltung, keine Zustell-Sätze, keine Action im setState-Updater (Vorbild `tests/whatsapp-versand.test.ts`, Ausweitung auf alle (hof)-Clients mit Nr. 75; Regelvorschlag 66, Lauf 11; freigegeben 13.10.2026).
+- Client-Komponenten unter `src/app/(hof)` stehen unter einer Quelltext-Wache: keine Zeitschaltung, keine Zustell-Sätze, keine Action im setState-Updater (Vorbild `tests/whatsapp-versand.test.ts`, Ausweitung auf alle (hof)-Clients mit Nr. 75; Regelvorschlag 66, Lauf 11; freigegeben 13.10.2026) Eine Zeitschaltung, die nur die Seite neu holt (`router.refresh`), steht mit Grund in `ERLAUBTE_ZEITSCHALTUNG` (seit Nr. 87: offener Faden im Postfach, alle 60 s, Register N12).
 - Prüfsummen (etwa die Version eines Bilds in der Adresse) nur über die echte Route testen, nicht über eine im Test nachgebaute Berechnung (Regelvorschlag 67, Lauf 11; freigegeben 13.10.2026).
 - Steht eine Regel als Prisma-Bedingung und als SQL (Liste und EXISTS), prüft ein Integrationstest beide an denselben Zeilen (Regelvorschlag 75, Lauf 12; freigegeben 13.10.2026; den Test baut Nr. 85).
 - Attrappen für `next/og` liefern ein echtes PNG als Körper — Text ergäbe 503, weil sharp ihn nicht lesen kann (Regelvorschlag 76, Lauf 12; freigegeben 13.10.2026; verschoben aus ARCHITECTURE.md „Vorschaubild und Icons").

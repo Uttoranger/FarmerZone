@@ -5106,6 +5106,19 @@ Auftrag freigabe.md §17 „86“ (Register N12, nur das Wort). Keine Migration,
 - **Kopfzeile des Kurator-Exports:** `# Briefkasten — n Meldungen` bleibt (Ausnahme im Test). `istExport` in `scripts/briefkasten.ts` erkennt den Export der Leseroute an diesem Anfang; ein anderer Kopf allein ließe `pnpm briefkasten export` über die Leseroute mit Code 3 abbrechen (`tests/briefkasten-cli.test.ts` hält die Bindung fest). Umstellen geht nur zusammen mit der CLI und vier Testdateien.
 - **Nicht erfasst:** „Benachrichtigungen“ (Mehrzahl) trifft die Wortgrenze nicht und steht in fünf Kundentexten (Toast-Region, Mail-Fuß, Magic-Link-Mail, Konto, Abmelde-Seite); ob es „Nachrichten“ heißen soll, entscheidet der Mensch.
 
+## Postfach, Stufe 1 (Nachtlauf 13, Nr. 87, Oktober 2026)
+
+Register N12: ein Wort und ein Ort für alles, was ankommt. Das Team schreibt Höfen Nachrichten (Rundschreiben an alle, ausgewählte oder nach Filter, auch an einen einzelnen Hof); jede Nachricht ist eine Unterhaltung, auf die der Hof antwortet. Höfe beginnen keine Unterhaltung — Fehler, Wünsche, Fragen gehen weiter über „Problem melden“.
+
+- **Migration `20261013210000_postfach`** (die einzige des Laufs, Expand): vier neue Tabellen `Rundschreiben`, `Unterhaltung`, `Nachricht`, `UnterhaltungStand`, drei Enums, Index je Fremdschlüssel, RLS; nichts an bestehenden Tabellen. Erzeugt nach Regel 3 (`prisma migrate diff` gegen das Schema von main), wiederholbar gemacht; die Integrationsschicht spielt sie ein zweites Mal ohne Änderung ein. Dazu `Unterhaltung.letzteMailAm` für „höchstens eine E-Mail je Faden und Stunde“ — ohne neue Tabelle.
+- **Warum zwei Fremdschlüssel fehlen:** `Nachricht.vonFarmId` (null = Team) bekäme mit SetNull aus der Antwort eines gelöschten Hofs eine Nachricht des Teams; `Rundschreiben.erstelltVonUserId` soll nie das Löschen eines Kontos aufhalten. Spalten für Unterhaltungen zwischen Höfen (K3/T8) kommen erst mit ihrem Lauf.
+- **Lesestand je Seite statt „gelesen“ je Nachricht:** gelesen ist, was die andere Seite bis `gelesenBis` schrieb; der Stand rückt nur vor und reicht bis zur `createdAt` der gelesenen Nachricht — eine Nachricht, die zwischen Seitenaufbau und „gelesen“ ankommt, bleibt ungelesen. Öffnen setzt ihn erst nach dem Rendern über die Action, damit die Zähler in Leiste und Admin-Reiter sofort mitgehen.
+- **Zähler:** „Postfach“ in der HofShell (Seitenleiste nach „Bestellungen“, am Handy ganz oben im Mehr-Blatt, „Mehr“ trägt die Zahl mit) zählt Fäden mit Ungelesenem vom Team; der Admin-Reiter „Postfach“ zählt ungelesene Antworten plus Meldungen, die auf das Team warten. Beide über eine SQL-Abfrage, die Listen über dieselbe Regel in `src/lib/postfach.ts`.
+- **Heute:** Ungelesenes vom Team steht als erster Block der Hauptspalte (`heuteAufbau` mit `postfach`), „Gelesen“ ist ein Formular und geht ohne JavaScript.
+- **Admin:** `/admin/postfach` mit den Reitern Unterhaltungen · Meldungen · Rundschreiben; `/admin/meldungen` leitet mit 308 um (Filter gehen mit), die Detailseite einer Meldung bleibt.
+- **Mitgezogen, weil Wachen und Sicherheit es verlangen:** `/postfach` steht in `RESERVED_SLUGS`, in `KEINE_HOFSEITE` (next.config.ts) und im Proxy; HofShell und FarmerNav kennen das Symbol, `ladeHofbereich` lädt den Zähler.
+- **Offen:** Der Eintrag der Bremse gehört nach `DB_BREMSEN` (steht vorerst als `POSTFACH_DB_BREMSE` in `src/lib/postfach.ts`); der Screenreader-Text am Admin-Reiter sagt noch „Meldungen zu entscheiden“; der Fuß der Mail-Vorlage sagt „im Auftrag eines Hofes“ auch bei Mails des Teams. Bericht 87.
+
 ## Nützliche Befehle
 
 ```bash

@@ -114,6 +114,17 @@ const ERLAUBTE_SAETZE: readonly { datei: string; satz: string; grund: string }[]
   { datei: 'status/new/status-new-client.tsx', satz: 'Wird versendet…', grund: 'Knopf, solange die App veröffentlicht und die Mails verschickt.' },
 ]
 
+/**
+ * Ausnahmen von „keine Zeitschaltung", je Datei mit Grund: Ein offener Faden im
+ * Postfach lädt alle 60 s nach (Register N12, router.refresh, kein
+ * Polling-Endpunkt) — die Zeitschaltung holt nur die Seite neu, sie speichert
+ * nichts und behauptet keine Zustellung. Eine Ausnahme ohne Zeitschaltung
+ * macht die Wache rot.
+ */
+const ERLAUBTE_ZEITSCHALTUNG: readonly { datei: string; grund: string }[] = [
+  { datei: 'postfach/[id]/faden-nachladen.tsx', grund: 'Register N12: offener Faden lädt alle 60 s nach (router.refresh), nur bei sichtbarer Seite.' },
+]
+
 function ohneErlaubteSaetze(datei: string, text: string): string {
   return ERLAUBTE_SAETZE.filter((e) => e.datei === datei).reduce((rest, e) => rest.split(e.satz).join(''), text)
 }
@@ -149,8 +160,17 @@ describe('Client-Komponenten unter src/app/(hof) (Quelltext-Wache, Regelvorschla
 
   it('keine Zeitschaltung und kein Satz, der eine Zustellung behauptet — außer den begründeten E-Mail-Sätzen', () => {
     for (const [datei, text] of CLIENTS) {
-      expect(text, datei).not.toMatch(/\bset(Timeout|Interval)\b/)
+      if (!ERLAUBTE_ZEITSCHALTUNG.some((e) => e.datei === datei)) expect(text, datei).not.toMatch(/\bset(Timeout|Interval)\b/)
       expect(ohneErlaubteSaetze(datei, text), datei).not.toMatch(UNEHRLICH)
+    }
+  })
+
+  it('jede erlaubte Zeitschaltung steht noch in ihrer Datei — und nur als router.refresh', () => {
+    for (const { datei } of ERLAUBTE_ZEITSCHALTUNG) {
+      const text = CLIENTS.get(datei) ?? ''
+      expect(text, datei).toMatch(/\bsetInterval\b/)
+      expect(text, datei).toContain('router.refresh()')
+      expect(aktionImUpdater(text), datei).toBe(false)
     }
   })
 

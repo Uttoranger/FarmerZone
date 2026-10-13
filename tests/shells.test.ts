@@ -294,7 +294,8 @@ describe('AdminShell', () => {
     // Wortliste (N12): Der Reiter heißt „Postfach“ — auch in der Zeile unter dem Kopf am Handy, die dieselben Reiter zeigt.
     expect(reiter).toContain('Postfach')
     expect(reiter).not.toContain('Briefkasten')
-    expect(reiter).toContain('<a href="/admin/meldungen" aria-current="true"')
+    // Die Detailseite einer Meldung gehört zum Postfach (Nr. 87): der Reiter zeigt auf /admin/postfach und bleibt aktiv.
+    expect(reiter).toContain('<a href="/admin/postfach" aria-current="true"')
     expect(html).toContain('Zu meinem Hof')
     expect(html).toContain(`href="${ADMIN_ZURUECK.href}"`)
     expect(html).not.toContain('<aside')

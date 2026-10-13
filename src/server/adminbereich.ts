@@ -3,6 +3,7 @@ import { kontoHatHof } from '@/lib/admin-navigation'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { zaehleWartendeHoefe } from '@/server/queries/admin'
 import { zaehleZuEntscheiden } from '@/server/queries/meldung'
+import { zaehleUngelesenTeam } from '@/server/queries/postfach'
 
 export type Adminbereich = {
   personName: string
@@ -12,7 +13,7 @@ export type Adminbereich = {
    * beide Ziele liegen im Hofbereich.
    */
   hatHof: boolean
-  /** Die Zähler der Reiter: wartende Höfe, Meldungen zu entscheiden. */
+  /** Die Zähler der Reiter: wartende Höfe; am Postfach ungelesene Antworten der Höfe plus Meldungen zu entscheiden (N12). */
   zahlen: { hoefe: number; briefkasten: number }
 }
 
@@ -32,11 +33,14 @@ export type Adminbereich = {
  */
 export async function ladeAdminbereich(): Promise<Adminbereich> {
   const userId = await verlangeAdminSeite()
-  const [nutzer, hoefe, briefkasten] = await Promise.all([
+  const [nutzer, hoefe, zuEntscheiden, ungelesen] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true, farm: { select: { id: true } } } }),
     zaehleWartendeHoefe(),
     zaehleZuEntscheiden(),
+    zaehleUngelesenTeam(),
   ])
+  // Ein Postfach, eine Zahl (Register N12): was auf das Team wartet — Antworten der Höfe und Meldungen.
+  const briefkasten = zuEntscheiden + ungelesen
   return {
     personName: nutzer?.name ?? '',
     hatHof: kontoHatHof({ rolle: nutzer?.role, hofVorhanden: nutzer?.farm != null }),
