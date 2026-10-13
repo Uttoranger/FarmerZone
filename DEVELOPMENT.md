@@ -5015,6 +5015,15 @@ Auftrag freigabe.md §15 „74" (Register I1). Keine Migration, kein neues Paket
 - **Datei-Tracing:** Gemessen mit `next build`: Alle 37 Routenpakete mit Zugriff auf `process.cwd()/public` tragen die Illustrationen samt Unterordnern in der `.nft.json`; die Teilen-Bild-Route trägt sie zusätzlich ausdrücklich ein (`**`).
 - **Aus der Prüfung von 69:** Die Attrappe des Teilen-Bild-Laders wertet Umleitungssperre und Zeitlimit aus; ein Strom einer Fehlerseite wird abgebrochen; eine nicht ladbare Illustration geht mit Klasse und bereinigter Nachricht nach Sentry, nicht mit dem Pfad der Datei.
 
+## Wortliste: ein Wort je Sache (Nachtlauf Nr. 77, Oktober 2026)
+
+Auftrag freigabe.md §16 „77“ (Register N8). Keine Migration, kein neues Paket, kein Nutzertext geändert (das macht Nr. 78).
+
+- **Anlass:** Für dieselbe Sache standen mehrere Wörter in den Texten („Zeitfenster“ neben „Abholtermin“, „Bestand“ neben „Vorrat“, „Status posten“ neben „Neuer Beitrag“, „Hilfe und Rückmeldung“ neben „Problem melden“). Die Tabelle steht in `docs/ai/DESIGN_SYSTEM.md` (Abschnitt „Wortliste“); `tests/wortliste.test.ts` liest ihre Spalte „nicht“ und sucht die Wörter im Syntaxbaum, damit Kommentare und Bezeichner nicht zählen.
+- **Wort statt Wortverbindung:** „Status“, „Post“ und „Neuigkeit“ stehen als einzelne Wörter in der Tabelle. Eine Liste von Verbindungen wie „Status posten“ hätte die Sätze von heute gefunden, nicht den nächsten („Dein Status“ und „Status-Foto“ standen neben „Status posten“). Dafür stehen elf Texte, in denen „Status“ etwas anderes meint (Bestellung, Zahlung, Freischaltung, Meldung, Spaltenkopf, WhatsApp-Funktion), mit Grund in der Ausnahmeliste des Tests. „Neuigkeiten“ (Mehrzahl, der Name der Anmeldung bei einem Hof) trifft die Wortgrenze nicht; „per Post“ ist als Wendung erlaubt.
+- **Käufer:** Heute steht „Käufer“ in keinem Text für die Futter-Käuferarten, sondern für die Kundschaft („So sehen Käufer dein Futter“). Darum steht es in der Spalte „nicht“ der beiden Kunden-Zeilen; der Rechtstext im Impressum bleibt wörtlich (Ausnahme).
+- **Arbeitsliste:** `OFFEN_BIS_78` im Test hält die 38 Fundstellen von heute fest (Stand f367433). Sie greift über Datei, Wort und Text, nicht über die Zeile, weil andere Nummern im Sammel-PR die Zeilen verschieben. Nr. 78 stellt um, streicht die Einträge und macht aus dem `it.skip('OFFEN_BIS_78 ist leer …')` ein `it`. Einträge mit `nummer` liegen in Dateien anderer Nummern dieses Laufs und gehen über den Dirigenten.
+
 ## Nützliche Befehle
 
 ```bash
