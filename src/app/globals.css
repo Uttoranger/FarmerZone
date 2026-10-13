@@ -22,6 +22,16 @@
      Packen, erledigt/gepackt. Als Text- und Symbolfarbe, je Modus eigen. */
   --color-status-offen: var(--fz-status-offen);
   --color-status-fertig: var(--fz-status-fertig);
+  /* Bedeutungsfarben (Register G5): Schrift und Fläche je Art der Marke, je
+     Modus eigen. Gezeichnet nur vom Baustein Marke (components/ui/marke.tsx). */
+  --color-zustand-tun: var(--fz-zustand-tun);
+  --color-zustand-tun-grund: var(--fz-zustand-tun-grund);
+  --color-zustand-laeuft: var(--fz-zustand-laeuft);
+  --color-zustand-laeuft-grund: var(--fz-zustand-laeuft-grund);
+  --color-zustand-erledigt: var(--fz-zustand-erledigt);
+  --color-zustand-erledigt-grund: var(--fz-zustand-erledigt-grund);
+  --color-zustand-abgebrochen: var(--fz-zustand-abgebrochen);
+  --color-zustand-abgebrochen-grund: var(--fz-zustand-abgebrochen-grund);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -248,6 +258,17 @@
   --fz-on-primary: oklch(0.2034 0.0338 50.7); /* #231208 */
   --fz-status-offen: oklch(0.5109 0.1198 47.2); /* #9C4D20 */
   --fz-status-fertig: oklch(0.4765 0.0886 153.9); /* #2E6B45 */
+  /* Bedeutungsfarben (Register G5): je Art der Marke (tun · läuft · erledigt
+     · abgebrochen) eine Schrift auf eigener Fläche, jedes Paar ≥ 4,5:1 —
+     unabhängig davon, ob die Marke auf Karte oder Seitengrund steht. */
+  --fz-zustand-tun: oklch(0.5109 0.1198 47.2); /* #9C4D20 */
+  --fz-zustand-tun-grund: oklch(0.9564 0.0204 62.9); /* #FBEEE3 */
+  --fz-zustand-laeuft: oklch(0.4411 0.0761 153.8); /* #2D5F3F */
+  --fz-zustand-laeuft-grund: oklch(0.9453 0.0204 131.5); /* #E8F0E2 */
+  --fz-zustand-erledigt: oklch(0.5089 0.0269 143.2); /* #5D6A5C */
+  --fz-zustand-erledigt-grund: oklch(0.9462 0.0111 89.7); /* #F0EDE5 */
+  --fz-zustand-abgebrochen: oklch(0.5054 0.1905 27.5); /* #B91C1C */
+  --fz-zustand-abgebrochen-grund: oklch(0.9356 0.0309 17.7); /* #FEE2E2 */
 }
 
 [data-theme="dark"] {
@@ -359,6 +380,17 @@
   --fz-on-primary: oklch(0.2034 0.0338 50.7); /* #231208 */
   --fz-status-offen: oklch(0.7512 0.1071 50.3); /* #E59A6F */
   --fz-status-fertig: oklch(0.8140 0.0691 155.1); /* #9FD0AF */
+  /* Bedeutungsfarben bei Nacht: die Schrift wie die Zustandsfarben bzw. die
+     leise Textfarbe (abgebrochen ein helles Rot), die Flächen dunkel aus
+     demselben Farbton abgeleitet. */
+  --fz-zustand-tun: oklch(0.7512 0.1071 50.3); /* #E59A6F */
+  --fz-zustand-tun-grund: oklch(0.2872 0.0382 50.4); /* #3A2519 */
+  --fz-zustand-laeuft: oklch(0.8140 0.0691 155.1); /* #9FD0AF */
+  --fz-zustand-laeuft-grund: oklch(0.2962 0.0409 155.5); /* #1B3324 */
+  --fz-zustand-erledigt: oklch(0.7162 0.0266 143.4); /* #9AA899 */
+  --fz-zustand-erledigt-grund: oklch(0.2785 0.0183 145.1); /* #232B23 */
+  --fz-zustand-abgebrochen: oklch(0.8077 0.1035 19.6); /* #FCA5A5 */
+  --fz-zustand-abgebrochen-grund: oklch(0.2829 0.0666 22.3); /* #451A1A */
 }
 
 /* ── Neues Design im Geltungsbereich ─────────────────────────────────

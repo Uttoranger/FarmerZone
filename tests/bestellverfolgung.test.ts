@@ -14,8 +14,8 @@ import {
   bestellStatusAnzeige,
   formatiereAbholtermin,
   zahlungsAnzeige,
-  MARKE_GRUEN,
 } from '@/lib/bestellstatus'
+import { MARKE_ARTEN } from '@/lib/marke-art'
 import { erzeugeIcs, icsFalte, icsText, wienKalendertag } from '@/lib/kalender'
 
 describe('Bestell-Link — die Signatur', () => {
@@ -45,7 +45,7 @@ describe('Bestell-Link — die Signatur', () => {
   })
 })
 
-describe('bestellStatusAnzeige — jeder reale Status bekommt Marke, Farbe und Satz', () => {
+describe('bestellStatusAnzeige — jeder reale Status bekommt Marke, Bedeutung und Satz', () => {
   const TERMIN = 'am Freitag, 4. September zwischen 14:00 und 16:00 Uhr'
 
   // Über das ECHTE Enum, nicht über eine abgeschriebene Liste: Kommt je ein
@@ -54,8 +54,7 @@ describe('bestellStatusAnzeige — jeder reale Status bekommt Marke, Farbe und S
     const anzeige = bestellStatusAnzeige(status, TERMIN)
     expect(anzeige.marke.length).toBeGreaterThan(0)
     expect(anzeige.satz.length).toBeGreaterThan(10)
-    expect(anzeige.farbe).toMatch(/bg-/)
-    expect(anzeige.farbe).toMatch(/text-/)
+    expect(MARKE_ARTEN).toContain(anzeige.art)
   })
 
   it('READY erklärt sich mit dem Abholtermin im Satz', () => {
@@ -65,18 +64,16 @@ describe('bestellStatusAnzeige — jeder reale Status bekommt Marke, Farbe und S
     expect(anzeige.satz).toContain(TERMIN)
   })
 
-  it('die FARBEN tragen die Bedeutung — grün läuft, orange verlangt etwas, rot ist schiefgegangen, grau ist vorbei', () => {
-    // Nicht nur „irgendeine Farbe": Ein grünes „Storniert" wäre eine
-    // falsche Botschaft, die kein Typcheck fängt.
-    expect(bestellStatusAnzeige('READY', TERMIN).farbe).toBe(MARKE_GRUEN)
-    expect(bestellStatusAnzeige('PAID', TERMIN).farbe).toBe(MARKE_GRUEN)
-    expect(bestellStatusAnzeige('PENDING_CONFIRMATION', TERMIN).farbe).toContain('#FBEEE3')
-    // toContain statt toBe: An den Klassen hängen seit dem Dark Mode noch
-    // dark:-Entsprechungen. Geprüft wird die Bedeutung (rot), nicht die
-    // vollständige Klassenliste.
-    expect(bestellStatusAnzeige('CANCELLED', TERMIN).farbe).toContain('text-red-700')
-    expect(bestellStatusAnzeige('NOT_PICKED_UP', TERMIN).farbe).toContain('text-red-700')
-    expect(bestellStatusAnzeige('PICKED_UP', TERMIN).farbe).toContain('#F0EDE5')
+  it('die ART trägt die Bedeutung — läuft (grün), tun (orange), abgebrochen (rot), erledigt (grau)', () => {
+    // Nicht nur „irgendeine Art": Ein laufendes „Storniert" wäre eine
+    // falsche Botschaft, die kein Typcheck fängt. Die Farbe dazu kommt seit
+    // Register G5 nur aus dem Baustein Marke.
+    expect(bestellStatusAnzeige('READY', TERMIN).art).toBe('laeuft')
+    expect(bestellStatusAnzeige('PAID', TERMIN).art).toBe('laeuft')
+    expect(bestellStatusAnzeige('PENDING_CONFIRMATION', TERMIN).art).toBe('tun')
+    expect(bestellStatusAnzeige('CANCELLED', TERMIN).art).toBe('abgebrochen')
+    expect(bestellStatusAnzeige('NOT_PICKED_UP', TERMIN).art).toBe('abgebrochen')
+    expect(bestellStatusAnzeige('PICKED_UP', TERMIN).art).toBe('erledigt')
   })
 
   it('PENDING_CONFIRMATION unterscheidet ehrlich nach Zahlungsart: online gibt es keinen Bestätigungslink', () => {
@@ -95,7 +92,7 @@ describe('bestellStatusAnzeige — jeder reale Status bekommt Marke, Farbe und S
     const anzeige = bestellStatusAnzeige('KUENFTIGER_WERT', TERMIN)
     expect(anzeige.marke).toBe('Bestellung')
     expect(anzeige.satz.length).toBeGreaterThan(10)
-    expect(anzeige.farbe).toMatch(/bg-/)
+    expect(anzeige.art).toBe('erledigt')
   })
 
   it('formatiereAbholtermin nennt den Wiener Wochentag, auch wenn der Server in UTC läuft', () => {
