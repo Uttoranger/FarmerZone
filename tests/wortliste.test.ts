@@ -14,10 +14,11 @@
  *    zählen nicht.
  *  - Steht ein Wort in anderem Sinn richtig da (der Status einer Bestellung), steht
  *    der Text mit Grund in AUSNAHMEN — je Text, nicht je Datei, ohne Zeilennummer.
- *  - OFFEN_BIS_78 war die Arbeitsliste für Nr. 78 und ist leer: Jede Fundstelle ist
- *    umgestellt. Ein Eintrag griffe über Datei, Wort und Text, nicht über die Zeile —
- *    im Sammel-PR verschieben andere Nummern die Zeilen. Er deckt genau eine
- *    Fundstelle; ein Eintrag, hinter dem kein Text mehr steht, fällt auf.
+ *  - OFFEN_BIS_86 ist die Arbeitsliste für Nr. 86: die Fundstellen der neuen „nicht"-Wörter
+ *    aus N12 (Briefkasten, Mitteilung, Newsletter), die 86 umstellt und streicht. Sie greift
+ *    über Datei, Wort und Text, nicht über die Zeile — im Sammel-PR verschieben andere
+ *    Nummern die Zeilen. Jeder Eintrag deckt genau eine Fundstelle; ein Eintrag, hinter dem
+ *    kein Text mehr steht, fällt auf. Ist die Liste leer, schaltet 86 den letzten Test ein.
  *  - Gegenprobe: Die Suche schlägt am Wort im String an, nicht im Kommentar.
  */
 import { describe, it, expect, beforeAll } from 'vitest'
@@ -178,14 +179,38 @@ const AUSNAHMEN: Ausnahme[] = [
 ]
 
 /**
- * Die Arbeitsliste von Nr. 78: Sie hielt die 38 Fundstellen von main f367433, bis 78 jeden Text
- * auf das Wort der Tabelle umgestellt hat — jetzt ist sie leer und bleibt es (letzter Test).
- * Wer künftig mehrere Texte nummernweise umstellt, trägt sie hier ein: `stelle` ist
- * Datei:Zeile von heute (nur zum Finden; geglichen wird über Datei, Wort und Text), `text` ein
- * Ausschnitt, `nummer` die andere Nummer, der die Datei gehört.
+ * Die Arbeitsliste von Nr. 86 (Stand main 5e75103): Sie hält die 23 Fundstellen der neuen „nicht"-Wörter
+ * aus N12, bis 86 jeden Text auf das Wort der Tabelle umgestellt hat — dann ist sie leer und der
+ * letzte Test schaltet ein (Muster 77/78). `stelle` ist Datei:Zeile von heute (nur zum Finden;
+ * geglichen wird über Datei, Wort und Text), `text` ein Ausschnitt, `nummer` die Nummer, die den
+ * Text umstellt. Wer künftig mehrere Texte nummernweise umstellt, trägt sie hier ein.
  */
 type Offen = { stelle: string; wort: string; text: string; nummer?: string }
-const OFFEN_BIS_78: Offen[] = []
+const OFFEN_BIS_86: Offen[] = [
+  { stelle: 'src/app/(hof)/status/new/status-new-client.tsx:32', wort: 'Mitteilung', text: 'Mitteilung', nummer: '86' },
+  { stelle: 'src/app/(public)/datenschutz/page.tsx:153', wort: 'Newsletter', text: '9. Newsletter und Neuigkeiten von Höfen', nummer: '86' },
+  { stelle: 'src/app/admin/meldungen/[id]/page.tsx:91', wort: 'Briefkasten', text: 'Briefkasten', nummer: '86' },
+  { stelle: 'src/app/admin/meldungen/page.tsx:33', wort: 'Briefkasten', text: 'Briefkasten — Admin', nummer: '86' },
+  { stelle: 'src/app/admin/meldungen/page.tsx:73', wort: 'Briefkasten', text: 'Briefkasten', nummer: '86' },
+  { stelle: 'src/app/admin/meldungen/page.tsx:73', wort: 'Briefkasten', text: 'Wir konnten den Briefkasten gerade nicht laden.', nummer: '86' },
+  { stelle: 'src/app/admin/meldungen/page.tsx:103', wort: 'Briefkasten', text: 'Briefkasten', nummer: '86' },
+  { stelle: 'src/app/api/status-image/[id]/route.tsx:13', wort: 'Mitteilung', text: 'Mitteilung', nummer: '86' },
+  { stelle: 'src/app/api/status-image/[id]/route.tsx:31', wort: 'Mitteilung', text: 'Mitteilung', nummer: '86' },
+  { stelle: 'src/components/admin/hoefe-ansicht.tsx:282', wort: 'Briefkasten', text: 'Neu im Briefkasten', nummer: '86' },
+  { stelle: 'src/components/hofseite/hofseite-kunde.tsx:103', wort: 'Mitteilung', text: 'Mitteilung', nummer: '86' },
+  { stelle: 'src/emails/briefkasten-zusammenfassung.tsx:17', wort: 'Briefkasten', text: 'Briefkasten:', nummer: '86' },
+  { stelle: 'src/emails/briefkasten-zusammenfassung.tsx:18', wort: 'Briefkasten', text: 'Briefkasten — Wochenstand', nummer: '86' },
+  { stelle: 'src/emails/briefkasten-zusammenfassung.tsx:43', wort: 'Briefkasten', text: 'Briefkasten öffnen →', nummer: '86' },
+  { stelle: 'src/emails/meldung-notification.tsx:53', wort: 'Briefkasten', text: 'Im Briefkasten ansehen →', nummer: '86' },
+  { stelle: 'src/emails/meldung-notification.tsx:56', wort: 'Briefkasten', text: 'Wünsche und Fragen kommen nicht per Mail — sie stehen gesammelt im Briefkasten und in der', nummer: '86' },
+  { stelle: 'src/emails/newsletter.tsx:52', wort: 'Newsletter', text: 'Du erhältst diese Nachricht, weil du den Newsletter von', nummer: '86' },
+  { stelle: 'src/emails/status-update.tsx:9', wort: 'Mitteilung', text: 'Mitteilung', nummer: '86' },
+  { stelle: 'src/emails/status-update.tsx:43', wort: 'Mitteilung', text: 'Mitteilung', nummer: '86' },
+  { stelle: 'src/lib/admin-navigation.ts:25', wort: 'Briefkasten', text: 'Briefkasten', nummer: '86' },
+  { stelle: 'src/lib/briefkasten-export.ts:161', wort: 'Briefkasten', text: '# Briefkasten —', nummer: '86' },
+  { stelle: 'src/lib/email.ts:459', wort: 'Briefkasten', text: 'Briefkasten:', nummer: '86' },
+  { stelle: 'src/lib/teilen-bild.ts:183', wort: 'Mitteilung', text: 'Mitteilung', nummer: '86' },
+]
 
 type Deckt = { datei: string; wort: string; text: string }
 const dateiVon = (stelle: string): string => stelle.slice(0, stelle.lastIndexOf(':'))
@@ -210,7 +235,7 @@ function gleicheAb<E extends Deckt>(funde: Fund[], liste: E[]): { rest: Fund[]; 
   return { rest, ungenutzt: frei }
 }
 
-const OFFEN = OFFEN_BIS_78.map((e) => ({ ...e, datei: dateiVon(e.stelle) }))
+const OFFEN = OFFEN_BIS_86.map((e) => ({ ...e, datei: dateiVon(e.stelle) }))
 const posix = (pfad: string): string => pfad.split(sep).join('/')
 
 // ── Prüfungen ────────────────────────────────────────────────────────────────
@@ -309,7 +334,7 @@ describe('Wortliste', () => {
 
     const ohneAusnahmen = (): Fund[] => funde.filter((f) => !AUSNAHMEN.some((a) => deckt(a, f)))
 
-    it('kein Wort der Spalte „nicht" steht in einem Text — außer Ausnahmen und OFFEN_BIS_78', () => {
+    it('kein Wort der Spalte „nicht" steht in einem Text — außer Ausnahmen und OFFEN_BIS_86', () => {
       const statt = new Map(VERBOTE.map((v) => [v.wort, v.statt.join(' / ')]))
       const verstoesse = gleicheAb(ohneAusnahmen(), OFFEN).rest.map(
         (f) => `${f.datei}:${f.zeile} „${f.wort}“ (statt: ${statt.get(f.wort)}): ${f.text.slice(0, 90)}`
@@ -324,15 +349,16 @@ describe('Wortliste', () => {
       expect(ungenutzt.map((a) => `${a.datei} „${a.wort}“: ${a.grund}`)).toEqual([])
     })
 
-    it('OFFEN_BIS_78: jeder Eintrag hat einen Text und steht noch so da — Erledigtes gehört gestrichen', () => {
+    it('OFFEN_BIS_86: jeder Eintrag hat einen Text und steht noch so da — Erledigtes gehört gestrichen', () => {
       expect(OFFEN.filter((e) => e.text.trim() === '').map((e) => e.stelle)).toEqual([])
       const { ungenutzt } = gleicheAb(ohneAusnahmen(), OFFEN)
       expect(ungenutzt.map((e) => `${e.stelle} „${e.wort}“: ${e.text}`)).toEqual([])
     })
   })
 
-  // Seit Nr. 78 gilt die Tabelle ohne Arbeitsliste: Ein Eintrag in OFFEN_BIS_78 macht diesen Test rot.
-  it('OFFEN_BIS_78 ist leer — jede Fundstelle ist umgestellt', () => {
-    expect(OFFEN_BIS_78).toEqual([])
+  // Nr. 86 leert die Liste und schaltet den Test ein (Muster 77/78). Kein stillgelegter roter Test:
+  // Bis dahin ist die Liste die Arbeit von 86, und die Prüfung darüber läuft grün.
+  it.skip('OFFEN_BIS_86 ist leer — jede Fundstelle ist umgestellt', () => {
+    expect(OFFEN_BIS_86).toEqual([])
   })
 })
