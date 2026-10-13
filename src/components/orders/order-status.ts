@@ -1,3 +1,5 @@
+import type { MarkeArt } from '@/lib/marke-art'
+
 export function statusLabel(status: string): string {
   switch (status) {
     case 'PENDING_CONFIRMATION': return 'Wartet auf Kunden-Bestätigung'
@@ -12,22 +14,22 @@ export function statusLabel(status: string): string {
   }
 }
 
-// Referenz-19-Farbwelt: Neu/wartet = Orange auf #FBEEE3 ·
-// In Arbeit/Bezahlt = Grün auf #E8F0E2 · Erledigt/neutral = #9AA08F auf #F0EDE5
-//
-// Die Tag-Werte bleiben unverändert; jede Marke trägt zusätzlich eine
-// dark:-Entsprechung — gleiche Konvention wie src/lib/bestellstatus.ts.
-export function statusColor(status: string): string {
+// Die Bedeutung jedes Status aus Sicht des Hofs (Register G5): tun = wartet
+// auf die Kundin bzw. auf dich · läuft = bezahlt, in Arbeit · erledigt =
+// abholbereit oder abgeholt (für den Hof getane Arbeit) · abgebrochen. Die
+// Farbe dazu kommt nur aus dem Baustein Marke; die Kundin liest dieselben
+// Status anders (src/lib/bestellstatus.ts).
+export function statusArt(status: string): MarkeArt {
   switch (status) {
-    case 'PENDING_CONFIRMATION': return 'bg-[#FBEEE3] text-[#E8854A] dark:bg-accent/12 dark:text-accent-hover'
-    case 'PAID': return 'bg-[#E8F0E2] text-[#2D5F3F] dark:bg-primary/15 dark:text-brand-text'
-    case 'CONFIRMED': return 'bg-[#FBEEE3] text-[#E8854A] dark:bg-accent/12 dark:text-accent-hover'
-    case 'IN_PREPARATION': return 'bg-[#E8F0E2] text-[#2D5F3F] dark:bg-primary/15 dark:text-brand-text'
-    case 'READY': return 'bg-[#F0EDE5] text-[#9AA08F] dark:bg-muted dark:text-muted-foreground'
-    case 'PICKED_UP': return 'bg-[#F0EDE5] text-[#9AA08F] dark:bg-muted dark:text-muted-foreground'
-    case 'CANCELLED': return 'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-300'
-    case 'NOT_PICKED_UP': return 'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-300'
-    default: return 'bg-[#F0EDE5] text-[#9AA08F] dark:bg-muted dark:text-muted-foreground'
+    case 'PENDING_CONFIRMATION': return 'tun'
+    case 'PAID': return 'laeuft'
+    case 'CONFIRMED': return 'tun'
+    case 'IN_PREPARATION': return 'laeuft'
+    case 'READY': return 'erledigt'
+    case 'PICKED_UP': return 'erledigt'
+    case 'CANCELLED': return 'abgebrochen'
+    case 'NOT_PICKED_UP': return 'abgebrochen'
+    default: return 'erledigt'
   }
 }
 
@@ -41,7 +43,7 @@ export function paymentLabel(method: string): string {
 }
 
 // Hinweis zu IN_PREPARATION („In Vorbereitung"): Der Status wird überall
-// GELESEN — Beschriftung und Farbe oben, ACTIVE_STATUSES hier, die Abholbereit-
+// GELESEN — Beschriftung und Bedeutung oben, ACTIVE_STATUSES hier, die Abholbereit-
 // Schaltfläche (bestellAktionen in src/lib/hof-bestellungen.ts), OPEN_STATUSES in den
 // Queries und die Rückschritt-Whitelist in actions/orders.ts —, aber kein
 // Codepfad SETZT ihn je. Bestellungen springen direkt von PAID/CONFIRMED auf
