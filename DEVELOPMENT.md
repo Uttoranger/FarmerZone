@@ -5015,6 +5015,16 @@ Auftrag freigabe.md §15 „74" (Register I1). Keine Migration, kein neues Paket
 - **Datei-Tracing:** Gemessen mit `next build`: Alle 37 Routenpakete mit Zugriff auf `process.cwd()/public` tragen die Illustrationen samt Unterordnern in der `.nft.json`; die Teilen-Bild-Route trägt sie zusätzlich ausdrücklich ein (`**`).
 - **Aus der Prüfung von 69:** Die Attrappe des Teilen-Bild-Laders wertet Umleitungssperre und Zeitlimit aus; ein Strom einer Fehlerseite wird abgebrochen; eine nicht ladbare Illustration geht mit Klasse und bereinigter Nachricht nach Sentry, nicht mit dem Pfad der Datei.
 
+## Kasse geglättet (Nachtlauf 12, Nr. 82, Oktober 2026)
+
+Auftrag freigabe.md §16 „82" (Register N10). Keine Migration, kein neues Paket; Beträge, Schema, `/api/checkout` und Reservierung unverändert — die Kasse zeigt Geld nur an.
+
+- **Warum vier flache Karten:** Abholung und Deine Daten standen ab 768 px halb breit nebeneinander; die Termine brachen in zwei Spalten, die Felder wurden eng. Jetzt Korb → Abholung → Deine Daten → Bezahlen untereinander, die Felder ab 768 px zweispaltig. Am Handy folgt die Übersicht dem Quelltext (nach Bezahlen); der Zahlungsschritt behält sie unter dem Korb (`uebersichtZuletzt` nur im Formular).
+- **Online bleibt vorbelegt, auch im Testbetrieb** (Entscheidung 13.10.: Die Plattform verdient nur an Online-Zahlungen). Der Testbetrieb-Satz steht weiter an der Online-Option.
+- **Bar trägt seinen Vorteil selbst:** „Ohne Servicegebühr bis …" steht an der Option nur, wenn `barHinweis` ihn liefert (vor dem Stichtag und mit Online-Gebühr); der lose Absatz darunter und „gleicher Betrag" sind weg. `BAR_OHNE_GEBUEHR_HINWEIS` bleibt für Startseite, Hofseite und Mini-Warenkorb.
+- **„entfällt":** `gebuehrZeile` entscheidet nur das Wort, den Betrag zeigt die Übersicht allein aus `kassenBetraege`; liegt ein Betrag vor, steht er da — „entfällt" nie darüber. Beim gebührenfreien Hof gibt es keine Zeile (es entfällt nichts).
+- **Prüfstand für das ganze Formular** (`tests/kasse-formular.test.ts`): Auf dem Server zeigt die Kasse nur ihr Skelett, weil der Korb im Effekt aus dem localStorage kommt. Der Test lässt jeden Effekt der eigenen Dateien einmal sofort beim Rendern laufen (`vi.mock('react')`, je Quelltext einmal, je Aufbau zurückgesetzt) und rendert so das echte Formular — Reihenfolge, Vorbelegung und Bar-Zustand am HTML statt am Quelltext.
+
 ## Nützliche Befehle
 
 ```bash
