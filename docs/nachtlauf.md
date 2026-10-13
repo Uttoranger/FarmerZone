@@ -143,6 +143,14 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 82 | Kasse glätten | `freigabe.md` §16 | N10, N2 |
 | 83 | Heute: Reihenfolge und leeres „Braucht dich" (gestapelt auf 80) | `freigabe.md` §16 | N11 |
 | Sammel 12 | Sammel-PR `integration/lauf12` | `freigabe.md` §16 | G3, G4 |
+| 91 | Agrilo: Name und Domain | `freigabe.md` §17 | M1 |
+| 84 | Ortssuche auf /hoefe: PLZ und Ort, mehrere Treffer, ungenauer Standort | `freigabe.md` §17 | – |
+| 85 | Nacharbeit Lauf 12 (Marken, Telefonnummern, Leerzustände, Kasse, Doku) | `freigabe.md` §17 | G5, N8, N9, N10, N11 |
+| 86 | Briefkasten → Postfach (Nutzertexte, Wortliste-Arbeitsliste) | `freigabe.md` §17 | N12 |
+| 87 | Postfach Stufe 1: Nachrichten vom Team, Antworten, Admin-Reiter (gestapelt auf 86; eine Expand-Migration) | `freigabe.md` §17 | N12 |
+| 89 | Titelbild am Computer | `freigabe.md` §17 | N13 |
+| 90 | AGB-Seite und Einbindung | `freigabe.md` §17 | O4 |
+| Sammel 13 | Sammel-PR `integration/lauf13` | `freigabe.md` §17 | G3, G4 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
@@ -183,6 +191,14 @@ Höchstens drei Umsetzer gleichzeitig. Nie zwei Nummern an derselben Code-Datei 
 
 Höchstens drei Umsetzer gleichzeitig. Nie zwei Nummern an derselben Code-Datei (Dateigrenzen in `freigabe.md` §16).
 
+**Reihenfolge in Lauf 13** (`freigabe.md` §17, Haltepunkt Sammel-PR): 91 (allein) → 84 ∥ 85 ∥ 86 → 89 ∥ 90 ∥ 87 sobald Plätze frei sind → Sammel-PR. Die Branches:
+- 91 zweigt von `docs/lauf13` ab (dort liegen die verschobenen Mockups und der AGB-Entwurf).
+- 84, 85, 86, 89 und 90 zweigen vom Branch der Nr. 91 ab, 87 vom Branch der Nr. 86.
+- Ist 91 nach zwei Runden nicht fertig: STOPP des Laufs und melden (alles andere würde den alten Namen festschreiben).
+- Ist 86 nach zwei Runden nicht fertig: 87 zweigt vom Branch der Nr. 91 ab und übernimmt die drei Nutzertext-Stellen von 86.
+
+Höchstens drei Umsetzer gleichzeitig. Nie zwei Nummern an derselben Code-Datei (Dateigrenzen in `freigabe.md` §17).
+
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 
 Gate 9 (Ende-zu-Ende mit dem Pilothof) läuft **nie** im Nachtlauf.
@@ -216,8 +232,8 @@ Gilt seit Lauf 10 (`freigabe.md` §14 §0); geht §4 vor, wo es abweicht (Bilder
 1. Lesemappe statt Volltext. Der Dirigent gibt jedem Umsetzer: den Text seiner Nummer, die Ausgangslage (Dateien mit Textankern), die Mockup-Dateien, docs/ai/CODING_STANDARDS.md und docs/ai/TESTING_GUIDELINES.md ganz, von ARCHITECTURE.md (129 KB) und DESIGN_SYSTEM.md (108 KB) nur die in der Nummer genannten Abschnitte, aus entscheidungen.md und umsetzungsprompt.md nur die genannten Einträge, das Bausteinverzeichnis docs/ai/BAUSTEINE.md (Lauf 10: ab Nr. 59 aus 58). Weiteres sucht der Umsetzer gezielt mit Grep; keine der großen Dateien wird am Stück gelesen. CLAUDE.md liest jeder Agent ohnehin. Beim Schreiben einer Freigabe je Textkonstante und je neuem Bezeichner einmal grep -rn über src/ und tests/; alle Fundstellen gehören in die Dateigrenzen. (Regelvorschlag 73 aus Lauf 11, freigegeben 13.10.2026)
 2. Tests gezielt. Nach jedem Schritt: pnpm typecheck und pnpm vitest related --run <geänderte Quelldateien>; der Dirigent gibt dem tester diesen Modus und die Dateiliste ausdrücklich mit („nur typecheck und vitest related, kein lint, kein voller Lauf"). Vor JEDEM Commit der volle Lauf pnpm typecheck && pnpm lint && pnpm test (CLAUDE.md §1); deshalb Commits sparsam: ein Commit je Umsetzung, ein Commit je Runde, WIP-Commits nur beim Stopp nach §5. pnpm test:integration nur bei Nummern, für die die Freigabe es nennt (Lauf 10: 62), und auf dem Sammel-PR. Gemessen am 11.10.: voller Testlauf 2:48 min, typecheck 0:57, lint 0:44, related je nach Datei 0:30–1:40.
 3. Prüfen in Runden, nicht alles neu. Nach einer Nachbesserung bekommt der pruefer im Aufruf den Bereich git diff <zuletzt geprüfter Commit>..HEAD und seine eigenen Befunde; nur das prüft er. Ein zweiter voller Durchgang über den Gesamt-Diff nur bei Nummern, die die Freigabe als Kaufstrecke, Admin-Action/Migration, Sicherheits- oder Datenpfad nennt (Lauf 10: 60, 62, 64, 65); bei allen anderen keiner (Lauf 10: 58, 59, 61, 63).
-4. Runden nur für Blocker. Blocker = Sicherheit oder Geld, Datenkonsistenz, Typisierung, rote Tests, Mockup-Abweichung ohne Begründung, Regelverstoß aus CLAUDE.md §2. Sollte = Stil, Teststärke, Doku, Benennung. Sollte-Befunde behebt der Umsetzer nur, wenn sie Dateien betreffen, die er in derselben Runde ohnehin anfasst; sonst stehen sie im Bericht unter „Nacharbeit" und gesammelt im Morgenbericht. Kein Durchgang nur für Teststärke oder Stil (Lauf 9, Nr. 54 Runde 2). Das ist für den Nachtlauf die Ausnahme von sprint Schritt 5; der Dirigent gibt die Zuordnung dem pruefer mit.
-   - **Blocker:** Sicherheit oder Geld, Datenkonsistenz, Typisierung, rote Tests, Mockup-Abweichung ohne Begründung, Regelverstoß aus CLAUDE.md §2.
+4. Runden nur für Blocker. Blocker = Sicherheit oder Geld, Datenkonsistenz, Typisierung, rote Tests, Mockup-Abweichung ohne Begründung, Regelverstoß aus CLAUDE.md §2. Ein Befund, der dem Wortlaut der Freigabe oder eines Register-Eintrags widerspricht, ist im pruefer-Rahmen ein Blocker, kein Sollte. (Dirigenten-Vorschlag aus Morgenbericht 12 §9, freigegeben 13.10.2026) Sollte = Stil, Teststärke, Doku, Benennung. Sollte-Befunde behebt der Umsetzer nur, wenn sie Dateien betreffen, die er in derselben Runde ohnehin anfasst; sonst stehen sie im Bericht unter „Nacharbeit" und gesammelt im Morgenbericht. Kein Durchgang nur für Teststärke oder Stil (Lauf 9, Nr. 54 Runde 2). Das ist für den Nachtlauf die Ausnahme von sprint Schritt 5; der Dirigent gibt die Zuordnung dem pruefer mit.
+   - **Blocker:** Sicherheit oder Geld, Datenkonsistenz, Typisierung, rote Tests, Mockup-Abweichung ohne Begründung, Regelverstoß aus CLAUDE.md §2, Widerspruch zum Wortlaut der Freigabe oder eines Register-Eintrags.
    - **Sollte:** Stil, Teststärke, Doku, Benennung – nur in ohnehin angefassten Dateien beheben, sonst Bericht „Nacharbeit" und Morgenbericht.
 5. Höchstens zwei Runden. Rote Tests danach: Lauf stoppen (§5, unverändert). Anderer Blocker danach: PR als Entwurf, Blocker im Morgenbericht, nächste Nummer.
 6. Bilder einmal. a) Mit sichter: Der Umsetzer macht keine Screenshots. Nach tester und pruefer startet der Dirigent im Worktree der Nummer den Dev-Server gegen die lokale Test-DB (DATABASE_URL und DIRECT_URL ausdrücklich gesetzt, keine .env.local im Worktree, eigener Port je Worktree) und übergibt dem sichter Adresse, Routen, Zustände und Mockups. Der sichter prüft nur diese Routen bei 390 und 1440 px in beiden Themes, ein Durchgang; seine Blocker und Abweichungen gehen als Runde an den Umsetzer; danach beendet der Dirigent den Server. b) Ohne sichter: Der Umsetzer macht genau diese Bilder selbst, keine weiteren Breiten. Keine Bilder bei Nummern ohne sichtbare Änderung und beim Doku-PR (Lauf 10: 58, 63). Geht §4 Schritt 3 (Vorlage) vor.
