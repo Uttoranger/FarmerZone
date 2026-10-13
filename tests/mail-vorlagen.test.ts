@@ -76,7 +76,7 @@ function bestellung(teil: Partial<import('@/lib/email').OrderForEmail> = {}): im
       address: 'Feldweg 1',
       city: 'Beispieldorf',
       postalCode: '4910',
-      phone: '+43 660 1111111',
+      phone: '+43 664 0000000',
       slug: 'hof-beispiel',
     },
     items: [
@@ -239,7 +239,24 @@ describe('Abholbereit-Mail (Vorlage pickup-reminder.tsx)', () => {
     expect(text).toContain('HT-0210-A4F2')
     expect(text).toContain('15:00–18:00 Uhr')
     expect(links(html).some((u) => u.hostname === 'www.google.com')).toBe(true)
-    expect(html).toContain('href="tel:+43 660 1111111"')
+    expect(html).toContain('href="tel:+43 664 0000000"')
+  })
+})
+
+describe('Neue-Bestellung-Mail an den Hof (Vorlage new-order-notification.tsx)', () => {
+  it('die Nummer der Kundin steht einheitlich da, der Link wählt sie mit +43 (Nr. 81, N8)', async () => {
+    await email.sendOrderPaidToFarmer(bestellung({ customerPhone: '0660 0000000' }))
+    const { text, html } = zuletzt()
+    expect(text).toContain('+43 660 000 0000')
+    expect(text).not.toContain('0660 0000000')
+    expect(html).toContain('href="tel:+436600000000"')
+  })
+
+  it('eine Nummer ohne Ziffer steht, wie sie eingegeben wurde — ohne Link', async () => {
+    await email.sendOrderPaidToFarmer(bestellung({ customerPhone: 'keine Angabe' }))
+    const { text, html } = zuletzt()
+    expect(text).toContain('keine Angabe')
+    expect(html).not.toContain('href="tel:')
   })
 })
 

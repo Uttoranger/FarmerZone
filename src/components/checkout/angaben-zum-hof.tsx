@@ -1,6 +1,7 @@
 import { ChevronDown } from 'lucide-react'
 import type { PublicFarm } from '@/server/queries/farm'
 import { ANGABEN_ZUM_HOF_TITEL } from '@/lib/stripe-konto'
+import { formatiereTelefon } from '@/lib/telefon-anzeige'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { HINWEIS } from './kasse-teile'
@@ -27,11 +28,12 @@ export function hofAdresse(farm: Pick<PublicFarm, 'address' | 'postalCode' | 'ci
 
 export function AngabenZumHof({ hof }: { hof: AngabenHof }): React.JSX.Element {
   // Was der Hof nicht angegeben hat (die Hof-E-Mail ist im Onboarding
-  // freiwillig), steht nicht als leere Zeile da.
+  // freiwillig), steht nicht als leere Zeile da. Die Nummer steht einheitlich da (N8), wie auch
+  // immer der Hof sie eingetragen hat.
   const zeilen = [
     { titel: 'Verkäufer', wert: [hof.name, hof.ownerName].filter(Boolean).join(', ') },
     { titel: 'Anschrift', wert: hofAdresse(hof) },
-    { titel: 'Telefon', wert: hof.phone },
+    { titel: 'Telefon', wert: formatiereTelefon(hof.phone) },
     { titel: 'E-Mail', wert: hof.email },
   ].filter((zeile) => zeile.wert !== '')
   return (

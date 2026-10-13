@@ -158,6 +158,8 @@ describe('Bestätigungsseite — Zugang nur mit Signatur', () => {
 
 describe('Bestätigungsseite — „Hof erreichen" nur hinter der Signatur (Nr. 60, S1)', () => {
   const KONTAKT = { phone: '+43 660 0000000', email: 'hof@example.com' }
+  // So zeigt „Hof erreichen“ die gespeicherte Nummer (Nr. 81, N8).
+  const ANZEIGE = '+43 660 000 0000'
   // Bar bestätigt: Die Bestellung steht, die Abholkarte erscheint.
   const steht = (teil: Record<string, unknown> = {}) =>
     bestellung({ status: 'CONFIRMED', farm: { ...bestellung().farm, ...KONTAKT }, ...teil })
@@ -167,7 +169,7 @@ describe('Bestätigungsseite — „Hof erreichen" nur hinter der Signatur (Nr. 
     const text = await seite({ sig: GUELTIG })
     expect(text).toContain('Hof erreichen')
     expect(text).toContain('Kommst du später oder kannst du nicht kommen? Sag dem Hof kurz Bescheid.')
-    expect(text).toContain(KONTAKT.phone)
+    expect(text).toContain(ANZEIGE)
     expect(text).toContain(KONTAKT.email)
   })
 
@@ -184,6 +186,7 @@ describe('Bestätigungsseite — „Hof erreichen" nur hinter der Signatur (Nr. 
       const text = await seite(suche)
       expect(text).not.toContain('Hof erreichen')
       expect(text).not.toContain(KONTAKT.phone)
+      expect(text).not.toContain(ANZEIGE)
       expect(text).not.toContain(KONTAKT.email)
     }
     expect(findUnique).not.toHaveBeenCalled()
@@ -195,6 +198,7 @@ describe('Bestätigungsseite — „Hof erreichen" nur hinter der Signatur (Nr. 
     expect(text).toContain('HT-0210-A4F2')
     expect(text).not.toContain('Hof erreichen')
     expect(text).not.toContain(KONTAKT.phone)
+    expect(text).not.toContain(ANZEIGE)
   })
 })
 

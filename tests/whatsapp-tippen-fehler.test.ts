@@ -72,7 +72,7 @@ import { WHATSAPP_VERSAND_TEXT, type Abonnentin } from '@/lib/whatsapp-versand'
 import { WhatsAppTapClient } from '@/app/(hof)/status/[id]/send-whatsapp/whatsapp-tap-client'
 
 const ANNA: Abonnentin = { id: 'cabo00000000000000000001', name: 'Anna Muster', phone: '+43 660 0000000' }
-const BERTA: Abonnentin = { id: 'cabo00000000000000000002', name: 'Berta Muster', phone: '+43 660 0000001' }
+const BERTA: Abonnentin = { id: 'cabo00000000000000000002', name: 'Berta Muster', phone: '+43 664 0000000' }
 const PROPS = { postId: 'cpost0000000000000000001', title: 'Neue Eier', body: 'Frisch gelegt.', farmSlug: 'hof-test' }
 
 type Knoten = { type?: unknown; key?: unknown; props?: Record<string, unknown> }
@@ -145,5 +145,18 @@ describe('Tipp-Liste: kein Link ohne Ziffern', () => {
       .map((e) => String(e.props?.href))
     expect(links).toHaveLength(1)
     expect(links[0]).toMatch(/^https:\/\/wa\.me\/436600000000\?text=/)
+  })
+})
+
+describe('Tipp-Liste: die Nummer einheitlich', () => {
+  it('unter dem Namen steht die Nummer als „+43 660 000 0000“ (Nr. 81, N8) — Unlesbares unverändert', () => {
+    const ROH: Abonnentin = { id: 'cabo00000000000000000004', name: 'Dora Muster', phone: '0660 0000000' }
+    const OHNE: Abonnentin = { id: 'cabo00000000000000000003', name: 'Carla Muster', phone: 'keine Angabe' }
+    const zeilen = elemente(rendere([ROH, OHNE], []))
+      .filter((e) => e.type === 'p')
+      .map((e) => e.props?.children)
+    expect(zeilen).toContain('+43 660 000 0000')
+    expect(zeilen).toContain('keine Angabe')
+    expect(zeilen).not.toContain('0660 0000000')
   })
 })
