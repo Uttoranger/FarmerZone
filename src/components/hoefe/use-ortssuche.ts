@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { loeseOrtAuf, type OrtsTreffer } from '@/server/actions/hoefe'
 import type { Bezugspunkt } from '@/lib/hofuebersicht'
-import { hinweisMehrere } from '@/lib/geokodierung'
-import { SUCHFELD_TEXT } from '@/lib/hoefe-entdecken'
+import { erkenneOrtseingabe, hinweisMehrere } from '@/lib/geokodierung'
+import { SUCHFELD_TEXT, standortIstUngenau, standortUngefaehrText } from '@/lib/hoefe-entdecken'
 
 /**
  * Der Bezugspunkt der Umkreissuche auf /hoefe: eigener Standort oder ein
@@ -16,15 +16,23 @@ import { SUCHFELD_TEXT } from '@/lib/hoefe-entdecken'
  * uns noch an Dritte; die Entfernungen rechnet der Browser selbst auf den
  * ohnehin geladenen Hofkoordinaten (src/lib/hofuebersicht.ts). Nur die
  * Ortssuche schickt den GETIPPTEN Text zur Auflösung an Nominatim
- * (`loeseOrtAuf`, serverseitig mit Bremse), und auch das erst auf Wunsch,
- * nie beim Tippen.
+ * (`loeseOrtAuf`, serverseitig mit Bremse), und auch das erst, wenn die
+ * Kundin ihn absendet — mit Enter, über den Eintrag „Höfe rund um …" oder
+ * indem sie mit einem Suchtext auf /hoefe ankommt (Startseite, Kopfzeile,
+ * 404: Dort hat sie abgesendet) —, nie beim Tippen.
  *
  * Nichts wird gemerkt: kein localStorage, kein Konto, keine URL-Parameter —
  * der Bezugspunkt lebt ausschließlich im Seitenzustand (hoefe-client.tsx).
  *
  * ÜBER DIE GRENZE (AT/DE): Derselbe Ortsname kommt beiderseits der Grenze
- * vor; bei mehreren Treffern erscheint eine Auswahl MIT Landangabe statt
+ * vor; bei mehreren Treffern erscheint eine Auswahl MIT Bundesland statt
  * einer stillen Entscheidung, bei genau einem wird direkt übernommen.
+ *
+ * STANDORT NUR UNGEFÄHR (Nr. 84): Ein Browser ohne GPS ortet über die
+ * IP-Adresse und liegt 10 bis 50 km daneben — `coords.accuracy` sagt es. Ab
+ * 2 000 m wird der Standort nicht stumm übernommen: Die Kundin entscheidet
+ * („Genauer bestimmen" oder „So lassen"). Das Gerät behält die Position auch
+ * dann; es geht nichts hinaus.
  */
 
 /**
@@ -37,20 +45,42 @@ import { SUCHFELD_TEXT } from '@/lib/hoefe-entdecken'
  * trotzdem.
  */
 const STANDORT_GEDULD_MS = 10_000
+/** Beim genaueren Bestimmen ist die Erlaubnis schon da: 12 s Zeitlimit des Browsers plus Luft. */
+const STANDORT_GENAU_GEDULD_MS = 14_000
+
+/**
+ * Ein Standort, der nur ungefähr stimmt und noch NICHT übernommen ist: Die
+ * Kundin entscheidet, ob sie ihn so lässt oder genauer bestimmen lässt.
+ */
+export type UngefaehrerStandort = {
+  punkt: Bezugspunkt
+  /** „Dein Standort ist nur ungefähr bekannt (etwa 15 km)." */
+  satz: string
+  /** Das genauere Bestimmen hat nicht geklappt — der Hinweis sagt es dazu. */
+  genauerMisslang: boolean
+}
 
 export type Ortssuche = {
   /** Die sichtbare Meldezeile (null = keine). */
   hinweis: string | null
   /** Mehrdeutige Orte zur Auswahl — leer, sobald einer gewählt ist. */
   kandidaten: OrtsTreffer[]
+  /** Ein nur ungefähr bekannter Standort wartet auf die Entscheidung der Kundin. */
+  ungefaehr: UngefaehrerStandort | null
   /** Die Standortabfrage läuft. */
   ortet: boolean
   /** Die Ortssuche läuft. */
   laeuft: boolean
   standortErfragen: () => void
+  /** Zweiter Anlauf mit hoher Genauigkeit (GPS), höchstens 12 s. */
+  genauerBestimmen: () => void
+  /** Den ungefähren Standort so übernehmen. */
+  soLassen: () => void
   ortSuchen: (text: string) => void
   uebernimm: (treffer: OrtsTreffer) => void
   keinerDavon: () => void
+  /** Das Feld wird getippt: Der Satz und die Auswahl zum alten Text gelten nicht mehr. */
+  textGeaendert: () => void
   /** „Ort ändern": Was noch unterwegs ist, gilt nicht mehr. */
   aufheben: () => void
 }
@@ -59,6 +89,8 @@ export function useOrtssuche({
   onStandort,
   onOrt,
   onZumFeld,
+  ankunftsText = '',
+  onAnkunftErledigt,
 }: {
   /** Der eigene Standort ist da — die Suche im Feld bleibt, wie sie ist. */
   onStandort: (punkt: Bezugspunkt) => void
@@ -66,9 +98,14 @@ export function useOrtssuche({
   onOrt: (punkt: Bezugspunkt) => void
   /** Zum Suchfeld, wenn der Standort nicht geht: dort führt der andere Weg weiter. */
   onZumFeld: () => void
+  /** Der Suchtext, mit dem die Kundin auf /hoefe ankam: wird einmal wie Enter aufgelöst. */
+  ankunftsText?: string
+  /** Der Ankunftstext ist abgearbeitet — die Seite vergisst ihn, ein neuer Aufbau des Felds löst nichts mehr aus. */
+  onAnkunftErledigt?: () => void
 }): Ortssuche {
   const [hinweis, setHinweis] = useState<string | null>(null)
   const [kandidaten, setKandidaten] = useState<OrtsTreffer[]>([])
+  const [ungefaehr, setUngefaehr] = useState<UngefaehrerStandort | null>(null)
   const [ortet, setOrtet] = useState(false)
   const [laeuft, starteAufloesung] = useTransition()
   const waechter = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -76,6 +113,7 @@ export function useOrtssuche({
   // einen Ort gesucht oder den Umkreis aufgehoben hat, soll von einer späten
   // Antwort nicht überfahren werden — in beide Richtungen.
   const laufNr = useRef(0)
+  const ankunftBegonnen = useRef(false)
 
   const verwerfeWaechter = () => {
     if (waechter.current) clearTimeout(waechter.current)
@@ -94,16 +132,20 @@ export function useOrtssuche({
     onZumFeld()
   }
 
+  /** Die Ortung des Browsers ist da; ohne sie bleibt nur der Weg über das Suchfeld. */
+  const kannOrten = () => typeof navigator !== 'undefined' && !!navigator.geolocation
+
   function standortErfragen() {
     if (ortet) return
     // Erst der Frühausstieg, DANN aufräumen: Ohne Geolocation soll ein
     // Fehlklick nicht die eben erarbeitete Ortsauswahl vernichten.
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    if (!kannOrten()) {
       zumFeld()
       return
     }
     setHinweis(null)
     setKandidaten([])
+    setUngefaehr(null)
     setOrtet(true)
     const meinLauf = ++laufNr.current
     const veraltet = () => laufNr.current !== meinLauf
@@ -125,7 +167,13 @@ export function useOrtssuche({
         setHinweis(null)
         // Bleibt im Browser: von hier geht die Position in keine Anfrage.
         // Ohne Namen: Die Sätze nennen ihn „deinen Standort" (SUCHFELD_TEXT).
-        onStandort({ lat: position.coords.latitude, lon: position.coords.longitude })
+        const punkt = { lat: position.coords.latitude, lon: position.coords.longitude }
+        if (standortIstUngenau(position.coords.accuracy)) {
+          // Meist die IP-Adresse statt GPS: nicht stumm als Ort übernehmen.
+          setUngefaehr({ punkt, satz: standortUngefaehrText(position.coords.accuracy), genauerMisslang: false })
+          return
+        }
+        onStandort(punkt)
       },
       () => {
         if (veraltet()) return
@@ -138,47 +186,113 @@ export function useOrtssuche({
     )
   }
 
+  function genauerBestimmen() {
+    if (ortet || !ungefaehr || !kannOrten()) return
+    const stand = ungefaehr
+    setOrtet(true)
+    const meinLauf = ++laufNr.current
+    const veraltet = () => laufNr.current !== meinLauf
+    verwerfeWaechter()
+
+    // Misslingt der zweite Anlauf, bleibt der erste Wert zur Wahl: Der Hinweis steht wieder da.
+    const misslungen = () => {
+      verwerfeWaechter()
+      setOrtet(false)
+      setUngefaehr({ ...stand, genauerMisslang: true })
+    }
+    waechter.current = setTimeout(() => {
+      if (!veraltet()) misslungen()
+    }, STANDORT_GENAU_GEDULD_MS)
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        if (veraltet()) return
+        verwerfeWaechter()
+        setOrtet(false)
+        setUngefaehr(null)
+        // Was der Browser jetzt liefert, ist das Beste, das er hat — auch wenn es wieder grob ist.
+        onStandort({ lat: position.coords.latitude, lon: position.coords.longitude })
+      },
+      () => {
+        if (!veraltet()) misslungen()
+      },
+      { enableHighAccuracy: true, timeout: 12_000 }
+    )
+  }
+
+  function soLassen() {
+    if (!ungefaehr) return
+    const { punkt } = ungefaehr
+    // Eine laufende Nachfrage gilt nicht mehr.
+    laufNr.current += 1
+    verwerfeWaechter()
+    setOrtet(false)
+    setUngefaehr(null)
+    onStandort(punkt)
+  }
+
   function uebernimm(treffer: OrtsTreffer) {
     setKandidaten([])
     setHinweis(null)
-    // Der aufgelöste Name statt des Rohtexts: „4910 Ried im Innkreis" sagt
-    // mehr als „4910" — und zeigt, worauf sich die Entfernungen beziehen.
+    // Der aufgelöste Name statt des Rohtexts: „Mattighofen, Oberösterreich"
+    // sagt mehr als „5230" — und zeigt, worauf sich die Entfernungen beziehen.
     onOrt({ lat: treffer.lat, lon: treffer.lon, name: treffer.name })
+  }
+
+  /** Löst den Text auf und setzt die Antwort ein — nur, solange `meinLauf` der jüngste Lauf ist. */
+  async function loeseAuf(text: string, meinLauf: number) {
+    const treffer = await loeseOrtAuf(text)
+    if (laufNr.current !== meinLauf) return
+    if (treffer.length === 0) {
+      // Kein Treffer: ruhiger Hinweis, der Text bleibt eine Suche nach Höfen und Produkten.
+      setHinweis(SUCHFELD_TEXT.keinOrt)
+      return
+    }
+    // Die Liste ist serverseitig entdoppelt (loeseOrtAuf): Genau einer wird
+    // direkt übernommen — der häufige Weg bleibt einstufig.
+    const [einziger] = treffer
+    if (treffer.length === 1 && einziger) {
+      uebernimm(einziger)
+      return
+    }
+    setHinweis(hinweisMehrere(treffer.length))
+    setKandidaten(treffer)
   }
 
   function ortSuchen(eingabe: string) {
     const text = eingabe.trim()
     if (!text || laeuft) return
     const meinLauf = ++laufNr.current
-    const veraltet = () => laufNr.current !== meinLauf
     verwerfeWaechter()
     setOrtet(false)
     setHinweis(null)
     setKandidaten([])
-    starteAufloesung(async () => {
-      const treffer = await loeseOrtAuf(text)
-      if (veraltet()) return
-      if (treffer.length === 0) {
-        // Kein Treffer: ruhiger Hinweis, die Liste bleibt unverändert.
-        setHinweis(SUCHFELD_TEXT.ohneTreffer)
-        return
-      }
-      // Die Liste ist serverseitig entdoppelt (loeseOrtAuf): Genau einer wird
-      // direkt übernommen — der häufige Weg bleibt einstufig.
-      const [einziger] = treffer
-      if (treffer.length === 1 && einziger) {
-        uebernimm(einziger)
-        return
-      }
-      setHinweis(hinweisMehrere(treffer.length))
-      setKandidaten(treffer)
-    })
+    setUngefaehr(null)
+    starteAufloesung(() => loeseAuf(text, meinLauf))
   }
+
+  // Die Kundin kam mit einem Suchtext an: Dort hat sie abgesendet, also löst die Seite ihn einmal auf —
+  // genau wie Enter. Die Seite vergisst den Text danach (onAnkunftErledigt); ein neu aufgebautes Feld
+  // (Karte ↔ Liste) löst damit nichts mehr aus, und getippter, nicht abgesendeter Text nie. Frisch
+  // aufgebaut ist nichts abzuräumen, deshalb startet der Effekt nur die Auflösung.
+  useEffect(() => {
+    if (ankunftBegonnen.current || ankunftsText.trim() === '') return
+    ankunftBegonnen.current = true
+    onAnkunftErledigt?.()
+    if (erkenneOrtseingabe(ankunftsText).art === 'text') return
+    const meinLauf = ++laufNr.current
+    starteAufloesung(() => loeseAuf(ankunftsText.trim(), meinLauf))
+  })
 
   function keinerDavon() {
     setKandidaten([])
     setHinweis(null)
     onZumFeld()
+  }
+
+  function textGeaendert() {
+    setHinweis(null)
+    setKandidaten([])
   }
 
   function aufheben() {
@@ -187,7 +301,22 @@ export function useOrtssuche({
     setOrtet(false)
     setHinweis(null)
     setKandidaten([])
+    setUngefaehr(null)
   }
 
-  return { hinweis, kandidaten, ortet, laeuft, standortErfragen, ortSuchen, uebernimm, keinerDavon, aufheben }
+  return {
+    hinweis,
+    kandidaten,
+    ungefaehr,
+    ortet,
+    laeuft,
+    standortErfragen,
+    genauerBestimmen,
+    soLassen,
+    ortSuchen,
+    uebernimm,
+    keinerDavon,
+    textGeaendert,
+    aufheben,
+  }
 }

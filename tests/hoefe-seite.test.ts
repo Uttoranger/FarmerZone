@@ -39,9 +39,9 @@ import {
   type KartenHof,
   type TrefferHof,
 } from '@/components/hoefe/entdecken-teile'
-import { HoefeSuche } from '@/components/hoefe/hoefe-suche'
+import { HoefeSuche, StandortUngefaehr } from '@/components/hoefe/hoefe-suche'
 import { EntdeckenFilterblatt } from '@/components/hoefe/entdecken-filterblatt'
-import { kategorieReihe, leerzustand } from '@/lib/hoefe-entdecken'
+import { SUCHFELD_TEXT, kategorieReihe, leerzustand, standortUngefaehrText } from '@/lib/hoefe-entdecken'
 import { grundpreisAusKennzeichnung, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
 import { LEERER_HOEFE_FILTER, SUCHTEXT_MAX, type HoefeFilter } from '@/schemas/hoefe-filter'
 
@@ -321,7 +321,6 @@ const SUCHE = {
   suchtext: '',
   vorschlaege: [],
   status: '',
-  treffer: 0,
   bezugspunkt: null,
   onSuchtext: () => {},
   onUebernehmen: () => {},
@@ -369,25 +368,68 @@ describe('Ein Suchfeld „Ort oder Produkt" plus „Standort nutzen" (Nr. 46)', 
     expect(suche).not.toContain('Standort nutzen')
   })
 
-  it('die Seite verdrahtet das eine Feld mit Trefferzahl und Bezugspunkt — die alte Umkreis-Karte gibt es nicht mehr', () => {
+  it('Standort nur ungefähr (Zustand 3): der Satz mit der Genauigkeit und zwei Knöpfe, beide 44 px hoch', () => {
+    const hinweis = html(
+      createElement(StandortUngefaehr, {
+        satz: standortUngefaehrText(15_000),
+        genauerMisslang: false,
+        ortet: false,
+        onGenauer: () => {},
+        onSoLassen: () => {},
+      })
+    )
+    expect(hinweis).toContain('data-slot="hinweiskarte"')
+    expect(hinweis).toContain('Dein Standort ist nur ungefähr bekannt (etwa 15 km).')
+    const knoepfe = [...hinweis.matchAll(/<button type="button"([^>]*)>(.*?)<\/button>/g)]
+    expect(knoepfe.map((k) => k[2].replace(/<[^>]*>/g, ''))).toEqual(['Genauer bestimmen', 'So lassen'])
+    for (const [, attribute] of knoepfe) expect(attribute.match(/class="([^"]*)"/)?.[1]).toMatch(/\bh-11\b/)
+    // Der Satz ist die Beschreibung des ersten Knopfs: Wer mit der Tastatur dort landet, hört ihn mit.
+    const beschreibung = hinweis.match(/aria-describedby="([^"]+)"/)?.[1]
+    expect(beschreibung).toBeTruthy()
+    expect(hinweis).toContain(`id="${beschreibung}"`)
+    // Gegenprobe: Misslang das genauere Bestimmen, sagt der Hinweis es dazu; läuft es, ist der Knopf beschäftigt.
+    expect(hinweis).not.toContain('Genauer ging es nicht.')
+    expect(hinweis).not.toContain('aria-busy="true"')
+    const misslungen = html(
+      createElement(StandortUngefaehr, { satz: 'Satz.', genauerMisslang: true, ortet: false, onGenauer: () => {}, onSoLassen: () => {} })
+    )
+    expect(misslungen).toContain(SUCHFELD_TEXT.genauerMisslang)
+    const laeuft = html(
+      createElement(StandortUngefaehr, { satz: 'Satz.', genauerMisslang: false, ortet: true, onGenauer: () => {}, onSoLassen: () => {} })
+    )
+    expect(laeuft).toContain('aria-busy="true"')
+  })
+
+  it('der Hinweis hängt am Hook: Er steht, solange ort.ungefaehr gesetzt ist, und seine Knöpfe rufen genauerBestimmen und soLassen', () => {
+    const suche = quelle('src/components/hoefe/hoefe-suche.tsx').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    expect(suche).toMatch(/ort\.ungefaehr && \(\s*<StandortUngefaehr[\s\S]*?onGenauer=\{ort\.genauerBestimmen\}[\s\S]*?onSoLassen=\{ort\.soLassen\}/)
+    // Gegenprobe: ohne Bedingung stünde der Hinweis immer da.
+    expect('<StandortUngefaehr onGenauer={ort.genauerBestimmen} onSoLassen={ort.soLassen} />').not.toMatch(/ort\.ungefaehr && \(\s*<StandortUngefaehr/)
+  })
+
+  it('die Seite verdrahtet das eine Feld mit Bezugspunkt und Ankunftstext — die alte Umkreis-Karte gibt es nicht mehr', () => {
     const client = quelle('src/components/hoefe/hoefe-client.tsx')
-    expect(client).toMatch(/<HoefeSuche[\s\S]*?treffer=\{anzahl\}[\s\S]*?bezugspunkt=\{bezugspunkt\}[\s\S]*?\/>/)
+    expect(client).toMatch(/<HoefeSuche[\s\S]*?bezugspunkt=\{bezugspunkt\}[\s\S]*?ankunftsText=\{ankunftsText\}[\s\S]*?\/>/)
+    // Der Ankunftstext kommt aus der Adresse und wird nach dem Auflösen vergessen — ein neu aufgebautes Feld (Karte ↔ Liste) fragt nicht noch einmal.
+    expect(client).toContain('const [ankunftsText, setAnkunftsText] = useState(filter.suchtext)')
+    expect(client).toContain("onAnkunftErledigt={() => setAnkunftsText('')}")
     expect(client).not.toMatch(/HoefeUmkreis|hoefe-umkreis/)
     // Gegenprobe: das Muster erkennt den alten Einbau.
     expect('import HoefeUmkreis from \'@/components/hoefe/hoefe-umkreis\'').toMatch(/HoefeUmkreis|hoefe-umkreis/)
   })
 
-  it('Enter löst die Ortssuche nur bei vier Ziffern aus — ohne Treffer markiert es den Eintrag „Höfe rund um …" (Runde 1)', () => {
+  it('Enter sucht den Ort, wenn der Text ein Ort sein kann — ein Weg zur Ortssuche beim Absenden, der Rest bleibt die Produktsuche (Nr. 84)', () => {
     const suche = quelle('src/components/hoefe/hoefe-suche.tsx').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
-    const absenden = suche.slice(suche.indexOf('function absenden('), suche.indexOf('const knopf'))
-    expect(absenden).toContain('enterImSuchfeld(suchtext, treffer)')
+    const anfang = suche.indexOf('function absenden(')
+    const absenden = suche.slice(anfang, suche.indexOf('return (', anfang))
+    expect(absenden).toContain('enterImSuchfeld(suchtext)')
     expect(absenden).toMatch(/aktion === 'ort-suchen'\) ort\.ortSuchen\(suchtext\)/)
-    expect(absenden).toMatch(/aktion === 'ort-eintrag-zeigen'\) setVorschlagsLage\(\{ offen: true, markiert: ORT_VORSCHLAG \}\)/)
-    // Genau ein Weg zur Ortssuche beim Absenden — der für vier Ziffern.
+    // Genau ein Weg zur Ortssuche beim Absenden — und der alte Zwischenschritt „Eintrag zeigen" ist weg.
     expect(absenden.match(/ortSuchen\(/g)).toHaveLength(1)
-    // Gegenprobe: Käme der alte Weg zurück (Enter ohne Treffer sucht selbst), zählte die Prüfung oben zwei Wege.
-    const mitAltemWeg = `${absenden}\nif (enterSuchtOrt(suchtext, treffer)) ort.ortSuchen(suchtext)`
-    expect(mitAltemWeg.match(/ortSuchen\(/g)).toHaveLength(2)
+    expect(absenden).not.toContain('ort-eintrag-zeigen')
+    // Gegenprobe: Käme ein zweiter Weg dazu (Enter sucht selbst, am Ergebnis der Produktsuche vorbei), zählte die Prüfung oben zwei.
+    const mitZweitemWeg = `${absenden}\nif (treffer === 0) ort.ortSuchen(suchtext)`
+    expect(mitZweitemWeg.match(/ortSuchen\(/g)).toHaveLength(2)
   })
 
   it('der Standort bleibt im Browser: Die Ortssuche schickt nur den getippten Text, der Standort geht in keine Anfrage', () => {

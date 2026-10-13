@@ -45,6 +45,7 @@ import {
   type ProductCategoryValue,
 } from '@/lib/taxonomie'
 import { suchForm, type Bezugspunkt, type UmkreisStufe } from '@/lib/hofuebersicht'
+import { erkenneOrtseingabe } from '@/lib/geokodierung'
 import { mitAnzahl } from '@/lib/format'
 
 // ─── Adresse ────────────────────────────────────────────────────────────────
@@ -456,9 +457,11 @@ export function leerzustand(eingabe: {
 /**
  * Das eine Suchfeld auf /hoefe (Nachtlauf Nr. 46, freigabe.md §12): Höfe und
  * Produkte filtert es beim Tippen wie bisher (berechneHofAuswahl, im
- * Browser); einen Ort — Postleitzahl oder Name — löst es erst auf Wunsch auf,
- * serverseitig über `loeseOrtAuf` wie vorher das eigene Postleitzahl-Feld.
- * Daneben „Standort nutzen"; der Standort bleibt im Browser.
+ * Browser); einen Ort — Postleitzahl, Name oder beides — löst es beim
+ * Absenden auf (Enter, der Eintrag „Höfe rund um …", der Suchtext beim
+ * Ankommen), serverseitig über `loeseOrtAuf`. Was der Text ist, entscheidet
+ * `erkenneOrtseingabe` (Nr. 84). Daneben „Standort nutzen"; der Standort
+ * bleibt im Browser.
  */
 export const SUCHFELD_TEXT = {
   platzhalter: 'Ort oder Produkt',
@@ -467,16 +470,39 @@ export const SUCHFELD_TEXT = {
   nichtsGespeichert: 'Nichts wird gespeichert.',
   /** Standort abgelehnt oder nicht verfügbar — kein Fehler, nur der andere Weg. */
   ohneStandort: 'Kein Problem — tipp einfach deinen Ort oder deine Postleitzahl ins Suchfeld.',
-  ohneTreffer: 'Diesen Ort kennen wir nicht — probier es mit der Postleitzahl.',
+  /** Die Ortssuche fand nichts: kein Fehler, der Text bleibt, was er war — eine Suche nach Höfen und Produkten. */
+  keinOrt: 'Keinen Ort gefunden – wir suchen nach Höfen und Produkten.',
   /** Der Dialog des Browsers liegt noch offen: kein Scheitern, nur Geduld — und ein zweiter Weg. */
   dauert: 'Das dauert gerade — du kannst auch deinen Ort ins Suchfeld tippen.',
   ortAendern: 'Ort ändern',
+  /** Der Standort ist nur ungefähr bekannt (standortUngefaehrText): zwei Wege, beide Entscheidung der Kundin. */
+  genauerBestimmen: 'Genauer bestimmen',
+  soLassen: 'So lassen',
+  /** Zusatz zum Hinweis, wenn das genauere Bestimmen nicht klappte. */
+  genauerMisslang: 'Genauer ging es nicht.',
   /** Der eigene Standort trägt keinen Namen — im Satz steht er so (Akkusativ bzw. Dativ). */
   rundUmStandort: 'deinen Standort',
   abStandort: 'deinem Standort',
   keinerDavon: 'Keiner davon',
   mehrereOrte: 'Welchen Ort meinst du?',
 } as const
+
+/** Ab dieser Ungenauigkeit (Meter, `coords.accuracy`) ist ein Standort nur ungefähr — meist
+ *  stammt er dann aus der IP-Adresse und liegt 10 bis 50 km daneben. */
+const STANDORT_UNGENAU_AB_M = 2_000
+
+/** Ist der gemessene Standort zu ungenau, um ihn ohne Rückfrage zu übernehmen? Fehlt die Angabe
+ *  (NaN), bleibt es beim bisherigen Weg: übernehmen. */
+export function standortIstUngenau(genauigkeitMeter: number): boolean {
+  return genauigkeitMeter > STANDORT_UNGENAU_AB_M
+}
+
+/** „Dein Standort ist nur ungefähr bekannt (etwa 15 km)." — die Zahl aus der Genauigkeit des
+ *  Geräts, auf ganze Kilometer gerundet. */
+export function standortUngefaehrText(genauigkeitMeter: number): string {
+  const km = Math.max(2, Math.round(genauigkeitMeter / 1000))
+  return `Dein Standort ist nur ungefähr bekannt (etwa ${km} km).`
+}
 
 /**
  * Der Schlüssel des Eintrags „Höfe rund um …" in der Vorschlagsliste neben
@@ -485,9 +511,10 @@ export const SUCHFELD_TEXT = {
  */
 export const ORT_VORSCHLAG = '\u0000ort'
 
-/** Ab zwei Zeichen kann der Text ein Ort sein — dieselbe Grenze wie `ortssucheSchema`. */
+/** Der Eintrag „Höfe rund um …" erscheint, sobald der Text ein Ort sein kann (erkenneOrtseingabe) — bei
+ *  Text, den die Ortssuche gar nicht annimmt, führte er ins Leere. */
 export function ortVorschlagAnbieten(text: string): boolean {
-  return text.trim().length >= 2
+  return erkenneOrtseingabe(text).art !== 'text'
 }
 
 /** „Höfe rund um „4910" zeigen" — der Eintrag, der den Text als Ort sucht. */
@@ -495,27 +522,17 @@ export function ortVorschlagText(text: string): string {
   return `Höfe rund um „${text.trim()}" zeigen`
 }
 
-/** Genau vier Ziffern: eine österreichische Postleitzahl — die einzige Eingabe, die ohne Wahl als Ort gilt. */
-export function istPostleitzahl(text: string): boolean {
-  return /^\d{4}$/.test(text.trim())
-}
-
 /** Was Enter ohne markierten Vorschlag tut. */
-export type EnterImSuchfeld = 'ort-suchen' | 'ort-eintrag-zeigen' | 'nichts'
+export type EnterImSuchfeld = 'ort-suchen' | 'nichts'
 
 /**
- * Enter ohne markierten Vorschlag (Nachbesserung Runde 1): An die Ortssuche
- * (`loeseOrtAuf`, Nominatim) geht ein Text nur, wenn er aus vier Ziffern
- * besteht oder wenn die Kundin den Eintrag „Höfe rund um …" ausdrücklich
- * wählt. Findet die Produktsuche nichts, ZEIGT Enter diesen Eintrag (Liste
- * offen, Eintrag markiert), statt ihn auszulösen — „Topinambur" ist ein
- * Produktwort, und die Datenschutzerklärung nennt für die Ortssuche nur
- * „Postleitzahl oder Ort". Sonst bleibt es bei der Produktsuche, die beim
- * Tippen schon wirkt. Deutsche Postleitzahlen (fünf Ziffern) und „4910 Ried"
- * gehen über den Eintrag.
+ * Enter ohne markierten Vorschlag ist das Absenden (Nr. 84): Ist der Text eine
+ * Postleitzahl, Postleitzahl mit Ort oder ein Ortsname (erkenneOrtseingabe), geht er an die
+ * Ortssuche (`loeseOrtAuf`, Nominatim) — ein eindeutiger Treffer wird übernommen, mehrere
+ * stehen zur Wahl, keiner lässt die Produktsuche, die beim Tippen schon wirkt, stehen (mit
+ * dem Satz `keinOrt`). Auch ein Produktwort wie „Heu" geht so hinaus; die Datenschutzerklärung
+ * nennt das Absenden als Auslöser. Alles andere (`text`) bleibt im Browser.
  */
-export function enterImSuchfeld(text: string, treffer: number): EnterImSuchfeld {
-  if (!ortVorschlagAnbieten(text)) return 'nichts'
-  if (istPostleitzahl(text)) return 'ort-suchen'
-  return treffer === 0 ? 'ort-eintrag-zeigen' : 'nichts'
+export function enterImSuchfeld(text: string): EnterImSuchfeld {
+  return ortVorschlagAnbieten(text) ? 'ort-suchen' : 'nichts'
 }

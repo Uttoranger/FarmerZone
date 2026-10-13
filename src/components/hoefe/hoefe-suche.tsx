@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Loader2, LocateFixed, MapPin, Search, X } from 'lucide-react'
 import { tasteInVorschlaegen, type Bezugspunkt, type ProduktVorschlag, type VorschlagsLage } from '@/lib/hofuebersicht'
 import {
@@ -26,10 +26,12 @@ import { useOrtssuche } from '@/components/hoefe/use-ortssuche'
  *   berechneHofAuswahl); darunter erst ab dem ersten Zeichen die
  *   Vorschlagsliste aus dem VERFÜGBAREN Angebot (höchstens sechs) und als
  *   letzter Eintrag „Höfe rund um „…" zeigen" — der sucht den Text als Ort.
- * - Enter ohne Markierung sucht den Ort nur bei vier Ziffern; findet die
- *   Produktsuche nichts, markiert Enter den Eintrag „Höfe rund um …", und
- *   erst ein zweites Enter (oder ein Tipp darauf) sucht ihn (enterImSuchfeld,
- *   Nachbesserung Runde 1).
+ * - Enter ohne Markierung ist das Absenden (Nr. 84): Postleitzahl, Postleitzahl
+ *   mit Ort („5230 Mattighofen") oder ein Ortsname geht an die Ortssuche —
+ *   ein eindeutiger Treffer wird übernommen, mehrere stehen zur Wahl, keiner
+ *   lässt die Produktsuche stehen (enterImSuchfeld, erkenneOrtseingabe). Mit
+ *   einem Suchtext kommt die Kundin auch von der Startseite an: Dort hat sie
+ *   abgesendet, /hoefe löst ihn einmal genauso auf (ankunftsText).
  * - Combobox-Muster (CODING_STANDARDS §8): Pfeiltasten, Enter, Escape; die
  *   Tastenlogik ist tasteInVorschlaegen (rein, getestet), hier wird nur
  *   ausgeführt. Die Liste steht im Fluss statt darüber, damit sie nie unter
@@ -37,7 +39,9 @@ import { useOrtssuche } from '@/components/hoefe/use-ortssuche'
  *
  * Übernommene Produkt-Vorschläge werden Such-Marken („Aktive Filter"). Ein
  * gefundener Ort wird der Bezugspunkt; der Text verlässt dann das Feld, denn
- * er war kein Produkt. Ortssuche und Standort: useOrtssuche.
+ * er war kein Produkt. Ortssuche und Standort: useOrtssuche. Ist der Standort
+ * nur ungefähr bekannt (über 2 000 m), steht statt der Übernahme der Hinweis
+ * mit „Genauer bestimmen" und „So lassen" (StandortUngefaehr).
  *
  * KOMPAKT (Kartenmodus am Handy, Nr. 52): nur das Feld, 44 px hoch, damit
  * Suche, Filter und Liste in EINE Zeile über der Karte passen. „Standort
@@ -55,12 +59,13 @@ export function HoefeSuche({
   suchtext,
   vorschlaege,
   status,
-  treffer,
   bezugspunkt,
+  ankunftsText = '',
   onSuchtext,
   onUebernehmen,
   onBezugspunkt,
   onAufheben,
+  onAnkunftErledigt,
 }: {
   /** Nur das Feld (Kartenmodus am Handy). */
   kompakt?: boolean
@@ -68,13 +73,15 @@ export function HoefeSuche({
   vorschlaege: readonly ProduktVorschlag[]
   /** Die Ansage fürs Vorlesen („3 Treffer gefunden."); leer ohne Suche. */
   status: string
-  /** Wie viel die Suche gerade zeigt — bei 0 zeigt Enter den Eintrag „Höfe rund um …". */
-  treffer: number
   bezugspunkt: Bezugspunkt | null
+  /** Der Suchtext, mit dem die Kundin ankam (Startseite, Kopfzeile, 404) — wird einmal wie Enter aufgelöst. */
+  ankunftsText?: string
   onSuchtext: (wert: string) => void
   onUebernehmen: (name: string) => void
   onBezugspunkt: (punkt: Bezugspunkt) => void
   onAufheben: () => void
+  /** Der Ankunftstext ist abgearbeitet — die Seite vergisst ihn. */
+  onAnkunftErledigt?: () => void
 }): React.JSX.Element {
   // Offen nur beim Tippen bzw. solange das Feld den Fokus hat — beim Laden
   // mit ?q=… bleibt sie zu, bis jemand ins Feld geht. Markiert wird über den
@@ -89,6 +96,8 @@ export function HoefeSuche({
       onSuchtext('')
     },
     onZumFeld: () => feld.current?.focus(),
+    ankunftsText,
+    onAnkunftErledigt,
   })
 
   const mitOrt = ortVorschlagAnbieten(suchtext)
@@ -111,24 +120,19 @@ export function HoefeSuche({
     if (ergebnis.uebernehmen) uebernimm(ergebnis.uebernehmen)
   }
 
-  /** Enter ohne markierten Vorschlag (die Taste hat tasteImSuchfeld dann nicht verbraucht). */
+  /** Enter ohne markierten Vorschlag (die Taste hat tasteImSuchfeld dann nicht verbraucht) — das Absenden. */
   function absenden(e: React.FormEvent) {
     e.preventDefault()
-    const aktion = enterImSuchfeld(suchtext, treffer)
-    // Ohne Treffer: den Eintrag zeigen und markieren — ausgelöst wird er erst
-    // mit dem nächsten Enter oder Tipp, also ausdrücklich (Nominatim, Datenschutz).
-    if (aktion === 'ort-eintrag-zeigen') setVorschlagsLage({ offen: true, markiert: ORT_VORSCHLAG })
-    else setVorschlagsLage({ offen: false, markiert: null })
+    const aktion = enterImSuchfeld(suchtext)
+    setVorschlagsLage({ offen: false, markiert: null })
     if (aktion === 'ort-suchen') ort.ortSuchen(suchtext)
   }
 
-  const knopf = cn(
-    'inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-4 text-[13.5px] font-semibold transition-colors duration-[250ms] aria-busy:opacity-60',
-    FOKUS_RAHMEN
-  )
+  /** Ein Satz oder eine Auswahl steht an (nicht nur die stille Ansage „Entfernungen ab …"). */
+  const meldungSichtbar = ort.hinweis !== null || ort.kandidaten.length > 0
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className={cn('flex flex-col gap-2', kompakt && 'relative')}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
         <form role="search" onSubmit={absenden} className={cn('min-w-0 sm:flex-1', kompakt && 'relative')}>
           <div className="relative">
@@ -151,6 +155,8 @@ export function HoefeSuche({
               maxLength={SUCHTEXT_MAX}
               onChange={(e) => {
                 setVorschlagsLage({ offen: true, markiert: null })
+                // Der Satz und die Auswahl der letzten Suche gehörten zum alten Text.
+                ort.textGeaendert()
                 onSuchtext(e.target.value)
               }}
               onKeyDown={tasteImSuchfeld}
@@ -249,7 +255,7 @@ export function HoefeSuche({
               type="button"
               onClick={ort.standortErfragen}
               aria-busy={ort.ortet}
-              className={cn(knopf, 'bg-accent text-accent-foreground hover:opacity-90')}
+              className={cn(KNOPF, 'bg-accent text-accent-foreground hover:opacity-90')}
             >
               {ort.ortet ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -263,6 +269,16 @@ export function HoefeSuche({
         )}
       </div>
 
+      {ort.ungefaehr && (
+        <StandortUngefaehr
+          satz={ort.ungefaehr.satz}
+          genauerMisslang={ort.ungefaehr.genauerMisslang}
+          ortet={ort.ortet}
+          onGenauer={ort.genauerBestimmen}
+          onSoLassen={ort.soLassen}
+        />
+      )}
+
       {bezugspunkt && !kompakt && (
         <Hinweiskarte
           symbol={MapPin}
@@ -273,7 +289,7 @@ export function HoefeSuche({
                 ort.aufheben()
                 onAufheben()
               }}
-              className={cn(knopf, 'border border-border bg-card text-foreground hover:bg-muted')}
+              className={cn(KNOPF, 'border border-border bg-card text-foreground hover:bg-muted')}
             >
               <X className="size-4" strokeWidth={1.7} aria-hidden="true" />
               {SUCHFELD_TEXT.ortAendern}
@@ -292,49 +308,135 @@ export function HoefeSuche({
       {/* Die Meldezeile steht DAUERHAFT im Baum (Hausmuster wie
           password-form.tsx): Eine Live-Region, die erst mit ihrem Text
           entsteht, sprechen mehrere Vorleseprogramme nicht. Den gefundenen
-          Bezugspunkt sagt sie mit an. */}
-      <p className={ort.hinweis ? 'text-[13px] break-words text-muted-foreground' : 'sr-only'} role="status" id="umkreis-meldung">
-        {ort.hinweis ?? (bezugspunkt ? `Entfernungen ab ${bezugspunkt.name ?? SUCHFELD_TEXT.abStandort}` : '')}
-      </p>
+          Bezugspunkt sagt sie mit an.
+          Im Kartenmodus (kompakt) legen sich Satz und Auswahl ÜBER die Karte wie die
+          Vorschlagsliste: Im Fluss schrumpfte die Karte um bis zu fünf Zeilen (Nr. 84). */}
+      <div
+        className={cn(
+          meldungSichtbar && kompakt
+            ? 'absolute top-full left-0 z-[1000] flex max-h-[calc(100dvh-var(--kunde-kopf)-var(--kunde-unterleiste)-4rem)] w-max max-w-[calc(100vw-2rem)] min-w-full flex-col gap-2 overflow-y-auto rounded-2xl border border-border bg-popover p-3 shadow-sm md:max-w-[calc(100vw-3rem)] dark:shadow-none'
+            : 'contents'
+        )}
+      >
+        <p className={ort.hinweis ? 'text-[13px] break-words text-muted-foreground' : 'sr-only'} role="status" id="umkreis-meldung">
+          {ort.hinweis ?? (bezugspunkt ? `Entfernungen ab ${bezugspunkt.name ?? SUCHFELD_TEXT.abStandort}` : '')}
+        </p>
 
-      {/* Die Auswahl bei mehrdeutigen Orten — untereinander statt nebeneinander:
-          Die Namen tragen Bezirk und Land und wären in einer Zeile bei 375 px
-          unlesbar. */}
-      {ort.kandidaten.length > 0 && (
-        <ul className="flex flex-col gap-1.5" aria-label={SUCHFELD_TEXT.mehrereOrte}>
-          {ort.kandidaten.map((treffer, i) => (
-            /* Der Index gehört in den Schlüssel: Zwei Nominatim-Zeilen
-               können dieselben Koordinaten tragen. */
-            <li key={`${i}:${treffer.lat},${treffer.lon}`}>
+        {/* Die Auswahl bei mehrdeutigen Orten — untereinander statt nebeneinander:
+            Die Namen tragen Bundesland oder Bezirk und wären in einer Zeile bei 375 px
+            unlesbar. */}
+        {ort.kandidaten.length > 0 && (
+          <ul className="flex flex-col gap-1.5" aria-label={SUCHFELD_TEXT.mehrereOrte}>
+            {ort.kandidaten.map((treffer, i) => (
+              /* Der Index gehört in den Schlüssel: Zwei Nominatim-Zeilen
+                 können dieselben Koordinaten tragen. */
+              <li key={`${i}:${treffer.lat},${treffer.lon}`}>
+                <button
+                  type="button"
+                  onClick={() => ort.uebernimm(treffer)}
+                  className={cn(
+                    'min-h-11 w-full rounded-xl border border-border bg-card px-4 py-2 text-left text-sm text-foreground transition-colors duration-[250ms] hover:bg-muted',
+                    FOKUS_RAHMEN
+                  )}
+                >
+                  <span className="break-words">{treffer.name}</span>
+                </button>
+              </li>
+            ))}
+            {/* Ein Ausstieg ohne Bezugspunkt — wer die Rückfrage nicht meinte,
+                säße sonst darin fest. */}
+            <li>
               <button
                 type="button"
-                onClick={() => ort.uebernimm(treffer)}
+                onClick={ort.keinerDavon}
                 className={cn(
-                  'min-h-11 w-full rounded-xl border border-border bg-card px-4 py-2 text-left text-sm text-foreground transition-colors duration-[250ms] hover:bg-muted',
+                  'inline-flex min-h-11 items-center gap-1 rounded-full px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground',
                   FOKUS_RAHMEN
                 )}
               >
-                <span className="break-words">{treffer.name}</span>
+                <X className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
+                {SUCHFELD_TEXT.keinerDavon}
               </button>
             </li>
-          ))}
-          {/* Ein Ausstieg ohne Bezugspunkt — wer die Rückfrage nicht meinte,
-              säße sonst darin fest. */}
-          <li>
-            <button
-              type="button"
-              onClick={ort.keinerDavon}
-              className={cn(
-                'inline-flex min-h-11 items-center gap-1 rounded-full px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground',
-                FOKUS_RAHMEN
-              )}
-            >
-              <X className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
-              {SUCHFELD_TEXT.keinerDavon}
-            </button>
-          </li>
-        </ul>
-      )}
+          </ul>
+        )}
+      </div>
     </div>
+  )
+}
+
+/** Der runde Knopf neben dem Feld und in den Hinweisen (44 px hoch). */
+const KNOPF = cn(
+  'inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-4 text-[13.5px] font-semibold transition-colors duration-[250ms] aria-busy:opacity-60',
+  FOKUS_RAHMEN
+)
+
+/**
+ * Der Hinweis „Dein Standort ist nur ungefähr bekannt" (Zustand 3, Nr. 84, Mockup
+ * system-k1-ortssuche-zustaende): Der Standort ist noch nicht übernommen — die Kundin
+ * entscheidet, ob das Gerät es genauer versucht (GPS, bis 12 s) oder es so bleibt.
+ * Orange wie jeder Hinweis, der eine Entscheidung offen lässt. Er erscheint nach dem
+ * Dialog des Browsers, deshalb geht der Fokus zum ersten Knopf; der Satz ist dessen
+ * Beschreibung und wird mitgelesen.
+ */
+export function StandortUngefaehr({
+  satz,
+  genauerMisslang,
+  ortet,
+  onGenauer,
+  onSoLassen,
+}: {
+  /** „Dein Standort ist nur ungefähr bekannt (etwa 15 km)." */
+  satz: string
+  /** Das genauere Bestimmen hat nicht geklappt — der Hinweis sagt es dazu. */
+  genauerMisslang: boolean
+  /** Das genauere Bestimmen läuft. */
+  ortet: boolean
+  onGenauer: () => void
+  onSoLassen: () => void
+}): React.JSX.Element {
+  const satzId = useId()
+  const genauer = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    genauer.current?.focus()
+  }, [])
+  return (
+    <Hinweiskarte
+      ton="orange"
+      symbol={LocateFixed}
+      aktion={
+        <>
+          {/* BEWUSST NICHT `disabled` während der Abfrage: Ein deaktivierter Knopf verliert den
+              Tastatur-Fokus. Den Doppelklick-Schutz trägt genauerBestimmen selbst. */}
+          <button
+            ref={genauer}
+            type="button"
+            onClick={onGenauer}
+            aria-busy={ortet}
+            aria-describedby={satzId}
+            className={cn(KNOPF, 'border border-border bg-card text-foreground hover:bg-muted')}
+          >
+            {ortet ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <LocateFixed className="size-4" strokeWidth={1.7} aria-hidden="true" />
+            )}
+            {SUCHFELD_TEXT.genauerBestimmen}
+          </button>
+          <button
+            type="button"
+            onClick={onSoLassen}
+            className={cn(KNOPF, 'border border-border bg-card text-foreground hover:bg-muted')}
+          >
+            {SUCHFELD_TEXT.soLassen}
+          </button>
+        </>
+      }
+    >
+      <p id={satzId} className="text-balance">
+        {satz}
+        {genauerMisslang && <> {SUCHFELD_TEXT.genauerMisslang}</>}
+      </p>
+    </Hinweiskarte>
   )
 }

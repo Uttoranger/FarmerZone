@@ -140,6 +140,10 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
   const setzeFilter = (aenderung: Partial<HoefeFilter>) => schreibeUrl({ ...filter, ...aenderung })
 
   const [lage, setLage] = useState<AuswahlLage>(LEERE_LAGE)
+  // Der Suchtext, mit dem die Kundin ankam (Startseite, Kopfzeile, 404 — sie hat dort abgesendet): Das
+  // Suchfeld löst ihn einmal wie Enter auf (Nr. 84) und vergisst ihn dann; ein neu aufgebautes Feld
+  // (Liste ↔ Karte) fragt nicht noch einmal.
+  const [ankunftsText, setAnkunftsText] = useState(filter.suchtext)
   // Zählt jede Pin-Anfahrt, damit dieselbe Nummer zweimal hintereinander wirkt.
   const [fokus, setFokus] = useState(0)
   // Der Bezugspunkt der Umkreissuche lebt NUR hier: kein localStorage, kein
@@ -468,12 +472,13 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
       suchtext={filter.suchtext}
       vorschlaege={vorschlaege}
       status={statusText}
-      treffer={anzahl}
       bezugspunkt={bezugspunkt}
+      ankunftsText={ankunftsText}
       onSuchtext={(wert) => setzeFilter({ suchtext: wert })}
       onUebernehmen={suchMarkeHinzufuegen}
       onBezugspunkt={setBezugspunkt}
       onAufheben={ortAufheben}
+      onAnkunftErledigt={() => setAnkunftsText('')}
     />
   )
 

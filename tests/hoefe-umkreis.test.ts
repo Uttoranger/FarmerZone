@@ -167,7 +167,7 @@ describe('sucheOrtspunkt — die Ortsauflösung über die Grenze', () => {
       return TREFFER
     })
 
-    expect(angefragt[0]).toEqual({ postalcode: '4910', countrycodes: 'at,de' })
+    expect(angefragt[0]).toEqual({ postalcode: '4910', countrycodes: 'at,de', limit: '10' })
     expect(punkte[0]).toMatchObject({ lat: 48.21, lon: 13.49, land: 'AT' })
   })
 
@@ -178,7 +178,7 @@ describe('sucheOrtspunkt — die Ortsauflösung über die Grenze', () => {
       return TREFFER
     })
 
-    expect(angefragt[0]).toEqual({ postalcode: '84359', countrycodes: 'at,de' })
+    expect(angefragt[0]).toEqual({ postalcode: '84359', countrycodes: 'at,de', limit: '10' })
   })
 
   it('alles andere fragt als ORT', async () => {
@@ -188,7 +188,7 @@ describe('sucheOrtspunkt — die Ortsauflösung über die Grenze', () => {
       return TREFFER
     })
 
-    expect(angefragt[0]).toEqual({ city: 'Simbach am Inn', countrycodes: 'at,de' })
+    expect(angefragt[0]).toEqual({ city: 'Simbach am Inn', countrycodes: 'at,de', limit: '10' })
   })
 
   it('liefert MEHRERE Kandidaten samt Land — „Simbach" gibt es beiderseits der Grenze', async () => {
