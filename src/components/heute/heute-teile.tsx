@@ -20,6 +20,7 @@ import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
 import { TeilenFensterKnopf } from '@/components/teilen/teilen-fenster'
 import type { TeilenFensterDaten } from '@/lib/teilen-fenster'
 import {
+  HEUTE_KEINE_BESTELLUNGEN,
   HEUTE_NIEMAND,
   KENNZAHL_TEXT,
   kennzahlBreiteEm,
@@ -33,6 +34,7 @@ import {
   type WochenBalken,
 } from '@/lib/heute'
 import { onlinePausiertHinweis } from '@/lib/stripe-konto'
+import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { ERSTE_SCHRITTE_WARTET, ZU_TUN_TEXT, type ZuTunAufgabe } from '@/lib/erste-schritte'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
@@ -320,15 +322,11 @@ export function Packliste({
         <EmptyState
           symbol={PackageOpen}
           titel={HEUTE_NIEMAND}
-          satz={
-            leer.abholfenster
-              ? `Nächste Abholung: ${leer.abholfenster.name}, ${leer.abholfenster.zeit}.`
-              : 'Trag deine Abholzeiten ein, damit Kunden bei dir bestellen können.'
-          }
+          satz={leer.abholfenster ? `Nächste Abholung: ${leer.abholfenster.name}, ${leer.abholfenster.zeit}.` : ABHOLZEITEN_FEHLEN.satz}
           aktion={
             leer.abholfenster ? undefined : (
-              <Link href="/settings/pickup-slots" className={KNOPF_ORANGE}>
-                Abholzeiten eintragen
+              <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={KNOPF_ORANGE}>
+                {ABHOLZEITEN_FEHLEN.aktion.text}
               </Link>
             )
           }
@@ -428,21 +426,17 @@ export function NaechsteAbholungKarte({ fenster, anzahl }: { fenster: NaechstesF
       <h2 id="heute-naechste-abholung" className={cn('text-[13px] font-normal', LEISE)}>
         Nächste Abholung
       </h2>
+      {/* Ohne Abholzeit nur der Titel als eine Zeile: Satz und Knopf stehen schon in der Packliste (N9, ein Zustand eine Fassung). */}
       {fenster ? (
         <>
           {/* Umbruch nur nach dem Komma — „15–18 Uhr" bleibt zusammen. */}
           <p className="font-heading text-[22px] leading-tight font-semibold break-words">
             {fenster.name}, <span className="whitespace-nowrap">{fenster.zeit}</span>
           </p>
-          <p className={cn('text-[13px]', LEISE)}>{anzahl > 0 ? mehrzahl(anzahl, 'Bestellung', 'Bestellungen') : 'Noch keine Bestellungen'}</p>
+          <p className={cn('text-[13px]', LEISE)}>{anzahl > 0 ? mehrzahl(anzahl, 'Bestellung', 'Bestellungen') : HEUTE_KEINE_BESTELLUNGEN}</p>
         </>
       ) : (
-        <>
-          <p className="text-sm">Du hast noch keine Abholzeiten eingetragen.</p>
-          <Link href="/settings/pickup-slots" className={TEXTLINK}>
-            Abholzeiten eintragen →
-          </Link>
-        </>
+        <p className={cn('text-[13px]', LEISE)}>{ABHOLZEITEN_FEHLEN.titel}</p>
       )}
     </section>
   )

@@ -5061,6 +5061,16 @@ Auftrag freigabe.md §16 „82" (Register N10). Keine Migration, kein neues Pake
 - **„entfällt":** `gebuehrZeile` entscheidet nur das Wort, den Betrag zeigt die Übersicht allein aus `kassenBetraege`; liegt ein Betrag vor, steht er da — „entfällt" nie darüber. Beim gebührenfreien Hof gibt es keine Zeile (es entfällt nichts).
 - **Prüfstand für das ganze Formular** (`tests/kasse-formular.test.ts`): Auf dem Server zeigt die Kasse nur ihr Skelett, weil der Korb im Effekt aus dem localStorage kommt. Der Test lässt jeden Effekt der eigenen Dateien einmal sofort beim Rendern laufen (`vi.mock('react')`, je Quelltext einmal, je Aufbau zurückgesetzt) und rendert so das echte Formular — Reihenfolge, Vorbelegung und Bar-Zustand am HTML statt am Quelltext.
 
+## Leerzustände (Nachtlauf Nr. 80, Oktober 2026)
+
+Auftrag freigabe.md §16 „80“ (Register N9), gestapelt auf 78. Keine Migration, kein neues Paket.
+
+- **Ursache:** „Noch keine …“ stand an zehn Stellen als lose Zeile ohne Symbol und ohne Weg weiter, und „keine Abholzeiten“ hatte auf Heute zwei Fassungen („Trag deine Abholzeiten ein …“ in der Packliste, „Du hast noch keine Abholzeiten eingetragen.“ in der Karte „Nächste Abholung“) und eine dritte in den Einstellungen.
+- **Umgestellt auf `EmptyState`:** die Abholzeiten in den Einstellungen, die Wunschliste im Briefkasten (Admin), die Umsatzkarte der Auswertung ohne Verkauf und die Seite „WhatsApp versenden“ ohne Abonnentin. Eine Fassung für „keine Abholzeiten“: `ABHOLZEITEN_FEHLEN` in `pickup-slot-rules.ts` (Heute und Einstellungen), `ABHOLZEITEN_FEHLEN_ZEILE` für die Zeile in Mein Hof und in den Einstellungen.
+- **Bleibt eine Zeile (Art B) oder ist kein Leerzustand (Art C):** Die Einordnung aller Stellen steht als Liste `AUSNAHMEN` mit Grund in `tests/leerzustaende-wache.test.ts`; eine neue Stelle fällt dort auf.
+- **Wortlaut:** Die Zeile „Noch keine — erst dann können Kundinnen bestellen“ sagt jetzt „Kundinnen“ (N8: ganze Sätze).
+- **Nachbesserung Runde 1:** Auf Heute ohne Abholzeit standen Satz und Knopf zweimal untereinander (Packliste und Karte „Nächste Abholung“) — „eine Fassung je Zustand“ gilt für die ganze Seite, nicht nur für den Text. Jetzt steht beides einmal in der Packliste, die Karte hat nur ihre Zeile. Ebenso schweigt die Kopfzeile der Produkte ohne Produkt. Die Wache zählt eine Aktion nur, wenn sie immer da ist, nimmt Texte aus `src/lib/` als Quelle, sobald ein EmptyState sie als `titel` oder `satz` nimmt (auch ohne Aktion), und führt Texte im Aufruf selbst als Altlast. Die `h1` von „WhatsApp versenden“ ohne Abonnentin ist der Titel des EmptyState (`titelStufe`) statt eines zweiten Literals.
+
 ## Nützliche Befehle
 
 ```bash

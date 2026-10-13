@@ -245,3 +245,12 @@ export function grenzeStand(prozent: number, grenzeText: string): GrenzeStand {
   }
   return { ton: 'gruen', marke: 'Im grünen Bereich', hinweis: null }
 }
+
+/**
+ * Die Umsatzkarte ohne Verkauf im gewählten Zeitraum (Register N9): Titel und der Weg, einen
+ * Verkauf einzutragen — `/sales?neu=1` öffnet dort gleich den Dialog.
+ */
+export const UMSATZ_LEER = {
+  titel: 'Noch keine Verkäufe in diesem Zeitraum',
+  aktion: { text: 'Verkauf eintragen', href: '/sales?neu=1' },
+} as const
