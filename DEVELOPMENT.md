@@ -5034,6 +5034,15 @@ Auftrag freigabe.md §16 „78“ (Register N8), gestapelt auf 77. Keine Migrati
 - **Kunden:** Überschriften sagen „Kunden“ (Vorbild „so sehen Kunden deine Hofseite“), Sätze „die Kundin“ und „deine Kundinnen“. „Käufer“ steht nur noch im Rechtstext des Impressums (Ausnahme im Test).
 - **Mockups:** Sie tragen die alten Wörter noch („Hilfe und Rückmeldung“ in 27 Dateien, „So sehen Käufer dein Futter“, „Dein Zeitfenster …“). Die Entscheidung N8 geht vor; die Mockups bleiben unverändert.
 
+## Leerzustände (Nachtlauf Nr. 80, Oktober 2026)
+
+Auftrag freigabe.md §16 „80“ (Register N9), gestapelt auf 78. Keine Migration, kein neues Paket.
+
+- **Ursache:** „Noch keine …“ stand an zehn Stellen als lose Zeile ohne Symbol und ohne Weg weiter, und „keine Abholzeiten“ hatte auf Heute zwei Fassungen („Trag deine Abholzeiten ein …“ in der Packliste, „Du hast noch keine Abholzeiten eingetragen.“ in der Karte „Nächste Abholung“) und eine dritte in den Einstellungen.
+- **Umgestellt auf `EmptyState`:** die Karte „Nächste Abholung“ (Heute), die Abholzeiten in den Einstellungen, die Wunschliste im Briefkasten (Admin), die Umsatzkarte der Auswertung ohne Verkauf und die Seite „WhatsApp versenden“ ohne Abonnentin. Eine Fassung für „keine Abholzeiten“: `ABHOLZEITEN_FEHLEN` in `pickup-slot-rules.ts` (Heute und Einstellungen), `ABHOLZEITEN_FEHLEN_ZEILE` für die Zeile in Mein Hof und in den Einstellungen.
+- **Bleibt eine Zeile (Art B) oder ist kein Leerzustand (Art C):** Die Einordnung aller Stellen steht als Liste `AUSNAHMEN` mit Grund in `tests/leerzustaende-wache.test.ts`; eine neue Stelle fällt dort auf.
+- **Wortlaut:** Die Zeile „Noch keine — erst dann können Kundinnen bestellen“ sagt jetzt „Kundinnen“ (N8: ganze Sätze).
+
 ## Nützliche Befehle
 
 ```bash

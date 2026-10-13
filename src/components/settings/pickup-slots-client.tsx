@@ -3,12 +3,14 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, Trash2, Loader2 } from 'lucide-react'
+import { CalendarClock, Plus, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { EmptyState } from '@/components/ui/empty-state'
+import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { addPickupSlot, deletePickupSlot, togglePickupSlotActive } from '@/server/actions/farm'
-import { findSlotError, DAY_NAMES } from '@/lib/pickup-slot-rules'
+import { findSlotError, DAY_NAMES, ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
 import type { FarmSettings } from '@/server/queries/farm'
 
 type Slot = FarmSettings['pickupSlots'][number]
@@ -173,13 +175,31 @@ export function PickupSlotsClient({
     })
   }
 
+  // Der Weg weiter ist das Formular darunter: Der Fokus springt ins erste Feld. Die Ansicht rückt es in die
+  // Mitte — ohne das stünde es am unteren Rand, unter der Leiste des Handys.
+  function zumFormular() {
+    const feld = document.getElementById('dayOfWeek')
+    feld?.focus({ preventScroll: true })
+    feld?.scrollIntoView({ block: 'center' })
+  }
+
   return (
     <div className="space-y-6">
       {/* Existing slots */}
       <div className="bg-card rounded-xl border border-border p-4">
         <h2 className="font-medium text-foreground mb-3">Aktuelle Abholzeiten</h2>
         {slots.length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">Noch keine Abholzeiten angelegt.</p>
+          <EmptyState
+            symbol={CalendarClock}
+            titel={ABHOLZEITEN_FEHLEN.titel}
+            satz={ABHOLZEITEN_FEHLEN.satz}
+            aktion={
+              <button type="button" onClick={zumFormular} className={KNOPF_RAHMEN}>
+                {ABHOLZEITEN_FEHLEN.aktion.text}
+              </button>
+            }
+            className="rounded-lg py-8"
+          />
         ) : (
           <div className="space-y-2">
             {slots.map((slot) => (

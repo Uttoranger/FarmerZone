@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ChevronRight, Inbox } from 'lucide-react'
+import { ChevronRight, Inbox, Lightbulb } from 'lucide-react'
 import type { MeldungTon } from '@/lib/meldung'
 import { WUNSCHLISTE_SATZ } from '@/lib/admin-briefkasten'
 import { cn } from '@/lib/utils'
@@ -105,7 +105,7 @@ export function Wunschliste({ buendel }: { buendel: WunschBuendel[] }): React.JS
         Wunschliste gebündelt
       </h2>
       {buendel.length === 0 ? (
-        <p className={cn('py-2 text-[13.5px]', LEISE)}>Noch keine Wünsche.</p>
+        <EmptyState symbol={Lightbulb} titel="Noch keine Wünsche" className="rounded-xl py-6" />
       ) : (
         <ul className="[&>li]:border-t [&>li]:border-border">
           {buendel.map((b) => (

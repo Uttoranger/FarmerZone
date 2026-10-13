@@ -24,6 +24,7 @@
 import type { Betriebsstatus, Tarif } from '@prisma/client'
 import { aufzaehlung, abholzeitenKurz, EINSTELLUNG_FUER_ZEILE, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
 import type { WeeklySlot } from '@/lib/pickup-days'
+import { ABHOLZEITEN_FEHLEN_ZEILE } from '@/lib/pickup-slot-rules'
 import { BETRIEBSNUMMER_ANKER, BETRIEBSSTATUS } from '@/lib/taxonomie'
 import {
   BAR_OHNE_GEBUEHR_SATZ,
@@ -165,7 +166,7 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
           ? abholzeitenKurz(d.abholzeiten)
           : d.abholzeitenGesamt > 0
             ? 'Alle Abholzeiten sind pausiert — gerade kann niemand bestellen'
-            : 'Noch keine — erst dann können Kunden bestellen',
+            : ABHOLZEITEN_FEHLEN_ZEILE,
       ton: d.abholzeiten.length > 0 ? 'fertig' : 'offen',
       href: '/settings/pickup-slots',
     },

@@ -131,6 +131,15 @@ Jeder Screen liefert vier Zustände:
 - **Laden** — Skeleton in Kartenform, kein Spinner.
 - **Fehler** — inline am Feld bzw. an der Karte, kein Modal.
 
+### Leerzustände (Register N9)
+
+- **Eine Liste oder Karte ohne Inhalt wird zum `EmptyState`** (`src/components/ui/empty-state.tsx`): Symbol, ein Satz als Titel (dazu höchstens ein erklärender Satz) und die nächste Handlung als Link oder Knopf. Die Aktion ist der Ausweg (anlegen, eintragen, zurück); wo keiner sinnvoll ist, bleibt sie weg, und der Grund steht in `OHNE_AKTION` der Wache.
+- **Eine kleine Zeile in einer Karte ist erlaubt** („Alles erledigt.“, „Noch keine Bestellungen“ unter dem Abholfenster), wenn sie eine einzelne Zeile bleibt und keine Aktion braucht. Ein Wert (Vergleichssatz, Zählzeile, Feldwert „Noch keine hinterlegt.“) und ein Infosatz sind keine Leerzustände.
+- **Ein Zustand hat eine Fassung.** Der Text kommt je Seite aus einer Quelle in `src/lib/`; derselbe Zustand auf zwei Seiten aus einer Konstante (`ABHOLZEITEN_FEHLEN` für Heute und die Einstellungen, `ABHOLZEITEN_FEHLEN_ZEILE` für die Zeile in Mein Hof). Die Textquelle eines EmptyState ist ein Objekt mit `titel` und `aktion`.
+- **In einer Karte** nimmt der EmptyState ihren Grund an: `className="rounded-none border-0 bg-transparent px-0 py-4"` (Heute, Karte „Nächste Abholung“) oder `rounded-xl py-8` für den Platz eines Diagramms.
+- **Seiten mit eigener `h1` im Randzustand** (WhatsApp ohne Abonnentin) setzen die `h1` unsichtbar (`sr-only`) über den EmptyState: Er zeichnet seinen Titel als Absatz.
+- **Prüfung:** `tests/leerzustaende-wache.test.ts` liest den Syntaxbaum von `src/`. Jeder Text „noch kein…“ steht in einem `EmptyState`, in der Textquelle eines EmptyState oder mit Art (B: einzelne Zeile, C: kein Leerzustand) und Grund in `AUSNAHMEN`; jeder `EmptyState` trägt eine Aktion oder steht in `OHNE_AKTION`. `tests/leerzustaende.test.ts` rendert je umgestellter Stelle Titel und Aktion.
+
 ### Ladeansicht einer Route (`loading.tsx`)
 
 - **Nur wo auf den Server gewartet wird.** Eine synchrone Seite ohne Datenabruf bekommt keine — das Skeleton wäre ein Blitzen ohne Anlass.

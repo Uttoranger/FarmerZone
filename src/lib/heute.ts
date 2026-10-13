@@ -423,6 +423,9 @@ export const KENNZAHL_TEXT = {
 /** Der Leerzustand der Packliste — auch der des Filters „Heute abholen" in Bestellungen. */
 export const HEUTE_NIEMAND = 'Heute holt niemand etwas ab.'
 
+/** Die eine Zeile unter dem Abholfenster in „Nächste Abholung“, solange nichts bestellt ist (Register N9, eine Zeile ohne Aktion). */
+export const HEUTE_KEINE_BESTELLUNGEN = 'Noch keine Bestellungen'
+
 /**
  * Was der Hinweis „Online-Zahlung ist pausiert" braucht (Register F4) — oder
  * null, wenn er nicht steht (onlineZahlungPausiert). „Nur bar bei Abholung"

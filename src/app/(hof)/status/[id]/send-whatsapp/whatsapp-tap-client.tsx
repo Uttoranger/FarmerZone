@@ -1,11 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { Check, MessageSquare } from 'lucide-react'
 import { setzeWhatsAppGetippt } from '@/server/actions/status-posts'
 import { toWaPhone } from '@/lib/whatsapp'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { EmptyState } from '@/components/ui/empty-state'
+import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
 import { teilenLink } from '@/lib/teilen-kanal'
 import {
   WHATSAPP_VERSAND_TEXT as TEXT,
@@ -94,10 +98,20 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, abonnentinnen
 
   if (stand.gesamt === 0) {
     return (
-      <div className="text-center py-16">
-        {/* h1 auch in den Randzuständen — sonst hätte die Seite keine Überschrift. */}
-        <h1 className="font-medium text-foreground mb-1">Keine WhatsApp-Abonnenten</h1>
-        <p className="text-sm text-muted-foreground">Es gibt noch keine Kunden mit WhatsApp-Opt-in.</p>
+      <div>
+        {/* h1 auch in den Randzuständen — sonst hätte die Seite keine Überschrift (der EmptyState zeichnet seinen Titel als Absatz). */}
+        <h1 className="sr-only">{TEXT.ueberschrift}</h1>
+        <EmptyState
+          symbol={MessageSquare}
+          titel={TEXT.leer.titel}
+          satz={TEXT.leer.satz}
+          aktion={
+            <Link href={BEITRAEGE_HREF} className={KNOPF_RAHMEN}>
+              {TEXT.leer.aktion}
+            </Link>
+          }
+          className="mt-6"
+        />
       </div>
     )
   }
