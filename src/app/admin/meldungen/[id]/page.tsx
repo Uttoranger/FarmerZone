@@ -89,7 +89,7 @@ export default async function AdminMeldungDetailPage({ params }: { params: Promi
           className={cn('inline-flex min-h-11 items-center gap-1 rounded-full pr-3 text-[14px] text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)}
         >
           <ChevronLeft className="size-4" strokeWidth={1.7} aria-hidden="true" />
-          Briefkasten
+          Postfach
         </Link>
         <div className="flex gap-2">
           {nachbarn.vorige && (

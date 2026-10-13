@@ -5096,6 +5096,16 @@ Register M1: Die Plattform heißt Agrilo, die Produktionsdomain ist agrilo.at. R
 - **Offen:** Das Vorschaubild der Startseite (`public/og/startseite.jpg`) zeigt noch Schriftzug und F-Symbol des alten Namens, die App-Symbole (`public/icons/*`, `src/app/apple-icon.png`) ein „F“ – neu zeichnen ist nicht beauftragt.
 - **Cutover (Projektleitung, nicht der Lauf; Freigabe Lauf 13 §2):** VOR dem Merge des Sammel-PRs in Vercel (Production) NEXT_PUBLIC_APP_URL und BETTER_AUTH_URL auf https://agrilo.at und EMAIL_FROM auf „Agrilo <noreply@agrilo.at>“ setzen, Resend „verified“ abwarten; NACH dem Merge farmerzone.at und www.farmerzone.at in Vercel auf 308 → agrilo.at stellen, in Stripe (Sandbox) Webhook-Adresse, Payment-Method-Domain und Connect-Profil auf agrilo.at, test.agrilo.at dem Branch staging zuweisen. Wird der Sammel-PR ohne die Variablen gemergt, schlägt die Anmeldung in der Produktion fehl.
 
+## Briefkasten wird Postfach (Nachtlauf 13, Nr. 86, Oktober 2026)
+
+Auftrag freigabe.md §17 „86“ (Register N12, nur das Wort). Keine Migration, kein neues Paket; Routen, Dateien und Bezeichner bleiben.
+
+- **Stand:** Alle 23 Fundstellen aus `OFFEN_BIS_86` sind erledigt (13 umgestellt, 10 durch Ausnahmen mit Grund gedeckt), die Liste ist leer, der Test „OFFEN_BIS_86 ist leer“ läuft statt `it.skip`. Bericht 86 zählt je Wort.
+- **Umgestellt:** Der Admin-Reiter heißt „Postfach“ (am Handy als Chip unter dem Kopf), ebenso Titel und Überschrift von `/admin/meldungen`, der Ladefehler, „‹ Postfach“ im Meldungsdetail, „Neu im Postfach“ auf der Hof-Übersicht am Handy und die zwei Mails an den Betreiber samt Betreff der Wochen-Mail (ein Mailfilter auf „Briefkasten:“ braucht die neue Zeile). `/admin/meldungen`, `briefkasten-teile.tsx`, `BriefkastenLaden`, `zahl: 'briefkasten'` und der Cron bleiben; bis zum Bau des Postfachs (Nr. 87) führt der Reiter auf die Meldungen.
+- **Ausnahmen mit Grund:** „Mitteilung“ als Anlass eines Beitrags (Register 22e, sieben Texte in fünf Dateien), „Newsletter“ als Anmeldung bei einem Hof (zwei Texte; die Entscheidung über „Neuigkeiten“ ist offen). „Betriebsmitteilung“ trifft die Wortgrenze nicht und braucht keinen Eintrag.
+- **Kopfzeile des Kurator-Exports:** `# Briefkasten — n Meldungen` bleibt (Ausnahme im Test). `istExport` in `scripts/briefkasten.ts` erkennt den Export der Leseroute an diesem Anfang; ein anderer Kopf allein ließe `pnpm briefkasten export` über die Leseroute mit Code 3 abbrechen (`tests/briefkasten-cli.test.ts` hält die Bindung fest). Umstellen geht nur zusammen mit der CLI und vier Testdateien.
+- **Nicht erfasst:** „Benachrichtigungen“ (Mehrzahl) trifft die Wortgrenze nicht und steht in fünf Kundentexten (Toast-Region, Mail-Fuß, Magic-Link-Mail, Konto, Abmelde-Seite); ob es „Nachrichten“ heißen soll, entscheidet der Mensch.
+
 ## Nützliche Befehle
 
 ```bash

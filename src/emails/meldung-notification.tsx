@@ -15,7 +15,7 @@ export interface MeldungNotificationProps {
   adminUrl: string
 }
 
-/** Betreiber-Benachrichtigung: eine neue FEHLER-Meldung im Briefkasten. */
+/** Nachricht an den Betreiber: eine neue FEHLER-Meldung im Postfach. */
 export function MeldungNotificationEmail(p: MeldungNotificationProps) {
   return (
     <EmailLayout previewText={`Fehlermeldung ${p.kurznummer}${p.farmName ? ` von ${p.farmName}` : ''}`}>
@@ -50,10 +50,10 @@ export function MeldungNotificationEmail(p: MeldungNotificationProps) {
         )}
       </div>
 
-      <Link href={p.adminUrl} style={ctaButton}>Im Briefkasten ansehen →</Link>
+      <Link href={p.adminUrl} style={ctaButton}>Im Postfach ansehen →</Link>
 
       <Text style={mutedText}>
-        Wünsche und Fragen kommen nicht per Mail — sie stehen gesammelt im Briefkasten und in der
+        Wünsche und Fragen kommen nicht per Mail — sie stehen gesammelt im Postfach und in der
         Wochen-Zusammenfassung.
       </Text>
     </EmailLayout>

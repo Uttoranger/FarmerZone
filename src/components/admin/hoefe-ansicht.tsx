@@ -50,7 +50,7 @@ export type NeueMeldung = { id: string; art: string; artTon: MeldungTon; titel: 
  * admin-hoefe-und-freischaltung, admin-mobil-unterwegs-freischalten): oben
  * die wartenden Höfe als Karten mit „Freischalten", darunter alle übrigen mit
  * Filter und Suche — ab 1024 px als Tabelle, darunter als Karten. Am Handy
- * steht zwischen beiden „Neu im Briefkasten".
+ * steht zwischen beiden „Neu im Postfach".
  *
  * Filter und Suche stehen in der Adresse und werden im Browser angewandt
  * (replaceState, kein Server-Aufruf je Tipp). Was eine Zeile sagt, entscheidet
@@ -274,12 +274,12 @@ function WartenderHof({ hof, onAktion }: { hof: AdminHof; onAktion: (a: HofAktio
   )
 }
 
-/** Am Handy: was im Briefkasten auf eine Entscheidung wartet (Mockup admin-mobil-unterwegs-freischalten). */
+/** Am Handy: was im Postfach auf eine Entscheidung wartet (Mockup admin-mobil-unterwegs-freischalten). */
 function NeuImBriefkasten({ meldungen }: { meldungen: NeueMeldung[] }): React.JSX.Element {
   return (
     <section aria-labelledby="neu-briefkasten-titel" className="flex flex-col gap-3 md:hidden">
       <h2 id="neu-briefkasten-titel" className={KICKER}>
-        Neu im Briefkasten
+        Neu im Postfach
       </h2>
       <ul className={cn(KARTE, 'overflow-hidden [&>li+li]:border-t [&>li+li]:border-border')}>
         {meldungen.map((m) => (
