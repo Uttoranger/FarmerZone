@@ -758,7 +758,10 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     const abholung = html(createElement(NaechsteAbholungKarte, { fenster: { tag: '2026-10-06', name: 'Heute', zeit: '15–18 Uhr' }, anzahl: 8 }))
     expect(abholung).toMatch(/Heute, <span[^>]*>15–18 Uhr<\/span>/)
     expect(abholung).toContain('8 Bestellungen')
-    expect(html(createElement(NaechsteAbholungKarte, { fenster: null, anzahl: 0 }))).toContain('href="/settings/pickup-slots"')
+    // Ohne Abholzeit nur der Titel als Zeile; Satz und Knopf stehen allein in der Packliste (tests/leerzustaende.test.ts).
+    const ohneFenster = html(createElement(NaechsteAbholungKarte, { fenster: null, anzahl: 0 }))
+    expect(ohneFenster).toContain('Noch keine Abholzeiten')
+    expect(ohneFenster).not.toContain('href=')
 
     const balken = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((label, i) => ({ label, cent: 1000 * i, heute: i === 1, hoeheProzent: Math.round((100 * i) / 6) }))
     const woche = html(createElement(WocheKarte, { summeCent: 61290, vergleich: '+20 % gegenüber der Vorwoche bis Dienstag, 14:30', balken }))

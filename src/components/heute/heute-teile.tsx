@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import {
-  CalendarClock,
   ChevronRight,
   Clock,
   CreditCard,
@@ -432,6 +431,7 @@ export function NaechsteAbholungKarte({ fenster, anzahl }: { fenster: NaechstesF
       <h2 id="heute-naechste-abholung" className={cn('text-[13px] font-normal', LEISE)}>
         Nächste Abholung
       </h2>
+      {/* Ohne Abholzeit nur der Titel als eine Zeile: Satz und Knopf stehen schon in der Packliste (N9, ein Zustand eine Fassung). */}
       {fenster ? (
         <>
           {/* Umbruch nur nach dem Komma — „15–18 Uhr" bleibt zusammen. */}
@@ -441,17 +441,7 @@ export function NaechsteAbholungKarte({ fenster, anzahl }: { fenster: NaechstesF
           <p className={cn('text-[13px]', LEISE)}>{anzahl > 0 ? mehrzahl(anzahl, 'Bestellung', 'Bestellungen') : HEUTE_KEINE_BESTELLUNGEN}</p>
         </>
       ) : (
-        <EmptyState
-          symbol={CalendarClock}
-          titel={ABHOLZEITEN_FEHLEN.titel}
-          satz={ABHOLZEITEN_FEHLEN.satz}
-          aktion={
-            <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={KNOPF_ORANGE}>
-              {ABHOLZEITEN_FEHLEN.aktion.text}
-            </Link>
-          }
-          className="rounded-none border-0 bg-transparent px-0 py-4"
-        />
+        <p className={cn('text-[13px]', LEISE)}>{ABHOLZEITEN_FEHLEN.titel}</p>
       )}
     </section>
   )

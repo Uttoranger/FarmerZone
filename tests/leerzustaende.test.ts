@@ -8,9 +8,10 @@
  *    die Aktion mit ihrem Ziel bzw. als Knopf.
  *  - Gegenprobe: Mit Inhalt rendert dieselbe Komponente keinen EmptyState — die Suche nach dem
  *    Merkmal (`data-slot="empty-state"`) schlägt also nicht überall an.
- *  - Heute: Packliste und Karte „Nächste Abholung“ sagen „keine Abholzeiten“ mit demselben Satz
- *    und demselben Knopf (vorher zwei Fassungen).
- *  - WhatsApp ohne Abonnentin behält genau eine h1 (unsichtbar), der EmptyState trägt sie nicht.
+ *  - Heute ohne Abholzeit: Satz und Knopf „Abholzeiten eintragen“ stehen auf der Seite genau
+ *    einmal (Packliste); die Karte „Nächste Abholung“ sagt es in einer Zeile (Nachbesserung Runde 1).
+ *  - Der Knopf der Einstellungen sucht das Feld, das im Formular wirklich diese Kennung trägt.
+ *  - WhatsApp ohne Abonnentin: der Titel des EmptyState ist die eine h1 der Seite.
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { createElement, type ReactNode } from 'react'
@@ -28,11 +29,11 @@ vi.mock('@/server/actions/farm', () => ({
 }))
 vi.mock('@/server/actions/status-posts', () => ({ setzeWhatsAppGetippt: () => undefined }))
 
-import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
+import { ABHOLZEITEN_FEHLEN, ABHOLZEITEN_FORMULAR_ID } from '@/lib/pickup-slot-rules'
 import { UMSATZ_LEER } from '@/lib/auswertung'
 import { WHATSAPP_VERSAND_TEXT } from '@/lib/whatsapp-versand'
 import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
-import { WUNSCHLISTE_SATZ } from '@/lib/admin-briefkasten'
+import { WUNSCHLISTE_LEER, WUNSCHLISTE_SATZ } from '@/lib/admin-briefkasten'
 
 let heute: typeof import('@/components/heute/heute-teile')
 let abholzeiten: typeof import('@/components/settings/pickup-slots-client')
@@ -50,8 +51,9 @@ beforeAll(async () => {
 
 const html = (el: React.ReactElement) => renderToStaticMarkup(el)
 const maskiere = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-const EMPTY_STATE = 'data-slot="empty-state"'
 const anzahlEmptyStates = (h: string) => (h.match(/data-slot="empty-state"/g) ?? []).length
+/** Wie oft der Text im Markup steht. */
+const vorkommen = (h: string, text: string) => h.split(text).length - 1
 
 /** Ein Link mit diesem Ziel, der nur diesen Text trägt. */
 const alsLink = (href: string, text: string) => new RegExp(`<a href="${maskiere(href)}"[^>]*>${maskiere(text)}</a>`)
@@ -59,16 +61,20 @@ const alsLink = (href: string, text: string) => new RegExp(`<a href="${maskiere(
 const alsKnopf = (text: string) => new RegExp(`<button type="button"[^>]*>${maskiere(text)}</button>`)
 
 describe('Heute — keine Abholzeiten', () => {
-  it('Packliste und „Nächste Abholung“ zeigen denselben Satz und denselben Knopf', () => {
+  it('Satz und Knopf stehen auf der Seite genau einmal — in der Packliste; die Karte sagt es in einer Zeile', () => {
     const packliste = html(createElement(heute.Packliste, { zeilen: [], zuPacken: 0, naechsteAbholung: null, leer: { abholfenster: null } }))
     const karte = html(createElement(heute.NaechsteAbholungKarte, { fenster: null, anzahl: 0 }))
-    for (const h of [packliste, karte]) {
-      expect(h).toContain(EMPTY_STATE)
-      expect(h).toContain(ABHOLZEITEN_FEHLEN.satz)
-      expect(h).toMatch(alsLink(ABHOLZEITEN_FEHLEN.aktion.href, ABHOLZEITEN_FEHLEN.aktion.text))
-    }
+    // So stehen die beiden Blöcke auf /dashboard untereinander (app/(hof)/dashboard/page.tsx).
+    const seite = packliste + karte
+    expect(vorkommen(seite, ABHOLZEITEN_FEHLEN.satz)).toBe(1)
+    expect(vorkommen(seite, ABHOLZEITEN_FEHLEN.aktion.text)).toBe(1)
+    expect(packliste).toMatch(alsLink(ABHOLZEITEN_FEHLEN.aktion.href, ABHOLZEITEN_FEHLEN.aktion.text))
+    // Die Karte: nur der Titel als Zeile, kein EmptyState, kein Knopf, kein Link.
+    expect(anzahlEmptyStates(karte)).toBe(0)
     expect(karte).toContain(ABHOLZEITEN_FEHLEN.titel)
-    // Die zweite Fassung von früher ist weg.
+    expect(karte).not.toContain('<a ')
+    expect(karte).not.toContain('<button')
+    // Die zweiten Fassungen von früher sind weg.
     expect(karte).not.toContain('Du hast noch keine Abholzeiten eingetragen')
     expect(packliste).not.toContain('damit Kunden bei dir bestellen')
   })
@@ -99,6 +105,13 @@ describe('Einstellungen — Abholzeiten', () => {
     expect(h).not.toContain('Noch keine Abholzeiten angelegt')
   })
 
+  it('der Knopf führt ins Formular: Das erste Feld trägt die Kennung, die er sucht', () => {
+    const h = html(createElement(abholzeiten.PickupSlotsClient, { initialSlots: [] }))
+    expect(ABHOLZEITEN_FORMULAR_ID).toBeTruthy()
+    expect(h).toContain(`id="${ABHOLZEITEN_FORMULAR_ID}"`)
+    expect(h).toContain(`for="${ABHOLZEITEN_FORMULAR_ID}"`)
+  })
+
   it('Gegenprobe: mit einer Abholzeit steht kein EmptyState da', () => {
     const h = html(createElement(abholzeiten.PickupSlotsClient, { initialSlots: [slot] }))
     expect(anzahlEmptyStates(h)).toBe(0)
@@ -110,7 +123,7 @@ describe('Admin — Briefkasten, Wunschliste', () => {
   it('ohne Wunsch: EmptyState „Noch keine Wünsche“, der Satz der Liste bleibt darunter', () => {
     const h = html(createElement(briefkasten.Wunschliste, { buendel: [] }))
     expect(anzahlEmptyStates(h)).toBe(1)
-    expect(h).toContain('Noch keine Wünsche')
+    expect(h).toContain(WUNSCHLISTE_LEER.titel)
     expect(h).toContain(WUNSCHLISTE_SATZ)
   })
 
@@ -149,16 +162,20 @@ describe('WhatsApp — keine Abonnentin', () => {
   const basis = { postId: 'p1', title: 'Frische Eier', body: 'Heute neu im Shop.', farmSlug: 'hof-test', getippt: [] }
   const anzahlH1 = (h: string) => (h.match(/<h1\b/g) ?? []).length
 
-  it('ohne Abonnentin: EmptyState mit Titel, Satz und dem Weg zurück zu den Beiträgen, die h1 bleibt', () => {
+  it('ohne Abonnentin: EmptyState mit Titel, Satz und dem Weg zurück zu den Beiträgen; sein Titel ist die eine h1', () => {
     const h = html(createElement(whatsapp.WhatsAppTapClient, { ...basis, abonnentinnen: [] }))
     expect(anzahlEmptyStates(h)).toBe(1)
-    expect(h).toContain(WHATSAPP_VERSAND_TEXT.leer.titel)
     expect(h).toContain(WHATSAPP_VERSAND_TEXT.leer.satz)
     expect(h).toMatch(alsLink(BEITRAEGE_HREF.replaceAll('&', '&amp;'), WHATSAPP_VERSAND_TEXT.leer.aktion))
-    // Der EmptyState zeichnet seinen Titel als Absatz — die Seite braucht ihre eine Überschrift extra.
     expect(anzahlH1(h)).toBe(1)
-    expect(h).toMatch(new RegExp(`<h1 class="sr-only">${maskiere(WHATSAPP_VERSAND_TEXT.ueberschrift)}</h1>`))
+    expect(h).toMatch(new RegExp(`<h1[^>]*>${maskiere(WHATSAPP_VERSAND_TEXT.leer.titel)}</h1>`))
+    // Keine zweite Fassung der Überschrift (unsichtbar oder nicht) und kein Fachwort.
+    expect(h).not.toContain('WhatsApp versenden')
     expect(h).not.toContain('Opt-in')
+  })
+
+  it('der Satz verspricht nicht mehr, als die Liste hält: nur Kundinnen mit Häkchen UND Nummer', () => {
+    expect(WHATSAPP_VERSAND_TEXT.leer.satz).toMatch(/Nummer/)
   })
 
   it('Gegenprobe: mit einer Abonnentin steht kein EmptyState da, und die Seite hat weiter eine h1', () => {
