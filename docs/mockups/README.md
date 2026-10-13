@@ -243,8 +243,8 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 | `mobil-k0-startseite-karte-region.html` | K0 · Startseite: Karte der Region | `/` | Umbau (Nr. 59) | 390×844 |
 | `web-k2-hofseite-ohne-telefon.html` | K2 · Hofseite ohne Telefonnummer vor dem Kauf | `/[farmSlug]` | Umbau (Nr. 60) | 1440×900 |
 | `mobil-k2-hofseite-ohne-telefon.html` | K2 · Hofseite ohne Telefonnummer | `/[farmSlug]` | Umbau (Nr. 60) | 390×844 |
-| `web-k3-kasse-angaben-zum-hof.html` | K3 · Kasse: Angaben zum Hof (Pflichtangaben) | `/[farmSlug]/checkout` | Umbau (Nr. 60) | 1440×760 |
-| `mobil-k3-kasse-angaben-zum-hof.html` | K3 · Kasse: Angaben zum Hof (Pflichtangaben) | `/[farmSlug]/checkout` | Umbau (Nr. 60) | 390×844 |
+| `web-k3-kasse-angaben-zum-hof.html` | K3 · Kasse: Angaben zum Hof (Pflichtangaben) | `/[farmSlug]/checkout` | Umbau (Nr. 60) · Anordnung ersetzt durch -kasse-glatt (Nr. 82); Angaben zum Hof unverändert | 1440×760 |
+| `mobil-k3-kasse-angaben-zum-hof.html` | K3 · Kasse: Angaben zum Hof (Pflichtangaben) | `/[farmSlug]/checkout` | Umbau (Nr. 60) · Anordnung ersetzt durch -kasse-glatt (Nr. 82); Angaben zum Hof unverändert | 390×844 |
 | `web-k4-bestellung-hof-erreichen.html` | K4 · Bestellung ansehen: Hof erreichen | `/[farmSlug]/bestellung/[orderId], /[farmSlug]/confirm/[orderId]` | Umbau (Nr. 60) | 1440×640 |
 | `mobil-k4-bestellung-hof-erreichen.html` | K4 · Bestellung ansehen: Hof erreichen | `/[farmSlug]/bestellung/[orderId], /[farmSlug]/confirm/[orderId]` | Umbau (Nr. 60) | 390×844 |
 | `system-komponente-tarif-zeile-startphase.html` | Komponente – Tarif-Zeile in der Seitenleiste: Startphase | `HofShell (Seitenleiste)` | neu (Nr. 61) | 264×960 |
@@ -267,3 +267,11 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 | `mobil-k2-hofseite-beitraege-alle-aktiven.html` | K2 · Hofseite › Beiträge: alle aktiven, neuester zuerst | `/[farmSlug]?reiter=beitraege` | Umbau (Nr. 68) | 390×844 |
 | `system-teilen-bild-varianten.html` | Komponente – Teilen-Bild 1:1: A Marktkarte (gilt), B Foto-Held (mit Foto), C Hoftafel (verworfen) | `/[farmSlug]/opengraph-image` | Umbau (Nr. 69) | 1720×720 |
 | `system-teilen-bild-story-und-beitrag.html` | Komponente – Teilen-Bild Status 9:16 (QR nur hier) und Beitrag-Modus | `/[farmSlug]/opengraph-image?format=story, Beitrag-Bild (Nr. 67)` | Umbau (Nr. 69) | 1720×860 |
+
+## Lauf 12 (Canvas, 12.10.2026)
+
+| Datei | Bildschirm | Route im Code | Arbeit | Größe |
+|---|---|---|---|---|
+| `web-k3-kasse-glatt.html` | K3 · Kasse geglättet: vier flache Karten (Korb → Abholung → Deine Daten → Bezahlen), Online bleibt vorbelegt, Erklärung je Option, Gebühr „entfällt“ bei Bar | `/[farmSlug]/checkout` | Umbau (Kasse glätten) | 1440×1000 |
+| `mobil-k3-kasse-glatt.html` | K3 · Kasse geglättet am Handy, feste Leiste mit Kaufknopf | `/[farmSlug]/checkout` | Umbau (Kasse glätten) | 390×1820 |
+| `system-k3-kasse-bezahlen-bar.html` | Komponente – Zustand „Bar gewählt“: Gebühr „entfällt“, Knopf „Zahlungspflichtig bestellen“, kein Stripe-Satz | `/[farmSlug]/checkout` | Umbau (Kasse glätten) | 1000×420 |

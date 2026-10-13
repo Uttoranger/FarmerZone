@@ -164,6 +164,11 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 10):** `docs/ai/BAUSTEINE.md` wird aus dem Code erzeugt (`pnpm bausteine`), nie von Hand geschrieben; ein Test hält es aktuell; vor jeder neuen Datei, Komponente oder Funktion wird es gelesen. Fehler, die wiederkommen können, werden bevorzugt durch eine Prüfung verhindert (Test, Lint, Hook), sonst durch eine Textregel am richtigen Ort. Agenten schlagen Regeln vor, der Mensch gibt frei; neue Regeln tragen Herkunft und Datum. Jeder fünfte Lauf (10, 15, …) beginnt mit einer Regel-Inventur: überholte, doppelte oder durch Tests abgedeckte Regeln werden zum Streichen vorgeschlagen, nicht selbst gestrichen.
 - **Umsetzung:** Nr. 58 (freigabe.md §14).
 
+### G5 · Bedeutungsfarben als Tokens (13.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 12):** Die vier Zustände tun (Kundin oder Hof muss etwas tun), läuft, erledigt, abgebrochen haben je ein Flächen- und ein Text-Token in beiden Modi; Marken entstehen nur aus dem Baustein `Marke`. Kontrast Text auf Fläche ≥ 4,5:1 in beiden Modi (heute 2,3:1 bei tun und erledigt im hellen Modus). Die Regel „keine Hexfarben in Komponenten" gilt damit ohne die Ausnahme aus bestellstatus.ts; benannte Ausnahmen bleiben: Teilen-Bild, Mails, QR, Absperrband, Leaflet-Pins (hoefe-anzeige.ts), Titelbild-Verläufe (mein-hof.ts), manifest/layout. Die bewusste Trennung Kundin-Sicht (bestellstatus.ts) / Hof-Sicht (order-status.ts) bleibt – nur die Farbe kommt aus einer Quelle.
+- **Verhältnis zu anderen Einträgen:** ersetzt die Ausnahme im Kopfkommentar von `src/lib/bestellstatus.ts` („keine Tokens für Bedeutungsfarben"); nimmt den Regelvorschlag 68 aus Lauf 11 (StatusBadge mit Symbol) im Baustein `Marke` auf.
+- **Umsetzung:** Nr. 79 (freigabe.md §16).
+
 ## F – Freigaben nach der Umsetzung
 
 ### F1 · Mockup-Abweichungen Nr. 03, 05 und 07–17 (06.10.2026)
@@ -231,6 +236,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 11):** Hofseite zeigt alle aktiven Beiträge, neuester zuerst mit „Aktuell", höchstens fünf; der Reiter heißt „Beiträge · n". Vorher: nur der neueste (ursprüngliches Konzept „ein Status je Hof").
 - **Verhältnis zu anderen Einträgen:** ergänzt F2.
 - **Umsetzung:** Nr. 68 (freigabe.md §15).
+- **Bestätigt (uttoranger, Freigabe Lauf 12, 13.10.2026):** Kennung F8 statt F7 aus der Freigabe Lauf 11 bestätigt.
 
 ---
 
@@ -342,11 +348,18 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 11):** Das Teilen-Fenster von „Heute" bekommt einen Beitrag-Modus (Bild aus dem Beitrag, Text und Link vorbelegt). Es öffnet sich nach dem Veröffentlichen und über „Teilen" je aktivem Beitrag. Die WhatsApp-Abonnentinnen sind darin die erste Karte und führen zur Tipp-Liste (W1); E-Mail an Abonnentinnen bleibt ein Häkchen beim Veröffentlichen; die Häkchen „Per WhatsApp" und „Als WhatsApp-Status-Bild" entfallen. Teilen (d) bleibt: Teilen legt keinen Beitrag an.
 - **Verhältnis zu anderen Einträgen:** Teilen (d) aus F6 bleibt; ergänzt W1.
 - **Umsetzung:** Nr. 67 (freigabe.md §15).
+- **Bestätigt (uttoranger, Freigabe Lauf 12, 13.10.2026):** Im Beitrag-Modus bestimmt die Auswahl `p` im Fenster das Bild vor den verknüpften Produkten; ohne `p` die verknüpften (nur kaufbare), sonst der Standard (Nr. 67 Runde 1, Entscheidung des Dirigenten in Lauf 11).
 
 ### T6 · Teilen-Bild (12.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 11):** Variante A „Marktkarte" (Creme, grüne Kante, Serif-Titel, Produktzeilen mit Foto oder Kategorie-Illustration, Abhol-Streifen, Link-Pille) ist das Bild; liegt ein Foto vor (Beitragsfoto, sonst erstes Produktfoto), gilt Variante B „Foto-Held". Der QR-Code steht nur im Format Status 9:16 (Storys haben keinen klickbaren Link); im 1:1 steht kein QR. Bildquelle je Produktzeile: eigenes Foto → Illustration der Kategorie → „Sonstiges". Schriften im Bild: Fraunces und Instrument Sans wie in der App.
 - **Verhältnis zu anderen Einträgen:** ergänzt T1 – Farbwerte im Teilen-Bild bleiben die Ausnahme vom Token-Gebot in `TEILEN_BILD_FARBE`.
 - **Umsetzung:** Nr. 69 (freigabe.md §15).
+- **Bestätigt (uttoranger, Freigabe Lauf 12, 13.10.2026):** Schriftquelle Instrument Sans aus github.com/Instrument/instrument-sans (Commit 7fa2230) statt der nicht vorhandenen Adresse github.com/googlefonts/instrument-sans – Entscheidung des Dirigenten in Lauf 11.
+
+### T7 · Teilen-Bild als JPEG (13.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 12):** Die Bildroute liefert JPEG (Qualität 82) statt PNG, damit die Vorschau in WhatsApp und Co. sicher erscheint (PNG mit Foto 1,2–1,4 MB); Dateiname und Teilen-Datei .jpg, Open-Graph-Typ image/jpeg. QR und Schrift müssen bei 1080 px lesbar bleiben (Abnahme an den sechs Bildern aus 69).
+- **Verhältnis zu anderen Einträgen:** ergänzt T6 (Gestaltung bleibt).
+- **Umsetzung:** Nr. 76 (freigabe.md §16).
 
 ---
 
@@ -463,12 +476,33 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 11):** Ein Titelbild, das höher als breit ist, wird am Desktop nicht beschnitten, sondern ganz gezeigt (object-contain, mittig) vor einer unscharfen, abgedunkelten Kopie desselben Bilds, die die Fläche füllt; am Handy bleibt der Beschnitt mit Fokuspunkt. Beim Hochladen sagt die App, dass Querformat am Computer größer wirkt – kein Zwang.
 - **Verhältnis zu anderen Einträgen:** ergänzt N5.
 - **Umsetzung:** Nr. 72 (freigabe.md §15).
+- **Bestätigt (uttoranger, Freigabe Lauf 12, 13.10.2026):** Kennung N6 statt B2 aus der Freigabe Lauf 11 bestätigt.
 
 ### N7 · Mein Hof am breiten Bildschirm (12.10.2026)
 - **Kennung:** In der Freigabe Lauf 11 „D3"; D steht für Direktverkauf; Mein Hof wie N4, darum N7 (Zuordnung durch den Dirigenten nach dem Muster des Registers).
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 11):** Der Editor ist auf 2 000 px Breite begrenzt und zentriert; die Vorschau ist nie breiter als 1 440 px, die Liste 400–560 px (Web) bzw. höchstens 720 px (Handy).
 - **Verhältnis zu anderen Einträgen:** ergänzt N4.
 - **Umsetzung:** Nr. 73 (freigabe.md §15).
+- **Bestätigt (uttoranger, Freigabe Lauf 12, 13.10.2026):** Kennung N7 statt D3 aus der Freigabe Lauf 11 bestätigt.
+
+### N8 · Wortliste (13.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 12):** Für jede Sache gibt es in Nutzertexten genau ein Wort; die Liste steht in docs/ai/DESIGN_SYSTEM.md und ein Test schützt sie. Erste Einträge: **Abholzeiten** = die Zeiten, die der Hof anbietet; **Abholtermin** = der Termin, den die Kundin gewählt hat; nicht: Zeitfenster, Abholslot. **Vorrat**; nicht: Bestand, Lagerstand, Lager (Code-Bezeichner wie `stock` bleiben). **Beitrag**; nicht: Status, Post, Neuigkeit als Objekt (Route /status bleibt, Register 22e). **Problem melden** als Türname auf beiden Seiten; „Meine Meldungen" bleibt die Übersicht des Hofs; nicht: Hilfe und Rückmeldung, Fehler melden. **Kundin/Kunden**: Beschriftungen, Reiter, Kennzahlen „Kunden" (z. B. „Kunden", „12 Kunden"); ganze Sätze „die Kundin"/„deine Kundinnen" (gewachsener Hausstil); „Käufer" nur für die Futter-Käuferarten (Betrieb/privat). **Telefonnummern** werden einheitlich angezeigt: „+43 660 000 0000" (Ländercode, Leerzeichen nach Vorwahl und in Dreier-/Vierergruppen), gespeichert bleibt die Eingabe. Jeder weitere Eintrag kommt nur über eine Freigabe.
+- **Verhältnis zu anderen Einträgen:** ergänzt CLAUDE.md §5 (Sprache) und E11 (Brennmaterial).
+- **Umsetzung:** Nr. 77 (Liste und Test), Nr. 78 (Begriffe), Nr. 81 (Telefonnummern); freigabe.md §16.
+
+### N9 · Leerzustände (13.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 12):** Jeder Leerzustand einer Liste oder Karte entsteht aus EmptyState (Symbol, ein Satz, nächste Aktion); kleine Zeilen in Karten („Alles erledigt.") sind erlaubt, wenn sie eine einzelne Zeile bleiben und keine Aktion brauchen. Text je Seite aus einer Quelle in src/lib; kein Zustand hat zwei Fassungen.
+- **Verhältnis zu anderen Einträgen:** ergänzt DESIGN_SYSTEM, Abschnitt „Zustände".
+- **Umsetzung:** Nr. 80 (freigabe.md §16).
+
+### N10 · Kasse glätten (13.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 12):** vier flache Karten in Lesereihenfolge Korb → Abholung (eine Zeile Chips, Adresse rechts im Kopf) → Deine Daten (ab md zwei Spalten: E-Mail · Name / Telefon · Notiz, Notiz einzeilig und wächst) → Bezahlen (Optionen ab md nebeneinander, jede mit eigener Erklärung). **Online bleibt vorbelegt**, auch im Testbetrieb (Entscheidung uttoranger 13.10.: Die Plattform verdient nur an Online-Zahlungen); der Testbetrieb-Satz steht an der Online-Option. Bar trägt seinen Vorteil selbst („Ohne Servicegebühr bis 31. Jänner 2027. Du bestätigst per E-Mail – ein Tipp genügt."); der Stripe-Satz nur bei Online (wie heute). „Ein Korb pro Hof" entfällt in der Kasse. Übersicht: „Servicegebühr (5 %)" mit (i)-Knopf, der den Erklärsatz und „mind. € 0,50" aufklappt; bei Bar ohne Gebühr steht „entfällt" statt € 0,00. Angaben zum Hof, Kaufknopf und Knopftexte bleiben (Nr. 60, N2). Abweichung von k3-kasse-angaben-zum-hof genehmigt.
+- **Verhältnis zu anderen Einträgen:** ergänzt N2 (Kasse ohne Zusatz-Haken), Z2 und B1; ersetzt die Anordnung aus `web-/mobil-k3-kasse-angaben-zum-hof` (Nr. 60), die Angaben zum Hof bleiben.
+- **Umsetzung:** Nr. 82 (freigabe.md §16); Mockups `web-k3-kasse-glatt`, `mobil-k3-kasse-glatt`, `system-k3-kasse-bezahlen-bar` (docs/mockups/README.md).
+
+### N11 · Heute (13.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 12):** Hauptspalte Packliste → Braucht dich → Teilen (dringend vor freiwillig); leeres „Braucht dich" ist eine Zeile „Nichts braucht dich heute." statt einer Karte. Kein Mockup; die Bilder im Bericht sind die Vorlage.
+- **Umsetzung:** Nr. 83 (freigabe.md §16; kein Mockup, die Bilder im Bericht sind die Vorlage).
 
 ---
 
@@ -507,3 +541,5 @@ Stand Lauf 9 (uttoranger, 10.10.2026): N3, N4, N5 und Z4 sind entschieden und in
 Stand Lauf 10 (uttoranger, 12.10.2026): G4, K2, S16 und die Ergänzungen zu E6 („ohne Wahl Hoftor"), Z4 („Bestellzahl ohne Testbestellungen") und N4 („die Server-Action schreibt nur mitgeschickte Felder") sind entschieden und in Nr. 58–65 eingeplant (freigabe.md §14). O8 (Produkte über der Grenze ab 1.2.2027) ist entschieden, der Bau folgt in Gate 8 / Lauf 11; O6 (Kachelquelle) bleibt offen und wird nicht gebaut. Lint gehört zur Abschlussprüfung (Nr. 63): 0 Fehler vor jedem Commit, der Stop-Hook prüft es ab Lauf 11. Die Mockup-Abweichungen aus den Berichten 49–54 und ebee305 (Reihenfolge der Liste „Bearbeiten") sind freigegeben (freigabe.md §13, Nachtrag). Vorgemerkt für Lauf 11: ein dauerhaftes Admin-Protokoll (S12) als Tabelle (braucht eine Migration). Die Live-Schaltung samt `STRIPE_LIVE_AB` macht der Mensch als letzten Schritt.
 
 Stand Lauf 11 (uttoranger, 12.10.2026): W1, T5, T6, F8, N6, N7 und I1 sind entschieden und in Nr. 66–74 eingeplant (freigabe.md §15); in der Freigabe heißen F8, N6 und N7 „F7", „B2" und „D3" (Zuordnung nach dem Muster des Registers). Nr. 66 darf eine Expand-Migration anlegen (Wortlaut bei W1). Die Nacharbeit aus Lauf 10 (Nr. 70) und der Fehler im Nachbestell-Link (Nr. 71) sind beauftragt; die Port-Frage ist durch Nr. 70 erledigt. Vorgemerkt im Backlog: „Illustrationen: Bögen in höherer Auflösung (2K/4K) neu erzeugen und mit dem Schneideskript der Projektleitung ersetzen, sobald Kacheln größer als 260 px gezeigt werden; Schwarzweiß-Fassung für Plakat und dunkles Theme nutzen". Offen und nicht in diesem Lauf: E-Mail-Pflicht nach FAGG; „Produkte im Shop" je Verkaufsgröße oder Familie; Gründungszusage bei Rücknahme der Freischaltung; Grundlage Kundinnen-Status; OSM-Auszug für die Karte; CI-Lint blockierend; SEPA-Weg, Rechnung/USt der Grundgebühr, Rücklastschriften, Admin-Protokoll (S12). Die Live-Schaltung samt `STRIPE_LIVE_AB` macht der Mensch als letzten Schritt.
+
+Stand Lauf 12 (uttoranger, 13.10.2026): N8, N9, N10, N11, G5 und T7 sind entschieden und in Nr. 76–83 eingeplant (freigabe.md §16); die Nacharbeit aus Lauf 11 ist als Nr. 75 beauftragt. Die Regelvorschläge 71, 66, 67 und 74 aus Morgenbericht 11 §8 sind freigegeben und eingetragen (TESTING_GUIDELINES §2, TECH_STACK; Wache und CI-Schritt baut Nr. 75), 73 steht in docs/nachtlauf.md 4a Punkt 1, 68 geht in Nr. 79 auf. Die Entscheidungen des Dirigenten aus Lauf 11 sind bestätigt (Kennungen F8/N6/N7, Schriftquelle, „p vor verknüpften Produkten", die Grenzerweiterungen aus Morgenbericht 11 §6). Lauf 12 hat keine Migration. Nicht in diesem Lauf (Lauf 13, nach Entscheidung): Warteliste je Produkt, Push bei neuer Bestellung, Nachfrage-Signal, Beitrag per Sprache, Hof merken. Offen bleibt: Kopf mit Reitern bei 2560 volle Breite (73); Titelbild-Maße beim Hochladen speichern (Migration); Contract whatsappSentCount/whatsappRecipientCount; E-Mail-Pflicht FAGG; Produkte je Verkaufsgröße/Familie; Gründungszusage bei Rücknahme; Kundinnen-Status; OSM-Auszug; CI-Lint blockierend; SEPA, Rechnung/USt, Rücklastschriften, Admin-Protokoll (S12). Die Live-Schaltung samt `STRIPE_LIVE_AB` macht der Mensch als letzten Schritt.
