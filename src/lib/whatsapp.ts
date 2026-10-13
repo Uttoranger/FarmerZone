@@ -5,9 +5,21 @@
 // "+43 660 123-45 67" / "0660 1234567" → "436601234567" (wa.me-Format ohne +)
 export function toWaPhone(phone: string): string {
   const digits = phone.replace(/[\s\-().]/g, '')
-  if (digits.startsWith('+')) return digits.slice(1)
-  if (digits.startsWith('0')) return '43' + digits.slice(1)
-  return digits
+  const international = digits.startsWith('+') ? digits.slice(1) : digits.startsWith('0') ? '43' + digits.slice(1) : digits
+  // Nur Ziffern in die Adresse (Sicherheitsprüfung 13.10., Nr. 75): Gespeichert
+  // ist, was eingegeben wurde — ein Buchstabe, „/" oder „?" landete sonst im Link.
+  return international.replace(/\D/g, '')
+}
+
+/**
+ * Die wa.me-Adresse zu einer Nummer, mit vorbelegtem Text — oder null, wenn
+ * in der Nummer keine Ziffer steht: `https://wa.me/` ohne Nummer erreicht
+ * niemanden, also gibt es dann keinen Link (Nr. 75).
+ */
+export function whatsAppLink(phone: string, text?: string): string | null {
+  const nummer = toWaPhone(phone)
+  if (!nummer) return null
+  return text === undefined ? `https://wa.me/${nummer}` : `https://wa.me/${nummer}?text=${encodeURIComponent(text)}`
 }
 
 export type OrderReminderInfo = {
@@ -33,6 +45,6 @@ export function buildOrderReminderMessage(order: OrderReminderInfo): string {
   )
 }
 
-export function buildOrderReminderUrl(phone: string, order: OrderReminderInfo): string {
-  return `https://wa.me/${toWaPhone(phone)}?text=${encodeURIComponent(buildOrderReminderMessage(order))}`
+export function buildOrderReminderUrl(phone: string, order: OrderReminderInfo): string | null {
+  return whatsAppLink(phone, buildOrderReminderMessage(order))
 }

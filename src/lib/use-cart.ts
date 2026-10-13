@@ -97,13 +97,13 @@ export function useCart(farmId: string, farmSlug: string): Warenkorb {
   const zuletzt = useRef<KorbStand | null>(null)
 
   /** Der Korb nach der letzten Änderung — auch wenn seitdem noch nicht neu gerendert wurde. */
-  function aktuelleItems(): CartItem[] {
+  function aktuellePositionen(): CartItem[] {
     const stand = zuletzt.current
     return stand?.farmId === farmId && stand.farmSlug === farmSlug ? stand.items : items
   }
 
   function persist(aendern: (vorher: CartItem[]) => CartItem[]) {
-    const stand = { farmId, farmSlug, items: aendern(aktuelleItems()) }
+    const stand = { farmId, farmSlug, items: aendern(aktuellePositionen()) }
     zuletzt.current = stand
     setKorb(stand)
     schreibeWarenkorb(stand)
@@ -113,7 +113,7 @@ export function useCart(farmId: string, farmSlug: string): Warenkorb {
     product: Omit<CartItem, 'quantity'>,
     qty = 1
   ): Promise<{ ok: boolean; error?: string }> {
-    const existingQty = aktuelleItems().find((i) => i.productId === product.productId)?.quantity ?? 0
+    const existingQty = aktuellePositionen().find((i) => i.productId === product.productId)?.quantity ?? 0
     const totalQty = existingQty + qty
 
     const res = await fetch('/api/reserve', {

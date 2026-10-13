@@ -1,5 +1,12 @@
+/**
+ * Lesen rund um Beiträge (StatusPost): die Liste im Reiter „Beiträge", die
+ * Beiträge der Hofseite (Register F8), die Vorlage für „Neuer Beitrag" und
+ * die WhatsApp-Abonnentinnen samt Tipp-Liste (Register W1) — wer WhatsApp
+ * vom Hof bekommt, steht hier EINMAL (`whatsAppAbonnentinnen`, als SQL für
+ * setzeWhatsAppGetippt `whatsAppAbonnentinSql`).
+ */
 import { prisma } from '@/lib/prisma'
-import type { Prisma, StatusPostAnlass } from '@prisma/client'
+import { Prisma, type StatusPostAnlass } from '@prisma/client'
 import type { Abonnentin } from '@/lib/whatsapp-versand'
 
 export type StatusPostSummary = {
@@ -118,11 +125,23 @@ export async function getStatusTemplate(
 }
 
 /**
- * Wer WhatsApp vom Hof bekommt: Häkchen gesetzt und eine Nummer hinterlegt —
- * dieselbe Bedingung für die Liste und für die Zahl im Reiter „Beiträge".
+ * Wer WhatsApp vom Hof bekommt: Häkchen gesetzt und eine Nummer hinterlegt,
+ * die nicht leer ist (`''` kam als „hinterlegt" durch, Nr. 75) — dieselbe
+ * Bedingung für die Liste, die Zahl im Reiter „Beiträge" und das Teilen-Fenster.
  */
 function whatsAppAbonnentinnen(farmId: string): Prisma.CustomerFarmSubscriptionWhereInput {
-  return { farmId, optInWhatsApp: true, customerPhone: { not: null } }
+  return { farmId, optInWhatsApp: true, AND: [{ customerPhone: { not: null } }, { customerPhone: { not: '' } }] }
+}
+
+/**
+ * Dieselbe Regel als SQL für eine Zeile von "CustomerFarmSubscription" — für
+ * das EXISTS in setzeWhatsAppGetippt, das in EINER Anweisung schreibt (Nr. 75,
+ * Defense in Depth): Eine E-Mail-Abonnentin lässt sich nicht als geöffnet
+ * markieren. Wer die Regel oben ändert, ändert sie hier mit
+ * (tests/integration/whatsapp-getippt.int.test.ts prüft beide).
+ */
+export function whatsAppAbonnentinSql(farmId: string): Prisma.Sql {
+  return Prisma.sql`"farmId" = ${farmId} AND "optInWhatsApp" = true AND "customerPhone" IS NOT NULL AND "customerPhone" <> ''`
 }
 
 /**
@@ -178,7 +197,7 @@ export async function getStatusPostForWhatsApp(
     abonnentinnen: subscribers.map((s) => ({
       id: s.id,
       name: nameMap.get(s.customerEmail.toLowerCase()) ?? s.customerEmail,
-      // Sicher: Die Bedingung oben verlangt customerPhone: { not: null }.
+      // Sicher: whatsAppAbonnentinnen verlangt customerPhone: { not: null }.
       phone: s.customerPhone!,
     })),
   }

@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { decimalZuCents } from '@/lib/order-totals'
 import type { HeuteFenster } from '@/lib/heute'
@@ -102,6 +103,41 @@ export async function ladeTeilenBildQuelle(wo: { slug: string } | { id: string }
     fotos: new Map(farm.products.flatMap((p) => (p.imageUrl ? [[p.id, p.imageUrl] as const] : []))),
     slots: farm.pickupSlots,
   }
+}
+
+/** Was die Bild-Route von einem Beitrag braucht — ob er ins Bild darf, entscheidet `beitragDarfInsBild`. */
+const TEILEN_BILD_BEITRAG_FELDER = {
+  farmId: true,
+  anlass: true,
+  title: true,
+  body: true,
+  photoUrl: true,
+  linkedProductIds: true,
+  publishedAt: true,
+  expiresAt: true,
+  showOnFarmPage: true,
+} as const satisfies Prisma.StatusPostSelect
+
+export type TeilenBildBeitragRoh = Prisma.StatusPostGetPayload<{ select: typeof TEILEN_BILD_BEITRAG_FELDER }>
+
+/**
+ * Alles aus der Datenbank, was die Bild-Route (`/[farmSlug]/opengraph-image`)
+ * braucht: Hof, Produkte und ihre Fotos aus EINER Abfrage
+ * (`ladeTeilenBildQuelle`; vorher las die Route die Fotos ein zweites Mal)
+ * und mit `beitragId` den Beitrag — nur von DIESEM Hof, Besitz in der
+ * WHERE-Klausel (Nr. 75, Defense in Depth: `beitragDarfInsBild` prüft den Hof
+ * trotzdem weiter). null: kein öffentlicher Hof.
+ */
+export async function ladeTeilenBild(
+  slug: string,
+  beitragId: string | undefined
+): Promise<{ quelle: TeilenBildQuelle; beitrag: TeilenBildBeitragRoh | null } | null> {
+  const quelle = await ladeTeilenBildQuelle({ slug })
+  if (!quelle) return null
+  const beitrag = beitragId
+    ? await prisma.statusPost.findFirst({ where: { id: beitragId, farmId: quelle.farmId }, select: TEILEN_BILD_BEITRAG_FELDER })
+    : null
+  return { quelle, beitrag }
 }
 
 /**

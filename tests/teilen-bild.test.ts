@@ -28,7 +28,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findFirst: vi.fn() },
     product: { findMany: vi.fn(async () => []) },
-    statusPost: { findUnique: vi.fn(async () => null) },
+    statusPost: { findFirst: vi.fn(async () => null) },
   },
 }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
@@ -49,9 +49,7 @@ vi.mock('next/og', () => ({
 import { prisma } from '@/lib/prisma'
 import * as Sentry from '@sentry/nextjs'
 import { ImageResponse } from 'next/og'
-import { hofAdresse } from '@/lib/mein-hof'
 import { Decimal } from '@prisma/client/runtime/index-browser'
-import { APP_URL } from '@/lib/umgebung-server'
 import {
   beitragDarfInsBild,
   beitragKurztext,
@@ -71,9 +69,10 @@ import { teilenBildSucheSchema } from '@/schemas/teilen'
 import { ladeTeilenBildBilder, type GeladeneBilder } from '@/lib/teilen-bild-quellen'
 import { TEILEN_BILD_FARBE, TeilenBildGrafik } from '@/components/teilen/teilen-bild-grafik'
 import { GET as bildRoute } from '@/app/(public)/[farmSlug]/opengraph-image/route'
+import { ladeTeilenVorschau } from '@/server/queries/teilen-bild'
 
 const findFirst = vi.mocked(prisma.farm.findFirst)
-const beitragLesen = vi.mocked(prisma.statusPost.findUnique)
+const beitragLesen = vi.mocked(prisma.statusPost.findFirst)
 const OHNE_BILDER: GeladeneBilder = { produkte: {}, held: null, ersatz: false }
 
 const HOF: TeilenBildHof = {
@@ -319,9 +318,10 @@ describe('GET /[farmSlug]/opengraph-image', () => {
     expect(findFirst.mock.calls[0][0]?.where).toMatchObject({ slug: 'hof-test', isActive: true, archivedAt: null, approvedAt: { not: null } })
   })
 
-  it('ungültiger Slug: 404 ohne Datenbank', async () => {
+  it('ungültiger Slug: 404 ohne Datenbank und ohne Zwischenspeicher', async () => {
     const res = await aufruf('Hof%20Test')
     expect(res.status).toBe(404)
+    expect(res.headers.get('cache-control')).toBe('no-store')
     expect(findFirst).not.toHaveBeenCalled()
   })
 })
@@ -341,17 +341,8 @@ describe('GET /[farmSlug]/opengraph-image — Zwischenspeicher, Bremse, Fehler (
     // Ohne Abholfenster hängt der Inhalt nicht an der Uhr.
     pickupSlots: [],
   }
-  const aktuelleVersion = () =>
-    teilenBildVersion(
-      teilenBildDaten({
-        hof: HOF,
-        produkte: [produkt('eier', { name: 'Freilandeier', stock: 3 })],
-        slots: [],
-        auswahl: null,
-        adresse: hofAdresse(APP_URL, 'hof-test').anzeige,
-        jetzt: JETZT,
-      })
-    )
+  // Die Prüfsumme der Metadaten der Hofseite (ladeTeilenVorschau), nie eine im Test nachgebaute Rechnung (Regelvorschlag 67).
+  const aktuelleVersion = async () => (await ladeTeilenVorschau('hof-test', JETZT))?.version
   const aufruf = (suche = '', kopf: Record<string, string> = {}) =>
     bildRoute(new NextRequest(`http://localhost/hof-test/opengraph-image${suche}`, { headers: kopf }), {
       params: Promise.resolve({ farmSlug: 'hof-test' }),
@@ -362,7 +353,7 @@ describe('GET /[farmSlug]/opengraph-image — Zwischenspeicher, Bremse, Fehler (
   })
 
   it('lang zwischengespeichert nur mit der Prüfsumme des aktuellen Inhalts', async () => {
-    const passend = await aufruf(`?v=${aktuelleVersion()}`)
+    const passend = await aufruf(`?v=${await aktuelleVersion()}`)
     expect(passend.status).toBe(200)
     expect(passend.headers.get('cache-control')).toContain('s-maxage=86400')
   })
@@ -400,7 +391,7 @@ describe('GET /[farmSlug]/opengraph-image — Zwischenspeicher, Bremse, Fehler (
       })
       return new Response(kaputt, { headers: { 'content-type': 'image/png' } })
     })
-    const res = await aufruf(`?v=${aktuelleVersion()}`)
+    const res = await aufruf(`?v=${await aktuelleVersion()}`)
     expect(res.status).toBe(503)
     expect(res.headers.get('cache-control')).toBe('no-store')
     expect(vi.mocked(Sentry.captureException)).toHaveBeenCalled()
@@ -681,7 +672,8 @@ describe('GET /[farmSlug]/opengraph-image — Beitrag-Modus (Register T6)', () =
     beitragLesen.mockResolvedValueOnce(beitrag() as never)
     const res = await aufruf(`?b=${BEITRAG_ID}&format=story`)
     expect(res.status).toBe(200)
-    expect(beitragLesen.mock.calls[0][0]?.where).toEqual({ id: BEITRAG_ID })
+    // Besitz in der Abfrage (Nr. 75): nur zusammen mit dem Hof; beitragDarfInsBild prüft dazu.
+    expect(beitragLesen.mock.calls[0][0]?.where).toEqual({ id: BEITRAG_ID, farmId: 'farm-1' })
     expect(imBild().beitrag).toEqual({ anlass: 'Frisches Produkt', titel: 'Frischer Honig ab Freitag', text: 'Aus eigener Imkerei. Die Menge ist begrenzt.' })
     expect(imBild().produkte.map((e) => e.id)).toEqual(['honig'])
   })
@@ -702,10 +694,16 @@ describe('GET /[farmSlug]/opengraph-image — Beitrag-Modus (Register T6)', () =
   it('Fotos nur aus dem eigenen Speicher und dem Pfad dieses Hofs; sonst Illustration und kein Foto-Held', async () => {
     vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_testspeicher_geheim')
     try {
-      vi.mocked(prisma.product.findMany).mockResolvedValueOnce([
-        { id: 'eier', imageUrl: 'https://testspeicher.public.blob.vercel-storage.com/farms/farm-1/product/1.webp' },
-        { id: 'honig', imageUrl: 'https://fremd.public.blob.vercel-storage.com/farms/farm-1/product/2.webp' },
-      ] as never)
+      // Die Fotos kommen mit dem Hof aus EINER Abfrage (ladeTeilenBildQuelle, Nr. 75).
+      findFirst.mockResolvedValueOnce({
+        ...HOF_ROH,
+        products: [
+          { ...roh('eier', 'Freilandeier'), imageUrl: 'https://testspeicher.public.blob.vercel-storage.com/farms/farm-1/product/1.webp' },
+          { ...roh('honig', 'Blütenhonig'), imageUrl: 'https://fremd.public.blob.vercel-storage.com/farms/farm-1/product/2.webp' },
+          roh('brot', 'Brot'),
+          roh('heu', 'Heu'),
+        ],
+      } as never)
       beitragLesen.mockResolvedValueOnce(
         beitrag({ linkedProductIds: ['eier', 'honig'], photoUrl: 'https://testspeicher.public.blob.vercel-storage.com/farms/farm-2/status/1.webp' }) as never
       )
@@ -716,6 +714,7 @@ describe('GET /[farmSlug]/opengraph-image — Beitrag-Modus (Register T6)', () =
         ['honig', 'illustration'],
       ])
       expect(eingabe?.beitragFoto).toBeNull()
+      expect(prisma.product.findMany).not.toHaveBeenCalled()
     } finally {
       vi.unstubAllEnvs()
     }
@@ -723,15 +722,8 @@ describe('GET /[farmSlug]/opengraph-image — Beitrag-Modus (Register T6)', () =
 
   it('fehlt ein Foto (Ersatz im Bild), kommt nur der kurze Zwischenspeicher — auch mit passender Prüfsumme', async () => {
     vi.mocked(ladeTeilenBildBilder).mockResolvedValueOnce({ produkte: {}, held: null, ersatz: true })
-    const daten = teilenBildDaten({
-      hof: HOF,
-      produkte: HOF_ROH.products.map((p) => produkt(p.id, { name: p.name, preisCents: 300, stock: 3 })),
-      slots: [],
-      auswahl: null,
-      adresse: hofAdresse(APP_URL, 'hof-test').anzeige,
-      jetzt: JETZT,
-    })
-    const res = await aufruf(`?v=${teilenBildVersion(daten)}`)
+    // Die passende Prüfsumme liefert die echte Quelle der Metadaten (Regelvorschlag 67).
+    const res = await aufruf(`?v=${(await ladeTeilenVorschau('hof-test', JETZT))?.version}`)
     expect(res.status).toBe(200)
     expect(res.headers.get('cache-control')).toBe('public, max-age=60, s-maxage=60')
   })

@@ -1,7 +1,6 @@
 import { ImageResponse } from 'next/og'
 import { NextRequest } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
-import { prisma } from '@/lib/prisma'
 import { hofSlugSchema } from '@/schemas/hof-adresse'
 import { teilenBildSucheSchema } from '@/schemas/teilen'
 import { beitragDarfInsBild, teilenBildAuswahl, teilenBildDaten, teilenBildVersion, TEILEN_BILD_MASSE } from '@/lib/teilen-bild'
@@ -13,7 +12,7 @@ import { mitZeitlimit } from '@/lib/upload-zeitwaechter'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { APP_URL } from '@/lib/umgebung-server'
 import { istEigenesBild } from '@/server/bild-url'
-import { ladeTeilenBildQuelle } from '@/server/queries/teilen-bild'
+import { ladeTeilenBild } from '@/server/queries/teilen-bild'
 import { TeilenBildGrafik } from '@/components/teilen/teilen-bild-grafik'
 
 export const runtime = 'nodejs'
@@ -55,7 +54,8 @@ export async function GET(
 
   const { farmSlug } = await params
   const slug = hofSlugSchema.safeParse(farmSlug)
-  if (!slug.success) return new Response('Nicht gefunden', { status: 404 })
+  // Auch ein ungültiger Slug ohne Zwischenspeicher (Nr. 75): Sonst hielte das CDN die 404 fest.
+  if (!slug.success) return new Response('Nicht gefunden', NICHT_GEFUNDEN)
 
   const parameter = request.nextUrl.searchParams
   const suche = teilenBildSucheSchema.safeParse({
@@ -68,15 +68,16 @@ export async function GET(
   if (!suche.success) return new Response('Nicht gefunden', NICHT_GEFUNDEN)
   const { format, p, b } = suche.data
 
-  let geladen: Awaited<ReturnType<typeof ladeBildQuelle>>
+  // Alles aus der Datenbank unter EINER Frist; die Abfragen stehen im Lader, nicht hier (Nr. 75).
+  let geladen: Awaited<ReturnType<typeof ladeTeilenBild>>
   try {
-    geladen = await mitZeitlimit(ladeBildQuelle(slug.data, b), LADE_FRIST_MS, () => new Error('Teilen-Bild: Datenbank zu langsam'))
+    geladen = await mitZeitlimit(ladeTeilenBild(slug.data, b), LADE_FRIST_MS, () => new Error('Teilen-Bild: Datenbank zu langsam'))
   } catch (fehler) {
     Sentry.captureException(fehler, { tags: { bereich: 'teilen-bild' } })
     return new Response('Das Bild ist gerade nicht verfügbar.', { status: 503, headers: { 'Cache-Control': 'no-store' } })
   }
   if (!geladen) return new Response('Nicht gefunden', NICHT_GEFUNDEN)
-  const { quelle, fotos } = geladen
+  const { quelle } = geladen
 
   const jetzt = new Date()
   // Beitrag-Modus nur mit einem Beitrag, der ins Bild darf (veröffentlicht,
@@ -102,7 +103,7 @@ export async function GET(
   const kategorien = new Map(quelle.produkte.map((produkt) => [produkt.id, produkt.category]))
   const eintraege = daten.produkte.map((e) => ({
     id: e.id,
-    quelle: produktBildQuelle({ imageUrl: fotos.get(e.id) ?? null, category: kategorien.get(e.id) ?? null }, istEigen),
+    quelle: produktBildQuelle({ imageUrl: quelle.fotos.get(e.id) ?? null, category: kategorien.get(e.id) ?? null }, istEigen),
   }))
   const beitragFoto = beitrag?.photoUrl && istEigen(beitrag.photoUrl) ? beitrag.photoUrl : null
   // Lang zwischenspeichern nur, wenn `v` die Prüfsumme GENAU dieses Inhalts
@@ -136,36 +137,4 @@ export async function GET(
     Sentry.captureException(fehler, { tags: { bereich: 'teilen-bild', farmId: quelle.farmId, slug: quelle.hof.slug } })
     return new Response('Das Bild ist gerade nicht verfügbar.', { status: 503, headers: { 'Cache-Control': 'no-store' } })
   }
-}
-
-/**
- * Alles aus der Datenbank, was ein Bild braucht — unter EINER Frist
- * (LADE_FRIST_MS). Produktfotos und Beitrag liest die Route hier selbst,
- * weil `ladeTeilenBildQuelle` (server/queries/teilen-bild.ts) außerhalb von
- * Nr. 69 liegt; die Regel, ob der Beitrag ins Bild darf, ist
- * `beitragDarfInsBild` (rein, getestet), nicht diese Abfrage.
- */
-async function ladeBildQuelle(slug: string, beitragId: string | undefined) {
-  const quelle = await ladeTeilenBildQuelle({ slug })
-  if (!quelle) return null
-  const [fotos, beitrag] = await Promise.all([
-    prisma.product.findMany({ where: { farmId: quelle.farmId, imageUrl: { not: null } }, select: { id: true, imageUrl: true } }),
-    beitragId
-      ? prisma.statusPost.findUnique({
-          where: { id: beitragId },
-          select: {
-            farmId: true,
-            anlass: true,
-            title: true,
-            body: true,
-            photoUrl: true,
-            linkedProductIds: true,
-            publishedAt: true,
-            expiresAt: true,
-            showOnFarmPage: true,
-          },
-        })
-      : Promise.resolve(null),
-  ])
-  return { quelle, fotos: new Map(fotos.map((f) => [f.id, f.imageUrl])), beitrag }
 }

@@ -8,13 +8,15 @@
  *    jemandem, der sich abgemeldet hat, zählt nicht (nie „4 von 3").
  *  - Geöffnet ist eine Person erst nach Verlassen UND Rückkehr der Seite, und
  *    gespeichert wird genau einmal — nie per Zeitschaltung.
- *  - Die Tipp-Liste hat keine Zeitschaltung, keine Sätze „Gesendet",
- *    „versendet", „automatisch gespeichert", nimmt ihre Sätze aus der Quelle
- *    in lib/ und ruft die Action nie aus einem setState-Updater (Syntaxbaum,
- *    mit Gegenprobe am alten Muster).
+ *  - Keine Client-Komponente unter src/app/(hof) hat eine Zeitschaltung,
+ *    einen Satz „Gesendet", „versendet", „automatisch gespeichert" (außer den
+ *    begründeten E-Mail-Sätzen) oder eine Action im setState-Updater
+ *    (Syntaxbaum, mit Gegenprobe am alten Muster) — seit Nr. 75 für alle
+ *    Clients des Hofbereichs (Regelvorschlag 66). Die Tipp-Liste nimmt ihre
+ *    Sätze aus der Quelle in lib/.
  */
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join, relative, sep } from 'node:path'
 import ts from 'typescript'
 import { describe, it, expect } from 'vitest'
 import { WHATSAPP_VERSAND_TEXT, nachSeitenEreignis, versandStand, type Abonnentin } from '@/lib/whatsapp-versand'
@@ -75,50 +77,99 @@ describe('nachSeitenEreignis — geöffnet erst bei der Rückkehr (W1)', () => {
   })
 })
 
-const CLIENT = readFileSync(
-  join(process.cwd(), 'src', 'app', '(hof)', 'status', '[id]', 'send-whatsapp', 'whatsapp-tap-client.tsx'),
-  'utf8'
-)
+const HOF_ORDNER = join(process.cwd(), 'src', 'app', '(hof)')
+
+/** Alle Client-Komponenten unter src/app/(hof): Pfad ab dort → Quelltext. */
+function hofClients(): Map<string, string> {
+  const clients = new Map<string, string>()
+  const besuche = (ordner: string): void => {
+    for (const eintrag of readdirSync(ordner, { withFileTypes: true })) {
+      const pfad = join(ordner, eintrag.name)
+      if (eintrag.isDirectory()) besuche(pfad)
+      else if (/\.tsx?$/.test(eintrag.name)) {
+        const text = readFileSync(pfad, 'utf8')
+        if (/^\s*['"]use client['"]/.test(text)) clients.set(relative(HOF_ORDNER, pfad).split(sep).join('/'), text)
+      }
+    }
+  }
+  besuche(HOF_ORDNER)
+  return clients
+}
+
+const CLIENTS = hofClients()
+const CLIENT = CLIENTS.get('status/[id]/send-whatsapp/whatsapp-tap-client.tsx') ?? ''
 
 /** Sätze, die eine Zustellung behaupten, die die App nicht sehen kann. */
 const UNEHRLICH = /Gesendet|versendet|automatisch gespeichert/
 
-/** Ruft ein setState-Updater (`setX(…)`) eine Action oder startTransition auf? */
+/**
+ * Ausnahmen je Datei und Satz: E-Mails an Abonnentinnen verschickt die App
+ * selbst (Resend), anders als WhatsApp — dort darf „versendet" stehen. Die
+ * längeren Sätze zuerst; ein Satz, den es nicht mehr gibt, macht die Wache
+ * rot, damit die Liste nicht still wächst.
+ */
+const ERLAUBTE_SAETZE: readonly { datei: string; satz: string; grund: string }[] = [
+  { datei: 'status/new/status-new-client.tsx', satz: 'E-Mails werden automatisch versendet', grund: 'Die App verschickt die Mails beim Veröffentlichen selbst.' },
+  { datei: 'status/new/status-new-client.tsx', satz: 'E-Mails versendet', grund: 'Zahl der Mails, die die App verschickt hat (Ergebnis und Mailabstand).' },
+  { datei: 'status/new/status-new-client.tsx', satz: 'Wird versendet…', grund: 'Knopf, solange die App veröffentlicht und die Mails verschickt.' },
+]
+
+function ohneErlaubteSaetze(datei: string, text: string): string {
+  return ERLAUBTE_SAETZE.filter((e) => e.datei === datei).reduce((rest, e) => rest.split(e.satz).join(''), text)
+}
+
+/** Ruft ein setState-Updater (`setX(…)`) eine Action oder startTransition auf? Actions: was die Datei aus src/server/actions einbindet. */
 function aktionImUpdater(quelltext: string): boolean {
   const datei = ts.createSourceFile('client.tsx', quelltext, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const aktionen = new Set(['startTransition'])
+  for (const anweisung of datei.statements) {
+    if (!ts.isImportDeclaration(anweisung) || !ts.isStringLiteral(anweisung.moduleSpecifier)) continue
+    if (!anweisung.moduleSpecifier.text.startsWith('@/server/actions/')) continue
+    const benannt = anweisung.importClause?.namedBindings
+    if (benannt && ts.isNamedImports(benannt)) for (const element of benannt.elements) aktionen.add(element.name.text)
+  }
   let gefunden = false
   const besuche = (knoten: ts.Node, imUpdater: boolean): void => {
     if (ts.isCallExpression(knoten) && ts.isIdentifier(knoten.expression) && /^set[A-Z]/.test(knoten.expression.text)) {
       knoten.arguments.forEach((argument) => besuche(argument, true))
       return
     }
-    if (imUpdater && ts.isIdentifier(knoten) && /^(startTransition|setzeWhatsAppGetippt|markWhatsAppSent)$/.test(knoten.text)) {
-      gefunden = true
-    }
+    if (imUpdater && ts.isIdentifier(knoten) && aktionen.has(knoten.text)) gefunden = true
     ts.forEachChild(knoten, (kind) => besuche(kind, imUpdater))
   }
   besuche(datei, false)
   return gefunden
 }
 
-describe('Tipp-Liste (whatsapp-tap-client.tsx)', () => {
-  it('keine Zeitschaltung und kein Satz, der eine Zustellung behauptet', () => {
-    expect(CLIENT).not.toMatch(/\bsetTimeout\b/)
-    expect(CLIENT).not.toMatch(UNEHRLICH)
-  })
-
-  it('nimmt Sätze und Regeln aus src/lib/whatsapp-versand.ts und speichert über setzeWhatsAppGetippt', () => {
-    expect(CLIENT).toContain("from '@/lib/whatsapp-versand'")
+describe('Client-Komponenten unter src/app/(hof) (Quelltext-Wache, Regelvorschlag 66, seit Nr. 75)', () => {
+  it('findet alle Clients des Hofbereichs, darunter die Tipp-Liste', () => {
+    expect(CLIENTS.size).toBeGreaterThanOrEqual(6)
     expect(CLIENT).toContain('setzeWhatsAppGetippt(')
-    expect(CLIENT).toContain('nachSeitenEreignis(')
   })
 
-  it('ruft die Action nie aus einem setState-Updater', () => {
-    expect(aktionImUpdater(CLIENT)).toBe(false)
+  it('keine Zeitschaltung und kein Satz, der eine Zustellung behauptet — außer den begründeten E-Mail-Sätzen', () => {
+    for (const [datei, text] of CLIENTS) {
+      expect(text, datei).not.toMatch(/\bset(Timeout|Interval)\b/)
+      expect(ohneErlaubteSaetze(datei, text), datei).not.toMatch(UNEHRLICH)
+    }
+  })
+
+  it('jede Ausnahme steht noch in ihrer Datei', () => {
+    for (const { datei, satz } of ERLAUBTE_SAETZE) expect(CLIENTS.get(datei) ?? '', `${datei}: ${satz}`).toContain(satz)
+  })
+
+  it('ruft eine Action nie aus einem setState-Updater', () => {
+    for (const [datei, text] of CLIENTS) expect(aktionImUpdater(text), datei).toBe(false)
+  })
+
+  it('die Tipp-Liste nimmt Sätze und Regeln aus src/lib/whatsapp-versand.ts und speichert über setzeWhatsAppGetippt', () => {
+    expect(CLIENT).toContain("from '@/lib/whatsapp-versand'")
+    expect(CLIENT).toContain('nachSeitenEreignis(')
   })
 
   it('Gegenprobe: das alte Muster schlägt an jeder Stelle an', () => {
     const alt = `
+      import { markWhatsAppSent } from '@/server/actions/status-posts'
       function markSent(email) {
         setSent((prev) => {
           const next = new Set(prev)
@@ -126,11 +177,18 @@ describe('Tipp-Liste (whatsapp-tap-client.tsx)', () => {
           return next
         })
       }
+      function speichern() {
+        setStand(() => markWhatsAppSent(postId, 1))
+      }
       const zeile = <a onClick={() => setTimeout(() => markSent(sub.email), 1000)}>Tippen</a>
       const marke = <span>Gesendet</span>
     `
     expect(alt).toMatch(/\bsetTimeout\b/)
     expect(alt).toMatch(UNEHRLICH)
     expect(aktionImUpdater(alt)).toBe(true)
+    expect(aktionImUpdater(alt.replace('startTransition(async () => { await markWhatsAppSent(postId, next.size) })', ''))).toBe(true)
+    // Ohne den Import ist markWhatsAppSent keine Action — dann zählt nur startTransition.
+    expect(aktionImUpdater(alt.replace(/^\s*import .*$/m, '').replace('setStand(() => markWhatsAppSent(postId, 1))', ''))).toBe(true)
+    expect(ohneErlaubteSaetze('status/new/status-new-client.tsx', 'Zugestellt: Gesendet')).toMatch(UNEHRLICH)
   })
 })

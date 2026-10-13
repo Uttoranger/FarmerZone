@@ -176,6 +176,20 @@ describe('setzeWhatsAppGetippt mit echter Hof-Anmeldung', () => {
     expect(await stand(beitrag.id)).toEqual({ whatsappGetippt: [], whatsappSentCount: 0 })
     expect(await stand(fremderBeitrag.id)).toEqual({ whatsappGetippt: [], whatsappSentCount: 0 })
   })
+
+  it('eine E-Mail-Abonnentin (ohne WhatsApp-Häkchen, ohne oder mit leerer Nummer) lässt sich nicht als geöffnet markieren (Nr. 75)', async () => {
+    const farm = await angemeldeterHof()
+    const beitrag = await beitragVon(farm.id)
+    const nurMail = await aboVon(farm.id, { optInWhatsApp: false })
+    const ohneNummer = await aboVon(farm.id, { customerPhone: null })
+    const leereNummer = await aboVon(farm.id, { customerPhone: '' })
+
+    for (const abo of [nurMail, ohneNummer, leereNummer]) {
+      expect(await setzeWhatsAppGetippt(beitrag.id, abo.id, true), abo.id).toEqual({ error: ABO_WEG })
+    }
+
+    expect(await stand(beitrag.id)).toEqual({ whatsappGetippt: [], whatsappSentCount: 0 })
+  })
 })
 
 describe('getStatusPostForWhatsApp und zaehleWhatsAppAbonnentinnen', () => {
@@ -202,5 +216,17 @@ describe('getStatusPostForWhatsApp und zaehleWhatsAppAbonnentinnen', () => {
     const { farm: fremd } = await erstelleHof()
     const fremderBeitrag = await beitragVon(fremd.id)
     expect(await getStatusPostForWhatsApp(farm.id, fremderBeitrag.id)).toBeNull()
+  })
+
+  it('eine leere Nummer zählt nicht — weder in der Liste noch in der Zahl (Nr. 75)', async () => {
+    const { farm } = await erstelleHof()
+    const beitrag = await beitragVon(farm.id)
+    const mitNummer = await aboVon(farm.id)
+    await aboVon(farm.id, { customerPhone: '' })
+
+    const daten = await getStatusPostForWhatsApp(farm.id, beitrag.id)
+
+    expect(daten?.abonnentinnen.map((a) => a.id)).toEqual([mitNummer.id])
+    expect(await zaehleWhatsAppAbonnentinnen(farm.id)).toBe(1)
   })
 })

@@ -151,10 +151,17 @@ describe('editorSpalten — die Spalten des Editors am breiten Bildschirm (Regis
   it('Web: die Vorschau bekommt, was neben der schmalsten Liste frei ist, nie mehr als die Seite breit ist; die Liste den Rest', () => {
     expect(editorSpalten(1280, 'web')).toEqual({ liste: 400, vorschau: 848 })
     expect(editorSpalten(1600, 'web')).toEqual({ liste: 400, vorschau: 1168 })
-    expect(editorSpalten(1920, 'web')).toEqual({ liste: 448, vorschau: 1440 })
+    // Ab hier hat die Vorschau ihre Höchstbreite neben der breitesten Liste (Nr. 75): Die Liste wächst bis 560.
+    expect(editorSpalten(1920, 'web')).toEqual({ liste: 480, vorschau: 1408 })
     // Über 2 000 px wächst nichts mehr — das Paar bleibt gleich breit und steht zentriert.
-    expect(editorSpalten(2560, 'web')).toEqual({ liste: 528, vorschau: 1440 })
-    expect(editorSpalten(3500, 'web')).toEqual({ liste: 528, vorschau: 1440 })
+    expect(editorSpalten(2560, 'web')).toEqual({ liste: 560, vorschau: 1408 })
+    expect(editorSpalten(3500, 'web')).toEqual({ liste: 560, vorschau: 1408 })
+  })
+
+  it('Web: EDITOR_LISTE_WEB_MAX greift — bei voller Breite ist die Liste genau so breit, nie breiter (Nr. 75)', () => {
+    expect(editorSpalten(2560, 'web').liste).toBe(EDITOR_LISTE_WEB_MAX)
+    expect(editorSpalten(1920, 'web').liste).toBeGreaterThan(VORSCHAU_BEARBEITUNG_BREITE)
+    expect(editorSpalten(1920, 'web').liste).toBeLessThan(EDITOR_LISTE_WEB_MAX)
   })
 
   it('Web: Liste, Abstand und Vorschau füllen die Gesamtbreite (bis 2 000 px), und die Grenzen halten bei jeder Breite', () => {

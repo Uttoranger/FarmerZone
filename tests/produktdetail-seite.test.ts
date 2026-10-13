@@ -58,6 +58,7 @@ import { KundeShell, type KundeShellProps } from '@/components/shells/kunde-shel
 import { ProduktdetailKunde } from '@/components/produktdetail/produktdetail-kunde'
 import type { PublicFarm, PublicFutter, PublicProduct } from '@/server/queries/farm'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
+import { findeElement } from './element-suche'
 
 const lade = vi.mocked(ladeHofseiteGeteilt)
 
@@ -342,22 +343,6 @@ describe('Telefon und E-Mail des Hofs gehen nicht an die Client-Komponente (Nr. 
   // Wie tests/telefon-nach-kauf.test.ts für die Hofseite: Was die Seite an die
   // Client-Komponente reicht, steht in den Seitendaten — auch ungezeigt.
   const VORSCHAU: SeitenAnsicht = { art: 'vorschau', noindex: true, kaufen: false }
-
-  /** Das Element der Client-Komponente im Baum der Seite — ohne Komponenten aufzurufen. */
-  function findeElement(knoten: unknown, typ: unknown): { props: Record<string, unknown> } | null {
-    if (knoten == null || typeof knoten !== 'object') return null
-    if (Array.isArray(knoten)) {
-      for (const kind of knoten) {
-        const fund = findeElement(kind, typ)
-        if (fund) return fund
-      }
-      return null
-    }
-    const element = knoten as { type?: unknown; props?: Record<string, unknown> }
-    if (!element.props) return null
-    if (element.type === typ) return { props: element.props }
-    return findeElement(element.props.children, typ)
-  }
 
   /** Jeder Schlüssel in Objekten und Listen, auf jeder Tiefe. */
   function alleSchluessel(wert: unknown): string[] {

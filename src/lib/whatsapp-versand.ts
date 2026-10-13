@@ -21,6 +21,8 @@ export const WHATSAPP_VERSAND_TEXT = {
   stand: (geoeffnet: number, gesamt: number): string => `${geoeffnet} von ${gesamt} geöffnet`,
   offen: (offen: number): string => `${offen} ausstehend`,
   abschluss: (gesamt: number): string => `Alle ${gesamt} geöffnet – gesendet hast du in WhatsApp.`,
+  /** Toast, wenn das Speichern gar nicht ankam (Netz weg) — die Person steht dann wieder wie vorher (Nr. 75). */
+  nichtGespeichert: 'Konnten wir nicht speichern – versuch es gleich noch einmal',
   /** Der Knopf je Beitrag im Reiter „Beiträge" (Mockup mobil-h4-beitraege-teilen-je-beitrag). */
   knopf: (getippt: number, gesamt: number): string => `WhatsApp · ${getippt} von ${gesamt}`,
 } as const

@@ -166,12 +166,26 @@ describe('setzeWhatsAppGetippt — eine Anweisung, Besitz in der WHERE-Klausel (
     expect(sp.updateMany).not.toHaveBeenCalled()
   })
 
-  it('Besitz in derselben Anweisung: der Beitrag über id UND farmId, das Abonnement über farmId', async () => {
+  it('Besitz in derselben Anweisung: der Beitrag über id UND farmId, das Abonnement über farmId und dieselbe Regel wie die Liste', async () => {
     roh.mockResolvedValue([{ whatsappGetippt: [ABO] }] as never)
     await setzeWhatsAppGetippt(POST, ABO, true)
+    // Nr. 75 (c): WhatsApp-Häkchen und eine Nummer, die nicht leer ist — wie whatsAppAbonnentinnen.
     expect(abfrage().text).toMatch(
-      /WHERE "id" = \$5 AND "farmId" = \$6 AND EXISTS \(SELECT 1 FROM "CustomerFarmSubscription" WHERE "id" = \$7 AND "farmId" = \$8\)/
+      /WHERE "id" = \$5 AND "farmId" = \$6 AND EXISTS \(SELECT 1 FROM "CustomerFarmSubscription" WHERE "id" = \$7 AND "farmId" = \$8 AND "optInWhatsApp" = true AND "customerPhone" IS NOT NULL AND "customerPhone" <> ''\)/
     )
+  })
+
+  it('nach dem Setzen bauen Reiter „Beiträge" und Tipp-Liste neu auf — ohne Treffer nicht', async () => {
+    roh.mockResolvedValue([{ whatsappGetippt: [ABO] }] as never)
+    await setzeWhatsAppGetippt(POST, ABO, true)
+    expect(revalidatePath).toHaveBeenCalledWith('/farm-page')
+    expect(revalidatePath).toHaveBeenCalledWith('/status', 'layout')
+
+    vi.mocked(revalidatePath).mockClear()
+    roh.mockResolvedValue([] as never)
+    sp.count.mockResolvedValue(1 as never)
+    await setzeWhatsAppGetippt(POST, ABO, true)
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 
   it('zurücksetzen: nur array_remove, ebenfalls eine Anweisung', async () => {

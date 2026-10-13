@@ -98,6 +98,14 @@ export const EDITOR_ABSTAND = 32
 /** Neben der Web-Vorschau ist die Liste höchstens so breit (mindestens `VORSCHAU_BEARBEITUNG_BREITE`). */
 export const EDITOR_LISTE_WEB_MAX = 560
 
+/**
+ * So breit wird die Web-Vorschau höchstens: nie breiter als die Seite, und so,
+ * dass bei voller Editorbreite die breiteste Liste daneben passt (2 000 − 32 −
+ * 560 = 1 408). Ohne die zweite Grenze nahm die Vorschau 1 440 und ließ der
+ * Liste höchstens 528 — EDITOR_LISTE_WEB_MAX griff nie (Nacharbeit Nr. 73 in Nr. 75).
+ */
+const VORSCHAU_WEB_MAX = Math.min(VORSCHAU_SEITENBREITE.web, EDITOR_BREITE_MAX - EDITOR_ABSTAND - EDITOR_LISTE_WEB_MAX)
+
 /** Neben der Handy-Vorschau ist die Liste höchstens so breit — breitere Zeilen lesen sich nicht mehr. */
 export const EDITOR_LISTE_HANDY_MAX = 720
 
@@ -114,9 +122,10 @@ export type EditorSpalten = { liste: number; vorschau: number }
  *
  * - Mehr als `EDITOR_BREITE_MAX` nutzt der Editor nie.
  * - Web: Die Vorschau bekommt, was neben der schmalsten Liste frei bleibt, nie
- *   mehr als die Seite breit ist (1440 px, `VORSCHAU_SEITENBREITE`); die Liste
- *   bekommt den Rest, mindestens 400 und höchstens 560 px. Beides zusammen füllt
- *   die Gesamtbreite, solange sie reicht.
+ *   mehr als `VORSCHAU_WEB_MAX` (1 408 px: die Seite ist 1 440 breit, aber bei
+ *   voller Breite soll die Liste ihre 560 px haben); die Liste bekommt den Rest,
+ *   mindestens 400 und höchstens 560 px. Beides zusammen füllt die
+ *   Gesamtbreite.
  * - Handy: Die Vorschau hat ihre feste Spalte; die Liste bekommt den Rest,
  *   höchstens 720 px. Das Paar steht zentriert, der Rest bleibt links und rechts.
  *
@@ -126,7 +135,7 @@ export type EditorSpalten = { liste: number; vorschau: number }
 export function editorSpalten(gesamtbreite: number, modus: VorschauGeraet, breit = false): EditorSpalten {
   const gesamt = Math.min(gesamtbreite, EDITOR_BREITE_MAX)
   if (modus === 'web') {
-    const vorschau = Math.min(VORSCHAU_SEITENBREITE.web, Math.max(0, gesamt - EDITOR_ABSTAND - VORSCHAU_BEARBEITUNG_BREITE))
+    const vorschau = Math.min(VORSCHAU_WEB_MAX, Math.max(0, gesamt - EDITOR_ABSTAND - VORSCHAU_BEARBEITUNG_BREITE))
     const liste = Math.min(EDITOR_LISTE_WEB_MAX, Math.max(VORSCHAU_BEARBEITUNG_BREITE, gesamt - EDITOR_ABSTAND - vorschau))
     return { liste, vorschau }
   }
