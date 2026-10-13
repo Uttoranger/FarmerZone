@@ -36,6 +36,20 @@ export const TEILEN_BILD_MASSE: Record<TeilenBildFormat, { width: number; height
   story: { width: 1080, height: 1920 },
 }
 
+/**
+ * Die Dateiart des Teilen-Bilds (Register T7): JPEG statt PNG. Mit Foto wiegt
+ * ein PNG 1,2–1,4 MB, und WhatsApp zeigt Link-Vorschauen über rund 300 KB oft
+ * nicht. EINE Quelle für die Bild-Route (Content-Type), das Teilen-Fenster
+ * (Name und Typ der Datei) und die Open-Graph-Angabe der Hofseite
+ * (`hofVorschaubild`) — wer eine davon ändert, ändert alle.
+ */
+export const TEILEN_BILD_TYP = { mime: 'image/jpeg', endung: 'jpg' } as const
+
+/** Der Name der Bilddatei beim Herunterladen und im Teilen-Menü: Story als Status, 1:1 als Beitrag. */
+export function teilenBildDateiName(slug: string, format: TeilenBildFormat): string {
+  return `${slug}-${format === 'story' ? 'status' : 'beitrag'}.${TEILEN_BILD_TYP.endung}`
+}
+
 export type TeilenBildProdukt = {
   id: string
   name: string

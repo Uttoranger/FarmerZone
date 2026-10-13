@@ -5032,6 +5032,15 @@ Auftrag freigabe.md §16 „77“ (Register N8). Keine Migration, kein neues Pak
 - **Käufer:** Heute steht „Käufer“ in keinem Text für die Futter-Käuferarten, sondern für die Kundschaft („So sehen Käufer dein Futter“). Darum steht es in der Spalte „nicht“ der beiden Kunden-Zeilen; der Rechtstext im Impressum bleibt wörtlich (Ausnahme).
 - **Arbeitsliste:** `OFFEN_BIS_78` im Test hält die 38 Fundstellen von heute fest (Stand f367433). Sie greift über Datei, Wort und Text, nicht über die Zeile, weil andere Nummern im Sammel-PR die Zeilen verschieben. Nr. 78 stellt um, streicht die Einträge und macht aus dem `it.skip('OFFEN_BIS_78 ist leer …')` ein `it`. Einträge mit `nummer` liegen in Dateien anderer Nummern dieses Laufs und gehen über den Dirigenten.
 
+## Teilen-Bild als JPEG (Nachtlauf Nr. 76, Oktober 2026)
+
+Auftrag freigabe.md §16 „76“ (Register T7). Keine Migration, kein neues Paket.
+
+- **Warum:** Ein PNG mit Foto wiegt 1,2–1,4 MB, und WhatsApp zeigt Link-Vorschauen über rund 300 KB oft nicht. Satori zeichnet weiter ein PNG, `sharp` macht daraus im selben `try` das JPEG (Qualität 82, mozjpeg); ein Fehler dort ist der 503-Pfad. Die Regel — Typ und Endung nur aus `TEILEN_BILD_TYP` — steht in ARCHITECTURE, „Vorschaubild und Icons“.
+- **Gemessen (die sechs Bilder aus 69, 1080 px):** ohne Foto 58–83 KB (PNG 130–206 KB), mit Foto 107–118 KB (PNG 1,16–1,44 MB), alle unter dem Ziel von 300 KB. mozjpeg kostet etwa 0,1–0,2 s je neu gezeichnetem Bild (ohne 0,02 s) und spart etwa 8–16 %; mit passender Prüfsumme liegt das Bild einen Tag im CDN.
+- **QR in der Story:** maschinell geprüft — die Modulmatrix aus `qrcode` gegen die Helligkeit des JPEG an den Modulmitten: 0 von 841 Modulen abweichend, dunkelstes Hell 243, hellstes Dunkel 38–40. Ein Handy-Scan steht aus.
+- **Aus der Umsetzung:** Zwei bestehende Tests ersetzten `next/og` mit Text als Körper; das ergibt nun 503. Sie liefern ein echtes PNG (ein Bildpunkt).
+
 ## Nützliche Befehle
 
 ```bash

@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
 import { hofSlugSchema } from '@/schemas/hof-adresse'
 import { teilenBildSucheSchema } from '@/schemas/teilen'
-import { beitragDarfInsBild, teilenBildAuswahl, teilenBildDaten, teilenBildVersion, TEILEN_BILD_MASSE } from '@/lib/teilen-bild'
+import { beitragDarfInsBild, teilenBildAuswahl, teilenBildDaten, teilenBildVersion, TEILEN_BILD_MASSE, TEILEN_BILD_TYP } from '@/lib/teilen-bild'
 import { heldKandidaten, ladeTeilenBildBilder, ladeTeilenBildSchriften, produktBildQuelle } from '@/lib/teilen-bild-quellen'
 import { teilenLink } from '@/lib/teilen-kanal'
 import { qrPfad } from '@/lib/qr-code'
@@ -121,9 +121,15 @@ export async function GET(
     // mit kaputtem Body und langem Cache-Header hinaus.
     const bild = new ImageResponse(<TeilenBildGrafik daten={daten} format={format} qr={qr} bilder={bilder} />, { ...masse, fonts: schriften })
     const inhalt = await bild.arrayBuffer()
-    return new Response(inhalt, {
+    // Ausgeliefert wird ein JPEG (Register T7): Ein PNG mit Foto wiegt 1,2–1,4 MB,
+    // und WhatsApp zeigt Link-Vorschauen über rund 300 KB oft nicht. Im selben
+    // try — scheitert die Umwandlung, nimmt sie denselben 503-Pfad wie das
+    // Zeichnen. sharp dynamisch, wie in teilen-bild-quellen.ts (natives Modul).
+    const { default: sharp } = await import('sharp')
+    const jpeg = await sharp(Buffer.from(inhalt)).jpeg({ quality: 82, mozjpeg: true }).toBuffer()
+    return new Response(jpeg, {
       headers: {
-        'Content-Type': 'image/png',
+        'Content-Type': TEILEN_BILD_TYP.mime,
         // Zeigt das Bild Ersatz für ein Foto, das nicht kam, nur kurz — beim
         // nächsten Abruf kommt das Foto vielleicht.
         'Cache-Control':

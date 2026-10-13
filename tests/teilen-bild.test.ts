@@ -42,7 +42,9 @@ vi.mock('@/lib/teilen-bild-quellen', async (importOriginal) => ({
 // Satori/resvg brauchen wir hier nicht: Die Aussage ist, was die Route mit dem Bild macht (Kopf, Fehler).
 vi.mock('next/og', () => ({
   ImageResponse: vi.fn(function (this: unknown, _el: unknown, optionen: { headers?: Record<string, string> }) {
-    return new Response('png', { headers: { 'content-type': 'image/png', ...optionen.headers } })
+    // Ein echtes PNG (ein Bildpunkt): Die Route wandelt es in JPEG um (Register T7); Text als Körper wäre ein 503.
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADElEQVQI12P4/fMTAAXZAudwTgkGAAAAAElFTkSuQmCC', 'base64')
+    return new Response(png, { headers: { 'content-type': 'image/png', ...optionen.headers } })
   }),
 }))
 

@@ -16,9 +16,9 @@
  */
 import { titelbildFoto } from '@/lib/mein-hof'
 import { teilenBildPfad } from '@/lib/teilen-kanal'
-import { TEILEN_BILD_MASSE } from '@/lib/teilen-bild'
+import { TEILEN_BILD_MASSE, TEILEN_BILD_TYP } from '@/lib/teilen-bild'
 
-export type Vorschaubild = { url: string; width?: number; height?: number; alt: string }
+export type Vorschaubild = { url: string; type?: string; width?: number; height?: number; alt: string }
 
 export const STARTSEITE_VORSCHAUBILD = {
   url: '/og/startseite.jpg',
@@ -48,12 +48,15 @@ export function metadatenBasis(appUrl: string | null): URL | undefined {
  * Das Vorschaubild einer Hofseite: ihr Teilen-Bild im Format 1:1. `version`
  * ist die Prüfsumme des Inhalts (`teilenBildVersion`) — sie macht die Adresse
  * neu, sobald sich das Bild ändert; ohne sie (Bild nicht ladbar) das Bild der
- * Startseite, damit ein geteilter Hof-Link nie ohne Bild ankommt.
+ * Startseite, damit ein geteilter Hof-Link nie ohne Bild ankommt. Die Route
+ * liefert ein JPEG (Register T7): `type` sagt das den Messengern vorab
+ * (`og:image:type`), aus derselben Quelle wie die Route.
  */
 export function hofVorschaubild(hof: { name: string; slug: string }, version: string | null): Vorschaubild {
   if (version === null) return STARTSEITE_VORSCHAUBILD
   return {
     url: teilenBildPfad(hof.slug, { version }),
+    type: TEILEN_BILD_TYP.mime,
     ...TEILEN_BILD_MASSE.quadrat,
     alt: `${hof.name} – frisch diese Woche`,
   }
