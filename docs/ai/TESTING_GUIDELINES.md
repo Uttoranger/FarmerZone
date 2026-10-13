@@ -146,7 +146,7 @@ bei `ADD COLUMN … NOT NULL` ohne `DEFAULT` an; begründete Ausnahmen tragen ei
 - Prüfsummen (etwa die Version eines Bilds in der Adresse) nur über die echte Route testen, nicht über eine im Test nachgebaute Berechnung (Regelvorschlag 67, Lauf 11; freigegeben 13.10.2026).
 - Steht eine Regel als Prisma-Bedingung und als SQL (Liste und EXISTS), prüft ein Integrationstest beide an denselben Zeilen (Regelvorschlag 75, Lauf 12; freigegeben 13.10.2026; den Test baut Nr. 85).
 - Attrappen für `next/og` liefern ein echtes PNG als Körper — Text ergäbe 503, weil sharp ihn nicht lesen kann (Regelvorschlag 76, Lauf 12; freigegeben 13.10.2026; verschoben aus ARCHITECTURE.md „Vorschaubild und Icons").
-- Telefonnummern-Wache (`tests/telefonnummern-wache.test.ts`): ein Test über `src/`, `tests/`, `docs/` und `DEVELOPMENT.md` findet Nummern mit nicht genulltem Teilnehmerteil; Ausnahmen mit Grund, z. B. die Nummer des BAES (Dirigenten-Vorschlag, Lauf 12; freigegeben 13.10.2026; gebaut in Nr. 85). Testnummern unterscheiden sich in der Vorwahl („+43 660 000 0000“, „+43 664 000 0000“), nie in den Ziffern dahinter.
+- Telefonnummern-Wache (`tests/telefonnummern-wache.test.ts`): ein Test über `src/`, `tests/`, `docs/` und `DEVELOPMENT.md` findet Nummern mit nicht genulltem Teilnehmerteil, auch in sich selbst; Ausnahmen je Nummer mit Grund, z. B. die Nummer des BAES — die Liste führt eine Kennung (SHA-256 der Ziffern) statt der Nummer, und die Gegenproben setzen ihre Ziffer erst zur Laufzeit ein (Dirigenten-Vorschlag, Lauf 12; freigegeben 13.10.2026; gebaut in Nr. 85). Testnummern unterscheiden sich in der Vorwahl („+43 660 000 0000“, „+43 664 000 0000“), nie in den Ziffern dahinter.
 
 ### Nicht testen
 - Prisma selbst, Next.js selbst, Stripe selbst.

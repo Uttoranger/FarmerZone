@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { toWaPhone, buildOrderReminderMessage, buildOrderReminderUrl, whatsAppLink } from '@/lib/whatsapp'
-import { telefonLink } from '@/lib/telefon-anzeige'
+import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 
 // 20.07.2026 ist ein Montag; 12:00 lokal entspricht der Speicher-Konvention des Checkouts
 const baseOrder = {
@@ -88,6 +88,13 @@ describe('toWaPhone liest die Nummer wie Anzeige und tel:-Link (telefonZiffern, 
     expect(toWaPhone('0043 660 0000000')).toBe('436600000000')
     expect(toWaPhone('+43 (0) 660 0000000')).toBe('436600000000')
     expect(toWaPhone('660 0000000')).toBe('436600000000')
+  })
+
+  it('Land DE: Eine führende 0 bleibt +43, keine +49-Vermutung — wer +49 eingibt, bekommt +49 (Entscheidung Lauf 13, N8)', () => {
+    // Die Lesart kennt das Land des Hofs nicht; für die Wahl-Null gilt Österreich.
+    expect(formatiereTelefon('08571 000000')).toBe('+43 8571 000 000')
+    expect(toWaPhone('08571 000000')).toBe('438571000000')
+    expect(toWaPhone('+49 8571 000000')).toBe('498571000000')
   })
 
   it('wählt dieselbe Nummer wie der tel:-Link — auch für fremde Ländercodes', () => {
