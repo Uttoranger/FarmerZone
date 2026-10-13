@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { EmptyState } from '@/components/ui/empty-state'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { addPickupSlot, deletePickupSlot, togglePickupSlotActive } from '@/server/actions/farm'
-import { findSlotError, DAY_NAMES, ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
+import { findSlotError, DAY_NAMES, ABHOLZEITEN_FEHLEN, ABHOLZEITEN_FORMULAR_ID } from '@/lib/pickup-slot-rules'
 import type { FarmSettings } from '@/server/queries/farm'
 
 type Slot = FarmSettings['pickupSlots'][number]
@@ -178,7 +178,7 @@ export function PickupSlotsClient({
   // Der Weg weiter ist das Formular darunter: Der Fokus springt ins erste Feld. Die Ansicht rückt es in die
   // Mitte — ohne das stünde es am unteren Rand, unter der Leiste des Handys.
   function zumFormular() {
-    const feld = document.getElementById('dayOfWeek')
+    const feld = document.getElementById(ABHOLZEITEN_FORMULAR_ID)
     feld?.focus({ preventScroll: true })
     feld?.scrollIntoView({ block: 'center' })
   }
@@ -222,11 +222,11 @@ export function PickupSlotsClient({
         <h2 className="font-medium text-foreground">Abholzeit hinzufügen</h2>
 
         <div>
-          <Label htmlFor="dayOfWeek" className="text-sm text-muted-foreground mb-1 block">Wochentag</Label>
+          <Label htmlFor={ABHOLZEITEN_FORMULAR_ID} className="text-sm text-muted-foreground mb-1 block">Wochentag</Label>
           <select
             value={form.dayOfWeek}
             onChange={(e) => setForm({ ...form, dayOfWeek: parseInt(e.target.value) })}
-            id="dayOfWeek"
+            id={ABHOLZEITEN_FORMULAR_ID}
             className="min-h-11 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground"
           >
             {DAY_NAMES.map((name, i) => (

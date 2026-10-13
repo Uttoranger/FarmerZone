@@ -23,12 +23,10 @@ export const WHATSAPP_VERSAND_TEXT = {
   abschluss: (gesamt: number): string => `Alle ${gesamt} geöffnet – gesendet hast du in WhatsApp.`,
   /** Der Knopf je Beitrag im Reiter „Beiträge" (Mockup mobil-h4-beitraege-teilen-je-beitrag). */
   knopf: (getippt: number, gesamt: number): string => `WhatsApp · ${getippt} von ${gesamt}`,
-  /** Die Überschrift der Seite — auch dort, wo keine Abonnentin da ist (jede Seite hat ihre eine h1). */
-  ueberschrift: 'WhatsApp versenden',
   /** Keine Abonnentin mit WhatsApp (Register N9): der Leerzustand der Seite; der Ausweg führt zurück in den Reiter „Beiträge“. */
   leer: {
     titel: 'Noch keine Abonnentin mit WhatsApp',
-    satz: 'Hier steht jede Kundin, die deine Beiträge per WhatsApp bekommen möchte.',
+    satz: 'Hier erscheint jede Kundin, die deine Beiträge per WhatsApp bekommen möchte und ihre Nummer angegeben hat.',
     aktion: 'Zu den Beiträgen',
   },
 } as const

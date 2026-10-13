@@ -99,11 +99,11 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, abonnentinnen
   if (stand.gesamt === 0) {
     return (
       <div>
-        {/* h1 auch in den Randzuständen — sonst hätte die Seite keine Überschrift (der EmptyState zeichnet seinen Titel als Absatz). */}
-        <h1 className="sr-only">{TEXT.ueberschrift}</h1>
+        {/* Der Titel ist hier die eine Überschrift der Seite: eine zweite, unsichtbare mit dem Seitennamen wäre eine zweite Fassung desselben Textes. */}
         <EmptyState
           symbol={MessageSquare}
           titel={TEXT.leer.titel}
+          titelStufe={1}
           satz={TEXT.leer.satz}
           aktion={
             <Link href={BEITRAEGE_HREF} className={KNOPF_RAHMEN}>

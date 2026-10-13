@@ -112,3 +112,6 @@ export const ABHOLZEITEN_FEHLEN = {
 
 /** Die Kurzform für eine Zeile in einer Liste (Mein Hof, Einstellungen) — beide zeigen denselben Wortlaut. */
 export const ABHOLZEITEN_FEHLEN_ZEILE = 'Noch keine — erst dann können Kundinnen bestellen'
+
+/** Die Kennung des ersten Felds im Formular „Neue Abholzeit“ (Wochentag): Der Knopf des Leerzustands springt dorthin, das Feld trägt sie. */
+export const ABHOLZEITEN_FORMULAR_ID = 'dayOfWeek'

@@ -47,13 +47,22 @@ export function produktStatus(p: { isAvailable: boolean; stock: number }): Produ
 }
 
 /**
- * „6 Produkte · 5 sichtbar". Gezählt wird isAvailable, NICHT der Bestand: Ein
+ * Die Liste ohne Produkte (Register N9): Titel und Satz des Leerzustands. Die Kopfzeile darüber
+ * schweigt dann (`produkteKopfzeile`) — derselbe Satz stünde sonst zweimal untereinander.
+ */
+export const PRODUKTE_LEER = {
+  titel: 'Noch keine Produkte',
+  satz: 'Leg dein erstes Produkt an – deine Kundinnen sehen es sofort auf deiner Hofseite.',
+} as const
+
+/**
+ * „6 Produkte · 5 sichtbar" — ohne Produkt null (dann steht nur der Leerzustand). Gezählt wird isAvailable, NICHT der Bestand: Ein
  * ausverkauftes Produkt steht für Kunden sichtbar als „Ausverkauft" da. Wer es
  * aus der Zählung nähme, ließe den Hof glauben, er habe weniger eingestellt,
  * als die Kundin sieht.
  */
-export function produkteKopfzeile(produkte: readonly { isAvailable: boolean }[]): string {
-  if (produkte.length === 0) return 'Noch keine Produkte'
+export function produkteKopfzeile(produkte: readonly { isAvailable: boolean }[]): string | null {
+  if (produkte.length === 0) return null
   const sichtbar = produkte.filter((p) => p.isAvailable).length
   return `${mitAnzahl(produkte.length, 'Produkt', 'Produkte')} · ${formatZahl(sichtbar)} sichtbar`
 }
