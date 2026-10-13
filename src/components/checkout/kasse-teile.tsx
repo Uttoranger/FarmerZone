@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { UseFormRegisterReturn } from 'react-hook-form'
-import { AlertCircle, CreditCard, Package, TimerReset } from 'lucide-react'
+import { AlertCircle, CreditCard, Info, Package, TimerReset } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatEuro, formatMenge } from '@/lib/format'
 import { SERVICEGEBUEHR_HINWEIS, centsAlsEuro } from '@/lib/servicegebuehr'
@@ -22,7 +22,9 @@ import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 /*
  * Die Bausteine der Kasse im neuen Design (Nachtlauf Nr. 12), abgenommen von
  * docs/mockups/web-k3-warenkorb-bezahlen.html, web-k3-zahlung-abgelehnt.html,
- * mobil-k3-warenkorb-bezahlen.html und mobil-k3-zahlung-abgelehnt.html.
+ * mobil-k3-warenkorb-bezahlen.html und mobil-k3-zahlung-abgelehnt.html;
+ * geglättet seit Nr. 82 (Register N10) nach web-/mobil-k3-kasse-glatt.html und
+ * system-k3-kasse-bezahlen-bar.html.
  *
  * Nur Anzeige: Beträge, Frist und Zahlarten kommen fertig entschieden aus
  * src/lib/kasse.ts. Die Farben stimmen, weil die Kasse in der Fokus-Shell
@@ -75,27 +77,39 @@ export function FeldFehler({ id, children }: { id: string; children: ReactNode }
 
 /**
  * Das Raster der Kasse: im Browser ab 1024 px links Korb und Angaben, rechts
- * die Übersicht (klebend); darunter alles in einer Spalte, die Übersicht direkt
- * unter dem Korb (Mockup mobil: Summen am Korb). Unten Platz für die feste
- * Leiste am Handy.
+ * die Übersicht (klebend); darunter alles in einer Spalte. Am Handy steht die
+ * Übersicht direkt unter dem Korb (Mockup mobil-k3-warenkorb-bezahlen: Summen
+ * am Korb) — mit `uebersichtZuletzt` (Formular seit Nr. 82, Mockup
+ * mobil-k3-kasse-glatt) wie im Quelltext nach Bezahlen. Unten Platz für die
+ * feste Leiste am Handy.
  */
 export function KassenRaster({
   korb,
   uebersicht,
+  uebersichtZuletzt = false,
   children,
 }: {
   korb: ReactNode
   uebersicht: ReactNode
+  uebersichtZuletzt?: boolean
   children: ReactNode
 }): React.JSX.Element {
   return (
     // Im Quelltext steht die Übersicht mit der Hauptaktion ZULETZT: Die
-    // Tastatur kommt erst durch die Angaben, dann zum Knopf. Gezeigt wird sie
-    // am Handy direkt unter dem Korb (order), ab 1024 px rechts.
+    // Tastatur kommt erst durch die Angaben, dann zum Knopf. Ohne
+    // `uebersichtZuletzt` zeigt `order` sie am Handy direkt unter dem Korb,
+    // ab 1024 px steht sie rechts.
     <div className="mx-auto grid max-w-[1200px] gap-4 px-4 pt-4 pb-44 md:px-6 md:pt-7 md:pb-12 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-x-7">
-      <div className="order-1 min-w-0 lg:order-none lg:col-start-1 lg:row-start-1">{korb}</div>
-      <div className="order-3 flex min-w-0 flex-col gap-4 lg:order-none lg:col-start-1 lg:row-start-2">{children}</div>
-      <div className="order-2 min-w-0 lg:sticky lg:top-24 lg:order-none lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
+      <div className={cn(!uebersichtZuletzt && 'order-1', 'min-w-0 lg:order-none lg:col-start-1 lg:row-start-1')}>{korb}</div>
+      <div className={cn(!uebersichtZuletzt && 'order-3', 'flex min-w-0 flex-col gap-4 lg:order-none lg:col-start-1 lg:row-start-2')}>
+        {children}
+      </div>
+      <div
+        className={cn(
+          !uebersichtZuletzt && 'order-2',
+          'min-w-0 lg:sticky lg:top-24 lg:order-none lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start'
+        )}
+      >
         {uebersicht}
       </div>
     </div>
@@ -137,7 +151,6 @@ export function KorbKarte({
           </Link>
         )}
       </div>
-      <p className={cn(HINWEIS, 'mt-0.5')}>Ein Korb pro Hof</p>
       <ul className="mt-2 divide-y divide-border">
         {positionen.map((p) => (
           <li key={p.productId} className="flex items-center gap-3 py-2.5">
@@ -245,24 +258,41 @@ export function ReservierungsHinweis({
 }
 
 /**
- * Die Übersicht rechts (Browser) bzw. unter dem Korb (Handy): Frist,
- * Warenpreis, Servicegebühr als EIGENE Zeile (E4, nie eingerechnet), Gesamt,
- * darunter die Hauptaktion. Ohne Gebühr entfällt die Zeile ersatzlos.
+ * Die Übersicht rechts (Browser) bzw. unter dem Korb oder nach Bezahlen
+ * (Handy): Frist, Warenpreis, Servicegebühr als EIGENE Zeile (E4, nie
+ * eingerechnet), Gesamt, darunter die Hauptaktion.
+ *
+ * Die Gebührenzeile (N10): Titel, daneben ein (i)-Knopf, der die Erklärung
+ * aufklappt (`gebuehrErklaerung`, ohne Angabe der Erklärsatz allein). Geld nur
+ * anzeigen: Der Betrag kommt allein aus `betraege`; „entfällt" steht nur, wo
+ * kein Betrag anfällt und die Kasse es so sagt (bar vor dem Stichtag,
+ * `gebuehrZeile`). Sonst entfällt die Zeile ohne Gebühr ersatzlos.
  */
 export function UebersichtKarte({
   betraege,
   gebuehrText,
+  gebuehrErklaerung = SERVICEGEBUEHR_HINWEIS,
+  gebuehrEntfaellt = false,
   reservierung,
   fehler,
   children,
 }: {
   betraege: Pick<KassenBetraege, 'warenCents' | 'gebuehrCents' | 'gesamtCents'>
+  /** Titel der Gebührenzeile — „Servicegebühr (5 %)" (`gebuehrZeile`), im Zahlungsschritt `zahlungsGebuehrText`. */
   gebuehrText: string
+  /** Was der (i)-Knopf aufklappt. */
+  gebuehrErklaerung?: string
+  /** Bar vor dem Stichtag (Register B1): „entfällt" statt € 0,00. */
+  gebuehrEntfaellt?: boolean
   reservierung?: ReactNode
   /** Ein Fehler der Anfrage — inline an der Karte, kein Modal. */
   fehler?: ReactNode
   children?: ReactNode
 }): React.JSX.Element {
+  const [erklaerungOffen, setErklaerungOffen] = useState(false)
+  const erklaerungId = useId()
+  const gebuehr =
+    betraege.gebuehrCents > 0 ? formatEuro(centsAlsEuro(betraege.gebuehrCents)) : gebuehrEntfaellt ? 'entfällt' : null
   return (
     <section aria-labelledby="kasse-uebersicht" className={cn(KARTE, 'flex flex-col gap-3')}>
       <h2 id="kasse-uebersicht" className={KARTEN_TITEL}>
@@ -274,14 +304,34 @@ export function UebersichtKarte({
           <dt className="text-muted-foreground">Warenpreis</dt>
           <dd className="ml-auto tabular-nums">{formatEuro(centsAlsEuro(betraege.warenCents))}</dd>
         </div>
-        {betraege.gebuehrCents > 0 && (
-          <div className="flex items-baseline gap-2">
-            <dt className="text-muted-foreground">{gebuehrText}</dt>
-            <dd className="ml-auto shrink-0 tabular-nums">{formatEuro(centsAlsEuro(betraege.gebuehrCents))}</dd>
+        {gebuehr && (
+          <div className="flex items-center gap-2">
+            <dt className="flex min-w-0 items-center text-muted-foreground">
+              <span className="min-w-0 break-words">{gebuehrText}</span>
+              {/* Tippfläche 44 px, die Zeile bleibt durch den negativen Rand so hoch wie der Text. */}
+              <button
+                type="button"
+                aria-label="Was ist die Servicegebühr?"
+                aria-expanded={erklaerungOffen}
+                aria-controls={erklaerungId}
+                onClick={() => setErklaerungOffen((offen) => !offen)}
+                className={cn(
+                  '-my-3 -ml-1.5 inline-flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground',
+                  FOKUS_RAHMEN
+                )}
+              >
+                <Info className="size-4" strokeWidth={1.7} aria-hidden="true" />
+              </button>
+            </dt>
+            <dd className={cn('ml-auto shrink-0 tabular-nums', betraege.gebuehrCents === 0 && 'text-muted-foreground')}>{gebuehr}</dd>
           </div>
         )}
       </dl>
-      {betraege.gebuehrCents > 0 && <p className={HINWEIS}>{SERVICEGEBUEHR_HINWEIS}</p>}
+      {gebuehr && (
+        <p id={erklaerungId} hidden={!erklaerungOffen} className={HINWEIS}>
+          {gebuehrErklaerung}
+        </p>
+      )}
       <div className="h-px bg-border" />
       <p className="flex items-baseline gap-2 text-[15px] font-semibold">
         <span>Gesamt</span>
@@ -329,10 +379,13 @@ export function KontaktHinweis(): React.JSX.Element {
 
 /**
  * Die Zahlart-Wahl (E5: online und bar). Echte Radioknöpfe — Pfeiltasten
- * wechseln, der Screenreader sagt die Gruppe an; jede Zeile ist 50 px hoch.
+ * wechseln, der Screenreader sagt die Gruppe an. Jede Zahlart ist eine Karte
+ * mit Titel und eigener Erklärung (`zusatz`), ab 768 px nebeneinander
+ * (Register N10, Mockups web-/mobil-k3-kasse-glatt); die ganze Karte ist
+ * Tippfläche.
  *
  * Ein `hinweis` (heute nur der Testbetrieb, Register Z2) steht als eigene
- * Zeile unter Titel und Zusatz, orange, IM Label: Er gehört zur Zahlart und
+ * Zeile unter der Erklärung, orange, IM Label: Er gehört zur Zahlart und
  * wird mit ihr vorgelesen — wer „Online bezahlen" wählt, hat ihn gehört.
  */
 export function ZahlartWahl({
@@ -347,19 +400,19 @@ export function ZahlartWahl({
   return (
     <fieldset aria-describedby={fehler ? 'paymentMethod-fehler' : undefined}>
       <legend className="sr-only">Wie möchtest du bezahlen?</legend>
-      <div className="divide-y divide-border">
+      <div className={cn('grid gap-2.5', zahlarten.length > 1 && 'md:grid-cols-2')}>
         {zahlarten.map((z) => (
           <label
             key={z.wert}
-            className="flex min-h-[50px] cursor-pointer flex-wrap items-center gap-x-3 gap-y-0.5 rounded-lg py-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring has-[:focus-visible]:outline-solid"
+            className="flex min-w-0 cursor-pointer flex-col gap-1.5 rounded-[14px] border border-border px-3.5 py-3 has-[:checked]:border-2 has-[:checked]:border-accent has-[:checked]:bg-accent/12 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring has-[:focus-visible]:outline-solid"
           >
-            <input type="radio" value={z.wert} {...feld} className="size-5 shrink-0 cursor-pointer accent-accent outline-none" />
-            <span className="text-[14px] font-semibold">{z.titel}</span>
-            <span className="basis-full pl-8 text-[12.5px] text-muted-foreground sm:ml-auto sm:basis-auto sm:pl-0 sm:text-right">
-              {z.zusatz}
+            <span className="flex items-center gap-3">
+              <input type="radio" value={z.wert} {...feld} className="size-5 shrink-0 cursor-pointer accent-accent outline-none" />
+              <span className="text-[15px] font-semibold">{z.titel}</span>
             </span>
+            <span className="pl-8 text-[13px] leading-snug text-muted-foreground">{z.zusatz}</span>
             {z.hinweis && (
-              <span className="mt-1 flex basis-full items-start gap-1.5 pl-8 text-[12.5px] leading-snug font-medium text-status-offen">
+              <span className="flex items-start gap-1.5 pl-8 text-[12.5px] leading-snug font-medium text-status-offen">
                 <AlertCircle className="mt-px size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
                 <span>{z.hinweis}</span>
               </span>
@@ -373,10 +426,11 @@ export function ZahlartWahl({
 }
 
 /**
- * Die Abholfenster als Kacheln (Mockup: „Heute · 15–18 Uhr"). Echte
+ * Die Abholfenster als Kacheln (Mockup: „So, 18. Okt · 14–16 Uhr"). Echte
  * Radioknöpfe, unsichtbar; der Fokus zeigt sich am Rahmen der Kachel. Volle
  * Fenster bleiben sichtbar, gestrichelt und nicht wählbar — ohne Deckkraft auf
- * dem Text (Kontrast).
+ * dem Text (Kontrast). Am Handy zwei je Zeile, ab 640 px eine Zeile mit
+ * Umbruch (Register N10: Die Karte steht in voller Breite).
  */
 export function AbholWahl({
   kacheln,
@@ -390,13 +444,12 @@ export function AbholWahl({
   return (
     <fieldset aria-describedby={fehler ? 'pickupSlotKey-fehler' : undefined}>
       <legend className="sr-only">Wann holst du ab?</legend>
-      {/* Ab 768 px steht die Karte halb breit neben „Deine Daten" — dann zwei Spalten. */}
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-2">
+      <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap">
         {kacheln.map((k) => (
           <label
             key={k.key}
             className={cn(
-              'flex min-h-14 flex-col justify-center rounded-xl border px-2.5 py-2.5 text-center has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring has-[:focus-visible]:outline-solid',
+              'flex min-h-[58px] flex-col justify-center rounded-[14px] border px-4 py-2 text-center sm:min-w-40 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring has-[:focus-visible]:outline-solid',
               k.ausgebucht
                 ? 'cursor-not-allowed border-dashed border-border text-muted-foreground'
                 : 'cursor-pointer border-border has-[:checked]:border-2 has-[:checked]:border-accent has-[:checked]:bg-accent/12'
@@ -405,8 +458,8 @@ export function AbholWahl({
             <input type="radio" value={k.key} {...feld} disabled={k.ausgebucht} className="sr-only" />
             {/* Jeder Termin mit Datum (Nr. 46): „Heute"/„Morgen" nur zusätzlich, nie statt des Datums. */}
             {k.relativ && <span className="text-[12px] font-semibold text-status-fertig">{k.relativ}</span>}
-            <span className="text-[13.5px] font-semibold break-words">{k.datum}</span>
-            <span className="mt-0.5 text-[12px] whitespace-nowrap text-muted-foreground">{k.zeit}</span>
+            <span className="text-[14.5px] font-semibold break-words">{k.datum}</span>
+            <span className="mt-0.5 text-[13px] whitespace-nowrap text-muted-foreground">{k.zeit}</span>
             {/* Voll heißt: Der Hof nimmt für dieses Fenster nichts mehr an (maxOrders). */}
             {k.ausgebucht && <span className="text-[12px] font-semibold">ausgebucht</span>}
           </label>

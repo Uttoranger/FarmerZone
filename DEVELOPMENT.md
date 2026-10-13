@@ -5051,6 +5051,16 @@ Auftrag freigabe.md §16 „78“ (Register N8), gestapelt auf 77. Keine Migrati
 - **Kunden:** Überschriften sagen „Kunden“ (Vorbild „so sehen Kunden deine Hofseite“), Sätze „die Kundin“ und „deine Kundinnen“. „Käufer“ steht nur noch im Rechtstext des Impressums (Ausnahme im Test).
 - **Mockups:** Sie tragen die alten Wörter noch („Hilfe und Rückmeldung“ in 27 Dateien, „So sehen Käufer dein Futter“, „Dein Zeitfenster …“). Die Entscheidung N8 geht vor; die Mockups bleiben unverändert.
 
+## Kasse geglättet (Nachtlauf 12, Nr. 82, Oktober 2026)
+
+Auftrag freigabe.md §16 „82" (Register N10). Keine Migration, kein neues Paket; Beträge, Schema, `/api/checkout` und Reservierung unverändert — die Kasse zeigt Geld nur an.
+
+- **Warum vier flache Karten:** Abholung und Deine Daten standen ab 768 px halb breit nebeneinander; die Termine brachen in zwei Spalten, die Felder wurden eng. Jetzt Korb → Abholung → Deine Daten → Bezahlen untereinander, die Felder ab 768 px zweispaltig. Am Handy folgt die Übersicht dem Quelltext (nach Bezahlen); der Zahlungsschritt behält sie unter dem Korb (`uebersichtZuletzt` nur im Formular).
+- **Online bleibt vorbelegt, auch im Testbetrieb** (Entscheidung 13.10.: Die Plattform verdient nur an Online-Zahlungen). Der Testbetrieb-Satz steht weiter an der Online-Option.
+- **Bar trägt seinen Vorteil selbst:** „Ohne Servicegebühr bis …" steht an der Option nur, wenn `barHinweis` ihn liefert (vor dem Stichtag und mit Online-Gebühr); der lose Absatz darunter und „gleicher Betrag" sind weg. `BAR_OHNE_GEBUEHR_HINWEIS` bleibt für Startseite, Hofseite und Mini-Warenkorb.
+- **„entfällt":** `gebuehrZeile` entscheidet nur das Wort, den Betrag zeigt die Übersicht allein aus `kassenBetraege`; liegt ein Betrag vor, steht er da — „entfällt" nie darüber. Beim gebührenfreien Hof gibt es keine Zeile (es entfällt nichts).
+- **Prüfstand für das ganze Formular** (`tests/kasse-formular.test.ts`): Auf dem Server zeigt die Kasse nur ihr Skelett, weil der Korb im Effekt aus dem localStorage kommt. Der Test lässt jeden Effekt der eigenen Dateien einmal sofort beim Rendern laufen (`vi.mock('react')`, je Quelltext einmal, je Aufbau zurückgesetzt) und rendert so das echte Formular — Reihenfolge, Vorbelegung und Bar-Zustand am HTML statt am Quelltext.
+
 ## Nützliche Befehle
 
 ```bash
