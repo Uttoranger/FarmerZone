@@ -10,8 +10,11 @@
  *  - Die Seite stellt die Packliste an den Anfang der Hauptspalte; oben
  *    steht höchstens EIN Kasten von Heute: der Stripe-Hinweis (Vorrang). Der
  *    Balken der Shell („wartet"/„stillgelegt") gehört zur Shell und zählt
- *    nicht. Die Teilen-Zeile steht kompakt direkt unter der Packliste
- *    (freigabe.md §12 Nr. 45, Nachbesserung Runde 1).
+ *    nicht. Die Teilen-Zeile steht kompakt und zuletzt in der Hauptspalte
+ *    (freigabe.md §12 Nr. 45, Nachbesserung Runde 1); „Braucht dich" steht
+ *    vor ihr — dringend vor freiwillig (Register N11, Nr. 83).
+ *  - „Braucht dich" ohne Eintrag ist eine leise Zeile „Nichts braucht dich
+ *    heute." ohne Karte, mit Einträgen die Karte wie bisher (Register N11).
  *  - Stripe-Hinweis: nur bei acceptsOnline && !stripeAccountReady (mit
  *    Konto) — alle vier Kombinationen, dazu der Fall ohne Konto.
  *  - Teilen-Zeile: immer kompakt, gar nicht, solange der Hof nicht
@@ -175,8 +178,8 @@ describe('Abholfenster — Wiener Wochentag', () => {
 // ─── Teilen-Karte ───────────────────────────────────────────────────────────
 
 describe('Teilen-Zeile', () => {
-  it('kompakt unter der Packliste — nur wenn Kunden den Hof sehen und bei ihm bestellen können', () => {
-    expect(heuteAufbau({ stripeHinweis: false, teilen: true, zuTun: false }).haupt).toEqual(['packliste', 'teilen', 'braucht-dich'])
+  it('kompakt, zuletzt in der Hauptspalte — nur wenn Kunden den Hof sehen und bei ihm bestellen können', () => {
+    expect(heuteAufbau({ stripeHinweis: false, teilen: true, zuTun: false }).haupt).toEqual(['packliste', 'braucht-dich', 'teilen'])
     const ohne = heuteAufbau({ stripeHinweis: false, teilen: false, zuTun: false })
     expect([...ohne.oben, ...ohne.haupt, ...ohne.seite]).not.toContain('teilen')
   })
@@ -211,13 +214,12 @@ describe('Teilen-Zeile', () => {
 // ─── Aufbau ─────────────────────────────────────────────────────────────────
 
 describe('Aufbau der Seite — Packliste zuerst, oben höchstens ein Kasten', () => {
-  it('die Hauptspalte beginnt immer mit der Packliste, die Teilen-Zeile folgt direkt darunter', () => {
+  it('die Hauptspalte läuft Packliste, Braucht dich, Teilen — dringend vor freiwillig, mit und ohne Teilen-Zeile (N11)', () => {
     for (const stripeHinweis of [true, false]) {
       for (const teilen of [true, false]) {
         for (const zuTun of [true, false]) {
           const { haupt } = heuteAufbau({ stripeHinweis, teilen, zuTun })
-          expect(haupt[0]).toBe('packliste')
-          if (teilen) expect(haupt[1]).toBe('teilen')
+          expect(haupt).toEqual(teilen ? ['packliste', 'braucht-dich', 'teilen'] : ['packliste', 'braucht-dich'])
         }
       }
     }
@@ -772,10 +774,26 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
 
   })
 
-  it('Braucht dich: leer „Alles erledigt.", sonst Zeilen mit Ziel', () => {
-    expect(html(createElement(BrauchtDichKarte, { eintraege: [] }))).toContain('Alles erledigt.')
-    const h = html(createElement(BrauchtDichKarte, { eintraege: [{ art: 'ausverkauft', text: 'Eier ist ausverkauft', href: '/products?edit=p1' }] }))
-    expect(h).toContain('href="/products?edit=p1"')
+  it('Braucht dich ohne Eintrag: eine leise Zeile „Nichts braucht dich heute." — keine Karte, keine Überschrift, kein Link (N11)', () => {
+    const leer = html(createElement(BrauchtDichKarte, { eintraege: [] }))
+    expect(leer).toContain('Nichts braucht dich heute.')
+    expect(leer).not.toContain('Alles erledigt.')
+    // Die Karte erkennt man am Abschnitt mit Überschrift, an der Liste und am Rahmen
+    // auf der Kartenfläche (Gegenprobe unten: dort kommt jedes dieser Merkmale vor).
+    expect(leer).not.toMatch(/<section|<h2|<ul|<a /)
+    expect(leer).not.toMatch(/bg-card|border/)
+  })
+
+  it('Braucht dich mit Einträgen: die Karte mit Überschrift und Zeilen mit Ziel — die leise Zeile fehlt dann (N11)', () => {
+    const gefuellt = html(createElement(BrauchtDichKarte, { eintraege: [{ art: 'ausverkauft', text: 'Eier ist ausverkauft', href: '/products?edit=p1' }] }))
+    expect(gefuellt).toMatch(/<section[^>]*aria-labelledby="heute-braucht-dich"/)
+    expect(gefuellt).toMatch(/<h2[^>]*>Braucht dich<\/h2>/)
+    expect(gefuellt).toContain('Eier ist ausverkauft')
+    expect(gefuellt).toContain('href="/products?edit=p1"')
+    expect(gefuellt).toMatch(/<ul/)
+    expect(gefuellt).toMatch(/bg-card/)
+    expect(gefuellt).toMatch(/border/)
+    expect(gefuellt).not.toContain('Nichts braucht dich heute.')
   })
 
   it('jedes Symbol ist aria-hidden', () => {

@@ -5079,6 +5079,13 @@ Auftrag freigabe.md §16 „80“ (Register N9), gestapelt auf 78. Keine Migrati
 - **Link:** `tel:+436600000000` aus denselben Ziffern. Lässt sich die Eingabe nicht eindeutig lesen (zwei Nummern in einem Feld, „ab 18 Uhr“, keine oder zu viele Ziffern), gibt es keinen Link und keinen Anrufen-Knopf: Ein Link auf ihre Ziffern wählte eine andere Nummer als die angezeigte (Runde 1; vorher hängte `telefonLink` alle Ziffern ohne Ländercode aneinander). Stattdessen steht die Eingabe als Text da — im Bestelldetail in der Karte „Kundin“, im Kundendetail in „Kontakt“; WhatsApp gibt es dort nur mit lesbarer Nummer, der Hinweis „Keine Telefonnummer hinterlegt“ nur, wenn gar keine Ziffer dasteht.
 - **Offen:** Deutsche Höfe (Land DE, noch nicht freigeschaltet): Eine Nummer mit führender 0 würde als österreichisch gelesen, sie müssten +49 eingeben, bis die Funktion das Land des Hofs bekommt. Die Wache in `tests/telefon-anzeige.test.ts` listet die Stellen, die noch einen `tel:`-Link von Hand bauen (Kundenliste, fünf Mail-Vorlagen).
 
+## Heute: Reihenfolge und leeres „Braucht dich“ (Nachtlauf Nr. 83, Oktober 2026)
+
+Auftrag freigabe.md §16 „83“ (Register N11), gestapelt auf 80. Keine Migration, kein neues Paket.
+
+- **Reihenfolge:** Die Hauptspalte von Heute läuft Packliste, Braucht dich, Teilen (`heuteAufbau`). Vorher stand die Teilen-Zeile (seit Nr. 45 kompakt unter der Packliste) vor „Braucht dich“ — eine Einladung zum Teilen schob eine überfällige Abholung nach unten. Dringend steht jetzt vor freiwillig.
+- **Leeres „Braucht dich“:** Ohne Eintrag keine Karte mehr, sondern die leise Zeile „Nichts braucht dich heute.“ (`BRAUCHT_DICH_LEER` in `src/lib/heute.ts`, gedämpft und ohne Rahmen wie „Zu tun einblenden“); vorher eine ganze Karte mit „Alles erledigt.“. Mit Einträgen bleibt die Karte, wie sie war. Kein Mockup zeigt „Braucht dich“, die Bilder im Bericht 83 sind die Vorlage.
+
 ## Nützliche Befehle
 
 ```bash

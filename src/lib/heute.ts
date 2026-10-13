@@ -205,6 +205,13 @@ export const BRAUCHT_DICH_EINZELN = 3
 /** So viele überfällige Abholungen mit eigenem Link, dann „und n weitere". */
 export const UEBERFAELLIG_EINZELN = 5
 
+/**
+ * Was „Braucht dich" sagt, wenn nichts ansteht (Register N11): eine leise Zeile
+ * statt einer Karte — eine leere Karte trüge neben der Packliste so viel
+ * Gewicht wie ein echter Auftrag.
+ */
+export const BRAUCHT_DICH_LEER = 'Nichts braucht dich heute.'
+
 export type BrauchtDichEintrag = {
   art: 'ueberfaellig' | 'ausverkauft' | 'ohne-kategorie' | 'status'
   text: string
@@ -239,7 +246,7 @@ function mehrzahl(n: number, eins: string, viele: string): string {
 
 /**
  * Nur, was eine Handlung verlangt — jede Zeile führt genau dorthin. Leer
- * heißt: „Alles erledigt."
+ * heißt: BRAUCHT_DICH_LEER.
  */
 export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
   const eintraege: BrauchtDichEintrag[] = []
@@ -630,8 +637,10 @@ export type HeuteBlock = 'stripe' | 'packliste' | 'teilen' | 'braucht-dich' | 'z
  * Balken der Shell („wartet auf Freischaltung", „stillgelegt") zeigt das
  * Layout auf jeder Seite; er zählt nicht mit (Entscheidung zur Prüfung,
  * Runde 1). Die Hauptspalte beginnt immer mit der Packliste (Gate 5:
- * „Packliste zuerst"), direkt darunter die kompakte Teilen-Zeile — nur bei
- * sichtbarem Hof (heuteHofSichtbar) —, dann „Braucht dich". Die Seitenspalte
+ * „Packliste zuerst"), dann „Braucht dich", zuletzt die kompakte Teilen-Zeile
+ * — nur bei sichtbarem Hof (heuteHofSichtbar). Dringend steht vor freiwillig
+ * (Register N11): Was eine Handlung verlangt, steht nicht hinter einer
+ * Einladung zum Teilen. Die Seitenspalte
  * steht am Handy unter der Hauptspalte und beginnt mit „Zu tun" (Nr. 53):
  * EINE Liste statt „Erste Schritte" oben und „Deine Hofseite" unten — direkt
  * nach „Braucht dich", was noch einzurichten ist, danach die Zahlen.
@@ -646,7 +655,7 @@ export function heuteAufbau({
   zuTun: boolean
 }): { oben: HeuteBlock[]; haupt: HeuteBlock[]; seite: HeuteBlock[] } {
   const oben: HeuteBlock[] = stripeHinweis ? ['stripe'] : []
-  const haupt: HeuteBlock[] = teilen ? ['packliste', 'teilen', 'braucht-dich'] : ['packliste', 'braucht-dich']
+  const haupt: HeuteBlock[] = teilen ? ['packliste', 'braucht-dich', 'teilen'] : ['packliste', 'braucht-dich']
   const seite: HeuteBlock[] = zuTun ? ['zu-tun', 'naechste-abholung', 'woche'] : ['naechste-abholung', 'woche']
   return { oben, haupt, seite }
 }
