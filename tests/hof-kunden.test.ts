@@ -530,7 +530,7 @@ describe('Ansicht /customers — vier Zustände, lange Namen, Tokens', () => {
     expect(html).toContain('href="/customers/aaaaaaaaaaaaaaaa"')
     expect(html).toContain(`title="${LANG}"`)
     expect(html).toContain(`aria-label="${LANG} anrufen"`)
-    expect(html).toContain('href="tel:+43 699 0000000"')
+    expect(html).toContain('href="tel:+436990000000"')
     expect(html).toContain('bekommt Neuigkeiten')
     expect(html).toContain('€ 90,00')
     expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgb\(|green-|amber-|purple-|blue-/)

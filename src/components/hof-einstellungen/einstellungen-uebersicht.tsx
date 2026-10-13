@@ -4,6 +4,7 @@ import { FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { EINSTELLUNGEN_SATZ, EINSTELLUNGEN_TITEL, TON_TEXT, type EinstellungBereich, type EinstellungTon } from '@/lib/hof-einstellungen'
 import { cn } from '@/lib/utils'
+import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 
 /** Der Punkt neben dem Titel: Zustandsfarbe des Themes, grau = nur zur Info. */
 const PUNKT: Record<EinstellungTon, string> = {
@@ -62,7 +63,7 @@ export function EinstellungenUebersicht({ bereiche }: { bereiche: readonly Einst
       <div className="mt-2">
         <Link href="/meldungen" className={KNOPF_RAHMEN}>
           <LifeBuoy className="size-4" strokeWidth={1.7} aria-hidden="true" />
-          Problem melden
+          {PROBLEM_MELDEN}
         </Link>
       </div>
     </div>

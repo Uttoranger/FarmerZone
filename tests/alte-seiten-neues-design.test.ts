@@ -16,8 +16,8 @@
  *    Bestellseite steht auf einer Karte, der Auge-Knopf der Passwortseite
  *    hat 44 px.
  *  - Die neuen reinen Helfer: mitgeschicktSatz (Problem melden),
- *    monatOhneJahr (Achse der Finanzen am Handy), bestellTon (Marke der
- *    Bestellseite = Marke in „Meine Bestellungen").
+ *    monatOhneJahr (Achse der Finanzen am Handy); die Marke der Bestellseite
+ *    = die Marke in „Meine Bestellungen" (Art aus bestellStatusAnzeige, Nr. 85).
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -37,7 +37,9 @@ import { metadata as barMeta } from '@/app/(public)/[farmSlug]/bestaetigen/[toke
 import { metadata as problemMeta } from '@/app/(public)/problem-melden/page'
 import { MELDUNG_TEXT_BEISPIEL, OHNE_IP_UND_COOKIES, mitgeschicktSatz } from '@/lib/hof-hilfe'
 import { monatKurz, monatOhneJahr } from '@/lib/finanzen'
-import { bestellEintrag, bestellTon, type BestellTon } from '@/lib/bestellungen-finden'
+import { bestellEintrag } from '@/lib/bestellungen-finden'
+import { bestellStatusAnzeige } from '@/lib/bestellstatus'
+import type { MarkeArt } from '@/lib/marke-art'
 import { monatsschluessel } from '@/lib/servicegebuehr'
 
 const WURZEL = process.cwd()
@@ -279,7 +281,7 @@ describe('Kontrast und Touch-Ziele (Befunde der Axe-Prüfung)', () => {
   it('die grüne Marke der Bestellseite steht auf der Kopf-Karte, nicht auf dem hellen Seitengrund', () => {
     const text = lies('src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx')
     const karte = text.indexOf("<div className={cn(KARTE, 'flex flex-col gap-2')}>")
-    const marke = text.indexOf('<StatusBadge')
+    const marke = text.indexOf('<Marke art={status.art}')
     const abholung = text.indexOf('abholung-titel')
     expect(karte).toBeGreaterThan(-1)
     // Die Marke steht im Kopf — nach dem Öffnen der Karte, vor der Karte „Abholung".
@@ -400,28 +402,29 @@ describe('monatOhneJahr — die Achse der Finanzen am Handy', () => {
   })
 })
 
-describe('bestellTon — die Marke der Bestellseite ist die Marke der Liste', () => {
+describe('Die Marke der Bestellseite ist die Marke der Liste (Art aus bestellStatusAnzeige, Register G5)', () => {
   /**
-   * Feste Erwartung je Status — nicht bestellTon selbst: Die Liste ruft
-   * bestellTon auf, ein Vergleich damit bewiese nichts.
+   * Feste Erwartung je Status — nicht bestellStatusAnzeige selbst: Liste und Seite rufen sie auf,
+   * ein Vergleich damit bewiese nichts.
    */
-  const ERWARTET: Record<OrderStatus, BestellTon> = {
-    PENDING_CONFIRMATION: 'offen',
-    PAID: 'fertig',
-    CONFIRMED: 'fertig',
-    IN_PREPARATION: 'fertig',
-    READY: 'fertig',
-    PICKED_UP: 'neutral',
-    CANCELLED: 'neutral',
-    NOT_PICKED_UP: 'neutral',
+  const ERWARTET: Record<OrderStatus, MarkeArt> = {
+    PENDING_CONFIRMATION: 'tun',
+    PAID: 'laeuft',
+    CONFIRMED: 'laeuft',
+    IN_PREPARATION: 'laeuft',
+    READY: 'laeuft',
+    PICKED_UP: 'erledigt',
+    // Freigabe Lauf 13 (Nr. 85): storniert rot, nicht abgeholt erledigt — vorher beide grau.
+    CANCELLED: 'abgebrochen',
+    NOT_PICKED_UP: 'erledigt',
   }
   const STATUS = Object.keys(ERWARTET) as OrderStatus[]
 
-  it('orange, solange die Kundin etwas tun muss; grün, solange es läuft; sonst neutral', () => {
-    for (const status of STATUS) expect(bestellTon(status), status).toBe(ERWARTET[status])
+  it('tun, solange die Kundin etwas tun muss; läuft, solange es läuft; storniert abgebrochen; sonst erledigt', () => {
+    for (const status of STATUS) expect(bestellStatusAnzeige(status, '', 'ONLINE').art, status).toBe(ERWARTET[status])
   })
 
-  it('„Meine Bestellungen" zeigt je Status dieselbe feste Farbe', () => {
+  it('„Meine Bestellungen" zeigt je Status dieselbe feste Art', () => {
     const jetzt = new Date('2026-10-10T08:00:00Z')
     for (const status of STATUS) {
       const eintrag = bestellEintrag(
@@ -443,13 +446,13 @@ describe('bestellTon — die Marke der Bestellseite ist die Marke der Liste', ()
         jetzt,
         true
       )
-      expect(eintrag.ton, status).toBe(ERWARTET[status])
+      expect(eintrag.art, status).toBe(ERWARTET[status])
     }
   })
 
-  it('die Bestellseite nimmt den Ton aus bestellTon', () => {
-    expect(lies('src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx')).toMatch(
-      /<StatusBadge status=\{bestellTon\(order\.status\)\}>/
-    )
+  it('die Bestellseite zeichnet die Art aus bestellStatusAnzeige mit dem Baustein Marke', () => {
+    const seite = lies('src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx')
+    expect(seite).toMatch(/const status = bestellStatusAnzeige\(order\.status, /)
+    expect(seite).toMatch(/<Marke art=\{status\.art\}>\{status\.marke\}<\/Marke>/)
   })
 })

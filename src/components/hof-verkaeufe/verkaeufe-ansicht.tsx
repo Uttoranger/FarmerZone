@@ -143,7 +143,7 @@ export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeRead
             symbol={ReceiptText}
             titel="Noch keine Verkäufe"
             satz="Abgeholte Bestellungen und eingetragene Direktverkäufe erscheinen hier."
-            aktion={
+            ausweg={
               <button type="button" onClick={neuerVerkauf} className={KNOPF_RAHMEN}>
                 Verkauf eintragen
               </button>

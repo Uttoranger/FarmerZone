@@ -16,6 +16,7 @@
 
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { HOFSEITE_HREF } from '@/lib/mein-hof'
+import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
 import { EINSTELLUNG_FUER_ZEILE, type HofseiteFortschritt } from '@/lib/hofseite-fortschritt'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 
@@ -96,7 +97,8 @@ export function ersteSchritte(daten: ErsteSchritteDaten): ErsterSchritt[] {
     {
       id: 'abholzeiten',
       titel: 'Abholzeiten festlegen',
-      nutzen: 'Erst dann können Kunden bestellen.',
+      // Derselbe Satz wie Packliste und Einstellungen (Register N9: ein Zustand, eine Fassung).
+      nutzen: ABHOLZEITEN_FEHLEN.satz,
       href: '/settings/pickup-slots',
       erledigt: daten.aktiveAbholzeiten > 0,
     },

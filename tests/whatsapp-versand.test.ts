@@ -22,8 +22,8 @@ import { describe, it, expect } from 'vitest'
 import { WHATSAPP_VERSAND_TEXT, nachSeitenEreignis, versandStand, type Abonnentin } from '@/lib/whatsapp-versand'
 
 const ANNA: Abonnentin = { id: 'cabo00000000000000000001', name: 'Anna Muster', phone: '+43 660 0000000' }
-const BERTA: Abonnentin = { id: 'cabo00000000000000000002', name: 'Berta Muster', phone: '+43 660 0000001' }
-const CARLA: Abonnentin = { id: 'cabo00000000000000000003', name: 'Carla Muster', phone: '+43 660 0000002' }
+const BERTA: Abonnentin = { id: 'cabo00000000000000000002', name: 'Berta Muster', phone: '+43 664 0000000' }
+const CARLA: Abonnentin = { id: 'cabo00000000000000000003', name: 'Carla Muster', phone: '+43 676 0000000' }
 const ALLE = [ANNA, BERTA, CARLA]
 
 describe('versandStand', () => {

@@ -214,6 +214,14 @@ describe('Zustände der Produktkarten — knapp, ausverkauft, kein „Merken"', 
     expect(html).not.toContain('aria-label="Blütenhonig in den Korb legen"')
   })
 
+  it('knapp ist eine leise Zeile, keine Marke — „tun" (Orange) passt nicht für einen Hinweis an die Kundin (Freigabe Lauf 13)', () => {
+    // Die Zeile selbst: gedämpfter Text, kein Element der Marke.
+    expect(html).toMatch(/<span class="[^"]*text-muted-foreground[^"]*">Nur noch 3 Stück<\/span>/)
+    expect(html).not.toMatch(/data-art="tun"[^>]*><span[^>]*>Nur noch 3 Stück/)
+    // Gegenprobe: „Ausverkauft" bleibt eine Marke.
+    expect(html).toMatch(/data-art="erledigt"[^>]*><span[^>]*>Ausverkauft/)
+  })
+
   it('kein „Merken" — in keinem Reiter', () => {
     for (const suche of ['', 'reiter=produkte', 'reiter=beitraege']) expect(seite({ suche })).not.toMatch(/Merken/)
   })

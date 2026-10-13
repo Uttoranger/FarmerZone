@@ -128,7 +128,7 @@ function anfrage(overrides: Record<string, unknown> = {}) {
       sessionId: 'sid_1',
       customerName: 'Anna Testerin',
       customerEmail: 'anna@test.local',
-      customerPhone: '+43 660 1234567',
+      customerPhone: '+43 699 0000000',
       customerNote: '',
       pickupDate: '2026-09-25',
       pickupTimeStart: '14:00',

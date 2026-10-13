@@ -69,7 +69,7 @@ export default async function PlakatPage(): Promise<React.JSX.Element> {
           symbol={Printer}
           titel="Das Plakat gibt es, sobald dein Hof online ist"
           satz="Solange Kunden deine Hofseite nicht sehen können, würde der Code ins Leere führen."
-          aktion={
+          ausweg={
             <Link href="/farm-page" className={KNOPF_ORANGE}>
               Zu Mein Hof
             </Link>

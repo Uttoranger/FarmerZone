@@ -22,6 +22,7 @@ import {
 import { kundenAnsichtAus, type KundenAnsicht as Ansicht } from '@/schemas/hof-kunden'
 import { centsAlsEuro, formatEuro, mitAnzahl } from '@/lib/format'
 import { EMAIL_MAX } from '@/lib/eingabegrenzen'
+import { telefonLink } from '@/lib/telefon-anzeige'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
@@ -72,7 +73,7 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
           symbol={Users}
           titel="Noch keine Kunden"
           satz="Sobald jemand bei dir bestellt, taucht er hier auf. Eine vollständige Hofseite hilft dabei."
-          aktion={
+          ausweg={
             <Link href="/farm-page" className={KNOPF_RAHMEN}>
               Zu Mein Hof
             </Link>
@@ -135,7 +136,7 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
               symbol={Search}
               titel="Niemand passt"
               satz={suche.trim() ? `Nichts gefunden für „${suche.trim()}“.` : 'In diesem Filter ist gerade niemand.'}
-              aktion={
+              ausweg={
                 <Link
                   href="/customers"
                   prefetch={false}
@@ -212,12 +213,13 @@ function Neuigkeiten({ an }: { an: boolean }): React.JSX.Element | null {
 }
 
 function Anrufen({ kunde, klassen }: { kunde: CustomerSummary; klassen?: string }): React.JSX.Element | null {
-  // Wie im Detail: Ein Telefon aus Leerzeichen ist keins.
-  const telefon = kunde.customerPhone.trim()
-  if (!telefon) return null
+  // Wie im Detail: nur eine lesbare Nummer bekommt den Knopf (telefonLink) — ein
+  // Telefon aus Leerzeichen ist keins, zwei Nummern in einem Feld wählten falsch.
+  const anrufen = telefonLink(kunde.customerPhone)
+  if (!anrufen) return null
   return (
     <a
-      href={`tel:${telefon}`}
+      href={anrufen}
       aria-label={`${kunde.customerName} anrufen`}
       className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN, klassen)}
     >

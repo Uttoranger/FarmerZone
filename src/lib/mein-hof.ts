@@ -41,9 +41,9 @@ export function titelbildFoto(hof: { bannerType: string; bannerUrl: string | nul
 export type HofZustandArt = 'sichtbar' | 'pausiert' | 'wartet' | 'aus' | 'stillgelegt'
 
 /**
- * Farbe eines Schilds — Bedeutungsfarben, die Komponente (components/farmer/schild.tsx)
- * ordnet Klassen zu. Rot braucht der Hofzustand nicht, wohl aber die
- * Produktzeile („Ausverkauft").
+ * Farbe eines Schilds — Bedeutungsfarben; die EINE Zuordnung zur Marke ist
+ * `schildTon` (unten), gezeichnet von StatusBadge über den Baustein Marke
+ * (Register G5). Rot setzt heute kein Zustand.
  */
 export type SchildFarbe = 'gruen' | 'bernstein' | 'grau' | 'rot'
 

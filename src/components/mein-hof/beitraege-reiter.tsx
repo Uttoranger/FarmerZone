@@ -33,7 +33,7 @@ export function BeitraegeReiter({ uebersicht }: { uebersicht: BeitraegeUebersich
         symbol={Megaphone}
         titel="Noch kein Beitrag"
         satz="Mit einem Beitrag erzählst du deinen Kunden, was es gerade gibt — er steht auf deiner Hofseite."
-        aktion={
+        ausweg={
           <Link href="/status/new" className={HAUPTKNOPF}>
             <Plus className="size-4" strokeWidth={2} aria-hidden="true" />
             Ersten Beitrag schreiben

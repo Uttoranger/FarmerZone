@@ -194,11 +194,11 @@ function Person({ name, handy }: { name: string; handy: boolean }) {
     <div className={cn('flex items-center gap-3 px-3', handy ? 'min-h-[48px] py-2' : 'min-h-10 py-2')}>
       <span
         className="flex size-8 shrink-0 items-center justify-center rounded-full font-heading text-xs font-semibold"
-        /* Dieselbe Sand-Plakette wie an der Hofkarte (farm-identity-card.tsx),
-           bewusst dieselben Werte: Die Leiste ist in beiden Modi dunkel, dafür
-           gibt es kein Token — zwei Plaketten in zwei Tönen wären ein Fehler. */
-        /* eslint-disable-next-line no-restricted-syntax -- Sand-Plakette auf der in beiden Modi dunklen Leiste, kein Token passt (siehe oben) */
-        style={{ background: '#F2E5D3', color: '#8B6B4F' }}
+        /* Dieselbe Sand-Plakette wie an der Hofkarte (farm-identity-card.tsx):
+           Die Leiste ist in beiden Modi dunkel, die Plakette deshalb auch in
+           beiden gleich (`--leiste-plakette`, `--leiste-plakette-ink`) — zwei
+           Plaketten in zwei Tönen wären ein Fehler. */
+        style={{ background: 'var(--leiste-plakette)', color: 'var(--leiste-plakette-ink)' }}
         aria-hidden="true"
       >
         {hofInitialen(anzeige)}

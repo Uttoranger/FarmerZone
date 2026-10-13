@@ -24,9 +24,9 @@ import { geraetKurz } from '@/lib/hof-hilfe'
 export const BRIEFKASTEN_HREF = '/admin/meldungen'
 
 /**
- * Der Ton des internen Status — dieselbe Farbwelt wie die alten Admin-Marken
- * (STATUS_MARKE_FARBE): Orange = wartet auf dich, Grün = läuft, neutral =
- * abgeschlossen.
+ * Der Ton des internen Status, als Art der Marke über StatusBadge (Register G5):
+ * offen → tun (wartet auf deine Entscheidung), fertig → läuft (in Arbeit),
+ * neutral → erledigt (abgeschlossen). Die einzige Zuordnung der Admin-Marken.
  */
 export const ADMIN_STATUS_TON: Record<MeldungStatus, MeldungTon> = {
   NEU: 'offen',

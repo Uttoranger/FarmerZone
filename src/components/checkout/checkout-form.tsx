@@ -34,11 +34,12 @@ import {
   abholKacheln,
   abholSatz,
   angezeigteBetraege,
-  barHinweis,
+  barGuenstiger,
   bestellschlussHeute,
   gebuehrZeile,
   kassenBetraege,
   kassenZahlarten,
+  kassenZahlweg,
   kassenZurueck,
   kaufknopfZeile,
   reservierungsStand,
@@ -263,12 +264,11 @@ export function CheckoutForm({
   // Dieselben Fenster, die der Handler annimmt (src/lib/abholfenster.ts).
   const kacheln = abholKacheln(farm.pickupSlots, jetzt, ausgebuchteAbholfenster)
   const bestellschluss = bestellschlussHeute(kacheln)
-  // B1: Solange bar keine Servicegebühr kostet, online aber schon, nennt
-  // „Bar bei Abholung" den Vorteil an der Option selbst (N10).
-  const hinweisBar = barHinweis(farm, jetzt)
   // E5: nur online (mit fertigem Stripe-Zugang) und bar bei Abholung; Z2:
   // im Testbetrieb mit Satz an „Online bezahlen", nach `onlineAus` nur bar.
-  const zahlarten = kassenZahlarten(farm, hinweisBar !== null, { testbetrieb, onlineAus })
+  // B1: Solange bar keine Servicegebühr kostet, online aber schon, nennt
+  // „Bar bei Abholung" den Vorteil an der Option selbst (N10).
+  const zahlarten = kassenZahlarten(farm, barGuenstiger(farm, jetzt), { testbetrieb, onlineAus })
   const defaultPayment = zahlarten[0]?.wert ?? 'ONSITE_CASH'
 
   const form = useForm<CheckoutFormData>({
@@ -308,7 +308,9 @@ export function CheckoutForm({
   const betraege = angezeigteBetraege(kassenBetraege(cart, farm, jetzt, paymentMethod), zahlung?.betrag ?? null)
   // Die Gebührenzeile (N10) nur in Worten; steht die Bestellung, bleibt der
   // beim Anlegen festgehaltene Titel samt Erklärsatz (zahlungsGebuehrText).
-  const gebuehr = gebuehrZeile(farm, jetzt, paymentMethod)
+  // „entfällt" und „bar am Hof" nur bei angebotener Barzahlung (N10, kassenZahlweg).
+  const zahlweg = kassenZahlweg(zahlarten, paymentMethod)
+  const gebuehr = gebuehrZeile(farm, jetzt, zahlweg)
   const gesamt = formatEuro(centsAlsEuro(betraege.gesamtCents))
   const hof = { farmId: farm.id, farmSlug: farm.slug }
 
@@ -502,7 +504,7 @@ export function CheckoutForm({
           symbol={ShoppingBasket}
           titel="Dein Korb ist leer"
           satz={`Leg bei ${farm.name} etwas in den Korb, dann kannst du hier bestellen.`}
-          aktion={
+          ausweg={
             <Link href={`/${farm.slug}`} className={cn(KNOPF_GRUEN, 'w-auto')}>
               Zurück zum Hof
             </Link>
@@ -611,7 +613,7 @@ export function CheckoutForm({
             wirdGesendet={isPending}
             gesperrt={isPending || kacheln.length === 0 || zahlarten.length === 0}
             gesamt={gesamt}
-            fussnote={kaufknopfZeile({ termin: gewaehlt ? abholSatz(gewaehlt) : null, online })}
+            fussnote={kaufknopfZeile({ termin: gewaehlt ? abholSatz(gewaehlt) : null, online, bar: zahlweg === 'ONSITE_CASH' })}
           />
         }
       >
@@ -635,7 +637,7 @@ export function CheckoutForm({
             </div>
             {kacheln.length === 0 ? (
               <p className="text-[13.5px] text-muted-foreground">
-                Gerade gibt es keine Abholtermine. {KONTAKT_UNTER_ANGABEN_ZUM_HOF}
+                Gerade gibt es keine Abholzeiten. {KONTAKT_UNTER_ANGABEN_ZUM_HOF}
               </p>
             ) : (
               <AbholWahl kacheln={kacheln} feld={form.register('pickupSlotKey')} fehler={fehlerAm.pickupSlotKey?.message} />

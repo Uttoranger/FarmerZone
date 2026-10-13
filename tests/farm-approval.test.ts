@@ -143,7 +143,7 @@ const CHECKOUT_BODY = {
   sessionId: 'sess_a',
   customerName: 'Anna Testerin',
   customerEmail: 'kundin@test.local',
-  customerPhone: '+43 660 1234567',
+  customerPhone: '+43 699 0000000',
   customerNote: '',
   pickupDate: '2026-08-01',
   pickupTimeStart: '09:00',
@@ -625,7 +625,7 @@ describe('Registrierung ohne Einladungscode', () => {
       address: 'Weg 1',
       postalCode: '5270',
       city: 'Mauerkirchen',
-      phone: '+43 660 1234567',
+      phone: '+43 699 0000000',
       email: 'neuer@test.local',
     })
 

@@ -8,6 +8,7 @@ import { statusLabel, paymentLabel } from '@/components/orders/order-status'
 import { PrintButton } from '@/components/orders/print-button'
 import { barZuKassierenCents, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
+import { formatiereTelefon } from '@/lib/telefon-anzeige'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,7 +62,7 @@ export default async function OrderPrintPage({
           <div className="text-sm text-slate-500">
             {farm.address} · {farm.postalCode} {farm.city}
           </div>
-          {farm.phone && <div className="text-sm text-slate-500">{farm.phone}</div>}
+          {farm.phone && <div className="text-sm text-slate-500">{formatiereTelefon(farm.phone)}</div>}
         </div>
 
         {/* Order header */}
@@ -92,7 +93,7 @@ export default async function OrderPrintPage({
             Kunde
           </div>
           <div className="font-medium">{order.customerName}</div>
-          <div className="text-sm text-slate-600">{order.customerPhone}</div>
+          <div className="text-sm text-slate-600">{formatiereTelefon(order.customerPhone)}</div>
           <div className="text-sm text-slate-600">{order.customerEmail}</div>
           {order.customerNote && (
             <div className="text-sm text-slate-500 mt-1 italic">{order.customerNote}</div>

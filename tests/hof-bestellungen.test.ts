@@ -198,13 +198,14 @@ describe('Kleinigkeiten der Anzeige', () => {
     expect(abholungKurz(SAMSTAG_MITTAG, '09:00', '12:00', JETZT)).toBe('Samstag, 9–12 Uhr')
   })
 
-  it('Marken: zum Packen orange, gepackt grün, wartet und Erledigtes neutral', () => {
-    expect(bestellMarke('CONFIRMED')).toEqual({ text: 'Zum Packen', ton: 'offen' })
-    expect(bestellMarke('READY')).toEqual({ text: 'Gepackt', ton: 'fertig' })
-    expect(bestellMarke('PENDING_CONFIRMATION')).toEqual({ text: 'Wartet auf Kunde', ton: 'neutral' })
-    expect(bestellMarke('PICKED_UP')).toEqual({ text: 'Abgeholt', ton: 'neutral' })
-    expect(bestellMarke('CANCELLED')).toEqual({ text: 'Storniert', ton: 'neutral' })
-    expect(bestellMarke('NOT_PICKED_UP')).toEqual({ text: 'Nicht abgeholt', ton: 'neutral' })
+  it('Marken (Register G5): zum Packen tun, gepackt läuft, wartend und abgeschlossen erledigt, storniert abgebrochen', () => {
+    expect(bestellMarke('CONFIRMED')).toEqual({ text: 'Zum Packen', art: 'tun' })
+    expect(bestellMarke('READY')).toEqual({ text: 'Gepackt', art: 'laeuft' })
+    expect(bestellMarke('PENDING_CONFIRMATION')).toEqual({ text: 'Wartet auf Kunde', art: 'erledigt' })
+    expect(bestellMarke('PICKED_UP')).toEqual({ text: 'Abgeholt', art: 'erledigt' })
+    // Freigabe Lauf 13 (Nr. 85): Storniert rot, Nicht abgeholt erledigt — vorher beide grau (neutral).
+    expect(bestellMarke('CANCELLED')).toEqual({ text: 'Storniert', art: 'abgebrochen' })
+    expect(bestellMarke('NOT_PICKED_UP')).toEqual({ text: 'Nicht abgeholt', art: 'erledigt' })
   })
 
   it('zahlartText sagt nie pauschal „bezahlt"', () => {
@@ -323,7 +324,7 @@ describe('Bestellung im Detail: die Nummer der Kundin', () => {
     id: 'order-1',
     nummer: 'HT-0210-A4F2',
     status: 'CONFIRMED',
-    marke: { text: 'Bestätigt', ton: 'offen' },
+    marke: { text: 'Bestätigt', art: 'tun' },
     abholung: 'heute, 15–18 Uhr',
     bestelltAm: '6. Okt, 9:00',
     kunde: { name: 'Erika Beispiel', vorname: 'Erika', email: 'erika@example.com', telefon, notiz: null },

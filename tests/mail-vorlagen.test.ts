@@ -239,7 +239,9 @@ describe('Abholbereit-Mail (Vorlage pickup-reminder.tsx)', () => {
     expect(text).toContain('HT-0210-A4F2')
     expect(text).toContain('15:00–18:00 Uhr')
     expect(links(html).some((u) => u.hostname === 'www.google.com')).toBe(true)
-    expect(html).toContain('href="tel:+43 664 0000000"')
+    // Nummer und Link einheitlich (formatiereTelefon/telefonLink, Nr. 85)
+    expect(html).toContain('href="tel:+436640000000"')
+    expect(text).toContain('Anrufen (+43 664 000 0000)')
   })
 })
 

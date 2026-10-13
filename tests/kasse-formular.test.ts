@@ -56,7 +56,7 @@ vi.mock('@stripe/react-stripe-js', () => ({
 vi.mock('@/lib/stripe-client', () => ({ getStripePromise: () => null }))
 
 import { CheckoutForm } from '@/components/checkout/checkout-form'
-import { barHinweis } from '@/lib/kasse'
+import { barGuenstiger } from '@/lib/kasse'
 import { BAR_OHNE_GEBUEHR_HINWEIS, BAR_OHNE_GEBUEHR_ZAHLART } from '@/lib/konditionen'
 import { ANGABEN_ZUM_HOF_TITEL } from '@/lib/stripe-konto'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
@@ -186,9 +186,17 @@ describe('Kasse glätten (N10): das ganze Formular', () => {
     expect(html).not.toContain(STRIPE_SATZ)
   })
 
+  it('Hof ganz ohne angebotene Zahlart: kein „entfällt" und kein „bar am Hof" unter dem gesperrten Knopf (N10, Ergänzung Lauf 13)', () => {
+    // Gegenprobe ist der Fall darüber: Mit angebotener Barzahlung steht beides da.
+    const html = kasse({ ...HOF, stripeAccountReady: false, acceptsOnsite: false })
+    expect(html).not.toContain('entfällt')
+    expect(html).not.toContain('bar am Hof')
+    expect(html).toContain('Wähl noch, wann du abholst')
+  })
+
   it('kein „Ein Korb pro Hof" und kein loser Bar-Absatz unter den Zahlarten', () => {
-    // Gegenprobe: Den Absatz gäbe es an diesem Tag — barHinweis liefert ihn.
-    expect(barHinweis(HOF, JETZT)).toBe(BAR_OHNE_GEBUEHR_HINWEIS)
+    // Gegenprobe: An diesem Tag ist bar günstiger — früher stand dann der lose Absatz da.
+    expect(barGuenstiger(HOF, JETZT)).toBe(true)
     for (const html of [kasse(HOF), kasse({ ...HOF, stripeAccountReady: false })]) {
       expect(html).toContain('Dein Korb bei')
       expect(html).not.toContain('Ein Korb pro Hof')

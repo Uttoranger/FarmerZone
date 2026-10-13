@@ -183,7 +183,7 @@ const AUSNAHMEN: Ausnahme[] = [
  * aus N12, bis 86 jeden Text auf das Wort der Tabelle umgestellt hat — dann ist sie leer und der
  * letzte Test schaltet ein (Muster 77/78). `stelle` ist Datei:Zeile von heute (nur zum Finden;
  * geglichen wird über Datei, Wort und Text), `text` ein Ausschnitt, `nummer` die Nummer, die den
- * Text umstellt. Wer künftig mehrere Texte nummernweise umstellt, trägt sie hier ein.
+ * Text umstellt. Eine neue Arbeitsliste gibt es nur mit Freigabe (Muster 77/78: Liste und `it.skip`, bis sie leer ist).
  */
 type Offen = { stelle: string; wort: string; text: string; nummer?: string }
 const OFFEN_BIS_86: Offen[] = [

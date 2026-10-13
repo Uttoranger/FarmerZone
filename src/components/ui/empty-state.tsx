@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { isValidElement, type ReactElement } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
  * EmptyState: der Leerzustand nach docs/ai/DESIGN_SYSTEM.md — Symbol, ein
  * Satz, eine nächste Handlung („Noch keine Produkte — Lege dein erstes an").
  * Nie nur „nichts gefunden": Die Aktion ist der Ausweg (Umkreis erweitern,
- * Filter lockern, anlegen) und kommt als Kind herein, meist ein Link.
+ * Filter lockern, anlegen) und kommt als `ausweg` herein, meist ein Link.
  *
  * Großes Symbol mit Strichstärke 1,5 (Regel für Leerzustände).
  */
@@ -15,7 +15,7 @@ export function EmptyState({
   titel,
   titelStufe,
   satz,
-  aktion,
+  ausweg,
   className,
 }: {
   symbol: LucideIcon
@@ -23,7 +23,7 @@ export function EmptyState({
   /** Der Titel als Überschrift dieser Stufe — für eine Seite, die im Randzustand sonst keine hätte; sonst ein Absatz. */
   titelStufe?: 1 | 2 | 3
   satz?: string
-  aktion?: ReactNode
+  ausweg: Ausweg
   className?: string
 }): React.JSX.Element {
   const Titel = titelStufe === undefined ? 'p' : (`h${titelStufe}` as const)
@@ -40,7 +40,16 @@ export function EmptyState({
       </span>
       <Titel className="font-heading text-lg font-semibold text-foreground">{titel}</Titel>
       {satz && <p className="max-w-sm text-sm text-muted-foreground">{satz}</p>}
-      {aktion && <div className="mt-1 flex flex-wrap justify-center gap-2">{aktion}</div>}
+      {isValidElement(ausweg) && <div className="mt-1 flex flex-wrap justify-center gap-2">{ausweg}</div>}
     </div>
   )
 }
+
+/**
+ * Der Ausweg eines Leerzustands (Register N9, Pflicht seit Nr. 85): eine Aktion, die immer da ist
+ * (meist ein Link) — oder `{ ohne: 'Grund' }`, wenn es keinen Weg weiter gibt. Der Grund steht im
+ * Aufruf, in ganzen Worten, und wird nicht gezeigt: Wer einen Leerzustand ohne Aktion baut, muss ihn
+ * hinschreiben (Wache `tests/leerzustaende-wache.test.ts`). Eine Aktion, die fehlen kann
+ * (`bedingung && …`, `… : undefined`), ist kein Ausweg — dafür steht der Grund im anderen Zweig.
+ */
+export type Ausweg = ReactElement | { ohne: string }

@@ -1,5 +1,3 @@
-import type { MarkeArt } from '@/lib/marke-art'
-
 export function statusLabel(status: string): string {
   switch (status) {
     case 'PENDING_CONFIRMATION': return 'Wartet auf Kunden-Bestätigung'
@@ -14,24 +12,10 @@ export function statusLabel(status: string): string {
   }
 }
 
-// Die Bedeutung jedes Status aus Sicht des Hofs (Register G5): tun = wartet
-// auf die Kundin bzw. auf dich · läuft = bezahlt, in Arbeit · erledigt =
-// abholbereit oder abgeholt (für den Hof getane Arbeit) · abgebrochen. Die
-// Farbe dazu kommt nur aus dem Baustein Marke; die Kundin liest dieselben
-// Status anders (src/lib/bestellstatus.ts).
-export function statusArt(status: string): MarkeArt {
-  switch (status) {
-    case 'PENDING_CONFIRMATION': return 'tun'
-    case 'PAID': return 'laeuft'
-    case 'CONFIRMED': return 'tun'
-    case 'IN_PREPARATION': return 'laeuft'
-    case 'READY': return 'erledigt'
-    case 'PICKED_UP': return 'erledigt'
-    case 'CANCELLED': return 'abgebrochen'
-    case 'NOT_PICKED_UP': return 'abgebrochen'
-    default: return 'erledigt'
-  }
-}
+// Die Bedeutung (Art der Marke, Register G5) eines Status aus Sicht des Hofs
+// liefert bestellMarke (src/lib/hof-bestellungen.ts) zusammen mit dem Wort —
+// dort lesen sie Bestellliste, Bestelldetail und Packliste; hier steht
+// bewusst keine zweite Zuordnung, die abweichen könnte.
 
 export function paymentLabel(method: string): string {
   switch (method) {

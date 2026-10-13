@@ -49,7 +49,7 @@ export function MeineMeldungen({ zeilen }: { zeilen: MeldungZeile[] | null }): R
           symbol={LifeBuoy}
           titel="Noch keine Meldungen"
           satz="Wenn etwas klemmt oder dir etwas fehlt, schreib uns — hier siehst du dann, was daraus geworden ist."
-          aktion={
+          ausweg={
             <Link href={NEUE_MELDUNG_HREF} className={KNOPF_RAHMEN}>
               Meldung schreiben
             </Link>

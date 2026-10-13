@@ -40,7 +40,7 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
-| `web-k3-warenkorb-bezahlen.html` | K3 · Warenkorb & Bezahlen | `/[farmSlug]/checkout` | Umbau | 1440×1180 |
+| `web-k3-warenkorb-bezahlen.html` | K3 · Warenkorb & Bezahlen | `/[farmSlug]/checkout` | Umbau · Kasse ersetzt durch `web-k3-kasse-glatt` und `system-k3-kasse-bezahlen-bar` (Nr. 82, Abschnitt Lauf 12) | 1440×1180 |
 | `web-k3-zahlung-abgelehnt.html` | K3 · Zahlung abgelehnt | `/[farmSlug]/checkout (Fehler)` | Zustand | 1440×1180 |
 | `web-k3-bestaetigung-online-mit-erzaehl-s-weiter.html` | K3 · Bestätigung (online) mit „Erzähl's weiter" | `/[farmSlug]/confirm/[orderId]?sig=` | Umbau | 1440×1200 |
 | `web-k3-bar-wartet-auf-bestaetigung.html` | K3 · Bar: wartet auf Bestätigung | `/[farmSlug]/confirm/[orderId] (bar, offen)` | Zustand | 1440×900 |
@@ -142,7 +142,7 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
-| `mobil-k3-warenkorb-bezahlen.html` | K3 · Warenkorb & Bezahlen | `/[farmSlug]/checkout` | Umbau | 390×844 |
+| `mobil-k3-warenkorb-bezahlen.html` | K3 · Warenkorb & Bezahlen | `/[farmSlug]/checkout` | Umbau · Kasse ersetzt durch `mobil-k3-kasse-glatt` und `system-k3-kasse-bezahlen-bar` (Nr. 82, Abschnitt Lauf 12) | 390×844 |
 | `mobil-k3-zahlung-abgelehnt.html` | K3 · Zahlung abgelehnt | `/[farmSlug]/checkout (Fehler)` | Zustand | 390×844 |
 | `mobil-k3-bestaetigung.html` | K3 · Bestätigung | `/[farmSlug]/confirm/[orderId]?sig=` | Umbau | 390×844 |
 | `mobil-k3-bar-bestaetigen.html` | K3 · Bar bestätigen | `/[farmSlug]/bestaetigen/[token] (neu, H3)` | neu | 390×844 |

@@ -119,7 +119,7 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, abonnentinnen
           titel={TEXT.leer.titel}
           titelStufe={1}
           satz={TEXT.leer.satz}
-          aktion={
+          ausweg={
             <Link href={BEITRAEGE_HREF} className={KNOPF_RAHMEN}>
               {TEXT.leer.aktion}
             </Link>

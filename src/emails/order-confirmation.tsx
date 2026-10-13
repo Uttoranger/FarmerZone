@@ -14,6 +14,7 @@ import {
 } from './_layout'
 import { SERVICEGEBUEHR_BEZEICHNUNG, SERVICEGEBUEHR_HINWEIS } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
+import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 
 /** Wie bezahlt wird — entscheidet nur der Satz und die Gesamtzeile, nie der Betrag. */
 export type MailZahlart = 'online' | 'bar' | 'karte'
@@ -55,6 +56,7 @@ const GESAMT_LABEL: Record<MailZahlart, string> = {
  * „bezahlt". Vertragsmail ohne Werbung (S11): kein „Nochmal bestellen".
  */
 export function OrderConfirmationEmail(p: OrderConfirmationProps) {
+  const anrufen = telefonLink(p.farmPhone)
   const mitGebuehr = (p.serviceFee ?? 0) > 0
   const satz =
     p.zahlart === 'online'
@@ -91,9 +93,13 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps) {
       {mitGebuehr && <Text style={kleinText}>{SERVICEGEBUEHR_BEZEICHNUNG}: {SERVICEGEBUEHR_HINWEIS}</Text>}
       <Text style={kleinText}>
         Fragen? Ruf direkt beim Hof an:{' '}
-        <Link href={`tel:${p.farmPhone}`} style={textLink}>
-          {p.farmPhone}
-        </Link>
+        {anrufen ? (
+          <Link href={anrufen} style={textLink}>
+            {formatiereTelefon(p.farmPhone)}
+          </Link>
+        ) : (
+          p.farmPhone
+        )}
       </Text>
     </EmailLayout>
   )

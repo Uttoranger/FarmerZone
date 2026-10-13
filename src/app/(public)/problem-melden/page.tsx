@@ -5,11 +5,11 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { MeldungForm } from '@/components/shared/meldung-form'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { generateFormToken } from '@/lib/form-token'
-import { KENNUNG_PARAMETER, bereinigeKennung } from '@/lib/fehlerseite'
+import { KENNUNG_PARAMETER, PROBLEM_MELDEN, bereinigeKennung } from '@/lib/fehlerseite'
 import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: `Problem melden — ${MARKE}`,
+  title: `${PROBLEM_MELDEN} — ${MARKE}`,
   robots: { index: false, follow: false },
 }
 
@@ -46,7 +46,7 @@ export default async function ProblemMeldenPage({
       <div className="mx-auto w-full max-w-[560px] px-4 pt-8 pb-12 md:pt-[60px]">
         <div className="flex flex-col gap-3.5 rounded-[22px] border border-border bg-card p-5 md:p-6">
           <div>
-            <h1 className="font-heading text-[22px] font-semibold text-foreground">Problem melden</h1>
+            <h1 className="font-heading text-[22px] font-semibold text-foreground">{PROBLEM_MELDEN}</h1>
             <p className="mt-1 text-[13.5px] leading-normal text-muted-foreground">
               Danke, dass du Bescheid gibst. Wir schauen uns das an.
             </p>

@@ -182,7 +182,7 @@ export const BAR_OHNE_GEBUEHR_HINWEIS = `Bei Barzahlung bis ${BAR_OHNE_GEBUEHR_B
 
 /**
  * Der erste Satz an „Bar bei Abholung" in der Kasse (Register N10, Nr. 82) —
- * nur, solange bar wirklich günstiger ist (`barHinweis` in src/lib/kasse.ts).
+ * nur, solange bar wirklich günstiger ist (`barGuenstiger` in src/lib/kasse.ts).
  */
 export const BAR_OHNE_GEBUEHR_ZAHLART = `Ohne Servicegebühr bis ${BAR_OHNE_GEBUEHR_BIS_TEXT}.`
 

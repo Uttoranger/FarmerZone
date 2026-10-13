@@ -234,15 +234,14 @@ describe('Hexwerte im Code (Register G5)', () => {
   ]
 
   /**
-   * Nacharbeit: Hexwerte außerhalb der Dateigrenze von Nr. 79 (Lauf 13 ersetzt
-   * sie durch Tokens und streicht sie hier). Je Datei nur genau diese Werte —
-   * ein neuer schlägt sofort an.
+   * Nacharbeit: Hexwerte außerhalb der Dateigrenzen von Nr. 79 und 85 (Nr. 85 hat
+   * farm-page-view, product-grid und farmer-nav in Tokens überführt und hier
+   * gestrichen). Je Datei nur genau diese Werte — ein neuer schlägt sofort an.
    */
   const NACHARBEIT: Record<string, string[]> = {
-    'src/components/farm/farm-page-view.tsx': ['#2D5F3F', '#5C6052'],
-    'src/components/farm/product-grid.tsx': ['#5C6052'],
+    // Die Plakette nimmt künftig --leiste-plakette/-ink wie farmer-nav.tsx (Nr. 85); #A9CFE3 braucht ein eigenes Token.
     'src/components/farmer/farm-identity-card.tsx': ['#F2E5D3', '#8B6B4F', '#A9CFE3'],
-    'src/components/farmer/farmer-nav.tsx': ['#F2E5D3', '#8B6B4F'],
+    // Der runde Knopf auf dem Titelbild nimmt künftig --foto-knopf-ink wie farm-page-view.tsx (Nr. 85).
     'src/components/shared/kunden-kopf.tsx': ['#2D5F3F'],
   }
 
