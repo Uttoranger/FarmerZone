@@ -28,6 +28,7 @@ import {
   filterAdresse,
   filtereProdukte,
   produktStatus,
+  PRODUKTE_LEER,
   produkteKopfzeile,
   sichtbareProdukteFilter,
   wiederDaMomentMoeglich,
@@ -186,12 +187,13 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
     </button>
   )
 
+  const kopfzeile = produkteKopfzeile(products)
   return (
     <div className="flex flex-col gap-4 md:gap-[18px]">
       <header className="flex items-end gap-3">
         <div className="min-w-0">
           <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Produkte</h1>
-          <p className="text-[13px] leading-normal text-muted-foreground">{produkteKopfzeile(products)}</p>
+          {kopfzeile && <p className="text-[13px] leading-normal text-muted-foreground">{kopfzeile}</p>}
         </div>
         {/* Am Handy legt das Plus der Unterleiste an (Mockup mobil-h2-produkte). */}
         {products.length > 0 && neuKnopf('ml-auto hidden md:inline-flex')}
@@ -200,8 +202,8 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
       {products.length === 0 ? (
         <EmptyState
           symbol={Package}
-          titel="Noch keine Produkte"
-          satz="Leg dein erstes Produkt an – Kunden sehen es sofort auf deiner Hofseite."
+          titel={PRODUKTE_LEER.titel}
+          satz={PRODUKTE_LEER.satz}
           aktion={neuKnopf()}
         />
       ) : (

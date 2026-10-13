@@ -24,7 +24,7 @@ import { Segment } from '@/components/ui/segment'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { teilenBildPfad, type TeilenBildFormat } from '@/lib/teilen-kanal'
-import { TEILEN_BILD_PRODUKTE_MAX } from '@/lib/teilen-bild'
+import { TEILEN_BILD_PRODUKTE_MAX, TEILEN_BILD_TYP, teilenBildDateiName } from '@/lib/teilen-bild'
 import { WHATSAPP_VERSAND_TEXT } from '@/lib/whatsapp-versand'
 import {
   anfangsAuswahl,
@@ -142,7 +142,7 @@ export function TeilenFenster({
   // abgelaufener Beitrag gibt so gleich „nicht gefunden", statt mit passender
   // Prüfsumme bis zu zwei Tage im CDN zu stehen.
   const bildUrl = teilenBildPfad(daten.slug, { format, auswahl: gewaehlt, beitrag: beitrag?.beitragId ?? null })
-  const dateiName = `${daten.slug}-${format === 'story' ? 'status' : 'beitrag'}.png`
+  const dateiName = teilenBildDateiName(daten.slug, format)
 
   // Das Bild für das Teilen-Menü schon jetzt holen: Das Menü des Telefons
   // geht nur direkt aus dem Tipp auf, ein Laden dazwischen verlöre ihn.
@@ -152,7 +152,7 @@ export function TeilenFenster({
     fetch(bildUrl)
       .then((antwort) => (antwort.ok ? antwort.blob() : null))
       .then((blob) => {
-        if (aktuell && blob) bildDatei.current = new File([blob], dateiName, { type: 'image/png' })
+        if (aktuell && blob) bildDatei.current = new File([blob], dateiName, { type: TEILEN_BILD_TYP.mime })
       })
       .catch(() => {
         // Ohne Datei teilt das Menü nur Text und Link — kein Fehler für den Hof.

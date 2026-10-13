@@ -1,4 +1,5 @@
 import { Mail, Phone } from 'lucide-react'
+import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 import { cn } from '@/lib/utils'
 import { KARTE, KNOPF_RAHMEN } from '@/components/bestaetigung/bestaetigung-teile'
 
@@ -14,10 +15,13 @@ import { KARTE, KNOPF_RAHMEN } from '@/components/bestaetigung/bestaetigung-teil
  * Handy führt der Knopf „E-Mail" zu ihr.
  *
  * Ohne Nummer bzw. Adresse (die Hof-E-Mail ist im Onboarding freiwillig)
- * entfallen Zeile und Knopf; ohne beides die ganze Karte.
+ * entfallen Zeile und Knopf; ohne beides die ganze Karte. Die Nummer steht
+ * einheitlich da (N8); lässt sie sich nicht lesen (keine Ziffer, zwei Nummern),
+ * bleibt die Eingabe sichtbar, aber ohne „Anrufen“.
  */
 export function HofErreichen({ telefon, email }: { telefon: string; email: string }): React.JSX.Element | null {
   if (!telefon && !email) return null
+  const anrufen = telefonLink(telefon)
   return (
     <section aria-labelledby="hof-erreichen-titel" className={cn(KARTE, 'flex flex-col gap-2.5')}>
       <h2 id="hof-erreichen-titel" className="text-[15px] font-semibold">
@@ -29,7 +33,7 @@ export function HofErreichen({ telefon, email }: { telefon: string; email: strin
       {telefon && (
         <p className="flex items-center gap-2.5 text-[15px] text-foreground">
           <Phone className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-          <span className="min-w-0 break-words">{telefon}</span>
+          <span className="min-w-0 break-words">{formatiereTelefon(telefon)}</span>
         </p>
       )}
       {email && (
@@ -40,8 +44,8 @@ export function HofErreichen({ telefon, email }: { telefon: string; email: strin
         </p>
       )}
       <div className="flex gap-2">
-        {telefon && (
-          <a href={`tel:${telefon}`} className={cn(KNOPF_RAHMEN, 'flex-1')}>
+        {anrufen && (
+          <a href={anrufen} className={cn(KNOPF_RAHMEN, 'flex-1')}>
             <Phone className="size-4" strokeWidth={1.7} aria-hidden="true" />
             Anrufen
           </a>

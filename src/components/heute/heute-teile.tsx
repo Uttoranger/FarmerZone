@@ -20,6 +20,8 @@ import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
 import { TeilenFensterKnopf } from '@/components/teilen/teilen-fenster'
 import type { TeilenFensterDaten } from '@/lib/teilen-fenster'
 import {
+  BRAUCHT_DICH_LEER,
+  HEUTE_KEINE_BESTELLUNGEN,
   HEUTE_NIEMAND,
   KENNZAHL_TEXT,
   kennzahlBreiteEm,
@@ -33,6 +35,7 @@ import {
   type WochenBalken,
 } from '@/lib/heute'
 import { onlinePausiertHinweis } from '@/lib/stripe-konto'
+import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { ERSTE_SCHRITTE_WARTET, ZU_TUN_TEXT, type ZuTunAufgabe } from '@/lib/erste-schritte'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
@@ -320,15 +323,11 @@ export function Packliste({
         <EmptyState
           symbol={PackageOpen}
           titel={HEUTE_NIEMAND}
-          satz={
-            leer.abholfenster
-              ? `Nächste Abholung: ${leer.abholfenster.name}, ${leer.abholfenster.zeit}.`
-              : 'Trag deine Abholzeiten ein, damit Kunden bei dir bestellen können.'
-          }
+          satz={leer.abholfenster ? `Nächste Abholung: ${leer.abholfenster.name}, ${leer.abholfenster.zeit}.` : ABHOLZEITEN_FEHLEN.satz}
           aktion={
             leer.abholfenster ? undefined : (
-              <Link href="/settings/pickup-slots" className={KNOPF_ORANGE}>
-                Abholzeiten eintragen
+              <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={KNOPF_ORANGE}>
+                {ABHOLZEITEN_FEHLEN.aktion.text}
               </Link>
             )
           }
@@ -369,53 +368,57 @@ const BRAUCHT_DICH_SYMBOL: Record<BrauchtDichEintrag['art'], LucideIcon> = {
   status: Megaphone,
 }
 
-/** „Braucht dich" — nur, was eine Handlung verlangt (brauchtDich in src/lib/heute.ts). */
+/**
+ * „Braucht dich" — nur, was eine Handlung verlangt (brauchtDich in src/lib/heute.ts).
+ * Ohne Eintrag keine Karte, sondern eine leise Zeile (Register N11): gedämpft
+ * und ohne Rahmen wie „Zu tun einblenden" unten auf der Seite, nur ohne Knopf —
+ * es gibt nichts zu tippen.
+ */
 export function BrauchtDichKarte({ eintraege }: { eintraege: BrauchtDichEintrag[] }): React.JSX.Element {
+  if (eintraege.length === 0) {
+    return <p className={cn('text-center text-[13px] font-medium', LEISE)}>{BRAUCHT_DICH_LEER}</p>
+  }
   return (
     <section aria-labelledby="heute-braucht-dich" className={cn(KARTE, 'overflow-hidden')}>
       <h2 id="heute-braucht-dich" className="border-b border-border px-4 py-3.5 text-[15px] font-semibold md:px-[18px]">
         Braucht dich
       </h2>
-      {eintraege.length === 0 ? (
-        <p className={cn('px-4 py-4 text-sm md:px-[18px]', LEISE)}>Alles erledigt.</p>
-      ) : (
-        <ul>
-          {eintraege.map((eintrag) => {
-            const Symbol = BRAUCHT_DICH_SYMBOL[eintrag.art]
-            return (
-              <li key={`${eintrag.art}-${eintrag.href}-${eintrag.text}`} className="border-t border-border first:border-t-0">
-                <Link
-                  href={eintrag.href}
-                  className={cn('flex min-h-14 items-center gap-3 px-4 py-3 transition-colors hover:bg-muted md:px-[18px]', FOKUS_RAHMEN_INNEN)}
-                >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-primary/12 text-status-offen">
-                    <Symbol className="size-4" strokeWidth={1.7} aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1 text-sm break-words">{eintrag.text}</span>
-                  <ChevronRight className={cn('size-4 shrink-0', LEISE)} strokeWidth={1.7} aria-hidden="true" />
-                </Link>
-                {eintrag.unterpunkte && eintrag.unterpunkte.length > 0 && (
-                  <ul className="pr-4 pb-2 pl-16">
-                    {eintrag.unterpunkte.map((u) => (
-                      <li key={`${u.href}-${u.text}`}>
-                        <Link
-                          href={u.href}
-                          className={cn('flex min-h-11 items-center gap-2 rounded-lg px-2 text-[13px] transition-colors hover:bg-muted', LEISE, FOKUS_RAHMEN_INNEN)}
-                        >
-                          <span className="min-w-0 flex-1 truncate" title={u.text}>
-                            {u.text}
-                          </span>
-                          <ChevronRight className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      )}
+      <ul>
+        {eintraege.map((eintrag) => {
+          const Symbol = BRAUCHT_DICH_SYMBOL[eintrag.art]
+          return (
+            <li key={`${eintrag.art}-${eintrag.href}-${eintrag.text}`} className="border-t border-border first:border-t-0">
+              <Link
+                href={eintrag.href}
+                className={cn('flex min-h-14 items-center gap-3 px-4 py-3 transition-colors hover:bg-muted md:px-[18px]', FOKUS_RAHMEN_INNEN)}
+              >
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-primary/12 text-status-offen">
+                  <Symbol className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1 text-sm break-words">{eintrag.text}</span>
+                <ChevronRight className={cn('size-4 shrink-0', LEISE)} strokeWidth={1.7} aria-hidden="true" />
+              </Link>
+              {eintrag.unterpunkte && eintrag.unterpunkte.length > 0 && (
+                <ul className="pr-4 pb-2 pl-16">
+                  {eintrag.unterpunkte.map((u) => (
+                    <li key={`${u.href}-${u.text}`}>
+                      <Link
+                        href={u.href}
+                        className={cn('flex min-h-11 items-center gap-2 rounded-lg px-2 text-[13px] transition-colors hover:bg-muted', LEISE, FOKUS_RAHMEN_INNEN)}
+                      >
+                        <span className="min-w-0 flex-1 truncate" title={u.text}>
+                          {u.text}
+                        </span>
+                        <ChevronRight className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          )
+        })}
+      </ul>
     </section>
   )
 }
@@ -428,21 +431,17 @@ export function NaechsteAbholungKarte({ fenster, anzahl }: { fenster: NaechstesF
       <h2 id="heute-naechste-abholung" className={cn('text-[13px] font-normal', LEISE)}>
         Nächste Abholung
       </h2>
+      {/* Ohne Abholzeit nur der Titel als eine Zeile: Satz und Knopf stehen schon in der Packliste (N9, ein Zustand eine Fassung). */}
       {fenster ? (
         <>
           {/* Umbruch nur nach dem Komma — „15–18 Uhr" bleibt zusammen. */}
           <p className="font-heading text-[22px] leading-tight font-semibold break-words">
             {fenster.name}, <span className="whitespace-nowrap">{fenster.zeit}</span>
           </p>
-          <p className={cn('text-[13px]', LEISE)}>{anzahl > 0 ? mehrzahl(anzahl, 'Bestellung', 'Bestellungen') : 'Noch keine Bestellungen'}</p>
+          <p className={cn('text-[13px]', LEISE)}>{anzahl > 0 ? mehrzahl(anzahl, 'Bestellung', 'Bestellungen') : HEUTE_KEINE_BESTELLUNGEN}</p>
         </>
       ) : (
-        <>
-          <p className="text-sm">Du hast noch keine Abholzeiten eingetragen.</p>
-          <Link href="/settings/pickup-slots" className={TEXTLINK}>
-            Abholzeiten eintragen →
-          </Link>
-        </>
+        <p className={cn('text-[13px]', LEISE)}>{ABHOLZEITEN_FEHLEN.titel}</p>
       )}
     </section>
   )

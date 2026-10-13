@@ -263,6 +263,8 @@ describe('Bestellseite — die Signatur wird an der Seite selbst durchgesetzt', 
 
 describe('Bestellseite — „Hof erreichen" nur hinter der Signatur (Nr. 60, S1)', () => {
   const KONTAKT = { phone: '+43 660 0000000', email: 'hof@example.com' }
+  // So zeigt „Hof erreichen“ die gespeicherte Nummer (Nr. 81, N8).
+  const ANZEIGE = '+43 660 000 0000'
   const mitKontakt = (teil: Record<string, unknown> = {}) => bestellung({ farm: { ...bestellung().farm, ...KONTAKT }, ...teil })
 
   it('gültige Signatur: Satz, Nummer und E-Mail des Hofs, Anrufen (tel:) und E-Mail (mailto:)', async () => {
@@ -270,10 +272,10 @@ describe('Bestellseite — „Hof erreichen" nur hinter der Signatur (Nr. 60, S1
     const text = await seite('order-1', bestellSignatur('order-1'))
     expect(text).toContain('Hof erreichen')
     expect(text).toContain('Kommst du später oder kannst du nicht kommen? Sag dem Hof kurz Bescheid.')
-    expect(text).toContain(KONTAKT.phone)
+    expect(text).toContain(ANZEIGE)
     expect(text).toContain(KONTAKT.email)
     const links = await seitenLinks('order-1', bestellSignatur('order-1'))
-    expect(links).toContainEqual({ href: `tel:${KONTAKT.phone}`, text: 'Anrufen' })
+    expect(links).toContainEqual({ href: 'tel:+436600000000', text: 'Anrufen' })
     expect(links).toContainEqual({ href: `mailto:${KONTAKT.email}`, text: 'E-Mail' })
   })
 
@@ -290,6 +292,7 @@ describe('Bestellseite — „Hof erreichen" nur hinter der Signatur (Nr. 60, S1
       const text = await seite('order-1', s)
       expect(text).not.toContain('Hof erreichen')
       expect(text).not.toContain(KONTAKT.phone)
+      expect(text).not.toContain(ANZEIGE)
       expect(text).not.toContain(KONTAKT.email)
     }
     expect(findUnique).not.toHaveBeenCalled()

@@ -1,11 +1,12 @@
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, Lightbulb, Share2 } from 'lucide-react'
+import { ChartColumn, ChevronLeft, ChevronRight, Lightbulb, Share2 } from 'lucide-react'
+import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { ProgressBar } from '@/components/ui/progress-bar'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
 import { centsAlsEuro, einheitLabel, formatEuro, formatZahl } from '@/lib/format'
-import { zahlartZeile, type GrenzeStand, type Kennzahlen, type TeilenKarte as TeilenKarteDaten } from '@/lib/auswertung'
+import { UMSATZ_LEER, zahlartZeile, type GrenzeStand, type Kennzahlen, type TeilenKarte as TeilenKarteDaten } from '@/lib/auswertung'
 import { UMSATZ_TEXT, type Balken, type KanalAnteil, type Periode, type TopProdukt, type Vergleichssatz } from '@/lib/umsatz'
 import { AUSWERTUNG_MAX_ZURUECK, auswertungHref } from '@/schemas/auswertung'
 import { TEILEN_ZAEHLUNG_HINWEIS } from '@/lib/teilen-kanal'
@@ -207,7 +208,16 @@ export function UmsatzKarte({
         </p>
       </div>
       {leer ? (
-        <p className="rounded-xl bg-muted/60 py-8 text-center text-sm text-muted-foreground">Noch keine Verkäufe in diesem Zeitraum</p>
+        <EmptyState
+          symbol={ChartColumn}
+          titel={UMSATZ_LEER.titel}
+          aktion={
+            <Link href={UMSATZ_LEER.aktion.href} className={KNOPF_RAHMEN}>
+              {UMSATZ_LEER.aktion.text}
+            </Link>
+          }
+          className="rounded-xl py-8"
+        />
       ) : (
         <BalkenDiagramm balken={balken} zeitraum={zeitraum} vergleichLabel={vergleichLabel} />
       )}

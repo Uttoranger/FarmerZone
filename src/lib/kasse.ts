@@ -12,12 +12,13 @@ import { formatEuro, formatTagKurz, formatZahl } from '@/lib/format'
 import { uhrzeitInWien } from '@/lib/fristen'
 import { tagVersetzt } from '@/lib/kalender'
 import { korbBetraege, zahlungsarten } from '@/lib/hofseite-kunde'
-import { BAR_OHNE_GEBUEHR_HINWEIS } from '@/lib/konditionen'
+import { BAR_OHNE_GEBUEHR_HINWEIS, BAR_OHNE_GEBUEHR_ZAHLART } from '@/lib/konditionen'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import { calcTotalAmount, decimalZuCents } from '@/lib/order-totals'
 import { RESERVIERUNG_TTL_MS } from '@/lib/reservierung'
 import {
   SERVICEGEBUEHR_BEZEICHNUNG,
+  SERVICEGEBUEHR_HINWEIS,
   barOhneServicegebuehr,
   berechneServicegebuehr,
   centsAlsEuro,
@@ -60,17 +61,19 @@ export type KassenZahlart = {
   hinweis?: string
 }
 
+/** Wie eine Barbestellung verbindlich wird (Mail H3) — an „Bar bei Abholung". */
+const BAR_BESTAETIGEN = 'Du bestätigst per E-Mail – ein Tipp genügt.'
+
 /**
  * Die Zahlarten, die die Kasse anbietet — aus derselben Regel wie die rechte
  * Spalte der Hofseite (`zahlungsarten`: online nur mit fertiger Stripe-Anbindung des Hofs).
- * Welche Online-Wege (Karte, EPS, Apple/Google Pay) es dann gibt, zeigt
- * Stripes Zahlungsfeld im nächsten Schritt — das hängt an den Einstellungen im
- * Stripe-Dashboard und am Gerät, nicht an uns. Deshalb verspricht der Zusatz
- * keinen bestimmten Weg.
  *
- * „gleicher Betrag" sagt der Zusatz nur, wenn es stimmt: Kostet bar gerade
- * keine Gebühr, online aber schon (`barHinweis`, Register B1), fällt er weg —
- * den Unterschied nennt dann der Hinweis unter den Zahlarten.
+ * Jede Zahlart trägt ihre eigene Erklärung (`zusatz`, Register N10, Nr. 82):
+ * Online nennt die üblichen Wege; welche davon wirklich erscheinen, zeigt
+ * Stripes Zahlungsfeld im nächsten Schritt (Apple/Google Pay nur auf
+ * passenden Geräten — das sagt der Satz unter den Zahlarten). Bar nennt
+ * seinen Vorteil selbst, aber nur, wenn es stimmt: Kostet bar gerade keine
+ * Gebühr, online aber schon (`barGuenstiger` aus `barHinweis`, Register B1).
  *
  * Register Z2 (Nr. 42): Im Testbetrieb steht an „Online bezahlen" der Satz
  * `TESTBETRIEB_TEXT.kasse`. Meldet der Server, dass Stripe den Zahlungszugang
@@ -97,22 +100,24 @@ export function kassenZahlarten(
       ? {
           wert: 'ONLINE',
           titel: 'Online bezahlen',
-          zusatz: 'Karte und weitere Wege – du wählst im nächsten Schritt',
+          zusatz: 'Karte, Apple/Google Pay oder EPS – du wählst im nächsten Schritt.',
           // Bar bleibt wählbar, die Beträge ändern sich nicht — nur der Satz kommt dazu.
           ...(optionen.testbetrieb ? { hinweis: TESTBETRIEB_TEXT.kasse } : {}),
         }
       : {
           wert: 'ONSITE_CASH',
           titel: 'Bar bei Abholung',
-          zusatz: barGuenstiger ? 'du bestätigst per E-Mail' : 'gleicher Betrag, du bestätigst per E-Mail',
+          zusatz: barGuenstiger ? `${BAR_OHNE_GEBUEHR_ZAHLART} ${BAR_BESTAETIGEN}` : BAR_BESTAETIGEN,
         }
   )
 }
 
 /**
- * Der Hinweis unter den Zahlarten (Register B1): „Bei Barzahlung bis
- * <Vortag des Stichtags> ohne Servicegebühr." — nur, solange bar wirklich günstiger
- * ist: vor dem Stichtag (`barOhneServicegebuehr`) UND bei einem Hof, dessen
+ * Ob bar gerade günstiger ist (Register B1), als Satz: „Bei Barzahlung bis
+ * <Vortag des Stichtags> ohne Servicegebühr." Die Kasse zeigt ihn seit Nr. 82
+ * nicht mehr als Absatz — sie fragt hier nur, ob „Bar bei Abholung" den
+ * Vorteil nennt (`kassenZahlarten`, N10). Nicht null nur, solange bar wirklich
+ * günstiger ist: vor dem Stichtag (`barOhneServicegebuehr`) UND bei einem Hof, dessen
  * Online-Gebühr gerade gilt. Bei einem gebührenfreien Hof ist bar ohnehin
  * gleich teuer, ab dem Stichtag zahlt bar wieder dieselbe Gebühr — dann
  * null, kein Hinweis. `jetzt` wie überall in der Kasse aus der Uhr der Seite;
@@ -199,12 +204,59 @@ export function zahlungsGebuehrText(hof: ServicegebuehrEinstellung, jetzt: Date,
   return gebuehrBezeichnung(hof, jetzt)
 }
 
+/** „5 %, mind. € 0,50" — Satz und Mindestgebühr aus der Hofeinstellung, wie sie heute gilt. */
+function satzMitMindestgebuehr(satz: { prozent: number; mindestCents: number }): string {
+  const mindestens = satz.mindestCents > 0 ? `, mind. ${formatEuro(centsAlsEuro(satz.mindestCents))}` : ''
+  return `${formatZahl(satz.prozent)} %${mindestens}`
+}
+
 /** „Servicegebühr · 5 %, mind. € 0,50" — Satz und Mindestgebühr aus der Hofeinstellung. */
 export function gebuehrBezeichnung(hof: ServicegebuehrEinstellung, jetzt: Date): string {
   const satz = servicegebuehrSatz(hof, jetzt)
   if (!satz) return SERVICEGEBUEHR_BEZEICHNUNG
-  const mindestens = satz.mindestCents > 0 ? `, mind. ${formatEuro(centsAlsEuro(satz.mindestCents))}` : ''
-  return `${SERVICEGEBUEHR_BEZEICHNUNG} · ${formatZahl(satz.prozent)} %${mindestens}`
+  return `${SERVICEGEBUEHR_BEZEICHNUNG} · ${satzMitMindestgebuehr(satz)}`
+}
+
+export type GebuehrZeile = {
+  /** „Servicegebühr (5 %)" */
+  titel: string
+  /** Was der (i)-Knopf aufklappt: „5 %, mind. € 0,50. Für Bereitstellung …" */
+  erklaerung: string
+  /** Bar vor dem Stichtag bei einem Hof mit Online-Gebühr: „entfällt" statt € 0,00. */
+  entfaellt: boolean
+}
+
+/**
+ * Die Gebührenzeile der Übersicht vor dem Bestellen (Register N10, Nr. 82):
+ * kurzer Titel mit dem Satz des Hofs, Mindestgebühr und Erklärsatz hinter dem
+ * (i)-Knopf. Nur Worte — den Betrag zeigt die Übersicht allein aus
+ * `kassenBetraege`. „entfällt" heißt: Bei bar kostet die Gebühr bis zum
+ * Stichtag nichts, online gälte sie (Register B1, dieselbe Bedingung wie
+ * `barHinweis`). Beim gebührenfreien Hof entfällt nichts — es gibt keine.
+ */
+export function gebuehrZeile(hof: ServicegebuehrEinstellung, jetzt: Date, zahlungsart: Zahlungsart): GebuehrZeile {
+  const satz = servicegebuehrSatz(hof, jetzt)
+  if (!satz) return { titel: SERVICEGEBUEHR_BEZEICHNUNG, erklaerung: SERVICEGEBUEHR_HINWEIS, entfaellt: false }
+  return {
+    titel: `${SERVICEGEBUEHR_BEZEICHNUNG} (${formatZahl(satz.prozent)} %)`,
+    erklaerung: `${satzMitMindestgebuehr(satz)}. ${SERVICEGEBUEHR_HINWEIS}`,
+    entfaellt: barOhneServicegebuehr(zahlungsart, jetzt),
+  }
+}
+
+/** Der Zahlweg online — unter dem Kaufknopf und im Zahlungsschritt. */
+export const ZAHLWEG_ONLINE = 'Bezahlung sicher über Stripe'
+
+/**
+ * Die Zeile unter dem Kaufknopf (Register N10): Termin und Zahlweg, damit die
+ * Kundin vor dem Tippen sieht, wann sie abholt und wie sie zahlt —
+ * „Abholung So, 18. Okt, 14:00–16:00 Uhr · Bezahlung sicher über Stripe" bzw.
+ * „… · bar am Hof · Bestätigung per E-Mail". Den Termin schreibt `abholSatz`;
+ * ohne gewählten Termin steht dort die Bitte, einen zu wählen.
+ */
+export function kaufknopfZeile(k: { termin: string | null; online: boolean }): string {
+  const abholung = k.termin ? `Abholung ${k.termin}` : 'Wähl noch, wann du abholst'
+  return `${abholung} · ${k.online ? ZAHLWEG_ONLINE : 'bar am Hof · Bestätigung per E-Mail'}`
 }
 
 // ─── Reservierungsfrist ─────────────────────────────────────────────────────

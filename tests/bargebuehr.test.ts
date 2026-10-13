@@ -9,8 +9,8 @@
  *  - berechneServicegebuehr: Matrix bar/online × vor/nach dem Stichtag, die
  *    Grenze auf die Millisekunde (genau am Stichtag gilt die Gebühr), „Karte
  *    bei Abholung" bleibt unberührt, ein gebührenfreier Hof bleibt frei.
- *  - Kasse: Der Wechsel online → bar → online rechnet sofort neu; Hinweis und
- *    Zusatz „gleicher Betrag" nur, wenn es stimmt.
+ *  - Kasse: Der Wechsel online → bar → online rechnet sofort neu; den Vorteil
+ *    nennt „Bar bei Abholung" nur, wenn es stimmt (seit Nr. 82 an der Option).
  *  - „Artikel fehlt" (E14): Bar ohne Gebühr bleibt ohne Gebühr; eine ältere
  *    Barbestellung mit Gebühr behält ihre Regel (gespeicherte Beträge).
  *  - Finanzen: Barbestellungen vor dem Stichtag bringen nichts ein und werden
@@ -183,11 +183,11 @@ describe('Kasse (Client-Vorschau) — derselbe Weg, mit der Zahlungsart', () => 
     expect(barHinweis({ ...HOF, serviceFeeActiveFrom: DANACH }, LANGE_VORHER)).toBeNull()
   })
 
-  it('„gleicher Betrag" verspricht der Zusatz nur, wenn es stimmt', () => {
+  it('„Ohne Servicegebühr" sagt die Bar-Zahlart nur, wenn es stimmt (seit Nr. 82 an der Option, Register N10)', () => {
     const hof = { acceptsOnline: true, stripeAccountReady: true, acceptsOnsite: true }
     const bar = (guenstiger: boolean) => kassenZahlarten(hof, guenstiger).find((z) => z.wert === 'ONSITE_CASH')?.zusatz
-    expect(bar(false)).toBe('gleicher Betrag, du bestätigst per E-Mail')
-    expect(bar(true)).toBe('du bestätigst per E-Mail')
+    expect(bar(false)).toBe('Du bestätigst per E-Mail – ein Tipp genügt.')
+    expect(bar(true)).toBe(`Ohne Servicegebühr bis ${BAR_OHNE_GEBUEHR_BIS_TEXT}. Du bestätigst per E-Mail – ein Tipp genügt.`)
     expect(kassenZahlarten(hof)).toEqual(kassenZahlarten(hof, false))
   })
 

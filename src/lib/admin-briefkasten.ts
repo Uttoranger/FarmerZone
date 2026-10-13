@@ -133,3 +133,6 @@ export function bildschirmText(viewport: string): string {
 
 /** Der Satz unter der Wunschliste (Mockup). */
 export const WUNSCHLISTE_SATZ = 'Gleiche Wünsche zählen zusammen – so siehst du, was am meisten gebraucht wird.'
+
+/** Die Wunschliste ohne Wunsch (Register N9): nur der Titel, der Satz darunter ist WUNSCHLISTE_SATZ. Ohne Aktion: Der Admin legt keinen Wunsch an. */
+export const WUNSCHLISTE_LEER = { titel: 'Noch keine Wünsche' } as const

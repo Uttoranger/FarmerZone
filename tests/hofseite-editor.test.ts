@@ -176,7 +176,9 @@ describe('Vorschau-Rahmen', () => {
     expect(rahmen).toContain('VORSCHAU_SEITENBREITE[geraet]')
     expect(rahmen).toContain("vorschauMassstab({ breite: panelBreite }, 'web')")
     expect(rahmen).not.toMatch(/scale\(0\.\d+\)/)
-    expect(rahmen).toContain('new ResizeObserver(')
+    // Gemessen über den Hook in src/lib (seit Nr. 75), der den ResizeObserver hält.
+    expect(rahmen).toContain('useElementGroesse()')
+    expect(readFileSync(join(process.cwd(), 'src', 'lib', 'use-element-groesse.ts'), 'utf8')).toContain('new ResizeObserver(')
   })
 
   it('der Umschalter ist Gerät, nicht Tab: gedrückte Knöpfe; Web ohne Platz daneben geht ins Overlay', () => {

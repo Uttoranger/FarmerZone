@@ -15,6 +15,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { useVorschauMarkierung } from '@/components/farmer/use-vorschau-markierung'
+import { useElementGroesse } from '@/lib/use-element-groesse'
 
 /**
  * Die Vorschau im Editor ab lg: die echte öffentliche Hofseite im
@@ -49,27 +50,6 @@ const GERAETE: { id: VorschauGeraet; label: string; Symbol: typeof Smartphone }[
   { id: 'handy', label: 'Handy', Symbol: Smartphone },
   { id: 'web', label: 'Web', Symbol: Monitor },
 ]
-
-/**
- * Breite und Höhe eines Elements, live per ResizeObserver — 0, solange nichts
- * gemessen ist. Das Element kommt über die Callback-Ref: Im Overlay hängt es
- * erst nach dem Portal des Dialogs im Dokument, eine Objekt-Ref wäre beim
- * ersten Effekt noch leer und die Fläche bliebe für immer 0 × 0. Der Editor
- * misst damit auch seine Gesamtbreite (hofseite-editor.tsx, `editorSpalten`).
- */
-export function useElementGroesse(): { ref: (el: HTMLElement | null) => void; breite: number; hoehe: number } {
-  const [el, setEl] = useState<HTMLElement | null>(null)
-  const [groesse, setGroesse] = useState({ breite: 0, hoehe: 0 })
-  useEffect(() => {
-    if (!el) return
-    const beobachter = new ResizeObserver(([eintrag]) => {
-      setGroesse({ breite: Math.round(eintrag.contentRect.width), hoehe: Math.round(eintrag.contentRect.height) })
-    })
-    beobachter.observe(el)
-    return () => beobachter.disconnect()
-  }, [el])
-  return { ref: setEl, breite: groesse.breite, hoehe: groesse.hoehe }
-}
 
 /** Handy | Web — zwei gedrückte Knöpfe, kein Tab: Die Bearbeitung daneben bleibt, nur das Gerät wechselt. */
 function GeraetUmschalter({ wert, onWert }: { wert: VorschauGeraet; onWert: (g: VorschauGeraet) => void }): React.JSX.Element {

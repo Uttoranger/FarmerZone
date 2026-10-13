@@ -43,5 +43,5 @@ export function dualUseHinweis(
   if (!treffer) return null
   return `Du hast schon ein Produkt namens ${treffer.name.trim()} im Bereich ${
     ANZEIGE_BEREICHE[anzeigeBereichVon(treffer.category)].titel
-  }. Das hier wird ein zweites, eigenes Produkt mit eigenem Bestand.`
+  }. Das hier wird ein zweites, eigenes Produkt mit eigenem Vorrat.`
 }

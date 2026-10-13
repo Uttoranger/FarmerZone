@@ -240,7 +240,7 @@ describe('brauchtDich', () => {
     statusErinnerung: null,
   }
 
-  it('nichts zu tun → leer („Alles erledigt.")', () => {
+  it('nichts zu tun → leer (die Seite zeigt dann die leise Zeile „Nichts braucht dich heute.")', () => {
     expect(brauchtDich(LEER)).toEqual([])
   })
 
@@ -304,10 +304,10 @@ describe('brauchtDich', () => {
   it('Status-Erinnerung nur, wenn fällig', () => {
     expect(brauchtDich({ ...LEER, statusErinnerung: null })).toEqual([])
     expect(brauchtDich({ ...LEER, statusErinnerung: 9 })).toEqual([
-      { art: 'status', text: 'Seit 9 Tagen kein neuer Status', href: '/status/new' },
+      { art: 'status', text: 'Seit 9 Tagen kein neuer Beitrag', href: '/status/new' },
     ])
     expect(brauchtDich({ ...LEER, statusErinnerung: 'never' })[0].text).toBe(
-      'Noch kein Status — erzähl deinen Kunden, was es gibt'
+      'Noch kein Beitrag — erzähl deinen Kundinnen, was es gibt'
     )
   })
 
@@ -360,7 +360,7 @@ describe('an den Seiten — Heute und Packliste teilen die Abfrage', () => {
     expect(packliste).toContain('datumLang(jetzt)')
   })
 
-  it('/dashboard ist Heute: kein Produkt-Knopf, keine Gesamtzahlen der alten Übersicht, Leerzustand „Alles erledigt."', () => {
+  it('/dashboard ist Heute: kein Produkt-Knopf, keine Gesamtzahlen der alten Übersicht, Leerzustand von „Braucht dich“ aus lib/heute.ts', () => {
     // Seit Nr. 17 in der HofShell: Seite in (hof), Bausteine in components/heute.
     const seite = quelle('src/app/(hof)/dashboard/page.tsx')
     const teile = quelle('src/components/heute/heute-teile.tsx')
@@ -370,7 +370,10 @@ describe('an den Seiten — Heute und Packliste teilen die Abfrage', () => {
     expect(beide).not.toContain('Produkt anlegen')
     expect(beide).not.toContain('Kunden gesamt')
     expect(beide).not.toContain('wa.me')
-    expect(teile).toContain('Alles erledigt.')
+    // Der Satz der leeren Zeile (N11) steht in lib/heute.ts, nicht noch einmal im Baustein.
+    expect(teile).toContain('BRAUCHT_DICH_LEER')
+    expect(teile).not.toContain('Nichts braucht dich heute.')
+    expect(teile).not.toContain('Alles erledigt.')
     // Die Zeile zum nächsten Abholtag entfällt ohne ihn und führt nach /orders.
     expect(teile).toMatch(/\{naechsteAbholung && \(\s*<Link\s+href="\/orders"/)
     expect(beide).not.toContain('Morgen:')

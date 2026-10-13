@@ -63,6 +63,23 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Regelvorschlag 74, gebaut in Nr. 75: Die Hofseite liest die Illustrationen
+      # der Unterkategorien vom Dateisystem (product-image.ts, assetExists). Fehlen
+      # sie in ihrer Trace-Datei, fehlen sie in Produktion still — dann wird die CI rot.
+      - name: Unterkategorie-Bilder im Paket der Hofseite
+        env:
+          TRACE: .next/server/app/(public)/[farmSlug]/page.js.nft.json
+        run: |
+          node -e "
+            const { files } = JSON.parse(require('node:fs').readFileSync(process.env.TRACE, 'utf8'))
+            const treffer = files.filter((f) => /public\/categories\/(?!sw\/)[^/]+\/[^/]+\.webp$/.test(f))
+            if (treffer.length === 0) {
+              console.log('FEHLER ' + process.env.TRACE + ': keine Illustration einer Unterkategorie (public/categories/<kategorie>/<name>.webp)')
+              process.exit(1)
+            }
+            console.log(treffer.length + ' Illustrationen von Unterkategorien in ' + process.env.TRACE)
+          "
+
   # Zweite Testschicht: Server-Handler gegen ein echtes Postgres
   # (docs/ai/TESTING_GUIDELINES.md, Abschnitt 1). Eigener Job, damit ein
   # fehlender Datenbankdienst nie die schnelle Suite mit umbringt und beide

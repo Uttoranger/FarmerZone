@@ -315,7 +315,7 @@ describe('einstellungenBereiche', () => {
   it('Abholzeiten: keine bzw. alle pausiert ist orange', () => {
     expect(bereich(einstellungenBereiche(daten({ abholzeiten: [], abholzeitenGesamt: 0 }), VOR_STICHTAG), 'abholzeiten')).toMatchObject({
       ton: 'offen',
-      zeile: 'Noch keine — erst dann können Kunden bestellen',
+      zeile: 'Noch keine — erst dann können Kundinnen bestellen',
     })
     const pausiert = bereich(einstellungenBereiche(daten({ abholzeiten: [], abholzeitenGesamt: 2 }), VOR_STICHTAG), 'abholzeiten')
     expect(pausiert.ton).toBe('offen')

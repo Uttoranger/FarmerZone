@@ -137,10 +137,12 @@ export function meinHofReiterAus(wert: string | string[] | undefined): MeinHofRe
 }
 
 /**
- * Der Hinweis rechts neben den Reitern ab md — genau dort, wo der Reiter
- * „Produkte" fehlt (`nurUnterMd`): Ab md hat Produkte seinen Punkt in der
- * Seitenleiste. Wortlaut wie im Mockup web-h1-mein-hof-vorschau-handy, der
- * Name kommt aus dem Reiter (seit Nr. 49, Register N3).
+ * Der Hinweis, wo Produkte liegen: Ab md fehlt der Reiter „Produkte"
+ * (`nurUnterMd`), er hat seinen Punkt in der Seitenleiste. Seit Nr. 73 steht
+ * der Satz leise am Ende der Liste im Editor (hofseite-editor.tsx, Register
+ * N7), nicht mehr rechts neben den Reitern. Wortlaut wie im Mockup
+ * web-h1-mein-hof-vorschau-handy, der Name kommt aus dem Reiter (seit Nr. 49,
+ * Register N3).
  */
 export const MEIN_HOF_HINWEIS = `${meinHofReiter('produkte').label} verwaltest du links unter „${meinHofReiter('produkte').label}“.`
 
@@ -174,7 +176,7 @@ export const NEU: readonly NeuPunkt[] = [
   },
   {
     id: 'status-posten',
-    label: 'Status posten',
+    label: 'Neuer Beitrag',
     satz: 'Sag deinen Kunden, was es gerade gibt.',
     href: '/status/new',
   },
@@ -188,8 +190,8 @@ export const NEU: readonly NeuPunkt[] = [
 
 /** „Neu" in der Seitenleiste: was auf der Hofseite landet (Mockup hof-mein-hof-v2-desktop.html). */
 export const NEU_BROWSER: readonly NeuPunkt[] = [
-  { id: 'produkt-anlegen', label: 'Neues Produkt', satz: 'Foto, Preis, Lagerstand', href: '/products?neu=1' },
-  { id: 'status-posten', label: 'Neuer Beitrag', satz: 'Neuigkeit auf deiner Hofseite', href: '/status/new' },
+  { id: 'produkt-anlegen', label: 'Neues Produkt', satz: 'Foto, Preis, Vorrat', href: '/products?neu=1' },
+  { id: 'status-posten', label: 'Neuer Beitrag', satz: 'Beitrag auf deiner Hofseite', href: '/status/new' },
 ]
 
 /** „Verkauf und Kunden" — am Handy im Mehr-Blatt, im Browser als eigene Gruppe. */
@@ -203,7 +205,7 @@ export const VERKAUF_UND_KUNDEN_TITEL = 'Verkauf und Kunden'
 
 /**
  * Unten: Einstellungen, Hilfe, Admin — danach folgt „Abmelden" (eine Handlung,
- * kein Ziel). „Hilfe und Rückmeldung" ist EIN Punkt für Melden und Nachsehen:
+ * kein Ziel). „Problem melden" ist EIN Punkt für Melden und Nachsehen:
  * Er führt nach /meldungen („Meine Meldungen" mit „+ Neue Meldung", seit
  * Nr. 22e nach Mockup web-/mobil-h6-meine-meldungen) und leuchtet auch auf
  * /fehler-melden; zwei Einträge nebeneinander („Fehler melden", „Meine
@@ -211,7 +213,7 @@ export const VERKAUF_UND_KUNDEN_TITEL = 'Verkauf und Kunden'
  */
 export const UNTEN: readonly NavPunkt[] = [
   { id: 'einstellungen', label: 'Einstellungen', href: '/settings' },
-  { id: 'hilfe', label: 'Hilfe und Rückmeldung', href: '/meldungen', auchAktivAuf: ['/fehler-melden'] },
+  { id: 'hilfe', label: 'Problem melden', href: '/meldungen', auchAktivAuf: ['/fehler-melden'] },
   { id: 'admin', label: 'Admin', href: '/admin', nurAdmin: true, zahl: 'admin' },
 ]
 
@@ -386,7 +388,7 @@ export const HOF_NEU: readonly HofNeuPunkt[] = [
   { id: 'lebensmittel', label: 'Lebensmittel', satz: 'Eier, Gemüse, Fleisch, Brot, Honig …', href: '/products?neu=1&bereich=lebensmittel', gruppe: 'anlegen' },
   { id: 'futtermittel', label: 'Futtermittel', satz: 'Heu, Stroh, Getreide, Silage', href: FUTTER_ANLEGEN_HREF, gruppe: 'anlegen' },
   { id: 'brennmaterial', label: 'Brennmaterial', satz: 'Brennholz, Anzündholz, Hackschnitzel', href: '/products?neu=1&bereich=brennmaterial', gruppe: 'anlegen' },
-  { id: 'status-posten', label: 'Neuer Beitrag', satz: 'Neuigkeit auf deiner Hofseite', href: '/status/new', gruppe: 'anderes' },
+  { id: 'status-posten', label: 'Neuer Beitrag', satz: 'Beitrag auf deiner Hofseite', href: '/status/new', gruppe: 'anderes' },
   { id: 'verkauf-eintragen', label: 'Verkauf eintragen', satz: 'Was du am Hof oder am Markt verkauft hast', href: '/sales?neu=1', gruppe: 'anderes' },
 ]
 

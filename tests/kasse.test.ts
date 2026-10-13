@@ -35,10 +35,13 @@ import {
   bestaetigungMitStatus,
   zahlungsBetraege,
   zahlungsGebuehrText,
+  gebuehrZeile,
+  kaufknopfZeile,
 } from '@/lib/kasse'
 import { checkoutZahlungsBetragSchema } from '@/schemas/checkout'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
-import { berechneServicegebuehr } from '@/lib/servicegebuehr'
+import { BAR_OHNE_GEBUEHR_BIS_TEXT, BAR_OHNE_GEBUEHR_ZAHLART, BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
+import { SERVICEGEBUEHR_HINWEIS, berechneServicegebuehr } from '@/lib/servicegebuehr'
 import { calcTotalAmount, decimalZuCents } from '@/lib/order-totals'
 
 const HOF_ALLES = { acceptsOnline: true, stripeAccountReady: true, acceptsOnsite: true }
@@ -101,6 +104,90 @@ describe('Testbetrieb an der Zahlart (Register Z2, Nr. 42)', () => {
   it('ohne Online-Zahlung beim Hof gibt es keinen Testbetrieb-Satz', () => {
     const arten = kassenZahlarten({ ...HOF_ALLES, stripeAccountReady: false }, false, { testbetrieb: true })
     expect(JSON.stringify(arten)).not.toContain(TESTBETRIEB_TEXT.kasse)
+  })
+})
+
+describe('Kasse glätten (N10, Nr. 82): jede Zahlart mit eigener Erklärung', () => {
+  const zusatz = (wert: string, barGuenstiger: boolean) =>
+    kassenZahlarten(HOF_ALLES, barGuenstiger).find((a) => a.wert === wert)?.zusatz
+
+  it('Online nennt die üblichen Wege und den nächsten Schritt', () => {
+    expect(zusatz('ONLINE', false)).toBe('Karte, Apple/Google Pay oder EPS – du wählst im nächsten Schritt.')
+  })
+
+  it('Bar trägt seinen Vorteil selbst — das Datum aus dem Stichtag, nie getippt', () => {
+    expect(zusatz('ONSITE_CASH', true)).toBe(`${BAR_OHNE_GEBUEHR_ZAHLART} Du bestätigst per E-Mail – ein Tipp genügt.`)
+    expect(zusatz('ONSITE_CASH', true)).toContain(`Ohne Servicegebühr bis ${BAR_OHNE_GEBUEHR_BIS_TEXT}.`)
+  })
+
+  it('ist bar nicht günstiger, steht kein Vorteil da — nur die Bestätigung per E-Mail', () => {
+    expect(zusatz('ONSITE_CASH', false)).toBe('Du bestätigst per E-Mail – ein Tipp genügt.')
+    expect(kassenZahlarten(HOF_ALLES)).toEqual(kassenZahlarten(HOF_ALLES, false))
+  })
+
+  it('Online steht zuerst und ist damit vorbelegt — auch im Testbetrieb (Entscheidung 13.10.)', () => {
+    for (const testbetrieb of [false, true]) {
+      expect(kassenZahlarten(HOF_ALLES, true, { testbetrieb })[0]?.wert).toBe('ONLINE')
+    }
+  })
+})
+
+describe('gebuehrZeile — die Gebührenzeile der Übersicht (N10)', () => {
+  it('Titel mit dem Satz des Hofs; Mindestgebühr und Erklärsatz klappt der (i)-Knopf auf', () => {
+    expect(gebuehrZeile(GEBUEHR_5, JETZT, 'ONLINE')).toEqual({
+      titel: 'Servicegebühr (5 %)',
+      erklaerung: `5 %, mind. € 0,50. ${SERVICEGEBUEHR_HINWEIS}`,
+      entfaellt: false,
+    })
+  })
+
+  it('Satz und Mindestgebühr kommen aus der Einstellung des Hofs', () => {
+    const zeile = gebuehrZeile({ ...GEBUEHR_5, serviceFeePercent: 3.5, serviceFeeMinCents: 0 }, JETZT, 'ONLINE')
+    expect(zeile.titel).toBe('Servicegebühr (3,5 %)')
+    expect(zeile.erklaerung).toBe(`3,5 %. ${SERVICEGEBUEHR_HINWEIS}`)
+  })
+
+  it('bar vor dem Stichtag bei einem Hof mit Online-Gebühr: „entfällt" (Register B1)', () => {
+    expect(gebuehrZeile(GEBUEHR_5, JETZT, 'ONSITE_CASH')).toEqual(expect.objectContaining({ titel: 'Servicegebühr (5 %)', entfaellt: true }))
+  })
+
+  it('Gegenproben: online, ab dem Stichtag und beim gebührenfreien Hof entfällt nichts', () => {
+    expect(gebuehrZeile(GEBUEHR_5, JETZT, 'ONLINE').entfaellt).toBe(false)
+    expect(gebuehrZeile(GEBUEHR_5, BAR_SERVICEGEBUEHR_AB, 'ONSITE_CASH').entfaellt).toBe(false)
+    expect(gebuehrZeile(GEBUEHRFREI, JETZT, 'ONSITE_CASH')).toEqual({ titel: 'Servicegebühr', erklaerung: SERVICEGEBUEHR_HINWEIS, entfaellt: false })
+  })
+
+  it('„entfällt" steht nur, wo die Kasse wirklich ohne Gebühr rechnet (kassenBetraege)', () => {
+    const korb = [{ productId: 'eier', price: 4.9, quantity: 2 }]
+    let gesehen = 0
+    for (const hof of [GEBUEHR_5, GEBUEHRFREI]) {
+      for (const zeit of [JETZT, new Date(BAR_SERVICEGEBUEHR_AB.getTime() - 1), BAR_SERVICEGEBUEHR_AB]) {
+        for (const art of ['ONLINE', 'ONSITE_CASH'] as const) {
+          if (!gebuehrZeile(hof, zeit, art).entfaellt) continue
+          gesehen++
+          expect(kassenBetraege(korb, hof, zeit, art).gebuehrCents).toBe(0)
+          // … und online gälte an diesem Tag eine Gebühr: Sonst gäbe es nichts, was entfällt.
+          expect(kassenBetraege(korb, hof, zeit, 'ONLINE').gebuehrCents).toBeGreaterThan(0)
+        }
+      }
+    }
+    expect(gesehen).toBe(2)
+  })
+})
+
+describe('kaufknopfZeile — Termin und Zahlweg unter dem Kaufknopf (N10)', () => {
+  const termin = abholSatz({ datum: 'So, 18. Okt', relativ: null, zeit: '14:00–16:00 Uhr' })
+
+  it('online: Termin · Bezahlung sicher über Stripe', () => {
+    expect(kaufknopfZeile({ termin, online: true })).toBe(`Abholung ${termin} · Bezahlung sicher über Stripe`)
+  })
+
+  it('bar: Termin · bar am Hof · Bestätigung per E-Mail', () => {
+    expect(kaufknopfZeile({ termin, online: false })).toBe(`Abholung ${termin} · bar am Hof · Bestätigung per E-Mail`)
+  })
+
+  it('ohne gewählten Termin die Bitte, einen zu wählen', () => {
+    expect(kaufknopfZeile({ termin: null, online: true })).toBe('Wähl noch, wann du abholst · Bezahlung sicher über Stripe')
   })
 })
 

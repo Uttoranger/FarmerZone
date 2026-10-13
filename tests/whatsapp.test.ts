@@ -6,7 +6,7 @@
  * (Umlaute) und die wa.me-Telefonnummern-Normalisierung.
  */
 import { describe, it, expect } from 'vitest'
-import { toWaPhone, buildOrderReminderMessage, buildOrderReminderUrl } from '@/lib/whatsapp'
+import { toWaPhone, buildOrderReminderMessage, buildOrderReminderUrl, whatsAppLink } from '@/lib/whatsapp'
 
 // 20.07.2026 ist ein Montag; 12:00 lokal entspricht der Speicher-Konvention des Checkouts
 const baseOrder = {
@@ -49,7 +49,7 @@ describe('buildOrderReminderMessage', () => {
 describe('buildOrderReminderUrl', () => {
   it('baut einen wa.me-Link mit normalisierter Nummer und URL-encodeter Nachricht', () => {
     const url = buildOrderReminderUrl('+43 660 123 45 67', baseOrder)
-    expect(url.startsWith('https://wa.me/436601234567?text=')).toBe(true)
+    expect(url?.startsWith('https://wa.me/436601234567?text=')).toBe(true)
     expect(url).not.toContain(' ')
   })
 
@@ -81,5 +81,28 @@ describe('toWaPhone (Konvention aus Kundendetail/Status-Werkstatt, jetzt zentral
 
   it('lässt bereits normalisierte Nummern unverändert', () => {
     expect(toWaPhone('436601234567')).toBe('436601234567')
+  })
+})
+
+describe('nur Ziffern in den Link, ohne Nummer kein Link (Sicherheitsprüfung 13.10., Nr. 75)', () => {
+  it('Buchstaben und Zeichen aus der Eingabe fallen weg', () => {
+    expect(toWaPhone('+43 660 ABC 0000000')).toBe('436600000000')
+    expect(toWaPhone('0660/000 0000#')).toBe('436600000000')
+  })
+
+  it('mit +43 vorn: ohne Plus, sonst unverändert', () => {
+    expect(toWaPhone('+43 660 0000000')).toBe('436600000000')
+  })
+
+  it('leer oder ohne eine Ziffer: leere Nummer und kein Link — auch keine Erinnerung', () => {
+    expect(toWaPhone('')).toBe('')
+    expect(toWaPhone('keine Angabe')).toBe('')
+    expect(whatsAppLink('', 'Hallo')).toBeNull()
+    expect(whatsAppLink('keine Angabe', 'Hallo')).toBeNull()
+    expect(buildOrderReminderUrl('  ', baseOrder)).toBeNull()
+  })
+
+  it('Gegenprobe: mit Nummer ein Link mit kodiertem Text', () => {
+    expect(whatsAppLink('+43 660 0000000', 'Hallo Anna')).toBe('https://wa.me/436600000000?text=Hallo%20Anna')
   })
 })

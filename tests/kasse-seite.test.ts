@@ -42,12 +42,16 @@ vi.mock('next/link', () => ({
 import {
   AbholWahl,
   KontaktHinweis,
+  KorbKarte,
   ReservierungsHinweis,
   UebersichtKarte,
   ZahlartWahl,
   ZahlungAbgelehnt,
 } from '@/components/checkout/kasse-teile'
-import { abholKacheln, gebuehrBezeichnung, kassenBetraege, kassenZahlarten, reservierungsStand } from '@/lib/kasse'
+import { abholKacheln, gebuehrZeile, kassenBetraege, kassenZahlarten, reservierungsStand } from '@/lib/kasse'
+import { BAR_OHNE_GEBUEHR_ZAHLART } from '@/lib/konditionen'
+import { SERVICEGEBUEHR_HINWEIS, type ServicegebuehrEinstellung } from '@/lib/servicegebuehr'
+import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import { StripeZahlung } from '@/components/checkout/stripe-payment'
 import { checkoutFormSchema, checkoutRequestSchema } from '@/schemas/checkout'
 import { paymentLabel } from '@/components/orders/order-status'
@@ -160,26 +164,100 @@ describe('Übersicht: Servicegebühr als eigene Zeile', () => {
     { productId: 'brot', price: 5.8, quantity: 1 },
   ]
 
-  it('zeigt Warenpreis, Gebühr mit Satz und Gesamt aus kassenBetraege (Mockup: € 10,30 + € 0,52 = € 10,82)', () => {
-    const betraege = kassenBetraege(korb, GEBUEHR_5, JETZT, 'ONLINE')
-    const html = renderToStaticMarkup(
-      createElement(UebersichtKarte, { betraege, gebuehrText: gebuehrBezeichnung(GEBUEHR_5, JETZT) }, createElement('button', null, 'Jetzt bestellen'))
+  /** Die Übersicht so, wie die Kasse sie baut: Beträge aus kassenBetraege, Zeile aus gebuehrZeile. */
+  function uebersicht(hof: ServicegebuehrEinstellung, art: 'ONLINE' | 'ONSITE_CASH', kinder?: ReactNode): string {
+    const zeile = gebuehrZeile(hof, JETZT, art)
+    return renderToStaticMarkup(
+      createElement(
+        UebersichtKarte,
+        { betraege: kassenBetraege(korb, hof, JETZT, art), gebuehrText: zeile.titel, gebuehrErklaerung: zeile.erklaerung, gebuehrEntfaellt: zeile.entfaellt },
+        kinder
+      )
     )
+  }
+
+  it('zeigt Warenpreis, „Servicegebühr (5 %)" und Gesamt aus kassenBetraege (Mockup: € 10,30 + € 0,52 = € 10,82)', () => {
+    const html = uebersicht(GEBUEHR_5, 'ONLINE', createElement('button', null, 'Jetzt bestellen'))
     expect(html).toContain('Warenpreis')
     expect(html).toContain('€ 10,30')
-    expect(html).toContain('Servicegebühr · 5 %, mind. € 0,50')
+    expect(html).toContain('Servicegebühr (5 %)')
     expect(html).toContain('€ 0,52')
     expect(html).toContain('€ 10,82')
     expect(html).toContain('Jetzt bestellen')
+    expect(html).not.toContain('entfällt')
   })
 
-  it('ohne Gebühr keine Gebührenzeile', () => {
-    const frei = { ...GEBUEHR_5, serviceFeeActiveFrom: null }
+  it('der (i)-Knopf klappt Mindestgebühr und Erklärsatz auf: aria-expanded, aria-controls, eigener Name', () => {
+    const html = uebersicht(GEBUEHR_5, 'ONLINE')
+    const knopf = html.match(/<button[^>]*aria-controls="([^"]+)"[^>]*>/)
+    expect(knopf?.[0]).toContain('aria-expanded="false"')
+    expect(knopf?.[0]).toContain('aria-label="Was ist die Servicegebühr?"')
+    expect(knopf?.[0]).toContain('type="button"')
+    // Das gesteuerte Element gibt es, zugeklappt, mit Satz und „mind. € 0,50".
+    const ziel = html.match(new RegExp(`<p[^>]*id="${knopf?.[1]}"[^>]*>([^<]*)</p>`))
+    expect(ziel?.[0]).toContain('hidden')
+    expect(ziel?.[1]).toBe(`5 %, mind. € 0,50. ${SERVICEGEBUEHR_HINWEIS}`)
+    // Der Erklärsatz steht nicht mehr offen unter der Zeile — nur im aufklappbaren Element.
+    expect(html.split(SERVICEGEBUEHR_HINWEIS)).toHaveLength(2)
+  })
+
+  it('bar vor dem Stichtag: „entfällt" statt € 0,00, Gesamt = Warenpreis (Mockup system-k3-kasse-bezahlen-bar)', () => {
+    const html = uebersicht(GEBUEHR_5, 'ONSITE_CASH')
+    expect(html).toContain('Servicegebühr (5 %)')
+    expect(html).toContain('entfällt')
+    expect(html).not.toContain('€ 0,00')
+    expect(html).not.toContain('€ 0,52')
+    expect(html.match(/€ 10,30/g)).toHaveLength(2)
+  })
+
+  it('Geld nur anzeigen: Liegt ein Betrag vor, steht er da — „entfällt" nie über einem Betrag', () => {
     const html = renderToStaticMarkup(
-      createElement(UebersichtKarte, { betraege: kassenBetraege(korb, frei, JETZT, 'ONLINE'), gebuehrText: gebuehrBezeichnung(frei, JETZT) })
+      createElement(UebersichtKarte, { betraege: kassenBetraege(korb, GEBUEHR_5, JETZT, 'ONLINE'), gebuehrText: 'Servicegebühr (5 %)', gebuehrEntfaellt: true })
     )
-    expect(html).not.toContain('Servicegebühr')
-    expect(html).toContain('€ 10,30')
+    expect(html).toContain('€ 0,52')
+    expect(html).not.toContain('entfällt')
+  })
+
+  it('ohne Gebühr keine Gebührenzeile — online wie bar beim gebührenfreien Hof', () => {
+    const frei = { ...GEBUEHR_5, serviceFeeActiveFrom: null }
+    for (const art of ['ONLINE', 'ONSITE_CASH'] as const) {
+      const html = uebersicht(frei, art)
+      expect(html).not.toContain('Servicegebühr')
+      expect(html).not.toContain('aria-expanded')
+      expect(html).toContain('€ 10,30')
+    }
+  })
+})
+
+describe('Korb und Zahlarten (N10)', () => {
+  it('„Ein Korb pro Hof" steht nicht mehr in der Kasse — Korb und Positionen schon', () => {
+    const html = renderToStaticMarkup(
+      createElement(KorbKarte, {
+        hofName: 'Hof Test',
+        positionen: [{ productId: 'eier', name: 'Freilandeier 10er', quantity: 2, unit: 'STUECK', price: 4.9 }],
+        zeilenCents: new Map([['eier', 980]]),
+      })
+    )
+    expect(html).toContain('Dein Korb bei')
+    expect(html).toContain('Freilandeier 10er')
+    expect(html).toContain('€ 9,80')
+    expect(html).not.toContain('Ein Korb pro Hof')
+  })
+
+  it('jede Zahlart trägt Titel und eigene Erklärung im Label; der Testbetrieb-Satz nur an Online', () => {
+    const html = renderToStaticMarkup(
+      createElement(ZahlartWahl, {
+        zahlarten: kassenZahlarten({ acceptsOnline: true, stripeAccountReady: true, acceptsOnsite: true }, true, { testbetrieb: true }),
+        feld: FELD,
+      })
+    )
+    const labels = html.split('<label').slice(1)
+    const online = labels.find((l) => l.includes('>Online bezahlen</span>'))
+    const bar = labels.find((l) => l.includes('>Bar bei Abholung</span>'))
+    expect(online).toContain('Karte, Apple/Google Pay oder EPS – du wählst im nächsten Schritt.')
+    expect(online).toContain(TESTBETRIEB_TEXT.kasse)
+    expect(bar).toContain(`${BAR_OHNE_GEBUEHR_ZAHLART} Du bestätigst per E-Mail – ein Tipp genügt.`)
+    expect(bar).not.toContain(TESTBETRIEB_TEXT.kasse)
   })
 })
 

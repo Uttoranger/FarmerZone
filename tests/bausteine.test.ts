@@ -136,7 +136,7 @@ const FAELLE: Fall[] = [
       el(StatusBadge, { status: 'fertig' }, 'Gepackt'),
       el(StatusBadge, { status: 'neutral' }, 'Pausiert')
     ),
-    merkmale: ['data-status="offen"', 'text-status-offen', 'data-status="fertig"', 'text-status-fertig', 'data-status="neutral"', 'Gepackt'],
+    merkmale: ['data-status="offen"', 'text-zustand-tun', 'data-status="fertig"', 'text-zustand-laeuft', 'data-status="neutral"', 'text-zustand-erledigt', 'Gepackt'],
   },
   {
     name: 'Groessenkachel',

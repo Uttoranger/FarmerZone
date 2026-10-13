@@ -36,12 +36,14 @@ import {
   angezeigteBetraege,
   barHinweis,
   bestellschlussHeute,
-  gebuehrBezeichnung,
+  gebuehrZeile,
   kassenBetraege,
   kassenZahlarten,
   kassenZurueck,
+  kaufknopfZeile,
   reservierungsStand,
   zahlungsGebuehrText,
+  ZAHLWEG_ONLINE,
   type ZahlungsBetrag,
 } from '@/lib/kasse'
 import { CODE_ZAHLUNG_NICHT_MOEGLICH, KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
@@ -76,7 +78,9 @@ import {
  * Die Kasse /[farmSlug]/checkout im neuen Design (Nachtlauf Nr. 12, Gate 4).
  * Mockups: docs/mockups/web-k3-warenkorb-bezahlen.html,
  * web-k3-zahlung-abgelehnt.html, mobil-k3-warenkorb-bezahlen.html,
- * mobil-k3-zahlung-abgelehnt.html. Fokus-Shell ohne Unterleiste.
+ * mobil-k3-zahlung-abgelehnt.html. Fokus-Shell ohne Unterleiste. Geglättet
+ * seit Nr. 82 (Register N10, Mockups web-/mobil-k3-kasse-glatt,
+ * system-k3-kasse-bezahlen-bar): vier flache Karten in Lesereihenfolge.
  *
  * Ein Oberflächen-Umbau: Was die Kasse an /api/checkout schickt und wie sie
  * dessen Antworten behandelt, ist der Bestand (Idempotenz-Schlüssel, Preise
@@ -259,8 +263,8 @@ export function CheckoutForm({
   // Dieselben Fenster, die der Handler annimmt (src/lib/abholfenster.ts).
   const kacheln = abholKacheln(farm.pickupSlots, jetzt, ausgebuchteAbholfenster)
   const bestellschluss = bestellschlussHeute(kacheln)
-  // B1: Solange bar keine Servicegebühr kostet, online aber schon, sagt die
-  // Kasse das unter den Zahlarten — und verspricht nicht „gleicher Betrag".
+  // B1: Solange bar keine Servicegebühr kostet, online aber schon, nennt
+  // „Bar bei Abholung" den Vorteil an der Option selbst (N10).
   const hinweisBar = barHinweis(farm, jetzt)
   // E5: nur online (mit fertigem Stripe-Zugang) und bar bei Abholung; Z2:
   // im Testbetrieb mit Satz an „Online bezahlen", nach `onlineAus` nur bar.
@@ -302,7 +306,9 @@ export function CheckoutForm({
   // weiter, die Gebühr der Bestellung nicht. Mit der gewählten Zahlart (B1):
   // Der Wechsel auf bar rechnet sofort neu, zurück auf online ebenso.
   const betraege = angezeigteBetraege(kassenBetraege(cart, farm, jetzt, paymentMethod), zahlung?.betrag ?? null)
-  const gebuehrText = zahlung?.gebuehrText ?? gebuehrBezeichnung(farm, jetzt)
+  // Die Gebührenzeile (N10) nur in Worten; steht die Bestellung, bleibt der
+  // beim Anlegen festgehaltene Titel samt Erklärsatz (zahlungsGebuehrText).
+  const gebuehr = gebuehrZeile(farm, jetzt, paymentMethod)
   const gesamt = formatEuro(centsAlsEuro(betraege.gesamtCents))
   const hof = { farmId: farm.id, farmSlug: farm.slug }
 
@@ -530,16 +536,14 @@ export function CheckoutForm({
         gebuehrText={zahlung.gebuehrText}
         korb={<KorbKarte hofName={farm.name} positionen={korbPositionen} zeilenCents={betraege.zeilenCents} />}
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
-        fussnote={`${zahlung.abholung ? `Abholung ${zahlung.abholung} · ` : ''}Bezahlung sicher über Stripe`}
+        fussnote={`${zahlung.abholung ? `Abholung ${zahlung.abholung} · ` : ''}${ZAHLWEG_ONLINE}`}
       />
     )
   }
 
   const stand = reservierungsStand(reserviertBis, jetzt)
-  const fussnote = [
-    gewaehlt ? `Abholung ${abholSatz(gewaehlt)}` : 'Wähl noch, wann du abholst',
-    paymentMethod === 'ONLINE' ? 'Bezahlung sicher über Stripe' : 'Du zahlst bar beim Abholen',
-  ].join(' · ')
+  // Online gewählt oder die Bestellung steht schon — dann geht es weiter zur Zahlung.
+  const online = bestellungAngelegt || paymentMethod === 'ONLINE'
 
   return fokusShell(
     'Bestellen',
@@ -557,6 +561,7 @@ export function CheckoutForm({
       noValidate
     >
       <KassenRaster
+        uebersichtZuletzt
         korb={
           <div className="flex flex-col gap-3">
             <KorbKarte
@@ -580,7 +585,9 @@ export function CheckoutForm({
             uebersicht={
               <UebersichtKarte
                 betraege={betraege}
-                gebuehrText={gebuehrText}
+                gebuehrText={zahlung?.gebuehrText ?? gebuehr.titel}
+                gebuehrErklaerung={zahlung ? undefined : gebuehr.erklaerung}
+                gebuehrEntfaellt={gebuehr.entfaellt}
                 reservierung={
                   bestellungAngelegt ? null : (
                     <ReservierungsHinweis
@@ -600,11 +607,11 @@ export function CheckoutForm({
                 }
               />
             }
-            online={bestellungAngelegt || paymentMethod === 'ONLINE'}
+            online={online}
             wirdGesendet={isPending}
             gesperrt={isPending || kacheln.length === 0 || zahlarten.length === 0}
             gesamt={gesamt}
-            fussnote={fussnote}
+            fussnote={kaufknopfZeile({ termin: gewaehlt ? abholSatz(gewaehlt) : null, online })}
           />
         }
       >
@@ -617,28 +624,31 @@ export function CheckoutForm({
         {/* Nach dem Anlegen stehen die Angaben fest: Ein neuer Versuch bekäme
             über den Idempotenz-Schlüssel ohnehin dieselbe Bestellung zurück. */}
         <fieldset disabled={bestellungAngelegt} className="flex min-w-0 flex-col gap-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <section aria-labelledby="kasse-abholung" className={cn(KARTE, 'flex min-w-0 flex-col gap-3')}>
-              <div>
-                <h2 id="kasse-abholung" className={KARTEN_TITEL}>
-                  Abholung wählen
-                </h2>
-                <p className={cn(HINWEIS, 'mt-1 text-[13px]')}>{hofAdresse(farm)}</p>
-              </div>
-              {kacheln.length === 0 ? (
-                <p className="text-[13.5px] text-muted-foreground">
-                  Gerade gibt es keine Abholtermine. {KONTAKT_UNTER_ANGABEN_ZUM_HOF}
-                </p>
-              ) : (
-                <AbholWahl kacheln={kacheln} feld={form.register('pickupSlotKey')} fehler={fehlerAm.pickupSlotKey?.message} />
-              )}
-              {bestellschluss && <p className={HINWEIS}>Bestellschluss für heute: {bestellschluss} Uhr</p>}
-            </section>
-
-            <section aria-labelledby="kasse-daten" className={cn(KARTE, 'flex min-w-0 flex-col gap-3')}>
-              <h2 id="kasse-daten" className={KARTEN_TITEL}>
-                Deine Daten
+          {/* N10: Korb → Abholung → Deine Daten → (Betrieb) → Bezahlen, jede Karte in voller Breite. */}
+          <section aria-labelledby="kasse-abholung" className={cn(KARTE, 'flex min-w-0 flex-col gap-3')}>
+            {/* Die Adresse rechts im Kopf, am Handy unter dem Titel. */}
+            <div className="flex flex-col gap-0.5 md:flex-row md:items-baseline md:justify-between md:gap-4">
+              <h2 id="kasse-abholung" className={KARTEN_TITEL}>
+                Abholung wählen
               </h2>
+              <p className={cn(HINWEIS, 'min-w-0 text-[13px] break-words md:text-right')}>{hofAdresse(farm)}</p>
+            </div>
+            {kacheln.length === 0 ? (
+              <p className="text-[13.5px] text-muted-foreground">
+                Gerade gibt es keine Abholtermine. {KONTAKT_UNTER_ANGABEN_ZUM_HOF}
+              </p>
+            ) : (
+              <AbholWahl kacheln={kacheln} feld={form.register('pickupSlotKey')} fehler={fehlerAm.pickupSlotKey?.message} />
+            )}
+            {bestellschluss && <p className={HINWEIS}>Bestellschluss für heute: {bestellschluss} Uhr</p>}
+          </section>
+
+          <section aria-labelledby="kasse-daten" className={cn(KARTE, 'flex min-w-0 flex-col gap-3')}>
+            <h2 id="kasse-daten" className={KARTEN_TITEL}>
+              Deine Daten
+            </h2>
+            {/* Ab 768 px zwei Spalten in Lesereihenfolge: E-Mail · Name / Telefon · Notiz. */}
+            <div className="grid gap-3.5 md:grid-cols-2 md:items-start md:gap-x-5">
               <Feld id="customerEmail" label="E-Mail" fehler={fehlerAm.customerEmail?.message}>
                 <input
                   id="customerEmail"
@@ -689,19 +699,21 @@ export function CheckoutForm({
                 </p>
               </Feld>
               <Feld id="customerNote" label="Notiz an den Hof (freiwillig)" fehler={fehlerAm.customerNote?.message}>
+                {/* Eine Zeile wie die Felder daneben; wächst mit dem Text (field-sizing),
+                    wo der Browser das nicht kann, lässt sie sich größer ziehen. */}
                 <textarea
                   id="customerNote"
                   {...form.register('customerNote')}
-                  rows={2}
+                  rows={1}
                   aria-invalid={fehlerAm.customerNote ? true : undefined}
                   aria-describedby={fehlerAm.customerNote ? 'customerNote-fehler' : undefined}
                   placeholder="z. B. Ich komme erst gegen 17:30"
-                  className={cn(FELD, 'h-auto min-h-[46px] py-2.5')}
+                  className={cn(FELD, 'field-sizing-content h-auto max-h-40 min-h-[46px] resize-y py-2.5 supports-[field-sizing:content]:resize-none')}
                 />
                 <FeldZaehler control={form.control} name="customerNote" max={NOTIZ_MAX} />
               </Feld>
-            </section>
-          </div>
+            </div>
+          </section>
 
           {/* Betrieb (Sprint Bereiche 1, Konzept 6.4) — nur, wenn ein Futtermittel
               im Korb liegt, das der Hof nur an landwirtschaftliche Betriebe abgibt. */}
@@ -752,7 +764,7 @@ export function CheckoutForm({
             </section>
           )}
 
-          <section aria-labelledby="kasse-bezahlen" className={cn(KARTE, 'flex flex-col gap-2')}>
+          <section aria-labelledby="kasse-bezahlen" className={cn(KARTE, 'flex flex-col gap-3')}>
             <h2 id="kasse-bezahlen" className={KARTEN_TITEL}>
               Bezahlen
             </h2>
@@ -763,7 +775,7 @@ export function CheckoutForm({
             ) : (
               <ZahlartWahl zahlarten={zahlarten} feld={form.register('paymentMethod')} fehler={fehlerAm.paymentMethod?.message} />
             )}
-            {hinweisBar && zahlarten.some((z) => z.wert === 'ONSITE_CASH') && <p className={HINWEIS}>{hinweisBar}</p>}
+            {/* Bar hat keinen nächsten Schritt — der Satz zu Stripe steht nur bei Online. */}
             {paymentMethod === 'ONLINE' && (
               <p className={HINWEIS}>
                 Im nächsten Schritt bezahlst du sicher über Stripe. Apple Pay bzw. Google Pay erscheint nur, wenn dein Gerät es unterstützt.
@@ -823,7 +835,7 @@ export function KassenAbschluss({
             `Zahlungspflichtig bestellen · ${gesamt}`
           )}
         </button>
-        <p className={HINWEIS}>{fussnote}</p>
+        <p className={cn(HINWEIS, 'text-center md:text-left')}>{fussnote}</p>
       </AktionsLeiste>
     </div>
   )

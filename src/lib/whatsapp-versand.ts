@@ -21,8 +21,16 @@ export const WHATSAPP_VERSAND_TEXT = {
   stand: (geoeffnet: number, gesamt: number): string => `${geoeffnet} von ${gesamt} geöffnet`,
   offen: (offen: number): string => `${offen} ausstehend`,
   abschluss: (gesamt: number): string => `Alle ${gesamt} geöffnet – gesendet hast du in WhatsApp.`,
+  /** Toast, wenn das Speichern gar nicht ankam (Netz weg) — die Person steht dann wieder wie vorher (Nr. 75). */
+  nichtGespeichert: 'Konnten wir nicht speichern – versuch es gleich noch einmal',
   /** Der Knopf je Beitrag im Reiter „Beiträge" (Mockup mobil-h4-beitraege-teilen-je-beitrag). */
   knopf: (getippt: number, gesamt: number): string => `WhatsApp · ${getippt} von ${gesamt}`,
+  /** Keine Abonnentin mit WhatsApp (Register N9): der Leerzustand der Seite; der Ausweg führt zurück in den Reiter „Beiträge“. */
+  leer: {
+    titel: 'Noch keine Abonnentin mit WhatsApp',
+    satz: 'Hier erscheint jede Kundin, die deine Beiträge per WhatsApp bekommen möchte und ihre Nummer angegeben hat.',
+    aktion: 'Zu den Beiträgen',
+  },
 } as const
 
 /** Eine heutige Abonnentin mit WhatsApp-Häkchen und Nummer; `id` ist die Abonnements-ID. */

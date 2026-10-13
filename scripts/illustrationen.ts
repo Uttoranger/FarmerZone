@@ -102,7 +102,10 @@ export async function pruefeBild(bytes: Uint8Array, fassung: Fassung): Promise<s
     // Der Rand eines Bilds in falscher Größe sagt nichts mehr.
     return [...gruende, `${meta.width ?? '?'}×${meta.height ?? '?'} Pixel statt ${KANTE_PX}×${KANTE_PX}`]
   }
-  const abweichung = await randAbweichung(bytes, fassung)
+  // Der Kopf kann stimmen, während sich die Pixel nicht lesen lassen (Datei
+  // beschädigt): Das ist ein Verstoß mit FEHLER-Zeile, kein Abbruch des Laufs (Nr. 75).
+  const abweichung = await randAbweichung(bytes, fassung).catch(() => null)
+  if (abweichung === null) return [...gruende, 'Pixel nicht lesbar (Datei beschädigt)']
   if (abweichung > RAND_TOLERANZ) {
     gruende.push(`Rand nicht einfarbig ${RAND_NAME[fassung]} (Abweichung bis ${abweichung} von ±${RAND_TOLERANZ})`)
   }
@@ -143,8 +146,15 @@ export async function fuehreAus(
 }
 
 if (/illustrationen\.(ts|js|mjs|cjs)$/.test(process.argv[1] ?? '')) {
-  fuehreAus(process.cwd()).then(({ zeilen, exitCode }) => {
-    for (const zeile of zeilen) console.log(zeile)
-    process.exitCode = exitCode
-  })
+  fuehreAus(process.cwd()).then(
+    ({ zeilen, exitCode }) => {
+      for (const zeile of zeilen) console.log(zeile)
+      process.exitCode = exitCode
+    },
+    (fehler: unknown) => {
+      // Auch ein unerwarteter Abbruch endet mit einer FEHLER-Zeile und Exit 1, nie stumm.
+      console.log(`FEHLER Prüfung abgebrochen: ${fehler instanceof Error ? fehler.message : String(fehler)}`)
+      process.exitCode = 1
+    }
+  )
 }

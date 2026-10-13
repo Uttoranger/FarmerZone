@@ -1,11 +1,18 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { Check, MessageSquare } from 'lucide-react'
+import { toast } from 'sonner'
 import { setzeWhatsAppGetippt } from '@/server/actions/status-posts'
-import { toWaPhone } from '@/lib/whatsapp'
+import { speichernOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
+import { whatsAppLink } from '@/lib/whatsapp'
+import { formatiereTelefon } from '@/lib/telefon-anzeige'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { EmptyState } from '@/components/ui/empty-state'
+import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
 import { teilenLink } from '@/lib/teilen-kanal'
 import {
   WHATSAPP_VERSAND_TEXT as TEXT,
@@ -50,11 +57,21 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, abonnentinnen
       setFehler(null)
       laufend.current += 1
       startTransition(async () => {
-        const antwort = await setzeWhatsAppGetippt(postId, id, geoeffnet)
+        // Ein Wurf (Netz weg) ginge sonst an die Fehlergrenze, und die Liste wäre
+        // weg (Nr. 75): speichernOhneWurf fängt und meldet ihn. Seinen Satz
+        // nehmen wir nicht — die Liste hat ihren eigenen (WHATSAPP_VERSAND_TEXT).
+        const ergebnis: { antwort?: Awaited<ReturnType<typeof setzeWhatsAppGetippt>> } = {}
+        await speichernOhneWurf(async () => {
+          ergebnis.antwort = await setzeWhatsAppGetippt(postId, id, geoeffnet)
+          return {}
+        })
         laufend.current -= 1
-        if ('error' in antwort) {
+        const { antwort } = ergebnis
+        if (!antwort || 'error' in antwort) {
+          // Nicht gespeichert: Die Person steht wieder, wie sie vor dem Tipp stand.
           setGetippt((vorher) => (geoeffnet ? ohne(vorher) : [...ohne(vorher), id]))
-          setFehler(antwort.error)
+          if (antwort) setFehler(antwort.error)
+          else toast.error(TEXT.nichtGespeichert)
         } else if (laufend.current === 0) {
           // Erst wenn nichts mehr unterwegs ist — sonst flackerte ein späterer Tipp kurz zurück.
           setGetippt(antwort.getippt)
@@ -83,21 +100,31 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, abonnentinnen
     }
   }, [speichere])
 
-  function buildWaUrl(person: Abonnentin): string {
-    const phone = toWaPhone(person.phone)
+  /** Der wa.me-Link für eine Person — null, wenn ihre Nummer keine Ziffer hat (dann kein Link, Nr. 75). */
+  function buildWaUrl(person: Abonnentin): string | null {
     const firstName = person.name.split(' ')[0]
     // Mit ?k=wa: Besuche aus dieser Nachricht zählen für WhatsApp (Gate 7, T1; ohne Kennung der Person).
     const farmUrl = teilenLink(APP_URL, farmSlug, 'wa')
     const message = `Hallo ${firstName}!\n\n*${title}*\n\n${body}\n\nMehr auf: ${farmUrl}`
-    return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+    return whatsAppLink(person.phone, message)
   }
 
   if (stand.gesamt === 0) {
     return (
-      <div className="text-center py-16">
-        {/* h1 auch in den Randzuständen — sonst hätte die Seite keine Überschrift. */}
-        <h1 className="font-medium text-foreground mb-1">Keine WhatsApp-Abonnenten</h1>
-        <p className="text-sm text-muted-foreground">Es gibt noch keine Kunden mit WhatsApp-Opt-in.</p>
+      <div>
+        {/* Der Titel ist hier die eine Überschrift der Seite: eine zweite, unsichtbare mit dem Seitennamen wäre eine zweite Fassung desselben Textes. */}
+        <EmptyState
+          symbol={MessageSquare}
+          titel={TEXT.leer.titel}
+          titelStufe={1}
+          satz={TEXT.leer.satz}
+          aktion={
+            <Link href={BEITRAEGE_HREF} className={KNOPF_RAHMEN}>
+              {TEXT.leer.aktion}
+            </Link>
+          }
+          className="mt-6"
+        />
       </div>
     )
   }
@@ -121,7 +148,7 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, abonnentinnen
 
           {/* Preview */}
           <div className="bg-muted rounded-xl p-4 mb-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Dein Status</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Dein Beitrag</p>
             <p className="text-sm font-semibold text-foreground">{title}</p>
             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{body}</p>
           </div>
@@ -150,71 +177,76 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, abonnentinnen
 
       {/* Subscriber list */}
       <ul className="flex flex-col gap-2">
-        {stand.personen.map((person) => (
-          <li
-            key={person.id}
-            className={cn(
-              'flex items-center gap-3 p-3 rounded-xl border border-border transition-colors',
-              person.geoeffnet ? 'bg-muted/40' : 'bg-card'
-            )}
-          >
-            {/* Avatar */}
-            <div
+        {stand.personen.map((person) => {
+          const link = person.geoeffnet ? null : buildWaUrl(person)
+          return (
+            <li
+              key={person.id}
               className={cn(
-                'size-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0',
-                person.geoeffnet ? 'bg-accent/18 text-status-fertig' : 'bg-muted text-muted-foreground'
+                'flex items-center gap-3 p-3 rounded-xl border border-border transition-colors',
+                person.geoeffnet ? 'bg-muted/40' : 'bg-card'
               )}
             >
-              {person.geoeffnet ? <Check className="size-4" aria-hidden="true" /> : person.name.charAt(0).toUpperCase()}
-            </div>
+              {/* Avatar */}
+              <div
+                className={cn(
+                  'size-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0',
+                  person.geoeffnet ? 'bg-accent/18 text-status-fertig' : 'bg-muted text-muted-foreground'
+                )}
+              >
+                {person.geoeffnet ? <Check className="size-4" aria-hidden="true" /> : person.name.charAt(0).toUpperCase()}
+              </div>
 
-            {/* Name + phone */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate" title={person.name}>
-                {person.name}
-              </p>
-              <p className="text-xs text-muted-foreground">{person.phone}</p>
-              {person.geoeffnet && (
-                <p className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
-                  {TEXT.zuruecksetzenFrage}
-                  <button
-                    type="button"
-                    onClick={() => speichere(person.id, false)}
+              {/* Name + phone */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate" title={person.name}>
+                  {person.name}
+                </p>
+                <p className="text-xs text-muted-foreground">{formatiereTelefon(person.phone)}</p>
+                {person.geoeffnet && (
+                  <p className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
+                    {TEXT.zuruecksetzenFrage}
+                    <button
+                      type="button"
+                      onClick={() => speichere(person.id, false)}
+                      className={cn(
+                        'min-h-11 -my-2 px-1 font-semibold text-foreground underline underline-offset-2 rounded-md',
+                        FOKUS_RAHMEN
+                      )}
+                    >
+                      {TEXT.zuruecksetzen}
+                      <span className="sr-only">: {person.name}</span>
+                    </button>
+                  </p>
+                )}
+              </div>
+
+              {/* Action */}
+              {person.geoeffnet ? (
+                <span className="text-xs text-status-fertig font-medium shrink-0">{TEXT.geoeffnet}</span>
+              ) : (
+                link && (
+                  <a
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => {
+                      rueckkehr.current = { id: person.id, verlassen: false }
+                    }}
                     className={cn(
-                      'min-h-11 -my-2 px-1 font-semibold text-foreground underline underline-offset-2 rounded-md',
+                      'flex items-center gap-1.5 min-h-11 px-4 rounded-full bg-accent text-accent-foreground text-sm font-semibold hover:bg-accent/90 transition-colors shrink-0',
                       FOKUS_RAHMEN
                     )}
                   >
-                    {TEXT.zuruecksetzen}
-                    <span className="sr-only">: {person.name}</span>
-                  </button>
-                </p>
+                    <MessageSquare className="size-3.5" aria-hidden="true" />
+                    Tippen
+                    <span className="sr-only">: Nachricht an {person.name} in WhatsApp öffnen</span>
+                  </a>
+                )
               )}
-            </div>
-
-            {/* Action */}
-            {person.geoeffnet ? (
-              <span className="text-xs text-status-fertig font-medium shrink-0">{TEXT.geoeffnet}</span>
-            ) : (
-              <a
-                href={buildWaUrl(person)}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => {
-                  rueckkehr.current = { id: person.id, verlassen: false }
-                }}
-                className={cn(
-                  'flex items-center gap-1.5 min-h-11 px-4 rounded-full bg-accent text-accent-foreground text-sm font-semibold hover:bg-accent/90 transition-colors shrink-0',
-                  FOKUS_RAHMEN
-                )}
-              >
-                <MessageSquare className="size-3.5" aria-hidden="true" />
-                Tippen
-                <span className="sr-only">: Nachricht an {person.name} in WhatsApp öffnen</span>
-              </a>
-            )}
-          </li>
-        ))}
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

@@ -66,7 +66,7 @@ export function StatusUpdateEmail({
 
       {/* Farm name */}
       <Text style={{ ...bodyText, color: MAIL_FARBE.textLeise, marginBottom: '4px' }}>
-        Neuigkeit von {farmName}
+        Neuer Beitrag von {farmName}
       </Text>
 
       {/* Title */}

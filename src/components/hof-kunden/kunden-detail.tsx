@@ -4,7 +4,8 @@ import type { CustomerDetail } from '@/server/queries/customers'
 import { initialen, kundeSeitText, kundenMarke, tageSeit, vorTagenText, weitereBestellungen } from '@/lib/hof-kunden'
 import { BESTELL_FILTER_TEXT, bestellListeHref, bestellMarke } from '@/lib/hof-bestellungen'
 import { centsAlsEuro, formatEuro, formatZahl } from '@/lib/format'
-import { toWaPhone } from '@/lib/whatsapp'
+import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
+import { whatsAppLink } from '@/lib/whatsapp'
 import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -34,6 +35,12 @@ const KNOPF_ORANGE =
 export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: Date }): React.JSX.Element {
   const marke = kundenMarke(kunde.status)
   const telefon = kunde.customerPhone.trim()
+  // Anrufen und WhatsApp gibt es nur für eine Nummer, die sich lesen lässt (Nr. 75, Nr. 81): Aus zwei Nummern in einem Feld
+  // oder einem Zusatz wie „ab 18 Uhr“ würde ein Link eine andere Nummer wählen, als dort steht. Die Eingabe steht dann als Text in „Kontakt“.
+  const anrufen = telefonLink(telefon)
+  const whatsApp = anrufen ? whatsAppLink(telefon) : null
+  // Der Hinweis gilt nur, wenn gar keine Nummer dasteht („keine Angabe“) — sonst wäre er falsch neben der Nummer in „Kontakt“.
+  const keineNummer = !/\d/.test(telefon)
   const gezeigt = kunde.recentOrders.slice(0, GEZEIGTE_BESTELLUNGEN)
   const rest = weitereBestellungen(kunde.alleBestellungen, gezeigt.length)
   const abo = kunde.isSubscribed ? kunde.subscription : null
@@ -66,24 +73,24 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {telefon && (
-              <>
-                <a href={`tel:${telefon}`} className={cn(KNOPF_ORANGE, FOKUS_RAHMEN)}>
-                  <Phone className="size-4" strokeWidth={1.7} aria-hidden="true" />
-                  Anrufen
-                </a>
-                <a href={`https://wa.me/${toWaPhone(telefon)}`} target="_blank" rel="noopener noreferrer" className={KNOPF_RAHMEN}>
-                  <MessageCircle className="size-4" strokeWidth={1.7} aria-hidden="true" />
-                  WhatsApp
-                </a>
-              </>
+            {anrufen && (
+              <a href={anrufen} className={cn(KNOPF_ORANGE, FOKUS_RAHMEN)}>
+                <Phone className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                Anrufen
+              </a>
+            )}
+            {whatsApp && (
+              <a href={whatsApp} target="_blank" rel="noopener noreferrer" className={KNOPF_RAHMEN}>
+                <MessageCircle className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                WhatsApp
+              </a>
             )}
             <a href={`mailto:${kunde.customerEmail}`} className={KNOPF_RAHMEN}>
               <Mail className="size-4" strokeWidth={1.7} aria-hidden="true" />
               E-Mail
             </a>
           </div>
-          {!telefon && <p className={cn('text-[13px]', LEISE)}>Keine Telefonnummer hinterlegt – du erreichst sie per E-Mail.</p>}
+          {keineNummer && <p className={cn('text-[13px]', LEISE)}>Keine Telefonnummer hinterlegt – du erreichst sie per E-Mail.</p>}
         </header>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
@@ -142,11 +149,18 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
               <h2 id="kundin-kontakt" className={KICKER}>
                 Kontakt
               </h2>
-              {telefon && (
-                <a href={`tel:${telefon}`} className={cn('inline-flex min-h-11 w-fit items-center gap-2 rounded-md text-[14px] font-medium text-status-fertig hover:underline', FOKUS_RAHMEN)}>
+              {anrufen ? (
+                <a href={anrufen} className={cn('inline-flex min-h-11 w-fit items-center gap-2 rounded-md text-[14px] font-medium text-status-fertig hover:underline', FOKUS_RAHMEN)}>
                   <Phone className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-                  {telefon}
+                  {formatiereTelefon(telefon)}
                 </a>
+              ) : (
+                telefon !== '' && (
+                  <p className="flex min-h-11 items-center gap-2 text-[14px] font-medium">
+                    <Phone className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{formatiereTelefon(telefon)}</span>
+                  </p>
+                )
               )}
               <a href={`mailto:${kunde.customerEmail}`} className={cn('inline-flex min-h-11 min-w-0 items-center gap-2 rounded-md text-[14px] font-medium break-all text-status-fertig hover:underline', FOKUS_RAHMEN)}>
                 <Mail className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />

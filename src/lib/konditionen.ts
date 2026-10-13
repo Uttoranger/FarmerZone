@@ -173,8 +173,18 @@ export function mitBarAusnahme(text: string, jetzt: Date, satz: string = BAR_OHN
   return vorBarStichtag(jetzt) ? `${text} ${satz}` : text
 }
 
-/** Der Hinweis für Kundinnen — Kasse und Startseite (Wortlaut freigabe.md §9, 19a). */
+/**
+ * Der Hinweis für Kundinnen — Startseite, Hofseite, Mini-Warenkorb (Wortlaut
+ * freigabe.md §9, 19a). Die Kasse zeigt ihn seit Nr. 82 nicht mehr als Absatz:
+ * Dort trägt „Bar bei Abholung" den Vorteil selbst (`BAR_OHNE_GEBUEHR_ZAHLART`).
+ */
 export const BAR_OHNE_GEBUEHR_HINWEIS = `Bei Barzahlung bis ${BAR_OHNE_GEBUEHR_BIS_TEXT} ohne Servicegebühr.`
+
+/**
+ * Der erste Satz an „Bar bei Abholung" in der Kasse (Register N10, Nr. 82) —
+ * nur, solange bar wirklich günstiger ist (`barHinweis` in src/lib/kasse.ts).
+ */
+export const BAR_OHNE_GEBUEHR_ZAHLART = `Ohne Servicegebühr bis ${BAR_OHNE_GEBUEHR_BIS_TEXT}.`
 
 /** Derselbe Inhalt als Satz für Höfe — /konditionen, /fuer-hoefe und die Mail „Vor-Ort-Bestellung bestätigt". */
 export const BAR_OHNE_GEBUEHR_SATZ = `Bei Barzahlung fällt bis ${BAR_OHNE_GEBUEHR_BIS_TEXT} keine Servicegebühr an.`

@@ -18,6 +18,7 @@
 import type { SchildFarbe } from '@/lib/mein-hof'
 import { HOFSEITE_HREF, titelbildFoto } from '@/lib/mein-hof'
 import { formatSlotTime, type WeeklySlot } from '@/lib/pickup-days'
+import { ABHOLZEITEN_FEHLEN_ZEILE } from '@/lib/pickup-slot-rules'
 import { ueberUnsText } from '@/lib/hofseite-kunde'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 
@@ -223,7 +224,7 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
       'abholen-bezahlen',
       stand.abholzeiten.length > 0
         ? abholzeitenKurz(stand.abholzeiten)
-        : 'Noch keine — erst dann können Kunden bestellen',
+        : ABHOLZEITEN_FEHLEN_ZEILE,
       stand.abholzeiten.length > 0
     ),
     // Die Zeile zählt als fertig, trägt ohne Online-Zahlung aber das

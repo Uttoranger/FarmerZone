@@ -97,3 +97,21 @@ export function findBatchSlotError(candidates: SlotKey[], ctx: SlotContext): str
   }
   return null
 }
+
+/**
+ * Es ist keine Abholzeit eingetragen (Register N9: ein Zustand, eine Fassung). Heute
+ * (Packliste und Karte „Nächste Abholung“) und die Einstellungen zeigen diesen Titel, diesen
+ * Satz und diesen Knopf; ohne Abholzeit kann niemand bestellen. `aktion.href` ist der Weg
+ * dorthin, wo man sie einträgt.
+ */
+export const ABHOLZEITEN_FEHLEN = {
+  titel: 'Noch keine Abholzeiten',
+  satz: 'Trag deine Abholzeiten ein, damit deine Kundinnen bei dir bestellen können.',
+  aktion: { text: 'Abholzeiten eintragen', href: '/settings/pickup-slots' },
+} as const
+
+/** Die Kurzform für eine Zeile in einer Liste (Mein Hof, Einstellungen) — beide zeigen denselben Wortlaut. */
+export const ABHOLZEITEN_FEHLEN_ZEILE = 'Noch keine — erst dann können Kundinnen bestellen'
+
+/** Die Kennung des ersten Felds im Formular „Neue Abholzeit“ (Wochentag): Der Knopf des Leerzustands springt dorthin, das Feld trägt sie. */
+export const ABHOLZEITEN_FORMULAR_ID = 'dayOfWeek'

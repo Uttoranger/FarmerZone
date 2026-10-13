@@ -140,7 +140,7 @@ export function BrennmaterialBand(): React.JSX.Element {
 const SCHRITTE = [
   { titel: 'Hof finden', text: 'Such nach Ort oder Produkt. Du siehst sofort, was es gibt und wann du abholen kannst.' },
   {
-    titel: 'Bestellen und Zeitfenster wählen',
+    titel: 'Bestellen und Abholtermin wählen',
     text: 'Online oder bar bei Abholung bezahlen. Die Ware ist für dich reserviert, sobald du bestellst.',
   },
   { titel: 'Am Hof abholen', text: 'Zur gewählten Zeit vorbeikommen, Bestellnummer zeigen, mitnehmen. Keine Lieferkosten.' },

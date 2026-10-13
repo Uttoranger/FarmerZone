@@ -308,7 +308,7 @@ export type EntdeckenKopf = { titel: string; unterzeile: string }
 
 /** Wortlaut aus den Mockups. */
 export const ENTDECKEN_KOPF = {
-  hoefe: { titel: 'Höfe in deiner Nähe', unterzeile: 'Frisch vom Hof – bestellen und im Zeitfenster abholen' },
+  hoefe: { titel: 'Höfe in deiner Nähe', unterzeile: 'Frisch vom Hof – bestellen und am Hof abholen' },
   futter: { titel: 'Futtermittel in deiner Nähe', unterzeile: 'Vom Sackerl für den Hasen bis zum Rundballen' },
   sucheUnterzeile: 'Produkte statt Höfe, weil du nach einem Produkt suchst',
 } as const

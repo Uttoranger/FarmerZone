@@ -13,16 +13,20 @@ import { cn } from '@/lib/utils'
 export function EmptyState({
   symbol: Symbol,
   titel,
+  titelStufe,
   satz,
   aktion,
   className,
 }: {
   symbol: LucideIcon
   titel: string
+  /** Der Titel als Überschrift dieser Stufe — für eine Seite, die im Randzustand sonst keine hätte; sonst ein Absatz. */
+  titelStufe?: 1 | 2 | 3
   satz?: string
   aktion?: ReactNode
   className?: string
 }): React.JSX.Element {
+  const Titel = titelStufe === undefined ? 'p' : (`h${titelStufe}` as const)
   return (
     <div
       data-slot="empty-state"
@@ -34,7 +38,7 @@ export function EmptyState({
       <span className="flex size-14 items-center justify-center rounded-full bg-muted">
         <Symbol className="size-7 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
       </span>
-      <p className="font-heading text-lg font-semibold text-foreground">{titel}</p>
+      <Titel className="font-heading text-lg font-semibold text-foreground">{titel}</Titel>
       {satz && <p className="max-w-sm text-sm text-muted-foreground">{satz}</p>}
       {aktion && <div className="mt-1 flex flex-wrap justify-center gap-2">{aktion}</div>}
     </div>

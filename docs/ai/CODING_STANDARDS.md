@@ -295,9 +295,29 @@ beide Werte identisch — der Unterschied entsteht erst im Dunkeln. Also:
 Im Dunkeln trägt der **Rahmen**, nicht der Schatten: Ein Schatten auf fast
 schwarzem Grund ist unsichtbar. Karten bekommen dort `dark:ring-1 dark:ring-border`.
 
-### Bedeutungsfarben (grün/bernstein/rot)
-Für „erledigt", „Achtung", „schiefgegangen" gibt es außer `destructive` **kein**
-Token. Hier bleibt der helle Wert stehen und bekommt eine `dark:`-Entsprechung:
+### Bedeutungsfarben (Register G5)
+Die vier Zustände einer Marke — tun, läuft, erledigt, abgebrochen — haben je ein
+Text- und ein Flächen-Token in beiden Modi (`--fz-zustand-<art>`,
+`--fz-zustand-<art>-grund`; Utilities `text-zustand-<art>`,
+`bg-zustand-<art>-grund`). Gezeichnet werden sie nur vom Baustein `Marke`
+(`src/components/ui/marke.tsx`). Welche Art ein Zustand hat, liefert die Fachregel
+als `MarkeArt` (`src/lib/marke-art.ts`), nie als Klassen:
+
+```tsx
+// ❌ BAD — Farbe je Datei, Hexwert mit eigener dark:-Kopie
+<span className="bg-[#FBEEE3] text-[#9C4D20] dark:bg-[#3A2519]">Zum Packen</span>
+
+// ✅ GOOD — Art aus der Fachregel, Farbe aus dem Token
+<Marke art={art}>Zum Packen</Marke>
+```
+
+In `src/components` und `src/lib` steht kein Hexwert. Die benannten Ausnahmen
+(Teilen-Bild, Mails, QR, Absperrband, Leaflet-Pins, Titelbild-Verläufe u. a.)
+stehen je mit Grund in der Hex-Wache von `tests/design-tokens.test.ts`.
+
+Bedeutung ohne Marke (Hinweiskasten „Achtung", Fehlerfläche) nimmt `destructive`
+oder die Palette; dort bleibt der helle Wert stehen und bekommt eine
+`dark:`-Entsprechung:
 
 ```tsx
 // ✅ GOOD — heller Wert unverändert, dunkler Wert ergänzt

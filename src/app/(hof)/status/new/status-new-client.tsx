@@ -275,7 +275,7 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                   setBody(e.target.value.slice(0, 500))
                   if (fieldErrors.body) setFieldErrors((p) => ({ ...p, body: false }))
                 }}
-                placeholder="Schreibe hier deine Neuigkeit…"
+                placeholder="Schreibe hier deinen Beitrag…"
                 rows={5}
                 className={cn(
                   'w-full px-3 py-2.5 rounded-xl border bg-card text-sm focus:outline-none focus:ring-2 resize-none transition-colors',
@@ -301,7 +301,7 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
               <div className="relative w-full aspect-[3/2] max-h-48 mb-3 rounded-xl overflow-hidden border border-border bg-muted">
                 <Image
                   src={photoUrl}
-                  alt="Status-Foto"
+                  alt="Foto zum Beitrag"
                   fill
                   sizes="(min-width: 768px) 640px, 100vw"
                   className="object-contain"

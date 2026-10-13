@@ -8,10 +8,14 @@
  *    „Sonstiges". „Eigen" heißt: aus UNSEREM Blob-Speicher und dem Pfad
  *    dieses Hofs — das entscheidet der Aufrufer mit `istEigenesBild`
  *    (src/server/bild-url.ts, fail-closed), nie eine zweite Prüfung hier.
- *  - Fotos nur mit eigenem Zeitlimit (FOTO_FRIST_MS, auch für das Umwandeln)
- *    und Größenlimit (FOTO_MAX_BYTES), ohne Umleitung. Scheitert eins, steht
- *    die Illustration da: Das Bild wird nie leer und nie mehr als
- *    FOTO_FRIST_MS langsamer als ohne Fotos.
+ *  - Fotos nur mit eigenem Zeitlimit (FOTO_FRIST_MS je Foto und Größe, auch
+ *    für das Umwandeln) und Größenlimit (FOTO_MAX_BYTES, FOTO_MAX_PIXEL), ohne
+ *    Umleitung. Alle starten zugleich; scheitert eins, steht die Illustration
+ *    da, die mit dem Foto zu laden begann: Das Bild wird nie leer und nie mehr
+ *    als FOTO_FRIST_MS langsamer als ohne Fotos (Nr. 75).
+ *  - Gewandelte Fotos hält ein Zwischenspeicher je Prozess, Schlüssel ist
+ *    sha256 der Adresse samt Größe, höchstens FOTO_CACHE_MAX Einträge: Ein
+ *    Daten-URI eines Fotos ist bis zu einige hundert KB groß (Nr. 75).
  *  - Satori (next/og) zeichnet nur PNG, JPEG, GIF und SVG; WebP — so liegen
  *    Uploads und Illustrationen — lehnt es ab („Unsupported image type").
  *    Deshalb wandelt sharp jedes Bild in ein JPEG in der Größe, in der es im
@@ -19,6 +23,7 @@
  *  - Illustrationen und Schriften kommen vom Dateisystem, einmal je Prozess;
  *    beide trägt next.config.ts (outputFileTracingIncludes) in die Route ein.
  */
+import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import * as Sentry from '@sentry/nextjs'
@@ -33,8 +38,11 @@ export const FOTO_FRIST_MS = 1500
 /** Größer wird kein Foto abgerufen (1,5 MB) — unsere Uploads liegen weit darunter. */
 export const FOTO_MAX_BYTES = 1.5 * 1024 * 1024
 
-/** Bildpunkte, die sharp höchstens dekodiert: Uploads haben bis 2400 px Kante, mehr wäre kein Upload von uns. */
-const FOTO_MAX_PIXEL = 25_000_000
+/** Bildpunkte, die sharp höchstens dekodiert: Uploads haben bis 2400 px Kante (2400 × 2400 ≈ 5,8 MP), mehr wäre kein Upload von uns. */
+const FOTO_MAX_PIXEL = 6_000_000
+
+/** So viele gewandelte Fotos (Daten-URIs je Foto und Größe) hält der Zwischenspeicher eines Prozesses höchstens. */
+export const FOTO_CACHE_MAX = 50
 
 /** Kante, in der ein rundes Produktbild geladen wird — im Bild steht es höchstens rund 130 px groß. */
 const RUND_KANTE = 192
@@ -86,7 +94,7 @@ export type GeladeneBilder = {
   produkte: Record<string, string>
   /** Das Foto über das ganze Bild (Variante B), sonst null (Variante A). */
   held: string | null
-  /** Ein Foto kam nicht — das Bild zeigt Ersatz und darf nur kurz im Zwischenspeicher liegen. */
+  /** Ein Foto oder eine Illustration kam nicht — das Bild zeigt Ersatz und darf nur kurz im Zwischenspeicher liegen. */
   ersatz: boolean
 }
 
@@ -97,8 +105,13 @@ export type BildWerkzeuge = {
   lesen: (publicPfad: string) => Promise<Uint8Array>
   wandeln: (bytes: Uint8Array, breite: number, hoehe: number) => Promise<string>
   /** Gewandelte Illustrationen — sie ändern sich nur mit einem Deployment. */
-  illustrationen: Map<string, Promise<string | null>>
+  illustrationen: Map<string, Promise<Illustration>>
+  /** Gewandelte Fotos: sha256 der Adresse samt Größe → Daten-URI, höchstens FOTO_CACHE_MAX, der älteste Gebrauch fällt zuerst. */
+  fotos: Map<string, string>
 }
+
+/** Eine gewandelte Illustration; `ersatz`: Die gewünschte fehlte, es steht „Sonstiges" da oder nichts. */
+type Illustration = { bild: string | null; ersatz: boolean }
 
 async function alsJpegDatenUri(bytes: Uint8Array, breite: number, hoehe: number): Promise<string> {
   // Dynamisch: Wer nur die reinen Regeln braucht (Tests, Teilen-Fenster), lädt kein natives Modul.
@@ -120,6 +133,7 @@ function standardWerkzeuge(): BildWerkzeuge {
     lesen: async (publicPfad) => new Uint8Array(await readFile(path.join(process.cwd(), 'public', publicPfad))),
     wandeln: alsJpegDatenUri,
     illustrationen: new Map(),
+    fotos: new Map(),
   }
   return standard
 }
@@ -190,28 +204,63 @@ function meldeNichtLadbareIllustration(fehler: unknown): void {
   Sentry.captureException(ereignis, { tags: { bereich: 'teilen-bild', teil: 'illustration' }, extra: { fehlertext: meldung } })
 }
 
-function ladeIllustration(publicPfad: string, w: BildWerkzeuge): Promise<string | null> {
+function ladeIllustration(publicPfad: string, w: BildWerkzeuge): Promise<Illustration> {
   let geladen = w.illustrationen.get(publicPfad)
   if (!geladen) {
     geladen = w
       .lesen(publicPfad)
       .then((bytes) => w.wandeln(bytes, RUND_KANTE, RUND_KANTE))
-      .catch((fehler: unknown) => {
-        // Eine fehlende Illustration ist ein Fehler des Deployments (Datei
-        // nicht eingetragen) — einmal je Datei und Prozess melden, dann
-        // „Sonstiges", zuletzt ein leerer Kreis.
-        meldeNichtLadbareIllustration(fehler)
-        return publicPfad === SONSTIGES_BILD_PFAD ? null : ladeIllustration(SONSTIGES_BILD_PFAD, w)
-      })
+      .then(
+        (bild): Illustration => ({ bild, ersatz: false }),
+        async (fehler: unknown): Promise<Illustration> => {
+          // Eine fehlende Illustration ist ein Fehler des Deployments (Datei
+          // nicht eingetragen) — einmal je Datei und Prozess melden, dann
+          // „Sonstiges", zuletzt ein leerer Kreis. Beides ist Ersatz: Das Bild
+          // liegt dann nur kurz im Zwischenspeicher (Nr. 75), auch wenn die
+          // Antwort hier aus dem Speicher des Prozesses kommt.
+          meldeNichtLadbareIllustration(fehler)
+          const sonstiges = publicPfad === SONSTIGES_BILD_PFAD ? null : (await ladeIllustration(SONSTIGES_BILD_PFAD, w)).bild
+          return { bild: sonstiges, ersatz: true }
+        }
+      )
     w.illustrationen.set(publicPfad, geladen)
   }
   return geladen
 }
 
+/** Der Schlüssel eines gewandelten Fotos: sha256 der Adresse (feste Länge, keine Adresse im Speicher) und die Größe. */
+function fotoSchluessel(url: string, breite: number, hoehe: number): string {
+  return `${createHash('sha256').update(url).digest('hex')}@${breite}x${hoehe}`
+}
+
+/** Ein Foto aus dem Zwischenspeicher; ein Treffer rückt nach hinten (zuletzt gebraucht). */
+function ausDemSpeicher(fotos: Map<string, string>, schluessel: string): string | undefined {
+  const bild = fotos.get(schluessel)
+  if (bild !== undefined) {
+    fotos.delete(schluessel)
+    fotos.set(schluessel, bild)
+  }
+  return bild
+}
+
+function inDenSpeicher(fotos: Map<string, string>, schluessel: string, bild: string): void {
+  fotos.delete(schluessel)
+  // Eine Map zählt in Einfüge-Reihenfolge: Vorn steht, was am längsten nicht gebraucht wurde.
+  while (fotos.size >= FOTO_CACHE_MAX) {
+    const aeltester = fotos.keys().next()
+    if (aeltester.done) break
+    fotos.delete(aeltester.value)
+  }
+  fotos.set(schluessel, bild)
+}
+
 /**
- * Alle Bilder eines Teilen-Bilds, parallel und unter EINER Frist: die runden
- * Produktbilder (Foto oder Illustration) und das Foto für Variante B
- * (Beitragsfoto, sonst das erste Produktfoto, das lädt).
+ * Alle Bilder eines Teilen-Bilds, alle zugleich und jedes unter eigener Frist
+ * (FOTO_FRIST_MS ab jetzt): die runden Produktbilder (Foto oder Illustration)
+ * und das Foto für Variante B — das Beitragsfoto, sonst das erste Produktfoto
+ * in der Reihenfolge von `heldKandidaten`, das kam. Hängt das Beitragsfoto,
+ * trägt das Produktfoto, das inzwischen geladen ist (Nr. 75; vorher bekam es
+ * nach der gemeinsamen Frist 0 ms).
  */
 export async function ladeTeilenBildBilder(
   eingabe: {
@@ -221,33 +270,54 @@ export async function ladeTeilenBildBilder(
   },
   werkzeuge: BildWerkzeuge = standardWerkzeuge()
 ): Promise<GeladeneBilder> {
-  const frist = Date.now() + FOTO_FRIST_MS
   const kandidaten = heldKandidaten(
     eingabe.beitragFoto,
     eingabe.eintraege.map((e) => e.quelle)
   )
-  // Jedes Foto genau einmal holen, alle sofort — auch die, die nur Variante B braucht.
-  const holungen = new Map(kandidaten.map((url) => [url, holeFoto(url, werkzeuge)]))
-  const fristig = (arbeit: Promise<string | null>): Promise<string | null> =>
-    mitZeitlimit(arbeit, Math.max(0, frist - Date.now()), () => new Error('Teilen-Bild: Foto zu langsam')).catch(() => null)
-  const gewandelt = (url: string, breite: number, hoehe: number): Promise<string | null> =>
-    fristig(
-      (holungen.get(url) ?? Promise.resolve(null)).then((bytes) => (bytes ? werkzeuge.wandeln(bytes, breite, hoehe) : null))
+  // Jedes Foto höchstens einmal holen — und nur, wenn eine Größe nicht schon im Zwischenspeicher liegt.
+  const holungen = new Map<string, Promise<Uint8Array | null>>()
+  const hole = (url: string): Promise<Uint8Array | null> => {
+    let holung = holungen.get(url)
+    if (!holung) {
+      holung = holeFoto(url, werkzeuge)
+      holungen.set(url, holung)
+    }
+    return holung
+  }
+  const gewandelt = (url: string, breite: number, hoehe: number): Promise<string | null> => {
+    const schluessel = fotoSchluessel(url, breite, hoehe)
+    const bekannt = ausDemSpeicher(werkzeuge.fotos, schluessel)
+    if (bekannt !== undefined) return Promise.resolve(bekannt)
+    const arbeit = hole(url).then((bytes) => (bytes ? werkzeuge.wandeln(bytes, breite, hoehe) : null))
+    return mitZeitlimit(arbeit, FOTO_FRIST_MS, () => new Error('Teilen-Bild: Foto zu langsam')).then(
+      (bild) => {
+        if (bild) inDenSpeicher(werkzeuge.fotos, schluessel, bild)
+        return bild
+      },
+      () => null
     )
+  }
 
   let ersatz = false
   const zeilen = Promise.all(
     eingabe.eintraege.map(async ({ id, quelle }) => {
-      if (quelle.art === 'illustration') return [id, await ladeIllustration(quelle.pfad, werkzeuge)] as const
+      if (quelle.art === 'illustration') {
+        const illustration = await ladeIllustration(quelle.pfad, werkzeuge)
+        if (illustration.ersatz) ersatz = true
+        return [id, illustration.bild] as const
+      }
+      // Die Illustration lädt mit dem Foto, nicht erst nach seiner Frist: Kommt es nicht, steht sie sofort bereit.
+      const reserve = ladeIllustration(quelle.ersatz, werkzeuge)
       const foto = await gewandelt(quelle.url, RUND_KANTE, RUND_KANTE)
       if (foto) return [id, foto] as const
       ersatz = true
-      return [id, await ladeIllustration(quelle.ersatz, werkzeuge)] as const
+      return [id, (await reserve).bild] as const
     })
   )
+  const versuche = kandidaten.map((url) => gewandelt(url, eingabe.held.width, eingabe.held.height))
   const held = (async (): Promise<string | null> => {
-    for (const url of kandidaten) {
-      const bild = await gewandelt(url, eingabe.held.width, eingabe.held.height)
+    for (const versuch of versuche) {
+      const bild = await versuch
       if (bild) return bild
       ersatz = true
     }

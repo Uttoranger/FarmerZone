@@ -18,6 +18,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS, centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
+import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 import { cn } from '@/lib/utils'
 import { BestellDialog, DialogFehler } from './bestell-dialog'
 import { StornoDialog } from './storno-dialog'
@@ -53,6 +54,7 @@ export function BestellDetail({
   const [kundinInformieren, setKundinInformieren] = useState(true)
   const [laeuft, starte] = useTransition()
   const { aktionen, betrag, kunde } = bestellung
+  const anrufen = telefonLink(kunde.telefon)
 
   const vorhanden = bestellung.positionen.filter((p) => !p.fehlt)
   const zumPacken = aktionen.packen || aktionen.abgeholt || aktionen.abgeholtBezahlt
@@ -142,8 +144,8 @@ export function BestellDetail({
         suche={zurueckSuche}
         listeDaneben
         aktion={
-          kunde.telefon ? (
-            <a href={`tel:${kunde.telefon}`} aria-label={`${kunde.name} anrufen`} className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-muted', FOKUS_RAHMEN)}>
+          anrufen ? (
+            <a href={anrufen} aria-label={`${kunde.name} anrufen`} className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-muted', FOKUS_RAHMEN)}>
               <Phone className="size-5" strokeWidth={1.7} aria-hidden="true" />
             </a>
           ) : undefined
@@ -378,6 +380,7 @@ function Betrag({ bestellung }: { bestellung: HofBestellDetail }): React.JSX.Ele
 /** Die Kundin: Name, Telefon, E-Mail, Notiz, Erinnern — dazu Bestellzeit und Drucken. */
 function Kundin({ bestellung }: { bestellung: HofBestellDetail }): React.JSX.Element {
   const { kunde } = bestellung
+  const anrufen = telefonLink(kunde.telefon)
   return (
     <section aria-labelledby={`kundin-${bestellung.id}`} className={cn(KARTE, 'flex flex-col gap-2 p-4 md:px-[18px]')}>
       <h3 id={`kundin-${bestellung.id}`} className={KICKER}>
@@ -385,11 +388,19 @@ function Kundin({ bestellung }: { bestellung: HofBestellDetail }): React.JSX.Ele
       </h3>
       <p className="text-[14.5px] font-semibold break-words">{kunde.name}</p>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13.5px]">
-        {kunde.telefon && (
-          <a href={`tel:${kunde.telefon}`} className={cn('inline-flex min-h-11 items-center gap-1.5 rounded-md font-medium text-status-fertig hover:underline', FOKUS_RAHMEN)}>
+        {anrufen ? (
+          <a href={anrufen} className={cn('inline-flex min-h-11 items-center gap-1.5 rounded-md font-medium text-status-fertig hover:underline', FOKUS_RAHMEN)}>
             <Phone className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            {kunde.telefon}
+            {formatiereTelefon(kunde.telefon)}
           </a>
+        ) : (
+          // Eine Nummer, die sich nicht lesen lässt (zwei Nummern, „ab 18 Uhr“), steht als Text da: Die Eingabe der Kundin soll der Hof sehen, auch ohne Link.
+          kunde.telefon.trim() !== '' && (
+            <span className="inline-flex min-h-11 min-w-0 items-center gap-1.5 font-medium">
+              <Phone className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+              <span className="min-w-0 [overflow-wrap:anywhere]">{formatiereTelefon(kunde.telefon)}</span>
+            </span>
+          )
         )}
         {bestellung.erinnernUrl && (
           <a

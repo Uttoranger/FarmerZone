@@ -72,6 +72,7 @@ import {
   passtZurSuche,
   produktBereich,
   produktStatus,
+  PRODUKTE_LEER,
   produkteKopfzeile,
   sichtbareProdukteFilter,
   wiederDaMomentMoeglich,
@@ -204,7 +205,8 @@ describe('Kopfzeile und Gebinde', () => {
   it('„6 Produkte · 5 sichtbar" zählt isAvailable, nicht den Bestand', () => {
     expect(produkteKopfzeile([p(), p({ stock: 0 }), p({ isAvailable: false })])).toBe('3 Produkte · 2 sichtbar')
     expect(produkteKopfzeile([p()])).toBe('1 Produkt · 1 sichtbar')
-    expect(produkteKopfzeile([])).toBe('Noch keine Produkte')
+    // Ohne Produkte sagt der EmptyState darunter alles; eine Kopfzeile mit demselben Satz stünde doppelt da.
+    expect(produkteKopfzeile([])).toBeNull()
     // Auch der Fall, in dem alles ausgeblendet ist (aus der Bestandsliste übernommen).
     expect(produkteKopfzeile([p({ isAvailable: false }), p({ isAvailable: false })])).toBe('2 Produkte · 0 sichtbar')
   })
@@ -451,7 +453,8 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
 
   it('leer: EmptyState mit Ausweg „Neues Produkt"; kein Treffer: Ausweg „Alle Produkte zeigen"', async () => {
     const leer = await rendere([])
-    expect(leer).toContain('Noch keine Produkte')
+    expect(leer.split(PRODUKTE_LEER.titel).length - 1).toBe(1)
+    expect(leer).toContain(PRODUKTE_LEER.satz)
     expect(leer).toContain('Neues Produkt')
     const keinTreffer = await rendere(liste, 'gibtesnicht')
     expect(keinTreffer).toContain('Kein Produkt passt')

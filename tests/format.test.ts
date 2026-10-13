@@ -346,13 +346,13 @@ describe('nachkommastellen', () => {
   })
 })
 
-describe('Bestand mit Einheit', () => {
+describe('Vorrat mit Einheit', () => {
   it('Label ohne Gebinde nennt die Einheit, mit Gebinde zählt es Pakete', () => {
-    expect(bestandLabel('KG')).toBe('Bestand (kg)')
-    expect(bestandLabel('KG', 1)).toBe('Bestand (kg)')
-    expect(bestandLabel('STUECK', null)).toBe('Bestand (Stück)')
-    expect(bestandLabel('KG', 2)).toBe('Bestand (Pakete)')
-    expect(bestandLabel('PAKET', 6)).toBe('Bestand (Pakete)')
+    expect(bestandLabel('KG')).toBe('Vorrat (kg)')
+    expect(bestandLabel('KG', 1)).toBe('Vorrat (kg)')
+    expect(bestandLabel('STUECK', null)).toBe('Vorrat (Stück)')
+    expect(bestandLabel('KG', 2)).toBe('Vorrat (Pakete)')
+    expect(bestandLabel('PAKET', 6)).toBe('Vorrat (Pakete)')
   })
 
   it('formatBestand rechnet Pakete in die Einheit um', () => {

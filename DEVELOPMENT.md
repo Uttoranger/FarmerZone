@@ -4939,7 +4939,7 @@ Auftrag freigabe.md §14 „62" (Register K2, K1, S12). Eine Migration (freigege
 
 Auftrag freigabe.md §15 „70" (Register S16, E8). Keine Schema-Änderung, keine Migration, kein neues Paket, keine Bilder.
 
-- **Produktseite:** `produkt/[id]/page.tsx` gibt den Hof über `entferneKontaktdaten` an `ProduktdetailKunde`, dessen Prop `farm` jetzt `HofseiteHof` ist. Telefon und E-Mail standen vorher in den Seitendaten jeder öffentlichen Produktseite, obwohl die Hofseite sie seit Nr. 60 nicht mehr trägt; sichtbar waren sie dort nie. Metadaten und Sichtbarkeitsprüfung der Seite lesen weiter den vollen Hof auf dem Server.
+- **Produktseite:** `produkt/[id]/page.tsx` gibt den Hof über `entferneKontaktdaten` an `ProduktdetailKunde`, dessen Prop `farm` jetzt `HofseiteHof` ist. Telefon und E-Mail standen vorher in den Seitendaten jeder öffentlichen Produktseite, obwohl die Hofseite sie seit Nr. 60 nicht mehr trägt; sichtbar waren sie dort seit Nr. 60 nicht mehr. Metadaten und Sichtbarkeitsprüfung der Seite lesen weiter den vollen Hof auf dem Server.
 - **Warum ein Test und nicht der Typ:** Der volle Hof ist an `HofseiteHof` zuweisbar (Zusatzfelder sind bei Zuweisungen erlaubt), ein vergessenes `entferneKontaktdaten` bricht den Typecheck also nicht. Der Test liest die Props der Client-Komponente im Baum der Seite (Schlüssel auf jeder Tiefe und Werte), für Kundinnen und in der Vorschau des Hofs; die Gegenprobe zeigt, dass die Suche am vollen Hof anschlägt und Name, Anschrift, Abholzeiten und Produkte ankommen.
 - **Host-Prüfung (S16):** Für `NEXT_PUBLIC_APP_URL` in der Produktion zählt ein Wert mit Port als fremder Host (`istEchteHerkunft`: echter Host und kein Port). `https://farmerzone.at:8443` gilt weiter als Herkunft, meldet sich aber mit `WARNUNG_APP_URL_FREMDER_HOST`: Better Auth vergleicht Herkünfte genau, der Browser der echten Seite sendet keinen Port, die Anmeldung bräche still. Der Standard-Port 443 fällt schon im URL-Parser weg; die Prüfung der Vorschau (`pruefeAdresse`) blieb, wie sie war.
 
@@ -5014,6 +5014,77 @@ Auftrag freigabe.md §15 „74" (Register I1). Keine Migration, kein neues Paket
 - **Prüfskript `pnpm illustrationen`:** 57 Farbdateien und 57 Schwarzweiß-Dateien — da, WebP, 1024 × 1024, höchstens 80 KB, äußere 8 Pixel einfarbig (Creme bzw. Weiß, ±6). Eigener CI-Schritt neben dem Lint. Die vorhandenen Dateien weichen am Rand höchstens um 4 ab.
 - **Datei-Tracing:** Gemessen mit `next build`: Alle 37 Routenpakete mit Zugriff auf `process.cwd()/public` tragen die Illustrationen samt Unterordnern in der `.nft.json`; die Teilen-Bild-Route trägt sie zusätzlich ausdrücklich ein (`**`).
 - **Aus der Prüfung von 69:** Die Attrappe des Teilen-Bild-Laders wertet Umleitungssperre und Zeitlimit aus; ein Strom einer Fehlerseite wird abgebrochen; eine nicht ladbare Illustration geht mit Klasse und bereinigter Nachricht nach Sentry, nicht mit dem Pfad der Datei.
+
+## Nacharbeit Lauf 11 (Nachtlauf Nr. 75, Oktober 2026)
+
+- **Sicherheit (Defense in Depth):** Die Bild-Route liest den Beitrag nur noch mit `{ id, farmId }` (`ladeTeilenBild` in `server/queries/teilen-bild.ts`; `beitragDarfInsBild` prüft weiter), die Fotos kommen aus der einen Abfrage von `ladeTeilenBildQuelle` statt aus einer zweiten. `toWaPhone` lässt nur Ziffern übrig, `whatsAppLink` gibt ohne Ziffer keinen Link. „Geöffnet" setzt `setzeWhatsAppGetippt` nur für Abonnentinnen mit WhatsApp-Häkchen und nicht leerer Nummer — dieselbe Regel wie Liste und Zahl (`whatsAppAbonnentinnen` bzw. `whatsAppAbonnentinSql`); vorher ließ `customerPhone: { not: null }` leere Nummern durch.
+- **Tipp-Liste:** Ein Wurf beim Speichern (Netz weg) geht nicht mehr an die Fehlergrenze: `speichernOhneWurf` fängt und meldet ihn, ein Toast sagt „Konnten wir nicht speichern – versuch es gleich noch einmal", die Person steht wieder wie vor dem Tipp. Nach dem Setzen baut der Server `/farm-page` und `/status` neu.
+- **Teilen-Bild:** Variante B lädt alle Kandidaten zugleich, jeden unter eigener Frist; es gilt der erste in der Reihenfolge von `heldKandidaten`, der kam (vorher bekam ein Produktfoto nach einem hängenden Beitragsfoto 0 ms). Die Ersatz-Illustration lädt mit dem Foto. sharp dekodiert höchstens 6 MP; gewandelte Fotos liegen in einem Zwischenspeicher je Prozess (Schlüssel sha256 der Adresse samt Größe, höchstens 50). Eine fehlende Illustration zeigt „Sonstiges" und zählt als Ersatz (kurzer Zwischenspeicher). Satoris eigener Speicher für Daten-URIs (500 Einträge) bleibt: Ihn umgeht nur ein `ArrayBuffer` als `src` in `teilen-bild-grafik.tsx`.
+- **Mein Hof breit:** Die Web-Vorschau ist höchstens 1 408 px breit, damit die Liste bei voller Editorbreite ihre 560 px bekommt (`EDITOR_LISTE_WEB_MAX` griff vorher nie: 2 000 − 32 − 1 440 = 528). `useElementGroesse` liegt in `src/lib/use-element-groesse.ts`.
+- **Kleinkram:** `aktuellePositionen` in `use-cart.ts` samt Prüfstand-Test für Funktionen aus einem alten Render; Prüfskript der Illustrationen meldet beschädigte Pixel als FEHLER-Zeile; der Test „jede Unterkategorie" läuft über alle Werte des Enums; die Fünfer-Grenze der Hofseiten-Beiträge prüft auch die schnelle Suite; `findeElement` liegt einmal in `tests/element-suche.ts`; CI sucht nach dem Build in der Trace-Datei der Hofseite eine Unterkategorie-Datei.
+
+## Wortliste: ein Wort je Sache (Nachtlauf Nr. 77, Oktober 2026)
+
+Auftrag freigabe.md §16 „77“ (Register N8). Keine Migration, kein neues Paket, kein Nutzertext geändert (das macht Nr. 78).
+
+- **Anlass:** Für dieselbe Sache standen mehrere Wörter in den Texten („Zeitfenster“ neben „Abholtermin“, „Bestand“ neben „Vorrat“, „Status posten“ neben „Neuer Beitrag“, „Hilfe und Rückmeldung“ neben „Problem melden“). Die Tabelle steht in `docs/ai/DESIGN_SYSTEM.md` (Abschnitt „Wortliste“); `tests/wortliste.test.ts` liest ihre Spalte „nicht“ und sucht die Wörter im Syntaxbaum, damit Kommentare und Bezeichner nicht zählen.
+- **Wort statt Wortverbindung:** „Status“, „Post“ und „Neuigkeit“ stehen als einzelne Wörter in der Tabelle. Eine Liste von Verbindungen wie „Status posten“ hätte die Sätze von heute gefunden, nicht den nächsten („Dein Status“ und „Status-Foto“ standen neben „Status posten“). Dafür stehen elf Texte, in denen „Status“ etwas anderes meint (Bestellung, Zahlung, Freischaltung, Meldung, Spaltenkopf, WhatsApp-Funktion), mit Grund in der Ausnahmeliste des Tests. „Neuigkeiten“ (Mehrzahl, der Name der Anmeldung bei einem Hof) trifft die Wortgrenze nicht; „per Post“ ist als Wendung erlaubt.
+- **Käufer:** Heute steht „Käufer“ in keinem Text für die Futter-Käuferarten, sondern für die Kundschaft („So sehen Käufer dein Futter“). Darum steht es in der Spalte „nicht“ der beiden Kunden-Zeilen; der Rechtstext im Impressum bleibt wörtlich (Ausnahme).
+- **Arbeitsliste:** `OFFEN_BIS_78` im Test hält die 38 Fundstellen von heute fest (Stand f367433). Sie greift über Datei, Wort und Text, nicht über die Zeile, weil andere Nummern im Sammel-PR die Zeilen verschieben. Nr. 78 stellt um, streicht die Einträge und macht aus dem `it.skip('OFFEN_BIS_78 ist leer …')` ein `it`. Einträge mit `nummer` liegen in Dateien anderer Nummern dieses Laufs und gehen über den Dirigenten.
+
+## Teilen-Bild als JPEG (Nachtlauf Nr. 76, Oktober 2026)
+
+Auftrag freigabe.md §16 „76“ (Register T7). Keine Migration, kein neues Paket.
+
+- **Warum:** Ein PNG mit Foto wiegt 1,2–1,4 MB, und WhatsApp zeigt Link-Vorschauen über rund 300 KB oft nicht. Satori zeichnet weiter ein PNG, `sharp` macht daraus im selben `try` das JPEG (Qualität 82, mozjpeg); ein Fehler dort ist der 503-Pfad. Die Regel — Typ und Endung nur aus `TEILEN_BILD_TYP` — steht in ARCHITECTURE, „Vorschaubild und Icons“.
+- **Gemessen (die sechs Bilder aus 69, 1080 px):** ohne Foto 58–83 KB (PNG 130–206 KB), mit Foto 107–118 KB (PNG 1,16–1,44 MB), alle unter dem Ziel von 300 KB. mozjpeg kostet etwa 0,1–0,2 s je neu gezeichnetem Bild (ohne 0,02 s) und spart etwa 8–16 %; mit passender Prüfsumme liegt das Bild einen Tag im CDN.
+- **QR in der Story:** maschinell geprüft — die Modulmatrix aus `qrcode` gegen die Helligkeit des JPEG an den Modulmitten: 0 von 841 Modulen abweichend, dunkelstes Hell 243, hellstes Dunkel 38–40. Ein Handy-Scan steht aus.
+- **Aus der Umsetzung:** Zwei bestehende Tests ersetzten `next/og` mit Text als Körper; das ergibt nun 503. Sie liefern ein echtes PNG (ein Bildpunkt).
+
+## Begriffe abräumen (Nachtlauf Nr. 78, Oktober 2026)
+
+Auftrag freigabe.md §16 „78“ (Register N8), gestapelt auf 77. Keine Migration, kein neues Paket.
+
+- **Stand:** Alle 38 Fundstellen aus `OFFEN_BIS_78` stehen auf dem Wort der Wortliste, die Liste ist leer, der Test „OFFEN_BIS_78 ist leer“ läuft statt `it.skip`. Jede Stelle einzeln, kein Massenersatz. Bericht 78 zählt je Wort.
+- **Hof-Tür:** Der Punkt unten in Leiste und Seitenleiste, die Zeile in den Einstellungen und das Formular auf `/fehler-melden` heißen „Problem melden“. Ziel `/meldungen` und Seitentitel „Meine Meldungen“ bleiben. Der Satz nach dem Absenden (`MeldungForm`) verweist auf „Meine Meldungen“, weil dort der Stand steht — „Problem melden“ stünde auf einer Seite, die selbst so heißt.
+- **Abholtermin:** Wo die Kundin wählt (Startseite, Hofseite, Fehlertext der Kasse), steht „Abholtermin“. Die Zeile unter „Höfe in deiner Nähe“ nennt keine Wahl und sagt „am Hof abholen“.
+- **Kunden:** Überschriften sagen „Kunden“ (Vorbild „so sehen Kunden deine Hofseite“), Sätze „die Kundin“ und „deine Kundinnen“. „Käufer“ steht nur noch im Rechtstext des Impressums (Ausnahme im Test).
+- **Mockups:** Sie tragen die alten Wörter noch („Hilfe und Rückmeldung“ in 27 Dateien, „So sehen Käufer dein Futter“, „Dein Zeitfenster …“). Die Entscheidung N8 geht vor; die Mockups bleiben unverändert.
+
+## Kasse geglättet (Nachtlauf 12, Nr. 82, Oktober 2026)
+
+Auftrag freigabe.md §16 „82" (Register N10). Keine Migration, kein neues Paket; Beträge, Schema, `/api/checkout` und Reservierung unverändert — die Kasse zeigt Geld nur an.
+
+- **Warum vier flache Karten:** Abholung und Deine Daten standen ab 768 px halb breit nebeneinander; die Termine brachen in zwei Spalten, die Felder wurden eng. Jetzt Korb → Abholung → Deine Daten → Bezahlen untereinander, die Felder ab 768 px zweispaltig. Am Handy folgt die Übersicht dem Quelltext (nach Bezahlen); der Zahlungsschritt behält sie unter dem Korb (`uebersichtZuletzt` nur im Formular).
+- **Online bleibt vorbelegt, auch im Testbetrieb** (Entscheidung 13.10.: Die Plattform verdient nur an Online-Zahlungen). Der Testbetrieb-Satz steht weiter an der Online-Option.
+- **Bar trägt seinen Vorteil selbst:** „Ohne Servicegebühr bis …" steht an der Option nur, wenn `barHinweis` ihn liefert (vor dem Stichtag und mit Online-Gebühr); der lose Absatz darunter und „gleicher Betrag" sind weg. `BAR_OHNE_GEBUEHR_HINWEIS` bleibt für Startseite, Hofseite und Mini-Warenkorb.
+- **„entfällt":** `gebuehrZeile` entscheidet nur das Wort, den Betrag zeigt die Übersicht allein aus `kassenBetraege`; liegt ein Betrag vor, steht er da — „entfällt" nie darüber. Beim gebührenfreien Hof gibt es keine Zeile (es entfällt nichts).
+- **Prüfstand für das ganze Formular** (`tests/kasse-formular.test.ts`): Auf dem Server zeigt die Kasse nur ihr Skelett, weil der Korb im Effekt aus dem localStorage kommt. Der Test lässt jeden Effekt der eigenen Dateien einmal sofort beim Rendern laufen (`vi.mock('react')`, je Quelltext einmal, je Aufbau zurückgesetzt) und rendert so das echte Formular — Reihenfolge, Vorbelegung und Bar-Zustand am HTML statt am Quelltext.
+
+## Leerzustände (Nachtlauf Nr. 80, Oktober 2026)
+
+Auftrag freigabe.md §16 „80“ (Register N9), gestapelt auf 78. Keine Migration, kein neues Paket.
+
+- **Ursache:** „Noch keine …“ stand an zehn Stellen als lose Zeile ohne Symbol und ohne Weg weiter, und „keine Abholzeiten“ hatte auf Heute zwei Fassungen („Trag deine Abholzeiten ein …“ in der Packliste, „Du hast noch keine Abholzeiten eingetragen.“ in der Karte „Nächste Abholung“) und eine dritte in den Einstellungen.
+- **Umgestellt auf `EmptyState`:** die Abholzeiten in den Einstellungen, die Wunschliste im Briefkasten (Admin), die Umsatzkarte der Auswertung ohne Verkauf und die Seite „WhatsApp versenden“ ohne Abonnentin. Eine Fassung für „keine Abholzeiten“: `ABHOLZEITEN_FEHLEN` in `pickup-slot-rules.ts` (Heute und Einstellungen), `ABHOLZEITEN_FEHLEN_ZEILE` für die Zeile in Mein Hof und in den Einstellungen.
+- **Bleibt eine Zeile (Art B) oder ist kein Leerzustand (Art C):** Die Einordnung aller Stellen steht als Liste `AUSNAHMEN` mit Grund in `tests/leerzustaende-wache.test.ts`; eine neue Stelle fällt dort auf.
+- **Wortlaut:** Die Zeile „Noch keine — erst dann können Kundinnen bestellen“ sagt jetzt „Kundinnen“ (N8: ganze Sätze).
+- **Nachbesserung Runde 1:** Auf Heute ohne Abholzeit standen Satz und Knopf zweimal untereinander (Packliste und Karte „Nächste Abholung“) — „eine Fassung je Zustand“ gilt für die ganze Seite, nicht nur für den Text. Jetzt steht beides einmal in der Packliste, die Karte hat nur ihre Zeile. Ebenso schweigt die Kopfzeile der Produkte ohne Produkt. Die Wache zählt eine Aktion nur, wenn sie immer da ist, nimmt Texte aus `src/lib/` als Quelle, sobald ein EmptyState sie als `titel` oder `satz` nimmt (auch ohne Aktion), und führt Texte im Aufruf selbst als Altlast. Die `h1` von „WhatsApp versenden“ ohne Abonnentin ist der Titel des EmptyState (`titelStufe`) statt eines zweiten Literals.
+
+## Telefonnummern einheitlich (Nachtlauf Nr. 81, Oktober 2026)
+
+- **Anzeige (N8):** „+43 660 000 0000“ — `formatiereTelefon` in `src/lib/telefon-anzeige.ts`, der `tel:`-Link kommt aus `telefonLink`. Gespeichert bleibt die Eingabe. Anlass: ein Screenshot der Kasse (12.10.), auf dem die Nummer des Hofs ohne 0 und ohne +43 stand.
+- **Was gelesen wird:** nur Ziffern, Leerraum und `( ) . / -`, ein „+“ ganz vorn. Führende 0 → +43 (Österreich als Standard), `0043 …` und `+43 (0) …` → +43, ein anderer Ländercode bleibt (`+49 151 0000 0000`). Ohne 0 und ohne + gilt nur eine Mobil-Vorwahl (65x–69x, auch mit vorangestelltem „43“) als österreichisch; bei Festnetz ohne 0 würde geraten. Buchstaben, zwei Nummern in einem Feld, zu kurz oder zu lang: Die Eingabe kommt unverändert zurück, nie leer — lieber die Eingabe zeigen als eine Nummer erraten, die nicht stimmt.
+- **Gruppen:** Die Vorwahl hat drei Stellen bei 65x–69x und bei Graz (316), Klagenfurt (463), Innsbruck (512), Salzburg (662) und Linz (732), Wien eine, sonst vier (St. Pölten 2742, Wels 7242 …). Der Rest geht von links in Dreiergruppen; bleibt eine Ziffer über, ist die letzte Gruppe ein Vierer, bleiben zwei, sind es die letzten zwei (7 → 3+4, 8 → 4+4); bis fünf Ziffern bleiben beisammen. Sonderbereiche (0720, 0800, 0900) bekommen vier Stellen Vorwahl — dann weicht nur die Gruppierung ab, nie eine Ziffer. Bei fremden Ländercodes ist die Ortsvorwahl unbekannt, dort bestimmen nur die Gruppen die Leerzeichen.
+- **Link:** `tel:+436600000000` aus denselben Ziffern. Lässt sich die Eingabe nicht eindeutig lesen (zwei Nummern in einem Feld, „ab 18 Uhr“, keine oder zu viele Ziffern), gibt es keinen Link und keinen Anrufen-Knopf: Ein Link auf ihre Ziffern wählte eine andere Nummer als die angezeigte (Runde 1; vorher hängte `telefonLink` alle Ziffern ohne Ländercode aneinander). Stattdessen steht die Eingabe als Text da — im Bestelldetail in der Karte „Kundin“, im Kundendetail in „Kontakt“; WhatsApp gibt es dort nur mit lesbarer Nummer, der Hinweis „Keine Telefonnummer hinterlegt“ nur, wenn gar keine Ziffer dasteht.
+- **Offen:** Deutsche Höfe (Land DE, noch nicht freigeschaltet): Eine Nummer mit führender 0 würde als österreichisch gelesen, sie müssten +49 eingeben, bis die Funktion das Land des Hofs bekommt. Die Wache in `tests/telefon-anzeige.test.ts` listet die Stellen, die noch einen `tel:`-Link von Hand bauen (Kundenliste, fünf Mail-Vorlagen).
+
+## Heute: Reihenfolge und leeres „Braucht dich“ (Nachtlauf Nr. 83, Oktober 2026)
+
+Auftrag freigabe.md §16 „83“ (Register N11), gestapelt auf 80. Keine Migration, kein neues Paket.
+
+- **Reihenfolge:** Die Hauptspalte von Heute läuft Packliste, Braucht dich, Teilen (`heuteAufbau`). Vorher stand die Teilen-Zeile (seit Nr. 45 kompakt unter der Packliste) vor „Braucht dich“ — eine Einladung zum Teilen schob eine überfällige Abholung nach unten. Dringend steht jetzt vor freiwillig.
+- **Leeres „Braucht dich“:** Ohne Eintrag keine Karte mehr, sondern die leise Zeile „Nichts braucht dich heute.“ (`BRAUCHT_DICH_LEER` in `src/lib/heute.ts`, gedämpft und ohne Rahmen wie „Zu tun einblenden“); vorher eine ganze Karte mit „Alles erledigt.“. Mit Einträgen bleibt die Karte, wie sie war. Kein Mockup zeigt „Braucht dich“, die Bilder im Bericht 83 sind die Vorlage.
 
 ## Nützliche Befehle
 

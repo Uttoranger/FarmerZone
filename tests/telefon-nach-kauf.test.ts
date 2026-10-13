@@ -69,11 +69,14 @@ import { HofErreichen } from '@/components/bestaetigung/hof-erreichen'
 import { KONTAKT_NACH_DEM_KAUF } from '@/lib/hofseite-kunde'
 import { KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
+import { findeElement } from './element-suche'
 
 const WURZEL = process.cwd()
 const lade = vi.mocked(ladeHofseiteGeteilt)
 
+// So hat der Hof sie eingetragen (gespeichert bleibt die Eingabe) und so zeigt sie die Kasse (Nr. 81, N8).
 const TELEFON = '+43 660 0000000'
+const ANZEIGE = '+43 660 000 0000'
 const EMAIL = 'hof@example.com'
 
 function produkt(id: string, name: string): PublicProduct {
@@ -102,22 +105,7 @@ const HOF: PublicFarm = {
 const JETZT = '2026-10-02T08:00:00.000Z'
 const KUNDIN = { art: 'kundin' as const, kaufen: true }
 
-/** Das Element der Client-Komponente im Baum der Seite — ohne Komponenten aufzurufen. */
-function findeElement(knoten: unknown, typ: unknown): { props: Record<string, unknown> } | null {
-  if (knoten == null || typeof knoten !== 'object') return null
-  if (Array.isArray(knoten)) {
-    for (const kind of knoten) {
-      const fund = findeElement(kind, typ)
-      if (fund) return fund
-    }
-    return null
-  }
-  const element = knoten as { type?: unknown; props?: Record<string, unknown> }
-  if (!element.props) return null
-  if (element.type === typ) return { props: element.props }
-  return findeElement(element.props.children, typ)
-}
-
+/** Die Props der Client-Komponente im Baum der Seite — ohne Komponenten aufzurufen. */
 async function seitenProps(art: 'kundin' | 'vorschau'): Promise<Record<string, unknown>> {
   lade.mockResolvedValue({ farm: HOF, ansicht: { art, noindex: art === 'vorschau', kaufen: art === 'kundin' } })
   const baum = await FarmPage({ params: Promise.resolve({ farmSlug: 'hof-test' }), searchParams: Promise.resolve({}) })
@@ -188,7 +176,7 @@ describe('Hofseite: kein Anruf, kein tel:-Link, statt der Nummer der Hinweis', (
 })
 
 describe('Kasse: die Angaben zum Hof stehen vor dem Kaufknopf', () => {
-  const ANGABEN = ['Hof Test, Erika Muster', 'Musterweg 1, 4900 Musterdorf', TELEFON, EMAIL]
+  const ANGABEN = ['Hof Test, Erika Muster', 'Musterweg 1, 4900 Musterdorf', ANZEIGE, EMAIL]
 
   it('die Karte nennt Verkäufer, Anschrift, Telefon und E-Mail, offen, mit dem Satz zum Vertragspartner', () => {
     const html = renderToStaticMarkup(createElement(AngabenZumHof, { hof: HOF }))
@@ -233,7 +221,18 @@ describe('Kasse: die Angaben zum Hof stehen vor dem Kaufknopf', () => {
     const html = renderToStaticMarkup(createElement(AngabenZumHof, { hof: { ...HOF, email: '' } }))
     expect(html).not.toContain('>E-Mail<')
     expect(html).toContain('>Telefon<')
-    expect(html).toContain(TELEFON)
+    expect(html).toContain(ANZEIGE)
+  })
+
+  it('die Nummer steht einheitlich da, wie auch immer der Hof sie eingegeben hat (N8) — Unlesbares unverändert, nie eine leere Zeile', () => {
+    const mitNummer = (phone: string) => renderToStaticMarkup(createElement(AngabenZumHof, { hof: { ...HOF, phone } }))
+    for (const eingabe of ['0660 0000000', '0043 660 0000000', '660 0000000', '(0660) 000-00 00']) {
+      const html = mitNummer(eingabe)
+      expect(html, eingabe).toContain(`>${ANZEIGE}<`)
+      expect(html, eingabe).not.toContain(`>${eingabe}<`)
+    }
+    expect(mitNummer('keine Angabe')).toContain('>keine Angabe<')
+    expect(mitNummer('')).not.toContain('>Telefon<')
   })
 
   it('die Kasse nimmt den Abschluss für ihre Übersicht, und nur er trägt den Kaufknopf', () => {
@@ -250,8 +249,20 @@ describe('Hof erreichen: nur, was der Hof angegeben hat', () => {
 
   it('mit beidem: Anrufen über tel:, E-Mail über mailto:', () => {
     const html = karte(TELEFON, EMAIL)
-    expect(html).toContain(`href="tel:${TELEFON}"`)
+    expect(html).toContain('href="tel:+436600000000"')
+    expect(html).toContain(`>${ANZEIGE}<`)
     expect(html).toContain(`href="mailto:${EMAIL}"`)
+  })
+
+  it('die Nummer steht einheitlich da und der Anrufen-Link wählt sie mit +43; ohne Ziffer bleibt die Eingabe stehen, aber ohne Anrufen', () => {
+    const html = karte('0660 0000000', '')
+    expect(html).toContain(`>${ANZEIGE}<`)
+    expect(html).toContain('href="tel:+436600000000"')
+    expect(html).not.toContain('0660 0000000')
+    const ohneZiffer = karte('keine Angabe', '')
+    expect(ohneZiffer).toContain('>keine Angabe<')
+    expect(ohneZiffer).not.toContain('tel:')
+    expect(ohneZiffer).not.toContain('Anrufen')
   })
 
   it('ohne E-Mail kein mailto:, ohne Telefon kein tel:, ohne beides keine Karte', () => {

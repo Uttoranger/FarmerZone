@@ -1,49 +1,34 @@
 // Die Status-Darstellung der Kundinnen-Bestellseite: je Order-Status eine
-// Marke (kurzes Wort auf farbiger Fläche), die Farbklassen dazu und ein
-// erklärender Satz in Kundinnen-Sprache.
+// Marke (kurzes Wort), ihre Bedeutung und ein erklärender Satz in
+// Kundinnen-Sprache.
 //
 // BEWUSST NEBEN src/components/orders/order-status.ts (Bauern-Bereich), nicht
 // darin: Dieselben Status bedeuten aus beiden Blickwinkeln Verschiedenes.
-// Für den Bauern ist READY erledigte Arbeit (dort grau „fertig"), für die
-// Kundin ist READY der Höhepunkt — jetzt hinfahren (hier kräftig grün).
+// Für den Bauern ist READY erledigte Arbeit (dort „erledigt"), für die
+// Kundin ist READY der Höhepunkt — jetzt hinfahren (hier „läuft", grün).
 // Auch die Wortwahl trennt sich: „Wartet auf Kunden-Bestätigung" ist ein
 // Satz ÜBER die Kundin, „Bitte bestätige…" ist einer AN sie.
 //
-// Farbwelt wie die Referenz-19-Marken des Bauern-Bereichs: Orange auf
-// #FBEEE3 = die Kundin muss etwas tun · Grün auf #E8F0E2 = alles läuft ·
-// #9AA08F auf #F0EDE5 = abgeschlossen · Rot = storniert/nicht abgeholt.
-//
-// Die Tag-Werte bleiben unverändert; für den Dark Mode hängt an jeder Marke
-// eine dark:-Entsprechung. Es sind bewusst KEINE Tokens: Diese vier Flächen
-// sind eigene Bedeutungsfarben (tun / läuft / erledigt / abgebrochen), für
-// die es im Farbsatz keine Tokens gibt.
+// Die Bedeutung steht als Art der Marke (Register G5): tun = die Kundin muss
+// etwas tun · läuft = alles läuft · erledigt = abgeschlossen · abgebrochen =
+// storniert/nicht abgeholt. Schrift und Fläche dazu sind Tokens in beiden
+// Modi und kommen nur aus dem Baustein Marke — hier steht keine Farbe.
 //
 // Nur die REAL VORHANDENEN Enum-Werte (prisma OrderStatus, schema.prisma:17)
 // — keine erfundenen Zwischenschritte. Zwei davon setzt heute kein Codepfad
-// (IN_PREPARATION, NOT_PICKED_UP; siehe order-status.ts:40), sie können aber
+// (IN_PREPARATION, NOT_PICKED_UP; siehe order-status.ts), sie können aber
 // in Daten stehen und brauchen deshalb trotzdem eine ehrliche Darstellung.
+
+import type { MarkeArt } from '@/lib/marke-art'
 
 export type BestellStatusAnzeige = {
   /** Das kurze Wort auf der Marke, z. B. „Abholbereit". */
   marke: string
-  /** Tailwind-Klassen für die Marken-Fläche (Hintergrund + Text). */
-  farbe: string
+  /** Die Bedeutung der Marke (Register G5) — die Farbe zeichnet der Baustein Marke. */
+  art: MarkeArt
   /** Ein ganzer Satz an die Kundin — mit dem Abholtermin, wo er hilft. */
   satz: string
 }
-
-// dark: Fläche bewusst nur 12 % Orange und die Schrift der hellere Hover-Ton
-// — bei 15 % blieb die Marke unter 4,5:1.
-const ORANGE = 'bg-[#FBEEE3] text-[#E8854A] dark:bg-accent/12 dark:text-accent-hover'
-const FERTIG = 'bg-[#F0EDE5] text-[#9AA08F] dark:bg-muted dark:text-muted-foreground'
-const ROT = 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300'
-
-/** Das Grün der laufenden Bestellung — exportiert, weil die Abholtermin-Marke
- *  der Hofübersicht (Teil desselben Gestaltungs-Elements) dieselbe Fläche
- *  trägt und die Farbe nicht zweimal definiert sein soll. */
-export const MARKE_GRUEN =
-  'bg-[#E8F0E2] text-[#2D5F3F] dark:bg-primary/15 dark:text-brand-text'
-const GRUEN = MARKE_GRUEN
 
 /**
  * „am Freitag, 4. September zwischen 14:00 und 16:00 Uhr" — der Abholtermin
@@ -62,7 +47,7 @@ export function formatiereAbholtermin(datum: Date, start: string, ende: string):
 }
 
 /**
- * Marke, Farbe und erklärender Satz zu einem Bestellstatus.
+ * Marke, Bedeutung und erklärender Satz zu einem Bestellstatus.
  *
  * `abholtermin` ist der fertig formatierte Satzbaustein (formatiereAbholtermin)
  * — die Funktion bleibt damit rein und ohne Datumslogik prüfbar. Ein
@@ -84,61 +69,61 @@ export function bestellStatusAnzeige(
       if (paymentMethod === 'ONLINE') {
         return {
           marke: 'Zahlung offen',
-          farbe: ORANGE,
+          art: 'tun',
           satz: 'Deine Zahlung ist noch nicht abgeschlossen. Sobald sie bestätigt ist, findest du hier den aktuellen Stand.',
         }
       }
       return {
         marke: 'Bestätigung offen',
-        farbe: ORANGE,
+        art: 'tun',
         satz: 'Fast geschafft — bitte bestätige deine Bestellung über den Link in deiner E-Mail.',
       }
     case 'PAID':
       return {
         marke: 'Bezahlt',
-        farbe: GRUEN,
+        art: 'laeuft',
         satz: `Deine Bestellung ist bezahlt und beim Hof eingegangen — abholbar ${abholtermin}.`,
       }
     case 'CONFIRMED':
       return {
         marke: 'Bestätigt',
-        farbe: GRUEN,
+        art: 'laeuft',
         satz: `Deine Bestellung ist verbindlich bestätigt — abholbar ${abholtermin}, bezahlt wird bei der Abholung.`,
       }
     case 'IN_PREPARATION':
       return {
         marke: 'In Vorbereitung',
-        farbe: GRUEN,
+        art: 'laeuft',
         satz: `Der Hof stellt deine Bestellung gerade zusammen — abholbar ${abholtermin}.`,
       }
     case 'READY':
       return {
         marke: 'Abholbereit',
-        farbe: GRUEN,
+        art: 'laeuft',
         satz: `Dein Paket wartet — abholbar ${abholtermin}.`,
       }
     case 'PICKED_UP':
       return {
         marke: 'Abgeholt',
-        farbe: FERTIG,
+        art: 'erledigt',
         satz: 'Abgeholt — danke für deinen Einkauf!',
       }
     case 'CANCELLED':
       return {
         marke: 'Storniert',
-        farbe: ROT,
+        art: 'abgebrochen',
         satz: 'Diese Bestellung wurde storniert. Bei Fragen hilft dir der Hof direkt weiter.',
       }
     case 'NOT_PICKED_UP':
       return {
         marke: 'Nicht abgeholt',
-        farbe: ROT,
+        art: 'abgebrochen',
         satz: 'Diese Bestellung wurde nicht abgeholt. Melde dich beim Hof, wenn du dazu Fragen hast.',
       }
     default:
       return {
         marke: 'Bestellung',
-        farbe: FERTIG,
+        art: 'erledigt',
         satz: 'Den aktuellen Stand deiner Bestellung erfährst du direkt beim Hof.',
       }
   }

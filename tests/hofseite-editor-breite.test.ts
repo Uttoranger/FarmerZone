@@ -37,6 +37,9 @@ vi.mock('next/link', () => ({
 vi.mock('@/components/mein-hof/abschnitt-inhalt', () => ({ AbschnittInhalt: () => null, SOFORT_GESPEICHERT: new Set<string>() }))
 vi.mock('@/components/farmer/hofseite-vorschau-rahmen', () => ({
   HofseiteVorschauRahmen: () => createElement('aside', { 'aria-label': 'Vorschau' }),
+}))
+// Der Hook liegt seit Nr. 75 in src/lib (Hooks nach CODING_STANDARDS §1 in use-*.ts).
+vi.mock('@/lib/use-element-groesse', () => ({
   useElementGroesse: () => ({ ref: () => undefined, breite: messung.breite, hoehe: 0 }),
 }))
 
