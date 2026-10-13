@@ -48,12 +48,14 @@ import {
 } from '@/lib/kasse'
 import { CODE_ZAHLUNG_NICHT_MOEGLICH, KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
 import { EMAIL_MAX, NOTIZ_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
+import { KASSE_AGB_SATZ } from '@/lib/rechtstexte/agb-einbindung'
 import { cn } from '@/lib/utils'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
+import { AgbSatz } from '@/components/rechtstexte/agb-stuecke'
 import { StripeZahlung } from './stripe-payment'
 import { AngabenZumHof, hofAdresse, type AngabenHof } from './angaben-zum-hof'
 import {
@@ -817,7 +819,9 @@ export function KassenAbschluss({
   fussnote: string
 }): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-3.5">
+    // max-md:mb-8: Mit dem AGB-Satz ist die feste Leiste am Handy rund 190 px hoch (vorher 125);
+    // der Platz unten im Raster (pb-44) war dafür bemessen und ließ die Unterkante der letzten Karte darunter.
+    <div className="flex flex-col gap-3.5 max-md:mb-8">
       {uebersicht}
       <AngabenZumHof hof={hof} />
       <AktionsLeiste>
@@ -836,6 +840,10 @@ export function KassenAbschluss({
           )}
         </button>
         <p className={cn(HINWEIS, 'text-center md:text-left')}>{fussnote}</p>
+        {/* Register O4: Die AGB gelten, der Hof ist Vertragspartner, und mit dem Tippen auf den
+            Knopf fällt die Zustimmung zur sofortigen Ausführung — ohne Haken. Der Link öffnet
+            in einem neuen Tab, damit Kasse und Reservierung stehen bleiben. */}
+        <AgbSatz stuecke={KASSE_AGB_SATZ} neuerTab className={cn(HINWEIS, 'text-center md:text-left')} />
       </AktionsLeiste>
     </div>
   )

@@ -298,6 +298,8 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     'src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx': [],
     'src/app/(public)/[farmSlug]/bestaetigen/[token]/page.tsx': [],
     'src/app/(public)/impressum/page.tsx': [],
+    // Die AGB (Nr. 90, Register O4) sind gleich in der KundeShell entstanden.
+    'src/app/(public)/agb/page.tsx': [],
     // Der Datenschutz zieht erst mit Nr. 57 um — bis dahin der letzte KundenKopf.
     'src/app/(public)/datenschutz/page.tsx': ['info'],
     'src/app/(public)/konditionen/page.tsx': [],

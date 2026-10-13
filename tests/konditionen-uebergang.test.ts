@@ -104,9 +104,20 @@ const ZWEITES_EXEMPLAR =
 describe('Kein zweites Exemplar unter src/', () => {
   const dateien = quelldateien(join(process.cwd(), 'src')).map((p) => relative(process.cwd(), p))
 
+  // Die AGB (Register O4) sagen in Punkt 17.2 „Startphase" und verweisen für das Datum auf die Konditionen —
+  // wörtlich aus docs/recht/agb.md, das ein Lauf nicht umschreibt. Die Ausnahme gilt nur für dieses Wort.
+  const AGB = 'src/lib/rechtstexte/agb.ts'
+
   it('nur src/lib/konditionen.ts nennt das Datum oder den Satz', () => {
-    const treffer = dateien.filter((d) => ZWEITES_EXEMPLAR.test(lies(d)))
+    const treffer = dateien.filter((d) => ZWEITES_EXEMPLAR.test(lies(d)) && d !== AGB)
     expect(treffer).toEqual(['src/lib/konditionen.ts'])
+  })
+
+  it('die AGB nennen das Wort „Startphase", aber weder das Datum noch den Satz — Gegenprobe: ohne das Wort schlägt die Suche dort nicht an', () => {
+    const text = lies(AGB)
+    expect(text).toContain('Startphase')
+    expect(ZWEITES_EXEMPLAR.test(text)).toBe(true)
+    expect(ZWEITES_EXEMPLAR.test(text.replaceAll('Startphase', ''))).toBe(false)
   })
 
   it('Gegenprobe: die Suche schlägt bei Datum und Satzteilen an', () => {

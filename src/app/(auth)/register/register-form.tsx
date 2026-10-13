@@ -1,7 +1,6 @@
 'use client'
 
 import { useId, useState } from 'react'
-import Link from 'next/link'
 import { useForm, useWatch, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Eye, EyeOff, Loader2, Mail } from 'lucide-react'
@@ -11,6 +10,7 @@ import { schreibeHofnameEntwurf, sitzungsSpeicher } from '@/lib/hofname-entwurf'
 import { KONDITIONEN_UEBERGANG } from '@/lib/konditionen'
 import { REGISTRIEREN_SCHRITTE } from '@/lib/fuer-hoefe'
 import { KONTAKT_EMAIL } from '@/lib/support'
+import { REGISTRIERUNG_AGB_SATZ } from '@/lib/rechtstexte/agb-einbindung'
 import { EMAIL_MAX, HOFNAME_MAX, PERSONENNAME_MAX } from '@/lib/eingabegrenzen'
 import { registrierenFormularSchema, type RegistrierenFormular } from '@/schemas/register'
 import { cn } from '@/lib/utils'
@@ -21,6 +21,7 @@ import { HofAdresseVorschau } from '@/components/shared/hof-adresse-vorschau'
 import { SchonDabei } from '@/components/shared/schon-dabei'
 import { FELD, FELD_LABEL, FeldFehler } from '@/components/checkout/kasse-teile'
 import { StartSchritte } from '@/components/fuer-hoefe/start-schritte'
+import { AgbSatz } from '@/components/rechtstexte/agb-stuecke'
 import { PostfachHinweis } from './postfach-hinweis'
 
 /**
@@ -47,8 +48,6 @@ const KNOPF_ORANGE = cn(
   FOKUS_RAHMEN
 )
 
-const TEXTLINK = cn('rounded-sm font-semibold text-status-fertig underline-offset-2 hover:underline', FOKUS_RAHMEN)
-
 /**
  * Hof registrieren im neuen Design (Gate 5, Nr. 15; Mockups
  * web-h0-hof-registrieren und mobil-h0-registrieren).
@@ -58,8 +57,9 @@ const TEXTLINK = cn('rounded-sm font-semibold text-status-fertig underline-offse
  * danach zeigt das Formular „Schau in dein Postfach" (PostfachHinweis) und
  * meldet NICHT selbst an — eine scheiternde Anmeldung verriete, dass es die
  * Adresse schon gab (Register F6 „19b"). Neu im Formular (Nr. 15): Hofname mit der
- * künftigen Adresse, Passwortstärke, ein Link zu den Konditionen (ohne
- * Zustimmungs-Haken, siehe registrierenFormularSchema). Den Hof
+ * künftigen Adresse, Passwortstärke, ein Satz mit Links zu AGB und
+ * Konditionen (ohne Zustimmungs-Haken, siehe registrierenFormularSchema und
+ * Register O4). Den Hof
  * selbst legt weiter Einrichten an; der Name wartet bis dahin im
  * sessionStorage (hofname-entwurf.ts).
  */
@@ -252,13 +252,10 @@ export function RegisterForm({ formToken }: { formToken: string }): React.JSX.El
                 )}
               </div>
 
-              {/* Nur zum Nachlesen, keine Zustimmung: AGB und Nutzungsbedingungen
-                  sind offen (Register O4), bis dahin kein Haken. */}
-              <p className="text-[13.5px] leading-snug text-muted-foreground">
-                <Link href="/konditionen" target="_blank" className={cn(TEXTLINK, 'inline-flex min-h-11 items-center')}>
-                  Konditionen für Höfe ansehen
-                </Link>
-              </p>
+              {/* Register O4 (geändert 13.10.2026): AGB und Konditionen werden mit diesem
+                  Satz einbezogen — Links, kein Haken. Beide öffnen in einem neuen Tab,
+                  damit das ausgefüllte Formular stehen bleibt. */}
+              <AgbSatz stuecke={REGISTRIERUNG_AGB_SATZ} neuerTab className="text-[13.5px] leading-snug text-muted-foreground" />
 
               {fehler && (
                 <div role="alert">

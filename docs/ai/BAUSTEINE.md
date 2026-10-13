@@ -244,6 +244,12 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/produkte/was-legst-du-an.tsx · WasLegstDuAn · „Was legst du an?" hinter „+ Neues Produkt" (Mockups web-h2-neu-was-legst- du-an, mobil-h2-neu-was-legst-du-an; Nachtlauf Nr. 18). · genutzt
 - src/components/produkte/wieder-da-moment.tsx · WiederDaMoment · Moment „wieder da" (Mockups web-h2-ware-wieder-da-teilen, mobil-h2-gespeichert-teilen; Nachtlauf Nr. 18) — seit Nr. 30 auch der Moment „gespeichert" (eigene Texte, „Jetzt teilen"/„Später" und … · genutzt
 
+## src/components/rechtstexte
+
+- src/components/rechtstexte/agb-ansicht.tsx · AnhangAbschnitt, InhaltsVerzeichnis, KurzErklaert, TeilAbschnitt · Die Teile der Seite /agb (Register O4), gezeichnet aus den Daten in src/lib/rechtstexte/agb.ts. · genutzt
+- src/components/rechtstexte/agb-stuecke.tsx · AgbSatz, AgbStuecke, SATZ_LINK · Zeichnet Textstücke (src/lib/rechtstexte/stuecke.ts) als Fließtext: Klartext, fett, kursiv, Link, Mail-Adresse — und die zwei Platzhalter des AGB-Entwurfs, die aus den Konstanten des Impressums … · genutzt
+- src/components/rechtstexte/seite-drucken.tsx · SeiteDrucken · Öffnet den Druckdialog des Browsers — dort lässt sich auch als PDF speichern. · genutzt
+
 ## src/components/region
 
 - src/components/region/futter-kaufen-ansicht.tsx · FutterKaufenAnsicht · Region › Futter kaufen (Nachtlauf Nr. 22c, Mockup web-h5-region-futter- kaufen): Umkreis, Futterart und Menge als Links in der Adresse, darunter je Familie eine Karte mit Hof, Entfernung, nächster … · genutzt
@@ -343,7 +349,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/status-badge.tsx · StatusBadge, type StatusTon · StatusBadge: ein Zustand als Marke — offen/zum Packen, fertig/gepackt/ bezahlt, neutral (pausiert, Entwurf). · genutzt
 - src/components/ui/stepper.tsx · Stepper · Stepper: Menge mit − und +. · genutzt
 - src/components/ui/switch.tsx · Switch · kein Zweck vermerkt · genutzt
-- src/components/ui/table.tsx · Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow · kein Zweck vermerkt · unbenutzt
+- src/components/ui/table.tsx · Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow · kein Zweck vermerkt · genutzt
 - src/components/ui/tabs.tsx · Tabs, TabsContent, TabsList, TabsTrigger, tabsListVariants · kein Zweck vermerkt · unbenutzt
 - src/components/ui/textarea.tsx · Textarea · kein Zweck vermerkt · genutzt
 - src/components/ui/zaehler.tsx · Zaehler · Eine kleine Zahl an einem Eintrag: offene Bestellungen, Meldungen zu entscheiden, Artikel im Korb. · genutzt
@@ -525,6 +531,12 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/lib/whatsapp.ts · buildOrderReminderMessage, buildOrderReminderUrl, toWaPhone, whatsAppLink, type OrderReminderInfo · Gemeinsame WhatsApp-Helfer: Telefonnummern-Normalisierung für wa.me-Links (vorher lokal dupliziert in Kundendetail + Status-Werkstatt) und die Erinnerungs-Nachricht für Bestellkarten. · genutzt
 - src/lib/wieder-da-moment.ts · browserSpeicher, leseWiederDaGezeigt, merkeWiederDaGezeigt, wiederDaOeffnen, wiederDaSchluessel · Der Moment „wieder da" in der Produkttabelle (Mockups web-h2-ware-wieder- da-teilen, mobil-h2-gespeichert-teilen; Nachtlauf Nr. 18): Geht der Vorrat eines sichtbaren Produkts von 0 auf mehr, fragt … · genutzt
 - src/lib/wiener-tag.ts · kalendertagInWien, wienerMitternacht · Ein Wiener Kalendertag als Zeitpunkt und zurück — rein, ohne Abhängigkeit. · genutzt
+
+## src/lib/rechtstexte
+
+- src/lib/rechtstexte/agb-einbindung.ts · AGB_LINK_TEXT, AGB_PFAD, KASSE_AGB_SATZ, MAIL_AGB_ZEILE, REGISTRIERUNG_AGB_SATZ, REIHENFOLGE_HINWEIS · Wo und wie die AGB eingebunden werden (Register O4, geändert 13.10.2026): die kurzen Sätze mit Link in Registrierung, Kasse und Bestellbestätigung, der Link in den Fußzeilen und der Satz zur … · genutzt
+- src/lib/rechtstexte/agb.ts · AGB_ANHANG, AGB_ANHANG_ANKER, AGB_KURZ_ERKLAERT, AGB_SEITE_TEXT, AGB_STAND_VERMERK, AGB_TEILE, AGB_TITEL, agbAnker, agbTeilAnker, type AgbAnhang, type AgbBlock, type AgbKurzErklaert, type AgbPunkt, type AgbTeil · Die AGB als Daten (Register O4, Nr. 90) — der Text von /agb. · genutzt
+- src/lib/rechtstexte/stuecke.ts · BETREIBER, E_MAIL, PLATZHALTER_ANGABE, fett, kursiv, link, mail, type AgbLink, type AgbPlatzhalter, type AgbStueck, type SatzMitLinks · Textstücke für Rechtstexte und die Sätze, die auf sie verweisen (Register O4): Klartext, Fett, Kursiv, Link, Mail-Adresse und die zwei Platzhalter des AGB-Entwurfs. · genutzt
 
 ## src/server
 

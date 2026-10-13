@@ -157,12 +157,13 @@ describe('RegisterForm — gerendert', () => {
     expect(html).toContain('Mindestens 8 Zeichen, mit Groß- und Kleinbuchstaben und einer Zahl.')
   })
 
-  it('kein Zustimmungs-Haken: nur ein Link zum Nachlesen der Konditionen', () => {
+  it('kein Zustimmungs-Haken: ein Satz mit Links zu AGB und Konditionen, beide in neuem Tab (Register O4)', () => {
     expect(html).not.toContain('type="checkbox"')
-    expect(html).not.toMatch(/akzeptier|bestätige|zustimm/i)
-    expect(html).toContain('href="/konditionen"')
-    expect(html).toContain('Konditionen für Höfe ansehen')
-    expect(html).not.toMatch(/AGB/)
+    expect(html).toMatch(
+      /Mit der Registrierung stimmst du den <a href="\/agb" target="_blank"[^>]*>AGB<\/a> und den <a href="\/konditionen" target="_blank"[^>]*>Konditionen für Höfe<\/a> zu\./
+    )
+    // Der frühere Link „zum Nachlesen" ist im Satz aufgegangen.
+    expect(html).not.toContain('Konditionen für Höfe ansehen')
   })
 
   it('Honigtopf und Zeitschranke bleiben', () => {

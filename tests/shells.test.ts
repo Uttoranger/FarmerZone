@@ -375,6 +375,8 @@ describe('kein Big Bang', () => {
     '(public)/[farmSlug]/bestellung/[orderId]/page.tsx',
     '(public)/impressum/page.tsx',
     '(public)/konditionen/page.tsx',
+    // Nr. 90: die AGB (Register O4) sind gleich in der KundeShell entstanden.
+    '(public)/agb/page.tsx',
     '(public)/problem-melden/page.tsx',
     'not-found.tsx',
     '(public)/[farmSlug]/not-found.tsx',
