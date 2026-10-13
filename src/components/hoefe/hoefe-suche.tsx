@@ -66,6 +66,7 @@ export function HoefeSuche({
   onBezugspunkt,
   onAufheben,
   onAnkunftErledigt,
+  onAnkunftAufgeloest,
 }: {
   /** Nur das Feld (Kartenmodus am Handy). */
   kompakt?: boolean
@@ -74,7 +75,7 @@ export function HoefeSuche({
   /** Die Ansage fürs Vorlesen („3 Treffer gefunden."); leer ohne Suche. */
   status: string
   bezugspunkt: Bezugspunkt | null
-  /** Der Suchtext, mit dem die Kundin ankam (Startseite, Kopfzeile, 404) — wird einmal wie Enter aufgelöst. */
+  /** Der Suchtext, mit dem die Kundin abgesendet ankam (Startseite, Kopfzeile, 404) — wird einmal wie Enter aufgelöst. */
   ankunftsText?: string
   onSuchtext: (wert: string) => void
   onUebernehmen: (name: string) => void
@@ -82,6 +83,8 @@ export function HoefeSuche({
   onAufheben: () => void
   /** Der Ankunftstext ist abgearbeitet — die Seite vergisst ihn. */
   onAnkunftErledigt?: () => void
+  /** Die Auflösung des Ankunftstexts ist durch — die Seite vermerkt es in der Adresse. */
+  onAnkunftAufgeloest?: () => void
 }): React.JSX.Element {
   // Offen nur beim Tippen bzw. solange das Feld den Fokus hat — beim Laden
   // mit ?q=… bleibt sie zu, bis jemand ins Feld geht. Markiert wird über den
@@ -98,6 +101,7 @@ export function HoefeSuche({
     onZumFeld: () => feld.current?.focus(),
     ankunftsText,
     onAnkunftErledigt,
+    onAnkunftAufgeloest,
   })
 
   const mitOrt = ortVorschlagAnbieten(suchtext)

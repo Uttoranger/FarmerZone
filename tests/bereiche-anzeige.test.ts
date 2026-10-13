@@ -37,6 +37,7 @@ import { formatAbGrundpreis, formatGrundpreisNetto, formatKilopreis, kilopreisNe
 import {
   LEERER_HOEFE_FILTER,
   SUCHTEXT_MAX,
+  abgesendeterSuchtext,
   leseHoefeFilter,
   schreibeHoefeFilter,
   wechsleBereich,
@@ -394,6 +395,55 @@ describe('URL-Zustand von /hoefe', () => {
   it('zu langer Suchtext und die Altlast-Sorte werden verworfen', () => {
     expect(lies(`q=${'x'.repeat(SUCHTEXT_MAX + 1)}`).suchtext).toBe('')
     expect(lies('bereich=futter&kat=HEU_STROH&sorte=EINZELFUTTERMITTEL').sorten).toEqual([])
+  })
+
+  describe('Suchtext: abgesendet oder getippt (Nr. 84, Runde 1)', () => {
+    const abgesendet = (query: string) => abgesendeterSuchtext(new URLSearchParams(query))
+
+    it('ein Suchtext von außen (die Formulare schicken nur q) gilt als abgesendet — die Adresse der Seite selbst nicht', () => {
+      expect(abgesendet('q=5230+Mattighofen')).toBe('5230 Mattighofen')
+      // Was die Seite beim Tippen in die Adresse schreibt, ist nach Neuladen und „Zurück" kein Ankunftstext.
+      const getippt = schreibeHoefeFilter({ ...LEERER_HOEFE_FILTER, suchtext: 'Eier' })
+      expect(getippt).toBe('q=Eier&t=1')
+      expect(abgesendet(getippt)).toBe('')
+    })
+
+    it('jede Adresse der Seite mit Suchtext trägt die Kennung — mit Filtern, im Futter, auf der Karte', () => {
+      const teile: Partial<HoefeFilter>[] = [
+        { siegel: ['BIO'] },
+        { bereich: 'FUTTERMITTEL' },
+        { ansicht: 'karte' },
+        { kategorien: ['EIER'], suchMarken: ['Brot'] },
+      ]
+      for (const teil of teile) {
+        const query = schreibeHoefeFilter({ ...LEERER_HOEFE_FILTER, ...teil, suchtext: 'Eier' })
+        expect(abgesendet(query), query).toBe('')
+      }
+      // Ohne Suchtext keine Kennung: Die Adresse bleibt, wie sie war.
+      expect(schreibeHoefeFilter({ ...LEERER_HOEFE_FILTER, siegel: ['BIO'] })).toBe('siegel=BIO')
+      expect(schreibeHoefeFilter({ ...LEERER_HOEFE_FILTER, suchtext: '   ' })).toBe('')
+    })
+
+    it('die Kennung ist kein Filter: Der gelesene Zustand kennt sie nicht, der Hin- und Rückweg bleibt gleich', () => {
+      const filter: HoefeFilter = { ...LEERER_HOEFE_FILTER, suchtext: 'Eier', siegel: ['BIO'] }
+      expect(lies(schreibeHoefeFilter(filter))).toEqual(filter)
+    })
+
+    it('leer, nur Leerzeichen oder zu lang ist kein Ankunftstext', () => {
+      expect(abgesendet('')).toBe('')
+      expect(abgesendet('q=')).toBe('')
+      expect(abgesendet('q=%20%20')).toBe('')
+      expect(abgesendet(`q=${'x'.repeat(SUCHTEXT_MAX + 1)}`)).toBe('')
+    })
+
+    it('nach dem Auflösen schreibt die Seite die Adresse neu: danach ist der Text kein Ankunftstext mehr', () => {
+      const angekommen = new URLSearchParams('q=Heu')
+      expect(abgesendeterSuchtext(angekommen)).toBe('Heu')
+      // Aus der Adresse von jetzt gelesen und geschrieben (hoefe-client: onAnkunftAufgeloest).
+      const danach = schreibeHoefeFilter(leseHoefeFilter(angekommen))
+      expect(danach).toBe('q=Heu&t=1')
+      expect(abgesendet(danach)).toBe('')
+    })
   })
 
   it('Bezugspunkt und Umkreis stehen nie in der URL', () => {

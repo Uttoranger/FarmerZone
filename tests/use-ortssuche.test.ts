@@ -11,7 +11,7 @@
  *
  * Gegenprobe zur Grenze „der Standort bleibt im Browser": In keinem Standort-
  * Fall wird `loeseOrtAuf` gerufen — es gibt keinen Weg, auf dem eine gemessene
- * Position an den Server ginge.
+ * Position an den Server ginge (afterEach des Standort-Blocks, für jeden Fall).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -117,9 +117,13 @@ vi.mock('react', async (importOriginal) => ({
 const { loeseOrtAuf } = vi.hoisted(() => ({ loeseOrtAuf: vi.fn() }))
 vi.mock('@/server/actions/hoefe', () => ({ loeseOrtAuf }))
 
+const sentry = vi.hoisted(() => ({ captureException: vi.fn(), addBreadcrumb: vi.fn() }))
+vi.mock('@sentry/nextjs', () => sentry)
+
 import { useOrtssuche, type Ortssuche } from '@/components/hoefe/use-ortssuche'
 import { SUCHFELD_TEXT } from '@/lib/hoefe-entdecken'
 import type { Bezugspunkt } from '@/lib/hofuebersicht'
+import { LEERER_HOEFE_FILTER, abgesendeterSuchtext, schreibeHoefeFilter } from '@/schemas/hoefe-filter'
 
 type Rueckruf = (position: { coords: { latitude: number; longitude: number; accuracy: number }; timestamp: number }) => void
 type Fehlerrueckruf = (fehler: { code: number; message: string }) => void
@@ -145,6 +149,7 @@ let beiStandort: ReturnType<typeof vi.fn<(punkt: Bezugspunkt) => void>>
 let beiOrt: ReturnType<typeof vi.fn<(punkt: Bezugspunkt) => void>>
 let beiZumFeld: ReturnType<typeof vi.fn<() => void>>
 let beiAnkunftErledigt: ReturnType<typeof vi.fn<() => void>>
+let beiAnkunftAufgeloest: ReturnType<typeof vi.fn<() => void>>
 
 function starte(ankunftsText = '') {
   pruefstand.starte(() => {
@@ -154,6 +159,7 @@ function starte(ankunftsText = '') {
       onZumFeld: beiZumFeld,
       ankunftsText,
       onAnkunftErledigt: beiAnkunftErledigt,
+      onAnkunftAufgeloest: beiAnkunftAufgeloest,
     })
   })
 }
@@ -169,10 +175,13 @@ const zuRuhe = () => vi.advanceTimersByTimeAsync(5)
 beforeEach(() => {
   vi.useFakeTimers()
   vi.clearAllMocks()
+  // Auch die Antworten des vorigen Falls: Eine hängengebliebene Ablehnung soll keinen anderen Fall treffen.
+  loeseOrtAuf.mockReset()
   beiStandort = vi.fn<(punkt: Bezugspunkt) => void>()
   beiOrt = vi.fn<(punkt: Bezugspunkt) => void>()
   beiZumFeld = vi.fn<() => void>()
   beiAnkunftErledigt = vi.fn<() => void>()
+  beiAnkunftAufgeloest = vi.fn<() => void>()
   vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } })
 })
 
@@ -182,6 +191,11 @@ afterEach(() => {
 })
 
 describe('Standort — die Genauigkeit entscheidet, ob er ohne Rückfrage gilt', () => {
+  // Die Position bleibt im Browser: In keinem Fall geht ein Aufruf an den Server.
+  afterEach(() => {
+    expect(loeseOrtAuf).not.toHaveBeenCalled()
+  })
+
   it('bis 2 000 m wie bisher: sofort übernommen, ohne Hinweis', async () => {
     starte()
     hook.standortErfragen()
@@ -206,8 +220,6 @@ describe('Standort — die Genauigkeit entscheidet, ob er ohne Rückfrage gilt',
     expect(hook.ungefaehr?.satz).toBe('Dein Standort ist nur ungefähr bekannt (etwa 15 km).')
     expect(hook.ungefaehr?.genauerMisslang).toBe(false)
     expect(hook.ortet).toBe(false)
-    // Die Position bleibt im Browser: Es gibt keinen Aufruf an den Server.
-    expect(loeseOrtAuf).not.toHaveBeenCalled()
   })
 
   it('„Genauer bestimmen": zweiter Aufruf mit hoher Genauigkeit und 12 s — das Ergebnis wird übernommen', async () => {
@@ -228,7 +240,6 @@ describe('Standort — die Genauigkeit entscheidet, ob er ohne Rückfrage gilt',
     expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.1067, lon: 13.15 })
     expect(hook.ungefaehr).toBeNull()
     expect(hook.ortet).toBe(false)
-    expect(loeseOrtAuf).not.toHaveBeenCalled()
   })
 
   it('„Genauer bestimmen" klappt nicht: der Hinweis bleibt und sagt es dazu — „So lassen" übernimmt dann den ersten Wert', async () => {
@@ -250,6 +261,56 @@ describe('Standort — die Genauigkeit entscheidet, ob er ohne Rückfrage gilt',
     await zuRuhe()
     expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.0, lon: 13.0 })
     expect(hook.ungefaehr).toBeNull()
+  })
+
+  it('„Genauer bestimmen" liefert wieder nur einen groben Wert (Rechner ohne GPS): der Hinweis bleibt, nichts wird übernommen', async () => {
+    starte()
+    hook.standortErfragen()
+    ortung(0)[0](position(15_000, 48.0, 13.0))
+    await zuRuhe()
+    hook.genauerBestimmen()
+    await zuRuhe()
+
+    // Die IP-Ortung antwortet noch einmal, nur etwas anders gerundet.
+    ortung(1)[0](position(2_001, 48.2, 13.2))
+    await zuRuhe()
+
+    expect(beiStandort).not.toHaveBeenCalled()
+    expect(hook.ungefaehr?.genauerMisslang).toBe(true)
+    expect(hook.ungefaehr?.punkt).toEqual({ lat: 48.0, lon: 13.0 })
+    expect(hook.ortet).toBe(false)
+
+    // Der Hinweis gilt weiter: ein dritter Versuch, der bis 2 000 m genau ist, wird übernommen (Gegenprobe zur Grenze).
+    hook.genauerBestimmen()
+    await zuRuhe()
+    ortung(2)[0](position(2_000, 48.1067, 13.15))
+    await zuRuhe()
+    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.1067, lon: 13.15 })
+    expect(hook.ungefaehr).toBeNull()
+  })
+
+  it('antwortet das Gerät beim „Genauer bestimmen" gar nicht, endet das Warten nach 14 s — der Hinweis steht wieder da', async () => {
+    starte()
+    hook.standortErfragen()
+    ortung(0)[0](position(15_000, 48.0, 13.0))
+    await zuRuhe()
+    hook.genauerBestimmen()
+    await zuRuhe()
+
+    // Knapp davor wartet es noch: 12 s Zeitlimit des Browsers plus zwei Sekunden Luft.
+    await vi.advanceTimersByTimeAsync(13_990)
+    expect(hook.ortet).toBe(true)
+    expect(hook.ungefaehr?.genauerMisslang).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(5)
+    await zuRuhe()
+    expect(hook.ortet).toBe(false)
+    expect(hook.ungefaehr?.genauerMisslang).toBe(true)
+    expect(beiStandort).not.toHaveBeenCalled()
+
+    hook.soLassen()
+    await zuRuhe()
+    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.0, lon: 13.0 })
   })
 
   it('„So lassen" übernimmt den ungefähren Standort — auch mitten in der Nachfrage, deren späte Antwort dann nicht mehr zählt', async () => {
@@ -405,6 +466,77 @@ describe('Ortssuche — Enter und Eintrag', () => {
   })
 })
 
+describe('Ortssuche — die Auflösung scheitert (Verbindung weg, Aktion nach einem Deploy unbekannt)', () => {
+  /** So wirft Next.js, wenn die Aktion nach einem Deploy unbekannt ist. */
+  function aktionUnbekannt(): Error {
+    const fehler = new Error('Server Action "7f2c9d1e4b3a59687c0d1e2f3a4b5c6d7e8f9a0b1c" was not found on the server.')
+    fehler.name = 'UnrecognizedActionError'
+    return fehler
+  }
+
+  it('gilt wie „kein Treffer": der ruhige Satz, die Produktsuche bleibt — kein Wurf an die Fehlergrenze', async () => {
+    loeseOrtAuf.mockRejectedValue(aktionUnbekannt())
+    starte()
+    hook.ortSuchen('Mattighofen')
+    await zuRuhe()
+
+    expect(hook.hinweis).toBe(SUCHFELD_TEXT.keinOrt)
+    expect(beiOrt).not.toHaveBeenCalled()
+    expect(hook.kandidaten).toEqual([])
+  })
+
+  it('auch beim Auflösen beim Ankommen — und die Adresse vermerkt den Text trotzdem als erledigt', async () => {
+    loeseOrtAuf.mockRejectedValue(new TypeError('Failed to fetch'))
+    starte('Mattighofen')
+    await zuRuhe()
+
+    expect(hook.hinweis).toBe(SUCHFELD_TEXT.keinOrt)
+    expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
+  })
+
+  it('Sentry bekommt Klasse und festen Text, nie den getippten Text — auch nicht aus der Fehlermeldung', async () => {
+    const getippt = 'Musterhausen'
+    loeseOrtAuf.mockRejectedValue(new TypeError(`Cannot read properties of undefined (reading 'lat') bei ${getippt}`))
+    starte()
+    hook.ortSuchen(getippt)
+    await zuRuhe()
+
+    // Ein Programmierfehler ist auch ein TypeError — aber kein Netzabbruch: Er wird gemeldet.
+    expect(sentry.captureException).toHaveBeenCalledTimes(1)
+    const [ereignis, kontext] = sentry.captureException.mock.calls[0]
+    expect(ereignis.name).toBe('TypeError')
+    expect(ereignis.message).toBe('Ortssuche: Auflösen gescheitert')
+    expect(kontext.tags).toEqual({ bereich: 'ortssuche', klasse: 'TypeError' })
+    const gesendet = JSON.stringify(sentry.captureException.mock.calls[0], (_schluessel, wert) =>
+      wert instanceof Error ? { name: wert.name, message: wert.message } : wert
+    )
+    expect(gesendet).not.toContain(getippt)
+    expect(sentry.addBreadcrumb).not.toHaveBeenCalled()
+  })
+
+  it('ein Netzabbruch ist nur eine Brotkrume, kein Befund — und scheitert Sentry selbst, bleibt der Satz', async () => {
+    loeseOrtAuf.mockRejectedValue(new TypeError('Failed to fetch'))
+    starte()
+    hook.ortSuchen('Mattighofen')
+    await zuRuhe()
+    expect(sentry.captureException).not.toHaveBeenCalled()
+    expect(sentry.addBreadcrumb).toHaveBeenCalledExactlyOnceWith({
+      category: 'ortssuche',
+      level: 'warning',
+      message: 'Ortssuche: Verbindung abgebrochen',
+      data: { klasse: 'TypeError' },
+    })
+
+    sentry.captureException.mockImplementationOnce(() => {
+      throw new Error('Sentry kaputt')
+    })
+    loeseOrtAuf.mockRejectedValue(aktionUnbekannt())
+    hook.ortSuchen('Simbach')
+    await zuRuhe()
+    expect(hook.hinweis).toBe(SUCHFELD_TEXT.keinOrt)
+  })
+})
+
 describe('Ankunft mit Suchtext — die Kundin hat abgesendet (Startseite, Kopfzeile, 404)', () => {
   it('löst den Text einmal auf, genau wie Enter — auch bei weiteren Renderings', async () => {
     loeseOrtAuf.mockResolvedValue([{ lat: 48.1067, lon: 13.15, name: 'Mattighofen, Oberösterreich' }])
@@ -437,6 +569,49 @@ describe('Ankunft mit Suchtext — die Kundin hat abgesendet (Startseite, Kopfze
     expect(loeseOrtAuf).not.toHaveBeenCalled()
     expect(hook.hinweis).toBeNull()
     expect(beiAnkunftErledigt).toHaveBeenCalledTimes(1)
+  })
+
+  it('Neuladen nach eigenem Tippen löst nichts auf — nur ein abgesendetes q geht an die Ortssuche', async () => {
+    // So gibt die Seite dem Feld den Text: aus der Adresse, über abgesendeterSuchtext.
+    const ausAdresse = (query: string) => abgesendeterSuchtext(new URLSearchParams(query))
+
+    // Eingetippt, nie abgesendet: Die Seite schrieb `q=Eier&t=1` in die Adresse; F5 oder „Zurück" baut das Feld neu auf.
+    const getippt = schreibeHoefeFilter({ ...LEERER_HOEFE_FILTER, suchtext: 'Eier' })
+    starte(ausAdresse(getippt))
+    await zuRuhe()
+    expect(loeseOrtAuf).not.toHaveBeenCalled()
+    expect(beiAnkunftErledigt).not.toHaveBeenCalled()
+    expect(beiAnkunftAufgeloest).not.toHaveBeenCalled()
+
+    // Gegenprobe: dasselbe Wort, abgesendet (die Formulare der Startseite, der Kopfzeile und der 404 schicken nur `q`), geht hinaus — einmal.
+    loeseOrtAuf.mockResolvedValue([])
+    starte(ausAdresse('q=Eier'))
+    await zuRuhe()
+    expect(loeseOrtAuf).toHaveBeenCalledExactlyOnceWith('Eier')
+  })
+
+  it('die Seite vermerkt den Text erst NACH der Antwort als erledigt — nicht schon im Effekt beim Aufbau', async () => {
+    let antwort: (orte: unknown[]) => void = () => {}
+    loeseOrtAuf.mockImplementationOnce(() => new Promise((weiter) => (antwort = weiter)))
+    starte('Ried')
+    await zuRuhe()
+    expect(beiAnkunftErledigt).toHaveBeenCalledTimes(1)
+    expect(beiAnkunftAufgeloest).not.toHaveBeenCalled()
+
+    antwort([])
+    await zuRuhe()
+    expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
+
+    // Einmal: ein weiteres Rendern löst nichts mehr aus und meldet nichts mehr.
+    pruefstand.erneut()
+    await zuRuhe()
+    expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
+  })
+
+  it('Text, der kein Ort sein kann, braucht keinen Vermerk — er geht nie hinaus', async () => {
+    starte('Eier 10er')
+    await zuRuhe()
+    expect(beiAnkunftAufgeloest).not.toHaveBeenCalled()
   })
 
   it('ohne Suchtext passiert nichts: Tippen im Feld löst nie von selbst aus', async () => {

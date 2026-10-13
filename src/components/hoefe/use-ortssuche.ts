@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
+import * as Sentry from '@sentry/nextjs'
 import { loeseOrtAuf, type OrtsTreffer } from '@/server/actions/hoefe'
 import type { Bezugspunkt } from '@/lib/hofuebersicht'
 import { erkenneOrtseingabe, hinweisMehrere } from '@/lib/geokodierung'
 import { SUCHFELD_TEXT, standortIstUngenau, standortUngefaehrText } from '@/lib/hoefe-entdecken'
+import { BEZEICHNER, befundVon, istNetzfehler } from '@/lib/upload-diagnose'
 
 /**
  * Der Bezugspunkt der Umkreissuche auf /hoefe: eigener Standort oder ein
@@ -19,7 +21,9 @@ import { SUCHFELD_TEXT, standortIstUngenau, standortUngefaehrText } from '@/lib/
  * (`loeseOrtAuf`, serverseitig mit Bremse), und auch das erst, wenn die
  * Kundin ihn absendet — mit Enter, über den Eintrag „Höfe rund um …" oder
  * indem sie mit einem Suchtext auf /hoefe ankommt (Startseite, Kopfzeile,
- * 404: Dort hat sie abgesendet) —, nie beim Tippen.
+ * 404: Dort hat sie abgesendet; was die Seite selbst beim Tippen in die
+ * Adresse schrieb, ist kein Ankunftstext, abgesendeterSuchtext) —, nie beim
+ * Tippen.
  *
  * Nichts wird gemerkt: kein localStorage, kein Konto, keine URL-Parameter —
  * der Bezugspunkt lebt ausschließlich im Seitenzustand (hoefe-client.tsx).
@@ -85,12 +89,36 @@ export type Ortssuche = {
   aufheben: () => void
 }
 
+/**
+ * Meldet eine gescheiterte Ortsauflösung (Aktion nach einem Deploy unbekannt,
+ * Serverfehler) an Sentry: fester Text und Fehlerklasse, nie der getippte Text
+ * (Vorbild meldeGescheitertesLaden in components/teilen/beitrag-teilen.tsx);
+ * ein Netzabbruch ist nur eine Brotkrume. Wirft nie — die Kundin behält ihre
+ * Produktsuche auch, wenn Sentry selbst scheitert.
+ */
+function meldeGescheiterteOrtssuche(fehler: unknown, text: string): void {
+  try {
+    const { klasse, meldung } = befundVon(fehler, [text])
+    const name = BEZEICHNER.test(klasse) ? klasse : 'Unbekannt'
+    if (istNetzfehler(fehler)) {
+      Sentry.addBreadcrumb({ category: 'ortssuche', level: 'warning', message: 'Ortssuche: Verbindung abgebrochen', data: { klasse: name } })
+      return
+    }
+    const ereignis = new Error('Ortssuche: Auflösen gescheitert')
+    ereignis.name = name
+    Sentry.captureException(ereignis, { level: 'error', tags: { bereich: 'ortssuche', klasse: name }, extra: { fehlertext: meldung } })
+  } catch {
+    // Absichtlich leer: Telemetrie scheitert leise, die Kundin behält ihre Produktsuche.
+  }
+}
+
 export function useOrtssuche({
   onStandort,
   onOrt,
   onZumFeld,
   ankunftsText = '',
   onAnkunftErledigt,
+  onAnkunftAufgeloest,
 }: {
   /** Der eigene Standort ist da — die Suche im Feld bleibt, wie sie ist. */
   onStandort: (punkt: Bezugspunkt) => void
@@ -98,10 +126,12 @@ export function useOrtssuche({
   onOrt: (punkt: Bezugspunkt) => void
   /** Zum Suchfeld, wenn der Standort nicht geht: dort führt der andere Weg weiter. */
   onZumFeld: () => void
-  /** Der Suchtext, mit dem die Kundin auf /hoefe ankam: wird einmal wie Enter aufgelöst. */
+  /** Der Suchtext, mit dem die Kundin abgesendet auf /hoefe ankam: wird einmal wie Enter aufgelöst. */
   ankunftsText?: string
   /** Der Ankunftstext ist abgearbeitet — die Seite vergisst ihn, ein neuer Aufbau des Felds löst nichts mehr aus. */
   onAnkunftErledigt?: () => void
+  /** Die Auflösung ist durch (Treffer, keiner oder gescheitert) — die Seite vermerkt in der Adresse, dass der Text abgesendet UND aufgelöst ist. */
+  onAnkunftAufgeloest?: () => void
 }): Ortssuche {
   const [hinweis, setHinweis] = useState<string | null>(null)
   const [kandidaten, setKandidaten] = useState<OrtsTreffer[]>([])
@@ -187,14 +217,14 @@ export function useOrtssuche({
   }
 
   function genauerBestimmen() {
-    if (ortet || !ungefaehr || !kannOrten()) return
+    if (ortet || !ungefaehr) return
     const stand = ungefaehr
     setOrtet(true)
     const meinLauf = ++laufNr.current
     const veraltet = () => laufNr.current !== meinLauf
     verwerfeWaechter()
 
-    // Misslingt der zweite Anlauf, bleibt der erste Wert zur Wahl: Der Hinweis steht wieder da.
+    // Misslingt der zweite Anlauf (Fehler, Zeit oder wieder nur grob), bleibt der erste Wert zur Wahl: Der Hinweis steht wieder da.
     const misslungen = () => {
       verwerfeWaechter()
       setOrtet(false)
@@ -207,10 +237,14 @@ export function useOrtssuche({
     navigator.geolocation.getCurrentPosition(
       (position) => {
         if (veraltet()) return
+        // Am Rechner ohne GPS kommt auch beim zweiten Anlauf wieder die IP-Ortung: Der Hinweis bleibt, mit dem Zusatz.
+        if (standortIstUngenau(position.coords.accuracy)) {
+          misslungen()
+          return
+        }
         verwerfeWaechter()
         setOrtet(false)
         setUngefaehr(null)
-        // Was der Browser jetzt liefert, ist das Beste, das er hat — auch wenn es wieder grob ist.
         onStandort({ lat: position.coords.latitude, lon: position.coords.longitude })
       },
       () => {
@@ -241,7 +275,15 @@ export function useOrtssuche({
 
   /** Löst den Text auf und setzt die Antwort ein — nur, solange `meinLauf` der jüngste Lauf ist. */
   async function loeseAuf(text: string, meinLauf: number) {
-    const treffer = await loeseOrtAuf(text)
+    let treffer: OrtsTreffer[]
+    try {
+      treffer = await loeseOrtAuf(text)
+    } catch (fehler) {
+      // Ein Wurf ginge an die Fehlergrenze — und seit dem Auflösen beim Ankommen endete jede Suche von der
+      // Startseite auf der Fehlerseite. Für die Kundin ist es „kein Treffer"; Sentry sieht die Art, nie den Text.
+      meldeGescheiterteOrtssuche(fehler, text)
+      treffer = []
+    }
     if (laufNr.current !== meinLauf) return
     if (treffer.length === 0) {
       // Kein Treffer: ruhiger Hinweis, der Text bleibt eine Suche nach Höfen und Produkten.
@@ -273,15 +315,21 @@ export function useOrtssuche({
 
   // Die Kundin kam mit einem Suchtext an: Dort hat sie abgesendet, also löst die Seite ihn einmal auf —
   // genau wie Enter. Die Seite vergisst den Text danach (onAnkunftErledigt); ein neu aufgebautes Feld
-  // (Karte ↔ Liste) löst damit nichts mehr aus, und getippter, nicht abgesendeter Text nie. Frisch
-  // aufgebaut ist nichts abzuräumen, deshalb startet der Effekt nur die Auflösung.
+  // (Karte ↔ Liste) löst damit nichts mehr aus, und getippter, nicht abgesendeter Text nie (die Seite
+  // reicht nur den abgesendeten herein, abgesendeterSuchtext). Frisch aufgebaut ist nichts abzuräumen,
+  // deshalb startet der Effekt nur die Auflösung. Die Adresse vermerkt erst NACH der Antwort, dass der
+  // Text erledigt ist (onAnkunftAufgeloest), nicht schon hier: Next erweitert history.replaceState in
+  // einem Effekt der Wurzel, und der läuft nach denen ihrer Kinder — nach der Antwort ist der Aufbau sicher durch.
   useEffect(() => {
     if (ankunftBegonnen.current || ankunftsText.trim() === '') return
     ankunftBegonnen.current = true
     onAnkunftErledigt?.()
     if (erkenneOrtseingabe(ankunftsText).art === 'text') return
     const meinLauf = ++laufNr.current
-    starteAufloesung(() => loeseAuf(ankunftsText.trim(), meinLauf))
+    starteAufloesung(async () => {
+      await loeseAuf(ankunftsText.trim(), meinLauf)
+      onAnkunftAufgeloest?.()
+    })
   })
 
   function keinerDavon() {

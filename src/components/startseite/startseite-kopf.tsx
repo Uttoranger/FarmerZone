@@ -113,7 +113,9 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
                 404 und der KundeShell. /hoefe löst ihn beim Ankommen auf (Nr. 84):
                 Eine Postleitzahl, „Postleitzahl Ort" oder ein Ortsname sucht dort
                 den Ort, sonst Höfe und Produkte. Das Absenden hier ist der
-                Auslöser — die Ortssuche startet nie beim Tippen. Der Standort
+                Auslöser — die Ortssuche startet nie beim Tippen. Das Formular
+                schickt nur `q`: Daran erkennt /hoefe, dass hier abgesendet wurde
+                (abgesendeterSuchtext) — kein Feld `t` dazusetzen. Der Standort
                 steht nie in der Adresse; der Link darunter führt zu „Standort
                 nutzen" auf /hoefe. */}
             <form

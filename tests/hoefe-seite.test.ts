@@ -167,7 +167,8 @@ describe('Chips und aktive Filter sind echte Links', () => {
     const zeile = html(createElement(AktiveFilterZeile, { filter }))
     expect(zeile).toContain('Aktive Filter:')
     expect(zeile).toContain('aria-label="Bio entfernen"')
-    expect(zeile).toContain('href="/hoefe?q=Eier"')
+    // Jede Adresse der Seite trägt zum Suchtext die Kennung `t=1`: Der Text ist getippt, nicht abgesendet (abgesendeterSuchtext).
+    expect(zeile).toContain('href="/hoefe?q=Eier&amp;t=1"')
     expect(zeile).toMatch(/<a href="\/hoefe"[^>]*>Alle zurücksetzen<\/a>/)
     // Gegenprobe: ohne Filter keine Zeile.
     expect(html(createElement(AktiveFilterZeile, { filter: LEERER_HOEFE_FILTER }))).toBe('')
@@ -410,9 +411,15 @@ describe('Ein Suchfeld „Ort oder Produkt" plus „Standort nutzen" (Nr. 46)', 
   it('die Seite verdrahtet das eine Feld mit Bezugspunkt und Ankunftstext — die alte Umkreis-Karte gibt es nicht mehr', () => {
     const client = quelle('src/components/hoefe/hoefe-client.tsx')
     expect(client).toMatch(/<HoefeSuche[\s\S]*?bezugspunkt=\{bezugspunkt\}[\s\S]*?ankunftsText=\{ankunftsText\}[\s\S]*?\/>/)
-    // Der Ankunftstext kommt aus der Adresse und wird nach dem Auflösen vergessen — ein neu aufgebautes Feld (Karte ↔ Liste) fragt nicht noch einmal.
-    expect(client).toContain('const [ankunftsText, setAnkunftsText] = useState(filter.suchtext)')
+    // Der Ankunftstext ist nur der ABGESENDETE Suchtext der Adresse (nicht, was die Seite beim Tippen selbst hineinschrieb) und wird
+    // vergessen — ein neu aufgebautes Feld (Karte ↔ Liste) fragt nicht noch einmal.
+    expect(client).toContain('const [ankunftsText, setAnkunftsText] = useState(() => abgesendeterSuchtext(suchParameter))')
     expect(client).toContain("onAnkunftErledigt={() => setAnkunftsText('')}")
+    // Nach dem Auflösen schreibt die Seite die Adresse neu (mit der Kennung) — aus der Adresse von jetzt, nicht aus dem Stand beim Ankommen.
+    expect(client).toContain('onAnkunftAufgeloest={() => schreibeUrl(leseHoefeFilter(new URLSearchParams(window.location.search)))}')
+    // Gegenprobe: der alte Weg (jedes q der Adresse ist ein Ankunftstext) steht nicht mehr da.
+    expect(client).not.toContain('useState(filter.suchtext)')
+    expect('const [ankunftsText, setAnkunftsText] = useState(filter.suchtext)').toContain('useState(filter.suchtext)')
     expect(client).not.toMatch(/HoefeUmkreis|hoefe-umkreis/)
     // Gegenprobe: das Muster erkennt den alten Einbau.
     expect('import HoefeUmkreis from \'@/components/hoefe/hoefe-umkreis\'').toMatch(/HoefeUmkreis|hoefe-umkreis/)
@@ -544,7 +551,7 @@ describe('Kartenmodus am Handy: Suche · Filter · Liste in einer Zeile (Nr. 52)
     // Mit einem Filter daneben: der Filter ja, der Text nicht — und sein Entfernen behält den Text.
     const zeile = html(createElement(AktiveFilterZeile, { filter: { ...LEERER_HOEFE_FILTER, siegel: ['BIO'], suchtext: 'Eier' }, suchtextImFeld: true }))
     expect(zeile).toContain('aria-label="Bio entfernen"')
-    expect(zeile).toContain('href="/hoefe?q=Eier"')
+    expect(zeile).toContain('href="/hoefe?q=Eier&amp;t=1"')
     expect(zeile).not.toContain('Suche: Eier')
     // Gegenprobe: in der Liste steht der Eintrag.
     expect(html(createElement(AktiveFilterZeile, { filter: { ...LEERER_HOEFE_FILTER, suchtext: 'Eier' } }))).toContain('aria-label="Suche: Eier entfernen"')

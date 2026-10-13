@@ -28,6 +28,17 @@ import {
  *
  * Voreinstellungen stehen nicht in der URL: Die nackte /hoefe ist Hofladen,
  * Liste, ohne Filter.
+ *
+ * ABGESENDET ODER GETIPPT: Der Suchtext `q` kommt auf zwei Wegen in die
+ * Adresse. Von außen schicken ihn die GET-Formulare der Startseite, der
+ * Kopfzeile und der 404 — dort hat die Kundin abgesendet, und /hoefe löst ihn
+ * beim Ankommen als Ort auf (Nr. 84). Von innen schreibt ihn die Seite selbst,
+ * bei jedem Tippen und in jedem Filter-Link (schreibeHoefeFilter) — das ist
+ * kein Absenden, und nach einem Neuladen oder „Zurück" darf dieser Text nicht
+ * an die Ortssuche gehen („Die Suche startet erst, wenn du sie absendest").
+ * Darum trägt jede Adresse, die die Seite selbst schreibt, die Kennung `t=1`
+ * beim Suchtext; ohne sie kam er von außen (abgesendeterSuchtext). Die
+ * Formulare brauchen von der Kennung nichts zu wissen.
  */
 
 export const GEBINDE_VALUES = ['KLEIN', 'GROSS'] as const
@@ -94,6 +105,8 @@ const P = {
   gebinde: 'gebinde',
   sortierung: 'sort',
   suchtext: SUCHTEXT_PARAMETER,
+  /** Die Kennung der Seite beim Suchtext: getippt oder schon aufgelöst, nicht von außen abgesendet. */
+  eigenerSuchtext: 't',
   suchMarken: 'such',
   ansicht: 'ansicht',
 } as const
@@ -174,10 +187,23 @@ export function schreibeHoefeFilter(filter: HoefeFilter): string {
   if (filter.tiere.length > 0) params.set(P.tiere, filter.tiere.join(','))
   if (filter.gebinde) params.set(P.gebinde, filter.gebinde === 'KLEIN' ? 'klein' : 'gross')
   if (filter.sortierung === 'GRUNDPREIS') params.set(P.sortierung, 'grundpreis')
-  if (filter.suchtext.trim() !== '') params.set(P.suchtext, filter.suchtext)
+  if (filter.suchtext.trim() !== '') {
+    params.set(P.suchtext, filter.suchtext)
+    params.set(P.eigenerSuchtext, '1')
+  }
   for (const marke of filter.suchMarken) params.append(P.suchMarken, marke)
   if (filter.ansicht === 'karte') params.set(P.ansicht, 'karte')
   return params.toString()
+}
+
+/**
+ * Der Suchtext, mit dem die Kundin ABGESENDET ankam — oder '' bei einer Adresse,
+ * die die Seite selbst geschrieben hat (Kennung `t`, siehe oben). Nur dieser Text
+ * wird beim Ankommen an die Ortssuche gegeben; was die Kundin getippt hat, bleibt
+ * auch nach Neuladen und „Zurück" im Browser.
+ */
+export function abgesendeterSuchtext(params: SuchParameter): string {
+  return params.get(P.eigenerSuchtext) === null ? leseHoefeFilter(params).suchtext : ''
 }
 
 /**
