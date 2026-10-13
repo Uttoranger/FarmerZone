@@ -243,6 +243,23 @@ describe('Abholbereit-Mail (Vorlage pickup-reminder.tsx)', () => {
   })
 })
 
+describe('Neue-Bestellung-Mail an den Hof (Vorlage new-order-notification.tsx)', () => {
+  it('die Nummer der Kundin steht einheitlich da, der Link wählt sie mit +43 (Nr. 81, N8)', async () => {
+    await email.sendOrderPaidToFarmer(bestellung({ customerPhone: '0660 0000000' }))
+    const { text, html } = zuletzt()
+    expect(text).toContain('+43 660 000 0000')
+    expect(text).not.toContain('0660 0000000')
+    expect(html).toContain('href="tel:+436600000000"')
+  })
+
+  it('eine Nummer ohne Ziffer steht, wie sie eingegeben wurde — ohne Link', async () => {
+    await email.sendOrderPaidToFarmer(bestellung({ customerPhone: 'keine Angabe' }))
+    const { text, html } = zuletzt()
+    expect(text).toContain('keine Angabe')
+    expect(html).not.toContain('href="tel:')
+  })
+})
+
 describe('„Bestätige deine E-Mail" (S3, Nr. 17b)', () => {
   it('ein Knopf auf /verify mit dem Token — nie Better Auths GET-Pfad, ohne Emojis, Betreff ohne Link', async () => {
     await email.sendEmailBestaetigung('neu@example.com', 'https://farmerzone.example/verify?token=kopf.inhalt.signatur')

@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { setzeWhatsAppGetippt } from '@/server/actions/status-posts'
 import { speichernOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
 import { whatsAppLink } from '@/lib/whatsapp'
+import { formatiereTelefon } from '@/lib/telefon-anzeige'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { teilenLink } from '@/lib/teilen-kanal'
@@ -187,7 +188,7 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, abonnentinnen
                 <p className="text-sm font-medium text-foreground truncate" title={person.name}>
                   {person.name}
                 </p>
-                <p className="text-xs text-muted-foreground">{person.phone}</p>
+                <p className="text-xs text-muted-foreground">{formatiereTelefon(person.phone)}</p>
                 {person.geoeffnet && (
                   <p className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
                     {TEXT.zuruecksetzenFrage}

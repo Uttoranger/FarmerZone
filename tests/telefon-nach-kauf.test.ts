@@ -74,7 +74,9 @@ import { findeElement } from './element-suche'
 const WURZEL = process.cwd()
 const lade = vi.mocked(ladeHofseiteGeteilt)
 
+// So hat der Hof sie eingetragen (gespeichert bleibt die Eingabe) und so zeigt sie die Kasse (Nr. 81, N8).
 const TELEFON = '+43 660 0000000'
+const ANZEIGE = '+43 660 000 0000'
 const EMAIL = 'hof@example.com'
 
 function produkt(id: string, name: string): PublicProduct {
@@ -174,7 +176,7 @@ describe('Hofseite: kein Anruf, kein tel:-Link, statt der Nummer der Hinweis', (
 })
 
 describe('Kasse: die Angaben zum Hof stehen vor dem Kaufknopf', () => {
-  const ANGABEN = ['Hof Test, Erika Muster', 'Musterweg 1, 4900 Musterdorf', TELEFON, EMAIL]
+  const ANGABEN = ['Hof Test, Erika Muster', 'Musterweg 1, 4900 Musterdorf', ANZEIGE, EMAIL]
 
   it('die Karte nennt Verkäufer, Anschrift, Telefon und E-Mail, offen, mit dem Satz zum Vertragspartner', () => {
     const html = renderToStaticMarkup(createElement(AngabenZumHof, { hof: HOF }))
@@ -219,7 +221,18 @@ describe('Kasse: die Angaben zum Hof stehen vor dem Kaufknopf', () => {
     const html = renderToStaticMarkup(createElement(AngabenZumHof, { hof: { ...HOF, email: '' } }))
     expect(html).not.toContain('>E-Mail<')
     expect(html).toContain('>Telefon<')
-    expect(html).toContain(TELEFON)
+    expect(html).toContain(ANZEIGE)
+  })
+
+  it('die Nummer steht einheitlich da, wie auch immer der Hof sie eingegeben hat (N8) — Unlesbares unverändert, nie eine leere Zeile', () => {
+    const mitNummer = (phone: string) => renderToStaticMarkup(createElement(AngabenZumHof, { hof: { ...HOF, phone } }))
+    for (const eingabe of ['0660 0000000', '0043 660 0000000', '660 0000000', '(0660) 000-00 00']) {
+      const html = mitNummer(eingabe)
+      expect(html, eingabe).toContain(`>${ANZEIGE}<`)
+      expect(html, eingabe).not.toContain(`>${eingabe}<`)
+    }
+    expect(mitNummer('keine Angabe')).toContain('>keine Angabe<')
+    expect(mitNummer('')).not.toContain('>Telefon<')
   })
 
   it('die Kasse nimmt den Abschluss für ihre Übersicht, und nur er trägt den Kaufknopf', () => {
@@ -236,8 +249,20 @@ describe('Hof erreichen: nur, was der Hof angegeben hat', () => {
 
   it('mit beidem: Anrufen über tel:, E-Mail über mailto:', () => {
     const html = karte(TELEFON, EMAIL)
-    expect(html).toContain(`href="tel:${TELEFON}"`)
+    expect(html).toContain('href="tel:+436600000000"')
+    expect(html).toContain(`>${ANZEIGE}<`)
     expect(html).toContain(`href="mailto:${EMAIL}"`)
+  })
+
+  it('die Nummer steht einheitlich da und der Anrufen-Link wählt sie mit +43; ohne Ziffer bleibt die Eingabe stehen, aber ohne Anrufen', () => {
+    const html = karte('0660 0000000', '')
+    expect(html).toContain(`>${ANZEIGE}<`)
+    expect(html).toContain('href="tel:+436600000000"')
+    expect(html).not.toContain('0660 0000000')
+    const ohneZiffer = karte('keine Angabe', '')
+    expect(ohneZiffer).toContain('>keine Angabe<')
+    expect(ohneZiffer).not.toContain('tel:')
+    expect(ohneZiffer).not.toContain('Anrufen')
   })
 
   it('ohne E-Mail kein mailto:, ohne Telefon kein tel:, ohne beides keine Karte', () => {

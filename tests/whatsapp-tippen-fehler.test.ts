@@ -147,3 +147,16 @@ describe('Tipp-Liste: kein Link ohne Ziffern', () => {
     expect(links[0]).toMatch(/^https:\/\/wa\.me\/436600000000\?text=/)
   })
 })
+
+describe('Tipp-Liste: die Nummer einheitlich', () => {
+  it('unter dem Namen steht die Nummer als „+43 660 000 0000“ (Nr. 81, N8) — Unlesbares unverändert', () => {
+    const ROH: Abonnentin = { id: 'cabo00000000000000000004', name: 'Dora Muster', phone: '0660 0000000' }
+    const OHNE: Abonnentin = { id: 'cabo00000000000000000003', name: 'Carla Muster', phone: 'keine Angabe' }
+    const zeilen = elemente(rendere([ROH, OHNE], []))
+      .filter((e) => e.type === 'p')
+      .map((e) => e.props?.children)
+    expect(zeilen).toContain('+43 660 000 0000')
+    expect(zeilen).toContain('keine Angabe')
+    expect(zeilen).not.toContain('0660 0000000')
+  })
+})

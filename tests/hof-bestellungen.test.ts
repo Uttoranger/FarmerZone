@@ -18,6 +18,12 @@ vi.mock('next/link', () => ({
     return createElement('a', { href, ...attribute }, children)
   },
 }))
+// Die Bestellung im Detail trägt den Kopf mit dem Rückweg (UnterseitenKopf liest den Pfad).
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/orders/order-1',
+  useRouter: () => ({ refresh() {}, push() {}, replace() {}, back() {}, prefetch() {} }),
+  useSearchParams: () => new URLSearchParams(),
+}))
 // Die Liste bindet die Bestellung samt Dialogen ein; deren Aktionen schreiben — hier nie aufgerufen.
 vi.mock('@/server/actions/orders', () => ({
   cancelOrder: vi.fn(),
@@ -50,7 +56,7 @@ import {
 import { ABHOLUNG_ERLEDIGT, HEUTE_ABHOLEN, HEUTE_NIEMAND } from '@/lib/heute'
 import { HOF_BESTELL_FILTER_WERTE, hofBestellFilterAus } from '@/schemas/hof-bestellungen'
 import { BestellungenAnsicht } from '@/components/hof-bestellungen/bestellungen-ansicht'
-import type { BestellungenSeite } from '@/server/queries/orders'
+import type { BestellungenSeite, HofBestellDetail } from '@/server/queries/orders'
 
 // Dienstag, 6. Oktober 2026, 10:00 in Wien (UTC+2)
 const JETZT = new Date('2026-10-06T08:00:00Z')
@@ -307,5 +313,54 @@ describe('Ansicht /orders — die Filterreihe', () => {
     const erledigt = renderToStaticMarkup(createElement(BestellungenAnsicht, { seite: seite(), filter: 'erledigt', detail: null, modus: 'liste' }))
     expect(erledigt).toContain('Noch nichts erledigt')
     expect(html + erledigt).not.toContain('filter=alle')
+  })
+})
+
+// ─── Die Nummer der Kundin (Nr. 81, N8) ─────────────────────────────────────
+
+describe('Bestellung im Detail: die Nummer der Kundin', () => {
+  const bestellung = (telefon: string): HofBestellDetail => ({
+    id: 'order-1',
+    nummer: 'HT-0210-A4F2',
+    status: 'CONFIRMED',
+    marke: { text: 'Bestätigt', ton: 'offen' },
+    abholung: 'heute, 15–18 Uhr',
+    bestelltAm: '6. Okt, 9:00',
+    kunde: { name: 'Erika Beispiel', vorname: 'Erika', email: 'erika@example.com', telefon, notiz: null },
+    zahlart: 'Bar bei Abholung',
+    vorOrt: true,
+    bezahltAm: null,
+    betrag: { warenCents: 1000, gebuehrCents: 0, gesamtCents: 1000, erstattetCents: 0, gebuehrEntfallen: false, gebuehrErstattungOffen: false, gebuehrFuerAbrechnung: false },
+    positionen: [],
+    storno: null,
+    stornoGrund: null,
+    aktionen: bestellAktionen({ status: 'CONFIRMED', paymentMethod: 'ONSITE_CASH', offenePositionen: 0 }),
+    erinnernUrl: null,
+  })
+  const ansicht = (telefon: string): string =>
+    renderToStaticMarkup(
+      createElement(BestellungenAnsicht, {
+        seite: { kopfzeile: '1 offen', chips: filterChips(LISTE, JETZT), gruppen: [], hatBestellungen: true },
+        filter: 'offen',
+        detail: bestellung(telefon),
+        modus: 'detail',
+      })
+    )
+
+  it('der Anrufen-Knopf im Kopf wählt die Nummer mit +43; die Karte „Kundin“ zeigt sie einheitlich und verlinkt sie ebenso', () => {
+    const html = ansicht('0660 0000000')
+    expect(html).toContain('aria-label="Erika Beispiel anrufen"')
+    expect(html).toContain('href="tel:+436600000000"')
+    const karte = html.slice(html.indexOf('id="kundin-order-1"'))
+    expect(karte).toContain('+43 660 000 0000')
+    expect(karte).toContain('href="tel:+436600000000"')
+    expect(html).not.toContain('0660 0000000')
+  })
+
+  it('eine Nummer ohne Ziffer: kein Anrufen-Link, die Karte „Kundin“ steht trotzdem da', () => {
+    const html = ansicht('keine Angabe')
+    expect(html).not.toContain('href="tel:')
+    expect(html).not.toContain('anrufen"')
+    expect(html).toContain('id="kundin-order-1"')
   })
 })

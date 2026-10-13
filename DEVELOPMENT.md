@@ -5023,6 +5023,14 @@ Auftrag freigabe.md §15 „74" (Register I1). Keine Migration, kein neues Paket
 - **Mein Hof breit:** Die Web-Vorschau ist höchstens 1 408 px breit, damit die Liste bei voller Editorbreite ihre 560 px bekommt (`EDITOR_LISTE_WEB_MAX` griff vorher nie: 2 000 − 32 − 1 440 = 528). `useElementGroesse` liegt in `src/lib/use-element-groesse.ts`.
 - **Kleinkram:** `aktuellePositionen` in `use-cart.ts` samt Prüfstand-Test für Funktionen aus einem alten Render; Prüfskript der Illustrationen meldet beschädigte Pixel als FEHLER-Zeile; der Test „jede Unterkategorie" läuft über alle Werte des Enums; die Fünfer-Grenze der Hofseiten-Beiträge prüft auch die schnelle Suite; `findeElement` liegt einmal in `tests/element-suche.ts`; CI sucht nach dem Build in der Trace-Datei der Hofseite eine Unterkategorie-Datei.
 
+## Telefonnummern einheitlich (Nachtlauf Nr. 81, Oktober 2026)
+
+- **Anzeige (N8):** „+43 660 000 0000“ — `formatiereTelefon` in `src/lib/telefon-anzeige.ts`, der `tel:`-Link kommt aus `telefonLink`. Gespeichert bleibt die Eingabe. Anlass: ein Screenshot der Kasse (12.10.), auf dem die Nummer des Hofs ohne 0 und ohne +43 stand.
+- **Was gelesen wird:** nur Ziffern, Leerraum und `( ) . / -`, ein „+“ ganz vorn. Führende 0 → +43 (Österreich als Standard), `0043 …` und `+43 (0) …` → +43, ein anderer Ländercode bleibt (`+49 151 1234 5678`). Ohne 0 und ohne + gilt nur eine Mobil-Vorwahl (65x–69x, auch mit vorangestelltem „43“) als österreichisch; bei Festnetz ohne 0 würde geraten. Buchstaben, zwei Nummern in einem Feld, zu kurz oder zu lang: Die Eingabe kommt unverändert zurück, nie leer — lieber die Eingabe zeigen als eine Nummer erraten, die nicht stimmt.
+- **Gruppen:** Die Vorwahl hat drei Stellen bei 65x–69x und bei Graz (316), Klagenfurt (463), Innsbruck (512), Salzburg (662) und Linz (732), Wien eine, sonst vier (St. Pölten 2742, Wels 7242 …). Der Rest geht von links in Dreiergruppen; bleibt eine Ziffer über, ist die letzte Gruppe ein Vierer, bleiben zwei, sind es die letzten zwei (7 → 3+4, 8 → 4+4); bis fünf Ziffern bleiben beisammen. Sonderbereiche (0720, 0800, 0900) bekommen vier Stellen Vorwahl — dann weicht nur die Gruppierung ab, nie eine Ziffer. Bei fremden Ländercodes ist die Ortsvorwahl unbekannt, dort bestimmen nur die Gruppen die Leerzeichen.
+- **Link:** `tel:+436600000000` aus denselben Ziffern. Lässt sich die Eingabe nicht eindeutig lesen, wählt der Link wie bisher ihre Ziffern (nie ein Sonderzeichen); ohne Ziffer oder mit mehr als 15 gibt es weder Link noch Anrufen-Knopf.
+- **Offen:** Deutsche Höfe (Land DE, noch nicht freigeschaltet): Eine Nummer mit führender 0 würde als österreichisch gelesen, sie müssten +49 eingeben, bis die Funktion das Land des Hofs bekommt. Die Wache in `tests/telefon-anzeige.test.ts` listet die Stellen, die noch einen `tel:`-Link von Hand bauen (Kundenliste, fünf Mail-Vorlagen).
+
 ## Nützliche Befehle
 
 ```bash

@@ -691,7 +691,9 @@ describe('Kundendetail', () => {
     expect(html).toContain('<h1')
     expect(html).toContain(`title="${LANG}"`)
     expect(html).toContain('Stammkunde')
-    expect(html).toContain('href="tel:+43 660 7654321"')
+    expect(html).toContain('href="tel:+436607654321"')
+    expect(html).toContain('+43 660 765 4321')
+    expect(html).not.toContain('660 7654321')
     expect(html).toContain('href="https://wa.me/436607654321"')
     expect(html).toContain('href="mailto:aaaaaaaaaaaaaaaa@example.com"')
     expect(html).toContain('€ 123,45')
@@ -724,6 +726,21 @@ describe('Kundendetail', () => {
     expect(html).not.toContain('href="tel:')
     expect(html).not.toContain('wa.me')
     expect(html).toContain('mailto:')
+    expect(html).toContain('Keine Telefonnummer')
+  })
+
+  it('die Nummer steht einheitlich da, wie auch immer sie eingegeben wurde — Anrufen wählt sie mit +43, WhatsApp dieselbe (N8)', () => {
+    const html = renderToStaticMarkup(createElement(KundenDetail, { kunde: detail({ customerPhone: '(0660) 765-43 21' }), jetzt: JETZT }))
+    expect(html).toContain('href="tel:+436607654321"')
+    expect(html).toContain('+43 660 765 4321')
+    expect(html).not.toContain('(0660)')
+    expect(html).toContain('href="https://wa.me/436607654321"')
+  })
+
+  it('eine Nummer ohne Ziffer ist keine: kein Anrufen, kein WhatsApp, dafür der Hinweis', () => {
+    const html = renderToStaticMarkup(createElement(KundenDetail, { kunde: detail({ customerPhone: 'keine Angabe' }), jetzt: JETZT }))
+    expect(html).not.toContain('href="tel:')
+    expect(html).not.toContain('wa.me')
     expect(html).toContain('Keine Telefonnummer')
   })
 
