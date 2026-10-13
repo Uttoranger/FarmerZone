@@ -20,6 +20,7 @@ Präfixe:
 - **W** – WhatsApp-Versand
 - **D** – Direktverkauf
 - **R** – Rate-Limit
+- **M** – Marke und Domain
 - **N** – Nutzerführung (Navigation und Bedienung)
 - **I** – Illustrationen
 - **O** – offen
@@ -168,6 +169,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 12):** Die vier Zustände tun (Kundin oder Hof muss etwas tun), läuft, erledigt, abgebrochen haben je ein Flächen- und ein Text-Token in beiden Modi; Marken entstehen nur aus dem Baustein `Marke`. Kontrast Text auf Fläche ≥ 4,5:1 in beiden Modi (heute 2,3:1 bei tun und erledigt im hellen Modus). Die Regel „keine Hexfarben in Komponenten" gilt damit ohne die Ausnahme aus bestellstatus.ts; benannte Ausnahmen bleiben: Teilen-Bild, Mails, QR, Absperrband, Leaflet-Pins (hoefe-anzeige.ts), Titelbild-Verläufe (mein-hof.ts), manifest/layout. Die bewusste Trennung Kundin-Sicht (bestellstatus.ts) / Hof-Sicht (order-status.ts) bleibt – nur die Farbe kommt aus einer Quelle.
 - **Verhältnis zu anderen Einträgen:** ersetzt die Ausnahme im Kopfkommentar von `src/lib/bestellstatus.ts` („keine Tokens für Bedeutungsfarben"); nimmt den Regelvorschlag 68 aus Lauf 11 (StatusBadge mit Symbol) im Baustein `Marke` auf.
 - **Umsetzung:** Nr. 79 (freigabe.md §16).
+- **Bestätigt (uttoranger, Freigabe Lauf 13, 13.10.2026):** Entscheidungen des Dirigenten aus Lauf 12 (Morgenbericht 12 §7): CODING_STANDARDS §7 ist nach G5 umgeschrieben (Zustandsmarken nur über `Marke` mit den Tokens `--fz-zustand-*`; kein Hexwert in `src/components` und `src/lib` außer den benannten Ausnahmen der Hex-Wache; Palette mit `dark:` nur noch für Bedeutung ohne Marke). Grenzerweiterung für Nr. 79: `components/farmer/schild.tsx` und die neue `src/lib/marke-art.ts` (der Typ liegt in lib, weil die Fachregeln ihn liefern).
 
 ## F – Freigaben nach der Umsetzung
 
@@ -238,6 +240,10 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Umsetzung:** Nr. 68 (freigabe.md §15).
 - **Bestätigt (uttoranger, Freigabe Lauf 12, 13.10.2026):** Kennung F8 statt F7 aus der Freigabe Lauf 11 bestätigt.
 
+### F9 · Mockup-Abweichungen Lauf 12 (13.10.2026)
+- **Entscheidung (uttoranger, Freigabe Lauf 13):** genehmigt sind die Mockup-Abweichungen aus Nr. 82 (Uhrzeit-Format, Pille 50 px, Radioknopf, „für dich reserviert", Platzhalter 17:30) und aus Nr. 79 (Dunkel deckt die Fläche).
+- **Verhältnis zu anderen Einträgen:** betrifft N10 (Nr. 82) und G5 (Nr. 79).
+
 ---
 
 ## K – Konditionen
@@ -254,6 +260,11 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Verhältnis zu anderen Einträgen:** entscheidet O7 (Variante b); ergänzt E6 und K1.
 - **Migration (freigegeben, Wortlaut):** „Nr. 62 darf eine Expand-Migration anlegen: neue Spalte Farm.gruendungBis vom Typ DATE, nullable, ohne Default, ohne Backfill und ohne andere Schema-Änderung. Erzeugt mit prisma migrate diff; Produktion bekommt sie nur über vercel-build beim Merge."
 - **Umsetzung:** Nr. 61 und 62 (freigabe.md §14).
+
+### K3 · Unterhaltungen zwischen Höfen (13.10.2026)
+- **Stand:** beschlossen 13.10.2026, **Bau nach Signal**, nicht in Lauf 13.
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 13):** Eine Unterhaltung mit einem anderen Hof beginnt nur ein Hof, dessen Tarifstand nicht „hoftor" ist; antworten kann jeder Hof. Tariftabelle: Hoftor „Fragen anderer Höfe beantworten", Hofladen „Fragen an andere Höfe stellen – unbegrenzt". Signal für den Bau: mehr als eine Handvoll Nachfragen je Monat (z. B. über ein späteres „Frage per E-Mail" in Futter kaufen) oder mindestens 15 Höfe mit Futterangebot. Konzept, Mockups und Belege: claude/lauf13-vormerkung.md Abschnitt 7.
+- **Verhältnis zu anderen Einträgen:** ergänzt die Tarife aus E6; gehört mit T8 zusammen.
 
 ---
 
@@ -361,6 +372,11 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Verhältnis zu anderen Einträgen:** ergänzt T6 (Gestaltung bleibt).
 - **Umsetzung:** Nr. 76 (freigabe.md §16).
 
+### T8 · Lebenslauf und Aufbewahrung einer Hof↔Hof-Unterhaltung (13.10.2026)
+- **Stand:** beschlossen 13.10.2026, **Bau nach Signal**, nicht in Lauf 13.
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 13):** läuft 14 Tage ab der letzten Nachricht des Beginners, danach nur lesen; 3 Jahre ab Abschluss lesbar und herunterladbar, dann gelöscht (Verjährung § 1489 ABGB; DSGVO Art. 5 Abs. 1 lit. e); das Team liest nur gemeldete Unterhaltungen; kein Löschen durch Nutzer. Wortlaut in claude/lauf13-vormerkung.md Abschnitt 7.
+- **Verhältnis zu anderen Einträgen:** gehört zu K3.
+
 ---
 
 ## W – WhatsApp-Versand
@@ -370,6 +386,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Verhältnis zu anderen Einträgen:** ergänzt E12 (WhatsApp fortsetzen im Reiter Beiträge) und T5.
 - **Migration (freigegeben, Wortlaut):** „Nr. 66 darf eine Expand-Migration anlegen: neue Spalte StatusPost.whatsappGetippt vom Typ TEXT[] (Abonnements-IDs, keine E-Mails, keine Nummern), nullable, mit leerem Default wie linkedProductIds, ohne Backfill und ohne andere Schema-Änderung. Erzeugt mit prisma migrate diff; Produktion bekommt sie nur über vercel-build beim Merge." Die bestehenden Spalten whatsappSentCount und whatsappRecipientCount bleiben (Contract später, eigene Freigabe).
 - **Umsetzung:** Nr. 66 (freigabe.md §15).
+- **Bestätigt (uttoranger, Freigabe Lauf 13, 13.10.2026):** Entscheidung des Dirigenten aus Lauf 12 (Morgenbericht 12 §7): Nr. 75 – Grenzerweiterungen `server/queries/teilen-bild.ts` (Lader) und `lib/whatsapp-versand.ts` (nur der Toast-Satz); der Hook lag in `hofseite-vorschau-rahmen.tsx` statt im Editor, dort ist nur die Funktion heraus und der Import hinein.
 
 ---
 
@@ -419,6 +436,16 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Entscheidung (uttoranger, Freigabe Lauf 7):** Für Anmeldecode, Registrierung, Problem melden, Bestellungen finden und Checkout zählt eine Tabelle in der Datenbank (Schlüssel, Fenster, Zähler) die Versuche über alle Instanzen. Die bestehende Bremse je Instanz bleibt als erste Stufe. Alte Einträge räumt der bestehende Cron auf. Migration nur Expand.
 - **Begründung:** Die Bremse je Instanz greift auf Vercel nur teilweise (Backlog Lauf 6); ein eigener Dienst ist nicht nötig.
 - **Dateien:** `src/lib/rate-limit.ts`, Cron; Umsetzung Nr. 40.
+
+---
+
+## M – Marke und Domain
+
+### M1 · Marke und Domain (13.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 13):** Die Plattform heißt **Agrilo** (Entscheidung uttoranger 13.10.2026). Produktionsdomain agrilo.at; agrilo.eu, [www.agrilo.at](https://www.agrilo.at), [www.agrilo.eu](https://www.agrilo.eu) und farmerzone.at leiten per 308 auf agrilo.at um (farmerzone.at bis zum Ablauf, world4you); DNS und Mail-Empfang bei Cloudflare, Versand über Resend (agrilo.at), Absender „Agrilo <noreply@agrilo.at>" über EMAIL_FROM; Adressen support@, kontakt@, datenschutz@agrilo.at. Der Name steht im Code an EINER Stelle (Konstante MARKE in src/lib/marke.ts, dazu MARKE_TEAM = `${MARKE}-Team`); die Domain bleibt an EINER Stelle (PRODUKTION_HOST). Repo „FarmerZone", Vercel-Projekt „farmer-zone" und farmer-zone.vercel.app bleiben technische Namen. Überall, wo dieser Text, das Register, die Mockups oder die Wortliste „FarmerZone" sagen, gilt ab Nr. 91 „Agrilo" (z. B. „Agrilo-Team" im Postfach). Testumgebung test.agrilo.at.
+- **Offen (Projektleitung):** Markenprüfung in TMview (gleichnamige App „Agrilo" eines anderen Anbieters), Stripe-Anzeigename auf der Kartenabrechnung, Vercel-Plan Pro vor Stripe-Live.
+- **Verhältnis zu anderen Einträgen:** ergänzt Z3 (die Testumgebung heißt test.agrilo.at) und S16 (trustedOrigins).
+- **Umsetzung:** Nr. 91 (freigabe.md §17). Den Cutover (Variablen, Umleitungen, Stripe-Adressen) macht die Projektleitung nach §2 der Freigabe, nicht der Lauf.
 
 ---
 
@@ -484,25 +511,43 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Verhältnis zu anderen Einträgen:** ergänzt N4.
 - **Umsetzung:** Nr. 73 (freigabe.md §15).
 - **Bestätigt (uttoranger, Freigabe Lauf 12, 13.10.2026):** Kennung N7 statt D3 aus der Freigabe Lauf 11 bestätigt.
+- **Ergänzung (uttoranger, Freigabe Lauf 13, 13.10.2026):** Web-Vorschau bleibt 1 408 px, DESIGN_SYSTEM nennt 1 408. Quelle: Morgenbericht 12 §10, zu Nr. 75; Umsetzung Nr. 85.
 
 ### N8 · Wortliste (13.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 12):** Für jede Sache gibt es in Nutzertexten genau ein Wort; die Liste steht in docs/ai/DESIGN_SYSTEM.md und ein Test schützt sie. Erste Einträge: **Abholzeiten** = die Zeiten, die der Hof anbietet; **Abholtermin** = der Termin, den die Kundin gewählt hat; nicht: Zeitfenster, Abholslot. **Vorrat**; nicht: Bestand, Lagerstand, Lager (Code-Bezeichner wie `stock` bleiben). **Beitrag**; nicht: Status, Post, Neuigkeit als Objekt (Route /status bleibt, Register 22e). **Problem melden** als Türname auf beiden Seiten; „Meine Meldungen" bleibt die Übersicht des Hofs; nicht: Hilfe und Rückmeldung, Fehler melden. **Kundin/Kunden**: Beschriftungen, Reiter, Kennzahlen „Kunden" (z. B. „Kunden", „12 Kunden"); ganze Sätze „die Kundin"/„deine Kundinnen" (gewachsener Hausstil); „Käufer" nur für die Futter-Käuferarten (Betrieb/privat). **Telefonnummern** werden einheitlich angezeigt: „+43 660 000 0000" (Ländercode, Leerzeichen nach Vorwahl und in Dreier-/Vierergruppen), gespeichert bleibt die Eingabe. Jeder weitere Eintrag kommt nur über eine Freigabe.
 - **Verhältnis zu anderen Einträgen:** ergänzt CLAUDE.md §5 (Sprache) und E11 (Brennmaterial).
 - **Umsetzung:** Nr. 77 (Liste und Test), Nr. 78 (Begriffe), Nr. 81 (Telefonnummern); freigabe.md §16.
+- **Bestätigt (uttoranger, Freigabe Lauf 13, 13.10.2026):** Entscheidungen des Dirigenten aus Lauf 12 (Morgenbericht 12 §7): Nr. 81 – zwei Sollte zu Blockern hochgestuft; das Kundendetail nutzt `whatsAppLink` aus Nr. 75 (gestapelt), ohne die Datei zu ändern. Nr. 78 – in Dateien anderer Nummern nur die genannten Zeilen (Tipp-Liste Z. 124, `product-grid.tsx` Z. 420/442).
+- **Ergänzung (uttoranger, Freigabe Lauf 13, 13.10.2026):** Land DE: führende 0 bleibt +43 (Standard Österreich), keine +49-Vermutung. „Neuigkeiten" (Mehrzahl, Name der Anmeldung), „Hof-Seite", „Dashboard" in Mails, „Plattformgebühr", „Abholfenster" bleiben offen; keine Änderung in diesem Lauf. Quelle: Morgenbericht 12 §10, zu Nr. 77, 78 und 81; Umsetzung Nr. 85.
 
 ### N9 · Leerzustände (13.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 12):** Jeder Leerzustand einer Liste oder Karte entsteht aus EmptyState (Symbol, ein Satz, nächste Aktion); kleine Zeilen in Karten („Alles erledigt.") sind erlaubt, wenn sie eine einzelne Zeile bleiben und keine Aktion brauchen. Text je Seite aus einer Quelle in src/lib; kein Zustand hat zwei Fassungen.
 - **Verhältnis zu anderen Einträgen:** ergänzt DESIGN_SYSTEM, Abschnitt „Zustände".
 - **Umsetzung:** Nr. 80 (freigabe.md §16).
+- **Bestätigt (uttoranger, Freigabe Lauf 13, 13.10.2026):** Entscheidungen des Dirigenten aus Lauf 12 (Morgenbericht 12 §7): Nr. 80 – ein Sollte zum Blocker hochgestuft; neue Variante `titelStufe` am EmptyState (die Freigabe erlaubt eine Variante, wo nötig). Runde 1 von Nr. 80 ist in den Branch von Nr. 83 zusammengeführt (e813eb7; Konflikt nur in DESIGN_SYSTEM „Leerzustände").
 
 ### N10 · Kasse glätten (13.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 12):** vier flache Karten in Lesereihenfolge Korb → Abholung (eine Zeile Chips, Adresse rechts im Kopf) → Deine Daten (ab md zwei Spalten: E-Mail · Name / Telefon · Notiz, Notiz einzeilig und wächst) → Bezahlen (Optionen ab md nebeneinander, jede mit eigener Erklärung). **Online bleibt vorbelegt**, auch im Testbetrieb (Entscheidung uttoranger 13.10.: Die Plattform verdient nur an Online-Zahlungen); der Testbetrieb-Satz steht an der Online-Option. Bar trägt seinen Vorteil selbst („Ohne Servicegebühr bis 31. Jänner 2027. Du bestätigst per E-Mail – ein Tipp genügt."); der Stripe-Satz nur bei Online (wie heute). „Ein Korb pro Hof" entfällt in der Kasse. Übersicht: „Servicegebühr (5 %)" mit (i)-Knopf, der den Erklärsatz und „mind. € 0,50" aufklappt; bei Bar ohne Gebühr steht „entfällt" statt € 0,00. Angaben zum Hof, Kaufknopf und Knopftexte bleiben (Nr. 60, N2). Abweichung von k3-kasse-angaben-zum-hof genehmigt.
 - **Verhältnis zu anderen Einträgen:** ergänzt N2 (Kasse ohne Zusatz-Haken), Z2 und B1; ersetzt die Anordnung aus `web-/mobil-k3-kasse-angaben-zum-hof` (Nr. 60), die Angaben zum Hof bleiben.
 - **Umsetzung:** Nr. 82 (freigabe.md §16); Mockups `web-k3-kasse-glatt`, `mobil-k3-kasse-glatt`, `system-k3-kasse-bezahlen-bar` (docs/mockups/README.md).
+- **Bestätigt (uttoranger, Freigabe Lauf 13, 13.10.2026):** Entscheidung des Dirigenten aus Lauf 12 (Morgenbericht 12 §7): Nr. 82 – Grenzerweiterung `tests/bargebuehr.test.ts` (ein `it` mit dem alten Bar-Text).
+- **Ergänzung (uttoranger, Freigabe Lauf 13, 13.10.2026):** TESTBETRIEB_TEXT.kasse auf den Mockup-Satz kürzen (ohne „Bitte wähle Bar"); Bar-Zeilen („entfällt", „bar am Hof") nur, wenn Bar angeboten wird; „Du bestätigst per E-Mail – ein Tipp genügt." → „Du bestätigst per E-Mail." Quelle: Morgenbericht 12 §10, zu Nr. 82; Umsetzung Nr. 85.
 
 ### N11 · Heute (13.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 12):** Hauptspalte Packliste → Braucht dich → Teilen (dringend vor freiwillig); leeres „Braucht dich" ist eine Zeile „Nichts braucht dich heute." statt einer Karte. Kein Mockup; die Bilder im Bericht sind die Vorlage.
 - **Umsetzung:** Nr. 83 (freigabe.md §16; kein Mockup, die Bilder im Bericht sind die Vorlage).
+- **Bestätigt (uttoranger, Freigabe Lauf 13, 13.10.2026):** Entscheidungen des Dirigenten aus Lauf 12 (Morgenbericht 12 §7): Nr. 83 – Runde 1 von Nr. 80 hereingeholt (e813eb7); eine Kommentarzeile an `brauchtDich` außerhalb von `heuteAufbau`.
+- **Ergänzung (uttoranger, Freigabe Lauf 13, 13.10.2026):** „Nichts braucht dich heute." nur, wenn Packliste UND Braucht dich leer sind. Quelle: Morgenbericht 12 §10, zu Nr. 83; Umsetzung Nr. 85.
+
+### N12 · Postfach, Stufe 1 (13.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 13):** ein Wort für alles, was ankommt – bei Hof und Admin. Das Team schreibt Höfen Nachrichten (Rundschreiben an alle, ausgewählte oder nach Filter: ohne Online-Zahlung, Futter ohne Nummer; auch an einen einzelnen Hof); jede Nachricht ist ein eigener Faden, auf den der Hof antwortet; das Team antwortet im selben Faden. Höfe beginnen keine Fäden – ein Problem, Wunsch oder eine Frage geht wie bisher über „Problem melden" (Meldung); so gibt es für jede Sache einen Weg. Art Info/Wichtig; Link nur relativ oder auf die Produktionsdomain (aus PRODUKTION_HOST, ab 91 agrilo.at); E-Mail an den Hof nur mit Haken „Betriebsmitteilung" (betrifft den Betrieb des Hofs; Werbung für Dritte nie) und bei einer Antwort des Teams höchstens eine je Faden und Stunde. Hof: Hauptpunkt „Postfach" nach „Bestellungen" (Seitenleiste; am Handy ganz oben im Mehr-Blatt) mit Zähler ungelesen; auf Heute steht eine ungelesene Nachricht **ganz oben in der Hauptspalte lesbar** (Titel, Text, Link, „Antworten", „Gelesen"; bei mehreren die neueste, darunter „n weitere im Postfach"). Admin: /admin/postfach mit Reitern Unterhaltungen (Antworten der Höfe) · Meldungen (der bisherige „Briefkasten", Logik unverändert, /admin/meldungen leitet um) · Rundschreiben (Gesendet mit Lesequote, Neues Rundschreiben). Kein Echtzeit-Kanal: Laden beim Öffnen, offener Faden alle 60 s nachladen (router.refresh). Rate-Limit je Hof und Tag: 30 Nachrichten. Wortliste: Postfach, Nachricht, Rundschreiben, Unterhaltung, Meldung; „Briefkasten" entfällt. Aufbewahrung: Nachrichten vom Team bleiben, solange das Hofkonto besteht (Betriebsmitteilungen, Abrechnung); mit dem Hof werden sie gelöscht (Cascade). Mockups: mobil-h6-postfach, mobil-h6-unterhaltung, mobil-h3-heute-post-karte, admin-postfach, admin-rundschreiben, system-h0-navigation-postfach.
+- **Verhältnis zu anderen Einträgen:** ergänzt N1 (Handy-Navigation: Mehr-Blatt), N9 (Leerzustand ohne Aktion, begründet), N11 (Heute: Block ganz oben in der Hauptspalte) und 22e/Briefkasten (F6); die Wortliste N8 ist um fünf Zeilen ergänzt (DESIGN_SYSTEM „Wortliste").
+- **Umsetzung:** Nr. 86 (Wort) und Nr. 87 (Bau); freigabe.md §17.
+
+### N13 · Titelbild am Computer (13.10.2026)
+- **Entscheidung (uttoranger, im Chat, Freigabe Lauf 13):** Die Fläche wird mit der Breite höher – 220 px am Handy, 300 px ab 768, 360 px ab 1 280, 420 px ab 1 536 – und wird ab 1 920 px nicht weiter aufgezogen (Foto und Fläche rechnen mit höchstens 1 920 px Breite, der Rest ist Hintergrund aus derselben unscharfen Kopie). Ab 768 px steht ein Foto ganz (volle Höhe, mittig, dahinter die unscharfe, abgedunkelte Kopie), sobald breite/hoehe < 1,5 – Quadrat, Hochformat und 4:3; nur Querformate ab 3:2 füllen die Fläche mit Fokuspunkt (wie heute). Der Wechsel von beschnitt nach ganz nach dem Laden blendet weich über (kein Sprung). Die Maße beim Hochladen zu speichern (Migration) bleibt offen; damit könnte der Server später sofort richtig rendern.
+- **Verhältnis zu anderen Einträgen:** ergänzt N6 (Titelbild im Hochformat) und N7 (Mein Hof am breiten Bildschirm).
+- **Umsetzung:** Nr. 89 (freigabe.md §17); Mockup `system-k2-titelbild-computer` (docs/mockups/README.md).
 
 ---
 
@@ -522,7 +567,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 | O1 | Fehler-Token | **Entschieden 07.10.2026 (uttoranger):** Die Fehler-Farbe bekommt einen Kontrast von mindestens 4,5:1 in beiden Themes (Nr. 28). Bisher: Fehlertext 4,22:1 im hellen Theme, deshalb orange Hinweiskarte bzw. `text-status-offen`. |
 | O2 | Bearbeiten am Handy (#180) | **Entschieden durch N4 (10.10.2026, Freigabe Lauf 9).** Bisher: Unter der Checkliste in Mein Hof steht weiter der Editor mit Stiften; das Mockup zeigt nur „Vorschau ansehen". Entfällt er, braucht es einen eigenen Auftrag. |
 | O3 | S11 Double-Opt-in | **Entschieden, siehe S11** (Freigabe Lauf 7, Umsetzung Nr. 38). Offen bleibt die Frage, ob „Nochmal bestellen" in der Abholbereit-Mail Werbung ist. |
-| O4 | AGB / Nutzungsbedingungen | Werden separat erstellt — **NICHT anfassen** (bestätigt 07.10.2026). Bis dahin gibt es beim Registrieren keinen Zustimmungs-Haken. |
+| O4 | AGB / Nutzungsbedingungen | **Geändert 13.10.2026 (uttoranger, Freigabe Lauf 13):** AGB liegen als Entwurf in docs/recht/agb.md (Fassung 0.9, 13.10.2026); Seite /agb baut Nr. 90; Freigabe der Fassung 1.0 nach anwaltlicher Prüfung durch die Projektleitung; bis dahin trägt die Seite den Stand-Vermerk. Beim Registrieren und in der Kasse ein Satz mit Link, kein Haken. Der Entwurf docs/recht/agb.md ist die Quelle der AGB-Seite; Änderungen am Wortlaut nur durch die Projektleitung (nach anwaltlicher Prüfung), nie durch einen Lauf. Die Seite trägt bis zur Freigabe „Fassung 0.9 – Entwurf, Stand 13.10.2026". Einbeziehung: Registrierung mit dem Satz „Mit der Registrierung stimmst du den AGB und den Konditionen zu" (Links), Kasse unter dem Kaufknopf „Es gelten die AGB von Agrilo. Vertragspartner ist der Hof." (Link; Name aus MARKE) und die Zustimmung zur sofortigen Ausführung der Vermittlung („… und stimme zu, dass Agrilo die Vermittlung sofort ausführt") – ohne Haken. AGB-Link in jeder Fußzeile und in der Bestellbestätigungs-Mail. |
 | O5 | Rückruf anfordern | **Entfällt (07.10.2026, uttoranger).** Schema `RueckrufAnfrage` wird nicht gebaut. Ersatz bleibt „E-Mail schreiben". |
 | O6 | Kachelquelle der Karten (10.10.2026) | OSM direkt, basemap.at oder ein Anbieter mit Schlüssel. Ein Wechsel ändert die Datenschutzerklärung. **Nicht bauen**; Nr. 52 legt nur einen Vorschlag in den Bericht. Stand 12.10.2026: weiter offen; der Vorschlag aus Bericht 52 steht. |
 | O7 | Gründungszusage (10.10.2026) | **Entschieden durch K2 (12.10.2026, Freigabe Lauf 10).** Bisher: Der Freischalt-Dialog im Admin (`GRUENDUNGS_KONDITIONEN`, `src/lib/gruendungshof.ts`) verspricht „keine Plattformgebühr bis 31.12.2029, danach dauerhaft 3 %". Das passt nicht zu E6 und K1. Der Mensch entscheidet; der Text bleibt. |
@@ -543,3 +588,5 @@ Stand Lauf 10 (uttoranger, 12.10.2026): G4, K2, S16 und die Ergänzungen zu E6 (
 Stand Lauf 11 (uttoranger, 12.10.2026): W1, T5, T6, F8, N6, N7 und I1 sind entschieden und in Nr. 66–74 eingeplant (freigabe.md §15); in der Freigabe heißen F8, N6 und N7 „F7", „B2" und „D3" (Zuordnung nach dem Muster des Registers). Nr. 66 darf eine Expand-Migration anlegen (Wortlaut bei W1). Die Nacharbeit aus Lauf 10 (Nr. 70) und der Fehler im Nachbestell-Link (Nr. 71) sind beauftragt; die Port-Frage ist durch Nr. 70 erledigt. Vorgemerkt im Backlog: „Illustrationen: Bögen in höherer Auflösung (2K/4K) neu erzeugen und mit dem Schneideskript der Projektleitung ersetzen, sobald Kacheln größer als 260 px gezeigt werden; Schwarzweiß-Fassung für Plakat und dunkles Theme nutzen". Offen und nicht in diesem Lauf: E-Mail-Pflicht nach FAGG; „Produkte im Shop" je Verkaufsgröße oder Familie; Gründungszusage bei Rücknahme der Freischaltung; Grundlage Kundinnen-Status; OSM-Auszug für die Karte; CI-Lint blockierend; SEPA-Weg, Rechnung/USt der Grundgebühr, Rücklastschriften, Admin-Protokoll (S12). Die Live-Schaltung samt `STRIPE_LIVE_AB` macht der Mensch als letzten Schritt.
 
 Stand Lauf 12 (uttoranger, 13.10.2026): N8, N9, N10, N11, G5 und T7 sind entschieden und in Nr. 76–83 eingeplant (freigabe.md §16); die Nacharbeit aus Lauf 11 ist als Nr. 75 beauftragt. Die Regelvorschläge 71, 66, 67 und 74 aus Morgenbericht 11 §8 sind freigegeben und eingetragen (TESTING_GUIDELINES §2, TECH_STACK; Wache und CI-Schritt baut Nr. 75), 73 steht in docs/nachtlauf.md 4a Punkt 1, 68 geht in Nr. 79 auf. Die Entscheidungen des Dirigenten aus Lauf 11 sind bestätigt (Kennungen F8/N6/N7, Schriftquelle, „p vor verknüpften Produkten", die Grenzerweiterungen aus Morgenbericht 11 §6). Lauf 12 hat keine Migration. Nicht in diesem Lauf (Lauf 13, nach Entscheidung): Warteliste je Produkt, Push bei neuer Bestellung, Nachfrage-Signal, Beitrag per Sprache, Hof merken. Offen bleibt: Kopf mit Reitern bei 2560 volle Breite (73); Titelbild-Maße beim Hochladen speichern (Migration); Contract whatsappSentCount/whatsappRecipientCount; E-Mail-Pflicht FAGG; Produkte je Verkaufsgröße/Familie; Gründungszusage bei Rücknahme; Kundinnen-Status; OSM-Auszug; CI-Lint blockierend; SEPA, Rechnung/USt, Rücklastschriften, Admin-Protokoll (S12). Die Live-Schaltung samt `STRIPE_LIVE_AB` macht der Mensch als letzten Schritt.
+
+Stand Lauf 13 (uttoranger, 13.10.2026): M1, N12, N13 und die Änderung von O4 sind entschieden und in Nr. 84–87 und 89–91 eingeplant (freigabe.md §17); K3 und T8 sind beschlossen, Bau nach Signal. Die Regelvorschläge 75, 76, 82 und der Dirigenten-Vorschlag (Telefonnummern-Wache) aus Morgenbericht 12 §9 sind freigegeben und eingetragen (TESTING_GUIDELINES §1/§2; die Tests baut Nr. 85), der Blocker-Satz steht in docs/nachtlauf.md 4a und .claude/agents/pruefer.md; nicht freigegeben: eine Prüfung „Kundin" als Beschriftung (78). Die Entscheidungen des Dirigenten aus Lauf 12 sind bestätigt (Register-Kennungen wie in der Freigabe: N8–N11, G5 und T7 waren frei; drei hochgestufte Sollte; CODING_STANDARDS §7 nach G5; Grenzerweiterungen; Zusammenführung 80-R1 in 83; Bilderstrecke auf eigenem Seed-Hof). Lauf 13 hat genau eine Migration (Nr. 87, Expand). Geparkt: Unterhaltungen zwischen Höfen (K3/T8), Anzeige im Umkreis, Startseite gestalten. Nicht in diesem Lauf: Warteliste je Produkt, Push bei neuer Bestellung, Nachfrage-Signal, Beitrag per Sprache, Hof merken. Offen bleibt: Kopf mit Reitern bei 2560 volle Breite (73); Titelbild-Maße beim Hochladen speichern; Contract whatsappSentCount/whatsappRecipientCount; E-Mail-Pflicht FAGG; Produkte je Verkaufsgröße/Familie; Gründungszusage bei Rücknahme; Kundinnen-Status; OSM-Auszug; CI-Lint blockierend; SEPA, Rechnung/USt, Rücklastschriften, Admin-Protokoll (S12). Der Cutover auf agrilo.at (§2 der Freigabe) und die Live-Schaltung samt `STRIPE_LIVE_AB` macht der Mensch.

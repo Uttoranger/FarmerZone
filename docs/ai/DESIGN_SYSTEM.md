@@ -120,9 +120,15 @@ Für jede Sache gibt es in Nutzertexten genau ein Wort (Register N8): in Beschri
 | Die öffentliche Seite des Hofs | Hofseite | | „Auf der Hofseite zeigen“ |
 | Hof oder Beitrag weitergeben | Teilen | | „Teilen“, „Teilen-Bild“ |
 | Gebühr, die die Kundin zum Warenpreis zahlt (Register E4) | Servicegebühr | | „zzgl. Servicegebühr“ |
+| Der eine Ort, an dem bei Hof und Admin alles ankommt (Register N12) | Postfach | Briefkasten, Post, Posteingang | „Postfach · 2“ |
+| Ein Eintrag vom Team oder vom Hof | Nachricht | Mitteilung, Benachrichtigung | „Nachricht vom Team“ |
+| Eine Nachricht vom Team an einen oder viele Höfe | Rundschreiben | Newsletter, Post | „Neues Rundschreiben“ |
+| Der Faden aus Nachricht und Antworten | Unterhaltung | Chat, Thread, Konversation | „Unterhaltungen · 3“ |
+| Fehler, Wunsch oder Frage an das Team über „Problem melden“ | Meldung | | „Meine Meldungen“ |
 
 - **Prüfung:** `tests/wortliste.test.ts` liest die Spalte „nicht“ und sucht jedes Wort in jeder Zeichenkette und jedem JSX-Text unter `src/` — mit Wortgrenzen und in der Schreibweise der Tabelle („Bestand“ trifft weder „Lagerbestand“ noch „bestand“). Kommentare, Bezeichner und Server-Logs (`console.*`) zählen nicht. Wo ein Wort in anderem Sinn richtig ist, steht der Text mit Grund in der Ausnahmeliste im Test: je Text, nicht je Datei, ohne Zeilennummer.
 - **„Status“, „Post“, „Neuigkeit“ meinen den Beitrag als Sache.** Der Status einer Bestellung, Zahlung, Freischaltung oder Meldung bleibt „Status“, ebenso der Name der WhatsApp-Funktion „Status“; „Neuigkeiten“ (Mehrzahl) ist der Name der Anmeldung bei einem Hof. Solche Texte stehen als Ausnahme im Test, ebenso ein Text über die Käuferart (Betrieb, privat) beim Futter, der „Käufer“ sagt.
+- **Postfach (Register N12):** „Betriebsmitteilung“ bleibt als Rechtsbegriff für E-Mails erlaubt (Ausnahme im Test). Die heutigen Fundstellen von „Briefkasten“ und der übrigen neuen „nicht“-Wörter stehen in der Arbeitsliste `OFFEN_BIS_86` des Tests; Nr. 86 leert sie.
 - **Nicht maschinell geprüft** sind die Zeilen ohne Wort in „nicht“ und die Stilregel „Kunden“ in Beschriftungen gegen „die Kundin“ in Sätzen; sie gelten beim Schreiben und im Review. „Brennholz“ steht nicht in „nicht“, weil es der Name einer Art in der Kategorie „Brennmaterial“ ist (Register E11).
 
 ## Navigation (AppShells)
