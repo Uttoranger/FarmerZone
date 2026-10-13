@@ -105,16 +105,18 @@ export function istVorabruf(headers: Pick<Headers, 'get'>): boolean {
 
 /**
  * Die Adresse des Teilen-Bilds eines Hofs (Route `/[farmSlug]/opengraph-image`).
- * `auswahl` sind die im Teilen-Fenster gewählten Einträge, `version` die
- * Prüfsumme des Inhalts (nur für den Zwischenspeicher).
+ * `auswahl` sind die im Teilen-Fenster gewählten Einträge, `beitrag` die
+ * Kennung eines Beitrags (Beitrag-Modus, `?b=`), `version` die Prüfsumme des
+ * Inhalts (nur für den Zwischenspeicher).
  */
 export function teilenBildPfad(
   slug: string,
-  optionen: { format?: TeilenBildFormat; auswahl?: readonly string[] | null; version?: string } = {}
+  optionen: { format?: TeilenBildFormat; auswahl?: readonly string[] | null; beitrag?: string | null; version?: string } = {}
 ): string {
   const suche = new URLSearchParams()
   if (optionen.format && optionen.format !== 'quadrat') suche.set('format', optionen.format)
   if (optionen.auswahl) suche.set('p', optionen.auswahl.join(','))
+  if (optionen.beitrag) suche.set('b', optionen.beitrag)
   if (optionen.version) suche.set('v', optionen.version)
   const text = suche.toString()
   return `/${encodeURIComponent(slug)}/opengraph-image${text ? `?${text}` : ''}`

@@ -12,16 +12,33 @@
  *  - Der QR-Code ist ein reiner Pfad aus Rechtecken, gleich für gleiche Adresse.
  *  - Die Route liefert nur für öffentliche Höfe ein Bild (sonst 404) und
  *    fragt mit derselben Sichtbarkeits-Bedingung wie die Hofseite.
+ *  - Beitrag-Modus (Register T6, Nr. 69): nur ein veröffentlichter, sichtbarer,
+ *    nicht abgelaufener Beitrag DIESES Hofs, sonst 404; die verknüpften
+ *    Produkte kommen ins Bild; die Prüfsumme nimmt Beitrag und Fotos auf.
+ *  - Der QR-Code steht nur in der Story, nie im 1:1.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createElement } from 'react'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/prisma', () => ({ prisma: { farm: { findFirst: vi.fn() } } }))
-vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    farm: { findFirst: vi.fn() },
+    product: { findMany: vi.fn(async () => []) },
+    statusPost: { findUnique: vi.fn(async () => null) },
+  },
+}))
+vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
+// Fotos, Illustrationen und Schriften lädt der Lader (eigene Tests in
+// tests/teilen-bild-quellen.test.ts); hier zählt, was die Route entscheidet.
+vi.mock('@/lib/teilen-bild-quellen', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/teilen-bild-quellen')>()),
+  ladeTeilenBildBilder: vi.fn(async () => ({ produkte: {}, held: null, ersatz: false })),
+  ladeTeilenBildSchriften: vi.fn(async () => []),
+}))
 // Satori/resvg brauchen wir hier nicht: Die Aussage ist, was die Route mit dem Bild macht (Kopf, Fehler).
 vi.mock('next/og', () => ({
   ImageResponse: vi.fn(function (this: unknown, _el: unknown, optionen: { headers?: Record<string, string> }) {
@@ -36,8 +53,11 @@ import { hofAdresse } from '@/lib/mein-hof'
 import { Decimal } from '@prisma/client/runtime/index-browser'
 import { APP_URL } from '@/lib/umgebung-server'
 import {
+  beitragDarfInsBild,
+  beitragKurztext,
   bildProdukte,
   teilenAuswahl,
+  teilenBildAuswahl,
   teilenBildDaten,
   teilenBildVersion,
   teilenTextVorschlag,
@@ -48,10 +68,13 @@ import {
 import { teilenBildPfad } from '@/lib/teilen-kanal'
 import { qrPfad } from '@/lib/qr-code'
 import { teilenBildSucheSchema } from '@/schemas/teilen'
+import { ladeTeilenBildBilder, type GeladeneBilder } from '@/lib/teilen-bild-quellen'
 import { TEILEN_BILD_FARBE, TeilenBildGrafik } from '@/components/teilen/teilen-bild-grafik'
 import { GET as bildRoute } from '@/app/(public)/[farmSlug]/opengraph-image/route'
 
 const findFirst = vi.mocked(prisma.farm.findFirst)
+const beitragLesen = vi.mocked(prisma.statusPost.findUnique)
+const OHNE_BILDER: GeladeneBilder = { produkte: {}, held: null, ersatz: false }
 
 const HOF: TeilenBildHof = {
   name: 'Hof Test',
@@ -77,6 +100,8 @@ function produkt(id: string, abweichend: Partial<TeilenBildProdukt> = {}): Teile
 }
 
 const JETZT = new Date('2026-10-07T08:00:00Z') // Mittwoch, 10 Uhr in Wien
+/** Eine erfundene Beitragskennung in der Form einer cuid. */
+const BEITRAG_ID = 'cm9beitrag0000000000000001'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -182,7 +207,7 @@ describe('Fremdtext im Bild', () => {
       adresse: 'farmerzone.at/hof-test',
       jetzt: JETZT,
     })
-    const html = renderToStaticMarkup(createElement(TeilenBildGrafik, { daten, format: 'quadrat', qr: qrPfad('https://x.at/hof-test?k=qr') }))
+    const html = renderToStaticMarkup(createElement(TeilenBildGrafik, { daten, format: 'quadrat', qr: qrPfad('https://x.at/hof-test?k=qr'), bilder: OHNE_BILDER }))
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
     expect(html).not.toContain('<script')
     expect(html).not.toContain('<img')
@@ -198,7 +223,7 @@ describe('Fremdtext im Bild', () => {
       adresse: 'farmerzone.at/hof-test',
       jetzt: JETZT,
     })
-    const html = renderToStaticMarkup(createElement(TeilenBildGrafik, { daten, format: 'story', qr: qrPfad('https://x.at') }))
+    const html = renderToStaticMarkup(createElement(TeilenBildGrafik, { daten, format: 'story', qr: qrPfad('https://x.at'), bilder: OHNE_BILDER }))
     expect(html).toContain('line-clamp:2')
     expect(html).toContain('Direkt vom Hof')
   })
@@ -215,6 +240,9 @@ describe('Daten, Text und Prüfsumme', () => {
       jetzt: JETZT,
     })
     expect(daten).toMatchObject({ hofName: 'Hof Test', ort: 'Teststadt', abholung: 'Abholung Samstag, 9–12 Uhr' })
+    // Im Abhol-Streifen mit Datum: Ein geteiltes Bild wird Tage später noch gesehen.
+    expect(daten.abholTermin).toBe('Sa, 10.\u00a0Okt · 9–12 Uhr')
+    expect(daten).not.toHaveProperty('beitrag')
   })
 
   it('die Prüfsumme ändert sich, wenn ein Produkt ausverkauft ist', () => {
@@ -237,7 +265,14 @@ describe('Daten, Text und Prüfsumme', () => {
       'Frisch bei uns diese Woche: Eier, Erdäpfel und Heu. Online bestellen, Abholung Samstag, 9–12 Uhr.'
     )
     expect(teilenTextVorschlag([], null)).toBe('Frisch bei uns diese Woche. Jetzt online bestellen.')
-    const daten = { hofName: 'Hof Test', ort: 'Teststadt', produkte: [{ id: 'a', name: 'Eier', preis: '€ 1' }], abholung: 'Abholung Samstag, 9–12 Uhr', adresse: 'x' }
+    const daten = {
+      hofName: 'Hof Test',
+      ort: 'Teststadt',
+      produkte: [{ id: 'a', name: 'Eier', preis: '€ 1' }],
+      abholung: 'Abholung Samstag, 9–12 Uhr',
+      abholTermin: 'Sa, 10.\u00a0Okt · 9–12 Uhr',
+      adresse: 'x',
+    }
     expect(teilenVorschauText('Hof Test', 'Über uns', daten)).toEqual({
       title: 'Hof Test – frisch vom Hof in Teststadt',
       description: 'Eier · Abholung Samstag, 9–12 Uhr',
@@ -252,6 +287,14 @@ describe('Daten, Text und Prüfsumme', () => {
     )
     expect(teilenBildSucheSchema.parse({ format: 'riesig', p: 'a,b,<x>' })).toEqual({ format: 'quadrat', p: ['a', 'b'] })
     expect(teilenBildSucheSchema.parse({})).toEqual({ format: 'quadrat', p: undefined })
+    expect(teilenBildPfad('hof-test', { format: 'story', beitrag: BEITRAG_ID })).toBe(`/hof-test/opengraph-image?format=story&b=${BEITRAG_ID}`)
+  })
+
+  it('b nur in der Form einer cuid — eine andere Form lässt die Prüfung scheitern statt still wegzufallen', () => {
+    expect(teilenBildSucheSchema.parse({ b: BEITRAG_ID }).b).toBe(BEITRAG_ID)
+    expect(teilenBildSucheSchema.safeParse({ b: 'x y' }).success).toBe(false)
+    expect(teilenBildSucheSchema.safeParse({ b: '../anderer' }).success).toBe(false)
+    expect(teilenBildSucheSchema.parse({ format: 'story' }).b).toBeUndefined()
   })
 })
 
@@ -433,16 +476,263 @@ describe('Farben des Teilen-Bilds kommen aus den Tokens (Satori-Ausnahme, eine S
     return (spalte === 'dunkel' ? zeile[1] : zeile[2]).toLowerCase()
   }
 
-  it('Schrift, QR-Grund und QR-Module sind genau die Token-Werte, der Verlauf hat das Akzent-Grün in der Mitte', () => {
-    expect(TEILEN_BILD_FARBE.text).toBe(token('text', 'dunkel'))
-    expect(TEILEN_BILD_FARBE.qrGrund).toBe(token('surface', 'hell'))
-    expect(TEILEN_BILD_FARBE.qrModul).toBe(token('text', 'hell'))
-    expect(TEILEN_BILD_FARBE.grund).toContain(`${token('accent', 'dunkel')} 55%`)
+  it('Grund, Schrift, Grün und Linien sind genau die Token-Werte (helles Theme wie das Mockup)', () => {
+    expect(TEILEN_BILD_FARBE.grund).toBe(token('surface', 'hell'))
+    expect(TEILEN_BILD_FARBE.tinte).toBe(token('text', 'hell'))
+    expect(TEILEN_BILD_FARBE.leise).toBe(token('text-muted', 'hell'))
+    expect(TEILEN_BILD_FARBE.gruen).toBe(token('accent', 'hell'))
+    expect(TEILEN_BILD_FARBE.aufGruen).toBe(token('on-accent', 'hell'))
+    expect(TEILEN_BILD_FARBE.linie).toBe(token('border', 'hell'))
+    expect(TEILEN_BILD_FARBE.fotoLeise).toBe(token('status-fertig', 'dunkel'))
+  })
+
+  it('die abgeleiteten Werte bauen auf den Tokens auf (Deckkraft über --accent, --surface und --bg)', () => {
+    const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(',')
+    expect(TEILEN_BILD_FARBE.markeKreis).toContain(`rgba(${rgb(token('accent', 'hell'))},`)
+    for (const wert of [TEILEN_BILD_FARBE.cremeAufFoto, TEILEN_BILD_FARBE.markeKreisFoto, TEILEN_BILD_FARBE.linieFoto]) {
+      expect(wert).toContain(`rgba(${rgb(token('surface', 'hell'))},`)
+    }
+    for (const verlauf of [TEILEN_BILD_FARBE.schleier, TEILEN_BILD_FARBE.schleierStory, TEILEN_BILD_FARBE.titelSchatten]) {
+      expect(verlauf.match(/rgba\(([\d,]+),[\d.]+\)/g)?.every((w) => w.startsWith(`rgba(${rgb(token('bg', 'dunkel'))},`))).toBe(true)
+    }
+    // Der Abhol-Streifen liegt zwischen --bg (hell) und --border (hell), eine Stufe unter dem Grund.
+    const [bg, rand, streifen] = [token('bg', 'hell'), token('border', 'hell'), TEILEN_BILD_FARBE.streifen].map((h) => rgb(h).split(',').map(Number))
+    expect(streifen.every((kanal, i) => kanal <= bg[i] && kanal >= rand[i])).toBe(true)
   })
 
   it('Farbwerte gibt es im Teilen-Bild nur im Objekt TEILEN_BILD_FARBE', () => {
     const text = readFileSync(join(process.cwd(), 'src/components/teilen/teilen-bild-grafik.tsx'), 'utf8')
     const ausserhalb = text.slice(text.indexOf('} as const'))
     expect(ausserhalb).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/)
+  })
+})
+
+describe('Beitrag im Bild (Register T6, Nr. 69)', () => {
+  const GUELTIG = {
+    farmId: 'farm-1',
+    publishedAt: new Date('2026-10-06T08:00:00Z'),
+    expiresAt: new Date('2026-10-14T08:00:00Z'),
+    showOnFarmPage: true,
+  }
+
+  it('nur veröffentlicht, auf der Hofseite, nicht abgelaufen und vom selben Hof', () => {
+    expect(beitragDarfInsBild(GUELTIG, 'farm-1', JETZT)).toBe(true)
+    expect(beitragDarfInsBild({ ...GUELTIG, expiresAt: null }, 'farm-1', JETZT)).toBe(true)
+    expect(beitragDarfInsBild(GUELTIG, 'farm-2', JETZT)).toBe(false)
+    expect(beitragDarfInsBild({ ...GUELTIG, publishedAt: null }, 'farm-1', JETZT)).toBe(false)
+    expect(beitragDarfInsBild({ ...GUELTIG, showOnFarmPage: false }, 'farm-1', JETZT)).toBe(false)
+  })
+
+  it('Grenzen: veröffentlicht genau jetzt zählt, eine Millisekunde später nicht; abgelaufen genau jetzt zählt nicht', () => {
+    const ms = (d: Date, n: number) => new Date(d.getTime() + n)
+    expect(beitragDarfInsBild({ ...GUELTIG, publishedAt: JETZT }, 'farm-1', JETZT)).toBe(true)
+    expect(beitragDarfInsBild({ ...GUELTIG, publishedAt: ms(JETZT, 1) }, 'farm-1', JETZT)).toBe(false)
+    expect(beitragDarfInsBild({ ...GUELTIG, expiresAt: JETZT }, 'farm-1', JETZT)).toBe(false)
+    expect(beitragDarfInsBild({ ...GUELTIG, expiresAt: ms(JETZT, 1) }, 'farm-1', JETZT)).toBe(true)
+  })
+
+  it('Text: höchstens zwei Sätze, ohne {Vorname} und Steuerzeichen, gekürzt', () => {
+    expect(beitragKurztext('Hallo {Vorname}, frischer Honig ist da! Aus eigener Imkerei.\n\nBis bald.')).toBe(
+      'Hallo, frischer Honig ist da! Aus eigener Imkerei.'
+    )
+    expect(beitragKurztext('‮Ein Satz ohne Ende')).toBe('Ein Satz ohne Ende')
+    expect(beitragKurztext('A'.repeat(400)).length).toBeLessThanOrEqual(160)
+  })
+
+  it('Anlass als Wort, Titel und Text gereinigt in den Daten; ohne Beitrag fehlt das Feld', () => {
+    const eingabe = { hof: HOF, produkte: [produkt('eier')], slots: [], auswahl: null, adresse: 'farmerzone.at/hof-test', jetzt: JETZT }
+    const daten = teilenBildDaten({ ...eingabe, beitrag: { anlass: 'NEW_SEASON', title: '<b>Spargel</b>​ ist da', body: 'Ab heute. Täglich frisch. Bis Juni.' } })
+    expect(daten.beitrag).toEqual({ anlass: 'Neue Saison', titel: '<b>Spargel</b> ist da', text: 'Ab heute. Täglich frisch.' })
+    expect(teilenBildDaten({ ...eingabe, beitrag: null })).not.toHaveProperty('beitrag')
+  })
+
+  it('Auswahl: verknüpfte Produkte, soweit kaufbar (eine Familie über jede ihrer Größen), sonst p, sonst Standard', () => {
+    const produkte = [
+      produkt('eier'),
+      produkt('honig', { stock: 0 }),
+      produkt('heu-1', { familieId: 'heu', name: 'Heu Sackerl' }),
+      produkt('heu-2', { familieId: 'heu', name: 'Heu Ballen' }),
+    ]
+    expect(teilenBildAuswahl(produkte, HOF, [['heu-2'], ['eier']])).toEqual(['heu-2'])
+    expect(bildProdukte(produkte, HOF, ['heu-2']).map((e) => e.id)).toEqual(['heu-1'])
+    expect(teilenBildAuswahl(produkte, HOF, [['honig'], ['eier']])).toEqual(['eier'])
+    expect(teilenBildAuswahl(produkte, HOF, [['honig'], undefined])).toBeNull()
+    expect(teilenBildAuswahl(produkte, HOF, [[], null])).toBeNull()
+  })
+
+  it('die Prüfsumme nimmt Beitrag und Fotos auf; ohne beides bleibt sie die der Metadaten der Hofseite', () => {
+    const eingabe = { hof: HOF, produkte: [produkt('eier')], slots: [], auswahl: null, adresse: 'farmerzone.at/hof-test', jetzt: JETZT }
+    const ohne = teilenBildVersion(teilenBildDaten(eingabe))
+    expect(teilenBildVersion(teilenBildDaten({ ...eingabe, beitrag: null }), [])).toBe(ohne)
+    const mit = teilenBildVersion(teilenBildDaten({ ...eingabe, beitrag: { anlass: 'PROMOTION', title: 'Aktion', body: 'Text.' } }))
+    expect(mit).not.toBe(ohne)
+    expect(teilenBildVersion(teilenBildDaten({ ...eingabe, beitrag: { anlass: 'PROMOTION', title: 'Aktion!', body: 'Text.' } }))).not.toBe(mit)
+    expect(teilenBildVersion(teilenBildDaten(eingabe), ['https://speicher.public.blob.vercel-storage.com/farms/farm-1/product/1.webp'])).not.toBe(ohne)
+  })
+})
+
+describe('Grafik: QR nur in der Story, Foto-Held mit Foto (Register T6)', () => {
+  const daten = teilenBildDaten({
+    hof: HOF,
+    produkte: [produkt('eier', { name: 'Freilandeier' })],
+    slots: [{ dayOfWeek: 6, startTime: '09:00', endTime: '12:00' }],
+    auswahl: null,
+    adresse: 'farmerzone.at/hof-test',
+    jetzt: JETZT,
+  })
+  const qr = qrPfad('https://farmerzone.at/hof-test?k=qr')
+  const MIT_FOTO: GeladeneBilder = { produkte: { eier: 'data:image/jpeg;base64,RUND' }, held: 'data:image/jpeg;base64,HELD', ersatz: false }
+  const zeichne = (format: 'quadrat' | 'story', bilder: GeladeneBilder) =>
+    renderToStaticMarkup(createElement(TeilenBildGrafik, { daten, format, qr, bilder }))
+
+  it('im 1:1 nie ein QR-Code, in der Story immer (mit und ohne Foto)', () => {
+    for (const bilder of [OHNE_BILDER, MIT_FOTO]) {
+      const quadrat = zeichne('quadrat', bilder)
+      expect(quadrat).not.toContain(qr.pfad)
+      expect(quadrat).not.toContain('Code scannen')
+      // Gegenprobe: Dieselbe Grafik zeichnet beide Merkmale in der Story.
+      const story = zeichne('story', bilder)
+      expect(story).toContain(qr.pfad)
+      expect(story).toContain('Code scannen oder farmerzone.at/hof-test')
+    }
+  })
+
+  it('mit Foto Variante B (Foto als Grund, rundes Produktbild), ohne Foto Variante A mit Abhol-Streifen', () => {
+    const b = zeichne('quadrat', MIT_FOTO)
+    expect(b).toContain('data:image/jpeg;base64,HELD')
+    expect(b).toContain('data:image/jpeg;base64,RUND')
+    expect(b).toContain('Abholung Sa, 10. Okt · 9–12 Uhr')
+    const a = zeichne('quadrat', OHNE_BILDER)
+    expect(a).not.toContain('data:image/jpeg;base64,HELD')
+    expect(a).toContain('Abholung am Hof')
+    expect(a).toContain('Sa, 10. Okt · 9–12 Uhr')
+  })
+})
+
+describe('GET /[farmSlug]/opengraph-image — Beitrag-Modus (Register T6)', () => {
+  const roh = (id: string, name: string, stock = 3) => ({
+    id,
+    name,
+    price: new Decimal('3.00'),
+    isAvailable: true,
+    stock,
+    familieId: null,
+    category: 'EIER',
+    verpackung: null,
+  })
+  const HOF_ROH = {
+    id: 'farm-1',
+    name: 'Hof Test',
+    slug: 'hof-test',
+    city: 'Teststadt',
+    isPaused: false,
+    betriebsnummer: null,
+    betriebsstatus: null,
+    products: [roh('eier', 'Freilandeier'), roh('honig', 'Blütenhonig'), roh('brot', 'Brot'), roh('heu', 'Heu')],
+    pickupSlots: [],
+  }
+  const beitrag = (abweichend: Record<string, unknown> = {}) => ({
+    farmId: 'farm-1',
+    anlass: 'FRESH_PRODUCT',
+    title: 'Frischer Honig ab Freitag',
+    body: 'Aus eigener Imkerei. Die Menge ist begrenzt. Bis bald!',
+    photoUrl: null,
+    linkedProductIds: ['honig'],
+    publishedAt: new Date('2026-10-06T08:00:00Z'),
+    expiresAt: null,
+    showOnFarmPage: true,
+    ...abweichend,
+  })
+  const aufruf = (suche: string) =>
+    bildRoute(new NextRequest(`http://localhost/hof-test/opengraph-image${suche}`), { params: Promise.resolve({ farmSlug: 'hof-test' }) })
+  const imBild = () =>
+    (vi.mocked(ImageResponse).mock.calls.at(-1)?.[0] as { props: { daten: { produkte: { id: string }[]; beitrag?: unknown } } }).props.daten
+
+  beforeEach(() => {
+    // Die Route nimmt ihre eigene Uhr: Nur Date steht still, Zeitgeber laufen echt.
+    vi.useFakeTimers({ toFake: ['Date'], now: JETZT })
+    findFirst.mockResolvedValue(HOF_ROH as never)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it.each([
+    ['es den Beitrag nicht gibt', null],
+    ['er zu einem anderen Hof gehört', beitrag({ farmId: 'farm-2' })],
+    ['er ein Entwurf ist', beitrag({ publishedAt: null })],
+    ['er abgelaufen ist', beitrag({ expiresAt: new Date(JETZT.getTime() - 1) })],
+    ['er nicht auf der Hofseite steht', beitrag({ showOnFarmPage: false })],
+  ])('404, wenn %s — nie das Bild ohne Beitrag unter seiner Adresse', async (_fall, gelesen) => {
+    beitragLesen.mockResolvedValueOnce(gelesen as never)
+    const res = await aufruf(`?b=${BEITRAG_ID}`)
+    expect(res.status).toBe(404)
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    expect(ImageResponse).not.toHaveBeenCalled()
+  })
+
+  it('eine Kennung, die keine cuid sein kann: 404 ohne Datenbank', async () => {
+    const res = await aufruf('?b=..%2Fx%20y')
+    expect(res.status).toBe(404)
+    expect(findFirst).not.toHaveBeenCalled()
+  })
+
+  it('gültiger Beitrag: Anlass, Titel, zwei Sätze und die verknüpften Produkte im Bild', async () => {
+    beitragLesen.mockResolvedValueOnce(beitrag() as never)
+    const res = await aufruf(`?b=${BEITRAG_ID}&format=story`)
+    expect(res.status).toBe(200)
+    expect(beitragLesen.mock.calls[0][0]?.where).toEqual({ id: BEITRAG_ID })
+    expect(imBild().beitrag).toEqual({ anlass: 'Frisches Produkt', titel: 'Frischer Honig ab Freitag', text: 'Aus eigener Imkerei. Die Menge ist begrenzt.' })
+    expect(imBild().produkte.map((e) => e.id)).toEqual(['honig'])
+  })
+
+  // Nachbesserung Runde 1 (Nr. 67): Das Fenster zeigt die Auswahl „Im Bild" und belegt sie mit den
+  // verknüpften Produkten vor — das geteilte Bild muss ihr folgen, sonst teilt der Hof abgewählte Produkte.
+  it.each([
+    ['p schlägt die verknüpften Produkte (Auswahl im Fenster)', '&p=eier,brot', ['honig'], ['eier', 'brot']],
+    ['ohne p die verknüpften Produkte (geteilte Bildadresse)', '', ['honig'], ['honig']],
+    ['ohne p und ohne kaufbares verknüpftes Produkt der Standard', '', ['gibt-es-nicht'], ['eier', 'honig', 'brot']],
+  ])('Beitrag-Modus: %s', async (_fall, p, verknuepft, erwartet) => {
+    beitragLesen.mockResolvedValueOnce(beitrag({ linkedProductIds: verknuepft }) as never)
+    const res = await aufruf(`?b=${BEITRAG_ID}${p}`)
+    expect(res.status).toBe(200)
+    expect(imBild().produkte.map((e) => e.id)).toEqual(erwartet)
+  })
+
+  it('Fotos nur aus dem eigenen Speicher und dem Pfad dieses Hofs; sonst Illustration und kein Foto-Held', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_testspeicher_geheim')
+    try {
+      vi.mocked(prisma.product.findMany).mockResolvedValueOnce([
+        { id: 'eier', imageUrl: 'https://testspeicher.public.blob.vercel-storage.com/farms/farm-1/product/1.webp' },
+        { id: 'honig', imageUrl: 'https://fremd.public.blob.vercel-storage.com/farms/farm-1/product/2.webp' },
+      ] as never)
+      beitragLesen.mockResolvedValueOnce(
+        beitrag({ linkedProductIds: ['eier', 'honig'], photoUrl: 'https://testspeicher.public.blob.vercel-storage.com/farms/farm-2/status/1.webp' }) as never
+      )
+      await aufruf(`?b=${BEITRAG_ID}`)
+      const eingabe = vi.mocked(ladeTeilenBildBilder).mock.calls.at(-1)?.[0]
+      expect(eingabe?.eintraege.map((e) => [e.id, e.quelle.art])).toEqual([
+        ['eier', 'foto'],
+        ['honig', 'illustration'],
+      ])
+      expect(eingabe?.beitragFoto).toBeNull()
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('fehlt ein Foto (Ersatz im Bild), kommt nur der kurze Zwischenspeicher — auch mit passender Prüfsumme', async () => {
+    vi.mocked(ladeTeilenBildBilder).mockResolvedValueOnce({ produkte: {}, held: null, ersatz: true })
+    const daten = teilenBildDaten({
+      hof: HOF,
+      produkte: HOF_ROH.products.map((p) => produkt(p.id, { name: p.name, preisCents: 300, stock: 3 })),
+      slots: [],
+      auswahl: null,
+      adresse: hofAdresse(APP_URL, 'hof-test').anzeige,
+      jetzt: JETZT,
+    })
+    const res = await aufruf(`?v=${teilenBildVersion(daten)}`)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('cache-control')).toBe('public, max-age=60, s-maxage=60')
   })
 })

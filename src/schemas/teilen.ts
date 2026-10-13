@@ -27,7 +27,12 @@ export type TeilenBesuch = z.infer<typeof teilenBesuchSchema>
  * die im Teilen-Fenster gewählten Produkte. Was nicht passt, fällt still weg
  * (Standard: quadrat, alle kaufbaren); ob ein Produkt ins Bild darf,
  * entscheidet trotzdem `bildProdukte` (nie ausverkauft, nie gesperrt).
- * `v` ist nur die Prüfsumme für den Zwischenspeicher und wird nicht gelesen.
+ * `b` ist die Kennung eines Beitrags (Beitrag-Modus, Register T6) — nur die
+ * Form einer cuid; eine andere Form fällt NICHT still weg, sondern lässt die
+ * Prüfung scheitern (die Route antwortet 404: ein Beitragsbild ohne Beitrag
+ * gibt es nicht). Ob der Beitrag ins Bild darf, entscheidet
+ * `beitragDarfInsBild`. `v` ist nur die Prüfsumme für den Zwischenspeicher
+ * und wird nicht gelesen.
  */
 export const teilenBildSucheSchema = z.object({
   format: z.enum(TEILEN_BILD_FORMATE).catch('quadrat'),
@@ -45,6 +50,7 @@ export const teilenBildSucheSchema = z.object({
     )
     .optional()
     .catch(undefined),
+  b: z.cuid().optional(),
 })
 
 export type TeilenBildSuche = z.infer<typeof teilenBildSucheSchema>

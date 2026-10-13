@@ -21,6 +21,8 @@
  *
  * Wer eine Unterkategorie ergänzt, ändert das Prisma-Enum UND diese Datei —
  * sonst schlägt der Abgleich-Test an. Labels stehen hier, nirgends sonst.
+ * Dazu gehört ihre Illustration: ein Eintrag in UNTERKATEGORIE_BILD_SLUG oder
+ * in OHNE_EIGENE_ILLUSTRATION — der Compiler verlangt genau eins von beidem.
  */
 
 // ---------------------------------------------------------------------------
@@ -64,7 +66,8 @@ export const KATEGORIE_LABEL: Record<ProductCategoryValue, string> = {
 
 /**
  * Die Illustration jeder Kategorie: public/categories/<slug>.webp — das Bild
- * der Produktkarte, solange ein Produkt kein eigenes Foto hat.
+ * der Produktkarte, solange ein Produkt kein eigenes Foto hat. Die Unterkategorie
+ * hat vor ihr den Vorrang (illustrationPfad, weiter unten bei den Unterkategorien).
  *
  * Die Zuordnung ist VOLLSTÄNDIG (Record über alle Kategorien — TypeScript
  * erzwingt jeden Wert), und zu jedem Dateinamen liegt eine Illustration in
@@ -95,9 +98,22 @@ export const KATEGORIE_BILD_SLUG: Record<ProductCategoryValue, string> = {
   SONSTIGES: 'sonstiges',
 }
 
-/** Der Pfad der Illustration einer Kategorie („/categories/milch.webp") — ohne Kategorie keiner. */
+/** Der Ordner aller Illustrationen unter public/ — Kategorien als Dateien, Unterkategorien in einem Ordner je Kategorie. */
+const ILLUSTRATION_ORDNER = '/categories'
+
+/**
+ * Die neutrale Illustration: letzte Stufe der Rückfall-Kette, auch für ein
+ * Produkt ohne Kategorie (Register I1).
+ */
+export const SONSTIGES_BILD_PFAD = `${ILLUSTRATION_ORDNER}/${KATEGORIE_BILD_SLUG.SONSTIGES}.webp`
+
+/**
+ * Der Pfad der Illustration einer Kategorie („/categories/milch.webp") — ohne
+ * Kategorie keiner. Für Aufrufer ohne Unterkategorie (Startseite, „Für Höfe");
+ * wer ein Produkt zeigt, nimmt illustrationPfad.
+ */
 export function kategorieBildPfad(l1: ProductCategoryValue | null | undefined): string | null {
-  return l1 ? `/categories/${KATEGORIE_BILD_SLUG[l1]}.webp` : null
+  return l1 ? `${ILLUSTRATION_ORDNER}/${KATEGORIE_BILD_SLUG[l1]}.webp` : null
 }
 
 /**
@@ -319,6 +335,104 @@ export function zeigeUnterkategorien(
     if (verschiedene.size >= 2) return true
   }
   return false
+}
+
+// ---------------------------------------------------------------------------
+// Illustrationen der Unterkategorien (Register I1, Nr. 74)
+// ---------------------------------------------------------------------------
+
+/**
+ * Unterkategorien ohne eigene Illustration: Bei den Eiern unterscheiden sich
+ * nur die Haltungsformen (kein eigenes Bild wert), die Futter-Altlast steht
+ * nur noch an Bestandsdaten. Sie zeigen die Illustration ihrer Kategorie.
+ */
+export const OHNE_EIGENE_ILLUSTRATION = [
+  'EIER_BIO', 'EIER_FREILAND', 'EIER_BODENHALTUNG',
+  'EINZELFUTTERMITTEL', 'MISCHFUTTERMITTEL', 'ERGAENZUNGSFUTTERMITTEL',
+] as const satisfies readonly ZugeordneteUnterkategorie[]
+
+type UnterkategorieMitIllustration = Exclude<ZugeordneteUnterkategorie, (typeof OHNE_EIGENE_ILLUSTRATION)[number]>
+
+/**
+ * Der Dateiname der Illustration einer Unterkategorie, ohne Endung — sie liegt
+ * im Ordner ihrer Kategorie: public/categories/<KATEGORIE_BILD_SLUG>/<Name>.webp.
+ *
+ * Vollständig: Der Typ nimmt jede Unterkategorie, die NICHT in
+ * OHNE_EIGENE_ILLUSTRATION steht, und keine andere — fehlt eine oder steht eine
+ * in beiden Listen, bricht der Typecheck. Ob die Dateien liegen, prüft
+ * `pnpm illustrationen`.
+ */
+export const UNTERKATEGORIE_BILD_SLUG: Record<UnterkategorieMitIllustration, string> = {
+  // Fleisch
+  RIND: 'rind',
+  SCHWEIN: 'schwein',
+  HAEHNCHEN: 'haehnchen',
+  PUTE: 'pute',
+  LAMM: 'lamm',
+  WILD: 'wild',
+  WURST: 'wurst',
+  // Milch
+  TRINKMILCH: 'trinkmilch',
+  KAESE: 'kaese',
+  JOGHURT_TOPFEN: 'joghurt-topfen',
+  BUTTER: 'butter',
+  // Gemüse
+  ERDAEPFEL: 'erdaepfel',
+  WURZELGEMUESE: 'wurzelgemuese',
+  BLATT_SALAT: 'blatt-salat',
+  KOHL: 'kohl',
+  FRUCHTGEMUESE: 'fruchtgemuese',
+  KUERBIS: 'kuerbis',
+  ZWIEBEL_LAUCH: 'zwiebel-lauch',
+  KRAEUTER: 'kraeuter',
+  EINGELEGT: 'eingelegt',
+  // Obst
+  KERNOBST: 'kernobst',
+  STEINOBST: 'steinobst',
+  BEEREN: 'beeren',
+  NUESSE: 'nuesse',
+  EINGEKOCHT_GETROCKNET: 'eingekocht-getrocknet',
+  // Honig
+  BLUETENHONIG: 'bluetenhonig',
+  WALDHONIG: 'waldhonig',
+  SORTENHONIG: 'sortenhonig',
+  BIENENPRODUKTE: 'bienenprodukte',
+  // Heu & Stroh
+  WIESENHEU: 'wiesenheu',
+  LUZERNE: 'luzerne',
+  STROH: 'stroh',
+  SILAGE: 'silage',
+  // Getreide & Körner
+  MAIS: 'mais',
+  HAFER: 'hafer',
+  GERSTE: 'gerste',
+  WEIZEN: 'weizen',
+  ROGGEN: 'roggen',
+  TRITICALE: 'triticale',
+  // Brennmaterial
+  BRENNHOLZ_SCHEIT: 'brennholz-scheit',
+  ANZUENDHOLZ: 'anzuendholz',
+  HACKSCHNITZEL: 'hackschnitzel',
+}
+
+/**
+ * Die Illustration eines Produkts ohne Foto (Register I1): Unterkategorie →
+ * Kategorie → „Sonstiges". Gibt immer einen Pfad zurück; ob die Datei liegt,
+ * prüft nur der Server (categoryImagePath in product-image.ts, Stufe für Stufe).
+ *
+ * Die Unterkategorie zählt nur, wenn sie zur Kategorie gehört: Ihr Ordner ist
+ * der der Kategorie, ein Paar wie Milch/Rind ergäbe sonst einen Pfad ins Leere.
+ */
+export function illustrationPfad(
+  l1: ProductCategoryValue | null | undefined,
+  l2?: ProductSubcategoryValue | null
+): string {
+  if (l1 != null && l2 != null && gehoertZu(l1, l2)) {
+    const bildSlug: Partial<Record<ProductSubcategoryValue, string>> = UNTERKATEGORIE_BILD_SLUG
+    const datei = bildSlug[l2]
+    if (datei) return `${ILLUSTRATION_ORDNER}/${KATEGORIE_BILD_SLUG[l1]}/${datei}.webp`
+  }
+  return kategorieBildPfad(l1) ?? SONSTIGES_BILD_PFAD
 }
 
 // ---------------------------------------------------------------------------

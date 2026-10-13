@@ -28,12 +28,12 @@ import { hofInitialen } from '@/lib/hof-initialen'
 import {
   aktiverReiter,
   alleProdukteText,
+  beitragZeitText,
   gebuehrHinweisFuerHof,
   hofseiteReiter,
   reiterAdresse,
   ueberUnsText,
   verfuegbarText,
-  vorWieLange,
   zahlungsarten,
   zeigeSchaufenster,
   type HofReiterId,
@@ -58,6 +58,7 @@ import { ProductGrid, useBereichWunsch } from '@/components/farm/product-grid'
 import { VorschauImRahmen } from '@/components/farm/vorschau-im-rahmen'
 import { HofseiteSeitenspalte } from '@/components/hofseite/hofseite-seitenspalte'
 import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
+import { Titelbild } from '@/components/hofseite/titelbild'
 
 /*
  * Die Hofseite für Kundinnen im neuen Design (Nachtlauf Nr. 10, Gate 4).
@@ -119,13 +120,14 @@ const ALLE_PRODUKTE_KNOPF = cn(
 
 export function HofseiteKunde({
   farm,
-  activeStatus,
+  beitraege,
   reorderItems,
   ansicht,
   jetzt,
 }: {
   farm: HofseiteHof
-  activeStatus: ActiveStatusPost | null
+  /** Die aktiven Beiträge, der neueste zuerst (Register F8) — page.tsx lädt höchstens fünf. */
+  beitraege: ActiveStatusPost[]
   reorderItems?: ReorderItem[]
   ansicht: Pick<SeitenAnsicht, 'art' | 'kaufen'>
   /**
@@ -152,10 +154,11 @@ export function HofseiteKunde({
   const zurueck = rueckweg(kundenSeite, false)
   const beimZurueck = useRueckwegKlick(kundenSeite, 'zeile')
 
-  const beitrag = sichtbar('status') ? activeStatus : null
+  // Hat der Hof den Abschnitt Status ausgeblendet, gibt es auch den Reiter nicht.
+  const gezeigteBeitraege = sichtbar('status') ? beitraege : []
   // EINE Zahl für den Reiter „Produkte · n" und „Alle Produkte (n)": alles, was der Reiter Produkte zeigt.
   const produktAnzahl = produkte.length
-  const reiter = hofseiteReiter({ produktAnzahl, hatBeitrag: beitrag !== null })
+  const reiter = hofseiteReiter({ produktAnzahl, beitragAnzahl: gezeigteBeitraege.length })
   const offen = aktiverReiter({ reiter: suche.get(REITER_PARAMETER), bereich: suche.get('bereich') }, reiter)
   const schaufenster = zeigeSchaufenster(offen, produktAnzahl)
 
@@ -311,26 +314,8 @@ export function HofseiteKunde({
 
       {/* ── Titelbild, Name, Aktionen ── */}
       <div className="relative">
-        <div data-abschnitt="titelbild" className="relative h-[220px] w-full overflow-hidden bg-muted md:h-[300px]">
-          {foto ? (
-            <Image
-              src={foto}
-              alt=""
-              fill
-              sizes="100vw"
-              priority
-              className="object-cover"
-              style={{ objectPosition: `50% ${farm.bannerFocusY}%` }}
-            />
-          ) : (
-            // Der Verlauf ist ein Wert des Hofs (Titelbild-Einstellung), kein Farbliteral im Code.
-            <div className="absolute inset-0" style={{ background: titelbildVerlauf(farm.bannerValue) }} />
-          )}
-          {/* Am Handy steht der Name auf dem Bild: dunkler Schleier, theme-fest (DESIGN_SYSTEM, Bild-Overlays). */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-linear-to-t from-primary-foreground/75 via-primary-foreground/10 to-transparent md:hidden"
-          />
+        {/* Hochformat ab md ganz statt beschnitten (Register N6, Nr. 72): entscheidet titelbild.tsx. */}
+        <Titelbild foto={foto} verlauf={titelbildVerlauf(farm.bannerValue)} fokusY={farm.bannerFocusY}>
           <button
             type="button"
             onClick={() => void teileHof(farm)}
@@ -342,7 +327,7 @@ export function HofseiteKunde({
           >
             <Share2 className="size-5" strokeWidth={1.7} aria-hidden="true" />
           </button>
-        </div>
+        </Titelbild>
 
         <div className="relative mx-auto max-w-[1200px] px-4 md:flex md:items-end md:gap-6 md:px-6">
           {/* Am Handy über dem unteren Rand des Titelbilds, ab 768 px darunter neben dem Hofzeichen. */}
@@ -486,7 +471,7 @@ export function HofseiteKunde({
             </div>
           ) : null}
 
-          {offen === 'beitraege' && beitrag ? <Beitrag beitrag={beitrag} jetzt={jetzt} /> : null}
+          {offen === 'beitraege' ? <Beitraege beitraege={gezeigteBeitraege} jetzt={jetzt} /> : null}
 
           <div id="produkte">
             <ProductGrid
@@ -529,20 +514,42 @@ export function HofseiteKunde({
   )
 }
 
-/** Der Beitrag des Hofs (aktiver Status) im Reiter „Beiträge". */
-function Beitrag({ beitrag, jetzt }: { beitrag: ActiveStatusPost; jetzt: string }): ReactNode {
+/**
+ * Die Beiträge des Hofs im Reiter „Beiträge“ (Register F8): alle aktiven, der
+ * neueste zuerst mit „Aktuell“. Wie viele es höchstens sind, sagt die Abfrage
+ * (HOFSEITE_BEITRAEGE_MAX), nicht die Anzeige.
+ */
+function Beitraege({ beitraege, jetzt }: { beitraege: ActiveStatusPost[]; jetzt: string }): ReactNode {
+  return (
+    <ul className="flex flex-col gap-3">
+      {beitraege.map((beitrag, index) => (
+        <li key={beitrag.id}>
+          <Beitrag beitrag={beitrag} neuester={index === 0} jetzt={jetzt} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Ein Beitrag des Hofs; der neueste trägt „Aktuell“ und den grünen Rahmen (Mockup mobil-k2-hofseite-beitraege-alle-aktiven). */
+function Beitrag({ beitrag, neuester, jetzt }: { beitrag: ActiveStatusPost; neuester: boolean; jetzt: string }): ReactNode {
   const anlass = ANLASS[beitrag.anlass] ?? ANLASS.ANNOUNCEMENT
   const Symbol = anlass.symbol
+  // Eine Kennung je Karte: Mehrere Beiträge auf einer Seite dürfen sich nicht dieselbe teilen.
+  const titelId = `beitrag-titel-${beitrag.id}`
   return (
-    <article aria-labelledby="beitrag-titel" className={cn(KARTE, 'flex flex-col gap-3')}>
-      <div className="flex flex-wrap items-center gap-2.5">
-        <StatusBadge status="fertig" className="gap-1">
-          <Symbol className="size-3 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-          {anlass.label}
+    <article aria-labelledby={titelId} className={cn(KARTE, 'flex flex-col gap-3', neuester && 'border-accent')}>
+      <div className="flex flex-wrap items-center justify-between gap-x-2.5 gap-y-1">
+        {/* Symbol und Anlass in EINER Zeile: StatusBadge setzt seinen Inhalt in einen Block, ein Symbol stünde sonst über dem Wort (Mockup: daneben). */}
+        <StatusBadge status="fertig">
+          <span className="inline-flex items-center gap-1">
+            <Symbol className="size-3 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+            {anlass.label}
+          </span>
         </StatusBadge>
-        <span className="text-[13px] text-muted-foreground">Aktuell · {vorWieLange(beitrag.publishedAt, jetzt)}</span>
+        <span className="text-[13px] text-muted-foreground">{beitragZeitText(neuester, beitrag.publishedAt, jetzt)}</span>
       </div>
-      <h2 id="beitrag-titel" className="font-heading text-xl font-semibold break-words text-foreground">
+      <h2 id={titelId} className="font-heading text-xl font-semibold break-words text-foreground">
         {beitrag.title}
       </h2>
       <p className="text-[14.5px] leading-relaxed whitespace-pre-wrap break-words text-muted-foreground">

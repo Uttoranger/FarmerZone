@@ -1,13 +1,13 @@
 import { notFound, unstable_rethrow } from 'next/navigation'
 import type { Metadata } from 'next'
 import * as Sentry from '@sentry/nextjs'
-import { getActiveStatusPost, type ActiveStatusPost } from '@/server/queries/status-posts'
+import { getActiveStatusPosts, type ActiveStatusPost } from '@/server/queries/status-posts'
 import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
 import { verifyReorderToken } from '@/lib/reorder-token'
 import { prisma } from '@/lib/prisma'
 import { hofVorschaubild } from '@/lib/vorschaubild'
 import { teilenVorschauText } from '@/lib/teilen-bild'
-import { entferneKontaktdaten, ueberUnsText } from '@/lib/hofseite-kunde'
+import { HOFSEITE_BEITRAEGE_MAX, entferneKontaktdaten, ueberUnsText } from '@/lib/hofseite-kunde'
 import { ladeTeilenVorschau } from '@/server/queries/teilen-bild'
 import type { Suchparameter } from '@/lib/ansichts-modus'
 import { nachbestellToken } from '@/schemas/nachbestellung'
@@ -98,17 +98,19 @@ async function loadReorderItems(token: string, farmId: string): Promise<ReorderI
 }
 
 /**
- * Der aktuelle Beitrag des Hofs. Scheitert das Laden, fehlt nur der Reiter
- * „Beiträge" — die Seite mit Produkten und Korb bleibt (Fehler inline statt
- * der 500 für alles); der Fehler geht nach Sentry.
+ * Die aktiven Beiträge des Hofs (Register F8: höchstens fünf, der neueste
+ * zuerst). Scheitert das Laden, fehlt nur der Reiter „Beiträge" — die Seite mit
+ * Produkten und Korb bleibt (Fehler inline statt der 500 für alles); der Fehler
+ * geht nach Sentry. Die Vorschau im Bauern-Bereich ist dieselbe Route
+ * (?vorschau=1) und bekommt deshalb dieselbe Liste.
  */
-async function ladeBeitrag(farmId: string): Promise<ActiveStatusPost | null> {
+async function ladeBeitraege(farmId: string): Promise<ActiveStatusPost[]> {
   try {
-    return await getActiveStatusPost(farmId)
+    return await getActiveStatusPosts(farmId, HOFSEITE_BEITRAEGE_MAX)
   } catch (err) {
     unstable_rethrow(err)
     Sentry.captureException(err, { tags: { bereich: 'hofseite-beitrag' } })
-    return null
+    return []
   }
 }
 
@@ -119,7 +121,7 @@ export default async function FarmPage({ params, searchParams }: Props) {
 
   if (!farm) notFound()
 
-  const activeStatus = await ladeBeitrag(farm.id)
+  const beitraege = await ladeBeitraege(farm.id)
   // Wo Kaufen nicht wirkt (Vorschau), gibt es keinen Korb — also auch nichts,
   // was ein Nachbestell-Link hineinlegen dürfte (korbErlaubt, src/lib/hofseite-vorschau.ts).
   const reorder = nachbestellToken(suche.reorder)
@@ -134,7 +136,7 @@ export default async function FarmPage({ params, searchParams }: Props) {
         // Telefon und E-Mail erst nach dem Kauf (Nr. 60): Sie bleiben hier auf
         // dem Server und stehen so nicht in den Seitendaten der Client-Komponente.
         farm={entferneKontaktdaten(farm)}
-        activeStatus={activeStatus}
+        beitraege={beitraege}
         reorderItems={reorderItems}
         ansicht={ansicht}
         jetzt={jetzt.toISOString()}

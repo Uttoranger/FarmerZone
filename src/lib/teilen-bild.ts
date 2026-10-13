@@ -12,12 +12,17 @@
  *  - Hof- und Produktnamen sind Fremdtext: gereinigt (Steuer- und
  *    Richtungszeichen weg, einzeilig, gekürzt) und im Bild nur als Text —
  *    Satori kennt kein HTML, ein `<script>` im Namen bleibt Buchstaben.
+ *  - Beitrag-Modus (`?b=`, Register T6): nur ein veröffentlichter Beitrag
+ *    dieses Hofs, der auf der Hofseite steht und nicht abgelaufen ist
+ *    (`beitragDarfInsBild`); Titel und Text sind Fremdtext wie die Namen.
  */
+import type { StatusPostAnlass } from '@prisma/client'
 import type { BetriebsstatusValue, ProductCategoryValue } from '@/lib/taxonomie'
 import { istGebindeGesperrt, type VerpackungValue } from '@/lib/futter-registrierung'
 import { einzeiligerFremdtext } from '@/lib/fremdtext'
-import { HOFNAME_MAX, PRODUKTNAME_MAX } from '@/lib/eingabegrenzen'
-import { centsAlsEuro, formatEuro } from '@/lib/format'
+import { BEITRAG_TEXT_MAX, BEITRAG_TITEL_MAX, HOFNAME_MAX, PRODUKTNAME_MAX } from '@/lib/eingabegrenzen'
+import { centsAlsEuro, formatEuro, formatTagKurz } from '@/lib/format'
+import { stripStatusVariables } from '@/lib/status-body'
 import { gemeinsamerAnfang } from '@/lib/produktdetail'
 import { abholungText, naechstesAbholfenster, type HeuteFenster } from '@/lib/heute'
 import type { TeilenBildFormat } from '@/lib/teilen-kanal'
@@ -125,8 +130,10 @@ export function teilenAuswahl(produkte: readonly TeilenBildProdukt[], hof: Teile
 
 /**
  * Die Produkte im Bild: höchstens drei kaufbare, eine Familie als ein
- * Eintrag. Mit `auswahl` (Kennungen aus dem Teilen-Fenster) nur diese — aber
- * auch dann nie ein ausverkauftes oder gesperrtes. Pausiert: keins.
+ * Eintrag. Mit `auswahl` (Kennungen aus dem Teilen-Fenster oder die
+ * verknüpften Produkte eines Beitrags) nur diese — eine Familie zählt, wenn
+ * eine ihrer kaufbaren Größen gewählt ist; auch dann nie ein ausverkauftes
+ * oder gesperrtes. Pausiert: keins.
  */
 export function bildProdukte(
   produkte: readonly TeilenBildProdukt[],
@@ -134,9 +141,71 @@ export function bildProdukte(
   auswahl: readonly string[] | null
 ): TeilenBildEintrag[] {
   if (hof.isPaused) return []
-  const eintraege = gruppen(produkte.filter((p) => kaufbar(p, hof))).map(eintragAus)
-  const gewaehlt = auswahl === null ? eintraege : eintraege.filter((e) => auswahl.includes(e.id))
-  return gewaehlt.slice(0, TEILEN_BILD_PRODUKTE_MAX)
+  const kaufbare = gruppen(produkte.filter((p) => kaufbar(p, hof)))
+  const gewaehlt = auswahl === null ? kaufbare : kaufbare.filter((g) => g.some((p) => auswahl.includes(p.id)))
+  return gewaehlt.slice(0, TEILEN_BILD_PRODUKTE_MAX).map(eintragAus)
+}
+
+/**
+ * Welche Auswahl das Bild bekommt: die erste Liste, aus der mindestens ein
+ * Produkt ins Bild darf — im Beitrag-Modus zuerst die verknüpften Produkte,
+ * dann `?p=`; bleibt nichts, gilt die Standardauswahl (null). Geprüft gegen
+ * die volle Auswahl, nicht gegen die ersten drei (sonst ginge das vierte
+ * Produkt verloren).
+ */
+export function teilenBildAuswahl(
+  produkte: readonly TeilenBildProdukt[],
+  hof: TeilenBildHof,
+  listen: readonly (readonly string[] | null | undefined)[]
+): readonly string[] | null {
+  return listen.find((liste) => liste && liste.length > 0 && bildProdukte(produkte, hof, liste).length > 0) ?? null
+}
+
+/** Der Anlass eines Beitrags als Wort für die Vorzeile — wie auf der Hofseite und in der Mail. */
+export const BEITRAG_ANLASS_TEXT: Record<StatusPostAnlass, string> = {
+  FRESH_PRODUCT: 'Frisches Produkt',
+  NEW_SEASON: 'Neue Saison',
+  PROMOTION: 'Aktion',
+  ANNOUNCEMENT: 'Mitteilung',
+}
+
+/** So lang darf der Text eines Beitrags im Bild höchstens sein (zwei Sätze, gekürzt). */
+export const TEILEN_BILD_BEITRAG_TEXT_MAX = 160
+
+/**
+ * Darf dieser Beitrag ins Bild? Dieselben Bedingungen wie der aktive Beitrag
+ * der Hofseite (`getActiveStatusPost`): gehört zum Hof, ist veröffentlicht,
+ * steht auf der Hofseite und ist nicht abgelaufen. Ein Entwurf oder ein
+ * abgelaufener Beitrag wäre sonst über seine Kennung öffentlich lesbar.
+ */
+export function beitragDarfInsBild(
+  beitrag: { farmId: string; publishedAt: Date | null; expiresAt: Date | null; showOnFarmPage: boolean },
+  farmId: string,
+  jetzt: Date
+): boolean {
+  return (
+    beitrag.farmId === farmId &&
+    beitrag.publishedAt !== null &&
+    beitrag.publishedAt.getTime() <= jetzt.getTime() &&
+    beitrag.showOnFarmPage &&
+    (beitrag.expiresAt === null || beitrag.expiresAt.getTime() > jetzt.getTime())
+  )
+}
+
+/** Höchstens zwei Sätze des Beitrags, einzeilig gereinigt und gekürzt; `{Vorname}` fällt weg wie auf der Hofseite. */
+export function beitragKurztext(body: string): string {
+  const text = einzeiligerFremdtext(stripStatusVariables(body), BEITRAG_TEXT_MAX)
+  const saetze = text.split(/(?<=[.!?…])\s+/)
+  return einzeiligerFremdtext(saetze.slice(0, 2).join(' '), TEILEN_BILD_BEITRAG_TEXT_MAX)
+}
+
+/** Was ein Beitrag ins Bild bringt (Beitrag-Modus). */
+export type TeilenBildBeitrag = {
+  /** „Frisches Produkt" — die Vorzeile vor dem Hofnamen. */
+  anlass: string
+  titel: string
+  /** Höchstens zwei Sätze (`beitragKurztext`). */
+  text: string
 }
 
 export type TeilenBildDaten = {
@@ -145,8 +214,16 @@ export type TeilenBildDaten = {
   produkte: TeilenBildEintrag[]
   /** „Abholung Samstag, 9–12 Uhr"; null ohne Abholfenster oder bei pausiertem Hof. */
   abholung: string | null
+  /**
+   * Der Termin im Abhol-Streifen mit Wochentag und Datum („So, 18. Okt ·
+   * 14–16 Uhr", `formatTagKurz`): Ein geteiltes Bild wird Tage später noch
+   * gesehen, „morgen" stimmte dann nicht mehr. null wie `abholung`.
+   */
+  abholTermin: string | null
   /** „farmerzone.at/hof-test" — so steht die Adresse im Bild. */
   adresse: string
+  /** Nur im Beitrag-Modus; sonst fehlt das Feld (die Prüfsumme bleibt dann wie ohne Beitrag). */
+  beitrag?: TeilenBildBeitrag
 }
 
 export function teilenBildDaten(eingabe: {
@@ -156,26 +233,39 @@ export function teilenBildDaten(eingabe: {
   auswahl: readonly string[] | null
   adresse: string
   jetzt: Date
+  /** Ein Beitrag, der ins Bild darf (`beitragDarfInsBild` hat der Aufrufer geprüft). */
+  beitrag?: { anlass: StatusPostAnlass; title: string; body: string } | null
 }): TeilenBildDaten {
-  const { hof } = eingabe
+  const { hof, beitrag } = eingabe
   const fenster = hof.isPaused ? null : naechstesAbholfenster(eingabe.slots, eingabe.jetzt)
   return {
     hofName: einzeiligerFremdtext(hof.name, HOFNAME_MAX),
     ort: einzeiligerFremdtext(hof.city, HOFNAME_MAX),
     produkte: bildProdukte(eingabe.produkte, hof, eingabe.auswahl),
     abholung: fenster ? abholungText(fenster) : null,
+    abholTermin: fenster ? `${formatTagKurz(fenster.tag)} · ${fenster.zeit}` : null,
     adresse: eingabe.adresse,
+    ...(beitrag && {
+      beitrag: {
+        anlass: BEITRAG_ANLASS_TEXT[beitrag.anlass],
+        titel: einzeiligerFremdtext(beitrag.title, BEITRAG_TITEL_MAX),
+        text: beitragKurztext(beitrag.body),
+      },
+    }),
   }
 }
 
 /**
  * Kurze Prüfsumme über den Inhalt des Bilds (FNV-1a). Sie hängt als `?v=` an
- * der Bildadresse in den Metadaten: Ändert sich Name, Angebot oder Abholung,
- * ändert sich die Adresse — so darf das Bild lange im Zwischenspeicher liegen
- * und ist trotzdem nie veraltet (S9 „Cache je Hof mit Invalidierung").
+ * der Bildadresse in den Metadaten: Ändert sich Name, Angebot, Abholung oder
+ * Beitrag, ändert sich die Adresse — so darf das Bild lange im
+ * Zwischenspeicher liegen und ist trotzdem nie veraltet (S9 „Cache je Hof mit
+ * Invalidierung"). `fotos` sind die Adressen der eigenen Fotos im Bild (ein
+ * neues Foto hat eine neue Adresse); ohne Fotos ist die Summe dieselbe wie
+ * die der Metadaten (`ladeTeilenVorschau`).
  */
-export function teilenBildVersion(daten: TeilenBildDaten): string {
-  const text = JSON.stringify(daten)
+export function teilenBildVersion(daten: TeilenBildDaten, fotos: readonly string[] = []): string {
+  const text = JSON.stringify(fotos.length > 0 ? [daten, fotos] : daten)
   let h = 0x811c9dc5
   for (let i = 0; i < text.length; i++) {
     h ^= text.charCodeAt(i)

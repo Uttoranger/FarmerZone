@@ -6,7 +6,7 @@
  * Beweist:
  *  - Der Reiter „Beiträge" kann alles, was /status konnte: Deaktivieren (nur
  *    aktiv), Löschen (immer, mit Rückfrage), Als Vorlage (nur vergangen),
- *    WhatsApp fortsetzen (nur, wenn noch Nachrichten offen sind).
+ *    „WhatsApp · n von m" (Register W1: nur, solange heutige Abonnentinnen offen sind).
  *  - /status leitet auf den Reiter um (alte Links funktionieren), „Neuer
  *    Beitrag" und „WhatsApp fortsetzen" liegen unter (hof) und führen nach
  *    dem Speichern zurück in den Reiter.
@@ -31,6 +31,7 @@ vi.mock('@/server/actions/status-posts', () => ({
   deleteStatusPost: vi.fn(),
 }))
 vi.mock('@/server/actions/meldung', () => ({ meldungAbsenden: vi.fn() }))
+vi.mock('@/server/actions/teilen-fenster', () => ({ ladeTeilenFensterBeitragAction: vi.fn() }))
 vi.mock('@/components/shared/image-upload', () => ({
   useImageUpload: () => ({ fileInput: null, openFilePicker: () => {}, isUploading: false, progress: null }),
   stufenText: () => '',
@@ -64,13 +65,14 @@ const basis: BeitragQuelle = {
   isActive: false,
   isDraft: false,
   publishedAt: '2026-09-20T10:00:00.000Z',
+  showOnFarmPage: true,
   sentViaEmail: false,
-  sentViaWhatsApp: false,
   emailRecipientCount: 0,
-  whatsappSentCount: 0,
-  whatsappRecipientCount: 0,
+  whatsappGetippt: [],
 }
-const eintrag = (q: Partial<BeitragQuelle>) => beitraegeUebersicht([{ ...basis, ...q }], jetzt).gruppen[0].eintraege[0]
+/** `abonnentinnen`: die heutigen WhatsApp-Abonnentinnen des Hofs (Register W1, m in „n von m"). */
+const eintrag = (q: Partial<BeitragQuelle>, abonnentinnen = 0) =>
+  beitraegeUebersicht([{ ...basis, ...q }], jetzt, abonnentinnen).gruppen[0].eintraege[0]
 
 describe('Beiträge: Aktionen je Eintrag (E12, was /status konnte)', () => {
   it('aktiv: Deaktivieren, keine Vorlage', () => {
@@ -86,18 +88,45 @@ describe('Beiträge: Aktionen je Eintrag (E12, was /status konnte)', () => {
   })
 
   it('Entwurf: weder Deaktivieren noch Vorlage noch WhatsApp', () => {
-    const e = eintrag({ isDraft: true, publishedAt: null, sentViaWhatsApp: true, whatsappRecipientCount: 3 })
-    expect(e.aktionen).toEqual({ deaktivieren: false, vorlage: null, whatsapp: null })
+    const e = eintrag({ isDraft: true, publishedAt: null }, 3)
+    expect(e.aktionen).toEqual({ teilen: false, deaktivieren: false, vorlage: null, whatsapp: null })
   })
 
-  it('WhatsApp fortsetzen nur, solange noch Nachrichten offen sind — mit Stand im Text', () => {
-    expect(eintrag({ sentViaWhatsApp: true, whatsappSentCount: 2, whatsappRecipientCount: 5 }).aktionen.whatsapp).toEqual({
+  it('W1: „WhatsApp · n von m" — n wer geöffnet bekam, m die heutigen Abonnentinnen, solange m > n', () => {
+    // vergangen (basis) und aktiv zeigen den Knopf gleich.
+    for (const q of [{}, { isActive: true, publishedAt: jetzt }]) {
+      expect(eintrag({ ...q, whatsappGetippt: ['a', 'b'] }, 5).aktionen.whatsapp).toEqual({
+        href: '/status/b1/send-whatsapp',
+        text: 'WhatsApp · 2 von 5',
+      })
+    }
+    // Die heutige Zahl zählt, nicht die beim Veröffentlichen: kam jemand dazu, ist wieder etwas offen.
+    expect(eintrag({ whatsappGetippt: ['a', 'b'] }, 3).aktionen.whatsapp?.text).toBe('WhatsApp · 2 von 3')
+  })
+
+  it('W1: das Häkchen beim Veröffentlichen zählt nicht — ohne Häkchen und m > n trotzdem der Knopf', () => {
+    expect(eintrag({ whatsappGetippt: [] }, 5).aktionen.whatsapp).toEqual({
       href: '/status/b1/send-whatsapp',
-      text: 'WhatsApp fortsetzen · 2 von 5',
+      text: 'WhatsApp · 0 von 5',
     })
-    // Gegenprobe: alle verschickt bzw. nie per WhatsApp → nichts fortzusetzen.
-    expect(eintrag({ sentViaWhatsApp: true, whatsappSentCount: 5, whatsappRecipientCount: 5 }).aktionen.whatsapp).toBeNull()
-    expect(eintrag({ sentViaWhatsApp: false, whatsappSentCount: 0, whatsappRecipientCount: 5 }).aktionen.whatsapp).toBeNull()
+    // Vergangener Beitrag ohne Häkchen (basis): der Weg zurück in die Tipp-Liste bleibt.
+    expect(eintrag({ whatsappGetippt: ['a'] }, 2).aktionen.whatsapp?.text).toBe('WhatsApp · 1 von 2')
+  })
+
+  it('W1: kein Knopf, wenn alle geöffnet sind oder der Hof keine Abonnentinnen hat (m = 0)', () => {
+    expect(eintrag({ whatsappGetippt: ['a', 'b'] }, 2).aktionen.whatsapp).toBeNull()
+    expect(eintrag({ whatsappGetippt: [] }, 0).aktionen.whatsapp).toBeNull()
+    expect(eintrag({ whatsappGetippt: [] }, 0).aktionen.whatsapp).toBeNull()
+    expect(eintrag({ isActive: true, publishedAt: jetzt, whatsappGetippt: [] }, 0).aktionen.whatsapp).toBeNull()
+  })
+})
+
+describe('Beiträge: „Teilen" je Beitrag (Register T5, Nr. 67)', () => {
+  it('nur aktive Beiträge, die auf der Hofseite stehen — dort zeigen Bild und Link sie', () => {
+    expect(eintrag({ isActive: true, publishedAt: jetzt }).aktionen.teilen).toBe(true)
+    expect(eintrag({ isActive: true, publishedAt: jetzt, showOnFarmPage: false }).aktionen.teilen).toBe(false)
+    expect(eintrag({}).aktionen.teilen).toBe(false)
+    expect(eintrag({ isDraft: true, publishedAt: null }).aktionen.teilen).toBe(false)
   })
 })
 
@@ -107,9 +136,10 @@ describe('Reiter „Beiträge" (gerendert)', () => {
       uebersicht: beitraegeUebersicht(
         [
           { ...basis, id: 'a1', title: 'Spargel ab heute', isActive: true, publishedAt: jetzt },
-          { ...basis, id: 'v1', title: 'Kürbisse', sentViaWhatsApp: true, whatsappSentCount: 1, whatsappRecipientCount: 4 },
+          { ...basis, id: 'v1', title: 'Kürbisse', whatsappGetippt: ['a'] },
         ],
-        jetzt
+        jetzt,
+        4
       ),
     })
   )
@@ -120,9 +150,12 @@ describe('Reiter „Beiträge" (gerendert)', () => {
     expect(html).toContain('Deaktivieren')
     expect(html).toContain('href="/status/new?from=v1"')
     expect(html).toContain('href="/status/v1/send-whatsapp"')
-    expect(html).toContain('WhatsApp fortsetzen · 1 von 4')
+    expect(html).toContain('WhatsApp · 1 von 4')
     expect(html.match(/>Löschen</g)).toHaveLength(2)
     expect(html).not.toContain('href="/status"')
+    // T5: „Teilen" beim aktiven Beitrag, nicht beim vergangenen (Gegenprobe im selben HTML).
+    expect(html).toContain('Teilen<span class="sr-only">: Spargel ab heute</span>')
+    expect(html).not.toContain('Teilen<span class="sr-only">: Kürbisse</span>')
   })
 
   it('Knöpfe nennen den Beitrag für den Screenreader', () => {

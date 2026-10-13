@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import type { StatusPostAnlass } from '@prisma/client'
+import type { Prisma, StatusPostAnlass } from '@prisma/client'
+import type { Abonnentin } from '@/lib/whatsapp-versand'
 
 export type StatusPostSummary = {
   id: string
@@ -16,6 +17,8 @@ export type StatusPostSummary = {
   emailRecipientCount: number
   whatsappRecipientCount: number
   whatsappSentCount: number
+  /** Register W1: wer geöffnet bekam (Abonnements-IDs) — daraus „WhatsApp · n von m". */
+  whatsappGetippt: string[]
   createdAt: string
   isActive: boolean
   isDraft: boolean
@@ -52,33 +55,44 @@ export async function getStatusPostsForFarm(farmId: string): Promise<StatusPostS
     emailRecipientCount: p.emailRecipientCount,
     whatsappRecipientCount: p.whatsappRecipientCount,
     whatsappSentCount: p.whatsappSentCount,
+    whatsappGetippt: p.whatsappGetippt,
     createdAt: p.createdAt.toISOString(),
     isActive: !!p.publishedAt && (!p.expiresAt || p.expiresAt > now),
     isDraft: !p.publishedAt,
   }))
 }
 
-export async function getActiveStatusPost(farmId: string): Promise<ActiveStatusPost | null> {
+/**
+ * Die Beiträge, die die Hofseite zeigt (Register F8): veröffentlicht, nicht
+ * abgelaufen und mit „Auf der Hofseite zeigen“ — der neueste zuerst, höchstens
+ * `anzahl`. Die Frist gilt hier beim Lesen, kein Cron räumt sie weg.
+ */
+export async function getActiveStatusPosts(farmId: string, anzahl: number): Promise<ActiveStatusPost[]> {
   const now = new Date()
-  const post = await prisma.statusPost.findFirst({
+  const posts = await prisma.statusPost.findMany({
     where: {
       farmId,
       publishedAt: { lte: now },
       showOnFarmPage: true,
       OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
     },
-    orderBy: { publishedAt: 'desc' },
+    // Bei gleicher Veröffentlichungszeit entscheidet die Kennung: Die Reihenfolge
+    // ist nie Zufall, und kein Beitrag springt zwischen zwei Aufrufen über die Grenze.
+    orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
+    take: anzahl,
+    // Nur, was die Karte zeigt: Der Beitrag ist öffentlich, sein Versand (Empfänger, Zähler) nicht.
+    select: { id: true, title: true, body: true, anlass: true, photoUrl: true, linkedProductIds: true, publishedAt: true },
   })
-  if (!post) return null
-  return {
+  return posts.map((post) => ({
     id: post.id,
     title: post.title,
     body: post.body,
     anlass: post.anlass,
     photoUrl: post.photoUrl,
     linkedProductIds: post.linkedProductIds,
+    // Sicher: `publishedAt: { lte: now }` schließt Entwürfe (null) aus.
     publishedAt: post.publishedAt!.toISOString(),
-  }
+  }))
 }
 
 // Vorlage-Muster (nachlese-6): lädt einen Alt-Status als Vorbefüllung für den
@@ -103,23 +117,49 @@ export async function getStatusTemplate(
   return post ?? null
 }
 
-export async function getStatusPostForWhatsApp(farmId: string, postId: string) {
+/**
+ * Wer WhatsApp vom Hof bekommt: Häkchen gesetzt und eine Nummer hinterlegt —
+ * dieselbe Bedingung für die Liste und für die Zahl im Reiter „Beiträge".
+ */
+function whatsAppAbonnentinnen(farmId: string): Prisma.CustomerFarmSubscriptionWhereInput {
+  return { farmId, optInWhatsApp: true, customerPhone: { not: null } }
+}
+
+/**
+ * Die Tipp-Liste eines eigenen Beitrags (fremde ID → null). Register W1: die
+ * Empfängerinnen live beim Öffnen, nie die beim Veröffentlichen eingefrorene
+ * Zahl, dazu, wer schon geöffnet bekam. Je Person gehen Abonnements-ID, Name
+ * und Nummer an den Browser; ohne Bestellung beim Hof steht wie bisher die
+ * Adresse als Name.
+ */
+export async function getStatusPostForWhatsApp(
+  farmId: string,
+  postId: string
+): Promise<{
+  id: string
+  title: string
+  body: string
+  farm: { name: string; slug: string }
+  getippt: string[]
+  abonnentinnen: Abonnentin[]
+} | null> {
   const post = await prisma.statusPost.findFirst({
     where: { id: postId, farmId },
     select: {
       id: true,
       title: true,
       body: true,
-      whatsappSentCount: true,
-      whatsappRecipientCount: true,
+      whatsappGetippt: true,
       farm: { select: { name: true, slug: true } },
     },
   })
   if (!post) return null
 
+  // Feste Reihenfolge: Wer später weitermacht, findet die Liste wie verlassen.
   const subscribers = await prisma.customerFarmSubscription.findMany({
-    where: { farmId, optInWhatsApp: true, customerPhone: { not: null } },
-    select: { customerEmail: true, customerPhone: true },
+    where: whatsAppAbonnentinnen(farmId),
+    select: { id: true, customerEmail: true, customerPhone: true },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   })
 
   const nameMap = await prisma.order
@@ -131,12 +171,23 @@ export async function getStatusPostForWhatsApp(farmId: string, postId: string) {
     })
     .then((rows) => new Map(rows.map((r) => [r.customerEmail.toLowerCase(), r.customerName])))
 
+  const { whatsappGetippt, ...beitrag } = post
   return {
-    ...post,
-    subscribers: subscribers.map((s) => ({
-      email: s.customerEmail,
-      phone: s.customerPhone!,
+    ...beitrag,
+    getippt: whatsappGetippt,
+    abonnentinnen: subscribers.map((s) => ({
+      id: s.id,
       name: nameMap.get(s.customerEmail.toLowerCase()) ?? s.customerEmail,
+      // Sicher: Die Bedingung oben verlangt customerPhone: { not: null }.
+      phone: s.customerPhone!,
     })),
   }
+}
+
+/**
+ * Wie viele heutige Abonnentinnen der Hof per WhatsApp erreicht — das „m" im
+ * Knopf „WhatsApp · n von m" (Register W1), einmal je Seitenaufruf geladen.
+ */
+export async function zaehleWhatsAppAbonnentinnen(farmId: string): Promise<number> {
+  return prisma.customerFarmSubscription.count({ where: whatsAppAbonnentinnen(farmId) })
 }

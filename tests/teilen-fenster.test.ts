@@ -58,7 +58,7 @@ describe('Auswahl „Im Bild"', () => {
 })
 
 describe('Kanäle', () => {
-  const basis = { basis: 'https://farmerzone.at', slug: 'hof-test', text: 'Frisch bei uns', hofName: 'Hof Test' }
+  const basis = { link: 'https://farmerzone.at/hof-test', text: 'Frisch bei uns', hofName: 'Hof Test' }
 
   it('jeder Kanal trägt genau sein Kürzel', () => {
     const wa = kanalZiel('wa', basis)

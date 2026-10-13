@@ -18,9 +18,10 @@ export const dynamic = 'force-dynamic'
  * „Neuer Beitrag" (Wizard Inhalt → Empfänger → Versand) in der HofShell
  * (Nachtlauf Nr. 22e): dieselbe Action publishStatusPost und derselbe Ablauf
  * wie bisher, nur in die Routengruppe (hof) gezogen und auf Tokens gestellt.
- * Das Teilen-Fenster (Mockup web-h4-teilen-fenster-mit-bild) steht seit
- * Nr. 21 auf Heute; dieser Ablauf bleibt der Weg für Beiträge mit Foto und
- * Versand an Abonnentinnen. Zurück führt in den Reiter „Beiträge" von Mein Hof
+ * Nach dem Veröffentlichen öffnet sich das Teilen-Fenster im Beitrag-Modus
+ * (Register T5, Nr. 67) mit den WhatsApp-Abonnentinnen als erster Karte —
+ * ein WhatsApp-Häkchen gibt es hier nicht mehr, E-Mail bleibt eines.
+ * Zurück führt in den Reiter „Beiträge" von Mein Hof
  * (UnterseitenKopf, seit Nr. 44 am Handy fest oben; die h1 trägt der
  * Assistent je Schritt selbst).
  */
@@ -45,7 +46,7 @@ export default async function StatusNewPage({
   // rechnet „vor n Tagen" mit demselben jetzt, nie mit der Uhr des Browsers.
   const jetzt = new Date()
 
-  const [products, emailCount, whatsAppCount, recentEmail] = await Promise.all([
+  const [products, emailCount, recentEmail] = await Promise.all([
     prisma.product.findMany({
       where: { farmId: farm.id, isAvailable: true },
       select: { id: true, name: true, price: true },
@@ -53,7 +54,6 @@ export default async function StatusNewPage({
     }),
     // Dieselben Empfänger wie beim Versand: Bestand und bestätigte Anmeldungen (S11).
     prisma.customerFarmSubscription.count({ where: { farmId: farm.id, ...WERBEMAIL_EMPFAENGER } }),
-    prisma.customerFarmSubscription.count({ where: { farmId: farm.id, optInWhatsApp: true } }),
     prisma.statusPost.findFirst({
       where: {
         farmId: farm.id,
@@ -70,7 +70,6 @@ export default async function StatusNewPage({
       <StatusNewClient
         products={products.map((p) => ({ id: p.id, name: p.name, price: Number(p.price) }))}
         emailCount={emailCount}
-        whatsAppCount={whatsAppCount}
         recentEmailSentAt={recentEmail?.publishedAt?.toISOString() ?? null}
         jetzt={jetzt.toISOString()}
         farmSlug={farm.id}

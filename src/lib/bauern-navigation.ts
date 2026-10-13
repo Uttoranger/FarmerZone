@@ -84,7 +84,7 @@ export type MeinHofReiter = {
   href: string
   /**
    * Nur unter md (768 px): Ab md steht „Produkte" als eigener Punkt in der
-   * Seitenleiste, und dort steht statt des Reiters der Hinweis MEIN_HOF_HINWEIS.
+   * Seitenleiste; der Hinweis MEIN_HOF_HINWEIS steht seit Nr. 73 am Ende der Liste im Editor.
    */
   nurUnterMd?: boolean
 }

@@ -30,6 +30,7 @@ vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))
 vi.mock('@/server/actions/status-posts', () => ({ expireStatusPost: vi.fn(), deleteStatusPost: vi.fn() }))
+vi.mock('@/server/actions/teilen-fenster', () => ({ ladeTeilenFensterBeitragAction: vi.fn() }))
 vi.mock('next/image', () => ({
   default: (props: { src: string; alt: string }) => createElement('img', { src: props.src, alt: props.alt }),
 }))
@@ -81,11 +82,10 @@ describe('Beiträge-Übersicht', () => {
     isActive: false,
     isDraft: false,
     publishedAt: null,
+    showOnFarmPage: true,
     sentViaEmail: false,
-    sentViaWhatsApp: false,
     emailRecipientCount: 0,
-    whatsappSentCount: 0,
-    whatsappRecipientCount: 0,
+    whatsappGetippt: [],
   }
 
   it('ordnet Aktiv · Entwürfe · Vergangen, leere Gruppen fallen weg', () => {
@@ -95,7 +95,8 @@ describe('Beiträge-Übersicht', () => {
         { ...basis, id: 'entwurf', isDraft: true },
         { ...basis, id: 'aktiv', isActive: true, publishedAt: '2026-10-06T07:00:00.000Z' },
       ],
-      jetzt
+      jetzt,
+      0
     )
     expect(u.gruppen.map((g) => [g.titel, g.eintraege.map((e) => e.id)])).toEqual([
       ['Aktiv', ['aktiv']],
@@ -103,30 +104,31 @@ describe('Beiträge-Übersicht', () => {
       ['Vergangen', ['alt']],
     ])
     expect(u.anzahl).toBe(3)
-    expect(beitraegeUebersicht([{ ...basis, isDraft: true }], jetzt).gruppen.map((g) => g.titel)).toEqual(['Entwürfe'])
-    expect(beitraegeUebersicht([], jetzt)).toEqual({ gruppen: [], anzahl: 0 })
+    expect(beitraegeUebersicht([{ ...basis, isDraft: true }], jetzt, 0).gruppen.map((g) => g.titel)).toEqual(['Entwürfe'])
+    expect(beitraegeUebersicht([], jetzt, 0)).toEqual({ gruppen: [], anzahl: 0 })
   })
 
   it('Marke je Zustand: aktiv grün, Entwurf und abgelaufen neutral', () => {
-    const [aktiv] = beitraegeUebersicht([{ ...basis, isActive: true, publishedAt: jetzt }], jetzt).gruppen[0].eintraege
+    const [aktiv] = beitraegeUebersicht([{ ...basis, isActive: true, publishedAt: jetzt }], jetzt, 0).gruppen[0].eintraege
     expect(aktiv.marke).toEqual({ text: 'Aktiv', ton: 'fertig' })
-    const [entwurf] = beitraegeUebersicht([{ ...basis, isDraft: true }], jetzt).gruppen[0].eintraege
+    const [entwurf] = beitraegeUebersicht([{ ...basis, isDraft: true }], jetzt, 0).gruppen[0].eintraege
     expect(entwurf.marke).toEqual({ text: 'Entwurf', ton: 'neutral' })
-    const [alt] = beitraegeUebersicht([{ ...basis, publishedAt: '2026-09-01T10:00:00.000Z' }], jetzt).gruppen[0].eintraege
+    const [alt] = beitraegeUebersicht([{ ...basis, publishedAt: '2026-09-01T10:00:00.000Z' }], jetzt, 0).gruppen[0].eintraege
     expect(alt.marke).toEqual({ text: 'Abgelaufen', ton: 'neutral' })
   })
 
   it('„vor …" vom übergebenen Zeitpunkt, und wohin der Beitrag ging', () => {
-    const eintrag = (q: Partial<BeitragQuelle>) => beitraegeUebersicht([{ ...basis, ...q }], jetzt).gruppen[0].eintraege[0]
+    const eintrag = (q: Partial<BeitragQuelle>) => beitraegeUebersicht([{ ...basis, ...q }], jetzt, 0).gruppen[0].eintraege[0]
     expect(eintrag({ isActive: true, publishedAt: '2026-10-06T07:00:00.000Z' }).zeile).toBe('vor 3 Stunden · Nur auf der Hofseite')
-    expect(eintrag({ publishedAt: '2026-10-04T09:00:00.000Z', sentViaWhatsApp: true }).zeile).toBe('vor 2 Tagen · Hofseite und WhatsApp')
+    // W1/T5: „WhatsApp", sobald jemand geöffnet bekam — ein Häkchen beim Veröffentlichen gibt es nicht mehr.
+    expect(eintrag({ publishedAt: '2026-10-04T09:00:00.000Z', whatsappGetippt: ['abo-1'] }).zeile).toBe('vor 2 Tagen · Hofseite und WhatsApp')
   })
 
   it('F6 (22e): „N per E-Mail" steht wieder in der Zeile — die Zahl der Empfänger wie auf der alten Karte', () => {
-    const eintrag = (q: Partial<BeitragQuelle>) => beitraegeUebersicht([{ ...basis, ...q }], jetzt).gruppen[0].eintraege[0]
+    const eintrag = (q: Partial<BeitragQuelle>) => beitraegeUebersicht([{ ...basis, ...q }], jetzt, 0).gruppen[0].eintraege[0]
     const vor2Tagen = '2026-10-04T09:00:00.000Z'
     expect(eintrag({ publishedAt: vor2Tagen, sentViaEmail: true, emailRecipientCount: 12 }).zeile).toBe('vor 2 Tagen · Hofseite und 12 per E-Mail')
-    expect(eintrag({ publishedAt: vor2Tagen, sentViaEmail: true, sentViaWhatsApp: true, emailRecipientCount: 1 }).zeile).toBe(
+    expect(eintrag({ publishedAt: vor2Tagen, sentViaEmail: true, whatsappGetippt: ['abo-1'], emailRecipientCount: 1 }).zeile).toBe(
       'vor 2 Tagen · Hofseite, 1 per E-Mail und WhatsApp'
     )
     // Tausender wie überall über formatZahl.
@@ -262,14 +264,14 @@ describe('Reiter „Beiträge"', () => {
               isActive: true,
               isDraft: false,
               publishedAt: jetzt,
+              showOnFarmPage: true,
               sentViaEmail: true,
-              sentViaWhatsApp: false,
               emailRecipientCount: 7,
-              whatsappSentCount: 0,
-              whatsappRecipientCount: 0,
+              whatsappGetippt: [],
             },
           ],
-          jetzt
+          jetzt,
+          0
         ),
       })
     )

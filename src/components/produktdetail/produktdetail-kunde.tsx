@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Building2, ChevronLeft, Leaf, PauseCircle, ShieldCheck, ShoppingBasket } from 'lucide-react'
 import { toast } from 'sonner'
-import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
+import type { PublicProduct } from '@/server/queries/farm'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
 import { formatEuro, formatGrundpreis, formatKategorie } from '@/lib/format'
 import { kartenZustand, knappText } from '@/lib/bereiche-anzeige'
@@ -42,6 +42,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { Stepper } from '@/components/ui/stepper'
 import { useRueckwegKlick } from '@/components/shared/kunden-kopf'
 import { CartSheet } from '@/components/farm/cart-sheet'
+import type { HofseiteHof } from '@/components/hofseite/hofseite-kunde'
 import { HofseiteSeitenspalte } from '@/components/hofseite/hofseite-seitenspalte'
 import { GleichMitAbholen, Kennzeichnung } from '@/components/produktdetail/produktdetail-teile'
 import { RaummassErklaerung } from '@/components/shared/raummass-erklaerung'
@@ -81,7 +82,8 @@ export function ProduktdetailKunde({
   kaeufer = null,
   jetzt,
 }: {
-  farm: PublicFarm
+  /** Der Hof ohne Telefon und E-Mail (Nr. 70): Die Seite entfernt sie auf dem Server, wie bei der Hofseite. */
+  farm: HofseiteHof
   /** Das Produkt aus dem Pfad — die Seite hat geprüft, dass es zu diesem Hof gehört und sichtbar ist. */
   produktId: string
   /** Die gewählte Größe (aus ?groesse=, geprüft) — sonst gleich produktId. */

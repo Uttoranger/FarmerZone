@@ -38,7 +38,9 @@ Stand: 2026-09. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 
 **Tailwind 4:** Konfiguration lebt in `src/app/globals.css` per `@theme` / `@import "tailwindcss"`. **Keine** `tailwind.config.js` anlegen. Keine `content`-Pfade pflegen.
 
-**Schriften:** ausschließlich über `next/font/google` in `src/app/layout.tsx` (self-gehostet, kein CDN, keine Schriftdateien im Repo); welche und wie sie verdrahtet sind, steht in `docs/ai/DESIGN_SYSTEM.md`, „Technische Regeln".
+**Schriften:** in der App ausschließlich über `next/font/google` in `src/app/layout.tsx` (self-gehostet, kein CDN); welche und wie sie verdrahtet sind, steht in `docs/ai/DESIGN_SYSTEM.md`, „Technische Regeln". Die einzigen Schriftdateien im Repo sind die des Teilen-Bilds (nächster Absatz).
+
+**Schriftdateien für das Teilen-Bild (OFL, seit Nr. 69):** Satori (`next/og`) kann `next/font` nicht nutzen und liest kein WOFF2 — deshalb statische TTF unter `src/assets/fonts/<familie>/`, je mit `OFL.txt` daneben: Fraunces 72pt SemiBold aus github.com/undercasetype/Fraunces (Commit 7ccdec31c602, `fonts/ttf/Fraunces72pt-SemiBold.ttf`) und Instrument Sans Regular/SemiBold aus github.com/Instrument/instrument-sans (Commit 7fa22308a3d0, `fonts/ttf/…`) — das offizielle Repo laut Google Fonts (`ofl/instrumentsans/METADATA.pb`); github.com/googlefonts/instrument-sans gibt es nicht. Geladen nur über `ladeTeilenBildSchriften` (`src/lib/teilen-bild-quellen.ts`), für die Route in `outputFileTracingIncludes` eingetragen. Ein neuer Schnitt nur mit Quelle, Commit und Lizenzdatei.
 
 **Next 16:**
 - `params` und `searchParams` sind **Promises** → `const { farmSlug } = await params`.
@@ -78,9 +80,10 @@ Stand: 2026-09. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 | Klassen-Merge | `cn()` aus `@/lib/utils` | Manuelle Template-Strings mit Klassen |
 | IDs / Tokens | `nanoid`, `crypto.randomUUID()` | `Math.random()`, Zeitstempel als ID |
 | QR-Code | `qrcode` (^1.5.4, Typen `@types/qrcode`) — nur die Matrix über `qrPfad` in `src/lib/qr-code.ts`, gezeichnet als eigener SVG-Pfad (Teilen-Bild, QR-Plakat; seit Nr. 21, Freigabe §3) | `QRCode.toDataURL`/`toString` im Code (fremde Grafik, zweite Gestalt), QR-Dienste im Netz |
-| Teilen-Bild | `next/og` (`ImageResponse`, Satori) — nur in Routen-Handlern, Farben als Werte mit Lint-Ausnahme je Zeile (Satori kennt keine CSS-Variablen) | Puppeteer/Canvas-Pakete, Bilddienste im Netz |
+| Teilen-Bild | `next/og` (`ImageResponse`, Satori) — nur in Routen-Handlern, Farben als Werte mit Lint-Ausnahme je Zeile (Satori kennt keine CSS-Variablen), Schriften als TTF (oben); Bilder vorher über `sharp` in JPEG, weil Satori nur PNG, JPEG, GIF und SVG zeichnet (kein WebP) | Puppeteer/Canvas-Pakete, Bilddienste im Netz |
 | Server-State | React Query (nur wo vorhanden) | Neue globale Stores |
 | Bausteinverzeichnis | `pnpm bausteine` (`scripts/bausteine.ts`, `tsx` + die Compiler-API des vorhandenen `typescript`, nur Syntaxbaum) erzeugt `docs/ai/BAUSTEINE.md` | Von Hand gepflegte Liste, zweites Parser-Paket (ts-morph, acorn), Zeitstempel in der Datei |
+| Illustrationen prüfen | `pnpm illustrationen` (`scripts/illustrationen.ts`, `tsx` + das vorhandene `sharp`) prüft `public/categories/`: WebP, 1024 × 1024, höchstens 80 KB, einfarbiger Rand; eigener CI-Schritt neben dem Lint, nicht Teil von `build` (Register I1) | Prüfung von Hand, ein weiteres Bildpaket |
 
 ---
 

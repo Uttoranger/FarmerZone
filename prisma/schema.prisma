@@ -893,6 +893,11 @@ model StatusPost {
   emailRecipientCount    Int              @default(0)
   whatsappRecipientCount Int              @default(0)
   whatsappSentCount      Int              @default(0)
+  // Register W1 (Nachtlauf Nr. 66): WER die Nachricht in WhatsApp geöffnet
+  // bekam — Abonnements-IDs (CustomerFarmSubscription.id), keine E-Mails,
+  // keine Nummern. Die Zahl folgt daraus; whatsappSentCount schreibt
+  // setzeWhatsAppGetippt gleich der Länge mit (Contract später).
+  whatsappGetippt        String[]         @default([])
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
 

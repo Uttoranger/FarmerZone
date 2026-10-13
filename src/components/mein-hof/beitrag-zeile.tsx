@@ -8,12 +8,15 @@ import { deleteStatusPost, expireStatusPost } from '@/server/actions/status-post
 import type { BeitragEintrag } from '@/lib/mein-hof-beitraege'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { BestellDialog, DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
+import { BeitragTeilenKnopf } from '@/components/teilen/beitrag-teilen'
 import { KNOPF_RAHMEN, TEXT_ORANGE } from '@/components/hof-bestellungen/stil'
 import { cn } from '@/lib/utils'
 
 /*
  * Ein Beitrag im Reiter „Beiträge" (Nachtlauf Nr. 22e): Titel, Marke, wann und
- * wohin er ging, darunter die Handlungen, die früher auf /status standen.
+ * wohin er ging, darunter die Handlungen, die früher auf /status standen —
+ * seit Nr. 67 zuerst „Teilen" (Teilen-Fenster im Beitrag-Modus, T5) in der
+ * Reihenfolge des Mockups mobil-h4-beitraege-teilen-je-beitrag.
  * Welche angeboten werden, entscheidet beitraegeUebersicht
  * (src/lib/mein-hof-beitraege.ts) — hier nur die Gestalt.
  *
@@ -60,6 +63,16 @@ export function BeitragZeile({ eintrag }: { eintrag: BeitragEintrag }): React.JS
       </div>
 
       <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        {eintrag.aktionen.teilen && (
+          <BeitragTeilenKnopf beitragId={eintrag.id} titel={eintrag.titel} onFehler={setFehler} className={cn(KNOPF_RAHMEN, KLEIN)} />
+        )}
+        {eintrag.aktionen.whatsapp && (
+          <Link href={eintrag.aktionen.whatsapp.href} className={cn(KNOPF_RAHMEN, KLEIN)}>
+            <MessageSquare className="size-4" strokeWidth={1.7} aria-hidden="true" />
+            {eintrag.aktionen.whatsapp.text}
+            <span className="sr-only">: {eintrag.titel}</span>
+          </Link>
+        )}
         {eintrag.aktionen.deaktivieren && (
           <button
             type="button"
@@ -75,13 +88,6 @@ export function BeitragZeile({ eintrag }: { eintrag: BeitragEintrag }): React.JS
           <Link href={eintrag.aktionen.vorlage} className={cn(KNOPF_RAHMEN, KLEIN)}>
             <CopyPlus className="size-4" strokeWidth={1.7} aria-hidden="true" />
             Als Vorlage verwenden
-            <span className="sr-only">: {eintrag.titel}</span>
-          </Link>
-        )}
-        {eintrag.aktionen.whatsapp && (
-          <Link href={eintrag.aktionen.whatsapp.href} className={cn(KNOPF_RAHMEN, KLEIN)}>
-            <MessageSquare className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            {eintrag.aktionen.whatsapp.text}
             <span className="sr-only">: {eintrag.titel}</span>
           </Link>
         )}

@@ -6,6 +6,8 @@
  *  - „So sehen Käufer dein Produkt" zeigt die ECHTE Produktkarte der Hofseite
  *    (Vorschau-Variante), live aus Foto, Name, Preis und Einheit: andere
  *    Formularwerte, andere Karte.
+ *  - Mit gewählter Unterkategorie zeigt sie deren Illustration — dasselbe Bild
+ *    wie Hofseite und /products (Register I1, Nr. 74, Runde 1).
  *  - Ohne Link und ohne Korb.
  *  - Leere oder ungültige Felder zeigen ruhige Platzhalter, nie „NaN".
  *  - Der Produktdialog zeigt sie nur für Lebensmittel; Futter (E9-Schild) und
@@ -26,7 +28,8 @@ vi.mock('next/image', () => ({
 
 import { LebensmittelVorschau } from '@/components/products/lebensmittel-vorschau'
 import { KAEUFER_VORSCHAU } from '@/lib/hofseite-kunde'
-import type { ProductCategoryValue } from '@/lib/taxonomie'
+import { categoryImagePath } from '@/lib/product-image'
+import type { ProductCategoryValue, ProductSubcategoryValue } from '@/lib/taxonomie'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
@@ -37,8 +40,9 @@ type Werte = {
   unitSize: number | null
   foto: string | null
   kategorie: ProductCategoryValue | null
+  unterkategorie: ProductSubcategoryValue | null
 }
-const KAESE: Werte = { name: 'Bergkäse', price: 12.9, unit: 'KG', unitSize: 0.5, foto: null, kategorie: 'MILCH' }
+const KAESE: Werte = { name: 'Bergkäse', price: 12.9, unit: 'KG', unitSize: 0.5, foto: null, kategorie: 'MILCH', unterkategorie: null }
 const vorschau = (werte: Werte) => renderToStaticMarkup(createElement(LebensmittelVorschau, werte))
 
 describe('„So sehen Käufer dein Produkt" — die echte Produktkarte, live aus dem Formular', () => {
@@ -51,8 +55,28 @@ describe('„So sehen Käufer dein Produkt" — die echte Produktkarte, live aus
     expect(html).toContain('src="/categories/milch.webp"')
   })
 
+  it('mit gewählter Unterkategorie zeigt die Karte deren Illustration, nicht die der Kategorie', () => {
+    const html = vorschau({ ...KAESE, unterkategorie: 'KAESE' })
+    expect(html).toContain('src="/categories/milch/kaese.webp"')
+    expect(html).not.toContain('src="/categories/milch.webp"')
+    // Gegenprobe: ohne Unterkategorie bleibt es das Bild der Kategorie.
+    expect(vorschau(KAESE)).toContain('src="/categories/milch.webp"')
+  })
+
+  it('dasselbe Bild wie auf Hofseite und /products: der Server gibt den Produktkacheln es über categoryImagePath', () => {
+    for (const [kategorie, unterkategorie] of [
+      ['MILCH', 'JOGHURT_TOPFEN'],
+      ['HONIG', 'WALDHONIG'],
+      ['EIER', 'EIER_BIO'],
+      ['GEMUESE', null],
+    ] as const) {
+      const html = vorschau({ ...KAESE, kategorie, unterkategorie })
+      expect(html, `${kategorie}/${unterkategorie}`).toContain(`src="${categoryImagePath(kategorie, unterkategorie, () => true)}"`)
+    }
+  })
+
   it('andere Formularwerte, andere Karte — mit gewähltem Foto statt der Illustration', () => {
-    const html = vorschau({ name: 'Topfen', price: 3.2, unit: 'STUECK', unitSize: null, foto: 'blob:foto-1', kategorie: 'MILCH' })
+    const html = vorschau({ name: 'Topfen', price: 3.2, unit: 'STUECK', unitSize: null, foto: 'blob:foto-1', kategorie: 'MILCH', unterkategorie: null })
     expect(html).toContain('Topfen')
     expect(html).toContain('€ 3,20 / Stück')
     expect(html).toContain('src="blob:foto-1"')
@@ -69,7 +93,7 @@ describe('„So sehen Käufer dein Produkt" — die echte Produktkarte, live aus
 
   it('leere oder ungültige Felder: ruhige Platzhalter, nie „NaN" oder „€ 0,00"', () => {
     for (const price of [Number.NaN, 0, 4.505]) {
-      const html = vorschau({ name: '', price, unit: 'STUECK', unitSize: null, foto: null, kategorie: null })
+      const html = vorschau({ name: '', price, unit: 'STUECK', unitSize: null, foto: null, kategorie: null, unterkategorie: null })
       expect(html, String(price)).toContain(KAEUFER_VORSCHAU.name)
       expect(html, String(price)).toContain(KAEUFER_VORSCHAU.preisFehlt)
       expect(html, String(price)).not.toMatch(/NaN|€ 0,00/)
@@ -91,7 +115,7 @@ describe('nur im Produktdialog für Lebensmittel — Futter und Brennmaterial bl
 
   it('der Dialog gibt Foto, Name, Preis und Einheit aus dem Formular weiter, nichts Gerechnetes', () => {
     const aufruf = dialog.slice(dialog.indexOf('<LebensmittelVorschau'), dialog.indexOf('/>', dialog.indexOf('<LebensmittelVorschau')))
-    for (const feld of ['name={werte.name}', 'price={werte.price}', 'unit={werte.unit}', 'unitSize={werte.unitSize}', 'foto={previewUrl}', 'kategorie={category}']) {
+    for (const feld of ['name={werte.name}', 'price={werte.price}', 'unit={werte.unit}', 'unitSize={werte.unitSize}', 'foto={previewUrl}', 'kategorie={category}', 'unterkategorie={werte.subcategory}']) {
       expect(aufruf, feld).toContain(feld)
     }
   })

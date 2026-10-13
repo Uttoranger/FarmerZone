@@ -9,9 +9,11 @@ import { cn } from '@/lib/utils'
 
 /*
  * Der Reiter „Beiträge" in Mein Hof (E12; Nachtlauf Nr. 16 als Übersicht,
- * seit Nr. 22e mit allem, was /status konnte): je Beitrag Deaktivieren,
- * Löschen, „Als Vorlage verwenden" und „WhatsApp fortsetzen"
- * (components/mein-hof/beitrag-zeile.tsx). /status leitet hierher um.
+ * seit Nr. 22e mit allem, was /status konnte; Mockup
+ * mobil-h4-beitraege-teilen-je-beitrag): je Beitrag „Teilen" (Teilen-Fenster
+ * im Beitrag-Modus, T5), „WhatsApp · n von m" (W1), Deaktivieren, „Als
+ * Vorlage verwenden" und Löschen (components/mein-hof/beitrag-zeile.tsx).
+ * /status leitet hierher um.
  * Geschrieben wird im bestehenden Ablauf /status/new — kein zweiter Editor.
  * Was angeboten wird, entscheidet src/lib/mein-hof-beitraege.ts.
  *
@@ -44,7 +46,7 @@ export function BeitraegeReiter({ uebersicht }: { uebersicht: BeitraegeUebersich
   return (
     <div className="max-w-3xl">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">Was du deinen Kunden erzählst — auf der Hofseite und auf Wunsch per E-Mail oder WhatsApp.</p>
+        <p className="text-sm text-muted-foreground">Was du deinen Kunden erzählst – auf der Hofseite und auf Wunsch per E-Mail oder WhatsApp.</p>
         <Link href="/status/new" className={cn(HAUPTKNOPF, 'shrink-0 self-start sm:self-auto')}>
           <Plus className="size-4" strokeWidth={2} aria-hidden="true" />
           Neuer Beitrag

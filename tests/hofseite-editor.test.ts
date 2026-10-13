@@ -21,9 +21,11 @@
  *  - Die Vorschau ist die echte Hofseite im Vorschau-Modus — Handy (390 px)
  *    oder Web (1440 px) in EINEM iframe, der Maßstab gerechnet, nie hart
  *    codiert; die Markierung geht nur an den eigenen Ursprung.
- *  - Web neben der Bearbeitung nur ab 1280 px Fensterbreite (Spalte ~400 px,
- *    Breiten-Transition 200 ms), darunter im Overlay; „Vergrößern" öffnet
- *    das Overlay mit Titel und Umschalter.
+ *  - Web neben der Bearbeitung nur ab 1280 px Fensterbreite, darunter im
+ *    Overlay; die Spaltenbreiten kommen aus EINER Regel (editorSpalten,
+ *    Register N7; Breiten-Transition 200 ms); „Vergrößern" öffnet das Overlay
+ *    mit Titel und Umschalter. (Die Breiten selbst: tests/hofseite-vorschau.test.ts,
+ *    ihr Einbau im Editor: tests/hofseite-editor-breite.test.ts.)
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
@@ -153,10 +155,12 @@ describe('Editor und Bausteine', () => {
     expect(liste).toMatch(/if \(!auf && !hochladenJetzt\.current\) setzeOffen\(null\)/)
   })
 
-  it('Web neben der Bearbeitung nur ab der Mindestbreite; die Bearbeitung behält ihre Mindestbreite aus der Regel', () => {
+  it('Web neben der Bearbeitung nur ab der Mindestbreite; die Spaltenbreiten kommen aus der einen Regel, nicht aus einer Rechnung im Editor', () => {
     expect(editor).toContain('useMindestbreite(VORSCHAU_WEB_MINDESTBREITE)')
     expect(editor).toContain("const webInline = geraet === 'web' && breit")
-    expect(editor).toContain('${VORSCHAU_BEARBEITUNG_BREITE}px')
+    expect(editor).toContain("editorSpalten(gemessen, webInline ? 'web' : 'handy', breit)")
+    expect(editor).not.toContain('calc(100%')
+    expect(editor).not.toContain('VORSCHAU_BEARBEITUNG_BREITE')
     expect(editor).toContain('webInlineMoeglich={breit}')
     // Der Server kennt die Fensterbreite nicht: der Hook liefert dort false, sonst spränge die Seite beim Hydrieren.
     const hook = quelltext('src/lib/use-mindestbreite.ts')

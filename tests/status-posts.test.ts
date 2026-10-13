@@ -1,8 +1,11 @@
 /**
  * Die Beitrags-Actions (src/server/actions/status-posts.ts, Nr. 32,
  * Morgenbericht Lauf 5 §5):
- *  - Zod an ALLEN Actions (Kennung, Zähler, Felder des Beitrags) — nichts
+ *  - Zod an ALLEN Actions (Kennungen, Felder des Beitrags) — nichts
  *    Ungeprüftes geht in eine WHERE-Klausel oder die Datenbank.
+ *  - „Geöffnet" je Person (Register W1, Nr. 66): EIN UPDATE mit
+ *    array_remove/array_append ohne Lesen davor, Beitrag UND Abonnement über
+ *    farmId in der WHERE-Klausel, keine Zahl aus dem Browser.
  *  - Besitz im selben Schreibvorgang: `updateMany`/`deleteMany` mit
  *    `{ id, farmId }` und `count` statt vorgelagertem `findFirst` und blindem
  *    `update`/`delete` per ID.
@@ -24,11 +27,13 @@ vi.mock('@/server/bild-url', () => ({ BILD_NICHT_UEBERNOMMEN: 'Bild nicht übern
 vi.mock('@/lib/email', () => ({ sendStatusUpdateEmail: vi.fn() }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    $queryRaw: vi.fn(),
     farm: { findUnique: vi.fn() },
     product: { findMany: vi.fn() },
     order: { findMany: vi.fn() },
     customerFarmSubscription: { findMany: vi.fn() },
     statusPost: {
+      count: vi.fn(),
       create: vi.fn(),
       findFirst: vi.fn(),
       update: vi.fn(),
@@ -39,10 +44,10 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
-import { StatusPostAnlass } from '@prisma/client'
+import { type Prisma, StatusPostAnlass } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import * as Sentry from '@sentry/nextjs'
-import { deleteStatusPost, expireStatusPost, markWhatsAppSent, publishStatusPost } from '@/server/actions/status-posts'
+import { deleteStatusPost, expireStatusPost, publishStatusPost, setzeWhatsAppGetippt } from '@/server/actions/status-posts'
 import { BEITRAG_PRODUKT_FREMD, STATUS_POST_ANLASS_VALUES } from '@/schemas/status-post'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -50,6 +55,12 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 
 const HOF = { id: 'farm_1', name: 'Testhof', slug: 'testhof', logoUrl: null }
 const sp = vi.mocked(prisma.statusPost)
+const roh = vi.mocked(prisma.$queryRaw)
+/** Prisma-Kennungen (cuid) wie in der Datenbank. */
+const POST = 'cbeitrag0000000000000001'
+const ABO = 'cabo00000000000000000001'
+/** Der Fehlersatz einer Antwort — gleich, welche Form die Erfolgsantwort hat. */
+const fehlerVon = (antwort: object): string | undefined => ('error' in antwort ? (antwort.error as string | undefined) : undefined)
 
 const beitrag = (mehr: Record<string, unknown> = {}) => ({
   title: 'Neue Eier',
@@ -57,7 +68,6 @@ const beitrag = (mehr: Record<string, unknown> = {}) => ({
   anlass: 'FRESH_PRODUCT',
   showOnFarmPage: true,
   sendEmail: false,
-  sendWhatsApp: false,
   ...mehr,
 })
 
@@ -133,25 +143,82 @@ describe('deleteStatusPost — Besitz im selben Schreibvorgang', () => {
   })
 })
 
-describe('markWhatsAppSent — Zod und Besitz', () => {
-  it('zählt per updateMany mit id UND farmId', async () => {
-    expect(await markWhatsAppSent('post_1', 3)).toEqual({})
-    expect(sp.updateMany).toHaveBeenCalledWith({
-      where: { id: 'post_1', farmId: 'farm_1' },
-      data: { whatsappSentCount: 3 },
-    })
-    expect(sp.findFirst).not.toHaveBeenCalled()
-    expect(sp.update).not.toHaveBeenCalled()
-  })
+describe('setzeWhatsAppGetippt — eine Anweisung, Besitz in der WHERE-Klausel (W1)', () => {
+  /** Die eine Abfrage an die Datenbank, Leerraum zusammengezogen. */
+  const abfrage = () => {
+    const sql = roh.mock.calls[0]?.[0] as unknown as Prisma.Sql
+    return { text: sql.text.replace(/\s+/g, ' '), values: sql.values }
+  }
 
-  it.each([[-1], [1.5], [Number.NaN], [Infinity], ['3'], [1_000_000]])('ungültiger Zähler %j → abgelehnt', async (count) => {
-    expect((await markWhatsAppSent('post_1', count as never)).error).toBeTruthy()
+  it('geöffnet: EIN UPDATE mit array_remove + array_append, Zähler gleich der Länge, Liste der Datenbank zurück', async () => {
+    roh.mockResolvedValue([{ whatsappGetippt: ['cabo00000000000000000009', ABO] }] as never)
+
+    expect(await setzeWhatsAppGetippt(POST, ABO, true)).toEqual({ ok: true, getippt: ['cabo00000000000000000009', ABO] })
+
+    expect(roh).toHaveBeenCalledTimes(1)
+    const { text, values } = abfrage()
+    expect(text).toContain('UPDATE "StatusPost" SET "whatsappGetippt" = array_append(array_remove(COALESCE("whatsappGetippt", ARRAY[]::TEXT[])')
+    expect(text).toContain('"whatsappSentCount" = cardinality(array_append(array_remove(')
+    expect(text).toContain('RETURNING "whatsappGetippt"')
+    expect(values).toEqual([ABO, ABO, ABO, ABO, POST, 'farm_1', ABO, 'farm_1'])
+    // Kein Lesen davor und kein Schreiben einer Zahl aus dem Browser.
+    expect(sp.findFirst).not.toHaveBeenCalled()
     expect(sp.updateMany).not.toHaveBeenCalled()
   })
 
-  it('fremder Beitrag (count 0) → Satz', async () => {
-    sp.updateMany.mockResolvedValue({ count: 0 } as never)
-    expect((await markWhatsAppSent('post_fremd', 1)).error).toBe('Diesen Beitrag gibt es nicht mehr. Lade die Seite neu.')
+  it('Besitz in derselben Anweisung: der Beitrag über id UND farmId, das Abonnement über farmId', async () => {
+    roh.mockResolvedValue([{ whatsappGetippt: [ABO] }] as never)
+    await setzeWhatsAppGetippt(POST, ABO, true)
+    expect(abfrage().text).toMatch(
+      /WHERE "id" = \$5 AND "farmId" = \$6 AND EXISTS \(SELECT 1 FROM "CustomerFarmSubscription" WHERE "id" = \$7 AND "farmId" = \$8\)/
+    )
+  })
+
+  it('zurücksetzen: nur array_remove, ebenfalls eine Anweisung', async () => {
+    roh.mockResolvedValue([{ whatsappGetippt: [] }] as never)
+
+    expect(await setzeWhatsAppGetippt(POST, ABO, false)).toEqual({ ok: true, getippt: [] })
+
+    const { text, values } = abfrage()
+    expect(text).not.toContain('array_append')
+    expect(text).toContain('"whatsappSentCount" = cardinality(array_remove(')
+    expect(values).toEqual([ABO, ABO, POST, 'farm_1', ABO, 'farm_1'])
+  })
+
+  it('fremde Abonnements-ID: nichts getroffen → Satz zur Person', async () => {
+    roh.mockResolvedValue([] as never)
+    sp.count.mockResolvedValue(1 as never)
+
+    expect(await setzeWhatsAppGetippt(POST, ABO, true)).toEqual({
+      error: 'Diese Person bekommt deine WhatsApp-Nachrichten nicht mehr. Lade die Seite neu.',
+    })
+    expect(sp.count).toHaveBeenCalledWith({ where: { id: POST, farmId: 'farm_1' } })
+  })
+
+  it('fremder Beitrag: nichts getroffen → Satz zum Beitrag', async () => {
+    roh.mockResolvedValue([] as never)
+    sp.count.mockResolvedValue(0 as never)
+    expect(await setzeWhatsAppGetippt(POST, ABO, false)).toEqual({ error: 'Diesen Beitrag gibt es nicht mehr. Lade die Seite neu.' })
+  })
+
+  it.each([
+    ['post_1', ABO, true],
+    [POST, 'abo-1', true],
+    [POST, '', false],
+    [123, ABO, true],
+    [POST, ABO, 'ja'],
+    [POST, ABO, 1],
+  ])('ungültige Eingabe (%j, %j, %j) → abgelehnt, nichts geschrieben', async (beitrag, abo, geoeffnet) => {
+    expect(await setzeWhatsAppGetippt(beitrag as never, abo as never, geoeffnet as never)).toEqual({
+      error: 'Da stimmt etwas mit dem Beitrag nicht. Lade die Seite neu und versuch es noch einmal.',
+    })
+    expect(roh).not.toHaveBeenCalled()
+  })
+
+  it('angemeldet ohne Hof (etwa eine Kundin) → Satz zum Neu-Anmelden, nichts geschrieben', async () => {
+    vi.mocked(getFarmForUser).mockResolvedValue(null as never)
+    expect(await setzeWhatsAppGetippt(POST, ABO, true)).toEqual({ error: 'Bitte melde dich neu an.' })
+    expect(roh).not.toHaveBeenCalled()
   })
 })
 
@@ -208,6 +275,18 @@ describe('publishStatusPost — Zod', () => {
   })
 })
 
+describe('publishStatusPost — kein WhatsApp-Häkchen mehr (Register T5, Nr. 67)', () => {
+  it('ein mitgeschicktes sendWhatsApp verwirft das Schema: keine Abonnentinnen-Abfrage, nichts eingefroren', async () => {
+    const antwort = await publishStatusPost(beitrag({ sendWhatsApp: true }) as never)
+    expect(antwort).toEqual({ postId: 'post_1', emailCount: 0 })
+    expect(prisma.customerFarmSubscription.findMany).not.toHaveBeenCalled()
+    // W1: Die Tipp-Liste liest die Abonnentinnen beim Öffnen — beim Veröffentlichen wird nichts gesetzt.
+    const daten = sp.create.mock.calls[0][0].data
+    expect(daten).not.toHaveProperty('sentViaWhatsApp')
+    expect(daten).not.toHaveProperty('whatsappRecipientCount')
+  })
+})
+
 describe('Fehler nach außen: nie err.message, Sentry ohne Inhalte', () => {
   const INTERN = 'Invalid `prisma.statusPost.create()` invocation: title "Geheimer Titel" kundin@example.com'
 
@@ -229,13 +308,13 @@ describe('Fehler nach außen: nie err.message, Sentry ohne Inhalte', () => {
   it.each([
     ['expireStatusPost', () => expireStatusPost('post_1'), () => sp.updateMany],
     ['deleteStatusPost', () => deleteStatusPost('post_1'), () => sp.deleteMany],
-    ['markWhatsAppSent', () => markWhatsAppSent('post_1', 2), () => sp.updateMany],
+    ['setzeWhatsAppGetippt', () => setzeWhatsAppGetippt(POST, ABO, true), () => roh],
   ] as const)('%s: unerwarteter Fehler → Satz, kein interner Text', async (_name, aufruf, schreiben) => {
     schreiben().mockRejectedValue(new Error(INTERN) as never)
-    const antwort = await aufruf()
-    expect(antwort.error).toBeTruthy()
-    expect(antwort.error).not.toContain('prisma')
-    expect(antwort.error).not.toContain('Geheimer')
+    const fehler = fehlerVon(await aufruf())
+    expect(fehler).toBeTruthy()
+    expect(fehler).not.toContain('prisma')
+    expect(fehler).not.toContain('Geheimer')
     expect(Sentry.captureException).toHaveBeenCalledTimes(1)
     expect((vi.mocked(Sentry.captureException).mock.calls[0]?.[0] as Error).message).not.toContain('Geheimer')
   })
@@ -245,11 +324,12 @@ describe('Fehler nach außen: nie err.message, Sentry ohne Inhalte', () => {
     for (const antwort of [
       await expireStatusPost('post_1'),
       await deleteStatusPost('post_1'),
-      await markWhatsAppSent('post_1', 1),
+      await setzeWhatsAppGetippt(POST, ABO, true),
       await publishStatusPost(beitrag() as never),
     ]) {
-      expect(antwort.error).toBe('Bitte melde dich neu an.')
+      expect(fehlerVon(antwort)).toBe('Bitte melde dich neu an.')
     }
+    expect(roh).not.toHaveBeenCalled()
     expect(sp.updateMany).not.toHaveBeenCalled()
     expect(sp.deleteMany).not.toHaveBeenCalled()
     expect(sp.create).not.toHaveBeenCalled()

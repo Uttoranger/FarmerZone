@@ -4910,7 +4910,7 @@ Auftrag freigabe.md §14 „59" (Mockups web-/mobil-k0-startseite-karte-region).
 
 - **Fachregel:** Die Hofseite zeigt Telefon und E-Mail des Hofs nicht mehr (kein „Anrufen", kein `tel:`, nichts im JSON-LD); an der Stelle steht der Hinweis auf die Bestellbestätigung. Die Kundin bekommt beide mit der Bestellung: in der Kasse vor dem Kaufknopf („Angaben zum Hof (dein Vertragspartner)"), danach auf Bestätigung und Bestellseite („Hof erreichen") und weiter in den Mails (`farmPhone`, unverändert).
 - **Warum vor dem Kaufknopf:** Die Kundin kauft direkt beim Hof; Name, Anschrift, Telefon und E-Mail des Verkäufers muss sie vor ihrer Bestellung sehen (§ 4 Abs. 1 Z 2 und 3 FAGG) — online wie bar, in beiden Breiten. `KassenAbschluss` legt die Reihenfolge Übersicht → Angaben → Kaufknopf fest; Online-Kunden sehen die Angaben vor „Weiter zur Zahlung", der Zahlungsschritt wiederholt sie nicht.
-- **Seitendaten:** Was eine Client-Komponente bekommt, steht im Quelltext der Seite, auch ungezeigt. Deshalb entfernt die Hofseite `phone` und `email` auf dem Server (`entferneKontaktdaten`), nicht `getPublicFarm` — die Kasse liest dieselbe Abfrage. Die Produktseite reicht den Hof weiter ganz durch (Nacharbeit, Bericht 60).
+- **Seitendaten:** Was eine Client-Komponente bekommt, steht im Quelltext der Seite, auch ungezeigt. Deshalb entfernt die Hofseite `phone` und `email` auf dem Server (`entferneKontaktdaten`), nicht `getPublicFarm` — die Kasse liest dieselbe Abfrage. Die Produktseite reichte den Hof zunächst ganz durch (Nacharbeit, Bericht 60); seit Nr. 70 entfernt sie beide ebenso.
 - **Zugang:** Bestätigung und Bestellseite lesen Telefon und E-Mail erst nach der Signaturprüfung (S1); „Bestellungen finden" führt nur über signierte Links dorthin, die Bestellnummer öffnet nichts.
 - **Sackgassen:** „… oder ruf direkt am Hof an" und „Frag am besten direkt beim Hof nach" gibt es nicht mehr; die Kasse verweist mit `KONTAKT_UNTER_ANGABEN_ZUM_HOF` auf die Angaben in derselben Kasse.
 
@@ -4935,6 +4935,86 @@ Auftrag freigabe.md §14 „62" (Register K2, K1, S12). Eine Migration (freigege
 - **Warum „früher" am wirksamen Datum hängt:** Eine Zusage verkürzt auch, wer ein eigenes späteres Datum auf einen früheren Standard zurücksetzt. Deshalb vergleicht die Action das bisher wirksame mit dem künftig wirksamen Ende, nicht die Spalten — und schreibt bedingt auf den gelesenen Stand, damit ein zweiter Tab die Zustimmungs-Regel nicht unterläuft.
 - **Protokoll (S12):** nur das DEV-Log wie bei der Servicegebühr, jetzt mit altem Wert. Ein dauerhaftes Protokoll braucht eine Tabelle (Lauf 11).
 
+## Nacharbeit Lauf 10: Produktseite ohne Kontaktdaten, Port in der Host-Prüfung (Nachtlauf Nr. 70, Oktober 2026)
+
+Auftrag freigabe.md §15 „70" (Register S16, E8). Keine Schema-Änderung, keine Migration, kein neues Paket, keine Bilder.
+
+- **Produktseite:** `produkt/[id]/page.tsx` gibt den Hof über `entferneKontaktdaten` an `ProduktdetailKunde`, dessen Prop `farm` jetzt `HofseiteHof` ist. Telefon und E-Mail standen vorher in den Seitendaten jeder öffentlichen Produktseite, obwohl die Hofseite sie seit Nr. 60 nicht mehr trägt; sichtbar waren sie dort nie. Metadaten und Sichtbarkeitsprüfung der Seite lesen weiter den vollen Hof auf dem Server.
+- **Warum ein Test und nicht der Typ:** Der volle Hof ist an `HofseiteHof` zuweisbar (Zusatzfelder sind bei Zuweisungen erlaubt), ein vergessenes `entferneKontaktdaten` bricht den Typecheck also nicht. Der Test liest die Props der Client-Komponente im Baum der Seite (Schlüssel auf jeder Tiefe und Werte), für Kundinnen und in der Vorschau des Hofs; die Gegenprobe zeigt, dass die Suche am vollen Hof anschlägt und Name, Anschrift, Abholzeiten und Produkte ankommen.
+- **Host-Prüfung (S16):** Für `NEXT_PUBLIC_APP_URL` in der Produktion zählt ein Wert mit Port als fremder Host (`istEchteHerkunft`: echter Host und kein Port). `https://farmerzone.at:8443` gilt weiter als Herkunft, meldet sich aber mit `WARNUNG_APP_URL_FREMDER_HOST`: Better Auth vergleicht Herkünfte genau, der Browser der echten Seite sendet keinen Port, die Anmeldung bräche still. Der Standard-Port 443 fällt schon im URL-Parser weg; die Prüfung der Vorschau (`pruefeAdresse`) blieb, wie sie war.
+
+## Nachbestell-Link: alle Produkte in den Korb (Nachtlauf Nr. 71, Oktober 2026)
+
+Fehler aus Bericht 63 (Nacharbeit), behoben nach `/fix`. Kein neues Paket, keine Migration.
+
+- **Ursache:** `addItem` rechnete mit `items` aus dem Render, aus dem die Funktion stammt. Der Nachbestell-Effekt im Produktraster ruft es in einer Schleife mit `await` aus EINEM Render auf; jeder Aufruf setzte auf denselben leeren Korb auf, Anzeige und Speicher behielten nur das letzte Produkt. `/api/reserve` hatte aber jedes reserviert — die übrigen hielten Bestand bis zum Ablauf der Frist (15 Minuten) für niemanden fest. Dasselbe Produkt zweimal hintereinander reservierte nur die zweite Menge statt der Summe.
+- **Fix (`use-cart.ts`):** Der Hook merkt sich den Stand der letzten Änderung (`useRef`); `persist` bekommt die Änderung als Updater (`vorher => …`) und schreibt Zustand und Speicher mit demselben Stand, `addItem` liest die vorhandene Menge von dort. Kein Updater im React-Zustand: Der darf nichts schreiben, und `schreibeWarenkorb` meldet jede Änderung per Ereignis an die Kopfzeile — mitten im Rendern hieße das ein Update einer fremden Komponente. Reservierung je Position, Reihenfolge, Fehlerbild und „ein anderer Hof ersetzt den Korb" bleiben; der Effekt im Produktraster ist unverändert.
+- **Test:** `tests/use-cart.test.ts` mit einem Hook-Prüfstand ohne DOM (TESTING_GUIDELINES §1), der auch den echten Nachbestell-Effekt laufen lässt.
+
+## Mein Hof am breiten Bildschirm (Nachtlauf Nr. 73, Oktober 2026)
+
+Auftrag freigabe.md §15 „73“ (Register N7, in der Freigabe „D3“). Keine Migration, kein neues Paket, keine neue Datei unter `src/`.
+
+- **Befund:** Der Reiter Hofseite (ab lg) hatte keine Höchstbreite. Ab etwa 2 200 px Fensterbreite blieb rechts der Web-Vorschau Leere (sie war nie breiter als 1 440 px, die Liste fest 400 px), am Handy wurde die Liste über 2 000 px breit. Die Regeln mit ihren Zahlen stehen in DESIGN_SYSTEM „Mein Hof“.
+- **Eine Rechnung statt drei:** Vorher standen die Breiten verteilt — Klassen (320/360 px, Abstand), eine `calc()` im Editor und die 400 px in `hofseite-vorschau.ts`. Jetzt rechnet `editorSpalten(gesamtbreite, modus, breit)` allein; der Editor misst seine Breite und setzt sie. Im Web-Modus sieht bis 2 200 px Fensterbreite alles aus wie vorher, im Handy-Modus bis 1 440 px; erst darüber greifen die Grenzen (im Browser nachgemessen bei 1 024 bis 2 560 px, nichts läuft über).
+- **Warum ein Gerüst bis zur ersten Messung:** Der Server kennt die Breite nicht. Ohne Gerüst sprängen Liste und Vorschau beim Hydrieren (Handy-Spalte 320 → 360 px ab xl). Das Gerüst ist die Handy-Regel in CSS; seine Zahlen koppelt ein Test an die Konstanten. Der Abstand ist jetzt überall 32 px (unter xl vorher 24 px) — eine Zahl statt zwei.
+- **Der Hinweis, wo Produkte liegen,** steht am Ende der Liste als leiser Link auf `/products`. Der Auftrag nannte `seitenkopf.tsx` als seinen Ort im Kopf; er stand aber in der Reiterleiste (`reiter-leiste.tsx`) und ist dort seit Runde 1 entfallen (die drei Tests dazu sind umgekehrt, nicht gelöscht). Folge: Auf dem Reiter Beiträge (ab md) und auf Hofseite zwischen md und lg (dort steht die Liste „Bearbeiten“) gibt es ihn nicht mehr; er bleibt nur im Editor ab lg — so beschreibt es die Freigabe, Entscheidung für den Morgenbericht.
+- **Offen:** Der Kopf (Karte und Reiter) bleibt am breiten Bildschirm volle Breite und steht links und rechts über den Editor hinaus. Den alten Ort des Hinweises nennen noch der Satz über `MEIN_HOF_HINWEIS` in `bauern-navigation.ts` (Z. 140–144), der Kopf von `tests/mein-hof-umschalter.test.ts` und `docs/entwicklung/hofseite-editor-browser.md` — außerhalb der Grenzen von Runde 1.
+
+## WhatsApp an Abonnentinnen: ehrlich, je Person, fortsetzbar (Nachtlauf Nr. 66, Oktober 2026)
+
+Auftrag freigabe.md §15 „66" (Register W1). Eine Migration (freigegeben), kein neues Paket.
+
+- **Befund:** Die Tipp-Liste markierte eine Person eine Sekunde nach dem Tipp als „Gesendet" (`setTimeout`), ohne zu wissen, ob WhatsApp überhaupt aufging; gespeichert wurde nur eine Zahl aus dem Browser (`markWhatsAppSent`), beim Fortsetzen galten wieder alle als offen, und die Zahl konnte über die Empfängerzahl wachsen.
+- **Migration `20261012200000_whatsapp_getippt`:** nur `StatusPost.whatsappGetippt TEXT[]`, nullable, Default `ARRAY[]::TEXT[]` (steht seit Postgres 11 nur im Katalog), kein Backfill — erzeugt mit `prisma migrate diff`, von Hand um `lock_timeout` und `IF NOT EXISTS` ergänzt. Bestandsbeiträge lesen [].
+- **Warum eine Anweisung:** Zwei Tabs (Handy und Rechner) tippen gleichzeitig. Lesen-dann-Schreiben verlor in der Gegenprobe drei von sechs Tipps; `array_remove`/`array_append` auf der gesperrten Zeile verliert keinen.
+- **Warum „verlassen und zurück":** Nur die Rückkehr in den Browser zeigt, dass WhatsApp vorn war. Ein Fokus ohne vorheriges Verlassen (etwa ein Tipp, der nichts öffnete) zählt nicht.
+- **Zähler:** `whatsappSentCount` wird gleich der Listenlänge mitgeschrieben (Bestand, alter Code im Deploy-Fenster); `whatsappRecipientCount` bleibt eingefroren und wird nicht mehr gelesen — Contract mit eigener Freigabe.
+- **Knopf ohne Häkchen-Bedingung (Runde 1):** „WhatsApp · n von m" steht bei aktiven und vergangenen Beiträgen, solange m > n — gleich, ob beim Veröffentlichen das WhatsApp-Häkchen gesetzt war oder schon Abonnentinnen da waren (Stand von heute, W1). `sentViaWhatsApp` bestimmt nur noch die Zeile „wohin". Das Mockup zeigt einen vergangenen Beitrag ohne Knopf; es gilt der Wortlaut der Freigabe.
+- **Offen:** n im Knopf zählt auch Kennungen von inzwischen Abgemeldeten (die Liste selbst nicht).
+
+## Hofseite: alle aktiven Beiträge (Nachtlauf Nr. 68, Oktober 2026)
+
+Auftrag freigabe.md §15 „68“ (in der Freigabe „F7“, im Register F8). Keine Migration, kein neues Paket.
+
+- **Entscheidung:** Die Hofseite zeigt alle aktiven Beiträge, den neuesten zuerst mit „Aktuell“, höchstens fünf; der Reiter heißt „Beiträge · n“. Vorher zeigte sie nur den neuesten (das ursprüngliche Konzept „ein Status je Hof“).
+- **Kein Gewinn an Daten:** Beiträge sind öffentlich, die Karte zeigt dieselben Felder wie vorher. Die Abfrage liest jetzt nur diese Felder (`select`) statt der ganzen Zeile samt Versandzählern. JSON-LD und Metadaten bleiben, wie sie waren.
+- **Die Zahl im Reiter:** n zählt die gezeigten Karten (höchstens 5), so wie „Produkte · n“ die gezeigten Produkte zählt. Einen Hinweis auf weitere Beiträge gibt es nicht — das Mockup zeigt keinen; ältere Beiträge stehen im Hofbereich (Mein Hof, Reiter Beiträge).
+- **Reihenfolge:** `publishedAt` absteigend, bei gleicher Zeit die Kennung. Sonst könnte ein Beitrag zwischen zwei Aufrufen über die Grenze von fünf springen.
+- **Vorschau:** „So sieht’s die Kundin“ in Mein Hof ist ein iframe derselben Route (`?vorschau=1`) und bekommt die Liste von selbst; `hofseite-vorschau.ts` lädt keine Beiträge und blieb unverändert.
+
+## Beitrag teilen = ein Fenster (Nachtlauf Nr. 67, Oktober 2026)
+
+Auftrag freigabe.md §15 „67" (Register T5, W1, T6, Teilen (d)). Keine Migration, kein neues Paket.
+
+- **Ein Weg statt drei:** Die Häkchen „Per WhatsApp an Abonnenten" und „Als WhatsApp-Status-Bild teilen" fallen weg (das zweite versprach einen Download, den es nie gab). Nach dem Veröffentlichen öffnet sich das Teilen-Fenster im Beitrag-Modus; die WhatsApp-Abonnentinnen sind dort die erste Karte und führen in die Tipp-Liste (W1). E-Mail bleibt ein Häkchen.
+- **Nur auf der Hofseite:** Fenster und „Teilen" im Reiter gibt es nur für Beiträge, die ins Bild dürfen (`beitragDarfInsBild`: veröffentlicht, auf der Hofseite, nicht abgelaufen) — Bild (`?b=`) und Link (`?reiter=beitraege`) zeigen ihn sonst nicht. Ohne Hofseite bleibt nach dem Veröffentlichen der Toast; kommt das Fenster nicht (Netz), ebenfalls — der Beitrag ist dann trotzdem veröffentlicht.
+- **Daten erst auf Wunsch:** `ladeTeilenFensterBeitragAction` (nur lesen, Hof aus der Sitzung, Besitz in der WHERE-Klausel); die Liste lädt nicht für jeden Beitrag ein Fenster vorab.
+- **„WhatsApp" in der Zeile:** sobald jemand geöffnet bekam (`whatsappGetippt`), nicht mehr nach `sentViaWhatsApp`; `publishStatusPost` setzt weder `sentViaWhatsApp` noch `whatsappRecipientCount` (Spalten bleiben, Expand/Contract).
+- **Befund aus Nr. 69, behoben hier:** `ladeTeilenVorschau` rechnete die Prüfsumme `v` ohne Produktfotos, die Bild-Route mit — bei Höfen mit eigenem Foto lag das Open-Graph-Bild deshalb nur 60 s im CDN. Jetzt liest `ladeTeilenBildQuelle` die Fotos mit, und beide bilden die Held-Kandidaten gleich (`istEigenesBild`).
+- **Runde 1 – `?p=` vor den verknüpften Produkten:** Die Bild-Route nahm im Beitrag-Modus die verknüpften Produkte vor `?p=`; das Fenster zeigte dann eine andere Auswahl als das geteilte Bild. Jetzt gilt `p` zuerst (Entscheidung des Dirigenten, abweichend vom Wortlaut der Freigabe „69"): Das Fenster belegt `p` mit den verknüpften Produkten vor, ohne `p` (geteilte Bildadresse) gelten die verknüpften, ohne beides der Standard.
+
+## Titelbild im Hochformat (Nachtlauf Nr. 72, Oktober 2026)
+
+Auftrag freigabe.md §15 „72“ (in der Freigabe „B2“, im Register N6). Keine Migration, kein neues Paket.
+
+- **Anlass und Entscheidung:** Ein Handyfoto im Hochformat (3000 × 4000) wurde auf die Breite der Hofseite gezogen und auf 300 px Höhe beschnitten — am Computer blieb ein schmaler, unscharfer Streifen (Screenshot der Projektleitung, 12.10.2026). Jetzt steht ein Titelbild, das höher als breit ist, ab 768 px ganz da, vor einer unscharfen, abgedunkelten Kopie desselben Fotos; am Handy bleibt der Beschnitt mit Fokuspunkt. Querformat und Verlauf ohne Foto sehen aus wie vorher.
+- **Maße nur im Browser:** Hochgeladen wird über `api/upload/verarbeiten` (sharp), die Maße werden nicht gespeichert — eine Migration dafür gab es nicht. Der Browser liest sie, sobald das Bild geladen ist (`onLoad`, `naturalWidth`/`naturalHeight`). Bis dahin gilt der Beschnitt: Querformat springt nie, ein Hochformat wechselt einmal nach dem Laden (am Handy unsichtbar). Vormerkung Lauf 12: Maße beim Hochladen speichern (Expand-Migration, eigene Freigabe) — dann entfällt der Wechsel.
+- **Zwei Bilder, eine Datei:** Kopie und ganzes Foto haben dasselbe `sizes`, also dieselbe Adresse; in einer frischen Browsersitzung bei 390 px kam nur eine Anfrage, auch wenn die Kopie dort verborgen ist (`hidden md:block`).
+- **Mein Hof:** Unter der Vorschau steht bei Hochformat ein ruhiger Satz (kein Blocker). Er erscheint, solange das Foto ein Hochformat ist — nicht nur direkt nach dem Hochladen: Die Maße kommen aus der Vorschau, einen Zustand „gerade hochgeladen“ gibt es dort nicht, und der Hinweis erklärt auch später, warum die Hofseite am Computer so aussieht.
+- **Herausgelöst:** Das Titelbild steht nicht mehr in `hofseite-kunde.tsx`, sondern in `components/hofseite/titelbild.tsx`; die Regel dazu (Hochformat ja/nein, Satz, Maße lesen) in `src/lib/titelbild.ts`.
+
+## Illustrationen verdrahtet (Nachtlauf Nr. 74, Oktober 2026)
+
+Auftrag freigabe.md §15 „74" (Register I1). Keine Migration, kein neues Paket, keine Bilder (die 114 Dateien lagen schon da).
+
+- **Fachregel:** Ein Produkt ohne Foto zeigt die Illustration seiner Unterkategorie, sonst die seiner Kategorie, sonst „Sonstiges“ (auch ohne Kategorie). Die Kette steht rein in `illustrationPfad` (`taxonomie.ts`); `categoryImagePath` fragt je Stufe das Dateisystem. Unterkategorien ohne eigenes Bild (Eier-Haltungsformen, Futter-Altlast) stehen in `OHNE_EIGENE_ILLUSTRATION`; der Typ von `UNTERKATEGORIE_BILD_SLUG` verlangt für jede Unterkategorie genau eines von beidem.
+- **Warum ein Paar Kategorie/Unterkategorie geprüft wird:** Der Ordner einer Unterkategorie ist der ihrer Kategorie. Ein Paar wie Milch/Rind gilt nicht als Unterkategorie, sondern fällt auf die Kategorie zurück — nie ein Pfad ins Leere.
+- **Verdrahtung:** Die Produktkacheln bekommen ihre Adresse in den Abfragen (`products.ts`, `farm.ts`), nicht im `product-grid.tsx`; dort ändert sich nichts. Startseite und „Für Höfe“ zeigen weiter die Kategorie. Das Teilen-Bild bleibt bei der Kategorie (die Route reicht keine Unterkategorie), nimmt aber dieselbe Kette. Die Käufer-Vorschau im Produktdialog bekommt die Unterkategorie vom Dialog (`LebensmittelVorschau` → `kaeuferVorschau`, Pflicht-Prop) und zeigt so dasselbe Bild wie die Hofseite.
+- **Prüfskript `pnpm illustrationen`:** 57 Farbdateien und 57 Schwarzweiß-Dateien — da, WebP, 1024 × 1024, höchstens 80 KB, äußere 8 Pixel einfarbig (Creme bzw. Weiß, ±6). Eigener CI-Schritt neben dem Lint. Die vorhandenen Dateien weichen am Rand höchstens um 4 ab.
+- **Datei-Tracing:** Gemessen mit `next build`: Alle 37 Routenpakete mit Zugriff auf `process.cwd()/public` tragen die Illustrationen samt Unterordnern in der `.nft.json`; die Teilen-Bild-Route trägt sie zusätzlich ausdrücklich ein (`**`).
+- **Aus der Prüfung von 69:** Die Attrappe des Teilen-Bild-Laders wertet Umleitungssperre und Zeitlimit aus; ein Strom einer Fehlerseite wird abgebrochen; eine nicht ladbare Illustration geht mit Klasse und bereinigter Nachricht nach Sentry, nicht mit dem Pfad der Datei.
+
 ## Nützliche Befehle
 
 ```bash
@@ -4944,6 +5024,7 @@ pnpm db:seed          # Testdaten laden (nur Dev-DB)
 pnpm db:studio        # Prisma Studio öffnen
 pnpm db:generate      # Prisma Client generieren
 pnpm test:integration # Integrationstests gegen echtes Postgres (braucht .env.test)
+pnpm illustrationen   # Illustrationen unter public/categories prüfen (Maße, Größe, Rand)
 pnpm briefkasten export   # Briefkasten als Markdown (nur lesend; Leseroute oder TRIAGE_DATABASE_URL)
 ```
 

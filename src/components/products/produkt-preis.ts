@@ -18,7 +18,13 @@ import {
   istMassEinheit,
 } from '@/lib/format'
 import { KAEUFER_VORSCHAU, type KartenVorschau } from '@/lib/hofseite-kunde'
-import { NETTO_EINHEIT_LABEL, kategorieBildPfad, type NettoEinheitValue, type ProductCategoryValue } from '@/lib/taxonomie'
+import {
+  NETTO_EINHEIT_LABEL,
+  illustrationPfad,
+  type NettoEinheitValue,
+  type ProductCategoryValue,
+  type ProductSubcategoryValue,
+} from '@/lib/taxonomie'
 import { preisZahl } from '@/schemas/product'
 
 /** „Preis je kg" ohne Gebinde, „Preis für das 2-kg-Paket" mit, „Preis für 6 Pakete" bei Stück/Paket. */
@@ -76,16 +82,19 @@ export function gueltigerPreis(price: number | null): number | null {
  * Foto, Name, Preis, Einheit. Die Produktkarte der Hofseite zeigt sie mit
  * ihren eigenen Helfern (formatGrundpreis, zweitePreiszeile); hier wird nichts
  * gerechnet. Ohne gültigen Preis (gueltigerPreis) zeigt die Karte den ruhigen
- * Platzhalter; ohne Foto die Illustration der Kategorie wie die Hofseite.
+ * Platzhalter; ohne Foto die Illustration wie auf der Hofseite: die der
+ * Unterkategorie, wenn der Aufrufer sie mitgibt (LebensmittelVorschau tut es,
+ * sonst zeigte die Karte ein anderes Bild als die Hofseite), sonst die der
+ * Kategorie, zuletzt „Sonstiges" (Register I1).
  */
 export function kaeuferVorschau(
   werte: { name: string; price: number | null; unit: string; unitSize: number | null | undefined },
-  bild: { foto: string | null; kategorie: ProductCategoryValue | null }
+  bild: { foto: string | null; kategorie: ProductCategoryValue | null; unterkategorie?: ProductSubcategoryValue | null }
 ): KartenVorschau {
   return {
     name: werte.name.trim() || KAEUFER_VORSCHAU.name,
     imageUrl: bild.foto,
-    categoryImageUrl: kategorieBildPfad(bild.kategorie),
+    categoryImageUrl: illustrationPfad(bild.kategorie, bild.unterkategorie),
     price: gueltigerPreis(werte.price),
     unit: werte.unit,
     unitSize: werte.unitSize ?? null,

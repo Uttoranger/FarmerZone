@@ -69,7 +69,7 @@ Bei **jeder** Codeänderung lesen.
 - `Decimal` und `Date` nicht roh übergeben.
 - `Decimal` → in der Query in `string` oder bereits formatiert wandeln.
 - `Date` → `toISOString()` oder fertig formatiert.
-- **Was eine Seite nicht zeigen darf, geht nicht an eine Client-Komponente** — auch nicht ungezeigt: Props stehen in den Seitendaten. Die Server-Seite entfernt solche Felder vorher und typisiert die Komponente ohne sie, nie die gemeinsame Abfrage (Vorbild: Telefon und E-Mail des Hofs auf der Hofseite, `entferneKontaktdaten` und `HofseiteHof`, Nr. 60).
+- **Was eine Seite nicht zeigen darf, geht nicht an eine Client-Komponente** — auch nicht ungezeigt: Props stehen in den Seitendaten. Die Server-Seite entfernt solche Felder vorher und typisiert die Komponente ohne sie, nie die gemeinsame Abfrage (Vorbild: Telefon und E-Mail des Hofs auf Hofseite und Produktseite, `entferneKontaktdaten` und `HofseiteHof`, Nr. 60 und 70). Der Typ allein hält das nicht: Der volle Hof ist an `HofseiteHof` zuweisbar, ein vergessenes `entferneKontaktdaten` meldet der Typecheck nicht — darum prüft je öffentlicher Seite ein Test die Props ihrer Client-Komponente (→ `TESTING_GUIDELINES.md` §2).
 - **Kein `Date.now()`/`new Date()` beim Rendern einer Client-Komponente**, deren Ausgabe davon abhängt („vor 3 Stunden", Gebührensatz ab Stichtag, Abholtage): Die Seite bestimmt den Zeitpunkt einmal auf dem Server und reicht ihn als ISO-Text durch (`jetzt`, Vorbild `/[farmSlug]/page.tsx` → `HofseiteKunde`) — sonst weichen Server und Browser ab (Hydration-Fehler).
 
 ---
@@ -139,6 +139,7 @@ NextResponse.json({ ok: true, …daten })
 ### Konsistenz bei Teilfehlschlag
 - Mehrere Schreibvorgänge, die zusammengehören → `prisma.$transaction`.
 - **In einer interaktiven Transaktion läuft alles nacheinander** — nie `Promise.all`/`allSettled` mit dem Transaktions-Client (Rückruf-Parameter oder `Prisma.TransactionClient`), auch nicht über eine vorher gebaute Liste von Aufrufen (`const s = [tx.a(), tx.b()]`) oder einen Helfer, der den Client bindet. Eine Verbindung, eine Abfrage zur Zeit; ab pg@9 ist alles andere ein Fehler (`tests/transaktion-nacheinander.test.ts`, Nr. 47).
+- **Eine Liste in einer Array-Spalte (`text[]`) ändert EINE Anweisung auf der Zeile** — `array_append`/`array_remove` per `$queryRaw` mit Parametern, Besitz in derselben WHERE-Klausel, die neue Liste per `RETURNING` zurück —, nie Lesen-dann-Schreiben: Zwei Tabs überschrieben sich sonst gegenseitig ihre Einträge. Ein Zähler daneben wird in derselben Anweisung aus der neuen Liste gerechnet (`cardinality`), nie hochgezählt (Vorbild `setzeWhatsAppGetippt`, Nr. 66).
 - **Eine Zeile als Sperre braucht ein echtes UPDATE.** Mit leerem `data` setzt Prisma kein UPDATE ab (geprüft mit Prisma 7.8: `updatedAt` bleibt stehen), die Zeile bleibt ungesperrt. Wer Felder nur bedingt schreibt (`...(x !== undefined && { x })`) und sich in derselben Transaktion auf die Sperre verlässt — etwa Kindzeilen löschen und neu anlegen —, schreibt `updatedAt: new Date()` immer mit (Vorbild `saveAppearanceAction`).
 - Geht das nicht (externer Dienst dazwischen): Kompensation schreiben, wie beim Bestandsabzug.
 - Nichts Langsames im Antwortpfad → `nachDerAntwort()`.
