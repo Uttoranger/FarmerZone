@@ -175,7 +175,7 @@ export type KartenVorschau = {
 
 /** Überschrift und ruhige Platzhalter der Käufer-Vorschau — leere Felder zeigen nie „NaN" oder „€ 0,00". */
 export const KAEUFER_VORSCHAU = {
-  titel: 'So sehen Käufer dein Produkt',
+  titel: 'So sehen Kunden dein Produkt',
   name: 'Dein Produkt',
   preisFehlt: 'Preis fehlt noch',
 } as const

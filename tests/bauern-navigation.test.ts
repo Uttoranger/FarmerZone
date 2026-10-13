@@ -16,9 +16,9 @@
  *    Leiste (gleich lange Treffer wie „Produkte" der Seitenleiste), das
  *    Mehr-Blatt ohne Mein Hof und ohne Produkte, die Seitenleiste unverändert.
  *  - Aktiv ist der längste passende Punkt; „Mehr" für alles, was im Blatt liegt.
- *  - „Hilfe und Rückmeldung" ist EIN Punkt nach /meldungen, aktiv auch auf
+ *  - „Problem melden" ist EIN Punkt nach /meldungen, aktiv auch auf
  *    /fehler-melden; „Meine Meldungen" trägt den Knopf „+ Neue Meldung",
- *    „Meldung abgeben" die Überschrift „Hilfe und Rückmeldung" (Nr. 22e).
+ *    „Meldung abgeben" die Überschrift „Problem melden" (Nr. 22e).
  *  - „Admin" nur für den Betreiber.
  *  - Jede Seite unter src/app/(farmer) ist über die Navigation erreichbar.
  *  - Rückweg (Nr. 44, Register N1): elternseite() kennt jede Unterseite mit
@@ -99,10 +99,10 @@ describe('Reihenfolge', () => {
     expect(fuerNutzer({ isAdmin: false }).nurImMehr.map((p) => p.href)).toEqual(['/products'])
   })
 
-  it('Plus am Handy: Verkauf eintragen, Status posten, Produkt anlegen — jeweils mit einem Satz', () => {
+  it('Plus am Handy: Verkauf eintragen, Neuer Beitrag, Produkt anlegen — jeweils mit einem Satz', () => {
     expect(NEU.map((p) => [p.label, p.href])).toEqual([
       ['Verkauf eintragen', '/sales?neu=1'],
-      ['Status posten', '/status/new'],
+      ['Neuer Beitrag', '/status/new'],
       ['Produkt anlegen', '/products?neu=1'],
     ])
     for (const p of NEU) expect(p.satz).toMatch(/^\S.*\.$/)
@@ -110,8 +110,8 @@ describe('Reihenfolge', () => {
 
   it('„Neu" im Browser: Neues Produkt und Neuer Beitrag, mit Untertitel, auf dieselben Ziele wie das Plus', () => {
     expect(NEU_BROWSER.map((p) => [p.label, p.satz, p.href])).toEqual([
-      ['Neues Produkt', 'Foto, Preis, Lagerstand', '/products?neu=1'],
-      ['Neuer Beitrag', 'Neuigkeit auf deiner Hofseite', '/status/new'],
+      ['Neues Produkt', 'Foto, Preis, Vorrat', '/products?neu=1'],
+      ['Neuer Beitrag', 'Beitrag auf deiner Hofseite', '/status/new'],
     ])
     for (const p of NEU_BROWSER) expect(NEU.map((n) => n.href)).toContain(p.href)
   })
@@ -125,10 +125,10 @@ describe('Reihenfolge', () => {
     ])
   })
 
-  it('Unten: Einstellungen, Hilfe und Rückmeldung, Admin — kein zweiter Eintrag fürs Melden', () => {
+  it('Unten: Einstellungen, Problem melden, Admin — kein zweiter Eintrag fürs Melden', () => {
     expect(UNTEN.map((p) => [p.label, p.href])).toEqual([
       ['Einstellungen', '/settings'],
-      ['Hilfe und Rückmeldung', '/meldungen'],
+      ['Problem melden', '/meldungen'],
       ['Admin', '/admin'],
     ])
     expect(UNTEN.map((p) => p.href)).not.toContain('/fehler-melden')
@@ -219,7 +219,7 @@ describe('Mein Hof', () => {
   })
 })
 
-describe('Hilfe und Rückmeldung', () => {
+describe('Problem melden', () => {
   // Sicher: Der Test „Unten: …" oben beweist, dass der Punkt existiert.
   const hilfe = UNTEN.find((p) => p.id === 'hilfe')!
 
@@ -235,7 +235,7 @@ describe('Hilfe und Rückmeldung', () => {
     expect(meldungen).toContain('Meine Meldungen')
     expect(meldungen).toMatch(/href=\{NEUE_MELDUNG_HREF\}[\s\S]{0,400}Neue Meldung/)
     const abgeben = quelle(hofSeite('/fehler-melden'))
-    expect(abgeben).toContain('Hilfe und Rückmeldung')
+    expect(abgeben).toContain('Problem melden')
   })
 })
 
@@ -364,7 +364,7 @@ describe('HofShell: Seitenleiste', () => {
     ])
   })
 
-  it('unten: Einstellungen · Hilfe und Rückmeldung · Admin (nur Betreiber, mit Zahl)', () => {
+  it('unten: Einstellungen · Problem melden · Admin (nur Betreiber, mit Zahl)', () => {
     expect(hofNavigation({ isAdmin: false }).unten.map((p) => p.id)).toEqual(['einstellungen', 'hilfe'])
     const betreiber = hofNavigation({ isAdmin: true }).unten
     expect(betreiber.map((p) => p.id)).toEqual(['einstellungen', 'hilfe', 'admin'])
@@ -416,14 +416,14 @@ describe('HofShell: Handy', () => {
     expect(HAUPT.find((p) => p.id === 'mein-hof')?.href).toBe('/farm-page')
   })
 
-  it('„Mehr" (N3): Kunden, Verkäufe, Auswertung, Region, Einstellungen, Hilfe und Rückmeldung, Admin — ohne Mein Hof und ohne Produkte', () => {
+  it('„Mehr" (N3): Kunden, Verkäufe, Auswertung, Region, Einstellungen, Problem melden, Admin — ohne Mein Hof und ohne Produkte', () => {
     expect(hofNavigation({ isAdmin: true }).mehr.map((p) => p.label)).toEqual([
       'Kunden',
       'Verkäufe',
       'Auswertung',
       'Region',
       'Einstellungen',
-      'Hilfe und Rückmeldung',
+      'Problem melden',
       'Admin',
     ])
     const ziele = hofNavigation({ isAdmin: true }).mehr.map((p) => p.href)
@@ -607,7 +607,7 @@ describe('elternseite — wohin der Rückweg einer Unterseite führt', () => {
     expect(elternseite('/settings/profile')).toEqual({ href: '/settings', name: 'Einstellungen' })
     expect(elternseite('/customers/abc')).toEqual({ href: '/customers', name: 'Kunden' })
     expect(elternseite('/orders/abc')).toEqual({ href: '/orders', name: 'Bestellungen' })
-    expect(elternseite('/fehler-melden')).toEqual({ href: '/meldungen', name: 'Hilfe und Rückmeldung' })
+    expect(elternseite('/fehler-melden')).toEqual({ href: '/meldungen', name: 'Problem melden' })
     expect(elternseite('/analytics/umfeld')).toEqual({ href: '/analytics', name: 'Auswertung' })
     expect(elternseite('/status/plakat')).toEqual({ href: '/dashboard', name: 'Heute' })
   })
@@ -632,7 +632,7 @@ describe('elternseite — wohin der Rückweg einer Unterseite führt', () => {
   it('Suche, Anker und Schrägstrich am Ende ändern nichts; tiefer als die Route trifft nichts', () => {
     expect(elternseite('/orders/abc?filter=heute')).toEqual({ href: '/orders', name: 'Bestellungen' })
     expect(elternseite('/settings/profile#betriebsnummer')).toEqual({ href: '/settings', name: 'Einstellungen' })
-    expect(elternseite('/fehler-melden/')).toEqual({ href: '/meldungen', name: 'Hilfe und Rückmeldung' })
+    expect(elternseite('/fehler-melden/')).toEqual({ href: '/meldungen', name: 'Problem melden' })
     // Druckansichten (ohne HofShell) und Pfade über ein Namenspräfix hinweg haben keinen.
     expect(elternseite('/orders/today/print')).toBeNull()
     expect(elternseite('/orders/abc/print')).toBeNull()

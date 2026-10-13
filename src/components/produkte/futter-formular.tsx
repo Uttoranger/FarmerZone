@@ -407,12 +407,12 @@ export function FutterFormular({
           })}
         </ul>
         <p className="text-[12.5px] leading-snug text-muted-foreground">
-          € / kg rechnet sich automatisch und wird Käufern zum Vergleichen gezeigt. Sackerl und Säcke gelten als abgepacktes Heimtierfutter,
+          € / kg rechnet sich automatisch und wird deinen Kundinnen zum Vergleichen gezeigt. Sackerl und Säcke gelten als abgepacktes Heimtierfutter,
           Ballen als lose Ernte – siehe Registrierungen unten. Jede Größe hat ihren eigenen Vorrat.
         </p>
       </Abschnitt>
 
-      <Abschnitt id="futter-hinweise" titel="Hinweise für Käufer">
+      <Abschnitt id="futter-hinweise" titel="Hinweise für Kunden">
         <div className="flex flex-wrap gap-2" role="group" aria-labelledby="futter-hinweise">
           <Wahl aktiv={bio} onClick={() => setBio((b) => !b)}>
             Bio
@@ -594,7 +594,7 @@ function KaeuferVorschau({
   return (
     <section aria-labelledby="futter-vorschau" className="flex flex-col gap-2 rounded-2xl border border-border bg-muted/40 p-4">
       <h3 id="futter-vorschau" className="text-[11px] font-semibold tracking-[1px] text-muted-foreground uppercase">
-        So sehen Käufer dein Futter
+        So sehen Kunden dein Futter
       </h3>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
         <p className="min-w-0 font-heading text-lg font-semibold break-words text-foreground">{name.trim() || 'Dein Futter'}</p>
@@ -620,7 +620,7 @@ function KaeuferVorschau({
           ))}
         </ul>
       )}
-      <p className={cn('text-xs text-muted-foreground')}>Die Servicegebühr zahlt der Käufer zusätzlich. Du bekommst genau deinen Preis.</p>
+      <p className={cn('text-xs text-muted-foreground')}>Die Servicegebühr zahlt die Kundin zusätzlich. Du bekommst genau deinen Preis.</p>
       <p className="text-xs text-muted-foreground">Erscheint auf deiner Hofseite und in Entdecken unter Futtermittel.</p>
     </section>
   )

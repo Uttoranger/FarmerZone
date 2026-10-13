@@ -291,8 +291,8 @@ export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
       art: 'status',
       text:
         statusErinnerung === 'never'
-          ? 'Noch kein Status — erzähl deinen Kunden, was es gibt'
-          : `Seit ${statusErinnerung} Tagen kein neuer Status`,
+          ? 'Noch kein Beitrag — erzähl deinen Kundinnen, was es gibt'
+          : `Seit ${statusErinnerung} Tagen kein neuer Beitrag`,
       href: '/status/new',
     })
   }

@@ -14,12 +14,12 @@ import { MeldungAbgeben } from '@/components/hof-hilfe/meldung-abgeben'
 import { HilfeSeitenspalte } from '@/components/hof-hilfe/hilfe-seitenspalte'
 import { MELDEN_RAHMEN } from '@/components/hof-hilfe/hilfe-laden'
 
-export const metadata: Metadata = { title: 'Hilfe und Rückmeldung — FarmerZone' }
+export const metadata: Metadata = { title: 'Problem melden — FarmerZone' }
 
 export const dynamic = 'force-dynamic'
 
 /*
- * „Hilfe und Rückmeldung" — Meldung abgeben in der HofShell (Nachtlauf
+ * „Problem melden" — Meldung abgeben in der HofShell (Nachtlauf
  * Nr. 22e; Mockups web-h6-meldung-abgeben, mobil-h6-meldung-abgeben). Nur für
  * Höfe: Kundinnen melden auf /problem-melden, das unverändert beim
  * Bestandsformular bleibt.
@@ -61,11 +61,11 @@ export default async function FehlerMeldenPage({
       <UnterseitenKopf zeileImBrowser={false} />
       <div className="lg:flex lg:items-start lg:gap-8">
         <div className="flex min-w-0 flex-col gap-3.5 lg:w-[640px] lg:shrink-0">
-          {/* Am Handy trägt die feste Leiste den Namen schon („← Hilfe und Rückmeldung", Elternseite = derselbe
+          {/* Am Handy trägt die feste Leiste den Namen schon („← Problem melden", Elternseite = derselbe
               Punkt). Die h1 gleichen Wortlauts steht dort nur für den Screenreader, ab 768 px sichtbar wie im
               Web-Mockup (Nr. 56, Bericht 44). */}
           <h1 className="sr-only font-heading text-2xl font-semibold text-foreground md:not-sr-only md:text-[26px]">
-            Hilfe und Rückmeldung
+            Problem melden
           </h1>
           <p className="text-sm leading-normal text-muted-foreground">
             Etwas klemmt, du wünschst dir etwas oder hast eine Frage? Schreib uns – wir lesen alles.

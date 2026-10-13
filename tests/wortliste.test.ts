@@ -14,11 +14,10 @@
  *    zählen nicht.
  *  - Steht ein Wort in anderem Sinn richtig da (der Status einer Bestellung), steht
  *    der Text mit Grund in AUSNAHMEN — je Text, nicht je Datei, ohne Zeilennummer.
- *  - OFFEN_BIS_78 ist die Arbeitsliste für Nr. 78: die Fundstellen von heute
- *    (Datei:Zeile), die 78 umstellt und streicht. Sie greift über Datei, Wort und
- *    Text, nicht über die Zeile — im Sammel-PR verschieben andere Nummern die Zeilen.
- *    Jeder Eintrag deckt genau eine Fundstelle; ein Eintrag, hinter dem kein Text
- *    mehr steht, fällt auf und gehört gestrichen.
+ *  - OFFEN_BIS_78 war die Arbeitsliste für Nr. 78 und ist leer: Jede Fundstelle ist
+ *    umgestellt. Ein Eintrag griffe über Datei, Wort und Text, nicht über die Zeile —
+ *    im Sammel-PR verschieben andere Nummern die Zeilen. Er deckt genau eine
+ *    Fundstelle; ein Eintrag, hinter dem kein Text mehr steht, fällt auf.
  *  - Gegenprobe: Die Suche schlägt am Wort im String an, nicht im Kommentar.
  */
 import { describe, it, expect, beforeAll } from 'vitest'
@@ -179,53 +178,14 @@ const AUSNAHMEN: Ausnahme[] = [
 ]
 
 /**
- * Arbeitsliste für Nr. 78 (Stand main f367433): die Fundstellen von heute. 78 stellt den
- * Text auf das Wort der Tabelle um und streicht den Eintrag. `stelle` ist Datei:Zeile von
- * heute (nur zum Finden; geglichen wird über Datei, Wort und Text), `text` ein Ausschnitt.
- * `nummer` nennt die andere Nummer dieses Laufs, der die Datei gehört — 78 ändert dort
- * nichts, der Dirigent gibt den Eintrag weiter.
+ * Die Arbeitsliste von Nr. 78: Sie hielt die 38 Fundstellen von main f367433, bis 78 jeden Text
+ * auf das Wort der Tabelle umgestellt hat — jetzt ist sie leer und bleibt es (letzter Test).
+ * Wer künftig mehrere Texte nummernweise umstellt, trägt sie hier ein: `stelle` ist
+ * Datei:Zeile von heute (nur zum Finden; geglichen wird über Datei, Wort und Text), `text` ein
+ * Ausschnitt, `nummer` die andere Nummer, der die Datei gehört.
  */
 type Offen = { stelle: string; wort: string; text: string; nummer?: string }
-const OFFEN_BIS_78: Offen[] = [
-  { stelle: 'src/app/(hof)/fehler-melden/page.tsx:17', wort: 'Hilfe und Rückmeldung', text: 'Hilfe und Rückmeldung — FarmerZone' },
-  { stelle: 'src/app/(hof)/fehler-melden/page.tsx:68', wort: 'Hilfe und Rückmeldung', text: 'Hilfe und Rückmeldung' },
-  { stelle: 'src/app/(hof)/status/[id]/send-whatsapp/whatsapp-tap-client.tsx:124', wort: 'Status', text: 'Dein Status', nummer: '81' },
-  { stelle: 'src/app/(hof)/status/new/status-new-client.tsx:278', wort: 'Neuigkeit', text: 'Schreibe hier deine Neuigkeit…' },
-  { stelle: 'src/app/(hof)/status/new/status-new-client.tsx:304', wort: 'Status', text: 'Status-Foto' },
-  { stelle: 'src/app/(public)/datenschutz/page.tsx:233', wort: 'Fehler melden', text: 'bzw. &bdquo;Fehler melden&ldquo; kannst du uns' },
-  { stelle: 'src/components/farm/product-grid.tsx:420', wort: 'Bestand', text: 'Bestand 0 — Kunden sehen „Ausverkauft“', nummer: '75' },
-  { stelle: 'src/components/farm/product-grid.tsx:442', wort: 'Lager', text: 'Lager', nummer: '75' },
-  { stelle: 'src/components/hof-einstellungen/einstellungen-uebersicht.tsx:65', wort: 'Hilfe und Rückmeldung', text: 'Hilfe und Rückmeldung' },
-  { stelle: 'src/components/hofseite/hofseite-seitenspalte.tsx:106', wort: 'Zeitfenster', text: 'Dein Zeitfenster wählst du beim Bestellen.' },
-  { stelle: 'src/components/products/product-dialog.tsx:309', wort: 'Lager', text: 'auf Lager' },
-  { stelle: 'src/components/produkte/brennmaterial-formular.tsx:201', wort: 'Käufer', text: 'Die drei Fragen, die jeder Käufer stellt.' },
-  { stelle: 'src/components/produkte/brennmaterial-formular.tsx:433', wort: 'Käufer', text: 'So sehen Käufer dein Holz' },
-  { stelle: 'src/components/produkte/futter-formular.tsx:410', wort: 'Käufern', text: 'sich automatisch und wird Käufern zum Vergleichen gezeigt.' },
-  { stelle: 'src/components/produkte/futter-formular.tsx:415', wort: 'Käufer', text: 'Hinweise für Käufer' },
-  { stelle: 'src/components/produkte/futter-formular.tsx:597', wort: 'Käufer', text: 'So sehen Käufer dein Futter' },
-  { stelle: 'src/components/produkte/futter-formular.tsx:623', wort: 'Käufer', text: 'Die Servicegebühr zahlt der Käufer zusätzlich. Du bekommst genau deinen Preis.' },
-  { stelle: 'src/components/shared/meldung-form.tsx:86', wort: 'Hilfe und Rückmeldung', text: 'Den Stand deiner Meldung findest du unter „Hilfe und Rückmeldung“.' },
-  { stelle: 'src/components/startseite/startseite-abschnitte.tsx:143', wort: 'Zeitfenster', text: 'Bestellen und Zeitfenster wählen' },
-  { stelle: 'src/emails/status-update.tsx:69', wort: 'Neuigkeit', text: 'Neuigkeit von' },
-  { stelle: 'src/lib/abholfenster.ts:29', wort: 'Zeitfenster', text: 'Dieses Zeitfenster ist leider nicht mehr verfügbar – bitte wähle ein anderes.' },
-  { stelle: 'src/lib/bauern-navigation.ts:177', wort: 'Status', text: 'Status posten' },
-  { stelle: 'src/lib/bauern-navigation.ts:191', wort: 'Lagerstand', text: 'Foto, Preis, Lagerstand' },
-  { stelle: 'src/lib/bauern-navigation.ts:192', wort: 'Neuigkeit', text: 'Neuigkeit auf deiner Hofseite' },
-  { stelle: 'src/lib/bauern-navigation.ts:214', wort: 'Hilfe und Rückmeldung', text: 'Hilfe und Rückmeldung' },
-  { stelle: 'src/lib/bauern-navigation.ts:389', wort: 'Neuigkeit', text: 'Neuigkeit auf deiner Hofseite' },
-  { stelle: 'src/lib/dual-use.ts:46', wort: 'Bestand', text: '. Das hier wird ein zweites, eigenes Produkt mit eigenem Bestand.' },
-  { stelle: 'src/lib/format.ts:345', wort: 'Bestand', text: 'Bestand (' },
-  { stelle: 'src/lib/format.ts:347', wort: 'Bestand', text: 'Bestand (Pakete)' },
-  { stelle: 'src/lib/format.ts:348', wort: 'Bestand', text: 'Bestand (' },
-  { stelle: 'src/lib/heute.ts:294', wort: 'Status', text: 'Noch kein Status — erzähl deinen Kunden, was es gibt' },
-  { stelle: 'src/lib/heute.ts:295', wort: 'Status', text: 'Tagen kein neuer Status' },
-  { stelle: 'src/lib/hoefe-entdecken.ts:311', wort: 'Zeitfenster', text: 'Frisch vom Hof – bestellen und im Zeitfenster abholen' },
-  { stelle: 'src/lib/hofseite-kunde.ts:178', wort: 'Käufer', text: 'So sehen Käufer dein Produkt' },
-  { stelle: 'src/lib/reservierung.ts:136', wort: 'Bestand', text: 'Mengen wurden an den verfügbaren Bestand angepasst.' },
-  { stelle: 'src/lib/reservierung.ts:136', wort: 'Bestand', text: 'Eine Menge wurde an den verfügbaren Bestand angepasst.' },
-  { stelle: 'src/schemas/product.ts:315', wort: 'Bestand', text: 'Bestand kann nicht negativ sein' },
-  { stelle: 'src/schemas/produktfamilie.ts:44', wort: 'Käufer', text: 'Bitte wähle die Scheitlänge — das fragt jeder Käufer.' },
-]
+const OFFEN_BIS_78: Offen[] = []
 
 type Deckt = { datei: string; wort: string; text: string }
 const dateiVon = (stelle: string): string => stelle.slice(0, stelle.lastIndexOf(':'))
@@ -371,9 +331,8 @@ describe('Wortliste', () => {
     })
   })
 
-  // Nr. 78 stellt die Texte um und macht aus dieser Zeile ein `it`. Kein stillgelegter roter Test:
-  // Bis dahin ist die Liste die Arbeit von 78, und die Prüfung darüber läuft grün.
-  it.skip('OFFEN_BIS_78 ist leer — jede Fundstelle ist umgestellt', () => {
+  // Seit Nr. 78 gilt die Tabelle ohne Arbeitsliste: Ein Eintrag in OFFEN_BIS_78 macht diesen Test rot.
+  it('OFFEN_BIS_78 ist leer — jede Fundstelle ist umgestellt', () => {
     expect(OFFEN_BIS_78).toEqual([])
   })
 })

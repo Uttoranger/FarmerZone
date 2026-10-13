@@ -133,7 +133,7 @@ export function befundMeldung(befund: WarenkorbBefund): string | null {
     teile.push(weg === 1 ? 'Eine Position ist nicht mehr verfügbar und wurde entfernt.' : `${weg} Positionen sind nicht mehr verfügbar und wurden entfernt.`)
   }
   if (gekuerzt > 0) {
-    teile.push(gekuerzt === 1 ? 'Eine Menge wurde an den verfügbaren Bestand angepasst.' : `${gekuerzt} Mengen wurden an den verfügbaren Bestand angepasst.`)
+    teile.push(gekuerzt === 1 ? 'Eine Menge wurde an den verfügbaren Vorrat angepasst.' : `${gekuerzt} Mengen wurden an den verfügbaren Vorrat angepasst.`)
   }
   if (teile.length === 0) teile.push(RESERVIERUNG_ABGELAUFEN)
   return teile.join(' ')

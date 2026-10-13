@@ -3,7 +3,7 @@
  * §13) — gerendert (react-dom/server in Node, TESTING_GUIDELINES §1).
  *
  * Beweist:
- *  - „So sehen Käufer dein Produkt" zeigt die ECHTE Produktkarte der Hofseite
+ *  - „So sehen Kunden dein Produkt" zeigt die ECHTE Produktkarte der Hofseite
  *    (Vorschau-Variante), live aus Foto, Name, Preis und Einheit: andere
  *    Formularwerte, andere Karte.
  *  - Mit gewählter Unterkategorie zeigt sie deren Illustration — dasselbe Bild
@@ -45,7 +45,7 @@ type Werte = {
 const KAESE: Werte = { name: 'Bergkäse', price: 12.9, unit: 'KG', unitSize: 0.5, foto: null, kategorie: 'MILCH', unterkategorie: null }
 const vorschau = (werte: Werte) => renderToStaticMarkup(createElement(LebensmittelVorschau, werte))
 
-describe('„So sehen Käufer dein Produkt" — die echte Produktkarte, live aus dem Formular', () => {
+describe('„So sehen Kunden dein Produkt" — die echte Produktkarte, live aus dem Formular', () => {
   it('Überschrift, Name, Preis mit Grundpreis und die Illustration der Kategorie', () => {
     const html = vorschau(KAESE)
     expect(html).toContain(KAEUFER_VORSCHAU.titel)
@@ -132,9 +132,9 @@ describe('nur im Produktdialog für Lebensmittel — Futter und Brennmaterial bl
   it('Futter und Brennmaterial: eigene Vorschau unverändert, keine Produktkarte', () => {
     const futter = quelle('src/components/produkte/futter-formular.tsx')
     const holz = quelle('src/components/produkte/brennmaterial-formular.tsx')
-    expect(futter).toContain('So sehen Käufer dein Futter')
+    expect(futter).toContain('So sehen Kunden dein Futter')
     expect(futter).toContain('futterSchild(')
-    expect(holz).toContain('So sehen Käufer dein Holz')
+    expect(holz).toContain('So sehen Kunden dein Holz')
     for (const text of [futter, holz]) {
       expect(text).not.toMatch(/LebensmittelVorschau|lebensmittel-vorschau/)
       expect(text).not.toMatch(/\bProduktKarte\b/)

@@ -83,7 +83,7 @@ export function MeldungForm({
         </p>
         <p className="text-sm text-muted-foreground">
           {alsHof
-            ? 'Den Stand deiner Meldung findest du unter „Hilfe und Rückmeldung“.'
+            ? 'Den Stand deiner Meldung findest du unter „Meine Meldungen“.'
             : 'Merk dir die Kurznummer, falls du nachfragen möchtest.'}
         </p>
         <div className="mt-2 flex flex-wrap gap-2.5">

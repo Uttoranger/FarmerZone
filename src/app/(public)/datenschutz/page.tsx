@@ -230,7 +230,7 @@ export default function DatenschutzPage() {
 
           <Section title="Fehler- und Wunschmeldungen">
             <p>
-              Über &bdquo;Problem melden&ldquo; bzw. &bdquo;Fehler melden&ldquo; kannst du uns Fehler, Wünsche und Fragen
+              Über &bdquo;Problem melden&ldquo; kannst du uns Fehler, Wünsche und Fragen
               zur Plattform schicken. Gespeichert werden dein Text, die Art der Meldung, die
               Adresse der Seite, von der du gemeldet hast, Browser-Kennung (User-Agent) und
               Bildschirmgröße sowie der Zeitpunkt — keine IP-Adresse, keine Cookies. Bei

@@ -41,7 +41,7 @@ export const FAMILIE_FEHLER = {
   vorrat: 'Bitte eine ganze Zahl ab 0 eintippen.',
   kategorie: 'Bitte wähle, welches Futter es ist.',
   holzart: 'Bitte gib die Holzart an, z. B. Buche.',
-  scheitlaenge: 'Bitte wähle die Scheitlänge — das fragt jeder Käufer.',
+  scheitlaenge: 'Bitte wähle die Scheitlänge — das fragt jede Kundin.',
   wassergehalt: 'Bitte wähle den Wassergehalt der Hackschnitzel.',
   koernung: 'Bitte wähle die Körnung der Hackschnitzel.',
   raummeterHackschnitzel: 'Hackschnitzel gibt es nur lose — bitte Schüttraummeter statt Raummeter.',

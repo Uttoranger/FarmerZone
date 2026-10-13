@@ -21,7 +21,7 @@ import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
 
 const HINWEIS_MAIS =
-  'Du hast schon ein Produkt namens Mais im Bereich Hofladen. Das hier wird ein zweites, eigenes Produkt mit eigenem Bestand.'
+  'Du hast schon ein Produkt namens Mais im Bereich Hofladen. Das hier wird ein zweites, eigenes Produkt mit eigenem Vorrat.'
 
 describe('dualUseHinweis (rein)', () => {
   it('gleicher Name im selben Bereich: kein Hinweis', () => {

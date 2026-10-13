@@ -306,7 +306,7 @@ function zusammenfassung(abschnitt: Abschnitt, w: ProductFormData): string {
       const preis = gueltigerPreis(w.price)
       const teile = [
         preis === null ? KAEUFER_VORSCHAU.preisFehlt : formatGrundpreis(preis, w.unit, w.unitSize),
-        `${Number.isFinite(w.stock) ? w.stock : 0} auf Lager`,
+        `${Number.isFinite(w.stock) ? w.stock : 0} im Vorrat`,
       ]
       if (!w.isAvailable) teile.push(NICHT_IM_SHOP_IM_SATZ)
       return teile.join(' · ')

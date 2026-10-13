@@ -2,7 +2,7 @@
  * Tests für die Anzeige von Ballen und Big Bags (src/lib/format.ts, Sprint
  * Bereiche 1).
  *
- * Beweist: Das Bestandsfeld heißt „Bestand (Ballen)" bzw. „Bestand (Big
+ * Beweist: Das Vorratsfeld heißt „Vorrat (Ballen)" bzw. „Vorrat (Big
  * Bags)"; das Gewicht darunter ist stock × nettoMenge, nie fest codiert; der
  * Kilopreis wird aus Gebindepreis ÷ Nettomenge vorgerechnet.
  */
@@ -17,13 +17,13 @@ import {
 
 describe('bestandLabel bei Großgebinden', () => {
   it('Ballen und Big Bags zählen Gebinde', () => {
-    expect(bestandLabel('BALLEN')).toBe('Bestand (Ballen)')
-    expect(bestandLabel('BIGBAG')).toBe('Bestand (Big Bags)')
+    expect(bestandLabel('BALLEN')).toBe('Vorrat (Ballen)')
+    expect(bestandLabel('BIGBAG')).toBe('Vorrat (Big Bags)')
   })
 
   it('die übrigen Einheiten bleiben wie bisher', () => {
-    expect(bestandLabel('KG')).toBe('Bestand (kg)')
-    expect(bestandLabel('KG', 2)).toBe('Bestand (Pakete)')
+    expect(bestandLabel('KG')).toBe('Vorrat (kg)')
+    expect(bestandLabel('KG', 2)).toBe('Vorrat (Pakete)')
   })
 
   it('Einheitenkürzel mit Plural', () => {
