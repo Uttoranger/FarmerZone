@@ -1,9 +1,9 @@
-import * as Sentry from '@sentry/nextjs'
 import {
   filterAusParametern,
   getMeldungenFuerAdmin,
   getWunschCluster,
   zaehleMeldungenJeStatus,
+  type AdminMeldungFilter,
   type AdminMeldungZeile,
   type WunschCluster,
 } from '@/server/queries/meldung'
@@ -25,7 +25,6 @@ import { wienKalendertag } from '@/lib/kalender'
 import { datumKurz } from '@/lib/verkauf-eintragen'
 import { cn } from '@/lib/utils'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { LEISE } from '@/components/hof-bestellungen/stil'
 import { MeldungListe, Wunschliste, type BriefkastenZeile, type WunschBuendel } from '@/components/admin/briefkasten-teile'
 
@@ -37,6 +36,20 @@ function adresse(basis: BriefkastenSuche, aenderung: BriefkastenSuche): string {
   return meldungenImPostfach(briefkastenAdresse(basis, aenderung))
 }
 
+export type MeldungenDaten = {
+  filter: AdminMeldungFilter
+  meldungen: AdminMeldungZeile[]
+  jeStatus: Partial<Record<MeldungStatus, number>>
+  cluster: WunschCluster[]
+}
+
+/** Die Daten des Reiters — wirft bei einem Datenbankfehler; die Seite zeigt dann AdminFehler. */
+export async function ladeMeldungenReiter(suche: BriefkastenSuche): Promise<MeldungenDaten> {
+  const filter = filterAusParametern(suche, STATUS_ZU_ENTSCHEIDEN)
+  const [meldungen, jeStatus, cluster] = await Promise.all([getMeldungenFuerAdmin(filter), zaehleMeldungenJeStatus(filter.art), getWunschCluster()])
+  return { filter, meldungen, jeStatus, cluster }
+}
+
 /*
  * Der Reiter „Meldungen" im Admin-Postfach (Register N12, Nr. 87; Mockup
  * admin-postfach): der bisherige Briefkasten von /admin/meldungen, Logik
@@ -46,26 +59,8 @@ function adresse(basis: BriefkastenSuche, aenderung: BriefkastenSuche): string {
  * leitet hierher um, die Detailseite /admin/meldungen/[id] bleibt.
  * Eingangskanal, kein Befehlskanal.
  */
-export async function MeldungenReiter({ suche, jetzt }: { suche: BriefkastenSuche; jetzt: Date }): Promise<React.JSX.Element> {
-  const filter = filterAusParametern(suche, STATUS_ZU_ENTSCHEIDEN)
-
-  let daten: { meldungen: AdminMeldungZeile[]; jeStatus: Partial<Record<MeldungStatus, number>>; cluster: WunschCluster[] } | null = null
-  try {
-    const [meldungen, jeStatus, cluster] = await Promise.all([
-      getMeldungenFuerAdmin(filter),
-      zaehleMeldungenJeStatus(filter.art),
-      getWunschCluster(),
-    ])
-    daten = { meldungen, jeStatus, cluster }
-  } catch (err) {
-    // Nur der Bereich — nie Meldungstext.
-    Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'postfach-meldungen' } })
-  }
-
-  if (!daten) {
-    return <Hinweiskarte ton="orange">Wir konnten die Meldungen gerade nicht laden. Lade die Seite bitte neu.</Hinweiskarte>
-  }
-
+export function MeldungenReiter({ suche, daten, jetzt }: { suche: BriefkastenSuche; daten: MeldungenDaten; jetzt: Date }): React.JSX.Element {
+  const { filter } = daten
   const heute = wienKalendertag(jetzt)
   const zeilen: BriefkastenZeile[] = daten.meldungen.map((m) => ({
     id: m.id,

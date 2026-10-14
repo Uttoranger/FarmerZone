@@ -8,7 +8,9 @@
  *    wird der Weg in der App (kein „//", kein „\", kein fremder Host, Port
  *    oder Anmeldedaten, kein http).
  *  - Lesestand je Seite: Neu ist nur, was die ANDERE Seite nach dem Lesestand
- *    schrieb; er rückt nur vor. Eine E-Mail je Faden höchstens jede Stunde.
+ *    schrieb. Dass er nur vorrückt und höchstens eine E-Mail je Faden und
+ *    Stunde geht, sind Bedingungen in den WHERE-Klauseln der Actions — das
+ *    prüft tests/integration/postfach.int.test.ts an der echten Datenbank.
  *  - Liste, Zähler und Karte auf Heute lesen dieselbe Regel; „Du hast
  *    geantwortet" nur, wenn die Antwort das Neueste ist.
  *  - Empfänger: Filter „ohne Online-Zahlung" und „Futter ohne Nummer",
@@ -33,9 +35,7 @@ import {
   heutePostfach,
   istNeuFuer,
   lesequoteText,
-  mailErlaubt,
   meldungenImPostfach,
-  neuerLesestand,
   neuesteDerAnderenSeite,
   passtZumFilter,
   postfachFilterAus,
@@ -105,18 +105,6 @@ describe('Lesestand je Seite', () => {
     expect(istNeuFuer('HOF', vomHof, null)).toBe(false)
     expect(istNeuFuer('TEAM', vomHof, null)).toBe(true)
     expect(istNeuFuer('TEAM', vomTeam, null)).toBe(false)
-  })
-
-  it('der Lesestand rückt nur vor', () => {
-    expect(neuerLesestand(null, vor(5))).toEqual(vor(5))
-    expect(neuerLesestand(vor(5), vor(10))).toEqual(vor(5))
-    expect(neuerLesestand(vor(10), vor(5))).toEqual(vor(5))
-  })
-
-  it('eine E-Mail je Faden höchstens jede Stunde', () => {
-    expect(mailErlaubt(null, JETZT)).toBe(true)
-    expect(mailErlaubt(new Date(JETZT.getTime() - 60 * 60_000 + 1), JETZT)).toBe(false)
-    expect(mailErlaubt(vor(60), JETZT)).toBe(true)
   })
 })
 

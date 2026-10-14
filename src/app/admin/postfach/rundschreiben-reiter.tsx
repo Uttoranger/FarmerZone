@@ -1,4 +1,3 @@
-import * as Sentry from '@sentry/nextjs'
 import { Send } from 'lucide-react'
 import { ladeEmpfaengerHoefe, ladeRundschreibenListe, type GesendetesRundschreiben } from '@/server/queries/postfach'
 import {
@@ -13,13 +12,20 @@ import {
 } from '@/lib/postfach'
 import { cn } from '@/lib/utils'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { Marke } from '@/components/ui/marke'
 import { ProgressBar } from '@/components/ui/progress-bar'
 import { RundschreibenFormular } from './rundschreiben-formular'
 
 const KARTE = 'rounded-2xl border border-border bg-card dark:ring-1 dark:ring-border'
 const UEBERSCHRIFT = 'font-heading text-lg font-semibold text-foreground'
+
+export type RundschreibenDaten = { gesendet: GesendetesRundschreiben[]; hoefe: EmpfaengerHof[] }
+
+/** Die Daten des Reiters — wirft bei einem Datenbankfehler; die Seite zeigt dann AdminFehler. */
+export async function ladeRundschreibenReiter(): Promise<RundschreibenDaten> {
+  const [gesendet, hoefe] = await Promise.all([ladeRundschreibenListe(), ladeEmpfaengerHoefe()])
+  return { gesendet, hoefe }
+}
 
 /*
  * Der Reiter „Rundschreiben" (Register N12, Nr. 87; Mockup
@@ -31,19 +37,7 @@ const UEBERSCHRIFT = 'font-heading text-lg font-semibold text-foreground'
  * Abweichend vom Mockup ohne „Entwurf speichern" (in der Freigabe nicht
  * vorgesehen) und ohne Pfeil je Zeile (es gibt keine Detailseite).
  */
-export async function RundschreibenReiter({ jetzt }: { jetzt: Date }): Promise<React.JSX.Element> {
-  let daten: { gesendet: GesendetesRundschreiben[]; hoefe: EmpfaengerHof[] } | null = null
-  try {
-    const [gesendet, hoefe] = await Promise.all([ladeRundschreibenListe(), ladeEmpfaengerHoefe()])
-    daten = { gesendet, hoefe }
-  } catch (err) {
-    // Nur der Bereich — nie ein Nachrichtentext.
-    Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'postfach-rundschreiben' } })
-  }
-  if (!daten) {
-    return <Hinweiskarte ton="orange">Wir konnten die Rundschreiben gerade nicht laden. Lade die Seite bitte neu.</Hinweiskarte>
-  }
-
+export function RundschreibenReiter({ daten, jetzt }: { daten: RundschreibenDaten; jetzt: Date }): React.JSX.Element {
   const zahlen = empfaengerZahlen(daten.hoefe, [])
 
   return (

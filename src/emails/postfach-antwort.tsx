@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { Link, Text } from '@react-email/components'
-import { MARKE_TEAM } from '@/lib/marke'
 import { POSTFACH_MAIL_TEXT } from '@/lib/postfach'
 import { EmailLayout, bodyText, ctaButton, h1, highlightBox, highlightValue, mutedText, textLink } from './_layout'
 
@@ -18,9 +17,9 @@ export interface PostfachAntwortProps {
  * (Unterhaltung.letzteMailAm). Der Text der Antwort steht in der Mail, dazu
  * der Link und der Weg in den Faden; geantwortet wird in der App.
  */
-export function PostfachAntwortEmail(p: PostfachAntwortProps) {
+export function PostfachAntwortEmail(p: PostfachAntwortProps): React.JSX.Element {
   return (
-    <EmailLayout previewText={POSTFACH_MAIL_TEXT.antwortBetreff(p.titel)}>
+    <EmailLayout previewText={POSTFACH_MAIL_TEXT.antwortBetreff(p.titel)} fusszeile={POSTFACH_MAIL_TEXT.fuss}>
       <Text style={h1}>{POSTFACH_MAIL_TEXT.antwortTitel}</Text>
       <Text style={mutedText}>{`${POSTFACH_MAIL_TEXT.zu}: ${p.titel}`}</Text>
       <div style={highlightBox}>
@@ -37,7 +36,7 @@ export function PostfachAntwortEmail(p: PostfachAntwortProps) {
         {POSTFACH_MAIL_TEXT.oeffnen}
       </Link>
       <Text style={mutedText}>{POSTFACH_MAIL_TEXT.antwortenInDerApp}</Text>
-      <Text style={mutedText}>{`Dein ${MARKE_TEAM}`}</Text>
+      <Text style={mutedText}>{POSTFACH_MAIL_TEXT.gruss}</Text>
     </EmailLayout>
   )
 }

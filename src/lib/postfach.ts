@@ -21,6 +21,9 @@ import { hatRegistrierung, type HofRegistrierung } from '@/lib/futter-registrier
 import { uhrzeitInWien } from '@/lib/fristen'
 import { datumKurz } from '@/lib/verkauf-eintragen'
 import type { DbBremse } from '@/lib/bremse-datenbank'
+// Nur Typen (zur Laufzeit nichts): Die Zod-Schemas sind die Quelle der Werte (CODING_STANDARDS §2).
+import type { z } from 'zod'
+import type { empfaengerRegelSchema, nachrichtArtSchema, unterhaltungSeiteSchema } from '@/schemas/postfach'
 
 // ─── Ziele ───────────────────────────────────────────────────────────────────
 
@@ -80,7 +83,7 @@ export const LINK_MAX = 300
 /** Rate-Limit je Hof und Tag (N12): Antworten eines Hofs. */
 export const NACHRICHTEN_JE_HOF_UND_TAG = 30
 export const TAG_MS = 24 * 60 * 60 * 1000
-/** Höchstens eine E-Mail je Faden in dieser Spanne, wenn das Team antwortet (N12). */
+/** Höchstens eine E-Mail je Faden in dieser Spanne, wenn das Team antwortet (N12) — als Bedingung im UPDATE auf letzteMailAm (actions/postfach.ts). */
 export const MAIL_ABSTAND_MS = 60 * 60 * 1000
 /** Ein offener Faden lädt so oft nach (router.refresh, kein Polling-Endpunkt). */
 export const NACHLADEN_MS = 60 * 1000
@@ -107,6 +110,8 @@ export const POSTFACH_TEXT = {
   wichtig: 'Wichtig',
   duHastGeantwortet: 'Du hast geantwortet',
   ungelesenSr: 'ungelesen',
+  /** Wofür die Zahl an „Postfach" zählt (Screenreader, HofShell). */
+  zaehler: 'ungelesene Nachrichten',
   erklaerung: `Hier schreibt dir das ${MARKE_TEAM}: Neues, Abrechnung, Rechtliches. Du kannst auf jede Nachricht antworten. Ein Problem oder einen Wunsch meldest du wie bisher unter „Problem melden“.`,
   antwortFeld: 'Antwort an das Team …',
   antwortBeschriftung: 'Deine Antwort',
@@ -130,6 +135,9 @@ export const POSTFACH_MAIL_TEXT = {
   link: 'Ansehen',
   oeffnen: 'Im Postfach öffnen',
   antwortenInDerApp: 'Antworten geht in der App: Öffne die Nachricht in deinem Postfach und schreib dort zurück.',
+  gruss: `Dein ${MARKE_TEAM}`,
+  /** Der Satz unter der Karte (EmailLayout `fusszeile`): Absender ist das Team, nicht ein Hof. */
+  fuss: `Versandt vom ${MARKE_TEAM}.`,
 } as const
 
 /**
@@ -161,7 +169,6 @@ export const POSTFACH_FEHLER = {
   keinHof: 'Kein Hof gefunden.',
   zuViele: `Du hast heute schon ${NACHRICHTEN_JE_HOF_UND_TAG} Nachrichten geschrieben. Morgen geht es weiter – oder melde dich über „Problem melden“.`,
   keineEmpfaenger: 'Für diese Auswahl gibt es keinen Hof. Wähl andere Empfänger.',
-  speichern: 'Wir konnten die Nachricht nicht speichern. Bitte versuch es noch einmal.',
 } as const
 
 /** „1 neu", „3 neu" — die Marke neben dem Titel. */
@@ -204,22 +211,12 @@ export function appPfadAusLink(link: string): string | null {
 
 // ─── Lesestand ───────────────────────────────────────────────────────────────
 
-export type Seite = 'HOF' | 'TEAM'
+export type Seite = z.infer<typeof unterhaltungSeiteSchema>
 
 /** Neu für diese Seite ist, was die ANDERE Seite nach dem Lesestand geschrieben hat. */
 export function istNeuFuer(seite: Seite, nachricht: { vonFarmId: string | null; createdAt: Date }, gelesenBis: Date | null): boolean {
   const vonAnderer = seite === 'HOF' ? nachricht.vonFarmId === null : nachricht.vonFarmId !== null
   return vonAnderer && (gelesenBis === null || nachricht.createdAt.getTime() > gelesenBis.getTime())
-}
-
-/** Der Lesestand rückt nur vor: Ein alter Tab mit einem älteren Stand setzt ihn nie zurück. */
-export function neuerLesestand(bisher: Date | null, gelesen: Date): Date {
-  return bisher !== null && bisher.getTime() >= gelesen.getTime() ? bisher : gelesen
-}
-
-/** Darf zu diesem Faden jetzt eine E-Mail gehen? Höchstens eine je Faden und Stunde (N12). */
-export function mailErlaubt(letzteMailAm: Date | null, jetzt: Date): boolean {
-  return letzteMailAm === null || jetzt.getTime() - letzteMailAm.getTime() >= MAIL_ABSTAND_MS
 }
 
 // ─── Zeit ────────────────────────────────────────────────────────────────────
@@ -268,7 +265,7 @@ export function postfachFilterHref(filter: PostfachFilter): string {
   return filter === 'ungelesen' ? `${POSTFACH_HREF}?filter=ungelesen` : POSTFACH_HREF
 }
 
-type NachrichtArtWert = 'NORMAL' | 'WICHTIG' | 'SYSTEM'
+type NachrichtArtWert = z.infer<typeof nachrichtArtSchema>
 
 /** Ein Faden, wie ihn die Abfrage liefert (src/server/queries/postfach.ts). */
 export type FadenRoh = {
@@ -438,13 +435,9 @@ export function neuesteDerAnderenSeite(nachrichten: readonly FadenNachricht[], s
 
 // ─── Rundschreiben: Empfänger ────────────────────────────────────────────────
 
-export type EmpfaengerArt = 'alle' | 'ausgewaehlt' | 'ohne-online-zahlung' | 'futter-ohne-nummer'
+export type EmpfaengerRegel = z.infer<typeof empfaengerRegelSchema>
 
-export type EmpfaengerRegel =
-  | { art: 'alle' }
-  | { art: 'ausgewaehlt'; hofIds: string[] }
-  | { art: 'ohne-online-zahlung' }
-  | { art: 'futter-ohne-nummer' }
+export type EmpfaengerArt = EmpfaengerRegel['art']
 
 export const EMPFAENGER_ARTEN: readonly EmpfaengerArt[] = ['alle', 'ausgewaehlt', 'ohne-online-zahlung', 'futter-ohne-nummer']
 
@@ -558,7 +551,8 @@ export const ADMIN_POSTFACH_TEXT = {
   alsWichtig: 'Als Wichtig markieren',
   linkEinfuegen: 'Link einfügen',
   auchPerMail: 'Auch per E-Mail (Betriebsmitteilung)',
-  waehlen: 'Wähl links eine Unterhaltung, um sie zu lesen und zu antworten.',
+  // Ohne „links": Unter 1024 px steht der Faden unter der Liste.
+  waehlen: 'Wähl eine Unterhaltung, um sie zu lesen und zu antworten.',
   du: 'du',
   gesendet: 'Gesendet',
   regeln: 'Regeln',
@@ -572,8 +566,15 @@ export const ADMIN_POSTFACH_TEXT = {
   textFeld: 'Text',
   linkFeld: 'Link (freiwillig)',
   linkHinweis: `Beginnt mit „/“ (Weg in der App) oder https://${PRODUKTION_HOST}/…`,
+  /**
+   * Beispiel im Feld „Link" — die Produkte des Hofs (wie PRODUKTE_HREF in
+   * bauern-navigation.ts; von dort nicht eingebunden, weil die Datei selbst
+   * POSTFACH_HREF von hier holt). Nur Platzhalter, kein Ziel.
+   */
+  linkBeispiel: '/products',
   perMail: 'Auch per E-Mail schicken – Betriebsmitteilung',
-  perMailSatz: `Nur, wenn es den Betrieb des Hofs betrifft. Absender: ${MARKE_TEAM}, Antwort über die App.`,
+  // Kein „Absender: …": Der Kopf der Mail nennt die Plattform (EMAIL_FROM), das Team steht in der Mail.
+  perMailSatz: `Nur, wenn es den Betrieb des Hofs betrifft. In der Mail steht „Nachricht vom ${MARKE_TEAM}“, geantwortet wird in der App.`,
   soSiehtsDerHof: 'So sieht’s der Hof',
   nochNichtGelesen: 'noch nicht gelesen',
   rundschreiben: 'Rundschreiben',
@@ -581,6 +582,8 @@ export const ADMIN_POSTFACH_TEXT = {
   reiterBeschriftung: 'Bereiche des Postfachs',
   zaehlerAntworten: 'ungelesene Antworten',
   zaehlerMeldungen: 'Meldungen zu entscheiden',
+  /** Die Zahl am Reiter „Postfach" der AdminShell zählt beides (adminbereich.ts). */
+  zaehlerReiter: 'ungelesene Antworten und Meldungen zu entscheiden',
   listeBeschriftung: 'Unterhaltungen mit Antworten der Höfe',
   fadenBeschriftung: 'Unterhaltung',
   gespeichert: 'Antwort gespeichert.',
@@ -590,6 +593,12 @@ export const ADMIN_POSTFACH_TEXT = {
   keinTreffer: 'Kein Hof passt zur Suche.',
   rundschreibenAn: (anzahl: number) => `Rundschreiben an ${anzahl} ${anzahl === 1 ? 'Hof' : 'Höfe'}`,
   gelesenVomHof: 'gelesen',
+  /** Ein Reiter ließ sich nicht laden — AdminFehler mit „Noch einmal versuchen". */
+  ladeFehler: {
+    unterhaltungen: 'Wir konnten die Unterhaltungen gerade nicht laden.',
+    meldungen: 'Wir konnten die Meldungen gerade nicht laden.',
+    rundschreiben: 'Wir konnten die Rundschreiben gerade nicht laden.',
+  } satisfies Record<AdminPostfachReiter, string>,
 } as const
 
 /** Der Leerzustand „Unterhaltungen" (Register N9): Der Ausweg ist ein neues Rundschreiben. */
@@ -601,6 +610,6 @@ export const UNTERHALTUNGEN_LEER = {
 /** Der Leerzustand „Gesendet" (Register N9). Ohne Aktion, Grund in `ohne` (wie POSTFACH_LEER). */
 export const RUNDSCHREIBEN_LEER = {
   titel: 'Noch kein Rundschreiben gesendet',
-  satz: 'Was du rechts schreibst und sendest, steht danach hier – mit der Zahl der Höfe, die es gelesen haben.',
-  ohne: 'Das Formular für ein neues Rundschreiben steht direkt daneben auf derselben Seite.',
+  satz: 'Was du unter „Neues Rundschreiben“ schreibst und sendest, steht danach hier – mit der Zahl der Höfe, die es gelesen haben.',
+  ohne: 'Das Formular für ein neues Rundschreiben steht auf derselben Seite.',
 } as const

@@ -6,7 +6,9 @@
  *    (header/aside, nav, main) mit Sprunglink „Zum Inhalt springen".
  *  - HofShell: Seitenleiste und Handy-Leiste zeigen die Einträge aus
  *    hofNavigation — dieselbe Quelle für Web und Handy; „Admin" nur für den
- *    Betreiber; Zahlen an Bestellungen und Admin.
+ *    Betreiber; Zahlen an Bestellungen und Admin. Postfach steht ganz oben im
+ *    Mehr-Blatt mit seinem Zähler, und „Mehr" trägt die Zahl mit (N12) —
+ *    ohne Ungelesenes keine Zahl.
  *  - KundeShell: ohne Sitzung mit „Anmelden" (→ /login, auch am Handy),
  *    mit Hof-Sitzung „Mein Hof" (→ /dashboard), mit Kundensitzung Suche und
  *    „Mein Konto" — ohne „Meine Höfe" und „Merken" (E8); Hell/Dunkel am Handy
@@ -34,6 +36,19 @@ vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))
 vi.mock('@/lib/auth-client', () => ({ signOut: vi.fn() }))
+// Ein Blatt liegt im Portal und steht auf dem Server nur offen im HTML. Für den
+// Blick ins Mehr-Blatt rendert SheetBlatt seinen Inhalt auf Wunsch an Ort und
+// Stelle (per vi.mock ersetzte Teilkomponente, TESTING_GUIDELINES §1); sonst
+// bleibt es das echte.
+const blatt = vi.hoisted(() => ({ inline: false }))
+vi.mock('@/components/ui/sheet', async (importOriginal) => {
+  const echt = await importOriginal<typeof import('@/components/ui/sheet')>()
+  return {
+    ...echt,
+    SheetBlatt: (props: Parameters<typeof echt.SheetBlatt>[0]) =>
+      blatt.inline ? createElement('div', { 'data-slot': 'sheet-blatt-inline' }, props.children as ReactNode) : createElement(echt.SheetBlatt, props),
+  }
+})
 
 import { HofShell } from '@/components/shells/hof-shell'
 import { KundeFokusShell, KundeShell } from '@/components/shells/kunde-shell'
@@ -41,6 +56,7 @@ import { AdminShell } from '@/components/shells/admin-shell'
 import { hofNavigation } from '@/lib/bauern-navigation'
 import { kundenNavigation, type KundenSitzung } from '@/lib/kunden-navigation'
 import { ADMIN_KONTO, ADMIN_REITER, ADMIN_ZURUECK } from '@/lib/admin-navigation'
+import { ADMIN_POSTFACH_TEXT, POSTFACH_HREF, POSTFACH_TEXT } from '@/lib/postfach'
 
 const INHALT = createElement('p', null, 'Inhalt der Seite')
 
@@ -175,6 +191,42 @@ describe('HofShell', () => {
   it('„Beiträge" ist kein eigener Punkt (E12)', () => {
     expect(hof(true)).not.toContain('href="/status"')
   })
+
+  describe('Postfach am Handy (N12): ganz oben im Mehr-Blatt, „Mehr" trägt die Zahl', () => {
+    function mitPostfach(postfach: number): { mehrKnopf: string; mehrBlatt: string; html: string } {
+      pfad.aktuell = '/dashboard'
+      blatt.inline = true
+      try {
+        const html = renderToStaticMarkup(
+          el(HofShell, { hofName: 'Hof Beispiel', hofSlug: 'hof-beispiel', personName: 'Max Mustermann', isAdmin: false, zahlen: { bestellungen: 3, postfach } })
+        )
+        const mehr = html.indexOf('>Mehr<')
+        // Das Mehr-Blatt ist das letzte Blatt der Leiste (davor das Blatt „Neu“).
+        const mehrBlatt = html.slice(html.lastIndexOf('data-slot="sheet-blatt-inline"'))
+        return { mehrKnopf: html.slice(html.lastIndexOf('<button', mehr), mehr), mehrBlatt, html }
+      } finally {
+        blatt.inline = false
+      }
+    }
+
+    it('mit Ungelesenem: erste Zeile im Blatt ist das Postfach mit Zähler, die Zahl steht auch an „Mehr"', () => {
+      const { mehrKnopf, mehrBlatt } = mitPostfach(2)
+      const ersteZeile = mehrBlatt.slice(mehrBlatt.indexOf('<li data-slot="list-row"'), mehrBlatt.indexOf('</li>') + '</li>'.length)
+      expect(mehrBlatt).toContain('Schließen')
+      expect(ersteZeile).toContain(`href="${POSTFACH_HREF}"`)
+      expect(ersteZeile).toContain(`2 ${POSTFACH_TEXT.zaehler}`)
+      expect(mehrKnopf).toContain(`2 ${POSTFACH_TEXT.zaehler}`)
+    })
+
+    it('Gegenprobe: ohne Ungelesenes steht das Postfach weiter oben, aber nirgends eine Zahl dafür', () => {
+      const { mehrKnopf, mehrBlatt, html } = mitPostfach(0)
+      const ersteZeile = mehrBlatt.slice(mehrBlatt.indexOf('<li data-slot="list-row"'), mehrBlatt.indexOf('</li>') + '</li>'.length)
+      expect(ersteZeile).toContain(`href="${POSTFACH_HREF}"`)
+      expect(mehrKnopf).toContain('<button')
+      expect(mehrKnopf).not.toContain('data-slot="zaehler"')
+      expect(html).not.toContain(POSTFACH_TEXT.zaehler)
+    })
+  })
 })
 
 describe('KundeShell', () => {
@@ -290,7 +342,8 @@ describe('AdminShell', () => {
     const reiter = abschnitt(html, '<nav aria-label="Admin-Bereiche"', '</nav>')
     expect([...reiter.matchAll(/<a href="([^"]+)"/g)].map((t) => t[1])).toEqual(ADMIN_REITER.map((r) => r.href))
     expect(reiter).toContain('2 Höfe warten auf Freischaltung')
-    expect(reiter).toContain('3 Meldungen zu entscheiden')
+    // Die Zahl am Postfach zählt ungelesene Antworten und Meldungen (N12) — der Screenreader sagt beides.
+    expect(reiter).toContain(`3 ${ADMIN_POSTFACH_TEXT.zaehlerReiter}`)
     // Wortliste (N12): Der Reiter heißt „Postfach“ — auch in der Zeile unter dem Kopf am Handy, die dieselben Reiter zeigt.
     expect(reiter).toContain('Postfach')
     expect(reiter).not.toContain('Briefkasten')

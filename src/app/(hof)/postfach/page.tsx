@@ -107,10 +107,10 @@ export default async function PostfachPage({
               ))}
             </ul>
           )}
+          {/* Nur mit Fäden: Leer sagt der EmptyState dasselbe (DESIGN_SYSTEM „Leerzustände"). */}
+          <p className="text-[12.5px] leading-relaxed text-muted-foreground">{POSTFACH_TEXT.erklaerung}</p>
         </>
       )}
-
-      <p className="text-[12.5px] leading-relaxed text-muted-foreground">{POSTFACH_TEXT.erklaerung}</p>
     </div>
   )
 }

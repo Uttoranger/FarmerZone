@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import { headers } from 'next/headers'
+import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { ladeFadenHof } from '@/server/queries/postfach'
@@ -35,8 +36,10 @@ export default async function FadenPage({ params }: { params: Promise<{ id: stri
   const farm = await getFarmForUser(session.user.id)
   if (!farm) redirect('/onboarding')
 
-  const { id } = await params
-  const faden = await ladeFadenHof(farm.id, id)
+  // URL-Parameter mit Zod (CODING_STANDARDS §3): keine cuid, kein Faden — wie ?faden= im Admin.
+  const id = z.cuid().safeParse((await params).id)
+  if (!id.success) notFound()
+  const faden = await ladeFadenHof(farm.id, id.data)
   if (!faden) notFound()
 
   const jetzt = new Date()

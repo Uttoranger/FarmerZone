@@ -91,9 +91,14 @@ interface EmailLayoutProps {
   previewText: string
   children: React.ReactNode
   manageUrl?: string
+  /**
+   * Der Satz unter der Karte. Ohne ihn der Satz der Mails im Namen eines Hofs;
+   * Mails des Teams (Postfach, Register N12) nennen das Team als Absender.
+   */
+  fusszeile?: string
 }
 
-export function EmailLayout({ previewText, children, manageUrl }: EmailLayoutProps) {
+export function EmailLayout({ previewText, children, manageUrl, fusszeile }: EmailLayoutProps): React.JSX.Element {
   return (
     <Html lang="de">
       <Head>
@@ -111,7 +116,7 @@ export function EmailLayout({ previewText, children, manageUrl }: EmailLayoutPro
             <Section style={content}>{children}</Section>
           </Section>
           <Section style={{ padding: '16px 24px 0' }}>
-            <Text style={footerText}>{`Versandt von ${MARKE} im Auftrag eines Hofes.`}</Text>
+            <Text style={footerText}>{fusszeile ?? `Versandt von ${MARKE} im Auftrag eines Hofes.`}</Text>
             {manageUrl && (
               <Text style={{ ...footerText, marginTop: '6px' }}>
                 <a href={manageUrl} style={{ color: MAIL_FARBE.textLeise }}>

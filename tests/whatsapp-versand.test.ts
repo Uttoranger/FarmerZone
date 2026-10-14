@@ -118,12 +118,18 @@ const ERLAUBTE_SAETZE: readonly { datei: string; satz: string; grund: string }[]
  * Ausnahmen von „keine Zeitschaltung", je Datei mit Grund: Ein offener Faden im
  * Postfach lädt alle 60 s nach (Register N12, router.refresh, kein
  * Polling-Endpunkt) — die Zeitschaltung holt nur die Seite neu, sie speichert
- * nichts und behauptet keine Zustellung. Eine Ausnahme ohne Zeitschaltung
- * macht die Wache rot.
+ * nichts und behauptet keine Zustellung. Die Ausnahme setzt die Wache nicht
+ * aus: Erlaubt ist genau ein Takt (`nurEinTakt`). Eine Ausnahme ohne
+ * Zeitschaltung macht die Wache rot.
  */
 const ERLAUBTE_ZEITSCHALTUNG: readonly { datei: string; grund: string }[] = [
   { datei: 'postfach/[id]/faden-nachladen.tsx', grund: 'Register N12: offener Faden lädt alle 60 s nach (router.refresh), nur bei sichtbarer Seite.' },
 ]
+
+/** Was eine erlaubte Zeitschaltung darf: genau ein `setInterval`, kein `setTimeout`. */
+function nurEinTakt(text: string): boolean {
+  return (text.match(/\bsetInterval\b/g) ?? []).length === 1 && !/\bsetTimeout\b/.test(text)
+}
 
 function ohneErlaubteSaetze(datei: string, text: string): string {
   return ERLAUBTE_SAETZE.filter((e) => e.datei === datei).reduce((rest, e) => rest.split(e.satz).join(''), text)
@@ -160,7 +166,8 @@ describe('Client-Komponenten unter src/app/(hof) (Quelltext-Wache, Regelvorschla
 
   it('keine Zeitschaltung und kein Satz, der eine Zustellung behauptet — außer den begründeten E-Mail-Sätzen', () => {
     for (const [datei, text] of CLIENTS) {
-      if (!ERLAUBTE_ZEITSCHALTUNG.some((e) => e.datei === datei)) expect(text, datei).not.toMatch(/\bset(Timeout|Interval)\b/)
+      if (ERLAUBTE_ZEITSCHALTUNG.some((e) => e.datei === datei)) expect(nurEinTakt(text), datei).toBe(true)
+      else expect(text, datei).not.toMatch(/\bset(Timeout|Interval)\b/)
       expect(ohneErlaubteSaetze(datei, text), datei).not.toMatch(UNEHRLICH)
     }
   })
@@ -204,6 +211,11 @@ describe('Client-Komponenten unter src/app/(hof) (Quelltext-Wache, Regelvorschla
       const marke = <span>Gesendet</span>
     `
     expect(alt).toMatch(/\bsetTimeout\b/)
+    // Auch eine erlaubte Zeitschaltung hat genau einen Takt: kein zweiter, keine Verzögerung.
+    expect(nurEinTakt(alt)).toBe(false)
+    expect(nurEinTakt('const a = setInterval(neu, 1000); const b = setInterval(neu, 5000)')).toBe(false)
+    expect(nurEinTakt('const t = setInterval(() => router.refresh(), 60000); setTimeout(speichern, 10)')).toBe(false)
+    expect(nurEinTakt('const t = setInterval(() => router.refresh(), 60000); clearInterval(t)')).toBe(true)
     expect(alt).toMatch(UNEHRLICH)
     expect(aktionImUpdater(alt)).toBe(true)
     expect(aktionImUpdater(alt.replace('startTransition(async () => { await markWhatsAppSent(postId, next.size) })', ''))).toBe(true)

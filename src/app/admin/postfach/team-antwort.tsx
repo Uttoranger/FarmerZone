@@ -95,7 +95,7 @@ export function TeamAntwort({ unterhaltungId, hofName }: { unterhaltungId: strin
           <label htmlFor={`${id}-link`} className="text-[13px] font-medium text-foreground">
             {ADMIN_POSTFACH_TEXT.linkFeld}
           </label>
-          <input id={`${id}-link`} value={link} onChange={(e) => setLink(e.target.value)} placeholder="/products" className={cn(FELD, 'min-h-11')} />
+          <input id={`${id}-link`} value={link} onChange={(e) => setLink(e.target.value)} placeholder={ADMIN_POSTFACH_TEXT.linkBeispiel} className={cn(FELD, 'min-h-11')} />
           <p className="text-xs text-muted-foreground">{ADMIN_POSTFACH_TEXT.linkHinweis}</p>
         </div>
       )}

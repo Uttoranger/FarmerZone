@@ -26,6 +26,7 @@ import {
 import { gelesenSchema, hofAntwortSchema, rundschreibenSchema, teamAntwortSchema } from '@/schemas/postfach'
 import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 import { verlangeAdminAktion } from '@/server/admin-wache'
+import { getFarmForUser } from '@/server/queries/dashboard'
 import { ladeEmpfaengerHoefe, ladeMailEmpfaenger } from '@/server/queries/postfach'
 
 /*
@@ -58,22 +59,23 @@ function satzAus(fehler: z.ZodError): string {
 }
 
 /**
- * Der Hof der Sitzung — nie aus dem Formular: der Hof, dessen Besitzer
- * angemeldet ist (wie getFarmForUser in den übrigen Hof-Actions). Die Rolle
- * aus der Sitzung zählt hier nicht — sie kann aus dem Sitzungs-Cookie stammen;
- * entscheidend ist der Besitz, frisch aus der Datenbank.
+ * Der Hof der Sitzung — nie aus dem Formular: getFarmForUser wie die
+ * Hof-Seiten und die übrigen Hof-Actions (der Besitz, frisch aus der
+ * Datenbank). Die Rolle aus der Sitzung zählt hier nicht — sie kann aus dem
+ * Sitzungs-Cookie stammen. Nicht ladeHofbereich: Das leitet um und lädt
+ * Zähler, Banner und Tarif — fünf Abfragen, die eine Action nicht braucht.
  */
 async function hofDerSitzung(): Promise<{ id: string } | { error: string }> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { error: POSTFACH_FEHLER.anmelden }
-  const hof = await prisma.farm.findUnique({ where: { ownerId: session.user.id }, select: { id: true } })
-  return hof ?? { error: POSTFACH_FEHLER.keinHof }
+  return (await getFarmForUser(session.user.id)) ?? { error: POSTFACH_FEHLER.keinHof }
 }
 
 /**
  * Der Lesestand einer Seite rückt bis `bis` vor — angelegt, wenn es keinen
- * gibt, sonst nur vorwärts (neuerLesestand als Bedingung im UPDATE): Zwei
- * Tabs mit verschiedenem Stand setzen ihn nie zurück. Nacheinander, auch in
+ * gibt, sonst nur vorwärts: Die Regel ist die Bedingung `gelesenBis < bis` im
+ * UPDATE, so setzen zwei Tabs mit verschiedenem Stand ihn nie zurück
+ * (geprüft in tests/integration/postfach.int.test.ts). Nacheinander, auch in
  * einer Transaktion (CODING_STANDARDS §4).
  */
 async function setzeLesestand(
@@ -206,12 +208,19 @@ export async function antworteAlsTeam(eingabe: unknown): Promise<TeamAntwortErge
 
   let mail: 'unterwegs' | 'gedrosselt' | 'aus' = 'aus'
   if (perMail) {
-    const { count } = await prisma.unterhaltung.updateMany({
-      where: { id: unterhaltungId, OR: [{ letzteMailAm: null }, { letzteMailAm: { lte: new Date(jetzt.getTime() - MAIL_ABSTAND_MS) } }] },
-      data: { letzteMailAm: jetzt },
-    })
-    mail = count === 1 ? 'unterwegs' : 'gedrosselt'
-    if (count === 1) {
+    // Nachlauf: Die Antwort ist gespeichert. Scheitert das Belegen der Stunde,
+    // geht keine Mail ('aus') — aber kein Fehler an den Admin, sonst schickte
+    // er dieselbe Antwort ein zweites Mal. Gemeldet wird nur die Fehlerklasse.
+    try {
+      const { count } = await prisma.unterhaltung.updateMany({
+        where: { id: unterhaltungId, OR: [{ letzteMailAm: null }, { letzteMailAm: { lte: new Date(jetzt.getTime() - MAIL_ABSTAND_MS) } }] },
+        data: { letzteMailAm: jetzt },
+      })
+      mail = count === 1 ? 'unterwegs' : 'gedrosselt'
+    } catch (err) {
+      meldeNachlauf(err, 'antwort-mail-stunde', unterhaltungId)
+    }
+    if (mail === 'unterwegs') {
       nachDerAntwort(async () => {
         try {
           const [empfaenger] = await ladeMailEmpfaenger([unterhaltungId])

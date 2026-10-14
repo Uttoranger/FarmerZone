@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import * as Sentry from '@sentry/nextjs'
 import { MessagesSquare, CheckCheck } from 'lucide-react'
 import { z } from 'zod'
 import { ladeFadenAdmin, ladeUnterhaltungenAdmin, type AdminFaden, type AdminUnterhaltung } from '@/server/queries/postfach'
@@ -20,13 +19,25 @@ import { hofInitialen } from '@/lib/hof-initialen'
 import { cn } from '@/lib/utils'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FadenVerlauf } from '@/app/(hof)/postfach/teile'
 import { TeamAntwort } from './team-antwort'
 import { FadenGelesenTeam } from './faden-gelesen-team'
 
 const KARTE = 'rounded-2xl border border-border bg-card dark:ring-1 dark:ring-border'
+
+export type UnterhaltungenDaten = { liste: AdminUnterhaltung[]; faden: AdminFaden | null }
+
+/**
+ * Die Daten des Reiters — wirft bei einem Datenbankfehler; die Seite zeigt
+ * dann AdminFehler. Der Faden kommt aus ?faden= (Zod: cuid), eine andere
+ * Kennung öffnet nichts.
+ */
+export async function ladeUnterhaltungenReiter(fadenParameter: string | string[] | undefined): Promise<UnterhaltungenDaten> {
+  const fadenId = z.cuid().safeParse(Array.isArray(fadenParameter) ? fadenParameter[0] : fadenParameter)
+  const [liste, faden] = await Promise.all([ladeUnterhaltungenAdmin(), fadenId.success ? ladeFadenAdmin(fadenId.data) : Promise.resolve(null)])
+  return { liste, faden }
+}
 
 /** Die Initialen eines Hofs als runde Plakette (Mockup admin-postfach) — Schmuck, der Name steht daneben. */
 function HofPlakette({ name }: { name: string }): React.JSX.Element {
@@ -122,28 +133,15 @@ function Faden({ faden, jetzt }: { faden: AdminFaden; jetzt: Date }): React.JSX.
  * Ohne „Hof öffnen" und ohne Namen der Person, Tarif und Bestellzahl im Kopf
  * (Bericht 87): Es gibt keine Admin-Seite eines einzelnen Hofs.
  */
-export async function UnterhaltungenReiter({
+export function UnterhaltungenReiter({
   filter,
-  fadenParameter,
+  daten: { liste, faden },
   jetzt,
 }: {
   filter: PostfachFilter
-  fadenParameter: string | string[] | undefined
+  daten: UnterhaltungenDaten
   jetzt: Date
-}): Promise<React.JSX.Element> {
-  const fadenId = z.cuid().safeParse(Array.isArray(fadenParameter) ? fadenParameter[0] : fadenParameter)
-  let liste: AdminUnterhaltung[] | null = null
-  let faden: AdminFaden | null = null
-  try {
-    ;[liste, faden] = await Promise.all([ladeUnterhaltungenAdmin(), fadenId.success ? ladeFadenAdmin(fadenId.data) : Promise.resolve(null)])
-  } catch (err) {
-    // Nur der Bereich — nie ein Nachrichtentext.
-    Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'postfach-unterhaltungen' } })
-  }
-  if (!liste) {
-    return <Hinweiskarte ton="orange">Wir konnten die Unterhaltungen gerade nicht laden. Lade die Seite bitte neu.</Hinweiskarte>
-  }
-
+}): React.JSX.Element {
   const ungelesen = liste.filter((u) => u.ungelesen)
   const zeilen = filter === 'ungelesen' ? ungelesen : liste
 

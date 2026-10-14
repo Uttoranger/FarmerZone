@@ -17,10 +17,10 @@ import { cn } from '@/lib/utils'
 import { MARKE } from '@/lib/marke'
 import { Zaehler } from '@/components/ui/zaehler'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { ADMIN_RAHMEN, SEITEN_TITEL } from '@/components/admin/admin-teile'
-import { UnterhaltungenReiter } from './unterhaltungen-reiter'
-import { MeldungenReiter } from './meldungen-reiter'
-import { RundschreibenReiter } from './rundschreiben-reiter'
+import { ADMIN_RAHMEN, AdminFehler, SEITEN_TITEL } from '@/components/admin/admin-teile'
+import { UnterhaltungenReiter, ladeUnterhaltungenReiter, type UnterhaltungenDaten } from './unterhaltungen-reiter'
+import { MeldungenReiter, ladeMeldungenReiter, type MeldungenDaten } from './meldungen-reiter'
+import { RundschreibenReiter, ladeRundschreibenReiter, type RundschreibenDaten } from './rundschreiben-reiter'
 
 export const metadata: Metadata = { title: `${ADMIN_POSTFACH_TEXT.titel} — Admin — ${MARKE}` }
 export const dynamic = 'force-dynamic'
@@ -38,6 +38,18 @@ function einzeln(wert: string | string[] | undefined): string | undefined {
   return Array.isArray(wert) ? wert[0] : wert
 }
 
+type ReiterDaten =
+  | { reiter: 'unterhaltungen'; daten: UnterhaltungenDaten }
+  | { reiter: 'meldungen'; daten: MeldungenDaten }
+  | { reiter: 'rundschreiben'; daten: RundschreibenDaten }
+
+/** Lädt nur den offenen Reiter; ein Datenbankfehler wirft. */
+async function ladeReiter(reiter: AdminPostfachReiter, roh: Suche): Promise<ReiterDaten> {
+  if (reiter === 'unterhaltungen') return { reiter, daten: await ladeUnterhaltungenReiter(roh.faden) }
+  if (reiter === 'meldungen') return { reiter, daten: await ladeMeldungenReiter({ status: einzeln(roh.status), art: einzeln(roh.art) }) }
+  return { reiter, daten: await ladeRundschreibenReiter() }
+}
+
 /*
  * /admin/postfach — der eine Ort, an dem beim Admin alles ankommt (Register
  * N12, Nachtlauf Nr. 87; Mockups admin-postfach, admin-rundschreiben): Reiter
@@ -45,7 +57,9 @@ function einzeln(wert: string | string[] | undefined): string | undefined {
  * /admin/meldungen leitet um) · Rundschreiben. Der Reiter steht in der
  * Adresse (?reiter=), wie bisher bei den Reitern im Admin. Erste Anweisung
  * ist die Admin-Prüfung; Zähler am Reiter: ungelesene Antworten bzw.
- * Meldungen, die auf das Team warten.
+ * Meldungen, die auf das Team warten. Lässt sich der offene Reiter nicht
+ * laden, steht AdminFehler da wie auf jeder Admin-Seite — mit EINER h1
+ * („Postfach"); im Reiter gäbe der Baustein eine zweite.
  */
 export default async function AdminPostfachPage({ searchParams }: { searchParams: Promise<Suche> }): Promise<React.JSX.Element> {
   await verlangeAdminSeite()
@@ -61,6 +75,21 @@ export default async function AdminPostfachPage({ searchParams }: { searchParams
   } catch (err) {
     // Ohne Zahlen geht es weiter — die Reiter laden ihre Inhalte selbst.
     Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'postfach' } })
+  }
+
+  let geladen: ReiterDaten | null = null
+  try {
+    geladen = await ladeReiter(reiter, roh)
+  } catch (err) {
+    // Nur Bereich und Reiter — nie ein Nachrichten- oder Meldungstext.
+    Sentry.captureException(err, { tags: { bereich: 'admin', seite: `postfach-${reiter}` } })
+  }
+  if (!geladen) {
+    return (
+      <div className={ADMIN_RAHMEN}>
+        <AdminFehler titel={ADMIN_POSTFACH_TEXT.titel} satz={ADMIN_POSTFACH_TEXT.ladeFehler[reiter]} nochmal={adminPostfachAdresse(reiter)} />
+      </div>
+    )
   }
 
   return (
@@ -105,9 +134,9 @@ export default async function AdminPostfachPage({ searchParams }: { searchParams
         </ul>
       </nav>
 
-      {reiter === 'unterhaltungen' && <UnterhaltungenReiter filter={postfachFilterAus(roh.filter)} fadenParameter={roh.faden} jetzt={jetzt} />}
-      {reiter === 'meldungen' && <MeldungenReiter suche={{ status: einzeln(roh.status), art: einzeln(roh.art) }} jetzt={jetzt} />}
-      {reiter === 'rundschreiben' && <RundschreibenReiter jetzt={jetzt} />}
+      {geladen.reiter === 'unterhaltungen' && <UnterhaltungenReiter filter={postfachFilterAus(roh.filter)} daten={geladen.daten} jetzt={jetzt} />}
+      {geladen.reiter === 'meldungen' && <MeldungenReiter suche={{ status: einzeln(roh.status), art: einzeln(roh.art) }} daten={geladen.daten} jetzt={jetzt} />}
+      {geladen.reiter === 'rundschreiben' && <RundschreibenReiter daten={geladen.daten} jetzt={jetzt} />}
     </div>
   )
 }

@@ -46,6 +46,7 @@ import {
   type HofNeuPunkt,
 } from '@/lib/bauern-navigation'
 import type { TarifZeileDaten } from '@/lib/konditionen'
+import { POSTFACH_TEXT } from '@/lib/postfach'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { BottomNav, BottomNavLink, BottomNavMitte, bottomNavEintragKlassen, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
@@ -133,7 +134,7 @@ function zahlFuer(punkt: HofNavPunkt, zahlen: HofShellProps['zahlen']): number |
 }
 
 function zahlWofuer(punkt: HofNavPunkt): string {
-  if (punkt.zahl === 'postfach') return 'ungelesene Nachrichten'
+  if (punkt.zahl === 'postfach') return POSTFACH_TEXT.zaehler
   return punkt.zahl === 'admin' ? 'Meldungen zu entscheiden' : 'offene Bestellungen'
 }
 

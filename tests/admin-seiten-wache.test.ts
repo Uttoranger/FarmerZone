@@ -12,6 +12,9 @@
  *    als ERSTE Anweisung mit verlangeAdminSeite.
  *  - Verhalten: Ohne Anmeldung → Login, angemeldet ohne Recht (frisch aus der
  *    Datenbank) → 404 — und in beiden Fällen wird nichts gezählt.
+ *  - /admin/meldungen leitet den Admin dauerhaft (308) auf den Reiter
+ *    „Meldungen" im Postfach um, status und art gehen mit (Nr. 87); ohne
+ *    Recht 404 und keine Umleitung.
  *  - Gegenproben: Schnipsel ohne Wache und mit Wache an zweiter Stelle.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -27,6 +30,9 @@ vi.mock('next/navigation', () => ({
   notFound: vi.fn(() => {
     throw new Error('NOT_FOUND')
   }),
+  permanentRedirect: vi.fn((ziel: string) => {
+    throw new Error(`PERMANENT:${ziel}`)
+  }),
 }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', () => ({
@@ -34,6 +40,8 @@ vi.mock('@/lib/prisma', () => ({
 }))
 
 import { ladeAdminbereich } from '@/server/adminbereich'
+import MeldungenUmleitung from '@/app/admin/meldungen/page'
+import { permanentRedirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -216,5 +224,28 @@ describe('ladeAdminbereich — Verhalten', () => {
       .mockResolvedValueOnce({ isAdmin: true } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'FARMER', farm: null } as never)
     expect(await ladeAdminbereich()).toMatchObject({ hatHof: false })
+  })
+})
+
+describe('/admin/meldungen — Umleitung auf den Reiter „Meldungen" (308, Nr. 87)', () => {
+  const getSession = vi.mocked(auth.api.getSession)
+  const userFindUnique = vi.mocked(prisma.user.findUnique)
+  const umleiten = (suche: { status?: string; art?: string }) => MeldungenUmleitung({ searchParams: Promise.resolve(suche) })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    getSession.mockResolvedValue({ user: { id: 'u1' } } as never)
+  })
+
+  it('Admin: auf /admin/postfach?reiter=meldungen, status und art gehen mit', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    await expect(umleiten({ status: 'NEU', art: 'FEHLER' })).rejects.toThrow(/^PERMANENT:\/admin\/postfach\?reiter=meldungen&status=NEU&art=FEHLER$/)
+    await expect(umleiten({})).rejects.toThrow(/^PERMANENT:\/admin\/postfach\?reiter=meldungen$/)
+  })
+
+  it('Gegenprobe: ohne Recht 404 — die Umleitung verrät das Ziel nicht', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: false } as never)
+    await expect(umleiten({ status: 'NEU' })).rejects.toThrow('NOT_FOUND')
+    expect(permanentRedirect).not.toHaveBeenCalled()
   })
 })

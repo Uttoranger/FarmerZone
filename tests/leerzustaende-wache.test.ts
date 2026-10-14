@@ -217,7 +217,7 @@ const OHNE_AKTION: OhneAktion[] = [
   {
     datei: 'src/app/admin/postfach/rundschreiben-reiter.tsx',
     titel: 'RUNDSCHREIBEN_LEER.titel',
-    grund: 'Das Formular „Neues Rundschreiben“ steht auf derselben Seite direkt daneben (RUNDSCHREIBEN_LEER.ohne; im Sammel-PR ausweg={{ ohne }}, Nr. 85)',
+    grund: 'Das Formular „Neues Rundschreiben“ steht auf derselben Seite, ab 1024 px daneben, schmaler darunter (RUNDSCHREIBEN_LEER.ohne; im Sammel-PR ausweg={{ ohne }}, Nr. 85)',
   },
   {
     datei: 'src/components/admin/hoefe-ansicht.tsx',
