@@ -35,7 +35,7 @@ export default function ProduktNichtGefunden() {
           symbol={PackageSearch}
           titel={PRODUKT_NICHT_GEFUNDEN_TITEL}
           satz={PRODUKT_NICHT_GEFUNDEN_TEXT}
-          aktion={
+          ausweg={
             <>
               <Link
                 href="/hoefe"

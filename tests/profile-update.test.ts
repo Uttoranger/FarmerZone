@@ -41,7 +41,7 @@ const gueltig = {
   address: 'Dorfstraße 12',
   postalCode: '3400',
   city: 'Klosterneuburg',
-  phone: '+43 664 123 4567',
+  phone: '+43 664 000 0000',
   email: 'hof@beispiel.at',
   country: 'AT' as const,
   latitude: null,

@@ -184,12 +184,9 @@ export function ProduktdetailKunde({
   // „nur an Betriebe" darf auf der Seite nicht fehlen, wenn eine Größe ihn braucht.
   const verantwortung = futterVerantwortung(familie.length > 0 ? familie : [produkt])
 
-  const marke =
-    zustand.art === 'knapp' ? (
-      <StatusBadge status="offen">{knappText(zustand.bestand, produkt.unit, produkt.unitSize)}</StatusBadge>
-    ) : zustand.art === 'ausverkauft' ? (
-      <StatusBadge status="neutral">Ausverkauft</StatusBadge>
-    ) : null
+  const marke = zustand.art === 'ausverkauft' ? <StatusBadge status="neutral">Ausverkauft</StatusBadge> : null
+  // „Nur noch …" als leise Zeile statt als Marke — wie auf der Produktkarte (Freigabe Lauf 13, Nr. 85).
+  const knapp = zustand.art === 'knapp' ? knappText(zustand.bestand, produkt.unit, produkt.unitSize) : null
 
   return (
     <>
@@ -277,6 +274,8 @@ export function ProduktdetailKunde({
                   )}
                 </ul>
               )}
+
+              {knapp && <p className="text-[13px] font-medium text-muted-foreground">{knapp}</p>}
 
               {schild && (
                 <p className="flex items-center gap-1.5 text-[12.5px] font-medium text-status-fertig">

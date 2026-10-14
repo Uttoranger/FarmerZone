@@ -6,7 +6,7 @@ import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getMeldungenFuerHof } from '@/server/queries/meldung'
 import { generateFormToken } from '@/lib/form-token'
-import { KENNUNG_PARAMETER, bereinigeKennung } from '@/lib/fehlerseite'
+import { KENNUNG_PARAMETER, PROBLEM_MELDEN, bereinigeKennung } from '@/lib/fehlerseite'
 import { meldungenStand } from '@/lib/hof-hilfe'
 import { supportMailto } from '@/lib/support'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
@@ -15,7 +15,7 @@ import { HilfeSeitenspalte } from '@/components/hof-hilfe/hilfe-seitenspalte'
 import { MELDEN_RAHMEN } from '@/components/hof-hilfe/hilfe-laden'
 import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: `Problem melden — ${MARKE}` }
+export const metadata: Metadata = { title: `${PROBLEM_MELDEN} — ${MARKE}` }
 
 export const dynamic = 'force-dynamic'
 
@@ -66,7 +66,7 @@ export default async function FehlerMeldenPage({
               Punkt). Die h1 gleichen Wortlauts steht dort nur für den Screenreader, ab 768 px sichtbar wie im
               Web-Mockup (Nr. 56, Bericht 44). */}
           <h1 className="sr-only font-heading text-2xl font-semibold text-foreground md:not-sr-only md:text-[26px]">
-            Problem melden
+            {PROBLEM_MELDEN}
           </h1>
           <p className="text-sm leading-normal text-muted-foreground">
             Etwas klemmt, du wünschst dir etwas oder hast eine Frage? Schreib uns – wir lesen alles.

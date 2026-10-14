@@ -89,7 +89,7 @@ function sitzung(
       email: 'Erika.Mustermann@Example.org',
       emailVerified: imCookie,
       role: 'CUSTOMER',
-      phone: '+43 660 0000001',
+      phone: '+43 664 0000000',
     },
   } as never)
   userFindUnique.mockResolvedValue({ email: 'erika.mustermann@example.org', emailVerified: inDb, ...konto } as never)

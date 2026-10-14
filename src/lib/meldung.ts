@@ -12,8 +12,6 @@
  * Wochenlauf und die Frage, ob der Betreiber eine Zusammenfassung braucht.
  */
 
-import type { MarkeArt } from '@/lib/marke-art'
-
 export const MELDUNG_ARTEN = ['FEHLER', 'WUNSCH', 'FRAGE'] as const
 export type MeldungArt = (typeof MELDUNG_ARTEN)[number]
 
@@ -100,22 +98,6 @@ export const STATUS_INTERN: Record<MeldungStatus, string> = {
   DUPLIKAT: 'Duplikat',
 }
 
-/**
- * Die Bedeutung der Admin-Marken (Register G5): tun = wartet auf die
- * Entscheidung des Menschen, läuft = in Arbeit, erledigt = abgeschlossen. Die
- * Farbe zeichnet nur der Baustein Marke.
- */
-export const STATUS_MARKE_ART: Record<MeldungStatus, MarkeArt> = {
-  NEU: 'tun',
-  GEPRUEFT: 'laeuft',
-  // Wartet auf die Entscheidung des Menschen — deshalb „tun" wie NEU.
-  VERMUTLICH_WUNSCH: 'tun',
-  GEPLANT: 'laeuft',
-  ERLEDIGT: 'erledigt',
-  KEIN_FEHLER: 'erledigt',
-  DUPLIKAT: 'erledigt',
-}
-
 /** Der Ton einer Marke im neuen Design — dieselben Werte wie StatusBadge (components/ui/status-badge.tsx). */
 export type MeldungTon = 'offen' | 'fertig' | 'neutral'
 
@@ -124,7 +106,7 @@ export type MeldungTon = 'offen' | 'fertig' | 'neutral'
  * Mockup web-h6-meine-meldungen): Grün, wenn sich etwas tut oder getan ist
  * (In Arbeit, Behoben/Umgesetzt/Beantwortet), sonst neutral. Nie Orange —
  * Orange heißt im Hofbereich „wartet auf dich", und keine Meldung wartet auf
- * den Hof. Die Admin-Marken (STATUS_MARKE_ART) bleiben, wie sie sind.
+ * den Hof. Die Admin-Marken (ADMIN_STATUS_TON in admin-briefkasten.ts) bleiben, wie sie sind.
  */
 export const STATUS_TON: Record<MeldungStatus, MeldungTon> = {
   NEU: 'neutral',

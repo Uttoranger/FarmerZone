@@ -44,7 +44,7 @@ import {
   gebuehrFuerMonatsabrechnung,
   type ServicegebuehrEinstellung,
 } from '@/lib/servicegebuehr'
-import { barHinweis, kassenBetraege, kassenZahlarten } from '@/lib/kasse'
+import { barGuenstiger, kassenBetraege, kassenZahlarten } from '@/lib/kasse'
 import { artikelFehltRechnung, artikelFehltZeilen, type ArtikelFehltBestellung } from '@/lib/artikel-fehlt'
 import { einnahmenImMonat, topfVonBestellung, type BestellungFuerFinanzen } from '@/lib/finanzen'
 import { BEISPIEL_GLEICH, STARTSEITE_FRAGEN, beispielRechnung, startseitenFragen } from '@/lib/startseite'
@@ -174,29 +174,28 @@ describe('Kasse (Client-Vorschau) — derselbe Weg, mit der Zahlungsart', () => 
     expect(kassenBetraege(KORB, HOF, DANACH, 'ONLINE').gesamtCents).toBe(1082)
   })
 
-  it('der Hinweis kommt nur, solange bar wirklich günstiger ist', () => {
-    expect(barHinweis(HOF, LANGE_VORHER)).toBe(BAR_OHNE_GEBUEHR_HINWEIS)
-    expect(barHinweis(HOF, KURZ_VORHER)).toBe(BAR_OHNE_GEBUEHR_HINWEIS)
-    expect(barHinweis(HOF, GENAU)).toBeNull()
+  it('bar ist nur günstiger, solange der Stichtag fern ist und online eine Gebühr gilt (barGuenstiger)', () => {
+    expect(barGuenstiger(HOF, LANGE_VORHER)).toBe(true)
+    expect(barGuenstiger(HOF, KURZ_VORHER)).toBe(true)
+    expect(barGuenstiger(HOF, GENAU)).toBe(false)
     // Ein gebührenfreier Hof (oder einer mit Datum in der Zukunft) kostet online auch nichts.
-    expect(barHinweis(GEBUEHRFREI, LANGE_VORHER)).toBeNull()
-    expect(barHinweis({ ...HOF, serviceFeeActiveFrom: DANACH }, LANGE_VORHER)).toBeNull()
+    expect(barGuenstiger(GEBUEHRFREI, LANGE_VORHER)).toBe(false)
+    expect(barGuenstiger({ ...HOF, serviceFeeActiveFrom: DANACH }, LANGE_VORHER)).toBe(false)
   })
 
   it('„Ohne Servicegebühr" sagt die Bar-Zahlart nur, wenn es stimmt (seit Nr. 82 an der Option, Register N10)', () => {
     const hof = { acceptsOnline: true, stripeAccountReady: true, acceptsOnsite: true }
     const bar = (guenstiger: boolean) => kassenZahlarten(hof, guenstiger).find((z) => z.wert === 'ONSITE_CASH')?.zusatz
-    expect(bar(false)).toBe('Du bestätigst per E-Mail – ein Tipp genügt.')
-    expect(bar(true)).toBe(`Ohne Servicegebühr bis ${BAR_OHNE_GEBUEHR_BIS_TEXT}. Du bestätigst per E-Mail – ein Tipp genügt.`)
+    expect(bar(false)).toBe('Du bestätigst per E-Mail.')
+    expect(bar(true)).toBe(`Ohne Servicegebühr bis ${BAR_OHNE_GEBUEHR_BIS_TEXT}. Du bestätigst per E-Mail.`)
     expect(kassenZahlarten(hof)).toEqual(kassenZahlarten(hof, false))
   })
 
-  it('das Formular rechnet mit der gewählten Zahlart und zeigt den Hinweis aus barHinweis', () => {
+  it('das Formular rechnet mit der gewählten Zahlart und fragt barGuenstiger, ob bar den Vorteil nennt', () => {
     const formular = lies('src/components/checkout/checkout-form.tsx')
     expect(formular).toMatch(/kassenBetraege\(cart, farm, jetzt, paymentMethod\)/)
-    expect(formular).toMatch(/barHinweis\(farm, jetzt\)/)
     // Seit Nr. 42 (Register Z2) kommen Testbetrieb und onlineAus als drittes Argument dazu.
-    expect(formular).toMatch(/kassenZahlarten\(farm, hinweisBar !== null(, \{ testbetrieb, onlineAus \})?\)/)
+    expect(formular).toMatch(/kassenZahlarten\(farm, barGuenstiger\(farm, jetzt\)(, \{ testbetrieb, onlineAus \})?\)/)
     // Gegenprobe: die alte Form ohne Zahlungsart fiele auf.
     expect('kassenBetraege(cart, farm, jetzt)').not.toMatch(/kassenBetraege\(cart, farm, jetzt, paymentMethod\)/)
   })

@@ -5,7 +5,7 @@ import { STRIPE_MARKE, TESTBETRIEB, TESTUMGEBUNG_URL } from '@/lib/umgebung-serv
 
 /*
  * Alle Routen unter /admin in der AdminShell (Nachtlauf Nr. 22f, Gate 8):
- * eigene Kopfzeile mit den Reitern Höfe · Briefkasten · Finanzen und — nur
+ * eigene Kopfzeile mit den Reitern Höfe · Postfach · Finanzen und — nur
  * mit eigenem Hof — „← Zu meinem Hof", keine Hof-Seitenleiste
  * (docs/ai/DESIGN_SYSTEM.md).
  *

@@ -101,7 +101,7 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, abonnentinnen
     }
   }, [speichere])
 
-  /** Der wa.me-Link für eine Person — null, wenn ihre Nummer keine Ziffer hat (dann kein Link, Nr. 75). */
+  /** Der wa.me-Link für eine Person — null, wenn sich ihre Nummer nicht eindeutig lesen lässt (dann kein Link, Nr. 75 und 85). */
   function buildWaUrl(person: Abonnentin): string | null {
     const firstName = person.name.split(' ')[0]
     // Mit ?k=wa: Besuche aus dieser Nachricht zählen für WhatsApp (Gate 7, T1; ohne Kennung der Person).
@@ -119,7 +119,7 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, abonnentinnen
           titel={TEXT.leer.titel}
           titelStufe={1}
           satz={TEXT.leer.satz}
-          aktion={
+          ausweg={
             <Link href={BEITRAEGE_HREF} className={KNOPF_RAHMEN}>
               {TEXT.leer.aktion}
             </Link>

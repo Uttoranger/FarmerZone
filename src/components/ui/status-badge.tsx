@@ -19,8 +19,9 @@ const ART_ZUM_TON: Record<StatusTon, MarkeArt> = {
  * ein Symbol steht mit dem Wort in einer Zeile. So tragen alle Aufrufer die
  * Farben von G5, ohne dass sich ihre Töne ändern.
  *
- * Welchen Zustand eine Bestellung hat, entscheidet nicht die Marke, sondern
- * der Aufrufer (z. B. bestellTon) — hier nur die Gestalt.
+ * Welchen Zustand etwas hat, entscheidet nicht die Marke, sondern der
+ * Aufrufer (z. B. ADMIN_STATUS_TON); Bestellungen tragen ihre Art direkt
+ * (`bestellMarke`, `bestellStatusAnzeige` → `Marke`) — hier nur die Gestalt.
  */
 export function StatusBadge({
   status,

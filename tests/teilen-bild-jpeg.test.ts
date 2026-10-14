@@ -13,7 +13,7 @@
  *  - Dateiname und Typ des Teilen-Bilds stehen an EINER Stelle
  *    (`TEILEN_BILD_TYP`): Route, Teilen-Fenster und Open-Graph-Angabe lesen sie.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { NextRequest } from 'next/server'
@@ -68,14 +68,23 @@ const HOF_ROH = {
 const aufruf = (suche = '') =>
   bildRoute(new NextRequest(`http://localhost/hof-test/opengraph-image${suche}`), { params: Promise.resolve({ farmSlug: 'hof-test' }) })
 
+// Echtes Zeichnen: kalt dauert das Sekunden (Satori, resvg, Schriften, sharp), unter Last länger als die
+// 5 s der Vorgabe. Einmal je Datei vorwärmen, mit eigenem Zeitlimit (TESTING_GUIDELINES §4) — die Tests
+// selbst laufen dann im Standard-Limit.
+beforeAll(async () => {
+  vi.mocked(prisma.farm.findFirst).mockResolvedValue(HOF_ROH as never)
+  await aufruf('?format=quadrat')
+  await aufruf('?format=story')
+  await import('sharp')
+}, 30_000)
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(prisma.farm.findFirst).mockResolvedValue(HOF_ROH as never)
 })
 
 describe('GET /[farmSlug]/opengraph-image — JPEG statt PNG (Register T7)', () => {
-  // Echtes Zeichnen: kalt dauert das Sekunden (Satori, resvg, Schriften), unter Last länger als die 5 s der Vorgabe.
-  it.each([['quadrat'], ['story']] as const)('Format %s: ein JPEG in den Maßen des Formats', { timeout: 30_000 }, async (format) => {
+  it.each([['quadrat'], ['story']] as const)('Format %s: ein JPEG in den Maßen des Formats', async (format) => {
     const res = await aufruf(`?format=${format}`)
     expect(res.status).toBe(200)
     expect(res.headers.get('content-type')).toBe('image/jpeg')
@@ -90,7 +99,7 @@ describe('GET /[farmSlug]/opengraph-image — JPEG statt PNG (Register T7)', () 
     expect({ format: meta.format, width: meta.width, height: meta.height }).toEqual({ format: 'jpeg', ...TEILEN_BILD_MASSE[format] })
   })
 
-  it('ohne Prüfsumme nur der kurze Zwischenspeicher, neben dem neuen Typ', { timeout: 30_000 }, async () => {
+  it('ohne Prüfsumme nur der kurze Zwischenspeicher, neben dem neuen Typ', async () => {
     const res = await aufruf()
     expect(res.headers.get('content-type')).toBe('image/jpeg')
     expect(res.headers.get('cache-control')).toBe('public, max-age=60, s-maxage=60')

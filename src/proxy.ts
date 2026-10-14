@@ -16,6 +16,7 @@ const FARMER_PATHS = [
   '/fehler-melden',
   '/meldungen',
   '/region',
+  '/postfach',
 ]
 
 export async function proxy(request: NextRequest) {
@@ -49,5 +50,6 @@ export const config = {
     '/fehler-melden/:path*',
     '/meldungen/:path*',
     '/region/:path*',
+    '/postfach/:path*',
   ],
 }

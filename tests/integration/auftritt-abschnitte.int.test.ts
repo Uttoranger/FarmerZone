@@ -186,8 +186,8 @@ const FAELLE: [string, () => Promise<{ error?: string }>, (vorher: Stand) => Sta
   ],
   [
     'Kontakt',
-    () => speichereProfil({ phone: '+43 660 1111111', email: 'int-kontakt-neu@example.com' }),
-    (v) => ({ ...v, hof: { ...v.hof, phone: '+43 660 1111111', email: 'int-kontakt-neu@example.com' } }),
+    () => speichereProfil({ phone: '+43 664 0000000', email: 'int-kontakt-neu@example.com' }),
+    (v) => ({ ...v, hof: { ...v.hof, phone: '+43 664 0000000', email: 'int-kontakt-neu@example.com' } }),
   ],
 ]
 
@@ -292,9 +292,9 @@ describe('zwei Abschnitte nacheinander, ohne neu zu laden', () => {
     const { farm } = await angemeldeterHof()
 
     await speichereProfil({ name: 'Hof Neuname', description: 'Gemüse, Eier und Brot aus Teststadt.' })
-    await speichereProfil({ phone: '+43 660 1111111', email: 'int-kontakt-neu@example.com' })
+    await speichereProfil({ phone: '+43 664 0000000', email: 'int-kontakt-neu@example.com' })
 
-    expect((await stand(farm.id)).hof).toMatchObject({ name: 'Hof Neuname', phone: '+43 660 1111111' })
+    expect((await stand(farm.id)).hof).toMatchObject({ name: 'Hof Neuname', phone: '+43 664 0000000' })
   })
 
   it('Gegenprobe Profil: mit dem Stand vom Öffnen der Seite ginge der Name verloren', async () => {
@@ -302,7 +302,7 @@ describe('zwei Abschnitte nacheinander, ohne neu zu laden', () => {
     const beimOeffnen = (await getFarmSettings(ownerId))!
 
     await speichereProfil({ name: 'Hof Neuname', description: 'Gemüse, Eier und Brot aus Teststadt.' })
-    await updateProfile({ ...profilBasis(beimOeffnen), phone: '+43 660 1111111' })
+    await updateProfile({ ...profilBasis(beimOeffnen), phone: '+43 664 0000000' })
 
     expect((await stand(farm.id)).hof.name).toBe('Hof Test')
   })
@@ -322,14 +322,14 @@ describe('zwei Abschnitte nacheinander, ohne neu zu laden', () => {
     expect((await speichereProfil({ phone: geladen.phone, email: 'int-kontakt-neu@example.com' })).error).toBeUndefined()
     // Im älteren Tab verlängert jemand die Beschreibung (sonst ließe das Formular nicht speichern), ändert das
     // Telefon und speichert, wie profile-form.tsx es tut: zodResolver gibt die Ausgabe des Schemas weiter.
-    const formular = schema.parse({ ...startwerte, description: 'Gemüse und Eier vom Hof', phone: '+43 660 2222222' })
+    const formular = schema.parse({ ...startwerte, description: 'Gemüse und Eier vom Hof', phone: '+43 676 0000000' })
     expect((await speichereProfil(geaendertSeitLaden(anfang, formular))).error).toBeUndefined()
 
     expect((await stand(farm.id)).hof).toMatchObject({
       name: 'Hof Neuname',
       email: 'int-kontakt-neu@example.com',
       description: 'Gemüse und Eier vom Hof',
-      phone: '+43 660 2222222',
+      phone: '+43 676 0000000',
     })
     // Gegenprobe: Mit dem ungeprüften Stand als Maßstab zählte die klein geschriebene E-Mail als geändert.
     expect(geaendertSeitLaden(startwerte, formular)).toMatchObject({ email: 'int-hof-alt@example.com' })

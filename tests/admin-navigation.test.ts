@@ -1,10 +1,12 @@
 /**
  * Tests für die Reiter der AdminShell (src/lib/admin-navigation.ts).
  *
- * Beweist: Höfe · Briefkasten · Finanzen auf die bestehenden Admin-Seiten,
- * Höfe und Briefkasten mit Zähler; der Weg zurück zum eigenen Hof und die
+ * Beweist: Höfe · Postfach · Finanzen auf die bestehenden Admin-Seiten,
+ * Höfe und Postfach mit Zähler; der Weg zurück zum eigenen Hof und die
  * Konto-Plakette nur mit eigenem Hof (Nr. 41, Register N1); aktiv ist der
- * längste passende Reiter.
+ * längste passende Reiter. Seit Nr. 87 (Register N12) hat das Postfach drei
+ * Reiter unter /admin/postfach; auf /admin/meldungen (Umleitung) und der
+ * Detailseite einer Meldung bleibt es aktiv.
  */
 import { describe, it, expect } from 'vitest'
 import { existsSync, readdirSync } from 'node:fs'
@@ -12,10 +14,10 @@ import { join } from 'node:path'
 import { ADMIN_KONTO, ADMIN_REITER, ADMIN_ZURUECK, adminAktiverReiter, kontoHatHof } from '@/lib/admin-navigation'
 
 describe('Admin-Reiter', () => {
-  it('Höfe · Briefkasten · Finanzen, Zähler an Höfe und Briefkasten', () => {
+  it('Höfe · Postfach · Finanzen, Zähler an Höfe und Postfach', () => {
     expect(ADMIN_REITER.map((r) => [r.label, r.href, r.zahl])).toEqual([
       ['Höfe', '/admin', 'hoefe'],
-      ['Briefkasten', '/admin/meldungen', 'briefkasten'],
+      ['Postfach', '/admin/postfach', 'briefkasten'],
       ['Finanzen', '/admin/finanzen', undefined],
     ])
   })
@@ -36,8 +38,9 @@ describe('Admin-Reiter', () => {
 
   it.each([
     ['/admin', 'hoefe'],
-    ['/admin/meldungen', 'briefkasten'],
-    ['/admin/meldungen/abc', 'briefkasten'],
+    ['/admin/postfach', 'postfach'],
+    ['/admin/meldungen', 'postfach'],
+    ['/admin/meldungen/abc', 'postfach'],
     ['/admin/finanzen', 'finanzen'],
     ['/dashboard', null],
     ['/adminx', null],

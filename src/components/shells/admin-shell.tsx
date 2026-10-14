@@ -18,6 +18,7 @@ import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
 import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
 import { ADMIN_RAHMEN } from '@/components/admin/admin-teile'
 import { MARKE } from '@/lib/marke'
+import { ADMIN_POSTFACH_TEXT } from '@/lib/postfach'
 
 /*
  * Die Shell des Betreiber-Bereichs im neuen Design (Gate 2): eigene
@@ -64,7 +65,7 @@ export type AdminShellProps = {
 
 function zahlFuer(reiter: AdminReiter, zahlen: AdminShellProps['zahlen']): { anzahl?: number; wofuer: string } {
   if (reiter.zahl === 'hoefe') return { anzahl: zahlen?.hoefe, wofuer: 'Höfe warten auf Freischaltung' }
-  if (reiter.zahl === 'briefkasten') return { anzahl: zahlen?.briefkasten, wofuer: 'Meldungen zu entscheiden' }
+  if (reiter.zahl === 'briefkasten') return { anzahl: zahlen?.briefkasten, wofuer: ADMIN_POSTFACH_TEXT.zaehlerReiter }
   return { wofuer: '' }
 }
 

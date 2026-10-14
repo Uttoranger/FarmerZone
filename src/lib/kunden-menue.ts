@@ -10,6 +10,7 @@
  */
 import { hoefeLink } from '@/lib/bereiche-anzeige'
 import { kopfKnopf, type KundenSitzung } from '@/lib/kunden-navigation'
+import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 
 export type MenuePunkt = {
   href: string
@@ -25,7 +26,7 @@ const EINKAUFEN: readonly MenuePunkt[] = [
 ]
 // Die Seite für Höfe (seit Nr. 15, vorher eine Sprungmarke auf die Startseite).
 const FUER_HOEFE: MenuePunkt = { href: '/fuer-hoefe', text: 'Für Höfe', gruppe: 'hoefe' }
-const PROBLEM_MELDEN: MenuePunkt = { href: '/problem-melden', text: 'Problem melden', gruppe: 'hilfe' }
+const PROBLEM_MELDEN_PUNKT: MenuePunkt = { href: '/problem-melden', text: PROBLEM_MELDEN, gruppe: 'hilfe' }
 
 /**
  * Die Punkte in Anzeigereihenfolge. Der Punkt der Sitzung ist derselbe wie
@@ -37,9 +38,9 @@ const PROBLEM_MELDEN: MenuePunkt = { href: '/problem-melden', text: 'Problem mel
 export function menueFuer(sitzung: KundenSitzung): readonly MenuePunkt[] {
   const knopf = kopfKnopf(sitzung)
   if (knopf.id === 'konto') {
-    return [...EINKAUFEN, { href: knopf.href, text: knopf.label, gruppe: 'kunden' }, FUER_HOEFE, PROBLEM_MELDEN]
+    return [...EINKAUFEN, { href: knopf.href, text: knopf.label, gruppe: 'kunden' }, FUER_HOEFE, PROBLEM_MELDEN_PUNKT]
   }
-  return [...EINKAUFEN, FUER_HOEFE, { href: knopf.href, text: knopf.label, gruppe: 'hoefe' }, PROBLEM_MELDEN]
+  return [...EINKAUFEN, FUER_HOEFE, { href: knopf.href, text: knopf.label, gruppe: 'hoefe' }, PROBLEM_MELDEN_PUNKT]
 }
 
 export type AngezeigterMenuePunkt = MenuePunkt & { aktuell: boolean }

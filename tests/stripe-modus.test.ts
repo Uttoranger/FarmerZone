@@ -158,8 +158,8 @@ describe('istTestbetrieb — nur die Produktion mit Test-Schlüssel', () => {
 })
 
 describe('TESTBETRIEB_TEXT — die drei Sätze aus EINER Quelle', () => {
-  it('stehen wörtlich wie in freigabe.md §12', () => {
-    expect(TESTBETRIEB_TEXT.kasse).toBe('Testbetrieb: Echte Karten werden noch abgelehnt. Bitte wähle Bar bei Abholung.')
+  it('stehen wörtlich wie in freigabe.md §12 — die Kasse mit dem Satz des Mockups (Freigabe Lauf 13)', () => {
+    expect(TESTBETRIEB_TEXT.kasse).toBe('Testbetrieb: Echte Karten werden noch abgelehnt.')
     expect(TESTBETRIEB_TEXT.admin).toBe(
       'Stripe läuft im Testmodus – Online-Zahlungen sind Testzahlungen, es fließt kein echtes Geld.'
     )

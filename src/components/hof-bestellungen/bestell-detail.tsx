@@ -15,6 +15,7 @@ import {
 } from '@/server/actions/orders'
 import type { HofBestellDetail } from '@/server/queries/orders'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS, centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
@@ -157,7 +158,7 @@ export function BestellDetail({
             <h2 id={`bestellung-${bestellung.id}`} className="line-clamp-2 min-w-0 font-heading text-[22px] leading-tight font-semibold break-words" title={kunde.name}>
               {kunde.name}
             </h2>
-            <StatusBadge status={bestellung.marke.ton}>{bestellung.marke.text}</StatusBadge>
+            <Marke art={bestellung.marke.art}>{bestellung.marke.text}</Marke>
             <span className={cn('basis-full text-[13px] xl:ml-auto xl:basis-auto', LEISE)}>
               {bestellung.nummer} · {bestellung.abholung}
             </span>

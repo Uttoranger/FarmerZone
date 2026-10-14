@@ -94,8 +94,12 @@ export function istTestbetrieb(u: Pick<Umgebung, 'art' | 'stripe'>): boolean {
 
 /** Die drei Sätze des Testbetriebs, wörtlich aus freigabe.md §12 (Nr. 42). */
 export const TESTBETRIEB_TEXT = {
-  /** Kasse, an der Zahlart „Online bezahlen". */
-  kasse: 'Testbetrieb: Echte Karten werden noch abgelehnt. Bitte wähle Bar bei Abholung.',
+  /**
+   * Kasse, an der Zahlart „Online bezahlen" — der Satz des Mockups (web-/mobil-k3-kasse-glatt):
+   * Online bleibt vorbelegt (N10), eine Bitte, bar zu wählen, stünde quer dazu (Register N10,
+   * Ergänzung Freigabe Lauf 13, Nr. 85).
+   */
+  kasse: 'Testbetrieb: Echte Karten werden noch abgelehnt.',
   /** AdminShell, orange Hinweiskarte über jeder Admin-Seite. */
   admin: 'Stripe läuft im Testmodus – Online-Zahlungen sind Testzahlungen, es fließt kein echtes Geld.',
   /** Einstellungen → Zahlung, in der Karte „Online-Zahlung (Stripe)". */

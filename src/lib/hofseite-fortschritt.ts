@@ -20,6 +20,7 @@ import { HOFSEITE_HREF, titelbildFoto } from '@/lib/mein-hof'
 import { formatSlotTime, type WeeklySlot } from '@/lib/pickup-days'
 import { ABHOLZEITEN_FEHLEN_ZEILE } from '@/lib/pickup-slot-rules'
 import { ueberUnsText } from '@/lib/hofseite-kunde'
+import { formatiereTelefon } from '@/lib/telefon-anzeige'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 
 export type HofseiteGruppeId = 'auftritt' | 'abholen-bezahlen' | 'sichtbarkeit'
@@ -242,7 +243,7 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
     zeile(
       'kontakt',
       'abholen-bezahlen',
-      kontakt ? `${stand.phone} · ${stand.email}` : 'Telefon oder E-Mail fehlt',
+      kontakt ? `${formatiereTelefon(stand.phone)} · ${stand.email}` : 'Telefon oder E-Mail fehlt',
       kontakt
     ),
     // Pausiert ist ein Zustand, kein Fehlen: fertig, aber mit eigenem Wort.

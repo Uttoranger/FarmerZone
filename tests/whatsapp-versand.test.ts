@@ -22,8 +22,8 @@ import { describe, it, expect } from 'vitest'
 import { WHATSAPP_VERSAND_TEXT, nachSeitenEreignis, versandStand, type Abonnentin } from '@/lib/whatsapp-versand'
 
 const ANNA: Abonnentin = { id: 'cabo00000000000000000001', name: 'Anna Muster', phone: '+43 660 0000000' }
-const BERTA: Abonnentin = { id: 'cabo00000000000000000002', name: 'Berta Muster', phone: '+43 660 0000001' }
-const CARLA: Abonnentin = { id: 'cabo00000000000000000003', name: 'Carla Muster', phone: '+43 660 0000002' }
+const BERTA: Abonnentin = { id: 'cabo00000000000000000002', name: 'Berta Muster', phone: '+43 664 0000000' }
+const CARLA: Abonnentin = { id: 'cabo00000000000000000003', name: 'Carla Muster', phone: '+43 676 0000000' }
 const ALLE = [ANNA, BERTA, CARLA]
 
 describe('versandStand', () => {
@@ -114,6 +114,23 @@ const ERLAUBTE_SAETZE: readonly { datei: string; satz: string; grund: string }[]
   { datei: 'status/new/status-new-client.tsx', satz: 'Wird versendet…', grund: 'Knopf, solange die App veröffentlicht und die Mails verschickt.' },
 ]
 
+/**
+ * Ausnahmen von „keine Zeitschaltung", je Datei mit Grund: Ein offener Faden im
+ * Postfach lädt alle 60 s nach (Register N12, router.refresh, kein
+ * Polling-Endpunkt) — die Zeitschaltung holt nur die Seite neu, sie speichert
+ * nichts und behauptet keine Zustellung. Die Ausnahme setzt die Wache nicht
+ * aus: Erlaubt ist genau ein Takt (`nurEinTakt`). Eine Ausnahme ohne
+ * Zeitschaltung macht die Wache rot.
+ */
+const ERLAUBTE_ZEITSCHALTUNG: readonly { datei: string; grund: string }[] = [
+  { datei: 'postfach/[id]/faden-nachladen.tsx', grund: 'Register N12: offener Faden lädt alle 60 s nach (router.refresh), nur bei sichtbarer Seite.' },
+]
+
+/** Was eine erlaubte Zeitschaltung darf: genau ein `setInterval`, kein `setTimeout`. */
+function nurEinTakt(text: string): boolean {
+  return (text.match(/\bsetInterval\b/g) ?? []).length === 1 && !/\bsetTimeout\b/.test(text)
+}
+
 function ohneErlaubteSaetze(datei: string, text: string): string {
   return ERLAUBTE_SAETZE.filter((e) => e.datei === datei).reduce((rest, e) => rest.split(e.satz).join(''), text)
 }
@@ -149,8 +166,18 @@ describe('Client-Komponenten unter src/app/(hof) (Quelltext-Wache, Regelvorschla
 
   it('keine Zeitschaltung und kein Satz, der eine Zustellung behauptet — außer den begründeten E-Mail-Sätzen', () => {
     for (const [datei, text] of CLIENTS) {
-      expect(text, datei).not.toMatch(/\bset(Timeout|Interval)\b/)
+      if (ERLAUBTE_ZEITSCHALTUNG.some((e) => e.datei === datei)) expect(nurEinTakt(text), datei).toBe(true)
+      else expect(text, datei).not.toMatch(/\bset(Timeout|Interval)\b/)
       expect(ohneErlaubteSaetze(datei, text), datei).not.toMatch(UNEHRLICH)
+    }
+  })
+
+  it('jede erlaubte Zeitschaltung steht noch in ihrer Datei — und nur als router.refresh', () => {
+    for (const { datei } of ERLAUBTE_ZEITSCHALTUNG) {
+      const text = CLIENTS.get(datei) ?? ''
+      expect(text, datei).toMatch(/\bsetInterval\b/)
+      expect(text, datei).toContain('router.refresh()')
+      expect(aktionImUpdater(text), datei).toBe(false)
     }
   })
 
@@ -184,6 +211,11 @@ describe('Client-Komponenten unter src/app/(hof) (Quelltext-Wache, Regelvorschla
       const marke = <span>Gesendet</span>
     `
     expect(alt).toMatch(/\bsetTimeout\b/)
+    // Auch eine erlaubte Zeitschaltung hat genau einen Takt: kein zweiter, keine Verzögerung.
+    expect(nurEinTakt(alt)).toBe(false)
+    expect(nurEinTakt('const a = setInterval(neu, 1000); const b = setInterval(neu, 5000)')).toBe(false)
+    expect(nurEinTakt('const t = setInterval(() => router.refresh(), 60000); setTimeout(speichern, 10)')).toBe(false)
+    expect(nurEinTakt('const t = setInterval(() => router.refresh(), 60000); clearInterval(t)')).toBe(true)
     expect(alt).toMatch(UNEHRLICH)
     expect(aktionImUpdater(alt)).toBe(true)
     expect(aktionImUpdater(alt.replace('startTransition(async () => { await markWhatsAppSent(postId, next.size) })', ''))).toBe(true)

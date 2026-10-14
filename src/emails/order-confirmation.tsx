@@ -14,6 +14,9 @@ import {
 } from './_layout'
 import { SERVICEGEBUEHR_BEZEICHNUNG, SERVICEGEBUEHR_HINWEIS } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
+import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
+import { MAIL_AGB_ZEILE } from '@/lib/rechtstexte/agb-einbindung'
+import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
 
 /** Wie bezahlt wird — entscheidet nur der Satz und die Gesamtzeile, nie der Betrag. */
 export type MailZahlart = 'online' | 'bar' | 'karte'
@@ -39,6 +42,8 @@ export interface OrderConfirmationProps {
   manageUrl?: string
   /** Der signierte Link zur Bestellseite — der Weg zurück zur Bestellung. */
   orderUrl?: string
+  /** Die Adresse der Seite für den Link auf die AGB; ohne Angabe die echte Seite. */
+  appUrl?: string
 }
 
 const GESAMT_LABEL: Record<MailZahlart, string> = {
@@ -54,7 +59,8 @@ const GESAMT_LABEL: Record<MailZahlart, string> = {
  * folgen deshalb der Zahlart — eine bar bestätigte Bestellung ist nicht
  * „bezahlt". Vertragsmail ohne Werbung (S11): kein „Nochmal bestellen".
  */
-export function OrderConfirmationEmail(p: OrderConfirmationProps) {
+export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Element {
+  const anrufen = telefonLink(p.farmPhone)
   const mitGebuehr = (p.serviceFee ?? 0) > 0
   const satz =
     p.zahlart === 'online'
@@ -86,14 +92,33 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps) {
         </Knopf>
       </KnopfReihe>
 
+      {/* Register O4: Die AGB gehören zum Vertragstext (§ 11 ECG). Satz und Link als Stücke,
+          die abwechselnd Text und Link sind — nebeneinander stehende Textteile trennt
+          react-email mit Kommentaren. */}
+      <Text style={kleinText}>
+        {MAIL_AGB_ZEILE.map((stueck, i) =>
+          typeof stueck === 'string' ? (
+            stueck
+          ) : (
+            <Link key={i} href={`${p.appUrl ?? PRODUKTION_ADRESSE}${stueck.ziel}`} style={textLink}>
+              {stueck.text}
+            </Link>
+          )
+        )}
+      </Text>
+
       {p.zahlart === 'bar' && <Text style={kleinText}>{`Bring bitte ${formatEuro(p.total)} in bar mit.`}</Text>}
       {p.zahlart === 'karte' && <Text style={kleinText}>{`Bitte zahle ${formatEuro(p.total)} bei der Abholung mit Karte.`}</Text>}
       {mitGebuehr && <Text style={kleinText}>{SERVICEGEBUEHR_BEZEICHNUNG}: {SERVICEGEBUEHR_HINWEIS}</Text>}
       <Text style={kleinText}>
         Fragen? Ruf direkt beim Hof an:{' '}
-        <Link href={`tel:${p.farmPhone}`} style={textLink}>
-          {p.farmPhone}
-        </Link>
+        {anrufen ? (
+          <Link href={anrufen} style={textLink}>
+            {formatiereTelefon(p.farmPhone)}
+          </Link>
+        ) : (
+          p.farmPhone
+        )}
       </Text>
     </EmailLayout>
   )

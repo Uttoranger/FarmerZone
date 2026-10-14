@@ -40,12 +40,14 @@ export function MeldungListe({
         symbol={Inbox}
         titel={leer.titel}
         satz={leer.satz}
-        aktion={
+        ausweg={
           leer.ausweg ? (
             <Link href={leer.ausweg.href} className={KNOPF_RAHMEN}>
               {leer.ausweg.text}
             </Link>
-          ) : undefined
+          ) : {
+            ohne: 'Den Ausweg gibt der Aufrufer mit: /admin/meldungen tut es immer (voreingestellt „Offene Meldungen zeigen“, mit Filter „Zu entscheiden zeigen“); nur ein Aufrufer ohne Ausweg landet hier',
+          }
         }
       />
     )
@@ -105,7 +107,12 @@ export function Wunschliste({ buendel }: { buendel: WunschBuendel[] }): React.JS
         Wunschliste gebündelt
       </h2>
       {buendel.length === 0 ? (
-        <EmptyState symbol={Lightbulb} titel={WUNSCHLISTE_LEER.titel} className="rounded-xl py-6" />
+        <EmptyState
+          symbol={Lightbulb}
+          titel={WUNSCHLISTE_LEER.titel}
+          ausweg={{ ohne: 'Die Wunschliste bündelt jeden Wunsch außer Dubletten; Wünsche kommen nur von Höfen und Kundinnen, der Admin legt keinen an' }}
+          className="rounded-xl py-6"
+        />
       ) : (
         <ul className="[&>li]:border-t [&>li]:border-border">
           {buendel.map((b) => (

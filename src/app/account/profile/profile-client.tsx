@@ -150,7 +150,7 @@ export function ProfileClient({ user, subscriptions: initialSubs }: Props): Reac
             symbol={BellOff}
             titel="Du hast noch keine Benachrichtigungen abonniert."
             satz="Beim nächsten Einkauf kannst du dich für Neuigkeiten anmelden."
-            aktion={
+            ausweg={
               <Link href="/hoefe" className={KNOPF_GRUEN}>
                 Höfe entdecken
               </Link>

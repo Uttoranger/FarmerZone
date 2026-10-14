@@ -101,7 +101,7 @@ export function HofKarten({ hoefe }: { hoefe: readonly StartseitenHof[] }): Reac
         symbol={Store}
         titel="Die ersten Höfe kommen gerade dazu"
         satz="Schau bald wieder vorbei. Du hast selbst einen Hof? Dann mach den Anfang."
-        aktion={
+        ausweg={
           <Link
             href="/register"
             className={cn(

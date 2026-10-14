@@ -7,6 +7,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { toWaPhone, buildOrderReminderMessage, buildOrderReminderUrl, whatsAppLink } from '@/lib/whatsapp'
+import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 
 // 20.07.2026 ist ein Montag; 12:00 lokal entspricht der Speicher-Konvention des Checkouts
 const baseOrder = {
@@ -48,13 +49,13 @@ describe('buildOrderReminderMessage', () => {
 
 describe('buildOrderReminderUrl', () => {
   it('baut einen wa.me-Link mit normalisierter Nummer und URL-encodeter Nachricht', () => {
-    const url = buildOrderReminderUrl('+43 660 123 45 67', baseOrder)
-    expect(url?.startsWith('https://wa.me/436601234567?text=')).toBe(true)
+    const url = buildOrderReminderUrl('+43 660 000 00 00', baseOrder)
+    expect(url?.startsWith('https://wa.me/436600000000?text=')).toBe(true)
     expect(url).not.toContain(' ')
   })
 
   it('encodet Umlaute korrekt (ü → %C3%BC)', () => {
-    const url = buildOrderReminderUrl('06601234567', {
+    const url = buildOrderReminderUrl('06600000000', {
       ...baseOrder,
       customerName: 'Jürgen Höfler',
       farmName: 'Grüner Hof',
@@ -65,41 +66,65 @@ describe('buildOrderReminderUrl', () => {
   })
 })
 
-describe('toWaPhone (Konvention aus Kundendetail/Status-Werkstatt, jetzt zentral)', () => {
+describe('toWaPhone liest die Nummer wie Anzeige und tel:-Link (telefonZiffern, Nr. 85)', () => {
   it('entfernt das + bei internationalen Nummern', () => {
-    expect(toWaPhone('+43 660 1234567')).toBe('436601234567')
+    expect(toWaPhone('+43 660 0000000')).toBe('436600000000')
   })
 
   it('ersetzt die führende 0 durch die österreichische Vorwahl 43', () => {
-    expect(toWaPhone('0660 1234567')).toBe('436601234567')
+    expect(toWaPhone('0660 0000000')).toBe('436600000000')
   })
 
   it('entfernt Leerzeichen, Bindestriche, Klammern und Punkte', () => {
-    expect(toWaPhone('(0660) 123-45.67')).toBe('436601234567')
-    expect(toWaPhone('+43 660-123 45 67')).toBe('436601234567')
+    expect(toWaPhone('(0660) 000-00.00')).toBe('436600000000')
+    expect(toWaPhone('+43 660-000 00 00')).toBe('436600000000')
   })
 
   it('lässt bereits normalisierte Nummern unverändert', () => {
-    expect(toWaPhone('436601234567')).toBe('436601234567')
+    expect(toWaPhone('436600000000')).toBe('436600000000')
+  })
+
+  it('liest „0043 …“, „+43 (0) …“ und eine Mobilnummer ohne 0 wie die Anzeige — vorher tote Links', () => {
+    expect(toWaPhone('0043 660 0000000')).toBe('436600000000')
+    expect(toWaPhone('+43 (0) 660 0000000')).toBe('436600000000')
+    expect(toWaPhone('660 0000000')).toBe('436600000000')
+  })
+
+  it('Land DE: Eine führende 0 bleibt +43, keine +49-Vermutung — wer +49 eingibt, bekommt +49 (Entscheidung Lauf 13, N8)', () => {
+    // Die Lesart kennt das Land des Hofs nicht; für die Wahl-Null gilt Österreich.
+    expect(formatiereTelefon('08571 000000')).toBe('+43 8571 000 000')
+    expect(toWaPhone('08571 000000')).toBe('438571000000')
+    expect(toWaPhone('+49 8571 000000')).toBe('498571000000')
+  })
+
+  it('wählt dieselbe Nummer wie der tel:-Link — auch für fremde Ländercodes', () => {
+    for (const eingabe of ['0660 0000000', '0043 664 0000000', '+43 1 000 0000', '06212 0000', '+49 151 00000000', '0660 0000000 ab 18 Uhr']) {
+      const link = telefonLink(eingabe)
+      expect(toWaPhone(eingabe), eingabe).toBe(link === null ? null : link.replace('tel:+', ''))
+    }
   })
 })
 
-describe('nur Ziffern in den Link, ohne Nummer kein Link (Sicherheitsprüfung 13.10., Nr. 75)', () => {
-  it('Buchstaben und Zeichen aus der Eingabe fallen weg', () => {
-    expect(toWaPhone('+43 660 ABC 0000000')).toBe('436600000000')
-    expect(toWaPhone('0660/000 0000#')).toBe('436600000000')
+describe('nur Ziffern in den Link, ohne lesbare Nummer kein Link (Sicherheitsprüfung 13.10., Nr. 75 und 85)', () => {
+  it('eine Eingabe mit Buchstaben oder fremden Zeichen ergibt keinen Link — er wählte sonst eine andere Nummer, als dasteht', () => {
+    expect(toWaPhone('+43 660 ABC 0000000')).toBeNull()
+    expect(toWaPhone('0660/000 0000#')).toBeNull()
+    expect(toWaPhone('Tel. 0660 0000000')).toBeNull()
+    expect(toWaPhone('0660 0000000 / 0664 0000000')).toBeNull()
+    expect(whatsAppLink('0660 0000000 ab 18 Uhr', 'Hallo')).toBeNull()
   })
 
   it('mit +43 vorn: ohne Plus, sonst unverändert', () => {
     expect(toWaPhone('+43 660 0000000')).toBe('436600000000')
   })
 
-  it('leer oder ohne eine Ziffer: leere Nummer und kein Link — auch keine Erinnerung', () => {
-    expect(toWaPhone('')).toBe('')
-    expect(toWaPhone('keine Angabe')).toBe('')
+  it('leer oder ohne eine Ziffer: keine Nummer und kein Link — auch keine Erinnerung', () => {
+    expect(toWaPhone('')).toBeNull()
+    expect(toWaPhone('keine Angabe')).toBeNull()
     expect(whatsAppLink('', 'Hallo')).toBeNull()
     expect(whatsAppLink('keine Angabe', 'Hallo')).toBeNull()
     expect(buildOrderReminderUrl('  ', baseOrder)).toBeNull()
+    expect(buildOrderReminderUrl('0660 0000000 ab 18 Uhr', baseOrder)).toBeNull()
   })
 
   it('Gegenprobe: mit Nummer ein Link mit kodiertem Text', () => {

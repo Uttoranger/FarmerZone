@@ -35,6 +35,7 @@ import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { ProgressBar } from '@/components/ui/progress-bar'
 import { EmptyState } from '@/components/ui/empty-state'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { Marke } from '@/components/ui/marke'
 import { GroessenWahl, Groessenkachel } from '@/components/ui/groessenkachel'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { BottomNav, BottomNavLink, BottomNavMitte, mittelknopfKlassen, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
@@ -122,9 +123,22 @@ const FAELLE: Fall[] = [
       symbol: Sprout,
       titel: 'Noch keine Produkte',
       satz: 'Lege dein erstes an.',
-      aktion: createElement('a', { href: '/products?neu=1' }, 'Produkt anlegen'),
+      ausweg: createElement('a', { href: '/products?neu=1' }, 'Produkt anlegen'),
     }),
     merkmale: ['Noch keine Produkte', 'Lege dein erstes an.', 'href="/products?neu=1"', 'lucide-sprout'],
+  },
+  {
+    name: 'Marke',
+    datei: 'marke',
+    element: createElement(
+      'span',
+      null,
+      el(Marke, { art: 'tun' }, 'Zum Packen'),
+      el(Marke, { art: 'laeuft' }, 'Gepackt'),
+      el(Marke, { art: 'erledigt' }, 'Abgeholt'),
+      el(Marke, { art: 'abgebrochen' }, 'Storniert')
+    ),
+    merkmale: ['data-art="tun"', 'data-art="laeuft"', 'data-art="erledigt"', 'data-art="abgebrochen"', 'text-zustand-abgebrochen', 'bg-zustand-abgebrochen-grund', 'Storniert'],
   },
   {
     name: 'StatusBadge',
@@ -274,7 +288,7 @@ describe('Quelltext der Bausteine', () => {
   it('die Vorschau /intern/bausteine bindet jeden Baustein ein', () => {
     const seite = quelle('src/app/intern/bausteine/bausteine-vorschau.tsx')
     for (const datei of [...DATEIEN, 'sheet']) expect(seite, datei).toContain(`@/components/ui/${datei}'`)
-    for (const name of ['Chip', 'FilterChip', 'Stepper', 'Segment', 'ListRow', 'ProgressBar', 'EmptyState', 'StatusBadge', 'Groessenkachel', 'Hinweiskarte', 'BottomNav', 'SidebarGruppe', 'SheetBlatt']) {
+    for (const name of ['Chip', 'FilterChip', 'Stepper', 'Segment', 'ListRow', 'ProgressBar', 'EmptyState', 'Marke', 'StatusBadge', 'Groessenkachel', 'Hinweiskarte', 'BottomNav', 'SidebarGruppe', 'SheetBlatt']) {
       expect(seite, name).toContain(`<${name}`)
     }
   })

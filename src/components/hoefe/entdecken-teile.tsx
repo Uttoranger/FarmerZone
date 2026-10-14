@@ -534,7 +534,7 @@ export function EntdeckenLeer({
       symbol={SearchX}
       titel={leer.titel}
       satz={leer.satz}
-      aktion={
+      ausweg={
         ausweg.art === 'link' ? (
           <Link
             href={hoefeHref(ausweg.ziel)}
@@ -561,7 +561,7 @@ export function KeineHoefe(): React.JSX.Element {
       symbol={Store}
       titel="Die ersten Höfe kommen gerade dazu"
       satz="Schau bald wieder vorbei. Du hast selbst einen Hof? Dann mach den Anfang."
-      aktion={
+      ausweg={
         <Link
           href="/register"
           className={cn(

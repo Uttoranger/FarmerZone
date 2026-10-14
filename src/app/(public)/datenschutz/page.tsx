@@ -247,8 +247,27 @@ export default function DatenschutzPage() {
             </p>
           </Section>
 
+          {/* Zusagen nach Register N12 und AGB 20.2 (Fassung 0.9); Mail-Regel aus Nr. 87.
+              Ändert sich eine davon, ändert sich dieser Abschnitt mit. */}
+          <Section title="Postfach">
+            <p>
+              Wir schreiben Höfen über das Postfach in der App, zum Beispiel zur Abrechnung oder zu
+              Änderungen der AGB. Der Hof kann jede Nachricht beantworten. Gespeichert werden der
+              Text der Nachricht und der Antwort, der Zeitpunkt und ob der Hof die Nachricht
+              gelesen hat.
+            </p>
+            <p>
+              Die Nachrichten bleiben gespeichert, solange das Hofkonto besteht, und werden mit dem
+              Hof gelöscht. Wir durchsuchen das Postfach nicht nach Inhalten; wir lesen nur, was
+              ein Hof uns schreibt. Betrifft eine Nachricht den Betrieb des Hofs, können wir sie
+              zusätzlich per E-Mail an die Adresse des Hofkontos schicken. Werbung für Dritte
+              schicken wir nie.
+            </p>
+            <p>Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung).</p>
+          </Section>
+
           <p className="text-xs text-muted-foreground pt-4 border-t border-border">
-            Stand: September 2026
+            Stand: Oktober 2026
           </p>
         </div>
       </div>

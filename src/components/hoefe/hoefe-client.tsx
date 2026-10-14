@@ -33,6 +33,7 @@ import {
   zeigtProdukte,
 } from '@/lib/hoefe-entdecken'
 import { hofseitenLink } from '@/lib/bereiche-anzeige'
+import { REIHENFOLGE_HINWEIS } from '@/lib/rechtstexte/agb-einbindung'
 import { LEERE_LAGE, nachLeerTipp, nachPinTipp, nachZeiger, type AuswahlLage } from '@/lib/hoefe-anzeige'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
 import { cn } from '@/lib/utils'
@@ -379,6 +380,11 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
     )
   }
 
+  // Die Hauptparameter der Reihenfolge (§ 4a Abs. 1 Z 1 FAGG, Register O4) stehen unter der Liste,
+  // wo man die Höfe liest — in beiden Ansichten mit Liste, nie über einer leeren.
+  const reihenfolgeHinweis = (klasse?: string) =>
+    anzahl > 0 && <p className={cn('text-[13px] text-muted-foreground', klasse)}>{REIHENFOLGE_HINWEIS}</p>
+
   const filterReihenBrowser = (
     <div className="hidden flex-col gap-3 lg:flex">
       <ChipReihe beschriftung="Kategorie" chips={reihen.kategorien} onWahl={schreibeUrl} />
@@ -512,7 +518,10 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
       <div>
         {kopfbereich}
         <div className="mt-5 grid grid-cols-[minmax(0,600px)_minmax(0,1fr)] items-start gap-6 pb-12 pl-[max(1.5rem,calc((100vw-1200px)/2+1.5rem))]">
-          <div className="min-w-0">{ergebnisse(true)}</div>
+          <div className="min-w-0">
+            {ergebnisse(true)}
+            {reihenfolgeHinweis('mt-4')}
+          </div>
           {/* Unter der Kopfzeile (64 px) plus Luft; die Höhe füllt das Fenster. */}
           <div className="sticky top-20 flex h-[calc(100dvh-6rem)] min-h-[420px] flex-col gap-2">
             {koordinatenHinweis}
@@ -675,6 +684,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
         </Link>
         <p className="text-[13px] text-muted-foreground">{zahlText}</p>
         {ergebnisse(false)}
+        {reihenfolgeHinweis()}
       </div>
     </div>
   )

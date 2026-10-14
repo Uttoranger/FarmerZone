@@ -62,7 +62,7 @@ export default function ImpressumPage() {
               Für die Beschreibung, Qualität, Kennzeichnung und Lieferung der angebotenen Produkte
               sind ausschließlich die jeweiligen Hofbetreiberinnen und Hofbetreiber verantwortlich.
               Diese handeln als eigenständige Verkäuferinnen und Verkäufer und sind selbst
-              Vertragsparterinnen bzw. Vertragspartner der Käuferinnen und Käufer.
+              Vertragspartnerinnen bzw. Vertragspartner der Käuferinnen und Käufer.
             </p>
           </section>
 

@@ -3,12 +3,11 @@ import { CalendarPlus, LinkIcon, MapPin } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { bestellLinkGilt, bestellSignatur } from '@/lib/bestell-link'
 import { bestellStatusAnzeige, formatiereAbholtermin, zahlungsAnzeige } from '@/lib/bestellstatus'
-import { bestellTon } from '@/lib/bestellungen-finden'
 import { formatPosition } from '@/lib/format'
 import { alsCents } from '@/lib/order-totals'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { Marke } from '@/components/ui/marke'
 import {
   Aktionen,
   AktionsLink,
@@ -163,8 +162,8 @@ export default async function BestellungPage({ params, searchParams }: Props) {
           Mail. Die Wege hinaus sind echte Links: zum Hof und über die Shell. */}
       <div className={SPALTE}>
         {/* Kopf als Karte wie in „Meine Bestellungen" und im Bestelldetail des
-            Hofs: Die grüne StatusBadge erreicht auf dem hellen Seitengrund
-            nur 4,37 : 1 (Axe), auf der Karte mindestens 4,5 : 1. */}
+            Hofs. Die Marke trägt die Art aus bestellStatusAnzeige (Register G5)
+            — dieselbe wie die Liste, storniert rot. */}
         <div className={cn(KARTE, 'flex flex-col gap-2')}>
           <p className="text-[13.5px] text-muted-foreground">
             Deine Bestellung bei{' '}
@@ -179,7 +178,7 @@ export default async function BestellungPage({ params, searchParams }: Props) {
             <h1 className="min-w-0 font-heading text-[26px] leading-tight font-semibold break-words text-foreground md:text-[28px]">
               {order.orderNumber}
             </h1>
-            <StatusBadge status={bestellTon(order.status)}>{status.marke}</StatusBadge>
+            <Marke art={status.art}>{status.marke}</Marke>
           </div>
           <p className="text-[14px] leading-normal text-foreground">{status.satz}</p>
         </div>

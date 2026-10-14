@@ -2,9 +2,12 @@ import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import { cookies, headers } from 'next/headers'
+import * as Sentry from '@sentry/nextjs'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getHeute } from '@/server/queries/heute'
+import { ladeFaedenHof } from '@/server/queries/postfach'
+import { heutePostfach } from '@/lib/postfach'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { ErsteSchritteSchalter } from '@/components/farmer/erste-schritte-schalter'
 import {
@@ -13,6 +16,7 @@ import {
   Kennzahlen,
   NaechsteAbholungKarte,
   Packliste,
+  PostfachKarte,
   StripeEinrichtenHinweis,
   StripeHinweis,
   TeilenKarte,
@@ -44,7 +48,8 @@ export const metadata: Metadata = {
  * Packliste zuerst: Was wo steht, entscheidet heuteAufbau; Regeln und Zahlen
  * kommen aus src/lib/heute.ts und src/server/queries/heute.ts, hier wird nur
  * angeordnet. Oben höchstens EIN Kasten (Stripe), die Teilen-Zeile kompakt
- * unter der Packliste (freigabe.md §12 Nr. 45). „Zu tun" ist EINE Liste statt
+ * zuletzt in der Hauptspalte, nach Packliste und „Braucht dich" (freigabe.md
+ * §12 Nr. 45, Register N11). „Zu tun" ist EINE Liste statt
  * Erster Schritte und „Deine Hofseite" (Nr. 53). Ab 1280 px zwei Spalten
  * (Hauptspalte links, Seitenspalte 360 px rechts) — bei 1024 px neben der
  * Seitenleiste wäre die Packliste zu schmal, dort steht die Seitenspalte als
@@ -67,10 +72,16 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   // eine verfallene Bestellung und ihre noch gebundene Ware. getHeute wartet
   // nur mit diesen Abfragen auf die Freigabe, alle anderen laufen daneben
   // (Nachtlauf Nr. 31); der Cookie ebenso.
-  const [heute, cookieJar] = await Promise.all([
+  const [heute, cookieJar, faeden] = await Promise.all([
     getHeute(farm.id, jetzt, gibVerwaisteFreiOhneRisiko(farm.id, jetzt)),
     cookies(),
+    // Postfach (Register N12, Nr. 87): Ein Ladefehler nimmt nur die Karte weg, nie Heute — gemeldet ohne Nachrichtentext.
+    ladeFaedenHof(farm.id).catch((err: unknown) => {
+      Sentry.captureException(err, { tags: { bereich: 'postfach', seite: 'heute' }, extra: { farmId: farm.id } })
+      return []
+    }),
   ])
+  const postfach = heutePostfach(faeden, jetzt)
 
   // Der Cookie entscheidet auf dem Server, ob die Karte oder die Zeile
   // „Zu tun einblenden" kommt — so blitzt nichts auf und nichts rutscht nach.
@@ -87,6 +98,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
     stripeHinweis: heute.stripeImKasten,
     teilen,
     zuTun: zuTunZeigen === 'karte',
+    postfach: postfach !== null,
   })
   const satz = teilenSatz(heute.angebot, heute.naechstesFenster?.fenster ?? null)
   // Teilen-Fenster und „letzte Woche … über deine Links" (Nr. 21, Gate 7) —
@@ -97,6 +109,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   const wirkungSatz = wirkung ? teilenWirkungSatz(wirkung) : null
 
   const bloecke: Record<HeuteBlock, ReactNode> = {
+    postfach: postfach && <PostfachKarte nachricht={postfach.nachricht} weitere={postfach.weitere} />,
     stripe: heute.onlinePausiert ? (
       <StripeHinweis barMoeglich={heute.onlinePausiert.barMoeglich} />
     ) : (
@@ -111,7 +124,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
         leer={{ abholfenster: heute.naechstesFenster?.fenster ?? null }}
       />
     ),
-    'braucht-dich': <BrauchtDichKarte eintraege={heute.brauchtDich} />,
+    'braucht-dich': <BrauchtDichKarte eintraege={heute.brauchtDich} packlisteLeer={heute.abholungen.length === 0} />,
     'zu-tun': (
       <ZuTunKarte
         aufgaben={heute.zuTun.aufgaben}
