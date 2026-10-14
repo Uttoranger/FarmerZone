@@ -14,6 +14,7 @@
  * (Formulare, Zähler).
  */
 import { MARKE_TEAM } from '@/lib/marke'
+import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 import { PRODUKTION_ADRESSE, PRODUKTION_HOST } from '@/lib/umgebung'
 import { MONAT_KURZ } from '@/lib/format'
 import { wienKalendertag, tagVersetzt } from '@/lib/kalender'
@@ -112,7 +113,7 @@ export const POSTFACH_TEXT = {
   ungelesenSr: 'ungelesen',
   /** Wofür die Zahl an „Postfach" zählt (Screenreader, HofShell). */
   zaehler: 'ungelesene Nachrichten',
-  erklaerung: `Hier schreibt dir das ${MARKE_TEAM}: Neues, Abrechnung, Rechtliches. Du kannst auf jede Nachricht antworten. Ein Problem oder einen Wunsch meldest du wie bisher unter „Problem melden“.`,
+  erklaerung: `Hier schreibt dir das ${MARKE_TEAM}: Neues, Abrechnung, Rechtliches. Du kannst auf jede Nachricht antworten. Ein Problem oder einen Wunsch meldest du wie bisher unter „${PROBLEM_MELDEN}“.`,
   antwortFeld: 'Antwort an das Team …',
   antwortBeschriftung: 'Deine Antwort',
   antwortHinweis: `Deine Antwort geht nur an das ${MARKE_TEAM}.`,
@@ -164,7 +165,7 @@ export const POSTFACH_FEHLER = {
   eingabe: 'Das hat nicht geklappt. Bitte lade die Seite neu.',
   anmelden: 'Bitte melde dich neu an.',
   keinHof: 'Kein Hof gefunden.',
-  zuViele: `Du hast heute schon ${NACHRICHTEN_JE_HOF_UND_TAG} Nachrichten geschrieben. Morgen geht es weiter – oder melde dich über „Problem melden“.`,
+  zuViele: `Du hast heute schon ${NACHRICHTEN_JE_HOF_UND_TAG} Nachrichten geschrieben. Morgen geht es weiter – oder melde dich über „${PROBLEM_MELDEN}“.`,
   keineEmpfaenger: 'Für diese Auswahl gibt es keinen Hof. Wähl andere Empfänger.',
 } as const
 

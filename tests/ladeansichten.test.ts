@@ -559,6 +559,7 @@ describe('Die Fehlernummer auf dem Weg in den Briefkasten', () => {
       'src/lib/fehlerseite.ts': 'die Quelle selbst',
       'src/lib/bauern-navigation.ts': 'Navigation des Hofbereichs, dort baut Nr. 87 den Punkt Postfach (Nacharbeit)',
       'src/app/(public)/datenschutz/page.tsx': 'ein Satz der Datenschutzerklärung (Rechtstext)',
+      'src/lib/rechtstexte/agb.ts': 'die AGB Wort für Wort aus docs/recht/agb.md (Nr. 90; Rechtstext ist von Textwachen ausgenommen, Freigabe §17 §2)',
     }
     const quellen = (ordner: string): string[] =>
       fs.readdirSync(ordner, { withFileTypes: true }).flatMap((e) => {

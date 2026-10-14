@@ -77,7 +77,7 @@ export default async function PostfachPage({
           symbol={Inbox}
           titel={POSTFACH_LEER.titel}
           satz={POSTFACH_LEER.satz}
-          ausweg={{ ohne: 'Höfe beginnen keine Unterhaltung (Register N12): Nachrichten schreibt nur das Team, ein Problem oder ein Wunsch geht über „Problem melden“' }}
+          ausweg={{ ohne: 'Höfe beginnen keine Unterhaltung (Register N12): Nachrichten schreibt nur das Team, Probleme und Wünsche gehen über die Meldungsseite' }}
         />
       ) : (
         <>
