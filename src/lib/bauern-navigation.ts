@@ -177,7 +177,7 @@ export const NEU: readonly NeuPunkt[] = [
   {
     id: 'status-posten',
     label: 'Neuer Beitrag',
-    satz: 'Sag deinen Kunden, was es gerade gibt.',
+    satz: 'Sag deinen Kundinnen, was es gerade gibt.',
     href: '/status/new',
   },
   {

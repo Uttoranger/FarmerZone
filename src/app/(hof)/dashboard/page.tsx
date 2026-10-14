@@ -44,7 +44,8 @@ export const metadata: Metadata = {
  * Packliste zuerst: Was wo steht, entscheidet heuteAufbau; Regeln und Zahlen
  * kommen aus src/lib/heute.ts und src/server/queries/heute.ts, hier wird nur
  * angeordnet. Oben höchstens EIN Kasten (Stripe), die Teilen-Zeile kompakt
- * unter der Packliste (freigabe.md §12 Nr. 45). „Zu tun" ist EINE Liste statt
+ * zuletzt in der Hauptspalte, nach Packliste und „Braucht dich" (freigabe.md
+ * §12 Nr. 45, Register N11). „Zu tun" ist EINE Liste statt
  * Erster Schritte und „Deine Hofseite" (Nr. 53). Ab 1280 px zwei Spalten
  * (Hauptspalte links, Seitenspalte 360 px rechts) — bei 1024 px neben der
  * Seitenleiste wäre die Packliste zu schmal, dort steht die Seitenspalte als
@@ -111,7 +112,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
         leer={{ abholfenster: heute.naechstesFenster?.fenster ?? null }}
       />
     ),
-    'braucht-dich': <BrauchtDichKarte eintraege={heute.brauchtDich} />,
+    'braucht-dich': <BrauchtDichKarte eintraege={heute.brauchtDich} packlisteLeer={heute.abholungen.length === 0} />,
     'zu-tun': (
       <ZuTunKarte
         aufgaben={heute.zuTun.aufgaben}

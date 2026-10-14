@@ -130,7 +130,7 @@ describe('profilBasis und profilMitTeil', () => {
   })
 
   it('ändert nur das eigene Feld', () => {
-    expect(profilMitTeil(PROFIL, { phone: '+43 660 1111111' })).toEqual({ ...profilBasis(PROFIL), phone: '+43 660 1111111' })
+    expect(profilMitTeil(PROFIL, { phone: '+43 664 0000000' })).toEqual({ ...profilBasis(PROFIL), phone: '+43 664 0000000' })
     expect(profilMitTeil(PROFIL, { name: undefined }).name).toBe('Hof Test')
   })
 })
@@ -173,8 +173,8 @@ describe('geaendertSeitLaden (Hof-Profil)', () => {
   const ANFANG = profilBasis(PROFIL)
 
   it('nur, was seit dem Laden geändert wurde — auch null', () => {
-    const jetzt = { ...ANFANG, phone: '+43 660 2222222', betriebsnummer: null }
-    expect(geaendertSeitLaden(ANFANG, jetzt)).toEqual({ phone: '+43 660 2222222', betriebsnummer: null })
+    const jetzt = { ...ANFANG, phone: '+43 676 0000000', betriebsnummer: null }
+    expect(geaendertSeitLaden(ANFANG, jetzt)).toEqual({ phone: '+43 676 0000000', betriebsnummer: null })
   })
 
   const GANZE_ADRESSE = { address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf', country: 'AT', latitude: 48.2, longitude: 13.4 }
@@ -189,8 +189,8 @@ describe('geaendertSeitLaden (Hof-Profil)', () => {
 
   it('Kartenpunkt typisch gewackelt (Größenwechsel der Karte, unter der Toleranz): unverändert — die Adresse bleibt beim frischen Stand', () => {
     // Leaflet rechnet die Mitte nach invalidateSize aus gerundeten Pixeln neu (Nachprüfung Runde 2).
-    const gewackelt = { ...ANFANG, latitude: 48.2 + 3e-6, longitude: 13.4 - 4e-6, phone: '+43 660 2222222' }
-    expect(geaendertSeitLaden(ANFANG, gewackelt)).toEqual({ phone: '+43 660 2222222' })
+    const gewackelt = { ...ANFANG, latitude: 48.2 + 3e-6, longitude: 13.4 - 4e-6, phone: '+43 676 0000000' }
+    expect(geaendertSeitLaden(ANFANG, gewackelt)).toEqual({ phone: '+43 676 0000000' })
     expect(KARTENPUNKT_TOLERANZ_GRAD).toBe(1e-5)
   })
 
@@ -201,8 +201,8 @@ describe('geaendertSeitLaden (Hof-Profil)', () => {
   })
 
   it('Kontakt und Adresse zugleich: beides, die Adresse ganz', () => {
-    const jetzt = { ...ANFANG, phone: '+43 660 2222222', postalCode: '4901' }
-    expect(geaendertSeitLaden(ANFANG, jetzt)).toEqual({ ...GANZE_ADRESSE, postalCode: '4901', phone: '+43 660 2222222' })
+    const jetzt = { ...ANFANG, phone: '+43 676 0000000', postalCode: '4901' }
+    expect(geaendertSeitLaden(ANFANG, jetzt)).toEqual({ ...GANZE_ADRESSE, postalCode: '4901', phone: '+43 676 0000000' })
   })
 
   it('keine Mischadresse: der frische Stand eines anderen Tabs mischt sich nicht in die Adresse', () => {
@@ -229,10 +229,10 @@ describe('geaendertSeitLaden (Hof-Profil)', () => {
   it('zusammen mit profilMitTeil: der frische Stand plus genau diese Änderung', () => {
     // Inzwischen hat Mein Hof den Namen geändert; der ältere Tab ändert nur das Telefon.
     const frisch = { ...PROFIL, name: 'Hof Neuname' }
-    const teil = geaendertSeitLaden(ANFANG, { ...ANFANG, phone: '+43 660 2222222' })
-    expect(profilMitTeil(frisch, teil)).toEqual({ ...profilBasis(frisch), phone: '+43 660 2222222' })
+    const teil = geaendertSeitLaden(ANFANG, { ...ANFANG, phone: '+43 676 0000000' })
+    expect(profilMitTeil(frisch, teil)).toEqual({ ...profilBasis(frisch), phone: '+43 676 0000000' })
     // Gegenprobe: das ganze Formular vom Laden schriebe den alten Namen zurück.
-    expect(profilMitTeil(frisch, { ...ANFANG, phone: '+43 660 2222222' }).name).toBe('Hof Test')
+    expect(profilMitTeil(frisch, { ...ANFANG, phone: '+43 676 0000000' }).name).toBe('Hof Test')
   })
 })
 

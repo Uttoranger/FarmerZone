@@ -19,6 +19,7 @@ import { SchonDabei } from '@/components/shared/schon-dabei'
 import { Wortmarke } from '@/components/shared/wortmarke'
 import { Kicker } from '@/components/startseite/kicker'
 import { MARKE } from '@/lib/marke'
+import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 
 /*
  * Die Abschnitte der Startseite unter „Höfe in deiner Nähe", in der Reihenfolge
@@ -265,7 +266,7 @@ export function FuerHoefeBand(): React.JSX.Element {
               Du hast einen Hof? Dein Hofladen, online.
             </h2>
             <p className="text-[13.5px] leading-normal text-foreground md:text-[15px]">
-              Schnell eingerichtet. Kunden bestellen vorab, du packst und übergibst – und behältst den vollen
+              Schnell eingerichtet. Deine Kundinnen bestellen vorab, du packst und übergibst – und behältst den vollen
               Warenpreis.
             </p>
           </div>
@@ -343,7 +344,7 @@ const FUSS_SPALTEN = [
     links: [
       { href: hoefeAdresse(), text: 'Höfe entdecken' },
       { href: '/#so-funktionierts', text: 'So funktioniert’s' },
-      { href: '/problem-melden', text: 'Problem melden' },
+      { href: '/problem-melden', text: PROBLEM_MELDEN },
     ],
   },
   {

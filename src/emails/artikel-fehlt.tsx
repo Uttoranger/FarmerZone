@@ -16,6 +16,7 @@ import {
   MAIL_FARBE,
 } from './_layout'
 import { formatEuro } from '@/lib/format'
+import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 
 /*
  * „Artikel fehlt" (E14, Nachtlauf Nr. 19): Der Hof hat eine Position als
@@ -44,6 +45,7 @@ export interface ArtikelFehltProps {
 }
 
 export function ArtikelFehltEmail(p: ArtikelFehltProps) {
+  const anrufen = telefonLink(p.farmPhone)
   return (
     <EmailLayout previewText={`Ein Artikel fehlt in deiner Bestellung ${p.orderNumber}`}>
       <Text style={h1}>Ein Artikel fehlt</Text>
@@ -87,9 +89,13 @@ export function ArtikelFehltEmail(p: ArtikelFehltProps) {
       <Trenner />
       <Text style={kleinText}>
         Fragen?{' '}
-        <Link href={`tel:${p.farmPhone}`} style={textLink}>
-          {p.farmPhone}
-        </Link>
+        {anrufen ? (
+          <Link href={anrufen} style={textLink}>
+            {formatiereTelefon(p.farmPhone)}
+          </Link>
+        ) : (
+          p.farmPhone
+        )}
       </Text>
     </EmailLayout>
   )

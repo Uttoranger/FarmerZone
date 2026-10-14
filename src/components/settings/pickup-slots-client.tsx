@@ -193,7 +193,7 @@ export function PickupSlotsClient({
             symbol={CalendarClock}
             titel={ABHOLZEITEN_FEHLEN.titel}
             satz={ABHOLZEITEN_FEHLEN.satz}
-            aktion={
+            ausweg={
               <button type="button" onClick={zumFormular} className={KNOPF_RAHMEN}>
                 {ABHOLZEITEN_FEHLEN.aktion.text}
               </button>

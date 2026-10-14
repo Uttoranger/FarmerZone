@@ -19,6 +19,7 @@ import { formatPosition } from '@/lib/format'
 import { zeitpunktFuerMail } from '@/lib/fristen'
 import { gebuehrEntfallen, gebuehrErstattungOffen, gebuehrFuerMonatsabrechnung, istVorOrtZahlung } from '@/lib/servicegebuehr'
 import { buildOrderReminderUrl } from '@/lib/whatsapp'
+import type { MarkeArt } from '@/lib/marke-art'
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
 
 const ORDER_INCLUDE = {
@@ -171,7 +172,7 @@ export type HofListenEintrag = {
   positionen: string
   gesamtCents: number
   zahlart: string
-  marke: { text: string; ton: 'offen' | 'fertig' | 'neutral' }
+  marke: { text: string; art: MarkeArt }
 }
 
 export type HofBestellPosition = {
@@ -187,7 +188,7 @@ export type HofBestellDetail = {
   id: string
   nummer: string
   status: string
-  marke: { text: string; ton: 'offen' | 'fertig' | 'neutral' }
+  marke: { text: string; art: MarkeArt }
   /** „heute, 15–18 Uhr" */
   abholung: string
   bestelltAm: string

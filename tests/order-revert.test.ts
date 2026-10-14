@@ -54,7 +54,7 @@ const EMAIL_ORDER = {
   orderNumber: 'TH-1907-TEST',
   customerName: 'Anna Testerin',
   customerEmail: 'kundin@test.local',
-  customerPhone: '+43 660 1234567',
+  customerPhone: '+43 699 0000000',
   totalAmount: { toString: () => '7.00' },
   pickupDate: new Date('2026-07-21T12:00:00Z'),
   pickupTimeStart: '09:00',

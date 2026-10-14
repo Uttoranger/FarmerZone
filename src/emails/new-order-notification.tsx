@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Text, Link, Button, Hr } from '@react-email/components'
+import { Text, Link, Hr } from '@react-email/components'
 import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton, textLink, MAIL_FARBE } from './_layout'
 import { formatEuro } from '@/lib/format'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'

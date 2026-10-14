@@ -102,12 +102,11 @@ export function ProduktKarte(props: KaufKarte | MusterKarte): React.JSX.Element 
   const { produkt, zustand, imKorb, wirdHinzugefuegt, href, onInDenKorb, onMenge } = props
   const kaufbar = zustand.art === 'kaufbar' || zustand.art === 'knapp'
   const ausverkauft = zustand.art === 'ausverkauft'
-  const marke =
-    zustand.art === 'knapp' ? (
-      <StatusBadge status="offen">{knappText(zustand.bestand, produkt.unit, produkt.unitSize)}</StatusBadge>
-    ) : ausverkauft ? (
-      <StatusBadge status="neutral">Ausverkauft</StatusBadge>
-    ) : null
+  const marke = ausverkauft ? <StatusBadge status="neutral">Ausverkauft</StatusBadge> : null
+  // „Nur noch …" ist ein Hinweis an die Kundin, kein Zustand, den jemand erledigen muss: eine leise
+  // Zeile statt einer Marke — „tun" (Orange) passte nicht, eine fünfte Art kennt DESIGN_SYSTEM nicht
+  // (Freigabe Lauf 13, Nr. 85).
+  const hinweis = zustand.art === 'knapp' ? knappText(zustand.bestand, produkt.unit, produkt.unitSize) : null
 
   return (
     <KartenAufbau
@@ -119,8 +118,7 @@ export function ProduktKarte(props: KaufKarte | MusterKarte): React.JSX.Element 
       kurz={kurzbeschreibung(produkt)}
       ausgegraut={ausverkauft}
       markeAufBild={marke}
-      // Am Handy nur „knapp" als Marke — „Ausverkauft" steht schon rechts, wo sonst der Knopf ist.
-      markeAmHandy={zustand.art === 'knapp' ? marke : null}
+      hinweis={hinweis}
       aktion={
         kaufbar && imKorb > 0 ? (
           <Stepper
@@ -171,7 +169,7 @@ function KartenAufbau({
   kurz = null,
   ausgegraut = false,
   markeAufBild = null,
-  markeAmHandy = null,
+  hinweis = null,
   aktion = null,
 }: {
   name: string
@@ -182,7 +180,8 @@ function KartenAufbau({
   kurz?: string | null
   ausgegraut?: boolean
   markeAufBild?: ReactNode
-  markeAmHandy?: ReactNode
+  /** Leise Zeile unter Name und Kurztext in jeder Breite, etwa „Nur noch 3 Stück"; „Ausverkauft" steht am Handy schon rechts. */
+  hinweis?: string | null
   aktion?: ReactNode
 }): React.JSX.Element {
   const bildUndName = (
@@ -210,7 +209,7 @@ function KartenAufbau({
         <span className="line-clamp-2 text-[15px] font-semibold break-words text-foreground">{name}</span>
         {kurz && <span className="truncate text-[13px] text-muted-foreground">{kurz}</span>}
         <Preis preis={preis} className="md:hidden" />
-        {markeAmHandy && <span className="mt-0.5 md:hidden">{markeAmHandy}</span>}
+        {hinweis && <span className="text-[12.5px] font-medium text-muted-foreground">{hinweis}</span>}
       </span>
     </>
   )

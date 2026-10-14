@@ -26,6 +26,7 @@ import { ANMELDECODE_GUELTIG_SEKUNDEN, ANMELDECODE_MAX_VERSUCHE } from '@/lib/an
 import { abholZeitText } from '@/lib/bestaetigung'
 import { bestellStatusAnzeige, zahlungsAnzeige } from '@/lib/bestellstatus'
 import { formatEuro, mitAnzahl } from '@/lib/format'
+import type { MarkeArt } from '@/lib/marke-art'
 import { centsAlsEuro, kalendertagInWien } from '@/lib/servicegebuehr'
 
 /** Die Seite — der Cookie gilt nur für diesen Pfad. */
@@ -157,31 +158,6 @@ export function teileBestellungen<T extends ListenBestellung>(liste: readonly T[
   return { laufend, frueher }
 }
 
-export type BestellTon = 'offen' | 'fertig' | 'neutral'
-
-const TON: Record<OrderStatus, BestellTon> = {
-  // Die Kundin muss etwas tun (bestätigen bzw. bezahlen): orange.
-  PENDING_CONFIRMATION: 'offen',
-  PAID: 'fertig',
-  CONFIRMED: 'fertig',
-  IN_PREPARATION: 'fertig',
-  READY: 'fertig',
-  // Abgeschlossen — auch storniert: Für „schiefgegangen" gibt es kein Token
-  // (DESIGN_SYSTEM, Bericht Nr. 08), die Marke sagt es in Worten.
-  PICKED_UP: 'neutral',
-  CANCELLED: 'neutral',
-  NOT_PICKED_UP: 'neutral',
-}
-
-/**
- * Der Ton der Status-Marke einer Bestellung — für die Liste hier und für die
- * Bestellseite (/{hof}/bestellung/{id}, seit Nr. 54 im neuen Design), damit
- * dieselbe Bestellung an beiden Stellen dieselbe Farbe trägt.
- */
-export function bestellTon(status: OrderStatus): BestellTon {
-  return TON[status] ?? 'neutral'
-}
-
 // Fester Wortlaut statt Intl „short": je nach ICU-Stand stünde „Sept." oder „Sep.".
 const MONAT_KURZ = ['Jän.', 'Feb.', 'März', 'Apr.', 'Mai', 'Juni', 'Juli', 'Aug.', 'Sep.', 'Okt.', 'Nov.', 'Dez.'] as const
 
@@ -199,7 +175,12 @@ export type BestellEintrag = {
   hofName: string
   bestellnummer: string
   marke: string
-  ton: BestellTon
+  /**
+   * Die Bedeutung der Marke (Register G5) aus `bestellStatusAnzeige` — dieselbe wie auf der
+   * Bestellseite (/{hof}/bestellung/{id}), damit dieselbe Bestellung an beiden Stellen dieselbe
+   * Farbe trägt; storniert rot (abgebrochen).
+   */
+  art: MarkeArt
   /** Laufend die Abholzeit („Morgen, 15:00–18:00 Uhr"), früher der Abholtag („26. Sep."). */
   wann: string
   betrag: string
@@ -214,13 +195,14 @@ export type BestellEintrag = {
  */
 export function bestellEintrag(b: ListenBestellung, jetzt: Date, laufend: boolean): BestellEintrag {
   const zahlung = zahlungsAnzeige(b.paymentMethod, b.paymentStatus)
+  const anzeige = bestellStatusAnzeige(b.status, '', b.paymentMethod)
   return {
     id: b.id,
     link: b.link,
     hofName: b.hofName,
     bestellnummer: b.bestellnummer,
-    marke: bestellStatusAnzeige(b.status, '', b.paymentMethod).marke,
-    ton: bestellTon(b.status),
+    marke: anzeige.marke,
+    art: anzeige.art,
     wann: laufend ? abholZeitText(b, jetzt) : kurzesDatum(b.pickupDate, jetzt),
     betrag: formatEuro(centsAlsEuro(b.gesamtCents)),
     zahlung: `${zahlung.art} · ${zahlung.zustand}`,

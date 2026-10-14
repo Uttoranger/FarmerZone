@@ -228,11 +228,11 @@ describe('teileBestellungen', () => {
 })
 
 describe('bestellEintrag', () => {
-  it('laufend: Marke und Ton aus dem Status, Abholzeit, Betrag über formatEuro, Zahlung in Kundinnen-Sprache', () => {
+  it('laufend: Marke und Art aus dem Status, Abholzeit, Betrag über formatEuro, Zahlung in Kundinnen-Sprache', () => {
     const eintrag = bestellEintrag(bestellung({ status: 'READY' }), JETZT, true)
     expect(eintrag).toMatchObject({
       marke: 'Abholbereit',
-      ton: 'fertig',
+      art: 'laeuft',
       wann: 'Morgen, 15:00–18:00 Uhr',
       betrag: '€ 10,82',
       zahlung: 'Online · Bezahlt',
@@ -241,25 +241,25 @@ describe('bestellEintrag', () => {
     })
   })
 
-  it('wartet auf die Kundin: orange', () => {
+  it('wartet auf die Kundin: tun (orange)', () => {
     const eintrag = bestellEintrag(
       bestellung({ status: 'PENDING_CONFIRMATION', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING' }),
       JETZT,
       true
     )
-    expect(eintrag.ton).toBe('offen')
+    expect(eintrag.art).toBe('tun')
     expect(eintrag.marke).toBe('Bestätigung offen')
     expect(eintrag.zahlung).toBe('Bar bei Abholung · Noch offen')
   })
 
-  it('früher: festes Datum des Abholtags, ohne Jahr im laufenden Jahr; abgeschlossen ist neutral', () => {
+  it('früher: festes Datum des Abholtags, ohne Jahr im laufenden Jahr; abgeholt erledigt, storniert abgebrochen', () => {
     const eintrag = bestellEintrag(bestellung({ status: 'PICKED_UP', pickupDate: new Date('2026-09-26T10:00:00.000Z') }), JETZT, false)
     expect(eintrag.wann).toBe('26. Sep.')
-    expect(eintrag.ton).toBe('neutral')
+    expect(eintrag.art).toBe('erledigt')
     expect(eintrag.marke).toBe('Abgeholt')
     const letztesJahr = bestellEintrag(bestellung({ status: 'CANCELLED', pickupDate: new Date('2025-01-10T10:00:00.000Z') }), JETZT, false)
     expect(letztesJahr.wann).toBe('10. Jän. 2025')
-    expect(letztesJahr.ton).toBe('neutral')
+    expect(letztesJahr.art).toBe('abgebrochen')
   })
 
   it('ein Artikel heißt „1 Artikel"', () => {

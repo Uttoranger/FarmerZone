@@ -99,10 +99,12 @@ export function findBatchSlotError(candidates: SlotKey[], ctx: SlotContext): str
 }
 
 /**
- * Es ist keine Abholzeit eingetragen (Register N9: ein Zustand, eine Fassung). Heute
- * (Packliste und Karte „Nächste Abholung“) und die Einstellungen zeigen diesen Titel, diesen
- * Satz und diesen Knopf; ohne Abholzeit kann niemand bestellen. `aktion.href` ist der Weg
- * dorthin, wo man sie einträgt.
+ * Es ist keine Abholzeit eingetragen (Register N9: ein Zustand, eine Fassung); ohne Abholzeit
+ * kann niemand bestellen. Die Einstellungen zeigen Titel, Satz und Knopf; die Packliste auf Heute
+ * Satz und Knopf (ihr Titel bleibt „Heute holt niemand etwas ab.“, mit Bestellungen für heute
+ * stehen Satz und Knopf unter der Liste); die Karte „Nächste Abholung“ nur den Titel als Zeile;
+ * „Zu tun“ den Satz am Schritt „Abholzeiten festlegen“. `aktion.href` ist der Weg dorthin, wo man
+ * sie einträgt.
  */
 export const ABHOLZEITEN_FEHLEN = {
   titel: 'Noch keine Abholzeiten',

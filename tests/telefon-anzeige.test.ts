@@ -148,21 +148,6 @@ describe('Wache: tel:-Links entstehen in src/lib/telefon-anzeige.ts', () => {
   // Ein Anführungszeichen oder Backtick direkt vor „tel:" — so beginnt ein von Hand gebauter Link.
   const TEL_VON_HAND = /[`'"]tel:/
 
-  /**
-   * Noch von Hand gebaut, weil sie außerhalb der Grenze von Nr. 81 liegen — die
-   * nächste Freigabe stellt sie auf `telefonLink` um. Die Liste darf nur
-   * kürzer werden: Eine Datei, die dort steht und nicht mehr von Hand baut,
-   * macht die Wache rot, damit die Liste nicht still stehen bleibt.
-   */
-  const NOCH_VON_HAND: readonly string[] = [
-    'src/components/hof-kunden/kunden-ansicht.tsx',
-    'src/emails/artikel-fehlt.tsx',
-    'src/emails/order-confirmation.tsx',
-    'src/emails/order-confirmed.tsx',
-    'src/emails/order-not-ready.tsx',
-    'src/emails/pickup-reminder.tsx',
-  ]
-
   /** Die Quelle selbst; und die feste Nummer des BAES, deren Link aus der Konstante entsteht. */
   const ERLAUBT: readonly string[] = ['src/lib/telefon-anzeige.ts', 'src/lib/futter-registrierung.ts']
 
@@ -186,12 +171,9 @@ describe('Wache: tel:-Links entstehen in src/lib/telefon-anzeige.ts', () => {
     expect(TEL_VON_HAND.test('const titel: string')).toBe(false)
   })
 
-  it('außer den erlaubten und den gelisteten baut keine Datei in src/ einen tel:-Link von Hand', () => {
+  // Die Liste „noch von Hand“ (fünf Mail-Vorlagen, Kundenliste) ist seit Nr. 85 leer und entfällt.
+  it('außer den erlaubten baut keine Datei in src/ einen tel:-Link von Hand', () => {
     const funde = quelldateien('src').filter((pfad) => TEL_VON_HAND.test(lies(pfad)))
-    expect(funde.filter((pfad) => !ERLAUBT.includes(pfad) && !NOCH_VON_HAND.includes(pfad))).toEqual([])
-  })
-
-  it('die Liste „noch von Hand" ist ehrlich: jede Datei darin baut wirklich noch von Hand', () => {
-    expect(NOCH_VON_HAND.filter((pfad) => !TEL_VON_HAND.test(lies(pfad)))).toEqual([])
+    expect(funde.filter((pfad) => !ERLAUBT.includes(pfad))).toEqual([])
   })
 })

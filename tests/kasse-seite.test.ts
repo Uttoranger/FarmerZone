@@ -256,7 +256,7 @@ describe('Korb und Zahlarten (N10)', () => {
     const bar = labels.find((l) => l.includes('>Bar bei Abholung</span>'))
     expect(online).toContain('Karte, Apple/Google Pay oder EPS – du wählst im nächsten Schritt.')
     expect(online).toContain(TESTBETRIEB_TEXT.kasse)
-    expect(bar).toContain(`${BAR_OHNE_GEBUEHR_ZAHLART} Du bestätigst per E-Mail – ein Tipp genügt.`)
+    expect(bar).toContain(`${BAR_OHNE_GEBUEHR_ZAHLART} Du bestätigst per E-Mail.`)
     expect(bar).not.toContain(TESTBETRIEB_TEXT.kasse)
   })
 })

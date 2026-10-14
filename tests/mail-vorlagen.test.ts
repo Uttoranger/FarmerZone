@@ -239,7 +239,9 @@ describe('Abholbereit-Mail (Vorlage pickup-reminder.tsx)', () => {
     expect(text).toContain('HT-0210-A4F2')
     expect(text).toContain('15:00–18:00 Uhr')
     expect(links(html).some((u) => u.hostname === 'www.google.com')).toBe(true)
-    expect(html).toContain('href="tel:+43 664 0000000"')
+    // Nummer und Link einheitlich (formatiereTelefon/telefonLink, Nr. 85)
+    expect(html).toContain('href="tel:+436640000000"')
+    expect(text).toContain('Anrufen (+43 664 000 0000)')
   })
 })
 
@@ -256,6 +258,43 @@ describe('Neue-Bestellung-Mail an den Hof (Vorlage new-order-notification.tsx)',
     await email.sendOrderPaidToFarmer(bestellung({ customerPhone: 'keine Angabe' }))
     const { text, html } = zuletzt()
     expect(text).toContain('keine Angabe')
+    expect(html).not.toContain('href="tel:')
+  })
+})
+
+/** Eine Bestellung, deren Hof diese Nummer eingetragen hat. */
+function mitHofTelefon(telefon: string): import('@/lib/email').OrderForEmail {
+  const b = bestellung()
+  return { ...b, farm: { ...b.farm, phone: telefon } }
+}
+
+/** Die übrigen vier Vorlagen mit Nummer und Anruf-Link (Abholbereit und Neue Bestellung stehen oben). */
+const MAILS_MIT_NUMMER: Array<[string, (telefon: string) => Promise<void>]> = [
+  ['order-confirmed (an den Hof, Nummer der Kundin)', (telefon) => email.sendOrderConfirmedToFarmer(bestellung({ paymentMethod: 'ONSITE_CASH', customerPhone: telefon }))],
+  ['order-confirmation (Nummer des Hofs)', (telefon) => email.sendOrderConfirmation(mitHofTelefon(telefon))],
+  ['order-not-ready (Nummer des Hofs)', (telefon) => email.sendOrderNotReady(mitHofTelefon(telefon))],
+  [
+    'artikel-fehlt (Nummer des Hofs)',
+    (telefon) => {
+      const b = mitHofTelefon(telefon)
+      return email.sendArtikelFehlt(b, { position: b.items[0], zahlung: 'online', bisherCents: 1082, neuCents: 632, erstattetCents: 450 })
+    },
+  ],
+]
+
+describe.each(MAILS_MIT_NUMMER)('Telefonnummer in %s (formatiereTelefon/telefonLink, Nr. 85)', (_name, senden) => {
+  it('steht einheitlich da, der Link wählt sie mit +43 (N8)', async () => {
+    await senden('0660 0000000')
+    const { text, html } = zuletzt()
+    expect(text).toContain('+43 660 000 0000')
+    expect(text).not.toContain('0660 0000000')
+    expect(html).toContain('href="tel:+436600000000"')
+  })
+
+  it('eine Nummer, die sich nicht eindeutig lesen lässt, steht wie eingegeben — ohne tel:-Link', async () => {
+    await senden('0660 0000000 ab 18 Uhr')
+    const { text, html } = zuletzt()
+    expect(text).toContain('0660 0000000 ab 18 Uhr')
     expect(html).not.toContain('href="tel:')
   })
 })

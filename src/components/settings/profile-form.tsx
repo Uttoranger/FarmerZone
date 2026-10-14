@@ -369,7 +369,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
 
       <div className="bg-card rounded-xl border border-border p-4 space-y-4">
         <h2 className="font-medium text-foreground">Kontakt</h2>
-        {field('phone', 'Telefon *', '+43 664 123 4567')}
+        {field('phone', 'Telefon *', '+43 660 000 0000')}
         {field('email', 'E-Mail *', 'hof@beispiel.at')}
       </div>
 

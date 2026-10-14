@@ -13,7 +13,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { Marke } from '@/components/ui/marke'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
@@ -21,6 +21,7 @@ import { TeilenFensterKnopf } from '@/components/teilen/teilen-fenster'
 import type { TeilenFensterDaten } from '@/lib/teilen-fenster'
 import {
   BRAUCHT_DICH_LEER,
+  brauchtDichAnzeige,
   HEUTE_KEINE_BESTELLUNGEN,
   HEUTE_NIEMAND,
   KENNZAHL_TEXT,
@@ -205,8 +206,8 @@ export function StripeEinrichtenHinweis(): React.JSX.Element {
 // ─── Teilen-Zeile ───────────────────────────────────────────────────────────
 
 /**
- * Teilen als EINE kompakte Zeile direkt unter der Packliste (freigabe.md §12
- * Nr. 45) — an jedem Tag; bis dahin stand sie an Abholtagen oben neben dem
+ * Teilen als EINE kompakte Zeile zuletzt in der Hauptspalte, nach Packliste und
+ * „Braucht dich" (freigabe.md §12 Nr. 45, Register N11) — an jedem Tag; bis dahin stand sie an Abholtagen oben neben dem
  * Stripe-Hinweis und an anderen Tagen als große Karte in der Seitenspalte.
  * Knopf rechts statt darunter, auch am Handy (Mockup
  * mobil-h3-heute-mit-teilen-karte). Seit Nr. 21 (Gate 7) öffnet der Knopf das
@@ -267,9 +268,9 @@ function PacklistenEintrag({ zeile }: { zeile: PacklistenZeile }) {
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1 md:flex-row md:items-center md:gap-3.5">
           <span className="text-[13.5px] font-semibold tabular-nums md:text-sm">{formatEuro(centsAlsEuro(zeile.gesamtCents))}</span>
-          <StatusBadge status={marke.ton} className="md:w-[124px] md:justify-center">
+          <Marke art={marke.art} className="md:w-[124px] md:justify-center">
             {marke.text}
-          </StatusBadge>
+          </Marke>
         </span>
       </Link>
     </li>
@@ -324,8 +325,10 @@ export function Packliste({
           symbol={PackageOpen}
           titel={HEUTE_NIEMAND}
           satz={leer.abholfenster ? `Nächste Abholung: ${leer.abholfenster.name}, ${leer.abholfenster.zeit}.` : ABHOLZEITEN_FEHLEN.satz}
-          aktion={
-            leer.abholfenster ? undefined : (
+          ausweg={
+            leer.abholfenster ? (
+              { ohne: 'Mit Abholzeit gibt es in der leeren Packliste nichts zu tun, der Satz nennt die nächste Abholung; nur ohne Abholzeit trägt sie den Knopf' }
+            ) : (
               <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={KNOPF_ORANGE}>
                 {ABHOLZEITEN_FEHLEN.aktion.text}
               </Link>
@@ -341,6 +344,15 @@ export function Packliste({
         </ul>
       )}
 
+      {zeilen.length > 0 && !leer.abholfenster && (
+        // Bestellungen für heute, aber keine aktive Abholzeit: Satz und Knopf stehen trotzdem (sonst nur im ausblendbaren „Zu tun").
+        <div className="flex flex-col gap-2.5 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-[18px]">
+          <p className={cn('text-[13px]', LEISE)}>{ABHOLZEITEN_FEHLEN.satz}</p>
+          <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={cn(KNOPF_ORANGE, 'shrink-0 self-start sm:self-auto')}>
+            {ABHOLZEITEN_FEHLEN.aktion.text}
+          </Link>
+        </div>
+      )}
       {naechsteAbholung && (
         <Link
           href="/orders"
@@ -371,11 +383,14 @@ const BRAUCHT_DICH_SYMBOL: Record<BrauchtDichEintrag['art'], LucideIcon> = {
 /**
  * „Braucht dich" — nur, was eine Handlung verlangt (brauchtDich in src/lib/heute.ts).
  * Ohne Eintrag keine Karte, sondern eine leise Zeile (Register N11): gedämpft
- * und ohne Rahmen wie „Zu tun einblenden" unten auf der Seite, nur ohne Knopf —
- * es gibt nichts zu tippen.
+ * und ohne Rahmen wie „Zu tun einblenden" unten auf der Seite (13 px, `font-medium`),
+ * nur ohne Knopf — es gibt nichts zu tippen. Die Zeile steht nur, wenn auch die
+ * Packliste leer ist (brauchtDichAnzeige); unter einer vollen Packliste steht nichts.
  */
-export function BrauchtDichKarte({ eintraege }: { eintraege: BrauchtDichEintrag[] }): React.JSX.Element {
-  if (eintraege.length === 0) {
+export function BrauchtDichKarte({ eintraege, packlisteLeer }: { eintraege: BrauchtDichEintrag[]; packlisteLeer: boolean }): React.JSX.Element | null {
+  const anzeige = brauchtDichAnzeige(eintraege.length, packlisteLeer)
+  if (anzeige === null) return null
+  if (anzeige === 'zeile') {
     return <p className={cn('text-center text-[13px] font-medium', LEISE)}>{BRAUCHT_DICH_LEER}</p>
   }
   return (

@@ -163,13 +163,14 @@ export function HoefeAnsicht({
             symbol={Store}
             titel="Noch kein Hof freigeschaltet"
             satz="Sobald du einen wartenden Hof freischaltest, steht er hier mit Servicegebühr und Bestellungen."
+            ausweg={{ ohne: 'Freischalten steht direkt darüber in „Warten auf Freischaltung“ (der Satz sagt es); die Liste darunter ist leer, weil noch kein Hof freigeschaltet ist' }}
           />
         ) : liste.length === 0 ? (
           <EmptyState
             symbol={Search}
             titel="Kein Hof passt"
             satz="Mit diesem Filter oder dieser Suche gibt es keinen Hof."
-            aktion={
+            ausweg={
               <Link
                 href="/admin"
                 className={KNOPF_RAHMEN}

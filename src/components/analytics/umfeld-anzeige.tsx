@@ -84,12 +84,14 @@ export function UmfeldAnzeige({
           symbol={MapPin}
           titel="Noch keine Höfe zum Vergleichen"
           satz={ansicht.leer}
-          aktion={
+          ausweg={
             ansicht.weiterUmkreis ? (
               <Link href={umfeldLink({ km: ansicht.weiterUmkreis, bereich, ansicht: wahl })} className={KNOPF_RAHMEN}>
                 Umkreis auf {ansicht.weiterUmkreis} km
               </Link>
-            ) : undefined
+            ) : (
+              { ohne: 'Den Knopf „Umkreis auf … km“ gibt es nur, solange ein größerer Umkreis bleibt; beim größten bleibt kein Ausweg' }
+            )
           }
         />
       )}

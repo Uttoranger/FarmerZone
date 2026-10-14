@@ -228,6 +228,14 @@
      noch einmal im Nacht-Block ([data-theme="dark"]). */
   --app-bar-ink: oklch(0.964 0.007 88.6); /* #F5F3EE */
   --app-bar-ink-soft: oklch(0.899 0.029 156.6); /* #CFE4D6 */
+  /* Auf Fotos und auf der in beiden Modi dunklen Bauern-Leiste: Der Grund
+     darunter folgt keinem Modus (Foto, --app-bar), also auch diese Farben
+     nicht — nur hier, nicht noch einmal im Nacht-Block (Nr. 85, vorher Hex im
+     Quelltext). */
+  --foto-knopf-ink: oklch(0.441 0.076 153.8); /* #2D5F3F — Schrift weißer Knöpfe auf dem Titelbild */
+  --foto-knopf-ink-soft: oklch(0.481 0.022 120.2); /* #5C6052 — leise Schrift weißer Knöpfe auf Fotos */
+  --leiste-plakette: oklch(0.927 0.028 76.2); /* #F2E5D3 — Sand-Plakette mit Initialen auf der Leiste */
+  --leiste-plakette-ink: oklch(0.553 0.058 62.4); /* #8B6B4F */
   --app-trough: oklch(0.946 0.011 89.7); /* #F0EDE5 — Wanne der Segmentwahl */
 
   /* Hinweis-Kasten (Pause, Freischaltung, „du musst etwas tun") */

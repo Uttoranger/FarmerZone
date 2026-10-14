@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Text, Link } from '@react-email/components'
 import { EmailLayout, BetragsZeile, Knopf, KnopfReihe, h1, bodyText, kleinText, textLink } from './_layout'
+import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 
 export interface OrderReadyProps {
   orderNumber: string
@@ -26,6 +27,7 @@ export interface OrderReadyProps {
  * statt „heute" zu sagen.
  */
 export function OrderReadyEmail(p: OrderReadyProps) {
+  const anrufen = telefonLink(p.farmPhone)
   return (
     <EmailLayout previewText={`Deine Bestellung bei ${p.farmName} liegt bereit`}>
       <Text style={h1}>Deine Bestellung liegt bereit</Text>
@@ -49,9 +51,14 @@ export function OrderReadyEmail(p: OrderReadyProps) {
 
       <Text style={kleinText}>
         Du schaffst es nicht? Gib dem Hof kurz Bescheid:{' '}
-        <Link href={`tel:${p.farmPhone}`} style={textLink}>
-          Anrufen ({p.farmPhone})
-        </Link>
+        {anrufen ? (
+          <Link href={anrufen} style={textLink}>
+            {/* Ein Textknoten: Die Textfassung der Mail schriebe sonst „Anrufen ( +43 … )“. */}
+            {`Anrufen (${formatiereTelefon(p.farmPhone)})`}
+          </Link>
+        ) : (
+          p.farmPhone
+        )}
       </Text>
 
       {/* Leise am Ende statt als Knopf über der Mail. Offene Ausnahme von

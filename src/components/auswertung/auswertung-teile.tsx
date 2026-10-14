@@ -211,7 +211,7 @@ export function UmsatzKarte({
         <EmptyState
           symbol={ChartColumn}
           titel={UMSATZ_LEER.titel}
-          aktion={
+          ausweg={
             <Link href={UMSATZ_LEER.aktion.href} className={KNOPF_RAHMEN}>
               {UMSATZ_LEER.aktion.text}
             </Link>

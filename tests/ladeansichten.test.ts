@@ -20,6 +20,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import ts from 'typescript'
 import {
   FEHLER_TEXT,
   FEHLER_TITEL,
@@ -534,5 +535,43 @@ describe('Die Fehlernummer auf dem Weg in den Briefkasten', () => {
     expect(HOEFE_ENTDECKEN).toBe('Höfe entdecken')
     expect(NOCHMAL_VERSUCHEN).toBe('Nochmal versuchen')
     expect(PROBLEM_MELDEN).toBe('Problem melden')
+  })
+
+  /** Texte (Zeichenkette, Vorlage, JSX-Text) einer Datei mit „Problem melden" — Kommentare zählen nicht. */
+  function problemMeldenTexte(quelltext: string, datei: string): string[] {
+    const quelle = ts.createSourceFile(datei, quelltext, ts.ScriptTarget.Latest, true, datei.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+    const funde: string[] = []
+    const besuche = (k: ts.Node): void => {
+      const text =
+        ts.isStringLiteral(k) || ts.isNoSubstitutionTemplateLiteral(k) || ts.isTemplateHead(k) || ts.isTemplateMiddle(k) || ts.isTemplateTail(k) || ts.isJsxText(k)
+          ? k.text
+          : null
+      if (text?.includes('Problem melden')) funde.push(text.trim())
+      ts.forEachChild(k, besuche)
+    }
+    besuche(quelle)
+    return funde
+  }
+
+  it('„Problem melden" steht als Text nur in PROBLEM_MELDEN — Seiten, Menüs und Fußzeile nehmen die Konstante (Nr. 85)', () => {
+    /** Wo das Wort noch als Text stehen darf — je mit Grund. */
+    const ERLAUBT: Record<string, string> = {
+      'src/lib/fehlerseite.ts': 'die Quelle selbst',
+      'src/lib/bauern-navigation.ts': 'Navigation des Hofbereichs, dort baut Nr. 87 den Punkt Postfach (Nacharbeit)',
+      'src/app/(public)/datenschutz/page.tsx': 'ein Satz der Datenschutzerklärung (Rechtstext)',
+    }
+    const quellen = (ordner: string): string[] =>
+      fs.readdirSync(ordner, { withFileTypes: true }).flatMap((e) => {
+        const voll = path.join(ordner, e.name)
+        return e.isDirectory() ? quellen(voll) : /\.(ts|tsx)$/.test(e.name) ? [voll] : []
+      })
+    const verstoesse = quellen(path.join(process.cwd(), 'src'))
+      .map((voll) => path.relative(process.cwd(), voll).split(path.sep).join('/'))
+      .filter((datei) => !(datei in ERLAUBT))
+      .filter((datei) => problemMeldenTexte(liesDatei(datei), datei).length > 0)
+    expect(verstoesse).toEqual([])
+    // Gegenprobe: Die Suche schlägt an einem Text an, nicht an einem Kommentar.
+    expect(problemMeldenTexte("const a = <a>Problem melden</a>; const b = 'Problem melden'", 'x.tsx')).toHaveLength(2)
+    expect(problemMeldenTexte('// Problem melden\nconst a = PROBLEM_MELDEN', 'x.ts')).toEqual([])
   })
 })

@@ -4,7 +4,7 @@ import type { BestellungenSeite, HofBestellDetail, HofListenEintrag } from '@/se
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
@@ -159,13 +159,13 @@ function ListenZeile({
         <span className="text-sm font-semibold tabular-nums">{formatEuro(centsAlsEuro(eintrag.gesamtCents))}</span>
         <span className={cn('hidden text-[11.5px] sm:block lg:hidden xl:block', LEISE)}>{eintrag.zahlart}</span>
         {/* Schmale Spalte (Handy, Liste neben der Bestellung bei 1024 px): Marke unter dem Betrag. */}
-        <StatusBadge status={eintrag.marke.ton} className="sm:hidden lg:inline-flex xl:hidden">
+        <Marke art={eintrag.marke.art} className="sm:hidden lg:inline-flex xl:hidden">
           {eintrag.marke.text}
-        </StatusBadge>
+        </Marke>
       </span>
-      <StatusBadge status={eintrag.marke.ton} className="hidden shrink-0 sm:inline-flex lg:hidden xl:inline-flex">
+      <Marke art={eintrag.marke.art} className="hidden shrink-0 sm:inline-flex lg:hidden xl:inline-flex">
         {eintrag.marke.text}
-      </StatusBadge>
+      </Marke>
       <ChevronRight className={cn('size-4 shrink-0 lg:hidden', LEISE)} strokeWidth={1.7} aria-hidden="true" />
     </Link>
   )
@@ -178,7 +178,7 @@ function LeereListe({ seite, filter }: { seite: BestellungenSeite; filter: HofBe
         symbol={Inbox}
         titel="Noch keine Bestellungen"
         satz="Teile deine Hofseite, damit Kundinnen bei dir bestellen können."
-        aktion={
+        ausweg={
           <Link href="/farm-page" className={KNOPF_RAHMEN}>
             Zu Mein Hof
           </Link>
@@ -192,7 +192,7 @@ function LeereListe({ seite, filter }: { seite: BestellungenSeite; filter: HofBe
         symbol={PartyPopper}
         titel="Alles erledigt"
         satz="Gerade wartet keine Bestellung auf dich."
-        aktion={
+        ausweg={
           <Link href={bestellListeHref('erledigt')} className={KNOPF_RAHMEN}>
             Erledigte ansehen
           </Link>
@@ -207,7 +207,7 @@ function LeereListe({ seite, filter }: { seite: BestellungenSeite; filter: HofBe
     </Link>
   )
   if (filter === 'heute') {
-    return <EmptyState symbol={CalendarCheck} titel={HEUTE_NIEMAND} satz="Alles, was noch abgeholt wird, steht unter „Noch offen“." aktion={ausweg} />
+    return <EmptyState symbol={CalendarCheck} titel={HEUTE_NIEMAND} satz="Alles, was noch abgeholt wird, steht unter „Noch offen“." ausweg={ausweg} />
   }
-  return <EmptyState symbol={Inbox} titel="Noch nichts erledigt" satz="Abgeholte, stornierte und nicht abgeholte Bestellungen stehen dann hier." aktion={ausweg} />
+  return <EmptyState symbol={Inbox} titel="Noch nichts erledigt" satz="Abgeholte, stornierte und nicht abgeholte Bestellungen stehen dann hier." ausweg={ausweg} />
 }

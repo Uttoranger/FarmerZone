@@ -6,6 +6,8 @@
  *  - Jede Zeile der Tabelle in docs/ai/DESIGN_SYSTEM.md steht als --fz-Token in
  *    beiden Modi, und kein Token steht in der CSS, das die Tabelle nicht kennt.
  *  - Die oklch-Werte treffen die Hexwerte der Tabelle (höchstens 1 je Kanal).
+ *  - Die modusfesten Tokens (Tabelle „Token | Wert | Wofür“) stehen genau einmal
+ *    in :root, nie im Nacht-Block, mit dem Hexwert der Tabelle (Nr. 85).
  *  - Der Modus hängt an data-theme, nicht mehr an einer Klasse — mit derselben
  *    Spezifität wie vorher, damit hover: und aria-*: die dark:-Klasse nicht
  *    überstimmen.
@@ -24,7 +26,7 @@ import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import ts from 'typescript'
-import { hexAbstand, kontrast, leseHex, leseOklch, oklchZuHex } from '@/lib/farbraum'
+import { hexAbstand, hexZuOklch, kontrast, leseHex, leseOklch, oklchZuHex } from '@/lib/farbraum'
 import { MARKE_ARTEN } from '@/lib/marke-art'
 
 const css = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8')
@@ -53,11 +55,13 @@ const soll = tabelle()
 const wert = (token: string, modus: 'hell' | 'dunkel'): string => sicher(soll.get(token), `Tabelle --${token}`)[modus]
 
 /** Der CSS-Block zu einem Selektor — bis zur ersten schließenden Klammer am Zeilenanfang. */
-function block(selektor: string): string {
-  const start = css.indexOf(`${selektor} {`)
+function blockIn(text: string, selektor: string): string {
+  const start = text.indexOf(`${selektor} {`)
   expect(start, `Block „${selektor}" fehlt`).toBeGreaterThan(-1)
-  return css.slice(start, css.indexOf('\n}', start))
+  return text.slice(start, text.indexOf('\n}', start))
 }
+
+const block = (selektor: string): string => blockIn(css, selektor)
 
 /** Alle --fz-Tokens eines Blocks mit ihrem Wert. */
 function tokens(blockText: string): Map<string, string> {
@@ -105,6 +109,70 @@ describe('Tabelle und CSS decken sich', () => {
         expect(roh).toMatch(/^oklch\(/)
       }
     }
+  })
+})
+
+describe('Modusfeste Tokens (DESIGN_SYSTEM „Modusfeste Tokens“, Nr. 85)', () => {
+  /** Die Tabelle „Token | Wert | Wofür“: Farben auf Fotos und auf der Bauern-Leiste, in beiden Modi gleich. */
+  function modusfesteTabelle(): Map<string, string> {
+    const zeilen = new Map<string, string>()
+    const kopf = doku.search(/^[ \t]*\| Token \| Wert \| Wofür \|$/m)
+    expect(kopf, 'Tabelle „Modusfeste Tokens“ fehlt').toBeGreaterThan(-1)
+    // Nach Kopf und Trennzeile: Die Tabelle endet an der ersten Zeile ohne Token.
+    for (const zeile of doku.slice(kopf).split('\n').slice(2)) {
+      const m = /^\s*\|\s*--([a-z-]+)\s*\|\s*(#[0-9A-Fa-f]{6})\s*\|/.exec(zeile)
+      if (!m) break
+      zeilen.set(m[1], sicher(leseHex(m[2]), m[2]))
+    }
+    return zeilen
+  }
+
+  /** Was an den modusfesten Tokens einer CSS nicht stimmt — leer, wenn jedes genau einmal in :root steht, nie im Nacht-Block und mit dem Wert der Tabelle. */
+  function modusfestVerstoesse(cssText: string, tabelle: Map<string, string>): string[] {
+    const hell = blockIn(cssText, HELL)
+    const dunkel = blockIn(cssText, DUNKEL)
+    const verstoesse: string[] = []
+    for (const [name, hex] of tabelle) {
+      const definition = new RegExp(`(?<![\\w-])--${name}:\\s*([^;]+);`, 'g')
+      const imHellen = [...hell.matchAll(definition)]
+      const insgesamt = [...cssText.matchAll(definition)].length
+      if (imHellen.length !== 1 || insgesamt !== 1) verstoesse.push(`--${name}: ${imHellen.length}× in :root, ${insgesamt}× insgesamt`)
+      if ([...dunkel.matchAll(definition)].length > 0) verstoesse.push(`--${name} steht im Nacht-Block`)
+      if (imHellen.length === 1) {
+        const roh = imHellen[0][1].trim()
+        const farbe = leseOklch(roh)
+        if (farbe === null || hexAbstand(oklchZuHex(farbe), hex) > 1) verstoesse.push(`--${name}: ${roh} trifft ${hex} nicht`)
+      }
+    }
+    return verstoesse
+  }
+
+  /** Eine Tokenzeile wie in globals.css, aus dem Hexwert gerechnet. */
+  function zeile(name: string, hex: string): string {
+    const { l, c, h } = hexZuOklch(hex)
+    return `  --${name}: oklch(${l.toFixed(4)} ${c.toFixed(4)} ${h.toFixed(1)}); /* ${hex} */`
+  }
+
+  const modusfest = modusfesteTabelle()
+
+  it('die Tabelle nennt die vier Tokens auf Fotos und der Bauern-Leiste — eine fehlende Zeile prüfte niemand mehr', () => {
+    expect([...modusfest.keys()].toSorted()).toEqual(['foto-knopf-ink', 'foto-knopf-ink-soft', 'leiste-plakette', 'leiste-plakette-ink'])
+  })
+
+  it('jedes steht genau einmal in :root, nie im Nacht-Block, und trifft den Hexwert der Tabelle', () => {
+    expect(modusfestVerstoesse(css, modusfest)).toEqual([])
+  })
+
+  it('Gegenprobe am Schnipsel: eine Kopie im Nacht-Block, eine zweite Definition oder ein anderer Wert schlägt an', () => {
+    const [name, hex] = sicher([...modusfest][0], 'erste Zeile der Tabelle')
+    const nurDieses = new Map([[name, hex]])
+    const schnipsel = (hellZeilen: string[], dunkelZeilen: string[]): string =>
+      `${HELL} {\n${hellZeilen.join('\n')}\n}\n\n${DUNKEL} {\n  color-scheme: dark;\n${dunkelZeilen.join('\n')}\n}\n`
+
+    expect(modusfestVerstoesse(schnipsel([zeile(name, hex)], []), nurDieses)).toEqual([])
+    expect(modusfestVerstoesse(schnipsel([zeile(name, hex)], [zeile(name, hex)]), nurDieses)).toContain(`--${name} steht im Nacht-Block`)
+    expect(modusfestVerstoesse(schnipsel([zeile(name, hex), zeile(name, hex)], []), nurDieses)).toEqual([`--${name}: 2× in :root, 2× insgesamt`])
+    expect(modusfestVerstoesse(schnipsel([zeile(name, '#B91C1C')], []), nurDieses).join(' ')).toContain(`trifft ${hex} nicht`)
   })
 })
 
@@ -234,15 +302,14 @@ describe('Hexwerte im Code (Register G5)', () => {
   ]
 
   /**
-   * Nacharbeit: Hexwerte außerhalb der Dateigrenze von Nr. 79 (Lauf 13 ersetzt
-   * sie durch Tokens und streicht sie hier). Je Datei nur genau diese Werte —
-   * ein neuer schlägt sofort an.
+   * Nacharbeit: Hexwerte außerhalb der Dateigrenzen von Nr. 79 und 85 (Nr. 85 hat
+   * farm-page-view, product-grid und farmer-nav in Tokens überführt und hier
+   * gestrichen). Je Datei nur genau diese Werte — ein neuer schlägt sofort an.
    */
   const NACHARBEIT: Record<string, string[]> = {
-    'src/components/farm/farm-page-view.tsx': ['#2D5F3F', '#5C6052'],
-    'src/components/farm/product-grid.tsx': ['#5C6052'],
+    // Die Plakette nimmt künftig --leiste-plakette/-ink wie farmer-nav.tsx (Nr. 85); #A9CFE3 braucht ein eigenes Token.
     'src/components/farmer/farm-identity-card.tsx': ['#F2E5D3', '#8B6B4F', '#A9CFE3'],
-    'src/components/farmer/farmer-nav.tsx': ['#F2E5D3', '#8B6B4F'],
+    // Der runde Knopf auf dem Titelbild nimmt künftig --foto-knopf-ink wie farm-page-view.tsx (Nr. 85).
     'src/components/shared/kunden-kopf.tsx': ['#2D5F3F'],
   }
 

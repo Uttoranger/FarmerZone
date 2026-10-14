@@ -15,9 +15,10 @@
  *  - Jede Ausnahme deckt eine Fundstelle; eine veraltete fällt auf.
  *  - Ein Text im Aufruf selbst (`titel="Noch keine …"`) gilt nicht als in Ordnung: Er steht mit
  *    Namen in ALTLAST_IM_AUFRUF (Nacharbeit) oder zieht in die Textquelle der Seite.
- *  - Jeder `<EmptyState>` hat eine Aktion, die immer da ist; eine, die fehlen kann (`undefined`,
- *    `bedingung ? … : undefined`, `bedingung && …`), zählt nicht. Ohne Aktion: Eintrag mit Grund
- *    in OHNE_AKTION.
+ *  - Jeder `<EmptyState>` hat einen Ausweg (Pflichtfeld `ausweg`, seit Nr. 85): eine Aktion, die
+ *    immer da ist — eine, die fehlen kann (`undefined`, `bedingung ? … : undefined`, `bedingung && …`),
+ *    zählt nicht —, oder `{ ohne: 'Grund' }` mit dem Grund in ganzen Worten im Aufruf selbst (vorher
+ *    stand er getrennt vom Aufruf in einer Liste OHNE_AKTION; ein falscher Grund fiel dort niemandem auf).
  *  - Ein Zustand hat eine Fassung: „keine Abholzeiten“ (Heute, Einstellungen) und die Zeile
  *    dazu (Mein Hof, Einstellungen) kommen je aus einer Konstante.
  *  - Gegenprobe: Die Suche schlägt an einem losen Text an, nicht im Kommentar und nicht im Log.
@@ -38,7 +39,8 @@ type Deklaration = { name: string; pfad: string[] }
 type Fund = { datei: string; zeile: number; text: string; ort: Ort; deklaration: Deklaration | null }
 /** Was ein `<EmptyState>` als `titel` oder `satz` aus einer Konstante nimmt: `TEXT.leer.titel` → name TEXT (ohne Umbenennung beim Import), pfad ['leer', 'titel']. */
 type Verweis = { name: string; pfad: string[] }
-type Aufruf = { datei: string; zeile: number; titel: string; hatAktion: boolean }
+/** `hatAusweg`: das Pflichtfeld steht da und kann nicht leer sein; `ohne`: die Gründe aus `{ ohne: … }` im Ausweg (ein Nicht-Text als ''). */
+type Aufruf = { datei: string; zeile: number; titel: string; hatAusweg: boolean; ohne: string[] }
 
 function* quelldateien(ordner: string): Generator<string> {
   for (const name of readdirSync(ordner)) {
@@ -115,6 +117,23 @@ function kannLeerSein(ausdruck: ts.Expression): boolean {
   return false
 }
 
+/** Die Gründe aus jedem `{ ohne: … }` im Ausdruck des Auswegs, in jedem Zweig. Ein Grund, der kein fester Text ist, zählt als ''. */
+function ohneGruende(ausdruck: ts.Expression): string[] {
+  const gruende: string[] = []
+  const besuche = (k: ts.Node): void => {
+    if (ts.isObjectLiteralExpression(k)) {
+      for (const e of k.properties) {
+        if (ts.isPropertyAssignment(e) && schluessel(e.name) === 'ohne') {
+          gruende.push(ts.isStringLiteral(e.initializer) || ts.isNoSubstitutionTemplateLiteral(e.initializer) ? e.initializer.text : '')
+        }
+      }
+    }
+    ts.forEachChild(k, besuche)
+  }
+  besuche(ausdruck)
+  return gruende
+}
+
 /** Alle Texte mit „noch kein…“ und alle EmptyState-Aufrufe einer Datei. */
 function untersuche(quelltext: string, datei = 'schnipsel.tsx'): { funde: Fund[]; aufrufe: Aufruf[]; verweise: Verweis[] } {
   const art = datei.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
@@ -134,20 +153,24 @@ function untersuche(quelltext: string, datei = 'schnipsel.tsx'): { funde: Fund[]
     if (ts.isStringLiteral(knoten) || ts.isNoSubstitutionTemplateLiteral(knoten)) roh = knoten.text
     else if (ts.isTemplateHead(knoten) || ts.isTemplateMiddle(knoten) || ts.isTemplateTail(knoten)) roh = knoten.text
     else if (ts.isJsxText(knoten)) roh = knoten.text
-    if (roh !== null && !imLog(knoten)) {
+    // Der Grund in `{ ohne: … }` ist kein Nutzertext — er wird nie gezeigt.
+    const eltern = knoten.parent as ts.Node | undefined
+    const istGrund = eltern !== undefined && ts.isPropertyAssignment(eltern) && eltern.initializer === knoten && schluessel(eltern.name) === 'ohne'
+    if (roh !== null && !imLog(knoten) && !istGrund) {
       const text = roh.replace(/\s+/g, ' ').trim()
       if (NOCH_KEIN.test(text)) funde.push({ datei, zeile: zeileVon(knoten), text, ort: ortVon(knoten), deklaration: deklarationVon(knoten) })
     }
     if ((ts.isJsxOpeningElement(knoten) || ts.isJsxSelfClosingElement(knoten)) && knoten.tagName.getText() === 'EmptyState') {
       const eigene = knoten.attributes.properties.filter(ts.isJsxAttribute)
       const titel = eigene.find((a) => a.name.getText() === 'titel')?.initializer
-      const aktion = eigene.find((a) => a.name.getText() === 'aktion')
-      const aktionAusdruck = aktion?.initializer && ts.isJsxExpression(aktion.initializer) ? aktion.initializer.expression : undefined
+      const ausweg = eigene.find((a) => a.name.getText() === 'ausweg')
+      const auswegAusdruck = ausweg?.initializer && ts.isJsxExpression(ausweg.initializer) ? ausweg.initializer.expression : undefined
       aufrufe.push({
         datei,
         zeile: zeileVon(knoten),
         titel: titel === undefined ? '' : ts.isStringLiteral(titel) ? titel.text : ts.isJsxExpression(titel) ? (titel.expression?.getText() ?? '') : titel.getText(),
-        hatAktion: aktion !== undefined && !(aktionAusdruck !== undefined && kannLeerSein(aktionAusdruck)),
+        hatAusweg: ausweg !== undefined && !(auswegAusdruck !== undefined && kannLeerSein(auswegAusdruck)),
+        ohne: auswegAusdruck ? ohneGruende(auswegAusdruck) : [],
       })
       for (const a of eigene) {
         const ausdruck = ['titel', 'satz'].includes(a.name.getText()) && a.initializer && ts.isJsxExpression(a.initializer) ? a.initializer.expression : undefined
@@ -206,39 +229,17 @@ const AUSNAHMEN: Ausnahme[] = [
   { datei: 'src/components/teilen/teilen-fenster.tsx', text: /^Noch keine Produkte im Shop/, art: 'C', grund: 'Hinweissatz in der Karte des Teilen-Fensters, kein Leerzustand; die Datei gehört zu Nr. 76' },
 ]
 
-/** Ein EmptyState, für den keine Aktion sinnvoll ist (oder der sie nur manchmal trägt) — je Titel mit Grund. */
-type OhneAktion = { datei: string; titel: string; grund: string }
-const OHNE_AKTION: OhneAktion[] = [
-  {
-    datei: 'src/components/admin/hoefe-ansicht.tsx',
-    titel: 'Noch kein Hof freigeschaltet',
-    grund: 'Freischalten steht direkt darüber in „Warten auf Freischaltung“ (der Satz sagt es); die Liste darunter ist leer, weil noch kein Hof freigeschaltet ist',
-  },
-  {
-    datei: 'src/components/admin/briefkasten-teile.tsx',
-    titel: 'WUNSCHLISTE_LEER.titel',
-    grund: 'Die gebündelte Wunschliste zählt jeden Wunsch außer Dubletten; ein Wunsch kommt nur von einem Hof oder einer Kundin über „Problem melden“, der Admin kann keinen anlegen',
-  },
-  {
-    datei: 'src/components/admin/briefkasten-teile.tsx',
-    titel: 'leer.titel',
-    grund: 'Der Ausweg „Offene Meldungen zeigen“ kommt vom Aufrufer und steht nur in der Voreinstellung der Liste; mit einem gewählten Filter gibt es keinen weiteren',
-  },
-  {
-    datei: 'src/components/analytics/umfeld-anzeige.tsx',
-    titel: 'Noch keine Höfe zum Vergleichen',
-    grund: 'Der Knopf „Umkreis auf … km“ steht nur, solange es einen größeren Umkreis gibt; beim größten bleibt kein Ausweg',
-  },
-  {
-    datei: 'src/components/region/futter-kaufen-ansicht.tsx',
-    titel: 'Gerade kein Futter in der Nähe',
-    grund: 'Je nach Grund „Alles Futter zeigen“ oder „Umkreis auf … km“; sind beide ausgeschöpft, bleibt kein Ausweg',
-  },
-  {
-    datei: 'src/components/heute/heute-teile.tsx',
-    titel: 'HEUTE_NIEMAND',
-    grund: 'Mit Abholfenster gibt es in der leeren Packliste nichts zu tun, der Satz nennt die nächste Abholung; nur ohne Abholzeit trägt sie den Knopf „Abholzeiten eintragen“',
-  },
+/**
+ * Wo ein EmptyState ohne Aktion auskommt (`{ ohne: … }` in mindestens einem Zweig) — nur, damit die Suche
+ * sich selbst belegt; der Grund steht im Aufruf, nicht hier (seit Nr. 85).
+ */
+const BEKANNT_OHNE: Array<{ datei: string; titel: string }> = [
+  { datei: 'src/components/admin/hoefe-ansicht.tsx', titel: 'Noch kein Hof freigeschaltet' },
+  { datei: 'src/components/admin/briefkasten-teile.tsx', titel: 'WUNSCHLISTE_LEER.titel' },
+  { datei: 'src/components/admin/briefkasten-teile.tsx', titel: 'leer.titel' },
+  { datei: 'src/components/analytics/umfeld-anzeige.tsx', titel: 'Noch keine Höfe zum Vergleichen' },
+  { datei: 'src/components/region/futter-kaufen-ansicht.tsx', titel: 'Gerade kein Futter in der Nähe' },
+  { datei: 'src/components/heute/heute-teile.tsx', titel: 'HEUTE_NIEMAND' },
 ]
 
 /**
@@ -323,16 +324,21 @@ describe('Leerzustände — der Text steht nicht im Aufruf selbst', () => {
   })
 })
 
-describe('Leerzustände — jeder EmptyState hat eine Aktion', () => {
-  it('trägt eine Aktion — oder steht mit Grund in OHNE_AKTION', () => {
+describe('Leerzustände — jeder EmptyState hat einen Ausweg', () => {
+  it('trägt einen Ausweg: eine Aktion, die immer da ist, oder { ohne: Grund } im Aufruf', () => {
     expect(aufrufe.length).toBeGreaterThan(20)
-    const ohne = aufrufe.filter((a) => !a.hatAktion && !OHNE_AKTION.some((o) => o.datei === a.datei && o.titel === a.titel))
-    expect(ohne.map((a) => `${a.datei}:${a.zeile} „${a.titel}“`)).toEqual([])
+    const ohneAusweg = aufrufe.filter((a) => !a.hatAusweg)
+    expect(ohneAusweg.map((a) => `${a.datei}:${a.zeile} „${a.titel}“`)).toEqual([])
   })
 
-  it('hat keinen veralteten Eintrag in OHNE_AKTION', () => {
-    const ungenutzt = OHNE_AKTION.filter((o) => !aufrufe.some((a) => !a.hatAktion && a.datei === o.datei && a.titel === o.titel))
-    expect(ungenutzt.map((o) => `${o.datei} „${o.titel}“`)).toEqual([])
+  it('nennt zu jedem { ohne } einen Grund in ganzen Worten, als festen Text im Aufruf', () => {
+    const kurz = aufrufe.flatMap((a) => a.ohne.filter((g) => g.split(' ').length < 5).map((g) => `${a.datei}:${a.zeile} „${g}“`))
+    expect(kurz).toEqual([])
+  })
+
+  it('findet die Leerzustände ohne Aktion (die Suche läuft)', () => {
+    const gefunden = aufrufe.filter((a) => a.ohne.length > 0).map((a) => ({ datei: a.datei, titel: a.titel }))
+    expect(gefunden).toEqual(expect.arrayContaining(BEKANNT_OHNE))
   })
 })
 
@@ -364,16 +370,30 @@ describe('Leerzustände — Gegenprobe: die Suche schlägt an', () => {
     expect(finde('const a = `${n} Höfe haben noch keinen Punkt`').funde).toMatchObject([{ ort: 'sonst' }])
   })
 
-  it('erkennt den Text im EmptyState und seine fehlende oder vorhandene Aktion', () => {
+  it('erkennt den Text im EmptyState und seinen fehlenden oder vorhandenen Ausweg', () => {
     const ohne = finde('const a = <EmptyState symbol={X} titel="Noch keine Dinge" satz="x" />')
     expect(ohne.funde).toMatchObject([{ ort: 'emptystate' }])
-    expect(ohne.aufrufe).toMatchObject([{ titel: 'Noch keine Dinge', hatAktion: false }])
-    const mit = finde('const a = <EmptyState symbol={X} titel="Noch keine Dinge" aktion={<a href="/x">Los</a>} />')
-    expect(mit.aufrufe).toMatchObject([{ titel: 'Noch keine Dinge', hatAktion: true }])
+    expect(ohne.aufrufe).toMatchObject([{ titel: 'Noch keine Dinge', hatAusweg: false, ohne: [] }])
+    const mit = finde('const a = <EmptyState symbol={X} titel="Noch keine Dinge" ausweg={<a href="/x">Los</a>} />')
+    expect(mit.aufrufe).toMatchObject([{ titel: 'Noch keine Dinge', hatAusweg: true, ohne: [] }])
+    // Das alte Feld zählt nicht mehr als Ausweg.
+    expect(finde('const a = <EmptyState titel="x" aktion={<a href="/x">Los</a>} />').aufrufe[0]?.hatAusweg).toBe(false)
+  })
+
+  it('liest den Grund aus { ohne } in jedem Zweig — ein Nicht-Text zählt als leer', () => {
+    const grund = 'Hier gibt es keinen Weg weiter, weil nichts fehlt'
+    expect(finde(`const a = <EmptyState titel="x" ausweg={{ ohne: '${grund}' }} />`).aufrufe[0]).toMatchObject({ hatAusweg: true, ohne: [grund] })
+    expect(finde(`const a = <EmptyState titel="x" ausweg={fenster ? { ohne: '${grund}' } : <a href="/x">Los</a>} />`).aufrufe[0]).toMatchObject({
+      hatAusweg: true,
+      ohne: [grund],
+    })
+    expect(finde('const a = <EmptyState titel="x" ausweg={{ ohne: GRUND }} />').aufrufe[0]?.ohne).toEqual([''])
+    // Der Grund ist kein gezeigter Text: „noch kein…“ darin zählt nicht als Text im Aufruf.
+    expect(finde(`const a = <EmptyState titel={T} ausweg={{ ohne: 'Leer, weil noch kein Hof da ist' }} />`).funde).toEqual([])
   })
 
   it('zählt eine Aktion nur, wenn sie immer da ist: undefined, null, false und bedingte Aktionen zählen nicht', () => {
-    const aktion = (ausdruck: string) => finde(`const a = <EmptyState titel={LEER.titel} aktion={${ausdruck}} />`).aufrufe[0]?.hatAktion
+    const aktion = (ausdruck: string) => finde(`const a = <EmptyState titel={LEER.titel} ausweg={${ausdruck}} />`).aufrufe[0]?.hatAusweg
     expect(aktion('undefined')).toBe(false)
     expect(aktion('null')).toBe(false)
     expect(aktion('false')).toBe(false)
@@ -387,7 +407,7 @@ describe('Leerzustände — Gegenprobe: die Suche schlägt an', () => {
     expect(aktion('neuKnopf()')).toBe(true)
     expect(aktion('knopf')).toBe(true)
     expect(aktion('vorhanden || <a href="/x">Los</a>')).toBe(true)
-    expect(finde('const a = <EmptyState titel="x" />').aufrufe[0]?.hatAktion).toBe(false)
+    expect(finde('const a = <EmptyState titel="x" />').aufrufe[0]?.hatAusweg).toBe(false)
   })
 
   it('erkennt die Textquelle eines EmptyState nur, wenn ein EmptyState sie als titel oder satz nimmt — mit oder ohne Aktion', () => {

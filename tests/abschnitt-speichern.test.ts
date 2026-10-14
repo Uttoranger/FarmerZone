@@ -79,7 +79,7 @@ describe('nacheinander', () => {
     aktion.saveAppearanceAction.mockReturnValueOnce(erstes.antwort)
 
     const eins = speichereAuftritt({ tagline: 'Eins' })
-    const zwei = speichereProfil({ phone: '+43 660 1111111' })
+    const zwei = speichereProfil({ phone: '+43 664 0000000' })
     await vi.waitFor(() => expect(aktion.saveAppearanceAction).toHaveBeenCalledTimes(1))
     expect(aktion.ladeProfilStand).not.toHaveBeenCalled()
 
@@ -87,7 +87,7 @@ describe('nacheinander', () => {
     await expect(eins).resolves.toEqual({})
     await expect(zwei).resolves.toEqual({})
     expect(aktion.ladeProfilStand).toHaveBeenCalledTimes(1)
-    expect(aktion.updateProfile).toHaveBeenCalledWith(expect.objectContaining({ name: 'Hof Test', phone: '+43 660 1111111' }))
+    expect(aktion.updateProfile).toHaveBeenCalledWith(expect.objectContaining({ name: 'Hof Test', phone: '+43 664 0000000' }))
   })
 })
 
@@ -123,21 +123,21 @@ describe('ein Fehler hält die Kette nicht an', () => {
     aktion.ladeProfilStand.mockResolvedValueOnce({ profil: PROFIL }).mockResolvedValueOnce({ profil: { ...PROFIL, name: 'Hof Inzwischen' } })
     aktion.updateProfile.mockRejectedValueOnce(new Error('Netz weg'))
 
-    const eins = speichereProfil({ phone: '+43 660 1111111' })
-    const zwei = speichereProfil({ phone: '+43 660 2222222' })
+    const eins = speichereProfil({ phone: '+43 664 0000000' })
+    const zwei = speichereProfil({ phone: '+43 676 0000000' })
 
     await expect(eins).rejects.toThrow('Netz weg')
     await expect(zwei).resolves.toEqual({})
     expect(aktion.ladeProfilStand).toHaveBeenCalledTimes(2)
     // Mit dem Stand des zweiten Lesens, nicht dem des ersten.
-    expect(aktion.updateProfile).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Hof Inzwischen', phone: '+43 660 2222222' }))
+    expect(aktion.updateProfile).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Hof Inzwischen', phone: '+43 676 0000000' }))
   })
 
   it('auch ein Fehler beim Lesen hält sie nicht an', async () => {
     const { speichereAuftritt, speichereProfil } = await speicherweg()
     aktion.ladeProfilStand.mockRejectedValueOnce(new Error('Netz weg'))
 
-    await expect(speichereProfil({ phone: '+43 660 1111111' })).rejects.toThrow('Netz weg')
+    await expect(speichereProfil({ phone: '+43 664 0000000' })).rejects.toThrow('Netz weg')
     await expect(speichereAuftritt({ tagline: 'Zwei' })).resolves.toEqual({})
     expect(aktion.updateProfile).not.toHaveBeenCalled()
     expect(aktion.saveAppearanceAction).toHaveBeenCalledTimes(1)

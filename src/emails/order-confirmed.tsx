@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Text, Link } from '@react-email/components'
 import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton, amberBox, textLink, MAIL_FARBE } from './_layout'
 import { formatEuro } from '@/lib/format'
+import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 import { BAR_OHNE_GEBUEHR_SATZ } from '@/lib/konditionen'
 
 export interface OrderConfirmedProps {
@@ -27,6 +28,7 @@ export interface OrderConfirmedProps {
 }
 
 export function OrderConfirmedEmail(p: OrderConfirmedProps) {
+  const anrufen = telefonLink(p.customerPhone)
   const mitGebuehr = (p.serviceFee ?? 0) > 0
   const kassieren = p.barZuKassieren ?? p.total
   return (
@@ -76,7 +78,13 @@ export function OrderConfirmedEmail(p: OrderConfirmedProps) {
       </Text>
       <Text style={mutedText}>
         <strong>Kunde:</strong> {p.customerName} ·{' '}
-        <Link href={`tel:${p.customerPhone}`} style={textLink}>{p.customerPhone}</Link>
+        {anrufen ? (
+          <Link href={anrufen} style={textLink}>
+            {formatiereTelefon(p.customerPhone)}
+          </Link>
+        ) : (
+          p.customerPhone
+        )}
       </Text>
 
       <Link href={p.dashboardUrl} style={ctaButton}>Im Dashboard ansehen →</Link>

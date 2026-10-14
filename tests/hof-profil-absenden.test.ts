@@ -133,10 +133,10 @@ beforeEach(() => {
 
 describe('Hof-Profil absenden', () => {
   it('nur das Telefon geändert: speichereProfil bekommt genau { phone } — Altwerte beim Laden zählen nicht als geändert', async () => {
-    await sendeAb({ phone: '+43 660 2222222' })
+    await sendeAb({ phone: '+43 676 0000000' })
 
     expect(speicherweg.speichereProfil).toHaveBeenCalledTimes(1)
-    expect(speicherweg.speichereProfil).toHaveBeenCalledWith({ phone: '+43 660 2222222' })
+    expect(speicherweg.speichereProfil).toHaveBeenCalledWith({ phone: '+43 676 0000000' })
     // Nach dem Erfolg zurück zur Übersicht (Register N1).
     expect(navigation.push).toHaveBeenCalledWith('/settings')
   })
@@ -151,7 +151,7 @@ describe('Hof-Profil absenden', () => {
   it('eine gescheiterte Anfrage: kein Sprung zur Übersicht', async () => {
     speicherweg.speichereProfil.mockRejectedValue(new TypeError('Failed to fetch'))
 
-    await sendeAb({ phone: '+43 660 2222222' })
+    await sendeAb({ phone: '+43 676 0000000' })
 
     expect(speicherweg.speichereProfil).toHaveBeenCalledTimes(1)
     expect(navigation.push).not.toHaveBeenCalled()
