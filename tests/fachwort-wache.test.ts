@@ -101,6 +101,12 @@ const KENNZEICHNUNG_ERLAUBT: Erlaubt[] = [
     grund: 'Rechtstext',
   },
   {
+    datei: 'src/lib/rechtstexte/agb.ts',
+    // Punkt 18.2 der AGB; der Satz geht danach mit dem Namen (MARKE) weiter, der JSX-Text bzw. die Vorlage endet dort.
+    text: /^Du bist für Registrierung und Kennzeichnung nach dem Futtermittelrecht verantwortlich/,
+    grund: 'Rechtstext, wörtlich aus docs/recht/agb.md (Register O4)',
+  },
+  {
     datei: 'src/lib/laender.ts',
     text: 'Vor der Freischaltung klären: Stripe-Konto in DE, steuerliche Behandlung, Kennzeichnungspflichten.',
     grund: 'Klär-Erinnerung nur im Admin, kein Hofbereich',

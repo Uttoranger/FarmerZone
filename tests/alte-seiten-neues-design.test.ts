@@ -57,6 +57,7 @@ describe('Shell je Seite (Nr. 54)', () => {
     ['src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx', 2],
     ['src/app/(public)/impressum/page.tsx', 1],
     ['src/app/(public)/konditionen/page.tsx', 1],
+    ['src/app/(public)/agb/page.tsx', 1],
     ['src/app/(public)/problem-melden/page.tsx', 1],
     ['src/app/not-found.tsx', 1],
     ['src/app/(public)/[farmSlug]/not-found.tsx', 1],

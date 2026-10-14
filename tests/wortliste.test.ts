@@ -12,6 +12,8 @@
  *    Attribut oder einem JSX-Text unter src/ — mit Wortgrenzen und in der
  *    Schreibweise der Tabelle. Kommentare, Bezeichner und Server-Logs (console.*)
  *    zählen nicht.
+ *  - Ein Rechtstext, den kein Lauf umschreibt (AGB, Register O4), steht als ganze Datei in
+ *    AUSNAHME_DATEIEN, mit Grund; hat die Datei kein Wort der Liste mehr, fällt die Ausnahme auf.
  *  - Steht ein Wort in anderem Sinn richtig da (der Status einer Bestellung), steht
  *    der Text mit Grund in AUSNAHMEN — je Text, nicht je Datei, ohne Zeilennummer.
  *  - OFFEN_BIS_86 war die Arbeitsliste für Nr. 86 (die Fundstellen der neuen „nicht"-Wörter
@@ -130,6 +132,21 @@ function findeVerbotene(quelltext: string, verbote: Verbot[], datei = 'schnipsel
 }
 
 // ── Ausnahmen und Arbeitsliste ───────────────────────────────────────────────
+
+/**
+ * Ganze Dateien, deren Wortlaut kein Lauf ändert: Rechtstexte, die die Projektleitung nach
+ * anwaltlicher Prüfung freigibt (Register O4). Eine Ausnahme je Datei statt je Text — ein
+ * Absatz mehr in der Quelle soll nicht an dieser Wache scheitern; jeder Text außerhalb der
+ * Datei wird weiter geprüft. Hierher gehört nur wörtlicher Rechtstext, nie ein Bedienwort der
+ * Seite (Knopf, Überschrift): AGB_SEITE_TEXT steht darum in agb-einbindung.ts, unter der Wache.
+ */
+type AusnahmeDatei = { datei: string; grund: string }
+const AUSNAHME_DATEIEN: AusnahmeDatei[] = [
+  { datei: 'src/lib/rechtstexte/agb.ts', grund: 'Rechtstext, wörtlich aus docs/recht/agb.md, Register O4' },
+]
+
+/** Die Funde ohne die der Ausnahmedateien. */
+const ohneDateien = (funde: Fund[], dateien: AusnahmeDatei[]): Fund[] => funde.filter((f) => !dateien.some((d) => d.datei === f.datei))
 
 /**
  * Wo ein verbotenes Wort in anderem Sinn richtig ist — dauerhaft, je Text mit Grund.
@@ -326,6 +343,12 @@ describe('Wortliste', () => {
       expect(gleicheAb([], liste).ungenutzt).toHaveLength(1)
     })
 
+    it('Gegenprobe: eine Ausnahmedatei nimmt nur ihre eigenen Funde aus, nie die einer anderen Datei', () => {
+      const fund = (datei: string): Fund => ({ datei, zeile: 1, wort: 'Mitteilung', text: 'Mitteilung' })
+      const rest = ohneDateien([fund('src/lib/rechtstexte/a.ts'), fund('src/lib/b.ts')], [{ datei: 'src/lib/rechtstexte/a.ts', grund: 'Probe der Ausnahme' }])
+      expect(rest.map((f) => f.datei)).toEqual(['src/lib/b.ts'])
+    })
+
     it('Gegenprobe: ein kurzer Text nimmt einem längeren, der ihn enthält, den Platz nicht weg — gleich in welcher Reihenfolge', () => {
       const kurz = { datei: 'src/f.ts', wort: 'Bestand', text: 'Bestand (' }
       const lang = { datei: 'src/f.ts', wort: 'Bestand', text: 'Bestand (Pakete)' }
@@ -351,7 +374,7 @@ describe('Wortliste', () => {
       )
     }, 30_000)
 
-    const ohneAusnahmen = (): Fund[] => funde.filter((f) => !AUSNAHMEN.some((a) => deckt(a, f)))
+    const ohneAusnahmen = (): Fund[] => ohneDateien(funde, AUSNAHME_DATEIEN).filter((f) => !AUSNAHMEN.some((a) => deckt(a, f)))
 
     it('kein Wort der Spalte „nicht" steht in einem Text — außer Ausnahmen und OFFEN_BIS_86', () => {
       const statt = new Map(VERBOTE.map((v) => [v.wort, v.statt.join(' / ')]))
@@ -366,6 +389,9 @@ describe('Wortliste', () => {
       expect(ERLAUBTE_WENDUNGEN.filter((w) => w.grund.trim().length < 5)).toEqual([])
       const ungenutzt = AUSNAHMEN.filter((a) => !funde.some((f) => deckt(a, f)))
       expect(ungenutzt.map((a) => `${a.datei} „${a.wort}“: ${a.grund}`)).toEqual([])
+      // Eine Ausnahmedatei hat einen Grund und trägt noch ein Wort der Liste — sonst gehört sie aus der Liste.
+      expect(AUSNAHME_DATEIEN.filter((d) => d.grund.trim().length < 10).map((d) => d.datei)).toEqual([])
+      expect(AUSNAHME_DATEIEN.filter((d) => !funde.some((f) => f.datei === d.datei)).map((d) => d.datei)).toEqual([])
     })
 
     it('OFFEN_BIS_86: jeder Eintrag hat einen Text und steht noch so da — Erledigtes gehört gestrichen', () => {

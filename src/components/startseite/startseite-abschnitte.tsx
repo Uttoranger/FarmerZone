@@ -20,6 +20,7 @@ import { Wortmarke } from '@/components/shared/wortmarke'
 import { Kicker } from '@/components/startseite/kicker'
 import { MARKE } from '@/lib/marke'
 import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
+import { AGB_LINK_TEXT, AGB_PFAD } from '@/lib/rechtstexte/agb-einbindung'
 
 /*
  * Die Abschnitte der Startseite unter „Höfe in deiner Nähe", in der Reihenfolge
@@ -360,6 +361,8 @@ const FUSS_SPALTEN = [
   {
     titel: 'Rechtliches',
     links: [
+      // Die AGB vor dem Impressum (Register O4): jede Fußzeile führt sie.
+      { href: AGB_PFAD, text: AGB_LINK_TEXT },
       { href: '/impressum', text: 'Impressum' },
       { href: '/datenschutz', text: 'Datenschutz' },
     ],
