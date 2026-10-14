@@ -34,9 +34,10 @@ import { BEZEICHNER, fehlerKlasse, istNetzfehler } from '@/lib/upload-diagnose'
  *
  * STANDORT NUR UNGEFÄHR (Nr. 84): Ein Browser ohne GPS ortet über die
  * IP-Adresse und liegt 10 bis 50 km daneben — `coords.accuracy` sagt es. Ab
- * 2 000 m wird der Standort nicht stumm übernommen: Die Kundin entscheidet
- * („Genauer bestimmen" oder „So lassen"). Das Gerät behält die Position auch
- * dann; es geht nichts hinaus.
+ * 2 000 m gilt der Punkt trotzdem sofort (die Liste zeigt Höfe im Umkreis,
+ * Mockup Zustand 3), und der Hinweis sagt es dazu: „Genauer bestimmen" holt
+ * einen genauen Wert, „So lassen" schließt den Hinweis. Das Gerät behält die
+ * Position auch dann; es geht nichts hinaus.
  */
 
 /**
@@ -53,8 +54,8 @@ const STANDORT_GEDULD_MS = 10_000
 const STANDORT_GENAU_GEDULD_MS = 14_000
 
 /**
- * Ein Standort, der nur ungefähr stimmt und noch NICHT übernommen ist: Die
- * Kundin entscheidet, ob sie ihn so lässt oder genauer bestimmen lässt.
+ * Ein Standort, der schon gilt, aber nur ungefähr stimmt: Die Kundin
+ * entscheidet, ob sie ihn so lässt oder genauer bestimmen lässt.
  */
 export type UngefaehrerStandort = {
   punkt: Bezugspunkt
@@ -69,7 +70,7 @@ export type Ortssuche = {
   hinweis: string | null
   /** Mehrdeutige Orte zur Auswahl — leer, sobald einer gewählt ist. */
   kandidaten: OrtsTreffer[]
-  /** Ein nur ungefähr bekannter Standort wartet auf die Entscheidung der Kundin. */
+  /** Ein nur ungefähr bekannter Standort gilt schon; der Hinweis bietet „Genauer bestimmen" und „So lassen" an. */
   ungefaehr: UngefaehrerStandort | null
   /** Die Standortabfrage läuft. */
   ortet: boolean
@@ -78,7 +79,7 @@ export type Ortssuche = {
   standortErfragen: () => void
   /** Zweiter Anlauf mit hoher Genauigkeit (GPS), höchstens 12 s. */
   genauerBestimmen: () => void
-  /** Den ungefähren Standort so übernehmen. */
+  /** Den Hinweis schließen — der ungefähre Standort gilt schon. */
   soLassen: () => void
   ortSuchen: (text: string) => void
   uebernimm: (treffer: OrtsTreffer) => void
@@ -207,9 +208,9 @@ export function useOrtssuche({
         // Ohne Namen: Die Sätze nennen ihn „deinen Standort" (SUCHFELD_TEXT).
         const punkt = { lat: position.coords.latitude, lon: position.coords.longitude }
         if (standortIstUngenau(position.coords.accuracy)) {
-          // Meist die IP-Adresse statt GPS: nicht stumm als Ort übernehmen.
+          // Meist die IP-Adresse statt GPS: Der ungefähre Punkt gilt trotzdem sofort — die Liste zeigt Höfe im Umkreis
+          // (Mockup Zustand 3) —, und der Hinweis sagt es dazu und bietet „Genauer bestimmen" und „So lassen" an.
           setUngefaehr({ punkt, satz: standortUngefaehrText(position.coords.accuracy), genauerMisslang: false })
-          return
         }
         onStandort(punkt)
       },
@@ -232,7 +233,7 @@ export function useOrtssuche({
     const veraltet = () => laufNr.current !== meinLauf
     verwerfeWaechter()
 
-    // Misslingt der zweite Anlauf (Fehler, Zeit oder wieder nur grob), bleibt der erste Wert zur Wahl: Der Hinweis steht wieder da.
+    // Misslingt der zweite Anlauf (Fehler, Zeit oder wieder nur grob), gilt der erste Wert weiter: Der Hinweis steht wieder da.
     const misslungen = () => {
       verwerfeWaechter()
       setOrtet(false)
@@ -264,13 +265,12 @@ export function useOrtssuche({
 
   function soLassen() {
     if (!ungefaehr) return
-    const { punkt } = ungefaehr
+    // Der ungefähre Punkt gilt schon seit seiner Ankunft — „So lassen" schließt nur den Hinweis.
     // Eine laufende Nachfrage gilt nicht mehr.
     laufNr.current += 1
     verwerfeWaechter()
     setOrtet(false)
     setUngefaehr(null)
-    onStandort(punkt)
   }
 
   function uebernimm(treffer: OrtsTreffer) {
@@ -293,6 +293,10 @@ export function useOrtssuche({
       treffer = []
     }
     if (laufNr.current !== meinLauf) return
+    // Die Seite ist weg (Tipp auf einen Hof, während die Ortssuche noch lief): Eine Antwort danach darf weder Hinweis noch
+    // Auswahl setzen — und vor allem nicht über uebernimm → onOrt → onSuchtext('') → setzeFilter → schreibeUrl die Adresse
+    // der inzwischen angezeigten Seite umschreiben (Neuladen oder Teilen landete sonst auf /hoefe).
+    if (!montiert.current) return
     if (treffer.length === 0) {
       // Kein Treffer: ruhiger Hinweis, der Text bleibt eine Suche nach Höfen und Produkten.
       setHinweis(SUCHFELD_TEXT.keinOrt)
@@ -338,8 +342,9 @@ export function useOrtssuche({
       await loeseAuf(ankunftsText.trim(), meinLauf)
       // Die Antwort kann kommen, nachdem die Kundin /hoefe verlassen hat (Tipp auf einen Hof, während die Ortssuche noch läuft). Dann
       // gehört die Adresse einer anderen Seite, und der Vermerk schriebe sie mit dem Pfad von /hoefe um: Neuladen oder Teilen landete
-      // auf /hoefe. Auch ein nur neu aufgebautes Feld (Karte ↔ Liste) vermerkt dann nichts; ein späteres Neuladen löst den Text noch
-      // einmal auf — eine Anfrage mehr, sonst nichts.
+      // auf /hoefe. Ein nur neu aufgebautes Feld (Karte ↔ Liste, während die Antwort unterwegs ist) kann der Hook davon nicht
+      // unterscheiden: Dann verwirft loeseAuf die Antwort ganz (kein Ort, kein Satz, keine Auswahl), und das neue Feld kennt den
+      // Ankunftstext nicht mehr (onAnkunftErledigt) — die Kundin sendet neu ab; ein späteres Neuladen löst den Text noch einmal auf.
       if (montiert.current) onAnkunftAufgeloest?.()
     })
   })

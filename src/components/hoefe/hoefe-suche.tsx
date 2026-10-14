@@ -40,8 +40,8 @@ import { useOrtssuche } from '@/components/hoefe/use-ortssuche'
  * Übernommene Produkt-Vorschläge werden Such-Marken („Aktive Filter"). Ein
  * gefundener Ort wird der Bezugspunkt; der Text verlässt dann das Feld, denn
  * er war kein Produkt. Ortssuche und Standort: useOrtssuche. Ist der Standort
- * nur ungefähr bekannt (über 2 000 m), steht statt der Übernahme der Hinweis
- * mit „Genauer bestimmen" und „So lassen" (StandortUngefaehr).
+ * nur ungefähr bekannt (über 2 000 m), gilt er trotzdem, und dazu steht der
+ * Hinweis mit „Genauer bestimmen" und „So lassen" (StandortUngefaehr).
  *
  * KOMPAKT (Kartenmodus am Handy, Nr. 52): nur das Feld, 44 px hoch, damit
  * Suche, Filter und Liste in EINE Zeile über der Karte passen. „Standort
@@ -250,7 +250,10 @@ export function HoefeSuche({
           </p>
         </form>
 
-        {!bezugspunkt && !kompakt && (
+        {/* Solange der Hinweis „Standort nur ungefähr" offen ist, bleibt der Knopf stehen und die grüne Karte wartet (Mockup
+            system-k1-ortssuche-zustaende, Zustand 3): Der ungefähre Punkt gilt zwar schon — die Liste zeigt Höfe im Umkreis —,
+            aber die Entscheidung „Genauer bestimmen"/„So lassen" steht noch an. Die Karte kommt, sobald der Hinweis zu ist. */}
+        {(!bezugspunkt || ort.ungefaehr) && !kompakt && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {/* BEWUSST NICHT `disabled` während der Abfrage: Ein deaktivierter
                 Knopf verliert den Tastatur-Fokus an den Seitenanfang. Der
@@ -283,7 +286,7 @@ export function HoefeSuche({
         />
       )}
 
-      {bezugspunkt && !kompakt && (
+      {bezugspunkt && !ort.ungefaehr && !kompakt && (
         <Hinweiskarte
           symbol={MapPin}
           aktion={

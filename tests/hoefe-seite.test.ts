@@ -27,6 +27,20 @@ vi.mock('next/link', () => ({
     return createElement('a', { href, ...attribute }, children)
   },
 }))
+// Die Ortssuche (useOrtssuche) läuft echt. Ein Test darf ihr einen festen Stand unterschieben — den Hinweis „Standort nur
+// ungefähr" gibt es erst nach der Antwort der Browser-Ortung, und die gibt es ohne DOM nicht. Der echte Hook läuft trotzdem
+// immer (gleiche Hook-Reihenfolge); nur sein Ergebnis wird ersetzt, solange `ersatz` gesetzt ist.
+const ortssuche = vi.hoisted(() => ({ ersatz: null as (() => unknown) | null }))
+vi.mock('@/components/hoefe/use-ortssuche', async (importOriginal) => {
+  const echt = await importOriginal<typeof import('@/components/hoefe/use-ortssuche')>()
+  return {
+    ...echt,
+    useOrtssuche(argumente: Parameters<typeof echt.useOrtssuche>[0]) {
+      const ergebnis = echt.useOrtssuche(argumente)
+      return ortssuche.ersatz ? (ortssuche.ersatz() as typeof ergebnis) : ergebnis
+    },
+  }
+})
 
 import {
   AktiveFilterZeile,
@@ -40,6 +54,7 @@ import {
   type TrefferHof,
 } from '@/components/hoefe/entdecken-teile'
 import { HoefeSuche, StandortUngefaehr } from '@/components/hoefe/hoefe-suche'
+import type { Ortssuche } from '@/components/hoefe/use-ortssuche'
 import { EntdeckenFilterblatt } from '@/components/hoefe/entdecken-filterblatt'
 import { SUCHFELD_TEXT, kategorieReihe, leerzustand, standortUngefaehrText } from '@/lib/hoefe-entdecken'
 import { grundpreisAusKennzeichnung, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
@@ -399,6 +414,48 @@ describe('Ein Suchfeld „Ort oder Produkt" plus „Standort nutzen" (Nr. 46)', 
       createElement(StandortUngefaehr, { satz: 'Satz.', genauerMisslang: false, ortet: true, onGenauer: () => {}, onSoLassen: () => {} })
     )
     expect(laeuft).toContain('aria-busy="true"')
+  })
+
+  it('Standort nur ungefähr mit Bezugspunkt (Zustand 3, Mockup): der Knopf „Standort nutzen" bleibt, die grüne Karte mit „Ort ändern" kommt erst, wenn der Hinweis zu ist', () => {
+    // Seit dem Abschluss von Nr. 84 gilt der ungefähre Punkt sofort (die Liste zeigt Höfe im Umkreis) — der Bezugspunkt steht
+    // also schon, während der Hinweis noch offen ist. Das Mockup (system-k1-ortssuche-zustaende, Zustand 3) zeigt dann Feld,
+    // Knopf und den orangen Satz; die grüne Karte „Wir zeigen Höfe rund um …" gehört zum geschlossenen Hinweis.
+    const RUHE: Ortssuche = {
+      hinweis: null,
+      kandidaten: [],
+      ungefaehr: null,
+      ortet: false,
+      laeuft: false,
+      standortErfragen() {},
+      genauerBestimmen() {},
+      soLassen() {},
+      ortSuchen() {},
+      uebernimm() {},
+      keinerDavon() {},
+      textGeaendert() {},
+      aufheben() {},
+    }
+    const punkt = { lat: 48.1, lon: 13.15 }
+    const karten = (t: string) => (t.match(/data-slot="hinweiskarte"/g) ?? []).length
+    try {
+      ortssuche.ersatz = () => ({ ...RUHE, ungefaehr: { punkt, satz: standortUngefaehrText(15_000), genauerMisslang: false } })
+      const offen = html(createElement(HoefeSuche, { ...SUCHE, bezugspunkt: punkt }))
+      expect(offen).toContain('Dein Standort ist nur ungefähr bekannt (etwa 15 km).')
+      expect(offen).toMatch(/<button type="button"[^>]*>.*Standort nutzen<\/button>/)
+      expect(offen).not.toContain(SUCHFELD_TEXT.ortAendern)
+      // Genau eine Hinweiskarte: die orange — nicht dazu die grüne.
+      expect(karten(offen)).toBe(1)
+
+      // Gegenprobe: Hinweis zu („So lassen" oder ein genauer Wert) — die grüne Karte mit „Ort ändern" statt des Knopfs.
+      ortssuche.ersatz = () => RUHE
+      const zu = html(createElement(HoefeSuche, { ...SUCHE, bezugspunkt: punkt }))
+      expect(zu).toContain(SUCHFELD_TEXT.ortAendern)
+      expect(zu).not.toContain('Standort nutzen')
+      expect(zu).not.toContain('nur ungefähr bekannt')
+      expect(karten(zu)).toBe(1)
+    } finally {
+      ortssuche.ersatz = null
+    }
   })
 
   it('der Hinweis hängt am Hook: Er steht, solange ort.ungefaehr gesetzt ist, und seine Knöpfe rufen genauerBestimmen und soLassen', () => {

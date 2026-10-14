@@ -16,6 +16,7 @@
  * Position an den Server ginge (afterEach des Standort-Blocks, für jeden Fall).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 
 const pruefstand = vi.hoisted(() => {
   type Setzer<T> = (wert: T | ((vorher: T) => T)) => void
@@ -27,11 +28,17 @@ const pruefstand = vi.hoisted(() => {
   let schmutzig = false
   let geplant = false
   let abgebaut = false
+  // Zustandsänderungen nach dem Abbau: Was eine späte Antwort noch setzen wollte.
+  let spaet = 0
   let komponente: () => unknown = () => null
 
   function geaendert(): void {
-    // Wie React: Ein abgebauter Baum rendert nicht mehr, auch wenn eine späte Antwort noch Zustand setzt.
-    if (abgebaut) return
+    // Wie React: Ein abgebauter Baum rendert nicht mehr, auch wenn eine späte Antwort noch Zustand setzt — React verwirft das
+    // stumm; der Prüfstand zählt es, damit ein Test verlangen kann, dass der Hook es gar nicht erst versucht.
+    if (abgebaut) {
+      spaet += 1
+      return
+    }
     schmutzig = true
     if (rendernd || geplant) return
     // Wie React: Eine Änderung von außen rendert danach, nicht mitten im Aufruf.
@@ -75,6 +82,7 @@ const pruefstand = vi.hoisted(() => {
       zellen = []
       geplant = false
       abgebaut = false
+      spaet = 0
       komponente = neu
       rendere()
     },
@@ -92,6 +100,10 @@ const pruefstand = vi.hoisted(() => {
     /** Rendert neu, ohne dass sich etwas geändert hat — wie ein Elternteil, der neu rendert. */
     erneut(): void {
       rendere()
+    },
+    /** Wie oft nach dem Abbau noch Zustand gesetzt wurde (0 = die späte Antwort hat nichts mehr angefasst). */
+    spaeteAenderungen(): number {
+      return spaet
     },
     useState<T>(anfang: T | (() => T)): [T, Setzer<T>] {
       const i = zeiger++
@@ -232,13 +244,14 @@ describe('Standort — die Genauigkeit entscheidet, ob er ohne Rückfrage gilt',
     expect(hook.ortet).toBe(false)
   })
 
-  it('über 2 000 m: nichts wird übernommen, der Hinweis mit der Genauigkeit steht (Zustand 3)', async () => {
+  it('über 2 000 m: der ungefähre Punkt gilt sofort — die Liste zeigt Höfe im Umkreis — und der Hinweis mit der Genauigkeit steht dazu (Zustand 3)', async () => {
     starte()
     hook.standortErfragen()
     ortung(0)[0](position(15_000))
     await zuRuhe()
 
-    expect(beiStandort).not.toHaveBeenCalled()
+    // Mockup Zustand 3: „wir zeigen Höfe im Umkreis" — nicht erst nach „So lassen".
+    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.1, lon: 13.15 })
     expect(hook.ungefaehr?.satz).toBe('Dein Standort ist nur ungefähr bekannt (etwa 15 km).')
     expect(hook.ungefaehr?.genauerMisslang).toBe(false)
     expect(hook.ortet).toBe(false)
@@ -259,12 +272,15 @@ describe('Standort — die Genauigkeit entscheidet, ob er ohne Rückfrage gilt',
     ortung(1)[0](position(25, 48.1067, 13.15))
     await zuRuhe()
 
-    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.1067, lon: 13.15 })
+    // Erst der ungefähre Punkt, dann der genaue — zwei Aufrufe, der letzte zählt in der Liste.
+    expect(beiStandort).toHaveBeenCalledTimes(2)
+    expect(beiStandort).toHaveBeenNthCalledWith(1, { lat: 48.0, lon: 13.0 })
+    expect(beiStandort).toHaveBeenNthCalledWith(2, { lat: 48.1067, lon: 13.15 })
     expect(hook.ungefaehr).toBeNull()
     expect(hook.ortet).toBe(false)
   })
 
-  it('„Genauer bestimmen" klappt nicht: der Hinweis bleibt und sagt es dazu — „So lassen" übernimmt dann den ersten Wert', async () => {
+  it('„Genauer bestimmen" klappt nicht: der Hinweis bleibt und sagt es dazu — der ungefähre Punkt gilt weiter, „So lassen" schließt nur den Hinweis', async () => {
     starte()
     hook.standortErfragen()
     ortung(0)[0](position(15_000, 48.0, 13.0))
@@ -275,17 +291,17 @@ describe('Standort — die Genauigkeit entscheidet, ob er ohne Rückfrage gilt',
     ortung(1)[1]({ code: 3, message: 'Timeout expired' })
     await zuRuhe()
 
-    expect(beiStandort).not.toHaveBeenCalled()
+    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.0, lon: 13.0 })
     expect(hook.ungefaehr?.genauerMisslang).toBe(true)
     expect(hook.ortet).toBe(false)
 
     hook.soLassen()
     await zuRuhe()
-    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.0, lon: 13.0 })
+    expect(beiStandort).toHaveBeenCalledTimes(1)
     expect(hook.ungefaehr).toBeNull()
   })
 
-  it('„Genauer bestimmen" liefert wieder nur einen groben Wert (Rechner ohne GPS): der Hinweis bleibt, nichts wird übernommen', async () => {
+  it('„Genauer bestimmen" liefert wieder nur einen groben Wert (Rechner ohne GPS): der Hinweis bleibt, der erste Punkt gilt weiter', async () => {
     starte()
     hook.standortErfragen()
     ortung(0)[0](position(15_000, 48.0, 13.0))
@@ -293,11 +309,11 @@ describe('Standort — die Genauigkeit entscheidet, ob er ohne Rückfrage gilt',
     hook.genauerBestimmen()
     await zuRuhe()
 
-    // Die IP-Ortung antwortet noch einmal, nur etwas anders gerundet.
+    // Die IP-Ortung antwortet noch einmal, nur etwas anders gerundet — kein zweiter Wechsel der Liste.
     ortung(1)[0](position(2_001, 48.2, 13.2))
     await zuRuhe()
 
-    expect(beiStandort).not.toHaveBeenCalled()
+    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.0, lon: 13.0 })
     expect(hook.ungefaehr?.genauerMisslang).toBe(true)
     expect(hook.ungefaehr?.punkt).toEqual({ lat: 48.0, lon: 13.0 })
     expect(hook.ortet).toBe(false)
@@ -307,7 +323,8 @@ describe('Standort — die Genauigkeit entscheidet, ob er ohne Rückfrage gilt',
     await zuRuhe()
     ortung(2)[0](position(2_000, 48.1067, 13.15))
     await zuRuhe()
-    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.1067, lon: 13.15 })
+    expect(beiStandort).toHaveBeenCalledTimes(2)
+    expect(beiStandort).toHaveBeenLastCalledWith({ lat: 48.1067, lon: 13.15 })
     expect(hook.ungefaehr).toBeNull()
   })
 
@@ -328,24 +345,27 @@ describe('Standort — die Genauigkeit entscheidet, ob er ohne Rückfrage gilt',
     await zuRuhe()
     expect(hook.ortet).toBe(false)
     expect(hook.ungefaehr?.genauerMisslang).toBe(true)
-    expect(beiStandort).not.toHaveBeenCalled()
+    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.0, lon: 13.0 })
 
     hook.soLassen()
     await zuRuhe()
-    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.0, lon: 13.0 })
+    expect(beiStandort).toHaveBeenCalledTimes(1)
+    expect(hook.ungefaehr).toBeNull()
   })
 
-  it('„So lassen" übernimmt den ungefähren Standort — auch mitten in der Nachfrage, deren späte Antwort dann nicht mehr zählt', async () => {
+  it('„So lassen" schließt den Hinweis — der ungefähre Punkt gilt schon — auch mitten in der Nachfrage, deren späte Antwort dann nicht mehr zählt', async () => {
     starte()
     hook.standortErfragen()
     ortung(0)[0](position(15_000, 48.0, 13.0))
     await zuRuhe()
+    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.0, lon: 13.0 })
     hook.genauerBestimmen()
     await zuRuhe()
 
     hook.soLassen()
     await zuRuhe()
-    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.0, lon: 13.0 })
+    expect(beiStandort).toHaveBeenCalledTimes(1)
+    expect(hook.ungefaehr).toBeNull()
     expect(hook.ortet).toBe(false)
 
     ortung(1)[0](position(10, 47.0, 12.0))
@@ -646,6 +666,8 @@ describe('Ankunft mit Suchtext — die Kundin hat abgesendet (Startseite, Kopfze
     antworten[0]([])
     await zuRuhe()
     expect(beiAnkunftAufgeloest).not.toHaveBeenCalled()
+    // Auch der Satz „Keinen Ort gefunden" wird nicht mehr gesetzt (Wächter in loeseAuf).
+    expect(pruefstand.spaeteAenderungen()).toBe(0)
 
     // Gegenprobe: derselbe Ablauf ohne Abbau — der Vermerk kommt, genau einmal.
     starte('Ried')
@@ -653,6 +675,69 @@ describe('Ankunft mit Suchtext — die Kundin hat abgesendet (Startseite, Kopfze
     antworten[1]([])
     await zuRuhe()
     expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
+  })
+
+  it('Abbau vor der Antwort mit genau einem Treffer: kein Ort, kein Vermerk — sonst schriebe die späte Antwort über onOrt → onSuchtext → schreibeUrl die Adresse der Hofseite um (Gegenprobe: ohne Abbau genau einmal)', async () => {
+    const MATTIGHOFEN = { lat: 48.1067, lon: 13.15, name: 'Mattighofen, Oberösterreich' }
+    const antworten: Array<(orte: unknown[]) => void> = []
+    loeseOrtAuf.mockImplementation(() => new Promise((weiter) => antworten.push(weiter)))
+    starte('5230 Mattighofen')
+    await zuRuhe()
+    expect(loeseOrtAuf).toHaveBeenCalledTimes(1)
+
+    pruefstand.baueAb()
+    antworten[0]([MATTIGHOFEN])
+    await zuRuhe()
+    expect(beiOrt).not.toHaveBeenCalled()
+    expect(beiAnkunftAufgeloest).not.toHaveBeenCalled()
+    expect(pruefstand.spaeteAenderungen()).toBe(0)
+
+    // Gegenprobe: derselbe Ablauf ohne Abbau — der Ort kommt genau einmal, der Vermerk auch.
+    starte('5230 Mattighofen')
+    await zuRuhe()
+    antworten[1]([MATTIGHOFEN])
+    await zuRuhe()
+    expect(beiOrt).toHaveBeenCalledExactlyOnceWith(MATTIGHOFEN)
+    expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
+  })
+
+  it('Abbau vor der Antwort mit mehreren Treffern: keine Auswahl, kein Vermerk, kein Sprung zum Feld (Gegenprobe: ohne Abbau steht die Auswahl)', async () => {
+    const RIED = [
+      { lat: 48.21, lon: 13.49, name: 'Ried im Innkreis, Oberösterreich' },
+      { lat: 47.99, lon: 14.04, name: 'Ried im Traunkreis, Oberösterreich' },
+    ]
+    const antworten: Array<(orte: unknown[]) => void> = []
+    loeseOrtAuf.mockImplementation(() => new Promise((weiter) => antworten.push(weiter)))
+    starte('Ried')
+    await zuRuhe()
+
+    pruefstand.baueAb()
+    antworten[0](RIED)
+    await zuRuhe()
+    expect(beiOrt).not.toHaveBeenCalled()
+    expect(beiZumFeld).not.toHaveBeenCalled()
+    expect(beiAnkunftAufgeloest).not.toHaveBeenCalled()
+    // Keine Auswahl nach dem Abbau: Die späte Antwort setzt nichts mehr — ohne den Wächter in loeseAuf wären es Satz und Auswahl
+    // (React verwirft beides stumm, von außen ist es sonst unsichtbar).
+    expect(pruefstand.spaeteAenderungen()).toBe(0)
+
+    // Gegenprobe: ohne Abbau steht die Auswahl mit beiden Orten.
+    starte('Ried')
+    await zuRuhe()
+    antworten[1](RIED)
+    await zuRuhe()
+    expect(hook.kandidaten).toEqual(RIED)
+    expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
+
+    // Gegenprobe zum Zähler: Eine Änderung nach dem Abbau zählt er.
+    let setzeSpaet: (wert: number) => void = () => {}
+    pruefstand.starte(() => {
+      const [, setze] = useState(0)
+      setzeSpaet = setze
+    })
+    pruefstand.baueAb()
+    setzeSpaet(1)
+    expect(pruefstand.spaeteAenderungen()).toBe(1)
   })
 
   it('im Entwicklungsmodus (React baut jeden Effekt einmal ab und gleich wieder auf) zählt die Seite weiter als eingebaut — der Vermerk kommt, der Text geht einmal hinaus', async () => {
