@@ -3,7 +3,9 @@
  * zeigen (Open Graph). Rein und ohne Datenbank prüfbar (tests/vorschaubild.test.ts).
  *
  * Die Startseite hat ein eigenes Bild (public/og/startseite.jpg, 1200 × 630 —
- * das Standardformat der großen Vorschau). Eine Hofseite zeigt seit Nr. 21
+ * das Standardformat der großen Vorschau). Es ist fertig geliefert (Register
+ * M1, Nr. 92): Der Text ist Teil des Bildes — ändert sich der Satz, liefert
+ * die Projektleitung ein neues Bild, kein Code. Eine Hofseite zeigt seit Nr. 21
  * ihr Teilen-Bild (Gate 7: „Dasselbe Bild ist Open-Graph-Vorschau der
  * Hofseite"): Hofname, was es diese Woche gibt, nächste Abholung — erzeugt
  * von der Route `/[farmSlug]/opengraph-image` (src/lib/teilen-bild.ts).

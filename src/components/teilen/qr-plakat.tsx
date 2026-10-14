@@ -1,4 +1,5 @@
 import { qrPfad } from '@/lib/qr-code'
+import { Bildmarke } from '@/components/shared/bildmarke'
 import type { PlakatDaten } from '@/server/queries/teilen-bild'
 
 /*
@@ -68,6 +69,9 @@ export function QrPlakat({ daten }: { daten: PlakatDaten }): React.JSX.Element {
             </p>
           )}
           <div className="flex-grow" />
+          {/* Die Bildmarke neben der Adresse — die volle Fassung als Bild, Rundung per CSS (Register M1, Nr. 92;
+              Mockup system-m1 „Marke – Entscheidung": das Plakat lädt die Marke, es zeichnet sie nicht). */}
+          <Bildmarke groesse={48} fassung="voll" className="size-[7cqw] self-center" />
           <p className="min-w-0 text-right break-words">
             <b>{daten.adresse}</b>
             {daten.bezahlen && (

@@ -4,6 +4,7 @@ import type { TeilenBildFormat } from '@/lib/teilen-kanal'
 import type { QrPfad } from '@/lib/qr-code'
 import type { GeladeneBilder } from '@/lib/teilen-bild-quellen'
 import { MARKE } from '@/lib/marke'
+import { MARKE_RUNDUNG_PROZENT } from '@/lib/marke-bild'
 
 /*
  * Das Teilen-Bild als Satori-Grafik (next/og; Register T6, Nr. 69; Mockups
@@ -24,6 +25,11 @@ import { MARKE } from '@/lib/marke'
  *    Titel, der voraussichtlich zwei Zeilen braucht, zwei (`zeilenMax`):
  *    Satori misst nicht vorab, und eine halbe Zeile am Rand sähe kaputt aus.
  *
+ * Die Bildmarke (Register M1, Nr. 92) ist ein Bild, keine Zeichnung: Die Route
+ * lädt die volle Fassung aus public/marke als data-URL (`ladeMarkeDataUrl`)
+ * und reicht sie als `marke` herein; Satori zeichnet sie als <img> mit 22 %
+ * Rundung — 50 px im 1:1, 59 px in der Story, beides über der Grenze von 48 px.
+ *
  * Satori kennt keine CSS-Variablen und keine Klassen — die Farben stehen
  * deshalb hier als Werte (Register T1), die Token-Werte aus
  * docs/ai/DESIGN_SYSTEM.md im HELLEN Theme wie im Mockup (ein Bild hat kein
@@ -33,9 +39,9 @@ import { MARKE } from '@/lib/marke'
  * --status-fertig (dunkel) für Zweittext auf dem dunklen Verlauf. Abgeleitet:
  * `streifen` (#F1EDE0 aus dem Mockup) ist --bg (hell) mit etwa einem Fünftel
  * --border (hell) — eine Stufe unter dem Grund, damit der Abhol-Streifen sich
- * ohne Rahmen abhebt; `markeKreis` ist --accent mit 16 % Deckkraft;
- * `cremeAufFoto`, `markeKreisFoto` und `linieFoto` sind --surface (hell) mit
- * 95, 16 und 24 % auf dem Foto; `schleier`/`schleierStory` und
+ * ohne Rahmen abhebt; `markeKreis` ist --accent mit 16 % Deckkraft (leerer
+ * Bildkreis); `cremeAufFoto` und `linieFoto` sind --surface (hell) mit 95
+ * und 24 % auf dem Foto; `schleier`/`schleierStory` und
  * `titelSchatten` sind --bg (dunkel) als Verlauf bzw. Schatten über dem Foto
  * (dichter als im Mockup: Auf hellen Fotos trügen Marke und Vorzeile sonst nicht). Grüne Schrift (Titel,
  * Preise, Marke) nimmt --accent statt des dunkleren Grüns im Mockup — dafür
@@ -60,14 +66,12 @@ export const TEILEN_BILD_FARBE = {
   linie: '#e2ddc9',
   // eslint-disable-next-line no-restricted-syntax -- Satori: abgeleitet (Kopfkommentar), Abhol-Streifen
   streifen: '#f1ede0',
-  // eslint-disable-next-line no-restricted-syntax -- Satori: --accent mit 16 % Deckkraft, Kreis der Marke und leerer Bildkreis
+  // eslint-disable-next-line no-restricted-syntax -- Satori: --accent mit 16 % Deckkraft, leerer Bildkreis
   markeKreis: 'rgba(46,107,69,0.16)',
   // eslint-disable-next-line no-restricted-syntax -- Satori: --status-fertig (dunkel), Zweittext auf dem dunklen Verlauf
   fotoLeise: '#9fd0af',
   // eslint-disable-next-line no-restricted-syntax -- Satori: --surface (hell) mit 95 % Deckkraft, Chips und QR-Streifen auf dem Foto
   cremeAufFoto: 'rgba(251,249,242,0.95)',
-  // eslint-disable-next-line no-restricted-syntax -- Satori: --surface (hell) mit 16 % Deckkraft, Kreis der Marke auf dem Foto
-  markeKreisFoto: 'rgba(251,249,242,0.16)',
   // eslint-disable-next-line no-restricted-syntax -- Satori: --surface (hell) mit 24 % Deckkraft, Trennlinie auf dem Foto
   linieFoto: 'rgba(251,249,242,0.24)',
   // eslint-disable-next-line no-restricted-syntax -- Satori: --bg (dunkel) als Verlauf im 1:1, oben für die Marke, unten dicht für die Schrift
@@ -101,8 +105,10 @@ function kleineZeile(groesse: number, farbe: string, abstand: number): CSSProper
   }
 }
 
-function Marke({ m, aufFoto }: { m: Mass; aufFoto: boolean }): React.JSX.Element {
+function Marke({ m, aufFoto, marke }: { m: Mass; aufFoto: boolean; marke: string }): React.JSX.Element {
   const farbe = aufFoto ? F.grund : F.gruen
+  // 22 im Mockup-Maß sind 50 px im 1:1 und 59 px in der Story — über der Grenze von 48 px, also die volle Fassung.
+  const kante = m(22)
   return (
     <div
       style={{
@@ -113,25 +119,18 @@ function Marke({ m, aufFoto }: { m: Mass; aufFoto: boolean }): React.JSX.Element
         fontSize: m(13, 14),
         fontWeight: 600,
         color: farbe,
-        // Auf einem hellen Foto (Himmel) trüge die helle Marke sonst nicht.
+        // Auf einem hellen Foto (Himmel) trüge die helle Schrift sonst nicht.
         ...(aufFoto ? { textShadow: F.titelSchatten } : {}),
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: m(21, 22),
-          height: m(21, 22),
-          borderRadius: m(21, 22),
-          backgroundColor: aufFoto ? F.markeKreisFoto : F.markeKreis,
-        }}
-      >
-        <svg width={m(10, 11)} height={m(12, 13)} viewBox="0 0 16 18">
-          <path d="M8 1C3 5 2 10 4 14c1 2 3 3 4 3s3-1 4-3c2-4 1-9-4-13Z" fill={farbe} />
-        </svg>
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element -- Satori (next/og) zeichnet nur <img>, next/image gibt es dort nicht */}
+      <img
+        src={marke}
+        alt=""
+        width={kante}
+        height={kante}
+        style={{ flexShrink: 0, width: kante, height: kante, borderRadius: Math.round((kante * MARKE_RUNDUNG_PROZENT) / 100) }}
+      />
       <div style={{ display: 'flex' }}>{MARKE}</div>
     </div>
   )
@@ -290,7 +289,21 @@ function QuadratFuss({ daten, m }: { daten: TeilenBildDaten; m: Mass }): React.J
 }
 
 /** Variante A „Marktkarte" — ohne Foto. */
-function MarktKarte({ daten, story, qr, bilder, m }: { daten: TeilenBildDaten; story: boolean; qr: QrPfad; bilder: GeladeneBilder; m: Mass }): React.JSX.Element {
+function MarktKarte({
+  daten,
+  story,
+  qr,
+  bilder,
+  marke,
+  m,
+}: {
+  daten: TeilenBildDaten
+  story: boolean
+  qr: QrPfad
+  bilder: GeladeneBilder
+  marke: string
+  m: Mass
+}): React.JSX.Element {
   const { beitrag } = daten
   const mitProdukten = daten.produkte.length > 0
   const vorzeile = beitrag ? `${beitrag.anlass} · ${daten.hofName}` : mitProdukten ? 'Frisch diese Woche' : 'Direkt vom Hof'
@@ -319,7 +332,7 @@ function MarktKarte({ daten, story, qr, bilder, m }: { daten: TeilenBildDaten; s
         }}
       />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, gap: m(10), marginTop: story ? m(0, 90) : 0 }}>
-        <Marke m={m} aufFoto={false} />
+        <Marke m={m} aufFoto={false} marke={marke} />
         <div style={{ display: 'block', lineClamp: 1, flexShrink: 1, minWidth: 0, fontSize: m(11.5), color: F.leise }}>
           {story ? BESTELLEN : beitrag ? daten.ort : ''}
         </div>
@@ -367,6 +380,7 @@ function FotoHeld({
   qr,
   bilder,
   held,
+  marke,
   m,
 }: {
   daten: TeilenBildDaten
@@ -374,6 +388,7 @@ function FotoHeld({
   qr: QrPfad
   bilder: GeladeneBilder
   held: string
+  marke: string
   m: Mass
 }): React.JSX.Element {
   const { beitrag } = daten
@@ -386,7 +401,7 @@ function FotoHeld({
       <img src={held} alt="" width={masse.width} height={masse.height} style={{ position: 'absolute', left: 0, top: 0, width: masse.width, height: masse.height, objectFit: 'cover' }} />
       <div style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, display: 'flex', backgroundImage: story ? F.schleierStory : F.schleier }} />
       <div style={{ position: 'absolute', left: m(24), top: m(22, 100), display: 'flex' }}>
-        <Marke m={m} aufFoto />
+        <Marke m={m} aufFoto marke={marke} />
       </div>
       <div style={{ position: 'absolute', left: m(26), right: m(26), bottom: m(26, 120), display: 'flex', flexDirection: 'column', gap: m(12, 14) }}>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -459,17 +474,20 @@ export function TeilenBildGrafik({
   format,
   qr,
   bilder,
+  marke,
 }: {
   daten: TeilenBildDaten
   format: TeilenBildFormat
   qr: QrPfad
   bilder: GeladeneBilder
+  /** Die Bildmarke (volle Fassung) als data-URL — `ladeMarkeDataUrl('voll')` in der Route. */
+  marke: string
 }): React.JSX.Element {
   const story = format === 'story'
   const m = massstab(story)
   return bilder.held ? (
-    <FotoHeld daten={daten} story={story} qr={qr} bilder={bilder} held={bilder.held} m={m} />
+    <FotoHeld daten={daten} story={story} qr={qr} bilder={bilder} held={bilder.held} marke={marke} m={m} />
   ) : (
-    <MarktKarte daten={daten} story={story} qr={qr} bilder={bilder} m={m} />
+    <MarktKarte daten={daten} story={story} qr={qr} bilder={bilder} marke={marke} m={m} />
   )
 }

@@ -27,7 +27,7 @@ export type KundenSeite =
 export type KopfForm = {
   /**
    * Handy: der Zurück-Knopf in der Leiste. Nur, wo „Zurück" woanders hinführt
-   * als das F-Icon daneben — auf der Hofübersicht ginge er zur Startseite:
+   * als die Bildmarke daneben — auf der Hofübersicht ginge er zur Startseite:
    * zwei Knöpfe mit demselben Ziel nebeneinander.
    */
   zurueck: boolean

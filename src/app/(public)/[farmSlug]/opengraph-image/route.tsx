@@ -8,6 +8,7 @@ import { heldKandidaten, ladeTeilenBildBilder, ladeTeilenBildSchriften, produktB
 import { teilenLink } from '@/lib/teilen-kanal'
 import { qrPfad } from '@/lib/qr-code'
 import { hofAdresse } from '@/lib/mein-hof'
+import { ladeMarkeDataUrl } from '@/lib/marke-bild'
 import { mitZeitlimit } from '@/lib/upload-zeitwaechter'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { APP_URL } from '@/lib/umgebung-server'
@@ -113,13 +114,18 @@ export async function GET(
 
   try {
     const masse = TEILEN_BILD_MASSE[format]
-    const [schriften, bilder] = await Promise.all([ladeTeilenBildSchriften(), ladeTeilenBildBilder({ eintraege, beitragFoto, held: masse })])
+    // Die Bildmarke kommt als Bild aus public/marke (Register M1, Nr. 92) — die Grafik zeichnet sie nicht.
+    const [schriften, bilder, marke] = await Promise.all([
+      ladeTeilenBildSchriften(),
+      ladeTeilenBildBilder({ eintraege, beitragFoto, held: masse }),
+      ladeMarkeDataUrl('voll'),
+    ])
     const qr = qrPfad(teilenLink(APP_URL, quelle.hof.slug, 'qr'))
     // Satori und resvg zeichnen erst beim Lesen des Bodys (der Konstruktor von
     // ImageResponse baut nur einen Stream). Deshalb hier ganz lesen: Scheitert
     // das Zeichnen, landet der Fehler in diesem catch — sonst ginge eine 200
     // mit kaputtem Body und langem Cache-Header hinaus.
-    const bild = new ImageResponse(<TeilenBildGrafik daten={daten} format={format} qr={qr} bilder={bilder} />, { ...masse, fonts: schriften })
+    const bild = new ImageResponse(<TeilenBildGrafik daten={daten} format={format} qr={qr} bilder={bilder} marke={marke} />, { ...masse, fonts: schriften })
     const inhalt = await bild.arrayBuffer()
     // Ausgeliefert wird ein JPEG (Register T7): Ein PNG mit Foto wiegt 1,2–1,4 MB,
     // und WhatsApp zeigt Link-Vorschauen über rund 300 KB oft nicht. Im selben

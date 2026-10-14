@@ -76,6 +76,8 @@ import { ladeTeilenVorschau } from '@/server/queries/teilen-bild'
 const findFirst = vi.mocked(prisma.farm.findFirst)
 const beitragLesen = vi.mocked(prisma.statusPost.findFirst)
 const OHNE_BILDER: GeladeneBilder = { produkte: {}, held: null, ersatz: false }
+/** Die Bildmarke, wie die Route sie hereinreicht (hier eine Attrappe statt der Datei). */
+const MARKE_BILD = 'data:image/svg+xml;base64,TUFSS0U='
 
 const HOF: TeilenBildHof = {
   name: 'Hof Test',
@@ -208,10 +210,12 @@ describe('Fremdtext im Bild', () => {
       adresse: 'agrilo.at/hof-test',
       jetzt: JETZT,
     })
-    const html = renderToStaticMarkup(createElement(TeilenBildGrafik, { daten, format: 'quadrat', qr: qrPfad('https://x.at/hof-test?k=qr'), bilder: OHNE_BILDER }))
+    const html = renderToStaticMarkup(createElement(TeilenBildGrafik, { daten, format: 'quadrat', qr: qrPfad('https://x.at/hof-test?k=qr'), bilder: OHNE_BILDER, marke: MARKE_BILD }))
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
     expect(html).not.toContain('<script')
-    expect(html).not.toContain('<img')
+    // Das einzige Bild ist die Bildmarke — der eingeschleuste <img> ist nur Text.
+    expect(html.match(/<img\b/g)).toHaveLength(1)
+    expect(html).toContain(`src="${MARKE_BILD}"`)
     expect(html).toContain('&quot;&gt;&lt;img')
   })
 
@@ -224,7 +228,7 @@ describe('Fremdtext im Bild', () => {
       adresse: 'agrilo.at/hof-test',
       jetzt: JETZT,
     })
-    const html = renderToStaticMarkup(createElement(TeilenBildGrafik, { daten, format: 'story', qr: qrPfad('https://x.at'), bilder: OHNE_BILDER }))
+    const html = renderToStaticMarkup(createElement(TeilenBildGrafik, { daten, format: 'story', qr: qrPfad('https://x.at'), bilder: OHNE_BILDER, marke: MARKE_BILD }))
     expect(html).toContain('line-clamp:2')
     expect(html).toContain('Direkt vom Hof')
   })
@@ -482,7 +486,7 @@ describe('Farben des Teilen-Bilds kommen aus den Tokens (Satori-Ausnahme, eine S
   it('die abgeleiteten Werte bauen auf den Tokens auf (Deckkraft über --accent, --surface und --bg)', () => {
     const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(',')
     expect(TEILEN_BILD_FARBE.markeKreis).toContain(`rgba(${rgb(token('accent', 'hell'))},`)
-    for (const wert of [TEILEN_BILD_FARBE.cremeAufFoto, TEILEN_BILD_FARBE.markeKreisFoto, TEILEN_BILD_FARBE.linieFoto]) {
+    for (const wert of [TEILEN_BILD_FARBE.cremeAufFoto, TEILEN_BILD_FARBE.linieFoto]) {
       expect(wert).toContain(`rgba(${rgb(token('surface', 'hell'))},`)
     }
     for (const verlauf of [TEILEN_BILD_FARBE.schleier, TEILEN_BILD_FARBE.schleierStory, TEILEN_BILD_FARBE.titelSchatten]) {
@@ -576,7 +580,7 @@ describe('Grafik: QR nur in der Story, Foto-Held mit Foto (Register T6)', () => 
   const qr = qrPfad('https://agrilo.at/hof-test?k=qr')
   const MIT_FOTO: GeladeneBilder = { produkte: { eier: 'data:image/jpeg;base64,RUND' }, held: 'data:image/jpeg;base64,HELD', ersatz: false }
   const zeichne = (format: 'quadrat' | 'story', bilder: GeladeneBilder) =>
-    renderToStaticMarkup(createElement(TeilenBildGrafik, { daten, format, qr, bilder }))
+    renderToStaticMarkup(createElement(TeilenBildGrafik, { daten, format, qr, bilder, marke: MARKE_BILD }))
 
   it('im 1:1 nie ein QR-Code, in der Story immer (mit und ohne Foto)', () => {
     for (const bilder of [OHNE_BILDER, MIT_FOTO]) {
@@ -587,6 +591,19 @@ describe('Grafik: QR nur in der Story, Foto-Held mit Foto (Register T6)', () => 
       const story = zeichne('story', bilder)
       expect(story).toContain(qr.pfad)
       expect(story).toContain('Code scannen oder agrilo.at/hof-test')
+    }
+  })
+
+  it('die Bildmarke ist ein Bild aus der Quelle, kein gezeichnetes Blatt: 50 px im 1:1, 59 px in der Story, 22 % gerundet — in A und B', () => {
+    for (const bilder of [OHNE_BILDER, MIT_FOTO]) {
+      const bild = (html: string) => html.match(new RegExp(`<img src="${MARKE_BILD.replace('+', '\\+')}"[^>]*>`))?.[0] ?? ''
+      const quadrat = bild(zeichne('quadrat', bilder))
+      expect(quadrat).toContain('width="50" height="50"')
+      expect(quadrat).toContain('border-radius:11px')
+      const story = bild(zeichne('story', bilder))
+      expect(story).toContain('width="59" height="59"')
+      expect(story).toContain('border-radius:13px')
+      expect(zeichne('quadrat', bilder)).not.toContain('<path d="M8 1C3 5')
     }
   })
 

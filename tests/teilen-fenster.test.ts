@@ -20,12 +20,18 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 vi.mock('@/lib/prisma', () => ({ prisma: { farm: { findFirst: vi.fn() } } }))
+// next/image braucht die Laufzeit von Next; das Plakat gibt der Bildmarke nur Quelle, Maße und Rundung.
+vi.mock('next/image', () => ({
+  default: (p: { src: string; alt: string; width: number; height: number; className?: string; style?: Record<string, string>; 'aria-hidden'?: string }) =>
+    createElement('img', { src: p.src, alt: p.alt, width: p.width, height: p.height, className: p.className, style: p.style, 'aria-hidden': p['aria-hidden'] }),
+}))
 
 import { prisma } from '@/lib/prisma'
 import { kanalZiel, PLAKAT_PFAD, schalteAuswahl, startAuswahl, FENSTER_KANAELE } from '@/lib/teilen-fenster'
 import { plakatBezahlen, type TeilenAuswahlEintrag } from '@/lib/teilen-bild'
 import { getPlakatDaten } from '@/server/queries/teilen-bild'
 import { QrPlakat } from '@/components/teilen/qr-plakat'
+import { markeBildUrl } from '@/lib/marke-bild'
 
 const findFirst = vi.mocked(prisma.farm.findFirst)
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
@@ -150,6 +156,13 @@ describe('QR-Plakat', () => {
     expect(html).not.toContain('<b>Abholung</b>')
     // Theme-fest: nur Farben, die in beiden Themes gleich sind — kein background/foreground/card.
     expect(html).not.toMatch(/\b(bg-background|bg-card|text-foreground|text-muted-foreground)\b/)
+    // Die Bildmarke neben der Adresse: die volle Fassung als Bild, gerundet, ohne Alternativtext (Register M1, Nr. 92).
+    const marke = html.match(/<img\b[^>]*>/g) ?? []
+    expect(marke).toHaveLength(1)
+    expect(marke[0]).toContain(`src="${markeBildUrl('voll')}"`)
+    expect(marke[0]).toContain('border-radius:22%')
+    expect(marke[0]).toContain('aria-hidden="true"')
+    expect(html).not.toContain('<path d="M8 1C3 5')
   })
 
   it('die Seite liegt in der HofShell und blendet ihren Kopf beim Drucken aus', () => {

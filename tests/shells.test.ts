@@ -108,7 +108,9 @@ describe('alle Shells', () => {
   }
 
   it.each(Object.entries(alle))('%s: data-design="neu", Landmarken und Sprunglink', (_name, rendere) => {
-    const html = rendere()
+    // Die Bildmarke der Kopfzeile wird vorab geladen (next/image `priority`); ohne Dokument setzt React den
+    // Vorlade-Link vor den Baum — im Browser steht er im <head>. Die Shell beginnt dahinter.
+    const html = rendere().replace(/^(<link rel="preload"[^>]*>)+/, '')
     expect(html).toMatch(/^<div data-design="neu"/)
     expect(html).toContain('<a href="#inhalt"')
     expect(html).toContain('Zum Inhalt springen')

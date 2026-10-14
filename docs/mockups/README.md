@@ -294,3 +294,10 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 Wortliste (gilt für alle Oberflächen, Admin und Hof): **Postfach** = der eine Ort, an dem alles ankommt; **Nachricht** = ein Eintrag; **Rundschreiben** = eine Nachricht vom Team an viele Höfe; **Unterhaltung** = der Faden aus Nachricht und Antworten; **Meldung** = Fehler, Wunsch oder Frage an das Team. Nicht mehr: Briefkasten, Post, Chat, Mitteilung, Benachrichtigung. Bestehende Admin-Mockups (`admin-hoefe`, `admin-meldungen`, `admin-meldung-detail`, `admin-finanzen`, `mobil-admin`) wurden im Canvas entsprechend umbenannt; im Repo ändert sie der Lauf, der das Admin-Postfach baut.
 
 Geparkt (Konzept und Mockups in claude/lauf13-vormerkung.md, Bau nach Signal): Unterhaltungen zwischen Höfen („Frage stellen“, Tarifregel, Lebenslauf, Aufbewahrung), Anzeige im Umkreis, Startseite gestalten.
+
+## Lauf 14 (Canvas, 14.10.2026) – Marke Agrilo
+
+| Datei | Inhalt | Route | Status | Größe |
+|---|---|---|---|---|
+| `system-m1-marke-agrilo-entscheidung.html` | M1 · Marke – Entscheidung: EINE Bildmarke (A mit Blatt, Baum, Stadel, Furchen auf grüner Kachel) in zwei Fassungen (voll ab 48 px, klein darunter), Größenprobe 16/24/32/48/64, Apple 180, maskierbar 80 %, Teilen-Bild der Startseite, Regeln für Skript und Kopfzeile — **gilt** | Kopfzeile, Favicon und App-Icons, Teilen-Bild, Status-Bild, QR-Plakat | Umbau (Nr. 92) | 1440×760 |
+| `system-m1-marke-agrilo.html` | M1 · Marke – die vier Varianten der Vorarbeit; nur Dokumentation, die Entscheidung steht im Board darüber | – | Dokumentation | 1440×1620 |
