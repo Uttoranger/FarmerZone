@@ -46,6 +46,8 @@ import {
   alsLand,
   type Land,
 } from '@/lib/laender'
+import { MARKE } from '@/lib/marke'
+import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
 
 export type StandortKandidat = {
   lat: number
@@ -241,7 +243,7 @@ async function frageNominatim(
 
   const antwort = await fetch(url, {
     headers: {
-      'User-Agent': `FarmerZone/1.0 (https://farmerzone.at; ${SUPPORT_EMAIL})`,
+      'User-Agent': `${MARKE}/1.0 (${PRODUKTION_ADRESSE}; ${SUPPORT_EMAIL})`,
     },
     signal: AbortSignal.timeout(NOMINATIM_TIMEOUT_MS),
   })

@@ -109,13 +109,25 @@ export function formatiereTelefon(eingabe: string): string {
 }
 
 /**
+ * Die Ziffern der Nummer samt Ländercode, ohne „+“: „436600000000“. Die EINE
+ * Lesart für alles, was eine Nummer wählt — den `tel:`-Link hier und den
+ * wa.me-Link (`toWaPhone` in src/lib/whatsapp.ts, auch „Per WhatsApp
+ * erinnern“). null, wenn sich die Eingabe nicht eindeutig lesen lässt: Ein
+ * Link wählte sonst eine andere Nummer, als die Anzeige zeigt.
+ */
+export function telefonZiffern(eingabe: string): string | null {
+  const nummer = liesNummer(eingabe)
+  return nummer ? `${nummer.land}${nummer.national}` : null
+}
+
+/**
  * Der Link zum Anrufen: `tel:+436600000000`, aus denselben Ziffern, die die
- * Anzeige zeigt. Lässt sich die Eingabe nicht eindeutig lesen (zwei Nummern in
- * einem Feld, „ab 18 Uhr“, keine oder zu viele Ziffern), gibt es keinen Link: Er
- * wählte sonst eine andere Nummer, als dort steht. Wer den Link weglässt, zeigt
- * die Nummer als Text — `formatiereTelefon` gibt die Eingabe dann unverändert zurück.
+ * Anzeige zeigt (`telefonZiffern`). Lässt sich die Eingabe nicht eindeutig lesen
+ * (zwei Nummern in einem Feld, „ab 18 Uhr“, keine oder zu viele Ziffern), gibt es
+ * keinen Link. Wer den Link weglässt, zeigt die Nummer als Text —
+ * `formatiereTelefon` gibt die Eingabe dann unverändert zurück.
  */
 export function telefonLink(eingabe: string): string | null {
-  const nummer = liesNummer(eingabe)
-  return nummer ? `tel:+${nummer.land}${nummer.national}` : null
+  const ziffern = telefonZiffern(eingabe)
+  return ziffern ? `tel:+${ziffern}` : null
 }

@@ -19,7 +19,7 @@ export function StandortFehlt(): React.JSX.Element {
       symbol={MapPin}
       titel="Wo liegt dein Hof?"
       satz="Trag deine Adresse ein, dann zeigen wir dir Höfe in der Nähe."
-      aktion={
+      ausweg={
         <Link href="/settings/profile" className={KNOPF_RAHMEN}>
           Zu den Hof-Einstellungen
         </Link>

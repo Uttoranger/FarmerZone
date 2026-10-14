@@ -32,6 +32,7 @@ import {
   vorratSchalterText,
 } from '@/lib/verkauf-eintragen'
 import { cn } from '@/lib/utils'
+import { MARKE } from '@/lib/marke'
 
 /*
  * „Verkauf eintragen" im neuen Design (Nachtlauf Nr. 22b, Register E13) —
@@ -459,7 +460,7 @@ export function VerkaufFormular({
         </div>
 
         <p className="text-[13px] leading-relaxed text-muted-foreground">
-          Nur Verkäufe, die nicht über FarmerZone bestellt wurden. Bestellungen zählt die Auswertung von selbst — auch die mit &bdquo;Bar bei
+          Nur Verkäufe, die nicht über {MARKE} bestellt wurden. Bestellungen zählt die Auswertung von selbst — auch die mit &bdquo;Bar bei
           Abholung&ldquo;.
         </p>
 

@@ -1,19 +1,24 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import {
+  Check,
   ChevronRight,
   Clock,
   CreditCard,
   Megaphone,
+  MessageCircle,
   PackageOpen,
   PackageX,
   Printer,
   Share2,
+  Sprout,
   Tags,
   type LucideIcon,
 } from 'lucide-react'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { Marke } from '@/components/ui/marke'
+import { POSTFACH_HREF, POSTFACH_TEXT, weitereText, type HeuteNachricht } from '@/lib/postfach'
+import { markiereGelesenFormular } from '@/server/actions/postfach'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
@@ -21,6 +26,7 @@ import { TeilenFensterKnopf } from '@/components/teilen/teilen-fenster'
 import type { TeilenFensterDaten } from '@/lib/teilen-fenster'
 import {
   BRAUCHT_DICH_LEER,
+  brauchtDichAnzeige,
   HEUTE_KEINE_BESTELLUNGEN,
   HEUTE_NIEMAND,
   KENNZAHL_TEXT,
@@ -62,6 +68,71 @@ const TEXTLINK = cn('inline-flex min-h-11 items-center rounded-md text-[13.5px] 
 
 function mehrzahl(n: number, eins: string, viele: string): string {
   return `${n} ${n === 1 ? eins : viele}`
+}
+
+// ─── Postfach (Register N12, Nr. 87) ────────────────────────────────────────
+
+/**
+ * Eine ungelesene Nachricht vom Team, ganz oben in der Hauptspalte lesbar
+ * (Mockup mobil-h3-heute-post-karte): Absender, Marke Wichtig, wann, Titel,
+ * Text, der Link als Knopf, „Antworten" in den Faden und „Gelesen" — das
+ * nimmt die Karte weg, die Nachricht bleibt im Postfach. Bei mehreren die
+ * neueste, darunter „n weitere im Postfach" (heutePostfach in lib/postfach.ts).
+ * „Gelesen" ist ein Formular mit Server Action, es geht auch ohne JavaScript.
+ */
+export function PostfachKarte({ nachricht, weitere }: { nachricht: HeuteNachricht; weitere: number }): React.JSX.Element {
+  const knopf = cn(
+    'flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-border px-3 text-sm font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted',
+    FOKUS_RAHMEN
+  )
+  return (
+    <div className="flex flex-col gap-1.5">
+      <article aria-labelledby="postfach-karte-titel" className={cn(KARTE, 'flex flex-col gap-2.5 border-accent/60 p-3.5 md:p-4 dark:ring-0')}>
+        <div className="flex min-w-0 items-center gap-2">
+          <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/12">
+            <Sprout className="size-4 text-brand-text" strokeWidth={1.9} />
+          </span>
+          <span className="truncate text-[12.5px] font-semibold">{POSTFACH_TEXT.absender}</span>
+          {nachricht.wichtig && <Marke art="tun" className="shrink-0">{POSTFACH_TEXT.wichtig}</Marke>}
+          <span className={cn('ml-auto shrink-0 text-xs', LEISE)}>{nachricht.wann}</span>
+        </div>
+        <h2 id="postfach-karte-titel" className="text-base leading-snug font-semibold break-words">
+          {nachricht.titel}
+        </h2>
+        <p className="text-sm leading-relaxed break-words whitespace-pre-line">{nachricht.text}</p>
+        {nachricht.link && (
+          <Link
+            href={nachricht.link}
+            className={cn(
+              'flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
+              FOKUS_RAHMEN
+            )}
+          >
+            {POSTFACH_TEXT.linkKnopf}
+          </Link>
+        )}
+        <div className="flex gap-2">
+          <Link href={nachricht.href} className={knopf}>
+            <MessageCircle className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+            {POSTFACH_TEXT.antworten}
+          </Link>
+          <form action={markiereGelesenFormular} className="flex flex-1">
+            <input type="hidden" name="unterhaltungId" value={nachricht.unterhaltungId} />
+            <input type="hidden" name="nachrichtId" value={nachricht.nachrichtId} />
+            <button type="submit" className={knopf}>
+              <Check className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+              {POSTFACH_TEXT.gelesen}
+            </button>
+          </form>
+        </div>
+      </article>
+      {weitere > 0 && (
+        <Link href={POSTFACH_HREF} className={cn(TEXTLINK, 'self-center')}>
+          {weitereText(weitere)}
+        </Link>
+      )}
+    </div>
+  )
 }
 
 // ─── Kopf ───────────────────────────────────────────────────────────────────
@@ -205,8 +276,8 @@ export function StripeEinrichtenHinweis(): React.JSX.Element {
 // ─── Teilen-Zeile ───────────────────────────────────────────────────────────
 
 /**
- * Teilen als EINE kompakte Zeile direkt unter der Packliste (freigabe.md §12
- * Nr. 45) — an jedem Tag; bis dahin stand sie an Abholtagen oben neben dem
+ * Teilen als EINE kompakte Zeile zuletzt in der Hauptspalte, nach Packliste und
+ * „Braucht dich" (freigabe.md §12 Nr. 45, Register N11) — an jedem Tag; bis dahin stand sie an Abholtagen oben neben dem
  * Stripe-Hinweis und an anderen Tagen als große Karte in der Seitenspalte.
  * Knopf rechts statt darunter, auch am Handy (Mockup
  * mobil-h3-heute-mit-teilen-karte). Seit Nr. 21 (Gate 7) öffnet der Knopf das
@@ -267,9 +338,9 @@ function PacklistenEintrag({ zeile }: { zeile: PacklistenZeile }) {
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1 md:flex-row md:items-center md:gap-3.5">
           <span className="text-[13.5px] font-semibold tabular-nums md:text-sm">{formatEuro(centsAlsEuro(zeile.gesamtCents))}</span>
-          <StatusBadge status={marke.ton} className="md:w-[124px] md:justify-center">
+          <Marke art={marke.art} className="md:w-[124px] md:justify-center">
             {marke.text}
-          </StatusBadge>
+          </Marke>
         </span>
       </Link>
     </li>
@@ -324,8 +395,10 @@ export function Packliste({
           symbol={PackageOpen}
           titel={HEUTE_NIEMAND}
           satz={leer.abholfenster ? `Nächste Abholung: ${leer.abholfenster.name}, ${leer.abholfenster.zeit}.` : ABHOLZEITEN_FEHLEN.satz}
-          aktion={
-            leer.abholfenster ? undefined : (
+          ausweg={
+            leer.abholfenster ? (
+              { ohne: 'Mit Abholzeit gibt es in der leeren Packliste nichts zu tun, der Satz nennt die nächste Abholung; nur ohne Abholzeit trägt sie den Knopf' }
+            ) : (
               <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={KNOPF_ORANGE}>
                 {ABHOLZEITEN_FEHLEN.aktion.text}
               </Link>
@@ -341,6 +414,15 @@ export function Packliste({
         </ul>
       )}
 
+      {zeilen.length > 0 && !leer.abholfenster && (
+        // Bestellungen für heute, aber keine aktive Abholzeit: Satz und Knopf stehen trotzdem (sonst nur im ausblendbaren „Zu tun").
+        <div className="flex flex-col gap-2.5 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-[18px]">
+          <p className={cn('text-[13px]', LEISE)}>{ABHOLZEITEN_FEHLEN.satz}</p>
+          <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={cn(KNOPF_ORANGE, 'shrink-0 self-start sm:self-auto')}>
+            {ABHOLZEITEN_FEHLEN.aktion.text}
+          </Link>
+        </div>
+      )}
       {naechsteAbholung && (
         <Link
           href="/orders"
@@ -371,11 +453,14 @@ const BRAUCHT_DICH_SYMBOL: Record<BrauchtDichEintrag['art'], LucideIcon> = {
 /**
  * „Braucht dich" — nur, was eine Handlung verlangt (brauchtDich in src/lib/heute.ts).
  * Ohne Eintrag keine Karte, sondern eine leise Zeile (Register N11): gedämpft
- * und ohne Rahmen wie „Zu tun einblenden" unten auf der Seite, nur ohne Knopf —
- * es gibt nichts zu tippen.
+ * und ohne Rahmen wie „Zu tun einblenden" unten auf der Seite (13 px, `font-medium`),
+ * nur ohne Knopf — es gibt nichts zu tippen. Die Zeile steht nur, wenn auch die
+ * Packliste leer ist (brauchtDichAnzeige); unter einer vollen Packliste steht nichts.
  */
-export function BrauchtDichKarte({ eintraege }: { eintraege: BrauchtDichEintrag[] }): React.JSX.Element {
-  if (eintraege.length === 0) {
+export function BrauchtDichKarte({ eintraege, packlisteLeer }: { eintraege: BrauchtDichEintrag[]; packlisteLeer: boolean }): React.JSX.Element | null {
+  const anzeige = brauchtDichAnzeige(eintraege.length, packlisteLeer)
+  if (anzeige === null) return null
+  if (anzeige === 'zeile') {
     return <p className={cn('text-center text-[13px] font-medium', LEISE)}>{BRAUCHT_DICH_LEER}</p>
   }
   return (

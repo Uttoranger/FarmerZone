@@ -12,8 +12,9 @@
  *  - StatusBadge übersetzt den Ton in die Art (offen → tun, fertig → läuft,
  *    neutral → erledigt), behält data-slot und data-status und reicht das
  *    Symbol durch.
- *  - Hof und Kundin lesen denselben Status verschieden (order-status.ts /
- *    bestellstatus.ts) — nur die Farbe kommt aus einer Quelle.
+ *  - Hof und Kundin lesen denselben Status verschieden (bestellMarke in
+ *    hof-bestellungen.ts / bestellStatusAnzeige in bestellstatus.ts) — nur die
+ *    Farbe kommt aus einer Quelle; storniert ist für beide abgebrochen (rot).
  */
 import { describe, it, expect } from 'vitest'
 import { createElement, type ComponentType, type ReactElement, type ReactNode } from 'react'
@@ -22,7 +23,7 @@ import { Check } from 'lucide-react'
 import { OrderStatus } from '@prisma/client'
 import { Marke } from '@/components/ui/marke'
 import { StatusBadge, type StatusTon } from '@/components/ui/status-badge'
-import { statusArt } from '@/components/orders/order-status'
+import { bestellMarke } from '@/lib/hof-bestellungen'
 import { bestellStatusAnzeige } from '@/lib/bestellstatus'
 import { MARKE_ARTEN, type MarkeArt } from '@/lib/marke-art'
 
@@ -89,12 +90,23 @@ describe('StatusBadge zeichnet über Marke', () => {
 })
 
 describe('Bedeutung je Blickwinkel — eine Farbquelle, zwei Lesarten', () => {
-  it('jeder reale Status hat im Hofbereich eine Art; abholbereit ist für den Hof erledigt, für die Kundin läuft es', () => {
-    for (const status of Object.values(OrderStatus)) expect(MARKE_ARTEN, status).toContain(statusArt(status))
+  it('jeder reale Status hat in beiden Lesarten eine Art; bezahlt heißt für den Hof „packen" (tun), für die Kundin läuft es', () => {
+    for (const status of Object.values(OrderStatus)) {
+      expect(MARKE_ARTEN, status).toContain(bestellMarke(status).art)
+      expect(MARKE_ARTEN, status).toContain(bestellStatusAnzeige(status, '').art)
+    }
 
-    expect(statusArt('READY')).toBe('erledigt')
-    expect(bestellStatusAnzeige('READY', '').art).toBe('laeuft')
-    expect(statusArt('CANCELLED')).toBe('abgebrochen')
+    expect(bestellMarke('PAID').art).toBe('tun')
+    expect(bestellStatusAnzeige('PAID', '').art).toBe('laeuft')
+    // Wartet auf die Kundin: Für den Hof ist nichts zu tun, die Kundin muss bestätigen.
+    expect(bestellMarke('PENDING_CONFIRMATION').art).toBe('erledigt')
+    expect(bestellStatusAnzeige('PENDING_CONFIRMATION', '').art).toBe('tun')
+  })
+
+  it('storniert ist für beide abgebrochen (rot), nicht abgeholt für beide erledigt (Freigabe Lauf 13)', () => {
+    expect(bestellMarke('CANCELLED').art).toBe('abgebrochen')
     expect(bestellStatusAnzeige('CANCELLED', '').art).toBe('abgebrochen')
+    expect(bestellMarke('NOT_PICKED_UP').art).toBe('erledigt')
+    expect(bestellStatusAnzeige('NOT_PICKED_UP', '').art).toBe('erledigt')
   })
 })

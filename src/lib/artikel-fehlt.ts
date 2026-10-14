@@ -39,6 +39,7 @@ import {
 } from '@/lib/servicegebuehr'
 import { onlineBezahlt } from '@/lib/storno'
 import type { OrderStatus } from '@prisma/client'
+import { MARKE } from '@/lib/marke'
 
 /** Aus diesen Status darf der Hof einen Artikel als fehlend melden — solange nichts übergeben ist. */
 export const ARTIKEL_FEHLT_STATUS = ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY'] as const satisfies readonly OrderStatus[]
@@ -224,7 +225,7 @@ export function artikelFehltZeilen(r: ArtikelFehltErgebnis, kundenVorname: strin
     saetze: [
       zusammensetzung,
       r.gebuehrDifferenzCents > 0
-        ? 'Das ist genau der Preis des fehlenden Artikels. Den Unterschied bei der Servicegebühr erstattet FarmerZone.'
+        ? `Das ist genau der Preis des fehlenden Artikels. Den Unterschied bei der Servicegebühr erstattet ${MARKE}.`
         : 'Das ist genau der Preis des fehlenden Artikels.',
     ],
   }

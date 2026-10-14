@@ -26,14 +26,21 @@
  * und der Punkt ist auch dort aktiv. In der HofShell kommt am Handy seit
  * Nr. 49 (Register N3) „Produkte" als erster Reiter dazu, und „Mein Hof" in
  * der Leiste öffnet ihn (unten, „Neue HofShell").
+ *
+ * „Postfach" (Register N12, seit Nr. 87) ist tägliche Arbeit wie Bestellungen
+ * und steht als Hauptpunkt direkt danach, mit dem Zähler ungelesener Fäden.
+ * Die Handy-Leiste bleibt (Heute · Bestellungen · Neu · Mein Hof · Mehr);
+ * dort steht Postfach ganz oben im Mehr-Blatt, und „Mehr" trägt den Zähler.
  */
 
 import { MEIN_HOF_REITER_PARAMETER, MEIN_HOF_REITER_VALUES, meinHofReiterSchema } from '@/schemas/mein-hof-reiter'
 import { HOFSEITE_HREF } from '@/lib/mein-hof'
+import { POSTFACH_HREF } from '@/lib/postfach'
 
 export type NavPunktId =
   | 'heute'
   | 'bestellungen'
+  | 'postfach'
   | 'produkte'
   | 'mein-hof'
   | 'kunden'
@@ -53,8 +60,8 @@ export type NavPunkt = {
    * Rückmeldung" führt nach /meldungen und leuchtet auch auf /fehler-melden.
    */
   auchAktivAuf?: readonly string[]
-  /** Eine Zahl am Punkt: offene Bestellungen bzw. Meldungen, die auf den Betreiber warten. */
-  zahl?: 'bestellungen' | 'admin'
+  /** Eine Zahl am Punkt: offene Bestellungen, ungelesene Fäden im Postfach (N12) bzw. Meldungen, die auf den Betreiber warten. */
+  zahl?: 'bestellungen' | 'postfach' | 'admin'
   /** Nur für das Betreiber-Konto (frisch aus der DB, nie aus der Sitzung). */
   nurAdmin?: boolean
 }
@@ -146,10 +153,14 @@ export function meinHofReiterAus(wert: string | string[] | undefined): MeinHofRe
  */
 export const MEIN_HOF_HINWEIS = `${meinHofReiter('produkte').label} verwaltest du links unter „${meinHofReiter('produkte').label}“.`
 
-/** Die Hauptpunkte — im Browser alle vier in der Leiste, am Handy drei davon direkt. */
+/**
+ * Die Hauptpunkte — im Browser alle fünf in der Leiste, am Handy drei davon
+ * direkt; Postfach und Produkte stehen dort oben im Mehr-Blatt (NUR_IM_MEHR).
+ */
 export const HAUPT: readonly NavPunkt[] = [
   { id: 'heute', label: 'Heute', href: '/dashboard' },
   { id: 'bestellungen', label: 'Bestellungen', href: '/orders', zahl: 'bestellungen' },
+  { id: 'postfach', label: 'Postfach', href: POSTFACH_HREF, zahl: 'postfach' },
   { id: 'produkte', label: 'Produkte', href: PRODUKTE_HREF },
   {
     id: 'mein-hof',
@@ -177,7 +188,7 @@ export const NEU: readonly NeuPunkt[] = [
   {
     id: 'status-posten',
     label: 'Neuer Beitrag',
-    satz: 'Sag deinen Kunden, was es gerade gibt.',
+    satz: 'Sag deinen Kundinnen, was es gerade gibt.',
     href: '/status/new',
   },
   {
@@ -434,7 +445,7 @@ const HOF_MEHR: readonly HofNavPunkt[] = HOF_ALLE.filter((p) => !leisteDeckt(p))
 const HOF_HANDY_ZIELE: readonly HofNavPunkt[] = [...HOF_LEISTEN_PUNKTE, ...HOF_MEHR]
 
 export type HofNavigation = {
-  /** Seitenleiste oben: Heute · Bestellungen · Produkte · Mein Hof. */
+  /** Seitenleiste oben: Heute · Bestellungen · Postfach · Produkte · Mein Hof. */
   haupt: readonly HofNavPunkt[]
   verkaufUndKunden: readonly HofNavPunkt[]
   /** Seitenleiste unten, danach folgen Darstellung und Abmelden (Handlungen, keine Ziele). */
@@ -537,6 +548,7 @@ const UNTERSEITEN: readonly { muster: RegExp; eltern: () => Elternseite }[] = [
   { muster: /^\/settings\/.+$/, eltern: () => alsElternseite(navPunkt('einstellungen')) },
   { muster: /^\/customers\/[^/]+$/, eltern: () => alsElternseite(navPunkt('kunden')) },
   { muster: /^\/orders\/[^/]+$/, eltern: () => alsElternseite(navPunkt('bestellungen')) },
+  { muster: /^\/postfach\/[^/]+$/, eltern: () => alsElternseite(navPunkt('postfach')) },
   { muster: /^\/status\/new$/, eltern: () => alsElternseite(beitraegeReiter()) },
   { muster: /^\/status\/[^/]+\/send-whatsapp$/, eltern: () => alsElternseite(beitraegeReiter()) },
   { muster: /^\/status\/plakat$/, eltern: () => alsElternseite(navPunkt('heute')) },

@@ -30,6 +30,7 @@ import {
   type BetriebsstatusValue,
   type ProductCategoryValue,
 } from '@/lib/taxonomie'
+import { MARKE } from '@/lib/marke'
 
 /** Dieselben Werte wie das Prisma-Enum `Verpackung`. */
 export const VERPACKUNG_VALUES = ['LOSE_BALLEN', 'ABGEPACKT_ETIKETT'] as const
@@ -412,7 +413,7 @@ export const BAES_KONTAKT_TEL = `tel:${BAES_KONTAKT.telefon.replace(/\s/g, '')}`
 
 /** Hinweis für Kundinnen bei jedem Futter (E10a, wörtlich). */
 export const KUNDEN_VERANTWORTUNG =
-  'Die Angaben zu Registrierung und Kennzeichnung stammen vom Hof. Der Hof ist für ihre Richtigkeit verantwortlich; FarmerZone vermittelt nur und prüft die Angaben nicht.'
+  `Die Angaben zu Registrierung und Kennzeichnung stammen vom Hof. Der Hof ist für ihre Richtigkeit verantwortlich; ${MARKE} vermittelt nur und prüft die Angaben nicht.`
 
 /** Zusatz bei Abgabe „nur an Betriebe" (E10a, wörtlich). */
 export const BETRIEB_VERANTWORTUNG = 'Als Betrieb bist du für den bestimmungsgemäßen Einsatz verantwortlich.'

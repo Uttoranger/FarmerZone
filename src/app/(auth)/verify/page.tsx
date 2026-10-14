@@ -11,9 +11,10 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { BestaetigenKarte } from '@/components/email-bestaetigung/bestaetigen-karte'
 import { ErneutSendenKnopf } from '@/components/email-bestaetigung/erneut-senden'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: 'E-Mail bestätigen — FarmerZone',
+  title: `E-Mail bestätigen — ${MARKE}`,
   // Der Link trägt einen gültigen Token (next.config.ts setzt dazu no-referrer).
   robots: { index: false, follow: false },
 }

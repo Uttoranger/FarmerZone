@@ -80,7 +80,7 @@ describe('stripeMarke — Marke im Admin-Kopf', () => {
   })
 
   it('kommt aus bestimmeUmgebung und trägt nie ein Stück des Schlüssels — auch bei eingeschränkten Schlüsseln', () => {
-    const werte = { NODE_ENV: 'production', VERCEL_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://farmerzone.example' }
+    const werte = { NODE_ENV: 'production', VERCEL_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://plattform.example' }
     const live = stripeMarke(bestimmeUmgebung({ ...werte, STRIPE_SECRET_KEY: 'sk_live_sehr-geheim' }))
     const eingeschraenkt = stripeMarke(bestimmeUmgebung({ ...werte, STRIPE_SECRET_KEY: 'rk_live_sehr-geheim' }))
     expect(live).toEqual({ text: 'Stripe Live', ton: 'fertig' })

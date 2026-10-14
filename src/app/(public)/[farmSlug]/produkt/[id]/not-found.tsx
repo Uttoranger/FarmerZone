@@ -11,9 +11,10 @@ import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { EmptyState } from '@/components/ui/empty-state'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: 'Produkt nicht gefunden — FarmerZone',
+  title: `Produkt nicht gefunden — ${MARKE}`,
   robots: { index: false, follow: false },
 }
 
@@ -34,7 +35,7 @@ export default function ProduktNichtGefunden() {
           symbol={PackageSearch}
           titel={PRODUKT_NICHT_GEFUNDEN_TITEL}
           satz={PRODUKT_NICHT_GEFUNDEN_TEXT}
-          aktion={
+          ausweg={
             <>
               <Link
                 href="/hoefe"

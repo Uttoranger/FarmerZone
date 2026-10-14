@@ -58,33 +58,33 @@ describe('Auswahl „Im Bild"', () => {
 })
 
 describe('Kanäle', () => {
-  const basis = { link: 'https://farmerzone.at/hof-test', text: 'Frisch bei uns', hofName: 'Hof Test' }
+  const basis = { link: 'https://agrilo.at/hof-test', text: 'Frisch bei uns', hofName: 'Hof Test' }
 
   it('jeder Kanal trägt genau sein Kürzel', () => {
     const wa = kanalZiel('wa', basis)
     expect(wa).toEqual({
       art: 'oeffnen',
-      href: `https://wa.me/?text=${encodeURIComponent('Frisch bei uns\nhttps://farmerzone.at/hof-test?k=wa')}`,
+      href: `https://wa.me/?text=${encodeURIComponent('Frisch bei uns\nhttps://agrilo.at/hof-test?k=wa')}`,
     })
     expect(kanalZiel('fb', basis)).toEqual({
       art: 'oeffnen',
-      href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://farmerzone.at/hof-test?k=fb')}`,
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://agrilo.at/hof-test?k=fb')}`,
     })
     const mail = kanalZiel('mail', basis)
-    expect(mail.art === 'oeffnen' && mail.href).toContain(encodeURIComponent('https://farmerzone.at/hof-test?k=mail'))
+    expect(mail.art === 'oeffnen' && mail.href).toContain(encodeURIComponent('https://agrilo.at/hof-test?k=mail'))
     expect(mail.art === 'oeffnen' && mail.href.startsWith('mailto:?subject=Hof%20Test')).toBe(true)
   })
 
   it('Status und Instagram: Bild über das Teilen-Menü, Link mit eigenem Kürzel', () => {
     expect(kanalZiel('wa-status', basis)).toEqual({
       art: 'bild',
-      text: 'Frisch bei uns\nhttps://farmerzone.at/hof-test?k=wa-status',
-      link: 'https://farmerzone.at/hof-test?k=wa-status',
+      text: 'Frisch bei uns\nhttps://agrilo.at/hof-test?k=wa-status',
+      link: 'https://agrilo.at/hof-test?k=wa-status',
     })
     expect(kanalZiel('ig', { ...basis, text: '  ' })).toEqual({
       art: 'bild',
-      text: 'https://farmerzone.at/hof-test?k=ig',
-      link: 'https://farmerzone.at/hof-test?k=ig',
+      text: 'https://agrilo.at/hof-test?k=ig',
+      link: 'https://agrilo.at/hof-test?k=ig',
     })
   })
 
@@ -134,8 +134,8 @@ describe('QR-Plakat', () => {
         daten: {
           hofName: '<b>Hof</b>',
           ort: 'Teststadt',
-          adresse: 'farmerzone.at/hof-test',
-          link: 'https://farmerzone.at/hof-test?k=qr',
+          adresse: 'agrilo.at/hof-test',
+          link: 'https://agrilo.at/hof-test?k=qr',
           abholzeiten: null,
           bezahlen: null,
         },
@@ -145,7 +145,7 @@ describe('QR-Plakat', () => {
     expect(html).toContain('aspect-[210/297]')
     expect(html).toContain('print:w-[210mm]')
     expect(html).toContain('role="img"')
-    expect(html).toContain('aria-label="QR-Code zur Hofseite farmerzone.at/hof-test"')
+    expect(html).toContain('aria-label="QR-Code zur Hofseite agrilo.at/hof-test"')
     // Ohne Abholzeiten keine leere Zeile „Abholung".
     expect(html).not.toContain('<b>Abholung</b>')
     // Theme-fest: nur Farben, die in beiden Themes gleich sind — kein background/foreground/card.

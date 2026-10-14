@@ -5,8 +5,9 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 import { teileOderKopiere, type TeilenUmgebung } from '@/lib/teilen'
+import { MARKE } from '@/lib/marke'
 
-const DATEN = { title: 'Testhof', text: 'Testhof auf FarmerZone', url: 'https://beispiel.test/testhof' }
+const DATEN = { title: 'Testhof', text: `Testhof auf ${MARKE}`, url: 'https://beispiel.test/testhof' }
 
 function umgebung(teilen?: () => Promise<void>, kopierenWirft = false) {
   const kopieren = vi.fn(async () => {

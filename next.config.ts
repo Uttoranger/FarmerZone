@@ -8,9 +8,9 @@ import { withSentryConfig } from "@sentry/nextjs";
 // Dieselbe Menge steht als RESERVED_SLUGS in src/lib/slug.ts, damit kein Hof
 // einen dieser Slugs bekommt (tests/reservierte-slugs.test.ts).
 const KEINE_HOFSEITE = [
-  'account', 'admin', 'analytics', 'api', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
+  'account', 'admin', 'agb', 'analytics', 'api', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
   'farm-page', 'fehler-melden', 'forgot-password', 'fuer-hoefe', 'hoefe', 'impressum', 'intern', 'konditionen',
-  'login', 'meldungen', 'onboarding', 'orders', 'problem-melden', 'products', 'region', 'register',
+  'login', 'meldungen', 'onboarding', 'orders', 'postfach', 'problem-melden', 'products', 'region', 'register',
   'reset-password', 'sales', 'settings', 'status', 'teilen', 'verify',
 ];
 // Genau EIN Pfadstück aus Slug-Zeichen (src/lib/slug.ts), das keine Route ist.

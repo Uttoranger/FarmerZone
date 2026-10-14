@@ -16,6 +16,9 @@
  *  - getStatusPostForWhatsApp liest die Empfängerinnen live (nichts
  *    eingefroren) und liefert, wer geöffnet bekam; zaehleWhatsAppAbonnentinnen
  *    zählt dieselben.
+ *  - Die Regel „wer WhatsApp bekommt" als Prisma-Bedingung (Liste, Zahl) und als
+ *    SQL (whatsAppAbonnentinSql, EXISTS in setzeWhatsAppGetippt) wählt an
+ *    DENSELBEN Zeilen dieselben Abonnentinnen (Regelvorschlag 75, Nr. 85).
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 
@@ -28,7 +31,7 @@ import { join } from 'node:path'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { setzeWhatsAppGetippt } from '@/server/actions/status-posts'
-import { getStatusPostForWhatsApp, zaehleWhatsAppAbonnentinnen } from '@/server/queries/status-posts'
+import { getStatusPostForWhatsApp, whatsAppAbonnentinSql, zaehleWhatsAppAbonnentinnen } from '@/server/queries/status-posts'
 import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf } from './setup/basis'
 
 const MIGRATION = readFileSync(
@@ -216,6 +219,36 @@ describe('getStatusPostForWhatsApp und zaehleWhatsAppAbonnentinnen', () => {
     const { farm: fremd } = await erstelleHof()
     const fremderBeitrag = await beitragVon(fremd.id)
     expect(await getStatusPostForWhatsApp(farm.id, fremderBeitrag.id)).toBeNull()
+  })
+
+  it('Prisma-Form und SQL-Form der Regel wählen an denselben Zeilen dieselben Abonnentinnen (Regelvorschlag 75)', async () => {
+    const { farm } = await erstelleHof()
+    const { farm: fremd } = await erstelleHof()
+    const beitrag = await beitragVon(farm.id)
+    // Jede Kombination aus Häkchen und Nummer (gesetzt, leer, fehlt) — nacheinander angelegt.
+    const kombinationen = [
+      { optInWhatsApp: true, customerPhone: '+43 660 0000000' },
+      { optInWhatsApp: true, customerPhone: '' },
+      { optInWhatsApp: true, customerPhone: null },
+      { optInWhatsApp: false, customerPhone: '+43 664 0000000' },
+      { optInWhatsApp: false, customerPhone: '' },
+      { optInWhatsApp: false, customerPhone: null },
+    ]
+    const abos: { id: string }[] = []
+    for (const k of kombinationen) abos.push(await aboVon(farm.id, k))
+    // Eine Abonnentin eines anderen Hofs gehört in keine der beiden Formen.
+    await aboVon(fremd.id)
+
+    const prismaForm = ((await getStatusPostForWhatsApp(farm.id, beitrag.id))?.abonnentinnen ?? []).map((a) => a.id).sort()
+    const sqlForm = (
+      await prisma.$queryRaw<{ id: string }[]>`SELECT "id" FROM "CustomerFarmSubscription" WHERE ${whatsAppAbonnentinSql(farm.id)}`
+    )
+      .map((z) => z.id)
+      .sort()
+
+    expect(sqlForm).toEqual(prismaForm)
+    expect(prismaForm).toEqual([abos[0].id])
+    expect(await zaehleWhatsAppAbonnentinnen(farm.id)).toBe(1)
   })
 
   it('eine leere Nummer zählt nicht — weder in der Liste noch in der Zahl (Nr. 75)', async () => {

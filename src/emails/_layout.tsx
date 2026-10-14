@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Html, Head, Body, Container, Section, Text, Hr, Preview, Row, Column, Link } from '@react-email/components'
+import { MARKE } from '@/lib/marke'
 
 /**
  * Die Mail-Palette — die EINZIGE Stelle mit Farbwerten unter src/emails/
@@ -90,9 +91,14 @@ interface EmailLayoutProps {
   previewText: string
   children: React.ReactNode
   manageUrl?: string
+  /**
+   * Der Satz unter der Karte. Ohne ihn der Satz der Mails im Namen eines Hofs;
+   * Mails des Teams (Postfach, Register N12) nennen das Team als Absender.
+   */
+  fusszeile?: string
 }
 
-export function EmailLayout({ previewText, children, manageUrl }: EmailLayoutProps) {
+export function EmailLayout({ previewText, children, manageUrl, fusszeile }: EmailLayoutProps): React.JSX.Element {
   return (
     <Html lang="de">
       <Head>
@@ -105,12 +111,12 @@ export function EmailLayout({ previewText, children, manageUrl }: EmailLayoutPro
         <Container style={container}>
           <Section style={karte}>
             <Section style={kopf}>
-              <Text style={wortmarke}>FarmerZone</Text>
+              <Text style={wortmarke}>{MARKE}</Text>
             </Section>
             <Section style={content}>{children}</Section>
           </Section>
           <Section style={{ padding: '16px 24px 0' }}>
-            <Text style={footerText}>Versandt von FarmerZone im Auftrag eines Hofes.</Text>
+            <Text style={footerText}>{fusszeile ?? `Versandt von ${MARKE} im Auftrag eines Hofes.`}</Text>
             {manageUrl && (
               <Text style={{ ...footerText, marginTop: '6px' }}>
                 <a href={manageUrl} style={{ color: MAIL_FARBE.textLeise }}>

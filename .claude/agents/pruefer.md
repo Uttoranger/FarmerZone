@@ -52,7 +52,10 @@ den tatsächlichen Diff, nicht die Absicht dahinter.
 ## Ausgabe
 Nur Verstöße, je Zeile: Datei:Zeile — Regel — was falsch ist — was
 stattdessen. Sortiert: Sicherheit und Geld zuerst, dann Datenkonsistenz,
-dann Typisierung, dann Stil. Ist alles sauber: ein Satz.
+dann Typisierung, dann Stil. Ein Befund, der dem Wortlaut der Freigabe
+(`docs/nachtlauf/freigabe.md`) oder eines Register-Eintrags
+(`docs/entscheidungen.md`) widerspricht, ist ein Blocker, kein Sollte
+(Lauf 13, 13.10.2026). Ist alles sauber: ein Satz.
 Keine Lobrede, keine Zusammenfassung des Diffs, keine Vorschläge, die
 über den Diff hinausgehen. Altlasten neben dem Diff: ein Satz am Ende,
 ohne Bewertung.

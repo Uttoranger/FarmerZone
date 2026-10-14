@@ -248,7 +248,8 @@ describe('fertig oder fehlt', () => {
   })
 
   it('Kontakt: Telefon und E-Mail in der Zeile', () => {
-    expect(alleZeilen(VOLL).find((z) => z.id === 'kontakt')!.wert).toBe('+43 660 0000000 · hof@example.com')
+    // Die Nummer einheitlich wie überall (formatiereTelefon, Register N8)
+    expect(alleZeilen(VOLL).find((z) => z.id === 'kontakt')!.wert).toBe('+43 660 000 0000 · hof@example.com')
     expect(alleZeilen({ ...VOLL, phone: '' }).find((z) => z.id === 'kontakt')!.fertig).toBe(false)
   })
 

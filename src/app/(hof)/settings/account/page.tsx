@@ -13,8 +13,9 @@ import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-
 import { PasswordForm } from './password-form'
 import { ArchiveFarmCard } from './archive-farm-card'
 import { DarstellungKarte } from './darstellung-karte'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: `${EINSTELLUNG_KONTO.label} — FarmerZone` }
+export const metadata: Metadata = { title: `${EINSTELLUNG_KONTO.label} — ${MARKE}` }
 
 /** Links im Fließtext: grüner Text (Hof-Links wie im Editor), nie oranger Text. */
 const TEXTLINK = 'font-medium text-brand-text underline underline-offset-2 break-words'
@@ -36,13 +37,13 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
   // stehen im Textkörper, damit nichts nachgefragt werden muss.
   const emailChangeMailto = supportMailto({
     subject: 'E-Mail-Adresse ändern',
-    anliegen: 'Hallo, ich möchte die E-Mail-Adresse meines FarmerZone-Kontos ändern.',
+    anliegen: `Hallo, ich möchte die E-Mail-Adresse meines ${MARKE}-Kontos ändern.`,
     farmSlug: farm?.slug,
     loginEmail: session.user.email,
   })
   const accountDeleteMailto = supportMailto({
     subject: 'Konto löschen',
-    anliegen: 'Hallo, ich möchte mein FarmerZone-Konto löschen lassen.',
+    anliegen: `Hallo, ich möchte mein ${MARKE}-Konto löschen lassen.`,
     farmSlug: farm?.slug,
     loginEmail: session.user.email,
   })
@@ -66,7 +67,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
             <p className="text-sm text-muted-foreground">
               Um deine E-Mail-Adresse zu ändern,{' '}
               <a href={emailChangeMailto} className={TEXTLINK}>
-                schreib dem FarmerZone-Support
+                schreib dem {MARKE}-Support
               </a>
               . Die Nachricht ist bereits vorausgefüllt.
             </p>
@@ -79,7 +80,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
               <Shield className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
               <CardTitle>Passwort</CardTitle>
             </div>
-            <CardDescription>Passwort für dein FarmerZone-Konto</CardDescription>
+            <CardDescription>Passwort für dein {MARKE}-Konto</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <PasswordForm />
@@ -98,7 +99,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
           <p>
             Wenn du dein Konto löschen möchtest,{' '}
             <a href={accountDeleteMailto} className="font-semibold underline underline-offset-2 break-words">
-              schreib dem FarmerZone-Support
+              schreib dem {MARKE}-Support
             </a>{' '}
             — die Nachricht ist bereits vorausgefüllt. Die Löschung wird innerhalb weniger Werktage bearbeitet.
             Beachte: Bestelldaten müssen aus steuerrechtlichen Gründen 7 Jahre aufbewahrt werden.

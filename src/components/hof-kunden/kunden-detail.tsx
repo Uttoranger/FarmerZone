@@ -8,6 +8,7 @@ import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 import { whatsAppLink } from '@/lib/whatsapp'
 import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
@@ -119,7 +120,7 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
                       ende={
                         <span className="flex shrink-0 flex-col items-end gap-1">
                           <span className="text-[14px] font-semibold tabular-nums">{euro(o.betragCents)}</span>
-                          <StatusBadge status={status.ton}>{status.text}</StatusBadge>
+                          <Marke art={status.art}>{status.text}</Marke>
                         </span>
                       }
                     />

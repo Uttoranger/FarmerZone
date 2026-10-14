@@ -319,6 +319,25 @@ enum Tarif {
   HOFLADEN
 }
 
+// Postfach, Stufe 1 (Register N12, Nr. 87): Art eines Rundschreibens (Info,
+// Wichtig), einer Nachricht im Faden (SYSTEM bleibt ungenutzt, bis ein Lauf
+// ihn anbietet) und die zwei Seiten einer Unterhaltung für den Lesestand.
+enum RundschreibenArt {
+  INFO
+  WICHTIG
+}
+
+enum NachrichtArt {
+  NORMAL
+  WICHTIG
+  SYSTEM
+}
+
+enum UnterhaltungSeite {
+  HOF
+  TEAM
+}
+
 // === ENTITÄTEN ===
 
 model User {
@@ -517,6 +536,7 @@ model Farm {
   meldungen     Meldung[]
   teilenAufrufe      TeilenAufruf[]
   monatsabrechnungen Monatsabrechnung[]
+  unterhaltungen     Unterhaltung[]
 
   @@index([slug])
 }
@@ -1076,4 +1096,90 @@ model RateLimitZaehler {
 
   @@id([schluessel, fensterStart])
   @@index([ablauf])
+}
+
+// Postfach, Stufe 1 (Register N12, Nachtlauf Nr. 87): Das Team schreibt Höfen
+// Nachrichten; jede Nachricht ist ein eigener Faden (Unterhaltung), auf den
+// der Hof antwortet und in dem das Team antwortet. Höfe beginnen keine Fäden —
+// ein Problem, Wunsch oder eine Frage geht über „Problem melden" (Meldung).
+// Senden legt in EINER Transaktion je Empfänger eine Unterhaltung mit der
+// ersten Nachricht an (src/server/actions/postfach.ts).
+//   titel, text   Grenzen (80, 1000) im Zod-Schema (src/schemas/postfach.ts)
+//   linkUrl       nur relativ („/…") oder auf die Produktionsdomain (PRODUKTION_HOST)
+//   perMail       „Auch per E-Mail schicken – Betriebsmitteilung"
+//   empfaengerRegel  wie die Empfänger gewählt wurden (alle, ausgewählte
+//                 Hof-IDs, ohne Online-Zahlung, Futter ohne Nummer) — Anzeige
+//   empfaenger    so viele Unterhaltungen hat das Senden angelegt (Snapshot)
+//   erstelltVonUserId  wer gesendet hat; bewusst ohne Fremdschlüssel — ein
+//                 Rundschreiben hält nie das Löschen eines Kontos auf
+model Rundschreiben {
+  id                String           @id @default(cuid())
+  titel             String
+  text              String           @db.Text
+  linkUrl           String?
+  art               RundschreibenArt
+  perMail           Boolean          @default(false)
+  empfaengerRegel   Json
+  empfaenger        Int
+  gesendetAm        DateTime
+  erstelltVonUserId String
+
+  unterhaltungen Unterhaltung[]
+}
+
+// Ein Faden des Postfachs: genau ein Hof und das Team. Mit dem Hof wird er
+// gelöscht (Cascade, N12: Nachrichten vom Team bleiben, solange das Hofkonto
+// besteht). Spalten für Fäden zwischen Höfen (K3/T8) kommen erst mit ihrem
+// eigenen Lauf.
+//   letzteNachrichtAm  für „neueste zuerst" (Index mit farmId)
+//   letzteMailAm  wann zuletzt eine E-Mail zu diesem Faden ging — höchstens
+//                 eine je Faden und Stunde (N12); null = noch keine
+model Unterhaltung {
+  id                String    @id @default(cuid())
+  farmId            String
+  rundschreibenId   String?
+  letzteNachrichtAm DateTime
+  letzteMailAm      DateTime?
+  createdAt         DateTime  @default(now())
+
+  farm          Farm                @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  rundschreiben Rundschreiben?      @relation(fields: [rundschreibenId], references: [id], onDelete: SetNull)
+  nachrichten   Nachricht[]
+  staende       UnterhaltungStand[]
+
+  // Ein Rundschreiben legt je Hof genau einen Faden an. Beide Indizes mit
+  // farmId vorn decken auch Abfragen nach dem Hof (Fremdschlüssel).
+  @@unique([farmId, rundschreibenId])
+  @@index([farmId, letzteNachrichtAm])
+  @@index([rundschreibenId])
+}
+
+// Eine Nachricht im Faden. vonFarmId null = vom Team, sonst der Hof, der
+// geschrieben hat — bewusst ohne Fremdschlüssel: Ein SetNull machte aus der
+// Antwort eines gelöschten Hofs eine Nachricht des Teams. text ≤ 1000 im Zod.
+model Nachricht {
+  id             String       @id @default(cuid())
+  unterhaltungId String
+  vonFarmId      String?
+  text           String       @db.Text
+  linkUrl        String?
+  art            NachrichtArt @default(NORMAL)
+  createdAt      DateTime     @default(now())
+
+  unterhaltung Unterhaltung @relation(fields: [unterhaltungId], references: [id], onDelete: Cascade)
+
+  @@index([unterhaltungId, createdAt])
+}
+
+// Der Lesestand je Seite (Hof, Team): gelesen ist jede Nachricht der anderen
+// Seite mit createdAt ≤ gelesenBis. Er rückt nur vor, nie zurück
+// (src/server/actions/postfach.ts). Je Faden und Seite genau eine Zeile.
+model UnterhaltungStand {
+  unterhaltungId String
+  seite          UnterhaltungSeite
+  gelesenBis     DateTime
+
+  unterhaltung Unterhaltung @relation(fields: [unterhaltungId], references: [id], onDelete: Cascade)
+
+  @@id([unterhaltungId, seite])
 }

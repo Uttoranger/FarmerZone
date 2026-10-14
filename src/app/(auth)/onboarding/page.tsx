@@ -12,9 +12,10 @@ import { ladeTarifZeile } from '@/server/hofbereich'
 import { HofShell } from '@/components/shells/hof-shell'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { EinrichtenSeite } from '@/components/einrichten/einrichten-seite'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: 'Hof einrichten — FarmerZone',
+  title: `Hof einrichten — ${MARKE}`,
 }
 
 export const dynamic = 'force-dynamic'

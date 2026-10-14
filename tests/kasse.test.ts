@@ -116,12 +116,12 @@ describe('Kasse glätten (N10, Nr. 82): jede Zahlart mit eigener Erklärung', ()
   })
 
   it('Bar trägt seinen Vorteil selbst — das Datum aus dem Stichtag, nie getippt', () => {
-    expect(zusatz('ONSITE_CASH', true)).toBe(`${BAR_OHNE_GEBUEHR_ZAHLART} Du bestätigst per E-Mail – ein Tipp genügt.`)
+    expect(zusatz('ONSITE_CASH', true)).toBe(`${BAR_OHNE_GEBUEHR_ZAHLART} Du bestätigst per E-Mail.`)
     expect(zusatz('ONSITE_CASH', true)).toContain(`Ohne Servicegebühr bis ${BAR_OHNE_GEBUEHR_BIS_TEXT}.`)
   })
 
   it('ist bar nicht günstiger, steht kein Vorteil da — nur die Bestätigung per E-Mail', () => {
-    expect(zusatz('ONSITE_CASH', false)).toBe('Du bestätigst per E-Mail – ein Tipp genügt.')
+    expect(zusatz('ONSITE_CASH', false)).toBe('Du bestätigst per E-Mail.')
     expect(kassenZahlarten(HOF_ALLES)).toEqual(kassenZahlarten(HOF_ALLES, false))
   })
 
@@ -179,15 +179,19 @@ describe('kaufknopfZeile — Termin und Zahlweg unter dem Kaufknopf (N10)', () =
   const termin = abholSatz({ datum: 'So, 18. Okt', relativ: null, zeit: '14:00–16:00 Uhr' })
 
   it('online: Termin · Bezahlung sicher über Stripe', () => {
-    expect(kaufknopfZeile({ termin, online: true })).toBe(`Abholung ${termin} · Bezahlung sicher über Stripe`)
+    expect(kaufknopfZeile({ termin, online: true, bar: false })).toBe(`Abholung ${termin} · Bezahlung sicher über Stripe`)
   })
 
   it('bar: Termin · bar am Hof · Bestätigung per E-Mail', () => {
-    expect(kaufknopfZeile({ termin, online: false })).toBe(`Abholung ${termin} · bar am Hof · Bestätigung per E-Mail`)
+    expect(kaufknopfZeile({ termin, online: false, bar: true })).toBe(`Abholung ${termin} · bar am Hof · Bestätigung per E-Mail`)
+  })
+
+  it('ohne angebotene Zahlart nur der Termin — kein „bar am Hof", wo kein Geld fließt (N10, Ergänzung Lauf 13)', () => {
+    expect(kaufknopfZeile({ termin, online: false, bar: false })).toBe(`Abholung ${termin}`)
   })
 
   it('ohne gewählten Termin die Bitte, einen zu wählen', () => {
-    expect(kaufknopfZeile({ termin: null, online: true })).toBe('Wähl noch, wann du abholst · Bezahlung sicher über Stripe')
+    expect(kaufknopfZeile({ termin: null, online: true, bar: false })).toBe('Wähl noch, wann du abholst · Bezahlung sicher über Stripe')
   })
 })
 
@@ -459,7 +463,7 @@ describe('Nachbesserung 1: nach dem Anlegen gilt der Betrag des Servers', () => 
 })
 
 describe('bestaetigungMitStatus — Rückleitung, wenn die Zahlung schon durch ist', () => {
-  const HIER = 'https://farmerzone.example'
+  const HIER = 'https://plattform.example'
 
   it('hängt redirect_status an einen signierten Pfad an', () => {
     expect(bestaetigungMitStatus('/hof-test/confirm/o1?sig=abc', HIER, 'processing')).toBe('/hof-test/confirm/o1?sig=abc&redirect_status=processing')

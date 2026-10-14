@@ -87,7 +87,7 @@ describe('Grenzen der Wache — die Wache vertraut VERCEL_ENV (dokumentiert, Run
 
   it('die echte Produktion ohne freigegebene Systemvariablen (VERCEL_ENV fehlt) ist gesperrt', () => {
     // Deshalb der Haken vor Schritt 8 in stripe-live.md: „Automatically expose System Environment Variables".
-    const ohneSystemvariablen = { NODE_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://farmerzone.example', STRIPE_SECRET_KEY: 'sk_live_erfunden' }
+    const ohneSystemvariablen = { NODE_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://plattform.example', STRIPE_SECRET_KEY: 'sk_live_erfunden' }
     expect(stripeStartGesperrt(bestimmeUmgebung(ohneSystemvariablen))).toBe(true)
   })
 })
@@ -149,7 +149,7 @@ describe('istTestbetrieb — nur die Produktion mit Test-Schlüssel', () => {
   })
 
   it('folgt bestimmeUmgebung: die Produktion lädt sk_test_/rk_test_ → Testbetrieb, sk_live_/rk_live_ → keiner', () => {
-    const basis = { NODE_ENV: 'production', VERCEL_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://farmerzone.example' }
+    const basis = { NODE_ENV: 'production', VERCEL_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://plattform.example' }
     expect(istTestbetrieb(bestimmeUmgebung({ ...basis, STRIPE_SECRET_KEY: 'sk_test_erfunden' }))).toBe(true)
     expect(istTestbetrieb(bestimmeUmgebung({ ...basis, STRIPE_SECRET_KEY: 'rk_test_erfunden' }))).toBe(true)
     expect(istTestbetrieb(bestimmeUmgebung({ ...basis, STRIPE_SECRET_KEY: 'sk_live_erfunden' }))).toBe(false)
@@ -158,8 +158,8 @@ describe('istTestbetrieb — nur die Produktion mit Test-Schlüssel', () => {
 })
 
 describe('TESTBETRIEB_TEXT — die drei Sätze aus EINER Quelle', () => {
-  it('stehen wörtlich wie in freigabe.md §12', () => {
-    expect(TESTBETRIEB_TEXT.kasse).toBe('Testbetrieb: Echte Karten werden noch abgelehnt. Bitte wähle Bar bei Abholung.')
+  it('stehen wörtlich wie in freigabe.md §12 — die Kasse mit dem Satz des Mockups (Freigabe Lauf 13)', () => {
+    expect(TESTBETRIEB_TEXT.kasse).toBe('Testbetrieb: Echte Karten werden noch abgelehnt.')
     expect(TESTBETRIEB_TEXT.admin).toBe(
       'Stripe läuft im Testmodus – Online-Zahlungen sind Testzahlungen, es fließt kein echtes Geld.'
     )

@@ -58,7 +58,7 @@ const TEST_EINGESCHRAENKT = 'rk_test_ERFUNDEN-nur-fuer-tests-geheim'
 
 /** Die Lagen, wie sie im Betrieb ankommen — ohne Schlüssel. */
 const LAGE = {
-  vercelProduktion: { NODE_ENV: 'production', VERCEL_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://farmerzone.example' },
+  vercelProduktion: { NODE_ENV: 'production', VERCEL_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://plattform.example' },
   vorschau: { NODE_ENV: 'production', VERCEL_ENV: 'preview', VERCEL_BRANCH_URL: 'farmer-zone-git-test.vercel.app' },
   nextDev: { NODE_ENV: 'development' },
   nextDevMitGezogenerProduktion: { NODE_ENV: 'development', VERCEL_ENV: 'production' },

@@ -11,6 +11,7 @@ import { formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { BestellDialog, DialogFehler } from './bestell-dialog'
 import { FELD, FELD_LABEL, LEISE } from './stil'
+import { MARKE } from '@/lib/marke'
 
 const euro = (cents: number): string => formatEuro(centsAlsEuro(cents))
 
@@ -97,7 +98,7 @@ export function StornoDialog({
             {storno.provisionCents > 0
               ? 'Das ist der Warenpreis ohne die Provision.'
               : 'Das ist genau der Warenpreis, den du für diese Bestellung bekommen hast.'}
-            {storno.servicegebuehrCents > 0 ? ' Die Servicegebühr erstattet FarmerZone.' : ''}
+            {storno.servicegebuehrCents > 0 ? ` Die Servicegebühr erstattet ${MARKE}.` : ''}
           </p>
         </div>
       ) : (

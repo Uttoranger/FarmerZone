@@ -29,8 +29,9 @@ import {
   ZeitraumWahl,
 } from '@/components/auswertung/auswertung-teile'
 import { cn } from '@/lib/utils'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'Auswertung — FarmerZone' }
+export const metadata: Metadata = { title: `Auswertung — ${MARKE}` }
 
 export const dynamic = 'force-dynamic'
 

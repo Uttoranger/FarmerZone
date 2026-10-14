@@ -4,7 +4,7 @@
  *
  * Der Ablauf selbst gehört Better Auth (`emailVerification` in
  * src/lib/auth.ts): Token signieren (JWT mit BETTER_AUTH_SECRET, keine
- * ratbare ID), prüfen, `emailVerified` setzen. Hier steht, was FarmerZone
+ * ratbare ID), prüfen, `emailVerified` setzen. Hier steht, was die Plattform
  * dabei festlegt — wer bestätigen muss (Stichtag), wohin der Link führt,
  * wie oft „Erneut senden" geht und was der Bauer liest.
  *

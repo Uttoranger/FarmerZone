@@ -239,7 +239,7 @@ export function HofseiteKunde({
             symbol={Sprout}
             titel="Dieser Hof richtet gerade seinen Shop ein"
             satz="Schau bald wieder vorbei."
-            aktion={
+            ausweg={
               <Link href="/hoefe" className={UMRISS_KNOPF}>
                 Andere Höfe entdecken
               </Link>

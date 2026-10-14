@@ -198,16 +198,16 @@ const HOF_DATEN: TeilenFensterHof = {
   art: 'hof',
   hofName: 'Hof Test',
   slug: 'hof-test',
-  link: 'https://farmerzone.at/hof-test',
-  adresse: 'farmerzone.at/hof-test',
+  link: 'https://agrilo.at/hof-test',
+  adresse: 'agrilo.at/hof-test',
   auswahl: [eintrag('a'), eintrag('b', true), eintrag('c'), eintrag('d'), eintrag('e')],
   textVorschlag: '',
 }
 const BEITRAG_DATEN: TeilenFensterBeitrag = {
   ...HOF_DATEN,
   art: 'beitrag',
-  link: 'https://farmerzone.at/hof-test?reiter=beitraege',
-  adresse: 'farmerzone.at/hof-test?reiter=beitraege',
+  link: 'https://agrilo.at/hof-test?reiter=beitraege',
+  adresse: 'agrilo.at/hof-test?reiter=beitraege',
   beitragId: BEITRAG_ID,
   titel: 'Frischer Honig',
   vorbelegt: ['d', 'e'],
@@ -235,14 +235,14 @@ describe('Beitrag-Modus: die reinen Regeln', () => {
     const ziel = { link: BEITRAG_DATEN.link, text: 'Frischer Honig', hofName: 'Hof Test' }
     expect(kanalZiel('wa', ziel)).toEqual({
       art: 'oeffnen',
-      href: `https://wa.me/?text=${encodeURIComponent('Frischer Honig\nhttps://farmerzone.at/hof-test?reiter=beitraege&k=wa')}`,
+      href: `https://wa.me/?text=${encodeURIComponent('Frischer Honig\nhttps://agrilo.at/hof-test?reiter=beitraege&k=wa')}`,
     })
     expect(kanalZiel('fb', ziel)).toEqual({
       art: 'oeffnen',
-      href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://farmerzone.at/hof-test?reiter=beitraege&k=fb')}`,
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://agrilo.at/hof-test?reiter=beitraege&k=fb')}`,
     })
-    expect(kanalZiel('ig', ziel)).toMatchObject({ art: 'bild', link: 'https://farmerzone.at/hof-test?reiter=beitraege&k=ig' })
-    expect(teilenBesuchAusAdresse('https://farmerzone.at/hof-test?reiter=beitraege&k=wa')).toEqual({ kanal: 'wa', ohne: '/hof-test?reiter=beitraege' })
+    expect(kanalZiel('ig', ziel)).toMatchObject({ art: 'bild', link: 'https://agrilo.at/hof-test?reiter=beitraege&k=ig' })
+    expect(teilenBesuchAusAdresse('https://agrilo.at/hof-test?reiter=beitraege&k=wa')).toEqual({ kanal: 'wa', ohne: '/hof-test?reiter=beitraege' })
   })
 
   it('kein Plakat im Beitrag-Modus — das Plakat trägt die feste Hofseite', () => {

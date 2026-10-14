@@ -72,7 +72,8 @@ describe('bestellStatusAnzeige — jeder reale Status bekommt Marke, Bedeutung u
     expect(bestellStatusAnzeige('PAID', TERMIN).art).toBe('laeuft')
     expect(bestellStatusAnzeige('PENDING_CONFIRMATION', TERMIN).art).toBe('tun')
     expect(bestellStatusAnzeige('CANCELLED', TERMIN).art).toBe('abgebrochen')
-    expect(bestellStatusAnzeige('NOT_PICKED_UP', TERMIN).art).toBe('abgebrochen')
+    // Freigabe Lauf 13 (Nr. 85): Nicht abgeholt ist abgeschlossen (erledigt), rot bleibt storniert.
+    expect(bestellStatusAnzeige('NOT_PICKED_UP', TERMIN).art).toBe('erledigt')
     expect(bestellStatusAnzeige('PICKED_UP', TERMIN).art).toBe('erledigt')
   })
 
@@ -119,7 +120,7 @@ describe('Kalendereintrag (ICS)', () => {
   const EINTRAG = {
     titel: 'Abholung Hof Müller',
     ort: 'Dorfstraße 12, 4910 Ried im Innkreis',
-    beschreibung: 'Bestellung HM-2611-A4F2\nhttps://farmerzone.at/hof-mueller/bestellung/o1?s=abc',
+    beschreibung: 'Bestellung HM-2611-A4F2\nhttps://agrilo.at/hof-mueller/bestellung/o1?s=abc',
     datum: '2026-09-04',
     beginn: '14:00',
     ende: '16:00',

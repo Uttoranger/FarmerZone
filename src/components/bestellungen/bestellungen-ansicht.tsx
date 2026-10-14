@@ -7,7 +7,7 @@ import { beendeBestellAnsicht } from '@/server/actions/bestellungen-finden'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { ListGruppe, ListRow } from '@/components/ui/list-row'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { Marke } from '@/components/ui/marke'
 import { KARTE, KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/bestaetigung/bestaetigung-teile'
 import { BestellungenFindenFormular } from '@/components/bestellungen/bestellungen-finden-formular'
 
@@ -75,9 +75,9 @@ function AnsichtKarte({ email }: { email: string }): React.JSX.Element {
 
 function LaufendeKarte({ eintrag }: { eintrag: BestellEintrag }): React.JSX.Element {
   return (
-    <li className={cn(KARTE, 'flex flex-col gap-3', eintrag.ton === 'fertig' && 'border-accent')}>
+    <li className={cn(KARTE, 'flex flex-col gap-3', eintrag.art === 'laeuft' && 'border-accent')}>
       <div className="flex min-w-0 items-center gap-2.5">
-        <StatusBadge status={eintrag.ton}>{eintrag.marke}</StatusBadge>
+        <Marke art={eintrag.art}>{eintrag.marke}</Marke>
         <span className="min-w-0 truncate text-[13px] text-muted-foreground" title={`${eintrag.bestellnummer} · ${eintrag.hofName}`}>
           {eintrag.bestellnummer} · {eintrag.hofName}
         </span>
@@ -123,7 +123,7 @@ export function BestellungenListe({
             symbol={ReceiptText}
             titel="Keine Bestellungen gefunden"
             satz="Unter dieser Adresse haben wir keine Bestellung gefunden. Vielleicht hast du mit einer anderen E-Mail-Adresse bestellt?"
-            aktion={
+            ausweg={
               <>
                 <Link href="/hoefe" className={KNOPF_GRUEN}>
                   Höfe entdecken

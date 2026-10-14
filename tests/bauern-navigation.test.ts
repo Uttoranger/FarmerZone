@@ -85,18 +85,19 @@ describe('Reihenfolge', () => {
     ])
   })
 
-  it('Browser: Produkte zwischen Bestellungen und Mein Hof; nur Bestellungen trägt eine Zahl', () => {
+  it('Browser: Postfach direkt nach Bestellungen (N12), Produkte vor Mein Hof; Zahlen an Bestellungen und Postfach', () => {
     expect(HAUPT.map((p) => [p.label, p.href, p.zahl])).toEqual([
       ['Heute', '/dashboard', undefined],
       ['Bestellungen', '/orders', 'bestellungen'],
+      ['Postfach', '/postfach', 'postfach'],
       ['Produkte', '/products', undefined],
       ['Mein Hof', '/farm-page', undefined],
     ])
   })
 
-  it('am Handy hat Produkte keinen Platz in der Leiste und steht deshalb im Mehr-Blatt', () => {
-    expect(NUR_IM_MEHR.map((p) => p.id)).toEqual(['produkte'])
-    expect(fuerNutzer({ isAdmin: false }).nurImMehr.map((p) => p.href)).toEqual(['/products'])
+  it('am Handy haben Postfach und Produkte keinen Platz in der Leiste — Postfach steht ganz oben im Mehr-Blatt', () => {
+    expect(NUR_IM_MEHR.map((p) => p.id)).toEqual(['postfach', 'produkte'])
+    expect(fuerNutzer({ isAdmin: false }).nurImMehr.map((p) => p.href)).toEqual(['/postfach', '/products'])
   })
 
   it('Plus am Handy: Verkauf eintragen, Neuer Beitrag, Produkt anlegen — jeweils mit einem Satz', () => {
@@ -347,9 +348,9 @@ describe('Vollständigkeit', () => {
 // aus denselben Punkten; die Bestandsnavigation oben bleibt unverändert, bis
 // die erste Route in die HofShell umzieht.
 describe('HofShell: Seitenleiste', () => {
-  it('Hauptpunkte: Heute · Bestellungen · Produkte · Mein Hof — dieselben Punkte wie im Bestand', () => {
+  it('Hauptpunkte: Heute · Bestellungen · Postfach · Produkte · Mein Hof — dieselben Punkte wie im Bestand', () => {
     const nav = hofNavigation({ isAdmin: false })
-    expect(nav.haupt.map((p) => p.label)).toEqual(['Heute', 'Bestellungen', 'Produkte', 'Mein Hof'])
+    expect(nav.haupt.map((p) => p.label)).toEqual(['Heute', 'Bestellungen', 'Postfach', 'Produkte', 'Mein Hof'])
     expect(nav.haupt).toEqual(HAUPT)
   })
 
@@ -416,8 +417,9 @@ describe('HofShell: Handy', () => {
     expect(HAUPT.find((p) => p.id === 'mein-hof')?.href).toBe('/farm-page')
   })
 
-  it('„Mehr" (N3): Kunden, Verkäufe, Auswertung, Region, Einstellungen, Problem melden, Admin — ohne Mein Hof und ohne Produkte', () => {
+  it('„Mehr" (N3, N12): ganz oben Postfach, dann Kunden, Verkäufe, Auswertung, Region, Einstellungen, Problem melden, Admin — ohne Mein Hof und ohne Produkte', () => {
     expect(hofNavigation({ isAdmin: true }).mehr.map((p) => p.label)).toEqual([
+      'Postfach',
       'Kunden',
       'Verkäufe',
       'Auswertung',
@@ -543,11 +545,21 @@ describe('HofShell: aktive Punkte', () => {
     expect(hofHandyAriaAktuell('/dashboard', meinHofLeiste)).toBeUndefined()
   })
 
+  it('Postfach (N12): aktiv auf /postfach und im Faden; am Handy leuchtet „Mehr"; der Faden führt zurück ins Postfach', () => {
+    expect(hofAktiverPunkt('/postfach')).toBe('postfach')
+    expect(hofAktiverPunkt('/postfach/cuntaaaaaaaaaaaaaaaaaaaa1')).toBe('postfach')
+    expect(hofHandyAktiverPunkt('/postfach/cuntaaaaaaaaaaaaaaaaaaaa1')).toBe('postfach')
+    expect(hofMehrAktiv('/postfach')).toBe(true)
+    expect(elternseite('/postfach/cuntaaaaaaaaaaaaaaaaaaaa1')).toEqual({ href: '/postfach', name: 'Postfach' })
+    expect(elternseite('/postfach')).toBeNull()
+  })
+
   it('die Seitenleiste bleibt, wie sie war: Produkte und Mein Hof getrennt, Mein Hof auf /farm-page und /status', () => {
     const nav = hofNavigation({ isAdmin: false })
     expect(nav.haupt.map((p) => [p.id, p.href])).toEqual([
       ['heute', '/dashboard'],
       ['bestellungen', '/orders'],
+      ['postfach', '/postfach'],
       ['produkte', '/products'],
       ['mein-hof', '/farm-page'],
     ])

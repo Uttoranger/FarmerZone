@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Text, Link, Hr } from '@react-email/components'
 import { EmailLayout, h1, bodyText, mutedText, ctaButton, textLink, MAIL_FARBE } from './_layout'
+import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
 
 export interface NewsletterEmailProps {
   farmName: string
@@ -21,7 +22,7 @@ export function NewsletterEmail({
   ctaLabel,
   ctaUrl,
   unsubscribeUrl,
-  appUrl = 'https://farmerzone.at',
+  appUrl = PRODUKTION_ADRESSE,
 }: NewsletterEmailProps) {
   const shopUrl = `${appUrl}/${farmSlug}`
 

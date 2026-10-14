@@ -12,8 +12,9 @@ import {
   INFOSEITE_TITEL,
 } from '@/components/shared/infoseite-stil'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'Impressum — FarmerZone' }
+export const metadata: Metadata = { title: `Impressum — ${MARKE}` }
 
 /**
  * Impressum in der KundeShell (seit Nr. 54, kein Mockup — Formen aus
@@ -34,7 +35,7 @@ export default function ImpressumPage() {
             {/* Orange Hinweiskarte statt der alten Bernstein-Fläche: Im neuen
                 Design gibt es für „Achtung" nur die Hinweiskarte (DESIGN_SYSTEM). */}
             <Hinweiskarte ton="orange" symbol={TriangleAlert} className="mb-4">
-              Pilotbetrieb — FarmerZone wird derzeit mit ausgewählten Höfen erprobt. Kein kommerzieller Betrieb.
+              Pilotbetrieb — {MARKE} wird derzeit mit ausgewählten Höfen erprobt. Kein kommerzieller Betrieb.
             </Hinweiskarte>
             <p className="mb-1 text-foreground"><strong className="font-semibold">Betreiber der Plattform:</strong></p>
             <address className="not-italic text-muted-foreground space-y-0.5">
@@ -48,7 +49,7 @@ export default function ImpressumPage() {
           <section>
             <h2 className={INFOSEITE_ABSCHNITT}>Unternehmensgegenstand</h2>
             <p>
-              FarmerZone ist eine digitale Vermittlungsplattform im Pilotbetrieb, die Verbrauchern die
+              {MARKE} ist eine digitale Vermittlungsplattform im Pilotbetrieb, die Verbrauchern die
               Möglichkeit bietet, Produkte direkt bei regionalen Landwirtschaftsbetrieben (Höfen) zu
               bestellen und abzuholen.
             </p>
@@ -57,11 +58,11 @@ export default function ImpressumPage() {
           <section>
             <h2 className={INFOSEITE_ABSCHNITT}>Haftungsausschluss — Produkte und Inhalte der Höfe</h2>
             <p>
-              FarmerZone stellt ausschließlich die technische Plattform zur Verfügung.
+              {MARKE} stellt ausschließlich die technische Plattform zur Verfügung.
               Für die Beschreibung, Qualität, Kennzeichnung und Lieferung der angebotenen Produkte
               sind ausschließlich die jeweiligen Hofbetreiberinnen und Hofbetreiber verantwortlich.
               Diese handeln als eigenständige Verkäuferinnen und Verkäufer und sind selbst
-              Vertragsparterinnen bzw. Vertragspartner der Käuferinnen und Käufer.
+              Vertragspartnerinnen bzw. Vertragspartner der Käuferinnen und Käufer.
             </p>
           </section>
 

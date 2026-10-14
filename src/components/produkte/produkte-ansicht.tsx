@@ -204,7 +204,7 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
           symbol={Package}
           titel={PRODUKTE_LEER.titel}
           satz={PRODUKTE_LEER.satz}
-          aktion={neuKnopf()}
+          ausweg={neuKnopf()}
         />
       ) : (
         <>
@@ -255,7 +255,7 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
               symbol={Search}
               titel="Kein Produkt passt"
               satz={suche.trim() ? `Nichts gefunden für „${suche.trim()}“.` : 'In diesem Filter ist gerade kein Produkt.'}
-              aktion={
+              ausweg={
                 <Link
                   href="/products"
                   prefetch={false}

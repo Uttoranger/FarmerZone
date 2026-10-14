@@ -48,7 +48,7 @@ const PRODUKTION: UmgebungsWerte = {
   NODE_ENV: 'production',
   VERCEL_ENV: 'production',
   VERCEL_URL: 'farmer-zone-xyz789-team.vercel.app',
-  NEXT_PUBLIC_APP_URL: 'https://farmerzone.at',
+  NEXT_PUBLIC_APP_URL: 'https://agrilo.at',
   DATABASE_URL: FREMDE_DB,
   STRIPE_SECRET_KEY: 'sk_live_abc',
   STRIPE_CONNECT_WEBHOOK_SECRET: 'whsec_connect_platzhalter',
@@ -93,8 +93,8 @@ describe('bestimmeUmgebung — Art', () => {
 describe('bestimmeUmgebung — Adresse und vertraute Herkünfte', () => {
   it('vertraut in Produktion ausschließlich NEXT_PUBLIC_APP_URL', () => {
     const u = bestimmeUmgebung(PRODUKTION)
-    expect(u.appUrl).toBe('https://farmerzone.at')
-    expect(u.trustedOrigins).toEqual(['https://farmerzone.at'])
+    expect(u.appUrl).toBe('https://agrilo.at')
+    expect(u.trustedOrigins).toEqual(['https://agrilo.at'])
   })
 
   it('ersetzt in Produktion eine fehlende NEXT_PUBLIC_APP_URL durch NICHTS — auch nicht durch VERCEL_URL', () => {
@@ -428,10 +428,10 @@ describe('bestimmeUmgebung — keine Geheimnisse im Ergebnis', () => {
   })
 })
 
-// ─── Testumgebung test.farmerzone.at (Register Z3, Nr. 43) ───────────────────
+// ─── Testumgebung test.agrilo.at (Register Z3, Nr. 43) ───────────────────
 // Erfundene Adressen unter .example — nur PRODUKTION_ADRESSE ist die echte,
 // öffentliche Adresse, und sie kommt aus dem Modul, nicht aus dem Test.
-const TESTUMGEBUNG = 'https://test.farmerzone.example'
+const TESTUMGEBUNG = 'https://test.plattform.example'
 const STAGING: UmgebungsWerte = {
   ...PREVIEW,
   VERCEL_GIT_COMMIT_REF: 'staging',
@@ -441,24 +441,24 @@ const STAGING: UmgebungsWerte = {
 
 describe('httpsHerkunft — nur eine reine https-Adresse', () => {
   it('gibt die Herkunft normalisiert zurück: klein, ohne Schrägstrich und ohne Punkt am Ende', () => {
-    expect(httpsHerkunft('https://test.farmerzone.example')).toBe(TESTUMGEBUNG)
-    expect(httpsHerkunft('  https://Test.FarmerZone.example/  ')).toBe(TESTUMGEBUNG)
+    expect(httpsHerkunft('https://test.plattform.example')).toBe(TESTUMGEBUNG)
+    expect(httpsHerkunft('  https://Test.Plattform.example/  ')).toBe(TESTUMGEBUNG)
     // Ein Punkt am Ende meint denselben Host — eine Schreibweise für Links.
-    expect(httpsHerkunft('https://test.farmerzone.example.')).toBe(TESTUMGEBUNG)
+    expect(httpsHerkunft('https://test.plattform.example.')).toBe(TESTUMGEBUNG)
     // Bleibt nach dem Normalisieren ein Punkt am Ende, ist es keine Herkunft (Runde 2).
-    expect(httpsHerkunft('https://test.farmerzone.example..')).toBeNull()
-    expect(httpsHerkunft('https://test..farmerzone.example')).toBeNull()
-    expect(httpsHerkunft('https://test.farmerzone.example:8443')).toBe('https://test.farmerzone.example:8443')
+    expect(httpsHerkunft('https://test.plattform.example..')).toBeNull()
+    expect(httpsHerkunft('https://test..plattform.example')).toBeNull()
+    expect(httpsHerkunft('https://test.plattform.example:8443')).toBe('https://test.plattform.example:8443')
   })
 
   it('lehnt alles ab, was keine reine https-Herkunft ist', () => {
     for (const wert of [
-      'http://test.farmerzone.example',
-      'test.farmerzone.example',
-      'https://test.farmerzone.example/pfad',
-      'https://test.farmerzone.example/?x=1',
-      'https://test.farmerzone.example/#anker',
-      'https://nutzer:passwort@test.farmerzone.example',
+      'http://test.plattform.example',
+      'test.plattform.example',
+      'https://test.plattform.example/pfad',
+      'https://test.plattform.example/?x=1',
+      'https://test.plattform.example/#anker',
+      'https://nutzer:passwort@test.plattform.example',
       'https://*.vercel.app',
       'javascript:alert(1)',
       'keine adresse',
@@ -477,7 +477,7 @@ describe('httpsHerkunft — nur eine reine https-Adresse', () => {
 describe('bestimmeUmgebung — eigene Adresse der Vorschau (Register Z3)', () => {
   it('Produktion: nur NEXT_PUBLIC_APP_URL — ohne https so, wie sie steht (bereinigt wird seit Nr. 56 nur eine https-Adresse)', () => {
     expect(bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_TESTUMGEBUNG_URL: TESTUMGEBUNG }).trustedOrigins).toEqual([
-      'https://farmerzone.at',
+      'https://agrilo.at',
     ])
     // Der lokale Produktions-Build (pnpm start) läuft mit http://localhost — wie bisher.
     const lokalerBuild = bestimmeUmgebung({ NODE_ENV: 'production', NEXT_PUBLIC_APP_URL: 'http://localhost:3000' })
@@ -507,14 +507,14 @@ describe('bestimmeUmgebung — eigene Adresse der Vorschau (Register Z3)', () =>
   })
 
   it('normalisiert die Adresse der Vorschau wie jede Herkunft', () => {
-    expect(bestimmeUmgebung({ ...STAGING, NEXT_PUBLIC_APP_URL: 'https://Test.FarmerZone.example/' }).appUrl).toBe(TESTUMGEBUNG)
+    expect(bestimmeUmgebung({ ...STAGING, NEXT_PUBLIC_APP_URL: 'https://Test.Plattform.example/' }).appUrl).toBe(TESTUMGEBUNG)
   })
 
   it('nimmt in der Vorschau nur https — sonst die Vercel-Adresse und eine Warnung im Banner', () => {
-    for (const wert of ['http://test.farmerzone.example', 'https://test.farmerzone.example/pfad', 'https://*.vercel.app']) {
+    for (const wert of ['http://test.plattform.example', 'https://test.plattform.example/pfad', 'https://*.vercel.app']) {
       const u = bestimmeUmgebung({ ...STAGING, NEXT_PUBLIC_APP_URL: wert })
       expect(u.appUrl, wert).toBe('https://farmer-zone-git-staging-team.vercel.app')
-      expect(u.trustedOrigins.join(' '), wert).not.toContain('test.farmerzone')
+      expect(u.trustedOrigins.join(' '), wert).not.toContain('test.plattform')
       expect(u.warnungen, wert).toEqual(['NEXT_PUBLIC_APP_URL ist keine reine https-Adresse — die Vorschau nimmt ihre Vercel-Adresse.'])
     }
   })
@@ -538,7 +538,7 @@ describe('bestimmeUmgebung — eigene Adresse der Vorschau (Register Z3)', () =>
     ]) {
       const u = bestimmeUmgebung({ ...STAGING, NEXT_PUBLIC_APP_URL: wert })
       expect(u.appUrl, wert).toBe('https://farmer-zone-git-staging-team.vercel.app')
-      expect(u.trustedOrigins.join(' '), wert).not.toContain('farmerzone.at')
+      expect(u.trustedOrigins.join(' '), wert).not.toContain('agrilo.at')
       expect(u.warnungen, wert).toEqual(['NEXT_PUBLIC_APP_URL zeigt auf die echte Seite — die Vorschau nimmt ihre Vercel-Adresse.'])
     }
   })
@@ -566,7 +566,7 @@ describe('bestimmeUmgebung — eigene Adresse der Vorschau (Register Z3)', () =>
 
 describe('bestimmeUmgebung — Link zur Testumgebung (Register Z3)', () => {
   it('reicht NEXT_PUBLIC_TESTUMGEBUNG_URL normalisiert durch', () => {
-    expect(bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_TESTUMGEBUNG_URL: 'https://Test.FarmerZone.example/' }).testumgebungUrl).toBe(TESTUMGEBUNG)
+    expect(bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_TESTUMGEBUNG_URL: 'https://Test.Plattform.example/' }).testumgebungUrl).toBe(TESTUMGEBUNG)
   })
 
   it('ohne Variable kein Link und keine Warnung', () => {
@@ -576,7 +576,7 @@ describe('bestimmeUmgebung — Link zur Testumgebung (Register Z3)', () => {
   })
 
   it('ohne reine https-Adresse kein Link, dafür eine Warnung (Produktion: an Sentry, Vorschau: im Banner)', () => {
-    for (const wert of ['http://test.farmerzone.example', 'test.farmerzone.example', 'https://test.farmerzone.example/admin']) {
+    for (const wert of ['http://test.plattform.example', 'test.plattform.example', 'https://test.plattform.example/admin']) {
       const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_TESTUMGEBUNG_URL: wert })
       expect(u.testumgebungUrl, wert).toBeNull()
       expect(u.warnungen, wert).toEqual(['NEXT_PUBLIC_TESTUMGEBUNG_URL ist keine reine https-Adresse — der Link zur Testumgebung fehlt.'])
@@ -745,14 +745,14 @@ describe('produktionsAdresse — NEXT_PUBLIC_APP_URL in der Produktion (Nr. 56)'
   // Eine Abfrage („?") macht den Wert seit Register S16 ungültig (Block S16 unten).
   it('macht aus einer https-Adresse die reine Herkunft: klein, ohne Pfad, Anker, Zugangsdaten und Schrägstrich am Ende', () => {
     for (const [wert, herkunft] of [
-      ['https://farmerzone.example', 'https://farmerzone.example'],
-      ['https://FarmerZone.example/', 'https://farmerzone.example'],
-      ['  https://farmerzone.example/  ', 'https://farmerzone.example'],
-      ['https://farmerzone.example/pfad/tiefer#anker', 'https://farmerzone.example'],
-      ['https://farmerzone.example.', 'https://farmerzone.example'],
-      ['https://farmerzone.example:8443/', 'https://farmerzone.example:8443'],
-      ['https://farmerzone.example:443', 'https://farmerzone.example'],
-      ['https://nutzer:passwort@farmerzone.example', 'https://farmerzone.example'],
+      ['https://plattform.example', 'https://plattform.example'],
+      ['https://Plattform.example/', 'https://plattform.example'],
+      ['  https://plattform.example/  ', 'https://plattform.example'],
+      ['https://plattform.example/pfad/tiefer#anker', 'https://plattform.example'],
+      ['https://plattform.example.', 'https://plattform.example'],
+      ['https://plattform.example:8443/', 'https://plattform.example:8443'],
+      ['https://plattform.example:443', 'https://plattform.example'],
+      ['https://nutzer:passwort@plattform.example', 'https://plattform.example'],
     ] as const) {
       expect(produktionsAdresse(wert), wert).toEqual({ herkunft })
     }
@@ -760,12 +760,12 @@ describe('produktionsAdresse — NEXT_PUBLIC_APP_URL in der Produktion (Nr. 56)'
 
   it('behält einen ungültigen Wert roh (nur ohne Ränder) — kein https oder kein gültiger Host', () => {
     for (const wert of [
-      'http://farmerzone.example',
+      'http://plattform.example',
       'http://localhost:3000',
-      'farmerzone.example',
-      'ftp://farmerzone.example',
-      'https://*.farmerzone.example',
-      'https://farmerzone.example..',
+      'plattform.example',
+      'ftp://plattform.example',
+      'https://*.plattform.example',
+      'https://plattform.example..',
       'https://far mer.example',
       'keine adresse',
     ]) {
@@ -783,25 +783,25 @@ describe('produktionsAdresse — NEXT_PUBLIC_APP_URL in der Produktion (Nr. 56)'
 describe('bestimmeUmgebung — Produktion nimmt NEXT_PUBLIC_APP_URL als bereinigte Herkunft (Nr. 56)', () => {
   it('bereinigt die Adresse für vertraute Herkünfte und appUrl — bei der echten Seite ohne Warnung', () => {
     // Seit S16: ohne „?" (sonst ungültig) und mit dem echten Host (sonst eine Warnung).
-    const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_APP_URL: 'https://FarmerZone.at/start' })
-    expect(u.trustedOrigins).toEqual(['https://farmerzone.at'])
-    expect(u.appUrl).toBe('https://farmerzone.at')
+    const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_APP_URL: 'https://Agrilo.at/start' })
+    expect(u.trustedOrigins).toEqual(['https://agrilo.at'])
+    expect(u.appUrl).toBe('https://agrilo.at')
     expect(u.warnungen).toEqual([])
   })
 
   it('ein ungültiger Wert bleibt roh — nie leer, sonst fiele APP_URL auf localhost — und meldet sich ohne den Wert', () => {
-    const wert = 'http://farmerzone.example/geheim-123'
+    const wert = 'http://plattform.example/geheim-123'
     const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_APP_URL: wert })
     expect(u.trustedOrigins).toEqual([wert])
     expect(u.appUrl).toBe(wert)
     expect(u.warnungen).toEqual([WARNUNG_APP_URL_UNGUELTIG])
-    expect(u.warnungen.join(' ')).not.toMatch(/farmerzone|geheim/)
+    expect(u.warnungen.join(' ')).not.toMatch(/plattform|geheim/)
   })
 
   it('auch ein Wert mit „*" bleibt roh — Better Auth liest ihn als Muster; gewollt (nie leer), er meldet sich als Warnung (Runde 1)', () => {
     // Hält fest, was der Kommentar zu trustedOrigins sagt: Erzeugt wird nie
     // ein Platzhalter, aber ein eingetragener steht roh da.
-    const wert = 'https://*.farmerzone.example'
+    const wert = 'https://*.plattform.example'
     const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_APP_URL: wert })
     expect(u.trustedOrigins).toEqual([wert])
     // Seit S16 mit eigener Warnung „Muster".
@@ -824,7 +824,7 @@ describe('bestimmeUmgebung — Produktion nimmt NEXT_PUBLIC_APP_URL als bereinig
 
   it('Vorschau und lokal: keine Warnung zur Adresse der Produktion', () => {
     expect(bestimmeUmgebung({ ...PREVIEW, NEXT_PUBLIC_APP_URL: undefined }).warnungen).toEqual([])
-    expect(bestimmeUmgebung({ ...LOKAL, NEXT_PUBLIC_APP_URL: 'http://farmerzone.example' }).warnungen).toEqual([])
+    expect(bestimmeUmgebung({ ...LOKAL, NEXT_PUBLIC_APP_URL: 'http://plattform.example' }).warnungen).toEqual([])
   })
 })
 
@@ -836,7 +836,7 @@ describe('Produktion: die Warnung zu NEXT_PUBLIC_APP_URL geht an Sentry (Nr. 56)
     vi.doMock('@/lib/env', () => ({
       env: {
         VERCEL_ENV: 'production',
-        NEXT_PUBLIC_APP_URL: 'http://farmerzone.example/geheim-123',
+        NEXT_PUBLIC_APP_URL: 'http://plattform.example/geheim-123',
         DATABASE_URL: FREMDE_DB,
         STRIPE_SECRET_KEY: 'sk_live_abc',
         STRIPE_CONNECT_WEBHOOK_SECRET: 'whsec_connect_platzhalter',
@@ -845,15 +845,15 @@ describe('Produktion: die Warnung zu NEXT_PUBLIC_APP_URL geht an Sentry (Nr. 56)
     const server = await import('@/lib/umgebung-server')
     const sentry = await import('@sentry/nextjs')
 
-    expect(server.UMGEBUNG.trustedOrigins).toEqual(['http://farmerzone.example/geheim-123'])
-    expect(server.APP_URL).toBe('http://farmerzone.example/geheim-123')
+    expect(server.UMGEBUNG.trustedOrigins).toEqual(['http://plattform.example/geheim-123'])
+    expect(server.APP_URL).toBe('http://plattform.example/geheim-123')
     server.meldeUmgebungsWarnungen()
     server.meldeUmgebungsWarnungen()
     expect(sentry.captureMessage).toHaveBeenCalledTimes(1)
     const [satz, stufe] = vi.mocked(sentry.captureMessage).mock.calls[0]
     expect(satz).toContain(WARNUNG_APP_URL_UNGUELTIG)
     expect(stufe).toBe('warning')
-    expect(String(satz)).not.toMatch(/farmerzone\.example|geheim/)
+    expect(String(satz)).not.toMatch(/plattform\.example|geheim/)
   })
 })
 
@@ -863,10 +863,10 @@ describe('Produktion: die Warnung zu NEXT_PUBLIC_APP_URL geht an Sentry (Nr. 56)
 // Wert, über meldeUmgebungsWarnungen einmal je Instanz.
 
 describe('S16 — NEXT_PUBLIC_APP_URL in der Produktion: kein Muster, fremder Host mit Warnung (Nr. 64)', () => {
-  const PROD_ECHT: UmgebungsWerte = { ...PRODUKTION, NEXT_PUBLIC_APP_URL: 'https://farmerzone.at' }
+  const PROD_ECHT: UmgebungsWerte = { ...PRODUKTION, NEXT_PUBLIC_APP_URL: 'https://agrilo.at' }
 
   it('„*" oder „?" irgendwo im Wert: ungültig, roh — auch wo die Herkunft sonst lesbar wäre', () => {
-    for (const wert of ['https://farmerzone.at/?x=1', 'https://farmerzone.at?', 'https://farmerzone.at/*', 'https://*.farmerzone.at', 'https://farmerzone.at/pfad?']) {
+    for (const wert of ['https://agrilo.at/?x=1', 'https://agrilo.at?', 'https://agrilo.at/*', 'https://*.agrilo.at', 'https://agrilo.at/pfad?']) {
       expect(produktionsAdresse(` ${wert} `), wert).toEqual({ roh: wert })
       const u = bestimmeUmgebung({ ...PROD_ECHT, NEXT_PUBLIC_APP_URL: wert })
       expect(u.trustedOrigins, wert).toEqual([wert])
@@ -879,8 +879,8 @@ describe('S16 — NEXT_PUBLIC_APP_URL in der Produktion: kein Muster, fremder Ho
     for (const [wert, herkunft] of [
       ['https://farmer-zone-beispiel.vercel.app/', 'https://farmer-zone-beispiel.vercel.app'],
       ['https://bäckerei.at/', 'https://xn--bckerei-5wa.at'],
-      ['https://farmerzone.at@evil.example', 'https://evil.example'],
-      ['https://farmerzone.at.evil.example/', 'https://farmerzone.at.evil.example'],
+      ['https://agrilo.at@evil.example', 'https://evil.example'],
+      ['https://agrilo.at.evil.example/', 'https://agrilo.at.evil.example'],
     ] as const) {
       expect(produktionsAdresse(wert), wert).toEqual({ herkunft })
       const u = bestimmeUmgebung({ ...PROD_ECHT, NEXT_PUBLIC_APP_URL: wert })
@@ -888,17 +888,17 @@ describe('S16 — NEXT_PUBLIC_APP_URL in der Produktion: kein Muster, fremder Ho
       expect(u.warnungen, wert).toEqual([WARNUNG_APP_URL_FREMDER_HOST])
       expect(u.warnungen.join(' '), wert).not.toMatch(/vercel|beispiel|xn--|evil|bäckerei/)
     }
-    for (const wert of ['https://farmerzone.at', 'https://www.farmerzone.at/', 'https://FarmerZone.at./start#oben']) {
+    for (const wert of ['https://agrilo.at', 'https://www.agrilo.at/', 'https://Agrilo.at./start#oben']) {
       expect(bestimmeUmgebung({ ...PROD_ECHT, NEXT_PUBLIC_APP_URL: wert }).warnungen, wert).toEqual([])
     }
   })
 
   it('ein Port macht auch die echte Seite zum fremden Host — angenommen, aber gemeldet; ohne Port und mit Standard-Port nicht (Nr. 70)', () => {
     // Better Auth vergleicht Herkünfte genau: Der Browser auf der echten Seite
-    // sendet https://farmerzone.at ohne Port, eine Herkunft mit Port träfe er nie.
+    // sendet https://agrilo.at ohne Port, eine Herkunft mit Port träfe er nie.
     for (const [wert, herkunft] of [
-      ['https://farmerzone.at:8443', 'https://farmerzone.at:8443'],
-      ['https://www.farmerzone.at:8443/start', 'https://www.farmerzone.at:8443'],
+      ['https://agrilo.at:8443', 'https://agrilo.at:8443'],
+      ['https://www.agrilo.at:8443/start', 'https://www.agrilo.at:8443'],
     ] as const) {
       expect(produktionsAdresse(wert), wert).toEqual({ herkunft })
       const u = bestimmeUmgebung({ ...PROD_ECHT, NEXT_PUBLIC_APP_URL: wert })
@@ -907,7 +907,7 @@ describe('S16 — NEXT_PUBLIC_APP_URL in der Produktion: kein Muster, fremder Ho
       expect(u.warnungen.join(' '), wert).not.toMatch(/8443/)
     }
     // Gegenprobe: Der Standard-Port fällt schon im URL-Parser weg — die Warnung kommt nur mit einem Port.
-    for (const wert of ['https://farmerzone.at', 'https://farmerzone.at:443']) {
+    for (const wert of ['https://agrilo.at', 'https://agrilo.at:443']) {
       expect(bestimmeUmgebung({ ...PROD_ECHT, NEXT_PUBLIC_APP_URL: wert }).warnungen, wert).toEqual([])
     }
   })
@@ -920,8 +920,31 @@ describe('S16 — NEXT_PUBLIC_APP_URL in der Produktion: kein Muster, fremder Ho
     expect(u.warnungen).toEqual([WARNUNG_APP_URL_UNGUELTIG])
   })
 
+  it('M1 (Nr. 91): die neue Domain ist die echte Seite — mit und ohne www keine Warnung zum Host', () => {
+    // Die Domain hier wörtlich: Mit PRODUKTION_ADRESSE prüfte der Test die Konstante gegen sich selbst.
+    for (const wert of ['https://agrilo.at', 'https://www.agrilo.at/', 'https://AGRILO.AT/start']) {
+      const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_APP_URL: wert })
+      expect(u.warnungen, wert).not.toContain(WARNUNG_APP_URL_FREMDER_HOST)
+      expect(u.warnungen, wert).toEqual([])
+    }
+    expect(bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_APP_URL: 'https://agrilo.at/' }).trustedOrigins).toEqual(['https://agrilo.at'])
+  })
+
+  it('M1 (Nr. 91): die alte Domain gilt in der Produktion nicht mehr als echte Herkunft — angenommen, aber gemeldet', () => {
+    // Gegenprobe zum Cutover: Bleibt NEXT_PUBLIC_APP_URL auf der alten Domain stehen, meldet
+    // sich das über Sentry, statt still als echte Seite durchzugehen.
+    for (const [wert, herkunft] of [
+      ['https://farmerzone.at', 'https://farmerzone.at'],
+      ['https://www.farmerzone.at/', 'https://www.farmerzone.at'],
+    ] as const) {
+      const u = bestimmeUmgebung({ ...PRODUKTION, NEXT_PUBLIC_APP_URL: wert })
+      expect(u.trustedOrigins, wert).toEqual([herkunft])
+      expect(u.warnungen, wert).toEqual([WARNUNG_APP_URL_FREMDER_HOST])
+    }
+  })
+
   it('Vorschau und lokal: keine Warnung zum Host, auch nicht bei fremdem', () => {
-    expect(bestimmeUmgebung({ ...PREVIEW, NEXT_PUBLIC_APP_URL: 'https://test.farmerzone.example' }).warnungen).toEqual([])
+    expect(bestimmeUmgebung({ ...PREVIEW, NEXT_PUBLIC_APP_URL: 'https://test.plattform.example' }).warnungen).toEqual([])
     expect(bestimmeUmgebung({ ...LOKAL, NEXT_PUBLIC_APP_URL: 'https://farmer-zone-beispiel.vercel.app' }).warnungen).toEqual([])
   })
 

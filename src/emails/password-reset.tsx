@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Text, Link } from '@react-email/components'
 import { EmailLayout, h1, bodyText, mutedText, ctaButton } from './_layout'
+import { MARKE } from '@/lib/marke'
 
 export interface PasswordResetProps {
   resetUrl: string
@@ -13,8 +14,7 @@ export function PasswordResetEmail({ resetUrl }: PasswordResetProps) {
       <Text style={bodyText}>
         Hallo,
         <br />
-        du möchtest das Passwort für dein FarmerZone-Konto zurücksetzen. Klicke auf den Button
-        unten und wähle ein neues Passwort.
+        {`du möchtest das Passwort für dein ${MARKE}-Konto zurücksetzen. Klicke auf den Button unten und wähle ein neues Passwort.`}
       </Text>
 
       <div style={{ textAlign: 'center' as const, margin: '28px 0' }}>

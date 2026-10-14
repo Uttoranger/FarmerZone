@@ -17,6 +17,8 @@ import { Wortmarke } from '@/components/shared/wortmarke'
 import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
 import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
 import { ADMIN_RAHMEN } from '@/components/admin/admin-teile'
+import { MARKE } from '@/lib/marke'
+import { ADMIN_POSTFACH_TEXT } from '@/lib/postfach'
 
 /*
  * Die Shell des Betreiber-Bereichs im neuen Design (Gate 2): eigene
@@ -63,7 +65,7 @@ export type AdminShellProps = {
 
 function zahlFuer(reiter: AdminReiter, zahlen: AdminShellProps['zahlen']): { anzahl?: number; wofuer: string } {
   if (reiter.zahl === 'hoefe') return { anzahl: zahlen?.hoefe, wofuer: 'Höfe warten auf Freischaltung' }
-  if (reiter.zahl === 'briefkasten') return { anzahl: zahlen?.briefkasten, wofuer: 'Meldungen zu entscheiden' }
+  if (reiter.zahl === 'briefkasten') return { anzahl: zahlen?.briefkasten, wofuer: ADMIN_POSTFACH_TEXT.zaehlerReiter }
   return { wofuer: '' }
 }
 
@@ -119,7 +121,7 @@ export function AdminShell({
       <header className="border-b border-border bg-card print:hidden">
         <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 px-4 py-2 sm:gap-x-3 md:min-h-16 md:flex-nowrap md:gap-x-[18px] md:px-8">
           <div className="flex min-h-11 items-center gap-2.5">
-            <Link href="/admin" aria-label="FarmerZone Admin – Übersicht der Höfe" className={cn('rounded-md', FOKUS_RAHMEN)}>
+            <Link href="/admin" aria-label={`${MARKE} Admin – Übersicht der Höfe`} className={cn('rounded-md', FOKUS_RAHMEN)}>
               <Wortmarke />
             </Link>
             {/* Am schmalen Handy passt die Marke nicht neben Rückweg und Hell/Dunkel in eine Zeile; die Reiter darunter sagen ohnehin, wo man ist. */}

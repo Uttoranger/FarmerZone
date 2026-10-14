@@ -14,8 +14,7 @@ import { formatSlotTime } from '@/lib/pickup-days'
 import { artikelFehltErlaubt } from '@/lib/artikel-fehlt'
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
 import type { PaymentMethod, PaymentStatus } from '@prisma/client'
-/** Die Töne der StatusBadge (src/components/ui/status-badge.tsx). */
-type StatusTon = 'offen' | 'fertig' | 'neutral'
+import type { MarkeArt } from '@/lib/marke-art'
 
 /** Noch nicht übergeben und nicht storniert — „offen" in Kopf und Filter. */
 export const OFFEN_STATUS: readonly string[] = ['PENDING_CONFIRMATION', 'PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY']
@@ -162,15 +161,21 @@ export function positionenText(items: readonly { productName: string; quantity: 
   return rest > 0 ? `${gezeigt.join(' · ')} +${rest}` : gezeigt.join(' · ')
 }
 
-/** Die Marke einer Bestellung — offen orange, gepackt grün, alles andere neutral. */
-export function bestellMarke(status: string): { text: string; ton: StatusTon } {
+/**
+ * Die Marke einer Bestellung aus Sicht des Hofs, ihre Bedeutung als Art (Register G5): zum
+ * Packen tun, gepackt läuft, wartend und abgeschlossen erledigt (auch „Nicht abgeholt" — für den
+ * Hof ist nichts mehr zu tun), storniert abgebrochen. Die EINE Hof-Lesart für Bestellliste,
+ * Bestelldetail, Kundendetail und Packliste; die Kundin liest dieselben Status anders
+ * (`bestellStatusAnzeige`, src/lib/bestellstatus.ts).
+ */
+export function bestellMarke(status: string): { text: string; art: MarkeArt } {
   switch (status) {
     case 'PICKED_UP':
-      return { text: 'Abgeholt', ton: 'neutral' }
+      return { text: 'Abgeholt', art: 'erledigt' }
     case 'CANCELLED':
-      return { text: 'Storniert', ton: 'neutral' }
+      return { text: 'Storniert', art: 'abgebrochen' }
     case 'NOT_PICKED_UP':
-      return { text: 'Nicht abgeholt', ton: 'neutral' }
+      return { text: 'Nicht abgeholt', art: 'erledigt' }
     default:
       return PACK_MARKE[abholChip(status)]
   }

@@ -9,6 +9,7 @@ import { NEU_EINRICHTEN_KURZ, istUnzugaenglichesStripeKonto, neuEinrichtenSchlue
 import { vermerkeUnbekanntesHofKonto } from '@/server/hofkonto-unbekannt'
 import { APP_URL } from '@/lib/umgebung-server'
 import { onlineZahlungEinschaltenSchema } from '@/schemas/online-zahlung'
+import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
 
 async function getAuthenticatedFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -31,7 +32,7 @@ async function getAuthenticatedFarm() {
 // Stripe requires a valid https:// URL; localhost is rejected even in test mode
 function getPublicUrl(): string {
   if (APP_URL.startsWith('https://')) return APP_URL
-  return 'https://farmerzone.at'
+  return PRODUKTION_ADRESSE
 }
 
 /**

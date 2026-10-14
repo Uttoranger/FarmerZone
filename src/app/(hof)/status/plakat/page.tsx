@@ -12,8 +12,9 @@ import { DruckenKnopf } from '@/components/teilen/drucken-knopf'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'QR-Plakat — FarmerZone' }
+export const metadata: Metadata = { title: `QR-Plakat — ${MARKE}` }
 
 export const dynamic = 'force-dynamic'
 
@@ -68,7 +69,7 @@ export default async function PlakatPage(): Promise<React.JSX.Element> {
           symbol={Printer}
           titel="Das Plakat gibt es, sobald dein Hof online ist"
           satz="Solange Kunden deine Hofseite nicht sehen können, würde der Code ins Leere führen."
-          aktion={
+          ausweg={
             <Link href="/farm-page" className={KNOPF_ORANGE}>
               Zu Mein Hof
             </Link>

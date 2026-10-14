@@ -15,6 +15,7 @@ import { Wortmarke } from '@/components/shared/wortmarke'
 import { ThemeUmschalter, ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
 import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
 import { KUNDE_KOPF_ZEILE, KUNDE_SHELL_MASSE } from '@/lib/kunde-shell-masse'
+import { MARKE } from '@/lib/marke'
 
 /*
  * Die Shell der Kundenseiten im neuen Design (Gate 2): Kopfzeile im Browser,
@@ -88,7 +89,7 @@ export function KundeShell({ sitzung, unterleiste = true, children }: KundeShell
   const nav = kundenNavigation({ sitzung })
   const korb = useWarenkorbKopf()
   // Steht der Warenkorb auch am Handy im Kopf (Fokus-Seiten ohne Unterleiste),
-  // reicht der Platz neben „Anmelden" unter 360 px nicht für das Wort „FarmerZone".
+  // reicht der Platz neben „Anmelden" unter 360 px nicht für den Namen.
   const korbAmHandy = korb !== null && !unterleiste
 
   return (
@@ -98,7 +99,7 @@ export function KundeShell({ sitzung, unterleiste = true, children }: KundeShell
       <SprungLink />
       <header className="sticky top-0 z-40 border-b border-border bg-background print:hidden">
         <div className={cn(KUNDE_KOPF_ZEILE, 'mx-auto flex max-w-[1200px] items-center gap-3 px-4 md:gap-3 md:px-6 lg:gap-[22px]')}>
-          <Link href="/" aria-label="FarmerZone – zur Startseite" className={cn('rounded-md', FOKUS_RAHMEN)}>
+          <Link href="/" aria-label={`${MARKE} – zur Startseite`} className={cn('rounded-md', FOKUS_RAHMEN)}>
             <Wortmarke wortKlasse={korbAmHandy ? 'max-[359px]:hidden' : undefined} />
           </Link>
 

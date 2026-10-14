@@ -151,7 +151,7 @@ function istStripeKonflikt(err: unknown): boolean {
  * die Plattform — netto bleibt ihm amount − application_fee_amount.
  * Deshalb: amount = Warenpreis + Servicegebühr und
  * application_fee_amount = Servicegebühr (+ Plattformgebühr, im Pilot 0)
- * → dem Hof fließt exakt der Warenpreis zu, FarmerZone trägt die
+ * → dem Hof fließt exakt der Warenpreis zu, die Plattform trägt die
  * Stripe-Kosten aus der Servicegebühr. Der Storno holt das spiegelbildlich
  * zurück — reverse_transfer UND refund_application_fee (cancelOrder). Wer
  * den Ladungstyp hier ändert, ändert ihn dort mit

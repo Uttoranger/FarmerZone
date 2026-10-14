@@ -27,7 +27,7 @@ const MELDUNG = {
   status: 'NEU',
   text: 'Abholzeiten speichern geht nicht.',
   createdAt: new Date('2026-09-01T10:00:00Z'),
-  seiteUrl: 'https://farmerzone.at/settings',
+  seiteUrl: 'https://agrilo.at/settings',
   userAgent: 'Mozilla/5.0 (iPhone)',
   viewport: '375x667',
   diagKennung: 'S71',

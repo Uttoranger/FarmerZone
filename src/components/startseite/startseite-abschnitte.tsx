@@ -18,6 +18,9 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { SchonDabei } from '@/components/shared/schon-dabei'
 import { Wortmarke } from '@/components/shared/wortmarke'
 import { Kicker } from '@/components/startseite/kicker'
+import { MARKE } from '@/lib/marke'
+import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
+import { AGB_LINK_TEXT, AGB_PFAD } from '@/lib/rechtstexte/agb-einbindung'
 
 /*
  * Die Abschnitte der Startseite unter „Höfe in deiner Nähe", in der Reihenfolge
@@ -264,7 +267,7 @@ export function FuerHoefeBand(): React.JSX.Element {
               Du hast einen Hof? Dein Hofladen, online.
             </h2>
             <p className="text-[13.5px] leading-normal text-foreground md:text-[15px]">
-              Schnell eingerichtet. Kunden bestellen vorab, du packst und übergibst – und behältst den vollen
+              Schnell eingerichtet. Deine Kundinnen bestellen vorab, du packst und übergibst – und behältst den vollen
               Warenpreis.
             </p>
           </div>
@@ -338,11 +341,11 @@ export function Fragen({ jetzt }: { jetzt: Date }): React.JSX.Element {
 
 const FUSS_SPALTEN = [
   {
-    titel: 'FarmerZone',
+    titel: MARKE,
     links: [
       { href: hoefeAdresse(), text: 'Höfe entdecken' },
       { href: '/#so-funktionierts', text: 'So funktioniert’s' },
-      { href: '/problem-melden', text: 'Problem melden' },
+      { href: '/problem-melden', text: PROBLEM_MELDEN },
     ],
   },
   {
@@ -358,6 +361,8 @@ const FUSS_SPALTEN = [
   {
     titel: 'Rechtliches',
     links: [
+      // Die AGB vor dem Impressum (Register O4): jede Fußzeile führt sie.
+      { href: AGB_PFAD, text: AGB_LINK_TEXT },
       { href: '/impressum', text: 'Impressum' },
       { href: '/datenschutz', text: 'Datenschutz' },
     ],
@@ -373,7 +378,7 @@ export function StartseiteFuss({ jahr }: { jahr: number }): React.JSX.Element {
           <p className="text-[13px] leading-normal text-muted-foreground">
             Regional einkaufen, direkt beim Hof abholen. Aus Österreich, für Österreich.
           </p>
-          <p className="text-xs text-muted-foreground">© {jahr} FarmerZone</p>
+          <p className="text-xs text-muted-foreground">© {jahr} {MARKE}</p>
         </div>
         <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:flex md:gap-[70px]">
           {FUSS_SPALTEN.map((spalte) => (

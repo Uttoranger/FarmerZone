@@ -8,11 +8,12 @@ import { ENTDECKEN_KOPF } from '@/lib/hoefe-entdecken'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { HoefeClient } from '@/components/hoefe/hoefe-client'
 import { HoefeFehler, KeineHoefe } from '@/components/hoefe/entdecken-teile'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
-  title: 'Höfe in deiner Nähe — FarmerZone',
+  title: `Höfe in deiner Nähe — ${MARKE}`,
   description:
-    'Alle Höfe auf FarmerZone: was sie verkaufen, wo sie sind und wann du abholen kannst — direkt vom Hof, ohne Umwege.',
+    `Alle Höfe auf ${MARKE}: was sie verkaufen, wo sie sind und wann du abholen kannst — direkt vom Hof, ohne Umwege.`,
 }
 
 // Dynamisch seit Bereiche 2: Die Filter stehen in der URL

@@ -15,8 +15,9 @@ import { NEU_EINRICHTEN_MARKE, NEU_EINRICHTEN_TITEL, neuEinrichtenSatz } from '@
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import { TESTBETRIEB } from '@/lib/umgebung-server'
 import { PaymentsActions } from './payments-actions'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'Zahlung — FarmerZone' }
+export const metadata: Metadata = { title: `Zahlung — ${MARKE}` }
 
 async function getFarmPaymentData() {
   const session = await auth.api.getSession({ headers: await headers() })

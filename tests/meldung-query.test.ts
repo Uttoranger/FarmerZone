@@ -43,7 +43,7 @@ const ZEILE = {
   sprintName: 'abholzeiten-v2',
   triagedAt: new Date('2026-09-02T08:00:00Z'),
   farmId: 'farm_1',
-  seiteUrl: 'https://farmerzone.at/settings',
+  seiteUrl: 'https://agrilo.at/settings',
   userAgent: 'UA',
   viewport: '375x667',
 }

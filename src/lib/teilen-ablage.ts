@@ -2,7 +2,7 @@
  * Ablage geteilter Fotos — die Übergabestelle zwischen Service Worker und
  * /teilen-Seite.
  *
- * Der Service Worker (public/sw.js) legt die per „Teilen an FarmerZone"
+ * Der Service Worker (public/sw.js) legt die per „Teilen an die App"
  * empfangenen Dateien in der Cache-API ab; die /teilen-Seite liest sie hier
  * wieder aus und leert die Ablage nach dem Upload. Cache-Name, Schlüsselschema
  * und Namens-Kopfzeile stehen in BEIDEN Dateien: Der Service Worker ist

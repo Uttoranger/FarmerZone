@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Text, Link } from '@react-email/components'
 import { EmailLayout, h1, bodyText, mutedText, ctaButton } from './_layout'
+import { MARKE } from '@/lib/marke'
 
 export interface CustomerMagicLinkProps {
   firstName?: string
@@ -11,13 +12,12 @@ export function CustomerMagicLinkEmail({ firstName, magicUrl }: CustomerMagicLin
   const greeting = firstName ? `Hallo ${firstName},` : 'Hallo,'
 
   return (
-    <EmailLayout previewText="Dein Login-Link für FarmerZone — gültig 15 Minuten">
+    <EmailLayout previewText={`Dein Login-Link für ${MARKE} — gültig 15 Minuten`}>
       <Text style={h1}>Dein Login-Link</Text>
       <Text style={bodyText}>
         {greeting}
         <br />
-        klicke auf den Button unten, um dich in deinem FarmerZone-Konto einzuloggen und deine
-        Benachrichtigungen zu verwalten.
+        {`klicke auf den Button unten, um dich in deinem ${MARKE}-Konto einzuloggen und deine Benachrichtigungen zu verwalten.`}
       </Text>
 
       <div style={{ textAlign: 'center' as const, margin: '28px 0' }}>

@@ -37,6 +37,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement, type ReactElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { MARKE } from '@/lib/marke'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
@@ -124,7 +125,7 @@ const HEUTE_NACHMITTAG = { dayOfWeek: 1, startTime: '15:00', endTime: '18:00', t
 
 describe('Metadaten', () => {
   it('Titel und Beschreibung nennen Futter — Open Graph und Twitter-Karte sagen dasselbe', () => {
-    expect(metadata.title).toBe('FarmerZone — Lebensmittel und Futter direkt vom Hof')
+    expect(metadata.title).toBe(`${MARKE} — Lebensmittel und Futter direkt vom Hof`)
     expect(metadata.description).toMatch(/Heu/)
     expect(metadata.description).toMatch(/Futter/)
     expect(metadata.openGraph).toMatchObject({ title: metadata.title, description: metadata.description })
@@ -629,7 +630,7 @@ describe('Abschnitte', () => {
     for (const href of ['/login', '/register', '/konditionen', '/impressum', '/datenschutz', '/#so-funktionierts']) {
       expect(text).toContain(`href="${href}"`)
     }
-    expect(text).toContain('© 2026 FarmerZone')
+    expect(text).toContain(`© 2026 ${MARKE}`)
   })
 })
 

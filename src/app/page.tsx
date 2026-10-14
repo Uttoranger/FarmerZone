@@ -25,12 +25,13 @@ import {
   SoFunktionierts,
   StartseiteFuss,
 } from '@/components/startseite/startseite-abschnitte'
+import { MARKE } from '@/lib/marke'
 
 // Futter steht im Titel und in der Beschreibung: Wer „Heu kaufen" sucht, soll
 // die Startseite finden, nicht erst eine Hofseite. Open Graph und die
 // X-/Twitter-Karte sagen dasselbe und zeigen das große Vorschaubild
 // (src/lib/vorschaubild.ts), damit ein geteilter Link dieselbe Karte zeigt.
-const SEITEN_TITEL = 'FarmerZone — Lebensmittel und Futter direkt vom Hof'
+const SEITEN_TITEL = `${MARKE} — Lebensmittel und Futter direkt vom Hof`
 const SEITEN_BESCHREIBUNG =
   'Lebensmittel für die Küche, Heu, Stroh und Futter für den Stall — direkt von den Höfen der Region bestellen und abholen. Pilotbetrieb mit ausgewählten Höfen.'
 
@@ -41,7 +42,7 @@ export const metadata: Metadata = {
     title: SEITEN_TITEL,
     description: SEITEN_BESCHREIBUNG,
     type: 'website',
-    siteName: 'FarmerZone',
+    siteName: MARKE,
     images: [STARTSEITE_VORSCHAUBILD],
   },
   twitter: {

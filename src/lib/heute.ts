@@ -14,6 +14,7 @@ import { formatSlotTime } from '@/lib/pickup-days'
 import { hofZustand } from '@/lib/mein-hof'
 import { summeCent, UMSATZ_TEXT, type UmsatzBuchung } from '@/lib/umsatz'
 import { onlineZahlungPausiert } from '@/lib/stripe-konto'
+import type { MarkeArt } from '@/lib/marke-art'
 
 // ─── Tage ───────────────────────────────────────────────────────────────────
 
@@ -212,6 +213,17 @@ export const UEBERFAELLIG_EINZELN = 5
  */
 export const BRAUCHT_DICH_LEER = 'Nichts braucht dich heute.'
 
+/**
+ * Wie „Braucht dich" erscheint (Register N11, Ergänzung Freigabe Lauf 13): die
+ * Karte, sobald etwas ansteht; die leise Zeile `BRAUCHT_DICH_LEER` nur, wenn
+ * auch die Packliste leer ist — unter „Packliste · 2 offen" läse sie sich an
+ * einem Packtag wie ein Widerspruch; sonst nichts.
+ */
+export function brauchtDichAnzeige(eintraege: number, packlisteLeer: boolean): 'karte' | 'zeile' | null {
+  if (eintraege > 0) return 'karte'
+  return packlisteLeer ? 'zeile' : null
+}
+
 export type BrauchtDichEintrag = {
   art: 'ueberfaellig' | 'ausverkauft' | 'ohne-kategorie' | 'status'
   text: string
@@ -246,7 +258,7 @@ function mehrzahl(n: number, eins: string, viele: string): string {
 
 /**
  * Nur, was eine Handlung verlangt — jede Zeile führt genau dorthin. Leer
- * heißt: BRAUCHT_DICH_LEER.
+ * heißt: BRAUCHT_DICH_LEER, wenn auch die Packliste leer ist (brauchtDichAnzeige).
  */
 export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
   const eintraege: BrauchtDichEintrag[] = []
@@ -365,14 +377,15 @@ export function vergleichText(prozent: number | null, jetzt: Date): string {
 // ─── Packliste (Gate 5, Nachtlauf Nr. 17) ──────────────────────────────────
 
 /**
- * Die Marke einer Zeile der Packliste — Wortlaut der Mockups H3 „Heute".
+ * Die Marke einer Zeile der Packliste — Wortlaut der Mockups H3 „Heute",
+ * Bedeutung als Art (Register G5): zum Packen = tun, gepackt = läuft.
  * READY heißt für den Hof „gepackt"; PENDING_CONFIRMATION wartet auf die
- * Bestätigung der Kundin (abholChip), da ist nichts zu packen.
+ * Bestätigung der Kundin (abholChip), da ist nichts zu packen — erledigt.
  */
-export const PACK_MARKE: Record<AbholChip, { text: string; ton: 'offen' | 'fertig' | 'neutral' }> = {
-  vorbereiten: { text: 'Zum Packen', ton: 'offen' },
-  wartet: { text: 'Wartet auf Kunde', ton: 'neutral' },
-  bereit: { text: 'Gepackt', ton: 'fertig' },
+export const PACK_MARKE: Record<AbholChip, { text: string; art: MarkeArt }> = {
+  vorbereiten: { text: 'Zum Packen', art: 'tun' },
+  wartet: { text: 'Wartet auf Kunde', art: 'erledigt' },
+  bereit: { text: 'Gepackt', art: 'laeuft' },
 }
 
 // Was Arbeit macht, steht oben: erst packen, dann warten, zuletzt Erledigtes.
@@ -628,7 +641,7 @@ export function teilenSatz(angebot: readonly string[], fenster: NaechstesFenster
 
 // ─── Aufbau ─────────────────────────────────────────────────────────────────
 
-export type HeuteBlock = 'stripe' | 'packliste' | 'teilen' | 'braucht-dich' | 'zu-tun' | 'naechste-abholung' | 'woche'
+export type HeuteBlock = 'postfach' | 'stripe' | 'packliste' | 'teilen' | 'braucht-dich' | 'zu-tun' | 'naechste-abholung' | 'woche'
 
 /**
  * Welche Blöcke wo stehen (freigabe.md §12 Nr. 45). Oben höchstens EIN Kasten
@@ -641,21 +654,26 @@ export type HeuteBlock = 'stripe' | 'packliste' | 'teilen' | 'braucht-dich' | 'z
  * — nur bei sichtbarem Hof (heuteHofSichtbar). Dringend steht vor freiwillig
  * (Register N11): Was eine Handlung verlangt, steht nicht hinter einer
  * Einladung zum Teilen. Die Seitenspalte
- * steht am Handy unter der Hauptspalte und beginnt mit „Zu tun" (Nr. 53):
- * EINE Liste statt „Erste Schritte" oben und „Deine Hofseite" unten — direkt
- * nach „Braucht dich", was noch einzurichten ist, danach die Zahlen.
+ * steht am Handy unter der ganzen Hauptspalte (nach der Teilen-Zeile, ohne sie
+ * nach „Braucht dich") und beginnt mit „Zu tun" (Nr. 53): EINE Liste statt
+ * „Erste Schritte" oben und „Deine Hofseite" unten — was noch einzurichten
+ * ist, danach die Zahlen.
  */
 export function heuteAufbau({
   stripeHinweis,
   teilen,
   zuTun,
+  postfach,
 }: {
   stripeHinweis: boolean
   teilen: boolean
   zuTun: boolean
+  /** Ungelesenes vom Team im Postfach (Register N12, Nr. 87): Die Karte steht dann als erster Block der Hauptspalte. */
+  postfach: boolean
 }): { oben: HeuteBlock[]; haupt: HeuteBlock[]; seite: HeuteBlock[] } {
   const oben: HeuteBlock[] = stripeHinweis ? ['stripe'] : []
   const haupt: HeuteBlock[] = teilen ? ['packliste', 'braucht-dich', 'teilen'] : ['packliste', 'braucht-dich']
+  if (postfach) haupt.unshift('postfach')
   const seite: HeuteBlock[] = zuTun ? ['zu-tun', 'naechste-abholung', 'woche'] : ['naechste-abholung', 'woche']
   return { oben, haupt, seite }
 }

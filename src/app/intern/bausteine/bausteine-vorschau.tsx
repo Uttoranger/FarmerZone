@@ -5,6 +5,7 @@ import Link from 'next/link'
 import {
   BarChart3,
   CalendarCheck,
+  Check,
   Compass,
   Info,
   Package,
@@ -24,6 +25,8 @@ import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { ProgressBar } from '@/components/ui/progress-bar'
 import { EmptyState } from '@/components/ui/empty-state'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { Marke } from '@/components/ui/marke'
+import { MARKE_ARTEN, type MarkeArt } from '@/lib/marke-art'
 import { GroessenWahl, Groessenkachel } from '@/components/ui/groessenkachel'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { BottomNav, BottomNavLink, BottomNavMitte, mittelknopfKlassen, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
@@ -43,6 +46,9 @@ import { HOF_NEU_KNOPF, HOF_NEU_KNOPF_NAME } from '@/lib/bauern-navigation'
  * nebeneinander). Beispieltexte sind erfunden. tests/bausteine.test.ts prüft,
  * dass jeder Baustein hier eingebunden ist.
  */
+
+/** Ein Wort je Art der Marke — die Wörter, die Bestellliste und Bestellseite tragen. */
+const MARKE_BEISPIEL: Record<MarkeArt, string> = { tun: 'Zum Packen', laeuft: 'Gepackt', erledigt: 'Abgeholt', abgebrochen: 'Storniert' }
 
 const LANGER_NAME = 'Biohof zur alten Linde am Waldrand oberhalb des Mühlbachs in der Gemeinde Beispielberg'
 
@@ -179,7 +185,27 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
             </div>
           </Abschnitt>
 
-          <Abschnitt id="status" titel="StatusBadge, Zähler und ProgressBar" satz="Zustände in Orange (offen), Grün (fertig) und neutral; Fortschritt als Balken.">
+          <Abschnitt
+            id="marke"
+            titel="Marke"
+            satz="Ein Zustand als Wort auf seiner Bedeutungsfarbe — tun, läuft, erledigt, abgebrochen (Register G5). Schrift und Fläche aus den acht Tokens, Symbol und Wort in einer Zeile, lange Wörter kürzen."
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              {MARKE_ARTEN.map((art) => (
+                <Marke key={art} art={art}>
+                  {MARKE_BEISPIEL[art]}
+                </Marke>
+              ))}
+              <Marke art="laeuft" symbol={Check}>
+                Gepackt
+              </Marke>
+              <Marke art="abgebrochen" className="max-w-40">
+                {LANGER_NAME}
+              </Marke>
+            </div>
+          </Abschnitt>
+
+          <Abschnitt id="status" titel="StatusBadge, Zähler und ProgressBar" satz="Töne der StatusBadge über die Marke: offen → tun, fertig → läuft, neutral → erledigt; Fortschritt als Balken.">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status="offen">Zum Packen</StatusBadge>
               <StatusBadge status="fertig">Gepackt</StatusBadge>
@@ -229,7 +255,7 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
               symbol={SearchX}
               titel="Keine Höfe im Umkreis"
               satz="Im Umkreis von 10 km bietet gerade niemand Eier an."
-              aktion={
+              ausweg={
                 <Link href="/intern/bausteine#leer" className={KNOPF.gruen}>
                   Umkreis auf 25 km erweitern
                 </Link>

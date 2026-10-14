@@ -1,7 +1,8 @@
 import { cn } from '@/lib/utils'
+import { MARKE } from '@/lib/marke'
 
 /**
- * Bildmarke und „FarmerZone" — für die Kopfzeile der Kundenseiten.
+ * Bildmarke und Name (MARKE) — für die Kopfzeile der Kundenseiten.
  *
  * Auch die KundeShell und der Fuß der Startseite zeigen sie. `wortKlasse`
  * kann das Wort auf schmalen Handys ausblenden, wo der Kopf sonst
@@ -21,7 +22,7 @@ export function Wortmarke({ wortKlasse }: { wortKlasse?: string } = {}): React.J
         />
         <path d="M40 64 L40 44" stroke="#7BAE85" strokeWidth="2.5" strokeLinecap="round" />
       </svg>
-      <span className={cn('whitespace-nowrap font-heading text-lg font-bold text-brand-text', wortKlasse)}>FarmerZone</span>
+      <span className={cn('whitespace-nowrap font-heading text-lg font-bold text-brand-text', wortKlasse)}>{MARKE}</span>
     </span>
   )
 }

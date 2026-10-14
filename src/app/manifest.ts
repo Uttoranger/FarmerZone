@@ -1,7 +1,8 @@
 import type { MetadataRoute } from 'next'
+import { MARKE } from '@/lib/marke'
 
 /**
- * Web-App-Manifest — macht FarmerZone am Handy installierbar und, das ist
+ * Web-App-Manifest — macht die App am Handy installierbar und, das ist
  * der eigentliche Zweck, zum TEILEN-ZIEL: Androids Galerie stellt beim
  * Teilen die Bytes selbst bereit (inklusive Cloud-Abruf) — genau der Weg,
  * auf dem cloud-ausgelagerte Fotos zuverlässig ankommen, während der
@@ -27,8 +28,8 @@ import type { MetadataRoute } from 'next'
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'FarmerZone',
-    short_name: 'FarmerZone',
+    name: MARKE,
+    short_name: MARKE,
     description: 'Regionale Lebensmittel direkt vom Bauern.',
     display: 'standalone',
     start_url: '/dashboard',

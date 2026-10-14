@@ -12,8 +12,9 @@ import {
   FuerHoefeSchritte,
   FuerHoefeVorteile,
 } from '@/components/fuer-hoefe/fuer-hoefe-abschnitte'
+import { MARKE } from '@/lib/marke'
 
-const SEITEN_TITEL = 'Für Höfe — FarmerZone'
+const SEITEN_TITEL = `Für Höfe — ${MARKE}`
 const SEITEN_BESCHREIBUNG =
   `Dein Hofladen, online: Kunden bestellen vorab, du packst nach Liste und übergibst zur Abholzeit. ` +
   // Kein Tarif als sofort gültig (Register K1): erst kostenlos, die Tarife ab dem Stichtag.
@@ -26,7 +27,7 @@ export const metadata: Metadata = {
     title: SEITEN_TITEL,
     description: SEITEN_BESCHREIBUNG,
     type: 'website',
-    siteName: 'FarmerZone',
+    siteName: MARKE,
     images: [STARTSEITE_VORSCHAUBILD],
   },
 }

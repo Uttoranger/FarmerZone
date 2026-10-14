@@ -11,7 +11,7 @@
  * Die einzige Regel, `bestimmeTarifZustand` (Nr. 61), sagt nur, welchen Stand
  * Tarif-Zeile und „Deine Konditionen" zeigen.
  *
- * Übergang (Register K1, Nachtlauf 17d): In der Startphase ist FarmerZone
+ * Übergang (Register K1, Nachtlauf 17d): In der Startphase ist die Plattform
  * kostenlos, die Tarife gelten erst ab `TARIFE_AB`. Jede Seite, die Tarife
  * zeigt, nennt dazu `KONDITIONEN_UEBERGANG` — das Datum steht nur hier.
  *
@@ -182,7 +182,7 @@ export const BAR_OHNE_GEBUEHR_HINWEIS = `Bei Barzahlung bis ${BAR_OHNE_GEBUEHR_B
 
 /**
  * Der erste Satz an „Bar bei Abholung" in der Kasse (Register N10, Nr. 82) —
- * nur, solange bar wirklich günstiger ist (`barHinweis` in src/lib/kasse.ts).
+ * nur, solange bar wirklich günstiger ist (`barGuenstiger` in src/lib/kasse.ts).
  */
 export const BAR_OHNE_GEBUEHR_ZAHLART = `Ohne Servicegebühr bis ${BAR_OHNE_GEBUEHR_BIS_TEXT}.`
 

@@ -18,8 +18,9 @@ import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellunge
 import { ADMIN_RAHMEN, AdminFehler } from '@/components/admin/admin-teile'
 import { TriageForm, type TriageWerte } from './triage-form'
 import { KiVorschlag } from './ki-vorschlag'
+import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: 'Meldung — Admin — FarmerZone' }
+export const metadata: Metadata = { title: `Meldung — Admin — ${MARKE}` }
 export const dynamic = 'force-dynamic'
 
 function uhrzeit(d: Date): string {
@@ -88,7 +89,7 @@ export default async function AdminMeldungDetailPage({ params }: { params: Promi
           className={cn('inline-flex min-h-11 items-center gap-1 rounded-full pr-3 text-[14px] text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)}
         >
           <ChevronLeft className="size-4" strokeWidth={1.7} aria-hidden="true" />
-          Briefkasten
+          Postfach
         </Link>
         <div className="flex gap-2">
           {nachbarn.vorige && (

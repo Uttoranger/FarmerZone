@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { formatEuro, formatMenge } from '@/lib/format'
 import { SERVICEGEBUEHR_HINWEIS, centsAlsEuro } from '@/lib/servicegebuehr'
 import {
+  GEBUEHR_ENTFAELLT,
   KONTAKT_HINWEIS,
   RESERVIERUNG_MINUTEN,
   zahlungAbgelehntText,
@@ -292,7 +293,7 @@ export function UebersichtKarte({
   const [erklaerungOffen, setErklaerungOffen] = useState(false)
   const erklaerungId = useId()
   const gebuehr =
-    betraege.gebuehrCents > 0 ? formatEuro(centsAlsEuro(betraege.gebuehrCents)) : gebuehrEntfaellt ? 'entfällt' : null
+    betraege.gebuehrCents > 0 ? formatEuro(centsAlsEuro(betraege.gebuehrCents)) : gebuehrEntfaellt ? GEBUEHR_ENTFAELLT : null
   return (
     <section aria-labelledby="kasse-uebersicht" className={cn(KARTE, 'flex flex-col gap-3')}>
       <h2 id="kasse-uebersicht" className={KARTEN_TITEL}>

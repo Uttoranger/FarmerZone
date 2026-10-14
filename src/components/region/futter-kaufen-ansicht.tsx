@@ -61,7 +61,7 @@ export function FutterKaufenAnsicht({ ansicht, filter }: { ansicht: Ansicht; fil
           symbol={Wheat}
           titel="Gerade kein Futter in der Nähe"
           satz={ansicht.leer.satz}
-          aktion={
+          ausweg={
             ansicht.leer.auswahlZuruecksetzen ? (
               <Link href={futterKaufenLink({ km: filter.km, art: null, menge: null })} className={KNOPF_RAHMEN}>
                 Alles Futter zeigen
@@ -70,7 +70,9 @@ export function FutterKaufenAnsicht({ ansicht, filter }: { ansicht: Ansicht; fil
               <Link href={futterKaufenLink({ ...filter, km: ansicht.leer.weiterUmkreis })} className={KNOPF_RAHMEN}>
                 Umkreis auf {ansicht.leer.weiterUmkreis} km
               </Link>
-            ) : undefined
+            ) : (
+              { ohne: 'Je nach Grund „Alles Futter zeigen“ oder „Umkreis auf … km“; sind beide ausgeschöpft, bleibt kein Ausweg' }
+            )
           }
         />
       ) : (

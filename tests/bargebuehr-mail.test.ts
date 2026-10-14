@@ -61,7 +61,7 @@ function bestellung(felder: { serviceFeeCents: number; createdAt?: Date; payment
       address: 'Feldweg 1',
       city: 'Beispieldorf',
       postalCode: '1234',
-      phone: '+43 660 1111111',
+      phone: '+43 664 0000000',
       slug: 'hof-test',
     },
     items: [{ productName: 'Eier', quantity: 1, unitPrice: 10.3, totalPrice: 10.3, product: null }],

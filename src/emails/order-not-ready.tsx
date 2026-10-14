@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Text, Link } from '@react-email/components'
 import { EmailLayout, BetragsZeile, Knopf, KnopfReihe, h1, bodyText, kleinText, textLink } from './_layout'
+import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 
 // "Kurzes Update" nach einem Fertig-Rückschritt (bestellungen-undo-2):
 // neutral-freundlich, kein Schuld-Ton — die Bestellung ist doch noch nicht
@@ -18,6 +19,7 @@ export interface OrderNotReadyProps {
 }
 
 export function OrderNotReadyEmail(p: OrderNotReadyProps) {
+  const anrufen = telefonLink(p.farmPhone)
   return (
     <EmailLayout previewText={`Kurzes Update zu deiner Bestellung bei ${p.farmName}`}>
       <Text style={h1}>Kurzes Update zu deiner Bestellung</Text>
@@ -37,9 +39,13 @@ export function OrderNotReadyEmail(p: OrderNotReadyProps) {
 
       <Text style={kleinText}>
         Fragen?{' '}
-        <Link href={`tel:${p.farmPhone}`} style={textLink}>
-          {p.farmPhone}
-        </Link>
+        {anrufen ? (
+          <Link href={anrufen} style={textLink}>
+            {formatiereTelefon(p.farmPhone)}
+          </Link>
+        ) : (
+          p.farmPhone
+        )}
       </Text>
     </EmailLayout>
   )

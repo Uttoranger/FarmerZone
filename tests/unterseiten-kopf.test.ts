@@ -59,6 +59,7 @@ import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speich
 import { ProfileForm } from '@/components/settings/profile-form'
 import { PersonZeile } from '@/components/shells/hof-shell'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 import { EINSTELLUNG_KONTO, GESPEICHERT_TEXT, RUECKWEG_PRAEFIX, elternseite } from '@/lib/bauern-navigation'
 import type { FarmSettings } from '@/server/queries/farm'
 
@@ -160,8 +161,10 @@ describe('UnterseitenKopf im Browser und Titel', () => {
   it('/fehler-melden: am Handy steht der Name nur einmal — die Leiste trägt ihn, die h1 gleichen Wortlauts nur für den Screenreader (Nr. 56)', () => {
     // Bericht 44: „← Problem melden" in der Leiste und darunter die h1 „Problem melden".
     const seite = quelle('src/app/(hof)/fehler-melden/page.tsx')
-    const h1 = seite.match(/<h1 className="([^"]+)">([^<]+)<\/h1>/)
-    expect(h1?.[2].trim()).toBe(elternseite('/fehler-melden')?.name)
+    // Der Wortlaut kommt seit Nr. 85 aus PROBLEM_MELDEN (kein Literal) — derselbe wie der Name der Elternseite.
+    const h1 = seite.match(/<h1 className="([^"]+)">\s*\{PROBLEM_MELDEN\}\s*<\/h1>/)
+    expect(h1).not.toBeNull()
+    expect(PROBLEM_MELDEN).toBe(elternseite('/fehler-melden')?.name)
     const klassen = h1?.[1].split(/\s+/) ?? []
     expect(klassen).toContain('sr-only')
     expect(klassen).toContain('md:not-sr-only')
@@ -426,7 +429,7 @@ describe('Tab-Titel und Seitentitel der Unterseiten', () => {
   // /settings/appearance leitet seit Nr. 50 nur noch um — ohne eigenen Tab-Titel und Kopf.
   it.each(['profile', 'pickup-slots', 'pause', 'account', 'teilen'])('/settings/%s: der Tab nimmt dieselbe Schreibweise wie der Kopf', (seite) => {
     const text = quelle(`src/app/(hof)/settings/${seite}/page.tsx`)
-    const tab = text.match(/title: `\$\{([A-Za-z_.]+)\} — FarmerZone`/)
+    const tab = text.match(/title: `\$\{([A-Za-z_.]+)\} — \$\{MARKE\}`/)
     expect(tab, seite).not.toBeNull()
     const quelleDesTitels = tab?.[1] ?? ''
     expect(text, seite).toContain(`{${quelleDesTitels}}`)

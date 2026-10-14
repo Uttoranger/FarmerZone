@@ -44,7 +44,7 @@ const MELDUNG: ExportMeldung = {
   status: 'NEU',
   text: 'Abholzeiten speichern geht nicht.\nEs kommt keine Meldung.',
   createdAt: new Date('2026-09-01T10:00:00Z'),
-  seiteUrl: 'https://farmerzone.at/settings',
+  seiteUrl: 'https://agrilo.at/settings',
   userAgent: 'Mozilla/5.0 (iPhone)',
   viewport: '375x667',
   diagKennung: 'S71',
@@ -88,7 +88,7 @@ function holerErsatz(antwort: { status: number; text: string } = { status: 200, 
 const JETZT = new Date('2026-09-14T05:00:00Z')
 const EXPORT_TEXT = briefkastenAlsMarkdown([MELDUNG, ZWEITE], { status: ['NEU', 'GEPRUEFT'], art: null }, JETZT)
 
-const ROUTE = { TRIAGE_EXPORT_URL: 'https://farmerzone.at/api/triage/export', TRIAGE_TOKEN: 'tok-123' }
+const ROUTE = { TRIAGE_EXPORT_URL: 'https://agrilo.at/api/triage/export', TRIAGE_TOKEN: 'tok-123' }
 const DB = { TRIAGE_DATABASE_URL: 'postgresql://triage_leser@host/db' }
 
 // ── Weg wählen ──────────────────────────────────────────────────────────────
@@ -178,7 +178,7 @@ describe('briefkasten — über die Leseroute', () => {
     const result = await starte(['export'], { ...ROUTE, ...DB }, fabrik, JETZT, holer)
     expect(result).toEqual({ code: 0, ausgabe: EXPORT_TEXT })
     expect(holer).toHaveBeenCalledTimes(1)
-    expect(holer).toHaveBeenCalledWith('https://farmerzone.at/api/triage/export?status=NEU%2CGEPRUEFT%2CVERMUTLICH_WUNSCH', 'tok-123')
+    expect(holer).toHaveBeenCalledWith('https://agrilo.at/api/triage/export?status=NEU%2CGEPRUEFT%2CVERMUTLICH_WUNSCH', 'tok-123')
     expect(fabrik).not.toHaveBeenCalled()
   })
 
@@ -186,7 +186,7 @@ describe('briefkasten — über die Leseroute', () => {
     const holer = holerErsatz()
     await starte(['export', '--status', 'erledigt,kein_fehler', '--art', 'wunsch'], ROUTE, leserErsatz().fabrik, JETZT, holer)
     expect(holer).toHaveBeenCalledWith(
-      'https://farmerzone.at/api/triage/export?status=ERLEDIGT%2CKEIN_FEHLER&art=WUNSCH',
+      'https://agrilo.at/api/triage/export?status=ERLEDIGT%2CKEIN_FEHLER&art=WUNSCH',
       'tok-123'
     )
   })
@@ -445,7 +445,7 @@ describe('briefkasten — geplant und vermutlich-wunsch über die Schreibroute',
     const holer = holerErsatz()
     const result = await starte(['geplant', 'cmfmeldu', '--pr', '131'], { ...SCHREIBEN, ...DB }, fabrik, JETZT, holer, sender)
     expect(result).toEqual({ code: 0, ausgabe: 'Meldung cmfmeldu: Geplant (PR #131)' })
-    expect(sender).toHaveBeenCalledWith('https://farmerzone.at/api/triage/status', 'write-456', {
+    expect(sender).toHaveBeenCalledWith('https://agrilo.at/api/triage/status', 'write-456', {
       meldungId: 'cmfmeldu',
       status: 'GEPLANT',
       prNummer: 131,
@@ -522,7 +522,7 @@ describe('briefkasten — geplant und vermutlich-wunsch über die Schreibroute',
     const sender = senderErsatz()
     const result = await starte(
       ['geplant', 'cmfmeldu', '--pr', '5'],
-      { ...SCHREIBEN, TRIAGE_EXPORT_URL: 'http://farmerzone.at/api/triage/export' },
+      { ...SCHREIBEN, TRIAGE_EXPORT_URL: 'http://agrilo.at/api/triage/export' },
       leserErsatz().fabrik,
       JETZT,
       holerErsatz(),
@@ -531,10 +531,10 @@ describe('briefkasten — geplant und vermutlich-wunsch über die Schreibroute',
     expect(result).toEqual({ code: 2, ausgabe: NUR_HTTPS })
     expect(sender).not.toHaveBeenCalled()
     expect(sichereAdresse('http://localhost:3000/api/triage/status')).toBe(true)
-    expect(sichereAdresse('https://farmerzone.at/api/triage/status')).toBe(true)
+    expect(sichereAdresse('https://agrilo.at/api/triage/status')).toBe(true)
   })
 
   it('die Schreibroute liegt neben der Leseroute', () => {
-    expect(statusAdresse('https://farmerzone.at/api/triage/export?status=NEU')).toBe('https://farmerzone.at/api/triage/status')
+    expect(statusAdresse('https://agrilo.at/api/triage/export?status=NEU')).toBe('https://agrilo.at/api/triage/status')
   })
 })

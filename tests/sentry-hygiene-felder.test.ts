@@ -41,13 +41,13 @@ describe('logentry — Nachricht und Parameter', () => {
     const e = bereinigeEreignis(
       ereignis({
         logentry: {
-          message: `Mail an ${MAIL} mit Link https://farmerzone.at/reset-password?token=geheim-123 gescheitert`,
+          message: `Mail an ${MAIL} mit Link https://agrilo.at/reset-password?token=geheim-123 gescheitert`,
           params: [MAIL, IP4, { token: 'geheim-123' }, 42, `/fz/bestaetigen/${TOKEN}`],
         },
       })
     )
 
-    expect(e.logentry?.message).toBe('Mail an [e-mail entfernt] mit Link https://farmerzone.at/reset-password gescheitert')
+    expect(e.logentry?.message).toBe('Mail an [e-mail entfernt] mit Link https://agrilo.at/reset-password gescheitert')
     expect(e.logentry?.params).toEqual(['[e-mail entfernt]', '[ip entfernt]', '[objekt entfernt]', 42, '/fz/bestaetigen/[kennung entfernt]'])
     expect(JSON.stringify(e)).not.toMatch(HEIKEL)
   })
@@ -69,7 +69,7 @@ describe('tags', () => {
           token: 'geheim-123',
           ip: IP4,
           'x-forwarded-for': IP4,
-          link: 'https://farmerzone.at/account/unsubscribe?token=geheim-123&seite=2',
+          link: 'https://agrilo.at/account/unsubscribe?token=geheim-123&seite=2',
           herkunft: `Anfrage von ${IP6}`,
           anzahl: 3,
           aktiv: true,
@@ -82,7 +82,7 @@ describe('tags', () => {
       grund: 'abo_nicht_gespeichert',
       code: 'P2002',
       kundin: '[e-mail entfernt]',
-      link: 'https://farmerzone.at/account/unsubscribe?seite=2',
+      link: 'https://agrilo.at/account/unsubscribe?seite=2',
       herkunft: 'Anfrage von [ip entfernt]',
       anzahl: 3,
       aktiv: true,
@@ -156,7 +156,7 @@ describe('contexts — die übrigen', () => {
         contexts: {
           ...technisch,
           upload: { dateiTyp: 'image/jpeg', weg: 'galerie', versuche: 2, androidVersion: null },
-          kundin: { email: MAIL, ip: IP4, link: `https://farmerzone.at/account/neuigkeiten-bestaetigen?token=geheim-123`, notiz: `rief von ${IP6} an` },
+          kundin: { email: MAIL, ip: IP4, link: `https://agrilo.at/account/neuigkeiten-bestaetigen?token=geheim-123`, notiz: `rief von ${IP6} an` },
           response: { status_code: 500, headers: { 'set-cookie': 'session=geheim-123', 'content-type': 'text/html' } },
         },
       })
@@ -164,7 +164,7 @@ describe('contexts — die übrigen', () => {
 
     for (const [name, wert] of Object.entries(technisch)) expect(e.contexts?.[name], name).toEqual(wert)
     expect(e.contexts?.upload).toEqual({ dateiTyp: 'image/jpeg', weg: 'galerie', versuche: 2, androidVersion: null })
-    expect(e.contexts?.kundin).toEqual({ link: 'https://farmerzone.at/account/neuigkeiten-bestaetigen', notiz: 'rief von [ip entfernt] an' })
+    expect(e.contexts?.kundin).toEqual({ link: 'https://agrilo.at/account/neuigkeiten-bestaetigen', notiz: 'rief von [ip entfernt] an' })
     expect(e.contexts?.response).toEqual({ status_code: 500, headers: { 'content-type': 'text/html' } })
     expect(JSON.stringify(e)).not.toMatch(HEIKEL)
   })
@@ -267,7 +267,7 @@ describe('Texte unter Query-Schlüsseln (Nachbesserung 1)', () => {
   it('auch die Adresse der Anfrage: Werte im Query werden bereinigt, nicht nur Namen', () => {
     const e = bereinigeEreignis(
       ereignis({
-        request: { url: `https://farmerzone.at/suche?q=${encodeURIComponent(MAIL)}&seite=2`, query_string: `q=${MAIL}&seite=2` },
+        request: { url: `https://agrilo.at/suche?q=${encodeURIComponent(MAIL)}&seite=2`, query_string: `q=${MAIL}&seite=2` },
       })
     )
     expect(new URLSearchParams(e.request?.url?.split('?')[1]).get('q')).toBe('[e-mail entfernt]')
@@ -278,8 +278,8 @@ describe('Texte unter Query-Schlüsseln (Nachbesserung 1)', () => {
 })
 
 describe('Nachrichten — event.message und message der Brotkrumen (Nachbesserung 1)', () => {
-  const NACHRICHT = `Abruf https://farmerzone.at/upload?token=geheim-123 von ${IP4} für ${MAIL}, token=geheim-123, Kennung ${TOKEN}`
-  const SAUBER = 'Abruf https://farmerzone.at/upload von [ip entfernt] für [e-mail entfernt], token=[entfernt], Kennung [kennung entfernt]'
+  const NACHRICHT = `Abruf https://agrilo.at/upload?token=geheim-123 von ${IP4} für ${MAIL}, token=geheim-123, Kennung ${TOKEN}`
+  const SAUBER = 'Abruf https://agrilo.at/upload von [ip entfernt] für [e-mail entfernt], token=[entfernt], Kennung [kennung entfernt]'
 
   it('die Nachricht des Ereignisses mit derselben Regel wie logentry', () => {
     expect(bereinigeEreignis(ereignis({ message: NACHRICHT })).message).toBe(SAUBER)
@@ -292,21 +292,21 @@ describe('Nachrichten — event.message und message der Brotkrumen (Nachbesserun
           {
             category: 'console',
             level: 'error',
-            message: `Abo-Mail an ${MAIL} gescheitert: https://farmerzone.at/account/unsubscribe?token=geheim-123 von ${IP6} ${TOKEN}`,
+            message: `Abo-Mail an ${MAIL} gescheitert: https://agrilo.at/account/unsubscribe?token=geheim-123 von ${IP6} ${TOKEN}`,
             data: {
               logger: 'console',
-              arguments: [`Abo-Mail an ${MAIL} gescheitert:`, 'https://farmerzone.at/account/unsubscribe?token=geheim-123', `von ${IP6}`, TOKEN],
+              arguments: [`Abo-Mail an ${MAIL} gescheitert:`, 'https://agrilo.at/account/unsubscribe?token=geheim-123', `von ${IP6}`, TOKEN],
             },
           },
         ],
       })
     )
     expect(e.breadcrumbs?.[0].message).toBe(
-      'Abo-Mail an [e-mail entfernt] gescheitert: https://farmerzone.at/account/unsubscribe von [ip entfernt] [kennung entfernt]'
+      'Abo-Mail an [e-mail entfernt] gescheitert: https://agrilo.at/account/unsubscribe von [ip entfernt] [kennung entfernt]'
     )
     expect(e.breadcrumbs?.[0].data).toEqual({
       logger: 'console',
-      arguments: ['Abo-Mail an [e-mail entfernt] gescheitert:', 'https://farmerzone.at/account/unsubscribe', 'von [ip entfernt]', '[kennung entfernt]'],
+      arguments: ['Abo-Mail an [e-mail entfernt] gescheitert:', 'https://agrilo.at/account/unsubscribe', 'von [ip entfernt]', '[kennung entfernt]'],
     })
     expect(JSON.stringify(e)).not.toMatch(HEIKEL)
   })
@@ -351,7 +351,7 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['viele @ im Fehlertext', { exception: { values: [{ value: 'a@'.repeat(N) }] } }],
     ['lange Domain ohne Endung', { exception: { values: [{ value: 'a@' + 'b.'.repeat(N) + 'c' }] } }],
     ['kodierte Adressen ohne Endung', { extra: { text: 'a%40'.repeat(N) } }],
-    ['langer Pfad', { request: { url: 'https://farmerzone.at/' + 'a-'.repeat(N) } }],
+    ['langer Pfad', { request: { url: 'https://agrilo.at/' + 'a-'.repeat(N) } }],
     ['Brotkrume', { breadcrumbs: [{ message: 'a'.repeat(2 * N), data: { notiz: 'a-'.repeat(N), arguments: ['a'.repeat(2 * N)] } }] }],
     ['lange Ziffernfolge', { message: '01 '.repeat(N) }],
     ['token ohne Wert', { extra: { text: 'token' + ' '.repeat(2 * N) } }],
@@ -377,7 +377,7 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     // bis MAX_ADRESS_TIEFE; jede Adresse als Wert wird einzeln zerlegt (5 000).
     ['verschachtelte Adressen in Abfragewerten', { exception: { values: [{ value: '/?a='.repeat(N) }] } }],
     ['verschachtelte Anker als Nachricht', { message: '/#a='.repeat(N) }],
-    ['viele Adressen als Abfragewerte', { request: { url: 'https://farmerzone.at/?' + 'a=/b&'.repeat(N / 10) } }],
+    ['viele Adressen als Abfragewerte', { request: { url: 'https://agrilo.at/?' + 'a=/b&'.repeat(N / 10) } }],
     ['halbe Platzhalter nach token=', { exception: { values: [{ value: 'token=[code entfernt '.repeat(N / 4) }] } }],
     ['Schrägstriche nach Doppelpunkt im Fehlertext', { exception: { values: [{ value: ':/'.repeat(N) }] } }],
     ['Schrägstriche nach Umlauten im Fehlertext', { exception: { values: [{ value: 'ä/'.repeat(N) }] } }],
@@ -391,35 +391,35 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
     ['viele Kennungen mit Ziffernfolgen', { exception: { values: [{ value: 'x0123456789a '.repeat(N / 6) }] } }],
     // Nr. 56, Runde 2.
     ['Prozent-Escapes vor Ziffern', { exception: { values: [{ value: '%200'.repeat(N / 2) }] } }],
-    ['mehrfach kodierte Abfragewerte', { request: { url: 'https://farmerzone.at/?' + 'a=%252F%253Fb%253D1&'.repeat(N / 20) } }],
-    ['ungültige Bytes im Abfragewert', { request: { url: 'https://farmerzone.at/?a=' + '%25C3'.repeat(N) } }],
-    ['%25-Kette im Abfragewert', { request: { url: 'https://farmerzone.at/?a=%' + '25'.repeat(N) + '41' } }],
+    ['mehrfach kodierte Abfragewerte', { request: { url: 'https://agrilo.at/?' + 'a=%252F%253Fb%253D1&'.repeat(N / 20) } }],
+    ['ungültige Bytes im Abfragewert', { request: { url: 'https://agrilo.at/?a=' + '%25C3'.repeat(N) } }],
+    ['%25-Kette im Abfragewert', { request: { url: 'https://agrilo.at/?a=%' + '25'.repeat(N) + '41' } }],
     ['Schlüssel nach Prozent-Escapes', { exception: { values: [{ value: '%20a='.repeat(N / 5) }] } }],
-    ['kodierte Anker verschachtelt', { request: { url: 'https://farmerzone.at/#' + 'a%3D%2F%23'.repeat(N / 10) } }],
+    ['kodierte Anker verschachtelt', { request: { url: 'https://agrilo.at/#' + 'a%3D%2F%23'.repeat(N / 10) } }],
     ['viele relative Adressen als Nachricht', { message: ' /a?b=1'.repeat(N / 10) }],
     ['Schrägstriche nach Doppelpunkt in extra', { extra: { text: ':/'.repeat(N) } }],
-    ['viele Zuweisungen im Pfad', { request: { url: 'https://farmerzone.at/' + 'a=b/'.repeat(N / 2) } }],
-    ['token= im Pfad', { request: { url: 'https://farmerzone.at/' + 'token=a/'.repeat(N / 4) } }],
+    ['viele Zuweisungen im Pfad', { request: { url: 'https://agrilo.at/' + 'a=b/'.repeat(N / 2) } }],
+    ['token= im Pfad', { request: { url: 'https://agrilo.at/' + 'token=a/'.repeat(N / 4) } }],
     // Nr. 56, Nacharbeit nach der Nachprüfung von Runde 2.
     ['lange Folge aus 25 als Nachricht', { message: '25'.repeat(N) }],
     ['%25-Ketten vor Nummern', { exception: { values: [{ value: ('%' + '25'.repeat(500) + '200664 1234567 ').repeat(N / 500) }] } }],
-    ['viele kodierte Plus in einer Adresse als Abfragewert', { request: { url: 'https://farmerzone.at/?next=%2Fx%3Fa%3D' + '%252B'.repeat(N) } }],
+    ['viele kodierte Plus in einer Adresse als Abfragewert', { request: { url: 'https://agrilo.at/?next=%2Fx%3Fa%3D' + '%252B'.repeat(N) } }],
     // Mit Leerraum davor, sonst gilt die ganze Nachricht als eine Adresse und das Muster läuft nicht.
-    ['lange absolute Adresse mit Klammern als Nachricht', { message: 'Link https://farmerzone.at/x?' + 'f[a]=(1)&'.repeat(N / 10) }],
+    ['lange absolute Adresse mit Klammern als Nachricht', { message: 'Link https://agrilo.at/x?' + 'f[a]=(1)&'.repeat(N / 10) }],
     ['relative Adressen vor absoluten als Nachricht', { message: ' /a?u=https://x.example/b?f[a]=1'.repeat(N / 20) }],
     ['lange Folge aus Schrägstrichen und http als Nachricht', { message: 'x /' + 'http/'.repeat(N / 3) }],
-    ['viele Plus-Nummern-Anfänge in einer Abfrage', { request: { url: 'https://farmerzone.at/?' + 'a=+0&'.repeat(N / 5) } }],
-    ['viele @ in einer Abfrage', { request: { url: 'https://farmerzone.at/?q=' + 'a@'.repeat(N) } }],
+    ['viele Plus-Nummern-Anfänge in einer Abfrage', { request: { url: 'https://agrilo.at/?' + 'a=+0&'.repeat(N / 5) } }],
+    ['viele @ in einer Abfrage', { request: { url: 'https://agrilo.at/?q=' + 'a@'.repeat(N) } }],
     // Nacharbeit nach Runde 2: Werte hinter Leerraum vorab.
     ['viele Codes mit Bindestrich als Nachricht', { message: 'code-123456,'.repeat(N / 4) }],
-    ['viele Codes in einer Abfrage als Nachricht', { message: 'Abruf https://farmerzone.at/x?' + 'otp=123456&'.repeat(N / 4) }],
+    ['viele Codes in einer Abfrage als Nachricht', { message: 'Abruf https://agrilo.at/x?' + 'otp=123456&'.repeat(N / 4) }],
     ['viele Codes hinter Leerraum im Fehlertext', { exception: { values: [{ value: 'otp: 123456 '.repeat(N / 4) }] } }],
     ['viele Werte mit Adresse als Nachricht', { message: 'token: (/x?a=1&s=b) '.repeat(N / 8) }],
     ['Bearer vor langen Wörtern mit Schrägstrichen', { exception: { values: [{ value: ('Bearer ' + 'a/'.repeat(N / 10) + ' ').repeat(5) }] } }],
     ['viele Bearer mit Adresse in extra', { extra: { text: 'Bearer /x?s=1 '.repeat(N / 6) } }],
     ['Wert vor einem Wort aus vielen Schlüsseln', { message: 'token: /' + ',token:a'.repeat(N / 4) }],
     ['Wert aus einer langen Nummer', { message: 'token: 0' + '1 '.repeat(N) }],
-    ['viele Paare im Pfad', { request: { url: 'https://farmerzone.at/x' + '&s=1&a=2'.repeat(N / 4) } }],
+    ['viele Paare im Pfad', { request: { url: 'https://agrilo.at/x' + '&s=1&a=2'.repeat(N / 4) } }],
     ['viele Werte mit Ziffern dahinter', { message: ('token: a1 ' + '1 '.repeat(50)).repeat(N / 100) }],
     ['viele Adressen mit Nummern dahinter im Fehlertext', { exception: { values: [{ value: ' /a?s=0664 1234567'.repeat(N / 20) }] } }],
     ['Bearer vor einer langen E-Mail-Adresse', { message: 'Bearer kundin@' + 'a'.repeat(2 * N) }],
@@ -574,13 +574,13 @@ describe('Nr. 56 — die offenen Fälle aus Lauf 8 §6 (Bericht 47)', () => {
     // In Adressen steht der Umlaut kodiert — mit kodiertem wie mit rohem @.
     const e = bereinigeEreignis(
       ereignis({
-        request: { url: 'https://farmerzone.at/customers/j%C3%BCrgen%40b%C3%A4ckerei.example' },
+        request: { url: 'https://agrilo.at/customers/j%C3%BCrgen%40b%C3%A4ckerei.example' },
         breadcrumbs: [{ data: { from: '/customers/kundin@m%C3%BCller.example', to: '/orders' } }],
         message: 'Abo für jürgen@bäckerei.example gescheitert',
         extra: { kundin: 'Jürgen <jürgen@bäckerei.example>' },
       })
     )
-    expect(e.request?.url).toBe('https://farmerzone.at/customers/[e-mail entfernt]')
+    expect(e.request?.url).toBe('https://agrilo.at/customers/[e-mail entfernt]')
     expect(e.breadcrumbs?.[0].data?.from).toBe('/customers/[e-mail entfernt]')
     expect(e.message).toBe('Abo für [e-mail entfernt] gescheitert')
     expect(e.extra).toEqual({ kundin: 'Jürgen <[e-mail entfernt]>' })
@@ -592,14 +592,14 @@ describe('Nr. 56 — die offenen Fälle aus Lauf 8 §6 (Bericht 47)', () => {
     // die eine schon kodierte Adresse weiterträgt. Dreifach kodiert ebenso.
     const e = bereinigeEreignis(
       ereignis({
-        request: { url: 'https://farmerzone.at/customers/kundin%2540example.com?ziel=%2Fcustomers%2Fanna%252540example.org' },
+        request: { url: 'https://agrilo.at/customers/kundin%2540example.com?ziel=%2Fcustomers%2Fanna%252540example.org' },
         contexts: { nextjs: { request_path: '/customers/kundin%2540example.com' } },
         extra: { weiter: 'Weiter zu kundin%252540example.com' },
         exception: { values: [{ value: 'Weiterleitung zu /customers/kundin%2540example.com gescheitert' }] },
       })
     )
     const [pfad, query] = (e.request?.url ?? '').split('?')
-    expect(pfad).toBe('https://farmerzone.at/customers/[e-mail entfernt]')
+    expect(pfad).toBe('https://agrilo.at/customers/[e-mail entfernt]')
     expect(new URLSearchParams(query).get('ziel')).toBe('/customers/[e-mail entfernt]')
     expect(e.contexts?.nextjs).toEqual({ request_path: '/customers/[e-mail entfernt]' })
     expect(e.extra).toEqual({ weiter: 'Weiter zu [e-mail entfernt]' })
@@ -618,8 +618,8 @@ describe('Nr. 56 — die offenen Fälle aus Lauf 8 §6 (Bericht 47)', () => {
       'Weiterleitung (/account/unsubscribe?seite=2) verweigert'
     )
     // Dieselbe Regel für absolute Adressen, „token=…" und „Bearer …" — wie im Freitext.
-    expect(fehlertext('GET https://farmerzone.at/account/neuigkeiten-bestaetigen?token=geheim-123 failed')).toBe(
-      'GET https://farmerzone.at/account/neuigkeiten-bestaetigen failed'
+    expect(fehlertext('GET https://agrilo.at/account/neuigkeiten-bestaetigen?token=geheim-123 failed')).toBe(
+      'GET https://agrilo.at/account/neuigkeiten-bestaetigen failed'
     )
     expect(fehlertext('Abmeldung mit token=geheim-123 und Bearer geheim-123 abgelehnt')).toBe('Abmeldung mit token=[entfernt] und Bearer [entfernt] abgelehnt')
     // Ein schon ersetzter Code bleibt lesbar, auch im Freitext (vorher „otp: [entfernt] entfernt]").
@@ -642,7 +642,7 @@ describe('Nr. 56 — die offenen Fälle aus Lauf 8 §6 (Bericht 47)', () => {
         message: 'Öffentliche Hofliste: Fehleranzeige ausgeliefert',
         level: 'warning',
         tags: { sichtbar: 'ja' },
-        request: { url: 'https://farmerzone.at/hoefe?q=Musterhof', query_string: 'q=Musterhof', headers: { referer: 'https://farmerzone.at/hoefe?q=Bio' } },
+        request: { url: 'https://agrilo.at/hoefe?q=Musterhof', query_string: 'q=Musterhof', headers: { referer: 'https://agrilo.at/hoefe?q=Bio' } },
         breadcrumbs: [{ category: 'navigation', data: { to: '/hoefe?q=Musterhof' } }],
       })
     )
@@ -684,7 +684,7 @@ describe('Nr. 56, Nachbesserung Runde 1 — Befunde der Prüfung', () => {
           exception: { values: [{ type: 'Error', value: `Mail an ${adresse} gescheitert, Pfad /customers/${adresse}` }] },
           message: `Abo für ${adresse} gescheitert`,
           extra: { text: `an ${adresse}` },
-          request: { url: `https://farmerzone.at/customers/${adresse}` },
+          request: { url: `https://agrilo.at/customers/${adresse}` },
           breadcrumbs: [{ data: { from: `/customers/${adresse}` } }],
           contexts: { nextjs: { request_path: `/customers/${adresse}` } },
         })
@@ -692,7 +692,7 @@ describe('Nr. 56, Nachbesserung Runde 1 — Befunde der Prüfung', () => {
       expect(e.exception?.values?.[0].value, adresse).toBe('Mail an [e-mail entfernt] gescheitert, Pfad /customers/[e-mail entfernt]')
       expect(e.message, adresse).toBe('Abo für [e-mail entfernt] gescheitert')
       expect(e.extra, adresse).toEqual({ text: 'an [e-mail entfernt]' })
-      expect(e.request?.url, adresse).toBe('https://farmerzone.at/customers/[e-mail entfernt]')
+      expect(e.request?.url, adresse).toBe('https://agrilo.at/customers/[e-mail entfernt]')
       expect(e.breadcrumbs?.[0].data?.from, adresse).toBe('/customers/[e-mail entfernt]')
       expect(e.contexts?.nextjs, adresse).toEqual({ request_path: '/customers/[e-mail entfernt]' })
       expect(JSON.stringify(e), adresse).not.toMatch(/ckerei|kundin|rgen|beispiel/)
@@ -724,7 +724,7 @@ describe('Nr. 56, Nachbesserung Runde 1 — Befunde der Prüfung', () => {
       ['/login?next=/reset-password?token=abc123', '/login?next=%2Freset-password'],
       ['/login?next=%2Freset-password%3Ftoken%3Dabc123', '/login?next=%2Freset-password'],
       ['/login?next=/reset-password?token=abc123&seite=2', '/login?next=%2Freset-password&seite=2'],
-      ['/login?callbackUrl=https://farmerzone.at/reset-password?token=abc123', '/login?callbackUrl=https%3A%2F%2Ffarmerzone.at%2Freset-password'],
+      ['/login?callbackUrl=https://agrilo.at/reset-password?token=abc123', '/login?callbackUrl=https%3A%2F%2Fagrilo.at%2Freset-password'],
       ['/login?next=/api/orders/confirm/abc123', '/login?next=%2Fapi%2Forders%2Fconfirm%2F%5Bkennung+entfernt%5D'],
       ['/login?next=/x/token=abc123', '/login?next=%2Fx%2Ftoken%3D%5Bentfernt%5D'],
       ['/x?info=Bearer%20abc123', '/x?info=Bearer+%5Bentfernt%5D'],
@@ -742,12 +742,12 @@ describe('Nr. 56, Nachbesserung Runde 1 — Befunde der Prüfung', () => {
       expect(nachricht(roh), roh).toBe(sauber)
       const e = bereinigeEreignis(
         ereignis({
-          request: { url: `https://farmerzone.at${roh}`, headers: { Referer: `https://farmerzone.at${roh}` } },
+          request: { url: `https://agrilo.at${roh}`, headers: { Referer: `https://agrilo.at${roh}` } },
           breadcrumbs: [{ category: 'navigation', data: { from: roh } }],
         })
       )
-      expect(e.request?.url, roh).toBe(`https://farmerzone.at${sauber}`)
-      expect(e.request?.headers?.Referer, roh).toBe(`https://farmerzone.at${sauber}`)
+      expect(e.request?.url, roh).toBe(`https://agrilo.at${sauber}`)
+      expect(e.request?.headers?.Referer, roh).toBe(`https://agrilo.at${sauber}`)
       expect(e.breadcrumbs?.[0].data?.from, roh).toBe(sauber)
     }
     // Abfrage für sich: request.query_string, Span-Daten und Texte unter Query-Schlüsseln.
@@ -789,13 +789,13 @@ describe('Nr. 56, Nachbesserung Runde 1 — Befunde der Prüfung', () => {
       ['url „/account/unsubscribe?token=geheim-123“', 'url „/account/unsubscribe“'],
       ['url «/account/unsubscribe?token=geheim-123»', 'url «/account/unsubscribe»'],
       ['url:/account/unsubscribe?token=geheim-123&seite=2', 'url:/account/unsubscribe?seite=2'],
-      ['GET HTTPS://FARMERZONE.AT/api/orders/confirm/abc123 failed', 'GET HTTPS://FARMERZONE.AT/api/orders/confirm/[kennung entfernt] failed'],
-      ['GET Https://farmerzone.at/reset-password?token=abc123', 'GET Https://farmerzone.at/reset-password'],
+      ['GET HTTPS://AGRILO.AT/api/orders/confirm/abc123 failed', 'GET HTTPS://AGRILO.AT/api/orders/confirm/[kennung entfernt] failed'],
+      ['GET Https://agrilo.at/reset-password?token=abc123', 'GET Https://agrilo.at/reset-password'],
     ]
     for (const [roh, sauber] of faelle) expect(fehlertext(roh), roh).toBe(sauber)
     // In Nachrichten gilt die Adress-Regel für absolute Adressen im Text — jetzt auch groß geschrieben.
-    expect(nachricht('GET HTTPS://FARMERZONE.AT/api/orders/confirm/abc123 failed')).toBe(
-      'GET HTTPS://FARMERZONE.AT/api/orders/confirm/[kennung entfernt] failed'
+    expect(nachricht('GET HTTPS://AGRILO.AT/api/orders/confirm/abc123 failed')).toBe(
+      'GET HTTPS://AGRILO.AT/api/orders/confirm/[kennung entfernt] failed'
     )
     // Gegenproben: Ein Schrägstrich nach Buchstabe oder Ziffer (jeder Schrift) beginnt keine Adresse.
     for (const text of ['und/oder, 3/4 und 1/2', 'Maß/abcdefghijklmnopqrstuvwxyz', 'localhost:3000/api/orders/confirm/x', 'v1.2/beta', 'Gewicht 50%/Jahr']) {
@@ -869,7 +869,7 @@ describe('Nr. 56, Nachbesserung Runde 1 — Befunde der Prüfung', () => {
 describe('Nr. 56, Nachbesserung Runde 2 — Befunde der Nachprüfung', () => {
   const fehlertext = (wert: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: wert }] } })).exception?.values?.[0].value
   const nachricht = (wert: string) => bereinigeEreignis(ereignis({ message: wert })).message
-  const adresse = (pfad: string) => bereinigeEreignis(ereignis({ request: { url: `https://farmerzone.at${pfad}` } })).request?.url
+  const adresse = (pfad: string) => bereinigeEreignis(ereignis({ request: { url: `https://agrilo.at${pfad}` } })).request?.url
   const extraText = (wert: string) => (bereinigeEreignis(ereignis({ extra: { text: wert } })).extra as { text?: string } | undefined)?.text
 
   it('eine Nummer direkt nach einem Prozent-Escape fällt (%20, %22, %27, %28) — in Pfad, Fehlertext, Nachricht und extra', () => {
@@ -887,7 +887,7 @@ describe('Nr. 56, Nachbesserung Runde 2 — Befunde der Nachprüfung', () => {
       expect(nachricht(roh), roh).toBe(sauber)
       expect(extraText(roh), roh).toBe(sauber)
     }
-    expect(adresse('/kontakt/Ruf%2006641234567')).toBe('https://farmerzone.at/kontakt/Ruf%20[telefon entfernt]')
+    expect(adresse('/kontakt/Ruf%2006641234567')).toBe('https://agrilo.at/kontakt/Ruf%20[telefon entfernt]')
     // Gegenproben: Zeitstempel, cuid und UUID bleiben, auch nach einem Escape.
     for (const text of ['Zeit%202026-10-10%2020:02:00', 'Kennung%20clx0123456789abcdefghijkl', 'Anfrage%20550e8400-e29b-41d4-a716-0123456789ab']) {
       expect(fehlertext(text), text).toBe(text)
@@ -907,7 +907,7 @@ describe('Nr. 56, Nachbesserung Runde 2 — Befunde der Nachprüfung', () => {
       ['/login?info=token%253D%25C3abc123', '/login?info=token%3D%5Bentfernt%5D'],
     ]
     for (const [roh, sauber] of faelle) {
-      expect(adresse(roh), roh).toBe(`https://farmerzone.at${sauber}`)
+      expect(adresse(roh), roh).toBe(`https://agrilo.at${sauber}`)
       expect(fehlertext(`Fehler bei ${roh} gemeldet`), roh).toBe(`Fehler bei ${sauber} gemeldet`)
       expect(nachricht(roh), roh).toBe(sauber)
     }
@@ -916,7 +916,7 @@ describe('Nr. 56, Nachbesserung Runde 2 — Befunde der Nachprüfung', () => {
       'http.query': 'next=%2Freset-password',
     })
     // Gegenprobe: ein harmloser Wert bleibt.
-    expect(adresse('/hoefe?q=100%25&seite=2')).toBe('https://farmerzone.at/hoefe?q=100%25&seite=2')
+    expect(adresse('/hoefe?q=100%25&seite=2')).toBe('https://agrilo.at/hoefe?q=100%25&seite=2')
   })
   it('kodierte Trenner: Ein Escape vor dem Schlüssel ist eine Grenze, ein kodiertes „=" im Anker zählt wie ein rohes', () => {
     // Vorher wurde der Schlüssel zu „20token" bzw. „23token", und „#token%3D…"
@@ -935,13 +935,13 @@ describe('Nr. 56, Nachbesserung Runde 2 — Befunde der Nachprüfung', () => {
       ['/x#a%3D1%26token%3Dabc123', '/x#a=1'],
       ['/x#next%3D%2Fapi%2Forders%2Fconfirm%2Fabc123', '/x#next=%2Fapi%2Forders%2Fconfirm%2F%5Bkennung+entfernt%5D'],
     ]) {
-      expect(adresse(roh), roh).toBe(`https://farmerzone.at${sauber}`)
+      expect(adresse(roh), roh).toBe(`https://agrilo.at${sauber}`)
       expect(fehlertext(`Fehler bei ${roh} gemeldet`), roh).toBe(`Fehler bei ${sauber} gemeldet`)
       expect(nachricht(roh), roh).toBe(sauber)
     }
     // Gegenproben: ein Prozentzeichen ohne Escape vor dem Schlüssel; ein Anker ohne „=", auch dekodiert.
     expect(fehlertext('100%token=abc123')).toBe('100%token=[entfernt]')
-    expect(adresse('/hoefe#karte%20oben')).toBe('https://farmerzone.at/hoefe#karte%20oben')
+    expect(adresse('/hoefe#karte%20oben')).toBe('https://agrilo.at/hoefe#karte%20oben')
     expect(fehlertext('Rabatt 50%20token')).toBe('Rabatt 50%20token')
   })
   it('Nachricht, Brotkrume und extra nehmen eingebettete relative Adressen wie der Fehlertext', () => {
@@ -976,12 +976,12 @@ describe('Nr. 56, Nachbesserung Runde 2 — Befunde der Nachprüfung', () => {
       ['/x;token=abc123/weiter', '/x;token=[entfernt]'],
       ['/konto/access_token:abc123', '/konto/access_token:[entfernt]'],
     ]) {
-      expect(adresse(roh), roh).toBe(`https://farmerzone.at${sauber}`)
+      expect(adresse(roh), roh).toBe(`https://agrilo.at${sauber}`)
       expect(nachricht(roh), roh).toBe(sauber)
       expect(bereinigeEreignis(ereignis({ breadcrumbs: [{ category: 'navigation', data: { to: roh } }] })).breadcrumbs?.[0].data?.to, roh).toBe(sauber)
     }
     // Gegenproben: Schema, Host und Port sind keine Zuweisung; ein harmloser Schlüssel im Pfad bleibt.
-    expect(adresse('/hoefe/sorte=apfel')).toBe('https://farmerzone.at/hoefe/sorte=apfel')
+    expect(adresse('/hoefe/sorte=apfel')).toBe('https://agrilo.at/hoefe/sorte=apfel')
     expect(bereinigeEreignis(ereignis({ request: { url: 'http://localhost:3000/hoefe' } })).request?.url).toBe('http://localhost:3000/hoefe')
   })
 })
@@ -989,7 +989,7 @@ describe('Nr. 56, Nachbesserung Runde 2 — Befunde der Nachprüfung', () => {
 describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Runde 2', () => {
   const fehlertext = (wert: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: wert }] } })).exception?.values?.[0].value
   const nachricht = (wert: string) => bereinigeEreignis(ereignis({ message: wert })).message
-  const adresse = (pfad: string) => bereinigeEreignis(ereignis({ request: { url: `https://farmerzone.at${pfad}` } })).request?.url
+  const adresse = (pfad: string) => bereinigeEreignis(ereignis({ request: { url: `https://agrilo.at${pfad}` } })).request?.url
   const extraText = (wert: string) => (bereinigeEreignis(ereignis({ extra: { text: wert } })).extra as { text?: string } | undefined)?.text
   const brotkrume = (wert: string) => bereinigeEreignis(ereignis({ breadcrumbs: [{ category: 'console', message: wert }] })).breadcrumbs?.[0].message
   const spanAdresse = (url: string) =>
@@ -1006,7 +1006,7 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
       ['/login?next=%2Fx%3Ftel%3D%2B436641234567', '/login?next=%2Fx%3Ftel%3D%255Btelefon%2Bentfernt%255D'],
       ['/login?next=%2Fkunden%2F%252B436641234567', '/login?next=%2Fkunden%2F%5Btelefon+entfernt%5D'],
       ['/login?next=%2Fx%23%252B436641234567', '/login?next=%2Fx%23%5Btelefon+entfernt%5D'],
-      ['/login?next=https%3A%2F%2Ffarmerzone.at%2Fkunden%2F%252B436641234567', '/login?next=https%3A%2F%2Ffarmerzone.at%2Fkunden%2F%5Btelefon+entfernt%5D'],
+      ['/login?next=https%3A%2F%2Fagrilo.at%2Fkunden%2F%252B436641234567', '/login?next=https%3A%2F%2Fagrilo.at%2Fkunden%2F%5Btelefon+entfernt%5D'],
       ['/login?next=%2Fx%3Fh%3DBearer%2520abc%252Bdef123', '/login?next=%2Fx%3Fh%3DBearer%2B%255Bentfernt%255D'],
       // Auch in der Abfrage der Adresse selbst: als Plus, als Leerzeichen und gemischt.
       ['/x?tel=+436641234567', '/x?tel=%5Btelefon+entfernt%5D'],
@@ -1015,8 +1015,8 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
       ['/x?q=%22+436641234567', '/x?q=%22%5Btelefon+entfernt%5D'],
     ]
     for (const [roh, sauber] of faelle) {
-      expect(adresse(roh), roh).toBe(`https://farmerzone.at${sauber}`)
-      expect(spanAdresse(`https://farmerzone.at${roh}`), roh).toBe(`https://farmerzone.at${sauber}`)
+      expect(adresse(roh), roh).toBe(`https://agrilo.at${sauber}`)
+      expect(spanAdresse(`https://agrilo.at${roh}`), roh).toBe(`https://agrilo.at${sauber}`)
       expect(nachricht(roh), roh).toBe(sauber)
       expect(bereinigeEreignis(ereignis({ breadcrumbs: [{ category: 'navigation', data: { to: roh } }] })).breadcrumbs?.[0].data?.to, roh).toBe(sauber)
     }
@@ -1040,29 +1040,29 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     }
     // Gegenproben: Ein Leerzeichen bleibt ein Leerzeichen, ein Wert ohne Adresse wird ganz dekodiert,
     // eine kodierte Adresse nimmt den Pfad davor nicht mit.
-    expect(adresse('/login?next=%2Fsuche%3Fq%3Dmax%2Bmuster')).toBe('https://farmerzone.at/login?next=%2Fsuche%3Fq%3Dmax%2Bmuster')
-    expect(adresse('/hoefe?q=frische+eier&seite=2')).toBe('https://farmerzone.at/hoefe?q=frische+eier&seite=2')
-    expect(adresse('/login?info=%252B436641234567')).toBe('https://farmerzone.at/login?info=%5Btelefon+entfernt%5D')
-    expect(adresse('/x?ziel=%2Fkunden%2Fanna%2540example.org')).toBe('https://farmerzone.at/x?ziel=%2Fkunden%2F%5Be-mail+entfernt%5D')
+    expect(adresse('/login?next=%2Fsuche%3Fq%3Dmax%2Bmuster')).toBe('https://agrilo.at/login?next=%2Fsuche%3Fq%3Dmax%2Bmuster')
+    expect(adresse('/hoefe?q=frische+eier&seite=2')).toBe('https://agrilo.at/hoefe?q=frische+eier&seite=2')
+    expect(adresse('/login?info=%252B436641234567')).toBe('https://agrilo.at/login?info=%5Btelefon+entfernt%5D')
+    expect(adresse('/x?ziel=%2Fkunden%2Fanna%2540example.org')).toBe('https://agrilo.at/x?ziel=%2Fkunden%2F%5Be-mail+entfernt%5D')
     // Roh zählt ein „+" vorn nur mit freiem linken Rand als Nummer — auch nach Satzzeichen;
     // an einem Wort oder einer Zahl ist es ein Leerzeichen.
     for (const [roh, sauber] of [
       ['/go?to=tel:+436641234567', '/go?to=tel%3A%5Btelefon+entfernt%5D'],
       ['/x?q=Ruf,+436641234567', '/x?q=Ruf%2C%5Btelefon+entfernt%5D'],
       ['/x?q=(+43)6641234567', '/x?q=%28%5Btelefon+entfernt%5D'],
-      ['/api/og?url=https://farmerzone.at/anruf/tel:+436641234567', '/api/og?url=https%3A%2F%2Ffarmerzone.at%2Fanruf%2Ftel%3A%5Btelefon+entfernt%5D'],
+      ['/api/og?url=https://agrilo.at/anruf/tel:+436641234567', '/api/og?url=https%3A%2F%2Fagrilo.at%2Fanruf%2Ftel%3A%5Btelefon+entfernt%5D'],
     ]) {
-      expect(adresse(roh), roh).toBe(`https://farmerzone.at${sauber}`)
+      expect(adresse(roh), roh).toBe(`https://agrilo.at${sauber}`)
     }
-    expect(adresse('/x?q=Artikel+12345678')).toBe('https://farmerzone.at/x?q=Artikel+12345678')
-    expect(adresse('/x?q=12+345678901')).toBe('https://farmerzone.at/x?q=12+345678901')
+    expect(adresse('/x?q=Artikel+12345678')).toBe('https://agrilo.at/x?q=Artikel+12345678')
+    expect(adresse('/x?q=12+345678901')).toBe('https://agrilo.at/x?q=12+345678901')
     // Der Preis des freien Rands (sichere Richtung): nach einem Satzzeichen gilt ein „+" vor acht Ziffern als Nummer.
-    expect(adresse('/x?q=Bestellnr.+12345678')).toBe('https://farmerzone.at/x?q=Bestellnr.%5Btelefon+entfernt%5D')
-    expect(adresse('/x?q=a%0912345678')).toBe('https://farmerzone.at/x?q=a%0912345678')
+    expect(adresse('/x?q=Bestellnr.+12345678')).toBe('https://agrilo.at/x?q=Bestellnr.%5Btelefon+entfernt%5D')
+    expect(adresse('/x?q=a%0912345678')).toBe('https://agrilo.at/x?q=a%0912345678')
     // Der Preis der rohen Lesart (sichere Richtung): Ein mit „+" angehängtes Wort zählt zur Adresse.
-    expect(adresse('/x?q=Hallo+kundin@example.com')).toBe('https://farmerzone.at/x?q=%5Be-mail+entfernt%5D')
+    expect(adresse('/x?q=Hallo+kundin@example.com')).toBe('https://agrilo.at/x?q=%5Be-mail+entfernt%5D')
     // Ein heikler Name bleibt heikel, auch wenn die rohe Lesart ihn ersetzt hätte.
-    expect(adresse('/x?token@example.com=abc123&seite=2')).toBe('https://farmerzone.at/x?seite=2')
+    expect(adresse('/x?token@example.com=abc123&seite=2')).toBe('https://agrilo.at/x?seite=2')
   })
 
   it('ein doppelt kodiertes Escape links ist eine Grenze wie ein einfaches — in Pfad, Fehlertext, Nachricht und extra', () => {
@@ -1078,7 +1078,7 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
       expect(nachricht(roh), roh).toBe(sauber)
       expect(extraText(roh), roh).toBe(sauber)
     }
-    expect(adresse('/kontakt/Ruf%252006641234567')).toBe('https://farmerzone.at/kontakt/Ruf%2520[telefon entfernt]')
+    expect(adresse('/kontakt/Ruf%252006641234567')).toBe('https://agrilo.at/kontakt/Ruf%2520[telefon entfernt]')
     // Gegenproben: Zeitstempel und Kennungen nach einem doppelt kodierten Escape bleiben.
     for (const text of ['Zeit%25202026-10-10%252020:02:00', 'Kennung%2520clx0123456789abcdefghijkl']) {
       expect(fehlertext(text), text).toBe(text)
@@ -1089,19 +1089,19 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     // Runde 2 beendete sie an ) ] ' " und Backtick; was dahinter stand, sah die
     // URL-Regel nicht mehr (reorder=…, s=…). main und Runde 1 nahmen \S+.
     const faelle: [string, string][] = [
-      ['Link https://farmerzone.at/x?f[a]=1&reorder=abc123', 'Link https://farmerzone.at/x?f%5Ba%5D=1'],
-      ['Link https://farmerzone.at/x?utm=(herbst)&s=abc123sig', 'Link https://farmerzone.at/x?utm=%28herbst%29'],
-      [`Link https://farmerzone.at/x?q='a'&token=abc123`, 'Link https://farmerzone.at/x?q=%27a%27'],
+      ['Link https://agrilo.at/x?f[a]=1&reorder=abc123', 'Link https://agrilo.at/x?f%5Ba%5D=1'],
+      ['Link https://agrilo.at/x?utm=(herbst)&s=abc123sig', 'Link https://agrilo.at/x?utm=%28herbst%29'],
+      [`Link https://agrilo.at/x?q='a'&token=abc123`, 'Link https://agrilo.at/x?q=%27a%27'],
       // In einer relativen Adresse: Sie liest die absolute mit, bis zum Leerraum — die
       // Parameter danach gehören zur äußeren Abfrage, auch ohne „?" in der absoluten.
-      ['Abruf /api/og?url=https://farmerzone.at/x?f[a]=1&s=abc123sig gescheitert', 'Abruf /api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx%3Ff%255Ba%255D%3D1 gescheitert'],
-      ['Abruf /api/og?url=https://farmerzone.at/x&s=abc123sig gescheitert', 'Abruf /api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx gescheitert'],
-      ['Abruf /api/og?url=https://farmerzone.at/x&reorder=abc123 gescheitert', 'Abruf /api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx gescheitert'],
-      ['Abruf /api/og?url=https://farmerzone.at/x&pathname=hof/foto.jpg gescheitert', 'Abruf /api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx gescheitert'],
+      ['Abruf /api/og?url=https://agrilo.at/x?f[a]=1&s=abc123sig gescheitert', 'Abruf /api/og?url=https%3A%2F%2Fagrilo.at%2Fx%3Ff%255Ba%255D%3D1 gescheitert'],
+      ['Abruf /api/og?url=https://agrilo.at/x&s=abc123sig gescheitert', 'Abruf /api/og?url=https%3A%2F%2Fagrilo.at%2Fx gescheitert'],
+      ['Abruf /api/og?url=https://agrilo.at/x&reorder=abc123 gescheitert', 'Abruf /api/og?url=https%3A%2F%2Fagrilo.at%2Fx gescheitert'],
+      ['Abruf /api/og?url=https://agrilo.at/x&pathname=hof/foto.jpg gescheitert', 'Abruf /api/og?url=https%3A%2F%2Fagrilo.at%2Fx gescheitert'],
       // Ein Wert, der selbst eine absolute Adresse ist, fällt mit seinem Schlüssel.
-      ['Abruf /x?a=1&token=https://farmerzone.at/abc123 weg', 'Abruf /x?a=1 weg'],
-      ['Abruf /proxy/https://farmerzone.at/x?f[a]=1&reorder=abc123 weg', 'Abruf /proxy/https://farmerzone.at/x?f%5Ba%5D=1 weg'],
-      [`Wert =/https://farmerzone.at/x?q='a'&s=abc123sig weg`, 'Wert =/https://farmerzone.at/x?q=%27a%27 weg'],
+      ['Abruf /x?a=1&token=https://agrilo.at/abc123 weg', 'Abruf /x?a=1 weg'],
+      ['Abruf /proxy/https://agrilo.at/x?f[a]=1&reorder=abc123 weg', 'Abruf /proxy/https://agrilo.at/x?f%5Ba%5D=1 weg'],
+      [`Wert =/https://agrilo.at/x?q='a'&s=abc123sig weg`, 'Wert =/https://agrilo.at/x?q=%27a%27 weg'],
     ]
     for (const [roh, sauber] of faelle) {
       expect(nachricht(roh), roh).toBe(sauber)
@@ -1117,16 +1117,16 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     // kodiert in ihr (%22Bearer, token%3A) — die Regeln danach sahen es nicht mehr,
     // der Wert dahinter blieb. Jetzt fällt er vorab (ersetzeVorab).
     const faelle = [
-      'Fetch {"u":"/api/og?url=https://farmerzone.at/x","h":"Bearer abc123def456ghi"}',
-      'Fetch [["url","/api/og?url=https://farmerzone.at/x"],["authorization","Bearer abc123def456ghi"]]',
-      'Fetch {"u":"/api/og?url=https://farmerzone.at/x","code": 123456}',
-      'Abruf /api/og?url=https://farmerzone.at/x,token: abc123def456 weg',
-      '{"u":"/api/og?url=https://farmerzone.at/x","token": "abc123def456"}',
-      'Fetch {"url":"https://farmerzone.at/x","headers":{"authorization":"Bearer abc123def456ghi"}}',
-      'Login /api/auth?callbackUrl=https://farmerzone.at/konto&otp 123456 abgelaufen',
+      'Fetch {"u":"/api/og?url=https://agrilo.at/x","h":"Bearer abc123def456ghi"}',
+      'Fetch [["url","/api/og?url=https://agrilo.at/x"],["authorization","Bearer abc123def456ghi"]]',
+      'Fetch {"u":"/api/og?url=https://agrilo.at/x","code": 123456}',
+      'Abruf /api/og?url=https://agrilo.at/x,token: abc123def456 weg',
+      '{"u":"/api/og?url=https://agrilo.at/x","token": "abc123def456"}',
+      'Fetch {"url":"https://agrilo.at/x","headers":{"authorization":"Bearer abc123def456ghi"}}',
+      'Login /api/auth?callbackUrl=https://agrilo.at/konto&otp 123456 abgelaufen',
       // Ein „@" im Wert ist noch keine E-Mail-Adresse (Passwort).
-      '{"u":"/api/og?url=https://farmerzone.at/x","password": "Sommer@2024"}',
-      'Abruf https://farmerzone.at/x?a=1,password: Sommer@2024 weg',
+      '{"u":"/api/og?url=https://agrilo.at/x","password": "Sommer@2024"}',
+      'Abruf https://agrilo.at/x?a=1,password: Sommer@2024 weg',
     ]
     for (const roh of faelle) {
       for (const ergebnis of [nachricht(roh), extraText(roh), brotkrume(roh), fehlertext(roh)]) {
@@ -1137,10 +1137,10 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     for (const roh of [
       'Weiter redirect_token: (/x?a=1&s=abc123sig) weg',
       'Weiter redirect_token: «/x?a=1&s=abc123sig» weg',
-      'token: x(https://farmerzone.at/a?b=1&s=abc123sig) weg',
-      'Abruf /api/og?url=https://farmerzone.at/x,token: /9j4AAQgeheim weg',
+      'token: x(https://agrilo.at/a?b=1&s=abc123sig) weg',
+      'Abruf /api/og?url=https://agrilo.at/x,token: /9j4AAQgeheim weg',
       'Weiter: Bearer /x?s=abc123sig weg',
-      'Weiter: Bearer https://farmerzone.at/x?a=(1)&s=abc123sig weg',
+      'Weiter: Bearer https://agrilo.at/x?a=(1)&s=abc123sig weg',
       'Fehler code /123456?s=abc123sig weg',
     ]) {
       for (const ergebnis of [nachricht(roh), extraText(roh), brotkrume(roh), fehlertext(roh)]) {
@@ -1153,8 +1153,8 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     expect(fehlertext('Invalid prisma.session.findFirst() invocation: { where: { token: "abc123def456" } }')).toBe(
       'Invalid prisma.session.findFirst() invocation: { where: { token: "[entfernt]" } }'
     )
-    expect(nachricht(faelle[0])).toBe('Fetch {"u":"/api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx%22%2C%22h%22%3A%22Bearer [entfernt]"}')
-    expect(fehlertext(faelle[3])).toBe('Abruf /api/og?url=https%3A%2F%2Ffarmerzone.at%2Fx%2Ctoken%3A [entfernt] weg')
+    expect(nachricht(faelle[0])).toBe('Fetch {"u":"/api/og?url=https%3A%2F%2Fagrilo.at%2Fx%22%2C%22h%22%3A%22Bearer [entfernt]"}')
+    expect(fehlertext(faelle[3])).toBe('Abruf /api/og?url=https%3A%2F%2Fagrilo.at%2Fx%2Ctoken%3A [entfernt] weg')
     // Gegenproben: Ein Wert, der selbst eine Adresse ist, fällt mit der ganzen Adresse;
     // ein Code und eine E-Mail-Adresse als Wert behalten ihren Platzhalter.
     expect(nachricht('redirect_token: /x?a=1&s=abc123sig weg')).toBe('redirect_token: [entfernt] weg')
@@ -1239,7 +1239,7 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     expect(nachricht('Fehler token: 06641234567geheimT weg')).toBe('Fehler token: [entfernt] weg')
     expect(fehlertext('Fehler token: 06641234567geheimT weg')).toBe('Fehler token: [entfernt] weg')
     expect(nachricht('Abruf /x?code=123456&s=abc123sig weg')).toBe('Abruf /x weg')
-    expect(nachricht('Abruf https://farmerzone.at/x?code=123456&s=abc123sig weg')).toBe('Abruf https://farmerzone.at/x weg')
+    expect(nachricht('Abruf https://agrilo.at/x?code=123456&s=abc123sig weg')).toBe('Abruf https://agrilo.at/x weg')
     // Bleibt der Anfang einer Nummer in der Adresse stehen, fällt die Nummer danach ganz;
     // fällt er mit einem heiklen Parameter, fällt vorab ihr Rest dahinter.
     expect(nachricht('Link /x?tel=0664 1234567 weg')).toBe('Link /x?tel=[telefon entfernt] weg')
@@ -1254,20 +1254,20 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     expect(nachricht('Link /out?link=tel:0664 1234567 weg')).toBe('Link /out?link=tel%3A[telefon entfernt] weg')
     expect(fehlertext('Link /out?link=tel:+43 664 1234567 weg')).toBe('Link /out?link=tel%3A[telefon entfernt] weg')
     // Hinter einem Schlüsselwort ohne „=" am Ende einer Adresse fällt der Code vorab.
-    expect(nachricht('Login https://farmerzone.at/konto&a=1&otp 123456 abgelaufen')).toBe(
-      'Login https://farmerzone.at/konto&a=1&otp [code entfernt] abgelaufen'
+    expect(nachricht('Login https://agrilo.at/konto&a=1&otp 123456 abgelaufen')).toBe(
+      'Login https://agrilo.at/konto&a=1&otp [code entfernt] abgelaufen'
     )
   })
 
   it('ein Wert hinter Leerraum fällt auch, wenn eine Adresse mit Abfrage davor sein Schlüsselwort mitliest', () => {
     const faelle = [
-      '{"u":"https://farmerzone.at/x?a=1","token": "abc123def456"}',
-      '{"u":"https://farmerzone.at/x?a=1","h":"Bearer abc123def456ghi"}',
-      'Fehler https://farmerzone.at/x?a=1,code: 123456 weg',
+      '{"u":"https://agrilo.at/x?a=1","token": "abc123def456"}',
+      '{"u":"https://agrilo.at/x?a=1","h":"Bearer abc123def456ghi"}',
+      'Fehler https://agrilo.at/x?a=1,code: 123456 weg',
       '{"u":"/x?a=1","code": 123456}',
       '{"u":"/x?a=1","h":"Bearer /9j4AAQgeheim"}',
       'Fehler /x?a=1,token: /9j4AAQgeheim weg',
-      'Fehler https://farmerzone.at/x?a=1,token: (/y?s=abc123sig) weg',
+      'Fehler https://agrilo.at/x?a=1,token: (/y?s=abc123sig) weg',
       'Fehler /x?a=1&otp 123456 weg',
       // Hängt am Code oder an der Nummer noch etwas, fällt der ganze Wert schon vorab.
       'Fehler /x?a=1,otp: 905173-geheimO weg',
@@ -1275,9 +1275,9 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
       'Fehler /x?a=1,token: geheimQ1 /664/12345?s=abc123sig weg',
       // Eine Nummer, die in einer Adresse beginnt und dahinter weitergeht, fällt ganz,
       // auch wenn in der Adresse ihr Anfang mit einem heiklen Parameter fällt.
-      'Link https://farmerzone.at/x&s=0664 1234567 weg',
-      'Link https://farmerzone.at/x?s=x-0664 1234567 weg',
-      'Abruf /api/og?url=https://farmerzone.at/x&s=0664 1234567 weg',
+      'Link https://agrilo.at/x&s=0664 1234567 weg',
+      'Link https://agrilo.at/x?s=x-0664 1234567 weg',
+      'Abruf /api/og?url=https://agrilo.at/x&s=0664 1234567 weg',
       'Fehler code /482913 nach sig: code /123456 weg',
     ]
     for (const roh of faelle) {
@@ -1292,19 +1292,19 @@ describe('Nr. 56, Nacharbeit des Dirigenten — Befunde der Nachprüfung von Run
     // (next=%252Freset%253Ftoken%253Dabc123); vierfach fiel er schon.
     let wert = '/reset?token=abc123'
     for (let i = 0; i < 5; i++) wert = encodeURIComponent(wert)
-    expect(adresse(`/login?next=${wert}`)).toBe('https://farmerzone.at/login?next=%5Bentfernt%5D')
+    expect(adresse(`/login?next=${wert}`)).toBe('https://agrilo.at/login?next=%5Bentfernt%5D')
     expect(nachricht(`/login?next=${wert}`)).toBe('/login?next=%5Bentfernt%5D')
     // Gegenprobe: vierfach kodiert wird er ganz gelesen, der Token fällt, der Pfad bleibt.
     let vier = '/reset?token=abc123'
     for (let i = 0; i < 4; i++) vier = encodeURIComponent(vier)
-    expect(adresse(`/login?next=${vier}`)).toBe('https://farmerzone.at/login?next=%2Freset')
+    expect(adresse(`/login?next=${vier}`)).toBe('https://agrilo.at/login?next=%2Freset')
   })
 })
 
 describe('Nr. 64 — Telefon-Regel: Nummern auch an Wörtern, cuid und UUID an ihrer Form', () => {
   const fehlertext = (wert: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: wert }] } })).exception?.values?.[0].value
   const nachricht = (wert: string) => bereinigeEreignis(ereignis({ message: wert })).message
-  const adresse = (pfad: string) => bereinigeEreignis(ereignis({ request: { url: `https://farmerzone.at${pfad}` } })).request?.url
+  const adresse = (pfad: string) => bereinigeEreignis(ereignis({ request: { url: `https://agrilo.at${pfad}` } })).request?.url
   const extraText = (wert: string) => (bereinigeEreignis(ereignis({ extra: { text: wert } })).extra as { text?: string } | undefined)?.text
   // Eine cuid wie aus Prisma (c und 24 Zeichen) mit „0" und acht Ziffern am Stück; UUIDs, in denen
   // eine Gruppe mit führender 0 samt den folgenden Ziffern wie eine Nummer aussieht.
@@ -1326,9 +1326,9 @@ describe('Nr. 64 — Telefon-Regel: Nummern auch an Wörtern, cuid und UUID an i
       expect(nachricht(roh), roh).toBe(sauber)
       expect(extraText(roh), roh).toBe(sauber)
     }
-    expect(adresse('/bilder/Hof_06641234567_foto.jpg')).toBe('https://farmerzone.at/bilder/Hof_[telefon entfernt]_foto.jpg')
+    expect(adresse('/bilder/Hof_06641234567_foto.jpg')).toBe('https://agrilo.at/bilder/Hof_[telefon entfernt]_foto.jpg')
     // Ein Segment ab 24 Zeichen fällt weiter ganz — die Nummer zerteilt es nicht vorher.
-    expect(adresse('/x/Telefon06641234567Adresse')).toBe('https://farmerzone.at/x/[kennung entfernt]')
+    expect(adresse('/x/Telefon06641234567Adresse')).toBe('https://agrilo.at/x/[kennung entfernt]')
   })
 
   it('cuid und UUID bleiben ganz, auch nach Escape, Klammer oder „_" — erkannt an der Form, nicht an den Rändern', () => {
@@ -1360,7 +1360,7 @@ describe('Nr. 64 — Telefon-Regel: Nummern auch an Wörtern, cuid und UUID an i
 })
 
 describe('Nr. 64 — Abfragen: beide Lesarten auf dem unveränderten Text, Bereiche vereinigt', () => {
-  const adresse = (pfad: string) => bereinigeEreignis(ereignis({ request: { url: `https://farmerzone.at${pfad}` } })).request?.url
+  const adresse = (pfad: string) => bereinigeEreignis(ereignis({ request: { url: `https://agrilo.at${pfad}` } })).request?.url
   const abfrage = (qs: string) => bereinigeEreignis(ereignis({ request: { query_string: qs } })).request?.query_string
   const fehlertext = (wert: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: wert }] } })).exception?.values?.[0].value
   const nachricht = (wert: string) => bereinigeEreignis(ereignis({ message: wert })).message
@@ -1379,10 +1379,10 @@ describe('Nr. 64 — Abfragen: beide Lesarten auf dem unveränderten Text, Berei
       ['q=(0664)+987+65+43+(0664%2F9876543', 'q=%5Btelefon+entfernt%5D'],
     ]
     for (const [roh, sauber] of faelle) {
-      expect(adresse(`/hoefe?${roh}`), roh).toBe(`https://farmerzone.at/hoefe?${sauber}`)
+      expect(adresse(`/hoefe?${roh}`), roh).toBe(`https://agrilo.at/hoefe?${sauber}`)
       expect(abfrage(roh), roh).toBe(sauber)
-      expect(spanAdresse(`https://farmerzone.at/hoefe?${roh}`), roh).toBe(`https://farmerzone.at/hoefe?${sauber}`)
-      for (const text of [nachricht(`Abruf https://farmerzone.at/hoefe?${roh} gescheitert`), nachricht(`/hoefe?${roh}`)]) {
+      expect(spanAdresse(`https://agrilo.at/hoefe?${roh}`), roh).toBe(`https://agrilo.at/hoefe?${sauber}`)
+      for (const text of [nachricht(`Abruf https://agrilo.at/hoefe?${roh} gescheitert`), nachricht(`/hoefe?${roh}`)]) {
         expect(rest(text), `${roh} → ${text}`).toBeNull()
       }
     }
@@ -1394,21 +1394,21 @@ describe('Nr. 64 — Abfragen: beide Lesarten auf dem unveränderten Text, Berei
 
   it('eine Nummer mit rohem „+" vorn und %20 als Trenner fällt', () => {
     // Die rohe Lesart las %20 nicht als Trenner, die zerlegte sah kein „+" mehr.
-    expect(adresse('/hoefe?q=+43%20664%209876543')).toBe('https://farmerzone.at/hoefe?q=%5Btelefon+entfernt%5D')
+    expect(adresse('/hoefe?q=+43%20664%209876543')).toBe('https://agrilo.at/hoefe?q=%5Btelefon+entfernt%5D')
     expect(abfrage('q=+43%20664%209876543&seite=2')).toBe('q=%5Btelefon+entfernt%5D&seite=2')
     expect(rest(nachricht('Abruf /hoefe?q=+43%20664%209876543 gescheitert'))).toBeNull()
   })
 
   it('Gegenproben: ein „+" an einem Wort bleibt ein Leerzeichen, Pfad und übrige Parameter bleiben lesbar', () => {
-    expect(adresse('/suche?q=Artikel+12345678&seite=2')).toBe('https://farmerzone.at/suche?q=Artikel+12345678&seite=2')
-    expect(adresse('/suche?q=Abholung+10%3A30+Uhr')).toBe('https://farmerzone.at/suche?q=Abholung+10%3A30+Uhr')
-    expect(adresse('/x?next=%2Fkunden%2Fkundin%40example.com&a=1')).toBe('https://farmerzone.at/x?next=%2Fkunden%2F%5Be-mail+entfernt%5D&a=1')
+    expect(adresse('/suche?q=Artikel+12345678&seite=2')).toBe('https://agrilo.at/suche?q=Artikel+12345678&seite=2')
+    expect(adresse('/suche?q=Abholung+10%3A30+Uhr')).toBe('https://agrilo.at/suche?q=Abholung+10%3A30+Uhr')
+    expect(adresse('/x?next=%2Fkunden%2Fkundin%40example.com&a=1')).toBe('https://agrilo.at/x?next=%2Fkunden%2F%5Be-mail+entfernt%5D&a=1')
   })
 })
 
 describe('Nr. 64 — Zuweisungen: Schlüssel hinter einem Wert, Nummern im Wert und hinter einer Adresse', () => {
   const fehlertext = (wert: string) => bereinigeEreignis(ereignis({ exception: { values: [{ value: wert }] } })).exception?.values?.[0].value
-  const adresse = (pfad: string) => bereinigeEreignis(ereignis({ request: { url: `https://farmerzone.at${pfad}` } })).request?.url
+  const adresse = (pfad: string) => bereinigeEreignis(ereignis({ request: { url: `https://agrilo.at${pfad}` } })).request?.url
   const span = (teil: object) =>
     (bereinigeEreignis(ereignis({ type: 'transaction', spans: [teil] })) as unknown as { spans: Array<{ description?: string; data?: Record<string, unknown> }> }).spans[0]
   const spanAdresse = (url: string) => span({ data: { 'url.full': url } }).data?.['url.full']
@@ -1420,15 +1420,15 @@ describe('Nr. 64 — Zuweisungen: Schlüssel hinter einem Wert, Nummern im Wert 
   it('ein Schlüssel zählt, wenn sein Wert hinter dem Wert davor beginnt — auch in einem Bearer-Token und im Pfad', () => {
     // Vorher zählte kein Schlüssel im Wert eines anderen und keiner in einem Bearer-Token mit „=":
     // „Bearer [entfernt]%2Fgeheim-123", „token: [entfernt] geheim-123".
-    expect(spanAdresse('https://farmerzone.at/x/Bearer token=%2Fgeheim-123')).toBe('https://farmerzone.at/x/Bearer [entfernt]')
-    expect(spanAdresse(`https://farmerzone.at/x/token: ${UUID}]secret: geheim-123`)).toBe('https://farmerzone.at/x/token: [entfernt] [entfernt]')
+    expect(spanAdresse('https://agrilo.at/x/Bearer token=%2Fgeheim-123')).toBe('https://agrilo.at/x/Bearer [entfernt]')
+    expect(spanAdresse(`https://agrilo.at/x/token: ${UUID}]secret: geheim-123`)).toBe('https://agrilo.at/x/token: [entfernt] [entfernt]')
     // Gegenprobe: Der Schlüssel am Ende eines Tokens nimmt seinen Wert, der Code bleibt beim Code-Platzhalter.
     expect(fehlertext('Bearer otp: 123456 und Bearer token=geheim-123')).toBe('Bearer [entfernt]: [code entfernt] und Bearer [entfernt]')
   })
 
   it('eine Nummer, die in einem Wert beginnt, fällt ganz — auch mit „+" als Trenner, wie die Abfrage sie danach liest', () => {
     // Vorher blieb „664 9876543": Der Wert endete am Leerzeichen, die Telefon-Regel sah dahinter keine Nummer.
-    expect(adresse('/x?q=token%3A%20012012%2B43%20664%209876543')).toBe('https://farmerzone.at/x?q=token%3A+%5Bentfernt%5D')
+    expect(adresse('/x?q=token%3A%20012012%2B43%20664%209876543')).toBe('https://agrilo.at/x?q=token%3A+%5Bentfernt%5D')
     const weiter = adresse('/x?next=%2Fx%3Fq%3Dtoken%3A%20otp%3A%20012012%2B43%20664%209876543')
     expect(rest(weiter), weiter).toBeNull()
   })
@@ -1436,22 +1436,22 @@ describe('Nr. 64 — Zuweisungen: Schlüssel hinter einem Wert, Nummern im Wert 
   it('in einer Span-Beschreibung fällt der Rest einer Nummer, die in der Adresse beginnt und hinter ihr weitergeht', () => {
     // Die Adresse endet am Leerraum; vorher sah die Telefon-Regel im Rest dahinter keine Nummer mehr.
     for (const text of [
-      'GET https://farmerzone.at/x?q=token=2021-10-12+43 (664) 987-6543',
-      'GET https://farmerzone.at/x?q=token=abc0664 987 65 43 ok',
-      'GET https://farmerzone.at/x?a=106&s=06 64 987 65 43',
+      'GET https://agrilo.at/x?q=token=2021-10-12+43 (664) 987-6543',
+      'GET https://agrilo.at/x?q=token=abc0664 987 65 43 ok',
+      'GET https://agrilo.at/x?a=106&s=06 64 987 65 43',
     ]) {
       expect(rest(beschreibung(text)), text).toBeNull()
     }
     // Gegenproben: Nimmt die Telefon-Regel die Nummer danach ganz, bleibt es dabei; ohne Nummer bleibt alles.
-    expect(beschreibung('GET https://farmerzone.at/x?q=Tel+0664 987 6543')).toBe('GET https://farmerzone.at/x?q=Tel[telefon entfernt]')
-    expect(beschreibung('GET https://farmerzone.at/x/0664 9876543')).toBe('GET https://farmerzone.at/x/[telefon entfernt]')
-    expect(beschreibung('GET https://farmerzone.at/hoefe?seite=2 200 OK')).toBe('GET https://farmerzone.at/hoefe?seite=2 200 OK')
+    expect(beschreibung('GET https://agrilo.at/x?q=Tel+0664 987 6543')).toBe('GET https://agrilo.at/x?q=Tel[telefon entfernt]')
+    expect(beschreibung('GET https://agrilo.at/x/0664 9876543')).toBe('GET https://agrilo.at/x/[telefon entfernt]')
+    expect(beschreibung('GET https://agrilo.at/hoefe?seite=2 200 OK')).toBe('GET https://agrilo.at/hoefe?seite=2 200 OK')
   })
 
   it('kodiert die bereinigte Adresse den Anfang der Nummer neu, fällt die Nummer ganz — in Nachricht, Fehlertext und Span-Beschreibung', () => {
     // Vorher musste der Anfang unverändert am Ende der Adresse stehen; neu kodiert blieb er: „?q=%280043 [telefon entfernt]".
-    const text = 'Abruf https://farmerzone.at/x?q=(0043 664 9876543 fertig'
-    const sauber = 'Abruf https://farmerzone.at/x?q=%28[telefon entfernt] fertig'
+    const text = 'Abruf https://agrilo.at/x?q=(0043 664 9876543 fertig'
+    const sauber = 'Abruf https://agrilo.at/x?q=%28[telefon entfernt] fertig'
     expect(bereinigeEreignis(ereignis({ message: text })).message).toBe(sauber)
     expect(fehlertext(text)).toBe(sauber)
     expect(beschreibung(text)).toBe(sauber)
@@ -1459,7 +1459,7 @@ describe('Nr. 64 — Zuweisungen: Schlüssel hinter einem Wert, Nummern im Wert 
 
   it('reicht eine E-Mail-Adresse in den Rest der Nummer, fällt der Rest trotzdem', () => {
     // Die E-Mail-Regel läuft vor der Telefon-Regel und nähme die Ziffern als Teil vor dem @ — vorher blieb „664".
-    const text = 'Abruf https://farmerzone.at/x?q=(0043 664 9876543xq%40example.com fertig'
+    const text = 'Abruf https://agrilo.at/x?q=(0043 664 9876543xq%40example.com fertig'
     for (const sauber of [bereinigeEreignis(ereignis({ message: text })).message, fehlertext(text), beschreibung(text)]) {
       expect(rest(sauber), sauber).toBeNull()
       expect(sauber).not.toMatch(/xq|example/)
@@ -1480,15 +1480,15 @@ describe('Nr. 64, Runde 1 — Nummern an Wörtern in Abfragewerten von Adressen 
   it('eine Nummer mit „/" oder Leerzeichen an einem Wort fällt in Nachricht, extra, Brotkrume, Fehlertext und Span-Beschreibung wie in request.url', () => {
     // Vorher bereinigten diese Felder die Adresse ohne Nachlese, und die Nachlese am Schluss sah nur
     // den neu kodierten Wert: „Hof_0664%2F1234567_foto.jpg" — dort sind „%2F" und „+" keine Trenner.
-    const datei = 'https://farmerzone.at/x?f=Hof_0664%2F1234567_foto.jpg'
-    const datei_sauber = 'https://farmerzone.at/x?f=Hof_%5Btelefon+entfernt%5D_foto.jpg'
+    const datei = 'https://agrilo.at/x?f=Hof_0664%2F1234567_foto.jpg'
+    const datei_sauber = 'https://agrilo.at/x?f=Hof_%5Btelefon+entfernt%5D_foto.jpg'
     expect(adresse(datei)).toBe(datei_sauber)
     for (const feld of [nachricht, extraText, brotkrume]) expect(feld(`Abruf ${datei} gescheitert`)).toBe(`Abruf ${datei_sauber} gescheitert`)
     expect(fehlertext('Abruf /x?f=Telefon0664%201234567Adresse gescheitert')).toBe('Abruf /x?f=Telefon%5Btelefon+entfernt%5DAdresse gescheitert')
-    expect(beschreibung('GET https://farmerzone.at/x?f=Telefon0664%201234567Adresse')).toBe('GET https://farmerzone.at/x?f=Telefon%5Btelefon+entfernt%5DAdresse')
+    expect(beschreibung('GET https://agrilo.at/x?f=Telefon0664%201234567Adresse')).toBe('GET https://agrilo.at/x?f=Telefon%5Btelefon+entfernt%5DAdresse')
     // Auch im Pfad einer Adresse, die selbst ein Abfragewert ist: Er wird mit dem Wert neu kodiert.
-    expect(nachricht('Abruf https://farmerzone.at/login?next=%2Fbilder%2FHof_0664%201234567_x gescheitert')).toBe(
-      'Abruf https://farmerzone.at/login?next=%2Fbilder%2FHof_%5Btelefon+entfernt%5D_x gescheitert'
+    expect(nachricht('Abruf https://agrilo.at/login?next=%2Fbilder%2FHof_0664%201234567_x gescheitert')).toBe(
+      'Abruf https://agrilo.at/login?next=%2Fbilder%2FHof_%5Btelefon+entfernt%5D_x gescheitert'
     )
   })
 
@@ -1497,18 +1497,18 @@ describe('Nr. 64, Runde 1 — Nummern an Wörtern in Abfragewerten von Adressen 
     // ein Platzhalter für den Rest beendete ihn sonst an seinem Leerzeichen („[entfernt] entfernt]").
     expect(fehlertext('Fehler bei /token=(0664)+987+65+43 weiter')).toBe('Fehler bei /token=[entfernt] weiter')
     // Freitext: Beginnt mit dem Rest eine lange Kennung, fällt sie mit ihm, statt dass ihr Ende stehen bleibt.
-    expect(nachricht('Abruf https://farmerzone.at/x?q=token=%280664%29%2098765430043 664 9876543abcdefghijklmnopqrstuvwxy weiter')).toBe(
-      'Abruf https://farmerzone.at/x?q=token%3D%5Bentfernt%5D [telefon entfernt] weiter'
+    expect(nachricht('Abruf https://agrilo.at/x?q=token=%280664%29%2098765430043 664 9876543abcdefghijklmnopqrstuvwxy weiter')).toBe(
+      'Abruf https://agrilo.at/x?q=token%3D%5Bentfernt%5D [telefon entfernt] weiter'
     )
   })
 
   it('Gegenprobe: eine lange Kennung im Abfragewert fällt weiter ganz, die Nachlese zerteilt sie nicht vorher', () => {
     // Ohne Trenner steht die Nummer neu kodiert unverändert da — sie bleibt der Nachlese am Schluss, nach der Regel der langen Kennung.
-    expect(nachricht('Abruf https://farmerzone.at/x?v=abcdef0123456789abcdef0123456789ab gescheitert')).toBe(
-      'Abruf https://farmerzone.at/x?v=[kennung entfernt] gescheitert'
+    expect(nachricht('Abruf https://agrilo.at/x?v=abcdef0123456789abcdef0123456789ab gescheitert')).toBe(
+      'Abruf https://agrilo.at/x?v=[kennung entfernt] gescheitert'
     )
-    expect(nachricht('Abruf https://farmerzone.at/x?f=Hof_06641234567_foto.jpg gescheitert')).toBe(
-      'Abruf https://farmerzone.at/x?f=Hof_[telefon entfernt]_foto.jpg gescheitert'
+    expect(nachricht('Abruf https://agrilo.at/x?f=Hof_06641234567_foto.jpg gescheitert')).toBe(
+      'Abruf https://agrilo.at/x?f=Hof_[telefon entfernt]_foto.jpg gescheitert'
     )
   })
 })

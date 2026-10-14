@@ -330,6 +330,26 @@ describe('Zwischenspeicher der gewandelten Fotos und Grenze für sharp (Nr. 75)'
     expect(geholt).toEqual([adressen[0]])
   })
 
+  it('ein gebrauchtes Foto rückt nach hinten: Nicht das zuerst geholte fällt heraus, sondern das am längsten nicht gebrauchte (LRU, nicht FIFO)', async () => {
+    // Je Foto zwei Einträge (rund und als Grund): genau so viele Fotos, dass der Speicher voll ist.
+    const adressen = Array.from({ length: FOTO_CACHE_MAX / 2 + 1 }, (_, i) => blob(`farms/farm-1/product/lru-${i}.webp`))
+    const { w, geholt } = werkzeuge(Object.fromEntries(adressen.map((url) => [url, ok(WEBP)])))
+    for (const url of adressen.slice(0, -1)) await lade(url, w)
+    expect(w.fotos.size).toBe(FOTO_CACHE_MAX)
+
+    // Das zuerst geholte Foto wird gebraucht — es rückt nach hinten.
+    await lade(adressen[0], w)
+    // Ein neues Foto verdrängt jetzt das zweite, nicht das erste.
+    await lade(adressen[adressen.length - 1], w)
+    expect(w.fotos.size).toBe(FOTO_CACHE_MAX)
+
+    geholt.length = 0
+    await lade(adressen[0], w)
+    expect(geholt).toEqual([])
+    await lade(adressen[1], w)
+    expect(geholt).toEqual([adressen[1]])
+  })
+
   // Eigenes Limit: echtes sharp wandelt zwei große Fotos je zweimal (rund und als Grund).
   it('sharp dekodiert höchstens 6 MP: ein Upload in voller Größe (2400 px) kommt ins Bild, ein größeres Foto nicht', async () => {
     const foto = (breite: number, hoehe: number) =>

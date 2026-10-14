@@ -2,17 +2,19 @@
 // Marke (kurzes Wort), ihre Bedeutung und ein erklärender Satz in
 // Kundinnen-Sprache.
 //
-// BEWUSST NEBEN src/components/orders/order-status.ts (Bauern-Bereich), nicht
-// darin: Dieselben Status bedeuten aus beiden Blickwinkeln Verschiedenes.
-// Für den Bauern ist READY erledigte Arbeit (dort „erledigt"), für die
-// Kundin ist READY der Höhepunkt — jetzt hinfahren (hier „läuft", grün).
-// Auch die Wortwahl trennt sich: „Wartet auf Kunden-Bestätigung" ist ein
-// Satz ÜBER die Kundin, „Bitte bestätige…" ist einer AN sie.
+// BEWUSST NEBEN der Hof-Lesart (bestellMarke in src/lib/hof-bestellungen.ts),
+// nicht darin: Dieselben Status bedeuten aus beiden Blickwinkeln Verschiedenes.
+// Bezahlt heißt für den Hof „Zum Packen" (tun), für die Kundin läuft alles;
+// „Wartet auf Kunde" ist für den Hof erledigt, für die Kundin „Bestätigung
+// offen" (tun). Auch die Wortwahl trennt sich: „Wartet auf Kunden-Bestätigung"
+// ist ein Satz ÜBER die Kundin, „Bitte bestätige…" ist einer AN sie.
 //
 // Die Bedeutung steht als Art der Marke (Register G5): tun = die Kundin muss
-// etwas tun · läuft = alles läuft · erledigt = abgeschlossen · abgebrochen =
-// storniert/nicht abgeholt. Schrift und Fläche dazu sind Tokens in beiden
-// Modi und kommen nur aus dem Baustein Marke — hier steht keine Farbe.
+// etwas tun · läuft = alles läuft · erledigt = abgeschlossen (auch „Nicht
+// abgeholt", Freigabe Lauf 13) · abgebrochen = storniert. Schrift und Fläche
+// dazu sind Tokens in beiden Modi und kommen nur aus dem Baustein Marke — hier
+// steht keine Farbe. Bestellseite und „Meine Bestellungen" zeichnen beide aus
+// `art` (bestellEintrag in src/lib/bestellungen-finden.ts).
 //
 // Nur die REAL VORHANDENEN Enum-Werte (prisma OrderStatus, schema.prisma:17)
 // — keine erfundenen Zwischenschritte. Zwei davon setzt heute kein Codepfad
@@ -117,7 +119,7 @@ export function bestellStatusAnzeige(
     case 'NOT_PICKED_UP':
       return {
         marke: 'Nicht abgeholt',
-        art: 'abgebrochen',
+        art: 'erledigt',
         satz: 'Diese Bestellung wurde nicht abgeholt. Melde dich beim Hof, wenn du dazu Fragen hast.',
       }
     default:

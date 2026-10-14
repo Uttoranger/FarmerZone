@@ -19,6 +19,8 @@ import { ABO_BESTAETIGUNG_GUELTIG_TAGE } from '@/lib/abo-bestaetigung'
 import { env } from '@/lib/env'
 import { darfMailEmpfangen, leseTestEmpfaenger, sperrtTrotzProduktion } from '@/lib/testumgebung'
 import { abmeldeSeitenPfad, listUnsubscribeKoepfe } from '@/lib/abmelde-link'
+import { MARKE } from '@/lib/marke'
+import { POSTFACH_MAIL_TEXT, fadenHref } from '@/lib/postfach'
 
 const apiKey = process.env.RESEND_API_KEY
 const FROM = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
@@ -275,7 +277,7 @@ function betraege(order: OrderForEmail): { warenpreis: number; gebuehr: number; 
 export async function sendMagicLinkEmail(email: string, url: string, firstName?: string): Promise<void> {
   const { CustomerMagicLinkEmail } = await import('@/emails/customer-magic-link')
   const html = await toHtml(React.createElement(CustomerMagicLinkEmail, { firstName, magicUrl: url }))
-  await send(email, 'Dein Login-Link für FarmerZone', html)
+  await send(email, `Dein Login-Link für ${MARKE}`, html)
 }
 
 /**
@@ -291,7 +293,7 @@ export async function sendAnmeldeCodeEmail(email: string, code: string): Promise
     return React.createElement(AnmeldecodeEmail, { code, minuten })
   })
   if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, 'Dein Anmeldecode für FarmerZone', vorlage.html)
+  return sendRaw(email, `Dein Anmeldecode für ${MARKE}`, vorlage.html)
 }
 
 /**
@@ -306,7 +308,7 @@ export async function sendBestellCodeEmail(email: string, code: string): Promise
     return React.createElement(AnmeldecodeEmail, { code, minuten, zweck: 'bestellungen' })
   })
   if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, 'Dein Code für deine Bestellungen · FarmerZone', vorlage.html)
+  return sendRaw(email, `Dein Code für deine Bestellungen · ${MARKE}`, vorlage.html)
 }
 
 /**
@@ -320,7 +322,7 @@ export async function sendEmailBestaetigung(email: string, url: string): Promise
     return React.createElement(EmailBestaetigungEmail, { url, stunden: BESTAETIGUNG_GUELTIG_SEKUNDEN / 3600 })
   })
   if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, 'Bestätige deine E-Mail-Adresse · FarmerZone', vorlage.html)
+  return sendRaw(email, `Bestätige deine E-Mail-Adresse · ${MARKE}`, vorlage.html)
 }
 
 /**
@@ -337,7 +339,7 @@ export async function sendAboBestaetigung(
     return React.createElement(AboBestaetigungEmail, { ...daten, tage: ABO_BESTAETIGUNG_GUELTIG_TAGE })
   })
   if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, 'Bitte bestätige deine Anmeldung · FarmerZone', vorlage.html)
+  return sendRaw(email, `Bitte bestätige deine Anmeldung · ${MARKE}`, vorlage.html)
 }
 
 /**
@@ -354,14 +356,14 @@ export async function sendRegistrierungsHinweis(
   // sollen sie nicht mitziehen (Nachtlauf Nr. 31, „schwere Module nur bei Bedarf").
   const { RegistrierungHinweisEmail } = await import('@/emails/registrierung-hinweis')
   const html = await toHtml(React.createElement(RegistrierungHinweisEmail, ziele))
-  return sendRaw(email, 'Jemand wollte sich mit deiner Adresse registrieren · FarmerZone', html)
+  return sendRaw(email, `Jemand wollte sich mit deiner Adresse registrieren · ${MARKE}`, html)
 }
 
 /** Passwort-Reset → Bauer */
 export async function sendPasswordResetEmail(email: string, url: string): Promise<void> {
   const { PasswordResetEmail } = await import('@/emails/password-reset')
   const html = await toHtml(React.createElement(PasswordResetEmail, { resetUrl: url }))
-  await send(email, 'Passwort zurücksetzen · FarmerZone', html)
+  await send(email, `Passwort zurücksetzen · ${MARKE}`, html)
 }
 
 /** Neuer Hof registriert → Betreiber (Freischaltung nötig) */
@@ -456,7 +458,7 @@ export async function sendBriefkastenZusammenfassung(z: {
   )
   await send(
     SUPPORT_EMAIL,
-    `Briefkasten: ${z.neu} neu, ${z.liegenGeblieben} liegen länger als 14 Tage`,
+    `Postfach: ${z.neu} neu, ${z.liegenGeblieben} liegen länger als 14 Tage`,
     html
   )
 }
@@ -809,4 +811,40 @@ export async function sendBestellungVerfallen(
   }))
 
   await send(order.customerEmail, 'Deine Bestellung ist verfallen, weil sie nicht bestätigt wurde', html)
+}
+
+/**
+ * Postfach (Register N12, Nr. 87): eine Nachricht vom Team an einen Hof per
+ * E-Mail — ein Rundschreiben mit dem Haken „Betriebsmitteilung" oder eine
+ * Antwort des Teams im Faden (höchstens eine je Faden und Stunde, das
+ * entscheidet die Action). Nie bei Antworten des Hofs. Links der Nachricht
+ * sind Wege in der App (appPfadAusLink) und bekommen hier den eigenen
+ * Ursprung. Über sendRaw — die Post-Sperre (Z3) greift wie bei jeder Mail;
+ * das Ergebnis geht an den Aufrufer, der einen Fehler ohne Text meldet.
+ */
+export async function sendPostfachMail(m: {
+  art: 'rundschreiben' | 'antwort'
+  an: string
+  titel: string
+  text: string
+  link: string | null
+  unterhaltungId: string
+}): Promise<VersandErgebnis> {
+  const props = {
+    titel: m.titel,
+    text: m.text,
+    linkUrl: m.link ? `${APP_URL}${m.link}` : null,
+    fadenUrl: `${APP_URL}${fadenHref(m.unterhaltungId)}`,
+  }
+  const html = await htmlOderFehler(async () => {
+    if (m.art === 'rundschreiben') {
+      const { PostfachRundschreibenEmail } = await import('@/emails/postfach-rundschreiben')
+      return React.createElement(PostfachRundschreibenEmail, props)
+    }
+    const { PostfachAntwortEmail } = await import('@/emails/postfach-antwort')
+    return React.createElement(PostfachAntwortEmail, props)
+  })
+  if (!html.ok) return { error: html.error }
+  const betreff = m.art === 'rundschreiben' ? m.titel : POSTFACH_MAIL_TEXT.antwortBetreff(m.titel)
+  return sendRaw(m.an, betreff, html.html)
 }

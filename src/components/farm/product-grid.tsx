@@ -284,7 +284,7 @@ function SortableProductCard({
           // Der Ziehgriff liegt auf dem Produktfoto, nicht auf der Karte:
           // weiße Marke mit dunkler Schrift, in beiden Modi gleich.
           background: 'rgba(255,255,255,0.94)',
-          color: '#5C6052',
+          color: 'var(--foto-knopf-ink-soft)',
           boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
         }}
       >
@@ -729,7 +729,7 @@ export function ProductGrid({
             symbol={Sprout}
             titel="Gerade keine Produkte"
             satz="Dieser Hof hat im Moment nichts im Angebot. Schau bald wieder vorbei – oder such dir einen anderen Hof in der Nähe."
-            aktion={
+            ausweg={
               <Link
                 href="/hoefe"
                 className={cn('inline-flex min-h-11 items-center rounded-full border border-border px-4 text-[14px] font-semibold text-foreground hover:bg-muted', FOKUS_RAHMEN)}

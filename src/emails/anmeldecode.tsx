@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Text } from '@react-email/components'
 import { EmailLayout, h1, bodyText, mutedText, MAIL_FARBE } from './_layout'
+import { MARKE } from '@/lib/marke'
 
 export interface AnmeldecodeProps {
   code: string
@@ -17,13 +18,13 @@ export interface AnmeldecodeProps {
 const TEXTE = {
   anmelden: {
     titel: 'Dein Anmeldecode',
-    wozu: 'gib diesen Code auf FarmerZone ein, um dich anzumelden:',
+    wozu: `gib diesen Code auf ${MARKE} ein, um dich anzumelden:`,
     nichtDu: 'Du wolltest dich nicht anmelden?',
-    kurztext: 'Dein Code für FarmerZone',
+    kurztext: `Dein Code für ${MARKE}`,
   },
   bestellungen: {
     titel: 'Dein Code für deine Bestellungen',
-    wozu: 'gib diesen Code auf FarmerZone ein, um deine Bestellungen zu sehen:',
+    wozu: `gib diesen Code auf ${MARKE} ein, um deine Bestellungen zu sehen:`,
     nichtDu: 'Du wolltest deine Bestellungen nicht ansehen?',
     kurztext: 'Dein Code für deine Bestellungen',
   },

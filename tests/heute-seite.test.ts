@@ -47,6 +47,7 @@ vi.mock('next/link', () => ({
 }))
 
 import {
+  brauchtDichAnzeige,
   HEUTE_ABHOLEN,
   KENNZAHL_TEXT,
   PACK_MARKE,
@@ -91,6 +92,8 @@ import {
   ZuTunKarte,
 } from '@/components/heute/heute-teile'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
+import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
+import { LEISE } from '@/components/hof-bestellungen/stil'
 import { ERSTE_SCHRITTE_WARTET, ZU_TUN_TEXT, ersteSchritte, ersteSchritteDaten, zuTun, type ZuTunAufgabe } from '@/lib/erste-schritte'
 import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 
@@ -131,9 +134,9 @@ describe('Packliste — Reihenfolge und Zahlen', () => {
   })
 
   it('Marken: zum Packen orange, wartet neutral, gepackt grün', () => {
-    expect(PACK_MARKE.vorbereiten).toEqual({ text: 'Zum Packen', ton: 'offen' })
-    expect(PACK_MARKE.wartet).toEqual({ text: 'Wartet auf Kunde', ton: 'neutral' })
-    expect(PACK_MARKE.bereit).toEqual({ text: 'Gepackt', ton: 'fertig' })
+    expect(PACK_MARKE.vorbereiten).toEqual({ text: 'Zum Packen', art: 'tun' })
+    expect(PACK_MARKE.wartet).toEqual({ text: 'Wartet auf Kunde', art: 'erledigt' })
+    expect(PACK_MARKE.bereit).toEqual({ text: 'Gepackt', art: 'laeuft' })
   })
 })
 
@@ -179,8 +182,8 @@ describe('Abholfenster — Wiener Wochentag', () => {
 
 describe('Teilen-Zeile', () => {
   it('kompakt, zuletzt in der Hauptspalte — nur wenn Kunden den Hof sehen und bei ihm bestellen können', () => {
-    expect(heuteAufbau({ stripeHinweis: false, teilen: true, zuTun: false }).haupt).toEqual(['packliste', 'braucht-dich', 'teilen'])
-    const ohne = heuteAufbau({ stripeHinweis: false, teilen: false, zuTun: false })
+    expect(heuteAufbau({ stripeHinweis: false, teilen: true, zuTun: false, postfach: false }).haupt).toEqual(['packliste', 'braucht-dich', 'teilen'])
+    const ohne = heuteAufbau({ stripeHinweis: false, teilen: false, zuTun: false, postfach: false })
     expect([...ohne.oben, ...ohne.haupt, ...ohne.seite]).not.toContain('teilen')
   })
 
@@ -213,14 +216,39 @@ describe('Teilen-Zeile', () => {
 
 // ─── Aufbau ─────────────────────────────────────────────────────────────────
 
+describe('brauchtDichAnzeige — die leise Zeile nur bei leerer Packliste (N11, Ergänzung Lauf 13)', () => {
+  it('mit Eintrag die Karte, gleich wie voll die Packliste ist', () => {
+    expect(brauchtDichAnzeige(1, true)).toBe('karte')
+    expect(brauchtDichAnzeige(2, false)).toBe('karte')
+  })
+
+  it('ohne Eintrag: die Zeile nur, wenn auch die Packliste leer ist — sonst nichts', () => {
+    expect(brauchtDichAnzeige(0, true)).toBe('zeile')
+    expect(brauchtDichAnzeige(0, false)).toBeNull()
+  })
+})
+
 describe('Aufbau der Seite — Packliste zuerst, oben höchstens ein Kasten', () => {
   it('die Hauptspalte läuft Packliste, Braucht dich, Teilen — dringend vor freiwillig, mit und ohne Teilen-Zeile (N11)', () => {
     for (const stripeHinweis of [true, false]) {
       for (const teilen of [true, false]) {
         for (const zuTun of [true, false]) {
-          const { haupt } = heuteAufbau({ stripeHinweis, teilen, zuTun })
+          const { haupt } = heuteAufbau({ stripeHinweis, teilen, zuTun, postfach: false })
           expect(haupt).toEqual(teilen ? ['packliste', 'braucht-dich', 'teilen'] : ['packliste', 'braucht-dich'])
         }
+      }
+    }
+  })
+
+  it('Ungelesenes im Postfach steht als erster Block der Hauptspalte — sonst bleibt alles, wie es war (N12, Nr. 87)', () => {
+    for (const stripeHinweis of [true, false]) {
+      for (const teilen of [true, false]) {
+        const mit = heuteAufbau({ stripeHinweis, teilen, zuTun: true, postfach: true })
+        const ohne = heuteAufbau({ stripeHinweis, teilen, zuTun: true, postfach: false })
+        expect(mit.haupt).toEqual(['postfach', ...ohne.haupt])
+        expect(mit.oben).toEqual(ohne.oben)
+        expect(mit.seite).toEqual(ohne.seite)
+        expect(ohne.haupt).not.toContain('postfach')
       }
     }
   })
@@ -229,7 +257,7 @@ describe('Aufbau der Seite — Packliste zuerst, oben höchstens ein Kasten', ()
     for (const stripeHinweis of [true, false]) {
       for (const teilen of [true, false]) {
         for (const zuTun of [true, false]) {
-          const { oben } = heuteAufbau({ stripeHinweis, teilen, zuTun })
+          const { oben } = heuteAufbau({ stripeHinweis, teilen, zuTun, postfach: false })
           expect(oben.length).toBeLessThanOrEqual(1)
           expect(oben).toEqual(stripeHinweis ? ['stripe'] : [])
         }
@@ -238,18 +266,18 @@ describe('Aufbau der Seite — Packliste zuerst, oben höchstens ein Kasten', ()
   })
 
   it('jeder Block steht genau einmal; die Seitenspalte trägt Zu tun, nächste Abholung und Woche (Nr. 53)', () => {
-    const voll = heuteAufbau({ stripeHinweis: true, teilen: true, zuTun: true })
+    const voll = heuteAufbau({ stripeHinweis: true, teilen: true, zuTun: true, postfach: false })
     const alle = [...voll.oben, ...voll.haupt, ...voll.seite]
     expect(new Set(alle).size).toBe(alle.length)
     expect(voll.seite).toEqual(['zu-tun', 'naechste-abholung', 'woche'])
-    const ohne = heuteAufbau({ stripeHinweis: false, teilen: false, zuTun: false })
+    const ohne = heuteAufbau({ stripeHinweis: false, teilen: false, zuTun: false, postfach: false })
     expect(ohne).toEqual({ oben: [], haupt: ['packliste', 'braucht-dich'], seite: ['naechste-abholung', 'woche'] })
   })
 
   it('Erste Schritte und „Deine Hofseite" gibt es nicht mehr als eigene Blöcke — nur noch die eine Liste', () => {
     for (const stripeHinweis of [true, false]) {
       for (const zuTun of [true, false]) {
-        const { oben, haupt, seite } = heuteAufbau({ stripeHinweis, teilen: true, zuTun })
+        const { oben, haupt, seite } = heuteAufbau({ stripeHinweis, teilen: true, zuTun, postfach: false })
         const alle: string[] = [...oben, ...haupt, ...seite]
         expect(alle).not.toContain('erste-schritte')
         expect(alle).not.toContain('hofseite')
@@ -381,7 +409,7 @@ describe('Hinweis „Online-Zahlung einrichten" für freigeschaltete Höfe ohne 
   })
 
   it('die Seite zeigt ihn oben, wo sonst „pausiert" steht — keine Abschaltung, nur ein Hinweis', () => {
-    expect(heuteAufbau({ stripeHinweis: true, teilen: true, zuTun: false }).oben).toEqual(['stripe'])
+    expect(heuteAufbau({ stripeHinweis: true, teilen: true, zuTun: false, postfach: false }).oben).toEqual(['stripe'])
     const seite = quelle('src/app/(hof)/dashboard/page.tsx')
     expect(seite).toContain('<StripeEinrichtenHinweis')
     expect(seite).toContain('heute.stripeEinrichten')
@@ -774,10 +802,13 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
 
   })
 
-  it('Braucht dich ohne Eintrag: eine leise Zeile „Nichts braucht dich heute." — keine Karte, keine Überschrift, kein Link (N11)', () => {
-    const leer = html(createElement(BrauchtDichKarte, { eintraege: [] }))
+  it('Braucht dich ohne Eintrag bei leerer Packliste: eine leise Zeile „Nichts braucht dich heute." — gedämpft, keine Karte, keine Überschrift, kein Link (N11)', () => {
+    const leer = html(createElement(BrauchtDichKarte, { eintraege: [], packlisteLeer: true }))
     expect(leer).toContain('Nichts braucht dich heute.')
     expect(leer).not.toContain('Alles erledigt.')
+    // Gedämpft wie „Zu tun einblenden": die leise Schrift der Hofbereich-Bausteine (LEISE), halbfett-leicht (font-medium).
+    expect(leer).toMatch(new RegExp(`<p class="[^"]*\\b${LEISE}\\b[^"]*">Nichts braucht dich heute\\.</p>`))
+    expect(leer).toMatch(/<p class="[^"]*\bfont-medium\b/)
     // Die Karte erkennt man am Abschnitt mit Überschrift, an der Liste und am Rahmen
     // auf der Kartenfläche (Gegenprobe unten: dort kommt jedes dieser Merkmale vor).
     expect(leer).not.toMatch(/<section|<h2|<ul|<a /)
@@ -785,7 +816,7 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
   })
 
   it('Braucht dich mit Einträgen: die Karte mit Überschrift und Zeilen mit Ziel — die leise Zeile fehlt dann (N11)', () => {
-    const gefuellt = html(createElement(BrauchtDichKarte, { eintraege: [{ art: 'ausverkauft', text: 'Eier ist ausverkauft', href: '/products?edit=p1' }] }))
+    const gefuellt = html(createElement(BrauchtDichKarte, { eintraege: [{ art: 'ausverkauft', text: 'Eier ist ausverkauft', href: '/products?edit=p1' }], packlisteLeer: false }))
     expect(gefuellt).toMatch(/<section[^>]*aria-labelledby="heute-braucht-dich"/)
     expect(gefuellt).toMatch(/<h2[^>]*>Braucht dich<\/h2>/)
     expect(gefuellt).toContain('Eier ist ausverkauft')
@@ -794,6 +825,31 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     expect(gefuellt).toMatch(/bg-card/)
     expect(gefuellt).toMatch(/border/)
     expect(gefuellt).not.toContain('Nichts braucht dich heute.')
+  })
+
+  it('Braucht dich ohne Eintrag unter einer vollen Packliste: nichts — kein „Nichts braucht dich heute." an einem Packtag (N11, Ergänzung Lauf 13)', () => {
+    // Gegenprobe ist der Fall „bei leerer Packliste" darüber: dort steht die Zeile.
+    expect(html(createElement(BrauchtDichKarte, { eintraege: [], packlisteLeer: false }))).toBe('')
+  })
+
+  it('Packliste mit Bestellungen, aber ohne aktive Abholzeit: Satz und Knopf unter der Liste — mit Abholzeit nicht', () => {
+    const ohneAbholzeit = html(
+      createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], zuPacken: 1, naechsteAbholung: null, leer: { abholfenster: null } })
+    )
+    expect(ohneAbholzeit).toContain('href="/orders/o1"')
+    expect(ohneAbholzeit).toContain(ABHOLZEITEN_FEHLEN.satz)
+    expect(ohneAbholzeit).toContain(`href="${ABHOLZEITEN_FEHLEN.aktion.href}"`)
+    expect(ohneAbholzeit).toContain(ABHOLZEITEN_FEHLEN.aktion.text)
+    const mitAbholzeit = html(
+      createElement(Packliste, {
+        zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })],
+        zuPacken: 1,
+        naechsteAbholung: null,
+        leer: { abholfenster: { tag: '2026-10-08', name: 'Donnerstag', zeit: '15–18 Uhr' } },
+      })
+    )
+    expect(mitAbholzeit).not.toContain(ABHOLZEITEN_FEHLEN.satz)
+    expect(mitAbholzeit).not.toContain(`href="${ABHOLZEITEN_FEHLEN.aktion.href}"`)
   })
 
   it('jedes Symbol ist aria-hidden', () => {

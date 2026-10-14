@@ -38,12 +38,12 @@ import type { SeitenAnsicht } from '@/lib/ansichts-modus'
 /**
  * Knöpfe, die auf dem Titelbildfoto liegen (Baustein „Titelbild" von Mein
  * Hof, components/mein-hof/bild-bausteine.tsx): in beiden Modi eine weiße
- * Marke mit dunkelgrüner Schrift — das Foto darunter folgt keinem Modus, ein
- * Token passte nicht.
+ * Marke mit dunkelgrüner Schrift — das Foto darunter folgt keinem Modus, die
+ * Schrift deshalb auch nicht (`--foto-knopf-ink`, in beiden Modi gleich).
  */
 export const TITELBILD_KNOPF_STIL = {
   background: 'rgba(255,255,255,0.94)',
-  color: '#2D5F3F',
+  color: 'var(--foto-knopf-ink)',
   boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
 } as const
 
@@ -178,7 +178,7 @@ export function CoverFocusAdjust({
           onClick={onCancel}
           disabled={saving}
           className={`flex items-center gap-1.5 ${hoehe} px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-60`}
-          style={{ background: 'rgba(255,255,255,0.94)', color: '#5C6052', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
+          style={{ background: 'rgba(255,255,255,0.94)', color: 'var(--foto-knopf-ink-soft)', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
         >
           Abbrechen
         </button>

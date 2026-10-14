@@ -294,7 +294,7 @@ describe('am Quelltext: zwei Knöpfe, drei verborgene Eingaben', () => {
   })
 
   it('die Karte kennt das Teilen und den Installationshinweis', () => {
-    expect(quelle).toContain('Oder in der Galerie: Teilen → FarmerZone')
+    expect(quelle).toContain('Oder in der Galerie: Teilen → {MARKE}')
     expect(quelle).toContain('display-mode: standalone')
     expect(quelle).toContain('Zum Startbildschirm hinzufügen')
   })
