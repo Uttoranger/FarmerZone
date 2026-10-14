@@ -521,6 +521,8 @@ Umgesetzt in `src/components/shells/` (KundeShell, KundeFokusShell, HofShell, Ad
 
 ### Infoseiten (/impressum, /konditionen, seit Nr. 54)
 
+- **/agb (seit Nr. 90, Register O4):** Rechtstext aus `src/lib/rechtstexte/agb.ts` (Wort für Wort `docs/recht/agb.md`, der Test `agb-text` vergleicht jede Zeile), Verzeichnis mit Sprüngen, Stand-Vermerk („Entwurf“ bis Fassung 1.0), Druckknopf (`print:hidden` für Kopf, Knopf und Verzeichnis); Sätze der Einbindung (Registrierung, Kasse, Mail, Fußzeile, /hoefe) aus `src/lib/rechtstexte/agb-einbindung.ts`. Rechtstext ist von den Textwachen ausgenommen (Wortliste, Fachwort, „Problem melden“).
+
 - **Kein Mockup** — `KundeShellMitSitzung` mit Unterleiste (die Seiten bleiben statisch, die Sitzung liest der Browser) und die Formen aus `src/components/shared/infoseite-stil.ts`: Spalte höchstens 672 px, Kicker in Großbuchstaben, h1 Fraunces 26/30 px, Abschnitte mit h2 Fraunces 18 px, Fließtext leise, Links im Text grün (`text-brand-text`, unterstrichen), Fuß „Stand: …" unter einer Linie. Tarife als Karten (`--surface` mit Rand), die Aufnahme-Schritte mit den orangen Ringen von `/fuer-hoefe` (`StartSchritte`), „Hof registrieren" als der eine orange Knopf (Hof-Aktion). Der Hinweis „Pilotbetrieb" im Impressum ist eine orange `Hinweiskarte` statt der alten Bernstein-Fläche. Der Datenschutz zieht mit Nr. 57 um und trägt bis dahin als letzte Seite `KundenKopf`.
 
 ### Futtermittel und Brennmaterial
