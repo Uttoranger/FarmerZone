@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { List, Map as MapIcon } from 'lucide-react'
-import { leseHoefeFilter, schreibeHoefeFilter, type HoefeFilter } from '@/schemas/hoefe-filter'
+import { abgesendeterSuchtext, leseHoefeFilter, schreibeHoefeFilter, type HoefeFilter } from '@/schemas/hoefe-filter'
 import {
   berechneHofAuswahl,
   suchForm,
@@ -141,6 +141,10 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
   const setzeFilter = (aenderung: Partial<HoefeFilter>) => schreibeUrl({ ...filter, ...aenderung })
 
   const [lage, setLage] = useState<AuswahlLage>(LEERE_LAGE)
+  // Der Suchtext, mit dem die Kundin ABGESENDET ankam (Startseite, Kopfzeile, 404 — nicht der, den diese
+  // Seite beim Tippen selbst in die Adresse schrieb): Das Suchfeld löst ihn einmal wie Enter auf (Nr. 84)
+  // und vergisst ihn dann; ein neu aufgebautes Feld (Liste ↔ Karte) fragt nicht noch einmal.
+  const [ankunftsText, setAnkunftsText] = useState(() => abgesendeterSuchtext(suchParameter))
   // Zählt jede Pin-Anfahrt, damit dieselbe Nummer zweimal hintereinander wirkt.
   const [fokus, setFokus] = useState(0)
   // Der Bezugspunkt der Umkreissuche lebt NUR hier: kein localStorage, kein
@@ -474,12 +478,15 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
       suchtext={filter.suchtext}
       vorschlaege={vorschlaege}
       status={statusText}
-      treffer={anzahl}
       bezugspunkt={bezugspunkt}
+      ankunftsText={ankunftsText}
       onSuchtext={(wert) => setzeFilter({ suchtext: wert })}
       onUebernehmen={suchMarkeHinzufuegen}
       onBezugspunkt={setBezugspunkt}
       onAufheben={ortAufheben}
+      onAnkunftErledigt={() => setAnkunftsText('')}
+      // Aufgelöst: Die Adresse trägt den Suchtext jetzt mit der Kennung der Seite, ein Neuladen löst nicht noch einmal auf.
+      onAnkunftAufgeloest={() => schreibeUrl(leseHoefeFilter(new URLSearchParams(window.location.search)))}
     />
   )
 

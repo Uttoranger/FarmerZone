@@ -221,8 +221,8 @@ export default function DatenschutzPage() {
               schließt du die Seite, ist er fort.
             </p>
             <p className="mt-3">
-              Gibst du stattdessen eine Postleitzahl oder einen Ort ein, geht diese Eingabe
-              an unseren Server und von dort an Nominatim (OpenStreetMap Foundation), um
+              Sendest du eine Suche ab, geht dein Suchtext an unseren Server und von dort an
+              Nominatim (OpenStreetMap Foundation), um zu prüfen, ob es ein Ort ist, und
               daraus einen Kartenpunkt zu machen — deine IP-Adresse erreicht Nominatim dabei
               nicht, und ein gemessener Standort wird nie übermittelt. Die Suche startet
               erst, wenn du sie absendest; die Eingabe speichern wir nicht.

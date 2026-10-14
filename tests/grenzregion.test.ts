@@ -319,9 +319,11 @@ describe('entdoppleTreffer — der häufige Weg bleibt einstufig', () => {
 })
 
 describe('hinweisMehrere — die Ansage nennt die Anzahl', () => {
-  it('zwei und drei ausgeschrieben, darüber die Ziffer', () => {
+  it('zwei bis fünf ausgeschrieben (mehr als fünf Orte zeigt die Auswahl nie), darüber die Ziffer', () => {
     expect(hinweisMehrere(2)).toBe('Zwei Orte passen — welchen meinst du?')
     expect(hinweisMehrere(3)).toBe('Drei Orte passen — welchen meinst du?')
-    expect(hinweisMehrere(5)).toBe('5 Orte passen — welchen meinst du?')
+    expect(hinweisMehrere(4)).toBe('Vier Orte passen — welchen meinst du?')
+    expect(hinweisMehrere(5)).toBe('Fünf Orte passen — welchen meinst du?')
+    expect(hinweisMehrere(6)).toBe('6 Orte passen — welchen meinst du?')
   })
 })

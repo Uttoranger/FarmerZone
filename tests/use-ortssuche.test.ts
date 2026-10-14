@@ -1,0 +1,771 @@
+/**
+ * Der Bezugspunkt der Umkreissuche auf /hoefe (useOrtssuche, Nr. 84): Standort
+ * mit Genauigkeit, Ortssuche und das Auflösen des Suchtexts beim Ankommen.
+ *
+ * Ohne DOM (TESTING_GUIDELINES §1) spielt ein kleiner Prüfstand die Hooks von
+ * React nach, so weit es hier zählt: Zustand je Aufrufstelle, neues Rendern
+ * nach einer Änderung von außen (danach, nicht mitten im Aufruf), Effekte nach
+ * dem Rendern, der Abbau beim Verlassen der Seite (danach rendert nichts mehr)
+ * und der Entwicklungsmodus (jeder Effekt einmal ab und gleich wieder auf). Die
+ * Browser-Ortung ist eine Attrappe, deren Rückrufe der Test
+ * selbst auslöst; die Ortsauflösung (`loeseOrtAuf`) ist gemockt, ihre Antworten
+ * hält der Test in der Hand. Zeitgeber sind falsch (vi.useFakeTimers).
+ *
+ * Gegenprobe zur Grenze „der Standort bleibt im Browser": In keinem Standort-
+ * Fall wird `loeseOrtAuf` gerufen — es gibt keinen Weg, auf dem eine gemessene
+ * Position an den Server ginge (afterEach des Standort-Blocks, für jeden Fall).
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
+
+const pruefstand = vi.hoisted(() => {
+  type Setzer<T> = (wert: T | ((vorher: T) => T)) => void
+  type Effekt = { deps: readonly unknown[] | undefined; wirkung: () => void | (() => void); aufraeumen: void | (() => void) }
+  let zellen: unknown[] = []
+  let faellig: Array<() => void> = []
+  let zeiger = 0
+  let rendernd = false
+  let schmutzig = false
+  let geplant = false
+  let abgebaut = false
+  // Zustandsänderungen nach dem Abbau: Was eine späte Antwort noch setzen wollte.
+  let spaet = 0
+  let komponente: () => unknown = () => null
+
+  function geaendert(): void {
+    // Wie React: Ein abgebauter Baum rendert nicht mehr, auch wenn eine späte Antwort noch Zustand setzt — React verwirft das
+    // stumm; der Prüfstand zählt es, damit ein Test verlangen kann, dass der Hook es gar nicht erst versucht.
+    if (abgebaut) {
+      spaet += 1
+      return
+    }
+    schmutzig = true
+    if (rendernd || geplant) return
+    // Wie React: Eine Änderung von außen rendert danach, nicht mitten im Aufruf.
+    geplant = true
+    setTimeout(() => {
+      geplant = false
+      rendere()
+    }, 0)
+  }
+
+  function rendere(): void {
+    if (abgebaut) return
+    for (let runde = 1; ; runde++) {
+      if (runde > 25) throw new Error('Der Prüfstand rendert ohne Ende.')
+      schmutzig = false
+      faellig = []
+      zeiger = 0
+      rendernd = true
+      try {
+        komponente()
+      } finally {
+        rendernd = false
+      }
+      if (!schmutzig) break
+    }
+    const laeufe = faellig
+    faellig = []
+    for (const lauf of laeufe) lauf()
+  }
+
+  function effekte(): Effekt[] {
+    return zellen.filter((zelle): zelle is Effekt => typeof (zelle as Partial<Effekt> | undefined)?.wirkung === 'function')
+  }
+
+  function gleich(a: readonly unknown[] | undefined, b: readonly unknown[] | undefined): boolean {
+    return a !== undefined && b !== undefined && a.length === b.length && a.every((d, k) => Object.is(d, b[k]))
+  }
+
+  return {
+    starte(neu: () => unknown): void {
+      zellen = []
+      geplant = false
+      abgebaut = false
+      spaet = 0
+      komponente = neu
+      rendere()
+    },
+    /** Baut die Komponente ab, wie React beim Verlassen der Seite: Die Aufräumfunktionen aller Effekte laufen, danach rendert nichts mehr. */
+    baueAb(): void {
+      abgebaut = true
+      for (const effekt of effekte()) if (typeof effekt.aufraeumen === 'function') effekt.aufraeumen()
+    },
+    /** Wie React im Entwicklungsmodus (StrictMode): Gleich nach dem Aufbau wird jeder Effekt einmal abgebaut und wieder aufgebaut. */
+    strengerModus(): void {
+      const alle = effekte()
+      for (const effekt of alle) if (typeof effekt.aufraeumen === 'function') effekt.aufraeumen()
+      for (const effekt of alle) effekt.aufraeumen = effekt.wirkung()
+    },
+    /** Rendert neu, ohne dass sich etwas geändert hat — wie ein Elternteil, der neu rendert. */
+    erneut(): void {
+      rendere()
+    },
+    /** Wie oft nach dem Abbau noch Zustand gesetzt wurde (0 = die späte Antwort hat nichts mehr angefasst). */
+    spaeteAenderungen(): number {
+      return spaet
+    },
+    useState<T>(anfang: T | (() => T)): [T, Setzer<T>] {
+      const i = zeiger++
+      if (!(i in zellen)) {
+        const neu: { wert: T; setze: Setzer<T> } = {
+          wert: typeof anfang === 'function' ? (anfang as () => T)() : anfang,
+          setze: (wert) => {
+            neu.wert = typeof wert === 'function' ? (wert as (vorher: T) => T)(neu.wert) : wert
+            geaendert()
+          },
+        }
+        zellen[i] = neu
+      }
+      const zelle = zellen[i] as { wert: T; setze: Setzer<T> }
+      return [zelle.wert, zelle.setze]
+    },
+    useRef<T>(anfang: T): { current: T } {
+      const i = zeiger++
+      if (!(i in zellen)) zellen[i] = { current: anfang }
+      return zellen[i] as { current: T }
+    },
+    useEffect(wirkung: () => void | (() => void), deps?: readonly unknown[]): void {
+      const i = zeiger++
+      const alt = zellen[i] as Effekt | undefined
+      if (alt && gleich(alt.deps, deps)) return
+      faellig.push(() => {
+        if (typeof alt?.aufraeumen === 'function') alt.aufraeumen()
+        zellen[i] = { deps, wirkung, aufraeumen: wirkung() }
+      })
+    },
+    useTransition(): [boolean, (rueckruf: () => void) => void] {
+      return [false, (rueckruf) => rueckruf()]
+    },
+  }
+})
+
+vi.mock('react', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react')>()),
+  useState: pruefstand.useState,
+  useRef: pruefstand.useRef,
+  useEffect: pruefstand.useEffect,
+  useTransition: pruefstand.useTransition,
+}))
+
+const { loeseOrtAuf } = vi.hoisted(() => ({ loeseOrtAuf: vi.fn() }))
+vi.mock('@/server/actions/hoefe', () => ({ loeseOrtAuf }))
+
+const sentry = vi.hoisted(() => ({ captureException: vi.fn(), addBreadcrumb: vi.fn() }))
+vi.mock('@sentry/nextjs', () => sentry)
+
+import { useOrtssuche, type Ortssuche } from '@/components/hoefe/use-ortssuche'
+import { SUCHFELD_TEXT } from '@/lib/hoefe-entdecken'
+import type { Bezugspunkt } from '@/lib/hofuebersicht'
+import { LEERER_HOEFE_FILTER, abgesendeterSuchtext, schreibeHoefeFilter } from '@/schemas/hoefe-filter'
+
+type Rueckruf = (position: { coords: { latitude: number; longitude: number; accuracy: number }; timestamp: number }) => void
+type Fehlerrueckruf = (fehler: { code: number; message: string }) => void
+type Ortung = [Rueckruf, Fehlerrueckruf, { enableHighAccuracy?: boolean; timeout?: number } | undefined]
+
+const getCurrentPosition = vi.fn<(...argumente: Ortung) => void>()
+
+const position = (accuracy: number, latitude = 48.1, longitude = 13.15) => ({
+  coords: { latitude, longitude, accuracy },
+  timestamp: 0,
+})
+
+/** Das Gerät antwortet, wenn der Test es will: der n-te Ortungs-Aufruf. */
+const ortung = (n: number): Ortung => {
+  const aufruf = getCurrentPosition.mock.calls[n]
+  if (!aufruf) throw new Error(`Es gab keinen ${n + 1}. Ortungs-Aufruf.`)
+  return aufruf
+}
+
+/** Was der Hook zuletzt geliefert hat — aus dem letzten Rendern. */
+let hook: Ortssuche
+let beiStandort: ReturnType<typeof vi.fn<(punkt: Bezugspunkt) => void>>
+let beiOrt: ReturnType<typeof vi.fn<(punkt: Bezugspunkt) => void>>
+let beiZumFeld: ReturnType<typeof vi.fn<() => void>>
+let beiAnkunftErledigt: ReturnType<typeof vi.fn<() => void>>
+let beiAnkunftAufgeloest: ReturnType<typeof vi.fn<() => void>>
+
+function starte(ankunftsText = '') {
+  pruefstand.starte(() => {
+    hook = useOrtssuche({
+      onStandort: beiStandort,
+      onOrt: beiOrt,
+      onZumFeld: beiZumFeld,
+      ankunftsText,
+      onAnkunftErledigt: beiAnkunftErledigt,
+      onAnkunftAufgeloest: beiAnkunftAufgeloest,
+    })
+  })
+}
+
+/**
+ * Lässt Antworten und das neue Rendern ablaufen. Die Zeitgeber sind falsch: Ein Zeitgeber, der
+ * während eines Ablaufs entsteht (das neue Rendern nach einem Zustand), läuft erst eine
+ * Millisekunde später — ein paar Millisekunden decken auch eine Kette davon ab, die zehn
+ * Sekunden des Wächters rühren sie nicht an.
+ */
+const zuRuhe = () => vi.advanceTimersByTimeAsync(5)
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  vi.clearAllMocks()
+  // Auch die Antworten des vorigen Falls: Eine hängengebliebene Ablehnung soll keinen anderen Fall treffen.
+  loeseOrtAuf.mockReset()
+  beiStandort = vi.fn<(punkt: Bezugspunkt) => void>()
+  beiOrt = vi.fn<(punkt: Bezugspunkt) => void>()
+  beiZumFeld = vi.fn<() => void>()
+  beiAnkunftErledigt = vi.fn<() => void>()
+  beiAnkunftAufgeloest = vi.fn<() => void>()
+  vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } })
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
+
+describe('Standort — die Genauigkeit entscheidet, ob er ohne Rückfrage gilt', () => {
+  // Die Position bleibt im Browser: In keinem Fall geht ein Aufruf an den Server.
+  afterEach(() => {
+    expect(loeseOrtAuf).not.toHaveBeenCalled()
+  })
+
+  it('bis 2 000 m wie bisher: sofort übernommen, ohne Hinweis', async () => {
+    starte()
+    hook.standortErfragen()
+    const [ok, , optionen] = ortung(0)
+    expect(optionen).toEqual({ enableHighAccuracy: false, timeout: 8_000 })
+
+    ok(position(2_000))
+    await zuRuhe()
+
+    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.1, lon: 13.15 })
+    expect(hook.ungefaehr).toBeNull()
+    expect(hook.ortet).toBe(false)
+  })
+
+  it('über 2 000 m: der ungefähre Punkt gilt sofort — die Liste zeigt Höfe im Umkreis — und der Hinweis mit der Genauigkeit steht dazu (Zustand 3)', async () => {
+    starte()
+    hook.standortErfragen()
+    ortung(0)[0](position(15_000))
+    await zuRuhe()
+
+    // Mockup Zustand 3: „wir zeigen Höfe im Umkreis" — nicht erst nach „So lassen".
+    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.1, lon: 13.15 })
+    expect(hook.ungefaehr?.satz).toBe('Dein Standort ist nur ungefähr bekannt (etwa 15 km).')
+    expect(hook.ungefaehr?.genauerMisslang).toBe(false)
+    expect(hook.ortet).toBe(false)
+  })
+
+  it('„Genauer bestimmen": zweiter Aufruf mit hoher Genauigkeit und 12 s — das Ergebnis wird übernommen', async () => {
+    starte()
+    hook.standortErfragen()
+    ortung(0)[0](position(15_000, 48.0, 13.0))
+    await zuRuhe()
+
+    hook.genauerBestimmen()
+    await zuRuhe()
+    expect(getCurrentPosition).toHaveBeenCalledTimes(2)
+    expect(ortung(1)[2]).toEqual({ enableHighAccuracy: true, timeout: 12_000 })
+    expect(hook.ortet).toBe(true)
+
+    ortung(1)[0](position(25, 48.1067, 13.15))
+    await zuRuhe()
+
+    // Erst der ungefähre Punkt, dann der genaue — zwei Aufrufe, der letzte zählt in der Liste.
+    expect(beiStandort).toHaveBeenCalledTimes(2)
+    expect(beiStandort).toHaveBeenNthCalledWith(1, { lat: 48.0, lon: 13.0 })
+    expect(beiStandort).toHaveBeenNthCalledWith(2, { lat: 48.1067, lon: 13.15 })
+    expect(hook.ungefaehr).toBeNull()
+    expect(hook.ortet).toBe(false)
+  })
+
+  it('„Genauer bestimmen" klappt nicht: der Hinweis bleibt und sagt es dazu — der ungefähre Punkt gilt weiter, „So lassen" schließt nur den Hinweis', async () => {
+    starte()
+    hook.standortErfragen()
+    ortung(0)[0](position(15_000, 48.0, 13.0))
+    await zuRuhe()
+    hook.genauerBestimmen()
+    await zuRuhe()
+
+    ortung(1)[1]({ code: 3, message: 'Timeout expired' })
+    await zuRuhe()
+
+    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.0, lon: 13.0 })
+    expect(hook.ungefaehr?.genauerMisslang).toBe(true)
+    expect(hook.ortet).toBe(false)
+
+    hook.soLassen()
+    await zuRuhe()
+    expect(beiStandort).toHaveBeenCalledTimes(1)
+    expect(hook.ungefaehr).toBeNull()
+  })
+
+  it('„Genauer bestimmen" liefert wieder nur einen groben Wert (Rechner ohne GPS): der Hinweis bleibt, der erste Punkt gilt weiter', async () => {
+    starte()
+    hook.standortErfragen()
+    ortung(0)[0](position(15_000, 48.0, 13.0))
+    await zuRuhe()
+    hook.genauerBestimmen()
+    await zuRuhe()
+
+    // Die IP-Ortung antwortet noch einmal, nur etwas anders gerundet — kein zweiter Wechsel der Liste.
+    ortung(1)[0](position(2_001, 48.2, 13.2))
+    await zuRuhe()
+
+    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.0, lon: 13.0 })
+    expect(hook.ungefaehr?.genauerMisslang).toBe(true)
+    expect(hook.ungefaehr?.punkt).toEqual({ lat: 48.0, lon: 13.0 })
+    expect(hook.ortet).toBe(false)
+
+    // Der Hinweis gilt weiter: ein dritter Versuch, der bis 2 000 m genau ist, wird übernommen (Gegenprobe zur Grenze).
+    hook.genauerBestimmen()
+    await zuRuhe()
+    ortung(2)[0](position(2_000, 48.1067, 13.15))
+    await zuRuhe()
+    expect(beiStandort).toHaveBeenCalledTimes(2)
+    expect(beiStandort).toHaveBeenLastCalledWith({ lat: 48.1067, lon: 13.15 })
+    expect(hook.ungefaehr).toBeNull()
+  })
+
+  it('antwortet das Gerät beim „Genauer bestimmen" gar nicht, endet das Warten nach 14 s — der Hinweis steht wieder da', async () => {
+    starte()
+    hook.standortErfragen()
+    ortung(0)[0](position(15_000, 48.0, 13.0))
+    await zuRuhe()
+    hook.genauerBestimmen()
+    await zuRuhe()
+
+    // Knapp davor wartet es noch: 12 s Zeitlimit des Browsers plus zwei Sekunden Luft.
+    await vi.advanceTimersByTimeAsync(13_990)
+    expect(hook.ortet).toBe(true)
+    expect(hook.ungefaehr?.genauerMisslang).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(5)
+    await zuRuhe()
+    expect(hook.ortet).toBe(false)
+    expect(hook.ungefaehr?.genauerMisslang).toBe(true)
+    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.0, lon: 13.0 })
+
+    hook.soLassen()
+    await zuRuhe()
+    expect(beiStandort).toHaveBeenCalledTimes(1)
+    expect(hook.ungefaehr).toBeNull()
+  })
+
+  it('„So lassen" schließt den Hinweis — der ungefähre Punkt gilt schon — auch mitten in der Nachfrage, deren späte Antwort dann nicht mehr zählt', async () => {
+    starte()
+    hook.standortErfragen()
+    ortung(0)[0](position(15_000, 48.0, 13.0))
+    await zuRuhe()
+    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 48.0, lon: 13.0 })
+    hook.genauerBestimmen()
+    await zuRuhe()
+
+    hook.soLassen()
+    await zuRuhe()
+    expect(beiStandort).toHaveBeenCalledTimes(1)
+    expect(hook.ungefaehr).toBeNull()
+    expect(hook.ortet).toBe(false)
+
+    ortung(1)[0](position(10, 47.0, 12.0))
+    await zuRuhe()
+    expect(beiStandort).toHaveBeenCalledTimes(1)
+  })
+
+  it('„Ort ändern" räumt den Hinweis ab; eine späte Antwort des Geräts gilt dann nicht mehr', async () => {
+    starte()
+    hook.standortErfragen()
+    const [ok] = ortung(0)
+    hook.aufheben()
+    ok(position(15_000))
+    await zuRuhe()
+
+    expect(hook.ungefaehr).toBeNull()
+    expect(beiStandort).not.toHaveBeenCalled()
+  })
+
+  it('Ablehnung ist kein Fehler: der Satz zum Suchfeld, der Fokus geht dorthin', async () => {
+    starte()
+    hook.standortErfragen()
+    ortung(0)[1]({ code: 1, message: 'User denied Geolocation' })
+    await zuRuhe()
+
+    expect(hook.hinweis).toBe(SUCHFELD_TEXT.ohneStandort)
+    expect(beiZumFeld).toHaveBeenCalledTimes(1)
+    expect(hook.ungefaehr).toBeNull()
+  })
+
+  it('wartet der Dialog des Browsers zu lange, endet das Warten nach 10 s — die Antwort danach zählt trotzdem', async () => {
+    starte()
+    hook.standortErfragen()
+    await vi.advanceTimersByTimeAsync(10_000)
+    await zuRuhe()
+    expect(hook.ortet).toBe(false)
+    expect(hook.hinweis).toBe(SUCHFELD_TEXT.dauert)
+
+    ortung(0)[0](position(30))
+    await zuRuhe()
+    expect(beiStandort).toHaveBeenCalledTimes(1)
+    expect(hook.hinweis).toBeNull()
+  })
+
+  it('zwei Aufrufe aus demselben Render: nur die Antwort des letzten zählt', async () => {
+    starte()
+    // Beide Aufrufe stammen aus demselben Render (der Zustand „ortet" ist darin noch falsch).
+    const { standortErfragen } = hook
+    standortErfragen()
+    standortErfragen()
+    expect(getCurrentPosition).toHaveBeenCalledTimes(2)
+
+    ortung(0)[0](position(20, 1, 1))
+    ortung(1)[0](position(20, 2, 2))
+    await zuRuhe()
+
+    expect(beiStandort).toHaveBeenCalledExactlyOnceWith({ lat: 2, lon: 2 })
+  })
+})
+
+describe('Ortssuche — Enter und Eintrag', () => {
+  const ORT = { lat: 48.1067, lon: 13.15, name: 'Mattighofen, Oberösterreich' }
+
+  it('ein eindeutiger Treffer wird ohne Liste übernommen', async () => {
+    loeseOrtAuf.mockResolvedValue([ORT])
+    starte()
+    hook.ortSuchen('5230 Mattighofen')
+    await zuRuhe()
+
+    expect(loeseOrtAuf).toHaveBeenCalledExactlyOnceWith('5230 Mattighofen')
+    expect(beiOrt).toHaveBeenCalledExactlyOnceWith(ORT)
+    expect(hook.kandidaten).toEqual([])
+  })
+
+  it('mehrere Treffer: die Liste (Zustand 2) mit der Anzahl im Satz — übernommen wird erst die Wahl', async () => {
+    const orte = [
+      { lat: 48.21, lon: 13.49, name: 'Ried im Innkreis, Oberösterreich' },
+      { lat: 47.99, lon: 14.06, name: 'Ried im Traunkreis, Oberösterreich' },
+      { lat: 48.29, lon: 10.95, name: 'Ried, Bayern' },
+    ]
+    loeseOrtAuf.mockResolvedValue(orte)
+    starte()
+    hook.ortSuchen('Ried')
+    await zuRuhe()
+
+    expect(beiOrt).not.toHaveBeenCalled()
+    expect(hook.kandidaten).toEqual(orte)
+    expect(hook.hinweis).toBe('Drei Orte passen — welchen meinst du?')
+
+    hook.uebernimm(orte[1])
+    await zuRuhe()
+    expect(beiOrt).toHaveBeenCalledExactlyOnceWith(orte[1])
+    expect(hook.kandidaten).toEqual([])
+    expect(hook.hinweis).toBeNull()
+  })
+
+  it('kein Treffer: der Satz „Keinen Ort gefunden …", nichts wird übernommen — die Produktsuche läuft weiter', async () => {
+    loeseOrtAuf.mockResolvedValue([])
+    starte()
+    hook.ortSuchen('Heu')
+    await zuRuhe()
+
+    expect(hook.hinweis).toBe('Keinen Ort gefunden – wir suchen nach Höfen und Produkten.')
+    expect(beiOrt).not.toHaveBeenCalled()
+    expect(hook.kandidaten).toEqual([])
+  })
+
+  it('Tippen räumt den Satz zum alten Text und die alte Auswahl ab', async () => {
+    loeseOrtAuf.mockResolvedValue([])
+    starte()
+    hook.ortSuchen('Heu')
+    await zuRuhe()
+    expect(hook.hinweis).not.toBeNull()
+
+    hook.textGeaendert()
+    await zuRuhe()
+    expect(hook.hinweis).toBeNull()
+  })
+
+  it('zwei Aufrufe aus demselben Render: die späte Antwort des ersten überfährt den zweiten nicht', async () => {
+    let ersteAntwort: (orte: unknown[]) => void = () => {}
+    loeseOrtAuf
+      .mockImplementationOnce(() => new Promise((weiter) => (ersteAntwort = weiter)))
+      .mockResolvedValueOnce([{ lat: 48.267, lon: 13.025, name: 'Simbach am Inn, Bayern' }])
+    starte()
+    const { ortSuchen } = hook
+    ortSuchen('Ried')
+    ortSuchen('Simbach')
+    await zuRuhe()
+    expect(beiOrt).toHaveBeenCalledExactlyOnceWith({ lat: 48.267, lon: 13.025, name: 'Simbach am Inn, Bayern' })
+
+    // Die Antwort auf „Ried" kommt zuletzt — und zählt nicht mehr.
+    ersteAntwort([
+      { lat: 1, lon: 1, name: 'Ried A' },
+      { lat: 2, lon: 2, name: 'Ried B' },
+    ])
+    await zuRuhe()
+    expect(beiOrt).toHaveBeenCalledTimes(1)
+    expect(hook.kandidaten).toEqual([])
+  })
+})
+
+describe('Ortssuche — die Auflösung scheitert (Verbindung weg, Aktion nach einem Deploy unbekannt)', () => {
+  /** So wirft Next.js, wenn die Aktion nach einem Deploy unbekannt ist. */
+  function aktionUnbekannt(): Error {
+    const fehler = new Error('Server Action "7f2c9d1e4b3a59687c0d1e2f3a4b5c6d7e8f9a0b1c" was not found on the server.')
+    fehler.name = 'UnrecognizedActionError'
+    return fehler
+  }
+
+  it('gilt wie „kein Treffer": der ruhige Satz, die Produktsuche bleibt — kein Wurf an die Fehlergrenze', async () => {
+    loeseOrtAuf.mockRejectedValue(aktionUnbekannt())
+    starte()
+    hook.ortSuchen('Mattighofen')
+    await zuRuhe()
+
+    expect(hook.hinweis).toBe(SUCHFELD_TEXT.keinOrt)
+    expect(beiOrt).not.toHaveBeenCalled()
+    expect(hook.kandidaten).toEqual([])
+  })
+
+  it('auch beim Auflösen beim Ankommen — und die Adresse vermerkt den Text trotzdem als erledigt', async () => {
+    loeseOrtAuf.mockRejectedValue(new TypeError('Failed to fetch'))
+    starte('Mattighofen')
+    await zuRuhe()
+
+    expect(hook.hinweis).toBe(SUCHFELD_TEXT.keinOrt)
+    expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
+  })
+
+  it('Sentry bekommt Klasse und festen Text, nie den getippten Text und nie die Fehlermeldung — die könnte ihn anders geschrieben zitieren', async () => {
+    const getippt = 'Musterhausen'
+    // Die Meldung zitiert den Text kleingeschrieben: Die wörtliche Bereinigung (bereinigeFehlerText) erkennt ihn so nicht.
+    loeseOrtAuf.mockRejectedValue(new TypeError(`Cannot read properties of undefined (reading 'lat') bei ${getippt.toLowerCase()}`))
+    starte()
+    hook.ortSuchen(getippt)
+    await zuRuhe()
+
+    // Ein Programmierfehler ist auch ein TypeError — aber kein Netzabbruch: Er wird gemeldet.
+    expect(sentry.captureException).toHaveBeenCalledTimes(1)
+    const [ereignis, kontext] = sentry.captureException.mock.calls[0]
+    expect(ereignis.name).toBe('TypeError')
+    expect(ereignis.message).toBe('Ortssuche: Auflösen gescheitert')
+    // Sonst nichts: kein `extra`, das die Fehlermeldung (bereinigt oder nicht) trüge.
+    expect(kontext).toEqual({ level: 'error', tags: { bereich: 'ortssuche', klasse: 'TypeError' } })
+    const gesendet = JSON.stringify(sentry.captureException.mock.calls[0], (_schluessel, wert) =>
+      wert instanceof Error ? { name: wert.name, message: wert.message } : wert
+    )
+    expect(gesendet).not.toMatch(new RegExp(getippt, 'i'))
+    expect(gesendet).not.toContain('Cannot read')
+    expect(sentry.addBreadcrumb).not.toHaveBeenCalled()
+  })
+
+  it('ein Netzabbruch ist nur eine Brotkrume, kein Befund — und scheitert Sentry selbst, bleibt der Satz', async () => {
+    loeseOrtAuf.mockRejectedValue(new TypeError('Failed to fetch'))
+    starte()
+    hook.ortSuchen('Mattighofen')
+    await zuRuhe()
+    expect(sentry.captureException).not.toHaveBeenCalled()
+    expect(sentry.addBreadcrumb).toHaveBeenCalledExactlyOnceWith({
+      category: 'ortssuche',
+      level: 'warning',
+      message: 'Ortssuche: Verbindung abgebrochen',
+      data: { klasse: 'TypeError' },
+    })
+
+    sentry.captureException.mockImplementationOnce(() => {
+      throw new Error('Sentry kaputt')
+    })
+    loeseOrtAuf.mockRejectedValue(aktionUnbekannt())
+    hook.ortSuchen('Simbach')
+    await zuRuhe()
+    expect(hook.hinweis).toBe(SUCHFELD_TEXT.keinOrt)
+  })
+})
+
+describe('Ankunft mit Suchtext — die Kundin hat abgesendet (Startseite, Kopfzeile, 404)', () => {
+  it('löst den Text einmal auf, genau wie Enter — auch bei weiteren Renderings', async () => {
+    loeseOrtAuf.mockResolvedValue([{ lat: 48.1067, lon: 13.15, name: 'Mattighofen, Oberösterreich' }])
+    starte('5230 Mattighofen')
+    await zuRuhe()
+
+    expect(loeseOrtAuf).toHaveBeenCalledExactlyOnceWith('5230 Mattighofen')
+    expect(beiOrt).toHaveBeenCalledTimes(1)
+    expect(beiAnkunftErledigt).toHaveBeenCalledTimes(1)
+
+    pruefstand.erneut()
+    await zuRuhe()
+    expect(loeseOrtAuf).toHaveBeenCalledTimes(1)
+    expect(beiAnkunftErledigt).toHaveBeenCalledTimes(1)
+  })
+
+  it('findet sich kein Ort, steht der Satz — der Text bleibt als Produktsuche', async () => {
+    loeseOrtAuf.mockResolvedValue([])
+    starte('Heu')
+    await zuRuhe()
+
+    expect(hook.hinweis).toBe(SUCHFELD_TEXT.keinOrt)
+    expect(beiOrt).not.toHaveBeenCalled()
+  })
+
+  it('Text, der kein Ort sein kann, geht gar nicht erst an die Ortssuche — er ist trotzdem erledigt', async () => {
+    starte('Eier 10er')
+    await zuRuhe()
+
+    expect(loeseOrtAuf).not.toHaveBeenCalled()
+    expect(hook.hinweis).toBeNull()
+    expect(beiAnkunftErledigt).toHaveBeenCalledTimes(1)
+  })
+
+  it('Neuladen nach eigenem Tippen löst nichts auf — nur ein abgesendetes q geht an die Ortssuche', async () => {
+    // So gibt die Seite dem Feld den Text: aus der Adresse, über abgesendeterSuchtext.
+    const ausAdresse = (query: string) => abgesendeterSuchtext(new URLSearchParams(query))
+
+    // Eingetippt, nie abgesendet: Die Seite schrieb `q=Eier&t=1` in die Adresse; F5 oder „Zurück" baut das Feld neu auf.
+    const getippt = schreibeHoefeFilter({ ...LEERER_HOEFE_FILTER, suchtext: 'Eier' })
+    starte(ausAdresse(getippt))
+    await zuRuhe()
+    expect(loeseOrtAuf).not.toHaveBeenCalled()
+    expect(beiAnkunftErledigt).not.toHaveBeenCalled()
+    expect(beiAnkunftAufgeloest).not.toHaveBeenCalled()
+
+    // Gegenprobe: dasselbe Wort, abgesendet (die Formulare der Startseite, der Kopfzeile und der 404 schicken nur `q`), geht hinaus — einmal.
+    loeseOrtAuf.mockResolvedValue([])
+    starte(ausAdresse('q=Eier'))
+    await zuRuhe()
+    expect(loeseOrtAuf).toHaveBeenCalledExactlyOnceWith('Eier')
+  })
+
+  it('die Seite vermerkt den Text erst NACH der Antwort als erledigt — nicht schon im Effekt beim Aufbau', async () => {
+    let antwort: (orte: unknown[]) => void = () => {}
+    loeseOrtAuf.mockImplementationOnce(() => new Promise((weiter) => (antwort = weiter)))
+    starte('Ried')
+    await zuRuhe()
+    expect(beiAnkunftErledigt).toHaveBeenCalledTimes(1)
+    expect(beiAnkunftAufgeloest).not.toHaveBeenCalled()
+
+    antwort([])
+    await zuRuhe()
+    expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
+
+    // Einmal: ein weiteres Rendern löst nichts mehr aus und meldet nichts mehr.
+    pruefstand.erneut()
+    await zuRuhe()
+    expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
+  })
+
+  it('Abbau vor der Antwort: kein Vermerk — die Adresse gehört dann einer anderen Seite (Gegenprobe: ohne Abbau genau einer)', async () => {
+    // Tipp auf einen Hof, während die Ortssuche noch läuft: /hoefe ist weg, die Antwort kommt erst danach. Der Vermerk schriebe mit dem
+    // Pfad von /hoefe die Adresse der Hofseite um — Neuladen oder Teilen landete auf /hoefe.
+    const antworten: Array<(orte: unknown[]) => void> = []
+    loeseOrtAuf.mockImplementation(() => new Promise((weiter) => antworten.push(weiter)))
+    starte('Ried')
+    await zuRuhe()
+    expect(loeseOrtAuf).toHaveBeenCalledTimes(1)
+
+    pruefstand.baueAb()
+    antworten[0]([])
+    await zuRuhe()
+    expect(beiAnkunftAufgeloest).not.toHaveBeenCalled()
+    // Auch der Satz „Keinen Ort gefunden" wird nicht mehr gesetzt (Wächter in loeseAuf).
+    expect(pruefstand.spaeteAenderungen()).toBe(0)
+
+    // Gegenprobe: derselbe Ablauf ohne Abbau — der Vermerk kommt, genau einmal.
+    starte('Ried')
+    await zuRuhe()
+    antworten[1]([])
+    await zuRuhe()
+    expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
+  })
+
+  it('Abbau vor der Antwort mit genau einem Treffer: kein Ort, kein Vermerk — sonst schriebe die späte Antwort über onOrt → onSuchtext → schreibeUrl die Adresse der Hofseite um (Gegenprobe: ohne Abbau genau einmal)', async () => {
+    const MATTIGHOFEN = { lat: 48.1067, lon: 13.15, name: 'Mattighofen, Oberösterreich' }
+    const antworten: Array<(orte: unknown[]) => void> = []
+    loeseOrtAuf.mockImplementation(() => new Promise((weiter) => antworten.push(weiter)))
+    starte('5230 Mattighofen')
+    await zuRuhe()
+    expect(loeseOrtAuf).toHaveBeenCalledTimes(1)
+
+    pruefstand.baueAb()
+    antworten[0]([MATTIGHOFEN])
+    await zuRuhe()
+    expect(beiOrt).not.toHaveBeenCalled()
+    expect(beiAnkunftAufgeloest).not.toHaveBeenCalled()
+    expect(pruefstand.spaeteAenderungen()).toBe(0)
+
+    // Gegenprobe: derselbe Ablauf ohne Abbau — der Ort kommt genau einmal, der Vermerk auch.
+    starte('5230 Mattighofen')
+    await zuRuhe()
+    antworten[1]([MATTIGHOFEN])
+    await zuRuhe()
+    expect(beiOrt).toHaveBeenCalledExactlyOnceWith(MATTIGHOFEN)
+    expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
+  })
+
+  it('Abbau vor der Antwort mit mehreren Treffern: keine Auswahl, kein Vermerk, kein Sprung zum Feld (Gegenprobe: ohne Abbau steht die Auswahl)', async () => {
+    const RIED = [
+      { lat: 48.21, lon: 13.49, name: 'Ried im Innkreis, Oberösterreich' },
+      { lat: 47.99, lon: 14.04, name: 'Ried im Traunkreis, Oberösterreich' },
+    ]
+    const antworten: Array<(orte: unknown[]) => void> = []
+    loeseOrtAuf.mockImplementation(() => new Promise((weiter) => antworten.push(weiter)))
+    starte('Ried')
+    await zuRuhe()
+
+    pruefstand.baueAb()
+    antworten[0](RIED)
+    await zuRuhe()
+    expect(beiOrt).not.toHaveBeenCalled()
+    expect(beiZumFeld).not.toHaveBeenCalled()
+    expect(beiAnkunftAufgeloest).not.toHaveBeenCalled()
+    // Keine Auswahl nach dem Abbau: Die späte Antwort setzt nichts mehr — ohne den Wächter in loeseAuf wären es Satz und Auswahl
+    // (React verwirft beides stumm, von außen ist es sonst unsichtbar).
+    expect(pruefstand.spaeteAenderungen()).toBe(0)
+
+    // Gegenprobe: ohne Abbau steht die Auswahl mit beiden Orten.
+    starte('Ried')
+    await zuRuhe()
+    antworten[1](RIED)
+    await zuRuhe()
+    expect(hook.kandidaten).toEqual(RIED)
+    expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
+
+    // Gegenprobe zum Zähler: Eine Änderung nach dem Abbau zählt er.
+    let setzeSpaet: (wert: number) => void = () => {}
+    pruefstand.starte(() => {
+      const [, setze] = useState(0)
+      setzeSpaet = setze
+    })
+    pruefstand.baueAb()
+    setzeSpaet(1)
+    expect(pruefstand.spaeteAenderungen()).toBe(1)
+  })
+
+  it('im Entwicklungsmodus (React baut jeden Effekt einmal ab und gleich wieder auf) zählt die Seite weiter als eingebaut — der Vermerk kommt, der Text geht einmal hinaus', async () => {
+    let antwort: (orte: unknown[]) => void = () => {}
+    loeseOrtAuf.mockImplementationOnce(() => new Promise((weiter) => (antwort = weiter)))
+    starte('Ried')
+    pruefstand.strengerModus()
+    await zuRuhe()
+
+    antwort([])
+    await zuRuhe()
+    expect(loeseOrtAuf).toHaveBeenCalledTimes(1)
+    expect(beiAnkunftAufgeloest).toHaveBeenCalledTimes(1)
+  })
+
+  it('Text, der kein Ort sein kann, braucht keinen Vermerk — er geht nie hinaus', async () => {
+    starte('Eier 10er')
+    await zuRuhe()
+    expect(beiAnkunftAufgeloest).not.toHaveBeenCalled()
+  })
+
+  it('ohne Suchtext passiert nichts: Tippen im Feld löst nie von selbst aus', async () => {
+    starte('')
+    await zuRuhe()
+    starte('   ')
+    await zuRuhe()
+
+    expect(loeseOrtAuf).not.toHaveBeenCalled()
+    expect(beiAnkunftErledigt).not.toHaveBeenCalled()
+  })
+})

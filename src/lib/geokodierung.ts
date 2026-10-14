@@ -48,6 +48,7 @@ import {
 } from '@/lib/laender'
 import { MARKE } from '@/lib/marke'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
+import { ORTSSUCHE_MAX_ZEICHEN } from '@/schemas/ortssuche'
 
 export type StandortKandidat = {
   lat: number
@@ -57,6 +58,14 @@ export type StandortKandidat = {
    *  die Umkreissuche zeigt es an, damit „Simbach" diesseits und jenseits der
    *  Grenze unterscheidbar bleibt. */
   land?: string
+  /** Der Ortsname aus den Adressteilen („Mattighofen") — der Nominatim-Name
+   *  (`anzeigeName`) ist eine lange Kette samt Bezirk, Postleitzahl und Land. */
+  ort?: string
+  /** Das Bundesland bzw. Land des Treffers („Oberösterreich", „Bayern"). */
+  bundesland?: string
+  /** Die Beschriftung in der Auswahl — gesetzt von beschrifteKandidaten, denn
+   *  erst die ganze Liste sagt, ob „Ort, Bundesland" zum Unterscheiden reicht. */
+  beschriftung?: string
 }
 
 export type GeokodierungsErgebnis = {
@@ -131,22 +140,101 @@ export function istPostleitzahl(eingabe: string): boolean {
   return /^\d{4,5}$/.test(eingabe.trim())
 }
 
+/** Was ein Text im Suchfeld von /hoefe ist (Nr. 84). */
+export type Ortseingabe =
+  | { art: 'plz'; plz: string }
+  | { art: 'plz-ort'; plz: string; ort: string }
+  | { art: 'ort'; ort: string }
+  | { art: 'text' }
+
+const KEIN_ORT: Ortseingabe = { art: 'text' }
+
+/** Ein Wort im Ortsnamen: Buchstaben jeder Schrift, dazu Punkt, Bindestrich und Apostroph
+ *  („St. Johann", „Garmisch-Partenkirchen"). Ziffern und Sonderzeichen stehen in keinem Ortsnamen. */
+const ORTSWORT = /^\p{L}[\p{L}\p{M}.'’-]*$/u
+
+/** Ein Ortsname besteht aus Ortswörtern und hat mindestens zwei Buchstaben (wie ortssucheSchema). */
+function istOrtsname(woerter: string[]): boolean {
+  return woerter.every((w) => ORTSWORT.test(w)) && (woerter.join('').match(/\p{L}/gu)?.length ?? 0) >= 2
+}
+
+/**
+ * Was ist der Text im Suchfeld? Die EINE Stelle, die das entscheidet: Enter, das
+ * Auflösen von `q` beim Ankommen, der Eintrag „Höfe rund um …" und die Anfrage
+ * an Nominatim fragen alle sie (vorher gab es zwei Postleitzahl-Regeln, vier
+ * Ziffern hier, vier oder fünf dort).
+ *
+ *  - `plz`:     vier Ziffern (österreichische) oder fünf (deutsche Postleitzahl)
+ *  - `plz-ort`: Postleitzahl und Ortsname, in beiden Reihenfolgen — Nominatim
+ *               bekommt beide getrennt, nicht „5230 Mattighofen" als einen Ortsnamen
+ *  - `ort`:     ein Name ohne Ziffern. Ob er ein Ort ist, sagt erst Nominatim —
+ *               ein Produktwort wie „Heu" findet dort nichts und bleibt eine Produktsuche
+ *  - `text`:    kann kein Ort sein (zu kurz, andere Ziffern, Sonderzeichen,
+ *               länger als ein Ortsname) und geht nie an Nominatim
+ *
+ * Komma und Leerraum trennen gleich („5230, Mattighofen").
+ */
+export function erkenneOrtseingabe(eingabe: string): Ortseingabe {
+  const woerter = eingabe.split(/[\s,;]+/).filter((w) => w !== '')
+  const text = woerter.join(' ')
+  const erstes = woerter[0]
+  const letztes = woerter[woerter.length - 1]
+  if (erstes === undefined || letztes === undefined || text.length > ORTSSUCHE_MAX_ZEICHEN) return KEIN_ORT
+
+  const anfangPlz = istPostleitzahl(erstes)
+  const endePlz = istPostleitzahl(letztes)
+  if (woerter.length === 1) {
+    if (anfangPlz) return { art: 'plz', plz: erstes }
+    return istOrtsname(woerter) ? { art: 'ort', ort: erstes } : KEIN_ORT
+  }
+  if (anfangPlz && endePlz) return KEIN_ORT
+  if (anfangPlz || endePlz) {
+    const ortswoerter = anfangPlz ? woerter.slice(1) : woerter.slice(0, -1)
+    return istOrtsname(ortswoerter)
+      ? { art: 'plz-ort', plz: anfangPlz ? erstes : letztes, ort: ortswoerter.join(' ') }
+      : KEIN_ORT
+  }
+  return istOrtsname(woerter) ? { art: 'ort', ort: text } : KEIN_ORT
+}
+
+/** Ein Text, wie ihn die Adressteile von Nominatim tragen — leer zählt als nichts. */
+function nichtLeer(wert: unknown): string | undefined {
+  return typeof wert === 'string' && wert.trim() ? wert.trim() : undefined
+}
+
 /** Sechs Nachkommastellen ≈ 11 cm — mehr Genauigkeit gäbe der Karte nur Rauschen. */
 export function rundeKoordinate(wert: number): number {
   return Math.round(wert * 1_000_000) / 1_000_000
 }
 
+/** Der Ortsname: die feinste vorhandene Stufe der Adressteile gewinnt (auf dem Land meist
+ *  `village`, bei kleinen Weilern `hamlet`). Ein Treffer auf eine Postleitzahl trägt oft
+ *  nur Postleitzahl, Bezirk und Bundesland in den Adressteilen — dann steht der Ort hinter
+ *  der Zahl im Nominatim-Namen („5230, Mattighofen, Bezirk …"). */
+function ortsname(adresse: Record<string, unknown> | null, anzeigeName: unknown): string | undefined {
+  const ausAdresse =
+    nichtLeer(adresse?.village) ??
+    nichtLeer(adresse?.town) ??
+    nichtLeer(adresse?.city) ??
+    nichtLeer(adresse?.municipality) ??
+    nichtLeer(adresse?.hamlet)
+  if (ausAdresse || typeof anzeigeName !== 'string') return ausAdresse
+  return nichtLeer(/^\d{4,5}\s*,\s*([^,]+)/.exec(anzeigeName)?.[1])
+}
+
 /**
  * Wertet eine Nominatim-Antwort (format=jsonv2: Array von Treffern) aus.
  * lat/lon kommen dort als STRINGS — wer das vergisst, rechnet mit NaN.
- * Höchstens drei, in Antwort-Reihenfolge (Nominatim sortiert nach Güte).
+ * In Antwort-Reihenfolge (Nominatim sortiert nach Güte), höchstens `hoechstens`:
+ * drei für die Hof-Adresse; die Ortssuche nimmt alle zehn und kappt erst NACH
+ * dem Entdoppeln — bei gleichnamigen Orten blieb sonst oft nur einer übrig.
  */
-export function werteNominatimAntwortAus(json: unknown): StandortKandidat[] {
+export function werteNominatimAntwortAus(json: unknown, hoechstens = 3): StandortKandidat[] {
   if (!Array.isArray(json)) return []
 
   const kandidaten: StandortKandidat[] = []
   for (const eintrag of json) {
-    if (kandidaten.length >= 3) break
+    if (kandidaten.length >= hoechstens) break
     const e = eintrag as { lat?: unknown; lon?: unknown; display_name?: unknown; address?: unknown }
     const lat = typeof e.lat === 'string' ? Number.parseFloat(e.lat) : NaN
     const lon = typeof e.lon === 'string' ? Number.parseFloat(e.lon) : NaN
@@ -156,22 +244,20 @@ export function werteNominatimAntwortAus(json: unknown): StandortKandidat[] {
     // Länderfeld. Fehlt er, bleibt das Feld weg statt zu raten.
     const adresse = typeof e.address === 'object' && e.address !== null ? (e.address as Record<string, unknown>) : null
     const code = typeof adresse?.country_code === 'string' ? adresse.country_code.toUpperCase() : undefined
+    const ort = ortsname(adresse, e.display_name)
+    const bundesland = nichtLeer(adresse?.state)
     kandidaten.push({
       lat,
       lon,
       anzeigeName: typeof e.display_name === 'string' && e.display_name ? e.display_name : 'Gefundener Ort',
       ...(code ? { land: code } : {}),
+      ...(ort ? { ort } : {}),
+      ...(bundesland ? { bundesland } : {}),
     })
   }
   return kandidaten
 }
 
-/**
- * Der Anzeigetext eines Kandidaten in der Auswahlliste: der Nominatim-Name,
- * dem das Land vorangestellt wird, wenn er es nicht ohnehin schon nennt.
- * Nominatims `display_name` endet in aller Regel auf „…, Österreich" bzw.
- * „…, Deutschland" — dann wäre eine zweite Landangabe nur Lärm.
- */
 /**
  * Wirft Treffer weg, die für die Kundin NICHT unterscheidbar wären.
  *
@@ -212,15 +298,64 @@ export function entdoppleTreffer(
   return behalten
 }
 
+const ANZAHL_WORT: Record<number, string> = { 2: 'Zwei', 3: 'Drei', 4: 'Vier', 5: 'Fünf' }
+
 /** „Zwei Orte passen …" — die Ansage nennt die Anzahl, damit sie auch
- *  vorgelesen etwas aussagt. */
+ *  vorgelesen etwas aussagt. Die Auswahl zeigt höchstens fünf Orte. */
 export function hinweisMehrere(anzahl: number): string {
-  const wort = anzahl === 2 ? 'Zwei' : anzahl === 3 ? 'Drei' : String(anzahl)
-  return `${wort} Orte passen — welchen meinst du?`
+  return `${ANZAHL_WORT[anzahl] ?? String(anzahl)} Orte passen — welchen meinst du?`
 }
 
+function landLabel(kandidat: StandortKandidat): string | null {
+  return kandidat.land === 'AT' || kandidat.land === 'DE' ? LAND_LABEL[kandidat.land] : null
+}
+
+/** „Mattighofen, Oberösterreich" — Ortsname und Bundesland, beim Stadtstaat (Ort und
+ *  Bundesland heißen gleich, „Wien") das Land. null, wenn Nominatim den Ortsnamen nicht lieferte. */
+function kurzeBeschriftung(kandidat: StandortKandidat): string | null {
+  if (!kandidat.ort) return null
+  const zusatz =
+    kandidat.bundesland && kandidat.bundesland !== kandidat.ort ? kandidat.bundesland : landLabel(kandidat)
+  return zusatz ? `${kandidat.ort}, ${zusatz}` : null
+}
+
+/** Der Nominatim-Name ohne Postleitzahl und Land: „Ried, Landkreis Aichach-Friedberg, Bayern". */
+function langeBeschriftung(kandidat: StandortKandidat): string {
+  const land = landLabel(kandidat)
+  const teile = kandidat.anzeigeName
+    .split(',')
+    .map((teil) => teil.trim())
+    .filter((teil) => teil !== '' && !/^\d+$/.test(teil) && teil !== land)
+  return teile.length > 0 ? teile.join(', ') : kandidat.anzeigeName
+}
+
+/**
+ * Gibt den Treffern der Auswahl ihre Beschriftung: Ortsname und Bundesland
+ * („Mattighofen, Oberösterreich"), nicht die lange Kette des Dienstes. Lautet
+ * die kurze Beschriftung bei zwei Treffern gleich — zwei „Ried" in Bayern —,
+ * bekommen beide die längere (Bezirk bzw. Landkreis dazwischen): Eine Auswahl
+ * aus gleich aussehenden Zeilen wäre eine Rückfrage ohne Erkenntnis.
+ */
+function beschrifteKandidaten(kandidaten: StandortKandidat[]): StandortKandidat[] {
+  const kurz = kandidaten.map(kurzeBeschriftung)
+  return kandidaten.map((kandidat, i) => {
+    const eigene = kurz[i]
+    if (!eigene) return kandidat
+    const gleichnamig = kurz.some((andere, j) => j !== i && andere === eigene)
+    return { ...kandidat, beschriftung: gleichnamig ? langeBeschriftung(kandidat) : eigene }
+  })
+}
+
+/**
+ * Der Anzeigetext eines Kandidaten in der Auswahlliste: die Beschriftung aus
+ * beschrifteKandidaten; fehlt sie (Nominatim lieferte keinen Ortsnamen), der
+ * Nominatim-Name, dem das Land vorangestellt wird, wenn er es nicht ohnehin
+ * schon nennt. Nominatims `display_name` endet in aller Regel auf
+ * „…, Österreich" bzw. „…, Deutschland" — dann wäre eine zweite Landangabe nur Lärm.
+ */
 export function kandidatenBeschriftung(kandidat: StandortKandidat): string {
-  const land = kandidat.land === 'AT' || kandidat.land === 'DE' ? LAND_LABEL[kandidat.land] : null
+  if (kandidat.beschriftung) return kandidat.beschriftung
+  const land = landLabel(kandidat)
   if (!land) return kandidat.anzeigeName
   return kandidat.anzeigeName.includes(land)
     ? kandidat.anzeigeName
@@ -253,21 +388,35 @@ async function frageNominatim(
 
 async function ladeNominatim(parameter: Record<string, string>): Promise<unknown> {
   return frageNominatim('/search', {
+    // Drei Kandidaten für die Hof-Adresse; die Ortssuche bittet um mehr (sucheOrtspunkt).
+    limit: '3',
     ...parameter,
     format: 'jsonv2',
-    limit: '3',
     addressdetails: '1',
   })
 }
+
+/** So viele Treffer verlangt die Ortssuche von Nominatim — zum Entdoppeln braucht sie
+ *  mehr, als die Auswahl am Ende zeigt. */
+const ORTSSUCHE_ABFRAGE_LIMIT = 10
+/** So viele Orte zeigt die Auswahl höchstens. */
+const ORTSSUCHE_TREFFER_MAX = 5
 
 /**
  * Löst eine EINGETIPPTE Postleitzahl oder einen Ortsnamen zum Kartenpunkt
  * auf — der Bezugspunkt der Umkreissuche auf /hoefe.
  *
  * Bewusst DIESELBE strukturierte Anbindung wie die Hof-Geokodierung (kein
- * zweiter Netzweg), und je nach Eingabe postalcode ODER city
- * (istPostleitzahl). Straße wird nie mitgeschickt: Gesucht ist die Gegend,
- * nicht die Adresse.
+ * zweiter Netzweg). Was Nominatim bekommt, entscheidet erkenneOrtseingabe:
+ * `postalcode` bei einer Postleitzahl, `city` bei einem Ortsnamen und BEIDES
+ * zusammen bei „5230 Mattighofen" bzw. „Mattighofen 5230" (als ein Ortsname
+ * fände der Dienst nichts). Was kein Ort sein kann, geht gar nicht erst hinaus.
+ * Straße wird nie mitgeschickt: Gesucht ist die Gegend, nicht die Adresse.
+ *
+ * ZEHN TREFFER, DANN ENTDOPPELN, DANN HÖCHSTENS FÜNF: Gleichnamige Orte
+ * (Ried, Neukirchen) stehen oft weit hinten, und mehrere Zeilen desselben
+ * Ortes vorn — erst kappen und dann entdoppeln ließ meist nur einen übrig.
+ * Die Treffer tragen ihre Beschriftung mit Bundesland (beschrifteKandidaten).
  *
  * ÜBER DIE GRENZE: `countrycodes=at,de` statt `country=at`. Im Innviertel
  * liegt Bayern näher als halb Oberösterreich — wer „Simbach" oder „84359"
@@ -288,16 +437,23 @@ export async function sucheOrtspunkt(
   eingabe: string,
   lade: NominatimLader = ladeNominatim
 ): Promise<StandortKandidat[]> {
-  const text = eingabe.trim()
-  if (text.length < 2) return []
+  const erkannt = erkenneOrtseingabe(eingabe)
+  if (erkannt.art === 'text') return []
+  const ort: Record<string, string> =
+    erkannt.art === 'plz'
+      ? { postalcode: erkannt.plz }
+      : erkannt.art === 'plz-ort'
+        ? { postalcode: erkannt.plz, city: erkannt.ort }
+        : { city: erkannt.ort }
 
   try {
-    return werteNominatimAntwortAus(
-      await lade({
-        [istPostleitzahl(text) ? 'postalcode' : 'city']: text,
-        countrycodes: UMKREIS_LAENDER_CODES,
-      })
-    )
+    const antwort = await lade({
+      ...ort,
+      countrycodes: UMKREIS_LAENDER_CODES,
+      limit: String(ORTSSUCHE_ABFRAGE_LIMIT),
+    })
+    const treffer = entdoppleTreffer(werteNominatimAntwortAus(antwort, ORTSSUCHE_ABFRAGE_LIMIT))
+    return beschrifteKandidaten(treffer.slice(0, ORTSSUCHE_TREFFER_MAX))
   } catch {
     return []
   }
@@ -390,16 +546,13 @@ export function werteRueckwaertsAntwortAus(json: unknown): RueckwaertsAdresse | 
   if (typeof adresse !== 'object' || adresse === null) return null
   const a = adresse as Record<string, unknown>
 
-  const text = (wert: unknown): string | undefined =>
-    typeof wert === 'string' && wert.trim() ? wert.trim() : undefined
-
   const ergebnis: RueckwaertsAdresse = {
-    strasse: text(a.road),
-    hausnummer: text(a.house_number),
-    plz: text(a.postcode),
+    strasse: nichtLeer(a.road),
+    hausnummer: nichtLeer(a.house_number),
+    plz: nichtLeer(a.postcode),
     // Die feinste vorhandene Orts-Stufe gewinnt — auf dem Land ist das
     // meist `village`, notfalls die Gemeinde.
-    ort: text(a.village) ?? text(a.town) ?? text(a.city) ?? text(a.municipality),
+    ort: nichtLeer(a.village) ?? nichtLeer(a.town) ?? nichtLeer(a.city) ?? nichtLeer(a.municipality),
   }
   return Object.values(ergebnis).some((wert) => wert !== undefined) ? ergebnis : null
 }

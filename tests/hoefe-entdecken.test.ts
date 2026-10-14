@@ -19,7 +19,8 @@ import {
   ortFilterText,
   ortVorschlagAnbieten,
   ortVorschlagText,
-  istPostleitzahl,
+  standortIstUngenau,
+  standortUngefaehrText,
   alleZuruecksetzen,
   entdeckenKopf,
   ergebnisZahl,
@@ -436,37 +437,51 @@ describe('Ein Suchfeld „Ort oder Produkt" (Nr. 46)', () => {
     expect(SUCHFELD_TEXT.standort).toBe('Standort nutzen')
   })
 
-  it('der Eintrag „Höfe rund um …" erscheint ab zwei Zeichen — dieselbe Grenze wie die Ortssuche des Servers', () => {
+  it('der Eintrag „Höfe rund um …" erscheint, sobald der Text ein Ort sein kann — und nie für Text, den die Ortssuche gar nicht annimmt', () => {
     expect(ortVorschlagAnbieten('')).toBe(false)
     expect(ortVorschlagAnbieten(' R ')).toBe(false)
     expect(ortVorschlagAnbieten('Ri')).toBe(true)
+    expect(ortVorschlagAnbieten('5230 Mattighofen')).toBe(true)
+    // Ziffern, die keine Postleitzahl sind, sind kein Ort: Der Eintrag liefe ins Leere.
+    expect(ortVorschlagAnbieten('Eier 10er')).toBe(false)
     // Gegenprobe am Schema: was der Eintrag anbietet, nimmt loeseOrtAuf auch an.
     expect(ortssucheSchema.safeParse(' R ').success).toBe(false)
     expect(ortssucheSchema.safeParse('Ri').success).toBe(true)
     expect(ortVorschlagText('  4910 ')).toBe('Höfe rund um „4910" zeigen')
   })
 
-  it('nur eine Eingabe aus vier Ziffern ist eine Postleitzahl (Runde 1)', () => {
-    expect(istPostleitzahl('4910')).toBe(true)
-    expect(istPostleitzahl(' 4910 ')).toBe(true)
-    for (const text of ['4910 Ried', '84359', '84359 Simbach', 'Eier 10er', '491', '491000', 'Ried', '']) {
-      expect(istPostleitzahl(text), text).toBe(false)
-    }
+  it('Enter ohne Markierung sucht den Ort — bei Postleitzahl, Postleitzahl mit Ort und Ort; sonst bleibt es bei der Produktsuche (Nr. 84)', () => {
+    // Je Art: plz, plz-ort, ort. Enter ist das Absenden; die Produktsuche läuft beim Tippen ohnehin.
+    expect(enterImSuchfeld('5230')).toBe('ort-suchen')
+    expect(enterImSuchfeld(' 84359 ')).toBe('ort-suchen')
+    expect(enterImSuchfeld('5230 Mattighofen')).toBe('ort-suchen')
+    expect(enterImSuchfeld('Mattighofen 5230')).toBe('ort-suchen')
+    expect(enterImSuchfeld('Ried im Innkreis')).toBe('ort-suchen')
+    // Auch ein Produktwort geht auf Enter an die Ortssuche: Findet sie nichts, bleibt es die Produktsuche.
+    expect(enterImSuchfeld('Heu')).toBe('ort-suchen')
+    // Art „text": nichts geht an Nominatim.
+    expect(enterImSuchfeld('Eier 10er')).toBe('nichts')
+    expect(enterImSuchfeld('R')).toBe('nichts')
+    expect(enterImSuchfeld('')).toBe('nichts')
   })
 
-  it('Enter ohne Markierung: vier Ziffern suchen den Ort, ohne Treffer zeigt Enter den Eintrag — ausgelöst wird er nur ausdrücklich', () => {
-    expect(enterImSuchfeld('4910', 3)).toBe('ort-suchen')
-    expect(enterImSuchfeld(' 4910 ', 0)).toBe('ort-suchen')
-    // Ohne Produkttreffer schickt Enter den Text NICHT an die Ortssuche (Nominatim): Er kann ein
-    // Produktwort sein. Die Datenschutzerklärung nennt dafür nur „Postleitzahl oder Ort".
-    expect(enterImSuchfeld('Ried', 0)).toBe('ort-eintrag-zeigen')
-    expect(enterImSuchfeld('Topinambur', 0)).toBe('ort-eintrag-zeigen')
-    expect(enterImSuchfeld('84359 Simbach', 0)).toBe('ort-eintrag-zeigen')
-    // Mit Treffern bleibt es bei der Produktsuche, die beim Tippen schon wirkt.
-    expect(enterImSuchfeld('Eier', 4)).toBe('nichts')
-    expect(enterImSuchfeld('84359', 2)).toBe('nichts')
-    expect(enterImSuchfeld('R', 0)).toBe('nichts')
-    expect(enterImSuchfeld('', 0)).toBe('nichts')
+  it('die Sätze der Ortssuche: kein Ort gefunden und der Hinweis auf den ungenauen Standort', () => {
+    expect(SUCHFELD_TEXT.keinOrt).toBe('Keinen Ort gefunden – wir suchen nach Höfen und Produkten.')
+    expect(SUCHFELD_TEXT.genauerBestimmen).toBe('Genauer bestimmen')
+    expect(SUCHFELD_TEXT.soLassen).toBe('So lassen')
+    // Die Zahl kommt aus der Genauigkeit des Geräts, gerundet auf ganze Kilometer.
+    expect(standortUngefaehrText(15_000)).toBe('Dein Standort ist nur ungefähr bekannt (etwa 15 km).')
+    expect(standortUngefaehrText(2_400)).toBe('Dein Standort ist nur ungefähr bekannt (etwa 2 km).')
+    expect(standortUngefaehrText(10_499)).toBe('Dein Standort ist nur ungefähr bekannt (etwa 10 km).')
+  })
+
+  it('ein Standort gilt über 2 000 m als nur ungefähr — genau 2 000 m und darunter wie bisher', () => {
+    expect(standortIstUngenau(15_000)).toBe(true)
+    expect(standortIstUngenau(2_001)).toBe(true)
+    expect(standortIstUngenau(2_000)).toBe(false)
+    expect(standortIstUngenau(15)).toBe(false)
+    // Fehlt die Angabe (NaN), bleibt es beim bisherigen Weg: übernehmen.
+    expect(standortIstUngenau(Number.NaN)).toBe(false)
   })
 
   it('mit der Tastatur: Pfeil nach oben aus dem Feld landet auf „Höfe rund um …", Enter übernimmt ihn', () => {

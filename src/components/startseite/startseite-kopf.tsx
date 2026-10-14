@@ -109,12 +109,15 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
               </span>
             </p>
 
-            {/* Die Suche schickt, was /hoefe heute versteht: den Suchtext `q`
-                (Hof oder Produkt) — derselbe Weg wie die Suche der 404 und der
-                KundeShell. Einen Ort nimmt /hoefe bewusst nicht aus der Adresse
-                (ARCHITECTURE §4, „Nie Standort in die URL"); die Umkreissuche
-                mit Postleitzahl oder Standort liegt dort, der Link darunter
-                führt hin. */}
+            {/* Die Suche schickt den Suchtext `q` — derselbe Weg wie die Suche der
+                404 und der KundeShell. /hoefe löst ihn beim Ankommen auf (Nr. 84):
+                Eine Postleitzahl, „Postleitzahl Ort" oder ein Ortsname sucht dort
+                den Ort, sonst Höfe und Produkte. Das Absenden hier ist der
+                Auslöser — die Ortssuche startet nie beim Tippen. Das Formular
+                schickt nur `q`: Daran erkennt /hoefe, dass hier abgesendet wurde
+                (abgesendeterSuchtext) — kein Feld `t` dazusetzen. Der Standort
+                steht nie in der Adresse; der Link darunter führt zu „Standort
+                nutzen" auf /hoefe. */}
             <form
               role="search"
               action="/hoefe"
