@@ -9,20 +9,29 @@
  * (src/server/admin-wache.ts) — die Navigation ist nie die Sperre.
  */
 import type { UserRole } from '@prisma/client'
+import { ADMIN_POSTFACH_HREF } from '@/lib/postfach'
+import { BRIEFKASTEN_HREF } from '@/lib/admin-briefkasten'
 
-export type AdminReiterId = 'hoefe' | 'briefkasten' | 'finanzen'
+export type AdminReiterId = 'hoefe' | 'postfach' | 'finanzen'
 
 export type AdminReiter = {
   id: AdminReiterId
   label: string
   href: string
-  /** Welche Zahl am Reiter steht: Höfe, die auf Freischaltung warten, bzw. Meldungen zu entscheiden. */
+  /**
+   * Welche Zahl am Reiter steht: Höfe, die auf Freischaltung warten, bzw. am
+   * Postfach ungelesene Antworten der Höfe plus Meldungen zu entscheiden (der
+   * Schlüssel heißt weiter 'briefkasten', Nr. 86/87).
+   */
   zahl?: 'hoefe' | 'briefkasten'
+  /** Weitere Pfade, auf denen der Reiter aktiv ist — das Postfach auch auf der Detailseite einer Meldung. */
+  auchAktivAuf?: readonly string[]
 }
 
 export const ADMIN_REITER: readonly AdminReiter[] = [
   { id: 'hoefe', label: 'Höfe', href: '/admin', zahl: 'hoefe' },
-  { id: 'briefkasten', label: 'Postfach', href: '/admin/meldungen', zahl: 'briefkasten' },
+  // Seit Nr. 87 (Register N12) mit drei Reitern unter /admin/postfach; /admin/meldungen leitet um, die Detailseite einer Meldung bleibt.
+  { id: 'postfach', label: 'Postfach', href: ADMIN_POSTFACH_HREF, zahl: 'briefkasten', auchAktivAuf: [BRIEFKASTEN_HREF] },
   { id: 'finanzen', label: 'Finanzen', href: '/admin/finanzen' },
 ]
 
@@ -51,12 +60,12 @@ export function kontoHatHof(konto: { rolle: UserRole | null | undefined; hofVorh
  */
 export const ADMIN_TESTUMGEBUNG = { label: 'Zur Testumgebung' } as const
 
-/** Der aktive Reiter — der längste passende, damit /admin/meldungen nicht auch „Höfe" ist. */
+/** Der aktive Reiter — der längste passende Pfad, damit /admin/postfach nicht auch „Höfe" ist. */
 export function adminAktiverReiter(pfad: string): AdminReiterId | null {
-  let bester: AdminReiter | null = null
+  let bester: { id: AdminReiterId; laenge: number } | null = null
   for (const reiter of ADMIN_REITER) {
-    if (pfad === reiter.href || pfad.startsWith(reiter.href + '/')) {
-      if (!bester || reiter.href.length > bester.href.length) bester = reiter
+    for (const ziel of [reiter.href, ...(reiter.auchAktivAuf ?? [])]) {
+      if ((pfad === ziel || pfad.startsWith(ziel + '/')) && (!bester || ziel.length > bester.laenge)) bester = { id: reiter.id, laenge: ziel.length }
     }
   }
   return bester?.id ?? null

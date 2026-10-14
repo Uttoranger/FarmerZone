@@ -20,6 +20,7 @@ import { env } from '@/lib/env'
 import { darfMailEmpfangen, leseTestEmpfaenger, sperrtTrotzProduktion } from '@/lib/testumgebung'
 import { abmeldeSeitenPfad, listUnsubscribeKoepfe } from '@/lib/abmelde-link'
 import { MARKE } from '@/lib/marke'
+import { POSTFACH_MAIL_TEXT, fadenHref } from '@/lib/postfach'
 
 const apiKey = process.env.RESEND_API_KEY
 const FROM = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
@@ -810,4 +811,40 @@ export async function sendBestellungVerfallen(
   }))
 
   await send(order.customerEmail, 'Deine Bestellung ist verfallen, weil sie nicht bestätigt wurde', html)
+}
+
+/**
+ * Postfach (Register N12, Nr. 87): eine Nachricht vom Team an einen Hof per
+ * E-Mail — ein Rundschreiben mit dem Haken „Betriebsmitteilung" oder eine
+ * Antwort des Teams im Faden (höchstens eine je Faden und Stunde, das
+ * entscheidet die Action). Nie bei Antworten des Hofs. Links der Nachricht
+ * sind Wege in der App (appPfadAusLink) und bekommen hier den eigenen
+ * Ursprung. Über sendRaw — die Post-Sperre (Z3) greift wie bei jeder Mail;
+ * das Ergebnis geht an den Aufrufer, der einen Fehler ohne Text meldet.
+ */
+export async function sendPostfachMail(m: {
+  art: 'rundschreiben' | 'antwort'
+  an: string
+  titel: string
+  text: string
+  link: string | null
+  unterhaltungId: string
+}): Promise<VersandErgebnis> {
+  const props = {
+    titel: m.titel,
+    text: m.text,
+    linkUrl: m.link ? `${APP_URL}${m.link}` : null,
+    fadenUrl: `${APP_URL}${fadenHref(m.unterhaltungId)}`,
+  }
+  const html = await htmlOderFehler(async () => {
+    if (m.art === 'rundschreiben') {
+      const { PostfachRundschreibenEmail } = await import('@/emails/postfach-rundschreiben')
+      return React.createElement(PostfachRundschreibenEmail, props)
+    }
+    const { PostfachAntwortEmail } = await import('@/emails/postfach-antwort')
+    return React.createElement(PostfachAntwortEmail, props)
+  })
+  if (!html.ok) return { error: html.error }
+  const betreff = m.art === 'rundschreiben' ? m.titel : POSTFACH_MAIL_TEXT.antwortBetreff(m.titel)
+  return sendRaw(m.an, betreff, html.html)
 }

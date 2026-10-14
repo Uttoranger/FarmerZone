@@ -9,6 +9,7 @@ import {
   CalendarCheck,
   ChevronDown,
   Home,
+  Inbox,
   LifeBuoy,
   LogOut,
   Megaphone,
@@ -54,6 +55,8 @@ import { cn } from '@/lib/utils'
 const SYMBOL: Record<NavPunktId, LucideIcon> = {
   heute: CalendarCheck,
   bestellungen: ReceiptText,
+  // Ein Eingangsfach: das Postfach (Register N12, Nr. 87).
+  postfach: Inbox,
   // Ein Paket: Produkte sind Tagesgeschäft und haben ihren eigenen Platz.
   produkte: Package,
   // Ein Haus: „Mein Hof" bündelt Hofseite und Beiträge.

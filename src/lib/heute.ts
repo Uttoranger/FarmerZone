@@ -641,7 +641,7 @@ export function teilenSatz(angebot: readonly string[], fenster: NaechstesFenster
 
 // ─── Aufbau ─────────────────────────────────────────────────────────────────
 
-export type HeuteBlock = 'stripe' | 'packliste' | 'teilen' | 'braucht-dich' | 'zu-tun' | 'naechste-abholung' | 'woche'
+export type HeuteBlock = 'postfach' | 'stripe' | 'packliste' | 'teilen' | 'braucht-dich' | 'zu-tun' | 'naechste-abholung' | 'woche'
 
 /**
  * Welche Blöcke wo stehen (freigabe.md §12 Nr. 45). Oben höchstens EIN Kasten
@@ -663,13 +663,17 @@ export function heuteAufbau({
   stripeHinweis,
   teilen,
   zuTun,
+  postfach,
 }: {
   stripeHinweis: boolean
   teilen: boolean
   zuTun: boolean
+  /** Ungelesenes vom Team im Postfach (Register N12, Nr. 87): Die Karte steht dann als erster Block der Hauptspalte. */
+  postfach: boolean
 }): { oben: HeuteBlock[]; haupt: HeuteBlock[]; seite: HeuteBlock[] } {
   const oben: HeuteBlock[] = stripeHinweis ? ['stripe'] : []
   const haupt: HeuteBlock[] = teilen ? ['packliste', 'braucht-dich', 'teilen'] : ['packliste', 'braucht-dich']
+  if (postfach) haupt.unshift('postfach')
   const seite: HeuteBlock[] = zuTun ? ['zu-tun', 'naechste-abholung', 'woche'] : ['naechste-abholung', 'woche']
   return { oben, haupt, seite }
 }

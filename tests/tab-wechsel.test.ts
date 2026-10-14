@@ -42,6 +42,7 @@ vi.mock('@/server/queries/orders', () => ({ getOpenOrdersCount: vi.fn() }))
 vi.mock('@/server/queries/farm', () => ({ getFarmBannerState: vi.fn() }))
 vi.mock('@/server/queries/admin', () => ({ isAdminUser: vi.fn(), ladeGruendungBis: vi.fn() }))
 vi.mock('@/server/queries/meldung', () => ({ zaehleZuEntscheiden: vi.fn() }))
+vi.mock('@/server/queries/postfach', () => ({ zaehleUngelesenHof: vi.fn() }))
 
 import { prisma } from '@/lib/prisma'
 import { umsatzBuchungen } from '@/server/queries/umsatz'
@@ -52,6 +53,7 @@ import { getOpenOrdersCount } from '@/server/queries/orders'
 import { getFarmBannerState } from '@/server/queries/farm'
 import { isAdminUser, ladeGruendungBis } from '@/server/queries/admin'
 import { zaehleZuEntscheiden } from '@/server/queries/meldung'
+import { zaehleUngelesenHof } from '@/server/queries/postfach'
 import { ladeHofbereich } from '@/server/hofbereich'
 
 const JETZT = new Date('2026-10-07T08:00:00Z')
@@ -86,6 +88,7 @@ beforeEach(() => {
   vi.mocked(prisma.statusPost.findFirst).mockResolvedValue(null as never)
   vi.mocked(prisma.farm.findUnique).mockResolvedValue(null as never)
   vi.mocked(umsatzBuchungen).mockResolvedValue([])
+  vi.mocked(zaehleUngelesenHof).mockResolvedValue(0)
 })
 
 describe('getHeute — wartet nur mit dem auf die Freigabe, was sie ändern kann', () => {
@@ -153,9 +156,11 @@ describe('ladeHofbereich — die Zahlen des Layouts nebeneinander', () => {
     vi.mocked(getFarmForUser).mockResolvedValue({ id: 'hof-1', name: 'Testhof', slug: 'testhof', logoUrl: null } as never)
   }
 
-  it('startet offene Bestellungen, Balken, Admin-Recht und Tarif-Zeile gleichzeitig', async () => {
+  it('startet offene Bestellungen, Postfach, Balken, Admin-Recht und Tarif-Zeile gleichzeitig', async () => {
     angemeldet()
     const offen = aufgeschoben<number>()
+    const postfach = aufgeschoben<number>()
+    vi.mocked(zaehleUngelesenHof).mockReturnValue(postfach.versprechen)
     const balken = aufgeschoben<null>()
     const admin = aufgeschoben<boolean>()
     vi.mocked(getOpenOrdersCount).mockReturnValue(offen.versprechen)
@@ -167,6 +172,8 @@ describe('ladeHofbereich — die Zahlen des Layouts nebeneinander', () => {
 
     // Keine der drei ist eingelöst — trotzdem sind alle gestartet.
     expect(getOpenOrdersCount).toHaveBeenCalledWith('hof-1')
+    // Nr. 87 (Register N12): der Zähler des Postfachs, daneben.
+    expect(zaehleUngelesenHof).toHaveBeenCalledWith('hof-1')
     expect(getFarmBannerState).toHaveBeenCalledWith('nutzer-1')
     expect(isAdminUser).toHaveBeenCalledWith('nutzer-1')
     // Nr. 61: Die Tarif-Zeile (Tarif und Produkte im Shop) läuft daneben, nicht danach.
@@ -175,10 +182,11 @@ describe('ladeHofbereich — die Zahlen des Layouts nebeneinander', () => {
     expect(ladeGruendungBis).toHaveBeenCalledWith({ id: 'hof-1' })
 
     offen.loese(3)
+    postfach.loese(2)
     balken.loese(null)
     admin.loese(false)
     const ergebnis = await laeuft
-    expect(ergebnis).toMatchObject({ offeneBestellungen: 3, balken: null, isAdmin: false, zuEntscheiden: 0 })
+    expect(ergebnis).toMatchObject({ offeneBestellungen: 3, ungelesenPostfach: 2, balken: null, isAdmin: false, zuEntscheiden: 0 })
     // Ein Hof bezahlt nie für die Zählabfrage des Betreibers.
     expect(zaehleZuEntscheiden).not.toHaveBeenCalled()
   })

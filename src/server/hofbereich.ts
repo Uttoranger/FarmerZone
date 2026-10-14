@@ -6,6 +6,7 @@ import { getOpenOrdersCount } from '@/server/queries/orders'
 import { getFarmBannerState } from '@/server/queries/farm'
 import { isAdminUser } from '@/server/queries/admin'
 import { zaehleZuEntscheiden } from '@/server/queries/meldung'
+import { zaehleUngelesenHof } from '@/server/queries/postfach'
 import { ladeTarifStand } from '@/server/queries/einstellungen'
 import { baueTarifZeile, type TarifZeileDaten } from '@/lib/konditionen'
 
@@ -22,6 +23,8 @@ export type Hofbereich = {
   hof: { id: string; name: string; slug: string; logoUrl: string | null }
   personName: string
   offeneBestellungen: number
+  /** Fäden im Postfach mit Ungelesenem vom Team (Register N12, Nr. 87) — der Zähler an „Postfach". */
+  ungelesenPostfach: number
   /** Ein Zugriff für beide Balken (stillgelegt / wartet auf Freigabe). */
   balken:
     | { art: 'stillgelegt' }
@@ -57,8 +60,9 @@ export async function ladeHofbereich(): Promise<Hofbereich> {
 
   // Unabhängig voneinander, also nebeneinander (Nachtlauf Nr. 31) — vorher
   // vier Rundreisen zur Datenbank hintereinander vor jeder Hof-Seite.
-  const [offeneBestellungen, bannerState, { isAdmin, zuEntscheiden }, tarifZeile] = await Promise.all([
+  const [offeneBestellungen, ungelesenPostfach, bannerState, { isAdmin, zuEntscheiden }, tarifZeile] = await Promise.all([
     getOpenOrdersCount(hof.id),
+    zaehleUngelesenHof(hof.id),
     getFarmBannerState(session.user.id),
     // Menüpunkt „Admin" nur für den Betreiber — frisch aus der DB, nicht aus der Sitzung.
     isAdminUser(session.user.id).then(async (admin) => ({
@@ -77,5 +81,5 @@ export async function ladeHofbereich(): Promise<Hofbereich> {
         ? { art: 'wartet', farmId: bannerState.id, farmName: bannerState.name, country: bannerState.country }
         : null
 
-  return { hof, personName: session.user.name ?? '', offeneBestellungen, balken, isAdmin, zuEntscheiden, tarifZeile }
+  return { hof, personName: session.user.name ?? '', offeneBestellungen, ungelesenPostfach, balken, isAdmin, zuEntscheiden, tarifZeile }
 }

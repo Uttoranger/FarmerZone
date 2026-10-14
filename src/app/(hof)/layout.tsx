@@ -21,7 +21,7 @@ import { SentryNutzer } from '@/components/farmer/sentry-nutzer'
  * wie das Bestandslayout (src/server/hofbereich.ts); die Shell lädt nichts selbst.
  */
 export default async function HofLayout({ children }: { children: React.ReactNode }): Promise<React.JSX.Element> {
-  const { hof, personName, offeneBestellungen, balken, isAdmin, zuEntscheiden, tarifZeile } = await ladeHofbereich()
+  const { hof, personName, offeneBestellungen, ungelesenPostfach, balken, isAdmin, zuEntscheiden, tarifZeile } = await ladeHofbereich()
 
   return (
     <HofShell
@@ -29,7 +29,7 @@ export default async function HofLayout({ children }: { children: React.ReactNod
       hofSlug={hof.slug}
       personName={personName}
       isAdmin={isAdmin}
-      zahlen={{ bestellungen: offeneBestellungen, admin: zuEntscheiden }}
+      zahlen={{ bestellungen: offeneBestellungen, postfach: ungelesenPostfach, admin: zuEntscheiden }}
       tarifZeile={tarifZeile}
     >
       {/* Teilen-Service-Worker und Sentry-Kennung (nur die Farm-ID) wie im

@@ -182,8 +182,8 @@ describe('Abholfenster — Wiener Wochentag', () => {
 
 describe('Teilen-Zeile', () => {
   it('kompakt, zuletzt in der Hauptspalte — nur wenn Kunden den Hof sehen und bei ihm bestellen können', () => {
-    expect(heuteAufbau({ stripeHinweis: false, teilen: true, zuTun: false }).haupt).toEqual(['packliste', 'braucht-dich', 'teilen'])
-    const ohne = heuteAufbau({ stripeHinweis: false, teilen: false, zuTun: false })
+    expect(heuteAufbau({ stripeHinweis: false, teilen: true, zuTun: false, postfach: false }).haupt).toEqual(['packliste', 'braucht-dich', 'teilen'])
+    const ohne = heuteAufbau({ stripeHinweis: false, teilen: false, zuTun: false, postfach: false })
     expect([...ohne.oben, ...ohne.haupt, ...ohne.seite]).not.toContain('teilen')
   })
 
@@ -233,9 +233,22 @@ describe('Aufbau der Seite — Packliste zuerst, oben höchstens ein Kasten', ()
     for (const stripeHinweis of [true, false]) {
       for (const teilen of [true, false]) {
         for (const zuTun of [true, false]) {
-          const { haupt } = heuteAufbau({ stripeHinweis, teilen, zuTun })
+          const { haupt } = heuteAufbau({ stripeHinweis, teilen, zuTun, postfach: false })
           expect(haupt).toEqual(teilen ? ['packliste', 'braucht-dich', 'teilen'] : ['packliste', 'braucht-dich'])
         }
+      }
+    }
+  })
+
+  it('Ungelesenes im Postfach steht als erster Block der Hauptspalte — sonst bleibt alles, wie es war (N12, Nr. 87)', () => {
+    for (const stripeHinweis of [true, false]) {
+      for (const teilen of [true, false]) {
+        const mit = heuteAufbau({ stripeHinweis, teilen, zuTun: true, postfach: true })
+        const ohne = heuteAufbau({ stripeHinweis, teilen, zuTun: true, postfach: false })
+        expect(mit.haupt).toEqual(['postfach', ...ohne.haupt])
+        expect(mit.oben).toEqual(ohne.oben)
+        expect(mit.seite).toEqual(ohne.seite)
+        expect(ohne.haupt).not.toContain('postfach')
       }
     }
   })
@@ -244,7 +257,7 @@ describe('Aufbau der Seite — Packliste zuerst, oben höchstens ein Kasten', ()
     for (const stripeHinweis of [true, false]) {
       for (const teilen of [true, false]) {
         for (const zuTun of [true, false]) {
-          const { oben } = heuteAufbau({ stripeHinweis, teilen, zuTun })
+          const { oben } = heuteAufbau({ stripeHinweis, teilen, zuTun, postfach: false })
           expect(oben.length).toBeLessThanOrEqual(1)
           expect(oben).toEqual(stripeHinweis ? ['stripe'] : [])
         }
@@ -253,18 +266,18 @@ describe('Aufbau der Seite — Packliste zuerst, oben höchstens ein Kasten', ()
   })
 
   it('jeder Block steht genau einmal; die Seitenspalte trägt Zu tun, nächste Abholung und Woche (Nr. 53)', () => {
-    const voll = heuteAufbau({ stripeHinweis: true, teilen: true, zuTun: true })
+    const voll = heuteAufbau({ stripeHinweis: true, teilen: true, zuTun: true, postfach: false })
     const alle = [...voll.oben, ...voll.haupt, ...voll.seite]
     expect(new Set(alle).size).toBe(alle.length)
     expect(voll.seite).toEqual(['zu-tun', 'naechste-abholung', 'woche'])
-    const ohne = heuteAufbau({ stripeHinweis: false, teilen: false, zuTun: false })
+    const ohne = heuteAufbau({ stripeHinweis: false, teilen: false, zuTun: false, postfach: false })
     expect(ohne).toEqual({ oben: [], haupt: ['packliste', 'braucht-dich'], seite: ['naechste-abholung', 'woche'] })
   })
 
   it('Erste Schritte und „Deine Hofseite" gibt es nicht mehr als eigene Blöcke — nur noch die eine Liste', () => {
     for (const stripeHinweis of [true, false]) {
       for (const zuTun of [true, false]) {
-        const { oben, haupt, seite } = heuteAufbau({ stripeHinweis, teilen: true, zuTun })
+        const { oben, haupt, seite } = heuteAufbau({ stripeHinweis, teilen: true, zuTun, postfach: false })
         const alle: string[] = [...oben, ...haupt, ...seite]
         expect(alle).not.toContain('erste-schritte')
         expect(alle).not.toContain('hofseite')
@@ -396,7 +409,7 @@ describe('Hinweis „Online-Zahlung einrichten" für freigeschaltete Höfe ohne 
   })
 
   it('die Seite zeigt ihn oben, wo sonst „pausiert" steht — keine Abschaltung, nur ein Hinweis', () => {
-    expect(heuteAufbau({ stripeHinweis: true, teilen: true, zuTun: false }).oben).toEqual(['stripe'])
+    expect(heuteAufbau({ stripeHinweis: true, teilen: true, zuTun: false, postfach: false }).oben).toEqual(['stripe'])
     const seite = quelle('src/app/(hof)/dashboard/page.tsx')
     expect(seite).toContain('<StripeEinrichtenHinweis')
     expect(seite).toContain('heute.stripeEinrichten')
