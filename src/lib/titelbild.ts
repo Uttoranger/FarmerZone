@@ -12,9 +12,9 @@
  *
  * Die Maße kennt nur der Browser, und erst beim Laden des Bilds — gespeichert
  * werden sie nicht (keine Migration). Bis dahin gilt „beschnitt“: Querformat
- * springt nie, alles andere wechselt einmal nach dem Laden, und die Kopie
- * blendet dabei weich ein. Offen: Maße beim Hochladen speichern, dann entfällt
- * der Wechsel (Register N13).
+ * springt nie, alles andere wechselt einmal nach dem Laden, und das blendet
+ * weich über (Foto in zwei Lagen und Kopie, components/hofseite/titelbild.tsx).
+ * Offen: Maße beim Hochladen speichern, dann entfällt der Wechsel (Register N13).
  */
 
 /** Breite und Höhe eines Bilds in Pixeln. */
@@ -30,7 +30,8 @@ export type TitelbildDarstellung = 'beschnitt' | 'ganz'
  * Unter diesem Seitenverhältnis (Breite ÷ Höhe) steht das Foto ganz: Quadrat,
  * Hochformat und 4:3. Ab 1,5 — das ist 3:2 selbst — füllt es die Fläche mit
  * Fokuspunkt, wie vor N6. Die Grenze ist eine Entscheidung der Projektleitung
- * (Register N13), keine Rechnung.
+ * (Register N13), keine Rechnung. Gemessen wird an der Größe, die next/image
+ * liefert — siehe titelbildDarstellung.
  */
 export const TITELBILD_GANZ_UNTER = 1.5
 
@@ -50,9 +51,29 @@ export const TITELBILD_BREITE_MAX = 1920
  */
 export const TITELBILD_SIZES = `(min-width: ${TITELBILD_BREITE_MAX}px) ${TITELBILD_BREITE_MAX}px, 100vw`
 
-/** Alles, was weniger als 1,5-mal so breit wie hoch ist, steht ganz — unbekannte Maße und Querformat ab 3:2 bleiben beim Beschnitt. */
+/**
+ * Die Höhe der gelieferten Größe ist auf ganze Pixel gerundet, also um höchstens
+ * einen halben Pixel falsch (sharp rundet zum nächsten ganzen Pixel).
+ */
+const RUNDUNG_PX = 0.5
+
+/**
+ * Alles, was weniger als 1,5-mal so breit wie hoch ist, steht ganz — unbekannte
+ * Maße und Querformat ab 3:2 bleiben beim Beschnitt.
+ *
+ * Die Maße sind die der Größe, die next/image liefert (`naturalWidth` des
+ * geladenen Bilds), nicht die des Originals — und sharp rundet dabei die Höhe:
+ * Ein Foto in genau 3:2 (1800 × 1200) kommt als 640 × 427 (1,4988) an. Rechnete
+ * man das Verhältnis blank nach, stünde dasselbe Foto in Mein Hof (640 px) ganz
+ * und auf der Hofseite (1 920 px) füllend. Darum zählt die Höhe um den möglichen
+ * Rundungsfehler kleiner: Was durch die Rundung knapp unter 1,5 liegen könnte,
+ * ist 3:2 und füllt. Die Toleranz ist klein: 1499 × 1000 steht weiter ganz.
+ * Bei einer `srcset` mit Breitenangaben teilt der Browser die Maße zudem durch die
+ * Bilddichte und rundet nach unten; dagegen reicht der halbe Pixel nicht in jedem
+ * Fall (DEVELOPMENT.md, Eintrag Nr. 89, „Rest“).
+ */
 export function titelbildDarstellung(masse: TitelbildMasse | null): TitelbildDarstellung {
-  return masse !== null && masse.breite / masse.hoehe < TITELBILD_GANZ_UNTER ? 'ganz' : 'beschnitt'
+  return masse !== null && masse.breite < TITELBILD_GANZ_UNTER * (masse.hoehe - RUNDUNG_PX) ? 'ganz' : 'beschnitt'
 }
 
 /**

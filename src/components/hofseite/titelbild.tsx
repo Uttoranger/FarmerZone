@@ -24,7 +24,10 @@ import { cn } from '@/lib/utils'
  * wenn es weniger als 1,5-mal so breit wie hoch ist (Quadrat, Hochformat, 4:3);
  * ein Querformat ab 3:2 füllt die Fläche mit Fokuspunkt, wie vor N6. Unter
  * 768 px bleibt es immer beim Beschnitt — dort steht der Name auf dem Bild. Der
- * Alt-Text bleibt leer (Schmuck); den Hof nennt die Überschrift.
+ * Wechsel nach dem Laden blendet weich über: `object-fit` lässt sich nicht
+ * überblenden, darum liegt das scharfe Foto in zwei Lagen (füllend und ganz), und
+ * beim Wechsel blenden die ganze Lage und die Kopie ein, während die füllende
+ * ausblendet. Der Alt-Text bleibt leer (Schmuck); den Hof nennt die Überschrift.
  */
 
 /**
@@ -48,9 +51,12 @@ export function useBildmasse(quelle: string | null): {
   return { masse, beimLaden }
 }
 
+/** Der Übergang aller drei Lagen: gleich lang und zugleich, bei „weniger Bewegung“ ohne. */
+const UEBERGANG = 'transition-opacity duration-500 motion-reduce:transition-none'
+
 /**
  * Die Bilder im Rahmen: hinten die unscharfe Kopie über die volle Breite, davor
- * im Kasten das scharfe Foto.
+ * im Kasten das scharfe Foto in zwei Lagen.
  *
  * Die Kopie (`object-cover` mit demselben Fokuspunkt, Weichzeichner, dunkle
  * Tönung aus dem Design-System — Bild-Overlay, in beiden Themes gleich) ist
@@ -64,6 +70,20 @@ export function useBildmasse(quelle: string | null): {
  * 45 % — die Werte des Mockups system-k2-titelbild-computer. Der Überstand
  * hält den Rand des Bilds außerhalb des Rahmens: Ein Weichzeichner macht die
  * Kante halbdurchsichtig, und dahinter stünde sonst die Fläche des Rahmens.
+ *
+ * Das scharfe Foto liegt zweimal im Kasten, beide Male dieselbe Quelle mit
+ * demselben `sizes` — der Browser lädt die Datei nur einmal:
+ *  - füllend (`object-cover`, Fokuspunkt): die Lage, die am Handy und bei einem
+ *    Querformat steht. Sie lädt vorrangig und liest die Maße (`onLoad`).
+ *  - ganz (`object-contain`): erst ab 768 px da (`hidden md:block` — darunter
+ *    gibt es sie nicht, also auch keinen Abruf) und unsichtbar, bis das Foto ganz steht.
+ * Beim Wechsel nach dem Laden blenden die ganze Lage und die Kopie ein, während die
+ * füllende ausblendet. Ein einzelnes Bild, das nur von `cover` auf `contain` wechselte,
+ * spränge: `object-fit` lässt sich nicht überblenden. Unter 768 px bleibt die
+ * füllende Lage stehen (`md:opacity-0`).
+ *
+ * Screenreader hören das Foto höchstens einmal: Kopie und ganze Lage sind
+ * `aria-hidden`, nur die füllende nicht — in jeder Darstellung und bei jeder Breite.
  */
 export function TitelbildBilder({
   foto,
@@ -78,7 +98,6 @@ export function TitelbildBilder({
   beimLaden: (ereignis: SyntheticEvent<HTMLImageElement>) => void
 }): React.JSX.Element {
   const ganz = darstellung === 'ganz'
-  // Bei object-contain im breiten Rahmen begrenzt die Höhe das Foto: Der senkrechte Fokus greift dort nie, mittig bleibt es von selbst.
   const position = { objectPosition: `50% ${fokusY}%` }
 
   return (
@@ -86,17 +105,14 @@ export function TitelbildBilder({
       {/* Die Kopie steht VOR dem Kasten im Baum: Beide liegen absolut übereinander, und ohne z-index malt das spätere Geschwister obenauf — so liegt das scharfe Foto über der Kopie. */}
       <div
         aria-hidden="true"
-        className={cn(
-          'absolute inset-0 hidden transition-opacity duration-500 motion-reduce:transition-none md:block',
-          ganz ? 'opacity-100' : 'opacity-0 min-[1920px]:opacity-100'
-        )}
+        className={cn('absolute inset-0 hidden md:block', UEBERGANG, ganz ? 'opacity-100' : 'opacity-0 min-[1920px]:opacity-100')}
       >
         <div className="absolute -inset-5">
           <Image src={foto} alt="" fill sizes={TITELBILD_SIZES} className="scale-110 object-cover blur-[28px]" style={position} />
         </div>
         <div className="absolute inset-0 bg-primary-foreground/45" />
       </div>
-      {/* Der Kasten: Breiter als 1 920 px (TITELBILD_BREITE_MAX) wird das scharfe Foto nicht aufgezogen. */}
+      {/* Der Kasten: Breiter als 1 920 px (TITELBILD_BREITE_MAX) wird das scharfe Foto nicht aufgezogen. Die ganze Lage steht nach der füllenden im Baum, also darüber. */}
       <div className="relative mx-auto h-full max-w-[1920px]">
         <Image
           src={foto}
@@ -105,8 +121,17 @@ export function TitelbildBilder({
           sizes={TITELBILD_SIZES}
           priority
           onLoad={beimLaden}
-          className={cn('object-cover', ganz && 'md:object-contain')}
+          className={cn('object-cover', UEBERGANG, ganz && 'md:opacity-0')}
           style={position}
+        />
+        {/* Ohne Fokuspunkt: Bei object-contain im breiten Rahmen begrenzt die Höhe das Foto, es steht von selbst mittig. */}
+        <Image
+          src={foto}
+          alt=""
+          aria-hidden="true"
+          fill
+          sizes={TITELBILD_SIZES}
+          className={cn('hidden object-contain md:block', UEBERGANG, ganz ? 'opacity-100' : 'opacity-0')}
         />
       </div>
     </>
