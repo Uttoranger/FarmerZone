@@ -9,11 +9,20 @@
  * unterscheiden sich in der Vorwahl (660, 664, 676 …), nie in den Ziffern dahinter.
  *
  * Beweist (Dateiarbeit, kein Netz): Keine Datei unter src/, tests/, docs/ und DEVELOPMENT.md —
- * auch diese nicht — enthält eine solche Nummer mit Ziffern 1–9 im Teilnehmerteil, außer den
- * Ausnahmen mit Grund, je Nummer. Jede Ausnahme deckt einen Fund; eine veraltete fällt auf.
- * Gegenprobe: eine eingeschmuggelte Nummer schlägt an, genullte und Nicht-Nummern (Datum,
- * Kennung, Betrag) nicht. Die Gegenproben setzen ihre Ziffer erst zur Laufzeit ein — im
- * Quelltext steht nur die genullte Fassung.
+ * auch diese nicht — enthält eine Nummer mit Ziffern 1–9 im Teilnehmerteil, außer den Ausnahmen.
+ * Erkannt wird (`KANDIDAT`): Ländercode (+43, 0043, +49, 0049) oder Wahl-Null mit Vorwahl, eine
+ * Mobilnummer auch ohne beides; Klammern um Ländercode und Vorwahl; Leerzeichen, Strich und Punkt
+ * als Trenner (nach der Vorwahl auch ein Schrägstrich); eine angehängte Zifferngruppe („… 2026“)
+ * ändert nichts, es zählt die Nummer davor. Nicht erkannt werden andere Ländercodes, Festnetz ohne
+ * 0 und „+“, Nummern mit Buchstaben oder anderen Trennern dazwischen und Ziffernfolgen, die an
+ * einem Wort, „#“, „_“ oder weiteren Ziffern kleben (Kennungen, Hashes, Beträge). Eine deutsche
+ * Nummer ohne Ländercode („0151 …“) liest die Wache als österreichische und meldet sie auch
+ * genullt — deutsche Nummern mit „+49“ schreiben.
+ * Ausnahmen gelten je Nummer (ihre Kennung) und Datei, nie für eine ganze Datei, und nennen ihren
+ * Grund. Jede Ausnahme deckt einen Fund; eine veraltete fällt auf.
+ * Gegenprobe je erkannter Schreibweise: eine eingeschmuggelte Nummer schlägt an, genullte und
+ * Nicht-Nummern (Datum, Kennung, Betrag) nicht. Die Gegenproben setzen ihre Ziffer erst zur
+ * Laufzeit ein — im Quelltext steht nur die genullte Fassung.
  */
 import { describe, it, expect, beforeAll } from 'vitest'
 import { createHash } from 'node:crypto'
@@ -26,21 +35,22 @@ const TEXTDATEI = /\.(ts|tsx|mjs|cjs|js|json|md|html|css|sql|txt|ya?ml)$/
 const DIESE_DATEI = 'tests/telefonnummern-wache.test.ts'
 
 /**
- * Ein Kandidat beginnt mit einem Ländercode (+43, 0043, +49, 0049, auch „+43 (0) 660 …“), mit
- * der Wahl-Null samt Vorwahl („0660“, „(0664)“, „06212“, „01“) oder — so liest auch die Anzeige
- * (`MOBIL_OHNE_NULL` in src/lib/telefon-anzeige.ts) — mit einer Mobil-Vorwahl 65x–69x ohne 0,
- * auch mit „43“ davor (E.164 ohne „+“). Nach der Vorwahl höchstens ein Trenner wie „ / “, danach
- * der Teilnehmerteil: Ziffern mit je einem Leerzeichen, Strich oder Punkt dazwischen.
+ * Ein Kandidat beginnt mit einem Ländercode (+43, 0043, +49, 0049, auch „(+43)“ und „+43 (0) 660 …“),
+ * mit der Wahl-Null samt Vorwahl („0660“, „(0664)“, „06212“, „01“) oder — so liest auch die Anzeige
+ * (`MOBIL_OHNE_NULL` in src/lib/telefon-anzeige.ts) — mit einer Mobil-Vorwahl 65x–69x ohne 0, auch mit
+ * „43“ davor (E.164 ohne „+“). Die Vorwahl darf in Klammern stehen („+43 (664) …“, „(664) …“). Ländercode,
+ * Vorwahl und Teilnehmerteil trennt höchstens ein Trenner wie „ / “ oder ein Punkt („+43.664.…“, „664.…“),
+ * den Teilnehmerteil selbst Ziffern mit je einem Leerzeichen, Strich oder Punkt dazwischen.
  * Nie mitten in einem Wort oder einer Zahl — auch nicht hinter einem Dezimalzeichen (oklch-Werte,
  * Beträge), „#“ (Farbwert) oder „_“, in einer Kennung oder einem Hex-Hash mit Buchstaben davor
  * oder danach, und nicht, wo das „+“ an einer Zahl klebt (Uhrzeit).
  */
 const KANDIDAT = new RegExp(
   [
-    String.raw`(?<![\p{L}\p{N}.,_#])(?:\+|00)[ ]?(?:43|49)(?:[ ]?\(0\))?[ \-\/]{0,3}\d{1,5}\)?[ \-\/]{0,3}\d(?:[ \-.]?\d)*(?![\p{L}\p{N}])`,
+    String.raw`(?<![\p{L}\p{N}.,_#])\(?(?:\+|00)[ ]?(?:43|49)\)?(?:[ ]?\(0\))?[ \-.\/]{0,3}\(?\d{1,5}\)?[ \-.\/]{0,3}\d(?:[ \-.]?\d)*(?![\p{L}\p{N}])`,
     String.raw`(?<![\p{L}\p{N}.,_#])\(?0[1-9]\d{0,3}\)?[ \-\/]{0,3}\d(?:[ \-.]?\d)*(?![\p{L}\p{N}])`,
     // Ohne 0 und ohne „+“ nur eine Mobil-Vorwahl: Festnetz ohne 0 würde geraten (wie die Anzeige).
-    String.raw`(?<![\p{L}\p{N}.,_#+])(?:43[ ]?)?6[5-9]\d[ \-\/]{0,3}\d(?:[ \-.]?\d)*(?![\p{L}\p{N}])`,
+    String.raw`(?<![\p{L}\p{N}.,_#+])\(?(?:43[ ]?)?6[5-9]\d\)?[ \-.\/]{0,3}\d(?:[ \-.]?\d)*(?![\p{L}\p{N}])`,
   ].join('|'),
   'gu'
 )
@@ -59,18 +69,20 @@ type Gelesen = {
 }
 
 /**
- * Ein Kandidat als Nummer gelesen — oder null, wenn er keine ist (zu kurz, nur eine Vorwahl).
- * Österreich: Vorwahl nach denselben Regeln wie die Anzeige; Deutschland: Mobil 15x–17x dreistellig,
- * sonst die erste Gruppe, wie sie geschrieben steht.
+ * Ein Kandidat als Nummer gelesen — oder null, wenn er keine ist (zu kurz, nur eine Vorwahl, mehr
+ * Ziffern als eine Nummer hat). Österreich: Vorwahl nach denselben Regeln wie die Anzeige;
+ * Deutschland: Mobil 15x–17x dreistellig, sonst die erste Gruppe, wie sie geschrieben steht.
  */
 function lies(kandidat: string): Gelesen | null {
-  const ziffern = kandidat.replace(/\D/g, '')
-  const gruppen = kandidat.split(/\D+/).filter(Boolean)
+  // Eine Klammer vor dem Ländercode („(+43) 1 000 0000“) gehört nicht zur Nummer.
+  const text = kandidat.replace(/^\(/, '')
+  const ziffern = text.replace(/\D/g, '')
+  const gruppen = text.split(/\D+/).filter(Boolean)
   let land: string
   let national: string
   let ersteGruppe: string | undefined
-  if (kandidat.startsWith('+') || ziffern.startsWith('00')) {
-    const ohneNullen = kandidat.startsWith('+') ? ziffern : ziffern.slice(2)
+  if (text.startsWith('+') || ziffern.startsWith('00')) {
+    const ohneNullen = text.startsWith('+') ? ziffern : ziffern.slice(2)
     land = ohneNullen.slice(0, 2)
     // „+43 (0) 660 …“: Die Wahl-Null gehört nicht zur Nummer.
     national = ohneNullen.slice(2).replace(/^0/, '')
@@ -91,8 +103,8 @@ function lies(kandidat: string): Gelesen | null {
   } else {
     vorwahl = /^1[5-7]/.test(national) ? 3 : Math.min(ersteGruppe?.length ?? 3, 5)
   }
-  // Österreichische Nummern haben 7 bis 13 Ziffern (wie die Anzeige), deutsche mindestens 6 — kürzer ist ein Code, keine Nummer.
-  if (land === '43' ? national.length < 7 || national.length > MAX_NATIONAL : national.length < 6) return null
+  // Österreichische Nummern haben 7 bis 13 Ziffern (wie die Anzeige), deutsche 6 bis 13 — kürzer ist ein Code, länger hängt etwas an.
+  if (national.length > MAX_NATIONAL || national.length < (land === '43' ? 7 : 6)) return null
   const teil = national.slice(vorwahl)
   return teil.length >= 3 ? { ziffern: land + national, teil } : null
 }
@@ -115,14 +127,30 @@ function kennung(ziffern: string): string {
 }
 
 /**
+ * Hängt hinter einer Nummer noch eine Zifferngruppe („+43 664 000 0000 2026“: Jahr, Hausnummer), hat der
+ * Kandidat zu viele Ziffern für `lies`. Es zählt die Nummer davor: Gruppen vom Ende her abschneiden, bis
+ * der Rest eine Nummer ist. Ist keine zu lesen, bleibt der Kandidat, wie er ist.
+ */
+function ohneAnhang(kandidat: string): string {
+  let rest = kandidat
+  while (!lies(rest)) {
+    const kuerzer = rest.replace(/[ \-.\/]+\d+$/, '')
+    if (kuerzer === rest) return kandidat
+    rest = kuerzer
+  }
+  return rest
+}
+
+/**
  * Mehrere Nummern hintereinander („0660 0000000 0660 0000000“, Prüfstoff für ein Feld mit zwei
  * Nummern) sind ein Kandidat mit zu vielen Ziffern: Er wird an jeder Gruppe getrennt, die mit der
- * Wahl-Null neu beginnt, und jede Nummer zählt für sich.
+ * Wahl-Null neu beginnt, und jede Nummer zählt für sich. Mit „+“ vorn bleibt er ganz: „+43 0664 …“
+ * schreibt die Wahl-Null hinter den Ländercode.
  */
 function nummernIn(kandidat: string): string[] {
   const ziffern = kandidat.replace(/\D/g, '')
-  if (ziffern.length - 1 <= MAX_NATIONAL || kandidat.startsWith('+')) return [kandidat]
-  return kandidat.split(/\s+(?=\(?0[1-9])/)
+  const teile = ziffern.length - 1 <= MAX_NATIONAL || /^\(?\+/.test(kandidat) ? [kandidat] : kandidat.split(/\s+(?=\(?0[1-9])/)
+  return teile.map(ohneAnhang)
 }
 
 type Fund = { datei: string; zeile: number; nummer: string; kennung: string }
@@ -160,7 +188,7 @@ const AUSNAHMEN: Ausnahme[] = [
     kennungen: [MOBIL_A, MOBIL_B, 'ckomggmnhdpd', 'eempbnjacgce', 'bmciclalhjfo', 'gadogmbdknkj', 'ghfpfpmdlgep', 'hipcmjkcmhbi'],
     grund: 'Prüfstoff der Sentry-Hygiene (Altlast): Escapes, Trenner und Kennungen in vielen Schreibweisen; genullte Folgen träfen andere Regeln (Hex-Kennung mit 0 und acht Ziffern)',
   },
-  { datei: 'tests/sentry-hygiene-vergleich.test.ts', kennungen: [MOBIL_B, 'ahncadihelkk', 'enoeeijaiegg', 'ggplcgbakmlj'], grund: 'Prüfstoff der Sentry-Hygiene (Altlast): eingefrorene Muster des Vergleichs „neu fängt mindestens, was main fängt“ — sie dürfen sich nicht ändern' },
+  { datei: 'tests/sentry-hygiene-vergleich.test.ts', kennungen: [MOBIL_B, 'ahncadihelkk', 'enoeeijaiegg'], grund: 'Prüfstoff der Sentry-Hygiene (Altlast): eingefrorene Muster des Vergleichs „neu fängt mindestens, was main fängt“ — sie dürfen sich nicht ändern' },
   { datei: 'tests/sentry-hygiene-wachstum.test.ts', kennungen: [MOBIL_A, MOBIL_B, 'ceakalodfnpf', 'cefpogmnfemo', 'ghfpfpmdlgep'], grund: 'Prüfstoff der Sentry-Hygiene (Altlast): Wachstumstest der Telefon-Regel, Nummern an vielen Stellen hintereinander' },
   { datei: 'tests/beobachtbarkeit.test.ts', kennungen: [MOBIL_A], grund: 'Prüfstoff der Sentry-Hygiene (Altlast): Rückrufnummern in Nachrichten, Anfragen und Getter-Fehlern müssen fallen' },
   // Historie und Mockups: werden nicht mehr geändert
@@ -246,6 +274,36 @@ describe('Telefonnummern-Wache — Gegenprobe: die Suche schlägt an', () => {
     }
   })
 
+  it('findet sie auch mit Klammern um Ländercode oder Vorwahl und mit Punkten als Trenner', () => {
+    for (const genullt of [
+      'Tel. +43 (664) 000-0000',
+      'Tel. +49 (8571) 000000',
+      '(+43) 1 000 0000',
+      '(0043) 1 000 0000',
+      '(+49) 30 0000000',
+      '(+43)664 000 0000',
+      '+43.664.0000000',
+      '+43 664.000.0000',
+      '0664.000.0000',
+      '(664) 000 0000',
+      '664.000.0000',
+    ]) {
+      expect(nummern(genullt), genullt).toEqual([])
+      const text = eingeschmuggelt(genullt)
+      expect(nummern(text), text).toHaveLength(1)
+    }
+  })
+
+  it('zählt die Nummer vor einer angehängten Zifferngruppe — mit ihr hätte der Kandidat zu viele Ziffern', () => {
+    for (const genullt of ['+43 664 000 0000', '(+43) 664 000 0000', '0664 0000000', '+49 8571 000000']) {
+      for (const anhang of ['2026', '4711', '1234 5678']) {
+        expect(nummern(`${genullt} ${anhang}`), genullt).toEqual([])
+        const text = `${eingeschmuggelt(genullt)} ${anhang}`
+        expect(nummern(text), text).toHaveLength(1)
+      }
+    }
+  })
+
   it('dieselbe Ziffernfolge ist keine Nummer, wo Buchstaben, „#“, „_“ oder ein Dezimalzeichen sie umgeben', () => {
     const folge = eingeschmuggelt('06640000000')
     const ohneNull = eingeschmuggelt('6640000000')
@@ -264,6 +322,9 @@ describe('Telefonnummern-Wache — Gegenprobe: die Suche schlägt an', () => {
       'Stand 2026-10-05 (Nr. 07)',
       'Nr. 07 (246071b)',
       '10:30+43',
+      'Vorwahl +43 (664) oder (676)',
+      'Version 1.664.000.1234 (Build)',
+      'Werte (664, 000, 1234)',
     ]) {
       expect(nummern(text), text).toEqual([])
     }
@@ -282,8 +343,22 @@ describe('Telefonnummern-Wache — Gegenprobe: die Suche schlägt an', () => {
   })
 
   it('eine Nummer hat in jeder Schreibweise dieselbe Kennung, und keine Kennung enthält eine Ziffer', () => {
-    const schreibweisen = ['+43 664 000 0000', '0664 0000000', '0043 664 0000000', '+43 (0) 664 0000000', '664 0000000', '436640000000']
-    const kennungen = new Set(schreibweisen.flatMap((genullt) => findeNummern(eingeschmuggelt(genullt)).map((f) => f.kennung)))
+    const schreibweisen = [
+      '+43 664 000 0000',
+      '0664 0000000',
+      '0043 664 0000000',
+      '+43 (0) 664 0000000',
+      '664 0000000',
+      '436640000000',
+      '+43 (664) 000-0000',
+      '(+43) 664 000 0000',
+      '(664) 000 0000',
+      '+43.664.0000000',
+    ]
+    const texte = [...schreibweisen.map(eingeschmuggelt), `${eingeschmuggelt('+43 664 000 0000')} 2026`]
+    const funde = texte.map((text) => findeNummern(text))
+    expect(funde.map((f) => f.length)).toEqual(texte.map(() => 1))
+    const kennungen = new Set(funde.flat().map((f) => f.kennung))
     expect(kennungen.size).toBe(1)
     expect([...kennungen][0]).toMatch(/^[a-p]{12}$/)
   })
