@@ -5,9 +5,13 @@
  *  - titelbildDarstellung (N13): Ein Foto, das weniger als 1,5-mal so breit wie
  *    hoch ist, steht ganz — Quadrat, Hochformat und 4:3. Ab 3:2 (und breiter)
  *    füllt es die Fläche mit Fokuspunkt, so wie vor N6. Unbekannte Maße (vor dem
- *    Laden) bleiben beim Beschnitt. Gerechnet wird mit der Größe, die next/image
- *    liefert: sharp rundet die Höhe, ein Foto in genau 3:2 kommt als 640 × 427
- *    (1,4988) an und darf deshalb nicht ganz stehen.
+ *    Laden) bleiben beim Beschnitt. Gerechnet wird mit den Maßen, die der Browser
+ *    für die gelieferte Größe meldet, und die sind zweimal verändert: sharp rundet
+ *    die Höhe (ein Foto in genau 3:2 kommt als 640 × 427, 1,4988, an), und bei
+ *    einer srcset teilt der Browser durch die Bilddichte und rundet ab (einem
+ *    glatten 3:2 fehlt an einzelnen Fensterbreiten ein Pixel Breite: 776 × 518
+ *    statt 777 × 518). Ein 3:2-Foto bleibt an jeder Breite und Dichte beim
+ *    Beschnitt, auch 1499 × 1000; die Fehlbreiten sind in Chrome gemessen.
  *  - leseBildmasse: Die Maße kommen aus dem geladenen Bild; meldet der Browser
  *    keine (0), gelten sie als unbekannt.
  *  - titelbildHinweis: Der Satz für Mein Hof erscheint genau dann, wenn die
@@ -26,8 +30,9 @@
  *  - Nur die füllende Lage liest die Maße (onLoad) und lädt vorrangig; sonst
  *    käme der Wechsel nie oder die Datei zweimal. Kopie und ganze Lage sind für
  *    Screenreader verborgen, der Alt-Text bleibt leer.
- *  - Der Weg onLoad → Maße → Lagen läuft im Titelbild selbst (Prüfstand für den
- *    einen Hook, ohne DOM): Quadrat schaltet um, 3:2 in der gelieferten Größe nicht.
+ *  - Der Weg onLoad → Maße → Lagen läuft im Titelbild selbst (Prüfstand für
+ *    useState mit einer Zelle je Aufrufstelle, ohne DOM): Quadrat schaltet um,
+ *    3:2 in der gelieferten Größe nicht.
  *  - Der Satz steht nur in lib/titelbild.ts, das Titelbild nur in titelbild.tsx.
  */
 import { beforeEach, describe, it, expect, vi } from 'vitest'
@@ -38,22 +43,46 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 type Ladeereignis = { currentTarget: { naturalWidth: number; naturalHeight: number } }
 
-// Der Prüfstand für das, was nur der Browser auslöst (TESTING_GUIDELINES §1):
-// `zustand` ist die eine Zelle von useState (useBildmasse im Titelbild),
-// `beimLaden` der onLoad, den das Titelbild dem Bild gegeben hat.
-const buehne = vi.hoisted(() => ({
-  zustand: undefined as unknown,
-  beimLaden: null as null | ((ereignis: Ladeereignis) => void),
-}))
+// Der Prüfstand für das, was nur der Browser auslöst (TESTING_GUIDELINES §1,
+// „Einen Hook samt Effekten prüfen“, Vorbild tests/use-cart.test.ts): useState
+// hat eine Zelle je Aufrufstelle, gezählt in der Reihenfolge des Renderns, und
+// setzt mit einem Wert oder einem Updater. `beimLaden` ist der onLoad, den das
+// Titelbild dem Bild gegeben hat.
+const buehne = vi.hoisted(() => {
+  type Setzer<T> = (wert: T | ((vorher: T) => T)) => void
+  let zellen: unknown[] = []
+  let zeiger = 0
+  return {
+    beimLaden: null as null | ((ereignis: Ladeereignis) => void),
+    /** Alle Zellen leer, wie ein frisch eingehängtes Titelbild. */
+    leere(): void {
+      zellen = []
+      zeiger = 0
+    },
+    /** Vor jedem Rendern: Die Aufrufstellen zählen wieder von vorn, die Zellen behalten ihren Wert. */
+    beginneRender(): void {
+      zeiger = 0
+    },
+    useState<T>(anfang: T | (() => T)): [T, Setzer<T>] {
+      const i = zeiger++
+      if (!(i in zellen)) {
+        const neu: { wert: T; setze: Setzer<T> } = {
+          wert: typeof anfang === 'function' ? (anfang as () => T)() : anfang,
+          setze: (wert) => {
+            neu.wert = typeof wert === 'function' ? (wert as (vorher: T) => T)(neu.wert) : wert
+          },
+        }
+        zellen[i] = neu
+      }
+      const zelle = zellen[i] as { wert: T; setze: Setzer<T> }
+      return [zelle.wert, zelle.setze]
+    },
+  }
+})
 
 vi.mock('react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react')>()),
-  useState: <T,>(anfang: T): [T, (neu: T) => void] => [
-    buehne.zustand === undefined ? anfang : (buehne.zustand as T),
-    (neu) => {
-      buehne.zustand = neu
-    },
-  ],
+  useState: buehne.useState,
 }))
 
 // Next gibt es im Test nicht: Das Bild wird zu einem schlichten <img>, das
@@ -96,7 +125,7 @@ const bilder = (html: string) => html.match(/<img\b[^>]*>/g) ?? []
 const tag = (html: string, merkmal: RegExp) => new RegExp(`<[a-z]+\\b[^>]*${merkmal.source}[^>]*>`).exec(html)?.[0] ?? ''
 const klassen = (oeffnenderTag: string) => (/class="([^"]*)"/.exec(oeffnenderTag)?.[1] ?? '').split(/\s+/).filter(Boolean)
 /** Das div, das mit `oeffnenderTag` beginnt, samt Inhalt bis zu seinem schließenden Tag. */
-function divMitInhalt(html: string, oeffnenderTag: string): string {
+function findeDivMitInhalt(html: string, oeffnenderTag: string): string {
   const anfang = html.indexOf(oeffnenderTag)
   const tags = /<div\b|<\/div>/g
   tags.lastIndex = anfang
@@ -113,13 +142,13 @@ function divMitInhalt(html: string, oeffnenderTag: string): string {
 const kopie = (html: string) => /<div\b[^>]*aria-hidden="true"[^>]*>/.exec(html)?.[0] ?? ''
 /** Der Kasten, in dem das scharfe Foto steht. */
 const kasten = (html: string) => tag(html, /max-w-\[\d+px\]/)
-const bildMit = (html: string, passt: (k: string[]) => boolean) => bilder(html).find((b) => passt(klassen(b))) ?? ''
+const findeBildMit = (html: string, passt: (k: string[]) => boolean) => bilder(html).find((b) => passt(klassen(b))) ?? ''
 const weich = (k: string[]) => k.some((c) => c.startsWith('blur-'))
-const kopieBild = (html: string) => bildMit(html, weich)
+const kopieBild = (html: string) => findeBildMit(html, weich)
 /** Das scharfe Foto, das die Fläche füllt (object-cover) — am Handy das einzige. */
-const fuellend = (html: string) => bildMit(html, (k) => k.includes('object-cover') && !weich(k))
+const fuellend = (html: string) => findeBildMit(html, (k) => k.includes('object-cover') && !weich(k))
 /** Das scharfe Foto, das ganz steht (object-contain) — erst ab 768 px. */
-const ganzBild = (html: string) => bildMit(html, (k) => k.includes('object-contain'))
+const ganzBild = (html: string) => findeBildMit(html, (k) => k.includes('object-contain'))
 
 describe('titelbildDarstellung (Register N13)', () => {
   it.each([
@@ -133,21 +162,42 @@ describe('titelbildDarstellung (Register N13)', () => {
     expect(titelbildDarstellung(masse)).toBe(erwartet)
   })
 
-  it('kippt genau bei 1,5: knapp darunter ganz, ab 3:2 beschnitten', () => {
-    expect(titelbildDarstellung({ breite: 1499, hoehe: 1000 })).toBe('ganz')
+  // Der Spielraum der Rundung ist ein Pixel in der Breite: Ein Pixel unter 3:2 gilt noch als 3:2, zwei darunter nicht mehr.
+  it('kippt bei 1,5 abzüglich der Rundung: 1498 × 1000 steht ganz, ab 1499 × 1000 füllt es die Fläche', () => {
+    expect(titelbildDarstellung({ breite: 1498, hoehe: 1000 })).toBe('ganz')
+    expect(titelbildDarstellung({ breite: 1499, hoehe: 1000 })).toBe('beschnitt')
     expect(titelbildDarstellung({ breite: 1500, hoehe: 1000 })).toBe('beschnitt')
     expect(titelbildDarstellung({ breite: 1501, hoehe: 1000 })).toBe('beschnitt')
   })
 
-  // Gemessen wird die Größe, die next/image liefert, nicht das Original: sharp rundet die Höhe auf ganze Pixel.
+  // Gemessen wird, was der Browser für die gelieferte Größe meldet, nicht das Original: sharp rundet die Höhe auf ganze Pixel.
   it.each([
     ['3:2 in 640 px Breite (1800 × 1200 verkleinert, 1,4988) bleibt beim Beschnitt', { breite: 640, hoehe: 427 }, 'beschnitt'],
     ['3:2 in 256 px Breite (1,4971) bleibt beim Beschnitt', { breite: 256, hoehe: 171 }, 'beschnitt'],
     ['3:2 in Originalgröße (1800 × 1200) bleibt beim Beschnitt', { breite: 1800, hoehe: 1200 }, 'beschnitt'],
-    ['knapp unter 3:2 in Originalgröße (1499 × 1000) steht ganz', { breite: 1499, hoehe: 1000 }, 'ganz'],
+    [
+      'einen Pixel unter 3:2 in Originalgröße (1499 × 1000) bleibt beim Beschnitt — bis 1 080 px Breite verkleinert es sich wie 3:2',
+      { breite: 1499, hoehe: 1000 },
+      'beschnitt',
+    ],
     ['4:3 in 640 px Breite steht ganz — die Rundung verschluckt es nicht', { breite: 640, hoehe: 480 }, 'ganz'],
+    ['Quadrat (1000 × 1000) steht ganz', { breite: 1000, hoehe: 1000 }, 'ganz'],
+    ['4:3 in 1 080 px Breite steht ganz', { breite: 1080, hoehe: 810 }, 'ganz'],
   ] as const)('rechnet mit der gelieferten Größe: %s', (_name, masse, erwartet) => {
     expect(titelbildDarstellung(masse)).toBe(erwartet)
+  })
+
+  // In Chrome gemessen (Nr. 89, Runde 2): Zum Foto 1800 × 1200, genau 3:2, wählt der Browser einen Eintrag der srcset (828 bis 3 840 px),
+  // teilt die gelieferte Größe durch die Dichte (Eintrag ÷ Platz) und rundet ab. Ein glattes Ergebnis fällt dabei an einzelnen
+  // Fensterbreiten um einen Pixel zu klein aus, nur in der Breite: 777 × 518 wird 776 × 518. Mit ½ px Spielraum stand das ganz.
+  it.each([
+    ['Fenster 777 px, Dichte 1: 776 × 518 statt 777 × 518', { breite: 776, hoehe: 518 }],
+    ['Fenster 894 px, Dichte 1: 893 × 596 statt 894 × 596', { breite: 893, hoehe: 596 }],
+    ['Fenster 1 648 px, Dichte 1: 1544 × 1030 statt 1545 × 1030', { breite: 1544, hoehe: 1030 }],
+    ['Fenster 880 px, Dichte 1,25: 824 × 550 statt 825 × 550', { breite: 824, hoehe: 550 }],
+    ['Fenster 1 888 px, Dichte 2: 884 × 590 statt 885 × 590', { breite: 884, hoehe: 590 }],
+  ] as const)('ein 3:2-Foto bleibt beim Beschnitt, wenn die Dichteteilung ihm einen Pixel Breite nimmt: %s', (_name, masse) => {
+    expect(titelbildDarstellung(masse)).toBe('beschnitt')
   })
 
   it('beschneidet, solange die Maße unbekannt sind (vor dem Laden)', () => {
@@ -222,7 +272,7 @@ describe('TitelbildBilder', () => {
     // Die Kopie ist der Behälter mit aria-hidden, ihr Bild liegt darin — und nichts vom scharfen Foto.
     expect(kopie(html)).not.toBe('')
     expect(html.indexOf(kopie(html))).toBeLessThan(html.indexOf(kopieBild(html)))
-    const behaelter = divMitInhalt(html, kopie(html))
+    const behaelter = findeDivMitInhalt(html, kopie(html))
     expect(behaelter).toContain(kopieBild(html))
     expect(behaelter).not.toContain(fuellend(html))
     expect(behaelter).not.toContain(ganzBild(html))
@@ -300,14 +350,16 @@ describe('TitelbildBilder', () => {
 
 describe('Titelbild', () => {
   beforeEach(() => {
-    buehne.zustand = undefined
+    buehne.leere()
     buehne.beimLaden = null
   })
 
-  const zeige = (foto: string | null) =>
-    renderToStaticMarkup(
+  const zeige = (foto: string | null) => {
+    buehne.beginneRender()
+    return renderToStaticMarkup(
       createElement(Titelbild, { foto, verlauf: 'linear-gradient(1deg, red, blue)', fokusY: 50 }, createElement('button', null, 'Teilen'))
     )
+  }
   const rahmen = (html: string) => tag(html, /data-abschnitt="titelbild"/)
   /** Der Browser meldet die Maße des geladenen Bilds an onLoad; danach rendert React neu. */
   const lade = (breite: number, hoehe: number) => {

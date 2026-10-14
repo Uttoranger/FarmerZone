@@ -52,25 +52,32 @@ export const TITELBILD_BREITE_MAX = 1920
 export const TITELBILD_SIZES = `(min-width: ${TITELBILD_BREITE_MAX}px) ${TITELBILD_BREITE_MAX}px, 100vw`
 
 /**
- * Die Höhe der gelieferten Größe ist auf ganze Pixel gerundet, also um höchstens
- * einen halben Pixel falsch (sharp rundet zum nächsten ganzen Pixel).
+ * Um so viele Pixel zählt die Höhe der gemeldeten Maße kleiner (siehe
+ * titelbildDarstellung). `naturalWidth` und `naturalHeight` sind zweimal
+ * verändert: sharp rundet die Höhe auf ganze Pixel (um höchstens ½ px), und bei
+ * einer `srcset` mit Breitenangaben teilt der Browser durch die Bilddichte und
+ * rundet ab — fällt ein glattes Ergebnis knapp unter die ganze Zahl, fehlt der
+ * Breite ein Pixel (776 × 518 statt 777 × 518). Ein Pixel Breite sind ⅔ Pixel
+ * Höhe (1 ÷ 1,5): Mit ½ px stand ein exaktes 3:2-Foto an bis zu 33 von 1 921
+ * Fensterbreiten ganz, mit ¾ px an keiner (Chrome, Dichte 1 bis 3; DEVELOPMENT.md,
+ * Eintrag Nr. 89). 3:2, das Format vieler Kameras, muss an jeder Breite und Dichte
+ * beschnitt bleiben (Register N13).
+ *
+ * Der Preis: 1499 × 1000 füllt in Originalgröße jetzt ebenfalls. Das ist hinnehmbar:
+ * bis 1 080 px Breite liefert next/image dafür dieselben Maße wie für 3:2.
  */
-const RUNDUNG_PX = 0.5
+const RUNDUNG_PX = 0.75
 
 /**
  * Alles, was weniger als 1,5-mal so breit wie hoch ist, steht ganz — unbekannte
  * Maße und Querformat ab 3:2 bleiben beim Beschnitt.
  *
  * Die Maße sind die der Größe, die next/image liefert (`naturalWidth` des
- * geladenen Bilds), nicht die des Originals — und sharp rundet dabei die Höhe:
- * Ein Foto in genau 3:2 (1800 × 1200) kommt als 640 × 427 (1,4988) an. Rechnete
- * man das Verhältnis blank nach, stünde dasselbe Foto in Mein Hof (640 px) ganz
- * und auf der Hofseite (1 920 px) füllend. Darum zählt die Höhe um den möglichen
- * Rundungsfehler kleiner: Was durch die Rundung knapp unter 1,5 liegen könnte,
- * ist 3:2 und füllt. Die Toleranz ist klein: 1499 × 1000 steht weiter ganz.
- * Bei einer `srcset` mit Breitenangaben teilt der Browser die Maße zudem durch die
- * Bilddichte und rundet nach unten; dagegen reicht der halbe Pixel nicht in jedem
- * Fall (DEVELOPMENT.md, Eintrag Nr. 89, „Rest“).
+ * geladenen Bilds), nicht die des Originals: Ein Foto in genau 3:2 (1800 × 1200)
+ * kommt als 640 × 427 (1,4988) an. Rechnete man das Verhältnis blank nach, stünde
+ * dasselbe Foto in Mein Hof (640 px) ganz und auf der Hofseite (1 920 px)
+ * füllend. Darum zählt die Höhe um RUNDUNG_PX kleiner: Was durch Rundung und
+ * Dichteteilung knapp unter 1,5 liegen könnte, ist 3:2 und füllt.
  */
 export function titelbildDarstellung(masse: TitelbildMasse | null): TitelbildDarstellung {
   return masse !== null && masse.breite < TITELBILD_GANZ_UNTER * (masse.hoehe - RUNDUNG_PX) ? 'ganz' : 'beschnitt'
