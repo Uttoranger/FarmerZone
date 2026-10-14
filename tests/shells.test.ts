@@ -12,7 +12,7 @@
  *    „Mein Konto" — ohne „Meine Höfe" und „Merken" (E8); Hell/Dunkel am Handy
  *    am Seitenfuß (Nr. 41, Register N1); Handy-Leiste mit drei Plätzen; die
  *    Fokus-Variante hat keine Unterleiste.
- *  - AdminShell: Reiter Höfe · Briefkasten · Finanzen mit Zählern; der Weg
+ *  - AdminShell: Reiter Höfe · Postfach · Finanzen mit Zählern; der Weg
  *    zurück zum Hof und die Konto-Plakette als Link nur mit eigenem Hof
  *    (Nr. 41); keine Hof-Seitenleiste.
  *  - Kein Big Bang: Außer der Vorschau unter /intern binden nur die Routen
@@ -285,12 +285,15 @@ describe('AdminShell', () => {
     return renderToStaticMarkup(el(AdminShell, { personName: 'Max Mustermann', hatHof, zahlen: { hoefe: 2, briefkasten: 3 } }))
   }
 
-  it('Reiter Höfe · Briefkasten · Finanzen mit Zählern, „Zu meinem Hof", keine Hof-Seitenleiste', () => {
+  it('Reiter Höfe · Postfach · Finanzen mit Zählern, „Zu meinem Hof", keine Hof-Seitenleiste', () => {
     const html = admin(true)
     const reiter = abschnitt(html, '<nav aria-label="Admin-Bereiche"', '</nav>')
     expect([...reiter.matchAll(/<a href="([^"]+)"/g)].map((t) => t[1])).toEqual(ADMIN_REITER.map((r) => r.href))
     expect(reiter).toContain('2 Höfe warten auf Freischaltung')
     expect(reiter).toContain('3 Meldungen zu entscheiden')
+    // Wortliste (N12): Der Reiter heißt „Postfach“ — auch in der Zeile unter dem Kopf am Handy, die dieselben Reiter zeigt.
+    expect(reiter).toContain('Postfach')
+    expect(reiter).not.toContain('Briefkasten')
     expect(reiter).toContain('<a href="/admin/meldungen" aria-current="true"')
     expect(html).toContain('Zu meinem Hof')
     expect(html).toContain(`href="${ADMIN_ZURUECK.href}"`)

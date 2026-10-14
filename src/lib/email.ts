@@ -457,7 +457,7 @@ export async function sendBriefkastenZusammenfassung(z: {
   )
   await send(
     SUPPORT_EMAIL,
-    `Briefkasten: ${z.neu} neu, ${z.liegenGeblieben} liegen länger als 14 Tage`,
+    `Postfach: ${z.neu} neu, ${z.liegenGeblieben} liegen länger als 14 Tage`,
     html
   )
 }

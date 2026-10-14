@@ -1,6 +1,6 @@
 /**
  * Die Reiter der AdminShell (components/shells/admin-shell.tsx): Höfe ·
- * Briefkasten · Finanzen, dazu der Weg zurück zum eigenen Hof und das Ziel der
+ * Postfach · Finanzen, dazu der Weg zurück zum eigenen Hof und das Ziel der
  * Konto-Plakette. Keine Hof-Seitenleiste im Admin (docs/ai/DESIGN_SYSTEM.md,
  * „Shells und Navigation"). Rein, getestet in tests/admin-navigation.test.ts.
  *
@@ -22,7 +22,7 @@ export type AdminReiter = {
 
 export const ADMIN_REITER: readonly AdminReiter[] = [
   { id: 'hoefe', label: 'Höfe', href: '/admin', zahl: 'hoefe' },
-  { id: 'briefkasten', label: 'Briefkasten', href: '/admin/meldungen', zahl: 'briefkasten' },
+  { id: 'briefkasten', label: 'Postfach', href: '/admin/meldungen', zahl: 'briefkasten' },
   { id: 'finanzen', label: 'Finanzen', href: '/admin/finanzen' },
 ]
 

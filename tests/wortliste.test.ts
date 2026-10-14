@@ -7,18 +7,18 @@
  *
  * Beweist:
  *  - Die Tabelle wird gelesen: Kopf „Sache | Wort | nicht | Beispiel", vier Spalten
- *    je Zeile, und die verbotenen Wörter aus N8 stehen in der Spalte „nicht".
+ *    je Zeile, und die verbotenen Wörter aus N8 und N12 stehen in der Spalte „nicht".
  *  - Kein Wort aus „nicht" steht in einer Zeichenkette, einem Vorlagentext, einem
  *    Attribut oder einem JSX-Text unter src/ — mit Wortgrenzen und in der
  *    Schreibweise der Tabelle. Kommentare, Bezeichner und Server-Logs (console.*)
  *    zählen nicht.
  *  - Steht ein Wort in anderem Sinn richtig da (der Status einer Bestellung), steht
  *    der Text mit Grund in AUSNAHMEN — je Text, nicht je Datei, ohne Zeilennummer.
- *  - OFFEN_BIS_86 ist die Arbeitsliste für Nr. 86: die Fundstellen der neuen „nicht"-Wörter
- *    aus N12 (Briefkasten, Mitteilung, Newsletter), die 86 umstellt und streicht. Sie greift
- *    über Datei, Wort und Text, nicht über die Zeile — im Sammel-PR verschieben andere
- *    Nummern die Zeilen. Jeder Eintrag deckt genau eine Fundstelle; ein Eintrag, hinter dem
- *    kein Text mehr steht, fällt auf. Ist die Liste leer, schaltet 86 den letzten Test ein.
+ *  - OFFEN_BIS_86 war die Arbeitsliste für Nr. 86 (die Fundstellen der neuen „nicht"-Wörter
+ *    aus N12: Briefkasten, Mitteilung, Newsletter) und ist leer: Jede Fundstelle ist
+ *    umgestellt oder steht als Ausnahme mit Grund da. Ein Eintrag griffe über Datei, Wort und
+ *    Text, nicht über die Zeile — im Sammel-PR verschieben andere Nummern die Zeilen. Er deckt
+ *    genau eine Fundstelle; ein Eintrag, hinter dem kein Text mehr steht, fällt auf.
  *  - Gegenprobe: Die Suche schlägt am Wort im String an, nicht im Kommentar.
  */
 import { describe, it, expect, beforeAll } from 'vitest'
@@ -162,6 +162,32 @@ const AUSNAHMEN: Ausnahme[] = [
     text: /^Mail nicht verschickt: .*Post-Sperre/,
     grund: 'Meldung an Sentry für die Entwicklerin; „Post-Sperre“ ist die Sperre des Mailversands (Register Z3), kein Beitrag',
   },
+  // Briefkasten (Register N12)
+  {
+    datei: 'src/lib/briefkasten-export.ts',
+    wort: 'Briefkasten',
+    text: '# Briefkasten —',
+    grund: 'Kopfzeile des Exports für den Kurator: scripts/briefkasten.ts (istExport) erkennt den Export an „# Briefkasten“ — der Kopf wechselt nur zusammen mit der CLI (Bericht 86)',
+  },
+  // Mitteilung (Register N12)
+  { datei: 'src/app/(hof)/status/new/status-new-client.tsx', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach' },
+  { datei: 'src/app/api/status-image/[id]/route.tsx', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach' },
+  { datei: 'src/components/hofseite/hofseite-kunde.tsx', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach' },
+  { datei: 'src/emails/status-update.tsx', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach' },
+  { datei: 'src/lib/teilen-bild.ts', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach' },
+  // Newsletter (Register N12)
+  {
+    datei: 'src/app/(public)/datenschutz/page.tsx',
+    wort: 'Newsletter',
+    text: '9. Newsletter und Neuigkeiten von Höfen',
+    grund: 'Anmeldung bei einem Hof (Neuigkeiten), Entscheidung offen (Freigabe Lauf 13: keine Änderung)',
+  },
+  {
+    datei: 'src/emails/newsletter.tsx',
+    wort: 'Newsletter',
+    text: 'Du erhältst diese Nachricht, weil du den Newsletter von',
+    grund: 'Anmeldung bei einem Hof (Neuigkeiten), Entscheidung offen (Freigabe Lauf 13: keine Änderung)',
+  },
   // Lager
   {
     datei: 'src/lib/taxonomie.ts',
@@ -179,38 +205,16 @@ const AUSNAHMEN: Ausnahme[] = [
 ]
 
 /**
- * Die Arbeitsliste von Nr. 86 (Stand main 5e75103): Sie hält die 23 Fundstellen der neuen „nicht"-Wörter
- * aus N12, bis 86 jeden Text auf das Wort der Tabelle umgestellt hat — dann ist sie leer und der
- * letzte Test schaltet ein (Muster 77/78). `stelle` ist Datei:Zeile von heute (nur zum Finden;
- * geglichen wird über Datei, Wort und Text), `text` ein Ausschnitt, `nummer` die Nummer, die den
- * Text umstellt. Eine neue Arbeitsliste gibt es nur mit Freigabe (Muster 77/78: Liste und `it.skip`, bis sie leer ist).
+ * Die Arbeitsliste von Nr. 86: Sie hielt die 23 Fundstellen der neuen „nicht"-Wörter aus N12
+ * (Stand main 5e75103), bis 86 jeden Text auf das Wort der Tabelle umgestellt oder als Ausnahme
+ * mit Grund eingetragen hat — jetzt ist sie leer und bleibt es (letzter Test). Wer künftig
+ * mehrere Texte nummernweise umstellt, trägt sie hier ein: `stelle` ist Datei:Zeile von heute
+ * (nur zum Finden; geglichen wird über Datei, Wort und Text), `text` ein Ausschnitt, `nummer`
+ * die Nummer, die den Text umstellt. Eine neue Arbeitsliste
+ * gibt es nur mit Freigabe (Muster 77/78: Liste und `it.skip`, bis sie leer ist).
  */
 type Offen = { stelle: string; wort: string; text: string; nummer?: string }
-const OFFEN_BIS_86: Offen[] = [
-  { stelle: 'src/app/(hof)/status/new/status-new-client.tsx:32', wort: 'Mitteilung', text: 'Mitteilung', nummer: '86' },
-  { stelle: 'src/app/(public)/datenschutz/page.tsx:153', wort: 'Newsletter', text: '9. Newsletter und Neuigkeiten von Höfen', nummer: '86' },
-  { stelle: 'src/app/admin/meldungen/[id]/page.tsx:91', wort: 'Briefkasten', text: 'Briefkasten', nummer: '86' },
-  { stelle: 'src/app/admin/meldungen/page.tsx:33', wort: 'Briefkasten', text: 'Briefkasten — Admin', nummer: '86' },
-  { stelle: 'src/app/admin/meldungen/page.tsx:73', wort: 'Briefkasten', text: 'Briefkasten', nummer: '86' },
-  { stelle: 'src/app/admin/meldungen/page.tsx:73', wort: 'Briefkasten', text: 'Wir konnten den Briefkasten gerade nicht laden.', nummer: '86' },
-  { stelle: 'src/app/admin/meldungen/page.tsx:103', wort: 'Briefkasten', text: 'Briefkasten', nummer: '86' },
-  { stelle: 'src/app/api/status-image/[id]/route.tsx:13', wort: 'Mitteilung', text: 'Mitteilung', nummer: '86' },
-  { stelle: 'src/app/api/status-image/[id]/route.tsx:31', wort: 'Mitteilung', text: 'Mitteilung', nummer: '86' },
-  { stelle: 'src/components/admin/hoefe-ansicht.tsx:282', wort: 'Briefkasten', text: 'Neu im Briefkasten', nummer: '86' },
-  { stelle: 'src/components/hofseite/hofseite-kunde.tsx:103', wort: 'Mitteilung', text: 'Mitteilung', nummer: '86' },
-  { stelle: 'src/emails/briefkasten-zusammenfassung.tsx:17', wort: 'Briefkasten', text: 'Briefkasten:', nummer: '86' },
-  { stelle: 'src/emails/briefkasten-zusammenfassung.tsx:18', wort: 'Briefkasten', text: 'Briefkasten — Wochenstand', nummer: '86' },
-  { stelle: 'src/emails/briefkasten-zusammenfassung.tsx:43', wort: 'Briefkasten', text: 'Briefkasten öffnen →', nummer: '86' },
-  { stelle: 'src/emails/meldung-notification.tsx:53', wort: 'Briefkasten', text: 'Im Briefkasten ansehen →', nummer: '86' },
-  { stelle: 'src/emails/meldung-notification.tsx:56', wort: 'Briefkasten', text: 'Wünsche und Fragen kommen nicht per Mail — sie stehen gesammelt im Briefkasten und in der', nummer: '86' },
-  { stelle: 'src/emails/newsletter.tsx:52', wort: 'Newsletter', text: 'Du erhältst diese Nachricht, weil du den Newsletter von', nummer: '86' },
-  { stelle: 'src/emails/status-update.tsx:9', wort: 'Mitteilung', text: 'Mitteilung', nummer: '86' },
-  { stelle: 'src/emails/status-update.tsx:43', wort: 'Mitteilung', text: 'Mitteilung', nummer: '86' },
-  { stelle: 'src/lib/admin-navigation.ts:25', wort: 'Briefkasten', text: 'Briefkasten', nummer: '86' },
-  { stelle: 'src/lib/briefkasten-export.ts:161', wort: 'Briefkasten', text: '# Briefkasten —', nummer: '86' },
-  { stelle: 'src/lib/email.ts:459', wort: 'Briefkasten', text: 'Briefkasten:', nummer: '86' },
-  { stelle: 'src/lib/teilen-bild.ts:183', wort: 'Mitteilung', text: 'Mitteilung', nummer: '86' },
-]
+const OFFEN_BIS_86: Offen[] = []
 
 type Deckt = { datei: string; wort: string; text: string }
 const dateiVon = (stelle: string): string => stelle.slice(0, stelle.lastIndexOf(':'))
@@ -242,14 +246,16 @@ const posix = (pfad: string): string => pfad.split(sep).join('/')
 
 describe('Wortliste', () => {
   describe('Tabelle', () => {
-    it('hat in jeder Zeile Sache, Wort und Beispiel, und die verbotenen Wörter aus N8 stehen in „nicht"', () => {
+    it('hat in jeder Zeile Sache, Wort und Beispiel, und die verbotenen Wörter aus N8 und N12 stehen in „nicht"', () => {
       for (const z of TABELLE) {
         expect(z.sache, z.wort).not.toBe('')
         expect(z.wort, z.sache).not.toBe('')
         expect(z.beispiel, z.sache).not.toBe('')
       }
       const nicht = new Set(TABELLE.flatMap((z) => z.nicht))
-      for (const wort of ['Zeitfenster', 'Abholslot', 'Bestand', 'Lagerstand', 'Lager', 'Status', 'Post', 'Neuigkeit', 'Hilfe und Rückmeldung', 'Fehler melden', 'Käufer']) {
+      const n8 = ['Zeitfenster', 'Abholslot', 'Bestand', 'Lagerstand', 'Lager', 'Status', 'Post', 'Neuigkeit', 'Hilfe und Rückmeldung', 'Fehler melden', 'Käufer']
+      const n12 = ['Briefkasten', 'Posteingang', 'Mitteilung', 'Benachrichtigung', 'Newsletter', 'Chat', 'Thread', 'Konversation']
+      for (const wort of [...n8, ...n12]) {
         expect(nicht.has(wort), wort).toBe(true)
       }
     })
@@ -284,6 +290,19 @@ describe('Wortliste', () => {
         '7 Bestand',
         '16 Hilfe und Rückmeldung',
       ])
+    })
+
+    it('Gegenprobe (N12): schlägt an bei Briefkasten, Mitteilung und Newsletter — nicht bei Postfach, Betriebsmitteilung oder einem längeren Wort', () => {
+      const schnipsel = [
+        "const a = 'Neu im Briefkasten'",
+        'const b = <p>Newsletter von uns</p>',
+        'const c = <Feld label="Mitteilung" />',
+        // Das alles zählt nicht:
+        "const d = 'Postfach · 2, Betriebsmitteilung, Briefkastenschlüssel, Postfachnummer'",
+        '// Briefkasten im Kommentar',
+        'const BriefkastenLaden = 1',
+      ].join('\n')
+      expect(findeVerbotene(schnipsel, VERBOTE).map((f) => `${f.zeile} ${f.wort}`)).toEqual(['1 Briefkasten', '2 Newsletter', '3 Mitteilung'])
     })
 
     it('Gegenprobe: ein Wort neben einer erlaubten Wendung zählt trotzdem', () => {
@@ -356,9 +375,8 @@ describe('Wortliste', () => {
     })
   })
 
-  // Nr. 86 leert die Liste und schaltet den Test ein (Muster 77/78). Kein stillgelegter roter Test:
-  // Bis dahin ist die Liste die Arbeit von 86, und die Prüfung darüber läuft grün.
-  it.skip('OFFEN_BIS_86 ist leer — jede Fundstelle ist umgestellt', () => {
+  // Seit Nr. 86 gilt die Tabelle ohne Arbeitsliste: Ein Eintrag in OFFEN_BIS_86 macht diesen Test rot.
+  it('OFFEN_BIS_86 ist leer — jede Fundstelle ist umgestellt', () => {
     expect(OFFEN_BIS_86).toEqual([])
   })
 })

@@ -14,8 +14,8 @@ export interface BriefkastenZusammenfassungProps {
 /** Wochen-Zusammenfassung an den Betreiber — nur, wenn es etwas zu sagen gibt. */
 export function BriefkastenZusammenfassungEmail(p: BriefkastenZusammenfassungProps) {
   return (
-    <EmailLayout previewText={`Briefkasten: ${p.neu} neu, ${p.liegenGeblieben} liegen länger als 14 Tage`}>
-      <Text style={h1}>Briefkasten — Wochenstand</Text>
+    <EmailLayout previewText={`Postfach: ${p.neu} neu, ${p.liegenGeblieben} liegen länger als 14 Tage`}>
+      <Text style={h1}>Postfach — Wochenstand</Text>
       <Text style={bodyText}>
         {p.neu === 1 ? 'Eine neue Meldung' : `${p.neu} neue Meldungen`} seit der letzten Sichtung.{' '}
         {p.liegenGeblieben > 0 && (
@@ -40,7 +40,7 @@ export function BriefkastenZusammenfassungEmail(p: BriefkastenZusammenfassungPro
         </div>
       )}
 
-      <Link href={p.adminUrl} style={ctaButton}>Briefkasten öffnen →</Link>
+      <Link href={p.adminUrl} style={ctaButton}>Postfach öffnen →</Link>
 
       <Text style={mutedText}>
         Aufgeräumt: {p.geloescht === 0 ? 'nichts' : `${p.geloescht} erledigte ${p.geloescht === 1 ? 'Meldung' : 'Meldungen'}`}{' '}

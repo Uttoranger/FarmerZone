@@ -31,14 +31,14 @@ import { ADMIN_RAHMEN, AdminFehler, SEITEN_TITEL } from '@/components/admin/admi
 import { MeldungListe, Wunschliste, type BriefkastenZeile, type WunschBuendel } from '@/components/admin/briefkasten-teile'
 import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: `Briefkasten — Admin — ${MARKE}` }
+export const metadata: Metadata = { title: `Postfach — Admin — ${MARKE}` }
 export const dynamic = 'force-dynamic'
 
 /** Mehr zeigt die Liste nie auf einmal (getMeldungenFuerAdmin). */
 const LISTE_MAX = 200
 
 /*
- * /admin/meldungen — der Briefkasten in der AdminShell (Nachtlauf Nr. 22f,
+ * /admin/meldungen — das Postfach in der AdminShell (Nachtlauf Nr. 22f,
  * Mockup admin-briefkasten). Startansicht „Zu entscheiden": Neues und die
  * Wunsch-Vorschläge der KI. Daneben die gebündelte Wunschliste — Grundlage
  * einer Entscheidung, nie ihr Ersatz. Eingangskanal, kein Befehlskanal.
@@ -71,7 +71,7 @@ export default async function AdminMeldungenPage({
   if (!daten) {
     return (
       <div className={ADMIN_RAHMEN}>
-        <AdminFehler titel="Briefkasten" satz="Wir konnten den Briefkasten gerade nicht laden." nochmal="/admin/meldungen" />
+        <AdminFehler titel="Postfach" satz="Wir konnten das Postfach gerade nicht laden." nochmal="/admin/meldungen" />
       </div>
     )
   }
@@ -101,7 +101,7 @@ export default async function AdminMeldungenPage({
   return (
     <div className={cn(ADMIN_RAHMEN, 'flex flex-col gap-5')}>
       <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
-        <h1 className={SEITEN_TITEL}>Briefkasten</h1>
+        <h1 className={SEITEN_TITEL}>Postfach</h1>
         <p className={cn('text-[13px]', LEISE)}>Wochen-Zusammenfassung montags per E-Mail, wenn etwas wartet</p>
       </header>
 
