@@ -13,7 +13,8 @@
  *    vor; Zähler (SQL) und Liste (Regel in src/lib) sagen an denselben Zeilen
  *    dasselbe.
  *  - Antwort des Teams: höchstens eine Mail je Faden und Stunde; Antwort des
- *    Hofs: nie eine Mail.
+ *    Hofs: nie eine Mail an den Hof — seit Nr. 95 (N14) geht sie nach der
+ *    Regel „Antwort eines Hofs" an die Empfängerliste des Teams.
  *  - Filter „ohne Online-Zahlung" und „Futter ohne Nummer" treffen die
  *    richtigen Höfe; stillgelegte nie.
  *  - Mit dem Hof gehen seine Fäden (Cascade); die Migration läuft ein zweites
@@ -32,13 +33,16 @@ vi.mock('@/lib/nach-der-antwort', () => ({
     nachlauf.aufgaben.push(aufgabe)
   },
 }))
-vi.mock('@/lib/email', () => ({ sendPostfachMail: vi.fn(async () => ({ id: 'int-mail' })) }))
+vi.mock('@/lib/email', () => ({
+  sendPostfachMail: vi.fn(async () => ({ id: 'int-mail' })),
+  sendHofAntwortAnTeam: vi.fn(async () => ({ gesendet: 1, gescheitert: 0 })),
+}))
 
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
-import { sendPostfachMail } from '@/lib/email'
+import { sendHofAntwortAnTeam, sendPostfachMail } from '@/lib/email'
 import { empfaengerFuer, zaehleUngelesen, POSTFACH_FEHLER } from '@/lib/postfach'
 import { antworteAlsHof, antworteAlsTeam, markiereGelesen, markiereGelesenTeam, sendeRundschreiben } from '@/server/actions/postfach'
 import { ladeEmpfaengerHoefe, ladeFadenHof, ladeFaedenHof, zaehleUngelesenHof, zaehleUngelesenTeam } from '@/server/queries/postfach'
@@ -49,6 +53,7 @@ const MIGRATION = readFileSync(join(process.cwd(), 'prisma', 'migrations', '2026
 afterEach(async () => {
   vi.mocked(headers).mockResolvedValue(new Headers() as never)
   vi.mocked(sendPostfachMail).mockClear()
+  vi.mocked(sendHofAntwortAnTeam).mockClear()
   nachlauf.aufgaben.length = 0
   await prisma.rundschreiben.deleteMany({ where: { titel: { startsWith: 'int-' } } })
   await raeumeAuf()
@@ -79,6 +84,7 @@ async function sendeAn(cookie: string, hofIds: string[], abweichend: Record<stri
     art: 'WICHTIG',
     link: '/settings/pickup-slots',
     perMail: false,
+    antwortMoeglich: true,
     empfaenger: { art: 'ausgewaehlt', hofIds },
     ...abweichend,
   })
@@ -122,7 +128,7 @@ describe('Rundschreiben senden (Fan-out)', () => {
     expect(sendPostfachMail).not.toHaveBeenCalled()
 
     await alsSitzung(hofCookie)
-    const ergebnis = await sendeRundschreiben({ titel: 'int-Fremd', text: 'Erfunden.', art: 'INFO', link: '', perMail: false, empfaenger: { art: 'alle' } })
+    const ergebnis = await sendeRundschreiben({ titel: 'int-Fremd', text: 'Erfunden.', art: 'INFO', link: '', perMail: false, antwortMoeglich: false, empfaenger: { art: 'alle' } })
     expect(ergebnis).toEqual({ error: 'Kein Zugriff.' })
     expect(await prisma.rundschreiben.count({ where: { titel: 'int-Fremd' } })).toBe(0)
   })
@@ -216,7 +222,7 @@ describe('Lesestand je Seite', () => {
 })
 
 describe('E-Mail zur Antwort des Teams', () => {
-  it('höchstens eine je Faden und Stunde; eine Antwort des Hofs schickt nie eine', async () => {
+  it('höchstens eine je Faden und Stunde; eine Antwort des Hofs schickt nie eine an den Hof', async () => {
     const { cookie: adminCookie } = await erstelleAdmin()
     const { farm: hof, cookie: hofCookie } = await erstelleHofMitAnmeldung()
     const faden = (await sendeAn(adminCookie, [hof.id])).get(hof.id)!
@@ -234,6 +240,9 @@ describe('E-Mail zur Antwort des Teams', () => {
     await arbeiteNachlaufAb()
     expect(sendPostfachMail).toHaveBeenCalledTimes(1)
     expect(vi.mocked(sendPostfachMail).mock.calls[0][0]).toMatchObject({ art: 'antwort', unterhaltungId: faden, link: '/products' })
+    // Die Antwort des Hofs geht an die Empfängerliste des Teams (Zustellung, N14), nie an den Hof.
+    expect(sendHofAntwortAnTeam).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(sendHofAntwortAnTeam).mock.calls[0]![1]).toMatchObject({ unterhaltungId: faden, text: 'Erfundene Antwort des Hofs.' })
     expect(await prisma.nachricht.count({ where: { unterhaltungId: faden, vonFarmId: null, art: 'WICHTIG' } })).toBe(4)
   })
 })

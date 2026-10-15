@@ -777,6 +777,12 @@ model Order {
   cancelledAt  DateTime?
   cancelReason String?
 
+  // Erstattung offen (Register N14, Nr. 95): gesetzt, wenn die
+  // Stripe-Erstattung beim Storno scheitert oder Stripe sie später als
+  // gescheitert meldet; gelöscht, sobald erstattet ist. Daraus leitet das
+  // Admin-Postfach die Aufgabe „Erstattung offen" ab — kein eigener Datensatz.
+  erstattungOffenSeit DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -790,6 +796,8 @@ model Order {
   @@index([pickupDate])
   // Siehe ManualSale: Fremdschlüssel ohne Index (Supabase-Hinweis).
   @@index([customerId])
+  // Die Aufgaben im Admin-Postfach und der Zähler am Reiter lesen nur Zeilen mit gesetzter Spalte.
+  @@index([erstattungOffenSeit])
 }
 
 model OrderItem {
@@ -1112,6 +1120,9 @@ model RateLimitZaehler {
 //   empfaenger    so viele Unterhaltungen hat das Senden angelegt (Snapshot)
 //   erstelltVonUserId  wer gesendet hat; bewusst ohne Fremdschlüssel — ein
 //                 Rundschreiben hält nie das Löschen eines Kontos auf
+//   antwortMoeglich  „Antwort möglich" (Register N14, Nr. 95): false = der Hof
+//                 sieht statt des Antwortfelds einen Hinweis, antworteAlsHof
+//                 lehnt ab. Standard true — Bestand bleibt beantwortbar.
 model Rundschreiben {
   id                String           @id @default(cuid())
   titel             String
@@ -1119,6 +1130,7 @@ model Rundschreiben {
   linkUrl           String?
   art               RundschreibenArt
   perMail           Boolean          @default(false)
+  antwortMoeglich   Boolean          @default(true)
   empfaengerRegel   Json
   empfaenger        Int
   gesendetAm        DateTime
@@ -1202,4 +1214,24 @@ model PlattformEinstellung {
   zustellRegeln        Json?
   geaendertVonUserId   String?
   updatedAt            DateTime @updatedAt
+}
+
+// Weitere Empfänger der Betreiber-Mails (Admin › Postfach › Zustellung,
+// Register N14, Nr. 95). support@PRODUKTION_HOST ist fest und hat KEINE Zeile.
+// Eine Adresse bekommt erst Mails, wenn sie über den Link bestätigt ist
+// (Double-Opt-in wie S11): bis dahin bestaetigtAm null.
+//   email         klein geschrieben (emailSchema), eindeutig
+//   token         SHA-256 des Links aus der Bestätigungsmail (hex) — der
+//                 Link selbst steht nirgends; nach dem Einlösen null
+//   tokenBis      48 Stunden nach dem Anlegen bzw. erneuten Senden
+//   erstelltVonUserId  wer die Adresse eingetragen hat; bewusst ohne
+//                 Fremdschlüssel wie Rundschreiben.erstelltVonUserId
+model BetreiberEmpfaenger {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  bestaetigtAm      DateTime?
+  token             String?   @unique
+  tokenBis          DateTime?
+  erstelltVonUserId String
+  createdAt         DateTime  @default(now())
 }

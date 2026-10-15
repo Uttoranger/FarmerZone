@@ -720,15 +720,27 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
       }
     }
 
+    // Die Aufgabe „Erstattung offen" im Admin-Postfach (Register N14):
+    // bedingt gesetzt, die erste Zeit bleibt. Ein Nachlauf — scheitert er,
+    // bleibt die Stornierung gültig, Sentry und Mail melden das Geld trotzdem.
+    if (erstattungOffen) {
+      try {
+        await prisma.order.updateMany({ where: { id: orderId, erstattungOffenSeit: null }, data: { erstattungOffenSeit: new Date() } })
+      } catch (err) {
+        Sentry.captureException(err, { tags: { aktion: 'cancelOrder', grund: 'erstattung_offen_vermerk' }, extra: { orderId } })
+      }
+    }
+
     // Der Vermerk getrennt von der Erstattung: Scheitert NUR er, ist das
     // Geld trotzdem zurück — dann Erfolg an den Hof und Mail mit Betrag,
     // nur paymentStatus steht falsch auf PAID. Das bekommt der Betreiber
     // über Sentry zu sehen, nicht der Hof als „Erstattung fehlgeschlagen".
+    // Mit dem Erstatten ist auch die Aufgabe „Erstattung offen" erledigt.
     if (refundAmount !== null) {
       try {
         await prisma.order.update({
           where: { id: orderId },
-          data: { paymentStatus: 'REFUNDED' },
+          data: { paymentStatus: 'REFUNDED', erstattungOffenSeit: null },
         })
       } catch (err) {
         Sentry.captureException(err, {
@@ -761,17 +773,22 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
   // Mailfehler rollt nichts zurück. Ohne Daten der Kundin.
   if (handbuchungOffen) {
     const hand = handbuchungOffen
-    mailNachDerAntwort('erstattung_offen', orderId, async () =>
-      (await import('@/lib/email')).sendErstattungOffen({
-        was: 'Der Hof hat die Bestellung storniert, die Erstattung über Stripe hat aber nicht geklappt. Die Bestellung ist storniert, das Geld steht noch aus.',
-        bestellId: orderId,
-        bestellnummer: order.orderNumber,
-        hofName: farm.name,
-        betraege: hand.betraege,
-        handanweisung: hand.anweisung,
-        stripeKennung: null,
-      })
-    )
+    mailNachDerAntwort('erstattung_offen', orderId, async () => {
+      // Empfänger aus der Zustellung (Register N14): „Erstattung offen" geht immer, auch bei Regel „aus".
+      const { ladeBetreiberEmpfaenger } = await import('@/server/queries/postfach')
+      await (await import('@/lib/email')).sendErstattungOffen(
+        {
+          was: 'Der Hof hat die Bestellung storniert, die Erstattung über Stripe hat aber nicht geklappt. Die Bestellung ist storniert, das Geld steht noch aus.',
+          bestellId: orderId,
+          bestellnummer: order.orderNumber,
+          hofName: farm.name,
+          betraege: hand.betraege,
+          handanweisung: hand.anweisung,
+          stripeKennung: null,
+        },
+        await ladeBetreiberEmpfaenger('erstattungOffen')
+      )
+    })
   }
 
   revalidatePath('/orders')

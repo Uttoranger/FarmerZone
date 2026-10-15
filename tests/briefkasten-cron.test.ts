@@ -6,12 +6,16 @@
  * Datenbank; die Zusammenfassung geht nur bei neuen oder liegen gebliebenen
  * Meldungen; die 90-Tage-Auswahl löscht nur abgeschlossene, alte Meldungen
  * samt Screenshot; ein scheiternder Blob-Aufruf hält die Löschung nicht auf.
+ * Seit Nr. 95 (Register N14): Die Mail geht an die Empfängerliste der
+ * Zustellung (empfaengerFuer('wochenbericht')); Regel aus (leere Liste) heißt
+ * keine Mail, auch wenn etwas offen ist.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 vi.mock('@vercel/blob', () => ({ del: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendBriefkastenZusammenfassung: vi.fn() }))
+vi.mock('@/server/queries/postfach', () => ({ ladeBetreiberEmpfaenger: vi.fn() }))
 vi.mock('@/server/queries/meldung', () => ({
   findeLoeschKandidaten: vi.fn(),
   loescheMeldungen: vi.fn(),
@@ -22,6 +26,7 @@ import { GET } from '@/app/api/cron/briefkasten/route'
 import { del } from '@vercel/blob'
 import { sendBriefkastenZusammenfassung } from '@/lib/email'
 import { findeLoeschKandidaten, loescheMeldungen, zaehleFuerWochenlauf } from '@/server/queries/meldung'
+import { ladeBetreiberEmpfaenger } from '@/server/queries/postfach'
 import { AUFBEWAHRUNG_TAGE } from '@/lib/meldung'
 
 const blobDel = vi.mocked(del)
@@ -29,6 +34,8 @@ const mail = vi.mocked(sendBriefkastenZusammenfassung)
 const kandidaten = vi.mocked(findeLoeschKandidaten)
 const loeschen = vi.mocked(loescheMeldungen)
 const zaehlen = vi.mocked(zaehleFuerWochenlauf)
+const liste = vi.mocked(ladeBetreiberEmpfaenger)
+const LISTE = ['support@example.com', 'team@example.com']
 
 const JETZT = new Date('2026-09-14T05:00:00.000Z')
 const TAG = 24 * 60 * 60 * 1000
@@ -51,6 +58,7 @@ beforeEach(() => {
   loeschen.mockResolvedValue(0)
   zaehlen.mockResolvedValue(RUHIG)
   mail.mockResolvedValue(undefined)
+  liste.mockResolvedValue(LISTE)
   blobDel.mockResolvedValue(undefined)
 })
 
@@ -98,15 +106,29 @@ describe('Wochenlauf — Zusammenfassung', () => {
     zaehlen.mockResolvedValue({ neu: 2, liegenGeblieben: 0, offen: 2, neueste: [] })
     const res = await GET(anfrage('Bearer geheim-123'))
     expect(mail).toHaveBeenCalledTimes(1)
-    expect(mail).toHaveBeenCalledWith(expect.objectContaining({ neu: 2, geloescht: 0 }))
+    expect(mail).toHaveBeenCalledWith(expect.objectContaining({ neu: 2, geloescht: 0 }), LISTE)
+    expect(liste).toHaveBeenCalledWith('wochenbericht')
     expect(await res.json()).toMatchObject({ zusammenfassung: true, neu: 2 })
+  })
+
+  it('Regel „Wochenbericht" aus (leere Liste): keine Mail, obwohl etwas offen ist', async () => {
+    zaehlen.mockResolvedValue({ neu: 2, liegenGeblieben: 1, offen: 3, neueste: [] })
+    liste.mockResolvedValue([])
+    const res = await GET(anfrage('Bearer geheim-123'))
+    expect(mail).not.toHaveBeenCalled()
+    expect(await res.json()).toMatchObject({ zusammenfassung: false, neu: 2 })
+  })
+
+  it('ohne Offenes fragt der Lauf die Liste gar nicht erst', async () => {
+    await GET(anfrage('Bearer geheim-123'))
+    expect(liste).not.toHaveBeenCalled()
   })
 
   it('schickt eine Mail, wenn Meldungen länger als 14 Tage in NEU/GEPRUEFT stehen', async () => {
     zaehlen.mockResolvedValue({ neu: 0, liegenGeblieben: 1, offen: 3, neueste: [] })
     await GET(anfrage('Bearer geheim-123'))
     expect(mail).toHaveBeenCalledTimes(1)
-    expect(mail).toHaveBeenCalledWith(expect.objectContaining({ liegenGeblieben: 1 }))
+    expect(mail).toHaveBeenCalledWith(expect.objectContaining({ liegenGeblieben: 1 }), LISTE)
   })
 
   it('übergibt den Stichtag „jetzt" an die Zählung', async () => {

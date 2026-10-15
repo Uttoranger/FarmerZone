@@ -1,11 +1,14 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { ladeFadenHof } from '@/server/queries/postfach'
-import { POSTFACH_TEXT, fadenEintraege, istNeuFuer, neuesteDerAnderenSeite, rundschreibenVomText } from '@/lib/postfach'
+import { ANTWORT_NICHT_MOEGLICH, POSTFACH_TEXT, fadenEintraege, istNeuFuer, neuesteDerAnderenSeite, rundschreibenVomText } from '@/lib/postfach'
+import { cn } from '@/lib/utils'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { MARKE } from '@/lib/marke'
 import { FadenVerlauf, POSTFACH_RAHMEN, TeamZeichen } from '../teile'
@@ -29,6 +32,11 @@ export const dynamic = 'force-dynamic'
  * Öffnen setzt den Lesestand (FadenNachladen, nach dem Rendern über die
  * Action); der offene Faden lädt alle 60 s nach (router.refresh, kein
  * Polling-Endpunkt).
+ *
+ * „Antwort möglich" aus (Register N14, Nr. 95; Mockups web-/mobil-h6-
+ * unterhaltung, Zustand ohne Antwortfeld): statt des Felds der Hinweis mit
+ * „Problem melden" als Link — antworteAlsHof lehnt dann ohnehin ab. Ein Faden
+ * ohne Rundschreiben (Gründungs-Nachricht) bleibt beantwortbar.
  */
 export default async function FadenPage({ params }: { params: Promise<{ id: string }> }): Promise<React.JSX.Element> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -69,7 +77,17 @@ export default async function FadenPage({ params }: { params: Promise<{ id: stri
 
       <FadenVerlauf eintraege={eintraege} seite="HOF" fussErste={fuss} nameAndereSeite={POSTFACH_TEXT.absender} />
 
-      <AntwortFormular unterhaltungId={faden.id} />
+      {faden.rundschreiben && !faden.rundschreiben.antwortMoeglich ? (
+        <p className="mt-5 rounded-2xl border border-border bg-card px-4 py-3.5 text-[14px] leading-relaxed text-muted-foreground">
+          {ANTWORT_NICHT_MOEGLICH.satz}{' '}
+          <Link href={ANTWORT_NICHT_MOEGLICH.href} className={cn('rounded font-semibold text-brand-text underline-offset-2 hover:underline', FOKUS_RAHMEN)}>
+            „{ANTWORT_NICHT_MOEGLICH.link}“
+          </Link>
+          .
+        </p>
+      ) : (
+        <AntwortFormular unterhaltungId={faden.id} />
+      )}
       <FadenNachladen
         unterhaltungId={faden.id}
         nachrichtId={neueste?.id ?? null}

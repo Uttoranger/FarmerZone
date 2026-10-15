@@ -1,9 +1,10 @@
 'use server'
 
+import { randomBytes } from 'crypto'
 import { headers } from 'next/headers'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import * as Sentry from '@sentry/nextjs'
-import type { Prisma, UnterhaltungSeite } from '@prisma/client'
+import { Prisma, type UnterhaltungSeite } from '@prisma/client'
 import type { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -23,11 +24,39 @@ import {
   nachrichtArtVon,
   type EmpfaengerRegel,
 } from '@/lib/postfach'
-import { gelesenSchema, hofAntwortSchema, rundschreibenSchema, teamAntwortSchema } from '@/schemas/postfach'
+import {
+  empfaengerEntfernenSchema,
+  empfaengerHinzufuegenSchema,
+  empfaengerTokenSchema,
+  gelesenSchema,
+  hofAntwortSchema,
+  rundschreibenSchema,
+  teamAntwortSchema,
+  zustellRegelnSpeichernSchema,
+} from '@/schemas/postfach'
+import {
+  HINZUFUEGEN_JE_STUNDE,
+  STUNDE_MS,
+  TESTMAIL_ABSTAND_MS,
+  ZUSTELLUNG_FEHLER,
+  empfaengerliste,
+  empfaengerZustand,
+  tokenBisAb,
+} from '@/lib/zustellung'
+import { SUPPORT_EMAIL } from '@/lib/support'
+import { ZU_LANG } from '@/lib/eingabegrenzen'
+import { PLATTFORM_EINSTELLUNG_ID, PLATTFORM_EINSTELLUNG_TAG } from '@/lib/plattform-einstellung'
 import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 import { verlangeAdminAktion } from '@/server/admin-wache'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import { ladeEmpfaengerHoefe, ladeMailEmpfaenger } from '@/server/queries/postfach'
+import {
+  empfaengerTokenHash,
+  ladeAntwortFuerTeam,
+  ladeBetreiberEmpfaenger,
+  ladeEmpfaengerHoefe,
+  ladeMailEmpfaenger,
+  ladeZustellung,
+} from '@/server/queries/postfach'
 
 /*
  * Das Postfach, Stufe 1 (Register N12, Nachtlauf Nr. 87) — die schreibenden
@@ -49,6 +78,9 @@ type Ergebnis = { ok: true } | { error: string }
 
 /** Erste Stufe des Rate-Limits je Instanz (R1); die zweite zählt POSTFACH_DB_BREMSE über alle Instanzen. */
 const hofDrossel = createRateLimiter({ max: NACHRICHTEN_JE_HOF_UND_TAG, windowMs: TAG_MS })
+/** Zustellung (N14): höchstens fünf neue Adressen je Admin und Stunde, eine Testmail je Minute. */
+const hinzufuegenDrossel = createRateLimiter({ max: HINZUFUEGEN_JE_STUNDE, windowMs: STUNDE_MS })
+const testmailDrossel = createRateLimiter({ max: 1, windowMs: TESTMAIL_ABSTAND_MS })
 
 const EIGENE_SAETZE = new Set<string>(Object.values(POSTFACH_FEHLER))
 
@@ -107,7 +139,11 @@ function hofSeitenNeu(unterhaltungId: string): void {
  * Der Hof antwortet im eigenen Faden (N12: Höfe beginnen keine Fäden). Höchstens
  * NACHRICHTEN_JE_HOF_UND_TAG je Hof und Tag (nur in Produktion, zwei Stufen
  * wie R1). Wer antwortet, hat gelesen: Der Lesestand des Hofs rückt mit.
- * Keine E-Mail — der Zähler beim Team reicht.
+ * Hat das Rundschreiben „Antwort möglich" aus (N14), entsteht nichts — die
+ * Bedingung steht in derselben WHERE-Klausel wie der Besitz; ein Faden ohne
+ * Rundschreiben (Gründungs-Nachricht, Nr. 93) bleibt beantwortbar. Nach der
+ * Antwort geht nach der Regel „Antwort eines Hofs" eine Mail an die
+ * Empfängerliste (Zustellung) — nie an den Hof.
  */
 export async function antworteAlsHof(eingabe: unknown): Promise<Ergebnis> {
   const geprueft = hofAntwortSchema.safeParse(eingabe)
@@ -124,15 +160,38 @@ export async function antworteAlsHof(eingabe: unknown): Promise<Ergebnis> {
 
   const jetzt = new Date()
   const angelegt = await prisma.$transaction(async (tx) => {
-    // Besitz in der WHERE-Klausel, nicht in einem vorherigen if: Ein fremder
-    // Faden ergibt 0 Zeilen, und es entsteht keine Nachricht.
-    const { count } = await tx.unterhaltung.updateMany({ where: { id: unterhaltungId, farmId: hof.id }, data: { letzteNachrichtAm: jetzt } })
+    // Besitz und „Antwort möglich" in der WHERE-Klausel, nicht in einem
+    // vorherigen if: Ein fremder Faden oder ein Rundschreiben ohne Antwort
+    // ergibt 0 Zeilen, und es entsteht keine Nachricht.
+    const { count } = await tx.unterhaltung.updateMany({
+      where: { id: unterhaltungId, farmId: hof.id, OR: [{ rundschreibenId: null }, { rundschreiben: { antwortMoeglich: true } }] },
+      data: { letzteNachrichtAm: jetzt },
+    })
     if (count === 0) return false
     await tx.nachricht.create({ data: { unterhaltungId, vonFarmId: hof.id, text, createdAt: jetzt } })
     await setzeLesestand(tx, unterhaltungId, 'HOF', jetzt)
     return true
   })
-  if (!angelegt) return { error: POSTFACH_FEHLER.nichtGefunden }
+  if (!angelegt) {
+    // Nur für den richtigen Satz, nach dem Schreiben: Gehört der Faden dem
+    // Hof, war „Antwort möglich" aus — sonst gibt es ihn für diesen Hof nicht.
+    const eigener = await prisma.unterhaltung.count({ where: { id: unterhaltungId, farmId: hof.id } })
+    return { error: eigener > 0 ? POSTFACH_FEHLER.antwortNichtMoeglich : POSTFACH_FEHLER.nichtGefunden }
+  }
+
+  nachDerAntwort(async () => {
+    try {
+      const an = await ladeBetreiberEmpfaenger('antwortHof')
+      if (an.length === 0) return
+      const faden = await ladeAntwortFuerTeam(unterhaltungId)
+      if (!faden) return
+      const { sendHofAntwortAnTeam } = await import('@/lib/email')
+      const ergebnis = await sendHofAntwortAnTeam(an, { hofName: faden.hofName, titel: faden.titel ?? POSTFACH_TEXT.ohneTitel, text, unterhaltungId })
+      if (ergebnis.gescheitert > 0) meldeNachlauf(new Error('Versand'), 'antwort-team-mail', unterhaltungId)
+    } catch (err) {
+      meldeNachlauf(err, 'antwort-team-mail', unterhaltungId)
+    }
+  })
 
   hofSeitenNeu(unterhaltungId)
   revalidatePath(ADMIN_POSTFACH_HREF)
@@ -278,7 +337,7 @@ export type RundschreibenErgebnis = { ok: true; empfaenger: number } | { error: 
 export async function sendeRundschreiben(eingabe: unknown): Promise<RundschreibenErgebnis> {
   const geprueft = rundschreibenSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: satzAus(geprueft.error) }
-  const { titel, text, art, link, perMail, empfaenger } = geprueft.data
+  const { titel, text, art, link, perMail, antwortMoeglich, empfaenger } = geprueft.data
 
   const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
@@ -291,7 +350,7 @@ export async function sendeRundschreiben(eingabe: unknown): Promise<Rundschreibe
   const jetzt = new Date()
   const faeden = await prisma.$transaction(async (tx) => {
     const rundschreiben = await tx.rundschreiben.create({
-      data: { titel, text, linkUrl: link, art, perMail, empfaengerRegel: regel, empfaenger: hofIds.length, gesendetAm: jetzt, erstelltVonUserId: guard.userId },
+      data: { titel, text, linkUrl: link, art, perMail, antwortMoeglich, empfaengerRegel: regel, empfaenger: hofIds.length, gesendetAm: jetzt, erstelltVonUserId: guard.userId },
       select: { id: true },
     })
     const angelegt = await tx.unterhaltung.createManyAndReturn({
@@ -326,4 +385,154 @@ export async function sendeRundschreiben(eingabe: unknown): Promise<Rundschreibe
   revalidatePath(POSTFACH_HREF)
   revalidatePath('/dashboard')
   return { ok: true, empfaenger: faeden.length }
+}
+
+// ─── Zustellung (Register N14, Nr. 95) ───────────────────────────────────────
+
+export type HinzufuegenErgebnis = { ok: true; email: string } | { error: string }
+
+/**
+ * Eine weitere Adresse eintragen: Sie bekommt erst Mails, wenn sie über den
+ * Link bestätigt ist (Double-Opt-in, S11). Der Link trägt 32 zufällige Bytes;
+ * gespeichert wird nur ihr SHA-256 (empfaengerTokenHash), gültig 48 Stunden.
+ * Eine noch unbestätigte Adresse bekommt einen neuen Link (der alte gilt nicht
+ * mehr), eine bestätigte bleibt, wie sie ist. Bedingt geschrieben, ohne Lesen
+ * davor: Zwei gleichzeitige Klicks legen nie zwei Zeilen an (Unique email).
+ * Die Mail geht nach der Antwort; ein Fehler meldet nur die Klasse.
+ */
+export async function fuegeEmpfaengerHinzu(eingabe: unknown): Promise<HinzufuegenErgebnis> {
+  const geprueft = empfaengerHinzufuegenSchema.safeParse(eingabe)
+  if (!geprueft.success) {
+    // Nur die eigenen Sätze des Schemas (Format, ZU_LANG); jeder andere Zod-Text (Englisch) wird zum festen Satz.
+    const satz = geprueft.error.issues[0]?.message
+    return { error: satz === ZU_LANG.email ? ZU_LANG.email : ZUSTELLUNG_FEHLER.email }
+  }
+  const { email } = geprueft.data
+
+  const guard = await verlangeAdminAktion()
+  if ('error' in guard) return { error: guard.error }
+
+  if (email === SUPPORT_EMAIL.toLowerCase()) return { error: ZUSTELLUNG_FEHLER.schonFest }
+  if (process.env.NODE_ENV === 'production' && !hinzufuegenDrossel.check(guard.userId)) return { error: ZUSTELLUNG_FEHLER.zuViele }
+
+  const token = randomBytes(32).toString('base64url')
+  const link = { token: empfaengerTokenHash(token), tokenBis: tokenBisAb(new Date()) }
+  const { count } = await prisma.betreiberEmpfaenger.updateMany({ where: { email, bestaetigtAm: null }, data: link })
+  if (count === 0) {
+    try {
+      await prisma.betreiberEmpfaenger.create({ data: { email, ...link, erstelltVonUserId: guard.userId } })
+    } catch (err) {
+      // Es gibt die Adresse schon, und sie ist bestätigt (das bedingte Update traf nichts).
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') return { error: ZUSTELLUNG_FEHLER.schonBestaetigt }
+      throw err
+    }
+  }
+
+  nachDerAntwort(async () => {
+    try {
+      const { sendBetreiberBestaetigung } = await import('@/lib/email')
+      const ergebnis = await sendBetreiberBestaetigung(email, token)
+      if (ergebnis.error) meldeZustellung(new Error('Versand'), 'bestaetigung')
+    } catch (err) {
+      meldeZustellung(err, 'bestaetigung')
+    }
+  })
+
+  revalidatePath(ADMIN_POSTFACH_HREF)
+  return { ok: true, email }
+}
+
+/** Ein Fehler der Zustellung geht ohne Adresse nach Sentry: fester Satz, Klasse, Aufgabe. */
+function meldeZustellung(err: unknown, aufgabe: string): void {
+  const meldung = new Error('Zustellung: E-Mail nicht verschickt')
+  meldung.name = err instanceof Error ? err.name : 'Unbekannt'
+  Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'zustellung', aufgabe } })
+}
+
+/** Eine weitere Adresse entfernen — sofort; ab dann bekommt sie nichts mehr. */
+export async function entferneEmpfaenger(eingabe: unknown): Promise<Ergebnis> {
+  const geprueft = empfaengerEntfernenSchema.safeParse(eingabe)
+  if (!geprueft.success) return { error: ZUSTELLUNG_FEHLER.eingabe }
+
+  const guard = await verlangeAdminAktion()
+  if ('error' in guard) return { error: guard.error }
+
+  const { count } = await prisma.betreiberEmpfaenger.deleteMany({ where: { id: geprueft.data.id } })
+  if (count === 0) return { error: ZUSTELLUNG_FEHLER.nichtGefunden }
+  revalidatePath(ADMIN_POSTFACH_HREF)
+  return { ok: true }
+}
+
+/**
+ * Die Regeln speichern (nur die schaltbaren; „Erstattung offen" und
+ * Wünsche/Fragen sind fest). Geschrieben wird NUR zustellRegeln — nicht
+ * geaendertVonUserId, das ist die Protokollzeile der Gruppe Gründungshöfe
+ * (Nr. 93). Danach das Etikett der gecachten Einstellung leeren.
+ */
+export async function speichereZustellRegeln(eingabe: unknown): Promise<Ergebnis> {
+  const geprueft = zustellRegelnSpeichernSchema.safeParse(eingabe)
+  if (!geprueft.success) return { error: ZUSTELLUNG_FEHLER.eingabe }
+
+  const guard = await verlangeAdminAktion()
+  if ('error' in guard) return { error: guard.error }
+
+  const zustellRegeln = geprueft.data
+  await prisma.plattformEinstellung.upsert({
+    where: { id: PLATTFORM_EINSTELLUNG_ID },
+    create: { id: PLATTFORM_EINSTELLUNG_ID, zustellRegeln },
+    update: { zustellRegeln },
+  })
+  // updateTag statt revalidateTag: In Next 16 verlangt revalidateTag ein Profil (wie Nr. 93).
+  updateTag(PLATTFORM_EINSTELLUNG_TAG)
+  revalidatePath(ADMIN_POSTFACH_HREF)
+  return { ok: true }
+}
+
+export type TestmailErgebnis = { ok: true; empfaenger: number } | { error: string }
+
+/** „Testmail an alle senden": an die ganze Liste (SUPPORT_EMAIL und jede bestätigte Adresse), höchstens eine je Minute. */
+export async function sendeTestmail(): Promise<TestmailErgebnis> {
+  const guard = await verlangeAdminAktion()
+  if ('error' in guard) return { error: guard.error }
+  if (process.env.NODE_ENV === 'production' && !testmailDrossel.check('alle')) return { error: ZUSTELLUNG_FEHLER.testZuOft }
+
+  const an = empfaengerliste((await ladeZustellung()).bestaetigte)
+  nachDerAntwort(async () => {
+    try {
+      const { sendBetreiberTestmail } = await import('@/lib/email')
+      const ergebnis = await sendBetreiberTestmail(an)
+      if (ergebnis.gescheitert > 0) meldeZustellung(new Error(`${ergebnis.gescheitert} gescheitert`), 'testmail')
+    } catch (err) {
+      meldeZustellung(err, 'testmail')
+    }
+  })
+  return { ok: true, empfaenger: an.length }
+}
+
+export type BestaetigenErgebnis = { ok: true } | { error: 'abgelaufen' | 'ungueltig' }
+
+/**
+ * Den Link aus der Bestätigungsmail einlösen — OHNE Anmeldung: Der Token ist
+ * der Ausweis. Einmalig: In EINEM bedingten Schreiben (Hash über den
+ * eindeutigen Index, noch gültig, noch nicht bestätigt) wird bestaetigtAm
+ * gesetzt und der Token gelöscht — ein zweiter Klick findet nichts mehr.
+ * Aufgerufen von der Bestätigungsseite per Knopf (POST), nie beim Öffnen des
+ * Links.
+ */
+export async function bestaetigeEmpfaenger(eingabe: unknown): Promise<BestaetigenErgebnis> {
+  const token = empfaengerTokenSchema.safeParse(eingabe)
+  if (!token.success) return { error: 'ungueltig' }
+  const jetzt = new Date()
+  const hash = empfaengerTokenHash(token.data)
+  const { count } = await prisma.betreiberEmpfaenger.updateMany({
+    where: { token: hash, bestaetigtAm: null, tokenBis: { gt: jetzt } },
+    data: { bestaetigtAm: jetzt, token: null, tokenBis: null },
+  })
+  if (count === 1) {
+    revalidatePath(ADMIN_POSTFACH_HREF)
+    return { ok: true }
+  }
+  // Nur für den richtigen Satz: Gibt es den Link noch, ist er abgelaufen.
+  const zeile = await prisma.betreiberEmpfaenger.findUnique({ where: { token: hash }, select: { bestaetigtAm: true, tokenBis: true } })
+  return { error: zeile && empfaengerZustand(zeile, jetzt) === 'abgelaufen' ? 'abgelaufen' : 'ungueltig' }
 }

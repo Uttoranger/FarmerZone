@@ -5214,6 +5214,18 @@ Register N15 (Admin-Seitenmuster) und die Z3-Korrektur vom 15.10.2026 (`docs/ent
 - **Reiter-Zeile am Handy:** Mit fünf Reitern ist die Zeile breiter als der Bildschirm; die Shell scrollt den gewählten Reiter in die Mitte (`scrollLeft` der Zeile, nie der Seite).
 - **Das Wort „Startphase“ steht nur in `konditionen.ts`** (`tests/konditionen-uebergang.test.ts` liest jede Datei unter `src/`, auch Kommentare): Die Kachel „Grundgebühren“ nimmt den Wortlaut der Tarif-Zeile (`TARIF_ZEILE.startphase.titel`).
 
+## Postfach, Stufe 2: Eingang, Zustellung, Antwort möglich (Nachtlauf 14, Nr. 95, Oktober 2026)
+
+Register N12 (Änderung vom 15.10.2026) und N14 (`docs/entscheidungen.md`); Mockups `admin-postfach*`, `admin-rundschreiben`, `system-postfach-prozess`, `web-/mobil-h6-unterhaltung`. Die Regeln stehen in `docs/ai/ARCHITECTURE.md` („Postfach, Stufe 2“) und `docs/ai/DESIGN_SYSTEM.md` („Postfach“), hier Verlauf und Fachregeln.
+
+- **Ein Eingang statt drei Reitern:** Unterhaltungen und Meldungen waren zwei Orte, „Neuer Hof wartet“ und „Erstattung offen“ standen nur in Mails. Jetzt eine Liste mit drei Arten. Aufgaben sind Ableitungen aus offenen Zuständen — sie verschwinden von selbst, ein „Erledigt“-Knopf wäre ein zweiter Zustand neben dem echten. Dafür brauchte es genau eine neue Spalte: `Order.erstattungOffenSeit`; vorher gab es den Zustand „Erstattung offen“ nirgends gespeichert (Ausgangslage).
+- **„Offen“ heißt bei Meldungen NEU/GEPRUEFT** (Freigabe wörtlich). Der Reiter zählte bisher „zu entscheiden“ (NEU und Vorschlag der KI) — ein Vorschlag der KI zählt im Eingang nicht als offen, steht aber unter „Meldung“ und „Alle“.
+- **Die Beträge der Erstattung zeigt der Eingang aus der Bestellung, nicht aus der Mail:** Die Handbuchung je Weg (voll, Rest) hängt am Stand bei Stripe zum Zeitpunkt des Stornos und wird nicht gespeichert; der Eingang zeigt „online bezahlt“ aus `stornoBetraege` (dieselbe Rechnung wie Storno-Dialog und Mail) und verweist für die Anweisung auf Mail und Sentry. Gelöscht wird die Aufgabe, wenn Stripe eine erfolgreiche Erstattung meldet, die nach dem Vermerk entstand — eine ältere Teilerstattung derselben Zahlung erledigt das offene Geld nicht.
+- **Zustellung:** Alle Betreiber-Mails gingen fest an `SUPPORT_EMAIL`. Jetzt eine Liste (die feste Adresse plus bestätigte weitere) und eine Regel je Art. Weil `email.ts` nie die Datenbank liest, holen die Aufrufer (Anlegen eines Hofs, Meldung, Storno, Webhook, Wochenlauf, Antwort eines Hofs) die Liste über `ladeBetreiberEmpfaenger`. Neu ist die Mail „Ein Hof hat geantwortet“ (Regel „Antwort eines Hofs: sofort“, Standard laut Freigabe) — bis Nr. 94 schickte eine Antwort des Hofs keine Mail. Wünsche und Fragen bleiben fest „nur im Eingang“ (keine Vorlage dafür, Register: eine Regel ohne Wahl).
+- **Bestätigungslink ohne Anmeldung unter `/admin`:** Die Freigabe nennt `/admin/postfach/zustellung/bestaetigen?token=`. Eine Seite dort hängt im Admin-Layout (Login), eine Routengruppe ändert daran nichts; ein Route Handler hängt unter keinem Layout. Er zeigt eine schlichte Seite mit Knopf (POST) — Link-Scanner öffnen Links, bestätigt wird nur per Knopf. Gespeichert ist nur der SHA-256 des Tokens.
+- **Antwort möglich:** Standard beim Verfassen Wichtig an, Info aus. Bestehende Rundschreiben bleiben beantwortbar (Default true). Der Hof sieht statt des Felds den Satz der Freigabe; antworteAlsHof lehnt in derselben WHERE-Klausel ab.
+
+
 ## Nützliche Befehle
 
 ```bash

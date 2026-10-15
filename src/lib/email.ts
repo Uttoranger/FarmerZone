@@ -20,7 +20,8 @@ import { env } from '@/lib/env'
 import { darfMailEmpfangen, leseTestEmpfaenger, sperrtTrotzProduktion } from '@/lib/testumgebung'
 import { abmeldeSeitenPfad, listUnsubscribeKoepfe } from '@/lib/abmelde-link'
 import { MARKE } from '@/lib/marke'
-import { POSTFACH_MAIL_TEXT, fadenHref } from '@/lib/postfach'
+import { POSTFACH_MAIL_TEXT, eingangAdresse, eingangMeldungAdresse, fadenHref } from '@/lib/postfach'
+import { ZUSTELLUNG_MAIL_TEXT, bestaetigenPfad } from '@/lib/zustellung'
 
 const apiKey = process.env.RESEND_API_KEY
 const FROM = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
@@ -157,6 +158,27 @@ export async function sendRaw(
 
 async function send(to: string, subject: string, html: string, optionen?: MailOptionen): Promise<void> {
   await sendRaw(to, subject, html, optionen)
+}
+
+/** Wie viele Mails einer Liste hinausgingen und wie viele scheiterten (gesperrt zählt nicht als gescheitert, Z3). */
+export type ListenErgebnis = { gesendet: number; gescheitert: number }
+
+/**
+ * Eine Betreiber-Mail an jede Adresse der Empfängerliste (Register N14, Nr.
+ * 95): Wer sie bekommt, entscheidet `empfaengerFuer` (src/lib/zustellung.ts)
+ * und reicht der Aufrufer herein — diese Datei liest nie selbst die
+ * Datenbank. Nacheinander (Resend begrenzt die Anfragen je Sekunde), jede
+ * über sendRaw mit der Post-Sperre (Z3); ein Fehler bei einer Adresse hält die
+ * übrigen nicht auf. Eine leere Liste heißt: Die Regel ist aus — keine Mail.
+ */
+async function sendeAnListe(an: readonly string[], subject: string, html: string): Promise<ListenErgebnis> {
+  const ergebnis: ListenErgebnis = { gesendet: 0, gescheitert: 0 }
+  for (const adresse of an) {
+    const versand = await sendRaw(adresse, subject, html)
+    if (versand.error) ergebnis.gescheitert += 1
+    else if (versand.id) ergebnis.gesendet += 1
+  }
+  return ergebnis
 }
 
 function formatPickupDate(date: Date): string {
@@ -366,13 +388,17 @@ export async function sendPasswordResetEmail(email: string, url: string): Promis
   await send(email, `Passwort zurücksetzen · ${MARKE}`, html)
 }
 
-/** Neuer Hof registriert → Betreiber (Freischaltung nötig) */
-export async function sendNewFarmNotification(farm: {
-  id: string
-  name: string
-  slug: string
-  ownerEmail: string
-}): Promise<void> {
+/** Neuer Hof registriert → Betreiber (Freischaltung nötig); `an` aus empfaengerFuer('hofWartet'). */
+export async function sendNewFarmNotification(
+  farm: {
+    id: string
+    name: string
+    slug: string
+    ownerEmail: string
+  },
+  an: readonly string[]
+): Promise<void> {
+  if (an.length === 0) return
   const registeredAt = new Date().toLocaleString('de-AT', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
   })
@@ -386,7 +412,7 @@ export async function sendNewFarmNotification(farm: {
       registeredAt,
     })
   )
-  await send(SUPPORT_EMAIL, `Neuer Hof wartet auf Freischaltung: ${farm.name}`, html)
+  await sendeAnListe(an, `Neuer Hof wartet auf Freischaltung: ${farm.name}`, html)
 }
 
 /**
@@ -409,20 +435,25 @@ export async function sendFreischaltungEmail(farm: {
 
 /**
  * Neue FEHLER-Meldung → Betreiber (Fehlerbriefkasten). NUR bei art FEHLER —
- * Wünsche und Fragen bleiben still (Begründung in actions/meldung.ts).
+ * Wünsche und Fragen bleiben im Eingang (Register N14); `an` aus
+ * empfaengerFuer('fehlermeldung').
  */
-export async function sendMeldungNotification(m: {
-  id: string
-  kurznummer: string
-  text: string
-  seiteUrl: string
-  userAgent: string
-  viewport: string
-  diagKennung: string | null
-  farmName: string | null
-  screenshotUrl: string | null
-  createdAt: Date
-}): Promise<void> {
+export async function sendMeldungNotification(
+  m: {
+    id: string
+    kurznummer: string
+    text: string
+    seiteUrl: string
+    userAgent: string
+    viewport: string
+    diagKennung: string | null
+    farmName: string | null
+    screenshotUrl: string | null
+    createdAt: Date
+  },
+  an: readonly string[]
+): Promise<void> {
+  if (an.length === 0) return
   const { MeldungNotificationEmail } = await import('@/emails/meldung-notification')
   const html = await toHtml(
     React.createElement(MeldungNotificationEmail, {
@@ -438,26 +469,30 @@ export async function sendMeldungNotification(m: {
         day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
         timeZone: 'Europe/Vienna',
       }),
-      adminUrl: `${APP_URL}/admin/meldungen/${m.id}`,
+      adminUrl: `${APP_URL}${eingangMeldungAdresse(m.id)}`,
     })
   )
-  await send(SUPPORT_EMAIL, `Fehlermeldung ${m.kurznummer}${m.farmName ? ` – ${m.farmName}` : ''}`, html)
+  await sendeAnListe(an, `Fehlermeldung ${m.kurznummer}${m.farmName ? ` – ${m.farmName}` : ''}`, html)
 }
 
-/** Wochen-Zusammenfassung des Briefkastens → Betreiber (nur bei Bedarf, api/cron/briefkasten). */
-export async function sendBriefkastenZusammenfassung(z: {
-  neu: number
-  liegenGeblieben: number
-  offen: number
-  neueste: Array<{ kurznummer: string; art: string; ersteZeile: string; hofName: string | null }>
-  geloescht: number
-}): Promise<void> {
+/** Wochen-Zusammenfassung → Betreiber (nur bei Bedarf, api/cron/briefkasten); `an` aus empfaengerFuer('wochenbericht'). */
+export async function sendBriefkastenZusammenfassung(
+  z: {
+    neu: number
+    liegenGeblieben: number
+    offen: number
+    neueste: Array<{ kurznummer: string; art: string; ersteZeile: string; hofName: string | null }>
+    geloescht: number
+  },
+  an: readonly string[]
+): Promise<void> {
+  if (an.length === 0) return
   const { BriefkastenZusammenfassungEmail } = await import('@/emails/briefkasten-zusammenfassung')
   const html = await toHtml(
-    React.createElement(BriefkastenZusammenfassungEmail, { ...z, adminUrl: `${APP_URL}/admin/meldungen` })
+    React.createElement(BriefkastenZusammenfassungEmail, { ...z, adminUrl: `${APP_URL}${eingangAdresse('meldung')}` })
   )
-  await send(
-    SUPPORT_EMAIL,
+  await sendeAnListe(
+    an,
     `Postfach: ${z.neu} neu, ${z.liegenGeblieben} liegen länger als 14 Tage`,
     html
   )
@@ -483,7 +518,9 @@ export type ErstattungOffenMeldung = {
  * Erstatten kann nur das Plattformkonto; der Hof bekommt nur „Wir kümmern uns
  * um die Erstattung und melden uns."
  */
-export async function sendErstattungOffen(m: ErstattungOffenMeldung): Promise<void> {
+export async function sendErstattungOffen(m: ErstattungOffenMeldung, an: readonly string[]): Promise<void> {
+  // `an` aus empfaengerFuer('erstattungOffen') — diese Art ignoriert „aus" und hat immer mindestens SUPPORT_EMAIL.
+  if (an.length === 0) return
   const { ErstattungOffenEmail } = await import('@/emails/erstattung-offen')
   const html = await toHtml(
     React.createElement(ErstattungOffenEmail, {
@@ -496,7 +533,7 @@ export async function sendErstattungOffen(m: ErstattungOffenMeldung): Promise<vo
       stripeKennung: m.stripeKennung,
     })
   )
-  await send(SUPPORT_EMAIL, `Erstattung offen – Bestellung ${m.bestellnummer ?? m.stripeKennung ?? 'unbekannt'}`, html)
+  await sendeAnListe(an, `Erstattung offen – Bestellung ${m.bestellnummer ?? m.stripeKennung ?? 'unbekannt'}`, html)
 }
 
 /**
@@ -847,4 +884,53 @@ export async function sendPostfachMail(m: {
   if (!html.ok) return { error: html.error }
   const betreff = m.art === 'rundschreiben' ? m.titel : POSTFACH_MAIL_TEXT.antwortBetreff(m.titel)
   return sendRaw(m.an, betreff, html.html)
+}
+
+/**
+ * „Bitte bestätige deine Adresse" → eine weitere Adresse der Zustellung
+ * (Register N14, Nr. 95; Double-Opt-in nach dem Muster sendAboBestaetigung).
+ * Der Link öffnet nur die Seite, bestätigt wird dort per Knopf — Link-Scanner
+ * öffnen Links ungefragt. Gibt das Versandergebnis zurück (sendRaw wirft nie).
+ */
+export async function sendBetreiberBestaetigung(email: string, token: string): Promise<VersandErgebnis> {
+  const vorlage = await htmlOderFehler(async () => {
+    const { BetreiberBestaetigungEmail } = await import('@/emails/betreiber-bestaetigung')
+    return React.createElement(BetreiberBestaetigungEmail, { url: `${APP_URL}${bestaetigenPfad(token)}` })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, ZUSTELLUNG_MAIL_TEXT.bestaetigungBetreff, vorlage.html)
+}
+
+/**
+ * Ein Hof hat im Faden geantwortet → Empfängerliste (Regel „Antwort eines
+ * Hofs: sofort", Register N14). Hofname und Text sind Fremdtext — React
+ * escaped sie; nur an bestätigte Adressen (`an` aus empfaengerFuer).
+ */
+export async function sendHofAntwortAnTeam(
+  an: readonly string[],
+  m: { hofName: string; titel: string; text: string; unterhaltungId: string }
+): Promise<ListenErgebnis> {
+  if (an.length === 0) return { gesendet: 0, gescheitert: 0 }
+  const vorlage = await htmlOderFehler(async () => {
+    const { BetreiberAntwortEmail } = await import('@/emails/betreiber-antwort')
+    return React.createElement(BetreiberAntwortEmail, {
+      hofName: m.hofName,
+      titel: m.titel,
+      text: m.text,
+      url: `${APP_URL}${eingangAdresse('antwort', { art: 'antwort', id: m.unterhaltungId })}`,
+    })
+  })
+  if (!vorlage.ok) return { gesendet: 0, gescheitert: an.length }
+  return sendeAnListe(an, ZUSTELLUNG_MAIL_TEXT.antwortBetreff(m.hofName, m.titel), vorlage.html)
+}
+
+/** „Testmail an alle senden" (Postfach › Zustellung) → die ganze Liste. */
+export async function sendBetreiberTestmail(an: readonly string[]): Promise<ListenErgebnis> {
+  if (an.length === 0) return { gesendet: 0, gescheitert: 0 }
+  const vorlage = await htmlOderFehler(async () => {
+    const { BetreiberTestmailEmail } = await import('@/emails/betreiber-testmail')
+    return React.createElement(BetreiberTestmailEmail, { url: `${APP_URL}${eingangAdresse('offen')}` })
+  })
+  if (!vorlage.ok) return { gesendet: 0, gescheitert: an.length }
+  return sendeAnListe(an, ZUSTELLUNG_MAIL_TEXT.testBetreff, vorlage.html)
 }

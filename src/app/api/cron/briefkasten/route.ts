@@ -5,6 +5,7 @@ import { cronBerechtigt } from '@/lib/geheimnis'
 import { brauchtZusammenfassung, screenshotsVon, waehleZuLoeschende } from '@/lib/meldung'
 import { findeLoeschKandidaten, loescheMeldungen, zaehleFuerWochenlauf } from '@/server/queries/meldung'
 import { sendBriefkastenZusammenfassung } from '@/lib/email'
+import { ladeBetreiberEmpfaenger } from '@/server/queries/postfach'
 
 /**
  * Wochenlauf des Fehlerbriefkastens (Sprint fehlerbriefkasten, Teil F).
@@ -22,9 +23,11 @@ import { sendBriefkastenZusammenfassung } from '@/lib/email'
  *       Screenshots gehen im Blob-Speicher mit (bester Versuch: ein
  *       verwaistes Bild ist kein kaputter Zustand, eine hängende Löschung
  *       wäre einer).
- *   (a) Zusammenfassung an den Betreiber — NUR wenn es neue Meldungen gibt
- *       oder Meldungen länger als 14 Tage in NEU/GEPRUEFT stehen. Sonst keine
- *       Mail: eine leere Wochenmail wäre die erste, die keiner mehr liest.
+ *   (a) Zusammenfassung an die Empfängerliste der Zustellung — NUR wenn die
+ *       Regel „Wochenbericht" an ist (Register N14, Nr. 95; leere Liste = aus)
+ *       UND es neue Meldungen gibt oder Meldungen länger als 14 Tage in
+ *       NEU/GEPRUEFT stehen. Sonst keine Mail: eine leere Wochenmail wäre die
+ *       erste, die keiner mehr liest.
  * Aufräumen läuft zuerst, damit die Zusammenfassung den Stand danach nennt.
  */
 export async function GET(request: NextRequest) {
@@ -50,12 +53,13 @@ export async function GET(request: NextRequest) {
   // (a) Zusammenfassung nur bei Bedarf
   const zaehler = await zaehleFuerWochenlauf(jetzt)
   const zusammenfassung = brauchtZusammenfassung(zaehler)
-  if (zusammenfassung) {
-    await sendBriefkastenZusammenfassung({ ...zaehler, geloescht })
+  const an = zusammenfassung ? await ladeBetreiberEmpfaenger('wochenbericht') : []
+  if (an.length > 0) {
+    await sendBriefkastenZusammenfassung({ ...zaehler, geloescht }, an)
   }
 
   return NextResponse.json({
-    zusammenfassung,
+    zusammenfassung: an.length > 0,
     neu: zaehler.neu,
     liegenGeblieben: zaehler.liegenGeblieben,
     geloescht,

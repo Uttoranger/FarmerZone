@@ -23,6 +23,13 @@ import { wienKalendertag, tagVersetzt } from '@/lib/kalender'
 import { hatRegistrierung, type HofRegistrierung } from '@/lib/futter-registrierung'
 import { uhrzeitInWien } from '@/lib/fristen'
 import { datumKurz } from '@/lib/verkauf-eintragen'
+import { NEUE_MELDUNG_HREF } from '@/lib/hof-hilfe'
+import { MELDUNG_ART_LABEL, type MeldungArt, type MeldungStatus } from '@/lib/meldung'
+import type { MarkeArt } from '@/lib/marke-art'
+import { wartelistePlatzZeile } from '@/lib/admin-hoefe-seite'
+import { formatEuro } from '@/lib/format'
+import { centsAlsEuro } from '@/lib/servicegebuehr'
+import type { KennzahlDaten, UnterreiterDaten } from '@/lib/admin-seiten'
 import type { DbBremse } from '@/lib/bremse-datenbank'
 // Nur Typen (zur Laufzeit nichts): Die Zod-Schemas sind die Quelle der Werte (CODING_STANDARDS §2).
 import type { z } from 'zod'
@@ -41,39 +48,83 @@ export function fadenHref(unterhaltungId: string): string {
 /** Das Postfach des Admins mit seinen drei Reitern (?reiter=…). */
 export const ADMIN_POSTFACH_HREF = '/admin/postfach'
 
-export type AdminPostfachReiter = 'unterhaltungen' | 'meldungen' | 'rundschreiben'
+/**
+ * Die Reiter des Admin-Postfachs (Register N12-Änderung, N14; Nr. 95):
+ * Eingang · Rundschreiben · Zustellung. Gewählt wird über ?reiter= — die
+ * Adresse ist Fremddaten, gelesen mit Zod (`adminPostfachReiterAus` in
+ * src/schemas/postfach.ts): Unbekanntes heißt „Eingang".
+ */
+export const ADMIN_POSTFACH_REITER_IDS = ['eingang', 'rundschreiben', 'zustellung'] as const
+export type AdminPostfachReiter = (typeof ADMIN_POSTFACH_REITER_IDS)[number]
 
 export const ADMIN_POSTFACH_REITER: readonly { id: AdminPostfachReiter; label: string }[] = [
-  { id: 'unterhaltungen', label: 'Unterhaltungen' },
-  { id: 'meldungen', label: 'Meldungen' },
+  { id: 'eingang', label: 'Eingang' },
   { id: 'rundschreiben', label: 'Rundschreiben' },
+  { id: 'zustellung', label: 'Zustellung' },
 ]
 
-/** Der Reiter aus der Adresse — unbekannt oder leer heißt „Unterhaltungen". Next liefert Doppeltes als Liste: dann der erste. */
-export function adminReiterAus(wert: string | string[] | undefined): AdminPostfachReiter {
-  const roh = Array.isArray(wert) ? wert[0] : wert
-  return ADMIN_POSTFACH_REITER.find((r) => r.id === roh)?.id ?? 'unterhaltungen'
-}
-
-/**
- * Ein Link in das Admin-Postfach. Die Filter des Reiters „Meldungen" kommen
- * aus briefkastenAdresse (admin-briefkasten.ts) als fertige Abfrage und
- * bleiben, wie sie sind; nur Ort und Reiter stehen hier.
- */
+/** Ein Link in das Admin-Postfach: Ort, Reiter (ohne Parameter für den Eingang) und weitere Parameter. */
 export function adminPostfachAdresse(reiter: AdminPostfachReiter, weitere: Record<string, string | undefined> = {}): string {
   const parameter = new URLSearchParams()
-  if (reiter !== 'unterhaltungen') parameter.set('reiter', reiter)
+  if (reiter !== 'eingang') parameter.set('reiter', reiter)
   for (const [schluessel, wert] of Object.entries(weitere)) if (wert) parameter.set(schluessel, wert)
   const q = parameter.toString()
   return q ? `${ADMIN_POSTFACH_HREF}?${q}` : ADMIN_POSTFACH_HREF
 }
 
-/** `/admin/meldungen?status=…` → `/admin/postfach?reiter=meldungen&status=…` (die Umleitung und die Filter im Reiter). */
-export function meldungenImPostfach(briefkastenLink: string): string {
-  const abfrage = briefkastenLink.split('?')[1] ?? ''
-  const filter = new URLSearchParams(abfrage)
-  return adminPostfachAdresse('meldungen', { status: filter.get('status') ?? undefined, art: filter.get('art') ?? undefined })
+// ─── Eingang: Filter und Auswahl ─────────────────────────────────────────────
+
+/** Die Filterchips des Eingangs (N12-Änderung): Offen · Antwort · Meldung · Aufgabe · Alle. */
+export const EINGANG_FILTER_IDS = ['offen', 'antwort', 'meldung', 'aufgabe', 'alle'] as const
+export type EingangFilter = (typeof EINGANG_FILTER_IDS)[number]
+
+export const EINGANG_FILTER_LABEL: Record<EingangFilter, string> = {
+  offen: 'Offen',
+  antwort: 'Antwort',
+  meldung: 'Meldung',
+  aufgabe: 'Aufgabe',
+  alle: 'Alle',
 }
+
+/** Was ein Eintrag ist: eine Antwort, eine Meldung oder eine der zwei Aufgaben (Hof wartet, Erstattung offen). */
+export const EINGANG_ARTEN = ['antwort', 'meldung', 'hof', 'erstattung'] as const
+export type EingangArt = (typeof EINGANG_ARTEN)[number]
+
+/** Die Auswahl in der Adresse (?id=): Art und Kennung, z. B. „hof-ck…". */
+export type EingangAuswahl = { art: EingangArt; id: string }
+
+export function eingangKennung(auswahl: EingangAuswahl): string {
+  return `${auswahl.art}-${auswahl.id}`
+}
+
+/** Ein Link in den Eingang: Filter (ohne Parameter für „Offen") und die gewählte Zeile. */
+export function eingangAdresse(filter: EingangFilter, auswahl: EingangAuswahl | null = null): string {
+  return adminPostfachAdresse('eingang', { art: filter === 'offen' ? undefined : filter, id: auswahl ? eingangKennung(auswahl) : undefined })
+}
+
+/** Eine Meldung im Eingang (Filter Meldung) — Ziel der Umleitung von /admin/meldungen/[id] und der Mails. */
+export function eingangMeldungAdresse(meldungId: string): string {
+  return adminPostfachAdresse('eingang', { art: 'meldung', meldung: meldungId })
+}
+
+/**
+ * Die Reiter von Stufe 1 (Nr. 87) führen in den Eingang mit passendem Filter:
+ * Unterhaltungen → Antwort (ein offener Faden bleibt gewählt), Meldungen →
+ * Meldung. Status- und Art-Filter des alten Reiters gibt es im Eingang nicht.
+ * null = keine alte Adresse.
+ */
+export function alteReiterAdresse(reiter: string | undefined, faden: string | undefined): string | null {
+  if (reiter === 'unterhaltungen') return eingangAdresse('antwort', faden ? { art: 'antwort', id: faden } : null)
+  if (reiter === 'meldungen') return eingangAdresse('meldung')
+  return null
+}
+
+/**
+ * `/admin/meldungen?…` → der Eingang mit Filter Meldung (die Umleitung in
+ * src/app/admin/meldungen/page.tsx). Status und Art der alten Liste zählen im
+ * Eingang nicht mehr — der Link wird deshalb nicht gelesen.
+ */
+export const meldungenImPostfach: (briefkastenLink: string) => string = () => eingangAdresse('meldung')
 
 // ─── Grenzen ─────────────────────────────────────────────────────────────────
 
@@ -139,6 +190,17 @@ export const POSTFACH_TEXT = {
  */
 export const GRUENDUNGS_NACHRICHT = (platz: number, bis: Date): string => `Du bist ${gruendungshofLabel(platz)} – ${baueGruendungsZusage(bis)}`
 
+/**
+ * Statt des Antwortfelds, wenn das Rundschreiben „Antwort möglich" aus hat
+ * (Register N14, Nr. 95; Wortlaut der Freigabe). „Problem melden" ist ein Link
+ * auf die bestehende Seite für eine neue Meldung.
+ */
+export const ANTWORT_NICHT_MOEGLICH = {
+  satz: 'Auf diese Nachricht kannst du nicht antworten. Hast du eine Frage dazu? Dann',
+  link: PROBLEM_MELDEN,
+  href: NEUE_MELDUNG_HREF,
+} as const
+
 /** Der Link der Nachricht: „Deine Konditionen" des Hofs, wo „Dein Stand" die Zusage zeigt. */
 export const GRUENDUNGS_NACHRICHT_LINK = '/settings/konditionen'
 
@@ -182,6 +244,8 @@ export const POSTFACH_FEHLER = {
   keinHof: 'Kein Hof gefunden.',
   zuViele: `Du hast heute schon ${NACHRICHTEN_JE_HOF_UND_TAG} Nachrichten geschrieben. Morgen geht es weiter – oder melde dich über „${PROBLEM_MELDEN}“.`,
   keineEmpfaenger: 'Für diese Auswahl gibt es keinen Hof. Wähl andere Empfänger.',
+  /** antworteAlsHof bei „Antwort möglich" aus — derselbe Weg wie der Hinweis im Faden. */
+  antwortNichtMoeglich: `Auf diese Nachricht kannst du nicht antworten. Hast du eine Frage dazu? Dann „${PROBLEM_MELDEN}“.`,
 } as const
 
 /** „1 neu", „3 neu" — die Marke neben dem Titel. */
@@ -552,25 +616,350 @@ export function nachrichtArtVon(art: 'INFO' | 'WICHTIG'): 'NORMAL' | 'WICHTIG' {
   return art === 'WICHTIG' ? 'WICHTIG' : 'NORMAL'
 }
 
+/** Der Haken „Antwort möglich" beim Verfassen: Wichtig → an, Info → aus (N14), jeweils änderbar. */
+export function antwortMoeglichStandard(art: 'INFO' | 'WICHTIG'): boolean {
+  return art === 'WICHTIG'
+}
+
+/** „2 Antworten", „keine Antwort möglich" — die Zeile unter einem gesendeten Rundschreiben (Mockup admin-rundschreiben). */
+export function antwortenText(anzahl: number, antwortMoeglich: boolean): string {
+  if (!antwortMoeglich) return 'keine Antwort möglich'
+  if (anzahl === 0) return 'keine Antwort'
+  return anzahl === 1 ? '1 Antwort' : `${anzahl} Antworten`
+}
+
+// ─── Eingang (Register N12-Änderung, N14; Nr. 95) ────────────────────────────
+
+/**
+ * Meldungen, die im Eingang als offen zählen — Freigabe §18: „Meldungen
+ * NEU/GEPRUEFT". Dieselbe Liste für Zähler, Kennzahl und Filter „Offen".
+ */
+export const MELDUNG_STATUS_OFFEN_IM_EINGANG: readonly MeldungStatus[] = ['NEU', 'GEPRUEFT']
+
+/** Eine Antwort eines Hofs: ein Faden, in dem ein Hof geschrieben hat (ladeUnterhaltungenAdmin). */
+export type EingangAntwortRoh = {
+  id: string
+  hofName: string
+  titel: string | null
+  letzteAntwort: { text: string; createdAt: Date }
+  ungelesen: boolean
+}
+
+/** Eine Meldung, wie der Eingang sie listet — Wer und Zeile fertig aus der Abfrage (Fremdtext nur als Text). */
+export type EingangMeldungRoh = {
+  id: string
+  art: MeldungArt
+  status: MeldungStatus
+  createdAt: Date
+  ersteZeile: string
+  wer: string
+  zeile: string
+}
+
+/**
+ * Ein wartender Hof (approvedAt null, nicht stillgelegt) mit dem, was die
+ * Prüfliste braucht — alles aus vorhandenen Feldern, nichts Neues gespeichert.
+ * `platz`: der Gründungsplatz bei sofortiger Freischaltung
+ * (`platzBeiFreischaltung`, dieselbe Regel und Platzzahl wie Admin › Höfe).
+ */
+export type HofAufgabeRoh = {
+  id: string
+  name: string
+  createdAt: Date
+  hofseite: { erledigt: number; gesamt: number }
+  stripeBereit: boolean
+  sepaErteilt: boolean
+  /** Futtermittel im Shop — nur dann zählt die LFBIS-Nummer. */
+  futter: boolean
+  lfbis: boolean
+  titelbild: boolean
+  email: 'bestaetigt' | 'offen' | 'vor-pflicht'
+  platz: number | null
+}
+
+/**
+ * Eine Bestellung mit offener Erstattung (Order.erstattungOffenSeit). Der
+ * Betrag ist, was die Kundin online bezahlt hat — aus `stornoBetraege`
+ * (dieselbe Rechnung wie Storno-Dialog und Mail), null ohne Online-Zahlung.
+ */
+export type ErstattungAufgabeRoh = {
+  id: string
+  bestellnummer: string
+  hofName: string
+  seit: Date
+  bezahltCents: number | null
+  schonErstattetCents: number
+  /** Kennung der Zahlung bei Stripe — nur für den Knopf ins Dashboard. */
+  zahlungKennung: string | null
+}
+
+export type EingangRoh = {
+  antworten: readonly EingangAntwortRoh[]
+  meldungen: readonly EingangMeldungRoh[]
+  hoefe: readonly HofAufgabeRoh[]
+  erstattungen: readonly ErstattungAufgabeRoh[]
+}
+
+/** Eine Zeile der Liste — fertig für die Anzeige, ohne Datenbank-Typen. */
+export type EingangEintrag = {
+  auswahl: EingangAuswahl
+  /** Die Marke vorn: „Antwort", „Fehler", „Wunsch", „Frage", „Aufgabe". */
+  marke: string
+  markeArt: MarkeArt
+  wer: string
+  zeit: Date
+  titel: string
+  zeile: string
+  offen: boolean
+}
+
+/** Alle Sätze des Eingangs — EINE Quelle für Liste, Spalten, Kennzahlen und Zähler. */
+export const EINGANG_TEXT = {
+  satz: 'Ein Eingang für alles, was dich braucht: Antworten der Höfe, Meldungen (Fehler, Wunsch, Frage) und Aufgaben aus dem System. Höfe beginnen keine Fäden – nur du.',
+  hauptaktion: 'Rundschreiben schreiben',
+  kennzahlenBeschriftung: 'Postfach in Zahlen',
+  unterreiterBeschriftung: 'Bereiche des Postfachs',
+  filterBeschriftung: 'Eingang filtern',
+  listeKopf: (filter: EingangFilter) => `Eingang · Filter ${EINGANG_FILTER_LABEL[filter]}`,
+  listeBeschriftung: 'Einträge im Eingang',
+  detailBeschriftung: 'Eintrag',
+  waehlen: 'Wähl einen Eintrag, um ihn zu lesen und zu erledigen.',
+  antwort: 'Antwort',
+  aufgabe: 'Aufgabe',
+  antwortTitel: (titel: string | null) => `Re: ${titel ?? POSTFACH_TEXT.ohneTitel}`,
+  hofWartetTitel: 'Wartet auf Freischaltung',
+  erstattungTitel: 'Erstattung offen',
+  bestellung: (nummer: string) => `Bestellung ${nummer}`,
+  offenSr: 'offen',
+  regel: 'Aufgaben sind keine eigenen Einträge: Sie verschwinden von selbst, sobald der Hof entschieden oder die Erstattung durch ist. Antworten gelten als erledigt, sobald du sie gelesen hast.',
+  offenTitel: 'Offen im Eingang',
+  offenTitelKurz: 'Offen',
+  geldTitel: 'Davon Geld',
+  geldTitelKurz: 'Geld',
+  rundschreibenTitel: 'Rundschreiben',
+  rundschreibenSatz: 'diesen Monat verschickt',
+  /** Die Zahl am Reiter „Postfach" der AdminShell (adminbereich.ts) und am Unterreiter „Eingang". */
+  zaehler: 'offene Einträge im Eingang',
+  alleZeigen: 'Alle zeigen',
+  offenesZeigen: 'Offenes zeigen',
+  hofKopf: (name: string) => `${name} wartet auf Freischaltung`,
+  registriert: (datum: string) => `registriert ${datum}`,
+  prueflisteBeschriftung: 'Prüfliste',
+  erledigtSr: ' – erledigt',
+  fehltSr: ' – fehlt',
+  hofRegel:
+    'Freischalten stellt den Hof online, vergibt den Gründungsplatz, solange einer frei ist, und schickt ihm die Zusage. Ablehnen löscht den wartenden Hof samt Konto – das geht nur ohne Bestellungen. Die Aufgabe verschwindet aus dem Eingang, sobald du entschieden hast.',
+  erstattungKopf: (nummer: string) => `Erstattung offen – Bestellung ${nummer}`,
+  offenSeit: (hof: string, datum: string) => `${hof} · offen seit ${datum}`,
+  bezahlt: 'Online bezahlt (Waren und Servicegebühr)',
+  schonErstattet: 'Davon schon erstattet',
+  erstattungAnweisung:
+    'Erstatten geht nur über das Plattformkonto bei Stripe. Die genaue Anweisung mit den Beträgen je Weg steht in der Mail „Erstattung offen“ und in Sentry. Meldet Stripe die Erstattung, verschwindet die Aufgabe von selbst.',
+  /** Der Knopf der Freigabe („Zur Bestellung") — er führt zur Zahlung bei Stripe, eine Admin-Seite der Bestellung gibt es nicht. */
+  zurBestellung: 'Zur Bestellung bei Stripe',
+  ohneZahlung: 'Keine Zahlungskennung gespeichert – such die Bestellung bei Stripe über die Bestellnummer.',
+} as const
+
+/** Leerzustände je Filter (Register N9) — der Ausweg steht im Aufruf. */
+export const EINGANG_LEER: Record<EingangFilter, { titel: string; satz: string }> = {
+  offen: { titel: 'Nichts offen', satz: 'Neue Antworten der Höfe, neue Meldungen und Aufgaben erscheinen hier.' },
+  antwort: { titel: 'Bisher keine Antwort von einem Hof', satz: 'Antwortet ein Hof auf ein Rundschreiben, steht die Unterhaltung hier.' },
+  meldung: { titel: 'Bisher keine Meldung', satz: `Was Höfe und Kundinnen über „${PROBLEM_MELDEN}“ schicken, steht hier.` },
+  aufgabe: { titel: 'Keine Aufgabe offen', satz: 'Wartet ein Hof auf die Freischaltung oder steht eine Erstattung aus, steht es hier.' },
+  alle: { titel: 'Der Eingang ist leer', satz: 'Antworten, Meldungen und Aufgaben erscheinen hier, sobald es welche gibt.' },
+}
+
+function zahlWort(anzahl: number, eins: string, viele: string): string {
+  return `${anzahl} ${anzahl === 1 ? eins : viele}`
+}
+
+/** Was offen ist, gezählt — dieselbe Zählung für den Reiter der AdminShell und „Offen" im Eingang. */
+export type EingangZahlen = { antworten: number; meldungen: number; hoefe: number; erstattungen: number }
+
+export function offenGesamt(z: EingangZahlen): number {
+  return z.antworten + z.meldungen + z.hoefe + z.erstattungen
+}
+
+/** „2 Antworten · 1 Meldung · 2 Aufgaben" — die Zeile unter „Offen im Eingang". */
+export function offenSatz(z: EingangZahlen): string {
+  if (offenGesamt(z) === 0) return 'nichts offen'
+  return [zahlWort(z.antworten, 'Antwort', 'Antworten'), zahlWort(z.meldungen, 'Meldung', 'Meldungen'), zahlWort(z.hoefe + z.erstattungen, 'Aufgabe', 'Aufgaben')].join(' · ')
+}
+
+/** Die Zeile unter „Davon Geld": mit genau einer offenen Erstattung ihr Betrag — summiert wird nichts. */
+export function geldSatz(erstattungen: readonly ErstattungAufgabeRoh[]): string {
+  if (erstattungen.length === 0) return 'keine Erstattung offen'
+  const [einzige] = erstattungen
+  if (erstattungen.length === 1 && einzige.bezahltCents !== null) return `Erstattung offen, ${formatEuro(centsAlsEuro(einzige.bezahltCents))}`
+  return zahlWort(erstattungen.length, 'Erstattung offen', 'Erstattungen offen')
+}
+
+/**
+ * Die Kennzahlen des Postfachs (Seitenmuster N15, Mockup admin-postfach):
+ * Offen im Eingang · Davon Geld · Rundschreiben diesen Monat. Ein Ton nur bei
+ * Handlungsbedarf. Ohne „Antwortzeit" — sie steht weder in der Freigabe noch
+ * im Register (Bericht 95).
+ */
+export function postfachKennzahlen(stand: { zahlen: EingangZahlen; erstattungen: readonly ErstattungAufgabeRoh[]; rundschreibenImMonat: number }): KennzahlDaten[] {
+  const offen = offenGesamt(stand.zahlen)
+  return [
+    { id: 'offen', titel: EINGANG_TEXT.offenTitel, titelKurz: EINGANG_TEXT.offenTitelKurz, wert: String(offen), satz: offenSatz(stand.zahlen), ton: offen > 0 ? 'tun' : 'neutral' },
+    {
+      id: 'geld',
+      titel: EINGANG_TEXT.geldTitel,
+      titelKurz: EINGANG_TEXT.geldTitelKurz,
+      wert: String(stand.zahlen.erstattungen),
+      satz: geldSatz(stand.erstattungen),
+      ton: stand.zahlen.erstattungen > 0 ? 'tun' : 'neutral',
+    },
+    { id: 'rundschreiben', titel: EINGANG_TEXT.rundschreibenTitel, wert: String(stand.rundschreibenImMonat), satz: EINGANG_TEXT.rundschreibenSatz, ton: 'neutral' },
+  ]
+}
+
+/** Die Unterreiter des Postfachs (Eingang mit der Zahl „Offen", Rundschreiben, Zustellung) — echte Links mit ?reiter=. */
+export function postfachUnterreiter(offen: number | null): UnterreiterDaten[] {
+  return ADMIN_POSTFACH_REITER.map((r) => ({
+    id: r.id,
+    label: r.label,
+    href: adminPostfachAdresse(r.id),
+    zahl: r.id === 'eingang' && offen !== null ? String(offen) : undefined,
+  }))
+}
+
+/** „Hofseite 9 von 11 · Stripe und SEPA da – bekäme Gründungsplatz Nr. 8" (Mockup admin-postfach). */
+export function hofAufgabeZeile(h: HofAufgabeRoh): string {
+  const zahlung = h.stripeBereit ? (h.sepaErteilt ? 'Stripe und SEPA da' : 'Stripe da, SEPA fehlt') : 'Stripe fehlt'
+  const platz = wartelistePlatzZeile(h, h.platz)
+  return `Hofseite ${h.hofseite.erledigt} von ${h.hofseite.gesamt} · ${zahlung}${platz ? ` – ${platz.text}` : ''}`
+}
+
+export type PruefPunkt = { schluessel: string; text: string; erledigt: boolean }
+
+/**
+ * Die Prüfliste eines wartenden Hofs (Freigabe §18: Hofseite-Fortschritt,
+ * Stripe, SEPA, LFBIS, Titelbild, E-Mail bestätigt) — nur aus vorhandenen
+ * Feldern. Die LFBIS-Zeile steht nur bei Futtermitteln im Shop. Ein Konto von
+ * vor der Bestätigungspflicht (S3) gilt beim Freischalten als frei.
+ */
+export function hofPruefliste(h: HofAufgabeRoh): PruefPunkt[] {
+  const punkte: PruefPunkt[] = [
+    { schluessel: 'hofseite', text: `Hofseite ${h.hofseite.erledigt} von ${h.hofseite.gesamt} ausgefüllt`, erledigt: h.hofseite.erledigt >= h.hofseite.gesamt },
+    { schluessel: 'stripe', text: h.stripeBereit ? 'Stripe eingerichtet' : 'Stripe fehlt – ohne Stripe kein Freischalten', erledigt: h.stripeBereit },
+    { schluessel: 'sepa', text: h.sepaErteilt ? 'SEPA-Mandat erteilt' : 'SEPA-Mandat fehlt', erledigt: h.sepaErteilt },
+  ]
+  if (h.futter) punkte.push({ schluessel: 'lfbis', text: h.lfbis ? 'Futtermittel: LFBIS-Nummer angegeben' : 'Futtermittel ohne LFBIS-Nummer', erledigt: h.lfbis })
+  punkte.push({ schluessel: 'titelbild', text: h.titelbild ? 'Titelbild hochgeladen' : 'Kein eigenes Titelbild', erledigt: h.titelbild })
+  punkte.push({
+    schluessel: 'email',
+    text: h.email === 'bestaetigt' ? 'E-Mail bestätigt' : h.email === 'offen' ? 'E-Mail noch nicht bestätigt – ohne sie kein Freischalten' : 'E-Mail: Konto von vor der Bestätigungspflicht',
+    erledigt: h.email !== 'offen',
+  })
+  return punkte
+}
+
+/** „Hof Muster · online bezahlt € 23,40 – Erstattung steht aus". */
+export function erstattungZeile(e: ErstattungAufgabeRoh): string {
+  return e.bezahltCents === null ? `${e.hofName} · Erstattung steht aus` : `${e.hofName} · online bezahlt ${formatEuro(centsAlsEuro(e.bezahltCents))} – Erstattung steht aus`
+}
+
+/**
+ * Die Zahlung im Stripe-Dashboard des laufenden Modus — es gibt keine
+ * Admin-Seite einer Bestellung; erstattet wird dort, im bestehenden Weg. Ohne
+ * Kennung oder ohne Schlüssel kein Link.
+ */
+export function stripeZahlungAdresse(zahlungKennung: string | null, modus: 'test' | 'live' | 'fehlt'): string | null {
+  if (zahlungKennung === null || modus === 'fehlt' || !/^pi_[A-Za-z0-9]+$/.test(zahlungKennung)) return null
+  return `https://dashboard.stripe.com/${modus === 'test' ? 'test/' : ''}payments/${zahlungKennung}`
+}
+
+function antwortEintrag(a: EingangAntwortRoh): EingangEintrag {
+  return {
+    auswahl: { art: 'antwort', id: a.id },
+    marke: EINGANG_TEXT.antwort,
+    markeArt: 'laeuft',
+    wer: a.hofName,
+    zeit: a.letzteAntwort.createdAt,
+    titel: EINGANG_TEXT.antwortTitel(a.titel),
+    zeile: a.letzteAntwort.text,
+    offen: a.ungelesen,
+  }
+}
+
+function meldungEintrag(m: EingangMeldungRoh): EingangEintrag {
+  return {
+    auswahl: { art: 'meldung', id: m.id },
+    marke: MELDUNG_ART_LABEL[m.art],
+    markeArt: m.art === 'FEHLER' ? 'tun' : 'laeuft',
+    wer: m.wer,
+    zeit: m.createdAt,
+    titel: m.ersteZeile || '—',
+    zeile: m.zeile,
+    offen: MELDUNG_STATUS_OFFEN_IM_EINGANG.includes(m.status),
+  }
+}
+
+function hofEintrag(h: HofAufgabeRoh): EingangEintrag {
+  return {
+    auswahl: { art: 'hof', id: h.id },
+    marke: EINGANG_TEXT.aufgabe,
+    markeArt: 'tun',
+    wer: h.name,
+    zeit: h.createdAt,
+    titel: EINGANG_TEXT.hofWartetTitel,
+    zeile: hofAufgabeZeile(h),
+    offen: true,
+  }
+}
+
+function erstattungEintrag(e: ErstattungAufgabeRoh): EingangEintrag {
+  return {
+    auswahl: { art: 'erstattung', id: e.id },
+    marke: EINGANG_TEXT.aufgabe,
+    markeArt: 'tun',
+    wer: EINGANG_TEXT.bestellung(e.bestellnummer),
+    zeit: e.seit,
+    titel: EINGANG_TEXT.erstattungTitel,
+    zeile: erstattungZeile(e),
+    offen: true,
+  }
+}
+
+function passt(e: EingangEintrag, filter: EingangFilter): boolean {
+  if (filter === 'offen') return e.offen
+  if (filter === 'antwort') return e.auswahl.art === 'antwort'
+  if (filter === 'meldung') return e.auswahl.art === 'meldung'
+  if (filter === 'aufgabe') return e.auswahl.art === 'hof' || e.auswahl.art === 'erstattung'
+  return true
+}
+
+/**
+ * Der Eingang als EINE Liste (N12-Änderung): Antworten, Meldungen und
+ * Aufgaben gemischt, neueste zuerst, nach Filter. „Offen" = ungelesene
+ * Antworten, Meldungen NEU/GEPRUEFT und jede Aufgabe (Aufgaben sind offen,
+ * solange es sie gibt). Gleiche Zeit: feste Reihenfolge über die Kennung.
+ */
+export function eingangEintraege(roh: EingangRoh, filter: EingangFilter): EingangEintrag[] {
+  return [...roh.antworten.map(antwortEintrag), ...roh.meldungen.map(meldungEintrag), ...roh.hoefe.map(hofEintrag), ...roh.erstattungen.map(erstattungEintrag)]
+    .filter((e) => passt(e, filter))
+    .sort((a, b) => b.zeit.getTime() - a.zeit.getTime() || eingangKennung(a.auswahl).localeCompare(eingangKennung(b.auswahl)))
+}
+
 /** Sätze des Admin-Postfachs — EINE Quelle für die drei Reiter und das Formular. */
 export const ADMIN_POSTFACH_TEXT = {
   titel: 'Postfach',
   satz: 'Alles, was Höfe und Kundschaft dir schreiben – an einem Ort.',
   neuesRundschreiben: 'Neues Rundschreiben',
-  unterhaltungenHinweis: 'Hier stehen die Antworten der Höfe auf deine Rundschreiben. Was ein Hof von sich aus meldet, steht unter „Meldungen“.',
-  rundschreibenHinweis: 'Ein Rundschreiben landet bei jedem Empfänger als Nachricht vom Team im Postfach; Antworten kommen unter „Unterhaltungen“ zu dir.',
+  rundschreibenHinweis: 'Ein Rundschreiben landet bei jedem Empfänger als Nachricht vom Team im Postfach; Antworten kommen im Eingang zu dir.',
   antwortAuf: 'Antwort auf',
   antwortFeld: (hof: string) => `Antwort an ${hof} …`,
   alsWichtig: 'Als Wichtig markieren',
   linkEinfuegen: 'Link einfügen',
   auchPerMail: 'Auch per E-Mail (Betriebsmitteilung)',
-  // Ohne „links": Unter 1024 px steht der Faden unter der Liste.
-  waehlen: 'Wähl eine Unterhaltung, um sie zu lesen und zu antworten.',
   du: 'du',
   gesendet: 'Gesendet',
   regeln: 'Regeln',
   regelnText:
-    'Rundschreiben sind für Betriebsmitteilungen: neue Funktionen, Abrechnung, Rechtliches, Bitten an einzelne Höfe. Werbung für Dritte gibt es hier nicht. Per E-Mail geht ein Rundschreiben nur, wenn es den Betrieb des Hofs betrifft – sonst bleibt es in der App. Jeder Hof kann antworten; die Antwort landet als Unterhaltung in deinem Postfach.',
+    'Rundschreiben sind für Betriebsmitteilungen: neue Funktionen, Abrechnung, Rechtliches, Bitten an einzelne Höfe. Werbung für Dritte gibt es hier nicht. Per E-Mail geht ein Rundschreiben nur, wenn es den Betrieb des Hofs betrifft – sonst bleibt es in der App. Mit „Antwort möglich“ kann jeder Empfänger im Faden antworten; die Antwort landet im Eingang.',
   an: 'An',
   hofSuchen: 'Hof suchen …',
   art: 'Art',
@@ -586,19 +975,16 @@ export const ADMIN_POSTFACH_TEXT = {
    */
   linkBeispiel: '/products',
   perMail: 'Auch per E-Mail schicken – Betriebsmitteilung',
+  antwortMoeglich: 'Antwort möglich',
+  antwortMoeglichSatz: `Der Hof kann im Faden antworten. Aus bei reiner Info – dann sieht er statt des Felds einen Hinweis auf „${PROBLEM_MELDEN}“.`,
   // Kein „Absender: …": Der Kopf der Mail nennt die Plattform (EMAIL_FROM), das Team steht in der Mail.
   perMailSatz: `Nur, wenn es den Betrieb des Hofs betrifft. In der Mail steht „Nachricht vom ${MARKE_TEAM}“, geantwortet wird in der App.`,
   soSiehtsDerHof: 'So sieht’s der Hof',
   nochNichtGelesen: 'noch nicht gelesen',
   rundschreiben: 'Rundschreiben',
   keinHofGewaehlt: 'Wähl oben mindestens einen Hof aus.',
-  reiterBeschriftung: 'Bereiche des Postfachs',
-  zaehlerAntworten: 'ungelesene Antworten',
-  zaehlerMeldungen: 'Meldungen zu entscheiden',
-  /** Die Zahl am Reiter „Postfach" der AdminShell zählt beides (adminbereich.ts). */
-  zaehlerReiter: 'ungelesene Antworten und Meldungen zu entscheiden',
-  listeBeschriftung: 'Unterhaltungen mit Antworten der Höfe',
-  fadenBeschriftung: 'Unterhaltung',
+  /** Die Zahl am Reiter „Postfach" der AdminShell — dieselbe wie „Offen" im Eingang (adminbereich.ts). */
+  zaehlerReiter: EINGANG_TEXT.zaehler,
   gespeichert: 'Antwort gespeichert.',
   mitMail: 'Antwort gespeichert – mit E-Mail an den Hof.',
   gedrosselt: 'Antwort gespeichert. Keine E-Mail: Zu dieser Unterhaltung ging in der letzten Stunde schon eine.',
@@ -608,16 +994,10 @@ export const ADMIN_POSTFACH_TEXT = {
   gelesenVomHof: 'gelesen',
   /** Ein Reiter ließ sich nicht laden — AdminFehler mit „Noch einmal versuchen". */
   ladeFehler: {
-    unterhaltungen: 'Wir konnten die Unterhaltungen gerade nicht laden.',
-    meldungen: 'Wir konnten die Meldungen gerade nicht laden.',
+    eingang: 'Wir konnten den Eingang gerade nicht laden.',
     rundschreiben: 'Wir konnten die Rundschreiben gerade nicht laden.',
+    zustellung: 'Wir konnten die Zustellung gerade nicht laden.',
   } satisfies Record<AdminPostfachReiter, string>,
-} as const
-
-/** Der Leerzustand „Unterhaltungen" (Register N9): Der Ausweg ist ein neues Rundschreiben. */
-export const UNTERHALTUNGEN_LEER = {
-  titel: 'Noch keine Antwort von einem Hof',
-  satz: 'Antwortet ein Hof auf ein Rundschreiben, steht die Unterhaltung hier.',
 } as const
 
 /** Der Leerzustand „Gesendet" (Register N9). Ohne Aktion, Grund in `ohne` (wie POSTFACH_LEER). */
