@@ -7,18 +7,26 @@
  * der Token steht im Formular, nicht in der Ziel-Adresse; ein kaputter,
  * abgelaufener oder benutzter Link zeigt einen Satz ohne Knopf; POST löst
  * genau mit dem Token aus dem Körper ein. Kein Referrer, kein Suchindex, kein
- * Cache. Datenbank und Action gemockt — das Einlösen selbst prüft
+ * Cache. Datenbank und Einlösen gemockt — das Einlösen selbst prüft
  * tests/integration/postfach-eingang.int.test.ts.
+ *
+ * Runde 1: Das Einlösen liegt in src/server/zustellung-bestaetigen.ts, OHNE
+ * 'use server' — jeder Export einer 'use server'-Datei ist ein öffentlicher
+ * Endpunkt (Aktions-ID). Die Wache unten verlangt deshalb von jeder
+ * exportierten async-Funktion in src/server/actions/postfach.ts die
+ * Admin-Prüfung oder den Hof der Sitzung.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { NextRequest } from 'next/server'
 
 vi.mock('@/server/queries/postfach', () => ({ ladeEmpfaengerBestaetigung: vi.fn() }))
-vi.mock('@/server/actions/postfach', () => ({ bestaetigeEmpfaenger: vi.fn() }))
+vi.mock('@/server/zustellung-bestaetigen', () => ({ bestaetigeEmpfaenger: vi.fn() }))
 
 import { GET, POST } from '@/app/admin/postfach/zustellung/bestaetigen/route'
 import { ladeEmpfaengerBestaetigung } from '@/server/queries/postfach'
-import { bestaetigeEmpfaenger } from '@/server/actions/postfach'
+import { bestaetigeEmpfaenger } from '@/server/zustellung-bestaetigen'
 import { BESTAETIGEN_TEXT } from '@/lib/zustellung'
 
 const TOKEN = 'Ab-_'.repeat(10) + 'xyz'
@@ -81,5 +89,33 @@ describe('POST — einlösen per Knopf', () => {
     expect(await (await POST(formular(TOKEN))).text()).toContain(BESTAETIGEN_TEXT.ungueltigTitel)
     vi.mocked(bestaetigeEmpfaenger).mockResolvedValue({ error: 'abgelaufen' })
     expect(await (await POST(formular(TOKEN))).text()).toContain(BESTAETIGEN_TEXT.abgelaufenTitel)
+  })
+})
+
+describe('Wache: kein ungeprüfter Endpunkt in den Postfach-Actions', () => {
+  const quelle = readFileSync(join(process.cwd(), 'src/server/actions/postfach.ts'), 'utf8')
+  // Jede exportierte async-Funktion mit ihrem Körper bis zum nächsten Export.
+  const exporte = [...quelle.matchAll(/^export async function (\w+)\(/gm)].map((treffer, i, alle) => ({
+    name: treffer[1]!,
+    koerper: quelle.slice(treffer.index, alle[i + 1]?.index ?? quelle.length),
+  }))
+  const namen = new Set(exporte.map((e) => e.name))
+  /** Prüft selbst (Admin bzw. Hof der Sitzung) oder ruft nur einen Export, der selbst prüft. */
+  function geprueft(koerper: string): boolean {
+    if (/await (verlangeAdminAktion|hofDerSitzung)\(\)/.test(koerper)) return true
+    return [...koerper.matchAll(/await (\w+)\(/g)].some((t) => t[1] !== undefined && namen.has(t[1]) && geprueft(exporte.find((e) => e.name === t[1])!.koerper))
+  }
+
+  it('die Datei ist eine Server-Action-Datei und hat Exporte', () => {
+    expect(quelle.startsWith("'use server'")).toBe(true)
+    expect(exporte.length).toBeGreaterThan(5)
+  })
+
+  it('jede exportierte async-Funktion verlangt Admin oder den Hof der Sitzung', () => {
+    expect(exporte.filter((e) => !geprueft(e.koerper)).map((e) => e.name)).toEqual([])
+  })
+
+  it('das Einlösen ohne Anmeldung steht nicht in der Action-Datei', () => {
+    expect(namen.has('bestaetigeEmpfaenger')).toBe(false)
   })
 })

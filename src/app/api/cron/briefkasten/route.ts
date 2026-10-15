@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { del } from '@vercel/blob'
 import { env } from '@/lib/env'
 import { cronBerechtigt } from '@/lib/geheimnis'
-import { brauchtZusammenfassung, screenshotsVon, waehleZuLoeschende } from '@/lib/meldung'
+import { screenshotsVon, waehleZuLoeschende } from '@/lib/meldung'
 import { findeLoeschKandidaten, loescheMeldungen, zaehleFuerWochenlauf } from '@/server/queries/meldung'
 import { sendBriefkastenZusammenfassung } from '@/lib/email'
-import { ladeBetreiberEmpfaenger } from '@/server/queries/postfach'
+import { ladeBetreiberEmpfaenger, zaehleOffenImEingang } from '@/server/queries/postfach'
 
 /**
  * Wochenlauf des Fehlerbriefkastens (Sprint fehlerbriefkasten, Teil F).
@@ -25,9 +25,11 @@ import { ladeBetreiberEmpfaenger } from '@/server/queries/postfach'
  *       wäre einer).
  *   (a) Zusammenfassung an die Empfängerliste der Zustellung — NUR wenn die
  *       Regel „Wochenbericht" an ist (Register N14, Nr. 95; leere Liste = aus)
- *       UND es neue Meldungen gibt oder Meldungen länger als 14 Tage in
- *       NEU/GEPRUEFT stehen. Sonst keine Mail: eine leere Wochenmail wäre die
- *       erste, die keiner mehr liest.
+ *       UND im Eingang etwas offen ist (zaehleOffenImEingang: ungelesene
+ *       Antworten, Meldungen NEU/GEPRUEFT, wartende Höfe, offene
+ *       Erstattungen — dieselbe Zählung wie „Offen" und der Reiter). Sonst
+ *       keine Mail: eine leere Wochenmail wäre die erste, die keiner mehr
+ *       liest. Der Meldungsteil der Mail (neu, liegen geblieben) bleibt.
  * Aufräumen läuft zuerst, damit die Zusammenfassung den Stand danach nennt.
  */
 export async function GET(request: NextRequest) {
@@ -50,16 +52,16 @@ export async function GET(request: NextRequest) {
   }
   const geloescht = await loescheMeldungen(zuLoeschen.map((m) => m.id))
 
-  // (a) Zusammenfassung nur bei Bedarf
-  const zaehler = await zaehleFuerWochenlauf(jetzt)
-  const zusammenfassung = brauchtZusammenfassung(zaehler)
-  const an = zusammenfassung ? await ladeBetreiberEmpfaenger('wochenbericht') : []
+  // (a) Zusammenfassung nur, wenn im Eingang etwas offen ist
+  const [zaehler, eingang] = await Promise.all([zaehleFuerWochenlauf(jetzt), zaehleOffenImEingang()])
+  const an = eingang.gesamt > 0 ? await ladeBetreiberEmpfaenger('wochenbericht') : []
   if (an.length > 0) {
-    await sendBriefkastenZusammenfassung({ ...zaehler, geloescht }, an)
+    await sendBriefkastenZusammenfassung({ ...zaehler, geloescht, eingang }, an)
   }
 
   return NextResponse.json({
     zusammenfassung: an.length > 0,
+    offenImEingang: eingang.gesamt,
     neu: zaehler.neu,
     liegenGeblieben: zaehler.liegenGeblieben,
     geloescht,

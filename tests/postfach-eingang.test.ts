@@ -8,6 +8,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
+  alteReiterAdresse,
   antwortMoeglichStandard,
   antwortenText,
   eingangEintraege,
@@ -22,7 +23,7 @@ import {
   type ErstattungAufgabeRoh,
   type HofAufgabeRoh,
 } from '@/lib/postfach'
-import { adminPostfachReiterAus, eingangAuswahlAus, eingangFilterAus } from '@/schemas/postfach'
+import { adminPostfachReiterAus, eingangAuswahlAus, eingangFilterAus, fadenKennungAus } from '@/schemas/postfach'
 
 const um = (stunde: number) => new Date(`2026-10-15T${String(stunde).padStart(2, '0')}:00:00Z`)
 
@@ -199,5 +200,15 @@ describe('Adresse als Fremddaten', () => {
     expect(eingangAuswahlAus('fremd-abc', undefined)).toBeNull()
     expect(eingangAuswahlAus('hof-abc;drop', undefined)).toBeNull()
     expect(eingangAuswahlAus(undefined, '../x')).toBeNull()
+  })
+
+  it('alte Adresse ?reiter=unterhaltungen&faden=: nur eine Kennung kommt in die Umleitung, Unsinn wird weggelassen', () => {
+    expect(fadenKennungAus('cfaden123')).toBe('cfaden123')
+    expect(fadenKennungAus(['cfaden123', 'anderer'])).toBe('cfaden123')
+    expect(fadenKennungAus('x"><script>')).toBeUndefined()
+    expect(fadenKennungAus('../../admin')).toBeUndefined()
+    expect(fadenKennungAus(undefined)).toBeUndefined()
+    expect(alteReiterAdresse('unterhaltungen', fadenKennungAus('böse/../'))).toBe(alteReiterAdresse('unterhaltungen', undefined))
+    expect(alteReiterAdresse('unterhaltungen', fadenKennungAus('cfaden123'))).toContain('id=antwort-cfaden123')
   })
 })
