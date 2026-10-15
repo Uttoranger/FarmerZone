@@ -5,9 +5,13 @@
  * Datenbank und Sitzung, die Berechtigung echt (verlangeAdminAktion).
  *
  * Beweist: Weniger Plätze als vergeben geht nicht (gleich viele schon), ein
- * Ende vor dem heutigen WIENER Tag nicht, heute schon; „1e2" ist keine Zahl;
+ * Ende vor dem heutigen WIENER Tag nicht, heute schon;
  * das Schema gibt nur eigene deutsche Sätze heraus; ohne Admin-Recht wird
  * nichts geschrieben und nichts gelesen; mit Recht nur die Felder der Gruppe.
+ * Bis zur Nacharbeit (Runde 1, pruefer-Blocker) sind Plätze gesamt und das
+ * Standard-Ende gesperrt: Die Action lehnt jede Abweichung von 12 bzw.
+ * 31.12.2027 ab und schreibt nichts — Gegenprobe: nur die Anzeige umschalten
+ * geht; das Formular zeigt die zwei Felder nur lesend mit Hinweis.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -21,20 +25,26 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn(), unstable_cache: (fn: unknown) => fn }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
+vi.mock('sonner', () => ({ toast: { success: vi.fn() } }))
 
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { revalidatePath, updateTag } from 'next/cache'
 import {
+  EINSTELLUNGEN_TEXT,
   GRUENDUNG_EINSTELLUNG_FEHLER,
   PLATTFORM_EINSTELLUNG_STANDARD,
-  plaetzeAusEingabe,
   plattformEinstellungAus,
   protokollZeile,
   pruefeGruendungEingabe,
+  pruefeGruendungSperre,
 } from '@/lib/plattform-einstellung'
 import { einstellungenGruppeSchema, gruendungEinstellungSchema } from '@/schemas/plattform-einstellung'
 import { speichereGruendungEinstellung } from '@/server/actions/plattform-einstellung'
+import { EinstellungenGruendung } from '@/components/admin/einstellungen-gruendung'
 
 const JETZT = new Date('2026-10-15T10:00:00+02:00')
 const GUT = { plaetze: 12, bisTag: '2027-12-31', anzeige: true }
@@ -61,12 +71,14 @@ describe('pruefeGruendungEingabe', () => {
     expect(pruefeGruendungEingabe({ ...GUT, plaetze: 2.5 }, 0, JETZT)).toBe(GRUENDUNG_EINSTELLUNG_FEHLER.plaetze)
     expect(pruefeGruendungEingabe({ ...GUT, plaetze: -1 }, 0, JETZT)).toBe(GRUENDUNG_EINSTELLUNG_FEHLER.plaetze)
   })
+})
 
-  it('das Feld „Plätze gesamt": nur Ziffern zählen', () => {
-    expect(plaetzeAusEingabe(' 15 ')).toBe(15)
-    expect(plaetzeAusEingabe('1e2')).toBeNull()
-    expect(plaetzeAusEingabe('')).toBeNull()
-    expect(plaetzeAusEingabe('12,5')).toBeNull()
+describe('pruefeGruendungSperre — Plätze und Standard-Ende bleiben bei den Konstanten', () => {
+  it('genau 12 und 31.12.2027: in Ordnung; jede Abweichung: der feste Satz', () => {
+    expect(pruefeGruendungSperre(GUT)).toBeNull()
+    for (const abweichend of [{ ...GUT, plaetze: 13 }, { ...GUT, plaetze: 11 }, { ...GUT, bisTag: '2028-06-30' }, { ...GUT, bisTag: '2027-12-30' }]) {
+      expect(pruefeGruendungSperre(abweichend)).toBe(GRUENDUNG_EINSTELLUNG_FEHLER.gesperrt)
+    }
   })
 })
 
@@ -167,12 +179,23 @@ describe('speichereGruendungEinstellung — die Wache und was geschrieben wird',
     expect(p.plattformEinstellung.upsert).not.toHaveBeenCalled()
   })
 
-  it('mit Recht: nur die Felder der Gruppe samt Person, danach Cache und Seiten neu', async () => {
+  it.each([
+    ['mehr Plätze', { ...GUT, plaetze: 13 }],
+    ['ein anderes Ende', { ...GUT, bisTag: '2028-06-30' }],
+    ['beides', { plaetze: 20, bisTag: '2028-06-30', anzeige: false }],
+  ])('gesperrt (%s): der feste Satz, nichts geschrieben, kein Cache geleert', async (_fall, eingabe) => {
     angemeldet(true)
-    expect(await speichereGruendungEinstellung({ plaetze: 7, bisTag: '2028-06-30', anzeige: false })).toEqual({ ok: true })
+    expect(await speichereGruendungEinstellung(eingabe)).toEqual({ error: GRUENDUNG_EINSTELLUNG_FEHLER.gesperrt })
+    expect(p.plattformEinstellung.upsert).not.toHaveBeenCalled()
+    expect(vi.mocked(updateTag)).not.toHaveBeenCalled()
+  })
+
+  it('mit Recht (Gegenprobe zur Sperre: nur die Anzeige umgeschaltet): die Felder der Gruppe samt Person, danach Cache und Seiten neu', async () => {
+    angemeldet(true)
+    expect(await speichereGruendungEinstellung({ ...GUT, anzeige: false })).toEqual({ ok: true })
     const werte = {
-      gruendungPlaetze: 7,
-      gruendungBisStandard: new Date('2028-06-30T00:00:00.000Z'),
+      gruendungPlaetze: 12,
+      gruendungBisStandard: new Date('2027-12-31T00:00:00.000Z'),
       gruendungAnzeige: false,
       geaendertVonUserId: 'konto-1',
     }
@@ -183,5 +206,23 @@ describe('speichereGruendungEinstellung — die Wache und was geschrieben wird',
     })
     expect(vi.mocked(updateTag)).toHaveBeenCalledWith('plattform-einstellung')
     for (const pfad of ['/', '/fuer-hoefe', '/register', '/admin/einstellungen']) expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith(pfad)
+  })
+})
+
+describe('EinstellungenGruendung — die zwei gesperrten Felder', () => {
+  const daten = { gespeichert: GUT, imRennen: 7, jetzt: JETZT.toISOString(), protokoll: 'Noch nie geändert – es gelten die Standardwerte.' }
+
+  it('Plätze und Ende nur lesend mit Hinweis; der Schalter bleibt bedienbar', () => {
+    const html = renderToStaticMarkup(createElement(EinstellungenGruendung, { daten }))
+    const felder = html.match(/<input[^>]*>/g) ?? []
+    expect(felder).toHaveLength(2)
+    for (const feld of felder) expect(feld).toMatch(/readonly=""/i)
+    expect(html).toContain('value="12"')
+    expect(html).toContain('value="2027-12-31"')
+    expect(html).toContain(EINSTELLUNGEN_TEXT.gruendung.gesperrtHinweis)
+    // Gegenprobe: Der Schalter „Auf den Seiten zeigen" ist weder gesperrt noch nur lesend.
+    const schalter = html.match(/<button[^>]*role="switch"[^>]*>/)?.[0] ?? ''
+    expect(schalter).toContain('aria-checked="true"')
+    expect(schalter).not.toMatch(/disabled|readonly/i)
   })
 })

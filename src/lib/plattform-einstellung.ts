@@ -11,6 +11,8 @@
  *
  * Die Prüfungen (Plätze ≥ vergeben, Ende ≥ heute) sind reine Funktionen mit
  * festen Sätzen: dieselben im Formular (sofort) und in der Action (Schutz).
+ * Bis zur Nacharbeit sind Plätze und Standard-Ende gesperrt
+ * (`pruefeGruendungSperre`); schaltbar ist nur die Anzeige.
  */
 import {
   GRUENDUNG_BIS_STANDARD_TAG,
@@ -91,6 +93,7 @@ export const GRUENDUNG_EINSTELLUNG_FEHLER = {
   plaetze: `Trag bei „Plätze gesamt“ eine ganze Zahl von 0 bis ${GRUENDUNG_PLAETZE_MAX} ein.`,
   datum: 'Wähle den letzten Tag, bis zu dem neue Gründungshöfe kostenlos sind.',
   vergangen: 'Dieser Tag ist schon vorbei. Wähle heute oder einen späteren Tag.',
+  gesperrt: `„Plätze gesamt“ und „Kostenlos bis“ bleiben vorerst bei ${MAX_GRUENDUNGSHOEFE} und ${gruendungTagKurz(GRUENDUNG_BIS_STANDARD_TAG)} – sonst nennen die Konditionen der Höfe andere Zahlen als die Seiten. Umschalten kannst du nur „Auf den Seiten zeigen“.`,
   ungueltig: 'Wir konnten die Eingabe nicht lesen. Lade die Seite neu und versuch es noch einmal.',
 } as const
 
@@ -118,12 +121,18 @@ export function pruefeGruendungEingabe(eingabe: GruendungEingabe, vergeben: numb
 }
 
 /**
- * „Plätze gesamt" als Zahl aus dem Feld — nur Ziffern, sonst null (dann der
- * Satz `plaetze`). Nie `Number(text)`: Aus „1e2" würde sonst 100.
+ * Die Sperre bis zur Nacharbeit (Nr. 93, Runde 1): Plätze gesamt und das
+ * Standard-Ende bleiben bei den Konstanten aus gruendungshof.ts. Tarif-Zeile
+ * und „Dein Stand“ (`ladeGruendungBis`), `setzeGruendungBisAction`, der
+ * Freischalt-Dialog und Admin › Höfe rechnen noch fest damit — eine andere
+ * Zahl gäbe einer Zusage mit Geldwert zwei Quellen (Gründungs-Nachricht und
+ * Seiten nennten andere Nummern und Daten als die Konditionen). Fällt erst,
+ * wenn diese Stellen die Einstellung lesen und die bestehenden Zusagen je
+ * Hof festgeschrieben sind (Register K2). Geprüft NACH
+ * `pruefeGruendungEingabe`, damit deren Sätze die genaueren bleiben.
  */
-export function plaetzeAusEingabe(text: string): number | null {
-  const roh = text.trim()
-  return /^\d{1,4}$/.test(roh) ? Number.parseInt(roh, 10) : null
+export function pruefeGruendungSperre(eingabe: Pick<GruendungEingabe, 'plaetze' | 'bisTag'>): string | null {
+  return eingabe.plaetze === MAX_GRUENDUNGSHOEFE && eingabe.bisTag === GRUENDUNG_BIS_STANDARD_TAG ? null : GRUENDUNG_EINSTELLUNG_FEHLER.gesperrt
 }
 
 // ─── Texte der Seite ─────────────────────────────────────────────────────────
@@ -160,9 +169,10 @@ export const EINSTELLUNGEN_TEXT = {
     kachelFrei: 'Frei',
     kachelFreiZeile: 'steht im Satz auf den Seiten',
     feldPlaetze: 'Plätze gesamt',
-    feldPlaetzeHinweis: (vergeben: number): string => `mindestens ${vergeben} (vergeben)`,
     feldBis: 'Kostenlos bis (Standard)',
-    feldBisHinweis: 'für neue Gründungshöfe',
+    feldGesperrt: 'vorerst fest',
+    gesperrtHinweis:
+      'Plätze und Standard-Ende sind vorerst fest: Die Konditionen der Höfe und Admin › Höfe rechnen noch mit diesen Werten. Umschalten kannst du die Anzeige.',
     schalter: 'Auf den Seiten zeigen',
     schalterSatz:
       'Startseite (Satz im Für-Höfe-Band), /fuer-hoefe (Pill, Knopf, Preiszeile) und Registrieren (Satz). Verschwindet von selbst, wenn alle Plätze vergeben sind oder das Datum vorbei ist.',

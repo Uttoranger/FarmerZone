@@ -4,7 +4,7 @@ import { useId, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { bildeGruendungBis, seitenZahlen, type GruendungSeiten } from '@/lib/gruendungshof'
-import { EINSTELLUNGEN_TEXT, GRUENDUNG_EINSTELLUNG_FEHLER, plaetzeAusEingabe, pruefeGruendungEingabe } from '@/lib/plattform-einstellung'
+import { EINSTELLUNGEN_TEXT, pruefeGruendungEingabe, pruefeGruendungSperre } from '@/lib/plattform-einstellung'
 import { speichereGruendungEinstellung } from '@/server/actions/plattform-einstellung'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -14,6 +14,9 @@ import { GruendungSatz } from '@/components/gruendung/satz'
 import { GruendungPill } from '@/components/gruendung/pill'
 
 const TEXT = EINSTELLUNGEN_TEXT.gruendung
+
+/** Nur lesend sichtbar machen: gedämpfter Grund, kein Textcursor. */
+const GESPERRT = 'cursor-default bg-muted'
 
 /** Was die Seite mitgibt — nur Zahlen und Text (CODING_STANDARDS §2: kein Date an Client-Komponenten). */
 export type GruendungFormularDaten = {
@@ -43,41 +46,41 @@ function Kachel({ titel, wert, zeile, betont = false }: { titel: string; wert: n
  * ein eigenes Speichern. Kacheln und Vorschau folgen dem Formular, bevor
  * gespeichert ist — gerechnet mit derselben Regel wie die Seiten
  * (`seitenZahlen`), geprüft mit derselben wie die Action
- * (`pruefeGruendungEingabe`); den Schutz gibt die Action.
+ * (`pruefeGruendungEingabe`, `pruefeGruendungSperre`); den Schutz gibt die
+ * Action. Bis zur Nacharbeit sind Plätze und Standard-Ende nur lesend (die
+ * Konditionen der Höfe rechnen noch mit den Konstanten); gesendet wird der
+ * gespeicherte Stand, umschalten lässt sich nur die Anzeige.
  */
 export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDaten }): React.JSX.Element {
   const router = useRouter()
   const [laeuft, startTransition] = useTransition()
-  const [plaetzeText, setPlaetzeText] = useState(String(daten.gespeichert.plaetze))
-  const [bisTag, setBisTag] = useState(daten.gespeichert.bisTag)
+  const { plaetze, bisTag } = daten.gespeichert
   const [anzeige, setAnzeige] = useState(daten.gespeichert.anzeige)
   const [fehler, setFehler] = useState<string | null>(null)
   const plaetzeId = useId()
   const bisId = useId()
   const hinweisId = useId()
+  const gesperrtId = useId()
   const schalterSatzId = useId()
 
   const jetzt = new Date(daten.jetzt)
   // Wie die Action: vergeben mit den Plätzen, die bis jetzt gelten — wer einen Platz hat, behält ihn.
   const vergeben = Math.min(daten.imRennen, daten.gespeichert.plaetze)
-  const plaetze = plaetzeAusEingabe(plaetzeText)
-  const eingabeFehler = plaetze === null ? GRUENDUNG_EINSTELLUNG_FEHLER.plaetze : pruefeGruendungEingabe({ plaetze, bisTag, anzeige }, vergeben, jetzt)
-  const geaendert = plaetzeText.trim() !== String(daten.gespeichert.plaetze) || bisTag !== daten.gespeichert.bisTag || anzeige !== daten.gespeichert.anzeige
+  const eingabeFehler = pruefeGruendungEingabe({ plaetze, bisTag, anzeige }, vergeben, jetzt) ?? pruefeGruendungSperre({ plaetze, bisTag })
+  const geaendert = anzeige !== daten.gespeichert.anzeige
 
   // Kacheln und Beispiel: mit der Eingabe, solange sie gilt, sonst mit dem gespeicherten Stand.
-  const stand = eingabeFehler === null && plaetze !== null ? { plaetze, bisTag, anzeige } : daten.gespeichert
+  const stand = eingabeFehler === null ? { plaetze, bisTag, anzeige } : daten.gespeichert
   const zahlen = seitenZahlen({ plaetze: stand.plaetze, bis: bildeGruendungBis(stand.bisTag), anzeige: stand.anzeige }, daten.imRennen, jetzt)
   const aufSeiten: GruendungSeiten = { ...zahlen, voraussichtlicherPlatz: null }
 
   function verwerfen() {
-    setPlaetzeText(String(daten.gespeichert.plaetze))
-    setBisTag(daten.gespeichert.bisTag)
     setAnzeige(daten.gespeichert.anzeige)
     setFehler(null)
   }
 
   function speichern() {
-    if (plaetze === null || eingabeFehler !== null) {
+    if (eingabeFehler !== null) {
       setFehler(eingabeFehler)
       return
     }
@@ -115,21 +118,17 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
             <label htmlFor={plaetzeId} className={FELD_LABEL}>
               {TEXT.feldPlaetze}
             </label>
-            <span className="text-[12.5px] text-muted-foreground">{TEXT.feldPlaetzeHinweis(vergeben)}</span>
+            <span className="text-[12.5px] text-muted-foreground">{TEXT.feldGesperrt}</span>
           </div>
           <input
             id={plaetzeId}
             type="text"
             inputMode="numeric"
             autoComplete="off"
-            value={plaetzeText}
-            onChange={(e) => {
-              setPlaetzeText(e.target.value)
-              setFehler(null)
-            }}
-            aria-invalid={plaetze === null || plaetze < vergeben ? true : undefined}
-            aria-describedby={hinweisId}
-            className={FELD}
+            value={plaetze}
+            readOnly
+            aria-describedby={`${gesperrtId} ${hinweisId}`}
+            className={cn(FELD, GESPERRT)}
           />
         </div>
         <div className="min-w-0">
@@ -137,21 +136,15 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
             <label htmlFor={bisId} className={FELD_LABEL}>
               {TEXT.feldBis}
             </label>
-            <span className="text-[12.5px] text-muted-foreground">{TEXT.feldBisHinweis}</span>
+            <span className="text-[12.5px] text-muted-foreground">{TEXT.feldGesperrt}</span>
           </div>
-          <input
-            id={bisId}
-            type="date"
-            value={bisTag}
-            onChange={(e) => {
-              setBisTag(e.target.value)
-              setFehler(null)
-            }}
-            aria-describedby={hinweisId}
-            className={FELD}
-          />
+          <input id={bisId} type="date" value={bisTag} readOnly aria-describedby={`${gesperrtId} ${hinweisId}`} className={cn(FELD, GESPERRT)} />
         </div>
       </div>
+
+      <p id={gesperrtId} className="text-[12.5px] leading-snug text-muted-foreground">
+        {TEXT.gesperrtHinweis}
+      </p>
 
       {/* Der erste verletzte Satz schon beim Tippen — leise; erst ein Speicherversuch zeigt ihn als Fehler. */}
       <p id={hinweisId} className={cn('text-[12.5px] leading-snug text-status-offen', (eingabeFehler === null || fehler !== null) && 'sr-only')}>

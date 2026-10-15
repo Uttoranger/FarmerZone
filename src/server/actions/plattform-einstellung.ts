@@ -10,6 +10,7 @@ import {
   PLATTFORM_EINSTELLUNG_ID,
   PLATTFORM_EINSTELLUNG_TAG,
   pruefeGruendungEingabe,
+  pruefeGruendungSperre,
 } from '@/lib/plattform-einstellung'
 import { gruendungEinstellungSchema } from '@/schemas/plattform-einstellung'
 import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
@@ -30,6 +31,9 @@ const EIGENE_SAETZE: ReadonlySet<string> = new Set([
  * Plätze gesamt nie unter den vergebenen — gezählt mit den Plätzen, die bis
  * eben galten: Wer einen Platz hat, behält ihn (K1). Das Ende nicht vor dem
  * heutigen Wiener Tag. Beides prüft dieselbe reine Funktion wie das Formular.
+ * Bis zur Nacharbeit lehnt die Sperre jede Abweichung von den Konstanten ab
+ * (`pruefeGruendungSperre`) — sonst nennten Gründungs-Nachricht und Seiten
+ * andere Zahlen als Konditionen und Admin › Höfe; schaltbar bleibt die Anzeige.
  *
  * Geschrieben wird per upsert NUR in die Felder dieser Gruppe — die
  * Zustell-Regeln (Nr. 95) bleiben, wie sie sind; dazu wer gespeichert hat
@@ -48,7 +52,9 @@ export async function speichereGruendungEinstellung(eingabe: unknown): Promise<{
   const { plaetze, bisTag, anzeige } = geprueft.data
 
   const [bisher, hoefe] = await Promise.all([lesePlattformEinstellung(), ladeHoefeFuerGruendung()])
-  const fehler = pruefeGruendungEingabe({ plaetze, bisTag, anzeige }, vergebeneGruendungsplaetze(hoefe, bisher.gruendungPlaetze), new Date())
+  const fehler =
+    pruefeGruendungEingabe({ plaetze, bisTag, anzeige }, vergebeneGruendungsplaetze(hoefe, bisher.gruendungPlaetze), new Date()) ??
+    pruefeGruendungSperre({ plaetze, bisTag })
   if (fehler) return { error: fehler }
 
   const werte = {

@@ -12,8 +12,9 @@
  *    Link „Deine Konditionen") — auch nach Zurücknehmen und erneutem
  *    Freischalten nicht eine zweite; ohne freien Platz keine.
  *  - speichereGruendungEinstellung lehnt „weniger Plätze als vergeben" ab und
- *    schreibt dann nichts; mit gültiger Eingabe stehen Werte und Person in der
- *    Zeile.
+ *    schreibt dann nichts; bis zur Nacharbeit ebenso jede Abweichung von 12
+ *    Plätzen bzw. 31.12.2027 (Sperre); nur die Anzeige umgeschaltet: Werte und
+ *    Person stehen in der Zeile.
  *
  * Die Zeile ist geteilter Zustand der Test-Datenbank: Jeder Test stellt sie
  * im afterEach wieder her. Der Seed hat freigeschaltete Höfe — ein frisch
@@ -31,7 +32,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
-import { gruendungsplatzVon } from '@/lib/gruendungshof'
+import { GRUENDUNG_BIS_STANDARD_TAG, MAX_GRUENDUNGSHOEFE, gruendungsplatzVon } from '@/lib/gruendungshof'
 import { GRUENDUNGS_NACHRICHT_LINK } from '@/lib/postfach'
 import { GRUENDUNG_EINSTELLUNG_FEHLER } from '@/lib/plattform-einstellung'
 import { approveFarmAction, revokeFarmApprovalAction } from '@/server/actions/admin'
@@ -160,14 +161,29 @@ describe('speichereGruendungEinstellung mit echter Admin-Anmeldung', () => {
     expect((await prisma.plattformEinstellung.findUniqueOrThrow({ where: { id: 'plattform' } })).gruendungPlaetze).toBe(999)
   })
 
-  it('gültig: Werte, DATE und Person stehen in der Zeile', async () => {
-    const adminId = await alsAdmin()
-    const vergeben = Math.min((await ladeHoefeFuerGruendung()).length, vorher?.gruendungPlaetze ?? 12)
+  it('gesperrt: andere Plätze oder anderes Ende abgelehnt, die Zeile bleibt', async () => {
+    await alsAdmin()
+    await setzePlaetze(MAX_GRUENDUNGSHOEFE)
 
-    expect(await speichereGruendungEinstellung({ plaetze: vergeben + 3, bisTag: '2099-06-30', anzeige: false })).toEqual({ ok: true })
+    for (const eingabe of [
+      { plaetze: MAX_GRUENDUNGSHOEFE + 3, bisTag: GRUENDUNG_BIS_STANDARD_TAG, anzeige: true },
+      { plaetze: MAX_GRUENDUNGSHOEFE, bisTag: '2099-06-30', anzeige: true },
+    ]) {
+      expect(await speichereGruendungEinstellung(eingabe)).toEqual({ error: GRUENDUNG_EINSTELLUNG_FEHLER.gesperrt })
+    }
     const zeile = await prisma.plattformEinstellung.findUniqueOrThrow({ where: { id: 'plattform' } })
-    expect(zeile).toMatchObject({ gruendungPlaetze: vergeben + 3, gruendungAnzeige: false, geaendertVonUserId: adminId })
-    expect(zeile.gruendungBisStandard.toISOString()).toBe('2099-06-30T00:00:00.000Z')
+    expect(zeile.gruendungPlaetze).toBe(MAX_GRUENDUNGSHOEFE)
+    expect(zeile.gruendungBisStandard.toISOString()).toBe(vorher?.gruendungBisStandard.toISOString())
+  })
+
+  it('gültig (nur die Anzeige umgeschaltet): Werte, DATE und Person stehen in der Zeile', async () => {
+    const adminId = await alsAdmin()
+    await setzePlaetze(MAX_GRUENDUNGSHOEFE)
+
+    expect(await speichereGruendungEinstellung({ plaetze: MAX_GRUENDUNGSHOEFE, bisTag: GRUENDUNG_BIS_STANDARD_TAG, anzeige: false })).toEqual({ ok: true })
+    const zeile = await prisma.plattformEinstellung.findUniqueOrThrow({ where: { id: 'plattform' } })
+    expect(zeile).toMatchObject({ gruendungPlaetze: MAX_GRUENDUNGSHOEFE, gruendungAnzeige: false, geaendertVonUserId: adminId })
+    expect(zeile.gruendungBisStandard.toISOString()).toBe(`${GRUENDUNG_BIS_STANDARD_TAG}T00:00:00.000Z`)
   })
 
   it('ohne Admin-Recht: abgelehnt, nichts geschrieben', async () => {
