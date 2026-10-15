@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { ChevronRight, Inbox, Lightbulb } from 'lucide-react'
-import { MELDUNG_ART_LABEL, kiBegruendung, kurznummer, prLink, type MeldungTon } from '@/lib/meldung'
+import { Lightbulb } from 'lucide-react'
+import { MELDUNG_ART_LABEL, WUENSCHE_TEXT, kiBegruendung, kurznummer, prLink, type TriageStand } from '@/lib/meldung'
 import { ADMIN_STATUS_TON, WUNSCHLISTE_LEER, WUNSCHLISTE_SATZ, adminStatusText, bildschirmText } from '@/lib/admin-briefkasten'
 import { MELDUNG_ART_TON, OHNE_IP_UND_COOKIES, geraetKurz } from '@/lib/hof-hilfe'
 import { eingangMeldungAdresse } from '@/lib/postfach'
@@ -8,97 +8,24 @@ import { seitenPfad } from '@/lib/fremdtext'
 import { wienKalendertag } from '@/lib/kalender'
 import { datumKurz } from '@/lib/verkauf-eintragen'
 import { cn } from '@/lib/utils'
-import type { AdminMeldungDetail } from '@/server/queries/meldung'
+import type { AdminMeldungDetail, getDuplikateVon } from '@/server/queries/meldung'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { Marke } from '@/components/ui/marke'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
-import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
-// Die Formulare bleiben, wo sie seit Nr. 22f liegen; seit Nr. 95 stehen sie als Spalte im Eingang (Nacharbeit: nach components ziehen).
-import { TriageForm, type TriageWerte } from '@/app/admin/meldungen/[id]/triage-form'
-import { KiVorschlag } from '@/app/admin/meldungen/[id]/ki-vorschlag'
+import { KARTE, KICKER, LEISE } from '@/components/hof-bestellungen/stil'
+import { TriageForm, type TriageWerte } from '@/components/admin/meldungen-triage-form'
+import { KiVorschlag } from '@/components/admin/meldungen-ki-vorschlag'
+import { TrennenKnopf } from '@/components/admin/meldungen-werkzeug'
 
 /*
- * Die Teile des Briefkastens im Admin (Nachtlauf Nr. 22f, Mockup
- * admin-briefkasten): die Liste der Meldungen und die gebündelte Wunschliste.
- * Meldungstexte sind Fremdtext — sie stehen als Text da, gekürzt, mit dem
- * vollen Wortlaut im `title`; nie als Markup.
+ * Die Teile der Meldungen im Eingang des Admin-Postfachs (Nachtlauf Nr. 22f,
+ * seit Nr. 95 im Eingang, Mockup admin-postfach-meldungen; seit Nr. 101 mit
+ * „Woraus", Mockup admin-postfach-zusammenfassen): die gebündelte
+ * Wunschliste und „Meldung entscheiden". Die Liste aller Meldungen steht seit
+ * Nr. 101 im Reiter „Meldungen". Meldungstexte sind Fremdtext — sie stehen
+ * als Text da, gekürzt, mit dem vollen Wortlaut im `title`; nie als Markup.
  */
-
-export type BriefkastenZeile = {
-  id: string
-  art: string
-  artTon: MeldungTon
-  titel: string
-  herkunft: string
-  datum: string
-  status: string
-  statusTon: MeldungTon
-}
-
-export function MeldungListe({
-  zeilen,
-  leer,
-}: {
-  zeilen: BriefkastenZeile[]
-  /** Leer-Zustand: Titel, Satz und ein Ausweg. */
-  leer: { titel: string; satz: string; ausweg?: { text: string; href: string } }
-}): React.JSX.Element {
-  if (zeilen.length === 0) {
-    return (
-      <EmptyState
-        symbol={Inbox}
-        titel={leer.titel}
-        satz={leer.satz}
-        ausweg={
-          leer.ausweg ? (
-            <Link href={leer.ausweg.href} className={KNOPF_RAHMEN}>
-              {leer.ausweg.text}
-            </Link>
-          ) : {
-            ohne: 'Den Ausweg gibt der Aufrufer mit: /admin/meldungen tut es immer (voreingestellt „Offene Meldungen zeigen“, mit Filter „Zu entscheiden zeigen“); nur ein Aufrufer ohne Ausweg landet hier',
-          }
-        }
-      />
-    )
-  }
-  return (
-    <ul aria-label="Meldungen" className={cn(KARTE, 'overflow-hidden [&>li+li]:border-t [&>li+li]:border-border')}>
-      {zeilen.map((z) => (
-        <li key={z.id}>
-          <Link
-            href={eingangMeldungAdresse(z.id)}
-            className={cn(
-              'grid min-h-[60px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-3 hover:bg-muted md:grid-cols-[76px_minmax(0,1fr)_96px_auto_auto]',
-              FOKUS_RAHMEN_INNEN
-            )}
-          >
-            <StatusBadge status={z.artTon} className="justify-self-start">
-              {z.art}
-            </StatusBadge>
-            <span className="min-w-0">
-              <span className="block truncate text-[14.5px] font-semibold text-foreground" title={z.titel}>
-                {z.titel}
-              </span>
-              <span className={cn('block truncate text-[12.5px]', LEISE)} title={z.herkunft}>
-                {z.herkunft}
-              </span>
-            </span>
-            <span className={cn('hidden text-[13px] whitespace-nowrap md:block', LEISE)}>{z.datum}</span>
-            <span className="col-start-2 flex flex-wrap items-center gap-2 md:col-start-auto">
-              <span className={cn('text-[12.5px] whitespace-nowrap md:hidden', LEISE)}>{z.datum}</span>
-              <StatusBadge status={z.statusTon}>{z.status}</StatusBadge>
-            </span>
-            <ChevronRight
-              className="col-start-3 row-span-2 row-start-1 size-4 text-muted-foreground md:col-start-auto md:row-span-1"
-              strokeWidth={1.7}
-              aria-hidden="true"
-            />
-          </Link>
-        </li>
-      ))}
-    </ul>
-  )
-}
 
 export type WunschBuendel = {
   schluessel: string
@@ -176,7 +103,25 @@ function zeitpunkt(d: Date): string {
  * Das Formular trägt die Kennung als `key`: Wechselt die Auswahl, beginnt es
  * mit dem gespeicherten Stand der neuen Meldung.
  */
-export function MeldungEntscheidenSpalte({ m, jetzt }: { m: AdminMeldungDetail; jetzt: Date }): React.JSX.Element {
+export function MeldungEntscheidenSpalte({
+  m,
+  jetzt,
+  duplikate = [],
+}: {
+  m: AdminMeldungDetail
+  jetzt: Date
+  /** Die Duplikate dieser Meldung — „Woraus" mit „Trennen" (Register N14, Ergänzung; Nr. 101). */
+  duplikate?: Awaited<ReturnType<typeof getDuplikateVon>>
+}): React.JSX.Element {
+  const stand: TriageStand = {
+    status: m.status,
+    art: m.art,
+    clusterKey: m.clusterKey,
+    triageNotiz: m.triageNotiz,
+    duplikatVonId: m.duplikatVonId,
+    sprintName: m.sprintName,
+    antwortAnMelder: m.antwortAnMelder,
+  }
   const gespeichert: TriageWerte = {
     status: m.status,
     clusterKey: m.clusterKey ?? '',
@@ -219,7 +164,33 @@ export function MeldungEntscheidenSpalte({ m, jetzt }: { m: AdminMeldungDetail; 
         )}
       </article>
 
-      {m.status === 'VERMUTLICH_WUNSCH' && <KiVorschlag key={`ki-${m.id}`} meldungId={m.id} gespeichert={gespeichert} begruendung={kiBegruendung(m.triageNotiz)} />}
+      {m.status === 'VERMUTLICH_WUNSCH' && <KiVorschlag key={`ki-${m.id}`} meldungId={m.id} stand={stand} begruendung={kiBegruendung(m.triageNotiz)} />}
+
+      {duplikate.length > 0 && (
+        <section aria-labelledby="woraus-titel" className={cn(KARTE, 'p-4 md:p-[18px]')}>
+          <h3 id="woraus-titel" className={KICKER}>
+            {WUENSCHE_TEXT.woraus}
+          </h3>
+          <ul className="mt-2 [&>li+li]:border-t [&>li+li]:border-border">
+            {duplikate.map((d) => (
+              <li key={d.id} className="flex items-center gap-3 py-2">
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-[13.5px] font-semibold text-foreground" title={d.ersteZeile}>
+                    {d.ersteZeile || '—'}
+                  </span>
+                  <span className={cn('text-[12.5px]', LEISE)}>
+                    {datumKurz(wienKalendertag(d.createdAt), wienKalendertag(jetzt))} · {d.hofName ?? 'Kundin'} · <span className="font-mono">{d.kurznummer}</span>
+                  </span>
+                </span>
+                <Marke art="erledigt" className="shrink-0">
+                  {WUENSCHE_TEXT.duplikat}
+                </Marke>
+                <TrennenKnopf meldungId={d.id} titel={d.ersteZeile} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section aria-labelledby="entscheiden-titel" className={cn(KARTE, 'p-4 md:p-[18px]')}>
         <h3 id="entscheiden-titel" className="mb-3 font-heading text-[19px] font-semibold text-foreground">

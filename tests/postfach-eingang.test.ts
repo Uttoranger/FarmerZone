@@ -157,6 +157,7 @@ describe('Kennzahlen und Zähler', () => {
   it('der Unterreiter „Eingang" trägt die Zahl „Offen", die anderen keine', () => {
     expect(postfachUnterreiter(5).map((r) => [r.id, r.zahl, r.href])).toEqual([
       ['eingang', '5', '/admin/postfach'],
+      ['meldungen', undefined, '/admin/postfach?reiter=meldungen'],
       ['rundschreiben', undefined, '/admin/postfach?reiter=rundschreiben'],
       ['zustellung', undefined, '/admin/postfach?reiter=zustellung'],
     ])
@@ -182,7 +183,9 @@ describe('Adresse als Fremddaten', () => {
   it('Reiter: unbekannt oder leer heißt Eingang, doppelt zählt der erste', () => {
     expect(adminPostfachReiterAus('zustellung')).toBe('zustellung')
     expect(adminPostfachReiterAus(['rundschreiben', 'zustellung'])).toBe('rundschreiben')
-    expect(adminPostfachReiterAus('meldungen')).toBe('eingang')
+    // Seit Nr. 101 ist „Meldungen" wieder ein eigener Reiter (Register N14, Ergänzung).
+    expect(adminPostfachReiterAus('meldungen')).toBe('meldungen')
+    expect(adminPostfachReiterAus('unterhaltungen')).toBe('eingang')
     expect(adminPostfachReiterAus(undefined)).toBe('eingang')
   })
 

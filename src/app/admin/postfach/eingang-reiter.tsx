@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Check, CheckCheck, Inbox, Star, X } from 'lucide-react'
 import { z } from 'zod'
 import { getAdminFarms } from '@/server/queries/admin'
-import { getMeldungDetail, getWunschCluster, type AdminMeldungDetail } from '@/server/queries/meldung'
+import { getDuplikateVon, getMeldungDetail, getWunschCluster, type AdminMeldungDetail } from '@/server/queries/meldung'
 import {
   ladeEingang,
   ladeErstattungAufgaben,
@@ -48,7 +48,7 @@ const SPALTE = cn(KARTE, 'flex min-w-0 flex-col overflow-hidden dark:ring-1 dark
 
 type Detail =
   | { art: 'antwort'; faden: AdminFaden }
-  | { art: 'meldung'; meldung: AdminMeldungDetail }
+  | { art: 'meldung'; meldung: AdminMeldungDetail; duplikate: Awaited<ReturnType<typeof getDuplikateVon>> }
   | { art: 'hof'; hof: HofAufgabeRoh; zeile: AdminHofZeile | null; vergeben: number }
   | { art: 'erstattung'; erstattung: ErstattungAufgabeRoh; zahlungAdresse: string | null }
 
@@ -93,7 +93,8 @@ export async function ladeEingangReiter(filter: EingangFilter, auswahl: EingangA
     detail = faden ? { art: 'antwort', faden } : null
   } else if (auswahl?.art === 'meldung') {
     const meldung = await getMeldungDetail(auswahl.id)
-    detail = meldung ? { art: 'meldung', meldung } : null
+    // „Woraus" (Nr. 101): die Duplikate dieser Meldung, mit „Trennen".
+    detail = meldung ? { art: 'meldung', meldung, duplikate: await getDuplikateVon(meldung.id) } : null
   } else if (auswahl?.art === 'hof') {
     const hoefe = roh.hoefe.length > 0 ? roh.hoefe : await ladeHofAufgaben(jetzt)
     const hof = hoefe.find((h) => h.id === auswahl.id)
@@ -194,7 +195,7 @@ function HofSpalte({ hof, zeile, vergeben, jetzt }: { hof: HofAufgabeRoh; zeile:
 
 function DetailSpalte({ detail, wuensche, jetzt }: { detail: Detail | null; wuensche: WunschBuendel[] | null; jetzt: Date }): React.JSX.Element {
   if (detail?.art === 'antwort') return <FadenSpalte faden={detail.faden} jetzt={jetzt} />
-  if (detail?.art === 'meldung') return <MeldungEntscheidenSpalte m={detail.meldung} jetzt={jetzt} />
+  if (detail?.art === 'meldung') return <MeldungEntscheidenSpalte m={detail.meldung} jetzt={jetzt} duplikate={detail.duplikate} />
   if (detail?.art === 'hof') return <HofSpalte hof={detail.hof} zeile={detail.zeile} vergeben={detail.vergeben} jetzt={jetzt} />
   if (detail?.art === 'erstattung') return <PostfachErstattungSpalte e={detail.erstattung} zahlungAdresse={detail.zahlungAdresse} jetzt={jetzt} />
   return (

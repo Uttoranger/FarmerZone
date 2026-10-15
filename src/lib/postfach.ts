@@ -45,20 +45,22 @@ export function fadenHref(unterhaltungId: string): string {
   return `${POSTFACH_HREF}/${encodeURIComponent(unterhaltungId)}`
 }
 
-/** Das Postfach des Admins mit seinen drei Reitern (?reiter=…). */
+/** Das Postfach des Admins mit seinen vier Reitern (?reiter=…). */
 export const ADMIN_POSTFACH_HREF = '/admin/postfach'
 
 /**
- * Die Reiter des Admin-Postfachs (Register N12-Änderung, N14; Nr. 95):
- * Eingang · Rundschreiben · Zustellung. Gewählt wird über ?reiter= — die
+ * Die Reiter des Admin-Postfachs (Register N12-Änderung, N14; Nr. 95, seit
+ * Nr. 101 mit „Meldungen"): Eingang · Meldungen · Rundschreiben · Zustellung
+ * — nur der Eingang trägt eine Zahl. Gewählt wird über ?reiter= — die
  * Adresse ist Fremddaten, gelesen mit Zod (`adminPostfachReiterAus` in
  * src/schemas/postfach.ts): Unbekanntes heißt „Eingang".
  */
-export const ADMIN_POSTFACH_REITER_IDS = ['eingang', 'rundschreiben', 'zustellung'] as const
+export const ADMIN_POSTFACH_REITER_IDS = ['eingang', 'meldungen', 'rundschreiben', 'zustellung'] as const
 export type AdminPostfachReiter = (typeof ADMIN_POSTFACH_REITER_IDS)[number]
 
 export const ADMIN_POSTFACH_REITER: readonly { id: AdminPostfachReiter; label: string }[] = [
   { id: 'eingang', label: 'Eingang' },
+  { id: 'meldungen', label: 'Meldungen' },
   { id: 'rundschreiben', label: 'Rundschreiben' },
   { id: 'zustellung', label: 'Zustellung' },
 ]
@@ -108,23 +110,22 @@ export function eingangMeldungAdresse(meldungId: string): string {
 }
 
 /**
- * Die Reiter von Stufe 1 (Nr. 87) führen in den Eingang mit passendem Filter:
- * Unterhaltungen → Antwort (ein offener Faden bleibt gewählt), Meldungen →
- * Meldung. Status- und Art-Filter des alten Reiters gibt es im Eingang nicht.
- * null = keine alte Adresse.
+ * Der Reiter „Unterhaltungen" von Stufe 1 (Nr. 87) führt in den Eingang mit
+ * Filter Antwort (ein offener Faden bleibt gewählt). „Meldungen" ist seit
+ * Nr. 101 wieder ein eigener Reiter (Register N14, Ergänzung) und keine alte
+ * Adresse mehr. null = keine alte Adresse.
  */
 export function alteReiterAdresse(reiter: string | undefined, faden: string | undefined): string | null {
   if (reiter === 'unterhaltungen') return eingangAdresse('antwort', faden ? { art: 'antwort', id: faden } : null)
-  if (reiter === 'meldungen') return eingangAdresse('meldung')
   return null
 }
 
 /**
- * `/admin/meldungen?…` → der Eingang mit Filter Meldung (die Umleitung in
- * src/app/admin/meldungen/page.tsx). Status und Art der alten Liste zählen im
- * Eingang nicht mehr — der Link wird deshalb nicht gelesen.
+ * `/admin/meldungen?…` → der Reiter „Meldungen" (die Umleitung in
+ * src/app/admin/meldungen/route.ts, seit Nr. 101). Status und Art der alten
+ * Liste gibt es dort nicht — der Link wird deshalb nicht gelesen.
  */
-export const meldungenImPostfach: (briefkastenLink: string) => string = () => eingangAdresse('meldung')
+export const meldungenImPostfach: (briefkastenLink: string) => string = () => adminPostfachAdresse('meldungen')
 
 // ─── Grenzen ─────────────────────────────────────────────────────────────────
 
@@ -997,6 +998,7 @@ export const ADMIN_POSTFACH_TEXT = {
   /** Ein Reiter ließ sich nicht laden — AdminFehler mit „Noch einmal versuchen". */
   ladeFehler: {
     eingang: 'Wir konnten den Eingang gerade nicht laden.',
+    meldungen: 'Wir konnten die Meldungen gerade nicht laden.',
     rundschreiben: 'Wir konnten die Rundschreiben gerade nicht laden.',
     zustellung: 'Wir konnten die Zustellung gerade nicht laden.',
   } satisfies Record<AdminPostfachReiter, string>,

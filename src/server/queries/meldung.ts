@@ -4,14 +4,19 @@ import {
   STATUS_ABGESCHLOSSEN,
   STATUS_OFFEN,
   STATUS_ZU_ENTSCHEIDEN,
+  buendelStandVon,
   ersteZeile,
   fuerHof,
   istMeldungArt,
   istMeldungStatus,
   kurznummer,
   liegedauerGrenze,
+  type AblaufMeldung,
+  type BuendelStand,
+  type HauptmeldungAbschluss,
   type MeldungArt,
   type MeldungFuerHof,
+  type MeldungStand,
   type MeldungStatus,
 } from '@/lib/meldung'
 
@@ -24,22 +29,40 @@ import {
 
 // ─── Hof ────────────────────────────────────────────────────────────────────
 
+const HOF_AUSWAHL = { id: true, art: true, text: true, createdAt: true, status: true, antwortAnMelder: true, duplikatVonId: true } as const
+
+/**
+ * Stand und Art der Hauptmeldungen der eigenen Duplikate (Register N14,
+ * Ergänzung; Nr. 101): Die Hof-Sicht zeigt „Bereits bekannt · Behoben", sobald
+ * die Hauptmeldung erledigt ist. Nur diese zwei Felder — nie ihr Text, nie
+ * ihr Hof; die Kennung verlässt die Abfrage nicht (fuerHof ist eine Allowlist).
+ */
+async function hauptmeldungenFuer(zeilen: readonly { status: MeldungStatus; duplikatVonId: string | null }[]): Promise<Map<string, MeldungStand>> {
+  const ids = [...new Set(zeilen.flatMap((z) => (z.status === 'DUPLIKAT' && z.duplikatVonId ? [z.duplikatVonId] : [])))]
+  if (ids.length === 0) return new Map()
+  const haupt = await prisma.meldung.findMany({ where: { id: { in: ids } }, select: { id: true, status: true, art: true } })
+  return new Map(haupt.map((h) => [h.id, { status: h.status, art: h.art }]))
+}
+
 export async function getMeldungenFuerHof(farmId: string): Promise<MeldungFuerHof[]> {
   const zeilen = await prisma.meldung.findMany({
     where: { farmId },
     orderBy: { createdAt: 'desc' },
-    select: { id: true, art: true, text: true, createdAt: true, status: true, antwortAnMelder: true },
+    select: HOF_AUSWAHL,
   })
-  return zeilen.map(fuerHof)
+  const haupt = await hauptmeldungenFuer(zeilen)
+  return zeilen.map((z) => fuerHof(z, z.duplikatVonId ? (haupt.get(z.duplikatVonId) ?? null) : null))
 }
 
 /** Eine einzelne eigene Meldung — eine fremde ID liefert null, keinen Fehler. */
 export async function getMeldungFuerHof(farmId: string, id: string): Promise<MeldungFuerHof | null> {
   const zeile = await prisma.meldung.findFirst({
     where: { id, farmId },
-    select: { id: true, art: true, text: true, createdAt: true, status: true, antwortAnMelder: true },
+    select: HOF_AUSWAHL,
   })
-  return zeile ? fuerHof(zeile) : null
+  if (!zeile) return null
+  const haupt = await hauptmeldungenFuer([zeile])
+  return fuerHof(zeile, zeile.duplikatVonId ? (haupt.get(zeile.duplikatVonId) ?? null) : null)
 }
 
 // ─── Admin ──────────────────────────────────────────────────────────────────
@@ -215,56 +238,199 @@ export async function zaehleZuEntscheiden(): Promise<number> {
   return prisma.meldung.count({ where: { status: { in: [...STATUS_ZU_ENTSCHEIDEN] } } })
 }
 
+// ─── Ablauf im Reiter „Meldungen" (Register N14, Ergänzung; Nr. 101) ─────
+
+/**
+ * Alle Meldungen für den Ablauf — das Stand-Band zählt über alle, also ohne
+ * Grenze: Abgeschlossenes löscht der Wochenlauf nach 90 Tagen, die Liste
+ * bleibt klein. Der Text verlässt die Abfrage nur als erste Zeile.
+ */
+export async function ladeMeldungenAblauf(): Promise<AblaufMeldung[]> {
+  const zeilen = await prisma.meldung.findMany({
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      art: true,
+      status: true,
+      createdAt: true,
+      triagedAt: true,
+      text: true,
+      farmId: true,
+      customerEmail: true,
+      clusterKey: true,
+      sprintName: true,
+      duplikatVonId: true,
+      screenshotUrl: true,
+      diagKennung: true,
+      triageNotiz: true,
+      antwortAnMelder: true,
+      farm: { select: { name: true } },
+    },
+  })
+  return zeilen.map(({ text, farm, screenshotUrl, ...z }) => ({
+    ...z,
+    ersteZeile: ersteZeile(text),
+    hofName: farm?.name ?? null,
+    screenshot: screenshotUrl !== null && screenshotUrl !== '',
+  }))
+}
+
+/** Die Duplikate einer Hauptmeldung — für „Woraus" in Meldung entscheiden. Nur Kurztitel, Wer und Zeit. */
+export async function getDuplikateVon(hauptmeldungId: string): Promise<Array<{ id: string; kurznummer: string; ersteZeile: string; hofName: string | null; createdAt: Date }>> {
+  const zeilen = await prisma.meldung.findMany({
+    where: { status: 'DUPLIKAT', duplikatVonId: hauptmeldungId },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, text: true, createdAt: true, farm: { select: { name: true } } },
+  })
+  return zeilen.map((z) => ({ id: z.id, kurznummer: kurznummer(z.id), ersteZeile: ersteZeile(z.text), hofName: z.farm?.name ?? null, createdAt: z.createdAt }))
+}
+
 // ─── Wünsche, gebündelt ─────────────────────────────────────────────────────
+
+export type WunschMeldung = {
+  id: string
+  kurznummer: string
+  ersteZeile: string
+  hofName: string | null
+  createdAt: Date
+  status: MeldungStatus
+  /** true = ein Duplikat, das über seine Hauptmeldung in diesem Bündel zählt. */
+  duplikat: boolean
+}
 
 export type WunschCluster = {
   /** null = noch keinem Bündel zugeordnet */
   clusterKey: string | null
+  /** Meldungen samt Duplikaten. */
   anzahl: number
+  /** Verschiedene Höfe und Kundinnen (Register N14) — derselbe Hof zweimal zählt einmal. */
+  stimmen: number
+  hoefe: number
+  kundinnen: number
+  /** Kundinnen, die eine Adresse für Rückfragen angegeben haben — nur sie bekommen einen Bescheid per E-Mail. */
+  kundinnenMitAdresse: number
+  duplikate: number
+  erste: Date
+  letzte: Date
+  /** Der gemeinsame Stand der Meldungen ohne Duplikate, sonst „gemischt". */
+  stand: BuendelStand
+  /** Mindestens eine Meldung (ohne Duplikate) ist noch nicht abgeschlossen. */
+  offen: boolean
+  /** Der gemeinsame Sprintname („Nr. 97"), sonst null. */
+  sprintName: string | null
+  /** Alle Meldungen, neueste zuerst — für „Woraus". */
+  meldungen: WunschMeldung[]
   /** Die jüngsten Meldungen des Bündels, erste Zeile — als Anhalt, worum es geht. */
   beispiele: Array<{ id: string; kurznummer: string; ersteZeile: string; hofName: string | null; createdAt: Date }>
 }
 
+export type WunschRoh = {
+  id: string
+  art: MeldungArt
+  text: string
+  clusterKey: string | null
+  createdAt: Date
+  hofName: string | null
+  farmId: string | null
+  customerEmail: string | null
+  status: MeldungStatus
+  duplikatVonId: string | null
+  sprintName: string | null
+}
+
+/** Wer eine Stimme ist: der Hof, sonst die Adresse der Kundin, sonst die Meldung selbst (Kundin ohne Adresse). */
+function melderVon(w: WunschRoh): string {
+  if (w.farmId) return `hof:${w.farmId}`
+  if (w.customerEmail) return `kundin:${w.customerEmail.trim().toLowerCase()}`
+  return `meldung:${w.id}`
+}
+
 /**
- * Die gezählte Wunschliste: Wunsch-Meldungen nach clusterKey gebündelt, größte
- * Bündel zuerst, das Bündel „ohne Cluster" ganz unten. Rein, damit die
- * Bündelung ohne Datenbank prüfbar ist. Kein Automatismus daraus — die Liste
- * ist Grundlage einer Produktentscheidung, nicht ihr Ersatz.
+ * Die gezählte Wunschliste (Register N14, Ergänzung; Nr. 101): Wunsch-Meldungen
+ * nach Stichwort gebündelt. Gezählt werden STIMMEN — verschiedene Melder
+ * (Hof, sonst Adresse der Kundin, sonst die Meldung) —, Duplikate zählen beim
+ * Stichwort ihrer Hauptmeldung mit. Offene Bündel zuerst, dann nach Stimmen,
+ * das Bündel „ohne Stichwort" ganz unten. Rein, damit es ohne Datenbank
+ * prüfbar ist; kein Automatismus daraus — die Liste ist Grundlage einer
+ * Produktentscheidung, nicht ihr Ersatz.
  */
-export function gruppiereWuensche(
-  wuensche: readonly { id: string; text: string; clusterKey: string | null; createdAt: Date; hofName: string | null }[],
-  beispieleJeCluster = 3
-): WunschCluster[] {
-  const buendel = new Map<string | null, WunschCluster>()
-  const sortiert = [...wuensche].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-  for (const w of sortiert) {
-    const key = w.clusterKey && w.clusterKey.trim() !== '' ? w.clusterKey.trim() : null
-    const eintrag = buendel.get(key) ?? { clusterKey: key, anzahl: 0, beispiele: [] }
-    eintrag.anzahl += 1
-    if (eintrag.beispiele.length < beispieleJeCluster) {
-      eintrag.beispiele.push({
+export function gruppiereWuensche(meldungen: readonly WunschRoh[], beispieleJeCluster = 3): WunschCluster[] {
+  const wuensche = meldungen.filter((m) => m.art === 'WUNSCH' && m.status !== 'DUPLIKAT')
+  const nachId = new Map(wuensche.map((w) => [w.id, w]))
+  const buendel = new Map<string | null, { eigene: WunschRoh[]; duplikate: WunschRoh[] }>()
+  const keyVon = (w: WunschRoh): string | null => (w.clusterKey && w.clusterKey.trim() !== '' ? w.clusterKey.trim() : null)
+  for (const w of wuensche) {
+    const key = keyVon(w)
+    const eintrag = buendel.get(key) ?? { eigene: [], duplikate: [] }
+    eintrag.eigene.push(w)
+    buendel.set(key, eintrag)
+  }
+  for (const d of meldungen) {
+    const haupt = d.status === 'DUPLIKAT' && d.duplikatVonId ? nachId.get(d.duplikatVonId) : undefined
+    if (haupt) buendel.get(keyVon(haupt))?.duplikate.push(d)
+  }
+
+  const cluster: WunschCluster[] = [...buendel.entries()].map(([clusterKey, { eigene, duplikate }]) => {
+    const alle = [...eigene, ...duplikate].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    const melder = new Set(alle.map(melderVon))
+    const hoefe = [...melder].filter((m) => m.startsWith('hof:')).length
+    const sprints = new Set(eigene.map((w) => w.sprintName?.trim() || null))
+    const [sprint] = [...sprints]
+    const zeiten = alle.map((w) => w.createdAt.getTime())
+    return {
+      clusterKey,
+      anzahl: alle.length,
+      stimmen: melder.size,
+      hoefe,
+      kundinnen: melder.size - hoefe,
+      kundinnenMitAdresse: [...melder].filter((m) => m.startsWith('kundin:')).length,
+      duplikate: duplikate.length,
+      erste: new Date(Math.min(...zeiten)),
+      letzte: new Date(Math.max(...zeiten)),
+      stand: buendelStandVon(eigene.map((w) => w.status)),
+      offen: eigene.some((w) => !STATUS_ABGESCHLOSSEN.includes(w.status)),
+      sprintName: sprints.size === 1 ? (sprint ?? null) : null,
+      meldungen: alle.map((w) => ({
         id: w.id,
         kurznummer: kurznummer(w.id),
         ersteZeile: ersteZeile(w.text),
         hofName: w.hofName,
         createdAt: w.createdAt,
-      })
+        status: w.status,
+        duplikat: w.status === 'DUPLIKAT',
+      })),
+      beispiele: eigene
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(0, beispieleJeCluster)
+        .map((w) => ({ id: w.id, kurznummer: kurznummer(w.id), ersteZeile: ersteZeile(w.text), hofName: w.hofName, createdAt: w.createdAt })),
     }
-    buendel.set(key, eintrag)
-  }
-  return [...buendel.values()].sort((a, b) => {
+  })
+  return cluster.sort((a, b) => {
     if (a.clusterKey === null) return 1
     if (b.clusterKey === null) return -1
-    return b.anzahl - a.anzahl || a.clusterKey.localeCompare(b.clusterKey)
+    return Number(b.offen) - Number(a.offen) || b.stimmen - a.stimmen || a.clusterKey.localeCompare(b.clusterKey)
   })
 }
 
+/** Wünsche samt aller Duplikate (deren Hauptmeldung entscheidet, ob sie zählen). */
 export async function getWunschCluster(): Promise<WunschCluster[]> {
   const zeilen = await prisma.meldung.findMany({
-    where: { art: 'WUNSCH', status: { not: 'DUPLIKAT' } },
-    select: { id: true, text: true, clusterKey: true, createdAt: true, farm: { select: { name: true } } },
+    where: { OR: [{ art: 'WUNSCH', status: { not: 'DUPLIKAT' } }, { status: 'DUPLIKAT' }] },
+    select: {
+      id: true,
+      art: true,
+      text: true,
+      clusterKey: true,
+      createdAt: true,
+      farmId: true,
+      customerEmail: true,
+      status: true,
+      duplikatVonId: true,
+      sprintName: true,
+      farm: { select: { name: true } },
+    },
   })
-  return gruppiereWuensche(zeilen.map((z) => ({ ...z, hofName: z.farm?.name ?? null })))
+  return gruppiereWuensche(zeilen.map(({ farm, ...z }) => ({ ...z, hofName: farm?.name ?? null })))
 }
 
 // ─── Wochenlauf ─────────────────────────────────────────────────────────────
@@ -306,8 +472,23 @@ export async function zaehleFuerWochenlauf(jetzt: Date): Promise<WochenZaehler> 
 export async function findeLoeschKandidaten() {
   return prisma.meldung.findMany({
     where: { status: { in: [...STATUS_ABGESCHLOSSEN] } },
-    select: { id: true, status: true, triagedAt: true, createdAt: true, screenshotUrl: true },
+    select: { id: true, status: true, triagedAt: true, createdAt: true, screenshotUrl: true, duplikatVonId: true },
   })
+}
+
+/**
+ * Status und Abschluss der Hauptmeldungen (Register N14, Ergänzung; Nr. 101):
+ * die zweite Abfrage des Wochenlaufs — ein Duplikat geht erst mit seiner
+ * Hauptmeldung. Eine fehlende Kennung fehlt in der Karte (dann gilt die Regel
+ * für das Duplikat allein).
+ */
+export async function findeHauptmeldungen(ids: readonly string[]): Promise<Map<string, HauptmeldungAbschluss>> {
+  if (ids.length === 0) return new Map()
+  const zeilen = await prisma.meldung.findMany({
+    where: { id: { in: [...new Set(ids)] } },
+    select: { id: true, status: true, triagedAt: true, createdAt: true },
+  })
+  return new Map(zeilen.map(({ id, ...abschluss }) => [id, abschluss]))
 }
 
 export async function loescheMeldungen(ids: string[]): Promise<number> {

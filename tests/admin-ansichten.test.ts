@@ -47,7 +47,6 @@ vi.mock('@/components/hof-bestellungen/bestell-dialog', () => ({
 }))
 
 import { HoefeAnsicht, type AdminHof } from '@/components/admin/hoefe-ansicht'
-import { MeldungListe } from '@/components/admin/briefkasten-teile'
 import { HofAktionDialog } from '@/components/admin/hof-aktion-dialog'
 import { GruendungBisDialog } from '@/components/admin/gruendung-bis-dialog'
 import { adminHofZeile, FREISCHALTUNG_STRIPE_OFFEN_TEXT, type HofRohdaten } from '@/lib/admin-hoefe'
@@ -338,25 +337,4 @@ describe('Seitenmuster der Höfe (Nr. 94, Register N15)', () => {
   })
 })
 
-describe('Briefkasten', () => {
-  it('Meldungstext mit Markup bleibt Text', () => {
-    const html = renderToStaticMarkup(
-      createElement(MeldungListe, {
-        zeilen: [
-          { id: 'm1', art: 'Fehler', artTon: 'offen', titel: '<script>alert(1)</script>', herkunft: 'Hof Test', datum: 'Heute', status: 'Neu', statusTon: 'offen' },
-        ],
-        leer: { titel: '', satz: '' },
-      })
-    )
-    expect(html).not.toContain('<script>')
-    expect(html).toContain('&lt;script&gt;')
-  })
-
-  it('leer: mit Ausweg', () => {
-    const html = renderToStaticMarkup(
-      createElement(MeldungListe, { zeilen: [], leer: { titel: 'Nichts zu entscheiden', satz: 'x', ausweg: { text: 'Offene Meldungen zeigen', href: '/admin/meldungen?status=NEU' } } })
-    )
-    expect(html).toContain('Nichts zu entscheiden')
-    expect(html).toContain('Offene Meldungen zeigen')
-  })
-})
+// MeldungListe ist seit Nr. 101 entfernt (ohne Aufrufer seit Nr. 95); dass Meldungstext Text bleibt, prüft tests/meldungen-fremdtext-wache.test.ts am Reiter „Meldungen“.

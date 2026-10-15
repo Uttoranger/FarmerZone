@@ -250,17 +250,17 @@ describe('Adressen', () => {
     expect(postfachFilterAus('x')).toBe('alle')
   })
 
-  it('die Reiter von Stufe 1 führen in den Eingang mit passendem Filter, ein offener Faden bleibt gewählt (Nr. 95)', () => {
+  it('der Reiter „Unterhaltungen" von Stufe 1 führt in den Eingang, ein offener Faden bleibt gewählt (Nr. 95); „Meldungen" ist seit Nr. 101 ein eigener Reiter', () => {
     expect(alteReiterAdresse('unterhaltungen', undefined)).toBe('/admin/postfach?art=antwort')
     expect(alteReiterAdresse('unterhaltungen', ID_A)).toBe(`/admin/postfach?art=antwort&id=antwort-${ID_A}`)
-    expect(alteReiterAdresse('meldungen', undefined)).toBe('/admin/postfach?art=meldung')
+    expect(alteReiterAdresse('meldungen', undefined)).toBeNull()
     expect(alteReiterAdresse('rundschreiben', undefined)).toBeNull()
     expect(alteReiterAdresse(undefined, undefined)).toBeNull()
   })
 
-  it('die alten Briefkasten-Links landen im Eingang mit Filter Meldung, eine Meldung direkt in ihrer Spalte', () => {
-    expect(meldungenImPostfach('/admin/meldungen')).toBe('/admin/postfach?art=meldung')
-    expect(meldungenImPostfach('/admin/meldungen?status=NEU&art=FEHLER')).toBe('/admin/postfach?art=meldung')
+  it('die alten Briefkasten-Links landen im Reiter „Meldungen" (Nr. 101), eine Meldung direkt in ihrer Spalte im Eingang', () => {
+    expect(meldungenImPostfach('/admin/meldungen')).toBe('/admin/postfach?reiter=meldungen')
+    expect(meldungenImPostfach('/admin/meldungen?status=NEU&art=FEHLER')).toBe('/admin/postfach?reiter=meldungen')
     expect(eingangMeldungAdresse('abc12345')).toBe('/admin/postfach?art=meldung&meldung=abc12345')
   })
 })

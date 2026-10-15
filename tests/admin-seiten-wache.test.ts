@@ -43,9 +43,9 @@ vi.mock('@/lib/prisma', () => ({
 }))
 
 import { ladeAdminbereich } from '@/server/adminbereich'
-import MeldungenUmleitung from '@/app/admin/meldungen/page'
-import MeldungUmleitung from '@/app/admin/meldungen/[id]/page'
-import { permanentRedirect } from 'next/navigation'
+import { NextRequest } from 'next/server'
+import { GET as meldungenUmleitung } from '@/app/admin/meldungen/route'
+import { GET as meldungUmleitung } from '@/app/admin/meldungen/[id]/route'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -121,12 +121,10 @@ const SEITE = { modul: '@/server/admin-wache', exportName: 'verlangeAdminSeite',
 const SEITEN = [...seiten(ADMIN)]
 
 describe('jede Seite unter /admin', () => {
-  it('es gibt die sieben Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 93 die Einstellungen, seit Nr. 94 die Startseite; /admin/meldungen leitet um und prüft trotzdem)', () => {
+  it('es gibt die fünf Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 93 die Einstellungen, seit Nr. 94 die Startseite; /admin/meldungen leitet seit Nr. 101 als Route Handler um und prüft trotzdem)', () => {
     expect(SEITEN.map((p) => relative(ADMIN, p).split(sep).join('/')).sort()).toEqual([
       'einstellungen/page.tsx',
       'finanzen/page.tsx',
-      'meldungen/[id]/page.tsx',
-      'meldungen/page.tsx',
       'page.tsx',
       'postfach/page.tsx',
       'startseite/page.tsx',
@@ -135,6 +133,12 @@ describe('jede Seite unter /admin', () => {
 
   it('ruft als erste Anweisung `await verlangeAdminSeite()` auf', () => {
     const maengel = SEITEN.flatMap((p) => wachenMaengel(readFileSync(p, 'utf8'), SEITE, relative(WURZEL, p)))
+    expect(maengel).toEqual([])
+  })
+
+  it('die Umleitungen /admin/meldungen und /admin/meldungen/[id] (Route Handler, Nr. 101) prüfen als erste Anweisung im GET', () => {
+    const routen = ['meldungen/route.ts', 'meldungen/[id]/route.ts'].map((r) => join(ADMIN, r))
+    const maengel = routen.flatMap((p) => wachenMaengel(readFileSync(p, 'utf8'), { ...SEITE, funktionName: 'GET' }, relative(WURZEL, p)))
     expect(maengel).toEqual([])
   })
 })
@@ -239,48 +243,50 @@ describe('ladeAdminbereich — Verhalten', () => {
   })
 })
 
-describe('/admin/meldungen — Umleitung in den Eingang, Filter Meldung (308, Nr. 87/95)', () => {
+describe('/admin/meldungen — Umleitung in den Reiter „Meldungen" (echter 308, Nr. 101)', () => {
   const getSession = vi.mocked(auth.api.getSession)
   const userFindUnique = vi.mocked(prisma.user.findUnique)
-  const umleiten = (suche: { status?: string; art?: string }) => MeldungenUmleitung({ searchParams: Promise.resolve(suche) })
+  const umleiten = (suche = '') => meldungenUmleitung(new NextRequest(`http://localhost/admin/meldungen${suche}`))
 
   beforeEach(() => {
     vi.clearAllMocks()
     getSession.mockResolvedValue({ user: { id: 'u1' } } as never)
   })
 
-  it('Admin: in den Eingang mit Filter Meldung — die alten Filter gibt es dort nicht mehr', async () => {
+  it('Admin: 308 auf den Reiter — die alten Filter gibt es dort nicht', async () => {
     userFindUnique.mockResolvedValue({ isAdmin: true } as never)
-    await expect(umleiten({ status: 'NEU', art: 'FEHLER' })).rejects.toThrow(/^PERMANENT:\/admin\/postfach\?art=meldung$/)
-    await expect(umleiten({})).rejects.toThrow(/^PERMANENT:\/admin\/postfach\?art=meldung$/)
+    for (const antwort of [await umleiten('?status=NEU&art=FEHLER'), await umleiten()]) {
+      expect(antwort.status).toBe(308)
+      expect(antwort.headers.get('location')).toBe('http://localhost/admin/postfach?reiter=meldungen')
+    }
   })
 
   it('Gegenprobe: ohne Recht 404 — die Umleitung verrät das Ziel nicht', async () => {
     userFindUnique.mockResolvedValue({ isAdmin: false } as never)
-    await expect(umleiten({ status: 'NEU' })).rejects.toThrow('NOT_FOUND')
-    expect(permanentRedirect).not.toHaveBeenCalled()
+    await expect(umleiten('?status=NEU')).rejects.toThrow('NOT_FOUND')
   })
 })
 
-describe('/admin/meldungen/[id] — Umleitung in die Spalte „Meldung entscheiden" (308, Nr. 95)', () => {
+describe('/admin/meldungen/[id] — Umleitung in die Spalte „Meldung entscheiden" (echter 308, Nr. 95/101)', () => {
   const getSession = vi.mocked(auth.api.getSession)
   const userFindUnique = vi.mocked(prisma.user.findUnique)
-  const umleiten = (id: string) => MeldungUmleitung({ params: Promise.resolve({ id }) })
+  const umleiten = (id: string) => meldungUmleitung(new NextRequest(`http://localhost/admin/meldungen/${id}`), { params: Promise.resolve({ id }) })
 
   beforeEach(() => {
     vi.clearAllMocks()
     getSession.mockResolvedValue({ user: { id: 'u1' } } as never)
   })
 
-  it('Admin: dauerhaft auf /admin/postfach?art=meldung&meldung=<id> — auch mit der Kurznummer', async () => {
+  it('Admin: 308 auf /admin/postfach?art=meldung&meldung=<id> — auch mit der Kurznummer', async () => {
     userFindUnique.mockResolvedValue({ isAdmin: true } as never)
-    await expect(umleiten('ckmeldung00000000000000000')).rejects.toThrow(/^PERMANENT:\/admin\/postfach\?art=meldung&meldung=ckmeldung00000000000000000$/)
-    await expect(umleiten('ab12cd34')).rejects.toThrow(/^PERMANENT:\/admin\/postfach\?art=meldung&meldung=ab12cd34$/)
+    const voll = await umleiten('ckmeldung00000000000000000')
+    expect(voll.status).toBe(308)
+    expect(voll.headers.get('location')).toBe('http://localhost/admin/postfach?art=meldung&meldung=ckmeldung00000000000000000')
+    expect((await umleiten('ab12cd34')).headers.get('location')).toBe('http://localhost/admin/postfach?art=meldung&meldung=ab12cd34')
   })
 
   it('Gegenprobe: ohne Recht 404 — die Umleitung verrät das Ziel nicht', async () => {
     userFindUnique.mockResolvedValue({ isAdmin: false } as never)
     await expect(umleiten('ab12cd34')).rejects.toThrow('NOT_FOUND')
-    expect(permanentRedirect).not.toHaveBeenCalled()
   })
 })

@@ -353,7 +353,7 @@ describe('mitgeschicktSatz — was unter „Problem melden" automatisch mitgeht'
     for (const datei of [
       'src/components/shared/meldung-form.tsx',
       'src/components/hof-hilfe/meldung-abgeben.tsx',
-      'src/app/admin/meldungen/[id]/page.tsx',
+      'src/components/admin/briefkasten-teile.tsx',
     ]) {
       expect(lies(datei), datei).not.toMatch(/Keine IP-Adresse|automatisch mit\./)
     }
