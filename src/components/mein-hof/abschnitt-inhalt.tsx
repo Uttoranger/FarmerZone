@@ -21,6 +21,7 @@ import { PickupSlotsClient } from '@/components/settings/pickup-slots-client'
 import { PauseClient } from '@/components/settings/pause-client'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
+import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 
 /*
  * Was eine Zeile von Mein Hof zum Bearbeiten öffnet (Nachtlauf Nr. 50,
@@ -43,6 +44,8 @@ export type AbschnittHof = {
   bannerUrl: string | null
   bannerValue: string | null
   bannerFocusY: number
+  /** Ausschnitt des Titelbilds, schon geprüft (Register N13, Nr. 97); null = wie vorher. */
+  bannerAusschnitt: BildAusschnitt | null
   isPaused: boolean
   pauseMessage: string | null
 }
@@ -91,7 +94,15 @@ export function AbschnittInhalt({
   function inhalt(): React.ReactNode {
     switch (id) {
       case 'titelbild':
-        return <TitelbildBaustein hof={hof} onGespeichert={onGespeichert} meldeErfolg={meldeErfolg} onHochladen={onHochladen} />
+        return (
+          <TitelbildBaustein
+            hof={hof}
+            anschrift={einstellungen}
+            onGespeichert={onGespeichert}
+            meldeErfolg={meldeErfolg}
+            onHochladen={onHochladen}
+          />
+        )
       case 'logo':
         // Der Schlüssel wechselt mit dem Logo: Nach dem Neuladen zeigt der Baustein den neuen Stand.
         return (

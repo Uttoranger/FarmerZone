@@ -34,6 +34,11 @@
  *    useState mit einer Zelle je Aufrufstelle, ohne DOM): Quadrat schaltet um,
  *    3:2 in der gelieferten Größe nicht.
  *  - Der Satz steht nur in lib/titelbild.ts, das Titelbild nur in titelbild.tsx.
+ *  - Seit Nr. 97 (Register N13, Ergänzung): Die Wahl des Hofs sticht die Regel
+ *    (FUELLEN füllt auch ein Quadrat, GANZ zeigt auch 3:2 ganz, AUTO und ohne
+ *    Wahl die Regel); der Satz in Mein Hof steht nur ohne Wahl. Füllende Lage
+ *    und Kopie tragen den Ausschnitt (Fokus, Zoom, Filter), die Kopie den
+ *    Weichzeichner und den Filter in EINER Angabe, die ganze Lage nur den Filter.
  */
 import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -94,6 +99,7 @@ vi.mock('next/image', () => ({
     alt: string
     sizes?: string
     className?: string
+    style?: Record<string, string>
     priority?: boolean
     'aria-hidden'?: boolean | 'true' | 'false'
     onLoad?: (ereignis: Ladeereignis) => void
@@ -104,6 +110,7 @@ vi.mock('next/image', () => ({
       alt: p.alt,
       sizes: p.sizes,
       className: p.className,
+      style: p.style,
       'aria-hidden': p['aria-hidden'],
       'data-liest-masse': typeof p.onLoad === 'function' ? 'ja' : undefined,
       'data-vorrang': p.priority ? 'ja' : undefined,
@@ -112,7 +119,18 @@ vi.mock('next/image', () => ({
 }))
 
 import { Titelbild, TitelbildBilder } from '@/components/hofseite/titelbild'
-import { TITELBILD_BREITE_MAX, TITELBILD_SIZES, leseBildmasse, titelbildDarstellung, titelbildHinweis } from '@/lib/titelbild'
+import {
+  TITELBILD_BREITE_MAX,
+  TITELBILD_SIZES,
+  leseBildmasse,
+  titelbildAusschnitt,
+  titelbildDarstellung,
+  titelbildHinweis,
+} from '@/lib/titelbild'
+import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
+
+/** Ein Ausschnitt mit allem: Fokus, Zoom und Filter (Warm). */
+const AUSSCHNITT: BildAusschnitt = { fokusX: 30, fokusY: 64, zoom: 115, filter: 'WARM' }
 
 const QUER = { breite: 3000, hoehe: 2000 }
 const QUADRAT = { breite: 1000, hoehe: 1000 }
@@ -143,10 +161,11 @@ const kopie = (html: string) => /<div\b[^>]*aria-hidden="true"[^>]*>/.exec(html)
 /** Der Kasten, in dem das scharfe Foto steht. */
 const kasten = (html: string) => tag(html, /max-w-\[\d+px\]/)
 const findeBildMit = (html: string, passt: (k: string[]) => boolean) => bilder(html).find((b) => passt(klassen(b))) ?? ''
-const weich = (k: string[]) => k.some((c) => c.startsWith('blur-'))
-const kopieBild = (html: string) => findeBildMit(html, weich)
+/** Weichgezeichnet ist ein Bild mit `blur(` in seinem Inline-Filter (seit Nr. 97 dort, zusammen mit dem Filter des Ausschnitts). */
+const weich = (bild: string) => /filter:\s*blur\(/.test(bild)
+const kopieBild = (html: string) => bilder(html).find(weich) ?? ''
 /** Das scharfe Foto, das die Fläche füllt (object-cover) — am Handy das einzige. */
-const fuellend = (html: string) => findeBildMit(html, (k) => k.includes('object-cover') && !weich(k))
+const fuellend = (html: string) => bilder(html).find((b) => klassen(b).includes('object-cover') && !weich(b)) ?? ''
 /** Das scharfe Foto, das ganz steht (object-contain) — erst ab 768 px. */
 const ganzBild = (html: string) => findeBildMit(html, (k) => k.includes('object-contain'))
 
@@ -241,7 +260,7 @@ describe('titelbildHinweis (Satz unter der Vorschau in Mein Hof)', () => {
 describe('TitelbildBilder', () => {
   const DARSTELLUNGEN = ['beschnitt', 'ganz'] as const
   const zeige = (darstellung: 'beschnitt' | 'ganz') =>
-    renderToStaticMarkup(createElement(TitelbildBilder, { foto: '/foto.jpg', fokusY: 40, darstellung, beimLaden: () => {} }))
+    renderToStaticMarkup(createElement(TitelbildBilder, { foto: '/foto.jpg', ausschnitt: AUSSCHNITT, darstellung, beimLaden: () => {} }))
 
   it.each(DARSTELLUNGEN)('%s: drei Bilder desselben Fotos — die Kopie und das scharfe Foto in zwei Lagen, füllend und ganz', (darstellung) => {
     const html = zeige(darstellung)
@@ -341,10 +360,69 @@ describe('TitelbildBilder', () => {
 
   it.each(DARSTELLUNGEN)('%s: die Kopie ist weichgezeichnet und füllt, das scharfe Foto nie weichgezeichnet', (darstellung) => {
     const html = zeige(darstellung)
-    expect(weich(klassen(kopieBild(html)))).toBe(true)
+    expect(weich(kopieBild(html))).toBe(true)
     expect(klassen(kopieBild(html))).toContain('object-cover')
-    expect(weich(klassen(fuellend(html)))).toBe(false)
-    expect(weich(klassen(ganzBild(html)))).toBe(false)
+    expect(weich(fuellend(html))).toBe(false)
+    expect(weich(ganzBild(html))).toBe(false)
+  })
+
+  it.each(DARSTELLUNGEN)('%s: füllende Lage und Kopie tragen den Ausschnitt — Fokus, Zoom um den Fokus und Filter', (darstellung) => {
+    const html = zeige(darstellung)
+    for (const lage of [fuellend(html), kopieBild(html)]) {
+      expect(lage).toContain('object-position:30% 64%')
+      expect(lage).toContain('transform:scale(1.15)')
+      expect(lage).toContain('transform-origin:30% 64%')
+    }
+    expect(fuellend(html)).toContain('filter:sepia(0.22) saturate(1.2)')
+  })
+
+  it('die Kopie hat Weichzeichner UND Filter in EINER Angabe — eine Klasse blur-… daneben wäre wirkungslos', () => {
+    const k = kopieBild(zeige('ganz'))
+    expect(k.match(/filter:/g)).toHaveLength(1)
+    expect(k).toContain('filter:blur(28px) sepia(0.22) saturate(1.2)')
+    expect(klassen(k).some((c) => c.startsWith('blur-'))).toBe(false)
+  })
+
+  it('die ganze Lage trägt nur den Filter — ohne Fokus und Zoom steht sie mittig in voller Höhe', () => {
+    const ganz = ganzBild(zeige('ganz'))
+    expect(ganz).toContain('filter:sepia(0.22) saturate(1.2)')
+    expect(ganz).not.toContain('object-position')
+    expect(ganz).not.toContain('transform')
+  })
+
+  it('Natürlich setzt keinen Filter — am scharfen Foto nichts, an der Kopie nur der Weichzeichner', () => {
+    const html = renderToStaticMarkup(
+      createElement(TitelbildBilder, { foto: '/foto.jpg', ausschnitt: { ...AUSSCHNITT, filter: 'NATUERLICH' }, darstellung: 'ganz', beimLaden: () => {} })
+    )
+    expect(fuellend(html)).not.toContain('filter')
+    expect(ganzBild(html)).not.toContain('style=')
+    expect(kopieBild(html)).toContain('filter:blur(28px)"')
+  })
+})
+
+describe('Wahl des Hofs: füllen oder ganz (Register N13, Ergänzung, Nr. 97)', () => {
+  it.each([
+    ['FUELLEN füllt auch ein Quadrat', QUADRAT, 'FUELLEN', 'beschnitt'],
+    ['FUELLEN füllt auch ein Hochformat', HOCH, 'FUELLEN', 'beschnitt'],
+    ['GANZ zeigt auch 3:2 ganz', QUER, 'GANZ', 'ganz'],
+    ['GANZ zeigt ganz, auch bevor die Maße bekannt sind', null, 'GANZ', 'ganz'],
+    ['AUTO nimmt die Regel: Quadrat ganz', QUADRAT, 'AUTO', 'ganz'],
+    ['AUTO nimmt die Regel: 3:2 füllt', QUER, 'AUTO', 'beschnitt'],
+    ['ohne Wahl die Regel: Quadrat ganz', QUADRAT, undefined, 'ganz'],
+  ] as const)('%s', (_name, masse, wahl, erwartet) => {
+    expect(titelbildDarstellung(masse, wahl)).toBe(erwartet)
+  })
+
+  it('der Satz in Mein Hof steht nur ohne eigene Wahl', () => {
+    expect(titelbildHinweis(QUADRAT, 'AUTO')).toContain('zeigen wir es ganz')
+    expect(titelbildHinweis(QUADRAT, undefined)).toContain('zeigen wir es ganz')
+    expect(titelbildHinweis(QUADRAT, 'FUELLEN')).toBeNull()
+    expect(titelbildHinweis(QUADRAT, 'GANZ')).toBeNull()
+  })
+
+  it('ohne gespeicherten Ausschnitt gilt der Stand von vorher: Mitte, bannerFocusY, 100 %, Natürlich, ohne Wahl', () => {
+    expect(titelbildAusschnitt(null, 30)).toEqual({ fokusX: 50, fokusY: 30, zoom: 100, filter: 'NATUERLICH' })
+    expect(titelbildAusschnitt(AUSSCHNITT, 30)).toBe(AUSSCHNITT)
   })
 })
 
@@ -354,10 +432,10 @@ describe('Titelbild', () => {
     buehne.beimLaden = null
   })
 
-  const zeige = (foto: string | null) => {
+  const zeige = (foto: string | null, ausschnitt: BildAusschnitt = titelbildAusschnitt(null, 50)) => {
     buehne.beginneRender()
     return renderToStaticMarkup(
-      createElement(Titelbild, { foto, verlauf: 'linear-gradient(1deg, red, blue)', fokusY: 50 }, createElement('button', null, 'Teilen'))
+      createElement(Titelbild, { foto, verlauf: 'linear-gradient(1deg, red, blue)', ausschnitt }, createElement('button', null, 'Teilen'))
     )
   }
   const rahmen = (html: string) => tag(html, /data-abschnitt="titelbild"/)
@@ -402,6 +480,21 @@ describe('Titelbild', () => {
     expect(klassen(fuellend(html))).not.toContain('md:opacity-0')
     expect(klassen(ganzBild(html))).toContain('opacity-0')
     expect(klassen(kopie(html))).toContain('opacity-0')
+  })
+
+  it('„Ganz zeigen“ zeigt ein 3:2-Foto nach dem Laden ganz, „Ausschnitt füllen“ lässt ein Quadrat füllen', () => {
+    zeige('/foto.jpg', { ...AUSSCHNITT, darstellung: 'GANZ' })
+    buehne.beimLaden?.({ currentTarget: { naturalWidth: 640, naturalHeight: 427 } })
+    const ganz = zeige('/foto.jpg', { ...AUSSCHNITT, darstellung: 'GANZ' })
+    expect(klassen(ganzBild(ganz))).toContain('opacity-100')
+    expect(klassen(fuellend(ganz))).toContain('md:opacity-0')
+
+    buehne.beimLaden?.({ currentTarget: { naturalWidth: 1000, naturalHeight: 1000 } })
+    const fuellen = zeige('/foto.jpg', { ...AUSSCHNITT, darstellung: 'FUELLEN' })
+    expect(klassen(fuellend(fuellen))).not.toContain('md:opacity-0')
+    expect(klassen(ganzBild(fuellen))).toContain('opacity-0')
+    // Gegenprobe: ohne Wahl stünde dasselbe Quadrat ganz.
+    expect(klassen(fuellend(zeige('/foto.jpg')))).toContain('md:opacity-0')
   })
 
   it('ohne Foto steht der Verlauf des Hofs, kein Bild und keine Kopie', () => {

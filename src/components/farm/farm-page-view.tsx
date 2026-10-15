@@ -19,13 +19,15 @@
  * Stiften (am Handy unter lg auf /farm-page). Seit Nr. 50 bearbeitet Mein Hof
  * mit der Liste der Abschnitte und dem Blatt von unten
  * (components/mein-hof/abschnitte-liste.tsx); der Bearbeitungsmodus ist seit
- * Nr. 50 Runde 1 entfernt. Geblieben sind Titelbild-Knopf und Ausschnitt
- * (CoverEditButton, CoverFocusAdjust), die Mein Hof weiter nutzt.
+ * Nr. 50 Runde 1 entfernt. Geblieben ist der Titelbild-Knopf
+ * (CoverEditButton), den Mein Hof weiter nutzt; den Ausschnitt wählt seit
+ * Nr. 97 der Bild-Baustein (components/shared/bild-ausschnitt.tsx), das
+ * frühere CoverFocusAdjust (nur senkrecht) ist entfallen.
  */
 
-import { useEffect, useRef, useTransition } from 'react'
+import { useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Camera, Check, MoveVertical } from 'lucide-react'
+import { Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import { updateFarmBannerAction } from '@/server/actions/appearance'
@@ -112,87 +114,6 @@ export function CoverEditButton({
         <Camera className="size-3.5" strokeWidth={1.7} />
         {isUploading ? (progress ? stufenText(progress) : 'Lädt…') : 'Titelbild ersetzen'}
       </button>
-    </>
-  )
-}
-
-// ── Titelbild-Fokuspunkt: Anpass-Zustand (Drag mit Maus & Touch) ──────────────
-// Auch im Baustein „Titelbild" von Mein Hof (bild-bausteine.tsx) über einem
-// kleinen Abbild des Titelbilds; `gross` macht die Knöpfe 44 px hoch (Nr. 50).
-
-export function CoverFocusAdjust({
-  focusY,
-  onChange,
-  onSave,
-  onCancel,
-  saving,
-  gross = false,
-}: {
-  focusY: number
-  onChange: (v: number) => void
-  onSave: () => void
-  onCancel: () => void
-  saving: boolean
-  gross?: boolean
-}): React.JSX.Element {
-  const hoehe = gross ? 'min-h-11' : 'h-9'
-  const drag = useRef<{ startY: number; startFocus: number; height: number } | null>(null)
-
-  return (
-    <>
-      {/* Drag-Fläche über dem ganzen Cover */}
-      <div
-        className="absolute inset-0 z-10 cursor-grab active:cursor-grabbing"
-        style={{ touchAction: 'none' }}
-        onPointerDown={(e) => {
-          drag.current = {
-            startY: e.clientY,
-            startFocus: focusY,
-            height: e.currentTarget.getBoundingClientRect().height,
-          }
-          e.currentTarget.setPointerCapture(e.pointerId)
-        }}
-        onPointerMove={(e) => {
-          const s = drag.current
-          if (!s) return
-          const dy = e.clientY - s.startY
-          onChange(Math.min(100, Math.max(0, Math.round(s.startFocus - (dy / s.height) * 100))))
-        }}
-        onPointerUp={() => { drag.current = null }}
-        onPointerCancel={() => { drag.current = null }}
-      >
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span
-            className="flex items-center gap-1.5 rounded-full text-xs font-semibold text-white px-3.5 py-2"
-            style={{ background: 'rgba(45,48,39,0.85)' }}
-          >
-            <MoveVertical className="size-3.5" strokeWidth={1.7} />
-            Bild ziehen, um den Ausschnitt zu wählen
-          </span>
-        </div>
-      </div>
-      {/* Speichern / Abbrechen */}
-      <div className="absolute top-3.5 right-[22px] z-20 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={saving}
-          className={`flex items-center gap-1.5 ${hoehe} px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-60`}
-          style={{ background: 'rgba(255,255,255,0.94)', color: 'var(--foto-knopf-ink-soft)', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
-        >
-          Abbrechen
-        </button>
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={saving}
-          className={`flex items-center gap-1.5 ${hoehe} px-3.5 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60`}
-          style={{ background: 'rgba(45,48,39,0.85)', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
-        >
-          <Check className="size-3.5" strokeWidth={1.7} />
-          {saving ? 'Speichert…' : 'Speichern'}
-        </button>
-      </div>
     </>
   )
 }

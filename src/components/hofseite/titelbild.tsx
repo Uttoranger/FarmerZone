@@ -3,6 +3,8 @@
 import { useState, type ReactNode, type SyntheticEvent } from 'react'
 import Image from 'next/image'
 import { TITELBILD_SIZES, leseBildmasse, titelbildDarstellung, type TitelbildDarstellung, type TitelbildMasse } from '@/lib/titelbild'
+import { bildStil, filterMit, nurFilterStil } from '@/lib/bild-ausschnitt'
+import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { cn } from '@/lib/utils'
 
 /*
@@ -28,6 +30,11 @@ import { cn } from '@/lib/utils'
  * überblenden, darum liegt das scharfe Foto in zwei Lagen (füllend und ganz), und
  * beim Wechsel blenden die ganze Lage und die Kopie ein, während die füllende
  * ausblendet. Der Alt-Text bleibt leer (Schmuck); den Hof nennt die Überschrift.
+ *
+ * Seit Nr. 97 (Register N13, Ergänzung; N17) kommt statt des senkrechten
+ * Fokuspunkts der ganze Ausschnitt: Fokus waagrecht und senkrecht, Zoom und
+ * Filter wirken am Computer und am Handy gleich (`bildStil`, lib/bild-ausschnitt.ts),
+ * die Wahl „füllen oder ganz“ nur am Computer (`titelbildDarstellung`).
  */
 
 /**
@@ -58,7 +65,7 @@ const UEBERGANG = 'transition-opacity duration-500 motion-reduce:transition-none
  * Die Bilder im Rahmen: hinten die unscharfe Kopie über die volle Breite, davor
  * im Kasten das scharfe Foto in zwei Lagen.
  *
- * Die Kopie (`object-cover` mit demselben Fokuspunkt, Weichzeichner, dunkle
+ * Die Kopie (`object-cover` mit demselben Ausschnitt, Weichzeichner, dunkle
  * Tönung aus dem Design-System — Bild-Overlay, in beiden Themes gleich) ist
  * immer im Baum, nur ihre Sichtbarkeit wechselt: Bei `ganz` ist sie ab 768 px
  * da, bei `beschnitt` bleibt sie unsichtbar — außer über 1 920 px, wo sie die
@@ -67,16 +74,18 @@ const UEBERGANG = 'transition-opacity duration-500 motion-reduce:transition-none
  * sie ohne Übergang an. Unter 768 px ist sie aus.
  *
  * Weichzeichner 28 px, Kopie 10 % größer und 20 px über den Rahmen hinaus, Tönung
- * 45 % — die Werte des Mockups system-k2-titelbild-computer. Der Überstand
+ * 45 % — die Werte des Mockups system-k2-titelbild-computer. Weichzeichner und
+ * Filter stehen in EINER Inline-Angabe `filter` (`filterMit`): Eine Klasse
+ * `blur-[28px]` neben dem Inline-Filter des Ausschnitts wäre wirkungslos. Der Überstand
  * hält den Rand des Bilds außerhalb des Rahmens: Ein Weichzeichner macht die
  * Kante halbdurchsichtig, und dahinter stünde sonst die Fläche des Rahmens.
  *
  * Das scharfe Foto liegt zweimal im Kasten, beide Male dieselbe Quelle mit
  * demselben `sizes` — der Browser lädt die Datei nur einmal:
- *  - füllend (`object-cover`, Fokuspunkt): die Lage, die am Handy und bei einem
- *    Querformat steht. Sie lädt vorrangig und liest die Maße (`onLoad`).
- *  - ganz (`object-contain`): erst ab 768 px da (`hidden md:block` — darunter
- *    gibt es sie nicht, also auch keinen Abruf) und unsichtbar, bis das Foto ganz steht.
+ *  - füllend (`object-cover`, ganzer Ausschnitt): die Lage, die am Handy und bei
+ *    „füllen“ steht. Sie lädt vorrangig und liest die Maße (`onLoad`).
+ *  - ganz (`object-contain`, nur der Filter): erst ab 768 px da (`hidden md:block` —
+ *    darunter gibt es sie nicht, also auch keinen Abruf) und unsichtbar, bis das Foto ganz steht.
  * Beim Wechsel nach dem Laden blenden die ganze Lage und die Kopie ein, während die
  * füllende ausblendet. Ein einzelnes Bild, das nur von `cover` auf `contain` wechselte,
  * spränge: `object-fit` lässt sich nicht überblenden. Unter 768 px bleibt die
@@ -87,18 +96,20 @@ const UEBERGANG = 'transition-opacity duration-500 motion-reduce:transition-none
  */
 export function TitelbildBilder({
   foto,
-  fokusY,
+  ausschnitt,
   darstellung,
   beimLaden,
 }: {
   foto: string
-  /** Fokuspunkt, senkrecht, 0–100 (`Farm.bannerFocusY`). */
-  fokusY: number
+  /** Fokus, Zoom und Filter (`titelbildAusschnitt`, lib/titelbild.ts). */
+  ausschnitt: BildAusschnitt
   darstellung: TitelbildDarstellung
   beimLaden: (ereignis: SyntheticEvent<HTMLImageElement>) => void
 }): React.JSX.Element {
   const ganz = darstellung === 'ganz'
-  const position = { objectPosition: `50% ${fokusY}%` }
+  const fuellend = bildStil(ausschnitt)
+  const kopie = { ...bildStil(ausschnitt, { filter: false }), filter: filterMit('blur(28px)', ausschnitt) }
+  const nurFilter = nurFilterStil(ausschnitt)
 
   return (
     <>
@@ -108,7 +119,7 @@ export function TitelbildBilder({
         className={cn('absolute inset-0 hidden md:block', UEBERGANG, ganz ? 'opacity-100' : 'opacity-0 min-[1920px]:opacity-100')}
       >
         <div className="absolute -inset-5">
-          <Image src={foto} alt="" fill sizes={TITELBILD_SIZES} className="scale-110 object-cover blur-[28px]" style={position} />
+          <Image src={foto} alt="" fill sizes={TITELBILD_SIZES} className="scale-110 object-cover" style={kopie} />
         </div>
         <div className="absolute inset-0 bg-primary-foreground/45" />
       </div>
@@ -122,9 +133,9 @@ export function TitelbildBilder({
           priority
           onLoad={beimLaden}
           className={cn('object-cover', UEBERGANG, ganz && 'md:opacity-0')}
-          style={position}
+          style={fuellend}
         />
-        {/* Ohne Fokuspunkt: Bei object-contain im breiten Rahmen begrenzt die Höhe das Foto, es steht von selbst mittig. */}
+        {/* Ohne Fokus und Zoom: Bei object-contain im breiten Rahmen begrenzt die Höhe das Foto, es steht von selbst mittig — ganz eben. Der Filter gilt auch hier. */}
         <Image
           src={foto}
           alt=""
@@ -132,6 +143,7 @@ export function TitelbildBilder({
           fill
           sizes={TITELBILD_SIZES}
           className={cn('hidden object-contain md:block', UEBERGANG, ganz ? 'opacity-100' : 'opacity-0')}
+          style={nurFilter}
         />
       </div>
     </>
@@ -145,14 +157,15 @@ export function TitelbildBilder({
 export function Titelbild({
   foto,
   verlauf,
-  fokusY,
+  ausschnitt,
   children,
 }: {
   /** Das hochgeladene Foto (`titelbildFoto`), sonst null — dann steht der Verlauf. */
   foto: string | null
   /** Der Verlauf des Hofs (`titelbildVerlauf`). */
   verlauf: string
-  fokusY: number
+  /** Der Ausschnitt (`titelbildAusschnitt`): ohne gespeicherten der Stand von vorher. */
+  ausschnitt: BildAusschnitt
   children?: ReactNode
 }): React.JSX.Element {
   const { masse, beimLaden } = useBildmasse(foto)
@@ -163,7 +176,12 @@ export function Titelbild({
       className="relative h-[220px] w-full overflow-hidden bg-muted md:h-[300px] xl:h-[360px] 2xl:h-[420px]"
     >
       {foto ? (
-        <TitelbildBilder foto={foto} fokusY={fokusY} darstellung={titelbildDarstellung(masse)} beimLaden={beimLaden} />
+        <TitelbildBilder
+          foto={foto}
+          ausschnitt={ausschnitt}
+          darstellung={titelbildDarstellung(masse, ausschnitt.darstellung)}
+          beimLaden={beimLaden}
+        />
       ) : (
         // Der Verlauf ist ein Wert des Hofs (Titelbild-Einstellung), kein Farbliteral im Code.
         <div className="absolute inset-0" style={{ background: verlauf }} />
