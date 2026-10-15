@@ -137,9 +137,13 @@ export function StandBand({ stand }: { stand: AblaufStand }): React.JSX.Element 
 
 // ─── Kopf: Umschalter und Filter ────────────────────────────────────────────
 
+/**
+ * Umschalter für alle Breiten; die Filter Art und Von erst ab 1024 px — das Handy-Mockup zeigt zwischen Umschalter und Teil-Chips nichts.
+ * Am Handy steht der Umschalter über dem Stand-Band (Mockup mobil), ab 1024 px darunter (Mockup Ablauf); das Band hat nichts zum Antippen, die Tab-Reihenfolge bleibt.
+ */
 export function MeldungenKopf({ ansicht, stand }: { ansicht: MeldungenAnsicht; stand: AblaufStand }): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3">
+    <div className="order-first flex flex-col gap-2 lg:order-none lg:flex-row lg:flex-wrap lg:items-center lg:gap-3">
       <FilterChipReihe beschriftung={MELDUNGEN_TEXT.ansichtBeschriftung}>
         <FilterChip href={meldungenAdresse(ansicht, { ansicht: 'ablauf' })} aktiv={ansicht.ansicht === 'ablauf'}>
           {MELDUNGEN_TEXT.ablauf}
@@ -151,7 +155,7 @@ export function MeldungenKopf({ ansicht, stand }: { ansicht: MeldungenAnsicht; s
       {ansicht.ansicht === 'ablauf' && (
         <>
           <span className="hidden flex-1 lg:block" />
-          <FilterChipReihe beschriftung={MELDUNGEN_TEXT.artBeschriftung}>
+          <FilterChipReihe beschriftung={MELDUNGEN_TEXT.artBeschriftung} className="hidden lg:block">
             <FilterChip href={meldungenAdresse(ansicht, { art: null })} aktiv={ansicht.art === null}>
               {MELDUNGEN_TEXT.alle} <span className="ml-1.5 text-xs font-semibold tabular-nums">{stand.jeArt.alle}</span>
             </FilterChip>
@@ -161,7 +165,7 @@ export function MeldungenKopf({ ansicht, stand }: { ansicht: MeldungenAnsicht; s
               </FilterChip>
             ))}
           </FilterChipReihe>
-          <div className="flex items-center gap-2">
+          <div className="hidden items-center gap-2 lg:flex">
             <span className={cn('text-[12.5px]', LEISE)} aria-hidden="true">
               {MELDUNGEN_TEXT.von}
             </span>
@@ -420,7 +424,10 @@ function KiKasten(): React.JSX.Element {
   )
 }
 
-/** Am Handy: Chips je Teil (Zahl aus dem Stand-Band) und die Liste des gewählten — in „Braucht dich" zuerst die KI-Vorschläge. */
+/**
+ * Am Handy: Chips je Teil (Zahl aus dem Stand-Band) und die Liste des gewählten — in „Braucht dich" zuerst die KI-Vorschläge.
+ * `stand` ist hier immer ungefiltert: Art und Von gibt es am Handy nicht, also zählen Chip und Liste dieselben Meldungen.
+ */
 function HandyAblauf({ stand, ansicht, jetzt, such }: { stand: AblaufStand; ansicht: MeldungenAnsicht; jetzt: Date; such: Map<string, SuchMeldung> }): React.JSX.Element {
   const k = stand.karten
   return (
@@ -454,13 +461,27 @@ function HandyAblauf({ stand, ansicht, jetzt, such }: { stand: AblaufStand; ansi
   )
 }
 
-export function AblaufAnsicht({ stand, ansicht, jetzt, kandidaten }: { stand: AblaufStand; ansicht: MeldungenAnsicht; jetzt: Date; kandidaten: SuchMeldung[] }): React.JSX.Element {
+export function AblaufAnsicht({
+  stand,
+  handy,
+  ansicht,
+  jetzt,
+  kandidaten,
+}: {
+  /** Nach Art und Von gefiltert — für die Spalten ab 1024 px. */
+  stand: AblaufStand
+  /** Ohne Filter — für die Chips und die Liste am Handy. */
+  handy: AblaufStand
+  ansicht: MeldungenAnsicht
+  jetzt: Date
+  kandidaten: SuchMeldung[]
+}): React.JSX.Element {
   const such = new Map(kandidaten.map((m) => [m.id, m]))
   const k = stand.karten
   const ohneKarte = stand.inBuendeln + stand.alsDuplikat
   return (
     <div className="flex flex-col gap-4">
-      <HandyAblauf stand={stand} ansicht={ansicht} jetzt={jetzt} such={such} />
+      <HandyAblauf stand={handy} ansicht={ansicht} jetzt={jetzt} such={such} />
       <div className="hidden items-start gap-3 lg:grid lg:grid-cols-4">
         <Spalte teil="neu" karten={k.neu} kinder={<KartenListe karten={k.neu} jetzt={jetzt} ansicht={ansicht} such={such} />} />
         <Spalte teil="ki" karten={k.ki} kinder={<KartenListe karten={k.ki} jetzt={jetzt} ansicht={ansicht} such={such} />} />

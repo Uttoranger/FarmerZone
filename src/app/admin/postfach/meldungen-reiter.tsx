@@ -6,7 +6,10 @@ import { AblaufAnsicht, MeldungenKopf, StandBand, WuenscheAnsicht } from '@/comp
 
 export type MeldungenDaten = {
   ansicht: MeldungenAnsicht
+  /** Nach Art und Von gefiltert (Spalten ab 1024 px); das Band zählt ohnehin alle. */
   stand: AblaufStand
+  /** Ohne Filter: am Handy gibt es Art und Von nicht (Mockup mobil). */
+  handy: AblaufStand
   kandidaten: SuchMeldung[]
   stichwoerter: string[]
   /** Nur in der Ansicht „Wünsche gebündelt". */
@@ -22,9 +25,11 @@ export type MeldungenDaten = {
 export async function ladeMeldungenReiter(ansicht: MeldungenAnsicht): Promise<MeldungenDaten> {
   const meldungen = await ladeMeldungenAblauf()
   const stichwoerter = [...new Set(meldungen.flatMap((m) => (m.clusterKey?.trim() ? [m.clusterKey.trim()] : [])))].sort((a, b) => a.localeCompare(b))
+  const handy = ablaufStand(meldungen, { art: null, von: 'alle' })
   return {
     ansicht,
-    stand: ablaufStand(meldungen, { art: ansicht.art, von: ansicht.von }),
+    stand: ansicht.art === null && ansicht.von === 'alle' ? handy : ablaufStand(meldungen, { art: ansicht.art, von: ansicht.von }),
+    handy,
     kandidaten: meldungen.map((m) => suchMeldungVon(m, MELDUNGEN_TEXT.kundin)),
     stichwoerter,
     // Der Kurztitel genügt für Woraus und die Beispiele — der volle Text bleibt in der Datenbank.
@@ -40,7 +45,7 @@ export async function ladeMeldungenReiter(ansicht: MeldungenAnsicht): Promise<Me
  * damit ein Dialog stehen bleibt, wenn eine Karte nach einem Klick wandert.
  */
 export function MeldungenReiter({ daten, jetzt }: { daten: MeldungenDaten; jetzt: Date }): React.JSX.Element {
-  const { ansicht, stand, kandidaten, stichwoerter, cluster } = daten
+  const { ansicht, stand, handy, kandidaten, stichwoerter, cluster } = daten
   return (
     <MeldungenWerkzeug kandidaten={kandidaten} stichwoerter={stichwoerter}>
       <div className="flex flex-col gap-3 md:gap-4">
@@ -49,7 +54,7 @@ export function MeldungenReiter({ daten, jetzt }: { daten: MeldungenDaten; jetzt
         {cluster ? (
           <WuenscheAnsicht cluster={cluster} ansicht={ansicht} jetzt={jetzt} kandidaten={kandidaten} />
         ) : (
-          <AblaufAnsicht stand={stand} ansicht={ansicht} jetzt={jetzt} kandidaten={kandidaten} />
+          <AblaufAnsicht stand={stand} handy={handy} ansicht={ansicht} jetzt={jetzt} kandidaten={kandidaten} />
         )}
       </div>
     </MeldungenWerkzeug>
