@@ -6,14 +6,18 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
   MAX_LONG_SIDE,
+  STARTSEITE_MIN_KANTE,
   WEBP_QUALITAET,
   darfGeloeschtWerden,
+  darfStartseitenBildVerarbeitetWerden,
   darfVerarbeitetWerden,
   istUploadZweck,
+  startseitenZielPfad,
   zielPfad,
 } from '@/lib/upload-pfade'
 import { UPLOAD_GESPERRT_TEXT } from '@/lib/email-bestaetigung'
 import { emailBestaetigungOffen } from '@/server/email-bestaetigung'
+import { isAdminUser } from '@/server/queries/admin'
 
 /**
  * Verkleinert ein hochgeladenes Original und legt das Ergebnis ab.
@@ -54,10 +58,98 @@ async function verkleinern(bytes: ArrayBuffer, maxLangeSeite: number): Promise<B
     .toBuffer()
 }
 
+/** Das Bild noch einmal holen und als WebP ablegen; das Original fällt in jedem Ausgang weg. */
+async function verarbeiteUndLege(
+  url: string,
+  bearbeite: (bytes: ArrayBuffer) => Promise<Buffer | 'zu-klein'>,
+  ziel: string,
+  aufraeumen: () => Promise<void>
+): Promise<NextResponse> {
+  try {
+    const antwort = await fetch(url)
+    if (!antwort.ok) {
+      return NextResponse.json({ error: 'Original nicht lesbar', art: 'server' }, { status: 502 })
+    }
+    let fertig: Buffer | 'zu-klein'
+    try {
+      fertig = await bearbeite(await antwort.arrayBuffer())
+    } catch {
+      return NextResponse.json({ error: 'Format nicht lesbar', art: 'format' }, { status: 415 })
+    }
+    if (fertig === 'zu-klein') {
+      return NextResponse.json({ error: 'Bild zu klein', code: 'BILD_ZU_KLEIN', art: 'format' }, { status: 422 })
+    }
+    const blob = await put(ziel, fertig, {
+      access: 'public',
+      addRandomSuffix: true,
+      contentType: 'image/webp',
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    })
+    return NextResponse.json({ url: blob.url })
+  } catch {
+    return NextResponse.json({ error: 'Verarbeitung fehlgeschlagen', art: 'server' }, { status: 500 })
+  } finally {
+    await aufraeumen()
+  }
+}
+
+/**
+ * Ein Bild für einen Block der Startseite (Register N16, Nr. 96): nur mit
+ * Admin-Sitzung (frisch aus der Datenbank), nur aus dem Ordner der Startseite,
+ * quadratisch (1:1) mit der langen Kante höchstens 1600 px — und nicht unter
+ * STARTSEITE_MIN_KANTE, sonst wird es auf großen Schirmen unscharf. Ein altes
+ * Bild löscht diese Route NICHT: Es kann noch an einem gespeicherten Block
+ * hängen, solange das Formular nicht gespeichert ist.
+ */
+async function verarbeiteStartseitenBild(userId: string, url: string): Promise<NextResponse> {
+  if (!(await isAdminUser(userId))) {
+    return NextResponse.json({ error: 'Kein Zugriff', art: 'server' }, { status: 403 })
+  }
+  if (!darfStartseitenBildVerarbeitetWerden(url)) {
+    return NextResponse.json({ error: 'URL nicht erlaubt', art: 'server' }, { status: 403 })
+  }
+  return verarbeiteUndLege(
+    url,
+    async (bytes) => {
+      const bild = sharp(Buffer.from(bytes))
+      const { width, height } = await bild.metadata()
+      // Die kürzere Kante ändert sich durch die EXIF-Drehung nicht.
+      const kante = Math.min(width ?? 0, height ?? 0)
+      if (kante < STARTSEITE_MIN_KANTE) return 'zu-klein'
+      const seite = Math.min(kante, MAX_LONG_SIDE.startseite)
+      return bild.rotate().resize({ width: seite, height: seite, fit: 'cover' }).webp({ quality: WEBP_QUALITAET }).toBuffer()
+    },
+    startseitenZielPfad(),
+    async () => {
+      try {
+        await del(url, { token: process.env.BLOB_READ_WRITE_TOKEN })
+      } catch {
+        // bewusst still — eine Waise im Speicher, kein kaputter Zustand
+      }
+    }
+  )
+}
+
+/** Der Körper, einmal gelesen — null, wenn er kein JSON ist (die Antwort darauf bleibt, wo sie war). */
+async function leseDaten(request: NextRequest): Promise<{ url?: unknown; zweck?: unknown; altUrl?: unknown } | null> {
+  try {
+    return await request.json()
+  } catch {
+    return null
+  }
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) {
     return NextResponse.json({ error: 'Nicht angemeldet', art: 'server' }, { status: 401 })
+  }
+
+  const gelesen = await leseDaten(request)
+  // Zweck 'startseite' prüft die Admin-Sitzung statt der Hof-Sitzung — alle
+  // anderen Zwecke laufen unverändert weiter unten.
+  if (gelesen?.zweck === 'startseite') {
+    return verarbeiteStartseitenBild(session.user.id, typeof gelesen.url === 'string' ? gelesen.url : '')
   }
 
   const rolle = (session.user as typeof session.user & { role?: string }).role
@@ -80,12 +172,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: UPLOAD_GESPERRT_TEXT, code: 'EMAIL_UNBESTAETIGT', art: 'server' }, { status: 403 })
   }
 
-  let daten: { url?: unknown; zweck?: unknown; altUrl?: unknown }
-  try {
-    daten = await request.json()
-  } catch {
+  if (gelesen === null) {
     return NextResponse.json({ error: 'Ungültige Anfrage', art: 'server' }, { status: 400 })
   }
+  const daten = gelesen
 
   const url = typeof daten.url === 'string' ? daten.url : ''
   const altUrl = typeof daten.altUrl === 'string' ? daten.altUrl : ''

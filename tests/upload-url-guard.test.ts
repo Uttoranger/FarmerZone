@@ -149,6 +149,8 @@ describe('Zweck-Tabelle', () => {
       // Sprint fehlerbriefkasten: Screenshots zu Meldungen — 1600px reichen,
       // um einen Bildschirm lesbar zu zeigen; die bisherigen Werte bleiben.
       meldung: 1600,
+      // Nr. 96 (Register N16): Bilder der Startseite, quadratisch, lange Kante 1600.
+      startseite: 1600,
     })
     expect(WEBP_QUALITAET).toBe(82)
   })

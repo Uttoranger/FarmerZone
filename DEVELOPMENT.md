@@ -5226,6 +5226,18 @@ Register N12 (Änderung vom 15.10.2026) und N14 (`docs/entscheidungen.md`); Mock
 - **Antwort möglich:** Standard beim Verfassen Wichtig an, Info aus. Bestehende Rundschreiben bleiben beantwortbar (Default true). Der Hof sieht statt des Felds den Satz der Freigabe; antworteAlsHof lehnt in derselben WHERE-Klausel ab.
 
 
+## Startseite gestalten: Abschnitte, Blöcke, Vorschau (Nachtlauf 14, Nr. 96, Oktober 2026)
+
+Register N16; Mockups `admin-startseite-gestalten`, `admin-startseite-vorschau`, `mobil-k0-startseite-saisonblock`. Die Regeln stehen in `docs/ai/DESIGN_SYSTEM.md` („Startseite gestalten“) und `docs/ai/ARCHITECTURE.md` (statische Seite mit Vorschau, Upload-Zweck 'startseite'), hier der Verlauf.
+
+- **Liste statt fester Reihenfolge:** Zwei Tabellen (`StartseiteAbschnitt`, `StartseiteBlock`), Migration `20261015140000_startseite_gestalten` mit den acht festen Abschnitten als Seed (feste Kennungen `startseite-<art>`). Ohne Zeilen oder bei einem Lesefehler rendert die Seite die heutige Reihenfolge — das Deploy-Fenster (alter Code, neues Schema und umgekehrt) bricht nichts. Eine kaputte Liste (fester Abschnitt fehlt, steht falsch, ist aus) fällt ebenso zurück: Kopf, Höfe und Fuß fehlen nie.
+- **„Höfe nicht verschiebbar“ heißt hier:** Höfe ist der erste Abschnitt unter dem Kopf; Blöcke dürfen dazwischen (Mockup: der Osterblock zwischen Kopf und Höfe), andere Abschnitte nicht. Das ist eine Lesart von „KOPF/HOEFE/FUSS nicht verschiebbar“ (Freigabe) und „nicht über/unter KOPF/FUSS“ (Mappe).
+- **Statisch bleiben trotz Vorschau:** Eine Seite, die `searchParams` liest, wird in Next 16 dynamisch — die meistbesuchte Seite hätte dann jeden Besuch auf eine Serverfunktion warten lassen. Darum der Draft Mode: „Vorschau öffnen“ (Admin-Action) schaltet ihn für den Browser des Admins ein; nur dann rendert Next je Anfrage, und erst dann liest `vorschauDieserAnfrage` den Link und die Sitzung. Der Link trägt die Signatur in `sig` (fällt in Sentry nach dem Namen weg), den Inhalt (Ausstellzeit, Stand, Block) in `vorschau`.
+- **Rahmen in Admin › Startseite:** Die Startseite trägt `X-Frame-Options: DENY` (next.config.ts) — der Rahmen „So sieht’s die Kundin“ bleibt leer, bis eine Header-Regel für `/` mit `?vorschau` die Einbettung von derselben Herkunft erlaubt (wie die Hofseite mit `?vorschau=1`). Die Datei gehört nicht zu Nr. 96; beantragt im Bericht. „Vorschau öffnen“ in einem eigenen Tab geht ohne sie.
+- **Vorschau zeigt den gespeicherten Stand:** Der Link trägt nur Datum und Block (Freigabe: Payload `{ datum, blockEntwurfId? }`); ungespeicherte Reihenfolge und Augen zeigt die Vorschau erst nach dem Speichern (Hinweis an der Vorschau). Das Mockup sagt „inklusive ungespeicherter Änderungen“.
+- **Bilder der Startseite ohne Hof:** eigener Ordner (`startseite/originale/`, `startseite/bilder/`), Admin-Sitzung statt Hof-Sitzung nur für diesen Zweck. Ein Admin ohne Hof bekommt aus `GET /api/upload/token` eine Kennung, mit der nur dieser Zweck einen Pfad hat — so funktioniert der bestehende Upload-Haken unverändert. Quadratisch 1:1 auf die kürzere Kante (höchstens 1600), unter 320 px abgelehnt. Alte Bilder bleiben liegen (Waisen im Speicher), weil sie noch an einem gespeicherten Block hängen können.
+- **Höfe-Auswahl:** `farmIds` ohne Fremdschlüssel; die Liste holt die Slugs aller Blöcke in EINER zweiten Abfrage (nur freigeschaltete, öffentlich sichtbare Höfe) und die Karten aus derselben Hofliste wie „Höfe in deiner Nähe“ — keine Abfrage je Block.
+
 ## Nützliche Befehle
 
 ```bash
