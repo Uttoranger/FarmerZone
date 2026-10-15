@@ -2,80 +2,64 @@
 
 import { useEffect, useState } from 'react'
 import { ArrowUpRight, CalendarDays } from 'lucide-react'
-import {
-  ABSCHNITT_TEXT,
-  ADMIN_STARTSEITE_TEXT as T,
-  STAND_TEXT,
-  standText,
-  standZeitpunkt,
-  zuRendern,
-  type AbschnittArt,
-  type StandWahl,
-  type StartseitenZeile,
-} from '@/lib/startseite-gestalten'
-import { istBrennmaterialSaison } from '@/lib/brennmaterial-saison'
+import { ADMIN_STARTSEITE_TEXT as T, STAND_TEXT, type StandWahl } from '@/lib/startseite-gestalten'
+import { ENTWURF_TEXT } from '@/lib/startseite-fassung'
 import { VORSCHAU_HANDY_HOEHE, VORSCHAU_SEITENBREITE, vorschauMassstab, type VorschauGeraet } from '@/lib/hofseite-vorschau'
 import { useElementGroesse } from '@/lib/use-element-groesse'
 import { cn } from '@/lib/utils'
-import type { AdminStartseitenZeile } from '@/server/queries/startseite'
+import type { VorschauQuelle } from '@/schemas/startseite'
 import { beendeStartseitenVorschau, erzeugeStartseitenVorschau } from '@/server/actions/startseite'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Segment } from '@/components/ui/segment'
-import { KARTE, LEISE } from '@/components/hof-bestellungen/stil'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Sheet, SheetBlatt, SheetClose, SheetTitle } from '@/components/ui/sheet'
+import { useMindestbreite } from '@/lib/use-mindestbreite'
+import { LEISE } from '@/components/hof-bestellungen/stil'
 
 /*
  * „So sieht’s die Kundin" in Admin › Startseite (Register N16, Nr. 96;
- * Mockup admin-startseite-vorschau): die ECHTE Startseite im Rahmen — Handy
- * 304 px (390 CSS-px verkleinert) oder Web (1 440 CSS-px auf die Breite des
- * Panels), dieselben Maße wie die Vorschau in Mein Hof (src/lib/hofseite-
- * vorschau.ts). Der Rahmen von Mein Hof (hofseite-vorschau-rahmen.tsx) hängt
- * an der Adresse einer Hofseite — darum ein eigener Rahmen hier.
+ * seit Nr. 99 nach admin-startseite-entwurf): die ECHTE Startseite im Rahmen —
+ * Handy 304 px (390 CSS-px verkleinert) oder Web (1 440 CSS-px auf die Breite
+ * des Panels), dieselben Maße wie die Vorschau in Mein Hof
+ * (src/lib/hofseite-vorschau.ts).
  *
- * Die Adresse holt die Action (erzeugeStartseitenVorschau): signiert, eine
- * Stunde gültig, und sie schaltet für diesen Browser den Draft Mode ein. „Stand
- * am" wählt den Tag: heute, in einer Woche oder der Beginn des nächsten Blocks.
- * „Vorschau öffnen" führt über die Route /admin/startseite/vorschau, damit der
- * Link auch auf einem anderen Gerät mit Admin-Sitzung wirkt. Verschwindet die
- * Vorschau (zurück auf „Bearbeiten", weg von der Seite), schaltet
+ * Entwurf | Live wählt die Quelle (Standard Entwurf), „Stand am" den Tag:
+ * heute, in einer Woche, der Beginn des nächsten Blocks oder der Termin der
+ * nächsten Planung. Die Adresse holt die Action (erzeugeStartseitenVorschau):
+ * signiert, mit der Quelle im signierten Teil, eine Stunde gültig, und sie
+ * schaltet für diesen Browser den Draft Mode ein. Oben im Rahmen ein Band,
+ * damit niemand den Entwurf für die echte Seite hält. „Vorschau öffnen" führt
+ * über die Route /admin/startseite/vorschau (anderes Gerät mit
+ * Admin-Sitzung), mit derselben Quelle. Verschwindet die Vorschau, schaltet
  * beendeStartseitenVorschau den Draft Mode wieder aus.
  */
 
 const HANDY_SCHIRM = 304
-const WEB_RAHMEN_HOEHE = 680
+const WEB_RAHMEN_HOEHE = 760
 
 type Link = { pfad: string; link: string; stand: string } | { fehler: string }
 
-/** Die Zeilen der Admin-Liste so, wie die Startseite sie bekommt. */
-function alsStartseitenZeilen(zeilen: readonly AdminStartseitenZeile[]): StartseitenZeile[] {
-  return zeilen.flatMap((z): StartseitenZeile[] => {
-    if (z.art !== 'BLOCK') return [{ art: z.art as AbschnittArt, sichtbar: z.sichtbar }]
-    return z.block ? [{ art: 'BLOCK', sichtbar: z.sichtbar, block: z.block }] : []
-  })
+export type VorschauBand = 'entwurf' | 'live' | 'geplant'
+
+const BAND: Record<VorschauBand, { text: string; klasse: string }> = {
+  // Bild-Overlay: im neuen Design sind primary/accent samt Schrift in beiden Themes gleich (DESIGN_SYSTEM „Farbtokens“).
+  entwurf: { text: ENTWURF_TEXT.bandEntwurf, klasse: 'bg-primary text-primary-foreground' },
+  live: { text: ENTWURF_TEXT.bandLive, klasse: 'bg-accent text-accent-foreground' },
+  geplant: { text: ENTWURF_TEXT.bandGeplant, klasse: 'bg-accent text-accent-foreground' },
 }
 
-/** Was am gewählten Tag anders ist als die bloße Liste: Blöcke, Automatik, Ausgeblendetes (Mockup, rechte Spalte). */
-function amTag(zeilen: readonly AdminStartseitenZeile[], datum: Date, blockEntwurfId: string | null): { art: string; text: string }[] {
-  const liste = alsStartseitenZeilen(zeilen)
-  const saison = istBrennmaterialSaison(datum)
-  const eintraege = zuRendern(liste, datum, { brennmaterialSaison: saison, blockEntwurfId })
-  const zeilenTexte: { art: string; text: string }[] = []
-  for (const e of eintraege) if (e.art === 'BLOCK') zeilenTexte.push({ art: 'Block', text: e.block.titel })
-  if (!saison && liste.some((z) => z.art === 'BRENNMATERIAL' && z.sichtbar)) {
-    zeilenTexte.push({ art: T.automatik, text: 'Brennmaterial aus (nur Okt.–März)' })
-  }
-  for (const z of liste) {
-    if (!z.sichtbar && z.art !== 'BLOCK') zeilenTexte.push({ art: 'Aus', text: `${ABSCHNITT_TEXT[z.art].titel} ausgeblendet` })
-  }
-  return zeilenTexte
-}
-
-function Rahmen({ geraet, link }: { geraet: VorschauGeraet; link: Link | null }): React.JSX.Element {
+function Rahmen({ geraet, link, band }: { geraet: VorschauGeraet; link: Link | null; band: VorschauBand }): React.JSX.Element {
   const { ref, breite } = useElementGroesse()
   const massstab = geraet === 'web' ? vorschauMassstab({ breite }, 'web') : vorschauMassstab({ breite: HANDY_SCHIRM }, 'handy')
   const hoehe = geraet === 'web' ? Math.round(WEB_RAHMEN_HOEHE / massstab) : VORSCHAU_HANDY_HOEHE
   const seite = VORSCHAU_SEITENBREITE[geraet]
   const pfad = link && 'pfad' in link ? link.pfad : null
 
+  const bandZeile = (
+    <p className={cn('flex h-[22px] items-center justify-center px-2 text-center text-[10px] font-bold tracking-[0.08em]', BAND[band].klasse)}>
+      {BAND[band].text}
+    </p>
+  )
   const innen = (
     <div className="relative overflow-hidden bg-background" style={{ width: Math.round(seite * massstab), height: Math.round(hoehe * massstab) }}>
       {pfad ? (
@@ -96,7 +80,10 @@ function Rahmen({ geraet, link }: { geraet: VorschauGeraet; link: Link | null })
     // Ein Gerät, kein Teil der Seite: fast schwarz in beiden Modi wie in Mein Hof (hofseite-vorschau-rahmen.tsx).
     return (
       <div className="mx-auto w-fit rounded-[2.4rem] border border-border bg-primary-foreground p-2 shadow-[0_12px_32px] shadow-primary-foreground/30">
-        <div className="overflow-hidden rounded-[2rem]">{innen}</div>
+        <div className="overflow-hidden rounded-[2rem]">
+          {bandZeile}
+          {innen}
+        </div>
       </div>
     )
   }
@@ -111,41 +98,59 @@ function Rahmen({ geraet, link }: { geraet: VorschauGeraet; link: Link | null })
         <span className="mx-auto max-w-[70%] truncate rounded-full bg-card px-3 py-0.5 text-[11.5px] text-muted-foreground ring-1 ring-border">/</span>
         <span className="w-9" />
       </div>
+      {bandZeile}
       {breite > 0 && innen}
     </div>
   )
 }
 
 export function StartseiteVorschau({
-  zeilen,
-  jetzt,
+  quelle: festeQuelle,
+  blockMoeglich,
+  termin,
   blockEntwurfId,
-  ungespeichert,
+  neuLaden,
+  geraetStandard = 'web',
+  standStandard = 'heute',
+  band: festesBand,
 }: {
-  zeilen: readonly AdminStartseitenZeile[]
-  /** Der Zeitpunkt der Seite (ISO) — kein Date.now() beim Rendern (CODING_STANDARDS §2). */
-  jetzt: string
+  /** Fest (Zeitplan) — sonst wählt das Segment Entwurf | Live. */
+  quelle?: VorschauQuelle
+  /** Ob „nächster Block" je Quelle einen Tag hat (sonst fehlt die Wahl). */
+  blockMoeglich: { entwurf: boolean; live: boolean }
+  /** Der Termin der nächsten Planung (ISO) — nur dann gibt es „geplanter Termin". */
+  termin: string | null
   blockEntwurfId: string | null
-  ungespeichert: boolean
+  /** Ändert sich nach jedem gespeicherten Entwurf — der Rahmen lädt dann neu. */
+  neuLaden?: number
+  geraetStandard?: VorschauGeraet
+  standStandard?: StandWahl
+  band?: VorschauBand
 }): React.JSX.Element {
-  const [geraet, setGeraet] = useState<VorschauGeraet>('handy')
-  const [stand, setStand] = useState<StandWahl>('heute')
+  const [geraet, setGeraet] = useState<VorschauGeraet>(geraetStandard)
+  const [gewaehlt, setGewaehlt] = useState<'entwurf' | 'live'>('entwurf')
+  const [stand, setStand] = useState<StandWahl>(standStandard)
   const [link, setLink] = useState<Link | null>(null)
+  const quelle: VorschauQuelle = festeQuelle ?? gewaehlt
+  const band: VorschauBand = festesBand ?? (quelle === 'entwurf' ? 'entwurf' : 'live')
 
-  const bloecke = zeilen.flatMap((z) => (z.block ? [{ liveAb: new Date(z.block.liveAb), liveBis: z.block.liveBis ? new Date(z.block.liveBis) : null }] : []))
-  const datum = standZeitpunkt(stand, new Date(jetzt), bloecke)
-  const optionen = (['heute', 'woche', 'block'] as const).filter((w) => w !== 'block' || standZeitpunkt('block', new Date(jetzt), bloecke) !== null)
+  const optionen = (['heute', 'woche', 'block', 'termin'] as const).filter(
+    (w) => (w !== 'block' || (quelle === 'entwurf' ? blockMoeglich.entwurf : blockMoeglich.live)) && (w !== 'termin' || termin !== null)
+  )
+  // Fällt die gewählte Wahl weg (andere Quelle ohne Block), gilt heute.
+  const standGilt: StandWahl = optionen.includes(stand) ? stand : 'heute'
 
   useEffect(() => {
     let gueltig = true
-    void erzeugeStartseitenVorschau({ stand, blockEntwurfId }).then((ergebnis) => {
+    // Der Block in Bearbeitung zählt nur im Entwurf — live zeigt nur, was live ist.
+    void erzeugeStartseitenVorschau({ stand: standGilt, quelle, blockEntwurfId: quelle === 'entwurf' ? blockEntwurfId : null }).then((ergebnis) => {
       if (!gueltig) return
       setLink('error' in ergebnis ? { fehler: ergebnis.error } : { pfad: ergebnis.pfad, link: ergebnis.link, stand: ergebnis.stand })
     })
     return () => {
       gueltig = false
     }
-  }, [stand, blockEntwurfId])
+  }, [standGilt, quelle, blockEntwurfId, neuLaden])
 
   // Nur beim Aushängen: Sonst rendert dieser Browser jede statische Seite bis
   // zum Ende der Sitzung ohne Cache. Actions laufen nacheinander — ein
@@ -175,67 +180,90 @@ export function StartseiteVorschau({
           onWertChange={(w) => setGeraet(w as VorschauGeraet)}
         />
         <span className="flex-1" />
+        {!festeQuelle && (
+          <Segment
+            beschriftung={ENTWURF_TEXT.quelleBeschriftung}
+            optionen={[
+              { wert: 'entwurf', label: ENTWURF_TEXT.entwurf },
+              { wert: 'live', label: ENTWURF_TEXT.live },
+            ]}
+            wert={gewaehlt}
+            onWertChange={(w) => setGewaehlt(w as 'entwurf' | 'live')}
+          />
+        )}
         <span className={cn('inline-flex items-center gap-1.5 text-[13px]', LEISE)}>
           <CalendarDays className="size-4" strokeWidth={1.8} aria-hidden="true" />
-          Stand am <span className="font-semibold text-foreground">{datum ? standText(datum) : '–'}</span>
+          am <span className="font-semibold text-foreground">{link && 'stand' in link ? link.stand : '–'}</span>
         </span>
-        <Segment
-          beschriftung="Stand am"
-          optionen={optionen.map((w) => ({ wert: w, label: STAND_TEXT[w] }))}
-          wert={stand}
-          onWertChange={(w) => setStand(w as StandWahl)}
-        />
       </div>
-
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
-        <div className="min-w-0 flex-1">
-          <Rahmen geraet={geraet} link={link} />
-        </div>
-        <aside className="flex w-full shrink-0 flex-col gap-3 xl:w-[280px]" aria-label="Zur Vorschau">
-          <div className={cn(KARTE, 'px-4 py-3')}>
-            <h3 className="text-[13.5px] font-semibold text-foreground">{T.vorschauTitel}</h3>
-            <p className={cn('mt-1 text-[12.5px] leading-normal', LEISE)}>{T.vorschauSatz}</p>
-            {ungespeichert && <p className="mt-1.5 text-[12.5px] font-medium text-status-offen">{T.vorschauUngespeichert}</p>}
-          </div>
-          {datum && (
-            <div className={cn(KARTE, 'px-4 py-3')}>
-              <h3 className="text-[13.5px] font-semibold text-foreground">Am {standText(datum)}</h3>
-              <ul className="mt-1.5 flex flex-col gap-1">
-                {amTag(zeilen, datum, blockEntwurfId).map((z) => (
-                  <li key={`${z.art}-${z.text}`} className="flex gap-2 text-[12.5px]">
-                    <span className="w-[72px] shrink-0 font-semibold text-muted-foreground">{z.art}</span>
-                    <span className="min-w-0 text-foreground">{z.text}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <div className={cn(KARTE, 'flex flex-col gap-2 px-4 py-3')}>
-            <h3 className="text-[13.5px] font-semibold text-foreground">{T.vorschauLinkTitel}</h3>
-            <p className={cn('text-[12.5px] leading-normal', LEISE)}>{T.vorschauLinkSatz}</p>
-            {link && 'fehler' in link && (
-              <p role="alert" className="text-[12.5px] font-medium text-destructive">
-                {link.fehler}
-              </p>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Segment beschriftung="Stand am" optionen={optionen.map((w) => ({ wert: w, label: STAND_TEXT[w] }))} wert={standGilt} onWertChange={(w) => setStand(w as StandWahl)} />
+        <span className="flex-1" />
+        {oeffnen && (
+          <a
+            href={oeffnen}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={T.vorschauLinkSatz}
+            className={cn(
+              'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] font-semibold text-status-fertig transition-colors hover:bg-muted',
+              FOKUS_RAHMEN
             )}
-            {oeffnen && (
-              <a
-                href={oeffnen}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(
-                  'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-border px-4 text-[13px] font-semibold text-foreground transition-colors hover:bg-muted',
-                  FOKUS_RAHMEN
-                )}
-              >
-                {T.vorschauOeffnen}
-                <ArrowUpRight className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
-                <span className="sr-only"> (öffnet in neuem Tab)</span>
-              </a>
-            )}
-          </div>
-        </aside>
+          >
+            {T.vorschauOeffnen}
+            <ArrowUpRight className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
+            <span className="sr-only"> (öffnet in neuem Tab)</span>
+          </a>
+        )}
       </div>
+      {link && 'fehler' in link && (
+        <p role="alert" className="text-[12.5px] font-medium text-destructive">
+          {link.fehler}
+        </p>
+      )}
+      <Rahmen geraet={geraet} link={link} band={band} />
+      <p className={cn('text-[12px] leading-normal', LEISE)}>{T.vorschauSatz}</p>
     </section>
+  )
+}
+
+/**
+ * Die Vorschau als eigenes Fenster: ab 768 px ein breiter Dialog, am Handy
+ * ein Blatt von unten (Mockup mobil-admin-startseite-entwurf, DESIGN_SYSTEM
+ * „Dialoge und Blätter"). Für „Vorschau" in der Leiste am Handy und für
+ * „Vorschau"/„Ansehen" im Zeitplan.
+ */
+export function VorschauFenster({
+  offen,
+  onOffenChange,
+  titel,
+  children,
+}: {
+  offen: boolean
+  onOffenChange: (offen: boolean) => void
+  titel: string
+  children: React.ReactNode
+}): React.JSX.Element {
+  const breit = useMindestbreite(768)
+  if (breit) {
+    return (
+      <Dialog open={offen} onOpenChange={onOffenChange}>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] gap-3 overflow-y-auto p-5 sm:max-w-[960px]">
+          <DialogTitle className="font-heading text-xl leading-tight font-semibold">{titel}</DialogTitle>
+          {children}
+        </DialogContent>
+      </Dialog>
+    )
+  }
+  return (
+    <Sheet open={offen} onOpenChange={onOffenChange}>
+      <SheetBlatt>
+        <SheetTitle className="font-heading text-xl leading-tight font-semibold">{titel}</SheetTitle>
+        {children}
+        <SheetClose className={cn('mx-auto min-h-11 rounded-full px-5 text-sm font-semibold text-status-fertig hover:bg-muted', FOKUS_RAHMEN)}>
+          Schließen
+        </SheetClose>
+      </SheetBlatt>
+    </Sheet>
   )
 }

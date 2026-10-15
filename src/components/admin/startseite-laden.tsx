@@ -2,9 +2,10 @@ import { cn } from '@/lib/utils'
 import { ADMIN_RAHMEN } from './admin-teile'
 
 /**
- * Ladeansicht von Admin › Startseite (Nr. 96) — in der Form der Seite: Kopf
- * mit Umschalter, links die Abschnittsliste (acht Zeilen), rechts die
- * Vorlagen. Die AdminShell steht schon. Farbstaffelung wie admin-laden.tsx.
+ * Ladeansicht von Admin › Startseite (Nr. 96, seit Nr. 99 mit Statusleiste) —
+ * in der Form der Seite: Kopf mit Umschalter, die Statusleiste des Entwurfs,
+ * links die Abschnittsliste (acht Zeilen), rechts die Vorschau. Die AdminShell
+ * steht schon. Farbstaffelung wie admin-laden.tsx.
  */
 export function StartseiteLaden(): React.JSX.Element {
   return (
@@ -16,11 +17,12 @@ export function StartseiteLaden(): React.JSX.Element {
         </div>
         <div className="h-11 w-72 max-w-full rounded-full bg-muted" />
       </div>
-      <div className="flex flex-col gap-[18px] lg:flex-row lg:items-start">
-        <div className="w-full shrink-0 overflow-hidden rounded-2xl border border-border bg-card lg:w-[520px]">
+      <div className="h-[68px] rounded-2xl border border-border bg-card lg:h-[66px]" />
+      <div className="flex flex-col gap-[22px] lg:flex-row lg:items-start">
+        <div className="w-full shrink-0 overflow-hidden rounded-2xl border border-border bg-card lg:w-[480px]">
           <div className="h-12" />
           {Array.from({ length: 8 }, (_, i) => (
-            <div key={i} className="flex h-[58px] items-center gap-3 border-t border-border px-4">
+            <div key={i} className="flex h-[48px] items-center gap-3 border-t border-border px-4">
               <div className="h-4 w-2/5 rounded bg-border" />
               <div className="ml-auto h-5 w-12 rounded-full bg-muted" />
             </div>

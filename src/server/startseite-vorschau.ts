@@ -2,17 +2,20 @@ import { createHmac } from 'crypto'
 import { draftMode, headers } from 'next/headers'
 import { env } from '@/lib/env'
 import { geheimnisGleich } from '@/lib/geheimnis'
-import { vorschauParameterSchema, type VorschauParameter } from '@/schemas/startseite'
+import { vorschauParameterSchema, vorschauQuelleSchema, type VorschauParameter, type VorschauQuelle } from '@/schemas/startseite'
 
 /*
  * Der Vorschau-Link der Startseite (Register N16, Nr. 96): `/?vorschau=…&sig=…`
  * zeigt die Startseite mit dem „Stand am" eines Tages und dem Block in
- * Bearbeitung — nur mit gültiger Admin-Sitzung, eine Stunde lang.
+ * Bearbeitung — nur mit gültiger Admin-Sitzung, eine Stunde lang. Seit Nr. 99
+ * trägt der Inhalt auch die Quelle (`entwurf`, `live` oder `fassung:<id>`):
+ * Sie steht im signierten Teil, ein geänderter Link zeigt also nie eine
+ * andere Quelle.
  *
  * Dasselbe HMAC-Muster wie abo-bestaetigung-token.ts (Geheimnis aus dem
  * validierten env-Modul, Zweck im Inhalt, Vergleich in konstanter Zeit).
  *
- * INHALT UND SIGNATUR GETRENNT: `vorschau` trägt nur Datum, Block und
+ * INHALT UND SIGNATUR GETRENNT: `vorschau` trägt nur Datum, Block, Quelle und
  * Ausstellzeit (nichts Geheimes), `sig` die Signatur. Den Parameter `sig`
  * entfernt die Sentry-Hygiene schon nach seinem Namen (HEIKLE_PARAMETER in
  * src/lib/sentry-hygiene.ts) — so steht die Signatur in keinem Sentry-
@@ -39,7 +42,7 @@ function signiere(inhalt: string): string {
   return createHmac('sha256', env.BETTER_AUTH_SECRET).update(inhalt).digest('hex')
 }
 
-export type VorschauInhalt = { datum: Date; blockEntwurfId: string | null }
+export type VorschauInhalt = { datum: Date; blockEntwurfId: string | null; quelle: VorschauQuelle }
 
 /** Die Abfrage `vorschau=…&sig=…` aus geprüften Werten (Base64url und Hex, nichts zu kodieren). */
 function alsAbfrage({ vorschau, sig }: VorschauParameter): string {
@@ -48,13 +51,9 @@ function alsAbfrage({ vorschau, sig }: VorschauParameter): string {
 
 /** Die Abfrage des Vorschau-Links — nur der Server baut sie (Action „Vorschau öffnen"). */
 export function erzeugeVorschauAbfrage(inhalt: VorschauInhalt, jetzt: Date): string {
-  const roh = `${ZWECK}:${jetzt.getTime()}:${inhalt.datum.getTime()}:${inhalt.blockEntwurfId ?? ''}`
+  // Die Quelle zuletzt: Sie darf selbst ein „:" tragen (`fassung:<id>`).
+  const roh = `${ZWECK}:${jetzt.getTime()}:${inhalt.datum.getTime()}:${inhalt.blockEntwurfId ?? ''}:${inhalt.quelle}`
   return alsAbfrage({ vorschau: Buffer.from(roh).toString('base64url'), sig: signiere(roh) })
-}
-
-/** Der Pfad der Startseite mit Vorschau-Link. */
-export function erzeugeVorschauPfad(inhalt: VorschauInhalt, jetzt: Date): string {
-  return `/?${erzeugeVorschauAbfrage(inhalt, jetzt)}`
 }
 
 export type VorschauErgebnis = ({ ok: true } & VorschauInhalt) | { ok: false; grund: 'abgelaufen' | 'ungueltig' }
@@ -64,13 +63,14 @@ export function pruefeVorschau(vorschau: string, sig: string, jetzt: Date): Vors
   const roh = Buffer.from(vorschau, 'base64url').toString()
   if (!geheimnisGleich(sig, signiere(roh))) return { ok: false, grund: 'ungueltig' }
   const teile = roh.split(':')
-  if (teile.length !== 4 || teile[0] !== ZWECK) return { ok: false, grund: 'ungueltig' }
+  const quelle = vorschauQuelleSchema.safeParse(teile.slice(4).join(':'))
+  if (teile.length < 5 || teile[0] !== ZWECK || !quelle.success) return { ok: false, grund: 'ungueltig' }
   const ausgestellt = Number(teile[1])
   const datum = Number(teile[2])
   if (!Number.isSafeInteger(ausgestellt) || !Number.isSafeInteger(datum) || datum <= 0) return { ok: false, grund: 'ungueltig' }
   if (ausgestellt > jetzt.getTime() + UHR_SPIELRAUM_MS) return { ok: false, grund: 'ungueltig' }
   if (jetzt.getTime() >= ausgestellt + VORSCHAU_GUELTIG_MS) return { ok: false, grund: 'abgelaufen' }
-  return { ok: true, datum: new Date(datum), blockEntwurfId: teile[3] === '' ? null : teile[3] }
+  return { ok: true, datum: new Date(datum), blockEntwurfId: teile[3] === '' ? null : teile[3], quelle: quelle.data }
 }
 
 /**
@@ -85,7 +85,7 @@ async function vorschauFuerAdmin({ vorschau, sig }: VorschauParameter, jetzt: Da
   const [{ auth }, { isAdminUser }] = await Promise.all([import('@/lib/auth'), import('@/server/queries/admin')])
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user || !(await isAdminUser(session.user.id))) return null
-  return { datum: ergebnis.datum, blockEntwurfId: ergebnis.blockEntwurfId }
+  return { datum: ergebnis.datum, blockEntwurfId: ergebnis.blockEntwurfId, quelle: ergebnis.quelle }
 }
 
 /**
@@ -113,7 +113,7 @@ export async function vorschauDieserAnfrage(
  * `/?vorschau=…&sig=…` (aus den geprüften Werten neu gebaut, nie die rohe
  * Adresse); sonst `/`, die normale Startseite. Geändert wird dabei nur das
  * Draft-Mode-Cookie des eigenen Browsers, kein Datensatz — darum darf es ein
- * GET sein (ARCHITECTURE §5, Aufruf per Link).
+ * GET sein (ARCHITECTURE §3, Aufruf per Link).
  */
 export async function oeffneVorschau(parameter: Record<string, string>, jetzt: Date): Promise<string> {
   const gelesen = vorschauParameterSchema.safeParse(parameter)

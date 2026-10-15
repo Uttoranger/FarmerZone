@@ -14,6 +14,9 @@
  *    der Weg jedes Besuchs bleibt statisch.
  *  - Die Signatur steht im Parameter `sig`, den die Sentry-Hygiene nach dem
  *    Namen entfernt; der Inhalt trägt kein Geheimnis.
+ *  - Seit Nr. 99 trägt der signierte Inhalt die Quelle (Entwurf, Live oder eine
+ *    Fassung): Eine andere Quelle ändert die Signatur, eine unbekannte ist
+ *    ungültig.
  *  - „Vorschau öffnen" wirkt auf jedem Gerät mit Admin-Sitzung (Runde 2): Die
  *    Route /admin/startseite/vorschau schaltet dort den Draft Mode ein und
  *    leitet mit demselben Link auf die Startseite; ohne Admin-Sitzung, mit
@@ -36,11 +39,13 @@ import { prisma } from '@/lib/prisma'
 import { bereinigeEreignis } from '@/lib/sentry-hygiene'
 import {
   VORSCHAU_GUELTIG_MS,
-  erzeugeVorschauPfad,
+  erzeugeVorschauAbfrage,
   pruefeVorschau,
   vorschauDieserAnfrage,
 } from '@/server/startseite-vorschau'
 import { GET as oeffneVorschauRoute } from '@/app/admin/startseite/vorschau/route'
+import type { VorschauQuelle } from '@/schemas/startseite'
+import { createHmac } from 'crypto'
 
 const AUSGESTELLT = new Date('2026-10-15T10:00:00Z')
 const DATUM = new Date('2027-03-27T09:00:00Z')
@@ -49,17 +54,22 @@ function parameterAus(pfad: string): Record<string, string> {
   return Object.fromEntries(new URL(pfad, 'http://localhost').searchParams)
 }
 
-function link(blockEntwurfId: string | null = 'block-1'): Record<string, string> {
-  return parameterAus(erzeugeVorschauPfad({ datum: DATUM, blockEntwurfId }, AUSGESTELLT))
+/** Der Pfad der Startseite mit Vorschau-Link — wie ihn die Action baut (`/?${abfrage}`). */
+function erzeugeVorschauPfad(inhalt: Parameters<typeof erzeugeVorschauAbfrage>[0], jetzt: Date): string {
+  return `/?${erzeugeVorschauAbfrage(inhalt, jetzt)}`
+}
+
+function link(blockEntwurfId: string | null = 'block-1', quelle: VorschauQuelle = 'entwurf'): Record<string, string> {
+  return parameterAus(erzeugeVorschauPfad({ datum: DATUM, blockEntwurfId, quelle }, AUSGESTELLT))
 }
 
 describe('pruefeVorschau', () => {
   it('gilt mit Datum und Block bis knapp unter einer Stunde', () => {
     const { vorschau, sig } = link()
     const kurzVorher = new Date(AUSGESTELLT.getTime() + VORSCHAU_GUELTIG_MS - 1)
-    expect(pruefeVorschau(vorschau, sig, kurzVorher)).toEqual({ ok: true, datum: DATUM, blockEntwurfId: 'block-1' })
+    expect(pruefeVorschau(vorschau, sig, kurzVorher)).toEqual({ ok: true, datum: DATUM, blockEntwurfId: 'block-1', quelle: 'entwurf' })
     const ohneBlock = link(null)
-    expect(pruefeVorschau(ohneBlock.vorschau, ohneBlock.sig, AUSGESTELLT)).toEqual({ ok: true, datum: DATUM, blockEntwurfId: null })
+    expect(pruefeVorschau(ohneBlock.vorschau, ohneBlock.sig, AUSGESTELLT)).toEqual({ ok: true, datum: DATUM, blockEntwurfId: null, quelle: 'entwurf' })
   })
 
   it('ist ab genau einer Stunde abgelaufen', () => {
@@ -69,7 +79,7 @@ describe('pruefeVorschau', () => {
 
   it('ist mit verändertem Inhalt oder fremder Signatur ungültig — nie „abgelaufen"', () => {
     const { vorschau, sig } = link()
-    const anderesDatum = parameterAus(erzeugeVorschauPfad({ datum: new Date('2030-01-01T00:00:00Z'), blockEntwurfId: 'block-1' }, AUSGESTELLT))
+    const anderesDatum = parameterAus(erzeugeVorschauPfad({ datum: new Date('2030-01-01T00:00:00Z'), blockEntwurfId: 'block-1', quelle: 'entwurf' }, AUSGESTELLT))
     expect(pruefeVorschau(anderesDatum.vorschau, sig, AUSGESTELLT)).toEqual({ ok: false, grund: 'ungueltig' })
     expect(pruefeVorschau(vorschau, 'a'.repeat(64), AUSGESTELLT)).toEqual({ ok: false, grund: 'ungueltig' })
     const spaet = new Date(AUSGESTELLT.getTime() + 2 * VORSCHAU_GUELTIG_MS)
@@ -77,14 +87,40 @@ describe('pruefeVorschau', () => {
   })
 
   it('trägt kein Geheimnis im Inhalt und die Signatur nur im Parameter sig', () => {
-    const pfad = erzeugeVorschauPfad({ datum: DATUM, blockEntwurfId: 'block-1' }, AUSGESTELLT)
+    const pfad = erzeugeVorschauPfad({ datum: DATUM, blockEntwurfId: 'block-1', quelle: 'fassung:f1' }, AUSGESTELLT)
     const { vorschau, sig } = parameterAus(pfad)
-    expect(Buffer.from(vorschau, 'base64url').toString()).toBe(`startseite-vorschau:${AUSGESTELLT.getTime()}:${DATUM.getTime()}:block-1`)
+    expect(Buffer.from(vorschau, 'base64url').toString()).toBe(`startseite-vorschau:${AUSGESTELLT.getTime()}:${DATUM.getTime()}:block-1:fassung:f1`)
     expect(sig).toMatch(/^[a-f0-9]{64}$/)
     // Die Sentry-Hygiene nimmt `sig` aus der Adresse einer Anfrage — die Signatur reist nie mit.
     const ereignis = bereinigeEreignis({ request: { url: `https://hof.example${pfad}` } } as never) as { request?: { url?: string } } | null
     expect(ereignis?.request?.url).toBeDefined()
     expect(ereignis?.request?.url).not.toContain(sig)
+  })
+})
+
+describe('Quelle im signierten Inhalt (Nr. 99)', () => {
+  it('liest Entwurf, Live und eine Fassung zurück', () => {
+    for (const quelle of ['entwurf', 'live', 'fassung:cm1abc'] as const) {
+      const { vorschau, sig } = link('block-1', quelle)
+      expect(pruefeVorschau(vorschau, sig, AUSGESTELLT)).toMatchObject({ ok: true, quelle })
+    }
+  })
+
+  it('macht aus dem Entwurf mit fremder Signatur nie Live — eine andere Quelle braucht eine eigene Signatur', () => {
+    const entwurf = link('block-1', 'entwurf')
+    const live = link('block-1', 'live')
+    expect(live.sig).not.toBe(entwurf.sig)
+    expect(pruefeVorschau(live.vorschau, entwurf.sig, AUSGESTELLT)).toEqual({ ok: false, grund: 'ungueltig' })
+  })
+
+  it('weist eine unbekannte Quelle ab, auch richtig signiert', () => {
+    const roh = `startseite-vorschau:${AUSGESTELLT.getTime()}:${DATUM.getTime()}::alles`
+    const sig = createHmac('sha256', process.env.BETTER_AUTH_SECRET ?? '').update(roh).digest('hex')
+    expect(pruefeVorschau(Buffer.from(roh).toString('base64url'), sig, AUSGESTELLT)).toEqual({ ok: false, grund: 'ungueltig' })
+    // Gegenprobe: derselbe Weg mit bekannter Quelle gilt — die Signatur oben ist also richtig gebaut.
+    const gut = `${roh.slice(0, -'alles'.length)}live`
+    const gutSig = createHmac('sha256', process.env.BETTER_AUTH_SECRET ?? '').update(gut).digest('hex')
+    expect(pruefeVorschau(Buffer.from(gut).toString('base64url'), gutSig, AUSGESTELLT)).toMatchObject({ ok: true, quelle: 'live' })
   })
 })
 
@@ -99,7 +135,7 @@ describe('vorschauDieserAnfrage', () => {
   })
 
   it('zeigt die Vorschau mit Draft Mode, gültigem Link und Admin-Sitzung', async () => {
-    expect(await vorschauDieserAnfrage(Promise.resolve(link()), JETZT)).toEqual({ datum: DATUM, blockEntwurfId: 'block-1' })
+    expect(await vorschauDieserAnfrage(Promise.resolve(link()), JETZT)).toEqual({ datum: DATUM, blockEntwurfId: 'block-1', quelle: 'entwurf' })
   })
 
   it('liest ohne Draft Mode weder die Adresse noch die Sitzung — die Seite bleibt statisch', async () => {

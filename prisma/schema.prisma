@@ -1298,3 +1298,22 @@ model StartseiteBlock {
   updatedAt         DateTime             @updatedAt
   abschnitt         StartseiteAbschnitt?
 }
+
+// Eine Fassung der Startseite (Register N16, Änderung Nr. 99): ein
+// unveränderlicher Stand aus dem Entwurf (StartseiteAbschnitt/-Block), jetzt
+// oder zu einem Zeitpunkt veröffentlicht. Live ist die jüngste nicht
+// zurückgezogene Fassung mit liveAb ≤ jetzt — verglichen beim Lesen, kein
+// Cron. inhalt im Format von src/schemas/startseite-fassung.ts (v: 1), gelesen
+// nur über leseFassung. Ohne Fassung zeigt die Startseite die
+// Standard-Reihenfolge. erstelltVonUserId ohne Fremdschlüssel wie
+// StartseiteBlock.erstelltVonUserId.
+model StartseiteFassung {
+  id                String    @id @default(cuid())
+  inhalt            Json
+  liveAb            DateTime
+  zurueckgezogenAm  DateTime?
+  erstelltVonUserId String
+  createdAt         DateTime  @default(now())
+
+  @@index([liveAb])
+}

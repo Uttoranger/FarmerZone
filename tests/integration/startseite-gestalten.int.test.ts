@@ -6,9 +6,11 @@
  *    (global-setup fährt `migrate deploy`): die acht festen Abschnitte mit
  *    festen Kennungen in der heutigen Reihenfolge, alle sichtbar, RLS an auf
  *    beiden Tabellen.
- *  - speichereStartseite mit echter Admin-Anmeldung schreibt Block,
- *    Reihenfolge und Auge zusammen; die Liste liest danach genau diese
- *    Reihenfolge (eine Abfrage, die Höfe des Blocks aus derselben Runde).
+ *  - speichereEntwurf (bis Nr. 99 speichereStartseite) mit echter
+ *    Admin-Anmeldung schreibt Block, Reihenfolge und Auge zusammen; die
+ *    Vorschau des Entwurfs liest danach genau diese Reihenfolge (die Höfe des
+ *    Blocks aus derselben Runde). Die öffentliche Seite liest den Entwurf nie
+ *    (tests/integration/startseite-fassung.int.test.ts).
  *  - Feste Abschnitte bleiben unverschiebbar und sichtbar: Ein Versuch ändert
  *    in der Datenbank nichts — weder Positionen noch Blöcke.
  *  - Ein Block mit einem nicht freigeschalteten Hof wird nicht angelegt.
@@ -28,8 +30,8 @@ import { join } from 'node:path'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { NEUER_BLOCK, REIHENFOLGE_FEHLER_TEXT, STANDARD_REIHENFOLGE } from '@/lib/startseite-gestalten'
-import { loescheStartseitenBlock, speichereStartseite } from '@/server/actions/startseite'
-import { leseStartseitenZeilen } from '@/server/queries/startseite'
+import { loescheStartseitenBlock, speichereEntwurf } from '@/server/actions/startseite'
+import { ladeVorschauZeilen } from '@/server/queries/startseite'
 import type { StartseitenBlockEingabe } from '@/schemas/startseite'
 import { erstelleHof, erstelleHofMitAnmeldung, raeumeAuf } from './setup/basis'
 
@@ -96,7 +98,7 @@ describe('Migration und Seed', () => {
   })
 })
 
-describe('speichereStartseite', () => {
+describe('speichereEntwurf', () => {
   it('schreibt Block, Reihenfolge und Auge zusammen — die Liste liest genau das', async () => {
     const adminId = await alsAdmin()
     const { farm } = await erstelleHof({ approvedAt: new Date() })
@@ -106,7 +108,7 @@ describe('speichereStartseite', () => {
     // Futter und Brennmaterial tauschen.
     ;[reihenfolge[3], reihenfolge[4]] = [reihenfolge[4], reihenfolge[3]]
 
-    const ergebnis = await speichereStartseite({ reihenfolge, block: block({ vorlage: 'HOEFE_AUSWAHL', farmIds: [farm.id] }) })
+    const ergebnis = await speichereEntwurf({ reihenfolge, block: block({ vorlage: 'HOEFE_AUSWAHL', farmIds: [farm.id] }) })
     expect(ergebnis).toMatchObject({ ok: true })
     const blockId = 'blockId' in ergebnis ? ergebnis.blockId : null
 
@@ -118,7 +120,7 @@ describe('speichereStartseite', () => {
     const gespeichert = await prisma.startseiteBlock.findUniqueOrThrow({ where: { id: blockId ?? '' } })
     expect(gespeichert).toMatchObject({ vorlage: 'HOEFE_AUSWAHL', farmIds: [farm.id], erstelltVonUserId: adminId, liveAb: new Date('2026-10-01T04:00:00.000Z') })
 
-    const liste = await leseStartseitenZeilen()
+    const liste = await ladeVorschauZeilen({ quelle: 'entwurf', datum: new Date() })
     const imBlock = liste.find((z) => z.art === 'BLOCK')
     expect(imBlock && imBlock.art === 'BLOCK' ? imBlock.block.hofSlugs : null).toEqual([farm.slug])
   })
@@ -129,16 +131,16 @@ describe('speichereStartseite', () => {
 
     const fussHoch = vorher.map((z) => ({ id: z.id, sichtbar: true }))
     ;[fussHoch[6], fussHoch[7]] = [fussHoch[7], fussHoch[6]]
-    expect(await speichereStartseite({ reihenfolge: [...fussHoch.slice(0, 1), { id: NEUER_BLOCK, sichtbar: true }, ...fussHoch.slice(1)], block: block() })).toEqual({
+    expect(await speichereEntwurf({ reihenfolge: [...fussHoch.slice(0, 1), { id: NEUER_BLOCK, sichtbar: true }, ...fussHoch.slice(1)], block: block() })).toEqual({
       error: REIHENFOLGE_FEHLER_TEXT['fuss-nicht-unten'],
     })
 
     const hoefeAus = vorher.map((z) => ({ id: z.id, sichtbar: z.art !== 'HOEFE' }))
-    expect(await speichereStartseite({ reihenfolge: hoefeAus, block: null })).toEqual({ error: REIHENFOLGE_FEHLER_TEXT['fest-ausgeblendet'] })
+    expect(await speichereEntwurf({ reihenfolge: hoefeAus, block: null })).toEqual({ error: REIHENFOLGE_FEHLER_TEXT['fest-ausgeblendet'] })
 
     const futterHoch = vorher.map((z) => ({ id: z.id, sichtbar: true }))
     ;[futterHoch[1], futterHoch[2]] = [futterHoch[2], futterHoch[1]]
-    expect(await speichereStartseite({ reihenfolge: futterHoch, block: null })).toEqual({ error: REIHENFOLGE_FEHLER_TEXT['hoefe-nicht-unter-kopf'] })
+    expect(await speichereEntwurf({ reihenfolge: futterHoch, block: null })).toEqual({ error: REIHENFOLGE_FEHLER_TEXT['hoefe-nicht-unter-kopf'] })
 
     expect(await zustand()).toEqual(vorher)
     expect(await prisma.startseiteBlock.count({ where: { titel: { startsWith: 'int-' } } })).toBe(0)
@@ -149,7 +151,7 @@ describe('speichereStartseite', () => {
     const { farm } = await erstelleHof({ approvedAt: null })
     const vorher = await zustand()
     const reihenfolge = [{ id: vorher[0].id, sichtbar: true }, { id: NEUER_BLOCK, sichtbar: true }, ...vorher.slice(1).map((z) => ({ id: z.id, sichtbar: true }))]
-    expect(await speichereStartseite({ reihenfolge, block: block({ vorlage: 'HOEFE_AUSWAHL', farmIds: [farm.id] }) })).toEqual({ error: 'Wähle nur freigeschaltete Höfe.' })
+    expect(await speichereEntwurf({ reihenfolge, block: block({ vorlage: 'HOEFE_AUSWAHL', farmIds: [farm.id] }) })).toEqual({ error: 'Wähle nur freigeschaltete Höfe.' })
     expect(await zustand()).toEqual(vorher)
   })
 
@@ -157,7 +159,7 @@ describe('speichereStartseite', () => {
     await alsAdmin()
     const vorher = await zustand()
     const reihenfolge = [{ id: vorher[0].id, sichtbar: true }, { id: NEUER_BLOCK, sichtbar: true }, ...vorher.slice(1).map((z) => ({ id: z.id, sichtbar: true }))]
-    const ergebnis = await speichereStartseite({ reihenfolge, block: block() })
+    const ergebnis = await speichereEntwurf({ reihenfolge, block: block() })
     const blockId = 'blockId' in ergebnis ? (ergebnis.blockId ?? '') : ''
     expect(await prisma.startseiteAbschnitt.count({ where: { blockId } })).toBe(1)
 

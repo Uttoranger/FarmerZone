@@ -312,14 +312,15 @@ describe('Startseite — bewusst OHNE src/app/loading.tsx', () => {
     // Seit Nr. 96 (Register N16) wartet die Seite auf genau zwei Dinge, die
     // beide nichts aus der Anfrage lesen: die Vorschau (ohne Draft Mode sofort
     // null, src/server/startseite-vorschau.ts) und die Liste der Abschnitte
-    // aus dem Datencache (ladeStartseite, wirft nie). Jedes weitere await
-    // fällt hier auf.
+    // aus dem Datencache (ladeStartseite, wirft nie). Seit Nr. 99 liest nur
+    // die Vorschau ihre Quelle selbst (ladeVorschauZeilen, Draft Mode) — auf
+    // derselben Zeile, statt der Live-Liste. Jedes weitere await fällt hier auf.
     const seite = liesDatei('src/app/page.tsx')
     const komponente = seite.slice(seite.indexOf('export default async function HomePage('))
     expect(komponente.length).toBeLessThan(seite.length)
     expect(komponente.match(/\bawait\b[^\n]*/g)).toEqual([
       'await vorschauDieserAnfrage(searchParams, new Date())',
-      'await ladeStartseite(), jetzt, {',
+      'await ladeVorschauZeilen(vorschau) : await ladeStartseite(), jetzt, {',
     ])
     expect(seite).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>/)
   })
