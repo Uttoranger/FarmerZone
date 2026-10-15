@@ -1,10 +1,10 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeft, CircleAlert, FlaskConical } from 'lucide-react'
-import { ADMIN_KONTO, ADMIN_REITER, ADMIN_TESTUMGEBUNG, ADMIN_ZURUECK, adminAktiverReiter, type AdminReiter } from '@/lib/admin-navigation'
+import { ArrowLeft, CircleAlert } from 'lucide-react'
+import { ADMIN_KONTO, ADMIN_REITER, ADMIN_ZURUECK, adminAktiverReiter, type AdminReiter } from '@/lib/admin-navigation'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import type { StripeMarke } from '@/lib/testumgebung'
@@ -22,9 +22,11 @@ import { ADMIN_POSTFACH_TEXT } from '@/lib/postfach'
 
 /*
  * Die Shell des Betreiber-Bereichs im neuen Design (Gate 2): eigene
- * Kopfzeile mit den Reitern Höfe · Briefkasten · Finanzen (mit Zählern) und
+ * Kopfzeile mit den Reitern Höfe · Postfach · Startseite · Finanzen ·
+ * Einstellungen (Register N15; Höfe und Postfach mit Zählern) und
  * „← Zu meinem Hof" — keine Hof-Seitenleiste (docs/ai/DESIGN_SYSTEM.md).
- * Am Handy rutschen die Reiter als Zeile unter den Kopf. Mockups:
+ * Am Handy rutschen die Reiter als scrollbare Zeile unter den Kopf; der
+ * gewählte Reiter scrollt in die Mitte, damit man ihn sieht. Mockups:
  * admin-hoefe-und-freischaltung (Browser), admin-mobil-unterwegs-freischalten.
  *
  * Die Shell schützt nichts: Jede Admin-Seite prüft selbst mit
@@ -36,9 +38,11 @@ import { ADMIN_POSTFACH_TEXT } from '@/lib/postfach'
  * über /dashboard auf /login. Die Initialen-Plakette ist dann ein Link auf
  * „Konto und Sicherheit" und steht auch am Handy da.
  *
- * Seit Nr. 43 (Register Z3) die Betriebsleiste unter dem Kopf: Marke
- * „Stripe Live"/„Stripe Test" und „Zur Testumgebung". Beides entscheidet der
- * Server (umgebung-server.ts) und reicht nur Text, Ton und Adresse herein.
+ * Seit Nr. 43 (Register Z3) die Betriebsleiste unter dem Kopf: die Marke
+ * „Stripe Live"/„Stripe Test". Sie entscheidet der Server (umgebung-server.ts)
+ * und reicht nur Text und Ton herein. Den Link „Zur Testumgebung" gibt es seit
+ * der Z3-Korrektur (15.10.2026, Nr. 94) nicht mehr: Die Testumgebung wurde
+ * nie eingerichtet.
  */
 
 export type AdminShellProps = {
@@ -58,8 +62,6 @@ export type AdminShellProps = {
    * umgebung-server.ts) — nur Text und Ton, nie der Schlüssel.
    */
   stripeMarke?: StripeMarke | null
-  /** Ziel von „Zur Testumgebung" (TESTUMGEBUNG_URL) — ohne Adresse kein Link. */
-  testumgebungUrl?: string | null
   children: ReactNode
 }
 
@@ -108,12 +110,22 @@ export function AdminShell({
   zahlen,
   testbetrieb = false,
   stripeMarke = null,
-  testumgebungUrl = null,
   children,
 }: AdminShellProps): React.JSX.Element {
   const pathname = usePathname()
   const aktiv = adminAktiverReiter(pathname)
   const anzeige = personName.trim() || 'Dein Konto'
+
+  // Am Handy ist die Reiter-Zeile breiter als der Bildschirm: Der gewählte Reiter
+  // soll nicht außerhalb stehen. Nur die Zeile scrollt (scrollLeft), nie die Seite.
+  const reiterZeile = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const zeile = reiterZeile.current
+    const gewaehlt = zeile?.querySelector<HTMLElement>('[aria-current]')
+    if (!zeile || !gewaehlt) return
+    const links = gewaehlt.getBoundingClientRect().left - zeile.getBoundingClientRect().left
+    zeile.scrollLeft += links - (zeile.clientWidth - gewaehlt.offsetWidth) / 2
+  }, [pathname])
 
   return (
     <div data-design="neu" className="min-h-dvh bg-background text-foreground">
@@ -130,7 +142,7 @@ export function AdminShell({
             </StatusBadge>
           </div>
 
-          <nav aria-label="Admin-Bereiche" className="order-last -mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pb-1 md:order-none md:mx-0 md:ml-5 md:w-auto md:p-0">
+          <nav ref={reiterZeile} aria-label="Admin-Bereiche" className="order-last -mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pb-1 md:order-none md:mx-0 md:ml-5 md:w-auto md:p-0">
             <ul className="flex gap-2 md:gap-1">
               {ADMIN_REITER.map((reiter) => {
                 const istAktiv = aktiv === reiter.id
@@ -179,25 +191,12 @@ export function AdminShell({
             <KontoPlakette anzeige={anzeige} hatHof={hatHof} />
           </div>
         </div>
-        {/* Betriebsleiste (Register Z3): welcher Stripe-Modus gilt und der Weg
-            in die Testumgebung. Eine eigene Zeile unter dem Kopf statt in ihm:
-            Die Kopfzeile ist am Handy und bis 1024 px schon voll, hier stehen
-            Marke und Link in jeder Breite gleich. */}
-        {(stripeMarke || testumgebungUrl) && (
-          <div className="flex min-h-11 items-center justify-between gap-3 border-t border-border px-4 md:px-8">
-            {stripeMarke ? <StatusBadge status={stripeMarke.ton}>{stripeMarke.text}</StatusBadge> : <span />}
-            {testumgebungUrl && (
-              <a
-                href={testumgebungUrl}
-                className={cn(
-                  '-mr-3 inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[14px] font-semibold whitespace-nowrap text-brand-text hover:bg-muted',
-                  FOKUS_RAHMEN
-                )}
-              >
-                <FlaskConical className="size-4" strokeWidth={1.7} aria-hidden="true" />
-                {ADMIN_TESTUMGEBUNG.label}
-              </a>
-            )}
+        {/* Betriebsleiste (Register Z3): welcher Stripe-Modus gilt. Eine eigene Zeile
+            unter dem Kopf statt in ihm: Die Kopfzeile ist am Handy und bis 1024 px
+            schon voll. Ohne Marke keine Leiste. */}
+        {stripeMarke && (
+          <div className="flex min-h-11 items-center border-t border-border px-4 md:px-8">
+            <StatusBadge status={stripeMarke.ton}>{stripeMarke.text}</StatusBadge>
           </div>
         )}
       </header>

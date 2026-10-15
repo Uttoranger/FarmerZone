@@ -25,6 +25,31 @@ function Kopf({ breite }: { breite: string }): React.JSX.Element {
   )
 }
 
+/** Seitenkopf des Musters (Register N15): h1, ein Satz, rechts ein Feld. */
+function MusterKopf({ breite, rechts }: { breite: string; rechts?: string }): React.JSX.Element {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+      <div>
+        <div className={cn('h-8 rounded-lg bg-border md:h-9', breite)} />
+        <div className="mt-2 h-3.5 w-64 max-w-full rounded bg-muted" />
+      </div>
+      {rechts && <div className={cn('h-11 w-full rounded-full bg-muted md:w-auto', rechts)} />}
+    </div>
+  )
+}
+
+/** Kennzahlen des Musters: am Handy zu dritt, ab 1024 px eine Reihe. */
+function MusterKennzahlen({ anzahl }: { anzahl: 3 | 4 | 5 }): React.JSX.Element {
+  const spalten = { 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4', 5: 'lg:grid-cols-5' }[anzahl]
+  return (
+    <div className={cn('grid grid-cols-3 gap-2 md:gap-3', spalten)}>
+      {Array.from({ length: anzahl }, (_, i) => (
+        <div key={i} className={cn('h-[64px] rounded-2xl border border-border bg-card md:h-[92px]', i >= 3 && 'hidden md:block')} />
+      ))}
+    </div>
+  )
+}
+
 function Chips({ breiten }: { breiten: number[] }): React.JSX.Element {
   return (
     <div className="flex gap-2 overflow-hidden">
@@ -38,8 +63,9 @@ function Chips({ breiten }: { breiten: number[] }): React.JSX.Element {
 export function HoefeLaden(): React.JSX.Element {
   return (
     <Rahmen>
-      <Kopf breite="w-24" />
-      <div className="h-3 w-48 rounded bg-muted" />
+      <MusterKopf breite="w-24" rechts="md:w-72" />
+      <MusterKennzahlen anzahl={5} />
+      <Chips breiten={[44, 22, 30]} />
       {[0, 1].map((i) => (
         <div key={i} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 md:flex-row md:items-center">
           <div className="flex flex-1 gap-3.5">
@@ -56,24 +82,7 @@ export function HoefeLaden(): React.JSX.Element {
           </div>
         </div>
       ))}
-      <Chips breiten={[18, 24, 26, 32]} />
-      <div className="hidden overflow-hidden rounded-2xl border border-border bg-card lg:block">
-        <div className="h-10 border-b border-border" />
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="flex h-[60px] items-center gap-6 border-t border-border px-3.5 first:border-t-0">
-            <div className="h-4 w-56 rounded bg-border" />
-            <div className="h-5 w-20 rounded-full bg-muted" />
-            <div className="ml-auto h-4 w-10 rounded bg-muted" />
-            <div className="h-6 w-24 rounded bg-muted" />
-            <div className="h-4 w-10 rounded bg-muted" />
-          </div>
-        ))}
-      </div>
-      <div className="flex flex-col gap-3 lg:hidden">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="h-[168px] rounded-2xl border border-border bg-card" />
-        ))}
-      </div>
+      <div className="h-3 w-3/4 rounded bg-muted" />
     </Rahmen>
   )
 }
@@ -133,19 +142,23 @@ export function MeldungLaden(): React.JSX.Element {
 export function FinanzenLaden(): React.JSX.Element {
   return (
     <Rahmen>
-      <div className="flex items-center justify-between gap-4">
-        <div className="h-8 w-36 rounded-lg bg-border md:h-9" />
-        <div className="h-11 w-60 rounded-full bg-muted" />
-      </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="h-[104px] rounded-2xl border border-border bg-card" />
-        ))}
-      </div>
+      <MusterKopf breite="w-36" rechts="md:w-60" />
+      <MusterKennzahlen anzahl={5} />
+      <Chips breiten={[22, 22, 30, 40]} />
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)]">
         <div className="h-80 rounded-2xl border border-border bg-card" />
         <div className="h-80 rounded-2xl border border-border bg-card" />
       </div>
+    </Rahmen>
+  )
+}
+
+/** Die Seiten, die nur ihren Kopf haben (Startseite bis Nr. 96): der Kopf des Musters und eine leere Fläche. */
+export function KopfLaden(): React.JSX.Element {
+  return (
+    <Rahmen>
+      <MusterKopf breite="w-40" />
+      <div className="h-40 rounded-2xl border border-border bg-card" />
     </Rahmen>
   )
 }

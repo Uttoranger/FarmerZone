@@ -1,8 +1,9 @@
 /**
  * Die Reiter der AdminShell (components/shells/admin-shell.tsx): Höfe ·
- * Postfach · Finanzen, dazu der Weg zurück zum eigenen Hof und das Ziel der
- * Konto-Plakette. Keine Hof-Seitenleiste im Admin (docs/ai/DESIGN_SYSTEM.md,
- * „Shells und Navigation"). Rein, getestet in tests/admin-navigation.test.ts.
+ * Postfach · Startseite · Finanzen · Einstellungen (Register N15), dazu der
+ * Weg zurück zum eigenen Hof und das Ziel der Konto-Plakette. Keine
+ * Hof-Seitenleiste im Admin (docs/ai/DESIGN_SYSTEM.md, „Shells und
+ * Navigation"). Rein, getestet in tests/admin-navigation.test.ts.
  *
  * Die Reiter sagen nur, wohin es geht. Ob jemand den Bereich sehen darf,
  * entscheidet jede Admin-Seite selbst über verlangeAdminSeite
@@ -12,7 +13,7 @@ import type { UserRole } from '@prisma/client'
 import { ADMIN_POSTFACH_HREF } from '@/lib/postfach'
 import { BRIEFKASTEN_HREF } from '@/lib/admin-briefkasten'
 
-export type AdminReiterId = 'hoefe' | 'postfach' | 'finanzen' | 'einstellungen'
+export type AdminReiterId = 'hoefe' | 'postfach' | 'startseite' | 'finanzen' | 'einstellungen'
 
 export type AdminReiter = {
   id: AdminReiterId
@@ -32,6 +33,8 @@ export const ADMIN_REITER: readonly AdminReiter[] = [
   { id: 'hoefe', label: 'Höfe', href: '/admin', zahl: 'hoefe' },
   // Seit Nr. 87 (Register N12) mit drei Reitern unter /admin/postfach; /admin/meldungen leitet um, die Detailseite einer Meldung bleibt.
   { id: 'postfach', label: 'Postfach', href: ADMIN_POSTFACH_HREF, zahl: 'briefkasten', auchAktivAuf: [BRIEFKASTEN_HREF] },
+  // Bis Nr. 96 ein Platzhalter mit dem Kopf des Musters (src/app/admin/startseite/page.tsx).
+  { id: 'startseite', label: 'Startseite', href: '/admin/startseite' },
   { id: 'finanzen', label: 'Finanzen', href: '/admin/finanzen' },
   { id: 'einstellungen', label: 'Einstellungen', href: '/admin/einstellungen' },
 ]
@@ -53,13 +56,6 @@ export const ADMIN_KONTO = { label: 'Konto und Sicherheit', href: '/settings/acc
 export function kontoHatHof(konto: { rolle: UserRole | null | undefined; hofVorhanden: boolean }): boolean {
   return konto.rolle === 'FARMER' && konto.hofVorhanden
 }
-
-/**
- * „Zur Testumgebung" in der Betriebsleiste der AdminShell (Register Z3). Das
- * Ziel ist keine feste Adresse: Es kommt aus NEXT_PUBLIC_TESTUMGEBUNG_URL
- * (TESTUMGEBUNG_URL in src/lib/umgebung-server.ts) — ohne Variable kein Link.
- */
-export const ADMIN_TESTUMGEBUNG = { label: 'Zur Testumgebung' } as const
 
 /** Der aktive Reiter — der längste passende Pfad, damit /admin/postfach nicht auch „Höfe" ist. */
 export function adminAktiverReiter(pfad: string): AdminReiterId | null {
