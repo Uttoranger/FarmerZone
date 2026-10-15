@@ -8,7 +8,7 @@ import {
   UEBERZEILE_MAX,
   VORLAGEN,
   istRelativerLink,
-  wienerZeitpunkt,
+  zeitpunktAusEingabe,
 } from '@/lib/startseite-gestalten'
 
 /*
@@ -93,13 +93,13 @@ export const startseitenBlockSchema = z
     if (b.vorlage === 'KATEGORIE_HINWEIS' && b.kategorie === null) {
       ctx.addIssue({ code: 'custom', path: ['kategorie'], message: S.kategorie })
     }
-    const ab = wienerZeitpunkt(b.liveAbTag, b.liveAbUhrzeit)
+    const ab = zeitpunktAusEingabe(b.liveAbTag, b.liveAbUhrzeit)
     if (!ab) {
       ctx.addIssue({ code: 'custom', path: ['liveAbUhrzeit'], message: S.umstellung })
       return
     }
     if (b.liveBisTag === null) return
-    const bis = wienerZeitpunkt(b.liveBisTag, b.liveBisUhrzeit ?? '23:59')
+    const bis = zeitpunktAusEingabe(b.liveBisTag, b.liveBisUhrzeit ?? '23:59')
     if (!bis) {
       ctx.addIssue({ code: 'custom', path: ['liveBisUhrzeit'], message: S.umstellung })
     } else if (bis.getTime() <= ab.getTime()) {
@@ -137,3 +137,4 @@ export const vorschauParameterSchema = z.object({
   vorschau: z.string().max(400).regex(/^[A-Za-z0-9_-]+$/),
   sig: z.string().regex(/^[a-f0-9]{64}$/),
 })
+export type VorschauParameter = z.infer<typeof vorschauParameterSchema>

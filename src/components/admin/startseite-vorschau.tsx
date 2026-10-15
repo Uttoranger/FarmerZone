@@ -18,7 +18,7 @@ import { VORSCHAU_HANDY_HOEHE, VORSCHAU_SEITENBREITE, vorschauMassstab, type Vor
 import { useElementGroesse } from '@/lib/use-element-groesse'
 import { cn } from '@/lib/utils'
 import type { AdminStartseitenZeile } from '@/server/queries/startseite'
-import { erzeugeStartseitenVorschau } from '@/server/actions/startseite'
+import { beendeStartseitenVorschau, erzeugeStartseitenVorschau } from '@/server/actions/startseite'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Segment } from '@/components/ui/segment'
 import { KARTE, LEISE } from '@/components/hof-bestellungen/stil'
@@ -34,12 +34,16 @@ import { KARTE, LEISE } from '@/components/hof-bestellungen/stil'
  * Die Adresse holt die Action (erzeugeStartseitenVorschau): signiert, eine
  * Stunde gültig, und sie schaltet für diesen Browser den Draft Mode ein. „Stand
  * am" wählt den Tag: heute, in einer Woche oder der Beginn des nächsten Blocks.
+ * „Vorschau öffnen" führt über die Route /admin/startseite/vorschau, damit der
+ * Link auch auf einem anderen Gerät mit Admin-Sitzung wirkt. Verschwindet die
+ * Vorschau (zurück auf „Bearbeiten", weg von der Seite), schaltet
+ * beendeStartseitenVorschau den Draft Mode wieder aus.
  */
 
 const HANDY_SCHIRM = 304
 const WEB_RAHMEN_HOEHE = 680
 
-type Link = { pfad: string; stand: string } | { fehler: string }
+type Link = { pfad: string; link: string; stand: string } | { fehler: string }
 
 /** Die Zeilen der Admin-Liste so, wie die Startseite sie bekommt. */
 function alsStartseitenZeilen(zeilen: readonly AdminStartseitenZeile[]): StartseitenZeile[] {
@@ -136,14 +140,24 @@ export function StartseiteVorschau({
     let gueltig = true
     void erzeugeStartseitenVorschau({ stand, blockEntwurfId }).then((ergebnis) => {
       if (!gueltig) return
-      setLink('error' in ergebnis ? { fehler: ergebnis.error } : { pfad: ergebnis.pfad, stand: ergebnis.stand })
+      setLink('error' in ergebnis ? { fehler: ergebnis.error } : { pfad: ergebnis.pfad, link: ergebnis.link, stand: ergebnis.stand })
     })
     return () => {
       gueltig = false
     }
   }, [stand, blockEntwurfId])
 
-  const pfad = link && 'pfad' in link ? link.pfad : null
+  // Nur beim Aushängen: Sonst rendert dieser Browser jede statische Seite bis
+  // zum Ende der Sitzung ohne Cache. Actions laufen nacheinander — ein
+  // späteres Einschalten (wieder „So sieht's die Kundin") gewinnt.
+  useEffect(
+    () => () => {
+      void beendeStartseitenVorschau()
+    },
+    []
+  )
+
+  const oeffnen = link && 'link' in link ? link.link : null
 
   return (
     <section aria-labelledby="kundin-titel" className="flex min-w-0 flex-col gap-3">
@@ -204,9 +218,9 @@ export function StartseiteVorschau({
                 {link.fehler}
               </p>
             )}
-            {pfad && (
+            {oeffnen && (
               <a
-                href={pfad}
+                href={oeffnen}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cn(

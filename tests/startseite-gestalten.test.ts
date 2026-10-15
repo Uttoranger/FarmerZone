@@ -14,10 +14,13 @@
  *    Liste ebenso, Brennmaterial nur in der Saison, Blöcke nur im Zeitraum
  *    (außer dem Block in Bearbeitung der Vorschau), Ausgeblendetes nie.
  *  - Link nur relativ; Grenzen und Pflichtfelder je Vorlage im Schema.
+ *  - Die Listen der Arten und Vorlagen decken genau die Prisma-Enums ab.
  */
 import { describe, expect, it } from 'vitest'
+import { StartseiteArt, StartseiteVorlage } from '@prisma/client'
 import {
   STANDARD_REIHENFOLGE,
+  VORLAGEN,
   darfVerschieben,
   istLive,
   istRelativerLink,
@@ -26,13 +29,20 @@ import {
   standardZeilen,
   verschiebe,
   wienerEingabe,
-  wienerZeitpunkt,
+  zeitpunktAusEingabe,
   zuRendern,
   type ListenEintrag,
   type StartseitenBlockDaten,
   type StartseitenZeile,
 } from '@/lib/startseite-gestalten'
 import { STARTSEITE_SAETZE, startseitenBlockSchema, type StartseitenBlockEingabe } from '@/schemas/startseite'
+
+describe('Arten und Vorlagen', () => {
+  it('kennen genau die Werte der Prisma-Enums — ein neuer Wert fällt sofort auf', () => {
+    expect([...VORLAGEN].sort()).toEqual(Object.values(StartseiteVorlage).sort())
+    expect([...STANDARD_REIHENFOLGE, 'BLOCK'].sort()).toEqual(Object.values(StartseiteArt).sort())
+  })
+})
 
 const standard = (): ListenEintrag[] => STANDARD_REIHENFOLGE.map((art) => ({ art, sichtbar: true }))
 const BLOCK: ListenEintrag = { art: 'BLOCK', sichtbar: true }
@@ -130,33 +140,33 @@ describe('istLive', () => {
   })
 })
 
-describe('wienerZeitpunkt', () => {
+describe('zeitpunktAusEingabe', () => {
   it('rechnet im Winter mit einer Stunde Vorsprung, im Sommer mit zwei', () => {
-    expect(wienerZeitpunkt('2026-12-01', '06:00')?.toISOString()).toBe('2026-12-01T05:00:00.000Z')
-    expect(wienerZeitpunkt('2027-07-01', '06:00')?.toISOString()).toBe('2027-07-01T04:00:00.000Z')
+    expect(zeitpunktAusEingabe('2026-12-01', '06:00')?.toISOString()).toBe('2026-12-01T05:00:00.000Z')
+    expect(zeitpunktAusEingabe('2027-07-01', '06:00')?.toISOString()).toBe('2027-07-01T04:00:00.000Z')
   })
 
   it('trifft an den Tagen der Umstellung die Wiener Uhrzeit', () => {
     // 28. März 2027: um 2 Uhr springt die Uhr auf 3 Uhr.
-    expect(wienerZeitpunkt('2027-03-28', '01:30')?.toISOString()).toBe('2027-03-28T00:30:00.000Z')
-    expect(wienerZeitpunkt('2027-03-28', '06:00')?.toISOString()).toBe('2027-03-28T04:00:00.000Z')
+    expect(zeitpunktAusEingabe('2027-03-28', '01:30')?.toISOString()).toBe('2027-03-28T00:30:00.000Z')
+    expect(zeitpunktAusEingabe('2027-03-28', '06:00')?.toISOString()).toBe('2027-03-28T04:00:00.000Z')
     // 31. Oktober 2027: um 3 Uhr zurück auf 2 Uhr.
-    expect(wienerZeitpunkt('2027-10-31', '06:00')?.toISOString()).toBe('2027-10-31T05:00:00.000Z')
-    expect(wienerZeitpunkt('2027-10-31', '00:30')?.toISOString()).toBe('2027-10-30T22:30:00.000Z')
+    expect(zeitpunktAusEingabe('2027-10-31', '06:00')?.toISOString()).toBe('2027-10-31T05:00:00.000Z')
+    expect(zeitpunktAusEingabe('2027-10-31', '00:30')?.toISOString()).toBe('2027-10-30T22:30:00.000Z')
   })
 
   it('kennt die fehlende Stunde Ende März nicht und nimmt keinen Unsinn', () => {
-    expect(wienerZeitpunkt('2027-03-28', '02:30')).toBeNull()
-    expect(wienerZeitpunkt('2027-02-30', '06:00')).toBeNull()
-    expect(wienerZeitpunkt('2027-03-01', '24:00')).toBeNull()
-    expect(wienerZeitpunkt('2027-03-01', '6:00')).toBeNull()
+    expect(zeitpunktAusEingabe('2027-03-28', '02:30')).toBeNull()
+    expect(zeitpunktAusEingabe('2027-02-30', '06:00')).toBeNull()
+    expect(zeitpunktAusEingabe('2027-03-01', '24:00')).toBeNull()
+    expect(zeitpunktAusEingabe('2027-03-01', '6:00')).toBeNull()
   })
 
   it('geht mit wienerEingabe hin und zurück', () => {
     const zeitpunkt = new Date('2027-04-06T21:59:00.000Z')
     expect(wienerEingabe(zeitpunkt)).toEqual({ tag: '2027-04-06', uhrzeit: '23:59' })
     const { tag, uhrzeit } = wienerEingabe(zeitpunkt)
-    expect(wienerZeitpunkt(tag, uhrzeit)?.toISOString()).toBe(zeitpunkt.toISOString())
+    expect(zeitpunktAusEingabe(tag, uhrzeit)?.toISOString()).toBe(zeitpunkt.toISOString())
   })
 })
 

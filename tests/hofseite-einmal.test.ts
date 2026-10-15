@@ -145,12 +145,10 @@ function erlaubt(fund: Fund, text: string): boolean {
     return imImport || imRumpf(code, 'export async function ansichtsModus(', fund.stelle)
   }
   // Die Vorschau der STARTSEITE (Register N16, Nr. 96) ist ein eigener, signierter Parameter derselben
-  // Schreibweise (/?vorschau=…&sig=…, Freigabe §18): geschrieben nur in erzeugeVorschauPfad, gelesen nur
-  // in vorschauDieserAnfrage (nach dem Draft Mode) — die Hofseite und ansichtsModus berührt er nicht.
+  // Schreibweise (/?vorschau=…&sig=…, Freigabe §18): geschrieben nur in alsAbfrage (aus geprüften Werten),
+  // gelesen nur über vorschauParameterSchema — die Hofseite und ansichtsModus berührt er nicht.
   if (fund.pfad === 'src/server/startseite-vorschau.ts') {
-    if (fund.art === 'Adresse im Text') return imRumpf(code, 'export function erzeugeVorschauPfad(', fund.stelle)
-    if (fund.art === 'Eigenschaft') return imRumpf(code, 'export async function vorschauDieserAnfrage(', fund.stelle)
-    return false
+    return fund.art === 'Adresse im Text' && imRumpf(code, 'function alsAbfrage(', fund.stelle)
   }
   // Die eine Ausnahme: die Breite der Vorschau-Spalte heißt `vorschau` (Ergebnis von editorSpalten, Nr. 73) —
   // eine Eigenschaft eines Ergebnisses, kein Parameter der Adresse. Nur im Editor und nur als `spalten.vorschau`.

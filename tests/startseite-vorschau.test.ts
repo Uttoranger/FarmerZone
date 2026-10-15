@@ -14,13 +14,18 @@
  *    der Weg jedes Besuchs bleibt statisch.
  *  - Die Signatur steht im Parameter `sig`, den die Sentry-Hygiene nach dem
  *    Namen entfernt; der Inhalt trägt kein Geheimnis.
+ *  - „Vorschau öffnen" wirkt auf jedem Gerät mit Admin-Sitzung (Runde 2): Die
+ *    Route /admin/startseite/vorschau schaltet dort den Draft Mode ein und
+ *    leitet mit demselben Link auf die Startseite; ohne Admin-Sitzung, mit
+ *    abgelaufenem oder falschem Link kein Draft Mode, normale Startseite.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { NextRequest } from 'next/server'
 
-const draft = vi.hoisted(() => ({ an: false }))
+const draft = vi.hoisted(() => ({ an: false, enable: vi.fn() }))
 vi.mock('next/headers', () => ({
   headers: vi.fn(async () => new Headers()),
-  draftMode: vi.fn(async () => ({ isEnabled: draft.an })),
+  draftMode: vi.fn(async () => ({ isEnabled: draft.an, enable: draft.enable })),
 }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', () => ({ prisma: { user: { findUnique: vi.fn() } } }))
@@ -35,6 +40,7 @@ import {
   pruefeVorschau,
   vorschauDieserAnfrage,
 } from '@/server/startseite-vorschau'
+import { GET as oeffneVorschauRoute } from '@/app/admin/startseite/vorschau/route'
 
 const AUSGESTELLT = new Date('2026-10-15T10:00:00Z')
 const DATUM = new Date('2027-03-27T09:00:00Z')
@@ -121,6 +127,56 @@ describe('vorschauDieserAnfrage', () => {
     expect(await vorschauDieserAnfrage(Promise.resolve(link()), spaet)).toBeNull()
     expect(await vorschauDieserAnfrage(Promise.resolve({ ...link(), sig: 'c'.repeat(64) }), JETZT)).toBeNull()
     expect(await vorschauDieserAnfrage(Promise.resolve({ vorschau: '<script>', sig: 'x' }), JETZT)).toBeNull()
+    expect(auth.api.getSession).not.toHaveBeenCalled()
+  })
+})
+
+describe('Route /admin/startseite/vorschau — „Vorschau öffnen" auf jedem Gerät', () => {
+  const JETZT = new Date(AUSGESTELLT.getTime() + 60_000)
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(JETZT)
+    // Ein anderes Gerät: Dort hat noch keine Action den Draft Mode eingeschaltet.
+    draft.an = false
+    vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'admin-1' } } as never)
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true } as never)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  function oeffne(parameter: Record<string, string>): Promise<Response> {
+    return oeffneVorschauRoute(new NextRequest(`http://localhost/admin/startseite/vorschau?${new URLSearchParams(parameter)}`))
+  }
+
+  it('schaltet mit Admin-Sitzung den Draft Mode ein und leitet mit demselben Link auf die Startseite', async () => {
+    const parameter = link()
+    const antwort = await oeffne(parameter)
+    expect(draft.enable).toHaveBeenCalledTimes(1)
+    expect(antwort.status).toBe(303)
+    expect(antwort.headers.get('location')).toBe(`http://localhost/?vorschau=${parameter.vorschau}&sig=${parameter.sig}`)
+    expect(antwort.headers.get('cache-control')).toContain('no-store')
+  })
+
+  it('zeigt ohne Sitzung oder mit Hof-Sitzung die normale Startseite — ohne Draft Mode', async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce(null as never)
+    expect((await oeffne(link())).headers.get('location')).toBe('http://localhost/')
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({ user: { id: 'hof-1', role: 'FARMER' } } as never)
+    vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({ isAdmin: false } as never)
+    expect((await oeffne(link())).headers.get('location')).toBe('http://localhost/')
+    expect(draft.enable).not.toHaveBeenCalled()
+  })
+
+  it('zeigt mit abgelaufenem, falsch signiertem oder unsinnigem Link die normale Startseite — ohne nach der Sitzung zu fragen', async () => {
+    vi.setSystemTime(new Date(AUSGESTELLT.getTime() + VORSCHAU_GUELTIG_MS))
+    expect((await oeffne(link())).headers.get('location')).toBe('http://localhost/')
+    vi.setSystemTime(JETZT)
+    expect((await oeffne({ ...link(), sig: 'c'.repeat(64) })).headers.get('location')).toBe('http://localhost/')
+    expect((await oeffne({ vorschau: '<script>', sig: 'x' })).headers.get('location')).toBe('http://localhost/')
+    expect(draft.enable).not.toHaveBeenCalled()
     expect(auth.api.getSession).not.toHaveBeenCalled()
   })
 })

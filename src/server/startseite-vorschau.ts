@@ -2,7 +2,7 @@ import { createHmac } from 'crypto'
 import { draftMode, headers } from 'next/headers'
 import { env } from '@/lib/env'
 import { geheimnisGleich } from '@/lib/geheimnis'
-import { vorschauParameterSchema } from '@/schemas/startseite'
+import { vorschauParameterSchema, type VorschauParameter } from '@/schemas/startseite'
 
 /*
  * Der Vorschau-Link der Startseite (Register N16, Nr. 96): `/?vorschau=…&sig=…`
@@ -21,7 +21,10 @@ import { vorschauParameterSchema } from '@/schemas/startseite'
  *
  * Der Link allein öffnet nichts: Die Seite verlangt zusätzlich die Admin-
  * Sitzung (frisch aus der Datenbank, wie verlangeAdminSeite) und den Draft
- * Mode, den nur die Admin-Action einschaltet.
+ * Mode. Den schalten nur zwei Wege ein, beide nach derselben Prüfung: die
+ * Admin-Action (Rahmen „So sieht's die Kundin") und die Route hinter
+ * „Vorschau öffnen" (oeffneVorschau) — die macht den Link auf jedem Gerät
+ * wirksam, auf dem der Admin angemeldet ist.
  */
 
 const ZWECK = 'startseite-vorschau'
@@ -38,11 +41,20 @@ function signiere(inhalt: string): string {
 
 export type VorschauInhalt = { datum: Date; blockEntwurfId: string | null }
 
-/** Der Pfad des Vorschau-Links — nur der Server baut ihn (Action „Vorschau öffnen"). */
-export function erzeugeVorschauPfad(inhalt: VorschauInhalt, jetzt: Date): string {
+/** Die Abfrage `vorschau=…&sig=…` aus geprüften Werten (Base64url und Hex, nichts zu kodieren). */
+function alsAbfrage({ vorschau, sig }: VorschauParameter): string {
+  return `vorschau=${vorschau}&sig=${sig}`
+}
+
+/** Die Abfrage des Vorschau-Links — nur der Server baut sie (Action „Vorschau öffnen"). */
+export function erzeugeVorschauAbfrage(inhalt: VorschauInhalt, jetzt: Date): string {
   const roh = `${ZWECK}:${jetzt.getTime()}:${inhalt.datum.getTime()}:${inhalt.blockEntwurfId ?? ''}`
-  const vorschau = Buffer.from(roh).toString('base64url')
-  return `/?vorschau=${vorschau}&sig=${signiere(roh)}`
+  return alsAbfrage({ vorschau: Buffer.from(roh).toString('base64url'), sig: signiere(roh) })
+}
+
+/** Der Pfad der Startseite mit Vorschau-Link. */
+export function erzeugeVorschauPfad(inhalt: VorschauInhalt, jetzt: Date): string {
+  return `/?${erzeugeVorschauAbfrage(inhalt, jetzt)}`
 }
 
 export type VorschauErgebnis = ({ ok: true } & VorschauInhalt) | { ok: false; grund: 'abgelaufen' | 'ungueltig' }
@@ -62,6 +74,21 @@ export function pruefeVorschau(vorschau: string, sig: string, jetzt: Date): Vors
 }
 
 /**
+ * Gültiger, nicht abgelaufener Link UND Admin-Sitzung → der Inhalt; sonst
+ * null. Die Sitzung wird erst nach einer gültigen Signatur gelesen.
+ */
+async function vorschauFuerAdmin({ vorschau, sig }: VorschauParameter, jetzt: Date): Promise<VorschauInhalt | null> {
+  const ergebnis = pruefeVorschau(vorschau, sig, jetzt)
+  if (!ergebnis.ok) return null
+  // Sitzung und Admin-Recht erst hier und dynamisch geladen: Der statische
+  // Weg der Startseite braucht Better Auth nie (ARCHITECTURE §4).
+  const [{ auth }, { isAdminUser }] = await Promise.all([import('@/lib/auth'), import('@/server/queries/admin')])
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user || !(await isAdminUser(session.user.id))) return null
+  return { datum: ergebnis.datum, blockEntwurfId: ergebnis.blockEntwurfId }
+}
+
+/**
  * Die Vorschau dieser Anfrage — oder null (dann die normale Startseite).
  *
  * ZUERST der Draft Mode: Nur wenn ihn „Vorschau öffnen" für diesen Browser
@@ -77,13 +104,20 @@ export async function vorschauDieserAnfrage(
 ): Promise<VorschauInhalt | null> {
   if (!(await draftMode()).isEnabled) return null
   const gelesen = vorschauParameterSchema.safeParse(await parameter)
-  if (!gelesen.success) return null
-  const ergebnis = pruefeVorschau(gelesen.data.vorschau, gelesen.data.sig, jetzt)
-  if (!ergebnis.ok) return null
-  // Sitzung und Admin-Recht erst hier und dynamisch geladen: Der statische
-  // Weg der Startseite braucht Better Auth nie (ARCHITECTURE §4).
-  const [{ auth }, { isAdminUser }] = await Promise.all([import('@/lib/auth'), import('@/server/queries/admin')])
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user || !(await isAdminUser(session.user.id))) return null
-  return { datum: ergebnis.datum, blockEntwurfId: ergebnis.blockEntwurfId }
+  return gelesen.success ? vorschauFuerAdmin(gelesen.data, jetzt) : null
+}
+
+/**
+ * Der Weg hinter „Vorschau öffnen" (Route /admin/startseite/vorschau): Link
+ * und Admin-Sitzung gültig → Draft Mode für DIESEN Browser an und das Ziel
+ * `/?vorschau=…&sig=…` (aus den geprüften Werten neu gebaut, nie die rohe
+ * Adresse); sonst `/`, die normale Startseite. Geändert wird dabei nur das
+ * Draft-Mode-Cookie des eigenen Browsers, kein Datensatz — darum darf es ein
+ * GET sein (ARCHITECTURE §5, Aufruf per Link).
+ */
+export async function oeffneVorschau(parameter: Record<string, string>, jetzt: Date): Promise<string> {
+  const gelesen = vorschauParameterSchema.safeParse(parameter)
+  if (!gelesen.success || !(await vorschauFuerAdmin(gelesen.data, jetzt))) return '/'
+  ;(await draftMode()).enable()
+  return `/?${alsAbfrage(gelesen.data)}`
 }

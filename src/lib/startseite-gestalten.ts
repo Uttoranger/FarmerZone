@@ -9,8 +9,9 @@
  * dieselben Grenzen und Regeln wie Action und Seite.
  */
 import type { ProductCategory, StartseiteArt, StartseiteVorlage } from '@prisma/client'
-import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
+import { kalendertagInWien } from '@/lib/wiener-tag'
 import { tagVersetzt } from '@/lib/kalender'
+import { uhrzeitInWien, wienerZeitpunkt } from '@/lib/fristen'
 import { formatTagKurz } from '@/lib/format'
 
 /** Das Etikett des Datencaches der Startseite — Speichern in Admin › Startseite leert es. */
@@ -166,56 +167,21 @@ export function blockZustand(block: Zeitraum, jetzt: Date): BlockZustand {
 
 export const BLOCK_ZUSTAND_TEXT: Record<BlockZustand, string> = { live: 'Live', geplant: 'Geplant', beendet: 'Beendet' }
 
-/** Minuten, um die Wien dem UTC voraus ist (60 im Winter, 120 im Sommer). */
-function wienVorsprungMinuten(zeitpunkt: Date): number {
-  const teile = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Europe/Vienna',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    hourCycle: 'h23',
-  }).formatToParts(zeitpunkt)
-  const wert = (typ: string) => Number(teile.find((p) => p.type === typ)?.value)
-  const alsUtc = Date.UTC(wert('year'), wert('month') - 1, wert('day'), wert('hour'), wert('minute'))
-  return Math.round((alsUtc - Math.floor(zeitpunkt.getTime() / 60_000) * 60_000) / 60_000)
-}
-
-/** „06:00" in Wien für einen Zeitpunkt (für das Formular). */
-export function uhrzeitInWienFuerFeld(zeitpunkt: Date): string {
-  const teile = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/Vienna',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(zeitpunkt)
-  const wert = (typ: string) => teile.find((p) => p.type === typ)?.value ?? '00'
-  return `${wert('hour')}:${wert('minute')}`
-}
-
 /**
- * Kalendertag (JJJJ-MM-TT) und Uhrzeit (HH:MM) in Wien → Zeitpunkt. Der Tag
- * beginnt um Wiener Mitternacht (wienerMitternacht); an den Tagen der
- * Zeitumstellung verschiebt sich der Abstand zur Mitternacht um die Stunde,
- * die der Tag gewinnt oder verliert. Eine Uhrzeit, die es an dem Tag nicht
- * gibt (Ende März 02:00–02:59), ist null.
+ * Kalendertag (JJJJ-MM-TT) und Uhrzeit (HH:MM) aus dem Formular, Wiener Zeit
+ * → Zeitpunkt (über wienerZeitpunkt aus fristen.ts). Eine Uhrzeit, die es an
+ * dem Tag nicht gibt (Ende März 02:00–02:59), ist null: Der Rundweg über die
+ * Wiener Uhrzeit trifft sie nicht — sonst stünde im Block eine andere Zeit als
+ * eingegeben.
  */
-export function wienerZeitpunkt(tag: string, uhrzeit: string): Date | null {
-  const treffer = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(uhrzeit)
-  const mitternacht = wienerMitternacht(tag)
-  if (!treffer || !mitternacht) return null
-  const minuten = Number(treffer[1]) * 60 + Number(treffer[2])
-  const roh = new Date(mitternacht.getTime() + minuten * 60_000)
-  const verschiebung = wienVorsprungMinuten(roh) - wienVorsprungMinuten(mitternacht)
-  const ergebnis = new Date(roh.getTime() - verschiebung * 60_000)
-  if (kalendertagInWien(ergebnis) !== tag || uhrzeitInWienFuerFeld(ergebnis) !== uhrzeit) return null
-  return ergebnis
+export function zeitpunktAusEingabe(tag: string, uhrzeit: string): Date | null {
+  const zeitpunkt = wienerZeitpunkt(tag, uhrzeit)
+  return zeitpunkt && uhrzeitInWien(zeitpunkt) === uhrzeit ? zeitpunkt : null
 }
 
 /** Ein Zeitpunkt → Tag und Uhrzeit in Wien, wie sie im Formular stehen. */
 export function wienerEingabe(zeitpunkt: Date): { tag: string; uhrzeit: string } {
-  return { tag: kalendertagInWien(zeitpunkt), uhrzeit: uhrzeitInWienFuerFeld(zeitpunkt) }
+  return { tag: kalendertagInWien(zeitpunkt), uhrzeit: uhrzeitInWien(zeitpunkt) }
 }
 
 /** „Fr, 27. März 2027" — der Stand einer Vorschau, Wiener Tag. */
@@ -244,7 +210,7 @@ export function standZeitpunkt(wahl: StandWahl, jetzt: Date, bloecke: readonly Z
   if (wahl === 'heute') return jetzt
   if (wahl === 'woche') {
     const { tag, uhrzeit } = wienerEingabe(jetzt)
-    return wienerZeitpunkt(tagVersetzt(tag, 7), uhrzeit) ?? new Date(jetzt.getTime() + 7 * 24 * 60 * 60_000)
+    return zeitpunktAusEingabe(tagVersetzt(tag, 7), uhrzeit) ?? new Date(jetzt.getTime() + 7 * 24 * 60 * 60_000)
   }
   const kuenftige = bloecke.map((b) => b.liveAb.getTime()).filter((t) => t > jetzt.getTime())
   return kuenftige.length > 0 ? new Date(Math.min(...kuenftige)) : null
@@ -313,6 +279,13 @@ export function zuRendern(
 // ─── Admin › Startseite ─────────────────────────────────────────────────────
 
 export const ADMIN_STARTSEITE_HREF = '/admin/startseite'
+
+/**
+ * Die Route hinter „Vorschau öffnen": prüft Link und Admin-Sitzung, schaltet
+ * den Draft Mode für DIESEN Browser ein und leitet auf die Startseite weiter —
+ * so wirkt der Link auf jedem Gerät, auf dem der Admin angemeldet ist.
+ */
+export const ADMIN_STARTSEITE_VORSCHAU_HREF = `${ADMIN_STARTSEITE_HREF}/vorschau`
 
 /** Die Texte von Admin › Startseite (Mockups admin-startseite-gestalten, admin-startseite-vorschau). */
 export const ADMIN_STARTSEITE_TEXT = {

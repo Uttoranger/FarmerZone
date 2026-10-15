@@ -6,16 +6,18 @@ import type { Prisma, StartseiteArt } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { verlangeAdminAktion } from '@/server/admin-wache'
 import { OEFFENTLICH_SICHTBAR } from '@/server/queries/farm'
-import { erzeugeVorschauPfad } from '@/server/startseite-vorschau'
+import { erzeugeVorschauAbfrage } from '@/server/startseite-vorschau'
 import { blobSpeicherAusSchluessel, istEigeneStartseitenBildUrl } from '@/lib/upload-pfade'
 import {
+  ADMIN_STARTSEITE_HREF,
+  ADMIN_STARTSEITE_VORSCHAU_HREF,
   NEUER_BLOCK,
   REIHENFOLGE_FEHLER_TEXT,
   STARTSEITE_CACHE_TAG,
   pruefeReihenfolge,
   standText,
   standZeitpunkt,
-  wienerZeitpunkt,
+  zeitpunktAusEingabe,
 } from '@/lib/startseite-gestalten'
 import {
   EIGENE_STARTSEITE_SAETZE,
@@ -32,8 +34,6 @@ import {
  * Zod über jede Eingabe; was nur die Datenbank weiß (feste Abschnitte,
  * freigeschaltete Höfe, eigenes Bild), prüft der Server selbst.
  */
-
-const ADMIN_STARTSEITE_HREF = '/admin/startseite'
 
 const SATZ = {
   veraltet: 'Die Startseite wurde inzwischen geändert. Lade die Seite neu und versuch es noch einmal.',
@@ -89,8 +89,8 @@ export async function speichereStartseite(
 
   let daten: ReturnType<typeof blockDaten> | null = null
   if (block) {
-    const liveAb = wienerZeitpunkt(block.liveAbTag, block.liveAbUhrzeit)
-    const liveBis = block.liveBisTag ? wienerZeitpunkt(block.liveBisTag, block.liveBisUhrzeit ?? '23:59') : null
+    const liveAb = zeitpunktAusEingabe(block.liveAbTag, block.liveAbUhrzeit)
+    const liveBis = block.liveBisTag ? zeitpunktAusEingabe(block.liveBisTag, block.liveBisUhrzeit ?? '23:59') : null
     // Das Schema hat beide Zeitpunkte schon geprüft; das hier hält nur den Typ.
     if (!liveAb || (block.liveBisTag && !liveBis)) return { error: STARTSEITE_SAETZE.umstellung }
     daten = blockDaten(block, liveAb, liveBis)
@@ -176,14 +176,16 @@ export async function loescheStartseitenBlock(eingabe: unknown): Promise<{ ok: t
 }
 
 /**
- * „Vorschau öffnen" und „So sieht's die Kundin": der signierte Link für den
+ * „So sieht's die Kundin" und „Vorschau öffnen": der signierte Link für den
  * gewählten Stand (heute, +1 Woche, nächster Block). Schaltet für den
  * Browser des Admins den Draft Mode ein — nur dann rendert die sonst
  * statische Startseite je Anfrage und liest den Link (src/app/page.tsx).
+ * `pfad` lädt der Rahmen in diesem Browser; `link` führt über die Route, die
+ * den Draft Mode auf jedem Gerät mit Admin-Sitzung einschaltet (am Handy).
  */
 export async function erzeugeStartseitenVorschau(
   eingabe: unknown
-): Promise<{ ok: true; pfad: string; stand: string } | { error: string }> {
+): Promise<{ ok: true; pfad: string; link: string; stand: string } | { error: string }> {
   const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
   const geprueft = vorschauAnfrageSchema.safeParse(eingabe)
@@ -195,5 +197,18 @@ export async function erzeugeStartseitenVorschau(
   if (!datum) return { error: SATZ.keinBlock }
 
   ;(await draftMode()).enable()
-  return { ok: true, pfad: erzeugeVorschauPfad({ datum, blockEntwurfId: geprueft.data.blockEntwurfId }, jetzt), stand: standText(datum) }
+  const abfrage = erzeugeVorschauAbfrage({ datum, blockEntwurfId: geprueft.data.blockEntwurfId }, jetzt)
+  return { ok: true, pfad: `/?${abfrage}`, link: `${ADMIN_STARTSEITE_VORSCHAU_HREF}?${abfrage}`, stand: standText(datum) }
+}
+
+/**
+ * Zurück auf „Bearbeiten" oder weg von Admin › Startseite: Draft Mode aus —
+ * sonst rendert dieser Browser jede statische Seite bis zum Ende der Sitzung
+ * ohne Cache. Ohne Admin-Prüfung mit Absicht: Die Action löscht nur das
+ * Draft-Mode-Cookie des Aufrufers selbst und liest oder schreibt sonst nichts;
+ * auch ein abgelaufener Admin soll es loswerden.
+ */
+export async function beendeStartseitenVorschau(): Promise<{ ok: true }> {
+  ;(await draftMode()).disable()
+  return { ok: true }
 }

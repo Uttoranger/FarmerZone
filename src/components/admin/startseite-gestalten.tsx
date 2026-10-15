@@ -37,7 +37,7 @@ import {
   istFest,
   verschiebe,
   wienerEingabe,
-  wienerZeitpunkt,
+  zeitpunktAusEingabe,
   zeitraumText,
   type BlockZustand,
   type StartseitenBlockDaten,
@@ -178,8 +178,8 @@ function alsEingabe(e: Entwurf): StartseitenBlockEingabe {
 
 /** Der Entwurf so, wie die Seite einen Block bekommt — für die Vorschau-Kachel und die Liste. */
 function alsDaten(e: Entwurf, hofSlugs: readonly string[]): StartseitenBlockDaten & { farmIds: string[] } {
-  const ab = wienerZeitpunkt(e.liveAbTag, e.liveAbUhrzeit)
-  const bis = e.liveBisTag ? wienerZeitpunkt(e.liveBisTag, e.liveBisUhrzeit || '23:59') : null
+  const ab = zeitpunktAusEingabe(e.liveAbTag, e.liveAbUhrzeit)
+  const bis = e.liveBisTag ? zeitpunktAusEingabe(e.liveBisTag, e.liveBisUhrzeit || '23:59') : null
   return {
     id: e.id ?? NEUER_BLOCK,
     vorlage: e.vorlage,

@@ -13,14 +13,16 @@
  *    (oder das schon gespeicherte unverändert).
  *  - Ein gültiges Speichern schreibt Block und Positionen in EINER Transaktion
  *    und leert den Cache der Startseite; die Felder anderer Vorlagen fallen weg.
- *  - Der Vorschau-Link schaltet den Draft Mode nur für den Admin ein.
+ *  - Der Vorschau-Link schaltet den Draft Mode nur für den Admin ein; „Vorschau
+ *    öffnen" führt über die Route, die ihn auf jedem Gerät einschaltet;
+ *    zurück auf „Bearbeiten" schaltet ihn wieder aus.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const h = vi.hoisted(() => ({ draftEnable: vi.fn() }))
+const h = vi.hoisted(() => ({ draftEnable: vi.fn(), draftDisable: vi.fn() }))
 vi.mock('next/headers', () => ({
   headers: vi.fn(async () => new Headers()),
-  draftMode: vi.fn(async () => ({ isEnabled: false, enable: h.draftEnable })),
+  draftMode: vi.fn(async () => ({ isEnabled: false, enable: h.draftEnable, disable: h.draftDisable })),
 }))
 vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidatePath: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
@@ -43,8 +45,13 @@ vi.mock('@/lib/prisma', () => {
 import { updateTag } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { REIHENFOLGE_FEHLER_TEXT, STANDARD_REIHENFOLGE, NEUER_BLOCK } from '@/lib/startseite-gestalten'
-import { erzeugeStartseitenVorschau, loescheStartseitenBlock, speichereStartseite } from '@/server/actions/startseite'
+import { ADMIN_STARTSEITE_VORSCHAU_HREF, REIHENFOLGE_FEHLER_TEXT, STANDARD_REIHENFOLGE, NEUER_BLOCK } from '@/lib/startseite-gestalten'
+import {
+  beendeStartseitenVorschau,
+  erzeugeStartseitenVorschau,
+  loescheStartseitenBlock,
+  speichereStartseite,
+} from '@/server/actions/startseite'
 import type { StartseitenBlockEingabe } from '@/schemas/startseite'
 
 type TxMock = {
@@ -227,6 +234,18 @@ describe('Vorschau-Link', () => {
     expect(h.draftEnable).toHaveBeenCalledTimes(1)
     expect(ergebnis).toMatchObject({ ok: true })
     expect('pfad' in ergebnis && ergebnis.pfad).toMatch(/^\/\?vorschau=[A-Za-z0-9_-]+&sig=[a-f0-9]{64}$/)
+  })
+
+  it('führt „Vorschau öffnen" über die Route, die den Draft Mode auf jedem Gerät einschaltet — mit demselben Link', async () => {
+    const ergebnis = await erzeugeStartseitenVorschau({ stand: 'heute', blockEntwurfId: 'b1' })
+    if (!('link' in ergebnis)) throw new Error('kein Link')
+    expect(ergebnis.link.startsWith(`${ADMIN_STARTSEITE_VORSCHAU_HREF}?`)).toBe(true)
+    expect(ergebnis.link.slice(ADMIN_STARTSEITE_VORSCHAU_HREF.length)).toBe(ergebnis.pfad.slice(1))
+  })
+
+  it('schaltet den Draft Mode beim Zurückschalten auf „Bearbeiten" wieder aus', async () => {
+    expect(await beendeStartseitenVorschau()).toEqual({ ok: true })
+    expect(h.draftDisable).toHaveBeenCalledTimes(1)
   })
 
   it('sagt ohne geplanten Block, dass keiner kommt — ohne Draft Mode', async () => {
