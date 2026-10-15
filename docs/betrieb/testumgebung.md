@@ -2,6 +2,8 @@
 
 Schritte für den Menschen (Register Z3). In der Produktion gibt es keinen Umschalter zwischen Test und Live. Echte Abläufe testest du in der **Testumgebung**: Branch `staging`, Entwicklungsdatenbank, Stripe im Testmodus, erreichbar unter **`https://test.farmerzone.at`**.
 
+**Korrektur (15.10.2026, Register Z3, Nr. 94):** Eine Testumgebung wurde nie eingerichtet (keine Variable `NEXT_PUBLIC_TESTUMGEBUNG_URL`, kein Branch `staging`). Die Betriebsleiste im Admin der echten Seite zeigt deshalb bis auf Weiteres nur den Stripe-Modus; den Link „Zur Testumgebung“ gibt es nicht mehr. Die Variable bleibt in der App lesbar (`TESTUMGEBUNG_URL` in `src/lib/umgebung-server.ts`) — wird die Testumgebung später eingerichtet, braucht der Link eine eigene Nummer. Die Zeilen dazu unten sind bis dahin gegenstandslos.
+
 Kein Agent ruft Vercel, DNS oder Stripe auf. Hier stehen nur Schritte, keine Werte: Schlüssel und Secrets gehören nur in Vercel und Stripe, nie in Chat, Tickets oder Commits.
 
 Danach kommt der Probelauf (`docs/nachtlauf/probelauf-checkliste.md`, Nr. 48) und ganz am Schluss die Live-Schaltung (`docs/betrieb/stripe-live.md`).
@@ -10,7 +12,7 @@ Danach kommt der Probelauf (`docs/nachtlauf/probelauf-checkliste.md`, Nr. 48) un
 
 - **Eigene Adresse:** In einer Vorschau gilt `NEXT_PUBLIC_APP_URL` als Adresse der App — aber nur als reine https-Adresse und nie als `farmerzone.at`. Links in Mails, die Rücksprünge von Stripe und die Anmeldung laufen dann über `test.farmerzone.at`. Andere Vorschauen bleiben bei ihrer Vercel-Adresse.
 - **Banner:** Oben steht „TESTUMGEBUNG · Dev-Datenbank · Stripe Test · staging", daneben der Link „Zur echten Seite".
-- **Admin der echten Seite:** Unter dem Kopf steht eine Leiste mit der Marke „Stripe Test" (nach der Live-Schaltung „Stripe Live") und dem Link „Zur Testumgebung".
+- **Admin der echten Seite:** Unter dem Kopf steht eine Leiste mit der Marke „Stripe Test" (nach der Live-Schaltung „Stripe Live"). Der Link „Zur Testumgebung“ ist seit Nr. 94 entfallen (siehe Korrektur oben).
 - **Post nur an dich:** An jede Adresse geht Post nur im Produktions-Deployment bei Vercel. Überall sonst gehen Mails nur an Adressen aus `TEST_EMPFAENGER` und an `@example.com`: in der Testumgebung, in Vorschauen, lokal und in einem lokalen Produktions-Build. Grenze: Wer lokal `vercel env pull --environment=production` und dann `next start` ausführt, hat `VERCEL_ENV=production` und damit freie Post. Alles andere wird nicht verschickt, nur gezählt: Im Log steht „[E-Mail] Nicht verschickt …" mit einer Zahl, ohne Adresse.
 - **Action „Staging nachziehen"** (`.github/workflows/staging-nachziehen.yml`): Nach jedem Push auf `main` setzt sie `staging` per Fast-Forward auf `main`, ohne Force. Vercel baut daraufhin die Testumgebung neu. Hat `staging` eigene Commits, wird die Action rot, statt sie zu überschreiben.
 
@@ -51,7 +53,7 @@ Vercel → Settings → Environment Variables → „Add". Umgebung **Preview**,
 
 ## 4. Variable in Production
 
-- [ ] **`NEXT_PUBLIC_TESTUMGEBUNG_URL`** = `https://test.farmerzone.at`, nur Umgebung **Production**. Danach zeigt der Admin der echten Seite „Zur Testumgebung".
+- [ ] **`NEXT_PUBLIC_TESTUMGEBUNG_URL`** = `https://test.farmerzone.at`, nur Umgebung **Production**. Seit Nr. 94 zeigt der Admin dazu keinen Link mehr (siehe Korrektur oben).
   - Gilt nur als reine https-Adresse ohne Pfad. Ein Tippfehler lässt den Link weg, und Sentry bekommt die Warnung „NEXT_PUBLIC_TESTUMGEBUNG_URL ist keine reine https-Adresse …". Der Deploy läuft trotzdem.
   - In der Testumgebung selbst zeigt der Admin den Link nie, auch wenn die Variable dort ankäme.
 - [ ] Production neu deployen, damit die Variable greift.
@@ -78,7 +80,7 @@ Vercel → Settings → Environment Variables → „Add". Umgebung **Preview**,
 
 - [ ] **Ohne Vercel-Login kein Zugriff:** In einem privaten Fenster `https://test.farmerzone.at` öffnen. Erwartung: die Anmeldeseite von Vercel (HTTP 401), keine Seite von FarmerZone.
 - [ ] **Banner:** Mit Vercel-Login oben „TESTUMGEBUNG · Dev-Datenbank · **Stripe Test** · staging" auf gelbem Grund, daneben „Zur echten Seite" (führt auf `farmerzone.at`). Ist der Balken rot, steht der Grund darin.
-- [ ] **Admin der echten Seite** (`https://farmerzone.at/admin`): Unter dem Kopf stehen „Stripe Test" und „Zur Testumgebung". Der Link führt nach `test.farmerzone.at`.
+- [ ] **Admin der echten Seite** (`https://farmerzone.at/admin`): Unter dem Kopf steht „Stripe Test“. Einen Link „Zur Testumgebung“ gibt es seit Nr. 94 nicht mehr.
 - [ ] **Vercel baut den Push der Action:** Nach dem nächsten Merge auf `main` ist GitHub → Actions → „Staging nachziehen" grün. Vercel → Deployments zeigt eine neue Vorschau für `staging` mit demselben Commit wie `main`.
 - [ ] **Post-Sperre:** In der Testumgebung bestellen, einmal mit einer Adresse aus `TEST_EMPFAENGER` (die Mail kommt an), einmal mit einer anderen (keine Mail). Im Vercel-Log steht dann „[E-Mail] Nicht verschickt … Bisher 1 in dieser Instanz.", ohne Adresse.
 - [ ] **Stripe:** Ein Testkauf in der Testumgebung (Karte `4242 4242 4242 4242`). Der Endpunkt `test.farmerzone.at` zeigt in Stripe eine Zustellung mit 200.
@@ -97,4 +99,4 @@ Vercel → Settings → Environment Variables → „Add". Umgebung **Preview**,
 ## Nach der Live-Schaltung
 
 - Die Testumgebung bleibt im Testmodus: Sie erbt weiter die Test-Schlüssel von Preview (`stripe-live.md`, Schritt 5), ihr Webhook-Secret für `staging` bleibt.
-- Der Admin der echten Seite zeigt dann „Stripe Live" in Grün; „Zur Testumgebung" bleibt.
+- Der Admin der echten Seite zeigt dann „Stripe Live" in Grün.

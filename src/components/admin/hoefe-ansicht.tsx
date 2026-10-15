@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Check, ChevronRight, Ellipsis, Search, Store } from 'lucide-react'
+import { Check, ChevronRight, Ellipsis, Search, Star, Store } from 'lucide-react'
 import {
   HOF_FILTER_LABEL,
   HOF_FILTER_WERTE,
@@ -11,14 +11,26 @@ import {
   ONLINE_AUS_TEXT,
   SERVICEGEBUEHR_NUR_NEUE,
   filtereHoefe,
-  hoefeAdresse,
+  passtZurSuche,
   zaehleHofFilter,
   type AdminHofZeile,
 } from '@/lib/admin-hoefe'
+import {
+  GRUENDUNGSHOF_SPALTE,
+  HOEFE_SEITE,
+  gruendungshofZelle,
+  gruendungshoefeListe,
+  hoefeKennzahlen,
+  hoefeSeitenAdresse,
+  hoefeUnterreiter,
+  waehleHoefeReiter,
+  wartelistePlatzZeile,
+} from '@/lib/admin-hoefe-seite'
 import { hoefeAnsichtAus } from '@/schemas/admin-hoefe'
+import { hoefeReiterAus } from '@/schemas/admin-reiter'
 import { aktivitaetsTeile, istOhneInhalt, AKTIVITAET_LEER, type FarmAktivitaet } from '@/lib/farm-aktivitaet'
 import { DE_ADMIN_KLAERUNG, LAND_LABEL } from '@/lib/laender'
-import { GRUENDUNG_BIS_MARKE, GRUENDUNG_BIS_TITEL, KEIN_GRUENDUNGSPLATZ, type GruendungAnzeige } from '@/lib/gruendungshof'
+import { GRUENDUNG_BIS_MARKE, GRUENDUNG_BIS_TITEL, type GruendungAnzeige } from '@/lib/gruendungshof'
 import { HOFNAME_MAX } from '@/lib/eingabegrenzen'
 import { mitAnzahl } from '@/lib/format'
 import type { MeldungTon } from '@/lib/meldung'
@@ -35,26 +47,38 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { KARTE, KICKER, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
-import { HofKachel, SEITEN_TITEL } from './admin-teile'
+import { HofKachel } from './admin-teile'
+import { Kennzahlen } from './kennzahlen'
+import { Seitenkopf } from './seitenkopf'
+import { Unterreiter } from './unterreiter'
 import { HofAktionDialog, type HofAktion } from './hof-aktion-dialog'
 import { ServicegebuehrDialog } from './servicegebuehr-dialog'
 import { GruendungBisDialog, type GruendungsHof } from './gruendung-bis-dialog'
 
-/** `gruendung`: das wirksame Gründungs-Ende (Nr. 62), null ohne Gründungsplatz. */
-export type AdminHof = AdminHofZeile & { aktivitaet: FarmAktivitaet; gruendung: GruendungAnzeige | null }
+/**
+ * `gruendung`: das wirksame Gründungs-Ende (Nr. 62), null ohne Gründungsplatz.
+ * `platzBeiFreischaltung`: der Gründungsplatz, den ein wartender Hof bei
+ * sofortiger Freischaltung bekäme (Nr. 94, Register N15) — null für alle
+ * anderen und wenn alle Plätze vergeben sind.
+ */
+export type AdminHof = AdminHofZeile & { aktivitaet: FarmAktivitaet; gruendung: GruendungAnzeige | null; platzBeiFreischaltung: number | null }
 
 export type NeueMeldung = { id: string; art: string; artTon: MeldungTon; titel: string }
 
 /**
- * Höfe und Freischaltung (Nachtlauf Nr. 22f; Mockups
- * admin-hoefe-und-freischaltung, admin-mobil-unterwegs-freischalten): oben
- * die wartenden Höfe als Karten mit „Freischalten", darunter alle übrigen mit
- * Filter und Suche — ab 1024 px als Tabelle, darunter als Karten. Am Handy
- * steht zwischen beiden „Neu im Postfach".
+ * Höfe und Freischaltung (Nachtlauf Nr. 22f; seit Nr. 94 im Admin-Seitenmuster,
+ * Register N15; Mockups admin-hoefe-und-freischaltung,
+ * admin-mobil-unterwegs-freischalten): Seitenkopf mit Suche, Kennzahlen,
+ * Unterreiter „Warten auf Freischaltung · Alle Höfe · Gründungshöfe“, darunter
+ * der Inhalt des gewählten Reiters und die Regel-Zeile. Warten zeigt die
+ * wartenden Höfe als Karten mit „Freischalten“, Alle Höfe die Liste mit
+ * Filtern — ab 1024 px als Tabelle, darunter als Karten —, Gründungshöfe die
+ * Höfe mit Platz. Am Handy steht unter der Warteliste „Neu im Postfach“.
  *
- * Filter und Suche stehen in der Adresse und werden im Browser angewandt
- * (replaceState, kein Server-Aufruf je Tipp). Was eine Zeile sagt, entscheidet
- * src/lib/admin-hoefe.ts; die Wirkung die bestehenden Actions.
+ * Reiter, Filter und Suche stehen in der Adresse und werden im Browser
+ * angewandt (replaceState, kein Server-Aufruf je Tipp). Was eine Zeile sagt,
+ * entscheidet src/lib/admin-hoefe.ts, was die Kennzahlen und die Warteliste
+ * sagen src/lib/admin-hoefe-seite.ts; die Wirkung die bestehenden Actions.
  */
 export function HoefeAnsicht({
   hoefe,
@@ -67,7 +91,8 @@ export function HoefeAnsicht({
   maxPlaetze: number
   neueMeldungen: NeueMeldung[]
 }): React.JSX.Element {
-  const ansicht = hoefeAnsichtAus(useSearchParams())
+  const parameter = useSearchParams()
+  const ansicht = hoefeAnsichtAus(parameter)
   // Die Suche tippt lokal; die Adresse bekommt sie bereinigt mit.
   const [suche, setSuche] = useState(ansicht.suche)
   const [aktion, setAktion] = useState<HofAktion | null>(null)
@@ -76,61 +101,41 @@ export function HoefeAnsicht({
 
   const wartende = hoefe.filter((h) => h.status.id === 'wartet')
   const zahlen = zaehleHofFilter(hoefe)
-  const liste = filtereHoefe(hoefe, { filter: ansicht.filter, suche })
+  const reiter = waehleHoefeReiter(hoefeReiterAus(parameter), wartende.length)
+  const gruendungshoefe = gruendungshoefeListe(hoefe)
+  const liste = reiter === 'gruendung' ? filtereHoefe(gruendungshoefe, { filter: 'alle', suche }) : filtereHoefe(hoefe, { filter: ansicht.filter, suche })
+  const wartendeGefunden = wartende.filter((h) => passtZurSuche(h, suche))
+  const adresse = (neu: { reiter?: typeof reiter; filter?: typeof ansicht.filter; suche?: string }): string =>
+    hoefeSeitenAdresse({ reiter: neu.reiter ?? reiter, filter: neu.filter ?? ansicht.filter, suche: neu.suche ?? suche })
+  // Alle Hofzeilen derselben Art zeigen dieselbe Lage: ohne Treffer ein Satz mit Ausweg.
+  const keinTreffer = (
+    <EmptyState
+      symbol={Search}
+      titel="Kein Hof passt"
+      satz="Mit diesem Filter oder dieser Suche gibt es keinen Hof."
+      ausweg={
+        <Link
+          href={hoefeSeitenAdresse({ reiter, filter: 'alle', suche: '' })}
+          className={KNOPF_RAHMEN}
+          onNavigate={(e) => {
+            e.preventDefault()
+            setSuche('')
+            schreibeAdresse(hoefeSeitenAdresse({ reiter, filter: 'alle', suche: '' }))
+          }}
+        >
+          Alle Höfe zeigen
+        </Link>
+      }
+    />
+  )
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
-        <h1 className={SEITEN_TITEL}>Höfe</h1>
-        <p className={cn('text-[13px]', LEISE)}>
-          {maxPlaetze} Gründungsplätze · {vergebenePlaetze} vergeben
-        </p>
-      </header>
-
-      <section aria-labelledby="wartende-titel" className="flex flex-col gap-3">
-        <h2 id="wartende-titel" className={KICKER}>
-          Warten auf Freischaltung · {wartende.length}
-        </h2>
-        {wartende.length === 0 ? (
-          <p className={cn('text-[14px]', LEISE)}>Kein Hof wartet auf Freischaltung.</p>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {wartende.map((hof) => (
-              <li key={hof.id}>
-                <WartenderHof hof={hof} onAktion={setAktion} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {neueMeldungen.length > 0 && <NeuImBriefkasten meldungen={neueMeldungen} />}
-
-      <section aria-labelledby="alle-titel" className="flex flex-col gap-3">
-        <h2 id="alle-titel" className="sr-only">
-          Alle Höfe
-        </h2>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          <FilterChipReihe beschriftung="Höfe filtern" className="min-w-0 lg:flex-1">
-            {HOF_FILTER_WERTE.filter((f) => (f !== 'stillgelegt' && f !== 'online-aus') || zahlen[f] > 0).map((f) => {
-              const adresse = hoefeAdresse({ filter: f, suche })
-              return (
-                <FilterChip
-                  key={f}
-                  href={adresse}
-                  aktiv={ansicht.filter === f}
-                  onNavigate={(e) => {
-                    e.preventDefault()
-                    schreibeAdresse(adresse)
-                  }}
-                >
-                  {HOF_FILTER_LABEL[f]}
-                  <span className="ml-1 tabular-nums">· {zahlen[f]}</span>
-                </FilterChip>
-              )
-            })}
-          </FilterChipReihe>
-          <label className="relative block md:max-w-[340px] lg:w-[288px] lg:shrink-0">
+    <div className="flex flex-col gap-5">
+      <Seitenkopf
+        titel={HOEFE_SEITE.titel}
+        satz={HOEFE_SEITE.satz}
+        rechts={
+          <label className="relative block w-full md:w-[288px]">
             <span className="sr-only">Hof suchen</span>
             <Search
               className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -143,58 +148,104 @@ export function HoefeAnsicht({
               onChange={(e) => {
                 const wert = e.target.value.slice(0, HOFNAME_MAX)
                 setSuche(wert)
-                schreibeAdresse(hoefeAdresse({ filter: ansicht.filter, suche: wert }))
+                schreibeAdresse(adresse({ suche: wert }))
               }}
               placeholder="Hof suchen …"
               className={cn(
-                'h-11 w-full rounded-full border border-border bg-card pr-4 pl-10 text-base text-foreground placeholder:text-muted-foreground md:h-10 md:text-[13.5px]',
+                'h-11 w-full rounded-full border border-border bg-card pr-4 pl-10 text-base text-foreground placeholder:text-muted-foreground md:text-[13.5px]',
                 FOKUS_RAHMEN
               )}
             />
           </label>
-        </div>
+        }
+      />
 
-        <p className={cn('text-[13px]', LEISE)} aria-live="polite">
-          {mitAnzahl(liste.length, 'Hof', 'Höfe')}
-        </p>
+      <Kennzahlen beschriftung={HOEFE_SEITE.kennzahlen} eintraege={hoefeKennzahlen(hoefe, { vergeben: vergebenePlaetze, max: maxPlaetze })} />
 
-        {zahlen.alle === 0 ? (
-          <EmptyState
-            symbol={Store}
-            titel="Noch kein Hof freigeschaltet"
-            satz="Sobald du einen wartenden Hof freischaltest, steht er hier mit Servicegebühr und Bestellungen."
-            ausweg={{ ohne: 'Freischalten steht direkt darüber in „Warten auf Freischaltung“ (der Satz sagt es); die Liste darunter ist leer, weil noch kein Hof freigeschaltet ist' }}
-          />
-        ) : liste.length === 0 ? (
-          <EmptyState
-            symbol={Search}
-            titel="Kein Hof passt"
-            satz="Mit diesem Filter oder dieser Suche gibt es keinen Hof."
-            ausweg={
-              <Link
-                href="/admin"
-                className={KNOPF_RAHMEN}
-                onNavigate={(e) => {
-                  e.preventDefault()
-                  setSuche('')
-                  schreibeAdresse('/admin')
-                }}
-              >
-                Alle Höfe zeigen
-              </Link>
-            }
-          />
-        ) : (
-          <>
-            <Tabelle hoefe={liste} onGebuehr={setGebuehrHof} onGruendung={setGruendungHof} onAktion={setAktion} />
-            <Karten hoefe={liste} onGebuehr={setGebuehrHof} onGruendung={setGruendungHof} onAktion={setAktion} />
-          </>
-        )}
+      <Unterreiter
+        beschriftung={HOEFE_SEITE.reiter}
+        eintraege={hoefeUnterreiter({ wartende: wartende.length, alle: zahlen.alle, gruendungshoefe: gruendungshoefe.length, maxPlaetze, suche })}
+        aktiv={reiter}
+        onNavigate={(e, eintrag) => {
+          e.preventDefault()
+          schreibeAdresse(eintrag.href)
+        }}
+      />
 
-        <p className={cn('text-[12.5px] leading-relaxed', LEISE)}>
-          {SERVICEGEBUEHR_NUR_NEUE} {NUMMER_HINWEIS}
-        </p>
-      </section>
+      {reiter === 'warten' && (
+        <section aria-labelledby="warten-titel" className="flex flex-col gap-3">
+          <h2 id="warten-titel" className="sr-only">
+            Warten auf Freischaltung
+          </h2>
+          {wartende.length === 0 ? (
+            <p className={cn('text-[14px]', LEISE)}>{HOEFE_SEITE.keineWartenden}</p>
+          ) : wartendeGefunden.length === 0 ? (
+            keinTreffer
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {wartendeGefunden.map((hof) => (
+                <li key={hof.id}>
+                  <WartenderHof hof={hof} onAktion={setAktion} />
+                </li>
+              ))}
+            </ul>
+          )}
+          {neueMeldungen.length > 0 && <NeuImBriefkasten meldungen={neueMeldungen} />}
+        </section>
+      )}
+
+      {reiter !== 'warten' && (
+        <section aria-labelledby="liste-titel" className="flex flex-col gap-3">
+          <h2 id="liste-titel" className="sr-only">
+            {reiter === 'alle' ? 'Alle Höfe' : 'Gründungshöfe'}
+          </h2>
+          {reiter === 'alle' && (
+            <FilterChipReihe beschriftung="Höfe filtern">
+              {HOF_FILTER_WERTE.filter((f) => (f !== 'stillgelegt' && f !== 'online-aus') || zahlen[f] > 0).map((f) => {
+                const ziel = adresse({ filter: f })
+                return (
+                  <FilterChip
+                    key={f}
+                    href={ziel}
+                    aktiv={ansicht.filter === f}
+                    onNavigate={(e) => {
+                      e.preventDefault()
+                      schreibeAdresse(ziel)
+                    }}
+                  >
+                    {HOF_FILTER_LABEL[f]}
+                    <span className="ml-1 tabular-nums">· {zahlen[f]}</span>
+                  </FilterChip>
+                )
+              })}
+            </FilterChipReihe>
+          )}
+
+          <p className={cn('text-[13px]', LEISE)} aria-live="polite">
+            {mitAnzahl(liste.length, 'Hof', 'Höfe')}
+          </p>
+
+          {zahlen.alle === 0 ? (
+            <EmptyState
+              symbol={Store}
+              titel="Noch kein Hof freigeschaltet"
+              satz="Sobald du einen wartenden Hof freischaltest, steht er hier mit Servicegebühr und Bestellungen."
+              ausweg={{ ohne: 'Freischalten steht im Reiter „Warten auf Freischaltung“ (der Satz sagt es); die Liste hier ist leer, weil noch kein Hof freigeschaltet ist' }}
+            />
+          ) : liste.length === 0 ? (
+            keinTreffer
+          ) : (
+            <>
+              <Tabelle hoefe={liste} onGebuehr={setGebuehrHof} onGruendung={setGruendungHof} onAktion={setAktion} />
+              <Karten hoefe={liste} onGebuehr={setGebuehrHof} onGruendung={setGruendungHof} onAktion={setAktion} />
+            </>
+          )}
+        </section>
+      )}
+
+      <p className={cn('text-[12.5px] leading-relaxed', LEISE)}>
+        {HOEFE_SEITE.regel} {SERVICEGEBUEHR_NUR_NEUE} {NUMMER_HINWEIS}
+      </p>
 
       <HofAktionDialog aktion={aktion} vergebenePlaetze={vergebenePlaetze} onClose={() => setAktion(null)} />
       <ServicegebuehrDialog hof={gebuehrHof} onClose={() => setGebuehrHof(null)} />
@@ -215,6 +266,8 @@ function WartenderHof({ hof, onAktion }: { hof: AdminHof; onAktion: (a: HofAktio
   // Ohne Stripe steht der Grund darunter orange (hof.sperre, Register Z1).
   const zahlung = hof.stripeBereit ? ['Stripe eingerichtet', ...(hof.onlineAn ? [] : [ONLINE_AUS_TEXT])] : []
   const angaben = [...teile, ...zahlung, ...(hof.sepaErteilt ? ['SEPA erteilt'] : [])]
+  // Der Gründungsplatz bei Freischaltung (Register N15): mit Stripe der Platz, sonst der Hinweis; keine Zeile, wenn alle Plätze vergeben sind.
+  const platzZeile = wartelistePlatzZeile(hof, hof.platzBeiFreischaltung)
   return (
     <article
       aria-label={hof.name}
@@ -245,6 +298,12 @@ function WartenderHof({ hof, onAktion }: { hof: AdminHof; onAktion: (a: HofAktio
             ))}
           </p>
           {hof.sperre && <p className="mt-0.5 text-[13px] font-medium text-status-offen">{hof.sperre}</p>}
+          {platzZeile && (
+            <p className={cn('mt-1 flex items-center gap-1.5 text-[12.5px]', platzZeile.art === 'bekaeme' ? 'font-semibold text-status-offen' : 'font-medium text-muted-foreground')}>
+              {platzZeile.art === 'bekaeme' && <Star className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />}
+              {platzZeile.text}
+            </p>
+          )}
           <p className={cn('mt-0.5 flex flex-wrap gap-x-3 text-[12.5px]', LEISE)}>
             <span>E-Mail bestätigt: {hof.emailBestaetigtText}</span>
             {hof.nummer && <span>Betriebsnummer {hof.nummer}</span>}
@@ -314,31 +373,31 @@ function gruendungMarke(gruendung: GruendungAnzeige): string {
   return gruendung.abweichend ? GRUENDUNG_BIS_MARKE.abweichend : GRUENDUNG_BIS_MARKE.standard
 }
 
-/** Die Zelle „Gründungshof bis": Datum, darunter die Marke, daneben „ändern" — ohne Platz ein Strich. */
+/**
+ * Die Zelle „Gründungshof“ (Register N15, Mockup): „Nr. 3 · bis 30.06.2027“,
+ * darunter leise die Marke „Standard“ bzw. „abweichend“, daneben „ändern“ —
+ * ohne Platz „kein Gründungshof“.
+ */
 function GruendungZelle({ hof, onGruendung }: { hof: AdminHof; onGruendung: (hof: GruendungsHof) => void }): React.JSX.Element {
+  const zelle = gruendungshofZelle(hof)
   const gruendung = hof.gruendung
-  if (!gruendung) {
-    return (
-      <>
-        <span aria-hidden="true">–</span>
-        <span className="sr-only">{KEIN_GRUENDUNGSPLATZ}</span>
-      </>
-    )
-  }
+  if (!zelle) return <span className={LEISE}>{GRUENDUNGSHOF_SPALTE.kein}</span>
   return (
     <span className="inline-flex items-center gap-1.5">
-      {/* Mindestbreite des längsten Datums („31. Dezember 2027"), damit „ändern" in jeder Zeile gleich steht. */}
-      <span className="flex min-w-32 flex-col leading-tight">
-        <span className="text-foreground">{gruendung.bisText}</span>
-        <span className={cn('text-[12px]', LEISE)}>{gruendungMarke(gruendung)}</span>
+      {/* Mindestbreite des längsten Textes („Nr. 12 · bis 31.12.2027“), damit „ändern“ in jeder Zeile gleich steht. */}
+      <span className="flex min-w-40 flex-col leading-tight">
+        <span className="text-foreground">{zelle.text}</span>
+        {zelle.marke && <span className={cn('text-[12px]', LEISE)}>{zelle.marke}</span>}
       </span>
-      <button
-        type="button"
-        onClick={() => onGruendung({ id: hof.id, name: hof.name, gruendung })}
-        className={cn('min-h-11 rounded-full px-2 text-[13px] font-medium text-status-fertig hover:bg-muted', FOKUS_RAHMEN)}
-      >
-        ändern<span className="sr-only"> ({GRUENDUNG_BIS_TITEL} {hof.name})</span>
-      </button>
+      {gruendung && (
+        <button
+          type="button"
+          onClick={() => onGruendung({ id: hof.id, name: hof.name, gruendung })}
+          className={cn('min-h-11 rounded-full px-2 text-[13px] font-medium text-status-fertig hover:bg-muted', FOKUS_RAHMEN)}
+        >
+          ändern<span className="sr-only"> ({GRUENDUNG_BIS_TITEL} {hof.name})</span>
+        </button>
+      )}
     </span>
   )
 }
@@ -358,10 +417,7 @@ function Tabelle({ hoefe, onGebuehr, onGruendung, onAktion }: ZeilenProps): Reac
               Status
             </th>
             <th scope="col" className={kopf}>
-              Platz
-            </th>
-            <th scope="col" className={kopf}>
-              {GRUENDUNG_BIS_TITEL}
+              {GRUENDUNGSHOF_SPALTE.titel}
             </th>
             <th scope="col" className={kopf}>
               Servicegebühr
@@ -394,7 +450,6 @@ function Tabelle({ hoefe, onGebuehr, onGruendung, onAktion }: ZeilenProps): Reac
               <td className="px-3.5 py-2.5">
                 <StatusBadge status={hof.status.ton}>{hof.status.text}</StatusBadge>
               </td>
-              <td className="px-3.5 py-2.5 whitespace-nowrap tabular-nums">{hof.gruendungsplatz !== null ? `#${hof.gruendungsplatz}` : '–'}</td>
               <td className="px-3.5 py-1.5 whitespace-nowrap">
                 <GruendungZelle hof={hof} onGruendung={onGruendung} />
               </td>
@@ -453,8 +508,8 @@ function Karten({ hoefe, onGebuehr, onGruendung, onAktion }: ZeilenProps): React
           </div>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[13px] sm:grid-cols-4">
             <div>
-              <dt className={LEISE}>Platz</dt>
-              <dd className="text-foreground tabular-nums">{hof.gruendungsplatz !== null ? `#${hof.gruendungsplatz}` : '–'}</dd>
+              <dt className={LEISE}>{GRUENDUNGSHOF_SPALTE.titel}</dt>
+              <dd className="text-foreground">{hof.gruendungsplatz !== null ? `Nr. ${hof.gruendungsplatz}` : GRUENDUNGSHOF_SPALTE.kein}</dd>
             </div>
             <div>
               <dt className={LEISE}>Bestellungen im Monat</dt>

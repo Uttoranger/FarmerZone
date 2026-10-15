@@ -68,6 +68,8 @@ vi.mock('@/server/queries/auswertung', () => ({
 vi.mock('@/server/queries/teilen-wirkung', () => ({ getTeilenWirkung: vi.fn(async () => ({ besuche: 0, kanaele: [] })) }))
 vi.mock('@/server/queries/testzahlungen', () => ({ testzahlungenHinweisFuerHof: vi.fn(async () => zustand.hinweis) }))
 
+// Die Zahl der Gründungshöfe für die Kachel „Grundgebühren“ (Nr. 94) — ohne Bezug zur Zeile.
+vi.mock('@/server/queries/admin', () => ({ ladeHoefeFuerGruendung: vi.fn(async () => []) }))
 vi.mock('@/server/queries/finanzen', () => ({
   aktuellerFinanzMonat: () => '2026-11',
   getFinanzen: vi.fn(async () => ({

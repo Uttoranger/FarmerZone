@@ -3,12 +3,14 @@
  * mit renderToStaticMarkup.
  *
  * Beweist:
- *  - AdminShell: Marke „Stripe Live"/„Stripe Test" und der Link „Zur
- *    Testumgebung" — nur mit Marke bzw. Adresse; ohne beides keine Leiste.
+ *  - AdminShell: Marke „Stripe Live"/„Stripe Test" — nur mit Marke, ohne
+ *    keine Leiste. Den Link „Zur Testumgebung" gibt es seit der Z3-Korrektur
+ *    (15.10.2026, Nr. 94) nicht mehr: Die Testumgebung wurde nie eingerichtet.
  *  - Umgebungsbanner: „Zur echten Seite" nur in der Vorschau; lokal steht das
  *    Banner ohne Link, in der Produktion gibt es keines.
- *  - Verdrahtung: Marke und Adresse entstehen in umgebung-server.ts aus
- *    bestimmeUmgebung und gehen als Props an die Shell; die Shell liest nichts selbst.
+ *  - Verdrahtung: Die Marke entsteht in umgebung-server.ts aus bestimmeUmgebung
+ *    und geht als Prop an die Shell; die Shell liest nichts selbst. Die Adresse
+ *    TESTUMGEBUNG_URL bleibt dort (Link nur mit Variable), die Shell bekommt sie nicht.
  *
  * Jede Prüfung hat ihre Gegenprobe aus derselben Komponente.
  */
@@ -37,7 +39,6 @@ vi.mock('@/lib/umgebung-server', () => ({
 
 import { AdminShell, type AdminShellProps } from '@/components/shells/admin-shell'
 import { UmgebungsBanner, UmgebungsBannerLink } from '@/components/shared/umgebungs-banner'
-import { ADMIN_TESTUMGEBUNG } from '@/lib/admin-navigation'
 import { STRIPE_MARKE_TEXT, ZUR_ECHTEN_SEITE } from '@/lib/testumgebung'
 
 const WURZEL = process.cwd()
@@ -52,7 +53,7 @@ afterEach(() => {
 
 // ─── AdminShell ──────────────────────────────────────────────────────────────
 
-describe('AdminShell: Marke und Link zur Testumgebung', () => {
+describe('AdminShell: Marke des Stripe-Modus', () => {
   const shell = (props: Partial<AdminShellProps>) =>
     renderToStaticMarkup(
       createElement(
@@ -72,34 +73,20 @@ describe('AdminShell: Marke und Link zur Testumgebung', () => {
     expect(html).toMatch(/data-status="fertig"[^>]*><span[^>]*>Stripe Live<\/span>/)
   })
 
-  it('verlinkt „Zur Testumgebung" auf die Adresse aus der Variable', () => {
-    const html = shell({ stripeMarke: { text: STRIPE_MARKE_TEXT.test, ton: 'offen' }, testumgebungUrl: TESTUMGEBUNG })
-    const link = html.slice(html.indexOf(`<a href="${TESTUMGEBUNG}"`))
-    expect(link.slice(0, link.indexOf('</a>'))).toContain(ADMIN_TESTUMGEBUNG.label)
-    expect(html).toContain('lucide-flask-conical')
-  })
-
-  it('Gegenprobe: ohne Variable kein Link — die Marke bleibt', () => {
-    const html = shell({ stripeMarke: { text: STRIPE_MARKE_TEXT.test, ton: 'offen' }, testumgebungUrl: null })
-    expect(html).not.toContain(ADMIN_TESTUMGEBUNG.label)
+  it('kein Weg zur Testumgebung in der Betriebsleiste — auch nicht, wenn jemand eine Adresse hineinreicht', () => {
+    const html = shell({ stripeMarke: { text: STRIPE_MARKE_TEXT.test, ton: 'offen' }, testumgebungUrl: TESTUMGEBUNG } as Partial<AdminShellProps>)
+    expect(html).not.toContain(TESTUMGEBUNG)
+    expect(html).not.toContain('Zur Testumgebung')
     expect(html).not.toContain('lucide-flask-conical')
     expect(html).toContain('Stripe Test')
   })
 
-  it('Gegenprobe: ohne Marke und ohne Adresse weder Marke noch Link — die Shell ist da', () => {
+  it('Gegenprobe: ohne Marke keine Betriebsleiste — die Shell ist da', () => {
     const html = shell({})
     expect(html).not.toContain('Stripe Test')
     expect(html).not.toContain('Stripe Live')
-    expect(html).not.toContain(ADMIN_TESTUMGEBUNG.label)
     expect(html).toContain('Inhalt der Seite')
     expect(html).toContain('Admin-Bereiche')
-  })
-
-  it('der Link bleibt im selben Tab — wie jeder Weg der Shell', () => {
-    const html = shell({ testumgebungUrl: TESTUMGEBUNG })
-    const start = html.indexOf(`<a href="${TESTUMGEBUNG}"`)
-    expect(start).toBeGreaterThan(-1)
-    expect(html.slice(start, html.indexOf('>', start))).not.toContain('target=')
   })
 })
 
@@ -213,15 +200,17 @@ describe('Marke und Adresse entstehen auf dem Server', () => {
     expect(w.TESTUMGEBUNG_URL).toBeNull()
   })
 
-  it('das Admin-Layout reicht beides als Prop an die Shell, die Shell liest nichts selbst', () => {
+  it('das Admin-Layout reicht nur die Marke als Prop an die Shell, die Shell liest nichts selbst', () => {
     const layout = quelle('src/app/admin/layout.tsx')
     expect(layout).toContain('stripeMarke={STRIPE_MARKE}')
-    expect(layout).toContain('testumgebungUrl={TESTUMGEBUNG_URL}')
+    // Seit der Z3-Korrektur (Nr. 94) bekommt die Shell keine Adresse der Testumgebung.
+    expect(layout).not.toMatch(/TESTUMGEBUNG_URL|testumgebungUrl/)
     expect(quelle('src/lib/umgebung-server.ts')).toContain('stripeMarke(UMGEBUNG)')
+    // Die Variable bleibt lesbar (Link nur mit Variable), nur nicht in der Shell.
     expect(quelle('src/lib/umgebung-server.ts')).toContain('NEXT_PUBLIC_TESTUMGEBUNG_URL: env.NEXT_PUBLIC_TESTUMGEBUNG_URL')
     // Ohne Kommentare: Die dürfen erzählen, woher ein Wert kommt.
     const shellQuelle = ohneKommentare(quelle('src/components/shells/admin-shell.tsx'))
-    expect(shellQuelle).not.toMatch(/umgebung-server|process\.env|NEXT_PUBLIC_TESTUMGEBUNG_URL/)
+    expect(shellQuelle).not.toMatch(/umgebung-server|process\.env|NEXT_PUBLIC_TESTUMGEBUNG_URL|testumgebungUrl/)
     // Gegenprobe: Die Suche schlägt an, wo die Variable tatsächlich gelesen wird.
     expect(quelle('src/lib/umgebung-server.ts')).toMatch(/NEXT_PUBLIC_TESTUMGEBUNG_URL/)
   })

@@ -3,8 +3,9 @@ import * as Sentry from '@sentry/nextjs'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { getAdminFarms } from '@/server/queries/admin'
 import { getMeldungenFuerAdmin } from '@/server/queries/meldung'
-import { gruendungsplaetze, vergebeneGruendungsplaetze, MAX_GRUENDUNGSHOEFE } from '@/lib/gruendungshof'
+import { gruendungsplaetze, MAX_GRUENDUNGSHOEFE } from '@/lib/gruendungshof'
 import { adminHofZeile } from '@/lib/admin-hoefe'
+import { platzBeiFreischaltung } from '@/lib/admin-hoefe-seite'
 import { MELDUNG_ART_LABEL, STATUS_ZU_ENTSCHEIDEN } from '@/lib/meldung'
 import { MELDUNG_ART_TON } from '@/lib/hof-hilfe'
 import { HoefeAnsicht, type AdminHof, type NeueMeldung } from '@/components/admin/hoefe-ansicht'
@@ -17,10 +18,17 @@ export const dynamic = 'force-dynamic'
 /** So viele Meldungen zeigt „Neu im Briefkasten" am Handy — der Rest steht im Briefkasten. */
 const NEU_IM_BRIEFKASTEN = 3
 
+/**
+ * Wie viele Gründungsplätze es gibt — an genau EINER Stelle der Seite (Register
+ * K2). Bis Nr. 93 gemergt ist; danach aus ladePlattformEinstellung.
+ */
+const MAX_PLAETZE = MAX_GRUENDUNGSHOEFE
+
 /*
- * /admin — Höfe und Freischaltung in der AdminShell (Nachtlauf Nr. 22f).
- * Die Shell kommt aus src/app/admin/layout.tsx; die Seite prüft trotzdem
- * selbst und zuerst (verlangeAdminSeite, frisch aus der Datenbank).
+ * /admin — Höfe und Freischaltung in der AdminShell (Nachtlauf Nr. 22f), seit
+ * Nr. 94 im Seitenmuster (Register N15): Kennzahlen, Unterreiter, Inhalt. Die
+ * Shell kommt aus src/app/admin/layout.tsx; die Seite prüft trotzdem selbst
+ * und zuerst (verlangeAdminSeite, frisch aus der Datenbank).
  */
 export default async function AdminPage(): Promise<React.JSX.Element> {
   await verlangeAdminSeite()
@@ -37,12 +45,14 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
     const plaetze = gruendungsplaetze(farms)
     daten = {
       hoefe: farms.map((f) => ({
-        ...adminHofZeile(f, { gruendungsplatz: plaetze.get(f.id) ?? null, maxPlaetze: MAX_GRUENDUNGSHOEFE }, jetzt),
+        ...adminHofZeile(f, { gruendungsplatz: plaetze.get(f.id) ?? null, maxPlaetze: MAX_PLAETZE }, jetzt),
         aktivitaet: f.aktivitaet,
         // Das wirksame Gründungs-Ende, fertig aus getAdminFarms (Nr. 62).
         gruendung: f.gruendung,
+        // Nur wartende Höfe: der Platz, den sie bei sofortiger Freischaltung bekämen (Warteliste).
+        platzBeiFreischaltung: f.approvedAt === null && f.archivedAt === null ? platzBeiFreischaltung(f.id, farms, jetzt, MAX_PLAETZE) : null,
       })),
-      vergeben: vergebeneGruendungsplaetze(farms),
+      vergeben: Math.min(plaetze.size, MAX_PLAETZE),
       neu: zuEntscheiden.slice(0, NEU_IM_BRIEFKASTEN).map((m) => ({
         id: m.id,
         art: MELDUNG_ART_LABEL[m.art],
@@ -58,7 +68,7 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
   return (
     <div className={ADMIN_RAHMEN}>
       {daten ? (
-        <HoefeAnsicht hoefe={daten.hoefe} vergebenePlaetze={daten.vergeben} maxPlaetze={MAX_GRUENDUNGSHOEFE} neueMeldungen={daten.neu} />
+        <HoefeAnsicht hoefe={daten.hoefe} vergebenePlaetze={daten.vergeben} maxPlaetze={MAX_PLAETZE} neueMeldungen={daten.neu} />
       ) : (
         <AdminFehler titel="Höfe" satz="Wir konnten die Höfe gerade nicht laden." nochmal="/admin" />
       )}
