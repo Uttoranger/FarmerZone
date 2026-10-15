@@ -45,6 +45,7 @@ vi.mock('@/lib/stripe', () => ({
   stripe: { refunds: { create: vi.fn(), list: vi.fn(async () => ({ data: [], has_more: false })) } },
 }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
+vi.mock('@/server/queries/postfach', () => ({ ladeBetreiberEmpfaenger: vi.fn(async () => ['support@example.com']) }))
 vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
 vi.mock('@/lib/email', () => ({
   sendOrderReady: vi.fn(),
@@ -122,7 +123,9 @@ function datenbankMit(satz: ReturnType<typeof bestellung>) {
     data: Record<string, unknown>
   }) => {
     if (arg.where.status?.notIn?.includes(satz.status)) return { count: 0 }
-    satz.status = String(arg.data.status)
+    // Der Statuswechsel setzt den Status; der Vermerk „Erstattung offen" (Nr. 95) nur seine Spalte.
+    if ('status' in arg.data) satz.status = String(arg.data.status)
+    else Object.assign(satz, arg.data)
     return { count: 1 }
   }) as never)
   vi.mocked(prisma.order.update).mockImplementation((async (arg: { data: Record<string, unknown> }) => {

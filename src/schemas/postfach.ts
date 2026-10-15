@@ -1,5 +1,19 @@
 import { z } from 'zod'
-import { LINK_MAX, POSTFACH_FEHLER, TEXT_MAX, TITEL_MAX, appPfadAusLink } from '@/lib/postfach'
+import {
+  ADMIN_POSTFACH_REITER_IDS,
+  EINGANG_ARTEN,
+  EINGANG_FILTER_IDS,
+  LINK_MAX,
+  POSTFACH_FEHLER,
+  TEXT_MAX,
+  TITEL_MAX,
+  appPfadAusLink,
+  type AdminPostfachReiter,
+  type EingangAuswahl,
+  type EingangFilter,
+} from '@/lib/postfach'
+import { TOKEN_MUSTER, ZUSTELLUNG_FEHLER, type SchaltbareArt } from '@/lib/zustellung'
+import { emailSchema } from '@/schemas/email'
 
 /**
  * Die Grenzen des Postfachs (Register N12, Nr. 87) — für die Server Actions
@@ -80,9 +94,80 @@ export const rundschreibenSchema = z.strictObject({
   art: z.enum(RUNDSCHREIBEN_ARTEN, POSTFACH_FEHLER.eingabe),
   link: linkSchema,
   perMail: z.boolean(POSTFACH_FEHLER.eingabe),
+  /** „Antwort möglich" (Register N14): Pflicht — das Formular setzt den Standard nach Art, der Server übernimmt nur, was kam. */
+  antwortMoeglich: z.boolean(POSTFACH_FEHLER.eingabe),
   empfaenger: empfaengerRegelSchema,
 })
 
 export type HofAntwort = z.infer<typeof hofAntwortSchema>
 export type TeamAntwort = z.input<typeof teamAntwortSchema>
 export type RundschreibenEingabe = z.input<typeof rundschreibenSchema>
+
+// ─── Admin-Postfach: Adresse (Register N12-Änderung, N14; Nr. 95) ───────────
+
+/** Der erste Wert, wenn Next einen doppelten Parameter als Liste liefert. */
+function ersterWert(wert: unknown): unknown {
+  return Array.isArray(wert) ? wert[0] : wert
+}
+
+/** Der Reiter aus ?reiter= — unbekannt oder leer heißt „Eingang", nie ein Fehler (wie src/schemas/admin-reiter.ts). */
+export const adminPostfachReiterSchema = z.preprocess(ersterWert, z.enum(ADMIN_POSTFACH_REITER_IDS).catch('eingang'))
+
+export function adminPostfachReiterAus(wert: string | string[] | undefined): AdminPostfachReiter {
+  return adminPostfachReiterSchema.parse(wert)
+}
+
+/** Der Filter des Eingangs aus ?art= — unbekannt oder leer heißt „Offen". */
+export const eingangFilterSchema = z.preprocess(ersterWert, z.enum(EINGANG_FILTER_IDS).catch('offen'))
+
+export function eingangFilterAus(wert: string | string[] | undefined): EingangFilter {
+  return eingangFilterSchema.parse(wert)
+}
+
+/**
+ * Die gewählte Zeile aus ?id= („hof-ck…") bzw. aus ?meldung= (Umleitung von
+ * /admin/meldungen/[id]: dort darf auch die Kurznummer stehen). Als Kennung
+ * nur Buchstaben, Ziffern, „-" und „_" (cuid, Kurznummer, Seed-Kennungen);
+ * die Art steht vor dem ersten „-". Alles andere öffnet nichts.
+ */
+const KENNUNG = /^[A-Za-z0-9_-]{1,60}$/
+const auswahlSchema = z.string().regex(new RegExp(`^(${EINGANG_ARTEN.join('|')})-([A-Za-z0-9_-]{1,60})$`))
+
+export function eingangAuswahlAus(id: string | string[] | undefined, meldung: string | string[] | undefined): EingangAuswahl | null {
+  const roh = auswahlSchema.safeParse(ersterWert(id))
+  if (roh.success) {
+    const trenner = roh.data.indexOf('-')
+    const art = EINGANG_ARTEN.find((a) => a === roh.data.slice(0, trenner))
+    if (art) return { art, id: roh.data.slice(trenner + 1) }
+  }
+  const alt = z.string().regex(KENNUNG).safeParse(ersterWert(meldung))
+  return alt.success ? { art: 'meldung', id: alt.data } : null
+}
+
+/** Der Faden aus der alten Adresse ?reiter=unterhaltungen&faden= — nur eine Kennung, sonst ohne Faden umleiten. */
+export function fadenKennungAus(wert: string | string[] | undefined): string | undefined {
+  const faden = z.string().regex(KENNUNG).safeParse(ersterWert(wert))
+  return faden.success ? faden.data : undefined
+}
+
+// ─── Zustellung (Register N14, Nr. 95) ───────────────────────────────────────
+
+/** Eine weitere Adresse: klein, ohne Ränder, höchstens 254 Zeichen (emailSchema). */
+export const empfaengerHinzufuegenSchema = z.strictObject({
+  email: emailSchema(ZUSTELLUNG_FEHLER.email),
+})
+
+export const empfaengerEntfernenSchema = z.strictObject({
+  id: z.cuid(ZUSTELLUNG_FEHLER.eingabe),
+})
+
+/** Die schaltbaren Regeln beim Speichern — streng: jede Art genau einmal als Wahrheitswert. */
+export const zustellRegelnSpeichernSchema = z.strictObject({
+  fehlermeldung: z.boolean(ZUSTELLUNG_FEHLER.eingabe),
+  hofWartet: z.boolean(ZUSTELLUNG_FEHLER.eingabe),
+  antwortHof: z.boolean(ZUSTELLUNG_FEHLER.eingabe),
+  wochenbericht: z.boolean(ZUSTELLUNG_FEHLER.eingabe),
+}) satisfies z.ZodType<Record<SchaltbareArt, boolean>>
+
+/** Der Token aus dem Link der Bestätigungsmail (genau 43 Zeichen base64url). */
+export const empfaengerTokenSchema = z.string().regex(TOKEN_MUSTER)

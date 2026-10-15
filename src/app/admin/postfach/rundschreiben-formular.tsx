@@ -11,6 +11,7 @@ import {
   POSTFACH_TEXT,
   TEXT_MAX,
   TITEL_MAX,
+  antwortMoeglichStandard,
   appPfadAusLink,
   gesendetText,
   sendenText,
@@ -58,8 +59,10 @@ function WahlPille({
  * „Neues Rundschreiben" (Register N12, Nr. 87; Mockup admin-rundschreiben):
  * Empfänger alle / ausgewählte (Hofsuche, auch genau einer) / ohne
  * Online-Zahlung / Futter ohne Nummer, Art Info/Wichtig, Titel, Text, Link,
- * „Auch per E-Mail schicken – Betriebsmitteilung", die Vorschau „So sieht’s
- * der Hof" und „An n Höfe senden". Die Zahlen je Filter kommen vom Server;
+ * „Antwort möglich" (N14, Nr. 95: Standard nach Art — Wichtig an, Info aus —,
+ * beim Wechsel der Art neu gesetzt, danach änderbar), „Auch per E-Mail
+ * schicken – Betriebsmitteilung", die Vorschau „So sieht’s der Hof" und „An n
+ * Höfe senden". Die Zahlen je Filter kommen vom Server;
  * welche Höfe es trifft, rechnet beim Senden der Server noch einmal. Kein
  * maxLength — die Zähler sagen Bescheid, die Grenzen prüft das Schema.
  */
@@ -73,6 +76,7 @@ export function RundschreibenFormular({ hoefe, zahlen }: { hoefe: readonly Hof[]
   const [text, setText] = useState('')
   const [link, setLink] = useState('')
   const [perMail, setPerMail] = useState(false)
+  const [antwortMoeglich, setAntwortMoeglich] = useState(antwortMoeglichStandard('INFO'))
   const [meldung, setMeldung] = useState<{ art: 'ok' | 'fehler'; text: string } | null>(null)
   const [laeuft, starte] = useTransition()
 
@@ -91,7 +95,7 @@ export function RundschreibenFormular({ hoefe, zahlen }: { hoefe: readonly Hof[]
     if (laeuft) return
     const empfaenger: EmpfaengerRegel = an === 'ausgewaehlt' ? { art: 'ausgewaehlt', hofIds: gewaehlt } : { art: an }
     starte(async () => {
-      const ergebnis = await sendeRundschreiben({ titel, text, art: wichtig ? 'WICHTIG' : 'INFO', link, perMail, empfaenger })
+      const ergebnis = await sendeRundschreiben({ titel, text, art: wichtig ? 'WICHTIG' : 'INFO', link, perMail, antwortMoeglich, empfaenger })
       if ('error' in ergebnis) {
         setMeldung({ art: 'fehler', text: ergebnis.error })
         return
@@ -102,6 +106,7 @@ export function RundschreibenFormular({ hoefe, zahlen }: { hoefe: readonly Hof[]
       setLink('')
       setPerMail(false)
       setWichtig(false)
+      setAntwortMoeglich(antwortMoeglichStandard('INFO'))
       setGewaehlt([])
       setSuche('')
     })
@@ -187,10 +192,24 @@ export function RundschreibenFormular({ hoefe, zahlen }: { hoefe: readonly Hof[]
       <fieldset className="flex flex-col gap-2">
         <legend className={cn(BESCHRIFTUNG, 'mb-2')}>{ADMIN_POSTFACH_TEXT.art}</legend>
         <div className="flex flex-wrap gap-2">
-          <WahlPille name={`${id}-art`} gewaehlt={!wichtig} onWahl={() => setWichtig(false)}>
+          <WahlPille
+            name={`${id}-art`}
+            gewaehlt={!wichtig}
+            onWahl={() => {
+              setWichtig(false)
+              setAntwortMoeglich(antwortMoeglichStandard('INFO'))
+            }}
+          >
             {ADMIN_POSTFACH_TEXT.info}
           </WahlPille>
-          <WahlPille name={`${id}-art`} gewaehlt={wichtig} onWahl={() => setWichtig(true)}>
+          <WahlPille
+            name={`${id}-art`}
+            gewaehlt={wichtig}
+            onWahl={() => {
+              setWichtig(true)
+              setAntwortMoeglich(antwortMoeglichStandard('WICHTIG'))
+            }}
+          >
             {POSTFACH_TEXT.wichtig}
           </WahlPille>
         </div>
@@ -221,6 +240,14 @@ export function RundschreibenFormular({ hoefe, zahlen }: { hoefe: readonly Hof[]
           {ADMIN_POSTFACH_TEXT.linkHinweis}
         </p>
       </div>
+
+      <label className="flex items-start gap-2.5 rounded-xl border border-border px-3.5 py-3">
+        <input type="checkbox" checked={antwortMoeglich} onChange={(e) => setAntwortMoeglich(e.target.checked)} className="mt-0.5 size-4 shrink-0 accent-primary" />
+        <span className="flex flex-col gap-0.5">
+          <span className="text-sm font-semibold text-foreground">{ADMIN_POSTFACH_TEXT.antwortMoeglich}</span>
+          <span className="text-[12.5px] text-muted-foreground">{ADMIN_POSTFACH_TEXT.antwortMoeglichSatz}</span>
+        </span>
+      </label>
 
       <label className="flex items-start gap-2.5 rounded-xl border border-border px-3.5 py-3">
         <input type="checkbox" checked={perMail} onChange={(e) => setPerMail(e.target.checked)} className="mt-0.5 size-4 shrink-0 accent-primary" />

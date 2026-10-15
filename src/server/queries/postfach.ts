@@ -1,14 +1,46 @@
+import { createHash } from 'crypto'
+import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
 import { PRODUCT_CATEGORY_VALUES, istFuttermittel } from '@/lib/taxonomie'
 import {
+  MELDUNG_STATUS_OFFEN_IM_EINGANG,
   empfaengerArtAus,
   istNeuFuer,
+  offenGesamt,
   rundschreibenGelesen,
+  type EingangFilter,
+  type EingangMeldungRoh,
+  type EingangRoh,
+  type EingangZahlen,
   type EmpfaengerArt,
   type EmpfaengerHof,
+  type ErstattungAufgabeRoh,
   type FadenNachricht,
   type FadenRoh,
+  type HofAufgabeRoh,
 } from '@/lib/postfach'
+import {
+  ZUSTELL_STANDARD,
+  empfaengerFuer,
+  empfaengerZustand,
+  zustellRegelnAus,
+  type EmpfaengerZustand,
+  type ZustellArt,
+  type ZustellRegeln,
+} from '@/lib/zustellung'
+import { PLATTFORM_EINSTELLUNG_ID } from '@/lib/plattform-einstellung'
+import { MELDUNG_STATUS, STATUS_INTERN, kurznummer } from '@/lib/meldung'
+import { hatRegistrierung } from '@/lib/futter-registrierung'
+import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
+import { bestaetigungOffen } from '@/lib/email-bestaetigung'
+import { platzBeiFreischaltung } from '@/lib/admin-hoefe-seite'
+import { MAX_GRUENDUNGSHOEFE } from '@/lib/gruendungshof'
+import { stornoBetraege } from '@/lib/storno'
+import { alsCents } from '@/lib/order-totals'
+import { monatsgrenzenWien } from '@/lib/servicegebuehr'
+import { DEFAULT_SECTIONS, type SectionConfig } from '@/server/queries/appearance'
+import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
+import { getMeldungenFuerAdmin } from '@/server/queries/meldung'
 
 /*
  * Lesen rund um das Postfach (Register N12, Nachtlauf Nr. 87). Regeln
@@ -96,7 +128,7 @@ export async function zaehleUngelesenHof(farmId: string): Promise<number> {
 export type FadenAnsicht = {
   id: string
   titel: string | null
-  rundschreiben: { gesendetAm: Date; perMail: boolean; wichtig: boolean; empfaenger: number } | null
+  rundschreiben: { gesendetAm: Date; perMail: boolean; wichtig: boolean; empfaenger: number; antwortMoeglich: boolean } | null
   nachrichten: FadenNachricht[]
   /** Lesestand der anderen Seite — für „gelesen" an den eigenen Nachrichten. */
   gelesenBisAndere: Date | null
@@ -110,7 +142,7 @@ export async function ladeFadenHof(farmId: string, unterhaltungId: string): Prom
     where: { id: unterhaltungId, farmId },
     select: {
       id: true,
-      rundschreiben: { select: { titel: true, gesendetAm: true, perMail: true, art: true, empfaenger: true } },
+      rundschreiben: { select: { titel: true, gesendetAm: true, perMail: true, art: true, empfaenger: true, antwortMoeglich: true } },
       nachrichten: { orderBy: { createdAt: 'asc' }, select: NACHRICHT_FELDER },
       staende: { select: { seite: true, gelesenBis: true } },
     },
@@ -122,7 +154,7 @@ export async function ladeFadenHof(farmId: string, unterhaltungId: string): Prom
 function alsAnsicht(
   faden: {
     id: string
-    rundschreiben: { titel: string; gesendetAm: Date; perMail: boolean; art: 'INFO' | 'WICHTIG'; empfaenger: number } | null
+    rundschreiben: { titel: string; gesendetAm: Date; perMail: boolean; art: 'INFO' | 'WICHTIG'; empfaenger: number; antwortMoeglich: boolean } | null
     nachrichten: FadenNachricht[]
     staende: { seite: 'HOF' | 'TEAM'; gelesenBis: Date }[]
   },
@@ -138,6 +170,7 @@ function alsAnsicht(
           perMail: faden.rundschreiben.perMail,
           wichtig: faden.rundschreiben.art === 'WICHTIG',
           empfaenger: faden.rundschreiben.empfaenger,
+          antwortMoeglich: faden.rundschreiben.antwortMoeglich,
         }
       : null,
     nachrichten: faden.nachrichten,
@@ -218,7 +251,7 @@ export async function ladeFadenAdmin(unterhaltungId: string): Promise<AdminFaden
     select: {
       id: true,
       farm: { select: { id: true, name: true, city: true, slug: true } },
-      rundschreiben: { select: { titel: true, gesendetAm: true, perMail: true, art: true, empfaenger: true } },
+      rundschreiben: { select: { titel: true, gesendetAm: true, perMail: true, art: true, empfaenger: true, antwortMoeglich: true } },
       nachrichten: { orderBy: { createdAt: 'asc' }, select: NACHRICHT_FELDER },
       staende: { select: { seite: true, gelesenBis: true } },
     },
@@ -235,6 +268,9 @@ export type GesendetesRundschreiben = {
   empfaenger: number
   gelesen: number
   gesendetAm: Date
+  antwortMoeglich: boolean
+  /** In wie vielen Fäden ein Hof geantwortet hat. */
+  antworten: number
 }
 
 /** Die gesendeten Rundschreiben mit Lesequote — neueste zuerst. */
@@ -242,14 +278,21 @@ export async function ladeRundschreibenListe(): Promise<GesendetesRundschreiben[
   const liste = await prisma.rundschreiben.findMany({
     orderBy: { gesendetAm: 'desc' },
     take: RUNDSCHREIBEN_MAX,
-    select: { id: true, titel: true, art: true, empfaengerRegel: true, empfaenger: true, gesendetAm: true },
+    select: { id: true, titel: true, art: true, empfaengerRegel: true, empfaenger: true, gesendetAm: true, antwortMoeglich: true },
   })
-  const staende = liste.length
-    ? await prisma.unterhaltungStand.findMany({
-        where: { seite: 'HOF', unterhaltung: { rundschreibenId: { in: liste.map((r) => r.id) } } },
-        select: { gelesenBis: true, unterhaltung: { select: { rundschreibenId: true } } },
-      })
-    : []
+  const ids = liste.map((r) => r.id)
+  const [staende, beantwortet] = liste.length
+    ? await Promise.all([
+        prisma.unterhaltungStand.findMany({
+          where: { seite: 'HOF', unterhaltung: { rundschreibenId: { in: ids } } },
+          select: { gelesenBis: true, unterhaltung: { select: { rundschreibenId: true } } },
+        }),
+        prisma.unterhaltung.findMany({
+          where: { rundschreibenId: { in: ids }, nachrichten: { some: { vonFarmId: { not: null } } } },
+          select: { rundschreibenId: true },
+        }),
+      ])
+    : [[], []]
   return liste.map((r) => ({
     id: r.id,
     titel: r.titel,
@@ -258,7 +301,15 @@ export async function ladeRundschreibenListe(): Promise<GesendetesRundschreiben[
     empfaenger: r.empfaenger,
     gelesen: staende.filter((s) => s.unterhaltung.rundschreibenId === r.id && rundschreibenGelesen(s.gelesenBis, r.gesendetAm)).length,
     gesendetAm: r.gesendetAm,
+    antwortMoeglich: r.antwortMoeglich,
+    antworten: beantwortet.filter((u) => u.rundschreibenId === r.id).length,
   }))
+}
+
+/** Wie viele Rundschreiben im laufenden Wiener Monat gesendet wurden — die Kennzahl „Rundschreiben". */
+export async function zaehleRundschreibenImMonat(jetzt: Date): Promise<number> {
+  const monat = monatsgrenzenWien(jetzt)
+  return prisma.rundschreiben.count({ where: { gesendetAm: { gte: monat.von, lt: monat.bis } } })
 }
 
 /**
@@ -298,4 +349,259 @@ export async function ladeMailEmpfaenger(unterhaltungIds: readonly string[]): Pr
     select: { id: true, rundschreiben: { select: { titel: true } }, farm: { select: { owner: { select: { email: true } } } } },
   })
   return faeden.map((f) => ({ unterhaltungId: f.id, email: f.farm.owner.email, titel: f.rundschreiben?.titel ?? null }))
+}
+
+/** Für die Mail an das Team nach einer Antwort des Hofs: Hofname und Titel des Fadens. */
+export async function ladeAntwortFuerTeam(unterhaltungId: string): Promise<{ hofName: string; titel: string | null } | null> {
+  const faden = await prisma.unterhaltung.findUnique({
+    where: { id: unterhaltungId },
+    select: { farm: { select: { name: true } }, rundschreiben: { select: { titel: true } } },
+  })
+  return faden ? { hofName: faden.farm.name, titel: faden.rundschreiben?.titel ?? null } : null
+}
+
+// ─── Eingang (Register N12-Änderung, N14; Nr. 95) ────────────────────────────
+
+/**
+ * Wartend heißt: noch nicht freigeschaltet und nicht stillgelegt (wie die
+ * Gründungsplätze auf den Seiten, gruendungFuerSeiten) — ein stillgelegter Hof
+ * kommt nie dran und ist keine Aufgabe.
+ */
+const WARTENDER_HOF = { approvedAt: null, archivedAt: null } as const
+
+/**
+ * Was im Eingang offen ist, gezählt — die EINE Zählung für die Zahl am Reiter
+ * „Postfach" (adminbereich.ts) und „Offen" im Eingang: ungelesene Antworten
+ * (dieselbe SQL wie bisher), Meldungen NEU/GEPRUEFT, wartende Höfe und
+ * Bestellungen mit offener Erstattung. Vier Zählungen, keine Listen.
+ */
+export async function zaehleOffenImEingang(): Promise<EingangZahlen & { gesamt: number }> {
+  const [antworten, meldungen, hoefe, erstattungen] = await Promise.all([
+    zaehleUngelesenTeam(),
+    prisma.meldung.count({ where: { status: { in: [...MELDUNG_STATUS_OFFEN_IM_EINGANG] } } }),
+    prisma.farm.count({ where: WARTENDER_HOF }),
+    prisma.order.count({ where: { erstattungOffenSeit: { not: null } } }),
+  ])
+  const zahlen = { antworten, meldungen, hoefe, erstattungen }
+  return { ...zahlen, gesamt: offenGesamt(zahlen) }
+}
+
+/**
+ * Die wartenden Höfe mit allem, was Zeile und Prüfliste brauchen — aus
+ * vorhandenen Feldern: Hofseite-Fortschritt (dieselbe Liste wie „Mein Hof",
+ * hofseiteFortschritt), Stripe, SEPA, LFBIS bei Futtermitteln, Titelbild,
+ * E-Mail bestätigt. Der Platz bei sofortiger Freischaltung mit derselben
+ * Regel und Platzzahl wie Admin › Höfe (platzBeiFreischaltung,
+ * MAX_GRUENDUNGSHOEFE — Nacharbeit 93 stellt alle Aufrufer gemeinsam um).
+ * Ohne Inhaber-Adresse und ohne Texte des Hofs: Nur Ja/Nein und Zahlen
+ * verlassen diese Funktion.
+ */
+export async function ladeHofAufgaben(jetzt: Date): Promise<HofAufgabeRoh[]> {
+  const [hoefe, imRennen] = await Promise.all([
+    prisma.farm.findMany({
+      where: WARTENDER_HOF,
+      orderBy: { createdAt: 'desc' },
+      take: ADMIN_LISTE_MAX,
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+        description: true,
+        aboutText: true,
+        logoUrl: true,
+        bannerType: true,
+        bannerUrl: true,
+        address: true,
+        postalCode: true,
+        city: true,
+        latitude: true,
+        longitude: true,
+        acceptsOnline: true,
+        stripeAccountReady: true,
+        phone: true,
+        email: true,
+        isPaused: true,
+        sectionsConfig: true,
+        sepaMandatAm: true,
+        betriebsnummer: true,
+        betriebsstatus: true,
+        farmPhotos: { select: { id: true } },
+        pickupSlots: { where: { isActive: true }, select: { dayOfWeek: true, startTime: true, endTime: true } },
+        products: { where: { isAvailable: true, category: { in: FUTTER_KATEGORIEN } }, select: { id: true }, take: 1 },
+        owner: { select: { emailVerified: true, createdAt: true } },
+      },
+    }),
+    ladeHoefeFuerGruendung(),
+  ])
+  return hoefe.map((h) => {
+    const sektionen = h.sectionsConfig
+    const fortschritt = hofseiteFortschritt(
+      hofseiteStand(
+        { ...h, sectionsConfig: Array.isArray(sektionen) && sektionen.length > 0 ? (sektionen as SectionConfig[]) : DEFAULT_SECTIONS },
+        { latitude: h.latitude, longitude: h.longitude }
+      )
+    )
+    const titelbild = fortschritt.gruppen.flatMap((g) => g.zeilen).find((z) => z.id === 'titelbild')?.fertig ?? false
+    return {
+      id: h.id,
+      name: h.name,
+      createdAt: h.createdAt,
+      hofseite: { erledigt: fortschritt.erledigt, gesamt: fortschritt.gesamt },
+      stripeBereit: h.stripeAccountReady,
+      sepaErteilt: h.sepaMandatAm !== null,
+      futter: h.products.length > 0,
+      lfbis: hatRegistrierung('LFBIS', h),
+      titelbild,
+      email: h.owner.emailVerified === true ? 'bestaetigt' : bestaetigungOffen(h.owner) ? 'offen' : 'vor-pflicht',
+      platz: platzBeiFreischaltung(h.id, imRennen, jetzt, MAX_GRUENDUNGSHOEFE),
+    }
+  })
+}
+
+/**
+ * Bestellungen mit offener Erstattung, älteste zuerst. Der Betrag ist, was
+ * die Kundin online bezahlt hat — `stornoBetraege` wie Storno-Dialog und
+ * Mail, keine neue Rechnung; die Anweisung je Weg steht in Mail und Sentry.
+ * Keine Daten der Kundin.
+ */
+export async function ladeErstattungAufgaben(): Promise<ErstattungAufgabeRoh[]> {
+  const bestellungen = await prisma.order.findMany({
+    where: { erstattungOffenSeit: { not: null } },
+    orderBy: { erstattungOffenSeit: 'asc' },
+    take: ADMIN_LISTE_MAX,
+    select: {
+      id: true,
+      orderNumber: true,
+      erstattungOffenSeit: true,
+      stripePaymentIntentId: true,
+      paymentStatus: true,
+      totalAmount: true,
+      platformFeeAmount: true,
+      serviceFeeCents: true,
+      erstattetCents: true,
+      farm: { select: { name: true } },
+    },
+  })
+  return bestellungen.flatMap((b) => {
+    if (!b.erstattungOffenSeit) return []
+    const betraege = stornoBetraege({
+      stripePaymentIntentId: b.stripePaymentIntentId,
+      paymentStatus: b.paymentStatus,
+      warenpreisCents: alsCents(b.totalAmount),
+      provisionCents: alsCents(b.platformFeeAmount),
+      serviceFeeCents: b.serviceFeeCents,
+    })
+    return [
+      {
+        id: b.id,
+        bestellnummer: b.orderNumber,
+        hofName: b.farm.name,
+        seit: b.erstattungOffenSeit,
+        bezahltCents: betraege?.erstattetCents ?? null,
+        schonErstattetCents: b.erstattetCents,
+        zahlungKennung: b.stripePaymentIntentId,
+      },
+    ]
+  })
+}
+
+/** Wer eine Meldung schickte, als Wort — nie die Adresse der Kundin. */
+function meldungVon(m: { hofName: string | null; customerEmail: string | null }): string {
+  return m.hofName ?? (m.customerEmail ? 'Kundin (ohne Konto)' : 'Anonym')
+}
+
+/**
+ * Die Meldungen des Eingangs: beim Filter „Offen" nur NEU/GEPRUEFT, sonst
+ * die jüngsten aller Stände (getMeldungenFuerAdmin, höchstens 200).
+ */
+async function ladeMeldungenEingang(filter: EingangFilter): Promise<EingangMeldungRoh[]> {
+  const status = filter === 'offen' ? [...MELDUNG_STATUS_OFFEN_IM_EINGANG] : [...MELDUNG_STATUS]
+  const zeilen = await getMeldungenFuerAdmin({ status, art: null })
+  return zeilen.map((m) => ({
+    id: m.id,
+    art: m.art,
+    status: m.status,
+    createdAt: m.createdAt,
+    ersteZeile: m.ersteZeile,
+    wer: meldungVon(m),
+    zeile: `${STATUS_INTERN[m.status]} · Nr. ${kurznummer(m.id)}`,
+  }))
+}
+
+/**
+ * Die Rohdaten des Eingangs je Filter — gemischt und sortiert wird rein in
+ * src/lib/postfach.ts (eingangEintraege). Was ein Filter nicht zeigt, wird
+ * nicht geladen.
+ */
+export async function ladeEingang(filter: EingangFilter, jetzt: Date): Promise<EingangRoh> {
+  const mitAntworten = filter === 'offen' || filter === 'antwort' || filter === 'alle'
+  const mitMeldungen = filter === 'offen' || filter === 'meldung' || filter === 'alle'
+  const mitAufgaben = filter === 'offen' || filter === 'aufgabe' || filter === 'alle'
+  const [antworten, meldungen, hoefe, erstattungen] = await Promise.all([
+    mitAntworten ? ladeUnterhaltungenAdmin() : Promise.resolve([]),
+    mitMeldungen ? ladeMeldungenEingang(filter) : Promise.resolve([]),
+    mitAufgaben ? ladeHofAufgaben(jetzt) : Promise.resolve([]),
+    mitAufgaben ? ladeErstattungAufgaben() : Promise.resolve([]),
+  ])
+  return { antworten, meldungen, hoefe, erstattungen }
+}
+
+// ─── Zustellung (Register N14, Nr. 95) ───────────────────────────────────────
+
+/**
+ * Der Link der Bestätigungsmail steht nirgends: gespeichert ist nur sein
+ * SHA-256. Hier, weil die Action (anlegen) und die Bestätigungsroute (lesen,
+ * einlösen) denselben Wert brauchen. Gesucht wird über den eindeutigen Index
+ * — kein Vergleich geheimer Werte im Code.
+ */
+export function empfaengerTokenHash(token: string): string {
+  return createHash('sha256').update(token, 'utf8').digest('hex')
+}
+
+/** Regeln und bestätigte Adressen, frisch — ein Lesepfad schreibt nie. */
+export async function ladeZustellung(): Promise<{ regeln: ZustellRegeln; bestaetigte: string[] }> {
+  const [einstellung, bestaetigte] = await Promise.all([
+    prisma.plattformEinstellung.findUnique({ where: { id: PLATTFORM_EINSTELLUNG_ID }, select: { zustellRegeln: true } }),
+    prisma.betreiberEmpfaenger.findMany({ where: { bestaetigtAm: { not: null } }, orderBy: { createdAt: 'asc' }, select: { email: true } }),
+  ])
+  return { regeln: zustellRegelnAus(einstellung?.zustellRegeln), bestaetigte: bestaetigte.map((e) => e.email) }
+}
+
+/**
+ * Wer die Betreiber-Mail dieser Art bekommt (empfaengerFuer). Scheitert das
+ * Lesen der Liste, geht die Mail trotzdem an SUPPORT_EMAIL nach dem heutigen
+ * Verhalten — eine offene Erstattung darf nie still bleiben, nur weil die
+ * Liste nicht lesbar war. Gemeldet wird ein fester Satz, nie eine Adresse.
+ */
+export async function ladeBetreiberEmpfaenger(art: ZustellArt): Promise<string[]> {
+  try {
+    return empfaengerFuer(art, await ladeZustellung())
+  } catch (err) {
+    Sentry.captureException(new Error('Zustellung nicht lesbar – Mail nur an die feste Adresse'), {
+      level: 'warning',
+      tags: { bereich: 'zustellung', art, klasse: err instanceof Error ? err.name : 'Unbekannt' },
+    })
+    return empfaengerFuer(art, { regeln: ZUSTELL_STANDARD, bestaetigte: [] })
+  }
+}
+
+export type EmpfaengerZeile = { id: string; email: string; zustand: EmpfaengerZustand; createdAt: Date; bestaetigtAm: Date | null }
+
+/** Was der Reiter „Zustellung" zeigt: die Regeln und jede weitere Adresse mit ihrem Stand. */
+export async function ladeZustellungReiter(jetzt: Date): Promise<{ regeln: ZustellRegeln; empfaenger: EmpfaengerZeile[] }> {
+  const [einstellung, empfaenger] = await Promise.all([
+    prisma.plattformEinstellung.findUnique({ where: { id: PLATTFORM_EINSTELLUNG_ID }, select: { zustellRegeln: true } }),
+    prisma.betreiberEmpfaenger.findMany({ orderBy: { createdAt: 'asc' }, select: { id: true, email: true, bestaetigtAm: true, tokenBis: true, createdAt: true } }),
+  ])
+  return {
+    regeln: zustellRegelnAus(einstellung?.zustellRegeln),
+    empfaenger: empfaenger.map((e) => ({ id: e.id, email: e.email, zustand: empfaengerZustand(e, jetzt), createdAt: e.createdAt, bestaetigtAm: e.bestaetigtAm })),
+  }
+}
+
+/** Der Stand eines Links aus der Bestätigungsmail — die Frist gilt beim Lesen. */
+export async function ladeEmpfaengerBestaetigung(token: string, jetzt: Date): Promise<{ zustand: 'offen' | 'abgelaufen' | 'ungueltig' }> {
+  const zeile = await prisma.betreiberEmpfaenger.findUnique({ where: { token: empfaengerTokenHash(token) }, select: { tokenBis: true, bestaetigtAm: true } })
+  if (!zeile || zeile.bestaetigtAm !== null) return { zustand: 'ungueltig' }
+  return { zustand: empfaengerZustand(zeile, jetzt) === 'ausstehend' ? 'offen' : 'abgelaufen' }
 }

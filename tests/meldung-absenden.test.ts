@@ -22,6 +22,8 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 vi.mock('@/lib/email', () => ({ sendMeldungNotification: vi.fn() }))
+// Empfänger und Regel aus der Zustellung (Register N14, Nr. 95) — hier die Liste fest.
+vi.mock('@/server/queries/postfach', () => ({ ladeBetreiberEmpfaenger: vi.fn(async () => ['support@example.com', 'team@example.com']) }))
 // Zweite Stufe der Bremse (Register R1): hier nur, ob und wann sie gefragt
 // wird — die Zählung prüfen tests/bremse-datenbank*.test.ts.
 vi.mock('@/server/bremse-datenbank', () => ({ bremseUeberAlleInstanzen: vi.fn(async () => true) }))
@@ -321,7 +323,9 @@ describe('meldungAbsenden — Betreiber-Mail', () => {
         diagKennung: 'S71',
         seiteUrl: 'https://agrilo.at/settings',
         viewport: '375x667',
-      })
+      }),
+      // An die ganze Empfängerliste der Zustellung (Regel „Fehlermeldung: sofort").
+      ['support@example.com', 'team@example.com']
     )
   })
 

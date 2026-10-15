@@ -26,6 +26,8 @@ vi.mock('@/lib/stripe', () => ({
   stripe: { refunds: { create: vi.fn(), list: vi.fn(async () => ({ data: [], has_more: false })) } },
 }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
+// Empfänger der Betreiber-Mail aus der Zustellung (Register N14, Nr. 95) — hier die feste Adresse.
+vi.mock('@/server/queries/postfach', () => ({ ladeBetreiberEmpfaenger: vi.fn(async () => ['support@example.com']) }))
 vi.mock('@/lib/email', () => ({
   sendOrderReady: vi.fn(),
   sendOrderCancelled: vi.fn(),
@@ -299,7 +301,8 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
       refundCreate.mock.invocationCallOrder[0]
     )
     expect(orderUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { paymentStatus: 'REFUNDED' } })
+      // Mit dem Erstatten ist auch eine offene Erstattung erledigt (Aufgabe im Admin-Postfach, N14).
+      expect.objectContaining({ data: { paymentStatus: 'REFUNDED', erstattungOffenSeit: null } })
     )
     // Dritter Wert: der Grund aus dem Storno-Dialog (Nr. 19) — hier keiner.
     // Die Mail läuft nach der Antwort und lädt den Versand erst dann (Nr. 31) — also abwarten.
@@ -337,8 +340,11 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
     // Der Betreiber bekommt eine Meldung — der Hof hat keinen Zugang zum
     // Plattformkonto (Nr. 19c). Ohne Daten der Kundin.
     await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
-    const meldung = vi.mocked(sendErstattungOffen).mock.calls[0]![0]
+    const [meldung, an] = vi.mocked(sendErstattungOffen).mock.calls[0]!
     expect(meldung).toMatchObject({ bestellId: 'order_1', bestellnummer: 'TH-1' })
+    expect(an).toEqual(['support@example.com'])
+    // Die Aufgabe „Erstattung offen" im Admin-Postfach: bedingt gesetzt, die erste Zeit bleibt.
+    expect(orderUpdateMany).toHaveBeenCalledWith({ where: { id: 'order_1', erstattungOffenSeit: null }, data: { erstattungOffenSeit: expect.any(Date) } })
     expect(JSON.stringify(meldung)).not.toContain('anna@example.com')
     expect(JSON.stringify(meldung)).not.toContain('Anna')
   })
