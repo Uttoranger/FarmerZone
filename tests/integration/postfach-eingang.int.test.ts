@@ -69,13 +69,8 @@ import { POSTFACH_FEHLER, eingangEintraege } from '@/lib/postfach'
 import { SUPPORT_EMAIL } from '@/lib/support'
 import { PLATTFORM_EINSTELLUNG_ID } from '@/lib/plattform-einstellung'
 import { POST as webhook } from '@/app/api/stripe/webhook/route'
-import {
-  antworteAlsHof,
-  bestaetigeEmpfaenger,
-  fuegeEmpfaengerHinzu,
-  sendeRundschreiben,
-  speichereZustellRegeln,
-} from '@/server/actions/postfach'
+import { antworteAlsHof, fuegeEmpfaengerHinzu, sendeRundschreiben, speichereZustellRegeln } from '@/server/actions/postfach'
+import { bestaetigeEmpfaenger } from '@/server/zustellung-bestaetigen'
 import { empfaengerTokenHash, ladeBetreiberEmpfaenger, ladeEingang, zaehleOffenImEingang } from '@/server/queries/postfach'
 import { INTEGRATIONS_ENV } from './setup/integrations-umgebung'
 import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf } from './setup/basis'

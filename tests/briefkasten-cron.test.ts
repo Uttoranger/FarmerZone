@@ -8,14 +8,16 @@
  * samt Screenshot; ein scheiternder Blob-Aufruf hält die Löschung nicht auf.
  * Seit Nr. 95 (Register N14): Die Mail geht an die Empfängerliste der
  * Zustellung (empfaengerFuer('wochenbericht')); Regel aus (leere Liste) heißt
- * keine Mail, auch wenn etwas offen ist.
+ * keine Mail, auch wenn etwas offen ist. Ob der Bericht geht, entscheidet
+ * „etwas offen im Eingang" (zaehleOffenImEingang — dieselbe Zählung wie
+ * „Offen" und der Reiter): Auch eine wartende Aufgabe allein löst ihn aus.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 vi.mock('@vercel/blob', () => ({ del: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendBriefkastenZusammenfassung: vi.fn() }))
-vi.mock('@/server/queries/postfach', () => ({ ladeBetreiberEmpfaenger: vi.fn() }))
+vi.mock('@/server/queries/postfach', () => ({ ladeBetreiberEmpfaenger: vi.fn(), zaehleOffenImEingang: vi.fn() }))
 vi.mock('@/server/queries/meldung', () => ({
   findeLoeschKandidaten: vi.fn(),
   loescheMeldungen: vi.fn(),
@@ -26,7 +28,7 @@ import { GET } from '@/app/api/cron/briefkasten/route'
 import { del } from '@vercel/blob'
 import { sendBriefkastenZusammenfassung } from '@/lib/email'
 import { findeLoeschKandidaten, loescheMeldungen, zaehleFuerWochenlauf } from '@/server/queries/meldung'
-import { ladeBetreiberEmpfaenger } from '@/server/queries/postfach'
+import { ladeBetreiberEmpfaenger, zaehleOffenImEingang } from '@/server/queries/postfach'
 import { AUFBEWAHRUNG_TAGE } from '@/lib/meldung'
 
 const blobDel = vi.mocked(del)
@@ -35,6 +37,7 @@ const kandidaten = vi.mocked(findeLoeschKandidaten)
 const loeschen = vi.mocked(loescheMeldungen)
 const zaehlen = vi.mocked(zaehleFuerWochenlauf)
 const liste = vi.mocked(ladeBetreiberEmpfaenger)
+const eingang = vi.mocked(zaehleOffenImEingang)
 const LISTE = ['support@example.com', 'team@example.com']
 
 const JETZT = new Date('2026-09-14T05:00:00.000Z')
@@ -48,6 +51,11 @@ function anfrage(auth?: string) {
 }
 
 const RUHIG = { neu: 0, liegenGeblieben: 0, offen: 0, neueste: [] }
+const NICHTS_OFFEN = { antworten: 0, meldungen: 0, hoefe: 0, erstattungen: 0, gesamt: 0 }
+const offenImEingang = (z: Partial<typeof NICHTS_OFFEN>) => {
+  const zahlen = { ...NICHTS_OFFEN, ...z }
+  return { ...zahlen, gesamt: zahlen.antworten + zahlen.meldungen + zahlen.hoefe + zahlen.erstattungen }
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -59,6 +67,7 @@ beforeEach(() => {
   zaehlen.mockResolvedValue(RUHIG)
   mail.mockResolvedValue(undefined)
   liste.mockResolvedValue(LISTE)
+  eingang.mockResolvedValue(NICHTS_OFFEN)
   blobDel.mockResolvedValue(undefined)
 })
 
@@ -104,15 +113,17 @@ describe('Wochenlauf — Zusammenfassung', () => {
 
   it('schickt eine Mail bei neuen Meldungen', async () => {
     zaehlen.mockResolvedValue({ neu: 2, liegenGeblieben: 0, offen: 2, neueste: [] })
+    eingang.mockResolvedValue(offenImEingang({ meldungen: 2 }))
     const res = await GET(anfrage('Bearer geheim-123'))
     expect(mail).toHaveBeenCalledTimes(1)
-    expect(mail).toHaveBeenCalledWith(expect.objectContaining({ neu: 2, geloescht: 0 }), LISTE)
+    expect(mail).toHaveBeenCalledWith(expect.objectContaining({ neu: 2, geloescht: 0, eingang: offenImEingang({ meldungen: 2 }) }), LISTE)
     expect(liste).toHaveBeenCalledWith('wochenbericht')
     expect(await res.json()).toMatchObject({ zusammenfassung: true, neu: 2 })
   })
 
   it('Regel „Wochenbericht" aus (leere Liste): keine Mail, obwohl etwas offen ist', async () => {
     zaehlen.mockResolvedValue({ neu: 2, liegenGeblieben: 1, offen: 3, neueste: [] })
+    eingang.mockResolvedValue(offenImEingang({ meldungen: 3, hoefe: 1 }))
     liste.mockResolvedValue([])
     const res = await GET(anfrage('Bearer geheim-123'))
     expect(mail).not.toHaveBeenCalled()
@@ -124,8 +135,42 @@ describe('Wochenlauf — Zusammenfassung', () => {
     expect(liste).not.toHaveBeenCalled()
   })
 
+  it('nur eine Aufgabe offen (Hof wartet), keine Meldung: der Bericht geht trotzdem', async () => {
+    eingang.mockResolvedValue(offenImEingang({ hoefe: 1 }))
+    const res = await GET(anfrage('Bearer geheim-123'))
+    expect(liste).toHaveBeenCalledWith('wochenbericht')
+    expect(mail).toHaveBeenCalledTimes(1)
+    expect(mail).toHaveBeenCalledWith(expect.objectContaining({ neu: 0, liegenGeblieben: 0, eingang: offenImEingang({ hoefe: 1 }) }), LISTE)
+    expect(await res.json()).toMatchObject({ zusammenfassung: true, offenImEingang: 1 })
+  })
+
+  it('nur eine offene Erstattung oder eine ungelesene Antwort: der Bericht geht', async () => {
+    eingang.mockResolvedValue(offenImEingang({ erstattungen: 1 }))
+    await GET(anfrage('Bearer geheim-123'))
+    eingang.mockResolvedValue(offenImEingang({ antworten: 1 }))
+    await GET(anfrage('Bearer geheim-123'))
+    expect(mail).toHaveBeenCalledTimes(2)
+  })
+
+  it('Regel aus und nur eine Aufgabe offen: kein Bericht', async () => {
+    eingang.mockResolvedValue(offenImEingang({ hoefe: 1 }))
+    liste.mockResolvedValue([])
+    await GET(anfrage('Bearer geheim-123'))
+    expect(mail).not.toHaveBeenCalled()
+  })
+
+  it('nichts im Eingang offen: kein Bericht, auch wenn die alte Meldungszählung etwas meldet', async () => {
+    // Eine liegen gebliebene Meldung außerhalb von NEU/GEPRUEFT zählt im Eingang nicht als offen.
+    zaehlen.mockResolvedValue({ neu: 0, liegenGeblieben: 1, offen: 1, neueste: [] })
+    const res = await GET(anfrage('Bearer geheim-123'))
+    expect(liste).not.toHaveBeenCalled()
+    expect(mail).not.toHaveBeenCalled()
+    expect(await res.json()).toMatchObject({ zusammenfassung: false, offenImEingang: 0 })
+  })
+
   it('schickt eine Mail, wenn Meldungen länger als 14 Tage in NEU/GEPRUEFT stehen', async () => {
     zaehlen.mockResolvedValue({ neu: 0, liegenGeblieben: 1, offen: 3, neueste: [] })
+    eingang.mockResolvedValue(offenImEingang({ meldungen: 3 }))
     await GET(anfrage('Bearer geheim-123'))
     expect(mail).toHaveBeenCalledTimes(1)
     expect(mail).toHaveBeenCalledWith(expect.objectContaining({ liegenGeblieben: 1 }), LISTE)

@@ -202,6 +202,8 @@ export const ZUSTELLUNG_MAIL_TEXT = {
   antwortTitel: 'Ein Hof hat geantwortet',
   antwortZu: 'Zu',
   antwortOeffnen: 'Im Eingang öffnen',
+  /** Der Wochenbericht nennt im Betreff, was im Eingang offen ist (offenSatz aus src/lib/postfach.ts). */
+  wochenberichtBetreff: (offen: string) => `Postfach – Wochenstand: ${offen}`,
   testBetreff: `Testmail · ${MARKE}`,
   testTitel: 'Testmail aus dem Postfach',
   testSatz: 'So kommen die Betriebs-Mails bei dir an. Diese Adresse steht auf der Liste unter Postfach › Zustellung.',

@@ -20,7 +20,7 @@ import { env } from '@/lib/env'
 import { darfMailEmpfangen, leseTestEmpfaenger, sperrtTrotzProduktion } from '@/lib/testumgebung'
 import { abmeldeSeitenPfad, listUnsubscribeKoepfe } from '@/lib/abmelde-link'
 import { MARKE } from '@/lib/marke'
-import { POSTFACH_MAIL_TEXT, eingangAdresse, eingangMeldungAdresse, fadenHref } from '@/lib/postfach'
+import { EINGANG_TEXT, POSTFACH_MAIL_TEXT, eingangAdresse, eingangMeldungAdresse, fadenHref, offenSatz, type EingangZahlen } from '@/lib/postfach'
 import { ZUSTELLUNG_MAIL_TEXT, bestaetigenPfad } from '@/lib/zustellung'
 
 const apiKey = process.env.RESEND_API_KEY
@@ -475,7 +475,12 @@ export async function sendMeldungNotification(
   await sendeAnListe(an, `Fehlermeldung ${m.kurznummer}${m.farmName ? ` – ${m.farmName}` : ''}`, html)
 }
 
-/** Wochen-Zusammenfassung → Betreiber (nur bei Bedarf, api/cron/briefkasten); `an` aus empfaengerFuer('wochenbericht'). */
+/**
+ * Wochen-Zusammenfassung → Betreiber (nur wenn im Eingang etwas offen ist,
+ * api/cron/briefkasten); `an` aus empfaengerFuer('wochenbericht'). Die Zeile
+ * „Offen im Eingang" kommt aus derselben Zählung und demselben Satz wie die
+ * Kennzahl im Eingang (offenSatz); der Meldungsteil bleibt darunter.
+ */
 export async function sendBriefkastenZusammenfassung(
   z: {
     neu: number
@@ -483,19 +488,21 @@ export async function sendBriefkastenZusammenfassung(
     offen: number
     neueste: Array<{ kurznummer: string; art: string; ersteZeile: string; hofName: string | null }>
     geloescht: number
+    eingang: EingangZahlen
   },
   an: readonly string[]
 ): Promise<void> {
   if (an.length === 0) return
+  const { eingang, ...meldungen } = z
   const { BriefkastenZusammenfassungEmail } = await import('@/emails/briefkasten-zusammenfassung')
   const html = await toHtml(
-    React.createElement(BriefkastenZusammenfassungEmail, { ...z, adminUrl: `${APP_URL}${eingangAdresse('meldung')}` })
+    React.createElement(BriefkastenZusammenfassungEmail, {
+      ...meldungen,
+      offenZeile: `${EINGANG_TEXT.offenTitel}: ${offenSatz(eingang)}`,
+      adminUrl: `${APP_URL}${eingangAdresse('offen')}`,
+    })
   )
-  await sendeAnListe(
-    an,
-    `Postfach: ${z.neu} neu, ${z.liegenGeblieben} liegen länger als 14 Tage`,
-    html
-  )
+  await sendeAnListe(an, ZUSTELLUNG_MAIL_TEXT.wochenberichtBetreff(offenSatz(eingang)), html)
 }
 
 /** Was der Betreiber über offenes Geld erfährt — ohne Daten der Kundin. */
@@ -533,7 +540,8 @@ export async function sendErstattungOffen(m: ErstattungOffenMeldung, an: readonl
       stripeKennung: m.stripeKennung,
     })
   )
-  await sendeAnListe(an, `Erstattung offen – Bestellung ${m.bestellnummer ?? m.stripeKennung ?? 'unbekannt'}`, html)
+  // Derselbe Betreff, auf den die Aufgabe im Eingang verweist (EINGANG_TEXT.erstattungMail).
+  await sendeAnListe(an, EINGANG_TEXT.erstattungKopf(m.bestellnummer ?? m.stripeKennung ?? 'unbekannt'), html)
 }
 
 /**

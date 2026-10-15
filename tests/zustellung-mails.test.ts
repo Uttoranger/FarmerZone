@@ -22,6 +22,7 @@ vi.mock('resend', () => ({
 
 import { SUPPORT_EMAIL } from '@/lib/support'
 import { ZUSTELLUNG_MAIL_TEXT } from '@/lib/zustellung'
+import { EINGANG_TEXT, offenSatz } from '@/lib/postfach'
 
 let email: typeof import('@/lib/email')
 
@@ -45,6 +46,8 @@ const LISTE = [SUPPORT_EMAIL, 'team@example.com']
 function empfaenger(): string[] {
   return sendMock.mock.calls.map(([m]) => (m as { to: string }).to)
 }
+
+const NUR_AUFGABE = { antworten: 0, meldungen: 0, hoefe: 1, erstattungen: 0 }
 
 const ERSTATTUNG = {
   was: 'Erfundener Fall für den Test.',
@@ -80,7 +83,7 @@ describe('Betreiber-Mails an die Liste', () => {
       },
       []
     )
-    await email.sendBriefkastenZusammenfassung({ neu: 1, liegenGeblieben: 0, offen: 1, neueste: [], geloescht: 0 }, [])
+    await email.sendBriefkastenZusammenfassung({ neu: 1, liegenGeblieben: 0, offen: 1, neueste: [], geloescht: 0, eingang: NUR_AUFGABE }, [])
     expect(sendMock).not.toHaveBeenCalled()
   })
 
@@ -103,6 +106,18 @@ describe('Betreiber-Mails an die Liste', () => {
     const html = (sendMock.mock.calls[0]?.[0] as { html: string }).html
     expect(html).toContain('/admin/postfach?art=meldung&amp;meldung=meldung-1')
     expect(html).not.toContain('/admin/meldungen/')
+  })
+
+  it('der Wochenbericht nennt in einer Zeile, was im Eingang offen ist, und führt zu „Offen"', async () => {
+    await email.sendBriefkastenZusammenfassung({ neu: 0, liegenGeblieben: 0, offen: 0, neueste: [], geloescht: 0, eingang: NUR_AUFGABE }, LISTE)
+    expect(empfaenger()).toEqual(LISTE)
+    const { subject, html } = sendMock.mock.calls[0]?.[0] as { subject: string; html: string }
+    expect(subject).toBe(ZUSTELLUNG_MAIL_TEXT.wochenberichtBetreff(offenSatz(NUR_AUFGABE)))
+    expect(html).toContain(`${EINGANG_TEXT.offenTitel}: ${offenSatz(NUR_AUFGABE)}`)
+    expect(offenSatz(NUR_AUFGABE)).toBe('0 Antworten · 0 Meldungen · 1 Aufgabe')
+    // Der Meldungsteil bleibt.
+    expect(html).toContain('0 neue Meldungen')
+    expect(html).toContain('/admin/postfach"')
   })
 
   it('ein Fehler bei einer Adresse hält die übrigen nicht auf', async () => {

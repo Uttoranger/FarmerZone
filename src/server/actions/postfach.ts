@@ -27,7 +27,6 @@ import {
 import {
   empfaengerEntfernenSchema,
   empfaengerHinzufuegenSchema,
-  empfaengerTokenSchema,
   gelesenSchema,
   hofAntwortSchema,
   rundschreibenSchema,
@@ -40,7 +39,6 @@ import {
   TESTMAIL_ABSTAND_MS,
   ZUSTELLUNG_FEHLER,
   empfaengerliste,
-  empfaengerZustand,
   tokenBisAb,
 } from '@/lib/zustellung'
 import { SUPPORT_EMAIL } from '@/lib/support'
@@ -507,32 +505,4 @@ export async function sendeTestmail(): Promise<TestmailErgebnis> {
     }
   })
   return { ok: true, empfaenger: an.length }
-}
-
-export type BestaetigenErgebnis = { ok: true } | { error: 'abgelaufen' | 'ungueltig' }
-
-/**
- * Den Link aus der Bestätigungsmail einlösen — OHNE Anmeldung: Der Token ist
- * der Ausweis. Einmalig: In EINEM bedingten Schreiben (Hash über den
- * eindeutigen Index, noch gültig, noch nicht bestätigt) wird bestaetigtAm
- * gesetzt und der Token gelöscht — ein zweiter Klick findet nichts mehr.
- * Aufgerufen von der Bestätigungsseite per Knopf (POST), nie beim Öffnen des
- * Links.
- */
-export async function bestaetigeEmpfaenger(eingabe: unknown): Promise<BestaetigenErgebnis> {
-  const token = empfaengerTokenSchema.safeParse(eingabe)
-  if (!token.success) return { error: 'ungueltig' }
-  const jetzt = new Date()
-  const hash = empfaengerTokenHash(token.data)
-  const { count } = await prisma.betreiberEmpfaenger.updateMany({
-    where: { token: hash, bestaetigtAm: null, tokenBis: { gt: jetzt } },
-    data: { bestaetigtAm: jetzt, token: null, tokenBis: null },
-  })
-  if (count === 1) {
-    revalidatePath(ADMIN_POSTFACH_HREF)
-    return { ok: true }
-  }
-  // Nur für den richtigen Satz: Gibt es den Link noch, ist er abgelaufen.
-  const zeile = await prisma.betreiberEmpfaenger.findUnique({ where: { token: hash }, select: { bestaetigtAm: true, tokenBis: true } })
-  return { error: zeile && empfaengerZustand(zeile, jetzt) === 'abgelaufen' ? 'abgelaufen' : 'ungueltig' }
 }

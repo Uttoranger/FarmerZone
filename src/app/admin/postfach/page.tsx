@@ -17,7 +17,7 @@ import {
   type EingangZahlen,
   type ErstattungAufgabeRoh,
 } from '@/lib/postfach'
-import { adminPostfachReiterAus, eingangAuswahlAus, eingangFilterAus } from '@/schemas/postfach'
+import { adminPostfachReiterAus, eingangAuswahlAus, eingangFilterAus, fadenKennungAus } from '@/schemas/postfach'
 import { cn } from '@/lib/utils'
 import { MARKE } from '@/lib/marke'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -73,7 +73,7 @@ export default async function AdminPostfachPage({ searchParams }: { searchParams
   await verlangeAdminSeite()
 
   const roh = await searchParams
-  const alt = alteReiterAdresse(einzeln(roh.reiter), einzeln(roh.faden))
+  const alt = alteReiterAdresse(einzeln(roh.reiter), fadenKennungAus(roh.faden))
   if (alt) permanentRedirect(alt)
   const reiter = adminPostfachReiterAus(roh.reiter)
   const jetzt = new Date()

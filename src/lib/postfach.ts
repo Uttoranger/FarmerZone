@@ -753,8 +753,10 @@ export const EINGANG_TEXT = {
   offenSeit: (hof: string, datum: string) => `${hof} · offen seit ${datum}`,
   bezahlt: 'Online bezahlt (Waren und Servicegebühr)',
   schonErstattet: 'Davon schon erstattet',
-  erstattungAnweisung:
-    'Erstatten geht nur über das Plattformkonto bei Stripe. Die genaue Anweisung mit den Beträgen je Weg steht in der Mail „Erstattung offen“ und in Sentry. Meldet Stripe die Erstattung, verschwindet die Aufgabe von selbst.',
+  /** Der Eingang rechnet nicht nach: Was offen ist und was zu tun ist, steht nur in der Mail (Betreff = erstattungKopf). */
+  erstattungMail: (betreff: string) =>
+    `Wie viel davon noch offen ist und was genau zu tun ist, steht in der Mail „${betreff}“ und in Sentry. Offen kann auch nur ein Teil sein, etwa wenn nur eine Teilerstattung scheiterte.`,
+  erstattungAnweisung: 'Erstatten geht nur über das Plattformkonto bei Stripe. Meldet Stripe die Erstattung, verschwindet die Aufgabe von selbst.',
   /** Der Knopf der Freigabe („Zur Bestellung") — er führt zur Zahlung bei Stripe, eine Admin-Seite der Bestellung gibt es nicht. */
   zurBestellung: 'Zur Bestellung bei Stripe',
   ohneZahlung: 'Keine Zahlungskennung gespeichert – such die Bestellung bei Stripe über die Bestellnummer.',

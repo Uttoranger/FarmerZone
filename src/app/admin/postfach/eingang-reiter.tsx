@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Check, CheckCheck, ExternalLink, Inbox, Star, X } from 'lucide-react'
+import { Check, CheckCheck, Inbox, Star, X } from 'lucide-react'
 import { z } from 'zod'
 import { getAdminFarms } from '@/server/queries/admin'
 import { getMeldungDetail, getWunschCluster, type AdminMeldungDetail } from '@/server/queries/meldung'
@@ -30,8 +30,6 @@ import {
 import { adminHofZeile, type AdminHofZeile } from '@/lib/admin-hoefe'
 import { wartelistePlatzZeile } from '@/lib/admin-hoefe-seite'
 import { gruendungsplaetze, MAX_GRUENDUNGSHOEFE } from '@/lib/gruendungshof'
-import { formatEuro } from '@/lib/format'
-import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { wienKalendertag } from '@/lib/kalender'
 import { datumKurz } from '@/lib/verkauf-eintragen'
 import { UMGEBUNG } from '@/lib/umgebung-server'
@@ -40,9 +38,10 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
-import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
+import { KARTE, KICKER, LEISE } from '@/components/hof-bestellungen/stil'
 import { MeldungEntscheidenSpalte, Wunschliste, type WunschBuendel } from '@/components/admin/briefkasten-teile'
 import { PostfachHofAktionen } from '@/components/admin/postfach-aufgabe-hof'
+import { PostfachErstattungSpalte } from '@/components/admin/postfach-aufgabe-erstattung'
 import { FadenSpalte } from './faden-spalte'
 
 const SPALTE = cn(KARTE, 'flex min-w-0 flex-col overflow-hidden dark:ring-1 dark:ring-border')
@@ -193,45 +192,11 @@ function HofSpalte({ hof, zeile, vergeben, jetzt }: { hof: HofAufgabeRoh; zeile:
   )
 }
 
-/** Die Aufgabe „Erstattung offen": Beträge nur anzeigen, erstattet wird im bestehenden Weg (Stripe). */
-function ErstattungSpalte({ e, zahlungAdresse, jetzt }: { e: ErstattungAufgabeRoh; zahlungAdresse: string | null; jetzt: Date }): React.JSX.Element {
-  return (
-    <div className="flex flex-col gap-4 p-4 md:p-5">
-      <div className="min-w-0">
-        <p className={KICKER}>{EINGANG_TEXT.aufgabe}</p>
-        <h2 className="mt-1 font-heading text-[19px] leading-snug font-semibold break-words text-foreground">
-          {EINGANG_TEXT.erstattungKopf(e.bestellnummer)}
-        </h2>
-        <p className={cn('mt-0.5 text-[13px] break-words', LEISE)}>{EINGANG_TEXT.offenSeit(e.hofName, datumKurz(wienKalendertag(e.seit), wienKalendertag(jetzt)))}</p>
-      </div>
-      <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 text-[14px] [&>dd]:border-t [&>dd]:border-border [&>dd]:py-2 [&>dt]:border-t [&>dt]:border-border [&>dt]:py-2">
-        <dt className={LEISE}>{EINGANG_TEXT.bezahlt}</dt>
-        <dd className="text-right font-semibold text-foreground tabular-nums">{e.bezahltCents === null ? '–' : formatEuro(centsAlsEuro(e.bezahltCents))}</dd>
-        {e.schonErstattetCents > 0 && (
-          <>
-            <dt className={LEISE}>{EINGANG_TEXT.schonErstattet}</dt>
-            <dd className="text-right text-foreground tabular-nums">{formatEuro(centsAlsEuro(e.schonErstattetCents))}</dd>
-          </>
-        )}
-      </dl>
-      <p className={cn('text-[13px] leading-relaxed', LEISE)}>{EINGANG_TEXT.erstattungAnweisung}</p>
-      {zahlungAdresse ? (
-        <a href={zahlungAdresse} target="_blank" rel="noopener noreferrer" className={cn(KNOPF_RAHMEN, 'self-start')}>
-          {EINGANG_TEXT.zurBestellung}
-          <ExternalLink className="size-4" strokeWidth={1.7} aria-hidden="true" />
-        </a>
-      ) : (
-        <p className={cn('text-[13px]', LEISE)}>{EINGANG_TEXT.ohneZahlung}</p>
-      )}
-    </div>
-  )
-}
-
 function DetailSpalte({ detail, wuensche, jetzt }: { detail: Detail | null; wuensche: WunschBuendel[] | null; jetzt: Date }): React.JSX.Element {
   if (detail?.art === 'antwort') return <FadenSpalte faden={detail.faden} jetzt={jetzt} />
   if (detail?.art === 'meldung') return <MeldungEntscheidenSpalte m={detail.meldung} jetzt={jetzt} />
   if (detail?.art === 'hof') return <HofSpalte hof={detail.hof} zeile={detail.zeile} vergeben={detail.vergeben} jetzt={jetzt} />
-  if (detail?.art === 'erstattung') return <ErstattungSpalte e={detail.erstattung} zahlungAdresse={detail.zahlungAdresse} jetzt={jetzt} />
+  if (detail?.art === 'erstattung') return <PostfachErstattungSpalte e={detail.erstattung} zahlungAdresse={detail.zahlungAdresse} jetzt={jetzt} />
   return (
     <div className="flex flex-col gap-4 p-4 md:p-5">
       <p className={cn('py-6 text-center text-sm', LEISE)}>{EINGANG_TEXT.waehlen}</p>

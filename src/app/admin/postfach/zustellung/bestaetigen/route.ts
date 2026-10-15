@@ -3,7 +3,7 @@ import { BESTAETIGEN_TEXT, ZUSTELLUNG_BESTAETIGEN_PFAD } from '@/lib/zustellung'
 import { MARKE } from '@/lib/marke'
 import { empfaengerTokenSchema } from '@/schemas/postfach'
 import { ladeEmpfaengerBestaetigung } from '@/server/queries/postfach'
-import { bestaetigeEmpfaenger } from '@/server/actions/postfach'
+import { bestaetigeEmpfaenger } from '@/server/zustellung-bestaetigen'
 
 /*
  * Der Link aus der Bestätigungsmail der Zustellung (Register N14, Nr. 95):
@@ -18,7 +18,8 @@ import { bestaetigeEmpfaenger } from '@/server/actions/postfach'
  * GET liest nur und zeigt den Knopf — Link-Scanner der Mailprogramme öffnen
  * Links ungefragt (ARCHITECTURE §5). Bestätigt wird erst per POST (Formular
  * auf derselben Adresse, der Token im Körper statt in der Adresse) über
- * bestaetigeEmpfaenger: einmalig, Frist beim Lesen. Die Seite ist schlicht und
+ * bestaetigeEmpfaenger (src/server/zustellung-bestaetigen.ts, bewusst keine
+ * Server Action): einmalig, Frist beim Lesen. Die Seite ist schlicht und
  * folgt dem Farbschema des Geräts (color-scheme), weil sie außerhalb der App
  * steht — ohne eigene Farben. Kein Referrer, kein Suchindex, kein Cache.
  */

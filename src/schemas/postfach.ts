@@ -12,7 +12,7 @@ import {
   type EingangAuswahl,
   type EingangFilter,
 } from '@/lib/postfach'
-import { SCHALTBARE_ARTEN, TOKEN_MUSTER, ZUSTELLUNG_FEHLER } from '@/lib/zustellung'
+import { TOKEN_MUSTER, ZUSTELLUNG_FEHLER, type SchaltbareArt } from '@/lib/zustellung'
 import { emailSchema } from '@/schemas/email'
 
 /**
@@ -144,6 +144,12 @@ export function eingangAuswahlAus(id: string | string[] | undefined, meldung: st
   return alt.success ? { art: 'meldung', id: alt.data } : null
 }
 
+/** Der Faden aus der alten Adresse ?reiter=unterhaltungen&faden= — nur eine Kennung, sonst ohne Faden umleiten. */
+export function fadenKennungAus(wert: string | string[] | undefined): string | undefined {
+  const faden = z.string().regex(KENNUNG).safeParse(ersterWert(wert))
+  return faden.success ? faden.data : undefined
+}
+
 // ─── Zustellung (Register N14, Nr. 95) ───────────────────────────────────────
 
 /** Eine weitere Adresse: klein, ohne Ränder, höchstens 254 Zeichen (emailSchema). */
@@ -156,9 +162,12 @@ export const empfaengerEntfernenSchema = z.strictObject({
 })
 
 /** Die schaltbaren Regeln beim Speichern — streng: jede Art genau einmal als Wahrheitswert. */
-export const zustellRegelnSpeichernSchema = z.strictObject(
-  Object.fromEntries(SCHALTBARE_ARTEN.map((art) => [art, z.boolean(ZUSTELLUNG_FEHLER.eingabe)])) as Record<(typeof SCHALTBARE_ARTEN)[number], z.ZodBoolean>
-)
+export const zustellRegelnSpeichernSchema = z.strictObject({
+  fehlermeldung: z.boolean(ZUSTELLUNG_FEHLER.eingabe),
+  hofWartet: z.boolean(ZUSTELLUNG_FEHLER.eingabe),
+  antwortHof: z.boolean(ZUSTELLUNG_FEHLER.eingabe),
+  wochenbericht: z.boolean(ZUSTELLUNG_FEHLER.eingabe),
+}) satisfies z.ZodType<Record<SchaltbareArt, boolean>>
 
 /** Der Token aus dem Link der Bestätigungsmail (genau 43 Zeichen base64url). */
 export const empfaengerTokenSchema = z.string().regex(TOKEN_MUSTER)

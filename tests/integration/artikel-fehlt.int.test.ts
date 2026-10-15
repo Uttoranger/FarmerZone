@@ -40,6 +40,25 @@ vi.mock('@/lib/email', () => ({
   sendErstattungOffen: vi.fn(),
 }))
 
+/**
+ * Die Mails laufen nach der Antwort (`nachDerAntwort`). Seit Nr. 95 liest der
+ * Nachlauf „Erstattung offen" vorher die Empfänger aus der Datenbank — die
+ * Mail eines Falls kam so erst im NÄCHSTEN an und zählte dort mit (Nr. 95
+ * Runde 2). Der Nachlauf startet deshalb sofort wie im echten Rückfall ohne
+ * Request, aber sein Ende wird gemerkt: `nachlaufFertig()` wartet darauf —
+ * ohne Pause und ohne Zeitgrenze —, `afterEach` ebenso, bevor aufgeräumt wird.
+ */
+const nachlauf = vi.hoisted(() => ({ laufend: [] as Array<Promise<void>> }))
+vi.mock('@/lib/nach-der-antwort', () => ({
+  nachDerAntwort: (aufgabe: () => Promise<void>) => {
+    nachlauf.laufend.push(aufgabe().catch(() => {}))
+  },
+}))
+
+async function nachlaufFertig(): Promise<void> {
+  while (nachlauf.laufend.length > 0) await Promise.all(nachlauf.laufend.splice(0))
+}
+
 import { headers } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
 import { Prisma } from '@prisma/client'
@@ -125,6 +144,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
+  await nachlaufFertig()
   await raeumeAuf()
 })
 
@@ -707,6 +727,9 @@ describe('Im Zweifel nicht buchen (Nachbesserung 2)', () => {
       expect.anything(),
       expect.objectContaining({ tags: expect.objectContaining({ grund: 'stripe_unklar_ohne_zuordnung' }) })
     )
+    await nachlaufFertig()
+    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(sendErstattungOffen).mock.calls[0]![0]).toMatchObject({ bestellId: order.id })
   })
 })
 
@@ -733,10 +756,10 @@ describe('Rest-Storno mit Stripes bezahltem Betrag (Nr. 19c)', () => {
         extra: expect.objectContaining({ orderId: order.id, bezahltStripeCents: 1100, bezahltDatenbankCents: 1082 }),
       })
     )
-    await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
+    // Erst den ganzen Nachlauf abwarten: „genau einmal" und „keine Storno-Mail" gelten erst danach.
+    await nachlaufFertig()
+    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
     expect(vi.mocked(sendErstattungOffen).mock.calls[0]![0]).toMatchObject({ bestellId: order.id })
-    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
-    await vi.dynamicImportSettled()
     expect(sendOrderCancelled).not.toHaveBeenCalled()
   })
 
@@ -753,8 +776,10 @@ describe('Rest-Storno mit Stripes bezahltem Betrag (Nr. 19c)', () => {
     expect(kontext.extra).toMatchObject({ orderId: order.id, erstattungCents: 500, vomHofCents: 450 })
     expect(String(kontext.extra.handerstattung)).toContain('Teilerstattung')
     expect(String(kontext.extra.handerstattung)).not.toContain('Plattformgebühr erstatten')
-    await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
+    await nachlaufFertig()
+    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
     expect(vi.mocked(sendErstattungOffen).mock.calls[0]![0]).toMatchObject({
+      bestellId: order.id,
       betraege: [
         { label: expect.stringContaining('Kundin'), cents: 500 },
         { label: expect.stringContaining('Hof'), cents: 450 },
