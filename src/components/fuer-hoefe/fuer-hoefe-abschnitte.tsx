@@ -7,7 +7,8 @@ import {
   FUER_HOEFE_VORTEILE,
   fuerHoefeFragen,
 } from '@/lib/fuer-hoefe'
-import { KONDITIONEN_UEBERGANG, PRO_MONAT, TARIFE, servicegebuehrZahltKunde, type TarifText } from '@/lib/konditionen'
+import { KONDITIONEN_UEBERGANG, PRO_MONAT, TARIFE, grundgebuehrText, servicegebuehrZahltKunde, type TarifText } from '@/lib/konditionen'
+import { GRUENDUNG_TEXT, type GruendungSeiten } from '@/lib/gruendungshof'
 import { categoryImagePath } from '@/lib/product-image'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -16,6 +17,8 @@ import { Illustration } from '@/components/startseite/startseite-abschnitte'
 import { SchonDabei } from '@/components/shared/schon-dabei'
 import { HeuteBild } from '@/components/fuer-hoefe/heute-bild'
 import { StartSchritte } from '@/components/fuer-hoefe/start-schritte'
+import { GruendungPill } from '@/components/gruendung/pill'
+import { GruendungPreiszeile } from '@/components/gruendung/preiszeile'
 
 /*
  * Die Abschnitte von /fuer-hoefe in der Reihenfolge des Mockups
@@ -27,6 +30,13 @@ import { StartSchritte } from '@/components/fuer-hoefe/start-schritte'
  * Unter den Knöpfen im Einstieg und im Abschluss steht „Schon dabei?
  * Anmelden" (Register N1, Nr. 41) — wer schon registriert ist, landet hier
  * sonst nur bei „Kostenlos starten".
+ *
+ * Gründungshöfe (Register K2-Ergänzung, Nr. 93): Mit `gruendung.zeigen`
+ * stehen im Einstieg die Pill über der Überschrift, der orange Knopf heißt
+ * „Gründungshof werden" und die Fußnote nennt Frist und Bedingungen; in den
+ * Preisen steht die Angebotszeile über den Karten und die Hofladen-Karte
+ * zeigt den Gründungspreis. Ohne (`gruendung` null oder `zeigen` false) ist
+ * alles wie vorher — auch der Knopf trägt wieder „Kostenlos starten".
  */
 
 const CONTAINER = 'mx-auto max-w-[1200px] px-4 md:px-6'
@@ -42,12 +52,15 @@ const KNOPF_UMRISS = cn(
   FOKUS_RAHMEN
 )
 
-export function FuerHoefeEinstieg(): React.JSX.Element {
+export function FuerHoefeEinstieg({ gruendung = null }: { gruendung?: GruendungSeiten | null }): React.JSX.Element {
   return (
     <section aria-labelledby="fuer-hoefe-titel" className="pt-8 pb-10 md:pt-14 md:pb-16">
       <div className={cn(CONTAINER, 'grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] lg:gap-12')}>
         <div className="flex flex-col gap-4">
-          <Kicker ton="orange">Für Höfe</Kicker>
+          <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
+            <Kicker ton="orange">Für Höfe</Kicker>
+            <GruendungPill gruendung={gruendung} />
+          </div>
           <h1 id="fuer-hoefe-titel" className="font-heading text-[34px] leading-[1.08] font-semibold text-balance md:text-[52px]">
             Dein Hofladen, online.
           </h1>
@@ -60,14 +73,27 @@ export function FuerHoefeEinstieg(): React.JSX.Element {
           </p>
           <div className="flex flex-col gap-2.5 sm:flex-row">
             <Link href="/register" className={KNOPF_ORANGE}>
-              Kostenlos starten
+              {gruendung?.zeigen ? GRUENDUNG_TEXT.knopf : 'Kostenlos starten'}
             </Link>
             <Link href="/konditionen" className={KNOPF_UMRISS}>
               Konditionen ansehen
             </Link>
           </div>
           <SchonDabei className="-mt-2" />
-          <p className="max-w-[34rem] text-[13px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
+          {gruendung?.zeigen ? (
+            // Die Fußnote statt des Übergangs (Mockup); den Übergang K1 nennt der Abschnitt Preise.
+            <p className="max-w-[34rem] text-[13px] leading-normal text-muted-foreground">
+              {GRUENDUNG_TEXT.fussnote(gruendung.bisTag).map((teil, i, alle) => (
+                // Der letzte Teil erst ab 768 px (Mockup mobil-k2-fuer-hoefe-gruendung).
+                <span key={teil} className={i === alle.length - 1 ? 'hidden md:inline' : undefined}>
+                  {i > 0 && ' · '}
+                  {teil}
+                </span>
+              ))}
+            </p>
+          ) : (
+            <p className="max-w-[34rem] text-[13px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
+          )}
         </div>
         <HeuteBild />
       </div>
@@ -107,15 +133,30 @@ export function FuerHoefeSchritte(): React.JSX.Element {
   )
 }
 
-function TarifKarte({ tarif, hervorgehoben }: { tarif: TarifText; hervorgehoben: boolean }) {
+/**
+ * `gruendungBisTag` nur an der Hofladen-Karte und nur, solange die Bausteine
+ * gezeigt werden: dann „€ 0 / Monat · bis 31.12.2027 · dann € 19"
+ * (K2-Ergänzung, Punkt 2). Beträge aus konditionen.ts, nie als Literal.
+ */
+function TarifKarte({ tarif, hervorgehoben, gruendungBisTag = null }: { tarif: TarifText; hervorgehoben: boolean; gruendungBisTag?: string | null }) {
   return (
     <div className={cn('flex flex-col gap-3 rounded-2xl border bg-card p-5', hervorgehoben ? 'border-accent' : 'border-border')}>
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="font-heading text-xl font-semibold">{tarif.name}</h3>
-        <p className="shrink-0">
-          <span className="font-heading text-2xl font-semibold">{tarif.preis}</span>{' '}
-          <span className="text-[13px] text-muted-foreground">{PRO_MONAT}</span>
-        </p>
+        {gruendungBisTag !== null ? (
+          <p className="flex shrink-0 flex-col items-end">
+            <span>
+              <span className="font-heading text-2xl font-semibold text-status-offen">{grundgebuehrText(0)}</span>{' '}
+              <span className="text-[13px] text-muted-foreground">{PRO_MONAT}</span>
+            </span>
+            <span className="mt-1 text-[12px] text-muted-foreground">{GRUENDUNG_TEXT.hofladenPreis(gruendungBisTag)}</span>
+          </p>
+        ) : (
+          <p className="shrink-0">
+            <span className="font-heading text-2xl font-semibold">{tarif.preis}</span>{' '}
+            <span className="text-[13px] text-muted-foreground">{PRO_MONAT}</span>
+          </p>
+        )}
       </div>
       <p className="text-[13.5px] text-muted-foreground">{tarif.zusatz}</p>
       <ul className="flex flex-col gap-1.5">
@@ -131,10 +172,17 @@ function TarifKarte({ tarif, hervorgehoben }: { tarif: TarifText; hervorgehoben:
 }
 
 /** `jetzt` von der Seite (beim Bauen bzw. Revalidieren): die Bar-Ausnahme (B1) steht nur vor dem Stichtag da. */
-export function FuerHoefePreise({ jetzt }: { jetzt: Date }): React.JSX.Element {
+export function FuerHoefePreise({ jetzt, gruendung = null }: { jetzt: Date; gruendung?: GruendungSeiten | null }): React.JSX.Element {
+  const gruendungBisTag = gruendung?.zeigen ? gruendung.bisTag : null
   return (
     <section aria-labelledby="preise-titel" className="py-12 md:py-16">
-      <div className={cn(CONTAINER, 'grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-10')}>
+      {/* Direkt über den Tarifkarten, über die ganze Breite (Mockup web-k2-fuer-hoefe-gruendung). */}
+      {gruendung?.zeigen && (
+        <div className={cn(CONTAINER, 'mb-6 md:mb-[26px]')}>
+          <GruendungPreiszeile gruendung={gruendung} />
+        </div>
+      )}
+      <div className={cn(CONTAINER, 'grid grid-cols-1 gap-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-10')}>
         <div className="flex flex-col gap-3">
           <Kicker ton="orange">Preise</Kicker>
           <h2 id="preise-titel" className={H2}>
@@ -156,7 +204,12 @@ export function FuerHoefePreise({ jetzt }: { jetzt: Date }): React.JSX.Element {
         </div>
         <div className="grid gap-3 md:grid-cols-2 md:gap-4">
           {TARIFE.map((t, i) => (
-            <TarifKarte key={t.id} tarif={t} hervorgehoben={i === TARIFE.length - 1} />
+            <TarifKarte
+              key={t.id}
+              tarif={t}
+              hervorgehoben={i === TARIFE.length - 1}
+              gruendungBisTag={t.id === 'HOFLADEN' ? gruendungBisTag : null}
+            />
           ))}
         </div>
       </div>

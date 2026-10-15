@@ -26,6 +26,8 @@ vi.mock('next/image', () => ({
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), usePathname: () => '/register' }))
 vi.mock('@/components/shared/kunden-kopf', () => ({ KundenKopf: () => null }))
+// Seit Nr. 93 lädt die Seite die Zahlen der Gründungshöfe — ohne Zahlen rendert sie wie vorher.
+vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null }))
 vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
   KundeShellMitSitzung: ({ children }: { children: ReactNode }) => createElement('div', null, children),
 }))
@@ -146,8 +148,8 @@ describe('Kein zweites Exemplar unter src/', () => {
 describe('Die Seiten zeigen den Satz', () => {
   const satz = entschaerft(KONDITIONEN_UEBERGANG)
 
-  it('/fuer-hoefe — im Einstieg und bei den Preisen, Metadaten ohne sofortigen Tarif', () => {
-    const html = renderToStaticMarkup(createElement(FuerHoefePage))
+  it('/fuer-hoefe — im Einstieg und bei den Preisen, Metadaten ohne sofortigen Tarif', async () => {
+    const html = renderToStaticMarkup(await FuerHoefePage())
     expect(html.split(satz).length - 1).toBe(2)
     expect(fuerHoefeMeta.description).toContain(TARIFE_AB_TEXT)
     expect(fuerHoefeMeta.description).not.toMatch(/Start mit dem Tarif/)

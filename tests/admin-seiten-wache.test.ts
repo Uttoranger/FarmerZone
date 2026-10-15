@@ -117,8 +117,9 @@ const SEITE = { modul: '@/server/admin-wache', exportName: 'verlangeAdminSeite',
 const SEITEN = [...seiten(ADMIN)]
 
 describe('jede Seite unter /admin', () => {
-  it('es gibt die sechs Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 94 die Startseite; /admin/meldungen leitet um und prüft trotzdem)', () => {
+  it('es gibt die sieben Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 93 die Einstellungen, seit Nr. 94 die Startseite; /admin/meldungen leitet um und prüft trotzdem)', () => {
     expect(SEITEN.map((p) => relative(ADMIN, p).split(sep).join('/')).sort()).toEqual([
+      'einstellungen/page.tsx',
       'finanzen/page.tsx',
       'meldungen/[id]/page.tsx',
       'meldungen/page.tsx',

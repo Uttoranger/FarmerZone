@@ -14,6 +14,8 @@
  * (Formulare, Zähler).
  */
 import { MARKE_TEAM } from '@/lib/marke'
+import { gruendungshofLabel } from '@/lib/gruendungshof'
+import { baueGruendungsZusage } from '@/lib/konditionen'
 import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 import { PRODUKTION_ADRESSE, PRODUKTION_HOST } from '@/lib/umgebung'
 import { MONAT_KURZ } from '@/lib/format'
@@ -126,6 +128,19 @@ export const POSTFACH_TEXT = {
   auchPerMail: 'auch per E-Mail',
   ohneTitel: 'Nachricht vom Team',
 } as const
+
+/**
+ * Die EINE Nachricht vom Team nach der Freischaltung eines Gründungshofs
+ * (Register K2-Ergänzung, Punkt 4; Nr. 93): „Du bist Gründungshof Nr. n –"
+ * und danach die Zusage im Wortlaut von konditionen.ts (`baueGruendungsZusage`,
+ * dieselbe wie „Dein Stand"). Sie steht als Faden ohne Rundschreiben im
+ * Postfach (Titel `POSTFACH_TEXT.ohneTitel`), erscheint damit als Karte auf
+ * Heute und verschwindet mit „Gelesen" — keine Dauerkarte.
+ */
+export const GRUENDUNGS_NACHRICHT = (platz: number, bis: Date): string => `Du bist ${gruendungshofLabel(platz)} – ${baueGruendungsZusage(bis)}`
+
+/** Der Link der Nachricht: „Deine Konditionen" des Hofs, wo „Dein Stand" die Zusage zeigt. */
+export const GRUENDUNGS_NACHRICHT_LINK = '/settings/konditionen'
 
 /** Die Sätze der zwei E-Mails (src/emails/postfach-*.tsx) — Betriebsmitteilungen, geantwortet wird in der App. */
 export const POSTFACH_MAIL_TEXT = {

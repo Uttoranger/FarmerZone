@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
 import { verlangeAdminAktion } from '@/server/admin-wache'
 import {
@@ -20,9 +21,12 @@ import {
   GRUENDUNG_BIS_ZUSTIMMUNG_FEHLT,
   gruendungBisSchema,
 } from '@/schemas/gruendungshof'
-import { bestimmeGruendungBis, bildeGruendungBis, verkuerztGruendung } from '@/lib/gruendungshof'
+import { bestimmeGruendungBis, bildeGruendungBis, gruendungsZusageBeiFreigabe, verkuerztGruendung } from '@/lib/gruendungshof'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
+import { gruendungEinstellungAus } from '@/lib/plattform-einstellung'
+import { lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
+import { GRUENDUNGS_NACHRICHT, GRUENDUNGS_NACHRICHT_LINK, POSTFACH_HREF } from '@/lib/postfach'
 
 function revalidateAll(slug: string) {
   revalidatePath('/admin')
@@ -30,11 +34,71 @@ function revalidateAll(slug: string) {
 }
 
 /**
+ * Die EINE Nachricht vom Team an einen frisch freigeschalteten Gründungshof
+ * (Register K2-Ergänzung, Punkt 4; Nr. 93): ein Faden ohne Rundschreiben mit
+ * einer Nachricht der Art SYSTEM, Text GRUENDUNGS_NACHRICHT, Link „Deine
+ * Konditionen". Ohne Platz keine Nachricht. Platz und Plätze gesamt aus der
+ * Einstellung (frisch, nie aus dem Cache), Ende: das eigene des Hofs oder das
+ * Standard-Ende der Einstellung.
+ *
+ * IDEMPOTENT über eine eigene Prüfung: Der Unique (farmId, rundschreibenId)
+ * greift mit NULL nicht — zwei Fäden ohne Rundschreiben wären erlaubt. Gibt es
+ * für den Hof schon eine SYSTEM-Nachricht mit diesem Link in einem Faden ohne
+ * Rundschreiben (etwa nach Zurücknehmen und erneutem Freischalten), bleibt es
+ * bei der einen.
+ *
+ * NACHLAUF: Ein Fehler hier rollt die Freischaltung nie zurück (CLAUDE.md,
+ * Geld und Bestellungen) — er geht mit festem Text und ohne Nachrichtentext
+ * nach Sentry, die Nachricht lässt sich notfalls als Rundschreiben nachholen.
+ */
+async function legeGruendungsNachrichtAn(farmId: string): Promise<void> {
+  try {
+    const [einstellung, hoefe] = await Promise.all([lesePlattformEinstellung(), ladeHoefeFuerGruendung()])
+    const hof = hoefe.find((h) => h.id === farmId)
+    const zusage = hof ? gruendungsZusageBeiFreigabe(hof, hoefe, gruendungEinstellungAus(einstellung)) : null
+    if (!zusage) return
+
+    const schon = await prisma.nachricht.findFirst({
+      where: { art: 'SYSTEM', vonFarmId: null, linkUrl: GRUENDUNGS_NACHRICHT_LINK, unterhaltung: { farmId, rundschreibenId: null } },
+      select: { id: true },
+    })
+    if (schon) return
+
+    // Faden und Nachricht in EINER Anweisung (verschachteltes create) — nie ein leerer Faden.
+    const jetzt = new Date()
+    await prisma.unterhaltung.create({
+      data: {
+        farmId,
+        rundschreibenId: null,
+        letzteNachrichtAm: jetzt,
+        nachrichten: {
+          create: {
+            vonFarmId: null,
+            text: GRUENDUNGS_NACHRICHT(zusage.platz, zusage.bis),
+            linkUrl: GRUENDUNGS_NACHRICHT_LINK,
+            art: 'SYSTEM',
+            createdAt: jetzt,
+          },
+        },
+      },
+      select: { id: true },
+    })
+    revalidatePath(POSTFACH_HREF)
+    revalidatePath('/dashboard')
+  } catch (err) {
+    const meldung = new Error('Freischaltung: Gründungs-Nachricht nicht angelegt')
+    meldung.name = err instanceof Error ? err.name : 'Unbekannt'
+    Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'gruendung', aufgabe: 'nachricht' }, extra: { farmId } })
+  }
+}
+
+/**
  * Hof freischalten: ab jetzt öffentlich sichtbar und bestellbar.
  *
  * Dieser EINE Admin-Klick bleibt Absicht — er vergibt den Gründungsplatz und
  * ist die Schleuse gegen Bot-Anmeldungen. Alles davor (Registrierung,
- * Einrichten) und danach (die Zusage-Mail hier) läuft automatisch.
+ * Einrichten) und danach (die Gründungs-Nachricht im Postfach seit Nr. 93,
+ * die Zusage-Mail) läuft automatisch.
  */
 export async function approveFarmAction(farmId: string): Promise<{ error?: string }> {
   const guard = await verlangeAdminAktion()
@@ -76,6 +140,12 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
   })
   if (count === 0) return { error: FREISCHALTUNG_GEAENDERT_TEXT }
   revalidateAll(farm.slug)
+  // „Noch n Gründungsplätze" auf Startseite und /fuer-hoefe (K2-Ergänzung) zählt diesen Hof jetzt mit.
+  revalidatePath('/')
+  revalidatePath('/fuer-hoefe')
+
+  // Erst nach dem erfolgreichen Update und vor der Mail: Der Platz ist vergeben.
+  await legeGruendungsNachrichtAn(farmId)
 
   // Die Zusage an den Hof — NACH dem erfolgreichen Update. Ein Mail-Fehler
   // darf die Freischaltung nicht scheitern lassen: Der Hof ist ab hier

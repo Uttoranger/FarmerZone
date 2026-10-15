@@ -21,6 +21,9 @@ import { Kicker } from '@/components/startseite/kicker'
 import { MARKE } from '@/lib/marke'
 import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 import { AGB_LINK_TEXT, AGB_PFAD } from '@/lib/rechtstexte/agb-einbindung'
+import type { GruendungSeiten } from '@/lib/gruendungshof'
+import { gruendungFuerSeiten } from '@/server/queries/plattform-einstellung'
+import { GruendungSatz } from '@/components/gruendung/satz'
 
 /*
  * Die Abschnitte der Startseite unter „Höfe in deiner Nähe", in der Reihenfolge
@@ -256,7 +259,18 @@ export function SoFunktionierts({ rechnung }: { rechnung: Beispielrechnung }): R
  * (src/lib/konditionen.ts). Darunter „Schon dabei? Anmelden" für Höfe, die
  * schon registriert sind (Register N1, Nr. 41).
  */
-export function FuerHoefeBand(): React.JSX.Element {
+/**
+ * Das Für-Höfe-Band mit dem Satz der Gründungshöfe (Register K2-Ergänzung,
+ * Nr. 93). Es holt die Zahlen selbst, damit die Startseite (page.tsx) so
+ * bleibt, wie sie ist; die Seite ist gecacht (revalidate 300), das Speichern
+ * in Admin › Einstellungen baut sie neu. Scheitert das Laden, fehlt nur der Satz.
+ */
+export async function FuerHoefeBand(): Promise<React.JSX.Element> {
+  return <FuerHoefeBandInhalt gruendung={await gruendungFuerSeiten()} />
+}
+
+/** Das Band selbst — ohne Zahlen (`gruendung` null) ohne den Satz. */
+export function FuerHoefeBandInhalt({ gruendung = null }: { gruendung?: GruendungSeiten | null }): React.JSX.Element {
   return (
     <section id="fuer-hoefe" aria-labelledby="fuer-hoefe-titel" className="scroll-mt-20 pt-6 pb-[52px] md:pb-[72px]">
       <div className={CONTAINER}>
@@ -270,6 +284,8 @@ export function FuerHoefeBand(): React.JSX.Element {
               Schnell eingerichtet. Deine Kundinnen bestellen vorab, du packst und übergibst – und behältst den vollen
               Warenpreis.
             </p>
+            {/* Nach der Beschreibung, im Lesefluss — kein zweiter oranger Knopf (K2-Ergänzung, Punkt 1). */}
+            <GruendungSatz gruendung={gruendung} className="mt-1" />
           </div>
           <div className="flex flex-col gap-1 md:items-end">
             <div className="flex flex-col gap-2.5 md:flex-row">

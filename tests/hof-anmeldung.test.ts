@@ -47,9 +47,11 @@ vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
   KundeShellMitSitzung: ({ children }: { children: ReactNode }) => createElement('div', null, children),
 }))
 vi.mock('@/server/actions/register', () => ({ registerFarmer: vi.fn() }))
+// Seit Nr. 93 lädt die Seite die Zahlen der Gründungshöfe — ohne Zahlen rendert sie wie vorher.
+vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null }))
 
 import { KundenKopf } from '@/components/shared/kunden-kopf'
-import { FuerHoefeBand } from '@/components/startseite/startseite-abschnitte'
+import { FuerHoefeBandInhalt } from '@/components/startseite/startseite-abschnitte'
 import { FuerHoefeEinstieg, FuerHoefeSchluss } from '@/components/fuer-hoefe/fuer-hoefe-abschnitte'
 import FuerHoefePage from '@/app/(public)/fuer-hoefe/page'
 import RegisterPage from '@/app/(auth)/register/page'
@@ -149,23 +151,23 @@ describe('„Schon dabei? Anmelden" (→ /login)', () => {
   const MUSTER = new RegExp(`${SCHON_DABEI.frage.replace('?', '\\?')}[\\s\\S]{0,400}?<a [^>]*href="\\/login"[^>]*>${SCHON_DABEI.link}<\\/a>`)
 
   it('im Band „Für Höfe" der Startseite — neben „Hof registrieren"', () => {
-    const html = renderToStaticMarkup(createElement(FuerHoefeBand))
+    const html = renderToStaticMarkup(createElement(FuerHoefeBandInhalt))
     expect(html).toMatch(MUSTER)
     expect(html).toContain('href="/register"')
   })
 
-  it('auf /fuer-hoefe oben (Einstieg) und unten (Abschluss) — je einmal', () => {
+  it('auf /fuer-hoefe oben (Einstieg) und unten (Abschluss) — je einmal', async () => {
     expect(renderToStaticMarkup(createElement(FuerHoefeEinstieg))).toMatch(MUSTER)
     expect(renderToStaticMarkup(createElement(FuerHoefeSchluss))).toMatch(MUSTER)
-    const seite = renderToStaticMarkup(createElement(FuerHoefePage))
+    const seite = renderToStaticMarkup(await FuerHoefePage())
     expect(seite.split(SCHON_DABEI.frage).length - 1).toBe(2)
   })
 
-  it('auf /register: unter „Konto erstellen" und als Frage vor „Anmelden" im Kopf', () => {
+  it('auf /register: unter „Konto erstellen" und als Frage vor „Anmelden" im Kopf', async () => {
     const formular = renderToStaticMarkup(createElement(RegisterForm, { formToken: 'token' }))
     expect(formular).toMatch(MUSTER)
     expect(formular.indexOf(SCHON_DABEI.frage)).toBeGreaterThan(formular.indexOf('Konto erstellen'))
-    const seite = renderToStaticMarkup(RegisterPage())
+    const seite = renderToStaticMarkup(await RegisterPage())
     const kopfzeile = seite.slice(seite.indexOf('<header'), seite.indexOf('</header>'))
     expect(kopfzeile).toContain(SCHON_DABEI.frage)
     expect(kopfzeile).toMatch(/<a [^>]*href="\/login"[^>]*>Anmelden<\/a>/)
