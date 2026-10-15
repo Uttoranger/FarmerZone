@@ -1235,3 +1235,66 @@ model BetreiberEmpfaenger {
   erstelltVonUserId String
   createdAt         DateTime  @default(now())
 }
+
+// Startseite gestalten (Register N16, Nr. 96): die Startseite als Liste von
+// Abschnitten. Die acht festen Abschnitte legt die Migration an (feste
+// Kennungen, heutige Reihenfolge); BLOCK-Zeilen kommen aus Admin › Startseite
+// dazu. KOPF, HOEFE und FUSS sind fest (immer sichtbar, KOPF zuerst, FUSS
+// zuletzt) — der Server prüft das beim Speichern (src/lib/startseite-gestalten.ts).
+// Ohne Zeilen rendert die Seite die heutige Reihenfolge (Deploy-Fenster).
+enum StartseiteArt {
+  KOPF
+  HOEFE
+  FUTTER
+  BRENNMATERIAL
+  SO_FUNKTIONIERTS
+  FUER_HOEFE
+  FRAGEN
+  FUSS
+  BLOCK
+}
+
+// Die vier Vorlagen eines Blocks (components/startseite/bloecke) — neue nur
+// über einen Lauf.
+enum StartseiteVorlage {
+  SAISONKARTE
+  HINWEISBAND
+  HOEFE_AUSWAHL
+  KATEGORIE_HINWEIS
+}
+
+//   position  Reihenfolge, 0 = oben; kein eindeutiger Index — Speichern
+//             schreibt alle Positionen in einer Transaktion neu.
+//   blockId   nur bei art BLOCK; mit dem Block wird die Zeile gelöscht.
+model StartseiteAbschnitt {
+  id       String           @id @default(cuid())
+  art      StartseiteArt
+  position Int
+  sichtbar Boolean          @default(true)
+  blockId  String?          @unique
+  block    StartseiteBlock? @relation(fields: [blockId], references: [id], onDelete: Cascade)
+}
+
+// Ein Block mit Zeitraum: live, wenn liveAb ≤ jetzt < liveBis (ohne liveBis
+// offen) — verglichen nur am Server. farmIds nur freigeschaltete Höfe
+// (Action prüft), bewusst ohne Fremdschlüssel; ein später gesperrter Hof fällt
+// beim Rendern weg. erstelltVonUserId ohne Fremdschlüssel wie
+// Rundschreiben.erstelltVonUserId.
+model StartseiteBlock {
+  id                String               @id @default(cuid())
+  vorlage           StartseiteVorlage
+  ueberzeile        String?
+  titel             String
+  text              String?
+  bildUrl           String?
+  linkUrl           String?
+  linkText          String?
+  farmIds           String[]             @default([])
+  kategorie         ProductCategory?
+  liveAb            DateTime
+  liveBis           DateTime?
+  erstelltVonUserId String
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  abschnitt         StartseiteAbschnitt?
+}

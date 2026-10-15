@@ -45,9 +45,3 @@ export type UnterreiterDaten = {
   /** Die Zahl in der Pille, fertig geschrieben („2“, „7 / 12“). */
   zahl?: string
 }
-
-/**
- * Die Seite „Startseite“, bis Nr. 96 sie bringt (Register N15/N16): ein
- * Platzhalter mit dem Kopf des Musters. Nr. 96 ersetzt die Seite.
- */
-export const STARTSEITE_PLATZHALTER = { titel: 'Startseite', satz: 'Kommt mit Nr. 96.' } as const

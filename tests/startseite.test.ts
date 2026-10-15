@@ -69,6 +69,7 @@ import {
   type StartseitenHofEingabe,
 } from '@/lib/startseite'
 import { kundenNavigation } from '@/lib/kunden-navigation'
+import { STANDARD_REIHENFOLGE } from '@/lib/startseite-gestalten'
 import { STARTSEITE_VORSCHAUBILD } from '@/lib/vorschaubild'
 import { KATEGORIE_LABEL } from '@/lib/taxonomie'
 import type { ProductCategoryValue } from '@/schemas/product'
@@ -698,23 +699,23 @@ describe('Aufbau der Seite', () => {
     expect(code('src/app/page.tsx').match(/ladeOeffentlicheHoefe\(/g)).toHaveLength(1)
   })
 
+  // Seit Nr. 96 (Register N16) kommt die Reihenfolge aus Admin › Startseite;
+  // die Saison-Automatik entscheidet zuRendern (tests/startseite-gestalten.test.ts).
   it('das Brennmaterial-Band nur in der Saison', () => {
-    expect(seite).toMatch(/\{istBrennmaterialSaison\(jetzt\) && <BrennmaterialBand \/>\}/)
-    expect(seite.match(/<BrennmaterialBand/g)).toHaveLength(1)
+    expect(seite).toMatch(/brennmaterialSaison: istBrennmaterialSaison\(jetzt\)/)
+    const abschnitte = quelle('src/components/startseite/startseite-abschnitte.tsx')
+    expect(abschnitte.match(/BRENNMATERIAL: \(\) => <BrennmaterialBand \/>/g)).toHaveLength(1)
   })
 
-  it('die Reihenfolge des Mockups', () => {
-    const reihe = [
-      '<StartseiteKopf',
-      '<HoefeInDerNaehe',
-      '<FutterAbschnitt',
-      '<BrennmaterialBand',
-      '<SoFunktionierts',
-      '<FuerHoefeBand',
-      '<Fragen',
-      '<StartseiteFuss',
-    ].map((m) => seite.indexOf(m))
+  it('die Reihenfolge des Mockups — als Standard ohne Zeilen und als Seed der Migration', () => {
+    expect(STANDARD_REIHENFOLGE).toEqual(['KOPF', 'HOEFE', 'FUTTER', 'BRENNMATERIAL', 'SO_FUNKTIONIERTS', 'FUER_HOEFE', 'FRAGEN', 'FUSS'])
+    const seed = quelle('prisma/migrations/20261015140000_startseite_gestalten/migration.sql')
+    const reihe = STANDARD_REIHENFOLGE.map((art, i) => seed.indexOf(`'${art}', ${i}, true`))
     expect(reihe.every((stelle) => stelle > 0)).toBe(true)
     expect([...reihe].sort((a, b) => a - b)).toEqual(reihe)
+    // Kopf und Höfe rendert die Seite selbst, die übrigen Abschnitte kommen aus ihrer Tabelle.
+    expect(seite).toMatch(/case 'KOPF':\s*return \(\s*<StartseiteKopf/)
+    expect(seite).toMatch(/case 'HOEFE':\s*return \(\s*<HoefeInDerNaehe/)
+    expect(seite).toMatch(/STARTSEITE_ABSCHNITTE\[eintrag\.art\]/)
   })
 })

@@ -5,7 +5,7 @@
 // eigenmächtig anders auslegen. Ohne DOM und ohne Datenbank — damit prüfbar.
 
 /** Wofür ein Foto hochgeladen wird. Bestimmt Zielpfad und Auflösung. */
-export type UploadZweck = 'product' | 'banner' | 'logo' | 'gallery' | 'status' | 'meldung'
+export type UploadZweck = 'product' | 'banner' | 'logo' | 'gallery' | 'status' | 'meldung' | 'startseite'
 
 export const UPLOAD_ZWECKE: readonly UploadZweck[] = [
   'product',
@@ -16,6 +16,9 @@ export const UPLOAD_ZWECKE: readonly UploadZweck[] = [
   // Screenshot zu einer Meldung im Fehlerbriefkasten (nur eingeloggte Höfe —
   // der Upload-Weg verlangt eine Hof-Sitzung, siehe api/upload/token).
   'meldung',
+  // Bild eines Blocks der Startseite (Register N16, Nr. 96) — der einzige
+  // Zweck mit Admin-Sitzung statt Hof-Sitzung; eigener Ordner ohne Hof.
+  'startseite',
 ] as const
 
 export function istUploadZweck(wert: unknown): wert is UploadZweck {
@@ -43,7 +46,29 @@ export const MAX_LONG_SIDE: Record<UploadZweck, number> = {
   // Ein Bildschirmfoto muss lesbar sein, nicht schön — 1600 px reichen für
   // jede Fehlermeldung und halten den Speicher klein.
   meldung: 1600,
+  // Die Saisonkarte zeigt das Bild quadratisch (1:1) und klein; 1600 px
+  // reichen auch für doppelte Pixeldichte.
+  startseite: 1600,
 }
+
+/** Kürzeste Kante eines Startseiten-Bilds — kleiner wird es auf großen Schirmen unscharf (N16: ≥ 320 px). */
+export const STARTSEITE_MIN_KANTE = 320
+
+/**
+ * Die Ordner der Startseiten-Bilder (Zweck 'startseite'). Bewusst NICHT unter
+ * `originals/` bzw. `farms/`: Kein Hof-Pfad kann je hier liegen, und kein
+ * Startseiten-Pfad besteht die Hof-Prüfung (originalPrefix/zielPrefix).
+ */
+export const STARTSEITE_ORIGINAL_PREFIX = 'startseite/originale/'
+export const STARTSEITE_ZIEL_PREFIX = 'startseite/bilder/'
+
+/**
+ * Was GET /api/upload/token einer Admin-Sitzung ohne Hof als „Kennung"
+ * nennt. Der Browser baut daraus keinen Pfad: originalPfad nimmt für den
+ * Zweck 'startseite' immer den Ordner oben, für jeden anderen Zweck lehnt die
+ * Token-Route den Pfad ab (kein Hof).
+ */
+export const STARTSEITE_UPLOAD_KENNUNG = 'startseite'
 
 /** WebP-Qualität der Verkleinerung. Wert wie in der bisherigen Canvas-Fassung. */
 export const WEBP_QUALITAET = 82
@@ -79,6 +104,8 @@ export function originalPfad(farmId: string, zweck: UploadZweck, dateiname: stri
       .replace(/[^a-zA-Z0-9._-]/g, '_')
       .replace(/\.{2,}/g, '.')
       .slice(-80) || 'foto'
+  // Startseiten-Bilder gehören keinem Hof — auch wenn der Admin selbst einen hat.
+  if (zweck === 'startseite') return `${STARTSEITE_ORIGINAL_PREFIX}${sauber}`
   return `${originalPrefix(farmId)}${zweck}/${sauber}`
 }
 
@@ -122,6 +149,29 @@ export function darfVerarbeitetWerden(url: string, farmId: string): boolean {
  */
 export function darfGeloeschtWerden(url: string, farmId: string): boolean {
   return liegtImEigenenPfad(url, zielPrefix(farmId))
+}
+
+/** Darf dieses Original als Startseiten-Bild verarbeitet werden? Nur aus dem Ordner der Startseite (Admin-Sitzung prüft die Route). */
+export function darfStartseitenBildVerarbeitetWerden(url: string): boolean {
+  return liegtImEigenenPfad(url, STARTSEITE_ORIGINAL_PREFIX)
+}
+
+/** Zielpfad eines fertigen Startseiten-Bilds. */
+export function startseitenZielPfad(): string {
+  return `${STARTSEITE_ZIEL_PREFIX}${Date.now()}.webp`
+}
+
+/**
+ * Ist diese Adresse ein fertiges Startseiten-Bild in UNSEREM Speicher? Die
+ * Prüfung der Action, die einen Block speichert — dieselben Bedingungen wie
+ * `istEigeneBildUrl`, nur der Ordner der Startseite statt des Hofs.
+ */
+export function istEigeneStartseitenBildUrl(url: string, speicher: string | null): boolean {
+  if (!speicher) return false
+  if (!liegtImEigenenPfad(url, STARTSEITE_ZIEL_PREFIX)) return false
+  const zerlegt = new URL(url)
+  if (zerlegt.username || zerlegt.password || zerlegt.search || zerlegt.hash) return false
+  return zerlegt.hostname.toLowerCase() === `${speicher}.public.blob.vercel-storage.com`
 }
 
 function liegtImEigenenPfad(url: string, prefix: string): boolean {

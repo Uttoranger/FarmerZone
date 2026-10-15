@@ -4,10 +4,12 @@ import { Check, ChevronDown, HandCoins, MapPin } from 'lucide-react'
 import {
   BRENNMATERIAL_ADRESSE,
   FUTTER_ZIELGRUPPEN,
+  beispielRechnung,
   startseitenFragen,
   hoefeAdresse,
   type Beispielrechnung,
 } from '@/lib/startseite'
+import type { AbschnittArt } from '@/lib/startseite-gestalten'
 import { BRENNMATERIAL_SAISON_TEXT } from '@/lib/brennmaterial-saison'
 import { SERVICEGEBUEHR_BEZEICHNUNG, centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
@@ -423,3 +425,22 @@ export function StartseiteFuss({ jahr }: { jahr: number }): React.JSX.Element {
     </footer>
   )
 }
+
+/** Was ein Abschnitt von der Seite bekommt: den Zeitpunkt (Bau oder „Stand am" der Vorschau). */
+export type AbschnittProps = { jetzt: Date }
+
+/**
+ * Die Abschnitte dieser Datei je Art (Register N16, Nr. 96): page.tsx rendert
+ * die Liste aus Admin › Startseite darüber. Kopf und „Höfe in deiner Nähe"
+ * stehen in eigenen Dateien und brauchen die Höfe der Seite — die rendert
+ * page.tsx selbst. Die Saison-Automatik des Brennmaterial-Bands entscheidet
+ * die Liste (zuRendern), nicht diese Tabelle.
+ */
+export const STARTSEITE_ABSCHNITTE = {
+  FUTTER: () => <FutterAbschnitt />,
+  BRENNMATERIAL: () => <BrennmaterialBand />,
+  SO_FUNKTIONIERTS: ({ jetzt }) => <SoFunktionierts rechnung={beispielRechnung(jetzt)} />,
+  FUER_HOEFE: () => <FuerHoefeBand />,
+  FRAGEN: ({ jetzt }) => <Fragen jetzt={jetzt} />,
+  FUSS: ({ jetzt }) => <StartseiteFuss jahr={jetzt.getFullYear()} />,
+} satisfies Record<Exclude<AbschnittArt, 'KOPF' | 'HOEFE'>, (props: AbschnittProps) => React.ReactNode>

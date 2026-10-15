@@ -9,8 +9,9 @@
  *    URLSearchParams, Eigenschaft, Zerlegen, Adresse im Text, Literal —, und die
  *    Konstante VORSCHAU_PARAMETER steht nur in hofseite-vorschau.ts (Adressen
  *    schreiben) und in ansichtsModus. Die einzige Stelle außerhalb von src/
- *    ist die Header-Regel in next.config.ts — sie greift, bevor eine Seite
- *    läuft, und gibt nur das Einbetten frei (tests/sicherheits-header.test.ts).
+ *    sind die Header-Regeln in next.config.ts (Hofseite, seit Nr. 96 auch die
+ *    Startseite) — sie greifen, bevor eine Seite läuft, und geben nur das
+ *    Einbetten frei (tests/sicherheits-header.test.ts).
  *  - ansichtsModus läuft nur auf dem Server: aufgerufen allein im Lader,
  *    eingebunden von keinem Client-Modul.
  *  - FarmPageView bindet seit Nr. 50 genau eine Stelle ein: die Hofseite.
@@ -143,6 +144,12 @@ function erlaubt(fund: Fund, text: string): boolean {
     const imImport = /^import\s*\{[^}]*\}\s*from\s*'@\/lib\/hofseite-vorschau'\s*$/.test(zeileVon(code, fund.stelle))
     return imImport || imRumpf(code, 'export async function ansichtsModus(', fund.stelle)
   }
+  // Die Vorschau der STARTSEITE (Register N16, Nr. 96) ist ein eigener, signierter Parameter derselben
+  // Schreibweise (/?vorschau=…&sig=…, Freigabe §18): geschrieben nur in alsAbfrage (aus geprüften Werten),
+  // gelesen nur über vorschauParameterSchema — die Hofseite und ansichtsModus berührt er nicht.
+  if (fund.pfad === 'src/server/startseite-vorschau.ts') {
+    return fund.art === 'Adresse im Text' && imRumpf(code, 'function alsAbfrage(', fund.stelle)
+  }
   // Die eine Ausnahme: die Breite der Vorschau-Spalte heißt `vorschau` (Ergebnis von editorSpalten, Nr. 73) —
   // eine Eigenschaft eines Ergebnisses, kein Parameter der Adresse. Nur im Editor und nur als `spalten.vorschau`.
   if (fund.pfad === 'src/components/farmer/hofseite-editor.tsx' && fund.art === 'Eigenschaft') {
@@ -206,10 +213,12 @@ describe('der Parameter „vorschau" wird nur in ansichtsModus() gelesen', () =>
     expect(imModus.map((f) => f.art)).toContain('Index')
   })
 
-  it('außerhalb von src/ nur die Header-Regel in next.config.ts — sie gibt das Einbetten frei, sonst nichts', () => {
+  it('außerhalb von src/ nur die Header-Regeln in next.config.ts — sie geben das Einbetten frei, sonst nichts', () => {
     const konfiguration = ohneKommentare(quelle('next.config.ts'))
-    expect([...konfiguration.matchAll(/vorschau/g)]).toHaveLength(1)
+    // Zwei Regeln: die Hofseite mit ?vorschau=1 und die Startseite mit ihrem signierten ?vorschau (N16, Nr. 96).
+    expect([...konfiguration.matchAll(/vorschau/g)]).toHaveLength(2)
     expect(konfiguration).toContain("has: [{ type: 'query', key: 'vorschau', value: '1' }]")
+    expect(konfiguration).toContain("has: [{ type: 'query', key: 'vorschau' }]")
   })
 
   it('ansichtsModus läuft nur auf dem Server: aufgerufen im Lader, von keinem Client-Modul eingebunden', () => {
