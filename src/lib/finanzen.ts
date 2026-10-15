@@ -18,7 +18,7 @@
  * (monatsschluesselInWien) — eine Bestellung am 30. September um 23:30 Uhr
  * Wien ist 21:30 UTC und gehört in den September.
  */
-import { MONAT_KURZ, formatEuro } from '@/lib/format'
+import { MONAT_KURZ, formatEuro, mitAnzahl } from '@/lib/format'
 import {
   barOhneServicegebuehr,
   centsAlsEuro,
@@ -34,6 +34,14 @@ import {
   type Zahlungsart,
 } from '@/lib/servicegebuehr'
 import { istTestzahlung } from '@/lib/testzahlung'
+import type { KennzahlDaten, UnterreiterDaten } from '@/lib/admin-seiten'
+import {
+  FINANZEN_REITER_IDS,
+  FINANZEN_REITER_STANDARD,
+  finanzenAdresse,
+  finanzenReiterLabel,
+  type FinanzenReiterId,
+} from '@/lib/admin-finanzen-seite'
 
 // ─── Kosten ──────────────────────────────────────────────────────────────────
 
@@ -505,4 +513,510 @@ export function kostendeckungSatz(stand: {
     `Bestellung brauchst du rund ${stand.brauchtBestellungen} Bestellungen im Monat, damit die ` +
     `Kosten gedeckt sind. Im ${stand.bezeichnung} waren es ${stand.bestellungen}.`
   )
+}
+
+// ─── Das Jahr (Register N15, Ergänzung Nr. 100) ──────────────────────────────
+
+/**
+ * Das Jahr ist die SUMME SEINER MONATE — aus denselben Funktionen wie der
+ * Monat (`einnahmenImMonat`, `kostenImMonat`, `kostenSummeImMonat`), keine
+ * zweite Rechnung. Das laufende Jahr zählt bis heute: Monate nach dem
+ * heutigen sind `null` („noch offen"), nicht 0 — eine 0 behauptete, dass nichts
+ * eingenommen wurde. Der heutige Monat zählt so, wie ihn die Monatsansicht
+ * zeigt: die Einnahmen bis jetzt, die Kosten des ganzen Monats.
+ *
+ * Alles in ganzen Cent. Wo hier gerundet wird, ist es Anzeige (Anteil in
+ * Prozent, die Hochrechnung in ganzen Euro), nie ein Betrag, der in eine
+ * Summe zurückfließt.
+ */
+
+/** Ein Kostenposten, so weit ihn die Jahresrechnung braucht (zusätzlich Name und Art für die Tabelle). */
+export type KostenpostenFuerJahr = KostenpostenFuerRechnung & {
+  id: string
+  name: string
+  kategorie: KostenKategorieWert
+}
+
+export type JahrMonatZahlen = {
+  servicegebuehrCents: number
+  kostenCents: number
+  ergebnisCents: number
+  bestellungen: number
+  /** Der größte einmalige Posten des Monats — für die Beschriftung am Balken. */
+  einmalig: { name: string; cents: number } | null
+}
+
+export type JahrMonat = {
+  monat: Monatsschluessel
+  /** null = noch offen: der Monat liegt nach heute. */
+  zahlen: JahrMonatZahlen | null
+}
+
+export type KostenImJahrZeile = {
+  id: string
+  name: string
+  kategorie: KostenKategorieWert
+  rhythmus: KostenRhythmusWert
+  /** Der eingetragene Betrag in Cent — bei JAEHRLICH der Jahresbetrag. */
+  betragCents: number
+  /** In wie vielen gezählten Monaten des Jahres der Posten etwas kostet. */
+  monate: number
+  /** Nur bei einmaligen Posten: ihr Monat. */
+  einmaligImMonat: Monatsschluessel | null
+  imJahrCents: number
+  /** Anteil an den Kosten des Jahres in ganzen Prozent; null bei Kosten 0. */
+  anteilProzent: number | null
+}
+
+export type Hochrechnung = {
+  /** Das Ergebnis am Jahresende, wenn die offenen Monate so laufen wie der Schnitt — in Cent. */
+  ergebnisCents: number
+  /** Der Schnitt des Ergebnisses je vollem Monat. */
+  schnittCents: number
+  offeneMonate: number
+  /** Die Monate, aus denen der Schnitt kommt (bis zu drei volle Monate vor dem heutigen). */
+  von: Monatsschluessel
+  bis: Monatsschluessel
+}
+
+export type JahrRechnung = {
+  jahr: number
+  /** Immer zwölf, Jänner zuerst. */
+  monate: JahrMonat[]
+  /** Der letzte gezählte Monat (bis heute); null, wenn das Jahr noch nicht begonnen hat. */
+  zaehltBis: Monatsschluessel | null
+  servicegebuehrenCents: number
+  bestellungen: number
+  kostenCents: number
+  /** Die Kosten nach Rhythmus: laufend (monatlich) · jährlich · einmalig — zusammen genau `kostenCents`. */
+  kostenNachRhythmus: Record<KostenRhythmusWert, number>
+  ergebnisCents: number
+  /** Nur Posten, die im Jahr etwas kosten, in der Reihenfolge der Eingabe. */
+  posten: KostenImJahrZeile[]
+  /** Nur im laufenden Jahr, solange noch Monate offen sind und es volle Monate zum Mitteln gibt. */
+  hochrechnung: Hochrechnung | null
+}
+
+/** Wie viele volle Monate in den Schnitt der Hochrechnung gehen. */
+export const HOCHRECHNUNG_MONATE = 3
+
+/**
+ * Das Jahr aus den Bestellungen und Kostenposten. `bestellungen`: die des
+ * Jahres, wie `getFinanzenJahr` sie lädt (mehr schadet nicht — jeder Monat
+ * nimmt nur seine eigenen). `heute`: der Monat von „jetzt" in Wiener Zeit.
+ */
+export function rechneJahr(eingabe: {
+  jahr: number
+  heute: Monatsschluessel
+  bestellungen: readonly BestellungFuerFinanzen[]
+  posten: readonly KostenpostenFuerJahr[]
+  stripeLiveAb: Date | null
+}): JahrRechnung {
+  const { jahr, heute, posten, stripeLiveAb } = eingabe
+
+  // Einmal nach Monat sortieren, statt zwölfmal alle Bestellungen zu lesen;
+  // gerechnet wird dann je Monat mit derselben Funktion wie in der Monatsansicht.
+  const jeMonat = new Map<Monatsschluessel, BestellungFuerFinanzen[]>()
+  for (const b of eingabe.bestellungen) {
+    const m = monatsschluesselInWien(b.createdAt)
+    const liste = jeMonat.get(m)
+    if (liste) liste.push(b)
+    else jeMonat.set(m, [b])
+  }
+
+  const monate: JahrMonat[] = []
+  const nachRhythmus: Record<KostenRhythmusWert, number> = { MONATLICH: 0, JAEHRLICH: 0, EINMALIG: 0 }
+  const jePosten = new Map<string, { cents: number; monate: number; einmaligImMonat: Monatsschluessel | null }>()
+  let servicegebuehrenCents = 0
+  let bestellungen = 0
+  let kostenCents = 0
+  let zaehltBis: Monatsschluessel | null = null
+
+  for (let n = 1; n <= 12; n++) {
+    const monat = monatsschluessel(jahr, n)
+    if (monatsAbstand(monat, heute) < 0) {
+      monate.push({ monat, zahlen: null })
+      continue
+    }
+    zaehltBis = monat
+    const einnahmen = einnahmenImMonat(jeMonat.get(monat) ?? [], monat, stripeLiveAb)
+    const kosten = kostenSummeImMonat(posten, monat)
+
+    let einmalig: JahrMonatZahlen['einmalig'] = null
+    for (const p of posten) {
+      const betrag = kostenImMonat(p, monat)
+      if (betrag <= 0) continue
+      nachRhythmus[p.rhythmus] += betrag
+      const bisher = jePosten.get(p.id) ?? { cents: 0, monate: 0, einmaligImMonat: null }
+      bisher.cents += betrag
+      bisher.monate++
+      if (p.rhythmus === 'EINMALIG') {
+        bisher.einmaligImMonat = monat
+        if (einmalig === null || betrag > einmalig.cents) einmalig = { name: p.name, cents: betrag }
+      }
+      jePosten.set(p.id, bisher)
+    }
+
+    servicegebuehrenCents += einnahmen.gezaehltCents
+    bestellungen += einnahmen.bestellungen
+    kostenCents += kosten.cents
+    monate.push({
+      monat,
+      zahlen: {
+        servicegebuehrCents: einnahmen.gezaehltCents,
+        kostenCents: kosten.cents,
+        ergebnisCents: einnahmen.gezaehltCents - kosten.cents,
+        bestellungen: einnahmen.bestellungen,
+        einmalig,
+      },
+    })
+  }
+
+  const postenZeilen: KostenImJahrZeile[] = []
+  for (const p of posten) {
+    const summe = jePosten.get(p.id)
+    if (!summe) continue
+    postenZeilen.push({
+      id: p.id,
+      name: p.name,
+      kategorie: p.kategorie,
+      rhythmus: p.rhythmus,
+      betragCents: p.betragCents,
+      monate: summe.monate,
+      einmaligImMonat: summe.einmaligImMonat,
+      imJahrCents: summe.cents,
+      anteilProzent: kostenCents > 0 ? Math.round((summe.cents * 100) / kostenCents) : null,
+    })
+  }
+
+  const ergebnisCents = servicegebuehrenCents - kostenCents
+  return {
+    jahr,
+    monate,
+    zaehltBis,
+    servicegebuehrenCents,
+    bestellungen,
+    kostenCents,
+    kostenNachRhythmus: nachRhythmus,
+    ergebnisCents,
+    posten: postenZeilen,
+    hochrechnung: hochrechnungBisJahresende(jahr, heute, monate, ergebnisCents),
+  }
+}
+
+/**
+ * „Bis Jahresende ≈": der Schnitt des Ergebnisses der letzten drei VOLLEN
+ * Monate (die vor dem heutigen, ab dem ersten Monat mit Zahlen — vorher gab es
+ * die Plattform nicht) mal die offenen Monate, auf das Ergebnis bis heute
+ * gelegt. Nur im laufenden Jahr, und nur ein Hinweis: Die Zahl steht in keiner
+ * Summe und in keiner CSV.
+ */
+function hochrechnungBisJahresende(
+  jahr: number,
+  heute: Monatsschluessel,
+  monate: readonly JahrMonat[],
+  ergebnisBisHeute: number
+): Hochrechnung | null {
+  if (zerlegeMonat(heute)?.jahr !== jahr) return null
+  const offeneMonate = monate.filter((m) => m.zahlen === null).length
+  if (offeneMonate === 0) return null
+
+  const ersterMitZahlen = monate.findIndex((m) => m.zahlen !== null && (m.zahlen.bestellungen > 0 || m.zahlen.kostenCents > 0))
+  if (ersterMitZahlen < 0) return null
+  const volle = monate
+    .slice(ersterMitZahlen)
+    .filter((m): m is JahrMonat & { zahlen: JahrMonatZahlen } => m.zahlen !== null && m.monat !== heute)
+    .slice(-HOCHRECHNUNG_MONATE)
+  const erster = volle[0]
+  const letzter = volle[volle.length - 1]
+  if (!erster || !letzter) return null
+
+  const schnittCents = Math.round(volle.reduce((summe, m) => summe + m.zahlen.ergebnisCents, 0) / volle.length)
+  return {
+    ergebnisCents: ergebnisBisHeute + schnittCents * offeneMonate,
+    schnittCents,
+    offeneMonate,
+    von: erster.monat,
+    bis: letzter.monat,
+  }
+}
+
+/**
+ * Das erste Jahr, für das es etwas zu sehen gibt: das der ersten Bestellung
+ * oder des frühesten Kostenpostens. Ohne beides das laufende.
+ */
+export function ersteDatenJahr(
+  ersterBestellmonat: Monatsschluessel | null,
+  postenAb: readonly Monatsschluessel[],
+  heute: Monatsschluessel
+): number {
+  const jahre = [ersterBestellmonat, ...postenAb]
+    .filter((m): m is Monatsschluessel => m !== null)
+    .map((m) => zerlegeMonat(m)?.jahr)
+    .filter((j): j is number => j !== undefined)
+  return Math.min(zerlegeMonat(heute)?.jahr ?? Infinity, ...jahre)
+}
+
+/** Ein gewünschtes Jahr, das vor den ersten Daten oder nach dem laufenden liegt, ist das laufende. */
+export function jahrImBereich(gewuenscht: number, ersteJahr: number, laufendesJahr: number): number {
+  return gewuenscht < ersteJahr || gewuenscht > laufendesJahr ? laufendesJahr : gewuenscht
+}
+
+// ─── Texte, Adressen und Kennzahlen des Jahres ───────────────────────────────
+
+/** „Jän–Okt" — die gezählten Monate; ein einzelner Monat steht allein. */
+export function monatsSpanne(von: Monatsschluessel, bis: Monatsschluessel): string {
+  return von === bis ? monatOhneJahr(von) : `${monatOhneJahr(von)}–${monatOhneJahr(bis)}`
+}
+
+/** Ein Ergebnis mit Vorzeichen: „+ € 185,50" · „− € 203,10" · „€ 0,00". */
+export function ergebnisText(cents: number, stellen: 0 | 2 = 2): string {
+  const betrag = formatEuro(centsAlsEuro(stellen === 0 ? Math.round(Math.abs(cents) / 100) * 100 : Math.abs(cents)), stellen)
+  if (cents > 0) return `+ ${betrag}`
+  if (cents < 0) return `− ${betrag}`
+  return betrag
+}
+
+export const FINANZEN_JAHR_TEXT = {
+  umschalter: 'Zeitraum der Finanzen',
+  monat: 'Monat',
+  jahr: 'Jahr',
+  jahrWaehlen: 'Jahr wählen',
+  vorigesJahr: 'Voriges Jahr',
+  naechstesJahr: 'Nächstes Jahr',
+  uebersicht: 'Übersicht',
+  csv: (jahr: number) => `CSV ${jahr}`,
+  csvHerunterladen: 'herunterladen',
+  satz: (jahr: number, laufend: boolean) =>
+    laufend
+      ? `Was die Plattform ${jahr} einnimmt und was sie kostet — von Jänner bis heute, Testzahlungen zählen nicht.`
+      : `Was die Plattform ${jahr} eingenommen hat und was sie gekostet hat — Testzahlungen zählen nicht.`,
+  diagrammTitel: (jahr: number) => `${jahr} nach Monaten`,
+  diagrammBeschriftung: (jahr: number) => `Servicegebühren und Kosten je Monat ${jahr}`,
+  monatFuerMonat: 'Monat für Monat',
+  kostenImJahr: 'Kosten im Jahr',
+  summe: (jahr: number) => `Summe ${jahr}`,
+  vergleichen: (vorjahr: number) => `mit ${vorjahr} vergleichen`,
+  vergleichAb: (jahr: number) => `ab ${jahr}`,
+  vergleichSpalte: 'Vorjahr',
+  nochOffen: 'noch offen',
+  legendeServicegebuehren: 'Servicegebühren',
+  legendeKosten: 'Kosten',
+  legendeVorjahr: (vorjahr: number) => `Servicegebühren ${vorjahr}`,
+  leerTitel: 'Für dieses Jahr gibt es keine Zahlen',
+  leer: 'Sobald Bestellungen eingehen oder Kosten eingetragen sind, stehen hier die Monate nebeneinander.',
+  einmaligZusatz: 'einmalig',
+  hochrechnungSatz: (von: Monatsschluessel, bis: Monatsschluessel) =>
+    `Hochrechnung mit dem Schnitt ${monatsSpanne(von, bis)}, nur als Hinweis`,
+  keineKosten: 'keine Kosten im Jahr',
+  keineKostenTitel: (jahr: number) => `Für ${jahr} sind keine Kosten eingetragen`,
+  keineKostenSatz: 'Kostenposten trägst du in der Monatsansicht ein.',
+  keineKostenLink: 'Kostenposten eintragen',
+  bisHeute: 'bis heute',
+  ganzesJahr: 'im ganzen Jahr',
+  /**
+   * Die Regel-Zeile unter dem Jahr (Mockup admin-finanzen-jahr). Eine
+   * Abweichung vom Wortlaut des Mockups, und sie ist Absicht: Dort stünde
+   * „jährliche … in ihrem Monat", gerechnet wird aber wie im Monat — ein
+   * Jahresposten ist auf zwölf Monate umgelegt (`kostenImMonat`). Die Zeile
+   * sagt, was die Zahlen tun.
+   */
+  regel:
+    'Jahr = Summe der Monate (Wiener Zeit). Monatliche Posten zählen je Monat, in dem sie liefen; jährliche sind auf die zwölf Monate umgelegt, einmalige zählen in ihrem Monat. Ein Klick auf einen Balken oder eine Zeile öffnet den Monat. „CSV“ lädt alle Monate und Posten für die Steuerberatung.',
+} as const
+
+/** Die Adresse der Jahresansicht: Zeitraum und Jahr immer, der Reiter nur, wenn er nicht der Standard ist. */
+export function finanzenJahrAdresse(ansicht: { jahr: number; reiter: FinanzenReiterId }): string {
+  const parameter = new URLSearchParams({ zeitraum: 'jahr', jahr: String(ansicht.jahr) })
+  if (ansicht.reiter !== FINANZEN_REITER_STANDARD) parameter.set('reiter', ansicht.reiter)
+  return `/admin/finanzen?${parameter.toString()}`
+}
+
+/** Die Adresse der CSV — eine Route, kein Seitenaufruf. */
+export function finanzenExportAdresse(jahr: number): string {
+  return `/admin/finanzen/export?jahr=${jahr}`
+}
+
+/** Unterreiter der Jahresansicht: Übersicht · Kosten (mit der Zahl der Posten) · Auszahlungen · Entfallene Gebühren. */
+export function finanzenJahrUnterreiter(jahr: number, anzahlPosten: number): UnterreiterDaten[] {
+  return FINANZEN_REITER_IDS.map((id) => ({
+    id,
+    label: id === 'monat' ? FINANZEN_JAHR_TEXT.uebersicht : finanzenReiterLabel(id),
+    href: finanzenJahrAdresse({ jahr, reiter: id }),
+    ...(id === 'kosten' ? { zahl: String(anzahlPosten) } : {}),
+  }))
+}
+
+/**
+ * Die Kennzahlen des Jahres: Servicegebühren (mit Zahl der Bestellungen und
+ * Monatsspanne) · Kosten (laufend · jährlich · einmalig) · Ergebnis · im
+ * laufenden Jahr „Bis Jahresende ≈" als Hinweis. Der Ton des Ergebnisses ist
+ * grün nur bei einem Plus, orange bei einem Minus — kein Rot (Register O1).
+ */
+export function jahrKennzahlen(rechnung: JahrRechnung, laufendesJahr: number): KennzahlDaten[] {
+  const { jahr } = rechnung
+  const text = FINANZEN_JAHR_TEXT
+  const spanne = rechnung.zaehltBis === null ? null : monatsSpanne(monatsschluessel(jahr, 1), rechnung.zaehltBis)
+  const rhythmus = rechnung.kostenNachRhythmus
+  const euro = (cents: number) => formatEuro(centsAlsEuro(cents))
+
+  const kennzahlen: KennzahlDaten[] = [
+    {
+      id: 'servicegebuehren',
+      titel: `Servicegebühren ${jahr}`,
+      titelKurz: 'Gebühren',
+      wert: euro(rechnung.servicegebuehrenCents),
+      satz: [spanne, mitAnzahl(rechnung.bestellungen, 'Bestellung', 'Bestellungen')].filter((s) => s !== null).join(' · '),
+    },
+    {
+      id: 'kosten',
+      titel: `Kosten ${jahr}`,
+      titelKurz: 'Kosten',
+      wert: euro(rechnung.kostenCents),
+      satz:
+        rechnung.kostenCents === 0
+          ? text.keineKosten
+          : `laufend ${euro(rhythmus.MONATLICH)} · jährlich ${euro(rhythmus.JAEHRLICH)} · einmalig ${euro(rhythmus.EINMALIG)}`,
+    },
+    {
+      id: 'ergebnis',
+      titel: `Ergebnis ${jahr}`,
+      titelKurz: 'Ergebnis',
+      wert: ergebnisText(rechnung.ergebnisCents),
+      satz: jahr === laufendesJahr ? text.bisHeute : text.ganzesJahr,
+      ton: rechnung.ergebnisCents > 0 ? 'laeuft' : rechnung.ergebnisCents < 0 ? 'tun' : 'neutral',
+    },
+  ]
+  if (rechnung.hochrechnung) {
+    kennzahlen.push({
+      id: 'jahresende',
+      titel: 'Bis Jahresende',
+      wert: `≈ ${ergebnisText(rechnung.hochrechnung.ergebnisCents, 0)}`,
+      satz: text.hochrechnungSatz(rechnung.hochrechnung.von, rechnung.hochrechnung.bis),
+      // Am Handy höchstens drei Kacheln; eine Schätzung gehört nicht zu den ersten dreien.
+      amHandy: false,
+    })
+  }
+  return kennzahlen
+}
+
+/** Ein Monat, wie das Diagramm und die Tabelle der Jahresansicht ihn zeigen — mit dem Ziel, das der Klick öffnet. */
+export type JahrMonatAnzeige = {
+  monat: Monatsschluessel
+  /** „Okt 2026" für die Tabelle. */
+  bezeichnung: string
+  /** Die Monatsansicht dieses Monats. */
+  href: string
+  zahlen: Pick<JahrMonatZahlen, 'servicegebuehrCents' | 'kostenCents' | 'ergebnisCents' | 'bestellungen'> | null
+  /** Der Posten, der den Monat aus der Reihe bringt (einmalig und mehr als die Hälfte der Kosten) — sein Name steht am Balken. */
+  ausreisser: string | null
+  /** Die Servicegebühren desselben Monats im Vorjahr; null ohne Vergleich. */
+  vorjahrCents: number | null
+}
+
+/**
+ * Der Ausreißer eines Monats: ein einmaliger Posten, der mehr als die Hälfte
+ * der Kosten des Monats ausmacht (die Markenanmeldung im Mai, nicht die
+ * Domain im Okt neben zwölf laufenden Posten). Sein Name steht direkt am Balken.
+ */
+export function ausreisserImMonat(zahlen: JahrMonatZahlen): string | null {
+  const { einmalig, kostenCents } = zahlen
+  return einmalig !== null && einmalig.cents * 2 > kostenCents ? einmalig.name : null
+}
+
+/** Die zwölf Monate für Diagramm und Tabelle; `vorjahr` füllt die Vergleichsspalte, sonst bleibt sie null. */
+export function jahrMonateFuerAnzeige(rechnung: JahrRechnung, vorjahr: JahrRechnung | null): JahrMonatAnzeige[] {
+  return rechnung.monate.map((m, i) => {
+    const teile = zerlegeMonat(m.monat)
+    return {
+      monat: m.monat,
+      bezeichnung: `${monatOhneJahr(m.monat)} ${teile?.jahr ?? rechnung.jahr}`,
+      href: finanzenAdresse({ monat: m.monat, reiter: FINANZEN_REITER_STANDARD }),
+      zahlen: m.zahlen
+        ? {
+            servicegebuehrCents: m.zahlen.servicegebuehrCents,
+            kostenCents: m.zahlen.kostenCents,
+            ergebnisCents: m.zahlen.ergebnisCents,
+            bestellungen: m.zahlen.bestellungen,
+          }
+        : null,
+      ausreisser: m.zahlen ? ausreisserImMonat(m.zahlen) : null,
+      vorjahrCents: vorjahr?.monate[i]?.zahlen?.servicegebuehrCents ?? null,
+    }
+  })
+}
+
+// ─── CSV für die Steuerberatung ──────────────────────────────────────────────
+
+export const FINANZEN_CSV = {
+  monate: ['Monat', 'Servicegebühren (€)', 'Kosten (€)', 'Ergebnis (€)', 'Bestellungen'],
+  posten: ['Kostenposten', 'Rhythmus', 'Betrag (€)', 'Monate im Jahr', 'Im Jahr (€)'],
+} as const
+
+/** Ganze Cent als Euro mit Komma, ohne Tausenderpunkt und Zeichen — so liest Excel in Österreich sie als Zahl: 128450 → „1284,50", −10 → „-0,10". */
+export function csvBetrag(cents: number): string {
+  const betrag = Math.abs(Math.round(cents))
+  return `${cents < 0 ? '-' : ''}${Math.floor(betrag / 100)},${String(betrag % 100).padStart(2, '0')}`
+}
+
+/**
+ * Ein Textfeld der CSV. Mit Semikolon, Anführungszeichen oder Zeilenumbruch in
+ * Anführungszeichen; beginnt es mit einem Zeichen, das Excel als Formel liest
+ * (= + - @), steht ein Hochkomma davor — die Namen der Kostenposten tippt der
+ * Betreiber selbst, aber eine Tabelle, die sich beim Öffnen von selbst
+ * ausführt, soll es nie geben.
+ */
+export function csvFeld(text: string): string {
+  const entschaerft = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text
+  return /[;"\r\n]/.test(entschaerft) ? `"${entschaerft.replace(/"/g, '""')}"` : entschaerft
+}
+
+/**
+ * Das Jahr als CSV: UTF-8 mit BOM (Excel in Österreich erkennt sonst keine
+ * Umlaute), Semikolon, Euro mit Komma, Zeilenende CRLF. Zwei Blöcke mit je
+ * eigener Kopfzeile: eine Zeile je Monat (offene Monate mit leeren Zahlen,
+ * nicht mit 0) und eine je Kostenposten, jeweils mit Summenzeile. Die Zahlen
+ * sind die der Jahresansicht — nur Beträge, Bestellungen als Zahl, die Namen der
+ * Kostenposten (Betriebsdaten der Plattform); keine Hof- und keine
+ * Kundinnendaten.
+ */
+export function jahrAlsCsv(rechnung: JahrRechnung): string {
+  // Textfelder gehen durch csvFeld, Zahlen nie: ein Minus vor einem Betrag ist keine Formel.
+  const zeilen: string[][] = []
+  zeilen.push(FINANZEN_CSV.monate.map(csvFeld))
+  for (const m of rechnung.monate) {
+    const name = csvFeld(monatsgrenzenWienFuer(m.monat).bezeichnung)
+    zeilen.push(
+      m.zahlen === null
+        ? [name, '', '', '', '']
+        : [
+            name,
+            csvBetrag(m.zahlen.servicegebuehrCents),
+            csvBetrag(m.zahlen.kostenCents),
+            csvBetrag(m.zahlen.ergebnisCents),
+            String(m.zahlen.bestellungen),
+          ]
+    )
+  }
+  const summe = csvFeld(FINANZEN_JAHR_TEXT.summe(rechnung.jahr))
+  zeilen.push([
+    summe,
+    csvBetrag(rechnung.servicegebuehrenCents),
+    csvBetrag(rechnung.kostenCents),
+    csvBetrag(rechnung.ergebnisCents),
+    String(rechnung.bestellungen),
+  ])
+  zeilen.push([])
+  zeilen.push(FINANZEN_CSV.posten.map(csvFeld))
+  for (const p of rechnung.posten) {
+    zeilen.push([
+      csvFeld(p.name),
+      csvFeld(KOSTEN_RHYTHMUS_KURZ[p.rhythmus]),
+      csvBetrag(p.betragCents),
+      csvFeld(p.einmaligImMonat !== null ? monatsgrenzenWienFuer(p.einmaligImMonat).bezeichnung : String(p.monate)),
+      csvBetrag(p.imJahrCents),
+    ])
+  }
+  zeilen.push([summe, '', '', '', csvBetrag(rechnung.kostenCents)])
+  return `\uFEFF${zeilen.map((z) => z.join(';')).join('\r\n')}\r\n`
 }

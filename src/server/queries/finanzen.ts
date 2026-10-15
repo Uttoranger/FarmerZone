@@ -6,23 +6,33 @@ import {
   bestellungenBisKostendeckung,
   durchschnittsGebuehr,
   einnahmenImMonat,
+  ersteDatenJahr,
+  GEZAEHLTE_TOEPFE,
+  jahrImBereich,
   kostenImMonat,
   kostenSummeImMonat,
   monatKurz,
   monateBis,
   finanzseiteLaesstTestzahlungenAus,
+  rechneJahr,
+  testzahlungenBetroffen,
   utcDatumAlsMonat,
   type BestellungFuerFinanzen,
   type EinnahmenMonat,
+  type JahrRechnung,
+  type KostenpostenFuerJahr,
   type KostenKategorieWert,
   type KostenRhythmusWert,
   type KostenSumme,
+  type KostenpostenFuerRechnung,
 } from '@/lib/finanzen'
 import {
   monatsAbstand,
   monatVerschoben,
   monatsgrenzenWienFuer,
+  monatsschluessel,
   monatsschluesselInWien,
+  zerlegeMonat,
   type Monatsschluessel,
 } from '@/lib/servicegebuehr'
 
@@ -39,6 +49,75 @@ import {
 
 function centsAusDecimal(betrag: Prisma.Decimal): number {
   return Math.round(betrag.mul(100).toNumber())
+}
+
+/**
+ * Die zwei Abfragen, die Monat und Jahr gemeinsam haben: die Kostenposten und
+ * die erste Bestellung (für den Anfang der Anzeige). Die dritte — die
+ * Bestellungen des gezeigten Fensters — kennt je nach Ansicht ihr eigenes Fenster.
+ */
+async function ladeGrundlagen(): Promise<{
+  allePosten: (KostenpostenFuerRechnung & Omit<KostenpostenZeile, 'imMonatCents'>)[]
+  ersterBestellmonat: Monatsschluessel | null
+}> {
+  const [postenZeilen, ersteBestellung] = await Promise.all([
+    prisma.kostenposten.findMany({
+      select: {
+        id: true,
+        name: true,
+        kategorie: true,
+        betrag: true,
+        rhythmus: true,
+        ab: true,
+        bis: true,
+        notiz: true,
+      },
+      orderBy: [{ kategorie: 'asc' }, { name: 'asc' }],
+    }),
+    prisma.order.findFirst({ orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
+  ])
+
+  return {
+    allePosten: postenZeilen.map((p) => ({
+      id: p.id,
+      name: p.name,
+      kategorie: p.kategorie,
+      betragCents: centsAusDecimal(p.betrag),
+      rhythmus: p.rhythmus,
+      ab: utcDatumAlsMonat(p.ab),
+      bis: p.bis === null ? null : utcDatumAlsMonat(p.bis),
+      notiz: p.notiz,
+    })),
+    ersterBestellmonat: ersteBestellung === null ? null : monatsschluesselInWien(ersteBestellung.createdAt),
+  }
+}
+
+/**
+ * Die Bestellungen eines Fensters [von, bis) — nur mit den Feldern, die die
+ * Regel liest: kein Kundenname, keine Adresse, keine E-Mail.
+ */
+async function ladeBestellungen(von: Date, bis: Date): Promise<BestellungFuerFinanzen[]> {
+  const bestellungen = await prisma.order.findMany({
+    where: { createdAt: { gte: von, lt: bis } },
+    select: {
+      createdAt: true,
+      status: true,
+      paymentMethod: true,
+      paymentStatus: true,
+      serviceFeeCents: true,
+      serviceFeeRefundedAt: true,
+      platformFeeAmount: true,
+    },
+  })
+  return bestellungen.map((b) => ({
+    createdAt: b.createdAt,
+    status: b.status,
+    paymentMethod: b.paymentMethod,
+    paymentStatus: b.paymentStatus,
+    serviceFeeCents: b.serviceFeeCents,
+    serviceFeeRefundedAt: b.serviceFeeRefundedAt,
+    provisionCents: centsAusDecimal(b.platformFeeAmount),
+  }))
 }
 
 /** Ein Kostenposten, wie die Seite ihn zeigt. */
@@ -106,36 +185,7 @@ export async function getFinanzen(
   jetzt: Date = new Date(),
   stripeLiveAb: Date | null = STRIPE_LIVE_AB
 ): Promise<FinanzenDaten> {
-  const [postenZeilen, ersteBestellung] = await Promise.all([
-    prisma.kostenposten.findMany({
-      select: {
-        id: true,
-        name: true,
-        kategorie: true,
-        betrag: true,
-        rhythmus: true,
-        ab: true,
-        bis: true,
-        notiz: true,
-      },
-      orderBy: [{ kategorie: 'asc' }, { name: 'asc' }],
-    }),
-    prisma.order.findFirst({ orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
-  ])
-
-  const allePosten = postenZeilen.map((p) => ({
-    id: p.id,
-    name: p.name,
-    kategorie: p.kategorie,
-    betragCents: centsAusDecimal(p.betrag),
-    rhythmus: p.rhythmus,
-    ab: utcDatumAlsMonat(p.ab),
-    bis: p.bis === null ? null : utcDatumAlsMonat(p.bis),
-    notiz: p.notiz,
-  }))
-
-  const ersterBestellmonat =
-    ersteBestellung === null ? null : monatsschluesselInWien(ersteBestellung.createdAt)
+  const { allePosten, ersterBestellmonat } = await ladeGrundlagen()
   const monate = monateBis(monat, ersterBestellmonat)
 
   // Ein Fenster über alle gezeigten Monate: [Anfang des ersten, Ende des
@@ -145,28 +195,7 @@ export async function getFinanzen(
   const fensterVon = monatsgrenzenWienFuer(monate[0]!).von
   const fensterBis = monatsgrenzenWienFuer(monat).bis
 
-  const bestellungen = await prisma.order.findMany({
-    where: { createdAt: { gte: fensterVon, lt: fensterBis } },
-    select: {
-      createdAt: true,
-      status: true,
-      paymentMethod: true,
-      paymentStatus: true,
-      serviceFeeCents: true,
-      serviceFeeRefundedAt: true,
-      platformFeeAmount: true,
-    },
-  })
-
-  const fuerRegel: BestellungFuerFinanzen[] = bestellungen.map((b) => ({
-    createdAt: b.createdAt,
-    status: b.status,
-    paymentMethod: b.paymentMethod,
-    paymentStatus: b.paymentStatus,
-    serviceFeeCents: b.serviceFeeCents,
-    serviceFeeRefundedAt: b.serviceFeeRefundedAt,
-    provisionCents: centsAusDecimal(b.platformFeeAmount),
-  }))
+  const fuerRegel = await ladeBestellungen(fensterVon, fensterBis)
 
   const einnahmenJeMonat = monate.map((m) => einnahmenImMonat(fuerRegel, m, stripeLiveAb))
   // `!` sicher: einnahmenJeMonat ist die Abbildung von `monate` und damit
@@ -225,6 +254,68 @@ function vorigerMonatOderNull(
   if (anfaenge.length === 0) return null
   const frueheste = anfaenge.reduce((a, b) => (monatsAbstand(a, b) < 0 ? b : a))
   return monatsAbstand(frueheste, monat) > 0 ? monatVerschoben(monat, -1) : null
+}
+
+export type FinanzenJahrDaten = {
+  /** Das gezeigte Jahr — nach `jahrImBereich`, also nicht unbedingt das gewünschte. */
+  jahr: number
+  /** Die Nachbarjahre zum Blättern; null heißt „hier ist Schluss". */
+  vorigesJahr: number | null
+  naechstesJahr: number | null
+  rechnung: JahrRechnung
+  /** Das Vorjahr, wenn es Daten hat — für den Vergleich; sonst null. */
+  vorjahr: JahrRechnung | null
+  /** Ab diesem Jahr gibt es ein Vorjahr zum Vergleichen („ab 2027"). */
+  vergleichAb: number
+  /** „Testzahlungen vor dem … sind nicht mitgezählt." (Register Z4) — wie im Monat, für die Zahlen des Jahres. */
+  testzahlungenHinweis: string | null
+}
+
+/**
+ * Alles, was die Seite für EIN Jahr braucht (Register N15, Ergänzung Nr. 100).
+ *
+ * Dieselben drei Abfragen wie `getFinanzen`, unabhängig von der Zahl der
+ * Monate: die Kostenposten, die erste Bestellung und die Bestellungen des
+ * Fensters — vom Jänner des Vorjahrs (falls es Daten hat, für den Vergleich)
+ * bis zum Ende des letzten gezählten Monats. Das Jahr ist die Summe seiner
+ * Monate aus denselben Regeln wie im Monat (`rechneJahr`); kein eigener SQL-Weg
+ * für Geld. Ein Jahr vor den ersten Daten oder nach dem laufenden zeigt das
+ * laufende (`jahrImBereich`).
+ */
+export async function getFinanzenJahr(
+  jahr: number,
+  jetzt: Date = new Date(),
+  stripeLiveAb: Date | null = STRIPE_LIVE_AB
+): Promise<FinanzenJahrDaten> {
+  const { allePosten, ersterBestellmonat } = await ladeGrundlagen()
+  const heute = monatsschluesselInWien(jetzt)
+  // `!` sicher: monatsschluesselInWien liefert immer JJJJ-MM.
+  const laufendesJahr = zerlegeMonat(heute)!.jahr
+  const ersteJahr = ersteDatenJahr(ersterBestellmonat, allePosten.map((p) => p.ab), heute)
+  const gezeigt = jahrImBereich(jahr, ersteJahr, laufendesJahr)
+  const hatVorjahr = gezeigt - 1 >= ersteJahr
+
+  const letzterMonat = gezeigt === laufendesJahr ? heute : monatsschluessel(gezeigt, 12)
+  const fensterVon = monatsgrenzenWienFuer(monatsschluessel(hatVorjahr ? gezeigt - 1 : gezeigt, 1)).von
+  const fensterBis = monatsgrenzenWienFuer(letzterMonat).bis
+  const fuerRegel = await ladeBestellungen(fensterVon, fensterBis)
+
+  const posten: KostenpostenFuerJahr[] = allePosten
+  const rechnung = rechneJahr({ jahr: gezeigt, heute, bestellungen: fuerRegel, posten, stripeLiveAb })
+  const vorjahr = hatVorjahr ? rechneJahr({ jahr: gezeigt - 1, heute, bestellungen: fuerRegel, posten, stripeLiveAb }) : null
+
+  return {
+    jahr: gezeigt,
+    vorigesJahr: hatVorjahr ? gezeigt - 1 : null,
+    naechstesJahr: gezeigt < laufendesJahr ? gezeigt + 1 : null,
+    rechnung,
+    vorjahr,
+    vergleichAb: ersteJahr + 1,
+    testzahlungenHinweis:
+      stripeLiveAb !== null && testzahlungenBetroffen(fuerRegel, stripeLiveAb, GEZAEHLTE_TOEPFE)
+        ? testzahlungenHinweis(stripeLiveAb)
+        : null,
+  }
 }
 
 /** Der Monat, den die Seite ohne Parameter zeigt. */

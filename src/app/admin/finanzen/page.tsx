@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
-import { ChevronLeft, ChevronRight, Wallet } from 'lucide-react'
+import { Wallet } from 'lucide-react'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
 import { aktuellerFinanzMonat, getFinanzen, type FinanzenDaten } from '@/server/queries/finanzen'
@@ -12,6 +11,7 @@ import {
   EINNAHMEN_PROVISION_LABEL,
   EINNAHMEN_VOR_ORT_LABEL,
   FINANZEN_FUSSZEILE,
+  finanzenJahrAdresse,
   STRIPE_HINWEIS,
   kostendeckungSatz,
 } from '@/lib/finanzen'
@@ -23,15 +23,13 @@ import {
   finanzenReiterLabel,
   finanzenUnterreiter,
   grundgebuehrenKachel,
-  type FinanzenReiterId,
 } from '@/lib/admin-finanzen-seite'
 import type { KennzahlDaten } from '@/lib/admin-seiten'
 import { vergebeneGruendungsplaetze } from '@/lib/gruendungshof'
-import { finanzenReiterAus } from '@/schemas/admin-reiter'
+import { finanzenReiterAus, finanzenZeitraumAus } from '@/schemas/admin-reiter'
 import { cn } from '@/lib/utils'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ProgressBar } from '@/components/ui/progress-bar'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { KARTE, KICKER, LEISE } from '@/components/hof-bestellungen/stil'
 import { ADMIN_RAHMEN, AdminFehler } from '@/components/admin/admin-teile'
 import { Kennzahlen } from '@/components/admin/kennzahlen'
@@ -39,6 +37,8 @@ import { Seitenkopf } from '@/components/admin/seitenkopf'
 import { Unterreiter } from '@/components/admin/unterreiter'
 import { DiagrammLegende, FinanzenDiagramm } from './finanzen-diagramm'
 import { KostenListe } from './kosten-liste'
+import { ladeJahrSeite } from './jahr-seite'
+import { ZeitraumPfeil, ZeitraumUmschalter } from './zeitraum-wahl'
 import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = { title: `Finanzen — Admin — ${MARKE}` }
@@ -64,13 +64,17 @@ export const dynamic = 'force-dynamic'
 export default async function AdminFinanzenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ monat?: string; reiter?: string }>
+  searchParams: Promise<{ monat?: string; reiter?: string; zeitraum?: string; jahr?: string }>
 }): Promise<React.JSX.Element> {
   await verlangeAdminSeite()
 
-  const { monat: gewuenscht, reiter: gewaehlterReiter } = await searchParams
+  const { monat: gewuenscht, reiter: gewaehlterReiter, zeitraum: gewaehlterZeitraum, jahr: gewuenschtesJahr } = await searchParams
   // Auch der Reiter ist Fremdtext aus der Adresse: Unbekanntes ist der Monat (Zod, src/schemas/admin-reiter.ts).
   const reiter = finanzenReiterAus(gewaehlterReiter)
+  // Ohne gültigen `zeitraum` bleibt alles, wie es war: der Monat. Das Jahr (Nr. 100) hat seine eigene Seite darunter.
+  if (finanzenZeitraumAus(gewaehlterZeitraum) === 'jahr') {
+    return ladeJahrSeite({ jahrParameter: gewuenschtesJahr, reiter, jetzt: new Date() })
+  }
   // Ungültiges still verwerfen und den laufenden Monat zeigen (ARCHITECTURE §4):
   // Eine Adresszeile ist Fremdtext, kein Grund für eine Fehlerseite.
   const monat = typeof gewuenscht === 'string' && istMonatsschluessel(gewuenscht) ? gewuenscht : aktuellerFinanzMonat()
@@ -146,15 +150,30 @@ export default async function AdminFinanzenPage({
         // Leise, nur wenn eine gezeigte Zahl eine Testzahlung auslässt (finanzseiteLaesstTestzahlungenAus, Register Z4).
         hinweis={daten.testzahlungenHinweis}
         rechts={
-          /* Links statt Knöpfe: Der Monat steht in der Adresse, also ist er
-             teilbar und der Zurück-Pfeil des Browsers tut das Richtige. */
-          <nav aria-label="Monat wählen" className="flex items-center gap-1.5">
-            <MonatsPfeil monat={daten.vorigerMonat} reiter={reiter} richtung="zurueck" />
-            <span className="min-w-[9.5rem] text-center text-[15px] font-semibold text-foreground" aria-current="page">
-              {daten.bezeichnung}
-            </span>
-            <MonatsPfeil monat={daten.naechsterMonat} reiter={reiter} richtung="vor" />
-          </nav>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <ZeitraumUmschalter
+              aktiv="monat"
+              monatHref={finanzenAdresse({ monat: daten.monat, reiter })}
+              jahrHref={finanzenJahrAdresse({ jahr: Number(daten.monat.slice(0, 4)), reiter })}
+            />
+            {/* Links statt Knöpfe: Der Monat steht in der Adresse, also ist er
+                teilbar und der Zurück-Pfeil des Browsers tut das Richtige. */}
+            <nav aria-label="Monat wählen" className="flex items-center gap-1.5">
+              <ZeitraumPfeil
+                href={daten.vorigerMonat === null ? null : finanzenAdresse({ monat: daten.vorigerMonat, reiter })}
+                beschriftung="Vorheriger Monat"
+                richtung="zurueck"
+              />
+              <span className="min-w-[9.5rem] text-center text-[15px] font-semibold text-foreground" aria-current="page">
+                {daten.bezeichnung}
+              </span>
+              <ZeitraumPfeil
+                href={daten.naechsterMonat === null ? null : finanzenAdresse({ monat: daten.naechsterMonat, reiter })}
+                beschriftung="Nächster Monat"
+                richtung="vor"
+              />
+            </nav>
+          </div>
         }
       />
 
@@ -236,33 +255,5 @@ export default async function AdminFinanzenPage({
 
       <p className={cn('text-[12.5px] leading-relaxed', LEISE)}>{FINANZEN_FUSSZEILE}</p>
     </div>
-  )
-}
-
-/** Ein Monatspfeil — oder ein stiller Platzhalter, wo es nichts mehr gibt. */
-function MonatsPfeil({
-  monat,
-  reiter,
-  richtung,
-}: {
-  monat: string | null
-  /** Der Reiter bleibt beim Blättern stehen. */
-  reiter: FinanzenReiterId
-  richtung: 'zurueck' | 'vor'
-}): React.JSX.Element {
-  const Symbol = richtung === 'zurueck' ? ChevronLeft : ChevronRight
-  if (monat === null) {
-    // Kein ausgegrauter Knopf, der nichts tut: Die Fläche bleibt, damit der
-    // Monatsname nicht springt, aber es gibt nichts zu treffen.
-    return <span aria-hidden="true" className="block size-11" />
-  }
-  return (
-    <Link
-      href={finanzenAdresse({ monat, reiter })}
-      aria-label={richtung === 'zurueck' ? 'Vorheriger Monat' : 'Nächster Monat'}
-      className={cn('flex size-11 items-center justify-center rounded-full border border-border text-foreground hover:bg-muted', FOKUS_RAHMEN)}
-    >
-      <Symbol className="size-4" strokeWidth={1.7} aria-hidden="true" />
-    </Link>
   )
 }
