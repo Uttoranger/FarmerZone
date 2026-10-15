@@ -484,7 +484,7 @@ export const DEIN_STAND_STARTPHASE: DeinStand = {
 export function baueGruendungsZusage(bis: Date): string {
   return (
     `${HOFLADEN_NAME} ${TARIF_ZEILE.gruendungshof.zeile} ${formatDatumLang(bis)}. ` +
-    `Danach gelten die normalen Tarife – ohne Wahl ${HOFTOR_NAME}, ${KOSTENLOS}.`
+    `Danach wählst du deinen Tarif – ohne Wahl bleibt ${HOFTOR_NAME}, ${KOSTENLOS}.`
   )
 }
 

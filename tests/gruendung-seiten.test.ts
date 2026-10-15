@@ -146,7 +146,8 @@ describe('GRUENDUNG_TEXT — der Wortlaut der Entscheidung (K2-Ergänzung)', () 
     expect(satz(GRUENDUNG_TEXT.satz(5, 12, '2027-12-31'))).toBe('Noch 5 von 12 Gründungsplätzen frei – Hofladen kostenlos bis 31. Dezember 2027.')
     expect(GRUENDUNG_TEXT.pill(5, 12)).toBe('Gründungsphase · noch 5 von 12 Plätzen')
     expect(lang(GRUENDUNG_TEXT.fussnote('2027-12-31').join(' · '))).toBe(
-      'Kostenlos bis 31. Dezember 2027 · danach Tarif nach Wahl · monatlich kündbar · keine Bankdaten nötig'
+      // Korrektur 15.10.2026 (Register K2): „keine Bankdaten nötig“ gestrichen – Stripe verlangt beim Einrichten ein Auszahlungskonto.
+      'Kostenlos bis 31. Dezember 2027 · danach Tarif nach Wahl · monatlich kündbar'
     )
     expect(satz(GRUENDUNG_TEXT.registrieren(8, '2027-12-31'))).toBe(
       'Du wärst voraussichtlich Gründungshof Nr. 8 – Hofladen kostenlos bis 31. Dezember 2027. Die Zusage kommt mit der Freischaltung.'

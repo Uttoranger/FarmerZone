@@ -96,8 +96,8 @@ const NACH_STICHTAG = new Date(TARIFE_AB.getTime() + 24 * 3600 * 1000)
 const LANG = 'Biohof am Sonnenhang mit Hofladen, Bauernbrot aus dem Holzofen und Eiern vom Freiland'
 /** Eine DATE-Spalte kommt aus Prisma als UTC-Mitternacht des Tages (wie in tests/tarif-zeile.test.ts). */
 const BIS_SILVESTER_2027 = new Date('2027-12-31T00:00:00.000Z')
-/** Die Zusage eines Gründungshofs (K2), wörtlich wie in der Freigabe für Nr. 62. */
-const ZUSAGE_2027 = 'Hofladen ohne Grundgebühr bis 31. Dezember 2027. Danach gelten die normalen Tarife – ohne Wahl Hoftor, kostenlos.'
+/** Die Zusage eines Gründungshofs (K2) – zweiter Satz seit der Korrektur vom 15.10.2026 im Register K2. */
+const ZUSAGE_2027 = 'Hofladen ohne Grundgebühr bis 31. Dezember 2027. Danach wählst du deinen Tarif – ohne Wahl bleibt Hoftor, kostenlos.'
 /** Das geschützte Leerzeichen nach dem Tag ist Satz, nicht Wortlaut. */
 const normal = (text: string): string => text.replace(/ /g, ' ')
 
