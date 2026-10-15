@@ -19,7 +19,8 @@
     "db:generate": "dotenv -e .env.local -- prisma generate",
     "briefkasten": "dotenv -e .env.local -- tsx scripts/briefkasten.ts",
     "bausteine": "tsx scripts/bausteine.ts",
-    "illustrationen": "tsx scripts/illustrationen.ts"
+    "illustrationen": "tsx scripts/illustrationen.ts",
+    "marke": "tsx scripts/marke.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

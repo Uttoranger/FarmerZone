@@ -374,7 +374,8 @@ export function StartseiteFuss({ jahr }: { jahr: number }): React.JSX.Element {
     <footer className="border-t border-border py-10 md:pt-10 md:pb-[46px]">
       <div className={cn(CONTAINER, 'flex flex-col gap-8 md:flex-row md:gap-[70px]')}>
         <div className="flex flex-col gap-2.5 md:w-[300px]">
-          <Wortmarke />
+          {/* Der Fuß steht nicht im ersten Blick — vorab geladen wird die Marke nur in der Kopfzeile. */}
+          <Wortmarke priority={false} />
           <p className="text-[13px] leading-normal text-muted-foreground">
             Regional einkaufen, direkt beim Hof abholen. Aus Österreich, für Österreich.
           </p>

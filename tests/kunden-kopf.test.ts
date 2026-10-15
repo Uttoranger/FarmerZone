@@ -97,11 +97,11 @@ describe('rueckweg — übrige Seiten', () => {
 })
 
 describe('kopfForm — welche Seite welche Form bekommt', () => {
-  it('Zurück in der Handy-Leiste überall, wo es woanders hinführt als das F-Icon', () => {
+  it('Zurück in der Handy-Leiste überall, wo es woanders hinführt als das Bildmarke', () => {
     for (const seite of [HOFSEITE, FUTTER_HOFSEITE, CHECKOUT, INFO]) {
       expect(kopfForm(seite).zurueck, seite.art).toBe(true)
     }
-    // Die Hofübersicht führt hinauf zur Startseite — das tut das F-Icon schon.
+    // Die Hofübersicht führt hinauf zur Startseite — das tut das Bildmarke schon.
     expect(kopfForm(HOFUEBERSICHT).zurueck).toBe(false)
   })
   it('Warenkorb-Symbol weder auf der Hofseite noch im Checkout — sonst ja', () => {

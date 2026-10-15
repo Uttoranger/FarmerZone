@@ -4,8 +4,12 @@ import { NextRequest } from 'next/server'
 import { stripStatusVariables } from '@/lib/status-body'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { MARKE } from '@/lib/marke'
+import { MARKE_RUNDUNG_PROZENT, ladeMarkeDataUrl } from '@/lib/marke-bild'
 
 export const runtime = 'nodejs'
+
+/** Die Bildmarke im Fuß: 64 px, über der Grenze von 48 px, also die volle Fassung. */
+const MARKE_KANTE = 64
 
 const ANLASS_LABEL: Record<string, string> = {
   FRESH_PRODUCT: 'Frisches Produkt',
@@ -32,6 +36,8 @@ export async function GET(
   const anlassLabel = ANLASS_LABEL[post.anlass] ?? 'Mitteilung'
   const cleanBody = stripStatusVariables(post.body)
   const displayBody = cleanBody.length > 180 ? cleanBody.slice(0, 180) + '…' : cleanBody
+  // Die Bildmarke als Bild aus public/marke (Register M1, Nr. 92): Satori zeichnet SVG als <img>, gezeichnet wird sie nirgends.
+  const marke = await ladeMarkeDataUrl('voll')
 
   return new ImageResponse(
     (
@@ -156,6 +162,19 @@ export async function GET(
               </div>
               <div style={{ fontSize: '28px', color: '#5C6F65' }}>{`via ${MARKE}`}</div>
             </div>
+            {/* eslint-disable-next-line @next/next/no-img-element -- Satori (next/og) zeichnet nur <img>, next/image gibt es dort nicht */}
+            <img
+              src={marke}
+              alt=""
+              width={MARKE_KANTE}
+              height={MARKE_KANTE}
+              style={{
+                width: `${MARKE_KANTE}px`,
+                height: `${MARKE_KANTE}px`,
+                borderRadius: `${Math.round((MARKE_KANTE * MARKE_RUNDUNG_PROZENT) / 100)}px`,
+                flexShrink: 0,
+              }}
+            />
           </div>
         </div>
       </div>

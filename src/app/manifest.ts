@@ -8,9 +8,11 @@ import { MARKE } from '@/lib/marke'
  * auf dem cloud-ausgelagerte Fotos zuverlässig ankommen, während der
  * Datei-Picker für sie tote Referenzen liefert.
  *
- * Die Icons (Sprint „Marke und Startseite aus einem Guss"): 192 und 512 für
- * Startbildschirm und Splash-Screen (purpose any), dazu eine maskierbare
- * Fassung mit Schutzrand, die Android in Kreis oder Tropfen beschneiden darf.
+ * Die Icons kommen aus `pnpm marke` (scripts/marke.ts; Register M1, Nr. 92)
+ * aus den zwei Marken-SVG unter public/marke — nichts wird von Hand erzeugt:
+ * 192 und 512 für Startbildschirm und Splash-Screen (purpose any, Kachel mit
+ * 22 % Rundung), dazu die maskierbare Fassung mit der Zeichnung in der
+ * inneren 80-%-Zone, die Android in Kreis oder Tropfen beschneiden darf.
  * Das Favicon (src/app/favicon.ico) und das Apple-Icon (src/app/apple-icon.png)
  * gehören NICHT hierher: Sie wirken über Nexts Dateikonvention als <link> im
  * Kopf jeder Seite. tests/manifest.test.ts prüft, dass jedes Icon hier in

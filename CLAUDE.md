@@ -23,6 +23,7 @@ Solo-Entwickler, ein Pilothof. **Produktivsystem mit echten Bestellungen und ech
 | Migration lokal anwenden | `pnpm db:migrate` — nur lokal, scheitert an Supabase (P3006) |
 | Seed | `pnpm db:seed` |
 | Prisma Studio | `pnpm db:studio` |
+| Marken-Icons erzeugen (Favicon, icon.svg, Apple-Icon, App-Icons aus `public/marke/*.svg`) | `pnpm marke` |
 
 - Paketmanager ist **pnpm 10.33.0**. Nie `npm` oder `yarn` benutzen.
 - `db:*`-Skripte laden `.env.local` über `dotenv-cli`. Ohne diesen Vorsatz läuft Prisma gegen die falsche DB.

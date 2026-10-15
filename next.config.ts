@@ -60,9 +60,12 @@ const nextConfig: NextConfig = {
     // zeichnet: dieselben Binärpakete wie oben.
     // Der Schlüssel ist ein Glob auf den Routenpfad ohne Gruppe „(public)";
     // die eckigen Klammern sind maskiert, sonst wären sie eine Zeichenklasse.
+    // Status-Bild: Die Bildmarke kommt als Datei aus public/marke (Nr. 92), gelesen wie die Schriften unten.
+    '/api/status-image/\\[id\\]': ['./public/marke/*.svg'],
     '/\\[farmSlug\\]/opengraph-image': [
       './src/assets/fonts/**/*.ttf',
       './public/categories/**/*.webp',
+      './public/marke/*.svg',
       './node_modules/.pnpm/@img+sharp-libvips-linux-x64@*/node_modules/@img/sharp-libvips-linux-x64/**/*',
       './node_modules/.pnpm/@img+sharp-linux-x64@*/node_modules/@img/sharp-linux-x64/**/*',
     ],

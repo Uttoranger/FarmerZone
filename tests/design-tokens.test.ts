@@ -298,7 +298,6 @@ describe('Hexwerte im Code (Register G5)', () => {
     { pfad: /^src\/lib\/mein-hof\.ts$/, nurIn: 'TITELBILD_VERLAEUFE', grund: 'Die Titelbild-Verläufe ersetzen ein Foto und folgen dem Modus nicht — nur diese Tabelle.' },
     { pfad: /^src\/lib\/farbraum\.ts$/, grund: 'Die Farbumrechnung liest und schreibt Hexwerte als Daten.' },
     { pfad: /^src\/components\/checkout\/stripe-payment\.tsx$/, grund: 'Stripe Elements zeichnen in einem fremden Rahmen und kennen die CSS-Variablen der Seite nicht.' },
-    { pfad: /^src\/components\/shared\/wortmarke\.tsx$/, grund: 'Die Wortmarke ist das Logo und folgt dem Modus nicht.' },
   ]
 
   /**

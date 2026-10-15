@@ -446,6 +446,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Offen (Projektleitung):** Markenprüfung in TMview (gleichnamige App „Agrilo" eines anderen Anbieters), Stripe-Anzeigename auf der Kartenabrechnung, Vercel-Plan Pro vor Stripe-Live.
 - **Verhältnis zu anderen Einträgen:** ergänzt Z3 (die Testumgebung heißt test.agrilo.at) und S16 (trustedOrigins).
 - **Umsetzung:** Nr. 91 (freigabe.md §17). Den Cutover (Variablen, Umleitungen, Stripe-Adressen) macht die Projektleitung nach §2 der Freigabe, nicht der Lauf.
+- **Ergänzung Bildmarke (uttoranger, im Chat, 14.10.2026; Nr. 92):** Es gibt EINE Bildmarke in zwei Fassungen derselben Form — voll ab 48 px, klein darunter (Favicon 16/32, Kopfzeile 32). Farben fest: Kachel #2D5F3F, Zeichnung #F3EDE0, Blatt #D07A45; kein Wechsel mit Hell/Dunkel. Die Kachel ist Teil der Marke; ihre Rundung (22 %) entsteht im Skript (`pnpm marke`) bzw. per CSS, nie im SVG. Quelle: `public/marke/agrilo-icon-voll.svg` und `agrilo-icon-klein.svg` (dazu PNG 1024/2048) sowie `public/og/startseite.jpg` (1200 × 630, der Text ist Teil des Bildes); Mockup `docs/mockups/system-m1-marke-agrilo-entscheidung.html` (gilt; `system-m1-marke-agrilo.html` sind die Varianten der Vorarbeit, nur Dokumentation). Die drei bisherigen Zeichnungen — Blatt im Kreis (Wortmarke), Blatt im Kreis (Teilen-Bild), F-Icon (public/icons, apple-icon.png, favicon.ico, og/startseite.jpg) — entfallen ersatzlos. Regeln: `docs/ai/DESIGN_SYSTEM.md`, Abschnitt „Marke“.
 
 ---
 

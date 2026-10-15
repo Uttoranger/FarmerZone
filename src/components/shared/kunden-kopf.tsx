@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, type MouseEvent, type RefObject } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Menu, Share2, ShoppingCart, UserRound, X } from 'lucide-react'
@@ -13,6 +12,8 @@ import { useWarenkorbKopf } from '@/lib/use-warenkorb-kopf'
 import { eigenerVorgaengerJetzt, merkeHinauf } from '@/components/shared/rueckweg-merker'
 import { ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
 import { Wortmarke } from '@/components/shared/wortmarke'
+import { Bildmarke } from '@/components/shared/bildmarke'
+import { MARKE_KOPF_PX, MARKE_KOPF_RUNDUNG_PROZENT } from '@/lib/marke-bild'
 import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { MARKE } from '@/lib/marke'
 
@@ -33,13 +34,13 @@ export const SPRUNGZIEL_OHNE_KOPF = 'scroll-mt-14'
  *
  * HANDY (unter md): eine klebende Leiste, 56 px, auf jeder Kundenseite von
  * Anfang an — auch auf der Hofseite, dort ÜBER dem Titelbild. Links Zurück
- * (wo es woanders hinführt als nach Hause) und das F-Icon mit dem Namen
+ * (wo es woanders hinführt als nach Hause) und die Bildmarke mit dem Namen
  * als Weg zur Startseite, rechts der Warenkorb, „Anmelden" bzw. mit
  * Hof-Sitzung „Mein Hof" (Register N1, kopfKnopf) und das Menü. Hell/Dunkel
  * steht im Menü-Blatt. Kundenseiten haben keine Leiste unten; diese eine
  * Leiste trägt alle Wege, die im Browser die Kopfzeile trägt. Auf der
  * Hofseite erscheint in der Mitte der Hofname, sobald die Überschrift aus dem
- * Blick ist — dann tritt der Name zurück und nur das F-Icon
+ * Blick ist — dann tritt der Name zurück und nur die Bildmarke
  * bleibt als Weg nach Hause.
  *
  * BROWSER (ab md): eine Kopfzeile, 64 px — Name, Höfe entdecken, Für
@@ -97,7 +98,8 @@ export function KundenKopf({
               aria-label={`${MARKE} — zur Startseite`}
               className={`flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg px-0.5 ${FOKUS}`}
             >
-              <FIcon />
+              {/* Die kleine Fassung der Bildmarke wie in der Wortmarke (Register M1): unter 48 px nie die volle. */}
+              <Bildmarke groesse={MARKE_KOPF_PX} fassung="klein" rundung={MARKE_KOPF_RUNDUNG_PROZENT} priority />
               {/* Kompakt (16 px, enge Abstände), damit das Wort bei 390 px auch neben
                   Warenkorb und „Anmelden" stehen bleibt. Erst darunter tritt es
                   zurück — gemessen: WORT_PLATZ. */}
@@ -111,7 +113,7 @@ export function KundenKopf({
             </Link>
           </div>
           {/* Mitte der Leiste, nicht der Restfläche: links stehen Zurück und
-              F-Icon, rechts nur das Menü — gleicher Abstand zu beiden Rändern
+              Bildmarke, rechts nur das Menü — gleicher Abstand zu beiden Rändern
               (6rem = 8px Rand + zwei 44-px-Knöpfe). Die Schrift der Hofseite
               (app-*), sonst zwei Dunkeltöne übereinander. */}
           {nameInLeiste && (
@@ -221,18 +223,6 @@ function KopfKnopf({ punkt }: { punkt: KundenNavPunkt }) {
  */
 const RUND =
   'inline-flex size-11 items-center justify-center rounded-full bg-white/90 text-[#2D5F3F] shadow-[0_2px_8px_rgba(0,0,0,0.18)] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2D5F3F] focus-visible:ring-offset-2 focus-visible:ring-offset-white'
-
-/**
- * Das F-Icon — dasselbe Bild wie das App-Symbol auf dem Startbildschirm.
- * Behält seine Farben in beiden Modi (ein Logo, das je nach Einstellung
- * anders aussieht, ist kein Logo mehr); die dunkelgrüne Fläche trägt sich
- * auf hellem und dunklem Grund.
- */
-function FIcon() {
-  return (
-    <Image src="/icons/icon-192.png" alt="" width={32} height={32} className="size-8 shrink-0 rounded-lg" aria-hidden="true" />
-  )
-}
 
 /**
  * Das Menü als Blatt von rechts. Escape, ein Tipp daneben und der Schließen-
