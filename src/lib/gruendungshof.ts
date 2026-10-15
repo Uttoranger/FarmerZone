@@ -369,12 +369,15 @@ export const GRUENDUNG_TEXT = {
   pill: (frei: number, gesamt: number): string => `Gründungsphase · noch ${frei} von ${gesamt} Plätzen`,
   /** (2) Der eine orange Knopf auf /fuer-hoefe. */
   knopf: 'Gründungshof werden',
-  /** (2) Die Fußnote unter den Knöpfen; der letzte Teil am Handy nicht (Mockup mobil-k2-fuer-hoefe-gruendung). */
+  /**
+   * (2) Die Fußnote unter den Knöpfen, auch am Handy ganz (Mockup mobil-k2-fuer-hoefe-gruendung).
+   * „keine Bankdaten nötig“ ist gestrichen (Register K2, Korrektur 15.10.2026): Stripe verlangt
+   * beim Einrichten ein Auszahlungskonto.
+   */
   fussnote: (bisTag: string): readonly string[] => [
     `Kostenlos bis ${gruendungTagLang(bisTag)}`,
     'danach Tarif nach Wahl',
     MONATLICH_KUENDBAR,
-    'keine Bankdaten nötig',
   ],
   /** (2) Die Angebotszeile direkt über den Tarifkarten. */
   preiszeile: (frei: number, gesamt: number, bisTag: string): GruendungSatzTeile => ({

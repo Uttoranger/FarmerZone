@@ -143,7 +143,12 @@ describe('/fuer-hoefe', () => {
     expect(kopf).toMatch(/<a href="\/register"[^>]*bg-primary[^>]*>Gründungshof werden<\/a>/)
     expect(kopf).not.toContain('Kostenlos starten')
     expect(kopf).toContain('Kostenlos bis 31. Dezember 2027')
-    expect(kopf).toContain('keine Bankdaten nötig')
+    // Korrektur 15.10.2026 (Register K2): ohne „keine Bankdaten nötig“, und die ganze Fußnote auch am Handy
+    // (Mockup mobil-k2-fuer-hoefe-gruendung zeigt alle drei Teile) – kein Teil nur ab 768 px.
+    expect(kopf).not.toContain('Bankdaten')
+    const fussnote = kopf.match(/<p[^>]*>(?:(?!<\/p>)[\s\S])*Kostenlos bis(?:(?!<\/p>)[\s\S])*<\/p>/)?.[0] ?? ''
+    expect(fussnote.replace(/<[^>]+>/g, '')).toMatch(/^Kostenlos bis 31\.[\s\u00a0]Dezember 2027 · danach Tarif nach Wahl · monatlich kündbar$/)
+    expect(fussnote).not.toContain('hidden')
     expect(kopf).not.toContain(UEBERGANG)
     expect(anzahl(kopf, ORANGE_KNOPF)).toBe(1)
   })

@@ -210,7 +210,7 @@ describe('gruendungsKonditionenText — die Zusage K2 aus einer Quelle', () => {
   it('nennt das Datum lang und die normale Regel danach, ohne Provision und ohne „dauerhaft"', () => {
     const text = gruendungsKonditionenText(GRUENDUNG_BIS_STANDARD)
     expect(text).toBe(
-      'Hofladen ohne Grundgebühr bis 31. Dezember 2027. Danach gelten die normalen Tarife – ohne Wahl Hoftor, kostenlos.'
+      'Hofladen ohne Grundgebühr bis 31. Dezember 2027. Danach wählst du deinen Tarif – ohne Wahl bleibt Hoftor, kostenlos.'
     )
     expect(text).not.toMatch(/%|dauerhaft/)
   })

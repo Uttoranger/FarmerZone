@@ -83,13 +83,7 @@ export function FuerHoefeEinstieg({ gruendung = null }: { gruendung?: GruendungS
           {gruendung?.zeigen ? (
             // Die Fußnote statt des Übergangs (Mockup); den Übergang K1 nennt der Abschnitt Preise.
             <p className="max-w-[34rem] text-[13px] leading-normal text-muted-foreground">
-              {GRUENDUNG_TEXT.fussnote(gruendung.bisTag).map((teil, i, alle) => (
-                // Der letzte Teil erst ab 768 px (Mockup mobil-k2-fuer-hoefe-gruendung).
-                <span key={teil} className={i === alle.length - 1 ? 'hidden md:inline' : undefined}>
-                  {i > 0 && ' · '}
-                  {teil}
-                </span>
-              ))}
+              {GRUENDUNG_TEXT.fussnote(gruendung.bisTag).join(' · ')}
             </p>
           ) : (
             <p className="max-w-[34rem] text-[13px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
