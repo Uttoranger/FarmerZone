@@ -8,7 +8,7 @@ import { MELDUNG_KLICK_TEXT, kiEntscheidung, type TriageStand } from '@/lib/meld
 import { cn } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
-import { KARTE, KICKER, KNOPF_RAHMEN, TEXT_GRUEN } from '@/components/hof-bestellungen/stil'
+import { KARTE, KICKER, KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { useMeldungenWerkzeug } from './meldungen-werkzeug'
 
 /**
@@ -62,16 +62,21 @@ function useKiEntscheidung(meldungId: string, stand: TriageStand): { entscheide:
   return { entscheide, laeuft, fehler }
 }
 
-/** Die zwei Knöpfe — nebeneinander, je mindestens 44 px (Mockup mobil-admin-postfach-meldungen). */
+/**
+ * Die zwei Knöpfe — nebeneinander, je mindestens 44 px. Gewichtung wie in den
+ * Mockups admin-postfach-meldungen-ablauf und mobil-admin-postfach-meldungen:
+ * „Ja" grün gefüllt, „Nein" mit Rahmen; am Handy beide gleich breit (flex 1),
+ * ab 1024 px in Inhaltsbreite, in einer schmalen Spalte dürfen sie umbrechen.
+ */
 export function KiKnoepfe({ meldungId, stand }: { meldungId: string; stand: TriageStand }): React.JSX.Element {
   const { entscheide, laeuft, fehler } = useKiEntscheidung(meldungId, stand)
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={laeuft} onClick={() => entscheide(true)} className={cn(KNOPF_RAHMEN, 'px-4')}>
+      <div className="flex gap-2 lg:flex-wrap">
+        <button type="button" disabled={laeuft} onClick={() => entscheide(true)} className={cn(KNOPF_GRUEN, 'flex-1 px-4 lg:flex-none')}>
           {MELDUNG_KLICK_TEXT.jaWunsch}
         </button>
-        <button type="button" disabled={laeuft} onClick={() => entscheide(false)} className={TEXT_GRUEN}>
+        <button type="button" disabled={laeuft} onClick={() => entscheide(false)} className={cn(KNOPF_RAHMEN, 'flex-1 px-4 lg:flex-none')}>
           {MELDUNG_KLICK_TEXT.neinFehler}
         </button>
       </div>
