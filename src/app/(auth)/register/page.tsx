@@ -7,6 +7,8 @@ import { FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { RegisterForm } from './register-form'
 import { MARKE } from '@/lib/marke'
+import { gruendungFuerSeiten } from '@/server/queries/plattform-einstellung'
+import { RegistrierenSatz } from '@/components/gruendung/registrieren-satz'
 
 export const metadata: Metadata = {
   title: `Hof registrieren — ${MARKE}`,
@@ -30,7 +32,10 @@ export const dynamic = 'force-dynamic'
  * Formular „Schon dabei?" (SCHON_DABEI, Register N1) — vorher „Schon
  * registriert?".
  */
-export default function RegisterPage(): React.JSX.Element {
+export default async function RegisterPage(): Promise<React.JSX.Element> {
+  // Der voraussichtliche Gründungsplatz (Register K2-Ergänzung, Nr. 93) — die
+  // Seite ist ohnehin dynamisch, die Zahl also je Aufruf frisch.
+  const gruendung = await gruendungFuerSeiten()
   return (
     <KundeFokusShell
       titel="Hof registrieren"
@@ -51,7 +56,7 @@ export default function RegisterPage(): React.JSX.Element {
         </span>
       }
     >
-      <RegisterForm formToken={generateFormToken()} />
+      <RegisterForm formToken={generateFormToken()} gruendungSatz={<RegistrierenSatz gruendung={gruendung} className="-mt-2 mb-5" />} />
     </KundeFokusShell>
   )
 }

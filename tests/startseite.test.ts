@@ -78,7 +78,7 @@ import { HoefeInDerNaehe, HofKarten, HofKartenFehler, HofKartenSkelett } from '@
 import {
   BrennmaterialBand,
   Fragen,
-  FuerHoefeBand,
+  FuerHoefeBandInhalt,
   FutterAbschnitt,
   SoFunktionierts,
   StartseiteFuss,
@@ -536,7 +536,7 @@ describe('Sprungmarken für die Navigation der KundeShell', () => {
   it('„Für Höfe" führt seit Nr. 15 auf die eigene Seite — das Band verlinkt sie und behält seine Marke', () => {
     expect(web).toContain('/fuer-hoefe')
     expect(web).not.toContain('/#fuer-hoefe')
-    const band = html(createElement(FuerHoefeBand))
+    const band = html(createElement(FuerHoefeBandInhalt))
     expect(band).toMatch(/<section id="fuer-hoefe"/)
     expect(band).toContain('href="/fuer-hoefe"')
   })
@@ -567,7 +567,7 @@ describe('Abschnitte', () => {
   })
 
   it('keine erfundenen Preise: Futter, Brennmaterial und „Für Höfe" nennen keinen Betrag (E6)', () => {
-    for (const element of [createElement(FutterAbschnitt), createElement(BrennmaterialBand), createElement(FuerHoefeBand)]) {
+    for (const element of [createElement(FutterAbschnitt), createElement(BrennmaterialBand), createElement(FuerHoefeBandInhalt)]) {
       expect(html(element)).not.toMatch(/€/)
     }
     // Gegenprobe: Wo ein Betrag steht, findet die Suche ihn.
@@ -581,13 +581,13 @@ describe('Abschnitte', () => {
   })
 
   it('Für Höfe: keine unbelegte Zeitangabe', () => {
-    const text = html(createElement(FuerHoefeBand))
+    const text = html(createElement(FuerHoefeBandInhalt))
     expect(text).not.toMatch(/zehn Minuten|Minuten/)
     expect(text).toContain('Schnell eingerichtet')
   })
 
   it('Für Höfe: registrieren in Orange, „Mehr für Höfe" zur Seite für Höfe (seit Nr. 15)', () => {
-    const text = html(createElement(FuerHoefeBand))
+    const text = html(createElement(FuerHoefeBandInhalt))
     expect(text).toMatch(/<a href="\/register"[^>]*bg-primary/)
     expect(text).toContain('href="/fuer-hoefe"')
   })
@@ -641,7 +641,7 @@ describe('Themes: Farben nur über Tokens', () => {
     html(createElement(FutterAbschnitt)),
     html(createElement(BrennmaterialBand)),
     html(createElement(SoFunktionierts, { rechnung: beispielRechnung(JETZT) })),
-    html(createElement(FuerHoefeBand)),
+    html(createElement(FuerHoefeBandInhalt)),
     html(createElement(Fragen, { jetzt: JETZT })),
     html(createElement(StartseiteFuss, { jahr: 2026 })),
   ]

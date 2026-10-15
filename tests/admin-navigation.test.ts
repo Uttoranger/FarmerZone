@@ -14,11 +14,13 @@ import { join } from 'node:path'
 import { ADMIN_KONTO, ADMIN_REITER, ADMIN_ZURUECK, adminAktiverReiter, kontoHatHof } from '@/lib/admin-navigation'
 
 describe('Admin-Reiter', () => {
-  it('Höfe · Postfach · Finanzen, Zähler an Höfe und Postfach', () => {
+  it('Höfe · Postfach · Finanzen · Einstellungen, Zähler an Höfe und Postfach', () => {
     expect(ADMIN_REITER.map((r) => [r.label, r.href, r.zahl])).toEqual([
       ['Höfe', '/admin', 'hoefe'],
       ['Postfach', '/admin/postfach', 'briefkasten'],
       ['Finanzen', '/admin/finanzen', undefined],
+      // Seit Nr. 93 (Register N15).
+      ['Einstellungen', '/admin/einstellungen', undefined],
     ])
   })
 
@@ -42,6 +44,7 @@ describe('Admin-Reiter', () => {
     ['/admin/meldungen', 'postfach'],
     ['/admin/meldungen/abc', 'postfach'],
     ['/admin/finanzen', 'finanzen'],
+    ['/admin/einstellungen', 'einstellungen'],
     ['/dashboard', null],
     ['/adminx', null],
   ])('%s → %s', (pfad, id) => {

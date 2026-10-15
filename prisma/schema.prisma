@@ -1183,3 +1183,23 @@ model UnterhaltungStand {
 
   @@id([unterhaltungId, seite])
 }
+
+// Die Einstellungen der Plattform als Ganzes (Admin › Einstellungen, Register
+// K2-Ergänzung und N15, Nr. 93) — genau EINE Zeile mit der Kennung
+// "plattform", angelegt von der Migration. Gelesen wird nur (fehlt die Zeile,
+// gelten die Standardwerte aus src/lib/plattform-einstellung.ts), geschrieben
+// nur aus der Admin-Action. gruendungPlaetze und gruendungBisStandard ersetzen
+// die Konstanten MAX_GRUENDUNGSHOEFE und GRUENDUNG_BIS_STANDARD_TAG als
+// Standard; zustellRegeln nutzt Nr. 95 (Postfach › Zustellung).
+// geaendertVonUserId ist bewusst kein Fremdschlüssel (wie
+// Rundschreiben.erstelltVonUserId): Die Protokollzeile soll ein gelöschtes
+// Konto überleben.
+model PlattformEinstellung {
+  id                   String   @id @default("plattform")
+  gruendungPlaetze     Int      @default(12)
+  gruendungBisStandard DateTime @default(dbgenerated("'2027-12-31'::date")) @db.Date
+  gruendungAnzeige     Boolean  @default(true)
+  zustellRegeln        Json?
+  geaendertVonUserId   String?
+  updatedAt            DateTime @updatedAt
+}
