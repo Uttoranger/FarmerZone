@@ -107,12 +107,17 @@ export async function createFarm(data: {
     // der Betreiber auch über /admin.
     try {
       const { sendNewFarmNotification } = await import('@/lib/email')
-      await sendNewFarmNotification({
-        id: farm.id,
-        name: farm.name,
-        slug: farm.slug,
-        ownerEmail: session.user.email,
-      })
+      // Empfänger und Regel aus der Zustellung (Register N14, Nr. 95).
+      const { ladeBetreiberEmpfaenger } = await import('@/server/queries/postfach')
+      await sendNewFarmNotification(
+        {
+          id: farm.id,
+          name: farm.name,
+          slug: farm.slug,
+          ownerEmail: session.user.email,
+        },
+        await ladeBetreiberEmpfaenger('hofWartet')
+      )
     } catch (err) {
       console.error('[createFarm] Benachrichtigung fehlgeschlagen:', err)
       // Log-Hygiene wie in src/lib/auth.ts: Hofname und Adresse nur außerhalb

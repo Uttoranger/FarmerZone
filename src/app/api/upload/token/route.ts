@@ -3,9 +3,10 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { MAX_ORIGINAL_BYTES, originalPrefix } from '@/lib/upload-pfade'
+import { MAX_ORIGINAL_BYTES, STARTSEITE_ORIGINAL_PREFIX, STARTSEITE_UPLOAD_KENNUNG, originalPrefix } from '@/lib/upload-pfade'
 import { UPLOAD_GESPERRT_TEXT } from '@/lib/email-bestaetigung'
 import { emailBestaetigungOffen } from '@/server/email-bestaetigung'
+import { isAdminUser } from '@/server/queries/admin'
 
 /**
  * Ausgabestelle für signierte Upload-Token.
@@ -41,6 +42,17 @@ async function hofDerSitzung(): Promise<{ id: string } | 'email-offen' | null> {
   return farm
 }
 
+/**
+ * Zweck 'startseite' (Register N16, Nr. 96): Bilder der Startseite lädt der
+ * Admin hoch — die EINE Stelle, an der statt der Hof-Sitzung die Admin-
+ * Sitzung zählt, frisch aus der Datenbank (isAdminUser, wie verlangeAdminSeite).
+ * Alle anderen Zwecke gehen unverändert über hofDerSitzung.
+ */
+async function adminDerSitzung(): Promise<boolean> {
+  const session = await auth.api.getSession({ headers: await headers() })
+  return !!session?.user && (await isAdminUser(session.user.id))
+}
+
 /** Satz für den Bauern und Code für unseren Client (image-upload.tsx). */
 function emailOffenAntwort(status: number): NextResponse {
   return NextResponse.json({ error: UPLOAD_GESPERRT_TEXT, code: 'EMAIL_UNBESTAETIGT' }, { status })
@@ -64,9 +76,12 @@ class EmailOffenFehler extends Error {}
 export async function GET() {
   const farm = await hofDerSitzung()
   if (farm === 'email-offen') return emailOffenAntwort(403)
-  if (!farm) return NextResponse.json({ error: 'Kein Zugriff' }, { status: 403 })
-
-  return NextResponse.json({ farmId: farm.id })
+  if (farm) return NextResponse.json({ farmId: farm.id })
+  // Ein Admin ohne Hof bekommt eine Kennung, mit der nur der Zweck
+  // 'startseite' einen Pfad hat (originalPfad); jeder andere Pfad fällt im
+  // POST unten durch, weil er keinem Hof gehört.
+  if (await adminDerSitzung()) return NextResponse.json({ farmId: STARTSEITE_UPLOAD_KENNUNG })
+  return NextResponse.json({ error: 'Kein Zugriff' }, { status: 403 })
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -77,6 +92,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       body,
       request,
       onBeforeGenerateToken: async (pathname) => {
+        // Startseiten-Ordner: nur mit Admin-Sitzung, sonst nichts (auch kein Hof).
+        if (pathname.startsWith(STARTSEITE_ORIGINAL_PREFIX)) {
+          if (!(await adminDerSitzung())) throw new Error('Kein Zugriff')
+          return {
+            allowedContentTypes: ['image/*', 'application/octet-stream'],
+            maximumSizeInBytes: MAX_ORIGINAL_BYTES,
+            addRandomSuffix: true,
+            tokenPayload: JSON.stringify({ zweck: 'startseite' }),
+          }
+        }
+
         const farm = await hofDerSitzung()
         if (farm === 'email-offen') throw new EmailOffenFehler()
         if (!farm) throw new Error('Kein Zugriff')

@@ -379,9 +379,11 @@ describe('Zahlung abgelehnt', () => {
 
 describe('E8: kein Kontosatz in der Kasse', () => {
   const KONTO = /Konto|Passwort|meldest du dich|\/account/i
+  // Satz aus dem alten Kassen-Mockup web-k3-warenkorb-bezahlen.html, gelöscht in Lauf 14 (README-zeilen-v104 §6)
+  const KONTOSATZ_ALTES_MOCKUP = 'Kein Passwort nötig – beim nächsten Mal meldest du dich mit einem Code an.'
 
   it('Gegenprobe: das Muster findet den Kontosatz des Mockups', () => {
-    expect(lies('docs/mockups/web-k3-warenkorb-bezahlen.html')).toMatch(/meldest du dich/)
+    expect(KONTOSATZ_ALTES_MOCKUP).toMatch(/meldest du dich/)
   })
 
   it('keine Datei der Kasse spricht von einem Konto oder verlinkt /account', () => {

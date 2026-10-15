@@ -69,6 +69,7 @@ import {
   type StartseitenHofEingabe,
 } from '@/lib/startseite'
 import { kundenNavigation } from '@/lib/kunden-navigation'
+import { STANDARD_REIHENFOLGE } from '@/lib/startseite-gestalten'
 import { STARTSEITE_VORSCHAUBILD } from '@/lib/vorschaubild'
 import { KATEGORIE_LABEL } from '@/lib/taxonomie'
 import type { ProductCategoryValue } from '@/schemas/product'
@@ -78,7 +79,7 @@ import { HoefeInDerNaehe, HofKarten, HofKartenFehler, HofKartenSkelett } from '@
 import {
   BrennmaterialBand,
   Fragen,
-  FuerHoefeBand,
+  FuerHoefeBandInhalt,
   FutterAbschnitt,
   SoFunktionierts,
   StartseiteFuss,
@@ -536,7 +537,7 @@ describe('Sprungmarken für die Navigation der KundeShell', () => {
   it('„Für Höfe" führt seit Nr. 15 auf die eigene Seite — das Band verlinkt sie und behält seine Marke', () => {
     expect(web).toContain('/fuer-hoefe')
     expect(web).not.toContain('/#fuer-hoefe')
-    const band = html(createElement(FuerHoefeBand))
+    const band = html(createElement(FuerHoefeBandInhalt))
     expect(band).toMatch(/<section id="fuer-hoefe"/)
     expect(band).toContain('href="/fuer-hoefe"')
   })
@@ -567,7 +568,7 @@ describe('Abschnitte', () => {
   })
 
   it('keine erfundenen Preise: Futter, Brennmaterial und „Für Höfe" nennen keinen Betrag (E6)', () => {
-    for (const element of [createElement(FutterAbschnitt), createElement(BrennmaterialBand), createElement(FuerHoefeBand)]) {
+    for (const element of [createElement(FutterAbschnitt), createElement(BrennmaterialBand), createElement(FuerHoefeBandInhalt)]) {
       expect(html(element)).not.toMatch(/€/)
     }
     // Gegenprobe: Wo ein Betrag steht, findet die Suche ihn.
@@ -581,13 +582,13 @@ describe('Abschnitte', () => {
   })
 
   it('Für Höfe: keine unbelegte Zeitangabe', () => {
-    const text = html(createElement(FuerHoefeBand))
+    const text = html(createElement(FuerHoefeBandInhalt))
     expect(text).not.toMatch(/zehn Minuten|Minuten/)
     expect(text).toContain('Schnell eingerichtet')
   })
 
   it('Für Höfe: registrieren in Orange, „Mehr für Höfe" zur Seite für Höfe (seit Nr. 15)', () => {
-    const text = html(createElement(FuerHoefeBand))
+    const text = html(createElement(FuerHoefeBandInhalt))
     expect(text).toMatch(/<a href="\/register"[^>]*bg-primary/)
     expect(text).toContain('href="/fuer-hoefe"')
   })
@@ -641,7 +642,7 @@ describe('Themes: Farben nur über Tokens', () => {
     html(createElement(FutterAbschnitt)),
     html(createElement(BrennmaterialBand)),
     html(createElement(SoFunktionierts, { rechnung: beispielRechnung(JETZT) })),
-    html(createElement(FuerHoefeBand)),
+    html(createElement(FuerHoefeBandInhalt)),
     html(createElement(Fragen, { jetzt: JETZT })),
     html(createElement(StartseiteFuss, { jahr: 2026 })),
   ]
@@ -698,23 +699,23 @@ describe('Aufbau der Seite', () => {
     expect(code('src/app/page.tsx').match(/ladeOeffentlicheHoefe\(/g)).toHaveLength(1)
   })
 
+  // Seit Nr. 96 (Register N16) kommt die Reihenfolge aus Admin › Startseite;
+  // die Saison-Automatik entscheidet zuRendern (tests/startseite-gestalten.test.ts).
   it('das Brennmaterial-Band nur in der Saison', () => {
-    expect(seite).toMatch(/\{istBrennmaterialSaison\(jetzt\) && <BrennmaterialBand \/>\}/)
-    expect(seite.match(/<BrennmaterialBand/g)).toHaveLength(1)
+    expect(seite).toMatch(/brennmaterialSaison: istBrennmaterialSaison\(jetzt\)/)
+    const abschnitte = quelle('src/components/startseite/startseite-abschnitte.tsx')
+    expect(abschnitte.match(/BRENNMATERIAL: \(\) => <BrennmaterialBand \/>/g)).toHaveLength(1)
   })
 
-  it('die Reihenfolge des Mockups', () => {
-    const reihe = [
-      '<StartseiteKopf',
-      '<HoefeInDerNaehe',
-      '<FutterAbschnitt',
-      '<BrennmaterialBand',
-      '<SoFunktionierts',
-      '<FuerHoefeBand',
-      '<Fragen',
-      '<StartseiteFuss',
-    ].map((m) => seite.indexOf(m))
+  it('die Reihenfolge des Mockups — als Standard ohne Zeilen und als Seed der Migration', () => {
+    expect(STANDARD_REIHENFOLGE).toEqual(['KOPF', 'HOEFE', 'FUTTER', 'BRENNMATERIAL', 'SO_FUNKTIONIERTS', 'FUER_HOEFE', 'FRAGEN', 'FUSS'])
+    const seed = quelle('prisma/migrations/20261015140000_startseite_gestalten/migration.sql')
+    const reihe = STANDARD_REIHENFOLGE.map((art, i) => seed.indexOf(`'${art}', ${i}, true`))
     expect(reihe.every((stelle) => stelle > 0)).toBe(true)
     expect([...reihe].sort((a, b) => a - b)).toEqual(reihe)
+    // Kopf und Höfe rendert die Seite selbst, die übrigen Abschnitte kommen aus ihrer Tabelle.
+    expect(seite).toMatch(/case 'KOPF':\s*return \(\s*<StartseiteKopf/)
+    expect(seite).toMatch(/case 'HOEFE':\s*return \(\s*<HoefeInDerNaehe/)
+    expect(seite).toMatch(/STARTSEITE_ABSCHNITTE\[eintrag\.art\]/)
   })
 })

@@ -8,14 +8,19 @@ export interface BriefkastenZusammenfassungProps {
   offen: number
   neueste: Array<{ kurznummer: string; art: string; ersteZeile: string; hofName: string | null }>
   geloescht: number
+  /** „Offen im Eingang: 2 Antworten · 1 Meldung · 2 Aufgaben" — dieselbe Zählung wie im Eingang (offenSatz). */
+  offenZeile: string
   adminUrl: string
 }
 
-/** Wochen-Zusammenfassung an den Betreiber — nur, wenn es etwas zu sagen gibt. */
+/** Wochen-Zusammenfassung an den Betreiber — nur, wenn im Eingang etwas offen ist (Register N14). */
 export function BriefkastenZusammenfassungEmail(p: BriefkastenZusammenfassungProps) {
   return (
-    <EmailLayout previewText={`Postfach: ${p.neu} neu, ${p.liegenGeblieben} liegen länger als 14 Tage`}>
+    <EmailLayout previewText={p.offenZeile}>
       <Text style={h1}>Postfach — Wochenstand</Text>
+      <Text style={bodyText}>
+        <strong>{p.offenZeile}</strong>
+      </Text>
       <Text style={bodyText}>
         {p.neu === 1 ? 'Eine neue Meldung' : `${p.neu} neue Meldungen`} seit der letzten Sichtung.{' '}
         {p.liegenGeblieben > 0 && (

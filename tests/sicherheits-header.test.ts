@@ -7,6 +7,9 @@
  *    mit ?vorschau=1.
  *  - Nur die Hofseite MIT ?vorschau=1 darf sich selbst einbetten
  *    (SAMEORIGIN, frame-ancestors 'self'): der Editor zeigt sie im iframe.
+ *  - Ebenso die Startseite MIT ?vorschau (Register N16, Nr. 96): Admin ›
+ *    Startseite zeigt sie im Rahmen „So sieht’s die Kundin". Ohne den
+ *    Parameter bleibt sie gesperrt.
  *  - Die Ausschlussliste der Nicht-Hofseiten deckt jeden Routenordner unter
  *    src/app ab — ein neuer Ordner fällt hier auf.
  *  - Die Regel für /hoefe (Standort) bleibt.
@@ -102,9 +105,26 @@ describe('Einbetten', () => {
     expect((await ansichtsModus({ vorschau: ['1', '0'] }, besitzer)).art).toBe('kundin')
   })
 
-  it('Unterseiten der Hofseite und die Startseite bleiben gesperrt, auch mit Parameter', () => {
-    for (const pfad of ['/hof-test/bestellung/abc', '/hof-test/confirm/xyz', '/']) {
+  it('Unterseiten der Hofseite bleiben gesperrt, auch mit Parameter', () => {
+    for (const pfad of ['/hof-test/bestellung/abc', '/hof-test/confirm/xyz']) {
       expect(headerFuer(pfad, { vorschau: '1' })['X-Frame-Options'], pfad).toBe('DENY')
+    }
+  })
+
+  it('die Startseite mit ?vorschau darf sich selbst einbetten — der Rahmen in Admin › Startseite (N16)', () => {
+    // Der Wert ist der signierte Inhalt (src/server/startseite-vorschau.ts), keine feste Zahl.
+    const h = headerFuer('/', { vorschau: 'aW5oYWx0', sig: 'ab12' })
+    expect(h['X-Frame-Options']).toBe('SAMEORIGIN')
+    expect(h['Content-Security-Policy']).toBe("frame-ancestors 'self'")
+    expect(h['X-Content-Type-Options']).toBe('nosniff')
+  })
+
+  it('ohne ?vorschau bleibt die Startseite gesperrt, und die Regel trifft nur „/"', () => {
+    expect(headerFuer('/')['X-Frame-Options']).toBe('DENY')
+    expect(headerFuer('/')['Content-Security-Policy']).toBeUndefined()
+    expect(headerFuer('/', { sig: 'ab12' })['X-Frame-Options']).toBe('DENY')
+    for (const pfad of ['/admin/startseite', '/hoefe', '/hof-test/bestellung/abc']) {
+      expect(headerFuer(pfad, { vorschau: 'aW5oYWx0', sig: 'ab12' })['X-Frame-Options'], pfad).toBe('DENY')
     }
   })
 

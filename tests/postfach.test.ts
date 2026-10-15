@@ -26,7 +26,9 @@ import {
   POSTFACH_FEHLER,
   POSTFACH_TEXT,
   adminPostfachAdresse,
-  adminReiterAus,
+  alteReiterAdresse,
+  eingangAdresse,
+  eingangMeldungAdresse,
   appPfadAusLink,
   empfaengerFuer,
   empfaengerText,
@@ -239,18 +241,27 @@ describe('Empfänger eines Rundschreibens', () => {
 })
 
 describe('Adressen', () => {
-  it('Reiter aus der Adresse, unbekannt heißt Unterhaltungen', () => {
-    expect(adminReiterAus('rundschreiben')).toBe('rundschreiben')
-    expect(adminReiterAus(['meldungen', 'x'])).toBe('meldungen')
-    expect(adminReiterAus('fremd')).toBe('unterhaltungen')
-    expect(adminPostfachAdresse('unterhaltungen', { faden: ID_A })).toBe(`/admin/postfach?faden=${ID_A}`)
+  it('der Eingang braucht keinen Reiter-Parameter, die anderen Reiter schon', () => {
+    expect(adminPostfachAdresse('eingang')).toBe('/admin/postfach')
+    expect(adminPostfachAdresse('zustellung')).toBe('/admin/postfach?reiter=zustellung')
+    expect(eingangAdresse('offen')).toBe('/admin/postfach')
+    expect(eingangAdresse('antwort', { art: 'antwort', id: ID_A })).toBe(`/admin/postfach?art=antwort&id=antwort-${ID_A}`)
     expect(postfachFilterAus('ungelesen')).toBe('ungelesen')
     expect(postfachFilterAus('x')).toBe('alle')
   })
 
-  it('die alten Briefkasten-Links behalten ihre Filter im Reiter Meldungen', () => {
-    expect(meldungenImPostfach('/admin/meldungen')).toBe('/admin/postfach?reiter=meldungen')
-    expect(meldungenImPostfach('/admin/meldungen?status=NEU&art=FEHLER')).toBe('/admin/postfach?reiter=meldungen&status=NEU&art=FEHLER')
+  it('die Reiter von Stufe 1 führen in den Eingang mit passendem Filter, ein offener Faden bleibt gewählt (Nr. 95)', () => {
+    expect(alteReiterAdresse('unterhaltungen', undefined)).toBe('/admin/postfach?art=antwort')
+    expect(alteReiterAdresse('unterhaltungen', ID_A)).toBe(`/admin/postfach?art=antwort&id=antwort-${ID_A}`)
+    expect(alteReiterAdresse('meldungen', undefined)).toBe('/admin/postfach?art=meldung')
+    expect(alteReiterAdresse('rundschreiben', undefined)).toBeNull()
+    expect(alteReiterAdresse(undefined, undefined)).toBeNull()
+  })
+
+  it('die alten Briefkasten-Links landen im Eingang mit Filter Meldung, eine Meldung direkt in ihrer Spalte', () => {
+    expect(meldungenImPostfach('/admin/meldungen')).toBe('/admin/postfach?art=meldung')
+    expect(meldungenImPostfach('/admin/meldungen?status=NEU&art=FEHLER')).toBe('/admin/postfach?art=meldung')
+    expect(eingangMeldungAdresse('abc12345')).toBe('/admin/postfach?art=meldung&meldung=abc12345')
   })
 })
 
@@ -279,8 +290,12 @@ describe('Zod an der Grenze', () => {
   })
 
   it('Rundschreiben: Titel höchstens 80, Art Info/Wichtig, Empfänger nach Regel', () => {
-    const gueltig = { titel: 'Neue Abholzeiten', text: 'Erfundener Text.', art: 'INFO', link: '', perMail: false, empfaenger: { art: 'alle' } }
-    expect(rundschreibenSchema.parse(gueltig)).toMatchObject({ link: null, empfaenger: { art: 'alle' } })
+    const gueltig = { titel: 'Neue Abholzeiten', text: 'Erfundener Text.', art: 'INFO', link: '', perMail: false, antwortMoeglich: false, empfaenger: { art: 'alle' } }
+    expect(rundschreibenSchema.parse(gueltig)).toMatchObject({ link: null, antwortMoeglich: false, empfaenger: { art: 'alle' } })
+    // „Antwort möglich" kommt immer mit (N14) — der Server rät keinen Standard.
+    const ohneHaken: Record<string, unknown> = { ...gueltig }
+    delete ohneHaken.antwortMoeglich
+    expect(rundschreibenSchema.safeParse(ohneHaken).success).toBe(false)
     expect(rundschreibenSchema.safeParse({ ...gueltig, titel: 'x'.repeat(81) }).error?.issues[0]?.message).toBe(POSTFACH_FEHLER.titelZuLang)
     expect(rundschreibenSchema.safeParse({ ...gueltig, art: 'SYSTEM' }).success).toBe(false)
     expect(rundschreibenSchema.safeParse({ ...gueltig, empfaenger: { art: 'ausgewaehlt', hofIds: [] } }).success).toBe(false)

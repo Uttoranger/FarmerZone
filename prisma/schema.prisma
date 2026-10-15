@@ -777,6 +777,12 @@ model Order {
   cancelledAt  DateTime?
   cancelReason String?
 
+  // Erstattung offen (Register N14, Nr. 95): gesetzt, wenn die
+  // Stripe-Erstattung beim Storno scheitert oder Stripe sie später als
+  // gescheitert meldet; gelöscht, sobald erstattet ist. Daraus leitet das
+  // Admin-Postfach die Aufgabe „Erstattung offen" ab — kein eigener Datensatz.
+  erstattungOffenSeit DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -790,6 +796,8 @@ model Order {
   @@index([pickupDate])
   // Siehe ManualSale: Fremdschlüssel ohne Index (Supabase-Hinweis).
   @@index([customerId])
+  // Die Aufgaben im Admin-Postfach und der Zähler am Reiter lesen nur Zeilen mit gesetzter Spalte.
+  @@index([erstattungOffenSeit])
 }
 
 model OrderItem {
@@ -1112,6 +1120,9 @@ model RateLimitZaehler {
 //   empfaenger    so viele Unterhaltungen hat das Senden angelegt (Snapshot)
 //   erstelltVonUserId  wer gesendet hat; bewusst ohne Fremdschlüssel — ein
 //                 Rundschreiben hält nie das Löschen eines Kontos auf
+//   antwortMoeglich  „Antwort möglich" (Register N14, Nr. 95): false = der Hof
+//                 sieht statt des Antwortfelds einen Hinweis, antworteAlsHof
+//                 lehnt ab. Standard true — Bestand bleibt beantwortbar.
 model Rundschreiben {
   id                String           @id @default(cuid())
   titel             String
@@ -1119,6 +1130,7 @@ model Rundschreiben {
   linkUrl           String?
   art               RundschreibenArt
   perMail           Boolean          @default(false)
+  antwortMoeglich   Boolean          @default(true)
   empfaengerRegel   Json
   empfaenger        Int
   gesendetAm        DateTime
@@ -1182,4 +1194,107 @@ model UnterhaltungStand {
   unterhaltung Unterhaltung @relation(fields: [unterhaltungId], references: [id], onDelete: Cascade)
 
   @@id([unterhaltungId, seite])
+}
+
+// Die Einstellungen der Plattform als Ganzes (Admin › Einstellungen, Register
+// K2-Ergänzung und N15, Nr. 93) — genau EINE Zeile mit der Kennung
+// "plattform", angelegt von der Migration. Gelesen wird nur (fehlt die Zeile,
+// gelten die Standardwerte aus src/lib/plattform-einstellung.ts), geschrieben
+// nur aus der Admin-Action. gruendungPlaetze und gruendungBisStandard ersetzen
+// die Konstanten MAX_GRUENDUNGSHOEFE und GRUENDUNG_BIS_STANDARD_TAG als
+// Standard; zustellRegeln nutzt Nr. 95 (Postfach › Zustellung).
+// geaendertVonUserId ist bewusst kein Fremdschlüssel (wie
+// Rundschreiben.erstelltVonUserId): Die Protokollzeile soll ein gelöschtes
+// Konto überleben.
+model PlattformEinstellung {
+  id                   String   @id @default("plattform")
+  gruendungPlaetze     Int      @default(12)
+  gruendungBisStandard DateTime @default(dbgenerated("'2027-12-31'::date")) @db.Date
+  gruendungAnzeige     Boolean  @default(true)
+  zustellRegeln        Json?
+  geaendertVonUserId   String?
+  updatedAt            DateTime @updatedAt
+}
+
+// Weitere Empfänger der Betreiber-Mails (Admin › Postfach › Zustellung,
+// Register N14, Nr. 95). support@PRODUKTION_HOST ist fest und hat KEINE Zeile.
+// Eine Adresse bekommt erst Mails, wenn sie über den Link bestätigt ist
+// (Double-Opt-in wie S11): bis dahin bestaetigtAm null.
+//   email         klein geschrieben (emailSchema), eindeutig
+//   token         SHA-256 des Links aus der Bestätigungsmail (hex) — der
+//                 Link selbst steht nirgends; nach dem Einlösen null
+//   tokenBis      48 Stunden nach dem Anlegen bzw. erneuten Senden
+//   erstelltVonUserId  wer die Adresse eingetragen hat; bewusst ohne
+//                 Fremdschlüssel wie Rundschreiben.erstelltVonUserId
+model BetreiberEmpfaenger {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  bestaetigtAm      DateTime?
+  token             String?   @unique
+  tokenBis          DateTime?
+  erstelltVonUserId String
+  createdAt         DateTime  @default(now())
+}
+
+// Startseite gestalten (Register N16, Nr. 96): die Startseite als Liste von
+// Abschnitten. Die acht festen Abschnitte legt die Migration an (feste
+// Kennungen, heutige Reihenfolge); BLOCK-Zeilen kommen aus Admin › Startseite
+// dazu. KOPF, HOEFE und FUSS sind fest (immer sichtbar, KOPF zuerst, FUSS
+// zuletzt) — der Server prüft das beim Speichern (src/lib/startseite-gestalten.ts).
+// Ohne Zeilen rendert die Seite die heutige Reihenfolge (Deploy-Fenster).
+enum StartseiteArt {
+  KOPF
+  HOEFE
+  FUTTER
+  BRENNMATERIAL
+  SO_FUNKTIONIERTS
+  FUER_HOEFE
+  FRAGEN
+  FUSS
+  BLOCK
+}
+
+// Die vier Vorlagen eines Blocks (components/startseite/bloecke) — neue nur
+// über einen Lauf.
+enum StartseiteVorlage {
+  SAISONKARTE
+  HINWEISBAND
+  HOEFE_AUSWAHL
+  KATEGORIE_HINWEIS
+}
+
+//   position  Reihenfolge, 0 = oben; kein eindeutiger Index — Speichern
+//             schreibt alle Positionen in einer Transaktion neu.
+//   blockId   nur bei art BLOCK; mit dem Block wird die Zeile gelöscht.
+model StartseiteAbschnitt {
+  id       String           @id @default(cuid())
+  art      StartseiteArt
+  position Int
+  sichtbar Boolean          @default(true)
+  blockId  String?          @unique
+  block    StartseiteBlock? @relation(fields: [blockId], references: [id], onDelete: Cascade)
+}
+
+// Ein Block mit Zeitraum: live, wenn liveAb ≤ jetzt < liveBis (ohne liveBis
+// offen) — verglichen nur am Server. farmIds nur freigeschaltete Höfe
+// (Action prüft), bewusst ohne Fremdschlüssel; ein später gesperrter Hof fällt
+// beim Rendern weg. erstelltVonUserId ohne Fremdschlüssel wie
+// Rundschreiben.erstelltVonUserId.
+model StartseiteBlock {
+  id                String               @id @default(cuid())
+  vorlage           StartseiteVorlage
+  ueberzeile        String?
+  titel             String
+  text              String?
+  bildUrl           String?
+  linkUrl           String?
+  linkText          String?
+  farmIds           String[]             @default([])
+  kategorie         ProductCategory?
+  liveAb            DateTime
+  liveBis           DateTime?
+  erstelltVonUserId String
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  abschnitt         StartseiteAbschnitt?
 }

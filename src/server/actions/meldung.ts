@@ -169,6 +169,9 @@ export async function meldungAbsenden(data: MeldungFormularDaten): Promise<Meldu
     try {
       // Erst hier geladen (Nr. 31): Die Meldeseiten binden diese Action ein.
       const { sendMeldungNotification } = await import('@/lib/email')
+      // Empfänger und Regel aus der Zustellung (Register N14, Nr. 95).
+      const { ladeBetreiberEmpfaenger } = await import('@/server/queries/postfach')
+      const an = await ladeBetreiberEmpfaenger('fehlermeldung')
       await sendMeldungNotification({
         kurznummer: kurznummer(meldung.id),
         id: meldung.id,
@@ -180,7 +183,7 @@ export async function meldungAbsenden(data: MeldungFormularDaten): Promise<Meldu
         farmName: hof?.name ?? null,
         screenshotUrl,
         createdAt: meldung.createdAt,
-      })
+      }, an)
     } catch (e) {
       if (process.env.NODE_ENV !== 'production') {
         console.log(`[DEV] Meldungs-Mail fehlgeschlagen: ${e instanceof Error ? e.message : e}`)

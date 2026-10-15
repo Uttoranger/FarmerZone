@@ -12,9 +12,12 @@
  *    als ERSTE Anweisung mit verlangeAdminSeite.
  *  - Verhalten: Ohne Anmeldung → Login, angemeldet ohne Recht (frisch aus der
  *    Datenbank) → 404 — und in beiden Fällen wird nichts gezählt.
- *  - /admin/meldungen leitet den Admin dauerhaft (308) auf den Reiter
- *    „Meldungen" im Postfach um, status und art gehen mit (Nr. 87); ohne
- *    Recht 404 und keine Umleitung.
+ *  - /admin/meldungen leitet den Admin dauerhaft (308) in den Eingang mit
+ *    Filter Meldung um (Nr. 87, seit Nr. 95 ohne die alten Filter),
+ *    /admin/meldungen/[id] in die Spalte „Meldung entscheiden" des Eingangs
+ *    (Nr. 95); ohne Recht 404 und keine Umleitung.
+ *  - Die Zahl am Reiter „Postfach" ist „Offen" im Eingang (N14): ungelesene
+ *    Antworten, Meldungen NEU/GEPRUEFT, wartende Höfe, offene Erstattungen.
  *  - Gegenproben: Schnipsel ohne Wache und mit Wache an zweiter Stelle.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -36,11 +39,12 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', () => ({
-  prisma: { user: { findUnique: vi.fn() }, farm: { count: vi.fn() }, meldung: { count: vi.fn() }, $queryRaw: vi.fn() },
+  prisma: { user: { findUnique: vi.fn() }, farm: { count: vi.fn() }, meldung: { count: vi.fn() }, order: { count: vi.fn() }, $queryRaw: vi.fn() },
 }))
 
 import { ladeAdminbereich } from '@/server/adminbereich'
 import MeldungenUmleitung from '@/app/admin/meldungen/page'
+import MeldungUmleitung from '@/app/admin/meldungen/[id]/page'
 import { permanentRedirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -117,13 +121,15 @@ const SEITE = { modul: '@/server/admin-wache', exportName: 'verlangeAdminSeite',
 const SEITEN = [...seiten(ADMIN)]
 
 describe('jede Seite unter /admin', () => {
-  it('es gibt die fünf Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach; /admin/meldungen leitet um und prüft trotzdem)', () => {
+  it('es gibt die sieben Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 93 die Einstellungen, seit Nr. 94 die Startseite; /admin/meldungen leitet um und prüft trotzdem)', () => {
     expect(SEITEN.map((p) => relative(ADMIN, p).split(sep).join('/')).sort()).toEqual([
+      'einstellungen/page.tsx',
       'finanzen/page.tsx',
       'meldungen/[id]/page.tsx',
       'meldungen/page.tsx',
       'page.tsx',
       'postfach/page.tsx',
+      'startseite/page.tsx',
     ])
   })
 
@@ -168,6 +174,7 @@ describe('ladeAdminbereich — Verhalten', () => {
   const userFindUnique = vi.mocked(prisma.user.findUnique)
   const farmCount = vi.mocked(prisma.farm.count)
   const meldungCount = vi.mocked(prisma.meldung.count)
+  const orderCount = vi.mocked(prisma.order.count)
   // zaehleUngelesenTeam (Postfach, Nr. 87): Fäden mit ungelesener Antwort eines Hofs.
   const ungelesenTeam = vi.mocked(prisma.$queryRaw)
 
@@ -175,6 +182,7 @@ describe('ladeAdminbereich — Verhalten', () => {
     vi.clearAllMocks()
     farmCount.mockResolvedValue(2 as never)
     meldungCount.mockResolvedValue(3 as never)
+    orderCount.mockResolvedValue(1 as never)
     ungelesenTeam.mockResolvedValue([{ anzahl: 4 }] as never)
   })
 
@@ -195,13 +203,17 @@ describe('ladeAdminbereich — Verhalten', () => {
     expect(ungelesenTeam).not.toHaveBeenCalled()
   })
 
-  it('Admin ohne Hof: Name und Zähler — wartende Höfe; am Postfach Meldungen zu entscheiden plus ungelesene Antworten (N12), kein Weg zum Hof', async () => {
+  it('Admin ohne Hof: Name und Zähler — wartende Höfe; am Postfach „Offen" im Eingang (N14), kein Weg zum Hof', async () => {
     getSession.mockResolvedValue({ user: { id: 'u1' } } as never)
     userFindUnique
       .mockResolvedValueOnce({ isAdmin: true } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
-    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, zahlen: { hoefe: 2, briefkasten: 3 + 4 } })
+    // Meldungen 3 + ungelesene Antworten 4 + wartende Höfe 2 + offene Erstattung 1.
+    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, zahlen: { hoefe: 2, briefkasten: 3 + 4 + 2 + 1 } })
     expect(farmCount).toHaveBeenCalledWith({ where: { approvedAt: null } })
+    expect(farmCount).toHaveBeenCalledWith({ where: { approvedAt: null, archivedAt: null } })
+    expect(meldungCount).toHaveBeenCalledWith({ where: { status: { in: ['NEU', 'GEPRUEFT'] } } })
+    expect(orderCount).toHaveBeenCalledWith({ where: { erstattungOffenSeit: { not: null } } })
   })
 
   // Nr. 41 (Register N1): „← Mein Hof" und die Konto-Plakette nur mit eigenem Hof —
@@ -227,7 +239,7 @@ describe('ladeAdminbereich — Verhalten', () => {
   })
 })
 
-describe('/admin/meldungen — Umleitung auf den Reiter „Meldungen" (308, Nr. 87)', () => {
+describe('/admin/meldungen — Umleitung in den Eingang, Filter Meldung (308, Nr. 87/95)', () => {
   const getSession = vi.mocked(auth.api.getSession)
   const userFindUnique = vi.mocked(prisma.user.findUnique)
   const umleiten = (suche: { status?: string; art?: string }) => MeldungenUmleitung({ searchParams: Promise.resolve(suche) })
@@ -237,15 +249,38 @@ describe('/admin/meldungen — Umleitung auf den Reiter „Meldungen" (308, Nr. 
     getSession.mockResolvedValue({ user: { id: 'u1' } } as never)
   })
 
-  it('Admin: auf /admin/postfach?reiter=meldungen, status und art gehen mit', async () => {
+  it('Admin: in den Eingang mit Filter Meldung — die alten Filter gibt es dort nicht mehr', async () => {
     userFindUnique.mockResolvedValue({ isAdmin: true } as never)
-    await expect(umleiten({ status: 'NEU', art: 'FEHLER' })).rejects.toThrow(/^PERMANENT:\/admin\/postfach\?reiter=meldungen&status=NEU&art=FEHLER$/)
-    await expect(umleiten({})).rejects.toThrow(/^PERMANENT:\/admin\/postfach\?reiter=meldungen$/)
+    await expect(umleiten({ status: 'NEU', art: 'FEHLER' })).rejects.toThrow(/^PERMANENT:\/admin\/postfach\?art=meldung$/)
+    await expect(umleiten({})).rejects.toThrow(/^PERMANENT:\/admin\/postfach\?art=meldung$/)
   })
 
   it('Gegenprobe: ohne Recht 404 — die Umleitung verrät das Ziel nicht', async () => {
     userFindUnique.mockResolvedValue({ isAdmin: false } as never)
     await expect(umleiten({ status: 'NEU' })).rejects.toThrow('NOT_FOUND')
+    expect(permanentRedirect).not.toHaveBeenCalled()
+  })
+})
+
+describe('/admin/meldungen/[id] — Umleitung in die Spalte „Meldung entscheiden" (308, Nr. 95)', () => {
+  const getSession = vi.mocked(auth.api.getSession)
+  const userFindUnique = vi.mocked(prisma.user.findUnique)
+  const umleiten = (id: string) => MeldungUmleitung({ params: Promise.resolve({ id }) })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    getSession.mockResolvedValue({ user: { id: 'u1' } } as never)
+  })
+
+  it('Admin: dauerhaft auf /admin/postfach?art=meldung&meldung=<id> — auch mit der Kurznummer', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    await expect(umleiten('ckmeldung00000000000000000')).rejects.toThrow(/^PERMANENT:\/admin\/postfach\?art=meldung&meldung=ckmeldung00000000000000000$/)
+    await expect(umleiten('ab12cd34')).rejects.toThrow(/^PERMANENT:\/admin\/postfach\?art=meldung&meldung=ab12cd34$/)
+  })
+
+  it('Gegenprobe: ohne Recht 404 — die Umleitung verrät das Ziel nicht', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: false } as never)
+    await expect(umleiten('ab12cd34')).rejects.toThrow('NOT_FOUND')
     expect(permanentRedirect).not.toHaveBeenCalled()
   })
 })

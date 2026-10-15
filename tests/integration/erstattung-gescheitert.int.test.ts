@@ -46,6 +46,19 @@ vi.mock('@/lib/email', () => ({
   sendZahlungZuSpaet: vi.fn(),
   sendErstattungOffen: vi.fn(),
 }))
+/**
+ * Die Mails laufen nach der Antwort (`nachDerAntwort`). Seit Nr. 95 liest der
+ * Nachlauf vorher die Empfänger aus der Datenbank — eine feste Pause reicht
+ * unter Last nicht, und die Mail eines Falls käme sonst im nächsten an (Nr. 95
+ * Runde 2). Der Nachlauf startet sofort wie im echten Rückfall ohne Request,
+ * sein Ende wird gemerkt (`nachlaufFertig()` und `afterEach` warten darauf).
+ */
+const nachlauf = vi.hoisted(() => ({ laufend: [] as Array<Promise<void>> }))
+vi.mock('@/lib/nach-der-antwort', () => ({
+  nachDerAntwort: (aufgabe: () => Promise<void>) => {
+    nachlauf.laufend.push(aufgabe().catch(() => {}))
+  },
+}))
 
 import { NextRequest } from 'next/server'
 import { Prisma } from '@prisma/client'
@@ -73,6 +86,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
+  await nachlaufFertig()
   await raeumeAuf()
 })
 
@@ -172,9 +186,9 @@ async function zustellen(ev: ReturnType<typeof ereignis>) {
   )
 }
 
-/** Den Nachlauf (Mails über nachDerAntwort) beider Zustellungen ganz abwarten, dann erst zählen. */
+/** Den Nachlauf (Mails über nachDerAntwort) aller Zustellungen ganz abwarten, dann erst zählen — ohne Pause, ohne Zeitgrenze. */
 async function nachlaufFertig(): Promise<void> {
-  await new Promise((fertig) => setTimeout(fertig, 200))
+  while (nachlauf.laufend.length > 0) await Promise.all(nachlauf.laufend.splice(0))
 }
 
 function meldungen(grund: string): number {
@@ -199,7 +213,8 @@ describe('refund.failed — Teilerstattung nach „Artikel fehlt" gescheitert', 
     expect(danach.paymentStatus).toBe('PAID')
     expect(danach.serviceFeeCents).toBe(50)
     expect(meldungen('erstattung_gescheitert_zurueckgenommen')).toBe(1)
-    await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
+    await nachlaufFertig()
+    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
     const meldung = vi.mocked(sendErstattungOffen).mock.calls[0]![0]
     expect(meldung).toMatchObject({ bestellId: order.id, betraege: [expect.objectContaining({ cents: 582 })] })
     const sentryText = JSON.stringify(vi.mocked(Sentry.captureMessage).mock.calls)
@@ -223,7 +238,8 @@ describe('refund.failed — Teilerstattung nach „Artikel fehlt" gescheitert', 
     expect(antworten.map((a) => a.status)).toEqual([200, 200, 200])
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(0)
     expect(meldungen('erstattung_gescheitert_zurueckgenommen')).toBe(1)
-    await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
+    await nachlaufFertig()
+    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
   })
 
   it('zwei gleichzeitige Zustellungen (beide Ereignisse): nie doppelt zurückgenommen', async () => {
@@ -257,7 +273,8 @@ describe('refund.failed — Teilerstattung nach „Artikel fehlt" gescheitert', 
     expect(antwort.status).toBe(200)
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(900)
     expect(meldungen('erstattung_gescheitert_unklar')).toBe(1)
-    await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
+    await nachlaufFertig()
+    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -289,7 +306,8 @@ describe('Erstattungen, die nicht nachweislich zu einer unserer Buchungen gehör
     expect(danach.erstattetCents).toBe(1082)
     expect(danach.paymentStatus).toBe('REFUNDED')
     expect(meldungen('erstattung_gescheitert_fremd')).toBe(1)
-    await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
+    await nachlaufFertig()
+    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
     // Die Bestellung zur Zahlung wird zum Wiederfinden genannt, nicht geändert.
     expect(vi.mocked(sendErstattungOffen).mock.calls[0]![0]).toMatchObject({ bestellId: order.id })
     expect(stripe.refunds.list).not.toHaveBeenCalled()
@@ -314,6 +332,7 @@ describe('Erstattungen, die nicht nachweislich zu einer unserer Buchungen gehör
 
     expect(antwort.status).toBe(200)
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(582)
+    await nachlaufFertig()
     expect(Sentry.captureMessage).not.toHaveBeenCalled()
     expect(sendErstattungOffen).not.toHaveBeenCalled()
   })
@@ -331,7 +350,8 @@ describe('Nachbesserung Runde 1', () => {
     expect(antworten.map((a) => a.status)).toEqual([200, 200])
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(0)
     expect(meldungen('erstattung_gescheitert_zurueckgenommen')).toBe(1)
-    await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
+    await nachlaufFertig()
+    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
   })
 
   it('nie gezählt (Datenbank = Stripe ohne die gescheiterte): nichts geändert, genau eine Meldung, auch beim zweiten Ereignis', async () => {
@@ -402,6 +422,7 @@ describe('Nachbesserung Runde 1', () => {
 
     expect(antwort.status).toBe(200)
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(582)
+    await nachlaufFertig()
     expect(Sentry.captureMessage).not.toHaveBeenCalled()
     expect(sendErstattungOffen).not.toHaveBeenCalled()
   })
@@ -415,6 +436,7 @@ describe('Nachbesserung Runde 1', () => {
     expect(antwort.status).toBe(200)
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(582)
     expect(stripe.refunds.list).not.toHaveBeenCalled()
+    await nachlaufFertig()
     expect(Sentry.captureMessage).not.toHaveBeenCalled()
     expect(sendErstattungOffen).not.toHaveBeenCalled()
   })
@@ -472,7 +494,8 @@ describe('refund.failed — Vollerstattung mit Merkmalen gescheitert (Nr. 27)', 
     expect(danach.paymentStatus).toBe('PAID')
     expect(danach.erstattetCents).toBe(0)
     expect(meldungen('erstattung_gescheitert_zurueckgenommen')).toBe(1)
-    await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
+    await nachlaufFertig()
+    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
     const meldung = vi.mocked(sendErstattungOffen).mock.calls[0]![0]
     expect(meldung).toMatchObject({ bestellId: order.id, betraege: [expect.objectContaining({ cents: 1082 })] })
     expect(meldung.handanweisung).toContain('Vollerstattung')

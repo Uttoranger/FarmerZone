@@ -25,12 +25,17 @@ vi.mock('next/image', () => ({
   default: ({ alt }: { alt: string }) => createElement('img', { alt }),
 }))
 vi.mock('@/components/shared/kunden-kopf', () => ({ KundenKopf: () => null }))
+// Seit Nr. 93 lädt die Seite die Zahlen der Gründungshöfe — ohne Zahlen rendert sie wie vorher.
+vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null }))
 vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
   KundeShellMitSitzung: ({ children }: { children: ReactNode }) => createElement('div', null, children),
 }))
 
 import KonditionenPage from '@/app/(public)/konditionen/page'
 import FuerHoefePage from '@/app/(public)/fuer-hoefe/page'
+
+/** Die Seite ist seit Nr. 93 asynchron (Zahlen der Gründungshöfe). */
+const FUER_HOEFE_SEITE = await FuerHoefePage()
 import {
   ONLINE_ZAHLUNG_EINRICHTEN_SATZ,
   ONLINE_ZAHLUNG_START_KURZ,
@@ -184,7 +189,7 @@ const BAR_OPTION_FUER_HOEFE =
   /nur bar|ohne Online-Zahlung|Online-Zahlung (?:ist )?(?:optional|freiwillig|ein Plus)|kein Muss|geht auch ohne|keine Einrichtung nötig/i
 
 describe('/fuer-hoefe, /konditionen und Registrieren nennen Stripe als Teil des Starts', () => {
-  const fuerHoefe = renderToStaticMarkup(createElement(FuerHoefePage))
+  const fuerHoefe = renderToStaticMarkup(FUER_HOEFE_SEITE)
   const konditionen = renderToStaticMarkup(createElement(KonditionenPage))
 
   it.each([

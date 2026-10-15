@@ -221,6 +221,20 @@ const nextConfig: NextConfig = {
           { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
         ],
       },
+      {
+        // Dasselbe für die STARTSEITE mit ihrem Vorschau-Link (Register N16,
+        // Nr. 96): Admin › Startseite zeigt sie im Rahmen „So sieht’s die
+        // Kundin". Der Wert ist der signierte Inhalt, keine feste Zahl — darum
+        // nur der Name. Die Freigabe betrifft allein das Einbetten von uns
+        // selbst; was die Seite zeigt, entscheidet weiter vorschauDieserAnfrage
+        // (Draft Mode, Signatur, Admin-Sitzung). Ohne den Parameter bleibt DENY.
+        source: '/',
+        has: [{ type: 'query', key: 'vorschau' }],
+        headers: [
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
+        ],
+      },
     ]
   },
 };

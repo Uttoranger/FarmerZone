@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { sendErstattungOffen, sendOrderConfirmation, sendOrderPaidToFarmer, sendZahlungZuSpaet } from '@/lib/email'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
+import { ladeBetreiberEmpfaenger } from '@/server/queries/postfach'
 import { ANLASS_VOLLSTORNO } from '@/server/teilerstattung'
 import {
   MELDE_VERMERK_TYP,
@@ -310,8 +311,13 @@ async function erstatteSpaeteZahlung(
  * Die Kundin bekommt keine Mail: Der Betreiber klärt die Erstattung erst.
  */
 async function handleErstattungGescheitert(refund: Stripe.Refund, typ: 'refund.failed' | 'charge.refund.updated') {
+  if (refund.status === 'succeeded') await loescheErstattungOffen(refund)
   const ausgang = await nimmGescheiterteErstattungZurueck(refund)
   if (ausgang.art === 'nicht_gescheitert') return
+  // Die Aufgabe „Erstattung offen" im Admin-Postfach (Register N14), vor der
+  // Meldesperre: auch ein zweites Ereignis derselben Erstattung setzt sie,
+  // falls das erste Setzen scheiterte — die erste Zeit bleibt.
+  if (ausgang.bestellung) await setzeErstattungOffen(ausgang.bestellung.id)
   // Genau eine Meldung je Erstattung, über einen Vermerk in der
   // Idempotenz-Tabelle der Ereignisse. Die Zurücknahme gelingt nur einmal und
   // legt den Vermerk in ihrer eigenen Transaktion an — sie meldet immer.
@@ -340,18 +346,57 @@ async function handleErstattungGescheitert(refund: Stripe.Refund, typ: 'refund.f
     },
   })
   nachDerAntwort(async () => {
-    await mailOhneRisiko('erstattung_offen', orderId ?? refund.id, () =>
-      sendErstattungOffen({
-        was: meldung.was,
-        bestellId: orderId,
-        bestellnummer: ausgang.bestellung?.orderNumber ?? null,
-        hofName: ausgang.bestellung?.hofName ?? null,
-        betraege: [{ label: 'Gescheiterte Erstattung', cents: refund.amount }],
-        handanweisung: meldung.handanweisung,
-        stripeKennung: refund.id,
-      })
+    await mailOhneRisiko('erstattung_offen', orderId ?? refund.id, async () =>
+      sendErstattungOffen(
+        {
+          was: meldung.was,
+          bestellId: orderId,
+          bestellnummer: ausgang.bestellung?.orderNumber ?? null,
+          hofName: ausgang.bestellung?.hofName ?? null,
+          betraege: [{ label: 'Gescheiterte Erstattung', cents: refund.amount }],
+          handanweisung: meldung.handanweisung,
+          stripeKennung: refund.id,
+        },
+        // Empfänger aus der Zustellung (Register N14): „Erstattung offen" geht immer, auch bei Regel „aus".
+        await ladeBetreiberEmpfaenger('erstattungOffen')
+      )
     )
   })
+}
+
+/**
+ * Erstattung offen vermerken (Order.erstattungOffenSeit, Register N14) —
+ * bedingt, die erste Zeit bleibt. Ein Nachlauf: Scheitert er, stehen Sentry
+ * und Mail trotzdem, und die Verarbeitung des Ereignisses läuft weiter.
+ */
+async function setzeErstattungOffen(orderId: string): Promise<void> {
+  try {
+    await prisma.order.updateMany({ where: { id: orderId, erstattungOffenSeit: null }, data: { erstattungOffenSeit: new Date() } })
+  } catch (err) {
+    Sentry.captureException(err, { tags: { webhook: 'erstattung', grund: 'erstattung_offen_vermerk' }, extra: { orderId } })
+  }
+}
+
+/**
+ * Stripe meldet eine erfolgreiche Erstattung (charge.refund.updated) — der
+ * bestehende Weg, auf dem der Betreiber eine offene Erstattung im
+ * Plattformkonto nachholt. Gelöscht wird die Aufgabe nur, wenn die
+ * Erstattung NACH dem Vermerk entstand: Eine ältere Teilerstattung derselben
+ * Zahlung erledigt das offene Geld nicht. Nachlauf wie beim Setzen.
+ */
+async function loescheErstattungOffen(refund: Stripe.Refund): Promise<void> {
+  const zahlung = typeof refund.payment_intent === 'string' ? refund.payment_intent : (refund.payment_intent?.id ?? null)
+  // Fremddaten (Webhook): ohne Zahlung oder lesbaren Zeitpunkt nichts löschen.
+  const erstellt = new Date(refund.created * 1000)
+  if (!zahlung || Number.isNaN(erstellt.getTime())) return
+  try {
+    await prisma.order.updateMany({
+      where: { stripePaymentIntentId: zahlung, erstattungOffenSeit: { lte: erstellt } },
+      data: { erstattungOffenSeit: null },
+    })
+  } catch (err) {
+    Sentry.captureException(err, { tags: { webhook: 'erstattung', grund: 'erstattung_offen_loeschen' }, extra: { refundId: refund.id } })
+  }
 }
 
 /** Vermerkt, dass diese gescheiterte Erstattung gemeldet ist — false, wenn schon geschehen. */

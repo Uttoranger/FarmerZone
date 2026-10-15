@@ -63,7 +63,7 @@ const KNOPF_ORANGE = cn(
  * selbst legt weiter Einrichten an; der Name wartet bis dahin im
  * sessionStorage (hofname-entwurf.ts).
  */
-export function RegisterForm({ formToken }: { formToken: string }): React.JSX.Element {
+export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: string; gruendungSatz?: React.ReactNode }): React.JSX.Element {
   const id = useId()
   // Honigtopf: bleibt bei Menschen leer — außerhalb von react-hook-form, damit
   // er keine Regel und keinen Fehler bekommt.
@@ -120,6 +120,8 @@ export function RegisterForm({ formToken }: { formToken: string }): React.JSX.El
           <>
             {/* Der Übergang aus konditionen.ts (Register K1) statt eines Tarifs, der heute gälte. */}
             <p className="mb-5 text-[14px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
+            {/* Der voraussichtliche Gründungsplatz (Register K2-Ergänzung) — die Seite rendert ihn, ohne Platz nichts. */}
+            {gruendungSatz}
 
             <form onSubmit={form.handleSubmit(absenden)} noValidate className="flex flex-col gap-4">
               {/* Honigtopf — unsichtbar für Menschen, verlockend für Skripte.

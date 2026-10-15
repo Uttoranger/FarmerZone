@@ -1,36 +1,43 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { permanentRedirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
-import { Plus } from 'lucide-react'
+import { PenLine } from 'lucide-react'
 import { verlangeAdminSeite } from '@/server/admin-wache'
-import { zaehleZuEntscheiden } from '@/server/queries/meldung'
-import { zaehleUngelesenTeam } from '@/server/queries/postfach'
+import { ladeErstattungAufgaben, zaehleOffenImEingang, zaehleRundschreibenImMonat } from '@/server/queries/postfach'
 import {
-  ADMIN_POSTFACH_REITER,
   ADMIN_POSTFACH_TEXT,
+  EINGANG_TEXT,
   adminPostfachAdresse,
-  adminReiterAus,
-  postfachFilterAus,
+  alteReiterAdresse,
+  offenGesamt,
+  postfachKennzahlen,
+  postfachUnterreiter,
   type AdminPostfachReiter,
+  type EingangZahlen,
+  type ErstattungAufgabeRoh,
 } from '@/lib/postfach'
+import { adminPostfachReiterAus, eingangAuswahlAus, eingangFilterAus, fadenKennungAus } from '@/schemas/postfach'
 import { cn } from '@/lib/utils'
 import { MARKE } from '@/lib/marke'
-import { Zaehler } from '@/components/ui/zaehler'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { ADMIN_RAHMEN, AdminFehler, SEITEN_TITEL } from '@/components/admin/admin-teile'
-import { UnterhaltungenReiter, ladeUnterhaltungenReiter, type UnterhaltungenDaten } from './unterhaltungen-reiter'
-import { MeldungenReiter, ladeMeldungenReiter, type MeldungenDaten } from './meldungen-reiter'
+import { ADMIN_RAHMEN, AdminFehler } from '@/components/admin/admin-teile'
+import { Seitenkopf } from '@/components/admin/seitenkopf'
+import { Kennzahlen } from '@/components/admin/kennzahlen'
+import { Unterreiter } from '@/components/admin/unterreiter'
+import { EingangReiter, ladeEingangReiter, type EingangDaten } from './eingang-reiter'
 import { RundschreibenReiter, ladeRundschreibenReiter, type RundschreibenDaten } from './rundschreiben-reiter'
+import { ZustellungReiter, ladeZustellungDaten, type ZustellungDaten } from './zustellung-reiter'
 
 export const metadata: Metadata = { title: `${ADMIN_POSTFACH_TEXT.titel} — Admin — ${MARKE}` }
 export const dynamic = 'force-dynamic'
 
 type Suche = {
   reiter?: string | string[]
-  faden?: string | string[]
-  filter?: string | string[]
-  status?: string | string[]
   art?: string | string[]
+  id?: string | string[]
+  meldung?: string | string[]
+  faden?: string | string[]
 }
 
 /** Next liefert einen doppelten Parameter als Liste — dann zählt der erste. */
@@ -39,47 +46,50 @@ function einzeln(wert: string | string[] | undefined): string | undefined {
 }
 
 type ReiterDaten =
-  | { reiter: 'unterhaltungen'; daten: UnterhaltungenDaten }
-  | { reiter: 'meldungen'; daten: MeldungenDaten }
+  | { reiter: 'eingang'; daten: EingangDaten }
   | { reiter: 'rundschreiben'; daten: RundschreibenDaten }
+  | { reiter: 'zustellung'; daten: ZustellungDaten }
 
 /** Lädt nur den offenen Reiter; ein Datenbankfehler wirft. */
-async function ladeReiter(reiter: AdminPostfachReiter, roh: Suche): Promise<ReiterDaten> {
-  if (reiter === 'unterhaltungen') return { reiter, daten: await ladeUnterhaltungenReiter(roh.faden) }
-  if (reiter === 'meldungen') return { reiter, daten: await ladeMeldungenReiter({ status: einzeln(roh.status), art: einzeln(roh.art) }) }
-  return { reiter, daten: await ladeRundschreibenReiter() }
+async function ladeReiter(reiter: AdminPostfachReiter, roh: Suche, jetzt: Date): Promise<ReiterDaten> {
+  if (reiter === 'eingang') return { reiter, daten: await ladeEingangReiter(eingangFilterAus(roh.art), eingangAuswahlAus(roh.id, roh.meldung), jetzt) }
+  if (reiter === 'rundschreiben') return { reiter, daten: await ladeRundschreibenReiter() }
+  return { reiter, daten: await ladeZustellungDaten(jetzt) }
 }
 
 /*
  * /admin/postfach — der eine Ort, an dem beim Admin alles ankommt (Register
- * N12, Nachtlauf Nr. 87; Mockups admin-postfach, admin-rundschreiben): Reiter
- * Unterhaltungen (Antworten der Höfe) · Meldungen (der bisherige Briefkasten,
- * /admin/meldungen leitet um) · Rundschreiben. Der Reiter steht in der
- * Adresse (?reiter=), wie bisher bei den Reitern im Admin. Erste Anweisung
- * ist die Admin-Prüfung; Zähler am Reiter: ungelesene Antworten bzw.
- * Meldungen, die auf das Team warten. Lässt sich der offene Reiter nicht
- * laden, steht AdminFehler da wie auf jeder Admin-Seite — mit EINER h1
- * („Postfach"); im Reiter gäbe der Baustein eine zweite.
+ * N12 mit der Änderung vom 15.10., N14, N15; Nachtlauf Nr. 95; Mockups
+ * admin-postfach*, admin-rundschreiben). Seitenmuster N15: Seitenkopf mit Satz
+ * und „Rundschreiben schreiben", Kennzahlen, Unterreiter Eingang ·
+ * Rundschreiben · Zustellung (?reiter=, Zod mit Standard), Inhalt,
+ * Regel-Zeile. Die Reiter von Stufe 1 (?reiter=unterhaltungen|meldungen)
+ * leiten dauerhaft in den Eingang mit passendem Filter. Erste Anweisung ist
+ * die Admin-Prüfung. Lassen sich die Zahlen nicht laden, geht es ohne
+ * Kennzahlen weiter; lässt sich der Reiter nicht laden, steht AdminFehler da
+ * — mit EINER h1 („Postfach").
  */
 export default async function AdminPostfachPage({ searchParams }: { searchParams: Promise<Suche> }): Promise<React.JSX.Element> {
   await verlangeAdminSeite()
 
   const roh = await searchParams
-  const reiter = adminReiterAus(roh.reiter)
+  const alt = alteReiterAdresse(einzeln(roh.reiter), fadenKennungAus(roh.faden))
+  if (alt) permanentRedirect(alt)
+  const reiter = adminPostfachReiterAus(roh.reiter)
   const jetzt = new Date()
 
-  let zahlen: Record<AdminPostfachReiter, number | undefined> = { unterhaltungen: undefined, meldungen: undefined, rundschreiben: undefined }
+  let stand: { zahlen: EingangZahlen; erstattungen: ErstattungAufgabeRoh[]; rundschreibenImMonat: number } | null = null
   try {
-    const [ungelesen, zuEntscheiden] = await Promise.all([zaehleUngelesenTeam(), zaehleZuEntscheiden()])
-    zahlen = { unterhaltungen: ungelesen, meldungen: zuEntscheiden, rundschreiben: undefined }
+    const [zahlen, erstattungen, rundschreibenImMonat] = await Promise.all([zaehleOffenImEingang(), ladeErstattungAufgaben(), zaehleRundschreibenImMonat(jetzt)])
+    stand = { zahlen, erstattungen, rundschreibenImMonat }
   } catch (err) {
-    // Ohne Zahlen geht es weiter — die Reiter laden ihre Inhalte selbst.
+    // Ohne Zahlen geht es weiter — der Reiter lädt seinen Inhalt selbst.
     Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'postfach' } })
   }
 
   let geladen: ReiterDaten | null = null
   try {
-    geladen = await ladeReiter(reiter, roh)
+    geladen = await ladeReiter(reiter, roh, jetzt)
   } catch (err) {
     // Nur Bereich und Reiter — nie ein Nachrichten- oder Meldungstext.
     Sentry.captureException(err, { tags: { bereich: 'admin', seite: `postfach-${reiter}` } })
@@ -93,50 +103,29 @@ export default async function AdminPostfachPage({ searchParams }: { searchParams
   }
 
   return (
-    <div className={cn(ADMIN_RAHMEN, 'flex flex-col gap-4')}>
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <h1 className={SEITEN_TITEL}>{ADMIN_POSTFACH_TEXT.titel}</h1>
-        <p className="text-[13px] text-muted-foreground">{ADMIN_POSTFACH_TEXT.satz}</p>
-        <Link
-          href={adminPostfachAdresse('rundschreiben')}
-          className={cn(
-            'inline-flex min-h-11 items-center gap-2 rounded-full bg-accent px-[18px] text-sm font-semibold whitespace-nowrap text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90 sm:ml-auto',
-            FOKUS_RAHMEN
-          )}
-        >
-          <Plus className="size-4" strokeWidth={2.2} aria-hidden="true" />
-          {ADMIN_POSTFACH_TEXT.neuesRundschreiben}
-        </Link>
-      </header>
+    <div className={cn(ADMIN_RAHMEN, 'flex flex-col gap-4 md:gap-5')}>
+      <Seitenkopf
+        titel={ADMIN_POSTFACH_TEXT.titel}
+        satz={EINGANG_TEXT.satz}
+        rechts={
+          <Link
+            href={adminPostfachAdresse('rundschreiben')}
+            className={cn(
+              'inline-flex min-h-11 items-center gap-2 rounded-full bg-accent px-[18px] text-sm font-semibold whitespace-nowrap text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
+              FOKUS_RAHMEN
+            )}
+          >
+            <PenLine className="size-4" strokeWidth={2} aria-hidden="true" />
+            {EINGANG_TEXT.hauptaktion}
+          </Link>
+        }
+      />
+      {stand && <Kennzahlen beschriftung={EINGANG_TEXT.kennzahlenBeschriftung} eintraege={postfachKennzahlen(stand)} />}
+      <Unterreiter beschriftung={EINGANG_TEXT.unterreiterBeschriftung} eintraege={postfachUnterreiter(stand ? offenGesamt(stand.zahlen) : null)} aktiv={reiter} />
 
-      <nav aria-label={ADMIN_POSTFACH_TEXT.reiterBeschriftung} className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
-        <ul className="flex min-w-max items-center gap-6 border-b border-border">
-          {ADMIN_POSTFACH_REITER.map((r) => {
-            const aktiv = r.id === reiter
-            return (
-              <li key={r.id}>
-                <Link
-                  href={adminPostfachAdresse(r.id)}
-                  aria-current={aktiv ? 'page' : undefined}
-                  className={cn(
-                    '-mb-px inline-flex min-h-11 items-center gap-1.5 border-b-2 px-0.5 text-[14.5px] whitespace-nowrap transition-colors duration-[250ms]',
-                    aktiv ? 'border-foreground font-semibold text-foreground' : 'border-transparent font-medium text-muted-foreground hover:text-foreground',
-                    FOKUS_RAHMEN,
-                    'focus-visible:-outline-offset-2'
-                  )}
-                >
-                  {r.label}
-                  <Zaehler anzahl={zahlen[r.id]} wofuer={r.id === 'meldungen' ? ADMIN_POSTFACH_TEXT.zaehlerMeldungen : ADMIN_POSTFACH_TEXT.zaehlerAntworten} />
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
-      </nav>
-
-      {geladen.reiter === 'unterhaltungen' && <UnterhaltungenReiter filter={postfachFilterAus(roh.filter)} daten={geladen.daten} jetzt={jetzt} />}
-      {geladen.reiter === 'meldungen' && <MeldungenReiter suche={{ status: einzeln(roh.status), art: einzeln(roh.art) }} daten={geladen.daten} jetzt={jetzt} />}
+      {geladen.reiter === 'eingang' && <EingangReiter daten={geladen.daten} jetzt={jetzt} />}
       {geladen.reiter === 'rundschreiben' && <RundschreibenReiter daten={geladen.daten} jetzt={jetzt} />}
+      {geladen.reiter === 'zustellung' && <ZustellungReiter daten={geladen.daten} />}
     </div>
   )
 }

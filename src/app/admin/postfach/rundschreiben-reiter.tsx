@@ -4,6 +4,7 @@ import {
   ADMIN_POSTFACH_TEXT,
   POSTFACH_TEXT,
   RUNDSCHREIBEN_LEER,
+  antwortenText,
   empfaengerText,
   empfaengerZahlen,
   lesequoteText,
@@ -35,7 +36,9 @@ export async function ladeRundschreibenReiter(): Promise<RundschreibenDaten> {
  * Filter rechnet die Regel aus lib/postfach.ts auf dem Server; welche Höfe
  * ein Rundschreiben trifft, rechnet beim Senden noch einmal der Server.
  * Abweichend vom Mockup ohne „Entwurf speichern" (in der Freigabe nicht
- * vorgesehen) und ohne Pfeil je Zeile (es gibt keine Detailseite).
+ * vorgesehen) und ohne Pfeil je Zeile (es gibt keine Detailseite). Seit
+ * Nr. 95 (N14) steht je Zeile die Zahl der Antworten bzw. „keine Antwort
+ * möglich", und das Formular hat den Haken „Antwort möglich".
  */
 export function RundschreibenReiter({ daten, jetzt }: { daten: RundschreibenDaten; jetzt: Date }): React.JSX.Element {
   const zahlen = empfaengerZahlen(daten.hoefe, [])
@@ -71,7 +74,9 @@ export function RundschreibenReiter({ daten, jetzt }: { daten: RundschreibenDate
                             {r.titel}
                           </span>
                         </span>
-                        <span className="text-[12.5px] text-muted-foreground">{empfaengerText(r.empfaengerArt, r.empfaenger)}</span>
+                        <span className="text-[12.5px] text-muted-foreground">
+                          {empfaengerText(r.empfaengerArt, r.empfaenger)} · {antwortenText(r.antworten, r.antwortMoeglich)}
+                        </span>
                       </div>
                       <span className="shrink-0 text-xs text-muted-foreground">{wannText(r.gesendetAm, jetzt)}</span>
                     </div>

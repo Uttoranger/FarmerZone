@@ -151,6 +151,11 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 89 | Titelbild am Computer | `freigabe.md` §17 | N13 |
 | 90 | AGB-Seite und Einbindung | `freigabe.md` §17 | O4 |
 | Sammel 13 | Sammel-PR `integration/lauf13` | `freigabe.md` §17 | G3, G4 |
+| 93 | Gründungshöfe: Einstellungen und Bausteine (Migration) | `freigabe.md` §18 | K2 |
+| 94 | Admin-Seitenmuster, Höfe und Finanzen | `freigabe.md` §18 | N15, Z3 |
+| 95 | Postfach Stufe 2: Eingang, Aufgaben, Zustellung, Antwort möglich (von 94, holt 93 herein; Migration) | `freigabe.md` §18 | N12, N14 |
+| 96 | Startseite gestalten (gestapelt auf 95; Migration mit Seed) | `freigabe.md` §18 | N16 |
+| Sammel 14 | Sammel-PR `integration/lauf14` | `freigabe.md` §18 | G3, G4 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
@@ -198,6 +203,14 @@ Höchstens drei Umsetzer gleichzeitig. Nie zwei Nummern an derselben Code-Datei 
 - Ist 86 nach zwei Runden nicht fertig: 87 zweigt vom Branch der Nr. 91 ab und übernimmt die drei Nutzertext-Stellen von 86.
 
 Höchstens drei Umsetzer gleichzeitig. Nie zwei Nummern an derselben Code-Datei (Dateigrenzen in `freigabe.md` §17).
+
+**Reihenfolge in Lauf 14** (`freigabe.md` §18, Haltepunkt Sammel-PR): Doku-PR → 93 ∥ 94 → 95 → 96 → Sammel-PR. Die Branches:
+- 93 und 94 zweigen von `docs/lauf14` ab (dort liegen die Mockups, die Freigabe und das Register).
+- 95 zweigt vom Branch der Nr. 94 ab und holt den Branch der Nr. 93 per `git merge` herein, sobald beide fertig sind (die Migration aus 93 liegt vor der aus 95).
+- 96 zweigt vom Branch der Nr. 95 ab.
+- Ist 93 nach zwei Runden nicht fertig, zweigt 95 nur von 94 ab und lässt die Zustellung weg (Entwurf „nur Eingang und antwortMoeglich“). Ist 95 nicht fertig, zweigt 96 von 94 ab.
+
+Drei Migrationen (93, 95, 96), nur Expand, nach Regel 3 mit dem Schema des Vorgänger-Branchs als `--from-schema`. Die Reihenfolge ist zugleich die Priorität: 93 und 94 müssen fertig werden, 95 darf Entwurf bleiben, 96 nicht begonnen bleibt für Lauf 15. Nie zwei Nummern an derselben Code-Datei (Dateigrenzen in `freigabe.md` §18).
 
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 
