@@ -24,6 +24,8 @@ vi.mock('next/image', () => ({
 }))
 // Die Kopfzeilen lesen Sitzung und Pfad im Browser — hier zählt nur der Inhalt.
 vi.mock('@/components/shared/kunden-kopf', () => ({ KundenKopf: () => null }))
+// Seit Nr. 93 lädt die Seite die Zahlen der Gründungshöfe — ohne Zahlen rendert sie wie vorher.
+vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null }))
 vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
   KundeShellMitSitzung: ({ children }: { children: ReactNode }) => createElement('div', null, children),
 }))
@@ -32,6 +34,9 @@ import KonditionenPage, { revalidate as konditionenRevalidate } from '@/app/(pub
 import FuerHoefePage from '@/app/(public)/fuer-hoefe/page'
 import { BAR_OHNE_GEBUEHR_SATZ, SERVICEGEBUEHR_SATZ_TEXT, TARIFE, servicegebuehrZahltKunde, vorBarStichtag } from '@/lib/konditionen'
 import { FUER_HOEFE_FRAGEN } from '@/lib/fuer-hoefe'
+
+/** Die Seite ist seit Nr. 93 asynchron (Zahlen der Gründungshöfe) — einmal aufgelöst, dann gerendert. */
+const FUER_HOEFE_SEITE = await FuerHoefePage()
 
 const lies = (datei: string): string => readFileSync(join(process.cwd(), datei), 'utf8')
 const entschaerft = (text: string): string => text.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
@@ -94,7 +99,7 @@ describe('Quelltext — eine Quelle für Preise', () => {
 
 describe('Gerendert — dieselben Preise auf beiden Seiten', () => {
   const konditionen = renderToStaticMarkup(createElement(KonditionenPage))
-  const fuerHoefe = renderToStaticMarkup(createElement(FuerHoefePage))
+  const fuerHoefe = renderToStaticMarkup(FUER_HOEFE_SEITE)
 
   it.each([
     ['/konditionen', konditionen],
@@ -127,7 +132,7 @@ describe('Gerendert — dieselben Preise auf beiden Seiten', () => {
 })
 
 describe('/fuer-hoefe — Aufbau', () => {
-  const html = renderToStaticMarkup(createElement(FuerHoefePage))
+  const html = renderToStaticMarkup(FUER_HOEFE_SEITE)
 
   it('eine Überschrift erster Ordnung, Wege zur Registrierung und zu den Konditionen', () => {
     expect(html.match(/<h1\b/g)).toHaveLength(1)

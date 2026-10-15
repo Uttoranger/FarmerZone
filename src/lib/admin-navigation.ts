@@ -12,7 +12,7 @@ import type { UserRole } from '@prisma/client'
 import { ADMIN_POSTFACH_HREF } from '@/lib/postfach'
 import { BRIEFKASTEN_HREF } from '@/lib/admin-briefkasten'
 
-export type AdminReiterId = 'hoefe' | 'postfach' | 'finanzen'
+export type AdminReiterId = 'hoefe' | 'postfach' | 'finanzen' | 'einstellungen'
 
 export type AdminReiter = {
   id: AdminReiterId
@@ -33,6 +33,7 @@ export const ADMIN_REITER: readonly AdminReiter[] = [
   // Seit Nr. 87 (Register N12) mit drei Reitern unter /admin/postfach; /admin/meldungen leitet um, die Detailseite einer Meldung bleibt.
   { id: 'postfach', label: 'Postfach', href: ADMIN_POSTFACH_HREF, zahl: 'briefkasten', auchAktivAuf: [BRIEFKASTEN_HREF] },
   { id: 'finanzen', label: 'Finanzen', href: '/admin/finanzen' },
+  { id: 'einstellungen', label: 'Einstellungen', href: '/admin/einstellungen' },
 ]
 
 /** „← Zu meinem Hof" ab 1024 px, darunter „← Mein Hof" — nur, wenn das Konto einen Hof hat (kontoHatHof). */

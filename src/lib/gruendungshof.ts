@@ -18,8 +18,16 @@
 // REGEL FÜR ANZEIGEN: Zahlen und Datum kommen aus den Konstanten unten, nie
 // als Literal in eine Seite. Eine Zahl, die an zwei Orten steht, steht früher
 // oder später verschieden da — und bei Konditionen ist das kein Schönheitsfehler.
+//
+// SEIT NR. 93 (Register K2-Ergänzung „Gründungshöfe sichtbar"): Plätze gesamt,
+// Standard-Ende und Anzeige stehen in Admin › Einstellungen
+// (PlattformEinstellung, src/lib/plattform-einstellung.ts). MAX_GRUENDUNGSHOEFE
+// und GRUENDUNG_BIS_STANDARD_TAG sind deren Standardwerte. Die Funktionen hier
+// bleiben rein: Wer die Einstellung braucht, bekommt sie als Parameter
+// (`plaetze`, `GruendungEinstellung`) — ohne Parameter gilt der Standard, so
+// laufen die Aufrufer von vor Nr. 93 unverändert.
 
-import { baueGruendungsZusage, ONLINE_ZAHLUNG_START_SCHRITT } from '@/lib/konditionen'
+import { baueGruendungsZusage, KOSTENLOS, MONATLICH_KUENDBAR, ONLINE_ZAHLUNG_START_SCHRITT, tarifText } from '@/lib/konditionen'
 import { formatDatumLang } from '@/lib/format'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 
@@ -133,24 +141,24 @@ export function gruendungsplatzVon(hofId: string, hoefe: HofFuerPlatz[]): number
   return gruendungsplaetze(hoefe).get(hofId) ?? null
 }
 
-/** true, wenn der Hof einen der Gründungsplätze belegt (Platz <= 12). */
-export function istGruendungshof(hofId: string, hoefe: HofFuerPlatz[]): boolean {
+/** true, wenn der Hof einen der Gründungsplätze belegt (Platz <= `plaetze`, Standard 12). */
+export function istGruendungshof(hofId: string, hoefe: HofFuerPlatz[], plaetze: number = MAX_GRUENDUNGSHOEFE): boolean {
   const platz = gruendungsplatzVon(hofId, hoefe)
-  return platz !== null && platz <= MAX_GRUENDUNGSHOEFE
+  return platz !== null && platz <= plaetze
 }
 
-/** Wie viele der Plätze vergeben sind — höchstens MAX_GRUENDUNGSHOEFE. */
-export function vergebeneGruendungsplaetze(hoefe: HofFuerPlatz[]): number {
-  return Math.min(gruendungsplaetze(hoefe).size, MAX_GRUENDUNGSHOEFE)
+/** Wie viele der Plätze vergeben sind — höchstens `plaetze` (Standard MAX_GRUENDUNGSHOEFE). */
+export function vergebeneGruendungsplaetze(hoefe: HofFuerPlatz[], plaetze: number = MAX_GRUENDUNGSHOEFE): number {
+  return Math.min(gruendungsplaetze(hoefe).size, plaetze)
 }
 
 /**
  * Bekäme ein noch wartender Hof bei sofortiger Freischaltung einen Platz?
- * Für den Bestätigungsdialog. Die 12 sind eine KONDITIONS-Grenze, keine
+ * Für den Bestätigungsdialog. Die Plätze sind eine KONDITIONS-Grenze, keine
  * Zugangsgrenze — Freischalten bleibt in jedem Fall möglich.
  */
-export function bekaemePlatzBeiFreigabe(hoefe: HofFuerPlatz[]): boolean {
-  return vergebeneGruendungsplaetze(hoefe) < MAX_GRUENDUNGSHOEFE
+export function bekaemePlatzBeiFreigabe(hoefe: HofFuerPlatz[], plaetze: number = MAX_GRUENDUNGSHOEFE): boolean {
+  return vergebeneGruendungsplaetze(hoefe, plaetze) < plaetze
 }
 
 // === GRÜNDUNGS-ENDDATUM JE HOF (Register K2, Nr. 62) ===
@@ -218,3 +226,169 @@ export function baueGruendungAnzeige(hof: HofMitGruendungBis, hoefe: HofFuerPlat
   if (bis === null) return null
   return { bisTag: kalendertagInWien(bis), bisText: formatDatumLang(bis), abweichend: hof.gruendungBis !== null }
 }
+
+// === GRÜNDUNGSHÖFE SICHTBAR (Register K2-Ergänzung, Nr. 93) ===
+
+/**
+ * Was die Fachregeln aus Admin › Einstellungen brauchen: Plätze gesamt, das
+ * Standard-Ende (Wert der DATE-Spalte, Mitternacht UTC) und ob die Seiten es
+ * zeigen. Die Abfrage baut sie aus der Zeile (gruendungEinstellungAus in
+ * src/lib/plattform-einstellung.ts).
+ */
+export type GruendungEinstellung = { plaetze: number; bis: Date; anzeige: boolean }
+
+/** Ohne Einstellung gelten die Konstanten — wie vor Nr. 93. */
+export const GRUENDUNG_EINSTELLUNG_STANDARD: GruendungEinstellung = {
+  plaetze: MAX_GRUENDUNGSHOEFE,
+  bis: GRUENDUNG_BIS_STANDARD,
+  anzeige: true,
+}
+
+/**
+ * Was Startseite, /fuer-hoefe und Registrieren zeigen — fertig vom Server,
+ * nur Zahlen und Text, damit es auch an eine Client-Komponente gehen darf.
+ * `bisTag` ist der Wiener Kalendertag JJJJ-MM-TT des Standard-Endes.
+ */
+export type GruendungSeiten = {
+  zeigen: boolean
+  frei: number
+  gesamt: number
+  bisTag: string
+  /** „Du wärst voraussichtlich Gründungshof Nr. k" — null, wenn der Satz nicht stimmen könnte. */
+  voraussichtlicherPlatz: number | null
+}
+
+/**
+ * Die Zahlen der Seiten (Register K2-Ergänzung): frei = Plätze gesamt −
+ * vergeben. Gezeigt wird nur mit Anzeige an, mindestens einem freien Platz
+ * und einem Ende, das heute (Wiener Tag) noch nicht vorbei ist — sonst
+ * nichts, nie „0 von 12" (Punkt 5 der Entscheidung).
+ */
+export function fuerSeiten(
+  einstellung: GruendungEinstellung,
+  hoefe: HofFuerPlatz[],
+  jetzt: Date
+): { zeigen: boolean; frei: number; gesamt: number; bisTag: string } {
+  return seitenZahlen(einstellung, gruendungsplaetze(hoefe).size, jetzt)
+}
+
+/**
+ * Dieselbe Regel aus der Zahl der Höfe im Rennen (freigeschaltet, nicht
+ * stillgelegt) — für die Vorschau in Admin › Einstellungen, die keine
+ * Hofliste in den Browser schickt.
+ */
+export function seitenZahlen(
+  einstellung: GruendungEinstellung,
+  imRennen: number,
+  jetzt: Date
+): { zeigen: boolean; frei: number; gesamt: number; bisTag: string } {
+  const gesamt = Math.max(einstellung.plaetze, 0)
+  const frei = gesamt - Math.min(imRennen, gesamt)
+  const bisTag = kalendertagInWien(einstellung.bis)
+  const zeigen = einstellung.anzeige && frei > 0 && kalendertagInWien(jetzt) <= bisTag
+  return { zeigen, frei, gesamt, bisTag }
+}
+
+/**
+ * Der voraussichtliche Platz einer Registrierenden: vergeben + Höfe, die vor
+ * ihr auf die Freischaltung warten, + 1 (Register K2-Ergänzung, Punkt 3).
+ * Läge er hinter dem letzten Platz, gibt es keinen Satz (null) — „voraussichtlich
+ * Nr. 13" bei 12 Plätzen wäre falsch. Die Zusage kommt erst mit der
+ * Freischaltung; warten Höfe länger oder schaltet der Betreiber in anderer
+ * Reihenfolge frei, verschiebt sich die Nummer.
+ */
+export function voraussichtlicherPlatz(einstellung: GruendungEinstellung, hoefe: HofFuerPlatz[], wartendVorDir: number): number | null {
+  const gesamt = Math.max(einstellung.plaetze, 0)
+  const platz = vergebeneGruendungsplaetze(hoefe, gesamt) + Math.max(wartendVorDir, 0) + 1
+  return platz <= gesamt ? platz : null
+}
+
+/** Beides für die Seiten in einem — der Satz beim Registrieren nur, wenn auch die übrigen Bausteine stehen. */
+export function gruendungSeitenDaten(
+  einstellung: GruendungEinstellung,
+  hoefe: HofFuerPlatz[],
+  wartendVorDir: number,
+  jetzt: Date
+): GruendungSeiten {
+  const seiten = fuerSeiten(einstellung, hoefe, jetzt)
+  return { ...seiten, voraussichtlicherPlatz: seiten.zeigen ? voraussichtlicherPlatz(einstellung, hoefe, wartendVorDir) : null }
+}
+
+/** Nichts zeigen — wenn die Daten fehlen (Ladefehler, Bau ohne Datenbank). */
+export const KEINE_GRUENDUNG_SEITEN: GruendungSeiten = {
+  zeigen: false,
+  frei: 0,
+  gesamt: MAX_GRUENDUNGSHOEFE,
+  bisTag: GRUENDUNG_BIS_STANDARD_TAG,
+  voraussichtlicherPlatz: null,
+}
+
+/**
+ * Die Zusage bei der Freischaltung (Punkt 4): Platz und Ende, wenn der eben
+ * freigeschaltete Hof einen der Plätze belegt — sein eigenes Ende oder das
+ * Standard-Ende der Einstellung —, sonst null (dann keine Nachricht).
+ * `hoefe` ist die Liste der Platzvergabe NACH der Freischaltung.
+ */
+export function gruendungsZusageBeiFreigabe(
+  hof: HofMitGruendungBis,
+  hoefe: HofFuerPlatz[],
+  einstellung: GruendungEinstellung
+): { platz: number; bis: Date } | null {
+  const platz = gruendungsplatzVon(hof.id, hoefe)
+  if (platz === null || platz > einstellung.plaetze) return null
+  return { platz, bis: hof.gruendungBis ?? einstellung.bis }
+}
+
+/** „31.12.2027" — der Kalendertag in Ziffern, wie in der Hofladen-Karte; ohne Intl, damit es überall gleich aussieht. */
+export function gruendungTagKurz(kalendertag: string): string {
+  const [jahr, monat, tag] = kalendertag.split('-')
+  return `${tag}.${monat}.${jahr}`
+}
+
+/** „31. Dezember 2027" aus dem Kalendertag — über den gemeinsamen Formatierer. */
+export function gruendungTagLang(kalendertag: string): string {
+  return formatDatumLang(bildeGruendungBis(kalendertag))
+}
+
+/** Ein Satz mit einem hervorgehobenen Teil: vor · fett · danach. */
+export type GruendungSatzTeile = { vor: string; betont: string; nach: string }
+
+/**
+ * Alle Sätze der Bausteine mit Zusage — EINE Quelle (Register K2-Ergänzung,
+ * Wortlaut der Entscheidung vom 15.10.2026). Zahlen und Datum kommen als
+ * Parameter aus der Einstellung, nie als Literal.
+ */
+export const GRUENDUNG_TEXT = {
+  /** (1) Startseite, Für-Höfe-Band — „Letzter Gründungsplatz frei" beim letzten (Mockup, Zustände). */
+  satz: (frei: number, gesamt: number, bisTag: string): GruendungSatzTeile => ({
+    vor: '',
+    betont: frei === 1 ? 'Letzter Gründungsplatz frei' : `Noch ${frei} von ${gesamt} Gründungsplätzen frei`,
+    nach: ` – ${tarifText('HOFLADEN').name} ${KOSTENLOS} bis ${gruendungTagLang(bisTag)}.`,
+  }),
+  /** (2) /fuer-hoefe, über der Überschrift. */
+  pill: (frei: number, gesamt: number): string => `Gründungsphase · noch ${frei} von ${gesamt} Plätzen`,
+  /** (2) Der eine orange Knopf auf /fuer-hoefe. */
+  knopf: 'Gründungshof werden',
+  /** (2) Die Fußnote unter den Knöpfen; der letzte Teil am Handy nicht (Mockup mobil-k2-fuer-hoefe-gruendung). */
+  fussnote: (bisTag: string): readonly string[] => [
+    `Kostenlos bis ${gruendungTagLang(bisTag)}`,
+    'danach Tarif nach Wahl',
+    MONATLICH_KUENDBAR,
+    'keine Bankdaten nötig',
+  ],
+  /** (2) Die Angebotszeile direkt über den Tarifkarten. */
+  preiszeile: (frei: number, gesamt: number, bisTag: string): GruendungSatzTeile => ({
+    vor: '',
+    betont: `Gründungshöfe zahlen bis ${gruendungTagLang(bisTag)} keine Grundgebühr`,
+    nach: ` – auch im ${tarifText('HOFLADEN').name}. Noch ${frei} von ${gesamt} Plätzen, Zusage mit der Freischaltung.`,
+  }),
+  /** (2) In der Hofladen-Karte unter „€ 0 / Monat". */
+  hofladenPreis: (bisTag: string): string => `bis ${gruendungTagKurz(bisTag)} · dann ${tarifText('HOFLADEN').preis}`,
+  /** (3) /register, über dem Formular — immer mit „voraussichtlich". */
+  registrieren: (platz: number, bisTag: string): GruendungSatzTeile => ({
+    vor: 'Du wärst voraussichtlich ',
+    // „Nr." und Zahl bleiben in einer Zeile (geschütztes Leerzeichen) — am Handy stand die Zahl sonst allein.
+    betont: gruendungshofLabel(platz).replace('Nr. ', 'Nr.\u00a0'),
+    nach: ` – ${tarifText('HOFLADEN').name} ${KOSTENLOS} bis ${gruendungTagLang(bisTag)}. Die Zusage kommt mit der Freischaltung.`,
+  }),
+} as const
