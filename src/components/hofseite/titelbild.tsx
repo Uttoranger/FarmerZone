@@ -123,8 +123,9 @@ export function TitelbildBilder({
         </div>
         <div className="absolute inset-0 bg-primary-foreground/45" />
       </div>
-      {/* Der Kasten: Breiter als 1 920 px (TITELBILD_BREITE_MAX) wird das scharfe Foto nicht aufgezogen. Die ganze Lage steht nach der füllenden im Baum, also darüber. */}
-      <div className="relative mx-auto h-full max-w-[1920px]">
+      {/* Der Kasten: Breiter als 1 920 px (TITELBILD_BREITE_MAX) wird das scharfe Foto nicht aufgezogen. Die ganze Lage steht nach der füllenden im Baum, also darüber.
+          overflow-hidden, weil der Zoom (transform: scale) die füllende Lage über den Kasten hinaus vergrößert — über 1 920 px ragte sie sonst seitlich in die weiche Kopie. */}
+      <div className="relative mx-auto h-full max-w-[1920px] overflow-hidden">
         <Image
           src={foto}
           alt=""

@@ -313,6 +313,16 @@ describe('TitelbildBilder', () => {
     expect(klassen(kasten(zeige('ganz')))).toEqual(expect.arrayContaining(['relative', 'mx-auto', 'h-full', `max-w-[${TITELBILD_BREITE_MAX}px]`]))
   })
 
+  it('der Kasten schneidet ab: Ein gezoomtes Foto ragt über 1 920 px nicht seitlich in die weiche Kopie (Nr. 97, Runde 1)', () => {
+    // Zoom 115 % am Rand (fokusX 0): Das scharfe Foto wird um seinen linken Rand auf 115 % vergrößert und stünde
+    // ohne Beschnitt im Kasten bis zu 288 px rechts über die 1 920 px hinaus — mitten in der weichen Kopie.
+    const html = renderToStaticMarkup(
+      createElement(TitelbildBilder, { foto: '/foto.jpg', ausschnitt: { ...AUSSCHNITT, fokusX: 0, zoom: 115 }, darstellung: 'beschnitt', beimLaden: () => {} }),
+    )
+    expect(fuellend(html)).toContain('transform:scale(1.15)')
+    expect(klassen(kasten(html))).toContain('overflow-hidden')
+  })
+
   it('Kasten, Kopie-Grenze und sizes rechnen mit derselben Breite — der Browser lädt höchstens so viel', () => {
     const html = zeige('beschnitt')
     expect(/max-w-\[(\d+)px\]/.exec(kasten(html))?.[1]).toBe(String(TITELBILD_BREITE_MAX))
