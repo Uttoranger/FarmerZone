@@ -44,7 +44,7 @@ import AdminFinanzenPage from '@/app/admin/finanzen/page'
 import { getFinanzenJahr } from '@/server/queries/finanzen'
 import { ergebnisText } from '@/lib/finanzen'
 import { centsAlsEuro, formatEuro } from '@/lib/format'
-import { JETZT, STICHTAG, prismaAttrappe } from './finanzen-jahr-daten'
+import { JETZT, STICHTAG, csvCent, prismaAttrappe } from './finanzen-jahr-daten'
 
 function anfrage(abfrage = '?jahr=2026'): NextRequest {
   return new NextRequest(`http://localhost/admin/finanzen/export${abfrage}`)
@@ -107,11 +107,10 @@ describe('mit Admin', () => {
     const csv = await (await ruf('?jahr=2026')).text()
     const summe = csv.split('\r\n').find((z) => z.startsWith('Summe 2026;') && z.split(';')[4] !== '')?.split(';')
     expect(summe).toBeDefined()
-    const cents = (text: string) => Math.round(Number(text.replace(',', '.')) * 100)
     const { rechnung } = await getFinanzenJahr(2026, JETZT, STICHTAG)
-    expect(cents(summe![1]!)).toBe(rechnung.servicegebuehrenCents)
-    expect(cents(summe![2]!)).toBe(rechnung.kostenCents)
-    expect(cents(summe![3]!)).toBe(rechnung.ergebnisCents)
+    expect(csvCent(summe![1]!)).toBe(rechnung.servicegebuehrenCents)
+    expect(csvCent(summe![2]!)).toBe(rechnung.kostenCents)
+    expect(csvCent(summe![3]!)).toBe(rechnung.ergebnisCents)
     expect(Number(summe![4])).toBe(rechnung.bestellungen)
 
     // Dieselben Zahlen stehen auf der Seite — aus dem Text der CSV zurückgerechnet, nicht aus der Rechnung.
@@ -122,9 +121,9 @@ describe('mit Admin', () => {
     } finally {
       vi.useRealTimers()
     }
-    expect(html).toContain(formatEuro(centsAlsEuro(cents(summe![1]!))))
-    expect(html).toContain(formatEuro(centsAlsEuro(cents(summe![2]!))))
-    expect(html).toContain(ergebnisText(cents(summe![3]!)))
+    expect(html).toContain(formatEuro(centsAlsEuro(csvCent(summe![1]!))))
+    expect(html).toContain(formatEuro(centsAlsEuro(csvCent(summe![2]!))))
+    expect(html).toContain(ergebnisText(csvCent(summe![3]!)))
     expect(html).toContain(`${summe![4]} Bestellungen`)
   })
 

@@ -18,8 +18,11 @@
  *
  * Die acht Zeilen sind geteilter Zustand der Test-Datenbank: Jeder Test stellt
  * sie im afterEach wieder her und löscht seine Blöcke.
+ *
+ * Feste Uhr (Nacharbeit 99, Nr. 106): `vi.setSystemTime` auf JETZT, nur `Date`
+ * gestellt — der Block „ab 1. Oktober“ ist damit an jedem Tag des Laufs live.
  */
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()), draftMode: vi.fn(async () => ({ isEnabled: false, enable: vi.fn() })) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn(), unstable_cache: (fn: unknown) => fn }))
@@ -38,7 +41,16 @@ import { erstelleHof, erstelleHofMitAnmeldung, raeumeAuf } from './setup/basis'
 const MIGRATION = readFileSync(join(process.cwd(), 'prisma', 'migrations', '20261015140000_startseite_gestalten', 'migration.sql'), 'utf8')
 const SEED_IDS = STANDARD_REIHENFOLGE.map((art) => `startseite-${art.toLowerCase().replace(/_/g, '-')}`)
 
+/** Mittwoch, 14. Oktober 2026, 12:00 in Wien. */
+const JETZT = new Date('2026-10-14T10:00:00.000Z')
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(JETZT)
+})
+
 afterEach(async () => {
+  vi.useRealTimers()
   vi.mocked(headers).mockResolvedValue(new Headers() as never)
   await prisma.startseiteBlock.deleteMany({ where: { erstelltVonUserId: { startsWith: 'int-' } } })
   await prisma.startseiteBlock.deleteMany({ where: { titel: { startsWith: 'int-' } } })
@@ -101,7 +113,7 @@ describe('Migration und Seed', () => {
 describe('speichereEntwurf', () => {
   it('schreibt Block, Reihenfolge und Auge zusammen — die Liste liest genau das', async () => {
     const adminId = await alsAdmin()
-    const { farm } = await erstelleHof({ approvedAt: new Date() })
+    const { farm } = await erstelleHof({ approvedAt: JETZT })
     const vorher = await zustand()
     const reihenfolge = vorher.map((z) => ({ id: z.id, sichtbar: z.art !== 'FRAGEN' }))
     reihenfolge.splice(1, 0, { id: NEUER_BLOCK, sichtbar: true })
@@ -120,7 +132,7 @@ describe('speichereEntwurf', () => {
     const gespeichert = await prisma.startseiteBlock.findUniqueOrThrow({ where: { id: blockId ?? '' } })
     expect(gespeichert).toMatchObject({ vorlage: 'HOEFE_AUSWAHL', farmIds: [farm.id], erstelltVonUserId: adminId, liveAb: new Date('2026-10-01T04:00:00.000Z') })
 
-    const liste = await ladeVorschauZeilen({ quelle: 'entwurf', datum: new Date() })
+    const liste = await ladeVorschauZeilen({ quelle: 'entwurf', datum: JETZT })
     const imBlock = liste.find((z) => z.art === 'BLOCK')
     expect(imBlock && imBlock.art === 'BLOCK' ? imBlock.block.hofSlugs : null).toEqual([farm.slug])
   })

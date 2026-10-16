@@ -72,6 +72,16 @@ export function centsAlsEuro(cents: number): number {
   return cents / 100
 }
 
+/**
+ * Ganze Cent als Euro mit Komma, ohne Tausenderpunkt und Zeichen — so liest
+ * Excel in Österreich sie als Zahl: 128450 → „1284,50", −10 → „-0,10". Für
+ * CSV-Dateien (Finanzen › Jahr); auf der Seite steht Geld über `formatEuro`.
+ */
+export function csvBetrag(cents: number): string {
+  const betrag = Math.abs(Math.round(cents))
+  return `${cents < 0 ? '-' : ''}${Math.floor(betrag / 100)},${String(betrag % 100).padStart(2, '0')}`
+}
+
 /** „0,5" · „2" · „1.234" — eine Zahl ohne Einheit, deutsch geschrieben. */
 export function formatZahl(n: number): string {
   return mengenFormat.format(Number.isFinite(n) ? n : 0)

@@ -411,7 +411,7 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
         toast.error(ergebnis.error)
         return
       }
-      entwurf.oeffneBlock(null, entwurf.zeilen.filter((z) => z.block?.id !== blockId))
+      entwurf.blockGeloescht(blockId)
       toast.success(T.geloescht)
     })
   }

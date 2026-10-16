@@ -227,25 +227,34 @@ export async function ladeEntwurfAdmin(): Promise<AdminStartseitenZeile[]> {
   return adminZeilen(zeilen, await hofSlugs([fassungAusEntwurf(zeilen.map(entwurfZeile))]))
 }
 
-/** So viele Fassungen liest der Zeitplan — Planungen und Verlauf zusammen. */
-const FASSUNGEN_HOECHSTENS = 50
+/** So viele erreichte Fassungen liest der Zeitplan: die Live-Fassung und der Verlauf davor. */
+const ERREICHTE_HOECHSTENS = 50
 
-/** Alles für Admin › Startseite, frisch (die Seite ist ohnehin dynamisch). */
+const FASSUNG_ADMIN = { id: true, inhalt: true, liveAb: true, createdAt: true, erstelltVonUserId: true } satisfies Prisma.StartseiteFassungSelect
+
+/**
+ * Alles für Admin › Startseite, frisch (die Seite ist ohnehin dynamisch).
+ * Planungen und erreichte Fassungen getrennt gelesen (Nacharbeit 99): die
+ * Planungen alle, die erreichten höchstens 50 — so fällt die Live-Fassung nie
+ * aus dem Vergleich, auch nicht hinter vielen Planungen.
+ */
 export async function ladeStartseiteAdmin(jetzt: Date): Promise<AdminStartseite> {
-  const [zeilen, hoefe, fassungen] = await Promise.all([
+  const [zeilen, hoefe, planungen, erreicht] = await Promise.all([
     prisma.startseiteAbschnitt.findMany(ZEILE_MIT_BLOCK),
     prisma.farm.findMany({
       where: OEFFENTLICH_SICHTBAR,
       orderBy: { name: 'asc' },
       select: { id: true, slug: true, name: true, postalCode: true, city: true },
     }),
+    prisma.startseiteFassung.findMany({ where: { zurueckgezogenAm: null, liveAb: { gt: jetzt } }, orderBy: NEUESTE_ZUERST, select: FASSUNG_ADMIN }),
     prisma.startseiteFassung.findMany({
-      where: { zurueckgezogenAm: null },
+      where: { zurueckgezogenAm: null, liveAb: { lte: jetzt } },
       orderBy: NEUESTE_ZUERST,
-      take: FASSUNGEN_HOECHSTENS,
-      select: { id: true, inhalt: true, liveAb: true, createdAt: true, erstelltVonUserId: true },
+      take: ERREICHTE_HOECHSTENS,
+      select: FASSUNG_ADMIN,
     }),
   ])
+  const fassungen = [...planungen, ...erreicht]
   const personen = await prisma.user.findMany({
     where: { id: { in: [...new Set(fassungen.map((f) => f.erstelltVonUserId))] } },
     select: { id: true, name: true },

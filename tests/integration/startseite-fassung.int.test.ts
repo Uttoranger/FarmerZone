@@ -17,11 +17,17 @@
  *    ist 07:00 UTC, am Sonntag der Umstellung 08:00 UTC.
  *  - Als Entwurf übernehmen schreibt die Tabellen des Entwurfs aus der Fassung.
  *
- * Systemuhr (TESTING_GUIDELINES §1): Zeiten großzügig in Tagen gesetzt. Die acht
+ *  - Der Zeitplan liest die Planungen ohne Obergrenze und die erreichten
+ *    Fassungen getrennt: Hinter 51 Planungen bleibt die Live-Fassung live
+ *    (Nacharbeit 99, Nr. 106).
+ *
+ * Feste Uhr (Nacharbeit 99): `vi.setSystemTime` auf JETZT, nur `Date` ist
+ * gestellt (Prisma und pg laufen mit echten Zeitgebern) — die Actions lesen
+ * ihr `new Date()` von dort. Zeiten trotzdem großzügig in Tagen. Die acht
  * Abschnitte sind geteilter Zustand — jeder Test stellt sie im afterEach wieder
  * her und löscht seine Blöcke und Fassungen.
  */
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()), draftMode: vi.fn(async () => ({ isEnabled: false, enable: vi.fn() })) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn(), unstable_cache: (fn: unknown) => fn }))
@@ -39,8 +45,16 @@ import { erstelleHofMitAnmeldung, raeumeAuf } from './setup/basis'
 const SEED_IDS = STANDARD_REIHENFOLGE.map((art) => `startseite-${art.toLowerCase().replace(/_/g, '-')}`)
 const TAG_MS = 24 * 60 * 60 * 1000
 const INT_ADMIN = 'int-admin-fassung'
+/** Mittwoch, 14. Oktober 2026, 12:00 in Wien — zwei Wochen vor der Zeitumstellung. */
+const JETZT = new Date('2026-10-14T10:00:00.000Z')
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(JETZT)
+})
 
 afterEach(async () => {
+  vi.useRealTimers()
   vi.mocked(headers).mockResolvedValue(new Headers() as never)
   const testPersonen = await prisma.user.findMany({ where: { email: { startsWith: 'int-' } }, select: { id: true } })
   const ids = [INT_ADMIN, ...testPersonen.map((p) => p.id)]
@@ -69,7 +83,7 @@ async function fassung(liveAb: Date, inhalt: FassungInhalt, zurueckgezogenAm: Da
   return f.id
 }
 
-const fragenSichtbar = async (): Promise<boolean | undefined> => (await ladeStartseite(new Date())).find((z) => z.art === 'FRAGEN')?.sichtbar
+const fragenSichtbar = async (): Promise<boolean | undefined> => (await ladeStartseite(JETZT)).find((z) => z.art === 'FRAGEN')?.sichtbar
 
 /** Der Samstag vor der Umstellung Ende Oktober — der nächste, der noch kommt (höchstens ein Jahr voraus). */
 function samstagVorUmstellung(jetzt: Date): string {
@@ -94,20 +108,34 @@ describe('Migration', () => {
 
 describe('Auswahl der Live-Fassung', () => {
   it('nimmt von vergangen, künftig und zurückgezogen die vergangene — Startseite und Zeitplan gleich', async () => {
-    const jetzt = Date.now()
+    const jetzt = JETZT.getTime()
     const vergangen = await fassung(new Date(jetzt - 3 * TAG_MS), mitFragen(false))
     const kuenftig = await fassung(new Date(jetzt + 3 * TAG_MS), mitFragen(true))
     await fassung(new Date(jetzt - TAG_MS), mitFragen(true), new Date(jetzt - 2 * TAG_MS))
 
     expect(await fragenSichtbar()).toBe(false)
-    const admin = await ladeStartseiteAdmin(new Date())
+    const admin = await ladeStartseiteAdmin(JETZT)
     expect(admin.live?.id).toBe(vergangen)
     expect(admin.geplant.map((f) => f.id)).toEqual([kuenftig])
     expect(admin.frueher).toEqual([])
   })
 
+  it('hält die Live-Fassung im Zeitplan, auch hinter 51 Planungen', async () => {
+    const live = await fassung(new Date(JETZT.getTime() - 2 * TAG_MS), mitFragen(false))
+    await prisma.startseiteFassung.createMany({
+      data: Array.from({ length: 51 }, (_, i) => ({ inhalt: mitFragen(true), liveAb: new Date(JETZT.getTime() + (i + 1) * TAG_MS), erstelltVonUserId: INT_ADMIN })),
+    })
+
+    const admin = await ladeStartseiteAdmin(JETZT)
+
+    expect(admin.live?.id).toBe(live)
+    expect(admin.geplant).toHaveLength(51)
+    // Die nächste Planung zuerst.
+    expect(admin.geplant[0]?.liveAb).toBe(new Date(JETZT.getTime() + TAG_MS).toISOString())
+  })
+
   it('zeigt ohne Fassung die Standard-Reihenfolge', async () => {
-    expect((await ladeStartseite(new Date())).map((z) => z.art)).toEqual([...STANDARD_REIHENFOLGE])
+    expect((await ladeStartseite(JETZT)).map((z) => z.art)).toEqual([...STANDARD_REIHENFOLGE])
   })
 })
 
@@ -159,7 +187,7 @@ describe('Veröffentlichen', () => {
 
   it('rechnet Wiener Zeit an der Sommerzeitgrenze richtig um', async () => {
     const adminId = await alsAdmin()
-    const samstag = samstagVorUmstellung(new Date())
+    const samstag = samstagVorUmstellung(JETZT)
     const sonntag = new Date(Date.parse(`${samstag}T12:00:00Z`) + TAG_MS).toISOString().slice(0, 10)
     expect(await veroeffentlicheStartseite({ wann: 'termin', datum: samstag, uhrzeit: '09:00' })).toMatchObject({ ok: true, liveAb: `${samstag}T07:00:00.000Z` })
     expect(await veroeffentlicheStartseite({ wann: 'termin', datum: sonntag, uhrzeit: '09:00' })).toMatchObject({ ok: true, liveAb: `${sonntag}T08:00:00.000Z` })
@@ -173,7 +201,7 @@ describe('Veröffentlichen', () => {
 describe('Zurückziehen', () => {
   it('zieht eine geplante Fassung zurück, eine laufende nicht', async () => {
     await alsAdmin()
-    const jetzt = Date.now()
+    const jetzt = JETZT.getTime()
     const laufend = await fassung(new Date(jetzt - TAG_MS), mitFragen(false))
     const geplant = await fassung(new Date(jetzt + TAG_MS), mitFragen(true))
 
@@ -202,8 +230,8 @@ describe('Als Entwurf übernehmen', () => {
         ...rest,
       ],
     }
-    const id = await fassung(new Date(Date.now() - 10 * TAG_MS), alt)
-    const liveVorher = await ladeStartseite(new Date())
+    const id = await fassung(new Date(JETZT.getTime() - 10 * TAG_MS), alt)
+    const liveVorher = await ladeStartseite(JETZT)
 
     expect(await uebernehmeFassungAlsEntwurf({ id })).toMatchObject({ ok: true })
 
@@ -221,6 +249,6 @@ describe('Als Entwurf übernehmen', () => {
     ])
     expect(zeilen[2].block).toMatchObject({ titel: 'int-Erntedank am Hof', vorlage: 'HINWEISBAND' })
     // Live ändert sich dadurch nicht.
-    expect(await ladeStartseite(new Date())).toEqual(liveVorher)
+    expect(await ladeStartseite(JETZT)).toEqual(liveVorher)
   })
 })

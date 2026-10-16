@@ -259,6 +259,11 @@ describe('Gegenproben', () => {
     expect(html).toContain('>38 %<')
   })
 
+  it('die ProgressBar trägt ihren Namen schon im Server-HTML — Base UI setzt aria-labelledby erst nach der Hydrierung', () => {
+    const html = renderToStaticMarkup(createElement(ProgressBar, { beschriftung: 'Gepackt', wert: 3, max: 8 }))
+    expect(html).toMatch(/role="progressbar"[^>]*aria-label="Gepackt"|aria-label="Gepackt"[^>]*role="progressbar"/)
+  })
+
   it('ein Zähler ohne Anzahl rendert nichts', () => {
     expect(renderToStaticMarkup(createElement(Zaehler, { anzahl: 0, wofuer: 'x' }))).toBe('')
     expect(renderToStaticMarkup(createElement(Zaehler, { anzahl: undefined, wofuer: 'x' }))).toBe('')

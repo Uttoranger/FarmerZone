@@ -69,6 +69,7 @@ import {
   STANDARD_REIHENFOLGE,
   STARTSEITE_CACHE_TAG,
   NEUER_BLOCK,
+  standText,
 } from '@/lib/startseite-gestalten'
 import {
   beendeStartseitenVorschau,
@@ -289,8 +290,15 @@ describe('Vorschau-Link', () => {
     vi.mocked(prisma.startseiteFassung.findFirst).mockResolvedValue(null as never)
     expect(await erzeugeStartseitenVorschau({ stand: 'termin', quelle: 'live', blockEntwurfId: null })).toEqual({ error: 'Es ist gerade nichts geplant.' })
     expect(h.draftEnable).not.toHaveBeenCalled()
-    vi.mocked(prisma.startseiteFassung.findFirst).mockResolvedValue({ liveAb: new Date(Date.now() + 86_400_000) } as never)
-    expect(await erzeugeStartseitenVorschau({ stand: 'termin', quelle: 'live', blockEntwurfId: null })).toMatchObject({ ok: true })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-15T18:44:00.000Z'))
+    try {
+      const termin = new Date('2026-10-16T18:44:00.000Z')
+      vi.mocked(prisma.startseiteFassung.findFirst).mockResolvedValue({ liveAb: termin } as never)
+      expect(await erzeugeStartseitenVorschau({ stand: 'termin', quelle: 'live', blockEntwurfId: null })).toMatchObject({ ok: true, stand: standText(termin) })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('weist eine unbekannte Quelle ab, ohne den Draft Mode einzuschalten', async () => {
@@ -357,13 +365,19 @@ describe('veroeffentlicheStartseite', () => {
   })
 
   it('schreibt die Fassung aus dem Entwurf in EINER Transaktion, mit dem Admin aus der Sitzung', async () => {
-    const vorher = Date.now()
-    expect(await veroeffentlicheStartseite({ wann: 'jetzt' })).toMatchObject({ ok: true, id: 'fassung-neu' })
+    const jetzt = new Date('2026-10-15T18:44:00.000Z')
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(jetzt)
+    try {
+      expect(await veroeffentlicheStartseite({ wann: 'jetzt' })).toMatchObject({ ok: true, id: 'fassung-neu' })
+    } finally {
+      vi.useRealTimers()
+    }
     expect(prisma.$transaction).toHaveBeenCalledTimes(1)
     const daten = tx.startseiteFassung.create.mock.calls[0]?.[0].data
     expect(daten.erstelltVonUserId).toBe('admin-1')
     expect(daten.inhalt).toEqual({ v: 1, zeilen: STANDARD_REIHENFOLGE.map((art) => ({ art, sichtbar: true })) })
-    expect(daten.liveAb.getTime()).toBeGreaterThanOrEqual(vorher)
+    expect(daten.liveAb).toEqual(jetzt)
   })
 
   it('plant zu Tag und Uhrzeit in Wiener Zeit — ohne die Startseite neu zu bauen', async () => {

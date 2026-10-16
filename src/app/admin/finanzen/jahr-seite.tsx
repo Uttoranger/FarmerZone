@@ -9,6 +9,7 @@ import {
   finanzenJahrUnterreiter,
   jahrKennzahlen,
   jahrMonateFuerAnzeige,
+  testzahlungenHinweisImJahr,
 } from '@/lib/finanzen'
 import { FINANZEN_REITER_OHNE_INHALT, FINANZEN_SEITE, finanzenAdresse, finanzenReiterLabel, type FinanzenReiterId } from '@/lib/admin-finanzen-seite'
 import { finanzenJahrAus } from '@/schemas/admin-reiter'
@@ -66,7 +67,7 @@ export async function ladeJahrSeite({
       <Seitenkopf
         titel={FINANZEN_SEITE.titel}
         satz={text.satz(jahr, jahr === laufendesJahr)}
-        hinweis={daten.testzahlungenHinweis}
+        hinweis={testzahlungenHinweisImJahr(daten.testzahlungenHinweis, rechnung, daten.vorjahr, false)}
         rechts={
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <ZeitraumUmschalter
@@ -110,6 +111,7 @@ export async function ladeJahrSeite({
           monate={jahrMonateFuerAnzeige(rechnung, daten.vorjahr)}
           vorjahr={daten.vorjahr === null ? null : daten.vorjahr.jahr}
           vergleichAb={daten.vergleichAb}
+          hinweisImVergleich={rechnung.testzahlungAusgelassen ? null : testzahlungenHinweisImJahr(daten.testzahlungenHinweis, rechnung, daten.vorjahr, true)}
         />
       )}
 

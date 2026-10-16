@@ -12,6 +12,18 @@ export const STICHTAG = new Date('2025-06-01T00:00:00Z')
 /** Der 15. Oktober 2026, 10:00 in Wien. */
 export const JETZT = new Date('2026-10-15T08:00:00Z')
 
+/**
+ * Ein Betrag aus der CSV („1284,50", „-0,10") als ganze Cent — über die
+ * Ziffern, nie `Number(…) * 100` (CODING_STANDARDS „Geld“). Alles andere
+ * ist ein Fehler im Test, kein Betrag.
+ */
+export function csvCent(text: string): number {
+  const teile = /^(-?)(\d+),(\d{2})$/.exec(text)
+  if (!teile) throw new Error(`Kein CSV-Betrag: ${text}`)
+  const [, minus, euro, cent] = teile
+  return (minus ? -1 : 1) * (Number(euro) * 100 + Number(cent))
+}
+
 export const POSTEN = [
   { id: 'p1', name: 'Hosting Beispiel', kategorie: 'HOSTING', betrag: new Prisma.Decimal('18.50'), rhythmus: 'MONATLICH', ab: new Date(Date.UTC(2025, 2, 1)), bis: null, notiz: null },
   // 100 € im Jahr, ab September 2025: 833 Cent im Monat, die ersten vier Monate des Abo-Jahres 834 — über den Jahreswechsel hinweg.

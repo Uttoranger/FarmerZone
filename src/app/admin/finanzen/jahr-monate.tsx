@@ -73,12 +73,15 @@ export function JahrMonate({
   monate,
   vorjahr,
   vergleichAb,
+  hinweisImVergleich = null,
 }: {
   jahr: number
   monate: JahrMonatAnzeige[]
   /** Das Vorjahr, wenn es Daten hat; sonst null (der Schalter ist dann aus, mit Hinweis). */
   vorjahr: number | null
   vergleichAb: number
+  /** Der Testzahlungs-Satz, wenn nur das Vorjahr eine auslässt — er gilt erst, wenn dessen Zahlen dastehen (testzahlungenHinweisImJahr). */
+  hinweisImVergleich?: string | null
 }): React.JSX.Element {
   const [vergleich, setVergleich] = useState(false)
   const [messRahmen, breite] = useBreite()
@@ -105,6 +108,7 @@ export function JahrMonate({
           <VergleichSchalter jahr={jahr} vorjahr={vorjahr} vergleichAb={vergleichAb} an={mitVergleich} onChange={setVergleich} />
           <Legende vorjahr={mitVergleich ? vorjahr : null} />
         </div>
+        {mitVergleich && hinweisImVergleich && <p className={cn('-mt-2 text-[12.5px] leading-snug', LEISE)}>{hinweisImVergleich}</p>}
         <div ref={messRahmen}>
           <Diagramm jahr={jahr} monate={monate} breite={breite} vergleich={mitVergleich} beschreibtId={tabelleId} />
         </div>
