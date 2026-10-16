@@ -370,12 +370,11 @@ export function LogoUpload({
           toast.error(result.error)
           return
         }
-        // Der alte Ausschnitt gehörte zum alten Foto: zurück auf „wie heute“, bevor der Baustein aufgeht.
-        if (ausschnitt !== null) {
-          const zurueck = await speichereBildAusschnittAction({ ziel: 'logo', wert: AUSSCHNITT_STANDARD })
-          if ('error' in zurueck) toast.error(zurueck.error)
-          else setAusschnitt(null)
-        }
+        // Der alte Ausschnitt gehörte zum alten Foto: zurück auf „wie heute“ (`null`), bevor der Baustein
+        // aufgeht — immer, denn ob einer gespeichert ist, weiß der Baustein nur, wenn der Aufrufer ihn reicht.
+        const zurueck = await speichereBildAusschnittAction({ ziel: 'logo', wert: AUSSCHNITT_STANDARD })
+        if ('error' in zurueck) toast.error(zurueck.error)
+        setAusschnitt(null)
         setNeuesLogo(url)
         setOffen(true)
         if (meldeErfolg) meldeErfolg()
@@ -450,7 +449,7 @@ export function LogoUpload({
           ausschnitt={ausschnitt}
           isUploading={isUploading}
           fortschritt={progress ? stufenText(progress) : null}
-          onWaehlen={openFilePicker}
+          openFilePicker={openFilePicker}
           onAnpassen={() => setOffen(true)}
           onEntfernen={handleRemove}
         />
@@ -465,7 +464,7 @@ function LogoAnsicht({
   ausschnitt,
   isUploading,
   fortschritt,
-  onWaehlen,
+  openFilePicker,
   onAnpassen,
   onEntfernen,
 }: {
@@ -474,7 +473,8 @@ function LogoAnsicht({
   isUploading: boolean
   /** Die Stufe des Uploads als Satz, solange er läuft. */
   fortschritt: string | null
-  onWaehlen: () => void
+  /** Öffnet die Dateiauswahl (useImageUpload). */
+  openFilePicker: () => void
   onAnpassen: () => void
   onEntfernen: () => void
 }): React.JSX.Element {
@@ -509,7 +509,7 @@ function LogoAnsicht({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={onWaehlen}
+            onClick={openFilePicker}
             disabled={isUploading}
             className={cn(
               'inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-4 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-60',
