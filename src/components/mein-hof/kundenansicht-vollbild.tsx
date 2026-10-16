@@ -168,6 +168,8 @@ export function KundenansichtVollbild({
         side="bottom"
         showCloseButton={false}
         initialFocus={fertig}
+        // Base UI setzt aria-modal nicht selbst; die Seite dahinter macht es inert.
+        aria-modal="true"
         aria-labelledby={TITEL_ID}
         aria-describedby={BESCHREIBUNG_ID}
         // Volle Höhe statt Blatt mit Griff; der Home-Indicator bekommt seinen Platz unter der Seite im Rahmen.

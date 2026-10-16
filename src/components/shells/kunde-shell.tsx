@@ -40,7 +40,8 @@ import { useImVorschauRahmen } from '@/components/farm/vorschau-im-rahmen'
  *
  * Seit Nr. 107 (Register N4, Ergänzung): Steht die Hofseite als Vorschau im
  * Rahmen (Kundenansicht von Mein Hof, Vorschau im Editor), zeigt die Shell
- * ihre Unterleiste blass und ohne Wirkung (`inert`, Deckkraft 0,55) — die
+ * ihre Unterleiste blass und ohne Wirkung (`inert`, Deckkraft 0,55 auf den
+ * Einträgen; der Grund bleibt deckend, sonst schiene die Seite durch) — die
  * Kundschaft sieht sie, also gehört sie ins Bild, aber aus der Vorschau
  * führt kein Weg hinaus. Ein Tipp darauf zeigt kurz „Vorschau – hier geht es
  * nicht weiter". Ohne Rahmen (neuer Tab) bleibt die Leiste, wie sie ist.
@@ -238,7 +239,7 @@ export function KundeShell({ sitzung, unterleiste = true, children }: KundeShell
       {unterleiste && (
         // In der Vorschau im Rahmen ohne Wirkung — keine Klicks nach außen (VorschauLeisteSperre).
         <div inert={imRahmen}>
-          <BottomNav className={imRahmen ? 'opacity-55' : undefined}>
+          <BottomNav className={imRahmen ? '[&>div]:opacity-55' : undefined}>
             {nav.handy.map((platz) => {
               if (platz.art === 'warenkorb') {
                 // Leer gibt es keinen Korb, aber einen Ausweg: zu den Höfen (DESIGN_SYSTEM, „Leerzustand mit Ausweg").
