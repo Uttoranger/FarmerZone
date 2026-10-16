@@ -1,12 +1,19 @@
 import { z } from 'zod'
 import {
+  BUENDEL_STAND_WAHL,
+  MELDUNGEN_VON,
   MELDUNG_ARTEN,
   MELDUNG_KENNUNG_MAX,
   MELDUNG_TEXT_MAX,
   MELDUNG_TEXT_MIN,
   MELDUNG_STATUS,
+  STAND_TEILE,
   TRIAGE_NOTIZ_MAX,
   ZIEL_STATUS,
+  type BuendelStandWahl,
+  type MeldungArt,
+  type MeldungenVon,
+  type StandTeil,
 } from '@/lib/meldung'
 import { bereinige } from '@/lib/fremdtext'
 
@@ -52,7 +59,7 @@ export const triageEingabeSchema = z.object({
   status: z.enum(MELDUNG_STATUS, { message: 'Unbekannter Status.' }),
   // Nur der Knopf „Ja, ein Wunsch" schickt eine Art; das Formular lässt sie weg.
   art: z.enum(MELDUNG_ARTEN, { message: 'Unbekannte Art.' }).optional(),
-  clusterKey: leerZuNull(60, 'Cluster'),
+  clusterKey: leerZuNull(60, 'Bündel-Stichwort'),
   triageNotiz: leerZuNull(TRIAGE_NOTIZ_MAX, 'Notiz'),
   duplikatVonId: leerZuNull(40, 'Duplikat von'),
   sprintName: leerZuNull(60, 'Sprint'),
@@ -108,3 +115,90 @@ export const triageStatusSchema = z
   })
 
 export type TriageStatusEingabe = z.infer<typeof triageStatusSchema>
+
+// ─── Reiter „Meldungen" (Register N14, Ergänzung; Nr. 101) ──────────────────
+
+const UNBEKANNTE_MELDUNG = 'Diese Meldung gibt es nicht – lade die Seite neu.'
+// Kennungen sind cuid, die Seed-Meldungen tragen lesbare — beides nur Kleinbuchstaben, Ziffern und Bindestrich.
+const meldungIdSchema = z.string(UNBEKANNTE_MELDUNG).trim().regex(/^[a-z0-9-]{1,40}$/, UNBEKANNTE_MELDUNG)
+
+/** Zusammenfassen: die eine wird Duplikat, die andere bleibt Hauptmeldung — nie dieselbe. */
+export const zusammenfassenSchema = z
+  .object({ duplikatId: meldungIdSchema, hauptmeldungId: meldungIdSchema })
+  .refine((d) => d.duplikatId !== d.hauptmeldungId, { message: 'Eine Meldung kann nicht ihr eigenes Duplikat sein.', path: ['hauptmeldungId'] })
+
+/** Trennen in „Woraus": aus dem Duplikat wird wieder eine eigene Meldung. */
+export const trennenSchema = z.object({ meldungId: meldungIdSchema })
+
+export const BESCHEID_WAHL = ['hoefe', 'niemand'] as const
+
+/** „Stand für alle" eines Bündels (Mockup admin-postfach-wuensche). */
+export const buendelStandSchema = z.object({
+  clusterKey: z.string('Dieses Bündel gibt es nicht mehr – lade die Seite neu.').trim().min(1, 'Dieses Bündel gibt es nicht mehr – lade die Seite neu.').max(60, 'Bündel-Stichwort: höchstens 60 Zeichen'),
+  stand: z.enum(BUENDEL_STAND_WAHL, { message: 'Wähl einen Stand.' }),
+  sprintName: leerZuNull(60, 'Geplant in'),
+  antwort: leerZuNull(500, 'Antwort'),
+  bescheid: z.enum(BESCHEID_WAHL, { message: 'Wähl, wem du Bescheid gibst.' }),
+})
+
+export type BuendelStandEingabe = z.input<typeof buendelStandSchema>
+
+// ─── Adresse des Reiters: Fremddaten, ungültig heißt Standard ──────────────
+
+/** Der erste Wert, wenn Next einen doppelten Parameter als Liste liefert. */
+function ersterWert(wert: unknown): unknown {
+  return Array.isArray(wert) ? wert[0] : wert
+}
+
+export const MELDUNGEN_ANSICHTEN = ['ablauf', 'wuensche'] as const
+export type MeldungenAnsichtArt = (typeof MELDUNGEN_ANSICHTEN)[number]
+const ART_PARAMETER = ['fehler', 'wunsch', 'frage'] as const
+export const ZUGEKLAPPTE_TEILE = ['gesammelt', 'abgelegt'] as const
+export type ZugeklappterTeil = (typeof ZUGEKLAPPTE_TEILE)[number]
+export const WUENSCHE_FILTER = ['alle', ...BUENDEL_STAND_WAHL] as const
+export type WuenscheFilter = 'alle' | BuendelStandWahl
+
+const meldungenAdresseSchema = z.object({
+  ansicht: z.preprocess(ersterWert, z.enum(MELDUNGEN_ANSICHTEN).catch('ablauf')),
+  art: z.preprocess(ersterWert, z.enum(ART_PARAMETER).nullable().catch(null)),
+  von: z.preprocess(ersterWert, z.enum(MELDUNGEN_VON).catch('alle')),
+  auf: z.preprocess((v) => {
+    const wert = ersterWert(v)
+    return typeof wert === 'string' && wert !== '' ? wert.split(',') : []
+  }, z.array(z.enum(ZUGEKLAPPTE_TEILE)).max(2).catch([])),
+  teil: z.preprocess(ersterWert, z.enum(STAND_TEILE).catch('brauchtDich')),
+  aeltere: z.preprocess(ersterWert, z.literal('1').nullable().catch(null)),
+  buendel: z.preprocess(ersterWert, z.string().trim().min(1).max(60).nullable().catch(null)),
+  stand: z.preprocess(ersterWert, z.enum(WUENSCHE_FILTER).catch('alle')),
+})
+
+/** Was die Adresse des Reiters „Meldungen" wählt — alles mit Standard (Ablauf, alle Arten, alle Melder, zugeklappt). */
+export type MeldungenAnsicht = {
+  ansicht: MeldungenAnsichtArt
+  art: MeldungArt | null
+  von: MeldungenVon
+  auf: ZugeklappterTeil[]
+  teil: StandTeil
+  aeltere: boolean
+  buendel: string | null
+  stand: WuenscheFilter
+}
+
+export function meldungenAnsichtAus(roh: Record<string, string | string[] | undefined>): MeldungenAnsicht {
+  const a = meldungenAdresseSchema.parse({
+    ansicht: roh.ansicht,
+    art: roh.art,
+    von: roh.von,
+    auf: roh.auf,
+    teil: roh.teil,
+    aeltere: roh.aeltere,
+    buendel: roh.buendel,
+    stand: roh.stand,
+  })
+  return {
+    ...a,
+    art: a.art ? (a.art.toUpperCase() as MeldungArt) : null,
+    auf: [...new Set(a.auf)],
+    aeltere: a.aeltere === '1',
+  }
+}

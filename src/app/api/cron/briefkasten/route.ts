@@ -3,7 +3,7 @@ import { del } from '@vercel/blob'
 import { env } from '@/lib/env'
 import { cronBerechtigt } from '@/lib/geheimnis'
 import { screenshotsVon, waehleZuLoeschende } from '@/lib/meldung'
-import { findeLoeschKandidaten, loescheMeldungen, zaehleFuerWochenlauf } from '@/server/queries/meldung'
+import { findeHauptmeldungen, findeLoeschKandidaten, loescheMeldungen, zaehleFuerWochenlauf } from '@/server/queries/meldung'
 import { sendBriefkastenZusammenfassung } from '@/lib/email'
 import { ladeBetreiberEmpfaenger, zaehleOffenImEingang } from '@/server/queries/postfach'
 
@@ -20,6 +20,9 @@ import { ladeBetreiberEmpfaenger, zaehleOffenImEingang } from '@/server/queries/
  *   (b) Aufräumen: abgeschlossene Meldungen (ERLEDIGT, KEIN_FEHLER, DUPLIKAT),
  *       deren Abschluss 90 Tage zurückliegt — die AUSWAHL trifft die reine,
  *       getestete Funktion waehleZuLoeschende; hier wird nur angewendet.
+ *       Ein Duplikat geht erst mit seiner Hauptmeldung (Register N14,
+ *       Ergänzung; Nr. 101): Status und Abschluss der Hauptmeldungen lädt
+ *       eine zweite Abfrage, die Regel bleibt in waehleZuLoeschende.
  *       Screenshots gehen im Blob-Speicher mit (bester Versuch: ein
  *       verwaistes Bild ist kein kaputter Zustand, eine hängende Löschung
  *       wäre einer).
@@ -42,7 +45,8 @@ export async function GET(request: NextRequest) {
 
   // (b) Aufräumen
   const kandidaten = await findeLoeschKandidaten()
-  const zuLoeschen = waehleZuLoeschende(kandidaten, jetzt)
+  const hauptmeldungen = await findeHauptmeldungen(kandidaten.flatMap((m) => (m.status === 'DUPLIKAT' && m.duplikatVonId ? [m.duplikatVonId] : [])))
+  const zuLoeschen = waehleZuLoeschende(kandidaten, jetzt, hauptmeldungen)
   for (const url of screenshotsVon(zuLoeschen)) {
     try {
       await del(url, { token: process.env.BLOB_READ_WRITE_TOKEN })

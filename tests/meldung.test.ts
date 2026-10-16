@@ -5,8 +5,9 @@
  * Beweist: Die Sichtbarkeitsregel liefert dem Hof NIE ein Triage-Feld und
  * übersetzt alle sieben Status (ERLEDIGT je Art, VERMUTLICH_WUNSCH nie als
  * solcher); die KI-Zeile der Notiz lässt sich allein entfernen; Kurznummer = erste 8 Zeichen; die 90-Tage-
- * Auswahl trifft nur abgeschlossene, alte Meldungen; die Zusammenfassung
- * kommt nur bei Bedarf; der Export enthält Kurznummer, Kontext und Text.
+ * Auswahl trifft nur abgeschlossene, alte Meldungen; der Export enthält
+ * Kurznummer, Kontext und Text. Die Regeln des Reiters „Meldungen" (Nr. 101)
+ * prüft tests/meldungen-ablauf.test.ts.
  */
 import { describe, expect, it } from 'vitest'
 import {
@@ -15,7 +16,6 @@ import {
   STATUS_INTERN,
   STATUS_OFFEN,
   STATUS_ZU_ENTSCHEIDEN,
-  brauchtZusammenfassung,
   ersteZeile,
   fuerHof,
   kurznummer,
@@ -216,16 +216,9 @@ describe('Wochenlauf — 90-Tage-Auswahl', () => {
   })
 })
 
-describe('Wochenlauf — Zusammenfassung nur bei Bedarf', () => {
-  it('keine neuen, nichts liegen geblieben → keine Mail', () => {
-    expect(brauchtZusammenfassung({ neu: 0, liegenGeblieben: 0 })).toBe(false)
-  })
-  it('neue Meldungen → Mail', () => {
-    expect(brauchtZusammenfassung({ neu: 1, liegenGeblieben: 0 })).toBe(true)
-  })
-  it('alte offene Meldungen → Mail, auch ohne neue', () => {
-    expect(brauchtZusammenfassung({ neu: 0, liegenGeblieben: 2 })).toBe(true)
-  })
+// brauchtZusammenfassung ist seit Nr. 101 entfernt (ohne Aufrufer seit Nr. 95: Ob der
+// Wochenbericht geht, entscheidet „etwas offen im Eingang", tests/briefkasten-cron.test.ts).
+describe('Wochenlauf — Liegedauer', () => {
   it('Liegedauer-Grenze liegt 14 Tage zurück', () => {
     expect(liegedauerGrenze(new Date('2026-09-15T00:00:00.000Z')).toISOString()).toBe('2026-09-01T00:00:00.000Z')
   })

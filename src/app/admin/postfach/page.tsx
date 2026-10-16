@@ -18,6 +18,8 @@ import {
   type ErstattungAufgabeRoh,
 } from '@/lib/postfach'
 import { adminPostfachReiterAus, eingangAuswahlAus, eingangFilterAus, fadenKennungAus } from '@/schemas/postfach'
+import { meldungenAnsichtAus } from '@/schemas/meldung'
+import { MELDUNGEN_TEXT } from '@/lib/meldung'
 import { cn } from '@/lib/utils'
 import { MARKE } from '@/lib/marke'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -26,6 +28,7 @@ import { Seitenkopf } from '@/components/admin/seitenkopf'
 import { Kennzahlen } from '@/components/admin/kennzahlen'
 import { Unterreiter } from '@/components/admin/unterreiter'
 import { EingangReiter, ladeEingangReiter, type EingangDaten } from './eingang-reiter'
+import { MeldungenReiter, ladeMeldungenReiter, type MeldungenDaten } from './meldungen-reiter'
 import { RundschreibenReiter, ladeRundschreibenReiter, type RundschreibenDaten } from './rundschreiben-reiter'
 import { ZustellungReiter, ladeZustellungDaten, type ZustellungDaten } from './zustellung-reiter'
 
@@ -38,6 +41,14 @@ type Suche = {
   id?: string | string[]
   meldung?: string | string[]
   faden?: string | string[]
+  // Reiter „Meldungen" (Nr. 101) — gelesen von meldungenAnsichtAus (Zod mit Standard).
+  ansicht?: string | string[]
+  von?: string | string[]
+  auf?: string | string[]
+  teil?: string | string[]
+  aeltere?: string | string[]
+  buendel?: string | string[]
+  stand?: string | string[]
 }
 
 /** Next liefert einen doppelten Parameter als Liste — dann zählt der erste. */
@@ -47,12 +58,14 @@ function einzeln(wert: string | string[] | undefined): string | undefined {
 
 type ReiterDaten =
   | { reiter: 'eingang'; daten: EingangDaten }
+  | { reiter: 'meldungen'; daten: MeldungenDaten }
   | { reiter: 'rundschreiben'; daten: RundschreibenDaten }
   | { reiter: 'zustellung'; daten: ZustellungDaten }
 
 /** Lädt nur den offenen Reiter; ein Datenbankfehler wirft. */
 async function ladeReiter(reiter: AdminPostfachReiter, roh: Suche, jetzt: Date): Promise<ReiterDaten> {
   if (reiter === 'eingang') return { reiter, daten: await ladeEingangReiter(eingangFilterAus(roh.art), eingangAuswahlAus(roh.id, roh.meldung), jetzt) }
+  if (reiter === 'meldungen') return { reiter, daten: await ladeMeldungenReiter(meldungenAnsichtAus(roh)) }
   if (reiter === 'rundschreiben') return { reiter, daten: await ladeRundschreibenReiter() }
   return { reiter, daten: await ladeZustellungDaten(jetzt) }
 }
@@ -61,10 +74,12 @@ async function ladeReiter(reiter: AdminPostfachReiter, roh: Suche, jetzt: Date):
  * /admin/postfach — der eine Ort, an dem beim Admin alles ankommt (Register
  * N12 mit der Änderung vom 15.10., N14, N15; Nachtlauf Nr. 95; Mockups
  * admin-postfach*, admin-rundschreiben). Seitenmuster N15: Seitenkopf mit Satz
- * und „Rundschreiben schreiben", Kennzahlen, Unterreiter Eingang ·
+ * und „Rundschreiben schreiben", Kennzahlen, Unterreiter Eingang · Meldungen ·
  * Rundschreiben · Zustellung (?reiter=, Zod mit Standard), Inhalt,
- * Regel-Zeile. Die Reiter von Stufe 1 (?reiter=unterhaltungen|meldungen)
- * leiten dauerhaft in den Eingang mit passendem Filter. Erste Anweisung ist
+ * Regel-Zeile. Der Reiter „Meldungen" (Nr. 101, N14-Ergänzung) hat statt der
+ * Kennzahlen sein Stand-Band und einen eigenen Satz (Mockup
+ * admin-postfach-meldungen-ablauf). Der Reiter „Unterhaltungen" von Stufe 1
+ * leitet dauerhaft in den Eingang (Filter Antwort). Erste Anweisung ist
  * die Admin-Prüfung. Lassen sich die Zahlen nicht laden, geht es ohne
  * Kennzahlen weiter; lässt sich der Reiter nicht laden, steht AdminFehler da
  * — mit EINER h1 („Postfach").
@@ -106,7 +121,7 @@ export default async function AdminPostfachPage({ searchParams }: { searchParams
     <div className={cn(ADMIN_RAHMEN, 'flex flex-col gap-4 md:gap-5')}>
       <Seitenkopf
         titel={ADMIN_POSTFACH_TEXT.titel}
-        satz={EINGANG_TEXT.satz}
+        satz={reiter === 'meldungen' ? MELDUNGEN_TEXT.seitenSatz : EINGANG_TEXT.satz}
         rechts={
           <Link
             href={adminPostfachAdresse('rundschreiben')}
@@ -120,10 +135,11 @@ export default async function AdminPostfachPage({ searchParams }: { searchParams
           </Link>
         }
       />
-      {stand && <Kennzahlen beschriftung={EINGANG_TEXT.kennzahlenBeschriftung} eintraege={postfachKennzahlen(stand)} />}
+      {stand && reiter !== 'meldungen' && <Kennzahlen beschriftung={EINGANG_TEXT.kennzahlenBeschriftung} eintraege={postfachKennzahlen(stand)} />}
       <Unterreiter beschriftung={EINGANG_TEXT.unterreiterBeschriftung} eintraege={postfachUnterreiter(stand ? offenGesamt(stand.zahlen) : null)} aktiv={reiter} />
 
       {geladen.reiter === 'eingang' && <EingangReiter daten={geladen.daten} jetzt={jetzt} />}
+      {geladen.reiter === 'meldungen' && <MeldungenReiter daten={geladen.daten} jetzt={jetzt} />}
       {geladen.reiter === 'rundschreiben' && <RundschreibenReiter daten={geladen.daten} jetzt={jetzt} />}
       {geladen.reiter === 'zustellung' && <ZustellungReiter daten={geladen.daten} />}
     </div>

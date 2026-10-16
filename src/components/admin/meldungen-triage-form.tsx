@@ -19,8 +19,9 @@ export type TriageWerte = {
 }
 
 /**
- * „Entscheiden" — die Triage-Felder des Betreibers (Mockup
- * admin-meldung-entscheiden, im neuen Design seit Nr. 22f). Alles außer der
+ * „Entscheiden" — die Triage-Felder des Betreibers (im neuen Design seit
+ * Nr. 22f; seit Nr. 95 die Spalte im Eingang, Mockup admin-postfach-meldungen;
+ * seit Nr. 101 hier statt unter src/app/admin/meldungen/[id]). Alles außer der
  * Antwort bleibt intern — die Antwort ist das EINZIGE Feld, das der Hof unter
  * „Meine Meldungen" liest, und steht deshalb sichtbar so beschriftet.
  * Gespeichert wird unverändert über triageMeldungAction (mit Ausgangsstand,
@@ -94,7 +95,7 @@ export function TriageForm({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
         <div>
           <label htmlFor="triage-cluster" className={FELD_LABEL}>
-            Bündel
+            Bündel-Stichwort
           </label>
           <input
             id="triage-cluster"

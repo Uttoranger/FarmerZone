@@ -132,15 +132,22 @@ describe('Admin-Filter', () => {
 
 describe('gruppiereWuensche', () => {
   const t = (tage: number) => new Date(Date.UTC(2026, 8, 1 + tage))
+  // Jede Meldung von einem eigenen Hof — so zählt jede als eigene Stimme (die Stimmen-Regel prüft tests/meldungen-ablauf.test.ts).
   const w = (id: string, clusterKey: string | null, tage: number, text = `Wunsch ${id}`) => ({
     id,
+    art: 'WUNSCH' as const,
     text,
     clusterKey,
     createdAt: t(tage),
     hofName: 'Hof ' + id,
+    farmId: `farm-${id}`,
+    customerEmail: null,
+    status: 'GEPRUEFT' as const,
+    duplikatVonId: null,
+    sprintName: null,
   })
 
-  it('zählt je Cluster, größte Bündel zuerst, ohne Cluster ganz unten', () => {
+  it('zählt je Bündel, meiste Stimmen zuerst, ohne Stichwort ganz unten', () => {
     const cluster = gruppiereWuensche([
       w('a1', 'abholzeiten', 0),
       w('a2', 'abholzeiten', 1),
@@ -150,7 +157,7 @@ describe('gruppiereWuensche', () => {
       w('o1', null, 5),
       w('o2', '  ', 6),
     ])
-    expect(cluster.map((c) => [c.clusterKey, c.anzahl])).toEqual([
+    expect(cluster.map((c) => [c.clusterKey, c.stimmen])).toEqual([
       ['abholzeiten', 3],
       ['bilder', 2],
       [null, 2],
@@ -174,10 +181,10 @@ describe('gruppiereWuensche', () => {
     expect(cluster.map((c) => c.clusterKey)).toEqual(['apfel', 'zebra'])
   })
 
-  it('fragt für den Reiter nur Wünsche ab, Duplikate ausgenommen', async () => {
+  it('fragt Wünsche ab und dazu alle Duplikate — deren Hauptmeldung entscheidet, ob sie zählen', async () => {
     findMany.mockResolvedValue([] as never)
     await getWunschCluster()
-    expect(findMany.mock.calls[0][0]?.where).toEqual({ art: 'WUNSCH', status: { not: 'DUPLIKAT' } })
+    expect(findMany.mock.calls[0][0]?.where).toEqual({ OR: [{ art: 'WUNSCH', status: { not: 'DUPLIKAT' } }, { status: 'DUPLIKAT' }] })
   })
 })
 

@@ -161,7 +161,8 @@ type Ausnahme = { datei: string; wort: string; text: string | RegExp; grund: str
 const AUSNAHMEN: Ausnahme[] = [
   // Status
   { datei: 'src/app/(hof)/settings/payments/payments-actions.tsx', wort: 'Status', text: 'Status prüfen', grund: 'Knopf fragt bei Stripe, wie weit die Freischaltung des Hofs ist — kein Beitrag' },
-  { datei: 'src/app/admin/meldungen/[id]/triage-form.tsx', wort: 'Status', text: 'Status', grund: 'Feld „Status“ der Meldung im Admin — kein Beitrag' },
+  { datei: 'src/components/admin/meldungen-triage-form.tsx', wort: 'Status', text: 'Status', grund: 'Feld „Status“ der Meldung im Admin — kein Beitrag' },
+  { datei: 'src/lib/meldung.ts', wort: 'Status', text: /Status setzen und bauen tust du/, grund: 'Register N14 wörtlich: den Stand einer Meldung setzen tut der Mensch — kein Beitrag' },
   { datei: 'src/components/admin/hoefe-ansicht.tsx', wort: 'Status', text: 'Status', grund: 'Spaltenkopf der Hofliste im Admin (Freischaltung des Hofs) — kein Beitrag' },
   { datei: 'src/components/hof-kunden/kunden-ansicht.tsx', wort: 'Status', text: 'Status', grund: 'Spaltenkopf der Kundenliste (Marke je Kundin) — kein Beitrag' },
   { datei: 'src/components/produkte/produkte-ansicht.tsx', wort: 'Status', text: 'Status', grund: 'Spaltenkopf der Produktliste (sichtbar, nicht im Shop, ausverkauft) — kein Beitrag' },
