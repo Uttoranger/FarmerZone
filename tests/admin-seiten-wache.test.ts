@@ -121,8 +121,9 @@ const SEITE = { modul: '@/server/admin-wache', exportName: 'verlangeAdminSeite',
 const SEITEN = [...seiten(ADMIN)]
 
 describe('jede Seite unter /admin', () => {
-  it('es gibt die fünf Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 93 die Einstellungen, seit Nr. 94 die Startseite; /admin/meldungen leitet seit Nr. 101 als Route Handler um und prüft trotzdem)', () => {
+  it('es gibt die sechs Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 93 die Einstellungen, seit Nr. 94 die Startseite, seit Nr. 103 Betrieb; /admin/meldungen leitet seit Nr. 101 als Route Handler um und prüft trotzdem)', () => {
     expect(SEITEN.map((p) => relative(ADMIN, p).split(sep).join('/')).sort()).toEqual([
+      'betrieb/page.tsx',
       'einstellungen/page.tsx',
       'finanzen/page.tsx',
       'page.tsx',
@@ -140,6 +141,12 @@ describe('jede Seite unter /admin', () => {
     const routen = ['meldungen/route.ts', 'meldungen/[id]/route.ts'].map((r) => join(ADMIN, r))
     const maengel = routen.flatMap((p) => wachenMaengel(readFileSync(p, 'utf8'), { ...SEITE, funktionName: 'GET' }, relative(WURZEL, p)))
     expect(maengel).toEqual([])
+  })
+
+  it('jeder Export unter /admin (Route Handler, kein Layout) prüft als erste Anweisung mit verlangeAdminAktion — Finanzen (Nr. 100) und Betrieb (Nr. 103)', () => {
+    const exporte = ['finanzen/export/route.ts', 'betrieb/export/route.ts'].map((r) => join(ADMIN, r))
+    const aktion = { modul: '@/server/admin-wache', exportName: 'verlangeAdminAktion', funktionName: 'GET' } as const
+    expect(exporte.flatMap((p) => wachenMaengel(readFileSync(p, 'utf8'), aktion, relative(WURZEL, p)))).toEqual([])
   })
 })
 
@@ -213,7 +220,8 @@ describe('ladeAdminbereich — Verhalten', () => {
       .mockResolvedValueOnce({ isAdmin: true } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
     // Meldungen 3 + ungelesene Antworten 4 + wartende Höfe 2 + offene Erstattung 1.
-    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, zahlen: { hoefe: 2, briefkasten: 3 + 4 + 2 + 1 } })
+    // betrieb: null — Punkt und Hinweis von Admin › Betrieb nur in der Produktion (N15/N18, Nr. 103; tests/betrieb-seite.test.ts).
+    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, zahlen: { hoefe: 2, briefkasten: 3 + 4 + 2 + 1 }, betrieb: null })
     expect(farmCount).toHaveBeenCalledWith({ where: { approvedAt: null } })
     expect(farmCount).toHaveBeenCalledWith({ where: { approvedAt: null, archivedAt: null } })
     expect(meldungCount).toHaveBeenCalledWith({ where: { status: { in: ['NEU', 'GEPRUEFT'] } } })

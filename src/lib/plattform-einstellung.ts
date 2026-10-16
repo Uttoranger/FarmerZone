@@ -137,8 +137,12 @@ export function pruefeGruendungSperre(eingabe: Pick<GruendungEingabe, 'plaetze' 
 
 // ─── Texte der Seite ─────────────────────────────────────────────────────────
 
-/** Die drei Gruppen (Register N15: Gründungshöfe · Betrieb · Plattform). */
-export const EINSTELLUNGEN_GRUPPEN = ['gruendung', 'betrieb', 'plattform'] as const
+/**
+ * Die Gruppen (Register N15: Gründungshöfe · Plattform). Die Gruppe „Betrieb“
+ * entfiel mit Nr. 103 (N15 geändert): Der Stripe-Modus steht in Admin ›
+ * Betrieb, `?gruppe=betrieb` leitet dorthin um (src/app/admin/einstellungen/page.tsx).
+ */
+export const EINSTELLUNGEN_GRUPPEN = ['gruendung', 'plattform'] as const
 export type EinstellungenGruppe = (typeof EINSTELLUNGEN_GRUPPEN)[number]
 
 export const ADMIN_EINSTELLUNGEN_HREF = '/admin/einstellungen'
@@ -157,7 +161,6 @@ export const EINSTELLUNGEN_TEXT = {
   ladefehler: 'Wir konnten die Einstellungen gerade nicht laden.',
   gruppe: {
     gruendung: { titel: 'Gründungshöfe', zeile: 'Plätze, Standard-Ende, Anzeige' },
-    betrieb: { titel: 'Betrieb', zeile: 'Stripe-Modus' },
     plattform: { titel: 'Plattform', zeile: 'Name und Adresse' },
   },
   gruendung: {
@@ -186,11 +189,6 @@ export const EINSTELLUNGEN_TEXT = {
     speichern: 'Speichern',
     speichert: 'Wird gespeichert …',
     gespeichert: 'Gespeichert. Die Seiten zeigen die neuen Zahlen.',
-  },
-  betrieb: {
-    satz: 'Nur zum Nachsehen: Den Stripe-Modus bestimmt der Schlüssel der Umgebung, nicht diese Seite.',
-    stripe: 'Stripe-Modus',
-    ohneStripe: 'kein Schlüssel eingerichtet',
   },
   plattform: {
     satz: 'Nur zum Nachsehen: Name und Adresse stehen an einer Stelle im Code (Register M1).',

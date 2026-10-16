@@ -17,9 +17,18 @@ vi.mock('@/lib/prisma', () => ({
   prisma: { stockReservation: { deleteMany: vi.fn() }, rateLimitZaehler: { deleteMany: vi.fn() } },
 }))
 vi.mock('@sentry/nextjs', () => ({ captureMessage: vi.fn(), captureException: vi.fn() }))
+// Der Herzschlag-Rahmen (Register N18, Nr. 103) läuft hier durch: Er reicht den Lauf
+// unverändert weiter (geprüft in tests/betrieb-herzschlag.test.ts); hier zählt, dass
+// jede Route ihren Lauf unter ihrem Namen darin aufruft.
+vi.mock('@/server/betrieb', () => ({
+  mitHerzschlag: vi.fn(async (_name: string, lauf: () => Promise<unknown>) => lauf()),
+  messeUndPruefe: vi.fn(async () => ({ gemessen: ['datenbankBytes'], fehler: ['bilder'] })),
+}))
 
 import { GET as verwaiste } from '@/app/api/cron/verwaiste-bestellungen/route'
 import { GET as reservierungen } from '@/app/api/cron/cleanup-reservations/route'
+import { GET as betrieb } from '@/app/api/cron/betrieb/route'
+import { messeUndPruefe, mitHerzschlag } from '@/server/betrieb'
 import { gibVerwaisteBestellungenFrei } from '@/server/verwaiste-bestellungen'
 import { prisma } from '@/lib/prisma'
 import { cronBerechtigt } from '@/lib/geheimnis'
@@ -78,12 +87,12 @@ describe('Alle Cron-Routen — Secret nur über cronBerechtigt', () => {
 
   it('findet die Cron-Routen — Gegenprobe, sonst bewiese ein leerer Fund nichts', () => {
     expect(routen.map((r) => r.name)).toEqual(
-      expect.arrayContaining(['briefkasten', 'cleanup-reservations', 'verwaiste-bestellungen'])
+      expect.arrayContaining(['betrieb', 'briefkasten', 'cleanup-reservations', 'verwaiste-bestellungen'])
     )
     expect(EIGENER_VERGLEICH.test('if (!cronSecret || authHeader !== `Bearer ${cronSecret}`)')).toBe(true)
   })
 
-  it.each(['briefkasten', 'cleanup-reservations', 'verwaiste-bestellungen'])(
+  it.each(['betrieb', 'briefkasten', 'cleanup-reservations', 'verwaiste-bestellungen'])(
     '%s prüft mit cronBerechtigt und vergleicht nicht selbst',
     (name) => {
       const quelle = routen.find((r) => r.name === name)?.quelle ?? ''
@@ -103,12 +112,15 @@ describe('Alle Cron-Routen — Secret nur über cronBerechtigt', () => {
 describe.each([
   ['/api/cron/verwaiste-bestellungen', verwaiste],
   ['/api/cron/cleanup-reservations', reservierungen],
+  ['/api/cron/betrieb', betrieb],
 ] as const)('%s — Zugang', (pfad, GET) => {
-  it('ohne Header: 401, nichts passiert', async () => {
+  it('ohne Header: 401, nichts passiert — auch kein Herzschlag', async () => {
     const res = await GET(anfrage(pfad))
     expect(res.status).toBe(401)
     expect(freigeben).not.toHaveBeenCalled()
     expect(aufraeumen).not.toHaveBeenCalled()
+    expect(mitHerzschlag).not.toHaveBeenCalled()
+    expect(messeUndPruefe).not.toHaveBeenCalled()
   })
 
   it('falsches Secret: 401', async () => {
@@ -201,9 +213,29 @@ describe('/api/cron/cleanup-reservations', () => {
       crons: Array<{ path: string }>
     }
     expect(konfig.crons.map((c) => c.path).sort()).toEqual([
+      '/api/cron/betrieb',
       '/api/cron/briefkasten',
       '/api/cron/cleanup-reservations',
       '/api/cron/verwaiste-bestellungen',
     ])
+  })
+})
+
+describe('Herzschlag-Rahmen (Register N18, Nr. 103)', () => {
+  it('jede Route ruft ihren Lauf unter ihrem Namen im Rahmen auf — die Antwort bleibt die des Laufs', async () => {
+    const auth = 'Bearer geheim-123'
+    const frei = await verwaiste(anfrage('/api/cron/verwaiste-bestellungen', auth))
+    const weg = await reservierungen(anfrage('/api/cron/cleanup-reservations', auth))
+    expect(vi.mocked(mitHerzschlag).mock.calls.map(([name]) => name)).toEqual(['verwaisteBestellungen', 'aufraeumen'])
+    expect(await frei.json()).toMatchObject({ storniert: 2, uebersprungen: 1, fehler: 0 })
+    expect(await weg.json()).toMatchObject({ deleted: 3, bremsZaehler: 7 })
+  })
+
+  it('/api/cron/betrieb misst im Rahmen „betrieb“ und meldet nur Arten, keine Werte', async () => {
+    const res = await betrieb(anfrage('/api/cron/betrieb', 'Bearer geheim-123'))
+    expect(res.status).toBe(200)
+    expect(vi.mocked(mitHerzschlag).mock.calls.map(([name]) => name)).toEqual(['betrieb'])
+    expect(messeUndPruefe).toHaveBeenCalledTimes(1)
+    expect(await res.json()).toMatchObject({ gemessen: ['datenbankBytes'], fehler: ['bilder'] })
   })
 })

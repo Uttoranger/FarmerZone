@@ -1,8 +1,9 @@
 /**
  * Tests für die Reiter der AdminShell (src/lib/admin-navigation.ts).
  *
- * Beweist: Höfe · Postfach · Startseite · Finanzen · Einstellungen (Register
- * N15, Nr. 94) auf die Admin-Seiten, Höfe und Postfach mit Zähler; die
+ * Beweist: Höfe · Postfach · Startseite · Finanzen · Betrieb · Einstellungen
+ * (Register N15, Nr. 94; Betrieb seit Nr. 103 mit Warnpunkt statt Zahl) auf
+ * die Admin-Seiten, Höfe und Postfach mit Zähler; die
  * Einstellungen-Seite liefert Nr. 93, bis zum Merge zeigt der Reiter dorthin;
  * der Weg zurück zum eigenen Hof und die
  * Konto-Plakette nur mit eigenem Hof (Nr. 41, Register N1); aktiv ist der
@@ -16,13 +17,14 @@ import { join } from 'node:path'
 import { ADMIN_KONTO, ADMIN_REITER, ADMIN_ZURUECK, adminAktiverReiter, kontoHatHof } from '@/lib/admin-navigation'
 
 describe('Admin-Reiter', () => {
-  it('Höfe · Postfach · Startseite · Finanzen · Einstellungen, Zähler an Höfe und Postfach', () => {
-    expect(ADMIN_REITER.map((r) => [r.id, r.label, r.href, r.zahl])).toEqual([
-      ['hoefe', 'Höfe', '/admin', 'hoefe'],
-      ['postfach', 'Postfach', '/admin/postfach', 'briefkasten'],
-      ['startseite', 'Startseite', '/admin/startseite', undefined],
-      ['finanzen', 'Finanzen', '/admin/finanzen', undefined],
-      ['einstellungen', 'Einstellungen', '/admin/einstellungen', undefined],
+  it('Höfe · Postfach · Startseite · Finanzen · Betrieb · Einstellungen, Zähler an Höfe und Postfach, der Punkt nur an Betrieb', () => {
+    expect(ADMIN_REITER.map((r) => [r.id, r.label, r.href, r.zahl, r.warnpunkt])).toEqual([
+      ['hoefe', 'Höfe', '/admin', 'hoefe', undefined],
+      ['postfach', 'Postfach', '/admin/postfach', 'briefkasten', undefined],
+      ['startseite', 'Startseite', '/admin/startseite', undefined, undefined],
+      ['finanzen', 'Finanzen', '/admin/finanzen', undefined, undefined],
+      ['betrieb', 'Betrieb', '/admin/betrieb', undefined, true],
+      ['einstellungen', 'Einstellungen', '/admin/einstellungen', undefined, undefined],
     ])
   })
 
@@ -61,6 +63,8 @@ describe('Admin-Reiter', () => {
     ['/admin/startseite', 'startseite'],
     ['/admin/einstellungen', 'einstellungen'],
     ['/admin/einstellungen/betrieb', 'einstellungen'],
+    ['/admin/betrieb', 'betrieb'],
+    ['/admin/betrieb/export', 'betrieb'],
     ['/dashboard', null],
     ['/adminx', null],
   ])('%s → %s', (pfad, id) => {

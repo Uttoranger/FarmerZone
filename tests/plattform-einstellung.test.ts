@@ -104,10 +104,11 @@ describe('gruendungEinstellungSchema — nur eigene Sätze, nie Zods englischer 
     expect(satzVon(eingabe)).toBe(satz)
   })
 
-  it('die Gruppe aus der Adresse: Unbekanntes zeigt die erste', () => {
-    expect(einstellungenGruppeSchema.parse('betrieb')).toBe('betrieb')
+  it('die Gruppe aus der Adresse: Unbekanntes zeigt die erste — „betrieb“ gibt es seit Nr. 103 nicht mehr (die Seite leitet vorher um)', () => {
+    expect(einstellungenGruppeSchema.parse('plattform')).toBe('plattform')
+    expect(einstellungenGruppeSchema.parse('betrieb')).toBe('gruendung')
     expect(einstellungenGruppeSchema.parse('<script>')).toBe('gruendung')
-    expect(einstellungenGruppeSchema.parse(['plattform', 'betrieb'])).toBe('gruendung')
+    expect(einstellungenGruppeSchema.parse(['plattform', 'gruendung'])).toBe('gruendung')
     expect(einstellungenGruppeSchema.parse(undefined)).toBe('gruendung')
   })
 })

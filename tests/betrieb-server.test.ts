@@ -1,0 +1,201 @@
+/**
+ * Admin › Betrieb im Hintergrund (src/server/betrieb.ts, Register N18, Nr. 103).
+ *
+ * Beweist mit gemockter Datenbank und gemocktem `list()` von @vercel/blob:
+ *  - messeBetrieb liest den Bild-Speicher seitenweise (Cursor), zählt Bytes,
+ *    Dateien und Uploads des Monats, schreibt je Art eine Zeile für den
+ *    UTC-Tag; scheitert eine Quelle, läuft die andere weiter, und nach Sentry
+ *    geht nur die Klasse unter einem festen Satz.
+ *  - mitHerzschlag gibt das Ergebnis unverändert zurück bzw. wirft den Fehler
+ *    des Laufs weiter, schreibt Start und Ende (ok, Fehlerklasse) und hält den
+ *    Lauf nicht auf, wenn der Herzschlag selbst scheitert.
+ *  - Außerhalb der Produktion keine Prüfung und keine Warn-Mail; in der
+ *    Produktion geht die Mail nur, wenn das bedingte Setzen eine Zeile traf.
+ * Die Nebenläufigkeit selbst (zwei Prüfungen → eine Mail) prüft
+ * tests/integration/betrieb.int.test.ts an echtem Postgres.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { Prisma } from '@prisma/client'
+
+const db = vi.hoisted(() => ({
+  $queryRaw: vi.fn(),
+  $executeRaw: vi.fn(),
+  ablaufLauf: { upsert: vi.fn(), updateMany: vi.fn(), findMany: vi.fn() },
+  betriebMessung: { aggregate: vi.fn(), findMany: vi.fn() },
+  betriebWarnung: { findMany: vi.fn() },
+}))
+vi.mock('@/lib/prisma', () => ({ prisma: db }))
+vi.mock('@vercel/blob', () => ({ list: vi.fn() }))
+vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
+vi.mock('@/lib/email', () => ({ sendBetriebWarnung: vi.fn(async () => ({ gesendet: 1, gescheitert: 0 })) }))
+vi.mock('@/server/queries/postfach', () => ({ ladeBetreiberEmpfaenger: vi.fn(async () => ['team@example.com']) }))
+
+import { list } from '@vercel/blob'
+import * as Sentry from '@sentry/nextjs'
+import { sendBetriebWarnung } from '@/lib/email'
+import { ladeBetreiberEmpfaenger } from '@/server/queries/postfach'
+import { messeBetrieb, mitHerzschlag, pruefeAblaeufe, pruefeGrenzen } from '@/server/betrieb'
+
+const JETZT = new Date('2026-10-16T04:05:00.000Z')
+
+/** Die Werte einer Rohabfrage, flach — so, wie Postgres sie als Parameter bekommt. */
+function werteVon(aufruf: unknown[]): unknown[] {
+  const [teile, ...werte] = aufruf as [TemplateStringsArray, ...unknown[]]
+  return Prisma.sql(teile, ...werte).values
+}
+
+function blob(pathname: string, size: number, uploadedAt: string) {
+  return { pathname, url: `https://bilder.example/${pathname}`, downloadUrl: '', size, uploadedAt: new Date(uploadedAt), contentType: 'image/webp', contentDisposition: '', etag: '' }
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_platzhalter')
+  db.$queryRaw.mockResolvedValue([{ bytes: BigInt(46_000_000) }])
+  db.$executeRaw.mockResolvedValue(1)
+  db.betriebMessung.aggregate.mockResolvedValue({ _sum: { wert: BigInt(3) } })
+  vi.mocked(list)
+    .mockResolvedValue({ blobs: [], hasMore: false } as never)
+    .mockResolvedValueOnce({ blobs: [blob('hoefe/a/1.webp', 400_000, '2026-10-02T10:00:00Z'), blob('hoefe/a/2.webp', 600_000, '2026-09-20T10:00:00Z')], hasMore: true, cursor: 'seite-2' } as never)
+    .mockResolvedValueOnce({ blobs: [blob('hoefe/b/3.webp', 1_000_000, '2026-10-15T10:00:00Z')], hasMore: false } as never)
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
+describe('messeBetrieb', () => {
+  it('liest den Bild-Speicher seitenweise und schreibt je Art eine Zahl für den UTC-Tag', async () => {
+    const ergebnis = await messeBetrieb(JETZT)
+
+    expect(vi.mocked(list).mock.calls.map(([o]) => [o?.limit, o?.cursor])).toEqual([
+      [1000, undefined],
+      [1000, 'seite-2'],
+    ])
+    expect(ergebnis).toEqual({ gemessen: ['datenbankBytes', 'bilderBytes', 'bilderDateien', 'bilderUploadsMonat', 'bildVorgaengeMonat'], fehler: [] })
+    // Erst die eigenen Auflistungen (2 Seiten), dann alle Werte in EINER Anweisung.
+    expect(werteVon(db.$executeRaw.mock.calls[0])).toEqual(['2026-10-16', 2, JETZT])
+    expect(werteVon(db.$executeRaw.mock.calls[1])).toEqual([
+      ...['2026-10-16', 'datenbankBytes', BigInt(46_000_000), JETZT],
+      ...['2026-10-16', 'bilderBytes', BigInt(2_000_000), JETZT],
+      ...['2026-10-16', 'bilderDateien', BigInt(3), JETZT],
+      ...['2026-10-16', 'bilderUploadsMonat', BigInt(2), JETZT],
+      // 2 × 2 Uploads + 3 eigene Auflistungen im Monat (Summe aus der Datenbank).
+      ...['2026-10-16', 'bildVorgaengeMonat', BigInt(7), JETZT],
+    ])
+  })
+
+  it('zwischen 0 und 2 Uhr Wiener Zeit gilt der UTC-Tag — nie der Vortag', async () => {
+    await messeBetrieb(new Date('2026-10-15T22:30:00.000Z'))
+    expect(werteVon(db.$executeRaw.mock.calls[1])[0]).toBe('2026-10-15')
+    await messeBetrieb(new Date('2026-10-16T00:30:00.000Z'))
+    expect(werteVon(db.$executeRaw.mock.calls[3])[0]).toBe('2026-10-16')
+  })
+
+  it('die Abfrage der Datenbankgröße hat keinen Parameter', async () => {
+    await messeBetrieb(JETZT)
+    expect(werteVon(db.$queryRaw.mock.calls[0])).toEqual([])
+  })
+
+  it('ohne Schlüssel zum Bild-Speicher (lokal): Datenbank gemessen, Bilder als Fehlerklasse ohne Inhalt', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', '')
+    const ergebnis = await messeBetrieb(JETZT)
+    expect(ergebnis).toEqual({ gemessen: ['datenbankBytes'], fehler: ['bilder'] })
+    expect(list).not.toHaveBeenCalled()
+    const [fehler, kontext] = vi.mocked(Sentry.captureException).mock.calls[0] as [Error, { tags: Record<string, string> }]
+    expect([fehler.name, fehler.message]).toEqual(['BildSpeicherOhneZugang', 'Betrieb: Bild-Speicher nicht gemessen'])
+    expect(kontext.tags).toEqual({ bereich: 'betrieb', quelle: 'bilder' })
+  })
+
+  it('scheitert die Datenbank-Abfrage, werden die Bilder trotzdem geschrieben — ohne den Fehlertext', async () => {
+    db.$queryRaw.mockRejectedValueOnce(Object.assign(new Error('Verbindung zu db.example weg'), { name: 'PrismaClientKnownRequestError' }))
+    const ergebnis = await messeBetrieb(JETZT)
+    expect(ergebnis.fehler).toEqual(['datenbank'])
+    expect(ergebnis.gemessen).toContain('bilderBytes')
+    const [fehler] = vi.mocked(Sentry.captureException).mock.calls[0] as [Error]
+    expect(fehler.message).toBe('Betrieb: Datenbank nicht gemessen')
+    expect(fehler.name).toBe('PrismaClientKnownRequestError')
+  })
+})
+
+describe('mitHerzschlag', () => {
+  const nichtsDanach = vi.fn(async () => 0)
+
+  it('gibt das Ergebnis des Laufs unverändert zurück und schreibt Start und Ende (ok, Dauer)', async () => {
+    const ergebnis = { deleted: 3 }
+    const zurueck = await mitHerzschlag('aufraeumen', async () => ergebnis, nichtsDanach)
+
+    expect(zurueck).toBe(ergebnis)
+    expect(db.ablaufLauf.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { name: 'aufraeumen' }, create: expect.objectContaining({ ok: false }) }))
+    const [ende] = db.ablaufLauf.updateMany.mock.calls[0] as [{ where: { name: string }; data: { ok: boolean; fehlerKlasse: string | null; dauerMs: number } }]
+    expect(ende.where.name).toBe('aufraeumen')
+    expect(ende.data).toMatchObject({ ok: true, fehlerKlasse: null })
+    expect(ende.data.dauerMs).toBeGreaterThanOrEqual(0)
+    expect(nichtsDanach).toHaveBeenCalledTimes(1)
+  })
+
+  it('wirft den Fehler des Laufs weiter, schreibt nur die Fehlerklasse und prüft trotzdem die anderen', async () => {
+    const fehler = new TypeError('Inhalt, der nie in die Datenbank darf')
+    await expect(mitHerzschlag('briefkasten', async () => Promise.reject(fehler), nichtsDanach)).rejects.toBe(fehler)
+    const [ende] = db.ablaufLauf.updateMany.mock.calls[0] as [{ data: Record<string, unknown> }]
+    expect(ende.data).toMatchObject({ ok: false, fehlerKlasse: 'TypeError' })
+    expect(JSON.stringify(ende.data)).not.toContain('Inhalt')
+    expect(nichtsDanach).toHaveBeenCalledTimes(1)
+  })
+
+  it('scheitert der Herzschlag selbst, läuft der Lauf trotzdem und sein Ergebnis bleibt', async () => {
+    db.ablaufLauf.upsert.mockRejectedValueOnce(new Error('Tabelle fehlt'))
+    db.ablaufLauf.updateMany.mockRejectedValueOnce(new Error('Tabelle fehlt'))
+    const danach = vi.fn(async () => Promise.reject(new Error('Prüfung kaputt')))
+    await expect(mitHerzschlag('verwaisteBestellungen', async () => ({ storniert: 1 }), danach)).resolves.toEqual({ storniert: 1 })
+    expect(vi.mocked(Sentry.captureException).mock.calls.map(([e]) => (e as Error).message)).toEqual([
+      'Betrieb: Herzschlag nicht geschrieben',
+      'Betrieb: Herzschlag nicht geschrieben',
+      'Betrieb: Abläufe nicht geprüft',
+    ])
+  })
+})
+
+describe('Warnen — nur in der Produktion, nur nach getroffener Zeile', () => {
+  it('außerhalb der Produktion: keine Prüfung, keine Abfrage, keine Mail', async () => {
+    expect(await pruefeGrenzen(JETZT, { produktion: false })).toBe(0)
+    expect(await pruefeAblaeufe(JETZT, { produktion: false })).toBe(0)
+    await vi.dynamicImportSettled()
+    expect(db.betriebWarnung.findMany).not.toHaveBeenCalled()
+    expect(db.ablaufLauf.findMany).not.toHaveBeenCalled()
+    expect(sendBetriebWarnung).not.toHaveBeenCalled()
+  })
+
+  it('ohne Angabe gilt die Umgebung — unter Vitest keine Produktion', async () => {
+    expect(await pruefeAblaeufe(JETZT)).toBe(0)
+    expect(db.ablaufLauf.findMany).not.toHaveBeenCalled()
+  })
+
+  it('überfälliger Ablauf: eine Mail an die Empfänger der Art „Betrieb“, wenn das bedingte Setzen eine Zeile traf', async () => {
+    db.ablaufLauf.findMany.mockResolvedValue([{ name: 'betrieb', gestartetAm: new Date('2026-10-14T04:00:00Z'), beendetAm: new Date('2026-10-14T04:00:05Z'), ok: true, fehlerKlasse: null, dauerMs: 5000 }])
+    db.betriebWarnung.findMany.mockResolvedValue([])
+    db.$queryRaw.mockResolvedValueOnce([{ art: 'ablauf:betrieb' }])
+
+    expect(await pruefeAblaeufe(JETZT, { produktion: true })).toBe(1)
+    expect(werteVon(db.$queryRaw.mock.calls[0]).slice(0, 2)).toEqual(['ablauf:betrieb', 1])
+    expect(ladeBetreiberEmpfaenger).toHaveBeenCalledWith('betrieb')
+    expect(sendBetriebWarnung).toHaveBeenCalledWith(expect.objectContaining({ art: 'ablauf', name: 'betrieb', stand: 'ueberfaellig', stundenSeit: 48 }), ['team@example.com'])
+  })
+
+  it('traf das Setzen keine Zeile (eine andere Prüfung war schneller), geht keine Mail', async () => {
+    db.ablaufLauf.findMany.mockResolvedValue([{ name: 'betrieb', gestartetAm: new Date('2026-10-14T04:00:00Z'), beendetAm: null, ok: false, fehlerKlasse: null, dauerMs: null }])
+    db.betriebWarnung.findMany.mockResolvedValue([])
+    db.$queryRaw.mockResolvedValueOnce([])
+
+    expect(await pruefeAblaeufe(JETZT, { produktion: true })).toBe(0)
+    await vi.dynamicImportSettled()
+    expect(sendBetriebWarnung).not.toHaveBeenCalled()
+  })
+
+  it('„noch kein Lauf“ warnt nie — auch nicht in der Produktion', async () => {
+    db.ablaufLauf.findMany.mockResolvedValue([])
+    db.betriebWarnung.findMany.mockResolvedValue([])
+    expect(await pruefeAblaeufe(JETZT, { produktion: true })).toBe(0)
+    expect(db.$queryRaw).not.toHaveBeenCalled()
+  })
+})

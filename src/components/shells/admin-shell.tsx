@@ -3,7 +3,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeft, CircleAlert } from 'lucide-react'
+import { ArrowLeft, CircleAlert, TriangleAlert } from 'lucide-react'
 import { ADMIN_KONTO, ADMIN_REITER, ADMIN_ZURUECK, adminAktiverReiter, type AdminReiter } from '@/lib/admin-navigation'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
@@ -19,6 +19,7 @@ import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
 import { ADMIN_RAHMEN } from '@/components/admin/admin-teile'
 import { MARKE } from '@/lib/marke'
 import { ADMIN_POSTFACH_TEXT } from '@/lib/postfach'
+import { ADMIN_BETRIEB_HREF, BETRIEB_TEXT, warnungenText, type BetriebHinweis } from '@/lib/betrieb'
 
 /*
  * Die Shell des Betreiber-Bereichs im neuen Design (Gate 2): eigene
@@ -43,6 +44,11 @@ import { ADMIN_POSTFACH_TEXT } from '@/lib/postfach'
  * und reicht nur Text und Ton herein. Den Link „Zur Testumgebung" gibt es seit
  * der Z3-Korrektur (15.10.2026, Nr. 94) nicht mehr: Die Testumgebung wurde
  * nie eingerichtet.
+ *
+ * Seit Nr. 103 (Register N15/N18) der Reiter Betrieb: ein Punkt am Reiter und
+ * rechts in der Betriebsleiste der Hinweis mit Link, solange eine Warnung
+ * offen ist. Ob, entscheidet der Server (ladeAdminbereich, nur in der
+ * Produktion); die Shell bekommt nur Zahl und Text.
  */
 
 export type AdminShellProps = {
@@ -62,6 +68,8 @@ export type AdminShellProps = {
    * umgebung-server.ts) — nur Text und Ton, nie der Schlüssel.
    */
   stripeMarke?: StripeMarke | null
+  /** Register N15/N18: offene Warnungen von Admin › Betrieb — Punkt am Reiter und Hinweis in der Betriebsleiste. */
+  betrieb?: BetriebHinweis | null
   children: ReactNode
 }
 
@@ -110,6 +118,7 @@ export function AdminShell({
   zahlen,
   testbetrieb = false,
   stripeMarke = null,
+  betrieb = null,
   children,
 }: AdminShellProps): React.JSX.Element {
   const pathname = usePathname()
@@ -162,6 +171,9 @@ export function AdminShell({
                     >
                       {reiter.label}
                       <Zaehler anzahl={zahl.anzahl} wofuer={zahl.wofuer} />
+                      {reiter.warnpunkt && betrieb && (
+                        <span role="img" aria-label={warnungenText(betrieb.anzahl)} className="size-2 shrink-0 rounded-full bg-primary" />
+                      )}
                     </Link>
                   </li>
                 )
@@ -193,10 +205,24 @@ export function AdminShell({
         </div>
         {/* Betriebsleiste (Register Z3): welcher Stripe-Modus gilt. Eine eigene Zeile
             unter dem Kopf statt in ihm: Die Kopfzeile ist am Handy und bis 1024 px
-            schon voll. Ohne Marke keine Leiste. */}
-        {stripeMarke && (
-          <div className="flex min-h-11 items-center border-t border-border px-4 md:px-8">
-            <StatusBadge status={stripeMarke.ton}>{stripeMarke.text}</StatusBadge>
+            schon voll. Rechts seit Nr. 103 der Hinweis auf eine offene Warnung
+            (Register N15). Ohne Marke und ohne Warnung keine Leiste. */}
+        {(stripeMarke || betrieb) && (
+          <div className="flex min-h-11 items-center gap-3 border-t border-border px-4 md:px-8">
+            {stripeMarke && <StatusBadge status={stripeMarke.ton}>{stripeMarke.text}</StatusBadge>}
+            {betrieb && (
+              <Link
+                href={ADMIN_BETRIEB_HREF}
+                className={cn(
+                  'ml-auto inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md text-[13px] font-semibold text-status-offen hover:underline',
+                  FOKUS_RAHMEN
+                )}
+              >
+                <TriangleAlert className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+                <span className="truncate sm:hidden">{betrieb.kurz}</span>
+                <span className="hidden truncate sm:inline">{BETRIEB_TEXT.leiste(betrieb.text)}</span>
+              </Link>
+            )}
           </div>
         )}
       </header>
