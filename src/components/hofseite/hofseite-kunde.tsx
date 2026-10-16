@@ -43,6 +43,7 @@ import { korbErlaubt } from '@/lib/hofseite-vorschau'
 import { produktLink } from '@/lib/produktdetail'
 import { rueckweg, type KundenSeite } from '@/lib/kunden-kopf'
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
+import { titelbildAusschnitt } from '@/lib/titelbild'
 import { kundenPausenText } from '@/lib/shop-pause'
 import { stripStatusVariables } from '@/lib/status-body'
 import { anzeigeBereichVon } from '@/lib/taxonomie'
@@ -315,7 +316,7 @@ export function HofseiteKunde({
       {/* ── Titelbild, Name, Aktionen ── */}
       <div className="relative">
         {/* Hochformat ab md ganz statt beschnitten (Register N6, Nr. 72): entscheidet titelbild.tsx. */}
-        <Titelbild foto={foto} verlauf={titelbildVerlauf(farm.bannerValue)} fokusY={farm.bannerFocusY}>
+        <Titelbild foto={foto} verlauf={titelbildVerlauf(farm.bannerValue)} ausschnitt={titelbildAusschnitt(farm.bannerAusschnitt, farm.bannerFocusY)}>
           <button
             type="button"
             onClick={() => void teileHof(farm)}

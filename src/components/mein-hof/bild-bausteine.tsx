@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useState, useTransition, type ReactNode } from 'react'
 import Image from 'next/image'
-import { Camera, ChevronDown, ChevronUp, Loader2, MoveVertical, Plus, Trash2, Upload, X } from 'lucide-react'
+import { Camera, ChevronDown, ChevronUp, Crop, Loader2, Plus, Trash2, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { updateBannerFocusAction, updateFarmBannerAction, updateFarmLogoAction } from '@/server/actions/appearance'
+import { updateFarmBannerAction, updateFarmLogoAction } from '@/server/actions/appearance'
+import { speichereBildAusschnittAction } from '@/server/actions/bild-ausschnitt'
 import {
   addFarmPhotoAction,
   deleteFarmPhotoAction,
@@ -13,9 +14,22 @@ import {
 } from '@/server/actions/farm-photos'
 import type { FarmPhotoData } from '@/server/queries/appearance'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
-import { CoverEditButton, CoverFocusAdjust, TITELBILD_KNOPF_STIL } from '@/components/farm/farm-page-view'
+import { CoverEditButton, TITELBILD_KNOPF_STIL } from '@/components/farm/farm-page-view'
+import { BildAusschnitt } from '@/components/shared/bild-ausschnitt'
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
-import { titelbildHinweis } from '@/lib/titelbild'
+import {
+  TITELBILD_AUSSCHNITT_TEXT,
+  TITELBILD_RAHMEN_COMPUTER,
+  TITELBILD_VORSCHAU_BROWSER,
+  TITELBILD_VORSCHAU_HANDY,
+  titelbildAusschnitt,
+  titelbildDarstellung,
+  titelbildHinweis,
+} from '@/lib/titelbild'
+import { bildStil } from '@/lib/bild-ausschnitt'
+import { hofInitialen } from '@/lib/hof-initialen'
+import { MARKE } from '@/lib/marke'
+import type { BildAusschnitt as BildAusschnittWert } from '@/schemas/bild-ausschnitt'
 import { useBildmasse } from '@/components/hofseite/titelbild'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
@@ -77,28 +91,45 @@ export type TitelbildHof = {
   bannerUrl: string | null
   bannerValue: string | null
   bannerFocusY: number
+  /** Ausschnitt des Titelbilds, schon geprüft (Register N13, Nr. 97); null = wie vorher. */
+  bannerAusschnitt: BildAusschnittWert | null
+  /** Für die Vorschauen „So sieht es … aus“: Name, Logo und die Adresse der Hofseite, wie Kundinnen sie sehen. */
+  name: string
+  logoUrl: string | null
+  adresse: string
 }
+
+/** Die Anschrift unter dem Namen, wie auf der Hofseite. */
+type TitelbildAnschrift = { address: string; postalCode: string; city: string }
 
 /**
  * Titelbild: Abbild mit den vorhandenen Knöpfen der Hofseite — Foto ersetzen,
- * Ausschnitt ziehen, Foto entfernen (dann zeigt die Hofseite wieder den
+ * Ausschnitt anpassen, Foto entfernen (dann zeigt die Hofseite wieder den
  * Verlauf des Hofs). Entfernen ist dieselbe Aktion wie früher in „Mein
  * Auftritt" (updateFarmBannerAction mit GRADIENT), keine neue Logik.
+ *
+ * „Ausschnitt anpassen“ öffnet seit Nr. 97 den Bild-Baustein (Register N13,
+ * Ergänzung; N17): Rahmen „Computer“ zum Ziehen, Zoom, die Vorschauen
+ * „So sieht es im Browser aus“ und „… am Handy aus“, die Wahl füllen/ganz und
+ * die sechs Filter — in der Zeile wie im Blatt. Die Browser-Vorschau steht auch
+ * in der Zeile (Register N17): Die große Vorschau daneben ist die echte
+ * Hofseite und zeigt erst das Gespeicherte.
  */
 export function TitelbildBaustein({
   hof,
+  anschrift,
   onGespeichert,
   meldeErfolg,
   onHochladen,
-}: BildBausteinProps & { hof: TitelbildHof }): React.JSX.Element {
-  const [focusDraft, setFocusDraft] = useState<number | null>(null)
+}: BildBausteinProps & { hof: TitelbildHof; anschrift: TitelbildAnschrift }): React.JSX.Element {
+  const [offen, setOffen] = useState(false)
   const [pending, start] = useTransition()
   const [entferntGerade, startEntfernen] = useTransition()
   const foto = titelbildFoto(hof)
-  const focus = focusDraft ?? hof.bannerFocusY
-  // Die Maße liest der Browser aus der Vorschau, sobald sie geladen ist (Register N6, Nr. 72) — der Satz darunter gilt nur für Hochformat.
+  const ausschnitt = titelbildAusschnitt(hof.bannerAusschnitt, hof.bannerFocusY)
+  // Die Maße liest der Browser aus der Vorschau, sobald sie geladen ist (Register N6, Nr. 72) — der Satz darunter gilt nur ohne eigene Wahl.
   const { masse, beimLaden } = useBildmasse(foto)
-  const hochformatHinweis = titelbildHinweis(masse)
+  const hochformatHinweis = titelbildHinweis(masse, ausschnitt.darstellung)
 
   function entfernen() {
     startEntfernen(async () => {
@@ -113,85 +144,176 @@ export function TitelbildBaustein({
     })
   }
 
-  function speichern() {
-    const wert = focusDraft
-    if (wert === null) return
+  function speichern(wert: BildAusschnittWert) {
     start(async () => {
-      const res = await updateBannerFocusAction(wert)
-      if (res.error) {
+      const res = await speichereBildAusschnittAction({ ziel: 'banner', wert })
+      if ('error' in res) {
         toast.error(res.error)
-      } else {
-        if (meldeErfolg) meldeErfolg()
-        else toast.success('Bildausschnitt gespeichert')
-        onGespeichert?.()
+        return
       }
-      setFocusDraft(null)
+      if (meldeErfolg) meldeErfolg()
+      else toast.success(TITELBILD_AUSSCHNITT_TEXT.gespeichert)
+      setOffen(false)
+      onGespeichert?.()
     })
+  }
+
+  if (offen && foto) {
+    const ort = `${anschrift.address}, ${anschrift.postalCode} ${anschrift.city}`
+    return (
+      <div>
+        <BildAusschnitt
+          foto={foto}
+          wert={ausschnitt}
+          rahmen={{ name: TITELBILD_AUSSCHNITT_TEXT.rahmen, verhaeltnis: TITELBILD_RAHMEN_COMPUTER }}
+          vorschauen={[
+            {
+              titel: TITELBILD_AUSSCHNITT_TEXT.vorschauBrowser,
+              verhaeltnis: TITELBILD_VORSCHAU_BROWSER,
+              satz: TITELBILD_AUSSCHNITT_TEXT.browserSatz,
+              // Am Computer gilt die Wahl, ohne Wahl die Form des Fotos — dieselbe Regel wie die Hofseite.
+              ganz: (wert, gemessen) => titelbildDarstellung(gemessen, wert.darstellung) === 'ganz',
+              umgebung: (rahmen) => (
+                <BrowserVorschau hof={hof} ort={ort}>
+                  {rahmen}
+                </BrowserVorschau>
+              ),
+            },
+            {
+              titel: TITELBILD_AUSSCHNITT_TEXT.vorschauHandy,
+              verhaeltnis: TITELBILD_VORSCHAU_HANDY,
+              name: TITELBILD_AUSSCHNITT_TEXT.handyMarke,
+              breite: 156,
+              satz: TITELBILD_AUSSCHNITT_TEXT.handySatz,
+              darueber: <HandyName name={hof.name} ort={ort} />,
+            },
+          ]}
+          mitDarstellung
+          speichert={pending}
+          onSpeichern={speichern}
+          onAbbrechen={() => setOffen(false)}
+        />
+        <p className="mt-3 text-xs text-muted-foreground">{TITELBILD_AUSSCHNITT_TEXT.satz}</p>
+      </div>
+    )
   }
 
   return (
     <div>
       <div className="relative aspect-[5/2] overflow-hidden rounded-xl bg-muted">
         {foto ? (
-          <Image src={foto} alt="" fill sizes="640px" className="object-cover" style={{ objectPosition: `50% ${focus}%` }} onLoad={beimLaden} />
+          <Image src={foto} alt="" fill sizes="640px" className="object-cover" style={bildStil(ausschnitt)} onLoad={beimLaden} />
         ) : (
           // Der Verlauf ist ein Wert des Hofs (Titelbild-Einstellung), kein Farbliteral im Code.
           <div className="absolute inset-0" style={{ background: titelbildVerlauf(hof.bannerValue) }} />
         )}
-        {focusDraft !== null ? (
-          <CoverFocusAdjust
-            focusY={focus}
-            onChange={setFocusDraft}
-            onSave={speichern}
-            onCancel={() => setFocusDraft(null)}
-            saving={pending}
+        {foto && (
+          <button
+            type="button"
+            onClick={entfernen}
+            disabled={entferntGerade}
+            aria-label="Titelbild entfernen"
+            className={cn('group absolute top-0.5 left-0.5 flex size-11 items-center justify-center rounded-full disabled:opacity-60', FOKUS_RAHMEN_INNEN)}
+          >
+            {/* Sichtbar der 28-px-Kreis wie früher in „Mein Auftritt", getroffen wird der 44-px-Knopf (Nr. 35).
+                Theme-fest dunkel auf dem Foto über Tokens (DESIGN_SYSTEM, Bild-Overlays). */}
+            <span className="flex size-7 items-center justify-center rounded-full bg-primary-foreground/60 text-accent-foreground transition-colors group-hover:bg-primary-foreground/80">
+              <X className="size-3.5" aria-hidden="true" />
+            </span>
+          </button>
+        )}
+        <div className="absolute top-2 right-2 flex flex-wrap items-center justify-end gap-2">
+          {foto && (
+            <button
+              type="button"
+              onClick={() => setOffen(true)}
+              className="flex min-h-11 items-center gap-1.5 rounded-lg px-3.5 text-sm font-semibold transition-opacity hover:opacity-90"
+              style={TITELBILD_KNOPF_STIL}
+            >
+              <Crop className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
+              {TITELBILD_AUSSCHNITT_TEXT.anpassen}
+            </button>
+          )}
+          <CoverEditButton
+            currentBannerUrl={hof.bannerUrl}
+            onGespeichert={onGespeichert}
+            meldeErfolg={meldeErfolg}
+            onHochladen={onHochladen}
             gross
           />
-        ) : (
-          <>
-            {foto && (
-              <button
-                type="button"
-                onClick={entfernen}
-                disabled={entferntGerade}
-                aria-label="Titelbild entfernen"
-                className={cn('group absolute top-0.5 left-0.5 flex size-11 items-center justify-center rounded-full disabled:opacity-60', FOKUS_RAHMEN_INNEN)}
-              >
-                {/* Sichtbar der 28-px-Kreis wie früher in „Mein Auftritt", getroffen wird der 44-px-Knopf (Nr. 35).
-                    Theme-fest dunkel auf dem Foto über Tokens (DESIGN_SYSTEM, Bild-Overlays). */}
-                <span className="flex size-7 items-center justify-center rounded-full bg-primary-foreground/60 text-accent-foreground transition-colors group-hover:bg-primary-foreground/80">
-                  <X className="size-3.5" aria-hidden="true" />
-                </span>
-              </button>
-            )}
-            <div className="absolute top-2 right-2 flex flex-wrap items-center justify-end gap-2">
-              {foto && (
-                <button
-                  type="button"
-                  onClick={() => setFocusDraft(hof.bannerFocusY)}
-                  className="flex min-h-11 items-center gap-1.5 rounded-lg px-3.5 text-sm font-semibold transition-opacity hover:opacity-90"
-                  style={TITELBILD_KNOPF_STIL}
-                >
-                  <MoveVertical className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
-                  Ausschnitt anpassen
-                </button>
-              )}
-              <CoverEditButton
-                currentBannerUrl={hof.bannerUrl}
-                onGespeichert={onGespeichert}
-                meldeErfolg={meldeErfolg}
-                onHochladen={onHochladen}
-                gross
-              />
-            </div>
-          </>
-        )}
+        </div>
       </div>
       {hochformatHinweis && <p className="mt-2 text-xs text-muted-foreground">{hochformatHinweis}</p>}
-      <p className="mt-2 text-xs text-muted-foreground">
-        Querformat wirkt am besten. Der Ausschnitt gilt für das hohe Titelbild auf der Hofseite.
-      </p>
+      <p className="mt-2 text-xs text-muted-foreground">{TITELBILD_AUSSCHNITT_TEXT.satz}</p>
     </div>
+  )
+}
+
+/**
+ * „So sieht es im Browser aus“: die Hofseite am Computer verkleinert —
+ * Browserleiste mit Adresse, Kopf, das Titelbild über die volle Breite (der
+ * Rahmen aus dem Bild-Baustein), darunter der Hofkopf mit Logo, Name und
+ * Anschrift und angedeutete Produkte (Mockups web-/mobil-h1-titelbild-ausschnitt).
+ * Nur Bild: Der Baustein setzt es `aria-hidden`; Links und Knöpfe der echten
+ * Seite sind hier leere Flächen.
+ */
+function BrowserVorschau({ hof, ort, children }: { hof: TitelbildHof; ort: string; children: ReactNode }): React.JSX.Element {
+  return (
+    <div className="overflow-hidden rounded-[10px] border border-border bg-background">
+      <div className="flex h-[22px] items-center gap-1.5 border-b border-border bg-card px-2">
+        <span className="flex gap-1">
+          {[0, 1, 2].map((punkt) => (
+            <span key={punkt} className="size-1.5 rounded-full bg-border" />
+          ))}
+        </span>
+        <span className="flex min-w-0 flex-1 justify-center">
+          <span className="truncate rounded-full border border-border bg-background px-2 py-px text-[8px] text-muted-foreground">{hof.adresse}</span>
+        </span>
+        <span className="w-[26px]" />
+      </div>
+      <div className="flex h-[18px] items-center gap-1.5 border-b border-border px-2.5">
+        <span className="font-heading text-[7px] font-bold text-brand-text">{MARKE}</span>
+        <span className="flex-1" />
+        {[0, 1, 2, 3].map((stelle) => (
+          <span key={stelle} className="h-[3px] w-5 rounded-full bg-border" />
+        ))}
+      </div>
+      <div className="h-3" />
+      {children}
+      <div className="relative -mt-[13px] flex items-end gap-1.5 px-3">
+        <span className="relative flex size-[26px] shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-background bg-accent font-heading text-[9px] font-bold text-accent-foreground">
+          {hof.logoUrl ? <Image src={hof.logoUrl} alt="" fill sizes="26px" className="object-cover" /> : hofInitialen(hof.name)}
+        </span>
+        <span className="min-w-0 pb-px leading-tight">
+          <span className="block truncate font-heading text-[9.5px] font-semibold text-foreground">{hof.name}</span>
+          <span className="block truncate text-[5.5px] text-muted-foreground">{ort}</span>
+        </span>
+        <span className="flex-1" />
+        <span className="mb-0.5 flex gap-[3px]">
+          <span className="h-2 w-6 rounded-full border border-border" />
+          <span className="h-2 w-6 rounded-full border border-border" />
+          <span className="h-2 w-8 rounded-full bg-accent" />
+        </span>
+      </div>
+      <div className="grid grid-cols-4 gap-[5px] px-3 pt-2 pb-2.5">
+        {[0, 1, 2, 3].map((karte) => (
+          <span key={karte} className="h-11 rounded-[4px] border border-border bg-card" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Name und Anschrift auf dem Titelbild am Handy, über dem dunklen Schleier — theme-fest (Bild-Overlay). */
+function HandyName({ name, ort }: { name: string; ort: string }): React.JSX.Element {
+  return (
+    <>
+      <span className="pointer-events-none absolute inset-0 bg-linear-to-t from-primary-foreground/75 via-primary-foreground/10 to-transparent" />
+      <span className="pointer-events-none absolute right-2 bottom-[7px] left-[9px] leading-[1.1] text-accent-foreground">
+        <span className="block truncate font-heading text-[11px] font-semibold">{name}</span>
+        <span className="mt-0.5 block truncate text-[7px] opacity-85">{ort}</span>
+      </span>
+    </>
   )
 }
 

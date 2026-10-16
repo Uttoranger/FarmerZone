@@ -322,7 +322,7 @@ const HOF: PublicFarm = {
   id: 'farm_test', slug: 'hof-test', name: 'Hof Test', ownerName: 'Erika Muster',
   description: 'Gemüse aus Musterdorf', address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf',
   phone: '+43 660 0000000', email: 'hof@example.com', logoUrl: null, bannerUrl: null,
-  tagline: null, foundedYear: null, aboutText: null, bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50,
+  tagline: null, foundedYear: null, aboutText: null, bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50, bannerAusschnitt: null,
   sectionsConfig: [], farmValues: [], farmPhotos: [{ id: 'foto_1', url: '/foto.jpg', caption: null, sortOrder: 0 }],
   acceptsOnline: false, acceptsOnsite: true, stripeAccountReady: false, isPaused: true, pauseMessage: null,
   serviceFeePercent: 0, serviceFeeMinCents: 0, serviceFeeActiveFrom: null, betriebsstatus: null,

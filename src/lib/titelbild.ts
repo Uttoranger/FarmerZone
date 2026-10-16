@@ -15,7 +15,16 @@
  * springt nie, alles andere wechselt einmal nach dem Laden, und das blendet
  * weich über (Foto in zwei Lagen und Kopie, components/hofseite/titelbild.tsx).
  * Offen: Maße beim Hochladen speichern, dann entfällt der Wechsel (Register N13).
+ *
+ * Seit Nr. 97 (Register N13, Ergänzung 15.10.2026) wählt der Hof selbst, ob das
+ * Foto am Computer füllt oder ganz steht (`darstellung` im Ausschnitt,
+ * src/schemas/bild-ausschnitt.ts); ohne Wahl gilt die Regel nach
+ * Seitenverhältnis. Fokus, Zoom und Filter wirken am Computer und am Handy
+ * gleich, die Wahl nur am Computer — am Handy füllt das Foto immer, weil Name
+ * und Schleier darauf stehen.
  */
+
+import type { BildAusschnitt, DarstellungWahl } from '@/schemas/bild-ausschnitt'
 
 /** Breite und Höhe eines Bilds in Pixeln. */
 export type TitelbildMasse = { breite: number; hoehe: number }
@@ -69,6 +78,10 @@ export const TITELBILD_SIZES = `(min-width: ${TITELBILD_BREITE_MAX}px) ${TITELBI
 const RUNDUNG_PX = 0.75
 
 /**
+ * Hat der Hof gewählt, gilt seine Wahl: „Ausschnitt füllen“ (FUELLEN) füllt,
+ * „Ganz zeigen“ (GANZ) steht ganz. Ohne Wahl (AUTO, fehlend) die Regel nach
+ * Seitenverhältnis:
+ *
  * Alles, was weniger als 1,5-mal so breit wie hoch ist, steht ganz — unbekannte
  * Maße und Querformat ab 3:2 bleiben beim Beschnitt.
  *
@@ -79,7 +92,9 @@ const RUNDUNG_PX = 0.75
  * füllend. Darum zählt die Höhe um RUNDUNG_PX kleiner: Was durch Rundung und
  * Dichteteilung knapp unter 1,5 liegen könnte, ist 3:2 und füllt.
  */
-export function titelbildDarstellung(masse: TitelbildMasse | null): TitelbildDarstellung {
+export function titelbildDarstellung(masse: TitelbildMasse | null, wahl?: DarstellungWahl): TitelbildDarstellung {
+  if (wahl === 'FUELLEN') return 'beschnitt'
+  if (wahl === 'GANZ') return 'ganz'
   return masse !== null && masse.breite < TITELBILD_GANZ_UNTER * (masse.hoehe - RUNDUNG_PX) ? 'ganz' : 'beschnitt'
 }
 
@@ -96,8 +111,43 @@ const GANZ_HINWEIS = 'Quadrat oder Hochformat – am Computer zeigen wir es ganz
 
 /**
  * Der ruhige Satz unter der Vorschau in Mein Hof — nur, wenn die Hofseite das
- * Foto ganz zeigt. Kein Blocker und keine Pflicht: Der Hof darf sein Foto behalten.
+ * Foto nach der Regel ganz zeigt, solange der Hof nicht selbst gewählt hat.
+ * Kein Blocker und keine Pflicht: Der Hof darf sein Foto behalten.
  */
-export function titelbildHinweis(masse: TitelbildMasse | null): string | null {
+export function titelbildHinweis(masse: TitelbildMasse | null, wahl?: DarstellungWahl): string | null {
+  if (wahl === 'FUELLEN' || wahl === 'GANZ') return null
   return titelbildDarstellung(masse) === 'ganz' ? GANZ_HINWEIS : null
 }
+
+/**
+ * Der Ausschnitt des Titelbilds, wie Hofseite und Mein Hof ihn zeigen: der
+ * gespeicherte (schon über `leseAusschnitt` gelesen, src/server/queries/farm.ts)
+ * oder — ohne einen — der Stand von vorher: Mitte waagrecht, `bannerFocusY`
+ * senkrecht, 100 %, Natürlich, ohne Wahl.
+ */
+export function titelbildAusschnitt(gespeichert: BildAusschnitt | null, bannerFocusY: number): BildAusschnitt {
+  return gespeichert ?? { fokusX: 50, fokusY: bannerFocusY, zoom: 100, filter: 'NATUERLICH' }
+}
+
+/**
+ * Die Rahmen des Bild-Bausteins für das Titelbild (Mockups web-/mobil-h1-titelbild-ausschnitt):
+ * gezogen wird im Rahmen „Computer“ (3,6 : 1, zwischen 768 × 300 und 1 920 × 420);
+ * die Browser-Vorschau zeigt die Hofseite bei 1 440 px (Titelbild 1 440 × 360),
+ * die Handy-Vorschau den Rahmen am Handy (390 × 220).
+ */
+export const TITELBILD_RAHMEN_COMPUTER = 3.6
+export const TITELBILD_VORSCHAU_BROWSER = 1440 / 360
+export const TITELBILD_VORSCHAU_HANDY = 390 / 220
+
+/** Die Texte des Titelbild-Bausteins in Mein Hof (components/mein-hof/bild-bausteine.tsx). */
+export const TITELBILD_AUSSCHNITT_TEXT = {
+  anpassen: 'Ausschnitt anpassen',
+  gespeichert: 'Ausschnitt gespeichert',
+  rahmen: 'Computer',
+  handyMarke: 'Handy',
+  vorschauBrowser: 'So sieht es im Browser aus',
+  vorschauHandy: 'So sieht es am Handy aus',
+  browserSatz: 'Die Vorschau ist live: Was du oben wählst, steht hier so wie auf deiner Hofseite am Computer.',
+  handySatz: 'Am Handy füllt das Foto immer, der Name steht darauf. Derselbe Fokus – ziehen geht auch hier.',
+  satz: 'Querformat wirkt am besten. Der Ausschnitt gilt für Computer und Handy; ohne Wahl entscheidet die Form des Fotos (Quadrat und Hochformat stehen ganz).',
+} as const

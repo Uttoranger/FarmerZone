@@ -107,6 +107,7 @@ export default async function FarmPageOwnerRoute({
     bannerUrl: farm.bannerUrl,
     bannerValue: farm.bannerValue,
     bannerFocusY: farm.bannerFocusY,
+    bannerAusschnitt: farm.bannerAusschnitt,
     isPaused: farm.isPaused,
     pauseMessage: farm.pauseMessage,
   }

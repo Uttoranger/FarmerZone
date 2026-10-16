@@ -446,6 +446,13 @@ model Farm {
   bannerValue    String?    // gradient preset key or uploaded photo URL
   bannerFocusY   Int        @default(50) // vertikaler Fokuspunkt des Titelbilds: 0=oben, 100=unten
   sectionsConfig Json?      // SectionConfig[] — which sections are visible and in which order
+  // Ausschnitt, Zoom, Filter und Darstellung des Titelbilds (Register N13/N17, Nr. 97) —
+  // { fokusX, fokusY, zoom, filter, darstellung? }, gelesen nur über leseAusschnitt
+  // (src/schemas/bild-ausschnitt.ts); null = wie vorher. bannerFocusY wird beim
+  // Speichern mitgeschrieben (Expand), Contract später.
+  bannerAusschnitt Json?
+  // Ausschnitt und Zoom des Logos (ohne Filter, Register N17) — Nr. 98.
+  logoAusschnitt   Json?
 
   // Stripe Connect
   stripeAccountId    String?  @unique
@@ -547,6 +554,8 @@ model Product {
   name        String
   description String?     @db.Text
   imageUrl    String?
+  // Ausschnitt, Zoom und Filter des Produktfotos (Register N17, Nr. 98); null = Mitte wie vorher.
+  bildAusschnitt Json?
   price       Decimal     @db.Decimal(10, 2)
   vatRate     Decimal     @default(10) @db.Decimal(5, 2) // 10% Standard für Lebensmittel AT
   unit        ProductUnit
@@ -912,6 +921,8 @@ model StatusPost {
   body                   String           @db.Text
   anlass                 StatusPostAnlass @default(FRESH_PRODUCT)
   photoUrl               String?
+  // Ausschnitt, Zoom und Filter des Beitragsfotos (Register N17, Nr. 98); null = wie vorher.
+  fotoAusschnitt         Json?
   linkedProductIds       String[]         @default([])
   publishedAt            DateTime?
   expiresAt              DateTime?
@@ -953,6 +964,8 @@ model FarmPhoto {
   url       String
   caption   String?
   sortOrder Int
+  // Ausschnitt, Zoom und Filter der Kachel (Register N17, Nr. 98); null = wie vorher.
+  ausschnitt Json?
 
   farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
 

@@ -76,7 +76,7 @@ const hof: AbschnittHof = {
   bannerType: 'GRADIENT',
   bannerUrl: null,
   bannerValue: null,
-  bannerFocusY: 50,
+  bannerFocusY: 50, bannerAusschnitt: null,
   isPaused: false,
   pauseMessage: null,
 }

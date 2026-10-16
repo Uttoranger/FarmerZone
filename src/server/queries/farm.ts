@@ -5,6 +5,7 @@ import { APP_URL } from '@/lib/umgebung-server'
 import { categoryImagePath } from '@/lib/product-image'
 import { zuProduktDto } from '@/lib/produkt-dto'
 import { DEFAULT_SECTIONS, type SectionConfig } from './appearance'
+import { leseAusschnitt, type BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { PRODUCT_ORDER_BY } from './products'
 import type {
   Abgabe,
@@ -142,6 +143,8 @@ export type PublicFarm = {
   bannerType: 'GRADIENT' | 'PHOTO'
   bannerValue: string | null
   bannerFocusY: number
+  /** Ausschnitt, Zoom, Filter und Wahl füllen/ganz des Titelbilds (Register N13, Nr. 97) — schon geprüft; null = wie vorher. */
+  bannerAusschnitt: BildAusschnitt | null
   sectionsConfig: SectionConfig[]
   farmValues: PublicFarmValue[]
   farmPhotos: PublicFarmPhoto[]
@@ -303,6 +306,7 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       bannerType: true,
       bannerValue: true,
       bannerFocusY: true,
+      bannerAusschnitt: true,
       sectionsConfig: true,
       acceptsOnline: true,
       acceptsOnsite: true,
@@ -346,6 +350,8 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
   return {
     ...rest,
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
+    // Json aus der Datenbank nur über leseAusschnitt: Ein ungültiger Wert ergibt null, nie einen Fehler auf der Hofseite.
+    bannerAusschnitt: leseAusschnitt(farm.bannerAusschnitt),
     sectionsConfig: sections,
     farmPhotos: farm.farmPhotos,
     serviceFeePercent: Number(farm.serviceFeePercent),
@@ -391,6 +397,7 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       bannerType: true,
       bannerValue: true,
       bannerFocusY: true,
+      bannerAusschnitt: true,
       sectionsConfig: true,
       acceptsOnline: true,
       acceptsOnsite: true,
@@ -434,6 +441,8 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
   return {
     ...rest,
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
+    // Json aus der Datenbank nur über leseAusschnitt: Ein ungültiger Wert ergibt null, nie einen Fehler auf der Hofseite.
+    bannerAusschnitt: leseAusschnitt(farm.bannerAusschnitt),
     sectionsConfig: sections,
     farmPhotos: farm.farmPhotos,
     serviceFeePercent: Number(farm.serviceFeePercent),

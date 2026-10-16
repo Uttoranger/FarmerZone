@@ -85,7 +85,7 @@ const HOF: PublicFarm = {
   aboutText: null,
   bannerType: 'GRADIENT',
   bannerValue: null,
-  bannerFocusY: 50,
+  bannerFocusY: 50, bannerAusschnitt: null,
   sectionsConfig: [],
   farmValues: [],
   farmPhotos: [],
