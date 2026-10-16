@@ -210,7 +210,7 @@ describe('speichereGruendungEinstellung — die Wache und was geschrieben wird',
 })
 
 describe('EinstellungenGruendung — die zwei gesperrten Felder', () => {
-  const daten = { gespeichert: GUT, imRennen: 7, jetzt: JETZT.toISOString(), protokoll: 'Noch nie geändert – es gelten die Standardwerte.' }
+  const daten = { gespeichert: GUT, imRennen: 7, ausgenommen: 0, jetzt: JETZT.toISOString(), protokoll: 'Noch nie geändert – es gelten die Standardwerte.' }
 
   it('Plätze und Ende nur lesend mit Hinweis; der Schalter bleibt bedienbar', () => {
     const html = renderToStaticMarkup(createElement(EinstellungenGruendung, { daten }))

@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
 import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
 import { STRIPE_MARKE } from '@/lib/umgebung-server'
-import { bildeGruendungBis, gruendungsplaetze, seitenZahlen } from '@/lib/gruendungshof'
+import { bildeGruendungBis, gruendungsplaetze, seitenZahlen, zaehleAusgenommene } from '@/lib/gruendungshof'
 import { EINSTELLUNGEN_TEXT, gruendungZeileKurz, protokollZeile, ADMIN_EINSTELLUNGEN_HREF } from '@/lib/plattform-einstellung'
 import { einstellungenGruppeSchema } from '@/schemas/plattform-einstellung'
 import { cn } from '@/lib/utils'
@@ -28,7 +28,13 @@ async function ladeDaten(gewaehlt: EinstellungenDaten['gewaehlt'], jetzt: Date):
   const zahlen = seitenZahlen({ plaetze: gespeichert.plaetze, bis: bildeGruendungBis(gespeichert.bisTag), anzeige: gespeichert.anzeige }, imRennen, jetzt)
   return {
     gewaehlt,
-    gruendung: { gespeichert, imRennen, jetzt: jetzt.toISOString(), protokoll: protokollZeile(einstellung, person?.name ?? null) },
+    gruendung: {
+      gespeichert,
+      imRennen,
+      ausgenommen: zaehleAusgenommene(hoefe),
+      jetzt: jetzt.toISOString(),
+      protokoll: protokollZeile(einstellung, person?.name ?? null),
+    },
     gruendungZeile: gruendungZeileKurz(zahlen.gesamt, zahlen.frei, zahlen.bisTag),
     stripeMarke: STRIPE_MARKE,
   }

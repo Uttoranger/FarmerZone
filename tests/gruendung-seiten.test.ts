@@ -35,6 +35,7 @@ function hoefe(n: number): HofFuerPlatz[] {
     approvedAt: new Date(Date.UTC(2026, 0, 1 + i)),
     createdAt: new Date(Date.UTC(2025, 0, 1)),
     archivedAt: null,
+    gruendungAusgenommen: false,
   }))
 }
 
@@ -48,7 +49,7 @@ describe('fuerSeiten — frei und die Bedingung fürs Zeigen', () => {
   })
 
   it('wartende und stillgelegte Höfe belegen keinen Platz', () => {
-    const liste = [...hoefe(3), { id: 'wartet', approvedAt: null, createdAt: JETZT, archivedAt: null }]
+    const liste = [...hoefe(3), { id: 'wartet', approvedAt: null, createdAt: JETZT, archivedAt: null, gruendungAusgenommen: false }]
     liste[0] = { ...liste[0], archivedAt: JETZT }
     expect(fuerSeiten(einstellung(), liste, JETZT).frei).toBe(10)
   })

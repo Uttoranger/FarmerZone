@@ -21,8 +21,10 @@ const GESPERRT = 'cursor-default bg-muted'
 /** Was die Seite mitgibt — nur Zahlen und Text (CODING_STANDARDS §2: kein Date an Client-Komponenten). */
 export type GruendungFormularDaten = {
   gespeichert: { plaetze: number; bisTag: string; anzeige: boolean }
-  /** Freigeschaltete, nicht stillgelegte Höfe — die Reihenfolge der Plätze (gruendungsplaetze). */
+  /** Freigeschaltete, nicht stillgelegte Höfe — die Reihenfolge der Plätze (gruendungsplaetze, ohne ausgenommene). */
   imRennen: number
+  /** Freigeschaltete Höfe, die nicht für die Gründungsplätze zählen (Register K2, Nr. 109). */
+  ausgenommen: number
   /** Der Zeitpunkt der Seite als ISO-Text — „Datum vorbei" entscheidet sich daran, nicht an der Uhr des Browsers. */
   jetzt: string
   protokoll: string
@@ -108,7 +110,11 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
     >
       <div className="hidden grid-cols-3 gap-3 sm:grid">
         <Kachel titel={TEXT.kachelPlaetze} wert={zahlen.gesamt} />
-        <Kachel titel={TEXT.kachelVergeben} wert={zahlen.gesamt - zahlen.frei} zeile={TEXT.kachelVergebenZeile} />
+        <Kachel
+          titel={TEXT.kachelVergeben}
+          wert={zahlen.gesamt - zahlen.frei}
+          zeile={daten.ausgenommen > 0 ? TEXT.kachelVergebenAusgenommen(daten.ausgenommen) : TEXT.kachelVergebenZeile}
+        />
         <Kachel titel={TEXT.kachelFrei} wert={zahlen.frei} zeile={TEXT.kachelFreiZeile} betont={zahlen.frei > 0} />
       </div>
 

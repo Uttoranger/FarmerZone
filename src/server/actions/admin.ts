@@ -27,7 +27,7 @@ import {
   GRUENDUNG_BIS_ZUSTIMMUNG_FEHLT,
   gruendungBisSchema,
 } from '@/schemas/gruendungshof'
-import { bestimmeGruendungBis, bildeGruendungBis, gruendungsZusageBeiFreigabe, verkuerztGruendung } from '@/lib/gruendungshof'
+import { GRUENDUNGSPLAETZE_SPERRE, bestimmeGruendungBis, bildeGruendungBis, gruendungsZusageBeiFreigabe, verkuerztGruendung } from '@/lib/gruendungshof'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
 import { gruendungEinstellungAus } from '@/lib/plattform-einstellung'
@@ -43,9 +43,10 @@ function revalidateAll(slug: string) {
  * Die EINE Nachricht vom Team an einen frisch freigeschalteten Gründungshof
  * (Register K2-Ergänzung, Punkt 4; Nr. 93): ein Faden ohne Rundschreiben mit
  * einer Nachricht der Art SYSTEM, Text GRUENDUNGS_NACHRICHT, Link „Deine
- * Konditionen". Ohne Platz keine Nachricht. Platz und Plätze gesamt aus der
- * Einstellung (frisch, nie aus dem Cache), Ende: das eigene des Hofs oder das
- * Standard-Ende der Einstellung.
+ * Konditionen". Ohne Platz keine Nachricht. Platz und Ende bestimmt
+ * approveFarmAction in ihrer Transaktion unter der Sperre der Gründungsplätze
+ * (Nr. 109) und reicht sie herein — die Nachricht rechnet nie mit einem
+ * späteren Stand.
  *
  * IDEMPOTENT über eine eigene Prüfung: Der Unique (farmId, rundschreibenId)
  * greift mit NULL nicht — zwei Fäden ohne Rundschreiben wären erlaubt. Gibt es
@@ -57,13 +58,8 @@ function revalidateAll(slug: string) {
  * Geld und Bestellungen) — er geht mit festem Text und ohne Nachrichtentext
  * nach Sentry, die Nachricht lässt sich notfalls als Rundschreiben nachholen.
  */
-async function legeGruendungsNachrichtAn(farmId: string): Promise<void> {
+async function legeGruendungsNachrichtAn(farmId: string, zusage: { platz: number; bis: Date }): Promise<void> {
   try {
-    const [einstellung, hoefe] = await Promise.all([lesePlattformEinstellung(), ladeHoefeFuerGruendung()])
-    const hof = hoefe.find((h) => h.id === farmId)
-    const zusage = hof ? gruendungsZusageBeiFreigabe(hof, hoefe, gruendungEinstellungAus(einstellung)) : null
-    if (!zusage) return
-
     const schon = await prisma.nachricht.findFirst({
       where: { art: 'SYSTEM', vonFarmId: null, linkUrl: GRUENDUNGS_NACHRICHT_LINK, unterhaltung: { farmId, rundschreibenId: null } },
       select: { id: true },
@@ -136,22 +132,39 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
   })
   if (sperre) return { error: sperre }
 
-  // Bedingt schreiben, nicht blind: Die Sperre oben beruht auf einem Lesestand.
-  // Fällt Stripe dazwischen weg (account.updated) oder schaltet ein zweiter
-  // Klick schon frei, trifft das Schreiben nichts — dann keine Mail, sondern
-  // eine Meldung (ARCHITECTURE: der Statuswechsel ist die Sperre).
-  const { count } = await prisma.farm.updateMany({
-    where: { id: farmId, stripeAccountReady: true, approvedAt: null },
-    data: { approvedAt: new Date() },
+  // Die Zahl der Plätze frisch, nie aus dem Cache.
+  const einstellung = gruendungEinstellungAus(await lesePlattformEinstellung())
+
+  // Freischalten und Platz bestimmen in EINER Transaktion unter der Sperre der
+  // Gründungsplätze (Register K2, Nr. 109) — dieselbe wie Ausnehmen und
+  // Wiederaufnehmen: So vergeben Freischalten und Wiederaufnahme nie
+  // gleichzeitig denselben letzten Platz.
+  const freigabe = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${GRUENDUNGSPLAETZE_SPERRE})`
+    // Bedingt schreiben, nicht blind: Die Freischalt-Sperre oben beruht auf einem Lesestand.
+    // Fällt Stripe dazwischen weg (account.updated) oder schaltet ein zweiter
+    // Klick schon frei, trifft das Schreiben nichts — dann keine Mail, sondern
+    // eine Meldung (ARCHITECTURE: der Statuswechsel ist die Sperre).
+    // Der Zeitpunkt entsteht NACH der Sperre: Er bestimmt die Reihenfolge der
+    // Plätze, und ein Weg, der vor uns vergeben hat, steht so immer vor uns.
+    const { count } = await tx.farm.updateMany({
+      where: { id: farmId, stripeAccountReady: true, approvedAt: null },
+      data: { approvedAt: new Date() },
+    })
+    if (count === 0) return null
+    const hoefe = await ladeHoefeFuerGruendung(tx)
+    const hof = hoefe.find((h) => h.id === farmId)
+    return { zusage: hof ? gruendungsZusageBeiFreigabe(hof, hoefe, einstellung) : null }
   })
-  if (count === 0) return { error: FREISCHALTUNG_GEAENDERT_TEXT }
+  if (freigabe === null) return { error: FREISCHALTUNG_GEAENDERT_TEXT }
   revalidateAll(farm.slug)
   // „Noch n Gründungsplätze" auf Startseite und /fuer-hoefe (K2-Ergänzung) zählt diesen Hof jetzt mit.
   revalidatePath('/')
   revalidatePath('/fuer-hoefe')
 
   // Erst nach dem erfolgreichen Update und vor der Mail: Der Platz ist vergeben.
-  await legeGruendungsNachrichtAn(farmId)
+  // Ohne Platz (oder ausgenommen) keine Nachricht.
+  if (freigabe.zusage) await legeGruendungsNachrichtAn(farmId, freigabe.zusage)
 
   // Die Zusage an den Hof — NACH dem erfolgreichen Update. Ein Mail-Fehler
   // darf die Freischaltung nicht scheitern lassen: Der Hof ist ab hier
