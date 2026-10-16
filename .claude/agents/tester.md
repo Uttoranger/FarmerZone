@@ -19,6 +19,21 @@ Du führst die Prüfbefehle von FarmerZone aus und berichtest knapp.
 Bricht ein Schritt ab, trotzdem die folgenden ausführen: der Hauptagent
 soll alles auf einmal sehen.
 
+## Geldpfade: die ganze Integrationssuite
+Berührt die Änderung eine dieser Dateien — feste Liste, geprüft mit
+`git diff --name-only` gegen die Basis —, läuft als vierter Schritt die GANZE
+Integrationssuite, nicht nur die eigene Datei:
+`src/server/actions/orders.ts`, `src/app/api/stripe/webhook/route.ts`,
+`src/lib/nach-der-antwort.ts`.
+Ein Fehler zeigt sich bei Geld oft erst im Gesamtlauf (eine Datei räumt die
+Daten einer anderen weg, ein Nachlauf landet im falschen Test).
+Befehl: `pnpm test:integration` — braucht `.env.test`, läuft nur gegen
+localhost, 127.0.0.1 oder postgres, niemals gegen Dev oder Produktion; wo eine
+Sperre für die gemeinsame Test-Datenbank gilt, davor `flock -w 1800 <Sperrdatei>`.
+Laufzeit rund drei Minuten (4 Kerne): Zeitgrenze des
+Aufrufs auf mindestens sechs Minuten setzen. Ohne Treffer in der Liste bleibt
+es bei den drei Schritten oben.
+
 ## Umgebung — nichts hinzufügen
 Die `db:*`-Skripte und `briefkasten` laden `.env.local` bereits selbst
 über dotenv-cli. Typecheck, Lint und Tests brauchen KEIN `.env.local`:

@@ -62,7 +62,7 @@ Bei **jeder** Codeänderung lesen.
 ### Tage und Wochen
 - Der Tag und die Woche eines Hofs sind **Wiener** Tag und Woche, nie Serverzeit (Vercel rechnet in UTC — um 0:30 Uhr stünde der Hof sonst im Gestern).
 - Werkzeuge: `wienKalendertag`, `tagVersetzt`, `wienWochenMontag`, `wienWochenbeginn` (`src/lib/kalender.ts`), `wienerMitternacht` (`src/lib/wiener-tag.ts`, auch über `servicegebuehr.ts` erreichbar), `abholtage` und `wochenfenster` (`src/lib/heute.ts`).
-- Verboten für neue Abfragen: `setHours(0, 0, 0, 0)`, `getHours()`, `startOfWeek` aus `date-fns` auf einem Serverzeitpunkt, `toLocaleDateString` ohne `timeZone: 'Europe/Vienna'`.
+- Verboten unter `src/`: `setHours(0, …)`, `getHours()`, `startOfWeek` aus `date-fns`, `toLocaleDateString` ohne `timeZone: 'Europe/Vienna'` — ESLint meldet sie (`no-restricted-syntax` in `eslint.config.mjs`, Gegenprobe `tests/datums-regeln.test.ts`); die Dateien, die `toLocaleDateString` noch ohne `timeZone` schreiben, stehen dort in `DATUM_ORT_BESTAND` und die Liste darf nur schrumpfen.
 - Bestellungen eines Abholtags: `abholWhere(farmId, tag)` — dieselbe Bedingung für „Heute abholen", die nächste Abholung und die Packliste. Wie ein künftiger Tag im Hofbereich heißt („Morgen", Wochentag, Wochentag mit Datum), sagt `abholtagName`; ein Abholtermin für Kundinnen (Kasse, Hofseite) steht immer mit Wochentag und Datum über `formatTagKurz` („Sa, 10. Okt", `src/lib/format.ts`, aus dem Kalendertag JJJJ-MM-TT, seit Nr. 46) — nie ein eigenes Datumsformat daneben. Der Kalendertag ist immer der Wiener: `kalendertagInWien` (`src/lib/wiener-tag.ts`), `tagVersetzt`, `wochentagVon` (`src/lib/kalender.ts`) und für „jetzt" `uhrzeitInWien` — in Kasse (`angeboteneAbholfenster`) und Hofseite (`nextPickupDays`, seit Nr. 46, Runde 1) dieselben Helfer, nie `getDay()`/`getHours()` der Uhr, auf der der Code gerade läuft. Kurze Monatsnamen schreibt neuer Code fest (`MONAT_KURZ` in `format.ts`, auch für Achsen wie `monatOhneJahr`), nie über Intl `month: 'short'` — dessen Kürzel schwanken je nach ICU-Stand („Sep"/„Sep.", „Jul"/„Juli"); `monatKurz` (lange Achse der Finanzen, „Sep. 26") nimmt noch Intl.
 
 ### Serialisierung an Client-Komponenten
@@ -316,12 +316,14 @@ In `src/components` und `src/lib` steht kein Hexwert. Die benannten Ausnahmen
 stehen je mit Grund in der Hex-Wache von `tests/design-tokens.test.ts`.
 
 Bedeutung ohne Marke (Hinweiskasten „Achtung", Fehlerfläche) nimmt `destructive`
-oder die Palette; dort bleibt der helle Wert stehen und bekommt eine
-`dark:`-Entsprechung:
+oder die Hinweis-Tokens (`notice`, `notice-line`, `notice-ink`); Palette-Klassen
+(`bg-amber-50`, `text-slate-700`) sind verboten, weil jede ihre eigene
+`dark:`-Kopie braucht — `tests/palette-klassen-wache.test.ts` meldet jede neue,
+der Bestand steht dort mit Grund und darf nur schrumpfen:
 
 ```tsx
-// ✅ GOOD — heller Wert unverändert, dunkler Wert ergänzt
-<div className="bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200">
+// ✅ GOOD — Token, folgt dem Thema von selbst
+<div className="rounded-lg border border-notice-line bg-notice text-notice-ink">
 ```
 
 Keine neuen Bedeutungs-Tokens erfinden, ohne zu fragen — das wäre ein neues
