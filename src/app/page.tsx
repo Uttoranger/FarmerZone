@@ -4,7 +4,7 @@ import { unstable_rethrow } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { Eye } from 'lucide-react'
 import { ladeOeffentlicheHoefe } from '@/server/queries/oeffentliche-hoefe'
-import { ladeStartseite } from '@/server/queries/startseite'
+import { ladeStartseite, ladeVorschauZeilen } from '@/server/queries/startseite'
 import { vorschauDieserAnfrage } from '@/server/startseite-vorschau'
 import { schonGemeldet } from '@/server/oeffentlich-lesen'
 import { waehleKartenHoefe, waehleStartseitenHoefe, type StartseitenHof, type StartseitenKarte } from '@/lib/startseite'
@@ -54,7 +54,8 @@ export const metadata: Metadata = {
 // Die Sitzung für die Kopfzeile liest KundeShellMitSitzung im Browser.
 // „Saison" des Brennmaterial-Bands, Beispielrechnung, Jahr im Fuß und der
 // Zeitraum der Blöcke (Admin › Startseite) gelten damit je Bau — höchstens
-// fünf Minuten alt; Speichern in Admin › Startseite baut sofort neu.
+// fünf Minuten alt; „Veröffentlichen“ in Admin › Startseite baut sofort neu
+// (Nr. 99: das Speichern des Entwurfs nie, eine geplante Fassung gilt ab ihrer Zeit).
 //
 // EINZIGE AUSNAHME: die Vorschau aus Admin › Startseite (Register N16). Nur
 // im Draft Mode — den schaltet „Vorschau öffnen" für den Browser des Admins
@@ -182,7 +183,8 @@ export default async function HomePage({
   // Liest die Anfrage nur im Draft Mode (vorschauDieserAnfrage) — sonst bliebe die Seite nicht statisch.
   const vorschau = await vorschauDieserAnfrage(searchParams, new Date())
   const jetzt = vorschau?.datum ?? new Date()
-  const eintraege = zuRendern(await ladeStartseite(), jetzt, {
+  // Die Vorschau zeigt ihre Quelle (Entwurf, Live zum Tag, eine Fassung; Nr. 99), sonst die Live-Fassung aus dem Cache.
+  const eintraege = zuRendern(vorschau ? await ladeVorschauZeilen(vorschau) : await ladeStartseite(), jetzt, {
     brennmaterialSaison: istBrennmaterialSaison(jetzt),
     blockEntwurfId: vorschau?.blockEntwurfId ?? null,
   })

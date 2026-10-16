@@ -6,6 +6,7 @@ import type { Prisma, StartseiteArt } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { verlangeAdminAktion } from '@/server/admin-wache'
 import { OEFFENTLICH_SICHTBAR } from '@/server/queries/farm'
+import { ladeEntwurfAdmin, leseEntwurf, leseFassung, leseQuelle, naechsterTermin, type AdminStartseitenZeile } from '@/server/queries/startseite'
 import { erzeugeVorschauAbfrage } from '@/server/startseite-vorschau'
 import { blobSpeicherAusSchluessel, istEigeneStartseitenBildUrl } from '@/lib/upload-pfade'
 import {
@@ -14,11 +15,13 @@ import {
   NEUER_BLOCK,
   REIHENFOLGE_FEHLER_TEXT,
   STARTSEITE_CACHE_TAG,
+  felderDerVorlage,
   pruefeReihenfolge,
   standText,
   standZeitpunkt,
   zeitpunktAusEingabe,
 } from '@/lib/startseite-gestalten'
+import { entwurfAusBlock, pruefeTermin, standardFassung, veroeffentlichtText } from '@/lib/startseite-fassung'
 import {
   EIGENE_STARTSEITE_SAETZE,
   STARTSEITE_SAETZE,
@@ -27,12 +30,27 @@ import {
   vorschauAnfrageSchema,
   type StartseitenBlockGeprueft,
 } from '@/schemas/startseite'
+import {
+  entwurfUebernehmenSchema,
+  fassungInhaltSchema,
+  fassungWahlSchema,
+  veroeffentlichenSchema,
+  type FassungInhalt,
+} from '@/schemas/startseite-fassung'
 
 /*
- * Admin › Startseite (Register N16, Nr. 96): speichern, Block löschen,
- * Vorschau-Link. Nur der Admin (frisch aus der Datenbank, verlangeAdminAktion);
- * Zod über jede Eingabe; was nur die Datenbank weiß (feste Abschnitte,
- * freigeschaltete Höfe, eigenes Bild), prüft der Server selbst.
+ * Admin › Startseite (Register N16, Nr. 96; Entwurf und Fassung seit Nr. 99):
+ * Entwurf speichern, Block löschen, Vorschau-Link, Veröffentlichen,
+ * Zurückziehen, Als Entwurf übernehmen. Nur der Admin (frisch aus der
+ * Datenbank, verlangeAdminAktion); Zod über jede Eingabe; was nur die
+ * Datenbank weiß (feste Abschnitte, freigeschaltete Höfe, eigenes Bild),
+ * prüft der Server selbst.
+ *
+ * LIVE-WIRKUNG hat nur „Veröffentlichen …“ (jetzt: updateTag + revalidatePath
+ * '/'). Entwurf speichern, Block löschen und Übernehmen ändern nur die
+ * Tabellen des Entwurfs und erneuern nur /admin/startseite — eine Wache in
+ * tests/startseite-aktion.test.ts hält das fest. Bilddateien löscht hier
+ * nichts: Ein Bild kann noch in einer Fassung stehen.
  */
 
 const SATZ = {
@@ -40,6 +58,12 @@ const SATZ = {
   hoefe: 'Wähle nur freigeschaltete Höfe.',
   bild: 'Dieses Bild konnten wir nicht übernehmen. Bitte lade es noch einmal hoch.',
   keinBlock: 'Es ist gerade kein Block geplant.',
+  keinTermin: 'Es ist gerade nichts geplant.',
+  vergangen: 'Dieser Zeitpunkt ist schon vorbei. Wähle einen späteren.',
+  zuWeit: 'So weit voraus geht es nicht – höchstens ein Jahr.',
+  entwurfKaputt: 'Der Entwurf lässt sich so nicht veröffentlichen. Lade die Seite neu und versuch es noch einmal.',
+  schonLive: 'Diese Fassung ist schon live oder zurückgezogen. Lade die Seite neu.',
+  keineFassung: 'Diese Fassung gibt es nicht mehr. Lade die Seite neu.',
 } as const
 
 /** Die Zod-Meldung, wenn sie ein eigener Satz ist — sonst ein fester Satz (sonst käme Zods englischer Text). */
@@ -47,39 +71,46 @@ function satzAus(meldung: string | undefined): string {
   return meldung !== undefined && EIGENE_STARTSEITE_SAETZE.has(meldung) ? meldung : STARTSEITE_SAETZE.ungueltig
 }
 
-/**
- * Nur die Felder, die zur Vorlage gehören: Höfe nur bei der Höfe-Auswahl,
- * die Kategorie nur beim Kategorie-Hinweis, das Bild nur bei der Saisonkarte,
- * das Hinweisband ist ein Satz (nur Titel und Link) — ein Wechsel der Vorlage
- * lässt keine unsichtbaren Reste stehen.
- */
+/** Die Felder eines Blocks, wie die Tabelle sie speichert — nur die der Vorlage (felderDerVorlage). */
 function blockDaten(b: StartseitenBlockGeprueft, liveAb: Date, liveBis: Date | null) {
+  const felder = felderDerVorlage(b)
   return {
-    vorlage: b.vorlage,
-    ueberzeile: b.vorlage === 'HINWEISBAND' ? null : b.ueberzeile,
-    titel: b.titel,
-    text: b.vorlage === 'HINWEISBAND' ? null : b.text,
-    bildUrl: b.vorlage === 'SAISONKARTE' ? b.bildUrl : null,
-    linkUrl: b.linkUrl,
-    linkText: b.linkUrl ? b.linkText : null,
-    farmIds: b.vorlage === 'HOEFE_AUSWAHL' ? b.farmIds : [],
-    kategorie: b.vorlage === 'KATEGORIE_HINWEIS' ? b.kategorie : null,
+    vorlage: felder.vorlage,
+    ueberzeile: felder.ueberzeile,
+    titel: felder.titel,
+    text: felder.text,
+    bildUrl: felder.bildUrl,
+    linkUrl: felder.linkUrl,
+    linkText: felder.linkText,
+    farmIds: felder.farmIds,
+    kategorie: felder.kategorie,
     liveAb,
     liveBis,
   } satisfies Prisma.StartseiteBlockUpdateInput
 }
 
+/** Nur die Seite von Admin › Startseite — nie die öffentliche Startseite. */
+function erneuereAdmin(): void {
+  revalidatePath(ADMIN_STARTSEITE_HREF)
+}
+
+export type EntwurfGespeichert = {
+  ok: true
+  blockId: string | null
+  /** Die Zeile eines neu angelegten Blocks — der Browser ersetzt damit `NEUER_BLOCK`. */
+  zeilenId: string | null
+  gespeichertAm: string
+}
+
 /**
- * Speichern = EINE Transaktion: Reihenfolge und Auge aller Abschnitte und
- * höchstens ein Block (neu oder geändert). Die Reihenfolge muss genau die
- * Zeilen der Datenbank enthalten (sonst hat jemand anderes inzwischen
- * gespeichert) und die Regeln der festen Abschnitte erfüllen
+ * Entwurf speichern = EINE Transaktion: Reihenfolge und Auge aller
+ * Abschnitte und höchstens ein Block (neu oder geändert). Die Reihenfolge
+ * muss genau die Zeilen der Datenbank enthalten (sonst hat jemand anderes
+ * inzwischen gespeichert) und die Regeln der festen Abschnitte erfüllen
  * (pruefeReihenfolge) — geprüft vor dem ersten Schreiben, ein Fehler ändert
- * nichts.
+ * nichts. Die öffentliche Startseite bleibt, wie sie ist.
  */
-export async function speichereStartseite(
-  eingabe: unknown
-): Promise<{ ok: true; blockId: string | null } | { error: string }> {
+export async function speichereEntwurf(eingabe: unknown): Promise<EntwurfGespeichert | { error: string }> {
   const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
 
@@ -107,7 +138,7 @@ export async function speichereStartseite(
   }
   const speicher = blobSpeicherAusSchluessel(process.env.BLOB_READ_WRITE_TOKEN)
 
-  const ergebnis = await prisma.$transaction(async (tx): Promise<{ ok: true; blockId: string | null } | { error: string }> => {
+  const ergebnis = await prisma.$transaction(async (tx): Promise<Omit<EntwurfGespeichert, 'gespeichertAm'> | { error: string }> => {
     const zeilen = await tx.startseiteAbschnitt.findMany({
       select: { id: true, art: true, blockId: true, block: { select: { bildUrl: true } } },
     })
@@ -126,6 +157,7 @@ export async function speichereStartseite(
     if (fehler) return { error: REIHENFOLGE_FEHLER_TEXT[fehler] }
 
     let blockId: string | null = block?.id ?? null
+    let zeilenId: string | null = null
     if (block && daten) {
       const bisher = block.id ? zeilen.find((z) => z.blockId === block.id) : undefined
       if (block.id && !bisher) return { error: SATZ.veraltet }
@@ -138,9 +170,11 @@ export async function speichereStartseite(
       } else {
         const neu = await tx.startseiteBlock.create({ data: { ...daten, erstelltVonUserId: guard.userId }, select: { id: true } })
         blockId = neu.id
-        await tx.startseiteAbschnitt.create({
+        const zeile = await tx.startseiteAbschnitt.create({
           data: { art: 'BLOCK', position: neuIndex, sichtbar: reihenfolge[neuIndex]?.sichtbar ?? true, blockId: neu.id },
+          select: { id: true },
         })
+        zeilenId = zeile.id
       }
     }
 
@@ -149,18 +183,19 @@ export async function speichereStartseite(
       if (r.id === NEUER_BLOCK) continue
       await tx.startseiteAbschnitt.update({ where: { id: r.id }, data: { position, sichtbar: r.sichtbar } })
     }
-    return { ok: true, blockId }
+    return { ok: true, blockId, zeilenId }
   })
 
   if ('error' in ergebnis) return ergebnis
-  // updateTag statt revalidateTag: In Next 16 verlangt revalidateTag ein Profil (wie Nr. 93/95).
-  updateTag(STARTSEITE_CACHE_TAG)
-  revalidatePath('/')
-  revalidatePath(ADMIN_STARTSEITE_HREF)
-  return ergebnis
+  erneuereAdmin()
+  return { ...ergebnis, gespeichertAm: new Date().toISOString() }
 }
 
-/** Einen Block löschen — seine Zeile in der Liste fällt mit (Cascade). Lücken in den Positionen stören nicht. */
+/**
+ * Einen Block aus dem Entwurf löschen — seine Zeile fällt mit (Cascade).
+ * Lücken in den Positionen stören nicht. Die öffentliche Startseite bleibt;
+ * steht der Block in einer Fassung, bleibt er dort samt Bild.
+ */
 export async function loescheStartseitenBlock(eingabe: unknown): Promise<{ ok: true } | { error: string }> {
   const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
@@ -169,15 +204,151 @@ export async function loescheStartseitenBlock(eingabe: unknown): Promise<{ ok: t
 
   const { count } = await prisma.startseiteBlock.deleteMany({ where: { id: geprueft.data.blockId } })
   if (count === 0) return { error: SATZ.veraltet }
-  updateTag(STARTSEITE_CACHE_TAG)
-  revalidatePath('/')
-  revalidatePath(ADMIN_STARTSEITE_HREF)
+  erneuereAdmin()
   return { ok: true }
 }
 
 /**
+ * „Veröffentlichen …": liest den Entwurf und schreibt daraus eine Fassung in
+ * EINER Transaktion — jetzt oder zu Datum und Uhrzeit in Wiener Zeit
+ * (zeitpunktAusEingabe: dieselbe Umrechnung und dieselbe Prüfung der
+ * Sommerzeit-Lücke wie beim Zeitraum eines Blocks). Ein Termin liegt höchstens
+ * eine Minute zurück und höchstens 365 Tage voraus. Wer veröffentlicht hat,
+ * steht in der Fassung.
+ *
+ * Jetzt: Datencache und Seite neu (updateTag + revalidatePath '/'). Termin:
+ * nur der Datencache — er trägt den Zeitpunkt der nächsten Planung
+ * (ladeStartseite), die Seite selbst ändert sich bis dahin nicht.
+ */
+export async function veroeffentlicheStartseite(
+  eingabe: unknown
+): Promise<{ ok: true; id: string; liveAb: string; text: string } | { error: string }> {
+  const guard = await verlangeAdminAktion()
+  if ('error' in guard) return { error: guard.error }
+  const geprueft = veroeffentlichenSchema.safeParse(eingabe)
+  if (!geprueft.success) return { error: STARTSEITE_SAETZE.ungueltig }
+
+  const jetzt = new Date()
+  let liveAb = jetzt
+  if (geprueft.data.wann === 'termin') {
+    const termin = zeitpunktAusEingabe(geprueft.data.datum, geprueft.data.uhrzeit)
+    if (!termin) return { error: STARTSEITE_SAETZE.umstellung }
+    const fehler = pruefeTermin(termin, jetzt)
+    if (fehler) return { error: fehler === 'vergangen' ? SATZ.vergangen : SATZ.zuWeit }
+    liveAb = termin
+  }
+
+  const fassung = await prisma.$transaction(async (tx) => {
+    const inhalt = fassungInhaltSchema.safeParse(await leseEntwurf(tx))
+    if (!inhalt.success) return null
+    return tx.startseiteFassung.create({
+      data: { inhalt: inhalt.data, liveAb, erstelltVonUserId: guard.userId },
+      select: { id: true },
+    })
+  })
+  if (!fassung) return { error: SATZ.entwurfKaputt }
+
+  // updateTag statt revalidateTag: In Next 16 verlangt revalidateTag ein Profil (wie Nr. 93/95).
+  updateTag(STARTSEITE_CACHE_TAG)
+  if (geprueft.data.wann === 'jetzt') revalidatePath('/')
+  erneuereAdmin()
+  const termin = geprueft.data.wann === 'termin' ? liveAb : null
+  return { ok: true, id: fassung.id, liveAb: liveAb.toISOString(), text: veroeffentlichtText(termin) }
+}
+
+/**
+ * Eine geplante Fassung zurückziehen — nur, solange ihre Zeit nicht erreicht
+ * ist. Die Bedingung steht in der WHERE-Klausel, nicht in einem if davor:
+ * Zwischen Prüfen und Schreiben könnte die Zeit sonst gerade erreicht sein.
+ * Der Datencache vergisst damit den Termin; live ändert sich nichts.
+ */
+export async function zieheFassungZurueck(eingabe: unknown): Promise<{ ok: true } | { error: string }> {
+  const guard = await verlangeAdminAktion()
+  if ('error' in guard) return { error: guard.error }
+  const geprueft = fassungWahlSchema.safeParse(eingabe)
+  if (!geprueft.success) return { error: STARTSEITE_SAETZE.ungueltig }
+
+  const jetzt = new Date()
+  const { count } = await prisma.startseiteFassung.updateMany({
+    where: { id: geprueft.data.id, liveAb: { gt: jetzt }, zurueckgezogenAm: null },
+    data: { zurueckgezogenAm: jetzt },
+  })
+  if (count === 0) return { error: SATZ.schonLive }
+  updateTag(STARTSEITE_CACHE_TAG)
+  erneuereAdmin()
+  return { ok: true }
+}
+
+/**
+ * „Als Entwurf übernehmen" (und „Entwurf verwerfen" = die Live-Fassung bzw.
+ * ohne Fassung `id: null`, die Standard-Reihenfolge): schreibt die Tabellen des
+ * Entwurfs aus der Fassung in EINER Transaktion. Blöcke behalten ihre
+ * Kennung (gleicher Block = keine Änderung gegenüber live); Blöcke des
+ * Entwurfs, die die Fassung nicht kennt, fallen weg (ihre Bilder bleiben).
+ * Live ändert sich nichts.
+ */
+export async function uebernehmeFassungAlsEntwurf(eingabe: unknown): Promise<{ ok: true; zeilen: AdminStartseitenZeile[] } | { error: string }> {
+  const guard = await verlangeAdminAktion()
+  if ('error' in guard) return { error: guard.error }
+  const geprueft = entwurfUebernehmenSchema.safeParse(eingabe)
+  if (!geprueft.success) return { error: STARTSEITE_SAETZE.ungueltig }
+
+  let inhalt: FassungInhalt = standardFassung()
+  if (geprueft.data.id !== null) {
+    const fassung = await prisma.startseiteFassung.findUnique({ where: { id: geprueft.data.id }, select: { id: true, inhalt: true } })
+    const gelesen = fassung && leseFassung(fassung.inhalt, fassung.id)
+    if (!gelesen) return { error: SATZ.keineFassung }
+    inhalt = gelesen
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const zeilen = await tx.startseiteAbschnitt.findMany({ select: { id: true, art: true, blockId: true } })
+    const behalten = new Set(inhalt.zeilen.flatMap((z) => (z.art === 'BLOCK' && z.block.id ? [z.block.id] : [])))
+    // Erst die Blöcke, die die Fassung nicht kennt (Cascade nimmt ihre Zeile mit).
+    await tx.startseiteBlock.deleteMany({ where: { id: { notIn: [...behalten] } } })
+    const vorhanden = new Set((await tx.startseiteBlock.findMany({ select: { id: true } })).map((b) => b.id))
+
+    // Nacheinander, nie Promise.all im Transaktions-Client (CODING_STANDARDS §4).
+    for (const [position, zeile] of inhalt.zeilen.entries()) {
+      if (zeile.art !== 'BLOCK') {
+        const abschnitt = zeilen.find((z) => z.art === zeile.art)
+        if (abschnitt) {
+          await tx.startseiteAbschnitt.update({ where: { id: abschnitt.id }, data: { position, sichtbar: zeile.sichtbar } })
+        } else {
+          await tx.startseiteAbschnitt.create({ data: { art: zeile.art, position, sichtbar: zeile.sichtbar } })
+        }
+        continue
+      }
+      const { id, ...felder } = entwurfAusBlock(zeile.block)
+      const daten = { ...felder, liveAb: new Date(felder.liveAb), liveBis: felder.liveBis ? new Date(felder.liveBis) : null }
+      let blockId = id
+      if (blockId && vorhanden.has(blockId)) {
+        await tx.startseiteBlock.update({ where: { id: blockId }, data: daten })
+      } else {
+        const neu = await tx.startseiteBlock.create({
+          data: { ...(blockId ? { id: blockId } : {}), ...daten, erstelltVonUserId: guard.userId },
+          select: { id: true },
+        })
+        blockId = neu.id
+      }
+      // Die Zeile des Blocks: vorhanden (gleicher Block) oder neu.
+      if (zeilen.some((z) => z.blockId === blockId)) {
+        await tx.startseiteAbschnitt.update({ where: { blockId }, data: { position, sichtbar: zeile.sichtbar } })
+      } else {
+        await tx.startseiteAbschnitt.create({ data: { art: 'BLOCK', position, sichtbar: zeile.sichtbar, blockId } })
+      }
+    }
+  })
+
+  erneuereAdmin()
+  // Die neue Liste gleich mit: Der Browser ersetzt damit seinen Entwurf (Admin › Startseite übernimmt Props sonst nicht).
+  return { ok: true, zeilen: await ladeEntwurfAdmin() }
+}
+
+/**
  * „So sieht's die Kundin" und „Vorschau öffnen": der signierte Link für den
- * gewählten Stand (heute, +1 Woche, nächster Block). Schaltet für den
+ * gewählten Stand (heute, +1 Woche, nächster Block, geplanter Termin) und die
+ * Quelle (Entwurf, Live oder eine Fassung des Zeitplans). Schaltet für den
  * Browser des Admins den Draft Mode ein — nur dann rendert die sonst
  * statische Startseite je Anfrage und liest den Link (src/app/page.tsx).
  * `pfad` lädt der Rahmen in diesem Browser; `link` führt über die Route, die
@@ -190,14 +361,31 @@ export async function erzeugeStartseitenVorschau(
   if ('error' in guard) return { error: guard.error }
   const geprueft = vorschauAnfrageSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: STARTSEITE_SAETZE.ungueltig }
+  const { stand, quelle, blockEntwurfId } = geprueft.data
 
   const jetzt = new Date()
-  const bloecke = geprueft.data.stand === 'block' ? await prisma.startseiteBlock.findMany({ select: { liveAb: true, liveBis: true } }) : []
-  const datum = standZeitpunkt(geprueft.data.stand, jetzt, bloecke)
-  if (!datum) return { error: SATZ.keinBlock }
+  let datum: Date | null = jetzt
+  if (stand === 'woche') datum = standZeitpunkt('woche', jetzt, [])
+  if (stand === 'block') {
+    const inhalt = await leseQuelle(quelle, jetzt)
+    const bloecke = inhalt.zeilen.flatMap((z) =>
+      z.art === 'BLOCK' ? [{ liveAb: new Date(z.block.liveAb), liveBis: z.block.liveBis ? new Date(z.block.liveBis) : null }] : []
+    )
+    datum = standZeitpunkt('block', jetzt, bloecke)
+    if (!datum) return { error: SATZ.keinBlock }
+  }
+  if (stand === 'termin') {
+    const fassung = quelle.startsWith('fassung:')
+      ? await prisma.startseiteFassung.findUnique({ where: { id: quelle.slice('fassung:'.length) }, select: { liveAb: true } })
+      : null
+    const termin = fassung ? fassung.liveAb : await naechsterTermin(jetzt)
+    datum = standZeitpunkt('termin', jetzt, [], termin && termin.getTime() > jetzt.getTime() ? termin : null)
+    if (!datum) return { error: SATZ.keinTermin }
+  }
+  if (!datum) return { error: STARTSEITE_SAETZE.ungueltig }
 
   ;(await draftMode()).enable()
-  const abfrage = erzeugeVorschauAbfrage({ datum, blockEntwurfId: geprueft.data.blockEntwurfId }, jetzt)
+  const abfrage = erzeugeVorschauAbfrage({ datum, blockEntwurfId, quelle }, jetzt)
   return { ok: true, pfad: `/?${abfrage}`, link: `${ADMIN_STARTSEITE_VORSCHAU_HREF}?${abfrage}`, stand: standText(datum) }
 }
 

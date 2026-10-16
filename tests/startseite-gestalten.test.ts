@@ -235,6 +235,12 @@ describe('standZeitpunkt', () => {
     // 28. Oktober 2026, 12:00 in Wien (Sommerzeit) → 4. November, 12:00 (Winterzeit).
     expect(standZeitpunkt('woche', new Date('2026-10-28T11:00:00Z'), [])?.toISOString()).toBe('2026-11-04T11:00:00.000Z')
   })
+
+  it('nimmt als „geplanter Termin“ den Termin der nächsten Fassung — ohne Planung keinen', () => {
+    const termin = new Date('2026-10-17T07:00:00Z')
+    expect(standZeitpunkt('termin', JETZT, [], termin)).toBe(termin)
+    expect(standZeitpunkt('termin', JETZT, [])).toBeNull()
+  })
 })
 
 describe('istRelativerLink', () => {
@@ -246,6 +252,11 @@ describe('istRelativerLink', () => {
     for (const link of ['//fremd.example', '/\\fremd.example', 'https://fremd.example', 'hoefe', '/ hoefe', 'javascript:alert(1)', `/${'a'.repeat(200)}`]) {
       expect(istRelativerLink(link), link).toBe(false)
     }
+  })
+
+  it('sperrt „//“ auch mitten im Link (Nr. 99, Nacharbeit 96)', () => {
+    for (const link of ['/hoefe//fremd.example', '/a/b//', '/hoefe?ziel=//fremd.example']) expect(istRelativerLink(link), link).toBe(false)
+    expect(istRelativerLink('/hoefe/a/b')).toBe(true)
   })
 })
 

@@ -1,223 +1,100 @@
 'use client'
 
-import { useId, useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
-import {
-  ChevronDown,
-  ChevronUp,
-  Eye,
-  EyeOff,
-  ImagePlus,
-  Info,
-  LayoutGrid,
-  Megaphone,
-  Plus,
-  Save,
-  Sprout,
-  Tag,
-  Trash2,
-  type LucideIcon,
-} from 'lucide-react'
+import { toast } from 'sonner'
+import { CalendarDays, ChevronDown, ChevronUp, Eye, EyeOff, Info, Plus, Send } from 'lucide-react'
 import type { StartseiteVorlage } from '@prisma/client'
 import {
-  ABSCHNITT_TEXT,
   ADMIN_STARTSEITE_TEXT as T,
   BLOCK_ZUSTAND_TEXT,
-  HOEFE_AUSWAHL_MAX,
-  LINK_TEXT_MAX,
   NEUER_BLOCK,
-  TEXT_MAX,
-  TITEL_MAX,
-  UEBERZEILE_MAX,
-  VORLAGEN,
-  VORLAGE_TEXT,
   blockZustand,
   darfVerschieben,
   istFest,
+  standZeitpunkt,
   verschiebe,
-  wienerEingabe,
-  zeitpunktAusEingabe,
-  zeitraumText,
-  type BlockZustand,
-  type StartseitenBlockDaten,
 } from '@/lib/startseite-gestalten'
-import { PRODUCT_CATEGORY_VALUES, KATEGORIE_LABEL, illustrationPfad } from '@/lib/taxonomie'
-import type { MarkeArt } from '@/lib/marke-art'
+import {
+  ENTWURF_TEXT as E,
+  VORLAGE_KURZ,
+  aenderungenText,
+  liveText,
+  standardFassung,
+  terminText,
+  zeilenMarken,
+} from '@/lib/startseite-fassung'
+import type { FassungInhalt, VeroeffentlichenEingabe } from '@/schemas/startseite-fassung'
 import { cn } from '@/lib/utils'
-import type { AdminStartseite, AdminStartseitenZeile } from '@/server/queries/startseite'
-import { loescheStartseitenBlock, speichereStartseite } from '@/server/actions/startseite'
-import { startseitenBlockSchema, type StartseitenBlockEingabe } from '@/schemas/startseite'
+import type { AdminStartseite } from '@/server/queries/startseite'
+import {
+  loescheStartseitenBlock,
+  speichereEntwurf,
+  uebernehmeFassungAlsEntwurf,
+  veroeffentlicheStartseite,
+  zieheFassungZurueck,
+} from '@/server/actions/startseite'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Marke } from '@/components/ui/marke'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Segment } from '@/components/ui/segment'
-import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
-import { useImageUpload } from '@/components/shared/image-upload'
-import { StartseitenBlock } from '@/components/startseite/bloecke/startseiten-block'
-import { KARTE, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE, FELD as FELD_BASIS, FELD_LABEL } from '@/components/hof-bestellungen/stil'
+import { useMindestbreite } from '@/lib/use-mindestbreite'
+import { KARTE, KNOPF_GRUEN, KNOPF_ORANGE_RAHMEN, KNOPF_RAHMEN, LEISE, TEXT_GRUEN } from '@/components/hof-bestellungen/stil'
 import { Seitenkopf } from './seitenkopf'
-import { StartseiteVorschau } from './startseite-vorschau'
+import { StartseiteVorschau, VorschauFenster } from './startseite-vorschau'
+import { BlockFormular, Bibliothek, UEBERSCHRIFT, VORLAGE_SYMBOL, ZUSTAND_MARKE, titelVon } from './startseite-block-formular'
+import { AenderungsListe, VeroeffentlichenDialog } from './startseite-veroeffentlichen'
+import { StartseiteZeitplan, type ZeitplanAktion } from './startseite-zeitplan'
+import {
+  blockWerteAus,
+  entwurfInhalt,
+  mitOffenemBlock,
+  neueBlockWerte,
+  useStartseitenEntwurf,
+  type SpeicherStand,
+  type Zeile,
+} from './startseite-entwurf'
 
 /*
- * Admin › Startseite (Register N16, Nr. 96; Mockups admin-startseite-gestalten
- * und admin-startseite-vorschau). Links die Abschnittsliste (Pfeile =
- * Reihenfolge, Auge = aus/ein, „Block einfügen"), rechts der Block in
- * Bearbeitung mit Vorschau-Kachel und die Vorlagen-Bibliothek. Der Umschalter
- * oben zeigt statt der Bearbeitung die echte Startseite (StartseiteVorschau).
+ * Admin › Startseite (Register N16, Nr. 96; seit Nr. 99 Entwurf und Fassung,
+ * Mockups admin-startseite-entwurf, -veroeffentlichen, -zeitplan und
+ * mobil-admin-startseite-entwurf). Seitenkopf mit Bearbeiten · Zeitplan ·
+ * Verlauf. Bearbeiten: oben die Statusleiste (Entwurf, Änderungen gegenüber
+ * live, gespeichert, Live und Geplant, „Entwurf verwerfen“, „Veröffentlichen
+ * …“), links die Abschnittsliste mit Marken je Zeile, rechts die Vorschau
+ * oder — solange ein Block offen ist — sein Formular. Am Handy die
+ * Statuskarte oben und unten eine feste Leiste Vorschau · Veröffentlichen …,
+ * Vorschau und Dialog als Blatt.
  *
- * Alles bleibt hier im Browser, bis „Speichern" Reihenfolge, Auge und den
- * Block in EINER Aktion schickt (speichereStartseite). Welche Bewegung erlaubt
- * ist, entscheidet dieselbe Regel wie am Server (darfVerschieben).
+ * Jede Änderung speichert sich nach kurzer Ruhe selbst in den Entwurf
+ * (useStartseitenEntwurf); die öffentliche Startseite ändert erst
+ * „Veröffentlichen …“. Welche Bewegung erlaubt ist, entscheidet dieselbe Regel
+ * wie am Server (darfVerschieben).
  */
 
-type Zeile = AdminStartseitenZeile
-
-/** Der Block im Formular — Felder als Text, wie sie in den Eingaben stehen. */
-type Entwurf = {
-  zeilenId: string
-  id?: string
-  vorlage: StartseiteVorlage
-  ueberzeile: string
-  titel: string
-  text: string
-  bildUrl: string
-  linkUrl: string
-  linkText: string
-  farmIds: string[]
-  kategorie: string
-  liveAbTag: string
-  liveAbUhrzeit: string
-  liveBisTag: string
-  liveBisUhrzeit: string
-}
-
-type Meldung = { art: 'ok' | 'fehler'; text: string } | null
-
-const UEBERSCHRIFT = 'font-heading text-lg font-semibold text-foreground'
-/** Eingaben mindestens 44 px hoch (Tippfläche). */
-const FELD = cn(FELD_BASIS, 'min-h-11')
 const SYMBOL_KNOPF = cn(
   'inline-flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[250ms] hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent',
   FOKUS_RAHMEN
 )
 
-const VORLAGE_SYMBOL: Record<StartseiteVorlage, LucideIcon> = {
-  SAISONKARTE: Sprout,
-  HINWEISBAND: Megaphone,
-  HOEFE_AUSWAHL: LayoutGrid,
-  KATEGORIE_HINWEIS: Tag,
-}
+type Ansicht = 'bearbeiten' | 'zeitplan' | 'verlauf'
 
-/** Mockup: „Live" orange, „Geplant" grün — als Bedeutung der Marke (Register G5). */
-const ZUSTAND_MARKE: Record<BlockZustand, MarkeArt> = { live: 'tun', geplant: 'laeuft', beendet: 'erledigt' }
-
-function neuerEntwurf(vorlage: StartseiteVorlage, jetzt: Date): Entwurf {
-  const { tag, uhrzeit } = wienerEingabe(jetzt)
-  return {
-    zeilenId: NEUER_BLOCK,
-    vorlage,
-    ueberzeile: '',
-    titel: '',
-    text: '',
-    bildUrl: '',
-    linkUrl: '',
-    linkText: '',
-    farmIds: [],
-    kategorie: '',
-    liveAbTag: tag,
-    liveAbUhrzeit: uhrzeit,
-    liveBisTag: '',
-    liveBisUhrzeit: '',
-  }
-}
-
-function entwurfAus(zeile: Zeile): Entwurf | null {
-  const b = zeile.block
-  if (!b) return null
-  const ab = wienerEingabe(new Date(b.liveAb))
-  const bis = b.liveBis ? wienerEingabe(new Date(b.liveBis)) : null
-  return {
-    zeilenId: zeile.id,
-    id: b.id,
-    vorlage: b.vorlage,
-    ueberzeile: b.ueberzeile ?? '',
-    titel: b.titel,
-    text: b.text ?? '',
-    bildUrl: b.bildUrl ?? '',
-    linkUrl: b.linkUrl ?? '',
-    linkText: b.linkText ?? '',
-    farmIds: b.farmIds,
-    kategorie: b.kategorie ?? '',
-    liveAbTag: ab.tag,
-    liveAbUhrzeit: ab.uhrzeit,
-    liveBisTag: bis?.tag ?? '',
-    liveBisUhrzeit: bis?.uhrzeit ?? '',
-  }
-}
-
-/** Der Entwurf als Eingabe des Schemas — leere Felder als null (CODING_STANDARDS §8). */
-function alsEingabe(e: Entwurf): StartseitenBlockEingabe {
-  return {
-    ...(e.id ? { id: e.id } : {}),
-    vorlage: e.vorlage,
-    ueberzeile: e.ueberzeile,
-    titel: e.titel,
-    text: e.text,
-    bildUrl: e.bildUrl === '' ? null : e.bildUrl,
-    linkUrl: e.linkUrl,
-    linkText: e.linkText,
-    farmIds: e.farmIds,
-    kategorie: e.kategorie === '' ? null : (e.kategorie as StartseitenBlockEingabe['kategorie']),
-    liveAbTag: e.liveAbTag,
-    liveAbUhrzeit: e.liveAbUhrzeit,
-    liveBisTag: e.liveBisTag === '' ? null : e.liveBisTag,
-    liveBisUhrzeit: e.liveBisTag === '' || e.liveBisUhrzeit === '' ? null : e.liveBisUhrzeit,
-  }
-}
-
-/** Der Entwurf so, wie die Seite einen Block bekommt — für die Vorschau-Kachel und die Liste. */
-function alsDaten(e: Entwurf, hofSlugs: readonly string[]): StartseitenBlockDaten & { farmIds: string[] } {
-  const ab = zeitpunktAusEingabe(e.liveAbTag, e.liveAbUhrzeit)
-  const bis = e.liveBisTag ? zeitpunktAusEingabe(e.liveBisTag, e.liveBisUhrzeit || '23:59') : null
-  return {
-    id: e.id ?? NEUER_BLOCK,
-    vorlage: e.vorlage,
-    ueberzeile: e.ueberzeile.trim() || null,
-    titel: e.titel.trim() || VORLAGE_TEXT[e.vorlage].titel,
-    text: e.text.trim() || null,
-    bildUrl: e.bildUrl || null,
-    linkUrl: e.linkUrl.trim() || null,
-    linkText: e.linkText.trim() || null,
-    hofSlugs: [...hofSlugs],
-    farmIds: e.farmIds,
-    kategorie: (e.kategorie || null) as StartseitenBlockDaten['kategorie'],
-    liveAb: (ab ?? new Date(0)).toISOString(),
-    liveBis: bis?.toISOString() ?? null,
-  }
-}
-
-function blockSatz(block: StartseitenBlockDaten, jetzt: Date): { zustand: BlockZustand; satz: string } {
-  const zeitraum = { liveAb: new Date(block.liveAb), liveBis: block.liveBis ? new Date(block.liveBis) : null }
-  const zustand = blockZustand(zeitraum, jetzt)
-  return { zustand, satz: `${BLOCK_ZUSTAND_TEXT[zustand]} · ${zeitraumText(zeitraum)} · ${VORLAGE_TEXT[block.vorlage].titel}` }
-}
-
-function titelVon(zeile: Zeile): string {
-  return zeile.art === 'BLOCK' ? (zeile.block?.titel ?? VORLAGE_TEXT.SAISONKARTE.titel) : ABSCHNITT_TEXT[zeile.art].titel
+/** Der Schlüssel einer Zeile der Liste — derselbe wie im Vergleich (zeilenSchluessel). */
+function schluesselVon(zeile: Zeile): string {
+  return zeile.art === 'BLOCK' ? `block:${zeile.block?.id ?? NEUER_BLOCK}` : zeile.art
 }
 
 // ─── Die Liste ──────────────────────────────────────────────────────────────
 
 function EinfuegePunkt({ onEinfuegen, gesperrt }: { onEinfuegen: () => void; gesperrt: boolean }): React.JSX.Element {
   return (
-    <li className="border-t border-dashed border-border">
+    <li className="border-t border-border">
       <button
         type="button"
         onClick={onEinfuegen}
         disabled={gesperrt}
         className={cn(
-          'flex min-h-11 w-full items-center gap-2 px-3.5 text-[13px] font-semibold text-status-fertig transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50',
+          'flex min-h-11 w-full items-center gap-2 px-4 text-[13.5px] font-semibold text-status-fertig transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50',
           FOKUS_RAHMEN
         )}
       >
@@ -234,7 +111,7 @@ function ListenZeile({
   zeilen,
   jetzt,
   aktiv,
-  kompakt,
+  marke,
   onVerschieben,
   onAuge,
   onWaehlen,
@@ -244,20 +121,21 @@ function ListenZeile({
   zeilen: readonly Zeile[]
   jetzt: Date
   aktiv: boolean
-  kompakt: boolean
+  marke: { text: string; ton: 'tun' | 'laeuft' } | undefined
   onVerschieben: (richtung: -1 | 1) => void
   onAuge: () => void
   onWaehlen: () => void
 }): React.JSX.Element {
   const fest = istFest(zeile.art)
-  const titel = titelVon(zeile)
   const block = zeile.art === 'BLOCK' ? zeile.block : null
-  const info = block ? blockSatz(block, jetzt) : null
-  const satz = info?.satz ?? (zeile.art === 'BLOCK' ? '' : ABSCHNITT_TEXT[zeile.art].satz)
+  const titel = titelVon(zeile)
+  const anzeige = block ? `${VORLAGE_KURZ[block.vorlage]} · ${block.titel}` : titel
+  const zustand = block ? blockZustand({ liveAb: new Date(block.liveAb), liveBis: block.liveBis ? new Date(block.liveBis) : null }, jetzt) : null
   const Symbol = block ? VORLAGE_SYMBOL[block.vorlage] : null
+  const titelKlasse = cn('block w-full truncate text-[14px] font-semibold', zeile.sichtbar ? 'text-foreground' : 'text-muted-foreground line-through')
 
   return (
-    <li className={cn('flex items-center gap-1 border-t border-border px-1.5 py-1', aktiv && 'bg-muted')}>
+    <li className={cn('flex min-h-11 items-center gap-1 border-t border-border px-1.5 py-0.5', aktiv && 'bg-accent/12')}>
       {fest ? (
         <span className="w-[88px] shrink-0" aria-hidden="true" />
       ) : (
@@ -270,29 +148,36 @@ function ListenZeile({
           </button>
         </span>
       )}
-      {Symbol && <Symbol className="mr-1 size-4 shrink-0 text-status-fertig" strokeWidth={1.8} aria-hidden="true" />}
+      {Symbol && <Symbol className="mr-1 hidden size-4 shrink-0 text-status-fertig sm:block" strokeWidth={1.8} aria-hidden="true" />}
       {block ? (
         <button
           type="button"
           onClick={onWaehlen}
           aria-current={aktiv ? 'true' : undefined}
-          className={cn('group flex min-h-11 min-w-0 flex-1 flex-col justify-center rounded-lg py-1.5 text-left', !zeile.sichtbar && 'opacity-55', FOKUS_RAHMEN)}
+          className={cn('group flex min-h-11 min-w-0 flex-1 flex-col justify-center rounded-lg text-left', FOKUS_RAHMEN)}
         >
-          <span className="block w-full truncate text-[14px] font-semibold text-foreground group-hover:underline">{titel}</span>
-          {!kompakt && satz && <span className={cn('block w-full truncate text-[12px]', LEISE)}>{satz}</span>}
+          <span className={cn(titelKlasse, 'group-hover:underline')}>{anzeige}</span>
         </button>
       ) : (
-        <span className={cn('min-w-0 flex-1 py-1.5', !zeile.sichtbar && 'opacity-55')}>
-          <span className="block truncate text-[14px] font-semibold text-foreground">{titel}</span>
-          {!kompakt && satz && <span className={cn('block truncate text-[12px]', LEISE)}>{satz}</span>}
+        <span className="min-w-0 flex-1 py-1.5">
+          <span className={titelKlasse}>{anzeige}</span>
         </span>
       )}
       <span className="flex shrink-0 items-center gap-1.5">
         {fest && <StatusBadge status="neutral">{T.fest}</StatusBadge>}
         {zeile.art === 'BRENNMATERIAL' && <StatusBadge status="neutral">{T.automatik}</StatusBadge>}
-        {info && <Marke art={ZUSTAND_MARKE[info.zustand]}>{BLOCK_ZUSTAND_TEXT[info.zustand]}</Marke>}
+        {marke ? (
+          <Marke art={marke.ton}>{marke.text}</Marke>
+        ) : (
+          zustand && <Marke art={ZUSTAND_MARKE[zustand]}>{BLOCK_ZUSTAND_TEXT[zustand]}</Marke>
+        )}
         {!fest && (
-          <button type="button" className={SYMBOL_KNOPF} aria-label={zeile.sichtbar ? `„${titel}“ ausblenden` : `„${titel}“ einblenden`} onClick={onAuge}>
+          <button
+            type="button"
+            className={cn(SYMBOL_KNOPF, !zeile.sichtbar && 'text-status-offen')}
+            aria-label={zeile.sichtbar ? `„${titel}“ ausblenden` : `„${titel}“ einblenden`}
+            onClick={onAuge}
+          >
             {zeile.sichtbar ? <Eye className="size-4" strokeWidth={1.8} aria-hidden="true" /> : <EyeOff className="size-4" strokeWidth={1.8} aria-hidden="true" />}
           </button>
         )}
@@ -305,7 +190,7 @@ function AbschnittsListe({
   zeilen,
   jetzt,
   aktivId,
-  kompakt,
+  marken,
   onZeilen,
   onWaehlen,
   onEinfuegen,
@@ -313,7 +198,7 @@ function AbschnittsListe({
   zeilen: readonly Zeile[]
   jetzt: Date
   aktivId: string | null
-  kompakt: boolean
+  marken: ReturnType<typeof zeilenMarken>
   onZeilen: (zeilen: Zeile[]) => void
   onWaehlen: (zeile: Zeile) => void
   onEinfuegen: (nachIndex: number) => void
@@ -323,7 +208,7 @@ function AbschnittsListe({
   const fussIndex = zeilen.findIndex((z) => z.art === 'FUSS')
   return (
     <section aria-labelledby="abschnitte-titel" className={cn(KARTE, 'overflow-hidden')}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3.5 py-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
         <h2 id="abschnitte-titel" className={UEBERSCHRIFT}>
           {T.liste}
         </h2>
@@ -332,14 +217,14 @@ function AbschnittsListe({
       </div>
       <ul>
         {zeilen.map((zeile, index) => (
-          <ListenZeileMitPunkt
+          <ListenEintrag
             key={zeile.id}
             zeile={zeile}
             index={index}
             zeilen={zeilen}
             jetzt={jetzt}
             aktiv={zeile.id === aktivId}
-            kompakt={kompakt}
+            marke={marken.get(schluesselVon(zeile))}
             punktDanach={index === hoefeIndex || index === fussIndex - 1}
             gesperrt={hatNeuen}
             onZeilen={onZeilen}
@@ -352,7 +237,7 @@ function AbschnittsListe({
   )
 }
 
-function ListenZeileMitPunkt({
+function ListenEintrag({
   zeile,
   index,
   zeilen,
@@ -368,7 +253,7 @@ function ListenZeileMitPunkt({
   zeilen: readonly Zeile[]
   jetzt: Date
   aktiv: boolean
-  kompakt: boolean
+  marke: { text: string; ton: 'tun' | 'laeuft' } | undefined
   punktDanach: boolean
   gesperrt: boolean
   onZeilen: (zeilen: Zeile[]) => void
@@ -391,404 +276,235 @@ function ListenZeileMitPunkt({
   )
 }
 
-// ─── Das Formular ───────────────────────────────────────────────────────────
+// ─── Status ─────────────────────────────────────────────────────────────────
 
-function Feld({
-  label,
-  id,
-  laenge,
-  max,
-  hinweis,
-  children,
-}: {
-  label: string
-  id: string
-  laenge?: number
-  max?: number
-  hinweis?: string
-  children: React.ReactNode
-}): React.JSX.Element {
+function SpeicherZeile({ stand }: { stand: SpeicherStand }): React.JSX.Element | null {
+  if (stand.art === 'ruhe') return null
+  if (stand.art === 'fehler') {
+    return (
+      <span role="alert" className="text-[12.5px] font-medium text-destructive">
+        {stand.text}
+      </span>
+    )
+  }
   return (
-    <div className="flex min-w-0 flex-col">
-      <div className="flex items-baseline justify-between gap-2">
-        <label htmlFor={id} className={FELD_LABEL}>
-          {label}
-        </label>
-        {laenge !== undefined && max !== undefined && (
-          <span className={cn('text-[12px] tabular-nums', LEISE)} aria-hidden="true">
-            {laenge}/{max}
-          </span>
+    <span role="status" className={cn('text-[12.5px]', LEISE)}>
+      {stand.art === 'speichert' ? `· ${E.speichert}` : `· gespeichert ${stand.um}`}
+    </span>
+  )
+}
+
+function LiveUndGeplant({ daten, untereinander }: { daten: AdminStartseite; untereinander: boolean }): React.JSX.Element {
+  const geplant = daten.geplant[0]
+  return (
+    <span className={cn('flex text-[13px]', untereinander ? 'flex-col gap-0.5' : 'flex-wrap items-center gap-x-4 gap-y-1', LEISE)}>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="size-2 shrink-0 rounded-full bg-status-fertig" aria-hidden="true" />
+        <b className="font-semibold text-foreground">{E.live}:</b> {liveText(daten.live?.liveAb ?? null)}
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <CalendarDays className="size-3.5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+        {geplant ? (
+          <>
+            <b className="font-semibold text-foreground">{E.geplant}:</b> {terminText(new Date(geplant.liveAb))}
+            {daten.geplant.length > 1 ? ` (+${daten.geplant.length - 1})` : ''}
+          </>
+        ) : (
+          E.nichtsGeplant
         )}
-      </div>
-      {children}
-      {laenge !== undefined && max !== undefined && <ZeichenZaehler laenge={laenge} max={max} />}
-      {hinweis && <p className={cn('mt-1 text-[12px]', LEISE)}>{hinweis}</p>}
-    </div>
+      </span>
+    </span>
   )
 }
 
-function BildFeld({ wert, onWert }: { wert: string; onWert: (url: string) => void }): React.JSX.Element {
-  const hochladen = useImageUpload({ variant: 'startseite', onUploaded: (url) => onWert(url) })
+function VerwerfenFrage({ laeuft, onJa, onNein }: { laeuft: boolean; onJa: () => void; onNein: () => void }): React.JSX.Element {
   return (
-    <div className="flex min-w-0 flex-col">
-      <span className={FELD_LABEL}>Bild</span>
-      <div className="flex items-center gap-2.5">
-        {wert && (
-          <span className="relative size-11 shrink-0 overflow-hidden rounded-lg bg-muted">
-            <Image src={wert} alt="" fill sizes="44px" className="object-cover" />
-          </span>
-        )}
-        <button type="button" onClick={hochladen.openFilePicker} disabled={hochladen.isUploading} className={cn(KNOPF_RAHMEN, 'px-3.5')}>
-          <ImagePlus className="size-4" strokeWidth={1.8} aria-hidden="true" />
-          {hochladen.isUploading ? 'Lädt …' : wert ? 'Anderes Bild' : 'Bild wählen'}
-        </button>
-        {wert && !hochladen.isUploading && (
-          <button type="button" onClick={() => onWert('')} className={cn(KNOPF_RAHMEN, 'px-3.5')}>
-            Entfernen
-          </button>
-        )}
-      </div>
-      {hochladen.fileInput}
-      <p className={cn('mt-1 text-[12px]', LEISE)}>{T.bildHinweis}</p>
-    </div>
-  )
-}
-
-function BlockFormular({
-  entwurf,
-  zeilen,
-  daten,
-  jetzt,
-  meldung,
-  pending,
-  onEntwurf,
-  onSpeichern,
-  onLoeschen,
-}: {
-  entwurf: Entwurf
-  zeilen: readonly Zeile[]
-  daten: AdminStartseite
-  jetzt: Date
-  meldung: Meldung
-  pending: boolean
-  onEntwurf: (e: Entwurf) => void
-  onSpeichern: () => void
-  onLoeschen: () => void
-}): React.JSX.Element {
-  const id = useId()
-  const setze = (teil: Partial<Entwurf>) => onEntwurf({ ...entwurf, ...teil })
-  const index = zeilen.findIndex((z) => z.id === entwurf.zeilenId)
-  const davor = index > 0 ? titelVon(zeilen[index - 1]) : null
-  const hofSlugs = entwurf.farmIds.flatMap((farmId) => daten.hoefe.find((h) => h.id === farmId)?.hof.slug ?? [])
-  const block = alsDaten(entwurf, hofSlugs)
-  const zeitraum = { liveAb: new Date(block.liveAb), liveBis: block.liveBis ? new Date(block.liveBis) : null }
-  const zustand = blockZustand(zeitraum, jetzt)
-  const hinweisband = entwurf.vorlage === 'HINWEISBAND'
-  const gewaehlteHoefe = entwurf.farmIds.flatMap((farmId) => daten.hoefe.find((h) => h.id === farmId)?.hof ?? [])
-
-  return (
-    <section aria-labelledby={`${id}-titel`} className={cn(KARTE, 'flex flex-col gap-3.5 px-[18px] py-4')}>
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-        <h2 id={`${id}-titel`} className={UEBERSCHRIFT}>
-          {entwurf.id ? T.blockBearbeiten : T.blockNeu}
-        </h2>
-        <Marke art={ZUSTAND_MARKE[zustand]}>{BLOCK_ZUSTAND_TEXT[zustand]}</Marke>
-        <span className="flex-1" />
-        <span className={cn('text-[12.5px]', LEISE)}>
-          {VORLAGE_TEXT[entwurf.vorlage].titel}
-          {davor ? ` · nach „${davor}“` : ''}
-        </span>
-      </div>
-
-      <Segment
-        beschriftung="Vorlage"
-        optionen={VORLAGEN.map((v) => ({ wert: v, label: VORLAGE_TEXT[v].titel }))}
-        wert={entwurf.vorlage}
-        onWertChange={(v) => setze({ vorlage: v as StartseiteVorlage })}
-        className="flex-wrap rounded-2xl"
-      />
-
-      {!hinweisband && (
-        <Feld label="Überzeile (freiwillig)" id={`${id}-ueberzeile`} laenge={entwurf.ueberzeile.length} max={UEBERZEILE_MAX}>
-          <input id={`${id}-ueberzeile`} className={FELD} value={entwurf.ueberzeile} onChange={(e) => setze({ ueberzeile: e.target.value })} />
-        </Feld>
-      )}
-      <Feld label={hinweisband ? 'Satz' : 'Titel'} id={`${id}-titel-feld`} laenge={entwurf.titel.length} max={TITEL_MAX}>
-        <input id={`${id}-titel-feld`} className={FELD} value={entwurf.titel} onChange={(e) => setze({ titel: e.target.value })} />
-      </Feld>
-      {!hinweisband && (
-        <Feld label="Text (freiwillig)" id={`${id}-text`} laenge={entwurf.text.length} max={TEXT_MAX}>
-          <textarea id={`${id}-text`} rows={2} className={cn(FELD, 'resize-y')} value={entwurf.text} onChange={(e) => setze({ text: e.target.value })} />
-        </Feld>
-      )}
-
-      {entwurf.vorlage === 'SAISONKARTE' && <BildFeld wert={entwurf.bildUrl} onWert={(url) => setze({ bildUrl: url })} />}
-
-      {entwurf.vorlage === 'HOEFE_AUSWAHL' && (
-        <fieldset className="flex min-w-0 flex-col gap-1">
-          <legend className={FELD_LABEL}>Höfe</legend>
-          <ul className="grid max-h-56 gap-1 overflow-y-auto sm:grid-cols-2">
-            {daten.hoefe.map(({ id: farmId, hof }) => {
-              const gewaehlt = entwurf.farmIds.includes(farmId)
-              const voll = !gewaehlt && entwurf.farmIds.length >= HOEFE_AUSWAHL_MAX
-              return (
-                <li key={farmId}>
-                  <label className={cn('flex min-h-11 items-center gap-2.5 rounded-lg px-2 text-[14px]', voll ? 'opacity-50' : 'hover:bg-muted')}>
-                    <input
-                      type="checkbox"
-                      className="size-4 accent-accent"
-                      checked={gewaehlt}
-                      disabled={voll}
-                      onChange={() => setze({ farmIds: gewaehlt ? entwurf.farmIds.filter((f) => f !== farmId) : [...entwurf.farmIds, farmId] })}
-                    />
-                    <span className="min-w-0 truncate">{hof.name}</span>
-                    <span className={cn('ml-auto shrink-0 text-[12px]', LEISE)}>{hof.ort}</span>
-                  </label>
-                </li>
-              )
-            })}
-          </ul>
-          <p className={cn('text-[12px]', LEISE)}>{T.hoefeHinweis}</p>
-        </fieldset>
-      )}
-
-      {entwurf.vorlage === 'KATEGORIE_HINWEIS' && (
-        <Feld label="Kategorie" id={`${id}-kategorie`}>
-          <select id={`${id}-kategorie`} className={cn(FELD, 'min-h-11')} value={entwurf.kategorie} onChange={(e) => setze({ kategorie: e.target.value })}>
-            <option value="">Bitte wählen</option>
-            {PRODUCT_CATEGORY_VALUES.map((k) => (
-              <option key={k} value={k}>
-                {KATEGORIE_LABEL[k]}
-              </option>
-            ))}
-          </select>
-        </Feld>
-      )}
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Feld label="Link-Ziel (freiwillig)" id={`${id}-link`} hinweis="Beginnt mit „/“, etwa /hoefe">
-          <input id={`${id}-link`} className={FELD} value={entwurf.linkUrl} placeholder="/hoefe" onChange={(e) => setze({ linkUrl: e.target.value })} />
-        </Feld>
-        <Feld label="Linktext (freiwillig)" id={`${id}-linktext`} laenge={entwurf.linkText.length} max={LINK_TEXT_MAX}>
-          <input id={`${id}-linktext`} className={FELD} value={entwurf.linkText} onChange={(e) => setze({ linkText: e.target.value })} />
-        </Feld>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <fieldset className="flex min-w-0 flex-col">
-          <legend className={FELD_LABEL}>Live ab</legend>
-          <div className="flex gap-2">
-            <input type="date" aria-label="Live ab, Tag" className={FELD} value={entwurf.liveAbTag} onChange={(e) => setze({ liveAbTag: e.target.value })} />
-            <input type="time" aria-label="Live ab, Uhrzeit" className={cn(FELD, 'w-[9rem] shrink-0')} value={entwurf.liveAbUhrzeit} onChange={(e) => setze({ liveAbUhrzeit: e.target.value })} />
-          </div>
-        </fieldset>
-        <fieldset className="flex min-w-0 flex-col">
-          <legend className={FELD_LABEL}>Live bis (freiwillig)</legend>
-          <div className="flex gap-2">
-            <input type="date" aria-label="Live bis, Tag" className={FELD} value={entwurf.liveBisTag} onChange={(e) => setze({ liveBisTag: e.target.value })} />
-            <input type="time" aria-label="Live bis, Uhrzeit" className={cn(FELD, 'w-[9rem] shrink-0')} value={entwurf.liveBisUhrzeit} placeholder="23:59" onChange={(e) => setze({ liveBisUhrzeit: e.target.value })} />
-          </div>
-        </fieldset>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase">{T.vorschauKachel}</span>
-        <div className="pointer-events-none max-h-[360px] overflow-hidden rounded-2xl border border-border bg-background" inert>
-          <StartseitenBlock
-            block={block}
-            hoefe={gewaehlteHoefe}
-            kategorieBild={block.kategorie ? illustrationPfad(block.kategorie) : null}
-          />
-        </div>
-      </div>
-
-      <p className={cn('text-[12px] leading-normal', LEISE)}>{T.regel}</p>
-      <Rueckmeldung meldung={meldung} />
-      <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" className={KNOPF_RAHMEN} disabled={pending} onClick={onLoeschen}>
-          {entwurf.id && <Trash2 className="size-4" strokeWidth={1.8} aria-hidden="true" />}
-          {entwurf.id ? 'Löschen' : 'Verwerfen'}
-        </button>
-        <button type="button" className={KNOPF_GRUEN} disabled={pending} onClick={onSpeichern}>
-          <Save className="size-4" strokeWidth={1.8} aria-hidden="true" />
-          Speichern
-        </button>
-      </div>
-    </section>
-  )
-}
-
-function Rueckmeldung({ meldung }: { meldung: Meldung }): React.JSX.Element | null {
-  if (!meldung) return null
-  return (
-    <p role={meldung.art === 'fehler' ? 'alert' : 'status'} className={cn('text-[13px]', meldung.art === 'fehler' ? 'font-medium text-destructive' : LEISE)}>
-      {meldung.text}
-    </p>
-  )
-}
-
-function Bibliothek({ onVorlage }: { onVorlage: (v: StartseiteVorlage) => void }): React.JSX.Element {
-  return (
-    <section aria-labelledby="vorlagen-titel" className={cn(KARTE, 'flex flex-col gap-2 px-4 py-3.5')}>
-      <h2 id="vorlagen-titel" className={UEBERSCHRIFT}>
-        {T.bibliothek}
-      </h2>
-      <ul className="flex flex-col gap-2">
-        {VORLAGEN.map((v) => {
-          const Symbol = VORLAGE_SYMBOL[v]
-          return (
-            <li key={v}>
-              <button
-                type="button"
-                onClick={() => onVorlage(v)}
-                className={cn('flex min-h-11 w-full items-center gap-2.5 rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-left transition-colors hover:bg-muted', FOKUS_RAHMEN)}
-              >
-                <span className="inline-flex size-[34px] shrink-0 items-center justify-center rounded-[9px] bg-accent/14 text-status-fertig">
-                  <Symbol className="size-4" strokeWidth={1.8} aria-hidden="true" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-[13.5px] font-semibold text-foreground">{VORLAGE_TEXT[v].titel}</span>
-                  <span className={cn('block text-[12px]', LEISE)}>{VORLAGE_TEXT[v].satz}</span>
-                </span>
-                <Plus className="ml-auto size-4 shrink-0 text-status-fertig" strokeWidth={1.8} aria-hidden="true" />
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-      <p className={cn('mt-0.5 text-[12px]', LEISE)}>{T.bibliothekRegel}</p>
-    </section>
+    <span role="group" aria-label={E.verwerfenFrage} className="flex flex-wrap items-center gap-2">
+      <span className="text-[13px] font-medium text-foreground">{E.verwerfenFrage}</span>
+      <button type="button" className={KNOPF_ORANGE_RAHMEN} disabled={laeuft} onClick={onJa}>
+        {E.verwerfen}
+      </button>
+      <button type="button" className={KNOPF_RAHMEN} disabled={laeuft} onClick={onNein}>
+        {E.abbrechen}
+      </button>
+    </span>
   )
 }
 
 // ─── Die Seite ──────────────────────────────────────────────────────────────
 
-type Ansicht = 'bearbeiten' | 'kundin'
-
 export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminStartseite; jetzt: string }): React.JSX.Element {
   const router = useRouter()
   const jetzt = new Date(jetztText)
-  const [basis, setBasis] = useState(daten)
-  // Der Stand als Text: Next liefert die Seite auch ohne Änderung neu (etwa
-  // nachdem „Vorschau öffnen" den Draft-Mode-Cookie gesetzt hat) — dann bleibt
-  // alles offen, wie es ist. Nur ein anderer Stand ersetzt die Liste.
-  const stand = JSON.stringify(daten.zeilen)
-  const [basisStand, setBasisStand] = useState(stand)
-  const [zeilen, setZeilen] = useState<Zeile[]>(daten.zeilen)
-  const [entwurf, setEntwurf] = useState<Entwurf | null>(null)
-  const [nachLaden, setNachLaden] = useState<string | null>(null)
-  const [geaendert, setGeaendert] = useState(false)
+  const breit = useMindestbreite(1024)
+  const liveInhalt: FassungInhalt = daten.live?.inhalt ?? standardFassung()
+  const entwurf = useStartseitenEntwurf({ start: daten.zeilen, live: liveInhalt, speichere: speichereEntwurf })
   const [ansicht, setAnsicht] = useState<Ansicht>('bearbeiten')
-  const [meldung, setMeldung] = useState<Meldung>(null)
-  const [pending, startTransition] = useTransition()
+  const [dialog, setDialog] = useState(false)
+  const [dialogFehler, setDialogFehler] = useState<string | null>(null)
+  const [vorschauOffen, setVorschauOffen] = useState(false)
+  const [fassungVorschau, setFassungVorschau] = useState<Extract<ZeitplanAktion, { art: 'vorschau' }> | { art: 'ansehen-live' } | null>(null)
+  const [verwerfen, setVerwerfen] = useState(false)
+  const [aktionFehler, setAktionFehler] = useState<string | null>(null)
+  const [laeuft, startTransition] = useTransition()
 
-  // Neue Daten vom Server (nach dem Speichern): Liste übernehmen, den gespeicherten Block wieder öffnen.
-  if (basisStand !== stand) {
-    setBasisStand(stand)
-    setBasis(daten)
-    setZeilen(daten.zeilen)
-    setGeaendert(false)
-    const wieder = nachLaden ? daten.zeilen.find((z) => z.block?.id === nachLaden) : undefined
-    setEntwurf(wieder ? entwurfAus(wieder) : null)
-    setNachLaden(null)
+  const angezeigt = mitOffenemBlock(entwurf.zeilen, entwurf.block)
+  const inhalt = entwurfInhalt(angezeigt)
+  const anzahl = entwurf.aenderungen.length
+  const marken = zeilenMarken(entwurf.aenderungen)
+  const blockOffen = entwurf.block
+  const blockFehler = entwurf.stand.art === 'fehler' && blockOffen ? entwurf.stand.text : null
+
+  const bloeckeEntwurf = angezeigt.flatMap((z) => (z.block ? [{ liveAb: new Date(z.block.liveAb), liveBis: z.block.liveBis ? new Date(z.block.liveBis) : null }] : []))
+  const bloeckeLive = liveInhalt.zeilen.flatMap((z) =>
+    z.art === 'BLOCK' ? [{ liveAb: new Date(z.block.liveAb), liveBis: z.block.liveBis ? new Date(z.block.liveBis) : null }] : []
+  )
+  const blockMoeglich = {
+    entwurf: standZeitpunkt('block', jetzt, bloeckeEntwurf) !== null,
+    live: standZeitpunkt('block', jetzt, bloeckeLive) !== null,
   }
+  const termin = daten.geplant[0]?.liveAb ?? null
 
-  function aendereZeilen(neu: Zeile[]) {
-    setZeilen(neu)
-    setGeaendert(true)
-    setMeldung(null)
+  /** Was gerade wartet, erst in den Entwurf — dann `weiter` (Block wechseln, schließen, veröffentlichen). */
+  function nachSpeichern(weiter: () => void): void {
+    void entwurf.speichereSofort().then((ok) => {
+      if (ok) weiter()
+    })
   }
 
   function oeffne(zeile: Zeile) {
-    if (zeile.id === NEUER_BLOCK) return
-    setEntwurf(entwurfAus(zeile))
-    setMeldung(null)
+    if (zeile.id === NEUER_BLOCK || zeile.id === entwurf.block?.zeilenId) return
+    nachSpeichern(() => entwurf.oeffneBlock(blockWerteAus(zeile)))
   }
 
-  /** Ein neuer Block nach der Zeile `nachIndex` (Standard: nach „Höfe in deiner Nähe"). */
+  /** Ein neuer Block nach der Zeile `nachIndex` (Standard: nach „Höfe in deiner Nähe"). Gespeichert wird er mit der ersten Eingabe. */
   function fuegeEin(nachIndex: number, vorlage: StartseiteVorlage = 'SAISONKARTE') {
-    if (zeilen.some((z) => z.id === NEUER_BLOCK)) return
-    const neu: Zeile = { id: NEUER_BLOCK, art: 'BLOCK', sichtbar: true, block: null }
-    aendereZeilen([...zeilen.slice(0, nachIndex + 1), neu, ...zeilen.slice(nachIndex + 1)])
-    setEntwurf(neuerEntwurf(vorlage, jetzt))
+    if (entwurf.zeilen.some((z) => z.id === NEUER_BLOCK)) return
+    nachSpeichern(() => {
+      const neu: Zeile = { id: NEUER_BLOCK, art: 'BLOCK', sichtbar: true, block: null }
+      const zeilen = entwurf.zeilen
+      entwurf.oeffneBlock(neueBlockWerte(vorlage, jetzt), [...zeilen.slice(0, nachIndex + 1), neu, ...zeilen.slice(nachIndex + 1)])
+    })
   }
 
   function waehleVorlage(vorlage: StartseiteVorlage) {
-    if (entwurf) {
-      setEntwurf({ ...entwurf, vorlage })
-      setGeaendert(true)
+    if (entwurf.block) {
+      entwurf.aendereBlock({ ...entwurf.block, vorlage })
       return
     }
-    fuegeEin(zeilen.findIndex((z) => z.art === 'HOEFE'), vorlage)
-  }
-
-  function aendereEntwurf(neu: Entwurf) {
-    setEntwurf(neu)
-    setGeaendert(true)
-    setMeldung(null)
-  }
-
-  /** Verwerfen eines neuen, ungespeicherten Blocks: seine Zeile fällt aus der Liste. */
-  function schliesseNeuen() {
-    setZeilen(zeilen.filter((z) => z.id !== NEUER_BLOCK))
-    setEntwurf(null)
-  }
-
-  function speichern() {
-    let block: StartseitenBlockEingabe | null = null
-    if (entwurf) {
-      block = alsEingabe(entwurf)
-      const geprueft = startseitenBlockSchema.safeParse(block)
-      if (!geprueft.success) {
-        setMeldung({ art: 'fehler', text: geprueft.error.issues[0]?.message ?? 'Bitte prüf die Angaben.' })
-        return
-      }
-    }
-    const reihenfolge = zeilen.map((z) => ({ id: z.id, sichtbar: z.sichtbar }))
-    startTransition(async () => {
-      const ergebnis = await speichereStartseite({ reihenfolge, block })
-      if ('error' in ergebnis) {
-        setMeldung({ art: 'fehler', text: ergebnis.error })
-        return
-      }
-      setMeldung({ art: 'ok', text: T.gespeichert })
-      setGeaendert(false)
-      setNachLaden(ergebnis.blockId)
-      router.refresh()
-    })
+    fuegeEin(entwurf.zeilen.findIndex((z) => z.art === 'HOEFE'), vorlage)
   }
 
   function loeschen() {
-    if (!entwurf?.id) return
-    const blockId = entwurf.id
+    const offen = entwurf.block
+    if (!offen) return
+    if (!offen.id) {
+      // Ein neuer Block, der noch nie gespeichert war: nur die Zeile weg.
+      entwurf.oeffneBlock(null, entwurf.zeilen.filter((z) => z.id !== NEUER_BLOCK))
+      return
+    }
+    const blockId = offen.id
     startTransition(async () => {
+      await entwurf.speichereSofort()
       const ergebnis = await loescheStartseitenBlock({ blockId })
       if ('error' in ergebnis) {
-        setMeldung({ art: 'fehler', text: ergebnis.error })
+        toast.error(ergebnis.error)
         return
       }
-      setMeldung({ art: 'ok', text: T.geloescht })
+      entwurf.oeffneBlock(null, entwurf.zeilen.filter((z) => z.block?.id !== blockId))
+      toast.success(T.geloescht)
+    })
+  }
+
+  function veroeffentlichen(eingabe: VeroeffentlichenEingabe) {
+    setDialogFehler(null)
+    startTransition(async () => {
+      if (!(await entwurf.speichereSofort())) {
+        setDialogFehler(entwurf.stand.art === 'fehler' ? entwurf.stand.text : E.nichtGespeichert)
+        return
+      }
+      const ergebnis = await veroeffentlicheStartseite(eingabe)
+      if ('error' in ergebnis) {
+        setDialogFehler(ergebnis.error)
+        return
+      }
+      setDialog(false)
+      toast.success(ergebnis.text)
       router.refresh()
     })
   }
 
-  const aktivId = entwurf?.zeilenId ?? null
-  // Die Liste zeigt den neuen Block mit den Werten aus dem Formular.
-  const angezeigt = zeilen.map((z) =>
-    z.id === NEUER_BLOCK && entwurf && entwurf.zeilenId === NEUER_BLOCK ? { ...z, block: alsDaten(entwurf, []) } : z
+  function uebernimm(id: string | null, satz: string) {
+    setAktionFehler(null)
+    startTransition(async () => {
+      const ergebnis = await uebernehmeFassungAlsEntwurf({ id })
+      if ('error' in ergebnis) {
+        setAktionFehler(ergebnis.error)
+        return
+      }
+      entwurf.setzeZurueck(ergebnis.zeilen)
+      setVerwerfen(false)
+      setAnsicht('bearbeiten')
+      toast.success(satz)
+      router.refresh()
+    })
+  }
+
+  function zeitplanAktion(aktion: ZeitplanAktion) {
+    if (aktion.art === 'vorschau' || aktion.art === 'ansehen-live') {
+      setFassungVorschau(aktion)
+      return
+    }
+    if (aktion.art === 'uebernehmen') {
+      uebernimm(aktion.id, E.uebernommen)
+      return
+    }
+    setAktionFehler(null)
+    startTransition(async () => {
+      const ergebnis = await zieheFassungZurueck({ id: aktion.id })
+      if ('error' in ergebnis) {
+        setAktionFehler(ergebnis.error)
+        return
+      }
+      toast.success(E.zurueckgezogen)
+      router.refresh()
+    })
+  }
+
+  const vorschau = (
+    <StartseiteVorschau
+      blockMoeglich={blockMoeglich}
+      termin={termin}
+      blockEntwurfId={entwurf.block?.id ?? null}
+      neuLaden={entwurf.speicherungen}
+      geraetStandard={breit ? 'web' : 'handy'}
+    />
+  )
+
+  const knoepfe = (
+    <>
+      <button type="button" className={KNOPF_RAHMEN} disabled={anzahl === 0 || laeuft} onClick={() => setVerwerfen(true)}>
+        {E.verwerfen}
+      </button>
+      <button type="button" className={KNOPF_GRUEN} disabled={anzahl === 0} onClick={() => setDialog(true)}>
+        <Send className="size-4" strokeWidth={1.8} aria-hidden="true" />
+        {E.veroeffentlichen}
+      </button>
+    </>
   )
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={cn('flex flex-col gap-4', ansicht === 'bearbeiten' && 'pb-24 lg:pb-0')}>
       <Seitenkopf
         titel={T.titel}
-        satz={T.satz}
+        satz={ansicht === 'bearbeiten' ? E.satz : E.satzZeitplan}
         rechts={
           <Segment
             beschriftung="Ansicht"
             optionen={[
-              { wert: 'bearbeiten', label: T.bearbeiten },
-              { wert: 'kundin', label: T.kundin },
+              { wert: 'bearbeiten', label: E.bearbeiten },
+              { wert: 'zeitplan', label: daten.geplant.length > 0 ? `${E.zeitplan} · ${daten.geplant.length}` : E.zeitplan },
+              { wert: 'verlauf', label: E.verlauf },
             ]}
             wert={ansicht}
             onWertChange={(w) => setAnsicht(w as Ansicht)}
@@ -796,64 +512,164 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
         }
       />
 
-      <div className="flex flex-col gap-[18px] lg:flex-row lg:items-start">
-        <div className={cn('flex w-full shrink-0 flex-col gap-3', ansicht === 'kundin' ? 'lg:w-[440px]' : 'lg:w-[520px]')}>
-          <AbschnittsListe
-            zeilen={angezeigt}
-            jetzt={jetzt}
-            aktivId={aktivId}
-            kompakt={ansicht === 'kundin'}
-            onZeilen={aendereZeilen}
-            onWaehlen={oeffne}
-            onEinfuegen={(nachIndex) => fuegeEin(nachIndex)}
-          />
-          {(geaendert || meldung) && !entwurf && (
-            <div className={cn(KARTE, 'flex flex-wrap items-center justify-between gap-3 px-4 py-3')}>
-              {meldung ? <Rueckmeldung meldung={meldung} /> : <p className={cn('text-[13px]', LEISE)}>{T.ungespeichert}</p>}
-              {geaendert && (
-                <button type="button" className={KNOPF_GRUEN} disabled={pending} onClick={speichern}>
-                  <Save className="size-4" strokeWidth={1.8} aria-hidden="true" />
-                  Speichern
-                </button>
+      {ansicht === 'bearbeiten' ? (
+        <>
+          {/* Statusleiste (ab 1024 px) bzw. Statuskarte (Handy) — dieselben Angaben. */}
+          <section
+            aria-label={E.entwurf}
+            className={cn(KARTE, 'flex flex-col gap-2 border-primary/45 px-4 py-3 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-[18px]')}
+          >
+            <span className="flex flex-wrap items-center gap-2.5">
+              <Marke art="tun">{E.entwurf}</Marke>
+              <span className="text-[14px] font-semibold text-foreground">{aenderungenText(anzahl, breit)}</span>
+              <SpeicherZeile stand={entwurf.stand} />
+            </span>
+            <LiveUndGeplant daten={daten} untereinander={!breit} />
+            <span className="hidden flex-1 lg:block" />
+            {verwerfen ? (
+              <VerwerfenFrage laeuft={laeuft} onJa={() => uebernimm(daten.live?.id ?? null, E.verworfen)} onNein={() => setVerwerfen(false)} />
+            ) : (
+              <span className="hidden flex-wrap items-center gap-2 lg:flex">{knoepfe}</span>
+            )}
+            {!verwerfen && anzahl > 0 && (
+              <button type="button" className={cn(TEXT_GRUEN, 'self-start px-0 lg:hidden')} onClick={() => setVerwerfen(true)}>
+                {E.verwerfen}
+              </button>
+            )}
+            {aktionFehler && (
+              <p role="alert" className="text-[13px] font-medium text-destructive lg:basis-full">
+                {aktionFehler}
+              </p>
+            )}
+          </section>
+
+          <div className="flex flex-col gap-[22px] lg:flex-row lg:items-start">
+            <div className="flex w-full shrink-0 flex-col gap-3 lg:w-[480px]">
+              <AbschnittsListe
+                zeilen={angezeigt}
+                jetzt={jetzt}
+                aktivId={entwurf.block?.zeilenId ?? null}
+                marken={marken}
+                onZeilen={entwurf.aendereZeilen}
+                onWaehlen={oeffne}
+                onEinfuegen={(nachIndex) => fuegeEin(nachIndex)}
+              />
+              <p className={cn('text-[12.5px] lg:hidden', LEISE)}>{E.gespeichertHandy}</p>
+              <div className={cn(KARTE, 'hidden items-center gap-3 px-4 py-3 lg:flex')}>
+                <Info className="size-4 shrink-0 text-status-fertig" strokeWidth={1.8} aria-hidden="true" />
+                <p className={cn('text-[12.5px] leading-snug', LEISE)}>
+                  <b className="font-semibold text-foreground">{E.gespeichertTitel}</b> {E.gespeichertSatz}
+                </p>
+              </div>
+              <div className="hidden lg:block">
+                <AenderungsListe aenderungen={entwurf.aenderungen} />
+              </div>
+            </div>
+
+            <div className="flex min-w-0 flex-1 flex-col gap-3.5">
+              {blockOffen ? (
+                <>
+                  <BlockFormular
+                    werte={blockOffen}
+                    zeilen={angezeigt}
+                    daten={daten}
+                    jetzt={jetzt}
+                    fehler={blockFehler}
+                    loescht={laeuft}
+                    onWerte={entwurf.aendereBlock}
+                    onFertig={() => nachSpeichern(() => entwurf.oeffneBlock(null))}
+                    onLoeschen={loeschen}
+                  />
+                  <Bibliothek onVorlage={waehleVorlage} />
+                </>
+              ) : (
+                breit && vorschau
               )}
             </div>
-          )}
-        </div>
+          </div>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-3.5">
-          {ansicht === 'kundin' ? (
-            <StartseiteVorschau
-              zeilen={basis.zeilen}
-              jetzt={jetztText}
-              blockEntwurfId={entwurf?.id ?? null}
-              ungespeichert={geaendert}
-            />
-          ) : (
-            <>
-              {entwurf && (
-                <BlockFormular
-                  entwurf={entwurf}
-                  zeilen={angezeigt}
-                  daten={daten}
-                  jetzt={jetzt}
-                  meldung={meldung}
-                  pending={pending}
-                  onEntwurf={aendereEntwurf}
-                  onSpeichern={speichern}
-                  onLoeschen={entwurf.id ? loeschen : schliesseNeuen}
-                />
-              )}
-              <Bibliothek onVorlage={waehleVorlage} />
-              {!entwurf && (
-                <p className={cn('flex items-start gap-2 text-[12px]', LEISE)}>
-                  <Info className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
-                  {T.regel}
-                </p>
-              )}
-            </>
+          {/* Am Handy: feste Leiste unten, 48 px, über der Safe-Area (Mockup mobil-admin-startseite-entwurf).
+              data-unten-fest: Der Cookie-Hinweis steht über der Leiste (src/lib/cookie-hinweis.ts). */}
+          <div data-unten-fest="" className="fixed inset-x-0 bottom-0 z-30 flex gap-2.5 border-t border-border bg-card px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:hidden">
+            <button type="button" className={cn(KNOPF_RAHMEN, 'h-12 flex-1')} onClick={() => setVorschauOffen(true)}>
+              <Eye className="size-4" strokeWidth={1.8} aria-hidden="true" />
+              {E.vorschauKnopf}
+            </button>
+            <button type="button" className={cn(KNOPF_GRUEN, 'h-12 flex-[1.3]')} disabled={anzahl === 0} onClick={() => setDialog(true)}>
+              {E.veroeffentlichen}
+            </button>
+          </div>
+          {!breit && (
+            <VorschauFenster offen={vorschauOffen} onOffenChange={setVorschauOffen} titel={T.kundin}>
+              {vorschauOffen && vorschau}
+            </VorschauFenster>
           )}
-        </div>
-      </div>
+        </>
+      ) : (
+        <StartseiteZeitplan
+          daten={daten}
+          jetzt={jetztText}
+          nurVerlauf={ansicht === 'verlauf'}
+          laeuft={laeuft}
+          fehler={aktionFehler}
+          onAktion={zeitplanAktion}
+        />
+      )}
+
+      <VeroeffentlichenDialog
+        key={dialog ? 'offen' : 'zu'}
+        offen={dialog}
+        onOffenChange={(offen) => {
+          setDialog(offen)
+          if (!offen) setDialogFehler(null)
+        }}
+        aenderungen={entwurf.aenderungen}
+        entwurf={inhalt}
+        jetzt={jetztText}
+        laeuft={laeuft}
+        fehler={dialogFehler}
+        onVeroeffentlichen={veroeffentlichen}
+      />
+
+      <VorschauFenster
+        offen={fassungVorschau !== null}
+        onOffenChange={(offen) => {
+          if (!offen) setFassungVorschau(null)
+        }}
+        titel={fassungVorschau?.art === 'vorschau' && fassungVorschau.geplant ? `${E.geplant}: ${terminText(new Date(fassungVorschau.fassung.liveAb))}` : E.live}
+      >
+        {fassungVorschau && <FassungVorschau aktion={fassungVorschau} jetzt={jetzt} breit={breit} />}
+      </VorschauFenster>
     </div>
+  )
+}
+
+/** Die Vorschau einer Fassung aus dem Zeitplan — geplant am Termin, live heute. */
+function FassungVorschau({
+  aktion,
+  jetzt,
+  breit,
+}: {
+  aktion: Extract<ZeitplanAktion, { art: 'vorschau' }> | { art: 'ansehen-live' }
+  jetzt: Date
+  breit: boolean
+}): React.JSX.Element {
+  if (aktion.art === 'ansehen-live') {
+    return <StartseiteVorschau quelle="live" band="live" blockMoeglich={{ entwurf: false, live: false }} termin={null} blockEntwurfId={null} geraetStandard={breit ? 'web' : 'handy'} />
+  }
+  const { fassung, geplant } = aktion
+  const bloecke = fassung.inhalt.zeilen.flatMap((z) =>
+    z.art === 'BLOCK' ? [{ liveAb: new Date(z.block.liveAb), liveBis: z.block.liveBis ? new Date(z.block.liveBis) : null }] : []
+  )
+  return (
+    <StartseiteVorschau
+      quelle={`fassung:${fassung.id}`}
+      band={geplant ? 'geplant' : 'live'}
+      blockMoeglich={{ entwurf: false, live: standZeitpunkt('block', jetzt, bloecke) !== null }}
+      termin={geplant ? fassung.liveAb : null}
+      standStandard={geplant ? 'termin' : 'heute'}
+      blockEntwurfId={null}
+      geraetStandard={breit ? 'web' : 'handy'}
+    />
   )
 }

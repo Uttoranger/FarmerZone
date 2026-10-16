@@ -1,7 +1,7 @@
 /**
- * Die vier Vorlagen der Startseite (Register N16, Nr. 96) und das Lesen der
- * Liste — Rendertests ohne DOM (renderToStaticMarkup) und die Abfrage mit
- * gemockter Datenbank.
+ * Die vier Vorlagen der Startseite (Register N16, Nr. 96) — Rendertests ohne
+ * DOM (renderToStaticMarkup). Das Lesen der Liste prüft seit Nr. 99
+ * tests/startseite-live.test.ts (Fassung statt Tabellen).
  *
  * Beweist:
  *  - Jede Vorlage rendert ihre Merkmale (Titel, Überzeile, Text, Link mit
@@ -10,12 +10,8 @@
  *    rendert die Merkmale einer anderen.
  *  - Die Höfe-Auswahl ohne sichtbaren Hof rendert nichts.
  *  - Keine Vorlage schreibt eine Hexfarbe oder eine Farbe als style.
- *  - Lesen: EINE Abfrage für alle Abschnitte samt Blöcken, die Höfe aller
- *    Blöcke zusammen in höchstens einer weiteren — nie eine je Block; ohne
- *    Höfe keine zweite. Ein Lesefehler gibt eine leere Liste (die Seite
- *    rendert dann die heutige Reihenfolge) und geht nach Sentry.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement, type ReactNode } from 'react'
@@ -27,19 +23,9 @@ vi.mock('next/link', () => ({
 vi.mock('next/image', () => ({
   default: (p: { src: string; alt: string }) => createElement('img', { src: p.src, alt: p.alt }),
 }))
-vi.mock('next/cache', () => ({ unstable_cache: (fn: unknown) => fn }))
-vi.mock('next/navigation', () => ({ unstable_rethrow: vi.fn() }))
-vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
-vi.mock('@/lib/prisma', () => ({
-  prisma: { startseiteAbschnitt: { findMany: vi.fn() }, farm: { findMany: vi.fn() } },
-}))
-
-import * as Sentry from '@sentry/nextjs'
-import { prisma } from '@/lib/prisma'
 import type { StartseitenBlockDaten } from '@/lib/startseite-gestalten'
 import { hoefeAdresse, type StartseitenHof } from '@/lib/startseite'
 import { StartseitenBlock } from '@/components/startseite/bloecke/startseiten-block'
-import { ladeStartseite } from '@/server/queries/startseite'
 
 const html = (node: ReactNode) => renderToStaticMarkup(createElement('div', null, node))
 
@@ -163,68 +149,5 @@ describe('alle Vorlagen', () => {
       expect(quelle, datei).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
       expect(quelle, datei).not.toMatch(/style=\{\{[^}]*color/i)
     }
-  })
-})
-
-describe('ladeStartseite', () => {
-  const zeile = (id: string, art: string, extra: object = {}) => ({ id, art, position: 0, sichtbar: true, blockId: null, block: null, ...extra })
-  const roherBlock = (id: string, farmIds: string[]) => ({
-    id,
-    vorlage: 'HOEFE_AUSWAHL',
-    ueberzeile: null,
-    titel: `Block ${id}`,
-    text: null,
-    bildUrl: null,
-    linkUrl: null,
-    linkText: null,
-    farmIds,
-    kategorie: null,
-    liveAb: new Date('2026-10-01T04:00:00Z'),
-    liveBis: null,
-    erstelltVonUserId: 'admin-1',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  })
-
-  beforeEach(() => vi.clearAllMocks())
-
-  it('liest alle Blöcke in EINER Abfrage, die Höfe aller Blöcke in höchstens einer weiteren', async () => {
-    vi.mocked(prisma.startseiteAbschnitt.findMany).mockResolvedValue([
-      zeile('k', 'KOPF'),
-      zeile('a', 'BLOCK', { blockId: 'b1', block: roherBlock('b1', ['f1', 'f2']) }),
-      zeile('h', 'HOEFE'),
-      zeile('b', 'BLOCK', { blockId: 'b2', block: roherBlock('b2', ['f2', 'f3']) }),
-      zeile('c', 'BLOCK', { blockId: 'b3', block: roherBlock('b3', ['f9']) }),
-      zeile('f', 'FUSS'),
-    ] as never)
-    vi.mocked(prisma.farm.findMany).mockResolvedValue([
-      { id: 'f1', slug: 'hof-eins' },
-      { id: 'f2', slug: 'hof-zwei' },
-      { id: 'f3', slug: 'hof-drei' },
-    ] as never)
-
-    const zeilen = await ladeStartseite()
-
-    expect(prisma.startseiteAbschnitt.findMany).toHaveBeenCalledTimes(1)
-    expect(prisma.farm.findMany).toHaveBeenCalledTimes(1)
-    const gefragt = vi.mocked(prisma.farm.findMany).mock.calls[0]?.[0] as { where: { id: { in: string[] }; approvedAt: unknown } }
-    expect(new Set(gefragt.where.id.in)).toEqual(new Set(['f1', 'f2', 'f3', 'f9']))
-    expect(gefragt.where.approvedAt).toEqual({ not: null })
-    const slugs = zeilen.flatMap((z) => (z.art === 'BLOCK' ? [z.block.hofSlugs] : []))
-    // f9 ist nicht (mehr) sichtbar und fällt weg; die Reihenfolge der Wahl bleibt.
-    expect(slugs).toEqual([['hof-eins', 'hof-zwei'], ['hof-zwei', 'hof-drei'], []])
-    expect(zeilen.find((z) => z.art === 'BLOCK')).toMatchObject({ block: { liveAb: '2026-10-01T04:00:00.000Z', liveBis: null } })
-  })
-
-  it('fragt ohne gewählte Höfe keine zweite Abfrage', async () => {
-    vi.mocked(prisma.startseiteAbschnitt.findMany).mockResolvedValue([zeile('k', 'KOPF'), zeile('f', 'FUSS')] as never)
-    await ladeStartseite()
-    expect(prisma.farm.findMany).not.toHaveBeenCalled()
-  })
-
-  it('gibt bei einem Lesefehler eine leere Liste und meldet ihn nach Sentry', async () => {
-    vi.mocked(prisma.startseiteAbschnitt.findMany).mockRejectedValue(new Error('Verbindung weg'))
-    expect(await ladeStartseite()).toEqual([])
-    expect(Sentry.captureException).toHaveBeenCalledTimes(1)
   })
 })
