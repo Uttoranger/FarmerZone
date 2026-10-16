@@ -54,7 +54,7 @@ vi.mock('next/image', () => ({
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))
-vi.mock('@/server/actions/appearance', () => ({ updateFarmBannerAction: vi.fn(), updateBannerFocusAction: vi.fn() }))
+vi.mock('@/server/actions/appearance', () => ({ updateFarmBannerAction: vi.fn() }))
 vi.mock('@/server/actions/farm-photos', () => ({ addFarmPhotoAction: vi.fn(), reorderPhotosAction: vi.fn() }))
 vi.mock('@/server/actions/products', () => ({ updateProductImageAction: vi.fn(), reorderProductsAction: vi.fn() }))
 vi.mock('@/components/farm/cart-sheet', () => ({ CartSheet: () => createElement('div', { 'data-merkmal': 'korb' }) }))

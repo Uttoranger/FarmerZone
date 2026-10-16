@@ -54,6 +54,9 @@ export const MAX_LONG_SIDE: Record<UploadZweck, number> = {
 /** Kürzeste Kante eines Startseiten-Bilds — kleiner wird es auf großen Schirmen unscharf (N16: ≥ 320 px). */
 export const STARTSEITE_MIN_KANTE = 320
 
+/** Der Satz, wenn die Route ein Startseiten-Bild als zu klein abweist (422 `BILD_ZU_KLEIN`, Nr. 108) — die Zahl aus der Konstante. */
+export const BILD_ZU_KLEIN_TEXT = `Das Bild ist zu klein – es braucht an der kürzeren Seite mindestens ${STARTSEITE_MIN_KANTE} Pixel. Nimm ein größeres Foto.`
+
 /**
  * Die Ordner der Startseiten-Bilder (Zweck 'startseite'). Bewusst NICHT unter
  * `originals/` bzw. `farms/`: Kein Hof-Pfad kann je hier liegen, und kein
@@ -141,11 +144,14 @@ export function darfVerarbeitetWerden(url: string, farmId: string): boolean {
 }
 
 /**
- * Darf dieses alte Bild beim Ersetzen gelöscht werden?
+ * Liegt dieses fertige Bild im Zielordner des eigenen Hofes — dürfte es also
+ * gelöscht werden?
  *
  * Dieselbe Logik, nur auf den Zielordner statt den Originale-Ordner. Ohne die
- * Hof-Prüfung ließe sich die Verarbeitungs-Route zum Löschen fremder Bilder
- * missbrauchen — die alte Route prüfte hier nur den Host.
+ * Hof-Prüfung ließe sich ein Löschweg zum Löschen fremder Bilder missbrauchen.
+ * Seit Nr. 108 (Register N17, Ergänzung) löscht die Verarbeitungs-Route ein
+ * ersetztes Bild nicht mehr — es bleibt als „Bild ohne Verwendung“ liegen, bis
+ * es nach Durchsicht entfernt wird (N18). Die Prüfung bleibt für diesen Weg.
  */
 export function darfGeloeschtWerden(url: string, farmId: string): boolean {
   return liegtImEigenenPfad(url, zielPrefix(farmId))

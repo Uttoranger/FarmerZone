@@ -13,6 +13,8 @@
  *  - Neu herausgelöst: Leitspruch/Gründungsjahr (Textfelder, 44 px) und Werte
  *    (Kacheln mit aria-pressed, höchstens vier, danach gesperrt).
  *  - Die alte Hofseite mit Stiften steht nicht mehr darin.
+ *  - Das Titelbild bekommt den gespeicherten Ausschnitt des Logos mit — das
+ *    kleine Logo seiner Browser-Vorschau steht damit wie auf der Hofseite (Nr. 108).
  * Jede Suche hat ihre Gegenprobe.
  */
 import { describe, it, expect, vi } from 'vitest'
@@ -37,7 +39,6 @@ vi.mock('@/server/actions/appearance', () => ({
   saveAppearanceAction: vi.fn(),
   updateFarmLogoAction: vi.fn(),
   updateFarmBannerAction: vi.fn(),
-  updateBannerFocusAction: vi.fn(),
 }))
 vi.mock('@/server/actions/farm', () => ({
   updateProfile: vi.fn(),
@@ -60,6 +61,7 @@ vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOu
 
 import { AbschnitteListe } from '@/components/mein-hof/abschnitte-liste'
 import { AbschnittInhalt, SOFORT_GESPEICHERT, type AbschnittHof } from '@/components/mein-hof/abschnitt-inhalt'
+import { TitelbildBaustein } from '@/components/mein-hof/bild-bausteine'
 import { HOFSEITE_REIHENFOLGE, hofseiteFortschritt, type HofseiteStand } from '@/lib/hofseite-fortschritt'
 import { hofseiteZeileIdSchema, type HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 import type { FarmSettings } from '@/server/queries/farm'
@@ -324,5 +326,34 @@ describe('Logo — der gespeicherte Ausschnitt nach dem Neuladen (Nr. 98, Runde 
     const html = inhalt('logo', 'blatt', { ...AUFTRITT, logoUrl: '/logo.jpg' }, MIT_LOGO)
     expect(html).toMatch(/<img src="\/logo.jpg"/)
     expect(html).not.toContain('object-position')
+  })
+})
+
+describe('Titelbild — das kleine Logo der Browser-Vorschau (Nr. 108, Runde 1)', () => {
+  type Knoten = { type: unknown; props: { children?: unknown } & Record<string, unknown> }
+
+  /** Das Element des Titelbild-Bausteins im Baum von AbschnittInhalt, ohne Komponenten auszurollen. */
+  function titelbildIn(knoten: unknown): Knoten | null {
+    if (Array.isArray(knoten)) return knoten.map(titelbildIn).find(Boolean) ?? null
+    if (knoten === null || typeof knoten !== 'object' || !('props' in knoten)) return null
+    const element = knoten as Knoten
+    return element.type === TitelbildBaustein ? element : titelbildIn(element.props.children)
+  }
+
+  function titelbild(auftritt: AppearanceData): Knoten | null {
+    return titelbildIn(
+      AbschnittInhalt({ id: 'titelbild', hof: HOF, einstellungen: EINSTELLUNGEN, auftritt, darstellung: 'blatt', onGespeichert() {}, onAbbrechen() {} })
+    )
+  }
+
+  it('reicht den gespeicherten Ausschnitt des Logos an den Titelbild-Baustein', () => {
+    const logoAusschnitt = { fokusX: 30, fokusY: 70, zoom: 140, filter: 'NATUERLICH' } as const
+    expect(titelbild({ ...AUFTRITT, logoUrl: '/logo.jpg', logoAusschnitt })?.props.logoAusschnitt).toEqual(logoAusschnitt)
+  })
+
+  it('Gegenprobe: ohne gespeicherten Ausschnitt kommt null an, kein fester Wert', () => {
+    const element = titelbild({ ...AUFTRITT, logoUrl: '/logo.jpg' })
+    expect(element).not.toBeNull()
+    expect(element?.props).toHaveProperty('logoAusschnitt', null)
   })
 })

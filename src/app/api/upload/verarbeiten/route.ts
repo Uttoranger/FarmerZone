@@ -8,7 +8,6 @@ import {
   MAX_LONG_SIDE,
   STARTSEITE_MIN_KANTE,
   WEBP_QUALITAET,
-  darfGeloeschtWerden,
   darfStartseitenBildVerarbeitetWerden,
   darfVerarbeitetWerden,
   istUploadZweck,
@@ -131,7 +130,7 @@ async function verarbeiteStartseitenBild(userId: string, url: string): Promise<N
 }
 
 /** Der Körper, einmal gelesen — null, wenn er kein JSON ist (die Antwort darauf bleibt, wo sie war). */
-async function leseDaten(request: NextRequest): Promise<{ url?: unknown; zweck?: unknown; altUrl?: unknown } | null> {
+async function leseDaten(request: NextRequest): Promise<{ url?: unknown; zweck?: unknown } | null> {
   try {
     return await request.json()
   } catch {
@@ -178,7 +177,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const daten = gelesen
 
   const url = typeof daten.url === 'string' ? daten.url : ''
-  const altUrl = typeof daten.altUrl === 'string' ? daten.altUrl : ''
   if (!istUploadZweck(daten.zweck)) {
     return NextResponse.json({ error: 'Unbekannter Zweck', art: 'server' }, { status: 400 })
   }
@@ -215,18 +213,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       token: process.env.BLOB_READ_WRITE_TOKEN,
     })
 
-    // Das ersetzte Bild aufräumen — wie bisher nur der beste Versuch, und erst
-    // NACH dem erfolgreichen Ablegen des neuen. Der Guard ist strenger als in
-    // der alten Route: Die prüfte nur den Host, hier muss die Adresse auch im
-    // Zielordner dieses Hofes liegen.
-    if (altUrl && darfGeloeschtWerden(altUrl, farm.id)) {
-      try {
-        await del(altUrl, { token: process.env.BLOB_READ_WRITE_TOKEN })
-      } catch {
-        // bewusst still
-      }
-    }
-
+    // Das ersetzte Bild löscht diese Route NICHT mehr (Register N17, Ergänzung;
+    // Nr. 108): Zu diesem Zeitpunkt ist Produkt bzw. Hof noch nicht gespeichert.
+    // Scheitert das Speichern danach, zeigte es sonst ein gelöschtes Bild. Ein
+    // mitgeschicktes `altUrl` wird nicht einmal gelesen; das alte Bild bleibt als
+    // „Bild ohne Verwendung“ liegen und wird erst nach Durchsicht entfernt (N18).
     return NextResponse.json({ url: blob.url })
   } catch {
     return NextResponse.json({ error: 'Verarbeitung fehlgeschlagen', art: 'server' }, { status: 500 })

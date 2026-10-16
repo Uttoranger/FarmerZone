@@ -821,7 +821,6 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
         let diagnose: UploadDiagnose | undefined
         try {
           imageUrl = await ladeFotoHoch(selectedFile, 'product', {
-            altUrl: isEdit ? (product.imageUrl ?? undefined) : undefined,
             weg: gewaehlteAuswahl.current.weg,
             // Geprüft und kopiert bei der Auswahl (pruefeUndUebernehme).
             bereitsKopiert: true,

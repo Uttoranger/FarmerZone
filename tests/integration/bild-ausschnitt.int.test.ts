@@ -11,6 +11,8 @@
  *  - Seit Nr. 98: das eigene Produkt wird geschrieben, ein fremdes (echte
  *    Kennung, anderer Hof) bleibt null; Mitte/100 %/Natürlich setzt NULL; das
  *    Logo nur beim eigenen Hof und nie mit Filter.
+ *  - Seit Nr. 108: Ein neues Logo (updateFarmLogoAction) setzt den Ausschnitt
+ *    im selben Update auf NULL — kein zweiter Aufruf mehr, der scheitern kann.
  *  - Die öffentliche Abfrage liest den Wert über leseAusschnitt: gespeichert
  *    kommt er an, ein ungültiger Altwert wird null statt eines Fehlers.
  *  - Die Migration hat die fünf Spalten angelegt, alle nullable ohne Default.
@@ -25,6 +27,7 @@ import { headers } from 'next/headers'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { speichereBildAusschnittAction } from '@/server/actions/bild-ausschnitt'
+import { updateFarmLogoAction } from '@/server/actions/appearance'
 import { getPublicFarm } from '@/server/queries/farm'
 import { erstelleHof, erstelleHofMitAnmeldung, erstelleProdukt, raeumeAuf } from './setup/basis'
 
@@ -131,6 +134,26 @@ describe('speichereBildAusschnittAction — Logo und Produkt (Nr. 98)', () => {
     await speichereBildAusschnittAction({ ziel: 'logo', wert: { ...FOTO_WERT, filter: 'NATUERLICH' } })
     expect((await titelbildStand(eigen.id)).logoAusschnitt).toEqual({ ...FOTO_WERT, filter: 'NATUERLICH' })
     expect((await titelbildStand(fremd.id)).logoAusschnitt).toBeNull()
+  })
+
+  it('ein neues Logo setzt den Ausschnitt im selben Update zurück (NULL), der fremde Hof bleibt', async () => {
+    const speicher = 'intlogo108'
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', `vercel_blob_rw_${speicher}_nurFuerTests`)
+    try {
+      const { eigen, fremd } = await zweiHoefe()
+      const gewaehlt = { ...FOTO_WERT, filter: 'NATUERLICH' }
+      await speichereBildAusschnittAction({ ziel: 'logo', wert: gewaehlt })
+      await prisma.farm.update({ where: { id: fremd.id }, data: { logoAusschnitt: gewaehlt } })
+      const neu = `https://${speicher}.public.blob.vercel-storage.com/farms/${eigen.id}/logo/2.webp`
+
+      expect(await updateFarmLogoAction(neu)).toEqual({})
+
+      const danach = await prisma.farm.findUniqueOrThrow({ where: { id: eigen.id }, select: { logoUrl: true, logoAusschnitt: true } })
+      expect(danach).toEqual({ logoUrl: neu, logoAusschnitt: null })
+      expect((await titelbildStand(fremd.id)).logoAusschnitt).toEqual(gewaehlt)
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 })
 

@@ -6,7 +6,8 @@
  *  - Sechs Filterkacheln mit aria-pressed, genau die gewählte gedrückt; ein
  *    Tipp wählt um. Ohne Filter (Logo) gibt es keine Kacheln.
  *  - Pfeiltasten auf dem Rahmen verschieben den Ausschnitt um 2 %, mit Umschalt
- *    um 10 %; andere Tasten tun nichts (WCAG 2.1.1).
+ *    um 10 % — nur auf einer Achse mit Spiel (Nacharbeit 97, Nr. 108); andere
+ *    Tasten tun nichts (WCAG 2.1.1).
  *  - „Speichern“ schickt den Wert, den der Rahmen zeigt — samt Filter, Zoom und
  *    Wahl füllen/ganz; „Zurücksetzen“ stellt Mitte, 100 %, Natürlich.
  *  - Nur die Rahmen fangen Zeiger (touch-action: none) — die Bühne drumherum nicht.
@@ -65,7 +66,7 @@ vi.mock('react', async (importOriginal) => ({
 }))
 
 vi.mock('next/image', () => ({
-  default: (p: Record<string, unknown>) => createElement('img', { src: p.src, style: p.style, className: p.className }),
+  default: (p: Record<string, unknown>) => createElement('img', { src: p.src, style: p.style, className: p.className, onLoad: p.onLoad }),
 }))
 
 // Das Segment hält eigenen Zustand — hier nur ein Platzhalter, dessen Wahl der Test selbst auslöst.
@@ -140,6 +141,12 @@ const taste = (baum: unknown, key: string, shiftKey = false) => {
   return preventDefault
 }
 const klick = (k: Knoten) => (k.props.onClick as () => void)()
+/** Das Foto im Rahmen „lädt“ — erst dann kennt der Baustein seine Maße (useBildmasse). */
+const laden = (baum: unknown, breite: number, hoehe: number): void => {
+  const bild = alle(rahmen(baum), (k) => k.type === 'img' && typeof k.props.onLoad === 'function')[0]
+  if (!bild) throw new Error('Kein Bild mit onLoad im Rahmen')
+  ;(bild.props.onLoad as (e: unknown) => void)({ currentTarget: { naturalWidth: breite, naturalHeight: hoehe } })
+}
 
 beforeEach(() => {
   buehne.leere()
@@ -168,11 +175,22 @@ describe('Filterkacheln', () => {
 
 describe('Tastatur auf dem Rahmen', () => {
   it('→ verschiebt um 2 %, Umschalt + ↑ um 10 % — und der Rahmen zeigt es sofort', () => {
-    expect(taste(zeige(), 'ArrowRight')).toHaveBeenCalled()
-    taste(zeige(), 'ArrowUp', true)
-    const baum = zeige()
+    // Gezoomt ragt das Quadrat auf beiden Achsen über den Rahmen 3,6 : 1 — beide haben Spiel.
+    const gezoomt = { wert: { ...ANFANG, zoom: 250 } }
+    laden(zeige(gezoomt), 1000, 1000)
+    expect(taste(zeige(gezoomt), 'ArrowRight')).toHaveBeenCalled()
+    taste(zeige(gezoomt), 'ArrowUp', true)
+    const baum = zeige(gezoomt)
     const bild = alle(rahmen(baum), (k) => k.type === 'img')[0]
     expect(bild.props.style).toMatchObject({ objectPosition: '48% 60%' })
+  })
+
+  it('verschiebt nur auf einer Achse mit Spiel — Quadrat bei 100 %: → ändert nichts, ↑ schon (Nacharbeit 97)', () => {
+    laden(zeige(), 1000, 1000)
+    taste(zeige(), 'ArrowRight')
+    taste(zeige(), 'ArrowUp')
+    const bild = alle(rahmen(zeige()), (k) => k.type === 'img')[0]
+    expect(bild.props.style).toMatchObject({ objectPosition: '50% 52%' })
   })
 
   it('andere Tasten tun nichts und lassen den Browser gewähren (Tab bleibt Tab)', () => {
@@ -191,6 +209,8 @@ describe('Tastatur auf dem Rahmen', () => {
 
 describe('Speichern, Zurücksetzen', () => {
   it('„Speichern“ schickt den Wert, den der Rahmen zeigt — Fokus, Zoom, Filter und Wahl', () => {
+    // Ein Panorama 4 : 1 ragt im Rahmen 3,6 : 1 waagrecht hinaus — ← wirkt.
+    laden(zeige(), 4000, 1000)
     taste(zeige(), 'ArrowLeft')
     klick(filterKnoepfe(zeige()).find((k) => text(k.props.children) === 'Kräftig') as Knoten)
     const zoom = alle(zeige(), (k) => k.type === 'input' && k.props.type === 'range')[0]
@@ -269,6 +289,7 @@ describe('Zwecke der Nr. 98 — runder Rahmen, Vorschau-Paar, „Passt so“', (
   })
 
   it('wer nach dem Upload etwas ändert, bekommt „Abbrechen“ zurück — „Passt so“ verwürfe sonst die Wahl', () => {
+    laden(zeige({ nachUpload: true }), 4000, 1000)
     taste(zeige({ nachUpload: true }), 'ArrowLeft')
     const baum = zeige({ nachUpload: true })
     expect(() => knopf(baum, 'Passt so')).toThrow()
