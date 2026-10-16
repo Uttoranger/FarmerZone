@@ -148,7 +148,16 @@ describe('gefahr-blocken — prettier --write', () => {
     })
   }
 
-  for (const befehl of ['pnpm exec prettier --check src', 'pnpm exec prettier --version', 'pnpm lint', 'pnpm exec prettier --list-different .']) {
+  for (const befehl of [
+    'pnpm exec prettier --check src',
+    'pnpm exec prettier --version',
+    'pnpm lint',
+    'pnpm exec prettier --list-different .',
+    // Text, der den Befehl nur nennt (Commit-Nachricht, echo, grep), ist kein Aufruf.
+    'echo "prettier --write ist verboten"',
+    'git commit -m "kein prettier --write mehr im Ablauf"',
+    'grep -rn "prettier --write" CLAUDE.md',
+  ]) {
     it(`lässt durch: ${befehl}`, () => {
       expect(lauf(befehl).code).toBe(0)
     })
@@ -205,7 +214,7 @@ describe('gefahr-blocken — Commit auf main', () => {
     ]) {
       const r = lauf(befehl, aufMain)
       expect(r.code, befehl).toBe(2)
-      expect(r.grund, befehl).toContain('Auf main wird nie direkt committiert')
+      expect(r.grund, befehl).toContain('Auf main wird nie direkt committet')
     }
   })
 
@@ -230,6 +239,17 @@ describe('gefahr-blocken — Commit auf main', () => {
   it('lässt den Commit durch, wenn der Befehl zuerst einen Feature-Branch anlegt', () => {
     expect(lauf('git switch -c feature/neu && git commit -m x', aufMain).code).toBe(0)
     expect(lauf('git checkout -b fix/neu && git commit -m x', aufMain).code).toBe(0)
+  })
+
+  it('nimmt beim Anlegen mit Startpunkt den neuen Branch, nicht den Startpunkt', () => {
+    expect(lauf('git checkout -b fix/neu main && git commit -m x', aufMain).code).toBe(0)
+    expect(lauf('git switch -c feature/neu main && git commit -m x', aufMain).code).toBe(0)
+    expect(lauf('git checkout -B fix/neu origin/main && git commit -m x', aufMain).code).toBe(0)
+  })
+
+  it('löst ein relatives git -C nach einem cd gegen das cd-Ziel auf', () => {
+    expect(lauf(`cd ${wurzel} && git -C auf-main commit -m x`, keinRepo).code).toBe(2)
+    expect(lauf(`cd ${wurzel} && git -C auf-feature commit -m x`, keinRepo).code).toBe(0)
   })
 
   it('lässt auf main alles andere durch, was kein Commit ist', () => {

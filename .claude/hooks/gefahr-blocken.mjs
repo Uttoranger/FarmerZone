@@ -48,8 +48,11 @@ const regeln = [
   },
   {
     // Das Projekt hat keine Prettier-Konfiguration: Die Vorgaben von Prettier wären fremde und
-    // schrieben ganze Dateien um (700 Zeilen Diff). Prüfen mit --check bleibt erlaubt.
-    muster: /\bprettier\b[^|;&]*\s(?:--write|-w)(?=[\s=]|$)/,
+    // schrieben ganze Dateien um (700 Zeilen Diff). Prüfen mit --check bleibt erlaubt. Nur am
+    // Befehlsanfang — eine Commit-Nachricht oder ein echo, das den Aufruf nennt, ist keiner.
+    muster: new RegExp(
+      BEFEHLSANFANG + String.raw`(?:(?:pnpm\s+(?:exec|dlx)|pnpm|npx|pnpx)\s+)?prettier\b[^|;&\n]*\s(?:--write|-w)(?=[\s=]|$)`
+    ),
     grund:
       'prettier --write ist verboten: Das Projekt hat keinen Formatierer und keine Prettier-Konfiguration, ' +
       'der Aufruf schreibt Dateien nach fremden Vorgaben um. Formatiere von Hand im Stil der Datei.',
@@ -108,14 +111,20 @@ function branchDesCommits(befehl, arbeitsordner) {
   const gewechselt = [...davor.matchAll(/\bgit(?:\s+(?:-C|-c)\s+\S+)*\s+(?:checkout|switch)\b([^;&|\n]*)/g)]
     .map((m) => m[1].trim().split(/\s+/))
     .filter((teile) => !teile.includes('--'))
-    .map((teile) => teile.filter((t) => !t.startsWith('-')).pop()) // das Ziel: das letzte Wort ohne Schalter
+    .map((teile) => {
+      // Neuer Branch mit Startpunkt (`git checkout -b neu main`): der Commit landet auf „neu“.
+      const neu = teile.findIndex((t) => ['-b', '-B', '-c', '-C', '--create', '--force-create'].includes(t))
+      if (neu >= 0) return teile[neu + 1]
+      return teile.filter((t) => !t.startsWith('-')).pop() // sonst das Ziel: das letzte Wort ohne Schalter
+    })
     .filter(Boolean)
     .pop()
   if (gewechselt) return gewechselt
 
   const optionC = letzter[1].match(/-C\s+(\S+)/)
   const cdOrdner = [...davor.matchAll(/(?:^|[;&|(\n])\s*cd\s+(\S+)/g)].pop()?.[1]
-  const ordner = resolve(arbeitsordner, ohneAnfuehrung(optionC?.[1] ?? cdOrdner ?? '.'))
+  // Ein relatives `-C` gilt ab dem Ordner des `cd` davor, wie in der Shell.
+  const ordner = resolve(arbeitsordner, ohneAnfuehrung(cdOrdner ?? '.'), ohneAnfuehrung(optionC?.[1] ?? '.'))
   try {
     return execFileSync('git', ['-C', ordner, 'symbolic-ref', '--short', '-q', 'HEAD'], {
       encoding: 'utf8',
@@ -135,7 +144,7 @@ for (const regel of regeln) {
 
 if (branchDesCommits(befehl, arbeitsordner) === 'main') {
   console.error(
-    'Blockiert: Auf main wird nie direkt committiert. Lege zuerst einen Feature-Branch an ' +
+    'Blockiert: Auf main wird nie direkt committet. Lege zuerst einen Feature-Branch an ' +
       '(`git switch -c <branch>`), committe dort und öffne einen PR — der Mensch merged.'
   )
   process.exit(2)

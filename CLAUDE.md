@@ -21,7 +21,7 @@ Solo-Entwickler, ein Pilothof. **Produktivsystem mit echten Bestellungen und ech
 | Build (lokal) | `pnpm build` |
 | Migration erstellen | `pnpm exec prisma migrate diff --from-schema <Schema von main> --to-schema prisma/schema.prisma --script` (Regel 3 in `docs/nachtlauf.md`) |
 | Migration lokal anwenden | `pnpm db:migrate` — nur lokal, scheitert an Supabase (P3006) |
-| Migrationsfolge auf frischer DB prüfen | `pnpm exec prisma migrate deploy`, danach `pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code` ohne Unterschied — nur gegen lokales Postgres (Regel 3 in `docs/nachtlauf.md`) |
+| Migrationsfolge auf frischer DB prüfen | `DIRECT_URL=<wegwerf-db auf localhost> DATABASE_URL=<dieselbe> pnpm exec prisma migrate deploy`, danach `pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code` ohne Unterschied — beide Adressen ausdrücklich auf eine Wegwerf-DB im lokalen Postgres gesetzt, nie die Adresse aus der Umgebung (Regel 3 in `docs/nachtlauf.md`) |
 | Seed | `pnpm db:seed` |
 | Prisma Studio | `pnpm db:studio` |
 | Marken-Icons erzeugen (Favicon, icon.svg, Apple-Icon, App-Icons aus `public/marke/*.svg`) | `pnpm marke` |
