@@ -18,6 +18,12 @@
  *    (Nr. 95); ohne Recht 404 und keine Umleitung.
  *  - Die Zahl am Reiter „Postfach" ist „Offen" im Eingang (N14): ungelesene
  *    Antworten, Meldungen NEU/GEPRUEFT, wartende Höfe, offene Erstattungen.
+ *  - Jede `route.ts` unter src/app/admin (rekursiv, Nr. 110): jede exportierte HTTP-Methode ruft als
+ *    ERSTE Anweisung `await verlangeAdminSeite()` oder `await verlangeAdminAktion()` — oder die Datei
+ *    steht in ROUTEN_OHNE_WACHE mit Grund und dem Beleg, der den Grund trägt (Link ohne Anmeldung;
+ *    Prüfung im Aufruf). Eine neue Route ohne beides fällt hier auf, eine Ausnahme, die doch prüft, auch.
+ *    Eine Datei, die eine Adresse ausliefert (`page`, `route`, `manifest`, `icon`, `sitemap` …), ist
+ *    nur `page.tsx` oder `route.ts` — sonst gäbe es einen Weg am Layout und an dieser Wache vorbei.
  *  - Gegenproben: Schnipsel ohne Wache und mit Wache an zweiter Stelle.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -147,6 +153,136 @@ describe('jede Seite unter /admin', () => {
     const exporte = ['finanzen/export/route.ts', 'betrieb/export/route.ts'].map((r) => join(ADMIN, r))
     const aktion = { modul: '@/server/admin-wache', exportName: 'verlangeAdminAktion', funktionName: 'GET' } as const
     expect(exporte.flatMap((p) => wachenMaengel(readFileSync(p, 'utf8'), aktion, relative(WURZEL, p)))).toEqual([])
+  })
+})
+
+// ─── Route Handler und Adress-Dateien unter /admin (Nr. 110) ────────────────
+
+function* dateienUnter(ordner: string): Generator<string> {
+  for (const name of readdirSync(ordner)) {
+    const pfad = join(ordner, name)
+    if (statSync(pfad).isDirectory()) yield* dateienUnter(pfad)
+    else yield pfad
+  }
+}
+
+const HTTP_METHODEN = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
+
+/** Dateien, die in Next eine Adresse ausliefern oder eine Adresse beschreiben — ohne Layout, ohne `page`. */
+const LIEFERT_ADRESSE = /^(route|page|default|opengraph-image|twitter-image|icon|apple-icon|sitemap|robots|manifest)\.[a-z]+$/
+
+/** Die Dateien, die unter /admin eine Adresse ausliefern, aber weder `page.tsx` noch `route.ts` sind. */
+function fremdeAdressDateien(namen: string[]): string[] {
+  return namen.filter((n) => LIEFERT_ADRESSE.test(n.split('/').pop() ?? '') && !/(^|\/)(page\.tsx?|route\.ts)$/.test(n))
+}
+
+/** Die exportierten HTTP-Methoden einer Route-Datei (`export async function GET`). */
+function exportierteMethoden(quelltext: string, pfad = 'route.ts'): string[] {
+  const datei = lies(quelltext, pfad)
+  return datei.statements
+    .filter((st): st is ts.FunctionDeclaration => ts.isFunctionDeclaration(st) && modifikator(st, ts.SyntaxKind.ExportKeyword))
+    .map((st) => st.name?.text ?? '')
+    .filter((n) => HTTP_METHODEN.includes(n))
+}
+
+/** Was an den Methoden einer Route fehlt: Jede prüft zuerst mit der Seiten- oder der Aktions-Wache. Leer = gedeckt. */
+function routenMaengel(quelltext: string, pfad = 'route.ts'): string[] {
+  const methoden = exportierteMethoden(quelltext, pfad)
+  if (methoden.length === 0) return [`${pfad}: keine exportierte HTTP-Methode`]
+  return methoden.flatMap((m) => {
+    const seite = wachenMaengel(quelltext, { ...SEITE, funktionName: m }, pfad)
+    const aktion = wachenMaengel(quelltext, { modul: '@/server/admin-wache', exportName: 'verlangeAdminAktion', funktionName: m }, pfad)
+    return seite.length === 0 || aktion.length === 0 ? [] : [`${pfad}: ${m} prüft nicht als erste Anweisung mit verlangeAdminSeite oder verlangeAdminAktion`]
+  })
+}
+
+/**
+ * Routen unter /admin, die bewusst ohne Admin-Wache als erste Anweisung stehen — je Grund und ein Beleg, der
+ * im Quelltext der Datei stehen muss. Eine neue Ausnahme braucht Grund und Beleg; fällt der Grund weg, fällt sie auf.
+ */
+const ROUTEN_OHNE_WACHE: { datei: string; beleg: RegExp; grund: string }[] = [
+  {
+    datei: 'postfach/zustellung/bestaetigen/route.ts',
+    beleg: /OHNE Anmeldung/,
+    grund: 'Der Link aus der Bestätigungsmail geht an Adressen ohne Konto: GET liest nur und zeigt den Knopf, POST löst einen einmaligen Token ein',
+  },
+  {
+    datei: 'startseite/vorschau/route.ts',
+    beleg: /await oeffneVorschau\(/,
+    grund: 'Prüft Signatur, Ablauf und die Admin-Sitzung im Aufruf von oeffneVorschau und leitet sonst auf die normale Startseite',
+  },
+]
+
+const ROUTEN = [...dateienUnter(ADMIN)].filter((p) => p.endsWith(`${sep}route.ts`)).map((p) => relative(ADMIN, p).split(sep).join('/'))
+
+describe('jede Route unter /admin (route.ts)', () => {
+  it('es gibt die Routen, die bekannt sind — sonst bewiese der Rest nichts', () => {
+    expect(ROUTEN.sort()).toEqual([
+      'betrieb/export/route.ts',
+      'finanzen/export/route.ts',
+      'meldungen/[id]/route.ts',
+      'meldungen/route.ts',
+      'postfach/zustellung/bestaetigen/route.ts',
+      'startseite/vorschau/route.ts',
+    ])
+  })
+
+  it('jede exportierte Methode prüft als erste Anweisung mit der Admin-Wache — außer den Ausnahmen mit Grund', () => {
+    const ausgenommen = ROUTEN_OHNE_WACHE.map((a) => a.datei)
+    const maengel = ROUTEN.filter((r) => !ausgenommen.includes(r)).flatMap((r) => routenMaengel(readFileSync(join(ADMIN, r), 'utf8'), `src/app/admin/${r}`))
+    expect(maengel).toEqual([])
+  })
+
+  it('jede Ausnahme gibt es noch, trägt ihren Beleg im Quelltext, nennt einen Grund — und prüft wirklich nicht selbst als Erstes', () => {
+    for (const a of ROUTEN_OHNE_WACHE) {
+      expect(ROUTEN, a.datei).toContain(a.datei)
+      const quelle = readFileSync(join(ADMIN, a.datei), 'utf8')
+      expect(quelle, a.datei).toMatch(a.beleg)
+      expect(a.grund.split(' ').length, a.datei).toBeGreaterThanOrEqual(8)
+      expect(routenMaengel(quelle, a.datei).length, `${a.datei} prüft inzwischen selbst — raus aus ROUTEN_OHNE_WACHE`).toBeGreaterThan(0)
+    }
+  })
+
+  it('nur page.tsx und route.ts liefern unter /admin eine Adresse aus — kein manifest, icon, sitemap oder zweites page', () => {
+    const namen = [...dateienUnter(ADMIN)].map((p) => relative(ADMIN, p).split(sep).join('/'))
+    expect(namen.some((n) => n.endsWith('page.tsx')), 'die Wache sieht die Seiten').toBe(true)
+    expect(fremdeAdressDateien(namen)).toEqual([])
+  })
+})
+
+describe('Gegenproben — Routen und Adress-Dateien', () => {
+  const kopf = "import { verlangeAdminAktion, verlangeAdminSeite } from '@/server/admin-wache'\n"
+
+  it('erkennt eine Methode ohne Wache, mit Wache an zweiter Stelle und eine zweite Methode ohne Wache', () => {
+    expect(routenMaengel(`${kopf}export async function GET() { return Response.json({}) }`)).toHaveLength(1)
+    expect(routenMaengel(`${kopf}export async function GET() { const a = 1\n await verlangeAdminAktion()\n return a }`)).toHaveLength(1)
+    expect(routenMaengel(`${kopf}export async function GET() { await verlangeAdminSeite()\n return null }\nexport async function POST() { return null }`)).toHaveLength(1)
+  })
+
+  it('erkennt eine Route ohne exportierte Methode und eine Wache aus einem anderen Modul', () => {
+    expect(routenMaengel(`${kopf}export const GET = async () => { await verlangeAdminSeite() }`)).toHaveLength(1)
+    expect(routenMaengel("import { verlangeAdminAktion } from '@/lib/falsch'\nexport async function GET() { await verlangeAdminAktion() }")).toHaveLength(1)
+  })
+
+  it('lässt Seiten- und Aktions-Wache als erste Anweisung durch, auch je Methode verschieden', () => {
+    expect(routenMaengel(`${kopf}export async function GET() { await verlangeAdminSeite()\n return null }`)).toEqual([])
+    expect(routenMaengel(`${kopf}export async function GET() { const a = await verlangeAdminAktion()\n return a }`)).toEqual([])
+    expect(
+      routenMaengel(`${kopf}export async function GET() { await verlangeAdminSeite() }\nexport async function POST() { await verlangeAdminAktion() }`)
+    ).toEqual([])
+  })
+
+  it('erkennt Adress-Dateien, die weder page.tsx noch route.ts sind — in jedem Ordner', () => {
+    expect(fremdeAdressDateien(['page.tsx', 'betrieb/route.ts', 'betrieb/betrieb-teile.tsx', 'layout.tsx', 'loading.tsx'])).toEqual([])
+    expect(fremdeAdressDateien(['manifest.ts', 'a/icon.png', 'b/sitemap.xml', 'c/robots.txt', 'd/opengraph-image.tsx', 'e/default.tsx', 'f/route.tsx'])).toEqual([
+      'manifest.ts',
+      'a/icon.png',
+      'b/sitemap.xml',
+      'c/robots.txt',
+      'd/opengraph-image.tsx',
+      'e/default.tsx',
+      'f/route.tsx',
+    ])
   })
 })
 

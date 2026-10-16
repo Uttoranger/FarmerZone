@@ -12,6 +12,11 @@
  *    Parameter bleibt sie gesperrt.
  *  - Die Ausschlussliste der Nicht-Hofseiten deckt jeden Routenordner unter
  *    src/app ab — ein neuer Ordner fällt hier auf.
+ *  - Die Liste „einbettbar mit Parameter" (EINBETTBAR_MIT_PARAMETER, Nr. 110) ist vollständig und
+ *    wahr: Jede Regel in next.config.ts, die das Einbetten öffnet (X-Frame-Options nicht DENY oder
+ *    frame-ancestors anders als 'none'), hängt an einem Parameter und steht mit Beispiel und Grund in
+ *    der Liste; jeder Eintrag öffnet genau mit seinem Parameter und sonst nicht. Eine neue Öffnung
+ *    ohne Eintrag macht den Test rot — mit Gegenprobe an Attrappen.
  *  - Die Regel für /hoefe (Standort) bleibt.
  *  - Seiten mit Token in der Adresse schicken keinen Referrer und stehen in
  *    keinem Suchindex — seit Nr. 54 auch /reset-password, wie /verify; die mit
@@ -236,3 +241,77 @@ describe('Die Seiten, die mit Nr. 54 in eine Shell umgezogen sind, behalten ihre
     }
   })
 })
+
+// ─── Die Liste „einbettbar mit Parameter" (Nr. 110) ─────────────────────────
+
+/** Ob die Regel das Einbetten öffnet: X-Frame-Options anders als DENY oder frame-ancestors anders als 'none'. */
+function oeffnetEinbetten(regel: Regel): boolean {
+  return regel.headers.some(
+    (h) =>
+      (h.key === 'X-Frame-Options' && h.value.trim().toUpperCase() !== 'DENY') ||
+      (h.key === 'Content-Security-Policy' && /frame-ancestors/i.test(h.value) && !/frame-ancestors\s+'none'/i.test(h.value))
+  )
+}
+
+/**
+ * Die einzigen Seiten, die sich einbetten lassen — nur von uns selbst und nur mit Parameter. Eine neue Öffnung
+ * kommt hier mit Beispiel, Parameter und Grund hinein, nie allein in next.config.ts.
+ */
+const EINBETTBAR_MIT_PARAMETER: { beispiel: string; query: Record<string, string>; schluessel: string; grund: string }[] = [
+  { beispiel: '/hof-test', query: { vorschau: '1' }, schluessel: 'vorschau', grund: 'Der Editor zeigt die Hofseite als Handy-Vorschau im Rahmen' },
+  { beispiel: '/', query: { vorschau: 'aW5oYWx0', sig: 'ab12' }, schluessel: 'vorschau', grund: 'Admin › Startseite zeigt die Startseite im Rahmen „So sieht’s die Kundin“' },
+]
+
+describe('Einbetten — die Liste „einbettbar mit Parameter"', () => {
+  it('jede Regel, die das Einbetten öffnet, hängt an einem Parameter und steht in der Liste', () => {
+    const offene = regeln.filter(oeffnetEinbetten)
+    expect(offene.length).toBeGreaterThan(0)
+    for (const regel of offene) {
+      expect(regel.has?.length, `${regel.source} öffnet ohne Parameter`).toBeGreaterThan(0)
+      const eintraege = EINBETTBAR_MIT_PARAMETER.filter((e) => getPathMatch(regel.source)(e.beispiel) && regel.has?.some((h) => h.type === 'query' && h.key === e.schluessel))
+      expect(eintraege.length, `${regel.source} (has ${JSON.stringify(regel.has)}) fehlt in EINBETTBAR_MIT_PARAMETER`).toBeGreaterThan(0)
+    }
+    // Und keine Zeile der Liste ohne Regel: genau so viele offene Regeln wie Einträge.
+    expect(offene).toHaveLength(EINBETTBAR_MIT_PARAMETER.length)
+  })
+
+  it('jeder Eintrag öffnet genau mit seinem Parameter — ohne ihn und auf Unterseiten bleibt DENY', () => {
+    for (const e of EINBETTBAR_MIT_PARAMETER) {
+      expect(e.grund.split(' ').length, e.beispiel).toBeGreaterThanOrEqual(6)
+      expect(headerFuer(e.beispiel, e.query)['X-Frame-Options'], e.beispiel).toBe('SAMEORIGIN')
+      expect(headerFuer(e.beispiel, e.query)['Content-Security-Policy'], e.beispiel).toBe("frame-ancestors 'self'")
+      expect(headerFuer(e.beispiel)['X-Frame-Options'], `${e.beispiel} ohne Parameter`).toBe('DENY')
+      expect(headerFuer(`${e.beispiel === '/' ? '' : e.beispiel}/unterseite/abc`, e.query)['X-Frame-Options'], `${e.beispiel} Unterseite`).toBe('DENY')
+    }
+  })
+
+  it('Gegenprobe: die Suche erkennt eine Öffnung in jeder Form — und lässt DENY und die Sperre stehen', () => {
+    const regel = (headers: Regel['headers'], has?: Regel['has']): Regel => ({ source: '/:pfad*', headers, has })
+    for (const offen of [
+      regel([{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }]),
+      regel([{ key: 'X-Frame-Options', value: 'ALLOW-FROM https://example.com' }]),
+      regel([{ key: 'Content-Security-Policy', value: "frame-ancestors 'self'" }]),
+      regel([{ key: 'Content-Security-Policy', value: 'frame-ancestors *' }]),
+      regel([{ key: 'X-Frame-Options', value: 'DENY' }, { key: 'Content-Security-Policy', value: 'frame-ancestors https://example.com' }]),
+    ]) {
+      expect(oeffnetEinbetten(offen), JSON.stringify(offen)).toBe(true)
+    }
+    for (const zu of [
+      regel([{ key: 'X-Frame-Options', value: 'DENY' }]),
+      regel([{ key: 'X-Frame-Options', value: 'deny' }]),
+      regel([{ key: 'Content-Security-Policy', value: "frame-ancestors 'none'" }]),
+      regel([{ key: 'Referrer-Policy', value: 'no-referrer' }]),
+      regel([{ key: 'Content-Security-Policy', value: "default-src 'self'" }]),
+    ]) {
+      expect(oeffnetEinbetten(zu), JSON.stringify(zu)).toBe(false)
+    }
+  })
+
+  it('Gegenprobe: eine zusätzliche, unbedingte Öffnung würde auffallen', () => {
+    const mitNeuer = [...regeln, { source: '/:pfad*', headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }] }]
+    const offene = mitNeuer.filter(oeffnetEinbetten)
+    expect(offene).toHaveLength(EINBETTBAR_MIT_PARAMETER.length + 1)
+    expect(offene.some((r) => !r.has?.length)).toBe(true)
+  })
+})
+

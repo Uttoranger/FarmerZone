@@ -14,6 +14,13 @@
  *   -- EXPAND-CONTRACT: Schritt 2 von 2
  * Der Marker ist eine bewusste, begründete Entscheidung — kein Freibrief.
  *
+ * Dasselbe gilt für das, was alten Code im Deploy-Fenster bricht, weil er Spalten oder
+ * Tabellen noch liest: `DROP COLUMN`, eine Typänderung (`ALTER COLUMN … TYPE`, auch
+ * `SET DATA TYPE`) und `DROP TABLE` (`pruefeZerstoerendes`). Sie stehen nur mit einem
+ * Marker `-- EXPAND-CONTRACT: <Begründung>` (mindestens drei Wörter) in den fünf Zeilen vor
+ * dem Statement in der Datei — das ist der Schritt 2 (Contract), nachdem kein Code die Spalte
+ * mehr liest. Im Bestand gibt es heute keinen Treffer, also auch keine Bestandsliste.
+ *
  * Bewusst NICHT geprüft: `ALTER COLUMN … SET NOT NULL` (das ist Schritt 2 des
  * Expand/Contract-Musters, nach dem Backfill) und `CREATE TABLE` (eine neue
  * Tabelle kennt der alte Code nicht, er schreibt nicht hinein).
@@ -92,6 +99,40 @@ function pruefeMigrationsSql(sql: string): Befund[] {
   }
 
   return befunde
+}
+
+/** Der Marker für zerstörende Statements: `-- EXPAND-CONTRACT:` und eine Begründung aus mindestens drei Wörtern. */
+const BEGRUENDETER_MARKER = /--\s*EXPAND-CONTRACT:\s*\S+(?:\s+\S+){2,}/
+
+/** Was einen Deploy-Fensterbruch bedeutet, wenn der alte Code die Spalte oder Tabelle noch liest. */
+const ZERSTOERENDE_STATEMENTS: Array<{ art: string; muster: RegExp; ausTabelle: boolean }> = [
+  { art: 'DROP COLUMN', muster: /\bDROP\s+COLUMN\b/gi, ausTabelle: true },
+  { art: 'Typänderung', muster: /\bALTER\s+COLUMN\s+(?:"[^"]+"|\w+)\s+(?:SET\s+DATA\s+)?TYPE\b/gi, ausTabelle: true },
+  { art: 'DROP TABLE', muster: /\bDROP\s+TABLE\b/gi, ausTabelle: false },
+]
+
+/**
+ * Prüft den SQL-Text einer Migration auf `DROP COLUMN`, Typänderung und `DROP TABLE` ohne begründeten
+ * EXPAND-CONTRACT-Marker in den fünf Zeilen über dem Statement (bei Spalten: über dem `ALTER TABLE`,
+ * zu dem die Klausel gehört). Kommentare zählen nicht als Statement; Klauseln über mehrere Zeilen
+ * werden gefunden. Leeres Ergebnis = Migration in Ordnung.
+ */
+function pruefeZerstoerendes(sql: string): Befund[] {
+  const zeilen = sql.split('\n')
+  const ohneKommentar = zeilen.map((z) => z.split('--')[0])
+  const text = ohneKommentar.join('\n')
+  const befunde: Befund[] = []
+
+  for (const { art, muster, ausTabelle } of ZERSTOERENDE_STATEMENTS) {
+    for (const treffer of text.matchAll(muster)) {
+      const zeile = text.slice(0, treffer.index).split('\n').length - 1
+      let start = zeile
+      if (ausTabelle) while (start > 0 && !/ALTER\s+TABLE/i.test(ohneKommentar[start])) start--
+      const davor = zeilen.slice(Math.max(0, start - MARKER_FENSTER), start + 1)
+      if (!davor.some((z) => BEGRUENDETER_MARKER.test(z))) befunde.push({ zeile: zeile + 1, klausel: art })
+    }
+  }
+  return befunde.sort((a, b) => a.zeile - b.zeile)
 }
 
 // ─── Die Regel selbst, an Fixtures ──────────────────────────────────────────
@@ -184,6 +225,71 @@ describe('pruefeMigrationsSql — NOT NULL ohne Default im Deploy-Fenster', () =
   })
 })
 
+describe('pruefeZerstoerendes — DROP COLUMN, Typänderung, DROP TABLE nur mit Marker', () => {
+  const marker = '-- EXPAND-CONTRACT: Schritt 2 von 2, kein Code liest die Spalte mehr'
+
+  it('schlägt bei DROP COLUMN ohne Marker an — auch in einem mehrzeiligen ALTER TABLE', () => {
+    const einzeln = `ALTER TABLE "Farm" DROP COLUMN "alt";`
+    const mehrzeilig = [`ALTER TABLE "Farm"`, `  ADD COLUMN "neu" TEXT,`, `  DROP COLUMN "alt";`].join('\n')
+
+    expect(pruefeZerstoerendes(einzeln)).toEqual([{ zeile: 1, klausel: 'DROP COLUMN' }])
+    expect(pruefeZerstoerendes(mehrzeilig)).toEqual([{ zeile: 3, klausel: 'DROP COLUMN' }])
+  })
+
+  it('schlägt bei jeder Schreibweise einer Typänderung an', () => {
+    for (const sql of [
+      `ALTER TABLE "Product" ALTER COLUMN "stock" TYPE BIGINT;`,
+      `ALTER TABLE "Product" ALTER COLUMN "stock" SET DATA TYPE BIGINT;`,
+      `ALTER TABLE "Product"\n  ALTER COLUMN stock\n  TYPE "Neu" USING ("stock"::text::"Neu");`,
+      `alter table "Product" alter column "stock" set data type text;`,
+    ]) {
+      expect(pruefeZerstoerendes(sql), sql).toHaveLength(1)
+    }
+  })
+
+  it('schlägt bei DROP TABLE an, auch mit IF EXISTS und CASCADE', () => {
+    for (const sql of [`DROP TABLE "Alt";`, `DROP TABLE IF EXISTS "Alt" CASCADE;`, `drop table "Alt";`]) {
+      expect(pruefeZerstoerendes(sql), sql).toHaveLength(1)
+    }
+  })
+
+  it('lässt sie mit begründetem Marker in den fünf Zeilen davor durch', () => {
+    expect(pruefeZerstoerendes(`${marker}\nALTER TABLE "Farm" DROP COLUMN "alt";`)).toEqual([])
+    expect(pruefeZerstoerendes(`${marker}\nALTER TABLE "Product" ALTER COLUMN "stock" TYPE BIGINT;`)).toEqual([])
+    expect(pruefeZerstoerendes(`${marker}\nDROP TABLE "Alt";`)).toEqual([])
+    // Der Marker deckt das ganze mehrzeilige Statement (er steht über dem ALTER TABLE).
+    expect(pruefeZerstoerendes([marker, `ALTER TABLE "Farm"`, `  DROP COLUMN "a",`, `  DROP COLUMN "b";`].join('\n'))).toEqual([])
+  })
+
+  it('verlangt eine Begründung — der nackte Marker und ein Marker ohne Wörter reichen nicht', () => {
+    for (const nackt of ['-- EXPAND-CONTRACT:', '-- EXPAND-CONTRACT: ok', '-- EXPAND-CONTRACT: Schritt 2']) {
+      expect(pruefeZerstoerendes(`${nackt}\nALTER TABLE "Farm" DROP COLUMN "alt";`), nackt).toHaveLength(1)
+    }
+  })
+
+  it('sieht den Marker genau fünf Zeilen über dem Statement — sechs sind zu weit', () => {
+    const mitAbstand = (leerzeilen: number): string => [marker, ...Array.from({ length: leerzeilen }, () => ``), `DROP TABLE "Alt";`].join('\n')
+
+    expect(pruefeZerstoerendes(mitAbstand(4))).toEqual([])
+    expect(pruefeZerstoerendes(mitAbstand(5))).toHaveLength(1)
+  })
+
+  it('lässt Kommentare, Namen mit ähnlichem Klang und harmlose Änderungen stehen', () => {
+    for (const sql of [
+      `-- ALTER TABLE "Farm" DROP COLUMN "alt";`,
+      `-- DROP TABLE "Alt";`,
+      `ALTER TABLE "Farm" ADD COLUMN "drop_column_alt" TEXT;`,
+      `ALTER TABLE "Farm" ALTER COLUMN "name" SET NOT NULL;`,
+      `ALTER TABLE "Farm" ALTER COLUMN "name" SET DEFAULT 'x';`,
+      `ALTER TABLE "Farm" ALTER COLUMN "name" DROP NOT NULL;`,
+      `DROP INDEX "Farm_slug_idx";`,
+      `CREATE TABLE "Neu" ("id" TEXT NOT NULL);`,
+    ]) {
+      expect(pruefeZerstoerendes(sql), sql).toEqual([])
+    }
+  })
+})
+
 // ─── Der echte Bestand ──────────────────────────────────────────────────────
 
 describe('prisma/migrations — der echte Bestand', () => {
@@ -212,6 +318,25 @@ describe('prisma/migrations — der echte Bestand', () => {
         `in zwei Schritten migrieren (erst nullable + Code, dann NOT NULL) oder, ` +
         `wenn die Tabelle nachweislich leer ist, in den fünf Zeilen vor dem ` +
         `ALTER TABLE begründet markieren mit »${MARKER[0]}« bzw. »${MARKER[1]}«.\n` +
+        verstoesse.join('\n')
+    ).toHaveLength(0)
+  })
+
+  it('kein DROP COLUMN, keine Typänderung und kein DROP TABLE ohne begründeten EXPAND-CONTRACT-Marker', () => {
+    const wurzel = join(__dirname, '..', 'prisma', 'migrations')
+    const verstoesse: string[] = []
+    for (const eintrag of readdirSync(wurzel).filter((e) => statSync(join(wurzel, e)).isDirectory())) {
+      for (const befund of pruefeZerstoerendes(readFileSync(join(wurzel, eintrag, 'migration.sql'), 'utf8'))) {
+        verstoesse.push(`${eintrag}/migration.sql:${befund.zeile} — ${befund.klausel}`)
+      }
+    }
+
+    expect(
+      verstoesse,
+      `Zerstörendes Statement ohne Marker: Im Deploy-Fenster (migrate deploy läuft vor next build) liest der ` +
+        `alte Code die Spalte oder Tabelle noch — erst den Code umstellen und ausrollen (Expand/Contract, ` +
+        `ARCHITECTURE.md §5), dann in einer eigenen Migration entfernen und in den fünf Zeilen davor begründen ` +
+        `mit »-- EXPAND-CONTRACT: <Begründung>« (mindestens drei Wörter). Gepushte Migrationen ändert niemand.\n` +
         verstoesse.join('\n')
     ).toHaveLength(0)
   })
