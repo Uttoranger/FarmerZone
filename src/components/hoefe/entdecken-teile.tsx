@@ -22,6 +22,8 @@ import { hofseitenLink, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
 import { KATEGORIE_LABEL, SIEGEL, type AnzeigeBereich, type ProductCategoryValue } from '@/lib/taxonomie'
 import { formatGrundpreis, formatGrundpreisZeile, formatKilopreis } from '@/lib/format'
 import { hofInitialen } from '@/lib/hof-initialen'
+import { bildStil } from '@/lib/bild-ausschnitt'
+import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { Chip, FilterChip, FilterChipReihe } from '@/components/ui/chip'
@@ -210,6 +212,7 @@ export function AktiveFilterZeile({
 /** Das Bild einer Karte: Foto oder, ohne Foto, die Initialen auf ruhiger Fläche. */
 function Vorschaubild({
   foto,
+  ausschnitt = null,
   name,
   initialen,
   sizes,
@@ -217,6 +220,8 @@ function Vorschaubild({
   className,
 }: {
   foto: string | null
+  /** Ausschnitt eines Produktfotos (Register N17, Nr. 98); die Fotos des Hofs stehen wie heute. */
+  ausschnitt?: BildAusschnitt | null
   name: string
   initialen: string
   sizes: string
@@ -234,6 +239,8 @@ function Vorschaubild({
           // Ausgegraut wird nur das Bild — eine Deckkraft über dem Text drückte
           // ihn unter 4,5:1 (Axe color-contrast).
           className={cn('object-cover', gedaempft && 'opacity-60 grayscale')}
+          // Gedämpft ohne Filter des Hofs: Ein Inline-Filter überschriebe sonst die Klasse grayscale.
+          style={bildStil(ausschnitt, { filter: !gedaempft })}
         />
       ) : (
         <span
@@ -478,6 +485,7 @@ export function ProduktZeile({
       <div className="pointer-events-none relative flex min-w-0 flex-1 items-center gap-3.5">
         <Vorschaubild
           foto={produkt.imageUrl}
+          ausschnitt={produkt.bildAusschnitt}
           name={produkt.name}
           initialen={produktInitiale(produkt.name)}
           sizes="72px"

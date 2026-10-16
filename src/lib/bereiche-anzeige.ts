@@ -13,6 +13,7 @@
  * Der Bereich eines Produkts kommt immer aus anzeigeBereichVon (taxonomie.ts),
  * nie aus einem Vergleich mit einer Kategorie.
  */
+import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import {
   ANZEIGE_BEREICHE,
   ANZEIGE_BEREICH_VALUES,
@@ -89,6 +90,8 @@ export type AngebotsProdukt = AngebotsZeile & {
   unit: string
   unitSize: number | null
   imageUrl: string | null
+  /** Ausschnitt des Produktfotos (Register N17, Nr. 98), schon geprüft; null = wie heute. */
+  bildAusschnitt: BildAusschnitt | null
 }
 
 /**

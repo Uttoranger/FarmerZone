@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { Camera, X, Leaf, Thermometer, Snowflake, ChevronRight, Info, Sparkles } from 'lucide-react'
+import { Camera, Crop, X, Leaf, Thermometer, Snowflake, ChevronRight, Info, Sparkles, Plus } from 'lucide-react'
 import { ladeFotoHoch, pruefeLesbarkeit, stufenText, type UploadStufe } from '@/components/shared/image-upload'
 import { useFotoQuellen, type FotoAuswahl } from '@/components/shared/foto-quellen'
 import { ordneLeseFehler, type LeseDiagnose, type UploadDiagnose } from '@/lib/upload-diagnose'
@@ -99,6 +99,18 @@ import { KategorieSheet } from './kategorie-sheet'
 import { LebensmittelVorschau } from './lebensmittel-vorschau'
 import { produktBereich } from '@/lib/produkte-hof'
 import { KAEUFER_VORSCHAU } from '@/lib/hofseite-kunde'
+import { AUSSCHNITT_STANDARD, bildStil } from '@/lib/bild-ausschnitt'
+import {
+  BILD_RAHMEN_TEXT,
+  PRODUKT_RAHMEN_KARTE,
+  PRODUKT_VORSCHAU_LISTE_HANDY,
+  PRODUKT_VORSCHAU_SEITE_COMPUTER,
+  PRODUKT_VORSCHAU_SEITE_HANDY,
+  alsFotoAusschnitt,
+} from '@/lib/bild-rahmen'
+import type { BildAusschnitt as BildAusschnittWert } from '@/schemas/bild-ausschnitt'
+import { BildAusschnitt, type BildVorschau } from '@/components/shared/bild-ausschnitt'
+import { speichereBildAusschnittAction } from '@/server/actions/bild-ausschnitt'
 import type { NeuBereich } from '@/schemas/url-auftrag'
 import { FUTTER_ANLEGEN_HREF } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
@@ -382,6 +394,12 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
   // bedingt). Beim Öffnen der des Produkts; meldet der Server „inzwischen
   // geändert", der neue Stand — sonst scheiterte jedes weitere Speichern.
   const [bestandBasis, setBestandBasis] = useState<number | null>(null)
+  // Ausschnitt des Produktfotos (Register N17, Nr. 98): gewählt im Dialog,
+  // geschrieben nach dem Produkt — beim Anlegen gibt es erst dann eine Kennung.
+  const [ausschnitt, setAusschnitt] = useState<BildAusschnittWert | null>(null)
+  const [ausschnittOffen, setAusschnittOffen] = useState(false)
+  // Geschrieben wird nach einer Wahl im Baustein und bei jedem neuen Foto: Dessen alter Ausschnitt gehörte zum alten.
+  const [ausschnittSpeichern, setAusschnittSpeichern] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   // Über welchen Weg und warum das gewählte Foto kam — nur für die
   // Sentry-Meldung; der Upload läuft hier erst beim Absenden, also bis dahin merken.
@@ -474,6 +492,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
       setPruefeFoto(false)
       setSelectedFile(null)
       setPreviewUrl(isEdit ? (product.imageUrl ?? null) : null)
+      setAusschnitt(isEdit ? product.bildAusschnitt : null)
+      setAusschnittOffen(false)
+      setAusschnittSpeichern(false)
       setOffen(isEdit ? [] : ['grunddaten'])
       setKategorieWechsel(null)
       setKategorieSheetOffen(false)
@@ -616,6 +637,10 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
     if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl)
     setSelectedFile(file)
     setPreviewUrl(URL.createObjectURL(file))
+    // Ein neues Foto beginnt ohne Ausschnitt; der Baustein öffnet einmal von selbst (Register N17).
+    setAusschnitt(null)
+    setAusschnittSpeichern(true)
+    setAusschnittOffen(true)
   }
 
   function handleRemoveImage() {
@@ -623,6 +648,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
     setSelectedFile(null)
     setPreviewUrl(null)
     form.setValue('imageUrl', '')
+    setAusschnitt(null)
+    setAusschnittOffen(false)
+    setAusschnittSpeichern(isEdit)
   }
 
   /**
@@ -846,6 +874,16 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
         }
         return
       }
+      // Der Ausschnitt nach dem Produkt: Ein Fehler nimmt das gespeicherte Produkt nicht zurück, er sagt es nur.
+      const produktId = isEdit ? product.id : ergebnis.angelegt?.id
+      if (produktId && ausschnittSpeichern && (isEdit || ausschnitt !== null)) {
+        const gespeichert = await speichereBildAusschnittAction({
+          ziel: 'produkt',
+          productId: produktId,
+          wert: alsFotoAusschnitt(ausschnitt ?? AUSSCHNITT_STANDARD),
+        })
+        if ('error' in gespeichert) toast.error(BILD_RAHMEN_TEXT.produkt.nichtGespeichert)
+      }
       toast.success(isEdit ? 'Produkt gespeichert' : 'Produkt angelegt')
       // Gespeichert, aber nicht im Shop: Der Größe fehlt die Futtermittel-Registrierung (S7, Nr. 20).
       if (ergebnis.hinweis) toast.info(ergebnis.hinweis)
@@ -927,13 +965,27 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                           Illustration der Kategorie. Hochgeladen wird unverändert erst
                           beim Absenden. */}
                       <div data-feld="imageUrl">
-                        {previewUrl ? (
+                        {previewUrl && ausschnittOffen ? (
+                          <ProduktfotoAusschnitt
+                            foto={previewUrl}
+                            wert={ausschnitt ?? AUSSCHNITT_STANDARD}
+                            name={werte.name.trim() || KAEUFER_VORSCHAU.name}
+                            preis={gueltigerPreis(werte.price) === null ? KAEUFER_VORSCHAU.preisFehlt : formatGrundpreis(werte.price, werte.unit, werte.unitSize)}
+                            onUebernehmen={(wert) => {
+                              setAusschnitt(wert)
+                              setAusschnittSpeichern(true)
+                              setAusschnittOffen(false)
+                            }}
+                            onAbbrechen={() => setAusschnittOffen(false)}
+                          />
+                        ) : previewUrl ? (
                           <div className="relative overflow-hidden rounded-xl border border-border bg-muted/30">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={previewUrl}
                               alt="Vorschau"
                               className="h-44 w-full object-cover"
+                              style={bildStil(ausschnitt)}
                               // Ersatz für die entfallene Format-Probe: Kann der
                               // Browser das Foto nicht zeichnen (HEIC auf Android),
                               // verschwindet die Vorschau still, statt ein kaputtes
@@ -953,6 +1005,15 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                             </button>
                             {/* Während des Absendens gesperrt (#135): Der Klick leert das
                                 Datei-Feld, dessen Datei gerade übertragen wird. */}
+                            <button
+                              type="button"
+                              onClick={() => setAusschnittOffen(true)}
+                              disabled={isSubmitting || pruefeFoto}
+                              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'absolute bottom-2 left-2 min-h-11 gap-1.5 bg-card disabled:opacity-60')}
+                            >
+                              <Crop className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
+                              {BILD_RAHMEN_TEXT.anpassen}
+                            </button>
                             <button
                               type="button"
                               onClick={fotoQuellen.oeffnen}
@@ -1985,5 +2046,99 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
       </DialogContent>
     </Dialog>
     </>
+  )
+}
+
+/**
+ * Der Bild-Baustein für das Produktfoto im Dialog (Register N17, Nr. 98;
+ * Mockup mobil-h2-produktfoto-ausschnitt): Hauptrahmen wie die Karte am
+ * Computer (260 : 140), Vorschau in der Liste (Handy 64 × 64, Computer) und
+ * auf der Produktseite (Handy 390 : 200, Computer 300 × 300) — mit Name und
+ * Preis aus dem Formular. „Speichern“ übernimmt die Wahl in den Dialog;
+ * geschrieben wird sie mit dem Produkt (onSubmit).
+ */
+function ProduktfotoAusschnitt({
+  foto,
+  wert,
+  name,
+  preis,
+  onUebernehmen,
+  onAbbrechen,
+}: {
+  foto: string
+  wert: BildAusschnittWert
+  name: string
+  preis: string
+  onUebernehmen: (wert: BildAusschnittWert) => void
+  onAbbrechen: () => void
+}): React.JSX.Element {
+  const zeilen = (klein: boolean) => (
+    <div className={cn('min-w-0', klein ? 'px-2 py-1.5' : 'flex-1')}>
+      <div className={cn('truncate font-semibold text-foreground', klein ? 'text-[11.5px]' : 'text-[13px]')}>{name}</div>
+      <div className={cn('truncate text-muted-foreground', klein ? 'text-[10px]' : 'text-[11.5px]')}>{preis}</div>
+    </div>
+  )
+  const vorschauen: BildVorschau[] = [
+    {
+      titel: BILD_RAHMEN_TEXT.produkt.listeHandy,
+      verhaeltnis: PRODUKT_VORSCHAU_LISTE_HANDY,
+      // Die Zeile der Hofseite am Handy: Foto 64 × 64, Name, Preis, Plus.
+      umgebung: (rahmen) => (
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-2">
+          <div className="w-16 shrink-0 overflow-hidden rounded-xl">{rahmen}</div>
+          {zeilen(false)}
+          <span className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+            <Plus className="size-4" strokeWidth={1.7} aria-hidden="true" />
+          </span>
+        </div>
+      ),
+    },
+    {
+      titel: BILD_RAHMEN_TEXT.produkt.listeComputer,
+      verhaeltnis: PRODUKT_RAHMEN_KARTE,
+      breite: 150,
+      umgebung: (rahmen) => (
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          {rahmen}
+          {zeilen(true)}
+        </div>
+      ),
+    },
+    {
+      titel: BILD_RAHMEN_TEXT.produkt.seiteHandy,
+      verhaeltnis: PRODUKT_VORSCHAU_SEITE_HANDY,
+      breite: 196,
+      umgebung: (rahmen) => (
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          {rahmen}
+          {zeilen(true)}
+        </div>
+      ),
+    },
+    {
+      titel: BILD_RAHMEN_TEXT.produkt.seiteComputer,
+      verhaeltnis: PRODUKT_VORSCHAU_SEITE_COMPUTER,
+      breite: 110,
+      umgebung: (rahmen) => <div className="overflow-hidden rounded-[14px] border border-border">{rahmen}</div>,
+    },
+  ]
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-border p-3">
+      <div>
+        <h3 className="font-heading text-lg font-semibold text-foreground">{BILD_RAHMEN_TEXT.produkt.titel}</h3>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          {name} · {BILD_RAHMEN_TEXT.produkt.hilfe}
+        </p>
+      </div>
+      <BildAusschnitt
+        foto={foto}
+        wert={wert}
+        rahmen={{ name: BILD_RAHMEN_TEXT.produkt.rahmen, verhaeltnis: PRODUKT_RAHMEN_KARTE }}
+        vorschauen={vorschauen}
+        onSpeichern={onUebernehmen}
+        onAbbrechen={onAbbrechen}
+      />
+      <p className="text-[12.5px] leading-snug text-muted-foreground">{BILD_RAHMEN_TEXT.produkt.satz}</p>
+    </div>
   )
 }

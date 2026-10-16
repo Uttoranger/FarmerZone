@@ -58,6 +58,7 @@ function angebot(teil: Partial<AngebotsProdukt> & { name: string; category: Prod
     unit: 'STUECK',
     unitSize: null,
     imageUrl: null,
+    bildAusschnitt: null,
     ...teil,
   }
 }

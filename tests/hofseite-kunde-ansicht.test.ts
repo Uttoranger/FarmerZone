@@ -82,7 +82,7 @@ function dateien(ordner: string): string[] {
 
 function produkt(id: string, name: string, category: ProductCategoryValue | null, stock = 20): PublicProduct {
   return {
-    id, name, description: null, imageUrl: null, category, categoryImageUrl: null,
+    id, name, description: null, imageUrl: null, bildAusschnitt: null, category, categoryImageUrl: null,
     price: 4.5, unit: 'STUECK', unitSize: null, stock, isAvailable: true, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
@@ -93,7 +93,7 @@ function produkt(id: string, name: string, category: ProductCategoryValue | null
 const HOF: PublicFarm = {
   id: 'farm_test', slug: 'hof-test', name: 'Hof Test', ownerName: 'Erika Muster',
   description: 'Gemüse aus Musterdorf', address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf',
-  phone: '+43 660 0000000', email: 'hof@example.com', logoUrl: null, bannerUrl: null,
+  phone: '+43 660 0000000', email: 'hof@example.com', logoUrl: null, logoAusschnitt: null, bannerUrl: null,
   tagline: null, foundedYear: null, aboutText: 'Ein kleiner Familienbetrieb.', bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50, bannerAusschnitt: null,
   sectionsConfig: [], farmValues: [], farmPhotos: [],
   acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,
@@ -111,7 +111,7 @@ const HOF: PublicFarm = {
 
 const STATUS: ActiveStatusPost = {
   id: 'status_1', title: 'Neue Ernte', body: 'Frische Karotten ab Freitag.', anlass: 'ANNOUNCEMENT',
-  photoUrl: null, linkedProductIds: [], publishedAt: '2026-09-30T08:00:00.000Z',
+  photoUrl: null, fotoAusschnitt: null, linkedProductIds: [], publishedAt: '2026-09-30T08:00:00.000Z',
 }
 
 type Ansicht = { art: 'kundin' | 'vorschau'; kaufen: boolean }
@@ -472,7 +472,7 @@ describe('Produktkarten verlinken auf die Produktseite (Nr. 11)', () => {
 // ─── Nr. 51: Schaufenster zuerst (Register N5) ──────────────────────────────
 
 describe('Schaufenster zuerst (Register N5, Nr. 51)', () => {
-  const FOTOS = [1, 2, 3].map((i) => ({ id: `foto_${i}`, url: `/landing/row-${i}.jpg`, caption: null, sortOrder: i }))
+  const FOTOS = [1, 2, 3].map((i) => ({ id: `foto_${i}`, url: `/landing/row-${i}.jpg`, caption: null, sortOrder: i, ausschnitt: null }))
 
   it('der Quelltext hat die Reihenfolge, die man unter lg sieht: Fotos, Produkte, „Alle Produkte (n)", rechte Spalte, Über uns', () => {
     const html = seite({ farm: { ...HOF, farmPhotos: FOTOS } })

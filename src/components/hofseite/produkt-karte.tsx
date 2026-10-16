@@ -11,6 +11,8 @@ import { KAEUFER_VORSCHAU, stepperObergrenze, type KartenVorschau } from '@/lib/
 import { zweitePreiszeile } from '@/lib/produktdetail'
 import { produktInitiale } from '@/lib/hofuebersicht'
 import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
+import { bildStil } from '@/lib/bild-ausschnitt'
+import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -63,6 +65,8 @@ type MusterKarte = {
    */
   variante: 'muster'
   produkt: KartenVorschau
+  /** Der Ausschnitt des Fotos (Register N17, Nr. 98) — ohne Angabe steht das Foto wie heute (Mitte). */
+  ausschnitt?: BildAusschnitt | null
 }
 
 /**
@@ -94,6 +98,7 @@ export function ProduktKarte(props: KaufKarte | MusterKarte): React.JSX.Element 
         name={produkt.name}
         bild={produkt.imageUrl ?? produkt.categoryImageUrl}
         istFoto={produkt.imageUrl !== null}
+        ausschnitt={props.ausschnitt ?? null}
         preis={produkt.price === null ? null : { price: produkt.price, unit: produkt.unit, unitSize: produkt.unitSize, futter: null }}
       />
     )
@@ -113,6 +118,7 @@ export function ProduktKarte(props: KaufKarte | MusterKarte): React.JSX.Element 
       name={produkt.name}
       bild={produkt.imageUrl ?? produkt.categoryImageUrl}
       istFoto={produkt.imageUrl !== null}
+      ausschnitt={produkt.bildAusschnitt}
       preis={produkt}
       href={href}
       kurz={kurzbeschreibung(produkt)}
@@ -164,6 +170,7 @@ function KartenAufbau({
   name,
   bild,
   istFoto,
+  ausschnitt,
   preis,
   href,
   kurz = null,
@@ -175,6 +182,8 @@ function KartenAufbau({
   name: string
   bild: string | null
   istFoto: boolean
+  /** Nur mit echtem Foto: Die Kategorie-Illustration bekommt nie einen Ausschnitt (Register N17). */
+  ausschnitt: BildAusschnitt | null
   preis: PreisAngabe
   href?: string
   kurz?: string | null
@@ -197,6 +206,8 @@ function KartenAufbau({
               istFoto ? 'object-cover' : 'object-contain p-1 dark:brightness-[0.85] dark:saturate-[0.9]',
               ausgegraut && 'grayscale'
             )}
+            // Ausgegraut ohne Filter des Hofs: Ein Inline-Filter überschriebe sonst die Klasse grayscale.
+            style={istFoto ? bildStil(ausschnitt, { filter: !ausgegraut }) : undefined}
           />
         ) : (
           <span aria-hidden="true" className="font-heading text-xl font-semibold text-brand-text">

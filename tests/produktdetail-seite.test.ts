@@ -85,7 +85,7 @@ function futter(nettoMenge: number): PublicFutter {
 
 function produkt(id: string, teil: Partial<PublicProduct> = {}): PublicProduct {
   return {
-    id, name: `Produkt ${id}`, description: null, imageUrl: null, category: 'GEMUESE', categoryImageUrl: null,
+    id, name: `Produkt ${id}`, description: null, imageUrl: null, bildAusschnitt: null, category: 'GEMUESE', categoryImageUrl: null,
     price: 4.5, unit: 'STUECK', unitSize: null, stock: 20, isAvailable: true, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
@@ -98,7 +98,7 @@ const HEU = { category: 'HEU_STROH' as const, familieId: 'fam_heu' }
 const HOF: PublicFarm = {
   id: 'farm_test', slug: 'hof-test', name: 'Hof Test', ownerName: 'Erika Muster',
   description: 'Gemüse aus Musterdorf', address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf',
-  phone: '+43 660 0000000', email: 'hof@example.com', logoUrl: null, bannerUrl: null,
+  phone: '+43 660 0000000', email: 'hof@example.com', logoUrl: null, logoAusschnitt: null, bannerUrl: null,
   tagline: null, foundedYear: null, aboutText: null, bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50, bannerAusschnitt: null,
   sectionsConfig: [], farmValues: [], farmPhotos: [],
   acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,

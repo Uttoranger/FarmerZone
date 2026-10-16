@@ -48,7 +48,7 @@ import type { ProductCategoryValue } from '@/lib/taxonomie'
 
 function produkt(id: string, teil: Partial<PublicProduct> = {}): PublicProduct {
   return {
-    id, name: `Produkt ${id}`, description: null, imageUrl: null, category: 'GEMUESE' as ProductCategoryValue,
+    id, name: `Produkt ${id}`, description: null, imageUrl: null, bildAusschnitt: null, category: 'GEMUESE' as ProductCategoryValue,
     categoryImageUrl: null, price: 4.5, unit: 'STUECK', unitSize: null, stock: 20, isAvailable: true,
     allergens: [], isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,

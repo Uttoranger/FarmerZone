@@ -28,6 +28,7 @@ import {
 import { signOut } from '@/lib/auth-client'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { FarmIdentityCard } from '@/components/farmer/farm-identity-card'
+import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { ThemeUmschalter, ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLinkItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -87,6 +88,8 @@ interface FarmerNavProps {
   ordersBadge?: number
   /** Hof-Logo für die Identitätskarte; null = Initialen. */
   farmLogoUrl?: string | null
+  /** Ausschnitt des Logos, schon geprüft (Register N17, Nr. 98); null = wie heute. */
+  farmLogoAusschnitt?: BildAusschnitt | null
   /** approvedAt === null — für den ruhigen Status-Punkt an der Karte. */
   farmPending?: boolean
   /** Betreiber-Konto: zeigt den Menüpunkt „Admin" (frisch aus der DB, nie aus der Sitzung). */
@@ -243,6 +246,7 @@ export function FarmerNav({
   userName,
   ordersBadge,
   farmLogoUrl = null,
+  farmLogoAusschnitt = null,
   farmPending = false,
   isAdmin = false,
   adminBadge,
@@ -472,7 +476,7 @@ export function FarmerNav({
         {/* Hof-Visitenkarte am Kopf: der Hof tritt auf. WER angemeldet ist,
             steht unten bei den Handlungen der Person. */}
         <div className="shrink-0 border-b border-white/10 px-4 py-4">
-          <FarmIdentityCard farmName={farmName} logoUrl={farmLogoUrl} wartetAufFreigabe={farmPending} />
+          <FarmIdentityCard farmName={farmName} logoUrl={farmLogoUrl} logoAusschnitt={farmLogoAusschnitt} wartetAufFreigabe={farmPending} />
         </div>
 
         {/* Alles darunter scrollt als eine Spalte: Auf niedrigen Bildschirmen

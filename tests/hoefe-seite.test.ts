@@ -88,6 +88,7 @@ const BROT: AngebotsProdukt = {
   unit: 'STUECK',
   unitSize: null,
   imageUrl: null,
+  bildAusschnitt: null,
 }
 
 const TREFFER_HOF: TrefferHof = { ...HOF, entfernungKm: 4.2 }

@@ -130,6 +130,7 @@ const AUFTRITT: AppearanceData = {
   foundedYear: 1987,
   aboutText: null,
   logoUrl: null,
+  logoAusschnitt: null,
   bannerType: 'GRADIENT',
   bannerUrl: null,
   bannerValue: null,

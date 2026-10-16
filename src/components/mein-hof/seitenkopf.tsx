@@ -12,6 +12,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { MeinHofReiterLeiste } from '@/components/mein-hof/reiter-leiste'
 import { KundenansichtKnopf } from '@/components/mein-hof/kundenansicht-knopf'
+import { bildStil } from '@/lib/bild-ausschnitt'
 import { cn } from '@/lib/utils'
 
 /*
@@ -41,7 +42,10 @@ const KNOPF = cn(
 
 function Hofbild({ hof, klasse }: { hof: MeinHofKopfDaten; klasse: string }) {
   return hof.logoUrl ? (
-    <Image src={hof.logoUrl} alt="" width={112} height={112} className={cn(klasse, 'shrink-0 rounded-full object-cover')} />
+    // Rund geschnitten im Kasten: Mit Zoom ragte das Logo sonst über den Kreis; ohne Filter (Register N17, Nr. 98).
+    <span className={cn(klasse, 'block shrink-0 overflow-hidden rounded-full')}>
+      <Image src={hof.logoUrl} alt="" width={112} height={112} className="size-full object-cover" style={bildStil(hof.logoAusschnitt, { filter: false })} />
+    </span>
   ) : (
     <span
       aria-hidden="true"

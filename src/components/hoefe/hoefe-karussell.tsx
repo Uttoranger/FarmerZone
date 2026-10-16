@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import Image from 'next/image'
+import { bildStil } from '@/lib/bild-ausschnitt'
 import Link from 'next/link'
 import type { ProductCategoryValue } from '@/schemas/product'
 import {
@@ -163,13 +164,18 @@ export default function HoefeKarussell({
                   className="size-14 shrink-0 rounded-lg object-cover"
                 />
               ) : hof.logoUrl ? (
-                <Image
-                  src={hof.logoUrl}
-                  alt=""
-                  width={40}
-                  height={40}
-                  className="size-10 shrink-0 rounded-full object-cover dark:bg-app-bar-ink"
-                />
+                // Rund geschnitten im Kasten: Mit Zoom ragte das Logo sonst über den Kreis (Register N17, Nr. 98).
+                <span className="block size-10 shrink-0 overflow-hidden rounded-full dark:bg-app-bar-ink">
+                  <Image
+                    src={hof.logoUrl}
+                    alt=""
+                    width={40}
+                    height={40}
+                    className="size-full object-cover"
+                    // Das Logo bekommt keinen Filter (Register N17).
+                    style={bildStil(hof.logoAusschnitt, { filter: false })}
+                  />
+                </span>
               ) : (
                 <span
                   aria-hidden="true"

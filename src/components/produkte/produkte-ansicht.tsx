@@ -51,6 +51,7 @@ import type { KategorieVorschlag } from '@/lib/taxonomie'
 import type { NaechstesFenster } from '@/lib/heute'
 import type { HofRegistrierung } from '@/lib/futter-registrierung'
 import { useUrlAuftrag } from '@/lib/use-url-auftrag'
+import { bildStil } from '@/lib/bild-ausschnitt'
 import { cn } from '@/lib/utils'
 
 type Props = {
@@ -536,7 +537,7 @@ function ProduktBild({ product, className }: { product: ProductData; className?:
     <div className={cn('flex shrink-0 items-center justify-center overflow-hidden border border-border bg-muted', className)}>
       {product.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={product.imageUrl} alt="" className="h-full w-full object-cover" />
+        <img src={product.imageUrl} alt="" className="h-full w-full object-cover" style={bildStil(product.bildAusschnitt)} />
       ) : product.categoryImageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={product.categoryImageUrl} alt="" className="h-full w-full object-contain dark:brightness-[0.85] dark:saturate-[0.9]" />

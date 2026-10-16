@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { leseAusschnitt, type BildAusschnitt } from '@/schemas/bild-ausschnitt'
 
 export type SectionConfig = {
   key: string
@@ -27,6 +28,8 @@ export type FarmPhotoData = {
   url: string
   caption: string | null
   sortOrder: number
+  /** Ausschnitt der Kachel (Register N17, Nr. 98) — schon geprüft; null = wie heute. */
+  ausschnitt: BildAusschnitt | null
 }
 
 export type AppearanceData = {
@@ -35,6 +38,8 @@ export type AppearanceData = {
   foundedYear: number | null
   aboutText: string | null
   logoUrl: string | null
+  /** Ausschnitt des Logos (Register N17, Nr. 98) — schon geprüft; null = wie heute. */
+  logoAusschnitt: BildAusschnitt | null
   bannerType: 'GRADIENT' | 'PHOTO'
   bannerUrl: string | null
   bannerValue: string | null
@@ -53,6 +58,7 @@ export async function getAppearanceData(ownerId: string): Promise<AppearanceData
       foundedYear: true,
       aboutText: true,
       logoUrl: true,
+      logoAusschnitt: true,
       bannerType: true,
       bannerUrl: true,
       bannerValue: true,
@@ -64,7 +70,7 @@ export async function getAppearanceData(ownerId: string): Promise<AppearanceData
       },
       farmPhotos: {
         orderBy: { sortOrder: 'asc' },
-        select: { id: true, url: true, caption: true, sortOrder: true },
+        select: { id: true, url: true, caption: true, sortOrder: true, ausschnitt: true },
       },
     },
   })
@@ -83,12 +89,13 @@ export async function getAppearanceData(ownerId: string): Promise<AppearanceData
     foundedYear: farm.foundedYear,
     aboutText: farm.aboutText,
     logoUrl: farm.logoUrl,
+    logoAusschnitt: leseAusschnitt(farm.logoAusschnitt),
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
     bannerUrl: farm.bannerUrl,
     bannerValue: farm.bannerValue,
     sectionsConfig: sections,
     farmValues: farm.farmValues,
-    farmPhotos: farm.farmPhotos,
+    farmPhotos: farm.farmPhotos.map(({ ausschnitt, ...foto }) => ({ ...foto, ausschnitt: leseAusschnitt(ausschnitt) })),
     slug: farm.slug,
   }
 }

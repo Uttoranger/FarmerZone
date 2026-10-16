@@ -35,6 +35,8 @@ export type PublicProduct = {
   name: string
   description: string | null
   imageUrl: string | null
+  /** Ausschnitt und Filter des Produktfotos (Register N17, Nr. 98) — schon geprüft; null = wie heute (Mitte). Nur zusammen mit `imageUrl`. */
+  bildAusschnitt: BildAusschnitt | null
   category: ProductCategory | null
   categoryImageUrl: string | null
   price: number
@@ -121,6 +123,8 @@ export type PublicFarmPhoto = {
   url: string
   caption: string | null
   sortOrder: number
+  /** Ausschnitt und Filter der Kachel (Register N17, Nr. 98) — schon geprüft; null = wie heute. */
+  ausschnitt: BildAusschnitt | null
 }
 
 export type PublicFarm = {
@@ -135,6 +139,8 @@ export type PublicFarm = {
   phone: string
   email: string
   logoUrl: string | null
+  /** Ausschnitt des Logos, ohne Filter (Register N17, Nr. 98) — schon geprüft; null = wie heute. */
+  logoAusschnitt: BildAusschnitt | null
   bannerUrl: string | null
   // Presentation fields
   tagline: string | null
@@ -174,7 +180,12 @@ export type PublicFarm = {
 
 const FARM_PHOTO_SELECT = {
   orderBy: { sortOrder: 'asc' as const },
-  select: { id: true, url: true, caption: true, sortOrder: true },
+  select: { id: true, url: true, caption: true, sortOrder: true, ausschnitt: true },
+}
+
+/** Json aus der Datenbank nur über leseAusschnitt: Ein ungültiger Wert ergibt null, nie einen Fehler auf der Hofseite. */
+function alsOeffentlichesFoto({ ausschnitt, ...foto }: { id: string; url: string; caption: string | null; sortOrder: number; ausschnitt: Prisma.JsonValue }): PublicFarmPhoto {
+  return { ...foto, ausschnitt: leseAusschnitt(ausschnitt) }
 }
 
 /**
@@ -196,6 +207,7 @@ const OEFFENTLICHES_PRODUKT_SELECT = {
   name: true,
   description: true,
   imageUrl: true,
+  bildAusschnitt: true,
   category: true,
   subcategory: true,
   price: true,
@@ -257,6 +269,7 @@ function alsOeffentlichesProdukt(
 ): PublicProduct {
   return {
     ...zuProduktDto(p),
+    bildAusschnitt: leseAusschnitt(p.bildAusschnitt),
     categoryImageUrl: categoryImagePath(p.category, p.subcategory),
     isOrganic: p.labels.includes('BIO'),
     futter: futter
@@ -307,6 +320,7 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       bannerValue: true,
       bannerFocusY: true,
       bannerAusschnitt: true,
+      logoAusschnitt: true,
       sectionsConfig: true,
       acceptsOnline: true,
       acceptsOnsite: true,
@@ -352,8 +366,9 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
     // Json aus der Datenbank nur über leseAusschnitt: Ein ungültiger Wert ergibt null, nie einen Fehler auf der Hofseite.
     bannerAusschnitt: leseAusschnitt(farm.bannerAusschnitt),
+    logoAusschnitt: leseAusschnitt(farm.logoAusschnitt),
     sectionsConfig: sections,
-    farmPhotos: farm.farmPhotos,
+    farmPhotos: farm.farmPhotos.map(alsOeffentlichesFoto),
     serviceFeePercent: Number(farm.serviceFeePercent),
     serviceFeeActiveFrom: farm.serviceFeeActiveFrom?.toISOString() ?? null,
     products: farm.products.map((p) => alsOeffentlichesProdukt(p, { betriebsnummer })),
@@ -398,6 +413,7 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       bannerValue: true,
       bannerFocusY: true,
       bannerAusschnitt: true,
+      logoAusschnitt: true,
       sectionsConfig: true,
       acceptsOnline: true,
       acceptsOnsite: true,
@@ -443,8 +459,9 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
     // Json aus der Datenbank nur über leseAusschnitt: Ein ungültiger Wert ergibt null, nie einen Fehler auf der Hofseite.
     bannerAusschnitt: leseAusschnitt(farm.bannerAusschnitt),
+    logoAusschnitt: leseAusschnitt(farm.logoAusschnitt),
     sectionsConfig: sections,
-    farmPhotos: farm.farmPhotos,
+    farmPhotos: farm.farmPhotos.map(alsOeffentlichesFoto),
     serviceFeePercent: Number(farm.serviceFeePercent),
     serviceFeeActiveFrom: farm.serviceFeeActiveFrom?.toISOString() ?? null,
     products: farm.products.map((p) => alsOeffentlichesProdukt(p, { betriebsnummer })),
@@ -610,6 +627,8 @@ export type HofUebersichtEintrag = {
   postalCode: string
   city: string
   logoUrl: string | null
+  /** Ausschnitt des Logos (Register N17, Nr. 98) — schon geprüft; null = wie heute. */
+  logoAusschnitt: BildAusschnitt | null
   latitude: number | null
   longitude: number | null
   isPaused: boolean
@@ -676,6 +695,7 @@ export async function getOeffentlicheHoefe(
       subcategory: true,
       labels: true,
       imageUrl: true,
+      bildAusschnitt: true,
       name: true,
       price: true,
       stock: true,
@@ -710,6 +730,7 @@ export async function getOeffentlicheHoefe(
       postalCode: true,
       city: true,
       logoUrl: true,
+      logoAusschnitt: true,
       latitude: true,
       longitude: true,
       isPaused: true,
@@ -743,6 +764,7 @@ export async function getOeffentlicheHoefe(
           reservedStock: true,
           category: true,
           imageUrl: true,
+          bildAusschnitt: true,
         },
       },
       // Die Gesamtzahl der verfügbar geschalteten Produkte — die Zeile
@@ -800,6 +822,7 @@ export async function getOeffentlicheHoefe(
         unit: zeile.unit,
         unitSize: dto.unitSize,
         imageUrl: zeile.imageUrl,
+        bildAusschnitt: leseAusschnitt(zeile.bildAusschnitt),
       })
       angebotJeHof.set(zeile.farmId, bisher)
     }
@@ -823,6 +846,7 @@ export async function getOeffentlicheHoefe(
       postalCode: hof.postalCode,
       city: hof.city,
       logoUrl: hof.logoUrl,
+      logoAusschnitt: leseAusschnitt(hof.logoAusschnitt),
       latitude: hof.latitude,
       longitude: hof.longitude,
       isPaused: hof.isPaused,
@@ -834,6 +858,7 @@ export async function getOeffentlicheHoefe(
         ...zuProduktDto({ price: p.price, unitSize: p.unitSize }),
         unit: p.unit,
         imageUrl: p.imageUrl,
+        bildAusschnitt: leseAusschnitt(p.bildAusschnitt),
         category: p.category,
         // „Verfügbar" heißt: Es ist noch etwas da, das nicht schon reserviert
         // ist. Siehe VORSCHAU-VERFÜGBARKEIT im Kopf dieser Datei.
@@ -863,6 +888,8 @@ export type MeinHofKopfDaten = {
   /** Die öffentliche Adresse der Hofseite — zum Anzeigen ohne Protokoll, zum Öffnen und Kopieren vollständig. */
   adresse: { anzeige: string; url: string }
   logoUrl: string | null
+  /** Ausschnitt des Logos (Register N17, Nr. 98) — schon geprüft; null = wie heute. */
+  logoAusschnitt: BildAusschnitt | null
   /** Ein hochgeladenes Titelbild; null = Verlauf (bannerValue). */
   titelbildUrl: string | null
   bannerValue: string | null
@@ -878,6 +905,7 @@ export async function getMeinHofKopf(ownerId: string): Promise<MeinHofKopfDaten 
       name: true,
       slug: true,
       logoUrl: true,
+      logoAusschnitt: true,
       bannerType: true,
       bannerUrl: true,
       bannerValue: true,
@@ -894,6 +922,7 @@ export async function getMeinHofKopf(ownerId: string): Promise<MeinHofKopfDaten 
     slug: hof.slug,
     adresse: hofAdresse(APP_URL, hof.slug),
     logoUrl: hof.logoUrl,
+    logoAusschnitt: leseAusschnitt(hof.logoAusschnitt),
     titelbildUrl: titelbildFoto(hof),
     bannerValue: hof.bannerValue,
     bannerFocusY: hof.bannerFocusY,
