@@ -94,7 +94,7 @@ describe('getActiveStatusPosts — in der echten Datenbank', () => {
 
     const [erster] = await getActiveStatusPosts(farm.id, HOFSEITE_BEITRAEGE_MAX)
 
-    expect(Object.keys(erster ?? {}).sort()).toEqual(['anlass', 'body', 'id', 'linkedProductIds', 'photoUrl', 'publishedAt', 'title'])
+    expect(Object.keys(erster ?? {}).sort()).toEqual(['anlass', 'body', 'fotoAusschnitt', 'id', 'linkedProductIds', 'photoUrl', 'publishedAt', 'title'])
     expect(typeof erster?.publishedAt).toBe('string')
   })
 })
