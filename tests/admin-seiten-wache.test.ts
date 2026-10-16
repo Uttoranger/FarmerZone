@@ -218,6 +218,7 @@ const ROUTEN = [...dateienUnter(ADMIN)].filter((p) => p.endsWith(`${sep}route.ts
 describe('jede Route unter /admin (route.ts)', () => {
   it('es gibt die Routen, die bekannt sind — sonst bewiese der Rest nichts', () => {
     expect(ROUTEN.sort()).toEqual([
+      'betrieb/bilder-export/route.ts',
       'betrieb/export/route.ts',
       'finanzen/export/route.ts',
       'meldungen/[id]/route.ts',
