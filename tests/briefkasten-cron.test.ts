@@ -16,6 +16,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 vi.mock('@vercel/blob', () => ({ del: vi.fn() }))
+// Der Herzschlag-Rahmen (Nr. 103) reicht den Wochenlauf unverändert durch (tests/betrieb-herzschlag.test.ts).
+vi.mock('@/server/betrieb', () => ({ mitHerzschlag: vi.fn(async (_name: string, lauf: () => Promise<unknown>) => lauf()) }))
 vi.mock('@/lib/email', () => ({ sendBriefkastenZusammenfassung: vi.fn() }))
 vi.mock('@/server/queries/postfach', () => ({ ladeBetreiberEmpfaenger: vi.fn(), zaehleOffenImEingang: vi.fn() }))
 vi.mock('@/server/queries/meldung', () => ({

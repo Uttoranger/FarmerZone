@@ -20,11 +20,11 @@ import { MARKE } from '@/lib/marke'
 
 // ─── Arten und Regeln ────────────────────────────────────────────────────────
 
-/** Jede Betreiber-Mail gehört zu genau einer Art. */
-export const ZUSTELL_ARTEN = ['fehlermeldung', 'hofWartet', 'erstattungOffen', 'antwortHof', 'wunschFrage', 'wochenbericht'] as const
+/** Jede Betreiber-Mail gehört zu genau einer Art. „betrieb“ seit Nr. 103 (Register N18): die Warn-Mails von Admin › Betrieb. */
+export const ZUSTELL_ARTEN = ['fehlermeldung', 'hofWartet', 'erstattungOffen', 'betrieb', 'antwortHof', 'wunschFrage', 'wochenbericht'] as const
 export type ZustellArt = (typeof ZUSTELL_ARTEN)[number]
 
-/** Die Arten, die der Admin schalten kann. Erstattung offen und Wünsche/Fragen sind fest (N14). */
+/** Die Arten, die der Admin schalten kann. Erstattung offen, Betrieb (N18) und Wünsche/Fragen sind fest (N14). */
 export const SCHALTBARE_ARTEN = ['fehlermeldung', 'hofWartet', 'antwortHof', 'wochenbericht'] as const
 export type SchaltbareArt = (typeof SCHALTBARE_ARTEN)[number]
 
@@ -55,11 +55,13 @@ export function zustellRegelnAus(json: unknown): ZustellRegeln {
 
 /**
  * Geht eine Mail dieser Art hinaus? „Erstattung offen" immer — es geht um
- * Geld der Kundin, die Regel „aus" gibt es dafür nicht. Wünsche und Fragen
- * nie sofort: Sie bleiben im Eingang und stehen im Wochenbericht (N14).
+ * Geld der Kundin, die Regel „aus" gibt es dafür nicht. „Betrieb" ebenso
+ * (Register N18): Ein voller Bild-Speicher oder ein ausgefallener Ablauf
+ * betrifft die ganze Plattform. Wünsche und Fragen nie sofort: Sie bleiben im
+ * Eingang und stehen im Wochenbericht (N14).
  */
 export function regelAn(art: ZustellArt, regeln: ZustellRegeln): boolean {
-  if (art === 'erstattungOffen') return true
+  if (art === 'erstattungOffen' || art === 'betrieb') return true
   if (art === 'wunschFrage') return false
   return regeln[art]
 }
@@ -130,13 +132,15 @@ export const ZUSTELL_REGEL_TEXT: Record<ZustellArt, string> = {
   fehlermeldung: 'Fehlermeldung – sofort, je Meldung',
   hofWartet: 'Neuer Hof wartet auf Freischaltung – sofort',
   erstattungOffen: 'Erstattung offen – sofort; Geld, deshalb immer an (nicht abschaltbar)',
-  antwortHof: 'Antwort eines Hofs – sofort; aus heißt nur der Zähler im Eingang',
+  betrieb: 'Betrieb – Warnung ab 80 % oder bei einem ausgefallenen Ablauf; immer an (nicht abschaltbar)',
+  // Die Drossel kam mit Nr. 105 (Register N14, Ergänzung): höchstens eine Mail je Faden und voller Stunde.
+  antwortHof: 'Antwort eines Hofs – sofort, höchstens eine Mail je Faden und Stunde; aus heißt nur der Zähler im Eingang',
   wunschFrage: 'Wünsche und Fragen – nur im Eingang, gesammelt im Wochenbericht',
   wochenbericht: 'Wochenbericht – montags früh, nur wenn im Eingang etwas offen ist',
 }
 
 /** Die Reihenfolge im Formular (Mockup admin-postfach-zustellung). */
-export const ZUSTELL_REGEL_REIHENFOLGE: readonly ZustellArt[] = ['fehlermeldung', 'hofWartet', 'erstattungOffen', 'antwortHof', 'wunschFrage', 'wochenbericht']
+export const ZUSTELL_REGEL_REIHENFOLGE: readonly ZustellArt[] = ['fehlermeldung', 'hofWartet', 'erstattungOffen', 'betrieb', 'antwortHof', 'wunschFrage', 'wochenbericht']
 
 /** Alle Sätze des Reiters „Zustellung". */
 export const ZUSTELLUNG_TEXT = {

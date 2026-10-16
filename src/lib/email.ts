@@ -22,6 +22,7 @@ import { abmeldeSeitenPfad, listUnsubscribeKoepfe } from '@/lib/abmelde-link'
 import { MARKE } from '@/lib/marke'
 import { EINGANG_TEXT, POSTFACH_MAIL_TEXT, eingangAdresse, eingangMeldungAdresse, fadenHref, offenSatz, type EingangZahlen } from '@/lib/postfach'
 import { ZUSTELLUNG_MAIL_TEXT, bestaetigenPfad } from '@/lib/zustellung'
+import { ADMIN_BETRIEB_HREF, betriebMail, fehlerKlasse, type BetriebMailAnlass } from '@/lib/betrieb'
 
 const apiKey = process.env.RESEND_API_KEY
 const FROM = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
@@ -117,6 +118,29 @@ export type VersandErgebnis = { id?: string; error?: string; gesperrt?: true }
  */
 type MailOptionen = { headers?: Record<string, string> }
 
+/**
+ * Zählt eine verschickte Mail für Admin › Betrieb (Register N18, Nr. 103) —
+ * die EINE Ausnahme von „email.ts liest nie Prisma" (ARCHITECTURE §4): Der
+ * Zähler kommt per `await import()` erst nach dem Versand, email.ts selbst
+ * bindet ihn nicht statisch ein. Fail-open: Ein Fehler beim Zählen stoppt nie
+ * eine Mail und wirft nie — nach Sentry geht nur die Fehlerklasse unter einem
+ * festen Satz, nie Adresse oder Betreff.
+ */
+async function zaehleVersand(): Promise<void> {
+  try {
+    const { zaehleMail } = await import('@/server/betrieb-zaehler')
+    await zaehleMail()
+  } catch (err) {
+    try {
+      const meldung = new Error('Betrieb: Mail nicht gezählt')
+      meldung.name = fehlerKlasse(err)
+      Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'betrieb', grund: 'mail-zaehler' } })
+    } catch {
+      // Telemetrie scheitert leise — die Mail ist schon hinaus.
+    }
+  }
+}
+
 export async function sendRaw(
   to: string,
   subject: string,
@@ -148,6 +172,7 @@ export async function sendRaw(
       return { error: JSON.stringify(result.error) }
     }
     console.log(`[E-Mail] ✓ Gesendet, ID: ${result.data?.id}`)
+    await zaehleVersand()
     return { id: result.data?.id }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
@@ -941,4 +966,22 @@ export async function sendBetreiberTestmail(an: readonly string[]): Promise<List
   })
   if (!vorlage.ok) return { gesendet: 0, gescheitert: an.length }
   return sendeAnListe(an, ZUSTELLUNG_MAIL_TEXT.testBetreff, vorlage.html)
+}
+
+/**
+ * Warn-Mail von Admin › Betrieb (Register N18, Nr. 103; Mockup
+ * email-betrieb-warnung) an die Empfänger der Art „Betrieb“ — fest an, `an`
+ * aus `ladeBetreiberEmpfaenger('betrieb')`. Betreff und Sätze baut die reine
+ * `betriebMail`; nur Zahlen und Namen aus festen Listen, keine Personendaten.
+ * Sie selbst löst keine Prüfung aus (nur der Zähler in sendRaw zählt sie mit).
+ */
+export async function sendBetriebWarnung(anlass: BetriebMailAnlass, an: readonly string[]): Promise<ListenErgebnis> {
+  if (an.length === 0) return { gesendet: 0, gescheitert: 0 }
+  const mail = betriebMail(anlass)
+  const vorlage = await htmlOderFehler(async () => {
+    const { BetriebWarnungEmail } = await import('@/emails/betrieb-warnung')
+    return React.createElement(BetriebWarnungEmail, { mail, url: `${APP_URL}${ADMIN_BETRIEB_HREF}` })
+  })
+  if (!vorlage.ok) return { gesendet: 0, gescheitert: an.length }
+  return sendeAnListe(an, mail.betreff, vorlage.html)
 }

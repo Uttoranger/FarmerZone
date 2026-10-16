@@ -6,6 +6,7 @@ import { screenshotsVon, waehleZuLoeschende } from '@/lib/meldung'
 import { findeHauptmeldungen, findeLoeschKandidaten, loescheMeldungen, zaehleFuerWochenlauf } from '@/server/queries/meldung'
 import { sendBriefkastenZusammenfassung } from '@/lib/email'
 import { ladeBetreiberEmpfaenger, zaehleOffenImEingang } from '@/server/queries/postfach'
+import { mitHerzschlag } from '@/server/betrieb'
 
 /**
  * Wochenlauf des Fehlerbriefkastens (Sprint fehlerbriefkasten, Teil F).
@@ -34,6 +35,8 @@ import { ladeBetreiberEmpfaenger, zaehleOffenImEingang } from '@/server/queries/
  *       keine Mail: eine leere Wochenmail wäre die erste, die keiner mehr
  *       liest. Der Meldungsteil der Mail (neu, liegen geblieben) bleibt.
  * Aufräumen läuft zuerst, damit die Zusammenfassung den Stand danach nennt.
+ * Seit Nr. 103 im Herzschlag-Rahmen (Register N18): Admin › Betrieb sieht
+ * jeden Lauf, danach prüft er die anderen Abläufe.
  */
 export async function GET(request: NextRequest) {
   // Konstante Zeit, fail-closed — wie alle Cron-Routen (ARCHITECTURE §5).
@@ -41,6 +44,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  return NextResponse.json(await mitHerzschlag('briefkasten', wochenlauf))
+}
+
+async function wochenlauf(): Promise<Record<string, unknown>> {
   const jetzt = new Date()
 
   // (b) Aufräumen
@@ -63,12 +70,12 @@ export async function GET(request: NextRequest) {
     await sendBriefkastenZusammenfassung({ ...zaehler, geloescht, eingang }, an)
   }
 
-  return NextResponse.json({
+  return {
     zusammenfassung: an.length > 0,
     offenImEingang: eingang.gesamt,
     neu: zaehler.neu,
     liegenGeblieben: zaehler.liegenGeblieben,
     geloescht,
     at: jetzt.toISOString(),
-  })
+  }
 }

@@ -6,7 +6,7 @@ import { STRIPE_MARKE, TESTBETRIEB } from '@/lib/umgebung-server'
 /*
  * Alle Routen unter /admin in der AdminShell (Nachtlauf Nr. 22f, Gate 8):
  * eigene Kopfzeile mit den Reitern Höfe · Postfach · Startseite · Finanzen ·
- * Einstellungen und — nur mit eigenem Hof — „← Zu meinem Hof", keine Hof-Seitenleiste
+ * Betrieb · Einstellungen und — nur mit eigenem Hof — „← Zu meinem Hof", keine Hof-Seitenleiste
  * (docs/ai/DESIGN_SYSTEM.md).
  *
  * Zugang: ladeAdminbereich prüft zuerst mit verlangeAdminSeite (frisch aus
@@ -18,12 +18,13 @@ export const metadata: Metadata = {
 }
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }): Promise<React.JSX.Element> {
-  const { personName, hatHof, zahlen } = await ladeAdminbereich()
+  const { personName, hatHof, zahlen, betrieb } = await ladeAdminbereich()
 
   // Testbetrieb (Register Z2): Produktion mit Test-Schlüssel — nur der Wahrheitswert geht an die Shell.
-  // Betriebsleiste (Register Z3, Korrektur Nr. 94): nur der Stripe-Modus, als Text und Ton.
+  // Betriebsleiste (Register Z3, Korrektur Nr. 94): der Stripe-Modus, als Text und Ton;
+  // rechts seit Nr. 103 (N15/N18) der Hinweis auf eine offene Warnung — nur in der Produktion.
   return (
-    <AdminShell personName={personName} hatHof={hatHof} zahlen={zahlen} testbetrieb={TESTBETRIEB} stripeMarke={STRIPE_MARKE}>
+    <AdminShell personName={personName} hatHof={hatHof} zahlen={zahlen} testbetrieb={TESTBETRIEB} stripeMarke={STRIPE_MARKE} betrieb={betrieb}>
       {children}
     </AdminShell>
   )

@@ -4,7 +4,6 @@ import { verlangeAdminSeite } from '@/server/admin-wache'
 import { prisma } from '@/lib/prisma'
 import { lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
 import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
-import { STRIPE_MARKE } from '@/lib/umgebung-server'
 import { bildeGruendungBis, gruendungsplaetze, seitenZahlen, zaehleAusgenommene } from '@/lib/gruendungshof'
 import { EINSTELLUNGEN_TEXT, gruendungZeileKurz, protokollZeile, ADMIN_EINSTELLUNGEN_HREF } from '@/lib/plattform-einstellung'
 import { einstellungenGruppeSchema } from '@/schemas/plattform-einstellung'
@@ -12,6 +11,8 @@ import { cn } from '@/lib/utils'
 import { ADMIN_RAHMEN, AdminFehler, SEITEN_TITEL } from '@/components/admin/admin-teile'
 import { EinstellungenGruppen, type EinstellungenDaten } from '@/components/admin/einstellungen-gruppen'
 import { MARKE } from '@/lib/marke'
+import { redirect } from 'next/navigation'
+import { ADMIN_BETRIEB_HREF } from '@/lib/betrieb'
 
 export const metadata: Metadata = { title: `Einstellungen — Admin — ${MARKE}` }
 // Zeigt den gespeicherten Stand und rechnet „frei" mit den Höfen von jetzt — nie aus einem Cache.
@@ -36,7 +37,6 @@ async function ladeDaten(gewaehlt: EinstellungenDaten['gewaehlt'], jetzt: Date):
       protokoll: protokollZeile(einstellung, person?.name ?? null),
     },
     gruendungZeile: gruendungZeileKurz(zahlen.gesamt, zahlen.frei, zahlen.bisTag),
-    stripeMarke: STRIPE_MARKE,
   }
 }
 
@@ -44,7 +44,9 @@ async function ladeDaten(gewaehlt: EinstellungenDaten['gewaehlt'], jetzt: Date):
  * /admin/einstellungen — was die Plattform als Ganzes betrifft (Register N15
  * und K2-Ergänzung, Nr. 93; Mockups admin-einstellungen und
  * admin-mobil-einstellungen). Bearbeitbar ist in diesem Lauf nur die Gruppe
- * Gründungshöfe; Betrieb und Plattform stehen nur zum Nachsehen da.
+ * Gründungshöfe; Plattform steht nur zum Nachsehen da. Die Gruppe Betrieb
+ * entfiel mit Nr. 103 (Register N15 geändert): Ein alter Link
+ * `?gruppe=betrieb` führt nach Admin › Betrieb, wo der Stripe-Modus jetzt steht.
  */
 export default async function AdminEinstellungenPage({
   searchParams,
@@ -53,7 +55,9 @@ export default async function AdminEinstellungenPage({
 }): Promise<React.JSX.Element> {
   await verlangeAdminSeite()
 
-  const gewaehlt = einstellungenGruppeSchema.parse((await searchParams).gruppe)
+  const { gruppe } = await searchParams
+  if (gruppe === 'betrieb') redirect(ADMIN_BETRIEB_HREF)
+  const gewaehlt = einstellungenGruppeSchema.parse(gruppe)
   const jetzt = new Date()
 
   let daten: EinstellungenDaten | null = null
