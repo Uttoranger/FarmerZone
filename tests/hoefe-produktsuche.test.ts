@@ -34,6 +34,7 @@ function produkt(teil: Partial<VorschauProdukt> & { name: string }): VorschauPro
     unit: 'KG',
     unitSize: null,
     imageUrl: null,
+    bildAusschnitt: null,
     category: null,
     verfuegbar: true,
     ...teil,

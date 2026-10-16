@@ -14,6 +14,7 @@ import type {
   Tierart,
   Verpackung,
 } from '@prisma/client'
+import { leseAusschnitt, type BildAusschnitt } from '@/schemas/bild-ausschnitt'
 
 // Einheitliche Produkt-Reihenfolge (Sprint 17K): manuelle sortOrder,
 // createdAt als stabile Sekundärsortierung; ausgeblendete Produkte
@@ -57,6 +58,8 @@ export type ProductData = {
   name: string
   description: string | null
   imageUrl: string | null
+  /** Ausschnitt und Filter des Produktfotos (Register N17, Nr. 98) — schon geprüft; null = wie heute (Mitte). */
+  bildAusschnitt: BildAusschnitt | null
   category: ProductCategory | null
   subcategory: ProductSubcategory | null
   labels: ProductLabel[]
@@ -103,6 +106,7 @@ export async function getProductsForFarm(farmId: string): Promise<ProductData[]>
     name: p.name,
     description: p.description,
     imageUrl: p.imageUrl,
+    bildAusschnitt: leseAusschnitt(p.bildAusschnitt),
     category: p.category,
     subcategory: p.subcategory,
     labels: p.labels,

@@ -34,6 +34,7 @@ import { SHOP_PAUSED_BUTTON_LABEL, kundenPausenText } from '@/lib/shop-pause'
 import { SIEGEL } from '@/lib/taxonomie'
 import type { KundenSeite } from '@/lib/kunden-kopf'
 import { useCart } from '@/lib/use-cart'
+import { bildStil } from '@/lib/bild-ausschnitt'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { GroessenWahl, Groessenkachel } from '@/components/ui/groessenkachel'
@@ -218,6 +219,8 @@ export function ProduktdetailKunde({
                     produkt.imageUrl ? 'object-cover' : 'object-contain p-6 dark:brightness-[0.85] dark:saturate-[0.9]',
                     zustand.art === 'ausverkauft' && 'grayscale'
                   )}
+                  // Ausschnitt nur am echten Foto (Register N17); ausverkauft ohne Filter des Hofs, sonst überschriebe er grayscale.
+                  style={produkt.imageUrl ? bildStil(produkt.bildAusschnitt, { filter: zustand.art !== 'ausverkauft' }) : undefined}
                 />
               ) : (
                 <span aria-hidden="true" className="flex h-full items-center justify-center font-heading text-5xl font-semibold text-brand-text">

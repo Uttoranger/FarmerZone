@@ -4,6 +4,8 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Eye } from 'lucide-react'
 import { hofInitialen } from '@/lib/hof-initialen'
+import { bildStil } from '@/lib/bild-ausschnitt'
+import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 
 /**
  * Hof-Identitätskarte am Kopf der Bauern-Navigation.
@@ -28,10 +30,13 @@ import { hofInitialen } from '@/lib/hof-initialen'
 export function FarmIdentityCard({
   farmName,
   logoUrl,
+  logoAusschnitt,
   wartetAufFreigabe,
 }: {
   farmName: string
   logoUrl: string | null
+  /** Ausschnitt des Logos (Register N17, Nr. 98), ohne Filter; null = wie heute. */
+  logoAusschnitt: BildAusschnitt | null
   wartetAufFreigabe: boolean
 }) {
   const initialen = hofInitialen(farmName)
@@ -40,14 +45,17 @@ export function FarmIdentityCard({
     <div className="min-w-0">
       <div className="flex items-center gap-3 min-w-0">
         {logoUrl ? (
-          <Image
-            src={logoUrl}
-            alt=""
-            width={80}
-            height={80}
-            className="size-10 shrink-0 rounded-full object-cover"
-            style={{ boxShadow: '0 0 0 1.5px rgba(255,255,255,0.25)' }}
-          />
+          // Rund geschnitten im Kasten: Mit Zoom ragte das Logo sonst über den Kreis (Register N17, Nr. 98).
+          <span className="block size-10 shrink-0 overflow-hidden rounded-full" style={{ boxShadow: '0 0 0 1.5px rgba(255,255,255,0.25)' }}>
+            <Image
+              src={logoUrl}
+              alt=""
+              width={80}
+              height={80}
+              className="size-full object-cover"
+              style={bildStil(logoAusschnitt, { filter: false })}
+            />
+          </span>
         ) : (
           /* Kein kaputtes Bild-Symbol: Initialen auf Sandfläche sehen aus wie
              eine Entscheidung, ein Platzhalter-Icon wie ein Fehler. */

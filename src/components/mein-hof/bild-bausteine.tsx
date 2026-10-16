@@ -26,7 +26,15 @@ import {
   titelbildDarstellung,
   titelbildHinweis,
 } from '@/lib/titelbild'
-import { bildStil } from '@/lib/bild-ausschnitt'
+import { AUSSCHNITT_STANDARD, bildStil } from '@/lib/bild-ausschnitt'
+import {
+  BILD_RAHMEN_TEXT,
+  GALERIE_RAHMEN_KACHEL,
+  GALERIE_VORSCHAU_HANDY,
+  LOGO_RAHMEN,
+  LOGO_VORSCHAU_PX,
+  alsFotoAusschnitt,
+} from '@/lib/bild-rahmen'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { MARKE } from '@/lib/marke'
 import type { BildAusschnitt as BildAusschnittWert } from '@/schemas/bild-ausschnitt'
@@ -319,13 +327,25 @@ function HandyName({ name, ort }: { name: string; ort: string }): React.JSX.Elem
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Logo: rund, Ausschnitt ohne Filter (Register N17, Nr. 98). Nach dem Upload
+ * öffnet der Bild-Baustein einmal von selbst mit Standardwerten — „Passt so“
+ * lässt das Logo wie heute (Mitte, `null`).
+ *
+ * Der Aufrufer hängt den Baustein am Logo auf (`key`): Lädt die Seite nach dem
+ * Upload neu, beginnt er frisch. Darum meldet er das neue Logo erst, wenn der
+ * Baustein zu ist — sonst schlösse ihn das Neuladen, bevor der Hof wählen kann.
+ */
 export function LogoUpload({
   logoUrl,
+  logoAusschnitt = null,
   onUploaded,
   onHochladen,
   meldeErfolg,
 }: {
   logoUrl: string | null
+  /** Der gespeicherte Ausschnitt, schon geprüft; ohne Angabe wie heute. */
+  logoAusschnitt?: BildAusschnittWert | null
   onUploaded: (url: string | null) => void
   /** Meldet, solange ein Foto hochlädt oder gespeichert wird. */
   onHochladen?: (laeuft: boolean) => void
@@ -333,6 +353,13 @@ export function LogoUpload({
   meldeErfolg?: () => void
 }): React.JSX.Element {
   const [speichert, startTransition] = useTransition()
+  const [speichertAusschnitt, startAusschnitt] = useTransition()
+  // Das gerade hochgeladene Logo — bis der Aufrufer neu lädt, steht es nur hier.
+  const [neuesLogo, setNeuesLogo] = useState<string | null>(null)
+  const [ausschnitt, setAusschnitt] = useState<BildAusschnittWert | null>(logoAusschnitt)
+  // Offen gleich nach dem Upload („Passt so“) oder über „Ausschnitt anpassen“.
+  const [offen, setOffen] = useState<false | 'nachUpload' | 'anpassen'>(false)
+  const logo = neuesLogo ?? logoUrl
 
   const { isUploading, progress, openFilePicker, fileInput } = useImageUpload({
     variant: 'logo',
@@ -342,15 +369,43 @@ export function LogoUpload({
         const result = await updateFarmLogoAction(url)
         if (result.error) {
           toast.error(result.error)
-        } else {
-          onUploaded(url)
-          if (meldeErfolg) meldeErfolg()
-          else toast.success('Logo gespeichert')
+          return
         }
+        // Der alte Ausschnitt gehörte zum alten Foto: zurück auf „wie heute“ (`null`), bevor der Baustein
+        // aufgeht — immer, denn ob einer gespeichert ist, weiß der Baustein nur, wenn der Aufrufer ihn reicht.
+        const zurueck = await speichereBildAusschnittAction({ ziel: 'logo', wert: AUSSCHNITT_STANDARD })
+        if ('error' in zurueck) toast.error(zurueck.error)
+        setAusschnitt(null)
+        setNeuesLogo(url)
+        setOffen('nachUpload')
+        if (meldeErfolg) meldeErfolg()
+        else toast.success('Logo gespeichert')
       })
     },
   })
-  useHochladenMelden(isUploading || speichert, onHochladen)
+  useHochladenMelden(isUploading || speichert || speichertAusschnitt, onHochladen)
+
+  function schliessen() {
+    setOffen(false)
+    // Erst jetzt neu laden: Vorschau und Seite zeigen danach das neue Logo samt Ausschnitt.
+    if (neuesLogo) onUploaded(neuesLogo)
+  }
+
+  function speichern(wert: BildAusschnittWert) {
+    startAusschnitt(async () => {
+      // Das Logo bekommt keinen Filter (Register N17) — der Baustein zeigt keine Kacheln, die Aktion nimmt nur „Natürlich“.
+      const res = await speichereBildAusschnittAction({ ziel: 'logo', wert: { ...alsFotoAusschnitt(wert), filter: 'NATUERLICH' } })
+      if ('error' in res) {
+        toast.error(res.error)
+        return
+      }
+      setAusschnitt(wert)
+      if (meldeErfolg) meldeErfolg()
+      else toast.success(BILD_RAHMEN_TEXT.gespeichert)
+      setOffen(false)
+      onUploaded(logo)
+    })
+  }
 
   async function handleRemove() {
     startTransition(async () => {
@@ -365,23 +420,92 @@ export function LogoUpload({
     })
   }
 
+  const rund = (rahmen: ReactNode) => <div className="overflow-hidden rounded-full border border-border">{rahmen}</div>
+
+  // Das Datei-Feld steht in beiden Zuständen an derselben Stelle — es hängt nie aus (CODING_STANDARDS §8).
+  return (
+    <div>
+      {fileInput}
+      {offen && logo ? (
+        <div>
+          <BildAusschnitt
+            foto={logo}
+            wert={ausschnitt ?? AUSSCHNITT_STANDARD}
+            rahmen={{ name: BILD_RAHMEN_TEXT.logo.rahmen, verhaeltnis: LOGO_RAHMEN, rund: true }}
+            // Die drei Größen in einer Reihe unter einem Titel (Mockup system-h1-bild-baustein: 96 / 72 / 40 px rund).
+            vorschauen={[
+              {
+                titel: BILD_RAHMEN_TEXT.logo.groessen,
+                satz: BILD_RAHMEN_TEXT.logo.groessenSatz,
+                verhaeltnis: LOGO_RAHMEN,
+                breite: LOGO_VORSCHAU_PX.hofseite,
+                umgebung: rund,
+                mittig: true,
+                daneben: [
+                  { verhaeltnis: LOGO_RAHMEN, breite: LOGO_VORSCHAU_PX.meinHof, umgebung: rund },
+                  { verhaeltnis: LOGO_RAHMEN, breite: LOGO_VORSCHAU_PX.klein, umgebung: rund },
+                ],
+              },
+            ]}
+            mitFilter={false}
+            nachUpload={offen === 'nachUpload'}
+            speichert={speichertAusschnitt}
+            onSpeichern={speichern}
+            onAbbrechen={schliessen}
+          />
+          <p className="mt-3 text-xs text-muted-foreground">{BILD_RAHMEN_TEXT.logo.satz}</p>
+        </div>
+      ) : (
+        <LogoAnsicht
+          logo={logo}
+          ausschnitt={ausschnitt}
+          isUploading={isUploading}
+          fortschritt={progress ? stufenText(progress) : null}
+          openFilePicker={openFilePicker}
+          onAnpassen={() => setOffen('anpassen')}
+          onEntfernen={handleRemove}
+        />
+      )}
+    </div>
+  )
+}
+
+/** Das Logo, wie es ist: runde Vorschau mit Entfernen, darunter Ersetzen und „Ausschnitt anpassen“. */
+function LogoAnsicht({
+  logo,
+  ausschnitt,
+  isUploading,
+  fortschritt,
+  openFilePicker,
+  onAnpassen,
+  onEntfernen,
+}: {
+  logo: string | null
+  ausschnitt: BildAusschnittWert | null
+  isUploading: boolean
+  /** Die Stufe des Uploads als Satz, solange er läuft. */
+  fortschritt: string | null
+  /** Öffnet die Dateiauswahl (useImageUpload). */
+  openFilePicker: () => void
+  onAnpassen: () => void
+  onEntfernen: () => void
+}): React.JSX.Element {
   return (
     <div className="flex items-center gap-4">
-      {fileInput}
       {/* Runde Vorschau — der Entfernen-Knopf liegt außerhalb des runden
           Rahmens: overflow-hidden schnitte seine 44-px-Trefferfläche ab (Nr. 35). */}
       <div className="relative shrink-0">
         <div className="relative flex size-[72px] items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-border bg-muted">
-          {logoUrl ? (
-            <Image src={logoUrl} alt="Logo" fill sizes="72px" className="object-cover" />
+          {logo ? (
+            <Image src={logo} alt="Logo" fill sizes="72px" className="object-cover" style={bildStil(ausschnitt, { filter: false })} />
           ) : (
             <Camera className="size-6 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
           )}
         </div>
-        {logoUrl && (
+        {logo && (
           <button
             type="button"
-            onClick={handleRemove}
+            onClick={onEntfernen}
             className={cn('absolute -top-3 -right-3 size-11 rounded-full flex items-center justify-center', FOKUS_RAHMEN)}
             aria-label="Logo entfernen"
           >
@@ -393,21 +517,36 @@ export function LogoUpload({
           </button>
         )}
       </div>
-      <div>
-        <button
-          type="button"
-          onClick={openFilePicker}
-          disabled={isUploading}
-          className={cn(
-            'inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-4 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-60',
-            FOKUS_RAHMEN
+      <div className="min-w-0">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={openFilePicker}
+            disabled={isUploading}
+            className={cn(
+              'inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-4 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-60',
+              FOKUS_RAHMEN
+            )}
+          >
+            {isUploading ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Upload className="size-3.5" aria-hidden="true" />}
+            {/* Die Stufe statt eines stummen Spinners: Seit dem Zeitwächter-Umbau
+                nennt jeder Hänger seinen Ort. */}
+            {isUploading && fortschritt ? fortschritt : logo ? 'Logo ersetzen' : 'Logo hochladen'}
+          </button>
+          {logo && !isUploading && (
+            <button
+              type="button"
+              onClick={onAnpassen}
+              className={cn(
+                'inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-4 text-sm font-medium transition-colors hover:bg-muted',
+                FOKUS_RAHMEN
+              )}
+            >
+              <Crop className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
+              {BILD_RAHMEN_TEXT.anpassen}
+            </button>
           )}
-        >
-          {isUploading ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Upload className="size-3.5" aria-hidden="true" />}
-          {/* Die Stufe statt eines stummen Spinners: Seit dem Zeitwächter-Umbau
-              nennt jeder Hänger seinen Ort. */}
-          {isUploading && progress ? stufenText(progress) : logoUrl ? 'Logo ersetzen' : 'Logo hochladen'}
-        </button>
+        </div>
         <p className="mt-1 text-xs text-muted-foreground">Rund und quadratisch wirkt am besten · sonst zeigen wir den Anfangsbuchstaben.</p>
       </div>
     </div>
@@ -423,6 +562,7 @@ function GalleryPhotoItem({
   onDeleted,
   onCaptionChange,
   onMove,
+  onAnpassen,
 }: {
   photo: FarmPhotoData
   index: number
@@ -430,6 +570,8 @@ function GalleryPhotoItem({
   onDeleted: (id: string) => void
   onCaptionChange: (id: string, caption: string) => void
   onMove: (id: string, dir: 'up' | 'down') => void
+  /** Öffnet den Bild-Baustein für dieses Foto (Register N17, Nr. 98). */
+  onAnpassen: (photo: FarmPhotoData) => void
 }) {
   const [caption, setCaption] = useState(photo.caption ?? '')
   const [isDeleting, setIsDeleting] = useState(false)
@@ -460,9 +602,19 @@ function GalleryPhotoItem({
 
   return (
     <div className="flex items-start gap-3 rounded-xl border border-border bg-card p-3">
-      <div className="relative size-16 shrink-0 overflow-hidden rounded-lg bg-muted">
-        <Image src={photo.url} alt={caption || 'Foto'} fill sizes="64px" className="object-cover" />
-      </div>
+      {/* Das Vorschaubild ist der Knopf zum Ausschnitt: 64 px Trefferfläche, ohne einen fünften Knopf in der Zeile. */}
+      <button
+        type="button"
+        onClick={() => onAnpassen(photo)}
+        aria-label={`${BILD_RAHMEN_TEXT.anpassen}: Foto ${index + 1}`}
+        className={cn('relative size-16 shrink-0 overflow-hidden rounded-lg bg-muted', FOKUS_RAHMEN)}
+      >
+        <Image src={photo.url} alt="" fill sizes="64px" className="object-cover" style={bildStil(photo.ausschnitt)} />
+        {/* Theme-fest dunkel auf dem Foto (DESIGN_SYSTEM, Bild-Overlays). */}
+        <span className="absolute right-1 bottom-1 flex size-5 items-center justify-center rounded-full bg-primary-foreground/60 text-accent-foreground">
+          <Crop className="size-3" strokeWidth={1.7} aria-hidden="true" />
+        </span>
+      </button>
       <div className="min-w-0 flex-1 space-y-1.5">
         <input
           type="text"
@@ -521,6 +673,9 @@ export function GallerySection({
   onHochladen,
 }: BildBausteinProps & { initialPhotos: FarmPhotoData[] }): React.JSX.Element {
   const [photos, setPhotos] = useState<FarmPhotoData[]>(initialPhotos)
+  // Das Foto, dessen Ausschnitt gerade gewählt wird — nach einem Upload einmal von selbst (Register N17), dann mit „Passt so“.
+  const [offen, setOffen] = useState<{ foto: FarmPhotoData; nachUpload: boolean } | null>(null)
+  const [speichertAusschnitt, startAusschnitt] = useTransition()
   const canUpload = photos.length < GALERIE_MAX
 
   function erfolg(sonst: string | null) {
@@ -538,9 +693,12 @@ export function GallerySection({
       // In einer Serie zählt der Fehler ins Sammelergebnis — deshalb werfen
       // statt einzeln melden.
       if (result.error) throw new Error(result.error)
-      const neu = result.photo
-      if (neu) {
+      const photo = result.photo
+      if (photo) {
+        // Ein neues Foto hat noch keinen Ausschnitt; der Baustein öffnet einmal von selbst — in einer Serie für das erste.
+        const neu: FarmPhotoData = { ...photo, ausschnitt: null }
         setPhotos((prev) => [...prev, neu])
+        setOffen((alt) => alt ?? { foto: neu, nachUpload: true })
         // Eine Serie meldet ihr Ergebnis am Ende selbst (useImageUpload, serieGespeichert).
         if (batch) onGespeichert?.()
         else erfolg('Foto hinzugefügt')
@@ -550,7 +708,20 @@ export function GallerySection({
     serieGespeichert: meldeErfolg,
   })
   // onUploaded wird im Upload abgewartet — isUploading deckt das Speichern mit ab.
-  useHochladenMelden(isUploading, onHochladen)
+  useHochladenMelden(isUploading || speichertAusschnitt, onHochladen)
+
+  function speichereAusschnitt(foto: FarmPhotoData, wert: BildAusschnittWert) {
+    startAusschnitt(async () => {
+      const res = await speichereBildAusschnittAction({ ziel: 'foto', farmPhotoId: foto.id, wert: alsFotoAusschnitt(wert) })
+      if ('error' in res) {
+        toast.error(res.error)
+        return
+      }
+      setPhotos((prev) => prev.map((p) => (p.id === foto.id ? { ...p, ausschnitt: wert } : p)))
+      setOffen(null)
+      erfolg(BILD_RAHMEN_TEXT.gespeichert)
+    })
+  }
 
   function handleDeleted(id: string) {
     setPhotos((prev) => prev.filter((p) => p.id !== id).map((p, i) => ({ ...p, sortOrder: i })))
@@ -580,6 +751,30 @@ export function GallerySection({
     erfolg(null)
   }
 
+  if (offen) {
+    return (
+      <div>
+        {/* Dasselbe Datei-Feld an derselben Stelle: Läuft noch eine Serie, hängt es nie aus (CODING_STANDARDS §8). */}
+        {fileInput}
+        <BildAusschnitt
+          key={offen.foto.id}
+          foto={offen.foto.url}
+          wert={offen.foto.ausschnitt ?? AUSSCHNITT_STANDARD}
+          rahmen={{ name: BILD_RAHMEN_TEXT.galerie.rahmen, verhaeltnis: GALERIE_RAHMEN_KACHEL }}
+          vorschauen={[{ titel: BILD_RAHMEN_TEXT.galerie.vorschauHandy, verhaeltnis: GALERIE_VORSCHAU_HANDY, breite: 160, satz: BILD_RAHMEN_TEXT.galerie.satz }]}
+          nachUpload={offen.nachUpload}
+          speichert={speichertAusschnitt}
+          onSpeichern={(wert) => speichereAusschnitt(offen.foto, wert)}
+          onAbbrechen={() => setOffen(null)}
+        />
+        {/* Läuft die Serie weiter, sagt eine Zeile, wo sie steht — die Liste kommt nach dem Baustein. */}
+        {progress && progress.total > 1 && (
+          <p className="mt-3 text-xs text-muted-foreground">{`Foto ${progress.current} von ${progress.total} — ${stufenText(progress)}`}</p>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div>
       {fileInput}
@@ -601,6 +796,7 @@ export function GallerySection({
               onDeleted={handleDeleted}
               onCaptionChange={handleCaptionChange}
               onMove={handleMove}
+              onAnpassen={(foto) => setOffen({ foto, nachUpload: false })}
             />
           ))}
         </div>

@@ -9,7 +9,7 @@
  *  - Werte außerhalb der Grenzen, ein unbekannter Filter, eine unbekannte Wahl
  *    und eine mitgeschickte Hof-Kennung werden abgewiesen; nichts geschrieben.
  *  - Ohne Sitzung und ohne eigenen Hof wird nichts geschrieben.
- *  - Logo, Produkt, Foto und Beitrag sind in Nr. 97 noch gesperrt.
+ *  - Logo, Produkt, Foto und Beitrag prüft seit Nr. 98 tests/bild-ausschnitt-ziele.test.ts.
  *  - Der Altweg clampt (−5 → 0, 150 → 100, NaN → 0) und schreibt über die neue Aktion.
  *
  * Gemockt ist nur die Infrastruktur (Prisma, Sitzung, Cache); das Schema prüft echt.
@@ -116,22 +116,6 @@ describe('speichereBildAusschnittAction — Titelbild', () => {
 
     expect('error' in ergebnis).toBe(true)
     expect(revalidatePath).not.toHaveBeenCalled()
-  })
-})
-
-describe('speichereBildAusschnittAction — Ziele für Nr. 98', () => {
-  const FOTO_WERT = { fokusX: 50, fokusY: 50, zoom: 120, filter: 'KLAR' } as const
-
-  it.each([
-    ['logo', { ziel: 'logo', wert: { ...FOTO_WERT, filter: 'NATUERLICH' } }],
-    ['produkt', { ziel: 'produkt', productId: 'p1', wert: FOTO_WERT }],
-    ['foto', { ziel: 'foto', farmPhotoId: 'f1', wert: FOTO_WERT }],
-    ['beitrag', { ziel: 'beitrag', statusPostId: 's1', wert: FOTO_WERT }],
-  ])('%s ist noch gesperrt: abgewiesen, nichts geschrieben', async (_ziel, eingabe) => {
-    const ergebnis = await speichereBildAusschnittAction(eingabe)
-
-    expect(ergebnis).toEqual({ error: 'Für dieses Foto gibt es den Ausschnitt noch nicht.' })
-    nichtsGeschrieben()
   })
 })
 

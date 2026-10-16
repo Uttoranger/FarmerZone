@@ -8,8 +8,9 @@
  *    Hof aus der Sitzung; ein zweiter Hof bleibt, wie er war.
  *  - Eine mitgeschickte Hof-Kennung wird abgewiesen, nichts geschrieben.
  *  - Ohne Sitzung und ohne eigenen Hof wird nichts geschrieben.
- *  - Logo, Produkt (auch das eigene), Foto und Beitrag sind in Nr. 97 gesperrt:
- *    abgewiesen, die Spalten bleiben null.
+ *  - Seit Nr. 98: das eigene Produkt wird geschrieben, ein fremdes (echte
+ *    Kennung, anderer Hof) bleibt null; Mitte/100 %/Natürlich setzt NULL; das
+ *    Logo nur beim eigenen Hof und nie mit Filter.
  *  - Die öffentliche Abfrage liest den Wert über leseAusschnitt: gespeichert
  *    kommt er an, ein ungültiger Altwert wird null statt eines Fehlers.
  *  - Die Migration hat die fünf Spalten angelegt, alle nullable ohne Default.
@@ -91,19 +92,45 @@ describe('speichereBildAusschnittAction — Titelbild', () => {
   })
 })
 
-describe('speichereBildAusschnittAction — gesperrte Ziele (Nr. 98)', () => {
-  it('Logo und das eigene Produkt sind abgewiesen, ihre Spalten bleiben null', async () => {
+describe('speichereBildAusschnittAction — Logo und Produkt (Nr. 98)', () => {
+  const FOTO_WERT = { fokusX: 30, fokusY: 70, zoom: 120, filter: 'KLAR' } as const
+  const bildAusschnitt = async (id: string) =>
+    (await prisma.product.findUniqueOrThrow({ where: { id }, select: { bildAusschnitt: true } })).bildAusschnitt
+
+  it('schreibt das eigene Produkt; ein Produkt eines fremden Hofs bleibt null, auch mit seiner echten Kennung', async () => {
+    const { eigen, fremd } = await zweiHoefe()
+    const eigenes = await erstelleProdukt(eigen.id)
+    const fremdes = await erstelleProdukt(fremd.id)
+
+    const ok = await speichereBildAusschnittAction({ ziel: 'produkt', productId: eigenes.id, wert: FOTO_WERT })
+    const abgewiesen = await speichereBildAusschnittAction({ ziel: 'produkt', productId: fremdes.id, wert: FOTO_WERT })
+
+    expect(ok).toEqual({ ok: true })
+    expect(abgewiesen).toEqual({ error: 'Dieses Foto gibt es nicht mehr. Lade die Seite neu.' })
+    expect(await bildAusschnitt(eigenes.id)).toEqual(FOTO_WERT)
+    expect(await bildAusschnitt(fremdes.id)).toBeNull()
+  })
+
+  it('Mitte, 100 %, Natürlich setzt die Spalte zurück auf NULL (wie heute)', async () => {
     const { eigen } = await zweiHoefe()
     const produkt = await erstelleProdukt(eigen.id)
-    const fotoWert = { fokusX: 50, fokusY: 50, zoom: 120, filter: 'KLAR' } as const
+    await speichereBildAusschnittAction({ ziel: 'produkt', productId: produkt.id, wert: FOTO_WERT })
 
-    const logo = await speichereBildAusschnittAction({ ziel: 'logo', wert: { ...fotoWert, filter: 'NATUERLICH' } })
-    const eigenesProdukt = await speichereBildAusschnittAction({ ziel: 'produkt', productId: produkt.id, wert: fotoWert })
+    await speichereBildAusschnittAction({ ziel: 'produkt', productId: produkt.id, wert: { fokusX: 50, fokusY: 50, zoom: 100, filter: 'NATUERLICH' } })
 
-    expect(logo).toEqual({ error: 'Für dieses Foto gibt es den Ausschnitt noch nicht.' })
-    expect(eigenesProdukt).toEqual({ error: 'Für dieses Foto gibt es den Ausschnitt noch nicht.' })
+    expect(await bildAusschnitt(produkt.id)).toBeNull()
+  })
+
+  it('das Logo landet nur beim eigenen Hof — mit Filter abgewiesen, nichts geschrieben', async () => {
+    const { eigen, fremd } = await zweiHoefe()
+
+    const mitFilter = await speichereBildAusschnittAction({ ziel: 'logo', wert: FOTO_WERT })
+    expect(mitFilter).toEqual({ error: 'Den Ausschnitt konnten wir nicht speichern. Lade die Seite neu und versuch es noch einmal.' })
     expect((await titelbildStand(eigen.id)).logoAusschnitt).toBeNull()
-    expect((await prisma.product.findUniqueOrThrow({ where: { id: produkt.id }, select: { bildAusschnitt: true } })).bildAusschnitt).toBeNull()
+
+    await speichereBildAusschnittAction({ ziel: 'logo', wert: { ...FOTO_WERT, filter: 'NATUERLICH' } })
+    expect((await titelbildStand(eigen.id)).logoAusschnitt).toEqual({ ...FOTO_WERT, filter: 'NATUERLICH' })
+    expect((await titelbildStand(fremd.id)).logoAusschnitt).toBeNull()
   })
 })
 

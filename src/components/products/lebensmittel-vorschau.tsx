@@ -4,6 +4,7 @@ import { KAEUFER_VORSCHAU } from '@/lib/hofseite-kunde'
 import type { ProductCategoryValue, ProductSubcategoryValue } from '@/lib/taxonomie'
 import { ProduktKarte } from '@/components/hofseite/produkt-karte'
 import { kaeuferVorschau } from './produkt-preis'
+import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 
 /**
  * „So sehen Käufer dein Produkt" im Produktdialog für Lebensmittel (Nr. 51,
@@ -24,6 +25,7 @@ export function LebensmittelVorschau({
   foto,
   kategorie,
   unterkategorie,
+  ausschnitt = null,
 }: {
   name: string
   /** Der Wert des Preisfelds — NaN, solange es leer oder unlesbar ist. */
@@ -35,6 +37,8 @@ export function LebensmittelVorschau({
   kategorie: ProductCategoryValue | null
   /** Die gewählte Unterkategorie: Mit ihr zeigt die Karte ohne Foto dieselbe Illustration wie die Hofseite. */
   unterkategorie: ProductSubcategoryValue | null
+  /** Der Ausschnitt aus dem Bild-Baustein darüber (Nr. 98) — die Karte nimmt ihn nur am echten Foto, nie an der Illustration. */
+  ausschnitt?: BildAusschnitt | null
 }): React.JSX.Element {
   const karte = kaeuferVorschau({ name, price, unit, unitSize }, { foto, kategorie, unterkategorie })
   return (
@@ -44,7 +48,7 @@ export function LebensmittelVorschau({
       </h3>
       {/* Ab 768 px eine Kachel in der Breite wie auf der Hofseite, nicht über den ganzen Dialog. */}
       <div className="md:max-w-[260px]">
-        <ProduktKarte variante="muster" produkt={karte} />
+        <ProduktKarte variante="muster" produkt={karte} ausschnitt={ausschnitt} />
       </div>
     </section>
   )

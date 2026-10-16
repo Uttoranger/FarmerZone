@@ -1,11 +1,15 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
+import { Prisma } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { bildAusschnittSpeichernSchema, type BildAusschnittSpeichern, type BildAusschnittZiel } from '@/schemas/bild-ausschnitt'
+import { revalidiereProdukte } from '@/server/produkte-schreiben'
+import { bildAusschnittSpeichernSchema, type BildAusschnitt, type BildAusschnittSpeichern } from '@/schemas/bild-ausschnitt'
 import { BILD_AUSSCHNITT_TEXT } from '@/lib/bild-ausschnitt'
+import { BILD_RAHMEN_TEXT, ausschnittOderNull } from '@/lib/bild-rahmen'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 
 /*
  * Speichert den Ausschnitt eines Fotos (Register N13/N17, Nachtlauf Nr. 97).
@@ -15,20 +19,27 @@ import { BILD_AUSSCHNITT_TEXT } from '@/lib/bild-ausschnitt'
  * nicht in einem vorgelagerten if: Dazwischen bliebe sonst eine Lücke.
  */
 
-/**
- * Freigeschaltet ist in Nr. 97 nur das Titelbild. Logo, Produktfoto, Galerie
- * und Beitragsfoto schaltet Nr. 98 frei (Register N17) — bis dahin weist die
- * Aktion sie ab, ohne etwas zu schreiben.
- */
-const FREIGESCHALTET: ReadonlySet<BildAusschnittZiel> = new Set<BildAusschnittZiel>(['banner'])
-
 type Ergebnis = { ok: true } | { error: string }
+
+/**
+ * Alle fünf Ziele sind frei (Titelbild seit Nr. 97; Logo, Produktfoto, Galerie
+ * und Beitragsfoto seit Nr. 98, Register N17).
+ *
+ * Mitte, 100 %, Natürlich ist „wie heute“ (`AUSSCHNITT_STANDARD`): Bei Logo,
+ * Produkt, Foto und Beitrag speichert die Aktion dafür `null` — „Passt so“
+ * nach dem Upload und „Zurücksetzen“ führen so zurück zum Stand ohne
+ * Ausschnitt. Beim Beitrag ist das mehr als Kosmetik: Ohne Ausschnitt steht
+ * das Foto ganz (`object-contain`), mit Ausschnitt füllt es den Rahmen.
+ * Das Titelbild behält seinen Wert, weil dort die Wahl füllen/ganz mitreist.
+ */
+function alsSpalte(wert: Omit<BildAusschnitt, 'darstellung'>): Omit<BildAusschnitt, 'darstellung'> | typeof Prisma.DbNull {
+  return ausschnittOderNull(wert) ?? Prisma.DbNull
+}
 
 export async function speichereBildAusschnittAction(eingabe: unknown): Promise<Ergebnis> {
   const geprueft = bildAusschnittSpeichernSchema.safeParse(eingabe)
   // Zod meldet englisch; der Bauer bekommt einen festen Satz (CODING_STANDARDS §4).
   if (!geprueft.success) return { error: BILD_AUSSCHNITT_TEXT.ungueltig }
-  if (!FREIGESCHALTET.has(geprueft.data.ziel)) return { error: BILD_AUSSCHNITT_TEXT.nochNicht }
 
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { error: BILD_AUSSCHNITT_TEXT.nichtAngemeldet }
@@ -37,10 +48,20 @@ export async function speichereBildAusschnittAction(eingabe: unknown): Promise<E
   if (!hof) return { error: BILD_AUSSCHNITT_TEXT.hofFehlt }
 
   const geschrieben = await schreibeAusschnitt(geprueft.data, hof.id, session.user.id)
-  if (geschrieben === 0) return { error: BILD_AUSSCHNITT_TEXT.hofFehlt }
+  // 0 Zeilen: Titelbild und Logo hängen am Hof selbst; Produkt, Foto und Beitrag sind weg oder gehören einem anderen Hof.
+  if (geschrieben === 0) {
+    const amHof = geprueft.data.ziel === 'banner' || geprueft.data.ziel === 'logo'
+    return { error: amHof ? BILD_AUSSCHNITT_TEXT.hofFehlt : BILD_RAHMEN_TEXT.fotoFehlt }
+  }
 
-  revalidatePath(`/${hof.slug}`)
-  revalidatePath('/farm-page')
+  // Produktfotos stehen auch in /products, auf /hoefe (eigener Cache) und auf der Produktseite — derselbe Weg wie jede Produktänderung.
+  if (geprueft.data.ziel === 'produkt') revalidiereProdukte(hof.slug)
+  else {
+    revalidatePath(`/${hof.slug}`)
+    revalidatePath('/farm-page')
+    // Das Logo steht auch im Karussell auf /hoefe — dessen eigener Cache, wie bei den Produkten (revalidiereProdukte).
+    if (geprueft.data.ziel === 'logo') updateTag(HOEFE_CACHE_TAG)
+  }
   return { ok: true }
 }
 
@@ -57,19 +78,19 @@ async function schreibeAusschnitt(daten: BildAusschnittSpeichern, farmId: string
       return count
     }
     case 'logo': {
-      const { count } = await prisma.farm.updateMany({ where: { id: farmId, ownerId }, data: { logoAusschnitt: daten.wert } })
+      const { count } = await prisma.farm.updateMany({ where: { id: farmId, ownerId }, data: { logoAusschnitt: alsSpalte(daten.wert) } })
       return count
     }
     case 'produkt': {
-      const { count } = await prisma.product.updateMany({ where: { id: daten.productId, farmId }, data: { bildAusschnitt: daten.wert } })
+      const { count } = await prisma.product.updateMany({ where: { id: daten.productId, farmId }, data: { bildAusschnitt: alsSpalte(daten.wert) } })
       return count
     }
     case 'foto': {
-      const { count } = await prisma.farmPhoto.updateMany({ where: { id: daten.farmPhotoId, farmId }, data: { ausschnitt: daten.wert } })
+      const { count } = await prisma.farmPhoto.updateMany({ where: { id: daten.farmPhotoId, farmId }, data: { ausschnitt: alsSpalte(daten.wert) } })
       return count
     }
     case 'beitrag': {
-      const { count } = await prisma.statusPost.updateMany({ where: { id: daten.statusPostId, farmId }, data: { fotoAusschnitt: daten.wert } })
+      const { count } = await prisma.statusPost.updateMany({ where: { id: daten.statusPostId, farmId }, data: { fotoAusschnitt: alsSpalte(daten.wert) } })
       return count
     }
   }

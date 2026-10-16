@@ -8,6 +8,7 @@
 import { prisma } from '@/lib/prisma'
 import { Prisma, type StatusPostAnlass } from '@prisma/client'
 import type { Abonnentin } from '@/lib/whatsapp-versand'
+import { leseAusschnitt, type BildAusschnitt } from '@/schemas/bild-ausschnitt'
 
 export type StatusPostSummary = {
   id: string
@@ -37,6 +38,8 @@ export type ActiveStatusPost = {
   body: string
   anlass: StatusPostAnlass
   photoUrl: string | null
+  /** Ausschnitt und Filter des Fotos (Register N17, Nr. 98) — schon geprüft; null = das Foto steht ganz wie heute. */
+  fotoAusschnitt: BildAusschnitt | null
   linkedProductIds: string[]
   publishedAt: string
 }
@@ -88,7 +91,7 @@ export async function getActiveStatusPosts(farmId: string, anzahl: number): Prom
     orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
     take: anzahl,
     // Nur, was die Karte zeigt: Der Beitrag ist öffentlich, sein Versand (Empfänger, Zähler) nicht.
-    select: { id: true, title: true, body: true, anlass: true, photoUrl: true, linkedProductIds: true, publishedAt: true },
+    select: { id: true, title: true, body: true, anlass: true, photoUrl: true, fotoAusschnitt: true, linkedProductIds: true, publishedAt: true },
   })
   return posts.map((post) => ({
     id: post.id,
@@ -96,6 +99,7 @@ export async function getActiveStatusPosts(farmId: string, anzahl: number): Prom
     body: post.body,
     anlass: post.anlass,
     photoUrl: post.photoUrl,
+    fotoAusschnitt: leseAusschnitt(post.fotoAusschnitt),
     linkedProductIds: post.linkedProductIds,
     // Sicher: `publishedAt: { lte: now }` schließt Entwürfe (null) aus.
     publishedAt: post.publishedAt!.toISOString(),

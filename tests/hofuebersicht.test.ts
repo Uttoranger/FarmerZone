@@ -377,6 +377,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
         reservedStock: true,
         category: true,
         imageUrl: true,
+        bildAusschnitt: true,
       },
     })
     // „+ n weitere" zählt ALLE verfügbaren Produkte — ein ungefiltertes
@@ -401,6 +402,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
         subcategory: true,
         labels: true,
         imageUrl: true,
+        bildAusschnitt: true,
         name: true,
         price: true,
         stock: true,
@@ -455,6 +457,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
         unit: 'BALLEN',
         unitSize: null,
         imageUrl: 'heu.jpg',
+        bildAusschnitt: null,
       },
     ])
   })
@@ -555,6 +558,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
         unit: 'GRAMM',
         unitSize: 250,
         imageUrl: 'kaese.jpg',
+        bildAusschnitt: null,
         category: 'MILCH',
         verfuegbar: true,
       },
@@ -565,6 +569,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
         unit: 'KG',
         unitSize: null,
         imageUrl: null,
+        bildAusschnitt: null,
         category: 'EIER',
         verfuegbar: false,
       },
@@ -575,6 +580,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
         unit: 'KG',
         unitSize: null,
         imageUrl: null,
+        bildAusschnitt: null,
         category: 'BROT',
         verfuegbar: true,
       },

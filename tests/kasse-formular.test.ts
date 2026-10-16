@@ -79,6 +79,7 @@ const HOF: PublicFarm = {
   phone: '+43 660 0000000',
   email: 'hof@example.com',
   logoUrl: null,
+  logoAusschnitt: null,
   bannerUrl: null,
   tagline: null,
   foundedYear: null,

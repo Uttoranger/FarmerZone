@@ -7,9 +7,14 @@ import {
   Leaf, CalendarDays, Tag, MessageCircle,
   Home, Mail,
   ArrowRight, CheckCircle, Check,
-  Camera, Loader2, X,
+  Camera, Crop, Loader2, X,
 } from 'lucide-react'
 import { publishStatusPost } from '@/server/actions/status-posts'
+import { speichereBildAusschnittAction } from '@/server/actions/bild-ausschnitt'
+import { BildAusschnitt } from '@/components/shared/bild-ausschnitt'
+import { AUSSCHNITT_STANDARD, bildStil } from '@/lib/bild-ausschnitt'
+import { BEITRAG_RAHMEN, BILD_RAHMEN_TEXT, alsFotoAusschnitt, ausschnittOderNull } from '@/lib/bild-rahmen'
+import type { BildAusschnitt as BildAusschnittWert } from '@/schemas/bild-ausschnitt'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -114,11 +119,28 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
   const [photoUrl, setPhotoUrl] = useState<string | null>(prefill?.photoUrl ?? null)
   const [linkedProductIds, setLinkedProductIds] = useState<string[]>([])
 
+  // Ausschnitt des Beitragsfotos (Register N17, Nr. 98): gewählt vor dem
+  // Veröffentlichen, geschrieben danach — erst dann gibt es den Beitrag.
+  const [ausschnitt, setAusschnitt] = useState<BildAusschnittWert | null>(null)
+  // Offen gleich nach dem Upload („Passt so“) oder über „Ausschnitt anpassen“.
+  const [ausschnittOffen, setAusschnittOffen] = useState<false | 'nachUpload' | 'anpassen'>(false)
+
   const photoUpload = useImageUpload({
     variant: 'status',
     oldUrl: photoUrl ?? undefined,
-    onUploaded: (url) => setPhotoUrl(url),
+    onUploaded: (url) => {
+      setPhotoUrl(url)
+      // Ein neues Foto beginnt ohne Ausschnitt (ganz, wie bisher); der Baustein öffnet einmal von selbst.
+      setAusschnitt(null)
+      setAusschnittOffen('nachUpload')
+    },
   })
+
+  function entferneFoto() {
+    setPhotoUrl(null)
+    setAusschnitt(null)
+    setAusschnittOffen(false)
+  }
 
   // A3: field validation errors
   const [fieldErrors, setFieldErrors] = useState<{ title?: boolean; body?: boolean }>({})
@@ -166,6 +188,11 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
       if (res.error) {
         toast.error(res.error)
         return
+      }
+      // Der Beitrag steht — ein gescheiterter Ausschnitt nimmt ihn nicht zurück, er sagt es nur.
+      if (res.postId && photoUrl && ausschnitt) {
+        const gespeichert = await speichereBildAusschnittAction({ ziel: 'beitrag', statusPostId: res.postId, wert: alsFotoAusschnitt(ausschnitt) })
+        if ('error' in gespeichert) toast.error(BILD_RAHMEN_TEXT.beitrag.nichtGespeichert)
       }
       setVeroeffentlicht(true)
       // Register T5: Steht der Beitrag auf der Hofseite, öffnet sich das
@@ -296,19 +323,36 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
 
             {/* Optionales Foto */}
             {photoUpload.fileInput}
-            {/* object-contain auf Sand: volles Bild statt Zoom-Crop (nachlese-7) */}
-            {photoUrl && (
+            {/* Ohne Ausschnitt object-contain auf Sand: volles Bild (nachlese-7); mit Ausschnitt füllt es den Rahmen wie auf der Hofseite. */}
+            {photoUrl && ausschnittOffen ? (
+              <div className="mb-3">
+                <BildAusschnitt
+                  foto={photoUrl}
+                  wert={ausschnitt ?? AUSSCHNITT_STANDARD}
+                  rahmen={{ name: BILD_RAHMEN_TEXT.beitrag.rahmen, verhaeltnis: BEITRAG_RAHMEN }}
+                  nachUpload={ausschnittOffen === 'nachUpload'}
+                  onSpeichern={(wert) => {
+                    // Mitte, 100 %, Natürlich ist kein Ausschnitt: Das Foto bleibt ganz, so wie es die Hofseite danach zeigt.
+                    setAusschnitt(ausschnittOderNull(wert))
+                    setAusschnittOffen(false)
+                  }}
+                  onAbbrechen={() => setAusschnittOffen(false)}
+                />
+                <p className="mt-3 text-xs text-muted-foreground">{BILD_RAHMEN_TEXT.beitrag.satz}</p>
+              </div>
+            ) : photoUrl && (
               <div className="relative w-full aspect-[3/2] max-h-48 mb-3 rounded-xl overflow-hidden border border-border bg-muted">
                 <Image
                   src={photoUrl}
                   alt="Foto zum Beitrag"
                   fill
                   sizes="(min-width: 768px) 640px, 100vw"
-                  className="object-contain"
+                  className={ausschnitt ? 'object-cover' : 'object-contain'}
+                  style={bildStil(ausschnitt)}
                 />
                 <button
                   type="button"
-                  onClick={() => setPhotoUrl(null)}
+                  onClick={entferneFoto}
                   aria-label="Foto entfernen"
                   className={cn(
                     // Auf dem Foto theme-fest dunkel mit heller Schrift (DESIGN_SYSTEM „Bild-Overlays"); 44 px Trefferfläche.
@@ -342,6 +386,16 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                     ? 'Foto ersetzen'
                     : 'Foto hinzufügen'}
               </button>
+              {photoUrl && !ausschnittOffen && !photoUpload.isUploading && (
+                <button
+                  type="button"
+                  onClick={() => setAusschnittOffen('anpassen')}
+                  className={cn('flex items-center gap-1.5 min-h-11 px-3 rounded-lg border border-border text-xs text-foreground hover:bg-muted/40', FOKUS_RAHMEN)}
+                >
+                  <Crop className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
+                  {BILD_RAHMEN_TEXT.anpassen}
+                </button>
+              )}
             </div>
 
             {/* Product links */}

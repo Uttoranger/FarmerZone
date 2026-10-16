@@ -29,8 +29,9 @@ vi.mock('next/navigation', () => ({
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))
+// Der Stil geht mit: Am Logo ist er der gespeicherte Ausschnitt (Nr. 98).
 vi.mock('next/image', () => ({
-  default: (p: { src: string; alt: string }) => createElement('img', { src: p.src, alt: p.alt }),
+  default: (p: { src: string; alt: string; style?: Record<string, string> }) => createElement('img', { src: p.src, alt: p.alt, style: p.style }),
 }))
 vi.mock('@/server/actions/appearance', () => ({
   saveAppearanceAction: vi.fn(),
@@ -130,6 +131,7 @@ const AUFTRITT: AppearanceData = {
   foundedYear: 1987,
   aboutText: null,
   logoUrl: null,
+  logoAusschnitt: null,
   bannerType: 'GRADIENT',
   bannerUrl: null,
   bannerValue: null,
@@ -307,5 +309,20 @@ describe('Bausteine im Blatt und im Editor', () => {
     expect(quelle).toContain("updateFarmBannerAction('GRADIENT', null)")
     // Gegenprobe: Ohne Foto gibt es nichts zu entfernen.
     expect(inhalt('titelbild', 'blatt')).not.toContain('Titelbild entfernen')
+  })
+})
+
+describe('Logo — der gespeicherte Ausschnitt nach dem Neuladen (Nr. 98, Runde 1)', () => {
+  const MIT_LOGO: AbschnittHof = { ...HOF, logoUrl: '/logo.jpg' }
+
+  it('das runde Logo steht im gespeicherten Ausschnitt — „Ausschnitt anpassen“ beginnt dort, nicht in der Mitte', () => {
+    const html = inhalt('logo', 'blatt', { ...AUFTRITT, logoUrl: '/logo.jpg', logoAusschnitt: { fokusX: 20, fokusY: 70, zoom: 150, filter: 'NATUERLICH' } }, MIT_LOGO)
+    expect(html).toMatch(/<img src="\/logo.jpg"[^>]*style="object-position:20% 70%;transform:scale\(1.5\)/)
+  })
+
+  it('Gegenprobe: ohne gespeicherten Ausschnitt steht das Logo wie heute', () => {
+    const html = inhalt('logo', 'blatt', { ...AUFTRITT, logoUrl: '/logo.jpg' }, MIT_LOGO)
+    expect(html).toMatch(/<img src="\/logo.jpg"/)
+    expect(html).not.toContain('object-position')
   })
 })
