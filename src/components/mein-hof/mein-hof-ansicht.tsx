@@ -1,71 +1,48 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { ArrowUpRight } from 'lucide-react'
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import type { MeinHofReiterAlleId } from '@/lib/bauern-navigation'
-import {
-  MEIN_HOF_ANSICHT_OPTIONEN,
-  MEIN_HOF_ANSICHT_TEXT,
-  UMSCHALTER_AB_PX,
-  ansichtAdresse,
-  kundenAnsichtAdresse,
-  meinHofAnsichtAus,
-  umschalterBis,
-  type MeinHofAnsichtId,
-} from '@/lib/mein-hof-ansicht'
-import { MEIN_HOF_ANSICHT_PARAMETER } from '@/schemas/mein-hof-ansicht'
+import { UMSCHALTER_AB_PX, kundenAnsichtAdresse, umschalterBis } from '@/lib/mein-hof-ansicht'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
-import { Segment } from '@/components/ui/segment'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { useVorschauMarkierung } from '@/components/farmer/use-vorschau-markierung'
 import { useSchmalerAls } from '@/lib/use-mindestbreite'
 import { meldeGespeichertAnsehen } from '@/components/mein-hof/gespeichert-ansehen'
-import { cn } from '@/lib/utils'
+import { KundenansichtVollbild, useKundenansicht } from '@/components/mein-hof/kundenansicht-vollbild'
 
 /*
- * Der Umschalter von „Mein Hof" unter lg (Nachtlauf Nr. 49, Register N4):
- * „Bearbeiten · So sieht’s die Kundin" ganz oben unter dem Kopf, klebt beim
- * Scrollen. Ein Baustein für alle drei Reiter — Produkte (nur unter md, N3),
- * Hofseite und Beiträge; der Inhalt „Bearbeiten" hängt als Kind darunter
- * (Nr. 50 hängt dort die Liste der Abschnitte ein).
+ * Die Kundenansicht von „Mein Hof" unter lg (Nachtlauf Nr. 49, Register N4;
+ * seit Nr. 107 als Vollbild, N4 ergänzt). Ein Baustein für alle drei Reiter —
+ * Produkte (nur unter md, N3), Hofseite und Beiträge; der Inhalt hängt als
+ * Kind darunter und bleibt immer stehen. Den Umschalter „Bearbeiten · So
+ * sieht’s die Kundin" gibt es seit Nr. 107 nicht mehr: „Kundenansicht" im
+ * Kopf (kundenansicht-knopf.tsx), „Gespeichert · Ansehen" und die Adresse
+ * `?ansicht=kundin` öffnen ein Vollbild-Blatt (kundenansicht-vollbild.tsx)
+ * mit dem bestehenden Rahmen der echten Hofseite (kundenAnsichtAdresse →
+ * vorschauLink, keine zweite Darstellung), auf dem passenden Reiter der
+ * Hofseite.
  *
- * „So sieht’s die Kundin" ist das bestehende iframe der echten Hofseite
- * (kundenAnsichtAdresse → vorschauLink, volle Breite, Maßstab 1, keine zweite
- * Darstellung), auf dem passenden Reiter der Hofseite. Die Wahl steht in der
- * Adresse (?ansicht=kundin, geschrieben per replaceState wie die Filter) —
- * so führt „Ansehen" nach dem Veröffentlichen eines Beitrags von /status/new
- * direkt hierher. Ab der Grenze des Reiters (md bzw. lg) gibt es weder
- * Umschalter noch Rahmen; der Inhalt steht dort immer. Das iframe hängt nur
- * dort ein, wo man den Umschalter sieht (useSchmalerAls: live über
- * matchMedia, auf dem Server und beim Hydrieren „nein") — ein breiter
+ * Ab der Grenze des Reiters (md bzw. lg) öffnet nichts: useSchmalerAls (live
+ * über matchMedia, auf dem Server und beim Hydrieren „nein") — ein breiter
  * Bildschirm mit ?ansicht=kundin (Drehen, größeres Fenster, geteilter Link)
- * lädt die Hofseite nicht unsichtbar mit.
+ * lädt die Hofseite nicht unsichtbar mit. Dort öffnet der Kopf einen neuen
+ * Tab, und auf dem Reiter Hofseite steht die Vorschau neben der Liste.
  *
- * Kopf und Inhalt hängen im Kontext: Der Knopf „Kundenansicht" im Kopf
- * (kundenansicht-knopf.tsx) und „Gespeichert · Ansehen" nach dem Speichern
- * schalten über useMeinHofAnsicht um.
+ * Kopf und Inhalt hängen im Kontext: Der Knopf „Kundenansicht" im Kopf und
+ * „Gespeichert · Ansehen" nach dem Speichern öffnen über useMeinHofAnsicht.
  */
 
 export type MeinHofAnsichtSteuerung = {
-  /** Schaltet auf „So sieht’s die Kundin" und springt hin; mit Abschnitt umrandet die Hofseite ihn kurz. */
+  /** Öffnet die Kundenansicht; mit Abschnitt umrandet die Hofseite ihn kurz. */
   zeigeKundin: (abschnitt?: HofseiteZeileId | null) => void
-  /** „Gespeichert · Ansehen" nach einem Speichern; „Ansehen" springt zum Abschnitt. */
+  /** „Gespeichert · Ansehen" nach einem Speichern; „Ansehen" öffnet die Kundenansicht beim Abschnitt. */
   gespeichert: (abschnitt?: HofseiteZeileId | null) => void
 }
 
 const Steuerung = createContext<MeinHofAnsichtSteuerung | null>(null)
 
-/** Die Steuerung des Umschalters — null außerhalb von MeinHofAnsicht. */
+/** Die Steuerung der Kundenansicht — null außerhalb von MeinHofAnsicht. */
 export function useMeinHofAnsicht(): MeinHofAnsichtSteuerung | null {
   return useContext(Steuerung)
 }
-
-/** Die Klassen je Grenze — als ganze Wörter, damit Tailwind sie findet. */
-const GRENZE = {
-  md: { nurDarunter: 'md:hidden', abDort: 'hidden md:block' },
-  lg: { nurDarunter: 'lg:hidden', abDort: 'hidden lg:block' },
-} as const
 
 export function MeinHofAnsicht({
   reiter,
@@ -75,33 +52,23 @@ export function MeinHofAnsicht({
 }: {
   reiter: MeinHofReiterAlleId
   slug: string
-  /** Was über dem Umschalter steht: der Kopf von Mein Hof mit den Reitern, auf /products nur die Reiter. */
+  /** Was über dem Inhalt steht: der Kopf von Mein Hof mit den Reitern, auf /products nur die Reiter. */
   kopf: ReactNode
-  /** „Bearbeiten" — der Inhalt des Reiters. */
+  /** Der Inhalt des Reiters. */
   children: ReactNode
 }): React.JSX.Element {
-  const ansicht = meinHofAnsichtAus(useSearchParams().get(MEIN_HOF_ANSICHT_PARAMETER))
-  const bis = umschalterBis(reiter)
-  // Ob man den Umschalter sieht — erst dann lädt der Rahmen die Hofseite.
-  const sichtbar = useSchmalerAls(UMSCHALTER_AB_PX[bis])
+  // Ob die Kundenansicht hier als Vollbild gilt — erst dann lädt der Rahmen die Hofseite.
+  const schmal = useSchmalerAls(UMSCHALTER_AB_PX[umschalterBis(reiter)])
+  const kundenansicht = useKundenansicht(schmal)
   const [markiert, setMarkiert] = useState<HofseiteZeileId | null>(null)
-  // Zählt jeden Wunsch nach der Kundenansicht — auch einen zweiten bei schon offener —, damit der Sprung jedes Mal kommt.
-  const [sprung, setSprung] = useState(0)
-  const anker = useRef<HTMLDivElement>(null)
-
-  const schreibe = useCallback((neu: MeinHofAnsichtId) => {
-    const { pathname, search, hash } = window.location
-    // null als Zustand: Next gleicht useSearchParams ab (ARCHITECTURE §4, State-Regeln).
-    window.history.replaceState(null, '', ansichtAdresse(pathname, search, neu) + hash)
-  }, [])
+  const { oeffne } = kundenansicht
 
   const zeigeKundin = useCallback(
     (abschnitt: HofseiteZeileId | null = null) => {
       setMarkiert(abschnitt)
-      setSprung((n) => n + 1)
-      schreibe('kundin')
+      oeffne()
     },
-    [schreibe]
+    [oeffne]
   )
 
   const steuerung = useMemo<MeinHofAnsichtSteuerung>(
@@ -112,110 +79,16 @@ export function MeinHofAnsicht({
     [zeigeKundin]
   )
 
-  // Der Rahmen braucht den Bildschirm: Der Umschalter rückt nach oben, der
-  // Rahmen füllt den Rest bis zur Unterleiste. Ab der Grenze nie — dort steht
-  // der Inhalt, und die Seite bleibt, wo sie ist.
-  useEffect(() => {
-    if (ansicht !== 'kundin' || !sichtbar) return
-    const oben = anker.current?.getBoundingClientRect().top
-    if (oben !== undefined) window.scrollTo({ top: oben + window.scrollY })
-  }, [ansicht, sprung, sichtbar])
-
   return (
     <Steuerung.Provider value={steuerung}>
       {kopf}
-      {/* Wo der Umschalter ohne Kleben stünde — das Ziel des Sprungs. */}
-      <div ref={anker} />
-      <div
-        data-umschalter=""
-        className={cn(
-          'sticky top-0 z-30 flex h-14 items-center justify-center border-b border-border bg-background px-4 md:px-8 print:hidden',
-          GRENZE[bis].nurDarunter
-        )}
-      >
-        <Segment
-          beschriftung={MEIN_HOF_ANSICHT_TEXT.beschriftung}
-          optionen={MEIN_HOF_ANSICHT_OPTIONEN}
-          wert={ansicht}
-          onWertChange={(wert) => {
-            if (wert === 'kundin') {
-              zeigeKundin(null)
-              return
-            }
-            setMarkiert(null)
-            schreibe('bearbeiten')
-          }}
-        />
-      </div>
-      {ansicht === 'kundin' && (
-        <KundenRahmen
-          adresse={kundenAnsichtAdresse(slug, reiter)}
-          markiert={markiert}
-          laden={sichtbar}
-          className={GRENZE[bis].nurDarunter}
-        />
-      )}
-      <div className={cn(ansicht === 'kundin' && GRENZE[bis].abDort)}>{children}</div>
+      {children}
+      <KundenansichtVollbild
+        offen={kundenansicht.offen}
+        adresse={kundenAnsichtAdresse(slug, reiter)}
+        markiert={markiert}
+        onSchliessen={kundenansicht.schliesse}
+      />
     </Steuerung.Provider>
-  )
-}
-
-/**
- * Höhe des Rahmens: der Bildschirm abzüglich Umschalter (56 px), der Zeile
- * „In neuem Tab öffnen" (44 px) und unter md der Unterleiste der HofShell
- * (68 px und ihr Rand, dazu der Home-Indicator). Eine Angabe für das iframe
- * und die leere Fläche davor.
- */
-const RAHMEN_FLAECHE = 'h-[calc(100dvh-169px-env(safe-area-inset-bottom))] w-full md:h-[calc(100dvh-100px)]'
-
-/**
- * Die echte Hofseite im Rahmen. Einbetten ist nur für diese Adresse und nur
- * für uns selbst erlaubt (next.config.ts, frame-ancestors 'self'); Kaufen
- * wirkt in der Vorschau nicht. Das iframe hängt erst ein, wenn `laden` stimmt
- * (der Umschalter ist zu sehen); bis dahin steht dieselbe Fläche leer da.
- */
-export function KundenRahmen({
-  adresse,
-  markiert,
-  laden,
-  className,
-}: {
-  adresse: string
-  markiert: HofseiteZeileId | null
-  laden: boolean
-  className: string
-}): React.JSX.Element {
-  const rahmen = useRef<HTMLIFrameElement>(null)
-  useVorschauMarkierung(rahmen, markiert)
-
-  return (
-    <div className={className}>
-      {/* Der bearbeitete Inhalt mit seiner Überschrift ist ausgeblendet — die Seite behält eine. */}
-      <h1 className="sr-only">{MEIN_HOF_ANSICHT_TEXT.kundin}</h1>
-      <div className="flex min-h-11 items-center justify-end px-4 md:px-8">
-        <a
-          href={adresse}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(
-            'inline-flex min-h-11 items-center gap-1.5 rounded-full px-1 text-[13px] font-medium text-muted-foreground transition-colors duration-[250ms] hover:text-foreground',
-            FOKUS_RAHMEN
-          )}
-        >
-          {MEIN_HOF_ANSICHT_TEXT.neuerTab}
-          <ArrowUpRight className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
-        </a>
-      </div>
-      {laden ? (
-        <iframe
-          ref={rahmen}
-          src={adresse}
-          title={MEIN_HOF_ANSICHT_TEXT.rahmenTitel}
-          className={cn('block border-0 bg-background', RAHMEN_FLAECHE)}
-        />
-      ) : (
-        <div aria-hidden="true" data-rahmen-platz="" className={cn('bg-background', RAHMEN_FLAECHE)} />
-      )}
-    </div>
   )
 }

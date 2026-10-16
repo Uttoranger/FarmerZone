@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { BEREIT_TYP } from '@/schemas/hofseite-vorschau'
 import { leseMarkierung, verlaesstRahmen } from '@/lib/hofseite-vorschau'
 import { ZIEL_ABSCHNITT } from '@/lib/hofseite-fortschritt'
@@ -13,7 +13,8 @@ const KOPFLEISTE_PX = 56
 
 /**
  * Die Hofseite im Vorschau-Modus, wenn sie im Rahmen des Editors steht
- * (components/farmer/hofseite-vorschau-rahmen.tsx). Drei Aufgaben:
+ * (components/farmer/hofseite-vorschau-rahmen.tsx) oder in der Kundenansicht
+ * von Mein Hof (components/mein-hof/kundenansicht-vollbild.tsx). Vier Aufgaben:
  *
  * 1. Markierung: Der Editor schickt die Kennung seiner offenen Zeile per
  *    postMessage; die Seite scrollt zum passenden `data-abschnitt` und
@@ -28,12 +29,48 @@ const KOPFLEISTE_PX = 56
  *    die sich nicht einbetten lässt (X-Frame-Options DENY) — ein Fehlerbild
  *    im Handyrahmen.
  *
+ * 4. Leiste (seit Nr. 107, Register N4): Die Seite sagt der KundeShell, dass
+ *    sie im Rahmen steht (useImVorschauRahmen) — die Leiste der Kundschaft
+ *    steht dann blass und ohne Wirkung da. Die Erkennung ist dieselbe wie für
+ *    Klicks und Bereit-Meldung: die Vorschau (diese Komponente gibt es nur
+ *    mit `ansicht.art === 'vorschau'`, entschieden von ansichtsModus aus
+ *    ?vorschau=1) UND `window.parent !== window`. Erst nach dem Mounten — vom
+ *    Server und beim Hydrieren kommt die Leiste unverändert.
+ *
  * Steht die Seite nicht im Rahmen („In neuem Tab öffnen"), bleibt sie, wie
  * sie ist; dann meldet sie sich nicht und fängt keine Klicks ab.
  */
+let imRahmen = false
+const hoerer = new Set<() => void>()
+
+function setzeImRahmen(wert: boolean): void {
+  if (imRahmen === wert) return
+  imRahmen = wert
+  for (const melde of hoerer) melde()
+}
+
+function abonniere(melde: () => void): () => void {
+  hoerer.add(melde)
+  return () => {
+    hoerer.delete(melde)
+  }
+}
+
+/**
+ * Ob die Hofseite gerade als Vorschau im Rahmen steht (Punkt 4 oben) — für
+ * die KundeShell. Vom Server und beim Hydrieren immer `false`.
+ */
+export function useImVorschauRahmen(): boolean {
+  return useSyncExternalStore(
+    abonniere,
+    () => imRahmen,
+    () => false
+  )
+}
+
 export function VorschauImRahmen(): null {
   useEffect(() => {
-    const imRahmen = window.parent !== window
+    const rahmen = window.parent !== window
     let timer: ReturnType<typeof setTimeout> | null = null
     let markiert: HTMLElement | null = null
 
@@ -78,15 +115,17 @@ export function VorschauImRahmen(): null {
     }
 
     window.addEventListener('message', beiNachricht)
-    if (imRahmen) {
+    if (rahmen) {
       document.addEventListener('click', beiKlick, true)
       window.parent.postMessage({ typ: BEREIT_TYP }, window.location.origin)
+      setzeImRahmen(true)
     }
     return () => {
       window.removeEventListener('message', beiNachricht)
       document.removeEventListener('click', beiKlick, true)
       if (timer) clearTimeout(timer)
       aufheben()
+      setzeImRahmen(false)
     }
   }, [])
 

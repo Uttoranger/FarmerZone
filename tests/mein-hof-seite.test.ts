@@ -194,11 +194,12 @@ describe('/farm-page in der HofShell', () => {
     const rahmen = quelle('src/components/farmer/hofseite-vorschau-rahmen.tsx')
     expect(rahmen).toMatch(/<iframe[\s\S]*?src=\{vorschauAdresse\(slug, anfang\)\}/)
     expect(rahmen).not.toMatch(/FarmPageView|HofseiteKunde/)
-    // „So sieht’s die Kundin" (Nr. 49): dasselbe iframe für alle Reiter, Adresse über vorschauLink.
+    // Die Kundenansicht (Nr. 49, seit Nr. 107 als Vollbild): dasselbe iframe für alle Reiter, Adresse über vorschauLink.
     const kunde = quelle('src/components/mein-hof/mein-hof-ansicht.tsx')
-    expect(kunde).toMatch(/<iframe[\s\S]*?src=\{adresse\}/)
+    const vollbild = quelle('src/components/mein-hof/kundenansicht-vollbild.tsx')
+    expect(vollbild).toMatch(/<iframe[\s\S]*?src=\{adresse\}/)
     expect(kunde).toContain('kundenAnsichtAdresse(slug, reiter)')
-    expect(kunde).not.toMatch(/FarmPageView|HofseiteKunde/)
+    expect(kunde + vollbild).not.toMatch(/FarmPageView|HofseiteKunde/)
   })
 })
 

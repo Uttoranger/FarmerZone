@@ -62,6 +62,7 @@ vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOu
 
 import { FarmPageView } from '@/components/farm/farm-page-view'
 import { MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
+import { KundenansichtKnopf } from '@/components/mein-hof/kundenansicht-knopf'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
@@ -281,11 +282,12 @@ describe('FarmPageView bindet genau eine Stelle ein', () => {
   })
 
   it('die Kundenansicht des Besitzers ist die echte Route im Rahmen, kein Nachbau', () => {
-    // Seit Nr. 49 (Register N4) steht sie im Umschalter von Mein Hof, für jeden Reiter.
+    // Seit Nr. 49 (Register N4) gehört sie zu Mein Hof, für jeden Reiter; seit Nr. 107 als Vollbild.
     const ansicht = ohneKommentare(quelle('src/components/mein-hof/mein-hof-ansicht.tsx'))
-    expect(ansicht).toMatch(/<iframe[\s\S]*?src=\{adresse\}/)
+    const vollbild = ohneKommentare(quelle('src/components/mein-hof/kundenansicht-vollbild.tsx'))
+    expect(vollbild).toMatch(/<iframe[\s\S]*?src=\{adresse\}/)
     expect(ansicht).toContain('adresse={kundenAnsichtAdresse(slug, reiter)}')
-    expect(ansicht).not.toMatch(/FarmPageView|HofseiteKunde/)
+    expect(ansicht + vollbild).not.toMatch(/FarmPageView|HofseiteKunde/)
     // Die Adresse kommt aus vorschauLink — dieselbe Route wie für Kundinnen.
     expect(ohneKommentare(quelle('src/lib/mein-hof-ansicht.ts'))).toMatch(/kundenAnsichtAdresse[\s\S]*?vorschauLink\(slug\)/)
     // Mein Hof zeigt keine zweite Hofseite: unter lg die Liste der Abschnitte, ab lg der Editor (Nr. 50).
@@ -349,7 +351,7 @@ const IN_DER_ANSICHT: Merkmal[] = [
   { was: 'Status-Pflege', muster: /Neuer Status|Frühere Status/ },
   { was: 'Pausen-Hinweis für den Hof', muster: /Dein Shop ist pausiert/ },
 ]
-/** Die Werkzeugleiste (Umschalter „Bearbeiten · So sieht’s die Kundin") steht seit Nr. 49 im Baustein MeinHofAnsicht. */
+/** Die Werkzeugleiste von Mein Hof (seit Nr. 49; seit Nr. 107 ohne Umschalter, „Kundenansicht" im Kopf öffnet das Vollbild). */
 const WERKZEUGLEISTE: Merkmal = { was: 'Werkzeugleiste', muster: />Bearbeiten<|>So sieht’s die Kundin<|>Kundenansicht<|>Kopieren</ }
 const KORB = /data-merkmal="korb"/
 
@@ -386,12 +388,12 @@ describe('Bearbeitungs-Elemente gibt es auf der Hofseite nicht', () => {
     const mitListe: ComponentProps<typeof MeinHofAnsicht> = {
       reiter: 'hofseite',
       slug: HOF.slug,
-      kopf: null,
+      kopf: createElement(KundenansichtKnopf, { slug: HOF.slug, className: 'knopf' }),
       children: createElement('p', null, 'Liste der Abschnitte'),
     }
     const besitzer = renderToStaticMarkup(createElement(MeinHofAnsicht, mitListe))
     expect(gefunden(besitzer, [WERKZEUGLEISTE])).toEqual([WERKZEUGLEISTE.was])
-    expect(besitzer).toContain('So sieht’s die Kundin')
+    expect(besitzer).toContain('Kundenansicht')
   })
 
   it('die Seite für Kundinnen rendert ohne sie', () => {

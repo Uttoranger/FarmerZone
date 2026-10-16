@@ -257,7 +257,7 @@ describe('Käufer-Vorschau im Produktdialog — derselbe Ausschnitt wie im Baust
 })
 
 describe('Bildansicht der Galerie — das ganze Foto mit Filter, ohne Beschnitt', () => {
-  const bild = { offen: 0, oeffne: () => {}, schliesse: () => {}, vor: () => {}, zurueck: () => {} }
+  const bild = { offen: 0, oeffne: () => {}, schliesse: () => {}, vor: () => {}, zurueck: () => {}, geheZu: () => {} }
   const ansicht = (ausschnitt: BildAusschnitt | null) =>
     renderToStaticMarkup(createElement(BildansichtEbene, { fotos: [{ id: 'f1', url: FOTO, caption: null, ausschnitt }], bild, titel: 'Fotos vom Hof' }))
 

@@ -2,9 +2,10 @@
  * Ladeansicht von „Mein Hof" (Nachtlauf Nr. 16). Die HofShell steht durch
  * das Layout, gewartet wird nur auf den Inhalt. Gleiche Maße wie die
  * fertige Seite: Kopf (unter lg Karte mit Streifen, ab lg Zeile 80 px),
- * Reiter 48 px (unter md mit „Produkte", Nr. 49), unter lg der Umschalter
- * (56 px, volle Breite) und darunter die Liste „Bearbeiten" (Nr. 50: Stand
- * und die dreizehn Zeilen — es sind immer alle da), ab lg Liste links
+ * Reiter 48 px (unter md mit „Produkte", Nr. 49), unter lg direkt darunter
+ * die Liste „Bearbeiten" (Nr. 50: Stand und die dreizehn Zeilen — es sind
+ * immer alle da; den Umschalter darüber gibt es seit Nr. 107 nicht mehr, die
+ * Kundenansicht öffnet als Vollbild), ab lg Liste links
  * (Gruppen mit sieben und vier Zeilen) und Vorschau rechts (320 px, ab xl
  * 360 px). Nur, was sicher kommt — die Balken (Freigabe, stillgelegt) stehen
  * im Layout.
@@ -47,11 +48,6 @@ export default function MeinHofLaden(): React.JSX.Element {
           <div className="h-4 w-16 rounded bg-border" />
           <div className="h-4 w-24 rounded bg-muted" />
         </div>
-      </div>
-
-      {/* Unter lg: Umschalter „Bearbeiten · So sieht’s die Kundin" */}
-      <div className="flex h-14 items-center justify-center border-b border-border px-4 md:px-8 lg:hidden">
-        <div className="h-10 w-[258px] rounded-full bg-muted" />
       </div>
 
       {/* Unter lg: Liste „Bearbeiten" — Stand, dann die Zeilen der Hofseite */}
