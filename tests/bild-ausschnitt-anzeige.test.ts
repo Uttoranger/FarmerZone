@@ -15,6 +15,8 @@
  *    seinem Filter, ohne Fokus und Zoom (Nr. 98, Runde 1).
  *  - Alle vier Upload-Stellen (Logo, Galerie, Produktdialog, Beitrag) öffnen
  *    den Baustein nach dem Upload mit „Passt so“, das Titelbild nicht.
+ *  - Die Vorschau-Paare im Produktdialog passen am Handy (375 px) in die
+ *    Breite: kein waagrechtes Scrollen (Nr. 98, Runde 2).
  *  - Wache: Der Screenshot unter „Problem melden“ (Zweck meldung) und die
  *    Rohfoto-Stellen (Warenkorb, Kasse, E-Mails, Teilen-Bild) binden weder den
  *    Baustein noch den Stil ein. Gegenprobe: Dieselbe Suche findet beide in
@@ -300,5 +302,60 @@ describe('Nach dem Upload — „Passt so“ an allen vier Upload-Stellen, nicht
     const titelbild = aufrufe('src/components/mein-hof/bild-bausteine.tsx').filter((aufruf) => aufruf.includes('mitDarstellung'))
     expect(titelbild).toHaveLength(1)
     expect(titelbild[0]).not.toContain('nachUpload')
+  })
+})
+
+describe('Vorschau-Paare im Produktdialog — passen am Handy (375 px) in die Breite', () => {
+  // Platz für eine Reihe bei 375 px: Körper des Dialogs px-6 (2 × 24) und Rahmen
+  // des Bausteins p-3 mit Linie (2 × 12 + 2 × 1) — bei 390 px gemessen 316 px.
+  const PLATZ_375 = 375 - 48 - 26
+  // gap-2.5 zwischen den Rahmen einer Reihe.
+  const ABSTAND = 10
+  // So viel behält ein Rahmen ohne feste Breite mindestens, sonst ist er nicht mehr lesbar.
+  const GETEILT_MINDESTENS = 96
+
+  /** Je Vorschau-Reihe die festen Breiten (undefined = teilt sich den Platz) — aus dem Syntaxbaum. */
+  const reihen = (): (number | undefined)[][] => {
+    const pfad = 'src/components/products/product-dialog.tsx'
+    const baum = ts.createSourceFile(pfad, quelle(pfad), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const breite = (objekt: ts.ObjectLiteralExpression): number | undefined => {
+      const eigenschaft = objekt.properties.find(
+        (e): e is ts.PropertyAssignment => ts.isPropertyAssignment(e) && e.name.getText(baum) === 'breite',
+      )
+      if (!eigenschaft) return undefined
+      if (!ts.isNumericLiteral(eigenschaft.initializer)) throw new Error('breite ist keine Zahl')
+      return Number(eigenschaft.initializer.text)
+    }
+    let liste: ts.ArrayLiteralExpression | undefined
+    const besuche = (knoten: ts.Node): void => {
+      if (ts.isVariableDeclaration(knoten) && knoten.name.getText(baum) === 'vorschauen' && knoten.initializer && ts.isArrayLiteralExpression(knoten.initializer)) {
+        liste = knoten.initializer
+      }
+      ts.forEachChild(knoten, besuche)
+    }
+    besuche(baum)
+    if (!liste) throw new Error('Keine Vorschau-Liste im Produktdialog')
+    return liste.elements.filter(ts.isObjectLiteralExpression).map((vorschau) => {
+      const daneben = vorschau.properties.find(
+        (e): e is ts.PropertyAssignment => ts.isPropertyAssignment(e) && e.name.getText(baum) === 'daneben',
+      )
+      const partner =
+        daneben && ts.isArrayLiteralExpression(daneben.initializer) ? daneben.initializer.elements.filter(ts.isObjectLiteralExpression) : []
+      return [vorschau, ...partner].map(breite)
+    })
+  }
+  const mindestBreite = (reihe: (number | undefined)[]): number =>
+    reihe.reduce<number>((summe, b) => summe + (b ?? GETEILT_MINDESTENS), 0) + ABSTAND * (reihe.length - 1)
+
+  it('beide Titel stehen als Paar da — „In der Liste“ und „Auf der Produktseite“', () => {
+    expect(reihen().map((r) => r.length)).toEqual([2, 2])
+  })
+
+  it('keine Reihe ist breiter als der Platz bei 375 px', () => {
+    for (const reihe of reihen()) expect(mindestBreite(reihe)).toBeLessThanOrEqual(PLATZ_375)
+  })
+
+  it('Gegenprobe: zwei feste Rahmen wie 196 + 110 px schlügen an', () => {
+    expect(mindestBreite([196, 110])).toBeGreaterThan(PLATZ_375)
   })
 })

@@ -2114,7 +2114,8 @@ function ProduktfotoAusschnitt({
     {
       titel: BILD_RAHMEN_TEXT.produkt.seite,
       verhaeltnis: PRODUKT_VORSCHAU_SEITE_HANDY,
-      breite: 196,
+      // Ohne feste Breite: Das Handy teilt sich den Platz mit dem Computer (110 px),
+      // sonst liefe die Reihe am Handy (375 px) über den Dialog hinaus.
       umgebung: karte,
       daneben: [
         {
