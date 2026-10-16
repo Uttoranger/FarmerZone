@@ -1,9 +1,18 @@
 /**
- * Tests für die Titelbild-Fokuspunkt-Action (updateBannerFocusAction).
+ * Tests für das Speichern des Titelbild-Ausschnitts (speichereBildAusschnittAction,
+ * Register N13/N17, Nachtlauf Nr. 97) und den Altweg updateBannerFocusAction.
  *
- * Beweist: Werte werden hart auf 0–100 geclampt (−5→0, 150→100), ohne
- * Session/eigenen Hof wird verweigert (nichts geschrieben), und ein
- * gültiger Wert wird für den richtigen Hof persistiert.
+ * Beweist:
+ *  - Ein gültiger Ausschnitt landet beim eigenen Hof (Hof aus der Sitzung über
+ *    ownerId, Besitz in der WHERE-Klausel) — mit bannerFocusY = fokusY für alten
+ *    Code im Deploy-Fenster —, und Hofseite wie Mein Hof werden neu gebaut.
+ *  - Werte außerhalb der Grenzen, ein unbekannter Filter, eine unbekannte Wahl
+ *    und eine mitgeschickte Hof-Kennung werden abgewiesen; nichts geschrieben.
+ *  - Ohne Sitzung und ohne eigenen Hof wird nichts geschrieben.
+ *  - Logo, Produkt, Foto und Beitrag prüft seit Nr. 98 tests/bild-ausschnitt-ziele.test.ts.
+ *  - Der Altweg clampt (−5 → 0, 150 → 100, NaN → 0) und schreibt über die neue Aktion.
+ *
+ * Gemockt ist nur die Infrastruktur (Prisma, Sitzung, Cache); das Schema prüft echt.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -12,93 +21,124 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    farm: { findUnique: vi.fn(), update: vi.fn() },
+    farm: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    product: { updateMany: vi.fn() },
+    farmPhoto: { updateMany: vi.fn() },
+    statusPost: { updateMany: vi.fn() },
     farmValue: { deleteMany: vi.fn(), createMany: vi.fn() },
     $transaction: vi.fn(),
   },
 }))
 
+import { revalidatePath } from 'next/cache'
+import { speichereBildAusschnittAction } from '@/server/actions/bild-ausschnitt'
 import { updateBannerFocusAction } from '@/server/actions/appearance'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 const getSession = vi.mocked(auth.api.getSession)
 const farmFindUnique = vi.mocked(prisma.farm.findUnique)
-const farmUpdate = vi.mocked(prisma.farm.update)
+const farmUpdateMany = vi.mocked(prisma.farm.updateMany)
+const schreibende = [farmUpdateMany, prisma.farm.update, prisma.product.updateMany, prisma.farmPhoto.updateMany, prisma.statusPost.updateMany].map((f) =>
+  vi.mocked(f)
+)
+
+const WERT = { fokusX: 30, fokusY: 64, zoom: 115, filter: 'WARM', darstellung: 'FUELLEN' } as const
+
+function nichtsGeschrieben(): void {
+  for (const schreiben of schreibende) expect(schreiben).not.toHaveBeenCalled()
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
   getSession.mockResolvedValue({ user: { id: 'user_1' } } as never)
   farmFindUnique.mockResolvedValue({ id: 'farm_1', slug: 'testhof' } as never)
-  farmUpdate.mockResolvedValue({} as never)
+  farmUpdateMany.mockResolvedValue({ count: 1 })
 })
 
-describe('Clamping', () => {
-  it('clampt −5 auf 0', async () => {
-    await updateBannerFocusAction(-5)
-    expect(farmUpdate).toHaveBeenCalledWith({
-      where: { id: 'farm_1' },
-      data: { bannerFocusY: 0 },
+describe('speichereBildAusschnittAction — Titelbild', () => {
+  it('speichert den Ausschnitt beim eigenen Hof, schreibt bannerFocusY mit und baut Hofseite und Mein Hof neu', async () => {
+    const ergebnis = await speichereBildAusschnittAction({ ziel: 'banner', wert: WERT })
+
+    expect(ergebnis).toEqual({ ok: true })
+    expect(farmFindUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { ownerId: 'user_1' } }))
+    expect(farmUpdateMany).toHaveBeenCalledTimes(1)
+    expect(farmUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'farm_1', ownerId: 'user_1' },
+      data: { bannerAusschnitt: WERT, bannerFocusY: 64 },
     })
+    expect(vi.mocked(revalidatePath).mock.calls.map(([pfad]) => pfad)).toEqual(['/testhof', '/farm-page'])
   })
 
-  it('clampt 150 auf 100', async () => {
-    await updateBannerFocusAction(150)
-    expect(farmUpdate).toHaveBeenCalledWith({
-      where: { id: 'farm_1' },
-      data: { bannerFocusY: 100 },
-    })
+  it.each([
+    ['Fokus über 100', { ...WERT, fokusX: 150 }],
+    ['Fokus unter 0', { ...WERT, fokusY: -5 }],
+    ['Zoom über 250', { ...WERT, zoom: 300 }],
+    ['Fokus mit Komma', { ...WERT, fokusY: 37.6 }],
+    ['unbekannter Filter', { ...WERT, filter: 'NEON' }],
+    ['unbekannte Wahl', { ...WERT, darstellung: 'STRECKEN' }],
+  ])('weist %s ab und schreibt nichts', async (_name, wert) => {
+    const ergebnis = await speichereBildAusschnittAction({ ziel: 'banner', wert })
+
+    expect(ergebnis).toEqual({ error: expect.stringContaining('Ausschnitt') })
+    nichtsGeschrieben()
   })
 
-  it('rundet krumme Werte auf ganze Zahlen', async () => {
-    await updateBannerFocusAction(37.6)
-    expect(farmUpdate).toHaveBeenCalledWith({
-      where: { id: 'farm_1' },
-      data: { bannerFocusY: 38 },
-    })
+  it('weist eine mitgeschickte Hof-Kennung ab — der Hof kommt nur aus der Sitzung', async () => {
+    const ergebnis = await speichereBildAusschnittAction({ ziel: 'banner', wert: WERT, farmId: 'farm_fremd' })
+
+    expect('error' in ergebnis).toBe(true)
+    nichtsGeschrieben()
   })
 
-  it('behandelt NaN als 0 statt zu crashen', async () => {
-    await updateBannerFocusAction(Number.NaN)
-    expect(farmUpdate).toHaveBeenCalledWith({
-      where: { id: 'farm_1' },
-      data: { bannerFocusY: 0 },
-    })
-  })
-})
-
-describe('Ownership', () => {
-  it('verweigert ohne Session und schreibt nichts', async () => {
+  it('schreibt ohne Sitzung nichts', async () => {
     getSession.mockResolvedValue(null as never)
 
-    const result = await updateBannerFocusAction(50)
+    const ergebnis = await speichereBildAusschnittAction({ ziel: 'banner', wert: WERT })
 
-    expect(result.error).toBeDefined()
-    expect(farmUpdate).not.toHaveBeenCalled()
+    expect(ergebnis).toEqual({ error: 'Bitte melde dich neu an.' })
+    nichtsGeschrieben()
   })
 
-  it('verweigert, wenn dem Nutzer kein Hof gehört (Ownership über ownerId)', async () => {
+  it('schreibt nichts, wenn dem Nutzer kein Hof gehört — kein fremder Hof über eine Kennung', async () => {
     farmFindUnique.mockResolvedValue(null)
 
-    const result = await updateBannerFocusAction(50)
+    const ergebnis = await speichereBildAusschnittAction({ ziel: 'banner', wert: WERT })
 
-    expect(result.error).toBeDefined()
-    expect(farmFindUnique).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { ownerId: 'user_1' } })
-    )
-    expect(farmUpdate).not.toHaveBeenCalled()
+    expect('error' in ergebnis).toBe(true)
+    nichtsGeschrieben()
+  })
+
+  it('meldet einen Fehler, wenn die Zeile zwischen Lesen und Schreiben nicht mehr dem Nutzer gehört (0 Zeilen)', async () => {
+    farmUpdateMany.mockResolvedValue({ count: 0 })
+
+    const ergebnis = await speichereBildAusschnittAction({ ziel: 'banner', wert: WERT })
+
+    expect('error' in ergebnis).toBe(true)
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 })
 
-describe('Persistenz', () => {
-  it('speichert einen gültigen Wert für den eigenen Hof und meldet Erfolg', async () => {
-    const result = await updateBannerFocusAction(40)
+describe('updateBannerFocusAction — Altweg, ein dünner Aufruf', () => {
+  it.each([
+    [-5, 0],
+    [150, 100],
+    [37.6, 38],
+    [Number.NaN, 0],
+  ])('clampt %s auf %s und schreibt über die neue Aktion', async (eingabe, erwartet) => {
+    const ergebnis = await updateBannerFocusAction(eingabe)
 
-    expect(result).toEqual({})
-    expect(farmUpdate).toHaveBeenCalledTimes(1)
-    expect(farmUpdate).toHaveBeenCalledWith({
-      where: { id: 'farm_1' },
-      data: { bannerFocusY: 40 },
+    expect(ergebnis).toEqual({})
+    expect(farmUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'farm_1', ownerId: 'user_1' },
+      data: { bannerAusschnitt: { fokusX: 50, fokusY: erwartet, zoom: 100, filter: 'NATUERLICH' }, bannerFocusY: erwartet },
     })
+  })
+
+  it('gibt den Satz der neuen Aktion weiter, wenn niemand angemeldet ist', async () => {
+    getSession.mockResolvedValue(null as never)
+
+    expect(await updateBannerFocusAction(50)).toEqual({ error: 'Bitte melde dich neu an.' })
+    nichtsGeschrieben()
   })
 })

@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import { bildStil } from '@/lib/bild-ausschnitt'
 import { formatGrundpreis, formatGrundpreisZeile } from '@/lib/format'
 import { produktInitiale, type VorschauProdukt } from '@/lib/hofuebersicht'
 
@@ -78,16 +79,21 @@ export function HoefeProduktzeilen({
           </div>
 
           {produkt.imageUrl ? (
-            <Image
-              src={produkt.imageUrl}
-              alt=""
-              width={BILD_KANTE}
-              height={BILD_KANTE}
-              loading="lazy"
-              className={`size-12 shrink-0 rounded-lg object-cover ${
-                produkt.verfuegbar ? '' : 'grayscale opacity-70'
-              }`}
-            />
+            // Der Kasten schneidet ab: Mit Zoom ragte das Foto sonst über die Kante (Register N17, Nr. 98).
+            <span className="block size-12 shrink-0 overflow-hidden rounded-lg">
+              <Image
+                src={produkt.imageUrl}
+                alt=""
+                width={BILD_KANTE}
+                height={BILD_KANTE}
+                loading="lazy"
+                className={`size-full object-cover ${
+                  produkt.verfuegbar ? '' : 'grayscale opacity-70'
+                }`}
+                // „derzeit aus" ohne Filter des Hofs: Ein Inline-Filter überschriebe sonst grayscale.
+                style={bildStil(produkt.bildAusschnitt, { filter: produkt.verfuegbar })}
+              />
+            </span>
           ) : (
             <span
               aria-hidden="true"

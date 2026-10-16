@@ -158,7 +158,7 @@ const HOF_SLUG = 'hof-test'
 
 function produkt(id: string, name: string): PublicProduct {
   return {
-    id, name, description: null, imageUrl: null, category: null, categoryImageUrl: null,
+    id, name, description: null, imageUrl: null, bildAusschnitt: null, category: null, categoryImageUrl: null,
     price: 3.5, unit: 'kg', unitSize: 1, stock: 10, isAvailable: true, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,

@@ -9,6 +9,7 @@ import { zaehleZuEntscheiden } from '@/server/queries/meldung'
 import { zaehleUngelesenHof } from '@/server/queries/postfach'
 import { ladeTarifStand } from '@/server/queries/einstellungen'
 import { baueTarifZeile, type TarifZeileDaten } from '@/lib/konditionen'
+import { leseAusschnitt, type BildAusschnitt } from '@/schemas/bild-ausschnitt'
 
 /**
  * Was jedes Layout des Hofbereichs braucht — für das Bestandslayout
@@ -20,7 +21,8 @@ import { baueTarifZeile, type TarifZeileDaten } from '@/lib/konditionen'
  * Nicht angemeldet oder keine Hof-Rolle → Anmeldung; ohne Hof → Einrichten.
  */
 export type Hofbereich = {
-  hof: { id: string; name: string; slug: string; logoUrl: string | null }
+  /** logoAusschnitt schon geprüft (Register N17, Nr. 98): das runde Logo der Identitätskarte. */
+  hof: { id: string; name: string; slug: string; logoUrl: string | null; logoAusschnitt: BildAusschnitt | null }
   personName: string
   offeneBestellungen: number
   /** Fäden im Postfach mit Ungelesenem vom Team (Register N12, Nr. 87) — der Zähler an „Postfach". */
@@ -55,8 +57,10 @@ export async function ladeHofbereich(): Promise<Hofbereich> {
   const role = (session.user as typeof session.user & { role: string }).role
   if (role !== 'FARMER') redirect('/login')
 
-  const hof = await getFarmForUser(session.user.id)
-  if (!hof) redirect('/onboarding')
+  const zeile = await getFarmForUser(session.user.id)
+  if (!zeile) redirect('/onboarding')
+  // Ausdrücklich gebaut: Der Json-Wert geht nur geprüft an die Navigation (Client).
+  const hof = { id: zeile.id, name: zeile.name, slug: zeile.slug, logoUrl: zeile.logoUrl, logoAusschnitt: leseAusschnitt(zeile.logoAusschnitt) }
 
   // Unabhängig voneinander, also nebeneinander (Nachtlauf Nr. 31) — vorher
   // vier Rundreisen zur Datenbank hintereinander vor jeder Hof-Seite.

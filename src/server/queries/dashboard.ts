@@ -8,6 +8,6 @@ export async function getFarmForUser(userId: string) {
     // ruft diese Funktion ohnehin bei jedem Seitenaufruf.
     // `approvedAt` fehlt hier absichtlich — es kommt aus getFarmBannerState,
     // das im Layout für die Balken bereits geladen wird.
-    select: { id: true, name: true, slug: true, logoUrl: true },
+    select: { id: true, name: true, slug: true, logoUrl: true, logoAusschnitt: true },
   })
 }

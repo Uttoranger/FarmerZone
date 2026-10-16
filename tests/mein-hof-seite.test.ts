@@ -208,6 +208,7 @@ describe('Kopf und Reiter (neues Design)', () => {
     slug: 'hof-test',
     adresse: { anzeige: 'agrilo.at/hof-test', url: 'https://agrilo.at/hof-test' },
     logoUrl: null,
+    logoAusschnitt: null,
     titelbildUrl: null,
     bannerValue: null,
     bannerFocusY: 50,

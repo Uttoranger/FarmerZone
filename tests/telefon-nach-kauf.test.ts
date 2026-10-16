@@ -82,7 +82,7 @@ const EMAIL = 'hof@example.com'
 
 function produkt(id: string, name: string): PublicProduct {
   return {
-    id, name, description: null, imageUrl: null, category: 'GEMUESE', categoryImageUrl: null,
+    id, name, description: null, imageUrl: null, bildAusschnitt: null, category: 'GEMUESE', categoryImageUrl: null,
     price: 4.5, unit: 'STUECK', unitSize: null, stock: 20, isAvailable: true, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
@@ -93,8 +93,8 @@ function produkt(id: string, name: string): PublicProduct {
 const HOF: PublicFarm = {
   id: 'farm_test', slug: 'hof-test', name: 'Hof Test', ownerName: 'Erika Muster',
   description: 'Gemüse aus Musterdorf', address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf',
-  phone: TELEFON, email: EMAIL, logoUrl: null, bannerUrl: null,
-  tagline: null, foundedYear: null, aboutText: 'Ein kleiner Familienbetrieb.', bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50,
+  phone: TELEFON, email: EMAIL, logoUrl: null, logoAusschnitt: null, bannerUrl: null,
+  tagline: null, foundedYear: null, aboutText: 'Ein kleiner Familienbetrieb.', bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50, bannerAusschnitt: null,
   sectionsConfig: [], farmValues: [], farmPhotos: [],
   acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,
   serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',

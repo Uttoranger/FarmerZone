@@ -192,6 +192,7 @@ describe('/hoefe: der Satz zur Reihenfolge unter der Liste', () => {
     postalCode: '4900',
     city: 'Musterdorf',
     logoUrl: null,
+    logoAusschnitt: null,
     latitude: 48.1,
     longitude: 13.1,
     isPaused: false,

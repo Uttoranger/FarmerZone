@@ -169,6 +169,9 @@ function findeNummern(text: string, datei = 'schnipsel.md'): Fund[] {
   return funde
 }
 
+/** Ziffernfolge aus einem SVG-Pfad der Bild-Baustein-Mockups (Nr. 97/98), die wie eine Handynummer ohne 0 aussieht. */
+const SVG_HUEGEL = 'cjcddalpfaei'
+
 /** Ausnahmen — je Nummer (ihre Kennung) und Datei, je mit Grund. Eine Ausnahme für eine ganze Datei gibt es nicht. */
 type Ausnahme = { datei: string; kennungen: string[]; grund: string }
 
@@ -198,6 +201,11 @@ const AUSNAHMEN: Ausnahme[] = [
   { datei: 'docs/nachtlauf/morgenbericht-2026-10-13-lauf12.md', kennungen: ['foemjlcpdjfh'], grund: 'Morgenbericht eines früheren Laufs (Historie): eine Testnummer bis auf drei Ziffern genullt' },
   { datei: 'docs/mockups/web-k3-kasse-glatt.html', kennungen: ['bhojpaabapgd'], grund: 'Mockup, wird nur gelesen, nie geändert: Nummer bis auf die letzte Ziffer genullt' },
   { datei: 'docs/mockups/mobil-k3-kasse-glatt.html', kennungen: ['bhojpaabapgd'], grund: 'Mockup, wird nur gelesen, nie geändert: Nummer bis auf die letzte Ziffer genullt' },
+  { datei: 'docs/mockups/web-h1-titelbild-ausschnitt.html', kennungen: [SVG_HUEGEL], grund: 'Mockup, wird nur gelesen, nie geändert: Koordinaten eines SVG-Pfads (Hügel im Beispielfoto), keine Telefonnummer' },
+  { datei: 'docs/mockups/mobil-h1-titelbild-ausschnitt.html', kennungen: [SVG_HUEGEL], grund: 'Mockup, wird nur gelesen, nie geändert: Koordinaten eines SVG-Pfads (Hügel im Beispielfoto), keine Telefonnummer' },
+  { datei: 'docs/mockups/mobil-h2-produktfoto-ausschnitt.html', kennungen: [SVG_HUEGEL], grund: 'Mockup, wird nur gelesen, nie geändert: Koordinaten eines SVG-Pfads (Hügel im Beispielfoto), keine Telefonnummer' },
+  { datei: 'docs/mockups/system-h1-titelbild-filter.html', kennungen: [SVG_HUEGEL], grund: 'Mockup, wird nur gelesen, nie geändert: Koordinaten eines SVG-Pfads (Hügel im Beispielfoto), keine Telefonnummer' },
+  { datei: 'docs/mockups/system-h1-bild-baustein.html', kennungen: [SVG_HUEGEL], grund: 'Mockup, wird nur gelesen, nie geändert: Koordinaten eines SVG-Pfads (Hügel im Beispielfoto), keine Telefonnummer' },
   // Seed: Der Wert steht in der Datenbank jeder Entwicklungsumgebung
   { datei: 'tests/seed-idempotenz.test.ts', kennungen: [MOBIL_A], grund: 'Prüft den Wert, den der Seed (prisma/, außerhalb der Wache) seit dem ersten Lauf schreibt; ändert sich nur mit dem Seed' },
 ]

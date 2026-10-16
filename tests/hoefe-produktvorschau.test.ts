@@ -19,6 +19,7 @@ function p(teil: Partial<VorschauProdukt> & { id: string }): VorschauProdukt {
     unit: 'STUECK',
     unitSize: null,
     imageUrl: null,
+    bildAusschnitt: null,
     category: null,
     verfuegbar: true,
     ...teil,

@@ -19,6 +19,7 @@ vi.mock('@vercel/blob', () => ({ del: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendBriefkastenZusammenfassung: vi.fn() }))
 vi.mock('@/server/queries/postfach', () => ({ ladeBetreiberEmpfaenger: vi.fn(), zaehleOffenImEingang: vi.fn() }))
 vi.mock('@/server/queries/meldung', () => ({
+  findeHauptmeldungen: vi.fn(),
   findeLoeschKandidaten: vi.fn(),
   loescheMeldungen: vi.fn(),
   zaehleFuerWochenlauf: vi.fn(),
@@ -27,13 +28,14 @@ vi.mock('@/server/queries/meldung', () => ({
 import { GET } from '@/app/api/cron/briefkasten/route'
 import { del } from '@vercel/blob'
 import { sendBriefkastenZusammenfassung } from '@/lib/email'
-import { findeLoeschKandidaten, loescheMeldungen, zaehleFuerWochenlauf } from '@/server/queries/meldung'
+import { findeHauptmeldungen, findeLoeschKandidaten, loescheMeldungen, zaehleFuerWochenlauf } from '@/server/queries/meldung'
 import { ladeBetreiberEmpfaenger, zaehleOffenImEingang } from '@/server/queries/postfach'
 import { AUFBEWAHRUNG_TAGE } from '@/lib/meldung'
 
 const blobDel = vi.mocked(del)
 const mail = vi.mocked(sendBriefkastenZusammenfassung)
 const kandidaten = vi.mocked(findeLoeschKandidaten)
+const hauptmeldungen = vi.mocked(findeHauptmeldungen)
 const loeschen = vi.mocked(loescheMeldungen)
 const zaehlen = vi.mocked(zaehleFuerWochenlauf)
 const liste = vi.mocked(ladeBetreiberEmpfaenger)
@@ -63,6 +65,7 @@ beforeEach(() => {
   vi.setSystemTime(JETZT)
   vi.stubEnv('CRON_SECRET', 'geheim-123')
   kandidaten.mockResolvedValue([])
+  hauptmeldungen.mockResolvedValue(new Map())
   loeschen.mockResolvedValue(0)
   zaehlen.mockResolvedValue(RUHIG)
   mail.mockResolvedValue(undefined)
@@ -185,11 +188,11 @@ describe('Wochenlauf — Zusammenfassung', () => {
 describe('Wochenlauf — Löschung nach 90 Tagen', () => {
   it('löscht nur abgeschlossene Meldungen, deren Abschluss 90 Tage zurückliegt', async () => {
     kandidaten.mockResolvedValue([
-      { id: 'alt_erledigt', status: 'ERLEDIGT', triagedAt: vorTagen(AUFBEWAHRUNG_TAGE + 1), createdAt: vorTagen(120), screenshotUrl: null },
-      { id: 'genau_90', status: 'KEIN_FEHLER', triagedAt: vorTagen(AUFBEWAHRUNG_TAGE), createdAt: vorTagen(100), screenshotUrl: null },
-      { id: 'frisch_erledigt', status: 'DUPLIKAT', triagedAt: vorTagen(10), createdAt: vorTagen(100), screenshotUrl: null },
-      { id: 'ohne_triagedAt_alt', status: 'ERLEDIGT', triagedAt: null, createdAt: vorTagen(91), screenshotUrl: null },
-      { id: 'ohne_triagedAt_jung', status: 'ERLEDIGT', triagedAt: null, createdAt: vorTagen(30), screenshotUrl: null },
+      { id: 'alt_erledigt', status: 'ERLEDIGT', triagedAt: vorTagen(AUFBEWAHRUNG_TAGE + 1), createdAt: vorTagen(120), screenshotUrl: null, duplikatVonId: null },
+      { id: 'genau_90', status: 'KEIN_FEHLER', triagedAt: vorTagen(AUFBEWAHRUNG_TAGE), createdAt: vorTagen(100), screenshotUrl: null, duplikatVonId: null },
+      { id: 'frisch_erledigt', status: 'DUPLIKAT', triagedAt: vorTagen(10), createdAt: vorTagen(100), screenshotUrl: null, duplikatVonId: null },
+      { id: 'ohne_triagedAt_alt', status: 'ERLEDIGT', triagedAt: null, createdAt: vorTagen(91), screenshotUrl: null, duplikatVonId: null },
+      { id: 'ohne_triagedAt_jung', status: 'ERLEDIGT', triagedAt: null, createdAt: vorTagen(30), screenshotUrl: null, duplikatVonId: null },
     ])
     loeschen.mockResolvedValue(3)
 
@@ -202,9 +205,9 @@ describe('Wochenlauf — Löschung nach 90 Tagen', () => {
 
   it('löscht die Screenshots der betroffenen Meldungen im Blob-Speicher', async () => {
     kandidaten.mockResolvedValue([
-      { id: 'a', status: 'ERLEDIGT', triagedAt: vorTagen(100), createdAt: vorTagen(120), screenshotUrl: 'https://x.public.blob.vercel-storage.com/farms/f/meldung/a.webp' },
-      { id: 'b', status: 'ERLEDIGT', triagedAt: vorTagen(100), createdAt: vorTagen(120), screenshotUrl: null },
-      { id: 'c', status: 'ERLEDIGT', triagedAt: vorTagen(1), createdAt: vorTagen(120), screenshotUrl: 'https://x.public.blob.vercel-storage.com/farms/f/meldung/c.webp' },
+      { id: 'a', status: 'ERLEDIGT', triagedAt: vorTagen(100), createdAt: vorTagen(120), screenshotUrl: 'https://x.public.blob.vercel-storage.com/farms/f/meldung/a.webp', duplikatVonId: null },
+      { id: 'b', status: 'ERLEDIGT', triagedAt: vorTagen(100), createdAt: vorTagen(120), screenshotUrl: null, duplikatVonId: null },
+      { id: 'c', status: 'ERLEDIGT', triagedAt: vorTagen(1), createdAt: vorTagen(120), screenshotUrl: 'https://x.public.blob.vercel-storage.com/farms/f/meldung/c.webp', duplikatVonId: null },
     ])
     await GET(anfrage('Bearer geheim-123'))
     expect(blobDel).toHaveBeenCalledTimes(1)
@@ -212,9 +215,25 @@ describe('Wochenlauf — Löschung nach 90 Tagen', () => {
     expect(loeschen.mock.calls[0][0]).toEqual(['a', 'b'])
   })
 
+  it('lädt die Hauptmeldungen der Duplikate und lässt ein Duplikat mit offener Hauptmeldung stehen (Nr. 101)', async () => {
+    kandidaten.mockResolvedValue([
+      { id: 'dup_offen', status: 'DUPLIKAT', triagedAt: vorTagen(200), createdAt: vorTagen(210), screenshotUrl: null, duplikatVonId: 'haupt_offen' },
+      { id: 'dup_alt', status: 'DUPLIKAT', triagedAt: vorTagen(5), createdAt: vorTagen(10), screenshotUrl: null, duplikatVonId: 'haupt_alt' },
+    ])
+    hauptmeldungen.mockResolvedValue(
+      new Map([
+        ['haupt_offen', { status: 'GEPLANT' as const, triagedAt: vorTagen(150), createdAt: vorTagen(220) }],
+        ['haupt_alt', { status: 'ERLEDIGT' as const, triagedAt: vorTagen(91), createdAt: vorTagen(120) }],
+      ])
+    )
+    await GET(anfrage('Bearer geheim-123'))
+    expect(hauptmeldungen).toHaveBeenCalledWith(['haupt_offen', 'haupt_alt'])
+    expect(loeschen.mock.calls[0][0]).toEqual(['dup_alt'])
+  })
+
   it('lässt einen scheiternden Blob-Aufruf die Löschung nicht aufhalten', async () => {
     kandidaten.mockResolvedValue([
-      { id: 'a', status: 'ERLEDIGT', triagedAt: vorTagen(100), createdAt: vorTagen(120), screenshotUrl: 'https://x.public.blob.vercel-storage.com/farms/f/meldung/a.webp' },
+      { id: 'a', status: 'ERLEDIGT', triagedAt: vorTagen(100), createdAt: vorTagen(120), screenshotUrl: 'https://x.public.blob.vercel-storage.com/farms/f/meldung/a.webp', duplikatVonId: null },
     ])
     blobDel.mockRejectedValue(new Error('Blob weg'))
     const res = await GET(anfrage('Bearer geheim-123'))

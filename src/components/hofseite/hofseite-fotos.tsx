@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import type { PublicFarmPhoto } from '@/server/queries/farm'
+import { bildStil } from '@/lib/bild-ausschnitt'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { BildansichtEbene, useBildansicht } from '@/components/hofseite/bildansicht'
@@ -80,7 +81,8 @@ export function HofseiteFotos({
                 }
                 className={cn('relative block w-full touch-manipulation overflow-hidden rounded-[14px] bg-muted', form.kachel, FOKUS_RAHMEN)}
               >
-                <Image src={foto.url} alt="" fill sizes={form.sizes} className="object-cover" />
+                {/* Die Kachel mit Ausschnitt und Filter des Hofs (Register N17, Nr. 98); die Bildansicht zeigt das ganze Foto. */}
+                <Image src={foto.url} alt="" fill sizes={form.sizes} className="object-cover" style={bildStil(foto.ausschnitt)} />
                 {/* „+N" liegt auf dem Foto: dunkler Schleier, helle Schrift — in beiden Themes gleich (DESIGN_SYSTEM, Bild-Overlays). */}
                 {letzte && (
                   <span

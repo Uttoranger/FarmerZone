@@ -373,6 +373,7 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
       name: 'Freilandeier',
       description: null,
       imageUrl: null,
+      bildAusschnitt: null,
       category: 'EIER',
       subcategory: null,
       labels: [],

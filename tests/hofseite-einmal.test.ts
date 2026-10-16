@@ -309,7 +309,7 @@ describe('FarmPageView bindet genau eine Stelle ein', () => {
 
 function produkt(id: string, name: string, sichtbar: boolean): PublicProduct {
   return {
-    id, name, description: null, imageUrl: null, category: null, categoryImageUrl: null,
+    id, name, description: null, imageUrl: null, bildAusschnitt: null, category: null, categoryImageUrl: null,
     price: 3.5, unit: 'kg', unitSize: 1, stock: 10, isAvailable: sichtbar, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
@@ -321,9 +321,9 @@ function produkt(id: string, name: string, sichtbar: boolean): PublicProduct {
 const HOF: PublicFarm = {
   id: 'farm_test', slug: 'hof-test', name: 'Hof Test', ownerName: 'Erika Muster',
   description: 'Gemüse aus Musterdorf', address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf',
-  phone: '+43 660 0000000', email: 'hof@example.com', logoUrl: null, bannerUrl: null,
-  tagline: null, foundedYear: null, aboutText: null, bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50,
-  sectionsConfig: [], farmValues: [], farmPhotos: [{ id: 'foto_1', url: '/foto.jpg', caption: null, sortOrder: 0 }],
+  phone: '+43 660 0000000', email: 'hof@example.com', logoUrl: null, logoAusschnitt: null, bannerUrl: null,
+  tagline: null, foundedYear: null, aboutText: null, bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50, bannerAusschnitt: null,
+  sectionsConfig: [], farmValues: [], farmPhotos: [{ id: 'foto_1', url: '/foto.jpg', caption: null, sortOrder: 0, ausschnitt: null }],
   acceptsOnline: false, acceptsOnsite: true, stripeAccountReady: false, isPaused: true, pauseMessage: null,
   serviceFeePercent: 0, serviceFeeMinCents: 0, serviceFeeActiveFrom: null, betriebsstatus: null,
   products: [produkt('prod_1', 'Kartoffeln', true), produkt('prod_2', 'Zwiebeln', false)],
@@ -335,7 +335,7 @@ const HOF_OFFEN: PublicFarm = { ...HOF, isPaused: false }
 
 const STATUS: ActiveStatusPost = {
   id: 'status_1', title: 'Neue Ernte', body: 'Frische Kartoffeln ab Freitag.', anlass: 'ANNOUNCEMENT',
-  photoUrl: null, linkedProductIds: [], publishedAt: '2026-09-30T08:00:00.000Z',
+  photoUrl: null, fotoAusschnitt: null, linkedProductIds: [], publishedAt: '2026-09-30T08:00:00.000Z',
 }
 
 type Merkmal = { was: string; muster: RegExp }

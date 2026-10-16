@@ -94,7 +94,8 @@ describe('Editor und Bausteine', () => {
 
   it('speichert nur über die vorhandenen Aktionen — keine neue Aktion, keine zweite Speicherlogik', () => {
     const aktionen = new Set(BAUSTEINE.flatMap((pfad) => [...quelltext(pfad).matchAll(/from '@\/server\/actions\/([a-z-]+)'/g)].map((m) => m[1])))
-    expect([...aktionen].toSorted()).toEqual(['appearance', 'farm', 'farm-photos'])
+    // bild-ausschnitt: der Ausschnitt des Titelbilds seit Nr. 97 (Register N13/N17) — eine eigene, freigegebene Aktion.
+    expect([...aktionen].toSorted()).toEqual(['appearance', 'bild-ausschnitt', 'farm', 'farm-photos'])
     // Editor und Liste selbst rufen keine Aktion.
     for (const text of [editor, liste]) expect(text).not.toMatch(/from '@\/server\/actions\//)
     // Auftritt und Profil speichert NUR abschnitt-speichern.ts — die Formulare gehen über speichereAuftritt/speichereProfil

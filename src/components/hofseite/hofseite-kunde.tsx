@@ -43,6 +43,8 @@ import { korbErlaubt } from '@/lib/hofseite-vorschau'
 import { produktLink } from '@/lib/produktdetail'
 import { rueckweg, type KundenSeite } from '@/lib/kunden-kopf'
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
+import { titelbildAusschnitt } from '@/lib/titelbild'
+import { bildStil } from '@/lib/bild-ausschnitt'
 import { kundenPausenText } from '@/lib/shop-pause'
 import { stripStatusVariables } from '@/lib/status-body'
 import { anzeigeBereichVon } from '@/lib/taxonomie'
@@ -315,7 +317,7 @@ export function HofseiteKunde({
       {/* ── Titelbild, Name, Aktionen ── */}
       <div className="relative">
         {/* Hochformat ab md ganz statt beschnitten (Register N6, Nr. 72): entscheidet titelbild.tsx. */}
-        <Titelbild foto={foto} verlauf={titelbildVerlauf(farm.bannerValue)} fokusY={farm.bannerFocusY}>
+        <Titelbild foto={foto} verlauf={titelbildVerlauf(farm.bannerValue)} ausschnitt={titelbildAusschnitt(farm.bannerAusschnitt, farm.bannerFocusY)}>
           <button
             type="button"
             onClick={() => void teileHof(farm)}
@@ -334,7 +336,8 @@ export function HofseiteKunde({
           <div className="absolute inset-x-4 bottom-[calc(100%+1rem)] flex min-w-0 items-end gap-6 md:static md:-mt-11 md:flex-1">
             <span className="relative hidden size-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-[3px] border-background bg-accent font-heading text-[34px] font-semibold text-accent-foreground md:flex">
               {farm.logoUrl ? (
-                <Image src={farm.logoUrl} alt={`${farm.name} – Logo`} fill sizes="96px" className="object-cover" />
+                // Das Logo bekommt keinen Filter (Register N17).
+                <Image src={farm.logoUrl} alt={`${farm.name} – Logo`} fill sizes="96px" className="object-cover" style={bildStil(farm.logoAusschnitt, { filter: false })} />
               ) : (
                 <span aria-hidden="true">{hofInitialen(farm.name)}</span>
               )}
@@ -557,7 +560,15 @@ function Beitrag({ beitrag, neuester, jetzt }: { beitrag: ActiveStatusPost; neue
       </p>
       {beitrag.photoUrl && (
         <div className="relative aspect-[3/2] max-h-72 w-full overflow-hidden rounded-xl bg-muted">
-          <Image src={beitrag.photoUrl} alt={beitrag.title} fill sizes="(min-width: 1024px) 760px, 100vw" className="object-contain" />
+          {/* Mit Ausschnitt füllt das Foto den Rahmen; ohne steht es ganz wie bisher (Register N17, Nr. 98). */}
+          <Image
+            src={beitrag.photoUrl}
+            alt={beitrag.title}
+            fill
+            sizes="(min-width: 1024px) 760px, 100vw"
+            className={beitrag.fotoAusschnitt ? 'object-cover' : 'object-contain'}
+            style={bildStil(beitrag.fotoAusschnitt)}
+          />
         </div>
       )}
     </article>

@@ -9,8 +9,9 @@ import { MARKE } from '@/lib/marke'
 export const metadata: Metadata = { title: `${ADMIN_STARTSEITE_TEXT.titel} — Admin — ${MARKE}` }
 
 /*
- * /admin/startseite — Startseite gestalten (Register N16, Nr. 96; Mockups
- * admin-startseite-gestalten und admin-startseite-vorschau), im Muster der
+ * /admin/startseite — Startseite gestalten (Register N16, Nr. 96; seit Nr. 99
+ * Entwurf, Zeitplan und Verlauf nach admin-startseite-entwurf, -zeitplan und
+ * mobil-admin-startseite-entwurf), im Muster der
  * Admin-Seiten (Register N15): Seitenkopf mit Satz und Umschalter, Inhalt,
  * Regel-Zeile. Kennzahlen hat das Mockup keine. Die Seite prüft selbst und
  * zuerst (verlangeAdminSeite), wie jede Admin-Seite; jede Aktion prüft noch
@@ -18,11 +19,12 @@ export const metadata: Metadata = { title: `${ADMIN_STARTSEITE_TEXT.titel} — A
  */
 export default async function AdminStartseitePage(): Promise<React.JSX.Element> {
   await verlangeAdminSeite()
-  const daten = await ladeStartseiteAdmin()
+  const jetzt = new Date()
+  const daten = await ladeStartseiteAdmin(jetzt)
 
   return (
     <div className={ADMIN_RAHMEN}>
-      <StartseiteGestalten daten={daten} jetzt={new Date().toISOString()} />
+      <StartseiteGestalten daten={daten} jetzt={jetzt.toISOString()} />
     </div>
   )
 }

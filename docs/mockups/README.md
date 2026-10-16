@@ -35,7 +35,7 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 | `web-k2-alle-produkte-nach-kategorie.html` | K2 · Alle Produkte nach Kategorie | `/[farmSlug] Reiter Produkte` | Umbau | 1440×2420 |
 | `web-k2-futter-groesse-waehlen.html` | K2 · Futter: Größe wählen | `/[farmSlug]/produkt/[id] (neu)` | neu | 1440×1500 |
 | `web-k2-brennmaterial-brennholz.html` | K2 · Brennmaterial: Brennholz | `/[farmSlug]/produkt/[id] (neu)` | neu | 1440×1560 |
-| `system-k2-titelbild-computer.html` | K2 · Titelbild der Hofseite am Computer: Querformat füllt mit Fokuspunkt, Quadrat und Hochformat stehen ganz mit weichem Rand; Höhe 300/360/420 px nach Breite, ab 1 920 px nicht weiter aufgezogen | `/[farmSlug]` | Fix (Nr. 89) | 1440×1500 |
+| `system-k2-titelbild-computer.html` | K2 · Titelbild der Hofseite am Computer: Querformat füllt mit Fokuspunkt, Quadrat und Hochformat stehen ganz mit weichem Rand; Höhe 300/360/420 px nach Breite, ab 1 920 px nicht weiter aufgezogen | `/[farmSlug]` | Fix (Nr. 89); Wahl füllen/ganz je Hof ab Nr. 97 | 1440×1500 |
 
 ## WEB · Kunde – K3 Kaufen
 
@@ -74,6 +74,7 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 | `web-h1-einstellungen-uebersicht.html` | H1 · Einstellungen (Übersicht) | `/settings` | Umbau | 1440×900 |
 | `web-h1-einstellungen-konditionen-v2.html` | H1 · Einstellungen › Konditionen, Fassung 2 | `/settings/konditionen` | Umbau (Nr. 61), ersetzt die erste Fassung | 1440×1210 |
 | `web-h1-freigeschaltet-jetzt-teilen.html` | H1 · Freigeschaltet – jetzt teilen | `/dashboard (einmalig)` | neu | 1440×960 |
+| `web-h1-titelbild-ausschnitt.html` | H1 · Mein Hof – Titelbild: Ausschnitt ziehen (Fokus waagrecht/senkrecht), Zoom, „Ausschnitt füllen“ oder „Ganz zeigen“, sechs Filter; rechts die Vorschau mit dem Foto über die ganze Breite | `/farm-page` (Baustein Titelbild, ab lg in der Zeile) | neu (Nr. 97, N13/N17) | 1440×1150 |
 
 ## WEB · Hof – H2 Angebot pflegen
 
@@ -177,6 +178,7 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 | `mobil-h1-einrichten.html` | H1 · Einrichten | `/onboarding` | Umbau | 390×980 |
 | `mobil-h1-mein-hof.html` | H1 · Mein Hof | `/farm-page` | Umbau | 390×844 |
 | `mobil-h1-einstellungen-konditionen-v2.html` | H1 · Einstellungen › Konditionen, Fassung 2 | `/settings/konditionen` | Umbau (Nr. 61) | 390×1800 |
+| `mobil-h1-titelbild-ausschnitt.html` | H1 · Titelbild am Handy: Blatt mit Rahmen „Computer“, Zoom, Vorschau „So sieht es im Browser aus“ (Hofseite am Computer verkleinert) und „So sieht es am Handy aus“, Wahl füllen/ganz, Filter, Speichern | `/farm-page` (Blatt unter lg) | neu (Nr. 97) | 390×1280 |
 
 ## MOBIL · Hof – H2 Angebot
 
@@ -189,6 +191,7 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 | `mobil-h2-neues-futter-meldung-fehlt.html` | H2 · Neues Futter (Meldung fehlt) | `/products (Formular Futter)` | Umbau | 390×1320 |
 | `mobil-h2-neues-brennmaterial.html` | H2 · Neues Brennmaterial | `/products (Formular Brennmaterial)` | Umbau | 390×844 |
 | `mobil-h2-gespeichert-teilen.html` | H2 · Gespeichert – teilen? | `/products (Hinweis)` | neu | 390×844 |
+| `mobil-h2-produktfoto-ausschnitt.html` | H2 · Produktfoto am Handy: derselbe Bild-Baustein, Vorschau in der Liste (Handy quadratisch, Computer breit) und auf der Produktseite, Filter | Produkt anlegen/bearbeiten (Blatt) | neu (Nr. 98) | 390×1240 |
 
 ## MOBIL · Hof – H3 Tagesgeschäft
 
@@ -241,7 +244,7 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
-| `system-farbtokens.html` | Farbtokens | `globals.css` | Zustand | 900×640 |
+| `system-farbtokens.html` | Farbtokens | `globals.css` | Zustand | 900×980 |
 | `system-komponente-seitenleiste-hof.html` | Komponente – Seitenleiste Hof | `src/lib/bauern-navigation.ts + Shell` | Umbau | 264×960 |
 | `system-hofseite-hell.html` | Hofseite hell | `/[farmSlug] hell` | Zustand | 390×844 |
 | `system-heute-hell.html` | Heute hell | `/dashboard hell` | Zustand | 390×844 |
@@ -251,10 +254,12 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 | `system-teilen-bild-varianten.html` | Komponente – Teilen-Bild 1:1: A Marktkarte (gilt), B Foto-Held (mit Foto), C Hoftafel (verworfen) | `/[farmSlug]/opengraph-image` | Umbau (Nr. 69) | 1720×720 |
 | `system-teilen-bild-story-und-beitrag.html` | Komponente – Teilen-Bild Status 9:16 (QR nur hier) und Beitrag-Modus | `/[farmSlug]/opengraph-image?format=story, Beitrag-Bild (Nr. 67)` | Umbau (Nr. 69) | 1720×860 |
 | `system-m1-marke-agrilo-entscheidung.html` | M1 · Marke – Entscheidung: EINE Bildmarke (A mit Blatt, Baum, Stadel, Furchen auf grüner Kachel) in zwei Fassungen (voll ab 48 px, klein darunter), Größenprobe 16/24/32/48/64, Apple 180, maskierbar 80 %, Teilen-Bild der Startseite, Regeln für Skript und Kopfzeile — **gilt** | Kopfzeile, Favicon und App-Icons, Teilen-Bild, Status-Bild, QR-Plakat | Umbau (Nr. 92) | 1440×760 |
+| `system-h1-titelbild-filter.html` | SYSTEM · Bild-Filter: sechs Vorgaben nur als CSS (Natürlich, Klar, Warm, Kräftig, Sanft, Schwarzweiß), Enum-Namen und CSS-Zeichenketten – Quelle für `BILD_FILTER` in lib/bild-ausschnitt.ts | – | neu (Nr. 97) | 1440×640 |
+| `system-h1-bild-baustein.html` | SYSTEM · Ein Bild-Baustein für alle Fotos: Rahmen je Zweck (Titelbild, Logo ohne Filter, Produktfoto, Galerie, Beitragsfoto), ein Wert, ein Stil; nicht bei „Problem melden“ | – | neu (Nr. 97/98) | 1440×1060 |
 
 ## ADMIN · Betreiber – Stand Lauf 14 (15.10.)
 
-Ein Seitenmuster für alle Admin-Seiten: Seitenkopf (Titel + ein Satz + rechts die Hauptaktion oder der Monat) · Kennzahlen-Zeile · Unterreiter (zweite Ebene als Pillen) · Inhalt · Regel-Zeile in leiser Schrift. Reiter in der Kopfzeile: Höfe · Postfach · Startseite (neu, Nr. 96) · Finanzen · Einstellungen (neu, Nr. 93). Darunter die Betriebsleiste mit „Stripe Test" (Register Z2) – ohne Link „Zur Testumgebung", weil es keine gibt (Z3 korrigieren). Einstellungen sind Gruppen (Gründungshöfe · Benachrichtigungen · Betrieb · Plattform), jede mit eigenem Speichern und Protokollzeile.
+Ein Seitenmuster für alle Admin-Seiten: Seitenkopf (Titel + ein Satz + rechts die Hauptaktion oder der Monat) · Kennzahlen-Zeile · Unterreiter (zweite Ebene als Pillen) · Inhalt · Regel-Zeile in leiser Schrift. Reiter in der Kopfzeile: Höfe · Postfach · Startseite (neu, Nr. 96) · Finanzen · Einstellungen (neu, Nr. 93). Darunter die Betriebsleiste mit „Stripe Test" (Register Z2) – ohne Link „Zur Testumgebung", weil es keine gibt (Z3, Korrektur 15.10.). Einstellungen sind Gruppen (Gründungshöfe · Betrieb · Plattform), jede mit eigenem Speichern und Protokollzeile.
 
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
@@ -267,11 +272,22 @@ Ein Seitenmuster für alle Admin-Seiten: Seitenkopf (Titel + ein Satz + rechts d
 | `system-postfach-prozess.html` | Schaubild: Quellen (Hof, Kundschaft, System) → Eingang (drei Arten mit eigenem Weg) → Zustellung (Regeln, Empfänger, Wochenbericht); Ausgang Rundschreiben → Hof-Postfach → Antwort zurück in den Eingang; Hof-Seite spiegelbildlich | Konzept (`docs/konzepte/`) | Konzept | 1760×1250 |
 | `admin-finanzen.html` | Admin · Finanzen: Monat im Seitenkopf, Kennzahlen (Grundgebühren 0 € in der Gründungsphase), Unterreiter Monat · Kosten · Auszahlungen · Entfallene Gebühren, Verlauf, Kosten | `/admin/finanzen` | Umbau | 1440×900 |
 | `admin-einstellungen.html` | Admin · Einstellungen › Gründungshöfe: Gruppen links (Gründungshöfe · Betrieb · Plattform), rechts Plätze/Vergeben/Frei, Plätze gesamt, Kostenlos bis (Standard), Schalter „Auf den Seiten zeigen", Vorschau des Satzes und der Pill, Protokoll | `/admin/einstellungen` (neu) | neu | 1440×1010 |
-| `admin-startseite-gestalten.html` | Lauf 14 · Admin › Startseite: Abschnittsliste (Kopf, Höfe, Fuß fest; ziehen = Reihenfolge, Auge = aus/ein), Einfügepunkte „Block einfügen“, Block bearbeiten (Vorlage, Überzeile, Titel, Text, Bild, Link, Live ab/bis Wiener Zeit), Vorlagen-Bibliothek (Saisonkarte mit Bild, Hinweisband, Höfe-Auswahl, Kategorie-Hinweis) – Konzept in der Lauf-13-Vormerkung (StartseiteAbschnitt + StartseiteBlock, Migration + Seed) | `/admin/startseite` (neu) | neu (geparkt seit Lauf 13) | 1440×1100 |
-| `admin-startseite-vorschau.html` | Lauf 14 · Admin › Startseite, Umschalter „So sieht’s die Kundin“: Handy/Web, „Stand am“ (Heute · +1 Woche · nächster Block), echte Startseite mit den Blöcken des Tages plus Block in Bearbeitung, signierter Vorschau-Link (1 h) | `/admin/startseite?ansicht=vorschau` (neu) | neu (geparkt seit Lauf 13) | 1440×1040 |
+| `admin-startseite-gestalten.html` | Lauf 14 · Admin › Startseite: Abschnittsliste (Kopf, Höfe, Fuß fest; ziehen = Reihenfolge, Auge = aus/ein), Einfügepunkte „Block einfügen“, Block bearbeiten (Vorlage, Überzeile, Titel, Text, Bild, Link, Live ab/bis Wiener Zeit), Vorlagen-Bibliothek (Saisonkarte mit Bild, Hinweisband, Höfe-Auswahl, Kategorie-Hinweis) – Konzept in der Lauf-13-Vormerkung (StartseiteAbschnitt + StartseiteBlock, Migration + Seed) | `/admin/startseite` (neu) | ersetzt durch Nr. 99 (Entwurf); Speichern ging dort sofort live | 1440×1100 |
+| `admin-startseite-vorschau.html` | Lauf 14 · Admin › Startseite, Umschalter „So sieht’s die Kundin“: Handy/Web, „Stand am“ (Heute · +1 Woche · nächster Block), echte Startseite mit den Blöcken des Tages plus Block in Bearbeitung, signierter Vorschau-Link (1 h) | `/admin/startseite?ansicht=vorschau` (neu) | ersetzt durch Nr. 99 (Entwurf); Speichern ging dort sofort live | 1440×1040 |
 | `mobil-k0-startseite-saisonblock.html` | Lauf 14 · Startseite am Handy mit Saisonblock (Vorlage Saisonkarte mit Bild) zwischen Kopf und „Höfe in deiner Nähe“ | `/` (Handy) | Zustand | 390×900 |
 | `admin-mobil-unterwegs-freischalten.html` | Admin am Handy · Höfe: Reiter unter dem Kopf, Kennzahlen, Warteliste mit Gründungsplatz | `/admin (Handy)` | Umbau | 390×844 |
 | `admin-mobil-einstellungen.html` | Admin am Handy · Einstellungen: Gruppen als Liste (ohne Benachrichtigungen – die sind Postfach › Zustellung), Gründungshöfe aufgeklappt | `/admin/einstellungen (Handy)` | neu | 390×844 |
+| `admin-startseite-entwurf.html` | Admin · Startseite: Statusleiste Entwurf/Live/Geplant, Abschnittsliste mit Änderungsmarken, automatisch im Entwurf gespeichert, Vorschau „So sieht’s die Kundin“ mit Entwurf · Live und Stand am | `/admin/startseite` | Umbau (Nr. 99, N16 geändert) | 1440×1100 |
+| `admin-startseite-veroeffentlichen.html` | Admin · Startseite: Dialog „Entwurf veröffentlichen“ – Änderungen, Jetzt oder Datum + Uhrzeit (Wiener Zeit), Hinweis auf Block-Zeitraum | `/admin/startseite` (Dialog) | neu (Nr. 99) | 1440×1000 |
+| `admin-startseite-zeitplan.html` | Admin · Startseite: Zeitplan (geplant, live) und Verlauf der Fassungen, Zurückziehen, Als Entwurf übernehmen | `/admin/startseite` (Zeitplan, Verlauf) | neu (Nr. 99) | 1440×700 |
+| `mobil-admin-startseite-entwurf.html` | Admin am Handy · Startseite: Statuskarte, kompakte Liste, feste Leiste Vorschau · Veröffentlichen | `/admin/startseite` | neu (Nr. 99) | 390×1000 |
+| `admin-finanzen-jahr.html` | Admin · Finanzen: Umschalter Monat · Jahr, Jahreskennzahlen, zwölf Monatsbalken, Monat für Monat, Kosten im Jahr, CSV, Vorjahresvergleich (ab 2027) | `/admin/finanzen?zeitraum=jahr` | neu (Nr. 100, N15 ergänzt) | 1440×1680 |
+| `admin-postfach-meldungen-ablauf.html` | Admin · Postfach › Meldungen: Stand-Band (braucht dich · in Arbeit · erledigt · gesammelt · abgelegt), Spalten Neu · KI-Vorschlag · Geplant · Erledigt, Gesammelt/Abgelegt zugeklappt, Rückgängig, was die KI tut | `/admin/postfach?reiter=meldungen` | neu (Nr. 101, N14 ergänzt) | 1440×1590 |
+| `admin-postfach-wuensche.html` | Admin · Postfach › Meldungen: Wünsche gebündelt – Stimmen mit Duplikaten, Woraus mit Trennen/Dazunehmen, Stand für alle, So sieht es der Hof, Bescheid-Wahl | `/admin/postfach?reiter=meldungen&ansicht=wuensche` | neu (Nr. 101) | 1440×1440 |
+| `admin-postfach-zusammenfassen.html` | Admin · Postfach › Meldungen: Dialog Zusammenfassen – Hauptmeldung bleibt, Duplikat hängt sich an, Was passiert | `/admin/postfach?reiter=meldungen` (Dialog) | neu (Nr. 101) | 1440×1060 |
+| `mobil-admin-postfach-meldungen.html` | Admin am Handy · Postfach › Meldungen: Stand-Band, Chips statt gestapelter Spalten, KI-Vorschlag mit Rückgängig | `/admin/postfach?reiter=meldungen` | neu (Nr. 101) | 390×1300 |
+
+Hinweis Nr. 101: „später“-Marken in den Postfach-Mockups zeigen das Zielbild (Folgeauftrag mit Feld für KI-Vorschläge) und werden in Nr. 101 nicht gebaut.
 
 ## GRÜNDUNGSHÖFE · Vorschlag 15.10. (Register K2, nach Mobbin- und NN/g-Bewertung)
 
@@ -292,3 +308,15 @@ Kein Banner, sondern Bausteine: ein Satz im Lesefluss (Startseite), Pill + umben
 Wortliste (gilt für alle Oberflächen, Admin und Hof): **Postfach** = der eine Ort, an dem alles ankommt; **Nachricht** = ein Eintrag; **Rundschreiben** = eine Nachricht vom Team an viele Höfe; **Unterhaltung** = der Faden aus Nachricht und Antworten; **Meldung** = Fehler, Wunsch oder Frage an das Team. Nicht mehr: Briefkasten, Post, Chat, Mitteilung, Benachrichtigung. Verbindlich steht die Wortliste in `../ai/DESIGN_SYSTEM.md`.
 
 Geparkt bleiben Unterhaltungen zwischen Höfen (K3/T8) und Anzeige im Umkreis; „Startseite gestalten“ ist mit Lauf 14 freigegeben (Register N16, Nr. 96).
+
+## IDEEN (nicht entschieden, nicht bauen)
+
+| Datei | Bildschirm | Route im Code | Arbeit | Größe |
+|---|---|---|---|---|
+| `idee-web-k2-sammelbestellung.html` | Kunde · Sammelbestellung: Produktseite mit Balken, Frist, Karte hinterlegen, „Alles oder nichts“ | – | Idee (Fassung 2) | 1440×1040 |
+| `idee-mobil-k2-sammelbestellung.html` | Kunde am Handy · Sammelbestellung mit den Zuständen | – | Idee (Fassung 2) | 390×2010 |
+| `idee-mobil-k3-sammelbestellung-mitmachen.html` | Kunde am Handy · Mitmachen: Karte hinterlegen, heute € 0, Zustimmung als Satz, EPS per Link | – | Idee (Fassung 2) | 390×1000 |
+| `idee-email-sammelbestellung.html` | E-Mails · dabei, geschafft, Zahlung fehlgeschlagen, nicht erreicht (nichts abgebucht), Hof macht trotzdem | – | Idee (Fassung 2) | 1780×760 |
+| `idee-mobil-h2-sammelbestellung-anlegen.html` | Hof · Neue Sammelbestellung | – | Idee | 390×1360 |
+| `idee-mobil-h3-sammelbestellung-entscheiden.html` | Hof · Frist vorbei: trotzdem, verlängern, absagen | – | Idee | 390×960 |
+| `idee-system-sammelbestellung.html` | System · Ablauf mit Abbuchung bei Durchführung, vier Geldwege, Vorbilder | – | Idee (Fassung 2) | 1760×860 |

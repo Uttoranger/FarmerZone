@@ -11,7 +11,12 @@ import {
 } from '@/lib/farm-approval'
 import { EINSTELLUNG_UNGUELTIG, GILT_AB_UNGUELTIG, PROZENT_UNGUELTIG, servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
-import { triageEingabeSchema } from '@/schemas/meldung'
+import { buendelStandSchema, triageEingabeSchema, trennenSchema, zusammenfassenSchema } from '@/schemas/meldung'
+import { BUENDEL_STAND_STATUS, WUENSCHE_TEXT, bescheidMailHtml, triageAufruf, type TriageStand } from '@/lib/meldung'
+import { MEINE_MELDUNGEN_HREF } from '@/lib/hof-hilfe'
+import { MARKE_TEAM } from '@/lib/marke'
+import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import { sendeRundschreiben } from '@/server/actions/postfach'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
 import { FREISCHALTUNG_GEAENDERT_TEXT, freischaltSperre } from '@/lib/admin-hoefe'
 import {
@@ -481,4 +486,150 @@ export async function triageMeldungAction(
   revalidatePath(`/admin/meldungen/${meldungId}`)
   revalidatePath('/meldungen')
   return {}
+}
+
+// ─── Reiter „Meldungen": Zusammenfassen, Trennen, Stand für alle ────────────
+// (Register N14, Ergänzung; Nachtlauf Nr. 101). triageMeldungAction bleibt der
+// eine Schreibweg für eine einzelne Meldung — Zusammenfassen und Trennen rufen
+// sie mit dem gespeicherten Stand und dem Ausgangsstand auf.
+
+const TRIAGE_AUSWAHL = { status: true, art: true, clusterKey: true, triageNotiz: true, duplikatVonId: true, sprintName: true, antwortAnMelder: true } as const
+
+const MELDUNG_FEHLT = 'Meldung nicht gefunden.'
+
+/**
+ * Zusammenfassen (Mockup admin-postfach-zusammenfassen): die eine Meldung wird
+ * Duplikat der anderen — über triageMeldungAction, also mit derselben
+ * Existenz- und Selbstprüfung und derselben Bedingung gegen
+ * Zwischenänderungen. Keine Kette: Die Hauptmeldung ist weder Duplikat noch
+ * abgelegt, und eine Meldung mit eigenen Duplikaten wird nicht selbst eines
+ * (sonst zählten deren Stimmen nirgends). Kein Mail an den Hof.
+ */
+export async function fasseZusammenAction(eingabe: unknown): Promise<{ error?: string }> {
+  const guard = await verlangeAdminAktion()
+  if ('error' in guard) return { error: guard.error }
+  const parsed = zusammenfassenSchema.safeParse(eingabe)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe.' }
+  const { duplikatId, hauptmeldungId } = parsed.data
+
+  const [stand, haupt, eigeneDuplikate] = await Promise.all([
+    prisma.meldung.findUnique({ where: { id: duplikatId }, select: TRIAGE_AUSWAHL }),
+    prisma.meldung.findUnique({ where: { id: hauptmeldungId }, select: { status: true } }),
+    prisma.meldung.count({ where: { status: 'DUPLIKAT', duplikatVonId: duplikatId } }),
+  ])
+  if (!stand || !haupt) return { error: MELDUNG_FEHLT }
+  if (stand.status === 'DUPLIKAT') return { error: 'Diese Meldung ist schon ein Duplikat – trenn sie zuerst.' }
+  if (haupt.status === 'DUPLIKAT' || haupt.status === 'KEIN_FEHLER') return { error: 'Als Hauptmeldung geht nur eine offene oder erledigte Meldung.' }
+  if (eigeneDuplikate > 0) return { error: 'An dieser Meldung hängen schon Duplikate – nimm sie als Hauptmeldung (Tauschen).' }
+
+  return triageMeldungAction(duplikatId, triageAufruf(stand satisfies TriageStand, { status: 'DUPLIKAT', duplikatVonId: hauptmeldungId }))
+}
+
+/** Trennen in „Woraus": Das Duplikat wird wieder eine eigene, angesehene Meldung (GEPRUEFT, ohne Verweis). */
+export async function trenneDuplikatAction(eingabe: unknown): Promise<{ error?: string }> {
+  const guard = await verlangeAdminAktion()
+  if ('error' in guard) return { error: guard.error }
+  const parsed = trennenSchema.safeParse(eingabe)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe.' }
+
+  const stand = await prisma.meldung.findUnique({ where: { id: parsed.data.meldungId }, select: TRIAGE_AUSWAHL })
+  if (!stand) return { error: MELDUNG_FEHLT }
+  if (stand.status !== 'DUPLIKAT') return { error: 'Diese Meldung ist kein Duplikat mehr – lade die Seite neu.' }
+  return triageMeldungAction(parsed.data.meldungId, triageAufruf(stand, { status: 'GEPRUEFT', duplikatVonId: null }))
+}
+
+export type BuendelStandErgebnis = { ok: true; meldungen: number; hoefe: number; kundinnen: number } | { error: string }
+
+/** Ein Fehler beim Bescheid an Kundinnen geht ohne Adresse und ohne Text nach Sentry — nur Zahlen. */
+function meldeBescheid(err: unknown, gescheitert: number): void {
+  const meldung = new Error('Meldungen: Bescheid an Kundinnen nicht verschickt')
+  meldung.name = err instanceof Error ? err.name : 'Unbekannt'
+  Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'meldungen', aufgabe: 'bescheid-mail' }, extra: { gescheitert } })
+}
+
+/** Die Betriebsmail an Kundinnen mit Adresse für Rückfragen — nur über sendRaw (Post-Sperre Z3), nacheinander. */
+async function schreibeKundinnen(adressen: readonly string[], antwort: string): Promise<void> {
+  try {
+    const { sendRaw } = await import('@/lib/email')
+    const html = bescheidMailHtml(antwort, MARKE_TEAM)
+    let gescheitert = 0
+    for (const an of adressen) {
+      const ergebnis = await sendRaw(an, WUENSCHE_TEXT.bescheidTitel, html)
+      if (ergebnis.error) gescheitert += 1
+    }
+    if (gescheitert > 0) meldeBescheid(new Error('gescheitert'), gescheitert)
+  } catch (err) {
+    meldeBescheid(err, adressen.length)
+  }
+}
+
+/**
+ * „Stand für alle" eines Bündels (Mockup admin-postfach-wuensche): EINE
+ * Transaktion über genau die Meldungen des Bündels — Wünsche mit diesem
+ * Stichwort, keine Duplikate. Duplikate bleiben Duplikat und zeigen den
+ * neuen Stand über ihre Hauptmeldung (oeffentlicherStatus); sie bekommen nur
+ * die Antwort, damit ihr Hof sie bei seiner Meldung liest. Bescheid an die
+ * Höfe über die bestehende Rundschreiben-Logik mit „Ausgewählte" (eine
+ * Nachricht je Hof, kein Massenmail), an Kundinnen mit Adresse als
+ * Betriebsmail nach der Antwort. Ein gescheiterter Bescheid dreht den
+ * gespeicherten Stand nicht zurück.
+ */
+export async function setzeBuendelStandAction(eingabe: unknown): Promise<BuendelStandErgebnis> {
+  const guard = await verlangeAdminAktion()
+  if ('error' in guard) return { error: guard.error }
+  const parsed = buendelStandSchema.safeParse(eingabe)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe.' }
+  const { clusterKey, stand, sprintName, antwort, bescheid } = parsed.data
+  if (stand === 'nichtGeplant' && antwort === null) return { error: WUENSCHE_TEXT.antwortPflicht }
+  if (bescheid === 'hoefe' && antwort === null) return { error: WUENSCHE_TEXT.bescheidBrauchtAntwort }
+
+  const jetzt = new Date()
+  const betroffen = await prisma.$transaction(async (tx) => {
+    const buendel = { clusterKey, art: 'WUNSCH', status: { not: 'DUPLIKAT' } } as const
+    const eigene = await tx.meldung.findMany({ where: buendel, select: { id: true, farmId: true, customerEmail: true } })
+    if (eigene.length === 0) return null
+    const ids = eigene.map((m) => m.id)
+    const duplikate = await tx.meldung.findMany({ where: { status: 'DUPLIKAT', duplikatVonId: { in: ids } }, select: { id: true, farmId: true, customerEmail: true } })
+    await tx.meldung.updateMany({
+      where: { ...buendel, id: { in: ids } },
+      data: {
+        status: BUENDEL_STAND_STATUS[stand],
+        triagedAt: jetzt,
+        ...(stand === 'geplant' && sprintName !== null ? { sprintName } : {}),
+        ...(antwort !== null ? { antwortAnMelder: antwort } : {}),
+      },
+    })
+    if (antwort !== null && duplikate.length > 0) {
+      await tx.meldung.updateMany({ where: { id: { in: duplikate.map((d) => d.id) }, status: 'DUPLIKAT' }, data: { antwortAnMelder: antwort } })
+    }
+    return [...eigene, ...duplikate]
+  })
+  if (!betroffen) return { error: 'Dieses Bündel gibt es nicht mehr – lade die Seite neu.' }
+
+  const hofIds = [...new Set(betroffen.flatMap((m) => (m.farmId ? [m.farmId] : [])))]
+  const kundinnen = [...new Set(betroffen.flatMap((m) => (!m.farmId && m.customerEmail ? [m.customerEmail.trim().toLowerCase()] : [])))]
+  const geschrieben = { hoefe: 0, kundinnen: 0 }
+  if (bescheid === 'hoefe' && antwort !== null) {
+    if (hofIds.length > 0) {
+      const gesendet = await sendeRundschreiben({
+        titel: WUENSCHE_TEXT.bescheidTitel,
+        text: antwort,
+        art: 'INFO',
+        link: MEINE_MELDUNGEN_HREF,
+        perMail: false,
+        antwortMoeglich: false,
+        empfaenger: { art: 'ausgewaehlt', hofIds },
+      })
+      if ('error' in gesendet) return { error: WUENSCHE_TEXT.bescheidNichtGesendet }
+      // Die Rundschreiben-Logik schreibt nur nicht stillgelegten Höfen — gezählt wird, wer die Nachricht wirklich bekam.
+      geschrieben.hoefe = gesendet.empfaenger
+    }
+    if (kundinnen.length > 0) nachDerAntwort(() => schreibeKundinnen(kundinnen, antwort))
+    geschrieben.kundinnen = kundinnen.length
+  }
+
+  revalidatePath('/admin')
+  revalidatePath('/admin/postfach')
+  revalidatePath('/meldungen')
+  return { ok: true, meldungen: betroffen.length, ...geschrieben }
 }

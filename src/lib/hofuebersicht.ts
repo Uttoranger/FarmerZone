@@ -12,6 +12,7 @@
  * `Date` selbst, sondern bekommen „jetzt" als bereits nach Europe/Vienna
  * aufgelösten Wochentag + Uhrzeit — die Auflösung macht wienJetzt().
  */
+import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import type { ProductCategoryValue } from '@/schemas/product'
 import type { HoefeFilter } from '@/schemas/hoefe-filter'
 import { ANZEIGE_BEREICHE, anzeigeBereichVon, type AnzeigeBereich } from '@/lib/taxonomie'
@@ -167,6 +168,8 @@ export type VorschauProdukt = {
   unit: string
   unitSize: number | null
   imageUrl: string | null
+  /** Ausschnitt des Produktfotos (Register N17, Nr. 98), schon geprüft; null = wie heute. */
+  bildAusschnitt: BildAusschnitt | null
   category: ProductCategoryValue | null
   /** Bestand abzüglich Reservierung — false heißt „derzeit aus". */
   verfuegbar: boolean

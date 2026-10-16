@@ -6,6 +6,8 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { stelleNachBildansicht } from '@/lib/hofseite-sektionen'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { nurFilterStil } from '@/lib/bild-ausschnitt'
+import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 
 /*
  * Die Bildansicht der Hofseite (Lightbox) — eine eigene Ebene über der Seite,
@@ -96,7 +98,8 @@ export function useBildansicht(anzahl: number): Bildansicht {
   return { offen, oeffne, schliesse, vor, zurueck }
 }
 
-export type BildansichtFoto = { id: string; url: string; caption: string | null }
+/** Mit dem Ausschnitt des Fotos (Register N17, Nr. 98): groß zählt davon nur der Filter. */
+export type BildansichtFoto = { id: string; url: string; caption: string | null; ausschnitt?: BildAusschnitt | null }
 
 const RUNDER_KNOPF = cn(
   'flex size-11 items-center justify-center rounded-full bg-accent-foreground/12 text-accent-foreground transition-colors duration-[250ms] hover:bg-accent-foreground/24',
@@ -185,6 +188,8 @@ export function BildansichtEbene({
             fill
             sizes="(min-width: 768px) 768px, 100vw"
             className="rounded-xl object-contain"
+            // Das ganze Foto ohne Beschnitt, aber mit dem Filter des Hofs (Freigabe 98, Punkt 3) — Fokus und Zoom gelten nur in der Kachel.
+            style={nurFilterStil(foto.ausschnitt ?? null)}
           />
         </div>
         <figcaption className="mt-3 text-center text-sm text-accent-foreground">

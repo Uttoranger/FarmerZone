@@ -12,8 +12,10 @@ import {
 } from '@/lib/startseite-gestalten'
 
 /*
- * Die Systemgrenzen von Admin › Startseite (Register N16, Nr. 96): Speichern,
- * Block löschen, Vorschau-Link — und der Vorschau-Parameter der Startseite.
+ * Die Systemgrenzen von Admin › Startseite (Register N16, Nr. 96): Entwurf
+ * speichern, Block löschen, Vorschau-Link — und der Vorschau-Parameter der
+ * Startseite. Veröffentlichen, Zurückziehen und Übernehmen (Nr. 99) stehen in
+ * src/schemas/startseite-fassung.ts.
  * Formular und Action prüfen mit denselben Schemas; der Server prüft
  * zusätzlich, was nur die Datenbank weiß (freigeschaltete Höfe, feste
  * Abschnitte, eigene Bilder).
@@ -111,8 +113,8 @@ export type StartseitenBlockEingabe = z.input<typeof startseitenBlockSchema>
 export type StartseitenBlockGeprueft = z.output<typeof startseitenBlockSchema>
 
 /**
- * Speichern = die ganze Liste (Reihenfolge und Auge) und höchstens ein Block
- * in EINER Transaktion. Ein neuer Block steht in der Reihenfolge als
+ * Entwurf speichern = die ganze Liste (Reihenfolge und Auge) und höchstens ein
+ * Block in EINER Transaktion. Ein neuer Block steht in der Reihenfolge als
  * `NEUER_BLOCK` (src/lib/startseite-gestalten.ts).
  */
 export const startseiteSpeichernSchema = z.object({
@@ -127,8 +129,21 @@ export type StartseiteSpeichernEingabe = z.input<typeof startseiteSpeichernSchem
 
 export const blockLoeschenSchema = z.object({ blockId: KENNUNG })
 
+/**
+ * Was die Vorschau zeigt (Nr. 99): den Entwurf, die Live-Fassung oder eine
+ * bestimmte Fassung (Zeitplan). Steht im signierten Inhalt des Links.
+ */
+export type VorschauQuelle = 'entwurf' | 'live' | `fassung:${string}`
+
+function istVorschauQuelle(wert: unknown): wert is VorschauQuelle {
+  return typeof wert === 'string' && /^(entwurf|live|fassung:[A-Za-z0-9_-]{1,40})$/.test(wert)
+}
+
+export const vorschauQuelleSchema = z.custom<VorschauQuelle>(istVorschauQuelle)
+
 export const vorschauAnfrageSchema = z.object({
-  stand: z.enum(['heute', 'woche', 'block']),
+  stand: z.enum(['heute', 'woche', 'block', 'termin']),
+  quelle: vorschauQuelleSchema,
   blockEntwurfId: KENNUNG.nullable(),
 })
 

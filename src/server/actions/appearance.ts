@@ -9,6 +9,7 @@ import type { SectionConfig } from '@/server/queries/appearance'
 import { appearanceSchema } from '@/schemas/auftritt'
 import { ABSCHNITT_SPEICHERN_TEXT, auftrittFehlerText } from '@/lib/abschnitt-stand'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
+import { speichereBildAusschnittAction } from '@/server/actions/bild-ausschnitt'
 
 // Das Schema liegt in src/schemas/auftritt.ts — der Hofseiten-Editor prüft
 // „Über uns" daraus, ohne es abzuschreiben. Der Typ steht hier als Alias,
@@ -137,24 +138,19 @@ export async function updateFarmBannerAction(
   return {}
 }
 
-// Vertikaler Fokuspunkt des Titelbilds (0 = oben, 100 = unten).
-// Wert wird hart geclampt — der Client kann schicken, was er will.
+/**
+ * Altweg für den senkrechten Fokuspunkt (0 = oben, 100 = unten), seit Nr. 97
+ * nur noch ein dünner Aufruf von speichereBildAusschnittAction — Mein Hof
+ * nimmt den Bild-Baustein. Bleibt einen Zug für den Übergang und ist zum
+ * Löschen vorgemerkt (Bericht Nr. 97). Der Wert wird hart geclampt — der
+ * Client kann schicken, was er will; der Rest des Ausschnitts ist der Stand
+ * von vorher (Mitte, 100 %, Natürlich, ohne Wahl).
+ */
 export async function updateBannerFocusAction(focusY: number): Promise<{ error?: string }> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) return { error: 'Nicht angemeldet' }
-
-  const farm = await prisma.farm.findUnique({
-    where: { ownerId: session.user.id },
-    select: { id: true, slug: true },
+  const fokusY = Math.min(100, Math.max(0, Math.round(Number(focusY) || 0)))
+  const ergebnis = await speichereBildAusschnittAction({
+    ziel: 'banner',
+    wert: { fokusX: 50, fokusY, zoom: 100, filter: 'NATUERLICH' },
   })
-  if (!farm) return { error: 'Hof nicht gefunden' }
-
-  const clamped = Math.min(100, Math.max(0, Math.round(Number(focusY) || 0)))
-
-  await prisma.farm.update({ where: { id: farm.id }, data: { bannerFocusY: clamped } })
-
-  revalidatePath(`/${farm.slug}`)
-  revalidatePath('/farm-page')
-
-  return {}
+  return 'error' in ergebnis ? { error: ergebnis.error } : {}
 }

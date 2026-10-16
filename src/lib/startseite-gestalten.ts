@@ -14,15 +14,16 @@ import { tagVersetzt } from '@/lib/kalender'
 import { uhrzeitInWien, wienerZeitpunkt } from '@/lib/fristen'
 import { formatTagKurz } from '@/lib/format'
 
-/** Das Etikett des Datencaches der Startseite — Speichern in Admin › Startseite leert es. */
+/** Das Etikett des Datencaches der Startseite — Veröffentlichen in Admin › Startseite leert es (Nr. 99: nie das Speichern des Entwurfs). */
 export const STARTSEITE_CACHE_TAG = 'startseite'
 
 /** Ein Abschnitt, der eine bestehende Komponente der Startseite rendert (alles außer BLOCK). */
 export type AbschnittArt = Exclude<StartseiteArt, 'BLOCK'>
 
 /**
- * Die heutige Reihenfolge — dieselbe, die die Migration als Seed anlegt.
- * Ohne Zeilen (Deploy-Fenster) oder bei einem Lesefehler rendert die Seite sie.
+ * Die heutige Reihenfolge — dieselbe, die die Migration als Seed des Entwurfs
+ * anlegt. Ohne Fassung (Nr. 99: kein Seed der Fassungen), mit einer
+ * unlesbaren oder bei einem Lesefehler rendert die Seite sie.
  */
 export const STANDARD_REIHENFOLGE: readonly AbschnittArt[] = [
   'KOPF',
@@ -76,16 +77,48 @@ export const HOEFE_AUSWAHL_MAX = 3
 /** Ohne eigenen Linktext steht dieser am Link eines Blocks. */
 export const LINK_TEXT_STANDARD = 'Mehr ansehen'
 
+/**
+ * Nur die Felder, die zur Vorlage gehören: Höfe nur bei der Höfe-Auswahl, die
+ * Kategorie nur beim Kategorie-Hinweis, das Bild nur bei der Saisonkarte, das
+ * Hinweisband ist ein Satz (nur Titel und Link), ein Linktext nur mit Link —
+ * ein Wechsel der Vorlage lässt keine unsichtbaren Reste stehen. EINE Regel
+ * für die Action (was gespeichert wird) und den Entwurf im Browser (womit
+ * „Was sich gegenüber live ändert“ vergleicht).
+ */
+export function felderDerVorlage<
+  T extends {
+    vorlage: StartseiteVorlage
+    ueberzeile: string | null
+    text: string | null
+    bildUrl: string | null
+    linkUrl: string | null
+    linkText: string | null
+    farmIds: string[]
+    kategorie: ProductCategory | null
+  },
+>(b: T): T {
+  return {
+    ...b,
+    ueberzeile: b.vorlage === 'HINWEISBAND' ? null : b.ueberzeile,
+    text: b.vorlage === 'HINWEISBAND' ? null : b.text,
+    bildUrl: b.vorlage === 'SAISONKARTE' ? b.bildUrl : null,
+    linkText: b.linkUrl ? b.linkText : null,
+    farmIds: b.vorlage === 'HOEFE_AUSWAHL' ? b.farmIds : [],
+    kategorie: b.vorlage === 'KATEGORIE_HINWEIS' ? b.kategorie : null,
+  }
+}
+
 /** Die Kennung, unter der ein noch nicht gespeicherter Block in der Reihenfolge steht. */
 export const NEUER_BLOCK = 'neu'
 
 /**
- * Ein Link-Ziel nur relativ zur eigenen Seite: beginnt mit „/", danach kein
- * zweites „/" und kein „\" — „//fremd.example" und „/\fremd.example" öffnet
- * der Browser als fremde Adresse. Kein Leerraum, keine Steuerzeichen.
+ * Ein Link-Ziel nur relativ zur eigenen Seite: beginnt mit „/", nirgends „//"
+ * und kein „\" — „//fremd.example" und „/\fremd.example" öffnet der Browser
+ * als fremde Adresse; „//" mitten im Link (Nr. 99, Nacharbeit 96) braucht
+ * kein eigener Pfad. Kein Leerraum, keine Steuerzeichen.
  */
 export function istRelativerLink(wert: string): boolean {
-  return wert.length <= LINK_MAX && /^\/(?![/\\])[^\s\\\u0000-\u001f\u007f]*$/.test(wert)
+  return wert.length <= LINK_MAX && !wert.includes('//') && /^\/[^\s\\\u0000-\u001f\u007f]*$/.test(wert)
 }
 
 // ─── Reihenfolge ────────────────────────────────────────────────────────────
@@ -197,17 +230,19 @@ export function zeitraumText(block: Zeitraum): string {
   return `${ab} → ${formatTagKurz(kalendertagInWien(block.liveBis))}`
 }
 
-export type StandWahl = 'heute' | 'woche' | 'block'
+export type StandWahl = 'heute' | 'woche' | 'block' | 'termin'
 
-export const STAND_TEXT: Record<StandWahl, string> = { heute: 'Heute', woche: '+1 Woche', block: 'nächster Block' }
+export const STAND_TEXT: Record<StandWahl, string> = { heute: 'Heute', woche: '+1 Woche', block: 'nächster Block', termin: 'geplanter Termin' }
 
 /**
- * Die drei Tage der Vorschau („Stand am"): heute, in einer Woche (derselbe
- * Wiener Tag + 7, gleiche Uhrzeit) und der Beginn des nächsten geplanten
- * Blocks — null, wenn keiner geplant ist.
+ * Die Tage der Vorschau („Stand am"): heute, in einer Woche (derselbe Wiener
+ * Tag + 7, gleiche Uhrzeit), der Beginn des nächsten geplanten Blocks und
+ * (Nr. 99) der Termin der nächsten geplanten Fassung — null, wenn es keinen
+ * gibt.
  */
-export function standZeitpunkt(wahl: StandWahl, jetzt: Date, bloecke: readonly Zeitraum[]): Date | null {
+export function standZeitpunkt(wahl: StandWahl, jetzt: Date, bloecke: readonly Zeitraum[], termin: Date | null = null): Date | null {
   if (wahl === 'heute') return jetzt
+  if (wahl === 'termin') return termin
   if (wahl === 'woche') {
     const { tag, uhrzeit } = wienerEingabe(jetzt)
     return zeitpunktAusEingabe(tagVersetzt(tag, 7), uhrzeit) ?? new Date(jetzt.getTime() + 7 * 24 * 60 * 60_000)
@@ -287,10 +322,13 @@ export const ADMIN_STARTSEITE_HREF = '/admin/startseite'
  */
 export const ADMIN_STARTSEITE_VORSCHAU_HREF = `${ADMIN_STARTSEITE_HREF}/vorschau`
 
-/** Die Texte von Admin › Startseite (Mockups admin-startseite-gestalten, admin-startseite-vorschau). */
+/**
+ * Die Texte von Admin › Startseite (Mockups admin-startseite-gestalten,
+ * admin-startseite-vorschau; seit Nr. 99 dazu admin-startseite-entwurf —
+ * die Texte von Entwurf und Fassung stehen in src/lib/startseite-fassung.ts).
+ */
 export const ADMIN_STARTSEITE_TEXT = {
   titel: 'Startseite',
-  satz: 'Abschnitte ordnen und ein-/ausblenden, Blöcke mit Zeitraum einfügen. Feste Abschnitte bleiben immer.',
   bearbeiten: 'Bearbeiten',
   kundin: 'So sieht’s die Kundin',
   liste: 'Abschnitte',
@@ -302,19 +340,14 @@ export const ADMIN_STARTSEITE_TEXT = {
   bibliothekRegel: 'Mehr Vorlagen nur über einen Lauf – jede ist eine Komponente im Design-System, kein freies Layout.',
   blockNeu: 'Neuer Block',
   blockBearbeiten: 'Block bearbeiten',
-  regel:
-    'Wiener Ortszeit. Ohne „bis“ bleibt der Block, bis du ihn beendest. Reihenfolge und Sichtbarkeit der Abschnitte gelten sofort nach dem Speichern (spätestens 5 Minuten).',
-  gespeichert: 'Gespeichert.',
-  geloescht: 'Der Block ist gelöscht.',
-  ungespeichert: 'Geändert – noch nicht gespeichert.',
+  regel: 'Wiener Ortszeit. Ohne „bis“ bleibt der Block, bis du ihn beendest. Jede Änderung landet im Entwurf – live geht sie erst mit „Veröffentlichen …“.',
+  fertig: 'Fertig',
+  geloescht: 'Der Block ist aus dem Entwurf gelöscht.',
   bildHinweis: 'Quadratisch, mindestens 320 × 320 Pixel.',
   hoefeHinweis: 'Nur freigeschaltete Höfe, höchstens drei.',
   vorschauKachel: 'Vorschau',
-  vorschauTitel: 'Was die Vorschau zeigt',
   vorschauSatz:
-    'Die echte Startseite in der gespeicherten Reihenfolge, mit den Blöcken, die am gewählten Tag live wären, und dem Block in Bearbeitung. Höfe und Produkte sind der Stand von jetzt.',
-  vorschauUngespeichert: 'Ungespeicherte Änderungen zeigt die Vorschau erst nach dem Speichern.',
-  vorschauLinkTitel: 'Vorschau-Link',
+    'Die echte Startseite – dein Entwurf oder die Live-Fassung – mit den Blöcken, die am gewählten Tag live wären. Höfe und Produkte sind der Stand von jetzt.',
   vorschauLinkSatz: '„Vorschau öffnen“ zeigt dieselbe Seite im Browser über einen signierten Link (nur Admin, 1 Stunde) – zum Durchtippen am eigenen Handy.',
   vorschauOeffnen: 'Vorschau öffnen',
 } as const
