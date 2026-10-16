@@ -166,6 +166,8 @@ export const EINSTELLUNGEN_TEXT = {
     kachelPlaetze: 'Plätze gesamt',
     kachelVergeben: 'Vergeben',
     kachelVergebenZeile: 'nach Reihenfolge der Freischaltung',
+    /** Register K2, Nr. 109: ausgenommene Höfe zählen nicht mit, die Kachel nennt sie. */
+    kachelVergebenAusgenommen: (ausgenommen: number): string => `nach Reihenfolge der Freischaltung · ${ausgenommen} ausgenommen`,
     kachelFrei: 'Frei',
     kachelFreiZeile: 'steht im Satz auf den Seiten',
     feldPlaetze: 'Plätze gesamt',

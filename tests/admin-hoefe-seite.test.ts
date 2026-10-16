@@ -59,6 +59,7 @@ function roh(id: string, ueber: Partial<HofRohdaten> = {}): HofRohdaten {
     isPaused: false,
     betriebsnummer: null,
     sepaErteilt: false,
+    gruendungAusgenommen: false,
     ...ueber,
   }
 }
@@ -81,21 +82,29 @@ const gesamt = (liste: ReturnType<typeof hoefeKennzahlen>) => Object.fromEntries
 
 describe('Kennzahlen der Höfe', () => {
   it('Warten · Online · Pausiert · Ohne Zahlung · Gründungsplätze, in dieser Reihenfolge', () => {
-    const kennzahlen = hoefeKennzahlen(mockupHoefe(), { vergeben: 7, max: MAX })
+    const kennzahlen = hoefeKennzahlen(mockupHoefe(), { vergeben: 7, max: MAX, ausgenommen: 0 })
     expect(kennzahlen.map((k) => [k.titel, k.wert])).toEqual([
       ['Warten', '2'],
       ['Online', '2'],
       ['Pausiert', '1'],
       ['Ohne Zahlung', '1'],
-      ['Gründungsplätze', '5 frei'],
+      ['Gründungsplätze', '7 von 12'],
     ])
-    expect(gesamt(kennzahlen).gruendungsplaetze?.satz).toBe('7 von 12 vergeben')
+    expect(gesamt(kennzahlen).gruendungsplaetze?.satz).toBe('vergeben')
+  })
+
+  it('Gründungsplätze nennen ausgenommene Höfe (Register K2, Nr. 109): „vergeben · 1 ausgenommen“', () => {
+    const k = gesamt(hoefeKennzahlen(mockupHoefe(), { vergeben: 3, max: MAX, ausgenommen: 1 }))
+    expect(k.gruendungsplaetze?.wert).toBe('3 von 12')
+    expect(k.gruendungsplaetze?.satz).toBe('vergeben · 1 ausgenommen')
+    // Die Zahl der Plätze kommt aus der Einstellung, nie die feste 12.
+    expect(gesamt(hoefeKennzahlen(mockupHoefe(), { vergeben: 3, max: 20, ausgenommen: 0 })).gruendungsplaetze?.wert).toBe('3 von 20')
   })
 
   it('zählt genau wie die Filter der Liste — eine Regel, keine zweite', () => {
     const hoefe = mockupHoefe()
     const filter = zaehleHofFilter(hoefe)
-    const k = gesamt(hoefeKennzahlen(hoefe, { vergeben: 4, max: MAX }))
+    const k = gesamt(hoefeKennzahlen(hoefe, { vergeben: 4, max: MAX, ausgenommen: 0 }))
     expect(k.online?.wert).toBe(String(filter.online))
     expect(k.pausiert?.wert).toBe(String(filter.pausiert))
     expect(k.ohneZahlung?.wert).toBe(String(filter['stripe-fehlt']))
@@ -103,7 +112,7 @@ describe('Kennzahlen der Höfe', () => {
 
   it('„Ohne Zahlung“ findet auch einen pausierten Hof ohne Stripe — wie der Filter „Stripe fehlt“', () => {
     const hoefe = [zeile(roh('p', { isPaused: true, stripeBereit: false }), 1)]
-    const k = gesamt(hoefeKennzahlen(hoefe, { vergeben: 1, max: MAX }))
+    const k = gesamt(hoefeKennzahlen(hoefe, { vergeben: 1, max: MAX, ausgenommen: 0 }))
     expect(k.pausiert?.wert).toBe('1')
     expect(k.ohneZahlung?.wert).toBe('1')
     expect(k.online?.wert).toBe('0')
@@ -111,12 +120,12 @@ describe('Kennzahlen der Höfe', () => {
 
   it('ein stillgelegter Hof zählt in keiner Kachel', () => {
     const hoefe = [zeile(roh('s', { archivedAt: new Date('2026-10-01T09:00:00+02:00') }), null)]
-    const k = hoefeKennzahlen(hoefe, { vergeben: 0, max: MAX })
+    const k = hoefeKennzahlen(hoefe, { vergeben: 0, max: MAX, ausgenommen: 0 })
     expect(k.slice(0, 4).map((x) => x.wert)).toEqual(['0', '0', '0', '0'])
   })
 
   it('Ton nur bei Handlungsbedarf: Warten tun, wenn jemand wartet; Gründungsplätze tun, wenn einer wartet und Platz ist', () => {
-    const k = gesamt(hoefeKennzahlen(mockupHoefe(), { vergeben: 7, max: MAX }))
+    const k = gesamt(hoefeKennzahlen(mockupHoefe(), { vergeben: 7, max: MAX, ausgenommen: 0 }))
     expect(k.warten?.ton).toBe('tun')
     expect(k.gruendungsplaetze?.ton).toBe('tun')
     expect(k.online?.ton ?? 'neutral').toBe('neutral')
@@ -124,20 +133,20 @@ describe('Kennzahlen der Höfe', () => {
     expect(k.ohneZahlung?.ton ?? 'neutral').toBe('neutral')
   })
 
-  it('Gegenprobe: niemand wartet — kein Ton; alle Plätze vergeben — „0 frei“ ohne Ton', () => {
+  it('Gegenprobe: niemand wartet — kein Ton; alle Plätze vergeben — „12 von 12“ ohne Ton', () => {
     const ohneWartende = mockupHoefe().filter((h) => h.status.id !== 'wartet')
-    const ruhig = gesamt(hoefeKennzahlen(ohneWartende, { vergeben: 4, max: MAX }))
+    const ruhig = gesamt(hoefeKennzahlen(ohneWartende, { vergeben: 4, max: MAX, ausgenommen: 0 }))
     expect(ruhig.warten?.ton ?? 'neutral').toBe('neutral')
     expect(ruhig.gruendungsplaetze?.ton ?? 'neutral').toBe('neutral')
-    const voll = gesamt(hoefeKennzahlen(mockupHoefe(), { vergeben: 12, max: MAX }))
-    expect(voll.gruendungsplaetze?.wert).toBe('0 frei')
+    const voll = gesamt(hoefeKennzahlen(mockupHoefe(), { vergeben: 12, max: MAX, ausgenommen: 0 }))
+    expect(voll.gruendungsplaetze?.wert).toBe('12 von 12')
     expect(voll.gruendungsplaetze?.ton ?? 'neutral').toBe('neutral')
   })
 
-  it('am Handy zu dritt: Warten, Online und die Plätze — mit dem Kurztitel „Plätze frei“', () => {
-    const k = gesamt(hoefeKennzahlen(mockupHoefe(), { vergeben: 7, max: MAX }))
+  it('am Handy zu dritt: Warten, Online und die Plätze — mit dem Kurztitel „Plätze“', () => {
+    const k = gesamt(hoefeKennzahlen(mockupHoefe(), { vergeben: 7, max: MAX, ausgenommen: 0 }))
     expect(Object.values(k).filter((x) => x.amHandy !== false).map((x) => x.id)).toEqual(['warten', 'online', 'gruendungsplaetze'])
-    expect(k.gruendungsplaetze?.titelKurz).toBe('Plätze frei')
+    expect(k.gruendungsplaetze?.titelKurz).toBe('Plätze')
   })
 })
 
@@ -147,8 +156,15 @@ describe('Warteliste: Gründungsplatz bei Freischaltung', () => {
     approvedAt: new Date(`2026-09-${String(tag).padStart(2, '0')}T09:00:00+02:00`),
     createdAt: new Date('2026-08-01T09:00:00+02:00'),
     archivedAt: null,
+    gruendungAusgenommen: false,
   })
-  const warteHof: HofFuerPlatz = { id: 'wartet', approvedAt: null, createdAt: new Date('2026-10-10T09:00:00+02:00'), archivedAt: null }
+  const warteHof: HofFuerPlatz = {
+    id: 'wartet',
+    approvedAt: null,
+    createdAt: new Date('2026-10-10T09:00:00+02:00'),
+    archivedAt: null,
+    gruendungAusgenommen: false,
+  }
   const sieben = Array.from({ length: 7 }, (_, i) => frist(`h${i + 1}`, i + 1))
 
   it('k ist die Zahl der Höfe im Rennen plus eins — der Hof kommt als letzter in die Reihenfolge der Freischaltung', () => {
