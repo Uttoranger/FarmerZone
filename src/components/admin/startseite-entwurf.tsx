@@ -346,7 +346,9 @@ export function useStartseitenEntwurf({
     },
     oeffneBlock(neu, zeilen) {
       // Wer einen nie gespeicherten neuen Block verlässt, lässt seine leere Zeile nicht stehen.
-      const liste = zeilen ?? aktuell.current.zeilen
+      // Der Block, der zugeht, bleibt mit seinem Stand in der Liste (Nr. 106): Sonst zeigte sie nach „Fertig“
+      // seine alten Daten (ein neuer: keine) und zählte ihn nicht als Änderung, bis die Seite neu lädt.
+      const liste = mitOffenemBlock(zeilen ?? aktuell.current.zeilen, aktuell.current.block)
       uebernimm({ block: neu, zeilen: neu?.zeilenId === NEUER_BLOCK ? liste : liste.filter((z) => z.id !== NEUER_BLOCK) })
     },
     setzeZurueck(neu) {

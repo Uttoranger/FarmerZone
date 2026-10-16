@@ -241,6 +241,22 @@ describe('useStartseitenEntwurf', () => {
   })
 })
 
+describe('useStartseitenEntwurf — nach „Fertig“ (Nr. 106)', () => {
+  it('behält den Stand des Blocks in der Liste und zählt ihn weiter als Änderung', async () => {
+    speichere.mockResolvedValueOnce(gespeichert({ blockId: 'block-neu', zeilenId: 'zeile-neu' }))
+    const neu: Zeile = { id: 'neu', art: 'BLOCK', sichtbar: true, block: null }
+    tue((e) => e.oeffneBlock(neueBlockWerte('HINWEISBAND', JETZT), [e.zeilen[0], e.zeilen[1], neu, ...e.zeilen.slice(2)]))
+    tue((e) => e.block && e.aendereBlock({ ...e.block, titel: 'Winterpause' }))
+    await warte(800)
+
+    tue((e) => e.oeffneBlock(null))
+
+    expect(zuletzt.block).toBeNull()
+    expect(zuletzt.zeilen[2]).toMatchObject({ id: 'zeile-neu', block: { id: 'block-neu', titel: 'Winterpause' } })
+    expect(zuletzt.aenderungen.map((a) => a.art)).toEqual(['neu'])
+  })
+})
+
 describe('useStartseitenEntwurf — ein neuer Block, der nie gespeichert wurde', () => {
   it('lässt beim Schließen keine leere Zeile stehen — die nächste Speicherung geht durch', async () => {
     const neu: Zeile = { id: 'neu', art: 'BLOCK', sichtbar: true, block: null }
