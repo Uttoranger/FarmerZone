@@ -307,3 +307,67 @@ describe('useStartseitenEntwurf — die Vorschau lädt nach jeder Art von Änder
     expect(speichere).toHaveBeenCalledTimes(4)
   })
 })
+
+describe('useStartseitenEntwurf — neue Props → Liste bleibt', () => {
+  // Der Entwurf speichert von selbst. Käme eine neue `start`-Liste nach dem ersten Rendern still in den Zustand
+  // (etwa nach einem `revalidatePath` auf die eigene Seite), verschwänden Eingaben mitten im Speichern. Die Liste
+  // ändert sich nur durch den Menschen und durch die Antwort der Action (neue Kennungen), nie durch Props.
+  const ANDERE_ZEILEN: Zeile[] = ZEILEN.map((z) => ({ ...z, sichtbar: !z.sichtbar }))
+
+  /** Rendert mit `ZEILEN`, reicht dann `ANDERE_ZEILEN` als neue Props nach und rendert wie React zweimal (Effekte setzen Zustand). */
+  function listeNachNeuenProps(hook: (start: readonly Zeile[]) => Zeile[]): { vorher: Zeile[]; nachher: Zeile[] } {
+    let start: readonly Zeile[] = ZEILEN
+    let liste: Zeile[] = []
+    pruefstand.starte(() => {
+      liste = hook(start)
+    })
+    const vorher = liste
+    start = ANDERE_ZEILEN
+    pruefstand.rendere()
+    pruefstand.rendere()
+    return { vorher, nachher: liste }
+  }
+
+  it('der Entwurf behält seine Liste, auch wenn die Seite neue Props reicht', () => {
+    const { vorher, nachher } = listeNachNeuenProps((start) => {
+      zuletzt = useStartseitenEntwurf({ start, live: standardFassung(), speichere })
+      return zuletzt.zeilen
+    })
+    expect(vorher.every((z) => z.sichtbar)).toBe(true)
+    expect(nachher).toEqual(vorher)
+    expect(nachher).not.toEqual(ANDERE_ZEILEN)
+    expect(zuletzt.aenderungen).toEqual([])
+    expect(speichere).not.toHaveBeenCalled()
+  })
+
+  it('eigene Änderungen überleben neue Props und gehen unverändert hinaus — die neuen Props kommen nie in den Stand', async () => {
+    let start: readonly Zeile[] = ZEILEN
+    pruefstand.starte(() => {
+      zuletzt = useStartseitenEntwurf({ start, live: standardFassung(), speichere })
+    })
+    tue((e) => e.aendereZeilen(augeAn('FRAGEN', e)))
+    start = ANDERE_ZEILEN
+    pruefstand.rendere()
+    pruefstand.rendere()
+    expect(zuletzt.zeilen.find((z) => z.art === 'FRAGEN')?.sichtbar).toBe(false)
+    expect(zuletzt.zeilen.find((z) => z.art === 'FUTTER')?.sichtbar).toBe(true)
+
+    await warte(800)
+    expect(speichere).toHaveBeenCalledTimes(1)
+    const hinaus = speichere.mock.calls[0]?.[0].reihenfolge ?? []
+    expect(hinaus.filter((r) => !r.sichtbar).map((r) => r.id)).toEqual(['z-fragen'])
+  })
+
+  it('Gegenprobe: ein Hook, der neue Props in den Zustand übernimmt, fällt durch dieselbe Prüfung', async () => {
+    // Das Muster, das die Regel verbietet: Zustand aus `start`, nach jeder Änderung von `start` neu gesetzt.
+    const { useEffect, useState } = await import('react')
+    const { vorher, nachher } = listeNachNeuenProps((start) => {
+      const [liste, setListe] = useState<Zeile[]>(() => [...start])
+      useEffect(() => setListe([...start]), [start])
+      return liste
+    })
+    expect(vorher.every((z) => z.sichtbar)).toBe(true)
+    expect(nachher).toEqual(ANDERE_ZEILEN)
+    expect(nachher).not.toEqual(vorher)
+  })
+})

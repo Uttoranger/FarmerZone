@@ -18,6 +18,8 @@
  * einem Wort, „#“, „_“ oder weiteren Ziffern kleben (Kennungen, Hashes, Beträge). Eine deutsche
  * Nummer ohne Ländercode („0151 …“) liest die Wache als österreichische und meldet sie auch
  * genullt — deutsche Nummern mit „+49“ schreiben.
+ * Pfaddaten von SVG (`d="M…"`) überspringt die Wache grundsätzlich (`ohnePfaddaten`): Koordinaten sind
+ * keine Nummern, und eine Ausnahmeliste für Mockups und Symbole liefe jedem Upload hinterher.
  * Ausnahmen gelten je Nummer (ihre Kennung) und Datei, nie für eine ganze Datei, und nennen ihren
  * Grund. Jede Ausnahme deckt einen Fund; eine veraltete fällt auf.
  * Gegenprobe je erkannter Schreibweise: eine eingeschmuggelte Nummer schlägt an, genullte und
@@ -155,10 +157,20 @@ function nummernIn(kandidat: string): string[] {
 
 type Fund = { datei: string; zeile: number; nummer: string; kennung: string }
 
+/**
+ * SVG-Pfaddaten (`d="M…"`, auch mit einfachen Anführungszeichen) als Leerraum, die Zeilen bleiben
+ * erhalten. Pfaddaten beginnen immer mit M/m und bestehen nur aus Befehlsbuchstaben, Zahlen und Trennern —
+ * Koordinatenfolgen sehen sonst wie eine Handynummer aus (Mockups, Symbole). Eine Nummer
+ * außerhalb von `d="…"` bleibt sichtbar.
+ */
+function ohnePfaddaten(text: string): string {
+  return text.replace(/(?<![\p{L}\p{N}_-])d=(["'])\s*[Mm][MmLlHhVvCcSsQqTtAaZz0-9\s,.eE+-]*\1/gu, (treffer) => treffer.replace(/[^\n]/g, ' '))
+}
+
 /** Alle Nummern eines Texts, deren Teilnehmerteil nicht nur aus Nullen besteht. */
 function findeNummern(text: string, datei = 'schnipsel.md'): Fund[] {
   const funde: Fund[] = []
-  text.split('\n').forEach((zeile, i) => {
+  ohnePfaddaten(text).split('\n').forEach((zeile, i) => {
     for (const treffer of zeile.matchAll(KANDIDAT)) {
       for (const nummer of nummernIn(treffer[0].trim())) {
         const gelesen = lies(nummer)
@@ -168,9 +180,6 @@ function findeNummern(text: string, datei = 'schnipsel.md'): Fund[] {
   })
   return funde
 }
-
-/** Ziffernfolge aus einem SVG-Pfad der Bild-Baustein-Mockups (Nr. 97/98), die wie eine Handynummer ohne 0 aussieht. */
-const SVG_HUEGEL = 'cjcddalpfaei'
 
 /** Ausnahmen — je Nummer (ihre Kennung) und Datei, je mit Grund. Eine Ausnahme für eine ganze Datei gibt es nicht. */
 type Ausnahme = { datei: string; kennungen: string[]; grund: string }
@@ -194,18 +203,13 @@ const AUSNAHMEN: Ausnahme[] = [
   { datei: 'tests/sentry-hygiene-vergleich.test.ts', kennungen: [MOBIL_B, 'ahncadihelkk', 'enoeeijaiegg'], grund: 'Prüfstoff der Sentry-Hygiene (Altlast): eingefrorene Muster des Vergleichs „neu fängt mindestens, was main fängt“ — sie dürfen sich nicht ändern' },
   { datei: 'tests/sentry-hygiene-wachstum.test.ts', kennungen: [MOBIL_A, MOBIL_B, 'ceakalodfnpf', 'cefpogmnfemo', 'ghfpfpmdlgep'], grund: 'Prüfstoff der Sentry-Hygiene (Altlast): Wachstumstest der Telefon-Regel, Nummern an vielen Stellen hintereinander' },
   { datei: 'tests/beobachtbarkeit.test.ts', kennungen: [MOBIL_A], grund: 'Prüfstoff der Sentry-Hygiene (Altlast): Rückrufnummern in Nachrichten, Anfragen und Getter-Fehlern müssen fallen' },
-  // Historie und Mockups: werden nicht mehr geändert
+  // Historie und Mockups: werden nicht mehr geändert (SVG-Pfaddaten überspringt die Wache selbst)
   { datei: 'docs/nachtlauf/berichte/56.md', kennungen: [MOBIL_A, MOBIL_B], grund: 'Bericht eines früheren Laufs (Historie): beschreibt den Prüfstoff der Sentry-Hygiene' },
   { datei: 'docs/nachtlauf/berichte/64.md', kennungen: [MOBIL_B], grund: 'Bericht eines früheren Laufs (Historie): beschreibt den Prüfstoff der Sentry-Hygiene' },
   { datei: 'docs/nachtlauf/freigabe.md', kennungen: ['abbjofflhged'], grund: 'Freigabe des Menschen (Historie): Beispiel einer Festnetznummer zur Gruppierung, wird nicht geändert' },
   { datei: 'docs/nachtlauf/morgenbericht-2026-10-13-lauf12.md', kennungen: ['foemjlcpdjfh'], grund: 'Morgenbericht eines früheren Laufs (Historie): eine Testnummer bis auf drei Ziffern genullt' },
   { datei: 'docs/mockups/web-k3-kasse-glatt.html', kennungen: ['bhojpaabapgd'], grund: 'Mockup, wird nur gelesen, nie geändert: Nummer bis auf die letzte Ziffer genullt' },
   { datei: 'docs/mockups/mobil-k3-kasse-glatt.html', kennungen: ['bhojpaabapgd'], grund: 'Mockup, wird nur gelesen, nie geändert: Nummer bis auf die letzte Ziffer genullt' },
-  { datei: 'docs/mockups/web-h1-titelbild-ausschnitt.html', kennungen: [SVG_HUEGEL], grund: 'Mockup, wird nur gelesen, nie geändert: Koordinaten eines SVG-Pfads (Hügel im Beispielfoto), keine Telefonnummer' },
-  { datei: 'docs/mockups/mobil-h1-titelbild-ausschnitt.html', kennungen: [SVG_HUEGEL], grund: 'Mockup, wird nur gelesen, nie geändert: Koordinaten eines SVG-Pfads (Hügel im Beispielfoto), keine Telefonnummer' },
-  { datei: 'docs/mockups/mobil-h2-produktfoto-ausschnitt.html', kennungen: [SVG_HUEGEL], grund: 'Mockup, wird nur gelesen, nie geändert: Koordinaten eines SVG-Pfads (Hügel im Beispielfoto), keine Telefonnummer' },
-  { datei: 'docs/mockups/system-h1-titelbild-filter.html', kennungen: [SVG_HUEGEL], grund: 'Mockup, wird nur gelesen, nie geändert: Koordinaten eines SVG-Pfads (Hügel im Beispielfoto), keine Telefonnummer' },
-  { datei: 'docs/mockups/system-h1-bild-baustein.html', kennungen: [SVG_HUEGEL], grund: 'Mockup, wird nur gelesen, nie geändert: Koordinaten eines SVG-Pfads (Hügel im Beispielfoto), keine Telefonnummer' },
   // Seed: Der Wert steht in der Datenbank jeder Entwicklungsumgebung
   { datei: 'tests/seed-idempotenz.test.ts', kennungen: [MOBIL_A], grund: 'Prüft den Wert, den der Seed (prisma/, außerhalb der Wache) seit dem ersten Lauf schreibt; ändert sich nur mit dem Seed' },
 ]
@@ -320,6 +324,30 @@ describe('Telefonnummern-Wache — Gegenprobe: die Suche schlägt an', () => {
     for (const text of [`cabo${folge}`, `page-f${folge}abcde.js`, `token_${folge}`, `fill: '#${folge}'`, `0.${folge}`, `€ 0,${folge}`, `v${ohneNull}`]) {
       expect(nummern(text), text).toEqual([])
     }
+  })
+
+  it('überspringt SVG-Pfaddaten grundsätzlich, findet dieselbe Nummer aber außerhalb von d="…"', () => {
+    const koordinaten = eingeschmuggelt('664 0000000')
+    for (const pfad of [
+      `<path d="M12 5 L ${koordinaten} Z"/>`,
+      `<path d='m0 0c ${koordinaten} -3 4 5z'/>`,
+      `<path\n  d="M0 0\n  L ${koordinaten}\n  Z"/>`,
+      `<svg><path fill="none" d="M1.5 2.5 h ${koordinaten} v3"/></svg>`,
+    ]) {
+      expect(nummern(pfad), pfad).toEqual([])
+    }
+    // Außerhalb von d="…" bleibt sie sichtbar, auch direkt daneben und in einem anderen Attribut (data-d, id).
+    for (const text of [
+      `<path d="M0 0 L1 1"/> Ruf an: ${eingeschmuggelt('+43 664 000 0000')}`,
+      `<p>${koordinaten}</p><path d="M0 0 Z"/>`,
+      `<path data-d="M0 ${koordinaten}"/>`,
+      `<a title="d=Tel ${koordinaten}">`,
+    ]) {
+      expect(nummern(text), text).toHaveLength(1)
+    }
+    // Die Zeilennummer bleibt auch nach einem mehrzeiligen Pfad richtig.
+    const zweizeilig = `<path d="M0 0\n  L1 1"/>\nRuf an ${eingeschmuggelt('+43 664 000 0000')}`
+    expect(findeNummern(zweizeilig).map((f) => f.zeile)).toEqual([3])
   })
 
   it('lässt bloße Vorwahlen und Nicht-Nummern stehen', () => {

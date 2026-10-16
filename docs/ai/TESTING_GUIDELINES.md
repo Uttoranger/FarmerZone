@@ -133,20 +133,21 @@ pnpm test:integration                        # Integration (braucht .env.test)
 | Jeder Token-/Signaturweg — ein „Token nur hier"-Test zählt die Stellen im Syntaxbaum von TypeScript (kein Regex-Kommentarfilter: der hielt `//host` für einen Kommentar), mit einer Gegenprobe je Leckweg, auch für Wege ohne den Namen des Tokens (`document.URL`) | `geheimnis.test.ts`, `alte-seiten-neues-design.test.ts` |
 | Jeder behobene Bug | ein Test, der ihn vorher gefangen hätte |
 | Jede Migration gegen das Deploy-Fenster | `migrationen-wache.test.ts` |
-| Jede Architektur-Regel, die sich am Quelltext prüfen lässt (wer was einbindet, wo ein Parameter gelesen wird) — mit Gegenprobe, dass die Suche anschlägt | `hofseite-einmal.test.ts`, `design-tokens.test.ts` |
+| Jede Architektur-Regel, die sich am Quelltext prüfen lässt (wer was einbindet, wo ein Parameter gelesen wird) — mit Gegenprobe, dass die Suche anschlägt | `hofseite-einmal.test.ts`, `design-tokens.test.ts`, `decrement-wache.test.ts`, `workflows-wache.test.ts`, `palette-klassen-wache.test.ts`, `actions-sitzung-wache.test.ts`, `svg-bild-ohne-link.test.ts` |
 | Jeder Geldweg, bei dem die Datenbank die Antwort gibt, **zusätzlich** in der Integrationsschicht | `checkout-bestand.int.test.ts`, `storno-nebenlaeufig.int.test.ts` |
 
 Die **Migrationswache** ist ein normaler Unit-Test der Suite (reine Dateiarbeit,
 ohne Datenbank) — sie läuft bei `pnpm test` und damit im Stop-Hook. Sie schlägt
 bei `ADD COLUMN … NOT NULL` ohne `DEFAULT` an; begründete Ausnahmen tragen einen
-`-- EXPAND-CONTRACT:`-Marker (Regel: `ARCHITECTURE.md` §5).
+`-- EXPAND-CONTRACT:`-Marker (Regel: `ARCHITECTURE.md` §5). `DROP COLUMN`,
+Typänderung und `DROP TABLE` lässt sie nur mit einem begründeten Marker durch.
 
 - Jeder `use-*`-Hook, der nach einem `await` Zustand ändert, bekommt einen Prüfstand-Test „zwei Aufrufe aus demselben Render" (Regelvorschlag 71, Lauf 11; freigegeben 13.10.2026).
 - Client-Komponenten unter `src/app/(hof)` stehen unter einer Quelltext-Wache: keine Zeitschaltung, keine Zustell-Sätze, keine Action im setState-Updater (Vorbild `tests/whatsapp-versand.test.ts`, Ausweitung auf alle (hof)-Clients mit Nr. 75; Regelvorschlag 66, Lauf 11; freigegeben 13.10.2026). Eine Zeitschaltung, die nur die Seite neu holt (`router.refresh`), steht mit Grund in `ERLAUBTE_ZEITSCHALTUNG` und hat genau einen Takt: ein `setInterval`, kein `setTimeout` (`nurEinTakt`; seit Nr. 87: offener Faden im Postfach, alle 60 s, Register N12).
 - Prüfsummen (etwa die Version eines Bilds in der Adresse) nur über die echte Route testen, nicht über eine im Test nachgebaute Berechnung (Regelvorschlag 67, Lauf 11; freigegeben 13.10.2026).
 - Steht eine Regel als Prisma-Bedingung und als SQL (Liste und EXISTS), prüft ein Integrationstest beide an denselben Zeilen (Regelvorschlag 75, Lauf 12; freigegeben 13.10.2026; den Test baut Nr. 85).
 - Attrappen für `next/og` liefern ein echtes PNG als Körper — Text ergäbe 503, weil sharp ihn nicht lesen kann (Regelvorschlag 76, Lauf 12; freigegeben 13.10.2026; verschoben aus ARCHITECTURE.md „Vorschaubild und Icons").
-- Telefonnummern-Wache (`tests/telefonnummern-wache.test.ts`): ein Test über `src/`, `tests/`, `docs/` und `DEVELOPMENT.md` findet Nummern mit nicht genulltem Teilnehmerteil, auch in sich selbst; Ausnahmen je Nummer mit Grund, z. B. die Nummer des BAES — die Liste führt eine Kennung (SHA-256 der Ziffern) statt der Nummer, und die Gegenproben setzen ihre Ziffer erst zur Laufzeit ein (Dirigenten-Vorschlag, Lauf 12; freigegeben 13.10.2026; gebaut in Nr. 85). Testnummern unterscheiden sich in der Vorwahl („+43 660 000 0000“, „+43 664 000 0000“), nie in den Ziffern dahinter.
+- Telefonnummern-Wache (`tests/telefonnummern-wache.test.ts`): ein Test über `src/`, `tests/`, `docs/` und `DEVELOPMENT.md` findet Nummern mit nicht genulltem Teilnehmerteil, auch in sich selbst; Ausnahmen je Nummer mit Grund, z. B. die Nummer des BAES — die Liste führt eine Kennung (SHA-256 der Ziffern) statt der Nummer, und die Gegenproben setzen ihre Ziffer erst zur Laufzeit ein (Dirigenten-Vorschlag, Lauf 12; freigegeben 13.10.2026; gebaut in Nr. 85). Testnummern unterscheiden sich in der Vorwahl („+43 660 000 0000“, „+43 664 000 0000“), nie in den Ziffern dahinter. SVG-Pfaddaten (`d="M…"`) überspringt die Wache grundsätzlich, eine Ausnahme dafür gibt es nicht.
 
 ### Nicht testen
 - Prisma selbst, Next.js selbst, Stripe selbst.
@@ -248,6 +249,13 @@ in einen ungültigen Schlüssel statt in echtes Geld.
   hängt; wer daran vorbei anlegt, lässt Daten stehen. Faktoren dafür in
   `tests/integration/setup/basis.ts`, weil sie über Dateien hinweg gleich sein
   müssen.
+- **`raeumeAuf()` zählt vor und nach dem Aufräumen** die Zeilen aller Tabellen mit
+  Fremdschlüssel auf ein Konto oder einen Hof und bricht mit dem Namen der Tabelle
+  ab, wenn Zeilen von Test-Konten oder Test-Höfen liegen bleiben
+  (`tests/integration/setup/basis.ts`, Rechnung in `zaehlung.ts`, Gegenprobe
+  `tests/integration/raeume-auf-zaehlung.int.test.ts`); was an einer Konto-Kennung
+  ohne `int-` hängt (Better Auth vergibt sie), räumt der Test über die gemerkten
+  Kennungen selbst weg.
 
 ---
 
