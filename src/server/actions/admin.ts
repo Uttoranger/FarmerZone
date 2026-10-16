@@ -140,7 +140,7 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
   // gleichzeitig denselben letzten Platz.
   const freigabe = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${GRUENDUNGSPLAETZE_SPERRE})`
-    // Bedingt schreiben, nicht blind: Die Sperre oben beruht auf einem Lesestand.
+    // Bedingt schreiben, nicht blind: Die Freischalt-Sperre oben beruht auf einem Lesestand.
     // Fällt Stripe dazwischen weg (account.updated) oder schaltet ein zweiter
     // Klick schon frei, trifft das Schreiben nichts — dann keine Mail, sondern
     // eine Meldung (ARCHITECTURE: der Statuswechsel ist die Sperre).
