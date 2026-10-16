@@ -650,7 +650,6 @@ export function buendelVorschau(wahl: BuendelStandWahl): string {
 // ─── Texte des Reiters (EINE Quelle; Wörter aus der Wortliste N8/N12/N14) ───
 
 export const MELDUNGEN_TEXT = {
-  seitenSatz: 'Eingang = was dich jetzt braucht. Meldungen = der ganze Weg jeder Meldung, vom Eingang bis live.',
   standBeschriftung: 'Stand aller Meldungen',
   summe: (anzahl: number) => `${anzahl} ${anzahl === 1 ? 'Meldung' : 'Meldungen'}`,
   summeSatz: 'gezählt werden Meldungen, nicht Karten – ein Bündel mit 4 Meldungen zählt 4',

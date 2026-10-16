@@ -716,7 +716,6 @@ export type EingangEintrag = {
 
 /** Alle Sätze des Eingangs — EINE Quelle für Liste, Spalten, Kennzahlen und Zähler. */
 export const EINGANG_TEXT = {
-  satz: 'Ein Eingang für alles, was dich braucht: Antworten der Höfe, Meldungen (Fehler, Wunsch, Frage) und Aufgaben aus dem System. Höfe beginnen keine Fäden – nur du.',
   hauptaktion: 'Rundschreiben schreiben',
   kennzahlenBeschriftung: 'Postfach in Zahlen',
   unterreiterBeschriftung: 'Bereiche des Postfachs',
@@ -761,6 +760,15 @@ export const EINGANG_TEXT = {
   /** Der Knopf der Freigabe („Zur Bestellung") — er führt zur Zahlung bei Stripe, eine Admin-Seite der Bestellung gibt es nicht. */
   zurBestellung: 'Zur Bestellung bei Stripe',
   ohneZahlung: 'Keine Zahlungskennung gespeichert – such die Bestellung bei Stripe über die Bestellnummer.',
+  /**
+   * „Erstattung erledigt" (Register N14, Ergänzung; Nr. 105): Knopf und
+   * Rückfrage in der Seite, die Frage wörtlich aus der Freigabe. Die Action
+   * ändert nur das Merkmal — kein Geld, keine Mail.
+   */
+  erstattungErledigt: 'Erstattung erledigt',
+  erstattungErledigtFrage: 'Hast du im Stripe-Dashboard erstattet? Die Aufgabe verschwindet; die Kundin bekommt keine Mail.',
+  erstattungErledigtJa: 'Ja, erstattet',
+  erstattungErledigtAbbrechen: 'Abbrechen',
 } as const
 
 /** Leerzustände je Filter (Register N9) — der Ausweg steht im Aufruf. */
@@ -950,7 +958,8 @@ export function eingangEintraege(roh: EingangRoh, filter: EingangFilter): Eingan
 /** Sätze des Admin-Postfachs — EINE Quelle für die drei Reiter und das Formular. */
 export const ADMIN_POSTFACH_TEXT = {
   titel: 'Postfach',
-  satz: 'Alles, was Höfe und Kundschaft dir schreiben – an einem Ort.',
+  /** EIN Satz für alle vier Reiter (Register N14, Ergänzung; Nr. 105; Mockup admin-postfach-ruhig) — Kopf und Reiter stehen still. */
+  satz: 'Was dich braucht, der Weg jeder Meldung, Rundschreiben an die Höfe und wer welche Mails bekommt.',
   neuesRundschreiben: 'Neues Rundschreiben',
   rundschreibenHinweis: 'Ein Rundschreiben landet bei jedem Empfänger als Nachricht vom Team im Postfach; Antworten kommen im Eingang zu dir.',
   antwortAuf: 'Antwort auf',

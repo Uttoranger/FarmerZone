@@ -17,6 +17,11 @@
  *    wenn die Schreibroute inzwischen etwas gesetzt hat.
  *  - Aufbewahrung mit der zweiten Abfrage: Ein Duplikat mit offener
  *    Hauptmeldung bleibt, eines mit seit 91 Tagen erledigter geht.
+ *  - Nacharbeit 101 (Nr. 105): Die Kette Duplikat → Duplikat scheitert auch
+ *    beim Schreiben selbst (Hauptmeldung wird zwischen Prüfung und Schreiben
+ *    Duplikat); erneutes Speichern eines Bündels ohne Wechsel lässt die
+ *    90-Tage-Uhr stehen, zurück auf Gesammelt leert „Geplant in"; Ablegen
+ *    schreibt nur, solange der Status der Karte gilt.
  * Meldungstexte sind erfunden. Mails gemockt (Prüfstellen), der Nachlauf
  * gesammelt und selbst abgearbeitet (TESTING_GUIDELINES §3).
  */
@@ -42,7 +47,7 @@ import type { MeldungArt, MeldungStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { sendRaw, sendPostfachMail } from '@/lib/email'
 import { WUENSCHE_TEXT, kiEntscheidung, waehleZuLoeschende } from '@/lib/meldung'
-import { fasseZusammenAction, setzeBuendelStandAction, trenneDuplikatAction, triageMeldungAction } from '@/server/actions/admin'
+import { fasseZusammenAction, legeMeldungAbAction, setzeBuendelStandAction, trenneDuplikatAction, triageMeldungAction } from '@/server/actions/admin'
 import { findeHauptmeldungen, findeLoeschKandidaten, getMeldungenFuerHof } from '@/server/queries/meldung'
 import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf } from './setup/basis'
 
@@ -250,5 +255,68 @@ describe('Aufbewahrung mit der zweiten Abfrage', () => {
     expect([...haupt.keys()].sort()).toEqual([offen, erledigt].sort())
     expect(waehleZuLoeschende(kandidaten, jetzt, haupt).map((m) => m.id).sort()).toEqual([erledigt, dupErledigt].sort())
     expect(waehleZuLoeschende(kandidaten, jetzt, haupt).map((m) => m.id)).not.toContain(dupOffen)
+  })
+})
+
+describe('Nacharbeit 101 (Nr. 105)', () => {
+  it('keine Kette beim Schreiben: wird die Hauptmeldung zwischen Prüfung und Schreiben Duplikat, bleibt alles stehen', async () => {
+    const admin = await erstelleAdmin()
+    const ziel = await legeMeldungAn({})
+    const andere = await legeMeldungAn({})
+    const haupt = await legeMeldungAn({ status: 'DUPLIKAT', duplikatVonId: andere })
+    await alsSitzung(admin.cookie)
+
+    // Die Prüfung vor dem Schreiben sieht noch die alte Hauptmeldung — so, als änderte sie sich danach.
+    const vorher = vi.spyOn(prisma.meldung, 'findFirst').mockResolvedValueOnce({ id: haupt, status: 'GEPRUEFT' } as never)
+    const ergebnis = await triageMeldungAction(ziel, { status: 'DUPLIKAT', duplikatVonId: haupt, vorherStatus: 'GEPRUEFT', vorherNotiz: null })
+    vorher.mockRestore()
+
+    expect(ergebnis).toMatchObject({ error: expect.stringContaining('Hauptmeldung') })
+    expect(await prisma.meldung.findUniqueOrThrow({ where: { id: ziel }, select: { status: true, duplikatVonId: true } })).toEqual({ status: 'GEPRUEFT', duplikatVonId: null })
+    // Ohne Spion fängt schon die Prüfung, mit eigenem Satz.
+    expect(await fasseZusammenAction({ duplikatId: ziel, hauptmeldungId: haupt })).toMatchObject({ error: expect.any(String) })
+    // Gegenprobe: auf eine offene Hauptmeldung schreibt dieselbe Anweisung.
+    expect(await triageMeldungAction(ziel, { status: 'DUPLIKAT', duplikatVonId: andere, vorherStatus: 'GEPRUEFT', vorherNotiz: null })).toEqual({})
+    expect(await prisma.meldung.findUniqueOrThrow({ where: { id: ziel }, select: { status: true, duplikatVonId: true } })).toEqual({ status: 'DUPLIKAT', duplikatVonId: andere })
+  })
+
+  it('erneutes Speichern ohne Wechsel lässt die 90-Tage-Uhr stehen; ein Wechsel stellt sie; Gesammelt leert „Geplant in"', async () => {
+    const admin = await erstelleAdmin()
+    const k = intKennung('buendel')
+    const alt = new Date(Date.now() - 40 * TAG)
+    const a = await legeMeldungAn({ clusterKey: k, status: 'GEPLANT', triagedAt: alt })
+    const b = await legeMeldungAn({ clusterKey: k, status: 'GEPRUEFT', triagedAt: alt })
+    await alsSitzung(admin.cookie)
+
+    expect(await setzeBuendelStandAction({ clusterKey: k, stand: 'geplant', sprintName: 'Nr. 200', bescheid: 'niemand' })).toMatchObject({ ok: true })
+    const nachGeplant = await prisma.meldung.findMany({ where: { id: { in: [a, b] } }, select: { id: true, triagedAt: true, sprintName: true, status: true } })
+    const zeile = (id: string) => nachGeplant.find((m) => m.id === id)!
+    expect(zeile(a).triagedAt).toEqual(alt)
+    expect(zeile(b).triagedAt!.getTime()).toBeGreaterThan(alt.getTime())
+    expect(nachGeplant.every((m) => m.status === 'GEPLANT' && m.sprintName === 'Nr. 200')).toBe(true)
+
+    expect(await setzeBuendelStandAction({ clusterKey: k, stand: 'gesammelt', bescheid: 'niemand' })).toMatchObject({ ok: true })
+    const nachGesammelt = await prisma.meldung.findMany({ where: { id: { in: [a, b] } }, select: { status: true, sprintName: true } })
+    expect(nachGesammelt).toEqual([
+      { status: 'GEPRUEFT', sprintName: null },
+      { status: 'GEPRUEFT', sprintName: null },
+    ])
+  })
+
+  it('Ablegen schreibt nur, solange der Status der Karte gilt — mit Antwort an den Melder', async () => {
+    const admin = await erstelleAdmin()
+    const id = await legeMeldungAn({ status: 'NEU', art: 'FEHLER' })
+    await alsSitzung(admin.cookie)
+
+    expect(await legeMeldungAbAction({ meldungId: id, antwort: ' ', vorherStatus: 'NEU' })).toMatchObject({ error: expect.any(String) })
+    expect((await prisma.meldung.findUniqueOrThrow({ where: { id } })).status).toBe('NEU')
+
+    expect(await legeMeldungAbAction({ meldungId: id, antwort: 'Erfundene Antwort: das ist so gewollt.', vorherStatus: 'NEU' })).toEqual({})
+    const abgelegt = await prisma.meldung.findUniqueOrThrow({ where: { id }, select: { status: true, antwortAnMelder: true, triagedAt: true } })
+    expect(abgelegt).toMatchObject({ status: 'KEIN_FEHLER', antwortAnMelder: 'Erfundene Antwort: das ist so gewollt.' })
+
+    // Ein zweiter Klick aus einer alten Karte (Status NEU) ändert nichts mehr.
+    expect(await legeMeldungAbAction({ meldungId: id, antwort: 'Erfundene andere Antwort.', vorherStatus: 'NEU' })).toMatchObject({ error: expect.any(String) })
+    expect(await prisma.meldung.findUniqueOrThrow({ where: { id }, select: { status: true, antwortAnMelder: true, triagedAt: true } })).toEqual(abgelegt)
   })
 })

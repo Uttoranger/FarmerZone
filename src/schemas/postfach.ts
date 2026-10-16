@@ -105,8 +105,12 @@ export type RundschreibenEingabe = z.input<typeof rundschreibenSchema>
 
 // ─── Admin-Postfach: Adresse (Register N12-Änderung, N14; Nr. 95) ───────────
 
-/** Der erste Wert, wenn Next einen doppelten Parameter als Liste liefert. */
-function ersterWert(wert: unknown): unknown {
+/**
+ * Der erste Wert, wenn Next einen doppelten Parameter als Liste liefert — EINE
+ * Hilfe für die Adresse des Postfachs, auch für den Reiter „Meldungen"
+ * (src/schemas/meldung.ts, seit Nr. 105).
+ */
+export function ersterWert(wert: unknown): unknown {
   return Array.isArray(wert) ? wert[0] : wert
 }
 
@@ -149,6 +153,14 @@ export function fadenKennungAus(wert: string | string[] | undefined): string | u
   const faden = z.string().regex(KENNUNG).safeParse(ersterWert(wert))
   return faden.success ? faden.data : undefined
 }
+
+/**
+ * „Erstattung erledigt" (Register N14, Ergänzung; Nr. 105): nur die Kennung
+ * der Bestellung — was gesetzt wird, entscheidet der Server allein.
+ */
+export const erstattungErledigtSchema = z.strictObject({
+  orderId: z.cuid(POSTFACH_FEHLER.eingabe),
+})
 
 // ─── Zustellung (Register N14, Nr. 95) ───────────────────────────────────────
 

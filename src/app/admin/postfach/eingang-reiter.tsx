@@ -27,6 +27,7 @@ import {
   type ErstattungAufgabeRoh,
   type HofAufgabeRoh,
 } from '@/lib/postfach'
+import type { KennzahlDaten } from '@/lib/admin-seiten'
 import { adminHofZeile, type AdminHofZeile } from '@/lib/admin-hoefe'
 import { wartelistePlatzZeile } from '@/lib/admin-hoefe-seite'
 import { gruendungsplaetze, MAX_GRUENDUNGSHOEFE } from '@/lib/gruendungshof'
@@ -42,6 +43,8 @@ import { KARTE, KICKER, LEISE } from '@/components/hof-bestellungen/stil'
 import { MeldungEntscheidenSpalte, Wunschliste, type WunschBuendel } from '@/components/admin/briefkasten-teile'
 import { PostfachHofAktionen } from '@/components/admin/postfach-aufgabe-hof'
 import { PostfachErstattungSpalte } from '@/components/admin/postfach-aufgabe-erstattung'
+import { Kennzahlen } from '@/components/admin/kennzahlen'
+import { ErstattungErledigt } from './erstattung-erledigt'
 import { FadenSpalte } from './faden-spalte'
 
 const SPALTE = cn(KARTE, 'flex min-w-0 flex-col overflow-hidden dark:ring-1 dark:ring-border')
@@ -197,7 +200,17 @@ function DetailSpalte({ detail, wuensche, jetzt }: { detail: Detail | null; wuen
   if (detail?.art === 'antwort') return <FadenSpalte faden={detail.faden} jetzt={jetzt} />
   if (detail?.art === 'meldung') return <MeldungEntscheidenSpalte m={detail.meldung} jetzt={jetzt} duplikate={detail.duplikate} />
   if (detail?.art === 'hof') return <HofSpalte hof={detail.hof} zeile={detail.zeile} vergeben={detail.vergeben} jetzt={jetzt} />
-  if (detail?.art === 'erstattung') return <PostfachErstattungSpalte e={detail.erstattung} zahlungAdresse={detail.zahlungAdresse} jetzt={jetzt} />
+  if (detail?.art === 'erstattung') {
+    // „Erstattung erledigt" (Nr. 105) unter der Spalte aus Nr. 95 — in deren Polster, damit es wie ein Teil davon steht.
+    return (
+      <>
+        <PostfachErstattungSpalte e={detail.erstattung} zahlungAdresse={detail.zahlungAdresse} jetzt={jetzt} />
+        <div className="flex flex-col px-4 pb-4 md:px-5 md:pb-5">
+          <ErstattungErledigt key={detail.erstattung.id} orderId={detail.erstattung.id} />
+        </div>
+      </>
+    )
+  }
   return (
     <div className="flex flex-col gap-4 p-4 md:p-5">
       <p className={cn('py-6 text-center text-sm', LEISE)}>{EINGANG_TEXT.waehlen}</p>
@@ -216,20 +229,25 @@ function DetailSpalte({ detail, wuensche, jetzt }: { detail: Detail | null; wuen
  * Antwortfeld, Meldung entscheiden, Hof freischalten/ablehnen, Erstattung
  * ansehen. Gewählt wird über ?id= (art-kennung); nichts öffnet von selbst,
  * weil Öffnen den Lesestand setzt. Regel-Zeile darunter (Seitenmuster N15).
+ * Seit Nr. 105 (Mockup admin-postfach-ruhig) stehen die Kennzahlen hier oben,
+ * unter den Unterreitern — sie gehören zum Eingang; ohne Zahlen (Ladefehler)
+ * fehlen sie. Filter und Zeilen wechseln ohne Sprung nach oben, der gewählte
+ * Filter zeigt beim Laden den kleinen Kreis.
  */
-export function EingangReiter({ daten, jetzt }: { daten: EingangDaten; jetzt: Date }): React.JSX.Element {
+export function EingangReiter({ daten, kennzahlen, jetzt }: { daten: EingangDaten; kennzahlen: KennzahlDaten[] | null; jetzt: Date }): React.JSX.Element {
   const { filter, eintraege, auswahl, detail } = daten
   const leer = EINGANG_LEER[filter]
   const gewaehlt = auswahl ? eingangKennung(auswahl) : null
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3.5">
+      {kennzahlen && <Kennzahlen beschriftung={EINGANG_TEXT.kennzahlenBeschriftung} eintraege={kennzahlen} />}
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[480px_minmax(0,1fr)]">
         <section aria-label={EINGANG_TEXT.listeBeschriftung} className={SPALTE}>
           <div className="px-3.5 pt-3 pb-2">
             <p className={cn(KICKER, 'mb-1.5')}>{EINGANG_TEXT.listeKopf(filter)}</p>
             <FilterChipReihe beschriftung={EINGANG_TEXT.filterBeschriftung}>
               {EINGANG_FILTER_IDS.map((f) => (
-                <FilterChip key={f} href={eingangAdresse(f)} aktiv={f === filter}>
+                <FilterChip key={f} href={eingangAdresse(f)} aktiv={f === filter} scroll={false} ladePunkt>
                   {EINGANG_FILTER_LABEL[f]}
                 </FilterChip>
               ))}
@@ -242,7 +260,7 @@ export function EingangReiter({ daten, jetzt }: { daten: EingangDaten; jetzt: Da
               satz={leer.satz}
               className="rounded-none border-0 py-8"
               ausweg={
-                <Link href={eingangAdresse(filter === 'alle' ? 'offen' : 'alle')} className={cn('inline-flex min-h-11 items-center rounded-full border border-border px-4 text-sm font-semibold hover:bg-muted', FOKUS_RAHMEN)}>
+                <Link href={eingangAdresse(filter === 'alle' ? 'offen' : 'alle')} scroll={false} className={cn('inline-flex min-h-11 items-center rounded-full border border-border px-4 text-sm font-semibold hover:bg-muted', FOKUS_RAHMEN)}>
                   {filter === 'alle' ? EINGANG_TEXT.offenesZeigen : EINGANG_TEXT.alleZeigen}
                 </Link>
               }

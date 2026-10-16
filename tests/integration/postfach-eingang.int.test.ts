@@ -244,7 +244,11 @@ describe('Zustellung: Double-Opt-in', () => {
     expect(bestaetigt.bestaetigtAm).not.toBeNull()
     expect(bestaetigt.token).toBeNull()
 
-    await antworteAlsHof({ unterhaltungId: faden, text: 'Zweite Antwort.' })
+    // Die Mail geht höchstens einmal je Faden und voller Stunde (Drossel, Nr. 105) —
+    // die zweite Antwort deshalb in einem zweiten Faden.
+    const zweiterFaden = await prisma.unterhaltung.create({ data: { farmId: farm.id, letzteNachrichtAm: new Date() }, select: { id: true } })
+    await alsSitzung(hofCookie)
+    await antworteAlsHof({ unterhaltungId: zweiterFaden.id, text: 'Zweite Antwort.' })
     await arbeiteNachlaufAb()
     expect(vi.mocked(sendHofAntwortAnTeam).mock.calls[1]![0]).toEqual([SUPPORT, 'int-team@example.com'])
 

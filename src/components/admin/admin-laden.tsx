@@ -16,15 +16,6 @@ function Rahmen({ children }: { children: React.ReactNode }): React.JSX.Element 
   )
 }
 
-function Kopf({ breite }: { breite: string }): React.JSX.Element {
-  return (
-    <div className="flex items-end justify-between gap-4">
-      <div className={cn('h-8 rounded-lg bg-border md:h-9', breite)} />
-      <div className="hidden h-4 w-48 rounded bg-muted sm:block" />
-    </div>
-  )
-}
-
 /** Seitenkopf des Musters (Register N15): h1, ein Satz, rechts ein Feld. */
 function MusterKopf({ breite, rechts }: { breite: string; rechts?: string }): React.JSX.Element {
   return (
@@ -83,58 +74,6 @@ export function HoefeLaden(): React.JSX.Element {
         </div>
       ))}
       <div className="h-3 w-3/4 rounded bg-muted" />
-    </Rahmen>
-  )
-}
-
-export function BriefkastenLaden(): React.JSX.Element {
-  return (
-    <Rahmen>
-      <Kopf breite="w-40" />
-      <Chips breiten={[34, 22, 34, 18, 20, 22, 18]} />
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="flex flex-col gap-2">
-          <div className="h-4 w-24 rounded bg-muted" />
-          <div className="overflow-hidden rounded-2xl border border-border bg-card">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex h-[64px] items-center gap-3 border-t border-border px-4 first:border-t-0">
-                <div className="h-5 w-16 rounded-full bg-muted" />
-                <div className="flex-1">
-                  <div className="h-4 w-2/3 rounded bg-border" />
-                  <div className="mt-1.5 h-3 w-1/3 rounded bg-muted" />
-                </div>
-                <div className="h-5 w-20 rounded-full bg-muted" />
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="h-72 rounded-2xl border border-border bg-card" />
-      </div>
-    </Rahmen>
-  )
-}
-
-export function MeldungLaden(): React.JSX.Element {
-  return (
-    <Rahmen>
-      <div className="flex justify-between">
-        <div className="h-11 w-32 rounded-full bg-muted" />
-        <div className="flex gap-2">
-          <div className="h-11 w-24 rounded-full bg-muted" />
-          <div className="h-11 w-28 rounded-full bg-muted" />
-        </div>
-      </div>
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)]">
-        <div className="flex flex-col gap-4">
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <div className="h-5 w-48 rounded-full bg-muted" />
-            <div className="mt-3 h-4 w-full rounded bg-border" />
-            <div className="mt-2 h-4 w-3/4 rounded bg-border" />
-          </div>
-          <div className="h-64 rounded-2xl border border-border bg-card" />
-        </div>
-        <div className="h-[520px] rounded-2xl border border-border bg-card" />
-      </div>
     </Rahmen>
   )
 }

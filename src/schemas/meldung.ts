@@ -6,6 +6,7 @@ import {
   MELDUNG_KENNUNG_MAX,
   MELDUNG_TEXT_MAX,
   MELDUNG_TEXT_MIN,
+  MELDUNG_KLICK_TEXT,
   MELDUNG_STATUS,
   STAND_TEILE,
   TRIAGE_NOTIZ_MAX,
@@ -16,6 +17,7 @@ import {
   type StandTeil,
 } from '@/lib/meldung'
 import { bereinige } from '@/lib/fremdtext'
+import { ersterWert } from '@/schemas/postfach'
 
 /**
  * Was das Meldeformular an den Server schickt (Sprint fehlerbriefkasten).
@@ -130,6 +132,19 @@ export const zusammenfassenSchema = z
 /** Trennen in „Woraus": aus dem Duplikat wird wieder eine eigene Meldung. */
 export const trennenSchema = z.object({ meldungId: meldungIdSchema })
 
+/**
+ * Ablegen aus dem Kartenmenü (Nr. 105, Nacharbeit 101): die Meldung, die
+ * Antwort an den Melder (Pflicht — er soll lesen, warum) und der Status, den
+ * die Karte zeigte. Die Action schreibt nur, wenn er noch gilt.
+ */
+export const ablegenSchema = z.object({
+  meldungId: meldungIdSchema,
+  antwort: z.string(MELDUNG_KLICK_TEXT.ablegenPflicht).trim().min(1, MELDUNG_KLICK_TEXT.ablegenPflicht).max(500, 'Antwort: höchstens 500 Zeichen'),
+  vorherStatus: z.enum(MELDUNG_STATUS, { message: UNBEKANNTE_MELDUNG }),
+})
+
+export type AblegenEingabe = z.input<typeof ablegenSchema>
+
 export const BESCHEID_WAHL = ['hoefe', 'niemand'] as const
 
 /** „Stand für alle" eines Bündels (Mockup admin-postfach-wuensche). */
@@ -145,14 +160,11 @@ export type BuendelStandEingabe = z.input<typeof buendelStandSchema>
 
 // ─── Adresse des Reiters: Fremddaten, ungültig heißt Standard ──────────────
 
-/** Der erste Wert, wenn Next einen doppelten Parameter als Liste liefert. */
-function ersterWert(wert: unknown): unknown {
-  return Array.isArray(wert) ? wert[0] : wert
-}
-
 export const MELDUNGEN_ANSICHTEN = ['ablauf', 'wuensche'] as const
 export type MeldungenAnsichtArt = (typeof MELDUNGEN_ANSICHTEN)[number]
 const ART_PARAMETER = ['fehler', 'wunsch', 'frage'] as const
+/** Der Parameter ?art= und seine Art — eine Zuordnung statt eines Casts. */
+const ART_AUS_PARAMETER: Record<(typeof ART_PARAMETER)[number], MeldungArt> = { fehler: 'FEHLER', wunsch: 'WUNSCH', frage: 'FRAGE' }
 export const ZUGEKLAPPTE_TEILE = ['gesammelt', 'abgelegt'] as const
 export type ZugeklappterTeil = (typeof ZUGEKLAPPTE_TEILE)[number]
 export const WUENSCHE_FILTER = ['alle', ...BUENDEL_STAND_WAHL] as const
@@ -197,7 +209,7 @@ export function meldungenAnsichtAus(roh: Record<string, string | string[] | unde
   })
   return {
     ...a,
-    art: a.art ? (a.art.toUpperCase() as MeldungArt) : null,
+    art: a.art ? ART_AUS_PARAMETER[a.art] : null,
     auf: [...new Set(a.auf)],
     aeltere: a.aeltere === '1',
   }
