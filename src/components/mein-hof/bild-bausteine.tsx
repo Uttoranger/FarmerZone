@@ -127,15 +127,18 @@ type TitelbildAnschrift = { address: string; postalCode: string; city: string }
 export function TitelbildBaustein({
   hof,
   anschrift,
-  logoAusschnitt = null,
+  logoAusschnitt,
   onGespeichert,
   meldeErfolg,
   onHochladen,
 }: BildBausteinProps & {
   hof: TitelbildHof
   anschrift: TitelbildAnschrift
-  /** Ausschnitt des Logos, schon geprüft — das kleine Logo der Browser-Vorschau steht damit wie auf der Hofseite (Nr. 108). */
-  logoAusschnitt?: BildAusschnittWert | null
+  /**
+   * Ausschnitt des Logos, schon geprüft — das kleine Logo der Browser-Vorschau steht damit wie auf der Hofseite (Nr. 108).
+   * Pflicht ohne Standardwert: Ein Aufrufer, der ihn vergisst, fällt im Typecheck auf statt still ohne Ausschnitt.
+   */
+  logoAusschnitt: BildAusschnittWert | null
 }): React.JSX.Element {
   const [offen, setOffen] = useState(false)
   const [pending, start] = useTransition()
