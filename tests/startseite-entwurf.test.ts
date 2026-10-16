@@ -17,6 +17,9 @@
  *    nächste Speicherung schickt ihn als bestehenden Block.
  *  - Ein ungültiger Block bleibt draußen, die übrigen Änderungen gehen
  *    trotzdem, der Satz des Schemas steht als Fehlerzeile da.
+ *  - `speicherungen` (danach lädt die Vorschau neu) zählt bei jeder Art, die
+ *    den Entwurf ändert: Pfeil, Auge, Block-Formular, Löschen, Verwerfen —
+ *    nicht beim bloßen Öffnen und Schließen, nicht bei einem Fehler (Nr. 106).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -101,7 +104,7 @@ vi.mock('react', async (importOriginal) => ({
 }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), addBreadcrumb: vi.fn() }))
 
-import { STANDARD_REIHENFOLGE } from '@/lib/startseite-gestalten'
+import { STANDARD_REIHENFOLGE, verschiebe } from '@/lib/startseite-gestalten'
 import { aenderungenText, standardFassung } from '@/lib/startseite-fassung'
 import type { StartseiteSpeichernEingabe } from '@/schemas/startseite'
 import { neueBlockWerte, useStartseitenEntwurf, type Zeile } from '@/components/admin/startseite-entwurf'
@@ -248,5 +251,43 @@ describe('useStartseitenEntwurf — ein neuer Block, der nie gespeichert wurde',
     tue((e) => e.aendereZeilen(augeAn('FRAGEN', e)))
     await warte(800)
     expect(speichere.mock.calls[0]?.[0].reihenfolge.map((r) => r.id)).toEqual(ZEILEN.map((z) => z.id))
+  })
+})
+
+describe('useStartseitenEntwurf — die Vorschau lädt nach jeder Art von Änderung neu (Register N16, Nr. 106)', () => {
+  it('zählt Pfeil, Auge, Block-Formular, Löschen und Verwerfen — Öffnen, Schließen und ein Fehler zählen nicht', async () => {
+    expect(zuletzt.speicherungen).toBe(0)
+
+    tue((e) => e.aendereZeilen(verschiebe(e.zeilen, e.zeilen.findIndex((z) => z.art === 'FUTTER'), 1)))
+    await warte(800)
+    expect(zuletzt.speicherungen).toBe(1)
+
+    tue((e) => e.aendereZeilen(augeAn('FRAGEN', e)))
+    await warte(800)
+    expect(zuletzt.speicherungen).toBe(2)
+
+    speichere.mockResolvedValueOnce(gespeichert({ blockId: 'block-neu', zeilenId: 'zeile-neu' }))
+    const neu: Zeile = { id: 'neu', art: 'BLOCK', sichtbar: true, block: null }
+    tue((e) => e.oeffneBlock(neueBlockWerte('HINWEISBAND', JETZT), [e.zeilen[0], e.zeilen[1], neu, ...e.zeilen.slice(2)]))
+    await warte(800)
+    expect(zuletzt.speicherungen).toBe(2)
+    tue((e) => e.block && e.aendereBlock({ ...e.block, titel: 'Winterpause' }))
+    await warte(800)
+    expect(zuletzt.speicherungen).toBe(3)
+
+    speichere.mockResolvedValueOnce({ error: 'Wir konnten den Entwurf nicht speichern.' })
+    tue((e) => e.block && e.aendereBlock({ ...e.block, titel: 'Winterpause bis März' }))
+    await warte(800)
+    expect(zuletzt.stand).toEqual({ art: 'fehler', text: 'Wir konnten den Entwurf nicht speichern.' })
+    expect(zuletzt.speicherungen).toBe(3)
+
+    tue((e) => e.blockGeloescht('block-neu'))
+    expect(zuletzt.block).toBeNull()
+    expect(zuletzt.zeilen.map((z) => z.id)).not.toContain('zeile-neu')
+    expect(zuletzt.speicherungen).toBe(4)
+
+    tue((e) => e.setzeZurueck(ZEILEN))
+    expect(zuletzt.speicherungen).toBe(5)
+    expect(speichere).toHaveBeenCalledTimes(4)
   })
 })

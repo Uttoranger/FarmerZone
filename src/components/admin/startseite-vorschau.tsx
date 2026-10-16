@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowUpRight, CalendarDays } from 'lucide-react'
 import { ADMIN_STARTSEITE_TEXT as T, STAND_TEXT, type StandWahl } from '@/lib/startseite-gestalten'
-import { ENTWURF_TEXT } from '@/lib/startseite-fassung'
+import { ENTWURF_TEXT, scrollNachNeuladen, vorschauQuelleText, vorschauRahmen } from '@/lib/startseite-fassung'
+import { uhrzeitInWien } from '@/lib/fristen'
 import { VORSCHAU_HANDY_HOEHE, VORSCHAU_SEITENBREITE, vorschauMassstab, type VorschauGeraet } from '@/lib/hofseite-vorschau'
 import { useElementGroesse } from '@/lib/use-element-groesse'
 import { cn } from '@/lib/utils'
@@ -32,6 +33,13 @@ import { LEISE } from '@/components/hof-bestellungen/stil'
  * über die Route /admin/startseite/vorschau (anderes Gerät mit
  * Admin-Sitzung), mit derselben Quelle. Verschwindet die Vorschau, schaltet
  * beendeStartseitenVorschau den Draft Mode wieder aus.
+ *
+ * Neu laden ohne leeren Rahmen (Register N16, Ergänzung Nr. 106): Nach jeder
+ * Speicherung kommt eine neue Adresse. Der sichtbare Rahmen bleibt stehen, die
+ * neue lädt unsichtbar daneben (vorschauRahmen); ist sie fertig, scrollt sie
+ * dorthin, wo der alte stand (scrollNachNeuladen — gleicher Ursprung, also
+ * lesbar), und erst dann tauschen die beiden. Darunter „Vorschau aktualisiert
+ * · hh:mm" (Wiener Zeit), während des Ladens ein Punkt über dem Rahmen.
  */
 
 const HANDY_SCHIRM = 304
@@ -48,12 +56,41 @@ const BAND: Record<VorschauBand, { text: string; klasse: string }> = {
   geplant: { text: ENTWURF_TEXT.bandGeplant, klasse: 'bg-accent text-accent-foreground' },
 }
 
-function Rahmen({ geraet, link, band }: { geraet: VorschauGeraet; link: Link | null; band: VorschauBand }): React.JSX.Element {
+/** Wo ein Rahmen gerade steht — null, wenn der Browser nicht hineinsehen lässt (im Rahmen eine Seite anderer Herkunft geöffnet). */
+function lageIm(rahmen: HTMLIFrameElement | undefined): { pfadname: string; scrollY: number } | null {
+  try {
+    const fenster = rahmen?.contentWindow
+    return fenster ? { pfadname: fenster.location.pathname, scrollY: fenster.scrollY } : null
+  } catch {
+    // Fremde Herkunft wirft beim Lesen (SecurityError): dann beginnt der neue Rahmen oben.
+    return null
+  }
+}
+
+function Rahmen({
+  geraet,
+  rahmen,
+  sichtbar,
+  laedt,
+  band,
+  titel,
+  onGeladen,
+}: {
+  geraet: VorschauGeraet
+  /** Die Adressen, die stehen: die sichtbare und ggf. die ladende (vorschauRahmen). */
+  rahmen: string[]
+  sichtbar: string | null
+  laedt: boolean
+  band: VorschauBand
+  /** Titel des sichtbaren Rahmens, mit der Quelle — eindeutig neben dem ladenden. */
+  titel: string
+  onGeladen: (pfad: string, neu: HTMLIFrameElement, alt: HTMLIFrameElement | undefined) => void
+}): React.JSX.Element {
   const { ref, breite } = useElementGroesse()
   const massstab = geraet === 'web' ? vorschauMassstab({ breite }, 'web') : vorschauMassstab({ breite: HANDY_SCHIRM }, 'handy')
   const hoehe = geraet === 'web' ? Math.round(WEB_RAHMEN_HOEHE / massstab) : VORSCHAU_HANDY_HOEHE
   const seite = VORSCHAU_SEITENBREITE[geraet]
-  const pfad = link && 'pfad' in link ? link.pfad : null
+  const fenster = useRef(new Map<string, HTMLIFrameElement>())
 
   const bandZeile = (
     <p className={cn('flex h-[22px] items-center justify-center px-2 text-center text-[10px] font-bold tracking-[0.08em]', BAND[band].klasse)}>
@@ -61,17 +98,32 @@ function Rahmen({ geraet, link, band }: { geraet: VorschauGeraet; link: Link | n
     </p>
   )
   const innen = (
-    <div className="relative overflow-hidden bg-background" style={{ width: Math.round(seite * massstab), height: Math.round(hoehe * massstab) }}>
-      {pfad ? (
+    <div
+      className="relative overflow-hidden bg-background"
+      style={{ width: Math.round(seite * massstab), height: Math.round(hoehe * massstab) }}
+      aria-busy={laedt}
+    >
+      {sichtbar === null && <div className="absolute inset-0 animate-pulse bg-muted" />}
+      {rahmen.map((pfad) => (
         <iframe
           key={pfad}
-          title="Vorschau der Startseite"
+          ref={(el) => {
+            if (el) fenster.current.set(pfad, el)
+            return () => {
+              fenster.current.delete(pfad)
+            }
+          }}
+          // Der ladende Rahmen hat einen eigenen Titel und ist unsichtbar (visibility: der Browser lädt und scrollt ihn trotzdem).
+          title={pfad === sichtbar ? titel : T.vorschauLaedt}
           src={pfad}
-          className="absolute top-0 left-0 border-0"
+          tabIndex={pfad === sichtbar ? undefined : -1}
+          onLoad={(e) => onGeladen(pfad, e.currentTarget, sichtbar === null ? undefined : fenster.current.get(sichtbar))}
+          className={cn('absolute top-0 left-0 border-0', pfad !== sichtbar && 'pointer-events-none invisible')}
           style={{ width: seite, height: hoehe, transform: `scale(${massstab})`, transformOrigin: 'top left' }}
         />
-      ) : (
-        <div className="h-full animate-pulse bg-muted" aria-busy="true" />
+      ))}
+      {laedt && sichtbar !== null && (
+        <span className="absolute top-2.5 right-2.5 size-2.5 animate-pulse rounded-full bg-primary ring-2 ring-background" aria-hidden="true" />
       )}
     </div>
   )
@@ -131,6 +183,8 @@ export function StartseiteVorschau({
   const [gewaehlt, setGewaehlt] = useState<'entwurf' | 'live'>('entwurf')
   const [stand, setStand] = useState<StandWahl>(standStandard)
   const [link, setLink] = useState<Link | null>(null)
+  const [sichtbar, setSichtbar] = useState<string | null>(null)
+  const [aktualisiert, setAktualisiert] = useState<string | null>(null)
   const quelle: VorschauQuelle = festeQuelle ?? gewaehlt
   const band: VorschauBand = festesBand ?? (quelle === 'entwurf' ? 'entwurf' : 'live')
 
@@ -163,6 +217,17 @@ export function StartseiteVorschau({
   )
 
   const oeffnen = link && 'link' in link ? link.link : null
+  const gewuenscht = link && 'pfad' in link ? link.pfad : null
+  const { rahmen, laedt } = vorschauRahmen(sichtbar, gewuenscht)
+
+  /** Die neue Adresse ist fertig: an die Stelle des alten Rahmens scrollen, dann tauschen. */
+  function geladen(pfad: string, neu: HTMLIFrameElement, alt: HTMLIFrameElement | undefined): void {
+    // Der sichtbare Rahmen lädt selbst neu (Gerät gewechselt, Klick im Rahmen) oder eine überholte Adresse: nichts zu tauschen.
+    if (pfad === sichtbar || pfad !== gewuenscht) return
+    neu.contentWindow?.scrollTo({ top: scrollNachNeuladen(lageIm(alt)), behavior: 'instant' })
+    setSichtbar(pfad)
+    setAktualisiert(uhrzeitInWien(new Date()))
+  }
 
   return (
     <section aria-labelledby="kundin-titel" className="flex min-w-0 flex-col gap-3">
@@ -221,8 +286,19 @@ export function StartseiteVorschau({
           {link.fehler}
         </p>
       )}
-      <Rahmen geraet={geraet} link={link} band={band} />
-      <p className={cn('text-[12px] leading-normal', LEISE)}>{T.vorschauSatz}</p>
+      <Rahmen
+        geraet={geraet}
+        rahmen={rahmen}
+        sichtbar={sichtbar}
+        laedt={laedt}
+        band={band}
+        titel={`${T.rahmenTitel} · ${vorschauQuelleText(quelle)}`}
+        onGeladen={geladen}
+      />
+      <p role="status" className="min-h-[1.25rem] text-[12.5px] font-medium text-foreground">
+        {aktualisiert && T.vorschauAktualisiert(aktualisiert)}
+      </p>
+      <p className={cn('-mt-2 text-[12px] leading-normal', LEISE)}>{T.vorschauSatz}</p>
     </section>
   )
 }

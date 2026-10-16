@@ -244,7 +244,11 @@ export function useStartseitenEntwurf({
   zeilen: Zeile[]
   block: BlockWerte | null
   stand: SpeicherStand
-  /** Zählt die gespeicherten Stände — die Vorschau des Entwurfs lädt danach neu. */
+  /**
+   * Zählt die gespeicherten Stände — die Vorschau des Entwurfs lädt danach neu.
+   * Jede Art, die den Entwurf in der Datenbank ändert, zählt: Pfeil, Auge,
+   * Block-Formular, Löschen, Verwerfen bzw. Übernehmen (Register N16, Nr. 106).
+   */
   speicherungen: number
   aenderungen: Aenderung[]
   aendereZeilen: (neu: Zeile[]) => void
@@ -252,6 +256,8 @@ export function useStartseitenEntwurf({
   /** Öffnet bzw. schließt das Formular (und setzt die Liste, etwa mit einem neuen, noch leeren Block) — ohne zu speichern. */
   oeffneBlock: (neu: BlockWerte | null, zeilen?: Zeile[]) => void
   setzeZurueck: (zeilen: readonly Zeile[]) => void
+  /** Nach „Block löschen“: Die Action hat den Entwurf schon geändert — Formular zu, Zeile weg, Vorschau lädt neu. */
+  blockGeloescht: (blockId: string) => void
   speichereSofort: () => Promise<boolean>
 } {
   const [zeilen, setZeilen] = useState<Zeile[]>(() => [...start])
@@ -346,6 +352,12 @@ export function useStartseitenEntwurf({
     setzeZurueck(neu) {
       uebernimm({ zeilen: [...neu], block: null })
       setStand({ art: 'ruhe' })
+      setSpeicherungen((n) => n + 1)
+    },
+    blockGeloescht(blockId) {
+      // Auch über die Zeile des offenen Blocks: Ein in dieser Sitzung angelegter Block steht in `zeilen` ohne Daten (block: null).
+      const zeilenId = aktuell.current.block?.zeilenId
+      uebernimm({ block: null, zeilen: aktuell.current.zeilen.filter((z) => z.id !== zeilenId && z.block?.id !== blockId) })
       setSpeicherungen((n) => n + 1)
     },
     /** Vor „Veröffentlichen …": was noch wartet, sofort speichern — true, wenn danach alles im Entwurf steht. */

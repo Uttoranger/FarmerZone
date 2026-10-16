@@ -18,7 +18,7 @@
  * (monatsschluesselInWien) — eine Bestellung am 30. September um 23:30 Uhr
  * Wien ist 21:30 UTC und gehört in den September.
  */
-import { MONAT_KURZ, formatEuro, mitAnzahl } from '@/lib/format'
+import { MONAT_KURZ, csvBetrag, formatEuro, mitAnzahl } from '@/lib/format'
 import {
   barOhneServicegebuehr,
   centsAlsEuro,
@@ -595,6 +595,8 @@ export type JahrRechnung = {
   posten: KostenImJahrZeile[]
   /** Nur im laufenden Jahr, solange noch Monate offen sind und es volle Monate zum Mitteln gibt. */
   hochrechnung: Hochrechnung | null
+  /** Lässt eine Zahl DIESES Jahres eine Testzahlung aus (Register Z4)? Nur dann gilt der Hinweis für das Jahr. */
+  testzahlungAusgelassen: boolean
 }
 
 /** Wie viele volle Monate in den Schnitt der Hochrechnung gehen. */
@@ -631,6 +633,7 @@ export function rechneJahr(eingabe: {
   let bestellungen = 0
   let kostenCents = 0
   let zaehltBis: Monatsschluessel | null = null
+  let testzahlungAusgelassen = false
 
   for (let n = 1; n <= 12; n++) {
     const monat = monatsschluessel(jahr, n)
@@ -640,6 +643,7 @@ export function rechneJahr(eingabe: {
     }
     zaehltBis = monat
     const einnahmen = einnahmenImMonat(jeMonat.get(monat) ?? [], monat, stripeLiveAb)
+    testzahlungAusgelassen ||= testzahlungenBetroffen(jeMonat.get(monat) ?? [], stripeLiveAb, GEZAEHLTE_TOEPFE)
     const kosten = kostenSummeImMonat(posten, monat)
 
     let einmalig: JahrMonatZahlen['einmalig'] = null
@@ -701,7 +705,24 @@ export function rechneJahr(eingabe: {
     ergebnisCents,
     posten: postenZeilen,
     hochrechnung: hochrechnungBisJahresende(jahr, heute, monate, ergebnisCents),
+    testzahlungAusgelassen,
   }
+}
+
+/**
+ * Der Hinweis „Testzahlungen … nicht mitgezählt" in Finanzen › Jahr: für das
+ * gezeigte Jahr, wenn eine seiner Zahlen eine auslässt; für das Vorjahr nur,
+ * solange „mit <Vorjahr> vergleichen" an ist — sonst steht keine Zahl des
+ * Vorjahrs auf der Seite (Nacharbeit 100). `hinweis`: der Satz aus der
+ * Abfrage (null ohne Stichtag oder ohne Testzahlung im geladenen Fenster).
+ */
+export function testzahlungenHinweisImJahr(
+  hinweis: string | null,
+  jahr: Pick<JahrRechnung, 'testzahlungAusgelassen'>,
+  vorjahr: Pick<JahrRechnung, 'testzahlungAusgelassen'> | null,
+  mitVergleich: boolean
+): string | null {
+  return jahr.testzahlungAusgelassen || (mitVergleich && vorjahr?.testzahlungAusgelassen === true) ? hinweis : null
 }
 
 /**
@@ -952,12 +973,6 @@ export const FINANZEN_CSV = {
   monate: ['Monat', 'Servicegebühren (€)', 'Kosten (€)', 'Ergebnis (€)', 'Bestellungen'],
   posten: ['Kostenposten', 'Rhythmus', 'Betrag (€)', 'Monate im Jahr', 'Im Jahr (€)'],
 } as const
-
-/** Ganze Cent als Euro mit Komma, ohne Tausenderpunkt und Zeichen — so liest Excel in Österreich sie als Zahl: 128450 → „1284,50", −10 → „-0,10". */
-export function csvBetrag(cents: number): string {
-  const betrag = Math.abs(Math.round(cents))
-  return `${cents < 0 ? '-' : ''}${Math.floor(betrag / 100)},${String(betrag % 100).padStart(2, '0')}`
-}
 
 /**
  * Ein Textfeld der CSV. Mit Semikolon, Anführungszeichen oder Zeilenumbruch in

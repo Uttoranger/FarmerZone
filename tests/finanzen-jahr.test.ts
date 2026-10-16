@@ -21,17 +21,18 @@ vi.mock('@/lib/prisma', async () => ({ prisma: (await import('./finanzen-jahr-da
 import { getFinanzen, getFinanzenJahr } from '@/server/queries/finanzen'
 import {
   ausreisserImMonat,
-  csvBetrag,
   csvFeld,
   ersteDatenJahr,
   jahrAlsCsv,
   jahrImBereich,
   jahrKennzahlen,
   rechneJahr,
+  testzahlungenHinweisImJahr,
   type JahrMonatZahlen,
 } from '@/lib/finanzen'
 import { monatsschluessel } from '@/lib/servicegebuehr'
-import { JETZT, POSTEN, STICHTAG, prismaAttrappe } from './finanzen-jahr-daten'
+import { csvBetrag } from '@/lib/format'
+import { JETZT, POSTEN, STICHTAG, csvCent, prismaAttrappe } from './finanzen-jahr-daten'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -191,12 +192,36 @@ describe('welches Jahr, welches Vorjahr', () => {
   })
 })
 
+describe('der Hinweis auf Testzahlungen im Jahr — das Vorjahr nur mit Vergleich (Nacharbeit 100)', () => {
+  it('weiß je Jahr, ob eine seiner Zahlen eine Testzahlung auslässt', async () => {
+    const j2026 = await getFinanzenJahr(2026, JETZT, STICHTAG)
+    // Die Testzahlung liegt im Mai 2025: 2026 lässt keine aus, das Vorjahr schon.
+    expect(j2026.rechnung.testzahlungAusgelassen).toBe(false)
+    expect(j2026.vorjahr?.testzahlungAusgelassen).toBe(true)
+    expect((await getFinanzenJahr(2025, JETZT, STICHTAG)).rechnung.testzahlungAusgelassen).toBe(true)
+    // Ohne Stichtag gibt es keine Testzahlung.
+    expect((await getFinanzenJahr(2025, JETZT, null)).rechnung.testzahlungAusgelassen).toBe(false)
+  })
+
+  it('zeigt den Satz für das Jahr selbst immer, für das Vorjahr nur, solange verglichen wird', () => {
+    const satz = 'Testzahlungen vor dem 1. Juni 2025 sind nicht mitgezählt.'
+    const mit = { testzahlungAusgelassen: true }
+    const ohne = { testzahlungAusgelassen: false }
+    expect(testzahlungenHinweisImJahr(satz, mit, null, false)).toBe(satz)
+    expect(testzahlungenHinweisImJahr(satz, ohne, mit, false)).toBeNull()
+    expect(testzahlungenHinweisImJahr(satz, ohne, mit, true)).toBe(satz)
+    expect(testzahlungenHinweisImJahr(satz, ohne, ohne, true)).toBeNull()
+    expect(testzahlungenHinweisImJahr(satz, ohne, null, true)).toBeNull()
+    expect(testzahlungenHinweisImJahr(null, mit, mit, true)).toBeNull()
+  })
+})
+
 describe('die Hochrechnung „Bis Jahresende ≈“', () => {
   const posten = POSTEN.map((p) => ({
     id: p.id,
     name: p.name,
     kategorie: p.kategorie as 'HOSTING',
-    betragCents: Math.round(p.betrag.toNumber() * 100),
+    betragCents: p.betrag.mul(100).toNumber(),
     rhythmus: p.rhythmus as 'MONATLICH',
     ab: monatsschluessel(p.ab.getUTCFullYear(), p.ab.getUTCMonth() + 1),
     bis: p.bis === null ? null : monatsschluessel(p.bis.getUTCFullYear(), p.bis.getUTCMonth() + 1),
@@ -306,10 +331,9 @@ describe('die CSV für die Steuerberatung', () => {
       `Summe 2026;${csvBetrag(r.servicegebuehrenCents)};${csvBetrag(r.kostenCents)};${csvBetrag(r.ergebnisCents)};${r.bestellungen}`
     )
     // Summe der Monatszeilen = Summenzeile (von Hand aus dem Text gerechnet, nicht aus der Rechnung).
-    const zahl = (text: string) => Math.round(Number((text ?? '').replace(',', '.')) * 100)
     const monatsZeilen = zeilen.slice(1, 11).map((z) => z.split(';'))
-    expect(monatsZeilen.reduce((s, z) => s + zahl(z[1]!), 0)).toBe(r.servicegebuehrenCents)
-    expect(monatsZeilen.reduce((s, z) => s + zahl(z[2]!), 0)).toBe(r.kostenCents)
+    expect(monatsZeilen.reduce((s, z) => s + csvCent(z[1]!), 0)).toBe(r.servicegebuehrenCents)
+    expect(monatsZeilen.reduce((s, z) => s + csvCent(z[2]!), 0)).toBe(r.kostenCents)
     expect(monatsZeilen.reduce((s, z) => s + Number(z[4]), 0)).toBe(r.bestellungen)
     // Zweiter Block: Leerzeile, Kopfzeile, ein Posten je Zeile, Summe.
     expect(zeilen[14]).toBe('')

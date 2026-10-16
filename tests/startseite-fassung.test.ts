@@ -14,6 +14,8 @@
  *  - Live ist die jüngste nicht zurückgezogene Fassung, deren Zeit erreicht ist
  *    (ordneFassungen); ist der Termin der nächsten erreicht, liest die Seite
  *    am Cache vorbei (mussFrischLesen).
+ *  - Das Band der Vorschau nennt Quelle und Tag; nach einer Speicherung steht
+ *    nie ein leerer Rahmen, und es stehen höchstens zwei (Nr. 106).
  */
 import { describe, expect, it } from 'vitest'
 import {
@@ -24,7 +26,7 @@ import {
   type FassungInhalt,
   type FassungZeile,
 } from '@/schemas/startseite-fassung'
-import { STANDARD_REIHENFOLGE, TITEL_MAX, zuRendern } from '@/lib/startseite-gestalten'
+import { STANDARD_REIHENFOLGE, TITEL_MAX, standText, zuRendern } from '@/lib/startseite-gestalten'
 import {
   aenderungKurz,
   aenderungSatz,
@@ -37,6 +39,8 @@ import {
   pruefeTermin,
   standardFassung,
   vergleicheMitLive,
+  vorschauBandText,
+  vorschauRahmen,
   zeilenAusFassung,
   zeilenMarken,
   zeitraumKurz,
@@ -304,5 +308,26 @@ describe('Marken je Zeile', () => {
     expect(marken.get('FRAGEN')).toEqual({ text: 'ausgeblendet', ton: 'tun' })
     expect(marken.get('FUER_HOEFE')).toEqual({ text: 'verschoben', ton: 'tun' })
     expect(marken.has('KOPF')).toBe(false)
+  })
+})
+
+describe('Vorschau des Entwurfs (Nacharbeit 99, Register N16 Nr. 106)', () => {
+  it('nennt im Band die Quelle und den Tag', () => {
+    const tag = new Date('2026-10-16T10:00:00.000Z')
+    expect(standText(tag)).toMatch(/^Fr, 16\.\sOkt 2026$/)
+    expect(vorschauBandText('entwurf', tag)).toBe(`Vorschau · Entwurf · Stand am ${standText(tag)}`)
+    expect(vorschauBandText('live', tag)).toBe(`Vorschau · Live · Stand am ${standText(tag)}`)
+    expect(vorschauBandText('fassung:f-1', tag)).toBe(`Vorschau · Fassung · Stand am ${standText(tag)}`)
+  })
+
+  it('lässt den sichtbaren Rahmen stehen, bis der neue geladen ist — nie leer, höchstens zwei', () => {
+    expect(vorschauRahmen(null, null)).toEqual({ rahmen: [], laedt: false })
+    expect(vorschauRahmen(null, '/a')).toEqual({ rahmen: ['/a'], laedt: true })
+    expect(vorschauRahmen('/a', '/a')).toEqual({ rahmen: ['/a'], laedt: false })
+    expect(vorschauRahmen('/a', '/b')).toEqual({ rahmen: ['/a', '/b'], laedt: true })
+    // Eine noch neuere Adresse ersetzt die ladende, nicht die sichtbare.
+    expect(vorschauRahmen('/a', '/c')).toEqual({ rahmen: ['/a', '/c'], laedt: true })
+    // Scheitert der Link, bleibt das alte Bild.
+    expect(vorschauRahmen('/a', null)).toEqual({ rahmen: ['/a'], laedt: false })
   })
 })
