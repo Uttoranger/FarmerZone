@@ -233,3 +233,52 @@ describe('Zeiger', () => {
     expect(alle(baum, (k) => typeof k.props.onPointerDown === 'function')).toHaveLength(1)
   })
 })
+
+// Nachtlauf Nr. 98, Runde 1: was die Mockups system-h1-bild-baustein und
+// mobil-h2-produktfoto-ausschnitt für Logo, Produktfoto, Galerie und Beitrag
+// verlangen — das Titelbild bleibt, wie es oben geprüft ist.
+describe('Zwecke der Nr. 98 — runder Rahmen, Vorschau-Paar, „Passt so“', () => {
+  const klassen = (k: Knoten) => String(k.props.className).split(' ')
+  const pointerRahmen = (baum: unknown) => alle(baum, (k) => typeof k.props.onPointerDown === 'function')
+
+  it('der Hauptrahmen des Logos ist rund, samt Kontur; ohne `rund` bleibt er eckig (Titelbild)', () => {
+    const rund = rahmen(zeige({ rahmen: { name: 'Logo', verhaeltnis: 1, rund: true } }))
+    expect(klassen(rund)).toContain('rounded-full')
+    const kontur = alle(rund, (k) => k.type === 'span' && klassen(k).includes('ring-2'))[0]
+    expect(klassen(kontur)).toContain('rounded-full')
+    // Gegenprobe: dieselbe Suche am Rahmen des Titelbilds.
+    expect(klassen(rahmen(zeige()))).not.toContain('rounded-full')
+  })
+
+  it('ein Vorschau-Paar steht unter EINEM Titel in einer Reihe — gezogen wird in beiden Rahmen', () => {
+    const titel = 'So sieht es in der Liste aus'
+    const baum = zeige({ vorschauen: [{ titel, verhaeltnis: 1, satz: 'Links am Handy, rechts am Computer.', daneben: [{ verhaeltnis: 260 / 140, breite: 150 }] }] })
+    expect(text(baum).split(titel)).toHaveLength(2)
+    expect(pointerRahmen(baum)).toHaveLength(3)
+    const reihe = alle(baum, (k) => k.props['aria-hidden'] === 'true' && pointerRahmen(k).length === 2)
+    expect(reihe).toHaveLength(1)
+    // Gegenprobe: ohne Partner steht unter dem Titel ein Rahmen allein.
+    expect(pointerRahmen(zeige({ vorschauen: [{ titel, verhaeltnis: 1 }] }))).toHaveLength(2)
+  })
+
+  it('nach dem Upload steht „Passt so“ statt „Abbrechen“ und speichert Mitte, 100 %, Natürlich (= null)', () => {
+    const baum = zeige({ nachUpload: true })
+    expect(() => knopf(baum, 'Abbrechen')).toThrow()
+    klick(knopf(baum, 'Passt so'))
+    expect(onSpeichern).toHaveBeenCalledWith({ fokusX: 50, fokusY: 50, zoom: 100, filter: 'NATUERLICH' })
+  })
+
+  it('wer nach dem Upload etwas ändert, bekommt „Abbrechen“ zurück — „Passt so“ verwürfe sonst die Wahl', () => {
+    taste(zeige({ nachUpload: true }), 'ArrowLeft')
+    const baum = zeige({ nachUpload: true })
+    expect(() => knopf(baum, 'Passt so')).toThrow()
+    klick(knopf(baum, 'Speichern'))
+    expect(onSpeichern).toHaveBeenCalledWith({ ...ANFANG, fokusX: 52 })
+  })
+
+  it('ohne Upload („Ausschnitt anpassen“, Titelbild) gibt es kein „Passt so“', () => {
+    const baum = zeige()
+    expect(() => knopf(baum, 'Passt so')).toThrow()
+    expect(knopf(baum, 'Abbrechen')).toBeTruthy()
+  })
+})

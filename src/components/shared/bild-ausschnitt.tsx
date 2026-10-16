@@ -21,6 +21,7 @@ import {
   type Masse,
 } from '@/lib/bild-ausschnitt'
 import { BILD_FILTER_NAMEN, type BildAusschnitt as BildAusschnittWert } from '@/schemas/bild-ausschnitt'
+import { BILD_RAHMEN_TEXT } from '@/lib/bild-rahmen'
 import { cn } from '@/lib/utils'
 
 /*
@@ -50,25 +51,39 @@ export type BildRahmen = {
   name: string
   /** Breite ÷ Höhe. */
   verhaeltnis: number
+  /** Rund statt eckig (Logo, Nr. 98): Wo das Foto rund steht, wird es auch rund gewählt. */
+  rund?: boolean
 }
 
-/** Ein Vorschau-Rahmen „So sieht es … aus“. */
-export type BildVorschau = {
-  titel: string
+/** Ein Rahmen der Vorschau — allein unter seinem Titel oder als Partner daneben. */
+export type BildVorschauRahmen = {
   /** Breite ÷ Höhe. */
   verhaeltnis: number
   /** Kurzer Name auf dem Rahmen („Handy“); mit Name trägt er die Kontur wie der Hauptrahmen. */
   name?: string
   /** Feste Breite in px (der Satz steht dann daneben); ohne Angabe die volle Breite. */
   breite?: number
-  /** Ein Satz zum Rahmen. */
-  satz?: string
   /** Steht das Foto in diesem Rahmen ganz (Titelbild „Ganz zeigen“)? Dann weiche Kopie dahinter, gezogen wird dort nicht. */
   ganz?: (wert: BildAusschnittWert, masse: Masse | null) => boolean
   /** Was über dem Foto liegt (Schleier, Name) — fängt keine Zeiger. */
   darueber?: ReactNode
   /** Was den Rahmen umgibt (Browserleiste, Kopf, Hofkopf). */
   umgebung?: (rahmen: ReactNode) => ReactNode
+}
+
+/** Ein Vorschau-Rahmen „So sieht es … aus“. */
+export type BildVorschau = BildVorschauRahmen & {
+  titel: string
+  /** Ein Satz zum Rahmen. */
+  satz?: string
+  /**
+   * Weitere Rahmen in derselben Reihe unter demselben Titel (Nr. 98, Mockup
+   * mobil-h2-produktfoto-ausschnitt: links am Handy, rechts am Computer); der
+   * Satz steht dann unter der Reihe.
+   */
+  daneben?: readonly BildVorschauRahmen[]
+  /** Die Reihe mittig statt oben bündig (Logo: 96 / 72 / 40 px nebeneinander, Mockup system-h1-bild-baustein). */
+  mittig?: boolean
 }
 
 type Griffe = {
@@ -112,6 +127,8 @@ export function BildAusschnitt({
   mitFilter = true,
   mitDarstellung = false,
   speichert = false,
+  nachUpload = false,
+  speichernText = TEXT.speichern,
   onSpeichern,
   onAbbrechen,
 }: {
@@ -126,6 +143,14 @@ export function BildAusschnitt({
   /** Wahl „Am Computer: Ausschnitt füllen | Ganz zeigen“ (nur Titelbild). */
   mitDarstellung?: boolean
   speichert?: boolean
+  /**
+   * Gleich nach dem Upload geöffnet (Nr. 98): Solange nichts geändert ist,
+   * steht „Passt so“ statt „Abbrechen“ und speichert Mitte, 100 %, Natürlich —
+   * die Aktion macht daraus `null`, das Foto steht wie heute.
+   */
+  nachUpload?: boolean
+  /** Die Beschriftung von „Speichern“ — im Produktdialog „Übernehmen“, dort schreibt erst der Dialog. */
+  speichernText?: string
   onSpeichern: (wert: BildAusschnittWert) => void
   onAbbrechen: () => void
 }): React.JSX.Element {
@@ -172,12 +197,18 @@ export function BildAusschnitt({
     setWert((alt) => ({ ...alt, ...fokus }))
   }
 
+  const standard: BildAusschnittWert = mitDarstellung ? { ...AUSSCHNITT_STANDARD, darstellung: 'AUTO' } : AUSSCHNITT_STANDARD
+
   function zuruecksetzen(): void {
-    setWert(mitDarstellung ? { ...AUSSCHNITT_STANDARD, darstellung: 'AUTO' } : AUSSCHNITT_STANDARD)
+    setWert(standard)
   }
 
+  // „Passt so“ nur, solange der Hof nichts geändert hat — danach verwürfe es seine Wahl, dann wieder „Abbrechen“.
+  const passtSo =
+    nachUpload && wert.fokusX === anfang.fokusX && wert.fokusY === anfang.fokusY && wert.zoom === anfang.zoom && wert.filter === anfang.filter
+
   // Ein Vorschau-Rahmen: gezogen wird auch hier, außer das Foto steht dort ganz.
-  function vorschauRahmen(v: BildVorschau): ReactNode {
+  function vorschauRahmen(v: BildVorschauRahmen): ReactNode {
     const ganz = v.ganz?.(wert, masse) ?? false
     const flaeche = (
       <div
@@ -227,12 +258,17 @@ export function BildAusschnitt({
           tabIndex={0}
           onKeyDown={beiTaste}
           {...griffe}
-          className={cn('absolute cursor-grab touch-none overflow-hidden bg-background select-none active:cursor-grabbing', FOKUS_RAHMEN_INNEN)}
+          className={cn(
+            'absolute cursor-grab touch-none overflow-hidden bg-background select-none active:cursor-grabbing',
+            FOKUS_RAHMEN_INNEN,
+            rahmen.rund && 'rounded-full'
+          )}
           style={platz}
         >
           <Image src={foto} alt="" fill sizes={BILD_SIZES} draggable={false} className="object-cover" style={bildStil(wert)} onLoad={beimLaden} />
-          <span className={KONTUR} />
-          <span className={FOTO_MARKE}>{rahmen.name}</span>
+          <span className={cn(KONTUR, rahmen.rund && 'rounded-full')} />
+          {/* Im Kreis läge die Ecke oben links außerhalb: die Marke oben mittig. */}
+          <span className={cn(FOTO_MARKE, rahmen.rund && 'top-3 left-1/2 -translate-x-1/2')}>{rahmen.name}</span>
           {!beruehrt && (
             <span className="pointer-events-none absolute top-1/2 left-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full bg-accent-foreground/90 px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-primary-foreground">
               <Move className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
@@ -271,7 +307,19 @@ export function BildAusschnitt({
       {vorschauen.map((v) => (
         <div key={v.titel} className="flex flex-col gap-2">
           <div className="text-[12.5px] text-muted-foreground">{v.titel}</div>
-          {v.breite === undefined ? (
+          {v.daneben ? (
+            <>
+              {/* Eine Reihe: Rahmen ohne feste Breite teilen sich den Platz, die übrigen behalten ihre. */}
+              <div aria-hidden="true" className={cn('flex gap-2.5', v.mittig ? 'items-center' : 'items-start')}>
+                {[v, ...v.daneben].map((r, i) => (
+                  <div key={i} className={r.breite === undefined ? 'min-w-0 flex-1' : 'shrink-0'}>
+                    {vorschauRahmen(r)}
+                  </div>
+                ))}
+              </div>
+              {v.satz && <p className="text-[12.5px] leading-snug text-muted-foreground">{v.satz}</p>}
+            </>
+          ) : v.breite === undefined ? (
             <>
               <div aria-hidden="true">{vorschauRahmen(v)}</div>
               {v.satz && <p className="text-[12.5px] leading-snug text-muted-foreground">{v.satz}</p>}
@@ -349,7 +397,7 @@ export function BildAusschnitt({
             FOKUS_RAHMEN
           )}
         >
-          {speichert ? TEXT.speichert : TEXT.speichern}
+          {speichert ? TEXT.speichert : speichernText}
         </button>
         {/* Unter lg eine Zeile unter „Speichern“, ab lg in der Reihe: Abbrechen neben Speichern, Zurücksetzen rechts. */}
         <div className="flex items-center justify-between lg:contents">
@@ -363,14 +411,14 @@ export function BildAusschnitt({
           </button>
           <button
             type="button"
-            onClick={onAbbrechen}
+            onClick={passtSo ? () => onSpeichern(standard) : onAbbrechen}
             disabled={speichert}
             className={cn(
               'min-h-11 rounded-full px-4 text-sm font-semibold text-brand-text hover:bg-muted lg:border lg:border-border lg:text-foreground',
               FOKUS_RAHMEN
             )}
           >
-            {TEXT.abbrechen}
+            {passtSo ? BILD_RAHMEN_TEXT.passtSo : TEXT.abbrechen}
           </button>
         </div>
       </div>

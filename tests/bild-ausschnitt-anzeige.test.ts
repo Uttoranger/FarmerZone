@@ -10,6 +10,11 @@
  *    Ausschnitt, auch wenn einer gespeichert ist.
  *  - Ausverkauft behält Fokus und Zoom, aber ohne Filter des Hofs — ein
  *    Inline-Filter überschriebe sonst die Klasse grayscale.
+ *  - Die Käufer-Vorschau im Produktdialog zeigt das Foto im gewählten
+ *    Ausschnitt; die große Bildansicht der Galerie zeigt das ganze Foto mit
+ *    seinem Filter, ohne Fokus und Zoom (Nr. 98, Runde 1).
+ *  - Alle vier Upload-Stellen (Logo, Galerie, Produktdialog, Beitrag) öffnen
+ *    den Baustein nach dem Upload mit „Passt so“, das Titelbild nicht.
  *  - Wache: Der Screenshot unter „Problem melden“ (Zweck meldung) und die
  *    Rohfoto-Stellen (Warenkorb, Kasse, E-Mails, Teilen-Bild) binden weder den
  *    Baustein noch den Stil ein. Gegenprobe: Dieselbe Suche findet beide in
@@ -23,6 +28,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import ts from 'typescript'
 
 const adresse = { suche: '' }
 vi.mock('next/navigation', () => ({
@@ -52,6 +58,8 @@ vi.mock('@/server/hofseite-vorschau', () => ({ ladeHofseiteGeteilt: vi.fn() }))
 import ProduktSeite from '@/app/(public)/[farmSlug]/produkt/[id]/page'
 import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
 import { ProduktKarte } from '@/components/hofseite/produkt-karte'
+import { BildansichtEbene } from '@/components/hofseite/bildansicht'
+import { LebensmittelVorschau } from '@/components/products/lebensmittel-vorschau'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
 import type { KartenZustand } from '@/lib/bereiche-anzeige'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
@@ -224,5 +232,73 @@ describe('Wache — „Problem melden“ und die Rohfoto-Stellen ohne Ausschnitt
     expect(
       ['src/components/mein-hof/bild-bausteine.tsx', 'src/components/products/product-dialog.tsx', 'src/app/(hof)/status/new/status-new-client.tsx'].filter(bindetBildEin)
     ).toHaveLength(3)
+  })
+})
+
+describe('Käufer-Vorschau im Produktdialog — derselbe Ausschnitt wie im Baustein darüber', () => {
+  const vorschau = (foto: string | null, ausschnitt: BildAusschnitt | null) =>
+    renderToStaticMarkup(
+      createElement(LebensmittelVorschau, { name: 'Eier', price: 4.5, unit: 'STUECK', unitSize: null, foto, kategorie: 'EIER', unterkategorie: null, ausschnitt })
+    )
+
+  it('mit Foto und Ausschnitt trägt die Karte Fokus, Zoom und Filter', () => {
+    const bild = bildTag(vorschau(FOTO, AUSSCHNITT), FOTO)
+    expect(bild).toContain(FOKUS)
+    expect(bild).toContain(ZOOM)
+    expect(bild).toContain(FILTER)
+  })
+
+  it('ohne Ausschnitt steht das Foto wie heute; ohne Foto bekommt die Illustration keinen', () => {
+    expect(bildTag(vorschau(FOTO, null), FOTO)).not.toContain('style=')
+    expect(vorschau(null, AUSSCHNITT)).not.toContain(FOKUS)
+  })
+})
+
+describe('Bildansicht der Galerie — das ganze Foto mit Filter, ohne Beschnitt', () => {
+  const bild = { offen: 0, oeffne: () => {}, schliesse: () => {}, vor: () => {}, zurueck: () => {} }
+  const ansicht = (ausschnitt: BildAusschnitt | null) =>
+    renderToStaticMarkup(createElement(BildansichtEbene, { fotos: [{ id: 'f1', url: FOTO, caption: null, ausschnitt }], bild, titel: 'Fotos vom Hof' }))
+
+  it('trägt den Filter des Fotos, aber weder Fokus noch Zoom — object-contain bleibt', () => {
+    const tag = bildTag(ansicht(AUSSCHNITT), FOTO)
+    expect(tag).toContain(FILTER)
+    expect(tag).not.toContain('object-position')
+    expect(tag).not.toContain('transform')
+    expect(tag).toContain('object-contain')
+  })
+
+  it('ohne Ausschnitt steht das Foto unverändert da — kein Stil', () => {
+    expect(bildTag(ansicht(null), FOTO)).not.toContain('style=')
+  })
+})
+
+describe('Nach dem Upload — „Passt so“ an allen vier Upload-Stellen, nicht beim Titelbild', () => {
+  /** Die Namen der Eigenschaften je Aufruf `<BildAusschnitt … />` einer Datei — aus dem Syntaxbaum, kein Regex über verschachteltes JSX. */
+  const aufrufe = (pfad: string): string[][] => {
+    const baum = ts.createSourceFile(pfad, quelle(pfad), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const funde: string[][] = []
+    const besuche = (knoten: ts.Node): void => {
+      if (ts.isJsxSelfClosingElement(knoten) && knoten.tagName.getText(baum) === 'BildAusschnitt') {
+        funde.push(knoten.attributes.properties.map((a) => (ts.isJsxAttribute(a) ? a.name.getText(baum) : '…')))
+      }
+      ts.forEachChild(knoten, besuche)
+    }
+    besuche(baum)
+    return funde
+  }
+
+  it('Logo, Galerie, Produktdialog und Beitrag reichen `nachUpload` an den Baustein', () => {
+    const mitUpload = [
+      ...aufrufe('src/components/mein-hof/bild-bausteine.tsx'),
+      ...aufrufe('src/components/products/product-dialog.tsx'),
+      ...aufrufe('src/app/(hof)/status/new/status-new-client.tsx'),
+    ].filter((aufruf) => aufruf.includes('nachUpload'))
+    expect(mitUpload).toHaveLength(4)
+  })
+
+  it('Gegenprobe: Der Aufruf des Titelbilds (Nr. 97) findet sich und bleibt ohne', () => {
+    const titelbild = aufrufe('src/components/mein-hof/bild-bausteine.tsx').filter((aufruf) => aufruf.includes('mitDarstellung'))
+    expect(titelbild).toHaveLength(1)
+    expect(titelbild[0]).not.toContain('nachUpload')
   })
 })

@@ -13,7 +13,7 @@ import { publishStatusPost } from '@/server/actions/status-posts'
 import { speichereBildAusschnittAction } from '@/server/actions/bild-ausschnitt'
 import { BildAusschnitt } from '@/components/shared/bild-ausschnitt'
 import { AUSSCHNITT_STANDARD, bildStil } from '@/lib/bild-ausschnitt'
-import { BEITRAG_RAHMEN, BILD_RAHMEN_TEXT, alsFotoAusschnitt } from '@/lib/bild-rahmen'
+import { BEITRAG_RAHMEN, BILD_RAHMEN_TEXT, alsFotoAusschnitt, ausschnittOderNull } from '@/lib/bild-rahmen'
 import type { BildAusschnitt as BildAusschnittWert } from '@/schemas/bild-ausschnitt'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { toast } from 'sonner'
@@ -122,7 +122,8 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
   // Ausschnitt des Beitragsfotos (Register N17, Nr. 98): gewählt vor dem
   // Veröffentlichen, geschrieben danach — erst dann gibt es den Beitrag.
   const [ausschnitt, setAusschnitt] = useState<BildAusschnittWert | null>(null)
-  const [ausschnittOffen, setAusschnittOffen] = useState(false)
+  // Offen gleich nach dem Upload („Passt so“) oder über „Ausschnitt anpassen“.
+  const [ausschnittOffen, setAusschnittOffen] = useState<false | 'nachUpload' | 'anpassen'>(false)
 
   const photoUpload = useImageUpload({
     variant: 'status',
@@ -131,7 +132,7 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
       setPhotoUrl(url)
       // Ein neues Foto beginnt ohne Ausschnitt (ganz, wie bisher); der Baustein öffnet einmal von selbst.
       setAusschnitt(null)
-      setAusschnittOffen(true)
+      setAusschnittOffen('nachUpload')
     },
   })
 
@@ -329,8 +330,10 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                   foto={photoUrl}
                   wert={ausschnitt ?? AUSSCHNITT_STANDARD}
                   rahmen={{ name: BILD_RAHMEN_TEXT.beitrag.rahmen, verhaeltnis: BEITRAG_RAHMEN }}
+                  nachUpload={ausschnittOffen === 'nachUpload'}
                   onSpeichern={(wert) => {
-                    setAusschnitt(wert)
+                    // Mitte, 100 %, Natürlich ist kein Ausschnitt: Das Foto bleibt ganz, so wie es die Hofseite danach zeigt.
+                    setAusschnitt(ausschnittOderNull(wert))
                     setAusschnittOffen(false)
                   }}
                   onAbbrechen={() => setAusschnittOffen(false)}
@@ -386,7 +389,7 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
               {photoUrl && !ausschnittOffen && !photoUpload.isUploading && (
                 <button
                   type="button"
-                  onClick={() => setAusschnittOffen(true)}
+                  onClick={() => setAusschnittOffen('anpassen')}
                   className={cn('flex items-center gap-1.5 min-h-11 px-3 rounded-lg border border-border text-xs text-foreground hover:bg-muted/40', FOKUS_RAHMEN)}
                 >
                   <Crop className="size-3.5" strokeWidth={1.7} aria-hidden="true" />

@@ -31,6 +31,7 @@ vi.mock('@/lib/prisma', () => ({
 
 import { Prisma } from '@prisma/client'
 import { revalidatePath, updateTag } from 'next/cache'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { speichereBildAusschnittAction } from '@/server/actions/bild-ausschnitt'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -125,6 +126,8 @@ describe('speichereBildAusschnittAction — Logo', () => {
       data: { logoAusschnitt: { ...WERT, filter: 'NATUERLICH' } },
     })
     expect(vi.mocked(revalidatePath).mock.calls.map(([pfad]) => pfad)).toEqual(['/testhof', '/farm-page'])
+    // Das Karussell auf /hoefe zeigt das Logo im Ausschnitt — aus dem eigenen Fünf-Minuten-Cache.
+    expect(updateTag).toHaveBeenCalledWith(HOEFE_CACHE_TAG)
   })
 
   it.each(['KLAR', 'WARM', 'SCHWARZWEISS'] as const)('weist das Logo mit Filter %s ab — nichts gelesen, nichts geschrieben', async (filter) => {

@@ -329,8 +329,8 @@ function HandyName({ name, ort }: { name: string; ort: string }): React.JSX.Elem
 
 /**
  * Logo: rund, Ausschnitt ohne Filter (Register N17, Nr. 98). Nach dem Upload
- * öffnet der Bild-Baustein einmal von selbst mit Standardwerten — „Speichern“
- * ohne Änderung und „Abbrechen“ lassen das Logo wie heute (Mitte, `null`).
+ * öffnet der Bild-Baustein einmal von selbst mit Standardwerten — „Passt so“
+ * lässt das Logo wie heute (Mitte, `null`).
  *
  * Der Aufrufer hängt den Baustein am Logo auf (`key`): Lädt die Seite nach dem
  * Upload neu, beginnt er frisch. Darum meldet er das neue Logo erst, wenn der
@@ -357,7 +357,8 @@ export function LogoUpload({
   // Das gerade hochgeladene Logo — bis der Aufrufer neu lädt, steht es nur hier.
   const [neuesLogo, setNeuesLogo] = useState<string | null>(null)
   const [ausschnitt, setAusschnitt] = useState<BildAusschnittWert | null>(logoAusschnitt)
-  const [offen, setOffen] = useState(false)
+  // Offen gleich nach dem Upload („Passt so“) oder über „Ausschnitt anpassen“.
+  const [offen, setOffen] = useState<false | 'nachUpload' | 'anpassen'>(false)
   const logo = neuesLogo ?? logoUrl
 
   const { isUploading, progress, openFilePicker, fileInput } = useImageUpload({
@@ -376,7 +377,7 @@ export function LogoUpload({
         if ('error' in zurueck) toast.error(zurueck.error)
         setAusschnitt(null)
         setNeuesLogo(url)
-        setOffen(true)
+        setOffen('nachUpload')
         if (meldeErfolg) meldeErfolg()
         else toast.success('Logo gespeichert')
       })
@@ -430,13 +431,24 @@ export function LogoUpload({
           <BildAusschnitt
             foto={logo}
             wert={ausschnitt ?? AUSSCHNITT_STANDARD}
-            rahmen={{ name: BILD_RAHMEN_TEXT.logo.rahmen, verhaeltnis: LOGO_RAHMEN }}
+            rahmen={{ name: BILD_RAHMEN_TEXT.logo.rahmen, verhaeltnis: LOGO_RAHMEN, rund: true }}
+            // Die drei Größen in einer Reihe unter einem Titel (Mockup system-h1-bild-baustein: 96 / 72 / 40 px rund).
             vorschauen={[
-              { titel: BILD_RAHMEN_TEXT.logo.hofseite, verhaeltnis: LOGO_RAHMEN, breite: LOGO_VORSCHAU_PX.hofseite, umgebung: rund },
-              { titel: BILD_RAHMEN_TEXT.logo.meinHof, verhaeltnis: LOGO_RAHMEN, breite: LOGO_VORSCHAU_PX.meinHof, umgebung: rund },
-              { titel: BILD_RAHMEN_TEXT.logo.klein, verhaeltnis: LOGO_RAHMEN, breite: LOGO_VORSCHAU_PX.klein, umgebung: rund },
+              {
+                titel: BILD_RAHMEN_TEXT.logo.groessen,
+                satz: BILD_RAHMEN_TEXT.logo.groessenSatz,
+                verhaeltnis: LOGO_RAHMEN,
+                breite: LOGO_VORSCHAU_PX.hofseite,
+                umgebung: rund,
+                mittig: true,
+                daneben: [
+                  { verhaeltnis: LOGO_RAHMEN, breite: LOGO_VORSCHAU_PX.meinHof, umgebung: rund },
+                  { verhaeltnis: LOGO_RAHMEN, breite: LOGO_VORSCHAU_PX.klein, umgebung: rund },
+                ],
+              },
             ]}
             mitFilter={false}
+            nachUpload={offen === 'nachUpload'}
             speichert={speichertAusschnitt}
             onSpeichern={speichern}
             onAbbrechen={schliessen}
@@ -450,7 +462,7 @@ export function LogoUpload({
           isUploading={isUploading}
           fortschritt={progress ? stufenText(progress) : null}
           openFilePicker={openFilePicker}
-          onAnpassen={() => setOffen(true)}
+          onAnpassen={() => setOffen('anpassen')}
           onEntfernen={handleRemove}
         />
       )}
@@ -661,8 +673,8 @@ export function GallerySection({
   onHochladen,
 }: BildBausteinProps & { initialPhotos: FarmPhotoData[] }): React.JSX.Element {
   const [photos, setPhotos] = useState<FarmPhotoData[]>(initialPhotos)
-  // Das Foto, dessen Ausschnitt gerade gewählt wird — nach einem Upload einmal von selbst (Register N17).
-  const [offen, setOffen] = useState<FarmPhotoData | null>(null)
+  // Das Foto, dessen Ausschnitt gerade gewählt wird — nach einem Upload einmal von selbst (Register N17), dann mit „Passt so“.
+  const [offen, setOffen] = useState<{ foto: FarmPhotoData; nachUpload: boolean } | null>(null)
   const [speichertAusschnitt, startAusschnitt] = useTransition()
   const canUpload = photos.length < GALERIE_MAX
 
@@ -686,7 +698,7 @@ export function GallerySection({
         // Ein neues Foto hat noch keinen Ausschnitt; der Baustein öffnet einmal von selbst — in einer Serie für das erste.
         const neu: FarmPhotoData = { ...photo, ausschnitt: null }
         setPhotos((prev) => [...prev, neu])
-        setOffen((alt) => alt ?? neu)
+        setOffen((alt) => alt ?? { foto: neu, nachUpload: true })
         // Eine Serie meldet ihr Ergebnis am Ende selbst (useImageUpload, serieGespeichert).
         if (batch) onGespeichert?.()
         else erfolg('Foto hinzugefügt')
@@ -745,13 +757,14 @@ export function GallerySection({
         {/* Dasselbe Datei-Feld an derselben Stelle: Läuft noch eine Serie, hängt es nie aus (CODING_STANDARDS §8). */}
         {fileInput}
         <BildAusschnitt
-          key={offen.id}
-          foto={offen.url}
-          wert={offen.ausschnitt ?? AUSSCHNITT_STANDARD}
+          key={offen.foto.id}
+          foto={offen.foto.url}
+          wert={offen.foto.ausschnitt ?? AUSSCHNITT_STANDARD}
           rahmen={{ name: BILD_RAHMEN_TEXT.galerie.rahmen, verhaeltnis: GALERIE_RAHMEN_KACHEL }}
           vorschauen={[{ titel: BILD_RAHMEN_TEXT.galerie.vorschauHandy, verhaeltnis: GALERIE_VORSCHAU_HANDY, breite: 160, satz: BILD_RAHMEN_TEXT.galerie.satz }]}
+          nachUpload={offen.nachUpload}
           speichert={speichertAusschnitt}
-          onSpeichern={(wert) => speichereAusschnitt(offen, wert)}
+          onSpeichern={(wert) => speichereAusschnitt(offen.foto, wert)}
           onAbbrechen={() => setOffen(null)}
         />
         {/* Läuft die Serie weiter, sagt eine Zeile, wo sie steht — die Liste kommt nach dem Baustein. */}
@@ -783,7 +796,7 @@ export function GallerySection({
               onDeleted={handleDeleted}
               onCaptionChange={handleCaptionChange}
               onMove={handleMove}
-              onAnpassen={setOffen}
+              onAnpassen={(foto) => setOffen({ foto, nachUpload: false })}
             />
           ))}
         </div>

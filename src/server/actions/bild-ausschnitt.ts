@@ -1,14 +1,15 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { Prisma } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { revalidiereProdukte } from '@/server/produkte-schreiben'
 import { bildAusschnittSpeichernSchema, type BildAusschnitt, type BildAusschnittSpeichern } from '@/schemas/bild-ausschnitt'
-import { AUSSCHNITT_STANDARD, BILD_AUSSCHNITT_TEXT } from '@/lib/bild-ausschnitt'
-import { BILD_RAHMEN_TEXT } from '@/lib/bild-rahmen'
+import { BILD_AUSSCHNITT_TEXT } from '@/lib/bild-ausschnitt'
+import { BILD_RAHMEN_TEXT, ausschnittOderNull } from '@/lib/bild-rahmen'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 
 /*
  * Speichert den Ausschnitt eines Fotos (Register N13/N17, Nachtlauf Nr. 97).
@@ -32,12 +33,7 @@ type Ergebnis = { ok: true } | { error: string }
  * Das Titelbild behält seinen Wert, weil dort die Wahl füllen/ganz mitreist.
  */
 function alsSpalte(wert: Omit<BildAusschnitt, 'darstellung'>): Omit<BildAusschnitt, 'darstellung'> | typeof Prisma.DbNull {
-  const standard =
-    wert.fokusX === AUSSCHNITT_STANDARD.fokusX &&
-    wert.fokusY === AUSSCHNITT_STANDARD.fokusY &&
-    wert.zoom === AUSSCHNITT_STANDARD.zoom &&
-    wert.filter === AUSSCHNITT_STANDARD.filter
-  return standard ? Prisma.DbNull : wert
+  return ausschnittOderNull(wert) ?? Prisma.DbNull
 }
 
 export async function speichereBildAusschnittAction(eingabe: unknown): Promise<Ergebnis> {
@@ -63,6 +59,8 @@ export async function speichereBildAusschnittAction(eingabe: unknown): Promise<E
   else {
     revalidatePath(`/${hof.slug}`)
     revalidatePath('/farm-page')
+    // Das Logo steht auch im Karussell auf /hoefe — dessen eigener Cache, wie bei den Produkten (revalidiereProdukte).
+    if (geprueft.data.ziel === 'logo') updateTag(HOEFE_CACHE_TAG)
   }
   return { ok: true }
 }

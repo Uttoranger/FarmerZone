@@ -109,6 +109,7 @@ export function AbschnittInhalt({
           <LogoUpload
             key={hof.logoUrl ?? 'kein-logo'}
             logoUrl={hof.logoUrl}
+            logoAusschnitt={auftritt.logoAusschnitt}
             onUploaded={onGespeichert}
             meldeErfolg={meldeErfolg}
             onHochladen={onHochladen}

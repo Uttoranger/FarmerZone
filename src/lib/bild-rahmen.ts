@@ -1,3 +1,4 @@
+import { AUSSCHNITT_STANDARD } from '@/lib/bild-ausschnitt'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 
 /*
@@ -33,24 +34,26 @@ export const BEITRAG_RAHMEN = 3 / 2
 /** Die Texte rund um den Bild-Baustein bei Logo, Produktfoto, Galerie und Beitragsfoto — eine Quelle. */
 export const BILD_RAHMEN_TEXT = {
   anpassen: 'Ausschnitt anpassen',
+  /** Gleich nach dem Upload statt „Abbrechen“: speichert `null`, das Foto steht wie heute (Freigabe 98, Punkt 6). */
+  passtSo: 'Passt so',
+  /** „Speichern“ im Produktdialog: Der Baustein übernimmt nur, geschrieben wird mit dem Produkt. */
+  uebernehmen: 'Übernehmen',
   gespeichert: 'Ausschnitt gespeichert',
   /** 0 Zeilen beim Speichern: Das Produkt, das Foto oder der Beitrag ist weg — oder gehört einem anderen Hof. */
   fotoFehlt: 'Dieses Foto gibt es nicht mehr. Lade die Seite neu.',
   logo: {
     rahmen: 'Logo',
-    hofseite: 'So sieht es auf deiner Hofseite aus',
-    meinHof: 'In Mein Hof',
-    klein: 'Auf Karten und in der Seitenleiste',
+    groessen: 'So sieht es aus',
+    groessenSatz: 'Von links: Hofseite, Mein Hof, Karten und Seitenleiste.',
     satz: 'Ein Logo bekommt keinen Filter — es ist das Zeichen deines Hofs.',
   },
   produkt: {
     titel: 'Produktfoto',
     hilfe: 'Zieh das Foto in den Rahmen.',
     rahmen: 'Ausschnitt',
-    listeHandy: 'So sieht es in der Liste aus — am Handy',
-    listeComputer: 'In der Liste am Computer',
-    seiteHandy: 'Auf der Produktseite — am Handy',
-    seiteComputer: 'Auf der Produktseite am Computer',
+    liste: 'So sieht es in der Liste aus',
+    listeSatz: 'Links am Handy (quadratisch), rechts am Computer (breit) – derselbe Fokus.',
+    seite: 'Auf der Produktseite',
     satz: 'Ein Fokus für alle Größen: Karte am Handy und Computer, Produktseite. Das Foto selbst bleibt unverändert gespeichert.',
     nichtGespeichert:
       'Das Produkt ist gespeichert, nur den Ausschnitt des Fotos konnten wir nicht speichern. Öffne das Produkt und versuch es noch einmal.',
@@ -69,6 +72,21 @@ export const BILD_RAHMEN_TEXT = {
 
 /** Was die Aktion bei Logo, Produktfoto, Galerie und Beitragsfoto nimmt: ohne die Wahl füllen/ganz, die gibt es nur beim Titelbild. */
 export type FotoAusschnitt = Omit<BildAusschnitt, 'darstellung'>
+
+/**
+ * Mitte, 100 %, Natürlich ist kein Ausschnitt, sondern „wie heute“: `null`.
+ * Die Aktion speichert es so — und wer vor dem Speichern anzeigt (Beitrag,
+ * Produktdialog), zeigt es genauso: Beim Beitrag steht das Foto ohne
+ * Ausschnitt ganz, mit Ausschnitt füllt es den Rahmen.
+ */
+export function ausschnittOderNull<T extends FotoAusschnitt>(wert: T): T | null {
+  const standard =
+    wert.fokusX === AUSSCHNITT_STANDARD.fokusX &&
+    wert.fokusY === AUSSCHNITT_STANDARD.fokusY &&
+    wert.zoom === AUSSCHNITT_STANDARD.zoom &&
+    wert.filter === AUSSCHNITT_STANDARD.filter
+  return standard ? null : wert
+}
 
 /** Der Wert aus dem Baustein ohne die Wahl füllen/ganz — das strenge Schema der Aktion wiese sie sonst ab. */
 export function alsFotoAusschnitt(wert: BildAusschnitt): FotoAusschnitt {

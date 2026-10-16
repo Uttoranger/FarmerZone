@@ -5268,6 +5268,7 @@ Register N16; Mockups `admin-startseite-gestalten`, `admin-startseite-vorschau`,
 - **Gespeichert wird, wenn es die Zeile gibt:** Produkt (beim Anlegen) und Beitrag haben ihre Kennung erst nach dem Speichern bzw. Veröffentlichen. Der Ausschnitt wird darum im Dialog bzw. im Formular gewählt und danach geschrieben; scheitert er, bleibt das Produkt bzw. der Beitrag stehen (wie bei jedem Nachlauf) und ein Satz sagt es.
 - **Neues Foto, kein alter Ausschnitt:** Ein gespeicherter Fokus gehört zu seinem Foto. Das Logo setzt ihn nach dem Upload sofort zurück, das Produkt beim Speichern mit dem neuen Foto; neue Galerie-Fotos und Beiträge beginnen ohne.
 - **Logo und Neuladen:** Mein Hof hängt den Logo-Baustein am Logo auf (`key`). Lädt die Seite nach dem Upload sofort neu, schlösse sich der eben geöffnete Baustein — darum meldet er das neue Logo erst, wenn er zu ist.
+- **Runde 1 (Prüfung):** Mit der Grenzerweiterung kam „Passt so“ in den Baustein: Es steht nach dem Upload statt „Abbrechen“, aber nur, solange nichts geändert ist — danach verwürfe es die Wahl. Dazu der runde Hauptrahmen des Logos, Vorschau-Paare unter einem Titel (Produktfoto, Logo), der Filter in der großen Bildansicht und der Ausschnitt in der Käufer-Vorschau und in Mein Hof › Logo nach dem Neuladen. Die Regel „Mitte, 100 %, Natürlich = `null`“ steht seither einmal (`ausschnittOderNull`): Die Aktion speichert danach, Beitrag und Produktdialog zeigen danach — vorher stand ein Beitrag nach „Speichern“ ohne Änderung im Formular füllend, auf der Hofseite aber ganz.
 
 ## Nützliche Befehle
 

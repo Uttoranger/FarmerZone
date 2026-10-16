@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -107,6 +107,7 @@ import {
   PRODUKT_VORSCHAU_SEITE_COMPUTER,
   PRODUKT_VORSCHAU_SEITE_HANDY,
   alsFotoAusschnitt,
+  ausschnittOderNull,
 } from '@/lib/bild-rahmen'
 import type { BildAusschnitt as BildAusschnittWert } from '@/schemas/bild-ausschnitt'
 import { BildAusschnitt, type BildVorschau } from '@/components/shared/bild-ausschnitt'
@@ -397,7 +398,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
   // Ausschnitt des Produktfotos (Register N17, Nr. 98): gewählt im Dialog,
   // geschrieben nach dem Produkt — beim Anlegen gibt es erst dann eine Kennung.
   const [ausschnitt, setAusschnitt] = useState<BildAusschnittWert | null>(null)
-  const [ausschnittOffen, setAusschnittOffen] = useState(false)
+  // Offen gleich nach der Fotowahl („Passt so“) oder über „Ausschnitt anpassen“.
+  const [ausschnittOffen, setAusschnittOffen] = useState<false | 'nachUpload' | 'anpassen'>(false)
   // Geschrieben wird nach einer Wahl im Baustein und bei jedem neuen Foto: Dessen alter Ausschnitt gehörte zum alten.
   const [ausschnittSpeichern, setAusschnittSpeichern] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
@@ -640,7 +642,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
     // Ein neues Foto beginnt ohne Ausschnitt; der Baustein öffnet einmal von selbst (Register N17).
     setAusschnitt(null)
     setAusschnittSpeichern(true)
-    setAusschnittOffen(true)
+    setAusschnittOffen('nachUpload')
   }
 
   function handleRemoveImage() {
@@ -971,8 +973,10 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                             wert={ausschnitt ?? AUSSCHNITT_STANDARD}
                             name={werte.name.trim() || KAEUFER_VORSCHAU.name}
                             preis={gueltigerPreis(werte.price) === null ? KAEUFER_VORSCHAU.preisFehlt : formatGrundpreis(werte.price, werte.unit, werte.unitSize)}
+                            nachUpload={ausschnittOffen === 'nachUpload'}
                             onUebernehmen={(wert) => {
-                              setAusschnitt(wert)
+                              // Mitte, 100 %, Natürlich ist kein Ausschnitt — so speichert es die Aktion, so zeigt es der Dialog.
+                              setAusschnitt(ausschnittOderNull(wert))
                               setAusschnittSpeichern(true)
                               setAusschnittOffen(false)
                             }}
@@ -1007,7 +1011,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                                 Datei-Feld, dessen Datei gerade übertragen wird. */}
                             <button
                               type="button"
-                              onClick={() => setAusschnittOffen(true)}
+                              onClick={() => setAusschnittOffen('anpassen')}
                               disabled={isSubmitting || pruefeFoto}
                               className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'absolute bottom-2 left-2 min-h-11 gap-1.5 bg-card disabled:opacity-60')}
                             >
@@ -1965,6 +1969,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                   foto={previewUrl}
                   kategorie={category}
                   unterkategorie={werte.subcategory}
+                  ausschnitt={previewUrl ? ausschnitt : null}
                 />
               )}
             </div>
@@ -2054,14 +2059,16 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
  * Mockup mobil-h2-produktfoto-ausschnitt): Hauptrahmen wie die Karte am
  * Computer (260 : 140), Vorschau in der Liste (Handy 64 × 64, Computer) und
  * auf der Produktseite (Handy 390 : 200, Computer 300 × 300) — mit Name und
- * Preis aus dem Formular. „Speichern“ übernimmt die Wahl in den Dialog;
- * geschrieben wird sie mit dem Produkt (onSubmit).
+ * Preis aus dem Formular. Der Baustein übernimmt die Wahl nur in den Dialog;
+ * geschrieben wird sie mit dem Produkt (onSubmit) — darum heißt sein Knopf
+ * „Übernehmen“, „Speichern“ bleibt der Fuß des Dialogs.
  */
 function ProduktfotoAusschnitt({
   foto,
   wert,
   name,
   preis,
+  nachUpload,
   onUebernehmen,
   onAbbrechen,
 }: {
@@ -2069,6 +2076,8 @@ function ProduktfotoAusschnitt({
   wert: BildAusschnittWert
   name: string
   preis: string
+  /** Gleich nach der Fotowahl geöffnet: „Passt so“ statt „Abbrechen“. */
+  nachUpload: boolean
   onUebernehmen: (wert: BildAusschnittWert) => void
   onAbbrechen: () => void
 }): React.JSX.Element {
@@ -2078,9 +2087,17 @@ function ProduktfotoAusschnitt({
       <div className={cn('truncate text-muted-foreground', klein ? 'text-[10px]' : 'text-[11.5px]')}>{preis}</div>
     </div>
   )
+  const karte = (rahmen: ReactNode) => (
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      {rahmen}
+      {zeilen(true)}
+    </div>
+  )
+  // Zwei Paare wie im Mockup mobil-h2-produktfoto-ausschnitt: je Titel links das Handy, rechts der Computer.
   const vorschauen: BildVorschau[] = [
     {
-      titel: BILD_RAHMEN_TEXT.produkt.listeHandy,
+      titel: BILD_RAHMEN_TEXT.produkt.liste,
+      satz: BILD_RAHMEN_TEXT.produkt.listeSatz,
       verhaeltnis: PRODUKT_VORSCHAU_LISTE_HANDY,
       // Die Zeile der Hofseite am Handy: Foto 64 × 64, Name, Preis, Plus.
       umgebung: (rahmen) => (
@@ -2092,34 +2109,20 @@ function ProduktfotoAusschnitt({
           </span>
         </div>
       ),
+      daneben: [{ verhaeltnis: PRODUKT_RAHMEN_KARTE, breite: 150, umgebung: karte }],
     },
     {
-      titel: BILD_RAHMEN_TEXT.produkt.listeComputer,
-      verhaeltnis: PRODUKT_RAHMEN_KARTE,
-      breite: 150,
-      umgebung: (rahmen) => (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
-          {rahmen}
-          {zeilen(true)}
-        </div>
-      ),
-    },
-    {
-      titel: BILD_RAHMEN_TEXT.produkt.seiteHandy,
+      titel: BILD_RAHMEN_TEXT.produkt.seite,
       verhaeltnis: PRODUKT_VORSCHAU_SEITE_HANDY,
       breite: 196,
-      umgebung: (rahmen) => (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
-          {rahmen}
-          {zeilen(true)}
-        </div>
-      ),
-    },
-    {
-      titel: BILD_RAHMEN_TEXT.produkt.seiteComputer,
-      verhaeltnis: PRODUKT_VORSCHAU_SEITE_COMPUTER,
-      breite: 110,
-      umgebung: (rahmen) => <div className="overflow-hidden rounded-[14px] border border-border">{rahmen}</div>,
+      umgebung: karte,
+      daneben: [
+        {
+          verhaeltnis: PRODUKT_VORSCHAU_SEITE_COMPUTER,
+          breite: 110,
+          umgebung: (rahmen) => <div className="overflow-hidden rounded-[14px] border border-border">{rahmen}</div>,
+        },
+      ],
     },
   ]
   return (
@@ -2135,6 +2138,8 @@ function ProduktfotoAusschnitt({
         wert={wert}
         rahmen={{ name: BILD_RAHMEN_TEXT.produkt.rahmen, verhaeltnis: PRODUKT_RAHMEN_KARTE }}
         vorschauen={vorschauen}
+        nachUpload={nachUpload}
+        speichernText={BILD_RAHMEN_TEXT.uebernehmen}
         onSpeichern={onUebernehmen}
         onAbbrechen={onAbbrechen}
       />
