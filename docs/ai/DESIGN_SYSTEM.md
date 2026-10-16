@@ -160,6 +160,12 @@ Für jede Sache gibt es in Nutzertexten genau ein Wort (Register N8): in Beschri
 | Die Meldung, die beim Zusammenfassen bleibt (Register N14) | Hauptmeldung | Ticket, Issue, Merge | „Bleibt · Hauptmeldung“ |
 | Verschiedene Höfe und Kundinnen eines Bündels (Register N14) | Stimmen | Ticket, Issue, Merge | „4 Stimmen · 4 Höfe · 0 Kundinnen“ |
 | Meldungen mit demselben Stichwort (Register N14) | Bündel | Ticket, Issue, Merge, Cluster (seit Nr. 101; Feld „Bündel-Stichwort“) | „Bündel · 4 Höfe“ |
+| Was die Plattform im Hintergrund braucht: Speicher, Grenzen, Abläufe (Admin › Betrieb, Register N18/N15) – nicht zu verwechseln mit der Käuferart „Betrieb“ beim Futter, die in der Kasse bleibt | Betrieb | Monitoring | „Betrieb ansehen“ |
+| Was der Tarif eines Dienstes erlaubt (Register N18) | Grenze | Quota | „in % der Grenze, je Morgen gemessen“ |
+| Ein regelmäßiger Lauf, täglich oder wöchentlich (Register N18) – nicht zu verwechseln mit der Ansicht „Ablauf“ in Postfach › Meldungen (Ablauf · Wünsche) | Ablauf | Cron, Job | „Ein Ablauf ist nicht gelaufen“ |
+| Dateien im Bild-Speicher, an denen nichts mehr hängt (Register N18/N17) | Bilder ohne Verwendung | Waise, Orphan | „Bilder ohne Verwendung ansehen“ |
+| Hof, der nicht für die Gründungsplätze zählt (Register K2) | ausgenommen | | „ausgenommen · Testhof“ |
+| Die Hofseite, wie die Kundschaft sie sieht, aus Mein Hof geöffnet (Register N4) | Kundenansicht | | „Kundenansicht · So sieht dich die Kundschaft“ |
 
 - **Prüfung:** `tests/wortliste.test.ts` liest die Spalte „nicht“ und sucht jedes Wort in jeder Zeichenkette und jedem JSX-Text unter `src/` — mit Wortgrenzen und in der Schreibweise der Tabelle („Bestand“ trifft weder „Lagerbestand“ noch „bestand“). Kommentare, Bezeichner und Server-Logs (`console.*`) zählen nicht. Wo ein Wort in anderem Sinn richtig ist, steht der Text mit Grund in der Ausnahmeliste im Test: je Text, nicht je Datei, ohne Zeilennummer.
 - **„Status“, „Post“, „Neuigkeit“ meinen den Beitrag als Sache.** Der Status einer Bestellung, Zahlung, Freischaltung oder Meldung bleibt „Status“, ebenso der Name der WhatsApp-Funktion „Status“; „Neuigkeiten“ (Mehrzahl) ist der Name der Anmeldung bei einem Hof. Solche Texte stehen als Ausnahme im Test, ebenso ein Text über die Käuferart (Betrieb, privat) beim Futter, der „Käufer“ sagt.
