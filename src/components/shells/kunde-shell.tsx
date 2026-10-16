@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ChevronLeft, Compass, ReceiptText, Search, ShoppingBasket, UserRound, type LucideIcon } from 'lucide-react'
@@ -16,6 +16,8 @@ import { ThemeUmschalter, ThemeUmschalterZeile } from '@/components/shared/theme
 import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
 import { KUNDE_KOPF_ZEILE, KUNDE_SHELL_MASSE } from '@/lib/kunde-shell-masse'
 import { MARKE } from '@/lib/marke'
+import { VORSCHAU_LEISTE_HINWEIS, VORSCHAU_LEISTE_HINWEIS_MS } from '@/lib/hofseite-vorschau'
+import { useImVorschauRahmen } from '@/components/farm/vorschau-im-rahmen'
 
 /*
  * Die Shell der Kundenseiten im neuen Design (Gate 2): Kopfzeile im Browser,
@@ -35,6 +37,14 @@ import { MARKE } from '@/lib/marke'
  * „Anmelden" (→ /login) bzw. mit Hof-Sitzung „Mein Hof" (→ /dashboard). Dafür
  * wandert Hell/Dunkel am Handy aus dem Kopf an den Seitenfuß; im Browser
  * bleibt er im Kopf.
+ *
+ * Seit Nr. 107 (Register N4, Ergänzung): Steht die Hofseite als Vorschau im
+ * Rahmen (Kundenansicht von Mein Hof, Vorschau im Editor), zeigt die Shell
+ * ihre Unterleiste blass und ohne Wirkung (`inert`, Deckkraft 0,55 auf den
+ * Einträgen; der Grund bleibt deckend, sonst schiene die Seite durch) — die
+ * Kundschaft sieht sie, also gehört sie ins Bild, aber aus der Vorschau
+ * führt kein Weg hinaus. Ein Tipp darauf zeigt kurz „Vorschau – hier geht es
+ * nicht weiter". Ohne Rahmen (neuer Tab) bleibt die Leiste, wie sie ist.
  */
 
 const SYMBOL: Partial<Record<KundenNavId, LucideIcon>> = {
@@ -62,6 +72,40 @@ function WarenkorbKopf({ anzahl, href }: { anzahl: number; href: string }) {
 }
 
 /** Der Knopf rechts im Kopf: Pille mit 44 px Höhe — auch am Handy gut zu treffen und zu lesen. */
+/**
+ * Über der blassen Leiste in der Vorschau im Rahmen: fängt den Tipp, den die
+ * Leiste mit `inert` nicht mehr bekommt (er fiele sonst auf die Seite darunter),
+ * und zeigt kurz den Hinweis. Gleich groß wie die Leiste samt erhobenem
+ * Mittelknopf (Maße der Shell). Für Screenreader nicht da — die Leiste ist es
+ * mit `inert` auch nicht. Ebene 50 wie die Leiste, im Quelltext danach, also
+ * darüber.
+ */
+function VorschauLeisteSperre(): React.JSX.Element {
+  const [tipp, setTipp] = useState(false)
+  useEffect(() => {
+    if (!tipp) return
+    const weg = setTimeout(() => setTipp(false), VORSCHAU_LEISTE_HINWEIS_MS)
+    return () => clearTimeout(weg)
+  }, [tipp])
+
+  return (
+    <div
+      aria-hidden="true"
+      data-vorschau-sperre=""
+      // Feste Fläche unten: Der Cookie-Hinweis steht darüber, nie darauf (src/lib/cookie-hinweis.ts).
+      data-unten-fest=""
+      onClick={() => setTipp(true)}
+      className="fixed inset-x-0 bottom-0 z-50 h-[calc(var(--kunde-unterleiste)+var(--kunde-ueberstand))] md:hidden print:hidden"
+    >
+      {tipp && (
+        <p className="absolute bottom-full left-1/2 mb-3 -translate-x-1/2 rounded-full bg-foreground px-3.5 py-2 text-[12.5px] font-semibold whitespace-nowrap text-background shadow-lg">
+          {VORSCHAU_LEISTE_HINWEIS}
+        </p>
+      )}
+    </div>
+  )
+}
+
 const KOPF_KNOPF = cn(
   'inline-flex h-11 shrink-0 items-center rounded-full border border-border px-4 text-[14px] font-semibold whitespace-nowrap text-foreground transition-colors duration-[250ms] hover:bg-muted',
   FOKUS_RAHMEN
@@ -91,6 +135,8 @@ export function KundeShell({ sitzung, unterleiste = true, children }: KundeShell
   // Steht der Warenkorb auch am Handy im Kopf (Fokus-Seiten ohne Unterleiste),
   // reicht der Platz neben „Anmelden" unter 360 px nicht für den Namen.
   const korbAmHandy = korb !== null && !unterleiste
+  // Vorschau im Rahmen: erst nach dem Mounten bekannt, vom Server und beim Hydrieren false.
+  const imRahmen = useImVorschauRahmen()
 
   return (
     // Die Maße als CSS-Variablen (src/lib/kunde-shell-masse.ts): Der Kartenmodus auf
@@ -191,44 +237,48 @@ export function KundeShell({ sitzung, unterleiste = true, children }: KundeShell
       </main>
 
       {unterleiste && (
-        <BottomNav>
-          {nav.handy.map((platz) => {
-            if (platz.art === 'warenkorb') {
-              // Leer gibt es keinen Korb, aber einen Ausweg: zu den Höfen (DESIGN_SYSTEM, „Leerzustand mit Ausweg").
+        // In der Vorschau im Rahmen ohne Wirkung — keine Klicks nach außen (VorschauLeisteSperre).
+        <div inert={imRahmen}>
+          <BottomNav className={imRahmen ? '[&>div]:opacity-55' : undefined}>
+            {nav.handy.map((platz) => {
+              if (platz.art === 'warenkorb') {
+                // Leer gibt es keinen Korb, aber einen Ausweg: zu den Höfen (DESIGN_SYSTEM, „Leerzustand mit Ausweg").
+                return (
+                  <BottomNavMitte key="warenkorb">
+                    <Link
+                      href={korb?.href ?? '/hoefe'}
+                      aria-label={korb ? `Warenkorb öffnen, ${korb.anzahl} Artikel` : 'Warenkorb ist leer – Höfe entdecken'}
+                      className={mittelknopfKlassen('gruen')}
+                    >
+                      <ShoppingBasket className="size-6" strokeWidth={1.7} aria-hidden="true" />
+                      {korb && (
+                        <Zaehler
+                          anzahl={korb.anzahl}
+                          wofuer="Artikel im Korb"
+                          ton="orange"
+                          className="absolute -top-1 -right-1 ring-2 ring-card"
+                        />
+                      )}
+                    </Link>
+                  </BottomNavMitte>
+                )
+              }
+              const { punkt } = platz
+              const Symbol = SYMBOL[punkt.id] ?? Compass
               return (
-                <BottomNavMitte key="warenkorb">
-                  <Link
-                    href={korb?.href ?? '/hoefe'}
-                    aria-label={korb ? `Warenkorb öffnen, ${korb.anzahl} Artikel` : 'Warenkorb ist leer – Höfe entdecken'}
-                    className={mittelknopfKlassen('gruen')}
-                  >
-                    <ShoppingBasket className="size-6" strokeWidth={1.7} aria-hidden="true" />
-                    {korb && (
-                      <Zaehler
-                        anzahl={korb.anzahl}
-                        wofuer="Artikel im Korb"
-                        ton="orange"
-                        className="absolute -top-1 -right-1 ring-2 ring-card"
-                      />
-                    )}
-                  </Link>
-                </BottomNavMitte>
+                <BottomNavLink
+                  key={punkt.id}
+                  href={punkt.href}
+                  label={punkt.kurz ?? punkt.label}
+                  symbol={Symbol}
+                  aktuell={kundenAriaAktuell(pathname, punkt)}
+                />
               )
-            }
-            const { punkt } = platz
-            const Symbol = SYMBOL[punkt.id] ?? Compass
-            return (
-              <BottomNavLink
-                key={punkt.id}
-                href={punkt.href}
-                label={punkt.kurz ?? punkt.label}
-                symbol={Symbol}
-                aktuell={kundenAriaAktuell(pathname, punkt)}
-              />
-            )
-          })}
-        </BottomNav>
+            })}
+          </BottomNav>
+        </div>
       )}
+      {unterleiste && imRahmen && <VorschauLeisteSperre />}
     </div>
   )
 }

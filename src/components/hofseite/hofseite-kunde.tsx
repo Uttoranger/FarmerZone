@@ -452,7 +452,7 @@ export function HofseiteKunde({
           {!schaufenster && ueberUnsKarte}
 
           {offen === 'uebersicht' && sichtbar('gallery') ? (
-            <HofseiteFotos fotos={farm.farmPhotos} streifenUnterLg={schaufenster} />
+            <HofseiteFotos fotos={farm.farmPhotos} hofName={farm.name} schaufenster={schaufenster} />
           ) : null}
 
           {offen === 'uebersicht' ? (

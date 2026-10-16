@@ -7,12 +7,12 @@ import { useMeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
 
 /*
  * „Kundenansicht" im Kopf von Mein Hof unter lg (Nachtlauf Nr. 49, Register
- * N4): schaltet den Umschalter auf „So sieht’s die Kundin" — die echte
- * Hofseite in der App, kein neuer Tab. Den neuen Tab bietet die Kundenansicht
- * selbst leise an („In neuem Tab öffnen"). Ab lg öffnet der Kopf die Vorschau
- * weiter in einem neuen Tab (seitenkopf.tsx).
+ * N4; seit Nr. 107 als Vollbild, N4 ergänzt): öffnet die echte Hofseite als
+ * Vollbild-Blatt über Mein Hof (kundenansicht-vollbild.tsx) — kein neuer Tab,
+ * eine Leiste auf dem Schirm. Ab lg öffnet der Kopf die Vorschau weiter in
+ * einem neuen Tab (seitenkopf.tsx).
  *
- * Ohne Umschalter darum herum (der Kopf allein, etwa in einer Vorschau)
+ * Ohne Kundenansicht darum herum (der Kopf allein, etwa in einer Vorschau)
  * bleibt es der Link in einen neuen Tab — nie ein Knopf ohne Wirkung.
  */
 export function KundenansichtKnopf({ slug, className }: { slug: string; className: string }): React.JSX.Element {

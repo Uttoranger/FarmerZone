@@ -197,7 +197,8 @@ describe('Vorschau-Rahmen', () => {
 
   // Die Markierung geht seit Nr. 49 über EINEN Hook — für diesen Rahmen und „So sieht’s die Kundin" unter lg.
   const markierung = quelltext('src/components/farmer/use-vorschau-markierung.ts')
-  const kundin = quelltext('src/components/mein-hof/mein-hof-ansicht.tsx')
+  // Die Kundenansicht von Mein Hof (seit Nr. 107 als Vollbild) trägt den zweiten Rahmen.
+  const kundin = quelltext('src/components/mein-hof/kundenansicht-vollbild.tsx')
 
   it('der erste Stand im src, jeder weitere per location.replace; die Markierung nur an den eigenen Ursprung', () => {
     // Sonst legte jedes Speichern einen Eintrag im Browserverlauf an.

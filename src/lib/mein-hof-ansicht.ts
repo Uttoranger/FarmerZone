@@ -1,9 +1,10 @@
 /**
- * Die Ansicht von „Mein Hof" unter lg (Nachtlauf Nr. 49, Register N3/N4):
- * der Umschalter „Bearbeiten · So sieht’s die Kundin" oben auf jedem Reiter,
- * die Adresse der Kundenansicht und „Gespeichert · Ansehen". Rein und ohne
- * Browser prüfbar (tests/mein-hof-ansicht.test.ts); gezeichnet wird in
- * components/mein-hof/mein-hof-ansicht.tsx.
+ * Die Kundenansicht von „Mein Hof" unter lg (Nachtlauf Nr. 49, Register
+ * N3/N4; seit Nr. 107 als Vollbild, N4 ergänzt): die Adresse `?ansicht=kundin`,
+ * was der Rahmen zeigt, bis zu welcher Breite es das Vollbild gibt und
+ * „Gespeichert · Ansehen". Rein und ohne Browser prüfbar
+ * (tests/mein-hof-ansicht.test.ts); gezeichnet wird in
+ * components/mein-hof/mein-hof-ansicht.tsx und kundenansicht-vollbild.tsx.
  *
  * Eine eigene Datei statt lib/mein-hof.ts: Die Hofseite für Kundinnen bindet
  * mein-hof.ts ein (Titelbild), und die Navigation des Hofbereichs gehört nicht
@@ -18,19 +19,17 @@ import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 
 export type { MeinHofAnsichtId }
 
-/** Alle Wörter des Umschalters, der Kundenansicht und von „Gespeichert · Ansehen" — EINE Quelle. */
+/** Alle Wörter der Kundenansicht und von „Gespeichert · Ansehen" — EINE Quelle. */
 export const MEIN_HOF_ANSICHT_TEXT = {
-  /** Wofür umgeschaltet wird, für Screenreader (Segment). */
-  beschriftung: 'Ansicht von Mein Hof',
-  bearbeiten: 'Bearbeiten',
-  kundin: 'So sieht’s die Kundin',
-  /** Der Knopf im Kopf von Mein Hof — unter lg schaltet er auf die Kundenansicht. */
+  /** Der Knopf im Kopf von Mein Hof und der Titel des Vollbilds (Wortliste: Kundenansicht). */
   kundenansicht: 'Kundenansicht',
-  neuerTab: 'In neuem Tab öffnen',
+  /** Die zweite Zeile im Band des Vollbilds (Register N4, Ergänzung Nr. 107). */
+  kundschaft: 'So sieht dich die Kundschaft',
+  /** Schließt das Vollbild. */
+  fertig: 'Fertig',
   /**
    * Für Screenreader an Links, deren Text den neuen Tab nicht nennt (`sr-only`):
-   * „Kundenansicht" ab lg, die Adresse im Kopf. Der Link „In neuem Tab öffnen"
-   * sagt es selbst und bekommt ihn nicht — sonst hörte man es doppelt.
+   * „Kundenansicht" ab lg, die Adresse im Kopf.
    */
   neuerTabHinweis: ' (öffnet in neuem Tab)',
   /** Titel des Rahmens mit der echten Hofseite (für Screenreader). */
@@ -39,13 +38,7 @@ export const MEIN_HOF_ANSICHT_TEXT = {
   ansehen: 'Ansehen',
 } as const
 
-/** Die beiden Stellungen des Umschalters, in dieser Reihenfolge (Segment-Baustein). */
-export const MEIN_HOF_ANSICHT_OPTIONEN: readonly { wert: MeinHofAnsichtId; label: string }[] = [
-  { wert: 'bearbeiten', label: MEIN_HOF_ANSICHT_TEXT.bearbeiten },
-  { wert: 'kundin', label: MEIN_HOF_ANSICHT_TEXT.kundin },
-]
-
-/** Die Ansicht aus der Adresse (`?ansicht=`) — was nicht passt, ist „Bearbeiten". */
+/** Die Ansicht aus der Adresse (`?ansicht=`) — was nicht passt, ist „Bearbeiten" (kein Vollbild). */
 export function meinHofAnsichtAus(wert: string | null | undefined): MeinHofAnsichtId {
   return meinHofAnsichtSchema.parse(wert)
 }
@@ -69,7 +62,7 @@ function reiterHref(reiter: MeinHofReiterAlleId): string {
 }
 
 /**
- * Ein Reiter von Mein Hof mit „So sieht’s die Kundin" — für „Ansehen" von
+ * Ein Reiter von Mein Hof mit offener Kundenansicht — für „Ansehen" von
  * einer anderen Seite aus (nach dem Veröffentlichen eines Beitrags auf
  * /status/new). Die Adresse des Reiters kommt aus MEIN_HOF_REITER_HOFBEREICH.
  */
@@ -86,7 +79,7 @@ const HOFSEITEN_REITER: Record<MeinHofReiterAlleId, HofReiterId> = {
 }
 
 /**
- * Was „So sieht’s die Kundin" im Rahmen zeigt: die echte Hofseite in der
+ * Was die Kundenansicht im Rahmen zeigt: die echte Hofseite in der
  * Vorschau (vorschauLink, ARCHITECTURE §4 „Die Hofseite gibt es genau
  * einmal"), geöffnet auf dem passenden Reiter — Produkte zeigt den Reiter
  * Produkte der Hofseite. Gibt es den Reiter dort nicht (kein Beitrag), zeigt
@@ -98,17 +91,18 @@ export function kundenAnsichtAdresse(slug: string, reiter: MeinHofReiterAlleId):
 }
 
 /**
- * Bis zu welcher Breite es den Umschalter gibt: Produkte gehört nur unter md
- * zu Mein Hof (Register N3, ab md ein eigener Punkt der Seitenleiste),
- * Hofseite und Beiträge unter lg (N4, ab lg steht die Vorschau neben der
- * Liste).
+ * Bis zu welcher Breite die Kundenansicht als Vollbild öffnet (bis Nr. 107:
+ * der Umschalter): Produkte gehört nur unter md zu Mein Hof (Register N3, ab
+ * md ein eigener Punkt der Seitenleiste), Hofseite und Beiträge unter lg (N4,
+ * ab lg steht die Vorschau neben der Liste bzw. öffnet der Kopf einen neuen
+ * Tab).
  */
 export function umschalterBis(reiter: MeinHofReiterAlleId): 'md' | 'lg' {
   return reiter === 'produkte' ? 'md' : 'lg'
 }
 
 /**
- * Ab diesen Breiten gibt es den Umschalter nicht mehr — die Grenzen md und lg
+ * Ab diesen Breiten gibt es das Vollbild nicht mehr — die Grenzen md und lg
  * von Tailwind, für Abfragen im Browser (matchMedia), die keine Klasse kennen.
  */
 export const UMSCHALTER_AB_PX = { md: 768, lg: 1024 } as const

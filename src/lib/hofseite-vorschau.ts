@@ -12,6 +12,15 @@ import { bereitSchema, markierungSchema, type HofseiteZeileId } from '@/schemas/
 /** Der Name des Parameters — zum Schreiben von Adressen. Gelesen wird er nur in ansichtsModus. */
 export const VORSCHAU_PARAMETER = 'vorschau'
 
+/**
+ * Der kurze Tipp, wenn jemand in der Vorschau im Rahmen auf die blasse Leiste
+ * der Kundschaft tippt (Register N4, Ergänzung Nr. 107; kunde-shell.tsx).
+ */
+export const VORSCHAU_LEISTE_HINWEIS = 'Vorschau – hier geht es nicht weiter'
+
+/** So lange steht der Tipp, dann geht er von selbst. */
+export const VORSCHAU_LEISTE_HINWEIS_MS = 2200
+
 /** Statt „In den Warenkorb" — im Vorschau-Modus wird nichts bestellt und kein Korb angelegt. */
 export const VORSCHAU_KAUF_HINWEIS = 'Vorschau — hier wird nichts bestellt'
 
