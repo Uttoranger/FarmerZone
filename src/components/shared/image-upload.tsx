@@ -46,6 +46,7 @@ import {
 import {
   MAX_ORIGINAL_BYTES,
   originalPfad,
+  BILD_ZU_KLEIN_TEXT,
   type UploadZweck,
 } from '@/lib/upload-pfade'
 import {
@@ -450,7 +451,9 @@ function waechterBefund(grund: 'stillstand' | 'deckel'): AnlaufBefund {
  *      sie die Kopie im Speicher, und nur die geht weiter (JAVASCRIPT-NEXTJS-6).
  *   1. Original in den Blob-Speicher (signierter Client-Upload) — aus der Kopie.
  *   2. Verarbeitung anstoßen — der Server dreht, verkleinert, kodiert und
- *      löscht das Original.
+ *      löscht das Original. Ein ersetztes Bild löscht er nicht (Register N17,
+ *      Ergänzung; Nr. 108): Es kann noch an Produkt oder Hof hängen, solange
+ *      deren Speichern aussteht.
  *
  * Netz- und Sendefehler aus Stufe 1 und 2 sind BEWUSST nicht Ursache 'lesen':
  * Die Datei war lesbar (Stufe 0), gescheitert ist das Senden. Sie werfen einen
@@ -468,7 +471,6 @@ export async function ladeFotoHoch(
   file: File,
   zweck: UploadZweck,
   optionen: {
-    altUrl?: string
     onFortschritt?: (prozent: number) => void
     onStufe?: (stufe: UploadStufe) => void
     /** Reine Zusatz-Meldung (Sentry-Diagnose): welcher Transfer-Anlauf läuft. */
@@ -521,7 +523,7 @@ export async function ladeFotoHoch(
     antwort = await fetch('/api/upload/verarbeiten', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ url: hochgeladen.url, zweck, altUrl: optionen.altUrl }),
+      body: JSON.stringify({ url: hochgeladen.url, zweck }),
       signal: AbortSignal.timeout(VERARBEITEN_LIMIT_MS),
     })
   } catch (e) {
@@ -537,6 +539,7 @@ export async function ladeFotoHoch(
   })) as {
     url?: string
     art?: unknown
+    code?: unknown
   } | null
 
   if (antwort.ok && daten === null) {
@@ -555,7 +558,8 @@ export async function ladeFotoHoch(
       status: antwort.status,
     })
     protokolliereBildFehler(art, kopie)
-    throw new BildFehler(art)
+    // Zu klein (nur Startseite, 422): ein eigener Satz mit der Mindestkante — die Ursache bleibt 'format'.
+    throw new BildFehler(art, daten?.code === 'BILD_ZU_KLEIN' ? BILD_ZU_KLEIN_TEXT : undefined)
   }
 
   return daten.url
@@ -577,8 +581,6 @@ type UploadResult =
 
 interface UseImageUploadOptions {
   variant: ImageUploadVariant
-  /** Bisheriges Bild — wird nach dem erfolgreichen Ersetzen aufgeräumt. */
-  oldUrl?: string
   /** Mehrfachauswahl — bewusst standardmäßig AUS. Nur die Galerie schaltet sie
    *  ein; Logo, Cover, Status und Produktbild sind Einzelbild-Felder. */
   multiple?: boolean
@@ -599,7 +601,6 @@ interface UseImageUploadOptions {
 
 export function useImageUpload({
   variant,
-  oldUrl,
   multiple = false,
   maxFiles,
   onUploaded,
@@ -632,7 +633,6 @@ export function useImageUpload({
       // Die Kopie entsteht in ladeFotoHoch und lebt nur dort — nach dem
       // Upload ist sie frei, bevor das nächste Foto einer Serie gelesen wird.
       url = await ladeFotoHoch(file, variant, {
-        altUrl: oldUrl,
         weg: auswahl.weg,
         onStufe: (stufe) =>
           setProgress((v) => (v ? { ...v, stufe } : { current: 1, total: 1, prozent: 0, stufe })),

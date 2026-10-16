@@ -34,11 +34,12 @@ import {
   LOGO_RAHMEN,
   LOGO_VORSCHAU_PX,
   alsFotoAusschnitt,
+  ausschnittOderNull,
 } from '@/lib/bild-rahmen'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { MARKE } from '@/lib/marke'
 import type { BildAusschnitt as BildAusschnittWert } from '@/schemas/bild-ausschnitt'
-import { useBildmasse } from '@/components/hofseite/titelbild'
+import { useBildmasse } from '@/components/shared/bild-masse'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 
@@ -126,10 +127,16 @@ type TitelbildAnschrift = { address: string; postalCode: string; city: string }
 export function TitelbildBaustein({
   hof,
   anschrift,
+  logoAusschnitt = null,
   onGespeichert,
   meldeErfolg,
   onHochladen,
-}: BildBausteinProps & { hof: TitelbildHof; anschrift: TitelbildAnschrift }): React.JSX.Element {
+}: BildBausteinProps & {
+  hof: TitelbildHof
+  anschrift: TitelbildAnschrift
+  /** Ausschnitt des Logos, schon geprüft — das kleine Logo der Browser-Vorschau steht damit wie auf der Hofseite (Nr. 108). */
+  logoAusschnitt?: BildAusschnittWert | null
+}): React.JSX.Element {
   const [offen, setOffen] = useState(false)
   const [pending, start] = useTransition()
   const [entferntGerade, startEntfernen] = useTransition()
@@ -182,7 +189,7 @@ export function TitelbildBaustein({
               // Am Computer gilt die Wahl, ohne Wahl die Form des Fotos — dieselbe Regel wie die Hofseite.
               ganz: (wert, gemessen) => titelbildDarstellung(gemessen, wert.darstellung) === 'ganz',
               umgebung: (rahmen) => (
-                <BrowserVorschau hof={hof} ort={ort}>
+                <BrowserVorschau hof={hof} logoAusschnitt={logoAusschnitt} ort={ort}>
                   {rahmen}
                 </BrowserVorschau>
               ),
@@ -243,7 +250,6 @@ export function TitelbildBaustein({
             </button>
           )}
           <CoverEditButton
-            currentBannerUrl={hof.bannerUrl}
             onGespeichert={onGespeichert}
             meldeErfolg={meldeErfolg}
             onHochladen={onHochladen}
@@ -265,7 +271,17 @@ export function TitelbildBaustein({
  * Nur Bild: Der Baustein setzt es `aria-hidden`; Links und Knöpfe der echten
  * Seite sind hier leere Flächen.
  */
-function BrowserVorschau({ hof, ort, children }: { hof: TitelbildHof; ort: string; children: ReactNode }): React.JSX.Element {
+function BrowserVorschau({
+  hof,
+  logoAusschnitt,
+  ort,
+  children,
+}: {
+  hof: TitelbildHof
+  logoAusschnitt: BildAusschnittWert | null
+  ort: string
+  children: ReactNode
+}): React.JSX.Element {
   return (
     <div className="overflow-hidden rounded-[10px] border border-border bg-background">
       <div className="flex h-[22px] items-center gap-1.5 border-b border-border bg-card px-2">
@@ -290,7 +306,12 @@ function BrowserVorschau({ hof, ort, children }: { hof: TitelbildHof; ort: strin
       {children}
       <div className="relative -mt-[13px] flex items-end gap-1.5 px-3">
         <span className="relative flex size-[26px] shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-background bg-accent font-heading text-[9px] font-bold text-accent-foreground">
-          {hof.logoUrl ? <Image src={hof.logoUrl} alt="" fill sizes="26px" className="object-cover" /> : hofInitialen(hof.name)}
+          {/* Rund, ohne Filter, mit dem Ausschnitt des Logos — wie überall, wo das Logo rund steht (Register N17). */}
+          {hof.logoUrl ? (
+            <Image src={hof.logoUrl} alt="" fill sizes="26px" className="object-cover" style={bildStil(logoAusschnitt, { filter: false })} />
+          ) : (
+            hofInitialen(hof.name)
+          )}
         </span>
         <span className="min-w-0 pb-px leading-tight">
           <span className="block truncate font-heading text-[9.5px] font-semibold text-foreground">{hof.name}</span>
@@ -363,18 +384,14 @@ export function LogoUpload({
 
   const { isUploading, progress, openFilePicker, fileInput } = useImageUpload({
     variant: 'logo',
-    oldUrl: logoUrl ?? undefined,
     onUploaded: (url) => {
       startTransition(async () => {
+        // Setzt im selben Update auch den Ausschnitt zurück (`null`): Der alte gehörte zum alten Foto (Nr. 108).
         const result = await updateFarmLogoAction(url)
         if (result.error) {
           toast.error(result.error)
           return
         }
-        // Der alte Ausschnitt gehörte zum alten Foto: zurück auf „wie heute“ (`null`), bevor der Baustein
-        // aufgeht — immer, denn ob einer gespeichert ist, weiß der Baustein nur, wenn der Aufrufer ihn reicht.
-        const zurueck = await speichereBildAusschnittAction({ ziel: 'logo', wert: AUSSCHNITT_STANDARD })
-        if ('error' in zurueck) toast.error(zurueck.error)
         setAusschnitt(null)
         setNeuesLogo(url)
         setOffen('nachUpload')
@@ -392,9 +409,16 @@ export function LogoUpload({
   }
 
   function speichern(wert: BildAusschnittWert) {
+    // Das Logo bekommt keinen Filter (Register N17) — der Baustein zeigt keine Kacheln, die Aktion nimmt nur „Natürlich“.
+    const ohneFilter = { ...alsFotoAusschnitt(wert), filter: 'NATUERLICH' as const }
+    // „Passt so“ gleich nach dem Upload ändert nichts: Das neue Logo steht schon ohne Ausschnitt und hat seinen
+    // Toast bekommen — kein zweiter Aufruf, kein zweiter Toast (Nacharbeit 98, Nr. 108).
+    if (offen === 'nachUpload' && ausschnittOderNull(ohneFilter) === null) {
+      schliessen()
+      return
+    }
     startAusschnitt(async () => {
-      // Das Logo bekommt keinen Filter (Register N17) — der Baustein zeigt keine Kacheln, die Aktion nimmt nur „Natürlich“.
-      const res = await speichereBildAusschnittAction({ ziel: 'logo', wert: { ...alsFotoAusschnitt(wert), filter: 'NATUERLICH' } })
+      const res = await speichereBildAusschnittAction({ ziel: 'logo', wert: ohneFilter })
       if ('error' in res) {
         toast.error(res.error)
         return

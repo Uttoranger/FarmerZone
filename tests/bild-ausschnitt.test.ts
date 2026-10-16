@@ -200,7 +200,10 @@ describe('ausschnittNachZiehen (das Foto folgt dem Finger)', () => {
 })
 
 describe('ausschnittNachTaste (WCAG 2.1.1)', () => {
-  const WERT = { fokusX: 50, fokusY: 50 }
+  // Quadrat im Rahmen 2 : 1, Zoom 150 %: Das Foto ragt auf beiden Achsen über den Rahmen — beide haben Spiel.
+  const RAHMEN = { breite: 2, hoehe: 1 }
+  const QUADRAT = { breite: 1000, hoehe: 1000 }
+  const WERT = { fokusX: 50, fokusY: 50, zoom: 150 }
 
   it.each([
     ['ArrowRight', false, { fokusX: 48, fokusY: 50 }],
@@ -210,16 +213,35 @@ describe('ausschnittNachTaste (WCAG 2.1.1)', () => {
     ['ArrowRight', true, { fokusX: 40, fokusY: 50 }],
     ['ArrowUp', true, { fokusX: 50, fokusY: 60 }],
   ])('%s (Umschalt: %s) verschiebt das Foto in Pfeilrichtung', (taste, umschalt, erwartet) => {
-    expect(ausschnittNachTaste(WERT, taste, umschalt)).toEqual(erwartet)
+    expect(ausschnittNachTaste(WERT, taste, umschalt, RAHMEN, QUADRAT)).toEqual(erwartet)
   })
 
   it('bleibt in 0–100', () => {
-    expect(ausschnittNachTaste({ fokusX: 1, fokusY: 99 }, 'ArrowRight', true)).toEqual({ fokusX: 0, fokusY: 99 })
-    expect(ausschnittNachTaste({ fokusX: 1, fokusY: 99 }, 'ArrowUp', true)).toEqual({ fokusX: 1, fokusY: 100 })
+    expect(ausschnittNachTaste({ fokusX: 1, fokusY: 99, zoom: 150 }, 'ArrowRight', true, RAHMEN, QUADRAT)).toEqual({ fokusX: 0, fokusY: 99 })
+    expect(ausschnittNachTaste({ fokusX: 1, fokusY: 99, zoom: 150 }, 'ArrowUp', true, RAHMEN, QUADRAT)).toEqual({ fokusX: 1, fokusY: 100 })
+  })
+
+  it('verschiebt nur auf einer Achse mit Spiel — Quadrat im Rahmen 3,6 : 1 bei 100 %: ←/→ tun nichts, ↑/↓ schon', () => {
+    const titelbild = { breite: 3.6, hoehe: 1 }
+    const wert = { fokusX: 50, fokusY: 50, zoom: 100 }
+    expect(ausschnittNachTaste(wert, 'ArrowRight', false, titelbild, QUADRAT)).toEqual({ fokusX: 50, fokusY: 50 })
+    expect(ausschnittNachTaste(wert, 'ArrowLeft', true, titelbild, QUADRAT)).toEqual({ fokusX: 50, fokusY: 50 })
+    expect(ausschnittNachTaste(wert, 'ArrowUp', false, titelbild, QUADRAT)).toEqual({ fokusX: 50, fokusY: 52 })
+    // Gegenprobe: gezoomt ragt das Foto auch waagrecht hinaus — dann wirkt → wieder.
+    expect(ausschnittNachTaste({ ...wert, zoom: 250 }, 'ArrowRight', false, titelbild, QUADRAT)).toEqual({ fokusX: 48, fokusY: 50 })
+  })
+
+  it('füllt das Foto den Rahmen genau, zählt die Achse als ohne Spiel (Kommazahlen-Rest)', () => {
+    // 3 : 1 im Rahmen 3 : 1 — rechnerisch 0 Spiel, mit Kommazahlen ein winziger Rest.
+    expect(ausschnittNachTaste({ fokusX: 50, fokusY: 50, zoom: 100 }, 'ArrowUp', false, { breite: 3, hoehe: 1 }, { breite: 0.3 * 10, hoehe: 1 })).toEqual({ fokusX: 50, fokusY: 50 })
+  })
+
+  it('ohne Maße (das Foto lädt noch) bleibt der Fokus stehen — die Taste gilt trotzdem als erkannt', () => {
+    expect(ausschnittNachTaste(WERT, 'ArrowRight', false, RAHMEN, null)).toEqual({ fokusX: 50, fokusY: 50 })
   })
 
   it.each(['Enter', 'a', 'Tab', 'toString'])('tut bei %s nichts', (taste) => {
-    expect(ausschnittNachTaste(WERT, taste, false)).toBeNull()
+    expect(ausschnittNachTaste(WERT, taste, false, RAHMEN, QUADRAT)).toBeNull()
   })
 })
 

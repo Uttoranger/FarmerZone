@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { Move, ZoomIn } from 'lucide-react'
 import { Segment } from '@/components/ui/segment'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
-import { useBildmasse } from '@/components/hofseite/titelbild'
+import { useBildmasse } from '@/components/shared/bild-masse'
 import {
   AUSSCHNITT_STANDARD,
   BILD_AUSSCHNITT_TEXT as TEXT,
@@ -190,7 +190,8 @@ export function BildAusschnitt({
   }
 
   function beiTaste(ereignis: KeyboardEvent<HTMLDivElement>): void {
-    const fokus = ausschnittNachTaste(wert, ereignis.key, ereignis.shiftKey)
+    // Das Verhältnis des Rahmens genügt: Ob eine Achse Spiel hat, hängt nicht von den Pixeln ab.
+    const fokus = ausschnittNachTaste(wert, ereignis.key, ereignis.shiftKey, { breite: rahmen.verhaeltnis, hoehe: 1 }, masse)
     if (!fokus) return
     ereignis.preventDefault()
     setBeruehrt(true)

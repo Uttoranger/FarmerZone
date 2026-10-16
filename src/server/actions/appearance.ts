@@ -1,7 +1,8 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
+import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -9,7 +10,7 @@ import type { SectionConfig } from '@/server/queries/appearance'
 import { appearanceSchema } from '@/schemas/auftritt'
 import { ABSCHNITT_SPEICHERN_TEXT, auftrittFehlerText } from '@/lib/abschnitt-stand'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
-import { speichereBildAusschnittAction } from '@/server/actions/bild-ausschnitt'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 
 // Das Schema liegt in src/schemas/auftritt.ts — der Hofseiten-Editor prüft
 // „Über uns" daraus, ohne es abzuschreiben. Der Typ steht hier als Alias,
@@ -111,10 +112,14 @@ export async function updateFarmLogoAction(logoUrl: string | null): Promise<{ er
   if (!farm) return { error: 'Hof nicht gefunden' }
   if (!(await bildUrlErlaubt(logoUrl, farm.id, async () => farm.logoUrl))) return { error: BILD_NICHT_UEBERNOMMEN }
 
-  await prisma.farm.update({ where: { id: farm.id }, data: { logoUrl } })
+  // Der Ausschnitt gehörte zum alten Logo: im selben Update zurück auf „wie heute“ (Nacharbeit 98, Nr. 108).
+  // Vorher war das ein zweiter Aufruf — scheiterte er, stand der alte Ausschnitt am neuen Logo.
+  await prisma.farm.update({ where: { id: farm.id }, data: { logoUrl, logoAusschnitt: Prisma.DbNull } })
 
   revalidatePath(`/${farm.slug}`)
   revalidatePath('/farm-page')
+  // Das Logo steht auch im Karussell auf /hoefe — dessen eigener Cache (wie bei speichereBildAusschnittAction).
+  updateTag(HOEFE_CACHE_TAG)
 
   return {}
 }
@@ -136,21 +141,4 @@ export async function updateFarmBannerAction(
   revalidatePath('/farm-page')
 
   return {}
-}
-
-/**
- * Altweg für den senkrechten Fokuspunkt (0 = oben, 100 = unten), seit Nr. 97
- * nur noch ein dünner Aufruf von speichereBildAusschnittAction — Mein Hof
- * nimmt den Bild-Baustein. Bleibt einen Zug für den Übergang und ist zum
- * Löschen vorgemerkt (Bericht Nr. 97). Der Wert wird hart geclampt — der
- * Client kann schicken, was er will; der Rest des Ausschnitts ist der Stand
- * von vorher (Mitte, 100 %, Natürlich, ohne Wahl).
- */
-export async function updateBannerFocusAction(focusY: number): Promise<{ error?: string }> {
-  const fokusY = Math.min(100, Math.max(0, Math.round(Number(focusY) || 0)))
-  const ergebnis = await speichereBildAusschnittAction({
-    ziel: 'banner',
-    wert: { fokusX: 50, fokusY, zoom: 100, filter: 'NATUERLICH' },
-  })
-  return 'error' in ergebnis ? { error: ergebnis.error } : {}
 }
