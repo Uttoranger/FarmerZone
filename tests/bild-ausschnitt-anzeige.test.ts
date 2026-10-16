@@ -14,9 +14,11 @@
  *    Ausschnitt; die große Bildansicht der Galerie zeigt das ganze Foto mit
  *    seinem Filter, ohne Fokus und Zoom (Nr. 98, Runde 1).
  *  - Alle vier Upload-Stellen (Logo, Galerie, Produktdialog, Beitrag) öffnen
- *    den Baustein nach dem Upload mit „Passt so“, das Titelbild nicht.
+ *    den Baustein nach dem Upload mit „Passt so“, das Titelbild nicht; beim
+ *    Beitrag hängt der Baustein am Foto (`key`, Nr. 108).
  *  - Die Vorschau-Paare im Produktdialog passen am Handy (375 px) in die
- *    Breite: kein waagrechtes Scrollen (Nr. 98, Runde 2).
+ *    Breite: kein waagrechtes Scrollen (Nr. 98, Runde 2); die Listen-Zeile
+ *    zählt mit ihrer Mindestbreite von 132 px (Nr. 108).
  *  - Wache: Der Screenshot unter „Problem melden“ (Zweck meldung) und die
  *    Rohfoto-Stellen (Warenkorb, Kasse, E-Mails, Teilen-Bild) binden weder den
  *    Baustein noch den Stil ein. Gegenprobe: Dieselbe Suche findet beide in
@@ -257,7 +259,7 @@ describe('Käufer-Vorschau im Produktdialog — derselbe Ausschnitt wie im Baust
 })
 
 describe('Bildansicht der Galerie — das ganze Foto mit Filter, ohne Beschnitt', () => {
-  const bild = { offen: 0, oeffne: () => {}, schliesse: () => {}, vor: () => {}, zurueck: () => {} }
+  const bild = { offen: 0, oeffne: () => {}, schliesse: () => {}, vor: () => {}, zurueck: () => {}, geheZu: () => {} }
   const ansicht = (ausschnitt: BildAusschnitt | null) =>
     renderToStaticMarkup(createElement(BildansichtEbene, { fotos: [{ id: 'f1', url: FOTO, caption: null, ausschnitt }], bild, titel: 'Fotos vom Hof' }))
 
@@ -298,6 +300,24 @@ describe('Nach dem Upload — „Passt so“ an allen vier Upload-Stellen, nicht
     expect(mitUpload).toHaveLength(4)
   })
 
+  it('Beitrag: Der Baustein hängt am Foto (`key={photoUrl}`) — ein neues Foto bei offenem Baustein beginnt frisch (Nr. 108)', () => {
+    const pfad = 'src/app/(hof)/status/new/status-new-client.tsx'
+    const baum = ts.createSourceFile(pfad, quelle(pfad), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const schluessel: string[] = []
+    const besuche = (knoten: ts.Node): void => {
+      if (ts.isJsxSelfClosingElement(knoten) && knoten.tagName.getText(baum) === 'BildAusschnitt') {
+        for (const a of knoten.attributes.properties) {
+          if (ts.isJsxAttribute(a) && a.name.getText(baum) === 'key' && a.initializer) schluessel.push(a.initializer.getText(baum))
+        }
+      }
+      ts.forEachChild(knoten, besuche)
+    }
+    besuche(baum)
+    expect(schluessel).toEqual(['{photoUrl}'])
+    // Gegenprobe: Dieselbe Suche findet den Schlüssel der Galerie in Mein Hof.
+    expect(aufrufe('src/components/mein-hof/bild-bausteine.tsx').filter((aufruf) => aufruf.includes('key'))).toHaveLength(1)
+  })
+
   it('Gegenprobe: Der Aufruf des Titelbilds (Nr. 97) findet sich und bleibt ohne', () => {
     const titelbild = aufrufe('src/components/mein-hof/bild-bausteine.tsx').filter((aufruf) => aufruf.includes('mitDarstellung'))
     expect(titelbild).toHaveLength(1)
@@ -313,6 +333,9 @@ describe('Vorschau-Paare im Produktdialog — passen am Handy (375 px) in die Br
   const ABSTAND = 10
   // So viel behält ein Rahmen ohne feste Breite mindestens, sonst ist er nicht mehr lesbar.
   const GETEILT_MINDESTENS = 96
+  // Die Listen-Zeile (Nacharbeit 98, Nr. 108) braucht mehr, auch ohne Namen: Polster p-2 und Linie (2 × 8 + 2 × 1),
+  // Foto 64, Plus 30 und zwei Abstände gap-2.5 (2 × 10) — 132 px. Darunter schnitte sie den Plus-Knopf ab.
+  const LISTEN_ZEILE_MINDESTENS = 132
 
   /** Je Vorschau-Reihe die festen Breiten (undefined = teilt sich den Platz) — aus dem Syntaxbaum. */
   const reihen = (): (number | undefined)[][] => {
@@ -336,12 +359,15 @@ describe('Vorschau-Paare im Produktdialog — passen am Handy (375 px) in die Br
     besuche(baum)
     if (!liste) throw new Error('Keine Vorschau-Liste im Produktdialog')
     return liste.elements.filter(ts.isObjectLiteralExpression).map((vorschau) => {
-      const daneben = vorschau.properties.find(
-        (e): e is ts.PropertyAssignment => ts.isPropertyAssignment(e) && e.name.getText(baum) === 'daneben',
-      )
+      const eigenschaft = (name: string) =>
+        vorschau.properties.find((e): e is ts.PropertyAssignment => ts.isPropertyAssignment(e) && e.name.getText(baum) === name)
+      const daneben = eigenschaft('daneben')
       const partner =
         daneben && ts.isArrayLiteralExpression(daneben.initializer) ? daneben.initializer.elements.filter(ts.isObjectLiteralExpression) : []
-      return [vorschau, ...partner].map(breite)
+      // Der erste Rahmen der Reihe „In der Liste“ ist die Listen-Zeile; ohne feste Breite rechnet er mit deren Mindestbreite.
+      const listenZeile = eigenschaft('titel')?.initializer.getText(baum) === 'BILD_RAHMEN_TEXT.produkt.liste'
+      const [erster, ...rest] = [vorschau, ...partner].map(breite)
+      return [erster ?? (listenZeile ? LISTEN_ZEILE_MINDESTENS : undefined), ...rest]
     })
   }
   const mindestBreite = (reihe: (number | undefined)[]): number =>
@@ -353,6 +379,12 @@ describe('Vorschau-Paare im Produktdialog — passen am Handy (375 px) in die Br
 
   it('keine Reihe ist breiter als der Platz bei 375 px', () => {
     for (const reihe of reihen()) expect(mindestBreite(reihe)).toBeLessThanOrEqual(PLATZ_375)
+  })
+
+  it('die Reihe „In der Liste“ rechnet mit der Mindestbreite der Listen-Zeile (132 px), nicht mit 96', () => {
+    expect(reihen()[0]?.[0]).toBe(LISTEN_ZEILE_MINDESTENS)
+    // Gegenprobe: Mit einem Partner von 160 px statt 150 wäre die Reihe zu breit (132 + 10 + 160 = 302 > 301).
+    expect(mindestBreite([LISTEN_ZEILE_MINDESTENS, 160])).toBeGreaterThan(PLATZ_375)
   })
 
   it('Gegenprobe: zwei feste Rahmen wie 196 + 110 px schlügen an', () => {

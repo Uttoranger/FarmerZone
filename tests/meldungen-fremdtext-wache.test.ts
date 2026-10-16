@@ -24,6 +24,9 @@ const DATEIEN = [
   'src/lib/meldung.ts',
   'src/server/actions/admin.ts',
   'src/server/queries/meldung.ts',
+  // Seit Nr. 105 (Nacharbeit 101): der Weg der Meldung herein und die Schreibroute.
+  'src/server/actions/meldung.ts',
+  'src/app/api/triage/status/route.ts',
   'src/app/api/cron/briefkasten/route.ts',
   'src/app/admin/meldungen/route.ts',
   'src/app/admin/meldungen/[id]/route.ts',
@@ -35,8 +38,22 @@ const DATEIEN = [
     .map((n) => `src/components/admin/${n}`),
 ]
 
+/**
+ * Begründete Ausnahmen je Datei: ein Name, der dort nachweislich keinen
+ * Fremdtext trägt. Jede mit Grund; ein anderer Name in derselben Datei schlägt
+ * weiter an (Gegenprobe unten).
+ */
+const AUSNAHMEN: readonly { datei: string; name: string; warum: string }[] = [
+  {
+    datei: 'src/server/actions/meldung.ts',
+    name: 'grund',
+    warum: 'der Grund einer stillen Abweisung ist ein festes Wort (Honigtopf, Zeitschranke/…), kein Text der Meldung — und nur außerhalb der Produktion',
+  },
+]
+
 /** Alle Aufrufe von console.* und Sentry.*, deren Argumente einen Fremdtext-Namen enthalten. */
 function fremdtextInProtokoll(quelltext: string, pfad: string): string[] {
+  const ausgenommen = new Set(AUSNAHMEN.filter((a) => a.datei === pfad).map((a) => a.name))
   const datei = ts.createSourceFile(pfad, quelltext, ts.ScriptTarget.Latest, true, pfad.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
   const funde: string[] = []
   const namenIn = (knoten: ts.Node, namen: string[]): void => {
@@ -49,7 +66,7 @@ function fremdtextInProtokoll(quelltext: string, pfad: string): string[] {
       if (ziel === 'console' || ziel === 'Sentry') {
         const namen: string[] = []
         for (const arg of knoten.arguments) namenIn(arg, namen)
-        const treffer = namen.filter((n) => FREMDTEXT.has(n))
+        const treffer = namen.filter((n) => FREMDTEXT.has(n) && !ausgenommen.has(n))
         if (treffer.length > 0) {
           const zeile = datei.getLineAndCharacterOfPosition(knoten.getStart()).line + 1
           funde.push(`${pfad}:${zeile} ${ziel}.${knoten.expression.name.text}(… ${treffer.join(', ')} …)`)
@@ -70,6 +87,12 @@ describe('Wache: kein Meldungstext in Sentry oder in einer Server-Log-Zeile', ()
   it('kein console.*- oder Sentry.*-Aufruf reicht Text, Antwort, Notiz oder Adresse weiter', () => {
     const funde = DATEIEN.flatMap((d) => fremdtextInProtokoll(readFileSync(join(WURZEL, d), 'utf8'), relative(WURZEL, join(WURZEL, d))))
     expect(funde).toEqual([])
+  })
+
+  it('Gegenprobe: eine Ausnahme gilt nur für ihren Namen in ihrer Datei', () => {
+    expect(fremdtextInProtokoll('console.log(grund)', 'src/server/actions/meldung.ts')).toEqual([])
+    expect(fremdtextInProtokoll('console.log(grund, m.text)', 'src/server/actions/meldung.ts')).toHaveLength(1)
+    expect(fremdtextInProtokoll('console.log(grund)', 'src/server/actions/admin.ts')).toHaveLength(1)
   })
 
   it('Gegenprobe: Text, Antwort und Adresse schlagen an — als Variable, Feld und Kurzschreibweise', () => {

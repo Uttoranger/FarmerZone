@@ -104,10 +104,11 @@ describe('gruendungEinstellungSchema — nur eigene Sätze, nie Zods englischer 
     expect(satzVon(eingabe)).toBe(satz)
   })
 
-  it('die Gruppe aus der Adresse: Unbekanntes zeigt die erste', () => {
-    expect(einstellungenGruppeSchema.parse('betrieb')).toBe('betrieb')
+  it('die Gruppe aus der Adresse: Unbekanntes zeigt die erste — „betrieb“ gibt es seit Nr. 103 nicht mehr (die Seite leitet vorher um)', () => {
+    expect(einstellungenGruppeSchema.parse('plattform')).toBe('plattform')
+    expect(einstellungenGruppeSchema.parse('betrieb')).toBe('gruendung')
     expect(einstellungenGruppeSchema.parse('<script>')).toBe('gruendung')
-    expect(einstellungenGruppeSchema.parse(['plattform', 'betrieb'])).toBe('gruendung')
+    expect(einstellungenGruppeSchema.parse(['plattform', 'gruendung'])).toBe('gruendung')
     expect(einstellungenGruppeSchema.parse(undefined)).toBe('gruendung')
   })
 })
@@ -210,7 +211,7 @@ describe('speichereGruendungEinstellung — die Wache und was geschrieben wird',
 })
 
 describe('EinstellungenGruendung — die zwei gesperrten Felder', () => {
-  const daten = { gespeichert: GUT, imRennen: 7, jetzt: JETZT.toISOString(), protokoll: 'Noch nie geändert – es gelten die Standardwerte.' }
+  const daten = { gespeichert: GUT, imRennen: 7, ausgenommen: 0, jetzt: JETZT.toISOString(), protokoll: 'Noch nie geändert – es gelten die Standardwerte.' }
 
   it('Plätze und Ende nur lesend mit Hinweis; der Schalter bleibt bedienbar', () => {
     const html = renderToStaticMarkup(createElement(EinstellungenGruendung, { daten }))

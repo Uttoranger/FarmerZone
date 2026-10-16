@@ -8,7 +8,9 @@ import { ladeStartseite, ladeVorschauZeilen } from '@/server/queries/startseite'
 import { vorschauDieserAnfrage } from '@/server/startseite-vorschau'
 import { schonGemeldet } from '@/server/oeffentlich-lesen'
 import { waehleKartenHoefe, waehleStartseitenHoefe, type StartseitenHof, type StartseitenKarte } from '@/lib/startseite'
-import { HOEFE_AUSWAHL_MAX, standText, zuRendern, type RenderEintrag, type StartseitenBlockDaten } from '@/lib/startseite-gestalten'
+import { HOEFE_AUSWAHL_MAX, zuRendern, type RenderEintrag, type StartseitenBlockDaten } from '@/lib/startseite-gestalten'
+import { vorschauBandText } from '@/lib/startseite-fassung'
+import type { VorschauQuelle } from '@/schemas/startseite'
 import type { KartenForm } from '@/lib/regionskarte'
 import { istBrennmaterialSaison } from '@/lib/brennmaterial-saison'
 import { categoryImagePath } from '@/lib/product-image'
@@ -152,12 +154,12 @@ function Eintrag({ eintrag, jetzt }: { eintrag: RenderEintrag; jetzt: Date }) {
   }
 }
 
-/** Nur in der Vorschau: oben ein Band, damit niemand die Vorschau für die echte Seite hält. */
-function VorschauBand({ datum }: { datum: Date }) {
+/** Nur in der Vorschau: oben ein Band, damit niemand die Vorschau für die echte Seite hält — mit Quelle und Tag (Nr. 106). */
+function VorschauBand({ quelle, datum }: { quelle: VorschauQuelle; datum: Date }) {
   return (
     <p role="status" className="flex items-center justify-center gap-2 border-b border-primary/45 bg-primary/12 px-4 py-2 text-center text-[13px] font-semibold text-foreground">
       <Eye className="size-4 shrink-0 text-status-offen" strokeWidth={1.8} aria-hidden="true" />
-      Vorschau · Stand am {standText(datum)}
+      {vorschauBandText(quelle, datum)}
     </p>
   )
 }
@@ -191,7 +193,7 @@ export default async function HomePage({
 
   return (
     <KundeShellMitSitzung>
-      {vorschau && <VorschauBand datum={vorschau.datum} />}
+      {vorschau && <VorschauBand quelle={vorschau.quelle} datum={vorschau.datum} />}
       {eintraege.map((eintrag) => (
         <Eintrag key={eintrag.art === 'BLOCK' ? eintrag.block.id : eintrag.art} eintrag={eintrag} jetzt={jetzt} />
       ))}

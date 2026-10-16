@@ -19,9 +19,12 @@ vi.mock('@/lib/prisma', () => ({
     user: { findUnique: vi.fn() },
     farm: { findUnique: vi.fn(), update: vi.fn() },
     meldung: { findUnique: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
+    // Mit Verweis schreibt EINE SQL-Anweisung samt Bedingung an die Hauptmeldung (Nr. 105).
+    $executeRaw: vi.fn(),
   },
 }))
 
+import { Prisma } from '@prisma/client'
 import { triageMeldungAction } from '@/server/actions/admin'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -32,6 +35,14 @@ const meldungFindUnique = vi.mocked(prisma.meldung.findUnique)
 const meldungFindFirst = vi.mocked(prisma.meldung.findFirst)
 // Bedingtes Schreiben (Sprint Briefkasten-Rückkopplung): die Action nimmt updateMany.
 const meldungUpdate = vi.mocked(prisma.meldung.updateMany)
+const executeRaw = vi.mocked(prisma.$executeRaw)
+
+/** Die Anweisung des letzten SQL-Aufrufs, wie Prisma sie zusammensetzt — Text und Werte. */
+function letzteAnweisung(): { text: string; werte: unknown[] } {
+  const [teile, ...werte] = executeRaw.mock.calls.at(-1) as unknown as [TemplateStringsArray, ...unknown[]]
+  const anweisung = Prisma.sql(teile, ...werte)
+  return { text: anweisung.text, werte: anweisung.values }
+}
 
 const ID = 'cmfmeldung0000000001abc'
 const ORIGINAL = 'cmforiginal000000002xyz'
@@ -114,17 +125,39 @@ describe('triageMeldungAction — Duplikat', () => {
   })
 
   it('löst eine Kurznummer als Präfix auf und speichert die volle ID', async () => {
-    meldungFindFirst.mockResolvedValue({ id: ORIGINAL } as never)
+    meldungFindFirst.mockResolvedValue({ id: ORIGINAL, status: 'GEPRUEFT' } as never)
+    executeRaw.mockResolvedValue(1)
     const result = await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: ORIGINAL.slice(0, 8) })
     expect(result).toEqual({})
     expect(meldungFindFirst.mock.calls[0][0]?.where).toEqual({ id: { startsWith: ORIGINAL.slice(0, 8) } })
-    expect(meldungUpdate.mock.calls[0][0].data).toMatchObject({ status: 'DUPLIKAT', duplikatVonId: ORIGINAL })
+    const { werte } = letzteAnweisung()
+    expect(werte).toContain('DUPLIKAT')
+    expect(werte.filter((w) => w === ORIGINAL)).toHaveLength(2)
+    expect(meldungUpdate).not.toHaveBeenCalled()
   })
 
   it('sucht eine volle ID exakt', async () => {
-    meldungFindFirst.mockResolvedValue({ id: ORIGINAL } as never)
+    meldungFindFirst.mockResolvedValue({ id: ORIGINAL, status: 'GEPRUEFT' } as never)
+    executeRaw.mockResolvedValue(1)
     await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: ORIGINAL })
     expect(meldungFindFirst.mock.calls[0][0]?.where).toEqual({ id: ORIGINAL })
+  })
+
+  it('keine Kette: Ist die Hauptmeldung selbst ein Duplikat, wird nichts geschrieben', async () => {
+    meldungFindFirst.mockResolvedValue({ id: ORIGINAL, status: 'DUPLIKAT' } as never)
+    const result = await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: ORIGINAL })
+    expect(result).toEqual({ error: 'Diese Meldung ist selbst ein Duplikat – nimm ihre Hauptmeldung.' })
+    expect(executeRaw).not.toHaveBeenCalled()
+    expect(meldungUpdate).not.toHaveBeenCalled()
+  })
+
+  it('keine Kette beim Schreiben: wird die Hauptmeldung dazwischen Duplikat, trifft die Anweisung nichts — Satz mit Ausweg', async () => {
+    meldungFindFirst.mockResolvedValue({ id: ORIGINAL, status: 'GEPRUEFT' } as never)
+    executeRaw.mockResolvedValue(0)
+    const result = await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: ORIGINAL })
+    expect(result).toEqual({ error: 'Die Meldung oder ihre Hauptmeldung hat sich inzwischen geändert — lade die Seite neu und entscheide noch einmal.' })
+    // Die Bedingung steht in derselben Anweisung wie das Schreiben (Zustand prüft tests/integration/meldungen-ablauf.int.test.ts).
+    expect(letzteAnweisung().text).toMatch(/UPDATE "Meldung"[\s\S]*WHERE[\s\S]*EXISTS \(SELECT 1 FROM "Meldung" h WHERE h\."id" = \$\d+ AND h\."status" <> 'DUPLIKAT'\)/)
   })
 })
 

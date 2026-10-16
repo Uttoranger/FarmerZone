@@ -350,4 +350,8 @@ export const ADMIN_STARTSEITE_TEXT = {
     'Die echte Startseite – dein Entwurf oder die Live-Fassung – mit den Blöcken, die am gewählten Tag live wären. Höfe und Produkte sind der Stand von jetzt.',
   vorschauLinkSatz: '„Vorschau öffnen“ zeigt dieselbe Seite im Browser über einen signierten Link (nur Admin, 1 Stunde) – zum Durchtippen am eigenen Handy.',
   vorschauOeffnen: 'Vorschau öffnen',
+  /** Unter dem Rahmen, sobald die neue Vorschau steht — Uhrzeit in Wien (Register N16, Ergänzung Nr. 106). */
+  vorschauAktualisiert: (uhrzeit: string) => `Vorschau aktualisiert · ${uhrzeit}`,
+  vorschauLaedt: 'Vorschau wird aktualisiert',
+  rahmenTitel: 'Vorschau der Startseite',
 } as const

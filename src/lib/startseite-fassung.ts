@@ -21,7 +21,9 @@ import {
   type AbschnittArt,
   type StartseitenBlockDaten,
   type StartseitenZeile,
+  standText,
 } from '@/lib/startseite-gestalten'
+import type { VorschauQuelle } from '@/schemas/startseite'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { uhrzeitInWien } from '@/lib/fristen'
 import { MONAT_KURZ, formatTagKurz } from '@/lib/format'
@@ -473,6 +475,7 @@ export const ENTWURF_TEXT = {
   verlauf: 'Verlauf',
   entwurf: 'Entwurf',
   live: 'Live',
+  fassung: 'Fassung',
   geplant: 'Geplant',
   frueher: 'Früher',
   nichtsGeplant: 'Nichts geplant',
@@ -559,4 +562,40 @@ export function verlaufZeitraum(liveAb: string, bis: string): string {
 export function planungKurz(vorher: FassungInhalt, fassung: FassungInhalt): string {
   const aenderungen = vergleicheMitLive(vorher, fassung)
   return aenderungen.length > 0 ? aenderungen.map(aenderungKurz).join(' · ') : ENTWURF_TEXT.keineAenderungen
+}
+
+// ─── Vorschau des Entwurfs: Quelle, Neuladen, Lage im Rahmen (Nr. 106) ─────
+
+/** Wie die Quelle einer Vorschau heißt — im Band der Seite und im Titel des Rahmens. */
+export function vorschauQuelleText(quelle: VorschauQuelle): string {
+  if (quelle === 'entwurf') return ENTWURF_TEXT.entwurf
+  return quelle === 'live' ? ENTWURF_TEXT.live : ENTWURF_TEXT.fassung
+}
+
+/** Das Band oben auf der Seite im Rahmen: „Vorschau · Entwurf · Stand am Fr, 16. Okt 2026“ (Nacharbeit 99). */
+export function vorschauBandText(quelle: VorschauQuelle, datum: Date): string {
+  return `Vorschau · ${vorschauQuelleText(quelle)} · Stand am ${standText(datum)}`
+}
+
+/**
+ * Welche Rahmen stehen (Register N16, Ergänzung Nr. 106): Der sichtbare
+ * bleibt, bis die neue Adresse fertig geladen ist — dann tauscht die
+ * Vorschau. Bis dahin lädt die neue unsichtbar daneben; kommt währenddessen
+ * eine noch neuere, ersetzt sie die ladende. Nie ein leerer Rahmen nach einer
+ * Speicherung, nie mehr als zwei.
+ */
+export function vorschauRahmen(sichtbar: string | null, gewuenscht: string | null): { rahmen: string[]; laedt: boolean } {
+  const laedt = gewuenscht !== null && gewuenscht !== sichtbar
+  return { rahmen: [...(sichtbar === null ? [] : [sichtbar]), ...(laedt ? [gewuenscht] : [])], laedt }
+}
+
+/**
+ * Wohin der neue Rahmen nach dem Laden scrollt: dorthin, wo der alte stand —
+ * solange der alte noch die Startseite zeigt. Hat jemand im Rahmen eine
+ * andere Seite geöffnet (oder lässt der Browser keinen Blick hinein), beginnt
+ * der neue oben. Eine Markierung, die selbst scrollt (VorschauImRahmen),
+ * gibt es nur auf der Hofseite; die Startseite im Rahmen scrollt nie selbst.
+ */
+export function scrollNachNeuladen(alt: { pfadname: string; scrollY: number } | null): number {
+  return alt !== null && alt.pfadname === '/' ? Math.max(0, Math.round(alt.scrollY)) : 0
 }

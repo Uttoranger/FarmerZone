@@ -1,21 +1,20 @@
 /**
- * Tests für die Ansicht von „Mein Hof" unter lg (src/lib/mein-hof-ansicht.ts,
- * Nachtlauf Nr. 49, Register N3/N4).
+ * Tests für die Kundenansicht von „Mein Hof" unter lg (src/lib/mein-hof-ansicht.ts,
+ * Nachtlauf Nr. 49, Register N3/N4; seit Nr. 107 als Vollbild).
  *
  * Beweist:
- *  - Der Umschalter heißt „Bearbeiten · So sieht’s die Kundin"; seine Wahl
- *    steht in der Adresse (?ansicht=kundin), Unsinn fällt still auf
- *    „Bearbeiten", die übrigen Parameter bleiben.
- *  - „So sieht’s die Kundin" ist der passende Reiter der echten Hofseite in
- *    der Vorschau (vorschauLink) — Produkte zeigt den Reiter Produkte.
+ *  - Die Wörter des Vollbilds und von „Gespeichert · Ansehen" kommen aus einer
+ *    Quelle; die Wahl steht in der Adresse (?ansicht=kundin), Unsinn fällt still
+ *    auf „Bearbeiten", die übrigen Parameter bleiben.
+ *  - Die Kundenansicht ist der passende Reiter der echten Hofseite in der
+ *    Vorschau (vorschauLink) — Produkte zeigt den Reiter Produkte.
  *  - „Ansehen" von außen führt auf den Reiter von Mein Hof mit der
  *    Kundenansicht, aus derselben Liste wie die Reiter.
- *  - Der Umschalter gilt für Produkte unter md, für Hofseite und Beiträge
+ *  - Das Vollbild gilt für Produkte unter md, für Hofseite und Beiträge
  *    unter lg.
  */
 import { describe, it, expect } from 'vitest'
 import {
-  MEIN_HOF_ANSICHT_OPTIONEN,
   MEIN_HOF_ANSICHT_TEXT,
   ansichtAdresse,
   kundenAnsichtAdresse,
@@ -27,15 +26,13 @@ import { vorschauLink } from '@/lib/hofseite-vorschau'
 import { GESPEICHERT_TEXT, MEIN_HOF_REITER_HOFBEREICH } from '@/lib/bauern-navigation'
 
 describe('Texte', () => {
-  it('die Wahl heißt „Bearbeiten · So sieht’s die Kundin", in dieser Reihenfolge', () => {
-    expect(MEIN_HOF_ANSICHT_OPTIONEN.map((o) => [o.wert, o.label])).toEqual([
-      ['bearbeiten', 'Bearbeiten'],
-      ['kundin', 'So sieht’s die Kundin'],
-    ])
+  it('das Vollbild heißt „Kundenansicht · So sieht dich die Kundschaft" und schließt mit „Fertig"', () => {
+    expect(MEIN_HOF_ANSICHT_TEXT.kundenansicht).toBe('Kundenansicht')
+    expect(MEIN_HOF_ANSICHT_TEXT.kundschaft).toBe('So sieht dich die Kundschaft')
+    expect(MEIN_HOF_ANSICHT_TEXT.fertig).toBe('Fertig')
   })
 
-  it('„In neuem Tab öffnen" und „Gespeichert · Ansehen" aus einer Quelle', () => {
-    expect(MEIN_HOF_ANSICHT_TEXT.neuerTab).toBe('In neuem Tab öffnen')
+  it('„Gespeichert · Ansehen" aus einer Quelle', () => {
     expect(MEIN_HOF_ANSICHT_TEXT.ansehen).toBe('Ansehen')
     // „Gespeichert" ist derselbe Text wie der Toast der Einstellungen.
     expect(MEIN_HOF_ANSICHT_TEXT.gespeichert).toBe(GESPEICHERT_TEXT)

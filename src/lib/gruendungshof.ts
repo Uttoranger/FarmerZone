@@ -104,6 +104,13 @@ export type HofFuerPlatz = {
   approvedAt: Date | null
   createdAt: Date
   archivedAt: Date | null
+  /**
+   * Aus der Vergabe genommen (Register K2, Ergänzung 16.10.2026, Nr. 109) —
+   * Pflichtfeld, damit kein Aufrufer es vergisst: Die Höfe kommen nur aus
+   * HOF_FUER_GRUENDUNG oder dem Select von getAdminFarms (Wache
+   * tests/gruendung-ausgenommen-wache.test.ts).
+   */
+  gruendungAusgenommen: boolean
 }
 
 /**
@@ -112,6 +119,7 @@ export type HofFuerPlatz = {
  * Es zählen nur freigeschaltete und nicht stillgelegte Höfe. Ein stillgelegter
  * Hof belegt keinen Platz — sonst blockierte ein aufgegebener Hof dauerhaft
  * eine Zusage, die niemand mehr nutzt; die nachfolgenden Höfe rücken auf.
+ * Ebenso ein ausgenommener Hof (Register K2, Nr. 109, etwa ein Testhof).
  *
  * Sortiert wird nach `approvedAt` aufsteigend; bei gleichem Zeitpunkt
  * entscheidet `createdAt`, danach die `id`. Diese doppelte Rückfallebene ist
@@ -124,7 +132,7 @@ export type HofFuerPlatz = {
  */
 export function gruendungsplaetze(hoefe: HofFuerPlatz[]): Map<string, number> {
   const imRennen = hoefe
-    .filter((h): h is HofFuerPlatz & { approvedAt: Date } => h.approvedAt !== null && h.archivedAt === null)
+    .filter((h): h is HofFuerPlatz & { approvedAt: Date } => h.approvedAt !== null && h.archivedAt === null && !h.gruendungAusgenommen)
     .sort((a, b) => {
       const nachFreigabe = a.approvedAt.getTime() - b.approvedAt.getTime()
       if (nachFreigabe !== 0) return nachFreigabe
@@ -395,3 +403,115 @@ export const GRUENDUNG_TEXT = {
     nach: ` – ${tarifText('HOFLADEN').name} ${KOSTENLOS} bis ${gruendungTagLang(bisTag)}. Die Zusage kommt mit der Freischaltung.`,
   }),
 } as const
+
+// === AUSGENOMMENE HÖFE (Register K2, Ergänzung 16.10.2026, Nr. 109) ===
+
+/**
+ * Die Kennung der Advisory-Sperre um die Vergabe der Gründungsplätze
+ * („gruendungsplaetze“: „K2“ in ASCII und Nr. 109). Freischalten, Ausnehmen und
+ * Wiederaufnehmen nehmen sie in ihrer Transaktion
+ * (`SELECT pg_advisory_xact_lock(...)`), bevor sie die Höfe lesen — so
+ * können zwei Wege nie gleichzeitig denselben letzten Platz vergeben. EINE
+ * Stelle, damit alle drei dieselbe Sperre nehmen; als bigint, weil Postgres
+ * die Sperre über int8 führt. Andere Advisory-Sperren gibt es im Code nicht.
+ */
+export const GRUENDUNGSPLAETZE_SPERRE: bigint = BigInt(0x4b32_0109)
+
+/** Die Marke in der Spalte Gründungshof (Wortliste: „ausgenommen“). */
+export const GRUENDUNG_AUSGENOMMEN_MARKE = 'ausgenommen · Testhof'
+
+/** Wie viele freigeschaltete, nicht stillgelegte Höfe ausgenommen sind — „· k ausgenommen“ in Admin › Höfe und Einstellungen. */
+export function zaehleAusgenommene(hoefe: readonly HofFuerPlatz[]): number {
+  return hoefe.filter((h) => h.approvedAt !== null && h.archivedAt === null && h.gruendungAusgenommen).length
+}
+
+/** Alle Plätze vergeben — Satz der Action und Grund am ausgegrauten Menüeintrag. */
+export function gruendungAlleVergeben(plaetze: number): string {
+  return `Alle ${plaetze} Plätze sind vergeben – erst muss ein Platz frei werden.`
+}
+
+/**
+ * Darf ein ausgenommener Hof wieder in die Vergabe? Nur, wenn danach höchstens
+ * `plaetze` Höfe im Rennen sind (Register K2) — so verliert nie ein anderer
+ * Hof seine Zusage. EINE Regel für Action (in der Sperre) und Menü.
+ */
+export function wiederAufnahmeMoeglich(hofId: string, hoefe: readonly HofFuerPlatz[], plaetze: number): boolean {
+  const nachher = gruendungsplaetze(hoefe.map((h) => (h.id === hofId ? { ...h, gruendungAusgenommen: false } : h)))
+  return nachher.size <= Math.max(plaetze, 0)
+}
+
+export type GruendungRichtung = 'ausnehmen' | 'aufnehmen'
+
+/** Ein Hof, wie die Folgen ihn brauchen: Platzvergabe, Name und eigenes Ende (null = Standard). */
+export type HofFuerFolgen = HofFuerPlatz & { name: string; gruendungBis: Date | null }
+
+/** Ein anderer Hof, dessen Nummer sich ändert. `von`/`nach` sind Ränge, ein Platz nur bis `plaetze`. */
+export type PlatzWechsel = { id: string; name: string; von: number; nach: number; gruendungBis: Date | null }
+
+export type GruendungFolgen = {
+  richtung: GruendungRichtung
+  /** Der Gründungsplatz des Hofs vor der Änderung, null ohne Platz. */
+  platzVorher: number | null
+  /** Sein Gründungsplatz danach, null ohne Platz. */
+  platzNachher: number | null
+  /** Höfe mit Platz vorher und nachher, deren Nummer sich verschiebt — nach der neuen Nummer. */
+  verschoben: PlatzWechsel[]
+  /** Höfe, die dadurch NEU Gründungshof werden (nur beim Ausnehmen möglich). */
+  neu: PlatzWechsel[]
+  /** Höfe, die ihren Platz verlören — nur bei einer Wiederaufnahme, die nicht geht. */
+  verlieren: PlatzWechsel[]
+  freiNachher: number
+  /** Ausnehmen geht immer; Wiederaufnahme nur, wenn danach höchstens `plaetze` Höfe im Rennen sind. */
+  moeglich: boolean
+}
+
+function mitFlag<T extends HofFuerPlatz>(hoefe: readonly T[], hof: T, ausgenommen: boolean): T[] {
+  const andere = hoefe.filter((h) => h.id !== hof.id)
+  return [...andere, { ...hof, gruendungAusgenommen: ausgenommen }]
+}
+
+/**
+ * Was das Aus- bzw. Wiederaufnehmen eines Hofs an den Plätzen ändert — für die
+ * Bestätigung im Admin, in Zahlen. Gerechnet mit derselben Regel wie die Vergabe
+ * (`gruendungsplaetze`): vorher mit dem Hof im Rennen bzw. ausgenommen, nachher
+ * umgekehrt; ein Platz zählt nur bis `plaetze` (aus der Einstellung).
+ *
+ * Wiederaufnehmen geht nur, wenn danach höchstens `plaetze` Höfe im Rennen sind
+ * (Register K2) — so verliert nie ein anderer Hof seine Zusage; die Nummern der
+ * Höfe dahinter verschieben sich dann um eins.
+ */
+export function folgenDerAenderung<T extends HofFuerFolgen>(
+  hof: T,
+  hoefe: readonly T[],
+  plaetze: number,
+  richtung: GruendungRichtung
+): GruendungFolgen {
+  const vorher = gruendungsplaetze(mitFlag(hoefe, hof, richtung === 'aufnehmen'))
+  const nachher = gruendungsplaetze(mitFlag(hoefe, hof, richtung === 'ausnehmen'))
+  const platz = (rang: number | undefined): number | null => (rang !== undefined && rang <= plaetze ? rang : null)
+
+  const verschoben: PlatzWechsel[] = []
+  const neu: PlatzWechsel[] = []
+  const verlieren: PlatzWechsel[] = []
+  for (const h of hoefe) {
+    const von = vorher.get(h.id)
+    const nach = nachher.get(h.id)
+    if (h.id === hof.id || von === undefined || nach === undefined || von === nach) continue
+    const wechsel: PlatzWechsel = { id: h.id, name: h.name, von, nach, gruendungBis: h.gruendungBis }
+    if (platz(von) !== null && platz(nach) !== null) verschoben.push(wechsel)
+    else if (platz(nach) !== null) neu.push(wechsel)
+    else if (platz(von) !== null) verlieren.push(wechsel)
+  }
+  const nachNummer = (a: PlatzWechsel, b: PlatzWechsel) => a.nach - b.nach
+  const gesamt = Math.max(plaetze, 0)
+  return {
+    richtung,
+    platzVorher: platz(vorher.get(hof.id)),
+    platzNachher: platz(nachher.get(hof.id)),
+    verschoben: verschoben.sort(nachNummer),
+    neu: neu.sort(nachNummer),
+    verlieren: verlieren.sort(nachNummer),
+    freiNachher: gesamt - Math.min(nachher.size, gesamt),
+    moeglich: richtung === 'ausnehmen' || wiederAufnahmeMoeglich(hof.id, mitFlag(hoefe, hof, true), plaetze),
+  }
+}

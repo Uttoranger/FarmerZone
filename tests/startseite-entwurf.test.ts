@@ -17,6 +17,9 @@
  *    nächste Speicherung schickt ihn als bestehenden Block.
  *  - Ein ungültiger Block bleibt draußen, die übrigen Änderungen gehen
  *    trotzdem, der Satz des Schemas steht als Fehlerzeile da.
+ *  - `speicherungen` (danach lädt die Vorschau neu) zählt bei jeder Art, die
+ *    den Entwurf ändert: Pfeil, Auge, Block-Formular, Löschen, Verwerfen —
+ *    nicht beim bloßen Öffnen und Schließen, nicht bei einem Fehler (Nr. 106).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -101,7 +104,7 @@ vi.mock('react', async (importOriginal) => ({
 }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), addBreadcrumb: vi.fn() }))
 
-import { STANDARD_REIHENFOLGE } from '@/lib/startseite-gestalten'
+import { STANDARD_REIHENFOLGE, verschiebe } from '@/lib/startseite-gestalten'
 import { aenderungenText, standardFassung } from '@/lib/startseite-fassung'
 import type { StartseiteSpeichernEingabe } from '@/schemas/startseite'
 import { neueBlockWerte, useStartseitenEntwurf, type Zeile } from '@/components/admin/startseite-entwurf'
@@ -238,6 +241,22 @@ describe('useStartseitenEntwurf', () => {
   })
 })
 
+describe('useStartseitenEntwurf — nach „Fertig“ (Nr. 106)', () => {
+  it('behält den Stand des Blocks in der Liste und zählt ihn weiter als Änderung', async () => {
+    speichere.mockResolvedValueOnce(gespeichert({ blockId: 'block-neu', zeilenId: 'zeile-neu' }))
+    const neu: Zeile = { id: 'neu', art: 'BLOCK', sichtbar: true, block: null }
+    tue((e) => e.oeffneBlock(neueBlockWerte('HINWEISBAND', JETZT), [e.zeilen[0], e.zeilen[1], neu, ...e.zeilen.slice(2)]))
+    tue((e) => e.block && e.aendereBlock({ ...e.block, titel: 'Winterpause' }))
+    await warte(800)
+
+    tue((e) => e.oeffneBlock(null))
+
+    expect(zuletzt.block).toBeNull()
+    expect(zuletzt.zeilen[2]).toMatchObject({ id: 'zeile-neu', block: { id: 'block-neu', titel: 'Winterpause' } })
+    expect(zuletzt.aenderungen.map((a) => a.art)).toEqual(['neu'])
+  })
+})
+
 describe('useStartseitenEntwurf — ein neuer Block, der nie gespeichert wurde', () => {
   it('lässt beim Schließen keine leere Zeile stehen — die nächste Speicherung geht durch', async () => {
     const neu: Zeile = { id: 'neu', art: 'BLOCK', sichtbar: true, block: null }
@@ -248,5 +267,107 @@ describe('useStartseitenEntwurf — ein neuer Block, der nie gespeichert wurde',
     tue((e) => e.aendereZeilen(augeAn('FRAGEN', e)))
     await warte(800)
     expect(speichere.mock.calls[0]?.[0].reihenfolge.map((r) => r.id)).toEqual(ZEILEN.map((z) => z.id))
+  })
+})
+
+describe('useStartseitenEntwurf — die Vorschau lädt nach jeder Art von Änderung neu (Register N16, Nr. 106)', () => {
+  it('zählt Pfeil, Auge, Block-Formular, Löschen und Verwerfen — Öffnen, Schließen und ein Fehler zählen nicht', async () => {
+    expect(zuletzt.speicherungen).toBe(0)
+
+    tue((e) => e.aendereZeilen(verschiebe(e.zeilen, e.zeilen.findIndex((z) => z.art === 'FUTTER'), 1)))
+    await warte(800)
+    expect(zuletzt.speicherungen).toBe(1)
+
+    tue((e) => e.aendereZeilen(augeAn('FRAGEN', e)))
+    await warte(800)
+    expect(zuletzt.speicherungen).toBe(2)
+
+    speichere.mockResolvedValueOnce(gespeichert({ blockId: 'block-neu', zeilenId: 'zeile-neu' }))
+    const neu: Zeile = { id: 'neu', art: 'BLOCK', sichtbar: true, block: null }
+    tue((e) => e.oeffneBlock(neueBlockWerte('HINWEISBAND', JETZT), [e.zeilen[0], e.zeilen[1], neu, ...e.zeilen.slice(2)]))
+    await warte(800)
+    expect(zuletzt.speicherungen).toBe(2)
+    tue((e) => e.block && e.aendereBlock({ ...e.block, titel: 'Winterpause' }))
+    await warte(800)
+    expect(zuletzt.speicherungen).toBe(3)
+
+    speichere.mockResolvedValueOnce({ error: 'Wir konnten den Entwurf nicht speichern.' })
+    tue((e) => e.block && e.aendereBlock({ ...e.block, titel: 'Winterpause bis März' }))
+    await warte(800)
+    expect(zuletzt.stand).toEqual({ art: 'fehler', text: 'Wir konnten den Entwurf nicht speichern.' })
+    expect(zuletzt.speicherungen).toBe(3)
+
+    tue((e) => e.blockGeloescht('block-neu'))
+    expect(zuletzt.block).toBeNull()
+    expect(zuletzt.zeilen.map((z) => z.id)).not.toContain('zeile-neu')
+    expect(zuletzt.speicherungen).toBe(4)
+
+    tue((e) => e.setzeZurueck(ZEILEN))
+    expect(zuletzt.speicherungen).toBe(5)
+    expect(speichere).toHaveBeenCalledTimes(4)
+  })
+})
+
+describe('useStartseitenEntwurf — neue Props → Liste bleibt', () => {
+  // Der Entwurf speichert von selbst. Käme eine neue `start`-Liste nach dem ersten Rendern still in den Zustand
+  // (etwa nach einem `revalidatePath` auf die eigene Seite), verschwänden Eingaben mitten im Speichern. Die Liste
+  // ändert sich nur durch den Menschen und durch die Antwort der Action (neue Kennungen), nie durch Props.
+  const ANDERE_ZEILEN: Zeile[] = ZEILEN.map((z) => ({ ...z, sichtbar: !z.sichtbar }))
+
+  /** Rendert mit `ZEILEN`, reicht dann `ANDERE_ZEILEN` als neue Props nach und rendert wie React zweimal (Effekte setzen Zustand). */
+  function listeNachNeuenProps(hook: (start: readonly Zeile[]) => Zeile[]): { vorher: Zeile[]; nachher: Zeile[] } {
+    let start: readonly Zeile[] = ZEILEN
+    let liste: Zeile[] = []
+    pruefstand.starte(() => {
+      liste = hook(start)
+    })
+    const vorher = liste
+    start = ANDERE_ZEILEN
+    pruefstand.rendere()
+    pruefstand.rendere()
+    return { vorher, nachher: liste }
+  }
+
+  it('der Entwurf behält seine Liste, auch wenn die Seite neue Props reicht', () => {
+    const { vorher, nachher } = listeNachNeuenProps((start) => {
+      zuletzt = useStartseitenEntwurf({ start, live: standardFassung(), speichere })
+      return zuletzt.zeilen
+    })
+    expect(vorher.every((z) => z.sichtbar)).toBe(true)
+    expect(nachher).toEqual(vorher)
+    expect(nachher).not.toEqual(ANDERE_ZEILEN)
+    expect(zuletzt.aenderungen).toEqual([])
+    expect(speichere).not.toHaveBeenCalled()
+  })
+
+  it('eigene Änderungen überleben neue Props und gehen unverändert hinaus — die neuen Props kommen nie in den Stand', async () => {
+    let start: readonly Zeile[] = ZEILEN
+    pruefstand.starte(() => {
+      zuletzt = useStartseitenEntwurf({ start, live: standardFassung(), speichere })
+    })
+    tue((e) => e.aendereZeilen(augeAn('FRAGEN', e)))
+    start = ANDERE_ZEILEN
+    pruefstand.rendere()
+    pruefstand.rendere()
+    expect(zuletzt.zeilen.find((z) => z.art === 'FRAGEN')?.sichtbar).toBe(false)
+    expect(zuletzt.zeilen.find((z) => z.art === 'FUTTER')?.sichtbar).toBe(true)
+
+    await warte(800)
+    expect(speichere).toHaveBeenCalledTimes(1)
+    const hinaus = speichere.mock.calls[0]?.[0].reihenfolge ?? []
+    expect(hinaus.filter((r) => !r.sichtbar).map((r) => r.id)).toEqual(['z-fragen'])
+  })
+
+  it('Gegenprobe: ein Hook, der neue Props in den Zustand übernimmt, fällt durch dieselbe Prüfung', async () => {
+    // Das Muster, das die Regel verbietet: Zustand aus `start`, nach jeder Änderung von `start` neu gesetzt.
+    const { useEffect, useState } = await import('react')
+    const { vorher, nachher } = listeNachNeuenProps((start) => {
+      const [liste, setListe] = useState<Zeile[]>(() => [...start])
+      useEffect(() => setListe([...start]), [start])
+      return liste
+    })
+    expect(vorher.every((z) => z.sichtbar)).toBe(true)
+    expect(nachher).toEqual(ANDERE_ZEILEN)
+    expect(nachher).not.toEqual(vorher)
   })
 })

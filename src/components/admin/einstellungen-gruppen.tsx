@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ChevronDown, Globe, Settings2, Star, type LucideIcon } from 'lucide-react'
+import { ChevronDown, Globe, Star, type LucideIcon } from 'lucide-react'
 import {
   EINSTELLUNGEN_GRUPPEN,
   EINSTELLUNGEN_TEXT,
@@ -7,14 +7,12 @@ import {
   einstellungenGruppeHref,
   type EinstellungenGruppe,
 } from '@/lib/plattform-einstellung'
-import type { StripeMarke } from '@/lib/testumgebung'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Chip } from '@/components/ui/chip'
-import { StatusBadge } from '@/components/ui/status-badge'
 import { EinstellungenGruendung, type GruendungFormularDaten } from '@/components/admin/einstellungen-gruendung'
 
-const SYMBOL: Record<EinstellungenGruppe, LucideIcon> = { gruendung: Star, betrieb: Settings2, plattform: Globe }
+const SYMBOL: Record<EinstellungenGruppe, LucideIcon> = { gruendung: Star, plattform: Globe }
 
 const H2 = 'font-heading text-lg font-semibold text-foreground'
 
@@ -24,7 +22,6 @@ export type EinstellungenDaten = {
   gruendung: GruendungFormularDaten
   /** „12 Plätze · 5 frei · bis 31.12.2027" — Zeile der zugeklappten Gruppe am Handy. */
   gruendungZeile: string
-  stripeMarke: StripeMarke | null
 }
 
 function Navigation({ gewaehlt }: { gewaehlt: EinstellungenGruppe }): React.JSX.Element {
@@ -70,20 +67,6 @@ function Angabe({ titel, children }: { titel: string; children: React.ReactNode 
   )
 }
 
-function Betrieb({ stripeMarke }: { stripeMarke: StripeMarke | null }): React.JSX.Element {
-  return (
-    <>
-      <p className="text-[13px] leading-snug text-muted-foreground">{EINSTELLUNGEN_TEXT.betrieb.satz}</p>
-      <dl>
-        <Angabe titel={EINSTELLUNGEN_TEXT.betrieb.stripe}>
-          {/* Dieselbe Marke wie in der Betriebsleiste der AdminShell (Register Z3). */}
-          {stripeMarke ? <StatusBadge status={stripeMarke.ton}>{stripeMarke.text}</StatusBadge> : EINSTELLUNGEN_TEXT.betrieb.ohneStripe}
-        </Angabe>
-      </dl>
-    </>
-  )
-}
-
 function Plattform(): React.JSX.Element {
   return (
     <>
@@ -105,15 +88,15 @@ function Plattform(): React.JSX.Element {
  * steht EINMAL im HTML: Ab 1024 px ist nur die gewählte zu sehen, ihr Kopf
  * zum Aufklappen verschwindet, der Titel steht dann in der Karte.
  *
- * Betrieb und Plattform nur lesend (in diesem Lauf keine neuen Felder): der
- * Stripe-Modus wie in der Betriebsleiste, Name und Adresse aus MARKE und
- * PRODUKTION_HOST. Die Gruppe „Benachrichtigungen" des Mockups gibt es nicht —
- * das ist Postfach › Zustellung (Nr. 95).
+ * Plattform nur lesend (in diesem Lauf keine neuen Felder): Name und Adresse
+ * aus MARKE und PRODUKTION_HOST. Die Gruppe „Benachrichtigungen" des Mockups
+ * gibt es nicht — das ist Postfach › Zustellung (Nr. 95); die Gruppe „Betrieb"
+ * entfiel mit Nr. 103 (Register N15 geändert) — der Stripe-Modus steht in
+ * Admin › Betrieb.
  */
 export function EinstellungenGruppen({ daten }: { daten: EinstellungenDaten }): React.JSX.Element {
   const zeileHandy: Record<EinstellungenGruppe, string> = {
     gruendung: daten.gruendungZeile,
-    betrieb: daten.stripeMarke?.text ?? EINSTELLUNGEN_TEXT.betrieb.ohneStripe,
     plattform: `${PLATTFORM_ANGABEN.name} · ${PLATTFORM_ANGABEN.adresse}`,
   }
   return (
@@ -155,7 +138,6 @@ export function EinstellungenGruppen({ daten }: { daten: EinstellungenDaten }): 
                     <EinstellungenGruendung daten={daten.gruendung} />
                   </>
                 )}
-                {gruppe === 'betrieb' && <Betrieb stripeMarke={daten.stripeMarke} />}
                 {gruppe === 'plattform' && <Plattform />}
               </section>
             </details>

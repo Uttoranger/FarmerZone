@@ -54,7 +54,7 @@ vi.mock('next/link', () => ({
   },
 }))
 vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOut: vi.fn() }))
-vi.mock('@/server/actions/appearance', () => ({ updateFarmBannerAction: vi.fn(), updateBannerFocusAction: vi.fn() }))
+vi.mock('@/server/actions/appearance', () => ({ updateFarmBannerAction: vi.fn() }))
 vi.mock('@/server/actions/farm-photos', () => ({ addFarmPhotoAction: vi.fn(), reorderPhotosAction: vi.fn() }))
 vi.mock('@/server/actions/products', () => ({ updateProductImageAction: vi.fn(), reorderProductsAction: vi.fn() }))
 
@@ -517,24 +517,27 @@ describe('Schaufenster zuerst (Register N5, Nr. 51)', () => {
     expect(seite({ suche: 'reiter=produkte' })).not.toContain('Alle Produkte (')
   })
 
-  it('Fotos: jede Kachel öffnet die Bildansicht, kein Bild liegt in einem Link (Meldung cmua8bof); ohne Fotos kein Streifen', () => {
+  it('Fotos: jede Kachel öffnet die Bildansicht, kein Bild liegt in einem Link (Meldung cmua8bof); ohne Fotos kein Abschnitt', () => {
     expect(seite()).not.toContain('id="fotos"')
     const html = seite({ farm: { ...HOF, farmPhotos: FOTOS } })
     const bereich = html.slice(html.indexOf('id="fotos"'), html.indexOf('</section>', html.indexOf('id="fotos"')))
-    expect(bereich.match(/<button[^>]*aria-label="Foto \d von 3 vergrößern"/g)).toHaveLength(3)
+    // Je drei im Mosaik (unter lg) und im Raster (ab lg) — Register N5, Nr. 107.
+    expect(bereich.match(/<button[^>]*aria-label="Foto \d von 3 öffnen"/g)).toHaveLength(6)
+    expect(bereich).toContain('aria-label="Fotos von Hof Test, 3 insgesamt"')
     expect(bereich).not.toMatch(/<a\b/)
     // Auch die Fotos stehen vor der rechten Spalte.
     expect(html.indexOf('id="fotos"')).toBeLessThan(html.indexOf('<aside'))
   })
 
-  it('EINE Fotokomponente mit EINER Bildansicht — der Streifen ist eine Variante, keine zweite Liste daneben', () => {
-    for (const streifenUnterLg of [true, false]) {
-      const html = renderToStaticMarkup(createElement(HofseiteFotos, { fotos: FOTOS, streifenUnterLg }))
-      expect(html.match(/<ul\b/g), String(streifenUnterLg)).toHaveLength(1)
-      expect(html.match(/<button\b/g), String(streifenUnterLg)).toHaveLength(3)
+  it('EINE Fotokomponente mit EINER Bildansicht — Mosaik und Raster sind zwei Listen derselben Fotos, je eine zu sehen', () => {
+    for (const schaufenster of [true, false]) {
+      const html = renderToStaticMarkup(createElement(HofseiteFotos, { fotos: FOTOS, hofName: 'Hof Test', schaufenster }))
+      expect(html.match(/<ul\b/g), String(schaufenster)).toHaveLength(2)
+      expect(html.match(/<button\b/g), String(schaufenster)).toHaveLength(6)
       expect(html).not.toMatch(/<a\b/)
     }
     expect(quelle('src/components/hofseite/hofseite-fotos.tsx').match(/useBildansicht\(/g)).toHaveLength(1)
+    expect(quelle('src/components/hofseite/hofseite-fotos.tsx').match(/<BildansichtEbene\b/g)).toHaveLength(1)
     expect(quelle('src/components/hofseite/hofseite-kunde.tsx').match(/<HofseiteFotos\b/g)).toHaveLength(1)
   })
 

@@ -40,6 +40,7 @@ vi.mock('@/server/actions/admin', () => ({
   setzeGruendungBisAction: vi.fn(),
   triageMeldungAction: vi.fn(),
 }))
+vi.mock('@/server/actions/gruendung', () => ({ nimmAusGruendung: vi.fn(), nimmWiederAuf: vi.fn() }))
 vi.mock('@/components/hof-bestellungen/bestell-dialog', () => ({
   BestellDialog: ({ offen, titel, unterzeile, children }: { offen: boolean; titel: string; unterzeile?: string; children?: ReactNode }) =>
     offen ? createElement('section', { 'aria-label': titel }, createElement('h2', null, titel), unterzeile, children) : null,
@@ -49,6 +50,8 @@ vi.mock('@/components/hof-bestellungen/bestell-dialog', () => ({
 import { HoefeAnsicht, type AdminHof } from '@/components/admin/hoefe-ansicht'
 import { HofAktionDialog } from '@/components/admin/hof-aktion-dialog'
 import { GruendungBisDialog } from '@/components/admin/gruendung-bis-dialog'
+import { GruendungAusnehmenDialog } from '@/components/admin/gruendung-ausnehmen-dialog'
+import { GRUENDUNG_AUSNEHMEN_TEXT, gruendungAenderung } from '@/lib/admin-hoefe-seite'
 import { adminHofZeile, FREISCHALTUNG_STRIPE_OFFEN_TEXT, type HofRohdaten } from '@/lib/admin-hoefe'
 import { GRUENDUNG_BIS_STANDARD, gruendungsKonditionenText, type GruendungAnzeige } from '@/lib/gruendungshof'
 
@@ -81,13 +84,14 @@ function hof(ueber: Partial<HofRohdaten>, platz: number | null = null, gruendung
     isPaused: false,
     betriebsnummer: null,
     sepaErteilt: false,
+    gruendungAusgenommen: false,
     ...ueber,
   }
-  return { ...adminHofZeile(roh, { gruendungsplatz: platz, maxPlaetze: 12 }, JETZT), aktivitaet: { ...LEER, produkte: 2 }, gruendung, platzBeiFreischaltung }
+  return { ...adminHofZeile(roh, { gruendungsplatz: platz, maxPlaetze: 12 }, JETZT), aktivitaet: { ...LEER, produkte: 2 }, gruendung, platzBeiFreischaltung, gruendungAenderung: null, gruendungZuletzt: null }
 }
 
 function render(hoefe: AdminHof[]): string {
-  return renderToStaticMarkup(createElement(HoefeAnsicht, { hoefe, vergebenePlaetze: 1, maxPlaetze: 12, neueMeldungen: [] }))
+  return renderToStaticMarkup(createElement(HoefeAnsicht, { hoefe, vergebenePlaetze: 1, maxPlaetze: 12, ausgenommen: 0, neueMeldungen: [] }))
 }
 
 /** Der <button>, der genau diesen Text trägt. */
@@ -240,15 +244,15 @@ describe('Seitenmuster der Höfe (Nr. 94, Register N15)', () => {
     ]
   }
   const stand = (hoefe: AdminHof[], vergeben = 3): string =>
-    renderToStaticMarkup(createElement(HoefeAnsicht, { hoefe, vergebenePlaetze: vergeben, maxPlaetze: 12, neueMeldungen: [] }))
+    renderToStaticMarkup(createElement(HoefeAnsicht, { hoefe, vergebenePlaetze: vergeben, maxPlaetze: 12, ausgenommen: 0, neueMeldungen: [] }))
 
   it('Seitenkopf mit Satz und Suche, Kennzahlen mit den Zahlen aus den Zeilen', () => {
     const html = stand(bestand())
     expect(html).toMatch(/<h1[^>]*>Höfe<\/h1>/)
-    expect(html).toContain('Freischalten, Gründungsplätze und Konditionen je Hof.')
+    expect(html).toContain('Gründungshöfe zählen nach der Freischaltung – Testhöfe nimmst du aus.')
     expect(html).toContain('aria-label="Höfe in Zahlen"')
     expect(html).toMatch(/<dt[^>]*>Warten<\/dt><dd[^>]*>2<\/dd>/)
-    expect(html).toMatch(/Gründungsplätze<\/span><\/dt><dd[^>]*>9 frei<\/dd><dd[^>]*>3 von 12 vergeben<\/dd>/)
+    expect(html).toMatch(/Gründungsplätze<\/span><\/dt><dd[^>]*>3 von 12<\/dd><dd[^>]*>vergeben<\/dd>/)
     expect(html).toContain('type="search"')
   })
 
@@ -334,6 +338,55 @@ describe('Seitenmuster der Höfe (Nr. 94, Register N15)', () => {
 
   it('die Regel-Zeile nennt die Reihenfolge der Freischaltung', () => {
     expect(stand(bestand())).toContain('Gründungsplätze zählen in der Reihenfolge der Freischaltung.')
+  })
+
+  it('ein ausgenommener Hof trägt in Tabelle und Karte die Marke „ausgenommen · Testhof“ (Register K2, Nr. 109)', () => {
+    adresse.parameter = 'reiter=alle'
+    const hoefe = [
+      { ...hof({ ...online, id: 'a', name: 'Testhof A' }, 1, STANDARD) },
+      { ...hof({ ...online, id: 't', name: 'Testhof B', gruendungAusgenommen: true }, null, null) },
+    ]
+    const html = stand(hoefe, 1)
+    expect(html.match(/ausgenommen · Testhof/g)).toHaveLength(2)
+    // Gegenprobe: der Hof mit Platz trägt Stern und Nummer, nicht die Marke.
+    expect(html).toContain('lucide-star')
+    expect(html).toContain('Nr. 1 · bis 31.12.2027')
+  })
+})
+
+describe('Bestätigung „Nicht als / Wieder als Gründungshof zählen“ (Register K2, Nr. 109)', () => {
+  const T = (tag: number) => new Date(Date.UTC(2026, 0, tag))
+  const platzHof = (n: number, gruendungAusgenommen = false) => ({
+    id: `hof_${n}`,
+    name: `Testhof ${String.fromCharCode(64 + n)}`,
+    approvedAt: T(n),
+    createdAt: T(1),
+    archivedAt: null,
+    gruendungAusgenommen,
+    gruendungBis: null,
+  })
+  const render = (n: number, hoefe: ReturnType<typeof platzHof>[], plaetze = 12): string => {
+    const h = hoefe[n - 1] as ReturnType<typeof platzHof>
+    const aenderung = gruendungAenderung(h, hoefe, plaetze, GRUENDUNG_BIS_STANDARD)
+    return renderToStaticMarkup(createElement(GruendungAusnehmenDialog, { hof: { id: h.id, name: h.name, aenderung }, onClose: () => {} }))
+  }
+
+  it('Hof mit Platz: die Folgen in Zahlen, die Hinweise und der Haken', () => {
+    const html = render(2, [platzHof(1), platzHof(2), platzHof(3)])
+    expect(html).toContain('Testhof B nicht als Gründungshof zählen?')
+    expect(html).toContain('Testhof B verliert Platz Nr. 2')
+    expect(html).toContain('Testhof C rückt auf Nr. 2.')
+    expect(html).toContain(GRUENDUNG_AUSNEHMEN_TEXT.keineNachricht)
+    expect(html).toContain('type="checkbox"')
+    expect(html).toContain(GRUENDUNG_AUSNEHMEN_TEXT.haken)
+  })
+
+  it('Gegenprobe: ohne Platz und bei der Wiederaufnahme kein Haken', () => {
+    expect(render(3, [platzHof(1), platzHof(2), platzHof(3)], 2)).not.toContain('type="checkbox"')
+    const wieder = render(1, [platzHof(1, true), platzHof(2)])
+    expect(wieder).toContain('Testhof A wieder als Gründungshof zählen?')
+    expect(wieder).toContain('Testhof B: Nr. 1 → Nr. 2 – die Zusage bleibt.')
+    expect(wieder).not.toContain('type="checkbox"')
   })
 })
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import * as Sentry from '@sentry/nextjs'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { verlangeAdminAktion } from '@/server/admin-wache'
 import {
@@ -11,7 +12,7 @@ import {
 } from '@/lib/farm-approval'
 import { EINSTELLUNG_UNGUELTIG, GILT_AB_UNGUELTIG, PROZENT_UNGUELTIG, servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
-import { buendelStandSchema, triageEingabeSchema, trennenSchema, zusammenfassenSchema } from '@/schemas/meldung'
+import { ablegenSchema, buendelStandSchema, triageEingabeSchema, trennenSchema, zusammenfassenSchema, type TriageEingabe } from '@/schemas/meldung'
 import { BUENDEL_STAND_STATUS, WUENSCHE_TEXT, bescheidMailHtml, triageAufruf, type TriageStand } from '@/lib/meldung'
 import { MEINE_MELDUNGEN_HREF } from '@/lib/hof-hilfe'
 import { MARKE_TEAM } from '@/lib/marke'
@@ -26,7 +27,7 @@ import {
   GRUENDUNG_BIS_ZUSTIMMUNG_FEHLT,
   gruendungBisSchema,
 } from '@/schemas/gruendungshof'
-import { bestimmeGruendungBis, bildeGruendungBis, gruendungsZusageBeiFreigabe, verkuerztGruendung } from '@/lib/gruendungshof'
+import { GRUENDUNGSPLAETZE_SPERRE, bestimmeGruendungBis, bildeGruendungBis, gruendungsZusageBeiFreigabe, verkuerztGruendung } from '@/lib/gruendungshof'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
 import { gruendungEinstellungAus } from '@/lib/plattform-einstellung'
@@ -42,9 +43,10 @@ function revalidateAll(slug: string) {
  * Die EINE Nachricht vom Team an einen frisch freigeschalteten Gründungshof
  * (Register K2-Ergänzung, Punkt 4; Nr. 93): ein Faden ohne Rundschreiben mit
  * einer Nachricht der Art SYSTEM, Text GRUENDUNGS_NACHRICHT, Link „Deine
- * Konditionen". Ohne Platz keine Nachricht. Platz und Plätze gesamt aus der
- * Einstellung (frisch, nie aus dem Cache), Ende: das eigene des Hofs oder das
- * Standard-Ende der Einstellung.
+ * Konditionen". Ohne Platz keine Nachricht. Platz und Ende bestimmt
+ * approveFarmAction in ihrer Transaktion unter der Sperre der Gründungsplätze
+ * (Nr. 109) und reicht sie herein — die Nachricht rechnet nie mit einem
+ * späteren Stand.
  *
  * IDEMPOTENT über eine eigene Prüfung: Der Unique (farmId, rundschreibenId)
  * greift mit NULL nicht — zwei Fäden ohne Rundschreiben wären erlaubt. Gibt es
@@ -56,13 +58,8 @@ function revalidateAll(slug: string) {
  * Geld und Bestellungen) — er geht mit festem Text und ohne Nachrichtentext
  * nach Sentry, die Nachricht lässt sich notfalls als Rundschreiben nachholen.
  */
-async function legeGruendungsNachrichtAn(farmId: string): Promise<void> {
+async function legeGruendungsNachrichtAn(farmId: string, zusage: { platz: number; bis: Date }): Promise<void> {
   try {
-    const [einstellung, hoefe] = await Promise.all([lesePlattformEinstellung(), ladeHoefeFuerGruendung()])
-    const hof = hoefe.find((h) => h.id === farmId)
-    const zusage = hof ? gruendungsZusageBeiFreigabe(hof, hoefe, gruendungEinstellungAus(einstellung)) : null
-    if (!zusage) return
-
     const schon = await prisma.nachricht.findFirst({
       where: { art: 'SYSTEM', vonFarmId: null, linkUrl: GRUENDUNGS_NACHRICHT_LINK, unterhaltung: { farmId, rundschreibenId: null } },
       select: { id: true },
@@ -135,22 +132,39 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
   })
   if (sperre) return { error: sperre }
 
-  // Bedingt schreiben, nicht blind: Die Sperre oben beruht auf einem Lesestand.
-  // Fällt Stripe dazwischen weg (account.updated) oder schaltet ein zweiter
-  // Klick schon frei, trifft das Schreiben nichts — dann keine Mail, sondern
-  // eine Meldung (ARCHITECTURE: der Statuswechsel ist die Sperre).
-  const { count } = await prisma.farm.updateMany({
-    where: { id: farmId, stripeAccountReady: true, approvedAt: null },
-    data: { approvedAt: new Date() },
+  // Die Zahl der Plätze frisch, nie aus dem Cache.
+  const einstellung = gruendungEinstellungAus(await lesePlattformEinstellung())
+
+  // Freischalten und Platz bestimmen in EINER Transaktion unter der Sperre der
+  // Gründungsplätze (Register K2, Nr. 109) — dieselbe wie Ausnehmen und
+  // Wiederaufnehmen: So vergeben Freischalten und Wiederaufnahme nie
+  // gleichzeitig denselben letzten Platz.
+  const freigabe = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${GRUENDUNGSPLAETZE_SPERRE})`
+    // Bedingt schreiben, nicht blind: Die Freischalt-Sperre oben beruht auf einem Lesestand.
+    // Fällt Stripe dazwischen weg (account.updated) oder schaltet ein zweiter
+    // Klick schon frei, trifft das Schreiben nichts — dann keine Mail, sondern
+    // eine Meldung (ARCHITECTURE: der Statuswechsel ist die Sperre).
+    // Der Zeitpunkt entsteht NACH der Sperre: Er bestimmt die Reihenfolge der
+    // Plätze, und ein Weg, der vor uns vergeben hat, steht so immer vor uns.
+    const { count } = await tx.farm.updateMany({
+      where: { id: farmId, stripeAccountReady: true, approvedAt: null },
+      data: { approvedAt: new Date() },
+    })
+    if (count === 0) return null
+    const hoefe = await ladeHoefeFuerGruendung(tx)
+    const hof = hoefe.find((h) => h.id === farmId)
+    return { zusage: hof ? gruendungsZusageBeiFreigabe(hof, hoefe, einstellung) : null }
   })
-  if (count === 0) return { error: FREISCHALTUNG_GEAENDERT_TEXT }
+  if (freigabe === null) return { error: FREISCHALTUNG_GEAENDERT_TEXT }
   revalidateAll(farm.slug)
   // „Noch n Gründungsplätze" auf Startseite und /fuer-hoefe (K2-Ergänzung) zählt diesen Hof jetzt mit.
   revalidatePath('/')
   revalidatePath('/fuer-hoefe')
 
   // Erst nach dem erfolgreichen Update und vor der Mail: Der Platz ist vergeben.
-  await legeGruendungsNachrichtAn(farmId)
+  // Ohne Platz (oder ausgenommen) keine Nachricht.
+  if (freigabe.zusage) await legeGruendungsNachrichtAn(farmId, freigabe.zusage)
 
   // Die Zusage an den Hof — NACH dem erfolgreichen Update. Ein Mail-Fehler
   // darf die Freischaltung nicht scheitern lassen: Der Hof ist ab hier
@@ -416,6 +430,39 @@ export async function setzeGruendungBisAction(
  * muss auf eine bestehende, andere Meldung zeigen; sonst stünde ein toter Link
  * in der Triage. antwortAnMelder ist das einzige Triage-Feld, das der Hof sieht.
  */
+const KEINE_KETTE = 'Diese Meldung ist selbst ein Duplikat – nimm ihre Hauptmeldung.'
+const VERWEIS_GEAENDERT = 'Die Meldung oder ihre Hauptmeldung hat sich inzwischen geändert — lade die Seite neu und entscheide noch einmal.'
+
+/**
+ * Keine Kette beim Schreiben (Nr. 105, Nacharbeit 101): Mit Verweis schreibt
+ * EINE Anweisung, die nur trifft, solange die Hauptmeldung selbst kein
+ * Duplikat ist — die Prüfung davor gibt den Satz, diese Bedingung schließt
+ * die Lücke bis zum Schreiben. Prisma kennt für duplikatVonId keine Relation,
+ * darum SQL mit Parametern; der Ausgangsstand steht in derselben WHERE wie in
+ * updateMany. Gibt die Zahl der geschriebenen Zeilen zurück.
+ */
+async function schreibeTriageMitVerweis(meldungId: string, triage: TriageEingabe, duplikatVonId: string, jetzt: Date): Promise<number> {
+  const bedingungen = [
+    Prisma.sql`m."id" = ${meldungId}`,
+    Prisma.sql`EXISTS (SELECT 1 FROM "Meldung" h WHERE h."id" = ${duplikatVonId} AND h."status" <> 'DUPLIKAT')`,
+  ]
+  if (triage.vorherStatus !== undefined) bedingungen.push(Prisma.sql`m."status" = ${triage.vorherStatus}::"MeldungStatus"`)
+  if (triage.vorherNotiz !== undefined) {
+    bedingungen.push(triage.vorherNotiz === null ? Prisma.sql`m."triageNotiz" IS NULL` : Prisma.sql`m."triageNotiz" = ${triage.vorherNotiz}`)
+  }
+  return prisma.$executeRaw`
+    UPDATE "Meldung" AS m SET
+      "status" = ${triage.status}::"MeldungStatus",
+      "art" = COALESCE(${triage.art ?? null}::"MeldungArt", m."art"),
+      "clusterKey" = ${triage.clusterKey},
+      "triageNotiz" = ${triage.triageNotiz},
+      "duplikatVonId" = ${duplikatVonId},
+      "sprintName" = ${triage.sprintName},
+      "antwortAnMelder" = ${triage.antwortAnMelder},
+      "triagedAt" = ${jetzt}
+    WHERE ${Prisma.join(bedingungen, ' AND ')}`
+}
+
 export async function triageMeldungAction(
   meldungId: string,
   eingabe: {
@@ -447,35 +494,44 @@ export async function triageMeldungAction(
     const eingabe = triage.duplikatVonId
     const original = await prisma.meldung.findFirst({
       where: eingabe.length >= 20 ? { id: eingabe } : { id: { startsWith: eingabe } },
-      select: { id: true },
+      select: { id: true, status: true },
     })
     if (!original) return { error: 'Duplikat-Verweis: diese Meldung gibt es nicht.' }
     if (original.id === meldungId) return { error: 'Eine Meldung kann nicht ihr eigenes Duplikat sein.' }
+    if (original.status === 'DUPLIKAT') return { error: KEINE_KETTE }
     duplikatVonId = original.id
   }
 
   // Bedingt schreiben, wenn das Formular seinen Ausgangsstand mitschickt: Hat
   // die Schreibroute (CLI, Deployment) inzwischen etwas gesetzt, würde ein
   // altes Formular sonst Status, PR-Nummer und festen Satz zurückdrehen.
-  const { count } = await prisma.meldung.updateMany({
-    where: {
-      id: meldungId,
-      ...(triage.vorherStatus !== undefined ? { status: triage.vorherStatus } : {}),
-      ...(triage.vorherNotiz !== undefined ? { triageNotiz: triage.vorherNotiz } : {}),
-    },
-    data: {
-      status: triage.status,
-      // Nur der Knopf „Ja, ein Wunsch" schickt eine Art (Sprint Briefkasten-Rückkopplung).
-      ...(triage.art ? { art: triage.art } : {}),
-      clusterKey: triage.clusterKey,
-      triageNotiz: triage.triageNotiz,
-      duplikatVonId,
-      sprintName: triage.sprintName,
-      antwortAnMelder: triage.antwortAnMelder,
-      triagedAt: new Date(),
-    },
-  })
-  if (count === 0) return { error: 'Die Meldung hat sich inzwischen geändert — lade die Seite neu und entscheide noch einmal.' }
+  const jetzt = new Date()
+  const count =
+    duplikatVonId === null
+      ? (
+          await prisma.meldung.updateMany({
+            where: {
+              id: meldungId,
+              ...(triage.vorherStatus !== undefined ? { status: triage.vorherStatus } : {}),
+              ...(triage.vorherNotiz !== undefined ? { triageNotiz: triage.vorherNotiz } : {}),
+            },
+            data: {
+              status: triage.status,
+              // Nur der Knopf „Ja, ein Wunsch" schickt eine Art (Sprint Briefkasten-Rückkopplung).
+              ...(triage.art ? { art: triage.art } : {}),
+              clusterKey: triage.clusterKey,
+              triageNotiz: triage.triageNotiz,
+              duplikatVonId: null,
+              sprintName: triage.sprintName,
+              antwortAnMelder: triage.antwortAnMelder,
+              triagedAt: jetzt,
+            },
+          })
+        ).count
+      : await schreibeTriageMitVerweis(meldungId, triage, duplikatVonId, jetzt)
+  if (count === 0) {
+    return { error: duplikatVonId === null ? 'Die Meldung hat sich inzwischen geändert — lade die Seite neu und entscheide noch einmal.' : VERWEIS_GEAENDERT }
+  }
 
   if (process.env.NODE_ENV !== 'production') {
     console.log(`[DEV] Meldung triagiert: ${new Date().toISOString()} admin=${guard.userId} meldung=${meldungId} status=${triage.status}`)
@@ -503,7 +559,9 @@ const MELDUNG_FEHLT = 'Meldung nicht gefunden.'
  * Existenz- und Selbstprüfung und derselben Bedingung gegen
  * Zwischenänderungen. Keine Kette: Die Hauptmeldung ist weder Duplikat noch
  * abgelegt, und eine Meldung mit eigenen Duplikaten wird nicht selbst eines
- * (sonst zählten deren Stimmen nirgends). Kein Mail an den Hof.
+ * (sonst zählten deren Stimmen nirgends). Dass die Hauptmeldung kein Duplikat
+ * ist, gilt seit Nr. 105 auch beim Schreiben selbst (schreibeTriageMitVerweis,
+ * Bedingung derselben Anweisung). Kein Mail an den Hof.
  */
 export async function fasseZusammenAction(eingabe: unknown): Promise<{ error?: string }> {
   const guard = await verlangeAdminAktion()
@@ -547,6 +605,13 @@ function meldeBescheid(err: unknown, gescheitert: number): void {
   Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'meldungen', aufgabe: 'bescheid-mail' }, extra: { gescheitert } })
 }
 
+/** Ein geworfenes Rundschreiben des Bescheids geht nur als Klasse nach Sentry — ohne Antwort, ohne Höfe. */
+function meldeHofBescheid(err: unknown): void {
+  const meldung = new Error('Meldungen: Bescheid an die Höfe nicht verschickt')
+  meldung.name = err instanceof Error ? err.name : 'Unbekannt'
+  Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'meldungen', aufgabe: 'bescheid-hoefe' } })
+}
+
 /** Die Betriebsmail an Kundinnen mit Adresse für Rückfragen — nur über sendRaw (Post-Sperre Z3), nacheinander. */
 async function schreibeKundinnen(adressen: readonly string[], antwort: string): Promise<void> {
   try {
@@ -572,7 +637,10 @@ async function schreibeKundinnen(adressen: readonly string[], antwort: string): 
  * Höfe über die bestehende Rundschreiben-Logik mit „Ausgewählte" (eine
  * Nachricht je Hof, kein Massenmail), an Kundinnen mit Adresse als
  * Betriebsmail nach der Antwort. Ein gescheiterter Bescheid dreht den
- * gespeicherten Stand nicht zurück.
+ * gespeicherten Stand nicht zurück; die Kundinnen-Mail und das Neuladen
+ * laufen trotzdem, erst danach kommt der Satz (Nr. 105). Die 90-Tage-Uhr
+ * (triagedAt) läuft nur neu, wo sich der Stand ändert; zurück auf Gesammelt
+ * leert „Geplant in".
  */
 export async function setzeBuendelStandAction(eingabe: unknown): Promise<BuendelStandErgebnis> {
   const guard = await verlangeAdminAktion()
@@ -590,15 +658,15 @@ export async function setzeBuendelStandAction(eingabe: unknown): Promise<Buendel
     if (eigene.length === 0) return null
     const ids = eigene.map((m) => m.id)
     const duplikate = await tx.meldung.findMany({ where: { status: 'DUPLIKAT', duplikatVonId: { in: ids } }, select: { id: true, farmId: true, customerEmail: true } })
-    await tx.meldung.updateMany({
-      where: { ...buendel, id: { in: ids } },
-      data: {
-        status: BUENDEL_STAND_STATUS[stand],
-        triagedAt: jetzt,
-        ...(stand === 'geplant' && sprintName !== null ? { sprintName } : {}),
-        ...(antwort !== null ? { antwortAnMelder: antwort } : {}),
-      },
-    })
+    const ziel = BUENDEL_STAND_STATUS[stand]
+    // Nur wessen Stand sich ändert, bekommt einen neuen Abschluss: triagedAt
+    // ist die 90-Tage-Uhr bis zum Löschen (Nr. 105, Nacharbeit 101) —
+    // erneutes Speichern ohne Wechsel stellt sie nicht zurück.
+    await tx.meldung.updateMany({ where: { ...buendel, id: { in: ids }, AND: [{ status: { not: ziel } }] }, data: { status: ziel, triagedAt: jetzt } })
+    // „Geplant in" gilt nur für Geplant; zurück auf Gesammelt ist der Wunsch nicht mehr eingeplant.
+    const sprint = stand === 'gesammelt' ? { sprintName: null } : stand === 'geplant' && sprintName !== null ? { sprintName } : {}
+    const rest = { ...sprint, ...(antwort !== null ? { antwortAnMelder: antwort } : {}) }
+    if (Object.keys(rest).length > 0) await tx.meldung.updateMany({ where: { ...buendel, id: { in: ids } }, data: rest })
     if (antwort !== null && duplikate.length > 0) {
       await tx.meldung.updateMany({ where: { id: { in: duplikate.map((d) => d.id) }, status: 'DUPLIKAT' }, data: { antwortAnMelder: antwort } })
     }
@@ -609,20 +677,28 @@ export async function setzeBuendelStandAction(eingabe: unknown): Promise<Buendel
   const hofIds = [...new Set(betroffen.flatMap((m) => (m.farmId ? [m.farmId] : [])))]
   const kundinnen = [...new Set(betroffen.flatMap((m) => (!m.farmId && m.customerEmail ? [m.customerEmail.trim().toLowerCase()] : [])))]
   const geschrieben = { hoefe: 0, kundinnen: 0 }
+  let hofBescheidGescheitert = false
   if (bescheid === 'hoefe' && antwort !== null) {
     if (hofIds.length > 0) {
-      const gesendet = await sendeRundschreiben({
-        titel: WUENSCHE_TEXT.bescheidTitel,
-        text: antwort,
-        art: 'INFO',
-        link: MEINE_MELDUNGEN_HREF,
-        perMail: false,
-        antwortMoeglich: false,
-        empfaenger: { art: 'ausgewaehlt', hofIds },
-      })
-      if ('error' in gesendet) return { error: WUENSCHE_TEXT.bescheidNichtGesendet }
-      // Die Rundschreiben-Logik schreibt nur nicht stillgelegten Höfen — gezählt wird, wer die Nachricht wirklich bekam.
-      geschrieben.hoefe = gesendet.empfaenger
+      // Eigener try (Nr. 105, Nacharbeit 101): Der Stand ist schon gespeichert —
+      // scheitert das Rundschreiben, laufen Kundinnen-Mail und Neuladen trotzdem.
+      try {
+        const gesendet = await sendeRundschreiben({
+          titel: WUENSCHE_TEXT.bescheidTitel,
+          text: antwort,
+          art: 'INFO',
+          link: MEINE_MELDUNGEN_HREF,
+          perMail: false,
+          antwortMoeglich: false,
+          empfaenger: { art: 'ausgewaehlt', hofIds },
+        })
+        // Die Rundschreiben-Logik schreibt nur nicht stillgelegten Höfen — gezählt wird, wer die Nachricht wirklich bekam.
+        if ('error' in gesendet) hofBescheidGescheitert = true
+        else geschrieben.hoefe = gesendet.empfaenger
+      } catch (err) {
+        hofBescheidGescheitert = true
+        meldeHofBescheid(err)
+      }
     }
     if (kundinnen.length > 0) nachDerAntwort(() => schreibeKundinnen(kundinnen, antwort))
     geschrieben.kundinnen = kundinnen.length
@@ -631,5 +707,32 @@ export async function setzeBuendelStandAction(eingabe: unknown): Promise<Buendel
   revalidatePath('/admin')
   revalidatePath('/admin/postfach')
   revalidatePath('/meldungen')
+  if (hofBescheidGescheitert) return { error: WUENSCHE_TEXT.bescheidNichtGesendet }
   return { ok: true, meldungen: betroffen.length, ...geschrieben }
+}
+
+/**
+ * Ablegen aus dem Kartenmenü (Mockup admin-postfach-meldungen-ablauf; Nr. 105,
+ * Nacharbeit 101): eine schmale Action statt des vollen Triage-Wegs. Sie setzt
+ * nur KEIN_FEHLER, die Antwort an den Melder (Pflicht, geprüft am Server) und
+ * den Abschluss — und nur, solange die Meldung noch den Status hat, den die
+ * Karte zeigte. Schon Abgelegtes und Duplikate legt sie nie ab.
+ */
+export async function legeMeldungAbAction(eingabe: unknown): Promise<{ error?: string }> {
+  const guard = await verlangeAdminAktion()
+  if ('error' in guard) return { error: guard.error }
+  const parsed = ablegenSchema.safeParse(eingabe)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe.' }
+  const { meldungId, antwort, vorherStatus } = parsed.data
+
+  const { count } = await prisma.meldung.updateMany({
+    where: { id: meldungId, status: { equals: vorherStatus, notIn: ['KEIN_FEHLER', 'DUPLIKAT'] } },
+    data: { status: 'KEIN_FEHLER', antwortAnMelder: antwort, triagedAt: new Date() },
+  })
+  if (count === 0) return { error: 'Die Meldung hat sich inzwischen geändert — lade die Seite neu und entscheide noch einmal.' }
+
+  revalidatePath('/admin')
+  revalidatePath('/admin/postfach')
+  revalidatePath('/meldungen')
+  return {}
 }

@@ -1,6 +1,7 @@
 /**
  * Die Reiter der AdminShell (components/shells/admin-shell.tsx): Höfe ·
- * Postfach · Startseite · Finanzen · Einstellungen (Register N15), dazu der
+ * Postfach · Startseite · Finanzen · Betrieb · Einstellungen (Register N15,
+ * Betrieb seit Nr. 103), dazu der
  * Weg zurück zum eigenen Hof und das Ziel der Konto-Plakette. Keine
  * Hof-Seitenleiste im Admin (docs/ai/DESIGN_SYSTEM.md, „Shells und
  * Navigation"). Rein, getestet in tests/admin-navigation.test.ts.
@@ -12,8 +13,9 @@
 import type { UserRole } from '@prisma/client'
 import { ADMIN_POSTFACH_HREF } from '@/lib/postfach'
 import { BRIEFKASTEN_HREF } from '@/lib/admin-briefkasten'
+import { ADMIN_BETRIEB_HREF } from '@/lib/betrieb'
 
-export type AdminReiterId = 'hoefe' | 'postfach' | 'startseite' | 'finanzen' | 'einstellungen'
+export type AdminReiterId = 'hoefe' | 'postfach' | 'startseite' | 'finanzen' | 'betrieb' | 'einstellungen'
 
 export type AdminReiter = {
   id: AdminReiterId
@@ -25,6 +27,8 @@ export type AdminReiter = {
    * Schlüssel heißt weiter 'briefkasten', Nr. 86/87).
    */
   zahl?: 'hoefe' | 'briefkasten'
+  /** Ein Punkt statt einer Zahl, solange eine Warnung offen ist (Betrieb, Register N15/N18). */
+  warnpunkt?: true
   /** Weitere Pfade, auf denen der Reiter aktiv ist — das Postfach auch auf der Detailseite einer Meldung. */
   auchAktivAuf?: readonly string[]
 }
@@ -36,6 +40,8 @@ export const ADMIN_REITER: readonly AdminReiter[] = [
   // Bis Nr. 96 ein Platzhalter mit dem Kopf des Musters (src/app/admin/startseite/page.tsx).
   { id: 'startseite', label: 'Startseite', href: '/admin/startseite' },
   { id: 'finanzen', label: 'Finanzen', href: '/admin/finanzen' },
+  // Seit Nr. 103 (Register N15/N18): Speicher, Grenzen, Abläufe; der Punkt nur in der Produktion.
+  { id: 'betrieb', label: 'Betrieb', href: ADMIN_BETRIEB_HREF, warnpunkt: true },
   { id: 'einstellungen', label: 'Einstellungen', href: '/admin/einstellungen' },
 ]
 

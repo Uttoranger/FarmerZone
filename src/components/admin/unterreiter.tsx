@@ -13,6 +13,12 @@ import { FilterChip } from '@/components/ui/chip'
  * `onNavigate`: Wendet die Seite ihren Reiter selbst im Browser an (Höfe,
  * `history.replaceState` und `preventDefault()`), gibt sie ihn mit; der Link
  * bleibt ein Link (Mittelklick, neuer Tab). Ohne ihn lädt der Link die Seite.
+ *
+ * `scroll` (Nr. 105, Register N14-Ergänzung): Ein Wechsel des Unterreiters
+ * springt standardmäßig NICHT nach oben — Kopf und Reiter stehen still,
+ * abschaltbar mit `scroll`. `ladePunkt` zeigt am gewählten Reiter den kleinen
+ * Kreis, solange die Seite lädt (braucht einen `LadeRahmen` drumherum, damit
+ * der Inhalt `aria-busy` trägt).
  */
 export function Unterreiter({
   beschriftung,
@@ -20,6 +26,8 @@ export function Unterreiter({
   aktiv,
   onNavigate,
   className,
+  scroll = false,
+  ladePunkt = false,
 }: {
   /** Wofür der Reiter wählt, für Screenreader: „Ansicht der Höfe“. */
   beschriftung: string
@@ -28,6 +36,8 @@ export function Unterreiter({
   aktiv: string | null
   onNavigate?: (ereignis: { preventDefault: () => void }, eintrag: UnterreiterDaten) => void
   className?: string
+  scroll?: boolean
+  ladePunkt?: boolean
 }): React.JSX.Element {
   return (
     <nav aria-label={beschriftung} className={cn('-mx-4 overflow-x-auto px-4 py-1 md:mx-0 md:px-0', className)}>
@@ -36,7 +46,13 @@ export function Unterreiter({
           const gewaehlt = e.id === aktiv
           return (
             <li key={e.id}>
-              <FilterChip href={e.href} aktiv={gewaehlt} onNavigate={onNavigate ? (ereignis) => onNavigate(ereignis, e) : undefined}>
+              <FilterChip
+                href={e.href}
+                aktiv={gewaehlt}
+                scroll={scroll}
+                ladePunkt={ladePunkt}
+                onNavigate={onNavigate ? (ereignis) => onNavigate(ereignis, e) : undefined}
+              >
                 {e.labelKurz ? (
                   <>
                     <span className="md:hidden">{e.labelKurz}</span>

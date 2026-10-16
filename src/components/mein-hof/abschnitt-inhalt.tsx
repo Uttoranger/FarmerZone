@@ -98,6 +98,7 @@ export function AbschnittInhalt({
           <TitelbildBaustein
             hof={hof}
             anschrift={einstellungen}
+            logoAusschnitt={auftritt.logoAusschnitt}
             onGespeichert={onGespeichert}
             meldeErfolg={meldeErfolg}
             onHochladen={onHochladen}

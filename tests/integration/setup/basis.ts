@@ -23,6 +23,7 @@ import { tagVersetzt } from '@/lib/kalender'
 import { DB_BREMSEN, bremsSchluessel } from '@/lib/bremse-datenbank'
 import { env } from '@/lib/env'
 import type { Abgabe, Farm, Prisma, Product, User } from '@prisma/client'
+import { liegengebliebene, type Zaehlung } from './zaehlung'
 
 export const INT_PRAEFIX = 'int-'
 
@@ -239,6 +240,58 @@ export function checkoutAnfrage(eingabe: {
 }
 
 /**
+ * Wie viele Zeilen je Tabelle an einem Test-Konto (`User.email` mit `int-`) oder Test-Hof (`Farm.slug` mit
+ * `int-`) hängen — und wie viele die Tabelle insgesamt hat. Welche Tabellen das sind, liest der Katalog:
+ * jede Tabelle mit einem einspaltigen Fremdschlüssel auf `User` oder `Farm`.
+ *
+ * Warum: Better Auth vergibt Kennungen ohne `int-`; was an einem Konto hängt, trägt das Präfix nicht
+ * selbst. Hängt eine Zeile mit ON DELETE SET NULL am Konto, bleibt sie nach dem Löschen des Kontos
+ * liegen — ein Rundschreiben blieb so in der Test-DB. Gefunden wird das nur durch Zählen vor und
+ * nach dem Aufräumen: Die Zeilen, die vorher an Test-Konten hingen, dürfen nachher nicht mehr da sein.
+ */
+type Bindung = { tabelle: string; bedingung: string }
+
+let bindungen: Promise<Bindung[]> | null = null
+
+function ladeBindungen(): Promise<Bindung[]> {
+  bindungen ??= prisma
+    .$queryRaw<{ tabelle: string; spalte: string; eigentuemer: string }[]>`
+      SELECT c.conrelid::regclass::text AS tabelle, a.attname AS spalte, c.confrelid::regclass::text AS eigentuemer
+      FROM pg_constraint c
+      JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+      WHERE c.contype = 'f' AND array_length(c.conkey, 1) = 1
+        AND c.confrelid IN ('"User"'::regclass, '"Farm"'::regclass)
+      ORDER BY 1, 2`
+    .then((zeilen) => {
+      // Eine Tabelle, ein Eintrag: mehrere Fremdschlüssel einer Tabelle gelten zusammen (ODER).
+      const je = new Map<string, string[]>()
+      for (const z of zeilen) {
+        const eigentuemer =
+          z.eigentuemer.replace(/"/g, '') === 'User'
+            ? `(SELECT id FROM "User" WHERE email LIKE '${INT_PRAEFIX}%')`
+            : `(SELECT id FROM "Farm" WHERE slug LIKE '${INT_PRAEFIX}%')`
+        je.set(z.tabelle, [...(je.get(z.tabelle) ?? []), `"${z.spalte}" IN ${eigentuemer}`])
+      }
+      return [...je].map(([tabelle, teile]) => ({ tabelle, bedingung: teile.join(' OR ') }))
+    })
+  return bindungen
+}
+
+/** Zeilen je Tabelle mit Fremdschlüssel auf Konto oder Hof: insgesamt und die, die an Test-Konten oder -Höfen hängen. */
+async function zaehleAnTestEigentuemern(): Promise<Zaehlung> {
+  const liste = await ladeBindungen()
+  const anfrage = liste
+    .map(
+      (b) =>
+        `SELECT '${b.tabelle.replace(/'/g, "''")}' AS tabelle, (SELECT count(*)::int FROM ${b.tabelle}) AS gesamt, ` +
+        `(SELECT count(*)::int FROM ${b.tabelle} WHERE ${b.bedingung}) AS haengt`
+    )
+    .join(' UNION ALL ')
+  const zeilen = await prisma.$queryRawUnsafe<{ tabelle: string; gesamt: number; haengt: number }[]>(anfrage)
+  return new Map(zeilen.map((z) => [z.tabelle, { gesamt: z.gesamt, haengt: z.haengt }]))
+}
+
+/**
  * Alles mit `int-`-Präfix löschen, in Fremdschlüssel-Reihenfolge.
  *
  * Bestellungen zuerst: Order → Farm und OrderItem → Product sind NICHT
@@ -247,6 +300,7 @@ export function checkoutAnfrage(eingabe: {
  * kaskadierend am User.
  */
 export async function raeumeAuf(): Promise<void> {
+  const vorher = await zaehleAnTestEigentuemern()
   const testBestellungen = {
     OR: [{ farm: { slug: { startsWith: INT_PRAEFIX } } }, { customerEmail: { startsWith: INT_PRAEFIX } }],
   } satisfies Prisma.OrderWhereInput
@@ -261,6 +315,14 @@ export async function raeumeAuf(): Promise<void> {
           in: kennungen.map(({ id }) => bremsSchluessel(env.BETTER_AUTH_SECRET, DB_BREMSEN.neuigkeitenBestellung.zweck, id)),
         },
       },
+    })
+  }
+  // Ebenso die Drossel der Mail „Ein Hof hat geantwortet" (Nr. 105): Merkmal
+  // ist die Kennung des Fadens — über die Fäden der Testhöfe, bevor sie weg sind.
+  const faeden = await prisma.unterhaltung.findMany({ where: { farm: { slug: { startsWith: INT_PRAEFIX } } }, select: { id: true } })
+  if (faeden.length > 0) {
+    await prisma.rateLimitZaehler.deleteMany({
+      where: { schluessel: { in: faeden.map(({ id }) => bremsSchluessel(env.BETTER_AUTH_SECRET, DB_BREMSEN.antwortHofMail.zweck, id)) } },
     })
   }
   await prisma.order.deleteMany({ where: testBestellungen })
@@ -284,4 +346,13 @@ export async function raeumeAuf(): Promise<void> {
   // Die Webhook-Tests vergeben Event-IDs mit Präfix; ohne Aufräumen hielte
   // die Idempotenz-Tabelle sie fest, und ein nächster Lauf sähe „schon erledigt".
   await prisma.webhookEvent.deleteMany({ where: { stripeEventId: { startsWith: INT_PRAEFIX } } })
+
+  // Zählung nach dem Aufräumen: Zeilen, die vorher an Test-Konten oder -Höfen hingen, dürfen nicht stehen bleiben.
+  const uebrig = liegengebliebene(vorher, await zaehleAnTestEigentuemern())
+  if (uebrig.length > 0) {
+    throw new Error(
+      `raeumeAuf: Zeilen von Test-Konten oder Test-Höfen blieben liegen — ${uebrig.join(', ')}. ` +
+        `Besser vor dem Löschen des Kontos über die gemerkten Kennungen wegräumen (TESTING_GUIDELINES §5).`
+    )
+  }
 }

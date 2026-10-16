@@ -127,7 +127,6 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
 
   const photoUpload = useImageUpload({
     variant: 'status',
-    oldUrl: photoUrl ?? undefined,
     onUploaded: (url) => {
       setPhotoUrl(url)
       // Ein neues Foto beginnt ohne Ausschnitt (ganz, wie bisher); der Baustein öffnet einmal von selbst.
@@ -327,6 +326,8 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
             {photoUrl && ausschnittOffen ? (
               <div className="mb-3">
                 <BildAusschnitt
+                  // Ein neues Foto bei offenem Baustein beginnt frisch — der Baustein hält seine Wahl selbst, sie gehörte zum alten Foto.
+                  key={photoUrl}
                   foto={photoUrl}
                   wert={ausschnitt ?? AUSSCHNITT_STANDARD}
                   rahmen={{ name: BILD_RAHMEN_TEXT.beitrag.rahmen, verhaeltnis: BEITRAG_RAHMEN }}

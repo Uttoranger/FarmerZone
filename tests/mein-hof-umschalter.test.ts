@@ -6,14 +6,14 @@
  *    aria-current; „Produkte" nur unter md (ab md hat Produkte seinen Punkt in
  *    der Seitenleiste; der Hinweis dazu steht seit Nr. 73 am Ende der Liste
  *    im Editor, Register N7).
- *  - Umschalter „Bearbeiten · So sieht’s die Kundin": Bearbeiten zeigt den
- *    Inhalt, die Kundenansicht das iframe der echten Hofseite (passender
- *    Reiter, vorschauLink) mit dem leisen Link „In neuem Tab öffnen"; die Wahl
- *    steht in der Adresse und wird nur über ansichtAdresse geschrieben. Das
- *    iframe kommt erst im Browser und nur, wo der Umschalter zu sehen ist —
- *    vom Server kommt an seiner Stelle eine leere Fläche.
- *  - „Kundenansicht" im Kopf schaltet im Umschalter um (Knopf, kein neuer
- *    Tab); ohne Umschalter bleibt es der Link.
+ *  - Kundenansicht (seit Nr. 107 als Vollbild, Register N4 ergänzt): den
+ *    Umschalter „Bearbeiten · So sieht’s die Kundin" gibt es nicht mehr; der
+ *    Inhalt steht immer. Das iframe der echten Hofseite (passender Reiter,
+ *    vorschauLink) kommt erst im Browser und nur unter der Grenze des
+ *    Reiters — vom Server nie. Die Wahl steht in der Adresse und wird nur über
+ *    ansichtAdresse geschrieben (Verlauf: tests/kundenansicht-vollbild.test.ts).
+ *  - „Kundenansicht" im Kopf öffnet das Vollbild (Knopf, kein neuer Tab);
+ *    ohne Kundenansicht darum herum bleibt es der Link.
  *  - „Gespeichert · Ansehen" nur auf Hofseite und Beiträge: nach Titelbild,
  *    Ausschnitt und Fotos der Hofseite mit Stiften und nach dem Veröffentlichen
  *    eines Beitrags; Produkte behält seinen Teilen-Moment (Nr. 30). Je
@@ -44,11 +44,11 @@ const toast = vi.hoisted(() => ({ custom: vi.fn(), success: vi.fn(), dismiss: vi
 vi.mock('sonner', () => ({ toast }))
 
 import { MeinHofReiterLeiste } from '@/components/mein-hof/reiter-leiste'
-import { KundenRahmen, MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
+import { MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
 import { KundenansichtKnopf } from '@/components/mein-hof/kundenansicht-knopf'
 import { GespeichertAnsehenKarte, meldeGespeichertAnsehen } from '@/components/mein-hof/gespeichert-ansehen'
 import { MEIN_HOF_HINWEIS } from '@/lib/bauern-navigation'
-import { MEIN_HOF_ANSICHT_TEXT, gespeichertHinweisId, kundenAnsichtAdresse } from '@/lib/mein-hof-ansicht'
+import { MEIN_HOF_ANSICHT_TEXT, gespeichertHinweisId } from '@/lib/mein-hof-ansicht'
 import { useSchmalerAls } from '@/lib/use-mindestbreite'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
@@ -93,58 +93,29 @@ describe('Reiterleiste', () => {
   })
 })
 
-describe('Umschalter „Bearbeiten · So sieht’s die Kundin"', () => {
-  it('Bearbeiten (ohne Parameter): Umschalter und Inhalt, kein Rahmen', () => {
+describe('Kundenansicht als Vollbild — kein Umschalter mehr (Nr. 107)', () => {
+  it('ohne Parameter: der Inhalt, kein Umschalter, kein Rahmen', () => {
     const html = ansicht('hofseite')
-    expect(html).toContain('role="toolbar"')
-    expect(html).toContain('aria-label="Ansicht von Mein Hof"')
-    expect(html).toContain('>Bearbeiten<')
-    expect(html).toContain('>So sieht’s die Kundin<')
     expect(html).toContain('Inhalt zum Bearbeiten')
+    expect(html).not.toContain('role="toolbar"')
+    expect(html).not.toContain('So sieht’s die Kundin')
     expect(html).not.toContain('<iframe')
   })
 
-  it('So sieht’s die Kundin (?ansicht=kundin): der leise Link in einen neuen Tab und die Fläche des Rahmens', () => {
-    const html = ansicht('hofseite', 'ansicht=kundin')
-    const ziel = kundenAnsichtAdresse('hof-test', 'hofseite')
-    expect(html).toMatch(new RegExp(`<a href="${ziel.replace(/[?]/g, '\\?')}" target="_blank" rel="noopener noreferrer"[^>]*>In neuem Tab öffnen`))
-    expect(html).toContain('<h1 class="sr-only">So sieht’s die Kundin</h1>')
-    // Vom Server noch ohne Hofseite: Ob man den Rahmen sieht, weiß erst der Browser (Nachbesserung 8).
-    expect(html).not.toContain('<iframe')
-    expect(html).toContain('data-rahmen-platz=""')
-    // Der Inhalt bleibt eingehängt — ab der Grenze steht er dort, wo es keinen Umschalter gibt.
-    expect(html).toContain('Inhalt zum Bearbeiten')
+  it('?ansicht=kundin vom Server: der Inhalt bleibt, das Vollbild samt Hofseite kommt erst im Browser', () => {
+    for (const reiter of ['produkte', 'hofseite', 'beitraege'] as const) {
+      const html = ansicht(reiter, 'ansicht=kundin')
+      expect(html, reiter).toContain('Inhalt zum Bearbeiten')
+      expect(html, reiter).not.toContain('<iframe')
+      expect(html, reiter).not.toContain('role="dialog"')
+    }
   })
 
-  it('der Link sagt „In neuem Tab öffnen" selbst — kein zweiter Hinweis für Screenreader', () => {
-    const html = ansicht('hofseite', 'ansicht=kundin')
-    const link = html.match(/<a [^>]*target="_blank"[^>]*>[\s\S]*?<\/a>/)?.[0] ?? ''
-    expect(link).toContain(MEIN_HOF_ANSICHT_TEXT.neuerTab)
-    expect(link).not.toContain('sr-only')
-    expect(link).not.toContain(MEIN_HOF_ANSICHT_TEXT.neuerTabHinweis)
-  })
-
-  it('Produkte zeigt den Reiter Produkte der Hofseite, Beiträge den Reiter Beiträge', () => {
-    expect(ansicht('produkte', 'ansicht=kundin')).toContain('<a href="/hof-test?vorschau=1&amp;reiter=produkte" target="_blank"')
-    expect(ansicht('beitraege', 'ansicht=kundin')).toContain('<a href="/hof-test?vorschau=1&amp;reiter=beitraege" target="_blank"')
-  })
-
-  it('der Rahmen: im Browser, wo man ihn sieht, das iframe der echten Hofseite; sonst dieselbe Fläche ohne Inhalt', () => {
-    const ziel = kundenAnsichtAdresse('hof-test', 'produkte')
-    const rahmen = (laden: boolean) => renderToStaticMarkup(createElement(KundenRahmen, { adresse: ziel, markiert: null, laden, className: 'lg:hidden' }))
-    expect(rahmen(true)).toContain(`<iframe src="${ziel.replace('&', '&amp;')}" title="So sehen Kunden deine Hofseite"`)
-    expect(rahmen(true)).not.toContain('data-rahmen-platz')
-    expect(rahmen(false)).not.toContain('<iframe')
-    expect(rahmen(false)).toMatch(/<div aria-hidden="true" data-rahmen-platz=""/)
-  })
-
-  it('am Quelltext: der Rahmen lädt nur, wo der Umschalter zu sehen ist — live über matchMedia', () => {
+  it('am Quelltext: das Vollbild gilt nur unter der Grenze des Reiters — live über matchMedia, vom Server „nein"', () => {
     const text = quelle('src/components/mein-hof/mein-hof-ansicht.tsx')
-    expect(text).toContain('const sichtbar = useSchmalerAls(UMSCHALTER_AB_PX[bis])')
-    expect(text).toContain('laden={sichtbar}')
-    expect(text).toMatch(/\{laden \? \(\s*<iframe/)
-    // Gegenprobe: die Suche findet das iframe dort, wo es steht.
-    expect(text.match(/<iframe/g)).toHaveLength(1)
+    expect(text).toContain('const schmal = useSchmalerAls(UMSCHALTER_AB_PX[umschalterBis(reiter)])')
+    expect(text).toContain('useKundenansicht(schmal)')
+    expect(text).toContain('adresse={kundenAnsichtAdresse(slug, reiter)}')
     const hook = quelle('src/lib/use-mindestbreite.ts')
     expect(hook).toMatch(
       /export function useSchmalerAls[\s\S]*?!window\.matchMedia\(`\(min-width: \$\{px\}px\)`\)\.matches[\s\S]*?useSyncExternalStore\(anmelden, lesen, \(\) => false\)/
@@ -159,40 +130,36 @@ describe('Umschalter „Bearbeiten · So sieht’s die Kundin"', () => {
     expect(renderToStaticMarkup(createElement(Zeige))).toBe('<span>false</span>')
   })
 
-  it('Unsinn in der Adresse ist Bearbeiten', () => {
-    expect(ansicht('hofseite', 'ansicht=vorschau')).not.toContain('<iframe')
+  it('am Quelltext: EIN Rahmen der echten Hofseite, die Adresse nur über ansichtAdresse, mit null als Zustand', () => {
+    const vollbild = quelle('src/components/mein-hof/kundenansicht-vollbild.tsx')
+    expect(vollbild.match(/<iframe/g)).toHaveLength(1)
+    expect(vollbild).toMatch(/<iframe ref=\{rahmen\} src=\{adresse\}/)
+    expect(vollbild).toContain("window.history.pushState(null, '', ansichtAdresse(pathname, search, 'kundin') + hash)")
+    expect(vollbild).toContain("window.history.replaceState(null, '', ansichtAdresse(pathname, search, 'bearbeiten') + hash)")
+    expect(vollbild.match(/pushState\(/g)).toHaveLength(1)
+    expect(vollbild.match(/replaceState\(/g)).toHaveLength(1)
+    expect(vollbild).toContain('meinHofAnsichtAus(useSearchParams().get(MEIN_HOF_ANSICHT_PARAMETER))')
+    // Gegenprobe: Mein Hof selbst schreibt die Adresse nicht mehr.
+    expect(quelle('src/components/mein-hof/mein-hof-ansicht.tsx')).not.toMatch(/history\./)
   })
 
-  it('der Kopf steht über dem Umschalter, der Inhalt darunter', () => {
+  it('der Kopf steht über dem Inhalt', () => {
     const html = ansicht('hofseite', '', createElement('header', null, 'Kopf von Mein Hof'))
-    expect(html.indexOf('Kopf von Mein Hof')).toBeLessThan(html.indexOf('role="toolbar"'))
-    expect(html.indexOf('role="toolbar"')).toBeLessThan(html.indexOf('Inhalt zum Bearbeiten'))
-  })
-
-  it('jedes Symbol ist aria-hidden', () => {
-    for (const svg of ansicht('beitraege', 'ansicht=kundin').match(/<svg[^>]*>/g) ?? []) expect(svg).toContain('aria-hidden="true"')
-  })
-
-  it('am Quelltext: die Wahl geht nur über ansichtAdresse in die Adresse, mit null als Zustand; der Umschalter klebt oben', () => {
-    const text = quelle('src/components/mein-hof/mein-hof-ansicht.tsx')
-    expect(text).toContain("window.history.replaceState(null, '', ansichtAdresse(pathname, search, neu) + hash)")
-    expect(text.match(/replaceState\(/g)).toHaveLength(1)
-    expect(text).toContain('meinHofAnsichtAus(useSearchParams().get(MEIN_HOF_ANSICHT_PARAMETER))')
-    expect(text).toMatch(/data-umschalter=""[\s\S]{0,120}sticky top-0/)
+    expect(html.indexOf('Kopf von Mein Hof')).toBeLessThan(html.indexOf('Inhalt zum Bearbeiten'))
   })
 })
 
 describe('„Kundenansicht" im Kopf', () => {
   const knopf = () => createElement(KundenansichtKnopf, { slug: 'hof-test', className: 'knopf' })
 
-  it('im Umschalter: ein Knopf, der umschaltet — kein neuer Tab', () => {
+  it('in Mein Hof: ein Knopf, der das Vollbild öffnet — kein neuer Tab', () => {
     adresse.suche = ''
     const html = renderToStaticMarkup(mitInhalt({ reiter: 'hofseite', slug: 'hof-test', kopf: knopf() }))
     expect(html).toMatch(/<button type="button" class="knopf">[\s\S]*?Kundenansicht<\/button>/)
     expect(html).not.toContain('target="_blank"')
   })
 
-  it('Gegenprobe ohne Umschalter: der Link in einen neuen Tab', () => {
+  it('Gegenprobe ohne Kundenansicht darum herum: der Link in einen neuen Tab', () => {
     const html = renderToStaticMarkup(knopf())
     expect(html).toContain('<a href="/hof-test?vorschau=1" target="_blank"')
     expect(html).toContain('Kundenansicht')
@@ -210,7 +177,12 @@ describe('„Kundenansicht" im Kopf', () => {
     expect(kopf.match(/<span className="sr-only">\{MEIN_HOF_ANSICHT_TEXT\.neuerTabHinweis\}<\/span>/g)).toHaveLength(2)
     const knopfText = quelle('src/components/mein-hof/kundenansicht-knopf.tsx')
     expect(knopfText).toContain('<span className="sr-only">{MEIN_HOF_ANSICHT_TEXT.neuerTabHinweis}</span>')
-    for (const pfad of ['src/components/mein-hof/seitenkopf.tsx', 'src/components/mein-hof/kundenansicht-knopf.tsx', 'src/components/mein-hof/mein-hof-ansicht.tsx']) {
+    for (const pfad of [
+      'src/components/mein-hof/seitenkopf.tsx',
+      'src/components/mein-hof/kundenansicht-knopf.tsx',
+      'src/components/mein-hof/mein-hof-ansicht.tsx',
+      'src/components/mein-hof/kundenansicht-vollbild.tsx',
+    ]) {
       const text = quelle(pfad)
       expect(text, pfad).not.toContain('(öffnet in neuem Tab)')
       expect(text, pfad).not.toMatch(/>\s*Kundenansicht\s*</)

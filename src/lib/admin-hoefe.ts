@@ -236,6 +236,8 @@ export type HofRohdaten = {
   isPaused: boolean
   betriebsnummer: string | null
   sepaErteilt: boolean
+  /** Aus der Vergabe der Gründungsplätze genommen (Register K2, Nr. 109). */
+  gruendungAusgenommen: boolean
 }
 
 /**
@@ -255,8 +257,10 @@ export type AdminHofZeile = {
   /** TT.MM.JJJJ der Freischaltung, sonst null. */
   freigeschaltetAm: string | null
   status: HofStatus
-  /** Belegter Gründungsplatz (1 … 12) — null ohne Platz. */
+  /** Belegter Gründungsplatz (1 … Plätze der Einstellung) — null ohne Platz, auch wenn ausgenommen. */
   gruendungsplatz: number | null
+  /** Ausgenommen (Register K2, Nr. 109): Die Spalte zeigt die Marke „ausgenommen · Testhof“ statt „kein Gründungshof“. */
+  gruendungAusgenommen: boolean
   stripeBereit: boolean
   /** Freigeschaltet, aber ohne fertiges Stripe-Konto (stripeFehlt, Z1). */
   stripeFehlt: boolean
@@ -297,6 +301,8 @@ export function adminHofZeile(
     status: hofStatus(hof),
     // Ein wartender Hof hat noch keinen Platz, ein stillgelegter belegt keinen mehr.
     gruendungsplatz: hof.approvedAt && !hof.archivedAt ? platz : null,
+    // Nur ein Hof im Rennen kann ausgenommen sein; ein stillgelegter trägt die Marke nicht.
+    gruendungAusgenommen: hof.approvedAt !== null && hof.archivedAt === null && hof.gruendungAusgenommen,
     stripeBereit: hof.stripeBereit,
     stripeFehlt: stripeFehlt(hof),
     onlineAn: hof.onlineAn,

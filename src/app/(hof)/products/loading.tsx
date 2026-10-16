@@ -1,9 +1,9 @@
 /*
  * Ladeansicht von „Produkte" (Nachtlauf Nr. 18). Die HofShell steht durch das
  * Layout, gewartet wird nur auf den Inhalt. Gleiche Maße wie die fertige
- * Seite: unter md die Reiter von Mein Hof (48 px) und der Umschalter (56 px,
- * seit Nr. 49), dann Kopf (h1 + Zahl), Filter-Chips und Suche, darunter ab
- * 1024 px die Tabelle mit Kopfzeile und vier Zeilen, sonst vier
+ * Seite: unter md die Reiter von Mein Hof (48 px, seit Nr. 49; der
+ * Umschalter darunter entfiel mit Nr. 107), dann Kopf (h1 + Zahl),
+ * Filter-Chips und Suche, darunter ab 1024 px die Tabelle mit Kopfzeile und vier Zeilen, sonst vier
  * Karten-Zeilen. Nur, was sicher kommt — Hinweise und der leere Zustand
  * hängen von den Daten ab.
  *
@@ -13,16 +13,13 @@
 export default function ProdukteLaden(): React.JSX.Element {
   return (
     <div className="animate-pulse" aria-busy="true">
-      {/* Unter md: Reiter Produkte · Hofseite · Beiträge und der Umschalter */}
+      {/* Unter md: Reiter Produkte · Hofseite · Beiträge (den Umschalter gibt es seit Nr. 107 nicht mehr) */}
       <div className="px-4 pt-5 md:hidden">
         <div className="flex h-12 items-center gap-7 border-b border-border">
           <div className="h-4 w-16 rounded bg-border" />
           <div className="h-4 w-16 rounded bg-muted" />
           <div className="h-4 w-24 rounded bg-muted" />
         </div>
-      </div>
-      <div className="flex h-14 items-center justify-center border-b border-border px-4 md:hidden">
-        <div className="h-10 w-[258px] rounded-full bg-muted" />
       </div>
 
       <div className="mx-auto w-full max-w-6xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10">

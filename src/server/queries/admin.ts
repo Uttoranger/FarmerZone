@@ -79,6 +79,11 @@ export type AdminFarmRow = {
   gruendungBis: Date | null
   /** Das wirksame Gründungs-Ende als Text (Nr. 62); null ohne Gründungsplatz. */
   gruendung: GruendungAnzeige | null
+  /** Aus der Vergabe der Gründungsplätze genommen (Register K2, Nr. 109). */
+  gruendungAusgenommen: boolean
+  /** Wer zuletzt aus- oder wieder aufgenommen hat und wann (Nr. 109) — null, wenn nie. */
+  gruendungGeaendertAm: Date | null
+  gruendungGeaendertVonUserId: string | null
 }
 
 /** Ist der angemeldete Nutzer Plattformbetreiber? Frisch aus der DB, nie aus der Session. */
@@ -189,6 +194,10 @@ export async function getAdminFarms(
         betriebsnummer: true,
         sepaMandatAm: true,
         gruendungBis: true,
+        // Register K2, Nr. 109: gruendungsplaetze lässt ausgenommene Höfe weg.
+        gruendungAusgenommen: true,
+        gruendungGeaendertAm: true,
+        gruendungGeaendertVonUserId: true,
         owner: { select: { email: true, emailVerified: true, createdAt: true } },
         _count: { select: { products: true, farmPhotos: true, pickupSlots: true } },
       },
@@ -235,6 +244,9 @@ export async function getAdminFarms(
     // Aus derselben Liste wie die Plätze (gruendungsplaetze filtert selbst) —
     // keine zweite Abfrage.
     gruendung: baueGruendungAnzeige(f, farms),
+    gruendungAusgenommen: f.gruendungAusgenommen,
+    gruendungGeaendertAm: f.gruendungGeaendertAm,
+    gruendungGeaendertVonUserId: f.gruendungGeaendertVonUserId,
   }))
 
   // Wartende zuerst — das ist die einzige Liste, in der der Betreiber
@@ -250,6 +262,8 @@ const HOF_FUER_GRUENDUNG = {
   createdAt: true,
   archivedAt: true,
   gruendungBis: true,
+  // Register K2, Nr. 109: ein ausgenommener Hof belegt keinen Platz.
+  gruendungAusgenommen: true,
 } satisfies Prisma.FarmSelect
 
 /** Ein Hof der Platzvergabe samt seinem Gründungs-Ende (HofFuerPlatz plus Inhaber und Spalte). */
@@ -261,9 +275,13 @@ export type HofFuerGruendung = Prisma.FarmGetPayload<{ select: typeof HOF_FUER_G
  * (gruendungsplaetze) — mit genau den Feldern, die Platz und Enddatum
  * brauchen. Keine Namen, keine E-Mail: Sie läuft vor jeder Seite des
  * Hofbereichs (Tarif-Zeile), deshalb nicht über getAdminFarms.
+ *
+ * `db`: Freischalten, Ausnehmen und Wiederaufnehmen lesen die Liste in ihrer
+ * Transaktion NACH der Sperre (GRUENDUNGSPLAETZE_SPERRE, Nr. 109) — sonst
+ * rechneten sie mit einem Stand von vor dem anderen Weg.
  */
-export async function ladeHoefeFuerGruendung(): Promise<HofFuerGruendung[]> {
-  return prisma.farm.findMany({ where: { approvedAt: { not: null }, archivedAt: null }, select: HOF_FUER_GRUENDUNG })
+export async function ladeHoefeFuerGruendung(db: Pick<Prisma.TransactionClient, 'farm'> = prisma): Promise<HofFuerGruendung[]> {
+  return db.farm.findMany({ where: { approvedAt: { not: null }, archivedAt: null }, select: HOF_FUER_GRUENDUNG })
 }
 
 /**

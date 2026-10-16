@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, type ReactNode, type SyntheticEvent } from 'react'
+import type { ReactNode, SyntheticEvent } from 'react'
 import Image from 'next/image'
-import { TITELBILD_SIZES, leseBildmasse, titelbildDarstellung, type TitelbildDarstellung, type TitelbildMasse } from '@/lib/titelbild'
+import { TITELBILD_SIZES, titelbildDarstellung, type TitelbildDarstellung } from '@/lib/titelbild'
+import { useBildmasse } from '@/components/shared/bild-masse'
 import { bildStil, filterMit, nurFilterStil } from '@/lib/bild-ausschnitt'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { cn } from '@/lib/utils'
@@ -36,27 +37,6 @@ import { cn } from '@/lib/utils'
  * Filter wirken am Computer und am Handy gleich (`bildStil`, lib/bild-ausschnitt.ts),
  * die Wahl „füllen oder ganz“ nur am Computer (`titelbildDarstellung`).
  */
-
-/**
- * Die Maße des Bilds `quelle`, sobald der Browser es geladen hat (`beimLaden`
- * ans Bild hängen). Gespeichert sind sie nicht (siehe lib/titelbild.ts).
- * Maße eines früheren Fotos gelten nicht fürs neue — Mein Hof ersetzt das
- * Foto, ohne die Seite neu zu laden.
- */
-export function useBildmasse(quelle: string | null): {
-  masse: TitelbildMasse | null
-  beimLaden: (ereignis: SyntheticEvent<HTMLImageElement>) => void
-} {
-  const [gelesen, setGelesen] = useState<{ quelle: string; masse: TitelbildMasse } | null>(null)
-  const masse = gelesen?.quelle === quelle ? gelesen.masse : null
-
-  function beimLaden(ereignis: SyntheticEvent<HTMLImageElement>): void {
-    const gemessen = leseBildmasse(ereignis.currentTarget)
-    if (quelle !== null && gemessen !== null) setGelesen({ quelle, masse: gemessen })
-  }
-
-  return { masse, beimLaden }
-}
 
 /** Der Übergang aller drei Lagen: gleich lang und zugleich, bei „weniger Bewegung“ ohne. */
 const UEBERGANG = 'transition-opacity duration-500 motion-reduce:transition-none'

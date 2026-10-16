@@ -60,13 +60,11 @@ export const TITELBILD_KNOPF_STIL = {
  * `gross` macht den Knopf 44 px hoch (Touch-Ziel im Blatt, Nr. 50).
  */
 export function CoverEditButton({
-  currentBannerUrl,
   onGespeichert,
   meldeErfolg,
   onHochladen,
   gross = false,
 }: {
-  currentBannerUrl: string | null
   onGespeichert?: () => void
   meldeErfolg?: () => void
   onHochladen?: (laeuft: boolean) => void
@@ -77,7 +75,6 @@ export function CoverEditButton({
 
   const { isUploading, progress, openFilePicker, fileInput } = useImageUpload({
     variant: 'banner',
-    oldUrl: currentBannerUrl ?? undefined,
     onUploaded: (url) => {
       startTransition(async () => {
         const result = await updateFarmBannerAction('PHOTO', url)

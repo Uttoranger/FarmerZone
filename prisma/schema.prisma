@@ -526,6 +526,17 @@ model Farm {
   // Geschrieben nur über setzeGruendungBisAction (Admin).
   gruendungBis DateTime? @db.Date
 
+  // Aus der Vergabe der Gründungsplätze genommen (Register K2, Ergänzung
+  // 16.10.2026, Nachtlauf Nr. 109) — etwa ein Testhof. Default false = zählt
+  // wie bisher (Expand, kein Backfill). gruendungGeaendertAm/-VonUserId: wer
+  // zuletzt aus- oder wieder aufgenommen hat und wann (bleibt bei der
+  // Wiederaufnahme stehen); VonUserId bewusst ohne Fremdschlüssel wie
+  // PlattformEinstellung.geaendertVonUserId. Geschrieben nur über
+  // nimmAusGruendung/nimmWiederAuf (src/server/actions/gruendung.ts).
+  gruendungAusgenommen        Boolean   @default(false)
+  gruendungGeaendertAm        DateTime?
+  gruendungGeaendertVonUserId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1329,4 +1340,42 @@ model StartseiteFassung {
   createdAt         DateTime  @default(now())
 
   @@index([liveAb])
+}
+
+// Admin › Betrieb (Register N18, Nachtlauf Nr. 103): was die Plattform im
+// Hintergrund braucht, jeden Morgen gemessen. Je UTC-Tag und Art EINE Zahl
+// (Bytes, Dateien, Mails …); `art` nur aus BETRIEB_ARTEN in src/lib/betrieb.ts
+// (gelesen über Zod). Der Mail-Zähler (src/server/betrieb-zaehler.ts) zählt in
+// dieselbe Tabelle (Art „mails“, eine Anweisung je Mail). Keine Personendaten,
+// keine Inhalte; 400 Tage lang (das Aufräumen kommt mit Nr. 104).
+model BetriebMessung {
+  tag        DateTime @db.Date
+  art        String
+  wert       BigInt
+  gemessenAm DateTime @default(now())
+
+  @@id([tag, art])
+}
+
+// Der Herzschlag der Abläufe (Register N18, Nr. 103): eine Zeile je Ablauf
+// (Name aus ABLAEUFE), vor dem Lauf gestartetAm, danach beendetAm, ok und
+// Dauer. Bei einem Fehler nur die Fehlerklasse (Error.name), nie ein Text.
+model AblaufLauf {
+  name         String    @id
+  gestartetAm  DateTime
+  beendetAm    DateTime?
+  ok           Boolean
+  fehlerKlasse String?
+  dauerMs      Int?
+}
+
+// Die zuletzt gemeldete Warnstufe je Wert bzw. Ablauf (Register N18, Nr. 103):
+// 0 = nichts offen, 1/2/3 = ab 80 %/95 %/voll bzw. Ablauf ausgefallen. Gesetzt
+// wird bedingt (nur höher bzw. einmal je Tag), erst danach geht die Mail —
+// so nie zwei Mails für dieselbe Stufe. Entwarnung setzt 0, gelöscht wird nichts.
+model BetriebWarnung {
+  art        String   @id
+  stufe      Int
+  seit       DateTime
+  gemeldetAm DateTime
 }

@@ -40,6 +40,7 @@ function hof(id: string, opts: Partial<HofFuerPlatz> = {}): HofFuerPlatz {
     approvedAt: opts.approvedAt !== undefined ? opts.approvedAt : T(1),
     createdAt: opts.createdAt ?? T(1),
     archivedAt: opts.archivedAt ?? null,
+    gruendungAusgenommen: opts.gruendungAusgenommen ?? false,
   }
 }
 

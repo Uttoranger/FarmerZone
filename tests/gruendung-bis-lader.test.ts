@@ -62,7 +62,7 @@ describe('ladeGruendungBis', () => {
     expect(db.farm.findMany).toHaveBeenCalledTimes(1)
     const abfrage = db.farm.findMany.mock.calls[0]?.[0]
     expect(abfrage.where).toEqual({ approvedAt: { not: null }, archivedAt: null })
-    expect(Object.keys(abfrage.select).sort()).toEqual(['approvedAt', 'archivedAt', 'createdAt', 'gruendungBis', 'id', 'ownerId'])
+    expect(Object.keys(abfrage.select).sort()).toEqual(['approvedAt', 'archivedAt', 'createdAt', 'gruendungAusgenommen', 'gruendungBis', 'id', 'ownerId'])
   })
 })
 

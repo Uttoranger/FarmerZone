@@ -32,16 +32,22 @@ vi.mock('@/server/abholfenster', async (original) => ({
     fenster: { datum: '', start: '', ende: '', slot: { id: 'slot_1', dayOfWeek: 0, startTime: '', endTime: '', maxOrders: null, isActive: true } },
   })),
 }))
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    farm: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+vi.mock('@/lib/prisma', () => {
+  const prisma: Record<string, unknown> = {
+    // Die Höfe der Platzvergabe (Freischaltung, in der Transaktion): ohne Eintrag keine Gründungs-Nachricht.
+    farm: { findUnique: vi.fn(), findMany: vi.fn(async () => []), create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     product: { findUnique: vi.fn(), update: vi.fn(), createMany: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     stockReservation: { aggregate: vi.fn(), deleteMany: vi.fn(), upsert: vi.fn(), findMany: vi.fn() },
     user: { findUnique: vi.fn(), update: vi.fn() },
     order: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn() },
     customerFarmSubscription: { findUnique: vi.fn(), upsert: vi.fn() },
-  },
-}))
+    // Seit Nr. 109 schaltet approveFarmAction in einer Transaktion unter der Sperre der Gründungsplätze frei.
+    plattformEinstellung: { findUnique: vi.fn(async () => null) },
+    $executeRaw: vi.fn(async () => 1),
+  }
+  prisma.$transaction = vi.fn(async (fn: (tx: unknown) => unknown) => fn(prisma))
+  return { prisma }
+})
 vi.mock('@/lib/stripe', () => ({ stripe: { paymentIntents: { create: vi.fn() } } }))
 vi.mock('@/lib/email', () => ({
   sendOnsiteConfirmation: vi.fn(),

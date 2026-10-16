@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/nextjs'
 import { env } from '@/lib/env'
 import { cronBerechtigt } from '@/lib/geheimnis'
 import { gibVerwaisteBestellungenFrei } from '@/server/verwaiste-bestellungen'
+import { mitHerzschlag } from '@/server/betrieb'
 
 /**
  * Das Netz unter der Frist (src/lib/fristen.ts): einmal täglich alle Höfe.
@@ -14,13 +15,18 @@ import { gibVerwaisteBestellungenFrei } from '@/server/verwaiste-bestellungen'
  * stünden dort verfallene Bestellungen im Bestand und beim Hof.
  *
  * Geschützt wie die anderen Cron-Routen: Bearer mit CRON_SECRET, fail-closed,
- * Vergleich in konstanter Zeit.
+ * Vergleich in konstanter Zeit. Seit Nr. 103 im Herzschlag-Rahmen (Register
+ * N18): Admin › Betrieb sieht jeden Lauf, danach prüft er die anderen Abläufe.
  */
 export async function GET(request: NextRequest) {
   if (!cronBerechtigt(request.headers.get('authorization'), env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  return NextResponse.json(await mitHerzschlag('verwaisteBestellungen', gibFrei))
+}
+
+async function gibFrei(): Promise<Record<string, unknown>> {
   const jetzt = new Date()
   const { uebersprungenIds, ...ergebnis } = await gibVerwaisteBestellungenFrei(jetzt)
 
@@ -36,5 +42,5 @@ export async function GET(request: NextRequest) {
     })
   }
 
-  return NextResponse.json({ ...ergebnis, at: jetzt.toISOString() })
+  return { ...ergebnis, at: jetzt.toISOString() }
 }

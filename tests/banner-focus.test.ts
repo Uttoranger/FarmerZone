@@ -1,6 +1,8 @@
 /**
  * Tests für das Speichern des Titelbild-Ausschnitts (speichereBildAusschnittAction,
- * Register N13/N17, Nachtlauf Nr. 97) und den Altweg updateBannerFocusAction.
+ * Register N13/N17, Nachtlauf Nr. 97). Den Altweg updateBannerFocusAction gibt
+ * es seit Nr. 108 nicht mehr (ohne Aufrufer; Nacharbeit 97) — mit ihm seine
+ * zwei Tests.
  *
  * Beweist:
  *  - Ein gültiger Ausschnitt landet beim eigenen Hof (Hof aus der Sitzung über
@@ -10,7 +12,6 @@
  *    und eine mitgeschickte Hof-Kennung werden abgewiesen; nichts geschrieben.
  *  - Ohne Sitzung und ohne eigenen Hof wird nichts geschrieben.
  *  - Logo, Produkt, Foto und Beitrag prüft seit Nr. 98 tests/bild-ausschnitt-ziele.test.ts.
- *  - Der Altweg clampt (−5 → 0, 150 → 100, NaN → 0) und schreibt über die neue Aktion.
  *
  * Gemockt ist nur die Infrastruktur (Prisma, Sitzung, Cache); das Schema prüft echt.
  */
@@ -32,7 +33,6 @@ vi.mock('@/lib/prisma', () => ({
 
 import { revalidatePath } from 'next/cache'
 import { speichereBildAusschnittAction } from '@/server/actions/bild-ausschnitt'
-import { updateBannerFocusAction } from '@/server/actions/appearance'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -116,29 +116,5 @@ describe('speichereBildAusschnittAction — Titelbild', () => {
 
     expect('error' in ergebnis).toBe(true)
     expect(revalidatePath).not.toHaveBeenCalled()
-  })
-})
-
-describe('updateBannerFocusAction — Altweg, ein dünner Aufruf', () => {
-  it.each([
-    [-5, 0],
-    [150, 100],
-    [37.6, 38],
-    [Number.NaN, 0],
-  ])('clampt %s auf %s und schreibt über die neue Aktion', async (eingabe, erwartet) => {
-    const ergebnis = await updateBannerFocusAction(eingabe)
-
-    expect(ergebnis).toEqual({})
-    expect(farmUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'farm_1', ownerId: 'user_1' },
-      data: { bannerAusschnitt: { fokusX: 50, fokusY: erwartet, zoom: 100, filter: 'NATUERLICH' }, bannerFocusY: erwartet },
-    })
-  })
-
-  it('gibt den Satz der neuen Aktion weiter, wenn niemand angemeldet ist', async () => {
-    getSession.mockResolvedValue(null as never)
-
-    expect(await updateBannerFocusAction(50)).toEqual({ error: 'Bitte melde dich neu an.' })
-    nichtsGeschrieben()
   })
 })

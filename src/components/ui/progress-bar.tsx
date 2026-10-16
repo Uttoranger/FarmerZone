@@ -35,6 +35,9 @@ export function ProgressBar({
       value={wert}
       max={max}
       aria-valuetext={prozent}
+      // Base UI verknüpft die Beschriftung erst nach der Hydrierung (aria-labelledby);
+      // ohne aria-label hätte das Server-HTML einen namenlosen Fortschrittsbalken.
+      aria-label={beschriftung}
       data-slot="progress-bar"
       className={cn('grid gap-1.5', className)}
     >

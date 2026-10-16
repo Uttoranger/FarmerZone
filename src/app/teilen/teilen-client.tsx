@@ -32,10 +32,14 @@ type Ergebnis = { name: string; ok: boolean; meldung?: string }
  */
 export function TeilenClient({
   hofSlug,
-  bisherigesTitelbild,
 }: {
   hofSlug: string
-  bisherigesTitelbild: string | null
+  /**
+   * Ungelesen seit Nr. 108: Das ersetzte Titelbild wird beim Hochladen nicht
+   * mehr gelöscht (Register N17, Ergänzung). Steht noch hier, weil
+   * teilen/page.tsx es reicht — fällt mit der nächsten Änderung dort weg.
+   */
+  bisherigesTitelbild?: string | null
 }) {
   // null = Ablage wird noch gelesen
   const [fotos, setFotos] = useState<File[] | null>(null)
@@ -93,8 +97,6 @@ export function TeilenClient({
         try {
           url = await ladeFotoHoch(foto, wirksamesZiel, {
             weg: 'teilen',
-            altUrl:
-              wirksamesZiel === 'banner' ? (bisherigesTitelbild ?? undefined) : undefined,
             onStufe: (stufe) => setLaufend((v) => (v ? { ...v, stufe } : v)),
             onFortschritt: (prozent) => setLaufend((v) => (v ? { ...v, prozent } : v)),
             onVersuch: (versuch) => {

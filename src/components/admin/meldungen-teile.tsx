@@ -145,10 +145,10 @@ export function MeldungenKopf({ ansicht, stand }: { ansicht: MeldungenAnsicht; s
   return (
     <div className="order-first flex flex-col gap-2 lg:order-none lg:flex-row lg:flex-wrap lg:items-center lg:gap-3">
       <FilterChipReihe beschriftung={MELDUNGEN_TEXT.ansichtBeschriftung}>
-        <FilterChip href={meldungenAdresse(ansicht, { ansicht: 'ablauf' })} aktiv={ansicht.ansicht === 'ablauf'}>
+        <FilterChip scroll={false} ladePunkt href={meldungenAdresse(ansicht, { ansicht: 'ablauf' })} aktiv={ansicht.ansicht === 'ablauf'}>
           {MELDUNGEN_TEXT.ablauf}
         </FilterChip>
-        <FilterChip href={meldungenAdresse(ansicht, { ansicht: 'wuensche' })} aktiv={ansicht.ansicht === 'wuensche'}>
+        <FilterChip scroll={false} ladePunkt href={meldungenAdresse(ansicht, { ansicht: 'wuensche' })} aktiv={ansicht.ansicht === 'wuensche'}>
           {MELDUNGEN_TEXT.wuensche}
         </FilterChip>
       </FilterChipReihe>
@@ -156,11 +156,11 @@ export function MeldungenKopf({ ansicht, stand }: { ansicht: MeldungenAnsicht; s
         <>
           <span className="hidden flex-1 lg:block" />
           <FilterChipReihe beschriftung={MELDUNGEN_TEXT.artBeschriftung} className="hidden lg:block">
-            <FilterChip href={meldungenAdresse(ansicht, { art: null })} aktiv={ansicht.art === null}>
+            <FilterChip scroll={false} ladePunkt href={meldungenAdresse(ansicht, { art: null })} aktiv={ansicht.art === null}>
               {MELDUNGEN_TEXT.alle} <span className="ml-1.5 text-xs font-semibold tabular-nums">{stand.jeArt.alle}</span>
             </FilterChip>
             {MELDUNG_ARTEN.map((a) => (
-              <FilterChip key={a} href={meldungenAdresse(ansicht, { art: a })} aktiv={ansicht.art === a}>
+              <FilterChip scroll={false} ladePunkt key={a} href={meldungenAdresse(ansicht, { art: a })} aktiv={ansicht.art === a}>
                 {MELDUNG_ART_LABEL[a]} <span className="ml-1.5 text-xs font-semibold tabular-nums">{stand.jeArt[a]}</span>
               </FilterChip>
             ))}
@@ -172,6 +172,8 @@ export function MeldungenKopf({ ansicht, stand }: { ansicht: MeldungenAnsicht; s
             <FilterChipReihe beschriftung={MELDUNGEN_TEXT.vonBeschriftung}>
               {(['hoefe', 'kundschaft'] as const).map((v) => (
                 <FilterChip
+                  scroll={false}
+                  ladePunkt
                   key={v}
                   href={meldungenAdresse(ansicht, {
                     von: ansicht.von === v ? 'alle' : v,
@@ -316,6 +318,7 @@ function ErledigtListe({ karten, jetzt, ansicht }: { karten: AblaufKarte[]; jetz
       {aeltere.length > 0 && (
         <Link
           href={meldungenAdresse(ansicht, { aeltere: !ansicht.aeltere })}
+          scroll={false}
           className={cn('inline-flex min-h-11 items-center self-start rounded text-[12.5px] font-semibold text-brand-text hover:underline', FOKUS_RAHMEN)}
         >
           {ansicht.aeltere ? MELDUNGEN_TEXT.aeltereZu : MELDUNGEN_TEXT.aeltere(aeltere.length)}
@@ -434,7 +437,7 @@ function HandyAblauf({ stand, ansicht, jetzt, such }: { stand: AblaufStand; ansi
     <div className="flex flex-col gap-3 lg:hidden">
       <FilterChipReihe beschriftung={MELDUNGEN_TEXT.chipsBeschriftung}>
         {STAND_TEILE.map((t) => (
-          <FilterChip key={t} href={meldungenAdresse(ansicht, { teil: t })} aktiv={ansicht.teil === t}>
+          <FilterChip scroll={false} ladePunkt key={t} href={meldungenAdresse(ansicht, { teil: t })} aktiv={ansicht.teil === t}>
             {STAND_TEIL_TEXT[t].titel} <span className="ml-1.5 text-xs font-semibold tabular-nums">{stand.band[t]}</span>
           </FilterChip>
         ))}
@@ -538,7 +541,7 @@ export function WuenscheAnsicht({
       <section aria-label={WUENSCHE_TEXT.listeBeschriftung} className={cn(KARTE, 'flex min-w-0 flex-col gap-2 p-3.5 dark:ring-1 dark:ring-border')}>
         <FilterChipReihe beschriftung={WUENSCHE_TEXT.chipsBeschriftung}>
           {WUENSCHE_FILTER.map((f) => (
-            <FilterChip key={f} href={meldungenAdresse(ansicht, { stand: f, buendel: null })} aktiv={ansicht.stand === f}>
+            <FilterChip scroll={false} ladePunkt key={f} href={meldungenAdresse(ansicht, { stand: f, buendel: null })} aktiv={ansicht.stand === f}>
               {WUENSCHE_TEXT.chip[f]} <span className="ml-1.5 text-xs font-semibold tabular-nums">{zahl(f)}</span>
             </FilterChip>
           ))}
@@ -564,6 +567,7 @@ export function WuenscheAnsicht({
                   stand: 'alle',
                   buendel: null,
                 })}
+                scroll={false}
                 className={KNOPF_RAHMEN}
               >
                 {WUENSCHE_TEXT.chip.alle}

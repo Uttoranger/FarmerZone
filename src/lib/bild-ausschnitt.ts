@@ -61,7 +61,6 @@ export const BILD_AUSSCHNITT_TEXT = {
   nichtAngemeldet: 'Bitte melde dich neu an.',
   hofFehlt: 'Wir haben deinen Hof nicht gefunden. Lade die Seite neu.',
   ungueltig: 'Den Ausschnitt konnten wir nicht speichern. Lade die Seite neu und versuch es noch einmal.',
-  nochNicht: 'Für dieses Foto gibt es den Ausschnitt noch nicht.',
 } as const
 
 /** Der Stil eines Fotos mit `object-fit: cover` — als React-Style an `next/image`. */
@@ -173,14 +172,34 @@ const TASTEN_RICHTUNG: ReadonlyMap<string, { x: number; y: number }> = new Map([
   ['ArrowUp', { x: 0, y: 1 }],
 ])
 
-/** Der Fokus nach einer Pfeiltaste auf dem Rahmen; `null` für jede andere Taste. */
+/** Unterhalb dieses Anteils der Rahmenkante gilt eine Achse als ohne Spiel. */
+const SPIEL_TOLERANZ = 1e-6
+
+/**
+ * Der Fokus nach einer Pfeiltaste auf dem Rahmen; `null` für jede andere Taste.
+ *
+ * Wie beim Ziehen bewegt sich nur eine Achse mit Spiel — auf der das Foto über
+ * den Rahmen hinausragt (Nacharbeit 97, Nr. 108). Sonst änderte etwa → bei
+ * einem Quadrat im Rahmen 3,6 : 1 (Zoom 100 %) einen unsichtbaren Wert, der
+ * erst nach dem Zoomen wirkte. Rahmen und Bild dürfen Verhältnisse sein (wie
+ * bei `bildLage`); ohne Maße (das Foto lädt noch) bleibt der Fokus stehen.
+ */
 export function ausschnittNachTaste(
-  wert: Pick<BildAusschnitt, 'fokusX' | 'fokusY'>,
+  wert: Pick<BildAusschnitt, 'fokusX' | 'fokusY' | 'zoom'>,
   taste: string,
-  umschalt: boolean
+  umschalt: boolean,
+  rahmen: Masse,
+  bild: Masse | null
 ): { fokusX: number; fokusY: number } | null {
   const richtung = TASTEN_RICHTUNG.get(taste)
   if (!richtung) return null
   const schritt = umschalt ? TASTEN_SCHRITT_GROSS : TASTEN_SCHRITT
-  return { fokusX: aufProzent(wert.fokusX + richtung.x * schritt), fokusY: aufProzent(wert.fokusY + richtung.y * schritt) }
+  const lage = bild ? bildLage(rahmen, bild, wert) : null
+  // Ein Hauch Toleranz: Füllt das Foto den Rahmen genau, ergibt die Rechnung mit Kommazahlen mal −0,0000001.
+  const spielX = lage !== null && rahmen.breite - lage.breite < -SPIEL_TOLERANZ * rahmen.breite
+  const spielY = lage !== null && rahmen.hoehe - lage.hoehe < -SPIEL_TOLERANZ * rahmen.hoehe
+  return {
+    fokusX: spielX ? aufProzent(wert.fokusX + richtung.x * schritt) : wert.fokusX,
+    fokusY: spielY ? aufProzent(wert.fokusY + richtung.y * schritt) : wert.fokusY,
+  }
 }

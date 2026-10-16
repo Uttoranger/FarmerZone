@@ -3,6 +3,10 @@ import { kontoHatHof } from '@/lib/admin-navigation'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { zaehleWartendeHoefe } from '@/server/queries/admin'
 import { zaehleOffenImEingang } from '@/server/queries/postfach'
+import * as Sentry from '@sentry/nextjs'
+import { UMGEBUNG } from '@/lib/umgebung-server'
+import { fehlerKlasse, type BetriebHinweis } from '@/lib/betrieb'
+import { ladeBetriebHinweis } from '@/server/queries/betrieb'
 
 export type Adminbereich = {
   personName: string
@@ -14,6 +18,27 @@ export type Adminbereich = {
   hatHof: boolean
   /** Die Zähler der Reiter: wartende Höfe; am Postfach alles, was im Eingang offen ist (N14: Antworten, Meldungen, Aufgaben). */
   zahlen: { hoefe: number; briefkasten: number }
+  /**
+   * Offene Warnungen von Admin › Betrieb für Punkt und Betriebsleiste
+   * (Register N15/N18) — nur in der Produktion, sonst null.
+   */
+  betrieb: BetriebHinweis | null
+}
+
+/**
+ * Punkt und Hinweis dürfen den Admin nie aufhalten: Scheitert die schlanke
+ * Abfrage, fehlt nur der Punkt (Sentry mit festem Satz, nur die Klasse).
+ */
+async function ladeBetriebHinweisSicher(): Promise<BetriebHinweis | null> {
+  if (!UMGEBUNG.vercelProduktion) return null
+  try {
+    return await ladeBetriebHinweis(new Date())
+  } catch (err) {
+    const meldung = new Error('Betrieb: Hinweis der Shell nicht gelesen')
+    meldung.name = fehlerKlasse(err)
+    Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'betrieb', grund: 'shell-hinweis' } })
+    return null
+  }
 }
 
 /**
@@ -32,10 +57,11 @@ export type Adminbereich = {
  */
 export async function ladeAdminbereich(): Promise<Adminbereich> {
   const userId = await verlangeAdminSeite()
-  const [nutzer, hoefe, offen] = await Promise.all([
+  const [nutzer, hoefe, offen, betrieb] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true, farm: { select: { id: true } } } }),
     zaehleWartendeHoefe(),
     zaehleOffenImEingang(),
+    ladeBetriebHinweisSicher(),
   ])
   // Ein Postfach, eine Zahl (Register N14): dieselbe Zählung wie „Offen" im Eingang —
   // ungelesene Antworten, Meldungen NEU/GEPRUEFT, wartende Höfe, offene Erstattungen.
@@ -44,5 +70,6 @@ export async function ladeAdminbereich(): Promise<Adminbereich> {
     personName: nutzer?.name ?? '',
     hatHof: kontoHatHof({ rolle: nutzer?.role, hofVorhanden: nutzer?.farm != null }),
     zahlen: { hoefe, briefkasten },
+    betrieb,
   }
 }

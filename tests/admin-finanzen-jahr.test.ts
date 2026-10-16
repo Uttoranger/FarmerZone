@@ -146,7 +146,9 @@ describe('die Seite im Jahr (2026, laufend)', () => {
     expect(html).toContain('text-zustand-tun')
     expect(html).toContain('Bis Jahresende')
     expect(html).toContain('nur als Hinweis')
-    expect(html).toContain('Testzahlungen vor')
+    // Die einzige Testzahlung liegt im Mai 2025 (Vorjahr): Ohne „vergleichen" steht keine Zahl von 2025 da — also kein Hinweis (Nacharbeit 100).
+    expect(rechnung.testzahlungAusgelassen).toBe(false)
+    expect(html).not.toContain('Testzahlungen vor')
   })
 
   it('der Kopf: Umschalter (Jahr gewählt), Blättern (zurück ja, vor nein), CSV-Knopf', async () => {
@@ -226,6 +228,8 @@ describe('das vergangene und das erste Jahr (2025)', () => {
     expect(html).toMatch(/role="switch"[^>]*aria-disabled="true"/)
     // Alle zwölf Monate gezählt, keiner offen.
     expect(html).toContain('Dez 2025')
+    // Die Testzahlung vom Mai fehlt in den Zahlen dieses Jahres — der Hinweis steht.
+    expect(html).toContain('Testzahlungen vor')
   })
 })
 

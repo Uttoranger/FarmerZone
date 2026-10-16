@@ -60,7 +60,8 @@ const kennung = z.string().min(1).max(64)
  * Was „Speichern“ im Bild-Baustein schickt. Welcher Hof, sagt nie das
  * Formular, sondern die Sitzung (server/actions/bild-ausschnitt.ts); bei
  * Produkt, Foto und Beitrag steht die Kennung im Wert und der Hof in derselben
- * WHERE-Klausel. Freigeschaltet ist in Nr. 97 nur das Titelbild.
+ * WHERE-Klausel. Alle fünf Ziele sind frei (Titelbild seit Nr. 97; Logo,
+ * Produktfoto, Galerie und Beitragsfoto seit Nr. 98, Register N17).
  */
 export const bildAusschnittSpeichernSchema = z.discriminatedUnion('ziel', [
   z.strictObject({ ziel: z.literal('banner'), wert: bildAusschnittSchema }),

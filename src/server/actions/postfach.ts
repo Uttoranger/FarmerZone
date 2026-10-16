@@ -27,6 +27,7 @@ import {
 import {
   empfaengerEntfernenSchema,
   empfaengerHinzufuegenSchema,
+  erstattungErledigtSchema,
   gelesenSchema,
   hofAntwortSchema,
   rundschreibenSchema,
@@ -44,7 +45,8 @@ import {
 import { SUPPORT_EMAIL } from '@/lib/support'
 import { ZU_LANG } from '@/lib/eingabegrenzen'
 import { PLATTFORM_EINSTELLUNG_ID, PLATTFORM_EINSTELLUNG_TAG } from '@/lib/plattform-einstellung'
-import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
+import { DB_BREMSEN, innerhalbDerGrenze } from '@/lib/bremse-datenbank'
+import { bremseUeberAlleInstanzen, zaehleVersuche } from '@/server/bremse-datenbank'
 import { verlangeAdminAktion } from '@/server/admin-wache'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import {
@@ -131,6 +133,26 @@ function hofSeitenNeu(unterhaltungId: string): void {
   revalidatePath('/dashboard')
 }
 
+/**
+ * Die Drossel der Mail „Ein Hof hat geantwortet" (Register N14, Ergänzung;
+ * Nr. 105): höchstens eine je Faden und voller Stunde, gezählt über alle
+ * Instanzen (DB_BREMSEN.antwortHofMail). Fail-open wie die Bremse selbst:
+ * Ist der Zähler nicht erreichbar, geht die Mail — lieber eine zu viel als
+ * keine. Gemeldet wird nur die Klasse mit der Kennung des Fadens.
+ */
+async function antwortMailFrei(unterhaltungId: string, jetzt: Date): Promise<boolean> {
+  const bremse = DB_BREMSEN.antwortHofMail
+  try {
+    const [stand] = await zaehleVersuche([{ bremse, merkmal: unterhaltungId }], jetzt)
+    return innerhalbDerGrenze(stand, bremse.max)
+  } catch (err) {
+    const meldung = new Error('Postfach: Drossel nicht erreichbar, E-Mail geht trotzdem')
+    meldung.name = err instanceof Error ? err.name : 'Unbekannt'
+    Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'postfach', aufgabe: 'antwort-team-drossel' }, extra: { kennung: unterhaltungId } })
+    return true
+  }
+}
+
 // ─── Hof ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -141,7 +163,8 @@ function hofSeitenNeu(unterhaltungId: string): void {
  * Bedingung steht in derselben WHERE-Klausel wie der Besitz; ein Faden ohne
  * Rundschreiben (Gründungs-Nachricht, Nr. 93) bleibt beantwortbar. Nach der
  * Antwort geht nach der Regel „Antwort eines Hofs" eine Mail an die
- * Empfängerliste (Zustellung) — nie an den Hof.
+ * Empfängerliste (Zustellung) — nie an den Hof, und höchstens einmal je
+ * Faden und voller Stunde (antwortMailFrei, Nr. 105).
  */
 export async function antworteAlsHof(eingabe: unknown): Promise<Ergebnis> {
   const geprueft = hofAntwortSchema.safeParse(eingabe)
@@ -181,6 +204,7 @@ export async function antworteAlsHof(eingabe: unknown): Promise<Ergebnis> {
     try {
       const an = await ladeBetreiberEmpfaenger('antwortHof')
       if (an.length === 0) return
+      if (!(await antwortMailFrei(unterhaltungId, jetzt))) return
       const faden = await ladeAntwortFuerTeam(unterhaltungId)
       if (!faden) return
       const { sendHofAntwortAnTeam } = await import('@/lib/email')
@@ -318,6 +342,29 @@ export async function markiereGelesenTeam(eingabe: unknown): Promise<Ergebnis> {
   if (!nachricht) return { error: POSTFACH_FEHLER.nichtGefunden }
 
   await prisma.$transaction(async (tx) => setzeLesestand(tx, unterhaltungId, 'TEAM', nachricht.createdAt))
+  revalidatePath(ADMIN_POSTFACH_HREF)
+  return { ok: true }
+}
+
+/**
+ * „Erstattung erledigt" (Register N14, Ergänzung; Nr. 105): Der Admin hat im
+ * Stripe-Dashboard erstattet und schließt die Aufgabe. Es ändert sich NUR das
+ * Merkmal Order.erstattungOffenSeit — kein Geld, keine Mail, kein Aufruf bei
+ * Stripe. Bedingt geschrieben: Eine unbekannte oder schon erledigte
+ * Bestellung ergibt 0 Zeilen und keinen Fehler — der gewünschte Zustand
+ * (keine offene Erstattung) gilt dann schon.
+ */
+export async function markiereErstattungErledigt(eingabe: unknown): Promise<Ergebnis> {
+  const geprueft = erstattungErledigtSchema.safeParse(eingabe)
+  if (!geprueft.success) return { error: satzAus(geprueft.error) }
+
+  const guard = await verlangeAdminAktion()
+  if ('error' in guard) return { error: guard.error }
+
+  await prisma.order.updateMany({
+    where: { id: geprueft.data.orderId, erstattungOffenSeit: { not: null } },
+    data: { erstattungOffenSeit: null },
+  })
   revalidatePath(ADMIN_POSTFACH_HREF)
   return { ok: true }
 }
