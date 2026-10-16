@@ -36,6 +36,7 @@ import {
 } from '@/lib/betrieb'
 import { ladeLaeufe, ladeMessungenFuerPruefung, ladeWarnungen, summeImMonat } from '@/server/queries/betrieb'
 import { ladeBetreiberEmpfaenger } from '@/server/queries/postfach'
+import { ohneVerwendungMesswerte } from '@/server/betrieb-bilder'
 
 /*
  * Admin › Betrieb im Hintergrund (Register N18, Nr. 103): messen, Herzschlag,
@@ -112,8 +113,8 @@ async function schreibeMessungen(tag: string, werte: ReadonlyArray<readonly [Bet
     DO UPDATE SET "wert" = EXCLUDED."wert", "gemessenAm" = EXCLUDED."gemessenAm"`
 }
 
-/** Zählt die eigenen Auflistungen des Tages hoch (sie sind Bild-Vorgänge bei Vercel). */
-async function zaehleAuflistungen(tag: string, anzahl: number, jetzt: Date): Promise<void> {
+/** Zählt die eigenen Auflistungen des Tages hoch (sie sind Bild-Vorgänge bei Vercel) — auch die der „Liste als CSV“ (Nr. 104). */
+export async function zaehleAuflistungen(tag: string, anzahl: number, jetzt: Date): Promise<void> {
   await prisma.$executeRaw`
     INSERT INTO "BetriebMessung" ("tag", "art", "wert", "gemessenAm")
     VALUES (${tag}::date, 'bilderAuflistungen', ${anzahl}, ${jetzt})
@@ -125,8 +126,11 @@ async function zaehleAuflistungen(tag: string, anzahl: number, jetzt: Date): Pro
  * Misst Datenbank und Bild-Speicher und schreibt je Wert eine Zeile
  * BetriebMessung für den UTC-Tag. Wirft nicht wegen einer Quelle: Deren
  * Fehlerklasse geht nach Sentry (ohne Inhalt), die anderen laufen weiter.
+ * Nur in der Produktion zählt sie aus DERSELBEN Auflistung die Bilder ohne
+ * Verwendung (Nr. 104) — die Vorschau teilt den Speicher, kennt aber die
+ * Höfe der Produktion nicht.
  */
-export async function messeBetrieb(jetzt: Date = new Date()): Promise<MessErgebnis> {
+export async function messeBetrieb(jetzt: Date = new Date(), { produktion = UMGEBUNG.vercelProduktion }: Optionen = {}): Promise<MessErgebnis> {
   const tag = utcTag(jetzt)
   const werte: Array<readonly [BetriebArt, number]> = []
   const fehler: MessErgebnis['fehler'] = []
@@ -152,6 +156,14 @@ export async function messeBetrieb(jetzt: Date = new Date()): Promise<MessErgebn
       ['bilderUploadsMonat', uploads],
       ['bildVorgaengeMonat', bildVorgaengeSchaetzung(uploads, auflistungenImMonat)]
     )
+    if (produktion) {
+      // Eigenes try: Scheitert eine Abfrage der Adressen, bleiben die Werte des Speichers gültig.
+      try {
+        werte.push(...(await ohneVerwendungMesswerte(dateien, jetzt)))
+      } catch (err) {
+        meldeFehler('Betrieb: Bilder ohne Verwendung nicht gezählt', err, { quelle: 'ohneVerwendung' })
+      }
+    }
   } catch (err) {
     fehler.push('bilder')
     meldeFehler('Betrieb: Bild-Speicher nicht gemessen', err, { quelle: 'bilder' })

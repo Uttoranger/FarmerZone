@@ -143,8 +143,8 @@ describe('jede Seite unter /admin', () => {
     expect(maengel).toEqual([])
   })
 
-  it('jeder Export unter /admin (Route Handler, kein Layout) prüft als erste Anweisung mit verlangeAdminAktion — Finanzen (Nr. 100) und Betrieb (Nr. 103)', () => {
-    const exporte = ['finanzen/export/route.ts', 'betrieb/export/route.ts'].map((r) => join(ADMIN, r))
+  it('jeder Export unter /admin (Route Handler, kein Layout) prüft als erste Anweisung mit verlangeAdminAktion — Finanzen (Nr. 100), Betrieb (Nr. 103) und Bilder ohne Verwendung (Nr. 104)', () => {
+    const exporte = ['finanzen/export/route.ts', 'betrieb/export/route.ts', 'betrieb/bilder-export/route.ts'].map((r) => join(ADMIN, r))
     const aktion = { modul: '@/server/admin-wache', exportName: 'verlangeAdminAktion', funktionName: 'GET' } as const
     expect(exporte.flatMap((p) => wachenMaengel(readFileSync(p, 'utf8'), aktion, relative(WURZEL, p)))).toEqual([])
   })

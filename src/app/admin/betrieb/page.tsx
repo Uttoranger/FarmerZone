@@ -14,7 +14,10 @@ import {
   betriebKacheln,
   betriebVerlauf,
   gemessenText,
+  ohneVerwendungKarte,
+  OHNE_VERWENDUNG_ANKER,
   speicherText,
+  tabellenBleibt,
   tabellenName,
   verlaufBeschreibung,
   verlaufKurz,
@@ -32,6 +35,7 @@ import {
   AblaeufeListe,
   AblaeufeRegel,
   AblaeufeTabelle,
+  BilderOhneVerwendung,
   DashboardInhalt,
   Kacheln,
   Karte,
@@ -53,7 +57,13 @@ async function ladeTabellenSicher(): Promise<{ zeilen: TabellenAnzeige; bytes: n
   try {
     const tabellen = await ladeGroessteTabellen()
     return {
-      zeilen: tabellen.map((t) => ({ name: tabellenName(t.name), modell: t.name, zeilen: t.zeilen === null ? '–' : formatZahl(t.zeilen), groesse: speicherText(t.bytes) })),
+      zeilen: tabellen.map((t) => ({
+        name: tabellenName(t.name),
+        modell: t.name,
+        zeilen: t.zeilen === null ? '–' : formatZahl(t.zeilen),
+        groesse: speicherText(t.bytes),
+        bleibt: tabellenBleibt(t.name),
+      })),
       bytes: tabellen.reduce((summe, t) => summe + t.bytes, 0),
     }
   } catch (err) {
@@ -74,7 +84,10 @@ async function ladeDaten(jetzt: Date) {
   const kacheln = betriebKacheln(messungen, jetzt)
   const zeilen = ablaufZeilen(laeufe, jetzt)
   const verlauf = betriebVerlauf(messungen, jetzt)
-  const eintraege = warnEintraege(warnungen, kacheln, zeilen, messungen, jetzt, produktion)
+  // Bilder ohne Verwendung nur in der Produktion (Nr. 104) — die Messung zählt sie nur dort.
+  const ohneVerwendung = produktion ? ohneVerwendungKarte(messungen, jetzt) : null
+  const ohneVerwendungBytes = ohneVerwendung && ohneVerwendung.bytes > 0 ? ohneVerwendung.bytes : null
+  const eintraege = warnEintraege(warnungen, kacheln, zeilen, messungen, jetzt, produktion, ohneVerwendungBytes)
   const puenktlich = zeilen.filter((z) => z.stand === 'puenktlich').length
   const sonstGruen = kacheln.filter((k) => k.warnt).length <= eintraege.length && zeilen.every((z) => z.stand === 'puenktlich' || z.stand === 'nochKeinLauf')
   return {
@@ -84,6 +97,9 @@ async function ladeDaten(jetzt: Date) {
     zeilen,
     verlauf,
     eintraege,
+    ohneVerwendung,
+    davonOhneVerwendung: ohneVerwendung && ohneVerwendungBytes !== null ? BETRIEB_TEXT.davonOhneVerwendung(ohneVerwendung.summe) : null,
+    warnungBilder: ohneVerwendungBytes !== null && eintraege.some((e) => e.art === 'bilder'),
     gruen: sonstGruen ? BETRIEB_TEXT.grueneZone(puenktlich, ABLAEUFE.length) : BETRIEB_TEXT.ablaeufePuenktlich(puenktlich, ABLAEUFE.length),
     puenktlich: BETRIEB_TEXT.ablaeufePuenktlich(puenktlich, ABLAEUFE.length),
     tabellen: tabellen?.zeilen ?? null,
@@ -103,7 +119,9 @@ async function ladeDaten(jetzt: Date) {
  * entscheiden die reinen Funktionen in src/lib/betrieb.ts. Außerhalb der
  * Produktion sagt ein Satz oben, dass Bilder gemeinsam gemessen werden und
  * Abläufe nur in der Produktion laufen. Die Karte „Bilder ohne Verwendung“
- * und die Spalte „Bleibt“ kommen mit Nr. 104.
+ * (nur Liste, nur in der Produktion) und die Spalte „Bleibt“ kamen mit
+ * Nr. 104; die Karte steht ab 1024 px rechts unter „Nur im Dashboard“, am
+ * Handy unter den Abläufen.
  */
 export default async function AdminBetriebPage(): Promise<React.JSX.Element> {
   await verlangeAdminSeite()
@@ -154,9 +172,9 @@ export default async function AdminBetriebPage(): Promise<React.JSX.Element> {
         </p>
       )}
 
-      {daten.eintraege.length > 0 && <Warnkarte eintraege={daten.eintraege} gruen={daten.gruen} />}
+      {daten.eintraege.length > 0 && <Warnkarte eintraege={daten.eintraege} gruen={daten.gruen} ohneVerwendung={daten.warnungBilder} />}
 
-      <Kacheln kacheln={daten.kacheln} />
+      <Kacheln kacheln={daten.kacheln} ohneVerwendung={daten.davonOhneVerwendung} />
 
       {/* Ab 1024 px: links Verlauf, Abläufe, Tabellen; rechts Tarife und Dashboard (Mockup admin-betrieb). */}
       <div className="hidden gap-[18px] lg:grid lg:grid-cols-[minmax(0,1fr)_468px] lg:items-start">
@@ -184,12 +202,14 @@ export default async function AdminBetriebPage(): Promise<React.JSX.Element> {
             <p className={cn('-mt-2 text-[13px] leading-snug', LEISE)}>{BETRIEB_TEXT.dashboardSatz}</p>
             <DashboardInhalt />
           </Karte>
+          <BilderOhneVerwendung karte={daten.ohneVerwendung} produktion={daten.produktion} anker={OHNE_VERWENDUNG_ANKER.breit} />
         </div>
       </div>
 
       {/* Am Handy (Mockup mobil-admin-betrieb): Abläufe offen, der Rest zugeklappt. */}
       <div className="flex flex-col gap-3 lg:hidden">
         <AblaeufeListe zeilen={daten.zeilen} puenktlich={daten.puenktlich} />
+        <BilderOhneVerwendung karte={daten.ohneVerwendung} produktion={daten.produktion} anker={OHNE_VERWENDUNG_ANKER.handy} />
         <Klappkarte titel={BETRIEB_TEXT.verlaufTitel} zeile={verlaufKurz(daten.verlauf.linien)}>
           <VerlaufLegende linien={daten.verlauf.linien} />
           {verlaufInhalt}

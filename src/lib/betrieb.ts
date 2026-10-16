@@ -19,6 +19,8 @@ import { tagVersetzt } from '@/lib/kalender'
 import { uhrzeitInWien } from '@/lib/fristen'
 import { MARKE } from '@/lib/marke'
 import type { MarkeArt } from '@/lib/marke-art'
+import { AUFBEWAHRUNG_TAGE as MELDUNG_AUFBEWAHRUNG_TAGE } from '@/lib/meldung'
+import { STARTSEITE_ORIGINAL_PREFIX, STARTSEITE_ZIEL_PREFIX, type UploadZweck } from '@/lib/upload-pfade'
 
 // ─── Tarife und Grenzen ──────────────────────────────────────────────────────
 
@@ -69,6 +71,26 @@ export const BETRIEB_ARTEN = [
   'bildVorgaengeMonat',
   'datenbankBytes',
   'mails',
+  // Bilder ohne Verwendung (Nr. 104): je Gruppe Bytes und Dateien, dazu die älteste Datei (ms seit 1970) — nur in der Produktion gemessen.
+  'ohneVerwendung:produktfotos:bytes',
+  'ohneVerwendung:produktfotos:dateien',
+  'ohneVerwendung:galerie:bytes',
+  'ohneVerwendung:galerie:dateien',
+  'ohneVerwendung:titelbilder:bytes',
+  'ohneVerwendung:titelbilder:dateien',
+  'ohneVerwendung:logos:bytes',
+  'ohneVerwendung:logos:dateien',
+  'ohneVerwendung:beitragsfotos:bytes',
+  'ohneVerwendung:beitragsfotos:dateien',
+  'ohneVerwendung:meldungen:bytes',
+  'ohneVerwendung:meldungen:dateien',
+  'ohneVerwendung:originale:bytes',
+  'ohneVerwendung:originale:dateien',
+  'ohneVerwendung:unbekannterHof:bytes',
+  'ohneVerwendung:unbekannterHof:dateien',
+  'ohneVerwendung:startseite:bytes',
+  'ohneVerwendung:startseite:dateien',
+  'ohneVerwendung:aelteste',
 ] as const
 export type BetriebArt = (typeof BETRIEB_ARTEN)[number]
 
@@ -83,8 +105,42 @@ export function darfNeuMessen(letzte: Date | null, jetzt: Date): boolean {
   return letzte === null || jetzt.getTime() - letzte.getTime() >= NEU_MESSEN_AB_MS
 }
 
-/** So lange bleiben Messungen (Register N18; aufgeräumt wird mit Nr. 104). */
+// ─── Aufbewahrung: was der Ablauf „Aufräumen“ löscht (Register N18, Nr. 104) ──
+
+/** So lange bleiben Messungen; danach löscht sie der Ablauf „Aufräumen“. */
 export const MESSUNGEN_AUFBEWAHREN_TAGE = 400
+/** Abgelaufene Sitzungen (tragen IP-Adresse und Browserangabe) bleiben so viele Tage nach ihrem Ablauf — eine gültige nie. */
+export const SITZUNGEN_NACH_ABLAUF_TAGE = 7
+/** Abgelaufene Anmelde- und Bestätigungscodes bleiben so viele Tage nach ihrem Ablauf. */
+export const CODES_NACH_ABLAUF_TAGE = 1
+/**
+ * Webhook-Ereignisse bleiben so lange: Sie halten Stripe-Ereignisse nur
+ * davon ab, doppelt verarbeitet zu werden, und Stripe wiederholt ein
+ * Ereignis höchstens drei Tage lang. Die Melde-Vermerke (MELDE_VERMERK_TYP)
+ * bleiben immer — sie verhindern eine zweite Mail „Erstattung gescheitert“.
+ */
+export const WEBHOOK_EREIGNISSE_AUFBEWAHREN_TAGE = 30
+/** Ein Bild ohne Verwendung kommt erst ab diesem Alter in die Liste — ein jüngeres kann noch in einem offenen Formular hängen. */
+export const BILDER_OHNE_VERWENDUNG_AB_TAGE = 7
+
+const TAG_MS = 24 * 60 * 60 * 1000
+
+export type AufraeumGrenzen = { sitzungen: Date; codes: Date; webhookEreignisse: Date; messungen: Date }
+
+/**
+ * Die festen Grenzen des Aufräumens: gelöscht wird, was VOR der Grenze liegt
+ * (Sitzungen und Codes nach `expiresAt`, Webhook-Ereignisse nach `createdAt`,
+ * Messungen nach ihrem UTC-Tag). Genau an der Grenze bleibt eine Zeile.
+ */
+export function aufraeumGrenzen(jetzt: Date): AufraeumGrenzen {
+  const vor = (tage: number): Date => new Date(jetzt.getTime() - tage * TAG_MS)
+  return {
+    sitzungen: vor(SITZUNGEN_NACH_ABLAUF_TAGE),
+    codes: vor(CODES_NACH_ABLAUF_TAGE),
+    webhookEreignisse: vor(WEBHOOK_EREIGNISSE_AUFBEWAHREN_TAGE),
+    messungen: new Date(`${utcTagVersetzt(utcTag(jetzt), -MESSUNGEN_AUFBEWAHREN_TAGE)}T00:00:00.000Z`),
+  }
+}
 
 /** Der Verlauf auf der Seite. */
 export const VERLAUF_TAGE = 90
@@ -257,7 +313,7 @@ export const ABLAEUFE: readonly Ablauf[] = [
   {
     name: 'aufraeumen',
     text: 'Aufräumen',
-    zweck: 'Er räumt abgelaufene Reservierungen und alte Zähler der Bremse weg.',
+    zweck: 'Er räumt abgelaufene Reservierungen, alte Zähler der Bremse, abgelaufene Sitzungen und Codes, alte Webhook-Ereignisse und alte Messungen weg.',
     pfad: '/api/cron/cleanup-reservations',
     zeitplan: '0 3 * * *',
     rhythmus: 'taeglich',
@@ -511,6 +567,10 @@ export function betriebHinweis(
 
 export const ADMIN_BETRIEB_HREF = '/admin/betrieb'
 export const BETRIEB_EXPORT_HREF = '/admin/betrieb/export'
+/** „Liste als CSV“ der Bilder ohne Verwendung (Nr. 104). */
+export const BILDER_EXPORT_HREF = '/admin/betrieb/bilder-export'
+/** Die Anker der Karte „Bilder ohne Verwendung“: ab 1024 px rechts, am Handy unter den Abläufen — beide Fassungen stehen im Dokument. */
+export const OHNE_VERWENDUNG_ANKER = { breit: 'ohne-verwendung', handy: 'ohne-verwendung-handy' } as const
 
 /** Alle Sätze von Admin › Betrieb — EINE Quelle (Mockups admin-betrieb, mobil-admin-betrieb). */
 export const BETRIEB_TEXT = {
@@ -556,16 +616,29 @@ export const BETRIEB_TEXT = {
     '= mehr als 26 Stunden (täglich) bzw. 8 Tage (wöchentlich) ohne Lauf – Vercel startet einen Ablauf irgendwann in der genannten Stunde.',
   ablaeufeRegelFehler:
     '= der Lauf ist gescheitert (Fehlerklasse in Sentry, ohne Inhalt). Beides schickt eine Warn-Mail; jeder Ablauf prüft nach seinem Lauf die anderen.',
+  ablaeufeAufraeumen: '„Aufräumen“ = Reservierungen, Bremse, abgelaufene Sitzungen und Codes, alte Webhook-Ereignisse und Messungen.',
   dashboardTitel: 'Nur im Dashboard',
   dashboardSatz: `Das kann ${MARKE} selbst nicht messen – einmal im Monat ansehen.`,
   dashboardKurz: 'Vercel, Supabase, Sentry, Resend',
   neuerTab: '(öffnet in neuem Tab)',
   tabellenTitel: 'Größte Tabellen',
   tabellenZusammen: (gesamt: string): string => `zusammen ${gesamt}`,
-  tabellenSpalten: { tabelle: 'Tabelle', zeilen: 'Zeilen', groesse: 'Größe' },
+  tabellenSpalten: { tabelle: 'Tabelle', zeilen: 'Zeilen', groesse: 'Größe', bleibt: 'Bleibt' },
   tabellenLeer: 'Die Tabellen konnten gerade nicht gelesen werden.',
   csv: 'Messungen als CSV',
-  csvSatz: 'Gespeichert wird je Tag und Wert eine Zahl, 400 Tage lang. Keine Personendaten, keine Inhalte.',
+  csvSatz: `Gespeichert wird je Tag und Wert eine Zahl, ${MESSUNGEN_AUFBEWAHREN_TAGE} Tage lang. Keine Personendaten, keine Inhalte.`,
+  // Bilder ohne Verwendung (Nr. 104, Mockups admin-betrieb und mobil-admin-betrieb)
+  ohneVerwendungTitel: 'Bilder ohne Verwendung',
+  ohneVerwendungMarke: 'nur Liste',
+  ohneVerwendungSatz: 'Hängen an keinem Hof, Produkt, Beitrag, keiner Fassung der Startseite und keiner Meldung.',
+  ohneVerwendungGetrennt: 'Getrennt geführt, nicht mitgezählt',
+  ohneVerwendungDateien: 'Dateien',
+  ohneVerwendungCsv: 'Liste als CSV',
+  ohneVerwendungFuss: `Gelöscht wird nichts. In die Liste kommt nur, was älter als ${BILDER_OHNE_VERWENDUNG_AB_TAGE} Tage ist – jüngere Bilder können noch in einem offenen Formular hängen. Löschen kommt nach deiner Durchsicht in einer eigenen Nummer.`,
+  ohneVerwendungVorschau: 'Nur in der Produktion – Vorschau und Produktion teilen sich den Bild-Speicher.',
+  ohneVerwendungLeer: 'Die Liste kommt mit der nächsten Messung am Morgen.',
+  ohneVerwendungAnsehen: 'Bilder ohne Verwendung ansehen',
+  davonOhneVerwendung: (menge: string): string => `davon ${menge} ohne Verwendung`,
 } as const
 
 export const STAND_TEXT: Record<AblaufStand, string> = {
@@ -660,6 +733,216 @@ const TABELLEN_NAME: Record<string, string> = {
 
 export function tabellenName(modell: string): string {
   return TABELLEN_NAME[modell] ?? modell
+}
+
+/** Wie lange die Zeilen einer Tabelle bleiben (Spalte „Bleibt“, Nr. 104) — aus denselben Grenzen, nach denen aufgeräumt wird. */
+const TABELLEN_BLEIBT: Record<string, string> = {
+  Order: '7 Jahre (BAO) – nie automatisch',
+  OrderItem: '7 Jahre (BAO) – nie automatisch',
+  WebhookEvent: `${WEBHOOK_EREIGNISSE_AUFBEWAHREN_TAGE} Tage`,
+  Session: `abgelaufene nach ${SITZUNGEN_NACH_ABLAUF_TAGE} Tagen`,
+  Verification: `abgelaufene nach ${CODES_NACH_ABLAUF_TAGE} Tag`,
+  Product: 'solange der Hof sie führt',
+  Meldung: `erledigt ${MELDUNG_AUFBEWAHRUNG_TAGE} Tage`,
+  BetriebMessung: `${MESSUNGEN_AUFBEWAHREN_TAGE} Tage`,
+  StockReservation: 'abgelaufene bis zum nächsten Aufräumen',
+  RateLimitZaehler: 'abgelaufene bis zum nächsten Aufräumen',
+}
+
+/** „–“ heißt: Kein Ablauf löscht diese Tabelle von selbst. */
+export function tabellenBleibt(modell: string): string {
+  return TABELLEN_BLEIBT[modell] ?? '–'
+}
+
+// ─── Bilder ohne Verwendung (Register N18, Nr. 104) ──────────────────────────
+
+/**
+ * Die Arten der Bilder ohne Verwendung — je Ordner unter `farms/<hofId>/`
+ * bzw. `originals/<hofId>/` (src/lib/upload-pfade.ts). Getrennt geführt und
+ * NICHT als „ohne Verwendung“ gezählt: Pfade mit unbekannter Hof-Kennung
+ * (gelöscht oder aus der Vorschau, die den Speicher teilt) und der
+ * Startseiten-Ordner (ohne Hof-Kennung, auch von der Vorschau benutzt).
+ */
+export const BILD_ARTEN = ['produktfotos', 'galerie', 'titelbilder', 'logos', 'beitragsfotos', 'meldungen', 'originale'] as const
+export type BildArt = (typeof BILD_ARTEN)[number]
+export const BILD_GRUPPEN_GETRENNT = ['unbekannterHof', 'startseite'] as const
+export type BildGruppe = BildArt | (typeof BILD_GRUPPEN_GETRENNT)[number]
+
+export const BILD_GRUPPE_TEXT: Record<BildGruppe, string> = {
+  produktfotos: 'Produktfotos',
+  galerie: 'Galerie',
+  titelbilder: 'Titelbilder',
+  logos: 'Logos',
+  beitragsfotos: 'Beitragsfotos',
+  meldungen: 'Bildschirmfotos aus Meldungen',
+  originale: 'Reste von Originalen',
+  unbekannterHof: 'unbekannter Hof – gelöscht oder aus der Vorschau',
+  startseite: 'Startseite – auch Bilder aus der Vorschau',
+}
+
+/** Der Ordner eines Zwecks unter `farms/<hofId>/` → Art. */
+const ZWECK_ART = {
+  product: 'produktfotos',
+  gallery: 'galerie',
+  banner: 'titelbilder',
+  logo: 'logos',
+  status: 'beitragsfotos',
+  meldung: 'meldungen',
+} as const satisfies Record<Exclude<UploadZweck, 'startseite'>, BildArt>
+
+/** Die Art einer Messung der Bilder ohne Verwendung. */
+export function ohneVerwendungArt(gruppe: BildGruppe, was: 'bytes' | 'dateien'): BetriebArt {
+  return `ohneVerwendung:${gruppe}:${was}`
+}
+
+/**
+ * Wohin eine Datei im Bild-Speicher gehört — null, wenn ihr Pfad keinem
+ * bekannten Ordner folgt (dann wird sie weder gezählt noch gelistet).
+ */
+export function ordneBildEin(pathname: string, hoefe: ReadonlySet<string>): BildGruppe | null {
+  if (pathname.startsWith(STARTSEITE_ZIEL_PREFIX) || pathname.startsWith(STARTSEITE_ORIGINAL_PREFIX)) return 'startseite'
+  const ziel = /^farms\/([^/]+)\/([^/]+)\/[^/]+/.exec(pathname)
+  if (ziel) {
+    if (!hoefe.has(ziel[1])) return 'unbekannterHof'
+    return Object.hasOwn(ZWECK_ART, ziel[2]) ? ZWECK_ART[ziel[2] as keyof typeof ZWECK_ART] : null
+  }
+  const original = /^originals\/([^/]+)\/.+/.exec(pathname)
+  if (original) return hoefe.has(original[1]) ? 'originale' : 'unbekannterHof'
+  return null
+}
+
+/** Der Pfad einer gespeicherten Bild-Adresse (ohne Domain und Abfrage) — null, wenn sie keine Web-Adresse ist (etwa ein Verlauf im Titelbild). */
+export function pfadAusAdresse(adresse: string): string | null {
+  let url: URL
+  try {
+    url = new URL(adresse)
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null
+  const roh = url.pathname.replace(/^\/+/, '')
+  try {
+    return decodeURIComponent(roh)
+  } catch {
+    // Kaputt kodiert: der rohe Pfad zählt trotzdem als benutzt — lieber ein Bild zu wenig in der Liste.
+    return roh
+  }
+}
+
+/** Jede `bildUrl` in einem Json (Fassung der Startseite), auch verschachtelt. */
+export function bildUrlsAusInhalt(inhalt: unknown): string[] {
+  if (Array.isArray(inhalt)) return inhalt.flatMap(bildUrlsAusInhalt)
+  if (inhalt === null || typeof inhalt !== 'object') return []
+  return Object.entries(inhalt).flatMap(([schluessel, wert]) => (schluessel === 'bildUrl' && typeof wert === 'string' ? [wert] : bildUrlsAusInhalt(wert)))
+}
+
+export type BildVerwendung = {
+  /** Die Pfade aller gespeicherten Bild-Adressen (pfadAusAdresse). */
+  benutzt: ReadonlySet<string>
+  /** Die Kennungen aller Höfe DIESER Datenbank. */
+  hoefe: ReadonlySet<string>
+}
+
+export type BildOhneVerwendung = { gruppe: BildGruppe; pathname: string; size: number; uploadedAt: Date }
+
+/**
+ * Welche Dateien an nichts hängen: kein Feld trägt ihre Adresse, älter als 7
+ * Tage, und ihr Pfad gehört zu einem bekannten Ordner. Die Gruppe sagt, ob
+ * sie als „ohne Verwendung“ zählt (BILD_ARTEN) oder getrennt geführt wird.
+ * Älteste zuerst. Es wird nichts gelöscht.
+ */
+export function bilderOhneVerwendung(
+  dateien: ReadonlyArray<{ pathname: string; url: string; size: number; uploadedAt: Date }>,
+  verwendung: BildVerwendung,
+  jetzt: Date
+): BildOhneVerwendung[] {
+  const ab = jetzt.getTime() - BILDER_OHNE_VERWENDUNG_AB_TAGE * TAG_MS
+  const liste: BildOhneVerwendung[] = []
+  for (const d of dateien) {
+    if (d.uploadedAt.getTime() >= ab) continue
+    if (verwendung.benutzt.has(d.pathname) || verwendung.benutzt.has(pfadAusAdresse(d.url) ?? d.pathname)) continue
+    const gruppe = ordneBildEin(d.pathname, verwendung.hoefe)
+    if (gruppe !== null) liste.push({ gruppe, pathname: d.pathname, size: d.size, uploadedAt: d.uploadedAt })
+  }
+  return liste.sort((a, b) => a.uploadedAt.getTime() - b.uploadedAt.getTime())
+}
+
+/** Zählt „ohne Verwendung“? Nur die Arten — unbekannter Hof und Startseite nicht. */
+export function zaehltOhneVerwendung(gruppe: BildGruppe): gruppe is BildArt {
+  return (BILD_ARTEN as readonly string[]).includes(gruppe)
+}
+
+/** Die Summen für BetriebMessung: je Gruppe Bytes und Dateien (auch 0 — ein zweiter Lauf am Tag überschreibt), dazu die älteste gezählte Datei (0 = keine). */
+export function ohneVerwendungWerte(liste: readonly BildOhneVerwendung[]): Array<readonly [BetriebArt, number]> {
+  const werte: Array<readonly [BetriebArt, number]> = []
+  for (const gruppe of [...BILD_ARTEN, ...BILD_GRUPPEN_GETRENNT]) {
+    const eigene = liste.filter((b) => b.gruppe === gruppe)
+    werte.push([ohneVerwendungArt(gruppe, 'bytes'), eigene.reduce((s, b) => s + b.size, 0)], [ohneVerwendungArt(gruppe, 'dateien'), eigene.length])
+  }
+  const gezaehlt = liste.filter((b) => zaehltOhneVerwendung(b.gruppe))
+  werte.push(['ohneVerwendung:aelteste', gezaehlt.length === 0 ? 0 : Math.min(...gezaehlt.map((b) => b.uploadedAt.getTime()))])
+  return werte
+}
+
+export type OhneVerwendungZeile = { gruppe: BildGruppe; text: string; dateien: string; groesse: string }
+export type OhneVerwendungKarte = {
+  bytes: number
+  summe: string
+  zeile: string
+  arten: OhneVerwendungZeile[]
+  getrennt: OhneVerwendungZeile[]
+  hinweis: string | null
+}
+
+/** „3. Aug“, aus einem anderen Jahr „3. Aug 2025“ — der Wiener Tag. */
+function tagMitMonat(zeitpunkt: Date, jetzt: Date): string {
+  const tag = kalendertagInWien(zeitpunkt)
+  const text = `${Number(tag.slice(8, 10))}. ${MONAT_KURZ[Number(tag.slice(5, 7)) - 1]}`
+  return tag.slice(0, 4) === kalendertagInWien(jetzt).slice(0, 4) ? text : `${text} ${tag.slice(0, 4)}`
+}
+
+/**
+ * Die Karte „Bilder ohne Verwendung“ aus der jüngsten Messung, die sie
+ * gezählt hat — null, wenn es keine gibt. Stammt sie nicht vom letzten
+ * Messtag, sagt ein Hinweis, von wann.
+ */
+export function ohneVerwendungKarte(messungen: readonly Messung[], jetzt: Date): OhneVerwendungKarte | null {
+  let tag: string | null = null
+  for (const m of messungen) if (m.art.startsWith('ohneVerwendung:') && (tag === null || m.tag > tag)) tag = m.tag
+  if (tag === null) return null
+  const wert = (art: BetriebArt): number => messungen.find((m) => m.tag === tag && m.art === art)?.wert ?? 0
+  const roh = (gruppen: readonly BildGruppe[]): Array<{ gruppe: BildGruppe; anzahl: number; bytes: number }> =>
+    gruppen
+      .map((gruppe) => ({ gruppe, anzahl: wert(ohneVerwendungArt(gruppe, 'dateien')), bytes: wert(ohneVerwendungArt(gruppe, 'bytes')) }))
+      .filter((z) => z.anzahl > 0)
+      .sort((a, b) => b.bytes - a.bytes)
+  const zeile = (z: { gruppe: BildGruppe; anzahl: number; bytes: number }): OhneVerwendungZeile => ({
+    gruppe: z.gruppe,
+    text: BILD_GRUPPE_TEXT[z.gruppe],
+    dateien: formatZahl(z.anzahl),
+    groesse: speicherText(z.bytes),
+  })
+  const arten = roh(BILD_ARTEN)
+  const bytes = arten.reduce((s, z) => s + z.bytes, 0)
+  const anzahl = arten.reduce((s, z) => s + z.anzahl, 0)
+  const aelteste = wert('ohneVerwendung:aelteste')
+  const messtag = letzterMesstag(messungen)
+  return {
+    bytes,
+    summe: speicherText(bytes),
+    zeile: `in ${formatZahl(anzahl)} ${anzahl === 1 ? 'Datei' : 'Dateien'}${aelteste > 0 ? ` · älteste vom ${tagMitMonat(new Date(aelteste), jetzt)}` : ''}`,
+    arten: arten.map(zeile),
+    getrennt: roh(BILD_GRUPPEN_GETRENNT).map(zeile),
+    hinweis: messtag !== null && tag < messtag ? BETRIEB_TEXT.standVom(formatTagKurz(tag)) : null,
+  }
+}
+
+/** „Was hilft“ in der Warnkarte: beim Bilder-Speicher mit den Bildern ohne Verwendung, sobald sie gezählt sind (Mockup admin-betrieb). */
+export function hilftSatz(wert: GrenzWert, ohneVerwendungBytes: number | null): string | null {
+  if (wert === 'bilder' && ohneVerwendungBytes !== null && ohneVerwendungBytes > 0) {
+    return `${speicherText(ohneVerwendungBytes)} hängen an nichts mehr, oder Vercel Pro (ohne harte Sperre).`
+  }
+  return GRENZ_TEXT[wert].hilft
 }
 
 // ─── Kacheln, Verlauf, Abläufe: die Seite als Daten ──────────────────────────
@@ -898,6 +1181,8 @@ export type WarnEintrag = { art: string; titel: string; saetze: string[] }
  * Die Warnkarte: jede Warnung mit Stufe > 0 (Grenzwert mit dem Anteil von
  * heute, Ablauf mit seinem Stand), dazu — nur in der Produktion, wie die
  * Prüfung selbst — jeder überfällige Ablauf ohne Warnzeile. Höhere Stufe zuerst.
+ * Mit gezählten Bildern ohne Verwendung nennt „Was hilft“ beim Bilder-Speicher
+ * ihre Größe (Nr. 104).
  */
 export function warnEintraege(
   warnungen: ReadonlyArray<{ art: string; stufe: number; gemeldetAm: Date }>,
@@ -905,7 +1190,8 @@ export function warnEintraege(
   zeilen: readonly AblaufZeile[],
   messungen: readonly Messung[],
   jetzt: Date,
-  produktion: boolean
+  produktion: boolean,
+  ohneVerwendungBytes: number | null = null
 ): WarnEintrag[] {
   const anteilVon = (wert: GrenzWert): number | null => {
     if (wert === 'bilder') return kacheln.find((k) => k.id === 'bilder')?.anteil ?? null
@@ -924,11 +1210,11 @@ export function warnEintraege(
     if ((GRENZ_WERTE as readonly string[]).includes(w.art)) {
       const wert = w.art as GrenzWert
       const a = anteilVon(wert)
-      const text = GRENZ_TEXT[wert]
+      const hilft = hilftSatz(wert, ohneVerwendungBytes)
       eintraege.push({
         art: w.art,
         titel: a === null ? warnHinweis(w.art, w.stufe).text : grenzTitel(wert, a),
-        saetze: [text.voll, ...(text.hilft ? [`${BETRIEB_MAIL_TEXT.hilft} ${text.hilft}`] : []), mailSatz(w.gemeldetAm)],
+        saetze: [GRENZ_TEXT[wert].voll, ...(hilft ? [`${BETRIEB_MAIL_TEXT.hilft} ${hilft}`] : []), mailSatz(w.gemeldetAm)],
       })
     } else {
       const zeile = zeilen.find((z) => ablaufWarnArt(z.name) === w.art)

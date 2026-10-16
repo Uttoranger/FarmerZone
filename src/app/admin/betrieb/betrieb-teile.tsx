@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react'
-import { ChevronRight, Database, ExternalLink, Image as BildSymbol, LineChart, Mail, TriangleAlert, Upload, type LucideIcon } from 'lucide-react'
+import { ChevronRight, Database, Download, ExternalLink, Image as BildSymbol, ImageOff, LineChart, Mail, TriangleAlert, Upload, type LucideIcon } from 'lucide-react'
 import {
   BETRIEB_TEXT,
+  BILDER_EXPORT_HREF,
   NUR_IM_DASHBOARD,
+  OHNE_VERWENDUNG_ANKER,
   STAND_MARKE,
   STAND_TEXT,
   STUFEN,
@@ -15,6 +17,8 @@ import {
   type AblaufZeile,
   type Kachel,
   type KachelId,
+  type OhneVerwendungKarte,
+  type OhneVerwendungZeile,
   type VerlaufLinie,
   type WarnEintrag,
 } from '@/lib/betrieb'
@@ -25,7 +29,7 @@ import { Chip } from '@/components/ui/chip'
 import { Marke } from '@/components/ui/marke'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { EmptyState } from '@/components/ui/empty-state'
-import { KARTE, KICKER, LEISE } from '@/components/hof-bestellungen/stil'
+import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
 
 /*
  * Die Teile von Admin › Betrieb (Register N18, Nr. 103; Mockups admin-betrieb
@@ -49,8 +53,12 @@ function tonText(warnt: boolean): string {
 
 // ─── Kopf und Warnkarte ──────────────────────────────────────────────────────
 
-/** Die Warnkarte über den Kacheln, solange eine Stufe offen ist (Mockup: „1 Warnung: Bilder-Speicher bei 82 %“). */
-export function Warnkarte({ eintraege, gruen }: { eintraege: readonly WarnEintrag[]; gruen: string }): React.JSX.Element {
+/**
+ * Die Warnkarte über den Kacheln, solange eine Stufe offen ist (Mockup: „1 Warnung: Bilder-Speicher bei 82 %“).
+ * `ohneVerwendung`: der Knopf zur Karte „Bilder ohne Verwendung“ (Nr. 104) — je Breite ein Anker, weil die Karte
+ * ab 1024 px rechts und am Handy unter den Abläufen steht.
+ */
+export function Warnkarte({ eintraege, gruen, ohneVerwendung = false }: { eintraege: readonly WarnEintrag[]; gruen: string; ohneVerwendung?: boolean }): React.JSX.Element {
   const einzeln = eintraege.length === 1
   return (
     <section aria-labelledby="betrieb-warnung" className="flex gap-3 rounded-2xl border border-primary/45 bg-primary/12 p-4 md:p-5">
@@ -68,6 +76,16 @@ export function Warnkarte({ eintraege, gruen }: { eintraege: readonly WarnEintra
           </p>
         ))}
         <p className={cn('text-[12.5px] leading-snug', LEISE)}>{gruen}</p>
+        {ohneVerwendung && (
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            <a href={`#${OHNE_VERWENDUNG_ANKER.breit}`} className={cn(KNOPF_RAHMEN, 'hidden font-semibold lg:inline-flex')}>
+              {BETRIEB_TEXT.ohneVerwendungAnsehen}
+            </a>
+            <a href={`#${OHNE_VERWENDUNG_ANKER.handy}`} className={cn(KNOPF_RAHMEN, 'font-semibold lg:hidden')}>
+              {BETRIEB_TEXT.ohneVerwendungAnsehen}
+            </a>
+          </div>
+        )}
       </div>
     </section>
   )
@@ -99,7 +117,7 @@ export function GrenzBalken({ titel, anteil, warnt }: { titel: string; anteil: n
   )
 }
 
-function KachelKarte({ kachel: k }: { kachel: Kachel }): React.JSX.Element {
+function KachelKarte({ kachel: k, ohneVerwendung }: { kachel: Kachel; ohneVerwendung: string | null }): React.JSX.Element {
   const Symbol = KACHEL_SYMBOL[k.id]
   return (
     <article className={cn(KARTE, 'flex min-w-0 flex-col gap-2.5 p-4', k.warnt && 'border-primary/60')}>
@@ -121,13 +139,22 @@ function KachelKarte({ kachel: k }: { kachel: Kachel }): React.JSX.Element {
       {k.hinweis && <p className="text-[12.5px] leading-snug text-status-offen">{k.hinweis}</p>}
       <p className="hidden text-[12.5px] leading-snug break-words text-foreground lg:block">{k.zeile}</p>
       <p className={cn('hidden text-[12px] leading-snug lg:block', LEISE)}>{k.satz}</p>
+      {/* Nur ab 1024 px, wie im Mockup: Am Handy nennt die Warnkarte die Bilder ohne Verwendung. */}
+      {ohneVerwendung && (
+        <a
+          href={`#${OHNE_VERWENDUNG_ANKER.breit}`}
+          className={cn('hidden min-h-11 items-center self-start rounded-md text-[12.5px] font-semibold text-status-fertig underline-offset-2 hover:underline lg:inline-flex', FOKUS_RAHMEN)}
+        >
+          {ohneVerwendung}
+        </a>
+      )}
       <p className={cn('text-[12.5px] leading-snug lg:hidden', LEISE)}>{k.kurz}</p>
     </article>
   )
 }
 
-/** Die vier Kacheln: am Handy untereinander, ab 768 px zu zweit, ab 1024 px zu viert. */
-export function Kacheln({ kacheln }: { kacheln: readonly Kachel[] }): React.JSX.Element {
+/** Die vier Kacheln: am Handy untereinander, ab 768 px zu zweit, ab 1024 px zu viert. `ohneVerwendung`: „davon … ohne Verwendung“ unter den Bildern (Nr. 104). */
+export function Kacheln({ kacheln, ohneVerwendung = null }: { kacheln: readonly Kachel[]; ohneVerwendung?: string | null }): React.JSX.Element {
   return (
     <section aria-labelledby="betrieb-kacheln">
       <h2 id="betrieb-kacheln" className="sr-only">
@@ -135,7 +162,7 @@ export function Kacheln({ kacheln }: { kacheln: readonly Kachel[] }): React.JSX.
       </h2>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4 lg:gap-3.5">
         {kacheln.map((k) => (
-          <KachelKarte key={k.id} kachel={k} />
+          <KachelKarte key={k.id} kachel={k} ohneVerwendung={k.id === 'bilder' ? ohneVerwendung : null} />
         ))}
       </div>
     </section>
@@ -306,7 +333,7 @@ export function AblaeufeRegel(): React.JSX.Element {
         <strong className="font-semibold text-foreground">{STAND_TEXT.ueberfaellig}</strong> {BETRIEB_TEXT.ablaeufeRegel}
       </p>
       <p>
-        <strong className="font-semibold text-foreground">{STAND_TEXT.fehler}</strong> {BETRIEB_TEXT.ablaeufeRegelFehler}
+        <strong className="font-semibold text-foreground">{STAND_TEXT.fehler}</strong> {BETRIEB_TEXT.ablaeufeRegelFehler} {BETRIEB_TEXT.ablaeufeAufraeumen}
       </p>
     </div>
   )
@@ -389,9 +416,9 @@ export function DashboardInhalt(): React.JSX.Element {
   )
 }
 
-export type TabellenAnzeige = Array<{ name: string; modell: string; zeilen: string; groesse: string }>
+export type TabellenAnzeige = Array<{ name: string; modell: string; zeilen: string; groesse: string; bleibt: string }>
 
-/** Die fünf größten Tabellen (Name, Modell, geschätzte Zeilen, Größe). */
+/** Die fünf größten Tabellen (Name, Modell, geschätzte Zeilen, Größe, wie lange die Zeilen bleiben). */
 export function TabellenInhalt({ tabellen }: { tabellen: TabellenAnzeige | null }): React.JSX.Element {
   if (tabellen === null) return <p className={cn('text-[13px]', LEISE)}>{BETRIEB_TEXT.tabellenLeer}</p>
   const s = BETRIEB_TEXT.tabellenSpalten
@@ -406,8 +433,11 @@ export function TabellenInhalt({ tabellen }: { tabellen: TabellenAnzeige | null 
             <th scope="col" className="py-2 pr-4 text-right font-semibold">
               {s.zeilen}
             </th>
-            <th scope="col" className="py-2 text-right font-semibold">
+            <th scope="col" className="py-2 pr-4 text-right font-semibold">
               {s.groesse}
+            </th>
+            <th scope="col" className="py-2 font-semibold">
+              {s.bleibt}
             </th>
           </tr>
         </thead>
@@ -419,11 +449,84 @@ export function TabellenInhalt({ tabellen }: { tabellen: TabellenAnzeige | null 
                 {t.name !== t.modell && <span className={cn('block text-[12px] font-normal', LEISE)}>{t.modell}</span>}
               </th>
               <td className="py-2.5 pr-4 text-right text-foreground tabular-nums">{t.zeilen}</td>
-              <td className="py-2.5 text-right text-foreground tabular-nums">{t.groesse}</td>
+              <td className="py-2.5 pr-4 text-right text-foreground tabular-nums">{t.groesse}</td>
+              <td className={cn('py-2.5 text-[13px] leading-snug', LEISE)}>{t.bleibt}</td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
+  )
+}
+
+// ─── Bilder ohne Verwendung (Nr. 104) ────────────────────────────────────────
+
+function OhneVerwendungListe({ zeilen, leise = false }: { zeilen: readonly OhneVerwendungZeile[]; leise?: boolean }): React.JSX.Element {
+  return (
+    <ul>
+      {zeilen.map((z) => (
+        <li key={z.gruppe} className={cn('flex items-baseline gap-2.5 border-t border-border py-2 text-[13px]', leise ? LEISE : 'text-foreground')}>
+          <span className="min-w-0 flex-1 break-words">{z.text}</span>
+          <span className={cn('w-11 shrink-0 text-right tabular-nums', LEISE)}>
+            {z.dateien}
+            <span className="sr-only"> {BETRIEB_TEXT.ohneVerwendungDateien}</span>
+          </span>
+          <span className="w-16 shrink-0 text-right font-semibold tabular-nums">{z.groesse}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/**
+ * Die Karte „Bilder ohne Verwendung“ (Mockup admin-betrieb, Karte #ohne-verwendung):
+ * Summe, älteste Datei, Aufstellung je Art, „Liste als CSV“ und der Satz, dass
+ * nichts gelöscht wird. Getrennt darunter, nicht mitgezählt: unbekannter Hof
+ * und Startseite. Außerhalb der Produktion nur der Satz, warum es sie dort
+ * nicht gibt; ohne Messung ein Leerzustand.
+ */
+export function BilderOhneVerwendung({ karte, produktion, anker }: { karte: OhneVerwendungKarte | null; produktion: boolean; anker: string }): React.JSX.Element {
+  return (
+    <section id={anker} aria-labelledby={`${anker}-titel`} className={cn(KARTE, 'flex min-w-0 scroll-mt-24 flex-col gap-2 p-4 md:px-[18px]')}>
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 id={`${anker}-titel`} className="text-[15px] font-semibold text-foreground">
+          {BETRIEB_TEXT.ohneVerwendungTitel}
+        </h2>
+        {produktion && <Chip className="font-semibold">{BETRIEB_TEXT.ohneVerwendungMarke}</Chip>}
+      </div>
+      {!produktion ? (
+        <p className={cn('text-[13px] leading-snug', LEISE)}>{BETRIEB_TEXT.ohneVerwendungVorschau}</p>
+      ) : karte === null ? (
+        <EmptyState
+          symbol={ImageOff}
+          titel={BETRIEB_TEXT.ohneVerwendungLeer}
+          ausweg={{ ohne: 'Die Messung zählt die Bilder ohne Verwendung jeden Morgen von selbst; der Knopf „Jetzt messen“ oben auf der Seite zählt sofort.' }}
+          className="rounded-xl py-6"
+        />
+      ) : (
+        <>
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+            <span className="font-heading text-[26px] leading-tight font-semibold text-foreground tabular-nums">{karte.summe}</span>
+            <span className={cn('text-[13px]', LEISE)}>{karte.zeile}</span>
+          </div>
+          {karte.hinweis && <p className="text-[12.5px] leading-snug text-status-offen">{karte.hinweis}</p>}
+          {karte.arten.length > 0 && <p className="text-[12.5px] leading-normal text-foreground">{BETRIEB_TEXT.ohneVerwendungSatz}</p>}
+          {karte.arten.length > 0 && <OhneVerwendungListe zeilen={karte.arten} />}
+          {karte.getrennt.length > 0 && (
+            <div className="flex flex-col">
+              <p className={cn('pt-1 pb-1 text-[12px] leading-snug', LEISE)}>{BETRIEB_TEXT.ohneVerwendungGetrennt}</p>
+              <OhneVerwendungListe zeilen={karte.getrennt} leise />
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <a href={BILDER_EXPORT_HREF} download className={cn(KNOPF_RAHMEN, 'gap-2 font-semibold')}>
+              <Download className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+              {BETRIEB_TEXT.ohneVerwendungCsv}
+            </a>
+          </div>
+        </>
+      )}
+      {produktion && <p className={cn('text-[12px] leading-normal', LEISE)}>{BETRIEB_TEXT.ohneVerwendungFuss}</p>}
+    </section>
   )
 }
