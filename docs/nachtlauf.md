@@ -156,6 +156,12 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 95 | Postfach Stufe 2: Eingang, Aufgaben, Zustellung, Antwort möglich (von 94, holt 93 herein; Migration) | `freigabe.md` §18 | N12, N14 |
 | 96 | Startseite gestalten (gestapelt auf 95; Migration mit Seed) | `freigabe.md` §18 | N16 |
 | Sammel 14 | Sammel-PR `integration/lauf14` | `freigabe.md` §18 | G3, G4 |
+| 99 | Startseite gestalten, Stufe 2: Entwurf, Vorschau, Veröffentlichen jetzt oder geplant (Migration) | `freigabe.md` §19 | N16 |
+| 100 | Admin › Finanzen: Jahresansicht neben der Monatsansicht | `freigabe.md` §19 | N15 |
+| 101 | Postfach › Meldungen: Stand-Band, Ablauf, Wünsche gebündelt, Zusammenfassen | `freigabe.md` §19 | N14 |
+| 97 | Bild-Baustein und Titelbild: Ausschnitt, Zoom, füllen oder ganz, Filter (von 99; Migration) | `freigabe.md` §19 | N13, N17 |
+| 98 | Bild-Baustein für Logo, Produktfoto, Galerie und Beitragsfoto (von 97) | `freigabe.md` §19 | N17 |
+| Sammel 15 | Sammel-PR `integration/lauf15` | `freigabe.md` §19 | G3, G4 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
@@ -211,6 +217,14 @@ Höchstens drei Umsetzer gleichzeitig. Nie zwei Nummern an derselben Code-Datei 
 - Ist 93 nach zwei Runden nicht fertig, zweigt 95 nur von 94 ab und lässt die Zustellung weg (Entwurf „nur Eingang und antwortMoeglich“). Ist 95 nicht fertig, zweigt 96 von 94 ab.
 
 Drei Migrationen (93, 95, 96), nur Expand, nach Regel 3 mit dem Schema des Vorgänger-Branchs als `--from-schema`. Die Reihenfolge ist zugleich die Priorität: 93 und 94 müssen fertig werden, 95 darf Entwurf bleiben, 96 nicht begonnen bleibt für Lauf 15. Nie zwei Nummern an derselben Code-Datei (Dateigrenzen in `freigabe.md` §18).
+
+**Reihenfolge in Lauf 15** (`freigabe.md` §19, Haltepunkt Sammel-PR): Doku-PR → Regel-Inventur (G4) → 99 ∥ 101 ∥ 100 → 97 → 98 → Sammel-PR. Die Branches:
+- 99, 101 und 100 zweigen von `docs/lauf15` ab (höchstens drei gleichzeitig).
+- 97 zweigt vom Branch der Nr. 99 ab, sobald 99 fertig ist (die Migration aus 97 liegt nach der aus 99).
+- 98 zweigt vom Branch der Nr. 97 ab.
+- Ist 99 nach zwei Runden nicht fertig (Entwurf), zweigt 97 von `docs/lauf15` ab, Migration mit dem Schema von `docs/lauf15` als `--from-schema`. Ist 97 nicht fertig, entfällt 98 (Lauf 16).
+
+Zwei Migrationen (`<zeit>_startseite_fassung` in 99, danach `<zeit>_bild_ausschnitt` in 97), nur Expand, nach Regel 3 mit dem Schema des Basis-Branchs als `--from-schema`; 98, 100 und 101 ohne Migration. Priorität 99 → 97 → 101 → 100 → 98: 99 und 97 müssen fertig werden, 101 und 100 dürfen Entwurf bleiben, 98 nicht begonnen bleibt für Lauf 16. Nie zwei Nummern an derselben Code-Datei (Dateigrenzen in `freigabe.md` §19).
 
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 

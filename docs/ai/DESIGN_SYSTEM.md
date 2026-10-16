@@ -147,6 +147,19 @@ Für jede Sache gibt es in Nutzertexten genau ein Wort (Register N8): in Beschri
 | Die Regeln, welche Einträge zusätzlich per E-Mail hinausgehen, an wen (Register N14) | Zustellung | Benachrichtigung, Notification, Alert | „Zustellung“ |
 | Einer der Plätze für Gründungshöfe (Register K2) | Gründungsplatz | Banner, Founding, Early Bird | „Noch 4 von 12 Gründungsplätzen frei“ |
 | Die Zeit, in der Gründungsplätze vergeben werden (Register K2) | Gründungsphase | Banner, Founding, Early Bird | „Gründungsphase · noch 4 von 12 Plätzen“ |
+| Der Teil eines Fotos, den der Hof zeigen will: Fokus + Zoom (Register N13/N17) | Ausschnitt | Crop, Preset, Bildstil | „Ausschnitt anpassen“ |
+| Eine der sechs Vorgaben für die Anmutung eines Fotos: Natürlich, Klar, Warm, Kräftig, Sanft, Schwarzweiß (Register N17) | Filter | Crop, Preset, Bildstil | „Ausschnitt, Zoom und Filter“ |
+| Die Vorschau „So sieht es aus“ im Bild-Baustein (Register N17) | Vorschau | Crop, Preset, Bildstil | „So sieht es im Browser aus“ |
+| Der Arbeitsstand in Admin › Startseite, der die öffentliche Startseite nicht ändert (Register N16) | Entwurf | Draft, Version, Release, Publish | „Im Entwurf gespeichert · 20:41“ |
+| Ein veröffentlichter oder geplanter, unveränderlicher Stand der Startseite (Register N16) | Fassung | Draft, Version, Release, Publish | „Fassung vom Mi, 15. Okt, 20:30“ |
+| Aus dem Entwurf eine Fassung machen, jetzt oder zu Datum und Uhrzeit (Register N16) | Veröffentlichen | Draft, Version, Release, Publish | „Veröffentlichen …“ |
+| Der Balken über allen Meldungen im Reiter Meldungen des Admin-Postfachs (Register N14) | Stand-Band | Ticket, Issue, Merge | „28 Meldungen“ |
+| Wunsch, angesehen, noch nicht geplant (Register N14) | Gesammelt | Ticket, Issue, Merge | „Wünsche, noch nicht geplant“ |
+| Kein Fehler oder nicht geplant, mit Antwort an den Hof (Register N14) | Abgelegt | Ticket, Issue, Merge | „kein Fehler · nicht geplant“ |
+| Zwei Meldungen zur selben Sache verbinden (Register N14) | Zusammenfassen | Ticket, Issue, Merge | „Zusammenfassen …“ |
+| Die Meldung, die beim Zusammenfassen bleibt (Register N14) | Hauptmeldung | Ticket, Issue, Merge | „Bleibt · Hauptmeldung“ |
+| Verschiedene Höfe und Kundinnen eines Bündels (Register N14) | Stimmen | Ticket, Issue, Merge | „4 Stimmen · 4 Höfe · 0 Kundinnen“ |
+| Meldungen mit demselben Stichwort (Register N14) | Bündel | Ticket, Issue, Merge | „Bündel · 4 Höfe“ |
 
 - **Prüfung:** `tests/wortliste.test.ts` liest die Spalte „nicht“ und sucht jedes Wort in jeder Zeichenkette und jedem JSX-Text unter `src/` — mit Wortgrenzen und in der Schreibweise der Tabelle („Bestand“ trifft weder „Lagerbestand“ noch „bestand“). Kommentare, Bezeichner und Server-Logs (`console.*`) zählen nicht. Wo ein Wort in anderem Sinn richtig ist, steht der Text mit Grund in der Ausnahmeliste im Test: je Text, nicht je Datei, ohne Zeilennummer.
 - **„Status“, „Post“, „Neuigkeit“ meinen den Beitrag als Sache.** Der Status einer Bestellung, Zahlung, Freischaltung oder Meldung bleibt „Status“, ebenso der Name der WhatsApp-Funktion „Status“; „Neuigkeiten“ (Mehrzahl) ist der Name der Anmeldung bei einem Hof. Solche Texte stehen als Ausnahme im Test, ebenso ein Text über die Käuferart (Betrieb, privat) beim Futter, der „Käufer“ sagt.
