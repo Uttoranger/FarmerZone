@@ -48,8 +48,9 @@ const codesJeAdresse = { max: CODE_ANFORDERUNGEN_JE_ADRESSE.max, fensterMs: CODE
 
 /**
  * Die fünf Wege aus R1 mit ihren Grenzen — dazu die Bremse je Bestellung
- * (Nr. 46, Runde 1) und eine Drossel, die niemanden bremst, sondern nur
- * Sentry leise hält (Nr. 42, siehe unten).
+ * (Nr. 46, Runde 1) und zwei Drosseln, die niemanden bremsen, sondern nur
+ * Sentry (Nr. 42) bzw. die Empfänger der Betreiber-Mails (Nr. 105) leise
+ * halten (siehe unten).
  */
 export const DB_BREMSEN = {
   // Anmeldecode (Better Auth emailOTP, Hook in auth.ts)
@@ -76,6 +77,11 @@ export const DB_BREMSEN = {
   // Tag. Ohne erste Stufe — die Grenze schützt das Postfach hinter der
   // Bestellung, nicht den Server (src/lib/abo-bestaetigung.ts).
   neuigkeitenBestellung: { zweck: 'neuigkeiten-bestellung', max: NEUIGKEITEN_JE_BESTELLUNG_UND_TAG, fensterMs: TAG_MS },
+  // Drossel ohne erste Stufe (Register N14, Ergänzung; Nr. 105): Die Mail
+  // „Ein Hof hat geantwortet" geht höchstens einmal je Faden und VOLLER Stunde
+  // (festes Fenster, 10:05 und 10:15 teilen eins, 11:05 beginnt ein neues).
+  // Merkmal ist die Kennung des Fadens; der Zähler im Eingang zählt weiter.
+  antwortHofMail: { zweck: 'antwort-hof-mail', max: 1, fensterMs: STUNDE_MS },
 } as const satisfies Record<string, DbBremse>
 
 /**

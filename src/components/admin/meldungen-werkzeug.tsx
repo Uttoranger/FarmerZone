@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useTransition, type ReactNode } fr
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ArrowUpDown, MoreHorizontal } from 'lucide-react'
-import { fasseZusammenAction, trenneDuplikatAction, triageMeldungAction } from '@/server/actions/admin'
+import { fasseZusammenAction, legeMeldungAbAction, trenneDuplikatAction, triageMeldungAction } from '@/server/actions/admin'
 import {
   ERLEDIGT_OEFFENTLICH,
   MELDUNGEN_TEXT,
@@ -34,7 +34,8 @@ import { FELD, FELD_LABEL, KICKER, KNOPF_RAHMEN, LEISE, TEXT_GRUEN } from '@/com
  * Ins Bündel und Dazunehmen. Er sitzt über dem ganzen Reiter, damit ein
  * Dialog, den ein Toast öffnet („Ins Bündel …"), stehen bleibt, wenn die Karte
  * nach dem Klick in einen anderen Teil wandert. Jeder Klick schreibt über
- * triageMeldungAction mit gespeichertem Stand und Ausgangsstand — ändert
+ * triageMeldungAction mit gespeichertem Stand und Ausgangsstand (Ablegen seit
+ * Nr. 105 über die schmale legeMeldungAbAction, bedingt auf den Status) — ändert
  * inzwischen jemand anderes die Meldung, sagt die Action es, statt es zu
  * überschreiben. Meldungstexte stehen nur als Text da.
  */
@@ -243,9 +244,9 @@ function AblegenDialog({ meldung, onZu }: { meldung: SuchMeldung; onZu: () => vo
         ton: 'orange',
         laeuft,
         onClick: () => {
-          // Die Antwort ist Pflicht (Freigabe Nr. 101) — der Hof soll lesen, warum.
+          // Die Antwort ist Pflicht (Freigabe Nr. 101) — der Hof soll lesen, warum. Der Server prüft es noch einmal (ablegenSchema).
           if (antwort.trim() === '') return setFehler(text.ablegenPflicht)
-          schreibe(() => triageMeldungAction(meldung.id, triageAufruf(meldung.stand, { status: 'KEIN_FEHLER', antwortAnMelder: antwort.trim() })), text.abgelegt, onZu)
+          schreibe(() => legeMeldungAbAction({ meldungId: meldung.id, antwort, vorherStatus: meldung.stand.status }), text.abgelegt, onZu)
         },
       }}
     >

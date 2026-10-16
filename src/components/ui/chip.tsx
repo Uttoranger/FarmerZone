@@ -2,6 +2,7 @@ import { Children, type ReactNode } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { LadePunkt } from '@/components/ui/lade-punkt'
 
 /**
  * Chip: ein kurzes Merkmal ohne Handlung („Eier", „Gemüse", „Frontlader vor
@@ -45,6 +46,11 @@ export function Chip({
  * anwendet (/hoefe), schreibt dort die Adresse per `history.replaceState` und
  * ruft `preventDefault()` — so bleibt der Chip ein echter Link, und der Tipp
  * kostet keinen Server-Aufruf.
+ *
+ * `scroll` (Nr. 105) reicht an Nexts Link weiter — ohne Angabe wie bisher
+ * (nach oben); `false` behält die Position, etwa für die Filter des
+ * Postfachs. `ladePunkt` zeigt während des Wechsels den kleinen Kreis
+ * (`LadePunkt`, Register N14, Ergänzung) — nur, wo die Seite ihn will.
  */
 export function FilterChip({
   href,
@@ -52,17 +58,22 @@ export function FilterChip({
   children,
   className,
   onNavigate,
+  scroll,
+  ladePunkt = false,
 }: {
   href: string
   aktiv?: boolean
   children: ReactNode
   className?: string
   onNavigate?: (ereignis: { preventDefault: () => void }) => void
+  scroll?: boolean
+  ladePunkt?: boolean
 }): React.JSX.Element {
   return (
     <Link
       href={href}
       onNavigate={onNavigate}
+      scroll={scroll}
       // Wer selbst anwendet, braucht die Seite nicht vorab vom Server: Bei
       // einer dynamischen Seite wäre das eine Anfrage je sichtbarem Chip.
       prefetch={onNavigate ? false : undefined}
@@ -78,6 +89,7 @@ export function FilterChip({
       )}
     >
       {children}
+      {ladePunkt && <LadePunkt />}
     </Link>
   )
 }

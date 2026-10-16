@@ -263,6 +263,14 @@ export async function raeumeAuf(): Promise<void> {
       },
     })
   }
+  // Ebenso die Drossel der Mail „Ein Hof hat geantwortet" (Nr. 105): Merkmal
+  // ist die Kennung des Fadens — über die Fäden der Testhöfe, bevor sie weg sind.
+  const faeden = await prisma.unterhaltung.findMany({ where: { farm: { slug: { startsWith: INT_PRAEFIX } } }, select: { id: true } })
+  if (faeden.length > 0) {
+    await prisma.rateLimitZaehler.deleteMany({
+      where: { schluessel: { in: faeden.map(({ id }) => bremsSchluessel(env.BETTER_AUTH_SECRET, DB_BREMSEN.antwortHofMail.zweck, id)) } },
+    })
+  }
   await prisma.order.deleteMany({ where: testBestellungen })
   await prisma.stockReservation.deleteMany({
     where: { sessionId: { startsWith: INT_PRAEFIX } },

@@ -504,6 +504,13 @@
     @apply font-sans;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Platz für den Rollbalken immer frei (Register N14, Ergänzung; Nr. 105):
+       Unter Windows rückte der zentrierte Inhalt sonst seitlich, sobald eine
+       Seite länger oder kürzer wurde. Am Handy (Overlay-Balken) ohne Wirkung.
+       Dialoge und Blätter sperren mit base-ui (useScrollLock): Der setzt in
+       Browsern mit scrollbar-gutter genau diesen Wert, kein padding-right —
+       es bleibt nichts doppelt frei. */
+    scrollbar-gutter: stable;
   }
   /* Edge und der IE-Erbe zeigen in Passwortfeldern ein EIGENES Augen-Symbol.
      Zusammen mit unserem Umschalter in PasswordInput ergäbe das zwei Augen

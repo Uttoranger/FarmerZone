@@ -22,7 +22,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 ## src/components/admin
 
-- src/components/admin/admin-laden.tsx · BriefkastenLaden, FinanzenLaden, HoefeLaden, KopfLaden, MeldungLaden · Ladeansichten der Admin-Seiten (Nachtlauf Nr. 22f) — in der Form der fertigen Seite, innerhalb der AdminShell (der Kopf steht schon). · genutzt
+- src/components/admin/admin-laden.tsx · FinanzenLaden, HoefeLaden, KopfLaden · Ladeansichten der Admin-Seiten (Nachtlauf Nr. 22f) — in der Form der fertigen Seite, innerhalb der AdminShell (der Kopf steht schon). · genutzt
 - src/components/admin/admin-teile.tsx · ADMIN_RAHMEN, AdminFehler, HofKachel, SEITEN_TITEL · Gemeinsame Teile der Admin-Seiten im neuen Design (Nachtlauf Nr. 22f). · genutzt
 - src/components/admin/briefkasten-teile.tsx · MeldungEntscheidenSpalte, Wunschliste, type WunschBuendel · Die Teile der Meldungen im Eingang des Admin-Postfachs (Nachtlauf Nr. 22f, seit Nr. 95 im Eingang, Mockup admin-postfach-meldungen; seit Nr. 101 mit „Woraus", Mockup admin-postfach-zusammenfassen): … · genutzt
 - src/components/admin/einstellungen-gruendung.tsx · EinstellungenGruendung, type GruendungFormularDaten · Was die Seite mitgibt — nur Zahlen und Text (CODING_STANDARDS §2: kein Date an Client-Komponenten). · genutzt
@@ -375,6 +375,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/hinweiskarte.tsx · Hinweiskarte · Hinweiskarte: ein ruhiger Hinweis auf getönter Fläche mit Rahmen — Grün für Kundensachen und Gutes („Wir zeigen Höfe rund um …", „Registrierter Futtermittelbetrieb"), Orange für Hofsachen und Offenes … · genutzt
 - src/components/ui/input.tsx · Input · kein Zweck vermerkt · genutzt
 - src/components/ui/label.tsx · Label · kein Zweck vermerkt · genutzt
+- src/components/ui/lade-punkt.tsx · LadeInhalt, LadePunkt, LadeRahmen · Laden ohne Ladebild (Register N14, Ergänzung; Nr. 105; Mockup admin-postfach-ruhig): Ein Wechsel über einen Link lässt den bisherigen Inhalt stehen, bis der neue da ist. · genutzt
 - src/components/ui/list-row.tsx · ListGruppe, ListRow · ListGruppe: Zeilen auf einer Karte, durch feine Linien getrennt — wie das Mehr-Blatt und die Bestellliste in den Mockups. · genutzt
 - src/components/ui/marke.tsx · Marke · Die Marke: ein Zustand als kurzes Wort auf seiner Bedeutungsfarbe (Register G5) — tun (die Kundin oder der Hof muss etwas tun), läuft, erledigt, abgebrochen. · genutzt
 - src/components/ui/password-input.tsx · PasswordInput · kein Zweck vermerkt · genutzt
@@ -618,7 +619,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 ## src/server/actions
 
-- src/server/actions/admin.ts · approveFarmAction, fasseZusammenAction, rejectFarmAction, revokeFarmApprovalAction, setServiceFeeAction, setzeBuendelStandAction, setzeGruendungBisAction, trenneDuplikatAction, triageMeldungAction, type BuendelStandErgebnis · Hof freischalten: ab jetzt öffentlich sichtbar und bestellbar. · genutzt
+- src/server/actions/admin.ts · approveFarmAction, fasseZusammenAction, legeMeldungAbAction, rejectFarmAction, revokeFarmApprovalAction, setServiceFeeAction, setzeBuendelStandAction, setzeGruendungBisAction, trenneDuplikatAction, triageMeldungAction, type BuendelStandErgebnis · Hof freischalten: ab jetzt öffentlich sichtbar und bestellbar. · genutzt
 - src/server/actions/appearance.ts · saveAppearanceAction, updateBannerFocusAction, updateFarmBannerAction, updateFarmLogoAction, type AppearanceSaveInput · Das Schema liegt in src/schemas/auftritt.ts — der Hofseiten-Editor prüft „Über uns" daraus, ohne es abzuschreiben. · genutzt
 - src/server/actions/bar-bestaetigung.ts · bestaetigeBarBestellung, storniereBarBestellung, type BarAktionStand · Die zwei Knöpfe der Bar-Bestätigung (/{hof}/bestaetigen/{token}, H3). · genutzt
 - src/server/actions/bestellungen-finden.ts · beendeBestellAnsicht, fordereBestellCodeAn, zeigeBestellungen · „Bestellungen finden" (Nr. 14, E7/E8): Code anfordern, Code prüfen, Ansicht beenden. · genutzt
@@ -636,7 +637,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/server/actions/onboarding.ts · checkSlugAvailability, createFarm, createOnboardingProducts, createOnboardingSlots · Ist die Hofadresse (Domain/<slug>) zum Hofnamen noch frei? · genutzt
 - src/server/actions/orders.ts · cancelOrder, markAsNotPickedUp, markAsPickedUp, markAsPickedUpAndPaid, markAsReady, meldeArtikelFehlt, revertOrderStatus, revertPickedUp, revertReady, type ActionResult, type ArtikelFehltErgebnis, type StornoErgebnis · Was ein Storno zurückmeldet: die Beträge aus derselben Rechnung wie im Storno-Dialog (src/lib/storno.ts), sobald Stripe erstattet hat — vor Ort bezahlt beide 0. Scheitert die Erstattung, … · genutzt
 - src/server/actions/plattform-einstellung.ts · speichereGruendungEinstellung · Die Gruppe Gründungshöfe in Admin › Einstellungen speichern (Register K2-Ergänzung, Nr. 93): Plätze gesamt, Standard-Ende, Anzeige an/aus. · genutzt
-- src/server/actions/postfach.ts · antworteAlsHof, antworteAlsTeam, entferneEmpfaenger, fuegeEmpfaengerHinzu, markiereGelesen, markiereGelesenFormular, markiereGelesenTeam, sendeRundschreiben, sendeTestmail, speichereZustellRegeln, type HinzufuegenErgebnis, type RundschreibenErgebnis, type TeamAntwortErgebnis, type TestmailErgebnis · Das Postfach, Stufe 1 (Register N12, Nachtlauf Nr. 87) — die schreibenden Wege. · genutzt
+- src/server/actions/postfach.ts · antworteAlsHof, antworteAlsTeam, entferneEmpfaenger, fuegeEmpfaengerHinzu, markiereErstattungErledigt, markiereGelesen, markiereGelesenFormular, markiereGelesenTeam, sendeRundschreiben, sendeTestmail, speichereZustellRegeln, type HinzufuegenErgebnis, type RundschreibenErgebnis, type TeamAntwortErgebnis, type TestmailErgebnis · Das Postfach, Stufe 1 (Register N12, Nachtlauf Nr. 87) — die schreibenden Wege. · genutzt
 - src/server/actions/products.ts · createProduct, deleteProduct, produktSichtbarkeitSetzen, pruefeDualUse, reorderProductsAction, setzeKategorie, setzeVorrat, updateProduct, updateProductImageAction, type DualUseErgebnis, type ProduktErgebnis, type VorratErgebnis · GEAENDERT: Der Vorrat hat sich seit dem Öffnen geändert — `vorrat` ist der aktuelle Stand. · genutzt
 - src/server/actions/produktfamilie.ts · legeBrennmaterialFamilieAn, legeFutterFamilieAn, type FamilieErgebnis · Futter und Brennmaterial mit Verkaufsgrößen anlegen (Register E3, E10, E11; Gate 6, Nachtlauf Nr. 20). · genutzt
 - src/server/actions/register.ts · registerFarmer, setFarmerRole · Ablauf: Zod → auth.api.signUpEmail (legt das Konto an, meldet NICHT an) → Rolle FARMER → Bestätigungs-Mail. · genutzt

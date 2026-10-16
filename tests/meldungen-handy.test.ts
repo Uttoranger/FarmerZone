@@ -20,6 +20,8 @@ vi.mock('next/link', () => ({
   // `scroll` ist eine Angabe für Next, kein Attribut des Links.
   default: ({ href, children, ...rest }: { href: string; children: ReactNode }) =>
     createElement('a', { href, ...Object.fromEntries(Object.entries(rest).filter(([name]) => name !== 'scroll')) }, children),
+  // Der Ladepunkt der Chips (Nr. 105) fragt den Zustand des Links — beim Rendern auf dem Server lädt nichts.
+  useLinkStatus: () => ({ pending: false }),
 }))
 vi.mock('@/server/queries/meldung', async (original) => ({
   ...(await original<typeof import('@/server/queries/meldung')>()),
