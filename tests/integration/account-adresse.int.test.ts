@@ -10,8 +10,10 @@
  *  - Die Sitzung ist frisch: Sie sagt sofort „bestätigt", wie die Datenbank
  *    (Gegenprobe gegen die Datenbank; vor dem Code war es „unbestätigt").
  *  - /account/profile zeigt sofort die Abos der Adresse, „Abo ändern" wirkt,
- *    und „Konto löschen" nimmt Konto UND Abos mit — entschieden wird nach dem
- *    Stand in der Datenbank (bestaetigteAdresse).
+ *    und „Konto löschen" nimmt Konto UND Abos mit. Ob der Code dafür
+ *    `bestaetigteAdresse` oder die Sitzung liest, ist seit Nr. 114 nicht mehr
+ *    getrennt beweisbar (beide sagen dasselbe); ein Rückfall auf den
+ *    Cookie-Cache fällt im ersten Test auf.
  *  - Gegenprobe: Ein Passwort-Konto ohne Bestätigung sieht keine Abos und
  *    kann sie weder ändern noch mit dem Konto löschen.
  */
