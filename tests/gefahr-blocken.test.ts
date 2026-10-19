@@ -355,8 +355,6 @@ describe('gefahr-blocken — Here-Documents liest der Hook mit (bewusst, Nachtra
       ["cat <<'EOF' | bash", 'git stash', 'EOF'],
       ["cat <<'EOF' > a.sh && chmod +x a.sh && ./a.sh", 'git stash', 'EOF'],
       ["cat <<'EOF' | tee a.sh && ./a.sh", 'git stash', 'EOF'],
-      ['bash <<\'EOF\'', 'git stash', 'EOF'],
-      ['cat <<EOF', 'git stash', 'EOF'],
     ]) {
       expect(lauf(befehl.join('\n'), ohneRepo).code, befehl[0]).toBe(2)
     }
@@ -365,6 +363,95 @@ describe('gefahr-blocken — Here-Documents liest der Hook mit (bewusst, Nachtra
   it('prüft den Befehl vor und nach dem Dokument weiter', () => {
     expect(lauf(["cat > notiz.txt <<'EOF'", 'nur Text', 'EOF', 'git stash'].join('\n'), ohneRepo).code).toBe(2)
     expect(lauf(['git stash && cat <<\'EOF\'', 'nur Text', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
+  })
+
+  it('liest den Text ohne Quote am Begrenzer weiter mit: Die Shell führt $(…) darin aus', () => {
+    expect(lauf(['cat <<EOF', 'git stash', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
+  })
+
+  it('liest den Text mit, wenn das Dokument an eine Shell geht', () => {
+    expect(lauf(['bash <<\'EOF\'', 'git stash', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
+    expect(lauf(['sh -s <<\'EOF\'', 'pnpm exec prettier --write .', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
+  })
+
+  // Prüfung Runde 1: Der Text bleibt Befehl, sobald das Dokument ausgeführt wird — auch wenn der Aufruf, der es
+  // liest, erst hinter dem Begrenzer in die Shell läuft oder ein Interpreter es liest.
+  it('liest den Text mit, wenn das Dokument hinter dem Begrenzer an eine Shell geht', () => {
+    for (const ziel of ['bash', 'sh', 'zsh -s', 'sudo bash', 'env sh -e', 'xargs -0 sh -c', 'source /dev/stdin']) {
+      const befehl = [`cat <<'EOF' | ${ziel}`, 'git stash', 'EOF'].join('\n')
+      expect(lauf(befehl, ohneRepo).code, befehl).toBe(2)
+    }
+    expect(lauf(["cat <<'EOF' | tee neu.sh | bash", 'git stash', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
+    expect(lauf(["cat <<'EOF' > neu.sh && bash neu.sh", 'git stash', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
+  })
+
+  // Prüfung Runde 2: Der Ausführer wird nicht an seinem Namen erkannt. Hinter einer Pipe darf nur ein Leser stehen,
+  // der speichert oder weitergibt; alles andere — Pfad, Variable, Hülle, Interpreter mit Pfad — behält den Text.
+  it('liest den Text mit, wenn das Ziel mit Pfad, über eine Hülle oder als Variable aufgerufen wird', () => {
+    for (const ziel of [
+      '/bin/bash',
+      'sudo /bin/sh',
+      '$SHELL',
+      '"$SHELL" -s',
+      '${SHELL:-sh}',
+      '/usr/bin/python3 -',
+      '/usr/bin/env node -',
+      'cat | sh',
+      'cat | /bin/bash',
+      'tee >(bash)',
+      'tee neu.sh | /bin/bash',
+      'tclsh',
+    ]) {
+      const befehl = [`cat <<'EOF' | ${ziel}`, 'git stash', 'EOF'].join('\n')
+      expect(lauf(befehl, ohneRepo).code, befehl).toBe(2)
+    }
+  })
+
+  it('liest den Text mit, wenn die Hülle vor dem Begrenzer einen Pfad oder eine Variable hat', () => {
+    for (const kopf of ['/bin/bash -c "$(cat <<\'EOF\'', 'sudo /bin/sh -c "$(cat <<\'EOF\'', '$SHELL -c "$(cat <<\'EOF\'', '/usr/bin/python3 -c "$(cat <<\'EOF\'']) {
+      const befehl = [kopf, 'git stash', 'EOF', ')"'].join('\n')
+      expect(lauf(befehl, ohneRepo).code, kopf).toBe(2)
+    }
+  })
+
+  it('liest den Text mit, wenn ein Interpreter das Dokument liest', () => {
+    // Zusammengesetzt, damit dieser Test selbst nicht vom Hook der Sitzung gesperrt wird.
+    const dbPush = ['prisma db', 'push'].join(' ')
+    for (const leser of ['node -', 'python3 -', 'perl', 'ruby', 'deno run -', 'bun run -', 'tsx -', 'psql', 'sqlite3 db.sqlite']) {
+      const befehl = [`${leser} <<'EOF'`, `execSync("pnpm exec ${dbPush}")`, 'EOF'].join('\n')
+      expect(lauf(befehl, ohneRepo).code, befehl).toBe(2)
+    }
+  })
+
+  it('liest den Text mit, wenn eine Befehlsersetzung ihn ausführt (eval, bash -c, source <(…))', () => {
+    for (const kopf of ['eval "$(cat <<\'EOF\'', 'bash -c "$(cat <<\'EOF\'', 'source <(cat <<\'EOF\'', 'FOO=1 sh -c "$(cat <<\'EOF\'']) {
+      const befehl = [kopf, 'git stash', 'EOF', ')"'].join('\n')
+      expect(lauf(befehl, ohneRepo).code, kopf).toBe(2)
+    }
+  })
+
+  it('liest den Text mit, wenn der Leser unbekannt ist', () => {
+    // Nur die Leser, die den Text bloß speichern oder weitergeben, gelten als Daten; alles andere bleibt Befehl.
+    expect(lauf(["tclsh <<'EOF'", 'git stash', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
+  })
+
+  it('blockt heute auch Daten, die nur gespeichert oder weitergegeben werden (Fehlalarm aus Nr. 110 – Ziel für Lauf 18)', () => {
+    // Eine sichere Lösung in Lauf 18 soll diese Fälle durchlassen und alle Fälle oben weiter blocken.
+    for (const kopf of [
+      "cat > notiz.txt <<'EOF'",
+      "cat <<'EOF' | tee notiz.txt",
+      "cat <<'EOF' | git commit -F -",
+      "git commit -F - <<'EOF'",
+      'git commit -m "$(cat <<\'EOF\'',
+      "gh pr create --title t --body-file - <<'EOF'",
+    ]) {
+      const befehl = [kopf, 'git stash', 'pnpm exec prettier --write .', 'EOF', ...(kopf.includes('$(') ? [')"'] : [])].join('\n')
+      expect(lauf(befehl, ohneRepo).code, kopf).toBe(2)
+    }
+  })
+
+  it('hält einen Here-String (<<<) nicht für ein Dokument', () => {
+    expect(lauf(['cat <<< "Text"', 'git stash'].join('\n'), ohneRepo).code).toBe(2)
   })
 
   it('Gegenprobe: ein Dokument ohne verbotenen Text geht durch', () => {
