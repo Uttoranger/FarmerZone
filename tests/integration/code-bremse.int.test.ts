@@ -17,14 +17,18 @@
  *  - In der Tabelle steht keine Adresse, nur Zweck + HMAC.
  *
  * Feste Uhr (nur `Date`): Die Fenster sind fest — über eine Stundengrenze
- * hinweg zählte ein Test sonst in zwei Fenster. Aufräumen: Zählerzeilen über
- * ihre Schlüssel, Codes über `otp-int-`, Konten über `raeumeAuf`.
+ * hinweg zählte ein Test sonst in zwei Fenster. Sie steht GESTERN: Better
+ * Auth räumt beim Lesen abgelaufene Verification-Zeilen weg, nach seiner
+ * Uhr — eine Uhr in der Zukunft löschte in der geteilten Test-Datenbank
+ * Codes, die noch gelten. Aufräumen: Zählerzeilen über ihre Schlüssel, Codes
+ * über `otp-int-`, Konten über `raeumeAuf`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { env } from '@/lib/env'
 import { DB_BREMSEN, bremsSchluessel } from '@/lib/bremse-datenbank'
 import { ZU_VIELE_FALSCHE_CODES, ZU_VIELE_FALSCHE_PASSWOERTER } from '@/lib/anmeldecode'
+import { uhrzeitInWien } from '@/lib/fristen'
 import { fehlversucheGesperrt, zaehleFehlversuch } from '@/server/bremse-datenbank'
 import { legeBestellCodeAn, pruefeBestellCode } from '@/server/bestellungen-finden'
 import { intKennung, raeumeAuf } from './setup/basis'
@@ -60,9 +64,12 @@ vi.mock('@/lib/email', () => ({
 
 import { auth } from '@/lib/auth'
 
-// 10:20 in Wien (Winterzeit), mitten in der Stunde 09–10 UTC.
-const FEST = new Date('2027-02-10T09:20:00.000Z')
-const STUNDENENDE = new Date('2027-02-10T10:00:00.000Z')
+// Gestern, mitten in der Stunde 09–10 UTC (vor den Fake-Timern berechnet).
+const GESTERN = new Date(Date.now() - 24 * 60 * 60_000).toISOString().slice(0, 10)
+const FEST = new Date(`${GESTERN}T09:20:00.000Z`)
+const STUNDENENDE = new Date(`${GESTERN}T10:00:00.000Z`)
+const TAGESENDE = new Date(new Date(`${GESTERN}T00:00:00.000Z`).getTime() + 24 * 60 * 60_000)
+const BIS = uhrzeitInWien(STUNDENENDE)
 const adressen: string[] = []
 
 function neueAdresse(was = 'kundin'): string {
@@ -153,8 +160,8 @@ describe('falsche Codes je Adresse — über alle Codes', () => {
       ok: false,
       status: 429,
       code: ZU_VIELE_FALSCHE_CODES,
-      pauseBis: '11:00',
-      message: 'Zu viele falsche Codes. Die Anmeldung mit Code ist für diese Adresse bis 11:00 pausiert. Wir haben dir eine E-Mail geschickt.',
+      pauseBis: BIS,
+      message: `Zu viele falsche Codes. Die Anmeldung mit Code ist für diese Adresse bis ${BIS} pausiert. Wir haben dir eine E-Mail geschickt.`,
     })
     expect(await prisma.session.count({ where: { user: { email } } })).toBe(0)
     expect(await stand(DB_BREMSEN.codeFehlerStunde.zweck, email)).toBe(10)
@@ -183,7 +190,7 @@ describe('falsche Codes je Adresse — über alle Codes', () => {
 
     expect(antworten.hof).toEqual(antworten.unbekannt)
     expect(antworten.hof.slice(0, 10).every((a) => !a.ok && a.status === 400 && a.code === 'INVALID_OTP')).toBe(true)
-    expect(antworten.hof[10]).toMatchObject({ ok: false, status: 429, code: ZU_VIELE_FALSCHE_CODES, pauseBis: '11:00' })
+    expect(antworten.hof[10]).toMatchObject({ ok: false, status: 429, code: ZU_VIELE_FALSCHE_CODES, pauseBis: BIS })
     expect(await stand(DB_BREMSEN.codeFehlerStunde.zweck, hof)).toBe(10)
     expect(await stand(DB_BREMSEN.codeFehlerStunde.zweck, unbekannt)).toBe(10)
 
@@ -206,12 +213,12 @@ describe('falsche Codes je Adresse — über alle Codes', () => {
   it('30 falsche Codes am Tag pausieren bis zum Ende des Tagesfensters, auch in einer neuen Stunde', async () => {
     const email = neueAdresse()
     for (const stunde of ['06', '07', '08']) {
-      const zeit = new Date(`2027-02-10T${stunde}:30:00.000Z`)
+      const zeit = new Date(`${GESTERN}T${stunde}:30:00.000Z`)
       for (let i = 0; i < 10; i++) await zaehleFehlversuch('code', email, zeit)
     }
 
-    expect(await fehlversucheGesperrt('code', email, FEST)).toEqual({ gesperrt: true, bis: new Date('2027-02-11T00:00:00.000Z') })
-    expect(await mitCode(email, '000000')).toMatchObject({ status: 429, pauseBis: 'morgen um 01:00' })
+    expect(await fehlversucheGesperrt('code', email, FEST)).toEqual({ gesperrt: true, bis: TAGESENDE })
+    expect(await mitCode(email, '000000')).toMatchObject({ status: 429, pauseBis: `morgen um ${uhrzeitInWien(TAGESENDE)}` })
   })
 
   it('in der Tabelle steht keine Adresse — nur Zweck und HMAC', async () => {
@@ -236,8 +243,8 @@ describe('falsche Passwörter je Adresse', () => {
       ok: false,
       status: 429,
       code: ZU_VIELE_FALSCHE_PASSWOERTER,
-      pauseBis: '11:00',
-      message: 'Zu viele Versuche – versuch es nach 11:00 wieder oder setz dein Passwort zurück.',
+      pauseBis: BIS,
+      message: `Zu viele Versuche – versuch es nach ${BIS} wieder oder setz dein Passwort zurück.`,
     })
     await arbeiteNachlaufAb()
     expect(post.warnungen).toEqual([{ email, art: 'passwort', bis: STUNDENENDE }])

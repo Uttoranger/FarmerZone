@@ -5369,6 +5369,14 @@ Ausgangslage (Vercel Observability, 24 Stunden bis zum 19.10.2026): /hoefe hatte
 - **robots.txt ohne `Allow: /`:** Next schreibt Allow- vor Disallow-Zeilen; ein einfacher Crawler, bei dem die erste passende Regel gilt (etwa über Pythons `urllib.robotparser`), dürfte mit `Allow: /` alles. Erlaubt ist ohne passende Regel ohnehin alles.
 - **Weitere Fallen gesucht, keine gefunden:** Die Hofseite ist dynamisch, ihre Links mit Parametern sind begrenzt (`?reiter=` mit drei Werten, `?bereich=futter`; `reiterAdresse` behält fremde Parameter, setzt aber nur den Reiter); die Produktseite hat eine Adresse je Produkt; `/problem-melden` eine (dazu `?kennung=` nur aus Fehlerseiten); `/login` ohne Parameter.
 
+## Code- und Passwort-Raten bremsen (Register E7, Ergänzung; Nr. 112, Nachtlauf 17)
+
+- **Ausgangslage:** Better Auth zählte falsche Codes nur je Code (5 Versuche), und jeder neue Code brachte 5 neue — mit 5 Codes je 15 Minuten rund 100 Versuche je Stunde und Adresse. Passwörter hatten nur die allgemeine Grenze je IP (10 je Minute). Die Code-Anmeldung lehnte Hof- und Admin-Adressen ab, ohne zu zählen; `sendResetPassword` wartete auf den Versand.
+- **Fachregel:** Falsche Codes zählen je Adresse über alle Codes und über Anmeldung und „Bestellungen finden" zusammen, höchstens 10 je Stunde und 30 je Tag (feste Fenster, UTC); falsche Passwörter je Adresse 10 je Stunde. Danach pausiert der Weg bis zum Ende des Fensters, für jede Adresse gleich, auch für unbekannte. Eine Mail je Pause (nur an Konten, nie mit Code oder Link), beim Passwort höchstens eine am Tag. „Passwort vergessen" bleibt offen; ein erfolgreiches Zurücksetzen löscht den Passwort-Zähler.
+- **Warum fail-closed:** Die drei neuen Bremsen pausieren, wenn die Datenbank nicht antwortet — sie schützen ein Konto vor dem Raten, und ohne Datenbank meldet ohnehin niemand an. Alle älteren Bremsen bleiben fail-open (ein Test hält beides fest).
+- **Warum in jeder Umgebung:** Das Merkmal ist die Adresse, keine IP — lokal und in Tests teilen sich nicht alle einen Schlüssel. So prüft die Integrationsschicht die echte Bremse ohne Schalter, und die Vorschau verhält sich wie die Produktion.
+- **Bekannte Grenze:** Wer eine Adresse kennt, kann ihre Anmeldung mit Code oder Passwort jede Stunde neu pausieren (10 Fehlversuche). Eine Sperre auf Dauer gibt es nicht; beim Passwort hilft „Passwort vergessen".
+
 ## Nützliche Befehle
 
 ```bash
