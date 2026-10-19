@@ -206,6 +206,7 @@ function ordneTextquellen(funde: Fund[], verweise: Verweis[]): void {
 type Ausnahme = { datei: string; text: string | RegExp; art: 'B' | 'C'; grund: string }
 const AUSNAHMEN: Ausnahme[] = [
   // B — eine einzelne Zeile in einer Karte oder Liste, ohne Aktion, mit nur einer Fassung
+  { datei: 'src/lib/admin-hoefe.ts', text: /^Noch kein Produkt im Shop – Freischalten erst/, art: 'C', grund: 'Grund an der gesperrten Freischaltung (Warteliste in Admin › Höfe und Satz der Action), Wortlaut der Freigabe §21 (Nr. 116) — kein Leerzustand' },
   { datei: 'src/lib/betrieb.ts', text: 'noch kein Lauf', art: 'C', grund: 'Stand eines Ablaufs in der Tabelle „Abläufe“ von Admin › Betrieb (Register N18: ohne bisherigen Lauf nie überfällig) — ein Wert in einer Zeile, kein Leerzustand' },
   { datei: 'src/lib/heute.ts', text: 'Noch keine Bestellungen', art: 'B', grund: 'Zeile unter dem Abholfenster in der Karte „Nächste Abholung“; HEUTE_KEINE_BESTELLUNGEN ist ihre einzige Fassung' },
   { datei: 'src/lib/pickup-slot-rules.ts', text: 'Noch keine — erst dann können Kundinnen bestellen', art: 'B', grund: 'Wert der Zeile „Abholzeiten“ in Mein Hof und in den Einstellungen; die Zeile ist selbst der Link zu den Abholzeiten' },

@@ -28,28 +28,8 @@ const HEIMAT = ['src/lib/gruendungshof.ts', 'src/lib/plattform-einstellung.ts']
 
 type Ausnahme = { datei: string; namen: string[]; grund: string }
 
-const AUSNAHMEN: Ausnahme[] = [
-  {
-    datei: 'src/components/admin/gruendung-bis-dialog.tsx',
-    namen: ['GRUENDUNG_BIS_STANDARD_TAG'],
-    grund: 'Ein leeres Feld heißt Standard: Der Dialog vergleicht mit der Konstante statt mit der gespeicherten Einstellung (Nacharbeit: alle Aufrufer gemeinsam umstellen)',
-  },
-  {
-    datei: 'src/components/admin/hof-aktion-dialog.tsx',
-    namen: ['GRUENDUNG_BIS_STANDARD', 'MAX_GRUENDUNGSHOEFE'],
-    grund: 'Der Freischalte-Dialog nennt Plätze und Ende aus der Konstante statt aus der gespeicherten Einstellung (Nacharbeit: alle Aufrufer gemeinsam umstellen)',
-  },
-  {
-    datei: 'src/server/queries/postfach.ts',
-    namen: ['MAX_GRUENDUNGSHOEFE'],
-    grund: 'Der Platz der wartenden Höfe wird mit der Konstante gerechnet, wie Admin › Höfe es noch tut (Nacharbeit: beide gemeinsam auf die Einstellung umstellen)',
-  },
-  {
-    datei: 'src/app/admin/postfach/eingang-reiter.tsx',
-    namen: ['MAX_GRUENDUNGSHOEFE'],
-    grund: 'Zeile und Sperre der Hof-Aufgabe rechnen mit der Konstante, wie Admin › Höfe es noch tut (Nacharbeit: beide gemeinsam auf die Einstellung umstellen)',
-  },
-]
+// Nr. 116: Die vier Aufrufer lesen die Einstellung — die Liste ist leer und darf leer bleiben.
+const AUSNAHMEN: Ausnahme[] = []
 
 function* quelldateien(ordner: string): Generator<string> {
   for (const name of readdirSync(ordner)) {

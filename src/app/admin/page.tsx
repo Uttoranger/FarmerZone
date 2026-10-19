@@ -39,7 +39,8 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
       // Die Zahl der Plätze frisch aus der Einstellung (Register K2) — dieselbe, mit der die Actions prüfen.
       lesePlattformEinstellung(),
     ])
-    const { plaetze: maxPlaetze, bis: standardBis } = gruendungEinstellungAus(einstellung)
+    const regeln = gruendungEinstellungAus(einstellung)
+    const { plaetze: maxPlaetze, bis: standardBis } = regeln
     // Wer zuletzt aus- oder wieder aufgenommen hat (Nr. 109) — nur der Name, eine Abfrage für alle Höfe.
     const personIds = [...new Set(farms.flatMap((f) => (f.gruendungGeaendertVonUserId ? [f.gruendungGeaendertVonUserId] : [])))]
     const personen =
@@ -57,7 +58,7 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
           // Das wirksame Gründungs-Ende, fertig aus getAdminFarms (Nr. 62).
           gruendung: f.gruendung,
           // Nur wartende Höfe: der Platz, den sie bei sofortiger Freischaltung bekämen (Warteliste).
-          platzBeiFreischaltung: f.approvedAt === null && f.archivedAt === null ? platzBeiFreischaltung(f.id, farms, jetzt, maxPlaetze) : null,
+          platzBeiFreischaltung: f.approvedAt === null && f.archivedAt === null ? platzBeiFreischaltung(f.id, farms, jetzt, regeln) : null,
           // Nur freigeschaltete, nicht stillgelegte Höfe lassen sich aus- bzw. wieder aufnehmen (Register K2, Nr. 109).
           gruendungAenderung: imRennenOderAusgenommen ? gruendungAenderung(f, farms, maxPlaetze, standardBis) : null,
           gruendungZuletzt: gruendungZuletztText(

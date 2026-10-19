@@ -35,12 +35,17 @@ const PLATZ_REGELN: Record<string, readonly string[]> = {
     'folgenDerAenderung',
     'wiederAufnahmeMoeglich',
     'zaehleAusgenommene',
+    // Nr. 116: Festschreiben, Freischaltung nach dem Festschreiben, Hinweis im Freischalt-Dialog.
+    'festschreibenListe',
+    'festschreibenBrauchtPlaetze',
+    'zusageBeiFreischaltung',
+    'freischaltHinweis',
   ],
   '@/lib/admin-hoefe-seite': ['platzBeiFreischaltung', 'gruendungAenderung'],
 }
 
 /** Die beiden erlaubten Quellen der Hofliste. */
-const LADER = new Set(['ladeHoefeFuerGruendung', 'getAdminFarms'])
+const LADER = new Set(['ladeHoefeFuerGruendung', 'getAdminFarms', 'ladeHoefeFuerFestschreiben'])
 
 /** Dateien, die eine Regel einbinden, ohne eine Hofliste zu laden — je mit Grund. */
 const AUSNAHMEN: Record<string, string> = {
@@ -86,13 +91,18 @@ describe('Wache: die Platzvergabe bekommt ihre Höfe nur aus den zwei Selects', 
     expect(verstoesse).toEqual([])
   }, 30_000) // liest und parst jede Datei unter src/
 
-  it('beide Selects tragen gruendungAusgenommen', () => {
+  it('beide Selects tragen gruendungAusgenommen und den festgeschriebenen Platz (Nr. 116)', () => {
     const quelle = readFileSync(join(WURZEL, 'src/server/queries/admin.ts'), 'utf8')
     const hofFuerGruendung = quelle.slice(quelle.indexOf('const HOF_FUER_GRUENDUNG = {'), quelle.indexOf('} satisfies Prisma.FarmSelect'))
     expect(hofFuerGruendung).toMatch(/^\s*gruendungAusgenommen: true,$/m)
+    expect(hofFuerGruendung).toMatch(/^\s*gruendungPlatz: true,$/m)
     const start = quelle.indexOf('export async function getAdminFarms(')
     const select = quelle.slice(start, quelle.indexOf("orderBy: { createdAt: 'desc' }", start))
     expect(select).toMatch(/^\s*gruendungAusgenommen: true,$/m)
+    expect(select).toMatch(/^\s*gruendungPlatz: true,$/m)
+    // Beide setzen die geltende Vergabe an jede Zeile — sonst rechneten Admin › Höfe und Finanzen nach der Reihenfolge.
+    expect(quelle.slice(start)).toMatch(/gruendungFest: fest/)
+    expect(quelle.slice(quelle.indexOf('export async function ladeHoefeFuerGruendung('))).toMatch(/gruendungFest: fest/)
   })
 
   it('Gegenprobe: eine eigene Abfrage vor gruendungsplaetze schlägt an, ein Lader nicht', () => {

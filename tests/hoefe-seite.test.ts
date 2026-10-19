@@ -82,6 +82,7 @@ const HOF: KartenHof = {
   kategorien: ['EIER', 'BROT'],
   naechsteAbholung: { dayOfWeek: 5, startTime: '15:00', endTime: '18:00', tageVoraus: 0 },
   fotos: [],
+  gruendungshof: false,
   entfernungKm: null,
 }
 
@@ -756,6 +757,7 @@ describe('das Server-HTML: die ganze Hofliste, ungefiltert, mit Links auf die Ho
     produkteJeBereich: { LEBENSMITTEL: 1, FUTTERMITTEL: 0 },
     suchNamen: ['Bauernbrot'],
     fotos: [],
+    gruendungshof: false,
   })
 
   it('beide Höfe mit Link — auf dem Server gilt der leere Filter (kein window, kein Wurf)', () => {

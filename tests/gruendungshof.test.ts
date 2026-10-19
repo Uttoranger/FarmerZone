@@ -293,6 +293,7 @@ describe('baueGruendungAnzeige — die Admin-Liste zeigt das wirksame Datum', ()
       bisTag: '2027-12-31',
       bisText: '31. Dezember 2027',
       abweichend: false,
+      standardTag: '2027-12-31',
     })
   })
 
@@ -302,6 +303,7 @@ describe('baueGruendungAnzeige — die Admin-Liste zeigt das wirksame Datum', ()
       bisTag: '2028-06-30',
       bisText: '30. Juni 2028',
       abweichend: true,
+      standardTag: '2027-12-31',
     })
   })
 

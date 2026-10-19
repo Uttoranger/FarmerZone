@@ -16,6 +16,9 @@
  *    nicht abgelaufener Beitrag DIESES Hofs, sonst 404; die verknüpften
  *    Produkte kommen ins Bild; die Prüfsumme nimmt Beitrag und Fotos auf.
  *  - Der QR-Code steht nur in der Story, nie im 1:1.
+ *  - Abzeichen (Register K2, Nr. 116): Ein Gründungshof trägt das Etikett
+ *    über dem Namen, in beiden Formaten und Varianten; der Lader gibt nur
+ *    Ja/Nein weiter, nie die Nummer; die Prüfsumme ändert sich mit dem Schalter.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createElement } from 'react'
@@ -71,7 +74,8 @@ import { teilenBildSucheSchema } from '@/schemas/teilen'
 import { ladeTeilenBildBilder, type GeladeneBilder } from '@/lib/teilen-bild-quellen'
 import { TEILEN_BILD_FARBE, TeilenBildGrafik } from '@/components/teilen/teilen-bild-grafik'
 import { GET as bildRoute } from '@/app/(public)/[farmSlug]/opengraph-image/route'
-import { ladeTeilenVorschau } from '@/server/queries/teilen-bild'
+import { ladeTeilenBildQuelle, ladeTeilenVorschau } from '@/server/queries/teilen-bild'
+import { ABZEICHEN_TEXT } from '@/lib/gruendungshof'
 
 const findFirst = vi.mocked(prisma.farm.findFirst)
 const beitragLesen = vi.mocked(prisma.statusPost.findFirst)
@@ -745,5 +749,76 @@ describe('GET /[farmSlug]/opengraph-image — Beitrag-Modus (Register T6)', () =
     const res = await aufruf(`?v=${(await ladeTeilenVorschau('hof-test', JETZT))?.version}`)
     expect(res.status).toBe(200)
     expect(res.headers.get('cache-control')).toBe('public, max-age=60, s-maxage=60')
+  })
+})
+
+describe('Abzeichen im Teilen-Bild (Register K2, Nr. 116)', () => {
+  const ROH = {
+    id: 'farm-1',
+    name: 'Sonnhof',
+    slug: 'hof-test',
+    city: 'Teststadt',
+    isPaused: false,
+    betriebsnummer: null,
+    betriebsstatus: null,
+    approvedAt: new Date('2026-10-01T08:00:00Z'),
+    gruendungPlatz: 7,
+    gruendungAusgenommen: false,
+    gruendungAbzeichenZeigen: true,
+    products: [],
+    pickupSlots: [],
+  }
+
+  it('der Lader liest den Platz, gibt aber nur Ja/Nein weiter — ausgeblendet und ausgenommen ohne Etikett', async () => {
+    findFirst.mockResolvedValue(ROH as never)
+    const quelle = await ladeTeilenBildQuelle({ slug: 'hof-test' })
+    expect(quelle?.hof.gruendungshof).toBe(true)
+    expect(findFirst.mock.calls[0][0]?.select).toMatchObject({ gruendungPlatz: true, gruendungAusgenommen: true, gruendungAbzeichenZeigen: true })
+    expect(JSON.stringify(quelle)).not.toContain('gruendungPlatz')
+
+    findFirst.mockResolvedValue({ ...ROH, gruendungAbzeichenZeigen: false } as never)
+    expect((await ladeTeilenBildQuelle({ slug: 'hof-test' }))?.hof.gruendungshof).toBe(false)
+    findFirst.mockResolvedValue({ ...ROH, gruendungAusgenommen: true } as never)
+    expect((await ladeTeilenBildQuelle({ slug: 'hof-test' }))?.hof.gruendungshof).toBe(false)
+    findFirst.mockResolvedValue({ ...ROH, gruendungPlatz: null } as never)
+    expect((await ladeTeilenBildQuelle({ slug: 'hof-test' }))?.hof.gruendungshof).toBe(false)
+  })
+
+  it('die Prüfsumme ändert sich mit dem Schalter; ohne Abzeichen bleibt sie wie bisher', () => {
+    const eingabe = { hof: HOF, produkte: [produkt('eier')], slots: [], auswahl: null, adresse: 'x.at/hof-test', jetzt: JETZT }
+    const bisher = teilenBildVersion(teilenBildDaten(eingabe))
+    const ohne = teilenBildDaten({ ...eingabe, hof: { ...HOF, gruendungshof: false } })
+    expect('gruendungshof' in ohne).toBe(false)
+    expect(teilenBildVersion(ohne)).toBe(bisher)
+    const mit = teilenBildDaten({ ...eingabe, hof: { ...HOF, gruendungshof: true } })
+    expect(mit.gruendungshof).toBe(true)
+    expect(teilenBildVersion(mit)).not.toBe(bisher)
+  })
+
+  it('die Grafik zeichnet das Etikett über dem Namen — 1:1 und Story, mit und ohne Foto, auch im Beitrag; nie eine Nummer', () => {
+    const qr = qrPfad('https://x.at/hof-test?k=qr')
+    const MIT_FOTO: GeladeneBilder = { produkte: {}, held: 'data:image/jpeg;base64,HELD', ersatz: false }
+    const beitrag = { anlass: 'PROMOTION' as const, title: 'Kürbisse sind da', body: 'Ab Samstag am Hof.' }
+    for (const mitBeitrag of [false, true]) {
+      const eingabe = { produkte: [produkt('eier')], slots: [], auswahl: null, adresse: 'x.at/hof-test', jetzt: JETZT, beitrag: mitBeitrag ? beitrag : null }
+      const mit = teilenBildDaten({ ...eingabe, hof: { ...HOF, name: 'Sonnhof', gruendungshof: true } })
+      const ohne = teilenBildDaten({ ...eingabe, hof: { ...HOF, name: 'Sonnhof', gruendungshof: false } })
+      for (const format of ['quadrat', 'story'] as const) {
+        for (const bilder of [OHNE_BILDER, MIT_FOTO]) {
+          const html = renderToStaticMarkup(createElement(TeilenBildGrafik, { daten: mit, format, qr, bilder, marke: MARKE_BILD }))
+          const etikett = html.indexOf(`>${ABZEICHEN_TEXT.wort}<`)
+          expect(etikett).toBeGreaterThan(-1)
+          expect(etikett).toBeLessThan(html.indexOf('Sonnhof'))
+          // Großbuchstaben nur per CSS am Etikett selbst (kein Element dazwischen geschlossen), das Wort bleibt im Text.
+          const stil = html.slice(0, etikett).lastIndexOf('text-transform:uppercase')
+          expect(stil).toBeGreaterThan(-1)
+          expect(html.slice(stil, etikett)).not.toContain('</div>')
+          expect(html).not.toMatch(/Nr\.\s?\d/)
+          // Gegenprobe: ohne Abzeichen kein Etikett.
+          const ohneHtml = renderToStaticMarkup(createElement(TeilenBildGrafik, { daten: ohne, format, qr, bilder, marke: MARKE_BILD }))
+          expect(ohneHtml).not.toContain(`>${ABZEICHEN_TEXT.wort}<`)
+        }
+      }
+    }
   })
 })

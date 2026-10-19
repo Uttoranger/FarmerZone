@@ -18,7 +18,7 @@ export function GruendungPreiszeile({ gruendung, className }: { gruendung: Gruen
         <Star className="size-[18px]" strokeWidth={1.9} />
       </span>
       <p className="min-w-0 flex-1 text-[13.5px] leading-[1.45] text-muted-foreground md:text-[14px]">
-        <SatzTeile teile={GRUENDUNG_TEXT.preiszeile(gruendung.frei, gruendung.gesamt, gruendung.bisTag)} />
+        <SatzTeile teile={GRUENDUNG_TEXT.preiszeile(gruendung)} />
       </p>
     </div>
   )

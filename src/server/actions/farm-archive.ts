@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getOpenOrdersCount } from '@/server/queries/orders'
+import { GRUENDUNGSPLAETZE_SPERRE } from '@/lib/gruendungshof'
 
 async function getAuthFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -45,14 +46,26 @@ export async function archiveFarm(): Promise<ArchiveResult> {
   return {}
 }
 
-/** Hof wieder aktivieren — archivedAt zurück auf null. isPaused bleibt unberührt. */
+/**
+ * Hof wieder aktivieren — archivedAt zurück auf null. isPaused bleibt unberührt.
+ *
+ * SPERRE (Register K2, Änderung Nr. 116): Vor dem Festschreiben bringt das
+ * Wieder-Aktivieren den Hof mit seinem alten Rang zurück in die Vergabe der
+ * Gründungsplätze — deshalb unter GRUENDUNGSPLAETZE_SPERRE, in einer
+ * Transaktion, wie Freischalten und Ausnehmen: kein anderer Weg vergibt
+ * gleichzeitig. Am Platz ändert sich nichts — ein festgeschriebener Platz
+ * bleibt beim Stilllegen am Hof, und niemand anderes verliert ihn dadurch.
+ */
 export async function reactivateFarm(): Promise<ArchiveResult> {
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
 
-  await prisma.farm.update({
-    where: { id: farm.id },
-    data: { archivedAt: null },
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${GRUENDUNGSPLAETZE_SPERRE})`
+    await tx.farm.update({
+      where: { id: farm.id },
+      data: { archivedAt: null },
+    })
   })
 
   revalidatePath('/settings/account')

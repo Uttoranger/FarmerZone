@@ -209,6 +209,7 @@ describe('/hoefe: der Satz zur Reihenfolge unter der Liste', () => {
     produkteJeBereich: { LEBENSMITTEL: 0, FUTTERMITTEL: 0 },
     suchNamen: [],
     fotos: [],
+    gruendungshof: false,
   })
 
   const uebersicht = (suche = ''): string => {

@@ -61,6 +61,7 @@ import { VorschauImRahmen } from '@/components/farm/vorschau-im-rahmen'
 import { HofseiteSeitenspalte } from '@/components/hofseite/hofseite-seitenspalte'
 import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
 import { Titelbild } from '@/components/hofseite/titelbild'
+import { Abzeichen, AbzeichenKnopf } from '@/components/ui/abzeichen'
 
 /*
  * Die Hofseite für Kundinnen im neuen Design (Nachtlauf Nr. 10, Gate 4).
@@ -343,6 +344,16 @@ export function HofseiteKunde({
               )}
             </span>
             <div className="min-w-0 md:pb-1">
+              {/* Abzeichen „Gründungshof“ direkt über dem Namen (Register K2, Nr. 116) — nur das Ja/Nein, nie die Nummer. */}
+              {farm.gruendungshof && (
+                <div className="mb-2">
+                  {farm.abzeichenBlatt && farm.gruendungSeit ? (
+                    <AbzeichenKnopf hofName={farm.name} seit={farm.gruendungSeit} blatt={farm.abzeichenBlatt} />
+                  ) : (
+                    <Abzeichen aufBild />
+                  )}
+                </div>
+              )}
               <h1 className="line-clamp-2 font-heading text-[28px] leading-[1.1] font-semibold break-words text-accent-foreground md:text-[38px] md:text-foreground">
                 {farm.name}
               </h1>

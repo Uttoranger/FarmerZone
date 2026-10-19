@@ -61,25 +61,37 @@ function roh(ueber: Partial<HofRohdaten> = {}): HofRohdaten {
     betriebsnummer: '1234567',
     sepaErteilt: false,
     gruendungAusgenommen: false,
+    produktImShop: true,
     ...ueber,
   }
 }
 
 describe('freischaltSperre', () => {
   it('ohne bestätigte E-Mail: der Satz aus S3 — vor Stripe, wie der Server', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: true, stripeBereit: false })).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
+    expect(freischaltSperre({ emailBestaetigungOffen: true, stripeBereit: false, produktImShop: false })).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
   })
   it('ohne fertiges Stripe-Konto: gesperrt mit Grund (Register Z1)', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false, produktImShop: true })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
   })
-  it('mit Stripe und bestätigter E-Mail: nichts im Weg', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true })).toBeNull()
+  it('ohne Produkt im Shop: gesperrt mit dem Satz der Freigabe (Register K2, Nr. 116) — nach E-Mail und Stripe', () => {
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true, produktImShop: false })).toBe(
+      'Noch kein Produkt im Shop – Freischalten erst mit mindestens einem Produkt.'
+    )
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false, produktImShop: false })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
+  })
+  it('mit Stripe, bestätigter E-Mail und einem Produkt im Shop: nichts im Weg', () => {
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true, produktImShop: true })).toBeNull()
   })
   it('ein Hof, der früher „nur bar" wählen konnte, ist ohne Stripe gesperrt — die Wahl zählt nicht mehr (Z1)', () => {
     // Die Regel kennt acceptsOnline nicht: Auch ein Bestandshof mit
     // acceptsOnline=false bekommt ohne Stripe keine Freischaltung.
-    const hof = { emailBestaetigungOffen: false, stripeBereit: false, acceptsOnline: false }
+    const hof = { emailBestaetigungOffen: false, stripeBereit: false, produktImShop: true, acceptsOnline: false }
     expect(freischaltSperre(hof)).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
+  })
+  it('die Warteliste zeigt denselben Satz: ein wartender Hof ohne Produkt im Shop trägt ihn als Sperre (adminHofZeile)', () => {
+    expect(adminHofZeile(roh({ approvedAt: null, produktImShop: false }), { gruendungsplatz: null, maxPlaetze: 12 }, JETZT).sperre).toBe(
+      'Noch kein Produkt im Shop – Freischalten erst mit mindestens einem Produkt.'
+    )
   })
 })
 

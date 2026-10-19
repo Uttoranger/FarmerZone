@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const db = vi.hoisted(() => ({ farm: { findUnique: vi.fn(), findMany: vi.fn() } }))
+const db = vi.hoisted(() => ({ farm: { findUnique: vi.fn(), findMany: vi.fn() }, plattformEinstellung: { findUnique: vi.fn(async () => null) } }))
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
 
 import { ladeGruendungBis } from '@/server/queries/admin'
@@ -56,13 +56,29 @@ describe('ladeGruendungBis', () => {
     expect(await ladeGruendungBis({ ownerId: 'nutzer_wartet' })).toBeNull()
   })
 
+  it('vor dem Festschreiben mit mehr als 12 Plätzen (Nr. 116): Platz 13 hat das Standard-Ende, wie in der Gründungs-Nachricht', async () => {
+    db.plattformEinstellung.findUnique.mockResolvedValueOnce({
+      gruendungPlaetze: 100,
+      gruendungBisStandard: GRUENDUNG_BIS_STANDARD,
+      gruendungAnzeige: true,
+      gruendungMonate: 24,
+      gruendungAktionBis: null,
+      gruendungFestAm: null,
+      geaendertVonUserId: null,
+      updatedAt: new Date('2026-10-19T08:00:00.000Z'),
+    } as never)
+    db.farm.findMany.mockResolvedValue(hoefe(13))
+    expect(await ladeGruendungBis({ id: 'hof_13' })).toEqual(GRUENDUNG_BIS_STANDARD)
+  })
+
   it('eine schmale Abfrage: nur freigeschaltete, nicht stillgelegte Höfe, ohne Namen und E-Mail', async () => {
     db.farm.findMany.mockResolvedValue([])
     await ladeGruendungBis({ id: 'hof_1' })
     expect(db.farm.findMany).toHaveBeenCalledTimes(1)
     const abfrage = db.farm.findMany.mock.calls[0]?.[0]
-    expect(abfrage.where).toEqual({ approvedAt: { not: null }, archivedAt: null })
-    expect(Object.keys(abfrage.select).sort()).toEqual(['approvedAt', 'archivedAt', 'createdAt', 'gruendungAusgenommen', 'gruendungBis', 'id', 'ownerId'])
+    // Seit Nr. 116 auch jeder Hof mit festgeschriebenem Platz (stillgelegt oder zurückgenommen, er hält ihn).
+    expect(abfrage.where).toEqual({ OR: [{ approvedAt: { not: null }, archivedAt: null }, { gruendungPlatz: { not: null } }] })
+    expect(Object.keys(abfrage.select).sort()).toEqual(['approvedAt', 'archivedAt', 'createdAt', 'gruendungAusgenommen', 'gruendungBis', 'gruendungPlatz', 'id', 'ownerId'])
   })
 })
 

@@ -16,6 +16,9 @@ export const GRUENDUNG_NUR_FREIGESCHALTET = 'Nur ein freigeschalteter Hof zählt
 /** Das bedingte Schreiben traf nichts: Ein zweiter Tab hat schon aus- bzw. wieder aufgenommen. */
 export const GRUENDUNG_AUSNEHMEN_GEAENDERT = 'Der Hof hat sich inzwischen geändert. Lade die Seite neu und entscheide noch einmal.'
 
+/** Wiederaufnahme nach dem Festschreiben, aber die Aktion ist vorbei (Stichtag) — es gibt keinen Platz mehr (Nr. 116). */
+export const GRUENDUNG_AKTION_VORBEI = 'Die Aktion ist vorbei – es werden keine Gründungsplätze mehr vergeben.'
+
 /** Die Kennung eines Hofs (cuid) — Länge begrenzt, damit kein Riesentext in die Abfrage geht. */
 const hofKennung = z.string().min(1).max(64)
 
@@ -26,3 +29,13 @@ export const nimmAusGruendungSchema = z.strictObject({
 })
 
 export const nimmWiederAufSchema = z.strictObject({ farmId: hofKennung })
+
+/**
+ * „Zusagen festschreiben“ (Register K2, Änderung Nr. 116): nur die
+ * Bestätigung im Dialog — welche Höfe welchen Platz bekommen, rechnet die
+ * Action selbst nach der Sperre, nie aus dem Browser.
+ */
+export const schreibeZusagenFestSchema = z.strictObject({ bestaetigt: z.literal(true) })
+
+/** Der Schalter „Abzeichen zeigen“ unter Konditionen und Tarif (Nr. 116) — nur für den eigenen Hof. */
+export const abzeichenSichtbarSchema = z.strictObject({ zeigen: z.boolean() })

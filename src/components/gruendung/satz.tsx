@@ -19,7 +19,7 @@ export function GruendungSatz({ gruendung, className }: { gruendung: GruendungSe
     <p className={cn('flex items-start gap-2 text-[13px] leading-[1.45] text-foreground md:text-[14px]', className)}>
       <Star className="mt-[2px] size-[15px] shrink-0 text-status-offen" strokeWidth={1.9} aria-hidden="true" />
       <span className="min-w-0">
-        <SatzTeile teile={GRUENDUNG_TEXT.satz(gruendung.frei, gruendung.gesamt, gruendung.bisTag)} />
+        <SatzTeile teile={GRUENDUNG_TEXT.satz(gruendung)} />
       </span>
     </p>
   )

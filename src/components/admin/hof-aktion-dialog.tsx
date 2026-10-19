@@ -3,7 +3,6 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { approveFarmAction, revokeFarmApprovalAction, rejectFarmAction } from '@/server/actions/admin'
-import { GRUENDUNG_BIS_STANDARD, gruendungshofLabel, gruendungsKonditionenText, MAX_GRUENDUNGSHOEFE } from '@/lib/gruendungshof'
 import { KONDITIONEN_DERZEIT } from '@/lib/konditionen'
 import type { AdminHofZeile } from '@/lib/admin-hoefe'
 import { BestellDialog, DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
@@ -31,18 +30,18 @@ const KNOPF: Record<HofAktion['art'], string> = {
  */
 export function HofAktionDialog({
   aktion,
-  vergebenePlaetze,
   onClose,
 }: {
   aktion: HofAktion | null
-  vergebenePlaetze: number
+  /**
+   * Nicht mehr gelesen (Nr. 116): Platz und Ende kommen fertig vom Server
+   * (`hof.freischaltHinweis`, mit den Plätzen der Einstellung statt der festen 12).
+   */
+  vergebenePlaetze?: number
   onClose: () => void
 }): React.JSX.Element {
   const [laeuft, startTransition] = useTransition()
   const [fehler, setFehler] = useState<string | null>(null)
-  // Die 12 sind eine Konditions-, keine Zugangsgrenze — der Dialog sagt nur,
-  // was die Freischaltung für die Konditionen bedeutet.
-  const plaetzeFrei = vergebenePlaetze < MAX_GRUENDUNGSHOEFE
   const art = aktion?.art ?? 'approve'
   const hof = aktion?.hof
 
@@ -96,17 +95,9 @@ export function HofAktionDialog({
               <strong className="font-semibold break-words text-foreground">{hof?.name}</strong> wird sofort öffentlich
               erreichbar und kann Bestellungen entgegennehmen.
             </p>
-            {plaetzeFrei ? (
-              <Hinweiskarte ton="gruen">
-                {/* Ein neuer Hof startet mit dem Standard-Ende (K2); ändern lässt es sich danach in der Liste. */}
-                Dieser Hof belegt {gruendungshofLabel(vergebenePlaetze + 1)}. {gruendungsKonditionenText(GRUENDUNG_BIS_STANDARD)}
-              </Hinweiskarte>
-            ) : (
-              <Hinweiskarte ton="orange">
-                Alle {MAX_GRUENDUNGSHOEFE} Gründungsplätze sind vergeben — dieser Hof bekommt keinen Gründungsplatz.
-                Freischalten ist trotzdem möglich.
-              </Hinweiskarte>
-            )}
+            {/* Die Plätze sind eine Konditions-, keine Zugangsgrenze — der Satz sagt nur, was die Freischaltung
+                für die Konditionen bedeutet (fertig vom Server: freischaltHinweis, Register K2). */}
+            {hof?.freischaltHinweis && <Hinweiskarte ton={hof.freischaltHinweis.ton}>{hof.freischaltHinweis.text}</Hinweiskarte>}
             {/* Nur ein Hinweis (Register K1): Was öffentlich gilt, steht neben
                 der Gründungsplatz-Zusage, die bis zur Abrechnung (Gate 8) bleibt. */}
             <p className="text-[12.5px]">{KONDITIONEN_DERZEIT}</p>
@@ -116,7 +107,12 @@ export function HofAktionDialog({
             Die Hofseite von <strong className="font-semibold break-words text-foreground">{hof?.name}</strong> ist
             danach nicht mehr erreichbar und Bestellungen werden abgelehnt. Es wird nichts gelöscht — der Hof behält
             Zugang zu allen Daten.
-            {hof?.gruendungsplatz != null && <> Sein Gründungsplatz wird frei, die nachfolgenden Höfe rücken auf.</>}
+            {hof?.gruendungsplatz != null &&
+              (hof.gruendungFest ? (
+                <> Sein Gründungsplatz und das Ende bleiben festgeschrieben.</>
+              ) : (
+                <> Sein Gründungsplatz wird frei, die nachfolgenden Höfe rücken auf.</>
+              ))}
           </p>
         ) : (
           <>

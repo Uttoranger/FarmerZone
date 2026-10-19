@@ -15,10 +15,15 @@ import type { KennzahlDaten, UnterreiterDaten } from '@/lib/admin-seiten'
 import {
   GRUENDUNG_BIS_MARKE,
   GRUENDUNG_BIS_TITEL,
+  aktionLaeuft,
   folgenDerAenderung,
   gruendungAlleVergeben,
+  gruendungsplaetze,
   gruendungsplatzVon,
+  kleinsteFreieNummer,
+  vergabeFest,
   type GruendungAnzeige,
+  type GruendungEinstellung,
   type GruendungFolgen,
   type GruendungRichtung,
   type HofFuerFolgen,
@@ -145,8 +150,25 @@ export const GRUENDUNGSPLATZ_WARTELISTE = {
  * belegen nichts. Über der Zahl der Plätze: null (kein Platz mehr). Ein
  * ausgenommener Hof (Nr. 109) bekäme keinen.
  */
-export function platzBeiFreischaltung(hofId: string, hoefe: readonly HofFuerPlatz[], jetzt: Date, maxPlaetze: number): number | null {
+export function platzBeiFreischaltung(
+  hofId: string,
+  hoefe: readonly HofFuerPlatz[],
+  jetzt: Date,
+  einstellung: GruendungEinstellung
+): number | null {
+  const maxPlaetze = einstellung.plaetze
   const ausgenommen = hoefe.find((h) => h.id === hofId)?.gruendungAusgenommen === true
+  // Festgeschrieben (Nr. 116): ein Hof mit Platz behält ihn (auch nach dem Stichtag, wie approveFarmAction),
+  // sonst die kleinste freie Nummer — nur, solange die Aktion läuft. Sonst nennte die Warteliste nach dem
+  // Stichtag einen Platz, den die Freischaltung nicht vergibt.
+  if (vergabeFest(hoefe)) {
+    if (ausgenommen) return null
+    const plaetze = gruendungsplaetze(hoefe)
+    const eigener = plaetze.get(hofId)
+    if (eigener !== undefined) return eigener
+    if (!aktionLaeuft(jetzt, einstellung, plaetze.size)) return null
+    return kleinsteFreieNummer(new Set(plaetze.values()), Math.max(maxPlaetze, 0))
+  }
   const mitHof: HofFuerPlatz[] = [
     ...hoefe.filter((h) => h.id !== hofId),
     { id: hofId, approvedAt: jetzt, createdAt: jetzt, archivedAt: null, gruendungAusgenommen: ausgenommen },
@@ -215,6 +237,9 @@ export const GRUENDUNG_AUSNEHMEN_TEXT = {
   keineNachricht: 'Der Hof bekommt keine Nachricht. Seine Hofseite und seine Bestellungen bleiben, wie sie sind.',
   zurueck: 'Zurück geht es über ⋯ › „Wieder als Gründungshof zählen“, solange ein Platz frei ist.',
   nummer: 'Die Nummer ist eine Reihenfolge, die Zusage ist das Datum.',
+  /** Nach dem Festschreiben (Register K2, Nr. 116). */
+  nummerFest: 'Die Nummern stehen fest – niemand rückt auf, ein freier Platz geht an die nächste Freischaltung.',
+  endeAbHeute: 'Das Ende rechnet sich ab dem Tag der Wiederaufnahme – nie kürzer als ein noch gespeichertes Ende.',
   haken: 'Das ist ein Testhof – oder der Hof hat zugestimmt.',
   hakenGrund: 'Nötig, weil er gerade einen Platz hält (K1).',
   zuletzt: (person: string, am: string): string => `zuletzt geändert von ${person} am ${am}`,
@@ -268,7 +293,13 @@ export function folgenSaetze(hof: { name: string; gruendungBis: Date | null }, f
       saetze.push(`Neu Gründungshof: ${w.name} rückt auf Platz ${w.nach} und läuft dann bis ${formatDatumLang(bis(w))} ohne Grundgebühr.`)
     }
   } else {
-    if (folgen.platzNachher !== null) saetze.push(`${hof.name} bekommt Platz Nr. ${folgen.platzNachher} – ${zusage(bis(hof))}.`)
+    if (folgen.platzNachher !== null) {
+      saetze.push(
+        folgen.fest
+          ? `${hof.name} bekommt Platz Nr. ${folgen.platzNachher}. ${GRUENDUNG_AUSNEHMEN_TEXT.endeAbHeute}`
+          : `${hof.name} bekommt Platz Nr. ${folgen.platzNachher} – ${zusage(bis(hof))}.`
+      )
+    }
     const genannt = folgen.verschoben.slice(0, FOLGEN_HOECHSTENS)
     for (const w of genannt) saetze.push(`${w.name}: Nr. ${w.von} → Nr. ${w.nach} – die Zusage bleibt.`)
     const rest = folgen.verschoben.length - genannt.length
@@ -309,7 +340,7 @@ export function gruendungAenderung<T extends HofFuerFolgen>(hof: T, hoefe: reado
     gesperrt: folgen.moeglich ? null : gruendungAlleVergeben(plaetze),
     titel: t.titel[richtung](hof.name),
     saetze: folgen.moeglich ? folgenSaetze(hof, folgen, plaetze, standardBis) : [],
-    hinweise: richtung === 'ausnehmen' ? [t.keineNachricht, t.zurueck] : [t.keineNachricht, t.nummer],
+    hinweise: richtung === 'ausnehmen' ? [t.keineNachricht, t.zurueck] : [t.keineNachricht, folgen.fest ? t.nummerFest : t.nummer],
     haken: richtung === 'ausnehmen' && folgen.platzVorher !== null,
     knopf: t.knopf[richtung],
   }

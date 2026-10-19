@@ -37,7 +37,7 @@ import { GRUENDUNG_AUSNEHMEN_ZUSTIMMUNG_FEHLT } from '@/schemas/gruendung'
 import { nimmAusGruendung, nimmWiederAuf } from '@/server/actions/gruendung'
 import { approveFarmAction } from '@/server/actions/admin'
 import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
-import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf } from './setup/basis'
+import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf, erstelleProdukt } from './setup/basis'
 
 const MIGRATION = readFileSync(join(process.cwd(), 'prisma', 'migrations', '20261016120000_gruendung_ausgenommen', 'migration.sql'), 'utf8')
 
@@ -144,6 +144,8 @@ describe('Sperre: der letzte freie Platz geht genau einmal weg', () => {
     for (let runde = 0; runde < 3; runde++) {
       const { farm: zurueck } = await erstelleHof({ gruendungAusgenommen: true })
       const { farm: neu } = await erstelleHof({ approvedAt: null, stripeAccountReady: true })
+      // Seit Nr. 116 verlangt das Freischalten ein Produkt im Shop (Register K2).
+      await erstelleProdukt(neu.id)
       const vorherPlaetze = await imRennen()
       const plaetze = vorherPlaetze.size + 1
       await setzePlaetze(plaetze)

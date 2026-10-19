@@ -33,12 +33,13 @@ import { join } from 'node:path'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { GRUENDUNG_BIS_STANDARD_TAG, MAX_GRUENDUNGSHOEFE, gruendungsplatzVon } from '@/lib/gruendungshof'
+import { FREISCHALTUNG_PRODUKT_OFFEN_TEXT } from '@/lib/admin-hoefe'
 import { GRUENDUNGS_NACHRICHT_LINK } from '@/lib/postfach'
 import { GRUENDUNG_EINSTELLUNG_FEHLER } from '@/lib/plattform-einstellung'
 import { approveFarmAction, revokeFarmApprovalAction } from '@/server/actions/admin'
 import { speichereGruendungEinstellung } from '@/server/actions/plattform-einstellung'
 import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
-import { erstelleHof, erstelleHofMitAnmeldung, raeumeAuf } from './setup/basis'
+import { erstelleHof, erstelleHofMitAnmeldung, erstelleProdukt, raeumeAuf } from './setup/basis'
 
 const MIGRATION = readFileSync(join(process.cwd(), 'prisma', 'migrations', '20261015120000_plattform_einstellung', 'migration.sql'), 'utf8')
 
@@ -67,9 +68,10 @@ async function alsAdmin(): Promise<string> {
   return ownerId
 }
 
-/** Ein wartender Hof, den die Sperren durchlassen (E-Mail bestätigt, Stripe fertig). */
-async function wartenderHof() {
+/** Ein wartender Hof, den die Sperren durchlassen (E-Mail bestätigt, Stripe fertig, seit Nr. 116 ein Produkt im Shop). */
+async function wartenderHof(mitProdukt = true) {
   const { farm } = await erstelleHof({ approvedAt: null, stripeAccountReady: true })
+  if (mitProdukt) await erstelleProdukt(farm.id)
   return farm
 }
 
@@ -138,6 +140,17 @@ describe('approveFarmAction — die eine Gründungs-Nachricht', () => {
     expect(await prisma.unterhaltung.count({ where: { farmId: farm.id } })).toBe(1)
   })
 
+  it('ohne Produkt im Shop: abgewiesen mit dem Satz der Freigabe, der Hof bleibt wartend (Register K2, Nr. 116)', async () => {
+    await alsAdmin()
+    const farm = await wartenderHof(false)
+
+    expect(await approveFarmAction(farm.id)).toEqual({ error: FREISCHALTUNG_PRODUKT_OFFEN_TEXT })
+    expect((await prisma.farm.findUniqueOrThrow({ where: { id: farm.id } })).approvedAt).toBeNull()
+    // Gegenprobe: mit einem Produkt geht es.
+    await erstelleProdukt(farm.id)
+    expect(await approveFarmAction(farm.id)).toEqual({})
+  })
+
   it('ohne freien Platz: freigeschaltet, aber keine Nachricht', async () => {
     await alsAdmin()
     await setzePlaetze(0)
@@ -156,40 +169,39 @@ describe('speichereGruendungEinstellung mit echter Admin-Anmeldung', () => {
     await erstelleHof() // mindestens ein Hof im Rennen, auch ohne Seed
     const vergeben = (await ladeHoefeFuerGruendung()).length
 
-    const ergebnis = await speichereGruendungEinstellung({ plaetze: vergeben - 1, bisTag: '2099-12-31', anzeige: true })
+    const ergebnis = await speichereGruendungEinstellung({ plaetze: vergeben - 1, monate: 24, aktionBisTag: null, anzeige: true })
     expect(ergebnis).toEqual({ error: GRUENDUNG_EINSTELLUNG_FEHLER.weniger(vergeben) })
     expect((await prisma.plattformEinstellung.findUniqueOrThrow({ where: { id: 'plattform' } })).gruendungPlaetze).toBe(999)
   })
 
-  it('gesperrt: andere Plätze oder anderes Ende abgelehnt, die Zeile bleibt', async () => {
+  it('Plätze nur erhöhen (Nr. 116): weniger als gespeichert abgelehnt, die Zeile bleibt; das Standard-Ende ändert die Action nie', async () => {
     await alsAdmin()
-    await setzePlaetze(MAX_GRUENDUNGSHOEFE)
+    await setzePlaetze(MAX_GRUENDUNGSHOEFE + 50)
 
-    for (const eingabe of [
-      { plaetze: MAX_GRUENDUNGSHOEFE + 3, bisTag: GRUENDUNG_BIS_STANDARD_TAG, anzeige: true },
-      { plaetze: MAX_GRUENDUNGSHOEFE, bisTag: '2099-06-30', anzeige: true },
-    ]) {
-      expect(await speichereGruendungEinstellung(eingabe)).toEqual({ error: GRUENDUNG_EINSTELLUNG_FEHLER.gesperrt })
-    }
+    expect(await speichereGruendungEinstellung({ plaetze: MAX_GRUENDUNGSHOEFE + 49, monate: 24, aktionBisTag: null, anzeige: true })).toEqual({
+      error: GRUENDUNG_EINSTELLUNG_FEHLER.plaetzeNurMehr(MAX_GRUENDUNGSHOEFE + 50),
+    })
     const zeile = await prisma.plattformEinstellung.findUniqueOrThrow({ where: { id: 'plattform' } })
-    expect(zeile.gruendungPlaetze).toBe(MAX_GRUENDUNGSHOEFE)
+    expect(zeile.gruendungPlaetze).toBe(MAX_GRUENDUNGSHOEFE + 50)
     expect(zeile.gruendungBisStandard.toISOString()).toBe(vorher?.gruendungBisStandard.toISOString())
   })
 
-  it('gültig (nur die Anzeige umgeschaltet): Werte, DATE und Person stehen in der Zeile', async () => {
+  it('gültig: Plätze, Monate, Stichtag (DATE), Anzeige und Person stehen in der Zeile', async () => {
     const adminId = await alsAdmin()
     await setzePlaetze(MAX_GRUENDUNGSHOEFE)
+    await prisma.plattformEinstellung.update({ where: { id: 'plattform' }, data: { gruendungMonate: 24, gruendungAktionBis: null } })
 
-    expect(await speichereGruendungEinstellung({ plaetze: MAX_GRUENDUNGSHOEFE, bisTag: GRUENDUNG_BIS_STANDARD_TAG, anzeige: false })).toEqual({ ok: true })
+    expect(await speichereGruendungEinstellung({ plaetze: 100, monate: 24, aktionBisTag: '2099-03-31', anzeige: false })).toEqual({ ok: true })
     const zeile = await prisma.plattformEinstellung.findUniqueOrThrow({ where: { id: 'plattform' } })
-    expect(zeile).toMatchObject({ gruendungPlaetze: MAX_GRUENDUNGSHOEFE, gruendungAnzeige: false, geaendertVonUserId: adminId })
+    expect(zeile).toMatchObject({ gruendungPlaetze: 100, gruendungMonate: 24, gruendungAnzeige: false, geaendertVonUserId: adminId })
+    expect(zeile.gruendungAktionBis?.toISOString()).toBe('2099-03-31T00:00:00.000Z')
     expect(zeile.gruendungBisStandard.toISOString()).toBe(`${GRUENDUNG_BIS_STANDARD_TAG}T00:00:00.000Z`)
   })
 
   it('ohne Admin-Recht: abgelehnt, nichts geschrieben', async () => {
     const { cookie } = await erstelleHofMitAnmeldung()
     vi.mocked(headers).mockResolvedValue(new Headers({ cookie }) as never)
-    expect(await speichereGruendungEinstellung({ plaetze: 500, bisTag: '2099-06-30', anzeige: true })).toEqual({ error: 'Kein Zugriff.' })
+    expect(await speichereGruendungEinstellung({ plaetze: 500, monate: 24, aktionBisTag: null, anzeige: true })).toEqual({ error: 'Kein Zugriff.' })
     expect((await prisma.plattformEinstellung.findUniqueOrThrow({ where: { id: 'plattform' } })).gruendungPlaetze).toBe(vorher?.gruendungPlaetze)
   })
 })

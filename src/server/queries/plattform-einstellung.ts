@@ -2,16 +2,30 @@ import * as Sentry from '@sentry/nextjs'
 import { unstable_cache } from 'next/cache'
 import { unstable_rethrow } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { KEINE_GRUENDUNG_SEITEN, gruendungSeitenDaten, type GruendungSeiten } from '@/lib/gruendungshof'
+import {
+  KEINE_GRUENDUNG_SEITEN,
+  abzeichenBlattAus,
+  festschreibenBrauchtPlaetze,
+  festschreibenListe,
+  gruendungSeitenDaten,
+  gruendungsplaetze,
+  seitenZahlen,
+  zaehleAusgenommene,
+  type AbzeichenBlatt,
+  type FestschreibenZeile,
+  type GruendungSeiten,
+} from '@/lib/gruendungshof'
 import {
   PLATTFORM_EINSTELLUNG_ID,
+  PLATTFORM_EINSTELLUNG_SELECT,
   PLATTFORM_EINSTELLUNG_STANDARD,
   PLATTFORM_EINSTELLUNG_TAG,
   gruendungEinstellungAus,
   plattformEinstellungAus,
   type PlattformEinstellung,
 } from '@/lib/plattform-einstellung'
-import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
+import { ladeHoefeFuerFestschreiben, ladeHoefeFuerGruendung } from '@/server/queries/admin'
 
 /*
  * Die Plattform-Einstellungen lesen (Register K2-Ergänzung, N15; Nr. 93).
@@ -24,7 +38,7 @@ import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
 export async function lesePlattformEinstellung(): Promise<PlattformEinstellung> {
   const zeile = await prisma.plattformEinstellung.findUnique({
     where: { id: PLATTFORM_EINSTELLUNG_ID },
-    select: { gruendungPlaetze: true, gruendungBisStandard: true, gruendungAnzeige: true, geaendertVonUserId: true, updatedAt: true },
+    select: PLATTFORM_EINSTELLUNG_SELECT,
   })
   return zeile ? plattformEinstellungAus(zeile) : PLATTFORM_EINSTELLUNG_STANDARD
 }
@@ -54,17 +68,82 @@ export function ladePlattformEinstellung(): Promise<PlattformEinstellung> {
  */
 export async function gruendungFuerSeiten(jetzt: Date = new Date()): Promise<GruendungSeiten> {
   try {
-    const [einstellung, hoefe, wartend] = await Promise.all([
-      ladePlattformEinstellung(),
-      ladeHoefeFuerGruendung(),
-      // Wartend wie in der Admin-Liste (approvedAt null), stillgelegte nicht — sie kommen nie dran.
-      prisma.farm.count({ where: { approvedAt: null, archivedAt: null } }),
-    ])
-    return gruendungSeitenDaten(gruendungEinstellungAus(einstellung), hoefe, wartend, jetzt)
+    return await zaehleGruendungSeiten(jetzt)
   } catch (err) {
-    // Nexts eigene Steuersignale (dynamisches Rendern beim Bau) gehören nicht in die Fehleranzeige.
-    unstable_rethrow(err)
-    Sentry.captureException(err, { tags: { bereich: 'gruendung-seiten' } })
+    meldeSeitenFehler(err)
     return KEINE_GRUENDUNG_SEITEN
   }
+}
+
+/** Die Zahlen frisch gezählt — wirft bei einem Ladefehler; die Aufrufer fangen ihn. */
+async function zaehleGruendungSeiten(jetzt: Date): Promise<GruendungSeiten> {
+  const [einstellung, hoefe, wartend] = await Promise.all([
+    ladePlattformEinstellung(),
+    ladeHoefeFuerGruendung(),
+    // Wartend wie in der Admin-Liste (approvedAt null), stillgelegte nicht — sie kommen nie dran.
+    prisma.farm.count({ where: { approvedAt: null, archivedAt: null } }),
+  ])
+  return gruendungSeitenDaten(gruendungEinstellungAus(einstellung), hoefe, wartend, jetzt)
+}
+
+function meldeSeitenFehler(err: unknown): void {
+  // Nexts eigene Steuersignale (dynamisches Rendern beim Bau) gehören nicht in die Fehleranzeige.
+  unstable_rethrow(err)
+  Sentry.captureException(err, { tags: { bereich: 'gruendung-seiten' } })
+}
+
+/**
+ * Die Zahlen fürs Erklär-Blatt des Abzeichens (Hofseite, Register K2, Nr. 116)
+ * — gecacht statt bei jedem Aufruf der Hofseite alle Höfe zu zählen. Das
+ * Etikett der Höfe erneuern Freischalten, Ausnehmen, Wiederaufnahme,
+ * Festschreiben und der Schalter, das der Einstellung Speichern und
+ * Festschreiben; die fünf Minuten fangen den Stichtag (wie die Höfe-Liste).
+ * Ein Ladefehler wird nicht gecacht: Dann zeigt die Seite das Etikett ohne Blatt.
+ */
+export async function ladeAbzeichenBlatt(): Promise<AbzeichenBlatt | null> {
+  try {
+    return await unstable_cache(async () => abzeichenBlattAus(await zaehleGruendungSeiten(new Date())), ['abzeichen-blatt'], {
+      tags: [HOEFE_CACHE_TAG, PLATTFORM_EINSTELLUNG_TAG],
+      revalidate: 300,
+    })()
+  } catch (err) {
+    meldeSeitenFehler(err)
+    return null
+  }
+}
+
+/** Was Admin › Einstellungen › Gründungshöfe über die Höfe braucht — nur Zahlen und die Liste fürs Festschreiben. */
+export type GruendungStandAdmin = {
+  /** Vergebene Plätze: vor dem Festschreiben die Höfe im Rennen, danach die festgeschriebenen Nummern. */
+  vergeben: number
+  ausgenommen: number
+  /** Die Liste „Zusagen festschreiben“ — leer, sobald festgeschrieben ist. */
+  festschreiben: FestschreibenZeile[]
+  /** Reichen die Plätze nicht, damit jeder Hof mit Platz einen behält: die nötige Zahl, sonst null. */
+  festschreibenPlaetze: number | null
+}
+
+/**
+ * Der Stand der Gründungsplätze für Admin › Einstellungen (Register K2,
+ * Änderung Nr. 116) — frisch, nie aus dem Cache. Die Liste fürs Festschreiben
+ * mit derselben Regel wie die Action (`festschreibenListe`); die Action
+ * rechnet sie nach der Sperre noch einmal selbst.
+ */
+export async function ladeGruendungStandAdmin(einstellung: PlattformEinstellung): Promise<GruendungStandAdmin> {
+  const regeln = gruendungEinstellungAus(einstellung)
+  const [hoefe, alle] = await Promise.all([
+    ladeHoefeFuerGruendung(),
+    regeln.festAm === null ? ladeHoefeFuerFestschreiben() : Promise.resolve([]),
+  ])
+  return {
+    vergeben: gruendungsplaetze(hoefe).size,
+    ausgenommen: zaehleAusgenommene(hoefe),
+    festschreiben: regeln.festAm === null ? festschreibenListe(alle, regeln) : [],
+    festschreibenPlaetze: regeln.festAm === null ? festschreibenBrauchtPlaetze(alle, regeln) : null,
+  }
+}
+
+/** Die Zahlen der Seiten mit dem gespeicherten Stand — für die zugeklappte Gruppe am Handy. */
+export function gruendungZahlenAdmin(einstellung: PlattformEinstellung, vergeben: number, jetzt: Date): ReturnType<typeof seitenZahlen> {
+  return seitenZahlen(gruendungEinstellungAus(einstellung), vergeben, jetzt)
 }

@@ -99,6 +99,9 @@ const HOF: PublicFarm = {
   acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,
   serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
   betriebsstatus: null,
+  gruendungshof: false,
+  gruendungSeit: null,
+  abzeichenBlatt: null,
   products: [
     produkt('p_holz', 'Buchenscheite', 'BRENNHOLZ'),
     produkt('p_heu', 'Bergwiesen-Heu', 'HEU_STROH'),

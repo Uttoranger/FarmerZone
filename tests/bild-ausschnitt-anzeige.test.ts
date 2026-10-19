@@ -150,6 +150,9 @@ describe('Produktseite — der Ausschnitt am Foto', () => {
     acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,
     serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
     betriebsstatus: 'PRIMAERPRODUKTION',
+    gruendungshof: false,
+    gruendungSeit: null,
+    abzeichenBlatt: null,
     products: [],
     pickupSlots: [{ dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }],
   }

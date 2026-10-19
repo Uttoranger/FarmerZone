@@ -20,6 +20,8 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findUnique: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     user: { findUnique: vi.fn() },
+    // Seit Nr. 116 liest die Platzvergabe die Einstellung mit (ohne Zeile: Standard, nicht festgeschrieben).
+    plattformEinstellung: { findUnique: vi.fn(async () => null) },
   },
 }))
 

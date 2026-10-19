@@ -130,6 +130,8 @@ export type StartseitenHofEingabe = {
   fotos: readonly string[]
   latitude: number | null
   longitude: number | null
+  /** Abzeichen „Gründungshof“ (Register K2, Nr. 116) — nur Ja/Nein; fehlt es, ohne Abzeichen. */
+  gruendungshof?: boolean
 }
 
 /** Eine Karte unter „Höfe in deiner Nähe" — fertig zum Zeichnen, ohne Decimal und Date. */
@@ -148,6 +150,8 @@ export type StartseitenHof = {
   foto: string | null
   /** Wo der Hof liegt — null ohne Koordinaten (dann kein Pin auf der Karte). */
   lage: GeoPunkt | null
+  /** Abzeichen „Gründungshof“ über dem Namen (Nr. 116) — fehlt es (Platzhalter im Admin), ohne Abzeichen. */
+  gruendungshof?: boolean
 }
 
 /** Die Lage aus der Liste: nur mit beiden Koordinaten. */
@@ -177,6 +181,7 @@ function bereiteStartseitenHof(hof: StartseitenHofEingabe): StartseitenHof {
       .join(' · '),
     foto: hof.fotos[0] ?? null,
     lage: leseLage(hof),
+    gruendungshof: hof.gruendungshof === true,
   }
 }
 

@@ -6,7 +6,6 @@ import { setzeGruendungBisAction } from '@/server/actions/admin'
 import {
   GRUENDUNG_BIS_DIALOG,
   GRUENDUNG_BIS_MARKE,
-  GRUENDUNG_BIS_STANDARD_TAG,
   GRUENDUNG_BIS_TITEL,
   verkuerztGruendungTag,
   type GruendungAnzeige,
@@ -37,7 +36,7 @@ function Formular({ hof, onClose }: { hof: GruendungsHof | null; onClose: () => 
   // Leer heißt Standard; ein eigenes Datum steht als Tag im Feld.
   const [tag, setTag] = useState(hof?.gruendung.abweichend ? hof.gruendung.bisTag : '')
   const [zugestimmt, setZugestimmt] = useState(false)
-  const verkuerzt = hof !== null && verkuerztGruendungTag(hof.gruendung.bisTag, tag || GRUENDUNG_BIS_STANDARD_TAG)
+  const verkuerzt = hof !== null && verkuerztGruendungTag(hof.gruendung.bisTag, tag || hof.gruendung.standardTag)
 
   function aendere(neu: string) {
     setTag(neu)

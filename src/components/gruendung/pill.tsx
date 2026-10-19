@@ -20,7 +20,7 @@ export function GruendungPill({ gruendung, className }: { gruendung: GruendungSe
       )}
     >
       <Star className="size-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
-      {GRUENDUNG_TEXT.pill(gruendung.frei, gruendung.gesamt)}
+      {GRUENDUNG_TEXT.pill(gruendung)}
     </span>
   )
 }

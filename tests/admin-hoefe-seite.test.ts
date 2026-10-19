@@ -31,11 +31,13 @@ import {
   waehleHoefeReiter,
   wartelistePlatzZeile,
 } from '@/lib/admin-hoefe-seite'
-import type { HofFuerPlatz } from '@/lib/gruendungshof'
+import { GRUENDUNG_EINSTELLUNG_STANDARD, type HofFuerPlatz } from '@/lib/gruendungshof'
 import { hoefeReiterAus } from '@/schemas/admin-reiter'
 
 const JETZT = new Date('2026-10-15T10:00:00+02:00')
 const MAX = 12
+/** Die Einstellung vor dem Festschreiben mit MAX Plätzen — so liest platzBeiFreischaltung sie. */
+const EINSTELLUNG = { ...GRUENDUNG_EINSTELLUNG_STANDARD, plaetze: MAX }
 
 function roh(id: string, ueber: Partial<HofRohdaten> = {}): HofRohdaten {
   return {
@@ -60,6 +62,7 @@ function roh(id: string, ueber: Partial<HofRohdaten> = {}): HofRohdaten {
     betriebsnummer: null,
     sepaErteilt: false,
     gruendungAusgenommen: false,
+    produktImShop: true,
     ...ueber,
   }
 }
@@ -168,20 +171,20 @@ describe('Warteliste: Gründungsplatz bei Freischaltung', () => {
   const sieben = Array.from({ length: 7 }, (_, i) => frist(`h${i + 1}`, i + 1))
 
   it('k ist die Zahl der Höfe im Rennen plus eins — der Hof kommt als letzter in die Reihenfolge der Freischaltung', () => {
-    expect(platzBeiFreischaltung('wartet', [...sieben, warteHof], JETZT, MAX)).toBe(8)
+    expect(platzBeiFreischaltung('wartet', [...sieben, warteHof], JETZT, EINSTELLUNG)).toBe(8)
   })
 
   it('ein stillgelegter Hof gibt seinen Platz frei und ein wartender belegt keinen', () => {
     const still = { ...frist('weg', 5), archivedAt: new Date('2026-10-01T09:00:00+02:00') }
     const weitereWartende: HofFuerPlatz = { ...warteHof, id: 'zweiter' }
-    expect(platzBeiFreischaltung('wartet', [...sieben, still, weitereWartende, warteHof], JETZT, MAX)).toBe(8)
+    expect(platzBeiFreischaltung('wartet', [...sieben, still, weitereWartende, warteHof], JETZT, EINSTELLUNG)).toBe(8)
   })
 
   it('alle Plätze vergeben: kein Platz', () => {
     const zwoelf = Array.from({ length: 12 }, (_, i) => frist(`h${i + 1}`, i + 1))
-    expect(platzBeiFreischaltung('wartet', [...zwoelf, warteHof], JETZT, MAX)).toBeNull()
+    expect(platzBeiFreischaltung('wartet', [...zwoelf, warteHof], JETZT, EINSTELLUNG)).toBeNull()
     // Gegenprobe: elf vergeben — der zwölfte Platz ist noch frei.
-    expect(platzBeiFreischaltung('wartet', [...zwoelf.slice(0, 11), warteHof], JETZT, MAX)).toBe(12)
+    expect(platzBeiFreischaltung('wartet', [...zwoelf.slice(0, 11), warteHof], JETZT, EINSTELLUNG)).toBe(12)
   })
 
   it('mit Stripe: „bekäme Gründungsplatz Nr. k“', () => {
@@ -200,8 +203,8 @@ describe('Warteliste: Gründungsplatz bei Freischaltung', () => {
 })
 
 describe('Spalte Gründungshof', () => {
-  const standard = { bisTag: '2027-12-31', bisText: '31. Dezember 2027', abweichend: false }
-  const eigenes = { bisTag: '2027-06-30', bisText: '30. Juni 2027', abweichend: true }
+  const standard = { bisTag: '2027-12-31', bisText: '31. Dezember 2027', abweichend: false, standardTag: '2027-12-31' }
+  const eigenes = { bisTag: '2027-06-30', bisText: '30. Juni 2027', abweichend: true, standardTag: '2027-12-31' }
 
   it('„Nr. 3 · bis 30.06.2027“ mit der Marke „abweichend“', () => {
     expect(gruendungshofZelle({ gruendungsplatz: 3, gruendung: eigenes })).toEqual({ text: 'Nr. 3 · bis 30.06.2027', marke: 'abweichend' })

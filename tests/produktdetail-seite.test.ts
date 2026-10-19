@@ -104,6 +104,9 @@ const HOF: PublicFarm = {
   acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,
   serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
   betriebsstatus: 'PRIMAERPRODUKTION',
+  gruendungshof: false,
+  gruendungSeit: null,
+  abzeichenBlatt: null,
   products: [
     produkt('p_1kg', { ...HEU, name: 'Bergwiesen-Heu 1 kg-Sackerl', price: 2.5, futter: futter(1) }),
     produkt('p_5kg', { ...HEU, name: 'Bergwiesen-Heu 5 kg-Sack', price: 8, stock: 3, futter: futter(5), description: 'Fein und staubarm.' }),

@@ -8,7 +8,17 @@ import { ohneTestzahlungenSql } from '@/lib/testzahlung'
 import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
 import { nummerAnzeige } from '@/lib/admin-hoefe'
-import { baueGruendungAnzeige, bestimmeGruendungBis, type GruendungAnzeige } from '@/lib/gruendungshof'
+import {
+  GRUENDUNG_EINSTELLUNG_STANDARD,
+  baueGruendungAnzeige,
+  bestimmeGruendungBis,
+  freischaltHinweis,
+  type FreischaltHinweis,
+  type GruendungAnzeige,
+  type GruendungEinstellung,
+} from '@/lib/gruendungshof'
+import { PLATTFORM_EINSTELLUNG_ID, PLATTFORM_EINSTELLUNG_SELECT, gruendungEinstellungAus, plattformEinstellungAus } from '@/lib/plattform-einstellung'
+import { IM_SHOP_WHERE } from '@/server/queries/einstellungen'
 
 /**
  * Die Monatsspalten je Hof (Sprint servicegebuehr, E-3) — das Fundament der
@@ -84,6 +94,24 @@ export type AdminFarmRow = {
   /** Wer zuletzt aus- oder wieder aufgenommen hat und wann (Nr. 109) — null, wenn nie. */
   gruendungGeaendertAm: Date | null
   gruendungGeaendertVonUserId: string | null
+  /** Der festgeschriebene Platz (Nr. 116) — nur im Admin, nie an eine öffentliche Seite. */
+  gruendungPlatz: number | null
+  /** Zusagen festgeschrieben (PlattformEinstellung.gruendungFestAm) — an jeder Zeile gleich, für die Platzvergabe. */
+  gruendungFest: boolean
+  /** Mindestens ein Produkt im Shop (`IM_SHOP_WHERE`) — Bedingung fürs Freischalten (Register K2, Nr. 116). */
+  produktImShop: boolean
+  /** Was der Freischalt-Dialog zur Gründung sagt (nur wartende Höfe), mit den Plätzen der Einstellung. */
+  freischaltHinweis: FreischaltHinweis | null
+}
+
+/**
+ * Die Einstellung der Gründungsplätze frisch aus der Zeile, nie aus dem Cache
+ * (Register K2, Änderung Nr. 116) — die Lader der Platzvergabe setzen daraus
+ * `gruendungFest` und `gruendungPlaetze` an jede Zeile. Ohne Zeile: die Standardwerte (nicht festgeschrieben).
+ */
+export async function leseGruendungEinstellung(db: Pick<Prisma.TransactionClient, 'plattformEinstellung'>): Promise<GruendungEinstellung> {
+  const zeile = await db.plattformEinstellung.findUnique({ where: { id: PLATTFORM_EINSTELLUNG_ID }, select: PLATTFORM_EINSTELLUNG_SELECT })
+  return zeile ? gruendungEinstellungAus(plattformEinstellungAus(zeile)) : GRUENDUNG_EINSTELLUNG_STANDARD
 }
 
 /** Ist der angemeldete Nutzer Plattformbetreiber? Frisch aus der DB, nie aus der Session. */
@@ -167,7 +195,7 @@ export async function getAdminFarms(
 ): Promise<AdminFarmRow[]> {
   const monat = monatsgrenzenWien(jetzt)
 
-  const [farms, spalten] = await Promise.all([
+  const [farms, spalten, einstellung] = await Promise.all([
     prisma.farm.findMany({
       select: {
         id: true,
@@ -198,15 +226,22 @@ export async function getAdminFarms(
         gruendungAusgenommen: true,
         gruendungGeaendertAm: true,
         gruendungGeaendertVonUserId: true,
+        // Nr. 116: der festgeschriebene Platz (nur Admin) und ob ein Produkt im Shop ist (Freischalten).
+        gruendungPlatz: true,
         owner: { select: { email: true, emailVerified: true, createdAt: true } },
         _count: { select: { products: true, farmPhotos: true, pickupSlots: true } },
+        products: { where: IM_SHOP_WHERE, select: { id: true }, take: 1 },
       },
       orderBy: { createdAt: 'desc' },
     }),
     monatsSpaltenJeHof(monat.von, monat.bis, stripeLiveAb),
+    leseGruendungEinstellung(prisma),
   ])
+  const fest = einstellung.festAm !== null
 
-  const rows = farms.map((f) => ({
+  // Die Platzvergabe liest Kennzeichen und Plätze an jeder Zeile (vergabeFest, plaetzeDerVergabe) — dieselbe Liste wie bisher.
+  const platzListe = farms.map((f) => ({ ...f, gruendungFest: fest, gruendungPlaetze: einstellung.plaetze }))
+  const rows = platzListe.map((f) => ({
     id: f.id,
     name: f.name,
     slug: f.slug,
@@ -243,10 +278,14 @@ export async function getAdminFarms(
     gruendungBis: f.gruendungBis,
     // Aus derselben Liste wie die Plätze (gruendungsplaetze filtert selbst) —
     // keine zweite Abfrage.
-    gruendung: baueGruendungAnzeige(f, farms),
+    gruendung: baueGruendungAnzeige(f, platzListe),
     gruendungAusgenommen: f.gruendungAusgenommen,
     gruendungGeaendertAm: f.gruendungGeaendertAm,
     gruendungGeaendertVonUserId: f.gruendungGeaendertVonUserId,
+    gruendungPlatz: f.gruendungPlatz,
+    gruendungFest: fest,
+    produktImShop: f.products.length > 0,
+    freischaltHinweis: f.approvedAt === null ? freischaltHinweis(f, platzListe, einstellung, jetzt) : null,
   }))
 
   // Wartende zuerst — das ist die einzige Liste, in der der Betreiber
@@ -264,10 +303,22 @@ const HOF_FUER_GRUENDUNG = {
   gruendungBis: true,
   // Register K2, Nr. 109: ein ausgenommener Hof belegt keinen Platz.
   gruendungAusgenommen: true,
+  // Nr. 116: der festgeschriebene Platz — verlässt den Server nie Richtung Browser.
+  gruendungPlatz: true,
 } satisfies Prisma.FarmSelect
 
-/** Ein Hof der Platzvergabe samt seinem Gründungs-Ende (HofFuerPlatz plus Inhaber und Spalte). */
-export type HofFuerGruendung = Prisma.FarmGetPayload<{ select: typeof HOF_FUER_GRUENDUNG }>
+/** Ein Hof der Platzvergabe samt seinem Gründungs-Ende (HofFuerPlatz plus Inhaber und Spalte) und der geltenden Vergabe. */
+export type HofFuerGruendung = Prisma.FarmGetPayload<{ select: typeof HOF_FUER_GRUENDUNG }> & { gruendungFest: boolean; gruendungPlaetze: number }
+
+/** Der Lader braucht Höfe und die Zeile der Einstellung — im Transaktions-Client wie außerhalb. */
+type PlatzDb = Pick<Prisma.TransactionClient, 'farm' | 'plattformEinstellung'>
+
+/**
+ * Welche Höfe die Platzvergabe sieht: freigeschaltet und nicht stillgelegt —
+ * und seit Nr. 116 jeder Hof mit festgeschriebenem Platz (auch stillgelegt
+ * oder zurückgenommen: er hält ihn). Vor dem Festschreiben hat keiner einen.
+ */
+const IN_DER_VERGABE = { OR: [{ approvedAt: { not: null }, archivedAt: null }, { gruendungPlatz: { not: null } }] } satisfies Prisma.FarmWhereInput
 
 /**
  * Die schmale Liste der Platzvergabe (Register K2, Nr. 62): alle
@@ -280,8 +331,27 @@ export type HofFuerGruendung = Prisma.FarmGetPayload<{ select: typeof HOF_FUER_G
  * Transaktion NACH der Sperre (GRUENDUNGSPLAETZE_SPERRE, Nr. 109) — sonst
  * rechneten sie mit einem Stand von vor dem anderen Weg.
  */
-export async function ladeHoefeFuerGruendung(db: Pick<Prisma.TransactionClient, 'farm'> = prisma): Promise<HofFuerGruendung[]> {
-  return db.farm.findMany({ where: { approvedAt: { not: null }, archivedAt: null }, select: HOF_FUER_GRUENDUNG })
+export async function ladeHoefeFuerGruendung(db: PlatzDb = prisma): Promise<HofFuerGruendung[]> {
+  // Nacheinander, nie Promise.all: In einer Transaktion läuft eine Abfrage zur Zeit (CODING_STANDARDS §4).
+  const einstellung = await leseGruendungEinstellung(db)
+  const fest = einstellung.festAm !== null
+  const hoefe = await db.farm.findMany({ where: IN_DER_VERGABE, select: HOF_FUER_GRUENDUNG })
+  // Kennzeichen und Plätze an jeder Zeile: So rechnen Tarif-Zeile, „Dein Stand“ und
+  // die Actions mit denselben Plätzen wie die Gründungs-Nachricht (auch vor dem Festschreiben).
+  return hoefe.map((h) => ({ ...h, gruendungFest: fest, gruendungPlaetze: einstellung.plaetze }))
+}
+
+/** Ein Hof für „Zusagen festschreiben“: die Felder der Platzvergabe und der Name für die Liste. */
+export type HofFuerFestschreiben = Prisma.FarmGetPayload<{ select: typeof HOF_FUER_GRUENDUNG & { name: true } }>
+
+/**
+ * Die Höfe für „Zusagen festschreiben“ (Register K2, Änderung Nr. 116): ALLE
+ * freigeschalteten — auch stillgelegte, sie bekommen ebenfalls einen Platz —
+ * mit Name. Dieselben Felder wie HOF_FUER_GRUENDUNG; `db` wie oben (die Action
+ * liest nach der Sperre in ihrer Transaktion).
+ */
+export async function ladeHoefeFuerFestschreiben(db: Pick<Prisma.TransactionClient, 'farm'> = prisma): Promise<HofFuerFestschreiben[]> {
+  return db.farm.findMany({ where: { approvedAt: { not: null } }, select: { ...HOF_FUER_GRUENDUNG, name: true } })
 }
 
 /**

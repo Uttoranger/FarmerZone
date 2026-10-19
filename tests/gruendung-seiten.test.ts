@@ -13,6 +13,7 @@ import { describe, it, expect } from 'vitest'
 import {
   GRUENDUNG_BIS_STANDARD,
   GRUENDUNG_TEXT,
+  KEINE_GRUENDUNG_SEITEN,
   bekaemePlatzBeiFreigabe,
   bildeGruendungBis,
   fuerSeiten,
@@ -23,6 +24,7 @@ import {
   vergebeneGruendungsplaetze,
   voraussichtlicherPlatz,
   type GruendungEinstellung,
+  type GruendungSeiten,
   type HofFuerPlatz,
 } from '@/lib/gruendungshof'
 
@@ -40,12 +42,12 @@ function hoefe(n: number): HofFuerPlatz[] {
 }
 
 function einstellung(abweichend: Partial<GruendungEinstellung> = {}): GruendungEinstellung {
-  return { plaetze: 12, bis: bildeGruendungBis('2027-12-31'), anzeige: true, ...abweichend }
+  return { plaetze: 12, bis: bildeGruendungBis('2027-12-31'), anzeige: true, monate: 24, aktionBisTag: null, festAm: null, ...abweichend }
 }
 
 describe('fuerSeiten — frei und die Bedingung fürs Zeigen', () => {
   it('7 von 12 vergeben: 5 frei, wird gezeigt, mit dem Ende als Wiener Tag', () => {
-    expect(fuerSeiten(einstellung(), hoefe(7), JETZT)).toEqual({ zeigen: true, frei: 5, gesamt: 12, bisTag: '2027-12-31' })
+    expect(fuerSeiten(einstellung(), hoefe(7), JETZT)).toMatchObject({ zeigen: true, frei: 5, gesamt: 12, bisTag: '2027-12-31', art: 'bisher', zaehler: true })
   })
 
   it('wartende und stillgelegte Höfe belegen keinen Platz', () => {
@@ -138,30 +140,38 @@ describe('bestehende Aufrufer ohne Parameter rechnen wie vor Nr. 93 mit 12', () 
   })
 })
 
-describe('GRUENDUNG_TEXT — der Wortlaut der Entscheidung (K2-Ergänzung)', () => {
+describe('GRUENDUNG_TEXT — der Wortlaut der Entscheidung (K2-Ergänzung), vor dem Festschreiben unverändert', () => {
   // formatDatumLang setzt ein geschütztes Leerzeichen nach dem Tag.
-  const lang = (text: string): string => text.replace(/ /g, ' ')
+  const lang = (text: string): string => text.replace(/\u00a0/g, ' ')
   const satz = (t: { vor: string; betont: string; nach: string }): string => lang(`${t.vor}${t.betont}${t.nach}`)
+  const bisher = (frei: number, gesamt: number, bisTag = '2027-12-31'): GruendungSeiten => ({
+    ...KEINE_GRUENDUNG_SEITEN,
+    zeigen: true,
+    zaehler: true,
+    frei,
+    gesamt,
+    bisTag,
+  })
 
   it('(1) Startseite, (2) Pill und Preiszeile, (3) Registrieren — mit den Zahlen aus der Einstellung', () => {
-    expect(satz(GRUENDUNG_TEXT.satz(5, 12, '2027-12-31'))).toBe('Noch 5 von 12 Gründungsplätzen frei – Hofladen kostenlos bis 31. Dezember 2027.')
-    expect(GRUENDUNG_TEXT.pill(5, 12)).toBe('Gründungsphase · noch 5 von 12 Plätzen')
-    expect(lang(GRUENDUNG_TEXT.fussnote('2027-12-31').join(' · '))).toBe(
+    expect(satz(GRUENDUNG_TEXT.satz(bisher(5, 12)))).toBe('Noch 5 von 12 Gründungsplätzen frei – Hofladen kostenlos bis 31. Dezember 2027.')
+    expect(GRUENDUNG_TEXT.pill(bisher(5, 12))).toBe('Gründungsphase · noch 5 von 12 Plätzen')
+    expect(lang(GRUENDUNG_TEXT.fussnote(bisher(5, 12)).join(' · '))).toBe(
       // Korrektur 15.10.2026 (Register K2): „keine Bankdaten nötig“ gestrichen – Stripe verlangt beim Einrichten ein Auszahlungskonto.
       'Kostenlos bis 31. Dezember 2027 · danach Tarif nach Wahl · monatlich kündbar'
     )
-    expect(satz(GRUENDUNG_TEXT.registrieren(8, '2027-12-31'))).toBe(
+    expect(satz(GRUENDUNG_TEXT.registrieren(bisher(5, 12), 8))).toBe(
       'Du wärst voraussichtlich Gründungshof Nr. 8 – Hofladen kostenlos bis 31. Dezember 2027. Die Zusage kommt mit der Freischaltung.'
     )
-    expect(GRUENDUNG_TEXT.hofladenPreis('2027-12-31')).toBe('bis 31.12.2027 · dann € 19')
+    expect(GRUENDUNG_TEXT.hofladenPreis(bisher(5, 12))).toBe('bis 31.12.2027 · dann € 19')
   })
 
   it('der letzte Platz heißt „Letzter Gründungsplatz frei" (Mockup, Zustände)', () => {
-    expect(GRUENDUNG_TEXT.satz(1, 12, '2027-12-31').betont).toBe('Letzter Gründungsplatz frei')
+    expect(GRUENDUNG_TEXT.satz(bisher(1, 12)).betont).toBe('Letzter Gründungsplatz frei')
   })
 
   it('ein anderes Ende aus der Einstellung steht überall', () => {
-    expect(satz(GRUENDUNG_TEXT.preiszeile(3, 20, '2028-06-30'))).toBe(
+    expect(satz(GRUENDUNG_TEXT.preiszeile(bisher(3, 20, '2028-06-30')))).toBe(
       'Gründungshöfe zahlen bis 30. Juni 2028 keine Grundgebühr – auch im Hofladen. Noch 3 von 20 Plätzen, Zusage mit der Freischaltung.'
     )
   })
