@@ -327,8 +327,12 @@ export function anmeldeFehlerText(fehler: AnmeldeFehler, schritt: 'senden' | 'pr
     return 'Das waren gerade zu viele Versuche. Warte eine Minute und probier es dann noch einmal.'
   }
   switch (fehler.code) {
+    // Seit Nr. 112 kommt bei der Anmeldung jeder gescheiterte Code so an —
+    // auch ein abgelaufener oder zu oft probierter (src/lib/auth.ts,
+    // alsFalscherCode). Die zwei Fälle darunter bleiben für den Fall, dass
+    // Better Auth sie doch durchreicht.
     case 'INVALID_OTP':
-      return 'Der Code stimmt nicht. Schau noch einmal in die E-Mail oder lass dir einen neuen schicken.'
+      return 'Der Code stimmt nicht oder ist abgelaufen. Schau noch einmal in die E-Mail oder lass dir einen neuen schicken.'
     case 'OTP_EXPIRED':
       return 'Der Code ist abgelaufen – er gilt 10 Minuten. Lass dir einen neuen schicken.'
     case 'TOO_MANY_ATTEMPTS':

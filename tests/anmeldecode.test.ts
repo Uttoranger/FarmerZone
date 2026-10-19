@@ -182,9 +182,10 @@ describe('normalisiereCode und codeVollstaendig', () => {
 describe('anmeldeFehlerText', () => {
   const TECHNIK = /otp|token|error|fehler \d|status|http|api/i
 
-  it('falscher Code: stimmt nicht, mit Ausweg', () => {
+  it('falscher Code: stimmt nicht oder abgelaufen, mit Ausweg — die Anmeldung meldet jeden gescheiterten Code so (Nr. 112)', () => {
     const text = anmeldeFehlerText({ code: 'INVALID_OTP', status: 400 }, 'pruefen')
     expect(text).toContain('stimmt nicht')
+    expect(text).toContain('abgelaufen')
     expect(text).toMatch(/neuen/)
   })
 

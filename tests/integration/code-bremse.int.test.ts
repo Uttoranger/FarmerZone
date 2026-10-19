@@ -10,6 +10,10 @@
  *    „Zu viele falsche Codes", erst nach der Antwort, ohne Code.
  *  - Eine Adresse, die es nicht gibt, und eine Hof-Adresse antworten genauso
  *    (Antwort, Status, Zählung) — nur ohne Mail bzw. mit Mail an den Hof.
+ *  - Hof, Kundin und unbekannte Adresse fordern je einen Code an: Über HTTP
+ *    ist die Antwortfolge gleich (Status, Körper), auch für einen zu oft
+ *    probierten und einen abgelaufenen Code — sonst verriete der 6. Versuch,
+ *    welche Adresse ein Hof ist (ein Hof bekommt nie einen Code).
  *  - Anmeldung und „Bestellungen finden" zählen zusammen.
  *  - 30 falsche Codes am Tag pausieren bis zum Ende des Tagesfensters.
  *  - Passwort: 10 falsch → 429 mit Satz; „Passwort vergessen" geht weiter, ein
@@ -104,15 +108,34 @@ async function mitPasswort(email: string, password: string): Promise<Ergebnis> {
   }
 }
 
-async function fordereCodeAn(email: string): Promise<string> {
+/** Fordert einen Code an; `null`, wenn keiner hinausging (ein Hof bekommt nie einen). */
+async function fordereAn(email: string): Promise<string | null> {
   // Die Uhr steht: Ohne Schritt trügen alter und neuer Code dieselbe
   // Anlagezeit, und Better Auth fände beim Prüfen womöglich den alten.
   vi.setSystemTime(new Date(Date.now() + 1_000))
   await auth.api.sendVerificationOTP({ body: { email, type: 'sign-in' } })
   await arbeiteNachlaufAb()
-  const gesendet = post.codes.findLast((c) => c.email === email)
-  if (!gesendet) throw new Error('Kein Code verschickt')
-  return gesendet.code
+  return post.codes.findLast((c) => c.email === email)?.code ?? null
+}
+
+async function fordereCodeAn(email: string): Promise<string> {
+  const code = await fordereAn(email)
+  if (!code) throw new Error('Kein Code verschickt')
+  return code
+}
+
+type HttpAntwort = { status: number; statusText: string; art: string | null; text: string }
+
+/** Wie das Formular: über HTTP, also so, wie es von außen aussieht. */
+async function mitCodeUeberHttp(email: string, otp: string): Promise<HttpAntwort> {
+  const antwort = await auth.handler(
+    new Request('http://localhost:3000/api/auth/sign-in/email-otp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'http://localhost:3000' },
+      body: JSON.stringify({ email, otp }),
+    })
+  )
+  return { status: antwort.status, statusText: antwort.statusText, art: antwort.headers.get('content-type'), text: await antwort.text() }
 }
 
 const falscherCode = (richtig: string): string => (richtig === '000000' ? '111111' : '000000')
@@ -177,7 +200,7 @@ describe('falsche Codes je Adresse — über alle Codes', () => {
     expect(await mitCode(email, neu)).toEqual({ ok: true })
   })
 
-  it('eine Adresse, die es nicht gibt, und eine Hof-Adresse antworten genauso wie eine Kundin', async () => {
+  it('ohne angeforderten Code: eine Adresse, die es nicht gibt, und eine Hof-Adresse antworten und zählen gleich', async () => {
     const unbekannt = neueAdresse('niemand')
     const hof = neueAdresse('hof')
     await prisma.user.create({ data: { id: intKennung('nutzer-farmer'), email: hof, name: 'Max Mustermann', role: 'FARMER', emailVerified: true } })
@@ -197,6 +220,35 @@ describe('falsche Codes je Adresse — über alle Codes', () => {
     // Mail nur an das Konto, das es gibt — nie an eine unbekannte Adresse.
     await arbeiteNachlaufAb()
     expect(post.warnungen.map((w) => w.email)).toEqual([hof])
+  })
+
+  it('mit angefordertem Code: Hof, Kundin und unbekannte Adresse — über HTTP dieselbe Antwortfolge, auch zu oft probiert und abgelaufen', async () => {
+    const adressenJeRolle = { kundin: neueAdresse('kundin'), hof: neueAdresse('hof'), unbekannt: neueAdresse('niemand') }
+    await prisma.user.create({ data: { id: intKennung('nutzer'), email: adressenJeRolle.kundin, name: 'Max Mustermann', role: 'CUSTOMER', emailVerified: true } })
+    await prisma.user.create({ data: { id: intKennung('nutzer-farmer'), email: adressenJeRolle.hof, name: 'Max Mustermann', role: 'FARMER', emailVerified: true } })
+
+    const folgen: Record<string, HttpAntwort[]> = {}
+    for (const [rolle, email] of Object.entries(adressenJeRolle)) {
+      vi.setSystemTime(FEST)
+      const folge: HttpAntwort[] = []
+      // 7 falsche auf denselben Code — das Plugin gibt einen Code nach 5 auf.
+      const erster = await fordereAn(email)
+      for (let i = 0; i < 7; i++) folge.push(await mitCodeUeberHttp(email, falscherCode(erster ?? '')))
+      // Ein neuer Code, der abläuft (er gilt 10 Minuten).
+      const zweiter = await fordereAn(email)
+      vi.setSystemTime(new Date(Date.now() + 11 * 60_000))
+      folge.push(await mitCodeUeberHttp(email, falscherCode(zweiter ?? '')))
+      // Bis in die Pause: 10 gezählt, der 11. pausiert.
+      for (let i = 0; i < 3; i++) folge.push(await mitCodeUeberHttp(email, '000000'))
+      folgen[rolle] = folge
+    }
+
+    expect(folgen.hof).toEqual(folgen.kundin)
+    expect(folgen.unbekannt).toEqual(folgen.kundin)
+    expect(folgen.kundin.slice(0, 10).every((a) => a.status === 400 && JSON.parse(a.text).code === 'INVALID_OTP')).toBe(true)
+    expect(folgen.kundin[10]).toMatchObject({ status: 429 })
+    expect(JSON.parse(folgen.kundin[10].text)).toMatchObject({ code: ZU_VIELE_FALSCHE_CODES, pauseBis: BIS })
+    for (const email of Object.values(adressenJeRolle)) expect(await stand(DB_BREMSEN.codeFehlerStunde.zweck, email)).toBe(10)
   })
 
   it('Anmeldung und „Bestellungen finden" zählen zusammen: 5 + 5 pausieren beide', async () => {

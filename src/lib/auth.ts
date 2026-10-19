@@ -7,7 +7,6 @@ import { prisma } from '@/lib/prisma'
 import { APP_URL, UMGEBUNG } from '@/lib/umgebung-server'
 import {
   ANMELDECODE_PLUGIN_OPTIONEN,
-  CODE_ANMELDUNG_PFAD,
   GESPERRTE_AUTH_PFADE,
   codeVersandErlaubt,
   istFehlversuch,
@@ -123,6 +122,25 @@ function meldeBestaetigungsFehler(grund: 'resend_fehler' | 'nachlauf_fehler', er
  */
 function falscherCodeFehler(): APIError {
   return APIError.from('BAD_REQUEST', { code: 'INVALID_OTP', message: 'Invalid OTP' })
+}
+
+/**
+ * Ein abgelaufener oder zu oft probierter Code antwortet wie ein falscher (E7,
+ * Ergänzung; Nr. 112): Ein Hof bekommt nie einen Code — „OTP expired" oder
+ * „Too many attempts" (403) verrieten sonst, dass für die Adresse einer lag,
+ * also dass sie keinem Hof gehört. Über HTTP als fertige Antwort in der Form
+ * von Better Auths Fehlerantwort: Einen in hooks.after geworfenen Fehler
+ * nähme Better Auth nur als Körper, den Status behielte es vom Plugin
+ * (dispatchAuthEndpoint → toResponse). Ohne Request (auth.api) geworfen.
+ */
+function alsFalscherCode(request: Request | undefined): Response {
+  const fehler = falscherCodeFehler()
+  if (!request) throw fehler
+  return new Response(JSON.stringify(fehler.body), {
+    status: fehler.statusCode,
+    statusText: fehler.status.toString(),
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
 
 /**
@@ -375,12 +393,13 @@ export const auth = betterAuth({
       switch (ctx.path) {
         case '/sign-in/email-otp':
         case '/sign-in/email': {
-          const art: FehlversuchArt = ctx.path === CODE_ANMELDUNG_PFAD ? 'code' : 'passwort'
+          const art: FehlversuchArt = ctx.path === '/sign-in/email-otp' ? 'code' : 'passwort'
           const body = ctx.body as { email?: unknown } | undefined
           const antwort = ctx.context.returned
-          if (typeof body?.email === 'string' && isAPIError(antwort) && istFehlversuch(art, antwort.body?.code)) {
-            await zaehleFehlversuch(art, body.email)
-          }
+          if (typeof body?.email !== 'string' || !isAPIError(antwort) || !istFehlversuch(art, antwort.body?.code)) return
+          await zaehleFehlversuch(art, body.email)
+          // Von außen jeder gescheiterte Code wie ein falscher — wie beim Hof.
+          if (art === 'code' && antwort.body?.code !== 'INVALID_OTP') return alsFalscherCode(ctx.request)
           return
         }
         case '/reset-password': {
