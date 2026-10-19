@@ -132,11 +132,24 @@ export type HofFuerPlatz = {
    * Reihenfolge wie vor Nr. 116.
    */
   gruendungFest?: boolean
+  /**
+   * Die Plätze der Einstellung (PlattformEinstellung.gruendungPlaetze) — von
+   * den Ladern an jede Zeile gesetzt wie `gruendungFest`. Vor dem Festschreiben
+   * lassen sich die Plätze schon erhöhen; ohne diese Zahl rechneten Tarif-Zeile,
+   * „Dein Stand“ und Admin › Höfe weiter mit 12, die Gründungs-Nachricht aber
+   * mit der Einstellung. Fehlt sie: der Standard.
+   */
+  gruendungPlaetze?: number
 }
 
 /** Gilt die festgeschriebene Vergabe? Die Lader setzen das Kennzeichen an allen Zeilen gleich. */
 export function vergabeFest(hoefe: readonly HofFuerPlatz[]): boolean {
   return hoefe.some((h) => h.gruendungFest === true)
+}
+
+/** Die Plätze der Einstellung, wie die Lader sie an die Zeilen schreiben — ohne: der Standard (MAX_GRUENDUNGSHOEFE). */
+export function plaetzeDerVergabe(hoefe: readonly HofFuerPlatz[]): number {
+  return hoefe.find((h) => h.gruendungPlaetze !== undefined)?.gruendungPlaetze ?? MAX_GRUENDUNGSHOEFE
 }
 
 /** Die Reihenfolge der Freischaltung: `approvedAt`, dann `createdAt`, dann `id` (siehe gruendungsplaetze). */
@@ -185,15 +198,15 @@ export function gruendungsplatzVon(hofId: string, hoefe: readonly HofFuerPlatz[]
   return gruendungsplaetze(hoefe).get(hofId) ?? null
 }
 
-/** true, wenn der Hof einen der Gründungsplätze belegt (Platz <= `plaetze`, Standard 12). */
-export function istGruendungshof(hofId: string, hoefe: readonly HofFuerPlatz[], plaetze: number = MAX_GRUENDUNGSHOEFE): boolean {
+/** true, wenn der Hof einen der Gründungsplätze belegt (Platz <= `plaetze`, Standard: die Plätze an den Zeilen). */
+export function istGruendungshof(hofId: string, hoefe: readonly HofFuerPlatz[], plaetze: number = plaetzeDerVergabe(hoefe)): boolean {
   const platz = gruendungsplatzVon(hofId, hoefe)
   // Festgeschrieben IST der Platz die Zusage — nie gegen eine Zahl geprüft (die Plätze wachsen nur).
   return platz !== null && (vergabeFest(hoefe) || platz <= plaetze)
 }
 
-/** Wie viele der Plätze vergeben sind — höchstens `plaetze` (Standard MAX_GRUENDUNGSHOEFE); festgeschrieben alle gespeicherten. */
-export function vergebeneGruendungsplaetze(hoefe: readonly HofFuerPlatz[], plaetze: number = MAX_GRUENDUNGSHOEFE): number {
+/** Wie viele der Plätze vergeben sind — höchstens `plaetze` (Standard: die Plätze an den Zeilen); festgeschrieben alle gespeicherten. */
+export function vergebeneGruendungsplaetze(hoefe: readonly HofFuerPlatz[], plaetze: number = plaetzeDerVergabe(hoefe)): number {
   const vergeben = gruendungsplaetze(hoefe).size
   return vergabeFest(hoefe) ? vergeben : Math.min(vergeben, plaetze)
 }
@@ -203,7 +216,7 @@ export function vergebeneGruendungsplaetze(hoefe: readonly HofFuerPlatz[], plaet
  * Für den Bestätigungsdialog. Die Plätze sind eine KONDITIONS-Grenze, keine
  * Zugangsgrenze — Freischalten bleibt in jedem Fall möglich.
  */
-export function bekaemePlatzBeiFreigabe(hoefe: readonly HofFuerPlatz[], plaetze: number = MAX_GRUENDUNGSHOEFE): boolean {
+export function bekaemePlatzBeiFreigabe(hoefe: readonly HofFuerPlatz[], plaetze: number = plaetzeDerVergabe(hoefe)): boolean {
   return vergebeneGruendungsplaetze(hoefe, plaetze) < plaetze
 }
 
@@ -213,8 +226,8 @@ export function bekaemePlatzBeiFreigabe(hoefe: readonly HofFuerPlatz[], plaetze:
 export type HofMitGruendungBis = { id: string; gruendungBis: Date | null }
 
 /**
- * Das wirksame Gründungs-Enddatum eines Hofs: mit Gründungsplatz (Platz ≤ 12)
- * sein eigenes Datum oder der Standard, ohne Platz null — dann gilt die
+ * Das wirksame Gründungs-Enddatum eines Hofs: mit Gründungsplatz (Platz ≤ den
+ * Plätzen an den Zeilen, `plaetzeDerVergabe`) sein eigenes Datum oder der Standard, ohne Platz null — dann gilt die
  * normale Regel. `hoefe` ist die Liste der Platzvergabe; steht der Hof nicht
  * darin, hat er keinen Platz.
  */
@@ -681,7 +694,7 @@ export const GRUENDUNG_TEXT = {
   registrieren: (g: GruendungSeiten, platz: number): GruendungSatzTeile => ({
     vor: 'Du wärst voraussichtlich ',
     // „Nr." und Zahl bleiben in einer Zeile (geschütztes Leerzeichen) — am Handy stand die Zahl sonst allein.
-    betont: gruendungshofLabel(platz).replace('Nr. ', 'Nr. '),
+    betont: gruendungshofLabel(platz).replace('Nr. ', 'Nr.\u00a0'),
     nach:
       g.art === 'bisher'
         ? ` – ${HOFLADEN.name} ${KOSTENLOS} bis ${gruendungTagLang(g.bisTag)}. Die Zusage kommt mit der Freischaltung.`
@@ -753,7 +766,7 @@ export const ABZEICHEN_TEXT = {
   mehrHref: '/fuer-hoefe',
   /** Konditionen und Tarif, Block „Dein Stand“. */
   schalter: 'Abzeichen zeigen',
-  schalterZeile: 'Über deinem Namen auf der Hofseite, in der Höfe-Liste und auf geteilten Bildern.',
+  schalterZeile: 'Über deinem Namen auf der Hofseite und in der Höfe-Liste.',
   schalterSatz: 'Deine Konditionen bleiben gleich, auch wenn du es ausblendest. Du kannst es jederzeit wieder einschalten.',
   fehler: 'Wir konnten das Abzeichen gerade nicht umstellen. Lade die Seite neu und versuch es noch einmal.',
 } as const

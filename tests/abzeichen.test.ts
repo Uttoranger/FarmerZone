@@ -26,6 +26,7 @@ import { prisma } from '@/lib/prisma'
 import { getPublicFarm } from '@/server/queries/farm'
 import { HofKarte, type KartenHof } from '@/components/hoefe/entdecken-teile'
 import { Abzeichen, AbzeichenKnopf } from '@/components/ui/abzeichen'
+import { ABZEICHEN_TEXT } from '@/lib/gruendungshof'
 
 const ZEILE = {
   id: 'hof_1',
@@ -141,5 +142,15 @@ describe('Abzeichen in der Höfe-Liste und auf der Hofseite', () => {
     // 26 px sichtbar + 2 × 9 px unsichtbarer Rand = 44 px Tippfläche.
     expect(html).toContain('before:-inset-y-[9px]')
     expect(html).not.toMatch(/Nr\.\s?\d/)
+  })
+})
+
+describe('Schalter „Abzeichen zeigen“ — der Satz nennt nur Orte, an denen das Etikett wirklich steht', () => {
+  it('„geteilte Bilder“ nur, wenn das Teilen-Bild das Etikett zeichnet (Register K2)', () => {
+    const teilenBild = ['src/app/(public)/[farmSlug]/opengraph-image/route.tsx', 'src/components/teilen/teilen-bild-grafik.tsx', 'src/lib/teilen-bild.ts', 'src/server/queries/teilen-bild.ts']
+      .map((datei) => readFileSync(join(process.cwd(), datei), 'utf8'))
+      .join('\n')
+    const zeichnetEtikett = /gruendungshof|Abzeichen/.test(teilenBild)
+    expect(/geteilt|Teilen/i.test(ABZEICHEN_TEXT.schalterZeile)).toBe(zeichnetEtikett)
   })
 })

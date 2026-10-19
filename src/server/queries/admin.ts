@@ -107,7 +107,7 @@ export type AdminFarmRow = {
 /**
  * Die Einstellung der Gründungsplätze frisch aus der Zeile, nie aus dem Cache
  * (Register K2, Änderung Nr. 116) — die Lader der Platzvergabe setzen daraus
- * `gruendungFest` an jede Zeile. Ohne Zeile: die Standardwerte (nicht festgeschrieben).
+ * `gruendungFest` und `gruendungPlaetze` an jede Zeile. Ohne Zeile: die Standardwerte (nicht festgeschrieben).
  */
 export async function leseGruendungEinstellung(db: Pick<Prisma.TransactionClient, 'plattformEinstellung'>): Promise<GruendungEinstellung> {
   const zeile = await db.plattformEinstellung.findUnique({ where: { id: PLATTFORM_EINSTELLUNG_ID }, select: PLATTFORM_EINSTELLUNG_SELECT })
@@ -239,8 +239,8 @@ export async function getAdminFarms(
   ])
   const fest = einstellung.festAm !== null
 
-  // Die Platzvergabe liest das Kennzeichen an jeder Zeile (vergabeFest) — dieselbe Liste wie bisher.
-  const platzListe = farms.map((f) => ({ ...f, gruendungFest: fest }))
+  // Die Platzvergabe liest Kennzeichen und Plätze an jeder Zeile (vergabeFest, plaetzeDerVergabe) — dieselbe Liste wie bisher.
+  const platzListe = farms.map((f) => ({ ...f, gruendungFest: fest, gruendungPlaetze: einstellung.plaetze }))
   const rows = platzListe.map((f) => ({
     id: f.id,
     name: f.name,
@@ -308,7 +308,7 @@ const HOF_FUER_GRUENDUNG = {
 } satisfies Prisma.FarmSelect
 
 /** Ein Hof der Platzvergabe samt seinem Gründungs-Ende (HofFuerPlatz plus Inhaber und Spalte) und der geltenden Vergabe. */
-export type HofFuerGruendung = Prisma.FarmGetPayload<{ select: typeof HOF_FUER_GRUENDUNG }> & { gruendungFest: boolean }
+export type HofFuerGruendung = Prisma.FarmGetPayload<{ select: typeof HOF_FUER_GRUENDUNG }> & { gruendungFest: boolean; gruendungPlaetze: number }
 
 /** Der Lader braucht Höfe und die Zeile der Einstellung — im Transaktions-Client wie außerhalb. */
 type PlatzDb = Pick<Prisma.TransactionClient, 'farm' | 'plattformEinstellung'>
@@ -333,9 +333,12 @@ const IN_DER_VERGABE = { OR: [{ approvedAt: { not: null }, archivedAt: null }, {
  */
 export async function ladeHoefeFuerGruendung(db: PlatzDb = prisma): Promise<HofFuerGruendung[]> {
   // Nacheinander, nie Promise.all: In einer Transaktion läuft eine Abfrage zur Zeit (CODING_STANDARDS §4).
-  const fest = (await leseGruendungEinstellung(db)).festAm !== null
+  const einstellung = await leseGruendungEinstellung(db)
+  const fest = einstellung.festAm !== null
   const hoefe = await db.farm.findMany({ where: IN_DER_VERGABE, select: HOF_FUER_GRUENDUNG })
-  return hoefe.map((h) => ({ ...h, gruendungFest: fest }))
+  // Kennzeichen und Plätze an jeder Zeile: So rechnen Tarif-Zeile, „Dein Stand“ und
+  // die Actions mit denselben Plätzen wie die Gründungs-Nachricht (auch vor dem Festschreiben).
+  return hoefe.map((h) => ({ ...h, gruendungFest: fest, gruendungPlaetze: einstellung.plaetze }))
 }
 
 /** Ein Hof für „Zusagen festschreiben“: die Felder der Platzvergabe und der Name für die Liste. */

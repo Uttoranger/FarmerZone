@@ -11,6 +11,8 @@ import {
   GRUENDUNG_TEXT,
   abzeichenBlattAus,
   aktionLaeuft,
+  baueGruendungAnzeige,
+  bestimmeGruendungBis,
   bildeGruendungBis,
   festschreibenBrauchtPlaetze,
   festschreibenListe,
@@ -18,6 +20,7 @@ import {
   freieNummer,
   freischaltHinweis,
   gruendungsplaetze,
+  gruendungsZusageBeiFreigabe,
   istGruendungshof,
   kleinsteFreieNummer,
   seitenZahlen,
@@ -212,6 +215,34 @@ describe('festschreibenListe — einmal, nie kürzer, auch stillgelegte, ausgeno
     // Heute (Reihenfolge ohne den stillgelegten) halten a und b je einen der 2 Plätze — b verlöre ihn.
     expect(festschreibenBrauchtPlaetze(hoefe, { ...vorher, plaetze: 2 })).toBe(3)
     expect(festschreibenBrauchtPlaetze(hoefe, { ...vorher, plaetze: 3 })).toBeNull()
+  })
+})
+
+describe('vor dem Festschreiben: jede Stelle rechnet mit den Plätzen der Einstellung', () => {
+  // So liefern die Lader die Zeilen: die Plätze der Einstellung an jeder Zeile, wie `gruendungFest`.
+  const vorher: GruendungEinstellung = { ...AKTION, festAm: null }
+  const hoefe = Array.from({ length: 13 }, (_, i) => ({
+    ...fest(`h${i + 1}`, null, { gruendungFest: false, gruendungBis: null, gruendungPlaetze: vorher.plaetze }),
+    approvedAt: new Date(Date.UTC(2026, 0, 1 + i)),
+  }))
+
+  it('100 Plätze gespeichert: Hof Nr. 13 bekommt Nachricht, Konditionen und Admin-Anzeige mit demselben Ende', () => {
+    const nr13 = hoefe[12]!
+    expect(gruendungsZusageBeiFreigabe(nr13, hoefe, vorher)).toEqual({ platz: 13, bis: vorher.bis })
+    expect(istGruendungshof(nr13.id, hoefe)).toBe(true)
+    expect(bestimmeGruendungBis(nr13, hoefe)).toEqual(vorher.bis)
+    expect(baueGruendungAnzeige(nr13, hoefe)).toMatchObject({ bisTag: '2027-12-31' })
+    expect(vergebeneGruendungsplaetze(hoefe)).toBe(13)
+  })
+
+  it('Gegenprobe: Zeilen ohne die Plätze der Einstellung rechnen wie vor Nr. 116 mit 12', () => {
+    const ohne = hoefe.map((h) => {
+      const kopie: HofFuerFolgen = { ...h }
+      delete kopie.gruendungPlaetze
+      return kopie
+    })
+    expect(bestimmeGruendungBis(ohne[12]!, ohne)).toBeNull()
+    expect(vergebeneGruendungsplaetze(ohne)).toBe(12)
   })
 })
 

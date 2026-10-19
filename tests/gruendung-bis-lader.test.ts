@@ -56,6 +56,21 @@ describe('ladeGruendungBis', () => {
     expect(await ladeGruendungBis({ ownerId: 'nutzer_wartet' })).toBeNull()
   })
 
+  it('vor dem Festschreiben mit mehr als 12 Plätzen (Nr. 116): Platz 13 hat das Standard-Ende, wie in der Gründungs-Nachricht', async () => {
+    db.plattformEinstellung.findUnique.mockResolvedValueOnce({
+      gruendungPlaetze: 100,
+      gruendungBisStandard: GRUENDUNG_BIS_STANDARD,
+      gruendungAnzeige: true,
+      gruendungMonate: 24,
+      gruendungAktionBis: null,
+      gruendungFestAm: null,
+      geaendertVonUserId: null,
+      updatedAt: new Date('2026-10-19T08:00:00.000Z'),
+    } as never)
+    db.farm.findMany.mockResolvedValue(hoefe(13))
+    expect(await ladeGruendungBis({ id: 'hof_13' })).toEqual(GRUENDUNG_BIS_STANDARD)
+  })
+
   it('eine schmale Abfrage: nur freigeschaltete, nicht stillgelegte Höfe, ohne Namen und E-Mail', async () => {
     db.farm.findMany.mockResolvedValue([])
     await ladeGruendungBis({ id: 'hof_1' })
