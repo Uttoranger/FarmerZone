@@ -53,7 +53,7 @@ import { legeBestellCodeAn, pruefeBestellCode } from '@/server/bestellungen-find
 import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 import { DB_BREMSEN } from '@/lib/bremse-datenbank'
 import { leseBestellZugang } from '@/lib/bestellungen-zugang'
-import { anmeldeFehlerText, zuVieleCodesText } from '@/lib/anmeldecode'
+import { anmeldeFehlerText, codesPausiertText } from '@/lib/anmeldecode'
 
 type Aktionen = typeof import('@/server/actions/bestellungen-finden')
 
@@ -278,16 +278,17 @@ describe('zeigeBestellungen', () => {
     expect(kontext.gesetzt).toEqual([])
   })
 
-  it('Adresse pausiert (falsche Codes je Adresse, E7): derselbe Satz mit Uhrzeit wie bei der Anmeldung; ohne Ende ohne Uhrzeit', async () => {
+  it('Adresse pausiert (falsche Codes je Adresse, E7): Satz mit Uhrzeit, aber ohne Mail-Zusage (meist Gäste ohne Konto); ohne Ende ohne Uhrzeit', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     try {
       vi.setSystemTime(new Date('2026-10-19T12:20:00Z')) // 14:20 in Wien
       vi.mocked(pruefeBestellCode).mockResolvedValueOnce({ ok: false, fehler: 'ZU_VIELE', bis: new Date('2026-10-19T13:00:00Z') })
       const { zeigeBestellungen } = await ladeAktionen()
-      expect(await zeigeBestellungen({ email: 'kundin@example.com', code: '000000' })).toEqual({
-        error: zuVieleCodesText('15:00'),
-        code: 'ZU_VIELE',
-      })
+      const pause = await zeigeBestellungen({ email: 'kundin@example.com', code: '000000' })
+      expect(pause).toEqual({ error: codesPausiertText('15:00'), code: 'ZU_VIELE' })
+      // Gegenprobe: Eine Mail geht nur an ein Konto — der Satz verspricht deshalb keine.
+      expect('error' in pause && pause.error).not.toMatch(/E-Mail/)
+      expect('error' in pause && pause.error).toMatch(/15:00/)
       // fail-closed: Die Bremse antwortete nicht, das Ende ist unbekannt — der Satz ohne Uhrzeit, wie bei der Anmeldung.
       vi.mocked(pruefeBestellCode).mockResolvedValueOnce({ ok: false, fehler: 'ZU_VIELE', bis: null })
       expect(await zeigeBestellungen({ email: 'kundin@example.com', code: '000000' })).toEqual({

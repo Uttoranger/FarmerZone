@@ -22,7 +22,7 @@
  * Cookie mit der bewiesenen Adresse — kein Konto, keine Better-Auth-Sitzung.
  */
 import type { OrderStatus, PaymentMethod, PaymentStatus } from '@prisma/client'
-import { ANMELDECODE_GUELTIG_SEKUNDEN, ANMELDECODE_MAX_VERSUCHE, pauseBisText, zuVieleCodesText } from '@/lib/anmeldecode'
+import { ANMELDECODE_GUELTIG_SEKUNDEN, ANMELDECODE_MAX_VERSUCHE, codesPausiertText, pauseBisText } from '@/lib/anmeldecode'
 import { abholZeitText } from '@/lib/bestaetigung'
 import { bestellStatusAnzeige, zahlungsAnzeige } from '@/lib/bestellstatus'
 import { formatEuro, mitAnzahl } from '@/lib/format'
@@ -116,12 +116,13 @@ export function bestellCodeFehlerText(fehler: BestellCodeFehler | 'ZU_VIELE' | '
 /**
  * Die Adresse ist pausiert, weil zu viele falsche Codes kamen (Register E7,
  * Ergänzung; Nr. 112) — die Zähler teilt „Bestellungen finden" mit der
- * Anmeldung mit Code, also auch derselbe Satz mit Uhrzeit (zuVieleCodesText).
+ * Anmeldung mit Code, also auch die Pause mit Uhrzeit — aber ohne Mail-Zusage
+ * (codesPausiertText): Gäste ohne Konto bekommen keine Mail.
  * `bis` = null: Die Bremse antwortete nicht (fail-closed), das Ende ist
  * unbekannt — dann der Satz ohne Uhrzeit, wie bei der Anmeldung.
  */
 export function bestellCodePauseText(bis: Date | null, jetzt: Date): string {
-  return bis === null ? bestellCodeFehlerText('ZU_VIELE') : zuVieleCodesText(pauseBisText(bis, jetzt))
+  return bis === null ? bestellCodeFehlerText('ZU_VIELE') : codesPausiertText(pauseBisText(bis, jetzt))
 }
 
 // ─── Die Liste ───────────────────────────────────────────────────────────────

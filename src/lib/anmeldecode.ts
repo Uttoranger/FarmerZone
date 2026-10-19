@@ -234,6 +234,16 @@ export function zuVieleCodesText(pauseBis: string): string {
   return `Zu viele falsche Codes. Die Anmeldung mit Code ist für diese Adresse bis ${pauseBis} pausiert. Wir haben dir eine E-Mail geschickt.`
 }
 
+/**
+ * Dieselbe Pause bei „Bestellungen finden“ (die Zähler sind gemeinsam), aber
+ * ohne Mail-Zusage: Dort fragen meist Gäste ohne Konto, und die Mail geht nur
+ * an ein Konto. Der Satz ist für jede Adresse gleich und verrät nicht, wer ein
+ * Konto hat.
+ */
+export function codesPausiertText(pauseBis: string): string {
+  return `Zu viele falsche Codes. Codes für diese Adresse sind bis ${pauseBis} pausiert.`
+}
+
 export function zuVielePasswoerterText(pauseBis: string): string {
   return `Zu viele Versuche – versuch es nach ${pauseBis} wieder oder setz dein Passwort zurück.`
 }
