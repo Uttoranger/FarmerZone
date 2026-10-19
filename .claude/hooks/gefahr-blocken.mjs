@@ -49,14 +49,48 @@ function istLokaleDatenbank(wert) {
 }
 
 /**
- * Zerlegt eine Befehlszeile wie die Shell in einfache Befehle, jeder eine Liste von Wörtern ohne
- * Anführungszeichen. Getrennt wird außerhalb von Anführungszeichen an ; & | ( ) Gravis und Zeilenwechsel; ein
- * # am Wortanfang beginnt einen Kommentar. Ein Text in Anführungszeichen bleibt ein Wort (`sh -c "a; b"` ist
- * ein Befehl mit einem Text als Argument).
+ * Wo schließt die Befehlsersetzung, die ab `von` (hinter `$(` bzw. dem öffnenden Gravis) beginnt? Gibt den Index
+ * der schließenden Klammer bzw. des schließenden Gravis zurück, bei fehlendem Ende die Länge des Textes.
+ * Anführungszeichen, Verschachtelung und `\` werden beachtet.
+ */
+function ersetzungsEnde(text, von, schluss) {
+  let tiefe = 0
+  for (let i = von; i < text.length; i++) {
+    const z = text[i]
+    if (z === '\\') i++
+    else if (schluss === ')' && z === "'") {
+      const zu = text.indexOf("'", i + 1)
+      if (zu < 0) return text.length
+      i = zu
+    } else if (schluss === ')' && z === '"') {
+      for (i++; i < text.length && text[i] !== '"'; i++) {
+        if (text[i] === '\\') i++
+        else if (text[i] === '$' && text[i + 1] === '(') i = ersetzungsEnde(text, i + 2, ')')
+      }
+    } else if (schluss === ')' && z === '(') tiefe++
+    else if (z === schluss) {
+      if (tiefe === 0) return i
+      tiefe--
+    }
+  }
+  return text.length
+}
+
+/**
+ * Zerlegt eine Befehlszeile wie die Shell in einfache Befehle. Jeder ist `{ woerter, ersetzungen, tiefe }`:
+ * seine Wörter ohne Anführungszeichen, die Texte der Befehlsersetzungen in seinen Wörtern und die Klammerstufe.
+ * Getrennt wird außerhalb von Anführungszeichen an ; & | ( ) Gravis und Zeilenwechsel; ein # am Wortanfang
+ * beginnt einen Kommentar. Ein Text in Anführungszeichen bleibt ein Wort (`sh -c "a; b"` ist ein Befehl mit einem
+ * Text als Argument) — aber `$(…)` und Gravis darin führt die Shell aus: ihr Inhalt steht in `ersetzungen` und
+ * muss selbst geprüft werden. Die Stufe zählt die offenen ( und Gravis: Ein `export` darin gilt nur bis zur
+ * schließenden Klammer.
  */
 function einfacheBefehle(text) {
   const befehle = []
   let woerter = []
+  let ersetzungen = []
+  let tiefe = 0
+  let gravisOffen = false
   let wort = null // null: kein Wort offen
   let anfuehrung = null
   const wortEnde = () => {
@@ -65,8 +99,9 @@ function einfacheBefehle(text) {
   }
   const befehlEnde = () => {
     wortEnde()
-    if (woerter.length > 0) befehle.push(woerter)
+    if (woerter.length > 0) befehle.push({ woerter, ersetzungen, tiefe })
     woerter = []
+    ersetzungen = []
   }
   for (let i = 0; i < text.length; i++) {
     const z = text[i]
@@ -76,7 +111,13 @@ function einfacheBefehle(text) {
     } else if (anfuehrung === '"') {
       if (z === '\\' && i + 1 < text.length) wort += text[++i]
       else if (z === '"') anfuehrung = null
-      else wort += z
+      else if (z === '`' || (z === '$' && text[i + 1] === '(')) {
+        const von = i + (z === '`' ? 1 : 2)
+        const bis = ersetzungsEnde(text, von, z === '`' ? '`' : ')')
+        ersetzungen.push(text.slice(von, bis))
+        wort += text.slice(i, bis + 1)
+        i = bis
+      } else wort += z
     } else if (z === "'" || z === '"') {
       anfuehrung = z
       wort ??= ''
@@ -87,6 +128,9 @@ function einfacheBefehle(text) {
       while (i + 1 < text.length && text[i + 1] !== '\n') i++
     } else if (z === '\n' || ';&|()`'.includes(z)) {
       befehlEnde()
+      if (z === '(' || (z === '`' && !gravisOffen)) tiefe++
+      else if (z === ')' || z === '`') tiefe = Math.max(0, tiefe - 1)
+      if (z === '`') gravisOffen = !gravisOffen
     } else if (/\s/.test(z)) {
       wortEnde()
     } else {
@@ -153,10 +197,17 @@ function sammle(map, name, wert) {
  * `export`-Anweisungen — nicht die Adresse in einem anderen Befehl (`A=… B=… true && deploy`), nicht Text
  * (`echo A=…`) und nicht eine bloße Zuweisung ohne export, die nur in der Shell gilt. Wird jede Variable mehrfach gesetzt,
  * muss jede Zuweisung lokal sein. `sh -c "…"`, `bash -lc …` und `eval …` werden mit der Umgebung davor mitgelesen.
+ * Befehlsersetzungen — `$(…)` und Gravis, auch zwischen Anführungszeichen — laufen in einer Unter-Shell mit der
+ * Umgebung VOR dem umgebenden Befehl: Die Zuweisungen an ihm erreichen sie nicht, die Shell wertet sie vorher aus.
+ * Ein `export` in Klammern oder in einer Ersetzung gilt nur bis zur schließenden Klammer.
  */
 function deployOhneLokaleAdressen(befehl, geerbt = new Map()) {
-  const exportiert = new Map(geerbt)
-  for (const einfach of einfacheBefehle(befehl)) {
+  const stufen = [new Map(geerbt)] // die exportierte Umgebung je Klammerstufe
+  for (const { woerter: einfach, ersetzungen, tiefe } of einfacheBefehle(befehl)) {
+    while (stufen.length - 1 > tiefe) stufen.pop()
+    while (stufen.length - 1 < tiefe) stufen.push(new Map(stufen[stufen.length - 1]))
+    const exportiert = stufen[tiefe]
+    for (const inhalt of ersetzungen) if (deployOhneLokaleAdressen(inhalt, exportiert)) return true
     const eigene = new Map()
     let anfang = 0
     while (anfang < einfach.length && zuweisung(einfach[anfang])) sammle(eigene, ...zuweisung(einfach[anfang++]))
@@ -192,21 +243,38 @@ function deployOhneLokaleAdressen(befehl, geerbt = new Map()) {
   return false
 }
 
-// Wer ein Dokument ausführt statt es zu speichern: Shells, source, eval, xargs und Interpreter. Als `.` nur am
-// Befehlsanfang (`git add . && …` ist kein source).
+// Wer ein Dokument ausführt statt es zu speichern: Shells, source, eval, xargs und Interpreter — mit oder ohne
+// Pfad (`/bin/bash`, `/usr/bin/python3`) — und jedes Wort mit `$` (`$SHELL`, `"${SHELL}"`: was dahinter steckt,
+// weiß erst die Shell). Als `.` nur am Befehlsanfang (`git add . && …` ist kein source).
 const AUSFUEHRER =
-  /(?:^|[\s;&|(`])(?:(?:ba|z|da|k|c|fi|a)?sh|source|eval|xargs|node|nodejs|deno|bun|tsx|ts-node|python[\d.]*|perl|ruby|php|lua|psql|sqlite3|Rscript)(?=$|[\s;&|)`"'])|(?:^|[;&|(`])\s*\.\s/
+  /(?:^|[\s;&|(`"'])(?:(?:\S*\/)?(?:(?:ba|z|da|k|c|fi|a)?sh|source|eval|xargs|node|nodejs|deno|bun|tsx|ts-node|python[\d.]*|perl|ruby|php|lua|psql|sqlite3|Rscript)(?=$|[\s;&|)`"'])|\$\{?[A-Za-z_0-9@*])|(?:^|[;&|(`])\s*\.\s/
 // Wer das Dokument nur speichert oder weitergibt: cat, tee, git commit/tag (-F -), gh (--body-file -).
 const DATEN_LESER = new RegExp(String.raw`^\s*(?:\w+=\S*\s+)*(?:cat|tee|` + GIT + String.raw`(?:commit|tag)|gh)\b`)
+
+/**
+ * Steht hinter dem Begrenzer nur, was das Dokument speichert oder weitergibt? Jedes Ziel einer Pipe muss selbst
+ * ein DATEN_LESER sein (Erlaubnisliste, kein Namensabgleich der Ausführer); `>(…)`, `<(…)` und ein Ausführer in
+ * einer Verkettung (`> a.sh && bash a.sh`) behalten den Text.
+ */
+function nurDatenHinter(dahinter) {
+  if (/[<>]\(/.test(dahinter) || AUSFUEHRER.test(dahinter)) return false
+  // `||` verkettet nur; erst ein einzelnes `|` reicht den Text weiter. Das Ziel ist das erste Wort bis zur nächsten Verkettung.
+  const ziele = dahinter.replace(/\|\|/g, ';').split('|').slice(1).map((stueck) => stueck.split(/;|&&/)[0])
+  return ziele.every((ziel) => DATEN_LESER.test(ziel))
+}
 
 /**
  * Den Text eines Here-Documents lesen die Regeln nicht mit, wenn er Daten ist (Commit-Nachricht, Datei): sonst
  * blockt eine Nachricht, deren Zeile mit „git stash“ beginnt (Fehlalarm aus Nr. 110). Nur bei gequotetem
  * Begrenzer (<<'EOF'): Ohne Quote führt die Shell `$(…)` im Text aus. Daten sind es nur, wenn ein bekannter
- * Leser das Dokument speichert oder weitergibt (cat, tee, git commit, gh) UND weder vor dem Begrenzer in dessen
- * Befehl (`bash -c "$(cat <<'EOF'`, `source <(cat <<'EOF'`) noch dahinter auf der Zeile (`cat <<'EOF' | bash`)
- * etwas Ausführendes steht. Alles andere — Shells, Interpreter (`node - <<'EOF'`), unbekannte Leser — behält den
- * Text: Er ist dann Befehl. Nicht erkannt wird, was erst eine spätere Zeile ausführt (`cat <<'EOF' > a.sh`, dann `bash a.sh`).
+ * Leser das Dokument speichert oder weitergibt (cat, tee, git commit, gh) UND
+ *  - vor dem Begrenzer in dessen Befehl nichts Ausführendes steht (`bash -c "$(cat <<'EOF'`, `/bin/sh -c …`,
+ *    `source <(cat <<'EOF'`, `$SHELL -c …`) und
+ *  - hinter dem Begrenzer jedes Ziel einer Pipe selbst ein solcher Leser ist (Erlaubnisliste: `| bash`,
+ *    `| /bin/bash`, `| sudo sh`, `| $SHELL`, `| /usr/bin/python3 -` behalten den Text, ebenso jedes `>(…)`) und
+ *    auf der Zeile kein Ausführer folgt (`> a.sh && bash a.sh`).
+ * Alles andere — Shells, Interpreter (`node - <<'EOF'`), unbekannte Leser — behält den Text: Er ist dann Befehl.
+ * Nicht erkannt wird, was erst eine spätere Zeile ausführt (`cat <<'EOF' > a.sh`, dann `bash a.sh`).
  */
 function ohneHeredocText(text) {
   const behalten = []
@@ -223,7 +291,7 @@ function ohneHeredocText(text) {
     const dahinter = zeile.slice(kopf.index + kopf[0].length)
     const befehlDavor = davor.split(/;|&|\||\n/).pop() // der Befehl, zu dem das Dokument gehört, samt Hülle wie `bash -c "$(`
     const leser = befehlDavor.split(/[(`]/).pop() // der Befehl, der es liest: `cat` in `git commit -m "$(cat`
-    if (DATEN_LESER.test(leser) && !AUSFUEHRER.test(befehlDavor) && !AUSFUEHRER.test(dahinter)) ende = kopf[2]
+    if (DATEN_LESER.test(leser) && !AUSFUEHRER.test(befehlDavor) && nurDatenHinter(dahinter)) ende = kopf[2]
   }
   return behalten.join('\n')
 }

@@ -231,6 +231,27 @@ describe('gefahr-blocken — prisma migrate deploy nur gegen eine ausdrücklich 
     'eval "pnpm exec prisma migrate deploy"',
     '(pnpm exec prisma migrate deploy)',
     'echo $(pnpm exec prisma migrate deploy)',
+    // Eine Befehlsersetzung führt die Shell auch zwischen Anführungszeichen aus (Prüfung Runde 2) — die übliche
+    // Form, um die Ausgabe aufzufangen.
+    'out="$(pnpm exec prisma migrate deploy 2>&1)"',
+    'echo "$(pnpm exec prisma migrate deploy)"',
+    'echo "`pnpm exec prisma migrate deploy`"',
+    'out=$(pnpm exec prisma migrate deploy)',
+    'out=`pnpm exec prisma migrate deploy`',
+    'echo "vorher $(echo "$(pnpm exec prisma migrate deploy)") nachher"',
+    'echo "x" "$(sh -c \'pnpm exec prisma migrate deploy\')"',
+    'sh -c "echo $(pnpm exec prisma migrate deploy)"',
+    'export AUSGABE="$(pnpm exec prisma migrate deploy)"',
+    'bash -c "$(cat <<\'EOF\'\npnpm exec prisma migrate deploy\nEOF\n)"',
+    // Zuweisungen am umgebenden Befehl erreichen die Ersetzung nicht: Die Shell führt sie vorher aus.
+    `DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL} echo "$(${DEPLOY})"`,
+    `DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL} out="$(${DEPLOY})"`,
+    // Ein export in einer Unter-Shell endet mit der Klammer (Prüfung Runde 2).
+    `(export DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL}); ${DEPLOY}`,
+    `echo $(export DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL}); ${DEPLOY}`,
+    `out="$(export DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL})"; ${DEPLOY}`,
+    `\`export DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL}\`; ${DEPLOY}`,
+    `(export DATABASE_URL=${LOKAL}); export DIRECT_URL=${LOKAL}; ${DEPLOY}`,
     `sh -c "DATABASE_URL=${LOKAL} ${DEPLOY}"`,
     // Eine Adresse mit Variable oder Befehlsersetzung ist keine ausdrückliche lokale Adresse.
     `DATABASE_URL="postgresql://u:p@localhost/\$(echo x)" DIRECT_URL=${LOKAL} ${DEPLOY}`,
@@ -265,6 +286,17 @@ describe('gefahr-blocken — prisma migrate deploy nur gegen eine ausdrücklich 
     // Der Aufruf hat seine Adressen; was danach kommt, ist ein anderer Befehl.
     `DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL} ${DEPLOY} && pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code`,
     `DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL} ${DEPLOY} > migrate.log 2>&1`,
+    // Die Ausgabe auffangen: mit beiden Adressen im geerbten oder im eigenen Befehl.
+    `export DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL}; out="$(${DEPLOY} 2>&1)"`,
+    `export DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL}; echo "$(${DEPLOY})"`,
+    `out="$(DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL} ${DEPLOY} 2>&1)"`,
+    `echo "$(DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL} ${DEPLOY})"`,
+    `echo "\`DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL} ${DEPLOY}\`"`,
+    // Ein export gilt innerhalb seiner Klammer.
+    `(export DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL}; ${DEPLOY})`,
+    `(export DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL}; out="$(${DEPLOY})")`,
+    `export DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL}; (${DEPLOY})`,
+    `export DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL}; (cd . && ${DEPLOY})`,
   ]) {
     it(`lässt durch: ${befehl}`, () => {
       expect(lauf(befehl).code).toBe(0)
@@ -284,6 +316,12 @@ describe('gefahr-blocken — prisma migrate deploy nur gegen eine ausdrücklich 
     'pnpm vitest run vercel-build',
     'pnpm vitest run tests/gefahr-blocken.test.ts -t "prisma migrate deploy"',
     'echo prisma migrate deploy',
+    // Andere Ersetzungen und Text in einfachen Anführungszeichen (kein Aufruf).
+    'echo "Stand: $(git rev-parse --short HEAD) um $(date +%F)"',
+    'echo "`date`"',
+    "echo '$(pnpm exec prisma migrate deploy)'",
+    'echo "preis: \\$(pnpm exec prisma migrate deploy)"',
+    'out="$(pnpm exec prisma migrate status 2>&1)"',
     'pnpm test # danach prisma migrate deploy auf der frischen Datenbank',
     'grep -rn vercel-build package.json',
     'git log --oneline -- vercel-build',
@@ -346,6 +384,35 @@ describe('gefahr-blocken — Text in einem Here-Document ist kein Befehl (Fehlal
     expect(lauf(["cat <<'EOF' > neu.sh && bash neu.sh", 'git stash', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
   })
 
+  // Prüfung Runde 2: Der Ausführer wird nicht an seinem Namen erkannt. Hinter einer Pipe darf nur ein Leser stehen,
+  // der speichert oder weitergibt; alles andere — Pfad, Variable, Hülle, Interpreter mit Pfad — behält den Text.
+  it('liest den Text mit, wenn das Ziel mit Pfad, über eine Hülle oder als Variable aufgerufen wird', () => {
+    for (const ziel of [
+      '/bin/bash',
+      'sudo /bin/sh',
+      '$SHELL',
+      '"$SHELL" -s',
+      '${SHELL:-sh}',
+      '/usr/bin/python3 -',
+      '/usr/bin/env node -',
+      'cat | sh',
+      'cat | /bin/bash',
+      'tee >(bash)',
+      'tee neu.sh | /bin/bash',
+      'tclsh',
+    ]) {
+      const befehl = [`cat <<'EOF' | ${ziel}`, 'git stash', 'EOF'].join('\n')
+      expect(lauf(befehl, ohneRepo).code, befehl).toBe(2)
+    }
+  })
+
+  it('liest den Text mit, wenn die Hülle vor dem Begrenzer einen Pfad oder eine Variable hat', () => {
+    for (const kopf of ['/bin/bash -c "$(cat <<\'EOF\'', 'sudo /bin/sh -c "$(cat <<\'EOF\'', '$SHELL -c "$(cat <<\'EOF\'', '/usr/bin/python3 -c "$(cat <<\'EOF\'']) {
+      const befehl = [kopf, 'git stash', 'EOF', ')"'].join('\n')
+      expect(lauf(befehl, ohneRepo).code, kopf).toBe(2)
+    }
+  })
+
   it('liest den Text mit, wenn ein Interpreter das Dokument liest', () => {
     // Zusammengesetzt, damit dieser Test selbst nicht vom Hook der Sitzung gesperrt wird.
     const dbPush = ['prisma db', 'push'].join(' ')
@@ -373,6 +440,8 @@ describe('gefahr-blocken — Text in einem Here-Document ist kein Befehl (Fehlal
       "cat <<'EOF' > notiz.txt",
       "cat <<'EOF' | tee notiz.txt",
       "tee notiz.txt <<'EOF'",
+      "cat <<'EOF' | cat | tee notiz.txt",
+      "cat <<'EOF' | git commit -F -",
       "git commit -F - <<'EOF'",
       "git -C /tmp/x commit -F - <<'EOF'",
       'git commit -m "$(cat <<\'EOF\'',
