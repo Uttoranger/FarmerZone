@@ -11,7 +11,11 @@
  *  - zaehleMail zählt atomar: zweimal → 2, zwanzig gleichzeitig → 22.
  *  - Die Warnstufe wird bedingt gesetzt: zwei gleichzeitige Prüfungen → EINE
  *    Mail; 85 % danach keine, 95 % eine, 74 % die Entwarnung — `stufe = 0`,
- *    die Zeile bleibt (gelöscht wird nichts).
+ *    die Zeile bleibt (gelöscht wird nichts). Geführt an der Datenbank
+ *    (Supabase Free, feste Grenze): Bilder haben seit Nr. 113 (Vercel Pro)
+ *    keine Grenze und keine Warnstufe — das prüfen tests/betrieb.test.ts
+ *    („Vercel Pro — Bilder ohne feste Grenze") und tests/betrieb-server.test.ts
+ *    („Bilder ohne feste Grenze").
  *  - mitHerzschlag schreibt AblaufLauf (ok, Dauer, nur die Fehlerklasse).
  *
  * Daten: Messungen an Tagen im Jahr 2001 (fern von jedem echten Tag),
@@ -22,7 +26,7 @@
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { prisma } from '@/lib/prisma'
-import type { AblaufName } from '@/lib/betrieb'
+import { GRENZE, type AblaufName } from '@/lib/betrieb'
 
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendBetriebWarnung: vi.fn(async () => ({ gesendet: 1, gescheitert: 0 })) }))
@@ -42,11 +46,13 @@ function tagDatum(tag: string): Date {
   return new Date(`${tag}T00:00:00.000Z`)
 }
 
-async function setzeBilderBytes(tag: string, bytes: number): Promise<void> {
+/** Belegt die Datenbank am Tag mit `prozent` % ihrer Grenze im Tarif von heute. */
+async function setzeDatenbankAnteil(tag: string, prozent: number): Promise<void> {
+  const wert = BigInt(Math.round((GRENZE.datenbankBytes * prozent) / 100))
   await prisma.betriebMessung.upsert({
-    where: { tag_art: { tag: tagDatum(tag), art: 'bilderBytes' } },
-    create: { tag: tagDatum(tag), art: 'bilderBytes', wert: BigInt(bytes) },
-    update: { wert: BigInt(bytes) },
+    where: { tag_art: { tag: tagDatum(tag), art: 'datenbankBytes' } },
+    create: { tag: tagDatum(tag), art: 'datenbankBytes', wert },
+    update: { wert },
   })
 }
 
@@ -139,42 +145,42 @@ describe('Warnstufe — bedingt gesetzt, erst dann die Mail', () => {
   const jetzt = new Date(`${tag}T04:05:00.000Z`)
 
   it('zwei gleichzeitige Prüfungen bei 82 % → genau eine Mail, Stufe 1', async () => {
-    await setzeBilderBytes(tag, 820_000_000)
+    await setzeDatenbankAnteil(tag, 82)
     const ergebnisse = await Promise.all([pruefeGrenzen(jetzt, { produktion: true }), pruefeGrenzen(jetzt, { produktion: true })])
 
     expect(ergebnisse.reduce((a, b) => a + b, 0)).toBe(1)
     expect(sendBetriebWarnung).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(sendBetriebWarnung).mock.calls[0][0]).toMatchObject({ art: 'grenze', wert: 'bilder' })
+    expect(vi.mocked(sendBetriebWarnung).mock.calls[0][0]).toMatchObject({ art: 'grenze', wert: 'datenbank' })
     expect(Array.isArray(vi.mocked(sendBetriebWarnung).mock.calls[0][1])).toBe(true)
-    expect(await stufeVon('bilder')).toBe(1)
+    expect(await stufeVon('datenbank')).toBe(1)
   })
 
   it('85 % → keine Mail, 95 % → eine Mail (Stufe 2), 74 % → Entwarnung: Stufe 0, die Zeile bleibt', async () => {
-    await setzeBilderBytes(tag, 820_000_000)
+    await setzeDatenbankAnteil(tag, 82)
     await pruefeGrenzen(jetzt, { produktion: true })
     vi.mocked(sendBetriebWarnung).mockClear()
 
-    await setzeBilderBytes(tag, 850_000_000)
+    await setzeDatenbankAnteil(tag, 85)
     expect(await pruefeGrenzen(jetzt, { produktion: true })).toBe(0)
-    expect(await stufeVon('bilder')).toBe(1)
+    expect(await stufeVon('datenbank')).toBe(1)
 
-    await setzeBilderBytes(tag, 950_000_000)
+    await setzeDatenbankAnteil(tag, 95)
     expect(await pruefeGrenzen(jetzt, { produktion: true })).toBe(1)
-    expect(await stufeVon('bilder')).toBe(2)
+    expect(await stufeVon('datenbank')).toBe(2)
 
-    await setzeBilderBytes(tag, 780_000_000)
+    await setzeDatenbankAnteil(tag, 78)
     expect(await pruefeGrenzen(jetzt, { produktion: true })).toBe(0)
 
-    await setzeBilderBytes(tag, 740_000_000)
+    await setzeDatenbankAnteil(tag, 74)
     expect(await pruefeGrenzen(jetzt, { produktion: true })).toBe(1)
     expect(vi.mocked(sendBetriebWarnung).mock.calls.map(([anlass]) => anlass.art)).toEqual(['grenze', 'entwarnung'])
-    expect(await stufeVon('bilder')).toBe(0)
+    expect(await stufeVon('datenbank')).toBe(0)
   })
 
   it('außerhalb der Produktion: nichts gesetzt, keine Mail', async () => {
-    await setzeBilderBytes(tag, 990_000_000)
+    await setzeDatenbankAnteil(tag, 99)
     expect(await pruefeGrenzen(jetzt, { produktion: false })).toBe(0)
-    expect(await stufeVon('bilder')).toBeNull()
+    expect(await stufeVon('datenbank')).toBeNull()
     expect(sendBetriebWarnung).not.toHaveBeenCalled()
   })
 })
