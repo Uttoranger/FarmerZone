@@ -18,9 +18,11 @@ import { genauesIlikeMuster } from '@/lib/ilike-muster'
 import { erzeugeAnforderungsSperre } from '@/lib/anmeldecode-sperre'
 import {
   anmeldecodeGebremst,
-  fehlversucheGesperrt,
+  gibVersuchZurueck,
   loeschePasswortFehlversuche,
-  zaehleFehlversuch,
+  zaehleAlsFehlversuch,
+  zaehleVersuchVorab,
+  type VorabVersuch,
 } from '@/server/bremse-datenbank'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { sendeRegistrierungsHinweis } from '@/server/registrierung-hinweis'
@@ -163,6 +165,15 @@ function zuVieleFehlversucheFehler(art: FehlversuchArt, bis: Date | null): APIEr
  * Belegt in tests/integration/code-bremse.int.test.ts.
  */
 const adresseBeimZuruecksetzen = new WeakMap<object, string>()
+
+/**
+ * Der vorab gezählte Versuch einer Anmeldung mit Code bzw. Passwort —
+ * hooks.before zählt ihn, hooks.after lässt ihn als Fehlversuch stehen oder
+ * gibt ihn zurück. Schlüssel wie oben `ctx.context`. Wirft hooks.before oder
+ * der Endpunkt etwas anderes als einen APIError, läuft hooks.after nicht
+ * (dispatchAuthEndpoint): Der Versuch bleibt gezählt, zur sicheren Seite.
+ */
+const vorabGezaehlt = new WeakMap<object, VorabVersuch>()
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -312,31 +323,35 @@ export const auth = betterAuth({
         }
         const body = ctx.body as { email?: unknown } | undefined
         if (typeof body?.email !== 'string') return
-        // Falsche Codes je Adresse (E7, Ergänzung; Nr. 112): Ist die Adresse
-        // pausiert, wird der Code gar nicht erst geprüft. VOR der
-        // Rollenprüfung — ein Hof pausiert wie eine Kundin oder eine Adresse,
-        // die es nicht gibt. Fail-closed (src/server/bremse-datenbank.ts).
-        const sperre = await fehlversucheGesperrt('code', body.email)
-        if (sperre.gesperrt) throw zuVieleFehlversucheFehler('code', sperre.bis)
+        // Falsche Codes je Adresse (E7, Ergänzung; Nr. 112): Der Versuch
+        // zählt VORAB, atomar; ist die Adresse pausiert, wird der Code gar
+        // nicht erst geprüft. VOR der Rollenprüfung — ein Hof pausiert wie
+        // eine Kundin oder eine Adresse, die es nicht gibt. Fail-closed
+        // (src/server/bremse-datenbank.ts).
+        const vorab = await zaehleVersuchVorab('code', body.email)
+        if (vorab.gesperrt) throw zuVieleFehlversucheFehler('code', vorab.bis)
         // Antwort wie bei falschem Code — und gezählt wie einer: Sonst ließe
         // sich an der Zählung erkennen, welche Adresse ein Hof ist. Der Code
         // (falls einer liegt) bleibt unberührt und läuft nach 10 Minuten ab.
         if (!codeVersandErlaubt(await rolleZurAdresse(adresseWieDasPlugin(body.email)))) {
-          await zaehleFehlversuch('code', body.email)
+          zaehleAlsFehlversuch(vorab.versuch)
           throw falscherCodeFehler()
         }
+        vorabGezaehlt.set(ctx.context, vorab.versuch)
         return
       }
 
       if (ctx.path === '/sign-in/email') {
-        // Falsche Passwörter je Adresse (E7, Ergänzung; Nr. 112): Ist die
-        // Adresse pausiert, wird das Passwort gar nicht erst geprüft — für
-        // jedes Konto und jede unbekannte Adresse gleich. Gezählt wird in
-        // hooks.after. „Passwort vergessen" bleibt offen.
+        // Falsche Passwörter je Adresse (E7, Ergänzung; Nr. 112): Der Versuch
+        // zählt VORAB, atomar; ist die Adresse pausiert, wird das Passwort
+        // gar nicht erst geprüft — für jedes Konto und jede unbekannte Adresse
+        // gleich. Stimmt es, gibt hooks.after den Versuch zurück. „Passwort
+        // vergessen" bleibt offen.
         const body = ctx.body as { email?: unknown } | undefined
         if (typeof body?.email !== 'string') return
-        const sperre = await fehlversucheGesperrt('passwort', body.email)
-        if (sperre.gesperrt) throw zuVieleFehlversucheFehler('passwort', sperre.bis)
+        const vorab = await zaehleVersuchVorab('passwort', body.email)
+        if (vorab.gesperrt) throw zuVieleFehlversucheFehler('passwort', vorab.bis)
+        vorabGezaehlt.set(ctx.context, vorab.versuch)
         return
       }
 
@@ -385,21 +400,27 @@ export const auth = betterAuth({
       }
     }),
     // Nach dem Endpunkt, eine Weiche nach Pfad (weitere Fälle kommen dazu):
-    // Fehlversuche zählen (E7, Ergänzung; Nr. 112) — erst hier weiß Better
-    // Auth, ob Code oder Passwort stimmte; ein Fehler steht als APIError in
-    // `ctx.context.returned`. Nach einem erfolgreichen Zurücksetzen fällt der
+    // Fehlversuche (E7, Ergänzung; Nr. 112) — erst hier weiß Better Auth, ob
+    // Code oder Passwort stimmte; ein Fehler steht als APIError in
+    // `ctx.context.returned`. Der vorab gezählte Versuch bleibt nur bei einem
+    // Fehlversuch stehen. Nach einem erfolgreichen Zurücksetzen fällt der
     // Passwort-Zähler der Adresse weg.
     after: createAuthMiddleware(async (ctx) => {
       switch (ctx.path) {
         case '/sign-in/email-otp':
         case '/sign-in/email': {
-          const art: FehlversuchArt = ctx.path === '/sign-in/email-otp' ? 'code' : 'passwort'
-          const body = ctx.body as { email?: unknown } | undefined
+          const versuch = vorabGezaehlt.get(ctx.context)
+          if (versuch === undefined) return
           const antwort = ctx.context.returned
-          if (typeof body?.email !== 'string' || !isAPIError(antwort) || !istFehlversuch(art, antwort.body?.code)) return
-          await zaehleFehlversuch(art, body.email)
+          // Angemeldet, oder gescheitert an etwas anderem (etwa einer
+          // ungültigen Adresse): Der Versuch zählt nicht.
+          if (!isAPIError(antwort) || !istFehlversuch(versuch.art, antwort.body?.code)) {
+            await gibVersuchZurueck(versuch)
+            return
+          }
+          zaehleAlsFehlversuch(versuch)
           // Von außen jeder gescheiterte Code wie ein falscher — wie beim Hof.
-          if (art === 'code' && antwort.body?.code !== 'INVALID_OTP') return alsFalscherCode(ctx.request)
+          if (versuch.art === 'code' && antwort.body?.code !== 'INVALID_OTP') return alsFalscherCode(ctx.request)
           return
         }
         case '/reset-password': {

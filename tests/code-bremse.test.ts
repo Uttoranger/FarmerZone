@@ -2,13 +2,15 @@
  * Code- und Passwort-Raten bremsen (Register E7, Ergänzung; Nr. 112) — die
  * Regeln aus src/lib/anmeldecode.ts und src/lib/bremse-datenbank.ts echt, die
  * Datenbank hinter src/server/bremse-datenbank.ts als kleiner Speicher im
- * Test (zählt wie das INSERT … ON CONFLICT, liest wie findMany). Die echte
+ * Test (zählt wie das INSERT … ON CONFLICT, gibt zurück wie updateMany). Die echte
  * Bremse gegen Postgres samt Better-Auth-Hooks prüft
  * tests/integration/code-bremse.int.test.ts.
  *
  * Beweist:
  *  - 9 falsche Codes → noch erlaubt; der 10. pausiert bis zum Ende der
  *    Stunde, mit Uhrzeit in Wiener Zeit; im nächsten Fenster wieder frei.
+ *  - Gezählt wird vorab (Nachbesserung Runde 2): Ein richtiger Versuch gibt
+ *    zurück, eine Ablehnung wegen Pause auch — sie füllt das Tagesfenster nicht.
  *  - 30 falsche Codes am Tag pausieren bis zum Ende des Tagesfensters.
  *  - Eine Adresse, die es nicht gibt, zählt und pausiert genauso — nur ohne Mail.
  *  - Eine Mail je Pause (genau beim Vollwerden), beim Passwort höchstens eine am Tag.
@@ -67,14 +69,21 @@ vi.mock('@/lib/prisma', () => ({
       return zeilen
     }),
     rateLimitZaehler: {
-      findMany: vi.fn(async ({ where }: { where: { OR: Array<{ schluessel: string; fensterStart: Date }> } }) => {
-        const fehler = stoerung()
-        if (fehler) return fehler
-        return where.OR.flatMap(({ schluessel, fensterStart }) => {
-          const zaehler = db.zeilen.get(`${schluessel}|${fensterStart.getTime()}`)
-          return zaehler === undefined ? [] : [{ schluessel, fensterStart, zaehler }]
-        })
-      }),
+      updateMany: vi.fn(
+        async ({ where }: { where: { OR: Array<{ schluessel: string; fensterStart: Date }>; zaehler: { gte: number } } }) => {
+          const fehler = stoerung()
+          if (fehler) return fehler
+          let count = 0
+          for (const { schluessel, fensterStart } of where.OR) {
+            const id = `${schluessel}|${fensterStart.getTime()}`
+            const zaehler = db.zeilen.get(id)
+            if (zaehler === undefined || zaehler < where.zaehler.gte) continue
+            db.zeilen.set(id, zaehler - 1)
+            count += 1
+          }
+          return { count }
+        }
+      ),
       deleteMany: vi.fn(async ({ where }: { where: { schluessel: string } }) => {
         let count = 0
         for (const id of [...db.zeilen.keys()]) {
@@ -125,11 +134,13 @@ import {
 } from '@/lib/bremse-datenbank'
 import {
   bremseUeberAlleInstanzen,
-  fehlversucheGesperrt,
+  gibVersuchZurueck,
   loeschePasswortFehlversuche,
   neueBremsMeldungen,
   neuigkeitenGebremst,
-  zaehleFehlversuch,
+  zaehleAlsFehlversuch,
+  zaehleVersuchVorab,
+  type FehlversuchVorab,
 } from '@/server/bremse-datenbank'
 
 const KUNDIN = 'kundin-112@example.com'
@@ -142,8 +153,20 @@ async function arbeiteNachlaufAb(): Promise<void> {
   while (nachlauf.aufgaben.length > 0) await nachlauf.aufgaben.shift()!()
 }
 
+/** Gescheiterte Versuche, wie die Hooks sie abwickeln: vorab zählen, stehen lassen. */
 async function falsch(art: 'code' | 'passwort', email: string, mal: number): Promise<void> {
-  for (let i = 0; i < mal; i++) await zaehleFehlversuch(art, email, new Date(), neueBremsMeldungen())
+  for (let i = 0; i < mal; i++) {
+    const vorab = await zaehleVersuchVorab(art, email, new Date(), neueBremsMeldungen())
+    if (!vorab.gesperrt) zaehleAlsFehlversuch(vorab.versuch)
+  }
+}
+
+/** Ein Versuch, der stimmt: vorab zählen, zurückgeben — sagt, ob die Adresse pausiert war. */
+async function pausiert(art: 'code' | 'passwort', email: string): Promise<{ gesperrt: false } | Extract<FehlversuchVorab, { gesperrt: true }>> {
+  const vorab = await zaehleVersuchVorab(art, email, new Date(), neueBremsMeldungen())
+  if (vorab.gesperrt) return vorab
+  await gibVersuchZurueck(vorab.versuch)
+  return { gesperrt: false }
 }
 
 beforeEach(() => {
@@ -232,14 +255,14 @@ describe('Texte (Mockup system-h1, Schritt 7)', () => {
 describe('falsche Codes je Adresse — zählen und pausieren', () => {
   it('9 falsche Codes → noch erlaubt, der 10. → pausiert bis zum Ende der Stunde', async () => {
     await falsch('code', KUNDIN, 9)
-    expect(await fehlversucheGesperrt('code', KUNDIN)).toEqual({ gesperrt: false })
+    expect(await pausiert('code', KUNDIN)).toEqual({ gesperrt: false })
 
     await falsch('code', KUNDIN, 1)
-    expect(await fehlversucheGesperrt('code', KUNDIN)).toEqual({ gesperrt: true, bis: new Date('2026-10-19T13:00:00.000Z') })
+    expect(await pausiert('code', KUNDIN)).toEqual({ gesperrt: true, bis: new Date('2026-10-19T13:00:00.000Z') })
 
     // Ab der nächsten Stunde wieder frei (festes Fenster).
     vi.setSystemTime(new Date('2026-10-19T13:00:00.000Z'))
-    expect(await fehlversucheGesperrt('code', KUNDIN)).toEqual({ gesperrt: false })
+    expect(await pausiert('code', KUNDIN)).toEqual({ gesperrt: false })
   })
 
   it('30 falsche Codes am Tag → pausiert bis zum Ende des Tagesfensters, auch in einer neuen Stunde', async () => {
@@ -248,13 +271,13 @@ describe('falsche Codes je Adresse — zählen und pausieren', () => {
       await falsch('code', KUNDIN, 10)
     }
     vi.setSystemTime(new Date('2026-10-19T12:05:00.000Z'))
-    expect(await fehlversucheGesperrt('code', KUNDIN)).toEqual({ gesperrt: true, bis: new Date('2026-10-20T00:00:00.000Z') })
+    expect(await pausiert('code', KUNDIN)).toEqual({ gesperrt: true, bis: new Date('2026-10-20T00:00:00.000Z') })
   })
 
   it('eine Adresse, die es nicht gibt, zählt und pausiert genauso — nur ohne Mail', async () => {
     await falsch('code', UNBEKANNT, 10)
     await falsch('code', KUNDIN, 10)
-    expect(await fehlversucheGesperrt('code', UNBEKANNT)).toEqual(await fehlversucheGesperrt('code', KUNDIN))
+    expect(await pausiert('code', UNBEKANNT)).toEqual(await pausiert('code', KUNDIN))
 
     await arbeiteNachlaufAb()
     expect(vi.mocked(sendZuVieleVersucheEmail).mock.calls).toEqual([
@@ -264,8 +287,8 @@ describe('falsche Codes je Adresse — zählen und pausieren', () => {
 
   it('zählt ohne Rand und klein — „ Kundin-112@…" ist dieselbe Adresse', async () => {
     await falsch('code', KUNDIN, 9)
-    await zaehleFehlversuch('code', ' Kundin-112@Example.com', new Date(), neueBremsMeldungen())
-    expect((await fehlversucheGesperrt('code', KUNDIN)).gesperrt).toBe(true)
+    await falsch('code', ' Kundin-112@Example.com', 1)
+    expect((await pausiert('code', KUNDIN)).gesperrt).toBe(true)
   })
 
   it('eine Mail je Pause: weitere Fehlversuche in derselben Stunde schicken keine zweite, die nächste Pause wieder eine', async () => {
@@ -279,6 +302,21 @@ describe('falsche Codes je Adresse — zählen und pausieren', () => {
     expect(sendZuVieleVersucheEmail).toHaveBeenCalledTimes(2)
   })
 
+  it('ein richtiger Versuch gibt zurück: 9 falsch, richtig, noch 1 falsch — erst dann pausiert', async () => {
+    await falsch('code', KUNDIN, 9)
+    expect(await pausiert('code', KUNDIN)).toEqual({ gesperrt: false })
+    expect(await pausiert('code', KUNDIN)).toEqual({ gesperrt: false })
+    await falsch('code', KUNDIN, 1)
+    expect((await pausiert('code', KUNDIN)).gesperrt).toBe(true)
+  })
+
+  it('eine Ablehnung wegen Pause gibt ihren Versuch zurück — sie füllt das Tagesfenster nicht', async () => {
+    await falsch('code', KUNDIN, 10 + 25)
+    vi.setSystemTime(new Date('2026-10-19T13:10:00.000Z'))
+    // Zählten die 25 Ablehnungen mit, stünde das Tagesfenster bei 35.
+    expect(await pausiert('code', KUNDIN)).toEqual({ gesperrt: false })
+  })
+
   it('die Mail liegt nicht im Antwortpfad: Zählen stellt sie nur in den Nachlauf', async () => {
     await falsch('code', KUNDIN, 10)
     expect(sendZuVieleVersucheEmail).not.toHaveBeenCalled()
@@ -289,9 +327,9 @@ describe('falsche Codes je Adresse — zählen und pausieren', () => {
 describe('falsche Passwörter je Adresse', () => {
   it('10 → pausiert bis zum Ende der Stunde; Mail höchstens eine am Tag', async () => {
     await falsch('passwort', KUNDIN, 10)
-    expect(await fehlversucheGesperrt('passwort', KUNDIN)).toEqual({ gesperrt: true, bis: new Date('2026-10-19T13:00:00.000Z') })
+    expect(await pausiert('passwort', KUNDIN)).toEqual({ gesperrt: true, bis: new Date('2026-10-19T13:00:00.000Z') })
     // Codes zählen getrennt.
-    expect(await fehlversucheGesperrt('code', KUNDIN)).toEqual({ gesperrt: false })
+    expect(await pausiert('code', KUNDIN)).toEqual({ gesperrt: false })
 
     vi.setSystemTime(new Date('2026-10-19T13:30:00.000Z'))
     await falsch('passwort', KUNDIN, 10)
@@ -308,9 +346,9 @@ describe('falsche Passwörter je Adresse', () => {
 
     await loeschePasswortFehlversuche(KUNDIN)
 
-    expect(await fehlversucheGesperrt('passwort', KUNDIN)).toEqual({ gesperrt: false })
-    expect((await fehlversucheGesperrt('passwort', UNBEKANNT)).gesperrt).toBe(true)
-    expect((await fehlversucheGesperrt('code', KUNDIN)).gesperrt).toBe(true)
+    expect(await pausiert('passwort', KUNDIN)).toEqual({ gesperrt: false })
+    expect((await pausiert('passwort', UNBEKANNT)).gesperrt).toBe(true)
+    expect((await pausiert('code', KUNDIN)).gesperrt).toBe(true)
   })
 })
 
@@ -319,8 +357,8 @@ describe('FAIL-CLOSED nur für die neuen Bremsen', () => {
     db.kaputt = 'fehler'
     const meldungen = neueBremsMeldungen()
 
-    expect(await fehlversucheGesperrt('code', KUNDIN, new Date(), meldungen)).toEqual({ gesperrt: true, bis: null })
-    expect(await fehlversucheGesperrt('passwort', KUNDIN, new Date(), meldungen)).toEqual({ gesperrt: true, bis: null })
+    expect(await zaehleVersuchVorab('code', KUNDIN, new Date(), meldungen)).toEqual({ gesperrt: true, bis: null })
+    expect(await zaehleVersuchVorab('passwort', KUNDIN, new Date(), meldungen)).toEqual({ gesperrt: true, bis: null })
     // Bestehende Bremsen: fail-open wie bisher.
     expect(await bremseUeberAlleInstanzen([{ bremse: DB_BREMSEN.meldungIp, merkmal: '203.0.113.7' }], new Date(), meldungen)).toBe(true)
     expect(await neuigkeitenGebremst('bestellung-1')).toBe(false)
@@ -328,7 +366,7 @@ describe('FAIL-CLOSED nur für die neuen Bremsen', () => {
 
   it('Zeitlimit: eine hängende Datenbank pausiert, statt ungezählt raten zu lassen', async () => {
     db.kaputt = 'haengt'
-    const ergebnis = fehlversucheGesperrt('passwort', KUNDIN, new Date(), neueBremsMeldungen())
+    const ergebnis = zaehleVersuchVorab('passwort', KUNDIN, new Date(), neueBremsMeldungen())
     await vi.advanceTimersByTimeAsync(DB_BREMSE_ZEITLIMIT_MS)
     expect(await ergebnis).toEqual({ gesperrt: true, bis: null })
   })
@@ -336,8 +374,8 @@ describe('FAIL-CLOSED nur für die neuen Bremsen', () => {
   it('Sentry erfährt es gedrosselt, ohne Adresse oder Schlüssel', async () => {
     db.kaputt = 'fehler'
     const meldungen = neueBremsMeldungen()
-    await fehlversucheGesperrt('code', KUNDIN, new Date(), meldungen)
-    await zaehleFehlversuch('code', KUNDIN, new Date(), meldungen)
+    await zaehleVersuchVorab('code', KUNDIN, new Date(), meldungen)
+    await zaehleVersuchVorab('passwort', KUNDIN, new Date(), meldungen)
 
     expect(Sentry.captureException).toHaveBeenCalledTimes(1)
     const gesendet = JSON.stringify(vi.mocked(Sentry.captureException).mock.calls)
@@ -346,10 +384,18 @@ describe('FAIL-CLOSED nur für die neuen Bremsen', () => {
     expect(gesendet).not.toContain(bremsSchluessel(process.env.BETTER_AUTH_SECRET!, 'code-fehler-stunde', KUNDIN))
   })
 
-  it('Zählen scheitert: keine Mail, der Versuch bleibt ungezählt', async () => {
+  it('Zählen scheitert: pausiert, keine Mail', async () => {
     db.kaputt = 'fehler'
     await falsch('code', KUNDIN, 10)
     expect(nachlauf.aufgaben).toHaveLength(0)
+  })
+
+  it('Zurückgeben scheitert: wirft nicht — der Versuch bleibt gezählt, zur sicheren Seite', async () => {
+    const vorab = await zaehleVersuchVorab('passwort', KUNDIN, new Date(), neueBremsMeldungen())
+    if (vorab.gesperrt) throw new Error('unerwartet pausiert')
+    db.kaputt = 'fehler'
+    await expect(gibVersuchZurueck(vorab.versuch, neueBremsMeldungen())).resolves.toBeUndefined()
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -377,24 +423,37 @@ describe('Quelltext: Hooks in auth.ts', () => {
   it('Code: erst pausiert?, dann die Rolle — die Ablehnung eines Hofs zählt wie ein falscher Code', () => {
     expect(
       inReihenfolge(abschnitt('/sign-in/email-otp'), [
-        "fehlversucheGesperrt('code', body.email)",
+        "await zaehleVersuchVorab('code', body.email)",
         "throw zuVieleFehlversucheFehler('code'",
         'rolleZurAdresse(adresseWieDasPlugin(body.email))',
-        "await zaehleFehlversuch('code', body.email)",
+        'zaehleAlsFehlversuch(vorab.versuch)',
         'throw falscherCodeFehler()',
+        'vorabGezaehlt.set(ctx.context, vorab.versuch)',
       ])
     ).toBe(true)
   })
 
   it('Gegenprobe: vertauscht fällt es auf', () => {
-    expect(inReihenfolge(abschnitt('/sign-in/email-otp'), ['rolleZurAdresse(', "fehlversucheGesperrt('code'"])).toBe(false)
+    expect(inReihenfolge(abschnitt('/sign-in/email-otp'), ['rolleZurAdresse(', "zaehleVersuchVorab('code'"])).toBe(false)
   })
 
-  it('Passwort: pausiert? vor dem Endpunkt; gezählt und gelöscht wird in hooks.after', () => {
-    expect(abschnitt('/sign-in/email')).toContain("fehlversucheGesperrt('passwort', body.email)")
+  it('Passwort: vorab gezählt vor dem Endpunkt; hooks.after lässt den Fehlversuch stehen oder gibt zurück', () => {
+    expect(
+      inReihenfolge(abschnitt('/sign-in/email'), [
+        "await zaehleVersuchVorab('passwort', body.email)",
+        "throw zuVieleFehlversucheFehler('passwort'",
+        'vorabGezaehlt.set(ctx.context, vorab.versuch)',
+      ])
+    ).toBe(true)
     expect(abschnitt('/reset-password')).toContain('adresseBeimZuruecksetzen.set(ctx.context')
-    expect(nachher).toContain('await zaehleFehlversuch(art, body.email)')
-    expect(nachher).toContain('istFehlversuch(art, antwort.body?.code)')
+    expect(
+      inReihenfolge(nachher, [
+        'vorabGezaehlt.get(ctx.context)',
+        'istFehlversuch(versuch.art, antwort.body?.code)',
+        'await gibVersuchZurueck(versuch)',
+        'zaehleAlsFehlversuch(versuch)',
+      ])
+    ).toBe(true)
     expect(nachher).toContain('await loeschePasswortFehlversuche(email)')
   })
 

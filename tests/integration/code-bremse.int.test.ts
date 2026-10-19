@@ -14,7 +14,10 @@
  *    ist die Antwortfolge gleich (Status, Körper), auch für einen zu oft
  *    probierten und einen abgelaufenen Code — sonst verriete der 6. Versuch,
  *    welche Adresse ein Hof ist (ein Hof bekommt nie einen Code).
- *  - Anmeldung und „Bestellungen finden" zählen zusammen.
+ *  - Anmeldung und „Bestellungen finden" zählen zusammen; ein richtiger Code
+ *    bzw. ein richtiges Passwort zählt nicht.
+ *  - Gleichzeitig: Von 20 falschen Codes bzw. Passwörtern werden höchstens 10
+ *    geprüft — gezählt wird VOR dem Prüfen (Nachbesserung Runde 2).
  *  - 30 falsche Codes am Tag pausieren bis zum Ende des Tagesfensters.
  *  - Passwort: 10 falsch → 429 mit Satz; „Passwort vergessen" geht weiter, ein
  *    erfolgreiches Zurücksetzen löscht den Zähler, das neue Passwort meldet an.
@@ -33,7 +36,7 @@ import { env } from '@/lib/env'
 import { DB_BREMSEN, bremsSchluessel } from '@/lib/bremse-datenbank'
 import { ZU_VIELE_FALSCHE_CODES, ZU_VIELE_FALSCHE_PASSWOERTER } from '@/lib/anmeldecode'
 import { uhrzeitInWien } from '@/lib/fristen'
-import { fehlversucheGesperrt, zaehleFehlversuch } from '@/server/bremse-datenbank'
+import { zaehleAlsFehlversuch, zaehleVersuchVorab } from '@/server/bremse-datenbank'
 import { legeBestellCodeAn, pruefeBestellCode } from '@/server/bestellungen-finden'
 import { intKennung, raeumeAuf } from './setup/basis'
 
@@ -253,6 +256,9 @@ describe('falsche Codes je Adresse — über alle Codes', () => {
 
   it('Anmeldung und „Bestellungen finden" zählen zusammen: 5 + 5 pausieren beide', async () => {
     const email = neueAdresse()
+    // Ein richtiger Code zählt nicht.
+    expect(await pruefeBestellCode(email, await legeBestellCodeAn(email))).toEqual({ ok: true })
+    expect(await stand(DB_BREMSEN.codeFehlerStunde.zweck, email)).toBe(0)
     const bestellCode = await legeBestellCodeAn(email)
     for (let i = 0; i < 5; i++) expect(await pruefeBestellCode(email, falscherCode(bestellCode))).toMatchObject({ ok: false })
     for (let i = 0; i < 5; i++) expect(await mitCode(email, '000000')).toMatchObject({ ok: false, code: 'INVALID_OTP' })
@@ -266,11 +272,26 @@ describe('falsche Codes je Adresse — über alle Codes', () => {
     const email = neueAdresse()
     for (const stunde of ['06', '07', '08']) {
       const zeit = new Date(`${GESTERN}T${stunde}:30:00.000Z`)
-      for (let i = 0; i < 10; i++) await zaehleFehlversuch('code', email, zeit)
+      for (let i = 0; i < 10; i++) {
+        const vorab = await zaehleVersuchVorab('code', email, zeit)
+        if (!vorab.gesperrt) zaehleAlsFehlversuch(vorab.versuch)
+      }
     }
 
-    expect(await fehlversucheGesperrt('code', email, FEST)).toEqual({ gesperrt: true, bis: TAGESENDE })
+    expect(await zaehleVersuchVorab('code', email, FEST)).toEqual({ gesperrt: true, bis: TAGESENDE })
+    expect(await stand(DB_BREMSEN.codeFehlerTag.zweck, email)).toBe(30)
     expect(await mitCode(email, '000000')).toMatchObject({ status: 429, pauseBis: `morgen um ${uhrzeitInWien(TAGESENDE)}` })
+  })
+
+  it('gleichzeitig: von 20 falschen Codes werden höchstens 10 geprüft — die Ablehnungen füllen das Tagesfenster nicht', async () => {
+    // Gezählt wird VOR dem Prüfen (Nachbesserung Runde 2): Getrennt gelesen und
+    // erst danach gezählt, sahen alle gleichzeitigen Versuche noch Stand 0.
+    const email = neueAdresse('niemand')
+    const ergebnisse = await Promise.all(Array.from({ length: 20 }, () => mitCode(email, '000000')))
+    const geprueft = ergebnisse.filter((e) => !e.ok && e.code === 'INVALID_OTP').length
+    expect(geprueft).toBeLessThanOrEqual(10)
+    expect(ergebnisse.filter((e) => !e.ok && e.status === 429)).toHaveLength(20 - geprueft)
+    expect(await stand(DB_BREMSEN.codeFehlerTag.zweck, email)).toBeLessThanOrEqual(10)
   })
 
   it('in der Tabelle steht keine Adresse — nur Zweck und HMAC', async () => {
@@ -315,6 +336,28 @@ describe('falsche Passwörter je Adresse', () => {
     await auth.api.resetPassword({ body: { newPassword: 'neues-passwort-5678', token: token! } })
     expect(await stand(DB_BREMSEN.passwortFehler.zweck, email)).toBe(0)
     expect(await mitPasswort(email, 'neues-passwort-5678')).toEqual({ ok: true })
+  })
+
+  it('gleichzeitig: von 20 falschen Passwörtern werden höchstens 10 geprüft (gezählt wird vor dem Prüfen)', async () => {
+    const email = neueAdresse('bauer')
+    await auth.api.signUpEmail({ body: { email, password: 'test-passwort-1234', name: 'Max Mustermann' } })
+
+    const ergebnisse = await Promise.all(Array.from({ length: 20 }, () => mitPasswort(email, 'falsch-falsch')))
+    const geprueft = ergebnisse.filter((e) => !e.ok && e.status === 401).length
+    expect(geprueft).toBeLessThanOrEqual(10)
+    expect(ergebnisse.filter((e) => !e.ok && e.status === 429)).toHaveLength(20 - geprueft)
+    expect(await stand(DB_BREMSEN.passwortFehler.zweck, email)).toBeLessThanOrEqual(10)
+  })
+
+  it('ein richtiges Passwort zählt nicht: 9 falsch, richtig, noch 1 falsch — erst dann pausiert', async () => {
+    const email = neueAdresse('bauer')
+    await auth.api.signUpEmail({ body: { email, password: 'test-passwort-1234', name: 'Max Mustermann' } })
+
+    for (let i = 0; i < 9; i++) expect(await mitPasswort(email, 'falsch-falsch')).toMatchObject({ ok: false, status: 401 })
+    expect(await mitPasswort(email, 'test-passwort-1234')).toEqual({ ok: true })
+    expect(await stand(DB_BREMSEN.passwortFehler.zweck, email)).toBe(9)
+    expect(await mitPasswort(email, 'falsch-falsch')).toMatchObject({ ok: false, status: 401 })
+    expect(await mitPasswort(email, 'test-passwort-1234')).toMatchObject({ ok: false, status: 429 })
   })
 
   it('„Passwort vergessen" antwortet für eine unbekannte Adresse genauso — und schickt nichts', async () => {

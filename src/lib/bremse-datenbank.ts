@@ -90,7 +90,7 @@ export const DB_BREMSEN = {
   // Merkmal ist die Kennung des Fadens; der Zähler im Eingang zählt weiter.
   antwortHofMail: { zweck: 'antwort-hof-mail', max: 1, fensterMs: STUNDE_MS },
   // Falsche Codes und Passwörter je Adresse (Register E7, Ergänzung; Nr. 112):
-  // ohne erste Stufe und als einzige FAIL-CLOSED (fehlversucheGesperrt in
+  // ohne erste Stufe und als einzige FAIL-CLOSED (zaehleVersuchVorab in
   // src/server/bremse-datenbank.ts) — Merkmal ist die Adresse (adressMerkmal),
   // gezählt wird nur ein Fehlversuch. Codes zählen über beide Wege zusammen.
   codeFehlerStunde: { zweck: 'code-fehler-stunde', max: FALSCHE_CODES_JE_STUNDE, fensterMs: STUNDE_MS },

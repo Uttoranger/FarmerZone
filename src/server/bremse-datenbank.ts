@@ -226,82 +226,97 @@ export async function neuigkeitenGebremst(orderId: string, jetzt: Date = new Dat
  * Schlüssel (wie neuigkeitenGebremst). So prüft die Integrationsschicht die
  * echte Bremse, ohne Schalter.
  *
- * Geprüft wird VOR dem Code bzw. Passwort (nur lesen), gezählt danach, nur
- * wenn der Versuch scheiterte — zwei Schritte, weil erst Better Auth weiß, ob
- * der Code stimmte (hooks.before und hooks.after in src/lib/auth.ts).
+ * Gezählt wird VOR dem Prüfen, atomar (`zaehleVersuche`), erst dann
+ * entscheidet der Stand — wie bremseUeberAlleInstanzen. Getrennt gelesen und
+ * erst nach dem Prüfen gezählt, sahen alle gleichzeitigen Versuche (Hash und
+ * Datenbankwege, 100–300 ms) noch einen Stand unter der Grenze, und ein
+ * Schwall von vielen IP-Adressen brächte beliebig viele durch (Nachbesserung
+ * Runde 2). Stimmt der Code bzw. das Passwort oder scheitert der Versuch an
+ * etwas anderem, gibt der Aufrufer den Versuch zurück (`gibVersuchZurueck`),
+ * so zählen weiter nur Fehlversuche. Je Fenster werden höchstens `max`
+ * Versuche geprüft, die nicht zurückgegeben wurden.
  */
 
-/** Die Versuche einer Art für diese Adresse — dieselben Schlüssel beim Prüfen, Zählen und Löschen. */
+/** Die Versuche einer Art für diese Adresse — dieselben Schlüssel beim Zählen, Zurückgeben und Löschen. */
 function fehlversuche(art: FehlversuchArt, email: string): Versuch[] {
   const merkmal = adressMerkmal(email)
   return FEHLVERSUCH_BREMSEN[art].map((bremse) => ({ bremse, merkmal }))
 }
 
-/** Die Stände im laufenden Fenster, OHNE zu zählen; keine Zeile = 0. */
-async function leseStaende(versuche: readonly Versuch[], jetzt: Date): Promise<number[]> {
-  const zeilen = versuche.map(({ bremse, merkmal }) => ({
-    schluessel: bremsSchluessel(env.BETTER_AUTH_SECRET, bremse.zweck, merkmal),
-    fensterStart: fensterBeginn(jetzt, bremse.fensterMs),
-  }))
-  const gefunden = await prisma.rateLimitZaehler.findMany({
-    where: { OR: zeilen },
-    select: { schluessel: true, fensterStart: true, zaehler: true },
-  })
-  return zeilen.map(
-    (z) =>
-      gefunden.find((g) => g.schluessel === z.schluessel && g.fensterStart.getTime() === z.fensterStart.getTime())
-        ?.zaehler ?? 0
-  )
-}
+/** Ein vorab gezählter Versuch: die Stände danach und die Uhrzeit, die das Fenster festlegt. */
+export type VorabVersuch = { art: FehlversuchArt; merkmal: string; staende: number[]; jetzt: Date }
 
-/** Pausiert bis `bis`; `bis: null` = die Datenbank antwortete nicht (fail-closed, Ende unbekannt). */
-export type FehlversuchSperre = { gesperrt: false } | { gesperrt: true; bis: Date | null }
+/** Pausiert bis `bis` (`null` = die Datenbank antwortete nicht: fail-closed, Ende unbekannt), sonst der gezählte Versuch. */
+export type FehlversuchVorab = { gesperrt: false; versuch: VorabVersuch } | { gesperrt: true; bis: Date | null }
 
 /**
- * Ist diese Adresse für Codes bzw. Passwörter pausiert? Zählt nicht. Bei
- * Datenbankfehler oder Zeitlimit: pausiert (fail-closed, siehe oben).
+ * Zählt den Versuch vorab und sagt, ob die Adresse pausiert ist. Pausiert
+ * war sie, wenn ein Stand VOR diesem Versuch `max` erreichte; dann wird der
+ * Versuch gleich zurückgegeben — sonst füllten abgelehnte Versuche, bei denen
+ * nichts geprüft wurde, das Tagesfenster. Bei Datenbankfehler oder Zeitlimit:
+ * pausiert (fail-closed, siehe oben).
  */
-export async function fehlversucheGesperrt(
+export async function zaehleVersuchVorab(
   art: FehlversuchArt,
   email: string,
   jetzt: Date = new Date(),
   meldungen: BremsMeldungen = MELDUNGEN_DIESER_INSTANZ
-): Promise<FehlversuchSperre> {
-  const versuche = fehlversuche(art, email)
-  try {
-    const staende = await mitFrist(leseStaende(versuche, jetzt), DB_BREMSE_ZEITLIMIT_MS)
-    const bis = fehlversuchSperreBis(FEHLVERSUCH_BREMSEN[art], staende, jetzt)
-    return bis === null ? { gesperrt: false } : { gesperrt: true, bis }
-  } catch (err) {
-    meldeBremsFehler(err, versuche, jetzt, meldungen)
-    return { gesperrt: true, bis: null }
-  }
-}
-
-/**
- * Zählt einen Fehlversuch. Macht genau dieser die Bremse voll, geht nach der
- * Antwort EINE Mail an die Adresse (nur wenn es ein Konto gibt). Wirft nie:
- * Scheitert das Zählen, bleibt der Versuch ungezählt — antwortet die
- * Datenbank nicht, pausiert schon die Prüfung vor dem nächsten Versuch.
- */
-export async function zaehleFehlversuch(
-  art: FehlversuchArt,
-  email: string,
-  jetzt: Date = new Date(),
-  meldungen: BremsMeldungen = MELDUNGEN_DIESER_INSTANZ
-): Promise<void> {
+): Promise<FehlversuchVorab> {
   const versuche = fehlversuche(art, email)
   let staende: number[]
   try {
     staende = await mitFrist(zaehleVersuche(versuche, jetzt), DB_BREMSE_ZEITLIMIT_MS)
   } catch (err) {
     meldeBremsFehler(err, versuche, jetzt, meldungen)
-    return
+    return { gesperrt: true, bis: null }
   }
-  const bis = pauseBeginntBis(FEHLVERSUCH_BREMSEN[art], staende, jetzt)
-  if (bis !== null) {
-    const merkmal = adressMerkmal(email)
-    nachDerAntwort(() => schickeWarnMail(art, merkmal, bis))
+  const versuch: VorabVersuch = { art, merkmal: adressMerkmal(email), staende, jetzt }
+  const bis = fehlversuchSperreBis(
+    FEHLVERSUCH_BREMSEN[art],
+    staende.map((stand) => stand - 1),
+    jetzt
+  )
+  if (bis === null) return { gesperrt: false, versuch }
+  await gibVersuchZurueck(versuch, meldungen)
+  return { gesperrt: true, bis }
+}
+
+/**
+ * Der vorab gezählte Versuch ist gescheitert: Er bleibt gezählt. Hat genau
+ * er die Bremse voll gemacht, geht nach der Antwort EINE Mail an die Adresse
+ * (nur wenn es ein Konto gibt).
+ */
+export function zaehleAlsFehlversuch(versuch: VorabVersuch): void {
+  const bis = pauseBeginntBis(FEHLVERSUCH_BREMSEN[versuch.art], versuch.staende, versuch.jetzt)
+  if (bis !== null) nachDerAntwort(() => schickeWarnMail(versuch.art, versuch.merkmal, bis))
+}
+
+/**
+ * Nimmt den vorab gezählten Versuch zurück — im Fenster, in dem er gezählt
+ * wurde, nie unter 0. Wirft nie: Scheitert es, bleibt er gezählt (zur
+ * sicheren Seite), und eine gelungene Anmeldung läuft weiter.
+ */
+export async function gibVersuchZurueck(
+  versuch: VorabVersuch,
+  meldungen: BremsMeldungen = MELDUNGEN_DIESER_INSTANZ
+): Promise<void> {
+  const versuche = fehlversuche(versuch.art, versuch.merkmal)
+  try {
+    await mitFrist(
+      prisma.rateLimitZaehler.updateMany({
+        where: {
+          OR: versuche.map(({ bremse, merkmal }) => ({
+            schluessel: bremsSchluessel(env.BETTER_AUTH_SECRET, bremse.zweck, merkmal),
+            fensterStart: fensterBeginn(versuch.jetzt, bremse.fensterMs),
+          })),
+          zaehler: { gte: 1 },
+        },
+        data: { zaehler: { decrement: 1 } },
+      }),
+      DB_BREMSE_ZEITLIMIT_MS
+    )
+  } catch (err) {
+    meldeBremsFehler(err, versuche, versuch.jetzt, meldungen)
   }
 }
 

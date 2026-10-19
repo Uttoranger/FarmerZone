@@ -14,7 +14,7 @@ import {
 } from '@/lib/bestellungen-finden'
 import { bestellCodePasst, erzeugeBestellCode, hashBestellCode } from '@/lib/bestellungen-zugang'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
-import { fehlversucheGesperrt, zaehleFehlversuch } from '@/server/bremse-datenbank'
+import { gibVersuchZurueck, zaehleAlsFehlversuch, zaehleVersuchVorab } from '@/server/bremse-datenbank'
 
 /*
  * „Bestellungen finden" gegen die Datenbank (Nr. 14). Was ein Code-Versuch
@@ -52,18 +52,22 @@ export async function legeBestellCodeAn(email: string, jetzt: Date = new Date())
  * Prüft einen Code. Falsche Codes zählen zusätzlich je Adresse über alle
  * Codes — in DENSELBEN Zählern wie die Anmeldung mit Code (Register E7,
  * Ergänzung; Nr. 112): 10 Fehlversuche über beide Wege zusammen pausieren
- * beide, sonst hätte, wer raten will, auf jedem Weg seine eigenen 10. Ist die
- * Adresse pausiert (oder antwortet die Bremse nicht: fail-closed), wird der
- * Code gar nicht erst geprüft — `ZU_VIELE`, wie die anderen Bremsen hier.
+ * beide, sonst hätte, wer raten will, auf jedem Weg seine eigenen 10. Der
+ * Versuch zählt VORAB, atomar — sonst kämen gleichzeitige Versuche alle am
+ * Stand vorbei; ein richtiger Code gibt ihn zurück. Ist die Adresse pausiert
+ * (oder antwortet die Bremse nicht: fail-closed), wird der Code gar nicht
+ * erst geprüft — `ZU_VIELE`, wie die anderen Bremsen hier.
  */
 export async function pruefeBestellCode(
   email: string,
   code: string,
   jetzt: Date = new Date()
 ): Promise<{ ok: true } | { ok: false; fehler: BestellCodeFehler | 'ZU_VIELE' }> {
-  if ((await fehlversucheGesperrt('code', email, jetzt)).gesperrt) return { ok: false, fehler: 'ZU_VIELE' }
+  const vorab = await zaehleVersuchVorab('code', email, jetzt)
+  if (vorab.gesperrt) return { ok: false, fehler: 'ZU_VIELE' }
   const ergebnis = await pruefeCodeZeile(email, code, jetzt)
-  if (!ergebnis.ok) await zaehleFehlversuch('code', email, jetzt)
+  if (ergebnis.ok) await gibVersuchZurueck(vorab.versuch)
+  else zaehleAlsFehlversuch(vorab.versuch)
   return ergebnis
 }
 
