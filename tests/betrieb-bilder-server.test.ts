@@ -191,7 +191,7 @@ describe('„Liste als CSV“ (/admin/betrieb/bilder-export)', () => {
     expect(antwort.headers.get('Cache-Control')).toBe('no-store')
     expect(antwort.headers.get('Content-Disposition')).toBe('attachment; filename="bilder-ohne-verwendung-2026-10-16.csv"')
     const text = await antwort.text()
-    expect(text.replace(/^﻿/, '').trim().split('\r\n')).toEqual(['Art;Pfad;Größe (Bytes);hochgeladen', 'Produktfotos;farms/hofa/product/alt.webp;4000;2026-08-03'])
+    expect(text.replace(/^\uFEFF/, '').trim().split('\r\n')).toEqual(['Art;Pfad;Größe (Bytes);hochgeladen', 'Produktfotos;farms/hofa/product/alt.webp;4000;2026-08-03'])
     expect(text).not.toContain(SPEICHER)
     // Die zwei Seiten der Auflistung zählen als Bild-Vorgänge.
     expect(werteVon(db.$executeRaw.mock.calls[0])).toEqual(['2026-10-16', 2, JETZT])

@@ -45,7 +45,7 @@ function WahlPille({
   return (
     <label
       className={cn(
-        "relative inline-flex h-9 shrink-0 items-center rounded-full border px-4 text-[13.5px] whitespace-nowrap transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-ring",
+        "relative inline-flex h-9 shrink-0 items-center rounded-full border px-4 text-[13.5px] whitespace-nowrap transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-[5px] before:content-[''] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-ring",
         gewaehlt ? 'border-foreground bg-foreground font-semibold text-background' : 'border-border bg-card font-medium text-foreground hover:bg-muted'
       )}
     >

@@ -57,7 +57,7 @@ export function GespeichertAnsehenKarte({
 }
 
 /**
- * Zeigt „Gespeichert · Ansehen" — nur unter lg, wo es den Umschalter gibt.
+ * Zeigt „Gespeichert · Ansehen" — nur unter lg, wo es die Kundenansicht als Vollbild gibt.
  * Ab lg steht die Vorschau neben der Liste (Hofseite) bzw. gibt es keine
  * Kundenansicht (Beiträge): Dort bleibt der bisherige Toast mit
  * `beschreibung` bzw. „Gespeichert". Je `abschnitt` gibt es den Hinweis nur

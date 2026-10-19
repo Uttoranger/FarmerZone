@@ -28,6 +28,62 @@ const BEFEHLSANFANG = String.raw`(?:^|[;&|(\n]|\s-c\s+["'])\s*(?:\w+=\S+\s+)*`
 // Globale Optionen zwischen git und dem Unterbefehl (git -C <ordner> commit, git -c k=v stash, git --no-pager …).
 const GIT = String.raw`git(?:\s+(?:-C|-c)\s+\S+|\s+--[\w-]+(?:=\S+)?)*\s+`
 
+// `prisma migrate deploy` — auch hinter pnpm/npx/env/dotenv — und `pnpm vercel-build`, das es als ersten Schritt
+// ausführt. Nur am Befehlsanfang: Eine Commit-Nachricht oder ein echo, das den Aufruf nennt, ist keiner.
+const MIGRATE_DEPLOY = new RegExp(
+  BEFEHLSANFANG +
+    String.raw`(?:(?:pnpm|npm|npx|pnpx|exec|dlx|run|env|dotenv|--|-e|\S*\.env\S*)\s+)*(?:prisma\s+migrate\s+deploy|vercel-build)\b`
+)
+
+/**
+ * Zeigt diese Datenbank-Adresse ausdrücklich auf den eigenen Rechner (localhost oder 127.0.0.1)? Gelesen
+ * wird der Host der Adresse, nicht ein Wort darin: `postgresql://localhost@fremd.example/db` und
+ * `…@localhost.fremd.example/db` zeigen auf fremde Rechner. Ein `?host=` in der Adresse überschreibt den Host
+ * (pg, libpq) und gilt deshalb nie als lokal; Variablen wie `$TEST_DATABASE_URL` sind keine ausdrückliche Adresse.
+ */
+function istLokaleDatenbank(wert) {
+  let adresse
+  try {
+    adresse = new URL(wert.replace(/^["']|["']$/g, ''))
+  } catch {
+    return false
+  }
+  if (adresse.protocol !== 'postgresql:' && adresse.protocol !== 'postgres:') return false
+  if ([...adresse.searchParams.keys()].some((name) => /^host(addr)?$/i.test(name))) return false
+  return adresse.hostname === 'localhost' || adresse.hostname === '127.0.0.1'
+}
+
+/** Setzt DIESER Befehl DATABASE_URL UND DIRECT_URL, und zeigen alle Zuweisungen beider auf den eigenen Rechner? */
+function deployNurLokal(befehl) {
+  const zuweisungen = (name) =>
+    [...befehl.matchAll(new RegExp(String.raw`(?:^|[\s;&|(])(?:export\s+)?${name}=("[^"]*"|'[^']*'|[^\s;&|)]+)`, 'g'))].map((m) => m[1])
+  return ['DATABASE_URL', 'DIRECT_URL'].every((name) => {
+    const werte = zuweisungen(name)
+    return werte.length > 0 && werte.every(istLokaleDatenbank)
+  })
+}
+
+/**
+ * Den Text eines Here-Documents lesen die Regeln nicht mit: Er ist Daten (Commit-Nachricht, Datei), kein
+ * Befehl — sonst blockt eine Nachricht, deren Zeile mit „git stash“ beginnt (Fehlalarm aus Nr. 110). Nur bei
+ * gequotetem Begrenzer (<<'EOF'): Ohne Quote führt die Shell `$(…)` im Text aus. Geht das Dokument an eine
+ * Shell (`bash <<'EOF'`), ist der Text Befehl und bleibt.
+ */
+function ohneHeredocText(text) {
+  const behalten = []
+  let ende = null
+  for (const zeile of text.split('\n')) {
+    if (ende !== null) {
+      if (zeile.trim() === ende) ende = null
+      continue
+    }
+    behalten.push(zeile)
+    const kopf = /(?<!<)<<(?!<)-?\s*(["'])([A-Za-z_]\w*)\1/.exec(zeile)
+    if (kopf && !/\b(?:ba|z|da|k)?sh\b|\bsource\b/.test(zeile.slice(0, kopf.index))) ende = kopf[2]
+  }
+  return behalten.join('\n')
+}
+
 const regeln = [
   {
     muster: /prisma\s+db\s+push/,
@@ -135,14 +191,32 @@ function branchDesCommits(befehl, arbeitsordner) {
   }
 }
 
+const geprueft = ohneHeredocText(befehl)
+
 for (const regel of regeln) {
-  if (regel.muster.test(befehl)) {
+  if (regel.muster.test(geprueft)) {
     console.error(`Blockiert: ${regel.grund}`)
     process.exit(2)
   }
 }
 
-if (branchDesCommits(befehl, arbeitsordner) === 'main') {
+// Wie die Regeln oben, nur mit Bedingung: Dieselbe Datenbank-Folge prüft der Sammel-PR (Regel 3 in
+// docs/nachtlauf.md) auf einer frischen lokalen Wegwerf-Datenbank — dort, und nur dort, ist der Aufruf richtig.
+// Zuweisungen zählen nur, wenn sie VOR dem Aufruf stehen — `deploy && DATABASE_URL=… true` setzt sie für etwas anderes.
+const deployNichtLokal = [...geprueft.matchAll(new RegExp(MIGRATE_DEPLOY, 'g'))].some(
+  (treffer) => !deployNurLokal(geprueft.slice(0, treffer.index + treffer[0].length))
+)
+if (deployNichtLokal) {
+  console.error(
+    'Blockiert: `prisma migrate deploy` (auch über `pnpm vercel-build`) läuft hier nur gegen eine ausdrücklich ' +
+      'lokale Datenbank: Setze im SELBEN Befehl DATABASE_URL und DIRECT_URL, beide auf localhost oder 127.0.0.1 ' +
+      '(Regel 3 in docs/nachtlauf.md, Prüfung im Sammel-PR). Entwicklungs- und Produktionsdatenbank bekommen ' +
+      'ihre Migrationen nur über `vercel-build` beim Push bzw. beim Merge auf main.'
+  )
+  process.exit(2)
+}
+
+if (branchDesCommits(geprueft, arbeitsordner) === 'main') {
   console.error(
     'Blockiert: Auf main wird nie direkt committet. Lege zuerst einen Feature-Branch an ' +
       '(`git switch -c <branch>`), committe dort und öffne einen PR — der Mensch merged.'

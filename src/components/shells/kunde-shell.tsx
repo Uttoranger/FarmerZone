@@ -71,7 +71,6 @@ function WarenkorbKopf({ anzahl, href }: { anzahl: number; href: string }) {
   )
 }
 
-/** Der Knopf rechts im Kopf: Pille mit 44 px Höhe — auch am Handy gut zu treffen und zu lesen. */
 /**
  * Über der blassen Leiste in der Vorschau im Rahmen: fängt den Tipp, den die
  * Leiste mit `inert` nicht mehr bekommt (er fiele sonst auf die Seite darunter),
@@ -106,6 +105,7 @@ function VorschauLeisteSperre(): React.JSX.Element {
   )
 }
 
+/** Der Knopf rechts im Kopf: Pille mit 44 px Höhe — auch am Handy gut zu treffen und zu lesen. */
 const KOPF_KNOPF = cn(
   'inline-flex h-11 shrink-0 items-center rounded-full border border-border px-4 text-[14px] font-semibold whitespace-nowrap text-foreground transition-colors duration-[250ms] hover:bg-muted',
   FOKUS_RAHMEN

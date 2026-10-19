@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
   const html = `
     <h1>${MARKE} Test-E-Mail</h1>
-    <p>Diese Mail wurde um <strong>${new Date().toLocaleString('de-AT')}</strong> gesendet.</p>
+    <p>Diese Mail wurde um <strong>${new Date().toLocaleString('de-AT', { timeZone: 'Europe/Vienna' })}</strong> gesendet.</p>
     <p>Wenn du diese Mail siehst, funktioniert der E-Mail-Versand korrekt.</p>
   `
 

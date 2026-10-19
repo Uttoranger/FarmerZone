@@ -38,7 +38,9 @@ export function Chip({
  * Seite, die gerade offen ist, und trägt deshalb `aria-current="page"`.
  *
  * Sichtbar 36 px hoch wie im Mockup; die Trefferfläche reicht über ein
- * unsichtbares ::before auf 44 px (Touch-Ziel).
+ * unsichtbares ::before auf 44 px (Touch-Ziel). Das ::before sitzt im
+ * Innenrand des Rahmens (36 − 2 px Rahmen), darum 5 px Überstand je Seite,
+ * nicht 4 — mit 4 waren es nur 42 px (Nr. 105, Nr. 118).
  *
  * `onNavigate` (zusätzlich, Nr. 09) reicht an Nexts Link weiter: Er läuft
  * nur bei einem gewöhnlichen Klick in der App, nie bei Mittelklick, Strg-Klick
@@ -87,7 +89,7 @@ export function FilterChip({
       data-slot="filter-chip"
       aria-current={aktiv ? 'page' : undefined}
       className={cn(
-        "relative inline-flex h-9 shrink-0 items-center rounded-full border px-4 text-[13.5px] whitespace-nowrap transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']",
+        "relative inline-flex h-9 shrink-0 items-center rounded-full border px-4 text-[13.5px] whitespace-nowrap transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-[5px] before:content-['']",
         aktiv
           ? 'border-foreground bg-foreground font-semibold text-background'
           : 'border-border bg-card font-medium text-foreground hover:bg-muted',

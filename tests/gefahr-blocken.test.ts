@@ -164,6 +164,125 @@ describe('gefahr-blocken — prettier --write', () => {
   }
 })
 
+describe('gefahr-blocken — prisma migrate deploy nur gegen eine ausdrücklich lokale Datenbank (Nr. 118, Regel 3)', () => {
+  const LOKAL = 'postgresql://postgres:postgres@localhost:5432/wegwerf_test'
+  const LOKAL_IP = 'postgresql://postgres:postgres@127.0.0.1:5432/wegwerf_test'
+  const FREMD = 'postgresql://postgres:geheim@db.example.com:5432/postgres'
+  const DEPLOY = 'pnpm exec prisma migrate deploy'
+
+  for (const befehl of [
+    DEPLOY,
+    'npx prisma migrate deploy',
+    'prisma migrate deploy',
+    'dotenv -e .env.local -- prisma migrate deploy',
+    'pnpm test && pnpm exec prisma migrate deploy',
+    // Das Skript vercel-build führt migrate deploy als ersten Schritt aus.
+    'pnpm vercel-build',
+    'pnpm run vercel-build',
+    // Nur eine der beiden Adressen: prisma.config.ts liest DIRECT_URL vor DATABASE_URL.
+    `DATABASE_URL=${LOKAL} ${DEPLOY}`,
+    `DIRECT_URL=${LOKAL} ${DEPLOY}`,
+    // Eine der beiden zeigt auf einen fremden Rechner.
+    `DATABASE_URL=${LOKAL} DIRECT_URL=${FREMD} ${DEPLOY}`,
+    `DATABASE_URL=${FREMD} DIRECT_URL=${LOKAL} ${DEPLOY}`,
+    // Wird eine Variable zweimal gesetzt, zählt jede Zuweisung.
+    `DATABASE_URL=${LOKAL} DATABASE_URL=${FREMD} DIRECT_URL=${LOKAL} ${DEPLOY}`,
+    // Das Wort localhost im Benutzernamen oder im Host einer Fremdadresse macht sie nicht lokal.
+    `DATABASE_URL=postgresql://localhost@db.example.com/x DIRECT_URL=postgresql://localhost@db.example.com/x ${DEPLOY}`,
+    `DATABASE_URL=postgresql://u:p@localhost.example.com/x DIRECT_URL=postgresql://u:p@localhost.example.com/x ${DEPLOY}`,
+    // ?host= überschreibt den Host der Adresse.
+    `DATABASE_URL=${LOKAL}?host=db.example.com DIRECT_URL=${LOKAL}?host=db.example.com ${DEPLOY}`,
+    // Keine ausdrückliche Adresse: eine Variable oder die Test-Variante des Namens.
+    `DATABASE_URL=$TEST_DATABASE_URL DIRECT_URL=$TEST_DATABASE_URL ${DEPLOY}`,
+    `TEST_DATABASE_URL=${LOKAL} ${DEPLOY}`,
+    // Die Adressen stehen erst nach dem Aufruf: Sie gelten für ihn nicht.
+    `${DEPLOY} && DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL} true`,
+  ]) {
+    it(`blockt: ${befehl}`, () => {
+      const r = lauf(befehl)
+      expect(r.code).toBe(2)
+      expect(r.grund).toContain('ausdrücklich lokale Datenbank')
+    })
+  }
+
+  for (const befehl of [
+    `DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL} ${DEPLOY}`,
+    `DIRECT_URL=${LOKAL} DATABASE_URL=${LOKAL} ${DEPLOY}`,
+    `DATABASE_URL=${LOKAL_IP} DIRECT_URL=${LOKAL_IP} ${DEPLOY}`,
+    `DATABASE_URL="${LOKAL}" DIRECT_URL='${LOKAL}' ${DEPLOY}`,
+    `env DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL} ${DEPLOY}`,
+    `export DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL}; ${DEPLOY}`,
+    `export DATABASE_URL=${LOKAL} && export DIRECT_URL=${LOKAL} && ${DEPLOY}`,
+    `DATABASE_URL=${LOKAL} DIRECT_URL=${LOKAL} pnpm vercel-build`,
+    `DATABASE_URL=postgresql://postgres:postgres@localhost/wegwerf_test?schema=public DIRECT_URL=${LOKAL_IP} ${DEPLOY}`,
+  ]) {
+    it(`lässt durch: ${befehl}`, () => {
+      expect(lauf(befehl).code).toBe(0)
+    })
+  }
+
+  for (const befehl of [
+    // Text, der den Aufruf nur nennt (Commit-Nachricht, echo, grep), ist kein Aufruf.
+    'echo "prisma migrate deploy ist gesperrt"',
+    'git commit -m "migrate deploy nur lokal"',
+    'grep -rn "prisma migrate deploy" docs/nachtlauf.md',
+    // Andere Unterbefehle von migrate und das lokale Bauen.
+    'pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code',
+    'pnpm exec prisma migrate status',
+    'pnpm build',
+  ]) {
+    it(`lässt durch: ${befehl}`, () => {
+      expect(lauf(befehl).code).toBe(0)
+    })
+  }
+})
+
+describe('gefahr-blocken — Text in einem Here-Document ist kein Befehl (Fehlalarm aus Nr. 110)', () => {
+  // Kein Repository im Ordner: Der Branch-Test des Hooks soll hier nichts mitentscheiden.
+  const ohneRepo = tmpdir()
+
+  it('lässt eine Commit-Nachricht durch, deren Zeile mit „git stash“ beginnt', () => {
+    const befehl = ['git commit -m "$(cat <<\'EOF\'', 'docs: Regel ergänzt', '', 'git stash ist verboten', 'EOF', ')"'].join('\n')
+    expect(lauf(befehl, ohneRepo).code).toBe(0)
+  })
+
+  it('lässt auch eine Zeile mit prettier --write und migrate deploy in der Nachricht durch', () => {
+    const befehl = [
+      "git commit -F - <<'ENDE'",
+      'fix: kein Aufruf',
+      'pnpm exec prettier --write src',
+      'pnpm exec prisma migrate deploy',
+      'ENDE',
+    ].join('\n')
+    expect(lauf(befehl, ohneRepo).code).toBe(0)
+  })
+
+  it('prüft den Befehl nach dem Dokument weiter', () => {
+    const befehl = ["cat > notiz.txt <<'EOF'", 'nur Text', 'EOF', 'git stash'].join('\n')
+    const r = lauf(befehl, ohneRepo)
+    expect(r.code).toBe(2)
+    expect(r.grund).toContain('git stash ist verboten')
+  })
+
+  it('prüft den Befehl vor dem Dokument weiter', () => {
+    const befehl = ['git stash && cat <<\'EOF\'', 'nur Text', 'EOF'].join('\n')
+    expect(lauf(befehl, ohneRepo).code).toBe(2)
+  })
+
+  it('liest den Text ohne Quote am Begrenzer weiter mit: Die Shell führt $(…) darin aus', () => {
+    expect(lauf(['cat <<EOF', 'git stash', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
+  })
+
+  it('liest den Text mit, wenn das Dokument an eine Shell geht', () => {
+    expect(lauf(['bash <<\'EOF\'', 'git stash', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
+    expect(lauf(['sh -s <<\'EOF\'', 'pnpm exec prettier --write .', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
+  })
+
+  it('hält einen Here-String (<<<) nicht für ein Dokument', () => {
+    expect(lauf(['cat <<< "Text"', 'git stash'].join('\n'), ohneRepo).code).toBe(2)
+  })
+})
+
 describe('gefahr-blocken — Hinweis zu db push', () => {
   it('rät zu migrate diff (Regel 3) und nicht zu db:migrate', () => {
     // Zusammengesetzt, damit dieser Test selbst nicht vom Hook der Sitzung gesperrt wird.

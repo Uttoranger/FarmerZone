@@ -13,7 +13,7 @@ import {
 import { EINSTELLUNG_UNGUELTIG, GILT_AB_UNGUELTIG, PROZENT_UNGUELTIG, servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { ablegenSchema, buendelStandSchema, triageEingabeSchema, trennenSchema, zusammenfassenSchema, type TriageEingabe } from '@/schemas/meldung'
-import { BUENDEL_STAND_STATUS, WUENSCHE_TEXT, bescheidMailHtml, triageAufruf, type TriageStand } from '@/lib/meldung'
+import { BUENDEL_STAND_STATUS, MELDUNG_GEAENDERT, MELDUNG_VERWEIS_GEAENDERT, WUENSCHE_TEXT, bescheidMailHtml, triageAufruf, type TriageStand } from '@/lib/meldung'
 import { MEINE_MELDUNGEN_HREF } from '@/lib/hof-hilfe'
 import { MARKE_TEAM } from '@/lib/marke'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
@@ -479,7 +479,6 @@ export async function setzeGruendungBisAction(
  * in der Triage. antwortAnMelder ist das einzige Triage-Feld, das der Hof sieht.
  */
 const KEINE_KETTE = 'Diese Meldung ist selbst ein Duplikat – nimm ihre Hauptmeldung.'
-const VERWEIS_GEAENDERT = 'Die Meldung oder ihre Hauptmeldung hat sich inzwischen geändert — lade die Seite neu und entscheide noch einmal.'
 
 /**
  * Keine Kette beim Schreiben (Nr. 105, Nacharbeit 101): Mit Verweis schreibt
@@ -578,7 +577,7 @@ export async function triageMeldungAction(
         ).count
       : await schreibeTriageMitVerweis(meldungId, triage, duplikatVonId, jetzt)
   if (count === 0) {
-    return { error: duplikatVonId === null ? 'Die Meldung hat sich inzwischen geändert — lade die Seite neu und entscheide noch einmal.' : VERWEIS_GEAENDERT }
+    return { error: duplikatVonId === null ? MELDUNG_GEAENDERT : MELDUNG_VERWEIS_GEAENDERT }
   }
 
   if (process.env.NODE_ENV !== 'production') {
@@ -777,7 +776,7 @@ export async function legeMeldungAbAction(eingabe: unknown): Promise<{ error?: s
     where: { id: meldungId, status: { equals: vorherStatus, notIn: ['KEIN_FEHLER', 'DUPLIKAT'] } },
     data: { status: 'KEIN_FEHLER', antwortAnMelder: antwort, triagedAt: new Date() },
   })
-  if (count === 0) return { error: 'Die Meldung hat sich inzwischen geändert — lade die Seite neu und entscheide noch einmal.' }
+  if (count === 0) return { error: MELDUNG_GEAENDERT }
 
   revalidatePath('/admin')
   revalidatePath('/admin/postfach')

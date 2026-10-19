@@ -81,7 +81,7 @@ import { Abzeichen, AbzeichenKnopf } from '@/components/ui/abzeichen'
  * Produktraster bleibt in jedem Reiter an derselben Stelle eingehängt — Korb
  * und Nachbestell-Link überstehen so den Wechsel. Die Karten führen zur
  * Produktseite (Nr. 11). Unter lg steht in der Übersicht zuerst das
- * Schaufenster (Register N5, Nr. 51): Fotostreifen, bis zu vier Produkte,
+ * Schaufenster (Register N5, Nr. 51): Fotomosaik, bis zu vier Produkte,
  * „Alle Produkte (n)"; danach rechte Spalte und Über uns.
  *
  * Was entschieden wird (Reiter, Abschnitte, Zustände, Zahlung, Gebühr), steht
@@ -426,7 +426,7 @@ export function HofseiteKunde({
 
       {/* ── Inhalt und rechte Spalte ──
           Unter lg in der Übersicht zuerst das Schaufenster (Register N5):
-          Fotostreifen, bis zu vier Produkte, „Alle Produkte (n)"; danach die
+          Fotomosaik, bis zu vier Produkte, „Alle Produkte (n)"; danach die
           rechte Spalte und Über uns. Der Quelltext hat unter lg genau diese
           Reihenfolge — Tastatur und Screenreader folgen ihr, kein `order`.
           Ab lg stellt das Raster die Teile an ihren alten Ort: Über uns oben

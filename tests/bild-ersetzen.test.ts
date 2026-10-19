@@ -137,8 +137,9 @@ describe('Verarbeitungs-Route — das ersetzte Bild bleibt liegen', () => {
   })
 })
 
-describe('Produktdialog — neues Foto, Speichern scheitert', () => {
-  it('das alte Foto ist nach dem Hochladen des neuen noch erreichbar', async () => {
+describe('Foto hochladen (ladeFotoHoch wie im Produktdialog) — das alte Foto bleibt liegen', () => {
+  // Geprüft wird nur der Upload; das Speichern des Produkts, das danach scheitern könnte, ist hier nicht Teil des Tests.
+  it('das alte Foto liegt nach dem Hochladen des neuen noch im Speicher — ein Speichern, das scheitert, zeigt weiter ein erreichbares Bild', async () => {
     vi.stubGlobal('fetch', netz(echteRoute))
 
     // Derselbe Aufruf wie im Dialog beim Absenden: Kopie aus der Auswahl, Zweck 'product'.

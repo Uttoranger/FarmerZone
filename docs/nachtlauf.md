@@ -283,7 +283,7 @@ Der Lauf beginnt bei der ersten Nummer, die in `status.md` nicht als „fertig" 
 5. **Abschluss:** `pnpm typecheck && pnpm lint && pnpm test` grün; bei Datenbank-Änderungen zusätzlich `pnpm test:integration` gegen die lokale Test-Datenbank. Dann pushen und PR öffnen: Titel mit Nummer, Basis = Vorgänger-Branch, Beschreibung = Bericht + Liste der weggelassenen Teile + Hinweis „Gestapelt auf #<vorheriger PR>, nach dessen Merge zuerst mergen".
 6. **`status.md` aktualisieren:** Nummer, Status, PR-Link, Branch, Dauer, offene Punkte.
 7. Nächste Nummer.
-8. **Am Ende des Laufs: Sammel-PR** (Register G3). Branch `integration/lauf<n>` von `main`, alle fertigen PRs des Laufs per `git merge --no-ff` in Merge-Reihenfolge; Doku-Konflikte beide Seiten behalten, Code-Konflikte sauber zusammenführen und jede Auflösung im PR-Text begründen; Typecheck, Unit- und Integrationstests auf dem Gesamtstand grün. Entwürfe kommen nicht hinein.
+8. **Am Ende des Laufs: Sammel-PR** (Register G3). Branch `integration/lauf<n>` von `main`, alle fertigen PRs des Laufs per `git merge --no-ff` in Merge-Reihenfolge; Doku-Konflikte: „beide Seiten behalten“ gilt nur, wo beide Seiten Abschnitte anhängen – hat eine Seite einen bestehenden Absatz geändert, stünde danach die alte und die neue Fassung da; in `docs/ai` den kombinierten Diff (`git show --cc`) ansehen und doppelte Absätze zu einem auflösen (Wache `tests/doku-doppelte-absaetze.test.ts`). Code-Konflikte sauber zusammenführen und jede Auflösung im PR-Text begründen; nach JEDEM Merge in den Sammel-Stand läuft `pnpm typecheck && pnpm lint && pnpm test` ganz, nicht erst am Ende – ändern parallele Branches Wachen, sind sie einzeln grün und zusammen rot (Lauf 16: Routen-Liste von 110 und neue Route von 104); Wachen mit fester Liste vergleichen gegen das Dateisystem und nennen die neue Datei mit Namen. Typecheck, Unit- und Integrationstests auf dem Gesamtstand grün. Entwürfe kommen nicht hinein.
 
 ---
 
@@ -368,7 +368,7 @@ claude -p "$(cat docs/nachtlauf-start.txt)" \
 **Windows PowerShell:** dieselben Argumente, nur der Prompt so: `claude -p (Get-Content docs\nachtlauf-start.txt -Raw) …` und die Ausgabe in `nachtlauf.log`.
 
 Hinweise:
-- Migrationen entstehen nur über `prisma migrate diff` (Regel 3); `migrate dev` und `migrate deploy` sind gesperrt. `git show origin/main:prisma/schema.prisma` deckt `Bash(git *)` ab.
+- Migrationen entstehen nur über `prisma migrate diff` (Regel 3); `migrate dev` ist gesperrt. `migrate deploy` ist es ebenfalls, außer für die Prüfung nach Regel 3 (frische lokale Wegwerf-Datenbank im Sammel-PR): Die läuft nur, wenn derselbe Befehl `DATABASE_URL` und `DIRECT_URL` ausdrücklich auf `localhost` oder `127.0.0.1` setzt — der Hook `gefahr-blocken` lässt `migrate deploy` (auch über `pnpm vercel-build`) sonst nie durch, und `--disallowedTools` sperrt den Aufruf ohne diese Zuweisungen schon am Anfang des Befehls. `git show origin/main:prisma/schema.prisma` deckt `Bash(git *)` ab.
 - `dontAsk` lehnt alles ab, was nicht in `--allowedTools` steht, und fragt niemanden. Bleibt der Lauf an einer Stelle hängen, steht der abgelehnte Befehl im Log und im Morgenbericht.
 - Die bestehenden Hooks aus `.claude/settings.json` gelten weiter (gefährliche Befehle blockiert, kein Zugende bei rotem Typecheck).
 - `--max-budget-usd` begrenzt API-Kosten. Mit einem Abo greifen stattdessen dessen Nutzungsgrenzen; ist das Kontingent erschöpft, endet der Lauf, und die nächste Nacht macht bei `status.md` weiter.
