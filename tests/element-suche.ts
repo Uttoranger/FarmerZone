@@ -1,3 +1,5 @@
+import { Suspense, type ReactElement } from 'react'
+
 /**
  * Hilfsmittel für die Tests auf die Props einer Client-Komponente
  * (TESTING_GUIDELINES §2): sucht im Baum, den eine Server-Seite als Funktion
@@ -18,4 +20,17 @@ export function findeElement(knoten: unknown, typ: unknown): { props: Record<str
   if (!element.props) return null
   if (element.type === typ) return { props: element.props }
   return findeElement(element.props.children, typ)
+}
+
+/**
+ * Seit Nr. 117 stellen Hof- und Produktseite ihren Inhalt NACH der Prüfung hinter
+ * eine Suspense-Grenze (Skelett als Fallback). `renderToStaticMarkup` zeigte dort
+ * nur das Skelett — dieser Helfer ruft das Kind der Grenze (die async
+ * Server-Komponente mit dem Inhalt) auf und gibt dessen Baum zurück.
+ */
+export async function inhaltHinterSuspense(knoten: unknown): Promise<ReactElement> {
+  const grenze = findeElement(knoten, Suspense)
+  if (!grenze) throw new Error('Keine Suspense-Grenze im Baum der Seite')
+  const kind = grenze.props.children as { type: (props: unknown) => Promise<ReactElement>; props: unknown }
+  return kind.type(kind.props)
 }

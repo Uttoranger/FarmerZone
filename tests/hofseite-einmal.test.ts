@@ -12,8 +12,9 @@
  *    sind die Header-Regeln in next.config.ts (Hofseite, seit Nr. 96 auch die
  *    Startseite) — sie greifen, bevor eine Seite läuft, und geben nur das
  *    Einbetten frei (tests/sicherheits-header.test.ts).
- *  - ansichtsModus läuft nur auf dem Server: aufgerufen allein im Lader,
- *    eingebunden von keinem Client-Modul.
+ *  - ansichtsModus läuft nur auf dem Server: aufgerufen im Lader und in der
+ *    Prüfung vor der Hofseite (src/server/queries/seo.ts, Nr. 117: verlangt die
+ *    Adresse die Vorschau?), eingebunden von keinem Client-Modul.
  *  - FarmPageView bindet seit Nr. 50 genau eine Stelle ein: die Hofseite.
  *    farm-page-client.tsx (Besitzer am Handy mit Stiften) ist entfallen —
  *    Mein Hof bearbeitet unter lg mit der Liste der Abschnitte (Register N4).
@@ -222,9 +223,10 @@ describe('der Parameter „vorschau" wird nur in ansichtsModus() gelesen', () =>
     expect(konfiguration).toContain("has: [{ type: 'query', key: 'vorschau' }]")
   })
 
-  it('ansichtsModus läuft nur auf dem Server: aufgerufen im Lader, von keinem Client-Modul eingebunden', () => {
+  it('ansichtsModus läuft nur auf dem Server: aufgerufen im Lader und in der Prüfung davor, von keinem Client-Modul eingebunden', () => {
     const aufrufer = SRC.filter((pfad) => /(?<!function )\bansichtsModus\(/.test(ohneKommentare(quelle(pfad))))
-    expect(aufrufer).toEqual(['src/server/hofseite-vorschau.ts'])
+    // Die Prüfung vor der Hofseite (Nr. 117) fragt nur, ob die Adresse die Vorschau verlangt — ohne Sitzung.
+    expect(aufrufer.sort()).toEqual(['src/server/hofseite-vorschau.ts', 'src/server/queries/seo.ts'])
     // Typen dürfen sie kennen (die Ansicht beschreibt ihr Ergebnis), Werte nicht —
     // gleich, ob über '@/lib/…' oder einen relativen Pfad, statisch oder dynamisch.
     // [^'"] hält das Muster in einer Anweisung: Ohne Semikolons liefe es sonst über die Importe davor.

@@ -8,6 +8,7 @@ import { UmgebungsBanner, UmgebungsBannerLink } from '@/components/shared/umgebu
 import { RueckwegMerker } from '@/components/shared/rueckweg-merker'
 import { UMGEBUNG, ZEIGE_UMGEBUNGSBANNER } from '@/lib/umgebung-server'
 import { metadatenBasis } from '@/lib/vorschaubild'
+import { OG_LOCALE } from '@/lib/json-ld'
 import './globals.css'
 import { MARKE } from '@/lib/marke'
 
@@ -58,6 +59,8 @@ export function generateMetadata(): Metadata {
       template: `${TITEL_PRAEFIX}%s`,
     },
     description: 'Regionale Lebensmittel direkt vom Bauern',
+    // Gilt nur für Seiten ohne eigenes openGraph — eines ersetzt dieses ganz (Next mischt flach).
+    openGraph: { locale: OG_LOCALE },
   }
 }
 
@@ -94,7 +97,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
     // Wert nicht kennen, deshalb weicht das <html>-Element planmäßig ab —
     // nur hier, nicht im Inhalt.
     <html
-      lang="de"
+      lang="de-AT"
       suppressHydrationWarning
       className={`${geist.variable} ${fraunces.variable} ${instrumentSans.variable} h-full antialiased`}
     >

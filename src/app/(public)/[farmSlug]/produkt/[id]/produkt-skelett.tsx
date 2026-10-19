@@ -1,5 +1,5 @@
 /**
- * Ladeansicht der Produktseite (Nr. 11) — Platzhalter in der Form des
+ * Skelett der Produktseite (Nr. 11) — Platzhalter in der Form des
  * fertigen Inhalts (DESIGN_SYSTEM, „Zustände": Skeleton in Kartenform, kein
  * Spinner). Maße von der KundeShell und
  * src/components/produktdetail/produktdetail-kunde.tsx abgenommen:
@@ -7,15 +7,16 @@
  * 768 px die Rückweg-Zeile (44 px) und das Bild 300 × 300 neben Name und
  * Text; darunter die Kaufkarte; ab 1024 px rechts die Spalte (340/360 px).
  *
- * Eigene Datei in diesem Segment: Sonst griffe die Ladeansicht der Hofseite
- * (Titelbild, Reiter) — eine andere Form, die beim Umschalten springt.
- * Die Seite steht im Geltungsbereich data-design="neu"; diese Ansicht kommt
+ * Seit Nr. 117 keine `loading.tsx` mehr, sondern die Suspense-Grenze IN der
+ * Seite, NACH der Prüfung von Hof und Produkt — so antwortet ein unbekanntes
+ * Produkt mit 404 statt hinter dem Skelett mit 200 (wie die Hofseite).
+ * Die Seite steht im Geltungsbereich data-design="neu"; das Skelett steht
  * vor der Shell und setzt den Marker selbst.
  *
  * BEWUSST OHNE Größenkacheln, Pausen-Hinweis und „Gleich mit abholen": Ob es
  * sie gibt, entscheiden die Daten.
  */
-export default function ProduktdetailLaden() {
+export function ProduktSkelett(): React.JSX.Element {
   return (
     <div data-design="neu" className="min-h-dvh animate-pulse bg-background" aria-busy="true" aria-label="Produkt wird geladen">
       <div className="h-14 border-b border-border bg-background md:h-16" />

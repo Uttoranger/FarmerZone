@@ -32,6 +32,7 @@ import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
   title: `Konditionen für Höfe — ${MARKE}`,
+  alternates: { canonical: '/konditionen' },
   description:
     `Was ${MARKE} kostet: ${STARTPHASE_SATZ} ${TARIFE_AB_SATZ} ` +
     `${TARIFE.map((t) => `${t.name} ${t.preis} ${PRO_MONAT}`).join(', ')}. ` +

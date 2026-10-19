@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { SERVICEGEBUEHR_SATZ_TEXT, STARTPHASE_SATZ, TARIFE_AB_SATZ } from '@/lib/konditionen'
 import { STARTSEITE_VORSCHAUBILD } from '@/lib/vorschaubild'
+import { OG_LOCALE } from '@/lib/json-ld'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { StartseiteFuss } from '@/components/startseite/startseite-abschnitte'
 import {
@@ -24,12 +25,14 @@ const SEITEN_BESCHREIBUNG =
 export const metadata: Metadata = {
   title: SEITEN_TITEL,
   description: SEITEN_BESCHREIBUNG,
+  alternates: { canonical: '/fuer-hoefe' },
   openGraph: {
     title: SEITEN_TITEL,
     description: SEITEN_BESCHREIBUNG,
     type: 'website',
     siteName: MARKE,
     images: [STARTSEITE_VORSCHAUBILD],
+    locale: OG_LOCALE,
   },
 }
 

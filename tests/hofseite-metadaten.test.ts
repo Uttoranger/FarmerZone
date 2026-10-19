@@ -12,6 +12,8 @@ import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('@/lib/prisma', () => ({ prisma: {} }))
 vi.mock('@/server/hofseite-vorschau', () => ({ ladeHofseiteGeteilt: vi.fn() }))
+// Die Prüfung vor dem Streamen (Nr. 117) prüft tests/hofseite-404.test.ts; hier ist der Hof öffentlich.
+vi.mock('@/server/queries/seo', () => ({ pruefeHofseiteGeteilt: vi.fn(async () => ({ indexieren: true, geo: null })) }))
 vi.mock('@/server/queries/teilen-bild', () => ({ ladeTeilenVorschau: vi.fn(async () => null) }))
 // Die Seite bindet die Hofseite mit Stiften ein; deren Speicherwege bleiben hier ohne Wirkung.
 vi.mock('@/server/actions/appearance', () => ({ updateFarmBannerAction: vi.fn() }))
@@ -28,7 +30,7 @@ const KURZ = 'Gemüse und Eier aus Musterdorf'
 
 /** Beschreibung der Metadaten und der Teilen-Vorschau für einen Hof mit diesen beiden Texten. */
 async function beschreibungen(aboutText: string | null, description = KURZ): Promise<{ meta: unknown; vorschau: unknown }> {
-  const farm = { name: 'Hof Test', slug: 'hof-test', aboutText, description } as PublicFarm
+  const farm = { name: 'Hof Test', slug: 'hof-test', city: 'Musterdorf', products: [], aboutText, description } as unknown as PublicFarm
   lade.mockResolvedValue({ farm, ansicht: { art: 'kundin', noindex: false, kaufen: true } })
   const meta = await generateMetadata({ params: Promise.resolve({ farmSlug: 'hof-test' }), searchParams: Promise.resolve({}) })
   return { meta: meta.description, vorschau: (meta.openGraph as { description?: string } | undefined)?.description }

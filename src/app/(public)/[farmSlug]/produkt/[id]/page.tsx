@@ -1,15 +1,20 @@
+import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
+import { pruefeProduktseiteGeteilt } from '@/server/queries/seo'
 import type { Suchparameter } from '@/lib/ansichts-modus'
-import { gewaehlteGroesse, produktFamilie, produktMetadaten, sichtbaresProdukt } from '@/lib/produktdetail'
+import { gewaehlteGroesse, produktFamilie, produktMetadaten, produktPfad, sichtbaresProdukt } from '@/lib/produktdetail'
 import { entferneKontaktdaten } from '@/lib/hofseite-kunde'
-import { hofTitelbildVorschau } from '@/lib/vorschaubild'
+import { hofTitelbildVorschau, metadatenBasis } from '@/lib/vorschaubild'
+import { UMGEBUNG } from '@/lib/umgebung-server'
+import { OG_LOCALE, jsonLdSicher, produktJsonLd } from '@/lib/json-ld'
 import { GROESSE_PARAMETER, leseGroesse } from '@/schemas/produktdetail'
 import { KAEUFER_PARAMETER, leseKaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { ProduktdetailKunde } from '@/components/produktdetail/produktdetail-kunde'
 import { StartseiteFuss } from '@/components/startseite/startseite-abschnitte'
+import { ProduktSkelett } from './produkt-skelett'
 
 /*
  * Die Produktseite eines Hofs (Nachtlauf Nr. 11, Gate 4; Mockups
@@ -26,6 +31,12 @@ import { StartseiteFuss } from '@/components/startseite/startseite-abschnitte'
  * Suchparameter (?groesse=, ?vorschau=). Die Sitzung für den Kopf liest
  * KundeShellMitSitzung im Browser, nie der Server. Fokus-Seite: Kopf ja,
  * Unterleiste am Handy nein (DESIGN_SYSTEM, „Fokus-Seiten ohne Unterleiste").
+ *
+ * Echte 404 (Nr. 117, wie die Hofseite): Erst die Form des Slugs (ohne
+ * Datenbank), dann EINE schlanke Abfrage — Produkt im Shop eines öffentlichen
+ * Hofs; die Vorschau des Besitzers bleibt möglich. Passt etwas nicht,
+ * `notFound()`, bevor etwas gestreamt wird; erst danach lädt die Seite den Hof
+ * samt Fristfreigabe hinter ihrem Skelett.
  */
 export const dynamic = 'force-dynamic'
 
@@ -34,28 +45,54 @@ type Props = {
   searchParams: Promise<Suchparameter>
 }
 
+const PRODUKT_NICHT_GEFUNDEN: Metadata = { title: 'Produkt nicht gefunden', robots: { index: false, follow: false } }
+
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { farmSlug, id } = await params
-  const { farm, ansicht } = await ladeHofseiteGeteilt(farmSlug, await searchParams)
-  const robots = ansicht.noindex ? { robots: { index: false, follow: false } } : {}
+  const suche = await searchParams
+  // Dieselbe Prüfung wie die Seite, zuerst (parallel zur Seite, einmal je Anfrage).
+  const seo = await pruefeProduktseiteGeteilt(farmSlug, id, suche)
+  if (!seo) return PRODUKT_NICHT_GEFUNDEN
+  const { farm, ansicht } = await ladeHofseiteGeteilt(farmSlug, suche)
+  // Wie auf der Hofseite: Die Vorschau-Adresse bleibt ganz fern; das Produkt
+  // eines ausgenommenen Hofs (Testhof) nur aus dem Index.
+  const robots = ansicht.noindex ? { robots: { index: false, follow: false } } : !seo.indexieren ? { robots: { index: false, follow: true } } : {}
   const produkt = farm ? sichtbaresProdukt(farm.products, id) : null
-  if (!farm || !produkt) return { title: 'Produkt nicht gefunden', ...robots }
+  if (!farm || !produkt) return { ...PRODUKT_NICHT_GEFUNDEN, ...robots }
 
   // Nur öffentliche Daten: Name, Beschreibung, Preis, Hofname, Ort, Bild.
-  const { titel, beschreibung } = produktMetadaten(produkt, farm)
+  // „{Produkt} vom {Hof} in {Ort}" (Nr. 117); die Beschreibung wie bisher.
+  const titel = `${produkt.name} vom ${farm.name} in ${farm.city}`
+  const { beschreibung } = produktMetadaten(produkt, farm)
   const bild = produkt.imageUrl ? { url: produkt.imageUrl, alt: produkt.name } : hofTitelbildVorschau(farm)
   return {
     title: titel,
     description: beschreibung,
+    // Ohne Parameter (?groesse=, ?kaeufer=): jede Größe hat ihre eigene Seite unter ihrer ID.
+    alternates: { canonical: produktPfad(farm.slug, produkt.id) },
     ...robots,
-    openGraph: { title: titel, description: beschreibung, type: 'website', images: [bild] },
+    openGraph: { title: titel, description: beschreibung, type: 'website', locale: OG_LOCALE, images: [bild] },
   }
 }
 
 export default async function ProduktSeite({ params, searchParams }: Props) {
   const { farmSlug, id } = await params
   const suche = await searchParams
+  // Vor dem Streamen: unbekannter Hof oder unbekanntes Produkt → 404, ohne Laden und Fristfreigabe.
+  if (!(await pruefeProduktseiteGeteilt(farmSlug, id, suche))) notFound()
+
+  return (
+    <Suspense fallback={<ProduktSkelett />}>
+      <Produktseite farmSlug={farmSlug} id={id} suche={suche} />
+    </Suspense>
+  )
+}
+
+/** Der Inhalt hinter dem Skelett — erst nach der Prüfung in ProduktSeite. */
+async function Produktseite({ farmSlug, id, suche }: { farmSlug: string; id: string; suche: Suchparameter }) {
   const { farm, ansicht } = await ladeHofseiteGeteilt(farmSlug, suche)
+  // Nur noch ein Wettlauf oder die Vorschau des Besitzers mit einem Produkt,
+  // das nicht im Shop ist: die 404-Ansicht hinter dem Skelett (Status 200, noindex).
   if (!farm) notFound()
   const einstieg = sichtbaresProdukt(farm.products, id)
   if (!einstieg) notFound()
@@ -80,6 +117,8 @@ export default async function ProduktSeite({ params, searchParams }: Props) {
         kaeufer={kaeufer}
         jetzt={jetzt.toISOString()}
       />
+      {/* Strukturierte Daten (Nr. 117): Preis und Verfügbarkeit des Einstiegs, auf dem Server gebaut. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSicher(produktJsonLd(einstieg, farm, metadatenBasis(UMGEBUNG.appUrl))) }} />
       <StartseiteFuss jahr={jetzt.getFullYear()} />
     </KundeShellMitSitzung>
   )

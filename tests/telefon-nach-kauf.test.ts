@@ -25,6 +25,8 @@ import { MARKE } from '@/lib/marke'
 
 vi.mock('@/lib/prisma', () => ({ prisma: {} }))
 vi.mock('@/server/hofseite-vorschau', () => ({ ladeHofseiteGeteilt: vi.fn() }))
+// Die Prüfung vor dem Streamen (Nr. 117) prüft tests/hofseite-404.test.ts; hier ist der Hof öffentlich.
+vi.mock('@/server/queries/seo', () => ({ pruefeHofseiteGeteilt: vi.fn(async () => ({ indexieren: true, geo: null })) }))
 vi.mock('@/server/queries/teilen-bild', () => ({ ladeTeilenVorschau: vi.fn(async () => null) }))
 vi.mock('@/server/queries/status-posts', () => ({ getActiveStatusPosts: vi.fn(async () => []) }))
 vi.mock('@/server/actions/appearance', () => ({ updateFarmBannerAction: vi.fn() }))
@@ -70,7 +72,7 @@ import { HofErreichen } from '@/components/bestaetigung/hof-erreichen'
 import { KONTAKT_NACH_DEM_KAUF } from '@/lib/hofseite-kunde'
 import { KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
-import { findeElement } from './element-suche'
+import { findeElement, inhaltHinterSuspense } from './element-suche'
 
 const WURZEL = process.cwd()
 const lade = vi.mocked(ladeHofseiteGeteilt)
@@ -112,7 +114,7 @@ const KUNDIN = { art: 'kundin' as const, kaufen: true }
 /** Die Props der Client-Komponente im Baum der Seite — ohne Komponenten aufzurufen. */
 async function seitenProps(art: 'kundin' | 'vorschau'): Promise<Record<string, unknown>> {
   lade.mockResolvedValue({ farm: HOF, ansicht: { art, noindex: art === 'vorschau', kaufen: art === 'kundin' } })
-  const baum = await FarmPage({ params: Promise.resolve({ farmSlug: 'hof-test' }), searchParams: Promise.resolve({}) })
+  const baum = await inhaltHinterSuspense(await FarmPage({ params: Promise.resolve({ farmSlug: 'hof-test' }), searchParams: Promise.resolve({}) }))
   const fund = findeElement(baum, FarmPageView)
   if (!fund) throw new Error('FarmPageView fehlt im Baum der Seite')
   return fund.props
@@ -169,9 +171,14 @@ describe('Hofseite: kein Anruf, kein tel:-Link, statt der Nummer der Hinweis', (
     expect(html).not.toContain('tel:')
   })
 
-  it('JSON-LD ohne telephone und email — Gegenprobe: Name und Anschrift stehen drin', () => {
-    const block = hofseite().match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)
+  it('JSON-LD ohne telephone und email — Gegenprobe: Name und Anschrift stehen drin', async () => {
+    // Seit Nr. 117 baut die Seite den Block auf dem Server — aus dem Hof MIT Telefon und E-Mail.
+    lade.mockResolvedValue({ farm: HOF, ansicht: { art: 'kundin', noindex: false, kaufen: true } })
+    const baum = await inhaltHinterSuspense(await FarmPage({ params: Promise.resolve({ farmSlug: 'hof-test' }), searchParams: Promise.resolve({}) }))
+    const block = renderToStaticMarkup(baum).match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)
     expect(block).not.toBeNull()
+    expect(block![1]).not.toContain(TELEFON)
+    expect(block![1]).not.toContain(EMAIL)
     const daten = JSON.parse(block![1]) as Record<string, unknown>
     expect(daten).not.toHaveProperty('telephone')
     expect(daten).not.toHaveProperty('email')

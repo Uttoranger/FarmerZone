@@ -58,7 +58,10 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOut: vi.fn() }))
 vi.mock('@/server/hofseite-vorschau', () => ({ ladeHofseiteGeteilt: vi.fn() }))
+// Die Prüfung vor dem Streamen (Nr. 117) prüft tests/hofseite-404.test.ts; hier besteht sie.
+vi.mock('@/server/queries/seo', () => ({ pruefeProduktseiteGeteilt: vi.fn(async () => ({ indexieren: true })) }))
 
+import { inhaltHinterSuspense } from './element-suche'
 import ProduktSeite from '@/app/(public)/[farmSlug]/produkt/[id]/page'
 import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
 import { ProduktKarte } from '@/components/hofseite/produkt-karte'
@@ -159,7 +162,7 @@ describe('Produktseite — der Ausschnitt am Foto', () => {
 
   async function seite(p: PublicProduct): Promise<string> {
     vi.mocked(ladeHofseiteGeteilt).mockResolvedValue({ farm: { ...HOF, products: [p] }, ansicht: { art: 'kundin', noindex: false, kaufen: true } })
-    return renderToStaticMarkup(await ProduktSeite({ params: Promise.resolve({ farmSlug: 'hof-test', id: p.id }), searchParams: Promise.resolve({}) }))
+    return renderToStaticMarkup(await inhaltHinterSuspense(await ProduktSeite({ params: Promise.resolve({ farmSlug: 'hof-test', id: p.id }), searchParams: Promise.resolve({}) })))
   }
 
   beforeEach(() => {

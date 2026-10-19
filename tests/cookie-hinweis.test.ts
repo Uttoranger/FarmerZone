@@ -88,7 +88,9 @@ describe('Wache: jede feste Leiste am unteren Rand trägt das Merkmal', () => {
 
   // Bewusst ausgenommen: Blätter (eigene Ebene mit Schleier) und Ladeansichten
   // (sie stehen nur, bis die Seite da ist — der Hinweis erscheint erst danach).
-  const AUSNAHMEN = ['components/ui/sheet.tsx']
+  // Das Skelett der Produktseite ist seit Nr. 117 keine loading.tsx mehr, sondern
+  // der Fallback ihrer Suspense-Grenze — dieselbe Rolle, derselbe Grund.
+  const AUSNAHMEN = ['components/ui/sheet.tsx', 'app/(public)/[farmSlug]/produkt/[id]/produkt-skelett.tsx']
   const istAusnahme = (pfad: string) => AUSNAHMEN.includes(pfad) || pfad.endsWith('/loading.tsx')
 
   it('erkennt feste Leisten (Gegenprobe) — und nicht den Hinweis selbst', () => {
