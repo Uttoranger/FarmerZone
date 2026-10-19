@@ -52,7 +52,7 @@ vi.mock('next/link', () => ({
 vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOut: vi.fn() }))
 vi.mock('@/server/hofseite-vorschau', () => ({ ladeHofseiteGeteilt: vi.fn() }))
 // Die Prüfung vor dem Streamen (Nr. 117) prüft tests/hofseite-404.test.ts; hier besteht sie.
-vi.mock('@/server/queries/seo', () => ({ pruefeProduktseiteGeteilt: vi.fn(async () => true) }))
+vi.mock('@/server/queries/seo', () => ({ pruefeProduktseiteGeteilt: vi.fn(async () => ({ indexieren: true })) }))
 
 import ProduktSeite, { generateMetadata } from '@/app/(public)/[farmSlug]/produkt/[id]/page'
 import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'

@@ -2,7 +2,7 @@ import { cache } from 'react'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { RESERVED_SLUGS } from '@/lib/slug'
-import type { Suchparameter } from '@/lib/ansichts-modus'
+import { ansichtsModus, type AnsichtsQuellen, type Suchparameter } from '@/lib/ansichts-modus'
 import { hofSlugSchema } from '@/schemas/hof-adresse'
 import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
 import { OEFFENTLICH_SICHTBAR } from './farm'
@@ -67,26 +67,41 @@ export const hofIstOeffentlich = cache(async (slug: string): Promise<HofSeo | nu
   }
 })
 
-/** Die schlanke Abfrage der Produktseite: ein Produkt im Shop eines öffentlichen Hofs unter diesem Slug. */
-export const produktIstOeffentlich = cache(async (slug: string, id: string): Promise<boolean> => {
+export type ProduktSeo = {
+  /** In Suchmaschinen und Sitemap: nicht bei einem ausgenommenen Hof (Testhof) — wie dessen Hofseite. */
+  indexieren: boolean
+}
+
+/** Die schlanke Abfrage der Produktseite: ein Produkt im Shop eines öffentlichen Hofs unter diesem Slug; null, wenn nicht. */
+export const produktIstOeffentlich = cache(async (slug: string, id: string): Promise<ProduktSeo | null> => {
   const produkt = await prisma.product.findFirst({
     where: { id, ...IM_SHOP, farm: { slug, ...OEFFENTLICH_SICHTBAR } },
-    select: { id: true },
+    select: { id: true, farm: { select: { gruendungAusgenommen: true } } },
   })
-  return produkt !== null
+  return produkt ? { indexieren: !produkt.farm.gruendungAusgenommen } : null
 })
+
+/**
+ * Quellen, die so tun, als frage der Besitzer selbst — ohne Sitzung, ohne
+ * Datenbank. Damit beantwortet `ansichtsModus` allein die Frage, ob die Adresse
+ * die Vorschau VERLANGT (genau ?vorschau=1); ob wirklich der Besitzer fragt,
+ * prüft danach der Lader mit den echten Quellen.
+ */
+const ALS_BESITZER: AnsichtsQuellen = {
+  angemeldeterNutzer: async () => 'angenommen',
+  besitzer: async () => 'angenommen',
+}
 
 /**
  * Zeigt die Adresse die Vorschau des Besitzers (?vorschau=1)? Sie lädt bewusst
  * auch noch nicht freigegebene Höfe — die schlanke Prüfung darf sie nicht
- * abweisen. Den Parameter liest nur `ansichtsModus` im Lader
- * (tests/hofseite-einmal.test.ts); deshalb fragt diese Stelle den Lader, wie
- * bisher — aber nur, wenn überhaupt ein Suchparameter dasteht. Ohne Parameter
- * kann es keine Vorschau sein: dann bleibt es bei der einen Abfrage. Der Lader
- * ist je Anfrage geteilt; die Seite bekommt danach dieselbe Antwort.
+ * abweisen. Den Parameter liest nur `ansichtsModus` (tests/hofseite-einmal.test.ts).
+ * Verlangt die Adresse keine Vorschau (?reiter=, ?utm_…, ?vorschau=0), bleibt es
+ * bei der einen Abfrage: kein Lader, keine Fristfreigabe. Sonst entscheidet der
+ * Lader — je Anfrage geteilt, die Seite bekommt danach dieselbe Antwort.
  */
 async function istVorschauDesBesitzers(slug: string, suche: Suchparameter): Promise<boolean> {
-  if (Object.keys(suche).length === 0) return false
+  if ((await ansichtsModus(suche, ALS_BESITZER)).art !== 'vorschau') return false
   const { farm, ansicht } = await ladeHofseiteGeteilt(slug, suche)
   return farm !== null && ansicht.art === 'vorschau'
 }
@@ -105,11 +120,12 @@ async function pruefeHofseite(slug: string, suche: Suchparameter): Promise<HofSe
   return (await istVorschauDesBesitzers(slug, suche)) ? IN_DER_VORSCHAU : null
 }
 
-/** Dasselbe für `/<slug>/produkt/<id>`: false → `notFound()`. */
-async function pruefeProduktseite(slug: string, id: string, suche: Suchparameter): Promise<boolean> {
-  if (!kannHofSlugSein(slug)) return false
-  if (await produktIstOeffentlich(slug, id)) return true
-  return istVorschauDesBesitzers(slug, suche)
+/** Dasselbe für `/<slug>/produkt/<id>`: null → `notFound()`. */
+async function pruefeProduktseite(slug: string, id: string, suche: Suchparameter): Promise<ProduktSeo | null> {
+  if (!kannHofSlugSein(slug)) return null
+  const produkt = await produktIstOeffentlich(slug, id)
+  if (produkt) return produkt
+  return (await istVorschauDesBesitzers(slug, suche)) ? IN_DER_VORSCHAU : null
 }
 
 // Metadaten und Seite prüfen beide, parallel — einmal je Anfrage. Schlüssel ist
@@ -127,7 +143,7 @@ export function pruefeHofseiteGeteilt(slug: string, suche: Suchparameter): Promi
 }
 
 /** `pruefeProduktseite` einmal je Anfrage, für Metadaten und Seite. */
-export function pruefeProduktseiteGeteilt(slug: string, id: string, suche: Suchparameter): Promise<boolean> {
+export function pruefeProduktseiteGeteilt(slug: string, id: string, suche: Suchparameter): Promise<ProduktSeo | null> {
   return produktseiteGeprueft(slug, id, JSON.stringify(suche))
 }
 

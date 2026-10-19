@@ -7,11 +7,13 @@
  *    zählt 0 Aufrufe, auch mit ?vorschau=1 und in den Metadaten.
  *  - Ein unbekannter Hof: genau EINE schlanke Abfrage, dann notFound() — der
  *    Lader (Hof samt Fristfreigabe) läuft nicht.
- *  - Die Vorschau des Besitzers bleibt: Mit Suchparametern entscheidet der Lader
- *    (nur er liest ?vorschau, tests/hofseite-einmal.test.ts).
+ *  - Andere Suchparameter (?reiter=, ?utm_…, ?fbclid=, ?vorschau=0) ändern daran
+ *    nichts: weiter EINE Abfrage, kein Lader. Nur ?vorschau=1 fragt den Lader
+ *    (Vorschau des Besitzers, auch vor der Freigabe) — ob die Adresse sie
+ *    verlangt, sagt ansichtsModus (tests/hofseite-einmal.test.ts).
  *  - Erst nach der Prüfung die Suspense-Grenze mit dem Skelett.
  *  - Metadaten: Titel, Canonical ohne Parameter, noindex (follow) für Höfe ohne
- *    Produkt im Shop und ausgenommene Höfe, Open Graph in de_AT.
+ *    Produkt im Shop und ausgenommene Höfe samt deren Produktseiten, Open Graph in de_AT.
  *  - JSON-LD der Seiten: gültiges JSON, ohne Telefon und E-Mail, `</script>`
  *    im Hofnamen bleibt im Block; Produkt mit Preis und Verfügbarkeit.
  * Status 404 selbst misst der sichter am lokalen Produktions-Build.
@@ -121,6 +123,8 @@ const HOF: PublicFarm = {
 
 /** Ein öffentlicher Hof in der schlanken Abfrage: ohne Ausnahme, mit Produkten im Shop. */
 const OEFFENTLICH = { gruendungAusgenommen: false, latitude: null, longitude: null, _count: { products: 4 } }
+/** Ein Produkt im Shop in der schlanken Abfrage der Produktseite — eines nicht ausgenommenen Hofs. */
+const IM_SHOP = (id: string, gruendungAusgenommen = false) => ({ id, farm: { gruendungAusgenommen } })
 
 const hofseite = (farmSlug: string, suche: Record<string, string> = {}) =>
   FarmPage({ params: Promise.resolve({ farmSlug }), searchParams: Promise.resolve(suche) })
@@ -130,6 +134,7 @@ const produktseite = (farmSlug: string, id: string, suche: Record<string, string
   ProduktSeite({ params: Promise.resolve({ farmSlug, id }), searchParams: Promise.resolve(suche) })
 const produktMeta = (farmSlug: string, id: string) =>
   produktMetadaten({ params: Promise.resolve({ farmSlug, id }), searchParams: Promise.resolve({}) })
+const alsText = (suche: Record<string, string>) => JSON.stringify(suche)
 
 /** Der JSON-LD-Block im gerendert Inhalt hinter der Grenze. */
 async function jsonLd(seite: Promise<ReactElement>): Promise<{ roh: string; daten: Record<string, unknown> }> {
@@ -205,10 +210,32 @@ describe('ein unbekannter Hof: eine schlanke Abfrage, dann 404', () => {
     expect(lade).not.toHaveBeenCalled()
   })
 
-  it('mit Suchparametern entscheidet der Lader über die Vorschau — für alle anderen bleibt es bei 404', async () => {
+  it('andere Suchparameter ändern nichts: eine Abfrage, kein Lader, keine Fristfreigabe — Seite und Metadaten', async () => {
+    const ANDERE: Record<string, string>[] = [{ reiter: 'produkte' }, { utm_source: 'teilen' }, { fbclid: 'abc' }, { vorschau: '0' }, { vorschau: 'ja' }]
+    for (const suche of ANDERE) {
+      db.aufrufe = []
+      await expect(hofseite('unbekannter-hof', suche), alsText(suche)).rejects.toBe(NICHT_GEFUNDEN)
+      expect(db.aufrufe, alsText(suche)).toEqual(['farm.findFirst'])
+      db.aufrufe = []
+      expect((await hofMeta('unbekannter-hof', suche)).title, alsText(suche)).toBe('Hof nicht gefunden')
+      expect(db.aufrufe, alsText(suche)).toEqual(['farm.findFirst'])
+    }
+    expect(lade).not.toHaveBeenCalled()
+  })
+
+  it('Gegenprobe: nur ?vorschau=1 fragt den Lader (Vorschau des Besitzers) — ohne Recht bleibt es bei 404', async () => {
     lade.mockResolvedValue({ farm: null, ansicht: KUNDIN })
-    await expect(hofseite('unbekannter-hof', { reiter: 'produkte' })).rejects.toBe(NICHT_GEFUNDEN)
-    expect(lade).toHaveBeenCalledWith('unbekannter-hof', { reiter: 'produkte' })
+    await expect(hofseite('unbekannter-hof', { vorschau: '1' })).rejects.toBe(NICHT_GEFUNDEN)
+    expect(lade).toHaveBeenCalledWith('unbekannter-hof', { vorschau: '1' })
+  })
+
+  it('die Produktseite ebenso: ?groesse= fragt den Lader nicht, ?vorschau=1 schon', async () => {
+    await expect(produktseite('hof-test', 'p_gibt_es_nicht', { groesse: 'p_eier' })).rejects.toBe(NICHT_GEFUNDEN)
+    expect(db.aufrufe).toEqual(['product.findFirst'])
+    expect(lade).not.toHaveBeenCalled()
+    lade.mockResolvedValue({ farm: null, ansicht: KUNDIN })
+    await expect(produktseite('hof-test', 'p_gibt_es_nicht', { vorschau: '1' })).rejects.toBe(NICHT_GEFUNDEN)
+    expect(lade).toHaveBeenCalledWith('hof-test', { vorschau: '1' })
   })
 
   it('die Vorschau des Besitzers zeigt seinen noch nicht freigegebenen Hof weiter', async () => {
@@ -233,7 +260,7 @@ describe('ein öffentlicher Hof: erst geprüft, dann das Skelett, dahinter der I
   })
 
   it('die Produktseite ebenso, mit ihrem eigenen Skelett', async () => {
-    db.produkt = { id: 'p_karotten' }
+    db.produkt = IM_SHOP('p_karotten')
     const baum = (await produktseite('hof-test', 'p_karotten')) as ReactElement<{ fallback: ReactElement }>
     expect(baum.type).toBe(Suspense)
     expect(baum.props.fallback.type).toBe(ProduktSkelett)
@@ -274,11 +301,18 @@ describe('Metadaten der Hofseite', () => {
 
 describe('Metadaten der Produktseite', () => {
   it('„{Produkt} vom {Hof} in {Ort}", Canonical auf die Produktseite ohne Parameter, de_AT', async () => {
-    db.produkt = { id: 'p_karotten' }
+    db.produkt = IM_SHOP('p_karotten')
     const meta = await produktMeta('hof-test', 'p_karotten')
     expect(meta.title).toBe('Karotten vom Hof Test in Musterdorf')
     expect(meta.alternates?.canonical).toBe('/hof-test/produkt/p_karotten')
+    expect(meta.robots).toBeUndefined()
     expect((meta.openGraph as { locale?: string }).locale).toBe('de_AT')
+  })
+
+  it('ein Produkt eines ausgenommenen Hofs (Testhof): noindex mit follow — wie dessen Hofseite', async () => {
+    db.produkt = IM_SHOP('p_karotten', true)
+    expect((await produktMeta('hof-test', 'p_karotten')).robots).toEqual({ index: false, follow: true })
+    expect(db.argumente).toEqual([expect.objectContaining({ select: expect.objectContaining({ farm: { select: { gruendungAusgenommen: true } } }) })])
   })
 })
 
@@ -303,14 +337,14 @@ describe('JSON-LD der Seiten', () => {
   })
 
   it('Produktseite: Product mit Preis, Währung und Verfügbarkeit aus dem Vorrat', async () => {
-    db.produkt = { id: 'p_eier' }
+    db.produkt = IM_SHOP('p_eier')
     const leer = await jsonLd(produktseite('hof-test', 'p_eier'))
     expect(leer.daten).toMatchObject({
       '@type': 'Product', name: 'Freilandeier',
       offers: { price: '4.50', priceCurrency: 'EUR', availability: 'https://schema.org/OutOfStock', seller: { name: 'Hof Test' } },
     })
     expect(leer.roh).not.toContain(TELEFON)
-    db.produkt = { id: 'p_karotten' }
+    db.produkt = IM_SHOP('p_karotten')
     const voll = await jsonLd(produktseite('hof-test', 'p_karotten'))
     expect((voll.daten.offers as { availability: string }).availability).toBe('https://schema.org/InStock')
   })

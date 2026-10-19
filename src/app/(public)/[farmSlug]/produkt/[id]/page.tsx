@@ -51,9 +51,12 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const { farmSlug, id } = await params
   const suche = await searchParams
   // Dieselbe Prüfung wie die Seite, zuerst (parallel zur Seite, einmal je Anfrage).
-  if (!(await pruefeProduktseiteGeteilt(farmSlug, id, suche))) return PRODUKT_NICHT_GEFUNDEN
+  const seo = await pruefeProduktseiteGeteilt(farmSlug, id, suche)
+  if (!seo) return PRODUKT_NICHT_GEFUNDEN
   const { farm, ansicht } = await ladeHofseiteGeteilt(farmSlug, suche)
-  const robots = ansicht.noindex ? { robots: { index: false, follow: false } } : {}
+  // Wie auf der Hofseite: Die Vorschau-Adresse bleibt ganz fern; das Produkt
+  // eines ausgenommenen Hofs (Testhof) nur aus dem Index.
+  const robots = ansicht.noindex ? { robots: { index: false, follow: false } } : !seo.indexieren ? { robots: { index: false, follow: true } } : {}
   const produkt = farm ? sichtbaresProdukt(farm.products, id) : null
   if (!farm || !produkt) return { ...PRODUKT_NICHT_GEFUNDEN, ...robots }
 
