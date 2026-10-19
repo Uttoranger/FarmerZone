@@ -19,7 +19,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
-vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
 vi.mock('@/lib/auth', () => ({
   auth: { api: { getSession: vi.fn(), signUpEmail: vi.fn() } },
 }))
@@ -351,6 +351,8 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
+      // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
+      products: [{ id: 'p_1' }],
       stripeAccountReady: true,
       // Konto vor dem Stichtag, unbestätigt: bestehende Höfe bleiben unberührt (17b).
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: false },
@@ -371,6 +373,8 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
+      // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
+      products: [{ id: 'p_1' }],
       stripeAccountReady: true,
       // Konto vor dem Stichtag, unbestätigt: bestehende Höfe bleiben unberührt (17b).
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: false },
@@ -393,6 +397,8 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
+      // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
+      products: [{ id: 'p_1' }],
       stripeAccountReady: true,
       // Konto vor dem Stichtag, unbestätigt: bestehende Höfe bleiben unberührt (17b).
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: false },
@@ -410,6 +416,8 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
+      // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
+      products: [{ id: 'p_1' }],
       owner: { email: 'bauer@testhof.at', createdAt: new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() + 1), emailVerified: false },
     } as never)
 
@@ -425,6 +433,8 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
+      // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
+      products: [{ id: 'p_1' }],
       stripeAccountReady: true,
       owner: { email: 'bauer@testhof.at', createdAt: new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() + 1), emailVerified: true },
     } as never)
@@ -438,6 +448,8 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
+      // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
+      products: [{ id: 'p_1' }],
       stripeAccountReady: false,
       acceptsOnline: true,
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
@@ -455,6 +467,8 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
+      // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
+      products: [{ id: 'p_1' }],
       stripeAccountReady: false,
       acceptsOnline: false,
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
@@ -472,6 +486,8 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
+      // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
+      products: [{ id: 'p_1' }],
       stripeAccountReady: true,
       acceptsOnline: true,
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
@@ -495,6 +511,8 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
+      // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
+      products: [{ id: 'p_1' }],
       stripeAccountReady: true,
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
     } as never)
@@ -511,6 +529,8 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
+      // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
+      products: [{ id: 'p_1' }],
       stripeAccountReady: true,
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
     } as never)
@@ -537,6 +557,8 @@ describe('Freigabe-Actions', () => {
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
+      // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
+      products: [{ id: 'p_1' }],
       stripeAccountReady: false,
       owner: { email: 'bauer@testhof.at', createdAt: new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() + 1), emailVerified: false },
     } as never)

@@ -442,6 +442,8 @@ describe('kein Big Bang', () => {
     '(public)/[farmSlug]/bestaetigen/[token]/page.tsx',
     '(auth)/forgot-password/page.tsx',
     '(auth)/reset-password/page.tsx',
+    // Nr. 114: „Das war ich nicht" (neu, KundeShell ohne Unterleiste wie die Bestätigungsseite).
+    'sicherheit/nicht-ich/page.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {

@@ -83,7 +83,7 @@ export function FuerHoefeEinstieg({ gruendung = null }: { gruendung?: GruendungS
           {gruendung?.zeigen ? (
             // Die Fußnote statt des Übergangs (Mockup); den Übergang K1 nennt der Abschnitt Preise.
             <p className="max-w-[34rem] text-[13px] leading-normal text-muted-foreground">
-              {GRUENDUNG_TEXT.fussnote(gruendung.bisTag).join(' · ')}
+              {GRUENDUNG_TEXT.fussnote(gruendung).join(' · ')}
             </p>
           ) : (
             <p className="max-w-[34rem] text-[13px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
@@ -128,22 +128,23 @@ export function FuerHoefeSchritte(): React.JSX.Element {
 }
 
 /**
- * `gruendungBisTag` nur an der Hofladen-Karte und nur, solange die Bausteine
- * gezeigt werden: dann „€ 0 / Monat · bis 31.12.2027 · dann € 19"
- * (K2-Ergänzung, Punkt 2). Beträge aus konditionen.ts, nie als Literal.
+ * `gruendung` nur an der Hofladen-Karte und nur, solange die Bausteine
+ * gezeigt werden: dann „€ 0 / Monat" und darunter die Zeile aus
+ * GRUENDUNG_TEXT.hofladenPreis (K2-Ergänzung, Punkt 2; seit Nr. 116 mit den
+ * Monaten der Aktion). Beträge aus konditionen.ts, nie als Literal.
  */
-function TarifKarte({ tarif, hervorgehoben, gruendungBisTag = null }: { tarif: TarifText; hervorgehoben: boolean; gruendungBisTag?: string | null }) {
+function TarifKarte({ tarif, hervorgehoben, gruendung = null }: { tarif: TarifText; hervorgehoben: boolean; gruendung?: GruendungSeiten | null }) {
   return (
     <div className={cn('flex flex-col gap-3 rounded-2xl border bg-card p-5', hervorgehoben ? 'border-accent' : 'border-border')}>
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="font-heading text-xl font-semibold">{tarif.name}</h3>
-        {gruendungBisTag !== null ? (
+        {gruendung !== null ? (
           <p className="flex shrink-0 flex-col items-end">
             <span>
               <span className="font-heading text-2xl font-semibold text-status-offen">{grundgebuehrText(0)}</span>{' '}
               <span className="text-[13px] text-muted-foreground">{PRO_MONAT}</span>
             </span>
-            <span className="mt-1 text-[12px] text-muted-foreground">{GRUENDUNG_TEXT.hofladenPreis(gruendungBisTag)}</span>
+            <span className="mt-1 text-[12px] text-muted-foreground">{GRUENDUNG_TEXT.hofladenPreis(gruendung)}</span>
           </p>
         ) : (
           <p className="shrink-0">
@@ -167,7 +168,7 @@ function TarifKarte({ tarif, hervorgehoben, gruendungBisTag = null }: { tarif: T
 
 /** `jetzt` von der Seite (beim Bauen bzw. Revalidieren): die Bar-Ausnahme (B1) steht nur vor dem Stichtag da. */
 export function FuerHoefePreise({ jetzt, gruendung = null }: { jetzt: Date; gruendung?: GruendungSeiten | null }): React.JSX.Element {
-  const gruendungBisTag = gruendung?.zeigen ? gruendung.bisTag : null
+  const gruendungKarte = gruendung?.zeigen ? gruendung : null
   return (
     <section aria-labelledby="preise-titel" className="py-12 md:py-16">
       {/* Direkt über den Tarifkarten, über die ganze Breite (Mockup web-k2-fuer-hoefe-gruendung). */}
@@ -202,7 +203,7 @@ export function FuerHoefePreise({ jetzt, gruendung = null }: { jetzt: Date; grue
               key={t.id}
               tarif={t}
               hervorgehoben={i === TARIFE.length - 1}
-              gruendungBisTag={t.id === 'HOFLADEN' ? gruendungBisTag : null}
+              gruendung={t.id === 'HOFLADEN' ? gruendungKarte : null}
             />
           ))}
         </div>

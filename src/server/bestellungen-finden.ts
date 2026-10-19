@@ -14,6 +14,7 @@ import {
 } from '@/lib/bestellungen-finden'
 import { bestellCodePasst, erzeugeBestellCode, hashBestellCode } from '@/lib/bestellungen-zugang'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
+import { gibVersuchZurueck, zaehleAlsFehlversuch, zaehleVersuchVorab } from '@/server/bremse-datenbank'
 
 /*
  * „Bestellungen finden" gegen die Datenbank (Nr. 14). Was ein Code-Versuch
@@ -48,16 +49,40 @@ export async function legeBestellCodeAn(email: string, jetzt: Date = new Date())
 }
 
 /**
- * Prüft einen Code. Die Zeile wird für die Dauer der Prüfung gesperrt
- * (`SELECT … FOR UPDATE`): Zwei gleichzeitige Versuche laufen nacheinander,
- * jeder Fehlversuch zählt — sonst brächten parallele Anfragen mehr als 5
- * Versuche durch (Lesen, dann blind Schreiben, wie `checkVerificationOTP` des
- * Plugins). Der Zähler steht in der Zeile, also über alle Instanzen (S4).
+ * Prüft einen Code. Falsche Codes zählen zusätzlich je Adresse über alle
+ * Codes — in DENSELBEN Zählern wie die Anmeldung mit Code (Register E7,
+ * Ergänzung; Nr. 112): 10 Fehlversuche über beide Wege zusammen pausieren
+ * beide, sonst hätte, wer raten will, auf jedem Weg seine eigenen 10. Der
+ * Versuch zählt VORAB, atomar — sonst kämen gleichzeitige Versuche alle am
+ * Stand vorbei; ein richtiger Code gibt ihn zurück. Ist die Adresse pausiert
+ * (oder antwortet die Bremse nicht: fail-closed), wird der Code gar nicht
+ * erst geprüft — `ZU_VIELE` mit dem Ende der Pause (`null` = unbekannt).
  */
 export async function pruefeBestellCode(
   email: string,
   code: string,
   jetzt: Date = new Date()
+): Promise<{ ok: true } | { ok: false; fehler: BestellCodeFehler } | { ok: false; fehler: 'ZU_VIELE'; bis: Date | null }> {
+  const vorab = await zaehleVersuchVorab('code', email, jetzt)
+  if (vorab.gesperrt) return { ok: false, fehler: 'ZU_VIELE', bis: vorab.bis }
+  const ergebnis = await pruefeCodeZeile(email, code, jetzt)
+  if (ergebnis.ok) await gibVersuchZurueck(vorab.versuch)
+  else zaehleAlsFehlversuch(vorab.versuch)
+  return ergebnis
+}
+
+/**
+ * Der Versuch gegen die Code-Zeile. Die Zeile wird für die Dauer der Prüfung
+ * gesperrt (`SELECT … FOR UPDATE`): Zwei gleichzeitige Versuche laufen
+ * nacheinander, jeder Fehlversuch zählt — sonst brächten parallele Anfragen
+ * mehr als 5 Versuche durch (Lesen, dann blind Schreiben, wie
+ * `checkVerificationOTP` des Plugins). Der Zähler steht in der Zeile, also
+ * über alle Instanzen (S4).
+ */
+async function pruefeCodeZeile(
+  email: string,
+  code: string,
+  jetzt: Date
 ): Promise<{ ok: true } | { ok: false; fehler: BestellCodeFehler }> {
   const identifier = bestellCodeKennung(email)
   return prisma.$transaction(async (tx) => {

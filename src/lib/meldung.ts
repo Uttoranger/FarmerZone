@@ -185,6 +185,11 @@ export function istMeldungStatus(wert: unknown): wert is MeldungStatus {
 export const MELDUNG_TEXT_MIN = 10
 export const MELDUNG_TEXT_MAX = 2000
 export const MELDUNG_KENNUNG_MAX = 20
+
+/** Die Antwort einer Triage-Aktion, wenn die Meldung inzwischen eine andere ist (bedingter Schreibzugriff trifft keine Zeile). */
+export const MELDUNG_GEAENDERT = 'Die Meldung hat sich inzwischen geändert — lade die Seite neu und entscheide noch einmal.'
+/** Dasselbe, wenn die Hauptmeldung eines Duplikats die andere ist. */
+export const MELDUNG_VERWEIS_GEAENDERT = 'Die Meldung oder ihre Hauptmeldung hat sich inzwischen geändert — lade die Seite neu und entscheide noch einmal.'
 /** Die Triage-Notiz — das Admin-Formular und die Schreibroute halten dieselbe Grenze. */
 export const TRIAGE_NOTIZ_MAX = 2000
 export const MELDUNGEN_PRO_STUNDE = 5

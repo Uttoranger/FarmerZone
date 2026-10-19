@@ -21,6 +21,7 @@ import {
   tabellenName,
   verlaufBeschreibung,
   verlaufKurz,
+  vercelAusgabenKarte,
   warnEintraege,
 } from '@/lib/betrieb'
 import { formatZahl } from '@/lib/format'
@@ -42,6 +43,7 @@ import {
   Klappkarte,
   TabellenInhalt,
   TarifeInhalt,
+  VercelAusgabenInhalt,
   VerlaufDiagramm,
   VerlaufLegende,
   Warnkarte,
@@ -102,6 +104,7 @@ async function ladeDaten(jetzt: Date) {
     warnungBilder: ohneVerwendungBytes !== null && eintraege.some((e) => e.art === 'bilder'),
     gruen: sonstGruen ? BETRIEB_TEXT.grueneZone(puenktlich, ABLAEUFE.length) : BETRIEB_TEXT.ablaeufePuenktlich(puenktlich, ABLAEUFE.length),
     puenktlich: BETRIEB_TEXT.ablaeufePuenktlich(puenktlich, ABLAEUFE.length),
+    vercel: vercelAusgabenKarte(messungen, jetzt),
     tabellen: tabellen?.zeilen ?? null,
     tabellenZusammen: tabellen === null ? null : BETRIEB_TEXT.tabellenZusammen(speicherText(tabellen.bytes)),
   }
@@ -121,7 +124,9 @@ async function ladeDaten(jetzt: Date) {
  * Abläufe nur in der Produktion laufen. Die Karte „Bilder ohne Verwendung“
  * (nur Liste, nur in der Produktion) und die Spalte „Bleibt“ kamen mit
  * Nr. 104; die Karte steht ab 1024 px rechts unter „Nur im Dashboard“, am
- * Handy unter den Abläufen.
+ * Handy unter den Abläufen. Seit Nr. 113 (Vercel Pro) zeigen Bilder und
+ * Bild-Vorgänge keine Prozente mehr, und die Karte „Vercel-Ausgaben“ steht
+ * rechts nach „Tarife und Grenzen“, am Handy als Klappkarte danach.
  */
 export default async function AdminBetriebPage(): Promise<React.JSX.Element> {
   await verlangeAdminSeite()
@@ -198,6 +203,9 @@ export default async function AdminBetriebPage(): Promise<React.JSX.Element> {
           <Karte titel={BETRIEB_TEXT.tarifeTitel}>
             <TarifeInhalt stripeMarke={STRIPE_MARKE} />
           </Karte>
+          <Karte titel={BETRIEB_TEXT.vercelTitel}>
+            <VercelAusgabenInhalt karte={daten.vercel} />
+          </Karte>
           <Karte titel={BETRIEB_TEXT.dashboardTitel}>
             <p className={cn('-mt-2 text-[13px] leading-snug', LEISE)}>{BETRIEB_TEXT.dashboardSatz}</p>
             <DashboardInhalt />
@@ -216,6 +224,9 @@ export default async function AdminBetriebPage(): Promise<React.JSX.Element> {
         </Klappkarte>
         <Klappkarte titel={BETRIEB_TEXT.tarifeTitel} zeile={TARIFE_KURZ}>
           <TarifeInhalt stripeMarke={STRIPE_MARKE} />
+        </Klappkarte>
+        <Klappkarte titel={BETRIEB_TEXT.vercelTitel} zeile={daten.vercel.kurz}>
+          <VercelAusgabenInhalt karte={daten.vercel} />
         </Klappkarte>
         <Klappkarte titel={BETRIEB_TEXT.tabellenTitel} zeile={daten.tabellenZusammen ?? BETRIEB_TEXT.tabellenLeer}>
           <TabellenInhalt tabellen={daten.tabellen} />

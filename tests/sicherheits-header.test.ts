@@ -218,6 +218,21 @@ describe('Passwort zurücksetzen (Nr. 54)', () => {
   })
 })
 
+describe('„Das war ich nicht" (Nr. 114)', () => {
+  it('/sicherheit/nicht-ich schickt keinen Referrer und steht in keinem Suchindex — die Adresse trägt den Einmal-Token, wie /verify', () => {
+    const header = headerFuer('/sicherheit/nicht-ich', { t: 'abc' })
+    const verify = headerFuer('/verify', { token: 'abc' })
+    expect(header['Referrer-Policy']).toBe(verify['Referrer-Policy'])
+    expect(header['X-Robots-Tag']).toBe(verify['X-Robots-Tag'])
+    expect(header['Referrer-Policy']).toBe('no-referrer')
+    expect(header['X-Frame-Options']).toBe('DENY')
+  })
+
+  it('eine Hofseite, die nur so anfängt, behält die allgemeine Regel — Gegenprobe', () => {
+    expect(headerFuer('/sicherheitshof')['Referrer-Policy']).toBe('strict-origin-when-cross-origin')
+  })
+})
+
 describe('Die Seiten, die mit Nr. 54 in eine Shell umgezogen sind, behalten ihre Header', () => {
   it('Bar-Bestätigung: Token im Pfad — kein Referrer, kein Suchindex', () => {
     const header = headerFuer('/hof-test/bestaetigen/V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k')

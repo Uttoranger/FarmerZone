@@ -5,6 +5,7 @@ import type { QrPfad } from '@/lib/qr-code'
 import type { GeladeneBilder } from '@/lib/teilen-bild-quellen'
 import { MARKE } from '@/lib/marke'
 import { MARKE_RUNDUNG_PROZENT } from '@/lib/marke-bild'
+import { ABZEICHEN_TEXT } from '@/lib/gruendungshof'
 
 /*
  * Das Teilen-Bild als Satori-Grafik (next/og; Register T6, Nr. 69; Mockups
@@ -24,6 +25,9 @@ import { MARKE_RUNDUNG_PROZENT } from '@/lib/marke-bild'
  *  - Variante A zeigt drei Produktzeilen, im Beitrag-Modus und bei einem
  *    Titel, der voraussichtlich zwei Zeilen braucht, zwei (`zeilenMax`):
  *    Satori misst nicht vorab, und eine halbe Zeile am Rand sähe kaputt aus.
+ *  - Ein Gründungshof (Register K2, Nr. 116; `daten.gruendungshof`) trägt
+ *    das Etikett „Gründungshof“ oben im Block mit dem Namen, in A und B
+ *    (`Etikett`); es kostet in A eine Produktzeile.
  *
  * Die Bildmarke (Register M1, Nr. 92) ist ein Bild, keine Zeichnung: Die Route
  * lädt die volle Fassung aus public/marke als data-URL (`ladeMarkeDataUrl`)
@@ -136,6 +140,47 @@ function Marke({ m, aufFoto, marke }: { m: Mass; aufFoto: boolean; marke: string
   )
 }
 
+/**
+ * Das Abzeichen „Gründungshof“ im Bild (Register K2, Nr. 116; Mockup
+ * system-k2-gruendung-abzeichen, Teilen-Bild): eckiges Etikett mit Spross
+ * (Pfade von lucide `Sprout`), Großbuchstaben nur per CSS, keine Nummer.
+ * Maße aus dem Mockup (26 px auf 600 px Breite) ins Mockup-Maß von 480 px
+ * umgerechnet. Auf dem Foto Creme mit grüner Schrift, auf der Marktkarte
+ * umgekehrt — wie die Tokens `--abzeichen` im dunklen bzw. hellen Modus.
+ */
+function Etikett({ m, aufFoto }: { m: Mass; aufFoto: boolean }): React.JSX.Element {
+  const [grund, schrift] = aufFoto ? [F.grund, F.gruen] : [F.gruen, F.aufGruen]
+  const kante = m(11)
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignSelf: 'flex-start',
+        alignItems: 'center',
+        gap: m(4),
+        height: m(21),
+        marginBottom: m(8),
+        padding: `0 ${m(8)}px 0 ${m(7)}px`,
+        borderRadius: m(5),
+        backgroundColor: grund,
+        color: schrift,
+        fontSize: m(9.5),
+        fontWeight: 600,
+        letterSpacing: m(0.6),
+        textTransform: 'uppercase',
+        ...(aufFoto ? { boxShadow: F.titelSchatten } : {}),
+      }}
+    >
+      <svg width={kante} height={kante} viewBox="0 0 24 24" fill="none" stroke={schrift} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3" />
+        <path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4" />
+        <path d="M5 21h14" />
+      </svg>
+      <div style={{ display: 'flex' }}>{ABZEICHEN_TEXT.wort}</div>
+    </div>
+  )
+}
+
 function Rund({ src, kante }: { src: string | undefined; kante: number }): React.JSX.Element {
   if (!src) {
     return <div style={{ display: 'flex', flexShrink: 0, width: kante, height: kante, borderRadius: kante, backgroundColor: F.markeKreis }} />
@@ -207,11 +252,13 @@ function QrStreifen({ daten, qr, m, aufFoto }: { daten: TeilenBildDaten; qr: QrP
  * unter dem Titel, wie im Mockup) und wenn der Titel voraussichtlich umbricht.
  * Geschätzt über die Zeichenzahl — Fraunces SemiBold braucht im 1:1 rund
  * 40 px je Zeichen auf 944 px, in der Story rund 56 px auf 942 px; die
- * Schwellen lassen Luft für breite Buchstaben.
+ * Schwellen lassen Luft für breite Buchstaben. Das Etikett eines
+ * Gründungshofs braucht etwa eine Zeile Höhe — dann eine Zeile weniger.
  */
 function zeilenMax(daten: TeilenBildDaten, story: boolean): number {
-  if (daten.beitrag) return 2
-  return daten.hofName.length > (story ? 14 : 20) ? 2 : 3
+  const etikett = daten.gruendungshof ? 1 : 0
+  if (daten.beitrag) return 2 - etikett
+  return (daten.hofName.length > (story ? 14 : 20) ? 2 : 3) - etikett
 }
 
 function Zeilen({ produkte, bilder, m, abstand }: { produkte: readonly TeilenBildEintrag[]; bilder: GeladeneBilder; m: Mass; abstand: number }): React.JSX.Element {
@@ -338,6 +385,7 @@ function MarktKarte({
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, marginTop: m(20, 26) }}>
+        {daten.gruendungshof && <Etikett m={m} aufFoto={false} />}
         <div style={kleineZeile(m(11, 11.5), F.leise, m(1.6))}>{vorzeile}</div>
         {/* Höchstens zwei Zeilen mit „…" (Satori kappt nur mit display block + lineClamp). */}
         <div
@@ -405,6 +453,7 @@ function FotoHeld({
       </div>
       <div style={{ position: 'absolute', left: m(26), right: m(26), bottom: m(26, 120), display: 'flex', flexDirection: 'column', gap: m(12, 14) }}>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {daten.gruendungshof && <Etikett m={m} aufFoto />}
           <div style={{ ...kleineZeile(m(11, 11.5), F.fotoLeise, m(1.6)), textShadow: F.titelSchatten }}>{vorzeile}</div>
           <div
             style={{

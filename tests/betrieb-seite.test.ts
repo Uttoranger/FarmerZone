@@ -4,6 +4,8 @@
  * Beweist:
  *  - „Jetzt messen“ (Action) nur für den Admin; liegt die letzte Messung
  *    weniger als 10 Minuten zurück, misst sie nicht neu und sagt die Uhrzeit.
+ *    Das entscheidet seit Nr. 113 EINE Anweisung (`beginneMessung`); die
+ *    Warn-Mail geht erst nach der Antwort (`nachher`).
  *  - „Messungen als CSV“: ohne Admin-Recht 403 ohne Inhalt, sonst nur Zahlen,
  *    no-store, als Datei.
  *  - Der Punkt am Reiter und der Hinweis in der Betriebsleiste: nur in der
@@ -28,7 +30,7 @@ const db = vi.hoisted(() => ({
 
 vi.mock('@/server/admin-wache', () => wache)
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
-vi.mock('@/server/betrieb', () => ({ messeUndPruefe: vi.fn(async () => ({ gemessen: [], fehler: [] })) }))
+vi.mock('@/server/betrieb', () => ({ messeUndPruefe: vi.fn(async () => ({ gemessen: [], fehler: [] })), beginneMessung: vi.fn(async () => true) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 vi.mock('@/server/queries/admin', () => ({ zaehleWartendeHoefe: vi.fn(async () => 0) }))
@@ -53,7 +55,7 @@ vi.mock('next/link', () => ({
 }))
 
 import * as Sentry from '@sentry/nextjs'
-import { messeUndPruefe } from '@/server/betrieb'
+import { beginneMessung, messeUndPruefe } from '@/server/betrieb'
 import { messeJetztAction } from '@/server/actions/betrieb'
 import { GET as exportGet } from '@/app/admin/betrieb/export/route'
 import { ladeAdminbereich } from '@/server/adminbereich'
@@ -73,22 +75,27 @@ describe('„Jetzt messen“', () => {
   it('ohne Admin-Recht: der Satz der Wache, keine Messung', async () => {
     wache.verlangeAdminAktion.mockResolvedValue({ error: 'Kein Zugriff.' })
     expect(await messeJetztAction()).toEqual({ error: 'Kein Zugriff.' })
+    expect(beginneMessung).not.toHaveBeenCalled()
     expect(messeUndPruefe).not.toHaveBeenCalled()
   })
 
-  it('letzte Messung vor 5 Minuten: misst nicht neu und nennt die Uhrzeit (Wiener Zeit)', async () => {
+  it('Beginn nicht belegt (Messung vor 5 Minuten): misst nicht neu und nennt die Uhrzeit (Wiener Zeit) — auch die eines laufenden Beginns', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-16T08:05:00.000Z'))
+    vi.mocked(beginneMessung).mockResolvedValueOnce(false)
     db.betriebMessung.findFirst.mockResolvedValue({ gemessenAm: new Date('2026-10-16T08:00:00.000Z') })
     expect(await messeJetztAction()).toEqual({ ok: true, satz: 'Gerade erst gemessen – um 10:00' })
     expect(messeUndPruefe).not.toHaveBeenCalled()
+    // Die Uhrzeit nimmt den Merker mit: Ein gleichzeitiger Klick sieht die Zeit des ersten, auch wenn der noch misst.
+    expect(db.betriebMessung.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { art: { in: expect.arrayContaining(['messBeginn', 'datenbankBytes']) } } }))
     vi.useRealTimers()
   })
 
-  it('letzte Messung älter als 10 Minuten (oder keine): misst', async () => {
-    db.betriebMessung.findFirst.mockResolvedValue(null)
-    expect(await messeJetztAction()).toMatchObject({ ok: true })
-    expect(messeUndPruefe).toHaveBeenCalledTimes(1)
+  it('Beginn belegt: misst, prüft die Grenzen und schickt die Warn-Mail erst nach der Antwort', async () => {
+    expect(await messeJetztAction()).toMatchObject({ ok: true, satz: 'Gemessen. Die Kacheln zeigen die neuen Zahlen.' })
+    expect(beginneMessung).toHaveBeenCalledTimes(1)
+    expect(messeUndPruefe).toHaveBeenCalledWith(expect.any(Date), { nachher: true })
+    expect(db.betriebMessung.findFirst).not.toHaveBeenCalled()
   })
 })
 

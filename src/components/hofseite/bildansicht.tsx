@@ -112,6 +112,14 @@ export function useBildansicht(anzahl: number): Bildansicht {
 /** Mit dem Ausschnitt des Fotos (Register N17, Nr. 98): groß zählt davon nur der Filter. */
 export type BildansichtFoto = { id: string; url: string; caption: string | null; ausschnitt?: BildAusschnitt | null }
 
+/**
+ * Der Alt-Text eines Hoffotos (Nr. 117): die Bildunterschrift des Hofs, sonst
+ * „Foto von {Hof}" — für Suchmaschinen; Screenreader hören auf den Knöpfen ihr aria-label.
+ */
+export function fotoAlt(foto: Pick<BildansichtFoto, 'caption'>, hofName: string | undefined): string {
+  return foto.caption || (hofName ? `Foto von ${hofName}` : '')
+}
+
 const RUNDER_KNOPF = cn(
   'flex size-11 shrink-0 items-center justify-center rounded-full bg-accent-foreground/12 text-accent-foreground transition-colors duration-[250ms] hover:bg-accent-foreground/24',
   FOKUS_RAHMEN
@@ -205,7 +213,7 @@ export function BildansichtEbene({
         >
           <Image
             src={foto.url}
-            alt={foto.caption ?? ''}
+            alt={fotoAlt(foto, hofName)}
             fill
             sizes="100vw"
             draggable={false}
@@ -254,7 +262,7 @@ export function BildansichtEbene({
             >
               {/* Klein mit Ausschnitt und Filter wie die Kachel der Übersicht (Register N17). */}
               <span className="relative block size-[46px] overflow-hidden rounded-md bg-accent-foreground/12">
-                <Image src={f.url} alt="" fill sizes="46px" className="object-cover" style={bildStil(f.ausschnitt ?? null)} />
+                <Image src={f.url} alt={fotoAlt(f, hofName)} fill sizes="46px" className="object-cover" style={bildStil(f.ausschnitt ?? null)} />
               </span>
             </button>
           ))}

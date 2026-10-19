@@ -79,12 +79,16 @@ function hexVon(modus: string, token: string): string {
 /** Text- und Flächen-Token je Art der Marke (Register G5). */
 const ZUSTAND_PAARE: [string, string][] = MARKE_ARTEN.map((art) => [`zustand-${art}`, `zustand-${art}-grund`])
 
+/** Schrift und Fläche des Abzeichens „Gründungshof“ (Register K2, Nr. 116). */
+const ABZEICHEN_PAAR: [string, string] = ['abzeichen', 'abzeichen-grund']
+
 describe('Tabelle und CSS decken sich', () => {
-  it('die Tabelle im Design-System hat neunzehn Tokens — elf Grundfarben, acht Bedeutungsfarben', () => {
+  it('die Tabelle im Design-System hat einundzwanzig Tokens — elf Grundfarben, acht Bedeutungsfarben, das Abzeichen', () => {
     expect([...soll.keys()].toSorted()).toEqual(
       [
         'accent', 'bg', 'border', 'on-accent', 'on-primary', 'primary', 'status-fertig', 'status-offen', 'surface', 'text', 'text-muted',
         ...ZUSTAND_PAARE.flat(),
+        ...ABZEICHEN_PAAR,
       ].toSorted()
     )
   })
@@ -242,6 +246,10 @@ describe('Geltungsbereich data-design="neu"', () => {
     expect(css).toContain('--color-status-fertig: var(--fz-status-fertig);')
   })
 
+  it('das Abzeichen ist als Utility erreichbar — Schrift und Fläche', () => {
+    for (const token of ABZEICHEN_PAAR) expect(css).toContain(`--color-${token}: var(--fz-${token});`)
+  })
+
   it('die Bedeutungsfarben (G5) sind als Utilities erreichbar — Text und Fläche je Art der Marke', () => {
     for (const [text, flaeche] of ZUSTAND_PAARE) {
       expect(css).toContain(`--color-${text}: var(--fz-${text});`)
@@ -268,6 +276,8 @@ describe('Kontrast in beiden Modi (≥ 4,5:1)', () => {
     ['status-fertig', 'surface'],
     // Die Marke trägt ihre eigene Fläche — ihr Text zählt nur gegen diese.
     ...ZUSTAND_PAARE,
+    // Das Abzeichen ebenso (Nr. 116).
+    ABZEICHEN_PAAR,
   ]
 
   it.each(paare)('%s auf %s', (vorne, hinten) => {

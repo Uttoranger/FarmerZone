@@ -7,7 +7,8 @@ import { getOrderDetail } from '@/server/queries/orders'
 import { statusLabel, paymentLabel } from '@/components/orders/order-status'
 import { PrintButton } from '@/components/orders/print-button'
 import { barZuKassierenCents, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
-import { formatEuro } from '@/lib/format'
+import { formatDatumLang, formatEuro } from '@/lib/format'
+import { datumLang } from '@/lib/heute'
 import { formatiereTelefon } from '@/lib/telefon-anzeige'
 
 export const dynamic = 'force-dynamic'
@@ -31,9 +32,8 @@ export default async function OrderPrintPage({
   const order = await getOrderDetail(farm.id, orderId)
   if (!order) notFound()
 
-  const pickupDate = order.pickupDate.toLocaleDateString('de-AT', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  })
+  // Wiener Tag, nie der der Serveruhr (CODING_STANDARDS „Tage und Wochen").
+  const pickupDate = datumLang(order.pickupDate)
   // Servicegebühr aus dem Snapshot: Zwischensumme/Gebühr/Gesamt wie im
   // Checkout, „Bar zu kassieren" bei Vor-Ort-Zahlung
   const summen = bestellSummen(order)
@@ -72,7 +72,7 @@ export default async function OrderPrintPage({
             <div className="text-sm">{statusLabel(order.status)}</div>
           </div>
           <div className="text-xs text-slate-400 mt-0.5">
-            Eingang: {order.createdAt.toLocaleDateString('de-AT')}
+            Eingang: {formatDatumLang(order.createdAt)}
           </div>
         </div>
 

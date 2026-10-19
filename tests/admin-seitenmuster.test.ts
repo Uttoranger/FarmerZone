@@ -50,8 +50,11 @@ function tagMit(html: string, muster: string): string {
  */
 function tippflaecheHoehe(klassen: string): number {
   const hoehe = /(?:^|\s)(?:min-)?h-(\d+(?:\.\d+)?)(?=\s|$)/.exec(klassen)
-  const ueberstand = /(?:^|\s)before:-inset-y-(\d+(?:\.\d+)?)(?=\s|$)/.exec(klassen)
-  return (hoehe ? Number(hoehe[1]) * 4 : 0) + (ueberstand ? Number(ueberstand[1]) * 4 * 2 : 0)
+  // Das ::before sitzt im Innenrand eines Rahmens: Mit `border` fehlen oben und unten je 1 px (Nr. 118, Filter-Chip).
+  const rahmen = /(?:^|\s)border(?=\s|$)/.test(klassen) ? 2 : 0
+  const ueberstand = /(?:^|\s)before:-inset-y-(?:(\d+(?:\.\d+)?)|\[(\d+)px\])(?=\s|$)/.exec(klassen)
+  const px = ueberstand ? (ueberstand[1] !== undefined ? Number(ueberstand[1]) * 4 : Number(ueberstand[2])) : 0
+  return (hoehe ? Number(hoehe[1]) * 4 : 0) - rahmen + px * 2
 }
 
 const kachel = (ueber: Partial<KennzahlDaten> & { id: string }): KennzahlDaten => ({ titel: 'Titel', wert: '1', ...ueber })
@@ -194,6 +197,9 @@ describe('Unterreiter', () => {
     expect(tippflaecheHoehe('inline-flex h-9 px-3')).toBeLessThan(44)
     expect(tippflaecheHoehe("relative inline-flex h-9 before:absolute before:-inset-y-1 before:content-['']")).toBe(44)
     expect(tippflaecheHoehe('inline-flex min-h-11')).toBe(44)
+    // mit Rahmen zählt der Innenrand: 4 px Überstand ergäben nur 42 px, 5 px ergeben 44
+    expect(tippflaecheHoehe("relative inline-flex h-9 border before:absolute before:-inset-y-1 before:content-['']")).toBe(42)
+    expect(tippflaecheHoehe("relative inline-flex h-9 border before:absolute before:-inset-y-[5px] before:content-['']")).toBe(44)
   })
 
   it('ohne Zahl steht nur das Wort', () => {

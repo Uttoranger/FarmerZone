@@ -4,8 +4,8 @@ import { ADMIN_RAHMEN } from '@/components/admin/admin-teile'
 /**
  * Ladeansicht von /admin/betrieb (Nr. 103) — in der Form der Seite, die
  * AdminShell steht schon: Kopf mit Knopf, vier Kacheln, darunter ab 1024 px
- * zwei Spalten (Verlauf, Abläufe | Tarife, Dashboard, Bilder ohne
- * Verwendung), am Handy eine Liste.
+ * zwei Spalten (Verlauf, Abläufe | Tarife, Vercel-Ausgaben, Dashboard,
+ * Bilder ohne Verwendung), am Handy eine Liste.
  * Die Warnkarte fehlt: Sie ist bedingt (DESIGN_SYSTEM „Ladeansicht“).
  */
 const FLAECHE = 'rounded-2xl border border-border bg-card'
@@ -37,6 +37,7 @@ export default function Laden(): React.JSX.Element {
         </div>
         <div className="flex flex-col gap-[18px]">
           <div className={cn(FLAECHE, 'h-[380px]')} />
+          <div className={cn(FLAECHE, 'h-[140px]')} />
           <div className={cn(FLAECHE, 'h-[300px]')} />
           <div className={cn(FLAECHE, 'h-[340px]')} />
         </div>
@@ -44,7 +45,7 @@ export default function Laden(): React.JSX.Element {
       <div className="flex flex-col gap-3 lg:hidden">
         <div className={cn(FLAECHE, 'h-[236px]')} />
         <div className={cn(FLAECHE, 'h-[340px]')} />
-        {[0, 1, 2, 3].map((i) => (
+        {[0, 1, 2, 3, 4].map((i) => (
           <div key={i} className={cn(FLAECHE, 'h-14')} />
         ))}
       </div>

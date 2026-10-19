@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { Check, CheckCheck, Inbox, Star, X } from 'lucide-react'
 import { z } from 'zod'
-import { getAdminFarms } from '@/server/queries/admin'
+import { getAdminFarms, leseGruendungEinstellung } from '@/server/queries/admin'
+import { prisma } from '@/lib/prisma'
 import { getDuplikateVon, getMeldungDetail, getWunschCluster, type AdminMeldungDetail } from '@/server/queries/meldung'
 import {
   ladeEingang,
@@ -30,7 +31,7 @@ import {
 import type { KennzahlDaten } from '@/lib/admin-seiten'
 import { adminHofZeile, type AdminHofZeile } from '@/lib/admin-hoefe'
 import { wartelistePlatzZeile } from '@/lib/admin-hoefe-seite'
-import { gruendungsplaetze, MAX_GRUENDUNGSHOEFE } from '@/lib/gruendungshof'
+import { vergebeneGruendungsplaetze } from '@/lib/gruendungshof'
 import { wienKalendertag } from '@/lib/kalender'
 import { datumKurz } from '@/lib/verkauf-eintragen'
 import { UMGEBUNG } from '@/lib/umgebung-server'
@@ -67,15 +68,15 @@ export type EingangDaten = {
 /**
  * Der Hof einer Aufgabe für Freischalten/Ablehnen: dieselbe Zeile und dieselbe
  * Platzzahl wie Admin › Höfe (src/app/admin/page.tsx — getAdminFarms,
- * adminHofZeile, MAX_GRUENDUNGSHOEFE), damit Rückfrage und Sperre dasselbe
- * sagen. Nur wenn eine Hof-Aufgabe gewählt ist.
+ * adminHofZeile, Plätze aus der Einstellung — Nr. 116), damit Rückfrage und
+ * Sperre dasselbe sagen. Nur wenn eine Hof-Aufgabe gewählt ist.
  */
 async function ladeHofZeile(hofId: string, jetzt: Date): Promise<{ zeile: AdminHofZeile | null; vergeben: number }> {
-  const farms = await getAdminFarms(jetzt)
+  const [farms, { plaetze }] = await Promise.all([getAdminFarms(jetzt), leseGruendungEinstellung(prisma)])
   const hof = farms.find((f) => f.id === hofId)
   return {
-    zeile: hof ? adminHofZeile(hof, { gruendungsplatz: null, maxPlaetze: MAX_GRUENDUNGSHOEFE }, jetzt) : null,
-    vergeben: Math.min(gruendungsplaetze(farms).size, MAX_GRUENDUNGSHOEFE),
+    zeile: hof ? adminHofZeile(hof, { gruendungsplatz: null, maxPlaetze: plaetze }, jetzt) : null,
+    vergeben: vergebeneGruendungsplaetze(farms, plaetze),
   }
 }
 

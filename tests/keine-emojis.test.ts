@@ -19,6 +19,11 @@
  *
  * Fremdtext — Produktnamen, Beiträge und Werte der Höfe — liegt in der
  * Datenbank, nicht im Quelltext, und bleibt unangetastet.
+ *
+ * Dazu (Regelvorschlag 103, Lauf 16; Nr. 118): Mitten in einer Datei unter src/ oder tests/ steht kein
+ * unsichtbares Zeichen U+FEFF (BOM). Eine als Escape gemeinte Byte-Reihenfolge-Marke kam unsichtbar in
+ * Quelltext und Test (Nr. 103, CSV-Ausgabe); wer sie braucht, schreibt `\uFEFF`. Ein BOM ganz am Dateianfang
+ * zählt nicht (Editoren setzen es).
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
@@ -99,4 +104,44 @@ describe('keine Emojis', () => {
     )
     expect(funde).toEqual([])
   })
+})
+
+/** Das Zeichen, das hier gesucht wird, steht nie als Zeichen im Quelltext dieser Datei — nur als Escape. */
+const BOM = '\uFEFF'
+const TEXTDATEI = /\.(ts|tsx|mjs|js|css|json|md|sql)$/
+
+function* textdateien(ordner: string): Generator<string> {
+  for (const name of readdirSync(ordner)) {
+    const pfad = join(ordner, name)
+    if (statSync(pfad).isDirectory()) yield* textdateien(pfad)
+    else if (TEXTDATEI.test(name)) yield pfad
+  }
+}
+
+/** Zeilen (1-basiert), in denen mitten im Text ein U+FEFF steht — am Dateianfang nicht. */
+function bomMittenImText(text: string): number[] {
+  const zeilen: number[] = []
+  for (let i = text.indexOf(BOM, 1); i !== -1; i = text.indexOf(BOM, i + 1)) {
+    zeilen.push(text.slice(0, i).split('\n').length)
+  }
+  return zeilen
+}
+
+describe('kein unsichtbares BOM mitten in Dateien (Regelvorschlag 103)', () => {
+  it('Gegenprobe: findet ein BOM in einer Zeichenkette und in einer Vorlage — nicht am Dateianfang', () => {
+    expect(bomMittenImText(`const a = 1\nconst b = \`${BOM}\${x}\`\n`)).toEqual([2])
+    expect(bomMittenImText(`x.replace(/^${BOM}/, '')`)).toEqual([1])
+    expect(bomMittenImText(`${BOM}const a = 1\n`)).toEqual([])
+    // als Escape geschrieben ist es sichtbar und ohne Befund
+    expect(bomMittenImText('const b = `\\uFEFF${x}`')).toEqual([])
+  })
+
+  it('unter src/ und tests/ steht kein BOM mitten in einer Datei', () => {
+    const funde = ['src', 'tests'].flatMap((ordner) =>
+      [...textdateien(join(WURZEL, ordner))].flatMap((pfad) =>
+        bomMittenImText(readFileSync(pfad, 'utf8')).map((zeile) => `${relative(WURZEL, pfad)}:${zeile}`)
+      )
+    )
+    expect(funde, 'Ein unsichtbares U+FEFF mitten in der Datei — als Escape \\uFEFF schreiben.').toEqual([])
+  }, 30_000)
 })

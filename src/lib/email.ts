@@ -413,6 +413,49 @@ export async function sendPasswordResetEmail(email: string, url: string): Promis
   await send(email, `Passwort zurücksetzen · ${MARKE}`, html)
 }
 
+/**
+ * „Zu viele falsche Codes" bzw. „… Passwörter" → das Konto hinter der Adresse
+ * (Register E7, Ergänzung; Nr. 112). Ohne Code und ohne Link; Betreff und
+ * Texte aus src/lib/anmeldecode.ts, die Pause mit Tag und Uhrzeit. Gibt das
+ * Versandergebnis zurück (sendRaw wirft nie).
+ */
+export async function sendZuVieleVersucheEmail(
+  email: string,
+  art: import('@/lib/anmeldecode').FehlversuchArt,
+  bis: Date
+): Promise<VersandErgebnis> {
+  // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
+  const { ZU_VIELE_VERSUCHE_MAIL } = await import('@/lib/anmeldecode')
+  const vorlage = await htmlOderFehler(async () => {
+    const { ZuVieleVersucheEmail } = await import('@/emails/zu-viele-versuche')
+    return React.createElement(ZuVieleVersucheEmail, { art, bis: zeitpunktFuerMail(bis) })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, `${ZU_VIELE_VERSUCHE_MAIL[art].betreff} · ${MARKE}`, vorlage.html)
+}
+
+/**
+ * „Neue Anmeldung bei deinem Hof-Konto" → Hof- bzw. Admin-Konto, das sich auf
+ * einem neuen Gerät angemeldet hat (Register E7, Ergänzung; Nr. 114). `link`
+ * trägt einen Einmal-Token — er steht nur in der Mail, nie im Betreff und nie
+ * im Log (sendRaw schreibt ohne Schlüssel nur Betreff und Empfänger). Gibt das
+ * Versandergebnis zurück (sendRaw wirft nie).
+ */
+export async function sendNeueAnmeldungEmail(
+  email: string,
+  daten: { hof: boolean; name: string | null; geraet: string; zeitpunkt: Date; link: string }
+): Promise<VersandErgebnis> {
+  // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
+  const { NEUE_ANMELDUNG_MAIL, anmeldeZeitpunkt } = await import('@/lib/geraete')
+  const vorlage = await htmlOderFehler(async () => {
+    const { NeueAnmeldungEmail } = await import('@/emails/neue-anmeldung')
+    const { zeitpunkt, ...rest } = daten
+    return React.createElement(NeueAnmeldungEmail, { ...rest, wann: anmeldeZeitpunkt(zeitpunkt) })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, `${NEUE_ANMELDUNG_MAIL.betreff(daten.hof)} · ${MARKE}`, vorlage.html)
+}
+
 /** Neuer Hof registriert → Betreiber (Freischaltung nötig); `an` aus empfaengerFuer('hofWartet'). */
 export async function sendNewFarmNotification(
   farm: {
@@ -426,6 +469,7 @@ export async function sendNewFarmNotification(
   if (an.length === 0) return
   const registeredAt = new Date().toLocaleString('de-AT', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    timeZone: 'Europe/Vienna',
   })
   const { NewFarmNotificationEmail } = await import('@/emails/new-farm-notification')
   const html = await toHtml(

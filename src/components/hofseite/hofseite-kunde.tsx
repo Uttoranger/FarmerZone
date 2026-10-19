@@ -38,7 +38,6 @@ import {
   zeigeSchaufenster,
   type HofReiterId,
 } from '@/lib/hofseite-kunde'
-import { jsonLdSicher } from '@/lib/json-ld'
 import { korbErlaubt } from '@/lib/hofseite-vorschau'
 import { produktLink } from '@/lib/produktdetail'
 import { rueckweg, type KundenSeite } from '@/lib/kunden-kopf'
@@ -61,6 +60,7 @@ import { VorschauImRahmen } from '@/components/farm/vorschau-im-rahmen'
 import { HofseiteSeitenspalte } from '@/components/hofseite/hofseite-seitenspalte'
 import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
 import { Titelbild } from '@/components/hofseite/titelbild'
+import { Abzeichen, AbzeichenKnopf } from '@/components/ui/abzeichen'
 
 /*
  * Die Hofseite für Kundinnen im neuen Design (Nachtlauf Nr. 10, Gate 4).
@@ -81,7 +81,7 @@ import { Titelbild } from '@/components/hofseite/titelbild'
  * Produktraster bleibt in jedem Reiter an derselben Stelle eingehängt — Korb
  * und Nachbestell-Link überstehen so den Wechsel. Die Karten führen zur
  * Produktseite (Nr. 11). Unter lg steht in der Übersicht zuerst das
- * Schaufenster (Register N5, Nr. 51): Fotostreifen, bis zu vier Produkte,
+ * Schaufenster (Register N5, Nr. 51): Fotomosaik, bis zu vier Produkte,
  * „Alle Produkte (n)"; danach rechte Spalte und Über uns.
  *
  * Was entschieden wird (Reiter, Abschnitte, Zustände, Zahlung, Gebühr), steht
@@ -202,21 +202,6 @@ export function HofseiteKunde({
     }
   }
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'LocalBusiness',
-    name: farm.name,
-    description: farm.description,
-    // Ohne telephone und email (Nr. 60): Die Nummer gibt es erst nach dem Kauf.
-    address: {
-      '@type': 'PostalAddress',
-      streetAddress: farm.address,
-      postalCode: farm.postalCode,
-      addressLocality: farm.city,
-      addressCountry: 'AT',
-    },
-  }
-
   const rueckwegZeile = (
     <div className="mx-auto max-w-[1200px] px-4 pt-1 md:px-6 md:pt-3">
       <Link
@@ -309,7 +294,7 @@ export function HofseiteKunde({
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSicher(jsonLd) }} />
+      {/* Das JSON-LD des Hofs baut seit Nr. 117 die Seite auf dem Server (src/app/(public)/[farmSlug]/page.tsx). */}
       {ansicht.art === 'vorschau' && <VorschauImRahmen />}
 
       {rueckwegZeile}
@@ -317,7 +302,7 @@ export function HofseiteKunde({
       {/* ── Titelbild, Name, Aktionen ── */}
       <div className="relative">
         {/* Hochformat ab md ganz statt beschnitten (Register N6, Nr. 72): entscheidet titelbild.tsx. */}
-        <Titelbild foto={foto} verlauf={titelbildVerlauf(farm.bannerValue)} ausschnitt={titelbildAusschnitt(farm.bannerAusschnitt, farm.bannerFocusY)}>
+        <Titelbild foto={foto} verlauf={titelbildVerlauf(farm.bannerValue)} ausschnitt={titelbildAusschnitt(farm.bannerAusschnitt, farm.bannerFocusY)} hofName={farm.name}>
           <button
             type="button"
             onClick={() => void teileHof(farm)}
@@ -343,6 +328,16 @@ export function HofseiteKunde({
               )}
             </span>
             <div className="min-w-0 md:pb-1">
+              {/* Abzeichen „Gründungshof“ direkt über dem Namen (Register K2, Nr. 116) — nur das Ja/Nein, nie die Nummer. */}
+              {farm.gruendungshof && (
+                <div className="mb-2">
+                  {farm.abzeichenBlatt && farm.gruendungSeit ? (
+                    <AbzeichenKnopf hofName={farm.name} seit={farm.gruendungSeit} blatt={farm.abzeichenBlatt} />
+                  ) : (
+                    <Abzeichen aufBild />
+                  )}
+                </div>
+              )}
               <h1 className="line-clamp-2 font-heading text-[28px] leading-[1.1] font-semibold break-words text-accent-foreground md:text-[38px] md:text-foreground">
                 {farm.name}
               </h1>
@@ -431,7 +426,7 @@ export function HofseiteKunde({
 
       {/* ── Inhalt und rechte Spalte ──
           Unter lg in der Übersicht zuerst das Schaufenster (Register N5):
-          Fotostreifen, bis zu vier Produkte, „Alle Produkte (n)"; danach die
+          Fotomosaik, bis zu vier Produkte, „Alle Produkte (n)"; danach die
           rechte Spalte und Über uns. Der Quelltext hat unter lg genau diese
           Reihenfolge — Tastatur und Screenreader folgen ihr, kein `order`.
           Ab lg stellt das Raster die Teile an ihren alten Ort: Über uns oben

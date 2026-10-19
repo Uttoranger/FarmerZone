@@ -10,6 +10,7 @@ import { FilterChip } from '@/components/ui/chip'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { Kicker } from '@/components/startseite/kicker'
+import { Abzeichen } from '@/components/ui/abzeichen'
 
 /*
  * „Höfe in deiner Nähe" (Mockups web-k0-startseite, mobil-k0-startseite):
@@ -130,6 +131,8 @@ export function HofKarten({ hoefe }: { hoefe: readonly StartseitenHof[] }): Reac
           >
             <HofBild hof={hof} sizes="(min-width: 1024px) 285px, (min-width: 768px) 50vw, 250px" className="h-[130px] w-full" />
             <span className="flex min-w-0 flex-col gap-1.5 px-4 py-3.5">
+              {/* Abzeichen klein über dem Namen (Register K2, Nr. 116) — die Karte bleibt der Link. */}
+              {hof.gruendungshof && <Abzeichen groesse="klein" className="self-start" />}
               <span className="line-clamp-2 font-heading text-lg leading-snug font-semibold break-words text-foreground">
                 {hof.name}
               </span>

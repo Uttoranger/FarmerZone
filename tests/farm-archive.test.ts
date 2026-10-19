@@ -34,6 +34,9 @@ vi.mock('@/lib/prisma', () => ({
     user: { findUnique: vi.fn(), create: vi.fn() },
     order: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn() },
     customerFarmSubscription: { findUnique: vi.fn(), upsert: vi.fn() },
+    // Seit Nr. 116 aktiviert reactivateFarm unter der Sperre der Gründungsplätze, in einer Transaktion.
+    $executeRaw: vi.fn(async () => 1),
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn((await import('@/lib/prisma')).prisma)),
   },
 }))
 vi.mock('@/lib/stripe', () => ({

@@ -42,6 +42,8 @@ export function buildOrderReminderMessage(order: OrderReminderInfo): string {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
+    // Wiener Tag, nie der der Serveruhr (CODING_STANDARDS „Tage und Wochen").
+    timeZone: 'Europe/Vienna',
   })
   return (
     `${opening} Bestellung ${order.orderNumber} bei ${order.farmName} liegt am ${date} ` +

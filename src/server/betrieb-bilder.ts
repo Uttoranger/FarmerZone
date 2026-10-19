@@ -83,5 +83,5 @@ export function bilderOhneVerwendungCsv(liste: readonly BildOhneVerwendung[]): s
     ['Art', 'Pfad', 'Größe (Bytes)', 'hochgeladen'],
     ...liste.filter((b) => zaehltOhneVerwendung(b.gruppe)).map((b) => [BILD_GRUPPE_TEXT[b.gruppe], b.pathname, String(b.size), kalendertagInWien(b.uploadedAt)]),
   ]
-  return `﻿${zeilen.map((z) => z.map(csvFeld).join(';')).join('\r\n')}\r\n`
+  return `\uFEFF${zeilen.map((z) => z.map(csvFeld).join(';')).join('\r\n')}\r\n`
 }

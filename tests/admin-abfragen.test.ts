@@ -12,6 +12,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findMany: vi.fn(), count: vi.fn() },
+    // Seit Nr. 116 liest getAdminFarms die Einstellung der Gründungsplätze (ohne Zeile: Standard).
+    plattformEinstellung: { findUnique: vi.fn(async () => null) },
     meldung: { groupBy: vi.fn(), findFirst: vi.fn() },
     $queryRaw: vi.fn(),
   },
@@ -52,6 +54,8 @@ function dbZeile(ueber: Record<string, unknown> = {}) {
     sepaMandatAm: null,
     owner: { email: 'max@example.com', emailVerified: true, createdAt: new Date('2026-01-01T00:00:00Z') },
     _count: { products: 0, farmPhotos: 0, pickupSlots: 0 },
+    // Seit Nr. 116: ob ein Produkt im Shop ist (Freischalten).
+    products: [],
     ...ueber,
   }
 }

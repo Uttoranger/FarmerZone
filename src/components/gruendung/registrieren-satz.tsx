@@ -21,7 +21,7 @@ export function RegistrierenSatz({ gruendung, className }: { gruendung: Gruendun
     >
       <Star className="mt-px size-4 shrink-0 text-status-offen" strokeWidth={1.9} aria-hidden="true" />
       <span className="min-w-0">
-        <SatzTeile teile={GRUENDUNG_TEXT.registrieren(gruendung.voraussichtlicherPlatz, gruendung.bisTag)} />
+        <SatzTeile teile={GRUENDUNG_TEXT.registrieren(gruendung, gruendung.voraussichtlicherPlatz)} />
       </span>
     </p>
   )

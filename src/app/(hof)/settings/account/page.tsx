@@ -4,6 +4,8 @@ import type { Metadata } from 'next'
 import { Mail, Shield, Trash2 } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getFarmArchiveState } from '@/server/queries/farm'
+import { ladeAngemeldeteGeraete } from '@/server/geraete'
+import { AngemeldeteGeraete } from '@/components/konto/angemeldete-geraete'
 import { supportMailto } from '@/lib/support'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
@@ -26,12 +28,16 @@ const TEXTLINK = 'font-medium text-brand-text underline underline-offset-2 break
  * E-Mail ändern und Konto löschen nur über die vorausgefüllte Support-Mail,
  * Hof stilllegen/reaktivieren über die bestehenden Actions mit Sperre bei
  * offenen Bestellungen. Neu sind nur Kopf, Rahmen und Farben (Tokens).
+ * Seit Nr. 114 (E7, Ergänzung) nach dem Passwort die angemeldeten Geräte.
  */
 export default async function AccountPage(): Promise<React.JSX.Element> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect('/login')
 
-  const farm = await getFarmArchiveState(session.user.id)
+  const [farm, geraete] = await Promise.all([
+    getFarmArchiveState(session.user.id),
+    ladeAngemeldeteGeraete(session.user.id, session.session.id, new Date()),
+  ])
 
   // Vorausgefüllte Support-Anfragen: Anliegen, Hof-Slug und Login-Adresse
   // stehen im Textkörper, damit nichts nachgefragt werden muss.
@@ -50,7 +56,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
 
   return (
     <div className={UNTERSEITE_RAHMEN}>
-      <UnterseitenKopf titel={EINSTELLUNG_KONTO.label} satz="Anmeldung, Passwort, Darstellung und dein Hof." />
+      <UnterseitenKopf titel={EINSTELLUNG_KONTO.label} satz="Anmeldung, Passwort, Geräte, Darstellung und dein Hof." />
 
       <div data-app-palette="neu" className="space-y-4">
         <Card>
@@ -90,6 +96,8 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
             </p>
           </CardContent>
         </Card>
+
+        <AngemeldeteGeraete zeilen={geraete} />
 
         <DarstellungKarte />
 

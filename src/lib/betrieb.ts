@@ -4,16 +4,19 @@
  * Bild-Vorgänge gegen die Grenze des Tarifs, die Abläufe mit ihrem letzten
  * Lauf, Warnstufen und die Texte von Seite und Warn-Mail. EINE Quelle für
  * Tarife, Grenzen, Arten und Abläufe; rein, ohne Datenbank prüfbar
- * (tests/betrieb.test.ts). `jetzt` ist immer ein Parameter.
+ * (tests/betrieb.test.ts). `jetzt` ist immer ein Parameter. Seit Nr. 113:
+ * Vercel Pro (Bilder ohne feste Grenze), die Regel des Lebenszeichens
+ * (`fehlendeAblaeufe`) und die Vercel-Ausgaben aus Spend Management.
  *
  * Tage: Gespeichert wird je UTC-Tag (Resend zählt den Tag ab 0 Uhr UTC, und
  * eine Messung zwischen 0 und 2 Uhr Wiener Zeit schreibt so nie in den
  * Vortag); angezeigt werden Uhrzeiten in Wiener Zeit.
  *
  * Wörter nur aus der Wortliste: Betrieb, Grenze, Ablauf, Bilder ohne
- * Verwendung (nicht Monitoring, Quota, Cron, Job); der Name nur aus MARKE.
+ * Verwendung, Lebenszeichen (nicht Monitoring, Quota, Cron, Job, Heartbeat);
+ * der Name nur aus MARKE.
  */
-import { MONAT_KURZ, formatDezimal, formatTagKurz, formatZahl } from '@/lib/format'
+import { MONAT_KURZ, formatDezimal, formatDollar, formatTagKurz, formatZahl } from '@/lib/format'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { tagVersetzt } from '@/lib/kalender'
 import { uhrzeitInWien } from '@/lib/fristen'
@@ -24,17 +27,23 @@ import { STARTSEITE_ORIGINAL_PREFIX, STARTSEITE_ZIEL_PREFIX, type UploadZweck } 
 
 // ─── Tarife und Grenzen ──────────────────────────────────────────────────────
 
-/** Die Tarife der Dienste (Stand 16.10.2026). Nach einem Tarifwechsel NUR hier ändern. */
-export const TARIFE = { vercel: 'HOBBY', supabase: 'FREE', resend: 'FREE' } as const
+/** Die Tarife der Dienste (Stand 19.10.2026: Vercel Pro). Nach einem Tarifwechsel NUR hier ändern. */
+export const TARIFE = { vercel: 'PRO', supabase: 'FREE', resend: 'FREE' } as const
+
+/** Die Namen der Tarife, wie sie auf der Seite stehen. */
+const TARIF_NAME: Record<'HOBBY' | 'PRO' | 'FREE', string> = { HOBBY: 'Hobby', PRO: 'Pro', FREE: 'Free' }
 
 /*
  * Grenzen je Tarif. Speicher in Dezimal-Einheiten (1 GB = 10⁹ Bytes, 1 MB =
  * 10⁶): Ob ein Dienst binär zählt, sagt er nicht eindeutig — die kleinere Zahl
- * warnt früher, nie später.
+ * warnt früher, nie später. `null` = keine feste Grenze: Bei Vercel Pro ist
+ * der Bild-Speicher nutzungsbasiert (bezahlt aus dem Pro-Guthaben, darüber
+ * zählt er zum Ausgabenlimit aus Spend Management; Nr. 113).
  */
 export const GRENZEN = {
   vercel: {
     HOBBY: { bilderBytes: 1_000_000_000, bildVorgaengeMonat: 2_000, uebertragungBytesMonat: 10_000_000_000 },
+    PRO: { bilderBytes: null, bildVorgaengeMonat: null, uebertragungBytesMonat: null },
   },
   supabase: {
     FREE: { datenbankBytes: 500_000_000, uebertragungBytesMonat: 5_000_000_000 },
@@ -44,16 +53,25 @@ export const GRENZEN = {
   },
 } as const
 
-/** Die Grenzen der Tarife von heute — daran misst die Seite, daran warnt die Mail. */
+/** Die Grenzen bei Vercel — je Tarif eine Zahl oder keine (null). */
+type VercelGrenzen = { bilderBytes: number | null; bildVorgaengeMonat: number | null; uebertragungBytesMonat: number | null }
+const VERCEL_GRENZEN: VercelGrenzen = GRENZEN.vercel[TARIFE.vercel]
+
+/** Die Grenzen der Tarife von heute — daran misst die Seite, daran warnt die Mail. null = keine feste Grenze (keine Prozente, keine Warnstufe). */
 export const GRENZE = {
-  bilderBytes: GRENZEN.vercel[TARIFE.vercel].bilderBytes,
-  bildVorgaengeMonat: GRENZEN.vercel[TARIFE.vercel].bildVorgaengeMonat,
-  bildUebertragungBytesMonat: GRENZEN.vercel[TARIFE.vercel].uebertragungBytesMonat,
+  bilderBytes: VERCEL_GRENZEN.bilderBytes,
+  bildVorgaengeMonat: VERCEL_GRENZEN.bildVorgaengeMonat,
+  bildUebertragungBytesMonat: VERCEL_GRENZEN.uebertragungBytesMonat,
   datenbankBytes: GRENZEN.supabase[TARIFE.supabase].datenbankBytes,
   datenbankUebertragungBytesMonat: GRENZEN.supabase[TARIFE.supabase].uebertragungBytesMonat,
   mailsTag: GRENZEN.resend[TARIFE.resend].mailsTag,
   mailsMonat: GRENZEN.resend[TARIFE.resend].mailsMonat,
 } as const
+
+/** Der Satz statt Prozent und Balken, wo der Tarif keine feste Grenze kennt (Nr. 113). */
+const OHNE_GRENZE = `nutzungsbasiert (${TARIF_NAME.PRO}) – zählt zum Ausgabenlimit`
+/** Was bei Vercel Pro statt einer Sperre droht (Spend Management, Nr. 113). */
+const OHNE_SPERRE = 'Keine Sperre bei einer Menge – erst bei 100 % des Ausgabenlimits pausiert Vercel das Projekt.'
 
 // ─── Arten der Messung ───────────────────────────────────────────────────────
 
@@ -91,18 +109,28 @@ export const BETRIEB_ARTEN = [
   'ohneVerwendung:startseite:bytes',
   'ohneVerwendung:startseite:dateien',
   'ohneVerwendung:aelteste',
+  // Vercel-Ausgaben (Nr. 113): was Spend Management zuletzt gemeldet hat, in ganzen Cent (aus Dollar) — Ausgaben und Limit.
+  'vercelAusgaben',
+  'vercelLimit',
 ] as const
 export type BetriebArt = (typeof BETRIEB_ARTEN)[number]
 
 /** Was nur `messeBetrieb` schreibt — daraus „Gemessen heute, hh:mm“ (der Mail-Zähler ist keine Messung). */
 export const MESS_ARTEN = ['bilderBytes', 'bilderDateien', 'bilderUploadsMonat', 'bildVorgaengeMonat', 'datenbankBytes'] as const satisfies readonly BetriebArt[]
 
+/**
+ * Der Merker „eine Messung hat begonnen“ (Nr. 113): eine Zeile je UTC-Tag in
+ * BetriebMessung, die „Jetzt messen“ in EINER Anweisung belegt. Bewusst nicht
+ * in BETRIEB_ARTEN — er ist kein Messwert, Seite und CSV lassen ihn weg.
+ */
+export const MESS_BEGINN_ART = 'messBeginn'
+
 /** „Jetzt messen“ misst nicht neu, wenn die letzte Messung jünger ist (jede Messung listet den Bild-Speicher). */
 export const NEU_MESSEN_AB_MS = 10 * 60 * 1000
 
-/** Misst „Jetzt messen“ neu? Nicht, solange die letzte Messung jünger als 10 Minuten ist — jede Auflistung ist ein Bild-Vorgang. */
-export function darfNeuMessen(letzte: Date | null, jetzt: Date): boolean {
-  return letzte === null || jetzt.getTime() - letzte.getTime() >= NEU_MESSEN_AB_MS
+/** Ab wann eine Messung „jung“ ist: Begann eine nach diesem Zeitpunkt, misst „Jetzt messen“ nicht neu — genau 10 Minuten danach wieder. */
+export function neuMessenAb(jetzt: Date): Date {
+  return new Date(jetzt.getTime() - NEU_MESSEN_AB_MS)
 }
 
 // ─── Aufbewahrung: was der Ablauf „Aufräumen“ löscht (Register N18, Nr. 104) ──
@@ -226,6 +254,18 @@ const FUENF_JAHRE_TAGE = 5 * 365
  * gibt es keinen Trend (null).
  */
 export function vollIn(verlauf: readonly VerlaufPunkt[], grenze: number, heute: string): Trend | null {
+  const z = zuwachsImFenster(verlauf, heute)
+  if (z === null) return null
+  const { zuwachs, tage, letzter } = z
+  if (letzter.wert >= grenze) return { zuwachs, tage, vollIn: { art: 'voll' } }
+  const jeTag = zuwachs / tage
+  if (jeTag <= 0) return { zuwachs, tage, vollIn: { art: 'mehrAls5Jahre' } }
+  const rest = Math.ceil((grenze - letzter.wert) / jeTag)
+  return { zuwachs, tage, vollIn: rest > FUENF_JAHRE_TAGE ? { art: 'mehrAls5Jahre' } : { art: 'tage', tage: rest } }
+}
+
+/** Zuwachs vom ältesten zum jüngsten Messpunkt der letzten 30 Tage — ohne zwei Messtage null. Auch für Werte ohne feste Grenze (Vercel Pro). */
+function zuwachsImFenster(verlauf: readonly VerlaufPunkt[], heute: string): { zuwachs: number; tage: number; letzter: VerlaufPunkt } | null {
   const ab = utcTagVersetzt(heute, -TREND_TAGE)
   const fenster = verlauf.filter((p) => p.tag >= ab && p.tag <= heute).sort((a, b) => a.tag.localeCompare(b.tag))
   if (fenster.length < 2) return null
@@ -233,12 +273,7 @@ export function vollIn(verlauf: readonly VerlaufPunkt[], grenze: number, heute: 
   const letzter = fenster[fenster.length - 1]
   const tage = tageZwischen(erster.tag, letzter.tag)
   if (tage < 1) return null
-  const zuwachs = letzter.wert - erster.wert
-  if (letzter.wert >= grenze) return { zuwachs, tage, vollIn: { art: 'voll' } }
-  const jeTag = zuwachs / tage
-  if (jeTag <= 0) return { zuwachs, tage, vollIn: { art: 'mehrAls5Jahre' } }
-  const rest = Math.ceil((grenze - letzter.wert) / jeTag)
-  return { zuwachs, tage, vollIn: rest > FUENF_JAHRE_TAGE ? { art: 'mehrAls5Jahre' } : { art: 'tage', tage: rest } }
+  return { zuwachs: letzter.wert - erster.wert, tage, letzter }
 }
 
 /** „voll in ≈ 3 Monaten“, „voll in mehr als 5 Jahren“. */
@@ -380,6 +415,21 @@ export function ablaufStand(ablauf: Pick<Ablauf, 'rhythmus'>, lauf: AblaufLaufDa
   return lauf.ok ? 'puenktlich' : 'fehler'
 }
 
+/**
+ * Was das Lebenszeichen vermisst (Nr. 113): die Namen der Abläufe, die
+ * überfällig oder gescheitert sind — gleiche Regel wie `ablaufStand` (täglich
+ * 26 Stunden, wöchentlich 8 Tage). Fail-closed, strenger als die Seite: Ein
+ * TÄGLICHER Ablauf ohne Zeile fehlt (er lief nie — genau der Ausfall, den
+ * das Lebenszeichen melden soll); nur der wöchentliche hat ohne Zeile
+ * Schonfrist, weil er nach dem Deploy bis Montag keine haben kann.
+ */
+export function fehlendeAblaeufe(laeufe: ReadonlyMap<string, AblaufLaufDaten>, jetzt: Date): AblaufName[] {
+  return ABLAEUFE.filter((a) => {
+    const stand = ablaufStand(a, laeufe.get(a.name) ?? null, jetzt)
+    return stand === 'ueberfaellig' || stand === 'fehler' || (stand === 'nochKeinLauf' && a.rhythmus === 'taeglich')
+  }).map((a) => a.name)
+}
+
 /** Die Fehlerklasse für AblaufLauf und Sentry — nur ein Bezeichner, nie ein Text aus dem Fehler. */
 export function fehlerKlasse(err: unknown): string {
   return err instanceof Error && /^[A-Za-z][A-Za-z0-9_]{0,59}$/.test(err.name) ? err.name : 'Unbekannt'
@@ -411,8 +461,20 @@ export const GRENZ_REGEL: Record<GrenzWert, GrenzRegel> = {
   mailsTag: 'tag',
 }
 
-/** Der Schlüssel in BetriebWarnung: ein Grenzwert oder `ablauf:<name>`. */
-export type WarnArt = GrenzWert | `ablauf:${AblaufName}`
+/** Die Grenze eines Werts im Tarif von heute — null = keine feste Grenze (Vercel Pro: Bilder, Bild-Vorgänge), dann gibt es keine Warnstufe. */
+export function grenzeVon(wert: GrenzWert): number | null {
+  if (wert === 'bilder') return GRENZE.bilderBytes
+  if (wert === 'bildVorgaenge') return GRENZE.bildVorgaengeMonat
+  if (wert === 'datenbank') return GRENZE.datenbankBytes
+  if (wert === 'mailsMonat') return GRENZE.mailsMonat
+  return GRENZE.mailsTag
+}
+
+/** Die Art der Warnung für die Vercel-Ausgaben (Nr. 113). */
+export const VERCEL_WARN_ART = 'vercelAusgaben'
+
+/** Der Schlüssel in BetriebWarnung: ein Grenzwert, `ablauf:<name>` oder die Vercel-Ausgaben. */
+export type WarnArt = GrenzWert | `ablauf:${AblaufName}` | typeof VERCEL_WARN_ART
 
 export function ablaufWarnArt(name: AblaufName): WarnArt {
   return `ablauf:${name}`
@@ -437,10 +499,13 @@ const NICHTS: WarnSchritt = { tun: 'nichts' }
  * Monatswerte (E-Mails, Bild-Vorgänge): je Monat einmal je Stufe, keine
  * Entwarnung, der neue Monat beginnt still bei 0. E-Mails je Tag (`anteil` ist
  * der VORTAG): ein Hinweis am Morgen, einmal je Tag, keine Entwarnung.
+ * Ohne feste Grenze (`anteilProzent` null, Vercel Pro) gibt es keine Stufe:
+ * Eine noch offene aus dem alten Tarif geht still auf 0.
  */
-export function grenzSchritt(regel: GrenzRegel, bisher: WarnStand, anteilProzent: number, jetzt: Date): WarnSchritt {
-  const ziel = stufe(anteilProzent)
+export function grenzSchritt(regel: GrenzRegel, bisher: WarnStand, anteilProzent: number | null, jetzt: Date): WarnSchritt {
   const bisherStufe = bisher?.stufe ?? 0
+  if (anteilProzent === null) return bisherStufe > 0 ? { tun: 'still' } : NICHTS
+  const ziel = stufe(anteilProzent)
   if (regel === 'speicher') {
     if (anteilProzent < ENTWARNUNG_UNTER) return bisherStufe > 0 ? { tun: 'entwarnen' } : NICHTS
     return ziel > bisherStufe ? { tun: 'warnen', stufe: ziel as Exclude<Stufe, 0> } : NICHTS
@@ -468,14 +533,64 @@ export function ablaufSchritt(stand: AblaufStand, bisher: WarnStand, jetzt: Date
   return bisherStufe === 0 || !heuteGemeldet ? { tun: 'warnen', stufe: 1 } : NICHTS
 }
 
+// ─── Vercel-Ausgaben (Register N18, Nr. 113) ─────────────────────────────────
+
+/** Der Tag im Monat, an dem bei Vercel ein neuer Abrechnungszeitraum beginnt (0 Uhr UTC). */
+export const VERCEL_ABRECHNUNG_TAG = 19
+
+/** Ab diesen Anteilen des Ausgabenlimits meldet Spend Management (in %): Stufe 1, 2, 3 — bei 100 % pausiert Vercel das Projekt. */
+export const VERCEL_SCHWELLEN = [50, 75, 100] as const
+
+/** Der Beginn des laufenden Abrechnungszeitraums: der 19. dieses Monats, vor dem 19. der des Vormonats (UTC). */
+export function abrechnungsBeginn(jetzt: Date): Date {
+  const jahr = jetzt.getUTCFullYear()
+  const monat = jetzt.getUTCMonth()
+  const diesen = Date.UTC(jahr, monat, VERCEL_ABRECHNUNG_TAG)
+  // Date.UTC rechnet Monat −1 ins Vorjahr um (Januar → Dezember).
+  return new Date(jetzt.getTime() >= diesen ? diesen : Date.UTC(jahr, monat - 1, VERCEL_ABRECHNUNG_TAG))
+}
+
+/** Die Stufe einer Meldung von Spend Management: 50 % → 1, 75 % → 2, 100 % → 3, darunter keine. */
+export function vercelStufe(schwelleProzent: number): Stufe {
+  if (schwelleProzent >= VERCEL_SCHWELLEN[2]) return 3
+  if (schwelleProzent >= VERCEL_SCHWELLEN[1]) return 2
+  if (schwelleProzent >= VERCEL_SCHWELLEN[0]) return 1
+  return 0
+}
+
+/**
+ * Die Regel der Vercel-Ausgaben: je Abrechnungszeitraum einmal je Stufe
+ * (wie die Monatswerte, nur mit dem 19. statt dem Ersten), keine Entwarnung;
+ * der neue Zeitraum beginnt still bei 0. `ziel` 0 heißt: keine Meldung, nur
+ * prüfen, ob eine alte Stufe still auf 0 muss (die tägliche Messung).
+ */
+export function vercelSchritt(bisher: WarnStand, ziel: Stufe, jetzt: Date): WarnSchritt {
+  const bisherStufe = bisher?.stufe ?? 0
+  const imZeitraum = bisher !== null && bisher.gemeldetAm.getTime() >= abrechnungsBeginn(jetzt).getTime() ? bisherStufe : 0
+  if (ziel > imZeitraum) return { tun: 'warnen', stufe: ziel as Exclude<Stufe, 0> }
+  return bisherStufe > 0 && imZeitraum === 0 ? { tun: 'still' } : NICHTS
+}
+
+/** „25,10 $ von 50 $ (50 %)“ — Ausgaben gegen das Limit. */
+function ausgabenText(ausgabenCent: number, limitCent: number): string {
+  return `${formatDollar(ausgabenCent)} von ${formatDollar(limitCent)} (${prozentText(anteil(ausgabenCent, limitCent))})`
+}
+
 // ─── Texte: Grenzwerte ───────────────────────────────────────────────────────
 
-/** Je Grenzwert: Name im Satz, Grenze als Text und was bei 100 % passiert. */
+/**
+ * Je Grenzwert: Name im Satz, Grenze als Text und was bei 100 % passiert.
+ * „Vercel Pro hilft“ gilt nur, solange der Tarif eine Grenze hat — ohne
+ * Grenze gibt es für diese Werte keine Warnung, die den Satz zeigte.
+ */
 export const GRENZ_TEXT: Record<GrenzWert, { name: string; kurz: string; voll: string; hilft: string | null }> = {
   bilder: {
     name: 'Bilder-Speicher',
     kurz: 'Bilder',
-    voll: `Bei ${speicherText(GRENZE.bilderBytes)} sperrt Vercel alle Bilder für 30 Tage – Hofseiten und Produkte zeigen dann keine Fotos.`,
+    voll:
+      GRENZE.bilderBytes === null
+        ? OHNE_SPERRE
+        : `Bei ${speicherText(GRENZE.bilderBytes)} sperrt Vercel alle Bilder für 30 Tage – Hofseiten und Produkte zeigen dann keine Fotos.`,
     hilft: 'Vercel Pro, dort gibt es keine harte Sperre.',
   },
   datenbank: {
@@ -493,7 +608,7 @@ export const GRENZ_TEXT: Record<GrenzWert, { name: string; kurz: string; voll: s
   bildVorgaenge: {
     name: 'Bild-Vorgänge im Monat',
     kurz: 'Bild-Vorgänge',
-    voll: `Bei ${formatZahl(GRENZE.bildVorgaengeMonat)} im Monat sperrt Vercel alle Bilder für 30 Tage.`,
+    voll: GRENZE.bildVorgaengeMonat === null ? OHNE_SPERRE : `Bei ${formatZahl(GRENZE.bildVorgaengeMonat)} im Monat sperrt Vercel alle Bilder für 30 Tage.`,
     hilft: 'Vercel Pro, dort gibt es keine harte Sperre.',
   },
   mailsTag: {
@@ -511,6 +626,8 @@ export function grenzTitel(wert: GrenzWert, anteilProzent: number): string {
 }
 
 const STUFE_HINWEIS: Record<Exclude<Stufe, 0>, string> = { 1: 'über 80 %', 2: 'über 95 %', 3: 'voll' }
+/** Die Stufen der Vercel-Ausgaben (Spend Management meldet bei 50, 75 und 100 %). */
+const VERCEL_STUFE_HINWEIS: Record<Exclude<Stufe, 0>, string> = { 1: 'ab 50 %', 2: 'ab 75 %', 3: 'am Limit' }
 
 /**
  * Der Hinweis rechts in der Betriebsleiste und am Reiter — nur aus der
@@ -523,6 +640,7 @@ export function warnHinweis(art: string, gespeicherteStufe: number): { text: str
     const ablauf = ABLAEUFE.find((a) => `ablauf:${a.name}` === art)
     return { text: `Ablauf „${ablauf?.text ?? 'unbekannt'}“ ausgefallen`, kurz: 'Ablauf ausgefallen' }
   }
+  if (art === VERCEL_WARN_ART) return { text: `Vercel-Ausgaben ${VERCEL_STUFE_HINWEIS[s]}`, kurz: `Vercel ${VERCEL_STUFE_HINWEIS[s]}` }
   const wert = (GRENZ_WERTE as readonly string[]).includes(art) ? (art as GrenzWert) : null
   if (!wert) return { text: 'Warnung offen', kurz: 'Warnung' }
   return { text: `${GRENZ_TEXT[wert].name} ${STUFE_HINWEIS[s]}`, kurz: `${GRENZ_TEXT[wert].kurz} ${STUFE_HINWEIS[s]}` }
@@ -639,6 +757,15 @@ export const BETRIEB_TEXT = {
   ohneVerwendungLeer: 'Die Liste kommt mit der nächsten Messung am Morgen.',
   ohneVerwendungAnsehen: 'Bilder ohne Verwendung ansehen',
   davonOhneVerwendung: (menge: string): string => `davon ${menge} ohne Verwendung`,
+  // Vercel Pro und Vercel-Ausgaben (Nr. 113; Karte nach dem Muster „Tarife und Grenzen“)
+  ohneGrenze: OHNE_GRENZE,
+  belegt: 'belegt',
+  imMonat: 'im Monat',
+  vercelTitel: 'Vercel-Ausgaben',
+  vercelGemeldet: (ausgaben: string, tag: string): string => `Zuletzt gemeldet: ${ausgaben} am ${tag}`,
+  vercelUnter50: 'Unter 50 % – Vercel meldet erst ab 50 % des Limits.',
+  vercelUnter50Kurz: 'Unter 50 %',
+  vercelLink: 'Vercel › Usage',
 } as const
 
 export const STAND_TEXT: Record<AblaufStand, string> = {
@@ -664,18 +791,28 @@ export function gemessenText(am: Date | null, jetzt: Date): string {
   return `Gemessen am ${formatTagKurz(tag)}, ${uhrzeitInWien(am)}`
 }
 
-/** Die Tarife für die Karte „Tarife und Grenzen“ — Zahlen aus GRENZE, Namen aus TARIFE. */
-const TARIF_NAME: Record<'HOBBY' | 'FREE', string> = { HOBBY: 'Hobby', FREE: 'Free' }
-
 export type TarifZeile = { dienst: string; marke: string; ton: MarkeArt; satz: string }
 
-export const TARIF_ZEILEN: readonly TarifZeile[] = [
-  {
-    dienst: 'Vercel',
-    marke: `${TARIF_NAME[TARIFE.vercel]} · nicht-kommerziell`,
+/**
+ * Die Zeile von Vercel je Tarif. Bei Pro steht „nutzungsbasiert“ in der Marke
+ * und „Ausgabenlimit in Spend Management“ am Anfang des Satzes — die Marke
+ * kürzt einen langen Text mit Auslassung (eine Zeile, Register G5).
+ */
+const VERCEL_TARIF: Record<(typeof TARIFE)['vercel'] | 'HOBBY', Omit<TarifZeile, 'dienst'>> = {
+  HOBBY: {
+    marke: `${TARIF_NAME.HOBBY} · nicht-kommerziell`,
     ton: 'tun',
-    satz: `Bilder ${speicherText(GRENZE.bilderBytes)}, ${formatZahl(GRENZE.bildVorgaengeMonat)} Vorgänge und ${speicherText(GRENZE.bildUebertragungBytesMonat)} Übertragung im Monat. Vor Stripe live auf Pro.`,
+    satz: `Bilder ${speicherText(GRENZEN.vercel.HOBBY.bilderBytes)}, ${formatZahl(GRENZEN.vercel.HOBBY.bildVorgaengeMonat)} Vorgänge und ${speicherText(GRENZEN.vercel.HOBBY.uebertragungBytesMonat)} Übertragung im Monat. Vor Stripe live auf Pro.`,
   },
+  PRO: {
+    marke: `${TARIF_NAME.PRO} · nutzungsbasiert`,
+    ton: 'erledigt',
+    satz: 'Ausgabenlimit in Spend Management. Bilder, Bild-Vorgänge und Übertragung ohne feste Grenze – sie zählen zum Ausgabenlimit; bei 100 % pausiert Vercel das Projekt.',
+  },
+}
+
+export const TARIF_ZEILEN: readonly TarifZeile[] = [
+  { dienst: 'Vercel', ...VERCEL_TARIF[TARIFE.vercel] },
   {
     dienst: 'Supabase',
     marke: `${TARIF_NAME[TARIFE.supabase]} · ohne Sicherung`,
@@ -698,8 +835,14 @@ export const TARIFE_KURZ = `Vercel ${TARIF_NAME[TARIFE.vercel]} · Supabase ${TA
  * Adresse (Team, Projekt und Organisation wählt der Dienst selbst), damit das
  * öffentliche Repository keine Kennungen trägt.
  */
+export const VERCEL_USAGE_HREF = 'https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fusage'
+
 export const NUR_IM_DASHBOARD = [
-  { titel: 'Vercel › Usage', satz: 'Datenübertragung, Bild-Übertragung (10 GB), Funktionen', href: 'https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fusage' },
+  {
+    titel: 'Vercel › Usage',
+    satz: `Datenübertragung, Bild-Übertragung${GRENZE.bildUebertragungBytesMonat === null ? '' : ` (${speicherText(GRENZE.bildUebertragungBytesMonat)})`}, Funktionen`,
+    href: VERCEL_USAGE_HREF,
+  },
   { titel: 'Supabase › Usage', satz: 'Übertragung (5 GB), aktive Konten', href: 'https://supabase.com/dashboard/org/_/usage' },
   { titel: 'Sentry › Stats', satz: 'Kontingent der Fehlermeldungen', href: 'https://sentry.io/stats/' },
   { titel: 'Resend › Usage', satz: 'Zustellquote, Bounces', href: 'https://resend.com/settings/usage' },
@@ -963,6 +1106,8 @@ export type Kachel = {
   von: string
   anteil: number | null
   prozent: string | null
+  /** Der Satz statt Balken, wenn der Tarif keine feste Grenze kennt (Vercel Pro, Nr. 113) — dann auch kein Prozent. */
+  ohneGrenze: string | null
   /** Orange ab 80 %, sonst grün. */
   warnt: boolean
   zeile: string
@@ -997,22 +1142,32 @@ function letzterMesstag(messungen: readonly Messung[]): string | null {
   return tag
 }
 
-function trendZeile(verlauf: readonly VerlaufPunkt[], grenze: number, heute: string): string {
+/** Ohne feste Grenze nur der Zuwachs, ohne „voll in …“. */
+function trendZeile(verlauf: readonly VerlaufPunkt[], grenze: number | null, heute: string): string {
+  if (grenze === null) {
+    const z = zuwachsImFenster(verlauf, heute)
+    return z ? zuwachsText(z.zuwachs, z.tage) : BETRIEB_TEXT.trendAb
+  }
   const t = vollIn(verlauf, grenze, heute)
   return t ? `${zuwachsText(t.zuwachs, t.tage)} · ${vollInText(t.vollIn)}` : BETRIEB_TEXT.trendAb
 }
 
-/** Die vier Kacheln (Mockup admin-betrieb): Bilder, Datenbank, E-Mails heute, Bild-Vorgänge. */
+/**
+ * Die vier Kacheln (Mockup admin-betrieb): Bilder, Datenbank, E-Mails heute,
+ * Bild-Vorgänge. Ohne feste Grenze (Vercel Pro, Nr. 113) zeigen Bilder und
+ * Bild-Vorgänge den Wert ohne Prozent und Balken, dafür den Satz `ohneGrenze`.
+ */
 export function betriebKacheln(messungen: readonly Messung[], jetzt: Date): Kachel[] {
   const heute = utcTag(jetzt)
   const messtag = letzterMesstag(messungen)
   const hinweisFuer = (m: Messung | null, leer: string): string | null =>
     m === null ? leer : messtag !== null && m.tag < messtag ? BETRIEB_TEXT.standVom(formatTagKurz(m.tag)) : null
 
+  const bilderGrenze = GRENZE.bilderBytes
   const bilder = letzter(messungen, 'bilderBytes')
   const dateien = letzter(messungen, 'bilderDateien')
-  const bilderAnteil = bilder ? anteil(bilder.wert, GRENZE.bilderBytes) : null
-  const bilderTrend = trendZeile(reihe(messungen, 'bilderBytes'), GRENZE.bilderBytes, heute)
+  const bilderAnteil = bilder && bilderGrenze !== null ? anteil(bilder.wert, bilderGrenze) : null
+  const bilderTrend = trendZeile(reihe(messungen, 'bilderBytes'), bilderGrenze, heute)
 
   const db = letzter(messungen, 'datenbankBytes')
   const dbAnteil = db ? anteil(db.wert, GRENZE.datenbankBytes) : null
@@ -1028,7 +1183,9 @@ export function betriebKacheln(messungen: readonly Messung[], jetzt: Date): Kach
   const vorgaengeHeute = vorgaenge && vorgaenge.tag.slice(0, 7) === heute.slice(0, 7) ? vorgaenge : null
   const uploads = letzter(messungen, 'bilderUploadsMonat')
   const uploadsImMonat = uploads && uploads.tag.slice(0, 7) === heute.slice(0, 7) ? uploads.wert : 0
-  const vorgaengeAnteil = vorgaengeHeute ? anteil(vorgaengeHeute.wert, GRENZE.bildVorgaengeMonat) : null
+  const vorgaengeGrenze = GRENZE.bildVorgaengeMonat
+  const vorgaengeAnteil = vorgaengeHeute && vorgaengeGrenze !== null ? anteil(vorgaengeHeute.wert, vorgaengeGrenze) : null
+  const bilderSperre = bilderGrenze === null ? null : `Bei ${speicherText(bilderGrenze)} sperrt Vercel alle Bilder für 30 Tage.`
 
   return [
     {
@@ -1037,13 +1194,14 @@ export function betriebKacheln(messungen: readonly Messung[], jetzt: Date): Kach
       untertitel: null,
       tarif: `Vercel ${TARIF_NAME[TARIFE.vercel]}`,
       wert: bilder ? speicherText(bilder.wert) : null,
-      von: `von ${speicherText(GRENZE.bilderBytes)}`,
+      von: bilderGrenze === null ? BETRIEB_TEXT.belegt : `von ${speicherText(bilderGrenze)}`,
       anteil: bilderAnteil,
       prozent: bilderAnteil === null ? null : prozentText(bilderAnteil),
+      ohneGrenze: bilderGrenze === null ? BETRIEB_TEXT.ohneGrenze : null,
       warnt: bilderAnteil !== null && stufe(bilderAnteil) > 0,
       zeile: dateien ? `${bilderTrend} · ${formatZahl(dateien.wert)} Dateien` : bilderTrend,
-      satz: `Bei ${speicherText(GRENZE.bilderBytes)} sperrt Vercel alle Bilder für 30 Tage.`,
-      kurz: `${bilderTrend}. Bei ${speicherText(GRENZE.bilderBytes)} sperrt Vercel alle Bilder für 30 Tage.`,
+      satz: bilderSperre ?? OHNE_SPERRE,
+      kurz: bilderSperre === null ? `${bilderTrend}.` : `${bilderTrend}. ${bilderSperre}`,
       hinweis: hinweisFuer(bilder, BETRIEB_TEXT.bilderOhneZugang),
     },
     {
@@ -1055,6 +1213,7 @@ export function betriebKacheln(messungen: readonly Messung[], jetzt: Date): Kach
       von: `von ${speicherText(GRENZE.datenbankBytes)}`,
       anteil: dbAnteil,
       prozent: dbAnteil === null ? null : prozentText(dbAnteil),
+      ohneGrenze: null,
       warnt: dbAnteil !== null && stufe(dbAnteil) > 0,
       zeile: dbTrend,
       satz: `Bei ${speicherText(GRENZE.datenbankBytes)} nur noch lesbar – keine neuen Bestellungen.`,
@@ -1070,6 +1229,7 @@ export function betriebKacheln(messungen: readonly Messung[], jetzt: Date): Kach
       von: `von ${formatZahl(GRENZE.mailsTag)}`,
       anteil: mailsAnteil,
       prozent: prozentText(mailsAnteil),
+      ohneGrenze: null,
       warnt: stufe(mailsAnteil) > 0 || stufe(mailsMonatAnteil) > 0,
       zeile: `Monat: ${formatZahl(mailsMonat)} von ${formatZahl(GRENZE.mailsMonat)} (${prozentText(mailsMonatAnteil)}) · zählt je Empfänger`,
       satz: GRENZ_TEXT.mailsTag.voll,
@@ -1082,12 +1242,16 @@ export function betriebKacheln(messungen: readonly Messung[], jetzt: Date): Kach
       untertitel: null,
       tarif: `Vercel ${TARIF_NAME[TARIFE.vercel]}`,
       wert: vorgaengeHeute ? `≈ ${formatZahl(vorgaengeHeute.wert)}` : null,
-      von: `von ${formatZahl(GRENZE.bildVorgaengeMonat)} im Monat`,
+      von: vorgaengeGrenze === null ? BETRIEB_TEXT.imMonat : `von ${formatZahl(vorgaengeGrenze)} ${BETRIEB_TEXT.imMonat}`,
       anteil: vorgaengeAnteil,
       prozent: vorgaengeAnteil === null ? null : prozentText(vorgaengeAnteil),
+      ohneGrenze: vorgaengeGrenze === null ? BETRIEB_TEXT.ohneGrenze : null,
       warnt: vorgaengeAnteil !== null && stufe(vorgaengeAnteil) > 0,
       zeile: `${formatZahl(uploadsImMonat)} Fotos hochgeladen · jedes zählt doppelt (Original + fertiges Bild)`,
-      satz: `Ein Blick in den Speicher im Vercel-Dashboard zählt auch. Bei ${formatZahl(GRENZE.bildVorgaengeMonat)}: Bilder 30 Tage gesperrt.`,
+      satz:
+        vorgaengeGrenze === null
+          ? 'Ein Blick in den Speicher im Vercel-Dashboard zählt auch.'
+          : `Ein Blick in den Speicher im Vercel-Dashboard zählt auch. Bei ${formatZahl(vorgaengeGrenze)}: Bilder 30 Tage gesperrt.`,
       kurz: 'Jedes Foto zählt doppelt; das Vercel-Dashboard auch.',
       hinweis: vorgaengeHeute ? hinweisFuer(vorgaengeHeute, BETRIEB_TEXT.bilderOhneZugang) : BETRIEB_TEXT.bilderOhneZugang,
     },
@@ -1096,7 +1260,11 @@ export function betriebKacheln(messungen: readonly Messung[], jetzt: Date): Kach
 
 export type VerlaufLinie = { id: 'bilder' | 'datenbank' | 'mailsMonat'; name: string; punkte: Array<{ tag: string; prozent: number }> }
 
-/** Der Verlauf von 90 Tagen in % der Grenze — Bilder, Datenbank, E-Mails im Monat (laufende Summe je Tag). */
+/**
+ * Der Verlauf von 90 Tagen in % der Grenze — Bilder, Datenbank, E-Mails im
+ * Monat (laufende Summe je Tag). Ohne feste Grenze (Vercel Pro) fehlt die
+ * Linie der Bilder: Prozent von nichts gibt es nicht.
+ */
 export function betriebVerlauf(messungen: readonly Messung[], jetzt: Date): { von: string; bis: string; linien: VerlaufLinie[] } {
   const bis = utcTag(jetzt)
   const von = utcTagVersetzt(bis, -(VERLAUF_TAGE - 1))
@@ -1107,11 +1275,12 @@ export function betriebVerlauf(messungen: readonly Messung[], jetzt: Date): { vo
       .sort((a, b) => a.tag.localeCompare(b.tag))
       .map((p) => ({ tag: p.tag, prozent: anteil(p.wert, grenze) }))
   const mailTage = [...new Set(messungen.filter((m) => m.art === 'mails' && imFenster(m.tag)).map((m) => m.tag))].sort()
+  const bilderGrenze = GRENZE.bilderBytes
   return {
     von,
     bis,
     linien: [
-      { id: 'bilder', name: 'Bilder', punkte: prozentReihe('bilderBytes', GRENZE.bilderBytes) },
+      ...(bilderGrenze === null ? [] : [{ id: 'bilder' as const, name: 'Bilder', punkte: prozentReihe('bilderBytes', bilderGrenze) }]),
       { id: 'datenbank', name: 'Datenbank', punkte: prozentReihe('datenbankBytes', GRENZE.datenbankBytes) },
       { id: 'mailsMonat', name: 'E-Mails im Monat', punkte: mailTage.map((tag) => ({ tag, prozent: anteil(mailsImMonatBis(messungen, tag), GRENZE.mailsMonat) })) },
     ],
@@ -1150,6 +1319,32 @@ export function verlaufKurz(linien: readonly VerlaufLinie[]): string {
 export function verlaufBeschreibung(linien: readonly VerlaufLinie[]): string {
   const heute = linien.map((l) => (l.punkte.length > 0 ? `${l.name} ${prozentText(l.punkte[l.punkte.length - 1].prozent)}` : `${l.name} nicht gemessen`))
   return `${BETRIEB_TEXT.verlaufTitel}, ${BETRIEB_TEXT.verlaufSatz}. Zuletzt: ${heute.join(', ')}.`
+}
+
+export type VercelAusgabenKarte = {
+  /** Gibt es im laufenden Abrechnungszeitraum eine Meldung von Spend Management? */
+  gemeldet: boolean
+  satz: string
+  /** Die Zeile der zugeklappten Karte am Handy. */
+  kurz: string
+}
+
+/**
+ * Die Karte „Vercel-Ausgaben“ (Nr. 113): die jüngste Meldung von Spend
+ * Management im laufenden Abrechnungszeitraum — „Zuletzt gemeldet: … am …“;
+ * ohne Meldung „Unter 50 % …“ (Vercel meldet erst ab 50 % des Limits). Kein
+ * Abruf der Vercel-API: Die Zahlen kommen nur über den Webhook.
+ */
+export function vercelAusgabenKarte(messungen: readonly Messung[], jetzt: Date): VercelAusgabenKarte {
+  const ab = utcTag(abrechnungsBeginn(jetzt))
+  const ausgaben = letzter(
+    messungen.filter((m) => m.tag >= ab),
+    'vercelAusgaben'
+  )
+  const limit = ausgaben ? messungen.find((m) => m.art === 'vercelLimit' && m.tag === ausgaben.tag) : undefined
+  if (!ausgaben || !limit) return { gemeldet: false, satz: BETRIEB_TEXT.vercelUnter50, kurz: BETRIEB_TEXT.vercelUnter50Kurz }
+  const betrag = ausgabenText(ausgaben.wert, limit.wert)
+  return { gemeldet: true, satz: BETRIEB_TEXT.vercelGemeldet(betrag, formatTagKurz(ausgaben.tag)), kurz: betrag }
 }
 
 export type AblaufZeile = {
@@ -1216,6 +1411,13 @@ export function warnEintraege(
         titel: a === null ? warnHinweis(w.art, w.stufe).text : grenzTitel(wert, a),
         saetze: [GRENZ_TEXT[wert].voll, ...(hilft ? [`${BETRIEB_MAIL_TEXT.hilft} ${hilft}`] : []), mailSatz(w.gemeldetAm)],
       })
+    } else if (w.art === VERCEL_WARN_ART) {
+      const karte = vercelAusgabenKarte(messungen, jetzt)
+      eintraege.push({
+        art: w.art,
+        titel: warnHinweis(w.art, w.stufe).text,
+        saetze: [...(karte.gemeldet ? [`${karte.satz}.`] : []), w.stufe >= 3 ? VERCEL_PAUSIERT : VERCEL_BEI_VOLL, mailSatz(w.gemeldetAm)],
+      })
     } else {
       const zeile = zeilen.find((z) => ablaufWarnArt(z.name) === w.art)
       eintraege.push({
@@ -1237,10 +1439,13 @@ export function warnEintraege(
 
 /** Woraus eine Warn-Mail entsteht — nur Zahlen und Namen aus den festen Listen, keine Personendaten. */
 export type BetriebMailAnlass =
-  | { art: 'grenze'; wert: GrenzWert; anteil: number; stand: string; trend: string | null }
+  /** `ohneVerwendungBytes`: die Summe der Bilder ohne Verwendung — beim Bilder-Speicher nennt „Was hilft“ sie (Nr. 113, Mockup email-betrieb-warnung). */
+  | { art: 'grenze'; wert: GrenzWert; anteil: number; stand: string; trend: string | null; ohneVerwendungBytes: number | null }
   | { art: 'entwarnung'; wert: GrenzWert; anteil: number; stand: string }
   | { art: 'ablauf'; name: AblaufName; stand: 'ueberfaellig' | 'fehler'; zuletzt: string | null; stundenSeit: number | null; wann: string }
   | { art: 'ablaufWieder'; name: AblaufName }
+  /** Spend Management meldet 50, 75 oder 100 % des Ausgabenlimits (Nr. 113) — Beträge in ganzen Cent. */
+  | { art: 'vercelAusgaben'; stufe: Exclude<Stufe, 0>; ausgabenCent: number; limitCent: number }
 
 export type BetriebMail = { betreff: string; titel: string; absaetze: string[]; hilft: string | null; knopf: string; fuss: string }
 
@@ -1251,6 +1456,12 @@ const FUSS_SPEICHER = `Diese Mail kommt einmal je Stufe (80 %, 95 %, voll) und n
 const FUSS_MONAT = 'Diese Mail kommt einmal je Stufe (80 %, 95 %, voll) und Monat; der neue Monat beginnt still bei 0. Abschalten lässt sie sich nicht – es geht um den Betrieb der Plattform.'
 const FUSS_TAG = 'Dieser Hinweis kommt höchstens einmal am Morgen, wenn der Vortag 80 % erreicht hat. Abschalten lässt er sich nicht – es geht um den Betrieb der Plattform.'
 const FUSS_ABLAUF = 'Höchstens eine Mail je Ablauf und Tag. Sobald er wieder läuft, kommt eine kurze Entwarnung.'
+const FUSS_VERCEL = `Diese Mail kommt einmal je Stufe (50 %, 75 %, 100 %) und Abrechnungszeitraum; der neue Zeitraum beginnt am ${VERCEL_ABRECHNUNG_TAG}. still bei 0. Abschalten lässt sie sich nicht – es geht um den Betrieb der Plattform.`
+
+/** Der Satz bei 100 % des Ausgabenlimits (Freigabe Nr. 113, wörtlich). */
+const VERCEL_PAUSIERT = 'Vercel pausiert das Projekt – die Seite ist offline, bis du fortsetzt oder das Limit erhöhst.'
+const VERCEL_BEI_VOLL = 'Bei 100 % pausiert Vercel das Projekt – die Seite ist dann offline, bis du fortsetzt oder das Limit erhöhst.'
+const VERCEL_HILFT = 'In Vercel › Spend Management das Limit erhöhen; in Vercel › Usage steht, was die Kosten treibt.'
 
 function ablaufVon(name: AblaufName): Ablauf {
   const ablauf = ABLAEUFE.find((a) => a.name === name)
@@ -1269,9 +1480,24 @@ export function betriebMail(anlass: BetriebMailAnlass): BetriebMail {
       betreff: `Betrieb: ${titel}`,
       titel,
       absaetze: [`${anlass.stand}${anlass.trend ? `, ${anlass.trend}` : ''}. ${text.voll}`],
-      hilft: text.hilft,
+      // Derselbe Satz wie in der Warnkarte der Seite — mit den Bildern ohne Verwendung, sobald sie gezählt sind.
+      hilft: hilftSatz(anlass.wert, anlass.ohneVerwendungBytes),
       knopf,
       fuss: regel === 'speicher' ? FUSS_SPEICHER : regel === 'monat' ? FUSS_MONAT : FUSS_TAG,
+    }
+  }
+  if (anlass.art === 'vercelAusgaben') {
+    const titel = anlass.stufe === 3 ? 'Vercel-Ausgabenlimit erreicht' : `Vercel-Ausgaben ${VERCEL_STUFE_HINWEIS[anlass.stufe]}`
+    return {
+      betreff: `Betrieb: ${titel}`,
+      titel,
+      absaetze: [
+        `Vercel meldet ${ausgabenText(anlass.ausgabenCent, anlass.limitCent)} des Ausgabenlimits in diesem Abrechnungszeitraum.`,
+        anlass.stufe === 3 ? VERCEL_PAUSIERT : VERCEL_BEI_VOLL,
+      ],
+      hilft: VERCEL_HILFT,
+      knopf,
+      fuss: FUSS_VERCEL,
     }
   }
   if (anlass.art === 'entwarnung') {
@@ -1313,10 +1539,13 @@ export function betriebMail(anlass: BetriebMailAnlass): BetriebMail {
 
 /** „838 MB von 1 GB sind belegt“ bzw. „412 von 3.000 E-Mails“ — der Stand im ersten Satz der Mail. */
 export function grenzStandText(wert: GrenzWert, zahl: number): string {
-  if (wert === 'bilder') return `${speicherText(zahl)} von ${speicherText(GRENZE.bilderBytes)} sind belegt`
+  const bilder = GRENZE.bilderBytes
+  const vorgaenge = GRENZE.bildVorgaengeMonat
+  if (wert === 'bilder') return bilder === null ? `${speicherText(zahl)} sind belegt` : `${speicherText(zahl)} von ${speicherText(bilder)} sind belegt`
   if (wert === 'datenbank') return `${speicherText(zahl)} von ${speicherText(GRENZE.datenbankBytes)} sind belegt`
   if (wert === 'mailsMonat') return `${formatZahl(zahl)} von ${formatZahl(GRENZE.mailsMonat)} E-Mails in diesem Monat`
-  if (wert === 'bildVorgaenge') return `≈ ${formatZahl(zahl)} von ${formatZahl(GRENZE.bildVorgaengeMonat)} Bild-Vorgängen in diesem Monat`
+  if (wert === 'bildVorgaenge')
+    return vorgaenge === null ? `≈ ${formatZahl(zahl)} Bild-Vorgänge in diesem Monat` : `≈ ${formatZahl(zahl)} von ${formatZahl(vorgaenge)} Bild-Vorgängen in diesem Monat`
   return `${formatZahl(zahl)} von ${formatZahl(GRENZE.mailsTag)} E-Mails gestern`
 }
 

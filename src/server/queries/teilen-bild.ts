@@ -29,7 +29,8 @@ import { abholzeitenKurz } from '@/lib/hofseite-fortschritt'
 import { einzeiligerFremdtext } from '@/lib/fremdtext'
 import { BEITRAG_TITEL_MAX, HOFNAME_MAX } from '@/lib/eingabegrenzen'
 import { istEigenesBild } from '@/server/bild-url'
-import { OEFFENTLICH_SICHTBAR } from '@/server/queries/farm'
+import { zeigtAbzeichen } from '@/lib/gruendungshof'
+import { ABZEICHEN_SELECT, OEFFENTLICH_SICHTBAR } from '@/server/queries/farm'
 import { PRODUCT_ORDER_BY } from '@/server/queries/products'
 import { zaehleWhatsAppAbonnentinnen } from '@/server/queries/status-posts'
 
@@ -62,6 +63,8 @@ export async function ladeTeilenBildQuelle(wo: { slug: string } | { id: string }
       isPaused: true,
       betriebsnummer: true,
       betriebsstatus: true,
+      // Abzeichen (Register K2, Nr. 116): gelesen für das Ja/Nein unten, die Nummer verlässt den Lader nicht.
+      ...ABZEICHEN_SELECT,
       products: {
         orderBy: PRODUCT_ORDER_BY,
         select: {
@@ -89,6 +92,7 @@ export async function ladeTeilenBildQuelle(wo: { slug: string } | { id: string }
       isPaused: farm.isPaused,
       betriebsnummer: farm.betriebsnummer,
       betriebsstatus: farm.betriebsstatus,
+      gruendungshof: zeigtAbzeichen(farm),
     },
     produkte: farm.products.map((p) => ({
       id: p.id,

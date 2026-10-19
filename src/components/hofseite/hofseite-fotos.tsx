@@ -16,7 +16,7 @@ import {
 } from '@/lib/hofseite-fotos'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { BildansichtEbene, useBildansicht } from '@/components/hofseite/bildansicht'
+import { BildansichtEbene, fotoAlt, useBildansicht } from '@/components/hofseite/bildansicht'
 
 /** So viele Kacheln zeigt das Raster ab lg; auf der letzten steht „+N", die Bildansicht blättert durch alle. */
 const SICHTBAR_AB_LG = 6
@@ -110,7 +110,7 @@ export function HofseiteFotos({
                   className={KACHEL}
                 >
                   {/* Die Kachel mit Ausschnitt und Filter des Hofs (Register N17, Nr. 98); die Bildansicht zeigt das ganze Foto. */}
-                  <Image src={foto.url} alt="" fill sizes={mosaik.sizes(i)} className="object-cover" style={bildStil(foto.ausschnitt)} />
+                  <Image src={foto.url} alt={fotoAlt(foto, hofName)} fill sizes={mosaik.sizes(i)} className="object-cover" style={bildStil(foto.ausschnitt)} />
                   {deckel && (
                     <span aria-hidden="true" className={cn('absolute inset-0 flex flex-col items-center justify-center gap-0.5', DECKEL_SCHLEIER)}>
                       <span className="font-heading text-[22px] leading-none font-semibold">{deckel.plus}</span>
@@ -137,7 +137,7 @@ export function HofseiteFotos({
                 aria-label={letzte ? alleFotosLabel(fotos.length) : fotoOeffnenLabel(i, fotos.length)}
                 className={cn(KACHEL, 'h-[140px]')}
               >
-                <Image src={foto.url} alt="" fill sizes="260px" className="object-cover" style={bildStil(foto.ausschnitt)} />
+                <Image src={foto.url} alt={fotoAlt(foto, hofName)} fill sizes="260px" className="object-cover" style={bildStil(foto.ausschnitt)} />
                 {letzte && (
                   <span aria-hidden="true" className={cn('absolute inset-0 flex items-center justify-center text-[15px] font-semibold', DECKEL_SCHLEIER)}>
                     +{rasterRest}

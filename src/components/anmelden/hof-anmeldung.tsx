@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { FlaskConical, Loader2 } from 'lucide-react'
 import { signIn } from '@/lib/auth-client'
-import { zielNachHofAnmeldung } from '@/lib/anmeldecode'
+import { anmeldeFehlerVon, passwortZuVieleText, zielNachHofAnmeldung } from '@/lib/anmeldecode'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { PasswordInput } from '@/components/ui/password-input'
@@ -60,7 +60,9 @@ export function HofAnmeldung(): React.JSX.Element {
     const { error } = await signIn.email({ email, password })
 
     if (error) {
-      setFehler('E-Mail oder Passwort falsch. Bitte nochmals versuchen.')
+      // Zu viele falsche Passwörter (E7, Ergänzung; Nr. 112): der Satz mit
+      // der Uhrzeit des Pausenendes und dem Ausweg „Passwort vergessen".
+      setFehler(passwortZuVieleText(anmeldeFehlerVon(error)) ?? 'E-Mail oder Passwort falsch. Bitte nochmals versuchen.')
       setLaedt(false)
       return
     }

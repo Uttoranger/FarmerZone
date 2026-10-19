@@ -3,14 +3,17 @@
  * echtes Better Auth (Nachtlauf Nr. 17a, Nachbesserung Runde 1).
  *
  * Ruhende Konten aus dem Checkout (bis Nr. 17a) sind unbestätigt. Meldet sich
- * die Kundin mit Code an, setzt Better Auth `emailVerified` in der Datenbank,
- * legt aber den ALTEN Stand (`emailVerified: false`) für fünf Minuten in den
- * Cookie-Cache der Sitzung (email-otp/routes.mjs: erst updateUser, dann
- * setSessionCookie mit dem vorher gelesenen Nutzer). Beweist:
- *  - Das Sitzungsobjekt ist tatsächlich veraltet (Ursache festgehalten).
- *  - Trotzdem zeigt /account/profile sofort die Abos der Adresse, „Abo
- *    ändern" wirkt, und „Konto löschen" nimmt Konto UND Abos mit — entschieden
- *    wird nach dem frischen Stand in der Datenbank.
+ * die Kundin mit Code an, setzt Better Auth `emailVerified` in der Datenbank.
+ * Bis Nr. 114 lag danach der ALTE Stand (`emailVerified: false`) fünf Minuten
+ * im Cookie-Cache der Sitzung; seit Nr. 114 ist der Cookie-Cache aus und jede
+ * Sitzung wird frisch aus der Datenbank gelesen (Register E7). Beweist:
+ *  - Die Sitzung ist frisch: Sie sagt sofort „bestätigt", wie die Datenbank
+ *    (Gegenprobe gegen die Datenbank; vor dem Code war es „unbestätigt").
+ *  - /account/profile zeigt sofort die Abos der Adresse, „Abo ändern" wirkt,
+ *    und „Konto löschen" nimmt Konto UND Abos mit. Ob der Code dafür
+ *    `bestaetigteAdresse` oder die Sitzung liest, ist seit Nr. 114 nicht mehr
+ *    getrennt beweisbar (beide sagen dasselbe); ein Rückfall auf den
+ *    Cookie-Cache fällt im ersten Test auf.
  *  - Gegenprobe: Ein Passwort-Konto ohne Bestätigung sieht keine Abos und
  *    kann sie weder ändern noch mit dem Konto löschen.
  */
@@ -76,15 +79,16 @@ async function ruhendesKontoMitAbo(): Promise<{ id: string; email: string; farmI
 }
 
 describe('/account nach der Code-Anmeldung eines ruhenden Altkontos', () => {
-  it('das Sitzungsobjekt ist veraltet — die Datenbank sagt bestätigt (Ursache)', async () => {
+  it('die Sitzung ist frisch — sie sagt sofort bestätigt, wie die Datenbank (E7, Nr. 114)', async () => {
     const { id, email } = await ruhendesKontoMitAbo()
+    expect((await prisma.user.findUniqueOrThrow({ where: { id } })).emailVerified).toBe(false)
 
     await meldeMitCodeAn(email)
 
     const sitzung = await auth.api.getSession({ headers: anfrage.headers })
     expect(sitzung?.user.id).toBe(id)
-    expect(sitzung?.user.emailVerified).toBe(false)
     expect((await prisma.user.findUniqueOrThrow({ where: { id } })).emailVerified).toBe(true)
+    expect(sitzung?.user.emailVerified).toBe(true)
   })
 
   it('zeigt die Abos sofort', async () => {

@@ -69,6 +69,8 @@ export type TeilenBildHof = {
   isPaused: boolean
   betriebsnummer: string | null
   betriebsstatus: BetriebsstatusValue | null
+  /** Abzeichen „Gründungshof“ (Register K2, Nr. 116) — nur Ja/Nein, nie die Nummer des Platzes. */
+  gruendungshof?: boolean
 }
 
 /** Ein Eintrag im Bild und in der Auswahl des Teilen-Fensters — eine Familie zählt als einer. */
@@ -238,6 +240,13 @@ export type TeilenBildDaten = {
   adresse: string
   /** Nur im Beitrag-Modus; sonst fehlt das Feld (die Prüfsumme bleibt dann wie ohne Beitrag). */
   beitrag?: TeilenBildBeitrag
+  /**
+   * Nur bei einem Gründungshof mit Abzeichen (Nr. 116); sonst fehlt das Feld
+   * und die Prüfsumme bleibt die bisherige. Schaltet der Hof es aus, ändert
+   * sich die Prüfsumme und mit ihr die Bildadresse — das alte Bild liegt nicht
+   * mehr im Zwischenspeicher.
+   */
+  gruendungshof?: true
 }
 
 export function teilenBildDaten(eingabe: {
@@ -259,6 +268,7 @@ export function teilenBildDaten(eingabe: {
     abholung: fenster ? abholungText(fenster) : null,
     abholTermin: fenster ? `${formatTagKurz(fenster.tag)} · ${fenster.zeit}` : null,
     adresse: eingabe.adresse,
+    ...(hof.gruendungshof ? { gruendungshof: true as const } : {}),
     ...(beitrag && {
       beitrag: {
         anlass: BEITRAG_ANLASS_TEXT[beitrag.anlass],

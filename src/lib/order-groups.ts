@@ -1,6 +1,9 @@
 // Gruppierung der Bestellliste nach Abholtag (Sprint 19, Referenz 19).
 // Heutige Gruppe zuerst, danach chronologisch; innerhalb eines Tages
 // nach Slot-Beginn. Tage ohne Bestellungen erscheinen nicht.
+// Ein Tag ist der Wiener Kalendertag, nie der der Serveruhr (CODING_STANDARDS „Tage und Wochen").
+
+import { tagVersetzt, wienKalendertag } from '@/lib/kalender'
 
 export type GroupableOrder = {
   pickupDate: Date | string
@@ -13,16 +16,13 @@ export type OrderDayGroup<T> = {
   orders: T[]
 }
 
-function dayKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 export function pickupDayLabel(date: Date, now: Date = new Date()): string {
-  const tomorrow = new Date(now)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  if (date.toDateString() === now.toDateString()) return 'Heute'
-  if (date.toDateString() === tomorrow.toDateString()) return 'Morgen'
-  return date.toLocaleDateString('de-AT', { weekday: 'long', day: 'numeric', month: 'long' })
+  const tag = wienKalendertag(date)
+  const heute = wienKalendertag(now)
+  if (tag === heute) return 'Heute'
+  // Morgen über den Kalendertag, nicht über +24 Stunden: In der Nacht der Zeitumstellung hat ein Tag 23 oder 25.
+  if (tag === tagVersetzt(heute, 1)) return 'Morgen'
+  return date.toLocaleDateString('de-AT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Vienna' })
 }
 
 export function groupOrdersByPickupDay<T extends GroupableOrder>(
@@ -33,13 +33,13 @@ export function groupOrdersByPickupDay<T extends GroupableOrder>(
 
   for (const order of orders) {
     const date = new Date(order.pickupDate)
-    const key = dayKey(date)
+    const key = wienKalendertag(date)
     const entry = byDay.get(key)
     if (entry) entry.orders.push(order)
     else byDay.set(key, { date, orders: [order] })
   }
 
-  const todayKey = dayKey(now)
+  const todayKey = wienKalendertag(now)
   const groups = [...byDay.entries()]
     .sort(([a], [b]) => {
       // Heutiger Tag immer zuerst, Rest chronologisch aufsteigend

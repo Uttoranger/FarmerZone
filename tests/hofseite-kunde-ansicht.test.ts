@@ -99,6 +99,9 @@ const HOF: PublicFarm = {
   acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,
   serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
   betriebsstatus: null,
+  gruendungshof: false,
+  gruendungSeit: null,
+  abzeichenBlatt: null,
   products: [
     produkt('p_holz', 'Buchenscheite', 'BRENNHOLZ'),
     produkt('p_heu', 'Bergwiesen-Heu', 'HEU_STROH'),
@@ -132,6 +135,15 @@ function seite({ suche = '', farm = HOF, beitraege = [STATUS], ansicht = KUNDIN,
 function reihenfolge(html: string, texte: string[]): string[] {
   return texte.filter((t) => html.includes(t)).sort((a, b) => html.indexOf(a) - html.indexOf(b))
 }
+
+describe('Titelbild der echten Hofseite (Nr. 117, Sammel-PR)', () => {
+  it('trägt „Titelbild von {Hof}“ – die Seite reicht den Namen an das Titelbild weiter', () => {
+    const html = seite({ farm: { ...HOF, bannerType: 'PHOTO', bannerUrl: 'https://blob.example/titel.jpg' } })
+    expect(html).toContain('alt="Titelbild von Hof Test"')
+    // Gegenprobe: Das Foto steht wirklich im HTML (sonst prüfte der Test nichts).
+    expect(html).toContain('src="https://blob.example/titel.jpg"')
+  })
+})
 
 describe('die Hofseite steht in der KundeShell', () => {
   it('neues Design, Kopfzeile und Unterleiste — für Kundinnen und in der Vorschau', () => {
@@ -343,7 +355,7 @@ describe('beide Themes: nur Tokens in den Teilen der Hofseite', () => {
   it('keine Datei der Kundenansicht nutzt sie', () => {
     const route = [
       'src/app/(public)/[farmSlug]/page.tsx',
-      'src/app/(public)/[farmSlug]/loading.tsx',
+      'src/app/(public)/[farmSlug]/hofseite-skelett.tsx',
       'src/components/farm/cart-sheet.tsx',
       ...dateien('src/components/hofseite'),
     ]
@@ -352,13 +364,13 @@ describe('beide Themes: nur Tokens in den Teilen der Hofseite', () => {
       expect(PALETTE.test(text), pfad).toBe(false)
       expect(SCHWARZ_WEISS.test(text), pfad).toBe(false)
       expect(HEX.test(text), pfad).toBe(false)
-      // Die Ladeansicht staffelt wie die übrigen Skelette über app-trough/app-chip (DESIGN_SYSTEM, Ladeansicht).
-      if (!pfad.endsWith('loading.tsx')) expect(BESTAND.test(text), pfad).toBe(false)
+      // Das Skelett staffelt wie die übrigen über app-trough/app-chip (DESIGN_SYSTEM, Ladeansicht).
+      if (!pfad.endsWith('skelett.tsx')) expect(BESTAND.test(text), pfad).toBe(false)
     }
   })
 
-  it('die Ladeansicht steht im neuen Design (sie kommt vor der Shell)', () => {
-    expect(quelle('src/app/(public)/[farmSlug]/loading.tsx')).toContain('data-design="neu"')
+  it('das Skelett steht im neuen Design (es kommt vor der Shell)', () => {
+    expect(quelle('src/app/(public)/[farmSlug]/hofseite-skelett.tsx')).toContain('data-design="neu"')
   })
 })
 
@@ -374,23 +386,18 @@ describe('Reiter und Chips schreiben die Adresse so, dass Next sie abgleicht', (
 
 // ─── Nachbesserung 1 ────────────────────────────────────────────────────────
 
-describe('JSON-LD: Text des Hofs bleibt im <script>', () => {
-  const ANGRIFF = '</script><script>alert(1)</script>'
-  const html = seite({ farm: { ...HOF, name: `Hof ${ANGRIFF}`, description: ANGRIFF } })
-  const block = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)
-
-  it('der Block endet erst nach dem JSON, und das JSON trägt Name und Beschreibung', () => {
-    expect(block).not.toBeNull()
-    expect(JSON.parse(block![1])).toMatchObject({ name: `Hof ${ANGRIFF}`, description: ANGRIFF })
-  })
-
-  it('kein eingeschleustes <script>alert', () => {
-    expect(html).not.toContain('<script>alert(1)')
+describe('JSON-LD: baut seit Nr. 117 die Seite auf dem Server', () => {
+  // Der Schutz gegen `</script>` im Hofnamen (jsonLdSicher) prüft tests/hofseite-404.test.ts am Block der Seite.
+  it('die Client-Komponente trägt keinen Block mehr — Koordinaten und volle Adressen bleiben auf dem Server', () => {
+    const html = seite({ farm: HOF })
+    expect(html).not.toContain('application/ld+json')
+    // Gegenprobe: Der Hof steht da.
+    expect(html).toContain('Hof Test')
   })
 
   it('die Seite nimmt dafür jsonLdSicher, nie JSON.stringify direkt im Script', () => {
-    const text = quelle('src/components/hofseite/hofseite-kunde.tsx')
-    expect(text).toContain('jsonLdSicher(')
+    const text = quelle('src/app/(public)/[farmSlug]/page.tsx')
+    expect(text).toContain('jsonLdSicher(hofJsonLd(')
     expect(text).not.toMatch(/__html:\s*JSON\.stringify/)
   })
 })

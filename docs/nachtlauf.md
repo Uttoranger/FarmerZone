@@ -171,6 +171,15 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 109 | Gründungshöfe: Testhöfe ausnehmen (Migration) | `freigabe.md` §20 | K2 |
 | 110 | Prüfungen statt Textregeln, Teil a (vom Zwischenstand `integration/lauf16`) | `freigabe.md` §20 | G4 |
 | Sammel 16 | Sammel-PR `integration/lauf16` | `freigabe.md` §20 | G3, G4 |
+| 111 | Filter-Falle auf /hoefe schließen (entfällt: lief vorher allein als Fix #307) | `freigabe.md` §21 | N19 |
+| 112 | Code- und Passwort-Raten bremsen | `freigabe.md` §21 | E7 |
+| 113 | Betrieb: Lebenszeichen von außen, Vercel Pro, Vercel-Ausgaben; Nacharbeit 103/104 | `freigabe.md` §21 | N18 |
+| 114 | Angemeldete Geräte, frische Sitzung, Mail bei neuem Gerät (von 112; Migration) | `freigabe.md` §21 | E7 |
+| 115 | Admin nur mit Passkey (von 114; Migration; Paket) | `freigabe.md` §21 | N20 |
+| 116 | Aktion „100 Gründungshöfe“ und Abzeichen (Migration) | `freigabe.md` §21 | K2 |
+| 117 | SEO-Grundlagen und echte 404 | `freigabe.md` §21 | N19 |
+| 118 | Reste aus 110, freigegebene Regelvorschläge, Kleinkram (vom Zwischenstand `integration/lauf17`) | `freigabe.md` §21 | G4 |
+| Sammel 17 | Sammel-PR `integration/lauf17` | `freigabe.md` §21 | G3 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
@@ -244,6 +253,14 @@ Zwei Migrationen (`<zeit>_startseite_fassung` in 99, danach `<zeit>_bild_ausschn
 
 Zwei Migrationen (`<zeit>_gruendung_ausgenommen` in 109, danach `<zeit>_betrieb` in 103), nur Expand, ohne Seed, nach Regel 3 mit dem Schema des Basis-Branchs als `--from-schema`; 104–108 und 110 ohne Migration. Priorität 105 → 107 → 106 → 109 → 103 → 108 → 104 → 110: 105, 107, 106 und 109 müssen fertig werden, 103 und 108 dürfen Entwurf bleiben, 104 entfällt ohne 103, 110 zuletzt (Teil b in Lauf 17). Nie zwei Nummern an derselben Code-Datei (Dateigrenzen in `freigabe.md` §20).
 
+**Reihenfolge in Lauf 17** (`freigabe.md` §21, Haltepunkt Sammel-PR): Doku-PR → 112 ∥ 116 ∥ 117 → 114 (von 112), 115 (von 114), sonst 113, sobald Plätze frei sind → 118 → Sammel-PR. Die Branches:
+- Nr. 111 entfällt: Der Fix „Filter-Falle auf /hoefe“ lief vorher allein (#307, auf main). Deshalb bilden 112, 116 und 117 die erste Welle; alle drei zweigen von `docs/lauf17` ab; ein Workflow je Nummer, höchstens drei gleichzeitig.
+- Wird ein Platz frei: Ist 112 fertig, startet 114 vom Branch der Nr. 112; ist 114 fertig, startet 115 vom Branch der Nr. 114; sonst 113 (von `docs/lauf17`).
+- 118 zweigt vom Zwischenstand `integration/lauf17` mit allen fertigen Nummern ab.
+- Ist 112 nach zwei Runden nicht fertig (Entwurf), zweigt 114 von `docs/lauf17` ab. Ist 114 nicht fertig, entfällt 115 (Lauf 18) – 115 braucht die frische Sitzung und den Geräte-Baustein aus 114.
+
+Drei Migrationen mit festen Namen (`20261019200000_gruendung_aktion` in 116, `20261019210000_geraete` in 114, `20261019220000_admin_passkey` in 115), nur Expand, ohne Seed, ohne Datenänderung, nach Regel 3 mit dem Schema des Basis-Branchs als `--from-schema`; 116 läuft auf einem eigenen Zweig, weil es getrennte Modelle berührt. Ein neues Paket nur in 115 (`@better-auth/passkey` 1.6.23). 112, 113, 117 und 118 ohne Migration. Priorität 112 → 114 → 115 → 113 → 117 → 116 → 118: 112 und 114 müssen fertig werden, 115 und 116 dürfen Entwurf bleiben, 118 zuletzt. Nie zwei Nummern an derselben Code-Datei außerhalb der Grenzen (`freigabe.md` §21).
+
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 
 Gate 9 (Ende-zu-Ende mit dem Pilothof) läuft **nie** im Nachtlauf.
@@ -266,7 +283,7 @@ Der Lauf beginnt bei der ersten Nummer, die in `status.md` nicht als „fertig" 
 5. **Abschluss:** `pnpm typecheck && pnpm lint && pnpm test` grün; bei Datenbank-Änderungen zusätzlich `pnpm test:integration` gegen die lokale Test-Datenbank. Dann pushen und PR öffnen: Titel mit Nummer, Basis = Vorgänger-Branch, Beschreibung = Bericht + Liste der weggelassenen Teile + Hinweis „Gestapelt auf #<vorheriger PR>, nach dessen Merge zuerst mergen".
 6. **`status.md` aktualisieren:** Nummer, Status, PR-Link, Branch, Dauer, offene Punkte.
 7. Nächste Nummer.
-8. **Am Ende des Laufs: Sammel-PR** (Register G3). Branch `integration/lauf<n>` von `main`, alle fertigen PRs des Laufs per `git merge --no-ff` in Merge-Reihenfolge; Doku-Konflikte beide Seiten behalten, Code-Konflikte sauber zusammenführen und jede Auflösung im PR-Text begründen; Typecheck, Unit- und Integrationstests auf dem Gesamtstand grün. Entwürfe kommen nicht hinein.
+8. **Am Ende des Laufs: Sammel-PR** (Register G3). Branch `integration/lauf<n>` von `main`, alle fertigen PRs des Laufs per `git merge --no-ff` in Merge-Reihenfolge; Doku-Konflikte: „beide Seiten behalten“ gilt nur, wo beide Seiten Abschnitte anhängen – hat eine Seite einen bestehenden Absatz geändert, stünde danach die alte und die neue Fassung da; in `docs/ai` den kombinierten Diff (`git show --cc`) ansehen und doppelte Absätze zu einem auflösen (Wache `tests/doku-doppelte-absaetze.test.ts`). Code-Konflikte sauber zusammenführen und jede Auflösung im PR-Text begründen; nach JEDEM Merge in den Sammel-Stand läuft `pnpm typecheck && pnpm lint && pnpm test` ganz, nicht erst am Ende – ändern parallele Branches Wachen, sind sie einzeln grün und zusammen rot (Lauf 16: Routen-Liste von 110 und neue Route von 104); Wachen mit fester Liste vergleichen gegen das Dateisystem und nennen die neue Datei mit Namen. Typecheck, Unit- und Integrationstests auf dem Gesamtstand grün. Entwürfe kommen nicht hinein.
 
 ---
 
@@ -342,6 +359,7 @@ claude -p "$(cat docs/nachtlauf-start.txt)" \
     "Bash(pnpm typecheck*)" "Bash(pnpm lint*)" "Bash(pnpm test*)" "Bash(pnpm vitest*)" \
     "Bash(pnpm build*)" "Bash(pnpm dev*)" "Bash(pnpm bausteine*)" "Bash(pnpm install --frozen-lockfile*)" "Bash(pnpm exec prisma migrate diff*)" \
     "Bash(pnpm exec prisma generate*)" "Bash(pnpm exec prisma validate*)" "Bash(pnpm exec prisma format*)" \
+    "Bash(DATABASE_URL=postgresql://postgres:postgres@localhost:5432/* DIRECT_URL=postgresql://postgres:postgres@localhost:5432/* pnpm exec prisma migrate deploy*)" \
     "Bash(git *)" "Bash(gh pr create*)" "Bash(gh pr view*)" "Bash(gh pr list*)" "Bash(agent-browser *)" \
   --disallowedTools "Bash(pnpm db:*)" "Bash(pnpm exec prisma migrate deploy*)" "Bash(pnpm exec prisma db push*)" "Bash(pnpm exec prisma migrate dev*)" "Bash(pnpm exec prisma migrate reset*)" "Bash(pnpm add*)" "Bash(git push --force*)" "Bash(git push -f*)" "Bash(gh pr merge*)" \
   --max-budget-usd 40 \
@@ -351,7 +369,7 @@ claude -p "$(cat docs/nachtlauf-start.txt)" \
 **Windows PowerShell:** dieselben Argumente, nur der Prompt so: `claude -p (Get-Content docs\nachtlauf-start.txt -Raw) …` und die Ausgabe in `nachtlauf.log`.
 
 Hinweise:
-- Migrationen entstehen nur über `prisma migrate diff` (Regel 3); `migrate dev` und `migrate deploy` sind gesperrt. `git show origin/main:prisma/schema.prisma` deckt `Bash(git *)` ab.
+- Migrationen entstehen nur über `prisma migrate diff` (Regel 3); `migrate dev` ist gesperrt. `migrate deploy` ist es ebenfalls, außer für die Prüfung nach Regel 3 (frische lokale Wegwerf-Datenbank im Sammel-PR): Die läuft nur, wenn derselbe Befehl `DATABASE_URL` und `DIRECT_URL` ausdrücklich auf `localhost` oder `127.0.0.1` setzt — der Hook `gefahr-blocken` lässt `migrate deploy` (auch über `pnpm vercel-build`, hinter pnpm/npx/timeout/`sh -c` …) sonst nie durch und zählt nur die Zuweisungen am Aufruf selbst oder in einem `export` davor, nicht die in einem anderen Befehl, in einem `echo` oder in einem `export` in Klammern (endet mit ihnen – zwei Klammern nebeneinander trennt der Hook noch nicht, Nacharbeit Lauf 18); `$(…)` und Gravis liest er auch zwischen Anführungszeichen mit. `--disallowedTools` sperrt den Aufruf ohne diese Zuweisungen schon am Anfang des Befehls; mit ihnen lässt `dontAsk` ihn nur durch den engen Eintrag in `--allowedTools` (beide Adressen auf `localhost:5432`) zu — jede andere Form lehnt er ab, und der Befehl steht im Log und im Morgenbericht. `git show origin/main:prisma/schema.prisma` deckt `Bash(git *)` ab.
 - `dontAsk` lehnt alles ab, was nicht in `--allowedTools` steht, und fragt niemanden. Bleibt der Lauf an einer Stelle hängen, steht der abgelehnte Befehl im Log und im Morgenbericht.
 - Die bestehenden Hooks aus `.claude/settings.json` gelten weiter (gefährliche Befehle blockiert, kein Zugende bei rotem Typecheck).
 - `--max-budget-usd` begrenzt API-Kosten. Mit einem Abo greifen stattdessen dessen Nutzungsgrenzen; ist das Kontingent erschöpft, endet der Lauf, und die nächste Nacht macht bei `status.md` weiter.

@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { KONTAKT_EMAIL } from '@/lib/support'
-import { GRUENDUNGS_AUFNAHME_SCHRITTE } from '@/lib/gruendungshof'
+import { GRUENDUNGS_AUFNAHME_SCHRITTE, GRUENDUNG_TEXT } from '@/lib/gruendungshof'
+import { gruendungFuerSeiten } from '@/server/queries/plattform-einstellung'
 import {
   KONDITIONEN_STAND,
   KONDITIONEN_UEBERGANG,
@@ -30,6 +32,7 @@ import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
   title: `Konditionen für Höfe — ${MARKE}`,
+  alternates: { canonical: '/konditionen' },
   description:
     `Was ${MARKE} kostet: ${STARTPHASE_SATZ} ${TARIFE_AB_SATZ} ` +
     `${TARIFE.map((t) => `${t.name} ${t.preis} ${PRO_MONAT}`).join(', ')}. ` +
@@ -42,6 +45,28 @@ export const metadata: Metadata = {
 export const revalidate = 3600
 
 const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent(`Mein Hof auf ${MARKE}`)}`
+
+/**
+ * Abschnitt „Aktion“ (Register K2, Nr. 116): nur, solange die Aktion läuft —
+ * auch bei Anzeige aus, Konditionen sind keine Werbung; Zahlen und Sätze aus
+ * derselben Quelle wie Startseite und /fuer-hoefe. Eigene Komponente hinter
+ * Suspense, damit der Rest der Seite nicht auf die Datenbank wartet.
+ */
+async function AktionAbschnitt({ jetzt }: { jetzt: Date }): Promise<React.JSX.Element | null> {
+  const gruendung = await gruendungFuerSeiten(jetzt)
+  if (!gruendung.aktionLaeuft) return null
+  const aktion = GRUENDUNG_TEXT.aktion(gruendung)
+  return (
+    <section>
+      <h2 className={INFOSEITE_ABSCHNITT}>{aktion.titel}</h2>
+      <ul className="flex list-disc flex-col gap-1.5 pl-5">
+        {aktion.saetze.map((satz) => (
+          <li key={satz}>{satz}</li>
+        ))}
+      </ul>
+    </section>
+  )
+}
 
 // Der Startseiten-CTA verspricht das Gründungshof-Angebot — bisher konnte man
 // es nirgends nachlesen. Diese Seite ist die Nachlese-Stelle.
@@ -82,6 +107,10 @@ export default function KonditionenPage() {
               ))}
             </ul>
           </section>
+
+          <Suspense fallback={null}>
+            <AktionAbschnitt jetzt={jetzt} />
+          </Suspense>
 
           <section>
             <h2 className={INFOSEITE_ABSCHNITT}>Servicegebühr und Abrechnung</h2>

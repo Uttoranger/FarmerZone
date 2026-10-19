@@ -18,7 +18,8 @@ const KEINE_FARBLITERALE =
   'Keine Farbwerte im Quelltext — Utilities der Tokens aus docs/ai/DESIGN_SYSTEM.md (bg-background, text-foreground, text-status-offen …).'
 // Tage und Wochen sind Wiener Tage und Wochen, nie Serverzeit (docs/ai/CODING_STANDARDS.md, „Tage und
 // Wochen"): Vercel rechnet in UTC, um 0:30 Uhr stünde der Hof sonst im Gestern. Die Verbotsliste dort
-// gilt für alles unter src/ — setHours(0 …), getHours(), startOfWeek, toLocaleDateString ohne timeZone.
+// gilt für alles unter src/ — setHours(0 …), getHours(), startOfWeek, und jede Datumsausgabe ohne timeZone
+// (toLocaleDateString, toLocaleTimeString, toLocaleString bei Datumswerten).
 // Wache und Gegenprobe: tests/datums-regeln.test.ts.
 const DATUM_HINWEIS =
   'Tag und Woche sind die Wiener, nie die der Serverzeit — wienKalendertag, wienWochenMontag, wienerMitternacht, uhrzeitInWien (docs/ai/CODING_STANDARDS.md, „Tage und Wochen").'
@@ -30,20 +31,32 @@ const DATUM_SELEKTOREN = [
   { selector: "ImportSpecifier[imported.name='startOfWeek']", message: DATUM_HINWEIS },
   { selector: "ImportDeclaration[source.value=/^date-fns\\/startOfWeek/]", message: DATUM_HINWEIS },
 ]
+const DATUM_ORT_MELDUNG = `${DATUM_HINWEIS} Eine Datumsausgabe (toLocaleDateString, toLocaleTimeString, toLocaleString) braucht timeZone: 'Europe/Vienna'.`
+const OHNE_ZEITZONE = ":not(:has(Property[key.name='timeZone']))"
+// toLocaleString gibt es auch für Zahlen (Tausenderpunkt, Prozent): Dort bleibt es erlaubt. Ein Datum erkennt
+// die Regel am Empfänger `new Date(…)`, an Optionen, die nur ein Datum kennt, oder am Namen des Empfängers
+// (`m.createdAt`, `startDatum`, `ankunftZeit`, `date`) — ohne Typen sieht ein Selektor sonst nicht, dass es ein
+// Date ist. Ein Date unter einem Namen ohne diese Endung und ohne Optionen bleibt unentdeckt.
+const DATUM_OPTIONEN = '^(day|month|weekday|year|hour|minute|second|dateStyle|timeStyle)$'
+const DATUM_NAME = '(At|Date|Datum|Zeit)$|^(date|datum|zeit|jetzt|heute)$'
 const DATUM_ORT_SELEKTOREN = [
+  { selector: `CallExpression[callee.property.name='toLocaleDateString']${OHNE_ZEITZONE}`, message: DATUM_ORT_MELDUNG },
+  { selector: `CallExpression[callee.property.name='toLocaleTimeString']${OHNE_ZEITZONE}`, message: DATUM_ORT_MELDUNG },
   {
-    selector: "CallExpression[callee.property.name='toLocaleDateString']:not(:has(Property[key.name='timeZone']))",
-    message: `${DATUM_HINWEIS} toLocaleDateString braucht timeZone: 'Europe/Vienna'.`,
+    // EIN Selektor mit :matches, damit ein Aufruf, auf den mehrere Merkmale zutreffen, nur einmal gemeldet wird.
+    selector:
+      "CallExpression[callee.property.name='toLocaleString']:matches(" +
+      "[callee.object.type='NewExpression'][callee.object.callee.name='Date']," +
+      `:has(Property[key.name=/${DATUM_OPTIONEN}/]),` +
+      `[callee.object.type='MemberExpression'][callee.object.property.name=/${DATUM_NAME}/],` +
+      `[callee.object.type='Identifier'][callee.object.name=/${DATUM_NAME}/])${OHNE_ZEITZONE}`,
+    message: DATUM_ORT_MELDUNG,
   },
 ]
-// Bestand von toLocaleDateString ohne timeZone: Die Liste darf nur schrumpfen — wer die Datei auf
-// timeZone: 'Europe/Vienna' umstellt, nimmt sie hier heraus (tests/datums-regeln.test.ts meldet eine
-// Datei ohne Treffer als veraltet).
-export const DATUM_ORT_BESTAND = [
-  'src/app/(farmer)/orders/\\[orderId\\]/print/page.tsx',
-  'src/lib/order-groups.ts',
-  'src/lib/whatsapp.ts',
-]
+// Bestand von Datumsausgaben ohne timeZone: leer seit Nr. 118 und es bleibt so. Eine einzelne Ausnahme gehört
+// als Zeile direkt über die Stelle (`eslint-disable-next-line no-restricted-syntax -- <warum>`), nicht in
+// eine Liste (tests/datums-regeln.test.ts prüft, dass sie leer ist).
+export const DATUM_ORT_BESTAND = []
 const FARBLITERAL_BESTAND = [
   'src/emails/**',
   // Eckige Klammern sind im Muster Zeichenklassen — für den Ordner [id] maskieren.
@@ -64,11 +77,6 @@ const FARBLITERAL_BESTAND = [
   'src/lib/meldung.ts',
 ]
 
-// Eine Datei darf nicht in beiden Listen stehen: Sie fiele aus allen drei Blöcken unten heraus.
-if (FARBLITERAL_BESTAND.some((datei) => DATUM_ORT_BESTAND.includes(datei))) {
-  throw new Error('FARBLITERAL_BESTAND und DATUM_ORT_BESTAND überschneiden sich — die Datei bekäme keine Regel.')
-}
-
 const FARBLITERAL_SELEKTOREN = [
   { selector: `Literal[value=/${FARBLITERAL_HEX}/]`, message: KEINE_FARBLITERALE },
   { selector: `TemplateElement[value.raw=/${FARBLITERAL_HEX}/]`, message: KEINE_FARBLITERALE },
@@ -82,12 +90,11 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: [...FARBLITERAL_BESTAND, ...DATUM_ORT_BESTAND],
+    ignores: FARBLITERAL_BESTAND,
     rules: regeln(FARBLITERAL_SELEKTOREN, DATUM_SELEKTOREN, DATUM_ORT_SELEKTOREN),
   },
-  // Die Bestände sind von je EINER Regel ausgenommen, nicht von den anderen.
+  // Der Bestand der Farbliterale ist von dieser Regel ausgenommen, nicht von den Datumsregeln.
   { files: FARBLITERAL_BESTAND, rules: regeln(DATUM_SELEKTOREN, DATUM_ORT_SELEKTOREN) },
-  { files: DATUM_ORT_BESTAND, rules: regeln(FARBLITERAL_SELEKTOREN, DATUM_SELEKTOREN) },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

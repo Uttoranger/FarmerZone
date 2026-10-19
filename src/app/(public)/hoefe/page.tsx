@@ -9,13 +9,26 @@ import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzun
 import { HoefeClient } from '@/components/hoefe/hoefe-client'
 import { HoefeFehler, KeineHoefe } from '@/components/hoefe/entdecken-teile'
 import { MARKE } from '@/lib/marke'
+import { STARTSEITE_VORSCHAUBILD } from '@/lib/vorschaubild'
+import { OG_LOCALE } from '@/lib/json-ld'
+
+const SEITEN_TITEL = `Höfe in deiner Nähe — ${MARKE}`
+const SEITEN_BESCHREIBUNG = `Alle Höfe auf ${MARKE}: was sie verkaufen, wo sie sind und wann du abholen kannst — direkt vom Hof, ohne Umwege.`
 
 export const metadata: Metadata = {
-  title: `Höfe in deiner Nähe — ${MARKE}`,
-  description:
-    `Alle Höfe auf ${MARKE}: was sie verkaufen, wo sie sind und wann du abholen kannst — direkt vom Hof, ohne Umwege.`,
+  title: SEITEN_TITEL,
+  description: SEITEN_BESCHREIBUNG,
   // Jede Filteradresse (/hoefe?kat=…) verweist auf die eine Seite (Register N19); metadataBase steht im Root-Layout.
   alternates: { canonical: '/hoefe' },
+  // Geteilt wie die Startseite: dasselbe Bild (Nr. 117).
+  openGraph: {
+    title: SEITEN_TITEL,
+    description: SEITEN_BESCHREIBUNG,
+    type: 'website',
+    siteName: MARKE,
+    locale: OG_LOCALE,
+    images: [STARTSEITE_VORSCHAUBILD],
+  },
 }
 
 // Statisch vom CDN, alle fünf Minuten neu gebaut — wie die Startseite

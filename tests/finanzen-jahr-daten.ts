@@ -21,7 +21,8 @@ export function csvCent(text: string): number {
   const teile = /^(-?)(\d+),(\d{2})$/.exec(text)
   if (!teile) throw new Error(`Kein CSV-Betrag: ${text}`)
   const [, minus, euro, cent] = teile
-  return (minus ? -1 : 1) * (Number(euro) * 100 + Number(cent))
+  // Die Ziffern von Euro und Cent hintereinander: „1284“ + „50“ ergibt 128450, ohne eine Rechnung mit 100.
+  return (minus ? -1 : 1) * Number(`${euro}${cent}`)
 }
 
 export const POSTEN = [

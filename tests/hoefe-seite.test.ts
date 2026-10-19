@@ -82,6 +82,7 @@ const HOF: KartenHof = {
   kategorien: ['EIER', 'BROT'],
   naechsteAbholung: { dayOfWeek: 5, startTime: '15:00', endTime: '18:00', tageVoraus: 0 },
   fotos: [],
+  gruendungshof: false,
   entfernungKm: null,
 }
 
@@ -703,8 +704,8 @@ describe('Filter im Browser: kein useSearchParams im Baum von /hoefe (Register N
     }
     return [...gesehen]
   }
-  // Seite, Ladeansichten und das Root-Layout darüber.
-  const hoefe = baum('src/app/(public)/hoefe/page.tsx', 'src/app/(public)/hoefe/loading.tsx', 'src/app/(public)/loading.tsx', 'src/app/layout.tsx')
+  // Seite, Ladeansicht und das Root-Layout darüber (die Ladeansicht der Gruppe entfiel mit Nr. 117).
+  const hoefe = baum('src/app/(public)/hoefe/page.tsx', 'src/app/(public)/hoefe/loading.tsx', 'src/app/layout.tsx')
   const liest = (datei: string) => /\buseSearchParams\b|\bsearchParams\b/.test(ohneKommentare(quelle(datei)))
 
   it('der Baum reicht bis in die Teile der Seite — sonst bewiese ein leerer Fund nichts', () => {
@@ -756,6 +757,7 @@ describe('das Server-HTML: die ganze Hofliste, ungefiltert, mit Links auf die Ho
     produkteJeBereich: { LEBENSMITTEL: 1, FUTTERMITTEL: 0 },
     suchNamen: ['Bauernbrot'],
     fotos: [],
+    gruendungshof: false,
   })
 
   it('beide Höfe mit Link — auf dem Server gilt der leere Filter (kein window, kein Wurf)', () => {

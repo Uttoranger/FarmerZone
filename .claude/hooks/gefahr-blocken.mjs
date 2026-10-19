@@ -28,6 +28,221 @@ const BEFEHLSANFANG = String.raw`(?:^|[;&|(\n]|\s-c\s+["'])\s*(?:\w+=\S+\s+)*`
 // Globale Optionen zwischen git und dem Unterbefehl (git -C <ordner> commit, git -c k=v stash, git --no-pager …).
 const GIT = String.raw`git(?:\s+(?:-C|-c)\s+\S+|\s+--[\w-]+(?:=\S+)?)*\s+`
 
+/**
+ * Zeigt diese Datenbank-Adresse ausdrücklich auf den eigenen Rechner (localhost oder 127.0.0.1)? Gelesen
+ * wird der Host der Adresse, nicht ein Wort darin: `postgresql://localhost@fremd.example/db` und
+ * `…@localhost.fremd.example/db` zeigen auf fremde Rechner. Ein `?host=` in der Adresse überschreibt den Host
+ * (pg, libpq) und gilt deshalb nie als lokal; Variablen (`$TEST_DATABASE_URL`) und Befehlsersetzungen sind
+ * keine ausdrückliche Adresse.
+ */
+function istLokaleDatenbank(wert) {
+  if (/[$`]/.test(wert)) return false
+  let adresse
+  try {
+    adresse = new URL(wert)
+  } catch {
+    return false
+  }
+  if (adresse.protocol !== 'postgresql:' && adresse.protocol !== 'postgres:') return false
+  if ([...adresse.searchParams.keys()].some((name) => /^host(addr)?$/i.test(name))) return false
+  return adresse.hostname === 'localhost' || adresse.hostname === '127.0.0.1'
+}
+
+/**
+ * Wo schließt die Befehlsersetzung, die ab `von` (hinter `$(` bzw. dem öffnenden Gravis) beginnt? Gibt den Index
+ * der schließenden Klammer bzw. des schließenden Gravis zurück, bei fehlendem Ende die Länge des Textes.
+ * Anführungszeichen, Verschachtelung und `\` werden beachtet.
+ */
+function ersetzungsEnde(text, von, schluss) {
+  let tiefe = 0
+  for (let i = von; i < text.length; i++) {
+    const z = text[i]
+    if (z === '\\') i++
+    else if (schluss === ')' && z === "'") {
+      const zu = text.indexOf("'", i + 1)
+      if (zu < 0) return text.length
+      i = zu
+    } else if (schluss === ')' && z === '"') {
+      for (i++; i < text.length && text[i] !== '"'; i++) {
+        if (text[i] === '\\') i++
+        else if (text[i] === '$' && text[i + 1] === '(') i = ersetzungsEnde(text, i + 2, ')')
+      }
+    } else if (schluss === ')' && z === '(') tiefe++
+    else if (z === schluss) {
+      if (tiefe === 0) return i
+      tiefe--
+    }
+  }
+  return text.length
+}
+
+/**
+ * Zerlegt eine Befehlszeile wie die Shell in einfache Befehle. Jeder ist `{ woerter, ersetzungen, tiefe }`:
+ * seine Wörter ohne Anführungszeichen, die Texte der Befehlsersetzungen in seinen Wörtern und die Klammerstufe.
+ * Getrennt wird außerhalb von Anführungszeichen an ; & | ( ) Gravis und Zeilenwechsel; ein # am Wortanfang
+ * beginnt einen Kommentar. Ein Text in Anführungszeichen bleibt ein Wort (`sh -c "a; b"` ist ein Befehl mit einem
+ * Text als Argument) — aber `$(…)` und Gravis darin führt die Shell aus: ihr Inhalt steht in `ersetzungen` und
+ * muss selbst geprüft werden. Die Stufe zählt die offenen ( und Gravis: Ein `export` darin gilt nur bis zur
+ * schließenden Klammer.
+ */
+function einfacheBefehle(text) {
+  const befehle = []
+  let woerter = []
+  let ersetzungen = []
+  let tiefe = 0
+  let gravisOffen = false
+  let wort = null // null: kein Wort offen
+  let anfuehrung = null
+  const wortEnde = () => {
+    if (wort !== null) woerter.push(wort)
+    wort = null
+  }
+  const befehlEnde = () => {
+    wortEnde()
+    if (woerter.length > 0) befehle.push({ woerter, ersetzungen, tiefe })
+    woerter = []
+    ersetzungen = []
+  }
+  for (let i = 0; i < text.length; i++) {
+    const z = text[i]
+    if (anfuehrung === "'") {
+      if (z === "'") anfuehrung = null
+      else wort += z
+    } else if (anfuehrung === '"') {
+      if (z === '\\' && i + 1 < text.length) wort += text[++i]
+      else if (z === '"') anfuehrung = null
+      else if (z === '`' || (z === '$' && text[i + 1] === '(')) {
+        const von = i + (z === '`' ? 1 : 2)
+        const bis = ersetzungsEnde(text, von, z === '`' ? '`' : ')')
+        ersetzungen.push(text.slice(von, bis))
+        wort += text.slice(i, bis + 1)
+        i = bis
+      } else wort += z
+    } else if (z === "'" || z === '"') {
+      anfuehrung = z
+      wort ??= ''
+    } else if (z === '\\') {
+      if (text[i + 1] === '\n') i++ // Zeilenfortsetzung
+      else wort = (wort ?? '') + (text[++i] ?? '')
+    } else if (z === '#' && wort === null) {
+      while (i + 1 < text.length && text[i + 1] !== '\n') i++
+    } else if (z === '\n' || ';&|()`'.includes(z)) {
+      befehlEnde()
+      if (z === '(' || (z === '`' && !gravisOffen)) tiefe++
+      else if (z === ')' || z === '`') tiefe = Math.max(0, tiefe - 1)
+      if (z === '`') gravisOffen = !gravisOffen
+    } else if (/\s/.test(z)) {
+      wortEnde()
+    } else {
+      wort = (wort ?? '') + z
+    }
+  }
+  befehlEnde()
+  return befehle
+}
+
+const zuweisung = (wort) => /^([A-Za-z_]\w*)=([\s\S]*)$/.exec(wort)?.slice(1)
+const basename = (wort) => wort.slice(wort.lastIndexOf('/') + 1)
+// `prisma`, `prisma@7`, `./node_modules/.bin/prisma` — hinter jeder Hülle (pnpm exec, npx, timeout …) gleich erkannt.
+const PRISMA = /^(?:.*\/)?prisma(?:@\S+)?$/
+// Wer das Wort „prisma migrate deploy“ nur nennt, ruft nichts auf.
+const NENNT_NUR = new Set(['echo', 'printf', 'grep', 'egrep', 'fgrep', 'rg', 'cat', 'head', 'tail', 'less', 'more', 'wc', 'diff', 'sed', 'awk', 'git', 'gh', 'ls', 'man', 'type', 'which', 'test', '[', '[['])
+const PAKETLAUFER = new Set(['pnpm', 'npm', 'yarn', 'bun'])
+// Optionen von pnpm/npm, die einen Wert als nächstes Wort tragen (`pnpm -C . run vercel-build`).
+const WERT_OPTIONEN = new Set(['-C', '--dir', '--filter', '-F', '--prefix', '--workspace', '-w', '--cwd'])
+const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh', 'ash'])
+
+function ueberspringeOptionen(woerter, von) {
+  let k = von
+  while (k < woerter.length && woerter[k].startsWith('-')) k += WERT_OPTIONEN.has(woerter[k]) ? 2 : 1
+  return k
+}
+
+/** Steht ab `von` ein Aufruf des Skripts `name` (`pnpm run name`, `pnpm -C . name`, `npm run name`)? */
+function istSkriptAufruf(woerter, von, name) {
+  let k = ueberspringeOptionen(woerter, von)
+  if (woerter[k] === 'run' || woerter[k] === 'run-script') k = ueberspringeOptionen(woerter, k + 1)
+  return woerter[k] === name
+}
+
+/**
+ * Wo beginnt in diesem einfachen Befehl ein Aufruf von `prisma migrate deploy` oder `vercel-build`, das es als
+ * ersten Schritt ausführt — oder -1? Hinter jeder Hülle: pnpm/npx/dlx mit Optionen, Pfad und Version, env,
+ * dotenv, timeout, time, nice, sudo, xargs … Befehle, die das Wort nur nennen (echo, grep, git commit …), zählen nicht.
+ */
+function deployAufrufStelle(woerter) {
+  if (NENNT_NUR.has(basename(woerter[0]))) return -1
+  for (let j = 0; j < woerter.length; j++) {
+    if (PRISMA.test(woerter[j]) && woerter[j + 1] === 'migrate' && woerter.slice(j + 2).includes('deploy')) return j
+    if (PAKETLAUFER.has(basename(woerter[j])) && istSkriptAufruf(woerter, j + 1, 'vercel-build')) return j
+  }
+  return -1
+}
+
+/** Die Umgebung für einen Aufruf: die früheren export-Anweisungen, überschrieben von den Zuweisungen an ihm selbst. */
+function umgebungFuer(exportiert, eigene) {
+  const umgebung = new Map(exportiert)
+  for (const [name, werte] of eigene) umgebung.set(name, werte)
+  return umgebung
+}
+
+function sammle(map, name, wert) {
+  map.set(name, [...(map.get(name) ?? []), wert])
+}
+
+/**
+ * Ruft `befehl` irgendwo `prisma migrate deploy` (auch über `pnpm vercel-build`) auf, ohne dass für DIESEN Aufruf
+ * DATABASE_URL UND DIRECT_URL ausdrücklich auf den eigenen Rechner zeigen? Es zählt, was der Aufruf wirklich
+ * erbt: Zuweisungen direkt davor im selben einfachen Befehl (`VAR=… cmd`, `env VAR=… cmd`) und frühere
+ * `export`-Anweisungen — nicht die Adresse in einem anderen Befehl (`A=… B=… true && deploy`), nicht Text
+ * (`echo A=…`) und nicht eine bloße Zuweisung ohne export, die nur in der Shell gilt. Wird jede Variable mehrfach gesetzt,
+ * muss jede Zuweisung lokal sein. `sh -c "…"`, `bash -lc …` und `eval …` werden mit der Umgebung davor mitgelesen.
+ * Befehlsersetzungen — `$(…)` und Gravis, auch zwischen Anführungszeichen — laufen in einer Unter-Shell mit der
+ * Umgebung VOR dem umgebenden Befehl: Die Zuweisungen an ihm erreichen sie nicht, die Shell wertet sie vorher aus.
+ * Ein `export` in Klammern oder in einer Ersetzung gilt nur bis zur schließenden Klammer.
+ */
+function deployOhneLokaleAdressen(befehl, geerbt = new Map()) {
+  const stufen = [new Map(geerbt)] // die exportierte Umgebung je Klammerstufe
+  for (const { woerter: einfach, ersetzungen, tiefe } of einfacheBefehle(befehl)) {
+    while (stufen.length - 1 > tiefe) stufen.pop()
+    while (stufen.length - 1 < tiefe) stufen.push(new Map(stufen[stufen.length - 1]))
+    const exportiert = stufen[tiefe]
+    for (const inhalt of ersetzungen) if (deployOhneLokaleAdressen(inhalt, exportiert)) return true
+    const eigene = new Map()
+    let anfang = 0
+    while (anfang < einfach.length && zuweisung(einfach[anfang])) sammle(eigene, ...zuweisung(einfach[anfang++]))
+    const woerter = einfach.slice(anfang)
+    if (woerter.length === 0) continue // bloße Zuweisung: gilt nur in der Shell, nicht für Gestartetes
+    if (woerter[0] === 'export') {
+      for (const w of woerter.slice(1)) if (zuweisung(w)) sammle(exportiert, ...zuweisung(w))
+      continue
+    }
+    // Zuweisungen mitten in der Hülle (`timeout 600 env A=… cmd`) gelten wie die am Anfang — aber nur die vor dem Aufruf.
+    const vorAufruf = (bis) => {
+      const alle = new Map(eigene)
+      for (const w of woerter.slice(0, bis)) if (zuweisung(w)) sammle(alle, ...zuweisung(w))
+      return umgebungFuer(exportiert, alle)
+    }
+    const stelle = deployAufrufStelle(woerter)
+    if (stelle >= 0) {
+      const umgebung = vorAufruf(stelle)
+      const lokal = ['DATABASE_URL', 'DIRECT_URL'].every((name) => (umgebung.get(name) ?? []).length > 0 && umgebung.get(name).every(istLokaleDatenbank))
+      if (!lokal) return true
+    }
+    for (let j = 0; j < woerter.length; j++) {
+      let text
+      if (SHELLS.has(basename(woerter[j]))) {
+        const k = woerter.findIndex((w, i) => i > j && /^-[A-Za-z]*c[A-Za-z]*$/.test(w))
+        if (k > j) text = woerter[k + 1]
+      } else if (j === 0 && woerter[j] === 'eval') {
+        text = woerter.slice(1).join(' ')
+      }
+      if (text !== undefined && deployOhneLokaleAdressen(text, vorAufruf(j))) return true
+    }
+  }
+  return false
+}
+
 const regeln = [
   {
     muster: /prisma\s+db\s+push/,
@@ -135,14 +350,32 @@ function branchDesCommits(befehl, arbeitsordner) {
   }
 }
 
+// Den Text eines Here-Documents liest der Hook bewusst MIT (Nachtrag Dirigent, Lauf 17): Drei Anläufe in
+// Nr. 118, ihn als Daten auszunehmen, öffneten jeweils neue Lücken. Der Fehlalarm aus Nr. 110 (eine
+// Commit-Nachricht, deren Zeile mit „git stash“ beginnt) bleibt deshalb; Vorsicht geht vor (Lauf 18).
+const geprueft = befehl
+
 for (const regel of regeln) {
-  if (regel.muster.test(befehl)) {
+  if (regel.muster.test(geprueft)) {
     console.error(`Blockiert: ${regel.grund}`)
     process.exit(2)
   }
 }
 
-if (branchDesCommits(befehl, arbeitsordner) === 'main') {
+// Wie die Regeln oben, nur mit Bedingung: Dieselbe Datenbank-Folge prüft der Sammel-PR (Regel 3 in
+// docs/nachtlauf.md) auf einer frischen lokalen Wegwerf-Datenbank — dort, und nur dort, ist der Aufruf richtig.
+// Geprüft wird je Aufruf in dessen eigenem einfachen Befehl (siehe deployOhneLokaleAdressen), nicht im Text davor.
+if (deployOhneLokaleAdressen(geprueft)) {
+  console.error(
+    'Blockiert: `prisma migrate deploy` (auch über `pnpm vercel-build`) läuft hier nur gegen eine ausdrücklich ' +
+      'lokale Datenbank: Setze im SELBEN Befehl DATABASE_URL und DIRECT_URL, beide auf localhost oder 127.0.0.1 ' +
+      '(Regel 3 in docs/nachtlauf.md, Prüfung im Sammel-PR). Entwicklungs- und Produktionsdatenbank bekommen ' +
+      'ihre Migrationen nur über `vercel-build` beim Push bzw. beim Merge auf main.'
+  )
+  process.exit(2)
+}
+
+if (branchDesCommits(geprueft, arbeitsordner) === 'main') {
   console.error(
     'Blockiert: Auf main wird nie direkt committet. Lege zuerst einen Feature-Branch an ' +
       '(`git switch -c <branch>`), committe dort und öffne einen PR — der Mensch merged.'

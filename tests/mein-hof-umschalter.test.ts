@@ -171,6 +171,31 @@ describe('„Kundenansicht" im Kopf', () => {
     expect(kopf).toMatch(/breit \? \(\s*<a href=\{vorschauLink\(hof\.slug\)\} target="_blank"/)
   })
 
+  it('auf /products steht derselbe Knopf unter den Reitern — nur unter md, als Knopf mit dem Vollbild (Nr. 118)', () => {
+    /** Der `kopf` der Seite: das, was MeinHofAnsicht über dem Inhalt zeigt. */
+    const kopfDerSeite = (seite: string): string => /kopf=\{([\s\S]*?)\n      \}\n    >/.exec(seite)?.[1] ?? ''
+    /** Steht der Knopf im Kopf, in demselben Kasten wie die Reiter, der ab md verschwindet? */
+    const knopfNurUnterMd = (kopf: string): boolean =>
+      /<div className="[^"]*\bmd:hidden\b[^"]*">[\s\S]*<MeinHofReiterLeiste[\s\S]*<KundenansichtKnopf slug=\{farm\.slug\}/.test(kopf)
+
+    const seite = quelle('src/app/(hof)/products/page.tsx')
+    expect(kopfDerSeite(seite)).toContain('<MeinHofReiterLeiste aktiv="produkte"')
+    expect(knopfNurUnterMd(kopfDerSeite(seite))).toBe(true)
+    // Gegenprobe: ohne den Knopf bzw. außerhalb des md:hidden-Kastens schlägt die Suche an.
+    expect(knopfNurUnterMd(kopfDerSeite(seite.replace(/\s*<KundenansichtKnopf[^>]*\/>/, '')))).toBe(false)
+    expect(knopfNurUnterMd(kopfDerSeite(seite.replace('px-4 pt-5 md:hidden', 'px-4 pt-5')))).toBe(false)
+    // Der Knopf kommt aus dem Baustein von Mein Hof, nicht aus einem eigenen Link in einen neuen Tab.
+    expect(seite).toContain("from '@/components/mein-hof/kundenansicht-knopf'")
+    expect(seite).not.toContain('vorschauLink')
+  })
+
+  it('auf /products öffnet der Knopf das Vollbild: unter MeinHofAnsicht mit Reiter produkte ein Knopf, kein Link', () => {
+    adresse.suche = ''
+    const html = renderToStaticMarkup(mitInhalt({ reiter: 'produkte', slug: 'hof-test', kopf: knopf() }))
+    expect(html).toMatch(/<button type="button" class="knopf">[\s\S]*?Kundenansicht<\/button>/)
+    expect(html).not.toContain('target="_blank"')
+  })
+
   it('„Kundenansicht" und „(öffnet in neuem Tab)" kommen aus der einen Quelle', () => {
     const kopf = quelle('src/components/mein-hof/seitenkopf.tsx')
     expect(kopf).toMatch(/target="_blank" rel="noopener noreferrer" className=\{KNOPF\}>\s*\{MEIN_HOF_ANSICHT_TEXT\.kundenansicht\}/)

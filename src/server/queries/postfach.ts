@@ -34,12 +34,11 @@ import { hatRegistrierung } from '@/lib/futter-registrierung'
 import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
 import { platzBeiFreischaltung } from '@/lib/admin-hoefe-seite'
-import { MAX_GRUENDUNGSHOEFE } from '@/lib/gruendungshof'
 import { stornoBetraege } from '@/lib/storno'
 import { alsCents } from '@/lib/order-totals'
 import { monatsgrenzenWien } from '@/lib/servicegebuehr'
 import { DEFAULT_SECTIONS, type SectionConfig } from '@/server/queries/appearance'
-import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
+import { ladeHoefeFuerGruendung, leseGruendungEinstellung } from '@/server/queries/admin'
 import { getMeldungenFuerAdmin } from '@/server/queries/meldung'
 
 /*
@@ -391,13 +390,13 @@ export async function zaehleOffenImEingang(): Promise<EingangZahlen & { gesamt: 
  * vorhandenen Feldern: Hofseite-Fortschritt (dieselbe Liste wie „Mein Hof",
  * hofseiteFortschritt), Stripe, SEPA, LFBIS bei Futtermitteln, Titelbild,
  * E-Mail bestätigt. Der Platz bei sofortiger Freischaltung mit derselben
- * Regel und Platzzahl wie Admin › Höfe (platzBeiFreischaltung,
- * MAX_GRUENDUNGSHOEFE — Nacharbeit 93 stellt alle Aufrufer gemeinsam um).
+ * Regel wie Admin › Höfe (platzBeiFreischaltung), mit der Einstellung
+ * (Nr. 116: Plätze statt der festen 12; nach dem Stichtag kein Platz).
  * Ohne Inhaber-Adresse und ohne Texte des Hofs: Nur Ja/Nein und Zahlen
  * verlassen diese Funktion.
  */
 export async function ladeHofAufgaben(jetzt: Date): Promise<HofAufgabeRoh[]> {
-  const [hoefe, imRennen] = await Promise.all([
+  const [hoefe, imRennen, einstellung] = await Promise.all([
     prisma.farm.findMany({
       where: WARTENDER_HOF,
       orderBy: { createdAt: 'desc' },
@@ -432,6 +431,7 @@ export async function ladeHofAufgaben(jetzt: Date): Promise<HofAufgabeRoh[]> {
       },
     }),
     ladeHoefeFuerGruendung(),
+    leseGruendungEinstellung(prisma),
   ])
   return hoefe.map((h) => {
     const sektionen = h.sectionsConfig
@@ -453,7 +453,7 @@ export async function ladeHofAufgaben(jetzt: Date): Promise<HofAufgabeRoh[]> {
       lfbis: hatRegistrierung('LFBIS', h),
       titelbild,
       email: h.owner.emailVerified === true ? 'bestaetigt' : bestaetigungOffen(h.owner) ? 'offen' : 'vor-pflicht',
-      platz: platzBeiFreischaltung(h.id, imRennen, jetzt, MAX_GRUENDUNGSHOEFE),
+      platz: platzBeiFreischaltung(h.id, imRennen, jetzt, einstellung),
     }
   })
 }

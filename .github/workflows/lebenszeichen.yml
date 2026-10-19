@@ -1,0 +1,28 @@
+name: Lebenszeichen
+
+# Die tägliche Prüfung von außen (Register N18, Nr. 113): Sind die Abläufe bei
+# Vercel gelaufen? Die Route antwortet 200 nur, wenn jeder tägliche Ablauf in
+# den letzten 26 Stunden und der wöchentliche in den letzten 8 Tagen ok lief.
+# Scheitert der Aufruf (503, 401, keine Antwort), scheitert dieser Workflow, und
+# GitHub schickt die Mail an die Projektleitung — unabhängig von Vercel.
+# Ohne gesetztes Secret scheitert er ebenfalls (bewusst, bis es gesetzt ist).
+#
+# Nur Zeitplan und Handstart, kein PR-Ereignis, kein Checkout, keine Rechte.
+# Das Secret steht nur unter env:, nie direkt in der run:-Zeile.
+
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  lebenszeichen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Abläufe gelaufen?
+        env:
+          TOKEN: ${{ secrets.LEBENSZEICHEN_TOKEN }}
+        run: curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" https://agrilo.at/api/lebenszeichen

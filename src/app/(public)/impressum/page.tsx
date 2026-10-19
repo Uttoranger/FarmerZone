@@ -14,7 +14,7 @@ import {
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: `Impressum — ${MARKE}` }
+export const metadata: Metadata = { title: `Impressum — ${MARKE}`, alternates: { canonical: '/impressum' } }
 
 /**
  * Impressum in der KundeShell (seit Nr. 54, kein Mockup — Formen aus

@@ -14,6 +14,7 @@ import { FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/lib/email-bestaetigung'
 import { datumKurz } from '@/lib/verkauf-eintragen'
 import { einstellungKurz, kalendertagInWien } from '@/lib/servicegebuehr'
 import { MINDESTGEBUEHR_KEINE_ZAHL } from '@/schemas/servicegebuehr'
+import type { FreischaltHinweis } from '@/lib/gruendungshof'
 
 /**
  * Jeder Hof braucht vor dem Freischalten ein fertiges Stripe-Konto (Register
@@ -21,6 +22,9 @@ import { MINDESTGEBUEHR_KEINE_ZAHL } from '@/schemas/servicegebuehr'
  * Sperre sitzt in approveFarmAction; hier steht nur, warum der Knopf ruht.
  */
 export const FREISCHALTUNG_STRIPE_OFFEN_TEXT = 'Stripe fehlt – Freischalten erst nach Stripe möglich.'
+
+/** Register K2, Änderung Nr. 116: Freischalten erst mit mindestens einem Produkt im Shop (Wortlaut der Freigabe). */
+export const FREISCHALTUNG_PRODUKT_OFFEN_TEXT = 'Noch kein Produkt im Shop – Freischalten erst mit mindestens einem Produkt.'
 
 /**
  * Das bedingte Schreiben der Freischaltung traf nichts: Zwischen Lesen und
@@ -38,10 +42,14 @@ export const FREISCHALTUNG_GEAENDERT_TEXT =
  * - Dann Stripe, für JEDEN Hof (Register Z1): Eine Wahl „nur bar" gibt es
  *   nicht mehr, `acceptsOnline` spielt hier keine Rolle. Die Lesart aus 22f
  *   Runde 1 (Sperre nur bei Online-Wunsch) ist verworfen.
+ * - Dann mindestens ein Produkt im Shop (Register K2, Änderung Nr. 116): Ein
+ *   Gründungsplatz zählt erst mit der Freischaltung — ein leerer Hof soll
+ *   keinen belegen. „Im Shop“ wie überall (`IM_SHOP_WHERE`, isAvailable).
  */
-export function freischaltSperre(hof: { emailBestaetigungOffen: boolean; stripeBereit: boolean }): string | null {
+export function freischaltSperre(hof: { emailBestaetigungOffen: boolean; stripeBereit: boolean; produktImShop: boolean }): string | null {
   if (hof.emailBestaetigungOffen) return FREISCHALTUNG_EMAIL_OFFEN_TEXT
   if (!hof.stripeBereit) return FREISCHALTUNG_STRIPE_OFFEN_TEXT
+  if (!hof.produktImShop) return FREISCHALTUNG_PRODUKT_OFFEN_TEXT
   return null
 }
 
@@ -238,6 +246,12 @@ export type HofRohdaten = {
   sepaErteilt: boolean
   /** Aus der Vergabe der Gründungsplätze genommen (Register K2, Nr. 109). */
   gruendungAusgenommen: boolean
+  /** Mindestens ein Produkt im Shop — Bedingung fürs Freischalten (Register K2, Nr. 116). */
+  produktImShop: boolean
+  /** Zusagen festgeschrieben (Nr. 116) — dann ändert Zurücknehmen keinen Platz. Fehlt es: nein. */
+  gruendungFest?: boolean
+  /** Was der Freischalt-Dialog zur Gründung sagt — fertig vom Server (getAdminFarms), nur für wartende Höfe. */
+  freischaltHinweis?: FreischaltHinweis | null
 }
 
 /**
@@ -261,6 +275,10 @@ export type AdminHofZeile = {
   gruendungsplatz: number | null
   /** Ausgenommen (Register K2, Nr. 109): Die Spalte zeigt die Marke „ausgenommen · Testhof“ statt „kein Gründungshof“. */
   gruendungAusgenommen: boolean
+  /** Zusagen festgeschrieben (Nr. 116): Zurücknehmen lässt Platz und Ende stehen. */
+  gruendungFest: boolean
+  /** Der Satz zur Gründung im Freischalt-Dialog (Platz und Ende bzw. warum keiner) — null ohne Satz. */
+  freischaltHinweis: FreischaltHinweis | null
   stripeBereit: boolean
   /** Freigeschaltet, aber ohne fertiges Stripe-Konto (stripeFehlt, Z1). */
   stripeFehlt: boolean
@@ -303,6 +321,8 @@ export function adminHofZeile(
     gruendungsplatz: hof.approvedAt && !hof.archivedAt ? platz : null,
     // Nur ein Hof im Rennen kann ausgenommen sein; ein stillgelegter trägt die Marke nicht.
     gruendungAusgenommen: hof.approvedAt !== null && hof.archivedAt === null && hof.gruendungAusgenommen,
+    gruendungFest: hof.gruendungFest === true,
+    freischaltHinweis: hof.approvedAt === null ? (hof.freischaltHinweis ?? null) : null,
     stripeBereit: hof.stripeBereit,
     stripeFehlt: stripeFehlt(hof),
     onlineAn: hof.onlineAn,

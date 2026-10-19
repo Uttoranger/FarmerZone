@@ -14,8 +14,9 @@
  *  - „Erneut senden": Bremse in der Datenbank — zweimal hintereinander geht
  *    nur einmal, zwei gleichzeitige Klicks ergeben genau eine Mail.
  *  - Upload-Sperre und Freigabe lesen den FRISCHEN Stand: Nach dem Bestätigen
- *    gibt die Upload-Route die Hof-Kennung sofort heraus, obwohl die Sitzung
- *    (Cookie-Cache) noch „unbestätigt" sagt.
+ *    gibt die Upload-Route die Hof-Kennung sofort heraus. Seit Nr. 114 ist der
+ *    Cookie-Cache aus (Register E7): Auch die Sitzung sagt sofort „bestätigt",
+ *    wie die Datenbank (Gegenprobe in beiden Richtungen).
  *  - Ein bestätigter Hof bekommt trotzdem keinen Anmeldecode (E7 bleibt).
  *  - Konten vor dem Stichtag bleiben unberührt: kein „Erneut senden",
  *    Upload frei.
@@ -239,13 +240,15 @@ describe('Erneut senden — Bremse in der Datenbank', () => {
     expect(versand.links).toHaveLength(1)
   })
 
-  it('nach dem Bestätigen: keine Mail mehr, auch wenn die Sitzung noch „unbestätigt" sagt', async () => {
+  it('nach dem Bestätigen: keine Mail mehr — die Sitzung sagt sofort „bestätigt" (E7, Nr. 114)', async () => {
     const { id } = await neuerHof()
     await arbeiteNachlaufAb()
     expect(await aktionen.bestaetigeEmail({ token: tokenAus(versand.links[0]?.link ?? '') })).toEqual({ ok: true })
     versand.links.length = 0
 
-    expect((await auth.api.getSession({ headers: anfrage.headers }))?.user.emailVerified).toBe(false)
+    // Die Sitzung ist frisch: derselbe Stand wie in der Datenbank, ohne neue Anmeldung.
+    expect((await prisma.user.findUniqueOrThrow({ where: { id } })).emailVerified).toBe(true)
+    expect((await auth.api.getSession({ headers: anfrage.headers }))?.user.emailVerified).toBe(true)
     expect(await aktionen.sendeBestaetigungErneut()).toEqual({ ok: true, schonBestaetigt: true })
     await arbeiteNachlaufAb()
     expect(versand.links).toHaveLength(0)
@@ -349,14 +352,17 @@ describe('Nachbesserung Runde 1: Bestätigung per Link nur für Höfe (Pre-Hijac
 })
 
 describe('Upload-Sperre nach frischem Stand', () => {
-  it('vor dem Bestätigen keine Hof-Kennung, danach sofort — trotz veralteter Sitzung', async () => {
-    await neuerHof(NACH_STICHTAG, true)
+  it('vor dem Bestätigen keine Hof-Kennung, danach sofort — die Sitzung ist frisch (E7, Nr. 114)', async () => {
+    const { id } = await neuerHof(NACH_STICHTAG, true)
     await arbeiteNachlaufAb()
 
+    expect((await auth.api.getSession({ headers: anfrage.headers }))?.user.emailVerified).toBe(false)
     expect((await kennungGET()).status).toBe(403)
 
     expect(await aktionen.bestaetigeEmail({ token: tokenAus(versand.links[0]?.link ?? '') })).toEqual({ ok: true })
-    expect((await auth.api.getSession({ headers: anfrage.headers }))?.user.emailVerified).toBe(false)
+    // Ohne neue Anmeldung: Sitzung und Datenbank sagen sofort „bestätigt".
+    expect((await prisma.user.findUniqueOrThrow({ where: { id } })).emailVerified).toBe(true)
+    expect((await auth.api.getSession({ headers: anfrage.headers }))?.user.emailVerified).toBe(true)
     const antwort = await kennungGET()
     expect(antwort.status).toBe(200)
     expect(await antwort.json()).toMatchObject({ farmId: expect.any(String) })

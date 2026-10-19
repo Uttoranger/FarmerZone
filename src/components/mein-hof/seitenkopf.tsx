@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils'
  * „Kundenansicht" zeigt die Vorschau der echten Hofseite (?vorschau=1) — sie
  * geht auch vor der Freigabe, nur für den Besitzer (ansichtsModus). Unter lg
  * schaltet der Knopf seit Nr. 49 (Register N4) auf „So sieht’s die Kundin"
- * (kundenansicht-knopf.tsx, Umschalter mein-hof-ansicht.tsx), ab lg öffnet er
+ * (kundenansicht-knopf.tsx, Vollbild kundenansicht-vollbild.tsx), ab lg öffnet er
  * sie in einem neuen Tab. Teilen, Adress-Link und Kopieren nur, wenn die
  * Hofseite öffentlich ist (hofZustand) — sonst führte der Link Kundinnen ins
  * Leere. Die Reiter sind seit Nr. 49 ein eigener Baustein (reiter-leiste.tsx),
@@ -111,7 +111,7 @@ export function MeinHofSeitenkopf({
   if (!hof) return null
 
   return (
-    // Unter lg folgt direkt der Umschalter (mein-hof-ansicht.tsx), ab lg der Inhalt.
+    // Unter lg folgt direkt der Inhalt des Reiters (mein-hof-ansicht.tsx), ab lg mit 24 px Abstand.
     <header className="mb-0 print:hidden lg:mb-6">
       {/* ===== Unter lg: Karte mit Titelbild-Streifen ===== */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card lg:hidden">

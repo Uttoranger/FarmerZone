@@ -9,6 +9,7 @@ import {
   STAND_TEXT,
   STUFEN,
   TARIF_ZEILEN,
+  VERCEL_USAGE_HREF,
   VERLAUF_TAGE,
   prozentText,
   verlaufAchse,
@@ -19,6 +20,7 @@ import {
   type KachelId,
   type OhneVerwendungKarte,
   type OhneVerwendungZeile,
+  type VercelAusgabenKarte,
   type VerlaufLinie,
   type WarnEintrag,
 } from '@/lib/betrieb'
@@ -135,7 +137,8 @@ function KachelKarte({ kachel: k, ohneVerwendung }: { kachel: Kachel; ohneVerwen
         <span className={cn('text-[13px]', LEISE)}>{k.von}</span>
         {k.prozent && <span className={cn('ml-auto hidden text-[15px] font-semibold tabular-nums lg:inline', tonText(k.warnt))}>{k.prozent}</span>}
       </div>
-      <GrenzBalken titel={k.titel} anteil={k.anteil} warnt={k.warnt} />
+      {/* Ohne feste Grenze (Vercel Pro, Nr. 113): kein Balken, dafür der Satz. */}
+      {k.ohneGrenze ? <p className={cn('text-[12.5px] leading-snug', LEISE)}>{k.ohneGrenze}</p> : <GrenzBalken titel={k.titel} anteil={k.anteil} warnt={k.warnt} />}
       {k.hinweis && <p className="text-[12.5px] leading-snug text-status-offen">{k.hinweis}</p>}
       <p className="hidden text-[12.5px] leading-snug break-words text-foreground lg:block">{k.zeile}</p>
       <p className={cn('hidden text-[12px] leading-snug lg:block', LEISE)}>{k.satz}</p>
@@ -387,6 +390,30 @@ export function TarifeInhalt({ stripeMarke }: { stripeMarke: StripeMarke | null 
         </div>
       </dl>
       <p className={cn('border-t border-border pt-3 text-[12.5px] leading-snug', LEISE)}>{BETRIEB_TEXT.tarifeFuss}</p>
+    </>
+  )
+}
+
+/**
+ * Die Karte „Vercel-Ausgaben“ (Nr. 113; nach dem Muster „Tarife und
+ * Grenzen“): die letzte Meldung von Spend Management bzw. „Unter 50 % …“,
+ * dazu der Link nach Vercel › Usage. Ab 1024 px in einer Karte, am Handy in
+ * einer Klappkarte.
+ */
+export function VercelAusgabenInhalt({ karte }: { karte: VercelAusgabenKarte }): React.JSX.Element {
+  return (
+    <>
+      <p className="text-[13.5px] leading-snug break-words text-foreground">{karte.satz}</p>
+      <a
+        href={VERCEL_USAGE_HREF}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn('inline-flex min-h-11 items-center gap-1.5 self-start rounded-md text-[13px] font-semibold text-status-fertig underline-offset-2 hover:underline', FOKUS_RAHMEN)}
+      >
+        {BETRIEB_TEXT.vercelLink}
+        <ExternalLink className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+        <span className="sr-only">{BETRIEB_TEXT.neuerTab}</span>
+      </a>
     </>
   )
 }

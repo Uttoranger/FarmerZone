@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import {
   MESS_ARTEN,
+  MESS_BEGINN_ART,
   VERLAUF_TAGE,
   TREND_TAGE,
   betriebHinweis,
@@ -56,10 +57,15 @@ export async function ladeMessungenFuerPruefung(jetzt: Date): Promise<Messung[]>
   return ladeMessungenAb(ab)
 }
 
-/** Wann zuletzt gemessen wurde (nur, was `messeBetrieb` schreibt — der Mail-Zähler zählt nicht). */
-export async function letzteMessungAm(): Promise<Date | null> {
+/**
+ * Wann zuletzt gemessen wurde (nur, was `messeBetrieb` schreibt — der
+ * Mail-Zähler zählt nicht). `mitBeginn`: auch der Merker von „Jetzt messen“
+ * (Nr. 113) — dann sagt die Zeit, warum gerade nicht neu gemessen wird, auch
+ * wenn eine Messung noch läuft.
+ */
+export async function letzteMessungAm(mitBeginn = false): Promise<Date | null> {
   const zeile = await prisma.betriebMessung.findFirst({
-    where: { art: { in: [...MESS_ARTEN] } },
+    where: { art: { in: mitBeginn ? [...MESS_ARTEN, MESS_BEGINN_ART] : [...MESS_ARTEN] } },
     orderBy: { gemessenAm: 'desc' },
     select: { gemessenAm: true },
   })

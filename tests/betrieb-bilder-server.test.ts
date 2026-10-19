@@ -12,6 +12,8 @@
  *  - „Liste als CSV“: ohne Admin 403, außerhalb der Produktion 404 — beide
  *    ohne Auflistung; sonst nur die gezählten Arten, Pfad ohne Domain,
  *    no-store, als Datei, und die Auflistung zählt als Bild-Vorgang.
+ *  - Scheitert die Auflistung (Nr. 113): 500 mit festem Satz, nach Sentry nur
+ *    die Klasse unter einem festen Satz, ohne Anfrage-Daten (`ohneAnfrage`).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Prisma } from '@prisma/client'
@@ -50,6 +52,7 @@ import { list } from '@vercel/blob'
 import * as Sentry from '@sentry/nextjs'
 import { messeBetrieb } from '@/server/betrieb'
 import { GET as bilderExport } from '@/app/admin/betrieb/bilder-export/route'
+import { ohneAnfrage } from '@/lib/sentry-hygiene'
 
 const JETZT = new Date('2026-10-16T04:05:00.000Z')
 const SPEICHER = 'https://speicher.public.blob.vercel-storage.com'
@@ -188,9 +191,26 @@ describe('„Liste als CSV“ (/admin/betrieb/bilder-export)', () => {
     expect(antwort.headers.get('Cache-Control')).toBe('no-store')
     expect(antwort.headers.get('Content-Disposition')).toBe('attachment; filename="bilder-ohne-verwendung-2026-10-16.csv"')
     const text = await antwort.text()
-    expect(text.replace(/^﻿/, '').trim().split('\r\n')).toEqual(['Art;Pfad;Größe (Bytes);hochgeladen', 'Produktfotos;farms/hofa/product/alt.webp;4000;2026-08-03'])
+    expect(text.replace(/^\uFEFF/, '').trim().split('\r\n')).toEqual(['Art;Pfad;Größe (Bytes);hochgeladen', 'Produktfotos;farms/hofa/product/alt.webp;4000;2026-08-03'])
     expect(text).not.toContain(SPEICHER)
     // Die zwei Seiten der Auflistung zählen als Bild-Vorgänge.
     expect(werteVon(db.$executeRaw.mock.calls[0])).toEqual(['2026-10-16', 2, JETZT])
+  })
+
+  it('scheitert die Auflistung: 500 mit festem Satz, kein Inhalt — Sentry nur mit Klasse unter festem Satz, ohne Anfrage-Daten', async () => {
+    vi.mocked(list)
+      .mockReset()
+      .mockRejectedValueOnce(Object.assign(new Error(`${SPEICHER}/farms/hofa/product/alt.webp nicht lesbar`), { name: 'BlobServiceNotAvailable' }))
+    const antwort = await bilderExport()
+
+    expect(antwort.status).toBe(500)
+    expect(antwort.headers.get('Cache-Control')).toBe('no-store')
+    expect(await antwort.text()).toBe('Die Liste ließ sich gerade nicht erstellen. Versuch es in ein paar Minuten noch einmal.')
+    const [fehler, kontext] = vi.mocked(Sentry.captureException).mock.calls[0] as unknown as [Error, (scope: unknown) => unknown]
+    expect([fehler.name, fehler.message]).toEqual(['BlobServiceNotAvailable', 'Betrieb: Liste der Bilder ohne Verwendung gescheitert'])
+    const scope = { setLevel: vi.fn(() => scope), setTags: vi.fn(() => scope), addEventProcessor: vi.fn(() => scope) }
+    kontext(scope)
+    expect(scope.setTags).toHaveBeenCalledWith({ bereich: 'betrieb', quelle: 'bilderExport' })
+    expect(scope.addEventProcessor).toHaveBeenCalledWith(ohneAnfrage)
   })
 })
