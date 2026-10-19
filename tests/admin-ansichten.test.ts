@@ -53,7 +53,7 @@ import { GruendungBisDialog } from '@/components/admin/gruendung-bis-dialog'
 import { GruendungAusnehmenDialog } from '@/components/admin/gruendung-ausnehmen-dialog'
 import { GRUENDUNG_AUSNEHMEN_TEXT, gruendungAenderung } from '@/lib/admin-hoefe-seite'
 import { adminHofZeile, FREISCHALTUNG_STRIPE_OFFEN_TEXT, type HofRohdaten } from '@/lib/admin-hoefe'
-import { GRUENDUNG_BIS_STANDARD, gruendungsKonditionenText, type GruendungAnzeige } from '@/lib/gruendungshof'
+import { GRUENDUNG_BIS_STANDARD, GRUENDUNG_EINSTELLUNG_STANDARD, freischaltHinweis, gruendungsKonditionenText, type GruendungAnzeige } from '@/lib/gruendungshof'
 
 const JETZT = new Date('2026-10-07T10:00:00+02:00')
 const LEER = { produkte: 0, fotos: 0, abholzeiten: 0, hatBeschreibung: false, hatLogo: false }
@@ -85,6 +85,7 @@ function hof(ueber: Partial<HofRohdaten>, platz: number | null = null, gruendung
     betriebsnummer: null,
     sepaErteilt: false,
     gruendungAusgenommen: false,
+    produktImShop: true,
     ...ueber,
   }
   return { ...adminHofZeile(roh, { gruendungsplatz: platz, maxPlaetze: 12 }, JETZT), aktivitaet: { ...LEER, produkte: 2 }, gruendung, platzBeiFreischaltung, gruendungAenderung: null, gruendungZuletzt: null }
@@ -166,8 +167,8 @@ describe('Höfe und Freischaltung', () => {
 })
 
 describe('Gründungshof bis (Nr. 62, Register K2)', () => {
-  const STANDARD: GruendungAnzeige = { bisTag: '2027-12-31', bisText: '31.\u00a0Dezember 2027', abweichend: false }
-  const EIGENES: GruendungAnzeige = { bisTag: '2028-06-30', bisText: '30.\u00a0Juni 2028', abweichend: true }
+  const STANDARD: GruendungAnzeige = { bisTag: '2027-12-31', bisText: '31.\u00a0Dezember 2027', abweichend: false, standardTag: '2027-12-31' }
+  const EIGENES: GruendungAnzeige = { bisTag: '2028-06-30', bisText: '30.\u00a0Juni 2028', abweichend: true, standardTag: '2027-12-31' }
   const online = { approvedAt: JETZT, stripeBereit: true }
 
   it('Tabelle und Karte zeigen das wirksame Ende mit „Standard" bzw. „abweichend"', () => {
@@ -191,9 +192,15 @@ describe('Gründungshof bis (Nr. 62, Register K2)', () => {
     expect(html).toContain('kein Gründungshof')
   })
 
+  /** n freigeschaltete Höfe der Platzvergabe — der Hinweis im Dialog kommt seit Nr. 116 fertig vom Server (freischaltHinweis). */
+  const imRennen = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ id: `h_${i}`, approvedAt: new Date(Date.UTC(2026, 0, 1 + i)), createdAt: new Date(Date.UTC(2025, 0, 1)), archivedAt: null, gruendungAusgenommen: false }))
+  const wartend = { id: 'neu', gruendungPlatz: null, gruendungBis: null, gruendungAusgenommen: false }
+
   it('der Freischalt-Dialog nennt die Zusage K2 mit dem Standard-Ende — ohne „dauerhaft" und ohne Prozent', () => {
+    const hinweis = freischaltHinweis(wartend, imRennen(3), GRUENDUNG_EINSTELLUNG_STANDARD, JETZT)
     const html = renderToStaticMarkup(
-      createElement(HofAktionDialog, { aktion: { hof: hof({ stripeBereit: true }), art: 'approve' }, vergebenePlaetze: 3, onClose: () => {} })
+      createElement(HofAktionDialog, { aktion: { hof: hof({ stripeBereit: true, approvedAt: null, freischaltHinweis: hinweis }), art: 'approve' }, onClose: () => {} })
     )
     expect(html).toContain('Gründungshof Nr. 4')
     expect(html).toContain(gruendungsKonditionenText(GRUENDUNG_BIS_STANDARD))
@@ -202,8 +209,9 @@ describe('Gründungshof bis (Nr. 62, Register K2)', () => {
   })
 
   it('Gegenprobe: alle Plätze vergeben — keine Zusage im Freischalt-Dialog', () => {
+    const hinweis = freischaltHinweis(wartend, imRennen(12), GRUENDUNG_EINSTELLUNG_STANDARD, JETZT)
     const html = renderToStaticMarkup(
-      createElement(HofAktionDialog, { aktion: { hof: hof({ stripeBereit: true }), art: 'approve' }, vergebenePlaetze: 12, onClose: () => {} })
+      createElement(HofAktionDialog, { aktion: { hof: hof({ stripeBereit: true, approvedAt: null, freischaltHinweis: hinweis }), art: 'approve' }, onClose: () => {} })
     )
     expect(html).toContain('Alle 12 Gründungsplätze sind vergeben')
     expect(html).not.toContain(gruendungsKonditionenText(GRUENDUNG_BIS_STANDARD))
@@ -229,8 +237,8 @@ describe('Gründungshof bis (Nr. 62, Register K2)', () => {
 
 describe('Seitenmuster der Höfe (Nr. 94, Register N15)', () => {
   const online = { approvedAt: JETZT, stripeBereit: true }
-  const STANDARD: GruendungAnzeige = { bisTag: '2027-12-31', bisText: '31.\u00a0Dezember 2027', abweichend: false }
-  const EIGENES: GruendungAnzeige = { bisTag: '2027-06-30', bisText: '30.\u00a0Juni 2027', abweichend: true }
+  const STANDARD: GruendungAnzeige = { bisTag: '2027-12-31', bisText: '31.\u00a0Dezember 2027', abweichend: false, standardTag: '2027-12-31' }
+  const EIGENES: GruendungAnzeige = { bisTag: '2027-06-30', bisText: '30.\u00a0Juni 2027', abweichend: true, standardTag: '2027-12-31' }
 
   /** Wie im Mockup: zwei online (Platz 1 und 2), einer pausiert (Platz 3, eigenes Ende), einer ohne Stripe (kein Platz), zwei wartend. */
   function bestand(wartenderPlatz: number | null = 4): AdminHof[] {

@@ -44,7 +44,16 @@ import { cn } from '@/lib/utils'
  * steht der Übergang wie in Fassung 1 als grüne Hinweiskarte (nach dem
  * Stichtag: Gate 8).
  */
-export function KonditionenAnsicht({ hof, jetzt }: { hof: KonditionenHof; jetzt: Date }): React.JSX.Element {
+export function KonditionenAnsicht({
+  hof,
+  jetzt,
+  abzeichen = null,
+}: {
+  hof: KonditionenHof
+  jetzt: Date
+  /** Der Schalter „Abzeichen zeigen“ im Block „Dein Stand“ (Register K2, Nr. 116) — nur für Gründungshöfe, sonst null. */
+  abzeichen?: React.ReactNode
+}): React.JSX.Element {
   const beispiel = konditionenRechenbeispiel(hof, jetzt)
   const seite = baueKonditionenSeite(hof, jetzt)
 
@@ -55,7 +64,7 @@ export function KonditionenAnsicht({ hof, jetzt }: { hof: KonditionenHof; jetzt:
       <div className="flex flex-col gap-5 md:gap-6">
         {/* Vor den Preisen, damit keiner als heute fällig gelesen wird (Register K1). */}
         {seite.stand ? (
-          <DeinStandKarte stand={seite.stand} />
+          <DeinStandKarte stand={seite.stand} zusatz={abzeichen} />
         ) : (
           <Hinweiskarte ton="gruen" symbol={Info}>
             <p className="font-medium">{KONDITIONEN_UEBERGANG}</p>
@@ -138,7 +147,7 @@ function HakenZeile({ children }: { children: React.ReactNode }): React.JSX.Elem
 }
 
 /** „Dein Stand": wo der Hof steht, seine Sätze (beim Gründungshof die Zusage), darunter der Übergang K1 wörtlich. */
-function DeinStandKarte({ stand }: { stand: DeinStand }): React.JSX.Element {
+function DeinStandKarte({ stand, zusatz = null }: { stand: DeinStand; zusatz?: React.ReactNode }): React.JSX.Element {
   return (
     <Hinweiskarte ton="gruen" className="rounded-[18px] p-4 md:px-[22px] md:py-[18px]">
       <div className="flex flex-col gap-3">
@@ -158,6 +167,7 @@ function DeinStandKarte({ stand }: { stand: DeinStand }): React.JSX.Element {
             </HakenZeile>
           ))}
         </ul>
+        {zusatz}
         {/* Normale Textfarbe wie in jeder Hinweiskarte: Leise Schrift hielte auf der Tönung im hellen Thema keine 4,5:1. */}
         <p className="border-t border-status-fertig/20 pt-2.5 text-[12px] leading-normal text-foreground">{KONDITIONEN_UEBERGANG}</p>
       </div>

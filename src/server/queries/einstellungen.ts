@@ -53,7 +53,7 @@ export async function ladeEinstellungenUebersicht(ownerId: string): Promise<Eins
 }
 
 /** Was „im Shop" heißt (produkt-sichtbarkeit.ts: Schalter „Im Shop") — Tarif-Zeile und Vergleich zählen gleich. */
-const IM_SHOP_WHERE = { isAvailable: true } as const
+export const IM_SHOP_WHERE = { isAvailable: true } as const
 
 /**
  * Die gespeicherten Sätze des eigenen Hofs für /settings/konditionen — als

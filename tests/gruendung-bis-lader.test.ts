@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const db = vi.hoisted(() => ({ farm: { findUnique: vi.fn(), findMany: vi.fn() } }))
+const db = vi.hoisted(() => ({ farm: { findUnique: vi.fn(), findMany: vi.fn() }, plattformEinstellung: { findUnique: vi.fn(async () => null) } }))
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
 
 import { ladeGruendungBis } from '@/server/queries/admin'
@@ -61,8 +61,9 @@ describe('ladeGruendungBis', () => {
     await ladeGruendungBis({ id: 'hof_1' })
     expect(db.farm.findMany).toHaveBeenCalledTimes(1)
     const abfrage = db.farm.findMany.mock.calls[0]?.[0]
-    expect(abfrage.where).toEqual({ approvedAt: { not: null }, archivedAt: null })
-    expect(Object.keys(abfrage.select).sort()).toEqual(['approvedAt', 'archivedAt', 'createdAt', 'gruendungAusgenommen', 'gruendungBis', 'id', 'ownerId'])
+    // Seit Nr. 116 auch jeder Hof mit festgeschriebenem Platz (stillgelegt oder zurückgenommen, er hält ihn).
+    expect(abfrage.where).toEqual({ OR: [{ approvedAt: { not: null }, archivedAt: null }, { gruendungPlatz: { not: null } }] })
+    expect(Object.keys(abfrage.select).sort()).toEqual(['approvedAt', 'archivedAt', 'createdAt', 'gruendungAusgenommen', 'gruendungBis', 'gruendungPlatz', 'id', 'ownerId'])
   })
 })
 

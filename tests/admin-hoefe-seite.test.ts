@@ -60,6 +60,7 @@ function roh(id: string, ueber: Partial<HofRohdaten> = {}): HofRohdaten {
     betriebsnummer: null,
     sepaErteilt: false,
     gruendungAusgenommen: false,
+    produktImShop: true,
     ...ueber,
   }
 }
@@ -200,8 +201,8 @@ describe('Warteliste: Gründungsplatz bei Freischaltung', () => {
 })
 
 describe('Spalte Gründungshof', () => {
-  const standard = { bisTag: '2027-12-31', bisText: '31. Dezember 2027', abweichend: false }
-  const eigenes = { bisTag: '2027-06-30', bisText: '30. Juni 2027', abweichend: true }
+  const standard = { bisTag: '2027-12-31', bisText: '31. Dezember 2027', abweichend: false, standardTag: '2027-12-31' }
+  const eigenes = { bisTag: '2027-06-30', bisText: '30. Juni 2027', abweichend: true, standardTag: '2027-12-31' }
 
   it('„Nr. 3 · bis 30.06.2027“ mit der Marke „abweichend“', () => {
     expect(gruendungshofZelle({ gruendungsplatz: 3, gruendung: eigenes })).toEqual({ text: 'Nr. 3 · bis 30.06.2027', marke: 'abweichend' })

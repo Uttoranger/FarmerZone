@@ -130,7 +130,8 @@ describe('nimmAusGruendung', () => {
     sperreVorLesen()
     expect(db.farm.updateMany).toHaveBeenCalledWith({
       where: { id: 'hof_2', gruendungAusgenommen: false, approvedAt: { not: null }, archivedAt: null },
-      data: { gruendungAusgenommen: true, gruendungGeaendertAm: expect.any(Date), gruendungGeaendertVonUserId: 'admin_1' },
+      // Festgeschrieben gibt das Ausnehmen den Platz frei (Nr. 116); vorher ist er ohnehin null.
+      data: { gruendungAusgenommen: true, gruendungPlatz: null, gruendungGeaendertAm: expect.any(Date), gruendungGeaendertVonUserId: 'admin_1' },
     })
     for (const pfad of PFADE) expect(revalidatePath).toHaveBeenCalledWith(pfad)
     // Keine Nachricht, keine Mail (K2).
@@ -203,6 +204,8 @@ describe('approveFarmAction nimmt dieselbe Sperre', () => {
       slug: 'testhof-a',
       stripeAccountReady: true,
       owner: { email: 'hof@example.com', emailVerified: true, createdAt: new Date('2026-01-01T00:00:00Z') },
+      // Seit Nr. 116: mindestens ein Produkt im Shop.
+      products: [{ id: 'p_1' }],
     })
   })
 
@@ -215,7 +218,7 @@ describe('approveFarmAction nimmt dieselbe Sperre', () => {
     expect(sperre).toBeLessThan(schreiben)
     expect(schreiben).toBeLessThan(db.farm.findMany.mock.invocationCallOrder[0] ?? 0)
     expect(db.farm.updateMany).toHaveBeenCalledWith({
-      where: { id: 'neu', stripeAccountReady: true, approvedAt: null },
+      where: { id: 'neu', stripeAccountReady: true, approvedAt: null, products: { some: { isAvailable: true } } },
       data: { approvedAt: expect.any(Date) },
     })
     // Mit Platz (2 von 12): die eine Gründungs-Nachricht.

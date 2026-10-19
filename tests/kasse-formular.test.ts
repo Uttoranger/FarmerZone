@@ -99,6 +99,9 @@ const HOF: PublicFarm = {
   serviceFeeMinCents: 50,
   serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
   betriebsstatus: null,
+  gruendungshof: false,
+  gruendungSeit: null,
+  abzeichenBlatt: null,
   products: [],
   pickupSlots: [{ dayOfWeek: 6, startTime: '14:00', endTime: '16:00' }],
 }

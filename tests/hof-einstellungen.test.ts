@@ -35,7 +35,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
 }))
 
-const db = vi.hoisted(() => ({ farm: { findUnique: vi.fn(), findMany: vi.fn() } }))
+const db = vi.hoisted(() => ({ farm: { findUnique: vi.fn(), findMany: vi.fn() }, plattformEinstellung: { findUnique: vi.fn(async () => null) } }))
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
 
 import {

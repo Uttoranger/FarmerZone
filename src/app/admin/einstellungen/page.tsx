@@ -2,10 +2,8 @@ import type { Metadata } from 'next'
 import * as Sentry from '@sentry/nextjs'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { prisma } from '@/lib/prisma'
-import { lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
-import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
-import { bildeGruendungBis, gruendungsplaetze, seitenZahlen, zaehleAusgenommene } from '@/lib/gruendungshof'
-import { EINSTELLUNGEN_TEXT, gruendungZeileKurz, protokollZeile, ADMIN_EINSTELLUNGEN_HREF } from '@/lib/plattform-einstellung'
+import { gruendungZahlenAdmin, ladeGruendungStandAdmin, lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
+import { EINSTELLUNGEN_TEXT, festgeschriebenZeile, gruendungZeileKurz, protokollZeile, ADMIN_EINSTELLUNGEN_HREF } from '@/lib/plattform-einstellung'
 import { einstellungenGruppeSchema } from '@/schemas/plattform-einstellung'
 import { cn } from '@/lib/utils'
 import { ADMIN_RAHMEN, AdminFehler, SEITEN_TITEL } from '@/components/admin/admin-teile'
@@ -19,24 +17,31 @@ export const metadata: Metadata = { title: `Einstellungen — Admin — ${MARKE}
 export const dynamic = 'force-dynamic'
 
 async function ladeDaten(gewaehlt: EinstellungenDaten['gewaehlt'], jetzt: Date): Promise<EinstellungenDaten> {
-  const [einstellung, hoefe] = await Promise.all([lesePlattformEinstellung(), ladeHoefeFuerGruendung()])
+  const einstellung = await lesePlattformEinstellung()
+  const stand = await ladeGruendungStandAdmin(einstellung)
   // Wer zuletzt gespeichert hat — nur der Name, für die Protokollzeile (N15).
   const person = einstellung.geaendertVonUserId
     ? await prisma.user.findUnique({ where: { id: einstellung.geaendertVonUserId }, select: { name: true } })
     : null
-  const imRennen = gruendungsplaetze(hoefe).size
-  const gespeichert = { plaetze: einstellung.gruendungPlaetze, bisTag: einstellung.gruendungBisTag, anzeige: einstellung.gruendungAnzeige }
-  const zahlen = seitenZahlen({ plaetze: gespeichert.plaetze, bis: bildeGruendungBis(gespeichert.bisTag), anzeige: gespeichert.anzeige }, imRennen, jetzt)
+  const zahlen = gruendungZahlenAdmin(einstellung, stand.vergeben, jetzt)
   return {
     gewaehlt,
+    // Nr. 116: Felder der Aktion und die Liste fürs Festschreiben (ladeGruendungStandAdmin).
     gruendung: {
-      gespeichert,
-      imRennen,
-      ausgenommen: zaehleAusgenommene(hoefe),
+      gespeichert: {
+        plaetze: einstellung.gruendungPlaetze,
+        monate: einstellung.gruendungMonate,
+        aktionBisTag: einstellung.gruendungAktionBisTag,
+        anzeige: einstellung.gruendungAnzeige,
+        bisTag: einstellung.gruendungBisTag,
+        festAm: einstellung.gruendungFestAm,
+      },
+      ...stand,
       jetzt: jetzt.toISOString(),
       protokoll: protokollZeile(einstellung, person?.name ?? null),
+      festgeschrieben: festgeschriebenZeile(einstellung),
     },
-    gruendungZeile: gruendungZeileKurz(zahlen.gesamt, zahlen.frei, zahlen.bisTag),
+    gruendungZeile: gruendungZeileKurz(zahlen),
   }
 }
 

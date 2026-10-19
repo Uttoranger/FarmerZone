@@ -537,6 +537,16 @@ model Farm {
   gruendungGeaendertAm        DateTime?
   gruendungGeaendertVonUserId String?
 
+  // Aktion „100 Gründungshöfe“ (Register K2, Änderung 19.10.2026, Nr. 116):
+  // der festgeschriebene Gründungsplatz (1 … Plätze; eindeutig, damit nie zwei
+  // Höfe dieselbe Nummer tragen) — gesetzt beim Festschreiben bzw. bei der
+  // Freischaltung, frei nur beim Ausnehmen; Stilllegen und Freigabe entziehen
+  // ändern ihn nicht. null = kein Platz (Expand, kein Backfill). Verlässt den
+  // Server nie Richtung Browser (öffentlich nur „Gründungshof ja/nein“).
+  // gruendungAbzeichenZeigen: der Hof blendet das Abzeichen selbst aus.
+  gruendungPlatz           Int?    @unique
+  gruendungAbzeichenZeigen Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1235,6 +1245,13 @@ model PlattformEinstellung {
   gruendungPlaetze     Int      @default(12)
   gruendungBisStandard DateTime @default(dbgenerated("'2027-12-31'::date")) @db.Date
   gruendungAnzeige     Boolean  @default(true)
+  // Aktion „100 Gründungshöfe“ (Nr. 116): Monate ohne Grundgebühr je neuer
+  // Zusage (nur erhöhen), Stichtag „Aktion bis“ (einmal gesetzt nur früher;
+  // null = ohne Stichtag) und wann die Zusagen festgeschrieben wurden (null =
+  // noch nicht: alles läuft wie vor Nr. 116).
+  gruendungMonate      Int       @default(24)
+  gruendungAktionBis   DateTime? @db.Date
+  gruendungFestAm      DateTime?
   zustellRegeln        Json?
   geaendertVonUserId   String?
   updatedAt            DateTime @updatedAt

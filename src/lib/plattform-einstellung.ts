@@ -9,17 +9,22 @@
  * hier — und die sind die Konstanten aus gruendungshof.ts. Geschrieben wird
  * nur aus der Admin-Action (src/server/actions/plattform-einstellung.ts).
  *
- * Die Prüfungen (Plätze ≥ vergeben, Ende ≥ heute) sind reine Funktionen mit
- * festen Sätzen: dieselben im Formular (sofort) und in der Action (Schutz).
- * Bis zur Nacharbeit sind Plätze und Standard-Ende gesperrt
- * (`pruefeGruendungSperre`); schaltbar ist nur die Anzeige.
+ * Die Prüfungen sind reine Funktionen mit festen Sätzen: dieselben im
+ * Formular (sofort) und in der Action (Schutz, mit dem Stand nach der Sperre).
+ * Seit Nr. 116 (Register K2, Aktion „100 Gründungshöfe“): Plätze nur erhöhen
+ * und nie unter die vergebenen, Monate nur erhöhen (mehr nur, solange die
+ * Aktion nicht vorbei ist), „Aktion bis“ einmal gesetzt nur noch früher. Das
+ * Standard-Ende bleibt für die Übernahme stehen und ist nicht mehr änderbar.
  */
 import {
   GRUENDUNG_BIS_STANDARD_TAG,
+  GRUENDUNG_MONATE_STANDARD,
   MAX_GRUENDUNGSHOEFE,
+  aktionLaeuft,
   bildeGruendungBis,
   gruendungTagKurz,
   type GruendungEinstellung,
+  type GruendungZahlen,
 } from '@/lib/gruendungshof'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
 import { MARKE } from '@/lib/marke'
@@ -40,6 +45,12 @@ export type PlattformEinstellung = {
   gruendungPlaetze: number
   gruendungBisTag: string
   gruendungAnzeige: boolean
+  /** Aktion (Nr. 116): Monate je neuer Zusage. */
+  gruendungMonate: number
+  /** Stichtag „Aktion bis“ als Wiener Kalendertag; null = ohne Stichtag. */
+  gruendungAktionBisTag: string | null
+  /** Wann die Zusagen festgeschrieben wurden (ISO-Text); null = noch nicht — alles wie vor Nr. 116. */
+  gruendungFestAm: string | null
   /** Wer zuletzt gespeichert hat; null = noch nie (Seed-Zeile der Migration). */
   geaendertVonUserId: string | null
   /** Zeitpunkt der letzten Änderung als ISO-Text; null ohne Zeile. */
@@ -51,15 +62,33 @@ export const PLATTFORM_EINSTELLUNG_STANDARD: PlattformEinstellung = {
   gruendungPlaetze: MAX_GRUENDUNGSHOEFE,
   gruendungBisTag: GRUENDUNG_BIS_STANDARD_TAG,
   gruendungAnzeige: true,
+  gruendungMonate: GRUENDUNG_MONATE_STANDARD,
+  gruendungAktionBisTag: null,
+  gruendungFestAm: null,
   geaendertVonUserId: null,
   geaendertAm: null,
 }
+
+/** Die Spalten, die `plattformEinstellungAus` braucht — EIN Select für alle Leser. */
+export const PLATTFORM_EINSTELLUNG_SELECT = {
+  gruendungPlaetze: true,
+  gruendungBisStandard: true,
+  gruendungAnzeige: true,
+  gruendungMonate: true,
+  gruendungAktionBis: true,
+  gruendungFestAm: true,
+  geaendertVonUserId: true,
+  updatedAt: true,
+} as const
 
 /** Die Zeile aus der Datenbank → die Form der Seiten (Datum als Wiener Kalendertag). */
 export function plattformEinstellungAus(zeile: {
   gruendungPlaetze: number
   gruendungBisStandard: Date
   gruendungAnzeige: boolean
+  gruendungMonate: number
+  gruendungAktionBis: Date | null
+  gruendungFestAm: Date | null
   geaendertVonUserId: string | null
   updatedAt: Date
 }): PlattformEinstellung {
@@ -67,6 +96,9 @@ export function plattformEinstellungAus(zeile: {
     gruendungPlaetze: zeile.gruendungPlaetze,
     gruendungBisTag: kalendertagInWien(zeile.gruendungBisStandard),
     gruendungAnzeige: zeile.gruendungAnzeige,
+    gruendungMonate: zeile.gruendungMonate,
+    gruendungAktionBisTag: zeile.gruendungAktionBis ? kalendertagInWien(zeile.gruendungAktionBis) : null,
+    gruendungFestAm: zeile.gruendungFestAm ? zeile.gruendungFestAm.toISOString() : null,
     geaendertVonUserId: zeile.geaendertVonUserId,
     geaendertAm: zeile.updatedAt.toISOString(),
   }
@@ -78,6 +110,9 @@ export function gruendungEinstellungAus(einstellung: PlattformEinstellung): Grue
     plaetze: einstellung.gruendungPlaetze,
     bis: bildeGruendungBis(einstellung.gruendungBisTag),
     anzeige: einstellung.gruendungAnzeige,
+    monate: einstellung.gruendungMonate,
+    aktionBisTag: einstellung.gruendungAktionBisTag,
+    festAm: einstellung.gruendungFestAm ? new Date(einstellung.gruendungFestAm) : null,
   }
 }
 
@@ -86,53 +121,66 @@ export function gruendungEinstellungAus(einstellung: PlattformEinstellung): Grue
 /** Obergrenze des Felds „Plätze gesamt" — nur gegen Tippfehler, keine Fachregel. */
 export const GRUENDUNG_PLAETZE_MAX = 999
 
-/** Die festen Sätze der Gruppe Gründungshöfe (Freigabe §18, Nr. 93). */
+/** Obergrenze des Felds „Monate“ — nur gegen Tippfehler (zehn Jahre), keine Fachregel. */
+export const GRUENDUNG_MONATE_MAX = 120
+
+/** Die festen Sätze der Gruppe Gründungshöfe (Freigabe §18, Nr. 93; §21, Nr. 116). */
 export const GRUENDUNG_EINSTELLUNG_FEHLER = {
   weniger: (vergeben: number): string =>
     `Weniger Plätze als vergeben geht nicht – ${vergeben} ${vergeben === 1 ? 'ist' : 'sind'} schon vergeben. Trag mindestens ${vergeben} ein.`,
   plaetze: `Trag bei „Plätze gesamt“ eine ganze Zahl von 0 bis ${GRUENDUNG_PLAETZE_MAX} ein.`,
-  datum: 'Wähle den letzten Tag, bis zu dem neue Gründungshöfe kostenlos sind.',
+  plaetzeNurMehr: (bisher: number): string => `Plätze lassen sich nur erhöhen – gerade sind es ${bisher}.`,
+  monate: `Trag bei „Monate“ eine ganze Zahl von 1 bis ${GRUENDUNG_MONATE_MAX} ein.`,
+  monateNurMehr: (bisher: number): string => `Die Monate lassen sich nur erhöhen – gerade sind es ${bisher}.`,
+  monateVorbei: 'Die Aktion ist vorbei – mehr Monate gehen nur, solange sie läuft.',
+  datum: 'Wähle den letzten Tag der Aktion.',
   vergangen: 'Dieser Tag ist schon vorbei. Wähle heute oder einen späteren Tag.',
-  gesperrt: `„Plätze gesamt“ und „Kostenlos bis“ bleiben vorerst bei ${MAX_GRUENDUNGSHOEFE} und ${gruendungTagKurz(GRUENDUNG_BIS_STANDARD_TAG)} – sonst nennen die Konditionen der Höfe andere Zahlen als die Seiten. Umschalten kannst du nur „Auf den Seiten zeigen“.`,
+  /** Wortlaut der Freigabe (§21, Nr. 116, Punkt 5). */
+  nieNachHinten: 'Nie nach hinten schieben – sonst ist die Werbung irreführend.',
   ungueltig: 'Wir konnten die Eingabe nicht lesen. Lade die Seite neu und versuch es noch einmal.',
 } as const
 
-/** Eine Eingabe der Gruppe Gründungshöfe, wie Formular und Action sie prüfen. */
-export type GruendungEingabe = { plaetze: number; bisTag: string; anzeige: boolean }
+/** Eine Eingabe der Gruppe Gründungshöfe, wie Formular und Action sie prüfen. `aktionBisTag` leer = ohne Stichtag. */
+export type GruendungEingabe = { plaetze: number; monate: number; aktionBisTag: string | null; anzeige: boolean }
+
+/** Ein gültiger Kalendertag JJJJ-MM-TT? Die Form allein ließe den 30. Februar durch. */
+function istKalendertag(tag: string): boolean {
+  const mitternacht = /^\d{4}-\d{2}-\d{2}$/.test(tag) ? wienerMitternacht(tag) : null
+  return mitternacht !== null && kalendertagInWien(mitternacht) === tag
+}
 
 /**
- * Die Regeln der Gruppe Gründungshöfe: Plätze gesamt nicht unter den
- * vergebenen (wer einen Platz hat, behält ihn — Register K1/K2) und das
- * Standard-Ende nicht vor dem heutigen WIENER Tag. Zurück kommt der erste
- * verletzte Satz oder null.
+ * Die Regeln der Gruppe Gründungshöfe (Register K2, Änderung Nr. 116) gegen
+ * den gespeicherten Stand (`bisher`, in der Action nach der Sperre gelesen)
+ * und die vergebenen Plätze: Plätze nur erhöhen, nie unter die vergebenen
+ * (wer einen Platz hat, behält ihn — K1); Monate nur erhöhen, und mehr nur,
+ * solange die Aktion nicht vorbei ist (sie gelten nur für künftige Zusagen);
+ * „Aktion bis“ einmal gesetzt nur noch früher (nie leer, nie später) und nie
+ * vor dem heutigen WIENER Tag. Zurück kommt der erste verletzte Satz oder null.
  */
-export function pruefeGruendungEingabe(eingabe: GruendungEingabe, vergeben: number, jetzt: Date): string | null {
+export function pruefeGruendungEingabe(eingabe: GruendungEingabe, bisher: GruendungEinstellung, vergeben: number, jetzt: Date): string | null {
   if (!Number.isInteger(eingabe.plaetze) || eingabe.plaetze < 0 || eingabe.plaetze > GRUENDUNG_PLAETZE_MAX) {
     return GRUENDUNG_EINSTELLUNG_FEHLER.plaetze
   }
   if (eingabe.plaetze < vergeben) return GRUENDUNG_EINSTELLUNG_FEHLER.weniger(vergeben)
-  // Die Form allein ließe den 30. Februar durch.
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(eingabe.bisTag) || wienerMitternacht(eingabe.bisTag) === null) {
-    return GRUENDUNG_EINSTELLUNG_FEHLER.datum
-  }
-  // JJJJ-MM-TT vergleicht sich als Text wie als Datum.
-  if (eingabe.bisTag < kalendertagInWien(jetzt)) return GRUENDUNG_EINSTELLUNG_FEHLER.vergangen
-  return null
-}
+  if (eingabe.plaetze < bisher.plaetze) return GRUENDUNG_EINSTELLUNG_FEHLER.plaetzeNurMehr(bisher.plaetze)
+  if (!Number.isInteger(eingabe.monate) || eingabe.monate < 1 || eingabe.monate > GRUENDUNG_MONATE_MAX) return GRUENDUNG_EINSTELLUNG_FEHLER.monate
+  if (eingabe.monate < bisher.monate) return GRUENDUNG_EINSTELLUNG_FEHLER.monateNurMehr(bisher.monate)
 
-/**
- * Die Sperre bis zur Nacharbeit (Nr. 93, Runde 1): Plätze gesamt und das
- * Standard-Ende bleiben bei den Konstanten aus gruendungshof.ts. Tarif-Zeile
- * und „Dein Stand“ (`ladeGruendungBis`), `setzeGruendungBisAction`, der
- * Freischalt-Dialog und Admin › Höfe rechnen noch fest damit — eine andere
- * Zahl gäbe einer Zusage mit Geldwert zwei Quellen (Gründungs-Nachricht und
- * Seiten nennten andere Nummern und Daten als die Konditionen). Fällt erst,
- * wenn diese Stellen die Einstellung lesen und die bestehenden Zusagen je
- * Hof festgeschrieben sind (Register K2). Geprüft NACH
- * `pruefeGruendungEingabe`, damit deren Sätze die genaueren bleiben.
- */
-export function pruefeGruendungSperre(eingabe: Pick<GruendungEingabe, 'plaetze' | 'bisTag'>): string | null {
-  return eingabe.plaetze === MAX_GRUENDUNGSHOEFE && eingabe.bisTag === GRUENDUNG_BIS_STANDARD_TAG ? null : GRUENDUNG_EINSTELLUNG_FEHLER.gesperrt
+  if (eingabe.aktionBisTag !== bisher.aktionBisTag) {
+    if (eingabe.aktionBisTag === null) return GRUENDUNG_EINSTELLUNG_FEHLER.nieNachHinten
+    if (!istKalendertag(eingabe.aktionBisTag)) return GRUENDUNG_EINSTELLUNG_FEHLER.datum
+    if (bisher.aktionBisTag !== null && eingabe.aktionBisTag > bisher.aktionBisTag) return GRUENDUNG_EINSTELLUNG_FEHLER.nieNachHinten
+    // JJJJ-MM-TT vergleicht sich als Text wie als Datum.
+    if (eingabe.aktionBisTag < kalendertagInWien(jetzt)) return GRUENDUNG_EINSTELLUNG_FEHLER.vergangen
+  }
+
+  // Mehr Monate nur, solange die Aktion nicht vorbei ist — mit den neuen Plätzen und dem neuen Stichtag gerechnet.
+  const danach: GruendungEinstellung = { ...bisher, plaetze: eingabe.plaetze, aktionBisTag: eingabe.aktionBisTag }
+  if (eingabe.monate > bisher.monate && bisher.festAm !== null && !aktionLaeuft(jetzt, danach, vergeben)) {
+    return GRUENDUNG_EINSTELLUNG_FEHLER.monateVorbei
+  }
+  return null
 }
 
 // ─── Texte der Seite ─────────────────────────────────────────────────────────
@@ -160,31 +208,56 @@ export const EINSTELLUNGEN_TEXT = {
   navigation: 'Gruppen der Einstellungen',
   ladefehler: 'Wir konnten die Einstellungen gerade nicht laden.',
   gruppe: {
-    gruendung: { titel: 'Gründungshöfe', zeile: 'Plätze, Standard-Ende, Anzeige' },
+    gruendung: { titel: 'Gründungshöfe', zeile: 'Plätze, Monate, Aktion, Anzeige' },
     plattform: { titel: 'Plattform', zeile: 'Name und Adresse' },
   },
   gruendung: {
     register: 'Register K2',
-    satz: 'Wie viele Höfe ohne Grundgebühr starten dürfen und bis wann.',
+    satz: 'Wie viele Höfe ohne Grundgebühr starten dürfen, wie lange und bis wann die Aktion läuft.',
     kachelPlaetze: 'Plätze gesamt',
     kachelVergeben: 'Vergeben',
     kachelVergebenZeile: 'nach Reihenfolge der Freischaltung',
+    /** Nach dem Festschreiben (Nr. 116): die Nummern stehen je Hof fest. */
+    kachelVergebenFest: 'festgeschrieben, Nummer je Hof',
     /** Register K2, Nr. 109: ausgenommene Höfe zählen nicht mit, die Kachel nennt sie. */
     kachelVergebenAusgenommen: (ausgenommen: number): string => `nach Reihenfolge der Freischaltung · ${ausgenommen} ausgenommen`,
     kachelFrei: 'Frei',
     kachelFreiZeile: 'steht im Satz auf den Seiten',
     feldPlaetze: 'Plätze gesamt',
-    feldBis: 'Kostenlos bis (Standard)',
-    feldGesperrt: 'vorerst fest',
-    gesperrtHinweis:
-      'Plätze und Standard-Ende sind vorerst fest: Die Konditionen der Höfe und Admin › Höfe rechnen noch mit diesen Werten. Umschalten kannst du die Anzeige.',
+    feldPlaetzeZeile: 'nur erhöhen, nie unter die vergebenen',
+    feldMonate: 'Monate ohne Grundgebühr',
+    feldMonateZeile: 'nur erhöhen; gilt nur für künftige Zusagen',
+    feldAktionBis: 'Aktion bis',
+    feldAktionBisZeile: 'leer = ohne Stichtag; einmal gesetzt nur noch früher',
+    /** Das Standard-Ende von vor Nr. 116 — nur noch für die Übernahme beim Festschreiben, nicht änderbar. */
+    feldBis: 'Bisheriges Standard-Ende',
+    feldGesperrt: 'fest',
     schalter: 'Auf den Seiten zeigen',
     schalterSatz:
-      'Startseite (Satz im Für-Höfe-Band), /fuer-hoefe (Pill, Knopf, Preiszeile) und Registrieren (Satz). Verschwindet von selbst, wenn alle Plätze vergeben sind oder das Datum vorbei ist.',
+      'Startseite (Satz im Für-Höfe-Band), /fuer-hoefe (Pill, Knopf, Preiszeile) und Registrieren (Satz). Steuert nur die Sätze, nie die Vergabe. Verschwindet von selbst, wenn alle Plätze vergeben sind oder die Aktion vorbei ist.',
     aufDenSeiten: 'So steht es auf den Seiten',
-    aufDenSeitenLeer: 'Auf den Seiten steht gerade nichts – die Anzeige ist aus, alle Plätze sind vergeben oder das Datum ist vorbei.',
+    aufDenSeitenLeer: 'Auf den Seiten steht gerade nichts – die Anzeige ist aus, alle Plätze sind vergeben oder die Aktion ist vorbei.',
     regel:
       'Weniger Plätze als vergeben geht nicht – wer einen Platz hat, behält ihn. Ein anderes Ende für einen einzelnen Hof: Höfe › „Gründungshof bis“ (dort steht dann „abweichend“).',
+    /** Zusagen festschreiben (Register K2, Änderung Nr. 116) — heikle Aktion, nur solange noch nicht festgeschrieben. */
+    festschreiben: 'Zusagen festschreiben …',
+    festschreibenSatz:
+      'Schreibt Platz und Ende für jeden freigeschalteten Hof fest – auch für stillgelegte. Danach vergibt jede Freischaltung die kleinste freie Nummer, solange die Aktion läuft.',
+    festschreibenTitel: 'Zusagen festschreiben?',
+    festschreibenDialog: (anzahl: number): string =>
+      `${anzahl} ${anzahl === 1 ? 'Hof bekommt' : 'Höfe bekommen'} Platz und Ende fest. Das Ende ist nie früher als bisher. Das geht nur einmal.`,
+    festschreibenLeer: 'Bisher ist kein Hof freigeschaltet. Festgeschrieben wird trotzdem – ab dann zählt jede Freischaltung.',
+    festschreibenSpalten: { hof: 'Hof', nummer: 'Nr.', ende: 'Ende bisher → neu' },
+    festschreibenOhne: 'keine Zusage',
+    festschreibenStillgelegt: 'stillgelegt',
+    festschreibenKnopf: 'Festschreiben',
+    festschreibenAbbrechen: 'Abbrechen',
+    festschreibenFertig: 'Die Zusagen sind festgeschrieben.',
+    festgeschrieben: (am: string): string => `Zusagen festgeschrieben am ${am}.`,
+    festschreibenSchon: 'Die Zusagen sind schon festgeschrieben. Lade die Seite neu.',
+    festschreibenPlaetze: (noetig: number): string =>
+      `Erhöhe zuerst die Plätze auf mindestens ${noetig} – sonst verlöre ein Hof, der heute einen Platz hat, seine Zusage.`,
+    festschreibenFehler: 'Wir konnten die Zusagen nicht festschreiben. Lade die Seite neu und versuch es noch einmal.',
     verwerfen: 'Verwerfen',
     speichern: 'Speichern',
     speichert: 'Wird gespeichert …',
@@ -220,7 +293,17 @@ export function protokollZeile(einstellung: PlattformEinstellung, personName: st
   return EINSTELLUNGEN_TEXT.protokoll(personName ?? EINSTELLUNGEN_TEXT.protokollUnbekannt, PROTOKOLL_FORMAT.format(new Date(einstellung.geaendertAm)))
 }
 
-/** „12 Plätze · 5 frei · bis 31.12.2027" — die Zeile der zugeklappten Gruppe am Handy. */
-export function gruendungZeileKurz(gesamt: number, frei: number, bisTag: string): string {
-  return `${gesamt} Plätze · ${frei} frei · bis ${gruendungTagKurz(bisTag)}`
+/** „Zusagen festgeschrieben am 19.10.2026, 21:14.“ — null, solange nicht festgeschrieben (Nr. 116). */
+export function festgeschriebenZeile(einstellung: PlattformEinstellung): string | null {
+  return einstellung.gruendungFestAm === null ? null : EINSTELLUNGEN_TEXT.gruendung.festgeschrieben(PROTOKOLL_FORMAT.format(new Date(einstellung.gruendungFestAm)))
+}
+
+/**
+ * „12 Plätze · 5 frei · bis 31.12.2027" — die Zeile der zugeklappten Gruppe am
+ * Handy; in der Aktion (Nr. 116) mit Monaten und Stichtag statt des Standard-Endes.
+ */
+export function gruendungZeileKurz(zahlen: Pick<GruendungZahlen, 'gesamt' | 'frei' | 'bisTag' | 'art' | 'monate' | 'aktionBisTag'>): string {
+  const anfang = `${zahlen.gesamt} Plätze · ${zahlen.frei} frei`
+  if (zahlen.art === 'bisher') return `${anfang} · bis ${gruendungTagKurz(zahlen.bisTag)}`
+  return `${anfang} · ${zahlen.monate} Monate${zahlen.aktionBisTag ? ` · bis ${gruendungTagKurz(zahlen.aktionBisTag)}` : ''}`
 }

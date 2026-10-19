@@ -5,6 +5,8 @@ import * as Sentry from '@sentry/nextjs'
 import { auth } from '@/lib/auth'
 import type { KonditionenHof } from '@/lib/hof-einstellungen'
 import { ladeKonditionenHof } from '@/server/queries/einstellungen'
+import { ladeAbzeichenSchalter } from '@/server/queries/farm'
+import { AbzeichenSchalter } from './abzeichen-schalter'
 import { KonditionenAnsicht } from '@/components/hof-einstellungen/konditionen-ansicht'
 import { EinstellungenFehler } from '@/components/hof-einstellungen/einstellungen-fehler'
 import { EINSTELLUNGEN_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
@@ -25,9 +27,12 @@ export default async function KonditionenEinstellungenPage(): Promise<React.JSX.
   if (!session?.user) redirect('/login')
 
   let hof: KonditionenHof | null = null
+  let abzeichen: { zeigen: boolean } | null = null
   let gefunden = true
   try {
-    hof = await ladeKonditionenHof(session.user.id)
+    const [geladen, schalter] = await Promise.all([ladeKonditionenHof(session.user.id), ladeAbzeichenSchalter(session.user.id)])
+    hof = geladen
+    abzeichen = schalter
     gefunden = hof !== null
   } catch (err) {
     Sentry.captureException(err, { tags: { bereich: 'einstellungen', seite: 'konditionen' } })
@@ -36,7 +41,16 @@ export default async function KonditionenEinstellungenPage(): Promise<React.JSX.
 
   return (
     <div className={EINSTELLUNGEN_RAHMEN}>
-      {hof ? <KonditionenAnsicht hof={hof} jetzt={new Date()} /> : <EinstellungenFehler titel="Deine Konditionen" href="/settings/konditionen" />}
+      {hof ? (
+        <KonditionenAnsicht
+          hof={hof}
+          jetzt={new Date()}
+          // Nur für Gründungshöfe (Register K2, Nr. 116): der Schalter im Block „Dein Stand“.
+          abzeichen={abzeichen ? <AbzeichenSchalter anfangsAn={abzeichen.zeigen} /> : null}
+        />
+      ) : (
+        <EinstellungenFehler titel="Deine Konditionen" href="/settings/konditionen" />
+      )}
     </div>
   )
 }

@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { KONTAKT_EMAIL } from '@/lib/support'
-import { GRUENDUNGS_AUFNAHME_SCHRITTE } from '@/lib/gruendungshof'
+import { GRUENDUNGS_AUFNAHME_SCHRITTE, GRUENDUNG_TEXT } from '@/lib/gruendungshof'
+import { gruendungFuerSeiten } from '@/server/queries/plattform-einstellung'
 import {
   KONDITIONEN_STAND,
   KONDITIONEN_UEBERGANG,
@@ -56,6 +58,28 @@ const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent(`Mein H
 // geht"). Steht hier eine Zahl im Text, ist das ein Fehler
 // (tests/konditionen-seiten.test.ts). Bis Nr. 15 stand hier das
 // Gründungshof-Angebot.
+/**
+ * Abschnitt „Aktion“ (Register K2, Nr. 116): nur, solange die Aktion läuft —
+ * auch bei Anzeige aus, Konditionen sind keine Werbung; Zahlen und Sätze aus
+ * derselben Quelle wie Startseite und /fuer-hoefe. Eigene Komponente hinter
+ * Suspense, damit der Rest der Seite nicht auf die Datenbank wartet.
+ */
+async function AktionAbschnitt({ jetzt }: { jetzt: Date }): Promise<React.JSX.Element | null> {
+  const gruendung = await gruendungFuerSeiten(jetzt)
+  if (!gruendung.aktionLaeuft) return null
+  const aktion = GRUENDUNG_TEXT.aktion(gruendung)
+  return (
+    <section>
+      <h2 className={INFOSEITE_ABSCHNITT}>{aktion.titel}</h2>
+      <ul className="flex list-disc flex-col gap-1.5 pl-5">
+        {aktion.saetze.map((satz) => (
+          <li key={satz}>{satz}</li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 export default function KonditionenPage() {
   // Je Bau bzw. stündlicher Revalidierung (oben): Danach entscheidet sich, ob die Bar-Ausnahme bis zum Stichtag (B1) dasteht.
   const jetzt = new Date()
@@ -82,6 +106,10 @@ export default function KonditionenPage() {
               ))}
             </ul>
           </section>
+
+          <Suspense fallback={null}>
+            <AktionAbschnitt jetzt={jetzt} />
+          </Suspense>
 
           <section>
             <h2 className={INFOSEITE_ABSCHNITT}>Servicegebühr und Abrechnung</h2>

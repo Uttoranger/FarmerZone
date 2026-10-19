@@ -27,11 +27,17 @@ import {
   GRUENDUNG_BIS_ZUSTIMMUNG_FEHLT,
   gruendungBisSchema,
 } from '@/schemas/gruendungshof'
-import { GRUENDUNGSPLAETZE_SPERRE, bestimmeGruendungBis, bildeGruendungBis, gruendungsZusageBeiFreigabe, verkuerztGruendung } from '@/lib/gruendungshof'
+import {
+  GRUENDUNGSPLAETZE_SPERRE,
+  bestimmeGruendungBis,
+  bildeGruendungBis,
+  gruendungsZusageBeiFreigabe,
+  verkuerztGruendung,
+  zusageBeiFreischaltung,
+} from '@/lib/gruendungshof'
 import { kalendertagInWien } from '@/lib/wiener-tag'
-import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
-import { gruendungEinstellungAus } from '@/lib/plattform-einstellung'
-import { lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
+import { ladeHoefeFuerGruendung, leseGruendungEinstellung } from '@/server/queries/admin'
+import { IM_SHOP_WHERE } from '@/server/queries/einstellungen'
 import { GRUENDUNGS_NACHRICHT, GRUENDUNGS_NACHRICHT_LINK, POSTFACH_HREF } from '@/lib/postfach'
 
 function revalidateAll(slug: string) {
@@ -113,6 +119,8 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
       slug: true,
       stripeAccountReady: true,
       owner: { select: { email: true, emailVerified: true, createdAt: true } },
+      // Register K2, Änderung Nr. 116: mindestens ein Produkt im Shop — nur ob, nie welches.
+      products: { where: IM_SHOP_WHERE, select: { id: true }, take: 1 },
     },
   })
   if (!farm) return { error: 'Hof nicht gefunden.' }
@@ -125,37 +133,71 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
   // - Register Z1: Jeder Hof braucht ein fertiges Stripe-Konto — auch einer
   //   mit acceptsOnline false aus der Zeit, als „nur bar" noch ging. Das ist
   //   die serverseitige Schranke für „Hof online stellen".
+  // - Register K2 (Nr. 116): mindestens ein Produkt im Shop.
   // Bereits freigeschaltete Höfe berührt das nicht; es wirkt nur auf diesen Klick.
   const sperre = freischaltSperre({
     emailBestaetigungOffen: bestaetigungOffen(farm.owner),
     stripeBereit: farm.stripeAccountReady === true,
+    produktImShop: farm.products.length > 0,
   })
   if (sperre) return { error: sperre }
 
-  // Die Zahl der Plätze frisch, nie aus dem Cache.
-  const einstellung = gruendungEinstellungAus(await lesePlattformEinstellung())
-
   // Freischalten und Platz bestimmen in EINER Transaktion unter der Sperre der
-  // Gründungsplätze (Register K2, Nr. 109) — dieselbe wie Ausnehmen und
-  // Wiederaufnehmen: So vergeben Freischalten und Wiederaufnahme nie
-  // gleichzeitig denselben letzten Platz.
-  const freigabe = await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${GRUENDUNGSPLAETZE_SPERRE})`
-    // Bedingt schreiben, nicht blind: Die Freischalt-Sperre oben beruht auf einem Lesestand.
-    // Fällt Stripe dazwischen weg (account.updated) oder schaltet ein zweiter
-    // Klick schon frei, trifft das Schreiben nichts — dann keine Mail, sondern
-    // eine Meldung (ARCHITECTURE: der Statuswechsel ist die Sperre).
-    // Der Zeitpunkt entsteht NACH der Sperre: Er bestimmt die Reihenfolge der
-    // Plätze, und ein Weg, der vor uns vergeben hat, steht so immer vor uns.
-    const { count } = await tx.farm.updateMany({
-      where: { id: farmId, stripeAccountReady: true, approvedAt: null },
-      data: { approvedAt: new Date() },
+  // Gründungsplätze (Register K2, Nr. 109) — dieselbe wie Ausnehmen,
+  // Wiederaufnehmen, Festschreiben, Einstellungen und Wieder-Aktivieren: So
+  // vergeben zwei Wege nie gleichzeitig denselben letzten Platz. Einstellung
+  // und Höfe werden erst NACH der Sperre gelesen (Nr. 116).
+  let freigabe: { zusage: { platz: number; bis: Date } | null } | null
+  try {
+    freigabe = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${GRUENDUNGSPLAETZE_SPERRE})`
+      const einstellung = await leseGruendungEinstellung(tx)
+      // Bedingt schreiben, nicht blind: Die Freischalt-Sperre oben beruht auf einem Lesestand.
+      // Fällt Stripe dazwischen weg (account.updated), nimmt der Hof sein letztes
+      // Produkt aus dem Shop oder schaltet ein zweiter Klick schon frei, trifft das
+      // Schreiben nichts — dann keine Mail, sondern eine Meldung (ARCHITECTURE:
+      // der Statuswechsel ist die Sperre).
+      // Der Zeitpunkt entsteht NACH der Sperre: Er bestimmt die Reihenfolge der
+      // Plätze, und ein Weg, der vor uns vergeben hat, steht so immer vor uns.
+      const jetzt = new Date()
+      const { count } = await tx.farm.updateMany({
+        where: { id: farmId, stripeAccountReady: true, approvedAt: null, products: { some: IM_SHOP_WHERE } },
+        data: { approvedAt: jetzt },
+      })
+      if (count === 0) return null
+      const hoefe = await ladeHoefeFuerGruendung(tx)
+
+      // Vor dem Festschreiben: Platz nach der Reihenfolge, wie bisher.
+      if (einstellung.festAm === null) {
+        const hof = hoefe.find((h) => h.id === farmId)
+        return { zusage: hof ? gruendungsZusageBeiFreigabe(hof, hoefe, einstellung) : null }
+      }
+
+      // Festgeschrieben (Nr. 116): Ein Hof mit Platz (erneute Freigabe nach Entzug)
+      // behält Platz und Ende; sonst, solange die Aktion läuft, die kleinste freie
+      // Nummer und das Ende ab heute. Ausgenommene bekommen keinen.
+      const hof = await tx.farm.findUnique({
+        where: { id: farmId },
+        select: { gruendungPlatz: true, gruendungBis: true, gruendungAusgenommen: true },
+      })
+      if (!hof || hof.gruendungAusgenommen) return { zusage: null }
+      const zusage = zusageBeiFreischaltung({ id: farmId, ...hof }, hoefe, einstellung, jetzt)
+      if (zusage === null) return { zusage: null }
+      if (zusage.neu) {
+        // Bedingt: nur ein Hof ohne Platz bekommt einen. Der eindeutige Index fängt den Rest (P2002 unten).
+        await tx.farm.updateMany({
+          where: { id: farmId, gruendungPlatz: null },
+          data: { gruendungPlatz: zusage.platz, gruendungBis: bildeGruendungBis(zusage.bisTag) },
+        })
+      }
+      return { zusage: { platz: zusage.platz, bis: bildeGruendungBis(zusage.bisTag) } }
     })
-    if (count === 0) return null
-    const hoefe = await ladeHoefeFuerGruendung(tx)
-    const hof = hoefe.find((h) => h.id === farmId)
-    return { zusage: hof ? gruendungsZusageBeiFreigabe(hof, hoefe, einstellung) : null }
-  })
+  } catch (err) {
+    // Zwei Wege mit derselben Nummer schließt die Sperre aus; greift doch der
+    // eindeutige Index, rollt die Transaktion ganz zurück (auch die Freischaltung).
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') return { error: FREISCHALTUNG_GEAENDERT_TEXT }
+    throw err
+  }
   if (freigabe === null) return { error: FREISCHALTUNG_GEAENDERT_TEXT }
   revalidateAll(farm.slug)
   // „Noch n Gründungsplätze" auf Startseite und /fuer-hoefe (K2-Ergänzung) zählt diesen Hof jetzt mit.

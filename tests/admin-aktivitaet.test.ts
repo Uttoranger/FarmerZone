@@ -16,7 +16,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/prisma', () => ({
-  prisma: { farm: { findMany: vi.fn() }, $queryRaw: vi.fn() },
+  // Seit Nr. 116 liest getAdminFarms die Einstellung der Gründungsplätze (ohne Zeile: Standard).
+  prisma: { farm: { findMany: vi.fn() }, plattformEinstellung: { findUnique: vi.fn(async () => null) }, $queryRaw: vi.fn() },
 }))
 
 import { getAdminFarms } from '@/server/queries/admin'
@@ -49,6 +50,8 @@ function dbZeile(overrides: Record<string, unknown> = {}) {
     // Altes Konto ohne Bestätigung — vor dem Stichtag keine Pflicht (S3, 17b).
     owner: { email: 'franz@test.local', emailVerified: false, createdAt: ANGELEGT },
     _count: { products: 3, farmPhotos: 2, pickupSlots: 1 },
+    // Seit Nr. 116: ob ein Produkt im Shop ist (Freischalten).
+    products: [{ id: 'p_1' }],
     ...overrides,
   }
 }
@@ -63,6 +66,8 @@ function leereZeile(overrides: Record<string, unknown> = {}) {
     description: '',
     logoUrl: null,
     _count: { products: 0, farmPhotos: 0, pickupSlots: 0 },
+    // Seit Nr. 116: ob ein Produkt im Shop ist (Freischalten).
+    products: [],
     ...overrides,
   })
 }

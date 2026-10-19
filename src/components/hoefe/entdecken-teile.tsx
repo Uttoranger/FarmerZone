@@ -31,6 +31,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { StatusBadge } from '@/components/ui/status-badge'
 import HoefeFotostreifen from '@/components/hoefe/hoefe-fotostreifen'
+import { Abzeichen } from '@/components/ui/abzeichen'
 
 /*
  * Die Teile von Entdecken (/hoefe) im neuen Design (Nachtlauf Nr. 09) —
@@ -282,6 +283,8 @@ export type KartenHof = {
   naechsteAbholung: NaechsteAbholung | null
   fotos: string[]
   entfernungKm: number | null
+  /** Abzeichen „Gründungshof“ (Register K2, Nr. 116) — nur Ja/Nein, nie die Nummer. */
+  gruendungshof: boolean
 }
 
 /** Wie viele Kategorie-Chips eine Hofkarte trägt — mehr bricht am Handy um. */
@@ -382,6 +385,8 @@ export function HofKarte({
         )}
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
+          {/* Klein über dem Namen, kein eigener Knopf — die ganze Karte bleibt der Link (Nr. 116). */}
+          {hof.gruendungshof && <Abzeichen groesse="klein" className="self-start" />}
           <div className="flex items-start gap-2">
             <h2
               className={cn(

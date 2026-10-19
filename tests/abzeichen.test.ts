@@ -1,0 +1,145 @@
+/**
+ * Abzeichen „Gründungshof“ (Register K2, Änderung Nr. 116; Mockup
+ * system-k2-gruendung-abzeichen) — die Nummer des Platzes geht nie an den
+ * Browser, das Etikett erscheint nur, wenn der Hof eins trägt.
+ *
+ * Beweist:
+ *  - getPublicFarm liest den festgeschriebenen Platz, gibt aber nur
+ *    `gruendungshof` und den Monat weiter — weder der Schlüssel noch die
+ *    Nummer stehen im Ergebnis (Gegenprobe: die Zeile der Datenbank trägt sie);
+ *  - die Abfragen der Hofliste und der Hofseite nehmen die Felder vor dem
+ *    Rückgabewert heraus (Quelltext);
+ *  - HofKarte zeigt das Etikett nur mit `gruendungshof` (Render-Test mit Gegenprobe);
+ *  - der Knopf auf der Hofseite öffnet einen Dialog (aria-haspopup) und hat
+ *    einen Namen mit dem sichtbaren Wort.
+ */
+import { describe, it, expect, vi } from 'vitest'
+
+vi.mock('@/lib/prisma', () => ({ prisma: { farm: { findUnique: vi.fn() } } }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/hoefe' }))
+
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { prisma } from '@/lib/prisma'
+import { getPublicFarm } from '@/server/queries/farm'
+import { HofKarte, type KartenHof } from '@/components/hoefe/entdecken-teile'
+import { Abzeichen, AbzeichenKnopf } from '@/components/ui/abzeichen'
+
+const ZEILE = {
+  id: 'hof_1',
+  slug: 'sonnhof',
+  name: 'Sonnhof',
+  ownerName: 'Max Mustermann',
+  description: '',
+  address: 'Teststraße 1',
+  postalCode: '5280',
+  city: 'Teststadt',
+  phone: '+43 660 000 0000',
+  email: 'hof@example.com',
+  logoUrl: null,
+  bannerUrl: null,
+  tagline: null,
+  foundedYear: null,
+  aboutText: null,
+  bannerType: 'GRADIENT',
+  bannerValue: null,
+  bannerFocusY: 50,
+  bannerAusschnitt: null,
+  logoAusschnitt: null,
+  sectionsConfig: null,
+  acceptsOnline: true,
+  acceptsOnsite: true,
+  stripeAccountReady: true,
+  isPaused: false,
+  pauseMessage: null,
+  serviceFeePercent: 0,
+  serviceFeeMinCents: 0,
+  serviceFeeActiveFrom: null,
+  farmValues: [],
+  farmPhotos: [],
+  betriebsnummer: null,
+  betriebsstatus: null,
+  products: [],
+  pickupSlots: [],
+  approvedAt: new Date('2026-10-05T10:00:00Z'),
+  gruendungPlatz: 4711,
+  gruendungAusgenommen: false,
+  gruendungAbzeichenZeigen: true,
+}
+
+describe('getPublicFarm — nur Ja/Nein, nie die Nummer', () => {
+  it('Gründungshof mit Monat der Freischaltung; der Platz steht weder als Schlüssel noch als Wert im Ergebnis', async () => {
+    vi.mocked(prisma.farm.findUnique).mockResolvedValue(ZEILE as never)
+    const hof = await getPublicFarm('sonnhof')
+    expect(hof).toMatchObject({ gruendungshof: true, gruendungSeit: 'Oktober 2026', abzeichenBlatt: null })
+    const json = JSON.stringify(hof)
+    expect(json).not.toContain('gruendungPlatz')
+    expect(json).not.toContain('4711')
+    expect(json).not.toContain('gruendungAbzeichenZeigen')
+    // Gegenprobe: Die Zeile der Datenbank trägt beides — die Suche schlägt an.
+    expect(JSON.stringify(ZEILE)).toContain('4711')
+  })
+
+  it('ausgeblendet oder ausgenommen: kein Abzeichen, kein Monat', async () => {
+    vi.mocked(prisma.farm.findUnique).mockResolvedValue({ ...ZEILE, gruendungAbzeichenZeigen: false } as never)
+    expect(await getPublicFarm('sonnhof')).toMatchObject({ gruendungshof: false, gruendungSeit: null })
+    vi.mocked(prisma.farm.findUnique).mockResolvedValue({ ...ZEILE, gruendungAusgenommen: true } as never)
+    expect(await getPublicFarm('sonnhof')).toMatchObject({ gruendungshof: false })
+  })
+
+  it('Quelltext: Hofseite und Hofliste nehmen den Platz vor dem Rückgabewert heraus', () => {
+    const quelle = readFileSync(join(process.cwd(), 'src/server/queries/farm.ts'), 'utf8')
+    // Hofseite und Vorschau des Besitzers: beide entpacken die Felder, bevor der Rest gespreizt wird.
+    expect(quelle.match(/const \{ betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, \.\.\.rest \} = farm/g)).toHaveLength(2)
+    // Hofliste: das Ergebnis nennt nur das Ja/Nein.
+    const start = quelle.indexOf('return hoefe.map((hof) => {')
+    const rueckgabe = quelle.slice(start, quelle.indexOf('\n  })\n', start))
+    expect(rueckgabe).toContain('gruendungshof: zeigtAbzeichen(hof)')
+    expect(rueckgabe).not.toMatch(/gruendungPlatz|\.\.\.hof\b/)
+  })
+})
+
+describe('Abzeichen in der Höfe-Liste und auf der Hofseite', () => {
+  const karte: KartenHof = {
+    slug: 'sonnhof',
+    name: 'Sonnhof',
+    postalCode: '5280',
+    city: 'Teststadt',
+    isPaused: false,
+    kategorien: [],
+    naechsteAbholung: null,
+    fotos: [],
+    entfernungKm: null,
+    gruendungshof: true,
+  }
+  const render = (hof: KartenHof): string =>
+    renderToStaticMarkup(createElement(HofKarte, { hof, bereich: 'LEBENSMITTEL', produktNamen: [], split: true, ausgewaehlt: false }))
+
+  it('HofKarte trägt das Etikett nur mit gruendungshof — kein eigener Knopf in der Karte', () => {
+    const mit = render(karte)
+    expect(mit).toContain('Gründungshof')
+    expect(mit).toContain('lucide-sprout')
+    expect(mit).not.toContain('aria-haspopup')
+    expect(render({ ...karte, gruendungshof: false })).not.toContain('Gründungshof')
+  })
+
+  it('das Etikett: Wort im Text (Großbuchstaben nur per CSS), Spross verborgen, Farben aus den Tokens', () => {
+    const html = renderToStaticMarkup(createElement(Abzeichen, { groesse: 'klein' }))
+    expect(html).toContain('>Gründungshof<')
+    expect(html).toContain('uppercase')
+    expect(html).toMatch(/lucide-sprout[^>]*aria-hidden="true"|aria-hidden="true"[^>]*lucide-sprout/)
+    expect(html).toContain('bg-abzeichen-grund')
+    expect(html).toContain('text-abzeichen')
+  })
+
+  it('auf der Hofseite ein Knopf, der einen Dialog öffnet — Name enthält das sichtbare Wort, Trefferfläche über ::before', () => {
+    const html = renderToStaticMarkup(createElement(AbzeichenKnopf, { hofName: 'Sonnhof', seit: 'Oktober 2026', blatt: { plaetze: 100, frei: 71 } }))
+    expect(html).toContain('aria-haspopup="dialog"')
+    expect(html).toContain('aria-label="Gründungshof – was heißt das?"')
+    // 26 px sichtbar + 2 × 9 px unsichtbarer Rand = 44 px Tippfläche.
+    expect(html).toContain('before:-inset-y-[9px]')
+    expect(html).not.toMatch(/Nr\.\s?\d/)
+  })
+})

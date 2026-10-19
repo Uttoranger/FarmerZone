@@ -38,7 +38,7 @@ vi.mock('@/server/actions/register', () => ({ registerFarmer: vi.fn() }))
 vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: vi.fn() }))
 
 import { gruendungFuerSeiten } from '@/server/queries/plattform-einstellung'
-import type { GruendungSeiten } from '@/lib/gruendungshof'
+import { KEINE_GRUENDUNG_SEITEN, type GruendungSeiten } from '@/lib/gruendungshof'
 import { KONDITIONEN_UEBERGANG } from '@/lib/konditionen'
 import { GruendungSatz } from '@/components/gruendung/satz'
 import { GruendungPill } from '@/components/gruendung/pill'
@@ -50,7 +50,7 @@ import FuerHoefePage, { revalidate as fuerHoefeRevalidate } from '@/app/(public)
 import RegisterPage from '@/app/(auth)/register/page'
 
 const JETZT = new Date('2026-10-15T10:00:00+02:00')
-const ZEIGEN: GruendungSeiten = { zeigen: true, frei: 5, gesamt: 12, bisTag: '2027-12-31', voraussichtlicherPlatz: 8 }
+const ZEIGEN: GruendungSeiten = { ...KEINE_GRUENDUNG_SEITEN, zeigen: true, zaehler: true, frei: 5, gesamt: 12, bisTag: '2027-12-31', voraussichtlicherPlatz: 8 }
 const AUS: GruendungSeiten = { ...ZEIGEN, zeigen: false, voraussichtlicherPlatz: null }
 
 /** HTML ohne das geschützte Leerzeichen, das formatDatumLang nach dem Tag setzt. */

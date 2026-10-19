@@ -1,5 +1,6 @@
 import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
+import { abzeichenSeit, zeigtAbzeichen, type AbzeichenBlatt } from '@/lib/gruendungshof'
 import { hofAdresse, hofZustand, titelbildFoto, type HofZustand } from '@/lib/mein-hof'
 import { APP_URL } from '@/lib/umgebung-server'
 import { categoryImagePath } from '@/lib/product-image'
@@ -176,6 +177,43 @@ export type PublicFarm = {
   betriebsstatus: Betriebsstatus | null
   products: PublicProduct[]
   pickupSlots: PublicPickupSlot[]
+  /** Abzeichen „Gründungshof“ (Register K2, Nr. 116) — nur Ja/Nein, nie die Nummer des Platzes. */
+  gruendungshof: boolean
+  /** „Oktober 2026“ — der Monat der Freischaltung fürs Erklär-Blatt; null ohne Abzeichen. */
+  gruendungSeit: string | null
+  /** Die Zahlen des Erklär-Blatts — die Abfrage liefert null, die Hofseite füllt sie (ladeHofseite). */
+  abzeichenBlatt: AbzeichenBlatt | null
+}
+
+/**
+ * Was das Abzeichen braucht (Register K2, Änderung Nr. 116). Gelesen wird der
+ * festgeschriebene Platz, gegeben wird nur das Ja/Nein (`abzeichenDaten`) —
+ * jede Abfrage, die diese Felder liest, nimmt sie vor dem Rückgabewert heraus.
+ */
+const ABZEICHEN_SELECT = {
+  approvedAt: true,
+  gruendungPlatz: true,
+  gruendungAusgenommen: true,
+  gruendungAbzeichenZeigen: true,
+} satisfies Prisma.FarmSelect
+
+/**
+ * Der Schalter „Abzeichen zeigen“ unter Konditionen und Tarif (Nr. 116): nur
+ * der eigene Hof (ownerId), nur ob er ein Gründungshof ist (festgeschriebener
+ * Platz, nicht ausgenommen) und wie der Schalter steht — nie die Nummer.
+ * null heißt „kein Gründungshof“ (dann kein Schalter).
+ */
+export async function ladeAbzeichenSchalter(ownerId: string): Promise<{ zeigen: boolean } | null> {
+  const hof = await prisma.farm.findUnique({ where: { ownerId }, select: ABZEICHEN_SELECT })
+  return hof && zeigtAbzeichen({ ...hof, gruendungAbzeichenZeigen: true }) ? { zeigen: hof.gruendungAbzeichenZeigen } : null
+}
+
+/** Aus den Feldern von ABZEICHEN_SELECT das, was an den Browser darf. */
+function abzeichenDaten(
+  hof: Prisma.FarmGetPayload<{ select: typeof ABZEICHEN_SELECT }>
+): Pick<PublicFarm, 'gruendungshof' | 'gruendungSeit' | 'abzeichenBlatt'> {
+  const gruendungshof = zeigtAbzeichen(hof)
+  return { gruendungshof, gruendungSeit: gruendungshof && hof.approvedAt ? abzeichenSeit(hof.approvedAt) : null, abzeichenBlatt: null }
 }
 
 const FARM_PHOTO_SELECT = {
@@ -338,6 +376,8 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       // Die Betriebsnummer des Hofs zeigt das Produktdetail in der
       // Futter-Kennzeichnung (Rückfrage F6); sie geht nur aufgelöst weiter.
       betriebsnummer: true,
+      // Abzeichen (Nr. 116): gelesen, aber nur als Ja/Nein weitergegeben (abzeichenDaten).
+      ...ABZEICHEN_SELECT,
       // Für das Schild nach E9 (Nr. 11): welche Nummer das ist.
       betriebsstatus: true,
       products: {
@@ -360,9 +400,11 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       ? (rawSections as SectionConfig[])
       : DEFAULT_SECTIONS
 
-  const { betriebsnummer, ...rest } = farm
+  // Die Felder des Abzeichens (auch die Nummer des Platzes) fallen hier heraus — nur das Ja/Nein geht weiter.
+  const { betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, ...rest } = farm
   return {
     ...rest,
+    ...abzeichenDaten({ approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen }),
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
     // Json aus der Datenbank nur über leseAusschnitt: Ein ungültiger Wert ergibt null, nie einen Fehler auf der Hofseite.
     bannerAusschnitt: leseAusschnitt(farm.bannerAusschnitt),
@@ -431,6 +473,8 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       // Die Betriebsnummer des Hofs zeigt das Produktdetail in der
       // Futter-Kennzeichnung (Rückfrage F6); sie geht nur aufgelöst weiter.
       betriebsnummer: true,
+      // Abzeichen (Nr. 116): gelesen, aber nur als Ja/Nein weitergegeben (abzeichenDaten).
+      ...ABZEICHEN_SELECT,
       // Für das Schild nach E9 (Nr. 11): welche Nummer das ist.
       betriebsstatus: true,
       products: {
@@ -453,9 +497,11 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       ? (rawSections as SectionConfig[])
       : DEFAULT_SECTIONS
 
-  const { betriebsnummer, ...rest } = farm
+  // Die Felder des Abzeichens (auch die Nummer des Platzes) fallen hier heraus — nur das Ja/Nein geht weiter.
+  const { betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, ...rest } = farm
   return {
     ...rest,
+    ...abzeichenDaten({ approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen }),
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
     // Json aus der Datenbank nur über leseAusschnitt: Ein ungültiger Wert ergibt null, nie einen Fehler auf der Hofseite.
     bannerAusschnitt: leseAusschnitt(farm.bannerAusschnitt),
@@ -662,6 +708,8 @@ export type HofUebersichtEintrag = {
    *  (baueFotostreifen in src/lib/hofuebersicht.ts). Leer = keine Fotos,
    *  die Karte bleibt kompakt. */
   fotos: string[]
+  /** Abzeichen „Gründungshof“ (Register K2, Nr. 116) — nur Ja/Nein, nie die Nummer. */
+  gruendungshof: boolean
 }
 
 /**
@@ -725,6 +773,10 @@ export async function getOeffentlicheHoefe(
       id: true,
       approvedAt: true,
       createdAt: true,
+      // Abzeichen (Nr. 116): nur für das Ja/Nein unten, die Nummer verlässt die Abfrage nicht.
+      gruendungPlatz: true,
+      gruendungAusgenommen: true,
+      gruendungAbzeichenZeigen: true,
       slug: true,
       name: true,
       postalCode: true,
@@ -877,6 +929,7 @@ export async function getOeffentlicheHoefe(
         // seinen Fotostreifen (Verhalten unverändert gegenüber #83).
         produktFotos: produktFotosJeHof.get(hof.id) ?? [],
       }),
+      gruendungshof: zeigtAbzeichen(hof),
     }
   })
 }
