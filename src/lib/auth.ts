@@ -2,18 +2,28 @@ import * as Sentry from '@sentry/nextjs'
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { emailOTP, magicLink } from 'better-auth/plugins'
-import { APIError, createAuthMiddleware } from 'better-auth/api'
+import { APIError, createAuthMiddleware, isAPIError } from 'better-auth/api'
 import { prisma } from '@/lib/prisma'
 import { APP_URL, UMGEBUNG } from '@/lib/umgebung-server'
 import {
   ANMELDECODE_PLUGIN_OPTIONEN,
   GESPERRTE_AUTH_PFADE,
   codeVersandErlaubt,
+  istFehlversuch,
   rolleAusTreffern,
+  zuVieleFehlversucheAntwort,
+  type FehlversuchArt,
 } from '@/lib/anmeldecode'
 import { genauesIlikeMuster } from '@/lib/ilike-muster'
 import { erzeugeAnforderungsSperre } from '@/lib/anmeldecode-sperre'
-import { anmeldecodeGebremst } from '@/server/bremse-datenbank'
+import {
+  anmeldecodeGebremst,
+  gibVersuchZurueck,
+  loeschePasswortFehlversuche,
+  zaehleAlsFehlversuch,
+  zaehleVersuchVorab,
+  type VorabVersuch,
+} from '@/server/bremse-datenbank'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { sendeRegistrierungsHinweis } from '@/server/registrierung-hinweis'
 import { leereKontaktdatenNachFremdemPasswort } from '@/server/kontaktdaten-fremd'
@@ -116,6 +126,55 @@ function falscherCodeFehler(): APIError {
   return APIError.from('BAD_REQUEST', { code: 'INVALID_OTP', message: 'Invalid OTP' })
 }
 
+/**
+ * Ein abgelaufener oder zu oft probierter Code antwortet wie ein falscher (E7,
+ * Ergänzung; Nr. 112): Ein Hof bekommt nie einen Code — „OTP expired" oder
+ * „Too many attempts" (403) verrieten sonst, dass für die Adresse einer lag,
+ * also dass sie keinem Hof gehört. Über HTTP als fertige Antwort in der Form
+ * von Better Auths Fehlerantwort: Einen in hooks.after geworfenen Fehler
+ * nähme Better Auth nur als Körper, den Status behielte es vom Plugin
+ * (dispatchAuthEndpoint → toResponse). Ohne Request (auth.api) geworfen.
+ */
+function alsFalscherCode(request: Request | undefined): Response {
+  const fehler = falscherCodeFehler()
+  if (!request) throw fehler
+  return new Response(JSON.stringify(fehler.body), {
+    status: fehler.statusCode,
+    statusText: fehler.status.toString(),
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+/**
+ * 429, wenn eine Adresse für Codes bzw. Passwörter pausiert ist (E7,
+ * Ergänzung; Nr. 112): Satz mit Uhrzeit und Code fürs Formular
+ * (src/lib/anmeldecode.ts). `bis: null` heißt, die Datenbank antwortete nicht
+ * (fail-closed) — dann der allgemeine Satz ohne Uhrzeit, für jede Adresse gleich.
+ */
+function zuVieleFehlversucheFehler(art: FehlversuchArt, bis: Date | null): APIError {
+  if (bis === null) return new APIError('TOO_MANY_REQUESTS', { message: 'Zu viele Anfragen.' })
+  return new APIError('TOO_MANY_REQUESTS', zuVieleFehlversucheAntwort(art, bis, new Date()))
+}
+
+/**
+ * Wessen Passwort gerade zurückgesetzt wird — hooks.before merkt es sich,
+ * hooks.after löscht nach Erfolg den Zähler dieser Adresse. Danach steht der
+ * Token nicht mehr in der Datenbank. Schlüssel ist `ctx.context`: Better Auth
+ * legt es je Aufruf neu an und reicht dasselbe Objekt an beide Hooks
+ * (dispatchAuthEndpoint); schwach gehalten, verschwindet es mit der Anfrage.
+ * Belegt in tests/integration/code-bremse.int.test.ts.
+ */
+const adresseBeimZuruecksetzen = new WeakMap<object, string>()
+
+/**
+ * Der vorab gezählte Versuch einer Anmeldung mit Code bzw. Passwort —
+ * hooks.before zählt ihn, hooks.after lässt ihn als Fehlversuch stehen oder
+ * gibt ihn zurück. Schlüssel wie oben `ctx.context`. Wirft hooks.before oder
+ * der Endpunkt etwas anderes als einen APIError, läuft hooks.after nicht
+ * (dispatchAuthEndpoint): Der Versuch bleibt gezählt, zur sicheren Seite.
+ */
+const vorabGezaehlt = new WeakMap<object, VorabVersuch>()
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
@@ -164,17 +223,24 @@ export const auth = betterAuth({
       nachDerAntwort(() => sendeRegistrierungsHinweis(user.id))
     },
     sendResetPassword: async ({ user, url }) => {
-      try {
-        const { sendPasswordResetEmail } = await import('@/lib/email')
-        await sendPasswordResetEmail(user.email, url)
-      } catch (err) {
-        console.error('[Passwort-Reset] E-Mail-Fehler:', err)
-        // Der Fallback-Log enthält einen GÜLTIGEN Zugangs-Link samt Adresse —
-        // er darf niemals in die Produktions-Logs (Vercel) gelangen.
-        if (process.env.NODE_ENV !== 'production') {
-          console.log(`[DEV] Passwort-Reset für ${user.email}: ${url}`)
+      // Erst NACH der Antwort (E7, Ergänzung; Nr. 112), wie der Anmeldecode:
+      // Better Auth antwortet auf eine unbekannte Adresse ohne Mail — wartete
+      // eine bekannte auf Rendern und Resend, verriete die Antwortzeit, wer ein
+      // Konto hat. Antwort und Status sind für beide schon gleich.
+      nachDerAntwort(async () => {
+        try {
+          const { sendPasswordResetEmail } = await import('@/lib/email')
+          await sendPasswordResetEmail(user.email, url)
+        } catch (err) {
+          // Nur die Art des Fehlers — sein Text könnte die Adresse tragen.
+          console.error('[Passwort-Reset] E-Mail-Fehler:', err instanceof Error ? err.name : 'unbekannt')
+          // Der Fallback-Log enthält einen GÜLTIGEN Zugangs-Link samt Adresse —
+          // er darf niemals in die Produktions-Logs (Vercel) gelangen.
+          if (process.env.NODE_ENV !== 'production') {
+            console.log(`[DEV] Passwort-Reset für ${user.email}: ${url}`)
+          }
         }
-      }
+      })
     },
   },
 
@@ -257,9 +323,46 @@ export const auth = betterAuth({
         }
         const body = ctx.body as { email?: unknown } | undefined
         if (typeof body?.email !== 'string') return
-        // Antwort wie bei falschem Code; der Code (falls einer liegt) bleibt
-        // unberührt und läuft nach 10 Minuten ab.
-        if (!codeVersandErlaubt(await rolleZurAdresse(adresseWieDasPlugin(body.email)))) throw falscherCodeFehler()
+        // Falsche Codes je Adresse (E7, Ergänzung; Nr. 112): Der Versuch
+        // zählt VORAB, atomar; ist die Adresse pausiert, wird der Code gar
+        // nicht erst geprüft. VOR der Rollenprüfung — ein Hof pausiert wie
+        // eine Kundin oder eine Adresse, die es nicht gibt. Fail-closed
+        // (src/server/bremse-datenbank.ts).
+        const vorab = await zaehleVersuchVorab('code', body.email)
+        if (vorab.gesperrt) throw zuVieleFehlversucheFehler('code', vorab.bis)
+        // Antwort wie bei falschem Code — und gezählt wie einer: Sonst ließe
+        // sich an der Zählung erkennen, welche Adresse ein Hof ist. Der Code
+        // (falls einer liegt) bleibt unberührt und läuft nach 10 Minuten ab.
+        if (!codeVersandErlaubt(await rolleZurAdresse(adresseWieDasPlugin(body.email)))) {
+          zaehleAlsFehlversuch(vorab.versuch)
+          throw falscherCodeFehler()
+        }
+        vorabGezaehlt.set(ctx.context, vorab.versuch)
+        return
+      }
+
+      if (ctx.path === '/sign-in/email') {
+        // Falsche Passwörter je Adresse (E7, Ergänzung; Nr. 112): Der Versuch
+        // zählt VORAB, atomar; ist die Adresse pausiert, wird das Passwort
+        // gar nicht erst geprüft — für jedes Konto und jede unbekannte Adresse
+        // gleich. Stimmt es, gibt hooks.after den Versuch zurück. „Passwort
+        // vergessen" bleibt offen.
+        const body = ctx.body as { email?: unknown } | undefined
+        if (typeof body?.email !== 'string') return
+        const vorab = await zaehleVersuchVorab('passwort', body.email)
+        if (vorab.gesperrt) throw zuVieleFehlversucheFehler('passwort', vorab.bis)
+        vorabGezaehlt.set(ctx.context, vorab.versuch)
+        return
+      }
+
+      if (ctx.path === '/reset-password') {
+        // Nur lesen, wessen Passwort es ist (adresseBeimZuruecksetzen); ob
+        // der Token gilt, entscheidet Better Auth im Endpunkt.
+        const token = (ctx.body as { token?: unknown } | undefined)?.token ?? ctx.query?.token
+        if (typeof token !== 'string') return
+        const eintrag = await ctx.context.internalAdapter.findVerificationValue(`reset-password:${token}`)
+        const konto = eintrag ? await ctx.context.internalAdapter.findUserById(eintrag.value) : null
+        if (konto) adresseBeimZuruecksetzen.set(ctx.context, konto.email)
         return
       }
 
@@ -294,6 +397,37 @@ export const auth = betterAuth({
         // die Datenbank schreibt einmal, wie bei einer Kundin (Antwortzeit).
         await prisma.verification.deleteMany({ where: { identifier: `sign-in-otp-${email}` } })
         return ctx.json({ success: true })
+      }
+    }),
+    // Nach dem Endpunkt, eine Weiche nach Pfad (weitere Fälle kommen dazu):
+    // Fehlversuche (E7, Ergänzung; Nr. 112) — erst hier weiß Better Auth, ob
+    // Code oder Passwort stimmte; ein Fehler steht als APIError in
+    // `ctx.context.returned`. Der vorab gezählte Versuch bleibt nur bei einem
+    // Fehlversuch stehen. Nach einem erfolgreichen Zurücksetzen fällt der
+    // Passwort-Zähler der Adresse weg.
+    after: createAuthMiddleware(async (ctx) => {
+      switch (ctx.path) {
+        case '/sign-in/email-otp':
+        case '/sign-in/email': {
+          const versuch = vorabGezaehlt.get(ctx.context)
+          if (versuch === undefined) return
+          const antwort = ctx.context.returned
+          // Angemeldet, oder gescheitert an etwas anderem (etwa einer
+          // ungültigen Adresse): Der Versuch zählt nicht.
+          if (!isAPIError(antwort) || !istFehlversuch(versuch.art, antwort.body?.code)) {
+            await gibVersuchZurueck(versuch)
+            return
+          }
+          zaehleAlsFehlversuch(versuch)
+          // Von außen jeder gescheiterte Code wie ein falscher — wie beim Hof.
+          if (versuch.art === 'code' && antwort.body?.code !== 'INVALID_OTP') return alsFalscherCode(ctx.request)
+          return
+        }
+        case '/reset-password': {
+          const email = adresseBeimZuruecksetzen.get(ctx.context)
+          if (email !== undefined && !isAPIError(ctx.context.returned)) await loeschePasswortFehlversuche(email)
+          return
+        }
       }
     }),
   },

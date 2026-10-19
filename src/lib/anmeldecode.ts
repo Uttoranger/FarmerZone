@@ -17,7 +17,11 @@
  * (Verification.value = "<hash>:<versuche>", atomicVerifyOTP in
  * better-auth/dist/plugins/email-otp/routes.mjs) — jede Instanz liest
  * dieselbe Zeile. Belegt in tests/integration/anmeldecode.int.test.ts.
+ * Seit Nr. 112 zählen falsche Codes zusätzlich je ADRESSE über alle Codes
+ * (FALSCHE_CODES_JE_STUNDE unten, Register E7, Ergänzung).
  */
+import { tagInWorten, uhrzeitInWien } from '@/lib/fristen'
+
 export const ANMELDECODE_LAENGE = 6
 export const ANMELDECODE_GUELTIG_SEKUNDEN = 10 * 60
 export const ANMELDECODE_MAX_VERSUCHE = 5
@@ -176,20 +180,169 @@ export function codeVollstaendig(code: string): boolean {
   return new RegExp(`^\\d{${ANMELDECODE_LAENGE}}$`).test(code)
 }
 
+// ─── Falsche Codes und Passwörter je Adresse (Register E7, Ergänzung; Nr. 112) ───
+
+/**
+ * Höchstens so viele FALSCHE Codes je Adresse — über alle Codes hinweg und
+ * über beide Wege zusammen (Anmeldung mit Code und „Bestellungen finden"),
+ * auch für Adressen, die es nicht gibt. Je Code zählt das Plugin nur seine 5
+ * Versuche, und jeder neue Code bringt 5 neue: Mit 5 Codes je 15 Minuten
+ * wären das rund 100 Versuche je Stunde. Der 10. falsche Code einer Stunde
+ * (bzw. der 30. eines Tages) pausiert die Anmeldung mit Code bis zum Ende
+ * des Zeitfensters; die Fenster sind fest (src/lib/bremse-datenbank.ts).
+ */
+export const FALSCHE_CODES_JE_STUNDE = 10
+export const FALSCHE_CODES_JE_TAG = 30
+
+/**
+ * Falsche Passwörter je Adresse in der Stunde; danach Pause bis zum Ende der
+ * Stunde. Keine Sperre auf Dauer: „Passwort vergessen" bleibt offen, und ein
+ * erfolgreiches Zurücksetzen löscht den Zähler — wer einen Hof mit falschen
+ * Passwörtern aussperren will, müsste es jede Stunde neu versuchen.
+ */
+export const FALSCHE_PASSWOERTER_JE_STUNDE = 10
+
+export type FehlversuchArt = 'code' | 'passwort'
+
+/**
+ * Welche Antworten von Better Auth ein Fehlversuch sind. Beim Code jeder
+ * gescheiterte Versuch mit einem Code — falsch, abgelaufen oder zu oft
+ * probiert (auch ohne liegenden Code antwortet das Plugin „INVALID_OTP", wie
+ * der Hook bei einem Hof); beim Passwort die eine Antwort „E-Mail oder
+ * Passwort falsch", die Better Auth für jedes Konto und jede unbekannte
+ * Adresse gleich gibt. Eine ungültige Adresse zählt nicht.
+ */
+const FEHLVERSUCH_CODES: Record<FehlversuchArt, readonly string[]> = {
+  code: ['INVALID_OTP', 'OTP_EXPIRED', 'TOO_MANY_ATTEMPTS'],
+  passwort: ['INVALID_EMAIL_OR_PASSWORD'],
+}
+
+export function istFehlversuch(art: FehlversuchArt, code: unknown): boolean {
+  return typeof code === 'string' && FEHLVERSUCH_CODES[art].includes(code)
+}
+
+/** Maschinenlesbar in der 429-Antwort, damit das Formular den Satz mit Uhrzeit zeigt. */
+export const ZU_VIELE_FALSCHE_CODES = 'ZU_VIELE_FALSCHE_CODES'
+export const ZU_VIELE_FALSCHE_PASSWOERTER = 'ZU_VIELE_FALSCHE_PASSWOERTER'
+
+/**
+ * Mockup system-h1-angemeldete-geraete, Schritt 7 — für jede Adresse gleich,
+ * auch für eine, die wir nicht kennen (dann geht keine Mail hinaus, der Satz
+ * bleibt derselbe: Die Seite verrät nicht, wer ein Konto hat).
+ */
+export function zuVieleCodesText(pauseBis: string): string {
+  return `Zu viele falsche Codes. Die Anmeldung mit Code ist für diese Adresse bis ${pauseBis} pausiert. Wir haben dir eine E-Mail geschickt.`
+}
+
+/**
+ * Dieselbe Pause bei „Bestellungen finden“ (die Zähler sind gemeinsam), aber
+ * ohne Mail-Zusage: Dort fragen meist Gäste ohne Konto, und die Mail geht nur
+ * an ein Konto. Der Satz ist für jede Adresse gleich und verrät nicht, wer ein
+ * Konto hat.
+ */
+export function codesPausiertText(pauseBis: string): string {
+  return `Zu viele falsche Codes. Codes für diese Adresse sind bis ${pauseBis} pausiert.`
+}
+
+export function zuVielePasswoerterText(pauseBis: string): string {
+  return `Zu viele Versuche – versuch es nach ${pauseBis} wieder oder setz dein Passwort zurück.`
+}
+
+/** „15:00", wenn die Pause heute endet, sonst „morgen um 02:00" — Wiener Zeit. */
+export function pauseBisText(bis: Date, jetzt: Date): string {
+  const tag = tagInWorten(bis, jetzt)
+  const uhrzeit = uhrzeitInWien(bis)
+  return tag === 'heute' ? uhrzeit : `${tag} um ${uhrzeit}`
+}
+
+/**
+ * Der Körper der 429-Antwort, wenn eine Adresse pausiert ist: `code` für das
+ * Formular, `pauseBis` als fertige Uhrzeit (der Server kennt „jetzt", das
+ * Formular baut daraus denselben Satz), `message` für jeden anderen Aufrufer.
+ * Beim Passwort nur die Uhrzeit — die Pause dauert höchstens eine Stunde.
+ */
+export function zuVieleFehlversucheAntwort(
+  art: FehlversuchArt,
+  bis: Date,
+  jetzt: Date
+): { code: string; message: string; pauseBis: string } {
+  if (art === 'code') {
+    const pauseBis = pauseBisText(bis, jetzt)
+    return { code: ZU_VIELE_FALSCHE_CODES, message: zuVieleCodesText(pauseBis), pauseBis }
+  }
+  const pauseBis = uhrzeitInWien(bis)
+  return { code: ZU_VIELE_FALSCHE_PASSWOERTER, message: zuVielePasswoerterText(pauseBis), pauseBis }
+}
+
+/**
+ * Die Mail „Zu viele falsche Codes" bzw. „… Passwörter" (src/emails/
+ * zu-viele-versuche.tsx). Nie mit Code und nie mit einem Link zum Anmelden:
+ * Sie geht an jede Adresse, für die es ein Konto gibt, und soll nur
+ * Bescheid sagen. `bis` steht fest mit Tag und Uhrzeit (zeitpunktFuerMail) —
+ * eine Mail wird später gelesen, als sie geschickt wurde.
+ */
+export const ZU_VIELE_VERSUCHE_MAIL: Record<
+  FehlversuchArt,
+  { betreff: string; titel: string; text: (bis: string) => string; ausweg: string }
+> = {
+  code: {
+    betreff: 'Zu viele falsche Codes',
+    titel: 'Zu viele falsche Codes',
+    text: (bis) =>
+      `für deine E-Mail-Adresse wurde zu oft ein falscher Code eingegeben. Deshalb nehmen wir für diese Adresse bis ${bis} keinen Code mehr an.`,
+    ausweg:
+      'Warst du das nicht? Dann musst du nichts tun: Ohne den Code aus deiner E-Mail kommt niemand weiter. Gib Codes nie an andere weiter – wir fragen dich nie danach.',
+  },
+  passwort: {
+    betreff: 'Zu viele falsche Passwörter',
+    titel: 'Zu viele falsche Passwörter',
+    text: (bis) =>
+      `bei deinem Konto wurde zu oft ein falsches Passwort eingegeben. Deshalb ist die Anmeldung mit Passwort bis ${bis} pausiert.`,
+    ausweg:
+      'Über „Passwort vergessen" kannst du dein Passwort jederzeit zurücksetzen – danach geht die Anmeldung sofort wieder. Warst du das nicht? Dann setz zur Sicherheit ein neues Passwort fest. Wir fragen dich nie per E-Mail nach deinem Passwort.',
+  },
+}
+
 /** Was Better Auth im Fehlerfall zurückgibt — nur die Felder, die hier zählen. */
-export type AnmeldeFehler = { code?: string; status?: number }
+export type AnmeldeFehler = { code?: string; status?: number; pauseBis?: string }
+
+/** Die Felder aus einem Fehler des Better-Auth-Clients; `pauseBis` nur, wenn es Text ist. */
+export function anmeldeFehlerVon(
+  e: { code?: string; status?: number; pauseBis?: unknown } | null | undefined
+): AnmeldeFehler {
+  return { code: e?.code, status: e?.status, pauseBis: typeof e?.pauseBis === 'string' ? e.pauseBis : undefined }
+}
+
+/**
+ * Der Satz zur Hof-Anmeldung mit Passwort, wenn zu viele Versuche gebremst
+ * wurden — mit Uhrzeit, wenn die Adresse pausiert ist; sonst (die Grenze je
+ * Minute, oder die Datenbank antwortete nicht) der Satz ohne Uhrzeit. `null`
+ * = kein Bremsen-Fehler, das Formular bleibt bei seinem Satz.
+ */
+export function passwortZuVieleText(fehler: AnmeldeFehler): string | null {
+  if (fehler.code === ZU_VIELE_FALSCHE_PASSWOERTER && fehler.pauseBis) return zuVielePasswoerterText(fehler.pauseBis)
+  if (fehler.status === 429) {
+    return 'Das waren gerade zu viele Versuche. Warte eine Minute und probier es dann noch einmal.'
+  }
+  return null
+}
 
 /**
  * Der Satz für die Kundin. Geduzt, ohne Fachbegriff, immer mit Ausweg.
  * `senden` = Code anfordern, `pruefen` = mit Code anmelden.
  */
 export function anmeldeFehlerText(fehler: AnmeldeFehler, schritt: 'senden' | 'pruefen'): string {
+  if (fehler.code === ZU_VIELE_FALSCHE_CODES && fehler.pauseBis) return zuVieleCodesText(fehler.pauseBis)
   if (fehler.status === 429) {
     return 'Das waren gerade zu viele Versuche. Warte eine Minute und probier es dann noch einmal.'
   }
   switch (fehler.code) {
+    // Seit Nr. 112 kommt bei der Anmeldung jeder gescheiterte Code so an —
+    // auch ein abgelaufener oder zu oft probierter (src/lib/auth.ts,
+    // alsFalscherCode). Die zwei Fälle darunter bleiben für den Fall, dass
+    // Better Auth sie doch durchreicht.
     case 'INVALID_OTP':
-      return 'Der Code stimmt nicht. Schau noch einmal in die E-Mail oder lass dir einen neuen schicken.'
+      return 'Der Code stimmt nicht oder ist abgelaufen. Schau noch einmal in die E-Mail oder lass dir einen neuen schicken.'
     case 'OTP_EXPIRED':
       return 'Der Code ist abgelaufen – er gilt 10 Minuten. Lass dir einen neuen schicken.'
     case 'TOO_MANY_ATTEMPTS':

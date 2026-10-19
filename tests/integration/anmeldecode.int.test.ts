@@ -153,7 +153,10 @@ describe('Anmeldecode in der Datenbank', () => {
     for (let i = 0; i < 2; i++) expect(await versuche(instanzB, email, falsch)).toEqual({ ok: false, code: 'INVALID_OTP' })
 
     expect((await zeile(email)).value.endsWith(':5')).toBe(true)
-    expect(await versuche(instanzB, email, code)).toEqual({ ok: false, code: 'TOO_MANY_ATTEMPTS' })
+    // Das Plugin gibt den Code auf (die Zeile ist weg); von außen sieht es aus
+    // wie ein falscher Code — sonst wäre ein Hof erkennbar (Nr. 112).
+    expect(await versuche(instanzB, email, code)).toEqual({ ok: false, code: 'INVALID_OTP' })
+    expect(await prisma.verification.count({ where: { identifier: `sign-in-otp-${email}` } })).toBe(0)
     expect(await prisma.session.count({ where: { user: { email } } })).toBe(0)
   })
 
@@ -180,7 +183,9 @@ describe('Anmeldecode in der Datenbank', () => {
       data: { expiresAt: new Date(Date.now() - 1_000) },
     })
 
-    expect(await versuche(instanzA, email, code)).toEqual({ ok: false, code: 'OTP_EXPIRED' })
+    // Abgelaufen: Das Plugin löscht die Zeile; die Antwort wie bei einem falschen Code (Nr. 112).
+    expect(await versuche(instanzA, email, code)).toEqual({ ok: false, code: 'INVALID_OTP' })
+    expect(await prisma.verification.count({ where: { identifier: `sign-in-otp-${email}` } })).toBe(0)
     expect(await prisma.session.count({ where: { user: { email } } })).toBe(0)
   })
 

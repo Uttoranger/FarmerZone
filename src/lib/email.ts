@@ -413,6 +413,27 @@ export async function sendPasswordResetEmail(email: string, url: string): Promis
   await send(email, `Passwort zurücksetzen · ${MARKE}`, html)
 }
 
+/**
+ * „Zu viele falsche Codes" bzw. „… Passwörter" → das Konto hinter der Adresse
+ * (Register E7, Ergänzung; Nr. 112). Ohne Code und ohne Link; Betreff und
+ * Texte aus src/lib/anmeldecode.ts, die Pause mit Tag und Uhrzeit. Gibt das
+ * Versandergebnis zurück (sendRaw wirft nie).
+ */
+export async function sendZuVieleVersucheEmail(
+  email: string,
+  art: import('@/lib/anmeldecode').FehlversuchArt,
+  bis: Date
+): Promise<VersandErgebnis> {
+  // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
+  const { ZU_VIELE_VERSUCHE_MAIL } = await import('@/lib/anmeldecode')
+  const vorlage = await htmlOderFehler(async () => {
+    const { ZuVieleVersucheEmail } = await import('@/emails/zu-viele-versuche')
+    return React.createElement(ZuVieleVersucheEmail, { art, bis: zeitpunktFuerMail(bis) })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, `${ZU_VIELE_VERSUCHE_MAIL[art].betreff} · ${MARKE}`, vorlage.html)
+}
+
 /** Neuer Hof registriert → Betreiber (Freischaltung nötig); `an` aus empfaengerFuer('hofWartet'). */
 export async function sendNewFarmNotification(
   farm: {
