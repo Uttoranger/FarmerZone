@@ -51,6 +51,10 @@ export function Chip({
  * (nach oben); `false` behält die Position, etwa für die Filter des
  * Postfachs. `ladePunkt` zeigt während des Wechsels den kleinen Kreis
  * (`LadePunkt`, Register N14, Ergänzung) — nur, wo die Seite ihn will.
+ *
+ * `nofollow` (Register N19) setzt `rel="nofollow"`: auf öffentlichen Seiten,
+ * deren Filter beliebig viele Adressen ergeben (/hoefe) — ein Crawler soll
+ * ihnen nicht folgen. Ohne Angabe kein `rel`, wie bisher (Admin, Hofbereich).
  */
 export function FilterChip({
   href,
@@ -60,6 +64,7 @@ export function FilterChip({
   onNavigate,
   scroll,
   ladePunkt = false,
+  nofollow = false,
 }: {
   href: string
   aktiv?: boolean
@@ -68,6 +73,7 @@ export function FilterChip({
   onNavigate?: (ereignis: { preventDefault: () => void }) => void
   scroll?: boolean
   ladePunkt?: boolean
+  nofollow?: boolean
 }): React.JSX.Element {
   return (
     <Link
@@ -77,6 +83,7 @@ export function FilterChip({
       // Wer selbst anwendet, braucht die Seite nicht vorab vom Server: Bei
       // einer dynamischen Seite wäre das eine Anfrage je sichtbarem Chip.
       prefetch={onNavigate ? false : undefined}
+      rel={nofollow ? 'nofollow' : undefined}
       data-slot="filter-chip"
       aria-current={aktiv ? 'page' : undefined}
       className={cn(

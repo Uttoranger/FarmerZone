@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { List, Map as MapIcon } from 'lucide-react'
-import { abgesendeterSuchtext, leseHoefeFilter, schreibeHoefeFilter, type HoefeFilter } from '@/schemas/hoefe-filter'
+import { leseHoefeFilter, schreibeHoefeFilter, type HoefeFilter } from '@/schemas/hoefe-filter'
 import {
   berechneHofAuswahl,
   suchForm,
@@ -43,6 +43,7 @@ import { KUNDE_PLATZ_HOEHE } from '@/lib/kunde-shell-masse'
 import { KarteLaedt } from '@/components/karte/karte-laedt'
 import HoefeKarussell from '@/components/hoefe/hoefe-karussell'
 import { HoefeSuche } from '@/components/hoefe/hoefe-suche'
+import { HOEFE_ADRESSE, ankunftAusAdresse, useHoefeAdresse } from '@/components/hoefe/use-hoefe-adresse'
 import { BlattGruppe, EntdeckenFilterblatt } from '@/components/hoefe/entdecken-filterblatt'
 import {
   AktiveFilterZeile,
@@ -109,12 +110,14 @@ function stufeAusWert(wert: string): UmkreisStufe {
  *
  * DIE URL IST DER ZUSTAND: Bereich, Kategorien, Sorten, Siegel, Tiere,
  * Menge, Sortierung, Suche und Ansicht stehen in der Adresse — teilbar und
- * reload-fest (src/schemas/hoefe-filter.ts). Jeder Filter ist ein echter
- * Link; ein gewöhnlicher Klick schreibt die Adresse per
- * history.replaceState (Link-onNavigate), statt die dynamische Seite neu vom
- * Server zu holen — gefiltert wird im Browser auf demselben Datensatz.
- * Ersetzen statt anhängen: Ein Filtertipp ist kein Schritt, zu dem „Zurück"
- * führen soll.
+ * reload-fest (src/schemas/hoefe-filter.ts). Die Seite ist statisch (Register
+ * N19): Das Server-HTML zeigt die ganze Liste, die Filter liest der Browser
+ * aus der Adresse (use-hoefe-adresse.ts) — ein geteilter Filter-Link zeigt kurz
+ * die ungefilterte Liste und dann die gefilterte. Jeder Filter ist ein echter
+ * Link mit rel="nofollow"; ein gewöhnlicher Klick schreibt die Adresse per
+ * history.replaceState (Link-onNavigate), statt die Seite neu vom Server zu
+ * holen — gefiltert wird im Browser auf demselben Datensatz. Ersetzen statt
+ * anhängen: Ein Filtertipp ist kein Schritt, zu dem „Zurück" führen soll.
  *
  * NICHT in der URL: Bezugspunkt und Umkreis — sie leben nur hier im Zustand.
  *
@@ -125,26 +128,23 @@ function stufeAusWert(wert: string): UmkreisStufe {
  */
 export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React.JSX.Element {
   const router = useRouter()
-  const pfad = usePathname()
   const istBreit = useIstBreit()
-  const suchParameter = useSearchParams()
-  const filter = useMemo(() => leseHoefeFilter(suchParameter), [suchParameter])
+  // Auf dem Server und beim Hydrieren null: der leere Filter, wie im Server-HTML.
+  const adresse = useHoefeAdresse()
+  const filter = useMemo(() => leseHoefeFilter(new URLSearchParams(adresse ?? '')), [adresse])
   const { bereich, ansicht } = filter
 
-  const schreibeUrl = useCallback(
-    (neu: HoefeFilter) => {
-      const query = schreibeHoefeFilter(neu)
-      window.history.replaceState(null, '', query ? `${pfad}?${query}` : pfad)
-    },
-    [pfad]
-  )
+  const schreibeUrl = useCallback((neu: HoefeFilter) => HOEFE_ADRESSE.ersetze(schreibeHoefeFilter(neu)), [])
   const setzeFilter = (aenderung: Partial<HoefeFilter>) => schreibeUrl({ ...filter, ...aenderung })
 
   const [lage, setLage] = useState<AuswahlLage>(LEERE_LAGE)
   // Der Suchtext, mit dem die Kundin ABGESENDET ankam (Startseite, Kopfzeile, 404 — nicht der, den diese
   // Seite beim Tippen selbst in die Adresse schrieb): Das Suchfeld löst ihn einmal wie Enter auf (Nr. 84)
-  // und vergisst ihn dann; ein neu aufgebautes Feld (Liste ↔ Karte) fragt nicht noch einmal.
-  const [ankunftsText, setAnkunftsText] = useState(() => abgesendeterSuchtext(suchParameter))
+  // und vergisst ihn dann; ein neu aufgebautes Feld (Liste ↔ Karte) fragt nicht noch einmal. Gelesen erst,
+  // wenn die Adresse feststeht — beim Hydrieren kennt die Seite sie noch nicht (null).
+  const [ankunftsText, setAnkunftsText] = useState<string | null>(null)
+  const ankunft = ankunftAusAdresse(ankunftsText, adresse)
+  if (ankunft !== ankunftsText) setAnkunftsText(ankunft)
   // Zählt jede Pin-Anfahrt, damit dieselbe Nummer zweimal hintereinander wirkt.
   const [fokus, setFokus] = useState(0)
   // Der Bezugspunkt der Umkreissuche lebt NUR hier: kein localStorage, kein
@@ -301,6 +301,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
         href={hoefeHref(zuruecksetzenZiel)}
         onNavigate={beimNavigieren(zuruecksetzenZiel, schreibeUrl, umkreisAufheben)}
         prefetch={false}
+        rel="nofollow"
         className={cn('inline-flex min-h-11 items-center rounded-full px-3 text-sm font-semibold text-status-fertig hover:bg-muted', FOKUS_RAHMEN)}
       >
         Zurücksetzen
@@ -479,7 +480,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
       vorschlaege={vorschlaege}
       status={statusText}
       bezugspunkt={bezugspunkt}
-      ankunftsText={ankunftsText}
+      ankunftsText={ankunftsText ?? ''}
       onSuchtext={(wert) => setzeFilter({ suchtext: wert })}
       onUebernehmen={suchMarkeHinzufuegen}
       onBezugspunkt={setBezugspunkt}
@@ -572,6 +573,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
               href={hoefeHref(zurListe)}
               onNavigate={beimNavigieren(zurListe, schreibeUrl)}
               prefetch={false}
+              rel="nofollow"
               className={cn(
                 'inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-3.5 text-[13.5px] font-semibold text-foreground hover:bg-muted',
                 FOKUS_RAHMEN
@@ -661,6 +663,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
           href={hoefeHref(zurKarte)}
           onNavigate={beimNavigieren(zurKarte, schreibeUrl)}
           prefetch={false}
+          rel="nofollow"
           aria-label="Karte öffnen"
           className={cn('relative block h-[120px] overflow-hidden rounded-2xl border border-border bg-accent', FOKUS_RAHMEN)}
         >

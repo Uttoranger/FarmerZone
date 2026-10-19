@@ -83,7 +83,7 @@ Alle Farben kommen aus CSS-Custom-Properties auf `:root`, umgeschaltet über `da
 
   | Datei | Baustein | Regel |
   |---|---|---|
-  | `chip.tsx` | `Chip`, `FilterChip`, `FilterChipReihe` | Filter ist ein Link (`href`), der gewählte trägt `aria-current="page"`; sichtbar 36 px, Trefferfläche 44 px über `::before`. Wendet die Seite Filter selbst im Browser an, gibt sie `onNavigate` mit (schreibt per `history.replaceState`, ruft `preventDefault()`; ohne Prefetch) — Mittelklick und neuer Tab folgen weiter dem Link |
+  | `chip.tsx` | `Chip`, `FilterChip`, `FilterChipReihe` | Filter ist ein Link (`href`), der gewählte trägt `aria-current="page"`; sichtbar 36 px, Trefferfläche 44 px über `::before`. Wendet die Seite Filter selbst im Browser an, gibt sie `onNavigate` mit (schreibt per `history.replaceState`, ruft `preventDefault()`; ohne Prefetch) — Mittelklick und neuer Tab folgen weiter dem Link. `nofollow` setzt `rel="nofollow"` — auf öffentlichen Seiten, deren Filter beliebig viele Adressen ergeben (/hoefe, Register N19); ohne Angabe kein `rel` (Admin, Hofbereich bleiben, wie sie sind) |
   | `stepper.tsx` | `Stepper` | Base UI NumberField; `max` setzt der Aufrufer, verbindlich prüft der Server |
   | `segment.tsx` | `Segment` | Base UI ToggleGroup als `role="toolbar"`, genau eine Wahl, nicht abwählbar; für Seitenzustand — Filter in der URL sind FilterChips |
   | `list-row.tsx` | `ListGruppe`, `ListRow` | mit `href` Link mit Pfeil, sonst Anzeige; ≥ 50 px; Titel `truncate` mit `title` |

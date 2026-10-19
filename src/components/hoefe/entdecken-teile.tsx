@@ -47,9 +47,9 @@ export type FilterWahl = (ziel: HoefeFilter) => void
 
 /**
  * Der onNavigate eines Filter-Links: Ein gewöhnlicher Klick wendet den Filter
- * im Browser an (history.replaceState in hoefe-client.tsx) statt die
- * dynamische Seite neu vom Server zu holen; Mittelklick und „In neuem Tab"
- * erreichen ihn nie und folgen dem echten Link.
+ * im Browser an (history.replaceState über use-hoefe-adresse.ts) statt die Seite
+ * neu vom Server zu holen; Mittelklick und „In neuem Tab" erreichen ihn nie
+ * und folgen dem echten Link.
  */
 export function beimNavigieren(
   ziel: HoefeFilter,
@@ -67,7 +67,7 @@ export function beimNavigieren(
   }
 }
 
-/** Eine Reihe Filter-Chips — jeder ein echter Link auf seine Adresse. */
+/** Eine Reihe Filter-Chips — jeder ein echter Link auf seine Adresse, mit nofollow (Register N19). */
 export function ChipReihe({
   beschriftung,
   chips,
@@ -89,6 +89,7 @@ export function ChipReihe({
       href={hoefeHref(chip.ziel)}
       aktiv={chip.aktiv}
       onNavigate={beimNavigieren(chip.ziel, onWahl)}
+      nofollow
     >
       {chip.label}
     </FilterChip>
@@ -111,8 +112,8 @@ export function ChipReihe({
 
 /**
  * „Aktive Filter: [Suche: Eier ×] [Bio ×] Alle zurücksetzen" (Mockup
- * web-k1-suche-filter). Jeder Eintrag ist ein Link auf die Adresse ohne ihn;
- * Umkreis und Bezugspunkt (nur Seitenzustand) sind Knöpfe.
+ * web-k1-suche-filter). Jeder Eintrag ist ein Link auf die Adresse ohne ihn
+ * (nofollow, Register N19); Umkreis und Bezugspunkt (nur Seitenzustand) sind Knöpfe.
  */
 export function AktiveFilterZeile({
   filter,
@@ -184,6 +185,7 @@ export function AktiveFilterZeile({
                 href={hoefeHref(f.ohne)}
                 onNavigate={beimNavigieren(f.ohne, onWahl)}
                 prefetch={onWahl ? false : undefined}
+                rel="nofollow"
                 aria-label={`${f.label} entfernen`}
                 title={f.label}
                 className={eintrag}
@@ -198,6 +200,7 @@ export function AktiveFilterZeile({
         href={hoefeHref(zurueck)}
         onNavigate={beimNavigieren(zurueck, onWahl, zuruecksetzenDanach)}
         prefetch={onWahl ? false : undefined}
+        rel="nofollow"
         className={cn(
           'inline-flex min-h-11 items-center rounded-lg px-1 text-[13px] font-semibold text-status-fertig hover:underline',
           FOKUS_RAHMEN
@@ -522,7 +525,7 @@ export function ProduktZeile({
   )
 }
 
-/** Leerzustand mit Ausweg (Mockup web-k1-leerzustand) — Link oder Umkreis-Knopf. */
+/** Leerzustand mit Ausweg (Mockup web-k1-leerzustand) — Link (nofollow) oder Umkreis-Knopf. */
 export function EntdeckenLeer({
   leer,
   onWahl,
@@ -548,6 +551,7 @@ export function EntdeckenLeer({
             href={hoefeHref(ausweg.ziel)}
             onNavigate={beimNavigieren(ausweg.ziel, onWahl)}
             prefetch={onWahl ? false : undefined}
+            rel="nofollow"
             className={knopf}
           >
             {ausweg.label}
@@ -597,7 +601,7 @@ export function HoefeFehler(): React.JSX.Element {
       titel="Wir konnten die Höfe gerade nicht laden."
       aktion={
         <Link
-          // Die Seite ist dynamisch: Derselbe Weg holt die Höfe neu vom Server.
+          // Die Seite wird alle fünf Minuten neu gebaut (Register N19): Derselbe Weg zeigt die Höfe, sobald ein Bau sie lesen konnte.
           href="/hoefe"
           prefetch={false}
           className={cn(
