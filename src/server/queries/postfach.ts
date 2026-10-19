@@ -390,8 +390,8 @@ export async function zaehleOffenImEingang(): Promise<EingangZahlen & { gesamt: 
  * vorhandenen Feldern: Hofseite-Fortschritt (dieselbe Liste wie „Mein Hof",
  * hofseiteFortschritt), Stripe, SEPA, LFBIS bei Futtermitteln, Titelbild,
  * E-Mail bestätigt. Der Platz bei sofortiger Freischaltung mit derselben
- * Regel wie Admin › Höfe (platzBeiFreischaltung), mit den Plätzen der
- * Einstellung (Nr. 116, statt der festen 12).
+ * Regel wie Admin › Höfe (platzBeiFreischaltung), mit der Einstellung
+ * (Nr. 116: Plätze statt der festen 12; nach dem Stichtag kein Platz).
  * Ohne Inhaber-Adresse und ohne Texte des Hofs: Nur Ja/Nein und Zahlen
  * verlassen diese Funktion.
  */
@@ -453,7 +453,7 @@ export async function ladeHofAufgaben(jetzt: Date): Promise<HofAufgabeRoh[]> {
       lfbis: hatRegistrierung('LFBIS', h),
       titelbild,
       email: h.owner.emailVerified === true ? 'bestaetigt' : bestaetigungOffen(h.owner) ? 'offen' : 'vor-pflicht',
-      platz: platzBeiFreischaltung(h.id, imRennen, jetzt, einstellung.plaetze),
+      platz: platzBeiFreischaltung(h.id, imRennen, jetzt, einstellung),
     }
   })
 }

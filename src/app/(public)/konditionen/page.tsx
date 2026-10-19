@@ -45,19 +45,6 @@ export const revalidate = 3600
 
 const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent(`Mein Hof auf ${MARKE}`)}`
 
-// Der Startseiten-CTA verspricht das Gründungshof-Angebot — bisher konnte man
-// es nirgends nachlesen. Diese Seite ist die Nachlese-Stelle.
-//
-// Aufbau bewusst wie das Impressum (gleiche Spalte, gleiche Abschnitts-
-// Typografie aus infoseite-stil.ts): eine Seite über Geld soll aussehen wie
-// die anderen verbindlichen Seiten, nicht wie Werbung. Seit Nr. 54 in der
-// KundeShell (KundeShellMitSitzung: die Seite bleibt statisch).
-//
-// ALLE Preise kommen aus src/lib/konditionen.ts — derselben Quelle wie
-// /fuer-hoefe (Nr. 15, E6 = Tarife: „damit nichts Widersprüchliches live
-// geht"). Steht hier eine Zahl im Text, ist das ein Fehler
-// (tests/konditionen-seiten.test.ts). Bis Nr. 15 stand hier das
-// Gründungshof-Angebot.
 /**
  * Abschnitt „Aktion“ (Register K2, Nr. 116): nur, solange die Aktion läuft —
  * auch bei Anzeige aus, Konditionen sind keine Werbung; Zahlen und Sätze aus
@@ -80,6 +67,19 @@ async function AktionAbschnitt({ jetzt }: { jetzt: Date }): Promise<React.JSX.El
   )
 }
 
+// Der Startseiten-CTA verspricht das Gründungshof-Angebot — bisher konnte man
+// es nirgends nachlesen. Diese Seite ist die Nachlese-Stelle.
+//
+// Aufbau bewusst wie das Impressum (gleiche Spalte, gleiche Abschnitts-
+// Typografie aus infoseite-stil.ts): eine Seite über Geld soll aussehen wie
+// die anderen verbindlichen Seiten, nicht wie Werbung. Seit Nr. 54 in der
+// KundeShell (KundeShellMitSitzung: die Seite bleibt statisch).
+//
+// ALLE Preise kommen aus src/lib/konditionen.ts — derselben Quelle wie
+// /fuer-hoefe (Nr. 15, E6 = Tarife: „damit nichts Widersprüchliches live
+// geht"). Steht hier eine Zahl im Text, ist das ein Fehler
+// (tests/konditionen-seiten.test.ts). Bis Nr. 15 stand hier das
+// Gründungshof-Angebot.
 export default function KonditionenPage() {
   // Je Bau bzw. stündlicher Revalidierung (oben): Danach entscheidet sich, ob die Bar-Ausnahme bis zum Stichtag (B1) dasteht.
   const jetzt = new Date()

@@ -182,6 +182,28 @@ describe('approveFarmAction nach dem Festschreiben', () => {
     expect(db.farm.updateMany).toHaveBeenCalledTimes(1) // nur die Freischaltung selbst
   })
 
+  it('Platz ohne gespeichertes Ende: die Nachricht nennt das Ende der Konditionen (Standard), nichts geschrieben', async () => {
+    db.farm.findUnique.mockImplementation(async ({ select }: { select: Record<string, unknown> }) =>
+      'owner' in select
+        ? { name: 'Testhof A', slug: 'testhof-a', stripeAccountReady: true, products: [{ id: 'p_1' }], owner: { email: 'hof@example.com', emailVerified: true, createdAt: new Date('2026-01-01T00:00:00Z') } }
+        : { gruendungPlatz: 7, gruendungBis: null, gruendungAusgenommen: false }
+    )
+    db.farm.findMany.mockResolvedValue([hof(1, { gruendungPlatz: 1 }), hof(9, { id: 'neu', gruendungPlatz: 7 })])
+    expect(await approveFarmAction('neu')).toEqual({})
+    expect(db.farm.updateMany).toHaveBeenCalledTimes(1) // nur die Freischaltung selbst
+    const text = (db.unterhaltung.create.mock.calls[0]?.[0].data.nachrichten.create.text as string).replace(/\u00a0/g, ' ')
+    expect(text).toContain('Du bist Gründungshof Nr. 7 – Hofladen ohne Grundgebühr bis 31. Dezember 2027.')
+    // Gegenprobe: nicht das Ende einer neuen Zusage ab heute.
+    expect(text).not.toContain('2029')
+  })
+
+  it('nach der Freischaltung: Höfe-Liste (Cache-Etikett) und /konditionen neu', async () => {
+    db.farm.findMany.mockResolvedValue([hof(1, { gruendungPlatz: 1 })])
+    expect(await approveFarmAction('neu')).toEqual({})
+    expect(updateTag).toHaveBeenCalledWith(HOEFE_CACHE_TAG)
+    expect(revalidatePath).toHaveBeenCalledWith('/konditionen')
+  })
+
   it('nach dem Stichtag: freigeschaltet, aber kein Platz und keine Nachricht', async () => {
     vi.setSystemTime(new Date('2027-04-01T09:00:00+02:00'))
     db.farm.findMany.mockResolvedValue([hof(1, { gruendungPlatz: 1 })])

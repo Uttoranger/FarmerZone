@@ -4,12 +4,14 @@ import { unstable_rethrow } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import {
   KEINE_GRUENDUNG_SEITEN,
+  abzeichenBlattAus,
   festschreibenBrauchtPlaetze,
   festschreibenListe,
   gruendungSeitenDaten,
   gruendungsplaetze,
   seitenZahlen,
   zaehleAusgenommene,
+  type AbzeichenBlatt,
   type FestschreibenZeile,
   type GruendungSeiten,
 } from '@/lib/gruendungshof'
@@ -22,6 +24,7 @@ import {
   plattformEinstellungAus,
   type PlattformEinstellung,
 } from '@/lib/plattform-einstellung'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { ladeHoefeFuerFestschreiben, ladeHoefeFuerGruendung } from '@/server/queries/admin'
 
 /*
@@ -65,18 +68,47 @@ export function ladePlattformEinstellung(): Promise<PlattformEinstellung> {
  */
 export async function gruendungFuerSeiten(jetzt: Date = new Date()): Promise<GruendungSeiten> {
   try {
-    const [einstellung, hoefe, wartend] = await Promise.all([
-      ladePlattformEinstellung(),
-      ladeHoefeFuerGruendung(),
-      // Wartend wie in der Admin-Liste (approvedAt null), stillgelegte nicht — sie kommen nie dran.
-      prisma.farm.count({ where: { approvedAt: null, archivedAt: null } }),
-    ])
-    return gruendungSeitenDaten(gruendungEinstellungAus(einstellung), hoefe, wartend, jetzt)
+    return await zaehleGruendungSeiten(jetzt)
   } catch (err) {
-    // Nexts eigene Steuersignale (dynamisches Rendern beim Bau) gehören nicht in die Fehleranzeige.
-    unstable_rethrow(err)
-    Sentry.captureException(err, { tags: { bereich: 'gruendung-seiten' } })
+    meldeSeitenFehler(err)
     return KEINE_GRUENDUNG_SEITEN
+  }
+}
+
+/** Die Zahlen frisch gezählt — wirft bei einem Ladefehler; die Aufrufer fangen ihn. */
+async function zaehleGruendungSeiten(jetzt: Date): Promise<GruendungSeiten> {
+  const [einstellung, hoefe, wartend] = await Promise.all([
+    ladePlattformEinstellung(),
+    ladeHoefeFuerGruendung(),
+    // Wartend wie in der Admin-Liste (approvedAt null), stillgelegte nicht — sie kommen nie dran.
+    prisma.farm.count({ where: { approvedAt: null, archivedAt: null } }),
+  ])
+  return gruendungSeitenDaten(gruendungEinstellungAus(einstellung), hoefe, wartend, jetzt)
+}
+
+function meldeSeitenFehler(err: unknown): void {
+  // Nexts eigene Steuersignale (dynamisches Rendern beim Bau) gehören nicht in die Fehleranzeige.
+  unstable_rethrow(err)
+  Sentry.captureException(err, { tags: { bereich: 'gruendung-seiten' } })
+}
+
+/**
+ * Die Zahlen fürs Erklär-Blatt des Abzeichens (Hofseite, Register K2, Nr. 116)
+ * — gecacht statt bei jedem Aufruf der Hofseite alle Höfe zu zählen. Das
+ * Etikett der Höfe erneuern Freischalten, Ausnehmen, Wiederaufnahme,
+ * Festschreiben und der Schalter, das der Einstellung Speichern und
+ * Festschreiben; die fünf Minuten fangen den Stichtag (wie die Höfe-Liste).
+ * Ein Ladefehler wird nicht gecacht: Dann zeigt die Seite das Etikett ohne Blatt.
+ */
+export async function ladeAbzeichenBlatt(): Promise<AbzeichenBlatt | null> {
+  try {
+    return await unstable_cache(async () => abzeichenBlattAus(await zaehleGruendungSeiten(new Date())), ['abzeichen-blatt'], {
+      tags: [HOEFE_CACHE_TAG, PLATTFORM_EINSTELLUNG_TAG],
+      revalidate: 300,
+    })()
+  } catch (err) {
+    meldeSeitenFehler(err)
+    return null
   }
 }
 

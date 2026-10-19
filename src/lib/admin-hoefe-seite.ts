@@ -15,6 +15,7 @@ import type { KennzahlDaten, UnterreiterDaten } from '@/lib/admin-seiten'
 import {
   GRUENDUNG_BIS_MARKE,
   GRUENDUNG_BIS_TITEL,
+  aktionLaeuft,
   folgenDerAenderung,
   gruendungAlleVergeben,
   gruendungsplaetze,
@@ -22,6 +23,7 @@ import {
   kleinsteFreieNummer,
   vergabeFest,
   type GruendungAnzeige,
+  type GruendungEinstellung,
   type GruendungFolgen,
   type GruendungRichtung,
   type HofFuerFolgen,
@@ -148,14 +150,24 @@ export const GRUENDUNGSPLATZ_WARTELISTE = {
  * belegen nichts. Über der Zahl der Plätze: null (kein Platz mehr). Ein
  * ausgenommener Hof (Nr. 109) bekäme keinen.
  */
-export function platzBeiFreischaltung(hofId: string, hoefe: readonly HofFuerPlatz[], jetzt: Date, maxPlaetze: number): number | null {
+export function platzBeiFreischaltung(
+  hofId: string,
+  hoefe: readonly HofFuerPlatz[],
+  jetzt: Date,
+  einstellung: GruendungEinstellung
+): number | null {
+  const maxPlaetze = einstellung.plaetze
   const ausgenommen = hoefe.find((h) => h.id === hofId)?.gruendungAusgenommen === true
-  // Festgeschrieben (Nr. 116): ein Hof mit Platz behält ihn, sonst die kleinste freie Nummer. Ob die Aktion
-  // noch läuft (Stichtag), weiß die Liste nicht — den Ausschlag gibt approveFarmAction nach der Sperre.
+  // Festgeschrieben (Nr. 116): ein Hof mit Platz behält ihn (auch nach dem Stichtag, wie approveFarmAction),
+  // sonst die kleinste freie Nummer — nur, solange die Aktion läuft. Sonst nennte die Warteliste nach dem
+  // Stichtag einen Platz, den die Freischaltung nicht vergibt.
   if (vergabeFest(hoefe)) {
     if (ausgenommen) return null
     const plaetze = gruendungsplaetze(hoefe)
-    return plaetze.get(hofId) ?? kleinsteFreieNummer(new Set(plaetze.values()), Math.max(maxPlaetze, 0))
+    const eigener = plaetze.get(hofId)
+    if (eigener !== undefined) return eigener
+    if (!aktionLaeuft(jetzt, einstellung, plaetze.size)) return null
+    return kleinsteFreieNummer(new Set(plaetze.values()), Math.max(maxPlaetze, 0))
   }
   const mitHof: HofFuerPlatz[] = [
     ...hoefe.filter((h) => h.id !== hofId),

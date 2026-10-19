@@ -232,7 +232,17 @@ export type HofMitGruendungBis = { id: string; gruendungBis: Date | null }
  * darin, hat er keinen Platz.
  */
 export function bestimmeGruendungBis(hof: HofMitGruendungBis, hoefe: readonly HofFuerPlatz[]): Date | null {
-  return istGruendungshof(hof.id, hoefe) ? (hof.gruendungBis ?? GRUENDUNG_BIS_STANDARD) : null
+  return istGruendungshof(hof.id, hoefe) ? wirksamesGruendungBis(hof.gruendungBis) : null
+}
+
+/**
+ * Das Ende eines Hofs MIT Platz: sein gespeichertes oder der Standard. Eine
+ * Regel für Konditionen (`bestimmeGruendungBis`) und Gründungs-Nachricht
+ * (`zusageBeiFreischaltung`) — sonst nennte die Nachricht ein anderes Datum,
+ * als „Dein Stand“ zeigt (K1).
+ */
+function wirksamesGruendungBis(gruendungBis: Date | null): Date {
+  return gruendungBis ?? GRUENDUNG_BIS_STANDARD
 }
 
 /**
@@ -521,7 +531,8 @@ export type Zusage = { platz: number; bisTag: string }
 /**
  * Was eine Freischaltung bzw. Wiederaufnahme nach dem Festschreiben bekommt:
  * Hat der Hof schon einen Platz (erneute Freigabe nach Entzug), bleiben Platz
- * und Ende, wie sie sind (`behalten`). Sonst, wenn die Aktion läuft, die
+ * und Ende, wie sie sind (ohne gespeichertes Ende: der Standard wie in
+ * `bestimmeGruendungBis`). Sonst, wenn die Aktion läuft, die
  * kleinste freie Nummer und das Ende nach `zusageEnde` ab heute — nie kürzer
  * als ein noch gespeichertes Ende (K1). Läuft sie nicht: null (kein Platz).
  * `hoefe` ist die Liste der Platzvergabe, gelesen nach der Sperre.
@@ -533,8 +544,8 @@ export function zusageBeiFreischaltung(
   jetzt: Date
 ): (Zusage & { neu: boolean }) | null {
   if (hof.gruendungPlatz !== null) {
-    const bisTag = hof.gruendungBis ? kalendertagInWien(hof.gruendungBis) : zusageEnde(kalendertagInWien(jetzt), einstellung)
-    return { platz: hof.gruendungPlatz, bisTag, neu: false }
+    // Nichts wird geschrieben — also nennt die Nachricht genau das Ende, das die Konditionen zeigen.
+    return { platz: hof.gruendungPlatz, bisTag: kalendertagInWien(wirksamesGruendungBis(hof.gruendungBis)), neu: false }
   }
   const vergeben = vergebeneNummern(hoefe)
   if (!aktionLaeuft(jetzt, einstellung, vergeben.size)) return null

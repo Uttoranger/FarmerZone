@@ -154,3 +154,15 @@ describe('Schalter „Abzeichen zeigen“ — der Satz nennt nur Orte, an denen 
     expect(/geteilt|Teilen/i.test(ABZEICHEN_TEXT.schalterZeile)).toBe(zeichnetEtikett)
   })
 })
+
+describe('Erklär-Blatt der Hofseite — die Zahlen hinter dem Cache, nicht bei jedem Aufruf frisch gezählt', () => {
+  it('hofseite-vorschau lädt sie über ladeAbzeichenBlatt; der Lader liegt hinter unstable_cache mit den Etiketten von Höfen und Einstellung', () => {
+    const vorschau = readFileSync(join(process.cwd(), 'src/server/hofseite-vorschau.ts'), 'utf8')
+    expect(vorschau).toContain('ladeAbzeichenBlatt()')
+    expect(vorschau).not.toContain('gruendungFuerSeiten')
+    const lader = readFileSync(join(process.cwd(), 'src/server/queries/plattform-einstellung.ts'), 'utf8')
+    const rumpf = lader.slice(lader.indexOf('export async function ladeAbzeichenBlatt'))
+    expect(rumpf).toMatch(/unstable_cache\(/)
+    expect(rumpf).toMatch(/tags: \[HOEFE_CACHE_TAG, PLATTFORM_EINSTELLUNG_TAG\]/)
+  })
+})

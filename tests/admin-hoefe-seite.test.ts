@@ -31,11 +31,13 @@ import {
   waehleHoefeReiter,
   wartelistePlatzZeile,
 } from '@/lib/admin-hoefe-seite'
-import type { HofFuerPlatz } from '@/lib/gruendungshof'
+import { GRUENDUNG_EINSTELLUNG_STANDARD, type HofFuerPlatz } from '@/lib/gruendungshof'
 import { hoefeReiterAus } from '@/schemas/admin-reiter'
 
 const JETZT = new Date('2026-10-15T10:00:00+02:00')
 const MAX = 12
+/** Die Einstellung vor dem Festschreiben mit MAX Plätzen — so liest platzBeiFreischaltung sie. */
+const EINSTELLUNG = { ...GRUENDUNG_EINSTELLUNG_STANDARD, plaetze: MAX }
 
 function roh(id: string, ueber: Partial<HofRohdaten> = {}): HofRohdaten {
   return {
@@ -169,20 +171,20 @@ describe('Warteliste: Gründungsplatz bei Freischaltung', () => {
   const sieben = Array.from({ length: 7 }, (_, i) => frist(`h${i + 1}`, i + 1))
 
   it('k ist die Zahl der Höfe im Rennen plus eins — der Hof kommt als letzter in die Reihenfolge der Freischaltung', () => {
-    expect(platzBeiFreischaltung('wartet', [...sieben, warteHof], JETZT, MAX)).toBe(8)
+    expect(platzBeiFreischaltung('wartet', [...sieben, warteHof], JETZT, EINSTELLUNG)).toBe(8)
   })
 
   it('ein stillgelegter Hof gibt seinen Platz frei und ein wartender belegt keinen', () => {
     const still = { ...frist('weg', 5), archivedAt: new Date('2026-10-01T09:00:00+02:00') }
     const weitereWartende: HofFuerPlatz = { ...warteHof, id: 'zweiter' }
-    expect(platzBeiFreischaltung('wartet', [...sieben, still, weitereWartende, warteHof], JETZT, MAX)).toBe(8)
+    expect(platzBeiFreischaltung('wartet', [...sieben, still, weitereWartende, warteHof], JETZT, EINSTELLUNG)).toBe(8)
   })
 
   it('alle Plätze vergeben: kein Platz', () => {
     const zwoelf = Array.from({ length: 12 }, (_, i) => frist(`h${i + 1}`, i + 1))
-    expect(platzBeiFreischaltung('wartet', [...zwoelf, warteHof], JETZT, MAX)).toBeNull()
+    expect(platzBeiFreischaltung('wartet', [...zwoelf, warteHof], JETZT, EINSTELLUNG)).toBeNull()
     // Gegenprobe: elf vergeben — der zwölfte Platz ist noch frei.
-    expect(platzBeiFreischaltung('wartet', [...zwoelf.slice(0, 11), warteHof], JETZT, MAX)).toBe(12)
+    expect(platzBeiFreischaltung('wartet', [...zwoelf.slice(0, 11), warteHof], JETZT, EINSTELLUNG)).toBe(12)
   })
 
   it('mit Stripe: „bekäme Gründungsplatz Nr. k“', () => {

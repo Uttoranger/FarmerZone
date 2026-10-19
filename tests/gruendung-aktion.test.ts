@@ -148,8 +148,18 @@ describe('festgeschriebene Vergabe — der gespeicherte Platz zählt, nicht die 
   })
 
   it('Warteliste im Admin: die kleinste freie Nummer bzw. der eigene Platz nach einem Entzug', () => {
-    expect(platzBeiFreischaltung('neu', hoefe, JETZT, 100)).toBe(3)
-    expect(platzBeiFreischaltung('b', hoefe, JETZT, 100)).toBe(2)
+    expect(platzBeiFreischaltung('neu', hoefe, JETZT, AKTION)).toBe(3)
+    expect(platzBeiFreischaltung('b', hoefe, JETZT, AKTION)).toBe(2)
+  })
+
+  it('Warteliste nach dem Stichtag bzw. mit allen Plätzen vergeben: kein Platz genannt — der eigene bleibt', () => {
+    const nachStichtag = new Date('2027-04-01T09:00:00+02:00')
+    expect(platzBeiFreischaltung('neu', hoefe, nachStichtag, AKTION)).toBeNull()
+    expect(platzBeiFreischaltung('neu', hoefe, JETZT, { ...AKTION, plaetze: 2 })).toBeNull()
+    // Gegenprobe: am Stichtag selbst läuft die Aktion noch.
+    expect(platzBeiFreischaltung('neu', hoefe, new Date('2027-03-31T20:00:00+02:00'), AKTION)).toBe(3)
+    // Wer schon einen Platz hält (Entzug), behält ihn auch nach dem Stichtag — wie approveFarmAction.
+    expect(platzBeiFreischaltung('b', hoefe, nachStichtag, AKTION)).toBe(2)
   })
 })
 
@@ -169,6 +179,20 @@ describe('zusageBeiFreischaltung — Platz und Ende bei der Freischaltung nach d
     const neu = { id: 'neu', gruendungPlatz: null, gruendungBis: null }
     expect(zusageBeiFreischaltung(neu, hoefe, AKTION, new Date('2027-04-01T09:00:00+02:00'))).toBeNull()
     expect(zusageBeiFreischaltung(neu, hoefe, { ...AKTION, plaetze: 2 }, JETZT)).toBeNull()
+  })
+
+  it('Platz ohne gespeichertes Ende: Nachricht und Konditionen nennen dasselbe Datum (bestimmeGruendungBis)', () => {
+    const ohneEnde = { id: 'b', gruendungPlatz: 3, gruendungBis: null }
+    const liste = [fest('a', 1), fest('b', 3, { gruendungBis: null })]
+    const konditionen = bestimmeGruendungBis(ohneEnde, liste)
+    const zusage = zusageBeiFreischaltung(ohneEnde, liste, AKTION, JETZT)
+    expect(zusage).toMatchObject({ platz: 3, neu: false })
+    expect(konditionen).not.toBeNull()
+    expect(zusage?.bisTag).toBe(konditionen?.toISOString().slice(0, 10))
+    // Gegenprobe: mit gespeichertem Ende nennen beide dieses Ende.
+    const mitEnde = { id: 'b', gruendungPlatz: 3, gruendungBis: bildeGruendungBis('2030-01-31') }
+    expect(zusageBeiFreischaltung(mitEnde, hoefe, AKTION, JETZT)?.bisTag).toBe('2030-01-31')
+    expect(bestimmeGruendungBis(mitEnde, hoefe)?.toISOString().slice(0, 10)).toBe('2030-01-31')
   })
 
   it('nie kürzer als ein noch gespeichertes Ende (K1)', () => {

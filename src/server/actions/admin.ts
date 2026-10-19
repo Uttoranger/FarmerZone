@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import * as Sentry from '@sentry/nextjs'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -39,6 +39,7 @@ import { kalendertagInWien } from '@/lib/wiener-tag'
 import { ladeHoefeFuerGruendung, leseGruendungEinstellung } from '@/server/queries/admin'
 import { IM_SHOP_WHERE } from '@/server/queries/einstellungen'
 import { GRUENDUNGS_NACHRICHT, GRUENDUNGS_NACHRICHT_LINK, POSTFACH_HREF } from '@/lib/postfach'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 
 function revalidateAll(slug: string) {
   revalidatePath('/admin')
@@ -200,6 +201,11 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
   }
   if (freigabe === null) return { error: FREISCHALTUNG_GEAENDERT_TEXT }
   revalidateAll(farm.slug)
+  // Höfe-Liste und Startseite lesen über den Fünf-Minuten-Cache: Der frische Hof und sein Abzeichen
+  // erscheinen sofort, ebenso die Zahlen des Erklär-Blatts. /konditionen zeigt den Abschnitt Aktion
+  // nur, solange Plätze frei sind.
+  updateTag(HOEFE_CACHE_TAG)
+  revalidatePath('/konditionen')
   // „Noch n Gründungsplätze" auf Startseite und /fuer-hoefe (K2-Ergänzung) zählt diesen Hof jetzt mit.
   revalidatePath('/')
   revalidatePath('/fuer-hoefe')

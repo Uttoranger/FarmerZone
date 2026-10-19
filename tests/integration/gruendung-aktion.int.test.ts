@@ -7,12 +7,15 @@
  *    nach, wieder aktivieren (reactivateFarm unter der Sperre) → beide behalten
  *    ihren Platz;
  *  - Freigabe entziehen und erneut freigeben ändert Platz und Ende nicht;
+ *  - „Zusagen festschreiben“ einmal wirklich: Nummern 1…n eindeutig, Ende nie
+ *    kürzer, stillgelegter Hof mit Platz, ausgenommener ohne — dabei werden
+ *    auch die Seed-Höfe der geteilten Test-DB umgeschrieben; Platz, Ende und
+ *    Änderungszeit aller Höfe kommen im finally exakt zurück;
  *  - „Zusagen festschreiben“ ein zweites Mal: abgewiesen, nichts geschrieben;
  *  - der eindeutige Index verbietet eine doppelte Nummer.
- * Festgeschrieben wird hier nur über die eine Spalte der Einstellung (der
- * Test schreibt keine Seed-Höfe um); die Liste des Festschreibens prüft die
- * Unit-Schicht (tests/gruendung-aktion.test.ts). Die Einstellung kommt nach
- * jedem Fall so zurück, wie der Test sie vorfand.
+ * Die übrigen Fälle schreiben nur über die eine Spalte der Einstellung fest.
+ * Die Einstellung kommt nach jedem Fall so zurück, wie der Test sie vorfand.
+ * Die Uhr bleibt echt (geteilte Test-DB).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
@@ -25,6 +28,7 @@ import { Prisma } from '@prisma/client'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { EINSTELLUNGEN_TEXT } from '@/lib/plattform-einstellung'
+import { GRUENDUNG_BIS_STANDARD } from '@/lib/gruendungshof'
 import { approveFarmAction, revokeFarmApprovalAction } from '@/server/actions/admin'
 import { archiveFarm, reactivateFarm } from '@/server/actions/farm-archive'
 import { schreibeZusagenFest } from '@/server/actions/gruendung'
@@ -141,6 +145,54 @@ describe('Freigabe entziehen und erneut freigeben', () => {
     await prisma.plattformEinstellung.update({ where: { id: 'plattform' }, data: { gruendungAktionBis: new Date('2026-01-01T00:00:00.000Z') } })
     expect(await approveFarmAction(farm.id)).toEqual({})
     expect(await prisma.farm.findUniqueOrThrow({ where: { id: farm.id }, select: { gruendungPlatz: true, gruendungBis: true } })).toEqual(nachher)
+  })
+})
+
+describe('Zusagen festschreiben — einmal wirklich in der Datenbank', () => {
+  it('Nummern 1…n eindeutig, Ende nie kürzer, stillgelegter Hof mit Platz, ausgenommener ohne', async () => {
+    await alsAdmin()
+    // Sichern: Platz, Ende und Änderungszeit ALLER Höfe (auch der Seed-Höfe) und die Einstellung.
+    const hoefeVorher = await prisma.farm.findMany({ select: { id: true, gruendungPlatz: true, gruendungBis: true, updatedAt: true } })
+    try {
+      // Ausgangslage vor dem Festschreiben: niemand hält eine Nummer, sonst stieße die Vergabe an den eindeutigen Index.
+      await prisma.farm.updateMany({ where: { gruendungPlatz: { not: null } }, data: { gruendungPlatz: null } })
+      const { farm: still } = await erstelleHof({ approvedAt: new Date('2026-01-02T10:00:00.000Z'), archivedAt: new Date() })
+      const { farm: aus } = await erstelleHof({ approvedAt: new Date('2026-01-02T10:00:00.000Z'), gruendungAusgenommen: true })
+      const langesEnde = new Date('2031-06-30T00:00:00.000Z')
+      const { farm: lang } = await erstelleHof({ approvedAt: new Date(), gruendungBis: langesEnde })
+      const imRennen = await prisma.farm.count({ where: { approvedAt: { not: null }, gruendungAusgenommen: false } })
+      await prisma.plattformEinstellung.update({
+        where: { id: 'plattform' },
+        data: { gruendungFestAm: null, gruendungAktionBis: null, gruendungMonate: 24, gruendungPlaetze: imRennen + 5 },
+      })
+      const bisVorher = new Map((await prisma.farm.findMany({ select: { id: true, gruendungBis: true } })).map((h) => [h.id, h.gruendungBis]))
+
+      expect(await schreibeZusagenFest({ bestaetigt: true })).toEqual({ ok: true })
+
+      const nachher = await prisma.farm.findMany({
+        where: { approvedAt: { not: null } },
+        select: { id: true, gruendungPlatz: true, gruendungBis: true, gruendungAusgenommen: true },
+      })
+      const nummern = nachher.flatMap((h) => (h.gruendungPlatz === null ? [] : [h.gruendungPlatz])).sort((a, b) => a - b)
+      expect(nummern).toEqual(Array.from({ length: imRennen }, (_, i) => i + 1))
+      for (const h of nachher.filter((z) => z.gruendungPlatz !== null)) {
+        // Nie kürzer als bisher (K1): das gespeicherte Ende bzw. der Standard, den ein Gründungshof ohne Ende hatte.
+        expect(h.gruendungBis?.getTime()).toBeGreaterThanOrEqual((bisVorher.get(h.id) ?? GRUENDUNG_BIS_STANDARD).getTime())
+      }
+      const von = (id: string) => nachher.find((h) => h.id === id)
+      expect(von(still.id)?.gruendungPlatz).not.toBeNull()
+      expect(von(aus.id)?.gruendungPlatz).toBeNull()
+      expect(von(lang.id)?.gruendungBis).toEqual(langesEnde)
+      expect((await prisma.plattformEinstellung.findUniqueOrThrow({ where: { id: 'plattform' } })).gruendungFestAm).not.toBeNull()
+    } finally {
+      // Exakt zurück: erst alle Nummern frei, dann die gesicherten Werte (samt Änderungszeit).
+      await prisma.farm.updateMany({ where: { gruendungPlatz: { not: null } }, data: { gruendungPlatz: null } })
+      for (const { id, ...werte } of hoefeVorher) await prisma.farm.update({ where: { id }, data: werte })
+      if (vorher) {
+        const { id, ...werte } = vorher
+        await prisma.plattformEinstellung.update({ where: { id }, data: { ...werte, zustellRegeln: werte.zustellRegeln ?? undefined } })
+      }
+    }
   })
 })
 

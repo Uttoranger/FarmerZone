@@ -16,6 +16,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   GRUENDUNG_BIS_STANDARD,
+  GRUENDUNG_EINSTELLUNG_STANDARD,
   bildeGruendungBis,
   folgenDerAenderung,
   gruendungAlleVergeben,
@@ -197,8 +198,8 @@ describe('Warteliste, Zähler und „zuletzt geändert“', () => {
   it('ein ausgenommener wartender Hof bekäme keinen Platz; Gegenprobe: ohne Ausnahme schon', () => {
     const jetzt = new Date(Date.UTC(2026, 9, 16))
     const wartet = hof(9, { approvedAt: null })
-    expect(platzBeiFreischaltung(wartet.id, [...reihe(2), { ...wartet, gruendungAusgenommen: true }], jetzt, 12)).toBeNull()
-    expect(platzBeiFreischaltung(wartet.id, [...reihe(2), wartet], jetzt, 12)).toBe(3)
+    expect(platzBeiFreischaltung(wartet.id, [...reihe(2), { ...wartet, gruendungAusgenommen: true }], jetzt, GRUENDUNG_EINSTELLUNG_STANDARD)).toBeNull()
+    expect(platzBeiFreischaltung(wartet.id, [...reihe(2), wartet], jetzt, GRUENDUNG_EINSTELLUNG_STANDARD)).toBe(3)
   })
 
   it('zählt nur freigeschaltete, nicht stillgelegte ausgenommene Höfe', () => {

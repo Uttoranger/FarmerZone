@@ -4,8 +4,7 @@ import { auth } from '@/lib/auth'
 import { getHofBesitzer, getOwnerFarm, getPublicFarm, type PublicFarm } from '@/server/queries/farm'
 import { ansichtsModus, type SeitenAnsicht, type Suchparameter } from '@/lib/ansichts-modus'
 import { gibVerwaisteFreiFuerSlug } from '@/server/verwaiste-bestellungen'
-import { KEINE_GRUENDUNG_SEITEN, abzeichenBlattAus } from '@/lib/gruendungshof'
-import { gruendungFuerSeiten } from '@/server/queries/plattform-einstellung'
+import { ladeAbzeichenBlatt } from '@/server/queries/plattform-einstellung'
 
 /**
  * Der Hof zu einem Slug und wer ihn sieht. Was die Vorschau (?vorschau=1)
@@ -37,11 +36,10 @@ export async function ladeHofseite(
   // ist eine Absicherung, keine Unterscheidung.
   if (!geladen || geladen.slug !== farmSlug) return { farm: null, ansicht }
   // Abzeichen (Register K2, Nr. 116): Das Erklär-Blatt nennt die Plätze und —
-  // solange der Zähler läuft — die freien. Nur für Gründungshöfe gezählt; ohne
-  // Zahlen (Ladefehler) zeigt die Seite das Etikett ohne Blatt.
+  // solange der Zähler läuft — die freien. Nur für Gründungshöfe, aus dem Cache
+  // (ladeAbzeichenBlatt); ohne Zahlen (Ladefehler) zeigt die Seite das Etikett ohne Blatt.
   if (!geladen.gruendungshof) return { farm: geladen, ansicht }
-  const seiten = await gruendungFuerSeiten()
-  return { farm: { ...geladen, abzeichenBlatt: seiten === KEINE_GRUENDUNG_SEITEN ? null : abzeichenBlattAus(seiten) }, ansicht }
+  return { farm: { ...geladen, abzeichenBlatt: await ladeAbzeichenBlatt() }, ansicht }
 }
 
 // React `cache` vergleicht Argumente nach Identität: Metadaten und Seite
