@@ -9,6 +9,9 @@ import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { ProdukteAnsicht } from '@/components/produkte/produkte-ansicht'
 import { MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
 import { MeinHofReiterLeiste } from '@/components/mein-hof/reiter-leiste'
+import { KundenansichtKnopf } from '@/components/mein-hof/kundenansicht-knopf'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { cn } from '@/lib/utils'
 import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
@@ -25,10 +28,19 @@ export const metadata: Metadata = {
  * (src/lib/use-url-auftrag.ts), ebenso Filter und Suche (?filter=, ?suche=).
  *
  * Unter md gehört Produkte seit Nr. 49 zu „Mein Hof" (Register N3): oben die
- * Reiter Produkte · Hofseite · Beiträge und der Umschalter „Bearbeiten · So
- * sieht’s die Kundin" (dort der Reiter Produkte der Hofseite). Ab md bleibt
- * die Seite, wie sie war — Produkte ist dort ein Punkt der Seitenleiste.
+ * Reiter Produkte · Hofseite · Beiträge und der Knopf „Kundenansicht" (Nr. 118,
+ * Register N4) — derselbe wie im Kopf von Mein Hof, er öffnet das Vollbild aus
+ * Nr. 107 mit dem Reiter Produkte der Hofseite. Ab md bleibt die Seite, wie sie
+ * war — Produkte ist dort ein Punkt der Seitenleiste.
+ *
+ * Die Gestalt des Knopfs ist die der Kopfknöpfe in seitenkopf.tsx (dort nicht
+ * exportiert, darum hier einmal wiederholt).
  */
+const KUNDENANSICHT_KNOPF = cn(
+  'inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-border bg-card px-4 text-sm font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted',
+  FOKUS_RAHMEN
+)
+
 export default async function ProductsPage(): Promise<React.JSX.Element> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect('/login')
@@ -50,6 +62,9 @@ export default async function ProductsPage(): Promise<React.JSX.Element> {
       kopf={
         <div className="px-4 pt-5 md:hidden">
           <MeinHofReiterLeiste aktiv="produkte" beitraegeZahl={beitraegeZahl} nurUnterMd />
+          <div className="pt-4">
+            <KundenansichtKnopf slug={farm.slug} className={KUNDENANSICHT_KNOPF} />
+          </div>
         </div>
       }
     >

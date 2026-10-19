@@ -9,12 +9,13 @@ import { describe, it, expect } from 'vitest'
 import { toWaPhone, buildOrderReminderMessage, buildOrderReminderUrl, whatsAppLink } from '@/lib/whatsapp'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 
-// 20.07.2026 ist ein Montag; 12:00 lokal entspricht der Speicher-Konvention des Checkouts
+// 20.07.2026 ist ein Montag; 12:00 Uhr entspricht der Speicher-Konvention des Checkouts. Mit Offset
+// geschrieben, damit der Test an keiner Zeitzone des Rechners hängt.
 const baseOrder = {
   customerName: 'Maria Huber',
   orderNumber: 'TST-2007-AB12',
   farmName: 'Biohof Müller',
-  pickupDate: new Date(2026, 6, 20, 12, 0, 0),
+  pickupDate: new Date('2026-07-20T12:00:00+02:00'),
   pickupTimeStart: '09:00',
   pickupTimeEnd: '12:00',
 }
@@ -25,6 +26,12 @@ describe('buildOrderReminderMessage', () => {
       'Hallo Maria, deine Bestellung TST-2007-AB12 bei Biohof Müller liegt am ' +
         'Montag, 20. Juli zwischen 09:00–12:00 Uhr zur Abholung bereit. Bis dann!'
     )
+  })
+
+  it('nennt den Wiener Tag, auch wenn der Zeitpunkt in UTC noch am Vortag liegt', () => {
+    // 0:30 Uhr am Dienstag in Wien = 22:30 Uhr UTC am Montag.
+    const msg = buildOrderReminderMessage({ ...baseOrder, pickupDate: new Date('2026-07-21T00:30:00+02:00') })
+    expect(msg).toContain('am Dienstag, 21. Juli')
   })
 
   it('nimmt nur das erste Wort des Namens als Anrede', () => {
@@ -41,7 +48,7 @@ describe('buildOrderReminderMessage', () => {
   it('akzeptiert das Abholdatum auch als ISO-String (RSC-Serialisierung)', () => {
     const msg = buildOrderReminderMessage({
       ...baseOrder,
-      pickupDate: new Date(2026, 6, 21, 12, 0, 0).toISOString(),
+      pickupDate: new Date('2026-07-21T12:00:00+02:00').toISOString(),
     })
     expect(msg).toContain('am Dienstag, 21. Juli')
   })

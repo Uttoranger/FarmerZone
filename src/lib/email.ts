@@ -469,6 +469,7 @@ export async function sendNewFarmNotification(
   if (an.length === 0) return
   const registeredAt = new Date().toLocaleString('de-AT', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    timeZone: 'Europe/Vienna',
   })
   const { NewFarmNotificationEmail } = await import('@/emails/new-farm-notification')
   const html = await toHtml(

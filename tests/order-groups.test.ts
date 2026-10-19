@@ -3,16 +3,22 @@
  *
  * Beweist: heutige Gruppe zuerst, saubere Tagesgrenzen, Sortierung nach
  * Slot-Beginn innerhalb des Tages, leere Eingabe → leeres Ergebnis,
- * deutsche Labels (Heute/Morgen/Wochentag).
+ * deutsche Labels (Heute/Morgen/Wochentag) — alles nach dem WIENER Tag, nie nach der
+ * Serveruhr (Nr. 118): Die Zeitpunkte stehen mit Wiener Offset im Test, nicht als `new Date(y, m, d)`.
  */
 import { describe, it, expect } from 'vitest'
 import { groupOrdersByPickupDay, pickupDayLabel } from '@/lib/order-groups'
 
-// Fixe "Jetzt"-Zeit: Montag, 20. Juli 2026, 10:00
-const NOW = new Date(2026, 6, 20, 10, 0, 0)
+/** Ein Zeitpunkt im Juli 2026 in Wiener Sommerzeit (UTC+2) — unabhängig von der Zeitzone des Rechners. */
+function wien(tag: number, stunde = 12, minute = 0): Date {
+  return new Date(`2026-07-${String(tag).padStart(2, '0')}T${String(stunde).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+02:00`)
+}
+
+// Fixe "Jetzt"-Zeit: Montag, 20. Juli 2026, 10:00 in Wien
+const NOW = wien(20, 10)
 
 function order(day: number, start: string, id: string) {
-  return { id, pickupDate: new Date(2026, 6, day, 12, 0, 0), pickupTimeStart: start }
+  return { id, pickupDate: wien(day), pickupTimeStart: start }
 }
 
 describe('groupOrdersByPickupDay', () => {
@@ -34,8 +40,8 @@ describe('groupOrdersByPickupDay', () => {
   })
 
   it('respektiert Tagesgrenzen: 23:59 und 00:01 des Folgetags sind getrennte Gruppen', () => {
-    const lateToday = { id: 'x', pickupDate: new Date(2026, 6, 20, 23, 59), pickupTimeStart: '18:00' }
-    const earlyTomorrow = { id: 'y', pickupDate: new Date(2026, 6, 21, 0, 1), pickupTimeStart: '08:00' }
+    const lateToday = { id: 'x', pickupDate: wien(20, 23, 59), pickupTimeStart: '18:00' }
+    const earlyTomorrow = { id: 'y', pickupDate: wien(21, 0, 1), pickupTimeStart: '08:00' }
     const groups = groupOrdersByPickupDay([lateToday, earlyTomorrow], NOW)
     expect(groups.map((g) => g.label)).toEqual(['Heute', 'Morgen'])
     expect(groups[0].orders.map((o) => o.id)).toEqual(['x'])
@@ -57,7 +63,7 @@ describe('groupOrdersByPickupDay', () => {
 
   it('akzeptiert ISO-Strings als pickupDate (RSC-Serialisierung)', () => {
     const groups = groupOrdersByPickupDay(
-      [{ id: 'z', pickupDate: new Date(2026, 6, 20, 12).toISOString(), pickupTimeStart: '10:00' }],
+      [{ id: 'z', pickupDate: wien(20).toISOString(), pickupTimeStart: '10:00' }],
       NOW
     )
     expect(groups[0].label).toBe('Heute')
@@ -66,8 +72,30 @@ describe('groupOrdersByPickupDay', () => {
 
 describe('pickupDayLabel', () => {
   it('liefert Heute/Morgen/deutschen Wochentag', () => {
-    expect(pickupDayLabel(new Date(2026, 6, 20), NOW)).toBe('Heute')
-    expect(pickupDayLabel(new Date(2026, 6, 21), NOW)).toBe('Morgen')
-    expect(pickupDayLabel(new Date(2026, 6, 25), NOW)).toBe('Samstag, 25. Juli')
+    expect(pickupDayLabel(wien(20), NOW)).toBe('Heute')
+    expect(pickupDayLabel(wien(21), NOW)).toBe('Morgen')
+    expect(pickupDayLabel(wien(25), NOW)).toBe('Samstag, 25. Juli')
+  })
+
+  it('zählt den Wiener Tag, auch wenn es auf dem Server (UTC) noch gestern ist', () => {
+    // 0:30 Uhr in Wien am 21. Juli = 22:30 Uhr UTC am 20. Juli: Der Hof steht schon im neuen Tag.
+    const nachMitternacht = wien(21, 0, 30)
+    expect(nachMitternacht.getUTCDate()).toBe(20)
+    expect(pickupDayLabel(wien(21), nachMitternacht)).toBe('Heute')
+    expect(pickupDayLabel(wien(22), nachMitternacht)).toBe('Morgen')
+    expect(pickupDayLabel(wien(20), nachMitternacht)).toBe('Montag, 20. Juli')
+  })
+
+  it('ordnet eine Abholung um 0:30 Uhr in Wien dem Wiener Tag zu, nicht dem UTC-Tag davor', () => {
+    const groups = groupOrdersByPickupDay([{ id: 'n', pickupDate: wien(21, 0, 30), pickupTimeStart: '08:00' }], NOW)
+    expect(groups[0].key).toBe('2026-07-21')
+    expect(groups[0].label).toBe('Morgen')
+  })
+
+  it('"Morgen" folgt dem Kalender, nicht 24 Stunden (Nacht der Zeitumstellung)', () => {
+    // 25. Oktober 2026: Sommerzeit endet, der Tag hat 25 Stunden. Jetzt: 23:30 Uhr am 24. Oktober (UTC+2).
+    const jetzt = new Date('2026-10-24T23:30:00+02:00')
+    expect(pickupDayLabel(new Date('2026-10-25T12:00:00+01:00'), jetzt)).toBe('Morgen')
+    expect(pickupDayLabel(new Date('2026-10-26T12:00:00+01:00'), jetzt)).toBe('Montag, 26. Oktober')
   })
 })

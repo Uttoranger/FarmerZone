@@ -8,7 +8,8 @@ import { ArrowLeft } from 'lucide-react'
 import { PrintButton } from '@/components/orders/print-button'
 import { unitSuffix } from '@/lib/order-line'
 import { barZuKassierenCents, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
-import { formatEuro } from '@/lib/format'
+import { formatDatumLang, formatEuro } from '@/lib/format'
+import { uhrzeitInWien } from '@/lib/fristen'
 import { abholtage, abholWhere, datumLang } from '@/lib/heute'
 import { MARKE } from '@/lib/marke'
 
@@ -196,7 +197,7 @@ export default async function PrintPacklistPage() {
 
         {/* Print footer */}
         <div className="mt-10 pt-4 border-t border-gray-200 text-xs text-gray-300 text-center">
-          Gedruckt am {new Date().toLocaleString('de-AT')} · {MARKE}
+          Gedruckt am {formatDatumLang(jetzt)}, {uhrzeitInWien(jetzt)} Uhr · {MARKE}
         </div>
       </div>
     </div>
