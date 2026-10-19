@@ -2,11 +2,15 @@ import * as Sentry from '@sentry/nextjs'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { UMGEBUNG } from '@/lib/umgebung-server'
+import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import {
   ABLAEUFE,
-  GRENZE,
   GRENZ_REGEL,
   GRENZ_WERTE,
+  MESS_ARTEN,
+  MESS_BEGINN_ART,
+  VERCEL_WARN_ART,
+  abrechnungsBeginn,
   ablaufSchritt,
   ablaufStand,
   ablaufWarnArt,
@@ -15,10 +19,15 @@ import {
   fehlerKlasse,
   grenzSchritt,
   grenzStandText,
+  grenzeVon,
+  neuMessenAb,
+  ohneVerwendungKarte,
   utcMonatsbeginn,
   utcTag,
   utcTagesbeginn,
   utcTagVersetzt,
+  vercelSchritt,
+  vercelStufe,
   vollIn,
   vollInText,
   wannText,
@@ -58,7 +67,11 @@ import { ohneVerwendungMesswerte } from '@/server/betrieb-bilder'
  * (ARCHITECTURE §4, tests/schwere-module.test.ts).
  */
 
-type Optionen = { produktion?: boolean }
+type Optionen = {
+  produktion?: boolean
+  /** Warn-Mails erst nach der Antwort (`nachDerAntwort`) — für „Jetzt messen“ und den Webhook: Niemand wartet auf den Versand. */
+  nachher?: boolean
+}
 
 // ─── Fehler nach Sentry: fester Satz, nur die Klasse ─────────────────────────
 
@@ -123,6 +136,31 @@ export async function zaehleAuflistungen(tag: string, anzahl: number, jetzt: Dat
 }
 
 /**
+ * Belegt den Beginn einer Messung für „Jetzt messen“ (Nr. 113) — in EINER
+ * Anweisung statt Lesen-dann-Schreiben: Der Merker des Tages wird nur
+ * angelegt bzw. überschrieben, wenn in den letzten 10 Minuten weder eine
+ * Messung (MESS_ARTEN) noch ein anderer Beginn stattfand. Zwei gleichzeitige
+ * Klicks: Der zweite trifft auf die Zeile des ersten, die Bedingung im
+ * DO UPDATE gilt für deren neuen Stand — er bekommt keine Zeile zurück.
+ * Die Casts stehen da, weil der Treiber Zeitpunkte als Text ohne Zone schickt
+ * (UTC, wie Prisma speichert) und ein SELECT sonst Text einfügen wollte.
+ */
+export async function beginneMessung(jetzt: Date): Promise<boolean> {
+  const ab = neuMessenAb(jetzt)
+  const getroffen = await prisma.$queryRaw<Array<{ art: string }>>`
+    INSERT INTO "BetriebMessung" ("tag", "art", "wert", "gemessenAm")
+    SELECT ${utcTag(jetzt)}::date, ${MESS_BEGINN_ART}::text, 0::bigint, ${jetzt}::timestamp(3)
+    WHERE NOT EXISTS (
+      SELECT 1 FROM "BetriebMessung"
+      WHERE "art" IN (${Prisma.join([...MESS_ARTEN, MESS_BEGINN_ART])}) AND "gemessenAm" > ${ab}::timestamp(3)
+    )
+    ON CONFLICT ("tag", "art") DO UPDATE SET "gemessenAm" = EXCLUDED."gemessenAm"
+    WHERE "BetriebMessung"."gemessenAm" <= ${ab}::timestamp(3)
+    RETURNING "art"`
+  return getroffen.length > 0
+}
+
+/**
  * Misst Datenbank und Bild-Speicher und schreibt je Wert eine Zeile
  * BetriebMessung für den UTC-Tag. Wirft nicht wegen einer Quelle: Deren
  * Fehlerklasse geht nach Sentry (ohne Inhalt), die anderen laufen weiter.
@@ -175,8 +213,12 @@ export async function messeBetrieb(jetzt: Date = new Date(), { produktion = UMGE
 
 // ─── Warnen ──────────────────────────────────────────────────────────────────
 
+/** Die Regel einer Warnart: Grenzwert, Ablauf oder Vercel-Ausgaben (je Abrechnungszeitraum, Nr. 113). */
+type WarnRegel = GrenzRegel | 'ablauf' | 'abrechnung'
+
 /** Die Bedingung, unter der eine Warnung (neu) gesetzt wird — als SQL in derselben Anweisung wie das Setzen. */
-function warnBedingung(regel: GrenzRegel | 'ablauf', jetzt: Date): Prisma.Sql {
+function warnBedingung(regel: WarnRegel, jetzt: Date): Prisma.Sql {
+  if (regel === 'abrechnung') return Prisma.sql`("BetriebWarnung"."stufe" < EXCLUDED."stufe" OR "BetriebWarnung"."gemeldetAm" < ${abrechnungsBeginn(jetzt)})`
   if (regel === 'speicher') return Prisma.sql`"BetriebWarnung"."stufe" < EXCLUDED."stufe"`
   if (regel === 'monat') return Prisma.sql`("BetriebWarnung"."stufe" < EXCLUDED."stufe" OR "BetriebWarnung"."gemeldetAm" < ${utcMonatsbeginn(jetzt)})`
   if (regel === 'tag') return Prisma.sql`"BetriebWarnung"."gemeldetAm" < ${utcTagesbeginn(jetzt)}`
@@ -188,7 +230,7 @@ function warnBedingung(regel: GrenzRegel | 'ablauf', jetzt: Date): Prisma.Sql {
  * Regel gilt — überschreiben. true = diese Prüfung hat gesetzt und schickt
  * die Mail; eine gleichzeitige zweite findet die Zeile schon gesetzt.
  */
-async function setzeStufe(art: WarnArt, neu: Exclude<Stufe, 0>, regel: GrenzRegel | 'ablauf', jetzt: Date): Promise<boolean> {
+async function setzeStufe(art: WarnArt, neu: Exclude<Stufe, 0>, regel: WarnRegel, jetzt: Date): Promise<boolean> {
   const getroffen = await prisma.$queryRaw<Array<{ art: string }>>`
     INSERT INTO "BetriebWarnung" ("art", "stufe", "seit", "gemeldetAm")
     VALUES (${art}, ${neu}, ${jetzt}, ${jetzt})
@@ -209,7 +251,7 @@ async function setzeNull(art: WarnArt): Promise<boolean> {
 }
 
 /** Die Warn-Mail an die Empfänger der Art „Betrieb“ (fest an, mindestens SUPPORT_EMAIL). Scheitert sie, bleibt die Stufe gesetzt. */
-async function sendeWarnMail(anlass: BetriebMailAnlass): Promise<void> {
+async function versendeWarnMail(anlass: BetriebMailAnlass): Promise<void> {
   try {
     const [{ sendBetriebWarnung }, an] = await Promise.all([import('@/lib/email'), ladeBetreiberEmpfaenger('betrieb')])
     await sendBetriebWarnung(anlass, an)
@@ -218,32 +260,38 @@ async function sendeWarnMail(anlass: BetriebMailAnlass): Promise<void> {
   }
 }
 
-/** Der Stand eines Grenzwerts heute: Zahl und Anteil — null, wenn heute nicht gemessen (dann wird nicht gewarnt). */
-function grenzStand(wert: GrenzWert, messungen: readonly Messung[], mailsImMonat: number, jetzt: Date): { zahl: number; anteil: number } | null {
+/** Sofort (Abläufe, Mess-Lauf) oder nach der Antwort (`nachher`: „Jetzt messen“, Webhook) — die Stufe ist vorher schon gesetzt. */
+async function sendeWarnMail(anlass: BetriebMailAnlass, nachher = false): Promise<void> {
+  if (nachher) {
+    nachDerAntwort(() => versendeWarnMail(anlass))
+    return
+  }
+  await versendeWarnMail(anlass)
+}
+
+/**
+ * Der Stand eines Grenzwerts heute: Zahl und Anteil — null, wenn heute nicht
+ * gemessen (dann wird nicht gewarnt). Ohne feste Grenze (Vercel Pro) ist der
+ * Anteil null: keine Warnstufe, eine alte geht still auf 0.
+ */
+function grenzStand(wert: GrenzWert, messungen: readonly Messung[], mailsImMonat: number, jetzt: Date): { zahl: number; anteil: number | null } | null {
   const heute = utcTag(jetzt)
   const vonHeute = (art: BetriebArt): number | null => messungen.find((m) => m.art === art && m.tag === heute)?.wert ?? null
-  if (wert === 'bilder') {
-    const zahl = vonHeute('bilderBytes')
-    return zahl === null ? null : { zahl, anteil: anteil(zahl, GRENZE.bilderBytes) }
-  }
-  if (wert === 'datenbank') {
-    const zahl = vonHeute('datenbankBytes')
-    return zahl === null ? null : { zahl, anteil: anteil(zahl, GRENZE.datenbankBytes) }
-  }
-  if (wert === 'bildVorgaenge') {
-    const zahl = vonHeute('bildVorgaengeMonat')
-    return zahl === null ? null : { zahl, anteil: anteil(zahl, GRENZE.bildVorgaengeMonat) }
-  }
-  if (wert === 'mailsMonat') return { zahl: mailsImMonat, anteil: anteil(mailsImMonat, GRENZE.mailsMonat) }
+  const grenze = grenzeVon(wert)
+  const mitAnteil = (zahl: number | null): { zahl: number; anteil: number | null } | null =>
+    zahl === null ? null : { zahl, anteil: grenze === null ? null : anteil(zahl, grenze) }
+  if (wert === 'bilder') return mitAnteil(vonHeute('bilderBytes'))
+  if (wert === 'datenbank') return mitAnteil(vonHeute('datenbankBytes'))
+  if (wert === 'bildVorgaenge') return mitAnteil(vonHeute('bildVorgaengeMonat'))
+  if (wert === 'mailsMonat') return mitAnteil(mailsImMonat)
   const gestern = utcTagVersetzt(heute, -1)
-  const zahl = messungen.find((m) => m.art === 'mails' && m.tag === gestern)?.wert ?? 0
-  return { zahl, anteil: anteil(zahl, GRENZE.mailsTag) }
+  return mitAnteil(messungen.find((m) => m.art === 'mails' && m.tag === gestern)?.wert ?? 0)
 }
 
 function trendFuer(wert: GrenzWert, messungen: readonly Messung[], jetzt: Date): string | null {
   const art: BetriebArt | null = wert === 'bilder' ? 'bilderBytes' : wert === 'datenbank' ? 'datenbankBytes' : null
-  if (!art) return null
-  const grenze = art === 'bilderBytes' ? GRENZE.bilderBytes : GRENZE.datenbankBytes
+  const grenze = grenzeVon(wert)
+  if (!art || grenze === null) return null
   const t = vollIn(
     messungen.filter((m) => m.art === art).map((m) => ({ tag: m.tag, wert: m.wert })),
     grenze,
@@ -260,8 +308,15 @@ function warnStandVon(zeilen: ReadonlyArray<{ art: string; stufe: number; gemeld
 /**
  * Prüft die Grenzen gegen die Messung von heute (nur im Mess-Lauf und bei
  * „Jetzt messen“, nie in sendRaw). Gibt die Zahl der angestoßenen Mails zurück.
+ * Beim Bilder-Speicher nennt die Mail die Bilder ohne Verwendung (Summe der
+ * jüngsten Zählung, Nr. 113). Danach: Hat ein neuer Abrechnungszeitraum bei
+ * Vercel begonnen, geht die Stufe der Vercel-Ausgaben still auf 0 — der
+ * Webhook kommt erst wieder ab 50 %.
  */
-export async function pruefeGrenzen(jetzt: Date = new Date(), { produktion = UMGEBUNG.vercelProduktion }: Optionen = {}): Promise<number> {
+export async function pruefeGrenzen(
+  jetzt: Date = new Date(),
+  { produktion = UMGEBUNG.vercelProduktion, nachher = false }: Optionen = {}
+): Promise<number> {
   if (!produktion) return 0
   const [messungen, warnungen, mailsImMonat] = await Promise.all([ladeMessungenFuerPruefung(jetzt), ladeWarnungen(), summeImMonat('mails', jetzt)])
   let mails = 0
@@ -270,17 +325,58 @@ export async function pruefeGrenzen(jetzt: Date = new Date(), { produktion = UMG
     if (stand === null) continue
     const regel = GRENZ_REGEL[wert]
     const schritt = grenzSchritt(regel, warnStandVon(warnungen, wert), stand.anteil, jetzt)
+    // grenzSchritt warnt und entwarnt nur mit Anteil; ohne Grenze kommt höchstens „still“.
+    const anteilHeute = stand.anteil ?? 0
     if (schritt.tun === 'warnen' && (await setzeStufe(wert, schritt.stufe, regel, jetzt))) {
-      await sendeWarnMail({ art: 'grenze', wert, anteil: stand.anteil, stand: grenzStandText(wert, stand.zahl), trend: trendFuer(wert, messungen, jetzt) })
+      const ohneVerwendungBytes = wert === 'bilder' ? (ohneVerwendungKarte(messungen, jetzt)?.bytes ?? null) : null
+      await sendeWarnMail(
+        { art: 'grenze', wert, anteil: anteilHeute, stand: grenzStandText(wert, stand.zahl), trend: trendFuer(wert, messungen, jetzt), ohneVerwendungBytes },
+        nachher
+      )
       mails += 1
     } else if (schritt.tun === 'entwarnen' && (await setzeNull(wert))) {
-      await sendeWarnMail({ art: 'entwarnung', wert, anteil: stand.anteil, stand: grenzStandText(wert, stand.zahl) })
+      await sendeWarnMail({ art: 'entwarnung', wert, anteil: anteilHeute, stand: grenzStandText(wert, stand.zahl) }, nachher)
       mails += 1
     } else if (schritt.tun === 'still') {
       await setzeNull(wert)
     }
   }
+  if (vercelSchritt(warnStandVon(warnungen, VERCEL_WARN_ART), 0, jetzt).tun === 'still') await setzeNull(VERCEL_WARN_ART)
   return mails
+}
+
+export type VercelAusgabenMeldung = { ausgabenCent: number; limitCent: number; schwelleProzent: number }
+
+/**
+ * Eine Meldung von Spend Management (Nr. 113, Webhook): Ausgaben und Limit
+ * als BetriebMessung des UTC-Tags (ein zweiter Aufruf am selben Tag
+ * überschreibt), dann — nur in der Produktion — die Stufe bedingt wie die
+ * anderen Warnungen (50/75/100 % → 1/2/3, je Abrechnungszeitraum einmal) und
+ * nur nach getroffener Zeile EINE Warn-Mail, nach der Antwort. Gibt die Zahl
+ * der Mails zurück (0 oder 1).
+ */
+export async function verbucheVercelAusgaben(
+  meldung: VercelAusgabenMeldung,
+  jetzt: Date = new Date(),
+  { produktion = UMGEBUNG.vercelProduktion }: Optionen = {}
+): Promise<number> {
+  await schreibeMessungen(
+    utcTag(jetzt),
+    [
+      ['vercelAusgaben', meldung.ausgabenCent],
+      ['vercelLimit', meldung.limitCent],
+    ],
+    jetzt
+  )
+  if (!produktion) return 0
+  const warnungen = await ladeWarnungen()
+  const schritt = vercelSchritt(warnStandVon(warnungen, VERCEL_WARN_ART), vercelStufe(meldung.schwelleProzent), jetzt)
+  if (schritt.tun === 'warnen' && (await setzeStufe(VERCEL_WARN_ART, schritt.stufe, 'abrechnung', jetzt))) {
+    await sendeWarnMail({ art: 'vercelAusgaben', stufe: schritt.stufe, ausgabenCent: meldung.ausgabenCent, limitCent: meldung.limitCent }, true)
+    return 1
+  }
+  if (schritt.tun === 'still') await setzeNull(VERCEL_WARN_ART)
+  return 0
 }
 
 /**
@@ -371,9 +467,9 @@ export async function mitHerzschlag<T>(
   return ergebnis
 }
 
-/** „Jetzt messen“ und der Mess-Lauf: messen, dann die Grenzen prüfen. */
-export async function messeUndPruefe(jetzt: Date = new Date()): Promise<MessErgebnis> {
+/** „Jetzt messen“ und der Mess-Lauf: messen, dann die Grenzen prüfen. `nachher`: die Warn-Mails nach der Antwort („Jetzt messen“). */
+export async function messeUndPruefe(jetzt: Date = new Date(), { nachher = false }: Pick<Optionen, 'nachher'> = {}): Promise<MessErgebnis> {
   const ergebnis = await messeBetrieb(jetzt)
-  await pruefeGrenzen(jetzt)
+  await pruefeGrenzen(jetzt, { nachher })
   return ergebnis
 }

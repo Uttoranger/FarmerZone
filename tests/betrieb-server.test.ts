@@ -29,12 +29,14 @@ vi.mock('@vercel/blob', () => ({ list: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendBetriebWarnung: vi.fn(async () => ({ gesendet: 1, gescheitert: 0 })) }))
 vi.mock('@/server/queries/postfach', () => ({ ladeBetreiberEmpfaenger: vi.fn(async () => ['team@example.com']) }))
+const nachlauf = vi.hoisted(() => ({ aufgaben: [] as Array<() => Promise<void>> }))
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn((aufgabe: () => Promise<void>) => nachlauf.aufgaben.push(aufgabe)) }))
 
 import { list } from '@vercel/blob'
 import * as Sentry from '@sentry/nextjs'
 import { sendBetriebWarnung } from '@/lib/email'
 import { ladeBetreiberEmpfaenger } from '@/server/queries/postfach'
-import { messeBetrieb, mitHerzschlag, pruefeAblaeufe, pruefeGrenzen } from '@/server/betrieb'
+import { beginneMessung, messeBetrieb, mitHerzschlag, pruefeAblaeufe, pruefeGrenzen } from '@/server/betrieb'
 
 const JETZT = new Date('2026-10-16T04:05:00.000Z')
 
@@ -50,6 +52,7 @@ function blob(pathname: string, size: number, uploadedAt: string) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  nachlauf.aufgaben = []
   vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_platzhalter')
   db.$queryRaw.mockResolvedValue([{ bytes: BigInt(46_000_000) }])
   db.$executeRaw.mockResolvedValue(1)
@@ -197,5 +200,60 @@ describe('Warnen — nur in der Produktion, nur nach getroffener Zeile', () => {
     db.betriebWarnung.findMany.mockResolvedValue([])
     expect(await pruefeAblaeufe(JETZT, { produktion: true })).toBe(0)
     expect(db.$queryRaw).not.toHaveBeenCalled()
+  })
+})
+
+describe('„Jetzt messen“ belegt den Beginn in EINER Anweisung (Nr. 113)', () => {
+  it('Merker des UTC-Tags, Bedingung „seit 10 Minuten keine Messung und kein Beginn“ in derselben Anweisung — getroffen heißt messen', async () => {
+    db.$queryRaw.mockResolvedValueOnce([{ art: 'messBeginn' }])
+    expect(await beginneMessung(JETZT)).toBe(true)
+
+    const [teile] = db.$queryRaw.mock.calls[0] as [TemplateStringsArray]
+    const sql = teile.join('?')
+    expect(sql).toMatch(/INSERT INTO "BetriebMessung"[\s\S]*WHERE NOT EXISTS[\s\S]*ON CONFLICT \("tag", "art"\) DO UPDATE[\s\S]*WHERE "BetriebMessung"\."gemessenAm" <= [\s\S]*RETURNING/)
+    const vor10 = new Date(JETZT.getTime() - 10 * 60 * 1000)
+    expect(werteVon(db.$queryRaw.mock.calls[0])).toEqual([
+      '2026-10-16',
+      'messBeginn',
+      JETZT,
+      ...['bilderBytes', 'bilderDateien', 'bilderUploadsMonat', 'bildVorgaengeMonat', 'datenbankBytes', 'messBeginn'],
+      vor10,
+      vor10,
+    ])
+  })
+
+  it('keine Zeile zurück (eine Messung begann vor weniger als 10 Minuten oder ein gleichzeitiger Klick war schneller): nicht messen', async () => {
+    db.$queryRaw.mockResolvedValueOnce([])
+    expect(await beginneMessung(JETZT)).toBe(false)
+  })
+})
+
+describe('Grenzen: Vercel Pro und Mail nach der Antwort (Nr. 113)', () => {
+  const zeile = (art: string, wert: number) => ({ tag: new Date('2026-10-16T00:00:00.000Z'), art, wert: BigInt(wert), gemessenAm: JETZT })
+
+  beforeEach(() => {
+    db.betriebMessung.findMany.mockResolvedValue([zeile('datenbankBytes', 410_000_000), zeile('bilderBytes', 5_000_000_000)])
+    db.betriebMessung.aggregate.mockResolvedValue({ _sum: { wert: null } })
+    db.betriebWarnung.findMany.mockResolvedValue([{ art: 'bilder', stufe: 1, seit: new Date('2026-10-01T04:00:00Z'), gemeldetAm: new Date('2026-10-01T04:00:00Z') }])
+    db.$queryRaw.mockImplementation(async (teile: TemplateStringsArray, ...werte: unknown[]) => [{ art: String(werte[0]) }])
+  })
+
+  it('Bilder ohne feste Grenze: keine Warnung, die alte Stufe still auf 0 — ohne Mail; die Datenbank (82 %) warnt weiter', async () => {
+    expect(await pruefeGrenzen(JETZT, { produktion: true })).toBe(1)
+    const anweisungen = db.$queryRaw.mock.calls.map((c) => ({ sql: (c[0] as TemplateStringsArray).join('?'), werte: werteVon(c) }))
+    expect(anweisungen.filter((a) => a.sql.includes('INSERT INTO "BetriebWarnung"')).map((a) => a.werte.slice(0, 2))).toEqual([['datenbank', 1]])
+    expect(anweisungen.filter((a) => a.sql.includes('SET "stufe" = 0')).map((a) => a.werte)).toEqual([['bilder']])
+    expect(sendBetriebWarnung).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(sendBetriebWarnung).mock.calls[0][0]).toMatchObject({ art: 'grenze', wert: 'datenbank', ohneVerwendungBytes: null })
+  })
+
+  it('mit `nachher` („Jetzt messen“): Stufe sofort gesetzt, die Mail erst im Nachlauf', async () => {
+    expect(await pruefeGrenzen(JETZT, { produktion: true, nachher: true })).toBe(1)
+    await vi.dynamicImportSettled()
+    expect(sendBetriebWarnung).not.toHaveBeenCalled()
+    expect(nachlauf.aufgaben).toHaveLength(1)
+
+    for (const aufgabe of nachlauf.aufgaben.splice(0)) await aufgabe()
+    expect(sendBetriebWarnung).toHaveBeenCalledTimes(1)
   })
 })

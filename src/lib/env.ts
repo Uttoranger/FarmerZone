@@ -47,6 +47,16 @@ const serverEnvSchema = z.object({
   // Triage-Tokens gleich, lehnt die Route alles ab.
   TRIAGE_WRITE_TOKEN: optional(),
   TRIAGE_MERGE_TOKEN: optional(),
+  // OPTIONAL (Register N18, Nr. 113): Das Token des Lebenszeichens
+  // GET /api/lebenszeichen (Authorization: Bearer …), das ein GitHub-Workflow
+  // täglich von außen aufruft. Fehlt es, antwortet die Route 503 (fail-closed,
+  // der Workflow scheitert sichtbar) — ein Deploy scheitert daran nicht.
+  LEBENSZEICHEN_TOKEN: optional(),
+  // OPTIONAL (Register N18, Nr. 113): Das Geheimnis aus Vercel › Spend
+  // Management, mit dem der Webhook POST /api/webhooks/vercel-ausgaben signiert
+  // ist (x-vercel-signature, HMAC-SHA1 des Rohtexts). Fehlt es, antwortet die
+  // Route 500 und speichert nichts (fail-closed).
+  VERCEL_AUSGABEN_SECRET: optional(),
   // OPTIONAL: Die öffentliche Adresse der App — in Produktion und, seit Nr. 43
   // (Register Z3), beim Branch staging (Testumgebung, nur https). Andere
   // Previews und lokal leiten ihre Adresse aus den Vercel-Systemvariablen
