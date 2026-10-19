@@ -136,6 +136,15 @@ function reihenfolge(html: string, texte: string[]): string[] {
   return texte.filter((t) => html.includes(t)).sort((a, b) => html.indexOf(a) - html.indexOf(b))
 }
 
+describe('Titelbild der echten Hofseite (Nr. 117, Sammel-PR)', () => {
+  it('trägt „Titelbild von {Hof}“ – die Seite reicht den Namen an das Titelbild weiter', () => {
+    const html = seite({ farm: { ...HOF, bannerType: 'PHOTO', bannerUrl: 'https://blob.example/titel.jpg' } })
+    expect(html).toContain('alt="Titelbild von Hof Test"')
+    // Gegenprobe: Das Foto steht wirklich im HTML (sonst prüfte der Test nichts).
+    expect(html).toContain('src="https://blob.example/titel.jpg"')
+  })
+})
+
 describe('die Hofseite steht in der KundeShell', () => {
   it('neues Design, Kopfzeile und Unterleiste — für Kundinnen und in der Vorschau', () => {
     for (const html of [seite(), seite({ ansicht: { art: 'vorschau', kaufen: false } })]) {

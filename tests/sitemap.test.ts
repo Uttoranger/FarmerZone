@@ -133,6 +133,16 @@ describe('Sitemap', () => {
   })
 })
 
+describe('„im Shop“ hat EINE Quelle (Sammel-PR 117/116)', () => {
+  it('seo.ts nutzt IM_SHOP_WHERE aus den Einstellungen statt einer eigenen Bedingung', () => {
+    const seo = quelle('src/server/queries/seo.ts')
+    expect(seo).toMatch(/import \{[^}]*\bIM_SHOP_WHERE\b[^}]*\} from '\.\/einstellungen'/)
+    expect(seo).not.toMatch(/isAvailable:\s*true/)
+    // Gegenprobe: Die Quelle selbst trägt die Bedingung.
+    expect(quelle('src/server/queries/einstellungen.ts')).toMatch(/export const IM_SHOP_WHERE = \{ isAvailable: true \}/)
+  })
+})
+
 describe('Canonical und Sprache der festen Seiten', () => {
   const SEITEN: Record<string, string> = {
     'src/app/page.tsx': '/',

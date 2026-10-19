@@ -6,6 +6,7 @@ import { ansichtsModus, type AnsichtsQuellen, type Suchparameter } from '@/lib/a
 import { hofSlugSchema } from '@/schemas/hof-adresse'
 import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
 import { OEFFENTLICH_SICHTBAR } from './farm'
+import { IM_SHOP_WHERE } from './einstellungen'
 
 /**
  * Suchmaschinen und echte 404 (Nr. 117): ob es unter einer Adresse überhaupt
@@ -18,11 +19,8 @@ import { OEFFENTLICH_SICHTBAR } from './farm'
  * Form (ohne Datenbank), dann EINE schlanke Abfrage; erst danach lädt die Seite.
  */
 
-/**
- * Ein Produkt steht im Shop — dieselbe Bedingung wie IM_SHOP_WHERE
- * (src/server/queries/einstellungen.ts); der Sammel-PR stellt auf den Export um.
- */
-const IM_SHOP = { isAvailable: true } as const satisfies Prisma.ProductWhereInput
+/** Ein Produkt steht im Shop — EINE Quelle mit den Einstellungen (IM_SHOP_WHERE). */
+const IM_SHOP = IM_SHOP_WHERE satisfies Prisma.ProductWhereInput
 
 /**
  * Kann diese Adresse ein Hof sein? Ohne Datenbank: Form und Länge wie beim

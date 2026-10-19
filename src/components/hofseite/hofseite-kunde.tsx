@@ -302,7 +302,7 @@ export function HofseiteKunde({
       {/* ── Titelbild, Name, Aktionen ── */}
       <div className="relative">
         {/* Hochformat ab md ganz statt beschnitten (Register N6, Nr. 72): entscheidet titelbild.tsx. */}
-        <Titelbild foto={foto} verlauf={titelbildVerlauf(farm.bannerValue)} ausschnitt={titelbildAusschnitt(farm.bannerAusschnitt, farm.bannerFocusY)}>
+        <Titelbild foto={foto} verlauf={titelbildVerlauf(farm.bannerValue)} ausschnitt={titelbildAusschnitt(farm.bannerAusschnitt, farm.bannerFocusY)} hofName={farm.name}>
           <button
             type="button"
             onClick={() => void teileHof(farm)}

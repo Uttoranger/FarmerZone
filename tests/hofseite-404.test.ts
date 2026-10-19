@@ -111,6 +111,7 @@ const HOF: PublicFarm = {
   sectionsConfig: [], farmValues: [], farmPhotos: [],
   acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,
   serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: null, betriebsstatus: null,
+  gruendungshof: false, gruendungSeit: null, abzeichenBlatt: null,
   products: [
     produkt('p_eier', { name: 'Freilandeier', category: 'EIER', price: 4.5, stock: 0 }),
     produkt('p_karotten', { name: 'Karotten', category: 'GEMUESE' }),
