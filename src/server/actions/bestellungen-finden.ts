@@ -12,6 +12,7 @@ import {
   BESTELLUNGEN_COOKIE,
   BESTELLUNGEN_PFAD,
   bestellCodeFehlerText,
+  bestellCodePauseText,
 } from '@/lib/bestellungen-finden'
 import { bestellZugangsToken } from '@/lib/bestellungen-zugang'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
@@ -125,6 +126,7 @@ export async function zeigeBestellungen(input: unknown): Promise<PruefAntwort> {
 
   const jetzt = new Date()
   const ergebnis = await pruefeBestellCode(email, code, jetzt)
+  if (!ergebnis.ok && ergebnis.fehler === 'ZU_VIELE') return { error: bestellCodePauseText(ergebnis.bis, jetzt), code: 'ZU_VIELE' }
   if (!ergebnis.ok) return { error: bestellCodeFehlerText(ergebnis.fehler), code: ergebnis.fehler }
 
   const jar = await cookies()

@@ -19,7 +19,7 @@ export interface ZuVieleVersucheProps {
  * Anmelden darin wäre genau die Mail, die ein Angreifer nachbauen möchte —
  * wer etwas tun will, geht selbst auf die Seite („Passwort vergessen").
  */
-export function ZuVieleVersucheEmail({ art, bis }: ZuVieleVersucheProps) {
+export function ZuVieleVersucheEmail({ art, bis }: ZuVieleVersucheProps): React.JSX.Element {
   const text = ZU_VIELE_VERSUCHE_MAIL[art]
   return (
     <EmailLayout previewText={text.titel}>

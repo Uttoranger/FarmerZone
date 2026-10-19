@@ -21,6 +21,7 @@ import {
   innerhalbDerGrenze,
   pauseBeginntBis,
   sekundenBisFensterEnde,
+  warnMailDrosseln,
   type DbBremse,
 } from '@/lib/bremse-datenbank'
 
@@ -237,9 +238,8 @@ export async function neuigkeitenGebremst(orderId: string, jetzt: Date = new Dat
  * Versuche geprüft, die nicht zurückgegeben wurden.
  */
 
-/** Die Versuche einer Art für diese Adresse — dieselben Schlüssel beim Zählen, Zurückgeben und Löschen. */
-function fehlversuche(art: FehlversuchArt, email: string): Versuch[] {
-  const merkmal = adressMerkmal(email)
+/** Die Versuche einer Art für dieses Merkmal (adressMerkmal) — dieselben Schlüssel beim Zählen, Zurückgeben und Löschen. */
+function fehlversuche(art: FehlversuchArt, merkmal: string): Versuch[] {
   return FEHLVERSUCH_BREMSEN[art].map((bremse) => ({ bremse, merkmal }))
 }
 
@@ -262,7 +262,8 @@ export async function zaehleVersuchVorab(
   jetzt: Date = new Date(),
   meldungen: BremsMeldungen = MELDUNGEN_DIESER_INSTANZ
 ): Promise<FehlversuchVorab> {
-  const versuche = fehlversuche(art, email)
+  const merkmal = adressMerkmal(email)
+  const versuche = fehlversuche(art, merkmal)
   let staende: number[]
   try {
     staende = await mitFrist(zaehleVersuche(versuche, jetzt), DB_BREMSE_ZEITLIMIT_MS)
@@ -270,7 +271,7 @@ export async function zaehleVersuchVorab(
     meldeBremsFehler(err, versuche, jetzt, meldungen)
     return { gesperrt: true, bis: null }
   }
-  const versuch: VorabVersuch = { art, merkmal: adressMerkmal(email), staende, jetzt }
+  const versuch: VorabVersuch = { art, merkmal, staende, jetzt }
   const bis = fehlversuchSperreBis(
     FEHLVERSUCH_BREMSEN[art],
     staende.map((stand) => stand - 1),
@@ -288,7 +289,7 @@ export async function zaehleVersuchVorab(
  */
 export function zaehleAlsFehlversuch(versuch: VorabVersuch): void {
   const bis = pauseBeginntBis(FEHLVERSUCH_BREMSEN[versuch.art], versuch.staende, versuch.jetzt)
-  if (bis !== null) nachDerAntwort(() => schickeWarnMail(versuch.art, versuch.merkmal, bis))
+  if (bis !== null) nachDerAntwort(() => schickeWarnMail(versuch, bis))
 }
 
 /**
@@ -336,21 +337,22 @@ function meldeWarnMailFehler(grund: 'resend_fehler' | 'nachlauf_fehler', err?: u
  * Die Mail „Zu viele falsche Codes" bzw. „… Passwörter" — nach der Antwort,
  * damit eine Adresse mit Konto nicht langsamer antwortet als eine ohne. Nur
  * an eine Adresse, die es gibt (genau, ohne Platzhalter, ohne Rücksicht auf
- * Groß-/Kleinschreibung); beim Passwort höchstens eine am Tag (Drossel in der
- * Datenbank, geschrieben nur, wenn es das Konto gibt). Nie mit Code oder
+ * Groß-/Kleinschreibung); eine je Pause, beim Passwort höchstens eine am Tag
+ * (warnMailDrosseln, in der Datenbank, geschrieben nur, wenn es das Konto
+ * gibt; antwortet sie nicht, geht im Zweifel KEINE Mail). Nie mit Code oder
  * Link; im Log (ohne RESEND_API_KEY) steht nur der Betreff.
  */
-async function schickeWarnMail(art: FehlversuchArt, merkmal: string, bis: Date): Promise<void> {
+async function schickeWarnMail(versuch: VorabVersuch, bis: Date): Promise<void> {
+  const { art, merkmal } = versuch
   try {
     const konto = await prisma.user.findFirst({
       where: { email: { equals: genauesIlikeMuster(merkmal), mode: 'insensitive' } },
       select: { email: true },
     })
     if (!konto) return
-    if (art === 'passwort') {
-      const [stand] = await zaehleVersuche([{ bremse: DB_BREMSEN.passwortFehlerMail, merkmal }])
-      if (!innerhalbDerGrenze(stand, DB_BREMSEN.passwortFehlerMail.max)) return
-    }
+    const drosseln = warnMailDrosseln(art, versuch.staende)
+    const staende = await zaehleVersuche(drosseln.map((bremse) => ({ bremse, merkmal })), versuch.jetzt)
+    if (!staende.some((stand, i) => innerhalbDerGrenze(stand, drosseln[i].max))) return
     const { sendZuVieleVersucheEmail } = await import('@/lib/email')
     const ergebnis = await sendZuVieleVersucheEmail(konto.email, art, bis)
     if (ergebnis.error) meldeWarnMailFehler('resend_fehler')
@@ -368,7 +370,7 @@ async function schickeWarnMail(art: FehlversuchArt, merkmal: string, bis: Date):
  * Das Passwort ist da schon geändert.
  */
 export async function loeschePasswortFehlversuche(email: string, jetzt: Date = new Date()): Promise<void> {
-  const [versuch] = fehlversuche('passwort', email)
+  const [versuch] = fehlversuche('passwort', adressMerkmal(email))
   try {
     await prisma.rateLimitZaehler.deleteMany({
       where: { schluessel: bremsSchluessel(env.BETTER_AUTH_SECRET, versuch.bremse.zweck, versuch.merkmal) },

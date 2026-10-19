@@ -96,8 +96,12 @@ export const DB_BREMSEN = {
   codeFehlerStunde: { zweck: 'code-fehler-stunde', max: FALSCHE_CODES_JE_STUNDE, fensterMs: STUNDE_MS },
   codeFehlerTag: { zweck: 'code-fehler-tag', max: FALSCHE_CODES_JE_TAG, fensterMs: TAG_MS },
   passwortFehler: { zweck: 'passwort-fehler', max: FALSCHE_PASSWOERTER_JE_STUNDE, fensterMs: STUNDE_MS },
-  // Drossel ohne erste Stufe: höchstens eine Warn-Mail zu falschen
-  // Passwörtern je Adresse und Tag (E7: „Warn-Mails dazu höchstens eine am Tag").
+  // Drosseln ohne erste Stufe für die Warn-Mails (FEHLVERSUCH_MAIL_DROSSELN):
+  // bei Codes eine je Pause, also je Fenster der Bremse, die voll wurde; bei
+  // Passwörtern höchstens eine je Adresse und Tag (E7: „Warn-Mails dazu
+  // höchstens eine am Tag").
+  codeFehlerMailStunde: { zweck: 'code-fehler-mail-stunde', max: 1, fensterMs: STUNDE_MS },
+  codeFehlerMailTag: { zweck: 'code-fehler-mail-tag', max: 1, fensterMs: TAG_MS },
   passwortFehlerMail: { zweck: 'passwort-fehler-mail', max: 1, fensterMs: TAG_MS },
 } as const satisfies Record<string, DbBremse>
 
@@ -134,6 +138,25 @@ export function fehlversuchSperreBis(bremsen: readonly DbBremse[], staende: read
 export function pauseBeginntBis(bremsen: readonly DbBremse[], staendeNachher: readonly number[], jetzt: Date): Date | null {
   if (!bremsen.some((bremse, i) => staendeNachher[i] === bremse.max)) return null
   return fehlversuchSperreBis(bremsen, staendeNachher, jetzt)
+}
+
+/**
+ * Je Fehlversuch-Bremse (gleiche Reihenfolge wie FEHLVERSUCH_BREMSEN) die
+ * Drossel ihrer Warn-Mail, `max: 1` je Fenster. Der atomare Stand allein
+ * reicht nicht: Gibt ein gleichzeitiger richtiger Versuch seinen Zähler
+ * zurück, sieht der nächste Fehlversuch wieder genau `max` (Nachbesserung
+ * Runde 3) — die Drossel hält es bei einer Mail je Pause.
+ */
+const FEHLVERSUCH_MAIL_DROSSELN = {
+  code: [DB_BREMSEN.codeFehlerMailStunde, DB_BREMSEN.codeFehlerMailTag],
+  passwort: [DB_BREMSEN.passwortFehlerMail],
+} as const satisfies Record<FehlversuchArt, readonly DbBremse[]>
+
+/** Die Drosseln der Bremsen, die DIESER Fehlversuch voll gemacht hat (Stand danach gleich `max`). */
+export function warnMailDrosseln(art: FehlversuchArt, staendeNachher: readonly number[]): DbBremse[] {
+  const bremsen: readonly DbBremse[] = FEHLVERSUCH_BREMSEN[art]
+  const drosseln: readonly DbBremse[] = FEHLVERSUCH_MAIL_DROSSELN[art]
+  return drosseln.filter((_, i) => staendeNachher[i] === bremsen[i].max)
 }
 
 /**

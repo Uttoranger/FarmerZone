@@ -302,6 +302,28 @@ describe('falsche Codes je Adresse — zählen und pausieren', () => {
     expect(sendZuVieleVersucheEmail).toHaveBeenCalledTimes(2)
   })
 
+  it('eine Mail je Pause auch bei Gleichzeitigkeit: zwei Fehlversuche sehen beide Stand 10 → genau eine Mail', async () => {
+    // Ein richtiger Versuch läuft noch (Stand 9), ein falscher macht die Bremse
+    // voll (10); der richtige gibt zurück (9), der nächste falsche sieht wieder 10.
+    await falsch('code', KUNDIN, 8)
+    const richtig = await zaehleVersuchVorab('code', KUNDIN, new Date(), neueBremsMeldungen())
+    await falsch('code', KUNDIN, 1)
+    if (richtig.gesperrt) throw new Error('nicht pausiert erwartet')
+    await gibVersuchZurueck(richtig.versuch)
+    await falsch('code', KUNDIN, 1)
+    expect(nachlauf.aufgaben).toHaveLength(2)
+
+    await arbeiteNachlaufAb()
+    expect(vi.mocked(sendZuVieleVersucheEmail).mock.calls).toEqual([[KUNDIN, 'code', new Date('2026-10-19T13:00:00.000Z')]])
+  })
+
+  it('die Drossel der Mail antwortet nicht: im Zweifel KEINE Mail', async () => {
+    await falsch('code', KUNDIN, 10)
+    db.kaputt = 'fehler'
+    await arbeiteNachlaufAb()
+    expect(sendZuVieleVersucheEmail).not.toHaveBeenCalled()
+  })
+
   it('ein richtiger Versuch gibt zurück: 9 falsch, richtig, noch 1 falsch — erst dann pausiert', async () => {
     await falsch('code', KUNDIN, 9)
     expect(await pausiert('code', KUNDIN)).toEqual({ gesperrt: false })

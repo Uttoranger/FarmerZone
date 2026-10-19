@@ -16,7 +16,7 @@
  *    welche Adresse ein Hof ist (ein Hof bekommt nie einen Code).
  *  - Anmeldung und „Bestellungen finden" zählen zusammen; ein richtiger Code
  *    bzw. ein richtiges Passwort zählt nicht.
- *  - Gleichzeitig: Von 20 falschen Codes bzw. Passwörtern werden höchstens 10
+ *  - Gleichzeitig: Von 20 falschen Codes bzw. Passwörtern werden genau 10
  *    geprüft — gezählt wird VOR dem Prüfen (Nachbesserung Runde 2).
  *  - 30 falsche Codes am Tag pausieren bis zum Ende des Tagesfensters.
  *  - Passwort: 10 falsch → 429 mit Satz; „Passwort vergessen" geht weiter, ein
@@ -159,7 +159,14 @@ afterEach(async () => {
   post.reset.length = 0
   post.warnungen.length = 0
   nachlauf.aufgaben.length = 0
-  const zwecke = [DB_BREMSEN.codeFehlerStunde, DB_BREMSEN.codeFehlerTag, DB_BREMSEN.passwortFehler, DB_BREMSEN.passwortFehlerMail].map((b) => b.zweck)
+  const zwecke = [
+    DB_BREMSEN.codeFehlerStunde,
+    DB_BREMSEN.codeFehlerTag,
+    DB_BREMSEN.passwortFehler,
+    DB_BREMSEN.codeFehlerMailStunde,
+    DB_BREMSEN.codeFehlerMailTag,
+    DB_BREMSEN.passwortFehlerMail,
+  ].map((b) => b.zweck)
   await prisma.rateLimitZaehler.deleteMany({
     where: { schluessel: { in: adressen.flatMap((a) => zwecke.map((z) => bremsSchluessel(env.BETTER_AUTH_SECRET, z, a))) } },
   })
@@ -265,7 +272,7 @@ describe('falsche Codes je Adresse — über alle Codes', () => {
 
     expect(await mitCode(email, '000000')).toMatchObject({ ok: false, status: 429, code: ZU_VIELE_FALSCHE_CODES })
     const frisch = await legeBestellCodeAn(email)
-    expect(await pruefeBestellCode(email, frisch)).toEqual({ ok: false, fehler: 'ZU_VIELE' })
+    expect(await pruefeBestellCode(email, frisch)).toEqual({ ok: false, fehler: 'ZU_VIELE', bis: STUNDENENDE })
   })
 
   it('30 falsche Codes am Tag pausieren bis zum Ende des Tagesfensters, auch in einer neuen Stunde', async () => {
@@ -283,15 +290,28 @@ describe('falsche Codes je Adresse — über alle Codes', () => {
     expect(await mitCode(email, '000000')).toMatchObject({ status: 429, pauseBis: `morgen um ${uhrzeitInWien(TAGESENDE)}` })
   })
 
-  it('gleichzeitig: von 20 falschen Codes werden höchstens 10 geprüft — die Ablehnungen füllen das Tagesfenster nicht', async () => {
+  it('gleichzeitig: von 20 falschen Codes werden genau 10 geprüft — die Ablehnungen füllen das Tagesfenster nicht', async () => {
     // Gezählt wird VOR dem Prüfen (Nachbesserung Runde 2): Getrennt gelesen und
     // erst danach gezählt, sahen alle gleichzeitigen Versuche noch Stand 0.
     const email = neueAdresse('niemand')
     const ergebnisse = await Promise.all(Array.from({ length: 20 }, () => mitCode(email, '000000')))
     const geprueft = ergebnisse.filter((e) => !e.ok && e.code === 'INVALID_OTP').length
-    expect(geprueft).toBeLessThanOrEqual(10)
+    expect(geprueft).toBe(10)
     expect(ergebnisse.filter((e) => !e.ok && e.status === 429)).toHaveLength(20 - geprueft)
-    expect(await stand(DB_BREMSEN.codeFehlerTag.zweck, email)).toBeLessThanOrEqual(10)
+    expect(await stand(DB_BREMSEN.codeFehlerTag.zweck, email)).toBe(10)
+  })
+
+  it('eine Mail je Pause: zwei Fehlversuche, die beide Stand 10 sehen, schicken genau eine (Drossel in der Datenbank)', async () => {
+    // So kommt es dazu: Ein gleichzeitiger richtiger Versuch gibt seinen Zähler
+    // zurück, der nächste Fehlversuch sieht wieder genau 10 (Nachbesserung Runde 3).
+    const email = neueAdresse()
+    await prisma.user.create({ data: { id: intKennung('nutzer'), email, name: 'Max Mustermann', role: 'CUSTOMER', emailVerified: true } })
+    const vollGemacht = { art: 'code' as const, merkmal: email, staende: [10, 10], jetzt: FEST }
+    zaehleAlsFehlversuch(vollGemacht)
+    zaehleAlsFehlversuch({ ...vollGemacht })
+    await arbeiteNachlaufAb()
+    expect(post.warnungen).toEqual([{ email, art: 'code', bis: STUNDENENDE }])
+    expect(await stand(DB_BREMSEN.codeFehlerMailStunde.zweck, email)).toBe(2)
   })
 
   it('in der Tabelle steht keine Adresse — nur Zweck und HMAC', async () => {
@@ -338,15 +358,15 @@ describe('falsche Passwörter je Adresse', () => {
     expect(await mitPasswort(email, 'neues-passwort-5678')).toEqual({ ok: true })
   })
 
-  it('gleichzeitig: von 20 falschen Passwörtern werden höchstens 10 geprüft (gezählt wird vor dem Prüfen)', async () => {
+  it('gleichzeitig: von 20 falschen Passwörtern werden genau 10 geprüft (gezählt wird vor dem Prüfen)', async () => {
     const email = neueAdresse('bauer')
     await auth.api.signUpEmail({ body: { email, password: 'test-passwort-1234', name: 'Max Mustermann' } })
 
     const ergebnisse = await Promise.all(Array.from({ length: 20 }, () => mitPasswort(email, 'falsch-falsch')))
     const geprueft = ergebnisse.filter((e) => !e.ok && e.status === 401).length
-    expect(geprueft).toBeLessThanOrEqual(10)
+    expect(geprueft).toBe(10)
     expect(ergebnisse.filter((e) => !e.ok && e.status === 429)).toHaveLength(20 - geprueft)
-    expect(await stand(DB_BREMSEN.passwortFehler.zweck, email)).toBeLessThanOrEqual(10)
+    expect(await stand(DB_BREMSEN.passwortFehler.zweck, email)).toBe(10)
   })
 
   it('ein richtiges Passwort zählt nicht: 9 falsch, richtig, noch 1 falsch — erst dann pausiert', async () => {

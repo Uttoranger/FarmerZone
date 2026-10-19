@@ -56,15 +56,15 @@ export async function legeBestellCodeAn(email: string, jetzt: Date = new Date())
  * Versuch zählt VORAB, atomar — sonst kämen gleichzeitige Versuche alle am
  * Stand vorbei; ein richtiger Code gibt ihn zurück. Ist die Adresse pausiert
  * (oder antwortet die Bremse nicht: fail-closed), wird der Code gar nicht
- * erst geprüft — `ZU_VIELE`, wie die anderen Bremsen hier.
+ * erst geprüft — `ZU_VIELE` mit dem Ende der Pause (`null` = unbekannt).
  */
 export async function pruefeBestellCode(
   email: string,
   code: string,
   jetzt: Date = new Date()
-): Promise<{ ok: true } | { ok: false; fehler: BestellCodeFehler | 'ZU_VIELE' }> {
+): Promise<{ ok: true } | { ok: false; fehler: BestellCodeFehler } | { ok: false; fehler: 'ZU_VIELE'; bis: Date | null }> {
   const vorab = await zaehleVersuchVorab('code', email, jetzt)
-  if (vorab.gesperrt) return { ok: false, fehler: 'ZU_VIELE' }
+  if (vorab.gesperrt) return { ok: false, fehler: 'ZU_VIELE', bis: vorab.bis }
   const ergebnis = await pruefeCodeZeile(email, code, jetzt)
   if (ergebnis.ok) await gibVersuchZurueck(vorab.versuch)
   else zaehleAlsFehlversuch(vorab.versuch)

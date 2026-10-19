@@ -421,7 +421,7 @@ export async function sendPasswordResetEmail(email: string, url: string): Promis
  */
 export async function sendZuVieleVersucheEmail(
   email: string,
-  art: 'code' | 'passwort',
+  art: import('@/lib/anmeldecode').FehlversuchArt,
   bis: Date
 ): Promise<VersandErgebnis> {
   // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.

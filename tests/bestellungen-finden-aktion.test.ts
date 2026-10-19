@@ -53,6 +53,7 @@ import { legeBestellCodeAn, pruefeBestellCode } from '@/server/bestellungen-find
 import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 import { DB_BREMSEN } from '@/lib/bremse-datenbank'
 import { leseBestellZugang } from '@/lib/bestellungen-zugang'
+import { anmeldeFehlerText, zuVieleCodesText } from '@/lib/anmeldecode'
 
 type Aktionen = typeof import('@/server/actions/bestellungen-finden')
 
@@ -275,6 +276,28 @@ describe('zeigeBestellungen', () => {
     expect(antwort).toMatchObject({ code: fehler })
     expect('error' in antwort && antwort.error).toMatch(text)
     expect(kontext.gesetzt).toEqual([])
+  })
+
+  it('Adresse pausiert (falsche Codes je Adresse, E7): derselbe Satz mit Uhrzeit wie bei der Anmeldung; ohne Ende ohne Uhrzeit', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date('2026-10-19T12:20:00Z')) // 14:20 in Wien
+      vi.mocked(pruefeBestellCode).mockResolvedValueOnce({ ok: false, fehler: 'ZU_VIELE', bis: new Date('2026-10-19T13:00:00Z') })
+      const { zeigeBestellungen } = await ladeAktionen()
+      expect(await zeigeBestellungen({ email: 'kundin@example.com', code: '000000' })).toEqual({
+        error: zuVieleCodesText('15:00'),
+        code: 'ZU_VIELE',
+      })
+      // fail-closed: Die Bremse antwortete nicht, das Ende ist unbekannt — der Satz ohne Uhrzeit, wie bei der Anmeldung.
+      vi.mocked(pruefeBestellCode).mockResolvedValueOnce({ ok: false, fehler: 'ZU_VIELE', bis: null })
+      expect(await zeigeBestellungen({ email: 'kundin@example.com', code: '000000' })).toEqual({
+        error: anmeldeFehlerText({ status: 429 }, 'pruefen'),
+        code: 'ZU_VIELE',
+      })
+      expect(kontext.gesetzt).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('ungültige Eingabe: weder Prüfung noch Cookie', async () => {

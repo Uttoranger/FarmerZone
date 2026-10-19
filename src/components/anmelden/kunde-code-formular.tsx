@@ -9,7 +9,6 @@ import {
   ANMELDECODE_LAENGE,
   anmeldeFehlerText,
   anmeldeFehlerVon,
-  type AnmeldeFehler,
   codeVollstaendig,
   restWartezeitSekunden,
 } from '@/lib/anmeldecode'
@@ -234,14 +233,6 @@ function LadeStatus({ laedt }: { laedt: boolean }): React.JSX.Element {
 
 type Schritt = 'email' | 'code'
 
-/**
- * Fehler aus dem Better-Auth-Client — nur Code, Status und bei „Zu viele
- * falsche Codes" die Uhrzeit des Pausenendes zählen (anmeldeFehlerText).
- */
-function fehlerVon(e: { code?: string; status?: number; pauseBis?: unknown } | null | undefined): AnmeldeFehler {
-  return anmeldeFehlerVon(e)
-}
-
 export function KundeCodeFormular({ ziel }: { ziel: string }): React.JSX.Element {
   const router = useRouter()
   const [schritt, setSchritt] = useState<Schritt>('email')
@@ -275,7 +266,7 @@ export function KundeCodeFormular({ ziel }: { ziel: string }): React.JSX.Element
     try {
       const { error } = await authClient.emailOtp.sendVerificationOtp({ email: geprueft.data.email, type: 'sign-in' })
       if (error) {
-        setFehler(anmeldeFehlerText(fehlerVon(error), 'senden'))
+        setFehler(anmeldeFehlerText(anmeldeFehlerVon(error), 'senden'))
         return
       }
       setEmail(geprueft.data.email)
@@ -303,7 +294,7 @@ export function KundeCodeFormular({ ziel }: { ziel: string }): React.JSX.Element
     try {
       const { error } = await authClient.signIn.emailOtp({ email, otp: codeJetzt })
       if (error) {
-        setFehler(anmeldeFehlerText(fehlerVon(error), 'pruefen'))
+        setFehler(anmeldeFehlerText(anmeldeFehlerVon(error), 'pruefen'))
         // Leeren: Das Feld nimmt nur sechs Ziffern, und neu getippt wird von
         // vorn — der Fehlertext bleibt stehen.
         setCode('')
