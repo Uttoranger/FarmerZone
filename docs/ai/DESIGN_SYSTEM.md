@@ -166,6 +166,12 @@ Für jede Sache gibt es in Nutzertexten genau ein Wort (Register N8): in Beschri
 | Dateien im Bild-Speicher, an denen nichts mehr hängt (Register N18/N17) | Bilder ohne Verwendung | Waise, Orphan | „Bilder ohne Verwendung ansehen“ |
 | Hof, der nicht für die Gründungsplätze zählt (Register K2) | ausgenommen | | „ausgenommen · Testhof“ |
 | Die Hofseite, wie die Kundschaft sie sieht, aus Mein Hof geöffnet (Register N4) | Kundenansicht | | „Kundenansicht · So sieht dich die Kundschaft“ |
+| Die Geräte, auf denen ein Konto gerade angemeldet ist – eine Zeile je Sitzung (Register E7) | Angemeldete Geräte | Device | „Angemeldete Geräte“, „Alle anderen abmelden“ |
+| Anmeldung mit Fingerabdruck, Gesicht oder PIN des Geräts statt Passwort; das Wort bleibt, wie es auf den Geräten steht (Register N20) | Passkey | 2FA | „Mit Passkey anmelden“ |
+| Einmal gültiger Code für den Notfall, wenn kein Passkey zur Hand ist (Register N20) | Ersatzcode | Backup-Code | „Ersatzcode eingeben“ |
+| Das Etikett „Gründungshof“ über dem Hofnamen (Register K2) | Abzeichen | Badge | „Abzeichen zeigen“ |
+| Die Aktion „100 Gründungshöfe“: Plätze, 24 Monate, Stichtag (Register K2) | Aktion | | „Aktion bis 31.3.2027“ |
+| Die tägliche Prüfung von außen, ob die Abläufe gelaufen sind (Register N18, Nr. 113) | Lebenszeichen | Heartbeat, Monitoring | „Lebenszeichen“ |
 
 - **Prüfung:** `tests/wortliste.test.ts` liest die Spalte „nicht“ und sucht jedes Wort in jeder Zeichenkette und jedem JSX-Text unter `src/` — mit Wortgrenzen und in der Schreibweise der Tabelle („Bestand“ trifft weder „Lagerbestand“ noch „bestand“). Kommentare, Bezeichner und Server-Logs (`console.*`) zählen nicht. Wo ein Wort in anderem Sinn richtig ist, steht der Text mit Grund in der Ausnahmeliste im Test: je Text, nicht je Datei, ohne Zeilennummer.
 - **„Status“, „Post“, „Neuigkeit“ meinen den Beitrag als Sache.** Der Status einer Bestellung, Zahlung, Freischaltung oder Meldung bleibt „Status“, ebenso der Name der WhatsApp-Funktion „Status“; „Neuigkeiten“ (Mehrzahl) ist der Name der Anmeldung bei einem Hof. Solche Texte stehen als Ausnahme im Test, ebenso ein Text über die Käuferart (Betrieb, privat) beim Futter, der „Käufer“ sagt.

@@ -171,6 +171,15 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 109 | Gründungshöfe: Testhöfe ausnehmen (Migration) | `freigabe.md` §20 | K2 |
 | 110 | Prüfungen statt Textregeln, Teil a (vom Zwischenstand `integration/lauf16`) | `freigabe.md` §20 | G4 |
 | Sammel 16 | Sammel-PR `integration/lauf16` | `freigabe.md` §20 | G3, G4 |
+| 111 | Filter-Falle auf /hoefe schließen (entfällt: lief vorher allein als Fix #307) | `freigabe.md` §21 | N19 |
+| 112 | Code- und Passwort-Raten bremsen | `freigabe.md` §21 | E7 |
+| 113 | Betrieb: Lebenszeichen von außen, Vercel Pro, Vercel-Ausgaben; Nacharbeit 103/104 | `freigabe.md` §21 | N18 |
+| 114 | Angemeldete Geräte, frische Sitzung, Mail bei neuem Gerät (von 112; Migration) | `freigabe.md` §21 | E7 |
+| 115 | Admin nur mit Passkey (von 114; Migration; Paket) | `freigabe.md` §21 | N20 |
+| 116 | Aktion „100 Gründungshöfe“ und Abzeichen (Migration) | `freigabe.md` §21 | K2 |
+| 117 | SEO-Grundlagen und echte 404 | `freigabe.md` §21 | N19 |
+| 118 | Reste aus 110, freigegebene Regelvorschläge, Kleinkram (vom Zwischenstand `integration/lauf17`) | `freigabe.md` §21 | G4 |
+| Sammel 17 | Sammel-PR `integration/lauf17` | `freigabe.md` §21 | G3 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
@@ -243,6 +252,14 @@ Zwei Migrationen (`<zeit>_startseite_fassung` in 99, danach `<zeit>_bild_ausschn
 - Ist 109 nach zwei Runden nicht fertig (Entwurf), zweigt 103 von `docs/lauf16` ab, Migration mit dem Schema von `docs/lauf16` als `--from-schema`. Ist 103 nicht fertig, entfällt 104 (Lauf 17).
 
 Zwei Migrationen (`<zeit>_gruendung_ausgenommen` in 109, danach `<zeit>_betrieb` in 103), nur Expand, ohne Seed, nach Regel 3 mit dem Schema des Basis-Branchs als `--from-schema`; 104–108 und 110 ohne Migration. Priorität 105 → 107 → 106 → 109 → 103 → 108 → 104 → 110: 105, 107, 106 und 109 müssen fertig werden, 103 und 108 dürfen Entwurf bleiben, 104 entfällt ohne 103, 110 zuletzt (Teil b in Lauf 17). Nie zwei Nummern an derselben Code-Datei (Dateigrenzen in `freigabe.md` §20).
+
+**Reihenfolge in Lauf 17** (`freigabe.md` §21, Haltepunkt Sammel-PR): Doku-PR → 112 ∥ 116 ∥ 117 → 114 (von 112), 115 (von 114), sonst 113, sobald Plätze frei sind → 118 → Sammel-PR. Die Branches:
+- Nr. 111 entfällt: Der Fix „Filter-Falle auf /hoefe“ lief vorher allein (#307, auf main). Deshalb bilden 112, 116 und 117 die erste Welle; alle drei zweigen von `docs/lauf17` ab; ein Workflow je Nummer, höchstens drei gleichzeitig.
+- Wird ein Platz frei: Ist 112 fertig, startet 114 vom Branch der Nr. 112; ist 114 fertig, startet 115 vom Branch der Nr. 114; sonst 113 (von `docs/lauf17`).
+- 118 zweigt vom Zwischenstand `integration/lauf17` mit allen fertigen Nummern ab.
+- Ist 112 nach zwei Runden nicht fertig (Entwurf), zweigt 114 von `docs/lauf17` ab. Ist 114 nicht fertig, entfällt 115 (Lauf 18) – 115 braucht die frische Sitzung und den Geräte-Baustein aus 114.
+
+Drei Migrationen mit festen Namen (`20261019200000_gruendung_aktion` in 116, `20261019210000_geraete` in 114, `20261019220000_admin_passkey` in 115), nur Expand, ohne Seed, ohne Datenänderung, nach Regel 3 mit dem Schema des Basis-Branchs als `--from-schema`; 116 läuft auf einem eigenen Zweig, weil es getrennte Modelle berührt. Ein neues Paket nur in 115 (`@better-auth/passkey` 1.6.23). 112, 113, 117 und 118 ohne Migration. Priorität 112 → 114 → 115 → 113 → 117 → 116 → 118: 112 und 114 müssen fertig werden, 115 und 116 dürfen Entwurf bleiben, 118 zuletzt. Nie zwei Nummern an derselben Code-Datei außerhalb der Grenzen (`freigabe.md` §21).
 
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 
