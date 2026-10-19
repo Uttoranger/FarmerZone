@@ -82,6 +82,16 @@ export function csvBetrag(cents: number): string {
   return `${cents < 0 ? '-' : ''}${Math.floor(betrag / 100)},${String(betrag % 100).padStart(2, '0')}`
 }
 
+/**
+ * „25,10 $" · „50 $" — Dollar aus ganzen Cent (Vercel-Ausgaben, Nr. 113), nur
+ * mit ganzen Zahlen gerechnet: keine Gleitkomma-Rundung auf dem Weg zum Text.
+ */
+export function formatDollar(cent: number): string {
+  const c = Math.max(0, Math.round(cent))
+  const rest = c % 100
+  return `${formatZahl((c - rest) / 100)}${rest === 0 ? '' : `,${String(rest).padStart(2, '0')}`} $`
+}
+
 /** „0,5" · „2" · „1.234" — eine Zahl ohne Einheit, deutsch geschrieben. */
 export function formatZahl(n: number): string {
   return mengenFormat.format(Number.isFinite(n) ? n : 0)
