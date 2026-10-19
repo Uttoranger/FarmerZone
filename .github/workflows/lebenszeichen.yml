@@ -25,4 +25,4 @@ jobs:
       - name: Abläufe gelaufen?
         env:
           TOKEN: ${{ secrets.LEBENSZEICHEN_TOKEN }}
-        run: curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" https://agrilo.at/api/lebenszeichen
+        run: 'curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" https://agrilo.at/api/lebenszeichen'
