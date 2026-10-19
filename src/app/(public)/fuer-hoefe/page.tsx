@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { SERVICEGEBUEHR_SATZ_TEXT, STARTPHASE_SATZ, TARIFE_AB_SATZ } from '@/lib/konditionen'
 import { STARTSEITE_VORSCHAUBILD } from '@/lib/vorschaubild'
+import { OG_LOCALE } from '@/lib/json-ld'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { StartseiteFuss } from '@/components/startseite/startseite-abschnitte'
 import {
@@ -31,6 +32,7 @@ export const metadata: Metadata = {
     type: 'website',
     siteName: MARKE,
     images: [STARTSEITE_VORSCHAUBILD],
+    locale: OG_LOCALE,
   },
 }
 

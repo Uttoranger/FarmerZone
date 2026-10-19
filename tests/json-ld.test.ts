@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest'
 import { absoluteAdresse, hofJsonLd, jsonLdSicher, produktJsonLd, startseiteJsonLd } from '@/lib/json-ld'
 import { MARKE } from '@/lib/marke'
+import { Decimal } from '@prisma/client/runtime/index-browser'
 
 const ANGRIFF = '</script><script>alert(1)</script>'
 
@@ -87,11 +88,16 @@ describe('produktJsonLd', () => {
   })
 
   it('der Preis kommt centgenau aus dem gespeicherten Wert — auch wo Kommazahlen krumm würden', () => {
-    const preis = (price: number | string) => (produktJsonLd({ ...PRODUKT, price }, HOF, BASIS).offers as { price: string }).price
+    const preis = (price: number | string | Decimal) => (produktJsonLd({ ...PRODUKT, price }, HOF, BASIS).offers as { price: string }).price
     expect(preis(19.99)).toBe('19.99')
     expect(preis(0.1 + 0.2)).toBe('0.30')
     expect(preis('1234.05')).toBe('1234.05')
     expect(preis(0)).toBe('0.00')
+    expect(preis(11)).toBe('11.00')
+    expect(preis(0.99)).toBe('0.99')
+    expect(preis('1234.50')).toBe('1234.50')
+    // Wie Prisma ihn liefert: als Decimal.
+    expect(preis(new Decimal('11'))).toBe('11.00')
   })
 
   it('ohne Vorrat OutOfStock; ohne Beschreibung und Bild fehlen die Felder', () => {

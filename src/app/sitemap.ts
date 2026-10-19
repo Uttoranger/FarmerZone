@@ -17,7 +17,9 @@ import { metadatenBasis } from '@/lib/vorschaubild'
  * private Seite, eine Seite mit Token oder eine Adresse mit Parametern
  * (tests/sitemap.test.ts gleicht mit `PRIVATE_BEREICHE` aus src/lib/robots.ts ab).
  *
- * Volle Adressen aus derselben Basis wie `metadataBase` im Root-Layout.
+ * Volle Adressen aus derselben Basis wie `metadataBase` im Root-Layout. Ohne
+ * bekannte Basis bleibt die Liste leer: Eine relative Adresse wäre in der
+ * Sitemap ungültig — robots.ts lässt dann auch die Zeile „Sitemap:" weg.
  */
 export const revalidate = 3600
 
@@ -46,6 +48,7 @@ async function ladeHoefe(): Promise<SitemapHof[]> {
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const basis = metadatenBasis(UMGEBUNG.appUrl)
+  if (!basis) return []
   const hoefe = await ladeHoefe()
   return [
     ...FESTE_SEITEN.map((pfad) => ({ url: absoluteAdresse(pfad, basis) })),

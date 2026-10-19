@@ -9,7 +9,8 @@
  *  - Kaufen ist wirkungslos.
  *
  * Aufgerufen wird sie serverseitig, im Lader der Hofseite
- * (src/server/hofseite-vorschau.ts). Die Seite und die Ansicht lesen nur ihr
+ * (src/server/hofseite-vorschau.ts) und in der Prüfung vor der Hofseite
+ * (src/server/queries/seo.ts), dort nur mit Quellen ohne Sitzung. Die Seite und die Ansicht lesen nur ihr
  * Ergebnis, nie den URL-Parameter — tests/hofseite-einmal.test.ts sucht nach
  * jeder anderen Lesestelle.
  */

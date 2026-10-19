@@ -8,9 +8,11 @@
  * U+2028/U+2029 (in JavaScript-Text Zeilenenden). Für JSON ist das
  * gleichbedeutend: JSON.parse liefert dieselben Daten (tests/json-ld.test.ts).
  */
+// Decimal aus dem Browser-Einstieg der Prisma-Runtime — wie src/lib/order-totals.ts.
+import { Decimal } from '@prisma/client/runtime/index-browser'
 import { MARKE } from '@/lib/marke'
 import { titelbildFoto } from '@/lib/mein-hof'
-import { alsCents, type DecimalEingabe } from '@/lib/order-totals'
+import type { DecimalEingabe } from '@/lib/order-totals'
 import { produktPfad } from '@/lib/produktdetail'
 
 const MASKE: Record<string, string> = {
@@ -40,11 +42,6 @@ export const OG_LOCALE = 'de_AT'
 /** Ein Pfad der App als volle Adresse; ohne bekannte Basis bleibt er, wie er ist. Volle Adressen (Blob) bleiben unverändert. */
 export function absoluteAdresse(pfad: string, basis: URL | undefined): string {
   return basis ? new URL(pfad, basis).toString() : pfad
-}
-
-/** Ganze Cent als Preis für schema.org: Punkt, zwei Stellen, ohne Zeichen (1999 → „19.99"). */
-function preisText(cents: number): string {
-  return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`
 }
 
 type HofFuerJsonLd = {
@@ -98,8 +95,9 @@ type ProduktFuerJsonLd = {
 }
 
 /**
- * Die Produktseite als `Product` mit Angebot. Der Preis geht über ganze Cent
- * (`alsCents`), nie über eine Rechnung mit Kommazahlen; verfügbar heißt Vorrat über null.
+ * Die Produktseite als `Product` mit Angebot. Der Preis kommt als Text aus dem
+ * gespeicherten Decimal (Punkt, zwei Stellen: „11.00"), nie über eine Rechnung
+ * mit Kommazahlen (CODING_STANDARDS §2); verfügbar heißt Vorrat über null.
  */
 export function produktJsonLd(
   produkt: ProduktFuerJsonLd,
@@ -116,7 +114,7 @@ export function produktJsonLd(
     offers: {
       '@type': 'Offer',
       url: absoluteAdresse(produktPfad(hof.slug, produkt.id), basis),
-      price: preisText(alsCents(produkt.price)),
+      price: new Decimal(produkt.price.toString()).toFixed(2, Decimal.ROUND_HALF_UP),
       priceCurrency: 'EUR',
       availability: produkt.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
       seller: { '@type': 'LocalBusiness', name: hof.name, url: absoluteAdresse(`/${hof.slug}`, basis) },

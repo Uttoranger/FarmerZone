@@ -33,9 +33,11 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('@/server/hofseite-vorschau', () => ({ ladeHofseiteGeteilt: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 vi.mock('next/navigation', () => ({ unstable_rethrow: () => {} }))
+// Die Adresse der App je Fall (wie tests/robots.test.ts): Die Sitemap liest sie beim Aufruf.
+const umgebung = vi.hoisted(() => ({ appUrl: 'https://hof.example' as string | null }))
 vi.mock('@/lib/umgebung-server', async (original) => {
   const echt = await original<typeof import('@/lib/umgebung-server')>()
-  return { ...echt, UMGEBUNG: { ...echt.UMGEBUNG, appUrl: 'https://hof.example' } }
+  return { ...echt, UMGEBUNG: Object.assign(umgebung, { ...echt.UMGEBUNG, appUrl: umgebung.appUrl }) }
 })
 
 import sitemap, { revalidate } from '@/app/sitemap'
@@ -115,6 +117,20 @@ describe('Sitemap', () => {
     expect(urls).toEqual(FESTE.map((p) => `https://hof.example${p}`))
     expect(Sentry.captureException).toHaveBeenCalledWith(db.fehler, { tags: { bereich: 'sitemap' } })
   })
+
+  it('ohne bekannte Basis eine leere Liste — eine relative Adresse wäre ungültig (wie robots.ts ohne „Sitemap:")', async () => {
+    umgebung.appUrl = null
+    try {
+      expect(await sitemap()).toEqual([])
+      expect(db.argumente).toEqual([])
+    } finally {
+      umgebung.appUrl = 'https://hof.example'
+    }
+    // Gegenprobe: Mit Basis stehen die Seiten wieder da, jede als volle Adresse.
+    const urls = (await sitemap()).map((e) => e.url)
+    expect(urls.length).toBeGreaterThan(FESTE.length)
+    for (const url of urls) expect(url, url).toMatch(/^https:\/\/hof\.example\//)
+  })
 })
 
 describe('Canonical und Sprache der festen Seiten', () => {
@@ -142,6 +158,13 @@ describe('Canonical und Sprache der festen Seiten', () => {
     expect(og.description).toBe(metadata.description)
     expect(og.locale).toBe('de_AT')
     expect(JSON.stringify(og.images)).toContain('/og/startseite.jpg')
+  })
+
+  it('Startseite und /fuer-hoefe nennen de_AT im eigenen openGraph — es ersetzt das des Layouts ganz', async () => {
+    const seiten = { '/': await import('@/app/page'), '/fuer-hoefe': await import('@/app/(public)/fuer-hoefe/page') }
+    for (const [pfad, { metadata }] of Object.entries(seiten)) {
+      expect((metadata.openGraph as { locale?: string } | undefined)?.locale, pfad).toBe('de_AT')
+    }
   })
 
   it('das Root-Layout spricht de-AT — im <html> und in Open Graph', () => {

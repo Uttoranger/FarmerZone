@@ -16,7 +16,7 @@ import { istBrennmaterialSaison } from '@/lib/brennmaterial-saison'
 import { categoryImagePath } from '@/lib/product-image'
 import { STARTSEITE_VORSCHAUBILD, metadatenBasis } from '@/lib/vorschaubild'
 import { UMGEBUNG } from '@/lib/umgebung-server'
-import { jsonLdSicher, startseiteJsonLd } from '@/lib/json-ld'
+import { OG_LOCALE, jsonLdSicher, startseiteJsonLd } from '@/lib/json-ld'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { RegionsKarte, StartseiteKopf } from '@/components/startseite/startseite-kopf'
 import { HoefeInDerNaehe, HofKarten, HofKartenFehler, HofKartenSkelett } from '@/components/startseite/hoefe-in-der-naehe'
@@ -43,6 +43,7 @@ export const metadata: Metadata = {
     type: 'website',
     siteName: MARKE,
     images: [STARTSEITE_VORSCHAUBILD],
+    locale: OG_LOCALE,
   },
   twitter: {
     card: 'summary_large_image',
