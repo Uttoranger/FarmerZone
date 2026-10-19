@@ -243,59 +243,6 @@ function deployOhneLokaleAdressen(befehl, geerbt = new Map()) {
   return false
 }
 
-// Wer ein Dokument ausführt statt es zu speichern: Shells, source, eval, xargs und Interpreter — mit oder ohne
-// Pfad (`/bin/bash`, `/usr/bin/python3`) — und jedes Wort mit `$` (`$SHELL`, `"${SHELL}"`: was dahinter steckt,
-// weiß erst die Shell). Als `.` nur am Befehlsanfang (`git add . && …` ist kein source).
-const AUSFUEHRER =
-  /(?:^|[\s;&|(`"'])(?:(?:\S*\/)?(?:(?:ba|z|da|k|c|fi|a)?sh|source|eval|xargs|node|nodejs|deno|bun|tsx|ts-node|python[\d.]*|perl|ruby|php|lua|psql|sqlite3|Rscript)(?=$|[\s;&|)`"'])|\$\{?[A-Za-z_0-9@*])|(?:^|[;&|(`])\s*\.\s/
-// Wer das Dokument nur speichert oder weitergibt: cat, tee, git commit/tag (-F -), gh (--body-file -).
-const DATEN_LESER = new RegExp(String.raw`^\s*(?:\w+=\S*\s+)*(?:cat|tee|` + GIT + String.raw`(?:commit|tag)|gh)\b`)
-
-/**
- * Steht hinter dem Begrenzer nur, was das Dokument speichert oder weitergibt? Jedes Ziel einer Pipe muss selbst
- * ein DATEN_LESER sein (Erlaubnisliste, kein Namensabgleich der Ausführer); `>(…)`, `<(…)` und ein Ausführer in
- * einer Verkettung (`> a.sh && bash a.sh`) behalten den Text.
- */
-function nurDatenHinter(dahinter) {
-  if (/[<>]\(/.test(dahinter) || AUSFUEHRER.test(dahinter)) return false
-  // `||` verkettet nur; erst ein einzelnes `|` reicht den Text weiter. Das Ziel ist das erste Wort bis zur nächsten Verkettung.
-  const ziele = dahinter.replace(/\|\|/g, ';').split('|').slice(1).map((stueck) => stueck.split(/;|&&/)[0])
-  return ziele.every((ziel) => DATEN_LESER.test(ziel))
-}
-
-/**
- * Den Text eines Here-Documents lesen die Regeln nicht mit, wenn er Daten ist (Commit-Nachricht, Datei): sonst
- * blockt eine Nachricht, deren Zeile mit „git stash“ beginnt (Fehlalarm aus Nr. 110). Nur bei gequotetem
- * Begrenzer (<<'EOF'): Ohne Quote führt die Shell `$(…)` im Text aus. Daten sind es nur, wenn ein bekannter
- * Leser das Dokument speichert oder weitergibt (cat, tee, git commit, gh) UND
- *  - vor dem Begrenzer in dessen Befehl nichts Ausführendes steht (`bash -c "$(cat <<'EOF'`, `/bin/sh -c …`,
- *    `source <(cat <<'EOF'`, `$SHELL -c …`) und
- *  - hinter dem Begrenzer jedes Ziel einer Pipe selbst ein solcher Leser ist (Erlaubnisliste: `| bash`,
- *    `| /bin/bash`, `| sudo sh`, `| $SHELL`, `| /usr/bin/python3 -` behalten den Text, ebenso jedes `>(…)`) und
- *    auf der Zeile kein Ausführer folgt (`> a.sh && bash a.sh`).
- * Alles andere — Shells, Interpreter (`node - <<'EOF'`), unbekannte Leser — behält den Text: Er ist dann Befehl.
- * Nicht erkannt wird, was erst eine spätere Zeile ausführt (`cat <<'EOF' > a.sh`, dann `bash a.sh`).
- */
-function ohneHeredocText(text) {
-  const behalten = []
-  let ende = null
-  for (const zeile of text.split('\n')) {
-    if (ende !== null) {
-      if (zeile.trim() === ende) ende = null
-      continue
-    }
-    behalten.push(zeile)
-    const kopf = /(?<!<)<<(?!<)-?\s*(["'])([A-Za-z_]\w*)\1/.exec(zeile)
-    if (!kopf) continue
-    const davor = zeile.slice(0, kopf.index)
-    const dahinter = zeile.slice(kopf.index + kopf[0].length)
-    const befehlDavor = davor.split(/;|&|\||\n/).pop() // der Befehl, zu dem das Dokument gehört, samt Hülle wie `bash -c "$(`
-    const leser = befehlDavor.split(/[(`]/).pop() // der Befehl, der es liest: `cat` in `git commit -m "$(cat`
-    if (DATEN_LESER.test(leser) && !AUSFUEHRER.test(befehlDavor) && nurDatenHinter(dahinter)) ende = kopf[2]
-  }
-  return behalten.join('\n')
-}
-
 const regeln = [
   {
     muster: /prisma\s+db\s+push/,
@@ -403,7 +350,10 @@ function branchDesCommits(befehl, arbeitsordner) {
   }
 }
 
-const geprueft = ohneHeredocText(befehl)
+// Den Text eines Here-Documents liest der Hook bewusst MIT (Nachtrag Dirigent, Lauf 17): Drei Anläufe in
+// Nr. 118, ihn als Daten auszunehmen, öffneten jeweils neue Lücken. Der Fehlalarm aus Nr. 110 (eine
+// Commit-Nachricht, deren Zeile mit „git stash“ beginnt) bleibt deshalb; Vorsicht geht vor (Lauf 18).
+const geprueft = befehl
 
 for (const regel of regeln) {
   if (regel.muster.test(geprueft)) {
