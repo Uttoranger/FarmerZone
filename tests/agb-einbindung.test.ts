@@ -30,6 +30,11 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/hof-test/checkout',
   useSearchParams: () => new URLSearchParams(adresse.suche),
 }))
+// /hoefe liest seine Filter im Browser aus der Adresse (Register N19) — hier der Stand nach der Hydration.
+vi.mock('@/components/hoefe/use-hoefe-adresse', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/hoefe/use-hoefe-adresse')>()),
+  useHoefeAdresse: () => (adresse.suche ? `?${adresse.suche}` : ''),
+}))
 // Die Karte lädt erst im Browser (Leaflet) — hier ohne.
 vi.mock('next/dynamic', () => ({ default: () => () => null }))
 vi.mock('next/image', () => ({ default: (p: { src: string; alt: string }) => createElement('img', { src: p.src, alt: p.alt }) }))

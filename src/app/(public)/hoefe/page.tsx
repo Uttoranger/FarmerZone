@@ -14,21 +14,27 @@ export const metadata: Metadata = {
   title: `Höfe in deiner Nähe — ${MARKE}`,
   description:
     `Alle Höfe auf ${MARKE}: was sie verkaufen, wo sie sind und wann du abholen kannst — direkt vom Hof, ohne Umwege.`,
+  // Jede Filteradresse (/hoefe?kat=…) verweist auf die eine Seite (Register N19); metadataBase steht im Root-Layout.
+  alternates: { canonical: '/hoefe' },
 }
 
-// Dynamisch seit Bereiche 2: Die Filter stehen in der URL
-// (src/schemas/hoefe-filter.ts), und ein geteilter Link soll schon im
-// Server-HTML so aussehen, wie er gemeint ist — nicht erst nach der
-// Hydration. Die HOFDATEN bleiben trotzdem fünf Minuten gecacht
-// (src/server/queries/oeffentliche-hoefe.ts — derselbe Eintrag wie auf der
-// Startseite): Gefiltert wird im Browser auf demselben Datensatz, jeder
-// Aufruf kostet also keine Datenbankabfrage.
-// Die Sitzung für die Kopfzeile liest KundeShellMitSitzung im Browser
-// (Nr. 09): Die Sitzung auf dem Server zu lesen kostete je Aufruf eine
-// Sitzungsabfrage — für nichts als „Anmelden" ↔ „Mein Konto".
-// BEWUSST IN KAUF GENOMMEN: Auch die „Heute/Morgen"-Angabe der nächsten
-// Abholung wird mit den Daten gecacht und altert höchstens fünf Minuten.
-export const dynamic = 'force-dynamic'
+// Statisch vom CDN, alle fünf Minuten neu gebaut — wie die Startseite
+// (Register N19). Bis 19.10.2026 war die Seite dynamisch, damit ein geteilter
+// Filter-Link schon im Server-HTML gefiltert aussah. Dann folgte ein Crawler
+// den Filter-Links: Jede Kombination ist eine eigene Adresse, jede kostete
+// einen Server-Render — 622.000 an einem Tag, das Kontingent war aufgebraucht.
+// Jetzt steht im Server-HTML immer die ganze Liste, ungefiltert, mit den Links
+// auf die Hofseiten; die Filter liest der Browser aus der Adresse
+// (use-hoefe-adresse.ts). Deshalb liest diese Seite weder Suchparameter noch
+// Anfrage-Kopf, Cookies oder die Sitzung — jedes davon machte sie dynamisch.
+// Die Sitzung für die Kopfzeile liest KundeShellMitSitzung im Browser (Nr. 09).
+// BEWUSST IN KAUF GENOMMEN: Ein geteilter Filter-Link zeigt kurz die ganze
+// Liste und dann die gefilterte. Die „Heute/Morgen"-Angabe der nächsten
+// Abholung altert höchstens fünf Minuten (Seite) plus fünf (Datencache,
+// src/server/queries/oeffentliche-hoefe.ts). Scheitert das Laden bei einem
+// Bau, bleibt die Fehleranzeige bis zum nächsten stehen — wie auf der
+// Startseite; beim Bau ohne Datenbank bricht der Build so nicht ab.
+export const revalidate = 300
 
 /**
  * Lädt die Höfe; scheitert es, zeigt die Seite den Fehler inline (DESIGN_SYSTEM,
@@ -70,8 +76,8 @@ function OhneListe({ children }: { children: React.ReactNode }) {
  */
 export default async function HoefePage() {
   const hoefe = await ladeHoefe()
-  // Erst hier steht fest, dass die Kundin die Fehleranzeige bekommt — ein
-  // Abbruch beim Neubau im Hintergrund kommt nie hierher (Nr. 56).
+  // Erst hier steht fest, dass die Fehleranzeige in die Seite kommt — ein
+  // Abbruch beim Neubau des Datencaches im Hintergrund kommt nie hierher (Nr. 56).
   if (hoefe === 'fehler') meldeFehleranzeige('hoefe-entdecken')
 
   return (

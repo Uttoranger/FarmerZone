@@ -594,6 +594,11 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Verhältnis zu anderen Einträgen:** ändert N15 (Reiter Betrieb, Gruppe ‚Betrieb‘ in Einstellungen entfällt); ergänzt N14 (Zustellung: Art ‚Betrieb‘, fest an) und N17 (ersetzte Fotos bleiben als Bilder ohne Verwendung liegen); Wortliste N8 um „Betrieb“, „Grenze“, „Ablauf“ und „Bilder ohne Verwendung“ ergänzt.
 - **Umsetzung:** Nr. 103 (freigabe.md §20; Admin › Betrieb, Messen, Herzschlag, Warn-Mail; eine Migration, Expand: drei neue Tabellen) und Nr. 104 (Aufräumen, Bilder ohne Verwendung; keine Migration). Mockups `admin-betrieb`, `mobil-admin-betrieb`, `email-betrieb-warnung` (docs/mockups/README.md).
 
+### N19 · Entdecken statisch (19.10.2026)
+- **Entscheidung (uttoranger, im Chat, 19.10.2026):** „/hoefe wird statisch mit Neubau alle fünf Minuten, wie die Startseite. Die Filter liest der Browser aus der Adresse. Ein geteilter Filter-Link zeigt kurz die ungefilterte Liste und dann die gefilterte. Filter-Links auf /hoefe tragen nofollow, robots.txt sperrt /hoefe mit Parametern und die privaten Bereiche, die Seite nennt /hoefe als Canonical.“
+- **Verhältnis zu anderen Einträgen:** ändert die Festlegung zu /hoefe in ARCHITECTURE.md (Nr. 09: „bleibt force-dynamic wegen der Filter im Server-HTML“); ergänzt docs/konzepte/bereiche.md (§6.2): Die Filter bleiben teilbar und reload-fest. Anlass und Zahlen: DEVELOPMENT.md, „Filter-Falle auf /hoefe“.
+- **Umsetzung:** /fix „Filter-Falle auf /hoefe schließen“ (Branch `fix/hoefe-filter-falle`; keine Migration, kein neues Paket).
+
 ---
 
 ## I – Illustrationen

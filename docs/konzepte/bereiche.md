@@ -211,7 +211,7 @@ Beide Orte (/hoefe und Hofseite) teilen **einen** Umschalter „Hofladen | Futte
 - L2-Reihe nur, wenn die Ergebnismenge mindestens zwei Unterkategorien hat, mit Zählern (Höfe); Chips ohne Treffer fehlen.
 - Facetten als eckige Chips: Bio, Gentechnikfrei, AMA; im Bereich Futtermittel zusätzlich „Für Tiere" (Sheet, Mehrfachwahl, Trefferzahl im Knopf) und „Gebinde: Klein (unter 25 kg) | Groß". *(Geändert vor dem Umfeld-Sprint: Klein bis einschließlich 25 kg, Groß erst darüber — der 25-kg-Sack ist Kleingebinde.)* Facetten gelten je Produkt: Ein Hof bleibt, wenn EIN kaufbares Produkt alle gewählten Bedingungen zugleich erfüllt.
 - Sortierung nach Grundpreis im Bereich Futtermittel: Höfe nach dem günstigsten Kilopreis (Preis ÷ Nettomenge) ihrer passenden Futterprodukte; die Hofkarte zeigt den Wert („ab € 0,12 / kg").
-- Alle Filter in der URL, teilbar und reload-fest — außer Bezugspunkt und Umkreis (der Standort verlässt den Browser nie). Ungültige Parameter werden verworfen, nie ein Fehler.
+- Alle Filter in der URL, teilbar und reload-fest — außer Bezugspunkt und Umkreis (der Standort verlässt den Browser nie). Ungültige Parameter werden verworfen, nie ein Fehler. *(Ergänzt am 2026-10-19, Register N19:)* Die Filter bleiben teilbar und reload-fest; angewandt werden sie im Browser. Die Seite ist statisch, ihr Server-HTML zeigt die ganze Liste — ein geteilter Filter-Link zeigt kurz die ungefilterte Liste und dann die gefilterte.
 - Der Link auf die Hofseite trägt den Bereich mit (`?bereich=futter`).
 
 ### 6.3 Hofseite und Produktdetail (Bereiche 2)

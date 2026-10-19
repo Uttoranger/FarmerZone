@@ -1,20 +1,24 @@
 /**
  * Entdecken (/hoefe) im neuen Design (Nachtlauf Nr. 09) — die Teile
  * serverseitig gerendert (TESTING_GUIDELINES §1: Merkmale statt Schnappschuss,
- * immer mit Gegenprobe) und die Seite am Quelltext: KundeShell, dynamisch wie
- * vorher, gemeinsamer Hofliste-Cache, Fehler inline, nur Tokens.
+ * immer mit Gegenprobe) und die Seite am Quelltext: KundeShell, statisch mit
+ * Neubau alle fünf Minuten (Register N19), gemeinsamer Hofliste-Cache, Fehler
+ * inline, nur Tokens, Filter-Links mit nofollow.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { createElement, type ReactNode } from 'react'
+import { createElement, type ComponentProps, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh() {}, push() {}, replace() {}, back() {}, prefetch() {} }),
   usePathname: () => '/hoefe',
-  useSearchParams: () => new URLSearchParams(),
+  unstable_rethrow: () => {},
 }))
+// Die Seite wird echt importiert (Metadaten, revalidate); Hofliste und Sitzung sind Attrappen.
+vi.mock('@/server/queries/oeffentliche-hoefe', () => ({ ladeOeffentlicheHoefe: async () => [] }))
+vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null, isPending: false }), signOut: () => {} }))
 vi.mock('next/image', () => ({
   default: (p: { src: string; alt: string }) => createElement('img', { src: p.src, alt: p.alt }),
 }))
@@ -59,8 +63,14 @@ import { EntdeckenFilterblatt } from '@/components/hoefe/entdecken-filterblatt'
 import { SUCHFELD_TEXT, kategorieReihe, leerzustand, standortUngefaehrText } from '@/lib/hoefe-entdecken'
 import { grundpreisAusKennzeichnung, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
 import { LEERER_HOEFE_FILTER, SUCHTEXT_MAX, type HoefeFilter } from '@/schemas/hoefe-filter'
+import { HoefeClient } from '@/components/hoefe/hoefe-client'
+import { FilterChip } from '@/components/ui/chip'
+import type { HofUebersichtEintrag } from '@/server/queries/farm'
+import { metadata, revalidate } from '@/app/(public)/hoefe/page'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
+/** Ohne Kommentare — die Dateien erklären selbst, warum es kein useSearchParams gibt. */
+const ohneKommentare = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 const html = (el: ReturnType<typeof createElement>) => renderToStaticMarkup(el)
 
 const HOF: KartenHof = {
@@ -274,12 +284,24 @@ describe('Leerzustand, kein Hof, Fehler', () => {
 describe('die Seite am Quelltext', () => {
   const seite = quelle('src/app/(public)/hoefe/page.tsx')
 
-  it('in der KundeShell, Sitzung im Browser — dynamisch wie vorher, nicht schlechter', () => {
+  it('statisch mit Neubau alle fünf Minuten wie die Startseite — liest weder Parameter noch Anfrage noch Sitzung (Register N19)', () => {
+    // Dynamisch kostete jeder Aufruf einen Server-Render — und jede Filterkombination ist ein Aufruf (19.10.: 622.000 an einem Tag).
     expect(seite).toMatch(/<KundeShellMitSitzung>/)
-    expect(seite).toMatch(/export const dynamic = 'force-dynamic'/)
-    expect(seite).not.toMatch(/\bheaders\(\)|\bcookies\(\)|auth\.api/)
-    // Gegenprobe: Die Suche findet headers(), wo es steht.
-    expect(quelle('src/app/account/profile/page.tsx')).toMatch(/headers\(\)/)
+    const code = ohneKommentare(seite)
+    expect(code).not.toMatch(/force-dynamic|export const dynamic\b/)
+    expect(code).not.toMatch(/\bsearchParams\b|\bheaders\(\)|\bcookies\(\)|auth\.api\b|next\/headers|from '@\/lib\/auth'/)
+    expect(revalidate).toBe(300)
+    expect(seite).toMatch(/^export const revalidate = 300$/m)
+    // Gegenprobe: Dieselbe Suche findet headers() und auth.api auf einer Seite, die die Sitzung auf dem Server liest.
+    const dynamisch = ohneKommentare(quelle('src/app/account/profile/page.tsx'))
+    expect(dynamisch).toMatch(/\bheaders\(\)/)
+    expect(dynamisch).toMatch(/auth\.api\b/)
+  })
+
+  it('nennt /hoefe als Canonical — jede Filteradresse verweist auf die eine Seite', () => {
+    expect(metadata.alternates?.canonical).toBe('/hoefe')
+    // metadataBase macht daraus die volle Adresse — sie steht im Root-Layout.
+    expect(quelle('src/app/layout.tsx')).toMatch(/metadataBase:/)
   })
 
   it('die Höfe kommen aus dem gemeinsamen Cache; ein Ladefehler geht nach Sentry und erscheint inline', () => {
@@ -468,15 +490,19 @@ describe('Ein Suchfeld „Ort oder Produkt" plus „Standort nutzen" (Nr. 46)', 
 
   it('die Seite verdrahtet das eine Feld mit Bezugspunkt und Ankunftstext — die alte Umkreis-Karte gibt es nicht mehr', () => {
     const client = quelle('src/components/hoefe/hoefe-client.tsx')
-    expect(client).toMatch(/<HoefeSuche[\s\S]*?bezugspunkt=\{bezugspunkt\}[\s\S]*?ankunftsText=\{ankunftsText\}[\s\S]*?\/>/)
+    expect(client).toMatch(/<HoefeSuche[\s\S]*?bezugspunkt=\{bezugspunkt\}[\s\S]*?ankunftsText=\{ankunftsText \?\? ''\}[\s\S]*?\/>/)
     // Der Ankunftstext ist nur der ABGESENDETE Suchtext der Adresse (nicht, was die Seite beim Tippen selbst hineinschrieb) und wird
-    // vergessen — ein neu aufgebautes Feld (Karte ↔ Liste) fragt nicht noch einmal.
-    expect(client).toContain('const [ankunftsText, setAnkunftsText] = useState(() => abgesendeterSuchtext(suchParameter))')
+    // vergessen — ein neu aufgebautes Feld (Karte ↔ Liste) fragt nicht noch einmal. Gelesen erst, wenn die Adresse feststeht
+    // (nach der Hydration bzw. nach dem Seitenwechsel), und nur einmal (ankunftAusAdresse, tests/hoefe-adresse.test.ts).
+    expect(client).toContain('const [ankunftsText, setAnkunftsText] = useState<string | null>(null)')
+    expect(client).toContain('const ankunft = ankunftAusAdresse(ankunftsText, adresse)')
+    expect(client).toContain('if (ankunft !== ankunftsText) setAnkunftsText(ankunft)')
     expect(client).toContain("onAnkunftErledigt={() => setAnkunftsText('')}")
     // Nach dem Auflösen schreibt die Seite die Adresse neu (mit der Kennung) — aus der Adresse von jetzt, nicht aus dem Stand beim Ankommen.
     expect(client).toContain('onAnkunftAufgeloest={() => schreibeUrl(leseHoefeFilter(new URLSearchParams(window.location.search)))}')
     // Gegenprobe: der alte Weg (jedes q der Adresse ist ein Ankunftstext) steht nicht mehr da.
     expect(client).not.toContain('useState(filter.suchtext)')
+    expect(client).not.toContain('useState(() => abgesendeterSuchtext(suchParameter))')
     expect(client).not.toMatch(/HoefeUmkreis|hoefe-umkreis/)
     // Gegenprobe: das Muster erkennt den alten Einbau.
     expect('import HoefeUmkreis from \'@/components/hoefe/hoefe-umkreis\'').toMatch(/HoefeUmkreis|hoefe-umkreis/)
@@ -646,5 +672,146 @@ describe('Kartenmodus am Handy: Suche · Filter · Liste in einer Zeile (Nr. 52)
     expect(client).toMatch(/filterblatt\(true\)/)
     // „Liste zeigen" — unter 640 px nur „Liste" sichtbar, vorgelesen immer ganz.
     expect(client).toMatch(/Liste<span className="max-sm:sr-only"> zeigen<\/span>/)
+  })
+})
+
+describe('Filter im Browser: kein useSearchParams im Baum von /hoefe (Register N19)', () => {
+  /** import … from, export … from und import(…) — ohne `import type`; nur eigene Dateien unter src. */
+  const IMPORT = /(?:^|\n)\s*(?:import|export)\s+(?!type\b)(?:[^'"]*?\sfrom\s+)?['"]([^'"]+)['"]|\bimport\(\s*['"]([^'"]+)['"]\s*\)/g
+  function aufloesen(von: string, ziel: string): string | null {
+    const basis = ziel.startsWith('@/') ? join('src', ziel.slice(2)) : ziel.startsWith('.') ? join(von, '..', ziel) : null
+    if (!basis) return null
+    for (const kandidat of [basis, `${basis}.ts`, `${basis}.tsx`, join(basis, 'index.ts'), join(basis, 'index.tsx')]) {
+      try {
+        if (statSync(join(process.cwd(), kandidat)).isFile()) return kandidat
+      } catch {
+        // gibt es nicht — nächster Kandidat
+      }
+    }
+    return null
+  }
+  function baum(...einstiege: string[]): string[] {
+    const gesehen = new Set<string>()
+    const offen = [...einstiege]
+    for (let datei = offen.pop(); datei !== undefined; datei = offen.pop()) {
+      if (gesehen.has(datei)) continue
+      gesehen.add(datei)
+      for (const treffer of ohneKommentare(quelle(datei)).matchAll(IMPORT)) {
+        const ziel = aufloesen(datei, treffer[1] ?? treffer[2])
+        if (ziel) offen.push(ziel)
+      }
+    }
+    return [...gesehen]
+  }
+  // Seite, Ladeansichten und das Root-Layout darüber.
+  const hoefe = baum('src/app/(public)/hoefe/page.tsx', 'src/app/(public)/hoefe/loading.tsx', 'src/app/(public)/loading.tsx', 'src/app/layout.tsx')
+  const liest = (datei: string) => /\buseSearchParams\b|\bsearchParams\b/.test(ohneKommentare(quelle(datei)))
+
+  it('der Baum reicht bis in die Teile der Seite — sonst bewiese ein leerer Fund nichts', () => {
+    for (const datei of [
+      'src/components/hoefe/hoefe-client.tsx',
+      'src/components/hoefe/use-hoefe-adresse.ts',
+      'src/components/hoefe/entdecken-teile.tsx',
+      'src/components/hoefe/use-ortssuche.ts',
+      'src/components/hoefe/hoefe-karte.tsx',
+      'src/components/shells/kunde-shell.tsx',
+    ]) {
+      expect(hoefe, datei).toContain(datei)
+    }
+  })
+
+  it('keine Datei im Baum liest Suchparameter über Next — die Liste stünde sonst nicht im Server-HTML', () => {
+    expect(hoefe.filter(liest)).toEqual([])
+    // Gegenprobe: Im Baum der Hofseite findet dieselbe Suche ihre Suchparameter.
+    expect(baum('src/app/(public)/[farmSlug]/page.tsx').filter(liest).length).toBeGreaterThan(0)
+  })
+
+  it('die Seite liest die Adresse über den Speicher und schreibt sie nur über ihn (replaceState, keine Server-Anfrage)', () => {
+    const client = ohneKommentare(quelle('src/components/hoefe/hoefe-client.tsx'))
+    expect(client).toContain('const adresse = useHoefeAdresse()')
+    expect(client).toMatch(/HOEFE_ADRESSE\.ersetze\(schreibeHoefeFilter\(neu\)\)/)
+    // Kein zweiter Weg an die Adresse: kein replaceState daneben, kein router.replace/push für Filter.
+    expect(client).not.toMatch(/history\.(?:replaceState|pushState)|router\.(?:replace|push)\(hoefeHref/)
+    // Gegenprobe: das Muster erkennt den alten Weg.
+    expect("window.history.replaceState(null, '', query ? `${pfad}?${query}` : pfad)").toMatch(/history\.(?:replaceState|pushState)/)
+  })
+})
+
+describe('das Server-HTML: die ganze Hofliste, ungefiltert, mit Links auf die Hofseiten', () => {
+  const hof = (slug: string, name: string): HofUebersichtEintrag => ({
+    slug,
+    name,
+    postalCode: '4900',
+    city: 'Musterdorf',
+    logoUrl: null,
+    logoAusschnitt: null,
+    latitude: 48.1,
+    longitude: 13.1,
+    isPaused: false,
+    kategorien: ['EIER'],
+    angebot: [{ ...BROT, id: `${slug}-brot` }],
+    naechsteAbholung: null,
+    produkte: [],
+    produkteGesamt: 1,
+    produkteJeBereich: { LEBENSMITTEL: 1, FUTTERMITTEL: 0 },
+    suchNamen: ['Bauernbrot'],
+    fotos: [],
+  })
+
+  it('beide Höfe mit Link — auf dem Server gilt der leere Filter (kein window, kein Wurf)', () => {
+    const seite = html(createElement(HoefeClient, { hoefe: [hof('hof-a', 'Hof Anfang'), hof('hof-b', 'Hof Berg')] }))
+    expect(seite).toContain('aria-label="Höfe"')
+    expect(seite).toContain('Hof Anfang')
+    expect(seite).toContain('href="/hof-a"')
+    expect(seite).toContain('Hof Berg')
+    expect(seite).toContain('href="/hof-b"')
+    // Gegenprobe: ohne Höfe steht keiner da.
+    expect(html(createElement(HoefeClient, { hoefe: [hof('hof-a', 'Hof Anfang')] }))).not.toContain('Hof Berg')
+  })
+})
+
+describe('Filter-Links auf /hoefe tragen rel="nofollow" (Register N19)', () => {
+  const hoefe = [{ angebot: [BROT] }]
+  /** Jeder Link auf /hoefe — mit oder ohne Parameter — samt seiner Attribute. */
+  const hoefeLinks = (text: string) => [...text.matchAll(/<a href="\/hoefe(?:\?[^"]*)?"[^>]*>/g)].map((m) => m[0])
+
+  it('die Chips der Reihen', () => {
+    const reihe = html(createElement(ChipReihe, { beschriftung: 'Kategorie', chips: kategorieReihe(hoefe, LEERER_HOEFE_FILTER) }))
+    const links = hoefeLinks(reihe)
+    expect(links.length).toBeGreaterThan(2)
+    for (const link of links) expect(link, link).toContain('rel="nofollow"')
+  })
+
+  it('die „ohne"-Einträge und „Alle zurücksetzen" in „Aktive Filter"', () => {
+    const zeile = html(createElement(AktiveFilterZeile, { filter: { ...LEERER_HOEFE_FILTER, siegel: ['BIO'], suchtext: 'Eier' } }))
+    const links = hoefeLinks(zeile)
+    expect(links).toHaveLength(3)
+    for (const link of links) expect(link, link).toContain('rel="nofollow"')
+  })
+
+  it('der Ausweg im Leerzustand', () => {
+    const leer = html(createElement(EntdeckenLeer, { leer: leerzustand({ sucheLeertDieListe: false, umkreis: null, filter: { ...LEERER_HOEFE_FILTER, kategorien: ['FISCH'] } }) }))
+    const links = hoefeLinks(leer)
+    expect(links).toHaveLength(1)
+    expect(links[0]).toContain('rel="nofollow"')
+  })
+
+  it('die Seite selbst: „Zurücksetzen", „Liste zeigen" und „Karte öffnen"', () => {
+    const client = quelle('src/components/hoefe/hoefe-client.tsx')
+    const links = [...client.matchAll(/<Link\s[^>]*?href=\{hoefeHref\([\s\S]*?>/g)].map((m) => m[0])
+    expect(links).toHaveLength(3)
+    for (const link of links) expect(link, link).toContain('rel="nofollow"')
+  })
+
+  it('Gegenprobe: Hofseiten bleiben folgbar, und ein FilterChip ohne nofollow trägt kein rel (Admin bleibt, wie er ist)', () => {
+    const karte = html(createElement(HofKarte, { hof: HOF, bereich: 'LEBENSMITTEL', produktNamen: [], split: true, ausgewaehlt: false }))
+    expect(karte).toContain('href="/hof-test"')
+    expect(karte).not.toContain('nofollow')
+    const zeile = html(createElement(ProduktZeile, { treffer: { hof: TREFFER_HOF, produkt: BROT }, bereich: 'LEBENSMITTEL' }))
+    expect(zeile).not.toContain('nofollow')
+    const chip = (props: Omit<ComponentProps<typeof FilterChip>, 'children'>, text: string) =>
+      html(createElement(FilterChip, props as ComponentProps<typeof FilterChip>, text))
+    expect(chip({ href: '/admin?reiter=alle' }, 'Alle')).not.toContain('rel=')
+    expect(chip({ href: '/hoefe?kat=EIER', nofollow: true }, 'Eier')).toContain('rel="nofollow"')
   })
 })
