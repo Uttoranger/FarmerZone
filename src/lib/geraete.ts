@@ -233,6 +233,9 @@ export function einmalLinkAufraeumGrenze(jetzt: Date): Date {
 
 export const NICHT_ICH_PFAD = '/sicherheit/nicht-ich'
 
+/** Knopf „Alle Geräte abmelden" je IP und Minute — nur gegen Schleifen, raten lässt sich der Token nicht. */
+export const NICHT_ICH_JE_MINUTE = 10
+
 export function nichtIchLink(appUrl: string, token: string): string {
   return `${appUrl}${NICHT_ICH_PFAD}?t=${token}`
 }
@@ -263,6 +266,7 @@ export const NICHT_ICH_TEXT = {
   ungueltigSatz:
     'Er war 7 Tage und einmal gültig. Kennst du ein Gerät nicht, melde dich an und schau unter Einstellungen › Konto und Sicherheit nach deinen Geräten.',
   zurAnmeldung: 'Zur Anmeldung',
+  zuViele: 'Das waren gerade zu viele Versuche. Warte eine Minute und probier es dann noch einmal.',
 } as const
 
 // ── Mail „Neue Anmeldung" ───────────────────────────────────────────────────

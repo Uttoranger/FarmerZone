@@ -6,7 +6,8 @@
  * und der Request-Kontext der Actions.
  *
  * Beweist:
- *  - Cookie-Cache aus: Eine gelöschte Sitzung ist beim nächsten getSession weg.
+ *  - Cookie-Cache aus: Eine gelöschte Sitzung ist beim nächsten getSession weg;
+ *    eine Prüfung kostet zwei Abfragen (Sitzung, dann Konto), gemessen an pg.
  *  - Neues Gerät: Ohne Cookie setzt die Anmeldung eines Hofs die Kennung
  *    (httpOnly, SameSite=Lax, 400 Tage) und merkt das Gerät nur gehasht; das
  *    erste Gerät still, ein bekanntes ohne Mail, ein weiteres neues mit Mail
@@ -19,6 +20,7 @@
  *  - Aufräumen: abgelaufene und seit 7 Tagen benutzte Links fallen, offene bleiben.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import pg from 'pg'
 
 const post = vi.hoisted(() => ({
   anmeldung: [] as Array<{ email: string; daten: { hof: boolean; name: string | null; geraet: string; zeitpunkt: Date; link: string } }>,
@@ -46,6 +48,7 @@ vi.mock('@/lib/email', () => ({
   }),
 }))
 
+import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { GERAETE_COOKIE, NICHT_ICH_PFAD } from '@/lib/geraete'
@@ -63,6 +66,7 @@ const UA = {
 const TAG = 24 * 60 * 60 * 1000
 
 afterEach(async () => {
+  vi.clearAllMocks()
   nachlauf.aufgaben.length = 0
   post.anmeldung.length = 0
   post.reset.length = 0
@@ -135,6 +139,26 @@ describe('Sitzung frisch aus der Datenbank (kein Cookie-Cache)', () => {
     await prisma.session.delete({ where: { id: a.sitzungId } })
 
     expect(await sitzungGilt(a.cookie)).toBe(false)
+  })
+
+  it('eine Prüfung kostet zwei Abfragen — Sitzung über den Token, dann das Konto (gemessen an pg)', async () => {
+    const hof = await erstelleKonto('FARMER')
+    const a = await meldeAn(hof.email, UA.windows)
+    const original = pg.Client.prototype.query
+    let abfragen = 0
+    // Nur zählen, nichts ändern; danach sofort zurück.
+    pg.Client.prototype.query = function (this: pg.Client, ...args: unknown[]) {
+      abfragen += 1
+      return (original as (...a: unknown[]) => unknown).apply(this, args)
+    } as typeof pg.Client.prototype.query
+    try {
+      await sitzungGilt(a.cookie)
+    } finally {
+      pg.Client.prototype.query = original
+    }
+
+    // Better Auth fragt den Join ohne experimentelle Joins als zwei Abfragen.
+    expect(abfragen).toBe(2)
   })
 })
 
@@ -308,6 +332,9 @@ describe('„Das war ich nicht"', () => {
     expect(await sitzungGilt(f.cookie)).toBe(true)
     expect(post.reset).toEqual([hof.email])
     expect((await prisma.einmalLink.findFirstOrThrow({ where: { userId: hof.id } })).benutztAm).toBeInstanceOf(Date)
+    // Kein Neuladen der Seite: Sie fände den Link verbraucht und zeigte
+    // „gilt nicht mehr" statt „Alle Geräte sind abgemeldet" (bei den Bildern gefunden).
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 
   it('ein zweites Mal: neutral, nichts passiert — auch nicht mit einer neuen Anmeldung', async () => {

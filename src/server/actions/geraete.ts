@@ -6,7 +6,8 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { EINMAL_LINK_ART, einmalTokenSchema } from '@/lib/geraete'
+import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
+import { EINMAL_LINK_ART, NICHT_ICH_JE_MINUTE, einmalTokenSchema } from '@/lib/geraete'
 import { loeseEinmalLinkEin } from '@/server/geraete'
 
 /*
@@ -53,7 +54,11 @@ export async function meldeAlleAnderenAb(): Promise<AbmeldenAntwort> {
   return { ok: true, abgemeldet: count }
 }
 
-export type NichtIchAntwort = { ok: true; passwortMail: boolean } | { error: 'ungueltig' }
+export type NichtIchAntwort = { ok: true; passwortMail: boolean } | { error: 'ungueltig' | 'zu-viele' }
+
+// Je IP, wie alle Speicher-Grenzen nur in Produktion und je Instanz
+// (ARCHITECTURE §3 „Öffentliche Server Action").
+const nichtIchJeIp = createRateLimiter({ max: NICHT_ICH_JE_MINUTE, windowMs: 60_000 })
 
 const nichtIchSchema = z.object({ token: einmalTokenSchema })
 
@@ -68,11 +73,13 @@ const nichtIchSchema = z.object({ token: einmalTokenSchema })
 export async function meldeAllesAbNichtIch(eingabe: unknown): Promise<NichtIchAntwort> {
   const v = nichtIchSchema.safeParse(eingabe)
   if (!v.success) return { error: 'ungueltig' }
+  if (process.env.NODE_ENV === 'production' && !nichtIchJeIp.check(getClientIp(await headers()))) return { error: 'zu-viele' }
   const link = await loeseEinmalLinkEin(v.data.token, EINMAL_LINK_ART.nichtIch, new Date())
   if (!link) return { error: 'ungueltig' }
 
+  // Kein revalidatePath: Es lüde die Seite /sicherheit/nicht-ich neu, und die
+  // fände den Link schon verbraucht. /settings/account liest ohnehin frisch.
   await prisma.session.deleteMany({ where: { userId: link.userId } })
-  revalidatePath(KONTO_HREF)
 
   // Die Adresse frisch aus der Datenbank, nie aus der Anfrage.
   const konto = await prisma.user.findUnique({ where: { id: link.userId }, select: { email: true } })

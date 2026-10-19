@@ -93,7 +93,7 @@ export function AngemeldeteGeraete({ zeilen }: { zeilen: readonly GeraeteZeile[]
                   <p className="text-xs leading-snug text-muted-foreground">{zeile.unterzeile}</p>
                 </div>
                 {zeile.dieses ? (
-                  <Marke art="erledigt" className="shrink-0">
+                  <Marke art="laeuft" className="shrink-0">
                     {GERAETE_TEXT.diesesGeraet}
                   </Marke>
                 ) : (

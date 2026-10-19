@@ -3,7 +3,7 @@ import { MARKE } from '@/lib/marke'
 import { NICHT_ICH_TEXT, anmeldeZeitpunkt, einmalTokenSchema } from '@/lib/geraete'
 import { ladeNichtIch } from '@/server/geraete'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
-import { NichtIchKarte, NichtIchUngueltig } from './nicht-ich-karte'
+import { NichtIchKarte } from './nicht-ich-karte'
 
 export const metadata: Metadata = {
   title: `${NICHT_ICH_TEXT.seitentitel} — ${MARKE}`,
@@ -34,14 +34,12 @@ export default async function NichtIchSeite({
   return (
     <KundeShellMitSitzung unterleiste={false}>
       <div className="mx-auto w-full max-w-[480px] px-4 pt-6 pb-12 md:pt-12">
-        {token.success && stand.gueltig ? (
-          <NichtIchKarte
-            token={token.data}
-            anmeldung={stand.geraet ? { wann: anmeldeZeitpunkt(stand.geraet.erstmalsAm), geraet: stand.geraet.name } : null}
-          />
-        ) : (
-          <NichtIchUngueltig />
-        )}
+        {/* Immer dieselbe Komponente: Lädt die Seite nach dem Knopf neu (Link
+            dann verbraucht), bleibt „Alle Geräte sind abgemeldet" stehen. */}
+        <NichtIchKarte
+          token={token.success && stand.gueltig ? token.data : null}
+          anmeldung={stand.gueltig && stand.geraet ? { wann: anmeldeZeitpunkt(stand.geraet.erstmalsAm), geraet: stand.geraet.name } : null}
+        />
       </div>
     </KundeShellMitSitzung>
   )

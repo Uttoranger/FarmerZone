@@ -567,8 +567,8 @@ export const auth = betterAuth({
     // (auth.api.getSession, /get-session) liest Sitzung und Rolle frisch aus
     // der Datenbank — eine abgemeldete Sitzung gilt ab dem nächsten Klick
     // nicht mehr, auch in Actions, die die Sitzung direkt lesen. Vorher galt
-    // sie bis zu 5 Minuten weiter. Kosten: eine Abfrage je Prüfung
-    // (ARCHITECTURE §5 „Sitzung frisch").
+    // sie bis zu 5 Minuten weiter. Kosten: zwei kurze Abfragen je Prüfung
+    // (Sitzung über den Token, dann das Konto; ARCHITECTURE §5 „Sitzung frisch").
     cookieCache: {
       enabled: false,
     },

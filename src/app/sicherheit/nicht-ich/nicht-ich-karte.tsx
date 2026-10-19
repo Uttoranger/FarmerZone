@@ -29,34 +29,38 @@ export function NichtIchKarte({
   token,
   anmeldung,
 }: {
-  token: string
+  /** null: Der Link gilt nicht (mehr) — ungültig, benutzt oder abgelaufen. */
+  token: string | null
   /** Wann und auf welchem Gerät — null, wenn das Gerät nicht mehr zu finden ist. */
   anmeldung: { wann: string; geraet: string } | null
 }): React.JSX.Element {
   const [laeuft, starte] = useTransition()
   const [stand, setStand] = useState<Stand>('offen')
-  const [fehler, setFehler] = useState(false)
+  const [fehler, setFehler] = useState<string | null>(null)
   const ueberschrift = useRef<HTMLHeadingElement>(null)
 
   function abmelden(): void {
-    setFehler(false)
+    if (token === null) return
+    setFehler(null)
     starte(async () => {
       try {
         const antwort = await meldeAllesAbNichtIch({ token })
+        if ('error' in antwort && antwort.error === 'zu-viele') {
+          setFehler(NICHT_ICH_TEXT.zuViele)
+          return
+        }
         setStand('ok' in antwort ? { passwortMail: antwort.passwortMail } : 'ungueltig')
         // Der Inhalt wechselt — der Fokus folgt der neuen Überschrift.
         requestAnimationFrame(() => ueberschrift.current?.focus())
       } catch {
         // Netz weg: nichts ist passiert oder alles — ein zweiter Druck klärt es
         // (ein verbrauchter Link sagt dann „gilt nicht mehr").
-        setFehler(true)
+        setFehler(GERAETE_TEXT.fehler)
       }
     })
   }
 
-  if (stand === 'ungueltig') return <NichtIchUngueltig ueberschrift={ueberschrift} />
-
-  if (stand !== 'offen') {
+  if (stand !== 'offen' && stand !== 'ungueltig') {
     return (
       <section aria-labelledby="nicht-ich-titel" className="flex flex-col gap-4">
         <span className="flex size-11 items-center justify-center rounded-full bg-accent text-accent-foreground">
@@ -80,6 +84,8 @@ export function NichtIchKarte({
     )
   }
 
+  if (stand === 'ungueltig' || token === null) return <NichtIchUngueltig ueberschrift={ueberschrift} />
+
   return (
     <section aria-labelledby="nicht-ich-titel" className="flex flex-col gap-4">
       <span className="flex size-11 items-center justify-center rounded-xl border border-primary/45 bg-primary/12 text-status-offen">
@@ -97,7 +103,7 @@ export function NichtIchKarte({
       <p className={SATZ}>{NICHT_ICH_TEXT.erklaerung}</p>
       {fehler && (
         <p role="alert" className="rounded-xl border border-primary/45 bg-primary/12 px-3 py-2.5 text-sm leading-relaxed text-foreground">
-          {GERAETE_TEXT.fehler}
+          {fehler}
         </p>
       )}
       <button type="button" onClick={abmelden} disabled={laeuft} className={cn(KNOPF_ORANGE, 'h-12 w-full disabled:opacity-60')}>
@@ -112,7 +118,7 @@ export function NichtIchKarte({
   )
 }
 
-export function NichtIchUngueltig({ ueberschrift }: { ueberschrift?: React.Ref<HTMLHeadingElement> }): React.JSX.Element {
+function NichtIchUngueltig({ ueberschrift }: { ueberschrift?: React.Ref<HTMLHeadingElement> }): React.JSX.Element {
   return (
     <section aria-labelledby="nicht-ich-titel" className="flex flex-col gap-4">
       <TriangleAlert className="size-8 text-status-offen" strokeWidth={1.6} aria-hidden="true" />

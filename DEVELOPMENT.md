@@ -5379,6 +5379,16 @@ Ausgangslage (Vercel Observability, 24 Stunden bis zum 19.10.2026): /hoefe hatte
 - **Nachbesserung Runde 2 (Prüfung):** Erst lesen, dann prüfen, dann zählen ließ gleichzeitige Versuche alle durch — 20 gleichzeitige falsche Passwörter wurden alle geprüft (Integrationstest rot). Seither zählt jeder Versuch vorab atomar, und ein Erfolg gibt ihn zurück; je Fenster werden höchstens 10 Versuche geprüft, die nicht zurückgegeben wurden — beim Passwort, bei der Code-Anmeldung und bei „Bestellungen finden" gleich.
 - **Bekannte Grenze:** Wer eine Adresse kennt, kann ihre Anmeldung mit Code oder Passwort jede Stunde neu pausieren (10 Fehlversuche). Eine Sperre auf Dauer gibt es nicht; beim Passwort hilft „Passwort vergessen".
 
+## Angemeldete Geräte, frische Sitzung, Mail bei neuem Gerät (Register E7, Ergänzung; Nr. 114, Nachtlauf 17)
+
+- **Ausgangslage:** Better Auth hielt die Sitzung 5 Minuten im Cookie zwischen — eine abgemeldete Sitzung galt so weiter, auch in Actions, die die Sitzung direkt lesen. Eine Liste der Sitzungen gab es nicht; andere Geräte fielen nur beim Passwortwechsel weg. Von einer Anmeldung auf einem fremden Gerät erfuhr niemand.
+- **Fachregel:** Höfe sehen unter Einstellungen › Konto und Sicherheit eine Zeile je gültiger Sitzung (Gerät und Browser, „zuletzt", „angemeldet seit") und melden einzelne oder alle anderen sofort ab. Meldet sich ein Hof- oder Admin-Konto auf einem Gerät an, das das Konto noch nicht kannte, geht die Mail „Neue Anmeldung" mit Gerät und Wiener Uhrzeit; ihr Knopf „Das war ich nicht" öffnet eine Seite, deren Knopf alle Geräte abmeldet und einen Link für ein neues Passwort schickt (7 Tage, einmal). Das erste Gerät eines Kontos (nach dem Deploy oder der Registrierung) wird still gemerkt — sonst bekäme am Tag nach dem Deploy jeder Hof eine Warnung. Kundschaft: weder Cookie noch Mail.
+- **Warum ein Cookie, keine IP:** Eine IP wechselt mit jedem Netz (Handy, Hof-WLAN) und ist ein Personendatum; die zufällige Kennung im Cookie erkennt das Gerät, und gespeichert wird nur ihr HMAC. Der Cookie-Name ist fest (nicht aus der Marke gebaut), damit ein Markenwechsel nicht jedes Gerät „neu" macht.
+- **Kosten der frischen Sitzung:** zwei Abfragen je Prüfung (Sitzung, dann Konto; gemessen), im Hofbereich vier je Seitenaufruf. Bei der heutigen Last vertretbar; ein eigener Zwischenspeicher bräuchte wieder eine Frist, in der Abmelden nicht wirkt.
+- **„zuletzt" ist so genau wie ein Tag:** Better Auth frischt eine Sitzung höchstens einmal am Tag auf (`updateAge`), erst dann ändert sich `updatedAt`.
+- **Datenschutz (für die Datenschutzerklärung):** neu je Hof- bzw. Admin-Konto: Gerätename („iPhone · Safari") und eine gehashte Geräte-Kennung je Gerät, Zeitpunkt der ersten und letzten Anmeldung; je Mail „Neue Anmeldung" ein gehashter Einmal-Link (7 Tage, danach gelöscht). Kein Ort, keine IP-Adresse, keine volle Browserangabe. Das Cookie der Geräte-Kennung (`GERAETE_COOKIE`) ist technisch notwendig (Sicherheit), 400 Tage.
+- **Bei den Bildern gefunden:** Der Knopf „Alle Geräte abmelden" zeigte danach „Dieser Link gilt nicht mehr" — `revalidatePath` in der Action lud die Seite neu, und die fand den Link verbraucht. Seither ruft die Action kein `revalidatePath`, und die Seite rendert immer dieselbe Komponente.
+
 ## Nützliche Befehle
 
 ```bash
