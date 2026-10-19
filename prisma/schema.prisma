@@ -359,6 +359,9 @@ model User {
   orders   Order[]
   sessions Session[]
   accounts Account[]
+  // Angemeldete Geräte und Einmal-Links (Register E7, Ergänzung; Nr. 114)
+  bekannteGeraete BekanntesGeraet[]
+  einmalLinks     EinmalLink[]
 
   @@index([email])
 }
@@ -379,6 +382,50 @@ model Session {
 
   @@index([userId])
   @@index([token])
+}
+
+// Die Geräte, auf denen sich ein Hof- oder Admin-Konto schon angemeldet hat
+// (Register E7, Ergänzung; Nr. 114). Erkannt an einer zufälligen Kennung im
+// Cookie GERAETE_COOKIE (src/lib/geraete.ts), nicht an der IP. Ein unbekanntes
+// Gerät löst die Mail „Neue Anmeldung" aus — außer beim allerersten Gerät
+// eines Kontos.
+//   kennungHash  HMAC-SHA256 der Kennung (BETTER_AUTH_SECRET, Zweck „geraet",
+//                src/lib/geraete.ts) — die Kennung selbst steht nirgends
+//   name         Gerät und Browser aus der Browserangabe („iPhone · Safari")
+//                — nie Ort, nie IP-Adresse
+//   zuletztAm    die letzte Anmeldung von diesem Gerät
+model BekanntesGeraet {
+  id          String   @id @default(cuid())
+  userId      String
+  kennungHash String
+  name        String
+  erstmalsAm  DateTime @default(now())
+  zuletztAm   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kennungHash])
+}
+
+// Ein Link aus einer Mail, der genau einmal und nur bis ablaufAm gilt
+// (Register E7, Ergänzung; Nr. 114) — etwa „Das war ich nicht" (zweck
+// „nicht-ich:<BekanntesGeraet.id>"; die Kennung selbst steht nie in der
+// Datenbank). Eingelöst per bedingtem Schreiben
+// (benutztAm null, nicht abgelaufen); das tägliche Aufräumen löscht
+// abgelaufene und seit 7 Tagen benutzte Zeilen (src/server/aufraeumen.ts).
+//   zweck      wofür der Link gilt, Art vorn, Bezug nach „:" (src/lib/geraete.ts)
+//   tokenHash  HMAC-SHA256 des Tokens aus dem Link — der Token steht nirgends
+model EinmalLink {
+  id        String    @id @default(cuid())
+  zweck     String
+  userId    String
+  tokenHash String    @unique
+  ablaufAm  DateTime
+  benutztAm DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Account {

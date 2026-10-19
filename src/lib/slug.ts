@@ -10,7 +10,7 @@ export const RESERVED_SLUGS = new Set([
   'account', 'admin', 'agb', 'analytics', 'api', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
   'farm-page', 'fehler-melden', 'forgot-password', 'fuer-hoefe', 'hoefe', 'impressum', 'intern', 'konditionen',
   'login', 'meldungen', 'onboarding', 'orders', 'postfach', 'problem-melden', 'products', 'region', 'register',
-  'reset-password', 'sales', 'settings', 'status', 'teilen', 'verify',
+  'reset-password', 'sales', 'settings', 'sicherheit', 'status', 'teilen', 'verify',
 ])
 
 export function generateSlug(name: string): string {

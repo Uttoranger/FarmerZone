@@ -1,11 +1,13 @@
 import { prisma } from '@/lib/prisma'
 import { aufraeumGrenzen } from '@/lib/betrieb'
+import { einmalLinkAufraeumGrenze } from '@/lib/geraete'
 import { MELDE_VERMERK_TYP } from '@/server/erstattung-gescheitert'
 
 /*
  * Das tägliche Aufräumen (Register N18, Nr. 104) — im bestehenden Ablauf
- * „Aufräumen“ (api/cron/cleanup-reservations). Genau vier Tabellen, je EIN
- * deleteMany mit fester Grenze aus src/lib/betrieb.ts (`aufraeumGrenzen`):
+ * „Aufräumen“ (api/cron/cleanup-reservations). Genau fünf Tabellen, je EIN
+ * deleteMany mit fester Grenze aus src/lib/betrieb.ts (`aufraeumGrenzen`) bzw.
+ * src/lib/geraete.ts:
  *
  *  - Session: 7 Tage nach Ablauf — sie trägt IP-Adresse und Browserangabe;
  *    eine gültige Sitzung (laufender Login) bleibt immer.
@@ -13,12 +15,14 @@ import { MELDE_VERMERK_TYP } from '@/server/erstattung-gescheitert'
  *  - WebhookEvent: nach 30 Tagen, OHNE die Melde-Vermerke — sie verhindern
  *    eine zweite Mail „Erstattung gescheitert“ und bleiben.
  *  - BetriebMessung: nach 400 Tagen.
+ *  - EinmalLink (E7, Ergänzung; Nr. 114): abgelaufen, oder seit 7 Tagen
+ *    benutzt. Ein offener, gültiger Link bleibt immer.
  *
  * Nie Bestellungen, Konten oder Höfe, nie eine Datei im Bild-Speicher
  * (Quelltext-Wache tests/aufraeumen.test.ts). Ins Ergebnis kommen nur Zahlen.
  */
 
-export type AufraeumErgebnis = { sitzungen: number; codes: number; webhookEreignisse: number; messungen: number }
+export type AufraeumErgebnis = { sitzungen: number; codes: number; webhookEreignisse: number; messungen: number; einmalLinks: number }
 
 export async function raeumeAltesAuf(jetzt: Date = new Date()): Promise<AufraeumErgebnis> {
   const grenze = aufraeumGrenzen(jetzt)
@@ -28,5 +32,14 @@ export async function raeumeAltesAuf(jetzt: Date = new Date()): Promise<Aufraeum
     where: { createdAt: { lt: grenze.webhookEreignisse }, type: { not: MELDE_VERMERK_TYP } },
   })
   const messungen = await prisma.betriebMessung.deleteMany({ where: { tag: { lt: grenze.messungen } } })
-  return { sitzungen: sitzungen.count, codes: codes.count, webhookEreignisse: webhookEreignisse.count, messungen: messungen.count }
+  const einmalLinks = await prisma.einmalLink.deleteMany({
+    where: { OR: [{ ablaufAm: { lt: jetzt } }, { benutztAm: { lt: einmalLinkAufraeumGrenze(jetzt) } }] },
+  })
+  return {
+    sitzungen: sitzungen.count,
+    codes: codes.count,
+    webhookEreignisse: webhookEreignisse.count,
+    messungen: messungen.count,
+    einmalLinks: einmalLinks.count,
+  }
 }

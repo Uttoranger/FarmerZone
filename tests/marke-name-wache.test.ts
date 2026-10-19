@@ -12,6 +12,8 @@
  *    (je Datei wörtlich, mit Grund). Eine neue Stelle in einer Ausnahmedatei
  *    schlägt trotzdem an, und eine Ausnahme ohne Treffer auch.
  *  - Der Name steht nur in src/lib/marke.ts; alle anderen importieren MARKE.
+ *    Ausnahme wie beim alten Name nur über die Liste (seit Nr. 114: der feste
+ *    Cookie-Name der Geräte-Kennung).
  *  - Die Domain steht unter src/ und public/ nur in src/lib/umgebung.ts. Tests
  *    dürfen sie als Beispieladresse nennen: Dort ist sie Prüfwert, und die
  *    Erwartung soll die echte Domain zeigen, nicht die Konstante gegen sich selbst.
@@ -50,9 +52,12 @@ const SPEICHER = 'technischer Schlüssel im Browser-Speicher — umbenannt verl�
 const NACHRICHT = 'technischer Nachrichtentyp zwischen Fenstern — umbenannt verstünden sich alter und neuer Stand im Deploy-Fenster nicht'
 const DATENBANK = 'Name der lokalen Test-Datenbank (technisch, wie .env.test und .github/workflows/ci.yml)'
 const REPO = 'Name des Repos auf GitHub — bleibt technischer Name (M1)'
+const GERAETE_COOKIE_GRUND =
+  'Cookie der Geräte-Kennung (E7, Nr. 114) — fester Name, damit ein Markenwechsel nicht jedes Gerät „neu“ macht und jeder Hof eine Mail „Neue Anmeldung“ bekommt'
 
-/** Wo der alte Name bleiben darf: die Stelle wörtlich, je Datei mit Grund. */
+/** Wo der alte Name (oder ausnahmsweise der Name) bleiben darf: die Stelle wörtlich, je Datei mit Grund. */
 const AUSNAHMEN: Record<string, Ausnahme> = {
+  'src/lib/geraete.ts': { stellen: ["'agrilo_geraet'"], grund: GERAETE_COOKIE_GRUND },
   'src/lib/kalender.ts': {
     stellen: ['@farmerzone`'],
     grund: 'UID der Kalendereinträge — ein neuer Suffix legte bereits eingetragene Abholungen doppelt an',
@@ -110,9 +115,10 @@ function ohneStellen(text: string, stellen: readonly string[]): string {
 
 /** Alle Funde einer Datei; `datei` ist der Pfad ab der Wurzel mit „/". */
 function pruefeText(text: string, datei: string, ausnahmen: Record<string, Ausnahme> = AUSNAHMEN): Fund[] {
-  const alt = funde(ohneStellen(text, ausnahmen[datei]?.stellen ?? []), ALTER_NAME, datei, 'alter Name')
+  const ohneAusnahmen = ohneStellen(text, ausnahmen[datei]?.stellen ?? [])
+  const alt = funde(ohneAusnahmen, ALTER_NAME, datei, 'alter Name')
   // Die Domain enthält den Namen; ohne sie bleibt nur, was wirklich der Name ist.
-  const ohneDomain = text.replace(DOMAIN, (d) => ' '.repeat(d.length))
+  const ohneDomain = ohneAusnahmen.replace(DOMAIN, (d) => ' '.repeat(d.length))
   const name = datei === NAME_QUELLE ? [] : funde(ohneDomain, NAME, datei, 'Name')
   const domain = datei === DOMAIN_QUELLE || datei.startsWith('tests/') ? [] : funde(text, DOMAIN, datei, 'Domain')
   return [...alt, ...name, ...domain]
@@ -151,6 +157,10 @@ describe('Marke und Domain an je einer Stelle (M1)', () => {
     expect(pruefeText(adresse, DOMAIN_QUELLE)).toEqual([])
     // In Tests ist die Domain Prüfwert — und kein Name.
     expect(pruefeText(`'https://${PRODUKTION_HOST.toUpperCase()}/hof'`, 'tests/x.test.ts')).toEqual([])
+    // Eine Stelle der Ausnahmeliste gilt auch für den Namen — nur genau sie.
+    const ausnahmen = { 'src/lib/x.ts': { stellen: [`'${MARKE.toLowerCase()}_keks'`], grund: 'Probe' } }
+    expect(pruefeText(`const k = '${MARKE.toLowerCase()}_keks'`, 'src/lib/x.ts', ausnahmen)).toEqual([])
+    expect(pruefeText(`const k = '${MARKE.toLowerCase()}_keks'\nconst t = '${MARKE}'`, 'src/lib/x.ts', ausnahmen).map((f) => f.zeile)).toEqual([2])
   })
 
   it('jede Ausnahme nennt einen Grund, und jede erlaubte Stelle steht noch in ihrer Datei', () => {
