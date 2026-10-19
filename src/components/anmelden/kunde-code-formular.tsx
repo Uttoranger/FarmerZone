@@ -8,6 +8,8 @@ import {
   ANMELDECODE_GUELTIG_SEKUNDEN,
   ANMELDECODE_LAENGE,
   anmeldeFehlerText,
+  anmeldeFehlerVon,
+  type AnmeldeFehler,
   codeVollstaendig,
   restWartezeitSekunden,
 } from '@/lib/anmeldecode'
@@ -232,9 +234,12 @@ function LadeStatus({ laedt }: { laedt: boolean }): React.JSX.Element {
 
 type Schritt = 'email' | 'code'
 
-/** Fehler aus dem Better-Auth-Client — nur Code und Status zählen (anmeldeFehlerText). */
-function fehlerVon(e: { code?: string; status?: number } | null | undefined): { code?: string; status?: number } {
-  return { code: e?.code, status: e?.status }
+/**
+ * Fehler aus dem Better-Auth-Client — nur Code, Status und bei „Zu viele
+ * falsche Codes" die Uhrzeit des Pausenendes zählen (anmeldeFehlerText).
+ */
+function fehlerVon(e: { code?: string; status?: number; pauseBis?: unknown } | null | undefined): AnmeldeFehler {
+  return anmeldeFehlerVon(e)
 }
 
 export function KundeCodeFormular({ ziel }: { ziel: string }): React.JSX.Element {

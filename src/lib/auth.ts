@@ -2,18 +2,27 @@ import * as Sentry from '@sentry/nextjs'
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { emailOTP, magicLink } from 'better-auth/plugins'
-import { APIError, createAuthMiddleware } from 'better-auth/api'
+import { APIError, createAuthMiddleware, isAPIError } from 'better-auth/api'
 import { prisma } from '@/lib/prisma'
 import { APP_URL, UMGEBUNG } from '@/lib/umgebung-server'
 import {
   ANMELDECODE_PLUGIN_OPTIONEN,
+  CODE_ANMELDUNG_PFAD,
   GESPERRTE_AUTH_PFADE,
   codeVersandErlaubt,
+  istFehlversuch,
   rolleAusTreffern,
+  zuVieleFehlversucheAntwort,
+  type FehlversuchArt,
 } from '@/lib/anmeldecode'
 import { genauesIlikeMuster } from '@/lib/ilike-muster'
 import { erzeugeAnforderungsSperre } from '@/lib/anmeldecode-sperre'
-import { anmeldecodeGebremst } from '@/server/bremse-datenbank'
+import {
+  anmeldecodeGebremst,
+  fehlversucheGesperrt,
+  loeschePasswortFehlversuche,
+  zaehleFehlversuch,
+} from '@/server/bremse-datenbank'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { sendeRegistrierungsHinweis } from '@/server/registrierung-hinweis'
 import { leereKontaktdatenNachFremdemPasswort } from '@/server/kontaktdaten-fremd'
@@ -116,6 +125,27 @@ function falscherCodeFehler(): APIError {
   return APIError.from('BAD_REQUEST', { code: 'INVALID_OTP', message: 'Invalid OTP' })
 }
 
+/**
+ * 429, wenn eine Adresse für Codes bzw. Passwörter pausiert ist (E7,
+ * Ergänzung; Nr. 112): Satz mit Uhrzeit und Code fürs Formular
+ * (src/lib/anmeldecode.ts). `bis: null` heißt, die Datenbank antwortete nicht
+ * (fail-closed) — dann der allgemeine Satz ohne Uhrzeit, für jede Adresse gleich.
+ */
+function zuVieleFehlversucheFehler(art: FehlversuchArt, bis: Date | null): APIError {
+  if (bis === null) return new APIError('TOO_MANY_REQUESTS', { message: 'Zu viele Anfragen.' })
+  return new APIError('TOO_MANY_REQUESTS', zuVieleFehlversucheAntwort(art, bis, new Date()))
+}
+
+/**
+ * Wessen Passwort gerade zurückgesetzt wird — hooks.before merkt es sich,
+ * hooks.after löscht nach Erfolg den Zähler dieser Adresse. Danach steht der
+ * Token nicht mehr in der Datenbank. Schlüssel ist `ctx.context`: Better Auth
+ * legt es je Aufruf neu an und reicht dasselbe Objekt an beide Hooks
+ * (dispatchAuthEndpoint); schwach gehalten, verschwindet es mit der Anfrage.
+ * Belegt in tests/integration/code-bremse.int.test.ts.
+ */
+const adresseBeimZuruecksetzen = new WeakMap<object, string>()
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
@@ -164,17 +194,24 @@ export const auth = betterAuth({
       nachDerAntwort(() => sendeRegistrierungsHinweis(user.id))
     },
     sendResetPassword: async ({ user, url }) => {
-      try {
-        const { sendPasswordResetEmail } = await import('@/lib/email')
-        await sendPasswordResetEmail(user.email, url)
-      } catch (err) {
-        console.error('[Passwort-Reset] E-Mail-Fehler:', err)
-        // Der Fallback-Log enthält einen GÜLTIGEN Zugangs-Link samt Adresse —
-        // er darf niemals in die Produktions-Logs (Vercel) gelangen.
-        if (process.env.NODE_ENV !== 'production') {
-          console.log(`[DEV] Passwort-Reset für ${user.email}: ${url}`)
+      // Erst NACH der Antwort (E7, Ergänzung; Nr. 112), wie der Anmeldecode:
+      // Better Auth antwortet auf eine unbekannte Adresse ohne Mail — wartete
+      // eine bekannte auf Rendern und Resend, verriete die Antwortzeit, wer ein
+      // Konto hat. Antwort und Status sind für beide schon gleich.
+      nachDerAntwort(async () => {
+        try {
+          const { sendPasswordResetEmail } = await import('@/lib/email')
+          await sendPasswordResetEmail(user.email, url)
+        } catch (err) {
+          // Nur die Art des Fehlers — sein Text könnte die Adresse tragen.
+          console.error('[Passwort-Reset] E-Mail-Fehler:', err instanceof Error ? err.name : 'unbekannt')
+          // Der Fallback-Log enthält einen GÜLTIGEN Zugangs-Link samt Adresse —
+          // er darf niemals in die Produktions-Logs (Vercel) gelangen.
+          if (process.env.NODE_ENV !== 'production') {
+            console.log(`[DEV] Passwort-Reset für ${user.email}: ${url}`)
+          }
         }
-      }
+      })
     },
   },
 
@@ -257,9 +294,42 @@ export const auth = betterAuth({
         }
         const body = ctx.body as { email?: unknown } | undefined
         if (typeof body?.email !== 'string') return
-        // Antwort wie bei falschem Code; der Code (falls einer liegt) bleibt
-        // unberührt und läuft nach 10 Minuten ab.
-        if (!codeVersandErlaubt(await rolleZurAdresse(adresseWieDasPlugin(body.email)))) throw falscherCodeFehler()
+        // Falsche Codes je Adresse (E7, Ergänzung; Nr. 112): Ist die Adresse
+        // pausiert, wird der Code gar nicht erst geprüft. VOR der
+        // Rollenprüfung — ein Hof pausiert wie eine Kundin oder eine Adresse,
+        // die es nicht gibt. Fail-closed (src/server/bremse-datenbank.ts).
+        const sperre = await fehlversucheGesperrt('code', body.email)
+        if (sperre.gesperrt) throw zuVieleFehlversucheFehler('code', sperre.bis)
+        // Antwort wie bei falschem Code — und gezählt wie einer: Sonst ließe
+        // sich an der Zählung erkennen, welche Adresse ein Hof ist. Der Code
+        // (falls einer liegt) bleibt unberührt und läuft nach 10 Minuten ab.
+        if (!codeVersandErlaubt(await rolleZurAdresse(adresseWieDasPlugin(body.email)))) {
+          await zaehleFehlversuch('code', body.email)
+          throw falscherCodeFehler()
+        }
+        return
+      }
+
+      if (ctx.path === '/sign-in/email') {
+        // Falsche Passwörter je Adresse (E7, Ergänzung; Nr. 112): Ist die
+        // Adresse pausiert, wird das Passwort gar nicht erst geprüft — für
+        // jedes Konto und jede unbekannte Adresse gleich. Gezählt wird in
+        // hooks.after. „Passwort vergessen" bleibt offen.
+        const body = ctx.body as { email?: unknown } | undefined
+        if (typeof body?.email !== 'string') return
+        const sperre = await fehlversucheGesperrt('passwort', body.email)
+        if (sperre.gesperrt) throw zuVieleFehlversucheFehler('passwort', sperre.bis)
+        return
+      }
+
+      if (ctx.path === '/reset-password') {
+        // Nur lesen, wessen Passwort es ist (adresseBeimZuruecksetzen); ob
+        // der Token gilt, entscheidet Better Auth im Endpunkt.
+        const token = (ctx.body as { token?: unknown } | undefined)?.token ?? ctx.query?.token
+        if (typeof token !== 'string') return
+        const eintrag = await ctx.context.internalAdapter.findVerificationValue(`reset-password:${token}`)
+        const konto = eintrag ? await ctx.context.internalAdapter.findUserById(eintrag.value) : null
+        if (konto) adresseBeimZuruecksetzen.set(ctx.context, konto.email)
         return
       }
 
@@ -294,6 +364,30 @@ export const auth = betterAuth({
         // die Datenbank schreibt einmal, wie bei einer Kundin (Antwortzeit).
         await prisma.verification.deleteMany({ where: { identifier: `sign-in-otp-${email}` } })
         return ctx.json({ success: true })
+      }
+    }),
+    // Nach dem Endpunkt, eine Weiche nach Pfad (weitere Fälle kommen dazu):
+    // Fehlversuche zählen (E7, Ergänzung; Nr. 112) — erst hier weiß Better
+    // Auth, ob Code oder Passwort stimmte; ein Fehler steht als APIError in
+    // `ctx.context.returned`. Nach einem erfolgreichen Zurücksetzen fällt der
+    // Passwort-Zähler der Adresse weg.
+    after: createAuthMiddleware(async (ctx) => {
+      switch (ctx.path) {
+        case '/sign-in/email-otp':
+        case '/sign-in/email': {
+          const art: FehlversuchArt = ctx.path === CODE_ANMELDUNG_PFAD ? 'code' : 'passwort'
+          const body = ctx.body as { email?: unknown } | undefined
+          const antwort = ctx.context.returned
+          if (typeof body?.email === 'string' && isAPIError(antwort) && istFehlversuch(art, antwort.body?.code)) {
+            await zaehleFehlversuch(art, body.email)
+          }
+          return
+        }
+        case '/reset-password': {
+          const email = adresseBeimZuruecksetzen.get(ctx.context)
+          if (email !== undefined && !isAPIError(ctx.context.returned)) await loeschePasswortFehlversuche(email)
+          return
+        }
       }
     }),
   },

@@ -1,6 +1,13 @@
 import { createHmac } from 'crypto'
 import { NEUIGKEITEN_JE_BESTELLUNG_UND_TAG } from '@/lib/abo-bestaetigung'
-import { ANMELDECODE_RATE_LIMIT, CODE_ANFORDERUNGEN_JE_ADRESSE } from '@/lib/anmeldecode'
+import {
+  ANMELDECODE_RATE_LIMIT,
+  CODE_ANFORDERUNGEN_JE_ADRESSE,
+  FALSCHE_CODES_JE_STUNDE,
+  FALSCHE_CODES_JE_TAG,
+  FALSCHE_PASSWOERTER_JE_STUNDE,
+  type FehlversuchArt,
+} from '@/lib/anmeldecode'
 import { MELDUNGEN_PRO_STUNDE } from '@/lib/meldung'
 
 /**
@@ -82,12 +89,58 @@ export const DB_BREMSEN = {
   // (festes Fenster, 10:05 und 10:15 teilen eins, 11:05 beginnt ein neues).
   // Merkmal ist die Kennung des Fadens; der Zähler im Eingang zählt weiter.
   antwortHofMail: { zweck: 'antwort-hof-mail', max: 1, fensterMs: STUNDE_MS },
+  // Falsche Codes und Passwörter je Adresse (Register E7, Ergänzung; Nr. 112):
+  // ohne erste Stufe und als einzige FAIL-CLOSED (fehlversucheGesperrt in
+  // src/server/bremse-datenbank.ts) — Merkmal ist die Adresse (adressMerkmal),
+  // gezählt wird nur ein Fehlversuch. Codes zählen über beide Wege zusammen.
+  codeFehlerStunde: { zweck: 'code-fehler-stunde', max: FALSCHE_CODES_JE_STUNDE, fensterMs: STUNDE_MS },
+  codeFehlerTag: { zweck: 'code-fehler-tag', max: FALSCHE_CODES_JE_TAG, fensterMs: TAG_MS },
+  passwortFehler: { zweck: 'passwort-fehler', max: FALSCHE_PASSWOERTER_JE_STUNDE, fensterMs: STUNDE_MS },
+  // Drossel ohne erste Stufe: höchstens eine Warn-Mail zu falschen
+  // Passwörtern je Adresse und Tag (E7: „Warn-Mails dazu höchstens eine am Tag").
+  passwortFehlerMail: { zweck: 'passwort-fehler-mail', max: 1, fensterMs: TAG_MS },
 } as const satisfies Record<string, DbBremse>
+
+/** Welche Bremsen je Art zählen: Codes je Stunde und je Tag, Passwörter je Stunde. */
+export const FEHLVERSUCH_BREMSEN = {
+  code: [DB_BREMSEN.codeFehlerStunde, DB_BREMSEN.codeFehlerTag],
+  passwort: [DB_BREMSEN.passwortFehler],
+} as const satisfies Record<FehlversuchArt, readonly DbBremse[]>
+
+/**
+ * Pausiert bis wann? Eine Fehlversuch-Bremse ist voll, sobald ihr Stand
+ * `max` erreicht: Der 10. falsche Code sperrt, der 11. Versuch wird
+ * abgelehnt, ohne dass ein Code geprüft wird. Sind mehrere voll, gilt das
+ * späteste Fensterende. `staende` in der Reihenfolge von `bremsen`; null = frei.
+ */
+export function fehlversuchSperreBis(bremsen: readonly DbBremse[], staende: readonly number[], jetzt: Date): Date | null {
+  let bis: Date | null = null
+  for (const [i, bremse] of bremsen.entries()) {
+    if ((staende[i] ?? 0) < bremse.max) continue
+    const ende = fensterEnde(jetzt, bremse.fensterMs)
+    if (bis === null || ende.getTime() > bis.getTime()) bis = ende
+  }
+  return bis
+}
+
+/**
+ * Hat genau DIESER Fehlversuch eine Bremse voll gemacht (Stand danach gleich
+ * `max`)? Dann beginnt die Pause, und es geht eine Mail hinaus. Das Hochzählen
+ * ist atomar: Nur ein Aufruf sieht genau `max` — so gibt es eine Mail je
+ * Pause über alle Instanzen, ohne Merker im Speicher. Werden zwei Bremsen
+ * zugleich voll (der 30. Code des Tages ist der 10. der Stunde), bleibt es
+ * eine Mail, mit dem späteren Ende.
+ */
+export function pauseBeginntBis(bremsen: readonly DbBremse[], staendeNachher: readonly number[], jetzt: Date): Date | null {
+  if (!bremsen.some((bremse, i) => staendeNachher[i] === bremse.max)) return null
+  return fehlversuchSperreBis(bremsen, staendeNachher, jetzt)
+}
 
 /**
  * So lange darf die zweite Stufe dauern. Danach gilt sie als nicht
  * erreichbar und lässt durch (fail-open): Eine langsame Datenbank darf weder
- * eine Anmeldung noch eine Bestellung aufhalten.
+ * eine Anmeldung noch eine Bestellung aufhalten. Ausnahme: die
+ * Fehlversuch-Bremsen oben gelten dann als voll (fail-closed).
  */
 export const DB_BREMSE_ZEITLIMIT_MS = 1500
 

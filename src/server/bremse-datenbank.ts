@@ -4,16 +4,22 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { env } from '@/lib/env'
 import { getClientIp } from '@/lib/rate-limit'
+import { genauesIlikeMuster } from '@/lib/ilike-muster'
+import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import type { FehlversuchArt } from '@/lib/anmeldecode'
 import {
   DB_BREMSEN,
   DB_BREMSE_ZEITLIMIT_MS,
+  FEHLVERSUCH_BREMSEN,
   ZU_VIELE_ANFRAGEN,
   adressMerkmal,
   bremsMeldungFaellig,
   bremsSchluessel,
+  fehlversuchSperreBis,
   fensterBeginn,
   fensterEnde,
   innerhalbDerGrenze,
+  pauseBeginntBis,
   sekundenBisFensterEnde,
   type DbBremse,
 } from '@/lib/bremse-datenbank'
@@ -205,6 +211,156 @@ export async function anmeldecodeGebremst(
  */
 export async function neuigkeitenGebremst(orderId: string, jetzt: Date = new Date()): Promise<boolean> {
   return !(await bremseUeberAlleInstanzen([{ bremse: DB_BREMSEN.neuigkeitenBestellung, merkmal: orderId }], jetzt))
+}
+
+/*
+ * FALSCHE CODES UND PASSWÖRTER JE ADRESSE (Register E7, Ergänzung Lauf 17,
+ * Nr. 112) — der Helfer für Fehlversuche. Anders als alle Bremsen oben
+ * FAIL-CLOSED: Antwortet die Datenbank nicht (Fehler oder Zeitlimit), gilt
+ * die Adresse als pausiert. Hier schützt die Bremse ein Konto vor dem Raten,
+ * und ohne Datenbank kann ohnehin niemand angemeldet werden — durchzulassen
+ * hieße nur, ungezählt raten zu lassen. Gemeldet wird gedrosselt wie oben.
+ *
+ * Gilt in jeder Umgebung, nicht nur in Produktion: Das Merkmal ist die
+ * Adresse, keine IP — lokal und in Tests teilen sich nicht alle einen
+ * Schlüssel (wie neuigkeitenGebremst). So prüft die Integrationsschicht die
+ * echte Bremse, ohne Schalter.
+ *
+ * Geprüft wird VOR dem Code bzw. Passwort (nur lesen), gezählt danach, nur
+ * wenn der Versuch scheiterte — zwei Schritte, weil erst Better Auth weiß, ob
+ * der Code stimmte (hooks.before und hooks.after in src/lib/auth.ts).
+ */
+
+/** Die Versuche einer Art für diese Adresse — dieselben Schlüssel beim Prüfen, Zählen und Löschen. */
+function fehlversuche(art: FehlversuchArt, email: string): Versuch[] {
+  const merkmal = adressMerkmal(email)
+  return FEHLVERSUCH_BREMSEN[art].map((bremse) => ({ bremse, merkmal }))
+}
+
+/** Die Stände im laufenden Fenster, OHNE zu zählen; keine Zeile = 0. */
+async function leseStaende(versuche: readonly Versuch[], jetzt: Date): Promise<number[]> {
+  const zeilen = versuche.map(({ bremse, merkmal }) => ({
+    schluessel: bremsSchluessel(env.BETTER_AUTH_SECRET, bremse.zweck, merkmal),
+    fensterStart: fensterBeginn(jetzt, bremse.fensterMs),
+  }))
+  const gefunden = await prisma.rateLimitZaehler.findMany({
+    where: { OR: zeilen },
+    select: { schluessel: true, fensterStart: true, zaehler: true },
+  })
+  return zeilen.map(
+    (z) =>
+      gefunden.find((g) => g.schluessel === z.schluessel && g.fensterStart.getTime() === z.fensterStart.getTime())
+        ?.zaehler ?? 0
+  )
+}
+
+/** Pausiert bis `bis`; `bis: null` = die Datenbank antwortete nicht (fail-closed, Ende unbekannt). */
+export type FehlversuchSperre = { gesperrt: false } | { gesperrt: true; bis: Date | null }
+
+/**
+ * Ist diese Adresse für Codes bzw. Passwörter pausiert? Zählt nicht. Bei
+ * Datenbankfehler oder Zeitlimit: pausiert (fail-closed, siehe oben).
+ */
+export async function fehlversucheGesperrt(
+  art: FehlversuchArt,
+  email: string,
+  jetzt: Date = new Date(),
+  meldungen: BremsMeldungen = MELDUNGEN_DIESER_INSTANZ
+): Promise<FehlversuchSperre> {
+  const versuche = fehlversuche(art, email)
+  try {
+    const staende = await mitFrist(leseStaende(versuche, jetzt), DB_BREMSE_ZEITLIMIT_MS)
+    const bis = fehlversuchSperreBis(FEHLVERSUCH_BREMSEN[art], staende, jetzt)
+    return bis === null ? { gesperrt: false } : { gesperrt: true, bis }
+  } catch (err) {
+    meldeBremsFehler(err, versuche, jetzt, meldungen)
+    return { gesperrt: true, bis: null }
+  }
+}
+
+/**
+ * Zählt einen Fehlversuch. Macht genau dieser die Bremse voll, geht nach der
+ * Antwort EINE Mail an die Adresse (nur wenn es ein Konto gibt). Wirft nie:
+ * Scheitert das Zählen, bleibt der Versuch ungezählt — antwortet die
+ * Datenbank nicht, pausiert schon die Prüfung vor dem nächsten Versuch.
+ */
+export async function zaehleFehlversuch(
+  art: FehlversuchArt,
+  email: string,
+  jetzt: Date = new Date(),
+  meldungen: BremsMeldungen = MELDUNGEN_DIESER_INSTANZ
+): Promise<void> {
+  const versuche = fehlversuche(art, email)
+  let staende: number[]
+  try {
+    staende = await mitFrist(zaehleVersuche(versuche, jetzt), DB_BREMSE_ZEITLIMIT_MS)
+  } catch (err) {
+    meldeBremsFehler(err, versuche, jetzt, meldungen)
+    return
+  }
+  const bis = pauseBeginntBis(FEHLVERSUCH_BREMSEN[art], staende, jetzt)
+  if (bis !== null) {
+    const merkmal = adressMerkmal(email)
+    nachDerAntwort(() => schickeWarnMail(art, merkmal, bis))
+  }
+}
+
+/** Fester Text, nur die Art — nie Adresse oder Fehlertext (ein Datenbank- oder Resend-Text kann die Adresse tragen). */
+function meldeWarnMailFehler(grund: 'resend_fehler' | 'nachlauf_fehler', err?: unknown): void {
+  const kontext = { tags: { aufgabe: 'zu-viele-versuche', grund } }
+  if (err === undefined) {
+    Sentry.captureMessage('Mail zu vielen Fehlversuchen nicht verschickt', { level: 'error', ...kontext })
+    return
+  }
+  const meldung = new Error('Mail zu vielen Fehlversuchen nicht verschickt')
+  meldung.name = err instanceof Error ? err.name : 'Unbekannt'
+  Sentry.captureException(meldung, kontext)
+}
+
+/**
+ * Die Mail „Zu viele falsche Codes" bzw. „… Passwörter" — nach der Antwort,
+ * damit eine Adresse mit Konto nicht langsamer antwortet als eine ohne. Nur
+ * an eine Adresse, die es gibt (genau, ohne Platzhalter, ohne Rücksicht auf
+ * Groß-/Kleinschreibung); beim Passwort höchstens eine am Tag (Drossel in der
+ * Datenbank, geschrieben nur, wenn es das Konto gibt). Nie mit Code oder
+ * Link; im Log (ohne RESEND_API_KEY) steht nur der Betreff.
+ */
+async function schickeWarnMail(art: FehlversuchArt, merkmal: string, bis: Date): Promise<void> {
+  try {
+    const konto = await prisma.user.findFirst({
+      where: { email: { equals: genauesIlikeMuster(merkmal), mode: 'insensitive' } },
+      select: { email: true },
+    })
+    if (!konto) return
+    if (art === 'passwort') {
+      const [stand] = await zaehleVersuche([{ bremse: DB_BREMSEN.passwortFehlerMail, merkmal }])
+      if (!innerhalbDerGrenze(stand, DB_BREMSEN.passwortFehlerMail.max)) return
+    }
+    const { sendZuVieleVersucheEmail } = await import('@/lib/email')
+    const ergebnis = await sendZuVieleVersucheEmail(konto.email, art, bis)
+    if (ergebnis.error) meldeWarnMailFehler('resend_fehler')
+  } catch (err) {
+    console.error('[Zu viele Versuche] E-Mail-Fehler:', err instanceof Error ? err.name : 'unbekannt')
+    meldeWarnMailFehler('nachlauf_fehler', err)
+  }
+}
+
+/**
+ * Nach einem erfolgreichen Zurücksetzen des Passworts (hooks.after in
+ * auth.ts): löscht die Zeilen von `passwort-fehler` für genau diese Adresse,
+ * in jedem Fenster — sonst bliebe ein Hof nach dem neuen Passwort bis zum
+ * Ende der Stunde ausgesperrt. Nur Zeilen der Bremse, kein Konto. Wirft nie:
+ * Das Passwort ist da schon geändert.
+ */
+export async function loeschePasswortFehlversuche(email: string, jetzt: Date = new Date()): Promise<void> {
+  const [versuch] = fehlversuche('passwort', email)
+  try {
+    await prisma.rateLimitZaehler.deleteMany({
+      where: { schluessel: bremsSchluessel(env.BETTER_AUTH_SECRET, versuch.bremse.zweck, versuch.merkmal) },
+    })
+  } catch (err) {
+    meldeBremsFehler(err, [versuch], jetzt, MELDUNGEN_DIESER_INSTANZ)
+  }
 }
 
 /**
