@@ -190,7 +190,7 @@ export type PublicFarm = {
  * festgeschriebene Platz, gegeben wird nur das Ja/Nein (`abzeichenDaten`) —
  * jede Abfrage, die diese Felder liest, nimmt sie vor dem Rückgabewert heraus.
  */
-const ABZEICHEN_SELECT = {
+export const ABZEICHEN_SELECT = {
   approvedAt: true,
   gruendungPlatz: true,
   gruendungAusgenommen: true,

@@ -766,7 +766,7 @@ export const ABZEICHEN_TEXT = {
   mehrHref: '/fuer-hoefe',
   /** Konditionen und Tarif, Block „Dein Stand“. */
   schalter: 'Abzeichen zeigen',
-  schalterZeile: 'Über deinem Namen auf der Hofseite und in der Höfe-Liste.',
+  schalterZeile: 'Über deinem Namen auf der Hofseite, in der Höfe-Liste und auf geteilten Bildern.',
   schalterSatz: 'Deine Konditionen bleiben gleich, auch wenn du es ausblendest. Du kannst es jederzeit wieder einschalten.',
   fehler: 'Wir konnten das Abzeichen gerade nicht umstellen. Lade die Seite neu und versuch es noch einmal.',
 } as const
