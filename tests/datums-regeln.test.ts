@@ -30,6 +30,8 @@ const DATEIEN_NACH_NR_118 = [
   'src/lib/email.ts',
   'src/app/api/test-email/route.ts',
 ]
+// Dateien mit toLocaleString für Zahlen: Die Regel darf sie nicht treffen.
+const ZAHLEN_DATEIEN = ['src/schemas/produktfamilie.ts', 'src/schemas/vorrat.ts', 'src/lib/admin-hoefe.ts', 'src/lib/servicegebuehr.ts']
 const ORT = /braucht timeZone: 'Europe\/Vienna'/
 
 let eslint: ESLint
@@ -92,6 +94,35 @@ describe('Datums-Regeln — Gegenprobe: die Selektoren schlagen an', () => {
     }
   }, 30_000)
 
+  it('toLocaleString ohne Optionen schlägt auch an, wenn der Name des Empfängers ein Datum sagt (Prüfung Runde 1)', async () => {
+    // Ohne Typen sieht die Regel einen Wert vom Typ Date nur am Namen: …At, …Date, …Datum, …Zeit, date, datum, jetzt, heute.
+    for (const code of [
+      "export const a = m.createdAt.toLocaleString('de-AT')",
+      "export const a = m?.updatedAt.toLocaleString('de-AT')",
+      "export const a = createdAt.toLocaleString('de-AT')",
+      "export const a = hof.startDatum.toLocaleString()",
+      "export const a = abholung.ankunftZeit.toLocaleString('de-AT')",
+      "export const a = sale.endDate.toLocaleString('de-AT')",
+      "export const a = date.toLocaleString('de-AT')",
+      "export const a = heute.toLocaleString('de-AT')",
+    ]) {
+      expect(await meldungen(code), code).toEqual([expect.stringMatching(ORT)])
+    }
+  }, 30_000)
+
+  it('der Name am Empfänger bleibt folgenlos, wenn timeZone da ist oder der Wert keine Datumsendung trägt', async () => {
+    for (const code of [
+      "export const a = m.createdAt.toLocaleString('de-AT', { timeZone: 'Europe/Vienna' })",
+      "export const a = createdAt.toLocaleString('de-AT', { timeZone: 'Europe/Vienna' })",
+      "export const a = hof.menge.toLocaleString('de-AT')",
+      "export const a = bestellung.summe.toLocaleString('de-AT')",
+      "export const a = datenmenge.toLocaleString('de-AT')",
+      "export const a = kosten.atlas.toLocaleString('de-AT')",
+    ]) {
+      expect(await meldungen(code), code).toEqual([])
+    }
+  }, 30_000)
+
   it('toLocaleString für Zahlen bleibt erlaubt (Tausenderpunkt, Prozent, Euro)', async () => {
     // Die Stellen, die es im Bestand gibt: schemas/produktfamilie.ts, schemas/vorrat.ts, admin-hoefe.ts, servicegebuehr.ts.
     for (const code of [
@@ -133,6 +164,16 @@ describe('Datums-Regeln — kein Bestand mehr (Nr. 118)', () => {
     // Echte Dateien an ihrem Platz: Der Test fällt auf, wenn jemand die Zeitzone wieder herausnimmt.
     for (const datei of DATEIEN_NACH_NR_118) {
       const quelle = readFileSync(join(WURZEL, datei), 'utf8')
+      expect((await meldungen(quelle, datei)).filter((m) => ORT.test(m)), datei).toEqual([])
+    }
+  }, 60_000)
+
+  it('die Zahlen-Formatierungen in den vier echten Dateien bleiben erlaubt (kein Befund der Datumsregel)', async () => {
+    // Nicht nachgebaut, sondern die Dateien selbst: produktfamilie/vorrat (VORRAT_MAX), admin-hoefe (Prozent),
+    // servicegebuehr (Prozent, Cent). Die Schnipsel oben beweisen die Selektoren, diese Dateien den Bestand.
+    for (const datei of ZAHLEN_DATEIEN) {
+      const quelle = readFileSync(join(WURZEL, datei), 'utf8')
+      expect(quelle, datei).toMatch(/\.toLocaleString\(/)
       expect((await meldungen(quelle, datei)).filter((m) => ORT.test(m)), datei).toEqual([])
     }
   }, 60_000)

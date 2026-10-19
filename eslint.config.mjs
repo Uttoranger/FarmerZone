@@ -34,18 +34,22 @@ const DATUM_SELEKTOREN = [
 const DATUM_ORT_MELDUNG = `${DATUM_HINWEIS} Eine Datumsausgabe (toLocaleDateString, toLocaleTimeString, toLocaleString) braucht timeZone: 'Europe/Vienna'.`
 const OHNE_ZEITZONE = ":not(:has(Property[key.name='timeZone']))"
 // toLocaleString gibt es auch für Zahlen (Tausenderpunkt, Prozent): Dort bleibt es erlaubt. Ein Datum erkennt
-// die Regel am Empfänger `new Date(…)` oder an Optionen, die nur ein Datum kennt — ein Wert vom Typ Date unter
-// anderem Namen und ohne Optionen sieht ein Selektor nicht (dafür bräuchte er Typen).
+// die Regel am Empfänger `new Date(…)`, an Optionen, die nur ein Datum kennt, oder am Namen des Empfängers
+// (`m.createdAt`, `startDatum`, `ankunftZeit`, `date`) — ohne Typen sieht ein Selektor sonst nicht, dass es ein
+// Date ist. Ein Date unter einem Namen ohne diese Endung und ohne Optionen bleibt unentdeckt.
 const DATUM_OPTIONEN = '^(day|month|weekday|year|hour|minute|second|dateStyle|timeStyle)$'
+const DATUM_NAME = '(At|Date|Datum|Zeit)$|^(date|datum|zeit|jetzt|heute)$'
 const DATUM_ORT_SELEKTOREN = [
   { selector: `CallExpression[callee.property.name='toLocaleDateString']${OHNE_ZEITZONE}`, message: DATUM_ORT_MELDUNG },
   { selector: `CallExpression[callee.property.name='toLocaleTimeString']${OHNE_ZEITZONE}`, message: DATUM_ORT_MELDUNG },
   {
-    selector: `CallExpression[callee.property.name='toLocaleString'][callee.object.type='NewExpression'][callee.object.callee.name='Date']${OHNE_ZEITZONE}`,
-    message: DATUM_ORT_MELDUNG,
-  },
-  {
-    selector: `CallExpression[callee.property.name='toLocaleString']:has(Property[key.name=/${DATUM_OPTIONEN}/])${OHNE_ZEITZONE}`,
+    // EIN Selektor mit :matches, damit ein Aufruf, auf den mehrere Merkmale zutreffen, nur einmal gemeldet wird.
+    selector:
+      "CallExpression[callee.property.name='toLocaleString']:matches(" +
+      "[callee.object.type='NewExpression'][callee.object.callee.name='Date']," +
+      `:has(Property[key.name=/${DATUM_OPTIONEN}/]),` +
+      `[callee.object.type='MemberExpression'][callee.object.property.name=/${DATUM_NAME}/],` +
+      `[callee.object.type='Identifier'][callee.object.name=/${DATUM_NAME}/])${OHNE_ZEITZONE}`,
     message: DATUM_ORT_MELDUNG,
   },
 ]

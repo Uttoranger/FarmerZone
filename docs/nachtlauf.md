@@ -359,6 +359,7 @@ claude -p "$(cat docs/nachtlauf-start.txt)" \
     "Bash(pnpm typecheck*)" "Bash(pnpm lint*)" "Bash(pnpm test*)" "Bash(pnpm vitest*)" \
     "Bash(pnpm build*)" "Bash(pnpm dev*)" "Bash(pnpm bausteine*)" "Bash(pnpm install --frozen-lockfile*)" "Bash(pnpm exec prisma migrate diff*)" \
     "Bash(pnpm exec prisma generate*)" "Bash(pnpm exec prisma validate*)" "Bash(pnpm exec prisma format*)" \
+    "Bash(DATABASE_URL=postgresql://postgres:postgres@localhost:5432/* DIRECT_URL=postgresql://postgres:postgres@localhost:5432/* pnpm exec prisma migrate deploy*)" \
     "Bash(git *)" "Bash(gh pr create*)" "Bash(gh pr view*)" "Bash(gh pr list*)" "Bash(agent-browser *)" \
   --disallowedTools "Bash(pnpm db:*)" "Bash(pnpm exec prisma migrate deploy*)" "Bash(pnpm exec prisma db push*)" "Bash(pnpm exec prisma migrate dev*)" "Bash(pnpm exec prisma migrate reset*)" "Bash(pnpm add*)" "Bash(git push --force*)" "Bash(git push -f*)" "Bash(gh pr merge*)" \
   --max-budget-usd 40 \
@@ -368,7 +369,7 @@ claude -p "$(cat docs/nachtlauf-start.txt)" \
 **Windows PowerShell:** dieselben Argumente, nur der Prompt so: `claude -p (Get-Content docs\nachtlauf-start.txt -Raw) …` und die Ausgabe in `nachtlauf.log`.
 
 Hinweise:
-- Migrationen entstehen nur über `prisma migrate diff` (Regel 3); `migrate dev` ist gesperrt. `migrate deploy` ist es ebenfalls, außer für die Prüfung nach Regel 3 (frische lokale Wegwerf-Datenbank im Sammel-PR): Die läuft nur, wenn derselbe Befehl `DATABASE_URL` und `DIRECT_URL` ausdrücklich auf `localhost` oder `127.0.0.1` setzt — der Hook `gefahr-blocken` lässt `migrate deploy` (auch über `pnpm vercel-build`) sonst nie durch, und `--disallowedTools` sperrt den Aufruf ohne diese Zuweisungen schon am Anfang des Befehls. `git show origin/main:prisma/schema.prisma` deckt `Bash(git *)` ab.
+- Migrationen entstehen nur über `prisma migrate diff` (Regel 3); `migrate dev` ist gesperrt. `migrate deploy` ist es ebenfalls, außer für die Prüfung nach Regel 3 (frische lokale Wegwerf-Datenbank im Sammel-PR): Die läuft nur, wenn derselbe Befehl `DATABASE_URL` und `DIRECT_URL` ausdrücklich auf `localhost` oder `127.0.0.1` setzt — der Hook `gefahr-blocken` lässt `migrate deploy` (auch über `pnpm vercel-build`, hinter pnpm/npx/timeout/`sh -c` …) sonst nie durch und zählt nur die Zuweisungen am Aufruf selbst oder in einem `export` davor, nicht die in einem anderen Befehl oder in einem `echo`. `--disallowedTools` sperrt den Aufruf ohne diese Zuweisungen schon am Anfang des Befehls; mit ihnen lässt `dontAsk` ihn nur durch den engen Eintrag in `--allowedTools` (beide Adressen auf `localhost:5432`) zu — jede andere Form lehnt er ab, und der Befehl steht im Log und im Morgenbericht. `git show origin/main:prisma/schema.prisma` deckt `Bash(git *)` ab.
 - `dontAsk` lehnt alles ab, was nicht in `--allowedTools` steht, und fragt niemanden. Bleibt der Lauf an einer Stelle hängen, steht der abgelehnte Befehl im Log und im Morgenbericht.
 - Die bestehenden Hooks aus `.claude/settings.json` gelten weiter (gefährliche Befehle blockiert, kein Zugende bei rotem Typecheck).
 - `--max-budget-usd` begrenzt API-Kosten. Mit einem Abo greifen stattdessen dessen Nutzungsgrenzen; ist das Kontingent erschöpft, endet der Lauf, und die nächste Nacht macht bei `status.md` weiter.
