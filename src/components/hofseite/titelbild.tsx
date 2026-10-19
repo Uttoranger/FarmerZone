@@ -41,6 +41,11 @@ import { cn } from '@/lib/utils'
 /** Der Übergang aller drei Lagen: gleich lang und zugleich, bei „weniger Bewegung“ ohne. */
 const UEBERGANG = 'transition-opacity duration-500 motion-reduce:transition-none'
 
+/** Der Alt-Text des Titelbilds (Nr. 117) — für Suchmaschinen und Screenreader. */
+function titelbildAlt(hofName: string | undefined): string {
+  return hofName ? `Titelbild von ${hofName}` : ''
+}
+
 /**
  * Die Bilder im Rahmen: hinten die unscharfe Kopie über die volle Breite, davor
  * im Kasten das scharfe Foto in zwei Lagen.
@@ -73,18 +78,23 @@ const UEBERGANG = 'transition-opacity duration-500 motion-reduce:transition-none
  *
  * Screenreader hören das Foto höchstens einmal: Kopie und ganze Lage sind
  * `aria-hidden`, nur die füllende nicht — in jeder Darstellung und bei jeder Breite.
+ * Nur sie trägt den Alt-Text „Titelbild von {Hof}" (Nr. 117); die beiden
+ * anderen sind Schmuck und bleiben leer.
  */
 export function TitelbildBilder({
   foto,
   ausschnitt,
   darstellung,
   beimLaden,
+  hofName,
 }: {
   foto: string
   /** Fokus, Zoom und Filter (`titelbildAusschnitt`, lib/titelbild.ts). */
   ausschnitt: BildAusschnitt
   darstellung: TitelbildDarstellung
   beimLaden: (ereignis: SyntheticEvent<HTMLImageElement>) => void
+  /** Für den Alt-Text; ohne Namen bleibt er leer wie bisher. */
+  hofName?: string
 }): React.JSX.Element {
   const ganz = darstellung === 'ganz'
   const fuellend = bildStil(ausschnitt)
@@ -108,7 +118,7 @@ export function TitelbildBilder({
       <div className="relative mx-auto h-full max-w-[1920px] overflow-hidden">
         <Image
           src={foto}
-          alt=""
+          alt={titelbildAlt(hofName)}
           fill
           sizes={TITELBILD_SIZES}
           priority
@@ -139,6 +149,7 @@ export function Titelbild({
   foto,
   verlauf,
   ausschnitt,
+  hofName,
   children,
 }: {
   /** Das hochgeladene Foto (`titelbildFoto`), sonst null — dann steht der Verlauf. */
@@ -147,6 +158,8 @@ export function Titelbild({
   verlauf: string
   /** Der Ausschnitt (`titelbildAusschnitt`): ohne gespeicherten der Stand von vorher. */
   ausschnitt: BildAusschnitt
+  /** Der Name des Hofs für den Alt-Text des Fotos (Nr. 117). */
+  hofName?: string
   children?: ReactNode
 }): React.JSX.Element {
   const { masse, beimLaden } = useBildmasse(foto)
@@ -162,6 +175,7 @@ export function Titelbild({
           ausschnitt={ausschnitt}
           darstellung={titelbildDarstellung(masse, ausschnitt.darstellung)}
           beimLaden={beimLaden}
+          hofName={hofName}
         />
       ) : (
         // Der Verlauf ist ein Wert des Hofs (Titelbild-Einstellung), kein Farbliteral im Code.

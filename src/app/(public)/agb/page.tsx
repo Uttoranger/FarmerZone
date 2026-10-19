@@ -12,7 +12,7 @@ import { AGB_STAND_VERMERK, AGB_TEILE, AGB_TITEL } from '@/lib/rechtstexte/agb'
 import { AGB_SEITE_TEXT } from '@/lib/rechtstexte/agb-einbindung'
 import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: `AGB — ${MARKE}` }
+export const metadata: Metadata = { title: `AGB — ${MARKE}`, alternates: { canonical: '/agb' } }
 
 /**
  * Die AGB (Register O4, Nr. 90) in der KundeShell, gebaut wie das Impressum:

@@ -199,7 +199,8 @@ function KartenAufbau({
         {bild ? (
           <Image
             src={bild}
-            alt=""
+            // Das Produktfoto heißt wie das Produkt (Nr. 117); die Kategorie-Illustration ist Schmuck.
+            alt={istFoto ? name : ''}
             fill
             sizes="(min-width: 1280px) 260px, (min-width: 768px) 33vw, 64px"
             className={cn(

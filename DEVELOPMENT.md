@@ -5369,6 +5369,17 @@ Ausgangslage (Vercel Observability, 24 Stunden bis zum 19.10.2026): /hoefe hatte
 - **robots.txt ohne `Allow: /`:** Next schreibt Allow- vor Disallow-Zeilen; ein einfacher Crawler, bei dem die erste passende Regel gilt (etwa über Pythons `urllib.robotparser`), dürfte mit `Allow: /` alles. Erlaubt ist ohne passende Regel ohnehin alles.
 - **Weitere Fallen gesucht, keine gefunden:** Die Hofseite ist dynamisch, ihre Links mit Parametern sind begrenzt (`?reiter=` mit drei Werten, `?bereich=futter`; `reiterAdresse` behält fremde Parameter, setzt aber nur den Reiter); die Produktseite hat eine Adresse je Produkt; `/problem-melden` eine (dazu `?kennung=` nur aus Fehlerseiten); `/login` ohne Parameter.
 
+## SEO-Grundlagen und echte 404 (Nr. 117, Nachtlauf 17, 19.10.2026)
+
+Ausgangslage: Jede Adresse `/<irgendwas>` landete in `[farmSlug]` und löste zuerst die Fristfreigabe (`gibVerwaisteFreiFuerSlug`) und `getPublicFarm` aus — auch `/wp-login.php`. Über der Seite lagen zwei Ladeansichten (`(public)/loading.tsx`, `[farmSlug]/loading.tsx`); Next streamte das Skelett zuerst, das `notFound()` kam mit Status 200 hinterher. Keine Sitemap, kein Canonical außer /hoefe.
+
+- **Echte 404:** Die drei Ladeansichten entfielen; Hof- und Produktseite prüfen vor dem Streamen (`pruefeHofseiteGeteilt`/`pruefeProduktseiteGeteilt`, `src/server/queries/seo.ts`): Form ohne Datenbank, dann eine schlanke Abfrage. Das Skelett steht danach als Suspense-Grenze in der Seite (umbenannt in `hofseite-skelett.tsx`/`produkt-skelett.tsx`). Die Infoseiten der Gruppe (AGB, Datenschutz, Impressum, Konditionen, Für Höfe) sind statisch und brauchen keine Ladeansicht.
+- **Warum die Vorschau über den Lader geht:** `?vorschau=1` darf nur `ansichtsModus` lesen, und nur der Lader ruft es auf (`tests/hofseite-einmal.test.ts`). Ein nicht öffentlicher Hof MIT Suchparametern fragt deshalb den Lader, ob der Besitzer seine Vorschau sieht; ohne Parameter bleibt es bei einer Abfrage. Der Lader ist je Anfrage geteilt — die Seite lädt danach nicht ein zweites Mal.
+- **Sitemap und noindex nach derselben Regel:** öffentlich, nicht ausgenommen, mindestens ein Produkt im Shop (`isAvailable`, wie `IM_SHOP_WHERE`; den Export bringt Nr. 116, der Sammel-PR stellt `seo.ts` darauf um). Höfe ohne Produkt im Shop und Testhöfe tragen `noindex, follow`.
+- **Titel:** Hofseite „{Hof} in {Ort} – {bis zu drei Kategorien}", Produktseite „{Produkt} vom {Hof} in {Ort}". Das `title.template` des Root-Layouts trägt heute keine Marke (`%s`), die Seiten mit Marke schreiben sie selbst — Hof- und Produktseite bleiben deshalb ohne.
+- **JSON-LD auf dem Server:** Der Block der Hofseite stand in der Client-Komponente; er zog mit Nr. 117 in die Seite, weil Koordinaten (`geo`) und volle Adressen nur dort vorliegen. Preise gehen über ganze Cent (`alsCents`) als Text mit Punkt.
+- **Open Graph `de_AT`:** Ein `openGraph` einer Seite ersetzt das des Layouts ganz; Startseite und /fuer-hoefe haben eigene und tragen `locale` noch nicht (außerhalb der Dateigrenzen, Nacharbeit).
+
 ## Nützliche Befehle
 
 ```bash

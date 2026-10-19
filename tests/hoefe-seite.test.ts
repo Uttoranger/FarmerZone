@@ -703,8 +703,8 @@ describe('Filter im Browser: kein useSearchParams im Baum von /hoefe (Register N
     }
     return [...gesehen]
   }
-  // Seite, Ladeansichten und das Root-Layout darüber.
-  const hoefe = baum('src/app/(public)/hoefe/page.tsx', 'src/app/(public)/hoefe/loading.tsx', 'src/app/(public)/loading.tsx', 'src/app/layout.tsx')
+  // Seite, Ladeansicht und das Root-Layout darüber (die Ladeansicht der Gruppe entfiel mit Nr. 117).
+  const hoefe = baum('src/app/(public)/hoefe/page.tsx', 'src/app/(public)/hoefe/loading.tsx', 'src/app/layout.tsx')
   const liest = (datei: string) => /\buseSearchParams\b|\bsearchParams\b/.test(ohneKommentare(quelle(datei)))
 
   it('der Baum reicht bis in die Teile der Seite — sonst bewiese ein leerer Fund nichts', () => {

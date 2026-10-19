@@ -96,8 +96,10 @@ describe('Gegenproben — schlagen die Muster überhaupt an?', () => {
  * Next.js dort als Ladeansicht erwartet.
  */
 const LADEANSICHTEN: ReadonlyArray<{ zweck: string; datei: string; teile?: readonly string[] }> = [
-  { zweck: 'Öffentliche Infoseiten', datei: 'src/app/(public)/loading.tsx' },
-  { zweck: 'Hofseite samt Produkten', datei: 'src/app/(public)/[farmSlug]/loading.tsx' },
+  // Hofseite und Produktseite seit Nr. 117 als Suspense-Grenze IN der Seite (unten
+  // „echte 404"); die Infoseiten sind statisch und brauchen keine.
+  { zweck: 'Hofseite samt Produkten', datei: 'src/app/(public)/[farmSlug]/hofseite-skelett.tsx' },
+  { zweck: 'Produktseite', datei: 'src/app/(public)/[farmSlug]/produkt/[id]/produkt-skelett.tsx' },
   { zweck: 'Höfe entdecken', datei: 'src/app/(public)/hoefe/loading.tsx' },
   {
     zweck: 'Warenkorb und Kasse',
@@ -290,6 +292,42 @@ describe('Ladeansichten — jede Route im Hofbereich und im Bestand hat eine eig
     for (const gruppe of ['src/app/(hof)/layout.tsx', 'src/app/(farmer)/layout.tsx']) {
       expect(liesDatei(gruppe), gruppe).toContain('await ladeHofbereich()')
     }
+  })
+})
+
+describe('Hofseite und Produktseite — die 404 kommt vor dem Skelett (Nr. 117)', () => {
+  // Mit einer loading.tsx davor streamt Next das Skelett zuerst; ein notFound()
+  // der Seite kam dann mit Status 200 im Datenstrom (ARCHITECTURE §4). Jede
+  // Adresse /<irgendwas> landet in [farmSlug] — auch /wp-login.php.
+  const OHNE = ['src/app/(public)/loading.tsx', 'src/app/(public)/[farmSlug]/loading.tsx', 'src/app/(public)/[farmSlug]/produkt/[id]/loading.tsx']
+  const SEITEN = [
+    { datei: 'src/app/(public)/[farmSlug]/page.tsx', skelett: 'HofseiteSkelett', pruefung: 'pruefeHofseiteGeteilt(' },
+    { datei: 'src/app/(public)/[farmSlug]/produkt/[id]/page.tsx', skelett: 'ProduktSkelett', pruefung: 'pruefeProduktseiteGeteilt(' },
+  ] as const
+
+  it('keine Ladeansicht über oder in der Hofseite', () => {
+    for (const datei of OHNE) expect(existiert(datei), datei).toBe(false)
+    // Gegenprobe: Die Suche findet Dateien, die es gibt.
+    expect(existiert('src/app/(public)/hoefe/loading.tsx')).toBe(true)
+  })
+
+  it('die Seite prüft, ruft notFound() und setzt erst danach die Suspense-Grenze mit dem Skelett', () => {
+    for (const { datei, skelett, pruefung } of SEITEN) {
+      const text = liesDatei(datei)
+      const seite = text.slice(text.indexOf('export default async function'))
+      const stellen = [seite.indexOf(pruefung), seite.indexOf('notFound()'), seite.indexOf(`<Suspense fallback={<${skelett} />}>`)]
+      expect(stellen.every((stelle) => stelle > -1), datei).toBe(true)
+      expect([...stellen].sort((a, b) => a - b), datei).toEqual(stellen)
+    }
+  })
+
+  it('die Infoseiten der Gruppe warten auf nichts — ohne Ladeansicht davor', () => {
+    for (const ordner of ['agb', 'datenschutz', 'impressum', 'konditionen', 'fuer-hoefe']) {
+      const text = liesDatei(`src/app/(public)/${ordner}/page.tsx`)
+      expect(text, ordner).not.toMatch(/force-dynamic|searchParams|from 'next\/headers'/)
+    }
+    // Gegenprobe: Die Hofseite ist dynamisch und fiele hier auf.
+    expect(liesDatei('src/app/(public)/[farmSlug]/page.tsx')).toMatch(/force-dynamic/)
   })
 })
 

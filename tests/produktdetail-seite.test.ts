@@ -51,6 +51,8 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOut: vi.fn() }))
 vi.mock('@/server/hofseite-vorschau', () => ({ ladeHofseiteGeteilt: vi.fn() }))
+// Die Prüfung vor dem Streamen (Nr. 117) prüft tests/hofseite-404.test.ts; hier besteht sie.
+vi.mock('@/server/queries/seo', () => ({ pruefeProduktseiteGeteilt: vi.fn(async () => true) }))
 
 import ProduktSeite, { generateMetadata } from '@/app/(public)/[farmSlug]/produkt/[id]/page'
 import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
@@ -58,7 +60,7 @@ import { KundeShell, type KundeShellProps } from '@/components/shells/kunde-shel
 import { ProduktdetailKunde } from '@/components/produktdetail/produktdetail-kunde'
 import type { PublicFarm, PublicFutter, PublicProduct } from '@/server/queries/farm'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
-import { findeElement } from './element-suche'
+import { findeElement, inhaltHinterSuspense } from './element-suche'
 
 const lade = vi.mocked(ladeHofseiteGeteilt)
 
@@ -121,9 +123,10 @@ function stelleBereit(farm: PublicFarm | null, ansicht: SeitenAnsicht = KUNDIN) 
   lade.mockResolvedValue({ farm, ansicht })
 }
 
+/** Der Inhalt der Seite — seit Nr. 117 hinter ihrer Suspense-Grenze, nach der Prüfung. */
 async function rufe(id: string, suche: Record<string, string> = {}, farmSlug = 'hof-test'): Promise<ReactElement> {
   adresse.suche = new URLSearchParams(suche).toString()
-  return ProduktSeite({ params: Promise.resolve({ farmSlug, id }), searchParams: Promise.resolve(suche) })
+  return inhaltHinterSuspense(await ProduktSeite({ params: Promise.resolve({ farmSlug, id }), searchParams: Promise.resolve(suche) }))
 }
 
 async function seite(id: string, suche: Record<string, string> = {}, farm: PublicFarm = HOF, ansicht = KUNDIN): Promise<string> {
@@ -165,7 +168,8 @@ describe('Metadaten', () => {
   it('Titel und Vorschaubild nur aus öffentlichen Daten', async () => {
     stelleBereit(HOF)
     const meta = await generateMetadata({ params: Promise.resolve({ farmSlug: 'hof-test', id: 'p_eier' }), searchParams: Promise.resolve({}) })
-    expect(meta.title).toBe('Freilandeier — Hof Test')
+    // „{Produkt} vom {Hof} in {Ort}" (Nr. 117).
+    expect(meta.title).toBe('Freilandeier vom Hof Test in Musterdorf')
     expect(JSON.stringify(meta.openGraph)).toContain('https://example.com/eier.jpg')
     const text = JSON.stringify(meta)
     for (const privat of ['hof@example.com', '+43 660 0000000', 'Erika Muster']) expect(text).not.toContain(privat)
@@ -321,12 +325,12 @@ describe('beide Themes: nur Tokens in den Dateien der Route', () => {
       expect(PALETTE.test(text), pfad).toBe(false)
       expect(SCHWARZ_WEISS.test(text), pfad).toBe(false)
       expect(HEX.test(text), pfad).toBe(false)
-      if (!pfad.endsWith('loading.tsx')) expect(BESTAND.test(text), pfad).toBe(false)
+      if (!pfad.endsWith('skelett.tsx')) expect(BESTAND.test(text), pfad).toBe(false)
     }
   })
 
-  it('die Ladeansicht steht im neuen Design', () => {
-    expect(quelle('src/app/(public)/[farmSlug]/produkt/[id]/loading.tsx')).toContain('data-design="neu"')
+  it('das Skelett steht im neuen Design', () => {
+    expect(quelle('src/app/(public)/[farmSlug]/produkt/[id]/produkt-skelett.tsx')).toContain('data-design="neu"')
   })
 })
 

@@ -7,7 +7,8 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
  * Kein Mockup — gebaut nach docs/ai/DESIGN_SYSTEM.md (Fraunces für
  * Überschriften, Karten auf --surface mit Rand, Links grün). Nur shadcn-Namen:
  * Die Farben stimmen, weil die Seiten im Geltungsbereich data-design="neu"
- * stehen. Die Ladeansicht `src/app/(public)/loading.tsx` hat dieselben Maße.
+ * stehen. Eine Ladeansicht haben sie seit Nr. 117 nicht mehr: Sie sind
+ * statisch, und `(public)/loading.tsx` stünde vor der 404 der Hofseite.
  */
 
 /** Die Spalte: höchstens 672 px, am Handy 16 px Rand. */

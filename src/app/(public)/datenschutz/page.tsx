@@ -4,7 +4,7 @@ import { KundenKopf } from '@/components/shared/kunden-kopf'
 import { DATENSCHUTZ_EMAIL } from '@/lib/support'
 import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: `Datenschutz — ${MARKE}` }
+export const metadata: Metadata = { title: `Datenschutz — ${MARKE}`, alternates: { canonical: '/datenschutz' } }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

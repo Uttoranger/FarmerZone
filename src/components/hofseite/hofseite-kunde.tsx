@@ -38,7 +38,6 @@ import {
   zeigeSchaufenster,
   type HofReiterId,
 } from '@/lib/hofseite-kunde'
-import { jsonLdSicher } from '@/lib/json-ld'
 import { korbErlaubt } from '@/lib/hofseite-vorschau'
 import { produktLink } from '@/lib/produktdetail'
 import { rueckweg, type KundenSeite } from '@/lib/kunden-kopf'
@@ -202,21 +201,6 @@ export function HofseiteKunde({
     }
   }
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'LocalBusiness',
-    name: farm.name,
-    description: farm.description,
-    // Ohne telephone und email (Nr. 60): Die Nummer gibt es erst nach dem Kauf.
-    address: {
-      '@type': 'PostalAddress',
-      streetAddress: farm.address,
-      postalCode: farm.postalCode,
-      addressLocality: farm.city,
-      addressCountry: 'AT',
-    },
-  }
-
   const rueckwegZeile = (
     <div className="mx-auto max-w-[1200px] px-4 pt-1 md:px-6 md:pt-3">
       <Link
@@ -309,7 +293,7 @@ export function HofseiteKunde({
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSicher(jsonLd) }} />
+      {/* Das JSON-LD des Hofs baut seit Nr. 117 die Seite auf dem Server (src/app/(public)/[farmSlug]/page.tsx). */}
       {ansicht.art === 'vorschau' && <VorschauImRahmen />}
 
       {rueckwegZeile}

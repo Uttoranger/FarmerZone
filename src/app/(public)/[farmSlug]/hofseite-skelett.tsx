@@ -2,7 +2,7 @@ import { stehtNurAmHandy } from '@/lib/hofseite-kunde'
 import { cn } from '@/lib/utils'
 
 /**
- * Ladeansicht der Hofseite (neues Design seit Nr. 10) — Platzhalter in der
+ * Skelett der Hofseite (neues Design seit Nr. 10) — Platzhalter in der
  * Form des fertigen Inhalts (DESIGN_SYSTEM, „Zustände": Skeleton in
  * Kartenform, kein Spinner). Maße von der KundeShell und
  * src/components/hofseite/hofseite-kunde.tsx abgenommen: Kopfzeile 56/64 px,
@@ -13,15 +13,20 @@ import { cn } from '@/lib/utils'
  * „Alle Produkte (n)", rechte Spalte, Über uns; ab lg wie bisher. „Nächste
  * Abholung" als Textzeilen wie die Seite seit Nr. 46.
  *
+ * Seit Nr. 117 keine `loading.tsx` mehr, sondern die Suspense-Grenze IN der
+ * Seite, NACH der Prüfung des Hofs: Mit einer Ladeansicht davor streamte Next
+ * das Skelett zuerst, und ein `notFound()` kam mit Status 200 hinterher. Jetzt
+ * antwortet eine unbekannte Adresse mit 404, bevor das Skelett hinausgeht.
+ *
  * Die Seite steht in der KundeShell und damit im Geltungsbereich
- * data-design="neu" — diese Ansicht kommt vor der Shell und setzt den Marker
+ * data-design="neu" — dieses Skelett steht vor der Shell und setzt den Marker
  * deshalb selbst, sonst blitzten beim Umschalten die alten Farben auf.
  *
  * BEWUSST OHNE Pausen-Hinweis, Fotos und Mini-Warenkorb: Ob es sie gibt,
  * entscheiden die Daten; Platz, in den nichts einrückt, ließe die Seite
  * springen.
  */
-export default function HofseiteLaden() {
+export function HofseiteSkelett(): React.JSX.Element {
   return (
     <div data-design="neu" className="min-h-dvh animate-pulse bg-background" aria-busy="true" aria-label="Hofseite wird geladen">
       <div className="h-14 border-b border-border bg-background md:h-16" />

@@ -42,6 +42,8 @@ export const PRIVATE_BEREICHE = [
   '/reset-password',
   '/bestellungen',
   '/teilen',
+  // „Das warst nicht du?" (Nr. 114): Links aus Mails, mit Token.
+  '/sicherheit',
 ] as const
 
 /**

@@ -174,6 +174,7 @@ describe('der Deckel öffnet bei Foto 3', () => {
     vi.doMock('@/components/hofseite/bildansicht', () => ({
       useBildansicht: () => ({ offen: null, oeffne, schliesse: () => {}, vor: () => {}, zurueck: () => {}, geheZu: () => {} }),
       BildansichtEbene: () => null,
+      fotoAlt: () => '',
     }))
     const { HofseiteFotos: Fotos } = await import('@/components/hofseite/hofseite-fotos')
     const baum = Fotos({ fotos: fotos(8), hofName: 'Hof Test' })

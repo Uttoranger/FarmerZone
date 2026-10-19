@@ -14,7 +14,9 @@ import type { VorschauQuelle } from '@/schemas/startseite'
 import type { KartenForm } from '@/lib/regionskarte'
 import { istBrennmaterialSaison } from '@/lib/brennmaterial-saison'
 import { categoryImagePath } from '@/lib/product-image'
-import { STARTSEITE_VORSCHAUBILD } from '@/lib/vorschaubild'
+import { STARTSEITE_VORSCHAUBILD, metadatenBasis } from '@/lib/vorschaubild'
+import { UMGEBUNG } from '@/lib/umgebung-server'
+import { jsonLdSicher, startseiteJsonLd } from '@/lib/json-ld'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { RegionsKarte, StartseiteKopf } from '@/components/startseite/startseite-kopf'
 import { HoefeInDerNaehe, HofKarten, HofKartenFehler, HofKartenSkelett } from '@/components/startseite/hoefe-in-der-naehe'
@@ -33,6 +35,8 @@ const SEITEN_BESCHREIBUNG =
 export const metadata: Metadata = {
   title: SEITEN_TITEL,
   description: SEITEN_BESCHREIBUNG,
+  // Auch die Vorschau-Adresse (?vorschau=…&sig=…) zählt als diese eine Seite (Nr. 117).
+  alternates: { canonical: '/' },
   openGraph: {
     title: SEITEN_TITEL,
     description: SEITEN_BESCHREIBUNG,
@@ -193,6 +197,8 @@ export default async function HomePage({
 
   return (
     <KundeShellMitSitzung>
+      {/* Strukturierte Daten (Nr. 117): Organization und WebSite, ohne Suchfeld — /hoefe? sperrt robots.txt. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSicher(startseiteJsonLd(metadatenBasis(UMGEBUNG.appUrl))) }} />
       {vorschau && <VorschauBand quelle={vorschau.quelle} datum={vorschau.datum} />}
       {eintraege.map((eintrag) => (
         <Eintrag key={eintrag.art === 'BLOCK' ? eintrag.block.id : eintrag.art} eintrag={eintrag} jetzt={jetzt} />

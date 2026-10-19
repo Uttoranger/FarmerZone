@@ -24,6 +24,7 @@ const SEITEN_BESCHREIBUNG =
 export const metadata: Metadata = {
   title: SEITEN_TITEL,
   description: SEITEN_BESCHREIBUNG,
+  alternates: { canonical: '/fuer-hoefe' },
   openGraph: {
     title: SEITEN_TITEL,
     description: SEITEN_BESCHREIBUNG,

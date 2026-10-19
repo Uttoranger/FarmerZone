@@ -9,9 +9,14 @@
  * und mit einem Leser, bei dem die erste passende Regel gilt (einfache Crawler, etwa über
  * Pythons urllib.robotparser).
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+// Die Adresse der App je Fall: Die Metadaten-Route liest sie beim Aufruf.
+const umgebung = vi.hoisted(() => ({ appUrl: 'https://hof.example' as string | null }))
+vi.mock('@/lib/umgebung-server', () => ({ UMGEBUNG: umgebung }))
+
 import robots from '@/app/robots'
 import { HOEFE_MIT_PARAMETERN, PRIVATE_BEREICHE, gesperrtePfade } from '@/lib/robots'
 
@@ -19,6 +24,9 @@ const proxy = readFileSync(join(process.cwd(), 'src/proxy.ts'), 'utf8')
 const FARMER_PATHS = [...(/const FARMER_PATHS = \[([\s\S]*?)\]/.exec(proxy)?.[1] ?? '').matchAll(/'([^']+)'/g)].map((m) => m[1])
 
 type Regel = { erlaubt: boolean; muster: string }
+
+/** Der Quelltext der Metadaten-Route. */
+const quelle = () => readFileSync(join(process.cwd(), 'src/app/robots.ts'), 'utf8')
 
 /** Passt das Muster auf den Pfad (samt Query)? Präfix, `$` verankert das Ende. */
 function passt(muster: string, pfad: string): boolean {
@@ -97,7 +105,8 @@ describe('robots.txt', () => {
   })
 
   it('sperrt die übrigen privaten Bereiche', () => {
-    for (const pfad of ['/admin', '/account', '/intern', '/onboarding', '/verify', '/reset-password', '/bestellungen', '/teilen']) {
+    // /sicherheit seit Nr. 117: „Das warst nicht du?" (Nr. 114) kommt mit einem Token aus der Mail.
+    for (const pfad of ['/admin', '/account', '/intern', '/onboarding', '/verify', '/reset-password', '/bestellungen', '/teilen', '/sicherheit']) {
       expect(PRIVATE_BEREICHE, pfad).toContain(pfad)
       expect(darf(regeln, pfad), pfad).toBe(false)
       expect(darf(regeln, `${pfad}?x=1`), pfad).toBe(false)
@@ -106,6 +115,13 @@ describe('robots.txt', () => {
     expect(darf(regeln, '/admin?reiter=alle')).toBe(false)
     expect(darf(regeln, '/api/upload/token')).toBe(false)
     expect(darf(regeln, '/teilen/abc?t=signiert')).toBe(false)
+    expect(darf(regeln, '/sicherheit/nicht-ich?t=signiert')).toBe(false)
+  })
+
+  it('der Admin-Zugang steht nicht in robots.txt — die Datei nennte ihn sonst jedem', () => {
+    // /login/admin trägt nur noindex (Nr. 115); eine Sperre hier verriete die Adresse.
+    expect(gesperrtePfade().some((muster) => muster.startsWith('/login'))).toBe(false)
+    expect(darf(regeln, '/login/admin')).toBe(true)
   })
 
   it('eine Hofseite, deren Slug mit einem gesperrten Wort beginnt, bleibt erreichbar', () => {
@@ -117,16 +133,30 @@ describe('robots.txt', () => {
     expect(darf([{ erlaubt: true, muster: '/' }, { erlaubt: false, muster: '/region' }], '/regionalhof-test')).toBe(false)
   })
 
-  it('die Sperrliste kommt aus der einen Konstante, keine Sitemap-Zeile', () => {
+  it('die Sperrliste kommt aus der einen Konstante', () => {
     const verboten = regeln.filter((r) => !r.erlaubt).map((r) => r.muster)
     expect(verboten).toEqual(gesperrtePfade())
     expect(verboten).toEqual([HOEFE_MIT_PARAMETERN, ...PRIVATE_BEREICHE.flatMap((b) => [`${b}$`, `${b}?`, `${b}/`])])
-    expect(robots().sitemap).toBeUndefined()
+  })
+
+  it('die Zeile „Sitemap:" nennt /sitemap.xml als volle Adresse — aus der Basis von metadataBase (Nr. 117)', () => {
+    expect(robots().sitemap).toBe('https://hof.example/sitemap.xml')
+    expect(quelle()).toMatch(/metadatenBasis\(UMGEBUNG\.appUrl\)/)
+  })
+
+  it('ohne bekannte Adresse keine Zeile „Sitemap:" — eine relative wäre ungültig', () => {
+    umgebung.appUrl = null
+    try {
+      expect(robots().sitemap).toBeUndefined()
+      // Gegenprobe: Die Regeln bleiben.
+      expect(regelnFuerAlle().length).toBeGreaterThan(1)
+    } finally {
+      umgebung.appUrl = 'https://hof.example'
+    }
   })
 
   it('die Route ist statisch und sagt, dass robots kein Schutz ist', () => {
-    const quelle = readFileSync(join(process.cwd(), 'src/app/robots.ts'), 'utf8')
-    expect(quelle).not.toMatch(/force-dynamic|next\/headers|\bheaders\(\)|\bcookies\(\)/)
-    expect(quelle).toMatch(/kein Schutz/)
+    expect(quelle()).not.toMatch(/force-dynamic|next\/headers|\bheaders\(\)|\bcookies\(\)/)
+    expect(quelle()).toMatch(/kein Schutz/)
   })
 })
