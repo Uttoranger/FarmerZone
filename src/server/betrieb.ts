@@ -250,6 +250,20 @@ async function setzeNull(art: WarnArt): Promise<boolean> {
   return getroffen.length > 0
 }
 
+/**
+ * Stiller Neubeginn der Vercel-Ausgaben: Stufe auf 0 nur, wenn sie VOR dem
+ * Beginn des laufenden Abrechnungszeitraums gemeldet wurde — geprüft in
+ * derselben Anweisung. Setzt der Webhook zwischen dem Lesen der Warnungen und
+ * diesem Schreiben eine frische Stufe, bleibt sie stehen (sonst fiele sie
+ * still auf 0, und die Warnung verschwände von der Seite, obwohl Vercel sie
+ * gerade gemeldet hat).
+ */
+async function setzeNullVorZeitraum(jetzt: Date): Promise<void> {
+  await prisma.$executeRaw`
+    UPDATE "BetriebWarnung" SET "stufe" = 0
+    WHERE "art" = ${VERCEL_WARN_ART} AND "stufe" > 0 AND "gemeldetAm" < ${abrechnungsBeginn(jetzt)}`
+}
+
 /** Die Warn-Mail an die Empfänger der Art „Betrieb“ (fest an, mindestens SUPPORT_EMAIL). Scheitert sie, bleibt die Stufe gesetzt. */
 async function versendeWarnMail(anlass: BetriebMailAnlass): Promise<void> {
   try {
@@ -341,7 +355,7 @@ export async function pruefeGrenzen(
       await setzeNull(wert)
     }
   }
-  if (vercelSchritt(warnStandVon(warnungen, VERCEL_WARN_ART), 0, jetzt).tun === 'still') await setzeNull(VERCEL_WARN_ART)
+  if (vercelSchritt(warnStandVon(warnungen, VERCEL_WARN_ART), 0, jetzt).tun === 'still') await setzeNullVorZeitraum(jetzt)
   return mails
 }
 
@@ -375,7 +389,7 @@ export async function verbucheVercelAusgaben(
     await sendeWarnMail({ art: 'vercelAusgaben', stufe: schritt.stufe, ausgabenCent: meldung.ausgabenCent, limitCent: meldung.limitCent }, true)
     return 1
   }
-  if (schritt.tun === 'still') await setzeNull(VERCEL_WARN_ART)
+  if (schritt.tun === 'still') await setzeNullVorZeitraum(jetzt)
   return 0
 }
 

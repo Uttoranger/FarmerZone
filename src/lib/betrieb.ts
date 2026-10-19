@@ -16,7 +16,7 @@
  * Verwendung, Lebenszeichen (nicht Monitoring, Quota, Cron, Job, Heartbeat);
  * der Name nur aus MARKE.
  */
-import { MONAT_KURZ, formatDezimal, formatTagKurz, formatZahl } from '@/lib/format'
+import { MONAT_KURZ, formatDezimal, formatDollar, formatTagKurz, formatZahl } from '@/lib/format'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { tagVersetzt } from '@/lib/kalender'
 import { uhrzeitInWien } from '@/lib/fristen'
@@ -418,13 +418,15 @@ export function ablaufStand(ablauf: Pick<Ablauf, 'rhythmus'>, lauf: AblaufLaufDa
 /**
  * Was das Lebenszeichen vermisst (Nr. 113): die Namen der Abläufe, die
  * überfällig oder gescheitert sind — gleiche Regel wie `ablaufStand` (täglich
- * 26 Stunden, wöchentlich 8 Tage). „Noch kein Lauf“ fehlt nicht, wie auf der
- * Seite: Nach dem Deploy hat der Wochenlauf bis Montag keine Zeile.
+ * 26 Stunden, wöchentlich 8 Tage). Fail-closed, strenger als die Seite: Ein
+ * TÄGLICHER Ablauf ohne Zeile fehlt (er lief nie — genau der Ausfall, den
+ * das Lebenszeichen melden soll); nur der wöchentliche hat ohne Zeile
+ * Schonfrist, weil er nach dem Deploy bis Montag keine haben kann.
  */
 export function fehlendeAblaeufe(laeufe: ReadonlyMap<string, AblaufLaufDaten>, jetzt: Date): AblaufName[] {
   return ABLAEUFE.filter((a) => {
     const stand = ablaufStand(a, laeufe.get(a.name) ?? null, jetzt)
-    return stand === 'ueberfaellig' || stand === 'fehler'
+    return stand === 'ueberfaellig' || stand === 'fehler' || (stand === 'nochKeinLauf' && a.rhythmus === 'taeglich')
   }).map((a) => a.name)
 }
 
@@ -569,16 +571,9 @@ export function vercelSchritt(bisher: WarnStand, ziel: Stufe, jetzt: Date): Warn
   return bisherStufe > 0 && imZeitraum === 0 ? { tun: 'still' } : NICHTS
 }
 
-/** „25,10 $“, „50 $“ — Dollar aus ganzen Cent, nur mit ganzen Zahlen gerechnet (keine Rundung auf dem Weg). */
-export function dollarText(cent: number): string {
-  const c = Math.max(0, Math.round(cent))
-  const rest = c % 100
-  return `${formatZahl((c - rest) / 100)}${rest === 0 ? '' : `,${String(rest).padStart(2, '0')}`} $`
-}
-
 /** „25,10 $ von 50 $ (50 %)“ — Ausgaben gegen das Limit. */
 function ausgabenText(ausgabenCent: number, limitCent: number): string {
-  return `${dollarText(ausgabenCent)} von ${dollarText(limitCent)} (${prozentText(anteil(ausgabenCent, limitCent))})`
+  return `${formatDollar(ausgabenCent)} von ${formatDollar(limitCent)} (${prozentText(anteil(ausgabenCent, limitCent))})`
 }
 
 // ─── Texte: Grenzwerte ───────────────────────────────────────────────────────

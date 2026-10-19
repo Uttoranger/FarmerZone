@@ -11,7 +11,9 @@
  *    → keine, 75 → eine; die Mail erst nach der Antwort; außerhalb der
  *    Produktion nur gespeichert, keine Stufe.
  *  - Neuer Abrechnungszeitraum: die tägliche Prüfung setzt die Stufe still
- *    auf 0 (ohne Mail).
+ *    auf 0 (ohne Mail) — in EINER Anweisung nur, wenn sie vor dem Beginn des
+ *    Zeitraums gemeldet wurde (eine frische Stufe aus dem Webhook bleibt).
+ *  - Beträge über 1 000 000 $ → 400 (die Cent laufen nie über BIGINT).
  * Die Bedingung in derselben Anweisung (zwei gleichzeitige Meldungen → eine
  * Mail) ist dieselbe wie bei den anderen Warnungen (`setzeStufe`).
  */
@@ -54,6 +56,16 @@ function werteVon(aufruf: unknown[]): unknown[] {
   const [teile, ...werte] = aufruf as [TemplateStringsArray, ...unknown[]]
   return Prisma.sql(teile, ...werte).values
 }
+
+/** Der Text einer Rohabfrage mit `?` für die Werte. */
+function sqlVon(aufruf: unknown[]): string {
+  const [teile, ...werte] = aufruf as [TemplateStringsArray, ...unknown[]]
+  return Prisma.sql(teile, ...werte).sql.replace(/\s+/g, ' ')
+}
+
+/** Der Beginn des Abrechnungszeitraums zu JETZT (25.10.): der 19. um 0 Uhr UTC. */
+const ZEITRAUM_BEGINN = new Date('2026-10-19T00:00:00.000Z')
+const STILL_BEDINGT = /UPDATE "BetriebWarnung" SET "stufe" = 0 WHERE "art" = \? AND "stufe" > 0 AND "gemeldetAm" < \?/
 
 function signiere(text: string, geheimnis = GEHEIMNIS): string {
   return createHmac('sha1', geheimnis).update(text).digest('hex')
@@ -137,6 +149,17 @@ describe('Webhook — Signatur und Eingabe', () => {
     }
     expect(db.$executeRaw).not.toHaveBeenCalled()
   })
+
+  it('Beträge über 1 000 000 $: 400, nichts gespeichert — die Cent bleiben weit unter BIGINT; genau an der Grenze: 200', async () => {
+    const mit = (budgetAmount: number, currentSpend: number) => JSON.stringify({ budgetAmount, currentSpend, teamId: 'team_test', thresholdPercent: 50 })
+    for (const text of [mit(1e300, 30), mit(50, 1_000_000.01)]) {
+      expect((await POST(anfrage(text))).status, text).toBe(400)
+    }
+    expect(db.$executeRaw).not.toHaveBeenCalled()
+
+    expect((await POST(anfrage(mit(1_000_000, 1_000_000)))).status).toBe(200)
+    expect(werteVon(db.$executeRaw.mock.calls[0])).toContain(BigInt(100_000_000))
+  })
 })
 
 describe('Webhook — Warnstufe und Mail', () => {
@@ -181,6 +204,15 @@ describe('Webhook — Warnstufe und Mail', () => {
     expect(db.$queryRaw).not.toHaveBeenCalled()
     expect(nachlauf.aufgaben).toEqual([])
   })
+
+  it('Meldung unter 50 % mit einer Stufe aus dem alten Zeitraum: still auf 0 — nur mit der Zeitraum-Bedingung in derselben Anweisung', async () => {
+    db.betriebWarnung.findMany.mockResolvedValue([{ art: 'vercelAusgaben', stufe: 1, seit: new Date('2026-10-10T10:00:00Z'), gemeldetAm: new Date('2026-10-10T10:00:00Z') }])
+    expect((await POST(anfrage(meldung(10, 20)))).status).toBe(200)
+    const still = db.$executeRaw.mock.calls.slice(1)
+    expect(still.map(sqlVon)).toEqual([expect.stringMatching(STILL_BEDINGT)])
+    expect(werteVon(still[0])).toEqual(['vercelAusgaben', ZEITRAUM_BEGINN])
+    expect(db.$queryRaw).not.toHaveBeenCalled()
+  })
 })
 
 describe('Neuer Abrechnungszeitraum (täglich in pruefeGrenzen)', () => {
@@ -191,9 +223,12 @@ describe('Neuer Abrechnungszeitraum (täglich in pruefeGrenzen)', () => {
     db.$queryRaw.mockResolvedValue([{ art: 'vercelAusgaben' }])
 
     expect(await pruefeGrenzen(JETZT, { produktion: true })).toBe(0)
-    const setzen = db.$queryRaw.mock.calls.map((c) => werteVon(c))
-    expect(setzen).toEqual([['vercelAusgaben']])
-    expect(String((db.$queryRaw.mock.calls[0][0] as TemplateStringsArray).join('?'))).toMatch(/UPDATE "BetriebWarnung" SET "stufe" = 0/)
+    // EINE Anweisung mit der Bedingung „gemeldet vor dem Beginn des Zeitraums“:
+    // Setzt der Webhook zwischen Lesen und Schreiben eine frische Stufe, trifft
+    // das Zurücksetzen sie nicht mehr (sonst fiele sie still auf 0).
+    expect(db.$queryRaw).not.toHaveBeenCalled()
+    expect(db.$executeRaw.mock.calls.map(sqlVon)).toEqual([expect.stringMatching(STILL_BEDINGT)])
+    expect(werteVon(db.$executeRaw.mock.calls[0])).toEqual(['vercelAusgaben', ZEITRAUM_BEGINN])
     await nachlaufAbarbeiten()
     expect(sendBetriebWarnung).not.toHaveBeenCalled()
 
@@ -204,5 +239,6 @@ describe('Neuer Abrechnungszeitraum (täglich in pruefeGrenzen)', () => {
     db.betriebWarnung.findMany.mockResolvedValue([{ art: 'vercelAusgaben', stufe: 2, seit: new Date('2026-10-20T10:00:00Z'), gemeldetAm: new Date('2026-10-20T10:00:00Z') }])
     await pruefeGrenzen(JETZT, { produktion: true })
     expect(db.$queryRaw).not.toHaveBeenCalled()
+    expect(db.$executeRaw).not.toHaveBeenCalled()
   })
 })

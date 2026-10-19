@@ -8,7 +8,8 @@
  *  - 200 `{ ok: true }` nur, wenn jeder tägliche Ablauf in den letzten 26
  *    Stunden und der wöchentliche in den letzten 8 Tagen ok lief;
  *  - sonst 503 mit den NAMEN der fehlenden Abläufe — nichts sonst (keine
- *    Zeit, keine Fehlerklasse).
+ *    Zeit, keine Fehlerklasse); ein täglicher Ablauf ohne Zeile fehlt
+ *    (fail-closed), nur der wöchentliche hat ohne Zeile Schonfrist.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
@@ -102,7 +103,21 @@ describe('Lebenszeichen — Abläufe', () => {
     expect(text).not.toContain('TypeError')
   })
 
-  it('„noch kein Lauf“ fehlt nicht (gleiche Regel wie Admin › Betrieb): nach dem Deploy ohne Wochenlauf 200', async () => {
+  it('ein täglicher Ablauf ganz ohne Zeile fehlt (fail-closed): 503 mit seinem Namen', async () => {
+    db.ablaufLauf.findMany.mockResolvedValue([lauf('aufraeumen', 4), lauf('verwaisteBestellungen', 3.5), lauf('briefkasten', 24)])
+    const antwort = await GET(anfrage(`Bearer ${TOKEN}`))
+    expect(antwort.status).toBe(503)
+    expect(await antwort.json()).toEqual({ fehlen: ['betrieb'] })
+  })
+
+  it('gar keine Zeile (Tabelle leer): 503 mit den drei täglichen Abläufen — der wöchentliche hat Schonfrist', async () => {
+    db.ablaufLauf.findMany.mockResolvedValue([])
+    const antwort = await GET(anfrage(`Bearer ${TOKEN}`))
+    expect(antwort.status).toBe(503)
+    expect(await antwort.json()).toEqual({ fehlen: ['aufraeumen', 'verwaisteBestellungen', 'betrieb'] })
+  })
+
+  it('Gegenprobe: nur der wöchentliche Ablauf ohne Zeile fehlt nicht (nach dem Deploy bis Montag): 200', async () => {
     db.ablaufLauf.findMany.mockResolvedValue(ALLE_PUENKTLICH.slice(0, 3))
     expect((await GET(anfrage(`Bearer ${TOKEN}`))).status).toBe(200)
   })

@@ -28,7 +28,6 @@ import {
   betriebKacheln,
   betriebMail,
   betriebVerlauf,
-  dollarText,
   fehlerKlasse,
   neuMessenAb,
   vercelAusgabenKarte,
@@ -49,6 +48,7 @@ import {
   type AblaufLaufDaten,
   type Messung,
 } from '@/lib/betrieb'
+import { formatDollar } from '@/lib/format'
 
 const WURZEL = process.cwd()
 const T = (iso: string): Date => new Date(iso)
@@ -412,8 +412,8 @@ describe('Vercel-Ausgaben — Abrechnungszeitraum, Stufe, Karte, Mail (Nr. 113)'
   })
 
   it('Dollar aus ganzen Cent ohne Rundung auf dem Weg', () => {
-    expect([dollarText(2510), dollarText(5000), dollarText(1999), dollarText(0)]).toEqual(['25,10 $', '50 $', '19,99 $', '0 $'])
-    expect(dollarText(123456)).toMatch(/^1\s234,56 \$$/)
+    expect([formatDollar(2510), formatDollar(5000), formatDollar(1999), formatDollar(0)]).toEqual(['25,10 $', '50 $', '19,99 $', '0 $'])
+    expect(formatDollar(123456)).toMatch(/^1\s234,56 \$$/)
   })
 
   it('Karte: die jüngste Meldung im laufenden Zeitraum, sonst „Unter 50 %“ — eine aus dem alten Zeitraum zählt nicht', () => {
