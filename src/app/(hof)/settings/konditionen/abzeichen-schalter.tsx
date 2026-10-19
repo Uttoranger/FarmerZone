@@ -50,7 +50,8 @@ export function AbzeichenSchalter({ anfangsAn }: { anfangsAn: boolean }): React.
             <span className="text-[14px] font-semibold text-foreground">{ABZEICHEN_TEXT.schalter}</span>
             <Abzeichen groesse="klein" />
           </span>
-          <span id={zeileId} className="mt-0.5 block text-[12.5px] leading-snug text-muted-foreground">
+          {/* Normale Textfarbe: Leise Schrift hielte auf der Tönung von „Dein Stand“ im hellen Thema keine 4,5:1 (Axe). */}
+          <span id={zeileId} className="mt-0.5 block text-[12.5px] leading-snug text-foreground">
             {ABZEICHEN_TEXT.schalterZeile}
           </span>
         </span>
@@ -63,7 +64,7 @@ export function AbzeichenSchalter({ anfangsAn }: { anfangsAn: boolean }): React.
           />
         </span>
       </button>
-      <p className="text-[12.5px] leading-snug text-muted-foreground">{ABZEICHEN_TEXT.schalterSatz}</p>
+      <p className="text-[12.5px] leading-snug text-foreground">{ABZEICHEN_TEXT.schalterSatz}</p>
     </div>
   )
 }
