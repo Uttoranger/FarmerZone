@@ -5388,6 +5388,7 @@ Ausgangslage (Vercel Observability, 24 Stunden bis zum 19.10.2026): /hoefe hatte
 - **„zuletzt" ist so genau wie ein Tag:** Better Auth frischt eine Sitzung höchstens einmal am Tag auf (`updateAge`), erst dann ändert sich `updatedAt`.
 - **Datenschutz (für die Datenschutzerklärung):** neu je Hof- bzw. Admin-Konto: Gerätename („iPhone · Safari") und eine gehashte Geräte-Kennung je Gerät, Zeitpunkt der ersten und letzten Anmeldung; je Mail „Neue Anmeldung" ein gehashter Einmal-Link (7 Tage, danach gelöscht). Kein Ort, keine IP-Adresse, keine volle Browserangabe. Das Cookie der Geräte-Kennung (`GERAETE_COOKIE`) ist technisch notwendig (Sicherheit), 400 Tage.
 - **Bei den Bildern gefunden:** Der Knopf „Alle Geräte abmelden" zeigte danach „Dieser Link gilt nicht mehr" — `revalidatePath` in der Action lud die Seite neu, und die fand den Link verbraucht. Seither ruft die Action kein `revalidatePath`, und die Seite rendert immer dieselbe Komponente.
+- **Nachbesserung (Prüfung):** Der Knopf löste den Link erst ein und löschte danach die Sitzungen, ohne Transaktion — scheiterte das Löschen, war der Link verbraucht und die fremden Geräte blieben angemeldet. Seither beides in EINER Transaktion (`loeseEinmalLinkEin(…, tx)`); scheitert das Löschen, gilt der Link weiter (Integrationstest mit scheiterndem DELETE an pg). Ohne `RESEND_API_KEY` meldet die Mail „Neue Anmeldung" keinen Versandfehler mehr an Sentry.
 
 ## Nützliche Befehle
 

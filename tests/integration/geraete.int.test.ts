@@ -9,14 +9,17 @@
  *  - Cookie-Cache aus: Eine gelöschte Sitzung ist beim nächsten getSession weg;
  *    eine Prüfung kostet zwei Abfragen (Sitzung, dann Konto), gemessen an pg.
  *  - Neues Gerät: Ohne Cookie setzt die Anmeldung eines Hofs die Kennung
- *    (httpOnly, SameSite=Lax, 400 Tage) und merkt das Gerät nur gehasht; das
- *    erste Gerät still, ein bekanntes ohne Mail, ein weiteres neues mit Mail
- *    und Einmal-Link (nur gehasht). Kundschaft: kein Cookie, keine Zeile.
+ *    (httpOnly, SameSite=Lax, 400 Tage, Secure wie das Sitzungs-Cookie) und
+ *    merkt das Gerät nur gehasht; das erste Gerät still, ein bekanntes ohne
+ *    Mail, ein weiteres neues mit Mail und Einmal-Link (nur gehasht).
+ *    Kundschaft: kein Cookie, keine Zeile. Ohne RESEND_API_KEY (Log-Modus)
+ *    meldet die Mail keinen Versandfehler an Sentry.
  *  - Actions: nur eigene Sitzungen — eine fremde Kennung trifft 0 Zeilen, „alle
  *    anderen" lässt die aktuelle stehen; das abgemeldete Gerät ist sofort weg.
  *  - Einmal-Link: Öffnen ändert nichts; der Knopf meldet ALLE Geräte des
  *    Kontos ab und schickt einen Link für ein neues Passwort — einmal; ein
  *    zweites Mal und ein abgelaufener Link: neutral, nichts passiert.
+ *    Scheitert das Abmelden, bleibt der Link gültig (eine Transaktion).
  *  - Aufräumen: abgelaufene und seit 7 Tagen benutzte Links fallen, offene bleiben.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -48,7 +51,9 @@ vi.mock('@/lib/email', () => ({
   }),
 }))
 
+import * as Sentry from '@sentry/nextjs'
 import { revalidatePath } from 'next/cache'
+import { sendNeueAnmeldungEmail } from '@/lib/email'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { GERAETE_COOKIE, NICHT_ICH_PFAD } from '@/lib/geraete'
@@ -67,6 +72,7 @@ const TAG = 24 * 60 * 60 * 1000
 
 afterEach(async () => {
   vi.clearAllMocks()
+  vi.unstubAllEnvs()
   nachlauf.aufgaben.length = 0
   post.anmeldung.length = 0
   post.reset.length = 0
@@ -124,6 +130,11 @@ async function meldeAn(email: string, ua: string, kennung?: string): Promise<Anm
 
 async function sitzungGilt(cookie: string): Promise<boolean> {
   return (await auth.api.getSession({ headers: new Headers({ cookie }) })) !== null
+}
+
+/** Die Attribute eines Set-Cookie ohne Name und Wert, klein geschrieben. */
+function attributeVon(keks: string): string[] {
+  return keks.split(';').slice(1).map((teil) => teil.trim().toLowerCase())
 }
 
 function alsGeraet(anmeldung: Anmeldung): void {
@@ -214,6 +225,46 @@ describe('Neues Gerät erkennen', () => {
     const neu = await prisma.bekanntesGeraet.findFirstOrThrow({ where: { userId: hof.id, name: 'iPhone · Safari' } })
     expect(links[0].zweck).toBe(`nicht-ich:${neu.id}`)
     expect(links[0].ablaufAm.getTime() - neu.erstmalsAm.getTime()).toBe(7 * TAG)
+  })
+
+  it('Secure wie das Sitzungs-Cookie: lokal über http nicht, mit https-Basis ja', async () => {
+    const hof = await erstelleKonto('FARMER')
+    const kontext = await auth.$context
+    const sitzungsKeks = kontext.authCookies.sessionToken.attributes
+    const vorher = sitzungsKeks.secure
+
+    const lokal = await meldeAn(hof.email, UA.windows)
+    // So stünde es mit einer https-Basis (Vorschau, Produktion); danach sofort zurück.
+    sitzungsKeks.secure = true
+    let https: Anmeldung
+    try {
+      https = await meldeAn(hof.email, UA.iphone)
+    } finally {
+      sitzungsKeks.secure = vorher
+    }
+
+    expect(vorher).toBeFalsy()
+    expect(attributeVon(lokal.geraeteKeks!)).not.toContain('secure')
+    expect(attributeVon(https.geraeteKeks!)).toContain('secure')
+  })
+
+  it('ohne RESEND_API_KEY (Log-Modus) kein Versandfehler an Sentry — mit Schlüssel und Fehler genau einer', async () => {
+    const hof = await erstelleKonto('FARMER')
+    await meldeAn(hof.email, UA.windows)
+    await arbeiteNachlaufAb()
+
+    // Was sendRaw ohne Schlüssel antwortet (src/lib/email.ts).
+    vi.stubEnv('RESEND_API_KEY', '')
+    vi.mocked(sendNeueAnmeldungEmail).mockResolvedValueOnce({ error: 'RESEND_API_KEY nicht gesetzt' })
+    await meldeAn(hof.email, UA.iphone)
+    await arbeiteNachlaufAb()
+    expect(Sentry.captureMessage).not.toHaveBeenCalled()
+
+    vi.stubEnv('RESEND_API_KEY', 're_platzhalter_int')
+    vi.mocked(sendNeueAnmeldungEmail).mockResolvedValueOnce({ error: 'Resend antwortet nicht' })
+    await meldeAn(hof.email, UA.android)
+    await arbeiteNachlaufAb()
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
   })
 
   it('Kundschaft: kein Cookie, keine Zeile, keine Mail', async () => {
@@ -351,6 +402,40 @@ describe('„Das war ich nicht"', () => {
     expect(await sitzungGilt(neu.cookie)).toBe(true)
     expect(post.reset).toEqual([])
     expect(await ladeNichtIch(token, new Date())).toEqual({ gueltig: false })
+  })
+
+  it('scheitert das Abmelden, bleibt der Link gültig — ein zweiter Druck meldet ab (Einlösen und Löschen in EINER Transaktion)', async () => {
+    const { hof, a, b, token } = await hofMitNeuemGeraet()
+    const original = pg.Client.prototype.query
+    // Nur das Löschen der Sitzungen scheitert, wie bei einem Verbindungsabbruch; danach sofort zurück.
+    // Mit Rückruf (pg.Pool.query außerhalb einer Transaktion) bekommt der den
+    // Fehler — sonst gäbe der Pool die Verbindung nie zurück.
+    pg.Client.prototype.query = function (this: pg.Client, ...args: unknown[]) {
+      const erstes = args[0]
+      const text = typeof erstes === 'string' ? erstes : (erstes as { text?: unknown } | null)?.text
+      if (typeof text !== 'string' || !/^\s*DELETE\b[\s\S]*"Session"/i.test(text)) return (original as (...a: unknown[]) => unknown).apply(this, args)
+      const fehler = new Error('Verbindung weg')
+      const rueckruf = args.at(-1)
+      if (typeof rueckruf !== 'function') return Promise.reject(fehler)
+      setImmediate(() => (rueckruf as (err: Error) => void)(fehler))
+      return undefined
+    } as typeof pg.Client.prototype.query
+    try {
+      await expect(meldeAllesAbNichtIch({ token })).rejects.toThrow()
+    } finally {
+      pg.Client.prototype.query = original
+    }
+    await arbeiteNachlaufAb()
+
+    expect(post.reset).toEqual([])
+    expect(await sitzungGilt(a.cookie)).toBe(true)
+    expect(await sitzungGilt(b.cookie)).toBe(true)
+    expect(await ladeNichtIch(token, new Date())).toMatchObject({ gueltig: true })
+
+    expect(await meldeAllesAbNichtIch({ token })).toEqual({ ok: true, passwortMail: true })
+    await arbeiteNachlaufAb()
+    expect(await prisma.session.count({ where: { userId: hof.id } })).toBe(0)
+    expect(post.reset).toEqual([hof.email])
   })
 
   it('zwei gleichzeitige Klicks: genau einer löst ein', async () => {

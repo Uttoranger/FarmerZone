@@ -11,7 +11,9 @@
  * `auth.api.getSession` oder `verlangeAdminAktion` im eigenen Körper oder über eine Funktion derselben
  * Datei (`eigenerHof`, `hofDerSitzung` …, beliebig tief). Wer keine hat, steht in OEFFENTLICH — je
  * Datei und Name mit Grund (Token, Code, Bremse). Eine Ausnahme, die doch prüft oder die es nicht mehr
- * gibt, fällt als veraltet auf; die Liste darf nur schrumpfen. Kommentare zählen nicht.
+ * gibt, fällt als veraltet auf. Die Liste schrumpft; neu hinein darf nur ein Weg, den eine Freigabe
+ * ausdrücklich ohne Sitzung verlangt und den statt ihrer ein Token aus einer Mail schützt (Einmal-Link
+ * oder signiertes Token, mit Frist; etwa `meldeAllesAbNichtIch`, Nr. 114) — mit Grund. Kommentare zählen nicht.
  *
  * Gegenprobe: Text-Attrappen — eine Action ohne Prüfung, mit Prüfung nur im Kommentar und eine Funktion,
  * die eine andere ohne Prüfung ruft, schlagen an; die direkte Prüfung, die über einen Helfer (auch zweistufig)

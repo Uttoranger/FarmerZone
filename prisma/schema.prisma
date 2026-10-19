@@ -386,8 +386,9 @@ model Session {
 
 // Die Geräte, auf denen sich ein Hof- oder Admin-Konto schon angemeldet hat
 // (Register E7, Ergänzung; Nr. 114). Erkannt an einer zufälligen Kennung im
-// Cookie agrilo_geraet, nicht an der IP. Ein unbekanntes Gerät löst die Mail
-// „Neue Anmeldung" aus — außer beim allerersten Gerät eines Kontos.
+// Cookie GERAETE_COOKIE (src/lib/geraete.ts), nicht an der IP. Ein unbekanntes
+// Gerät löst die Mail „Neue Anmeldung" aus — außer beim allerersten Gerät
+// eines Kontos.
 //   kennungHash  HMAC-SHA256 der Kennung (BETTER_AUTH_SECRET, Zweck „geraet",
 //                src/lib/geraete.ts) — die Kennung selbst steht nirgends
 //   name         Gerät und Browser aus der Browserangabe („iPhone · Safari")
@@ -408,7 +409,8 @@ model BekanntesGeraet {
 
 // Ein Link aus einer Mail, der genau einmal und nur bis ablaufAm gilt
 // (Register E7, Ergänzung; Nr. 114) — etwa „Das war ich nicht" (zweck
-// „nicht-ich:<Geräte-Kennung>"). Eingelöst per bedingtem Schreiben
+// „nicht-ich:<BekanntesGeraet.id>"; die Kennung selbst steht nie in der
+// Datenbank). Eingelöst per bedingtem Schreiben
 // (benutztAm null, nicht abgelaufen); das tägliche Aufräumen löscht
 // abgelaufene und seit 7 Tagen benutzte Zeilen (src/server/aufraeumen.ts).
 //   zweck      wofür der Link gilt, Art vorn, Bezug nach „:" (src/lib/geraete.ts)

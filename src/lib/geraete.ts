@@ -263,8 +263,7 @@ export const NICHT_ICH_TEXT = {
     'Kommt die Mail nicht an oder hat jemand dein Postfach übernommen? Ändere zuerst das Passwort deines E-Mail-Postfachs und schreib uns dann über',
   problemMelden: PROBLEM_MELDEN,
   ungueltigTitel: 'Dieser Link gilt nicht mehr.',
-  ungueltigSatz:
-    'Er war 7 Tage und einmal gültig. Kennst du ein Gerät nicht, melde dich an und schau unter Einstellungen › Konto und Sicherheit nach deinen Geräten.',
+  ungueltigSatz: `Er war ${EINMAL_LINK_GUELTIG_TAGE} Tage und einmal gültig. Kennst du ein Gerät nicht, melde dich an und schau unter Einstellungen › Konto und Sicherheit nach deinen Geräten.`,
   zurAnmeldung: 'Zur Anmeldung',
   zuViele: 'Das waren gerade zu viele Versuche. Warte eine Minute und probier es dann noch einmal.',
 } as const

@@ -65,21 +65,29 @@ const nichtIchSchema = z.object({ token: einmalTokenSchema })
 /**
  * „Das war ich nicht" (Knopf auf /sicherheit/nicht-ich, POST) — OHNE
  * Anmeldung: Der Link aus der Mail ist der Ausweis (7 Tage, einmal). Löst ihn
- * in einem bedingten Schreiben ein, meldet ALLE Geräte des Kontos ab, dem der
- * Link gehört, und schickt einen Link für ein neues Passwort (Better Auth,
- * auf dem Server; die Mail geht nach der Antwort). Ungültig, benutzt oder
- * abgelaufen: ein neutraler Satz, nichts passiert.
+ * in einem bedingten Schreiben ein und meldet ALLE Geräte des Kontos ab, dem
+ * der Link gehört — beides in EINER Transaktion; danach ein Link für ein
+ * neues Passwort (Better Auth, auf dem Server; die Mail geht nach der
+ * Antwort). Ungültig, benutzt oder abgelaufen: ein neutraler Satz, nichts
+ * passiert.
  */
 export async function meldeAllesAbNichtIch(eingabe: unknown): Promise<NichtIchAntwort> {
   const v = nichtIchSchema.safeParse(eingabe)
   if (!v.success) return { error: 'ungueltig' }
   if (process.env.NODE_ENV === 'production' && !nichtIchJeIp.check(getClientIp(await headers()))) return { error: 'zu-viele' }
-  const link = await loeseEinmalLinkEin(v.data.token, EINMAL_LINK_ART.nichtIch, new Date())
-  if (!link) return { error: 'ungueltig' }
 
+  // Einlösen und Abmelden stehen und fallen zusammen: Scheitert das Löschen,
+  // bleibt der Link gültig und ein zweiter Druck klappt — sonst wäre er
+  // verbraucht und die fremden Geräte blieben angemeldet. Der Fehler geht hoch
+  // (Sentry), die Karte sagt „Das hat nicht geklappt".
+  const link = await prisma.$transaction(async (tx) => {
+    const treffer = await loeseEinmalLinkEin(v.data.token, EINMAL_LINK_ART.nichtIch, new Date(), tx)
+    if (treffer) await tx.session.deleteMany({ where: { userId: treffer.userId } })
+    return treffer
+  })
+  if (!link) return { error: 'ungueltig' }
   // Kein revalidatePath: Es lüde die Seite /sicherheit/nicht-ich neu, und die
   // fände den Link schon verbraucht. /settings/account liest ohnehin frisch.
-  await prisma.session.deleteMany({ where: { userId: link.userId } })
 
   // Die Adresse frisch aus der Datenbank, nie aus der Anfrage.
   const konto = await prisma.user.findUnique({ where: { id: link.userId }, select: { email: true } })

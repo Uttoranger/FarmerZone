@@ -130,7 +130,9 @@ async function meldeNeueAnmeldung(
       zeitpunkt: geraet.zeitpunkt,
       link: nichtIchLink(APP_URL, token),
     })
-    if (ergebnis.error) meldeFehler('resend_fehler')
+    // Ohne Schlüssel (lokal, Log-Modus) ist „nicht verschickt" gewollt, kein
+    // Versandfehler; die Post-Sperre (Z3) antwortet ohnehin mit `gesperrt`.
+    if (ergebnis.error && process.env.RESEND_API_KEY) meldeFehler('resend_fehler')
   } catch (err) {
     console.error('[Neue Anmeldung] Mail-Fehler:', err instanceof Error ? err.name : 'unbekannt')
     meldeFehler('nachlauf_fehler', err)
@@ -187,9 +189,16 @@ export async function leseEinmalLink(token: string, art: string, jetzt: Date): P
  * benutzt, nicht abgelaufen, passende Art) setzt benutztAm und gibt die Zeile
  * zurück. Ein zweiter Klick, auch ein gleichzeitiger, findet nichts mehr.
  * Muster wie `bestaetigeEmpfaenger` (src/server/zustellung-bestaetigen.ts).
+ * `db`: der Transaktions-Client, wenn das, was der Link auslöst, mit dem
+ * Einlösen stehen oder fallen soll (scheitert es, bleibt der Link gültig).
  */
-export async function loeseEinmalLinkEin(token: string, art: string, jetzt: Date): Promise<EinmalLinkTreffer | null> {
-  const [treffer] = await prisma.einmalLink.updateManyAndReturn({
+export async function loeseEinmalLinkEin(
+  token: string,
+  art: string,
+  jetzt: Date,
+  db: Pick<Prisma.TransactionClient, 'einmalLink'> = prisma
+): Promise<EinmalLinkTreffer | null> {
+  const [treffer] = await db.einmalLink.updateManyAndReturn({
     where: { tokenHash: einmalTokenHash(token), benutztAm: null, ablaufAm: { gt: jetzt }, ...zweckDerArt(art) },
     data: { benutztAm: jetzt },
     select: { userId: true, zweck: true },
