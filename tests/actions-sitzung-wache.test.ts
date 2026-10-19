@@ -34,6 +34,7 @@ const OEFFENTLICH: Ausnahme[] = [
   { datei: 'bestellungen-finden.ts', name: 'zeigeBestellungen', grund: 'Wer seine Bestellungen finden will, hat kein Konto; der Besitz der Adresse wird mit einem Code bewiesen, dazu Bremse' },
   { datei: 'bestellungen-finden.ts', name: 'beendeBestellAnsicht', grund: 'Löscht nur das eigene Cookie der Bestellansicht; es gibt keine Sitzung und nichts zu schützen' },
   { datei: 'email-bestaetigung.ts', name: 'bestaetigeEmail', grund: 'Der Link in der Mail an den Hof trägt einen einmaligen Code mit Frist; beim Klicken ist oft noch niemand angemeldet' },
+  { datei: 'geraete.ts', name: 'meldeAllesAbNichtIch', grund: 'Der Link aus der Mail „Neue Anmeldung" trägt einen Einmal-Token (gehasht, 7 Tage, einmal); wer ihn öffnet, ist oft nirgends mehr angemeldet' },
   { datei: 'hoefe.ts', name: 'loeseOrtAuf', grund: 'Die Ortssuche auf der öffentlichen Hofliste ist ohne Konto gedacht; Eingabe mit Zod geprüft, dazu Bremse je Adresse' },
   { datei: 'neuigkeiten.ts', name: 'meldeNeuigkeitenAn', grund: 'Die Anmeldung zu Neuigkeiten eines Hofs ist ohne Konto gedacht; Double-Opt-in per Mail, Eingabe mit Zod geprüft, dazu Bremse' },
   { datei: 'onboarding.ts', name: 'checkSlugAvailability', grund: 'Die Vorschau der Hofadresse läuft beim Registrieren vor dem Konto; Eingabe mit Zod geprüft, dazu Bremse, bei Fehlern neutral' },

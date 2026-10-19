@@ -434,6 +434,28 @@ export async function sendZuVieleVersucheEmail(
   return sendRaw(email, `${ZU_VIELE_VERSUCHE_MAIL[art].betreff} · ${MARKE}`, vorlage.html)
 }
 
+/**
+ * „Neue Anmeldung bei deinem Hof-Konto" → Hof- bzw. Admin-Konto, das sich auf
+ * einem neuen Gerät angemeldet hat (Register E7, Ergänzung; Nr. 114). `link`
+ * trägt einen Einmal-Token — er steht nur in der Mail, nie im Betreff und nie
+ * im Log (sendRaw schreibt ohne Schlüssel nur Betreff und Empfänger). Gibt das
+ * Versandergebnis zurück (sendRaw wirft nie).
+ */
+export async function sendNeueAnmeldungEmail(
+  email: string,
+  daten: { hof: boolean; name: string | null; geraet: string; zeitpunkt: Date; link: string }
+): Promise<VersandErgebnis> {
+  // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
+  const { NEUE_ANMELDUNG_MAIL, anmeldeZeitpunkt } = await import('@/lib/geraete')
+  const vorlage = await htmlOderFehler(async () => {
+    const { NeueAnmeldungEmail } = await import('@/emails/neue-anmeldung')
+    const { zeitpunkt, ...rest } = daten
+    return React.createElement(NeueAnmeldungEmail, { ...rest, wann: anmeldeZeitpunkt(zeitpunkt) })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, `${NEUE_ANMELDUNG_MAIL.betreff(daten.hof)} · ${MARKE}`, vorlage.html)
+}
+
 /** Neuer Hof registriert → Betreiber (Freischaltung nötig); `an` aus empfaengerFuer('hofWartet'). */
 export async function sendNewFarmNotification(
   farm: {

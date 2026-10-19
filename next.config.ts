@@ -11,7 +11,7 @@ const KEINE_HOFSEITE = [
   'account', 'admin', 'agb', 'analytics', 'api', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
   'farm-page', 'fehler-melden', 'forgot-password', 'fuer-hoefe', 'hoefe', 'impressum', 'intern', 'konditionen',
   'login', 'meldungen', 'onboarding', 'orders', 'postfach', 'problem-melden', 'products', 'region', 'register',
-  'reset-password', 'sales', 'settings', 'status', 'teilen', 'verify',
+  'reset-password', 'sales', 'settings', 'sicherheit', 'status', 'teilen', 'verify',
 ];
 // Genau EIN Pfadstück aus Slug-Zeichen (src/lib/slug.ts), das keine Route ist.
 const HOFSEITEN_QUELLE = `/:farmSlug((?!(?:${KEINE_HOFSEITE.join('|')})$)[a-z0-9-]+)`;
@@ -157,6 +157,16 @@ const nextConfig: NextConfig = {
         // gültigen Token (?token=). Beim Klick hinaus geht er nicht als
         // Referrer mit, und die Seite kommt in keinen Suchindex.
         source: '/verify',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
+        // „Das war ich nicht" (E7, Ergänzung; Nr. 114): Der Link aus der Mail
+        // „Neue Anmeldung" trägt einen Einmal-Token (?t=) — gleiche Regel wie
+        // /verify: kein Referrer beim Klick hinaus, kein Suchindex.
+        source: '/sicherheit/:pfad*',
         headers: [
           { key: 'Referrer-Policy', value: 'no-referrer' },
           { key: 'X-Robots-Tag', value: 'noindex, nofollow' },

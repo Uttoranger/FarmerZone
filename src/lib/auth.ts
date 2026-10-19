@@ -25,6 +25,8 @@ import {
   type VorabVersuch,
 } from '@/server/bremse-datenbank'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import { GERAETE_COOKIE, GERAETE_COOKIE_OPTIONEN } from '@/lib/geraete'
+import { erkenneGeraet } from '@/server/geraete'
 import { sendeRegistrierungsHinweis } from '@/server/registrierung-hinweis'
 import { leereKontaktdatenNachFremdemPasswort } from '@/server/kontaktdaten-fremd'
 import {
@@ -175,6 +177,23 @@ const adresseBeimZuruecksetzen = new WeakMap<object, string>()
  */
 const vorabGezaehlt = new WeakMap<object, VorabVersuch>()
 
+/**
+ * Die Geräte-Kennung nach einer erfolgreichen Anmeldung (E7, Ergänzung;
+ * Nr. 114, src/server/geraete.ts): null = kein Cookie (Kundschaft). Scheitert
+ * die Datenbank, bleibt die Anmeldung gültig — nur Gerät und Mail fallen aus,
+ * gemeldet ohne Adresse und ohne Kennung (wie ein Nachlauf).
+ */
+async function geraeteKennungNachAnmeldung(userId: string, kennung: string | null, userAgent: string | null): Promise<string | null> {
+  try {
+    return (await erkenneGeraet({ userId, kennung, userAgent })).kennung
+  } catch (err) {
+    const meldung = new Error('Gerät nach der Anmeldung nicht erkannt')
+    meldung.name = err instanceof Error ? err.name : 'Unbekannt'
+    Sentry.captureException(meldung, { tags: { aufgabe: 'geraet-erkennen' } })
+    return null
+  }
+}
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
@@ -186,10 +205,11 @@ export const auth = betterAuth({
     window: AUTH_RATE_LIMIT_WINDOW_SECONDS,
     max: AUTH_RATE_LIMIT_MAX,
     customRules: {
-      // KEIN Limit fürs Session-Lesen: die Routen-Wache (src/proxy.ts) ruft
-      // get-session bei JEDER geschützten Navigation per HTTP auf — mit dem
-      // 10/min-Limit war Franz nach wenigen Seitenwechseln ausgesperrt
-      // (im E2E-Test gegen lokale DB gefunden). Session-Lesen ist kein
+      // KEIN Limit fürs Session-Lesen: Der Browser fragt get-session bei
+      // vielen Seitenwechseln ab (useSession in Shells und Formularen); die
+      // Routen-Wache (src/proxy.ts) prüft heute nur, ob das Cookie da ist,
+      // ohne HTTP-Aufruf. Mit dem 10/min-Limit wäre ein Hof nach
+      // wenigen Seitenwechseln ausgesperrt. Session-Lesen ist kein
       // Brute-Force-Ziel; Login/Registrierung behalten die 10/min.
       '/get-session': false,
     },
@@ -416,6 +436,15 @@ export const auth = betterAuth({
           // ungültigen Adresse): Der Versuch zählt nicht.
           if (!isAPIError(antwort) || !istFehlversuch(versuch.art, antwort.body?.code)) {
             await gibVersuchZurueck(versuch)
+            // Angemeldet: Kennt das Konto dieses Gerät? (E7, Ergänzung; Nr. 114 —
+            // Nr. 115 hängt die Anmeldung mit Passkey als eigenen case an.)
+            const neu = ctx.context.newSession
+            if (!isAPIError(antwort) && neu) {
+              const kennung = await geraeteKennungNachAnmeldung(neu.user.id, ctx.getCookie(GERAETE_COOKIE), neu.session.userAgent ?? null)
+              // Secure wie das Sitzungs-Cookie (https → ja, lokal über http nicht).
+              const secure = ctx.context.authCookies.sessionToken.attributes.secure
+              if (kennung !== null) ctx.setCookie(GERAETE_COOKIE, kennung, { ...GERAETE_COOKIE_OPTIONEN, secure })
+            }
             return
           }
           zaehleAlsFehlversuch(versuch)
@@ -534,9 +563,14 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 Tage
     updateAge: 60 * 60 * 24,      // täglich auffrischen
+    // Kein Zwischenspeicher im Cookie (E7, Ergänzung; Nr. 114): Jede Prüfung
+    // (auth.api.getSession, /get-session) liest Sitzung und Rolle frisch aus
+    // der Datenbank — eine abgemeldete Sitzung gilt ab dem nächsten Klick
+    // nicht mehr, auch in Actions, die die Sitzung direkt lesen. Vorher galt
+    // sie bis zu 5 Minuten weiter. Kosten: eine Abfrage je Prüfung
+    // (ARCHITECTURE §5 „Sitzung frisch").
     cookieCache: {
-      enabled: true,
-      maxAge: 5 * 60,
+      enabled: false,
     },
   },
 

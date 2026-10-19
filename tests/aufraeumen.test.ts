@@ -3,9 +3,10 @@
  * Nr. 104), am Syntaxbaum von TypeScript, nicht an Regex über den Rohtext.
  *
  * Beweist:
- *  - Gelöscht wird nur in den vier Tabellen mit fester Grenze (Session,
- *    Verification, WebhookEvent, BetriebMessung), je EIN deleteMany mit
- *    `where`; die Melde-Vermerke (MELDE_VERMERK_TYP) sind ausgenommen.
+ *  - Gelöscht wird nur in den fünf Tabellen mit fester Grenze (Session,
+ *    Verification, WebhookEvent, BetriebMessung, seit Nr. 114 EinmalLink), je
+ *    EIN deleteMany mit `where`; die Melde-Vermerke (MELDE_VERMERK_TYP) sind
+ *    ausgenommen.
  *  - Keine Bestellung, kein Konto, kein Hof wird je angefasst: kein
  *    `order.delete*` (auch nicht über einen anderen Client), keine Rohabfrage.
  *  - Kein `del(` (Bild-Speicher) in aufraeumen.ts, betrieb-bilder.ts und den
@@ -22,7 +23,7 @@ const WURZEL = process.cwd()
 
 /** Je Datei: welche Empfänger von delete/deleteMany erlaubt sind. */
 const DATEIEN: Record<string, readonly string[]> = {
-  'src/server/aufraeumen.ts': ['prisma.session', 'prisma.verification', 'prisma.webhookEvent', 'prisma.betriebMessung'],
+  'src/server/aufraeumen.ts': ['prisma.session', 'prisma.verification', 'prisma.webhookEvent', 'prisma.betriebMessung', 'prisma.einmalLink'],
   'src/server/betrieb-bilder.ts': [],
   'src/app/api/cron/cleanup-reservations/route.ts': ['prisma.stockReservation'],
   'src/app/admin/betrieb/bilder-export/route.ts': [],
@@ -73,9 +74,15 @@ describe('Aufräumen und Bilder ohne Verwendung löschen nur, was sie dürfen', 
     expect(pruefe(lies(pfad), erlaubt).maengel).toEqual([])
   })
 
-  it('aufraeumen.ts: je EIN deleteMany mit where für die vier Tabellen', () => {
+  it('aufraeumen.ts: je EIN deleteMany mit where für die fünf Tabellen', () => {
     const { loeschen } = pruefe(lies('src/server/aufraeumen.ts'), DATEIEN['src/server/aufraeumen.ts'])
-    expect(loeschen.map((l) => l.empfaenger).sort()).toEqual(['prisma.betriebMessung', 'prisma.session', 'prisma.verification', 'prisma.webhookEvent'])
+    expect(loeschen.map((l) => l.empfaenger).sort()).toEqual([
+      'prisma.betriebMessung',
+      'prisma.einmalLink',
+      'prisma.session',
+      'prisma.verification',
+      'prisma.webhookEvent',
+    ])
     for (const l of loeschen) {
       const arg = l.argument
       expect(arg !== undefined && ts.isObjectLiteralExpression(arg) && arg.properties.some((p) => p.name?.getText() === 'where')).toBe(true)
