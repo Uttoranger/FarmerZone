@@ -172,6 +172,11 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Umsetzung:** Nr. 79 (freigabe.md §16).
 - **Bestätigt (uttoranger, Freigabe Lauf 13, 13.10.2026):** Entscheidungen des Dirigenten aus Lauf 12 (Morgenbericht 12 §7): CODING_STANDARDS §7 ist nach G5 umgeschrieben (Zustandsmarken nur über `Marke` mit den Tokens `--fz-zustand-*`; kein Hexwert in `src/components` und `src/lib` außer den benannten Ausnahmen der Hex-Wache; Palette mit `dark:` nur noch für Bedeutung ohne Marke). Grenzerweiterung für Nr. 79: `components/farmer/schild.tsx` und die neue `src/lib/marke-art.ts` (der Typ liegt in lib, weil die Fachregeln ihn liefern).
 
+### G6 · Pakete erst ab 14 Tagen (19.10.2026)
+- Entscheidung (uttoranger, im Chat 19.10.2026): pnpm installiert keine Paketversion, die jünger als 14 Tage ist (`minimumReleaseAge: 20160` in pnpm-workspace.yaml), auch nicht als Unterpaket. Ausnahmen nur für eine dringende Sicherheitskorrektur, mit Freigabe, je Version in `minimumReleaseAgeExclude`.
+- Begründung: Verseuchte Paketversionen werden meist in den ersten Tagen entdeckt und zurückgezogen. Beim Paket für Nr. 115 wären sonst Unterpakete mitgekommen, die 3 bzw. 7 Tage alt waren.
+- Dateien: `pnpm-workspace.yaml`, `CLAUDE.md`, `docs/ai/TECH_STACK.md` §4.
+
 ## F – Freigaben nach der Umsetzung
 
 ### F1 · Mockup-Abweichungen Nr. 03, 05 und 07–17 (06.10.2026)

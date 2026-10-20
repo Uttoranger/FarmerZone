@@ -80,6 +80,7 @@ Kein Commit mit rotem Typecheck, rotem Lint (Fehler; Warnungen dürfen bleiben) 
 - **Niemals** `git stash`. Der Stash-Stapel ist für alle Worktrees gemeinsam; parallele Sitzungen holen sich sonst gegenseitig ihre Stände zurück (Vorfall in Bereiche 2). Zwischenstände als WIP-Commit auf dem eigenen Branch sichern (der Hook blockt `git stash` in jeder Form).
 - **Niemals** unaufgefordert Pakete installieren. Vorschlagen und fragen.
 - Pakete nur mit der in package.json festgelegten pnpm-Version installieren (corepack). Eine andere Version kann den Lockfile ohne die Sicherheits-Overrides neu schreiben.
+- pnpm installiert nur Versionen, die mindestens 14 Tage alt sind (`minimumReleaseAge` in pnpm-workspace.yaml, G6). Ausnahmen nur mit Freigabe, je Version.
 - **Niemals** Features bauen, die nicht beauftragt sind. Im Zweifel fragen.
 - Entscheidungen stehen in `docs/entscheidungen.md`; bei Widerspruch gilt das Register.
 

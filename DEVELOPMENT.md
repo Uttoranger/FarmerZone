@@ -5430,6 +5430,23 @@ Ausgangslage: Am 19.10. lief keiner der vier Abläufe (Vercel Hobby gesperrt), u
 - **Fix:** der ganze Wert in einfachen Anführungszeichen; die Shell bekommt denselben Befehl (geprüft mit einem YAML-Parser: alle fünf Workflows lesbar).
 - **Wache:** `tests/workflows-yaml-wache.test.ts` prüft jede Datei in `.github/workflows/`: Eine einzeilige `run:`-Zeile (auch `- run:`), deren Wert nicht mit `'`, `"`, `|` oder `>` beginnt, trägt kein „: “ (auch keinen Doppelpunkt am Zeilenende) und kein „ #“ (dort schnitte YAML den Befehl still als Kommentar ab); Befund mit Datei und Zeile, Gegenproben mit der alten Zeile. Ohne YAML-Paket — eine Zeilenprüfung reicht für die Form, die wir schreiben.
 
+## Paket für Nr. 115 vorab und Pakete erst ab 14 Tagen (Register G6, /fix, 20.10.2026)
+
+- **Anlass:** In Lauf 17 lehnte die Nachtlauf-Sitzung `pnpm install` ab, Nr. 115 (Admin nur mit Passkey, N20) blieb deshalb stehen. Das eine Paket ist jetzt vorab installiert, Code dafür kommt erst mit Nr. 115 (Lauf 18); niemand importiert es bisher.
+- **Paket:** `@better-auth/passkey` **1.6.23** (genau, gleich `better-auth`), über `package.json` und `pnpm install` mit pnpm 10.33.0. Seine Peer-Abhängigkeiten (`better-auth`, `@better-auth/core`, `@better-auth/utils`, `@better-fetch/fetch`, `better-call`, `nanostores`) standen schon im Lockfile.
+- **Mindestalter:** `minimumReleaseAge: 20160` (14 Tage) in `pnpm-workspace.yaml`, gilt auch für Unterpakete. Es hat schon gewirkt: pnpm nahm `@peculiar/asn1-*` 2.10.0 statt 2.11.0 (vom 12.10.) und `asn1js` 3.0.10 statt 3.1.0 (vom 16.10.).
+- **Prüfung des Lockfiles** (vollständige Tabelle je Paket im PR):
+
+| Prüfung | Ergebnis |
+|---|---|
+| Geänderte Dateien | `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml` (dazu die Doku) |
+| Bestehende Versionen geändert | keine – der Lockfile hat nur neue Zeilen (+247/−0), kein Eintrag fiel weg |
+| Neue Einträge | 24: `@better-auth/passkey`, `@simplewebauthn/server` 13.3.3, `@simplewebauthn/browser` 13.3.0, `@peculiar/x509` 1.14.3, elf `@peculiar/asn1-*` 2.10.0, `@peculiar/utils` 2.0.3, `asn1js` 3.0.10, `pvtsutils` 1.3.6, `pvutils` 1.2.0, `@hexagon/base64` 1.1.28, `@levischuck/tiny-cbor` 0.2.11, `tsyringe` 4.10.0, `reflect-metadata` 0.2.2, `tslib` 1.14.1 (neben 2.8.1, für `tsyringe`) |
+| Alle nur über `@better-auth/passkey` (`pnpm why`) | ja, alle 24 |
+| Alle ab 14 Tagen (`pnpm view <name> time --json`) | ja – jüngste: `@peculiar/asn1-*` 2.10.0 vom 27.09.2026 (22 Tage) |
+| Install-Skripte | keine; `pvutils` hat nur `prepare`, das bei Installation aus der Registry nicht läuft; `allowBuilds` unverändert |
+| `pnpm install --frozen-lockfile` (aus leerem `node_modules`) | läuft durch – keine Ausnahme in `minimumReleaseAgeExclude` nötig |
+
 ## Nützliche Befehle
 
 ```bash
