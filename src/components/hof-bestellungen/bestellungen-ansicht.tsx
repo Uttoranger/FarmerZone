@@ -4,6 +4,7 @@ import type { BestellungenSeite, HofBestellDetail, HofListenEintrag } from '@/se
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
+import { LadeInhalt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
@@ -43,50 +44,52 @@ export function BestellungenAnsicht({
 }): React.JSX.Element {
   const suche = filterSuche(filter)
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10">
-      <div className={cn('flex flex-col gap-4 md:gap-[18px]', modus === 'detail' && 'hidden lg:flex')}>
-        <div className="flex items-end gap-3">
-          <div className="min-w-0">
-            <h1 className="font-heading text-2xl font-semibold md:text-[26px]">Bestellungen</h1>
-            <p className={cn('text-[13px] leading-normal', LEISE)}>{seite.kopfzeile}</p>
+    <LadeRahmen>
+      <div className="mx-auto w-full max-w-7xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10">
+        <div className={cn('flex flex-col gap-4 md:gap-[18px]', modus === 'detail' && 'hidden lg:flex')}>
+          <div className="flex items-end gap-3">
+            <div className="min-w-0">
+              <h1 className="font-heading text-2xl font-semibold md:text-[26px]">Bestellungen</h1>
+              <p className={cn('text-[13px] leading-normal', LEISE)}>{seite.kopfzeile}</p>
+            </div>
+            <Link
+              href="/orders/today/print"
+              target="_blank"
+              aria-label="Packliste für heute drucken"
+              className={cn(KNOPF_RAHMEN, 'ml-auto size-11 px-0 md:w-auto md:px-[18px]')}
+            >
+              <Printer className="size-4" strokeWidth={1.7} aria-hidden="true" />
+              <span className="hidden md:inline" aria-hidden="true">
+                Packliste drucken
+              </span>
+            </Link>
           </div>
-          <Link
-            href="/orders/today/print"
-            target="_blank"
-            aria-label="Packliste für heute drucken"
-            className={cn(KNOPF_RAHMEN, 'ml-auto size-11 px-0 md:w-auto md:px-[18px]')}
-          >
-            <Printer className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            <span className="hidden md:inline" aria-hidden="true">
-              Packliste drucken
-            </span>
-          </Link>
+          <FilterChipReihe beschriftung="Bestellungen filtern">
+            {seite.chips.map((chip) => (
+              <FilterChip key={chip.filter} href={bestellListeHref(chip.filter)} aktiv={chip.filter === filter} ladePunkt>
+                {chip.text}
+              </FilterChip>
+            ))}
+          </FilterChipReihe>
         </div>
-        <FilterChipReihe beschriftung="Bestellungen filtern">
-          {seite.chips.map((chip) => (
-            <FilterChip key={chip.filter} href={bestellListeHref(chip.filter)} aktiv={chip.filter === filter}>
-              {chip.text}
-            </FilterChip>
-          ))}
-        </FilterChipReihe>
-      </div>
 
-      {/* In der Bestellung unter 1024 px kein Abstand oben: Dort beginnt die feste Leiste des Rückwegs am oberen Rand. */}
-      <div className={cn('lg:mt-5 lg:flex lg:items-start lg:gap-5 xl:gap-6', modus === 'liste' && 'mt-4')}>
-        <div className={cn('lg:w-[320px] lg:shrink-0 xl:w-[420px] 2xl:w-[520px]', modus === 'detail' && 'hidden lg:block')}>
-          <BestellListe seite={seite} filter={filter} gewaehlt={detail?.id ?? null} nurBreit={modus === 'liste'} suche={suche} />
-        </div>
-        <div className={cn('min-w-0 flex-1', modus === 'liste' && 'hidden lg:block')}>
-          {detail ? (
-            <BestellDetail key={detail.id} bestellung={detail} zurueckSuche={suche} />
-          ) : (
-            seite.gruppen.length > 0 && (
-              <p className={cn(KARTE, 'px-5 py-8 text-center text-[13.5px]', LEISE)}>Wähle links eine Bestellung.</p>
-            )
-          )}
-        </div>
+        {/* In der Bestellung unter 1024 px kein Abstand oben: Dort beginnt die feste Leiste des Rückwegs am oberen Rand. */}
+        <LadeInhalt className={cn('lg:mt-5 lg:flex lg:items-start lg:gap-5 xl:gap-6', modus === 'liste' && 'mt-4')}>
+          <div className={cn('lg:w-[320px] lg:shrink-0 xl:w-[420px] 2xl:w-[520px]', modus === 'detail' && 'hidden lg:block')}>
+            <BestellListe seite={seite} filter={filter} gewaehlt={detail?.id ?? null} nurBreit={modus === 'liste'} suche={suche} />
+          </div>
+          <div className={cn('min-w-0 flex-1', modus === 'liste' && 'hidden lg:block')}>
+            {detail ? (
+              <BestellDetail key={detail.id} bestellung={detail} zurueckSuche={suche} />
+            ) : (
+              seite.gruppen.length > 0 && (
+                <p className={cn(KARTE, 'px-5 py-8 text-center text-[13.5px]', LEISE)}>Wähle links eine Bestellung.</p>
+              )
+            )}
+          </div>
+        </LadeInhalt>
       </div>
-    </div>
+    </LadeRahmen>
   )
 }
 

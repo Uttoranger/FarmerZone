@@ -17,6 +17,8 @@ vi.mock('next/link', () => ({
     delete attribute.onNavigate
     return createElement('a', { href, ...attribute }, children)
   },
+  // Der Ladepunkt (Nr. 105/121) fragt den Zustand des Links — beim Rendern auf dem Server lädt nichts.
+  useLinkStatus: () => ({ pending: false }),
 }))
 // Die Bestellung im Detail trägt den Kopf mit dem Rückweg (UnterseitenKopf liest den Pfad).
 vi.mock('next/navigation', () => ({

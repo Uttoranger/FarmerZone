@@ -97,9 +97,20 @@ export const UNBEKANNTES_GERAET = 'Unbekanntes Gerät'
  * „Chrome, Windows" — eine andere Form für einen anderen Zweck.)
  */
 export function geraetName(userAgent: string | null): string {
-  const ua = (userAgent ?? '').trim()
-  const teile = [systemVon(ua), browserVon(ua)].filter((t): t is string => t !== null)
+  const { system, browser } = geraeteTeile(userAgent ?? '')
+  const teile = [system, browser].filter((t): t is string => t !== null)
   return teile.length > 0 ? teile.join(' · ') : UNBEKANNTES_GERAET
+}
+
+/**
+ * Die erkannten Teile einer Browserangabe – EINE Erkennungskette für
+ * `geraetName` („iPhone · Safari“) und `geraetKurz` in src/lib/hof-hilfe.ts
+ * („Safari, iPhone“): Wer eine neue Browser- oder Systemart ergänzt, tut es nur
+ * in `systemVon` bzw. `browserVon`. Nur feste Wörter, nie die Angabe selbst.
+ */
+export function geraeteTeile(userAgent: string): { system: string | null; browser: string | null } {
+  const ua = userAgent.trim()
+  return { system: systemVon(ua), browser: browserVon(ua) }
 }
 
 /** Für das Symbol der Zeile: Handy (auch Tablet) oder Computer. */

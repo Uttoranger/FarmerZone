@@ -179,29 +179,3 @@ export function FadenVerlauf({
     </ol>
   )
 }
-
-/**
- * Ladeansicht der Liste — Kopf und drei Zeilen (gleiche Maße wie die fertige
- * Seite). Ohne Filter-Chips: Sie stehen nur da, wenn es Fäden gibt
- * (DESIGN_SYSTEM „Ladeansicht": bedingte Teile weglassen).
- */
-export function PostfachLaden(): React.JSX.Element {
-  return (
-    <div className={POSTFACH_RAHMEN}>
-      <div className="flex animate-pulse flex-col gap-4" aria-busy="true">
-        <div className="h-8 w-40 rounded-lg bg-border" />
-        <div className="flex flex-col rounded-2xl border border-border bg-card">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="flex gap-3 border-b border-border px-4 py-3 last:border-0">
-              <div className="size-10 shrink-0 rounded-full bg-muted" />
-              <div className="flex flex-1 flex-col gap-2">
-                <div className="h-4 w-32 rounded bg-app-trough" />
-                <div className="h-3.5 w-full max-w-xs rounded bg-app-chip" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}

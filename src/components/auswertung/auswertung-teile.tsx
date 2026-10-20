@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ChartColumn, ChevronLeft, ChevronRight, Lightbulb, Share2 } from 'lucide-react'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { LadePunkt } from '@/components/ui/lade-punkt'
 import { ProgressBar } from '@/components/ui/progress-bar'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
@@ -35,7 +36,7 @@ const PERIODEN: { key: Periode; label: string }[] = [
 ]
 
 const PFEIL = cn(
-  'inline-flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[250ms] hover:bg-muted hover:text-foreground',
+  'relative inline-flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[250ms] hover:bg-muted hover:text-foreground',
   FOKUS_RAHMEN
 )
 
@@ -56,6 +57,7 @@ export function ZeitraumWahl({ periode, zurueck, zeitraum }: { periode: Periode;
               )}
             >
               {p.label}
+              <LadePunkt />
             </Link>
           </li>
         ))}
@@ -64,6 +66,7 @@ export function ZeitraumWahl({ periode, zurueck, zeitraum }: { periode: Periode;
         {zurueck < AUSWERTUNG_MAX_ZURUECK ? (
           <Link href={auswertungHref(periode, zurueck + 1)} aria-label="Zeitraum davor" className={PFEIL}>
             <ChevronLeft className="size-5" strokeWidth={1.7} aria-hidden="true" />
+            <LadePunkt />
           </Link>
         ) : (
           <span className="size-11" />
@@ -72,6 +75,7 @@ export function ZeitraumWahl({ periode, zurueck, zeitraum }: { periode: Periode;
         {zurueck > 0 ? (
           <Link href={auswertungHref(periode, zurueck - 1)} aria-label="Zeitraum danach" className={PFEIL}>
             <ChevronRight className="size-5" strokeWidth={1.7} aria-hidden="true" />
+            <LadePunkt />
           </Link>
         ) : (
           <span className="size-11" />

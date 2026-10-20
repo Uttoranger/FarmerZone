@@ -217,11 +217,21 @@ const BEREICHE = ['src/app/(hof)', 'src/app/(farmer)'] as const
 
 /**
  * Noch ohne eigene Ladeansicht, mit Grund: Die Auswertung zieht mit Nr. 22c
- * (#200) nach (hof) und bringt dort ihre Ladeansicht (AuswertungLaden) mit;
+ * (#200) nach (hof); dort zeigt sie seit Nr. 121 einen Ladepunkt statt eines Skeletts;
  * bis dahin greift der Rückfall (farmer)/loading.tsx. Nach dem Merge gibt es
  * diese Ordner nicht mehr — die Ausnahme greift dann ins Leere.
  */
 const OHNE_EIGENE = new Set(['src/app/(farmer)/analytics', 'src/app/(farmer)/analytics/umfeld'])
+
+/**
+ * Statt eines Skeletts bei jedem Klick zeigen diese Seiten einen Ladepunkt
+ * (Nr. 121, loading-filter-wache; Muster Admin › Postfach, Nr. 105): Ihre Filter
+ * stehen in der Adresse, die alte Ansicht bleibt stehen, bis die neue da ist
+ * (`LadeRahmen`/`LadeInhalt`, `ladePunkt` am Link). Eine eigene `loading.tsx`
+ * wäre genau das Skelett pro Klick; beim ersten Aufruf greift der Rückfall der
+ * Gruppe. Die Liste darf nur kleiner werden – und nie ohne Ladepunkt in der Seite.
+ */
+const LADEPUNKT_STATT_SKELETT = new Set(['src/app/(hof)/postfach', 'src/app/(hof)/orders', 'src/app/(hof)/analytics'])
 
 /** Alle Ordner unter `wurzel` mit einer page.tsx. */
 function routenOrdner(wurzel: string): string[] {
@@ -257,9 +267,20 @@ describe('Ladeansichten — jede Route im Hofbereich und im Bestand hat eine eig
     expect(routen.length).toBeGreaterThanOrEqual(25)
   })
 
-  for (const route of BEREICHE.flatMap(routenOrdner).filter((r) => !OHNE_EIGENE.has(r))) {
+  for (const route of BEREICHE.flatMap(routenOrdner).filter((r) => !OHNE_EIGENE.has(r) && !LADEPUNKT_STATT_SKELETT.has(r))) {
     it(`${route} hat loading.tsx`, () => {
       expect(existiert(`${route}/loading.tsx`), `${route}/loading.tsx fehlt`).toBe(true)
+    })
+  }
+
+  for (const route of LADEPUNKT_STATT_SKELETT) {
+    it(`${route} zeigt einen Ladepunkt statt des Skeletts – ohne loading.tsx, mit LadeRahmen, LadeInhalt und ladePunkt`, () => {
+      expect(routen, `${route} gibt es nicht mehr – aus LADEPUNKT_STATT_SKELETT nehmen`).toContain(route)
+      expect(existiert(`${route}/loading.tsx`), `${route}/loading.tsx steht neben dem Ladepunkt`).toBe(false)
+      const seite = ladeansichtMitTeilen(`${route}/page.tsx`)
+      // Der Punkt sitzt am Link: als Prop (`ladePunkt` am FilterChip) oder als `<LadePunkt />` im Link.
+      for (const teil of ['LadeRahmen', 'LadeInhalt']) expect(seite, `${route}: ${teil} fehlt`).toContain(teil)
+      expect(seite, `${route}: kein Ladepunkt am Link`).toMatch(/ladePunkt|<LadePunkt \/>/)
     })
   }
 
@@ -270,7 +291,9 @@ describe('Ladeansichten — jede Route im Hofbereich und im Bestand hat eine eig
 
   it('alle zeigen Platzhalter in Kartenform mit aria-busy, ohne Spinner, Farbliteral oder Emoji', () => {
     const dateien = [
-      ...BEREICHE.flatMap(routenOrdner).filter((r) => !OHNE_EIGENE.has(r)).map((r) => `${r}/loading.tsx`),
+      ...BEREICHE.flatMap(routenOrdner)
+        .filter((r) => !OHNE_EIGENE.has(r) && !LADEPUNKT_STATT_SKELETT.has(r))
+        .map((r) => `${r}/loading.tsx`),
       'src/app/(hof)/loading.tsx',
       'src/app/(farmer)/loading.tsx',
     ]

@@ -22,6 +22,8 @@ vi.mock('next/link', () => ({
     delete attribute.prefetch
     return createElement('a', { href, ...attribute }, children)
   },
+  // Der Ladepunkt (Nr. 105/121) fragt den Zustand des Links — beim Rendern auf dem Server lädt nichts.
+  useLinkStatus: () => ({ pending: false }),
 }))
 vi.mock('next/navigation', () => ({
   redirect: (ziel: string) => {

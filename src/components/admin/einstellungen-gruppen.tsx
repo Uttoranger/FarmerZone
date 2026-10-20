@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Chip } from '@/components/ui/chip'
+import { LadeInhalt, LadePunkt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { EinstellungenGruendung, type GruendungFormularDaten } from '@/components/admin/einstellungen-gruendung'
 
 const SYMBOL: Record<EinstellungenGruppe, LucideIcon> = { gruendung: Star, plattform: Globe, anmeldung: KeyRound }
@@ -36,7 +37,7 @@ function Navigation({ gewaehlt }: { gewaehlt: EinstellungenGruppe }): React.JSX.
             href={einstellungenGruppeHref(gruppe)}
             aria-current={aktiv ? 'page' : undefined}
             className={cn(
-              'flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors',
+              'relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors',
               aktiv ? 'bg-foreground text-background' : 'text-foreground hover:bg-muted',
               FOKUS_RAHMEN
             )}
@@ -50,6 +51,7 @@ function Navigation({ gewaehlt }: { gewaehlt: EinstellungenGruppe }): React.JSX.
                 {EINSTELLUNGEN_TEXT.gruppe[gruppe].zeile}
               </span>
             </span>
+            <LadePunkt />
           </Link>
         )
       })}
@@ -101,62 +103,64 @@ export function EinstellungenGruppen({ daten }: { daten: EinstellungenDaten }): 
     anmeldung: EINSTELLUNGEN_TEXT.gruppe.anmeldung.zeile,
   }
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start lg:gap-[18px]">
-      <Navigation gewaehlt={daten.gewaehlt} />
-      <div className="flex min-w-0 flex-col gap-2.5">
-        {EINSTELLUNGEN_GRUPPEN.map((gruppe) => {
-          const Symbol = SYMBOL[gruppe]
-          const titel = EINSTELLUNGEN_TEXT.gruppe[gruppe].titel
-          return (
-            <details
-              key={gruppe}
-              open={gruppe === daten.gewaehlt}
-              className={cn('group overflow-hidden rounded-2xl border border-border bg-card', gruppe !== daten.gewaehlt && 'lg:hidden')}
-            >
-              <summary
-                className={cn(
-                  'flex min-h-14 cursor-pointer list-none items-center gap-3 px-3.5 py-3 lg:hidden [&::-webkit-details-marker]:hidden',
-                  FOKUS_RAHMEN
-                )}
+    <LadeRahmen>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start lg:gap-[18px]">
+        <Navigation gewaehlt={daten.gewaehlt} />
+        <LadeInhalt className="flex min-w-0 flex-col gap-2.5">
+          {EINSTELLUNGEN_GRUPPEN.map((gruppe) => {
+            const Symbol = SYMBOL[gruppe]
+            const titel = EINSTELLUNGEN_TEXT.gruppe[gruppe].titel
+            return (
+              <details
+                key={gruppe}
+                open={gruppe === daten.gewaehlt}
+                className={cn('group overflow-hidden rounded-2xl border border-border bg-card', gruppe !== daten.gewaehlt && 'lg:hidden')}
               >
-                <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-muted text-foreground">
-                  <Symbol className="size-[18px]" strokeWidth={1.8} />
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-[15px] font-semibold text-foreground">{titel}</span>
-                  <span className="truncate text-[12.5px] text-muted-foreground">{zeileHandy[gruppe]}</span>
-                </span>
-                <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
-              </summary>
-              <section aria-label={titel} className="flex flex-col gap-3.5 border-t border-border p-3.5 lg:border-t-0 lg:p-5">
-                <div className="hidden flex-wrap items-center gap-2.5 lg:flex">
-                  <h2 className={H2}>{titel}</h2>
-                  {gruppe === 'gruendung' && <Chip>{EINSTELLUNGEN_TEXT.gruendung.register}</Chip>}
-                </div>
-                {gruppe === 'gruendung' && (
-                  <>
-                    <p className="-mt-1.5 hidden text-[13px] leading-snug text-muted-foreground lg:block">{EINSTELLUNGEN_TEXT.gruendung.satz}</p>
-                    <EinstellungenGruendung daten={daten.gruendung} />
-                  </>
-                )}
-                {gruppe === 'plattform' && <Plattform />}
-                {/* Anmeldung (Register N20) hat eine eigene Seite — hier nur der Weg dorthin. */}
-                {gruppe === 'anmeldung' && (
-                  <>
-                    <p className="text-[13px] leading-snug text-muted-foreground">{EINSTELLUNGEN_TEXT.gruppe.anmeldung.satz}</p>
-                    <Link
-                      href={einstellungenGruppeHref('anmeldung')}
-                      className={cn('inline-flex min-h-11 items-center self-start rounded-full text-[14px] font-semibold text-status-fertig underline underline-offset-2', FOKUS_RAHMEN)}
-                    >
-                      {EINSTELLUNGEN_TEXT.gruppe.anmeldung.link}
-                    </Link>
-                  </>
-                )}
-              </section>
-            </details>
-          )
-        })}
+                <summary
+                  className={cn(
+                    'flex min-h-14 cursor-pointer list-none items-center gap-3 px-3.5 py-3 lg:hidden [&::-webkit-details-marker]:hidden',
+                    FOKUS_RAHMEN
+                  )}
+                >
+                  <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-muted text-foreground">
+                    <Symbol className="size-[18px]" strokeWidth={1.8} />
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-[15px] font-semibold text-foreground">{titel}</span>
+                    <span className="truncate text-[12.5px] text-muted-foreground">{zeileHandy[gruppe]}</span>
+                  </span>
+                  <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+                </summary>
+                <section aria-label={titel} className="flex flex-col gap-3.5 border-t border-border p-3.5 lg:border-t-0 lg:p-5">
+                  <div className="hidden flex-wrap items-center gap-2.5 lg:flex">
+                    <h2 className={H2}>{titel}</h2>
+                    {gruppe === 'gruendung' && <Chip>{EINSTELLUNGEN_TEXT.gruendung.register}</Chip>}
+                  </div>
+                  {gruppe === 'gruendung' && (
+                    <>
+                      <p className="-mt-1.5 hidden text-[13px] leading-snug text-muted-foreground lg:block">{EINSTELLUNGEN_TEXT.gruendung.satz}</p>
+                      <EinstellungenGruendung daten={daten.gruendung} />
+                    </>
+                  )}
+                  {gruppe === 'plattform' && <Plattform />}
+                  {/* Anmeldung (Register N20) hat eine eigene Seite — hier nur der Weg dorthin. */}
+                  {gruppe === 'anmeldung' && (
+                    <>
+                      <p className="text-[13px] leading-snug text-muted-foreground">{EINSTELLUNGEN_TEXT.gruppe.anmeldung.satz}</p>
+                      <Link
+                        href={einstellungenGruppeHref('anmeldung')}
+                        className={cn('inline-flex min-h-11 items-center self-start rounded-full text-[14px] font-semibold text-status-fertig underline underline-offset-2', FOKUS_RAHMEN)}
+                      >
+                        {EINSTELLUNGEN_TEXT.gruppe.anmeldung.link}
+                      </Link>
+                    </>
+                  )}
+                </section>
+              </details>
+            )
+          })}
+        </LadeInhalt>
       </div>
-    </div>
+    </LadeRahmen>
   )
 }
