@@ -2,6 +2,20 @@ import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+type Ton = 'gruen' | 'orange' | 'neutral'
+
+const TON_FLAECHE: Record<Ton, string> = {
+  gruen: 'border-accent/45 bg-accent/12',
+  orange: 'border-primary/45 bg-primary/12',
+  neutral: 'border-border bg-muted',
+}
+
+const TON_SYMBOL: Record<Ton, string> = {
+  gruen: 'text-status-fertig',
+  orange: 'text-status-offen',
+  neutral: 'text-muted-foreground',
+}
+
 /**
  * Hinweiskarte: ein ruhiger Hinweis auf getönter Fläche mit Rahmen —
  * Grün für Kundensachen und Gutes („Wir zeigen Höfe rund um …", „Registrierter
@@ -17,20 +31,6 @@ import { cn } from '@/lib/utils'
  * (Knöpfe, Links) kommen als `aktion` herein und stehen rechts bzw. am Handy
  * darunter.
  */
-type Ton = 'gruen' | 'orange' | 'neutral'
-
-const TON_FLAECHE: Record<Ton, string> = {
-  gruen: 'border-accent/45 bg-accent/12',
-  orange: 'border-primary/45 bg-primary/12',
-  neutral: 'border-border bg-muted',
-}
-
-const TON_SYMBOL: Record<Ton, string> = {
-  gruen: 'text-status-fertig',
-  orange: 'text-status-offen',
-  neutral: 'text-muted-foreground',
-}
-
 export function Hinweiskarte({
   ton = 'gruen',
   symbol: Symbol,
