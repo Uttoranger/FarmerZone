@@ -382,7 +382,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/fokus.ts · FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN · Der sichtbare Fokus der neuen Bausteine und Shells — ein Rahmen außen in der Ringfarbe (im neuen Design --fz-status-fertig, ≥ 3:1 auf Grund und Fläche in beiden Modi). · genutzt
 - src/components/ui/form.tsx · Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage, useFormField · kein Zweck vermerkt · genutzt
 - src/components/ui/groessenkachel.tsx · GroessenWahl, Groessenkachel · GroessenWahl + Groessenkachel: Verkaufsgrößen als Kacheln (Futter, Brennmaterial, alles mit Gebinden) — Größe, Hinweis, Preis, Grundpreis, Vorrat (docs/ai/DESIGN_SYSTEM.md, „Kaufstrecke"). · genutzt
-- src/components/ui/hinweiskarte.tsx · Hinweiskarte · Hinweiskarte: ein ruhiger Hinweis auf getönter Fläche mit Rahmen — Grün für Kundensachen und Gutes („Wir zeigen Höfe rund um …", „Registrierter Futtermittelbetrieb"), Orange für Hofsachen und Offenes … · genutzt
+- src/components/ui/hinweiskarte.tsx · Hinweiskarte · kein Zweck vermerkt · genutzt
 - src/components/ui/input.tsx · Input · kein Zweck vermerkt · genutzt
 - src/components/ui/label.tsx · Label · kein Zweck vermerkt · genutzt
 - src/components/ui/lade-punkt.tsx · LadeInhalt, LadePunkt, LadeRahmen · Laden ohne Ladebild (Register N14, Ergänzung; Nr. 105; Mockup admin-postfach-ruhig): Ein Wechsel über einen Link lässt den bisherigen Inhalt stehen, bis der neue da ist. · genutzt

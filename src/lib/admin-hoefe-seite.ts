@@ -40,7 +40,7 @@ import { kalendertagInWien } from '@/lib/wiener-tag'
 
 export const HOEFE_SEITE = {
   titel: 'Höfe',
-  satz: 'Was wartet, steht oben. Gründungshöfe zählen nach der Freischaltung – Testhöfe nimmst du aus.',
+  satz: 'Was wartet, steht oben. Gründungshöfe zählen nach der Freischaltung – Testhöfe markierst du im Menü ⋯.',
   /** Beschriftung der Kennzahlen und der Unterreiter für Screenreader. */
   kennzahlen: 'Höfe in Zahlen',
   reiter: 'Ansicht der Höfe',

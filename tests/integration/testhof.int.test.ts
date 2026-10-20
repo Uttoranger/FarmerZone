@@ -9,9 +9,10 @@
  *  - Markieren und Wiederaufnahme gleichzeitig: In jeder Verschränkung ist der
  *    Hof danach Testhof UND ausgenommen (die Sperre ordnet beide Wege);
  *  - die Sichtbarkeit an echten Zeilen: ein Testhof fehlt in /hoefe-Daten,
- *    Sitemap, Umfeld und Admin › Startseite (und lässt sich dort nicht
- *    speichern), seine Hofseite lädt (istTesthof) mit noindex; ein nur
- *    ausgenommener Hof steht in der Sitemap und wird indexiert.
+ *    Sitemap, Umfeld, Futter kaufen, im Höfe-Block der Startseite und in
+ *    Admin › Startseite (und lässt sich dort nicht speichern), seine
+ *    Hofseite lädt (istTesthof) mit noindex; ein nur ausgenommener Hof steht
+ *    überall drin und wird indexiert.
  *
  * Alles trägt das Präfix int- (raeumeAuf). Die Einstellung der Gründung wird
  * je Fall gesetzt (viele Plätze, nicht festgeschrieben bzw. festgeschrieben)
@@ -34,7 +35,8 @@ import { speichereEntwurf } from '@/server/actions/startseite'
 import { getOeffentlicheHoefe, getPublicFarm } from '@/server/queries/farm'
 import { hofIstOeffentlich, ladeSitemapHoefe } from '@/server/queries/seo'
 import { getUmfeld } from '@/server/queries/umfeld'
-import { ladeStartseiteAdmin } from '@/server/queries/startseite'
+import { getFutterKaufen } from '@/server/queries/futter-kaufen'
+import { ladeStartseiteAdmin, zeilenFuerSeite } from '@/server/queries/startseite'
 import { erstelleHof, erstelleHofMitAnmeldung, erstelleProdukt, raeumeAuf } from './setup/basis'
 
 type Zeile = Awaited<ReturnType<typeof prisma.plattformEinstellung.findUnique>>
@@ -185,6 +187,34 @@ describe('Sichtbarkeit an echten Zeilen', () => {
     const slugs = umfeld.hoefe.map((h) => h.slug)
     expect(slugs).not.toContain(testhof.slug)
     expect(slugs).toContain(ausgenommen.slug)
+  })
+
+  it('Region › Futter kaufen: der Testhof fehlt, der gleich gebaute Nachbar steht da', async () => {
+    // erstelleHof trägt eine Betriebsnummer — ohne sie stünde keiner der beiden in Futter kaufen.
+    const { testhof, ausgenommen } = await zweiHoefe()
+    const { farm: eigen } = await erstelleHof(ORT)
+    const daten = await getFutterKaufen(eigen.id, 10)
+    if (!daten?.eigenerStandort) throw new Error('Futter kaufen ohne Standort')
+    const ids = daten.hoefe.map((h) => h.id)
+    expect(ids).not.toContain(testhof.id)
+    expect(ids).toContain(ausgenommen.id)
+  })
+
+  it('Startseite › Höfe-Block: ein gewählter Testhof fällt weg, der Nachbar im selben Block bleibt', async () => {
+    const { testhof, ausgenommen } = await zweiHoefe()
+    // Der Weg vom gespeicherten Inhalt zu den Zeilen der Seite — derselbe für Live, Fassung und Entwurf.
+    const [zeile] = await zeilenFuerSeite({
+      v: 1,
+      zeilen: [
+        {
+          art: 'BLOCK',
+          sichtbar: true,
+          block: { vorlage: 'HOEFE_AUSWAHL', titel: 'int-Höfe-Block', farmIds: [testhof.id, ausgenommen.id], liveAb: '2026-10-01T04:00:00.000Z' },
+        },
+      ],
+    })
+    if (zeile?.art !== 'BLOCK') throw new Error('keine Block-Zeile')
+    expect(zeile.block.hofSlugs).toEqual([ausgenommen.slug])
   })
 
   it('Admin › Startseite: der Testhof steht nicht zur Wahl und lässt sich nicht speichern', async () => {
