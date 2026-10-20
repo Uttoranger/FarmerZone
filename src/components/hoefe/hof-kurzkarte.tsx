@@ -160,10 +160,15 @@ function KurzkarteBereich({
 
   useEffect(() => {
     // Wer die Karte geöffnet hat (Enter bzw. Antippen am Pin), hatte gerade den Fokus.
+    // Steht er schon in der Karte (der Effekt läuft im Strict Mode doppelt), bleibt
+    // der gemerkte Pin – sonst ginge „Schließen" an die Karte selbst.
     const aktiv = document.activeElement
-    geoeffnetVon.current = aktiv instanceof HTMLElement ? aktiv : null
+    if (aktiv instanceof HTMLElement && !karte.current?.contains(aktiv)) geoeffnetVon.current = aktiv
     karte.current?.focus({ preventScroll: true })
-  }, [])
+    // Ein zweiter Pin bei offener Karte zeigt einen anderen Hof, ohne die Karte neu
+    // einzuhängen — auch dann geht der Fokus auf die Karte, und „Schließen" gibt ihn
+    // an diesen Pin zurück, nicht an den ersten.
+  }, [hof.slug])
 
   function schliessen(): void {
     const pin = findePin?.() ?? geoeffnetVon.current

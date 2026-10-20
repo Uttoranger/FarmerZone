@@ -11,6 +11,10 @@
  *    aus `findePin`; ein Pin, der nicht mehr im Dokument steht, bekommt nichts.
  *  - Escape geht nicht weiter an die Karte von /hoefe (stopPropagation); andere
  *    Tasten schließen nicht.
+ *  - Der Effekt beim Öffnen hängt am Hof: Zeigt dieselbe Karte nach einem zweiten
+ *    Pin einen anderen Hof, läuft er erneut (Fokus auf die Karte, „Schließen" geht
+ *    an den neuen Pin); mit demselben Hof springt nichts, und steht der Fokus schon
+ *    in der Karte (Strict Mode), bleibt der öffnende Pin gemerkt.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { ReactElement, ReactNode } from 'react'
@@ -18,6 +22,8 @@ import type { ReactElement, ReactNode } from 'react'
 const pruefstand = vi.hoisted(() => ({
   refs: [] as Array<{ current: unknown }>,
   index: 0,
+  effektAbhaengig: [] as Array<readonly unknown[] | undefined>,
+  effektIndex: 0,
 }))
 vi.mock('react', async (importOriginal) => {
   const echt = await importOriginal<typeof import('react')>()
@@ -29,9 +35,15 @@ vi.mock('react', async (importOriginal) => {
       pruefstand.index += 1
       return ref
     },
-    // Effekte laufen sofort — hier gibt es nur den einen beim Öffnen.
-    useEffect: (wirkung: () => void) => {
-      wirkung()
+    // Effekte laufen sofort — wie bei React aber nur beim ersten Rendern und wenn sich
+    // eine Abhängigkeit gegenüber dem vorigen Rendern geändert hat.
+    useEffect: (wirkung: () => void, abhaengig?: readonly unknown[]) => {
+      const i = pruefstand.effektIndex
+      pruefstand.effektIndex += 1
+      const vorher = pruefstand.effektAbhaengig[i]
+      const geaendert = vorher === undefined || abhaengig === undefined || abhaengig.some((wert, k) => !Object.is(wert, vorher[k]))
+      pruefstand.effektAbhaengig[i] = abhaengig
+      if (geaendert) wirkung()
     },
   }
 })
@@ -43,6 +55,8 @@ import { HofKurzkarte, type HofKurzkarteProps, type KurzkartenHof } from '@/comp
 class Element_ {
   focus = vi.fn()
   isConnected = true
+  // Nur das Element selbst liegt „in" ihm — für die Karte reicht das.
+  contains = (anderes: unknown) => anderes === this
 }
 
 const HOF: KurzkartenHof = {
@@ -60,11 +74,22 @@ function oeffne(props: Partial<Extract<HofKurzkarteProps, { art: 'region' }>> = 
   vi.stubGlobal('document', { activeElement: pin })
   pruefstand.refs = [{ current: karte }]
   pruefstand.index = 0
+  pruefstand.effektAbhaengig = []
+  pruefstand.effektIndex = 0
   const onSchliessen = vi.fn()
   const aussen = HofKurzkarte({ art: 'region', hof: HOF, bereich: 'LEBENSMITTEL', id: 'karte-1', onSchliessen, children: null, ...props }) as Knoten
   // HofKurzkarte gibt an den Bereich ab — dessen Funktion läuft hier mit dem Prüfstand.
   const bereich = (aussen.type as unknown as (p: unknown) => Knoten)(aussen.props)
   return { karte, pin, onSchliessen, bereich }
+}
+
+/** Zeichnet dieselbe Karte neu (Refs und Effekte bleiben), mit `aktiv` als fokussiertem Element. */
+function zeichneNeu(hof: KurzkartenHof, aktiv: unknown, onSchliessen: () => void) {
+  vi.stubGlobal('document', { activeElement: aktiv })
+  pruefstand.index = 0
+  pruefstand.effektIndex = 0
+  const aussen = HofKurzkarte({ art: 'region', hof, bereich: 'LEBENSMITTEL', id: 'karte-1', onSchliessen, children: null }) as Knoten
+  return (aussen.type as unknown as (p: unknown) => Knoten)(aussen.props)
 }
 
 /** Der erste Knoten im Baum, der die Bedingung erfüllt. */
@@ -127,6 +152,32 @@ describe('HofKurzkarte, Art „region" — Fokus und Schließen', () => {
     bereich.props.onKeyDown?.(taste('Escape'))
     expect(neu.focus).toHaveBeenCalledWith({ preventScroll: true })
     expect(pin.focus).not.toHaveBeenCalled()
+  })
+
+  it('ein zweiter Pin mit anderem Hof holt den Fokus erneut, „Schließen" geht an diesen Pin', () => {
+    const { karte, pin, onSchliessen } = oeffne()
+    const pinB = new Element_()
+    const bereichB = zeichneNeu({ ...HOF, slug: 'testhof-b', name: 'Testhof B' }, pinB, onSchliessen)
+    expect(karte.focus).toHaveBeenCalledTimes(2)
+    bereichB.props.onKeyDown?.(taste('Escape'))
+    expect(pinB.focus).toHaveBeenCalledWith({ preventScroll: true })
+    expect(pin.focus).not.toHaveBeenCalled()
+  })
+
+  it('neu gezeichnet mit demselben Hof: kein zweiter Sprung auf die Karte', () => {
+    const { karte, onSchliessen } = oeffne()
+    zeichneNeu({ ...HOF }, karte, onSchliessen)
+    expect(karte.focus).toHaveBeenCalledTimes(1)
+  })
+
+  it('läuft der Effekt mit dem Fokus schon in der Karte (Strict Mode), bleibt der öffnende Pin gemerkt', () => {
+    const { karte, pin, onSchliessen } = oeffne()
+    // Strict Mode hängt ein und gleich wieder ein: Der Effekt läuft ein zweites Mal, der Fokus steht dann in der Karte.
+    pruefstand.effektAbhaengig = []
+    const bereich = zeichneNeu(HOF, karte, onSchliessen)
+    bereich.props.onKeyDown?.(taste('Escape'))
+    expect(pin.focus).toHaveBeenCalledWith({ preventScroll: true })
+    expect(karte.focus).toHaveBeenCalledTimes(2)
   })
 
   it('ein Pin, der nicht mehr im Dokument steht, bekommt keinen Fokus — geschlossen wird trotzdem', () => {
