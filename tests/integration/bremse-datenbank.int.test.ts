@@ -257,6 +257,9 @@ describe('Anmeldecode über HTTP in Produktion', () => {
     const bremse = DB_BREMSEN.anmeldecodeAnfordernIp
     const [ipA, ipB, ipC] = ['192.0.2.77', '192.0.2.78', '192.0.2.79']
     geloeschteSchluessel.push(...[ipA, ipB, ipC].map((ip) => bremsSchluessel(GEHEIMNIS, bremse.zweck, ip)))
+    // Seit Nr. 125 zählt auch Better Auths eigene Bremse in der Tabelle (Zweck „auth", Schlüssel IP|Pfad):
+    // ohne Aufräumen stieße ein zweiter Lauf im selben Fenster an deren Grenze.
+    geloeschteSchluessel.push(...[ipA, ipB, ipC].map((ip) => bremsSchluessel(GEHEIMNIS, 'auth', `${ip}|/email-otp/send-verification-otp`)))
     await prisma.rateLimitZaehler.deleteMany({ where: { schluessel: { in: geloeschteSchluessel } } })
     const adressen = Array.from({ length: 5 }, () => `${intKennung('kundin')}@example.com`)
     for (const email of adressen) {

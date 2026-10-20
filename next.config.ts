@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import { CSP_BERICHT_GRUPPE, CSP_BERICHT_PFAD, CSP_HEADER, NIE_MELDEN_PARAMETER, NIE_MELDEN_PFADE, baueCsp } from "./src/lib/csp";
 
 // Jede eigene Route auf oberster Ebene unter src/app — damit die Regel für
 // die Vorschau unten wirklich nur eine HOFSEITE (/<slug>) trifft und nie
@@ -15,6 +16,45 @@ const KEINE_HOFSEITE = [
 ];
 // Genau EIN Pfadstück aus Slug-Zeichen (src/lib/slug.ts), das keine Route ist.
 const HOFSEITEN_QUELLE = `/:farmSlug((?!(?:${KEINE_HOFSEITE.join('|')})$)[a-z0-9-]+)`;
+
+type Regel = Awaited<ReturnType<NonNullable<NextConfig['headers']>>>[number];
+
+/**
+ * Content-Security-Policy ZUM BEOBACHTEN (Register G8, Nr. 125) — der Wert
+ * kommt aus src/lib/csp.ts. Nur im Produktions-Build (`next build`; in
+ * `next dev` störten die Meldungen nur). Gelesen wird die Umgebung beim
+ * Aufruf, also beim Build: VERCEL_ENV und NEXT_PUBLIC_SENTRY_DSN stehen dort.
+ *
+ * Gemeldet wird nur aus der Produktion; Vorschauen zeigen Verstöße nur in der
+ * Konsole. Seiten mit Token, Signatur oder Kennung in der Adresse melden NIE:
+ * dieselbe Policy ohne report-uri/report-to als SPÄTERE Regel mit demselben
+ * Schlüssel (spätere Regeln überschreiben frühere) — die Seiten mit
+ * `no-referrer` oben, die Liste NIE_MELDEN_PFADE und je heiklem Query-Wert
+ * eine eigene Regel (`has` verknüpft seine Einträge mit UND). Die Vorschau-
+ * Rahmen mit `frame-ancestors` haben einen anderen Schlüssel und bleiben.
+ */
+function cspRegeln(bisherige: Regel[]): Regel[] {
+  if (process.env.NODE_ENV !== 'production') return [];
+  const melden = process.env.VERCEL_ENV === 'production';
+  const optionen = { toolbar: process.env.VERCEL_ENV === 'preview', sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN };
+  const ohneMelden = [{ key: CSP_HEADER, value: baueCsp({ ...optionen, melden: false }) }];
+  const ohneReferrer = bisherige
+    .filter((regel) => regel.headers.some((h) => h.key === 'Referrer-Policy' && h.value === 'no-referrer'))
+    .map((regel) => regel.source);
+  return [
+    {
+      source: '/(.*)',
+      headers: [
+        { key: CSP_HEADER, value: baueCsp({ ...optionen, melden }) },
+        // Relative Adresse: Die Reporting API löst sie gegen die Adresse der
+        // Antwort auf (W3C Reporting API, „process reporting endpoints").
+        ...(melden ? [{ key: 'Reporting-Endpoints', value: `${CSP_BERICHT_GRUPPE}="${CSP_BERICHT_PFAD}"` }] : []),
+      ],
+    },
+    ...[...ohneReferrer, ...NIE_MELDEN_PFADE].map((source) => ({ source, headers: ohneMelden })),
+    ...NIE_MELDEN_PARAMETER.map((key) => ({ source: '/(.*)', has: [{ type: 'query' as const, key }], headers: ohneMelden })),
+  ];
+}
 
 const nextConfig: NextConfig = {
   // Kein „X-Powered-By: Next.js" in jeder Antwort (Sicherheitsupdate
@@ -85,11 +125,11 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Security-Header (Härtung 2b). Bewusst OHNE Content-Security-Policy:
-  // Stripe Elements bettet Frames/Skripte ein — eine CSP braucht eine eigene,
-  // getestete Allowlist (js.stripe.com, hooks etc.) und ist Parklisten-Punkt.
+  // Security-Header (Härtung 2b). Die Content-Security-Policy steht zunächst
+  // nur zum Beobachten (Report-Only, Register G8, Nr. 125) — scharf erst nach
+  // Auswertung der Meldungen; die Regeln dafür hängt cspRegeln() hinten an.
   async headers() {
-    return [
+    const regeln: Regel[] = [
       {
         source: '/(.*)',
         headers: [
@@ -250,7 +290,15 @@ const nextConfig: NextConfig = {
           { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
         ],
       },
-    ]
+    ];
+    return [...regeln, ...cspRegeln(regeln)];
+  },
+
+  // Nacharbeit 115: Next schreibt in `next dev` jeden Aufruf einer
+  // Server-Funktion samt Argumenten ins Terminal — darunter Anmeldecodes und
+  // Adressen. Lokale Logs werden geteilt (Fehlersuche), also aus.
+  logging: {
+    serverFunctions: false,
   },
 };
 

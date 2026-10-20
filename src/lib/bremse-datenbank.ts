@@ -110,6 +110,11 @@ export const DB_BREMSEN = {
   // Einrichtung je Konto und Stunde (src/server/actions/admin-anmeldung.ts).
   adminErsatzcode: { zweck: 'admin-ersatzcode', max: 5, fensterMs: STUNDE_MS },
   adminEinrichtungscode: { zweck: 'admin-einrichtungscode', max: 5, fensterMs: STUNDE_MS },
+  // Meldungen der CSP zum Beobachten (Register G8, Nr. 125): je IP 30 in der
+  // Minute über alle Instanzen. Gefragt erst nach dem Entdoppeln und der ersten
+  // Stufe im Speicher (src/app/api/csp-bericht/route.ts) — so schreibt nicht
+  // jede Meldung in die Datenbank.
+  cspBerichtIp: { zweck: 'csp-bericht-ip', max: 30, fensterMs: MINUTE_MS },
 } as const satisfies Record<string, DbBremse>
 
 /** Welche Bremsen je Art zählen: Codes je Stunde und je Tag, Passwörter je Stunde. */
