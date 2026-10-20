@@ -181,9 +181,9 @@ export function ausWeltPixel(x: number, y: number, zoom: number): { lat: number;
 
 /**
  * Ein Hof auf der Karte: die Nummer ist die der Liste, sie bleibt immer. Der
- * Name (Register N22) ist optional — nur /hoefe gibt ihn mit, und nur, wenn die
- * Karte ihn zeigt (zeigePinNamen); Startseite, Region und Umfeld zeichnen
- * weiter nur Nummern.
+ * Name (Register N22) ist optional — /hoefe gibt ihn mit, und nur, wenn die
+ * Karte ihn zeigt (zeigePinNamen); Region trägt ihn nach derselben Regel
+ * (Register N23, ab Nr. 123/124). Die Startseite zeichnet weiter nur Nummern.
  */
 export type PinPunkt = { slug: string; nummer: number; lat: number; lon: number; name?: string }
 

@@ -23,6 +23,8 @@ import { MARKE } from '@/lib/marke'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
+  // Umkreis und Reiter tragen seit Nr. 122 den Ladepunkt (useLinkStatus) — hier lädt nie etwas.
+  useLinkStatus: () => ({ pending: false }),
 }))
 const umgeleitet = vi.fn((ziel: string) => {
   throw new Error(`NEXT_REDIRECT:${ziel}`)
@@ -98,7 +100,8 @@ describe('/analytics/umfeld leitet nach /region um', () => {
 describe('Routen und Navigation', () => {
   it('Region und Auswertung liegen unter (hof), (farmer)/analytics gibt es nicht mehr', () => {
     expect(gibt('src/app/(farmer)/analytics')).toBe(false)
-    for (const datei of ['analytics/page.tsx', 'analytics/umfeld/page.tsx', 'region/page.tsx', 'region/loading.tsx']) {
+    // Seit Nr. 122 ohne region/loading.tsx (Ladepunkt statt Skelett), die Reiter in eigenen Teilen der Seite.
+    for (const datei of ['analytics/page.tsx', 'analytics/umfeld/page.tsx', 'region/page.tsx', 'region/preise-reiter.tsx', 'region/futter-reiter.tsx']) {
       expect(gibt(`src/app/(hof)/${datei}`), datei).toBe(true)
     }
   })

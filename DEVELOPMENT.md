@@ -5499,6 +5499,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Tests:** `pool: 'forks'` steht jetzt ausdrücklich in `vitest.config.ts` (Regel in TESTING_GUIDELINES §4) — `tests/sharp-lader-sperre.test.ts` sperrt die Lader für den ganzen Prozess, mit Worker-Threads scheiterte daneben `tests/marke-bilder.test.ts` in zwei von drei Läufen.
 - **Für die Zukunft:** Next.js kündigt Sicherheits-Releases vorab an. Wer die Ankündigung sieht, plant das Update ein, statt auf die 14 Tage zu warten — Vorschlag für eine Ergänzung von G6 steht im PR, nicht im Register.
 
+## Region · gemeinsame Bausteine und die Seite in zwei Teilen (Register N23; Nr. 122, Nachtlauf 19)
+
+- **Warum:** Region zeigt dieselben Höfe wie /hoefe — der Hof soll sie so sehen wie die Kundschaft. Nr. 123 (Futter kaufen) und 124 (Preise vergleichen) bauen darauf parallel, ohne dieselbe Datei anzufassen und ohne einen Baustein zu kopieren.
+- **Seite in zwei Teilen:** `page.tsx` prüft Sitzung, Hof und Reiter; `preise-reiter.tsx` und `futter-reiter.tsx` tragen die beiden Zweige von vorher 1:1. Statt `loading.tsx` der Ladepunkt (Muster Postfach, Nr. 105).
+- **Ein Kopf:** `HofKopf` (+ `Vorschaubild` in eigener Datei) ersetzt die Kopien in `HofKarte` und `HofKurzkarte`; /hoefe ist Zeichen für Zeichen gleich (Markup-Beleg mit `renderToStaticMarkup`, `diff` leer). Produkttreffer und Karussell bauen ihren Kopf anders und stehen mit Grund im Bestand (Lauf 20).
+- **Kurze Hofkarte in zwei Arten:** `tooltip` wie bisher auf /hoefe; `region` als Bereich mit „Schließen“, Escape und Fokus zurück auf den Pin (Freigabe §1, Abweichung 7). Die alte Kurzform (`schaufenster`, `jetzt`) bleibt für den Test von /hoefe gültig und rendert denselben `KurzkartenInhalt`, den /hoefe als Kinder übergibt.
+- **Ohne eigenen Standort:** ein Zustand für beide Reiter mit der eigenen Hofkarte, gebaut wie auf /hoefe: Die Felder und der Zusammenbau von `getOeffentlicheHoefe` sind dafür als `UEBERSICHT_ZEILEN_SELECT`, `UEBERSICHT_HOF_SELECT` und `baueHofUebersicht` benannt — die Abfrage selbst ist unverändert, `ladeEigenenListeneintrag` liest nur den Hof aus der Sitzung. Ein Testhof bekommt einen Satz statt der Karte.
+
 ## Nützliche Befehle
 
 ```bash

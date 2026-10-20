@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { LadePunkt } from '@/components/ui/lade-punkt'
 import type { UmfeldKm } from '@/lib/umfeld'
 import { regionReiterLink, type RegionReiter } from '@/schemas/region'
 
@@ -10,6 +11,8 @@ import { regionReiterLink, type RegionReiter } from '@/schemas/region'
  * „Preise vergleichen" | „Futter kaufen". Die Reiter sind Links mit eigener
  * Adresse (?reiter=futter), damit Zurück, Neuladen und Teilen im richtigen
  * landen — wie die Reiter von Mein Hof. Der Umkreis geht beim Wechsel mit.
+ * Solange der neue Reiter lädt, zeigt er den Ladepunkt (Nr. 122, Register
+ * N14): Die alte Ansicht bleibt stehen, statt als Skelett aufzublitzen.
  */
 
 export const REGION_RAHMEN = 'mx-auto w-full max-w-4xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10'
@@ -19,7 +22,16 @@ const REITER: readonly { id: RegionReiter; label: string }[] = [
   { id: 'futter', label: 'Futter kaufen' },
 ]
 
-export function RegionKopf({ reiter, km }: { reiter: RegionReiter | null; km: UmfeldKm }): React.JSX.Element {
+export function RegionKopf({
+  reiter,
+  km,
+  ladePunkt = false,
+}: {
+  reiter: RegionReiter | null
+  km: UmfeldKm
+  /** Der Ladepunkt am gewählten Reiter, solange er lädt — braucht einen `LadeRahmen` drumherum (wie `Unterreiter`). */
+  ladePunkt?: boolean
+}): React.JSX.Element {
   return (
     <header className="flex flex-col gap-4">
       <div>
@@ -35,12 +47,14 @@ export function RegionKopf({ reiter, km }: { reiter: RegionReiter | null; km: Um
               href={regionReiterLink(r.id, km)}
               aria-current={gewaehlt ? 'page' : undefined}
               className={cn(
-                '-mb-px inline-flex min-h-11 items-center border-b-2 px-0.5 text-[15px] transition-colors duration-[250ms]',
+                'relative -mb-px inline-flex min-h-11 items-center border-b-2 px-0.5 text-[15px] transition-colors duration-[250ms]',
                 gewaehlt ? 'border-foreground font-semibold text-foreground' : 'border-transparent font-medium text-muted-foreground hover:text-foreground',
                 FOKUS_RAHMEN
               )}
             >
               {r.label}
+              {/* Rechts neben dem Wort, im Abstand zum nächsten Reiter — der Reiter hat kein Polster. */}
+              {ladePunkt && <LadePunkt className="-right-3" />}
             </Link>
           )
         })}

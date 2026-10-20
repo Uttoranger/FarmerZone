@@ -20,6 +20,7 @@
 import { hofseitenLink } from '@/lib/bereiche-anzeige'
 import { einheitLabel, formatEuro, formatPreisSpanne, grundpreisJeKg, mitAnzahl } from '@/lib/format'
 import { ERDRADIUS_KM, entfernungKm, formatiereEntfernung } from '@/lib/hofuebersicht'
+import { ohneStandortHinweis } from '@/lib/region'
 import {
   ANZEIGE_BEREICHE,
   KATEGORIE_LABEL,
@@ -88,7 +89,7 @@ export function umkreisBox(punkt: { lat: number; lon: number }, km: number): Umk
  *
  *   - Exakte Entfernung (dieselbe Rechnung wie /hoefe), Grenze einschließlich.
  *   - Höfe ohne brauchbare Koordinaten stehen nicht im Umkreis — sie werden
- *     gezählt („ohne Standort nicht berücksichtigt"), nie platziert. Anders als
+ *     gezählt (ohneStandortHinweis in src/lib/region.ts), nie platziert. Anders als
  *     auf /hoefe: Dort bleiben sie in der Liste, hier gäbe es keine Entfernung.
  *   - Der eigene Hof ist nie dabei, auch wenn er übergeben wird.
  *   - Nach Entfernung sortiert; über dem Deckel bleiben die nächsten.
@@ -512,7 +513,7 @@ export function baueUmfeld(
   const zeilen = baueUmfeldZeilen(eingabe)
   const hinweise: string[] = []
   const ohneStandort = hoefeMitAngebotIm(eingabe.ohneStandort, eingabe.bereich)
-  if (ohneStandort > 0) hinweise.push(`${mitAnzahl(ohneStandort, 'Hof', 'Höfe')} ohne Standort nicht berücksichtigt.`)
+  if (ohneStandort > 0) hinweise.push(ohneStandortHinweis(ohneStandort))
   if (eingabe.abgeschnitten) {
     // Gedeckelt wird über alle sichtbaren Höfe im Umkreis, bevor feststeht, wer
     // gerade etwas Kaufbares hat — der Satz sagt deshalb „berücksichtigt".
