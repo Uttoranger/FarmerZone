@@ -7,6 +7,7 @@ import { GRUENDUNG_AUSNEHMEN_TEXT, TESTHOF_TEXT, type TesthofAenderung } from '@
 import { cn } from '@/lib/utils'
 import { BestellDialog, DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { useFrischBestaetigt } from '@/components/admin/frisch-bestaetigen'
 
 /** Ein Hof, wie die Bestätigung ihn braucht — Satz und Haken fertig vom Server (testhofAenderung). */
 export type TesthofHof = { id: string; name: string; aenderung: TesthofAenderung }
@@ -27,6 +28,9 @@ function Bestaetigung({ hof, onClose }: { hof: TesthofHof | null; onClose: () =>
   const [laeuft, startTransition] = useTransition()
   const [fehler, setFehler] = useState<string | null>(null)
   const [bestaetigt, setBestaetigt] = useState(false)
+  // Markieren und Zurücknehmen sind heikel (Register N20): frisch mit Passkey bestätigt.
+  const frischMarkieren = useFrischBestaetigt(markiereAlsTesthof)
+  const frischZuruecknehmen = useFrischBestaetigt(nimmTesthofZurueck)
   const aenderung = hof?.aenderung ?? null
 
   function bestaetigen() {
@@ -35,8 +39,8 @@ function Bestaetigung({ hof, onClose }: { hof: TesthofHof | null; onClose: () =>
     startTransition(async () => {
       const ergebnis =
         aenderung.richtung === 'markieren'
-          ? await markiereAlsTesthof({ farmId: hof.id, bestaetigt: aenderung.haken && bestaetigt })
-          : await nimmTesthofZurueck({ farmId: hof.id })
+          ? await frischMarkieren.ausfuehren({ farmId: hof.id, bestaetigt: aenderung.haken && bestaetigt })
+          : await frischZuruecknehmen.ausfuehren({ farmId: hof.id })
       if ('error' in ergebnis) {
         setFehler(ergebnis.error)
         return
@@ -61,6 +65,8 @@ function Bestaetigung({ hof, onClose }: { hof: TesthofHof | null; onClose: () =>
         gesperrt: aenderung === null || (aenderung.haken && !bestaetigt),
       }}
     >
+      {frischMarkieren.dialog}
+      {frischZuruecknehmen.dialog}
       {aenderung && (
         <div className="flex flex-col gap-3.5">
           <p className="text-[14px] leading-relaxed text-foreground">{aenderung.satz}</p>

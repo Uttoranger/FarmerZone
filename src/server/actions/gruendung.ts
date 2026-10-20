@@ -261,6 +261,9 @@ function revalidiereTesthof(slug: string): void {
  * markieren ändert nichts, auch nicht „geändert am“. Keine Nachricht an den Hof.
  */
 export async function markiereAlsTesthof(eingabe: unknown): Promise<Ergebnis> {
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  const frisch = await verlangeFrischeBestaetigung()
+  if ('error' in frisch) return { error: frisch.error }
   const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
 
@@ -307,6 +310,9 @@ export async function markiereAlsTesthof(eingabe: unknown): Promise<Ergebnis> {
  * geschrieben (`istTesthof: true`): Zweimal zurücknehmen ändert nichts.
  */
 export async function nimmTesthofZurueck(eingabe: unknown): Promise<Ergebnis> {
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  const frisch = await verlangeFrischeBestaetigung()
+  if ('error' in frisch) return { error: frisch.error }
   const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
 

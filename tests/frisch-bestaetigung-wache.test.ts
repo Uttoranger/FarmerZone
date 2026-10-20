@@ -20,7 +20,7 @@ const lies = (pfad: string): string => readFileSync(join(process.cwd(), pfad), '
 
 const HEIKLE_AKTIONEN: Array<{ datei: string; namen: string[] }> = [
   { datei: 'src/server/actions/admin.ts', namen: ['revokeFarmApprovalAction', 'rejectFarmAction'] },
-  { datei: 'src/server/actions/gruendung.ts', namen: ['nimmAusGruendung', 'nimmWiederAuf', 'schreibeZusagenFest'] },
+  { datei: 'src/server/actions/gruendung.ts', namen: ['nimmAusGruendung', 'nimmWiederAuf', 'schreibeZusagenFest', 'markiereAlsTesthof', 'nimmTesthofZurueck'] },
   { datei: 'src/server/actions/postfach.ts', namen: ['markiereErstattungErledigt'] },
   { datei: 'src/server/actions/admin-anmeldung.ts', namen: ['erstelleErsatzcodes', 'entfernePasskey', 'pruefeFrischFuerPasskey'] },
 ]
@@ -30,6 +30,7 @@ const EXPORTE = ['src/app/admin/finanzen/export/route.ts', 'src/app/admin/betrie
 const OBERFLAECHEN: Array<{ datei: string; aktionen: string[] }> = [
   { datei: 'src/components/admin/hof-aktion-dialog.tsx', aktionen: ['revokeFarmApprovalAction', 'rejectFarmAction'] },
   { datei: 'src/components/admin/gruendung-ausnehmen-dialog.tsx', aktionen: ['nimmAusGruendung', 'nimmWiederAuf'] },
+  { datei: 'src/components/admin/testhof-dialog.tsx', aktionen: ['markiereAlsTesthof', 'nimmTesthofZurueck'] },
   { datei: 'src/components/admin/einstellungen-gruendung.tsx', aktionen: ['schreibeZusagenFest'] },
   { datei: 'src/app/admin/postfach/erstattung-erledigt.tsx', aktionen: ['markiereErstattungErledigt'] },
   { datei: 'src/app/admin/einstellungen/anmeldung/anmeldung-verwalten.tsx', aktionen: ['entfernePasskey', 'erstelleErsatzcodes', 'pruefeFrischFuerPasskey'] },

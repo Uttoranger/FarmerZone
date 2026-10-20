@@ -1,10 +1,14 @@
 /**
  * Testhof (Register N21, Nr. 119) — die Actions markiereAlsTesthof und
  * nimmTesthofZurueck sowie die Ablehnung in nimmWiederAuf, am echten Code;
- * Prisma und Auth gemockt, Regeln und Berechtigung echt (verlangeAdminAktion).
+ * Prisma und Auth gemockt, Regeln und Berechtigung echt (verlangeAdminAktion,
+ * verlangeFrischeBestaetigung; die Sitzung aus tests/admin-sitzung.ts).
  *
  * Beweist:
  *  - ohne Anmeldung oder ohne Admin-Recht aus der Datenbank wirkt nichts;
+ *  - ohne frische Bestätigung mit Passkey (Register N20, Nr. 115) antworten
+ *    beide Actions „frisch“ — keine Höfe gelesen, nichts geschrieben, kein
+ *    Neubau; frisch bestätigt geht es;
  *  - Markieren nimmt ZUERST die Sperre der Gründungsplätze und liest danach;
  *    hält der Hof einen Platz, ohne den eigenen Haken abgewiesen, nichts
  *    geschrieben; mit Haken bedingt (`istTesthof: false`) — Testhof,
@@ -21,9 +25,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn(), unstable_cache: (fn: unknown) => fn }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
-vi.mock('@/lib/prisma', () => {
+vi.mock('@/lib/prisma', async () => {
   const prisma: Record<string, unknown> = {
     farm: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
+    // Die Wache liest seit Nr. 115 die Pflicht „erst Passkey“ (tests/admin-sitzung.ts).
+    ...(await import('./admin-sitzung')).passkeyAttrappen(),
     user: { findUnique: vi.fn() },
     plattformEinstellung: { findUnique: vi.fn() },
     $executeRaw: vi.fn(async () => 1),
@@ -37,10 +43,12 @@ import { revalidatePath, updateTag } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { GRUENDUNGSPLAETZE_SPERRE, TESTHOF_ZAEHLT_NIE } from '@/lib/gruendungshof'
+import { FRISCH_FEHLER, FRISCH_MINUTEN } from '@/lib/admin-anmeldung'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { STARTSEITE_CACHE_TAG } from '@/lib/startseite-gestalten'
 import { GRUENDUNG_AUSNEHMEN_GEAENDERT, GRUENDUNG_EINGABE_UNGUELTIG, TESTHOF_HAKEN_FEHLT, TESTHOF_NUR_FREIGESCHALTET } from '@/schemas/gruendung'
 import { markiereAlsTesthof, nimmTesthofZurueck, nimmWiederAuf } from '@/server/actions/gruendung'
+import { adminSitzung } from './admin-sitzung'
 
 type Fn = ReturnType<typeof vi.fn>
 const getSession = vi.mocked(auth.api.getSession)
@@ -89,6 +97,26 @@ function sperreZuerst(): void {
   expect(db.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(erstesLesen)
 }
 
+/** Ein Admin, mit Passkey angemeldet, aber zuletzt vor mehr als FRISCH_MINUTEN bestätigt. */
+function nichtFrisch(): unknown {
+  return {
+    user: { id: 'admin_1' },
+    session: { id: 'sitzung-admin_1', createdAt: new Date(), passkeyAm: new Date(Date.now() - (FRISCH_MINUTEN + 1) * 60_000) },
+  }
+}
+
+/** Ohne frische Bestätigung: kein Hof und keine Einstellung gelesen, nichts geschrieben, nichts neu gebaut. */
+function nichtsGetan(): void {
+  expect(db.$transaction).not.toHaveBeenCalled()
+  expect(db.$executeRaw).not.toHaveBeenCalled()
+  expect(db.farm.findMany).not.toHaveBeenCalled()
+  expect(db.plattformEinstellung.findUnique).not.toHaveBeenCalled()
+  expect(db.farm.updateMany).not.toHaveBeenCalled()
+  expect(db.farm.findUniqueOrThrow).not.toHaveBeenCalled()
+  expect(revalidatePath).not.toHaveBeenCalled()
+  expect(updateTag).not.toHaveBeenCalled()
+}
+
 /** Was nach jedem Testhof-Wechsel neu gebaut wird. */
 function neuGebaut(slug: string): void {
   for (const pfad of ['/admin', '/fuer-hoefe', '/', '/sitemap.xml', `/${slug}`]) expect(revalidatePath).toHaveBeenCalledWith(pfad)
@@ -98,7 +126,7 @@ function neuGebaut(slug: string): void {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  getSession.mockResolvedValue({ user: { id: 'admin_1' } } as never)
+  getSession.mockResolvedValue(adminSitzung('admin_1') as never)
   db.user.findUnique.mockResolvedValue({ isAdmin: true })
   db.farm.updateMany.mockResolvedValue({ count: 1 })
   db.farm.findUniqueOrThrow.mockResolvedValue({ slug: 'testhof-b' })
@@ -110,7 +138,7 @@ describe('ohne Admin wirkt nichts', () => {
     getSession.mockResolvedValue(null as never)
     expect(await markiereAlsTesthof({ farmId: 'hof_1', bestaetigt: true })).toEqual({ error: 'Nicht angemeldet.' })
     expect(await nimmTesthofZurueck({ farmId: 'hof_1' })).toEqual({ error: 'Nicht angemeldet.' })
-    getSession.mockResolvedValue({ user: { id: 'u_9' } } as never)
+    getSession.mockResolvedValue(adminSitzung('u_9') as never)
     db.user.findUnique.mockResolvedValue({ isAdmin: false })
     expect(await markiereAlsTesthof({ farmId: 'hof_1', bestaetigt: true })).toEqual({ error: 'Kein Zugriff.' })
     expect(await nimmTesthofZurueck({ farmId: 'hof_1' })).toEqual({ error: 'Kein Zugriff.' })
@@ -122,6 +150,29 @@ describe('ohne Admin wirkt nichts', () => {
     expect(await markiereAlsTesthof({ farmId: 'hof_1', bestaetigt: 'ja' })).toEqual({ error: GRUENDUNG_EINGABE_UNGUELTIG })
     expect(await nimmTesthofZurueck({ farmId: 7 })).toEqual({ error: GRUENDUNG_EINGABE_UNGUELTIG })
     expect(db.$transaction).not.toHaveBeenCalled()
+  })
+})
+
+describe('ohne frische Bestätigung mit Passkey wirkt nichts (N20, Nr. 115)', () => {
+  it('markiereAlsTesthof: Antwort „frisch“, nichts gelesen, nichts geschrieben, kein Neubau — Gegenprobe: frisch bestätigt geht es', async () => {
+    db.farm.findMany.mockResolvedValue([platzHof(1), platzHof(2)])
+    getSession.mockResolvedValue(nichtFrisch() as never)
+    expect(await markiereAlsTesthof({ farmId: 'hof_2', bestaetigt: true })).toEqual({ error: FRISCH_FEHLER })
+    nichtsGetan()
+    getSession.mockResolvedValue(adminSitzung('admin_1') as never)
+    expect(await markiereAlsTesthof({ farmId: 'hof_2', bestaetigt: true })).toEqual({ ok: true })
+    expect(db.farm.updateMany).toHaveBeenCalledTimes(1)
+    neuGebaut('testhof-b')
+  })
+
+  it('nimmTesthofZurueck: Antwort „frisch“, nichts gelesen, nichts geschrieben, kein Neubau — Gegenprobe: frisch bestätigt geht es', async () => {
+    getSession.mockResolvedValue(nichtFrisch() as never)
+    expect(await nimmTesthofZurueck({ farmId: 'hof_1' })).toEqual({ error: FRISCH_FEHLER })
+    nichtsGetan()
+    getSession.mockResolvedValue(adminSitzung('admin_1') as never)
+    expect(await nimmTesthofZurueck({ farmId: 'hof_1' })).toEqual({ ok: true })
+    expect(db.farm.updateMany).toHaveBeenCalledTimes(1)
+    neuGebaut('testhof-b')
   })
 })
 

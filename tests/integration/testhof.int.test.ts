@@ -37,7 +37,7 @@ import { hofIstOeffentlich, ladeSitemapHoefe } from '@/server/queries/seo'
 import { getUmfeld } from '@/server/queries/umfeld'
 import { getFutterKaufen } from '@/server/queries/futter-kaufen'
 import { ladeStartseiteAdmin, zeilenFuerSeite } from '@/server/queries/startseite'
-import { erstelleHof, erstelleHofMitAnmeldung, erstelleProdukt, raeumeAuf } from './setup/basis'
+import { erstelleHof, erstelleHofMitAnmeldung, erstelleProdukt, machePasskeyAdmin, raeumeAuf } from './setup/basis'
 
 type Zeile = Awaited<ReturnType<typeof prisma.plattformEinstellung.findUnique>>
 let vorher: Zeile = null
@@ -69,7 +69,7 @@ async function setzeEinstellung(daten: { gruendungPlaetze: number; gruendungFest
 /** Ein Admin mit echter Sitzung; das Cookie geht über das gemockte headers() an die Action. */
 async function alsAdmin(): Promise<string> {
   const { ownerId, cookie } = await erstelleHofMitAnmeldung()
-  await prisma.user.update({ where: { id: ownerId }, data: { isAdmin: true } })
+  await machePasskeyAdmin(ownerId)
   vi.mocked(headers).mockResolvedValue(new Headers({ cookie }) as never)
   return ownerId
 }
