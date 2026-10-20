@@ -185,6 +185,15 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 120 | Entdecken v2 auf /hoefe (vom Branch der Nr. 119) | `freigabe.md` §22 | N22 |
 | 121 | Regelvorschläge aus Lauf 17, Vorschau ohne WIP, Reste und Nacharbeit (vom Zwischenstand `integration/lauf18`) | `freigabe.md` §22 | G4, G7 |
 | Sammel 18 | Sammel-PR `integration/lauf18` | `freigabe.md` §22 | G3 |
+| 122 | Region · gemeinsame Bausteine und die Seite in zwei Teilen (von `docs/lauf19`) | `freigabe.md` §23 | N23 |
+| 123 | Region · Futter kaufen (vom Branch der Nr. 122; Migration) | `freigabe.md` §23 | N23, E9 |
+| 124 | Region · Preise vergleichen (vom Branch der Nr. 122; eigener PR, nicht im Sammel-PR) | `freigabe.md` §23 | N23 |
+| 125 | Sicherheit: Login-Bremse über alle Instanzen, CSP zum Beobachten, Sentry-Filter, Actions-Wache (von `docs/lauf19`) | `freigabe.md` §23 | R1, G8 |
+| 126 | Admin-Nacharbeit aus 115 (von `docs/lauf19`) | `freigabe.md` §23 | N20 |
+| 127 | Regelvorschläge aus Lauf 18, CI für gestapelte PRs, ein Fuß am Computer, Reste (vom Zwischenstand `integration/lauf19`) | `freigabe.md` §23 | G3, G4, N22 |
+| 128 | Beiträge v2 · „Aktuell vom Hof“ auf der Hofseite (von `docs/lauf19`) | `freigabe.md` §23 | F8, N5, T5 |
+| 129 | Beiträge v2 · Marke auf der Hofkarte, „Neu bei den Höfen“, „Dein Beitrag“ in Heute (vom Zwischenstand `integration/lauf19` mit 122 und 128; Migration) | `freigabe.md` §23 | N22, N16, E12 |
+| Sammel 19 (ohne 124) | Sammel-PR `integration/lauf19` | `freigabe.md` §23 | G3 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
@@ -273,6 +282,15 @@ Drei Migrationen mit festen Namen (`20261019200000_gruendung_aktion` in 116, `20
 - Entfällt 115 (Paket fehlt), ist Welle 1 nur 119. Ist 119 nach zwei Runden nicht fertig (Entwurf), zweigt 120 von `docs/lauf18` ab; die Abfragen in `src/server/queries/farm.ts` bleiben dann, wie sie sind, und der Sammel-PR führt beide zusammen.
 
 Zwei Migrationen mit festen Namen (`20261020100000_testhof` in 119, `20261020110000_admin_passkey` in 115), nur Expand, ohne Seed, ohne Datenänderung, nach Regel 3 mit dem Schema des Basis-Branchs als `--from-schema`; 115 und 119 laufen auf getrennten Zweigen und berühren getrennte Modelle. Kein neues Paket (`@better-auth/passkey` 1.6.23 kam vorher mit dem Paket-PR, G6). 120 und 121 ohne Migration. Priorität 119 → 115 → 120 → 121: 119 muss fertig werden, 115 und 120 dürfen Entwurf bleiben, 121 zuletzt. Nie zwei Nummern an derselben Code-Datei außerhalb der Grenzen (`freigabe.md` §22).
+
+**Reihenfolge in Lauf 19** (`freigabe.md` §23, Haltepunkt Sammel-PR): Doku-PR → 125 ∥ 122 ∥ 128 → 123, 124, 129, 126 nach Priorität, sobald Plätze frei sind → 127 → Sammel-PR. Die Branches:
+- 125, 122 und 128 zweigen von `docs/lauf19` ab; ein Workflow je Nummer, höchstens drei Umsetzer gleichzeitig.
+- Jeder frei werdende Platz geht an die nächste startbereite Nummer nach der Priorität: 123 und 124 vom Branch der Nr. 122; 129 vom Zwischenstand `integration/lauf19` mit 122 und 128 (der Dirigent merged beide dafür hinein); 126 von `docs/lauf19`. Ist eine Nummer nicht startbereit, weil ihre Basis fehlt, bekommt die nächste den Platz.
+- 127 zweigt zuletzt vom Zwischenstand ab und startet erst, wenn 122, 123, 125, 126, 128 und 129 fertig, Entwurf oder entfallen sind (124 zählt nicht mit).
+- 124 kommt nicht in den Sammel-PR: Sie bleibt ein eigener PR auf dem Branch der Nr. 122 und wird erst nach dem Sammel-PR gemergt (Basis auf main umstellen, CI abwarten). Der Sammel-PR prüft einmal, ob sie sich auf seinem Stand sauber mergen lässt.
+- Ist 122 nach zwei Runden nicht fertig (Entwurf), entfallen 123 und 124; ist 128 nicht fertig, entfällt 129. Entfällt 125 (Sicherheits-PR fehlt), ist Welle 1 122 ∥ 128 ∥ 126.
+
+Zwei Migrationen mit festen Namen (`20261021100000_abholhinweise` in 123, `20261021110000_startseite_neuigkeiten` in 129), nur Expand, ohne Seed, ohne Datenänderung, nach Regel 3 mit dem Schema des Basis-Branchs als `--from-schema`; 123 und 129 laufen auf getrennten Zweigen und berühren getrennte Modelle. Kein neues Paket (G6). Priorität 125 → 122 → 128 → 123 → 124 → 129 → 126 → 127: 125 muss fertig werden, 124 darf Entwurf bleiben, 126 und 127 sind die letzten. Nie zwei Nummern an derselben Code-Datei außerhalb der Grenzen (`freigabe.md` §23).
 
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 

@@ -1,6 +1,6 @@
 # Konzept: Umfeld — was andere Höfe in der Nähe anbieten
 
-Stand: 2026-09-26 · Status: **umgesetzt im Sprint Umfeld** (Branch `feature/hoefe-in-der-naehe`) · Voraussetzung: Bereiche 1 und 2 gemerged
+Stand: 2026-09-26 · Status: **umgesetzt im Sprint Umfeld** (Branch `feature/hoefe-in-der-naehe`) · Voraussetzung: Bereiche 1 und 2 gemerged · Geändert in Lauf 19 (Register N23)
 Verbindliche Quelle für den Sprint „Umfeld". Die Stellen mit *(geändert vor dem Umfeld-Sprint)* gelten vor dem ursprünglichen Wortlaut.
 
 In der Oberfläche heißt die Ansicht ‚In der Nähe‘.
@@ -42,6 +42,7 @@ In der Oberfläche heißt die Ansicht ‚In der Nähe‘.
 - Reine Logik in `src/lib/umfeld.ts` mit Tests: Gruppierung nach Bereich → L1 → L2, Spanne, Median, Grundpreis.
 - Grundpreis über `formatGrundpreis`-Logik: €/kg bzw. €/L aus `price`, `unit`, `unitSize`; im Bereich Futtermittel aus `price ÷ nettoMenge`. Produkte ohne berechenbaren Grundpreis (Stück, Paket ohne Nettomenge) werden **gezählt, aber nicht bepreist**.
   *(Geändert vor dem Umfeld-Sprint:)* Die Rechnung steht in `grundpreisJeKg` (`src/lib/format.ts`, neben `kilopreisNetto`); `formatGrundpreis` selbst formatiert nur. Gramm und Milliliter werden auf kg bzw. L umgerechnet. Brennholz je m³ ist in diesem Sprint nicht vergleichbar. Passt die Einheit eines Produkts nicht zur Anzeigeeinheit seiner Zeile (Liter in einer €/dt-Zeile), gilt es als nicht vergleichbar — kein Liter-gleich-Kilo in Preisvergleichen.
+  *(Geändert in Lauf 19, N23:)* Eier vergleichen wir je Stück: In der Kategorie Eier ist bei der Einheit Stück oder Paket der Stückpreis gleich Preis ÷ Stückzahl (`unitSize`). Das gilt nur für den Vergleich in der Region; der Grundpreis auf Hof- und Produktseite bleibt, wie er ist. Alle anderen Stück- und Paketpreise bleiben gezählt, aber nicht bepreist; die Zeile nennt den Grund.
 - Kein Caching in diesem Sprint; Ergebnis ist klein.
 
 ---
@@ -55,6 +56,7 @@ In der Oberfläche heißt die Ansicht ‚In der Nähe‘.
 - Umschalter Bereich: Lebensmittel | Futtermittel (`bereichVon`).
   *(Geändert vor dem Umfeld-Sprint:)* Der erste Bereich heißt **„Hofladen"**, nicht „Lebensmittel" — wie überall (`ANZEIGE_BEREICHE`, `bereiche.md` 6.0). Standard ist der Bereich mit den meisten eigenen Produkten, bei Gleichstand Hofladen.
 - Umkreis: 10 / 25 / 50 km, Standard 25. In der URL (`?km=25&bereich=futter`), damit Reload und Zurück funktionieren.
+  *(Geändert in Lauf 19, N23:)* Jede Stufe nennt die Zahl der Höfe, die die Liste bei diesem Umkreis zählen würde. Der Server lädt einmal 50 km und zählt je Stufe in der reinen Funktion.
 
 **Liste.** Je Unterkategorie (ohne L2: je Kategorie) **eine Zeile**:
 
@@ -63,9 +65,11 @@ In der Oberfläche heißt die Ansicht ‚In der Nähe‘.
 
 - **Anzeigeeinheit je Kategorie**, intern immer €/kg bzw. €/L: Heu & Stroh → €/t; Getreide & Körner, Mischfutter, Ergänzungsfutter → €/dt (100 kg); Lebensmittel → €/kg bzw. €/L. Tabelle in `taxonomie.ts`, Skalierung in `lib/umfeld.ts`, nie in der Komponente.
   *(Geändert vor dem Umfeld-Sprint:)* Im Hofladen gilt €/kg, außer Trinkmilch und Getränke in €/L. Geld steht vorn wie überall (`format.ts`): bei €/t und €/dt in ganzen Euro — „€ 120 – 180 / t · Mitte € 150", ein Cent je Tonne ist bedeutungslos und die Zeile passt so bei 375 px —, bei €/kg und €/L mit zwei Nachkommastellen.
+  *(Geändert in Lauf 19, N23:)* Eier → € / Stück.
 - **Teilung nach Gebindeklasse:** Kommen in einer Zeile Klein- und Großgebinde vor (Schwelle `GROSSGEBINDE_AB_KG`), zeigt die Zeile zwei Spannen untereinander — „Kleingebinde 180 – 240 €/t" und „Großgebinde 120 – 150 €/t". Nur eine Klasse: eine Spanne, kein Klassenlabel. Das verhindert, dass ein 5-kg-Sack den Median der Big Bags verzerrt.
   *(Geändert vor dem Umfeld-Sprint:)* Klassen nur im Bereich Futtermittel (nur dort gibt es die Nettomenge der Kennzeichnung, wie beim Gebinde-Filter auf `/hoefe`). Schwelle `KLEINGEBINDE_BIS_KG = 25`: Großgebinde erst **über** 25 kg — der 25-kg-Sack ist Kleingebinde. Das gilt auch für den Gebinde-Filter auf `/hoefe` (Korrektur an Bereiche 2).
 - **Ein Wert je Hof** *(geändert vor dem Umfeld-Sprint)*: Je Hof und Gebindeklasse zählt sein günstigster Grundpreis; Spanne und Median laufen über diese Werte. Das beantwortet „wo liegt das günstigste Angebot jedes Nachbarn" — ein Hof mit drei Heusorten zählt nicht dreifach.
+  *(Geändert in Lauf 19, N23:)* Ab zwei Höfen mit verschiedenen Werten zeigt die Zeile die Spanne zusätzlich als Streifen: je Hof ein Punkt, ohne Namen und nicht antippbar; die Mitte als Strich; ‚Deins‘ als eigener Punkt; Kleinst- und Höchstwert unter den Enden. Daneben die Lage in Worten: unter der Spanne, unter der Mitte, nahe der Mitte (höchstens 3 % daneben), über der Mitte, über der Spanne. Bei mehreren eigenen Produkten in der Zeile steht keine Lage. Keine Empfehlung, kein Zielpreis, kein ‚zu teuer‘.
 - **„Deins"** *(geändert vor dem Umfeld-Sprint)*: aus allen eigenen Produkten mit „Im Shop", auch bei Bestand 0 — der Preis gilt ja. Mehrere eigene Produkte in einer Zeile oder Klasse ergeben eine Spanne. Dieselbe Regel bestimmt den Standard-Bereich.
 - Zeilen ohne eigenes Produkt: rechte Spalte leer, kein Hinweis.
 - Zeilen mit Anzahl, aber ohne Grundpreis: „5 Höfe · Preis je Stück, nicht vergleichbar".
@@ -73,6 +77,7 @@ In der Oberfläche heißt die Ansicht ‚In der Nähe‘.
 
 **Aufklappen einer Zeile.** Die Höfe: Name, Entfernung, Produktname, Grundpreis, Link zur öffentlichen Hofseite. Sortiert nach Entfernung, nicht nach Preis. Darunter zwei Aktionen: „n weitere Höfe" und **„Auf der Karte zeigen"** — öffnet `/hoefe` in Kartenansicht mit Bereich, Unterkategorie und Umkreis als URL-Parameter vorbelegt (setzt Bereiche 2 voraus; bis dahin Link ohne Vorbelegung). Keine zweite Karte in dieser Ansicht. Ein Hinweissatz: „Kaufen geht über die Hofseite" — der Kauf bleibt dort, mit der Vorbelegung aus `bereiche.md` 6.4.
 *(Geändert nach dem Umfeld-Sprint:)* Statt „Auf der Karte zeigen“ (Link nach `/hoefe` mit `um=<slug>`) hat das Umfeld oben einen Umschalter **„Liste | Karte“** wie auf `/hoefe`; die Wahl steht als `?ansicht=karte` in der URL der Umfeld-Seite. Die Karte ist die Kartenkomponente von `/hoefe` (`hoefe-karte.tsx`, um einen optionalen Mittelpunkt erweitert), per dynamic import erst beim Umschalten geladen — kein Leaflet im ersten Laden der Auswertung. Mittelpunkt ist der eigene Hof als eigener, deutlich anderer Pin, der Umkreis ein Kreis. Pins genau für die Höfe, die die Liste zählt — gleicher Bereich, gleicher Umkreis, gleiche Regeln (`gezaehlteHoefe`). Pin antippen: unten eine Karte mit Hofname, Entfernung, dem günstigsten Grundpreis im Bereich (je Kilo bzw. Liter verglichen, nie gegeneinander; Kilo geht vor) und „Zur Hofseite“. Ohne eigenen Standort kein Umschalter. Der Parameter `um=` entfällt samt der URL-Ausnahme. Die ersten drei Höfe einer Zeile stehen gleich da, „n weitere Höfe“ ab dem vierten.
+*(Geändert in Lauf 19, N23:)* Die Karte am Pin zeigt statt des günstigsten Grundpreises die ersten zwei kaufbaren Produkte des Bereichs in der Reihenfolge der Hofseite, als Produktzeilen wie auf /hoefe, und ‚Zum Hof‘. Die Pins tragen Namen nach der Regel von /hoefe, nie Preise.
 
 **Leer.** „Im Umkreis von 25 km bietet gerade niemand Heu an." — kein leeres Raster. Vorschlag „Umkreis auf 50 km" als Link.
 
@@ -92,4 +97,5 @@ In der Oberfläche heißt die Ansicht ‚In der Nähe‘.
 - Median vs. Mittelwert → **Median** (robust gegen einen Ausreißer bei drei Höfen). Über einen Wert je Hof und Klasse (§4).
 - Mehr als 200 Höfe im Umkreis → die nächsten 200, mit Hinweis. Der Deckel greift nach der exakten Entfernung, nicht in der Box, und über alle sichtbaren Höfe — auch solche, die gerade nichts Kaufbares haben.
 - Ab wie vielen Höfen eine Spanne gezeigt wird → **ab 1**, aber bei 1 Hof steht „1 Hof · 0,15 €/kg" statt einer Spanne.
+  *(Geändert in Lauf 19, N23:)* Den Streifen gibt es erst ab zwei Höfen mit verschiedenen Werten. Bei einem Hof steht ‚1 Hof · € 2,90 / kg · nur 1 Angebot im Umkreis‘, bei mehreren Höfen mit gleichem Wert die Zeile wie bisher.
 - Regionalgrenze → nur Umkreis, keine Ländergrenze; Grenzhöfe sind Absicht der Plattform.
