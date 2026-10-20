@@ -259,7 +259,9 @@ describe('Seitenmuster der Höfe (Nr. 94, Register N15)', () => {
   it('Seitenkopf mit Satz und Suche, Kennzahlen mit den Zahlen aus den Zeilen', () => {
     const html = stand(bestand())
     expect(html).toMatch(/<h1[^>]*>Höfe<\/h1>/)
-    expect(html).toContain('Gründungshöfe zählen nach der Freischaltung – Testhöfe nimmst du aus.')
+    expect(html).toContain('Was wartet, steht oben. Gründungshöfe zählen nach der Freischaltung – Testhöfe markierst du im Menü ⋯.')
+    // „Ausnehmen“ heißt seit N21 nur noch: zählt nicht für die Plätze — ein Testhof ist etwas anderes.
+    expect(html).not.toContain('Testhöfe nimmst du aus')
     expect(html).toContain('aria-label="Höfe in Zahlen"')
     expect(html).toMatch(/<dt[^>]*>Warten<\/dt><dd[^>]*>2<\/dd>/)
     expect(html).toMatch(/Gründungsplätze<\/span><\/dt><dd[^>]*>3 von 12<\/dd><dd[^>]*>vergeben<\/dd>/)

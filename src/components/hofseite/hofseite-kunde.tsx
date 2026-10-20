@@ -301,10 +301,10 @@ export function HofseiteKunde({
 
       {rueckwegZeile}
 
-      {/* Testhof (Register N21, Nr. 119): oben ein ruhiger Hinweis, nie orange — Bestellen bleibt möglich (Testbestellungen sind der Zweck). */}
+      {/* Testhof (Register N21, Nr. 119): oben ein ruhiger Hinweis im neutralen Ton, nie orange — Bestellen bleibt möglich (Testbestellungen sind der Zweck). */}
       {farm.istTesthof && (
         <div className="mx-auto max-w-[1200px] px-4 pb-3 md:px-6">
-          <Hinweiskarte symbol={FlaskConical}>{TESTHOF_HINWEIS}</Hinweiskarte>
+          <Hinweiskarte ton="neutral" symbol={FlaskConical}>{TESTHOF_HINWEIS}</Hinweiskarte>
         </div>
       )}
 
