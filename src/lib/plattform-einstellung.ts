@@ -247,6 +247,8 @@ export const EINSTELLUNGEN_TEXT = {
     festschreibenDialog: (anzahl: number): string =>
       `${anzahl} ${anzahl === 1 ? 'Hof bekommt' : 'Höfe bekommen'} Platz und Ende fest. Das Ende ist nie früher als bisher. Das geht nur einmal.`,
     festschreibenLeer: 'Bisher ist kein Hof freigeschaltet. Festgeschrieben wird trotzdem – ab dann zählt jede Freischaltung.',
+    /** Leere Liste, aber freigeschaltete Höfe sind ausgenommen (Nr. 119) — „kein Hof freigeschaltet“ wäre dann falsch. */
+    festschreibenAlleAusgenommen: 'Alle freigeschalteten Höfe sind ausgenommen. Festgeschrieben wird trotzdem – ab dann zählt jede Freischaltung.',
     festschreibenSpalten: { hof: 'Hof', nummer: 'Nr.', ende: 'Ende bisher → neu' },
     festschreibenOhne: 'keine Zusage',
     festschreibenStillgelegt: 'stillgelegt',

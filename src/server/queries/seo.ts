@@ -5,7 +5,7 @@ import { RESERVED_SLUGS } from '@/lib/slug'
 import { ansichtsModus, type AnsichtsQuellen, type Suchparameter } from '@/lib/ansichts-modus'
 import { hofSlugSchema } from '@/schemas/hof-adresse'
 import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
-import { OEFFENTLICH_SICHTBAR } from './farm'
+import { IN_LISTEN_SICHTBAR, OEFFENTLICH_SICHTBAR } from './farm'
 import { IM_SHOP_WHERE } from './einstellungen'
 
 /**
@@ -33,8 +33,9 @@ export function kannHofSlugSein(slug: string): boolean {
 
 export type HofSeo = {
   /**
-   * In Suchmaschinen und Sitemap: mindestens ein Produkt im Shop und nicht
-   * ausgenommen (Testhof). Dieselbe Regel wie `SITEMAP_HOF` unten.
+   * In Suchmaschinen und Sitemap: mindestens ein Produkt im Shop und kein
+   * Testhof (Register N21, Nr. 119). Dieselbe Regel wie `SITEMAP_HOF` unten.
+   * Ein nur aus der Gründung ausgenommener Hof wird indexiert.
    */
   indexieren: boolean
   /** Für das JSON-LD (`geo`); nur, wenn der Hof beide Koordinaten hat. */
@@ -52,7 +53,7 @@ export const hofIstOeffentlich = cache(async (slug: string): Promise<HofSeo | nu
   const hof = await prisma.farm.findFirst({
     where: { slug, ...OEFFENTLICH_SICHTBAR },
     select: {
-      gruendungAusgenommen: true,
+      istTesthof: true,
       latitude: true,
       longitude: true,
       _count: { select: { products: { where: IM_SHOP } } },
@@ -60,13 +61,13 @@ export const hofIstOeffentlich = cache(async (slug: string): Promise<HofSeo | nu
   })
   if (!hof) return null
   return {
-    indexieren: !hof.gruendungAusgenommen && hof._count.products > 0,
+    indexieren: !hof.istTesthof && hof._count.products > 0,
     geo: hof.latitude !== null && hof.longitude !== null ? { latitude: hof.latitude, longitude: hof.longitude } : null,
   }
 })
 
 export type ProduktSeo = {
-  /** In Suchmaschinen und Sitemap: nicht bei einem ausgenommenen Hof (Testhof) — wie dessen Hofseite. */
+  /** In Suchmaschinen und Sitemap: nicht bei einem Testhof (Register N21) — wie dessen Hofseite. */
   indexieren: boolean
 }
 
@@ -74,9 +75,9 @@ export type ProduktSeo = {
 export const produktIstOeffentlich = cache(async (slug: string, id: string): Promise<ProduktSeo | null> => {
   const produkt = await prisma.product.findFirst({
     where: { id, ...IM_SHOP, farm: { slug, ...OEFFENTLICH_SICHTBAR } },
-    select: { id: true, farm: { select: { gruendungAusgenommen: true } } },
+    select: { id: true, farm: { select: { istTesthof: true } } },
   })
-  return produkt ? { indexieren: !produkt.farm.gruendungAusgenommen } : null
+  return produkt ? { indexieren: !produkt.farm.istTesthof } : null
 })
 
 /**
@@ -145,10 +146,13 @@ export function pruefeProduktseiteGeteilt(slug: string, id: string, suche: Suchp
   return produktseiteGeprueft(slug, id, JSON.stringify(suche))
 }
 
-/** Was in die Sitemap darf: öffentlich, nicht ausgenommen, mindestens ein Produkt im Shop (wie `indexieren`). */
+/**
+ * Was in die Sitemap darf: in Listen sichtbar (öffentlich und kein Testhof,
+ * Register N21), mindestens ein Produkt im Shop (wie `indexieren`). Ein nur
+ * aus der Gründung ausgenommener Hof steht drin.
+ */
 const SITEMAP_HOF = {
-  ...OEFFENTLICH_SICHTBAR,
-  gruendungAusgenommen: false,
+  ...IN_LISTEN_SICHTBAR,
   products: { some: IM_SHOP },
 } as const satisfies Prisma.FarmWhereInput
 

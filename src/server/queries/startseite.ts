@@ -20,7 +20,7 @@ import {
 import { fassungInhaltSchema, type FassungInhalt } from '@/schemas/startseite-fassung'
 import type { VorschauQuelle } from '@/schemas/startseite'
 import type { StartseitenHof } from '@/lib/startseite'
-import { OEFFENTLICH_SICHTBAR } from '@/server/queries/farm'
+import { IN_LISTEN_SICHTBAR } from '@/server/queries/farm'
 
 /*
  * Die Startseite lesen (Register N16; seit Nr. 99 Entwurf und Fassung).
@@ -66,7 +66,7 @@ export function leseFassung(json: unknown, kennung: string): FassungInhalt | nul
 async function hofSlugs(inhalte: readonly FassungInhalt[]): Promise<Map<string, string>> {
   const ids = hofKennungen(inhalte)
   if (ids.length === 0) return new Map()
-  const hoefe = await prisma.farm.findMany({ where: { id: { in: ids }, ...OEFFENTLICH_SICHTBAR }, select: { id: true, slug: true } })
+  const hoefe = await prisma.farm.findMany({ where: { id: { in: ids }, ...IN_LISTEN_SICHTBAR }, select: { id: true, slug: true } })
   return new Map(hoefe.map((h) => [h.id, h.slug]))
 }
 
@@ -242,7 +242,7 @@ export async function ladeStartseiteAdmin(jetzt: Date): Promise<AdminStartseite>
   const [zeilen, hoefe, planungen, erreicht] = await Promise.all([
     prisma.startseiteAbschnitt.findMany(ZEILE_MIT_BLOCK),
     prisma.farm.findMany({
-      where: OEFFENTLICH_SICHTBAR,
+      where: IN_LISTEN_SICHTBAR,
       orderBy: { name: 'asc' },
       select: { id: true, slug: true, name: true, postalCode: true, city: true },
     }),

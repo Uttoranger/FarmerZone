@@ -183,7 +183,7 @@ describe('nimmWiederAuf', () => {
     expect(await nimmWiederAuf({ farmId: 'hof_1' })).toEqual({ ok: true })
     sperreVorLesen()
     expect(db.farm.updateMany).toHaveBeenCalledWith({
-      where: { id: 'hof_1', gruendungAusgenommen: true, approvedAt: { not: null }, archivedAt: null },
+      where: { id: 'hof_1', gruendungAusgenommen: true, istTesthof: false, approvedAt: { not: null }, archivedAt: null },
       data: { gruendungAusgenommen: false, gruendungGeaendertAm: expect.any(Date), gruendungGeaendertVonUserId: 'admin_1' },
     })
     for (const pfad of PFADE) expect(revalidatePath).toHaveBeenCalledWith(pfad)

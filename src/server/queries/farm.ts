@@ -179,6 +179,8 @@ export type PublicFarm = {
   pickupSlots: PublicPickupSlot[]
   /** Abzeichen „Gründungshof“ (Register K2, Nr. 116) — nur Ja/Nein, nie die Nummer des Platzes. */
   gruendungshof: boolean
+  /** Testhof (Register N21, Nr. 119): Die Hofseite zeigt oben „Testhof – nur zum Ausprobieren“. */
+  istTesthof: boolean
   /** „Oktober 2026“ — der Monat der Freischaltung fürs Erklär-Blatt; null ohne Abzeichen. */
   gruendungSeit: string | null
   /** Die Zahlen des Erklär-Blatts — die Abfrage liefert null, die Hofseite füllt sie (ladeHofseite). */
@@ -237,6 +239,18 @@ export const OEFFENTLICH_SICHTBAR = {
   isActive: true,
   archivedAt: null,
   approvedAt: { not: null },
+} as const
+
+/**
+ * Die zweite Stufe der Sichtbarkeit (Register N21, Nr. 119): Was ein Link
+ * direkt öffnet (Hofseite, Produktseite, Teilen-Bild, Plakat, Teilen-Zählung),
+ * fragt OEFFENTLICH_SICHTBAR; jede Liste, Karte, Zählung und Auswahl fragt
+ * DIESE Bedingung — ein Testhof erscheint dort nie. Eine Quelle, damit keine
+ * Liste den Testhof vergisst (Wache: tests/testhof-sichtbarkeit-wache.test.ts).
+ */
+export const IN_LISTEN_SICHTBAR = {
+  ...OEFFENTLICH_SICHTBAR,
+  istTesthof: false,
 } as const
 
 /** Die Produktfelder der Hofseite — EINE Liste für Kundenansicht und Hof-Vorschau. */
@@ -380,6 +394,8 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       ...ABZEICHEN_SELECT,
       // Für das Schild nach E9 (Nr. 11): welche Nummer das ist.
       betriebsstatus: true,
+      // Testhof (Register N21, Nr. 119): der Hinweis oben auf der Hofseite.
+      istTesthof: true,
       products: {
         orderBy: PRODUCT_ORDER_BY,
         select: OEFFENTLICHES_PRODUKT_SELECT,
@@ -477,6 +493,8 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       ...ABZEICHEN_SELECT,
       // Für das Schild nach E9 (Nr. 11): welche Nummer das ist.
       betriebsstatus: true,
+      // Testhof (Register N21, Nr. 119): der Hinweis oben auf der Hofseite.
+      istTesthof: true,
       products: {
         orderBy: PRODUCT_ORDER_BY,
         select: OEFFENTLICHES_PRODUKT_SELECT,
@@ -713,9 +731,10 @@ export type HofUebersichtEintrag = {
 }
 
 /**
- * ALLE öffentlich sichtbaren Höfe — Filter EXAKT wie getPublicFarm oben
- * (isActive, archivedAt: null, approvedAt not null): Was dort die Einzelseite
- * sperrt, hält den Hof auch aus der Übersicht. EINE Query mit Einbindungen,
+ * ALLE öffentlich sichtbaren Höfe — Filter wie getPublicFarm oben
+ * (isActive, archivedAt: null, approvedAt not null), dazu kein Testhof
+ * (IN_LISTEN_SICHTBAR, Register N21): Was dort die Einzelseite sperrt, hält
+ * den Hof auch aus der Übersicht. EINE Query mit Einbindungen,
  * kein N+1; die Kategorie- und Termin-Ableitung ist reine, getestete Logik
  * (src/lib/hofuebersicht.ts).
  */
@@ -726,7 +745,7 @@ export async function getOeffentlicheHoefe(
   // und /hoefe cacht das Ergebnis fünf Minuten (unstable_cache in der Seite):
   // Der Aufwand fällt höchstens alle fünf Minuten an, nicht je Besuch.
   const zeilenJeHof = prisma.product.findMany({
-    where: { isAvailable: true, farm: OEFFENTLICH_SICHTBAR },
+    where: { isAvailable: true, farm: IN_LISTEN_SICHTBAR },
     orderBy: PRODUCT_ORDER_BY,
     // name/stock/reservedStock speisen die PRODUKTSUCHE (suchNamen unten):
     // Sie muss ALLE verfügbaren Produkte eines Hofes kennen — die auf acht
@@ -760,7 +779,7 @@ export async function getOeffentlicheHoefe(
   })
 
   const hoefe = await prisma.farm.findMany({
-    where: OEFFENTLICH_SICHTBAR,
+    where: IN_LISTEN_SICHTBAR,
     // Freischalt-Reihenfolge, die ältesten zuerst — stabil und fair, ohne
     // eine Rangfrage zu eröffnen, die diese Fassung nicht beantworten will.
     orderBy: { approvedAt: 'asc' },

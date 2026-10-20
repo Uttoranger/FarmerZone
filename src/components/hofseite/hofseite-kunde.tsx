@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Check,
   ChevronRight,
+  FlaskConical,
   Leaf,
   MapPin,
   MessageCircle,
@@ -61,6 +62,7 @@ import { HofseiteSeitenspalte } from '@/components/hofseite/hofseite-seitenspalt
 import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
 import { Titelbild } from '@/components/hofseite/titelbild'
 import { Abzeichen, AbzeichenKnopf } from '@/components/ui/abzeichen'
+import { TESTHOF_HINWEIS } from '@/lib/gruendungshof'
 
 /*
  * Die Hofseite für Kundinnen im neuen Design (Nachtlauf Nr. 10, Gate 4).
@@ -298,6 +300,13 @@ export function HofseiteKunde({
       {ansicht.art === 'vorschau' && <VorschauImRahmen />}
 
       {rueckwegZeile}
+
+      {/* Testhof (Register N21, Nr. 119): oben ein ruhiger Hinweis, nie orange — Bestellen bleibt möglich (Testbestellungen sind der Zweck). */}
+      {farm.istTesthof && (
+        <div className="mx-auto max-w-[1200px] px-4 pb-3 md:px-6">
+          <Hinweiskarte symbol={FlaskConical}>{TESTHOF_HINWEIS}</Hinweiskarte>
+        </div>
+      )}
 
       {/* ── Titelbild, Name, Aktionen ── */}
       <div className="relative">

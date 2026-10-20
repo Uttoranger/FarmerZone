@@ -81,7 +81,8 @@ async function zaehleGruendungSeiten(jetzt: Date): Promise<GruendungSeiten> {
     ladePlattformEinstellung(),
     ladeHoefeFuerGruendung(),
     // Wartend wie in der Admin-Liste (approvedAt null), stillgelegte nicht — sie kommen nie dran.
-    prisma.farm.count({ where: { approvedAt: null, archivedAt: null } }),
+    // Ein Testhof (nach zurückgenommener Freigabe) zählt nie mit (Register N21).
+    prisma.farm.count({ where: { approvedAt: null, archivedAt: null, istTesthof: false } }),
   ])
   return gruendungSeitenDaten(gruendungEinstellungAus(einstellung), hoefe, wartend, jetzt)
 }

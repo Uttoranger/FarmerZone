@@ -63,6 +63,7 @@ import { ProduktKarte } from '@/components/hofseite/produkt-karte'
 import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
 import { kartenZustand } from '@/lib/bereiche-anzeige'
 import { KAEUFER_VORSCHAU, type KartenVorschau } from '@/lib/hofseite-kunde'
+import { TESTHOF_HINWEIS } from '@/lib/gruendungshof'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
@@ -100,6 +101,7 @@ const HOF: PublicFarm = {
   serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
   betriebsstatus: null,
   gruendungshof: false,
+  istTesthof: false,
   gruendungSeit: null,
   abzeichenBlatt: null,
   products: [
@@ -624,5 +626,22 @@ describe('ProduktKarte: Vorschau-Variante (muster) ohne Link und ohne Korb (Nr. 
     )
     expect(html).toContain('href="/hof-test/produkt/p_karotten"')
     expect(html).toContain('aria-label="Karotten in den Korb legen"')
+  })
+})
+
+describe('Hofseite eines Testhofs (Register N21, Nr. 119)', () => {
+  it('oben der ruhige Hinweis aus der Hinweiskarte (nicht orange) — Bestellen bleibt möglich', () => {
+    const html = seite({ farm: { ...HOF, istTesthof: true } })
+    expect(html).toContain(TESTHOF_HINWEIS)
+    const karte = html.slice(html.lastIndexOf('<div data-slot="hinweiskarte"', html.indexOf(TESTHOF_HINWEIS)), html.indexOf(TESTHOF_HINWEIS))
+    expect(karte).not.toContain('data-ton="orange"')
+    // Vor dem Titelbild und dem Namen — „oben“.
+    expect(html.indexOf(TESTHOF_HINWEIS)).toBeLessThan(html.indexOf('>Hof Test</h1>'))
+    // Testbestellungen sind der Zweck: Korb und Bestellen bleiben.
+    expect(html).toContain('aria-label="Karotten in den Korb legen"')
+  })
+
+  it('Gegenprobe: ohne Testhof kein Hinweis', () => {
+    expect(seite()).not.toContain(TESTHOF_HINWEIS)
   })
 })

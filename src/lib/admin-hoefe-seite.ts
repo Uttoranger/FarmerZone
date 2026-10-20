@@ -20,7 +20,9 @@ import {
   gruendungAlleVergeben,
   gruendungsplaetze,
   gruendungsplatzVon,
+  istGruendungshof,
   kleinsteFreieNummer,
+  TESTHOF_ZAEHLT_NIE,
   vergabeFest,
   type GruendungAnzeige,
   type GruendungEinstellung,
@@ -328,20 +330,85 @@ export type GruendungAenderung = {
  * Menüeintrag und Bestätigung für einen freigeschalteten, nicht stillgelegten
  * Hof: ein ausgenommener wird wieder aufgenommen, jeder andere ausgenommen.
  * Gerechnet mit `folgenDerAenderung` aus derselben Liste wie die Plätze und
- * der Zahl der Plätze aus der Einstellung (nie die feste 12).
+ * der Zahl der Plätze aus der Einstellung (nie die feste 12). Ein Testhof
+ * (Register N21) ist immer ausgenommen: Wieder zählen ist ausgegraut, mit
+ * demselben Satz, mit dem `nimmWiederAuf` ablehnt. `istTesthof` fehlt: kein Testhof.
  */
-export function gruendungAenderung<T extends HofFuerFolgen>(hof: T, hoefe: readonly T[], plaetze: number, standardBis: Date): GruendungAenderung {
+export function gruendungAenderung<T extends HofFuerFolgen & { istTesthof?: boolean }>(
+  hof: T,
+  hoefe: readonly T[],
+  plaetze: number,
+  standardBis: Date
+): GruendungAenderung {
   const richtung: GruendungRichtung = hof.gruendungAusgenommen ? 'aufnehmen' : 'ausnehmen'
   const folgen = folgenDerAenderung(hof, hoefe, plaetze, richtung)
   const t = GRUENDUNG_AUSNEHMEN_TEXT
   return {
     richtung,
     menue: t.menue[richtung],
-    gesperrt: folgen.moeglich ? null : gruendungAlleVergeben(plaetze),
+    gesperrt: hof.istTesthof === true ? TESTHOF_ZAEHLT_NIE : folgen.moeglich ? null : gruendungAlleVergeben(plaetze),
     titel: t.titel[richtung](hof.name),
     saetze: folgen.moeglich ? folgenSaetze(hof, folgen, plaetze, standardBis) : [],
     hinweise: richtung === 'ausnehmen' ? [t.keineNachricht, t.zurueck] : [t.keineNachricht, folgen.fest ? t.nummerFest : t.nummer],
     haken: richtung === 'ausnehmen' && folgen.platzVorher !== null,
+    knopf: t.knopf[richtung],
+  }
+}
+
+// ─── Testhof (Register N21, Nr. 119) ─────────────────────────────────────────
+
+export const TESTHOF_TEXT = {
+  menue: { markieren: 'Als Testhof markieren …', zuruecknehmen: 'Kein Testhof mehr …' },
+  titel: {
+    markieren: (name: string): string => `${name} als Testhof markieren?`,
+    zuruecknehmen: (name: string): string => `${name} nicht mehr als Testhof führen?`,
+  },
+  satz: {
+    markieren:
+      'Er verschwindet aus /hoefe, der Startseite, der Karte, Region und der Suche und bekommt keinen Gründungsplatz. Seine Hofseite bleibt per Link erreichbar.',
+    zuruecknehmen:
+      'Er erscheint wieder auf /hoefe, der Startseite, der Karte, in Region und in der Suche. Aus der Gründung bleibt er ausgenommen – wieder zählen geht über ⋯ › „Wieder als Gründungshof zählen“.',
+  },
+  knopf: { markieren: 'Als Testhof markieren', zuruecknehmen: 'Kein Testhof mehr' },
+  erledigt: { markieren: 'Der Hof ist jetzt ein Testhof.', zuruecknehmen: 'Der Hof ist kein Testhof mehr.' },
+  /** Der eigene Haken, wenn der Hof einen Platz hält — der Haken beim Ausnehmen bleibt, wie er ist. */
+  haken: 'Das ist ein Testhof, kein echter Hof.',
+} as const
+
+export type TesthofRichtung = 'markieren' | 'zuruecknehmen'
+
+/** Menüeintrag und Bestätigung „Als Testhof markieren …“ bzw. „Kein Testhof mehr …“ — fertig als Text. */
+export type TesthofAenderung = {
+  richtung: TesthofRichtung
+  menue: string
+  titel: string
+  satz: string
+  /** Der Haken erscheint nur beim Markieren eines Hofs, der gerade einen Gründungsplatz hält (wie beim Ausnehmen, K1). */
+  haken: boolean
+  knopf: string
+}
+
+/**
+ * Was Menü ⋯ und Bestätigung zum Testhof brauchen (Register N21): ein Testhof
+ * wird zurückgenommen, jeder freigeschaltete, nicht stillgelegte Hof kann
+ * markiert werden; sonst null (kein Eintrag). Ob der Hof einen Platz hält,
+ * rechnet `istGruendungshof` aus derselben Liste wie die Plätze — dieselbe
+ * Regel, mit der `markiereAlsTesthof` den Haken verlangt.
+ */
+export function testhofAenderung<T extends HofFuerPlatz & { name: string; istTesthof: boolean }>(
+  hof: T,
+  hoefe: readonly T[],
+  plaetze: number
+): TesthofAenderung | null {
+  const t = TESTHOF_TEXT
+  const richtung: TesthofRichtung | null = hof.istTesthof ? 'zuruecknehmen' : hof.approvedAt !== null && hof.archivedAt === null ? 'markieren' : null
+  if (richtung === null) return null
+  return {
+    richtung,
+    menue: t.menue[richtung],
+    titel: t.titel[richtung](hof.name),
+    satz: t.satz[richtung],
+    haken: richtung === 'markieren' && istGruendungshof(hof.id, hoefe, plaetze),
     knopf: t.knopf[richtung],
   }
 }

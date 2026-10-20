@@ -2,15 +2,15 @@ import { prisma } from '@/lib/prisma'
 import { umkreisBox, waehleHoefeImUmkreis, type UmfeldKm } from '@/lib/umfeld'
 import { PRODUCT_CATEGORY_VALUES, betriebsnummerFuerAnzeige, istFuttermittel } from '@/lib/taxonomie'
 import type { FutterHof, FutterProdukt } from '@/lib/futter-kaufen'
-import { OEFFENTLICH_SICHTBAR } from './farm'
+import { IN_LISTEN_SICHTBAR } from './farm'
 
 /**
  * Region › Futter kaufen (Nachtlauf Nr. 22c, Gate 8): Futter registrierter
  * Futtermittelbetriebe im Umkreis des eigenen Hofs.
  *
  * Wie das Umfeld (src/server/queries/umfeld.ts) liest diese Abfrage fremde
- * Höfe — und genau so nur mit OEFFENTLICH_SICHTBAR (aktiv, nicht stillgelegt,
- * freigeschaltet), dazu nicht pausiert: ein pausierter Hof verkauft gerade
+ * Höfe — und genau so nur mit IN_LISTEN_SICHTBAR (aktiv, nicht stillgelegt,
+ * freigeschaltet, kein Testhof), dazu nicht pausiert: ein pausierter Hof verkauft gerade
  * nicht. Vorfilter `betriebsnummer` nicht leer; ob der Hof als registriert
  * gilt, ob eine Größe kaufbar und nicht gesperrt ist, entscheidet
  * src/lib/futter-kaufen.ts.
@@ -48,7 +48,7 @@ export async function getFutterKaufen(farmId: string, km: UmfeldKm): Promise<Fut
   const box = umkreisBox(punkt, km)
   const kandidaten = await prisma.farm.findMany({
     where: {
-      ...OEFFENTLICH_SICHTBAR,
+      ...IN_LISTEN_SICHTBAR,
       isPaused: false,
       id: { not: farmId },
       betriebsnummer: { not: null },

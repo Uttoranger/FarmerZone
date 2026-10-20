@@ -96,6 +96,10 @@ export type AdminFarmRow = {
   gruendungGeaendertVonUserId: string | null
   /** Der festgeschriebene Platz (Nr. 116) — nur im Admin, nie an eine öffentliche Seite. */
   gruendungPlatz: number | null
+  /** Testhof (Register N21, Nr. 119): unsichtbar in allen Listen der Plattform, im Admin sichtbar und mitgezählt. */
+  istTesthof: boolean
+  /** Breite und Länge gesetzt (Nr. 119) — nur Ja/Nein; ohne Punkt fehlt der Hof auf der Karte. */
+  hatKartenpunkt: boolean
   /** Zusagen festgeschrieben (PlattformEinstellung.gruendungFestAm) — an jeder Zeile gleich, für die Platzvergabe. */
   gruendungFest: boolean
   /** Mindestens ein Produkt im Shop (`IM_SHOP_WHERE`) — Bedingung fürs Freischalten (Register K2, Nr. 116). */
@@ -228,6 +232,10 @@ export async function getAdminFarms(
         gruendungGeaendertVonUserId: true,
         // Nr. 116: der festgeschriebene Platz (nur Admin) und ob ein Produkt im Shop ist (Freischalten).
         gruendungPlatz: true,
+        // Nr. 119: Testhof (Marke, Menü) und ob der Hof einen Kartenpunkt hat — die Koordinaten nur für das Ja/Nein.
+        istTesthof: true,
+        latitude: true,
+        longitude: true,
         owner: { select: { email: true, emailVerified: true, createdAt: true } },
         _count: { select: { products: true, farmPhotos: true, pickupSlots: true } },
         products: { where: IM_SHOP_WHERE, select: { id: true }, take: 1 },
@@ -283,6 +291,8 @@ export async function getAdminFarms(
     gruendungGeaendertAm: f.gruendungGeaendertAm,
     gruendungGeaendertVonUserId: f.gruendungGeaendertVonUserId,
     gruendungPlatz: f.gruendungPlatz,
+    istTesthof: f.istTesthof,
+    hatKartenpunkt: f.latitude !== null && f.longitude !== null,
     gruendungFest: fest,
     produktImShop: f.products.length > 0,
     freischaltHinweis: f.approvedAt === null ? freischaltHinweis(f, platzListe, einstellung, jetzt) : null,

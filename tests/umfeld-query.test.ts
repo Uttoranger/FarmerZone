@@ -2,7 +2,7 @@
  * Tests für die Umfeld-Query (src/server/queries/umfeld.ts) mit gemocktem
  * Prisma. Geprüft wird, was die Query der Datenbank sagt und was sie
  * zurückgibt:
- *   - Sichtbarkeit: OEFFENTLICH_SICHTBAR unverändert, dazu isPaused: false,
+ *   - Sichtbarkeit: IN_LISTEN_SICHTBAR unverändert (kein Testhof), dazu isPaused: false,
  *     der eigene Hof ausgeschlossen (strenger als /hoefe, nie lockerer),
  *   - Umkreis: Box in der WHERE-Klausel, das Urteil über die exakte Entfernung,
  *   - Verfügbar heißt istKaufbar,
@@ -20,7 +20,7 @@ vi.mock('@/lib/prisma', () => ({
 
 import { prisma } from '@/lib/prisma'
 import { getUmfeld } from '@/server/queries/umfeld'
-import { OEFFENTLICH_SICHTBAR } from '@/server/queries/farm'
+import { IN_LISTEN_SICHTBAR } from '@/server/queries/farm'
 import { umkreisBox } from '@/lib/umfeld'
 import { ERDRADIUS_KM } from '@/lib/hofuebersicht'
 
@@ -71,9 +71,10 @@ describe('getUmfeld — was die Query die Datenbank fragt', () => {
   it('nimmt die Sichtbarkeit von /hoefe unverändert, dazu „nicht pausiert" und ohne den eigenen Hof', async () => {
     await getUmfeld('hof-1', 25)
     const { where } = farm.findMany.mock.calls[0][0] as { where: Record<string, unknown> }
-    expect(where).toMatchObject({ ...OEFFENTLICH_SICHTBAR, isPaused: false, id: { not: 'hof-1' } })
-    // Kein Schlüssel von OEFFENTLICH_SICHTBAR darf fehlen oder gelockert sein.
-    for (const [schluessel, wert] of Object.entries(OEFFENTLICH_SICHTBAR)) {
+    expect(where).toMatchObject({ ...IN_LISTEN_SICHTBAR, isPaused: false, id: { not: 'hof-1' } })
+    // Kein Schlüssel von IN_LISTEN_SICHTBAR darf fehlen oder gelockert sein — auch nicht istTesthof (Register N21).
+    expect(where.istTesthof).toBe(false)
+    for (const [schluessel, wert] of Object.entries(IN_LISTEN_SICHTBAR)) {
       expect(where[schluessel], schluessel).toEqual(wert)
     }
   })

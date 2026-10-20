@@ -594,6 +594,19 @@ model Farm {
   gruendungPlatz           Int?    @unique
   gruendungAbzeichenZeigen Boolean @default(true)
 
+  // Testhof (Register N21, Nachtlauf Nr. 119): ein Hof nur zum Ausprobieren —
+  // in keiner Liste, Karte, Zählung oder Auswahl (IN_LISTEN_SICHTBAR in
+  // src/server/queries/farm.ts), noindex, die Hofseite nur per Link. Ein
+  // Testhof ist immer auch ausgenommen (gruendungAusgenommen). Default false =
+  // sichtbar wie bisher (Expand, kein Backfill; markiert wird nach dem Merge).
+  // testhofGeaendertAm/-VonUserId: wer zuletzt markiert oder zurückgenommen
+  // hat; VonUserId bewusst ohne Fremdschlüssel wie gruendungGeaendertVonUserId.
+  // Geschrieben nur über markiereAlsTesthof/nimmTesthofZurueck
+  // (src/server/actions/gruendung.ts).
+  istTesthof                Boolean   @default(false)
+  testhofGeaendertAm        DateTime?
+  testhofGeaendertVonUserId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

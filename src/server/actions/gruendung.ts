@@ -6,9 +6,11 @@ import { prisma } from '@/lib/prisma'
 import { verlangeAdminAktion } from '@/server/admin-wache'
 import { ladeHoefeFuerFestschreiben, ladeHoefeFuerGruendung, leseGruendungEinstellung } from '@/server/queries/admin'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
+import { STARTSEITE_CACHE_TAG } from '@/lib/startseite-gestalten'
 import { ADMIN_EINSTELLUNGEN_HREF, EINSTELLUNGEN_TEXT, PLATTFORM_EINSTELLUNG_ID, PLATTFORM_EINSTELLUNG_TAG } from '@/lib/plattform-einstellung'
 import {
   GRUENDUNGSPLAETZE_SPERRE,
+  TESTHOF_ZAEHLT_NIE,
   aktionLaeuft,
   bildeGruendungBis,
   festschreibenBrauchtPlaetze,
@@ -25,7 +27,11 @@ import {
   GRUENDUNG_AUSNEHMEN_ZUSTIMMUNG_FEHLT,
   GRUENDUNG_EINGABE_UNGUELTIG,
   GRUENDUNG_NUR_FREIGESCHALTET,
+  TESTHOF_HAKEN_FEHLT,
+  TESTHOF_NUR_FREIGESCHALTET,
+  markiereAlsTesthofSchema,
   nimmAusGruendungSchema,
+  nimmTesthofZurueckSchema,
   nimmWiederAufSchema,
   schreibeZusagenFestSchema,
 } from '@/schemas/gruendung'
@@ -123,6 +129,9 @@ export async function nimmWiederAuf(eingabe: unknown): Promise<Ergebnis> {
       const hoefe = await ladeHoefeFuerGruendung(tx)
       const hof = hoefe.find((h) => h.id === farmId)
       if (!hof || hof.approvedAt === null || hof.archivedAt !== null) return { error: GRUENDUNG_NUR_FREIGESCHALTET }
+      // Ein Testhof ist immer ausgenommen (Register N21) — wieder zählen erst nach „Kein Testhof mehr“.
+      const merkmal = await tx.farm.findUnique({ where: { id: farmId }, select: { istTesthof: true } })
+      if (merkmal?.istTesthof === true) return { error: TESTHOF_ZAEHLT_NIE }
 
       // Festgeschrieben: Platz nur, solange die Aktion läuft und eine Nummer frei ist.
       let platz: { gruendungPlatz: number; gruendungBis: Date } | null = null
@@ -141,7 +150,7 @@ export async function nimmWiederAuf(eingabe: unknown): Promise<Ergebnis> {
       }
 
       const { count } = await tx.farm.updateMany({
-        where: { id: farmId, gruendungAusgenommen: true, approvedAt: { not: null }, archivedAt: null },
+        where: { id: farmId, gruendungAusgenommen: true, istTesthof: false, approvedAt: { not: null }, archivedAt: null },
         data: { gruendungAusgenommen: false, ...platz, gruendungGeaendertAm: new Date(), gruendungGeaendertVonUserId: guard.userId },
       })
       return count === 0 ? { error: GRUENDUNG_AUSNEHMEN_GEAENDERT } : { ok: true }
@@ -213,5 +222,101 @@ export async function schreibeZusagenFest(eingabe: unknown): Promise<Ergebnis> {
   revalidiereGruendung()
   // Tarif-Zeile und „Dein Stand“ aller Höfe lesen das neue Ende.
   revalidatePath('/', 'layout')
+  return { ok: true }
+}
+
+// === TESTHOF (Register N21, Nr. 119) ===
+
+/** Wie `Ergebnis`, dazu der Slug für die Hofseite, die danach neu gebaut wird. */
+type TesthofErgebnis = { ok: true; slug: string } | { error: string }
+
+/**
+ * Was ein Testhof-Wechsel ändert: alles, was Plätze zählt (revalidiereGruendung,
+ * samt Höfe-Liste), dazu die Sitemap (sonst bis zu einer Stunde alt), die
+ * Startseite (Fassungen mit diesem Hof) und seine Hofseite (Hinweis, noindex).
+ */
+function revalidiereTesthof(slug: string): void {
+  revalidiereGruendung()
+  revalidatePath('/sitemap.xml')
+  updateTag(STARTSEITE_CACHE_TAG)
+  revalidatePath(`/${slug}`)
+}
+
+/**
+ * „Als Testhof markieren“: Der Hof verschwindet aus jeder Liste, Karte,
+ * Zählung und Auswahl (IN_LISTEN_SICHTBAR) und ist zugleich ausgenommen — so
+ * bleiben alle Regeln der Gründung, wie sie sind. Wie beim Ausnehmen nur für
+ * einen freigeschalteten, nicht stillgelegten Hof, in EINER Transaktion unter
+ * der Sperre; hält er einen Platz, nur mit dem eigenen Haken (`bestaetigt`),
+ * und der Platz wird frei. Bedingt geschrieben (`istTesthof: false`): Zweimal
+ * markieren ändert nichts, auch nicht „geändert am“. Keine Nachricht an den Hof.
+ */
+export async function markiereAlsTesthof(eingabe: unknown): Promise<Ergebnis> {
+  const guard = await verlangeAdminAktion()
+  if ('error' in guard) return { error: guard.error }
+
+  const parsed = markiereAlsTesthofSchema.safeParse(eingabe)
+  if (!parsed.success) return { error: GRUENDUNG_EINGABE_UNGUELTIG }
+  const { farmId, bestaetigt } = parsed.data
+
+  const ergebnis = await prisma.$transaction(async (tx): Promise<TesthofErgebnis> => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${GRUENDUNGSPLAETZE_SPERRE})`
+    // Nach der Sperre gelesen: ob der Hof gerade einen Platz hält, nach jedem anderen Weg, der gerade vergab.
+    const { plaetze } = await leseGruendungEinstellung(tx)
+    const hoefe = await ladeHoefeFuerGruendung(tx)
+    const hof = hoefe.find((h) => h.id === farmId)
+    if (!hof || hof.approvedAt === null || hof.archivedAt !== null) return { error: TESTHOF_NUR_FREIGESCHALTET }
+    if (istGruendungshof(farmId, hoefe, plaetze) && !bestaetigt) return { error: TESTHOF_HAKEN_FEHLT }
+
+    const jetzt = new Date()
+    const { count } = await tx.farm.updateMany({
+      where: { id: farmId, istTesthof: false, approvedAt: { not: null }, archivedAt: null },
+      data: {
+        istTesthof: true,
+        testhofGeaendertAm: jetzt,
+        testhofGeaendertVonUserId: guard.userId,
+        gruendungAusgenommen: true,
+        gruendungPlatz: null,
+        gruendungGeaendertAm: jetzt,
+        gruendungGeaendertVonUserId: guard.userId,
+      },
+    })
+    if (count === 0) return { error: GRUENDUNG_AUSNEHMEN_GEAENDERT }
+    const { slug } = await tx.farm.findUniqueOrThrow({ where: { id: farmId }, select: { slug: true } })
+    return { ok: true, slug }
+  })
+  if ('error' in ergebnis) return ergebnis
+
+  revalidiereTesthof(ergebnis.slug)
+  return { ok: true }
+}
+
+/**
+ * „Kein Testhof mehr“: setzt nur das Merkmal zurück. Der Hof bleibt
+ * ausgenommen — wieder zählen geht danach über „Wieder als Gründungshof
+ * zählen“. Unter derselben Sperre wie Markieren und Wiederaufnahme, bedingt
+ * geschrieben (`istTesthof: true`): Zweimal zurücknehmen ändert nichts.
+ */
+export async function nimmTesthofZurueck(eingabe: unknown): Promise<Ergebnis> {
+  const guard = await verlangeAdminAktion()
+  if ('error' in guard) return { error: guard.error }
+
+  const parsed = nimmTesthofZurueckSchema.safeParse(eingabe)
+  if (!parsed.success) return { error: GRUENDUNG_EINGABE_UNGUELTIG }
+  const { farmId } = parsed.data
+
+  const ergebnis = await prisma.$transaction(async (tx): Promise<TesthofErgebnis> => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${GRUENDUNGSPLAETZE_SPERRE})`
+    const { count } = await tx.farm.updateMany({
+      where: { id: farmId, istTesthof: true },
+      data: { istTesthof: false, testhofGeaendertAm: new Date(), testhofGeaendertVonUserId: guard.userId },
+    })
+    if (count === 0) return { error: GRUENDUNG_AUSNEHMEN_GEAENDERT }
+    const { slug } = await tx.farm.findUniqueOrThrow({ where: { id: farmId }, select: { slug: true } })
+    return { ok: true, slug }
+  })
+  if ('error' in ergebnis) return ergebnis
+
+  revalidiereTesthof(ergebnis.slug)
   return { ok: true }
 }

@@ -40,7 +40,7 @@ vi.mock('@/server/actions/admin', () => ({
   setzeGruendungBisAction: vi.fn(),
   triageMeldungAction: vi.fn(),
 }))
-vi.mock('@/server/actions/gruendung', () => ({ nimmAusGruendung: vi.fn(), nimmWiederAuf: vi.fn() }))
+vi.mock('@/server/actions/gruendung', () => ({ nimmAusGruendung: vi.fn(), nimmWiederAuf: vi.fn(), markiereAlsTesthof: vi.fn(), nimmTesthofZurueck: vi.fn() }))
 vi.mock('@/components/hof-bestellungen/bestell-dialog', () => ({
   BestellDialog: ({ offen, titel, unterzeile, children }: { offen: boolean; titel: string; unterzeile?: string; children?: ReactNode }) =>
     offen ? createElement('section', { 'aria-label': titel }, createElement('h2', null, titel), unterzeile, children) : null,
@@ -52,7 +52,7 @@ import { HofAktionDialog } from '@/components/admin/hof-aktion-dialog'
 import { GruendungBisDialog } from '@/components/admin/gruendung-bis-dialog'
 import { GruendungAusnehmenDialog } from '@/components/admin/gruendung-ausnehmen-dialog'
 import { GRUENDUNG_AUSNEHMEN_TEXT, gruendungAenderung } from '@/lib/admin-hoefe-seite'
-import { adminHofZeile, FREISCHALTUNG_STRIPE_OFFEN_TEXT, type HofRohdaten } from '@/lib/admin-hoefe'
+import { adminHofZeile, FREISCHALTUNG_STRIPE_OFFEN_TEXT, KEIN_KARTENPUNKT_TEXT, type HofRohdaten } from '@/lib/admin-hoefe'
 import { GRUENDUNG_BIS_STANDARD, GRUENDUNG_EINSTELLUNG_STANDARD, freischaltHinweis, gruendungsKonditionenText, type GruendungAnzeige } from '@/lib/gruendungshof'
 
 const JETZT = new Date('2026-10-07T10:00:00+02:00')
@@ -85,10 +85,12 @@ function hof(ueber: Partial<HofRohdaten>, platz: number | null = null, gruendung
     betriebsnummer: null,
     sepaErteilt: false,
     gruendungAusgenommen: false,
+    istTesthof: false,
+    hatKartenpunkt: true,
     produktImShop: true,
     ...ueber,
   }
-  return { ...adminHofZeile(roh, { gruendungsplatz: platz, maxPlaetze: 12 }, JETZT), aktivitaet: { ...LEER, produkte: 2 }, gruendung, platzBeiFreischaltung, gruendungAenderung: null, gruendungZuletzt: null }
+  return { ...adminHofZeile(roh, { gruendungsplatz: platz, maxPlaetze: 12 }, JETZT), aktivitaet: { ...LEER, produkte: 2 }, gruendung, platzBeiFreischaltung, gruendungAenderung: null, gruendungZuletzt: null, testhofAenderung: null }
 }
 
 function render(hoefe: AdminHof[]): string {
@@ -348,17 +350,43 @@ describe('Seitenmuster der Höfe (Nr. 94, Register N15)', () => {
     expect(stand(bestand())).toContain('Gründungsplätze zählen in der Reihenfolge der Freischaltung.')
   })
 
-  it('ein ausgenommener Hof trägt in Tabelle und Karte die Marke „ausgenommen · Testhof“ (Register K2, Nr. 109)', () => {
+  it('ein ausgenommener Hof trägt in Tabelle und Karte die Marke „ausgenommen“ (Register K2, Nr. 109; seit Nr. 119 ohne „Testhof“)', () => {
     adresse.parameter = 'reiter=alle'
     const hoefe = [
       { ...hof({ ...online, id: 'a', name: 'Testhof A' }, 1, STANDARD) },
       { ...hof({ ...online, id: 't', name: 'Testhof B', gruendungAusgenommen: true }, null, null) },
     ]
     const html = stand(hoefe, 1)
-    expect(html.match(/ausgenommen · Testhof/g)).toHaveLength(2)
+    expect(html.match(/>ausgenommen<\/span>/g)).toHaveLength(2)
+    expect(html).not.toContain('ausgenommen · Testhof')
     // Gegenprobe: der Hof mit Platz trägt Stern und Nummer, nicht die Marke.
     expect(html).toContain('lucide-star')
     expect(html).toContain('Nr. 1 · bis 31.12.2027')
+  })
+
+  it('ein Testhof trägt in Tabelle und Karte nur die Marke „Testhof“ — nie zusätzlich „ausgenommen“ (Register N21, Nr. 119)', () => {
+    adresse.parameter = 'reiter=alle'
+    const html = stand([hof({ ...online, id: 't', name: 'Sonnhof', gruendungAusgenommen: true, istTesthof: true }, null, null)], 0)
+    expect(html.match(/>Testhof<\/span>/g)).toHaveLength(2)
+    expect(html).not.toMatch(/>ausgenommen<\/span>/)
+    // Im Admin bleibt er sichtbar und zählt mit.
+    expect(html).toContain('1 Hof')
+  })
+
+  it('ohne Kartenpunkt: Warteliste und Zeile nennen es leise, Freischalten bleibt bedienbar (Nr. 119)', () => {
+    const ohnePunkt = [hof({ id: 'w1', name: 'Sonnhof', stripeBereit: true, hatKartenpunkt: false }), hof({ ...online, id: 'a', name: 'Testhof A', hatKartenpunkt: false }, 1, STANDARD)]
+    const warten = stand(ohnePunkt)
+    expect(warten).toContain(KEIN_KARTENPUNKT_TEXT)
+    expect(knopf(warten, 'Freischalten')).not.toContain('disabled=""')
+    // Nie orange: die Zeile steht leise da, nicht in der Farbe der Sperre.
+    const zeile = warten.slice(warten.lastIndexOf('<p class=', warten.indexOf(KEIN_KARTENPUNKT_TEXT)), warten.indexOf(KEIN_KARTENPUNKT_TEXT))
+    expect(zeile).toContain('text-muted-foreground')
+    expect(zeile).not.toContain('text-status-offen')
+    adresse.parameter = 'reiter=alle'
+    // Je einmal in Tabelle und Karte des freigeschalteten Hofs.
+    expect(stand(ohnePunkt).match(new RegExp(KEIN_KARTENPUNKT_TEXT, 'g'))).toHaveLength(2)
+    // Gegenprobe: mit Punkt keine Zeile.
+    expect(stand(bestand())).not.toContain(KEIN_KARTENPUNKT_TEXT)
   })
 })
 

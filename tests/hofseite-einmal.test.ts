@@ -330,7 +330,7 @@ const HOF: PublicFarm = {
   sectionsConfig: [], farmValues: [], farmPhotos: [{ id: 'foto_1', url: '/foto.jpg', caption: null, sortOrder: 0, ausschnitt: null }],
   acceptsOnline: false, acceptsOnsite: true, stripeAccountReady: false, isPaused: true, pauseMessage: null,
   serviceFeePercent: 0, serviceFeeMinCents: 0, serviceFeeActiveFrom: null, betriebsstatus: null,
-  gruendungshof: false, gruendungSeit: null, abzeichenBlatt: null,
+  gruendungshof: false, gruendungSeit: null, abzeichenBlatt: null, istTesthof: false,
   products: [produkt('prod_1', 'Kartoffeln', true), produkt('prod_2', 'Zwiebeln', false)],
   pickupSlots: [{ dayOfWeek: 5, startTime: '15:00', endTime: '18:00' }],
 }

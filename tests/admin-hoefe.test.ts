@@ -61,6 +61,8 @@ function roh(ueber: Partial<HofRohdaten> = {}): HofRohdaten {
     betriebsnummer: '1234567',
     sepaErteilt: false,
     gruendungAusgenommen: false,
+    istTesthof: false,
+    hatKartenpunkt: true,
     produktImShop: true,
     ...ueber,
   }
