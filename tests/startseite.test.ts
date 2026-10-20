@@ -629,10 +629,22 @@ describe('Abschnitte', () => {
 
   it('der Fuß: Weg der Höfe zur Anmeldung, Registrieren, Konditionen', () => {
     const text = html(createElement(StartseiteFuss, { jahr: 2026 }))
-    for (const href of ['/login', '/register', '/konditionen', '/#so-funktionierts']) {
+    for (const href of ['/login', '/register', '/konditionen']) {
       expect(text).toContain(`href="${href}"`)
     }
+    for (const wort of ['Hof registrieren', 'Anmelden für Höfe', 'Konditionen']) expect(text).toContain(`>${wort}</a>`)
     expect(text).toContain(`© 2026 ${MARKE}`)
+  })
+
+  // Nr. 120 Runde 1: „Höfe entdecken" und „So funktioniert's" stehen am Computer im
+  // Seitenfuß direkt darunter (SEITENFUSS.wege) — die Spalte mit der Marke fällt weg.
+  it('kein doppelter Weg: der Fuß der Startseite verlinkt weder /hoefe noch #so-funktionierts', () => {
+    const text = html(createElement(StartseiteFuss, { jahr: 2026 }))
+    for (const href of ['/hoefe', '/#so-funktionierts']) expect(text, href).not.toContain(`href="${href}"`)
+    expect(text).not.toContain(`aria-label="${MARKE}"`)
+    // Gegenprobe: Der Seitenfuß darunter führt beide Wege.
+    const fuss = html(createElement(KundeFuss))
+    for (const href of ['/hoefe', '/#so-funktionierts']) expect(fuss, href).toContain(`href="${href}"`)
   })
 
   // Nr. 120 (Register N22): Impressum, Datenschutz, AGB und „Problem melden" stehen im Seitenfuß der KundeShell direkt darunter.

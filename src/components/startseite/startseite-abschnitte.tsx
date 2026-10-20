@@ -356,16 +356,11 @@ export function Fragen({ jetzt }: { jetzt: Date }): React.JSX.Element {
 }
 
 // Impressum, Datenschutz, AGB und „Problem melden" stehen seit Nr. 120 im
-// Seitenfuß der KundeShell (KundeFuss, Register N22) direkt darunter — hier
-// nicht noch einmal, sonst stünde auf der Startseite alles doppelt.
+// Seitenfuß der KundeShell (KundeFuss, Register N22) direkt darunter, dazu am
+// Computer „Höfe entdecken" und „So funktioniert's" (SEITENFUSS.wege; am Handy
+// in der Unterleiste bzw. auf der Startseite selbst) — hier nicht noch einmal,
+// sonst stünde alles doppelt. Es bleibt der Weg der Höfe.
 const FUSS_SPALTEN = [
-  {
-    titel: MARKE,
-    links: [
-      { href: hoefeAdresse(), text: 'Höfe entdecken' },
-      { href: '/#so-funktionierts', text: 'So funktioniert’s' },
-    ],
-  },
   {
     titel: 'Für Höfe',
     links: [
@@ -390,7 +385,7 @@ export function StartseiteFuss({ jahr }: { jahr: number }): React.JSX.Element {
           </p>
           <p className="text-xs text-muted-foreground">© {jahr} {MARKE}</p>
         </div>
-        <div className="grid grid-cols-2 gap-6 md:flex md:gap-[70px]">
+        <div className="flex gap-6 md:gap-[70px]">
           {FUSS_SPALTEN.map((spalte) => (
             <nav key={spalte.titel} aria-label={spalte.titel} className="flex flex-col gap-1">
               <p className="text-[13px] font-semibold">{spalte.titel}</p>
