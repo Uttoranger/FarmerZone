@@ -180,6 +180,11 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 117 | SEO-Grundlagen und echte 404 | `freigabe.md` §21 | N19 |
 | 118 | Reste aus 110, freigegebene Regelvorschläge, Kleinkram (vom Zwischenstand `integration/lauf17`) | `freigabe.md` §21 | G4 |
 | Sammel 17 | Sammel-PR `integration/lauf17` | `freigabe.md` §21 | G3 |
+| 115 (Lauf 18) | Admin nur mit Passkey (neu von `docs/lauf18`; Migration) | `freigabe.md` §22 | N20 |
+| 119 | Datenqualität: Testhof, Kartenpunkt-Hinweis, Satz beim Festschreiben (Migration) | `freigabe.md` §22 | N21, K2 |
+| 120 | Entdecken v2 auf /hoefe (vom Branch der Nr. 119) | `freigabe.md` §22 | N22 |
+| 121 | Regelvorschläge aus Lauf 17, Vorschau ohne WIP, Reste und Nacharbeit (vom Zwischenstand `integration/lauf18`) | `freigabe.md` §22 | G4, G7 |
+| Sammel 18 | Sammel-PR `integration/lauf18` | `freigabe.md` §22 | G3 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
@@ -260,6 +265,14 @@ Zwei Migrationen (`<zeit>_gruendung_ausgenommen` in 109, danach `<zeit>_betrieb`
 - Ist 112 nach zwei Runden nicht fertig (Entwurf), zweigt 114 von `docs/lauf17` ab. Ist 114 nicht fertig, entfällt 115 (Lauf 18) – 115 braucht die frische Sitzung und den Geräte-Baustein aus 114.
 
 Drei Migrationen mit festen Namen (`20261019200000_gruendung_aktion` in 116, `20261019210000_geraete` in 114, `20261019220000_admin_passkey` in 115), nur Expand, ohne Seed, ohne Datenänderung, nach Regel 3 mit dem Schema des Basis-Branchs als `--from-schema`; 116 läuft auf einem eigenen Zweig, weil es getrennte Modelle berührt. Ein neues Paket nur in 115 (`@better-auth/passkey` 1.6.23). 112, 113, 117 und 118 ohne Migration. Priorität 112 → 114 → 115 → 113 → 117 → 116 → 118: 112 und 114 müssen fertig werden, 115 und 116 dürfen Entwurf bleiben, 118 zuletzt. Nie zwei Nummern an derselben Code-Datei außerhalb der Grenzen (`freigabe.md` §21).
+
+**Reihenfolge in Lauf 18** (`freigabe.md` §22, Haltepunkt Sammel-PR): Doku-PR → 115 ∥ 119 → 120 (vom Branch der Nr. 119) → 121 → Sammel-PR. Die Branches:
+- 115 und 119 zweigen von `docs/lauf18` ab; ein Workflow je Nummer; 115 startet zuerst (die größte und riskanteste Nummer). 115 bekommt einen neuen Branch mit dem Datum dieses Laufs; der alte Branch `nacht/2026-10-19/115-admin-passkey` bleibt unberührt, das Löschen entscheidet die Projektleitung.
+- Ist 119 fertig, startet 120 vom Branch der Nr. 119.
+- 121 zweigt vom Zwischenstand `integration/lauf18` mit allen fertigen Nummern ab.
+- Entfällt 115 (Paket fehlt), ist Welle 1 nur 119. Ist 119 nach zwei Runden nicht fertig (Entwurf), zweigt 120 von `docs/lauf18` ab; die Abfragen in `src/server/queries/farm.ts` bleiben dann, wie sie sind, und der Sammel-PR führt beide zusammen.
+
+Zwei Migrationen mit festen Namen (`20261020100000_testhof` in 119, `20261020110000_admin_passkey` in 115), nur Expand, ohne Seed, ohne Datenänderung, nach Regel 3 mit dem Schema des Basis-Branchs als `--from-schema`; 115 und 119 laufen auf getrennten Zweigen und berühren getrennte Modelle. Kein neues Paket (`@better-auth/passkey` 1.6.23 kam vorher mit dem Paket-PR, G6). 120 und 121 ohne Migration. Priorität 119 → 115 → 120 → 121: 119 muss fertig werden, 115 und 120 dürfen Entwurf bleiben, 121 zuletzt. Nie zwei Nummern an derselben Code-Datei außerhalb der Grenzen (`freigabe.md` §22).
 
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 
