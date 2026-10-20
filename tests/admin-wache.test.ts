@@ -11,8 +11,13 @@
  *    die `isAdmin: true` behauptet, kommt nicht durch.
  *  - Die Seite verrät sich nicht: angemeldet ohne Recht → 404, nicht → 403.
  *  - Die Aktion navigiert nicht, sie antwortet — { error } wie jede Action.
+ *  - Admin nur mit Passkey (Register N20; Nr. 115): Sitzung älter als 12
+ *    Stunden → abgemeldet und /login/admin; ohne Passkey (oder nach einem
+ *    Ersatzcode ohne neuen) → /admin/einrichten, außer mit `ohnePasskey`;
+ *    frische Bestätigung gilt 5 Minuten (6 → „frisch"); die Exporte leiten
+ *    ohne sie mit 303 auf /admin/bestaetigen, nur mit Pfaden unter /admin.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 // redirect und notFound werfen in Next; hier werfen sie erkennbare Fehler,
@@ -26,23 +31,64 @@ vi.mock('next/navigation', () => ({
   }),
 }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
-vi.mock('@/lib/prisma', () => ({ prisma: { user: { findUnique: vi.fn() } } }))
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    user: { findUnique: vi.fn() },
+    session: { deleteMany: vi.fn(async () => ({ count: 1 })) },
+    passkey: { aggregate: vi.fn() },
+    adminErsatzcode: { aggregate: vi.fn() },
+  },
+}))
 
-import { verlangeAdminAktion, verlangeAdminSeite } from '@/server/admin-wache'
+import { frischOderBestaetigen, verlangeAdminAktion, verlangeAdminSeite, verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 const getSession = vi.mocked(auth.api.getSession)
 const userFindUnique = vi.mocked(prisma.user.findUnique)
+const sessionDeleteMany = vi.mocked(prisma.session.deleteMany)
+const passkeyAggregate = vi.mocked(prisma.passkey.aggregate)
+const ersatzcodeAggregate = vi.mocked(prisma.adminErsatzcode.aggregate)
 
-/** Angemeldet als `id`; was in der DATENBANK steht, sagt `istAdmin`. */
-function melde(id: string | null, istAdmin: boolean | null) {
-  getSession.mockResolvedValue((id === null ? null : { user: { id } }) as never)
+const JETZT = new Date('2026-10-20T10:00:00Z')
+const MINUTE = 60_000
+
+/**
+ * Angemeldet als `id`; was in der DATENBANK steht, sagt `istAdmin`. Die
+ * Sitzung ist frisch angemeldet und frisch mit Passkey bestätigt, das Konto
+ * hat einen Passkey — außer der Fall sagt es anders.
+ */
+function melde(
+  id: string | null,
+  istAdmin: boolean | null,
+  stand: { angemeldetVor?: number; passkeyVor?: number | null; passkeys?: number; ersatzcodeVor?: number | null } = {}
+) {
+  const { angemeldetVor = 0, passkeyVor = 0, passkeys = 1, ersatzcodeVor = null } = stand
+  getSession.mockResolvedValue(
+    (id === null
+      ? null
+      : {
+          user: { id },
+          session: {
+            id: `sitzung-${id}`,
+            createdAt: new Date(JETZT.getTime() - angemeldetVor),
+            passkeyAm: passkeyVor === null ? null : new Date(JETZT.getTime() - passkeyVor),
+          },
+        }) as never
+  )
   userFindUnique.mockResolvedValue((istAdmin === null ? null : { isAdmin: istAdmin }) as never)
+  passkeyAggregate.mockResolvedValue({ _count: { _all: passkeys }, _max: { createdAt: passkeys > 0 ? new Date(JETZT.getTime() - 60 * MINUTE) : null } } as never)
+  ersatzcodeAggregate.mockResolvedValue({ _max: { benutztAm: ersatzcodeVor === null ? null : new Date(JETZT.getTime() - ersatzcodeVor) } } as never)
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(JETZT)
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('verlangeAdminSeite', () => {
@@ -99,5 +145,75 @@ describe('verlangeAdminAktion', () => {
       where: { id: 'user_admin' },
       select: { isAdmin: true },
     })
+  })
+})
+
+describe('Admin nur mit Passkey (Register N20) — 12 Stunden', () => {
+  it('Sitzung genau 12 Stunden alt: abgemeldet (nur die eigene) und zur Admin-Anmeldung', async () => {
+    melde('user_admin', true, { angemeldetVor: 12 * 60 * MINUTE })
+    await expect(verlangeAdminSeite()).rejects.toThrow('REDIRECT:/login/admin')
+    expect(sessionDeleteMany).toHaveBeenCalledWith({ where: { id: 'sitzung-user_admin', userId: 'user_admin' } })
+  })
+
+  it('eine Minute davor gilt sie noch; die Aktion antwortet danach mit dem Satz statt zu navigieren', async () => {
+    melde('user_admin', true, { angemeldetVor: 12 * 60 * MINUTE - MINUTE })
+    await expect(verlangeAdminSeite()).resolves.toBe('user_admin')
+    expect(sessionDeleteMany).not.toHaveBeenCalled()
+    melde('user_admin', true, { angemeldetVor: 13 * 60 * MINUTE })
+    expect(await verlangeAdminAktion()).toEqual({ error: 'Deine Admin-Sitzung ist abgelaufen. Melde dich neu mit deinem Passkey an.' })
+  })
+})
+
+describe('Admin nur mit Passkey (Register N20) — Pflicht in der Wache', () => {
+  it('ohne Passkey leitet die Seite auf /admin/einrichten um — mit ohnePasskey (Layout, Pflichtseite) nicht', async () => {
+    melde('user_admin', true, { passkeys: 0 })
+    await expect(verlangeAdminSeite()).rejects.toThrow('REDIRECT:/admin/einrichten')
+    await expect(verlangeAdminSeite({ ohnePasskey: true })).resolves.toBe('user_admin')
+  })
+
+  it('nach einem Ersatzcode, der jünger ist als der jüngste Passkey: Pflicht; ein älterer nicht', async () => {
+    melde('user_admin', true, { ersatzcodeVor: 5 * MINUTE })
+    await expect(verlangeAdminSeite()).rejects.toThrow('REDIRECT:/admin/einrichten')
+    melde('user_admin', true, { ersatzcodeVor: 2 * 60 * MINUTE })
+    await expect(verlangeAdminSeite()).resolves.toBe('user_admin')
+  })
+
+  it('Aktionen antworten im Pflicht-Zustand mit dem Satz — die Actions der Pflichtseite (ohnePasskey) gehen', async () => {
+    melde('user_admin', true, { passkeys: 0 })
+    expect(await verlangeAdminAktion()).toEqual({ error: 'Richte zuerst deinen Passkey ein.' })
+    expect(await verlangeAdminAktion({ ohnePasskey: true })).toEqual({ ok: true, userId: 'user_admin' })
+  })
+
+  it('ohne Recht kommt die Pflicht gar nicht erst zur Sprache (404, nichts gelesen)', async () => {
+    melde('user_1', false, { passkeys: 0 })
+    await expect(verlangeAdminSeite()).rejects.toThrow('NOT_FOUND')
+    expect(passkeyAggregate).not.toHaveBeenCalled()
+  })
+})
+
+describe('Admin nur mit Passkey (Register N20) — frische Bestätigung', () => {
+  it('5 Minuten nach der Bestätigung mit Passkey: frisch; 6 Minuten oder nie: „frisch" verlangt', async () => {
+    melde('user_admin', true, { passkeyVor: 5 * MINUTE })
+    expect(await verlangeFrischeBestaetigung()).toEqual({ ok: true, userId: 'user_admin', sitzungId: 'sitzung-user_admin' })
+    melde('user_admin', true, { passkeyVor: 6 * MINUTE })
+    expect(await verlangeFrischeBestaetigung()).toEqual({ error: 'frisch' })
+    melde('user_admin', true, { passkeyVor: null })
+    expect(await verlangeFrischeBestaetigung()).toEqual({ error: 'frisch' })
+  })
+
+  it('prüft vorher alles der Aktions-Wache: ohne Recht „Kein Zugriff.", nie „frisch"', async () => {
+    melde('user_1', false, { passkeyVor: null })
+    expect(await verlangeFrischeBestaetigung()).toEqual({ error: 'Kein Zugriff.' })
+  })
+
+  it('Exporte: frisch → weiter (null); sonst 303 auf /admin/bestaetigen mit dem Pfad; eine fremde Adresse wird /admin', async () => {
+    melde('user_admin', true, { passkeyVor: MINUTE })
+    expect(await frischOderBestaetigen('/admin/finanzen/export?jahr=2026')).toBeNull()
+
+    melde('user_admin', true, { passkeyVor: 10 * MINUTE })
+    const antwort = await frischOderBestaetigen('/admin/finanzen/export?jahr=2026')
+    expect(antwort?.status).toBe(303)
+    expect(antwort?.headers.get('location')).toBe('/admin/bestaetigen?weiter=%2Fadmin%2Ffinanzen%2Fexport%3Fjahr%3D2026')
+    expect((await frischOderBestaetigen('https://fremd.example.com/admin'))?.headers.get('location')).toBe('/admin/bestaetigen?weiter=%2Fadmin')
   })
 })

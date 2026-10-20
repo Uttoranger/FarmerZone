@@ -30,7 +30,7 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('next/navigation', () => ({ permanentRedirect: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
-vi.mock('@/server/admin-wache', () => ({ verlangeAdminSeite: vi.fn(async () => undefined) }))
+vi.mock('@/server/admin-wache', () => ({ verlangeAdminSeite: vi.fn(async () => undefined), verlangeFrischeBestaetigung: vi.fn(async () => ({ ok: true, userId: 'admin_1', sitzungId: 'sitzung-admin_1' })), frischOderBestaetigen: vi.fn(async () => null), adminPflichtOffen: vi.fn(async () => false) }))
 vi.mock('@/server/queries/postfach', () => ({
   zaehleOffenImEingang: vi.fn(async () => ({ antworten: 1, meldungen: 0, hoefe: 1, erstattungen: 0 })),
   ladeErstattungAufgaben: vi.fn(async () => []),

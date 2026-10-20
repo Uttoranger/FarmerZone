@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verlangeAdminAktion } from '@/server/admin-wache'
+import { frischOderBestaetigen, verlangeAdminAktion } from '@/server/admin-wache'
 import { ladeAlleMessungen } from '@/server/queries/betrieb'
 import { messungenAlsCsv, utcTag } from '@/lib/betrieb'
 
@@ -18,6 +18,9 @@ const KOPF = { 'Cache-Control': 'no-store' } as const
 export async function GET(): Promise<NextResponse> {
   const wache = await verlangeAdminAktion()
   if ('error' in wache) return new NextResponse('Kein Zugriff.', { status: 403, headers: { ...KOPF, 'Content-Type': 'text/plain; charset=utf-8' } })
+  // Heikler Download (Register N20, Nr. 115): ohne frische Bestätigung 303 auf /admin/bestaetigen.
+  const bestaetigen = await frischOderBestaetigen('/admin/betrieb/export')
+  if (bestaetigen) return bestaetigen
 
   const messungen = await ladeAlleMessungen()
   return new NextResponse(messungenAlsCsv(messungen), {

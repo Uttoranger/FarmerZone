@@ -11,7 +11,9 @@ import { STRIPE_MARKE, TESTBETRIEB } from '@/lib/umgebung-server'
  *
  * Zugang: ladeAdminbereich prüft zuerst mit verlangeAdminSeite (frisch aus
  * der Datenbank), erst danach lädt es Name und Zähler. Jede Seite darunter
- * prüft zusätzlich selbst (tests/admin-seiten-wache.test.ts).
+ * prüft zusätzlich selbst (tests/admin-seiten-wache.test.ts). Ohne Passkey
+ * (Pflicht, Register N20) kommt die Shell ohne Zähler und Betriebshinweis —
+ * das Layout umhüllt auch die Pflichtseite /admin/einrichten.
  */
 export const metadata: Metadata = {
   robots: { index: false, follow: false },

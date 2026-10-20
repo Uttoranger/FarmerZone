@@ -31,7 +31,7 @@ vi.mock('@/lib/nach-der-antwort', () => ({
     nachlauf.aufgaben.push(aufgabe)
   },
 }))
-vi.mock('@/lib/prisma', () => {
+vi.mock('@/lib/prisma', async () => {
   const tx = {
     unterhaltung: { updateMany: vi.fn(async () => ({ count: 1 })) },
     nachricht: { create: vi.fn(async () => ({})) },
@@ -39,6 +39,8 @@ vi.mock('@/lib/prisma', () => {
   }
   return {
     prisma: {
+      // Die Wache liest seit Nr. 115 die Pflicht „erst Passkey“ (tests/admin-sitzung.ts).
+      ...(await import('./admin-sitzung')).passkeyAttrappen(),
       user: { findUnique: vi.fn() },
       order: { updateMany: vi.fn() },
       $transaction: vi.fn(async (arbeit: (t: typeof tx) => Promise<unknown>) => arbeit(tx)),
@@ -53,6 +55,7 @@ import { sendHofAntwortAnTeam } from '@/lib/email'
 import { zaehleVersuche, type Versuch } from '@/server/bremse-datenbank'
 import { DB_BREMSEN, fensterBeginn } from '@/lib/bremse-datenbank'
 import { antworteAlsHof, markiereErstattungErledigt } from '@/server/actions/postfach'
+import { adminSitzung } from './admin-sitzung'
 
 const getSession = vi.mocked(auth.api.getSession)
 const userFindUnique = vi.mocked(prisma.user.findUnique)
@@ -68,7 +71,7 @@ async function arbeiteNachlaufAb(): Promise<void> {
 beforeEach(() => {
   vi.clearAllMocks()
   nachlauf.aufgaben.length = 0
-  getSession.mockResolvedValue({ user: { id: 'admin_1' } } as never)
+  getSession.mockResolvedValue(adminSitzung('admin_1') as never)
   userFindUnique.mockResolvedValue({ isAdmin: true } as never)
   orderUpdateMany.mockResolvedValue({ count: 1 })
 })
@@ -111,7 +114,7 @@ describe('Drossel: „Ein Hof hat geantwortet" höchstens einmal je Faden und vo
   beforeEach(() => {
     zaehler.clear()
     vi.useFakeTimers({ toFake: ['Date'] })
-    getSession.mockResolvedValue({ user: { id: 'hof_1' } } as never)
+    getSession.mockResolvedValue(adminSitzung('hof_1') as never)
     vi.mocked(zaehleVersuche).mockImplementation(async (versuche: readonly Versuch[], jetzt: Date = new Date()) =>
       versuche.map(({ bremse, merkmal }) => {
         const schluessel = `${bremse.zweck}|${merkmal}|${fensterBeginn(jetzt, bremse.fensterMs).getTime()}`

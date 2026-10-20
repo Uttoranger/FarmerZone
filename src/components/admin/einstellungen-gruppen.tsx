@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ChevronDown, Globe, Star, type LucideIcon } from 'lucide-react'
+import { ChevronDown, Globe, KeyRound, Star, type LucideIcon } from 'lucide-react'
 import {
   EINSTELLUNGEN_GRUPPEN,
   EINSTELLUNGEN_TEXT,
@@ -12,7 +12,7 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Chip } from '@/components/ui/chip'
 import { EinstellungenGruendung, type GruendungFormularDaten } from '@/components/admin/einstellungen-gruendung'
 
-const SYMBOL: Record<EinstellungenGruppe, LucideIcon> = { gruendung: Star, plattform: Globe }
+const SYMBOL: Record<EinstellungenGruppe, LucideIcon> = { gruendung: Star, plattform: Globe, anmeldung: KeyRound }
 
 const H2 = 'font-heading text-lg font-semibold text-foreground'
 
@@ -98,6 +98,7 @@ export function EinstellungenGruppen({ daten }: { daten: EinstellungenDaten }): 
   const zeileHandy: Record<EinstellungenGruppe, string> = {
     gruendung: daten.gruendungZeile,
     plattform: `${PLATTFORM_ANGABEN.name} · ${PLATTFORM_ANGABEN.adresse}`,
+    anmeldung: EINSTELLUNGEN_TEXT.gruppe.anmeldung.zeile,
   }
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start lg:gap-[18px]">
@@ -139,6 +140,18 @@ export function EinstellungenGruppen({ daten }: { daten: EinstellungenDaten }): 
                   </>
                 )}
                 {gruppe === 'plattform' && <Plattform />}
+                {/* Anmeldung (Register N20) hat eine eigene Seite — hier nur der Weg dorthin. */}
+                {gruppe === 'anmeldung' && (
+                  <>
+                    <p className="text-[13px] leading-snug text-muted-foreground">{EINSTELLUNGEN_TEXT.gruppe.anmeldung.satz}</p>
+                    <Link
+                      href={einstellungenGruppeHref('anmeldung')}
+                      className={cn('inline-flex min-h-11 items-center self-start rounded-full text-[14px] font-semibold text-status-fertig underline underline-offset-2', FOKUS_RAHMEN)}
+                    >
+                      {EINSTELLUNGEN_TEXT.gruppe.anmeldung.link}
+                    </Link>
+                  </>
+                )}
               </section>
             </details>
           )

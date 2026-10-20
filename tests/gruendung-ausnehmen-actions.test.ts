@@ -20,9 +20,11 @@ vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn(), unstable_cache: (fn: unknown) => fn }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/email', () => ({ sendFreischaltungEmail: vi.fn(async () => ({})) }))
-vi.mock('@/lib/prisma', () => {
+vi.mock('@/lib/prisma', async () => {
   const prisma: Record<string, unknown> = {
     farm: { findUnique: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
+    // Die Wache liest seit Nr. 115 die Pflicht „erst Passkey“ (tests/admin-sitzung.ts).
+    ...(await import('./admin-sitzung')).passkeyAttrappen(),
     user: { findUnique: vi.fn() },
     plattformEinstellung: { findUnique: vi.fn() },
     nachricht: { findFirst: vi.fn(async () => null) },
@@ -47,6 +49,7 @@ import {
 } from '@/schemas/gruendung'
 import { nimmAusGruendung, nimmWiederAuf } from '@/server/actions/gruendung'
 import { approveFarmAction } from '@/server/actions/admin'
+import { adminSitzung } from './admin-sitzung'
 
 const getSession = vi.mocked(auth.api.getSession)
 const db = prisma as unknown as {
@@ -93,7 +96,7 @@ const PFADE = ['/admin', '/admin/einstellungen', '/fuer-hoefe', '/register', '/'
 
 beforeEach(() => {
   vi.clearAllMocks()
-  getSession.mockResolvedValue({ user: { id: 'admin_1' } } as never)
+  getSession.mockResolvedValue(adminSitzung('admin_1') as never)
   db.user.findUnique.mockResolvedValue({ isAdmin: true })
   db.farm.updateMany.mockResolvedValue({ count: 1 })
   einstellung(12)

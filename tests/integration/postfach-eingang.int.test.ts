@@ -73,7 +73,7 @@ import { antworteAlsHof, fuegeEmpfaengerHinzu, sendeRundschreiben, speichereZust
 import { bestaetigeEmpfaenger } from '@/server/zustellung-bestaetigen'
 import { empfaengerTokenHash, ladeBetreiberEmpfaenger, ladeEingang, zaehleOffenImEingang } from '@/server/queries/postfach'
 import { INTEGRATIONS_ENV } from './setup/integrations-umgebung'
-import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf } from './setup/basis'
+import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf, machePasskeyAdmin } from './setup/basis'
 
 const MIGRATION = readFileSync(join(process.cwd(), 'prisma', 'migrations', '20261015130000_postfach_stufe2', 'migration.sql'), 'utf8')
 const SUPPORT = SUPPORT_EMAIL.toLowerCase()
@@ -107,7 +107,7 @@ async function alsSitzung(cookie: string): Promise<void> {
 
 async function erstelleAdmin(): Promise<{ cookie: string }> {
   const { ownerId, cookie } = await erstelleHofMitAnmeldung()
-  await prisma.user.update({ where: { id: ownerId }, data: { isAdmin: true } })
+  await machePasskeyAdmin(ownerId)
   return { cookie }
 }
 

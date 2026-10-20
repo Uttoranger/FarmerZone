@@ -142,6 +142,21 @@ export async function erstelleHofMitAnmeldung(
   return { farm, ownerId: owner.id, cookie }
 }
 
+/**
+ * Macht ein Konto zum Admin, wie die Admin-Wache ihn seit Nr. 115 verlangt
+ * (Register N20): Recht, ein Passkey (ohne echtes Gerät — die Wache zählt nur
+ * Zeilen) und frisch bestätigte Sitzungen. Für Tests, die Admin-Aktionen
+ * prüfen, nicht die Anmeldung selbst (die prüft admin-passkey.int.test.ts).
+ * Die Zeilen gehen mit dem Konto per Cascade.
+ */
+export async function machePasskeyAdmin(userId: string): Promise<void> {
+  await prisma.user.update({ where: { id: userId }, data: { isAdmin: true } })
+  await prisma.passkey.create({
+    data: { id: intKennung('passkey'), userId, publicKey: 'int-schluessel', credentialID: intKennung('credential'), counter: 0, deviceType: 'singleDevice', backedUp: false },
+  })
+  await prisma.session.updateMany({ where: { userId }, data: { passkeyAm: new Date() } })
+}
+
 export async function erstelleProdukt(
   farmId: string,
   abweichend: { stock?: number; vatRate?: number; abgabe?: Abgabe; price?: number; name?: string } = {}

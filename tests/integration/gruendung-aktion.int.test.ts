@@ -32,7 +32,7 @@ import { GRUENDUNG_BIS_STANDARD } from '@/lib/gruendungshof'
 import { approveFarmAction, revokeFarmApprovalAction } from '@/server/actions/admin'
 import { archiveFarm, reactivateFarm } from '@/server/actions/farm-archive'
 import { schreibeZusagenFest } from '@/server/actions/gruendung'
-import { erstelleHof, erstelleHofMitAnmeldung, erstelleProdukt, raeumeAuf } from './setup/basis'
+import { erstelleHof, erstelleHofMitAnmeldung, erstelleProdukt, raeumeAuf, machePasskeyAdmin } from './setup/basis'
 
 type Zeile = Awaited<ReturnType<typeof prisma.plattformEinstellung.findUnique>>
 let vorher: Zeile = null
@@ -53,7 +53,7 @@ afterEach(async () => {
 /** Ein Admin mit echter Sitzung; das Cookie geht über das gemockte headers() an die Action. */
 async function alsAdmin(): Promise<string> {
   const { ownerId, cookie } = await erstelleHofMitAnmeldung()
-  await prisma.user.update({ where: { id: ownerId }, data: { isAdmin: true } })
+  await machePasskeyAdmin(ownerId)
   vi.mocked(headers).mockResolvedValue(new Headers({ cookie }) as never)
   return cookie
 }

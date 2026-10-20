@@ -32,12 +32,14 @@ vi.mock('@/server/abholfenster', async (original) => ({
     fenster: { datum: '', start: '', ende: '', slot: { id: 'slot_1', dayOfWeek: 0, startTime: '', endTime: '', maxOrders: null, isActive: true } },
   })),
 }))
-vi.mock('@/lib/prisma', () => {
+vi.mock('@/lib/prisma', async () => {
   const prisma: Record<string, unknown> = {
     // Die Höfe der Platzvergabe (Freischaltung, in der Transaktion): ohne Eintrag keine Gründungs-Nachricht.
     farm: { findUnique: vi.fn(), findMany: vi.fn(async () => []), create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     product: { findUnique: vi.fn(), update: vi.fn(), createMany: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     stockReservation: { aggregate: vi.fn(), deleteMany: vi.fn(), upsert: vi.fn(), findMany: vi.fn() },
+    // Die Wache liest seit Nr. 115 die Pflicht „erst Passkey“ (tests/admin-sitzung.ts).
+    ...(await import('./admin-sitzung')).passkeyAttrappen(),
     user: { findUnique: vi.fn(), update: vi.fn() },
     order: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn() },
     customerFarmSubscription: { findUnique: vi.fn(), upsert: vi.fn() },
@@ -71,6 +73,7 @@ import { EMAIL_BESTAETIGUNG_STICHTAG, FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/l
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { FREISCHALTUNG_GEAENDERT_TEXT, FREISCHALTUNG_STRIPE_OFFEN_TEXT } from '@/lib/admin-hoefe'
+import { adminSitzung } from './admin-sitzung'
 
 /**
  * Seit dem Checkout-Sprint prüft POST /api/checkout die Reservierungsfrist und
@@ -208,7 +211,7 @@ beforeEach(() => {
   farmUpdate.mockResolvedValue({} as never)
   farmUpdateMany.mockResolvedValue({ count: 1 } as never)
   farmCreate.mockResolvedValue({ id: 'farm_neu', slug: 'neuer-hof', name: 'Neuer Hof' } as never)
-  getSession.mockResolvedValue({ user: { id: 'user_1', email: 'franz@test.local' } } as never)
+  getSession.mockResolvedValue(adminSitzung('user_1', { email: 'franz@test.local' }) as never)
 })
 
 // alterFormToken() stellt die Uhr — sie darf nicht in den nächsten Test lecken.
@@ -609,7 +612,7 @@ describe('Freigabe-Actions', () => {
 
   it('liest das Admin-Recht aus der Datenbank, nicht aus der Session', async () => {
     // Session behauptet isAdmin — die Datenbank sagt nein. Die DB gewinnt.
-    getSession.mockResolvedValue({ user: { id: 'user_1', isAdmin: true } } as never)
+    getSession.mockResolvedValue(adminSitzung('user_1', { isAdmin: true }) as never)
     userFindUnique.mockResolvedValue({ isAdmin: false } as never)
 
     const result = await approveFarmAction('farm_1')
@@ -624,7 +627,7 @@ describe('Freigabe-Actions', () => {
 describe('Registrierung ohne Einladungscode', () => {
   it('läuft ohne Code durch, auch wenn FARMER_SIGNUP_CODE gesetzt ist', async () => {
     vi.stubEnv('FARMER_SIGNUP_CODE', 'geheim')
-    signUpEmail.mockResolvedValue({ user: { id: 'user_neu' } } as never)
+    signUpEmail.mockResolvedValue(adminSitzung('user_neu') as never)
 
     const result = await registerFarmer({
       firstName: 'Franz',

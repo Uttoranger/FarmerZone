@@ -35,7 +35,7 @@ vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn(async () => ({ user: { id: 'nutzer-1' } })) } } }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: vi.fn(async () => ({ id: 'hof-1', slug: 'hof-eins' })) }))
-vi.mock('@/server/admin-wache', () => ({ verlangeAdminSeite: vi.fn(async () => undefined) }))
+vi.mock('@/server/admin-wache', () => ({ verlangeAdminSeite: vi.fn(async () => undefined), verlangeFrischeBestaetigung: vi.fn(async () => ({ ok: true, userId: 'admin_1', sitzungId: 'sitzung-admin_1' })), frischOderBestaetigen: vi.fn(async () => null), adminPflichtOffen: vi.fn(async () => false) }))
 
 vi.mock('@/server/queries/analytics', () => ({
   getUmsatzAuswertung: vi.fn(async () => ({

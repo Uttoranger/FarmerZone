@@ -7,6 +7,7 @@ import { KONDITIONEN_DERZEIT } from '@/lib/konditionen'
 import type { AdminHofZeile } from '@/lib/admin-hoefe'
 import { BestellDialog, DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { useFrischBestaetigt } from '@/components/admin/frisch-bestaetigen'
 
 export type HofAktion = { hof: AdminHofZeile; art: 'approve' | 'revoke' | 'reject' }
 
@@ -42,6 +43,9 @@ export function HofAktionDialog({
 }): React.JSX.Element {
   const [laeuft, startTransition] = useTransition()
   const [fehler, setFehler] = useState<string | null>(null)
+  // Zurücknehmen und Ablehnen sind heikel (Register N20): frisch mit Passkey bestätigt.
+  const frischZuruecknehmen = useFrischBestaetigt(revokeFarmApprovalAction)
+  const frischAblehnen = useFrischBestaetigt(rejectFarmAction)
   const art = aktion?.art ?? 'approve'
   const hof = aktion?.hof
 
@@ -59,8 +63,8 @@ export function HofAktionDialog({
         art === 'approve'
           ? await approveFarmAction(hof.id)
           : art === 'revoke'
-            ? await revokeFarmApprovalAction(hof.id)
-            : await rejectFarmAction(hof.id)
+            ? await frischZuruecknehmen.ausfuehren(hof.id)
+            : await frischAblehnen.ausfuehren(hof.id)
       if (ergebnis.error) {
         // Der Grund (Stripe fehlt, Bestellungen am Hof …) steht im Dialog —
         // der Betreiber sieht, warum nichts passiert ist.
@@ -88,6 +92,8 @@ export function HofAktionDialog({
       unterzeile={hof?.name}
       hauptaktion={{ text: KNOPF[art], onClick: ausfuehren, ton: art === 'approve' ? 'gruen' : 'orange', laeuft }}
     >
+      {frischZuruecknehmen.dialog}
+      {frischAblehnen.dialog}
       <div className="flex flex-col gap-3 text-[14px] text-muted-foreground">
         {art === 'approve' ? (
           <>

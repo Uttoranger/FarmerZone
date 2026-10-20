@@ -14,10 +14,12 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/prisma', () => ({
+vi.mock('@/lib/prisma', async () => ({
   prisma: {
     plattformEinstellung: { findUnique: vi.fn(), upsert: vi.fn() },
     farm: { findMany: vi.fn() },
+    // Die Wache liest seit Nr. 115 die Pflicht „erst Passkey“ (tests/admin-sitzung.ts).
+    ...(await import('./admin-sitzung')).passkeyAttrappen(),
     user: { findUnique: vi.fn() },
     $executeRaw: vi.fn(),
     $transaction: vi.fn(),
@@ -48,6 +50,7 @@ import {
 import { einstellungenGruppeSchema, gruendungEinstellungSchema } from '@/schemas/plattform-einstellung'
 import { speichereGruendungEinstellung } from '@/server/actions/plattform-einstellung'
 import { EinstellungenGruendung, type GruendungFormularDaten } from '@/components/admin/einstellungen-gruendung'
+import { adminSitzung } from './admin-sitzung'
 
 const JETZT = new Date('2026-10-15T10:00:00+02:00')
 const GUT = { plaetze: 12, monate: 24, aktionBisTag: null, anzeige: true }
@@ -217,7 +220,7 @@ describe('speichereGruendungEinstellung — die Wache, die Sperre und was geschr
   })
 
   function angemeldet(isAdmin: boolean) {
-    getSession.mockResolvedValue({ user: { id: 'konto-1' } } as never)
+    getSession.mockResolvedValue(adminSitzung('konto-1') as never)
     p.user.findUnique.mockResolvedValue({ isAdmin } as never)
   }
 

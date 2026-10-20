@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { verlangeAdminAktion } from '@/server/admin-wache'
+import { frischOderBestaetigen, verlangeAdminAktion } from '@/server/admin-wache'
 import { aktuellerFinanzMonat, getFinanzenJahr } from '@/server/queries/finanzen'
 import { jahrAlsCsv } from '@/lib/finanzen'
 import { finanzenJahrAus } from '@/schemas/admin-reiter'
@@ -23,6 +23,9 @@ const KOPF = { 'Cache-Control': 'no-store' } as const
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const wache = await verlangeAdminAktion()
   if ('error' in wache) return new NextResponse('Kein Zugriff.', { status: 403, headers: { ...KOPF, 'Content-Type': 'text/plain; charset=utf-8' } })
+  // Heikler Download (Register N20, Nr. 115): ohne frische Bestätigung 303 auf /admin/bestaetigen.
+  const bestaetigen = await frischOderBestaetigen(`${request.nextUrl.pathname}${request.nextUrl.search}`)
+  if (bestaetigen) return bestaetigen
 
   const jetzt = new Date()
   const laufendesJahr = Number(aktuellerFinanzMonat(jetzt).slice(0, 4))

@@ -16,7 +16,7 @@ import { NextRequest } from 'next/server'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-const wache = vi.hoisted(() => ({ verlangeAdminAktion: vi.fn(), verlangeAdminSeite: vi.fn(async () => 'admin_1') }))
+const wache = vi.hoisted(() => ({ verlangeAdminAktion: vi.fn(), verlangeAdminSeite: vi.fn(async () => 'admin_1'), verlangeFrischeBestaetigung: vi.fn(async () => ({ ok: true, userId: 'admin_1', sitzungId: 'sitzung-admin_1' })), frischOderBestaetigen: vi.fn(async () => null), adminPflichtOffen: vi.fn(async () => false) }))
 vi.mock('@/server/admin-wache', () => wache)
 vi.mock('@/lib/prisma', async () => ({ prisma: (await import('./finanzen-jahr-daten')).prismaAttrappe }))
 vi.mock('@/lib/umgebung-server', async (importOriginal) => ({

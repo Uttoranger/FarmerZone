@@ -49,7 +49,7 @@ import { sendRaw, sendPostfachMail } from '@/lib/email'
 import { WUENSCHE_TEXT, kiEntscheidung, waehleZuLoeschende } from '@/lib/meldung'
 import { fasseZusammenAction, legeMeldungAbAction, setzeBuendelStandAction, trenneDuplikatAction, triageMeldungAction } from '@/server/actions/admin'
 import { findeHauptmeldungen, findeLoeschKandidaten, getMeldungenFuerHof } from '@/server/queries/meldung'
-import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf } from './setup/basis'
+import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf, machePasskeyAdmin } from './setup/basis'
 
 const meldungIds: string[] = []
 // Better Auth vergibt die Kennung des Kontos selbst (ohne „int-") — die Rundschreiben des Bescheids hängen an ihr.
@@ -71,7 +71,7 @@ async function alsSitzung(cookie: string): Promise<void> {
 
 async function erstelleAdmin(): Promise<{ cookie: string; userId: string }> {
   const { ownerId, cookie } = await erstelleHofMitAnmeldung()
-  await prisma.user.update({ where: { id: ownerId }, data: { isAdmin: true } })
+  await machePasskeyAdmin(ownerId)
   adminIds.push(ownerId)
   return { cookie, userId: ownerId }
 }

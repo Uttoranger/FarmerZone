@@ -15,9 +15,11 @@ vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendFreischaltungEmail: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
-vi.mock('@/lib/prisma', () => ({
+vi.mock('@/lib/prisma', async () => ({
   prisma: {
     farm: { findUnique: vi.fn(), update: vi.fn() },
+    // Die Wache liest seit Nr. 115 die Pflicht „erst Passkey“ (tests/admin-sitzung.ts).
+    ...(await import('./admin-sitzung')).passkeyAttrappen(),
     user: { findUnique: vi.fn() },
   },
 }))
@@ -37,6 +39,7 @@ import { MINDESTGEBUEHR_UNGUELTIG } from '@/lib/admin-hoefe'
 import { centsAlsEuro, formatEuro } from '@/lib/format'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { adminSitzung } from './admin-sitzung'
 
 const getSession = vi.mocked(auth.api.getSession)
 const userFindUnique = vi.mocked(prisma.user.findUnique)
@@ -47,7 +50,7 @@ const GUELTIG = { percent: 4.9, minCents: 50, activeFrom: '2026-10-01' }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  getSession.mockResolvedValue({ user: { id: 'admin_1' } } as never)
+  getSession.mockResolvedValue(adminSitzung('admin_1') as never)
   userFindUnique.mockResolvedValue({ isAdmin: true } as never)
   farmFindUnique.mockResolvedValue({ slug: 'welszucht' } as never)
   farmUpdate.mockResolvedValue({} as never)
@@ -73,7 +76,7 @@ describe('setServiceFeeAction — Zugriff', () => {
   })
 
   it('das Recht kommt aus der Datenbank, nicht aus der Session', async () => {
-    getSession.mockResolvedValue({ user: { id: 'user_1', isAdmin: true } } as never)
+    getSession.mockResolvedValue(adminSitzung('user_1', { isAdmin: true }) as never)
     userFindUnique.mockResolvedValue({ isAdmin: false } as never)
     const result = await setServiceFeeAction('farm_1', GUELTIG)
     expect(result.error).toBe('Kein Zugriff.')

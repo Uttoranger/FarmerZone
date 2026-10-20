@@ -6,6 +6,7 @@ import { EINGANG_TEXT } from '@/lib/postfach'
 import { markiereErstattungErledigt } from '@/server/actions/postfach'
 import { cn } from '@/lib/utils'
 import { KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { useFrischBestaetigt } from '@/components/admin/frisch-bestaetigen'
 
 /**
  * „Erstattung erledigt" in der Aufgabe „Erstattung offen" (Register N14,
@@ -22,6 +23,8 @@ export function ErstattungErledigt({ orderId }: { orderId: string }): React.JSX.
   const frage = useRef<HTMLParagraphElement>(null)
   const knopf = useRef<HTMLButtonElement>(null)
   const warOffen = useRef(false)
+  // „Erstattung erledigt" ist heikel (Register N20): frisch mit Passkey bestätigt.
+  const frischErledigt = useFrischBestaetigt(markiereErstattungErledigt)
 
   // Der Fokus folgt der Rückfrage und kehrt beim Abbrechen zum Knopf zurück.
   useEffect(() => {
@@ -41,7 +44,7 @@ export function ErstattungErledigt({ orderId }: { orderId: string }): React.JSX.
   function bestaetige(): void {
     setFehler(null)
     starte(async () => {
-      const ergebnis = await markiereErstattungErledigt({ orderId })
+      const ergebnis = await frischErledigt.ausfuehren({ orderId })
       if ('error' in ergebnis) {
         setFehler(ergebnis.error)
         return
@@ -63,6 +66,7 @@ export function ErstattungErledigt({ orderId }: { orderId: string }): React.JSX.
           {EINGANG_TEXT.erstattungErledigtJa}
         </button>
       </div>
+      {frischErledigt.dialog}
       {fehler && (
         <p role="alert" className="text-[13px] text-destructive">
           {fehler}

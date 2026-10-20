@@ -3,7 +3,7 @@
 import { revalidatePath, updateTag } from 'next/cache'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { verlangeAdminAktion } from '@/server/admin-wache'
+import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { ladeHoefeFuerFestschreiben, ladeHoefeFuerGruendung, leseGruendungEinstellung } from '@/server/queries/admin'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { ADMIN_EINSTELLUNGEN_HREF, EINSTELLUNGEN_TEXT, PLATTFORM_EINSTELLUNG_ID, PLATTFORM_EINSTELLUNG_TAG } from '@/lib/plattform-einstellung'
@@ -71,6 +71,9 @@ function revalidiereGruendung(): void {
  * das Ende bleibt gespeichert — eine spätere Wiederaufnahme wird nie kürzer.
  */
 export async function nimmAusGruendung(eingabe: unknown): Promise<Ergebnis> {
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  const frisch = await verlangeFrischeBestaetigung()
+  if ('error' in frisch) return { error: frisch.error }
   const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
 
@@ -108,6 +111,9 @@ export async function nimmAusGruendung(eingabe: unknown): Promise<Ergebnis> {
  * Bedingt geschrieben (`gruendungAusgenommen: true`).
  */
 export async function nimmWiederAuf(eingabe: unknown): Promise<Ergebnis> {
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  const frisch = await verlangeFrischeBestaetigung()
+  if ('error' in frisch) return { error: frisch.error }
   const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
 
@@ -169,6 +175,9 @@ export async function nimmWiederAuf(eingabe: unknown): Promise<Ergebnis> {
  * Keine Nachricht, keine Mail: Für die Höfe ändert sich nur das Datum.
  */
 export async function schreibeZusagenFest(eingabe: unknown): Promise<Ergebnis> {
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  const frisch = await verlangeFrischeBestaetigung()
+  if ('error' in frisch) return { error: frisch.error }
   const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
 

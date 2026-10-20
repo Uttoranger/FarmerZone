@@ -15,8 +15,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
-vi.mock('@/lib/prisma', () => ({
+vi.mock('@/lib/prisma', async () => ({
   prisma: {
+    // Die Wache liest seit Nr. 115 die Pflicht „erst Passkey“ (tests/admin-sitzung.ts).
+    ...(await import('./admin-sitzung')).passkeyAttrappen(),
     user: { findUnique: vi.fn() },
     kostenposten: {
       create: vi.fn(),
@@ -36,6 +38,7 @@ import {
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
+import { adminSitzung } from './admin-sitzung'
 
 const getSession = vi.mocked(auth.api.getSession)
 const userFindUnique = vi.mocked(prisma.user.findUnique)
@@ -54,7 +57,7 @@ const GUELTIG = {
 }
 
 function alsAdmin() {
-  getSession.mockResolvedValue({ user: { id: 'user_admin' } } as never)
+  getSession.mockResolvedValue(adminSitzung('user_admin') as never)
   userFindUnique.mockResolvedValue({ isAdmin: true } as never)
 }
 
@@ -75,7 +78,7 @@ describe('Zugriff', () => {
   })
 
   it('lässt einen angemeldeten Nicht-Admin nicht schreiben', async () => {
-    getSession.mockResolvedValue({ user: { id: 'user_1' } } as never)
+    getSession.mockResolvedValue(adminSitzung('user_1') as never)
     userFindUnique.mockResolvedValue({ isAdmin: false } as never)
     expect(await kostenpostenAnlegen(GUELTIG)).toEqual({ error: 'Kein Zugriff.' })
     expect(create).not.toHaveBeenCalled()

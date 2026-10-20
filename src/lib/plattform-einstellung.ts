@@ -190,13 +190,15 @@ export function pruefeGruendungEingabe(eingabe: GruendungEingabe, bisher: Gruend
  * entfiel mit Nr. 103 (N15 geändert): Der Stripe-Modus steht in Admin ›
  * Betrieb, `?gruppe=betrieb` leitet dorthin um (src/app/admin/einstellungen/page.tsx).
  */
-export const EINSTELLUNGEN_GRUPPEN = ['gruendung', 'plattform'] as const
+// „Anmeldung" (Register N20, Nr. 115) ist eine eigene Seite: /admin/einstellungen/anmeldung.
+export const EINSTELLUNGEN_GRUPPEN = ['gruendung', 'plattform', 'anmeldung'] as const
 export type EinstellungenGruppe = (typeof EINSTELLUNGEN_GRUPPEN)[number]
 
 export const ADMIN_EINSTELLUNGEN_HREF = '/admin/einstellungen'
 
 /** Der Weg zu einer Gruppe — die erste ohne Abfrage. */
 export function einstellungenGruppeHref(gruppe: EinstellungenGruppe): string {
+  if (gruppe === 'anmeldung') return `${ADMIN_EINSTELLUNGEN_HREF}/anmeldung`
   return gruppe === 'gruendung' ? ADMIN_EINSTELLUNGEN_HREF : `${ADMIN_EINSTELLUNGEN_HREF}?gruppe=${gruppe}`
 }
 
@@ -210,6 +212,7 @@ export const EINSTELLUNGEN_TEXT = {
   gruppe: {
     gruendung: { titel: 'Gründungshöfe', zeile: 'Plätze, Monate, Aktion, Anzeige' },
     plattform: { titel: 'Plattform', zeile: 'Name und Adresse' },
+    anmeldung: { titel: 'Anmeldung', zeile: 'Passkeys, Ersatzcodes, Geräte', satz: 'Deine Passkeys, Ersatzcodes und angemeldeten Geräte.', link: 'Anmeldung öffnen' },
   },
   gruendung: {
     register: 'Register K2',

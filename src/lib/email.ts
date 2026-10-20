@@ -456,6 +456,29 @@ export async function sendNeueAnmeldungEmail(
   return sendRaw(email, `${NEUE_ANMELDUNG_MAIL.betreff(daten.hof)} · ${MARKE}`, vorlage.html)
 }
 
+/**
+ * „Admin-Sicherheit" → das eigene Admin-Konto (Register N20; Nr. 115): Passkey
+ * hinzugefügt oder entfernt, Ersatzcode benutzt (mit Gerät und Uhrzeit) und
+ * der E-Mail-Code der Einrichtung. Ohne Link zum Anmelden; der Code steht nie
+ * im Betreff (sendRaw schreibt ohne Schlüssel nur Betreff und Empfänger ins
+ * Log). Gibt das Versandergebnis zurück (sendRaw wirft nie).
+ */
+export async function sendAdminSicherheitEmail(
+  email: string,
+  anlass: import('@/lib/admin-anmeldung').AdminSicherheitAnlass,
+  daten: { geraet: string; zeitpunkt: Date; code?: string }
+): Promise<VersandErgebnis> {
+  // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
+  const { ADMIN_SICHERHEIT_MAIL } = await import('@/lib/admin-anmeldung')
+  const { anmeldeZeitpunkt } = await import('@/lib/geraete')
+  const vorlage = await htmlOderFehler(async () => {
+    const { AdminSicherheitEmail } = await import('@/emails/admin-sicherheit')
+    return React.createElement(AdminSicherheitEmail, { anlass, geraet: daten.geraet, wann: anmeldeZeitpunkt(daten.zeitpunkt), code: daten.code })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, `${ADMIN_SICHERHEIT_MAIL.betreff[anlass]} · ${MARKE}`, vorlage.html)
+}
+
 /** Neuer Hof registriert → Betreiber (Freischaltung nötig); `an` aus empfaengerFuer('hofWartet'). */
 export async function sendNewFarmNotification(
   farm: {
