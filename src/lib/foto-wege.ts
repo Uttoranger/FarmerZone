@@ -177,11 +177,22 @@ export const FORMAT_PROBE_BYTES = 64
  * ISO-BMFF-Marken der HEIC/HEIF-Familie (hinter „ftyp"). mif1 und msf1 sind
  * die allgemeinen HEIF-Marken — auch ein AVIF darf sie als Hauptmarke tragen
  * und nennt „avif" dann erst in den Zusatzmarken. Deshalb zählen alle Marken
- * des Kastens, und AVIF sticht: derselbe Behälter, aber ein Bild, das der
- * Server verarbeiten kann.
+ * des Kastens, und AVIF sticht: derselbe Behälter, aber kein Handyfoto — es
+ * soll nicht die HEIC-Karte zeigen. Der Server lehnt AVIF an den Bytes ab
+ * (formatFuerSharp, src/lib/bild-format.ts).
  */
 const HEIC_MARKEN = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1', 'heif'])
 const AVIF_MARKEN = new Set(['avif', 'avis'])
+
+/**
+ * Größter ftyp-Kasten, der zählt: der feste Teil (16 Bytes) und höchstens 32
+ * Zusatzmarken. Echte Fotos tragen eine Handvoll. Eine Größe darüber, eine,
+ * die nicht auf vier Bytes aufgeht, oder 0 heißt: Die ersten vier Bytes sind
+ * gar keine Kastengröße (etwa ein gzip-Kopf mit zufälligem „ftyp" dahinter) —
+ * der Server gäbe sonst ein fremdes Format an sharp weiter (Sicherheitsupdate
+ * 20.10.2026).
+ */
+const FTYP_MAX_BYTES = 16 + 4 * 32
 
 function ascii(bytes: ArrayLike<number>, von: number, bis: number): string {
   let text = ''
@@ -211,9 +222,10 @@ export function bildFormat(bytes: ArrayLike<number>): BildFormat | null {
   if (bytes.length >= 12 && ascii(bytes, 0, 4) === 'RIFF' && ascii(bytes, 8, 12) === 'WEBP') return 'webp'
   if (bytes.length >= 12 && ascii(bytes, 4, 8) === 'ftyp') {
     // Hauptmarke, dann die Zusatzmarken ab Byte 16 bis zum Ende des Kastens
-    // (seine Länge steht in den ersten vier Bytes; 0 = bis zum Dateiende).
+    // (seine Länge steht in den ersten vier Bytes).
     const laenge = ((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]) >>> 0
-    const ende = Math.min(bytes.length, laenge > 0 ? laenge : bytes.length)
+    if (laenge < 16 || laenge % 4 !== 0 || laenge > FTYP_MAX_BYTES) return null
+    const ende = Math.min(bytes.length, laenge)
     const marken = [ascii(bytes, 8, 12)]
     for (let i = 16; i + 4 <= ende; i += 4) marken.push(ascii(bytes, i, i + 4))
     if (marken.some((m) => AVIF_MARKEN.has(m))) return null
@@ -227,8 +239,9 @@ export function bildFormat(bytes: ArrayLike<number>): BildFormat | null {
  *   heic       Nie hochladen — der Server kann es nicht (sharp ohne HEIF), und
  *              8 MB für eine sichere Ablehnung wären Verschwendung.
  *   kein-foto  Nur über die Dateien-App: Dort sind auch Nicht-Bilder wählbar.
- *              Auf den anderen Wegen bleibt Unbekanntes wie bisher dem Server
- *              überlassen — er kennt mehr Formate als diese vier.
+ *              Auf den anderen Wegen geht Unbekanntes weiter an den Server;
+ *              der liest seit dem Sicherheitsupdate (20.10.2026) nur diese
+ *              vier und antwortet sonst mit der Formatmeldung (415).
  *   ok         Weiter zum Upload.
  */
 export function formatUrteil(format: BildFormat | null, weg: FotoWeg): 'ok' | 'heic' | 'kein-foto' {

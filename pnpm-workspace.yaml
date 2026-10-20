@@ -19,10 +19,41 @@ allowBuilds:
 # minimumReleaseAgeExclude (Register G6, 19.10.2026).
 minimumReleaseAge: 20160
 
+# G6-Ausnahme 20.10.2026, Sicherheitskorrektur GHSA-vcvr-r3jv-pc5j,
+# GHSA-2464-fhr4-w9xw, GHSA-p3m5-59mp-jv5r; entfernen, sobald 14 Tage alt
+# (ab 30.10.2026; 16.4.2 erschien am Abend des 15.10.). Je Version, nie ein bloßer Name: next 16.4.2, das Lint-Paket
+# und die @next/*-Pakete desselben Releases (eslint-config-next 16.4.2 zieht
+# @next/eslint-plugin-next exakt mit; freigegeben im Chat 20.10.2026).
+minimumReleaseAgeExclude:
+  - next@16.4.2
+  - eslint-config-next@16.4.2
+  - '@next/env@16.4.2'
+  - '@next/eslint-plugin-next@16.4.2'
+  - '@next/swc-darwin-arm64@16.4.2'
+  - '@next/swc-darwin-x64@16.4.2'
+  - '@next/swc-linux-arm64-gnu@16.4.2'
+  - '@next/swc-linux-arm64-musl@16.4.2'
+  - '@next/swc-linux-x64-gnu@16.4.2'
+  - '@next/swc-linux-x64-musl@16.4.2'
+  - '@next/swc-win32-arm64-msvc@16.4.2'
+  - '@next/swc-win32-x64-msvc@16.4.2'
+
 # Sicherheits-Overrides. Stehen hier, weil das Feld "pnpm" in package.json
 # abgekündigt ist — neuere pnpm-Versionen lesen es nicht mehr und ließen die
 # Overrides dort stillschweigend fallen.
 overrides:
-  undici@<6.27.0: '>=6.27.0'
+  # In der 6er-Reihe bleiben (Sicherheitsupdate 20.10.2026): Mit '>=6.27.0'
+  # hob dieser Override den Bereich ^6.23.0 von @vercel/blob auf undici 8.x an —
+  # genau in den Bereich von GHSA-w293-vg96-wgc3 (>=8.0.0 <8.10.2). Die 6er-Reihe
+  # ist davon nicht betroffen.
+  undici@<6.27.0: '^6.27.0'
   hono@<4.12.25: '>=4.12.25'
   ws@>=8.0.0 <8.21.0: '>=8.21.0'
+  # GHSA-wq5f-xc86-pv6w (SVG-Eingabe in librsvg, behoben in sharp 0.35.5): auch
+  # das sharp, das next selbst mitbringt, nie darunter (Sicherheitsupdate 20.10.2026).
+  sharp@<0.35.5: '>=0.35.5'
+  # GHSA-jqcg-44mw-7w3h (kritisch, behoben in 2.0.8 vom 15.09.2026): steckt nur im
+  # MCP-Server des shadcn-CLI (shadcn > @modelcontextprotocol/sdk > express), nicht
+  # im Laufzeitpfad — angehoben, damit `pnpm audit --prod` ohne kritischen Treffer
+  # bleibt (Sicherheitsupdate 20.10.2026). '^', damit kein Major nachrutscht.
+  proxy-addr@<2.0.8: '^2.0.8'

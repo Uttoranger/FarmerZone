@@ -4,6 +4,8 @@
 // Verarbeitungs-Route brauchen dieselben Werte, und keiner von ihnen darf sie
 // eigenmächtig anders auslegen. Ohne DOM und ohne Datenbank — damit prüfbar.
 
+import type { BildFormat } from '@/lib/foto-wege'
+
 /** Wofür ein Foto hochgeladen wird. Bestimmt Zielpfad und Auflösung. */
 export type UploadZweck = 'product' | 'banner' | 'logo' | 'gallery' | 'status' | 'meldung' | 'startseite'
 
@@ -56,6 +58,49 @@ export const STARTSEITE_MIN_KANTE = 320
 
 /** Der Satz, wenn die Route ein Startseiten-Bild als zu klein abweist (422 `BILD_ZU_KLEIN`, Nr. 108) — die Zahl aus der Konstante. */
 export const BILD_ZU_KLEIN_TEXT = `Das Bild ist zu klein – es braucht an der kürzeren Seite mindestens ${STARTSEITE_MIN_KANTE} Pixel. Nimm ein größeres Foto.`
+
+/** Der Satz, wenn die Route ein Foto über der Pixelgrenze abweist (422 `BILD_ZU_GROSS`, Sicherheitsupdate 20.10.2026). */
+export const BILD_ZU_GROSS_TEXT = 'Das Foto ist zu groß – nimm es bitte in normaler Auflösung auf.'
+
+/** Der Kurzgrund dazu in der Sammelmeldung einer Serie — sonst stünde dort „Format nicht unterstützt". */
+export const BILD_ZU_GROSS_KURZ = 'zu groß (zu viele Pixel)'
+
+/**
+ * Was der Upload-Token annimmt (Sicherheitsupdate 20.10.2026): nur die vier
+ * Formate, die die Verarbeitung liest — kein `image/*`, das auch SVG erlaubte.
+ * `application/octet-stream` bleibt: So schickt der Browser alles, was die
+ * ersten Bytes nicht als JPEG, PNG oder WebP ausweisen, und jede Datei, deren
+ * Anfang er nicht lesen konnte (uploadInhaltsTyp). Ohne ihn wiese der
+ * Bildspeicher solche Dateien mit falscher Meldung ab, statt dass die
+ * Verarbeitungs-Route an den Bytes entscheidet (src/lib/bild-format.ts).
+ * Dieselbe Liste für Hof- und Startseiten-Uploads.
+ */
+export const ERLAUBTE_UPLOAD_TYPEN = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'application/octet-stream',
+] as const
+
+/**
+ * Mit welchem Typ der Browser ein Original an den Bildspeicher gibt: aus den
+ * ersten Bytes, nie aus Gerät oder Dateiname. Ohne ausdrücklichen Typ bestimmt
+ * ihn der Speicher selbst (laut Doku aus der Dateiendung) — ein GIF scheiterte
+ * dann schon dort an der Token-Liste mit „Der Bildspeicher hat das Foto gerade
+ * nicht angenommen — bitte später nochmal.", statt an der Verarbeitung mit der
+ * Formatmeldung.
+ * Unbekanntes geht als `application/octet-stream`; ob es ein Bild ist,
+ * entscheidet die Verarbeitungs-Route an den Bytes.
+ */
+export function uploadInhaltsTyp(format: BildFormat | null): (typeof ERLAUBTE_UPLOAD_TYPEN)[number] {
+  if (format === 'jpeg') return 'image/jpeg'
+  if (format === 'png') return 'image/png'
+  if (format === 'webp') return 'image/webp'
+  if (format === 'heic') return 'image/heic'
+  return 'application/octet-stream'
+}
 
 /**
  * Die Ordner der Startseiten-Bilder (Zweck 'startseite'). Bewusst NICHT unter

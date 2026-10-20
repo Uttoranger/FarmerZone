@@ -17,6 +17,11 @@ const KEINE_HOFSEITE = [
 const HOFSEITEN_QUELLE = `/:farmSlug((?!(?:${KEINE_HOFSEITE.join('|')})$)[a-z0-9-]+)`;
 
 const nextConfig: NextConfig = {
+  // Kein „X-Powered-By: Next.js" in jeder Antwort (Sicherheitsupdate
+  // 20.10.2026): Die Auskunft über die Technik braucht niemand, und sie macht
+  // eine bekannte Lücke einer Version leichter auffindbar.
+  poweredByHeader: false,
+
   // sharp bleibt ein externes Server-Modul (native Binärdateien lassen sich
   // nicht bundeln). Steht hier ausdrücklich, auch wenn es dem Next-Standard
   // entspricht — die Absicht soll im Repo dokumentiert sein.

@@ -46,6 +46,9 @@ import {
 import {
   MAX_ORIGINAL_BYTES,
   originalPfad,
+  uploadInhaltsTyp,
+  BILD_ZU_GROSS_KURZ,
+  BILD_ZU_GROSS_TEXT,
   BILD_ZU_KLEIN_TEXT,
   type UploadZweck,
 } from '@/lib/upload-pfade'
@@ -330,7 +333,7 @@ async function leseVersuch(
  * bleiben aber ausdrücklich unwiederholbar.
  *
  * Das Rennen ist die eigentliche Befreiung des Wartenden: @vercel/blob
- * 2.4.0 reicht das Signal zwar an den Transfer durch, NICHT aber an seine
+ * (2.4.0 bis 2.8.1) reicht das Signal zwar an den Transfer durch, NICHT aber an seine
  * interne Token-Beschaffung (getToken ruft retrieveClientToken ohne
  * abortSignal auf) — ein stummer Hänger dort würde das abort() beider
  * Wächter nie hören. Das Rennen macht den Abbruch in jeder Phase wirksam;
@@ -357,6 +360,10 @@ async function uebertrageOriginal(
   // Name vom Gerät, der daraus bereinigte Name im Pfad, die Kennung.
   const pfad = originalPfad(farmId, zweck, file.name)
   const verborgen = [pfad, file.name, pfad.slice(pfad.lastIndexOf('/') + 1), farmId]
+  // Der Typ für den Bildspeicher kommt aus den ersten Bytes der Kopie, nie vom
+  // Gerät (uploadInhaltsTyp): Sonst scheiterte ein fremdes Format schon an der
+  // Token-Liste mit einer falschen Meldung, statt an der Verarbeitung.
+  const inhaltsTyp = await inhaltsTypVon(file)
   for (let versuch = 1; ; versuch++) {
     optionen.onVersuch?.(versuch)
     const beginn = Date.now()
@@ -384,6 +391,7 @@ async function uebertrageOriginal(
         upload(originalPfad(farmId, zweck, file.name), file, {
           access: 'public',
           handleUploadUrl: '/api/upload/token',
+          contentType: inhaltsTyp,
           multipart: true,
           abortSignal: abbruch.signal,
           onUploadProgress: ({ percentage }) => {
@@ -434,6 +442,24 @@ async function uebertrageOriginal(
     }
   }
 }
+
+/** Die ersten Bytes der Kopie als Typ für den Bildspeicher; geht das Lesen nicht, entscheidet die Route. */
+async function inhaltsTypVon(file: File): Promise<string> {
+  try {
+    return uploadInhaltsTyp(bildFormat(new Uint8Array(await file.slice(0, FORMAT_PROBE_BYTES).arrayBuffer())))
+  } catch {
+    return uploadInhaltsTyp(null)
+  }
+}
+
+/**
+ * Eigene Sätze (und wo nötig Kurzgründe für die Serie) für Ablehnungen der
+ * Verarbeitungs-Route mit Code (422) — alle anderen behalten den Text ihrer Ursache.
+ */
+const SATZ_ZUM_CODE = new Map<string, { satz: string; kurz?: string }>([
+  ['BILD_ZU_KLEIN', { satz: BILD_ZU_KLEIN_TEXT }],
+  ['BILD_ZU_GROSS', { satz: BILD_ZU_GROSS_TEXT, kurz: BILD_ZU_GROSS_KURZ }],
+])
 
 /** Befund für einen Abbruch durch unsere Wächter — es gibt keinen Originalfehler. */
 function waechterBefund(grund: 'stillstand' | 'deckel'): AnlaufBefund {
@@ -558,8 +584,10 @@ export async function ladeFotoHoch(
       status: antwort.status,
     })
     protokolliereBildFehler(art, kopie)
-    // Zu klein (nur Startseite, 422): ein eigener Satz mit der Mindestkante — die Ursache bleibt 'format'.
-    throw new BildFehler(art, daten?.code === 'BILD_ZU_KLEIN' ? BILD_ZU_KLEIN_TEXT : undefined)
+    // Zu klein (nur Startseite, 422) bzw. über der Pixelgrenze (422, Sicherheitsupdate
+    // 20.10.2026): je ein eigener Satz — die Ursache bleibt 'format'.
+    const eigen = typeof daten?.code === 'string' ? SATZ_ZUM_CODE.get(daten.code) : undefined
+    throw new BildFehler(art, eigen?.satz, eigen?.kurz)
   }
 
   return daten.url

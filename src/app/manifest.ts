@@ -24,7 +24,7 @@ import { MARKE } from '@/lib/marke'
  * TYP-VERANKERUNG: share_target ist Teil des OFFIZIELLEN Next-Typs
  * MetadataRoute.Manifest (next/dist/lib/metadata/types/manifest-types.d.ts,
  * `share_target?` mit `params.files` als `{ name, accept }` — Stand Next
- * 16.2.6) — kein Cast, keine strukturelle Lücke. Sollte ein Next-Update das
+ * 16.4.2) — kein Cast, keine strukturelle Lücke. Sollte ein Next-Update das
  * Feld je entfernen, schlägt `pnpm typecheck` GENAU HIER an, statt das
  * Teilen-Ziel lautlos wegzutypisieren.
  */

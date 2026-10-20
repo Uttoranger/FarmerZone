@@ -350,14 +350,20 @@ export function bildFehlerKurz(art: BildFehlerArt): string {
  * ihren Fall genauer als die Ursache allein (Freigabe entzogen, stumme Quelle,
  * unbestimmt), soll aber weiter als 'lesen' nach Sentry gehen und in einer
  * Serie unter demselben Kurzgrund erscheinen.
+ *
+ * `kurz` überschreibt den Kurzgrund in der Serie — nur wo die Ursache allein
+ * in die Irre führt: Ein Foto über der Pixelgrenze hat die Art 'format', ist
+ * aber kein „Format nicht unterstützt" (Sicherheitsupdate 20.10.2026).
  */
 export class BildFehler extends Error {
   readonly bildFehlerArt: BildFehlerArt
+  readonly kurz: string | undefined
 
-  constructor(art: BildFehlerArt, text: string = bildFehlerText(art)) {
+  constructor(art: BildFehlerArt, text: string = bildFehlerText(art), kurz?: string) {
     super(text)
     this.name = 'BildFehler'
     this.bildFehlerArt = art
+    this.kurz = kurz
   }
 }
 
@@ -379,7 +385,8 @@ export function bildFehlerArtVon(e: unknown): BildFehlerArt | null {
  *
  * Trägt ein Foto-Fehler einen eigenen Text, gilt der: Die Lese-Stufe
  * unterscheidet drei Fälle, die alle die Ursache 'lesen' haben (#135). Der
- * Kurzgrund bleibt der der Ursache — eine Serie listet Gründe, keine Fälle.
+ * Kurzgrund bleibt der der Ursache — eine Serie listet Gründe, keine Fälle —,
+ * außer der BildFehler bringt ein eigenes `kurz` mit (Pixelgrenze, siehe BildFehler).
  */
 export function bildFehlerMeldung(e: unknown): {
   text: string
@@ -389,7 +396,8 @@ export function bildFehlerMeldung(e: unknown): {
   const art = bildFehlerArtVon(e)
   if (art) {
     const eigener = e instanceof Error && e.message ? e.message : bildFehlerText(art)
-    return { text: eigener, kurz: bildFehlerKurz(art), art }
+    const kurz = e instanceof BildFehler && e.kurz ? e.kurz : bildFehlerKurz(art)
+    return { text: eigener, kurz, art }
   }
 
   const text = e instanceof Error ? e.message : 'Upload fehlgeschlagen'

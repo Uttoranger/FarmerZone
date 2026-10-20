@@ -24,7 +24,8 @@ vi.mock('@/lib/prisma', () => ({
   prisma: { farm: { findUnique: vi.fn() }, user: { findUnique: vi.fn() } },
 }))
 vi.mock('@vercel/blob', () => ({ put: vi.fn(), del: vi.fn() }))
-vi.mock('sharp', () => ({ default: vi.fn() }))
+// block/unblock: Die Route sperrt beim Laden die fremden Lader (Sicherheitsupdate 20.10.2026).
+vi.mock('sharp', () => ({ default: Object.assign(vi.fn(), { block: vi.fn(), unblock: vi.fn() }) }))
 vi.mock('@vercel/blob/client', () => ({
   handleUpload: vi.fn(async ({ onBeforeGenerateToken }: { onBeforeGenerateToken: (p: string) => Promise<unknown> }) => {
     await onBeforeGenerateToken('originals/farm-1/product/foto.jpg')

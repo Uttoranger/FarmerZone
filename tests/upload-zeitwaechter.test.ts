@@ -140,7 +140,7 @@ describe('darfZweitversuch — die Retry-Entscheidung', () => {
   })
 
   it('wiederholt kein Urteil des Blob-SDK — ein abgelehnter Token ist keine Verbindungsstörung', () => {
-    // Meldungstexte 1:1 aus @vercel/blob 2.4.0 (BlobError präfixiert im
+    // Meldungstexte 1:1 aus @vercel/blob 2.4.0 bis 2.8.1 (BlobError präfixiert im
     // Konstruktor mit „Vercel Blob: "). Abgelaufene Sitzung → Token-Route
     // verweigert → dieselbe Ablehnung fiele auch beim zweiten Anlauf.
     expect(darfZweitversuch(new Error('Vercel Blob: Failed to retrieve the client token'), 1)).toBe(
