@@ -5457,6 +5457,15 @@ Ausgangslage: Am 19.10. lief keiner der vier Abläufe (Vercel Hobby gesperrt), u
 - **Festschreiben:** Bei leerer Liste und ausgenommenen Höfen sagt der Dialog „Alle freigeschalteten Höfe sind ausgenommen …“ statt „Bisher ist kein Hof freigeschaltet …“.
 - **Marke:** „ausgenommen · Testhof“ wurde „ausgenommen“; ein Testhof trägt nur „Testhof“.
 
+## Entdecken v2: Abholzeile, Hofkarte A, Filter „Abholung", Pins mit Namen, Seitenfuß (Register N22; Nr. 120, Nachtlauf 18)
+
+- **Anlass:** Bewertung vom 19.10. (62 von 100): In der Liste fehlten Preise und eine klare Abholzeit, Höfe ohne Foto wirkten leer, Höfe ohne Kartenpunkt fehlten ohne Erklärung auf der Karte, Impressum und Datenschutz standen nur auf der Startseite. Board `system-k1-entdecken-v2`, Variante A.
+- **Fachregel „bestellbar":** Bestellen geht nur bis zum Beginn eines Abholfensters (Bestellschluss, `fristen.ts`). Die Übersicht zählte ein laufendes Fenster bis zu seinem Ende — sie versprach also Termine, die die Kasse ablehnte. Seit Nr. 120 gibt es EINE Regel, `istFensterBestellbar` (`abholfenster.ts`); `naechsteAbholung` ruft sie auf (über einen festen Bezugstag in einer Woche ohne Zeitumstellung, weil die Übersicht von „jetzt" nur Wochentag und Uhrzeit kennt) — damit nennen auch Startseite, Produkttreffer und „Futter kaufen" kein laufendes Fenster mehr. Ein Hof ist bestellbar (`istBestellbar`) mit kaufbarem Produkt und Abholzeit; die Pause zählt nicht hinein. Ein nicht bestellbarer Hof bleibt an seinem Platz (AGB §3, O4) und trägt „Noch nicht bestellbar"; eingeklappt am Ende erst nach einer Änderung von AGB §3.
+- **Uhr im Browser:** /hoefe ist statisch (N19) und bis zu zehn Minuten alt. Die Seite gibt ihren Zeitpunkt mit, `useUhr` nimmt ihn beim Hydrieren und danach die eigene Uhr auf die Minute — kein Hydrationsfehler, kein „heute" für gestern. Der Datencache bekam den Schlüsselteil `'v2'`, weil die Hofliste jetzt `abholfenster` trägt.
+- **Filter „Abholung":** heute (nur noch bestellbare Fenster), morgen, Wochenende (Samstag und Sonntag dieser Woche, am Sonntag nur Sonntag); Adresse `?abholung=`, im Browser gerechnet, nicht in einer Radiogruppe (Links). Leer: der nächste Tag mit Abholung und „Morgen zeigen". Volle Fenster (`maxOrders`) zählt die Übersicht bewusst nicht — das prüfen Hofseite und Kasse.
+- **Karte:** Namen an den Pins ab Zoom 12 oder bei höchstens 12 Pins im Bild (die Gruppierung rechnet die Pille mit), Pins per Tab, Enter wie Klick, am Computer die Vorschau `HofKurzkarte`; der Hinweis zu Höfen ohne Kartenpunkt steht auf der Karte.
+- **Seitenfuß:** `KundeFuss` in der KundeShell (nicht in der Fokus-Shell) und auf /datenschutz; der Fuß der Startseite verlor die rechtlichen Links, damit nichts doppelt steht. Reihenfolge Impressum · Datenschutz · AGB · Problem melden wie im Board (vorher führte der Fuß der Startseite die AGB vor dem Impressum).
+
 ## Nützliche Befehle
 
 ```bash

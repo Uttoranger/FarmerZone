@@ -60,7 +60,9 @@ import {
 import { HoefeSuche, StandortUngefaehr } from '@/components/hoefe/hoefe-suche'
 import type { Ortssuche } from '@/components/hoefe/use-ortssuche'
 import { EntdeckenFilterblatt } from '@/components/hoefe/entdecken-filterblatt'
-import { SUCHFELD_TEXT, kategorieReihe, leerzustand, standortUngefaehrText } from '@/lib/hoefe-entdecken'
+import { SUCHFELD_TEXT, abholungReihe, kategorieReihe, leerzustand, standortUngefaehrText } from '@/lib/hoefe-entdecken'
+import { HofKurzkarte } from '@/components/hoefe/hof-kurzkarte'
+import type { VorschauProdukt } from '@/lib/hofuebersicht'
 import { grundpreisAusKennzeichnung, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
 import { LEERER_HOEFE_FILTER, SUCHTEXT_MAX, type HoefeFilter } from '@/schemas/hoefe-filter'
 import { HoefeClient } from '@/components/hoefe/hoefe-client'
@@ -73,18 +75,8 @@ const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 const ohneKommentare = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 const html = (el: ReturnType<typeof createElement>) => renderToStaticMarkup(el)
 
-const HOF: KartenHof = {
-  slug: 'hof-test',
-  name: 'Hof Test',
-  postalCode: '1010',
-  city: 'Wien',
-  isPaused: false,
-  kategorien: ['EIER', 'BROT'],
-  naechsteAbholung: { dayOfWeek: 5, startTime: '15:00', endTime: '18:00', tageVoraus: 0 },
-  fotos: [],
-  gruendungshof: false,
-  entfernungKm: null,
-}
+/** Mi, 21. Okt 2026, 10:00 in Wien — der Zeitpunkt der Seite (Register N22: die Abholzeile rechnet damit bis zur Hydration). */
+const JETZT = '2026-10-21T08:00:00.000Z'
 
 const BROT: AngebotsProdukt = {
   id: 'p1',
@@ -102,53 +94,166 @@ const BROT: AngebotsProdukt = {
   bildAusschnitt: null,
 }
 
+const HOF: KartenHof = {
+  slug: 'hof-test',
+  name: 'Hof Test',
+  postalCode: '1010',
+  city: 'Wien',
+  isPaused: false,
+  kategorien: ['EIER', 'BROT'],
+  abholfenster: [{ dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }],
+  angebot: [BROT],
+  fotos: [],
+  gruendungshof: false,
+  entfernungKm: null,
+  latitude: 48.2,
+  longitude: 16.37,
+}
+
 const TREFFER_HOF: TrefferHof = { ...HOF, entfernungKm: 4.2 }
+
+const vorschauProdukt = (id: string, name: string, imageUrl: string | null = null): VorschauProdukt => ({
+  id,
+  name,
+  price: 4.2,
+  unit: 'STUECK',
+  unitSize: null,
+  imageUrl,
+  bildAusschnitt: null,
+  category: 'EIER',
+  verfuegbar: true,
+})
+const DREI = { produkte: [vorschauProdukt('a', 'Freilandeier'), vorschauProdukt('b', 'Bauernbrot'), vorschauProdukt('c', 'Honig')], weitere: 6 }
+const KEINE = { produkte: [], weitere: 0 }
+const karte = (props: Partial<ComponentProps<typeof HofKarte>> = {}) =>
+  html(createElement(HofKarte, { hof: HOF, bereich: 'LEBENSMITTEL', schaufenster: KEINE, split: false, ausgewaehlt: false, jetzt: JETZT, ...props }))
 
 describe('Hofkarte', () => {
   it('ein pausierter Hof bleibt sichtbar, aber ausgegraut — mit Hinweis statt Abholtermin', () => {
-    const pausiert = html(createElement(HofKarte, { hof: { ...HOF, isPaused: true }, bereich: 'LEBENSMITTEL', produktNamen: [], split: false, ausgewaehlt: false }))
+    const pausiert = karte({ hof: { ...HOF, isPaused: true } })
     expect(pausiert).toContain('data-pausiert="ja"')
     expect(pausiert).toContain('Macht gerade Pause')
-    expect(pausiert).not.toContain('Nächste Abholung')
+    expect(pausiert).not.toContain('Abholung heute')
     expect(pausiert).toContain('href="/hof-test"')
     // Gegenprobe: derselbe Hof ohne Pause.
-    const offen = html(createElement(HofKarte, { hof: HOF, bereich: 'LEBENSMITTEL', produktNamen: ['Freilandeier'], split: false, ausgewaehlt: false }))
+    const offen = karte({ schaufenster: DREI })
     expect(offen).not.toContain('data-pausiert')
-    expect(offen).toContain('Nächste Abholung')
-    expect(offen).toContain('Heute 15:00–18:00')
+    expect(offen).toContain('Abholung heute 15:00–18:00')
     expect(offen).toContain('Freilandeier')
   })
 
   it('im Splitscreen wählt die Fläche, zur Hofseite führt nur „Zum Hof" — im Futter direkt zum Futter', () => {
-    const split = html(createElement(HofKarte, { hof: HOF, bereich: 'FUTTERMITTEL', produktNamen: [], split: true, ausgewaehlt: false }))
+    const split = karte({ bereich: 'FUTTERMITTEL', split: true })
     expect(split).toContain('aria-label="Hof Test auf der Karte zeigen"')
     expect(split).toContain('href="/hof-test?bereich=futter"')
     expect(split).toContain('Zum Hof')
   })
 
   it('„Zum Hof" hat eine Trefferfläche von mindestens 44 px', () => {
-    const split = html(createElement(HofKarte, { hof: HOF, bereich: 'LEBENSMITTEL', produktNamen: [], split: true, ausgewaehlt: false }))
+    const split = karte({ split: true })
     const klassen = split.match(/<a href="\/hof-test" class="([^"]*)"[^>]*>Zum Hof/)?.[1] ?? ''
-    // h-9 (36 px) reicht nur mit dem unsichtbaren Rand darüber und darunter (4 + 36 + 4).
-    const reicht = (k: string) => /\bh-11\b|\bmin-h-11\b/.test(k) || (/\bh-9\b/.test(k) && k.includes('before:-inset-y-1') && k.includes('before:absolute'))
+    // h-9 (36 px, 34 im Rahmen) reicht nur mit dem unsichtbaren Rand darüber und darunter (5 + 34 + 5, wie chip.tsx).
+    const reicht = (k: string) => /\bh-11\b|\bmin-h-11\b/.test(k) || (/\bh-9\b/.test(k) && k.includes('before:-inset-y-[5px]') && k.includes('before:absolute'))
     expect(klassen).not.toBe('')
     expect(reicht(klassen)).toBe(true)
-    // Gegenprobe: der alte Knopf ohne Erweiterung fiele durch.
-    expect(reicht('relative inline-flex h-9 items-center')).toBe(false)
+    // Gegenprobe: der alte Knopf mit 4 px (42 px, Morgenbericht 17) fiele durch.
+    expect(reicht('relative inline-flex h-9 items-center before:absolute before:-inset-y-1')).toBe(false)
   })
 
   it('ein Name mit 80 Zeichen steht ganz im title und wird höchstens zweizeilig gezeigt', () => {
     const lang = 'Hof '.repeat(20).trim()
-    const karte = html(createElement(HofKarte, { hof: { ...HOF, name: lang }, bereich: 'LEBENSMITTEL', produktNamen: [], split: false, ausgewaehlt: false }))
-    expect(karte).toContain(`title="${lang}"`)
-    expect(karte).toContain('line-clamp-2')
+    const gross = karte({ hof: { ...HOF, name: lang } })
+    expect(gross).toContain(`title="${lang}"`)
+    expect(gross).toContain('line-clamp-2')
+  })
+})
+
+// Register N22 (Nr. 120): Variante A des Boards system-k1-entdecken-v2.
+describe('Hofkarte A', () => {
+  it('Foto und Bildfläche sind gleich hoch (150 px) — ohne Foto die Illustrationen der Kategorien, alt=""', () => {
+    const ohneFoto = karte()
+    expect(ohneFoto).toContain('data-slot="hof-bildflaeche"')
+    expect(ohneFoto).toMatch(/data-slot="hof-bildflaeche" class="[^"]*\bh-\[150px\]/)
+    expect(ohneFoto).toContain('<img src="/categories/eier.webp" alt=""/>')
+    expect(ohneFoto).toContain('<img src="/categories/brot.webp" alt=""/>')
+    const mitFoto = karte({ hof: { ...HOF, fotos: ['/hof.jpg'] } })
+    expect(mitFoto).toMatch(/class="group\/foto relative h-\[150px\]/)
+    expect(mitFoto).not.toContain('data-slot="hof-bildflaeche"')
+  })
+
+  it('keine Initialen, keine Kategorie-Chips — in beiden Gestalten', () => {
+    for (const gestalt of [karte(), karte({ split: true })]) {
+      expect(gestalt).not.toContain('>HT<')
+      expect(gestalt).not.toContain('data-slot="chip"')
+    }
+  })
+
+  it('drei Produktzeilen mit Preis und „+ n weitere", die ganze Karte ist EIN Link', () => {
+    const voll = karte({ schaufenster: DREI })
+    for (const name of ['Freilandeier', 'Bauernbrot', 'Honig']) expect(voll).toContain(name)
+    expect(voll).toContain('€ 4,20 / Stück')
+    expect(voll).toContain('+ 6 weitere Produkte')
+    expect(voll.match(/<a /g)).toHaveLength(1)
+    expect(voll).toContain('href="/hof-test"')
+  })
+
+  it('fehlt ein Produktfoto, steht die Illustration der Kategorie statt eines Anfangsbuchstabens', () => {
+    const voll = karte({ schaufenster: { produkte: [vorschauProdukt('a', 'Freilandeier')], weitere: 0 } })
+    const zeilen = voll.slice(voll.indexOf('Freilandeier'))
+    expect(zeilen).toContain('<img src="/categories/eier.webp" alt=""/>')
+    expect(zeilen).not.toMatch(/>F<\/span>/)
+    // Gegenprobe: mit Foto das Foto.
+    expect(karte({ schaufenster: { produkte: [vorschauProdukt('a', 'Freilandeier', '/eier.jpg')], weitere: 0 } })).toContain('src="/eier.jpg"')
+  })
+
+  it('noch nicht bestellbar (kein kaufbares Produkt oder keine Abholzeit): graue Zeile statt Abholzeile, die Pause geht vor', () => {
+    expect(karte({ hof: { ...HOF, angebot: [] } })).toContain('Noch nicht bestellbar')
+    expect(karte({ hof: { ...HOF, abholfenster: [] } })).toContain('Noch nicht bestellbar')
+    expect(karte({ hof: { ...HOF, angebot: [], isPaused: true } })).not.toContain('Noch nicht bestellbar')
+    expect(karte()).not.toContain('Noch nicht bestellbar')
+  })
+
+  it('ein Hof ohne Kartenpunkt trägt „Nicht auf der Karte"', () => {
+    expect(karte({ hof: { ...HOF, latitude: null } })).toContain('Nicht auf der Karte')
+    expect(karte()).not.toContain('Nicht auf der Karte')
+  })
+
+  it('im Splitscreen ohne Foto eine Illustration als Vorschaubild', () => {
+    const split = karte({ split: true })
+    expect(split.match(/<img src="\/categories\/[^"]+" alt=""\/>/g)).toHaveLength(1)
+  })
+})
+
+describe('HofKurzkarte — die Pin-Vorschau am Computer', () => {
+  const kurz = html(
+    createElement(HofKurzkarte, {
+      hof: { ...HOF, entfernungKm: 2.1 },
+      bereich: 'LEBENSMITTEL',
+      schaufenster: { produkte: DREI.produkte.slice(0, 2) },
+      jetzt: JETZT,
+      id: 'vorschau-1',
+    })
+  )
+
+  it('ein role="tooltip" mit Name, Entfernung, Ort, Abholzeile und zwei Produktzeilen mit 40er-Bildern', () => {
+    expect(kurz).toContain('id="vorschau-1" role="tooltip"')
+    for (const teil of ['Hof Test', '2,1 km', '1010 Wien', 'Abholung heute 15:00–18:00', 'Freilandeier', 'Bauernbrot']) expect(kurz, teil).toContain(teil)
+    expect(kurz).not.toContain('Honig')
+    expect(kurz).toContain('size-10')
+  })
+
+  it('„Zum Hof" führt zur Hofseite und liegt nicht im Tab-Weg (Enter am Pin wählt den Hof)', () => {
+    expect(kurz).toMatch(/<a href="\/hof-test" tabindex="-1"[^>]*>Zum Hof/)
   })
 })
 
 describe('Produktzeile — die Suche zeigt Produkte statt Höfe', () => {
   it('Produkt, Siegel, Hof mit Entfernung, Abholung und Preis; die Zeile führt zur Hofseite', () => {
-    const zeile = html(createElement(ProduktZeile, { treffer: { hof: TREFFER_HOF, produkt: BROT }, bereich: 'LEBENSMITTEL' }))
+    const zeile = html(createElement(ProduktZeile, { treffer: { hof: TREFFER_HOF, produkt: BROT }, bereich: 'LEBENSMITTEL', jetzt: JETZT }))
     expect(zeile).toContain('Bauernbrot')
+    expect(zeile).toContain('Abholung heute 15:00–18:00')
+    // Ohne Produktfoto die Illustration der Kategorie (Register N22).
+    expect(zeile).toContain('<img src="/categories/brot.webp" alt=""/>')
     expect(zeile).toContain('>Bio<')
     expect(zeile).toContain('Hof Test · 4,2 km')
     expect(zeile).toContain('€ 5,80 / Stück')
@@ -158,7 +263,7 @@ describe('Produktzeile — die Suche zeigt Produkte statt Höfe', () => {
 
   it('ohne Standort steht der Ort statt der Entfernung; Futter zeigt den Kilopreis aus der Kennzeichnung', () => {
     const heu: AngebotsProdukt = { ...BROT, name: 'Heu', category: 'HEU_STROH', labels: [], price: 45, unit: 'BALLEN', grundpreis: { wert: 0.15, einheit: 'KG', preis: 45, menge: 300 } }
-    const zeile = html(createElement(ProduktZeile, { treffer: { hof: HOF, produkt: heu }, bereich: 'FUTTERMITTEL' }))
+    const zeile = html(createElement(ProduktZeile, { treffer: { hof: HOF, produkt: heu }, bereich: 'FUTTERMITTEL', jetzt: JETZT }))
     expect(zeile).toContain('Hof Test · 1010 Wien')
     expect(zeile).toContain('€ 0,15 / kg')
     expect(zeile).toContain('href="/hof-test?bereich=futter"')
@@ -169,7 +274,7 @@ describe('Produktzeile — die Suche zeigt Produkte statt Höfe', () => {
       ...BROT, name: 'Hafer im Sack', category: 'GETREIDE_KOERNER', labels: [], price: 2.01, unit: 'STUECK',
       grundpreis: grundpreisAusKennzeichnung(2.01, { nettoMenge: 2, nettoEinheit: 'KG' }),
     }
-    const zeile = html(createElement(ProduktZeile, { treffer: { hof: HOF, produkt: sack }, bereich: 'FUTTERMITTEL' }))
+    const zeile = html(createElement(ProduktZeile, { treffer: { hof: HOF, produkt: sack }, bereich: 'FUTTERMITTEL', jetzt: JETZT }))
     expect(zeile).toContain('€ 1,01 / kg')
     expect(zeile).not.toContain('€ 1,00 / kg')
   })
@@ -752,6 +857,7 @@ describe('das Server-HTML: die ganze Hofliste, ungefiltert, mit Links auf die Ho
     kategorien: ['EIER'],
     angebot: [{ ...BROT, id: `${slug}-brot` }],
     naechsteAbholung: null,
+    abholfenster: [],
     produkte: [],
     produkteGesamt: 1,
     produkteJeBereich: { LEBENSMITTEL: 1, FUTTERMITTEL: 0 },
@@ -761,14 +867,49 @@ describe('das Server-HTML: die ganze Hofliste, ungefiltert, mit Links auf die Ho
   })
 
   it('beide Höfe mit Link — auf dem Server gilt der leere Filter (kein window, kein Wurf)', () => {
-    const seite = html(createElement(HoefeClient, { hoefe: [hof('hof-a', 'Hof Anfang'), hof('hof-b', 'Hof Berg')] }))
+    const seite = html(createElement(HoefeClient, { hoefe: [hof('hof-a', 'Hof Anfang'), hof('hof-b', 'Hof Berg')], jetzt: JETZT }))
     expect(seite).toContain('aria-label="Höfe"')
     expect(seite).toContain('Hof Anfang')
     expect(seite).toContain('href="/hof-a"')
     expect(seite).toContain('Hof Berg')
     expect(seite).toContain('href="/hof-b"')
     // Gegenprobe: ohne Höfe steht keiner da.
-    expect(html(createElement(HoefeClient, { hoefe: [hof('hof-a', 'Hof Anfang')] }))).not.toContain('Hof Berg')
+    expect(html(createElement(HoefeClient, { hoefe: [hof('hof-a', 'Hof Anfang')], jetzt: JETZT }))).not.toContain('Hof Berg')
+  })
+
+  it('die Zahlzeile ist eine Statusmeldung: „2 Höfe · 1 holt heute ab · nach Freischaltung"', () => {
+    const heute = { ...hof('hof-a', 'Hof Anfang'), abholfenster: [{ dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }] }
+    const seite = html(createElement(HoefeClient, { hoefe: [heute, hof('hof-b', 'Hof Berg')], jetzt: JETZT }))
+    expect(seite).toContain('<p role="status" class="text-[13px] text-muted-foreground">2 Höfe · 1 holt heute ab · nach Freischaltung</p>')
+  })
+
+  it('am Handy die Reihe „Abholung" über der Liste — eine Liste von Links mit aria-current, keine Radiogruppe', () => {
+    const seite = html(createElement(HoefeClient, { hoefe: [hof('hof-a', 'Hof Anfang')], jetzt: JETZT }))
+    const reihe = seite.slice(seite.indexOf('<ul aria-label="Abholung"'))
+    expect(reihe).toMatch(/^<ul aria-label="Abholung"/)
+    expect(reihe.slice(0, reihe.indexOf('</ul>'))).toMatch(/<a href="\/hoefe" rel="nofollow" data-slot="filter-chip" aria-current="page"[^>]*>Alle Tage<\/a>/)
+    expect(seite.indexOf('<ul aria-label="Abholung"')).toBeLessThan(seite.indexOf('aria-label="Höfe"'))
+    expect(seite).not.toContain('radiogroup')
+  })
+})
+
+describe('Filter „Abholung" (Register N22)', () => {
+  it('jeder Chip ein Link mit nofollow und 44 px Trefferfläche; der gewählte trägt aria-current', () => {
+    const reihe = html(createElement(ChipReihe, { beschriftung: 'Abholung', chips: abholungReihe({ ...LEERER_HOEFE_FILTER, abholung: 'heute' }) }))
+    const links = [...reihe.matchAll(/<a [^>]*>/g)].map((m) => m[0])
+    expect(links).toHaveLength(4)
+    for (const link of links) {
+      expect(link).toContain('rel="nofollow"')
+      expect(link).toContain('before:-inset-y-[5px]')
+    }
+    expect(links.filter((l) => l.includes('aria-current="page"'))).toHaveLength(1)
+    expect(reihe).toMatch(/aria-current="page"[^>]*>Heute<\/a>/)
+  })
+
+  it('im Filter-Blatt unter „Wann holst du ab?" mit dem Satz des Boards, am Computer in der zweiten Zeile', () => {
+    const client = quelle('src/components/hoefe/hoefe-client.tsx')
+    expect(client).toMatch(/<BlattGruppe titel=\{ABHOLUNG_TEXT\.frage\}>\s*<p[^>]*>\{ABHOLUNG_TEXT\.erklaerung\}<\/p>/)
+    expect(client).toMatch(/<FilterGruppe titel=\{ABHOLUNG_TEXT\.beschriftung\}>/)
   })
 })
 
@@ -806,10 +947,10 @@ describe('Filter-Links auf /hoefe tragen rel="nofollow" (Register N19)', () => {
   })
 
   it('Gegenprobe: Hofseiten bleiben folgbar, und ein FilterChip ohne nofollow trägt kein rel (Admin bleibt, wie er ist)', () => {
-    const karte = html(createElement(HofKarte, { hof: HOF, bereich: 'LEBENSMITTEL', produktNamen: [], split: true, ausgewaehlt: false }))
-    expect(karte).toContain('href="/hof-test"')
-    expect(karte).not.toContain('nofollow')
-    const zeile = html(createElement(ProduktZeile, { treffer: { hof: TREFFER_HOF, produkt: BROT }, bereich: 'LEBENSMITTEL' }))
+    const split = karte({ split: true })
+    expect(split).toContain('href="/hof-test"')
+    expect(split).not.toContain('nofollow')
+    const zeile = html(createElement(ProduktZeile, { treffer: { hof: TREFFER_HOF, produkt: BROT }, bereich: 'LEBENSMITTEL', jetzt: JETZT }))
     expect(zeile).not.toContain('nofollow')
     const chip = (props: Omit<ComponentProps<typeof FilterChip>, 'children'>, text: string) =>
       html(createElement(FilterChip, props as ComponentProps<typeof FilterChip>, text))

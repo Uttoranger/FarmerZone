@@ -146,13 +146,32 @@ describe('naechsteAbholung', () => {
     expect(a).toMatchObject({ dayOfWeek: 4, tageVoraus: 1 })
   })
 
-  it('ein noch laufendes Fenster zählt heute noch', () => {
+  // Register N22 (Nr. 120): Bestellen geht nur bis zum Beginn — ein laufendes Fenster ist nicht mehr bestellbar.
+  it('ein laufendes Fenster zählt nicht mehr — es kommt erst in einer Woche wieder', () => {
     const a = naechsteAbholung(
       [{ dayOfWeek: 3, startTime: '11:00', endTime: '13:00' }],
       MITTWOCH_MITTAG
     )
 
-    expect(a).toMatchObject({ dayOfWeek: 3, tageVoraus: 0 })
+    expect(a).toMatchObject({ dayOfWeek: 3, tageVoraus: 7 })
+  })
+
+  it('beginnt das Fenster in einer Minute, zählt es heute; hat es vor einer Minute begonnen, nicht mehr', () => {
+    const fenster = [{ dayOfWeek: 3, startTime: '12:01', endTime: '14:00' }]
+    expect(naechsteAbholung(fenster, MITTWOCH_MITTAG)).toMatchObject({ tageVoraus: 0 })
+    expect(naechsteAbholung(fenster, { wochentag: 3, uhrzeit: '12:01' })).toMatchObject({ tageVoraus: 7 })
+    expect(naechsteAbholung(fenster, { wochentag: 3, uhrzeit: '12:02' })).toMatchObject({ tageVoraus: 7 })
+  })
+
+  it('ein laufendes Fenster weicht dem nächsten bestellbaren am selben Tag', () => {
+    const a = naechsteAbholung(
+      [
+        { dayOfWeek: 3, startTime: '11:00', endTime: '13:00' },
+        { dayOfWeek: 3, startTime: '16:00', endTime: '18:00' },
+      ],
+      MITTWOCH_MITTAG
+    )
+    expect(a).toMatchObject({ startTime: '16:00', tageVoraus: 0 })
   })
 
   it('gibt es nur das vergangene Fenster, kommt es mit sieben Tagen wieder', () => {
@@ -500,6 +519,8 @@ describe('getOeffentlicheHoefe — die Query', () => {
       slug: 'hof-mueller',
       kategorien: ['MILCH', 'EIER'],
       naechsteAbholung: { dayOfWeek: 5, tageVoraus: 2 },
+      // Die Abholzeiten selbst, für die Uhr des Browsers (Register N22).
+      abholfenster: [{ dayOfWeek: 5, startTime: '14:00', endTime: '16:00' }],
       // Titelbild, Galerie, dann HÖCHSTENS DREI Produktfotos (p4 fällt).
       fotos: ['titel.jpg', 'g1.jpg', 'p1.jpg', 'p2.jpg', 'p3.jpg'],
       // Die Suchnamen: ALLE Zeilen mit Bestand über der Reservierung — der

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { KundenKopf } from '@/components/shared/kunden-kopf'
+import { KundeFuss } from '@/components/shells/kunde-fuss'
 import { DATENSCHUTZ_EMAIL } from '@/lib/support'
 import { MARKE } from '@/lib/marke'
 
@@ -271,6 +272,8 @@ export default function DatenschutzPage() {
           </p>
         </div>
       </div>
+      {/* Der Seitenfuß wie auf jeder Seite der Kundschaft (Register N22) — nur das Gerüst, der Text bleibt (O4). */}
+      <KundeFuss />
     </div>
   )
 }

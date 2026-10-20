@@ -28,7 +28,8 @@ const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
 describe('ladeOeffentlicheHoefe', () => {
   it('ein Eintrag unter HOEFE_CACHE_TAG, fünf Minuten, mit Etikett', () => {
-    expect(aufrufe).toEqual([{ schluessel: [HOEFE_CACHE_TAG], optionen: { revalidate: 300, tags: [HOEFE_CACHE_TAG] } }])
+    // 'v2' (Nr. 120, Register N22): Ein Eintrag von vor dem Deploy ohne `abholfenster` wird nie gelesen.
+    expect(aufrufe).toEqual([{ schluessel: [HOEFE_CACHE_TAG, 'v2'], optionen: { revalidate: 300, tags: [HOEFE_CACHE_TAG] } }])
   })
 
   it('liefert die öffentlichen Höfe', async () => {

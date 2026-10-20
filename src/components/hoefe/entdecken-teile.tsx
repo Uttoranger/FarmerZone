@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ChevronRight, SearchX, Store, X } from 'lucide-react'
+import { ChevronRight, MapPinOff, SearchX, Store, X } from 'lucide-react'
 import type { HoefeFilter } from '@/schemas/hoefe-filter'
 import {
   aktiveFilter,
@@ -11,26 +11,29 @@ import {
   type ProduktTreffer,
 } from '@/lib/hoefe-entdecken'
 import {
-  formatiereAbholung,
+  ABHOLZEILE_TEXT,
   formatiereEntfernung,
-  produktInitiale,
+  type AbholFenster,
   type Bezugspunkt,
-  type NaechsteAbholung,
   type UmkreisStufe,
+  type VorschauProdukt,
 } from '@/lib/hofuebersicht'
-import { hofseitenLink, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
-import { KATEGORIE_LABEL, SIEGEL, type AnzeigeBereich, type ProductCategoryValue } from '@/lib/taxonomie'
+import { hofseitenLink, istBestellbar, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
+import { SIEGEL, illustrationPfad, type AnzeigeBereich, type ProductCategoryValue } from '@/lib/taxonomie'
 import { formatGrundpreis, formatGrundpreisZeile, formatKilopreis } from '@/lib/format'
-import { hofInitialen } from '@/lib/hof-initialen'
+import { hofIllustrationen } from '@/lib/hoefe-anzeige'
 import { bildStil } from '@/lib/bild-ausschnitt'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
-import { Chip, FilterChip, FilterChipReihe } from '@/components/ui/chip'
+import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { StatusBadge } from '@/components/ui/status-badge'
 import HoefeFotostreifen from '@/components/hoefe/hoefe-fotostreifen'
+import { HoefeProduktzeilen } from '@/components/hoefe/hoefe-produktzeilen'
+import { HofBildflaeche } from '@/components/hoefe/hof-bildflaeche'
+import { Abholzeile } from '@/components/hoefe/abholzeile'
 import { Abzeichen } from '@/components/ui/abzeichen'
 
 /*
@@ -152,7 +155,8 @@ export function AktiveFilterZeile({
         }
       : undefined
   const eintrag = cn(
-    "relative inline-flex h-9 max-w-full items-center gap-1.5 rounded-full border border-border bg-card px-3 text-[13px] text-foreground transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] hover:bg-muted",
+    // before: der unsichtbare Rand — 5 px je Seite, das ::before sitzt im Innenrand des Rahmens (wie chip.tsx): 34 + 10 = 44 px.
+    "relative inline-flex h-9 max-w-full items-center gap-1.5 rounded-full border border-border bg-card px-3 text-[13px] text-foreground transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-[5px] before:content-[''] hover:bg-muted",
     FOKUS_RAHMEN
   )
   const inhalt = (label: string) => (
@@ -213,12 +217,11 @@ export function AktiveFilterZeile({
   )
 }
 
-/** Das Bild einer Karte: Foto oder, ohne Foto, die Initialen auf ruhiger Fläche. */
+/** Das Bild einer Karte: Foto oder, ohne Foto, die Illustration der Kategorie (Register N22; vorher Initialen). */
 function Vorschaubild({
   foto,
   ausschnitt = null,
-  name,
-  initialen,
+  illustration,
   sizes,
   gedaempft,
   className,
@@ -226,48 +229,38 @@ function Vorschaubild({
   foto: string | null
   /** Ausschnitt eines Produktfotos (Register N17, Nr. 98); die Fotos des Hofs stehen wie heute. */
   ausschnitt?: BildAusschnitt | null
-  name: string
-  initialen: string
+  /** Ohne Foto: der Pfad der Illustration (hofIllustrationen bzw. illustrationPfad). */
+  illustration: string
   sizes: string
   gedaempft: boolean
   className?: string
 }) {
+  if (!foto) {
+    return <HofBildflaeche bilder={[illustration]} sizes={sizes} gedaempft={gedaempft} fuellen className={cn('shrink-0', className)} />
+  }
   return (
     <span className={cn('relative block shrink-0 overflow-hidden bg-muted', className)}>
-      {foto ? (
-        <Image
-          src={foto}
-          alt=""
-          fill
-          sizes={sizes}
-          // Ausgegraut wird nur das Bild — eine Deckkraft über dem Text drückte
-          // ihn unter 4,5:1 (Axe color-contrast).
-          className={cn('object-cover', gedaempft && 'opacity-60 grayscale')}
-          // Gedämpft ohne Filter des Hofs: Ein Inline-Filter überschriebe sonst die Klasse grayscale.
-          style={bildStil(ausschnitt, { filter: !gedaempft })}
-        />
-      ) : (
-        <span
-          aria-hidden="true"
-          title={name}
-          className="flex h-full items-center justify-center font-heading text-lg font-semibold text-muted-foreground"
-        >
-          {initialen}
-        </span>
-      )}
+      <Image
+        src={foto}
+        alt=""
+        fill
+        sizes={sizes}
+        // Ausgegraut wird nur das Bild — eine Deckkraft über dem Text drückte
+        // ihn unter 4,5:1 (Axe color-contrast).
+        className={cn('object-cover', gedaempft && 'opacity-60 grayscale')}
+        // Gedämpft ohne Filter des Hofs: Ein Inline-Filter überschriebe sonst die Klasse grayscale.
+        style={bildStil(ausschnitt, { filter: !gedaempft })}
+      />
     </span>
   )
 }
 
-/** Abholung oder Pause — der Termin grün, die Pause orange (Zustandsfarben, nie Knopffarben). */
-function AbholZeile({ naechsteAbholung, isPaused }: { naechsteAbholung: NaechsteAbholung | null; isPaused: boolean }) {
-  if (isPaused) {
-    return <p className="text-[13px] font-semibold text-status-offen">Macht gerade Pause – Bestellen geht bald wieder</p>
-  }
-  if (!naechsteAbholung) return null
+/** „Nicht auf der Karte" — ein Hof ohne Kartenpunkt steht nur in der Liste (Register N22). */
+function OhneKartenpunkt(): React.JSX.Element {
   return (
-    <p className="text-[13px] text-muted-foreground">
-      Nächste Abholung: <span className="font-semibold text-foreground">{formatiereAbholung(naechsteAbholung)}</span>
+    <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+      <MapPinOff className="size-3.5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+      {ABHOLZEILE_TEXT.nichtAufDerKarte}
     </p>
   )
 }
@@ -279,50 +272,61 @@ export type KartenHof = {
   postalCode: string
   city: string
   isPaused: boolean
+  /** Die Kategorien im gewählten Bereich — ohne Foto zeigt die Bildfläche ihre Illustrationen. */
   kategorien: ProductCategoryValue[]
-  naechsteAbholung: NaechsteAbholung | null
+  /** Die aktiven Abholzeiten; die Abholzeile rechnet daraus mit der Uhr des Browsers. */
+  abholfenster?: readonly AbholFenster[]
+  /** Das kaufbare Angebot — nur, ob es eines gibt, zählt hier (istBestellbar). */
+  angebot: readonly unknown[]
   fotos: string[]
   entfernungKm: number | null
+  latitude: number | null
+  longitude: number | null
   /** Abzeichen „Gründungshof“ (Register K2, Nr. 116) — nur Ja/Nein, nie die Nummer. */
   gruendungshof: boolean
 }
 
-/** Wie viele Kategorie-Chips eine Hofkarte trägt — mehr bricht am Handy um. */
-const KARTEN_CHIPS = 3
-
 /**
- * Eine Hofkarte der Liste (Mockups web-k1-entdecken-einstieg links,
- * mobil-k1-entdecken). Pausierte Höfe bleiben sichtbar, aber ausgegraut
+ * Eine Hofkarte der Liste — Variante A des Boards system-k1-entdecken-v2
+ * (Register N22): oben Foto (wischbar) oder die Bildfläche, beide 150 px
+ * hoch; darunter Name, Entfernung, Ort, „Nicht auf der Karte" für Höfe ohne
+ * Kartenpunkt, die Abholzeile (bzw. „Noch nicht bestellbar") und drei
+ * Produktzeilen mit Preis samt „+ n weitere". Keine Initialen, keine
+ * Kategorie-Chips. Pausierte Höfe bleiben sichtbar, aber ausgegraut
  * (Umsetzungsprompt §4, „Urlaubsmodus"): ruhigere Fläche, gestrichelter
  * Rand, Bild entsättigt, Name leiser — der Text bleibt lesbar.
  *
- * Zwei Gestalten:
+ * EIN Link (Regel aus #82): Die Produktzeilen haben keine eigenen.
  *  - `split` (Browser ab 1024 px, Karte daneben): Die Fläche WÄHLT den Hof
  *    (Karte fliegt zum Pin) — so mit dem Betreiber entschieden; zur Hofseite
- *    führt nur „Zum Hof". Das Bild steht links.
+ *    führt nur „Zum Hof". Das Bild (116 × 100) steht links.
  *  - schmal: Die ganze Karte ist der Link zur Hofseite, oben der
  *    Fotostreifen (Wischen) wie bisher.
  */
 export function HofKarte({
   hof,
   bereich,
-  produktNamen,
+  schaufenster,
   split,
   ausgewaehlt,
+  jetzt,
   onAuswaehlen,
   onFotoTipp,
 }: {
   hof: KartenHof
   bereich: AnzeigeBereich
-  /** „Freilandeier · Bauernbrot · …" — die Schaufenster-Auswahl (waehleVorschauImBereich). */
-  produktNamen: readonly string[]
+  /** Die Schaufenster-Auswahl (waehleVorschauImBereich, drei Zeilen) und „+ n weitere". */
+  schaufenster: { produkte: VorschauProdukt[]; weitere: number }
   split: boolean
   ausgewaehlt: boolean
+  /** Der Zeitpunkt des Servers beim Bauen der Seite (ISO-Text) — für die Abholzeile. */
+  jetzt: string
   onAuswaehlen?: () => void
   onFotoTipp?: () => void
 }): React.JSX.Element {
   const ziel = hofseitenLink(hof.slug, bereich)
-  const chips = hof.kategorien.slice(0, KARTEN_CHIPS)
+  const bilder = hofIllustrationen(hof.kategorien)
+  const ohneKartenpunkt = hof.latitude == null || hof.longitude == null
   return (
     <article
       data-pausiert={hof.isPaused ? 'ja' : undefined}
@@ -351,37 +355,38 @@ export function HofKarte({
       )}
 
       {/* Nach der Überlagerung im Baum: So liegt der Streifen über ihr, und das
-          Wischen erreicht ihn (Pfeile und Punkte stoppen die Weitergabe selbst). */}
-      {!split && hof.fotos.length > 0 && (
-        <div className={cn(hof.isPaused && 'opacity-60 grayscale')}>
-          <HoefeFotostreifen
-            fotos={hof.fotos}
-            hofName={hof.name}
-            sizes="(min-width: 768px) 720px, calc(100vw - 2rem)"
-            onTipp={onFotoTipp}
+          Wischen erreicht ihn (Pfeile und Punkte stoppen die Weitergabe selbst).
+          Ohne Foto die Bildfläche in derselben Höhe — durchlässig für den Zeiger. */}
+      {!split &&
+        (hof.fotos.length > 0 ? (
+          <div className={cn(hof.isPaused && 'opacity-60 grayscale')}>
+            <HoefeFotostreifen
+              fotos={hof.fotos}
+              hofName={hof.name}
+              sizes="(min-width: 768px) 720px, calc(100vw - 2rem)"
+              onTipp={onFotoTipp}
+            />
+          </div>
+        ) : (
+          <HofBildflaeche
+            bilder={bilder}
+            sizes="150px"
+            gedaempft={hof.isPaused}
+            className="pointer-events-none relative h-[150px] w-full rounded-t-2xl"
           />
-        </div>
-      )}
+        ))}
 
       {/* Über der Überlagerung (relative), aber durchlässig für den Zeiger:
           Klicks landen auf ihr, und Axe kann Schrift und Fläche messen. */}
-      <div className={cn('pointer-events-none relative flex gap-3.5 p-3', split ? 'items-stretch' : 'items-start')}>
-        {split ? (
+      <div className="pointer-events-none relative flex items-start gap-3.5 p-3">
+        {split && (
           <Vorschaubild
             foto={hof.fotos[0] ?? null}
-            name={hof.name}
-            initialen={hofInitialen(hof.name)}
+            illustration={bilder[0]}
             sizes="116px"
             gedaempft={hof.isPaused}
             className="h-[100px] w-[116px] rounded-xl"
           />
-        ) : (
-          <span
-            aria-hidden="true"
-            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted font-heading text-sm font-semibold text-foreground"
-          >
-            {hofInitialen(hof.name)}
-          </span>
         )}
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -403,25 +408,17 @@ export function HofKarte({
           <p className="truncate text-[13px] text-muted-foreground">
             {hof.postalCode} {hof.city}
           </p>
-          {chips.length > 0 && (
-            <p className="flex flex-wrap gap-1.5">
-              {chips.map((k) => (
-                <Chip key={k}>{KATEGORIE_LABEL[k]}</Chip>
-              ))}
-            </p>
-          )}
-          <AbholZeile naechsteAbholung={hof.naechsteAbholung} isPaused={hof.isPaused} />
-          {produktNamen.length > 0 && (
-            <p className="line-clamp-1 text-[13px] break-words text-foreground">{produktNamen.join(' · ')}</p>
-          )}
+          {ohneKartenpunkt && <OhneKartenpunkt />}
+          <Abholzeile fenster={hof.abholfenster} isPaused={hof.isPaused} bestellbar={istBestellbar(hof)} jetzt={jetzt} />
+          <HoefeProduktzeilen produkte={schaufenster.produkte} weitere={schaufenster.weitere} />
           {split && (
             <p className="mt-1">
               {/* Der einzige Weg zur Hofseite im Splitscreen — über der Auswahl-Fläche. */}
               <Link
                 href={ziel}
                 className={cn(
-                  // before: der unsichtbare Rand oben und unten — 36 px Knopf, 44 px Trefferfläche (wie die Chips).
-                  "pointer-events-auto relative z-10 inline-flex h-9 items-center gap-1 rounded-full border border-border bg-card px-3.5 text-[13px] font-semibold text-foreground transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] hover:bg-muted",
+                  // before: der unsichtbare Rand oben und unten — 36 px Knopf, 44 px Trefferfläche (wie chip.tsx: 5 px, das ::before sitzt im Innenrand des Rahmens).
+                  "pointer-events-auto relative z-10 inline-flex h-9 items-center gap-1 rounded-full border border-border bg-card px-3.5 text-[13px] font-semibold text-foreground transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-[5px] before:content-[''] hover:bg-muted",
                   FOKUS_RAHMEN
                 )}
               >
@@ -443,7 +440,8 @@ export type TrefferHof = {
   postalCode: string
   city: string
   isPaused: boolean
-  naechsteAbholung: NaechsteAbholung | null
+  abholfenster?: readonly AbholFenster[]
+  angebot: readonly unknown[]
   entfernungKm: number | null
 }
 
@@ -468,9 +466,12 @@ function preise(p: AngebotsProdukt): {
 export function ProduktZeile({
   treffer,
   bereich,
+  jetzt,
 }: {
   treffer: ProduktTreffer<TrefferHof>
   bereich: AnzeigeBereich
+  /** Der Zeitpunkt des Servers beim Bauen der Seite (ISO-Text) — für die Abholzeile. */
+  jetzt: string
 }): React.JSX.Element {
   const { hof, produkt } = treffer
   const { preis, grundpreis } = preise(produkt)
@@ -494,8 +495,7 @@ export function ProduktZeile({
         <Vorschaubild
           foto={produkt.imageUrl}
           ausschnitt={produkt.bildAusschnitt}
-          name={produkt.name}
-          initialen={produktInitiale(produkt.name)}
+          illustration={illustrationPfad(produkt.category, produkt.subcategory)}
           sizes="72px"
           gedaempft={hof.isPaused}
           className="size-[72px] rounded-xl"
@@ -512,7 +512,7 @@ export function ProduktZeile({
           <p className="truncate text-[13px] text-muted-foreground" title={hof.name}>
             {hof.name} · {wo}
           </p>
-          <AbholZeile naechsteAbholung={hof.naechsteAbholung} isPaused={hof.isPaused} />
+          <Abholzeile fenster={hof.abholfenster} isPaused={hof.isPaused} bestellbar={istBestellbar(hof)} jetzt={jetzt} />
         </div>
         <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
           <span className="text-[15px] font-semibold whitespace-nowrap text-foreground">{preis}</span>

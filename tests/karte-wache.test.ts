@@ -80,11 +80,13 @@ describe('genau zwei Leaflet-Karten, beide am gemeinsamen Hook', () => {
 
   it('die Pins gruppieren für die Zoomstufe der Karte, nie für einen gemerkten Wert (Runde 1)', () => {
     const karte = code('src/components/hoefe/hoefe-karte.tsx')
-    expect(karte).toMatch(/gruppierePins\(hoefe, map\.getZoom\(\)\)/)
+    // Die Punkte sind die Höfe — mit Namen oder ohne (Register N22), immer für die aktuelle Zoomstufe.
+    expect(karte).toMatch(/gruppierePins\(punkte, map\.getZoom\(\)\)/)
+    expect(karte).toMatch(/const punkte = mitNamen \? hoefe : hoefe\.map\(/)
     // Jedes zoomend zählt — auch eines, das auf der Ausgangsstufe endet.
     expect(karte).toMatch(/on\('zoomend', \(\) => setZoomEnden\(\(n\) => n \+ 1\)\)/)
     // Gegenprobe: der alte Weg über die gemerkte Stufe fiele auf.
-    expect('gruppierePins(hoefe, zoomStufe ?? map.getZoom())').not.toMatch(/gruppierePins\(hoefe, map\.getZoom\(\)\)/)
+    expect('gruppierePins(punkte, zoomStufe ?? map.getZoom())').not.toMatch(/gruppierePins\(punkte, map\.getZoom\(\)\)/)
   })
 
   it('die Trefferfläche hat EINE Zahl für Marke und Gruppierung, rund wie das Bild (Runde 1)', () => {
@@ -135,5 +137,32 @@ describe('Platzhalter beim Nachladen', () => {
   it('Gegenprobe: ohne loading erkennt die Suche den alten Einbau', () => {
     const alt = "const HoefeKarte = dynamic(() => import('@/components/hoefe/hoefe-karte'), { ssr: false })"
     expect(alt).not.toMatch(/loading: \(\) => <KarteLaedt/)
+  })
+})
+
+// Nr. 120 (Register N22): Pins per Tab, Enter wie Klick, die Vorschau am Computer.
+// Ohne DOM lässt sich das Verhalten nicht ausführen — die Wache hält die Verdrahtung fest.
+describe('Pins per Tastatur und die Vorschau am Computer', () => {
+  it('jeder Pin und Gruppen-Pin ist per Tab erreichbar, Enter und Leertaste wirken wie ein Klick', () => {
+    const karte = code('src/components/hoefe/hoefe-karte.tsx')
+    expect(karte.match(/keyboard: true/g)).toHaveLength(2)
+    // Nur der eigene Hof der Umfeld-Karte bleibt ohne Tab — er ist nicht antippbar.
+    expect(karte.match(/keyboard: false/g)).toHaveLength(1)
+    expect(karte.match(/e\.key !== 'Enter' && e\.key !== ' '/g)).toHaveLength(2)
+    // Gegenprobe: die alte Zeile fiele auf.
+    expect('L.marker([marke.lat, marke.lon], { keyboard: false })'.match(/keyboard: true/g)).toBeNull()
+  })
+
+  it('die Vorschau öffnet bei Darüberfahren und Fokus und schließt mit Escape oder 300 ms nach dem Verlassen', () => {
+    const karte = code('src/components/hoefe/hoefe-karte.tsx')
+    for (const ereignis of ['mouseenter', 'mouseleave', 'focus', 'blur']) expect(karte, ereignis).toContain(`addEventListener('${ereignis}'`)
+    expect(karte).toMatch(/const VORSCHAU_NACHLAUF_MS = 300\b/)
+    expect(karte).toMatch(/e\.key === 'Escape'/)
+    expect(karte).toContain("setAttribute('aria-describedby', vorschauId)")
+    expect(code('src/components/hoefe/hof-kurzkarte.tsx')).toContain('role="tooltip"')
+  })
+
+  it('zeichnet die Karte die Pins neu, bekommt der Pin mit dem Fokus ihn zurück', () => {
+    expect(code('src/components/hoefe/hoefe-karte.tsx')).toMatch(/if \(fokusPin === pin\.slug\) element\.focus\(\{ preventScroll: true \}\)/)
   })
 })

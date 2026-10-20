@@ -28,6 +28,13 @@ import {
   zentrierterIndex,
   zoomBisEinzeln,
   zoomZumAufloesen,
+  PIN_NAME_MAX,
+  hofIllustrationen,
+  kartenpunktHinweis,
+  pinBeschriftung,
+  pinName,
+  pinNamenMasse,
+  zeigePinNamen,
   type KartenMarke,
   type PinPunkt,
 } from '@/lib/hoefe-anzeige'
@@ -468,5 +475,77 @@ describe('Ausschnitt-Merker — hat die Nutzerin verschoben oder gezoomt?', () =
     merker.bewegungBeginnt()
     merker.uebersichtGezeigt()
     expect(merker.nutzerinHatBewegt).toBe(false)
+  })
+})
+
+// ─── Nr. 120 (Register N22): Namen an den Pins, Hinweis ohne Kartenpunkt, Bildfläche ───
+
+describe('Namen an den Pins', () => {
+  it('ab Zoom 12 oder bei höchstens 12 Pins im Bild', () => {
+    expect(zeigePinNamen(12, 40)).toBe(true)
+    expect(zeigePinNamen(11, 12)).toBe(true)
+    expect(zeigePinNamen(11, 13)).toBe(false)
+    expect(zeigePinNamen(9.5, 0)).toBe(true)
+  })
+
+  it('höchstens 18 Zeichen, sonst gekürzt mit „…" — nach Zeichen, nicht nach Bytes', () => {
+    expect(pinName('Sonnhof')).toBe('Sonnhof')
+    expect(PIN_NAME_MAX).toBe(18)
+    const lang = pinName('Biohof Müllerbauer am Waldrand')
+    expect(Array.from(lang)).toHaveLength(18)
+    expect(lang.endsWith('…')).toBe(true)
+    expect(pinName('Ölmühle Großgrünau')).toBe('Ölmühle Großgrünau')
+  })
+
+  it('der Name für Screenreader trägt die Nummer der Liste', () => {
+    expect(pinBeschriftung({ nummer: 1, name: 'Sonnhof' })).toBe('Sonnhof, Nummer 1')
+    expect(pinBeschriftung({ nummer: 3 })).toBe('Nummer 3')
+  })
+
+  it('gruppierePins rechnet mit der Breite der Pille: Was ohne Namen zwei Pins sind, ist mit Namen eine Gruppe', () => {
+    const zoom = 14
+    // 60 px rechts daneben: zwei Scheiben (44 px) überdecken sich nicht, eine Pille mit Namen schon.
+    const nachbar = daneben(BASIS, 2, 60, 0, zoom)
+    expect(gruppierePins([BASIS, nachbar], zoom)).toHaveLength(2)
+    const mitNamen = gruppierePins([{ ...BASIS, name: 'Sonnhof' }, { ...nachbar, name: 'Testhof B' }], zoom)
+    expect(mitNamen).toHaveLength(1)
+    expect(mitNamen[0].art).toBe('gruppe')
+    // Links daneben reicht die Pille nicht hinüber: Die Fläche liegt rechts vom Punkt.
+    const links = daneben(BASIS, 2, -60, 0, zoom)
+    expect(gruppierePins([{ ...BASIS, name: 'Sonnhof' }, links], zoom)).toHaveLength(2)
+  })
+
+  it('die Pille ist breiter als die Trefferfläche und wächst mit dem Namen, höchstens bis 18 Zeichen', () => {
+    const kurz = pinNamenMasse('Hof')
+    const lang = pinNamenMasse('Sonnhof am Bach')
+    expect(kurz.breite).toBeGreaterThan(TREFFERFLAECHE)
+    expect(lang.breite).toBeGreaterThan(kurz.breite)
+    expect(pinNamenMasse('X'.repeat(40)).breite).toBe(pinNamenMasse('X'.repeat(30)).breite)
+    expect(kurz.ankerX).toBe(TREFFERFLAECHE / 2)
+  })
+
+  it('im Fächer (maximale Zoomstufe) stehen die Pins ohne Namen — die Pillen lägen sonst übereinander', () => {
+    const max = KARTEN_KACHELN.maxZoom
+    const marken = gruppierePins([{ ...BASIS, name: 'Sonnhof' }, { ...pin(2, BASIS.lat, BASIS.lon), name: 'Testhof B' }], max)
+    expect(marken.map((m) => m.art)).toEqual(['pin', 'pin'])
+    for (const m of marken) if (m.art === 'pin') expect(m.pin.name).toBeUndefined()
+  })
+})
+
+describe('kartenpunktHinweis — der Satz AUF der Karte', () => {
+  it('am Computer mit den Nummern der Liste, am Handy „du findest ihn in der Liste"', () => {
+    expect(kartenpunktHinweis([4], true)).toBe('Ein Hof hat noch keinen Kartenpunkt – Nr. 4 steht nur in der Liste.')
+    expect(kartenpunktHinweis([4, 6, 7], true)).toBe('3 Höfe haben noch keinen Kartenpunkt – Nr. 4, 6 und 7 stehen nur in der Liste.')
+    expect(kartenpunktHinweis([4], false)).toBe('Ein Hof hat noch keinen Kartenpunkt – du findest ihn in der Liste.')
+    expect(kartenpunktHinweis([1, 2, 3, 4, 5], true)).toBe('5 Höfe haben noch keinen Kartenpunkt – du findest sie in der Liste.')
+    expect(kartenpunktHinweis([], true)).toBeNull()
+  })
+})
+
+describe('hofIllustrationen — die Bildfläche ohne Foto', () => {
+  it('die Illustrationen der ersten ein bis drei Kategorien, ohne Kategorie „Sonstiges"', () => {
+    expect(hofIllustrationen(['EIER'])).toEqual(['/categories/eier.webp'])
+    expect(hofIllustrationen(['EIER', 'HONIG', 'BROT', 'FLEISCH'])).toEqual(['/categories/eier.webp', '/categories/honig.webp', '/categories/brot.webp'])
+    expect(hofIllustrationen([])).toEqual(['/categories/sonstiges.webp'])
   })
 })

@@ -84,6 +84,7 @@ import {
   SoFunktionierts,
   StartseiteFuss,
 } from '@/components/startseite/startseite-abschnitte'
+import { KundeFuss } from '@/components/shells/kunde-fuss'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 /** Ohne Kommentare — die Dateien erklären, was sie NICHT tun. */
@@ -626,12 +627,22 @@ describe('Abschnitte', () => {
     expect(konto?.antwort).not.toMatch(/legen dir ein Konto/)
   })
 
-  it('der Fuß: Weg der Höfe zur Anmeldung, Registrieren, Rechtliches', () => {
+  it('der Fuß: Weg der Höfe zur Anmeldung, Registrieren, Konditionen', () => {
     const text = html(createElement(StartseiteFuss, { jahr: 2026 }))
-    for (const href of ['/login', '/register', '/konditionen', '/impressum', '/datenschutz', '/#so-funktionierts']) {
+    for (const href of ['/login', '/register', '/konditionen', '/#so-funktionierts']) {
       expect(text).toContain(`href="${href}"`)
     }
     expect(text).toContain(`© 2026 ${MARKE}`)
+  })
+
+  // Nr. 120 (Register N22): Impressum, Datenschutz, AGB und „Problem melden" stehen im Seitenfuß der KundeShell direkt darunter.
+  it('kein doppelter Fuß: die rechtlichen Links und „Problem melden" fehlen im Fuß der Startseite', () => {
+    const text = html(createElement(StartseiteFuss, { jahr: 2026 }))
+    for (const href of ['/impressum', '/datenschutz', '/agb', '/problem-melden']) {
+      expect(text, href).not.toContain(`href="${href}"`)
+    }
+    // Gegenprobe: Die Suche erkennt die Links, wo sie stehen.
+    expect(html(createElement(KundeFuss))).toContain('href="/problem-melden"')
   })
 })
 

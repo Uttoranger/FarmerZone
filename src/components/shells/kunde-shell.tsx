@@ -12,8 +12,9 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { BottomNav, BottomNavLink, BottomNavMitte, mittelknopfKlassen } from '@/components/ui/bottom-nav'
 import { Zaehler } from '@/components/ui/zaehler'
 import { Wortmarke } from '@/components/shared/wortmarke'
-import { ThemeUmschalter, ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
+import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
 import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
+import { KundeFuss } from '@/components/shells/kunde-fuss'
 import { KUNDE_KOPF_ZEILE, KUNDE_SHELL_MASSE } from '@/lib/kunde-shell-masse'
 import { MARKE } from '@/lib/marke'
 import { VORSCHAU_LEISTE_HINWEIS, VORSCHAU_LEISTE_HINWEIS_MS } from '@/lib/hofseite-vorschau'
@@ -37,6 +38,10 @@ import { useImVorschauRahmen } from '@/components/farm/vorschau-im-rahmen'
  * „Anmelden" (→ /login) bzw. mit Hof-Sitzung „Mein Hof" (→ /dashboard). Dafür
  * wandert Hell/Dunkel am Handy aus dem Kopf an den Seitenfuß; im Browser
  * bleibt er im Kopf.
+ *
+ * Seit Nr. 120 (Register N22) trägt jede Seite der KundeShell den Seitenfuß
+ * (KundeFuss) mit Impressum, Datenschutz, AGB und „Problem melden"; Hell/Dunkel
+ * am Handy steht darin. Die KundeFokusShell bleibt ohne Fuß.
  *
  * Seit Nr. 107 (Register N4, Ergänzung): Steht die Hofseite als Vorschau im
  * Rahmen (Kundenansicht von Mein Hof, Vorschau im Editor), zeigt die Shell
@@ -226,15 +231,13 @@ export function KundeShell({ sitzung, unterleiste = true, children }: KundeShell
         </div>
       </header>
 
-      <main id={INHALT_ID} tabIndex={-1} className="pb-28 outline-none md:pb-0 print:pb-0">
+      <main id={INHALT_ID} tabIndex={-1} className="outline-none">
         {children}
-        {/* Seitenfuß am Handy: Hell/Dunkel (im Browser im Kopf). Als letzter
-            Teil des Inhalts, auf jeder Seite der Shell — auch dort, wo kein
-            Fuß der Startseite steht. */}
-        <div className="border-t border-border px-2 py-1.5 md:hidden print:hidden">
-          <ThemeUmschalterZeile className={cn('w-auto text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)} />
-        </div>
       </main>
+      {/* Der Seitenfuß auf jeder Seite der Shell, am Handy samt Hell/Dunkel (im
+          Browser im Kopf). Unten hält er Platz für die Unterleiste bzw. die
+          feste Leiste einer Fokus-Seite frei — vorher tat das der Inhalt. */}
+      <KundeFuss className="pb-28 md:pb-0 print:pb-0" />
 
       {unterleiste && (
         // In der Vorschau im Rahmen ohne Wirkung — keine Klicks nach außen (VorschauLeisteSperre).

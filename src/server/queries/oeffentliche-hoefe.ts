@@ -18,7 +18,12 @@ import { leseOeffentlichMitWiederholung } from '@/server/oeffentlich-lesen'
  * Eintrag, baut Next auch die Seite neu.
  *
  * BEWUSST IN KAUF GENOMMEN: Auch die „Heute/Morgen"-Angabe der nächsten
- * Abholung wird mit den Daten gecacht und altert höchstens fünf Minuten.
+ * Abholung wird mit den Daten gecacht und altert höchstens fünf Minuten. Auf
+ * /hoefe rechnet der Browser sie seit Nr. 120 aus `abholfenster` neu.
+ *
+ * DER SCHLÜSSELTEIL 'v2' (Nr. 120, wie 'fassung-v1' der Startseite seit Nr.
+ * 99): Ein Eintrag von vor dem Deploy trägt kein `abholfenster` — mit dem
+ * neuen Schlüssel wird er nie gelesen, die erste Anfrage danach lädt neu.
  *
  * EINE WIEDERHOLUNG bei einem Verbindungsabbruch (Nr. 47): Beim Neubau im
  * Hintergrund scheiterte die Anmeldung am Pooler gelegentlich mit
@@ -27,7 +32,7 @@ import { leseOeffentlichMitWiederholung } from '@/server/oeffentlich-lesen'
  */
 export const ladeOeffentlicheHoefe = unstable_cache(
   () => leseOeffentlichMitWiederholung('oeffentliche-hoefe', () => getOeffentlicheHoefe()),
-  [HOEFE_CACHE_TAG],
+  [HOEFE_CACHE_TAG, 'v2'],
   {
     revalidate: 300,
     tags: [HOEFE_CACHE_TAG],

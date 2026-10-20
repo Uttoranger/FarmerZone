@@ -4,17 +4,21 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { List, Map as MapIcon } from 'lucide-react'
+import { Clock, List, Map as MapIcon } from 'lucide-react'
 import { leseHoefeFilter, schreibeHoefeFilter, type HoefeFilter } from '@/schemas/hoefe-filter'
 import {
   berechneHofAuswahl,
+  holtAbAnTagen,
   suchForm,
+  tageDerAbholwahl,
   waehleVorschauImBereich,
   type Bezugspunkt,
   type UmkreisStufe,
 } from '@/lib/hofuebersicht'
 import {
+  ABHOLUNG_TEXT,
   MENGEN_HINWEIS,
+  abholungReihe,
   aktiveFilter,
   alleZuruecksetzen,
   entdeckenKopf,
@@ -24,17 +28,19 @@ import {
   kategorieReihe,
   leerzustand,
   mengenReihe,
+  naechsterAbholtag,
   produktTreffer,
   siegelReihe,
   sortenReihe,
   sortierReihe,
   tierReihe,
   zaehleFilter,
+  zahlZeile,
   zeigtProdukte,
 } from '@/lib/hoefe-entdecken'
 import { hofseitenLink } from '@/lib/bereiche-anzeige'
 import { REIHENFOLGE_HINWEIS } from '@/lib/rechtstexte/agb-einbindung'
-import { LEERE_LAGE, nachLeerTipp, nachPinTipp, nachZeiger, type AuswahlLage } from '@/lib/hoefe-anzeige'
+import { LEERE_LAGE, kartenpunktHinweis, nachLeerTipp, nachPinTipp, nachZeiger, type AuswahlLage } from '@/lib/hoefe-anzeige'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -45,6 +51,8 @@ import HoefeKarussell from '@/components/hoefe/hoefe-karussell'
 import { HoefeSuche } from '@/components/hoefe/hoefe-suche'
 import { HOEFE_ADRESSE, ankunftAusAdresse, useHoefeAdresse } from '@/components/hoefe/use-hoefe-adresse'
 import { BlattGruppe, EntdeckenFilterblatt } from '@/components/hoefe/entdecken-filterblatt'
+import { HofKurzkarte } from '@/components/hoefe/hof-kurzkarte'
+import { useUhr } from '@/components/hoefe/use-uhr'
 import {
   AktiveFilterZeile,
   ChipReihe,
@@ -126,9 +134,17 @@ function stufeAusWert(wert: string): UmkreisStufe {
  * verdrahtet nur. Im Browser ab 1024 px Liste links, Karte randlos rechts;
  * darunter die Liste mit einer Karten-Vorschau und die Filter im Blatt.
  */
-export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React.JSX.Element {
+export function HoefeClient({
+  hoefe,
+  jetzt,
+}: {
+  hoefe: HofUebersichtEintrag[]
+  /** Der Zeitpunkt des Servers beim Bauen der Seite (ISO-Text): Bis zur Hydration rechnet die Seite damit, danach mit der Uhr des Browsers (useUhr, Register N22). */
+  jetzt: string
+}): React.JSX.Element {
   const router = useRouter()
   const istBreit = useIstBreit()
+  const uhr = useUhr(jetzt)
   // Auf dem Server und beim Hydrieren null: der leere Filter, wie im Server-HTML.
   const adresse = useHoefeAdresse()
   const filter = useMemo(() => leseHoefeFilter(new URLSearchParams(adresse ?? '')), [adresse])
@@ -201,16 +217,33 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
 
   // DIE Ableitung — Bereich/Facetten → Umkreis → Sortierung → Suche (rein,
   // getestet). Liste, Produkttreffer UND Karte lesen `gefiltert`.
-  const { gefiltert, vorschlaege, suchbegriffe, sucheAktiv, sucheLeertDieListe, vorschauKategorien } = useMemo(
-    () => berechneHofAuswahl(hoefe, { ...filter, bezugspunkt, umkreis }),
-    [hoefe, filter, bezugspunkt, umkreis]
-  )
+  const {
+    gefiltert,
+    vorschlaege,
+    suchbegriffe,
+    sucheAktiv,
+    sucheLeertDieListe,
+    abholungLeertDieListe,
+    abholBasis,
+    vorschauKategorien,
+  } = useMemo(() => berechneHofAuswahl(hoefe, { ...filter, bezugspunkt, umkreis, jetzt: uhr }), [hoefe, filter, bezugspunkt, umkreis, uhr])
   const produkte = useMemo(() => produktTreffer(gefiltert, filter), [gefiltert, filter])
   const alsProdukte = zeigtProdukte(filter)
   const anzahl = alsProdukte ? produkte.length : gefiltert.length
   const zahlText = ergebnisZahl(filter, anzahl)
+  // „5 Höfe · 2 holen heute ab · nach Entfernung" — die Statusmeldung über der Liste (Register N22).
+  const holenHeute = useMemo(() => {
+    const heute = tageDerAbholwahl('heute', uhr)
+    return gefiltert.filter((hof) => holtAbAnTagen(hof, heute, uhr)).length
+  }, [gefiltert, uhr])
+  const zahlZeilenText = zahlZeile({ filter, anzahl, holenHeute, mitBezugspunkt: bezugspunkt !== null, jetzt: uhr })
   const kopf = entdeckenKopf(filter)
-  const leer = leerzustand({ sucheLeertDieListe, umkreis, filter })
+  const leer = leerzustand({
+    sucheLeertDieListe,
+    umkreis,
+    filter,
+    abholung: abholungLeertDieListe ? { naechster: naechsterAbholtag(abholBasis, uhr) } : null,
+  })
 
   const reihen = useMemo(
     () => ({
@@ -221,6 +254,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
       siegel: siegelReihe(hoefe, filter),
       tiere: tierReihe(hoefe, filter),
       sortierung: sortierReihe(filter),
+      abholung: abholungReihe(filter),
     }),
     [hoefe, filter]
   )
@@ -232,7 +266,10 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
     const behalten = (slug: string | null) => (slug && vorhanden.has(slug) ? slug : null)
     return { ausgewaehlt: behalten(lage.ausgewaehlt), hervorgehoben: behalten(lage.hervorgehoben) }
   }, [gefiltert, lage])
-  const ohneKoordinaten = gefiltert.filter((h) => h.latitude == null || h.longitude == null).length
+  // Höfe ohne Kartenpunkt erscheinen nie als Pin — nur die Liste führt alle. Der Hinweis steht AUF der
+  // Karte (Register N22): am Computer mit ihren Nummern, am Handy „du findest ihn in der Liste".
+  const nummernOhnePunkt = gefiltert.flatMap((h, i) => (h.latitude == null || h.longitude == null ? [i + 1] : []))
+  const kartenHinweis = kartenpunktHinweis(nummernOhnePunkt, istBreit)
   /** Die Pin-Menge: gefilterte Höfe MIT Koordinaten, Nummern = Listenindex. */
   const mitPunkt = useMemo(
     () =>
@@ -246,7 +283,17 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
     nummer,
     lat: hof.latitude as number,
     lon: hof.longitude as number,
+    // Der Name an der Pille — die Karte zeigt ihn ab Zoom 12 oder bei höchstens 12 Pins im Bild (Register N22).
+    name: hof.name,
   }))
+
+  /** Die Pin-Vorschau am Computer (HofKurzkarte): zwei Produktzeilen, Auswahl wie auf der Hofkarte. */
+  const pinVorschau = (slug: string, id: string) => {
+    const hof = gefiltert.find((h) => h.slug === slug)
+    if (!hof) return null
+    const auswahl = waehleVorschauImBereich(hof, bereich, vorschauKategorien, 2, suchbegriffe)
+    return <HofKurzkarte hof={hof} bereich={bereich} schaufenster={auswahl} jetzt={jetzt} id={id} />
+  }
 
   /** Vorschlag übernommen → Such-Marke, das Feld wird frei für den nächsten Begriff. */
   function suchMarkeHinzufuegen(name: string) {
@@ -314,15 +361,6 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
     </p>
   )
 
-  const koordinatenHinweis = ohneKoordinaten > 0 && (
-    // Höfe ohne Koordinaten erscheinen nie als Pin — nur die Liste führt alle.
-    <p className="text-[12.5px] text-muted-foreground">
-      {ohneKoordinaten === 1
-        ? 'Ein Hof hat noch keinen Kartenpunkt – du findest ihn in der Liste.'
-        : `${ohneKoordinaten} Höfe haben noch keinen Kartenpunkt – du findest sie in der Liste.`}
-    </p>
-  )
-
   /** Die Ergebnisse: Produkte (Suche, Futter) oder Höfe; leer mit Ausweg. */
   const ergebnisse = (split: boolean) => {
     if (anzahl === 0) {
@@ -342,7 +380,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
                 ref={erstes ? merkeEintrag(treffer.hof.slug) : undefined}
                 className="scroll-mt-24"
               >
-                <ProduktZeile treffer={treffer} bereich={bereich} />
+                <ProduktZeile treffer={treffer} bereich={bereich} jetzt={jetzt} />
               </li>
             )
           })}
@@ -352,7 +390,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
     return (
       <ol className="flex flex-col gap-3" aria-label="Höfe">
         {gefiltert.map((hof) => {
-          const vorschau = waehleVorschauImBereich(hof, bereich, vorschauKategorien, 4, suchbegriffe)
+          const schaufenster = waehleVorschauImBereich(hof, bereich, vorschauKategorien, 3, suchbegriffe)
           return (
             <li
               key={hof.slug}
@@ -368,8 +406,9 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
               <HofKarte
                 hof={hof}
                 bereich={bereich}
-                produktNamen={vorschau.produkte.filter((p) => p.verfuegbar).map((p) => p.name)}
+                schaufenster={schaufenster}
                 split={split}
+                jetzt={jetzt}
                 ausgewaehlt={sichtbareLage.ausgewaehlt === hof.slug}
                 onAuswaehlen={() => hofAnfahren(hof.slug)}
                 onFotoTipp={() => router.push(hofseitenLink(hof.slug, bereich))}
@@ -392,6 +431,9 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
       <ChipReihe beschriftung="Futtersorte" chips={reihen.futter} onWahl={schreibeUrl} />
       <ChipReihe beschriftung="Sorte" chips={reihen.sorten} onWahl={schreibeUrl} />
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <FilterGruppe titel={ABHOLUNG_TEXT.beschriftung}>
+          <ChipReihe beschriftung={ABHOLUNG_TEXT.beschriftung} chips={reihen.abholung} onWahl={schreibeUrl} />
+        </FilterGruppe>
         {umkreisSegment && <FilterGruppe titel="Umkreis">{umkreisSegment}</FilterGruppe>}
         {reihen.mengen.length > 0 && (
           <FilterGruppe titel="Menge">
@@ -410,8 +452,21 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
         )}
         <ChipReihe beschriftung="Sortierung" chips={reihen.sortierung} onWahl={schreibeUrl} />
         <span className="flex-1" />
-        <span className="text-[13px] text-muted-foreground">{zahlText}</span>
+        {/* Die Zahlzeile als Statusmeldung: Sie sagt nach jedem Filter neu, wie viele Höfe passen. Am Handy steht sie über der Liste. */}
+        {istBreit && (
+          <span role="status" className="text-[13px] text-muted-foreground">
+            {zahlZeilenText}
+          </span>
+        )}
       </div>
+    </div>
+  )
+
+  /** Am Handy die Reihe „Abholung" über der Liste (Board, Handy 1) — eine Liste von Links mit aria-current, keine Radiogruppe. */
+  const abholungReiheHandy = (
+    <div className="flex items-center gap-2 lg:hidden">
+      <Clock className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+      <ChipReihe beschriftung={ABHOLUNG_TEXT.beschriftung} chips={reihen.abholung} onWahl={schreibeUrl} className="min-w-0 flex-1" />
     </div>
   )
 
@@ -433,6 +488,10 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
       }}
     >
       {umkreisSegment && <BlattGruppe titel="Umkreis">{umkreisSegment}</BlattGruppe>}
+      <BlattGruppe titel={ABHOLUNG_TEXT.frage}>
+        <p className="text-[12.5px] text-muted-foreground">{ABHOLUNG_TEXT.erklaerung}</p>
+        <ChipReihe beschriftung={ABHOLUNG_TEXT.beschriftung} chips={reihen.abholung} onWahl={schreibeUrl} umbrechen />
+      </BlattGruppe>
       <BlattGruppe titel="Was suchst du?">
         <ChipReihe beschriftung="Kategorie" chips={reihen.kategorien} onWahl={schreibeUrl} umbrechen />
       </BlattGruppe>
@@ -504,6 +563,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
         <div className="lg:hidden">{filterblatt(false)}</div>
       </div>
       {suchfeld(false)}
+      {abholungReiheHandy}
       {filterReihenBrowser}
       {futterHinweis}
       <AktiveFilterZeile filter={filter} onWahl={schreibeUrl} umkreis={aktiverUmkreis} onUmkreisAufheben={umkreisAufheben} />
@@ -525,12 +585,13 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
           </div>
           {/* Unter der Kopfzeile (64 px) plus Luft; die Höhe füllt das Fenster. */}
           <div className="sticky top-20 flex h-[calc(100dvh-6rem)] min-h-[420px] flex-col gap-2">
-            {koordinatenHinweis}
             <div className="isolate min-h-0 flex-1 overflow-hidden rounded-l-2xl border-y border-l border-border">
               <HoefeKarte
                 hoefe={kartenHoefe}
                 lage={sichtbareLage}
                 fokus={fokus}
+                hinweis={kartenHinweis}
+                kurzkarte={pinVorschau}
                 hoeheKlasse="h-full"
                 onAuswahl={pinGewaehlt}
                 onLeerTipp={() => setLage((l) => nachLeerTipp(l))}
@@ -619,6 +680,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
               hoeheKlasse="h-full"
               polsterUnten={bandHoehe}
               polsterOhneAuswahl={hinweisPlatz}
+              hinweis={kartenHinweis}
               onAuswahl={pinGewaehlt}
               onLeerTipp={() => setLage((l) => nachLeerTipp(l))}
             />
@@ -641,6 +703,7 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
               suchbegriffe={suchbegriffe}
               onZentriert={hofAnfahren}
               bandRef={bandMessen}
+              jetzt={jetzt}
             />
             {/* Auch die Karte braucht die Leermeldung — eine leere Karte ohne
                 Wort wäre keine Rückmeldung. Sie liegt über der Karte, weil
@@ -648,7 +711,6 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
             {anzahl === 0 && <div className="absolute inset-x-3 top-3 z-[900]">{ergebnisse(false)}</div>}
           </div>
         </div>
-        {koordinatenHinweis && <div className="mx-auto max-w-[1200px] px-4 pt-3 pb-4 md:px-6">{koordinatenHinweis}</div>}
       </>
     )
   }
@@ -665,7 +727,8 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
           prefetch={false}
           rel="nofollow"
           aria-label="Karte öffnen"
-          className={cn('relative block h-[120px] overflow-hidden rounded-2xl border border-border bg-accent', FOKUS_RAHMEN)}
+          // 84 px hoch (Board, Handy 1): Die Hofkarten mit Produktzeilen brauchen den Platz.
+          className={cn('relative block h-[84px] overflow-hidden rounded-2xl border border-border bg-accent', FOKUS_RAHMEN)}
         >
           {/* Der dunkle Schleier: primary-foreground ist im neuen Design in
               beiden Themes fast schwarz — theme-fest wie jedes Bild-Overlay
@@ -685,7 +748,9 @@ export function HoefeClient({ hoefe }: { hoefe: HofUebersichtEintrag[] }): React
             Karte öffnen
           </span>
         </Link>
-        <p className="text-[13px] text-muted-foreground">{zahlText}</p>
+        <p role="status" className="text-[13px] text-muted-foreground">
+          {zahlZeilenText}
+        </p>
         {ergebnisse(false)}
         {reihenfolgeHinweis()}
       </div>
