@@ -7,7 +7,9 @@ import { zentrierterIndex } from '@/lib/hoefe-anzeige'
 
 /**
  * Der blätterbare Fotostreifen oben auf einer Hofkarte (Tripadvisor-Muster):
- * Seitenverhältnis 3:2 (feste Höhe — nichts springt beim Nachladen),
+ * 150 px hoch (seit Nr. 120, Hofkarte A; vorher 3:2) — genau so hoch wie die
+ * Bildfläche eines Hofs ohne Foto (HofBildflaeche), nichts springt beim
+ * Nachladen und keine Karte ist höher als die andere,
  * horizontales Scroll-Snap-Karussell OHNE neue Abhängigkeit. Wischen am
  * Touchgerät; am Zeigergerät erscheinen Pfeile beim Darüberfahren; Punkte
  * unten zeigen die Position (rein visuell).
@@ -71,7 +73,7 @@ export default function HoefeFotostreifen({
 
   return (
     // group/foto: Die Pfeile erscheinen beim Darüberfahren über dem Streifen.
-    <div className="group/foto relative aspect-[3/2] w-full overflow-hidden rounded-t-2xl">
+    <div className="group/foto relative h-[150px] w-full overflow-hidden rounded-t-2xl">
       <div
         ref={band}
         onScroll={beimScrollen}

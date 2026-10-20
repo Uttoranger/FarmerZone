@@ -42,9 +42,11 @@ export const metadata: Metadata = {
 // Anfrage-Kopf, Cookies oder die Sitzung — jedes davon machte sie dynamisch.
 // Die Sitzung für die Kopfzeile liest KundeShellMitSitzung im Browser (Nr. 09).
 // BEWUSST IN KAUF GENOMMEN: Ein geteilter Filter-Link zeigt kurz die ganze
-// Liste und dann die gefilterte. Die „Heute/Morgen"-Angabe der nächsten
-// Abholung altert höchstens fünf Minuten (Seite) plus fünf (Datencache,
-// src/server/queries/oeffentliche-hoefe.ts). Scheitert das Laden bei einem
+// Liste und dann die gefilterte. Die Abholzeile („heute", „morgen") rechnet
+// der Browser seit Nr. 120 mit seiner Uhr neu (Register N22): Die Seite gibt
+// nur ihren Zeitpunkt mit (`jetzt`), bis zur Hydration gilt der — sonst zeigte
+// eine bis zu zehn Minuten alte Seite nach Mitternacht „heute" für gestern.
+// Ein Zeitpunkt macht die Seite nicht dynamisch. Scheitert das Laden bei einem
 // Bau, bleibt die Fehleranzeige bis zum nächsten stehen — wie auf der
 // Startseite; beim Bau ohne Datenbank bricht der Build so nicht ab.
 export const revalidate = 300
@@ -104,7 +106,7 @@ export default async function HoefePage() {
           <KeineHoefe />
         </OhneListe>
       ) : (
-        <HoefeClient hoefe={hoefe} />
+        <HoefeClient hoefe={hoefe} jetzt={new Date().toISOString()} />
       )}
     </KundeShellMitSitzung>
   )

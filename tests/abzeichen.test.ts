@@ -110,13 +110,16 @@ describe('Abzeichen in der Höfe-Liste und auf der Hofseite', () => {
     city: 'Teststadt',
     isPaused: false,
     kategorien: [],
-    naechsteAbholung: null,
+    abholfenster: [],
+    angebot: [],
     fotos: [],
     entfernungKm: null,
+    latitude: null,
+    longitude: null,
     gruendungshof: true,
   }
   const render = (hof: KartenHof): string =>
-    renderToStaticMarkup(createElement(HofKarte, { hof, bereich: 'LEBENSMITTEL', produktNamen: [], split: true, ausgewaehlt: false }))
+    renderToStaticMarkup(createElement(HofKarte, { hof, bereich: 'LEBENSMITTEL', schaufenster: { produkte: [], weitere: 0 }, split: true, ausgewaehlt: false, jetzt: '2026-10-21T08:00:00.000Z' }))
 
   it('HofKarte trägt das Etikett nur mit gruendungshof — kein eigener Knopf in der Karte', () => {
     const mit = render(karte)

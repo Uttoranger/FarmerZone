@@ -2,22 +2,21 @@
 
 import { useEffect, useRef } from 'react'
 import Image from 'next/image'
-import { bildStil } from '@/lib/bild-ausschnitt'
 import Link from 'next/link'
 import type { ProductCategoryValue } from '@/schemas/product'
 import {
-  formatiereAbholung,
   formatiereEntfernung,
   waehleVorschauImBereich,
   type ImBereich,
   type MitEntfernung,
 } from '@/lib/hofuebersicht'
-import { hofseitenLink } from '@/lib/bereiche-anzeige'
-import { KATEGORIE_LABEL, type AnzeigeBereich } from '@/lib/taxonomie'
+import { hofseitenLink, istBestellbar } from '@/lib/bereiche-anzeige'
+import type { AnzeigeBereich } from '@/lib/taxonomie'
 import { formatAbGrundpreis } from '@/lib/format'
 import { HoefeProduktzeilen } from '@/components/hoefe/hoefe-produktzeilen'
-import { zentrierterIndex } from '@/lib/hoefe-anzeige'
-import { hofInitialen } from '@/lib/hof-initialen'
+import { HofBildflaeche } from '@/components/hoefe/hof-bildflaeche'
+import { Abholzeile } from '@/components/hoefe/abholzeile'
+import { hofIllustrationen, zentrierterIndex } from '@/lib/hoefe-anzeige'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
 
 /**
@@ -36,9 +35,15 @@ import type { HofUebersichtEintrag } from '@/server/queries/farm'
  * — Höfe ohne bleiben Listen-only wie in #79. Ohne Auswahl ist das Karussell
  * hinausgeglitten (der Eltern-Wrapper clippt es, zusätzlich fängt es dann
  * keine Zeiger-Eingaben); ein Pin-Tipp holt es samt passender Karte herein.
+ *
+ * Seit Nr. 120 nach dem Board system-k1-entdecken-v2 (Register N22): etwa
+ * 346 px breit, rundes Bild 40 px (erstes Foto, sonst die Illustration der
+ * ersten Kategorie — keine Initialen), zwei Produktzeilen, die Abholzeile wie
+ * in der Liste, keine Kategorie-Chips. Im Handy-Hochformat (390 px) bleiben
+ * links und rechts 22 px — die Nachbarkarten blitzen hervor.
  */
 
-const KARTEN_BREITE = 260
+const KARTEN_BREITE = 346
 const KARTEN_ABSTAND = 12
 const SCHRITT = KARTEN_BREITE + KARTEN_ABSTAND
 
@@ -51,6 +56,7 @@ export default function HoefeKarussell({
   suchbegriffe = [],
   onZentriert,
   bandRef,
+  jetzt,
 }: {
   /** Nur Höfe mit Koordinaten, in Pin-Reihenfolge. */
   hoefe: MitEntfernung<ImBereich<HofUebersichtEintrag>>[]
@@ -70,6 +76,8 @@ export default function HoefeKarussell({
    *  ist, landet sein Pin darüber, und die Übersicht hält Platz dafür frei
    *  (polsterUnten in hoefe-karte.tsx). */
   bandRef?: (el: HTMLDivElement | null) => void
+  /** Der Zeitpunkt des Servers beim Bauen der Seite (ISO-Text) — für die Abholzeile. */
+  jetzt: string
 }) {
   const band = useRef<HTMLDivElement>(null)
   const ruhe = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -134,12 +142,12 @@ export default function HoefeKarussell({
         // Unten: unter md frei vom erhobenen Warenkorb-Knopf der Unterleiste
         // (--kunde-ueberstand aus der KundeShell, Nr. 52); ab md endet die Karte
         // am Fensterrand, dort zählt der Home-Indicator.
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-[calc(50%-130px)] pt-2 pb-[calc(var(--kunde-ueberstand)+0.5rem)] [scrollbar-width:none] md:pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-[calc(50%-173px)] pt-2 pb-[calc(var(--kunde-ueberstand)+0.5rem)] [scrollbar-width:none] md:pb-[max(0.75rem,env(safe-area-inset-bottom))]"
       >
         {hoefe.map((hof) => (
           <article
             key={hof.slug}
-            className="relative w-[260px] shrink-0 snap-center rounded-2xl border border-border bg-card p-3 shadow-lg"
+            className="relative w-[346px] shrink-0 snap-center rounded-2xl border border-border bg-card p-3 shadow-lg"
           >
             {/* Tipp auf die Karte selbst → Hofseite (gestreckter Link);
                 „Zum Hof" darunter ist derselbe Weg, nur ausgeschrieben. */}
@@ -153,36 +161,17 @@ export default function HoefeKarussell({
               className="absolute inset-0 rounded-2xl"
             />
             <div className="flex items-center gap-2.5">
-              {/* NUR das erste Foto als stilles Vorschaubild — kein Karussell
-                  im Karussell; ohne Fotos wie bisher Logo bzw. Initialen. */}
+              {/* NUR das erste Foto als stilles, rundes Vorschaubild (40 px, Board) — kein
+                  Karussell im Karussell; ohne Foto die Illustration der ersten Kategorie. */}
               {hof.fotos.length > 0 ? (
-                <Image
-                  src={hof.fotos[0]}
-                  alt=""
-                  width={56}
-                  height={56}
-                  className="size-14 shrink-0 rounded-lg object-cover"
-                />
-              ) : hof.logoUrl ? (
-                // Rund geschnitten im Kasten: Mit Zoom ragte das Logo sonst über den Kreis (Register N17, Nr. 98).
-                <span className="block size-10 shrink-0 overflow-hidden rounded-full dark:bg-app-bar-ink">
-                  <Image
-                    src={hof.logoUrl}
-                    alt=""
-                    width={40}
-                    height={40}
-                    className="size-full object-cover"
-                    // Das Logo bekommt keinen Filter (Register N17).
-                    style={bildStil(hof.logoAusschnitt, { filter: false })}
-                  />
-                </span>
+                <Image src={hof.fotos[0]} alt="" width={40} height={40} className="size-10 shrink-0 rounded-full object-cover" />
               ) : (
-                <span
-                  aria-hidden="true"
-                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary font-heading text-xs font-semibold text-brand-text"
-                >
-                  {hofInitialen(hof.name)}
-                </span>
+                <HofBildflaeche
+                  bilder={hofIllustrationen(hof.kategorien).slice(0, 1)}
+                  sizes="40px"
+                  fuellen
+                  className="size-10 shrink-0 rounded-full"
+                />
               )}
               <div className="min-w-0">
                 <p className="truncate font-heading text-base font-semibold text-foreground">
@@ -201,18 +190,6 @@ export default function HoefeKarussell({
               </div>
             </div>
 
-            {/* Niedrige Fenster (Handy quer, Nr. 52): ohne Kategorien und
-                Produktzeilen — sonst wäre die Karte höher als die Landkarte
-                darunter und ihr Kopf abgeschnitten. */}
-            {hof.kategorien.length > 0 && (
-              <p className="mt-2 flex flex-wrap gap-1 [@media(max-height:500px)]:hidden">
-                {hof.kategorien.slice(0, 3).map((k) => (
-                  <span key={k} className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-foreground">
-                    {KATEGORIE_LABEL[k]}
-                  </span>
-                ))}
-              </p>
-            )}
             {hof.abGrundpreis && (
               <p className="mt-1.5 text-xs font-semibold text-brand-text">
                 {formatAbGrundpreis(hof.abGrundpreis)}
@@ -224,7 +201,9 @@ export default function HoefeKarussell({
                 „+ n weitere"-Zeile: Diese Karte liegt über der Landkarte und
                 darf um höchstens zwei Zeilen wachsen (gemessen: 110 px = 2 ×
                 (48 + 6)). Die Restzahl steht auf der Hofkarte der Liste, wo
-                Platz dafür ist; hier fräße sie eine dritte Zeile. */}
+                Platz dafür ist; hier fräße sie eine dritte Zeile. Niedrige
+                Fenster (Handy quer, Nr. 52): ohne Produktzeilen — sonst wäre
+                die Karte höher als die Landkarte darunter. */}
             <div className="[@media(max-height:500px)]:hidden">
               {(() => {
                 const vorschau = waehleVorschauImBereich(hof, bereich, gewaehlteKategorien, 2, suchbegriffe)
@@ -232,19 +211,14 @@ export default function HoefeKarussell({
               })()}
             </div>
 
-            {/* Seit Nr. 09 in den Zustandsfarben des neuen Designs (/hoefe
-                steht in der KundeShell): Termin grün, Pause orange — als
-                Text, nie in der Knopffarbe (Kontrast auf Creme). */}
-            {hof.naechsteAbholung && !hof.isPaused && (
-              <p className="mt-1.5 text-xs font-semibold text-status-fertig">
-                Abholung {formatiereAbholung(hof.naechsteAbholung)}
-              </p>
-            )}
-            {hof.isPaused && (
-              <p className="mt-1.5 text-xs font-semibold text-status-offen">
-                Macht gerade Pause
-              </p>
-            )}
+            {/* Dieselbe Abholzeile wie in der Liste und in der Pin-Vorschau (Register N22). */}
+            <Abholzeile
+              fenster={hof.abholfenster}
+              isPaused={hof.isPaused}
+              bestellbar={istBestellbar(hof)}
+              jetzt={jetzt}
+              className="mt-1.5"
+            />
 
             <p className="mt-2">
               {/* Kundenaktion = Grün (DESIGN_SYSTEM, „Farbrollen"); im neuen Design wäre primary Orange. */}

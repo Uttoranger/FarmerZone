@@ -14,13 +14,19 @@
  */
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import type { ProductCategoryValue } from '@/schemas/product'
-import type { HoefeFilter } from '@/schemas/hoefe-filter'
+import type { AbholungWahl, HoefeFilter } from '@/schemas/hoefe-filter'
 import { ANZEIGE_BEREICHE, anzeigeBereichVon, type AnzeigeBereich } from '@/lib/taxonomie'
 import { DAY_NAMES } from '@/lib/pickup-slot-rules'
+import { istFensterBestellbar } from '@/lib/abholfenster'
+import { wienerZeitpunkt } from '@/lib/fristen'
+import { tagVersetzt, wochentagVon } from '@/lib/kalender'
+import { kalendertagInWien } from '@/lib/wiener-tag'
+import { formatTagKurz } from '@/lib/format'
 import {
   abGrundpreis,
   fasseAngebotZusammen,
   filtereNachAngebot,
+  istBestellbar,
   sortiereNachGrundpreis,
   type AngebotsZeile,
   type Grundpreis,
@@ -86,19 +92,36 @@ export type NaechsteAbholung = AbholFenster & {
 }
 
 /**
- * Der nächste ANSTEHENDE Abholtermin: Vergangene Fenster werden übersprungen —
- * ein Fenster zählt heute noch, solange sein Ende nicht erreicht ist (wer um
- * 14:30 schaut, kann um 15:00 im 14–16-Fenster abholen). Ohne Fenster: null.
- * „HH:MM"-Strings vergleichen sich lexikografisch korrekt.
+ * Ein Sonntag in einer Woche ohne Zeitumstellung (Jänner 2026): Von dort aus
+ * hat jeder Wochentag einen festen Kalendertag (bezugstag). Die Übersicht kennt
+ * von „jetzt" nur Wochentag und Uhrzeit (OrtsZeit), die Regel der Kasse
+ * (istFensterBestellbar) rechnet mit Kalendertag und Zeitpunkt — am selben
+ * Wiener Tag ohne Umstellung kommt für jeden Tag dasselbe heraus.
+ */
+const BEZUGS_SONNTAG = '2026-01-04'
+
+function bezugstag(wochentag: number): string {
+  return tagVersetzt(BEZUGS_SONNTAG, wochentag)
+}
+
+/**
+ * Der nächste Abholtermin, den man noch BESTELLEN kann (Register N22): Ein
+ * Fenster zählt heute nur, solange sein Beginn nach jetzt liegt — der
+ * Bestellschluss der Kasse (istFensterBestellbar in src/lib/abholfenster.ts,
+ * EINE Regel). Bis Nr. 120 zählte ein laufendes Fenster bis zu seinem Ende;
+ * bestellen konnte man darin aber nicht mehr, die Übersicht versprach also
+ * einen Termin, den die Kasse ablehnte. Ohne Fenster: null.
  */
 export function naechsteAbholung(
-  fenster: AbholFenster[],
+  fenster: readonly AbholFenster[],
   jetzt: OrtsZeit
 ): NaechsteAbholung | null {
+  const heute = bezugstag(jetzt.wochentag)
+  const moment = wienerZeitpunkt(heute, jetzt.uhrzeit)
   let beste: NaechsteAbholung | null = null
   for (const f of fenster) {
     let tageVoraus = (f.dayOfWeek - jetzt.wochentag + 7) % 7
-    if (tageVoraus === 0 && f.endTime <= jetzt.uhrzeit) tageVoraus = 7
+    if (tageVoraus === 0 && !(moment && istFensterBestellbar(heute, f.startTime, moment))) tageVoraus = 7
     if (
       beste === null ||
       tageVoraus < beste.tageVoraus ||
@@ -118,6 +141,95 @@ export function formatiereAbholung(a: NaechsteAbholung): string {
   if (a.tageVoraus === 1) return `Morgen ${a.startTime}–${a.endTime}`
   if (a.tageVoraus === 7) return `${DAY_NAMES[a.dayOfWeek]} in einer Woche, ${a.startTime}–${a.endTime}`
   return `${DAY_NAMES[a.dayOfWeek]} ${a.startTime}–${a.endTime}`
+}
+
+// ─── Abholzeile (Register N22) ──────────────────────────────────────────────
+
+/**
+ * Die Lage der Abholzeile (Board system-k1-entdecken-v2, „eine Zeile, sechs
+ * Lagen"): das nächste Fenster, das man noch bestellen kann — heute, morgen,
+ * an einem Wochentag (bis 6 Tage), später (mit Datum) —, die Pause oder keine.
+ * Die Lage „jetzt · bis …" des Boards entfällt (freigegebene Abweichung): Ein
+ * laufendes Fenster kann man nicht mehr bestellen.
+ */
+export type AbholLage =
+  | { art: 'heute' | 'morgen' | 'wochentag' | 'spaeter'; fenster: NaechsteAbholung; kalendertag: string }
+  | { art: 'pause' }
+  | { art: 'keine' }
+
+/**
+ * Die Lage zu Fenstern, Pause und Zeitpunkt — Wiener Zeit. Fehlt `fenster`
+ * (ein Cache-Eintrag von vor Nr. 120 trug sie nicht), ist die Lage „keine".
+ * Baut auf naechsteAbholung auf, damit Übersicht und Startseite dieselbe Zeit
+ * nennen.
+ */
+export function abholLage(fenster: readonly AbholFenster[] | undefined, isPaused: boolean, jetzt: Date): AbholLage {
+  if (isPaused) return { art: 'pause' }
+  const naechste = naechsteAbholung(fenster ?? [], wienJetzt(jetzt))
+  if (!naechste) return { art: 'keine' }
+  const kalendertag = tagVersetzt(kalendertagInWien(jetzt), naechste.tageVoraus)
+  const art = naechste.tageVoraus === 0 ? 'heute' : naechste.tageVoraus === 1 ? 'morgen' : naechste.tageVoraus <= 6 ? 'wochentag' : 'spaeter'
+  return { art, fenster: naechste, kalendertag }
+}
+
+/** Die Wörter der Abholzeile und der Zeilen daneben — EINE Quelle für Liste, Karussell und Pin-Vorschau. */
+export const ABHOLZEILE_TEXT = {
+  pause: 'Macht gerade Pause – Bestellen geht bald wieder',
+  nichtBestellbar: 'Noch nicht bestellbar',
+  nichtAufDerKarte: 'Nicht auf der Karte',
+} as const
+
+/**
+ * „Abholung heute 15:00–18:00" · „Abholung morgen …" · „Abholung Samstag …"
+ * · „Abholung Sa, 7. Nov 09:00–12:00" · der Pause-Satz; ohne Fenster null
+ * (dann trägt der Hof „Noch nicht bestellbar"). Zeiten im Hausformat „09:00".
+ */
+export function abholzeileText(lage: AbholLage): string | null {
+  if (lage.art === 'pause') return ABHOLZEILE_TEXT.pause
+  if (lage.art === 'keine') return null
+  const zeit = `${lage.fenster.startTime}–${lage.fenster.endTime}`
+  if (lage.art === 'heute') return `Abholung heute ${zeit}`
+  if (lage.art === 'morgen') return `Abholung morgen ${zeit}`
+  if (lage.art === 'wochentag') return `Abholung ${DAY_NAMES[lage.fenster.dayOfWeek]} ${zeit}`
+  return `Abholung ${formatTagKurz(lage.kalendertag)} ${zeit}`
+}
+
+/**
+ * Die Wiener Kalendertage einer Wahl im Filter „Abholung": heute; morgen;
+ * Samstag und Sonntag DIESER Woche — am Samstag beide, am Sonntag nur noch
+ * der Sonntag.
+ */
+export function tageDerAbholwahl(wahl: AbholungWahl, jetzt: Date): string[] {
+  const heute = kalendertagInWien(jetzt)
+  if (wahl === 'heute') return [heute]
+  if (wahl === 'morgen') return [tagVersetzt(heute, 1)]
+  const wochentag = wochentagVon(heute)
+  if (wochentag === 0) return [heute]
+  return [tagVersetzt(heute, 6 - wochentag), tagVersetzt(heute, 7 - wochentag)]
+}
+
+/** Hat der Hof an einem dieser Kalendertage ein Fenster, das man jetzt noch bestellen kann? */
+export function holtAbAn(fenster: readonly AbholFenster[] | undefined, tage: readonly string[], jetzt: Date): boolean {
+  return tage.some((tag) => {
+    const wochentag = wochentagVon(tag)
+    return (fenster ?? []).some((f) => f.dayOfWeek === wochentag && istFensterBestellbar(tag, f.startTime, jetzt))
+  })
+}
+
+/** Was der Filter „Abholung" von einem Hof braucht. */
+export type AbholHof = {
+  isPaused: boolean
+  angebot: readonly unknown[]
+  abholfenster?: readonly AbholFenster[]
+}
+
+/**
+ * Erfüllt der Hof diese Kalendertage? Nur, wenn man bei ihm bestellen kann
+ * (istBestellbar), er keine Pause macht und an einem der Tage ein Fenster hat,
+ * das man noch bestellen kann. Dieselbe Regel zählt „holen heute ab".
+ */
+export function holtAbAnTagen(hof: AbholHof, tage: readonly string[], jetzt: Date): boolean {
+  return !hof.isPaused && istBestellbar(hof) && holtAbAn(hof.abholfenster, tage, jetzt)
 }
 
 /** Höchstens so viele Fotos trägt ein Streifen — mehr wäre Ballast im
@@ -451,12 +563,14 @@ export function filtereNachSuche<H extends { name: string; suchNamen: string[] }
 }
 
 /** Alle Filtergriffe der Übersicht in einem Wert — die Eingabe von
- *  berechneHofAuswahl. Bereich, Facetten und Suche kommen aus der URL
- *  (src/schemas/hoefe-filter.ts), Bezugspunkt und Umkreis bleiben im
- *  Browser. */
+ *  berechneHofAuswahl. Bereich, Facetten, Abholung und Suche kommen aus der
+ *  URL (src/schemas/hoefe-filter.ts), Bezugspunkt und Umkreis bleiben im
+ *  Browser. `jetzt` ist die Uhr, nach der „heute" und „morgen" gelten — im
+ *  Browser die eigene (useUhr), beim Bauen die des Servers. */
 export type UebersichtsFilter = Omit<HoefeFilter, 'ansicht'> & {
   bezugspunkt: Bezugspunkt | null
   umkreis: UmkreisStufe
+  jetzt: Date
 }
 
 /**
@@ -464,7 +578,7 @@ export type UebersichtsFilter = Omit<HoefeFilter, 'ansicht'> & {
  * getestet ist und nicht nur ihre Einzelteile (die Komponente ruft nur noch
  * diese eine Funktion):
  *
- *   - `gefiltert`: Kategorie → Umkreis/Sortierung → Suche (alles UND).
+ *   - `gefiltert`: Kategorie → Umkreis/Sortierung → Abholung → Suche (alles UND).
  *   - `vorschlaege`: NUR bei getipptem Text (ohne Eingabe keine — sonst
  *     stehen Produktnamen wie Filter über den Kategorien), höchstens
  *     VORSCHLAGS_DECKEL, aus dem Bereich/Kategorie/Umkreis-Ausschnitt
@@ -480,6 +594,9 @@ export type UebersichtsFilter = Omit<HoefeFilter, 'ansicht'> & {
  *     (ohne sie gäbe es Treffer) — nur dann hilft „Suche zurücksetzen“;
  *     hat schon der Umkreis die Basis geleert, muss die Leermeldung IHN
  *     nennen, sonst führt der Knopf ins Leere.
+ *   - `abholungLeertDieListe`: Erst der Filter „Abholung" hat die Liste
+ *     geleert — dann nennt die Leermeldung den nächsten Tag mit Abholung
+ *     (Register N22); `abholBasis` ist die Liste ohne ihn, zum Zählen.
  */
 export function berechneHofAuswahl<
   H extends {
@@ -489,6 +606,8 @@ export function berechneHofAuswahl<
     angebot: readonly AngebotsZeile[]
     latitude: number | null
     longitude: number | null
+    isPaused?: boolean
+    abholfenster?: readonly AbholFenster[]
   },
 >(
   hoefe: H[],
@@ -499,6 +618,8 @@ export function berechneHofAuswahl<
   suchbegriffe: string[]
   sucheAktiv: boolean
   sucheLeertDieListe: boolean
+  abholungLeertDieListe: boolean
+  abholBasis: MitEntfernung<ImBereich<H>>[]
   /** Die Kategorien, nach denen das Schaufenster jeder Karte zuerst greift:
    *  die gewählten, sonst die des Bereichs — im Futter-Bereich zeigt die
    *  Karte also das Futter zuerst. */
@@ -524,7 +645,12 @@ export function berechneHofAuswahl<
     filter.bereich === 'FUTTERMITTEL' && filter.sortierung === 'GRUNDPREIS'
       ? sortiereNachGrundpreis(nachEntfernung, filter)
       : nachEntfernung
-  const gefiltert = filtereNachSuche(suchBasis, filter.suchtext, filter.suchMarken)
+  // Die Abholung grenzt nur ein, die Reihenfolge bleibt (AGB §3, O4).
+  const tage = filter.abholung ? tageDerAbholwahl(filter.abholung, filter.jetzt) : null
+  const nachAbholung = tage
+    ? suchBasis.filter((hof) => holtAbAnTagen({ ...hof, isPaused: hof.isPaused ?? false }, tage, filter.jetzt))
+    : suchBasis
+  const gefiltert = filtereNachSuche(nachAbholung, filter.suchtext, filter.suchMarken)
   const eingabe = filter.suchtext.trim()
   const aktiv = new Set(filter.suchMarken.map(suchForm))
   const sucheAktiv = filter.suchMarken.length > 0 || eingabe !== ''
@@ -536,12 +662,14 @@ export function berechneHofAuswahl<
     vorschlaege:
       suchForm(filter.suchtext) === ''
         ? []
-        : verfuegbareProduktnamen(suchBasis, filter.suchtext, Infinity)
+        : verfuegbareProduktnamen(nachAbholung, filter.suchtext, Infinity)
             .filter((v) => !aktiv.has(suchForm(v.name)))
             .slice(0, VORSCHLAGS_DECKEL),
     suchbegriffe: eingabe === '' ? filter.suchMarken : [...filter.suchMarken, eingabe],
     sucheAktiv,
-    sucheLeertDieListe: sucheAktiv && gefiltert.length === 0 && suchBasis.length > 0,
+    sucheLeertDieListe: sucheAktiv && gefiltert.length === 0 && nachAbholung.length > 0,
+    abholungLeertDieListe: tage !== null && nachAbholung.length === 0 && suchBasis.length > 0,
+    abholBasis: suchBasis,
     vorschauKategorien:
       filter.kategorien.length > 0
         ? filter.kategorien

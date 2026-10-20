@@ -26,6 +26,7 @@ import {
   baueFotostreifen,
   naechsteAbholung,
   wienJetzt,
+  type AbholFenster,
   type NaechsteAbholung,
   type OrtsZeit,
   type VorschauProdukt,
@@ -705,8 +706,12 @@ export type HofUebersichtEintrag = {
    *  und seit Nr. 09 für die Produkttreffer der Suche (produktTreffer in
    *  src/lib/hoefe-entdecken.ts). */
   angebot: AngebotsProdukt[]
-  /** Der nächste anstehende Abholtermin — null ohne aktive Fenster. */
+  /** Der nächste Abholtermin, den man noch bestellen kann — null ohne aktive Fenster. */
   naechsteAbholung: NaechsteAbholung | null
+  /** Die aktiven Abholzeiten (Wochentag, Beginn, Ende): Daraus rechnet der
+   *  Browser die Abholzeile und den Filter „Abholung" mit SEINER Uhr neu
+   *  (Register N22) — die Seite ist bis zu zehn Minuten alt. */
+  abholfenster: AbholFenster[]
   /** Die Produktvorschau der Karte: höchstens VORSCHAU_LADE_DECKEL Zeilen,
    *  in der Reihenfolge der Hofseite. Die Auswahl daraus trifft
    *  waehleVorschauProdukte (src/lib/hofuebersicht.ts). */
@@ -939,6 +944,7 @@ export async function getOeffentlicheHoefe(
       produkteJeBereich: jeBereich.get(hof.id) ?? { LEBENSMITTEL: 0, FUTTERMITTEL: 0 },
       suchNamen,
       naechsteAbholung: naechsteAbholung(hof.pickupSlots, jetzt),
+      abholfenster: hof.pickupSlots,
       fotos: baueFotostreifen({
         bannerUrl: hof.bannerUrl,
         bannerType: hof.bannerType,

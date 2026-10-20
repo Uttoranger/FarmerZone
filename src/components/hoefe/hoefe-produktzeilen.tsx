@@ -1,7 +1,10 @@
 import Image from 'next/image'
 import { bildStil } from '@/lib/bild-ausschnitt'
 import { formatGrundpreis, formatGrundpreisZeile } from '@/lib/format'
-import { produktInitiale, type VorschauProdukt } from '@/lib/hofuebersicht'
+import type { VorschauProdukt } from '@/lib/hofuebersicht'
+import { illustrationPfad } from '@/lib/taxonomie'
+import { cn } from '@/lib/utils'
+import { HofBildflaeche } from '@/components/hoefe/hof-bildflaeche'
 
 /** „€ 50,00 für 2 kg · € 25,00 / kg" — in EINER Zeile, die Hofkarte hat keinen Platz für zwei. */
 function preisZeile(p: VorschauProdukt): string {
@@ -24,11 +27,9 @@ function preisZeile(p: VorschauProdukt): string {
  * für den ganzen Block wäre falsch, denn dann käme der Klick zwar durch,
  * aber der gestreckte Link/Knopf der Karte fängt ihn ohnehin ab).
  *
- * Fehlt ein Produktbild, steht dort der Anfangsbuchstabe auf Sandfläche —
- * dasselbe Prinzip wie die Hof-Initialen (src/lib/hof-initialen.ts): eine
- * Entscheidung statt eines gebrochenen Bild-Symbols. Die Ableitung ist
- * produktInitiale in src/lib/hofuebersicht.ts, damit sie ohne Browser
- * prüfbar bleibt.
+ * Fehlt ein Produktbild, steht seit Nr. 120 die Illustration der Kategorie da
+ * (illustrationPfad, dieselbe Quelle wie Produktseite und Teilen-Bild,
+ * Register N22) — vorher der Anfangsbuchstabe auf Sandfläche.
  *
  * AUSVERKAUFT wird gedämpft, aber NICHT verblasst: Ein `opacity` über die
  * ganze Zeile zöge den ohnehin gedeckten Preis auf rund 2,6:1 Kontrast — er
@@ -36,18 +37,23 @@ function preisZeile(p: VorschauProdukt): string {
  * Muted-Farbe), entsättigt nur das Bild.
  */
 
-/** Kantenlänge des quadratischen Vorschaubildes, in Pixeln. */
-const BILD_KANTE = 48
+/** Kantenlänge des quadratischen Vorschaubildes: 48 in Liste und Karussell, 40 in der Pin-Vorschau (Board). */
+export type ProduktBildKante = 48 | 40
+
+const BILD_KLASSE: Record<ProduktBildKante, string> = { 48: 'size-12', 40: 'size-10' }
 
 export function HoefeProduktzeilen({
   produkte,
   weitere,
+  bildKante = 48,
 }: {
   produkte: VorschauProdukt[]
   /** Zahl der nicht gezeigten Produkte — 0 blendet die Zeile aus. */
   weitere: number
+  bildKante?: ProduktBildKante
 }) {
   if (produkte.length === 0) return null
+  const bild = BILD_KLASSE[bildKante]
 
   return (
     <div className="mt-2 space-y-1.5">
@@ -80,12 +86,12 @@ export function HoefeProduktzeilen({
 
           {produkt.imageUrl ? (
             // Der Kasten schneidet ab: Mit Zoom ragte das Foto sonst über die Kante (Register N17, Nr. 98).
-            <span className="block size-12 shrink-0 overflow-hidden rounded-lg">
+            <span className={cn('block shrink-0 overflow-hidden rounded-lg', bild)}>
               <Image
                 src={produkt.imageUrl}
                 alt=""
-                width={BILD_KANTE}
-                height={BILD_KANTE}
+                width={bildKante}
+                height={bildKante}
                 loading="lazy"
                 className={`size-full object-cover ${
                   produkt.verfuegbar ? '' : 'grayscale opacity-70'
@@ -95,14 +101,13 @@ export function HoefeProduktzeilen({
               />
             </span>
           ) : (
-            <span
-              aria-hidden="true"
-              className={`flex size-12 shrink-0 items-center justify-center rounded-lg bg-secondary font-heading text-sm font-semibold text-brand-text ${
-                produkt.verfuegbar ? '' : 'grayscale opacity-70'
-              }`}
-            >
-              {produktInitiale(produkt.name)}
-            </span>
+            <HofBildflaeche
+              bilder={[illustrationPfad(produkt.category)]}
+              sizes={`${bildKante}px`}
+              gedaempft={!produkt.verfuegbar}
+              fuellen
+              className={cn('shrink-0 rounded-lg', bild)}
+            />
           )}
         </div>
       ))}

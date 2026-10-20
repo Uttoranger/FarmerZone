@@ -1,20 +1,26 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import {
   EIGENER_PIN,
   KARTEN_KACHELN,
+  PILLE_HOEHE,
+  PIN_FOKUS,
   UMKREIS_KREIS,
   erstelleAusschnittMerker,
   gruppenBeschriftung,
   gruppenPinMasse,
   gruppenZustand,
   gruppierePins,
+  pinBeschriftung,
   pinDarstellung,
+  pinName,
+  pinNamenMasse,
   pinZustand,
   trefferMasse,
+  zeigePinNamen,
   zoomBisEinzeln,
   zoomZumAufloesen,
   type AuswahlLage,
@@ -23,6 +29,7 @@ import {
 } from '@/lib/hoefe-anzeige'
 import { cn } from '@/lib/utils'
 import { useKartenGroesse } from '@/components/karte/use-karten-groesse'
+import { KURZKARTE_BREITE } from '@/components/hoefe/hof-kurzkarte'
 
 /**
  * Die Kundenkarte der Hofübersicht — Leaflet nach dem Muster der Profilkarte
@@ -52,6 +59,16 @@ import { useKartenGroesse } from '@/components/karte/use-karten-groesse'
  * Tipp darauf zoomt genau so weit hinein, bis die Gruppe zerfällt; bei
  * maximaler Zoomstufe stehen Höfe am selben Punkt leicht aufgefächert. Die
  * Nummern der Liste bleiben.
+ *
+ * NAMEN, TASTATUR UND VORSCHAU (Nr. 120, Register N22): Ab Zoom 12 oder bei
+ * höchstens 12 Pins im Bild trägt jeder Pin seinen Namen als Pille
+ * (zeigePinNamen; gruppierePins rechnet dann mit ihrer Breite). Jeder Pin und
+ * jeder Gruppen-Pin ist per Tab erreichbar (Leaflets `keyboard`), Enter und
+ * Leertaste wirken wie ein Klick. Am Computer öffnet Darüberfahren
+ * oder Tab-Fokus die HofKurzkarte (`kurzkarte`) als `role="tooltip"`; sie bleibt, solange
+ * der Zeiger auf Pin oder Vorschau ist, und schließt mit Escape oder 300 ms
+ * nach dem Verlassen. Am Handy gibt es keine Vorschau. Ein Hinweis auf Höfe
+ * ohne Kartenpunkt (`hinweis`) steht oben auf der Karte.
  *
  * GRÖSSENWECHSEL (Nr. 52): useKartenGroesse misst den Container
  * (ResizeObserver); solange die Nutzerin weder verschoben noch gezoomt hat,
@@ -99,18 +116,50 @@ function trefferRahmen(breite: number, hoehe: number, bild: string): Pick<L.DivI
   }
 }
 
-function pinIcon(nummer: number, zustand: PinZustand): L.DivIcon {
+/** Die Pille mit dem Namen: in jeder Stufe weiß mit dunkelgrüner Schrift — nur die Scheibe zeigt den Zustand (Board). */
+const PILLE = {
+  hintergrund: pinDarstellung('normal').hintergrund,
+  schrift: pinDarstellung('hervorgehoben').schrift,
+  rand: pinDarstellung('normal').rand,
+}
+
+/** Text für das HTML einer Marke — ein Hofname ist Fremdtext. */
+function ohneMarkup(text: string): string {
+  return text.replace(/[<>&"]/g, '')
+}
+
+function scheibe(nummer: number, zustand: PinZustand): string {
   const stil = pinDarstellung(zustand)
+  return (
+    `<div style="width:${stil.groesse}px;height:${stil.groesse}px;border-radius:9999px;flex:none;position:relative;z-index:1;` +
+    `background:${stil.hintergrund};color:${stil.schrift};` +
+    `display:flex;align-items:center;justify-content:center;` +
+    `font-size:13px;font-weight:600;border:2px solid ${stil.rand};` +
+    `box-shadow:0 1px 4px rgba(0,0,0,0.35);">${nummer}</div>`
+  )
+}
+
+function pinIcon(nummer: number, zustand: PinZustand, name?: string): L.DivIcon {
+  const stil = pinDarstellung(zustand)
+  if (!name) {
+    return L.divIcon({ ...trefferRahmen(stil.groesse, stil.groesse, scheibe(nummer, zustand)), className: cn(TREFFER_RUNDUNG, PIN_FOKUS) })
+  }
+  // Mit Namen (Register N22): die Scheibe mittig in ihrer Trefferfläche, rechts die
+  // Pille, unter die Scheibe geschoben. Der Punkt des Hofs bleibt die Mitte der Scheibe.
+  const masse = pinNamenMasse(name)
+  const links = masse.ankerX - stil.groesse / 2
+  const pille =
+    `<div style="height:${PILLE_HOEHE}px;margin-left:-6px;padding:0 8px 0 12px;border-radius:9999px;white-space:nowrap;` +
+    `display:flex;align-items:center;background:${PILLE.hintergrund};` +
+    `color:${PILLE.schrift};font-size:12px;font-weight:700;border:1px solid ${PILLE.rand};` +
+    `box-shadow:0 1px 4px rgba(0,0,0,0.25);">${ohneMarkup(pinName(name))}</div>`
   return L.divIcon({
-    ...trefferRahmen(
-      stil.groesse,
-      stil.groesse,
-      `<div style="width:${stil.groesse}px;height:${stil.groesse}px;border-radius:9999px;` +
-        `background:${stil.hintergrund};color:${stil.schrift};` +
-        `display:flex;align-items:center;justify-content:center;` +
-        `font-size:13px;font-weight:600;border:2px solid ${stil.rand};` +
-        `box-shadow:0 1px 4px rgba(0,0,0,0.35);">${nummer}</div>`
-    ),
+    className: cn(TREFFER_RUNDUNG, PIN_FOKUS),
+    html:
+      `<div style="width:${masse.breite}px;height:${masse.hoehe}px;border-radius:9999px;display:flex;align-items:center;padding-left:${links}px;">` +
+      `${scheibe(nummer, zustand)}${pille}</div>`,
+    iconSize: [masse.breite, masse.hoehe],
+    iconAnchor: [masse.ankerX, masse.hoehe / 2],
   })
 }
 
@@ -134,6 +183,7 @@ function gruppenIcon(anzahl: number, zustand: PinZustand): L.DivIcon {
         `font-size:12px;font-weight:700;border:2px solid ${stil.rand};` +
         `box-shadow:0 1px 4px rgba(0,0,0,0.35);">${name}</div>`
     ),
+    className: cn(TREFFER_RUNDUNG, PIN_FOKUS),
   })
 }
 
@@ -158,6 +208,21 @@ function eigenerPinIcon(titel: string): L.DivIcon {
 /** Mittelpunkt und Umkreis — nur in der Auswertung (Umfeld). */
 export type KartenZentrum = { lat: number; lon: number; radiusKm: number; titel: string }
 
+/** Die halbe Breite der Vorschau — die Karte zentriert sie über dem Pin. */
+const KURZKARTE_HALB = KURZKARTE_BREITE / 2
+
+/** So lange bleibt die Vorschau, nachdem Zeiger oder Fokus Pin und Vorschau verlassen haben (Board). */
+const VORSCHAU_NACHLAUF_MS = 300
+/** Abstand der Vorschau zum Punkt des Pins; darüber, wenn oben so viel Platz ist. */
+const VORSCHAU_ABSTAND = 26
+const VORSCHAU_PLATZ_OBEN = 330
+
+/** Wie viele Pins im sichtbaren Ausschnitt liegen — für die Namen (zeigePinNamen). */
+function pinsImBild(map: L.Map, hoefe: readonly KartenHof[]): number {
+  const bild = map.getBounds()
+  return hoefe.filter((h) => bild.contains([h.lat, h.lon])).length
+}
+
 /** Sanft nur, wenn das System nichts anderes wünscht. */
 function wuenschtRuhe(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -174,6 +239,8 @@ export default function HoefeKarte({
   polsterUnten = 0,
   polsterOhneAuswahl = 0,
   zentrum,
+  hinweis = null,
+  kurzkarte,
   onAuswahl,
   onLeerTipp,
 }: {
@@ -204,6 +271,10 @@ export default function HoefeKarte({
   polsterOhneAuswahl?: number
   /** Der eigene Hof als Mittelpunkt, samt Umkreis als Kreis (Umfeld). */
   zentrum?: KartenZentrum
+  /** Der Satz zu Höfen ohne Kartenpunkt — oben auf der Karte (kartenpunktHinweis). */
+  hinweis?: string | null
+  /** Am Computer: die Vorschau zu einem Pin (HofKurzkarte). Ohne sie (Handy, Umfeld) gibt es keine. */
+  kurzkarte?: (slug: string, id: string) => ReactNode
   onAuswahl: (slug: string) => void
   /** Tipp ins Kartenleere (nicht auf einen Pin). */
   onLeerTipp?: () => void
@@ -222,20 +293,90 @@ export default function HoefeKarte({
   // trotzdem neu gruppiert — unterwegs kann der Effekt den Zwischen-Zoom des
   // Bogens gelesen haben.
   const [zoomEnden, setZoomEnden] = useState(0)
+  // Zeigt die Karte gerade Namen an den Pins? Nach jeder Bewegung neu gefragt —
+  // gezeichnet wird nur neu, wenn sich die Antwort ändert (ein Neuzeichnen nähme
+  // dem Pin mit dem Fokus sonst den Fokus).
+  const [namenSichtbar, setNamenSichtbar] = useState(false)
+  // Die Vorschau (am Computer): zu welchem Pin und wo — beim Verschieben wandert sie mit.
+  const [vorschauStand, setVorschauStand] = useState<{ slug: string; lage: CSSProperties } | null>(null)
+  const vorschauSlug = vorschauStand?.slug ?? null
+  const vorschauId = useId()
+  const nachlauf = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hinweisRef = useRef<HTMLParagraphElement>(null)
+  const hoefeRef = useRef(hoefe)
+  const kurzkarteRef = useRef(kurzkarte)
+  const vorschauSlugRef = useRef(vorschauSlug)
   // Rückrufe wechseln mit jedem Render, die Handler hängen aber an Karte und
   // Ebene — Refs (im Effekt nachgeführt), damit nichts Altes gefangen bleibt.
   const auswahlRef = useRef(onAuswahl)
   const leerTippRef = useRef(onLeerTipp)
   const polsterRef = useRef(polsterUnten)
-  const hinweisRef = useRef(polsterOhneAuswahl)
+  const ohneAuswahlRef = useRef(polsterOhneAuswahl)
   const lageRef = useRef(lage)
   useEffect(() => {
     auswahlRef.current = onAuswahl
     leerTippRef.current = onLeerTipp
     polsterRef.current = polsterUnten
-    hinweisRef.current = polsterOhneAuswahl
+    ohneAuswahlRef.current = polsterOhneAuswahl
     lageRef.current = lage
+    hoefeRef.current = hoefe
+    kurzkarteRef.current = kurzkarte
+    vorschauSlugRef.current = vorschauSlug
   })
+
+  /** Wo die Vorschau steht: am Punkt des Pins, darüber, wenn oben Platz ist, sonst darunter; nie über den Rand. */
+  function vorschauLage(slug: string): CSSProperties | null {
+    const map = karte.current
+    const hof = hoefeRef.current.find((h) => h.slug === slug)
+    if (!map || !hof) return null
+    const punkt = map.latLngToContainerPoint([hof.lat, hof.lon])
+    const links = Math.max(8, Math.min(punkt.x - KURZKARTE_HALB, map.getSize().x - 2 * KURZKARTE_HALB - 8))
+    // Darüber, wenn oben Platz für die ganze Vorschau ist — oder wenigstens mehr als darunter.
+    const oben = punkt.y > VORSCHAU_PLATZ_OBEN || punkt.y > map.getSize().y - punkt.y
+    return oben
+      ? { left: links, top: punkt.y - VORSCHAU_ABSTAND, transform: 'translateY(-100%)' }
+      : { left: links, top: punkt.y + VORSCHAU_ABSTAND }
+  }
+
+  /** Vorschau öffnen (Zeiger oder Fokus am Pin) — ein laufender Nachlauf zählt nicht mehr. */
+  function vorschauOeffnen(slug: string) {
+    if (!kurzkarteRef.current) return
+    if (nachlauf.current) clearTimeout(nachlauf.current)
+    nachlauf.current = null
+    const lage = vorschauLage(slug)
+    setVorschauStand(lage ? { slug, lage } : null)
+  }
+  /** Zeiger oder Fokus haben Pin bzw. Vorschau verlassen: nach 300 ms zu, außer sie kommen zurück. */
+  function vorschauSpaeterZu() {
+    if (nachlauf.current) clearTimeout(nachlauf.current)
+    nachlauf.current = setTimeout(() => {
+      nachlauf.current = null
+      setVorschauStand(null)
+    }, VORSCHAU_NACHLAUF_MS)
+  }
+  function vorschauZu() {
+    if (nachlauf.current) clearTimeout(nachlauf.current)
+    nachlauf.current = null
+    setVorschauStand(null)
+  }
+
+  // Escape schließt die Vorschau, auch wenn der Zeiger sie geöffnet hat und der Fokus woanders steht.
+  useEffect(() => {
+    if (!vorschauSlug) return
+    const beiTaste = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') vorschauZu()
+    }
+    document.addEventListener('keydown', beiTaste)
+    return () => document.removeEventListener('keydown', beiTaste)
+  }, [vorschauSlug])
+
+  // Kein Geister-Timer nach dem Abbau.
+  useEffect(
+    () => () => {
+      if (nachlauf.current) clearTimeout(nachlauf.current)
+    },
+    []
+  )
 
   useEffect(() => {
     if (!kartenDiv.current || karte.current) return
@@ -280,6 +421,15 @@ export default function HoefeKarte({
     // Ziehen, Zoomen, ein angefahrener Hof, ein aufgezoomter Gruppen-Pin.
     map.on('movestart zoomstart', () => merker.bewegungBeginnt())
     map.on('zoomend', () => setZoomEnden((n) => n + 1))
+    map.on('moveend', () => setNamenSichtbar(zeigePinNamen(map.getZoom(), pinsImBild(map, hoefeRef.current))))
+    // Beim Zoomen zeichnet die Karte die Pins neu — die Vorschau stünde dann neben einem alten Punkt.
+    map.on('zoomstart', () => setVorschauStand(null))
+    map.on('move', () => {
+      const slug = vorschauSlugRef.current
+      if (!slug) return
+      const lage = vorschauLage(slug)
+      setVorschauStand(lage ? { slug, lage } : null)
+    })
     zentrumEbene.current = L.layerGroup().addTo(map)
     pinEbene.current = L.layerGroup().addTo(map)
     karte.current = map
@@ -384,34 +534,77 @@ export default function HoefeKarte({
   // ein koordinatenloser Hof VOR den Pins weg, ändern sich nur die Nummern —
   // auch dann müssen die Pins neu gezeichnet werden, sonst zählt die Karte
   // anders als die Liste.
-  const pinSignatur = hoefe.map((h) => `${h.slug}:${h.nummer}`).join(',')
+  const pinSignatur = hoefe.map((h) => `${h.slug}:${h.nummer}:${h.name ?? ''}`).join(',')
   useEffect(() => {
     const map = karte.current
     const ebene = pinEbene.current
     if (!map || !ebene) return
+    // Hatte ein Pin den Fokus (Tab, dann Enter), bekommt ihn sein neues Bild zurück —
+    // sonst fiele er nach jeder Auswahl an den Anfang der Seite.
+    const aktiv = document.activeElement
+    const fokusPin = aktiv instanceof HTMLElement && ebene.getLayers().some((l) => l instanceof L.Marker && l.getElement() === aktiv) ? aktiv.dataset.pin : undefined
     ebene.clearLayers()
-    for (const marke of gruppierePins(hoefe, map.getZoom())) {
+    const mitNamen = zeigePinNamen(map.getZoom(), pinsImBild(map, hoefe))
+    const punkte = mitNamen ? hoefe : hoefe.map((h) => ({ slug: h.slug, nummer: h.nummer, lat: h.lat, lon: h.lon }))
+    for (const marke of gruppierePins(punkte, map.getZoom())) {
       if (marke.art === 'pin') {
-        L.marker([marke.lat, marke.lon], {
-          icon: pinIcon(marke.pin.nummer, pinZustand(marke.pin.slug, lage)),
-          keyboard: false,
+        const { pin } = marke
+        const marker = L.marker([marke.lat, marke.lon], {
+          icon: pinIcon(pin.nummer, pinZustand(pin.slug, lage), pin.name),
+          keyboard: true,
         })
           .on('click', () => {
-            auswahlRef.current(marke.pin.slug)
+            auswahlRef.current(pin.slug)
             pinUeberDasBand(marke.lat, marke.lon)
           })
           .addTo(ebene)
+        const element = marker.getElement()
+        if (!element) continue
+        element.dataset.pin = pin.slug
+        element.setAttribute('aria-label', pinBeschriftung({ nummer: pin.nummer, name: hoefe.find((h) => h.slug === pin.slug)?.name }))
+        // Enter und Leertaste wirken wie ein Klick (Leaflet macht aus dem Fokus nur einen Knopf).
+        element.addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return
+          e.preventDefault()
+          auswahlRef.current(pin.slug)
+          pinUeberDasBand(marke.lat, marke.lon)
+        })
+        element.addEventListener('mouseenter', () => vorschauOeffnen(pin.slug))
+        element.addEventListener('mouseleave', vorschauSpaeterZu)
+        element.addEventListener('focus', () => vorschauOeffnen(pin.slug))
+        element.addEventListener('blur', vorschauSpaeterZu)
+        if (kurzkarteRef.current && vorschauSlugRef.current === pin.slug) element.setAttribute('aria-describedby', vorschauId)
+        if (fokusPin === pin.slug) element.focus({ preventScroll: true })
       } else {
-        L.marker([marke.lat, marke.lon], {
+        const marker = L.marker([marke.lat, marke.lon], {
           icon: gruppenIcon(marke.mitglieder.length, gruppenZustand(marke.mitglieder, lage)),
-          keyboard: false,
+          keyboard: true,
         })
           .on('click', () => gruppeAufzoomen(marke.mitglieder, marke.lat, marke.lon, lage.ausgewaehlt !== null))
           .addTo(ebene)
+        const element = marker.getElement()
+        element?.addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return
+          e.preventDefault()
+          gruppeAufzoomen(marke.mitglieder, marke.lat, marke.lon, lage.ausgewaehlt !== null)
+        })
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pinSignatur, lage.ausgewaehlt, lage.hervorgehoben, zoomEnden])
+  }, [pinSignatur, lage.ausgewaehlt, lage.hervorgehoben, zoomEnden, namenSichtbar])
+
+  // Der Pin mit offener Vorschau verweist auf sie (aria-describedby), alle anderen nicht.
+  useEffect(() => {
+    const ebene = pinEbene.current
+    if (!ebene) return
+    for (const layer of ebene.getLayers()) {
+      if (!(layer instanceof L.Marker)) continue
+      const element = layer.getElement()
+      if (!element?.dataset.pin) continue
+      if (kurzkarte && element.dataset.pin === vorschauSlug) element.setAttribute('aria-describedby', vorschauId)
+      else element.removeAttribute('aria-describedby')
+    }
+  }, [vorschauSlug, kurzkarte, vorschauId])
 
   /**
    * Die Übersicht: mit Zentrum der ganze Umkreis, sonst alle Pins. Polster
@@ -428,12 +621,14 @@ export default function HoefeKarte({
     const rand = zentrum ? 16 : 32
     const hoehe = map.getSize().y
     const zeile = attribution.current?.getContainer()?.offsetHeight ?? 0
-    const oben = attributionOben ? zeile : 0
+    // Oben liegt der Hinweis auf Höfe ohne Kartenpunkt (samt Abstand) — kein Pin darunter.
+    const hinweisHoehe = hinweisRef.current ? hinweisRef.current.offsetHeight + 8 : 0
+    const oben = (attributionOben ? zeile : 0) + hinweisHoehe
     // Mit Auswahl liegt das Band über der Karte, zusätzlich zum Rand. Ohne
     // Auswahl nur der Hinweis: Ein Pin muss mit seiner halben Höhe darüber
     // stehen, der Rand zählt dabei mit — sonst schrumpfte die Fläche der Pins
     // doppelt, und im Querformat blieben nur Gruppen.
-    const zusatz = lageRef.current.ausgewaehlt ? bandHoehe(map) : Math.max(0, hinweisRef.current + PIN_HALB - rand)
+    const zusatz = lageRef.current.ausgewaehlt ? bandHoehe(map) : Math.max(0, ohneAuswahlRef.current + PIN_HALB - rand)
     const unten = Math.max(0, Math.min((attributionOben ? 0 : zeile) + zusatz, hoehe - oben - 2 * rand - hoehe / 3))
     merker.still(() => {
       if (zentrum) {
@@ -504,11 +699,36 @@ export default function HoefeKarte({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fokus])
 
+  // Fiel der Hof aus der Pin-Menge (Filter), gibt es auch keine Vorschau mehr.
+  const vorschauHof = kurzkarte && vorschauStand ? hoefe.find((h) => h.slug === vorschauStand.slug) : undefined
+
   return (
     // `isolate`: Leaflets Ebenen (400) und Bedienteile (1000) bleiben in der
     // Karte — sonst lägen sie beim Scrollen über der klebenden Kopfzeile (40).
     <div className={cn('relative isolate overflow-hidden', !randlos && 'rounded-2xl border border-border', hoeheKlasse)}>
       <div ref={kartenDiv} className="h-full w-full" />
+      {hinweis && (
+        // Über den Pins (Ebene 600), neben dem Zoom links oben und unter der Attribution, wenn sie oben steht.
+        <p
+          ref={hinweisRef}
+          className={cn(
+            'pointer-events-none absolute right-3 left-14 z-[700] w-fit max-w-[calc(100%-4.25rem)] rounded-xl bg-card px-3 py-2 text-[12.5px] leading-snug text-foreground shadow-md',
+            attributionOben ? 'top-8' : 'top-3'
+          )}
+        >
+          {hinweis}
+        </p>
+      )}
+      {vorschauHof && vorschauStand && kurzkarte && (
+        <div
+          className="absolute z-[1100]"
+          style={vorschauStand.lage}
+          onMouseEnter={() => vorschauOeffnen(vorschauHof.slug)}
+          onMouseLeave={vorschauSpaeterZu}
+        >
+          {kurzkarte(vorschauHof.slug, vorschauId)}
+        </div>
+      )}
     </div>
   )
 }

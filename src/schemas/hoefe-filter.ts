@@ -44,6 +44,10 @@ import {
 export const GEBINDE_VALUES = ['KLEIN', 'GROSS'] as const
 export type GebindeWahl = (typeof GEBINDE_VALUES)[number]
 
+/** Der Filter „Abholung" (Register N22): heute, morgen oder am Wochenende; null = alle Tage. */
+export const ABHOLUNG_VALUES = ['heute', 'morgen', 'wochenende'] as const
+export type AbholungWahl = (typeof ABHOLUNG_VALUES)[number]
+
 export type HoefeFilter = {
   bereich: AnzeigeBereich
   kategorien: ProductCategoryValue[]
@@ -57,6 +61,8 @@ export type HoefeFilter = {
   sortierung: 'GRUNDPREIS' | null
   suchtext: string
   suchMarken: string[]
+  /** Wann die Kundin abholen will (Register N22) — gerechnet im Browser aus den Abholzeiten; null = alle Tage. */
+  abholung: AbholungWahl | null
   ansicht: 'liste' | 'karte'
 }
 
@@ -70,6 +76,7 @@ export const LEERER_HOEFE_FILTER: HoefeFilter = {
   sortierung: null,
   suchtext: '',
   suchMarken: [],
+  abholung: null,
   ansicht: 'liste',
 }
 
@@ -87,6 +94,7 @@ const bereichSchema = z.enum(['futter']).nullable().catch(null)
 const gebindeSchema = z.enum(['klein', 'gross']).nullable().catch(null)
 const sortSchema = z.enum(['grundpreis']).nullable().catch(null)
 const ansichtSchema = z.enum(['liste', 'karte']).catch('liste')
+const abholungSchema = z.enum(ABHOLUNG_VALUES).nullable().catch(null)
 
 /**
  * Der Name des Suchparameters, auch für Seiten, die nur AUF die Suche zeigen
@@ -108,6 +116,7 @@ const P = {
   /** Die Kennung der Seite beim Suchtext: getippt oder schon aufgelöst, nicht von außen abgesendet. */
   eigenerSuchtext: 't',
   suchMarken: 'such',
+  abholung: 'abholung',
   ansicht: 'ansicht',
 } as const
 
@@ -172,6 +181,7 @@ export function leseHoefeFilter(params: SuchParameter): HoefeFilter {
     // sonst spränge der Cursor beim Tippen); nur zu lang wird verworfen.
     suchtext: suchtext.success ? (params.get(P.suchtext) ?? '') : '',
     suchMarken,
+    abholung: abholungSchema.parse(params.get(P.abholung)),
     ansicht: ansichtSchema.parse(params.get(P.ansicht)),
   }
 }
@@ -192,6 +202,7 @@ export function schreibeHoefeFilter(filter: HoefeFilter): string {
     params.set(P.eigenerSuchtext, '1')
   }
   for (const marke of filter.suchMarken) params.append(P.suchMarken, marke)
+  if (filter.abholung) params.set(P.abholung, filter.abholung)
   if (filter.ansicht === 'karte') params.set(P.ansicht, 'karte')
   return params.toString()
 }
@@ -208,8 +219,8 @@ export function abgesendeterSuchtext(params: SuchParameter): string {
 
 /**
  * Bereichswechsel: Was nur im alten Bereich Sinn hatte (Kategorien, Sorten,
- * Tiere, Gebinde, Sortierung), fällt weg. Siegel, Suche und Ansicht bleiben —
- * „Bio" gilt in beiden Bereichen.
+ * Tiere, Gebinde, Sortierung), fällt weg. Siegel, Suche, Abholung und Ansicht
+ * bleiben — „Bio" und „heute" gelten in beiden Bereichen.
  */
 export function wechsleBereich(filter: HoefeFilter, bereich: AnzeigeBereich): HoefeFilter {
   if (filter.bereich === bereich) return filter

@@ -23,7 +23,8 @@ import { KARTE_LAEDT } from '@/lib/hoefe-anzeige'
 const WURZEL = process.cwd()
 const quelle = (pfad: string) => readFileSync(join(WURZEL, pfad), 'utf8')
 /** Ohne Kommentare — die Dateien erklären, was sie NICHT tun. */
-const code = (pfad: string) => quelle(pfad).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+const ohneKommentare = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+const code = (pfad: string) => ohneKommentare(quelle(pfad))
 
 function alleDateien(ordner: string): string[] {
   return readdirSync(join(WURZEL, ordner)).flatMap((name) => {
@@ -80,11 +81,13 @@ describe('genau zwei Leaflet-Karten, beide am gemeinsamen Hook', () => {
 
   it('die Pins gruppieren für die Zoomstufe der Karte, nie für einen gemerkten Wert (Runde 1)', () => {
     const karte = code('src/components/hoefe/hoefe-karte.tsx')
-    expect(karte).toMatch(/gruppierePins\(hoefe, map\.getZoom\(\)\)/)
+    // Die Punkte sind die Höfe — mit Namen oder ohne (Register N22), immer für die aktuelle Zoomstufe.
+    expect(karte).toMatch(/gruppierePins\(punkte, map\.getZoom\(\)\)/)
+    expect(karte).toMatch(/const punkte = mitNamen \? hoefe : hoefe\.map\(/)
     // Jedes zoomend zählt — auch eines, das auf der Ausgangsstufe endet.
     expect(karte).toMatch(/on\('zoomend', \(\) => setZoomEnden\(\(n\) => n \+ 1\)\)/)
     // Gegenprobe: der alte Weg über die gemerkte Stufe fiele auf.
-    expect('gruppierePins(hoefe, zoomStufe ?? map.getZoom())').not.toMatch(/gruppierePins\(hoefe, map\.getZoom\(\)\)/)
+    expect('gruppierePins(punkte, zoomStufe ?? map.getZoom())').not.toMatch(/gruppierePins\(punkte, map\.getZoom\(\)\)/)
   })
 
   it('die Trefferfläche hat EINE Zahl für Marke und Gruppierung, rund wie das Bild (Runde 1)', () => {
@@ -136,4 +139,61 @@ describe('Platzhalter beim Nachladen', () => {
     const alt = "const HoefeKarte = dynamic(() => import('@/components/hoefe/hoefe-karte'), { ssr: false })"
     expect(alt).not.toMatch(/loading: \(\) => <KarteLaedt/)
   })
+})
+
+// Nr. 120 (Register N22): Pins per Tab, Enter wie Klick, die Vorschau am Computer.
+// Ohne DOM lässt sich das Verhalten nicht ausführen — die Wache hält die Verdrahtung fest.
+// Die Abgleiche stehen in EINER Funktion, damit die Gegenprobe dieselben Abgleiche
+// gegen Abwandlungen des echten Quelltexts laufen lässt, nicht gegen ein Literal (Runde 1).
+const KARTE = 'src/components/hoefe/hoefe-karte.tsx'
+
+/** Was an der Tastatur- und Vorschau-Verdrahtung fehlt; leer = alles da. Kommentare zählen nicht. */
+function pruefeKarteTastatur(text: string): string[] {
+  const karte = ohneKommentare(text)
+  const anzahl = (muster: RegExp) => karte.match(muster)?.length ?? 0
+  const fehlt: string[] = []
+  if (anzahl(/keyboard: true/g) !== 2) fehlt.push('Pin und Gruppen-Pin mit keyboard: true')
+  // Nur der eigene Hof der Umfeld-Karte bleibt ohne Tab — er ist nicht antippbar.
+  if (anzahl(/keyboard: false/g) !== 1) fehlt.push('genau ein Pin mit keyboard: false')
+  if (anzahl(/e\.key !== 'Enter' && e\.key !== ' '/g) !== 2) fehlt.push('Enter und Leertaste an Pin und Gruppen-Pin')
+  for (const ereignis of ['mouseenter', 'mouseleave', 'focus', 'blur']) {
+    if (!karte.includes(`addEventListener('${ereignis}'`)) fehlt.push(`addEventListener('${ereignis}')`)
+  }
+  if (!/const VORSCHAU_NACHLAUF_MS = 300\b/.test(karte)) fehlt.push('Nachlauf 300 ms')
+  if (!/if \(e\.key === 'Escape'\) vorschauZu\(\)/.test(karte)) fehlt.push('Escape schließt die Vorschau')
+  if (!karte.includes("setAttribute('aria-describedby', vorschauId)")) fehlt.push('aria-describedby am Pin')
+  if (!/if \(fokusPin === pin\.slug\) element\.focus\(\{ preventScroll: true \}\)/.test(karte)) fehlt.push('Fokus zurück an den Pin')
+  return fehlt
+}
+
+/** Entfernt genau die eine Zeile, die `teil` enthält — sonst wäre die Abwandlung nicht eindeutig. */
+function ohneZeile(text: string, teil: string): string {
+  const zeilen = text.split('\n')
+  expect(zeilen.filter((z) => z.includes(teil)), teil).toHaveLength(1)
+  return zeilen.filter((z) => !z.includes(teil)).join('\n')
+}
+
+describe('Pins per Tastatur und die Vorschau am Computer', () => {
+  const echt = quelle(KARTE)
+
+  it('Pins per Tab, Enter und Leertaste wie ein Klick, Vorschau bei Zeiger und Fokus, Escape oder 300 ms', () => {
+    expect(pruefeKarteTastatur(echt)).toEqual([])
+    expect(code('src/components/hoefe/hof-kurzkarte.tsx')).toContain('role="tooltip"')
+  })
+
+  // Gegenprobe am echten Quelltext: Jede Abwandlung muss mindestens einen Fehler liefern.
+  const abwandlungen: Record<string, (text: string) => string> = {
+    'keyboard: true wird keyboard: false': (t) => t.replace('keyboard: true', 'keyboard: false'),
+    'Escape-Zweig entfernt': (t) => ohneZeile(t, "if (e.key === 'Escape') vorschauZu()"),
+    'Nachlauf 500 statt 300 ms': (t) => t.replace('VORSCHAU_NACHLAUF_MS = 300', 'VORSCHAU_NACHLAUF_MS = 500'),
+    "addEventListener('focus' entfernt": (t) => ohneZeile(t, "addEventListener('focus'"),
+    'Fokus zurück an den Pin entfernt': (t) => ohneZeile(t, 'element.focus({ preventScroll: true })'),
+  }
+  for (const [name, abwandeln] of Object.entries(abwandlungen)) {
+    it(`Gegenprobe: ${name} fällt auf`, () => {
+      const abgewandelt = abwandeln(echt)
+      expect(abgewandelt).not.toBe(echt)
+      expect(pruefeKarteTastatur(abgewandelt).length).toBeGreaterThan(0)
+    })
+  }
 })

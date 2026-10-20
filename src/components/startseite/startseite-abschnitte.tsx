@@ -21,8 +21,6 @@ import { SchonDabei } from '@/components/shared/schon-dabei'
 import { Wortmarke } from '@/components/shared/wortmarke'
 import { Kicker } from '@/components/startseite/kicker'
 import { MARKE } from '@/lib/marke'
-import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
-import { AGB_LINK_TEXT, AGB_PFAD } from '@/lib/rechtstexte/agb-einbindung'
 import type { GruendungSeiten } from '@/lib/gruendungshof'
 import { gruendungFuerSeiten } from '@/server/queries/plattform-einstellung'
 import { GruendungSatz } from '@/components/gruendung/satz'
@@ -357,13 +355,24 @@ export function Fragen({ jetzt }: { jetzt: Date }): React.JSX.Element {
   )
 }
 
-const FUSS_SPALTEN = [
+// Impressum, Datenschutz, AGB und „Problem melden" stehen seit Nr. 120 im
+// Seitenfuß der KundeShell (KundeFuss, Register N22) direkt darunter — hier
+// nicht noch einmal. „Höfe entdecken" und „So funktioniert's" führt der
+// Seitenfuß nur am Computer (SEITENFUSS.wege, ab md); am Handy nicht, und die
+// Produktseite hat dort keine Unterleiste. Darum bleibt die Spalte der Marke
+// und ist nur am Computer verborgen (`nurHandy`), damit dort nichts doppelt
+// steht.
+const FUSS_SPALTEN: readonly {
+  titel: string
+  nurHandy?: boolean
+  links: readonly { href: string; text: string }[]
+}[] = [
   {
     titel: MARKE,
+    nurHandy: true,
     links: [
       { href: hoefeAdresse(), text: 'Höfe entdecken' },
       { href: '/#so-funktionierts', text: 'So funktioniert’s' },
-      { href: '/problem-melden', text: PROBLEM_MELDEN },
     ],
   },
   {
@@ -376,16 +385,7 @@ const FUSS_SPALTEN = [
       { href: '/konditionen', text: 'Konditionen' },
     ],
   },
-  {
-    titel: 'Rechtliches',
-    links: [
-      // Die AGB vor dem Impressum (Register O4): jede Fußzeile führt sie.
-      { href: AGB_PFAD, text: AGB_LINK_TEXT },
-      { href: '/impressum', text: 'Impressum' },
-      { href: '/datenschutz', text: 'Datenschutz' },
-    ],
-  },
-] as const
+]
 
 export function StartseiteFuss({ jahr }: { jahr: number }): React.JSX.Element {
   return (
@@ -399,9 +399,9 @@ export function StartseiteFuss({ jahr }: { jahr: number }): React.JSX.Element {
           </p>
           <p className="text-xs text-muted-foreground">© {jahr} {MARKE}</p>
         </div>
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:flex md:gap-[70px]">
+        <div className="grid grid-cols-2 gap-6 md:flex md:gap-[70px]">
           {FUSS_SPALTEN.map((spalte) => (
-            <nav key={spalte.titel} aria-label={spalte.titel} className="flex flex-col gap-1">
+            <nav key={spalte.titel} aria-label={spalte.titel} className={cn('flex flex-col gap-1', spalte.nurHandy && 'md:hidden')}>
               <p className="text-[13px] font-semibold">{spalte.titel}</p>
               <ul className="flex flex-col">
                 {spalte.links.map((link) => (

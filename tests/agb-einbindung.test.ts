@@ -58,6 +58,7 @@ vi.mock('@/lib/stripe-client', () => ({ getStripePromise: () => null }))
 
 import { KassenAbschluss } from '@/components/checkout/checkout-form'
 import { StartseiteFuss } from '@/components/startseite/startseite-abschnitte'
+import { KundeFuss } from '@/components/shells/kunde-fuss'
 import { HoefeClient } from '@/components/hoefe/hoefe-client'
 import { SUCHTEXT_PARAMETER } from '@/schemas/hoefe-filter'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
@@ -137,15 +138,24 @@ describe('Kasse: der Satz unter dem Kaufknopf', () => {
   })
 })
 
-describe('Fußzeile der Startseite: AGB vor Impressum', () => {
-  it('der Link auf /agb steht vor dem auf /impressum, beide in „Rechtliches"', () => {
-    const html = renderToStaticMarkup(createElement(StartseiteFuss, { jahr: 2026 }))
-    const agb = html.indexOf(`href="${AGB_PFAD}"`)
-    const impressum = html.indexOf('href="/impressum"')
+// Seit Nr. 120 (Register N22) trägt der Seitenfuß der KundeShell den AGB-Link —
+// „AGB-Link in jeder Fußzeile" (O4); die Reihenfolge ist die des Boards.
+describe('Seitenfuß: Impressum, Datenschutz, AGB, Problem melden', () => {
+  it('der Link auf /agb steht im Seitenfuß, in „Rechtliches", nach Impressum und Datenschutz', () => {
+    const html = renderToStaticMarkup(createElement(KundeFuss))
+    const rechtlich = html.slice(html.indexOf('aria-label="Rechtliches"'))
+    const agb = rechtlich.indexOf(`href="${AGB_PFAD}"`)
     expect(agb).toBeGreaterThan(-1)
-    expect(agb).toBeLessThan(impressum)
-    expect(impressum).toBeLessThan(html.indexOf('href="/datenschutz"'))
+    expect(rechtlich.indexOf('href="/impressum"')).toBeLessThan(rechtlich.indexOf('href="/datenschutz"'))
+    expect(rechtlich.indexOf('href="/datenschutz"')).toBeLessThan(agb)
+    expect(agb).toBeLessThan(rechtlich.indexOf('href="/problem-melden"'))
     expect(html).toContain(`>${AGB_LINK_TEXT}</a>`)
+  })
+
+  it('die Startseite führt die AGB nicht noch einmal — ihr Fuß steht über dem Seitenfuß (Gegenprobe)', () => {
+    const html = renderToStaticMarkup(createElement(StartseiteFuss, { jahr: 2026 }))
+    expect(html).not.toContain(`href="${AGB_PFAD}"`)
+    expect(renderToStaticMarkup(createElement(KundeFuss))).toContain(`href="${AGB_PFAD}"`)
   })
 })
 
@@ -204,6 +214,7 @@ describe('/hoefe: der Satz zur Reihenfolge unter der Liste', () => {
     kategorien: [],
     angebot: [],
     naechsteAbholung: null,
+    abholfenster: [],
     produkte: [],
     produkteGesamt: 0,
     produkteJeBereich: { LEBENSMITTEL: 0, FUTTERMITTEL: 0 },
@@ -214,7 +225,7 @@ describe('/hoefe: der Satz zur Reihenfolge unter der Liste', () => {
 
   const uebersicht = (suche = ''): string => {
     adresse.suche = suche
-    return renderToStaticMarkup(createElement(HoefeClient, { hoefe: [hof('a'), hof('b')] }))
+    return renderToStaticMarkup(createElement(HoefeClient, { hoefe: [hof('a'), hof('b')], jetzt: '2026-10-21T08:00:00.000Z' }))
   }
 
   it('der Wortlaut ist der aus der Freigabe (§ 4a Abs. 1 Z 1 FAGG)', () => {

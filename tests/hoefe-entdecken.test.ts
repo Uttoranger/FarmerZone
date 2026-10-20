@@ -100,6 +100,7 @@ describe('hoefeHref — die Adresse eines Filters', () => {
       sortierung: 'GRUNDPREIS',
       suchtext: 'Heu',
       suchMarken: ['Stroh'],
+      abholung: 'heute',
       ansicht: 'karte',
     }
     expect(neuGeladen(hoefeHref(voll))).toEqual(voll)

@@ -19,9 +19,11 @@
  * angeordnet und benannt.
  */
 import {
+  ABHOLUNG_VALUES,
   LEERER_HOEFE_FILTER,
   schreibeHoefeFilter,
   wechsleBereich,
+  type AbholungWahl,
   type GebindeWahl,
   type HoefeFilter,
 } from '@/schemas/hoefe-filter'
@@ -44,9 +46,19 @@ import {
   gehoertZu,
   type ProductCategoryValue,
 } from '@/lib/taxonomie'
-import { suchForm, type Bezugspunkt, type UmkreisStufe } from '@/lib/hofuebersicht'
+import {
+  holtAbAnTagen,
+  suchForm,
+  wienJetzt,
+  type AbholHof,
+  type Bezugspunkt,
+  type UmkreisStufe,
+} from '@/lib/hofuebersicht'
 import { erkenneOrtseingabe } from '@/lib/geokodierung'
-import { mitAnzahl } from '@/lib/format'
+import { formatTagKurz, mitAnzahl } from '@/lib/format'
+import { DAY_NAMES } from '@/lib/pickup-slot-rules'
+import { kalendertagInWien } from '@/lib/wiener-tag'
+import { tagVersetzt, wochentagVon } from '@/lib/kalender'
 
 // ─── Adresse ────────────────────────────────────────────────────────────────
 
@@ -216,6 +228,42 @@ export function tierReihe(
   }))
 }
 
+// ─── Abholung (Register N22) ────────────────────────────────────────────────
+
+/** Die Wörter des Filters „Abholung" (Board system-k1-entdecken-v2) — Reihe, Blatt und aktive Filter. */
+export const ABHOLUNG_TEXT = {
+  beschriftung: 'Abholung',
+  frage: 'Wann holst du ab?',
+  erklaerung: 'Heute zählt nur, was noch kommt. Wochenende = Samstag und Sonntag.',
+  alle: 'Alle Tage',
+  wahl: { heute: 'Heute', morgen: 'Morgen', wochenende: 'Wochenende' },
+  /** Der Eintrag in „Aktive Filter" — ohne Reihe daneben muss er allein verständlich sein. */
+  aktiv: { heute: 'Abholung heute', morgen: 'Abholung morgen', wochenende: 'Abholung am Wochenende' },
+  /** Wann, im Satz („2 Höfe holen heute ab"). */
+  imSatz: { heute: 'heute', morgen: 'morgen', wochenende: 'am Wochenende' },
+} as const satisfies {
+  wahl: Record<AbholungWahl, string>
+  aktiv: Record<AbholungWahl, string>
+  imSatz: Record<AbholungWahl, string>
+} & Record<string, unknown>
+
+/**
+ * Die Reihe „Abholung": Alle Tage · Heute · Morgen · Wochenende — eine Wahl,
+ * jeder Chip ein Link (nofollow wie alle Filter, Register N19). Gerechnet wird
+ * im Browser aus den Abholzeiten (berechneHofAuswahl); die Seite bleibt im Cache.
+ */
+export function abholungReihe(filter: HoefeFilter): EntdeckenChip[] {
+  return [
+    { schluessel: 'alle', label: ABHOLUNG_TEXT.alle, aktiv: filter.abholung === null, ziel: { ...filter, abholung: null } },
+    ...ABHOLUNG_VALUES.map((wahl) => ({
+      schluessel: wahl,
+      label: ABHOLUNG_TEXT.wahl[wahl],
+      aktiv: filter.abholung === wahl,
+      ziel: { ...filter, abholung: wahl },
+    })),
+  ]
+}
+
 /** Die Sortierung nach Kilopreis — nur im Futter, ein Chip zum An- und Abschalten. */
 export function sortierReihe(filter: HoefeFilter): EntdeckenChip[] {
   if (filter.bereich !== 'FUTTERMITTEL') return []
@@ -264,6 +312,9 @@ export function aktiveFilter(filter: HoefeFilter, umkreis: UmkreisStufe = null, 
   }
   if (umkreis !== null) {
     liste.push({ schluessel: 'umkreis', label: `Umkreis: ${umkreis} km`, ohne: filter, umkreis: true })
+  }
+  if (filter.abholung) {
+    liste.push({ schluessel: 'abholung', label: ABHOLUNG_TEXT.aktiv[filter.abholung], ohne: { ...filter, abholung: null } })
   }
   if (filter.bereich === 'FUTTERMITTEL') {
     liste.push({ schluessel: 'futter', label: 'Futtermittel', ohne: wechsleBereich(filter, 'LEBENSMITTEL') })
@@ -341,6 +392,68 @@ export function ergebnisZahl(filter: HoefeFilter, anzahl: number): string {
   if (suchbegriffe(filter).length > 0) return mitAnzahl(anzahl, 'Treffer', 'Treffer')
   if (filter.bereich === 'FUTTERMITTEL') return mitAnzahl(anzahl, 'Angebot', 'Angebote')
   return mitAnzahl(anzahl, 'Hof', 'Höfe')
+}
+
+/** „holt" bei einem Hof, „holen" bei mehreren. */
+function holen(anzahl: number): string {
+  return anzahl === 1 ? 'holt' : 'holen'
+}
+
+/**
+ * Die Zahlzeile über der Liste (Register N22; die Seite liest sie als
+ * Statusmeldung vor): „5 Höfe · 2 holen heute ab · nach Entfernung", ohne
+ * Bezugspunkt „· nach Freischaltung" — genau die Reihenfolge, die der Satz
+ * darunter nennt (REIHENFOLGE_HINWEIS, AGB §3). Mit gewählter Abholung
+ * „2 Höfe holen heute ab · …", leer nach „Heute" mit der Uhrzeit, ab der
+ * „heute" gilt. Zählt nur, wer wirklich bestellbar ist (holtAbAnTagen); holt
+ * heute keiner ab, fällt der Teil weg. Produkte (Suche, Futter) zählen wie
+ * bisher (ergebnisZahl).
+ */
+export function zahlZeile(eingabe: {
+  filter: HoefeFilter
+  anzahl: number
+  /** Wie viele der gezeigten Höfe heute noch abholen. */
+  holenHeute: number
+  mitBezugspunkt: boolean
+  jetzt: Date
+}): string {
+  const { filter, anzahl, holenHeute } = eingabe
+  if (zeigtProdukte(filter)) return ergebnisZahl(filter, anzahl)
+  if (anzahl === 0) {
+    return filter.abholung === 'heute' ? `Kein Hof holt heute noch ab · ${wienJetzt(eingabe.jetzt).uhrzeit} Uhr` : ergebnisZahl(filter, 0)
+  }
+  const reihenfolge = eingabe.mitBezugspunkt ? 'nach Entfernung' : 'nach Freischaltung'
+  const hoefe = mitAnzahl(anzahl, 'Hof', 'Höfe')
+  if (filter.abholung) return `${hoefe} ${holen(anzahl)} ${ABHOLUNG_TEXT.imSatz[filter.abholung]} ab · ${reihenfolge}`
+  const heute = holenHeute > 0 ? ` · ${holenHeute} ${holen(holenHeute)} heute ab` : ''
+  return `${hoefe}${heute} · ${reihenfolge}`
+}
+
+/** Der nächste Tag, an dem Höfe abholen — Versatz ab heute (0–7), Kalendertag und wie viele. */
+export type NaechsterAbholtag = { versatz: number; kalendertag: string; anzahl: number }
+
+/**
+ * Der erste Tag ab heute, an dem mindestens ein Hof abholt, bei dem man noch
+ * bestellen kann (holtAbAnTagen) — für die Leermeldung des Filters „Abholung".
+ * Die Abholzeiten wiederholen sich jede Woche: Nach sieben Tagen kommt nichts
+ * Neues mehr, dann null.
+ */
+export function naechsterAbholtag(hoefe: readonly AbholHof[], jetzt: Date): NaechsterAbholtag | null {
+  const heute = kalendertagInWien(jetzt)
+  for (let versatz = 0; versatz <= 7; versatz++) {
+    const kalendertag = tagVersetzt(heute, versatz)
+    const anzahl = hoefe.filter((hof) => holtAbAnTagen(hof, [kalendertag], jetzt)).length
+    if (anzahl > 0) return { versatz, kalendertag, anzahl }
+  }
+  return null
+}
+
+/** „Heute" · „Morgen" · „Am Samstag" · „Am Mi, 28. Okt" (in einer Woche, sonst läse es sich wie heute). */
+function tagImSatz(tag: NaechsterAbholtag): string {
+  if (tag.versatz === 0) return 'Heute'
+  if (tag.versatz === 1) return 'Morgen'
+  if (tag.versatz <= 6) return `Am ${DAY_NAMES[wochentagVon(tag.kalendertag)]}`
+  return `Am ${formatTagKurz(tag.kalendertag)}`
 }
 
 // ─── Produkttreffer ─────────────────────────────────────────────────────────
@@ -421,6 +534,8 @@ export function leerzustand(eingabe: {
   sucheLeertDieListe: boolean
   umkreis: UmkreisStufe
   filter: HoefeFilter
+  /** Nur, wenn erst der Filter „Abholung" die Liste geleert hat (abholungLeertDieListe): der nächste Tag mit Abholung. */
+  abholung?: { naechster: NaechsterAbholtag | null } | null
 }): Leerzustand {
   const { filter, umkreis } = eingabe
   if (eingabe.sucheLeertDieListe) {
@@ -430,6 +545,7 @@ export function leerzustand(eingabe: {
       ausweg: { art: 'link', label: 'Suche zurücksetzen', ziel: { ...filter, suchtext: '', suchMarken: [] } },
     }
   }
+  if (eingabe.abholung && filter.abholung) return abholungLeer(filter, filter.abholung, eingabe.abholung.naechster)
   if (umkreis !== null) {
     const stufe = naechsteUmkreisStufe(umkreis)
     return {
@@ -450,6 +566,34 @@ export function leerzustand(eingabe: {
     satz: 'Nimm einen Filter heraus, dann siehst du mehr.',
     ausweg: { art: 'link', label: 'Alle zurücksetzen', ziel: alleZuruecksetzen(filter) },
   }
+}
+
+const ABHOLUNG_LEER_TITEL: Record<AbholungWahl, string> = {
+  heute: 'Heute holt hier kein Hof mehr ab',
+  morgen: 'Morgen holt hier kein Hof ab',
+  wochenende: 'Am Wochenende holt hier kein Hof ab',
+}
+
+/**
+ * Der Filter „Abholung" hat die Liste geleert (Board, Handy 5): ein Satz mit
+ * dem nächsten Tag, an dem Höfe abholen, und ein Knopf dorthin — „Heute
+ * zeigen" bzw. „Morgen zeigen"; liegt der Tag später, gibt es keinen Filter
+ * dafür, dann „Alle Tage".
+ */
+function abholungLeer(filter: HoefeFilter, wahl: AbholungWahl, naechster: NaechsterAbholtag | null): Leerzustand {
+  const titel = ABHOLUNG_LEER_TITEL[wahl]
+  const alleTage: LeerAusweg = { art: 'link', label: ABHOLUNG_TEXT.alle, ziel: { ...filter, abholung: null } }
+  if (!naechster) {
+    return { titel, satz: 'In den nächsten Tagen holt hier kein Hof ab.', ausweg: alleTage }
+  }
+  const satz = `${tagImSatz(naechster)} ${holen(naechster.anzahl)} ${mitAnzahl(naechster.anzahl, 'Hof', 'Höfe')} in deiner Nähe ab – du kannst ${naechster.versatz === 0 ? 'noch' : 'schon jetzt'} bestellen.`
+  if (naechster.versatz === 0) {
+    return { titel, satz, ausweg: { art: 'link', label: 'Heute zeigen', ziel: { ...filter, abholung: 'heute' } } }
+  }
+  if (naechster.versatz === 1) {
+    return { titel, satz, ausweg: { art: 'link', label: 'Morgen zeigen', ziel: { ...filter, abholung: 'morgen' } } }
+  }
+  return { titel, satz, ausweg: alleTage }
 }
 
 // ─── Ein Suchfeld „Ort oder Produkt" (Nr. 46) ───────────────────────────────

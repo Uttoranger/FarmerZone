@@ -5,8 +5,30 @@
  * Karussell-Snap-Erkennung und seit Nr. 52 die Gruppen-Pins, die Kachelquelle
  * und der Merker für bewegte Ausschnitte — für beide Leaflet-Stellen
  * (Hofübersicht samt Umfeld, Standortkarte im Hof-Profil). Alles ohne DOM und
- * ohne Leaflet, prüfbar in tests/hoefe-anzeige.test.ts.
+ * ohne Leaflet, prüfbar in tests/hoefe-anzeige.test.ts. Seit Nr. 120 auch die
+ * Bildfläche einer Hofkarte ohne Foto, die Namen an den Pins und der Hinweis
+ * auf Höfe ohne Kartenpunkt (Register N22).
  */
+import { SONSTIGES_BILD_PFAD, kategorieBildPfad, type ProductCategoryValue } from '@/lib/taxonomie'
+
+// ─── Bildfläche ohne Foto (Register N22) ────────────────────────────────────
+
+/** Höchstens so viele Illustrationen trägt die Bildfläche einer Hofkarte. */
+export const BILDFLAECHE_HOECHSTENS = 3
+
+/**
+ * Die Illustrationen der Bildfläche: die der ersten ein bis drei Kategorien
+ * des Hofs — dieselbe Quelle wie Produktseite und Teilen-Bild
+ * (kategorieBildPfad). Ohne Kategorie die Illustration „Sonstiges", damit nie
+ * eine leere Fläche steht.
+ */
+export function hofIllustrationen(kategorien: readonly ProductCategoryValue[]): string[] {
+  const pfade = kategorien
+    .slice(0, BILDFLAECHE_HOECHSTENS)
+    .map((k) => kategorieBildPfad(k))
+    .filter((pfad): pfad is string => pfad !== null)
+  return pfade.length > 0 ? pfade : [SONSTIGES_BILD_PFAD]
+}
 
 // ─── Kachelquelle und Texte ─────────────────────────────────────────────────
 
@@ -157,8 +179,85 @@ export function ausWeltPixel(x: number, y: number, zoom: number): { lat: number;
 
 // ─── Überlappende Pins (Gruppen-Pins) ───────────────────────────────────────
 
-/** Ein Hof auf der Karte: die Nummer ist die der Liste, sie bleibt immer. */
-export type PinPunkt = { slug: string; nummer: number; lat: number; lon: number }
+/**
+ * Ein Hof auf der Karte: die Nummer ist die der Liste, sie bleibt immer. Der
+ * Name (Register N22) ist optional — nur /hoefe gibt ihn mit, und nur, wenn die
+ * Karte ihn zeigt (zeigePinNamen); Startseite, Region und Umfeld zeichnen
+ * weiter nur Nummern.
+ */
+export type PinPunkt = { slug: string; nummer: number; lat: number; lon: number; name?: string }
+
+// ─── Namen an den Pins (Register N22) ───────────────────────────────────────
+
+/** So viele Zeichen trägt die Pille höchstens, sonst gekürzt mit „…". */
+export const PIN_NAME_MAX = 18
+/** Namen ab dieser Zoomstufe — oder bei höchstens PINS_MIT_NAMEN Pins im Bild. */
+export const NAMEN_AB_ZOOM = 12
+export const PINS_MIT_NAMEN = 12
+
+/** Zeigt die Karte die Namen? Ab Zoom 12 oder bei höchstens 12 Pins im sichtbaren Ausschnitt. */
+export function zeigePinNamen(zoom: number, pinsImBild: number): boolean {
+  return zoom >= NAMEN_AB_ZOOM || pinsImBild <= PINS_MIT_NAMEN
+}
+
+/** Der Name in der Pille: höchstens 18 Zeichen, sonst 17 und „…" (nach Zeichen, nicht nach Bytes). */
+export function pinName(name: string): string {
+  const zeichen = Array.from(name.trim())
+  return zeichen.length <= PIN_NAME_MAX ? zeichen.join('') : `${zeichen.slice(0, PIN_NAME_MAX - 1).join('').trimEnd()}…`
+}
+
+/** Geschätzte Breite eines Zeichens der Pille (12 px, fett) — ohne Browser, darum reichlich. */
+const PILLE_ZEICHEN_PX = 7.2
+/** Innenabstand der Pille: links mehr, weil sie 6 px unter der Scheibe beginnt. */
+const PILLE_POLSTER_PX = 18
+/** So weit schiebt sich die Pille unter die Scheibe des Pins. */
+const PILLE_UNTER_PIN_PX = 6
+export const PILLE_HOEHE = 24
+
+/**
+ * Die Maße eines Pins mit Namen: links die Scheibe mitten in ihrer
+ * Trefferfläche (44 px), rechts daran die Pille mit dem Namen. `ankerX` ist
+ * die Mitte der Scheibe — dort sitzt der Punkt des Hofs. Gerechnet mit der
+ * größten Stufe (ausgewählt), damit die Gruppierung bei einer Auswahl nicht
+ * springt.
+ */
+export function pinNamenMasse(name: string): { breite: number; hoehe: number; ankerX: number; pille: number } {
+  const ankerX = TREFFERFLAECHE / 2
+  const pille = Math.ceil(Array.from(pinName(name)).length * PILLE_ZEICHEN_PX) + PILLE_POLSTER_PX
+  const breite = Math.max(TREFFERFLAECHE, ankerX + PIN_DURCHMESSER / 2 - PILLE_UNTER_PIN_PX + pille)
+  return { breite, hoehe: TREFFERFLAECHE, ankerX, pille }
+}
+
+/** Der Name eines Pins für Screenreader: „Sonnhof, Nummer 1" bzw. „Nummer 3" ohne Namen. */
+export function pinBeschriftung(pin: Pick<PinPunkt, 'nummer' | 'name'>): string {
+  return pin.name ? `${pin.name}, Nummer ${pin.nummer}` : `Nummer ${pin.nummer}`
+}
+
+/**
+ * Der Fokusring eines Pins (Tab): ein Ring innerhalb der Trefferfläche, im
+ * Hof-Grün der Pins — er sitzt auf den hellen Kacheln und folgt dem Modus
+ * nicht (wie die Pins selbst, siehe pinDarstellung).
+ */
+export const PIN_FOKUS =
+  'outline-none focus-visible:outline-3 focus-visible:outline-solid focus-visible:-outline-offset-[6px] focus-visible:outline-[#2D5F3F]'
+
+/**
+ * Der Hinweis AUF der Karte, wenn gefilterte Höfe keinen Kartenpunkt haben
+ * (Register N22): am Computer mit ihren Nummern der Liste (daneben steht sie),
+ * am Handy „du findest ihn in der Liste" — dort liegt die Liste hinter der
+ * Karte. Ab fünf Nummern ohne Aufzählung.
+ */
+export function kartenpunktHinweis(nummern: readonly number[], mitNummern: boolean): string | null {
+  const anzahl = nummern.length
+  if (anzahl === 0) return null
+  if (!mitNummern || anzahl > 4) {
+    if (anzahl === 1) return 'Ein Hof hat noch keinen Kartenpunkt – du findest ihn in der Liste.'
+    return `${anzahl} Höfe haben noch keinen Kartenpunkt – du findest sie in der Liste.`
+  }
+  if (anzahl === 1) return `Ein Hof hat noch keinen Kartenpunkt – Nr. ${nummern[0]} steht nur in der Liste.`
+  const liste = `${nummern.slice(0, -1).join(', ')} und ${nummern[anzahl - 1]}`
+  return `${anzahl} Höfe haben noch keinen Kartenpunkt – Nr. ${liste} stehen nur in der Liste.`
+}
 
 /**
  * Was die Karte zeichnet: ein Pin mit der Nummer der Liste oder ein
@@ -238,7 +337,14 @@ function stadion(x: number, y: number, masse: { breite: number; hoehe: number })
 
 function flaecheVon(haufen: Haufen, aufgefaechert: boolean): Flaeche {
   const n = haufen.mitglieder.length
-  if (n === 1) return stadion(haufen.x, haufen.y, PIN_FLAECHE)
+  if (n === 1) {
+    // Mit Namen zählt die ganze Pille (Register N22): Die Fläche reicht vom
+    // linken Rand der Scheibe bis zum Ende des Namens, ihre Mitte liegt rechts vom Punkt.
+    const name = haufen.mitglieder[0].name
+    if (!name) return stadion(haufen.x, haufen.y, PIN_FLAECHE)
+    const masse = pinNamenMasse(name)
+    return stadion(haufen.x + masse.breite / 2 - masse.ankerX, haufen.y, masse)
+  }
   // Aufgefächert: der Kreis, in dem die Trefferflächen aller Höfe des Fächers liegen.
   if (aufgefaechert) return { x: haufen.x, y: haufen.y, halbeStrecke: 0, radius: faecherRadius(n) + PIN_FLAECHE.hoehe / 2 }
   const bild = gruppenPinMasse(n)
@@ -305,7 +411,8 @@ export function gruppierePins(pins: readonly PinPunkt[], zoom: number, maxZoom: 
         return h.mitglieder.map((pin, i) => {
           const winkel = -Math.PI / 2 + (2 * Math.PI * i) / h.mitglieder.length
           const stelle = ausWeltPixel(h.x + radius * Math.cos(winkel), h.y + radius * Math.sin(winkel), z)
-          return { art: 'pin', pin, lat: stelle.lat, lon: stelle.lon }
+          // Im Fächer ohne Namen: Die Pillen lägen sonst übereinander — der Kreis rechnet nur mit den Scheiben.
+          return { art: 'pin', pin: { slug: pin.slug, nummer: pin.nummer, lat: pin.lat, lon: pin.lon }, lat: stelle.lat, lon: stelle.lon }
         })
       }
       const mitte = ausWeltPixel(h.x, h.y, z)
