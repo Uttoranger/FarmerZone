@@ -168,7 +168,7 @@ Für jede Sache gibt es in Nutzertexten genau ein Wort (Register N8): in Beschri
 | Was der Tarif eines Dienstes erlaubt (Register N18) | Grenze | Quota | „in % der Grenze, je Morgen gemessen“ |
 | Ein regelmäßiger Lauf, täglich oder wöchentlich (Register N18) – nicht zu verwechseln mit der Ansicht „Ablauf“ in Postfach › Meldungen (Ablauf · Wünsche) | Ablauf | Cron, Job | „Ein Ablauf ist nicht gelaufen“ |
 | Dateien im Bild-Speicher, an denen nichts mehr hängt (Register N18/N17) | Bilder ohne Verwendung | Waise, Orphan | „Bilder ohne Verwendung ansehen“ |
-| Hof, der nicht für die Gründungsplätze zählt (Register K2) | ausgenommen | | „ausgenommen · Testhof“ |
+| Hof, der nicht für die Gründungsplätze zählt (Register K2) | ausgenommen | | „ausgenommen“ |
 | Die Hofseite, wie die Kundschaft sie sieht, aus Mein Hof geöffnet (Register N4) | Kundenansicht | | „Kundenansicht · So sieht dich die Kundschaft“ |
 | Die Geräte, auf denen ein Konto gerade angemeldet ist – eine Zeile je Sitzung (Register E7) | Angemeldete Geräte | Device | „Angemeldete Geräte“, „Alle anderen abmelden“ |
 | Anmeldung mit Fingerabdruck, Gesicht oder PIN des Geräts statt Passwort; das Wort bleibt, wie es auf den Geräten steht (Register N20) | Passkey | 2FA | „Mit Passkey anmelden“ |
@@ -176,6 +176,8 @@ Für jede Sache gibt es in Nutzertexten genau ein Wort (Register N8): in Beschri
 | Das Etikett „Gründungshof“ über dem Hofnamen (Register K2) | Abzeichen | Badge | „Abzeichen zeigen“ |
 | Die Aktion „100 Gründungshöfe“: Plätze, 24 Monate, Stichtag (Register K2) | Aktion | | „Aktion bis 31.3.2027“ |
 | Die tägliche Prüfung von außen, ob die Abläufe gelaufen sind (Register N18, Nr. 113) | Lebenszeichen | Heartbeat, Monitoring | „Lebenszeichen“ |
+| Ein Hof nur zum Ausprobieren, unsichtbar in allen Listen, Hofseite nur per Link (Register N21) | Testhof | Demo-Hof, Dummy | „Testhof – nur zum Ausprobieren“ |
+| Die Leiste am Ende jeder Seite der Kundschaft mit Impressum, Datenschutz, AGB und „Problem melden“ (Register N22) | Seitenfuß | Footer | „Impressum“, „Datenschutz“, „AGB“, „Problem melden“ |
 
 - **Prüfung:** `tests/wortliste.test.ts` liest die Spalte „nicht“ und sucht jedes Wort in jeder Zeichenkette und jedem JSX-Text unter `src/` — mit Wortgrenzen und in der Schreibweise der Tabelle („Bestand“ trifft weder „Lagerbestand“ noch „bestand“). Kommentare, Bezeichner und Server-Logs (`console.*`) zählen nicht. Wo ein Wort in anderem Sinn richtig ist, steht der Text mit Grund in der Ausnahmeliste im Test: je Text, nicht je Datei, ohne Zeilennummer.
 - **„Status“, „Post“, „Neuigkeit“ meinen den Beitrag als Sache.** Der Status einer Bestellung, Zahlung, Freischaltung oder Meldung bleibt „Status“, ebenso der Name der WhatsApp-Funktion „Status“; „Neuigkeiten“ (Mehrzahl) ist der Name der Anmeldung bei einem Hof. Solche Texte stehen als Ausnahme im Test, ebenso ein Text über die Käuferart (Betrieb, privat) beim Futter, der „Käufer“ sagt.
