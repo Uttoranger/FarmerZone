@@ -131,7 +131,7 @@ async function ladeDaten(): Promise<TeilenFensterBeitrag> {
 }
 
 describe('ladeTeilenFensterBeitragAction — Daten im Beitrag-Modus', () => {
-  it('eigener Beitrag: Link auf den Reiter „Beiträge", Produkte vorbelegt, Text aus dem Beitrag', async () => {
+  it('eigener Beitrag: Link auf genau diesen Beitrag (?beitrag=, T5 seit Nr. 128), Produkte vorbelegt, Text aus dem Beitrag', async () => {
     const daten = await ladeDaten()
     const hof = hofAdresse(APP_URL, 'hof-test')
     expect(daten).toMatchObject({
@@ -139,8 +139,8 @@ describe('ladeTeilenFensterBeitragAction — Daten im Beitrag-Modus', () => {
       beitragId: BEITRAG_ID,
       titel: 'Frischer Honig',
       slug: 'hof-test',
-      link: `${hof.url}?reiter=beitraege`,
-      adresse: `${hof.anzeige}?reiter=beitraege`,
+      link: `${hof.url}?beitrag=${BEITRAG_ID}`,
+      adresse: `${hof.anzeige}?beitrag=${BEITRAG_ID}`,
       // honig-klein ist verknüpft und ausverkauft — seine Familie zählt mit der kaufbaren Größe; heu ist ausverkauft.
       vorbelegt: ['honig-gross'],
       textVorschlag: 'Frischer Honig – Hallo, der Honig ist da. Jetzt online bestellen.',
@@ -206,8 +206,8 @@ const HOF_DATEN: TeilenFensterHof = {
 const BEITRAG_DATEN: TeilenFensterBeitrag = {
   ...HOF_DATEN,
   art: 'beitrag',
-  link: 'https://agrilo.at/hof-test?reiter=beitraege',
-  adresse: 'agrilo.at/hof-test?reiter=beitraege',
+  link: `https://agrilo.at/hof-test?beitrag=${BEITRAG_ID}`,
+  adresse: `agrilo.at/hof-test?beitrag=${BEITRAG_ID}`,
   beitragId: BEITRAG_ID,
   titel: 'Frischer Honig',
   vorbelegt: ['d', 'e'],
@@ -231,18 +231,18 @@ describe('Beitrag-Modus: die reinen Regeln', () => {
     expect(anfangsAuswahl(HOF_DATEN)).toEqual(['a', 'c', 'd'])
   })
 
-  it('der Link zählt mit denselben Kürzeln — und die Hofseite behält dabei den Reiter', () => {
+  it('der Link zählt mit denselben Kürzeln — und die Hofseite behält dabei den Beitrag', () => {
     const ziel = { link: BEITRAG_DATEN.link, text: 'Frischer Honig', hofName: 'Hof Test' }
     expect(kanalZiel('wa', ziel)).toEqual({
       art: 'oeffnen',
-      href: `https://wa.me/?text=${encodeURIComponent('Frischer Honig\nhttps://agrilo.at/hof-test?reiter=beitraege&k=wa')}`,
+      href: `https://wa.me/?text=${encodeURIComponent(`Frischer Honig\nhttps://agrilo.at/hof-test?beitrag=${BEITRAG_ID}&k=wa`)}`,
     })
     expect(kanalZiel('fb', ziel)).toEqual({
       art: 'oeffnen',
-      href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent('https://agrilo.at/hof-test?reiter=beitraege&k=fb')}`,
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`https://agrilo.at/hof-test?beitrag=${BEITRAG_ID}&k=fb`)}`,
     })
-    expect(kanalZiel('ig', ziel)).toMatchObject({ art: 'bild', link: 'https://agrilo.at/hof-test?reiter=beitraege&k=ig' })
-    expect(teilenBesuchAusAdresse('https://agrilo.at/hof-test?reiter=beitraege&k=wa')).toEqual({ kanal: 'wa', ohne: '/hof-test?reiter=beitraege' })
+    expect(kanalZiel('ig', ziel)).toMatchObject({ art: 'bild', link: `https://agrilo.at/hof-test?beitrag=${BEITRAG_ID}&k=ig` })
+    expect(teilenBesuchAusAdresse(`https://agrilo.at/hof-test?beitrag=${BEITRAG_ID}&k=wa`)).toEqual({ kanal: 'wa', ohne: `/hof-test?beitrag=${BEITRAG_ID}` })
   })
 
   it('kein Plakat im Beitrag-Modus — das Plakat trägt die feste Hofseite', () => {

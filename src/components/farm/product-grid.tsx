@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useOptimistic, useTransition } from 'react'
+import { useState, useEffect, useImperativeHandle, useMemo, useOptimistic, useTransition, type Ref } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -85,7 +85,15 @@ type Props = {
    * der Seite; das Seitenende hält ihn über das Polster von Seite und Shell frei.
    */
   platzUnten?: boolean
+  /**
+   * Der Weg in den Korb nach außen (Nr. 128): „Dazu im Hofladen“ in „Aktuell
+   * vom Hof“ legt über GENAU diese Funktion in den Korb — dieselbe, die die
+   * Produktkarten bekommen (Vorschau-Hinweis, Reservierung, Toast, Korb öffnen).
+   * Kein zweiter Warenkorb: Ein zweiter useCart führte seinen eigenen Korb.
+   */
+  inDenKorb?: Ref<InDenKorb>
 }
+
 
 
 // Produktpreise kommen aus src/lib/format.ts (formatGrundpreis + Grundpreis-
@@ -486,6 +494,9 @@ export function useBereichWunsch(): AnzeigeBereich | null {
   return wert === null ? null : bereichAusParameter(wert)
 }
 
+/** Ein Produkt in den Korb legen — so, wie es der Kaufknopf der Produktkarte tut (Nr. 128, `inDenKorb`). */
+export type InDenKorb = (produkt: PublicProduct) => void
+
 export function ProductGrid({
   products,
   farmId,
@@ -503,6 +514,7 @@ export function ProductGrid({
   onGesprungen,
   produktLink = (id) => produktPfad(farmSlug, id),
   platzUnten = true,
+  inDenKorb,
 }: Props) {
   const isEditMode = ownerMode && mode !== 'preview'
   // EINE Regel für jeden Weg in den Korb (Kaufknopf, Nachbestell-Link,
@@ -646,6 +658,10 @@ export function ProductGrid({
       toast.error(result.error ?? 'Produkt nicht verfügbar')
     }
   }
+
+  // Ohne Abhängigkeiten nach jedem Rendern: Die Funktion schließt den Korb
+  // dieses Renders ein, wie die Produktkarten sie bekommen.
+  useImperativeHandle(inDenKorb, () => handleAddToCart)
 
   // Der Warenkorb der Shell (Kopf, Mittelknopf am Handy) zeigt auf
   // /{hof}#warenkorb. Steht man schon auf dieser Hofseite, lädt der Link

@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Text, Link, Img } from '@react-email/components'
 import { EmailLayout, h1, bodyText, ctaButton, MAIL_FARBE } from './_layout'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
+import { beitragLink } from '@/lib/teilen-fenster'
 
 const ANLASS_LABEL: Record<string, string> = {
   FRESH_PRODUCT: 'Frisches Produkt',
@@ -26,6 +27,12 @@ interface StatusUpdateEmailProps {
   body: string
   anlass: string
   photoUrl?: string
+  /**
+   * Die Kennung des Beitrags (Register T5, Ergänzung Nr. 128): Der Knopf führt
+   * dann zur Übersicht mit genau diesem Beitrag oben (`?beitrag=<id>`). Ohne
+   * Kennung — der Beitrag steht nicht auf der Hofseite — die Hofseite selbst.
+   */
+  beitragId?: string
   unsubscribeUrl: string
   appUrl?: string
 }
@@ -37,10 +44,12 @@ export function StatusUpdateEmail({
   body,
   anlass,
   photoUrl,
+  beitragId,
   unsubscribeUrl,
   appUrl = PRODUKTION_ADRESSE,
 }: StatusUpdateEmailProps) {
-  const farmUrl = `${appUrl}/${farmSlug}`
+  const hofUrl = `${appUrl}/${farmSlug}`
+  const farmUrl = beitragId ? beitragLink(hofUrl, beitragId) : hofUrl
   const anlassLabel = ANLASS_LABEL[anlass] ?? 'Mitteilung'
   const anlassFarbe = ANLASS_FARBE[anlass] ?? ANLASS_FARBE.ANNOUNCEMENT
 

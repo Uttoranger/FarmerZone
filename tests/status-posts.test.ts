@@ -301,6 +301,26 @@ describe('publishStatusPost — kein WhatsApp-Häkchen mehr (Register T5, Nr. 67
   })
 })
 
+describe('publishStatusPost — die Mail verlinkt genau diesen Beitrag (Register T5, Nr. 128)', () => {
+  async function mailMit(showOnFarmPage: boolean) {
+    vi.mocked(prisma.customerFarmSubscription.findMany).mockResolvedValue([{ customerEmail: 'abo@example.com', customerPhone: null }] as never)
+    vi.mocked(prisma.order.findMany).mockResolvedValue([] as never)
+    sp.findFirst.mockResolvedValue(null as never)
+    await publishStatusPost(beitrag({ sendEmail: true, showOnFarmPage }) as never)
+    const { sendStatusUpdateEmail } = await import('@/lib/email')
+    await vi.waitFor(() => expect(sendStatusUpdateEmail).toHaveBeenCalledTimes(1))
+    return vi.mocked(sendStatusUpdateEmail).mock.calls[0]![0]
+  }
+
+  it('steht er auf der Hofseite, geht seine Kennung an die Mail', async () => {
+    expect((await mailMit(true)).beitragId).toBe('post_1')
+  })
+
+  it('Gegenprobe: ohne „Auf der Hofseite zeigen“ keine Kennung — die Seite sagte sonst „nicht mehr aktuell“', async () => {
+    expect((await mailMit(false)).beitragId).toBeUndefined()
+  })
+})
+
 describe('Fehler nach außen: nie err.message, Sentry ohne Inhalte', () => {
   const INTERN = 'Invalid `prisma.statusPost.create()` invocation: title "Geheimer Titel" kundin@example.com'
 

@@ -5499,6 +5499,15 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Tests:** `pool: 'forks'` steht jetzt ausdrücklich in `vitest.config.ts` (Regel in TESTING_GUIDELINES §4) — `tests/sharp-lader-sperre.test.ts` sperrt die Lader für den ganzen Prozess, mit Worker-Threads scheiterte daneben `tests/marke-bilder.test.ts` in zwei von drei Läufen.
 - **Für die Zukunft:** Next.js kündigt Sicherheits-Releases vorab an. Wer die Ankündigung sieht, plant das Update ein, statt auf die 14 Tage zu warten — Vorschlag für eine Ergänzung von G6 steht im PR, nicht im Register.
 
+## Nr. 128 · Beiträge v2: „Aktuell vom Hof“ auf der Hofseite (Register F8, N5, T5; Nachtlauf 19, 20.10.2026)
+
+- **Was sich ändert:** Die Hofseite hat keinen Reiter „Beiträge“ mehr. Die aktiven Beiträge stehen als Abschnitt „Aktuell vom Hof“ oben in der Übersicht (Board system-k2-beitraege-v2): der neueste als Karte mit „Weiterlesen“ und „Dazu im Hofladen“, ältere als Zeilen, die an Ort und Stelle aufklappen. Grund (Board §1): Im dritten Reiter sah die Kundin die Neuigkeit nicht, und die verknüpften Produkte erschienen nirgends.
+- **Eine Bedingung „aktiv“:** `AKTIVER_BEITRAG(jetzt)` in `src/server/queries/status-posts.ts` (veröffentlicht, nicht abgelaufen, „Auf der Hofseite zeigen“) — `getActiveStatusPosts`, `ladeAktivenBeitrag` (`?beitrag=`) und Nr. 129 nehmen sie. Sie trägt ein eigenes `OR`; darum steht sie als Element einer `AND`-Liste.
+- **Verknüpfte Produkte ohne zweite Abfrage:** Die Hofseite lädt alle Produkte des Hofs schon in EINER Abfrage (`getPublicFarm`). „Dazu im Hofladen“ nimmt die Produkte aus genau dieser Liste (`beitragProdukte`, im Shop) — dieselbe Regel wie die Produktliste, nur dieser Hof, und das „+“ bekommt denselben Gegenstand wie die Produktkarte. Eine eigene Abfrage hätte die Regel „im Shop“ doppelt geschrieben und die Produkte zweimal in die Seitendaten gelegt.
+- **Derselbe Weg in den Korb:** `useCart` führt je Aufruf einen eigenen Korb (er lädt einmal je Hof und abonniert nichts). Ein zweiter Aufruf im Abschnitt hätte die Korb-Leiste nicht mitgezählt. Darum gibt `ProductGrid` seine Funktion über die Ref `inDenKorb` heraus (`useImperativeHandle`) — Vorschau-Hinweis, Reservierung, Toast und Korb-Blatt bleiben genau die der Produktkarten.
+- **Links (T5):** `beitragLink(hof, id)` → `<hof>?beitrag=<id>` im Teilen-Fenster, im WhatsApp-Text (über `linkMitKanal`) und in der Mail an Abonnentinnen; die Mail nur, wenn der Beitrag auf der Hofseite steht (sonst sagte die Seite „nicht mehr aktuell“). Der Teilen-Besuch entfernt nur `k`. Alte Links `?reiter=beitraege` landen bei „Aktuell vom Hof“; Mein Hof › Beiträge öffnet die Kundenansicht weiter mit diesem Wert.
+- **Abweichungen vom Board** (Freigabe §1): kein Satz „Diesen Beitrag hat dir jemand geschickt.“ und kein „Geteilt · …“ (der Link kommt auch aus der Mail); kaufbare Produkte zuerst, höchstens drei.
+
 ## Nützliche Befehle
 
 ```bash

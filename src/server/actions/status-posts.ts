@@ -164,6 +164,9 @@ export async function publishStatusPost(
             body: personalBody,
             anlass: data.anlass,
             photoUrl: data.photoUrl,
+            // Der Knopf führt zu genau diesem Beitrag (T5) — nur, wenn er auf der
+            // Hofseite steht; sonst sagte die Seite „nicht mehr aktuell“.
+            beitragId: data.showOnFarmPage ? post.id : undefined,
             abmeldeToken: generateUnsubscribeToken(sub.customerEmail, farm.id),
           })
         }
