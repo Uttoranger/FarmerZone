@@ -392,6 +392,8 @@ export const FRISCH_TEXT = {
 
 export const ADMIN_AKTION_FEHLER = {
   pflicht: 'Richte zuerst deinen Passkey ein.',
+  /** Das Konto hat einen Passkey, diese Sitzung hat keinen benutzt (Passwort-Sitzung von vor der Einrichtung). */
+  ohnePasskey: 'Melde dich für den Admin-Bereich mit deinem Passkey an.',
   abgelaufen: 'Deine Admin-Sitzung ist abgelaufen. Melde dich neu mit deinem Passkey an.',
   letzterPasskey: 'Den letzten Passkey kannst du nicht entfernen.',
   passkeyFehlt: 'Diesen Passkey gibt es nicht mehr.',

@@ -26,8 +26,9 @@
  *    nur `page.tsx` oder `route.ts` — sonst gäbe es einen Weg am Layout und an dieser Wache vorbei.
  *  - Admin nur mit Passkey (Register N20; Nr. 115): Die Pflicht „erst Passkey"
  *    prüft JEDE Seite selbst — jede ruft `verlangeAdminSeite()` OHNE Argument,
- *    nur die Pflichtseite /admin/einrichten und ladeAdminbereich (Layout) mit
- *    `{ ohnePasskey: true }`. Im Pflicht-Zustand lädt das Layout keine Zähler.
+ *    nur die Pflichtseite /admin/einrichten mit `{ ohnePasskey: true }`;
+ *    ladeAdminbereich (Layout) mit `verlangeAdminShell()`. Im Pflicht-Zustand
+ *    und in einer Sitzung ohne Passkey lädt das Layout keine Zähler.
  *  - Gegenproben: Schnipsel ohne Wache und mit Wache an zweiter Stelle.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -330,9 +331,9 @@ describe('das Layout mit der AdminShell', () => {
     expect(wachenMaengel(quelle, { modul: '@/server/adminbereich', exportName: 'ladeAdminbereich', funktionName: 'default' })).toEqual([])
   })
 
-  it('ladeAdminbereich prüft als erste Anweisung mit verlangeAdminSeite({ ohnePasskey: true }) — das Layout umhüllt auch die Pflichtseite', () => {
+  it('ladeAdminbereich prüft als erste Anweisung mit verlangeAdminShell() — wie verlangeAdminSeite({ ohnePasskey: true }), das Layout umhüllt auch die Pflichtseite', () => {
     const quelle = readFileSync(join(WURZEL, 'src/server/adminbereich.ts'), 'utf8')
-    expect(wachenMaengel(quelle, { ...SEITE, funktionName: 'ladeAdminbereich', ohnePasskey: true }, 'src/server/adminbereich.ts')).toEqual([])
+    expect(wachenMaengel(quelle, { modul: '@/server/admin-wache', exportName: 'verlangeAdminShell', funktionName: 'ladeAdminbereich' }, 'src/server/adminbereich.ts')).toEqual([])
   })
 })
 
@@ -415,6 +416,17 @@ describe('ladeAdminbereich — Verhalten', () => {
     expect(farmCount).not.toHaveBeenCalled()
     expect(meldungCount).not.toHaveBeenCalled()
     expect(orderCount).not.toHaveBeenCalled()
+    expect(ungelesenTeam).not.toHaveBeenCalled()
+  })
+
+  it('Sitzung ohne Passkey (das Konto hat einen, N20): die Shell ohne Zähler — die Seite leitet zur Admin-Anmeldung um', async () => {
+    getSession.mockResolvedValue({ user: { id: 'u1' }, session: { id: 'sitzung-u1', createdAt: new Date(), passkeyAm: null } } as never)
+    userFindUnique
+      .mockResolvedValueOnce({ isAdmin: true } as never)
+      .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
+    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, betrieb: null })
+    expect(farmCount).not.toHaveBeenCalled()
+    expect(meldungCount).not.toHaveBeenCalled()
     expect(ungelesenTeam).not.toHaveBeenCalled()
   })
 

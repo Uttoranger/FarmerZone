@@ -38,8 +38,14 @@ import {
  *  - Pflicht: Ohne Passkey, oder nach einem Ersatzcode ohne neuen, bleibt der
  *    Admin-Bereich zu → /admin/einrichten. Die Prüfung sitzt in der Wache
  *    JEDER Seite, nicht nur im Layout: Das Layout rendert beim Wechsel
- *    zwischen Unterseiten nicht neu. `ohnePasskey` nur für das Layout und die
- *    Pflichtseite samt ihren Actions (tests/admin-seiten-wache.test.ts).
+ *    zwischen Unterseiten nicht neu. `ohnePasskey` nur für die Pflichtseite
+ *    samt ihren Actions; das Layout prüft mit verlangeAdminShell
+ *    (tests/admin-seiten-wache.test.ts).
+ *  - Sitzung mit Passkey: Hat das Konto einen, muss auch DIESE Sitzung mit
+ *    Passkey angemeldet oder bestätigt sein (`passkeyAm`) → sonst
+ *    /login/admin, ohne sie zu löschen (der Hof bleibt erreichbar). Sonst
+ *    öffnete eine Passwort-Sitzung von vor dem ersten Passkey (anderes Gerät,
+ *    oder von vor dem Deploy) den Bereich bis zum Ende ihrer 12 Stunden.
  *  - Frische Bestätigung (verlangeFrischeBestaetigung): heikle Aktionen nur,
  *    wenn die letzte Bestätigung mit Passkey höchstens 5 Minuten zurückliegt.
  *
@@ -53,7 +59,7 @@ import {
  */
 
 export type AdminWacheOptionen = {
-  /** Nur Layout und Pflichtseite (/admin/einrichten) samt ihren Actions: kein Passkey nötig. */
+  /** Nur die Pflichtseite (/admin/einrichten) samt ihren Actions — und verlangeAdminShell (Layout): kein Passkey nötig. */
   ohnePasskey?: true
 }
 
@@ -62,6 +68,7 @@ type Geprueft =
   | { art: 'kein-recht' }
   | { art: 'abgelaufen' }
   | { art: 'pflicht' }
+  | { art: 'ohne-passkey' }
   | { art: 'ok'; userId: string; sitzungId: string; passkeyAm: Date | null }
 
 /**
@@ -80,6 +87,19 @@ export async function adminPflichtOffen(userId: string): Promise<boolean> {
   })
 }
 
+/**
+ * Was ohne `ohnePasskey` zusätzlich gilt (N20): zuerst die Pflicht des Kontos
+ * (Einrichten geht vor), dann die Sitzung selbst. `passkeyAm` setzen nur die
+ * Anmeldung mit Passkey und das Einrichten in dieser Sitzung (src/lib/auth.ts)
+ * — also auch die Sitzung der Einrichtung und die nach Ersatzcode plus neuem
+ * Passkey. Freigabe Lauf 18 Punkt 5: kein Admin-Inhalt im Browser einer
+ * Sitzung ohne Passkey.
+ */
+async function passkeySperre(userId: string, passkeyAm: Date | null): Promise<'pflicht' | 'ohne-passkey' | null> {
+  if (await adminPflichtOffen(userId)) return 'pflicht'
+  return passkeyAm === null ? 'ohne-passkey' : null
+}
+
 async function pruefe(optionen: AdminWacheOptionen): Promise<Geprueft> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { art: 'abgemeldet' }
@@ -90,32 +110,55 @@ async function pruefe(optionen: AdminWacheOptionen): Promise<Geprueft> {
     await prisma.session.deleteMany({ where: { id: session.session.id, userId } })
     return { art: 'abgelaufen' }
   }
-  if (!optionen.ohnePasskey && (await adminPflichtOffen(userId))) return { art: 'pflicht' }
-  return { art: 'ok', userId, sitzungId: session.session.id, passkeyAm: session.session.passkeyAm ?? null }
+  const passkeyAm = session.session.passkeyAm ?? null
+  if (!optionen.ohnePasskey) {
+    const sperre = await passkeySperre(userId, passkeyAm)
+    if (sperre) return { art: sperre }
+  }
+  return { art: 'ok', userId, sitzungId: session.session.id, passkeyAm }
+}
+
+/** Wie eine Seite scheitert — kehrt nie zurück. */
+function seiteScheitert(art: Exclude<Geprueft['art'], 'ok'>): never {
+  switch (art) {
+    case 'abgemeldet':
+      redirect('/login')
+    case 'kein-recht':
+      notFound()
+    case 'abgelaufen':
+    case 'ohne-passkey':
+      redirect(ADMIN_PFAD.anmelden)
+    case 'pflicht':
+      redirect(ADMIN_PFAD.einrichten)
+  }
 }
 
 /**
  * Die Wache einer Admin-SEITE. Gibt die Nutzer-ID zurück oder kehrt nie
  * zurück: nicht angemeldet → `/login`, angemeldet ohne Recht → 404, Sitzung
- * älter als 12 Stunden → /login/admin, ohne Passkey → /admin/einrichten.
+ * älter als 12 Stunden → /login/admin, ohne Passkey → /admin/einrichten,
+ * Sitzung ohne Passkey → /login/admin.
  *
  * `notFound()` statt `redirect` oder 403: Der Bereich soll sich Unbefugten
  * nicht einmal zu erkennen geben — für sie existiert /admin schlicht nicht.
  */
 export async function verlangeAdminSeite(optionen: AdminWacheOptionen = {}): Promise<string> {
   const geprueft = await pruefe(optionen)
-  switch (geprueft.art) {
-    case 'abgemeldet':
-      redirect('/login')
-    case 'kein-recht':
-      notFound()
-    case 'abgelaufen':
-      redirect(ADMIN_PFAD.anmelden)
-    case 'pflicht':
-      redirect(ADMIN_PFAD.einrichten)
-    case 'ok':
-      return geprueft.userId
-  }
+  if (geprueft.art !== 'ok') return seiteScheitert(geprueft.art)
+  return geprueft.userId
+}
+
+/**
+ * Die Wache des Layouts (ladeAdminbereich): scheitert wie
+ * verlangeAdminSeite({ ohnePasskey: true }) — das Layout umhüllt auch die
+ * Pflichtseite —, sagt dazu, ob Kopf und Zähler Daten zeigen dürfen: nur ohne
+ * Pflicht und in einer Sitzung mit Passkey. Das Layout rendert parallel zur
+ * Seite und wird vor ihrer Umleitung gestreamt; mit einer Abfrage der Sitzung.
+ */
+export async function verlangeAdminShell(): Promise<{ userId: string; inhaltOffen: boolean }> {
+  const geprueft = await pruefe({ ohnePasskey: true })
+  if (geprueft.art !== 'ok') return seiteScheitert(geprueft.art)
+  return { userId: geprueft.userId, inhaltOffen: (await passkeySperre(geprueft.userId, geprueft.passkeyAm)) === null }
 }
 
 function alsAktionsFehler(art: Exclude<Geprueft['art'], 'ok'>): { error: string } {
@@ -128,6 +171,8 @@ function alsAktionsFehler(art: Exclude<Geprueft['art'], 'ok'>): { error: string 
       return { error: ADMIN_AKTION_FEHLER.abgelaufen }
     case 'pflicht':
       return { error: ADMIN_AKTION_FEHLER.pflicht }
+    case 'ohne-passkey':
+      return { error: ADMIN_AKTION_FEHLER.ohnePasskey }
   }
 }
 

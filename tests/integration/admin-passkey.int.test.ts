@@ -77,7 +77,7 @@ import { DB_BREMSEN, adressMerkmal, bremsSchluessel } from '@/lib/bremse-datenba
 import { ADMIN_ANMELDEN_FEHLER, ADMIN_AKTION_FEHLER, EINRICHTUNGSCODE_ART, FRISCH_FEHLER } from '@/lib/admin-anmeldung'
 import { ersatzcodeHash } from '@/lib/ersatzcodes'
 import { einmalLinkZweck } from '@/lib/geraete'
-import { adminPflichtOffen, verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
+import { adminPflichtOffen, verlangeAdminAktion, verlangeAdminSeite, verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { ladeAdminbereich } from '@/server/adminbereich'
 import { entfernePasskey, erstelleErsatzcodes, pruefeEinrichtungscode, schickeEinrichtungscode } from '@/server/actions/admin-anmeldung'
 import { meldeAllesAbNichtIch } from '@/server/actions/geraete'
@@ -608,6 +608,34 @@ describe('Wache: 12 Stunden, Pflicht, frische Bestätigung', () => {
     const bereich = await ladeAdminbereich()
     expect(bereich.zahlen).toBeUndefined()
     expect(bereich.betrieb).toBeNull()
+  })
+
+  it('Sitzung mit Passwort von vor dem ersten Passkey (anderes Gerät): Seite → /login/admin, Aktion → Satz, Shell ohne Zähler; die Sitzung der Einrichtung kommt durch', async () => {
+    const konto = await erstelleKonto({})
+    const geraetB = await mitPasswort(konto.email)
+    const geraetA = await mitPasswort(konto.email)
+    const sitzungA = await sitzungVon(geraetA)
+    const sitzungB = await sitzungVon(geraetB)
+    if (!sitzungA || !sitzungB) throw new Error('keine Sitzung')
+    await codeBestaetigt(konto.id, sitzungA.id)
+    expect((await registriere(geraetA, new Testgeraet())).status).toBe(200)
+    expect(await adminPflichtOffen(konto.id)).toBe(false)
+
+    alsBrowser(geraetB)
+    const satz = { error: ADMIN_AKTION_FEHLER.ohnePasskey }
+    expect(await verlangeAdminAktion()).toEqual(satz)
+    expect(await verlangeFrischeBestaetigung()).toEqual(satz)
+    const startseite = (await import('@/app/admin/page')) as { default: (props: unknown) => Promise<unknown> }
+    await expect(startseite.default({ searchParams: Promise.resolve({}), params: Promise.resolve({}) })).rejects.toThrow('REDIRECT:/login/admin')
+    expect((await ladeAdminbereich()).zahlen).toBeUndefined()
+    // Umgeleitet, nicht abgemeldet: Hof und Konto bleiben in dieser Sitzung erreichbar.
+    expect(await prisma.session.findUnique({ where: { id: sitzungB.id } })).not.toBeNull()
+
+    // Gegenprobe: die Sitzung, in der der Passkey eingerichtet wurde (passkeyAm gesetzt).
+    alsBrowser(geraetA)
+    expect(await verlangeAdminAktion()).toEqual({ ok: true, userId: konto.id })
+    expect(await verlangeAdminSeite()).toBe(konto.id)
+    expect((await ladeAdminbereich()).zahlen).toBeDefined()
   })
 
   it('ohne Passkey leitet jede Admin-Seite auf /admin/einrichten um, bevor sie Daten lädt — die Pflichtseite selbst nicht', async () => {

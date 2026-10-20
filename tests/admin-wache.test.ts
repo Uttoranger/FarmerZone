@@ -191,6 +191,30 @@ describe('Admin nur mit Passkey (Register N20) — Pflicht in der Wache', () => 
   })
 })
 
+describe('Admin nur mit Passkey (Register N20) — Sitzung ohne Passkey', () => {
+  // Das Konto hat einen Passkey, DIESE Sitzung nie einen benutzt (Passwort-Sitzung
+  // von vor der Einrichtung auf einem anderen Gerät, oder von vor dem Deploy).
+  it('die Seite leitet zur Admin-Anmeldung um, ohne die Sitzung zu löschen (der Hof bleibt erreichbar)', async () => {
+    melde('user_admin', true, { passkeyVor: null })
+    await expect(verlangeAdminSeite()).rejects.toThrow('REDIRECT:/login/admin')
+    expect(sessionDeleteMany).not.toHaveBeenCalled()
+  })
+
+  it('Aktionen antworten mit dem Satz, auch heikle; die Pflichtseite (ohnePasskey) geht', async () => {
+    melde('user_admin', true, { passkeyVor: null })
+    const satz = { error: 'Melde dich für den Admin-Bereich mit deinem Passkey an.' }
+    expect(await verlangeAdminAktion()).toEqual(satz)
+    expect(await verlangeFrischeBestaetigung()).toEqual(satz)
+    expect(await verlangeAdminAktion({ ohnePasskey: true })).toEqual({ ok: true, userId: 'user_admin' })
+    await expect(verlangeAdminSeite({ ohnePasskey: true })).resolves.toBe('user_admin')
+  })
+
+  it('ohne Passkey am Konto gilt zuerst die Pflicht (Einrichten), nicht die Anmeldung', async () => {
+    melde('user_admin', true, { passkeys: 0, passkeyVor: null })
+    await expect(verlangeAdminSeite()).rejects.toThrow('REDIRECT:/admin/einrichten')
+  })
+})
+
 describe('Admin nur mit Passkey (Register N20) — frische Bestätigung', () => {
   it('5 Minuten nach der Bestätigung mit Passkey: frisch; 6 Minuten oder nie: „frisch" verlangt', async () => {
     melde('user_admin', true, { passkeyVor: 5 * MINUTE })
@@ -198,7 +222,7 @@ describe('Admin nur mit Passkey (Register N20) — frische Bestätigung', () => 
     melde('user_admin', true, { passkeyVor: 6 * MINUTE })
     expect(await verlangeFrischeBestaetigung()).toEqual({ error: 'frisch' })
     melde('user_admin', true, { passkeyVor: null })
-    expect(await verlangeFrischeBestaetigung()).toEqual({ error: 'frisch' })
+    expect(await verlangeFrischeBestaetigung({ ohnePasskey: true })).toEqual({ error: 'frisch' })
   })
 
   it('prüft vorher alles der Aktions-Wache: ohne Recht „Kein Zugriff.", nie „frisch"', async () => {

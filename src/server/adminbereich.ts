@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { kontoHatHof } from '@/lib/admin-navigation'
-import { adminPflichtOffen, verlangeAdminSeite } from '@/server/admin-wache'
+import { verlangeAdminShell } from '@/server/admin-wache'
 import { zaehleWartendeHoefe } from '@/server/queries/admin'
 import { zaehleOffenImEingang } from '@/server/queries/postfach'
 import * as Sentry from '@sentry/nextjs'
@@ -18,7 +18,7 @@ export type Adminbereich = {
   hatHof: boolean
   /**
    * Die Zähler der Reiter: wartende Höfe; am Postfach alles, was im Eingang offen ist (N14: Antworten, Meldungen, Aufgaben).
-   * Fehlt im Pflicht-Zustand (N20, Nr. 115): ohne Passkey keine Daten, auch nicht im Kopf.
+   * Fehlt im Pflicht-Zustand und in einer Sitzung ohne Passkey (N20, Nr. 115): keine Daten, auch nicht im Kopf.
    */
   zahlen?: { hoefe: number; briefkasten: number }
   /**
@@ -59,11 +59,11 @@ async function ladeBetriebHinweisSicher(): Promise<BetriebHinweis | null> {
  * Admin-Recht, nicht aus der Sitzung.
  */
 export async function ladeAdminbereich(): Promise<Adminbereich> {
-  // ohnePasskey: Das Layout umhüllt auch die Pflichtseite (/admin/einrichten).
-  // Im Pflicht-Zustand nur die Shell mit Name — keine Zähler, kein
-  // Betriebshinweis (N20, Nr. 115); die Seiten prüfen die Pflicht selbst.
-  const userId = await verlangeAdminSeite({ ohnePasskey: true })
-  if (await adminPflichtOffen(userId)) {
+  // Das Layout umhüllt auch die Pflichtseite (/admin/einrichten). Im
+  // Pflicht-Zustand und in einer Sitzung ohne Passkey nur die Shell mit Name —
+  // keine Zähler, kein Betriebshinweis (N20, Nr. 115); die Seiten prüfen selbst.
+  const { userId, inhaltOffen } = await verlangeAdminShell()
+  if (!inhaltOffen) {
     const nutzer = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true, farm: { select: { id: true } } } })
     return { personName: nutzer?.name ?? '', hatHof: kontoHatHof({ rolle: nutzer?.role, hofVorhanden: nutzer?.farm != null }), betrieb: null }
   }
