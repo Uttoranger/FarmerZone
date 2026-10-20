@@ -107,8 +107,9 @@ Plattform verwalten?", mit zwei Ausgängen:
 
 | Wo | Aufruf | Verhalten |
 |---|---|---|
-| Admin-**Seite** (`src/app/admin/**/page.tsx`) | `await verlangeAdminSeite()` | nicht angemeldet → `redirect('/login')`, angemeldet ohne Recht → `notFound()` |
+| Admin-**Seite** (`src/app/admin/**/page.tsx`) | `await verlangeAdminSeite()` | nicht angemeldet → `redirect('/login')`, angemeldet ohne Recht → `notFound()`, Sitzung ≥ 12 h → abgemeldet und `/login/admin`, ohne Passkey → `/admin/einrichten` |
 | Admin-**Aktion** (`'use server'`) | `await verlangeAdminAktion()` | `{ ok: true, userId } \| { error }` — die Antwortform der Actions |
+| **Heikle** Admin-Aktion | `await verlangeFrischeBestaetigung()` als erste Anweisung | alles von `verlangeAdminAktion`, dazu `passkeyAm` ≤ 5 min, sonst `{ error: 'frisch' }` |
 
 - Beide lesen das Recht über `isAdminUser` **frisch aus der Datenbank**, nie aus
   der Session: `isAdmin` steckt bewusst nicht in den
@@ -127,6 +128,16 @@ Plattform verwalten?", mit zwei Ausgängen:
 - Im Admin gibt es keine Hofzugehörigkeit — das Admin-Recht **ist** die
   Besitzprüfung. Keine eigene Fassung daneben bauen: Vorher lag die Frage an
   vier Stellen und in zwei Implementierungen.
+
+### Admin-Anmeldung: nur mit Passkey (Register N20, seit Nr. 115)
+
+- **Plugin** `@better-auth/passkey` in `src/lib/auth.ts`, Client NUR in `src/lib/auth-client-passkey.ts` (Admin-Seiten und der Dialog „Mit Passkey bestätigen"). `rpID`/`origin` kommen geschützt aus `UMGEBUNG.appUrl` (`passkeyAdresse`): unlesbar → `hooks.before` antwortet auf `/passkey/*` und die Ersatzcode-Anmeldung mit 503, alles andere läuft. Ein Passkey gilt nur unter der Adresse, unter der er entstand (Vorschau: Branch-Adresse).
+- **Nutzerprüfung** (Fingerabdruck, Gesicht, PIN) erzwingen die beiden `afterVerification` (`userVerified`), nicht das Plugin — es prüft mit `requireUserVerification: false` und fragt beim Anmelden nur „preferred".
+- **Registrierung** nur in den Fällen a–c (`registrierungsFall`, `src/lib/admin-anmeldung.ts`), geprüft in `hooks.before` auf BEIDEN Pfaden (`generate-register-options`, `verify-registration`): (a) erster Passkey — kein Passkey, `adminSeit` ≤ 24 h, Sitzung ≤ 15 min mit Passwort, E-Mail-Code dieser Sitzung bestätigt (`EinmalLink`, Zweck `admin-einrichten:<Sitzung>`, Hash über Zweck, Konto und Code); (b) nach Ersatzcode genau EINER — `afterVerification` verbraucht den Anspruch per bedingtem `updateMany` auf der Sitzung (`anmeldeart` `ersatzcode` → `ersatzcode-eingeloest`); (c) weiterer — `passkeyAm` ≤ 5 min, nie in einer Sitzung aus einem Ersatzcode. Jede Registrierung setzt `passkeyAm`. `delete-passkey`/`update-passkey` stehen in `disabledPaths`; Entfernen nur über `entfernePasskey` (frisch, Kontozeile per UPDATE gesperrt, nie der letzte).
+- **Anmeldeart und `passkeyAm`** entstehen atomar mit der Sitzung in `databaseHooks.session.create.before` — der Hook bekommt den Endpunkt-Kontext mit `path` (`anmeldeartFuerPfad`); die Felder stehen in `session.additionalFields` mit `input: false` (sonst setzte `/update-session` sie).
+- **Frische Bestätigung = erneute Anmeldung mit Passkey.** `hooks.before` auf `/passkey/verify-authentication`: Gibt es eine Sitzung, muss `response.id` ein Passkey DIESES Kontos sein, sonst 401 vor dem Endpunkt (keine Sitzung, kein Cookie). Nach Erfolg löscht `hooks.after` die alte Sitzung — nur wenn sie demselben Konto gehört. Oberfläche: `useFrischBestaetigt(aktion)` (`src/components/admin/frisch-bestaetigen.tsx`) öffnet bei `{ error: 'frisch' }` den Dialog und wiederholt die Aktion genau einmal; die CSV-Exporte antworten mit 303 auf `/admin/bestaetigen?weiter=` (`frischOderBestaetigen`, nur Pfade unter `/admin`).
+- **Pflicht „erst Passkey"** prüft jede Seite selbst (`verlangeAdminSeite()` ohne Argument); nur `/admin/einrichten` und `ladeAdminbereich` rufen `verlangeAdminSeite({ ohnePasskey: true })`, im Pflicht-Zustand ohne Zähler. Pflicht = kein Passkey oder der zuletzt benutzte Ersatzcode ist jünger als der jüngste Passkey.
+- **Sperren** für ein Admin-Konto mit Passkey (auch für seinen Hof): `/sign-in/email` antwortet und zählt wie ein falsches Passwort, `/request-password-reset` antwortet wie bei einer unbekannten Adresse ohne Link, „Das war ich nicht" ruft keinen Passwort-Link. Ersatzcodes: 10 je Konto, nur als HMAC (`src/lib/ersatzcodes.ts`), Anmeldung über den eigenen Endpunkt `/admin-ersatzcode/anmelden` (Bremse 5 je Adresse und Stunde, fail-closed, bedingt verbraucht). Mails: `src/emails/admin-sicherheit.tsx`, ohne Link zum Anmelden.
 
 ---
 
