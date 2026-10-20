@@ -35,7 +35,7 @@ import { cn } from '@/lib/utils'
  * den auch /products unter md trägt.
  */
 
-const KNOPF = cn(
+export const KNOPF = cn(
   'inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border bg-card px-4 text-sm font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted',
   FOKUS_RAHMEN
 )
@@ -111,8 +111,8 @@ export function MeinHofSeitenkopf({
   if (!hof) return null
 
   return (
-    // Unter lg folgt direkt der Inhalt des Reiters (mein-hof-ansicht.tsx), ab lg mit 24 px Abstand.
-    <header className="mb-0 print:hidden lg:mb-6">
+    // Unter lg folgt direkt der Inhalt des Reiters (mein-hof-ansicht.tsx), ab lg mit 24 px Abstand (der Kopf hat keinen eigenen Außenabstand).
+    <header className="print:hidden lg:mb-6">
       {/* ===== Unter lg: Karte mit Titelbild-Streifen ===== */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card lg:hidden">
         {/* Bildersatz, folgt dem Modus bewusst nicht; mittig ausgeschnitten —

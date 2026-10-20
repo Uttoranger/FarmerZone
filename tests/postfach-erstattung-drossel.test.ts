@@ -9,8 +9,9 @@
  *    EIN bedingtes Schreiben, das nur das Merkmal löscht; eine fremde oder
  *    schon erledigte Bestellung (0 Zeilen) ist kein Fehler.
  *  - Drossel mit fester Uhr: Antworten um 10:05 und 10:15 → eine Mail, um
- *    11:05 wieder eine (das Fenster ist die volle Stunde der Bremse); wirft
- *    die Bremse, geht die Mail trotzdem (fail-open), nach Sentry nur die Klasse.
+ *    11:05 wieder eine (das Fenster ist die volle Stunde der Bremse). Die
+ *    Frist der Drossel (1,5 s, danach geht die Mail, nach Sentry nur die Klasse)
+ *    prüft tests/postfach-drossel-frist.test.ts mit der echten Bremse.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
@@ -23,7 +24,7 @@ vi.mock('@/server/queries/postfach', () => ({
   ladeBetreiberEmpfaenger: vi.fn(async () => ['team@example.com']),
   ladeAntwortFuerTeam: vi.fn(async () => ({ hofName: 'Testhof A', titel: 'Erfundener Titel' })),
 }))
-vi.mock('@/server/bremse-datenbank', () => ({ zaehleVersuche: vi.fn(), bremseUeberAlleInstanzen: vi.fn(async () => true) }))
+vi.mock('@/server/bremse-datenbank', () => ({ bremseUeberAlleInstanzen: vi.fn(async () => true) }))
 vi.mock('@/lib/email', () => ({ sendHofAntwortAnTeam: vi.fn(async () => ({ gesendet: 1, gescheitert: 0 })) }))
 const nachlauf = vi.hoisted(() => ({ aufgaben: [] as (() => Promise<void>)[] }))
 vi.mock('@/lib/nach-der-antwort', () => ({
@@ -48,12 +49,11 @@ vi.mock('@/lib/prisma', async () => {
   }
 })
 
-import * as Sentry from '@sentry/nextjs'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { sendHofAntwortAnTeam } from '@/lib/email'
-import { zaehleVersuche, type Versuch } from '@/server/bremse-datenbank'
-import { DB_BREMSEN, fensterBeginn } from '@/lib/bremse-datenbank'
+import { bremseUeberAlleInstanzen, type Versuch } from '@/server/bremse-datenbank'
+import { DB_BREMSEN, fensterBeginn, innerhalbDerGrenze } from '@/lib/bremse-datenbank'
 import { antworteAlsHof, markiereErstattungErledigt } from '@/server/actions/postfach'
 import { adminSitzung } from './admin-sitzung'
 
@@ -115,13 +115,16 @@ describe('Drossel: „Ein Hof hat geantwortet" höchstens einmal je Faden und vo
     zaehler.clear()
     vi.useFakeTimers({ toFake: ['Date'] })
     getSession.mockResolvedValue(adminSitzung('hof_1') as never)
-    vi.mocked(zaehleVersuche).mockImplementation(async (versuche: readonly Versuch[], jetzt: Date = new Date()) =>
-      versuche.map(({ bremse, merkmal }) => {
-        const schluessel = `${bremse.zweck}|${merkmal}|${fensterBeginn(jetzt, bremse.fensterMs).getTime()}`
-        const stand = (zaehler.get(schluessel) ?? 0) + 1
-        zaehler.set(schluessel, stand)
-        return stand
-      })
+    // Wie die echte Bremse: je Zweck, Merkmal und Fenster einen Treffer zählen, erlaubt = innerhalb der Grenze.
+    vi.mocked(bremseUeberAlleInstanzen).mockImplementation(async (versuche: readonly Versuch[], jetzt: Date = new Date()) =>
+      versuche
+        .map(({ bremse, merkmal }) => {
+          const schluessel = `${bremse.zweck}|${merkmal}|${fensterBeginn(jetzt, bremse.fensterMs).getTime()}`
+          const stand = (zaehler.get(schluessel) ?? 0) + 1
+          zaehler.set(schluessel, stand)
+          return innerhalbDerGrenze(stand, bremse.max)
+        })
+        .every(Boolean)
     )
   })
 
@@ -143,7 +146,7 @@ describe('Drossel: „Ein Hof hat geantwortet" höchstens einmal je Faden und vo
     await antwortUm('2026-10-16T11:05:00Z')
     expect(sendHofAntwortAnTeam).toHaveBeenCalledTimes(2)
     // Gezählt wird je Faden mit der Bremse der Mail — Merkmal ist die Kennung des Fadens.
-    expect(vi.mocked(zaehleVersuche).mock.calls.every(([v]) => v[0]?.bremse === DB_BREMSEN.antwortHofMail && v[0]?.merkmal === FADEN)).toBe(true)
+    expect(vi.mocked(bremseUeberAlleInstanzen).mock.calls.every(([v]) => v[0]?.bremse === DB_BREMSEN.antwortHofMail && v[0]?.merkmal === FADEN)).toBe(true)
   })
 
   it('10:59 und 11:00 liegen in zwei Fenstern — je eine Mail', async () => {
@@ -152,21 +155,11 @@ describe('Drossel: „Ein Hof hat geantwortet" höchstens einmal je Faden und vo
     expect(sendHofAntwortAnTeam).toHaveBeenCalledTimes(2)
   })
 
-  it('wirft die Bremse, geht die Mail trotzdem — nach Sentry nur Klasse und Kennung', async () => {
-    vi.mocked(zaehleVersuche).mockRejectedValue(new TypeError('Verbindung weg'))
-    await antwortUm('2026-10-16T10:05:00Z')
-    expect(sendHofAntwortAnTeam).toHaveBeenCalledTimes(1)
-    const [fehler, kontext] = vi.mocked(Sentry.captureException).mock.calls[0] ?? []
-    expect((fehler as Error).name).toBe('TypeError')
-    expect((fehler as Error).message).not.toContain('Verbindung')
-    expect(JSON.stringify(kontext)).not.toContain('Erfundene Antwort')
-  })
-
   it('ohne Empfänger wird nicht gezählt und nichts verschickt', async () => {
     const { ladeBetreiberEmpfaenger } = await import('@/server/queries/postfach')
     vi.mocked(ladeBetreiberEmpfaenger).mockResolvedValueOnce([])
     await antwortUm('2026-10-16T10:05:00Z')
-    expect(zaehleVersuche).not.toHaveBeenCalled()
+    expect(bremseUeberAlleInstanzen).not.toHaveBeenCalled()
     expect(sendHofAntwortAnTeam).not.toHaveBeenCalled()
   })
 })

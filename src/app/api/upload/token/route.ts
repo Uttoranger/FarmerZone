@@ -25,9 +25,10 @@ import { isAdminUser } from '@/server/queries/admin'
  * Wer darf hochladen, und für welchen Hof? Eine Antwort für beide Handler.
  *
  * Seit Nr. 17b (S3) zusätzlich: Ein neues Konto lädt erst nach bestätigter
- * E-Mail-Adresse hoch — frisch aus der Datenbank, nie aus der Sitzung
- * (Cookie-Cache). Galerie, Produktbilder, Titelbild, Logo, Beiträge und
- * /teilen nehmen alle diesen Weg (tests/upload-sperre.test.ts).
+ * E-Mail-Adresse hoch — frisch aus der Datenbank, nicht aus der Sitzung (der
+ * Cookie-Cache, der dafür bis Nr. 114 der Grund war, ist aus). Galerie,
+ * Produktbilder, Titelbild, Logo, Beiträge und /teilen nehmen alle diesen Weg
+ * (tests/upload-sperre.test.ts).
  */
 async function hofDerSitzung(): Promise<{ id: string } | 'email-offen' | null> {
   const session = await auth.api.getSession({ headers: await headers() })

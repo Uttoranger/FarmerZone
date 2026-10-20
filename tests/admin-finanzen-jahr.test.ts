@@ -23,6 +23,8 @@ vi.mock('next/link', () => ({
     const attribute = Object.fromEntries(Object.entries(rest).filter(([k]) => k !== 'onNavigate' && k !== 'prefetch'))
     return createElement('a', { href, ...attribute }, children)
   },
+  // Der Ladepunkt (Nr. 105/121) fragt den Zustand des Links — beim Rendern auf dem Server lädt nichts.
+  useLinkStatus: () => ({ pending: false }),
 }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),

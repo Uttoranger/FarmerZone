@@ -4,6 +4,7 @@ import { FINANZEN_JAHR_TEXT } from '@/lib/finanzen'
 import type { FinanzenZeitraum } from '@/schemas/admin-reiter'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { LadePunkt } from '@/components/ui/lade-punkt'
 
 /**
  * Monat | Jahr im Seitenkopf der Finanzen (Register N15, Ergänzung Nr. 100):
@@ -44,6 +45,7 @@ export function ZeitraumUmschalter({
           )}
         >
           {e.label}
+          <LadePunkt />
         </Link>
       ))}
     </nav>
@@ -74,9 +76,10 @@ export function ZeitraumPfeil({
     <Link
       href={href}
       aria-label={beschriftung}
-      className={cn('flex size-11 items-center justify-center rounded-full border border-border text-foreground hover:bg-muted', FOKUS_RAHMEN)}
+      className={cn('relative flex size-11 items-center justify-center rounded-full border border-border text-foreground hover:bg-muted', FOKUS_RAHMEN)}
     >
       <Symbol className="size-4" strokeWidth={1.7} aria-hidden="true" />
+      <LadePunkt />
     </Link>
   )
 }

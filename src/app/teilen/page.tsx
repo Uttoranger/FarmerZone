@@ -27,9 +27,9 @@ export default async function TeilenSeite() {
 
   const farm = await prisma.farm.findUnique({
     where: { ownerId: session.user.id },
-    select: { slug: true, bannerUrl: true },
+    select: { slug: true },
   })
   if (!farm) redirect('/onboarding')
 
-  return <TeilenClient hofSlug={farm.slug} bisherigesTitelbild={farm.bannerUrl} />
+  return <TeilenClient hofSlug={farm.slug} />
 }

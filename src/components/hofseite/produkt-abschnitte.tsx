@@ -25,7 +25,7 @@ const SPY_STREIFEN = '-30% 0px -60% 0px'
 const SPRUNG_SPERRE_MS = 1000
 
 const CHIP = cn(
-  "relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-4 text-[13.5px] whitespace-nowrap transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']",
+  "relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-4 text-[13.5px] whitespace-nowrap transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-[5px] before:content-['']",
   FOKUS_RAHMEN
 )
 

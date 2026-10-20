@@ -15,16 +15,20 @@ import { KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
  * gespeichert; der Satz darunter verweist auf die Mail mit genau ihrem
  * Betreff (EINGANG_TEXT.erstattungKopf, dieselbe Quelle wie sendErstattungOffen).
  * „Zur Bestellung" führt zur Zahlung im Stripe-Dashboard des laufenden
- * Modus; ohne Kennung steht der Ausweg da.
+ * Modus; ohne Kennung steht der Ausweg da. Der Knopf „Erstattung erledigt“
+ * (Nr. 105) kommt als `children` hinein und steht damit im Abstand der Spalte,
+ * nicht in einem eigenen Polster darunter (Nr. 121).
  */
 export function PostfachErstattungSpalte({
   e,
   zahlungAdresse,
   jetzt,
+  children,
 }: {
   e: ErstattungAufgabeRoh
   zahlungAdresse: string | null
   jetzt: Date
+  children?: React.ReactNode
 }): React.JSX.Element {
   const betreff = EINGANG_TEXT.erstattungKopf(e.bestellnummer)
   return (
@@ -54,6 +58,7 @@ export function PostfachErstattungSpalte({
       ) : (
         <p className={cn('text-[13px]', LEISE)}>{EINGANG_TEXT.ohneZahlung}</p>
       )}
+      {children}
     </div>
   )
 }

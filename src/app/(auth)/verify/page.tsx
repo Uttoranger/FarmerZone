@@ -58,7 +58,8 @@ function Kopf({ erledigt, titel, children }: { erledigt?: boolean; titel: string
  *  - angemeldet, bestätigt: weiter zum Einrichten;
  *  - angemeldet, Konto vor dem Stichtag: nichts zu tun;
  *  - abgemeldet ohne Token: Weg zur Anmeldung (danach zurück hierher).
- * Der Stand kommt frisch aus der Datenbank (Cookie-Cache, ARCHITECTURE §5).
+ * Der Stand kommt frisch aus der Datenbank (ARCHITECTURE §5 „Sitzung frisch“:
+ * seit Nr. 114 gibt es keinen Cookie-Cache mehr).
  */
 export default async function VerifyPage({
   searchParams,

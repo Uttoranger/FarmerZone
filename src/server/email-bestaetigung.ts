@@ -17,9 +17,10 @@ import {
  * entscheidet src/lib/email-bestaetigung.ts; hier wird gelesen, gesperrt und
  * geschrieben.
  *
- * Der Stand kommt IMMER frisch aus der Datenbank, nie aus der Sitzung: Better
- * Auth hält den Nutzer bis zu fünf Minuten im Cookie-Cache (src/lib/auth.ts)
- * — nach dem Bestätigen stünde dort noch „unbestätigt" (ARCHITECTURE §5).
+ * Der Stand kommt IMMER frisch aus der Datenbank, nicht aus der Sitzung. Bis
+ * Nr. 114 hielt Better Auth den Nutzer bis zu fünf Minuten im Cookie-Cache —
+ * nach dem Bestätigen stand dort noch „unbestätigt". Seit Nr. 114 ist der
+ * Cache aus (ARCHITECTURE §5 „Sitzung frisch"); dieses Lesen bleibt vorerst.
  */
 
 export type BestaetigungsStand = {

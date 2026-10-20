@@ -51,6 +51,8 @@ Wer eine Frist auf die Sekunde prüfen will, tut das an der reinen Funktion in
 `src/lib/reservierung.ts` — dort ist `jetzt` ein Parameter. Für die Unit-Schicht
 bleibt Abschnitt 4 unverändert in Kraft.
 
+**Eine feste Uhr (`vi.setSystemTime`, `vi.useFakeTimers({ now })`) steht in `tests/integration/` nur auf einem Datums-Literal in der Vergangenheit** (`new Date('…')` vor dem 20.10.2026, auch über eine `const` derselben Datei) — es sei denn, die Datei berührt Better Auth gar nicht (kein Import von `@/lib/auth`, keine Zeilen in `session` oder `verification`, kein Helfer aus `setup/basis.ts`, der Better Auth ruft). Better Auth räumt beim Lesen nach der Uhr ab, die gerade läuft; bei einer Uhr in der Zukunft verschwänden Codes und Sitzungen anderer Nummern in der geteilten Test-Datenbank. Die Wache `tests/integration-uhr-wache.test.ts` prüft es mit Gegenprobe; ihr Bestand steht dort mit Grund und darf nur schrumpfen (Nr. 112, Morgenbericht 17, freigegeben 19.10.2026).
+
 **Rate-Limit in beiden Schichten aus, und zwar nicht aus Bequemlichkeit:**
 `enforceRateLimit` kehrt bei `NODE_ENV !== 'production'` sofort zurück, bevor ein
 Zähler angefasst wird (`src/lib/rate-limit.ts`). In Tests ist der Limiter damit
@@ -246,6 +248,7 @@ in einen ungültigen Schlüssel statt in echtes Geld.
 - Namen: `Hof Test`, `Max Mustermann`. E-Mails: `@example.com` oder `@example.org`.
 - Telefon: `+43 660 0000000` — mehrere Nummern unterscheiden sich in der Vorwahl (664, 676, 699), der Teilnehmerteil bleibt genullt (Wache `tests/telefonnummern-wache.test.ts`).
 - Keine echten Stripe-IDs, keine echten Tokens — auch keine abgelaufenen.
+- Erfundene Tokens und Codes in Tests aus Buchstaben, nicht aus langen Ziffernfolgen (sonst schlägt die Telefonnummern-Wache an) (Nr. 113, Morgenbericht 17, freigegeben 19.10.2026).
 - Faktoren für Testobjekte lokal in der Testdatei halten, keine geteilte Fixture-Datei ohne Not.
 - **Integrationsschicht: alles trägt das Präfix `int-`** — Hof-Slug, Produkt-ID,
   Sitzungs-ID, E-Mail-Adresse. Das Präfix ist die Sicherung, an der `raeumeAuf()`

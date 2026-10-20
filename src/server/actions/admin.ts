@@ -475,15 +475,6 @@ export async function setzeGruendungBisAction(
   return {}
 }
 
-/**
- * Triage einer Meldung im Fehlerbriefkasten (Sprint fehlerbriefkasten, Teil D).
- *
- * Der Schreibweg des Menschen für ALLE Triage-Felder, auch die Art. Daneben
- * gibt es nur die Schreibroute /api/triage/status, die genau vier Status
- * setzen kann und nie die Art (Sprint Briefkasten-Rückkopplung). Ein Duplikat-Verweis
- * muss auf eine bestehende, andere Meldung zeigen; sonst stünde ein toter Link
- * in der Triage. antwortAnMelder ist das einzige Triage-Feld, das der Hof sieht.
- */
 const KEINE_KETTE = 'Diese Meldung ist selbst ein Duplikat – nimm ihre Hauptmeldung.'
 
 /**
@@ -516,6 +507,15 @@ async function schreibeTriageMitVerweis(meldungId: string, triage: TriageEingabe
     WHERE ${Prisma.join(bedingungen, ' AND ')}`
 }
 
+/**
+ * Triage einer Meldung im Fehlerbriefkasten (Sprint fehlerbriefkasten, Teil D).
+ *
+ * Der Schreibweg des Menschen für ALLE Triage-Felder, auch die Art. Daneben
+ * gibt es nur die Schreibroute /api/triage/status, die genau vier Status
+ * setzen kann und nie die Art (Sprint Briefkasten-Rückkopplung). Ein Duplikat-Verweis
+ * muss auf eine bestehende, andere Meldung zeigen; sonst stünde ein toter Link
+ * in der Triage. antwortAnMelder ist das einzige Triage-Feld, das der Hof sieht.
+ */
 export async function triageMeldungAction(
   meldungId: string,
   eingabe: {

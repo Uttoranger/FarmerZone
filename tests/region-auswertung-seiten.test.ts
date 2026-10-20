@@ -98,7 +98,7 @@ describe('/analytics/umfeld leitet nach /region um', () => {
 describe('Routen und Navigation', () => {
   it('Region und Auswertung liegen unter (hof), (farmer)/analytics gibt es nicht mehr', () => {
     expect(gibt('src/app/(farmer)/analytics')).toBe(false)
-    for (const datei of ['analytics/page.tsx', 'analytics/loading.tsx', 'analytics/umfeld/page.tsx', 'region/page.tsx', 'region/loading.tsx']) {
+    for (const datei of ['analytics/page.tsx', 'analytics/umfeld/page.tsx', 'region/page.tsx', 'region/loading.tsx']) {
       expect(gibt(`src/app/(hof)/${datei}`), datei).toBe(true)
     }
   })

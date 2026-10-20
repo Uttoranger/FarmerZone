@@ -16,6 +16,7 @@ import { formatEuro } from '@/lib/format'
 import { REGION_HREF } from '@/lib/bauern-navigation'
 import { auswertungHref, leseAuswertungZeitraum } from '@/schemas/auswertung'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { LadeInhalt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { AUSWERTUNG_RAHMEN, AuswertungFehler } from '@/components/auswertung/auswertung-zustaende'
 import {
   EinsichtZeile,
@@ -126,10 +127,13 @@ export default async function AnalyticsPage({
 
   return (
     <div className={AUSWERTUNG_RAHMEN}>
-      <div className="flex flex-col gap-4 md:gap-[18px]">
-        {kopf}
-        {inhalt}
-      </div>
+      {/* Zeitraum und Pfeile sind Links in der Adresse: Die alte Auswertung bleibt stehen, bis die neue da ist (Ladepunkt statt Skelett, Nr. 121). */}
+      <LadeRahmen>
+        <div className="flex flex-col gap-4 md:gap-[18px]">
+          {kopf}
+          <LadeInhalt className="flex flex-col gap-4 md:gap-[18px]">{inhalt}</LadeInhalt>
+        </div>
+      </LadeRahmen>
     </div>
   )
 }

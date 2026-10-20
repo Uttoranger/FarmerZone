@@ -10,7 +10,8 @@
  * Beweist (Quelltext, TypeScript-Syntaxbaum — kein Regex auf Kommentare):
  *  - Jeder Ordner unter src/app, der eine `loading.tsx` UND eine Seite hat, die die Adresse liest
  *    (`searchParams` in der `page.tsx`, `useSearchParams()` in einer Datei daneben), steht in AUSNAHMEN — mit
- *    Art und Grund. Eine neue Seite dieser Art fällt hier mit ihrem Namen auf.
+ *    Art und Grund. Eine neue Seite dieser Art fällt hier mit ihrem Namen auf. Nr. 121 hat fünf Seiten vom Bestand
+ *    genommen (Hof › Postfach, Bestellungen, Auswertung, Admin › Einstellungen und Finanzen); drei bleiben mit Grund.
  *  - Jede Ausnahme gibt es noch: Ist die `loading.tsx` weg oder liest die Seite die Adresse nicht mehr, fällt
  *    die Zeile als veraltet auf und muss raus.
  *  - /hoefe liest seit N19 (Entdecken statisch) keine Adresse mehr und behält seine `loading.tsx` ohne Ausnahme.
@@ -22,7 +23,7 @@
  *    einer Mail, Kennung aus einem Link, Rückkehr von Stripe, Startwert) — kein Skelett pro Klick.
  *  - 'bestand': Die Seite filtert wirklich in der Adresse und zeigt bei jedem Klick das Skelett. Das ist ein
  *    Bestand aus der Zeit vor Nr. 105; er darf nur schrumpfen — Umbau nach dem Muster des Postfachs (Ladepunkt,
- *    `aria-busy`, alte Liste bleibt) steht für Lauf 18 im Bericht der Nr. 118.
+ *    `aria-busy`, alte Liste bleibt); Rest siehe die Gründe unten (Nr. 121, Lauf 19).
  */
 import { describe, it, expect, afterAll } from 'vitest'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -47,14 +48,9 @@ const AUSNAHMEN: Record<string, { art: Art; grund: string }> = {
   'src/app/(public)/problem-melden': { art: 'kein-filter', grund: 'Die Adresse trägt die Kennung des Fehlers aus einem Link.' },
   'src/app/account/neuigkeiten-bestaetigen': { art: 'kein-filter', grund: 'Die Adresse trägt den Token aus der Bestätigungs-Mail.' },
   'src/app/sicherheit/nicht-ich': { art: 'kein-filter', grund: 'Die Adresse trägt den Token aus der Mail „Neue Anmeldung“.' },
-  'src/app/(hof)/analytics': { art: 'bestand', grund: 'Der Zeitraum (?periode=) wechselt per Link; jeder Klick zeigt das Skelett.' },
-  'src/app/(hof)/farm-page': { art: 'bestand', grund: 'Der Reiter (?reiter=) wechselt per Link; jeder Klick zeigt das Skelett.' },
-  'src/app/(hof)/orders': { art: 'bestand', grund: 'Der Filter der Liste (?filter=) wechselt per Link; jeder Klick zeigt das Skelett.' },
-  'src/app/(hof)/orders/[orderId]': { art: 'bestand', grund: 'Die Liste neben der Bestellung filtert in der Adresse (?filter=); jeder Klick zeigt das Skelett.' },
-  'src/app/(hof)/postfach': { art: 'bestand', grund: 'Der Filter (?filter=) wechselt per Link; jeder Klick zeigt das Skelett.' },
-  'src/app/(hof)/region': { art: 'bestand', grund: 'Reiter, Umkreis und Filter (?reiter=, km, …) stehen in der Adresse; jeder Klick zeigt das Skelett.' },
-  'src/app/admin/einstellungen': { art: 'bestand', grund: 'Die Gruppe (?gruppe=) wechselt per Link; jeder Klick zeigt das Skelett.' },
-  'src/app/admin/finanzen': { art: 'bestand', grund: 'Monat, Reiter, Zeitraum und Jahr (?monat=, ?reiter=, …) stehen in der Adresse; jeder Klick zeigt das Skelett.' },
+  'src/app/(hof)/farm-page': { art: 'bestand', grund: 'Der Reiter (?reiter=) wechselt per Link; jeder Klick zeigt das Skelett. /status zeigt dieselbe Ladeansicht (tests/ladeansichten.test.ts) – Umbau erst mit eigener Komponente (Lauf 19).' },
+  'src/app/(hof)/orders/[orderId]': { art: 'bestand', grund: 'Die Liste neben der Bestellung filtert in der Adresse (?filter=); jeder Klick zeigt das Skelett. Die Zeilen der Liste öffnen diese Route, ihr Skelett ist dort die einzige Rückmeldung – erst mit Ladepunkt an der Zeile (Lauf 19).' },
+  'src/app/(hof)/region': { art: 'bestand', grund: 'Reiter, Umkreis und Filter (?reiter=, km, …) stehen in der Adresse; jeder Klick zeigt das Skelett. Mehrere Arten von Links und die Karte dahinter – Umbau in Lauf 19.' },
 }
 
 /** Liest dieser Quelltext die Adresse der Seite — `searchParams` (Seiten-Eigenschaft) oder `useSearchParams()`? */
@@ -112,8 +108,10 @@ describe('loading.tsx neben einer Seite mit Filtern in der Adresse (Regelvorschl
   })
 
   it('Gegenprobe: fehlt eine Ausnahme, meldet die Prüfung den Ordner mit seinem Namen', () => {
-    const ohne = Object.keys(AUSNAHMEN).filter((ordner) => ordner !== 'src/app/(hof)/postfach')
-    expect(ordnerMitLadebildUndAdresse(APP, WURZEL).filter((ordner) => !ohne.includes(ordner))).toEqual(['src/app/(hof)/postfach'])
+    // Irgendeine Ausnahme genügt als Beispiel – so bleibt die Gegenprobe gültig, wenn der Bestand ganz leer ist.
+    const beispiel = Object.keys(AUSNAHMEN)[0]
+    const ohne = Object.keys(AUSNAHMEN).filter((ordner) => ordner !== beispiel)
+    expect(ordnerMitLadebildUndAdresse(APP, WURZEL).filter((ordner) => !ohne.includes(ordner))).toEqual([beispiel])
   })
 
   it('jede Seite mit Ladebild und Adresse steht in AUSNAHMEN — eine neue fällt mit ihrem Namen auf', () => {

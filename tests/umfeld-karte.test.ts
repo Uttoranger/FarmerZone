@@ -61,7 +61,6 @@ const AUSWERTUNG = [
   'src/app/layout.tsx',
   'src/app/(hof)/layout.tsx',
   'src/app/(hof)/analytics/page.tsx',
-  'src/app/(hof)/analytics/loading.tsx',
   'src/app/(hof)/analytics/umfeld/page.tsx',
   'src/app/(hof)/region/page.tsx',
   'src/app/(hof)/region/loading.tsx',

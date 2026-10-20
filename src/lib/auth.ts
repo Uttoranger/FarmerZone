@@ -10,6 +10,7 @@ import { APP_URL, UMGEBUNG } from '@/lib/umgebung-server'
 import {
   ANMELDECODE_PLUGIN_OPTIONEN,
   GESPERRTE_AUTH_PFADE,
+  PASSWORT_LINK_SEKUNDEN,
   codeVersandErlaubt,
   istFehlversuch,
   rolleAusTreffern,
@@ -433,9 +434,9 @@ export const auth = betterAuth({
     // Better-Auth-Default, jetzt sichtbar konfiguriert — muss zur Zod-Regel
     // min(8) in src/schemas/register.ts und zur Checkliste (password-rules) passen
     minPasswordLength: 8,
-    // Better-Auth-Default (1 Stunde), jetzt sichtbar konfiguriert — muss zum
-    // Gültigkeitshinweis in der Reset-Mail (password-reset.tsx) passen
-    resetPasswordTokenExpiresIn: 3600,
+    // Dieselbe Zahl wie in der Reset-Mail, im Formular „Passwort vergessen“ und
+    // bei „Das war ich nicht“ (PASSWORT_LINK_STUNDEN in src/lib/anmeldecode.ts)
+    resetPasswordTokenExpiresIn: PASSWORT_LINK_SEKUNDEN,
     // Nach erfolgreichem Reset fliegen alle alten Sessions
     revokeSessionsOnPasswordReset: true,
     // Registrieren meldet nicht an (Register F6 „19b", Nachtlauf Nr. 27):

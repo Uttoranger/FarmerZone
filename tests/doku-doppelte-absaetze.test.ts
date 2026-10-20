@@ -31,15 +31,11 @@ const SCHWELLE = 0.7
 
 /**
  * Doppelte Absätze, die schon vor Nr. 118 in der Doku standen: Datei, Anfang des ersten Absatzes (40 Zeichen).
- * Die alte Fassung nennt noch „Entwurf“ für Produkte, die neue „Nicht im Shop“ (Wortliste N8) — beim Auflösen
- * die neue Fassung behalten und Sätze, die nur die alte trägt, hinüberziehen. Stand für Lauf 18.
+ * Leer seit Nr. 121 (Lauf 18): Die vier Paare in DESIGN_SYSTEM.md sind aufgelöst, die Fassung mit „Nicht im Shop“
+ * (Wortliste N8) blieb. Ein neues Paar ist ein Fehler, kein Eintrag — beim Auflösen die neue Fassung behalten und
+ * Sätze, die nur die alte trägt, hinüberziehen.
  */
-const BESTAND: ReadonlyArray<{ datei: string; anfang: string }> = [
-  { datei: 'DESIGN_SYSTEM.md', anfang: '- **Moment „wieder da"** (`WiederDaMoment`' },
-  { datei: 'DESIGN_SYSTEM.md', anfang: '- **Produktdialog** im Geltungsbereich: am' },
-  { datei: 'DESIGN_SYSTEM.md', anfang: '- **Freischaltungs-Moment** („Dein Hof ist' },
-  { datei: 'DESIGN_SYSTEM.md', anfang: '- **Status** als `StatusBadge` aus `produk' },
-]
+const BESTAND: ReadonlyArray<{ datei: string; anfang: string }> = []
 
 /** Das Paar steht in BESTAND, wenn Datei und die ersten 40 Zeichen des ersten Absatzes passen. */
 const imBestand = (b: { datei: string; anfang: string }, f: { datei: string; anfang: string }): boolean => b.datei === f.datei && b.anfang.slice(0, 40) === f.anfang

@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { triageMeldungAction } from '@/server/actions/admin'
-import { MELDUNG_STATUS, STATUS_INTERN, oeffentlicherStatus, type MeldungArt, type MeldungStatus } from '@/lib/meldung'
+import { ANTWORT_AN_MELDER_MAX, MELDUNG_STATUS, STATUS_INTERN, oeffentlicherStatus, type MeldungArt, type MeldungStatus } from '@/lib/meldung'
 import { cn } from '@/lib/utils'
 import { DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { FELD, FELD_LABEL, KNOPF_GRUEN, TEXT_GRUEN } from '@/components/hof-bestellungen/stil'
@@ -129,14 +129,14 @@ export function TriageForm({
           id="triage-antwort"
           value={form.antwortAnMelder}
           onChange={(e) => setze('antwortAnMelder', e.target.value)}
-          maxLength={500}
+          maxLength={ANTWORT_AN_MELDER_MAX}
           rows={3}
           aria-describedby="triage-antwort-zaehler"
           placeholder={hatHof ? 'Kurz und in Alltagssprache.' : 'Ohne Hof-Konto liest das niemand — nur für die Akte.'}
           className={cn(FELD, 'resize-y')}
         />
         <p id="triage-antwort-zaehler" className="mt-1 text-[12px] text-muted-foreground tabular-nums">
-          {form.antwortAnMelder.length}/500
+          {form.antwortAnMelder.length}/{ANTWORT_AN_MELDER_MAX}
         </p>
       </div>
 
