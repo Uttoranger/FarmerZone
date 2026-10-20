@@ -392,7 +392,7 @@ describe('CSP zum Beobachten (G8)', () => {
   let entwicklung: Regel[] = []
 
   beforeAll(async () => {
-    produktion = await regelnFuer({ NODE_ENV: 'production', VERCEL_ENV: 'production', NEXT_PUBLIC_SENTRY_DSN: 'https://schluesselAbc@o4501.ingest.de.sentry.io/4502' })
+    produktion = await regelnFuer({ NODE_ENV: 'production', VERCEL_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://example.com', NEXT_PUBLIC_SENTRY_DSN: 'https://schluesselAbc@o4501.ingest.de.sentry.io/4502' })
     vorschau = await regelnFuer({ NODE_ENV: 'production', VERCEL_ENV: 'preview' })
     entwicklung = await regelnFuer({ NODE_ENV: 'development' })
   }, 30_000)
@@ -411,7 +411,7 @@ describe('CSP zum Beobachten (G8)', () => {
       expect(h[CSP], pfad).toContain('report-uri /api/csp-bericht')
       expect(h[CSP], pfad).toContain('report-to csp')
       expect(h[CSP], pfad).toContain('https://o4501.ingest.de.sentry.io')
-      expect(h['Reporting-Endpoints'], pfad).toBe('csp="/api/csp-bericht"')
+      expect(h['Reporting-Endpoints'], pfad).toBe('csp="https://example.com/api/csp-bericht"')
       // Nie die scharfe Policy: Die einzige echte CSP bleibt frame-ancestors der Vorschau-Rahmen.
       expect(h['Content-Security-Policy'], pfad).toBeUndefined()
     }
@@ -442,6 +442,14 @@ describe('CSP zum Beobachten (G8)', () => {
         expect(headerFuer(pfad, { [harmlos]: 'abc' }, produktion)[CSP], `${pfad}?${harmlos}=`).toContain('report-uri')
       }
     }
+  })
+
+  it('ohne https-Adresse der App meldet die Produktion nur über report-uri — ohne report-to und Reporting-Endpoints', async () => {
+    const ohneAdresse = await regelnFuer({ NODE_ENV: 'production', VERCEL_ENV: 'production', NEXT_PUBLIC_APP_URL: 'http://localhost:3000' })
+    const h = headerFuer('/hoefe', {}, ohneAdresse)
+    expect(h[CSP]).toContain('report-uri /api/csp-bericht')
+    expect(h[CSP]).not.toContain('report-to')
+    expect(h['Reporting-Endpoints']).toBeUndefined()
   })
 
   it('auf Vorschauen nur in der Konsole: keine Meldung, kein Reporting-Endpoints, dazu die Vercel-Toolbar', () => {

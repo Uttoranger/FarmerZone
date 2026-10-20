@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CSP_ENTDOPPELN_MAX,
   baueCsp,
+  cspBerichtAdresse,
   cspBerichtArt,
   istNeueCspMeldung,
   leseCspMeldungen,
@@ -55,7 +56,7 @@ describe('baueCsp', () => {
   })
 
   it('mit melden kommen report-uri und report-to dazu — ohne nicht, sonst bleibt alles gleich', () => {
-    const mit = zerlege(baueCsp({ melden: true }))
+    const mit = zerlege(baueCsp({ melden: true, berichtAdresse: 'https://example.com/api/csp-bericht' }))
     const ohne = zerlege(baueCsp({ melden: false }))
     expect(mit.get('report-uri')).toEqual(['/api/csp-bericht'])
     expect(mit.get('report-to')).toEqual(['csp'])
@@ -64,6 +65,20 @@ describe('baueCsp', () => {
     mit.delete('report-uri')
     mit.delete('report-to')
     expect(mit).toEqual(ohne)
+  })
+
+  it('ohne absolute Berichtsadresse kein report-to — Chromium ließe sonst auch report-uri fallen', () => {
+    const p = zerlege(baueCsp({ melden: true }))
+    expect(p.get('report-uri')).toEqual(['/api/csp-bericht'])
+    expect(p.has('report-to')).toBe(false)
+  })
+
+  it('die Berichtsadresse ist absolut und nur https: aus NEXT_PUBLIC_APP_URL die Herkunft plus Pfad', () => {
+    expect(cspBerichtAdresse('https://example.com')).toBe('https://example.com/api/csp-bericht')
+    expect(cspBerichtAdresse('https://example.com/irgendwo?x=1')).toBe('https://example.com/api/csp-bericht')
+    expect(cspBerichtAdresse('http://localhost:3000')).toBeNull()
+    expect(cspBerichtAdresse('kein Link')).toBeNull()
+    expect(cspBerichtAdresse(undefined)).toBeNull()
   })
 
   it('der Sentry-Host kommt nur aus der DSN — nur der Host, ohne DSN keiner', () => {

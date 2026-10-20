@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { KARTEN_KACHELN } from '@/lib/hoefe-anzeige'
 
 /*
  * Content-Security-Policy ZUM BEOBACHTEN (Register G8, Nr. 125) — rein, ohne
@@ -17,7 +16,8 @@ import { KARTEN_KACHELN } from '@/lib/hoefe-anzeige'
  *    Stripe.js und seine Elemente laden von dort. Die Stripe-Doku „Content
  *    Security Policy" war beim Bau nicht erreichbar; weitere Stripe-Hosts
  *    kommen erst, wenn die Meldungen sie zeigen.
- *  - die Kartenkacheln — KARTEN_KACHELN.url (src/lib/hoefe-anzeige.ts).
+ *  - die Kartenkacheln — die Herkunft von KARTEN_KACHELN.url
+ *    (src/lib/hoefe-anzeige.ts); tests/csp.test.ts hält beide gleich.
  *  - https://*.public.blob.vercel-storage.com — Fotos aus dem Bildspeicher
  *    (images.remotePatterns in next.config.ts, constructBlobUrl in @vercel/blob).
  *  - https://vercel.com — der Upload aus dem Browser (`upload()` aus
@@ -36,8 +36,12 @@ const STRIPE_JS = 'https://js.stripe.com'
 const BLOB_BILDER = 'https://*.public.blob.vercel-storage.com'
 const BLOB_UPLOAD = 'https://vercel.com'
 const VERCEL_TOOLBAR = 'https://vercel.live'
-/** Herkunft der Kartenkacheln — aus der einen Kartenadresse, die Platzhalter {z}/{x}/{y} sind dafür egal. */
-const KARTEN_HOST = new URL(KARTEN_KACHELN.url.replace(/\{[a-z]\}/g, '0')).origin
+/**
+ * Herkunft der Kartenkacheln. Steht hier als Wert und nicht als Import von
+ * KARTEN_KACHELN: next.config.ts lädt diese Datei beim Build, und dort lösen
+ * @/-Importe in weiteren Dateien nicht auf. Der Test vergleicht beide.
+ */
+const KARTEN_HOST = 'https://tile.openstreetmap.org'
 
 /** Nur der Host aus der DSN (https), nie Schlüssel oder Projekt; ohne gültige DSN null. */
 export function sentryHost(dsn: string | undefined): string | null {
@@ -50,9 +54,32 @@ export function sentryHost(dsn: string | undefined): string | null {
   }
 }
 
+/**
+ * Die Adresse für `Reporting-Endpoints` — absolut, aus NEXT_PUBLIC_APP_URL
+ * (nur https, nur die Herkunft). Relativ wäre sie laut W3C Reporting API
+ * erlaubt; belegen ließ sich das beim Bau nicht (Doku offline, der lokale
+ * Chromium stellt Meldungen der Reporting API gar nicht zu), darum der
+ * sichere Weg. Ohne gültige Adresse null: dann kein report-to.
+ */
+export function cspBerichtAdresse(appUrl: string | undefined): string | null {
+  if (!appUrl) return null
+  try {
+    const adresse = new URL(appUrl)
+    return adresse.protocol === 'https:' ? `${adresse.origin}${CSP_BERICHT_PFAD}` : null
+  } catch {
+    return null
+  }
+}
+
 export type CspOptionen = {
   /** Meldungen an /api/csp-bericht — nur in der Produktion (VERCEL_ENV=production). */
   melden: boolean
+  /**
+   * Absolute Adresse für report-to (cspBerichtAdresse). Fehlt sie, meldet die
+   * Policy nur über report-uri: Chromium nimmt report-uri nicht mehr, sobald
+   * report-to dasteht — auch wenn die Gruppe fehlt (lokal gemessen).
+   */
+  berichtAdresse?: string | null
   /** Vercel-Toolbar — nur auf Vorschauen (VERCEL_ENV=preview). */
   toolbar?: boolean
   /** NEXT_PUBLIC_SENTRY_DSN beim Build. */
@@ -60,7 +87,7 @@ export type CspOptionen = {
 }
 
 /** Der Wert für `Content-Security-Policy-Report-Only`. */
-export function baueCsp({ melden, toolbar: mitToolbar = false, sentryDsn }: CspOptionen): string {
+export function baueCsp({ melden, berichtAdresse = null, toolbar: mitToolbar = false, sentryDsn }: CspOptionen): string {
   const toolbar = mitToolbar ? [VERCEL_TOOLBAR] : []
   const sentry = sentryHost(sentryDsn)
   const anweisungen: [string, string[]][] = [
@@ -76,7 +103,8 @@ export function baueCsp({ melden, toolbar: mitToolbar = false, sentryDsn }: CspO
     ['base-uri', ["'self'"]],
     ['form-action', ["'self'"]],
   ]
-  if (melden) anweisungen.push(['report-uri', [CSP_BERICHT_PFAD]], ['report-to', [CSP_BERICHT_GRUPPE]])
+  if (melden) anweisungen.push(['report-uri', [CSP_BERICHT_PFAD]])
+  if (melden && berichtAdresse) anweisungen.push(['report-to', [CSP_BERICHT_GRUPPE]])
   return anweisungen.map(([name, quellen]) => `${name} ${quellen.join(' ')}`).join('; ')
 }
 

@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
-import { CSP_BERICHT_GRUPPE, CSP_BERICHT_PFAD, CSP_HEADER, NIE_MELDEN_PARAMETER, NIE_MELDEN_PFADE, baueCsp } from "./src/lib/csp";
+import { CSP_BERICHT_GRUPPE, CSP_HEADER, NIE_MELDEN_PARAMETER, NIE_MELDEN_PFADE, baueCsp, cspBerichtAdresse } from "./src/lib/csp";
 
 // Jede eigene Route auf oberster Ebene unter src/app — damit die Regel für
 // die Vorschau unten wirklich nur eine HOFSEITE (/<slug>) trifft und nie
@@ -36,6 +36,7 @@ type Regel = Awaited<ReturnType<NonNullable<NextConfig['headers']>>>[number];
 function cspRegeln(bisherige: Regel[]): Regel[] {
   if (process.env.NODE_ENV !== 'production') return [];
   const melden = process.env.VERCEL_ENV === 'production';
+  const berichtAdresse = melden ? cspBerichtAdresse(process.env.NEXT_PUBLIC_APP_URL) : null;
   const optionen = { toolbar: process.env.VERCEL_ENV === 'preview', sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN };
   const ohneMelden = [{ key: CSP_HEADER, value: baueCsp({ ...optionen, melden: false }) }];
   const ohneReferrer = bisherige
@@ -45,10 +46,9 @@ function cspRegeln(bisherige: Regel[]): Regel[] {
     {
       source: '/(.*)',
       headers: [
-        { key: CSP_HEADER, value: baueCsp({ ...optionen, melden }) },
-        // Relative Adresse: Die Reporting API löst sie gegen die Adresse der
-        // Antwort auf (W3C Reporting API, „process reporting endpoints").
-        ...(melden ? [{ key: 'Reporting-Endpoints', value: `${CSP_BERICHT_GRUPPE}="${CSP_BERICHT_PFAD}"` }] : []),
+        { key: CSP_HEADER, value: baueCsp({ ...optionen, melden, berichtAdresse }) },
+        // Absolute Adresse aus NEXT_PUBLIC_APP_URL (Begründung bei cspBerichtAdresse).
+        ...(berichtAdresse ? [{ key: 'Reporting-Endpoints', value: `${CSP_BERICHT_GRUPPE}="${berichtAdresse}"` }] : []),
       ],
     },
     ...[...ohneReferrer, ...NIE_MELDEN_PFADE].map((source) => ({ source, headers: ohneMelden })),
