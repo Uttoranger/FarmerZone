@@ -149,12 +149,12 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 120 | Entdecken v2 auf /hoefe (N22) | gemergt (mit #323) | `nacht/2026-10-20/120-entdecken-v2` | #320 | 119 | voller und zweiter Durchgang ohne Blocker; 2 Nachrunden des Dirigenten (Fuß der Startseite, Gegenprobe der Karten-Wache); /hoefe statisch 5 m, Cache HIT bei `?abholung=heute` gemessen | 20.10.2026 |
 | 121 | Regelvorschläge aus Lauf 17, Vorschau ohne WIP, Reste und Nacharbeit (G4, G7) | gemergt (mit #323) | `nacht/2026-10-20/121-reste` | #322 | `integration/lauf18` (Zwischenstand) | 1 Durchgang ohne Blocker, Sollte als Annahme (Dirigent); Ladepunkt 5 von 8 Seiten, Rest an Lauf 19 | 20.10.2026 |
 | Sammel 18 | Sammel-PR Lauf 18 | gemergt (#323) | `integration/lauf18` | #323 | main | Doku-PR, 119, 115, 120 per --no-ff (Konflikte nur DEVELOPMENT.md, beide Seiten), Nachtrag frische Bestätigung in den Testhof-Actions (115 × 119), 115 Runde 3, 121; Regel 3 mit 32 Migrationen, Integration ganz 64/575 | 20.10.2026 |
-| 122 | Region · gemeinsame Bausteine und die Seite in zwei Teilen (N23) | offen | `nacht/2026-10-20/122-region-bausteine` | – | `docs/lauf19` | – | 20.10.2026 |
+| 122 | Region · gemeinsame Bausteine und die Seite in zwei Teilen (N23) | läuft (Welle 1) | `nacht/2026-10-20/122-region-bausteine` | – | `docs/lauf19` | – | 20.10.2026 |
 | 123 | Region · Futter kaufen (N23, E9; Migration) | offen | `nacht/2026-10-20/123-futter-kaufen` | – | 122 | – | 20.10.2026 |
 | 124 | Region · Preise vergleichen (N23; eigener PR) | offen | `nacht/2026-10-20/124-preise-vergleichen` | – | 122 | – | 20.10.2026 |
-| 125 | Sicherheit: Login-Bremse über alle Instanzen, CSP zum Beobachten, Sentry-Filter, Actions-Wache (R1, G8) | offen | `nacht/2026-10-20/125-sicherheit` | – | `docs/lauf19` | – | 20.10.2026 |
+| 125 | Sicherheit: Login-Bremse über alle Instanzen, CSP zum Beobachten, Sentry-Filter, Actions-Wache (R1, G8) | läuft (Welle 1) | `nacht/2026-10-20/125-sicherheit` | – | `docs/lauf19` | – | 20.10.2026 |
 | 126 | Admin-Nacharbeit aus 115 (N20) | offen | `nacht/2026-10-20/126-admin-nacharbeit` | – | `docs/lauf19` | – | 20.10.2026 |
 | 127 | Regelvorschläge aus Lauf 18, CI für gestapelte PRs, ein Fuß am Computer, Reste (G3, G4, N22) | offen | `nacht/2026-10-20/127-reste` | – | `integration/lauf19` (Zwischenstand) | – | 20.10.2026 |
-| 128 | Beiträge v2 · „Aktuell vom Hof“ auf der Hofseite (F8, N5, T5) | offen | `nacht/2026-10-20/128-aktuell-vom-hof` | – | `docs/lauf19` | – | 20.10.2026 |
+| 128 | Beiträge v2 · „Aktuell vom Hof“ auf der Hofseite (F8, N5, T5) | läuft (Welle 1) | `nacht/2026-10-20/128-aktuell-vom-hof` | – | `docs/lauf19` | – | 20.10.2026 |
 | 129 | Beiträge v2 · Marke, „Neu bei den Höfen“, „Dein Beitrag“ (N22, N16, E12; Migration) | offen | `nacht/2026-10-20/129-beitraege-v2` | – | `integration/lauf19` (Zwischenstand mit 122 und 128) | – | 20.10.2026 |
 | Sammel 19 | Sammel-PR Lauf 19 (ohne 124) | offen | `integration/lauf19` | – | main | – | 20.10.2026 |
