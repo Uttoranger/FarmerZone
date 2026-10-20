@@ -110,6 +110,20 @@ describe('Werbliche Mail (Beitrag per Mail)', () => {
   })
 })
 
+describe('Werbliche Mail: der Knopf führt zum Beitrag (Register T5, Ergänzung Nr. 128)', () => {
+  it('mit Kennung zur Übersicht mit genau diesem Beitrag oben (?beitrag=<id>)', async () => {
+    await email.sendStatusUpdateEmail({ ...BEITRAG, beitragId: 'cbeitragaaaa' })
+    expect(gesendet().html).toContain(`href="${appUrl}/hof-test?beitrag=cbeitragaaaa"`)
+  })
+
+  it('Gegenprobe: ohne Kennung (Beitrag nicht auf der Hofseite) zur Hofseite selbst', async () => {
+    await email.sendStatusUpdateEmail(BEITRAG)
+    const html = gesendet().html
+    expect(html).toContain(`href="${appUrl}/hof-test"`)
+    expect(html).not.toContain('beitrag=')
+  })
+})
+
 describe('Transaktionsmails tragen keine Abmelde-Kopfzeilen', () => {
   it('Bestätigung der Anmeldung, Anmeldecode und Code für „Bestellungen finden"', async () => {
     const versand = [

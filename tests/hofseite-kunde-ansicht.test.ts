@@ -17,8 +17,9 @@
  *  - Zustände knapp und ausverkauft aus dem Bestand; kein „Merken".
  *  - E5: „Bar bei Abholung", nie „Karte bei Abholung"; E4: der Hinweis nennt
  *    den Satz des Hofs, gebührenfrei steht keiner da.
- *  - Reiter „Beiträge · n" nur mit Beitrag; er zeigt alle aktiven Beiträge, der neueste
- *    zuerst mit „Aktuell", die weiteren nur mit „vor …" (Register F8).
+ *  - Kein Reiter „Beiträge" mehr (Register F8, Nr. 128): Die aktiven Beiträge
+ *    stehen als „Aktuell vom Hof" oben in der Übersicht, höchstens fünf, der
+ *    neueste zuerst mit „Aktuell"; ?beitrag= und alte Links ?reiter=beitraege.
  *  - Schaufenster zuerst (Register N5, Nr. 51): In der Übersicht steht der
  *    Quelltext in der Reihenfolge, die man unter lg sieht — Fotos, bis zu
  *    vier Produkte, „Alle Produkte (n)", rechte Spalte, Über uns —, also
@@ -256,62 +257,162 @@ describe('Zahlung und Gebühr', () => {
   })
 })
 
-describe('Reiter „Beiträge"', () => {
-  it('nur mit Beitrag; dort steht er', () => {
-    expect(seite()).toContain('>Beiträge · 1<')
-    expect(seite({ suche: 'reiter=beitraege' })).toContain('Neue Ernte')
-    expect(seite({ beitraege: [] })).not.toMatch(/>Beiträge/)
+describe('Kein Reiter „Beiträge" mehr (Register F8, Nr. 128)', () => {
+  it('die Reiter heißen Übersicht · Produkte — auch mit Beiträgen', () => {
+    const html = seite()
+    expect(html).toMatch(/data-reiter="uebersicht"/)
+    expect(html).toMatch(/data-reiter="produkte"/)
+    expect(html).not.toMatch(/data-reiter="beitraege"|>Beiträge · /)
+    // Gegenprobe: Der Beitrag steht trotzdem da — in der Übersicht.
+    expect(html).toContain('Neue Ernte')
+  })
+
+  it('ein alter Link ?reiter=beitraege landet in der Übersicht bei „Aktuell vom Hof"', () => {
+    const html = seite({ suche: 'reiter=beitraege' })
+    expect(html).toMatch(/<a[^>]*data-reiter="uebersicht"[^>]*aria-current="page"|<a[^>]*aria-current="page"[^>]*data-reiter="uebersicht"/)
+    expect(html).toContain('id="aktuell"')
+    expect(html).toContain('Neue Ernte')
+  })
+
+  it('der Sprung zu „Aktuell vom Hof" hängt an EINER Regel, mit reduzierter Bewegung ohne Animation', () => {
+    // Verdrahtungswache über den Quelltext: Ohne jsdom (G6, kein neues Paket) läuft der
+    // Effekt hier nicht; die Regeln selbst prüft tests/aktuell-vom-hof-regeln.test.ts.
+    const text = quelle('src/components/hofseite/hofseite-kunde.tsx')
+    expect(text).toMatch(/springeZuAktuell\(suche\.get\(REITER_PARAMETER\), mitAktuell\)/)
+    expect(text).toMatch(/prefers-reduced-motion: reduce/)
+    expect(text).toMatch(/scrollVerhalten\(reduziert\)/)
   })
 })
 
-describe('Reiter „Beiträge" — alle aktiven Beiträge (Register F8)', () => {
-  const beitrag = (id: string, title: string, anlass: ActiveStatusPost['anlass'], publishedAt: string): ActiveStatusPost => ({
-    ...STATUS, id, title, anlass, publishedAt,
+describe('„Aktuell vom Hof" in der Übersicht (Register F8, N5)', () => {
+  const beitrag = (id: string, title: string, anlass: ActiveStatusPost['anlass'], publishedAt: string, mehr: Partial<ActiveStatusPost> = {}): ActiveStatusPost => ({
+    ...STATUS, id, title, anlass, publishedAt, ...mehr,
   })
   // JETZT ist der 2. Oktober, 8 Uhr: vor 2 Stunden, vor 3 Tagen, vor 12 Tagen.
-  const NEU = beitrag('status_neu', 'Frische Wels-Filets ab Freitag', 'FRESH_PRODUCT', '2026-10-02T06:00:00.000Z')
-  const MITTE = beitrag('status_mitte', 'Zehn Ballen Heu zum Preis von neun', 'PROMOTION', '2026-09-29T08:00:00.000Z')
-  const ALT = beitrag('status_alt', 'Neue Saison im Hofladen', 'NEW_SEASON', '2026-09-20T08:00:00.000Z')
+  const NEU = beitrag('statusneu', 'Frische Wels-Filets ab Freitag', 'FRESH_PRODUCT', '2026-10-02T06:00:00.000Z', {
+    linkedProductIds: ['p_honig', 'p_karotten', 'p_weg'],
+  })
+  const MITTE = beitrag('statusmitte', 'Zehn Ballen Heu zum Preis von neun', 'PROMOTION', '2026-09-29T08:00:00.000Z')
+  const ALT = beitrag('statusalt', 'Neue Saison im Hofladen', 'NEW_SEASON', '2026-09-20T08:00:00.000Z')
   const LISTE = [NEU, MITTE, ALT]
-  const offen = (beitraege: ActiveStatusPost[], farm: PublicFarm = HOF) => seite({ suche: 'reiter=beitraege', beitraege, farm })
+  const FOTOS = [1, 2].map((i) => ({ id: `foto_${i}`, url: `/landing/row-${i}.jpg`, caption: null, sortOrder: i, ausschnitt: null }))
 
-  it('der Reiter nennt, wie viele Beiträge die Seite zeigt', () => {
-    expect(seite({ beitraege: LISTE })).toContain('>Beiträge · 3<')
-    expect(seite({ beitraege: [NEU] })).toContain('>Beiträge · 1<')
+  it('ohne aktiven Beitrag entfällt der Abschnitt ganz', () => {
+    const html = seite({ beitraege: [] })
+    expect(html).not.toContain('id="aktuell"')
+    expect(html).not.toContain('Aktuell vom Hof')
+    // Gegenprobe
+    expect(seite({ beitraege: LISTE })).toContain('Aktuell vom Hof')
   })
 
-  it('alle stehen da, in der Reihenfolge der Liste — der neueste zuerst', () => {
-    const html = offen(LISTE)
-    expect(reihenfolge(html, [ALT.title, MITTE.title, NEU.title])).toEqual([NEU.title, MITTE.title, ALT.title])
-    // Jede Karte trägt ihren eigenen Anlass, nicht den der ersten.
-    expect(html).toContain('Frisches Produkt')
-    expect(html).toContain('Neue Saison</span>')
+  it('nur in der Übersicht — nicht im Reiter Produkte', () => {
+    expect(seite({ beitraege: LISTE, suche: 'reiter=produkte' })).not.toContain('id="aktuell"')
   })
 
-  it('„Aktuell" steht genau einmal, am neuesten; die weiteren tragen nur „vor …"', () => {
-    const html = offen(LISTE)
+  it('Kopf: Abschnitt mit Überschrift „Aktuell vom Hof" und der Zahl', () => {
+    const html = seite({ beitraege: LISTE })
+    expect(html).toMatch(/<section[^>]*id="aktuell"[^>]*aria-labelledby="aktuell-titel"/)
+    expect(html).toMatch(/<h2[^>]*id="aktuell-titel"[^>]*>Aktuell vom Hof<\/h2>/)
+    expect(html).toContain('>3 Beiträge<')
+  })
+
+  it('unter lg steht er im Quelltext nach den Knöpfen und dem Reiter, vor Fotos und Produkten (N5)', () => {
+    const html = seite({ beitraege: LISTE, farm: { ...HOF, farmPhotos: FOTOS } })
+    const stellen = [
+      html.indexOf('aria-label="Bereiche der Hofseite"'),
+      html.indexOf('id="aktuell"'),
+      html.indexOf('id="fotos"'),
+      html.indexOf('aria-label="Buchenscheite in den Korb legen"'),
+      html.indexOf('<aside'),
+      html.indexOf('id="ueber-uns"'),
+    ]
+    expect(stellen.every((stelle) => stelle > -1), String(stellen)).toBe(true)
+    expect([...stellen].sort((a, b) => a - b)).toEqual(stellen)
+  })
+
+  it('höchstens fünf, der neueste zuerst — „Aktuell" steht genau einmal, am neuesten (F8)', () => {
+    const sechs = [NEU, MITTE, ALT, ...[4, 5, 6].map((n) => beitrag(`status${n}`, `Beitrag ${n}`, 'ANNOUNCEMENT', `2026-09-1${n}T08:00:00.000Z`))]
+    const html = seite({ beitraege: sechs })
+    expect(html).toContain('>5 Beiträge<')
+    expect(html).not.toContain('Beitrag 6')
     expect(html.match(/Aktuell ·/g)).toHaveLength(1)
-    // Die Zeit steht über dem Titel ihrer Karte, Karte für Karte.
-    const folge = ['Aktuell · vor 2 Stunden', NEU.title, 'vor 3 Tagen', MITTE.title, 'vor 12 Tagen', ALT.title]
+    const folge = ['Aktuell · vor 2 Stunden', NEU.title, MITTE.title, 'vor 3 Tagen', ALT.title, 'vor 12 Tagen']
     expect(reihenfolge(html, [...folge].reverse())).toEqual(folge)
   })
 
-  it('ein einzelner Beitrag ist der neueste: „Aktuell" steht da, wie vorher', () => {
-    expect(offen([MITTE])).toContain('Aktuell · vor 3 Tagen')
-  })
-
-  it('jede Karte benennt sich mit ihrer eigenen Überschrift — keine Kennung kommt zweimal vor', () => {
-    const html = offen(LISTE)
-    const kennungen = [...html.matchAll(/aria-labelledby="(beitrag-titel-[^"]+)"/g)].map((treffer) => treffer[1])
+  it('je Beitrag ein article mit eigener Überschrift — keine Kennung doppelt', () => {
+    const html = seite({ beitraege: LISTE })
+    const kennungen = [...html.matchAll(/<article aria-labelledby="(beitrag-titel-[^"]+)"/g)].map((treffer) => treffer[1])
     expect(kennungen).toHaveLength(3)
     expect(new Set(kennungen).size).toBe(3)
-    for (const kennung of kennungen) expect(html).toContain(`id="${kennung}"`)
+    for (const kennung of kennungen) expect(html.match(new RegExp(`id="${kennung}"`, 'g'))).toHaveLength(1)
   })
 
-  it('hat der Hof den Abschnitt Status ausgeblendet, gibt es weder Reiter noch Beiträge', () => {
+  it('„Dazu im Hofladen": kaufbare zuerst, ausverkaufte gedimmt mit „derzeit aus", Fremdes und Gelöschtes fällt weg', () => {
+    const html = seite({ beitraege: LISTE })
+    const teil = html.slice(html.indexOf('Dazu im Hofladen'), html.indexOf('</article>', html.indexOf('Dazu im Hofladen')))
+    expect(reihenfolge(teil, ['Blütenhonig', 'Karotten'])).toEqual(['Karotten', 'Blütenhonig'])
+    expect(teil).toContain('aria-label="Karotten in den Korb"')
+    expect(teil).not.toContain('aria-label="Blütenhonig in den Korb"')
+    expect(teil).toContain('derzeit aus')
+    expect(teil).toContain('href="/hof-test/produkt/p_karotten"')
+  })
+
+  it('nicht im Shop fällt weg — dieselbe Regel wie die Produktliste', () => {
+    const farm: PublicFarm = { ...HOF, products: HOF.products.map((p) => (p.id === 'p_karotten' ? { ...p, isAvailable: false } : p)) }
+    const html = seite({ beitraege: LISTE, farm })
+    const teil = html.slice(html.indexOf('id="aktuell"'), html.indexOf('</section>', html.indexOf('id="aktuell"')))
+    // Der Text der Beiträge nennt Karotten — gesucht wird der Link der Produktzeile.
+    expect(teil).not.toContain('href="/hof-test/produkt/p_karotten"')
+    expect(teil).toContain('href="/hof-test/produkt/p_honig"')
+  })
+
+  it('kein „+" in der Vorschau des Hofs und bei Pause — wie bei allen Kaufwegen; der Abschnitt bleibt', () => {
+    const vorschau = seite({ beitraege: LISTE, ansicht: { art: 'vorschau', kaufen: false } })
+    const pausiert = seite({ beitraege: LISTE, farm: { ...HOF, isPaused: true } })
+    for (const html of [vorschau, pausiert]) {
+      expect(html).toContain('Dazu im Hofladen')
+      expect(html).not.toContain('aria-label="Karotten in den Korb"')
+    }
+    // Pausiert ist nichts „derzeit aus", was Vorrat hat.
+    expect(pausiert.match(/derzeit aus/g)).toHaveLength(1)
+  })
+
+  it('?beitrag= eines älteren Beitrags: er steht oben, „Aktuell" nur am neuesten, darunter „Neuester: …"', () => {
+    const html = seite({ beitraege: LISTE, suche: 'beitrag=statusmitte' })
+    expect(reihenfolge(html, [NEU.title, MITTE.title])).toEqual([MITTE.title, NEU.title])
+    expect(html).toContain('Neuester:</span> Frische Wels-Filets ab Freitag')
+    expect(html).not.toContain('Dieser Beitrag ist nicht mehr aktuell.')
+    // Die Karte trägt die normale Zeit (Abweichung 1: kein „Geteilt").
+    expect(html).not.toMatch(/Aktuell ·|Geteilt/)
+    expect(html).toContain('>3 Beiträge<')
+  })
+
+  it('?beitrag= abgelaufen, gelöscht, fremd oder unbekannt: die normale Übersicht mit dem Satz darüber', () => {
+    const html = seite({ beitraege: LISTE, suche: 'beitrag=gibtesnicht' })
+    expect(html).toContain('Dieser Beitrag ist nicht mehr aktuell.')
+    expect(html.indexOf('Dieser Beitrag ist nicht mehr aktuell.')).toBeLessThan(html.indexOf('id="aktuell"'))
+    expect(html).toContain('Aktuell · vor 2 Stunden')
+    expect(html).not.toContain('Neuester:')
+    // Auch ohne aktiven Beitrag steht der Satz — ohne Abschnitt.
+    const leer = seite({ beitraege: [], suche: 'beitrag=gibtesnicht' })
+    expect(leer).toContain('Dieser Beitrag ist nicht mehr aktuell.')
+    expect(leer).not.toContain('id="aktuell"')
+  })
+
+  it('?beitrag= mit unzulässigen Zeichen wird verworfen — kein Satz, die normale Übersicht', () => {
+    for (const wert of ['STATUSMITTE', 'status-mitte', 'a'.repeat(41)]) {
+      const html = seite({ beitraege: LISTE, suche: `beitrag=${wert}` })
+      expect(html, wert).not.toContain('Dieser Beitrag ist nicht mehr aktuell.')
+      expect(html, wert).toContain('Aktuell · vor 2 Stunden')
+    }
+  })
+
+  it('hat der Hof den Abschnitt Status ausgeblendet, gibt es keinen Abschnitt und keinen Beitrag', () => {
     const ohneStatus: PublicFarm = { ...HOF, sectionsConfig: [{ key: 'status', visible: false, order: 1 }] }
-    expect(seite({ beitraege: LISTE, farm: ohneStatus })).not.toMatch(/>Beiträge/)
-    expect(offen(LISTE, ohneStatus)).not.toContain(NEU.title)
+    const html = seite({ beitraege: LISTE, farm: ohneStatus })
+    expect(html).not.toContain('id="aktuell"')
+    expect(html).not.toContain(NEU.title)
   })
 })
 
@@ -558,11 +659,9 @@ describe('Schaufenster zuerst (Register N5, Nr. 51)', () => {
     expect(html.indexOf('id="ueber-uns"')).toBeLessThan(html.indexOf('id="fotos"'))
   })
 
-  it('in den Reitern Produkte und Beiträge bleibt die Reihenfolge, wie sie war', () => {
-    for (const suche of ['reiter=produkte', 'reiter=beitraege']) {
-      const html = seite({ suche })
-      expect(html.indexOf('<aside'), suche).toBeLessThan(html.indexOf('id="produkte"'))
-    }
+  it('im Reiter Produkte bleibt die Reihenfolge, wie sie war', () => {
+    const html = seite({ suche: 'reiter=produkte' })
+    expect(html.indexOf('<aside')).toBeLessThan(html.indexOf('id="produkte"'))
   })
 
   it('nach „Alle ansehen" und „Alle Produkte (n)" geht der Fokus auf den Reiter Produkte, ohne Scrollen — der Link verschwindet mit dem Wechsel', () => {

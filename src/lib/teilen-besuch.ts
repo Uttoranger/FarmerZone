@@ -15,7 +15,7 @@ import { teilenKanalCodeSchema } from '@/schemas/teilen'
 export type BesuchAusAdresse = {
   /** Das gültige Kürzel — nur dann wird ein Besuch gemeldet. */
   kanal: TeilenKanalCode | null
-  /** Die Adresse ohne `?k=…` (Rest, Reiter, Anker bleiben), oder null, wenn es nichts zu entfernen gibt. */
+  /** Die Adresse ohne `?k=…` (Rest, Reiter, `beitrag`, Anker bleiben), oder null, wenn es nichts zu entfernen gibt. */
   ohne: string | null
 }
 

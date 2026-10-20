@@ -9,7 +9,7 @@
  * Kundenansicht in bereiche-anzeige.ts, Abholzeiten in pickup-days.ts, der
  * Gebührensatz in servicegebuehr.ts.
  */
-import { formatEuro, formatZahl } from '@/lib/format'
+import { formatEuro, formatZahl, mitAnzahl } from '@/lib/format'
 import { zeigeKaufknopf } from '@/lib/bereiche-anzeige'
 import { calcLineTotal, decimalZuCents } from '@/lib/order-totals'
 import { BAR_OHNE_GEBUEHR_HINWEIS } from '@/lib/konditionen'
@@ -24,31 +24,37 @@ import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { WARENKORB_ANKER } from '@/lib/warenkorb-speicher'
 import { bereichAusParameter } from '@/schemas/hoefe-filter'
-import { REITER_PARAMETER, reiterSchema, type HofReiterId } from '@/schemas/hofseite-reiter'
+import {
+  ALTER_REITER_BEITRAEGE,
+  BEITRAG_PARAMETER,
+  REITER_PARAMETER,
+  reiterSchema,
+  type HofReiterAngebot,
+  type HofReiterId,
+} from '@/schemas/hofseite-reiter'
 
-export type { HofReiterId }
+export type { HofReiterAngebot, HofReiterId }
 
 // ─── Reiter ─────────────────────────────────────────────────────────────────
 
-export type HofReiter = { id: HofReiterId; label: string }
+export type HofReiter = { id: HofReiterAngebot; label: string }
 
 /**
  * So viele Beiträge zeigt die Hofseite höchstens (Register F8) — die neuesten.
- * Ältere sind kein Angebot mehr; der Reiter bliebe sonst eine Chronik.
+ * Ältere sind kein Angebot mehr; „Aktuell vom Hof“ bliebe sonst eine Chronik.
  */
 export const HOFSEITE_BEITRAEGE_MAX = 5
 
 /**
- * Übersicht · Produkte · Beiträge. „Beiträge · n“ nur, wenn die Hofseite gerade
- * Beiträge zeigt (alle aktiven, Register F8) — ein Reiter ins Leere wäre kein
- * Angebot. Beide Zahlen stehen im Reiter wie im Mockup und sind die Zahl dessen,
- * was der Reiter dann zeigt.
+ * Übersicht · Produkte (seit Nr. 128, Register F8): Die Beiträge stehen als
+ * „Aktuell vom Hof“ oben in der Übersicht, einen Reiter „Beiträge“ gibt es
+ * nicht mehr — die Leiste springt nicht mehr, je nachdem, ob ein Beitrag läuft.
+ * Die Zahl im Reiter ist die Zahl dessen, was der Reiter dann zeigt.
  */
-export function hofseiteReiter({ produktAnzahl, beitragAnzahl }: { produktAnzahl: number; beitragAnzahl: number }): HofReiter[] {
+export function hofseiteReiter({ produktAnzahl }: { produktAnzahl: number }): HofReiter[] {
   return [
     { id: 'uebersicht', label: 'Übersicht' },
     { id: 'produkte', label: produktAnzahl > 0 ? `Produkte · ${formatZahl(produktAnzahl)}` : 'Produkte' },
-    ...(beitragAnzahl > 0 ? [{ id: 'beitraege' as const, label: `Beiträge · ${formatZahl(beitragAnzahl)}` }] : []),
   ]
 }
 
@@ -61,7 +67,7 @@ export function hofseiteReiter({ produktAnzahl, beitragAnzahl }: { produktAnzahl
 export function aktiverReiter(
   suche: { reiter: string | null; bereich: string | null },
   angebot: readonly HofReiter[]
-): HofReiterId {
+): HofReiterAngebot {
   const gewaehlt = reiterSchema.parse(suche.reiter)
   if (gewaehlt && angebot.some((r) => r.id === gewaehlt)) return gewaehlt
   if (bereichAusParameter(suche.bereich) === 'FUTTERMITTEL' && angebot.some((r) => r.id === 'produkte')) return 'produkte'
@@ -70,7 +76,8 @@ export function aktiverReiter(
 
 /**
  * Die Adresse eines Reiters — die übrigen Parameter (Bereich, Nachbestell-
- * Link) bleiben, die Übersicht trägt keinen Reiter-Parameter.
+ * Link) bleiben, die Übersicht trägt keinen Reiter-Parameter. Der alte Reiter
+ * „Beiträge“ bleibt als Ziel (Mein Hof › Beiträge): Er landet bei „Aktuell vom Hof“.
  */
 export function reiterAdresse(pfad: string, suche: string, id: HofReiterId): string {
   const params = new URLSearchParams(suche)
@@ -107,7 +114,7 @@ export function stehtNurAmHandy(index: number): boolean {
 }
 
 /** Gibt es ein Schaufenster? Nur in der Übersicht und nur mit Produkten — ohne bleibt die Übersicht, wie sie war. */
-export function zeigeSchaufenster(offen: HofReiterId, produktAnzahl: number): boolean {
+export function zeigeSchaufenster(offen: HofReiterAngebot, produktAnzahl: number): boolean {
   return offen === 'uebersicht' && produktAnzahl > 0
 }
 
@@ -344,11 +351,134 @@ export function vorWieLange(iso: string, jetztIso: string): string {
 /**
  * Die Zeit über einer Beitragskarte (Register F8): Der neueste Beitrag heißt
  * „Aktuell · vor 2 Stunden“, die weiteren nur „vor 3 Tagen“ — „Aktuell“ steht
- * nie an zwei Karten.
+ * nie an zwei Karten. Auch ein geteilter Beitrag trägt die normale Zeit, kein
+ * „Geteilt · …“ (Freigabe §1, Abweichung 1).
  */
 export function beitragZeitText(istNeuester: boolean, veroeffentlichtIso: string, jetztIso: string): string {
   const her = vorWieLange(veroeffentlichtIso, jetztIso)
   return istNeuester ? `Aktuell · ${her}` : her
+}
+
+// ─── Aktuell vom Hof (Register F8, N5, T5; Nr. 128) ─────────────────────────
+
+/**
+ * Die Wörter des Abschnitts „Aktuell vom Hof“ — EINE Quelle für die
+ * Komponente (components/hofseite/aktuell-vom-hof.tsx) und die Tests. „Aktuell
+ * vom Hof“ ist das Wort für die Kundschaft, für den Hof heißt es „Beitrag“
+ * (Wortliste).
+ */
+export const AKTUELL_VOM_HOF_TEXT = {
+  titel: 'Aktuell vom Hof',
+  anzahl: (n: number): string => mitAnzahl(n, 'Beitrag', 'Beiträge'),
+  weiterlesen: 'Weiterlesen',
+  weniger: 'Weniger anzeigen',
+  dazu: 'Dazu im Hofladen',
+  produktAnzahl: (n: number): string => ` · ${mitAnzahl(n, 'Produkt', 'Produkte')}`,
+  derzeitAus: 'derzeit aus',
+  inDenKorb: (name: string): string => `${name} in den Korb`,
+  neuester: 'Neuester:',
+  /** Steht über dem Abschnitt, wenn `?beitrag=` keinen aktiven Beitrag dieses Hofs trifft — ohne Auskunft, ob es ihn gab. */
+  nichtMehrAktuell: 'Dieser Beitrag ist nicht mehr aktuell.',
+} as const
+
+/** Die Kennung des Abschnitts — Ziel alter Links (`?reiter=beitraege`). */
+export const AKTUELL_ANKER = 'aktuell'
+
+/** So viele verknüpfte Produkte stehen höchstens unter einem Beitrag („Dazu im Hofladen“). */
+export const AKTUELL_PRODUKTE_MAX = 3
+
+/** Wie „Aktuell vom Hof“ die Beiträge zeigt: einer als Karte, darunter Zeilen. */
+export type BeitragsAnordnung<B> = {
+  /** Oben als Karte: der Beitrag aus `?beitrag=`, sonst der neueste. */
+  karte: B
+  /** Trägt die Karte „Aktuell“? Nur der neueste (Register F8). */
+  karteIstNeuester: boolean
+  /** Die Zeile „Neuester: <Titel> ›“ — nur, wenn die Karte nicht selbst der neueste ist. */
+  neuester: B | null
+  /** Die übrigen als Zeilen, die an Ort und Stelle aufklappen, der neuere zuerst. */
+  zeilen: B[]
+  /** Wie viele Beiträge der Abschnitt zeigt — nie mehr als HOFSEITE_BEITRAEGE_MAX. */
+  anzahl: number
+}
+
+/**
+ * Ordnet die aktiven Beiträge für „Aktuell vom Hof“. `beitraege` kommt von
+ * page.tsx: die fünf neuesten, der neueste zuerst, und — wenn `?beitrag=` einen
+ * älteren aktiven Beitrag dieses Hofs trifft — dieser dahinter. `kennung` ist
+ * der geprüfte Wert aus der Adresse (beitragKennungSchema).
+ *
+ * Trifft die Kennung, steht dieser Beitrag oben, „Aktuell“ trägt trotzdem nur
+ * der neueste, und darunter steht „Neuester: …“. Trifft sie nicht (abgelaufen,
+ * gelöscht, anderer Hof, unbekannt), zeigt die Übersicht alles wie ohne
+ * Kennung und sagt nur, dass der Beitrag nicht mehr aktuell ist. Zusammen
+ * stehen nie mehr als fünf Beiträge da.
+ */
+export function ordneBeitraege<B extends { id: string }>(
+  beitraege: readonly B[],
+  kennung: string | null
+): { anordnung: BeitragsAnordnung<B> | null; nichtMehrAktuell: boolean } {
+  const geteilt = kennung === null ? undefined : beitraege.find((b) => b.id === kennung)
+  const nichtMehrAktuell = kennung !== null && geteilt === undefined
+  const [neuester] = beitraege
+  if (neuester === undefined) return { anordnung: null, nichtMehrAktuell }
+  const karte = geteilt ?? neuester
+  const karteIstNeuester = karte === neuester
+  // Karte und „Neuester“ zählen mit: zusammen nie mehr als fünf.
+  const oben = karteIstNeuester ? 1 : 2
+  const zeilen = beitraege.filter((b) => b !== karte && b !== neuester).slice(0, HOFSEITE_BEITRAEGE_MAX - oben)
+  return {
+    anordnung: { karte, karteIstNeuester, neuester: karteIstNeuester ? null : neuester, zeilen, anzahl: oben + zeilen.length },
+    nichtMehrAktuell,
+  }
+}
+
+/**
+ * „Dazu im Hofladen“ (Board §6, Freigabe §1 Abweichung 4): die verknüpften
+ * Produkte eines Beitrags, höchstens drei — kaufbare zuerst, je in der
+ * Reihenfolge von `linkedProductIds`, danach ausverkaufte (gedimmt, ohne „+“).
+ *
+ * `produkte` ist die Produktliste der Hofseite (farm.products im Shop) — dieselbe
+ * Regel, keine zweite: Was die Liste nicht zeigt (nicht im Shop, gelöscht, ein
+ * anderer Hof), fällt weg. Zurück kommen die Produkte der Liste selbst, damit
+ * das „+“ denselben Gegenstand in den Korb legt wie die Produktkarte.
+ * Ausverkauft heißt wie an der Karte: ohne Vorrat (zeigeKaufknopf ohne Pause —
+ * die Pause nimmt nur das „+“ weg, sie macht nichts „derzeit aus“).
+ */
+export function beitragProdukte<P extends { id: string; isAvailable: boolean; stock: number }>(
+  linkedProductIds: readonly string[],
+  produkte: readonly P[]
+): { produkt: P; ausverkauft: boolean }[] {
+  const nachId = new Map(produkte.map((p) => [p.id, p]))
+  const verknuepft = linkedProductIds.flatMap((id) => {
+    const produkt = nachId.get(id)
+    return produkt ? [{ produkt, ausverkauft: !zeigeKaufknopf(produkt, false) }] : []
+  })
+  return [...verknuepft.filter((z) => !z.ausverkauft), ...verknuepft.filter((z) => z.ausverkauft)].slice(0, AKTUELL_PRODUKTE_MAX)
+}
+
+/**
+ * Ein alter Link mit `?reiter=beitraege` (bis Nr. 128 der Reiter „Beiträge“)
+ * springt zu „Aktuell vom Hof“ — aber nur, wenn der Abschnitt da ist; ohne
+ * aktiven Beitrag bleibt die Seite oben.
+ */
+export function springeZuAktuell(reiterRoh: string | null, abschnittDa: boolean): boolean {
+  return reiterRoh === ALTER_REITER_BEITRAEGE && abschnittDa
+}
+
+/** Wie gesprungen wird: mit `prefers-reduced-motion` ohne Animation. */
+export function scrollVerhalten(reduzierteBewegung: boolean): ScrollBehavior {
+  return reduzierteBewegung ? 'auto' : 'smooth'
+}
+
+/**
+ * „Neuester: …“ — dieselbe Seite ohne `?beitrag=`: Dann steht der neueste oben.
+ * Die übrigen Parameter (Vorschau, Bereich) bleiben.
+ */
+export function adresseOhneBeitrag(pfad: string, suche: string): string {
+  const params = new URLSearchParams(suche)
+  params.delete(BEITRAG_PARAMETER)
+  const query = params.toString()
+  return query ? `${pfad}?${query}` : pfad
 }
 
 // ─── Warenkorb-Anker ────────────────────────────────────────────────────────
