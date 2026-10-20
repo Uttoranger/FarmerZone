@@ -133,8 +133,8 @@ function BeitragKarte({
   return (
     <article aria-labelledby={titelId} className="flex flex-col gap-2.5 rounded-2xl border border-accent bg-card p-3.5 lg:gap-3 lg:p-[18px]">
       <div className="flex gap-5">
-        {beitrag.photoUrl && (
-          // Ab lg links, 250 px — am Handy steht das Foto klein rechts neben dem Titel.
+        {beitrag.photoUrl && !offen && (
+          // Ab lg links, 250 px — am Handy steht das Foto klein rechts neben dem Titel. Aufgeklappt steht es groß beim Text.
           <span className="relative hidden h-[188px] w-[250px] shrink-0 overflow-hidden rounded-[14px] bg-muted lg:block">
             <Image src={beitrag.photoUrl} alt={beitrag.title} fill sizes="250px" className="object-cover" style={bildStil(beitrag.fotoAusschnitt)} />
           </span>
@@ -176,7 +176,8 @@ function BeitragKarte({
               )}
             </div>
             {beitrag.photoUrl && offen && (
-              <FotoGross src={beitrag.photoUrl} titel={beitrag.title} ausschnitt={beitrag.fotoAusschnitt} className="lg:hidden" />
+              // Aufgeklappt groß, am Handy wie am Computer (Freigabe 128 Punkt 3); ab lg so breit wie die Zeilen darunter.
+              <FotoGross src={beitrag.photoUrl} titel={beitrag.title} ausschnitt={beitrag.fotoAusschnitt} className="lg:max-w-[520px]" />
             )}
           </div>
 

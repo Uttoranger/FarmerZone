@@ -131,6 +131,24 @@ describe('Die Karte: kurz, mit „Weiterlesen“', () => {
     for (const name of ['Hokkaido-Kürbis', 'Äpfel Topaz', 'Freilandeier']) expect(offen).toContain(name)
   })
 
+  it('das Foto: zugeklappt klein (am Handy 76 px, ab lg 250 px), aufgeklappt groß — am Handy wie am Computer', () => {
+    // Ohne Browser zählt die Klasse: Welches Foto steht unter lg, welches ab lg?
+    const fotos = (seite: string, ab: 'handy' | 'lg') => {
+      const karte = seite.slice(seite.indexOf('<article aria-labelledby="beitrag-titel-bneu"'), seite.indexOf('</article>'))
+      return [...karte.matchAll(/<span class="([^"]*)"><img src="\/landing\/row-1\.jpg"/g)]
+        .map((treffer) => treffer[1].split(' '))
+        .filter((k) => (ab === 'lg' ? k.includes('lg:block') || (!k.includes('hidden') && !k.includes('lg:hidden')) : !k.includes('hidden')))
+        .map((k) => (k.includes('w-[250px]') ? 'klein-250' : k.includes('size-[76px]') ? 'klein-76' : k.includes('aspect-[3/2]') ? 'gross' : 'anders'))
+    }
+    const zu = html(props())
+    expect(fotos(zu, 'handy')).toEqual(['klein-76'])
+    expect(fotos(zu, 'lg')).toEqual(['klein-250'])
+    stand.offen = true
+    const offen = html(props())
+    expect(fotos(offen, 'handy')).toEqual(['gross'])
+    expect(fotos(offen, 'lg')).toEqual(['gross'])
+  })
+
   it('höchstens drei Produkte, kaufbare zuerst — das ausverkaufte vierte fällt weg', () => {
     const seite = html(props())
     const karte = seite.slice(seite.indexOf('id="beitrag-produkte-bneu"'), seite.indexOf('</article>'))
