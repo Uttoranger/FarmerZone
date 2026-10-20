@@ -95,7 +95,6 @@ type Props = {
 }
 
 
-
 // Produktpreise kommen aus src/lib/format.ts (formatGrundpreis + Grundpreis-
 // Zeile), damit Hofübersicht, Warenkorb und Bauern-Bereich dieselbe Schreib-
 // weise zeigen. Die Warenkorb-Summe nimmt formatEuro aus derselben Datei.

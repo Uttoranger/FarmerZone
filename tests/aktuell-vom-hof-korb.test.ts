@@ -75,7 +75,7 @@ const KAROTTEN: PublicProduct = {
   abgabe: 'ALLE', futter: null, familieId: null, brennmaterial: null,
 }
 const HOF: PublicFarm = {
-  id: 'farm_test', slug: 'hof-test', name: 'Hof Test', ownerName: 'Erika Muster', description: 'Gemüse', address: 'Musterweg 1',
+  id: 'farm_test', slug: 'hof-test', name: 'Testhof A', ownerName: 'Erika Muster', description: 'Gemüse', address: 'Musterweg 1',
   postalCode: '4900', city: 'Musterdorf', phone: '+43 660 0000000', email: 'hof@example.com', logoUrl: null, logoAusschnitt: null,
   bannerUrl: null, tagline: null, foundedYear: null, aboutText: null, bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50,
   bannerAusschnitt: null, sectionsConfig: [], farmValues: [], farmPhotos: [], acceptsOnline: true, acceptsOnsite: true,

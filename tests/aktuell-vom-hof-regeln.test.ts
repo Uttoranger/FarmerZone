@@ -167,13 +167,13 @@ describe('„Neuester: …“ — dieselbe Seite ohne ?beitrag=', () => {
 
 describe('Links eines Beitrags (Register T5, Ergänzung Nr. 128)', () => {
   it('beitragLink führt zur Übersicht mit genau diesem Beitrag, nicht mehr in einen Reiter', () => {
-    expect(beitragLink('https://agrilo.at/hof-test', 'cbeitragaaaa')).toBe('https://agrilo.at/hof-test?beitrag=cbeitragaaaa')
-    expect(beitragLink('agrilo.at/hof-test', 'cbeitragaaaa')).toBe('agrilo.at/hof-test?beitrag=cbeitragaaaa')
+    expect(beitragLink('https://example.com/hof-test', 'cbeitragaaaa')).toBe('https://example.com/hof-test?beitrag=cbeitragaaaa')
+    expect(beitragLink('example.com/hof-test', 'cbeitragaaaa')).toBe('example.com/hof-test?beitrag=cbeitragaaaa')
   })
 
   it('mit Kanal hängt `&k=` an — der Teilen-Besuch entfernt nur `k`, `beitrag` bleibt', () => {
-    const geteilt = linkMitKanal(beitragLink('https://agrilo.at/hof-test', 'cbeitragaaaa'), 'wa')
-    expect(geteilt).toBe('https://agrilo.at/hof-test?beitrag=cbeitragaaaa&k=wa')
+    const geteilt = linkMitKanal(beitragLink('https://example.com/hof-test', 'cbeitragaaaa'), 'wa')
+    expect(geteilt).toBe('https://example.com/hof-test?beitrag=cbeitragaaaa&k=wa')
     expect(teilenBesuchAusAdresse(geteilt)).toEqual({ kanal: 'wa', ohne: '/hof-test?beitrag=cbeitragaaaa' })
     // Gegenprobe: die Kennung kommt durch die Prüfung der Hofseite.
     expect(beitragKennungSchema.parse(new URL(geteilt).searchParams.get(BEITRAG_PARAMETER))).toBe('cbeitragaaaa')
