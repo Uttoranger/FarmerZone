@@ -12,6 +12,8 @@
  *    Schritte bleiben am Schloss erkennbar.
  *  - Nach dem Sichern der Ersatzcodes steht beim erledigten Schritt nicht mehr
  *    „… kommt nach dem Passkey".
+ *  - Nach einer Anmeldung mit Ersatzcode heißt der erste Schritt auch im
+ *    Zustand „eingerichtet" „Angemeldet mit Ersatzcode" (sichter Runde 2, K1).
  */
 import { describe, expect, it, vi } from 'vitest'
 import { createElement } from 'react'
@@ -39,6 +41,7 @@ function rendere(zustand: EinrichtenZustand, mehr: Partial<EinrichtenAnsicht> = 
     codeOffen: false,
     ersatzcodes: 0,
     jetztText: '20.10. um 10:00',
+    mitErsatzcode: false,
     ...mehr,
   }
   return renderToStaticMarkup(createElement(EinrichtenSchritte, { ansicht }))
@@ -80,5 +83,17 @@ describe('Pflichtseite: Schritte', () => {
     const li = schritt(rendere('eingerichtet', { ersatzcodes: 10 }), EINRICHTEN_TEXT.ersatzcodesGesichert)
     expect(li).not.toContain(EINRICHTEN_TEXT.schrittErsatzcodesSatz)
     expect(schritt(rendere('eingerichtet'), EINRICHTEN_TEXT.schrittErsatzcodes)).toContain(EINRICHTEN_TEXT.schrittErsatzcodesSatz)
+  })
+
+  it('nach Ersatzcode: „eingerichtet" zeigt „Angemeldet mit Ersatzcode", nicht „Bestätigt mit Passwort …"; der Passwort-Weg weiter den alten Satz', () => {
+    const nachErsatzcode = rendere('eingerichtet', { mitErsatzcode: true, bestaetigtText: null, ersatzcodes: 9 })
+    expect(schritt(nachErsatzcode, EINRICHTEN_TEXT.schrittErsatzcode)).toContain('lucide-check')
+    expect(nachErsatzcode).not.toContain(EINRICHTEN_TEXT.schrittBestaetigt)
+    // Die Aufforderung „Richte jetzt einen neuen Passkey ein" gehört nur vor den neuen Passkey.
+    expect(nachErsatzcode).not.toContain(EINRICHTEN_TEXT.ersatzcodeSatz)
+
+    const mitPasswort = rendere('eingerichtet', { ersatzcodes: 10 })
+    expect(schritt(mitPasswort, EINRICHTEN_TEXT.schrittBestaetigt)).toContain('heute, 10:00')
+    expect(mitPasswort).not.toContain(EINRICHTEN_TEXT.schrittErsatzcode)
   })
 })

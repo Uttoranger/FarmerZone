@@ -245,6 +245,15 @@ function alsBrowser(dose: Dose): void {
   anfrage.headers = new Headers({ cookie: keksKopf(dose), 'user-agent': UA })
 }
 
+/** Was die Pflichtseite /admin/einrichten der Sitzung von alsBrowser zeigt — die Ansicht, die sie an die Schritte gibt. */
+async function einrichtenAnsicht(): Promise<unknown> {
+  const seite = (await import('@/app/admin/einrichten/page')) as { default: () => Promise<{ props: { children: unknown } }> }
+  const kinder = [(await seite.default()).props.children].flat() as Array<{ props?: { ansicht?: unknown } }>
+  const schritte = kinder.find((k) => k?.props?.ansicht !== undefined)
+  if (!schritte) throw new Error('keine Schritte auf der Pflichtseite')
+  return schritte.props?.ansicht
+}
+
 /** Ein Konto mit Passwort; Admin mit `adminSeit` (Standard: jetzt). */
 async function erstelleKonto(admin: { adminSeit?: Date | null } | null): Promise<{ id: string; email: string }> {
   const email = `${intKennung('admin')}@example.com`
@@ -504,6 +513,9 @@ describe('Ersatzcode', () => {
     const dose: Dose = new Map()
     expect((await http(dose, '/admin-ersatzcode/anmelden', { email: admin.email, code: 'KCDC-TAKV' })).status).toBe(200)
     expect(await adminPflichtOffen(admin.id)).toBe(true)
+    // Pflicht offen: Die Pflichtseite öffnet der Sitzung aus dem Ersatzcode (ohne passkeyAm).
+    alsBrowser(dose)
+    expect(await einrichtenAnsicht()).toMatchObject({ zustand: 'ersatzcode', mitErsatzcode: true })
 
     // Zwei Tabs: dieselbe Sitzung, je eine eigene Challenge.
     const tab1 = new Map(dose)
@@ -520,6 +532,9 @@ describe('Ersatzcode', () => {
     expect(await sitzungsZeile(dose)).toMatchObject({ anmeldeart: 'ersatzcode-eingeloest' })
     expect(await adminPflichtOffen(admin.id)).toBe(false)
     expect((await registriere(new Map(dose), new Testgeraet())).status).toBe(403)
+    // Die Pflichtseite bleibt offen (passkeyAm) und nennt den Weg der Anmeldung (sichter Runde 2, K1).
+    alsBrowser(dose)
+    expect(await einrichtenAnsicht()).toMatchObject({ zustand: 'eingerichtet', mitErsatzcode: true })
   })
 
   it('erstelleErsatzcodes: 10 Codes, nur gehasht gespeichert; „Neue erstellen" macht die alten ungültig', async () => {
@@ -628,6 +643,9 @@ describe('Wache: 12 Stunden, Pflicht, frische Bestätigung', () => {
     const startseite = (await import('@/app/admin/page')) as { default: (props: unknown) => Promise<unknown> }
     await expect(startseite.default({ searchParams: Promise.resolve({}), params: Promise.resolve({}) })).rejects.toThrow('REDIRECT:/login/admin')
     expect((await ladeAdminbereich()).zahlen).toBeUndefined()
+    // Auch die Pflichtseite nicht mehr (sichter Runde 2, S1): sonst zeigte sie „eingerichtet" samt Admin-Kopf.
+    const pflichtseite = (await import('@/app/admin/einrichten/page')) as { default: () => Promise<unknown> }
+    await expect(pflichtseite.default()).rejects.toThrow('REDIRECT:/login/admin')
     // Umgeleitet, nicht abgemeldet: Hof und Konto bleiben in dieser Sitzung erreichbar.
     expect(await prisma.session.findUnique({ where: { id: sitzungB.id } })).not.toBeNull()
 
@@ -636,6 +654,7 @@ describe('Wache: 12 Stunden, Pflicht, frische Bestätigung', () => {
     expect(await verlangeAdminAktion()).toEqual({ ok: true, userId: konto.id })
     expect(await verlangeAdminSeite()).toBe(konto.id)
     expect((await ladeAdminbereich()).zahlen).toBeDefined()
+    expect(await einrichtenAnsicht()).toMatchObject({ zustand: 'eingerichtet', mitErsatzcode: false })
   })
 
   it('ohne Passkey leitet jede Admin-Seite auf /admin/einrichten um, bevor sie Daten lädt — die Pflichtseite selbst nicht', async () => {

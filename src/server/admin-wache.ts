@@ -38,9 +38,9 @@ import {
  *  - Pflicht: Ohne Passkey, oder nach einem Ersatzcode ohne neuen, bleibt der
  *    Admin-Bereich zu → /admin/einrichten. Die Prüfung sitzt in der Wache
  *    JEDER Seite, nicht nur im Layout: Das Layout rendert beim Wechsel
- *    zwischen Unterseiten nicht neu. `ohnePasskey` nur für die Pflichtseite
- *    samt ihren Actions; das Layout prüft mit verlangeAdminShell
- *    (tests/admin-seiten-wache.test.ts).
+ *    zwischen Unterseiten nicht neu. Die Pflichtseite prüft mit
+ *    verlangeEinrichtenSeite, ihre Actions mit `ohnePasskey`, das Layout mit
+ *    verlangeAdminShell (tests/admin-seiten-wache.test.ts).
  *  - Sitzung mit Passkey: Hat das Konto einen, muss auch DIESE Sitzung mit
  *    Passkey angemeldet oder bestätigt sein (`passkeyAm`) → sonst
  *    /login/admin, ohne sie zu löschen (der Hof bleibt erreichbar). Sonst
@@ -59,7 +59,7 @@ import {
  */
 
 export type AdminWacheOptionen = {
-  /** Nur die Pflichtseite (/admin/einrichten) samt ihren Actions — und verlangeAdminShell (Layout): kein Passkey nötig. */
+  /** Nur die Actions der Pflichtseite (/admin/einrichten): kein Passkey nötig. Die Seite selbst prüft mit verlangeEinrichtenSeite. */
   ohnePasskey?: true
 }
 
@@ -137,21 +137,41 @@ function seiteScheitert(art: Exclude<Geprueft['art'], 'ok'>): never {
  * Die Wache einer Admin-SEITE. Gibt die Nutzer-ID zurück oder kehrt nie
  * zurück: nicht angemeldet → `/login`, angemeldet ohne Recht → 404, Sitzung
  * älter als 12 Stunden → /login/admin, ohne Passkey → /admin/einrichten,
- * Sitzung ohne Passkey → /login/admin.
+ * Sitzung ohne Passkey → /login/admin. Ohne Optionen: Keine Seite kommt um
+ * die Pflicht herum, auch nicht aus Versehen.
  *
  * `notFound()` statt `redirect` oder 403: Der Bereich soll sich Unbefugten
  * nicht einmal zu erkennen geben — für sie existiert /admin schlicht nicht.
  */
-export async function verlangeAdminSeite(optionen: AdminWacheOptionen = {}): Promise<string> {
-  const geprueft = await pruefe(optionen)
+export async function verlangeAdminSeite(): Promise<string> {
+  const geprueft = await pruefe({})
   if (geprueft.art !== 'ok') return seiteScheitert(geprueft.art)
   return geprueft.userId
 }
 
 /**
- * Die Wache des Layouts (ladeAdminbereich): scheitert wie
- * verlangeAdminSeite({ ohnePasskey: true }) — das Layout umhüllt auch die
- * Pflichtseite —, sagt dazu, ob Kopf und Zähler Daten zeigen dürfen: nur ohne
+ * Die Wache der Pflichtseite /admin/einrichten: wie verlangeAdminSeite, nur
+ * die offene Pflicht lässt sie durch — dort wird sie erledigt (kein Passkey,
+ * oder nach einem Ersatzcode ohne neuen). Bei erledigter Pflicht verlangt sie
+ * wie jede Admin-Seite `passkeyAm` der Sitzung (Ersatzcodes, zweiter Passkey),
+ * sonst /login/admin: Eine Passwort-Sitzung von vor dem ersten Passkey sah
+ * hier sonst den Zustand „eingerichtet" samt Admin-Kopf (sichter Runde 2;
+ * Freigabe Lauf 18 Punkt 5). `pflicht` gibt sie mit, damit die Seite nicht
+ * ein zweites Mal zählt.
+ */
+export async function verlangeEinrichtenSeite(): Promise<{ userId: string; pflicht: boolean }> {
+  const geprueft = await pruefe({ ohnePasskey: true })
+  if (geprueft.art !== 'ok') return seiteScheitert(geprueft.art)
+  const sperre = await passkeySperre(geprueft.userId, geprueft.passkeyAm)
+  if (sperre === 'ohne-passkey') return seiteScheitert(sperre)
+  return { userId: geprueft.userId, pflicht: sperre === 'pflicht' }
+}
+
+/**
+ * Die Wache des Layouts (ladeAdminbereich): scheitert wie jede Admin-Seite,
+ * lässt aber Pflicht und Sitzung ohne Passkey durch — das Layout umhüllt auch
+ * die Pflichtseite, die Umleitung macht die Seite —, sagt dazu, ob Kopf und
+ * Zähler Daten zeigen dürfen: nur ohne
  * Pflicht und in einer Sitzung mit Passkey. Das Layout rendert parallel zur
  * Seite und wird vor ihrer Umleitung gestreamt; mit einer Abfrage der Sitzung.
  */
@@ -231,7 +251,7 @@ export type EinrichtenStand = {
 
 /**
  * Was die Pflichtseite zeigt — frisch aus der Datenbank, für die eigene
- * Sitzung. Nur nach `verlangeAdminSeite({ ohnePasskey: true })` aufrufen.
+ * Sitzung. Nur nach verlangeEinrichtenSeite() aufrufen.
  */
 export async function ladeEinrichtenStand(jetzt: Date): Promise<EinrichtenStand> {
   const session = await auth.api.getSession({ headers: await headers() })

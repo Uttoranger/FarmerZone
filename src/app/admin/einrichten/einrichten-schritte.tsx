@@ -25,6 +25,8 @@ export type EinrichtenAnsicht = {
   ersatzcodes: number
   /** Zeitpunkt für die Datei der Ersatzcodes („19.10. um 14:32"). */
   jetztText: string
+  /** Die Sitzung entstand aus einem Ersatzcode (auch schon eingelöst) — Schritt 1 sagt dann das, nicht „Passwort und Code". */
+  mitErsatzcode: boolean
 }
 
 type SchrittArt = 'fertig' | 'aktiv' | 'spaeter'
@@ -171,7 +173,11 @@ export function EinrichtenSchritte({ ansicht }: { ansicht: EinrichtenAnsicht }):
         {z === 'ersatzcode' ? (
           <Schritt art="fertig" titel={EINRICHTEN_TEXT.schrittErsatzcode} satz={EINRICHTEN_TEXT.ersatzcodeSatz} />
         ) : (
-          <Schritt art={bestaetigt ? 'fertig' : 'aktiv'} titel={EINRICHTEN_TEXT.schrittBestaetigt} satz={bestaetigt ? ansicht.bestaetigtText : null}>
+          <Schritt
+            art={bestaetigt ? 'fertig' : 'aktiv'}
+            titel={ansicht.mitErsatzcode ? EINRICHTEN_TEXT.schrittErsatzcode : EINRICHTEN_TEXT.schrittBestaetigt}
+            satz={bestaetigt ? ansicht.bestaetigtText : null}
+          >
             {z === 'neu-anmelden' && (
               <>
                 <p className="text-[13px] leading-snug text-muted-foreground">{EINRICHTEN_TEXT.passwortNoetig}</p>
