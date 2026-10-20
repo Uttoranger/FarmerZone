@@ -331,7 +331,9 @@ export default function HoefeKarte({
     if (!map || !hof) return null
     const punkt = map.latLngToContainerPoint([hof.lat, hof.lon])
     const links = Math.max(8, Math.min(punkt.x - KURZKARTE_HALB, map.getSize().x - 2 * KURZKARTE_HALB - 8))
-    return punkt.y > VORSCHAU_PLATZ_OBEN
+    // Darüber, wenn oben Platz für die ganze Vorschau ist — oder wenigstens mehr als darunter.
+    const oben = punkt.y > VORSCHAU_PLATZ_OBEN || punkt.y > map.getSize().y - punkt.y
+    return oben
       ? { left: links, top: punkt.y - VORSCHAU_ABSTAND, transform: 'translateY(-100%)' }
       : { left: links, top: punkt.y + VORSCHAU_ABSTAND }
   }

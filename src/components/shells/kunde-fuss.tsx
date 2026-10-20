@@ -18,7 +18,8 @@ const FUSS_LINK = cn(
 function FussLinks({ beschriftung, links, className }: { beschriftung: string; links: readonly FussLink[]; className?: string }) {
   return (
     <nav aria-label={beschriftung} className={className}>
-      <ul className="flex flex-wrap items-center gap-x-4 gap-y-1">
+      {/* 12 px Abstand am Handy: So passen die vier Links bei 390 px in eine Zeile wie im Board. */}
+      <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 md:gap-x-4">
         {links.map((link) => (
           <li key={link.href}>
             <Link href={link.href} className={FUSS_LINK}>
