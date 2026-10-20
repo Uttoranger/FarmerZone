@@ -32,6 +32,7 @@ vi.mock('@/lib/prisma', () => ({
 
 import {
   getOeffentlicheHoefe,
+  IN_LISTEN_SICHTBAR,
   OEFFENTLICH_SICHTBAR,
   VORSCHAU_LADE_DECKEL,
 } from '@/server/queries/farm'
@@ -336,16 +337,18 @@ describe('getOeffentlicheHoefe — die Query', () => {
     produktZeilen.mockResolvedValue([] as never)
   })
 
-  it('fragt EXAKT mit dem öffentlichen Filter der Einzelseite an — wartende und stillgelegte Höfe können ihn nicht passieren', async () => {
+  it('fragt EXAKT mit dem Filter der Listen an — wartende, stillgelegte Höfe und Testhöfe können ihn nicht passieren', async () => {
     farmFindMany.mockResolvedValue([] as never)
 
     await getOeffentlicheHoefe({ wochentag: 3, uhrzeit: '12:00' })
 
     expect(farmFindMany).toHaveBeenCalledTimes(1)
     const args = farmFindMany.mock.calls[0]![0]!
-    // Die GETEILTE Konstante ist die Parität mit getPublicFarm: Beide Queries
-    // bauen ihr where daraus — hier wird ihr Inhalt festgenagelt.
-    expect(args.where).toBe(OEFFENTLICH_SICHTBAR)
+    // Die GETEILTE Konstante: OEFFENTLICH_SICHTBAR ist die Parität mit
+    // getPublicFarm, IN_LISTEN_SICHTBAR nimmt dazu jeden Testhof heraus
+    // (Register N21, Nr. 119) — hier wird der Inhalt beider festgenagelt.
+    expect(args.where).toBe(IN_LISTEN_SICHTBAR)
+    expect(IN_LISTEN_SICHTBAR).toEqual({ isActive: true, archivedAt: null, approvedAt: { not: null }, istTesthof: false })
     expect(OEFFENTLICH_SICHTBAR).toEqual({ isActive: true, archivedAt: null, approvedAt: { not: null } })
     // Nur VERFÜGBARE Produkte (Kategorien UND Produktfotos speisen sich
     // daraus), Termine nur aus aktiven Fenstern, höchstens vier
@@ -392,7 +395,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
     // Produktsuche (suchNamen).
     expect(produktZeilen).toHaveBeenCalledTimes(1)
     expect(produktZeilen.mock.calls[0]![0]).toEqual({
-      where: { isAvailable: true, farm: OEFFENTLICH_SICHTBAR },
+      where: { isAvailable: true, farm: IN_LISTEN_SICHTBAR },
       orderBy: PRODUCT_ORDER_BY,
       select: {
         farmId: true,

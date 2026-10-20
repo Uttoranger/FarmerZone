@@ -19,6 +19,11 @@ export const GRUENDUNG_AUSNEHMEN_GEAENDERT = 'Der Hof hat sich inzwischen geänd
 /** Wiederaufnahme nach dem Festschreiben, aber die Aktion ist vorbei (Stichtag) — es gibt keinen Platz mehr (Nr. 116). */
 export const GRUENDUNG_AKTION_VORBEI = 'Die Aktion ist vorbei – es werden keine Gründungsplätze mehr vergeben.'
 
+/** Testhof (Register N21, Nr. 119): wie beim Ausnehmen nur ein freigeschalteter, nicht stillgelegter Hof. */
+export const TESTHOF_NUR_FREIGESCHALTET = 'Nur einen freigeschalteten Hof kannst du als Testhof markieren. Lade die Seite neu.'
+/** Testhof (Register N21, Nr. 119): Der Hof hält einen Gründungsplatz, der eigene Haken fehlt. */
+export const TESTHOF_HAKEN_FEHLT = 'Der Hof hält gerade einen Gründungsplatz. Markieren geht nur mit dem Haken „Das ist ein Testhof, kein echter Hof.“'
+
 /** Die Kennung eines Hofs (cuid) — Länge begrenzt, damit kein Riesentext in die Abfrage geht. */
 const hofKennung = z.string().min(1).max(64)
 
@@ -29,6 +34,16 @@ export const nimmAusGruendungSchema = z.strictObject({
 })
 
 export const nimmWiederAufSchema = z.strictObject({ farmId: hofKennung })
+
+/**
+ * „Als Testhof markieren“ (Register N21, Nr. 119). `bestaetigt` ist der eigene
+ * Haken „Das ist ein Testhof, kein echter Hof.“ — Pflicht, wenn der Hof einen
+ * Platz hält; ob er das tut, rechnet die Action nach der Sperre.
+ */
+export const markiereAlsTesthofSchema = z.strictObject({ farmId: hofKennung, bestaetigt: z.boolean() })
+
+/** „Kein Testhof mehr“ (Nr. 119) — nur die Kennung. */
+export const nimmTesthofZurueckSchema = z.strictObject({ farmId: hofKennung })
 
 /**
  * „Zusagen festschreiben“ (Register K2, Änderung Nr. 116): nur die

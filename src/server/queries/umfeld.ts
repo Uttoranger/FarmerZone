@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { istKaufbar } from '@/lib/bereiche-anzeige'
 import { umkreisBox, waehleHoefeImUmkreis, type UmfeldHof, type UmfeldKm, type UmfeldProdukt } from '@/lib/umfeld'
 import type { NettoEinheitValue, ProductCategoryValue, ProductSubcategoryValue } from '@/lib/taxonomie'
-import { OEFFENTLICH_SICHTBAR } from './farm'
+import { IN_LISTEN_SICHTBAR } from './farm'
 
 /**
  * Umfeld — was andere Höfe in der Nähe anbieten (docs/konzepte/umfeld.md).
@@ -10,7 +10,7 @@ import { OEFFENTLICH_SICHTBAR } from './farm'
  * Die EINE Ausnahme von „jede Abfrage im Bauern-Bereich ist auf den eigenen
  * Hof begrenzt" (ARCHITECTURE.md §5): Sie liest fremde Höfe, aber nur, was
  * auch auf /hoefe steht, und mit derselben Sichtbarkeitsregel —
- * OEFFENTLICH_SICHTBAR unverändert, dazu strenger `isPaused: false` (ein
+ * IN_LISTEN_SICHTBAR unverändert (kein Testhof, Register N21), dazu strenger `isPaused: false` (ein
  * pausierter Hof verkauft gerade nicht). Keine zweite Sichtbarkeitslogik.
  *
  * Was den Server NICHT verlässt: IDs, Adresse, Telefon, E-Mail, Bestand.
@@ -99,7 +99,7 @@ export async function getUmfeld(farmId: string, km: UmfeldKm): Promise<UmfeldDat
   const box = umkreisBox(punkt, km)
   const kandidaten = await prisma.farm.findMany({
     where: {
-      ...OEFFENTLICH_SICHTBAR,
+      ...IN_LISTEN_SICHTBAR,
       // Strenger als /hoefe: Ein pausierter Hof verkauft gerade nicht.
       isPaused: false,
       id: { not: farmId },

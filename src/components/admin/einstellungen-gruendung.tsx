@@ -359,7 +359,7 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
       hauptaktion={{ text: TEXT.festschreibenKnopf, onClick: festschreiben, ton: 'orange', laeuft: festLaeuft }}
     >
       <div className="flex flex-col gap-3 text-[14px] text-muted-foreground">
-        <p>{daten.festschreiben.length > 0 ? TEXT.festschreibenDialog(daten.festschreiben.length) : TEXT.festschreibenLeer}</p>
+        <p>{daten.festschreiben.length > 0 ? TEXT.festschreibenDialog(daten.festschreiben.length) : daten.ausgenommen > 0 ? TEXT.festschreibenAlleAusgenommen : TEXT.festschreibenLeer}</p>
         {daten.festschreibenPlaetze !== null && <DialogFehler text={TEXT.festschreibenPlaetze(daten.festschreibenPlaetze)} />}
         {daten.festschreiben.length > 0 && (
           <div className="max-h-[50vh] overflow-y-auto rounded-xl border border-border">

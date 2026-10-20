@@ -154,6 +154,7 @@ describe('Produktseite — der Ausschnitt am Foto', () => {
     serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
     betriebsstatus: 'PRIMAERPRODUKTION',
     gruendungshof: false,
+    istTesthof: false,
     gruendungSeit: null,
     abzeichenBlatt: null,
     products: [],

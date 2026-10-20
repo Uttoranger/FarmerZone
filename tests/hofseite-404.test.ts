@@ -13,7 +13,8 @@
  *    verlangt, sagt ansichtsModus (tests/hofseite-einmal.test.ts).
  *  - Erst nach der Prüfung die Suspense-Grenze mit dem Skelett.
  *  - Metadaten: Titel, Canonical ohne Parameter, noindex (follow) für Höfe ohne
- *    Produkt im Shop und ausgenommene Höfe samt deren Produktseiten, Open Graph in de_AT.
+ *    Produkt im Shop und Testhöfe samt deren Produktseiten (Register N21) — ein
+ *    nur aus der Gründung ausgenommener Hof wird indexiert —, Open Graph in de_AT.
  *  - JSON-LD der Seiten: gültiges JSON, ohne Telefon und E-Mail, `</script>`
  *    im Hofnamen bleibt im Block; Produkt mit Preis und Verfügbarkeit.
  * Status 404 selbst misst der sichter am lokalen Produktions-Build.
@@ -111,7 +112,7 @@ const HOF: PublicFarm = {
   sectionsConfig: [], farmValues: [], farmPhotos: [],
   acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,
   serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: null, betriebsstatus: null,
-  gruendungshof: false, gruendungSeit: null, abzeichenBlatt: null,
+  gruendungshof: false, gruendungSeit: null, abzeichenBlatt: null, istTesthof: false,
   products: [
     produkt('p_eier', { name: 'Freilandeier', category: 'EIER', price: 4.5, stock: 0 }),
     produkt('p_karotten', { name: 'Karotten', category: 'GEMUESE' }),
@@ -123,9 +124,9 @@ const HOF: PublicFarm = {
 }
 
 /** Ein öffentlicher Hof in der schlanken Abfrage: ohne Ausnahme, mit Produkten im Shop. */
-const OEFFENTLICH = { gruendungAusgenommen: false, latitude: null, longitude: null, _count: { products: 4 } }
+const OEFFENTLICH = { istTesthof: false, latitude: null, longitude: null, _count: { products: 4 } }
 /** Ein Produkt im Shop in der schlanken Abfrage der Produktseite — eines nicht ausgenommenen Hofs. */
-const IM_SHOP = (id: string, gruendungAusgenommen = false) => ({ id, farm: { gruendungAusgenommen } })
+const IM_SHOP = (id: string, istTesthof = false) => ({ id, farm: { istTesthof } })
 
 const hofseite = (farmSlug: string, suche: Record<string, string> = {}) =>
   FarmPage({ params: Promise.resolve({ farmSlug }), searchParams: Promise.resolve(suche) })
@@ -288,9 +289,16 @@ describe('Metadaten der Hofseite', () => {
     expect(meta.robots).toEqual({ index: false, follow: true })
   })
 
-  it('ein ausgenommener Hof (Testhof): noindex mit follow, auch mit Produkten', async () => {
-    db.hof = { ...OEFFENTLICH, gruendungAusgenommen: true }
+  it('ein Testhof (Register N21): noindex mit follow, auch mit Produkten — die Abfrage liest istTesthof', async () => {
+    db.hof = { ...OEFFENTLICH, istTesthof: true }
     expect((await hofMeta('hof-test')).robots).toEqual({ index: false, follow: true })
+    expect(db.argumente[0]).toEqual(expect.objectContaining({ select: expect.objectContaining({ istTesthof: true }) }))
+  })
+
+  it('ein nur aus der Gründung ausgenommener echter Hof hat KEIN noindex (Nr. 119) — die Abfrage fragt gruendungAusgenommen nicht', async () => {
+    db.hof = { ...OEFFENTLICH, gruendungAusgenommen: true }
+    expect((await hofMeta('hof-test')).robots).toBeUndefined()
+    expect(db.argumente[0]).toEqual(expect.objectContaining({ select: expect.not.objectContaining({ gruendungAusgenommen: expect.anything() }) }))
   })
 
   it('die Vorschau-Adresse bleibt ganz fern (noindex, nofollow)', async () => {
@@ -310,10 +318,10 @@ describe('Metadaten der Produktseite', () => {
     expect((meta.openGraph as { locale?: string }).locale).toBe('de_AT')
   })
 
-  it('ein Produkt eines ausgenommenen Hofs (Testhof): noindex mit follow — wie dessen Hofseite', async () => {
+  it('ein Produkt eines Testhofs (Register N21): noindex mit follow — wie dessen Hofseite', async () => {
     db.produkt = IM_SHOP('p_karotten', true)
     expect((await produktMeta('hof-test', 'p_karotten')).robots).toEqual({ index: false, follow: true })
-    expect(db.argumente).toEqual([expect.objectContaining({ select: expect.objectContaining({ farm: { select: { gruendungAusgenommen: true } } }) })])
+    expect(db.argumente).toEqual([expect.objectContaining({ select: expect.objectContaining({ farm: { select: { istTesthof: true } } }) })])
   })
 })
 

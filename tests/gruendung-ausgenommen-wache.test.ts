@@ -10,6 +10,12 @@
  * eine Regel der Platzvergabe einbindet, bindet auch einen der beiden Lader
  * ein; Ausnahmen nur mit Grund. Dazu tragen beide Selects das Feld. Gegenprobe:
  * Eine Datei mit eigener Abfrage schlägt an.
+ *
+ * Seit Nr. 119 (Register N21): Ein Testhof ist immer auch ausgenommen — nur so
+ * bleiben alle Regeln, die `gruendungAusgenommen` lesen, für Testhöfe richtig.
+ * Jedes `data` unter src/server, das `istTesthof: true` schreibt, schreibt im
+ * selben Objekt `gruendungAusgenommen: true` und `gruendungPlatz: null`.
+ * Gegenprobe: ein Markieren ohne Ausnahme schlägt an.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -41,7 +47,7 @@ const PLATZ_REGELN: Record<string, readonly string[]> = {
     'zusageBeiFreischaltung',
     'freischaltHinweis',
   ],
-  '@/lib/admin-hoefe-seite': ['platzBeiFreischaltung', 'gruendungAenderung'],
+  '@/lib/admin-hoefe-seite': ['platzBeiFreischaltung', 'gruendungAenderung', 'testhofAenderung'],
 }
 
 /** Die beiden erlaubten Quellen der Hofliste. */
@@ -118,5 +124,45 @@ describe('Wache: die Platzvergabe bekommt ihre Höfe nur aus den zwei Selects', 
     expect(ohneLader("import { platzBeiFreischaltung } from '@/lib/admin-hoefe-seite'")).toBe(true)
     // Ein reiner Typ-Import ist keine Regel.
     expect(ohneLader("import { type HofFuerPlatz } from '@/lib/gruendungshof'")).toBe(false)
+  })
+})
+
+/** Je `data`-Objekt mit `istTesthof: true`: schreibt es auch die Ausnahme und gibt den Platz frei? */
+function testhofOhneAusnahme(quelltext: string, name = 'datei.ts'): number[] {
+  const datei = ts.createSourceFile(name, quelltext, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const zeilen: number[] = []
+  const wert = (objekt: ts.ObjectLiteralExpression, schluessel: string): ts.Expression | undefined =>
+    objekt.properties.find((e): e is ts.PropertyAssignment => ts.isPropertyAssignment(e) && ts.isIdentifier(e.name) && e.name.text === schluessel)?.initializer
+  const besuche = (k: ts.Node): void => {
+    if (ts.isPropertyAssignment(k) && ts.isIdentifier(k.name) && k.name.text === 'data' && ts.isObjectLiteralExpression(k.initializer)) {
+      const daten = k.initializer
+      if (wert(daten, 'istTesthof')?.kind === ts.SyntaxKind.TrueKeyword) {
+        const ausgenommen = wert(daten, 'gruendungAusgenommen')?.kind === ts.SyntaxKind.TrueKeyword
+        const platzFrei = wert(daten, 'gruendungPlatz')?.kind === ts.SyntaxKind.NullKeyword
+        if (!ausgenommen || !platzFrei) zeilen.push(datei.getLineAndCharacterOfPosition(k.getStart(datei)).line + 1)
+      }
+    }
+    ts.forEachChild(k, besuche)
+  }
+  besuche(datei)
+  return zeilen
+}
+
+describe('Wache: ein Testhof ist immer auch ausgenommen (Register N21, Nr. 119)', () => {
+  it('jedes data unter src/server mit istTesthof: true schreibt gruendungAusgenommen: true und gruendungPlatz: null', () => {
+    const funde = dateien(join(WURZEL, 'src/server'))
+      .map((pfad) => ({ pfad: relative(WURZEL, pfad).split('\\').join('/'), text: readFileSync(pfad, 'utf8') }))
+      .filter((d) => d.text.includes('istTesthof'))
+    const verstoesse = funde.flatMap((d) => testhofOhneAusnahme(d.text, d.pfad).map((z) => `${d.pfad}:${z}`))
+    expect(verstoesse).toEqual([])
+    // Die Wache sieht das Markieren tatsächlich.
+    expect(funde.map((d) => d.pfad)).toContain('src/server/actions/gruendung.ts')
+  })
+
+  it('Gegenprobe: Markieren ohne Ausnahme oder ohne freien Platz schlägt an, Zurücknehmen nicht', () => {
+    expect(testhofOhneAusnahme('tx.farm.updateMany({ data: { istTesthof: true } })')).toEqual([1])
+    expect(testhofOhneAusnahme('tx.farm.updateMany({ data: { istTesthof: true, gruendungAusgenommen: true } })')).toEqual([1])
+    expect(testhofOhneAusnahme('tx.farm.updateMany({ data: { istTesthof: true, gruendungAusgenommen: true, gruendungPlatz: null } })')).toEqual([])
+    expect(testhofOhneAusnahme('tx.farm.updateMany({ data: { istTesthof: false } })')).toEqual([])
   })
 })

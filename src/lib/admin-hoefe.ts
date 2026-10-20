@@ -68,6 +68,18 @@ export function stripeFehlt(hof: { approvedAt: Date | null; archivedAt: Date | n
 /** Das Kennzeichen für Bestandshöfe mit Stripe, aber `acceptsOnline` false — neutral, kein Mangel des Kontos. */
 export const ONLINE_AUS_TEXT = 'Online-Zahlung aus'
 
+/** Die nicht sperrende Zeile bei fehlendem Kartenpunkt (Nr. 119) — Freischalten bleibt möglich, nie orange. */
+export const KEIN_KARTENPUNKT_TEXT = 'Kein Kartenpunkt – der Hof erscheint nicht auf der Karte.'
+
+/**
+ * Die Kartenpunkt-Zeile (Nr. 119): nur, wo der Hof ohne Punkt auf der Karte
+ * fehlen würde — nicht bei stillgelegten Höfen und nie bei einem Testhof (der
+ * steht ohnehin auf keiner Karte, Register N21). Ein Hinweis, keine Sperre.
+ */
+export function kartenpunktZeile(hof: { archivedAt: Date | null; istTesthof: boolean; hatKartenpunkt: boolean }): string | null {
+  return hof.archivedAt === null && !hof.istTesthof && !hof.hatKartenpunkt ? KEIN_KARTENPUNKT_TEXT : null
+}
+
 /**
  * Freigeschaltet, Stripe fertig, aber Online steht aus der Zeit vor Z1 noch
  * auf aus: Der Checkout bietet online dann nicht an. Der Hof schaltet es in
@@ -246,6 +258,10 @@ export type HofRohdaten = {
   sepaErteilt: boolean
   /** Aus der Vergabe der Gründungsplätze genommen (Register K2, Nr. 109). */
   gruendungAusgenommen: boolean
+  /** Testhof (Register N21, Nr. 119) — im Admin sichtbar und mitgezählt, nur die Marke ist anders. */
+  istTesthof: boolean
+  /** Breite UND Länge gesetzt (Nr. 119) — nur als Ja/Nein, die Koordinaten verlassen getAdminFarms nicht. */
+  hatKartenpunkt: boolean
   /** Mindestens ein Produkt im Shop — Bedingung fürs Freischalten (Register K2, Nr. 116). */
   produktImShop: boolean
   /** Zusagen festgeschrieben (Nr. 116) — dann ändert Zurücknehmen keinen Platz. Fehlt es: nein. */
@@ -273,8 +289,12 @@ export type AdminHofZeile = {
   status: HofStatus
   /** Belegter Gründungsplatz (1 … Plätze der Einstellung) — null ohne Platz, auch wenn ausgenommen. */
   gruendungsplatz: number | null
-  /** Ausgenommen (Register K2, Nr. 109): Die Spalte zeigt die Marke „ausgenommen · Testhof“ statt „kein Gründungshof“. */
+  /** Ausgenommen (Register K2, Nr. 109): Die Spalte zeigt die Marke „ausgenommen“ statt „kein Gründungshof“. */
   gruendungAusgenommen: boolean
+  /** Testhof (Register N21, Nr. 119): Die Spalte zeigt nur die Marke „Testhof“. */
+  istTesthof: boolean
+  /** „Kein Kartenpunkt – …“ (Nr. 119) oder null — nicht sperrend. */
+  kartenpunktZeile: string | null
   /** Zusagen festgeschrieben (Nr. 116): Zurücknehmen lässt Platz und Ende stehen. */
   gruendungFest: boolean
   /** Der Satz zur Gründung im Freischalt-Dialog (Platz und Ende bzw. warum keiner) — null ohne Satz. */
@@ -321,6 +341,8 @@ export function adminHofZeile(
     gruendungsplatz: hof.approvedAt && !hof.archivedAt ? platz : null,
     // Nur ein Hof im Rennen kann ausgenommen sein; ein stillgelegter trägt die Marke nicht.
     gruendungAusgenommen: hof.approvedAt !== null && hof.archivedAt === null && hof.gruendungAusgenommen,
+    istTesthof: hof.istTesthof,
+    kartenpunktZeile: kartenpunktZeile(hof),
     gruendungFest: hof.gruendungFest === true,
     freischaltHinweis: hof.approvedAt === null ? (hof.freischaltHinweis ?? null) : null,
     stripeBereit: hof.stripeBereit,

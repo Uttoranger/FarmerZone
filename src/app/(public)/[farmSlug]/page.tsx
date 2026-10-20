@@ -78,7 +78,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const { farm, ansicht } = await ladeHofseiteGeteilt(farmSlug, suche)
   if (!farm) return HOF_NICHT_GEFUNDEN
   // Die Vorschau-Adresse bleibt ganz fern; ein Hof ohne Produkt im Shop und ein
-  // ausgenommener (Testhof) nur aus dem Index — seinen Links folgen Suchmaschinen weiter.
+  // Testhof (Register N21) nur aus dem Index — seinen Links folgen Suchmaschinen weiter.
   const robots = ansicht.noindex ? { robots: { index: false, follow: false } } : !seo.indexieren ? { robots: { index: false, follow: true } } : {}
 
   // Dieselbe Regel wie „Über uns“ auf der Seite: Ein geleerter eigener Text

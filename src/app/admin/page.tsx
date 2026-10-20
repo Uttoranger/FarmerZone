@@ -8,7 +8,7 @@ import { lesePlattformEinstellung } from '@/server/queries/plattform-einstellung
 import { gruendungEinstellungAus } from '@/lib/plattform-einstellung'
 import { gruendungsplaetze, zaehleAusgenommene } from '@/lib/gruendungshof'
 import { adminHofZeile } from '@/lib/admin-hoefe'
-import { gruendungAenderung, gruendungZuletztText, platzBeiFreischaltung } from '@/lib/admin-hoefe-seite'
+import { gruendungAenderung, gruendungZuletztText, platzBeiFreischaltung, testhofAenderung } from '@/lib/admin-hoefe-seite'
 import { MELDUNG_ART_LABEL, STATUS_ZU_ENTSCHEIDEN } from '@/lib/meldung'
 import { MELDUNG_ART_TON } from '@/lib/hof-hilfe'
 import { HoefeAnsicht, type AdminHof, type NeueMeldung } from '@/components/admin/hoefe-ansicht'
@@ -61,6 +61,8 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
           platzBeiFreischaltung: f.approvedAt === null && f.archivedAt === null ? platzBeiFreischaltung(f.id, farms, jetzt, regeln) : null,
           // Nur freigeschaltete, nicht stillgelegte Höfe lassen sich aus- bzw. wieder aufnehmen (Register K2, Nr. 109).
           gruendungAenderung: imRennenOderAusgenommen ? gruendungAenderung(f, farms, maxPlaetze, standardBis) : null,
+          // Testhof (Register N21, Nr. 119): markieren wie ausnehmen, zurücknehmen bei jedem Testhof.
+          testhofAenderung: testhofAenderung(f, farms, maxPlaetze),
           gruendungZuletzt: gruendungZuletztText(
             f.gruendungGeaendertAm,
             f.gruendungGeaendertVonUserId ? (nameVon.get(f.gruendungGeaendertVonUserId) ?? null) : null

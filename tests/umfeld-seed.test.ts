@@ -26,6 +26,7 @@ type HofZeile = {
   isPaused: boolean
   archivedAt: Date | null
   approvedAt: Date | null
+  istTesthof: boolean
 }
 
 /** So legt der Seed-Lauf die Höfe an (prisma/seed-lauf.ts, `stamm`): aktiv, nicht pausiert, nicht stillgelegt. */
@@ -41,6 +42,8 @@ function alsZeile(h: SeedHof): HofZeile {
     isPaused: false,
     archivedAt: null,
     approvedAt: h.freigegeben ? new Date('2026-06-01') : null,
+    // Kein Seed-Hof ist markiert (Register N21) — die Vorschauen brauchen sichtbare Höfe.
+    istTesthof: false,
   }
 }
 
@@ -58,6 +61,7 @@ function passt(hof: HofZeile, where: Record<string, unknown>): boolean {
     switch (schluessel) {
       case 'isActive':
       case 'isPaused':
+      case 'istTesthof':
         return hof[schluessel] === bedingung
       case 'archivedAt':
         if (bedingung !== null) throw new Error('archivedAt: nur null erwartet')

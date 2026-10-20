@@ -3,7 +3,8 @@
  *
  * Beweist:
  *  - Die Sitemap fragt nur Höfe, die auch indexiert werden: öffentlich
- *    (OEFFENTLICH_SICHTBAR), nicht ausgenommen, mindestens ein Produkt im Shop —
+ *    und kein Testhof (IN_LISTEN_SICHTBAR, Register N21), mindestens ein Produkt
+ *    im Shop — ein nur aus der Gründung ausgenommener Hof steht drin (Nr. 119) —
  *    und von ihnen nur die Produkte im Shop.
  *  - Volle Adressen aus der Basis von metadataBase; lastModified je Hof (das
  *    jüngste Datum von Hof und Produkten) und je Produkt.
@@ -43,7 +44,7 @@ vi.mock('@/lib/umgebung-server', async (original) => {
 import sitemap, { revalidate } from '@/app/sitemap'
 import * as Sentry from '@sentry/nextjs'
 import { PRIVATE_BEREICHE } from '@/lib/robots'
-import { OEFFENTLICH_SICHTBAR } from '@/server/queries/farm'
+import { IN_LISTEN_SICHTBAR } from '@/server/queries/farm'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 const FESTE = ['/', '/hoefe', '/fuer-hoefe', '/konditionen', '/agb', '/datenschutz', '/impressum']
@@ -67,11 +68,12 @@ describe('Sitemap', () => {
     expect(revalidate).toBe(3600)
   })
 
-  it('fragt nur Höfe, die indexiert werden — öffentlich, nicht ausgenommen, mit Produkt im Shop — und deren Produkte im Shop', async () => {
+  it('fragt nur Höfe, die indexiert werden — öffentlich, kein Testhof, mit Produkt im Shop — und deren Produkte im Shop', async () => {
     await sitemap()
     expect(db.argumente).toEqual([
       expect.objectContaining({
-        where: { ...OEFFENTLICH_SICHTBAR, gruendungAusgenommen: false, products: { some: { isAvailable: true } } },
+        // EXAKT: kein gruendungAusgenommen mehr — ein ausgenommener echter Hof steht in der Sitemap (Register N21).
+        where: { ...IN_LISTEN_SICHTBAR, products: { some: { isAvailable: true } } },
         select: expect.objectContaining({ products: expect.objectContaining({ where: { isAvailable: true } }) }),
       }),
     ])

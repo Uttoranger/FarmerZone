@@ -226,7 +226,7 @@ describe('nimmWiederAuf nach dem Festschreiben', () => {
     db.farm.findMany.mockResolvedValue([hof(1, { gruendungPlatz: 1 }), hof(2, { gruendungAusgenommen: true, gruendungBis: new Date('2030-01-31T00:00:00.000Z') })])
     expect(await nimmWiederAuf({ farmId: 'hof_2' })).toEqual({ ok: true })
     expect(db.farm.updateMany).toHaveBeenCalledWith({
-      where: { id: 'hof_2', gruendungAusgenommen: true, approvedAt: { not: null }, archivedAt: null },
+      where: { id: 'hof_2', gruendungAusgenommen: true, istTesthof: false, approvedAt: { not: null }, archivedAt: null },
       data: expect.objectContaining({ gruendungAusgenommen: false, gruendungPlatz: 2, gruendungBis: new Date('2030-01-31T00:00:00.000Z') }),
     })
   })

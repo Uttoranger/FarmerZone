@@ -100,6 +100,7 @@ const HOF: PublicFarm = {
   serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
   betriebsstatus: null,
   gruendungshof: false,
+  istTesthof: false,
   gruendungSeit: null,
   abzeichenBlatt: null,
   products: [],
