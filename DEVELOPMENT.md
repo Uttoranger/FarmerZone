@@ -5447,6 +5447,16 @@ Ausgangslage: Am 19.10. lief keiner der vier Abläufe (Vercel Hobby gesperrt), u
 | Install-Skripte | keine; `pvutils` hat nur `prepare`, das bei Installation aus der Registry nicht läuft; `allowBuilds` unverändert |
 | `pnpm install --frozen-lockfile` (aus leerem `node_modules`) | läuft durch – keine Ausnahme in `minimumReleaseAgeExclude` nötig |
 
+## Testhof, Kartenpunkt-Hinweis, Satz beim Festschreiben (Register N21, K2; Nr. 119, Nachtlauf 18)
+
+- **Anlass:** „Ausgenommen“ (Nr. 109) hieß bisher zweierlei: zählt nicht für die Gründungsplätze UND ist ein Testhof. Seit Nr. 117 las auch noindex und Sitemap `gruendungAusgenommen` — ein echter, nur aus der Aktion genommener Hof war damit unsichtbar für Suchmaschinen (in der Produktion der Hof der Projektleitung).
+- **Fachregel:** Ein Testhof (`Farm.istTesthof`) ist ein Hof nur zum Ausprobieren. Er erscheint in keiner Liste, Karte, Zählung oder Auswahl (/hoefe samt Produktsuche, Startseite und Admin › Startseite, Umfeld, Futter kaufen, Sitemap, Zahl der wartenden Höfe), trägt noindex, seine Hofseite bleibt per Link erreichbar und zeigt oben einen ruhigen Hinweis; Bestellen bleibt möglich. Ein Testhof ist immer auch ausgenommen — so bleiben alle Regeln der Gründung unverändert und ein Testhof bekommt nie Platz oder Abzeichen. „Ausgenommen“ heißt nur noch „zählt nicht für die Plätze“: ein ausgenommener echter Hof ist normal sichtbar und wird indexiert.
+- **Zwei Stufen, eine Quelle:** `OEFFENTLICH_SICHTBAR` für direkte Links (Hofseite, Produktseite, Teilen-Bild, Plakat, Teilen-Zählung), `IN_LISTEN_SICHTBAR` = dasselbe plus `istTesthof: false` für alles andere (`src/server/queries/farm.ts`). Eine Wache am Syntaxbaum nennt jede neue Stelle von `OEFFENTLICH_SICHTBAR` mit Datei und Zeile.
+- **Markieren und Zurücknehmen** (Admin › Höfe › ⋯): `markiereAlsTesthof` setzt Testhof, ausgenommen und gibt den Platz frei — in EINER Transaktion unter der Sperre der Gründungsplätze, bedingt geschrieben; hält der Hof einen Platz, nur mit dem Haken „Das ist ein Testhof, kein echter Hof.“. `nimmTesthofZurueck` setzt nur das Merkmal zurück, der Hof bleibt ausgenommen; wieder zählen geht über den bestehenden Eintrag, den `nimmWiederAuf` für einen Testhof ablehnt. Danach neu gebaut: Seiten der Gründung, Höfe-Liste (Tag), Sitemap, Startseite (Tag) und die Hofseite. Markiert wird nach dem Merge durch die Projektleitung (die Migration ändert keine Daten).
+- **Kartenpunkt:** Admin › Höfe liest nur „hat Breite und Länge“ (`hatKartenpunkt`) und zeigt in Warteliste und Zeile die leise, nicht sperrende Zeile „Kein Kartenpunkt – der Hof erscheint nicht auf der Karte.“ Keine automatische Suche nach der Adresse — das bräuchte eine geänderte Datenschutzerklärung.
+- **Festschreiben:** Bei leerer Liste und ausgenommenen Höfen sagt der Dialog „Alle freigeschalteten Höfe sind ausgenommen …“ statt „Bisher ist kein Hof freigeschaltet …“.
+- **Marke:** „ausgenommen · Testhof“ wurde „ausgenommen“; ein Testhof trägt nur „Testhof“.
+
 ## Nützliche Befehle
 
 ```bash
