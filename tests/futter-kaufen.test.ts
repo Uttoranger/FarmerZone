@@ -188,7 +188,7 @@ describe('Filter, Chips, Hinweise, Leerzustand', () => {
         produkte: [produkt(), produkt({ id: 'x1', farmId: 'ohne-1' }), produkt({ id: 'x2', farmId: 'ohne-2' })],
       })
     )
-    expect(ansicht.hinweise).toEqual(['1 Hof ohne Standort nicht berücksichtigt.'])
+    expect(ansicht.hinweise).toEqual(['1 Hof hat noch keinen Standort auf der Karte und fehlt hier.'])
     expect(ansicht.angebote).toHaveLength(1)
   })
 })

@@ -176,7 +176,7 @@ describe('Umfeld des Pilothofs im Testdatensatz', () => {
     // Er führt Käse und Fisch — also Hofladen, kein Futter.
     const daten = await umfeld(25)
     expect(baueUmfeld({ ...daten, bereich: 'LEBENSMITTEL', km: 25 }).hinweise).toEqual([
-      '1 Hof ohne Standort nicht berücksichtigt.',
+      '1 Hof hat noch keinen Standort auf der Karte und fehlt hier.',
     ])
     expect(baueUmfeld({ ...daten, bereich: 'FUTTERMITTEL', km: 25 }).hinweise).toEqual([])
   })

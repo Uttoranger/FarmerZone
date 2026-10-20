@@ -11,7 +11,8 @@
  *  - Jeder Ordner unter src/app, der eine `loading.tsx` UND eine Seite hat, die die Adresse liest
  *    (`searchParams` in der `page.tsx`, `useSearchParams()` in einer Datei daneben), steht in AUSNAHMEN — mit
  *    Art und Grund. Eine neue Seite dieser Art fällt hier mit ihrem Namen auf. Nr. 121 hat fünf Seiten vom Bestand
- *    genommen (Hof › Postfach, Bestellungen, Auswertung, Admin › Einstellungen und Finanzen); drei bleiben mit Grund.
+ *    genommen (Hof › Postfach, Bestellungen, Auswertung, Admin › Einstellungen und Finanzen), Nr. 122 Region
+ *    (Ladepunkt statt Skelett, Register N23); zwei bleiben mit Grund.
  *  - Jede Ausnahme gibt es noch: Ist die `loading.tsx` weg oder liest die Seite die Adresse nicht mehr, fällt
  *    die Zeile als veraltet auf und muss raus.
  *  - /hoefe liest seit N19 (Entdecken statisch) keine Adresse mehr und behält seine `loading.tsx` ohne Ausnahme.
@@ -50,7 +51,6 @@ const AUSNAHMEN: Record<string, { art: Art; grund: string }> = {
   'src/app/sicherheit/nicht-ich': { art: 'kein-filter', grund: 'Die Adresse trägt den Token aus der Mail „Neue Anmeldung“.' },
   'src/app/(hof)/farm-page': { art: 'bestand', grund: 'Der Reiter (?reiter=) wechselt per Link; jeder Klick zeigt das Skelett. /status zeigt dieselbe Ladeansicht (tests/ladeansichten.test.ts) – Umbau erst mit eigener Komponente (Lauf 19).' },
   'src/app/(hof)/orders/[orderId]': { art: 'bestand', grund: 'Die Liste neben der Bestellung filtert in der Adresse (?filter=); jeder Klick zeigt das Skelett. Die Zeilen der Liste öffnen diese Route, ihr Skelett ist dort die einzige Rückmeldung – erst mit Ladepunkt an der Zeile (Lauf 19).' },
-  'src/app/(hof)/region': { art: 'bestand', grund: 'Reiter, Umkreis und Filter (?reiter=, km, …) stehen in der Adresse; jeder Klick zeigt das Skelett. Mehrere Arten von Links und die Karte dahinter – Umbau in Lauf 19.' },
 }
 
 /** Liest dieser Quelltext die Adresse der Seite — `searchParams` (Seiten-Eigenschaft) oder `useSearchParams()`? */

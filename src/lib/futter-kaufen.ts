@@ -20,7 +20,7 @@
  * pausiert) steht in der WHERE-Klausel der Abfrage — dieselbe Regel wie das
  * Umfeld, keine zweite.
  */
-import { formatEuro, formatKilopreis, mitAnzahl } from '@/lib/format'
+import { formatEuro, formatKilopreis } from '@/lib/format'
 import { istKaufbar, grundpreisAusKennzeichnung, type Grundpreis } from '@/lib/bereiche-anzeige'
 import { gebindeSperre, hatRegistrierung, type VerpackungValue } from '@/lib/futter-registrierung'
 import { formatiereAbholung, formatiereEntfernung, naechsteAbholung, type AbholFenster, type OrtsZeit } from '@/lib/hofuebersicht'
@@ -34,6 +34,7 @@ import {
   type ProductCategoryValue,
 } from '@/lib/taxonomie'
 import { UMFELD_KM, type UmfeldKm } from '@/lib/umfeld'
+import { ohneStandortHinweis } from '@/lib/region'
 import { mitKaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 import { FUTTER_ART_VALUES, type FutterArt, type FutterKaufenFilter, type FutterMenge } from '@/schemas/region'
 
@@ -267,7 +268,7 @@ export function baueFutterKaufen(eingabe: FutterKaufenEingabe): FutterKaufenAnsi
 
   const hinweise: string[] = []
   const ohneStandort = angeboteneGroessen(eingabe.ohneStandort, eingabe.produkte).size
-  if (ohneStandort > 0) hinweise.push(`${mitAnzahl(ohneStandort, 'Hof', 'Höfe')} ohne Standort nicht berücksichtigt.`)
+  if (ohneStandort > 0) hinweise.push(ohneStandortHinweis(ohneStandort))
   if (eingabe.abgeschnitten) hinweise.push('Wir zeigen die nächsten Höfe – weiter entfernte fehlen.')
 
   let leer: FutterKaufenAnsicht['leer'] = null

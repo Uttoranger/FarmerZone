@@ -230,8 +230,10 @@ const OHNE_EIGENE = new Set(['src/app/(farmer)/analytics', 'src/app/(farmer)/ana
  * (`LadeRahmen`/`LadeInhalt`, `ladePunkt` am Link). Eine eigene `loading.tsx`
  * wäre genau das Skelett pro Klick; beim ersten Aufruf greift der Rückfall der
  * Gruppe. Die Liste darf nur kleiner werden – und nie ohne Ladepunkt in der Seite.
+ * Region seit Nr. 122 (N23): `LadeRahmen` in der Seite, `LadeInhalt` und der Ladepunkt
+ * am Reiter in den beiden Teilen der Seite (preise-reiter.tsx, futter-reiter.tsx).
  */
-const LADEPUNKT_STATT_SKELETT = new Set(['src/app/(hof)/postfach', 'src/app/(hof)/orders', 'src/app/(hof)/analytics'])
+const LADEPUNKT_STATT_SKELETT = new Set(['src/app/(hof)/postfach', 'src/app/(hof)/orders', 'src/app/(hof)/analytics', 'src/app/(hof)/region'])
 
 /** Alle Ordner unter `wurzel` mit einer page.tsx. */
 function routenOrdner(wurzel: string): string[] {

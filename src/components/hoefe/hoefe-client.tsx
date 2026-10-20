@@ -51,7 +51,7 @@ import HoefeKarussell from '@/components/hoefe/hoefe-karussell'
 import { HoefeSuche } from '@/components/hoefe/hoefe-suche'
 import { HOEFE_ADRESSE, ankunftAusAdresse, useHoefeAdresse } from '@/components/hoefe/use-hoefe-adresse'
 import { BlattGruppe, EntdeckenFilterblatt } from '@/components/hoefe/entdecken-filterblatt'
-import { HofKurzkarte } from '@/components/hoefe/hof-kurzkarte'
+import { HofKurzkarte, KurzkartenInhalt } from '@/components/hoefe/hof-kurzkarte'
 import { useUhr } from '@/components/hoefe/use-uhr'
 import {
   AktiveFilterZeile,
@@ -292,7 +292,11 @@ export function HoefeClient({
     const hof = gefiltert.find((h) => h.slug === slug)
     if (!hof) return null
     const auswahl = waehleVorschauImBereich(hof, bereich, vorschauKategorien, 2, suchbegriffe)
-    return <HofKurzkarte hof={hof} bereich={bereich} schaufenster={auswahl} jetzt={jetzt} id={id} />
+    return (
+      <HofKurzkarte art="tooltip" hof={hof} bereich={bereich} id={id}>
+        <KurzkartenInhalt hof={hof} schaufenster={auswahl} jetzt={jetzt} />
+      </HofKurzkarte>
+    )
   }
 
   /** Vorschlag übernommen → Such-Marke, das Feld wird frei für den nächsten Begriff. */
