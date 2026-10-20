@@ -1,6 +1,6 @@
 # TECH_STACK
 
-Stand: 2026-09. Bei Abweichung gilt `package.json`, nicht diese Datei — und dann diese Datei korrigieren.
+Stand: 2026-10. Bei Abweichung gilt `package.json`, nicht diese Datei — und dann diese Datei korrigieren.
 
 ---
 
@@ -16,6 +16,7 @@ Stand: 2026-09. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 | `zod` | **^4.4.3** | **Zod 4**, nicht 3 (s. u.) |
 | `tailwindcss` | **^4** | **Tailwind 4**, CSS-basiert, keine `tailwind.config.js` |
 | `better-auth` | ^1.6.23 | Sessions, kein NextAuth |
+| `@better-auth/passkey` | **1.6.23** (genau, gleich `better-auth`) | Passkey-Anmeldung für Admins (N20). Offizielles Plugin von better-auth — keine eigene WebAuthn-Logik. Installiert vor Nr. 115, importiert erst dort. |
 | `stripe` | ^22.1.1 | Connect + Webhooks |
 | `vitest` | ^4.1.10 | Node-Umgebung, kein jsdom |
 | `pnpm` | **10.33.0** | Exklusiv |
@@ -110,6 +111,7 @@ Nur mit Freigabe. Vorher beantworten, im Vorschlag mitliefern:
 2. Deckt eine bereits installierte Bibliothek den Fall ab? (Tabelle Abschnitt 2 prüfen.)
 3. Bundle-Größe, Wartungsstand, Kompatibilität mit React 19 / Next 16?
 4. Läuft es in Vercels serverloser Umgebung? (Kein Dateisystem-Schreibzugriff, kein Prozess-Zustand über Requests hinweg.)
+5. Neue Versionen erst ab 14 Tagen (`minimumReleaseAge`, G6). Eine dringende Sicherheitskorrektur ist die einzige Ausnahme: nur mit Freigabe, je Version in `minimumReleaseAgeExclude`, mit Kommentar und Datum.
 
 Nach der Freigabe: hier in die Tabelle eintragen.
 

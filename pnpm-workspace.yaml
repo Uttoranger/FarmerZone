@@ -13,6 +13,12 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
 
+# Mindestalter für Paketversionen in Minuten (20160 = 14 Tage), auch für
+# Unterpakete: Verseuchte Versionen werden meist in den ersten Tagen entdeckt
+# und zurückgezogen. Ausnahmen nur mit Freigabe, je Version in
+# minimumReleaseAgeExclude (Register G6, 19.10.2026).
+minimumReleaseAge: 20160
+
 # Sicherheits-Overrides. Stehen hier, weil das Feld "pnpm" in package.json
 # abgekündigt ist — neuere pnpm-Versionen lesen es nicht mehr und ließen die
 # Overrides dort stillschweigend fallen.
