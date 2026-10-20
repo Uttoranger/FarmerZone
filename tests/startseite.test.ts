@@ -636,15 +636,56 @@ describe('Abschnitte', () => {
     expect(text).toContain(`© 2026 ${MARKE}`)
   })
 
-  // Nr. 120 Runde 1: „Höfe entdecken" und „So funktioniert's" stehen am Computer im
-  // Seitenfuß direkt darunter (SEITENFUSS.wege) — die Spalte mit der Marke fällt weg.
-  it('kein doppelter Weg: der Fuß der Startseite verlinkt weder /hoefe noch #so-funktionierts', () => {
-    const text = html(createElement(StartseiteFuss, { jahr: 2026 }))
-    for (const href of ['/hoefe', '/#so-funktionierts']) expect(text, href).not.toContain(`href="${href}"`)
-    expect(text).not.toContain(`aria-label="${MARKE}"`)
-    // Gegenprobe: Der Seitenfuß darunter führt beide Wege.
-    const fuss = html(createElement(KundeFuss))
-    for (const href of ['/hoefe', '/#so-funktionierts']) expect(fuss, href).toContain(`href="${href}"`)
+  // Nr. 120 Runde 2: „Höfe entdecken" und „So funktioniert's" stehen am Computer im
+  // Seitenfuß direkt darunter (SEITENFUSS.wege, erst ab md). Am Handy führt der
+  // Seitenfuß sie nicht, und die Produktseite hat dort keine Unterleiste — also
+  // bleibt die Spalte mit der Marke, nur am Computer ausgeblendet.
+  describe('Wege im Fuß: am Handy in der Spalte der Marke, am Computer im Seitenfuß', () => {
+    const WEGE = ['href="/hoefe', 'href="/#so-funktionierts"'] as const
+    /** Die Klassen aller umschließenden Kästen des Tags mit `marke` (samt diesem Tag): ein Stapel über die Tags davor. */
+    function klassenVor(text: string, marke: string): string[] {
+      const stelle = text.indexOf(marke)
+      expect(stelle, marke).toBeGreaterThan(-1)
+      const stapel: string[] = []
+      for (const [, zu, klasse] of text.slice(0, text.indexOf('>', stelle) + 1).matchAll(/<(\/)?(?:footer|div|nav|ul|li)\b(?:[^>]*class="([^"]*)")?[^>]*>/g)) {
+        if (zu) stapel.pop()
+        else stapel.push(klasse ?? '')
+      }
+      return stapel.join(' ').split(/\s+/).filter(Boolean)
+    }
+    const startseite = html(createElement(StartseiteFuss, { jahr: 2026 }))
+    const seitenfuss = html(createElement(KundeFuss))
+
+    it('der Fuß der Startseite führt beide Wege in der Spalte der Marke, Reihenfolge und Wörter wie vor Runde 1', () => {
+      const spalte = startseite.slice(startseite.indexOf(`aria-label="${MARKE}"`), startseite.indexOf('aria-label="Für Höfe"'))
+      expect(spalte).toContain(`>${MARKE}</p>`)
+      expect(spalte.indexOf(WEGE[0])).toBeGreaterThan(-1)
+      expect(spalte.indexOf(WEGE[0])).toBeLessThan(spalte.indexOf(WEGE[1]))
+      for (const wort of ['Höfe entdecken', 'So funktioniert’s']) expect(spalte).toContain(`>${wort}</a>`)
+    })
+
+    it('die Spalte der Marke ist nur am Computer verborgen (md:hidden), „Für Höfe" nicht (Gegenprobe)', () => {
+      expect(klassenVor(startseite, `aria-label="${MARKE}"`)).toContain('md:hidden')
+      expect(klassenVor(startseite, 'aria-label="Für Höfe"')).not.toContain('md:hidden')
+      // Am Handy stehen beide Spalten nebeneinander wie vor Runde 1.
+      expect(startseite).toMatch(/class="grid grid-cols-2 gap-6 md:flex md:gap-\[70px\]"/)
+    })
+
+    it('der Seitenfuß führt die Wege nur ab md — zusammen steht jeder Weg genau einmal sichtbar', () => {
+      for (const weg of WEGE) {
+        const huelle = klassenVor(seitenfuss, weg)
+        expect(huelle, weg).toContain('hidden')
+        expect(huelle, weg).toContain('md:flex')
+        // … und im Fuß der Startseite genau umgekehrt: am Handy sichtbar, ab md verborgen.
+        const spalte = klassenVor(startseite, weg)
+        expect(spalte, weg).toContain('md:hidden')
+        expect(spalte, weg).not.toContain('hidden')
+      }
+      // Gegenprobe: Die rechtlichen Links im Seitenfuß sind überall sichtbar.
+      const rechtlich = klassenVor(seitenfuss, 'href="/agb"')
+      expect(rechtlich).not.toContain('hidden')
+      expect(rechtlich).not.toContain('md:hidden')
+    })
   })
 
   // Nr. 120 (Register N22): Impressum, Datenschutz, AGB und „Problem melden" stehen im Seitenfuß der KundeShell direkt darunter.
