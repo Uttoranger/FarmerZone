@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { kontoHatHof } from '@/lib/admin-navigation'
-import { verlangeAdminSeite } from '@/server/admin-wache'
+import { verlangeAdminShell } from '@/server/admin-wache'
 import { zaehleWartendeHoefe } from '@/server/queries/admin'
 import { zaehleOffenImEingang } from '@/server/queries/postfach'
 import * as Sentry from '@sentry/nextjs'
@@ -16,8 +16,11 @@ export type Adminbereich = {
    * beide Ziele liegen im Hofbereich.
    */
   hatHof: boolean
-  /** Die Zähler der Reiter: wartende Höfe; am Postfach alles, was im Eingang offen ist (N14: Antworten, Meldungen, Aufgaben). */
-  zahlen: { hoefe: number; briefkasten: number }
+  /**
+   * Die Zähler der Reiter: wartende Höfe; am Postfach alles, was im Eingang offen ist (N14: Antworten, Meldungen, Aufgaben).
+   * Fehlt im Pflicht-Zustand und in einer Sitzung ohne Passkey (N20, Nr. 115): keine Daten, auch nicht im Kopf.
+   */
+  zahlen?: { hoefe: number; briefkasten: number }
   /**
    * Offene Warnungen von Admin › Betrieb für Punkt und Betriebsleiste
    * (Register N15/N18) — nur in der Produktion, sonst null.
@@ -56,7 +59,14 @@ async function ladeBetriebHinweisSicher(): Promise<BetriebHinweis | null> {
  * Admin-Recht, nicht aus der Sitzung.
  */
 export async function ladeAdminbereich(): Promise<Adminbereich> {
-  const userId = await verlangeAdminSeite()
+  // Das Layout umhüllt auch die Pflichtseite (/admin/einrichten). Im
+  // Pflicht-Zustand und in einer Sitzung ohne Passkey nur die Shell mit Name —
+  // keine Zähler, kein Betriebshinweis (N20, Nr. 115); die Seiten prüfen selbst.
+  const { userId, inhaltOffen } = await verlangeAdminShell()
+  if (!inhaltOffen) {
+    const nutzer = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true, farm: { select: { id: true } } } })
+    return { personName: nutzer?.name ?? '', hatHof: kontoHatHof({ rolle: nutzer?.role, hofVorhanden: nutzer?.farm != null }), betrieb: null }
+  }
   const [nutzer, hoefe, offen, betrieb] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true, farm: { select: { id: true } } } }),
     zaehleWartendeHoefe(),

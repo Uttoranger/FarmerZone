@@ -39,7 +39,7 @@ import { GRUENDUNG_EINSTELLUNG_FEHLER } from '@/lib/plattform-einstellung'
 import { approveFarmAction, revokeFarmApprovalAction } from '@/server/actions/admin'
 import { speichereGruendungEinstellung } from '@/server/actions/plattform-einstellung'
 import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
-import { erstelleHof, erstelleHofMitAnmeldung, erstelleProdukt, raeumeAuf } from './setup/basis'
+import { erstelleHof, erstelleHofMitAnmeldung, erstelleProdukt, raeumeAuf, machePasskeyAdmin } from './setup/basis'
 
 const MIGRATION = readFileSync(join(process.cwd(), 'prisma', 'migrations', '20261015120000_plattform_einstellung', 'migration.sql'), 'utf8')
 
@@ -63,7 +63,7 @@ afterEach(async () => {
 /** Ein Admin mit echter Sitzung — das Cookie geht über das gemockte headers() an die Action. */
 async function alsAdmin(): Promise<string> {
   const { ownerId, cookie } = await erstelleHofMitAnmeldung()
-  await prisma.user.update({ where: { id: ownerId }, data: { isAdmin: true } })
+  await machePasskeyAdmin(ownerId)
   vi.mocked(headers).mockResolvedValue(new Headers({ cookie }) as never)
   return ownerId
 }

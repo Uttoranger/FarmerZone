@@ -9,9 +9,12 @@ import { STRIPE_MARKE, TESTBETRIEB } from '@/lib/umgebung-server'
  * Betrieb · Einstellungen und — nur mit eigenem Hof — „← Zu meinem Hof", keine Hof-Seitenleiste
  * (docs/ai/DESIGN_SYSTEM.md).
  *
- * Zugang: ladeAdminbereich prüft zuerst mit verlangeAdminSeite (frisch aus
+ * Zugang: ladeAdminbereich prüft zuerst mit verlangeAdminShell (frisch aus
  * der Datenbank), erst danach lädt es Name und Zähler. Jede Seite darunter
- * prüft zusätzlich selbst (tests/admin-seiten-wache.test.ts).
+ * prüft zusätzlich selbst (tests/admin-seiten-wache.test.ts). Ohne Passkey
+ * (Pflicht, Register N20) und in einer Sitzung ohne Passkey kommt die Shell
+ * ohne Zähler und Betriebshinweis — das Layout umhüllt auch die Pflichtseite
+ * /admin/einrichten.
  */
 export const metadata: Metadata = {
   robots: { index: false, follow: false },

@@ -40,7 +40,7 @@ import { standardFassung } from '@/lib/startseite-fassung'
 import type { FassungInhalt } from '@/schemas/startseite-fassung'
 import { speichereEntwurf, uebernehmeFassungAlsEntwurf, veroeffentlicheStartseite, zieheFassungZurueck } from '@/server/actions/startseite'
 import { ladeStartseite, ladeStartseiteAdmin } from '@/server/queries/startseite'
-import { erstelleHofMitAnmeldung, raeumeAuf } from './setup/basis'
+import { erstelleHofMitAnmeldung, raeumeAuf, machePasskeyAdmin } from './setup/basis'
 
 const SEED_IDS = STANDARD_REIHENFOLGE.map((art) => `startseite-${art.toLowerCase().replace(/_/g, '-')}`)
 const TAG_MS = 24 * 60 * 60 * 1000
@@ -69,7 +69,7 @@ afterEach(async () => {
 /** Ein Admin mit echter Sitzung — das Cookie geht über das gemockte headers() an die Action. */
 async function alsAdmin(): Promise<string> {
   const { ownerId, cookie } = await erstelleHofMitAnmeldung()
-  await prisma.user.update({ where: { id: ownerId }, data: { isAdmin: true } })
+  await machePasskeyAdmin(ownerId)
   vi.mocked(headers).mockResolvedValue(new Headers({ cookie }) as never)
   return ownerId
 }

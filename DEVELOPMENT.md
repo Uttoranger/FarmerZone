@@ -5457,6 +5457,18 @@ Ausgangslage: Am 19.10. lief keiner der vier Abläufe (Vercel Hobby gesperrt), u
 - **Festschreiben:** Bei leerer Liste und ausgenommenen Höfen sagt der Dialog „Alle freigeschalteten Höfe sind ausgenommen …“ statt „Bisher ist kein Hof freigeschaltet …“.
 - **Marke:** „ausgenommen · Testhof“ wurde „ausgenommen“; ein Testhof trägt nur „Testhof“.
 
+## Nachtlauf 18 · Nr. 115 – Admin nur mit Passkey (Register N20, Ergänzung Lauf 18)
+
+Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passkey` 1.6.23) oder einem von 10 Ersatzcodes an; Passwort, „Passwort vergessen" und Code per E-Mail sind für dieses Konto gesperrt, auch für seinen Hof. Migration `20261020110000_admin_passkey` (Tabellen `Passkey`, `AdminErsatzcode`; `User.adminSeit`, `Session.passkeyAm`, `Session.anmeldeart`).
+
+- **Warum die Hooks und nicht das Plugin:** Das Plugin prüft Registrierung und Anmeldung mit `requireUserVerification: false`, fragt beim Anmelden fest „preferred" und legt bei jeder Anmeldung eine neue Sitzung an, ohne zu fragen, wer vorher angemeldet war (`allowCredentials` ist nur ein Hinweis an den Browser). Darum: Nutzerprüfung in beiden `afterVerification`, Besitz des Passkeys in `hooks.before` vor `/passkey/verify-authentication`, Fälle a–c auf beiden Registrierungs-Pfaden. Wirft `afterVerification` einen `APIError`, gibt das Plugin ihn weiter (sonst 500 bzw. 400).
+- **Anmeldeart:** `databaseHooks.session.create.before` bekommt in better-auth 1.6.23 den Endpunkt-Kontext samt `path` (`createWithHooks` → `getCurrentAuthContext`) — die Felder entstehen atomar mit der Sitzung; der Adapter schreibt sie nur, weil sie in `session.additionalFields` stehen (`input: false`, belegt: `/update-session` setzt sie nicht).
+- **Frische Bestätigung** ist eine erneute Anmeldung mit Passkey: Ein fremder Passkey scheitert mit 401 vor dem Endpunkt, die alte Sitzung bleibt; ein eigener ersetzt sie (eine Sitzung, `passkeyAm` jetzt). Nach einem Ersatzcode genau ein neuer Passkey: der Anspruch wird per bedingtem Schreiben auf der Sitzung verbraucht (zwei Tabs: einer 200, einer 403).
+- **Integrationstest mit echter Signatur:** `vi.mock('@simplewebauthn/server')` erreicht das Plugin nicht (es lädt außerhalb von Vite) — `tests/integration/admin-passkey.int.test.ts` baut die Antworten des Geräts mit einem kleinen Software-Authenticator (P-256, Attestation „none", Flag UV wählbar).
+- **Sitzung ohne Passkey (Runde 2):** Die Pflicht allein prüfte nur das Konto — eine Passwort-Sitzung auf einem anderen Gerät von vor dem ersten Passkey (oder jede Sitzung von vor dem Deploy, `passkeyAm` leer) öffnete nach der Einrichtung den Bereich bis zum Ende ihrer 12 Stunden. Die Wache verlangt deshalb auch `passkeyAm` der Sitzung; sie leitet nur um (der Hof bleibt erreichbar), statt abzumelden.
+- **Admin ohne Hof:** /login leitet ein Konto mit Admin-Recht ohne Hof nach /admin (vorher Schleife über /dashboard zurück auf /login); /account/profile zeigt „Zum Admin-Bereich".
+- **Nach dem Merge (Projektleitung):** `UPDATE "User" SET "adminSeit" = now() WHERE "email" = '<adresse>' AND "isAdmin" = true;` — dann binnen 24 Stunden mit Passwort anmelden, /admin/einrichten. Bis dahin ist der Admin-Bereich zu (Pflichtseite), der Hof bleibt erreichbar. Notfall (alle Geräte und Codes weg): `DELETE FROM "Passkey" WHERE "userId" = '<id>';` und `adminSeit` neu setzen.
+
 ## Nützliche Befehle
 
 ```bash

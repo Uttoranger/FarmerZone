@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { bestaetigteAdresse } from '@/server/kunden-adresse'
+import { isAdminUser } from '@/server/queries/admin'
 import { wartetAufBestaetigung, werbemailErlaubt } from '@/lib/abo-bestaetigung'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { ProfileClient } from './profile-client'
@@ -20,6 +21,9 @@ export default async function AccountProfilePage() {
   // Konto mehr anlegt, gehören Abos oft zu einer Adresse ohne Konto. Frisch
   // aus der Datenbank, nicht aus der Sitzung (bestaetigteAdresse).
   const customerEmail = await bestaetigteAdresse(session.user.id)
+  // Admin-Recht frisch aus der Datenbank, nie aus der Sitzung (Register N20,
+  // Nr. 115): Ein Admin ohne Hof findet hier den Weg in den Admin-Bereich.
+  const adminBereich = await isAdminUser(session.user.id)
   const subscriptions = customerEmail
     ? await prisma.customerFarmSubscription.findMany({
         where: { customerEmail },
@@ -32,6 +36,7 @@ export default async function AccountProfilePage() {
   return (
     <KundeShellMitSitzung>
       <ProfileClient
+        adminBereich={adminBereich}
         // Ohne Namen: Er kann aus einer Registrierung mit Passwort stammen, die
         // die Adresse nie bewiesen hat (Better Auth behält ihn beim ersten Code).
         user={{

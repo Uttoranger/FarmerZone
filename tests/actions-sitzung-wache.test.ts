@@ -46,10 +46,14 @@ const OEFFENTLICH: Ausnahme[] = [
   { datei: 'subscriptions.ts', name: 'unsubscribeWithToken', grund: 'Der Abmeldelink in der Mail trägt ein signiertes Token; die Abonnentin ist nicht angemeldet' },
 ]
 
-/** Aufrufe, die die Sitzung prüfen: Better Auth direkt oder die Admin-Prüfung der Aktionen. */
+/**
+ * Aufrufe, die die Sitzung prüfen: Better Auth direkt oder die Admin-Prüfung der Aktionen —
+ * seit Nr. 115 auch die der heiklen Aktionen (verlangeFrischeBestaetigung prüft erst alles von
+ * verlangeAdminAktion, dann die frische Bestätigung mit Passkey; Register N20).
+ */
 function istSitzungspruefung(aufruf: ts.CallExpression): boolean {
   const ziel = aufruf.expression
-  if (ts.isIdentifier(ziel)) return ziel.text === 'verlangeAdminAktion'
+  if (ts.isIdentifier(ziel)) return ziel.text === 'verlangeAdminAktion' || ziel.text === 'verlangeFrischeBestaetigung'
   return ts.isPropertyAccessExpression(ziel) && ziel.name.text === 'getSession'
 }
 
@@ -157,6 +161,8 @@ describe('Actions-Wache — Gegenprobe: die Suche schlägt an', () => {
     expect(ohnePruefung("'use server'\nasync function hof() { return await auth.api.getSession() }\nexport async function b() { return hof() }")).toEqual([])
     expect(ohnePruefung("'use server'\nasync function eins() { return await auth.api.getSession() }\nasync function zwei() { return eins() }\nexport async function c() { return zwei() }")).toEqual([])
     expect(ohnePruefung("'use server'\nexport const d = async () => { const a = await verlangeAdminAktion()\n return a }")).toEqual([])
+    expect(ohnePruefung("'use server'\nexport async function e() { const f = await verlangeFrischeBestaetigung()\n return f }")).toEqual([])
+    expect(ohnePruefung("'use server'\nexport async function g() { return verlangeFrischeBestaetigungNicht() }")).toEqual(['g'])
   })
 
   it('lässt Funktionen stehen, die nicht exportiert sind, und kommt mit Kreisen zurecht', () => {

@@ -23,7 +23,7 @@ const TEXTLINK = cn(
   FOKUS_RAHMEN
 )
 
-type Stand = 'offen' | 'ungueltig' | { passwortMail: boolean }
+type Stand = 'offen' | 'ungueltig' | { passwortMail: boolean; passkey?: true }
 
 export function NichtIchKarte({
   token,
@@ -49,7 +49,7 @@ export function NichtIchKarte({
           setFehler(NICHT_ICH_TEXT.zuViele)
           return
         }
-        setStand('ok' in antwort ? { passwortMail: antwort.passwortMail } : 'ungueltig')
+        setStand('ok' in antwort ? { passwortMail: antwort.passwortMail, passkey: antwort.passkey } : 'ungueltig')
         // Der Inhalt wechselt — der Fokus folgt der neuen Überschrift.
         requestAnimationFrame(() => ueberschrift.current?.focus())
       } catch {
@@ -69,7 +69,8 @@ export function NichtIchKarte({
         <h1 id="nicht-ich-titel" ref={ueberschrift} tabIndex={-1} className={TITEL}>
           {NICHT_ICH_TEXT.fertigTitel}
         </h1>
-        <p className={SATZ}>{stand.passwortMail ? NICHT_ICH_TEXT.fertigSatz : NICHT_ICH_TEXT.fertigOhneMail}</p>
+        {/* Admin mit Passkey (Register N20): kein Link für ein neues Passwort, eigener Satz. */}
+        <p className={SATZ}>{stand.passkey ? NICHT_ICH_TEXT.fertigPasskey : stand.passwortMail ? NICHT_ICH_TEXT.fertigSatz : NICHT_ICH_TEXT.fertigOhneMail}</p>
         <div className="flex gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3 text-[13px] leading-relaxed text-muted-foreground">
           <Info className="mt-0.5 size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
           <p>

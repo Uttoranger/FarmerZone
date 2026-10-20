@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { FlaskConical, Loader2 } from 'lucide-react'
 import { signIn } from '@/lib/auth-client'
 import { anmeldeFehlerVon, passwortZuVieleText, zielNachHofAnmeldung } from '@/lib/anmeldecode'
+import { ADMIN_ANMELDEN_TEXT, ADMIN_PFAD } from '@/lib/admin-anmeldung'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { PasswordInput } from '@/components/ui/password-input'
@@ -132,6 +133,10 @@ export function HofAnmeldung(): React.JSX.Element {
           Noch kein Hof? Registrieren
         </Link>
       </div>
+      {/* Der kleine Weg für Admin-Konten (Register N20, Nr. 115) — sonst ist /login/admin nirgends verlinkt. */}
+      <Link href={ADMIN_PFAD.anmelden} className={cn(TEXTKNOPF, 'self-start text-[13px] font-medium text-muted-foreground')}>
+        {ADMIN_ANMELDEN_TEXT.linkAufLogin}
+      </Link>
 
       {IS_DEV && (
         <div className="mt-2 rounded-2xl border border-dashed border-border p-4">

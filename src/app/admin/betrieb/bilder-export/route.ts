@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
-import { verlangeAdminAktion } from '@/server/admin-wache'
+import { frischOderBestaetigen, verlangeAdminAktion } from '@/server/admin-wache'
 import { listeBilder, zaehleAuflistungen } from '@/server/betrieb'
 import { bilderOhneVerwendungCsv, findeBilderOhneVerwendung } from '@/server/betrieb-bilder'
 import { UMGEBUNG } from '@/lib/umgebung-server'
@@ -29,6 +29,9 @@ const TEXT = { ...KOPF, 'Content-Type': 'text/plain; charset=utf-8' } as const
 export async function GET(): Promise<NextResponse> {
   const wache = await verlangeAdminAktion()
   if ('error' in wache) return new NextResponse('Kein Zugriff.', { status: 403, headers: TEXT })
+  // Heikler Download (Register N20, Nr. 115): ohne frische Bestätigung 303 auf /admin/bestaetigen.
+  const bestaetigen = await frischOderBestaetigen('/admin/betrieb/bilder-export')
+  if (bestaetigen) return bestaetigen
   if (!UMGEBUNG.vercelProduktion) return new NextResponse('Nur in der Produktion.', { status: 404, headers: TEXT })
 
   const jetzt = new Date()

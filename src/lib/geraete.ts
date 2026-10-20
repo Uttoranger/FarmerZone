@@ -259,6 +259,9 @@ export const NICHT_ICH_TEXT = {
   // „1 Stunde" = resetPasswordTokenExpiresIn in src/lib/auth.ts (wie die Mail password-reset.tsx).
   fertigSatz: 'Wir haben dir eine E-Mail mit einem Link für ein neues Passwort geschickt. Der Link gilt 1 Stunde.',
   fertigOhneMail: 'Leg über „Passwort vergessen" auf der Anmeldeseite ein neues Passwort fest.',
+  // Statt fertigSatz für einen Admin mit Passkey (Register N20, Nr. 115) — mit
+  // fertigTitel darüber: „Alle Geräte sind abgemeldet. Melde dich mit deinem Passkey wieder an."
+  fertigPasskey: 'Melde dich mit deinem Passkey wieder an.',
   fertigHinweis:
     'Kommt die Mail nicht an oder hat jemand dein Postfach übernommen? Ändere zuerst das Passwort deines E-Mail-Postfachs und schreib uns dann über',
   problemMelden: PROBLEM_MELDEN,

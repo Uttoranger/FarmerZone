@@ -4,7 +4,7 @@ import { revalidatePath, updateTag } from 'next/cache'
 import * as Sentry from '@sentry/nextjs'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { verlangeAdminAktion } from '@/server/admin-wache'
+import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import {
   FARM_REJECT_APPROVED_MESSAGE,
   FARM_REJECT_HAS_DATA_MESSAGE,
@@ -243,6 +243,9 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
  * offline" verschickt, würde mehr beschädigen als erklären.
  */
 export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?: string }> {
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  const frisch = await verlangeFrischeBestaetigung()
+  if ('error' in frisch) return { error: frisch.error }
   const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
 
@@ -279,6 +282,9 @@ export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?
  * Status-Beiträge, Abos (am Hof) sowie Sessions und Accounts (am User).
  */
 export async function rejectFarmAction(farmId: string): Promise<{ error?: string }> {
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  const frisch = await verlangeFrischeBestaetigung()
+  if ('error' in frisch) return { error: frisch.error }
   const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
 

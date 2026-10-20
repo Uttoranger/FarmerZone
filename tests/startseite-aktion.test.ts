@@ -38,7 +38,7 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidatePath: vi.fn(), unst
 vi.mock('next/navigation', () => ({ unstable_rethrow: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
-vi.mock('@/lib/prisma', () => {
+vi.mock('@/lib/prisma', async () => {
   const tx = {
     startseiteAbschnitt: { findMany: vi.fn(), update: vi.fn(), create: vi.fn() },
     startseiteBlock: { create: vi.fn(), update: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },
@@ -46,6 +46,8 @@ vi.mock('@/lib/prisma', () => {
   }
   return {
     prisma: {
+      // Die Wache liest seit Nr. 115 die Pflicht „erst Passkey“ (tests/admin-sitzung.ts).
+      ...(await import('./admin-sitzung')).passkeyAttrappen(),
       user: { findUnique: vi.fn(), findMany: vi.fn() },
       farm: { count: vi.fn(), findMany: vi.fn() },
       startseiteAbschnitt: { findMany: vi.fn() },
@@ -81,6 +83,7 @@ import {
   zieheFassungZurueck,
 } from '@/server/actions/startseite'
 import type { StartseitenBlockEingabe } from '@/schemas/startseite'
+import { adminSitzung } from './admin-sitzung'
 
 type Fn = ReturnType<typeof vi.fn>
 type TxMock = {
@@ -117,7 +120,7 @@ function block(teil: Partial<StartseitenBlockEingabe> = {}): StartseitenBlockEin
 beforeEach(() => {
   vi.clearAllMocks()
   vi.stubEnv('BLOB_READ_WRITE_TOKEN', `vercel_blob_rw_${SPEICHER}_geheim`)
-  vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'admin-1' } } as never)
+  vi.mocked(auth.api.getSession).mockResolvedValue(adminSitzung('admin-1') as never)
   vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true } as never)
   tx.startseiteAbschnitt.findMany.mockResolvedValue(ZEILEN)
   tx.startseiteBlock.create.mockResolvedValue({ id: 'block-neu' })

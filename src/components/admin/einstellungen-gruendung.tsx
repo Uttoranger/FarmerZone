@@ -13,6 +13,7 @@ import { FELD, FELD_LABEL, KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/hof-be
 import { BestellDialog, DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { GruendungSatz } from '@/components/gruendung/satz'
 import { GruendungPill } from '@/components/gruendung/pill'
+import { useFrischBestaetigt } from '@/components/admin/frisch-bestaetigen'
 
 const TEXT = EINSTELLUNGEN_TEXT.gruendung
 
@@ -110,6 +111,8 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
   const [fehler, setFehler] = useState<string | null>(null)
   const [festOffen, setFestOffen] = useState(false)
   const [festFehler, setFestFehler] = useState<string | null>(null)
+  // „Zusagen festschreiben" ist heikel (Register N20): frisch mit Passkey bestätigt.
+  const frischFest = useFrischBestaetigt(schreibeZusagenFest)
   const plaetzeId = useId()
   const monateId = useId()
   const aktionBisId = useId()
@@ -165,7 +168,7 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
   function festschreiben() {
     setFestFehler(null)
     startFest(async () => {
-      const ergebnis = await schreibeZusagenFest({ bestaetigt: true })
+      const ergebnis = await frischFest.ausfuehren({ bestaetigt: true })
       if ('error' in ergebnis) {
         setFestFehler(ergebnis.error)
         return
@@ -391,6 +394,7 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
         )}
         <DialogFehler text={festFehler} />
       </div>
+      {frischFest.dialog}
     </BestellDialog>
     </>
   )

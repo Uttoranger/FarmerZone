@@ -30,7 +30,7 @@ const db = vi.hoisted(() => ({
   startseiteBlock: { findMany: vi.fn() },
   startseiteFassung: { findMany: vi.fn() },
 }))
-const wache = vi.hoisted(() => ({ verlangeAdminAktion: vi.fn() }))
+const wache = vi.hoisted(() => ({ verlangeAdminAktion: vi.fn(), verlangeFrischeBestaetigung: vi.fn(async () => ({ ok: true, userId: 'admin_1', sitzungId: 'sitzung-admin_1' })), frischOderBestaetigen: vi.fn(async () => null), adminPflichtOffen: vi.fn(async () => false) }))
 const umgebung = vi.hoisted(() => ({ vercelProduktion: true }))
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
 vi.mock('@vercel/blob', () => ({ list: vi.fn() }))

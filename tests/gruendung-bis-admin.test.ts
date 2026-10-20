@@ -16,9 +16,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
-vi.mock('@/lib/prisma', () => ({
+vi.mock('@/lib/prisma', async () => ({
   prisma: {
     farm: { findUnique: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
+    // Die Wache liest seit Nr. 115 die Pflicht „erst Passkey“ (tests/admin-sitzung.ts).
+    ...(await import('./admin-sitzung')).passkeyAttrappen(),
     user: { findUnique: vi.fn() },
     // Seit Nr. 116 liest die Platzvergabe die Einstellung mit (ohne Zeile: Standard, nicht festgeschrieben).
     plattformEinstellung: { findUnique: vi.fn(async () => null) },
@@ -37,6 +39,7 @@ import {
 import { EINSTELLUNG_UNGUELTIG } from '@/schemas/servicegebuehr'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { adminSitzung } from './admin-sitzung'
 
 const getSession = vi.mocked(auth.api.getSession)
 const userFindUnique = vi.mocked(prisma.user.findUnique)
@@ -74,7 +77,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers()
   vi.setSystemTime(JETZT)
-  getSession.mockResolvedValue({ user: { id: 'admin_1' } } as never)
+  getSession.mockResolvedValue(adminSitzung('admin_1') as never)
   userFindUnique.mockResolvedValue({ isAdmin: true } as never)
   farmUpdateMany.mockResolvedValue({ count: 1 } as never)
   stand(null)
@@ -121,7 +124,7 @@ describe('setzeGruendungBisAction — Zugriff', () => {
   })
 
   it('ohne Admin-Recht aus der Datenbank: abgelehnt, auch wenn die Session es behauptet', async () => {
-    getSession.mockResolvedValue({ user: { id: 'user_1', isAdmin: true } } as never)
+    getSession.mockResolvedValue(adminSitzung('user_1', { isAdmin: true }) as never)
     userFindUnique.mockResolvedValue({ isAdmin: false } as never)
     expect(await setzeGruendungBisAction('farm_1', { gruendungBis: '2028-06-30', bestaetigt: false })).toEqual({ error: 'Kein Zugriff.' })
     expect(farmUpdateMany).not.toHaveBeenCalled()

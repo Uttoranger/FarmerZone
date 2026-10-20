@@ -25,10 +25,12 @@ vi.mock('@/lib/nach-der-antwort', () => ({
     nachlauf.aufgaben.push(aufgabe)
   },
 }))
-vi.mock('@/lib/prisma', () => {
+vi.mock('@/lib/prisma', async () => {
   const meldung = { findMany: vi.fn(), updateMany: vi.fn(async () => ({ count: 1 })) }
   return {
     prisma: {
+      // Die Wache liest seit Nr. 115 die Pflicht „erst Passkey“ (tests/admin-sitzung.ts).
+      ...(await import('./admin-sitzung')).passkeyAttrappen(),
       user: { findUnique: vi.fn() },
       meldung,
       $transaction: vi.fn(async (arbeit: (t: { meldung: typeof meldung }) => Promise<unknown>) => arbeit({ meldung })),
@@ -44,6 +46,7 @@ import { sendRaw } from '@/lib/email'
 import { sendeRundschreiben } from '@/server/actions/postfach'
 import { MELDUNG_KLICK_TEXT, WUENSCHE_TEXT } from '@/lib/meldung'
 import { legeMeldungAbAction, setzeBuendelStandAction } from '@/server/actions/admin'
+import { adminSitzung } from './admin-sitzung'
 
 const getSession = vi.mocked(auth.api.getSession)
 const userFindUnique = vi.mocked(prisma.user.findUnique)
@@ -52,7 +55,7 @@ const meldungUpdateMany = vi.mocked(prisma.meldung.updateMany)
 beforeEach(() => {
   vi.clearAllMocks()
   nachlauf.aufgaben.length = 0
-  getSession.mockResolvedValue({ user: { id: 'admin_1' } } as never)
+  getSession.mockResolvedValue(adminSitzung('admin_1') as never)
   userFindUnique.mockResolvedValue({ isAdmin: true } as never)
   meldungUpdateMany.mockResolvedValue({ count: 1 })
 })

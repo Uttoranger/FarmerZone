@@ -47,7 +47,7 @@ import { ZU_LANG } from '@/lib/eingabegrenzen'
 import { PLATTFORM_EINSTELLUNG_ID, PLATTFORM_EINSTELLUNG_TAG } from '@/lib/plattform-einstellung'
 import { DB_BREMSEN, innerhalbDerGrenze } from '@/lib/bremse-datenbank'
 import { bremseUeberAlleInstanzen, zaehleVersuche } from '@/server/bremse-datenbank'
-import { verlangeAdminAktion } from '@/server/admin-wache'
+import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import {
   empfaengerTokenHash,
@@ -355,6 +355,9 @@ export async function markiereGelesenTeam(eingabe: unknown): Promise<Ergebnis> {
  * (keine offene Erstattung) gilt dann schon.
  */
 export async function markiereErstattungErledigt(eingabe: unknown): Promise<Ergebnis> {
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  const frisch = await verlangeFrischeBestaetigung()
+  if ('error' in frisch) return { error: frisch.error }
   const geprueft = erstattungErledigtSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: satzAus(geprueft.error) }
 
