@@ -26,7 +26,8 @@
  *    nur `page.tsx` oder `route.ts` — sonst gäbe es einen Weg am Layout und an dieser Wache vorbei.
  *  - Admin nur mit Passkey (Register N20; Nr. 115): Die Pflicht „erst Passkey"
  *    prüft JEDE Seite selbst — jede ruft `verlangeAdminSeite()` OHNE Argument,
- *    nur die Pflichtseite /admin/einrichten mit `{ ohnePasskey: true }`;
+ *    nur die Pflichtseite /admin/einrichten `verlangeEinrichtenSeite()` (lässt
+ *    die offene Pflicht durch, eine Sitzung ohne Passkey nicht — Runde 3);
  *    ladeAdminbereich (Layout) mit `verlangeAdminShell()`. Im Pflicht-Zustand
  *    und in einer Sitzung ohne Passkey lädt das Layout keine Zähler.
  *  - Gegenproben: Schnipsel ohne Wache und mit Wache an zweiter Stelle.
@@ -111,8 +112,8 @@ function importiertAls(datei: ts.SourceFile, modul: string, exportName: string):
   return null
 }
 
-/** Ob die erste Anweisung `await <name>()` ist — allein oder als Initialisierer; `mitOhnePasskey`: genau `await <name>({ ohnePasskey: true })`. */
-function ersteIstAwait(fn: ts.FunctionDeclaration, name: string, mitOhnePasskey = false): boolean {
+/** Ob die erste Anweisung `await <name>()` ohne Argument ist — allein oder als Initialisierer. */
+function ersteIstAwait(fn: ts.FunctionDeclaration, name: string): boolean {
   const erste = fn.body?.statements[0]
   if (!erste) return false
   let ausdruck: ts.Expression | undefined
@@ -123,14 +124,13 @@ function ersteIstAwait(fn: ts.FunctionDeclaration, name: string, mitOhnePasskey 
   if (!ausdruck || !ts.isAwaitExpression(ausdruck)) return false
   const aufruf = ausdruck.expression
   if (!ts.isCallExpression(aufruf) || !ts.isIdentifier(aufruf.expression) || aufruf.expression.text !== name) return false
-  if (!mitOhnePasskey) return aufruf.arguments.length === 0
-  return aufruf.arguments.length === 1 && aufruf.arguments[0].getText().replace(/\s+/g, ' ') === '{ ohnePasskey: true }'
+  return aufruf.arguments.length === 0
 }
 
 /** Was an der Wache fehlt — leer heißt gedeckt. */
 function wachenMaengel(
   quelltext: string,
-  opt: { modul: string; exportName: string; funktionName: 'default' | string; ohnePasskey?: boolean },
+  opt: { modul: string; exportName: string; funktionName: 'default' | string },
   pfad = 'schnipsel.tsx'
 ): string[] {
   const datei = lies(quelltext, pfad)
@@ -139,13 +139,13 @@ function wachenMaengel(
   const fn = funktion(datei, opt.funktionName)
   if (!fn) return [`${pfad}: Funktion ${opt.funktionName} nicht gefunden`]
   if (!modifikator(fn, ts.SyntaxKind.AsyncKeyword)) return [`${pfad}: nicht async`]
-  if (!ersteIstAwait(fn, name, opt.ohnePasskey === true)) {
-    return [`${pfad}: erste Anweisung ist nicht \`await ${opt.exportName}(${opt.ohnePasskey ? '{ ohnePasskey: true }' : ''})\``]
-  }
+  if (!ersteIstAwait(fn, name)) return [`${pfad}: erste Anweisung ist nicht \`await ${opt.exportName}()\``]
   return []
 }
 
 const SEITE = { modul: '@/server/admin-wache', exportName: 'verlangeAdminSeite', funktionName: 'default' } as const
+/** Die Wache der Pflichtseite: offene Pflicht durch, Sitzung ohne Passkey bei erledigter Pflicht → /login/admin. */
+const EINRICHTEN = { modul: '@/server/admin-wache', exportName: 'verlangeEinrichtenSeite', funktionName: 'default' } as const
 const SEITEN = [...seiten(ADMIN)]
 /** Die EINE Seite, die ohne Passkey öffnet (Register N20): die Pflichtseite. */
 const PFLICHTSEITE = join(ADMIN, 'einrichten', 'page.tsx')
@@ -170,15 +170,20 @@ describe('jede Seite unter /admin', () => {
     expect(maengel).toEqual([])
   })
 
-  it('nur die Pflichtseite /admin/einrichten ruft `await verlangeAdminSeite({ ohnePasskey: true })`', () => {
-    expect(wachenMaengel(readFileSync(PFLICHTSEITE, 'utf8'), { ...SEITE, ohnePasskey: true }, relative(WURZEL, PFLICHTSEITE))).toEqual([])
+  it('nur die Pflichtseite /admin/einrichten ruft als erste Anweisung `await verlangeEinrichtenSeite()` — nicht mehr die Seiten-Wache mit `ohnePasskey`', () => {
+    const quelle = readFileSync(PFLICHTSEITE, 'utf8')
+    expect(wachenMaengel(quelle, EINRICHTEN, relative(WURZEL, PFLICHTSEITE))).toEqual([])
+    expect(quelle).not.toContain('ohnePasskey: true')
   })
 
-  it('Gegenprobe: eine Seite mit `{ ohnePasskey: true }` fällt unter der Regel aller Seiten auf, eine ohne unter der Pflichtseiten-Regel', () => {
-    const kopf = "import { verlangeAdminSeite } from '@/server/admin-wache'\n"
+  it('Gegenprobe: ein Argument fällt unter der Regel aller Seiten auf; die Pflichtseite mit der Seiten-Wache, mit Argument oder an zweiter Stelle auch', () => {
+    const kopf = "import { verlangeAdminSeite, verlangeEinrichtenSeite } from '@/server/admin-wache'\n"
     expect(wachenMaengel(`${kopf}export default async function S() { await verlangeAdminSeite({ ohnePasskey: true })\n return null }`, SEITE)).toHaveLength(1)
-    expect(wachenMaengel(`${kopf}export default async function S() { await verlangeAdminSeite()\n return null }`, { ...SEITE, ohnePasskey: true })).toHaveLength(1)
-    expect(wachenMaengel(`${kopf}export default async function S() { await verlangeAdminSeite({ ohnePasskey: false })\n return null }`, { ...SEITE, ohnePasskey: true })).toHaveLength(1)
+    expect(wachenMaengel(`${kopf}export default async function S() { await verlangeEinrichtenSeite()\n return null }`, SEITE)).toHaveLength(1)
+    expect(wachenMaengel(`${kopf}export default async function S() { await verlangeAdminSeite()\n return null }`, EINRICHTEN)).toHaveLength(1)
+    expect(wachenMaengel(`${kopf}export default async function S() { await verlangeEinrichtenSeite({ ohnePasskey: true })\n return null }`, EINRICHTEN)).toHaveLength(1)
+    expect(wachenMaengel(`${kopf}export default async function S() { const j = new Date()\n await verlangeEinrichtenSeite()\n return j }`, EINRICHTEN)).toHaveLength(1)
+    expect(wachenMaengel(`${kopf}export default async function S() { const { pflicht } = await verlangeEinrichtenSeite()\n return pflicht }`, EINRICHTEN)).toEqual([])
   })
 
   it('die Umleitungen /admin/meldungen und /admin/meldungen/[id] (Route Handler, Nr. 101) prüfen als erste Anweisung im GET', () => {
@@ -331,7 +336,7 @@ describe('das Layout mit der AdminShell', () => {
     expect(wachenMaengel(quelle, { modul: '@/server/adminbereich', exportName: 'ladeAdminbereich', funktionName: 'default' })).toEqual([])
   })
 
-  it('ladeAdminbereich prüft als erste Anweisung mit verlangeAdminShell() — wie verlangeAdminSeite({ ohnePasskey: true }), das Layout umhüllt auch die Pflichtseite', () => {
+  it('ladeAdminbereich prüft als erste Anweisung mit verlangeAdminShell() — lässt Pflicht und Sitzung ohne Passkey durch (ohne Zähler), das Layout umhüllt auch die Pflichtseite', () => {
     const quelle = readFileSync(join(WURZEL, 'src/server/adminbereich.ts'), 'utf8')
     expect(wachenMaengel(quelle, { modul: '@/server/admin-wache', exportName: 'verlangeAdminShell', funktionName: 'ladeAdminbereich' }, 'src/server/adminbereich.ts')).toEqual([])
   })

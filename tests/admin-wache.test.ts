@@ -13,7 +13,9 @@
  *  - Die Aktion navigiert nicht, sie antwortet — { error } wie jede Action.
  *  - Admin nur mit Passkey (Register N20; Nr. 115): Sitzung älter als 12
  *    Stunden → abgemeldet und /login/admin; ohne Passkey (oder nach einem
- *    Ersatzcode ohne neuen) → /admin/einrichten, außer mit `ohnePasskey`;
+ *    Ersatzcode ohne neuen) → /admin/einrichten, außer mit `ohnePasskey`
+ *    (Aktionen) bzw. auf der Pflichtseite (verlangeEinrichtenSeite) — die
+ *    leitet eine Sitzung ohne Passkey bei erledigter Pflicht zur Anmeldung;
  *    frische Bestätigung gilt 5 Minuten (6 → „frisch"); die Exporte leiten
  *    ohne sie mit 303 auf /admin/bestaetigen, nur mit Pfaden unter /admin.
  */
@@ -40,7 +42,7 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
-import { frischOderBestaetigen, verlangeAdminAktion, verlangeAdminSeite, verlangeFrischeBestaetigung } from '@/server/admin-wache'
+import { frischOderBestaetigen, verlangeAdminAktion, verlangeAdminSeite, verlangeEinrichtenSeite, verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -165,10 +167,10 @@ describe('Admin nur mit Passkey (Register N20) — 12 Stunden', () => {
 })
 
 describe('Admin nur mit Passkey (Register N20) — Pflicht in der Wache', () => {
-  it('ohne Passkey leitet die Seite auf /admin/einrichten um — mit ohnePasskey (Layout, Pflichtseite) nicht', async () => {
+  it('ohne Passkey leitet die Seite auf /admin/einrichten um — die Pflichtseite selbst nicht', async () => {
     melde('user_admin', true, { passkeys: 0 })
     await expect(verlangeAdminSeite()).rejects.toThrow('REDIRECT:/admin/einrichten')
-    await expect(verlangeAdminSeite({ ohnePasskey: true })).resolves.toBe('user_admin')
+    await expect(verlangeEinrichtenSeite()).resolves.toEqual({ userId: 'user_admin', pflicht: true })
   })
 
   it('nach einem Ersatzcode, der jünger ist als der jüngste Passkey: Pflicht; ein älterer nicht', async () => {
@@ -200,18 +202,48 @@ describe('Admin nur mit Passkey (Register N20) — Sitzung ohne Passkey', () => 
     expect(sessionDeleteMany).not.toHaveBeenCalled()
   })
 
-  it('Aktionen antworten mit dem Satz, auch heikle; die Pflichtseite (ohnePasskey) geht', async () => {
+  it('Aktionen antworten mit dem Satz, auch heikle; die Actions der Pflichtseite (ohnePasskey) gehen', async () => {
     melde('user_admin', true, { passkeyVor: null })
     const satz = { error: 'Melde dich für den Admin-Bereich mit deinem Passkey an.' }
     expect(await verlangeAdminAktion()).toEqual(satz)
     expect(await verlangeFrischeBestaetigung()).toEqual(satz)
     expect(await verlangeAdminAktion({ ohnePasskey: true })).toEqual({ ok: true, userId: 'user_admin' })
-    await expect(verlangeAdminSeite({ ohnePasskey: true })).resolves.toBe('user_admin')
   })
 
   it('ohne Passkey am Konto gilt zuerst die Pflicht (Einrichten), nicht die Anmeldung', async () => {
     melde('user_admin', true, { passkeys: 0, passkeyVor: null })
     await expect(verlangeAdminSeite()).rejects.toThrow('REDIRECT:/admin/einrichten')
+  })
+})
+
+describe('Admin nur mit Passkey (Register N20) — die Pflichtseite (verlangeEinrichtenSeite)', () => {
+  // Sichter Runde 2 (S1): Eine Passwort-Sitzung, deren Konto inzwischen einen Passkey
+  // hat, sah /admin/einrichten im Zustand „eingerichtet" samt Admin-Kopf.
+  it('Konto mit Passkey, Pflicht erledigt, Sitzung ohne passkeyAm: zur Admin-Anmeldung, ohne die Sitzung zu löschen', async () => {
+    melde('user_admin', true, { passkeyVor: null })
+    await expect(verlangeEinrichtenSeite()).rejects.toThrow('REDIRECT:/login/admin')
+    expect(sessionDeleteMany).not.toHaveBeenCalled()
+  })
+
+  it('Gegenprobe Pflicht offen: ohne Passkey und nach einem Ersatzcode öffnet sie — auch ohne passkeyAm', async () => {
+    melde('user_admin', true, { passkeys: 0, passkeyVor: null })
+    await expect(verlangeEinrichtenSeite()).resolves.toEqual({ userId: 'user_admin', pflicht: true })
+    melde('user_admin', true, { ersatzcodeVor: 5 * MINUTE, passkeyVor: null })
+    await expect(verlangeEinrichtenSeite()).resolves.toEqual({ userId: 'user_admin', pflicht: true })
+  })
+
+  it('Gegenprobe Sitzung mit passkeyAm: öffnet (Ersatzcodes, zweiter Passkey) — auch Stunden nach der Anmeldung', async () => {
+    melde('user_admin', true, { angemeldetVor: 3 * 60 * MINUTE, passkeyVor: 3 * 60 * MINUTE })
+    await expect(verlangeEinrichtenSeite()).resolves.toEqual({ userId: 'user_admin', pflicht: false })
+  })
+
+  it('scheitert sonst wie jede Admin-Seite: abgemeldet → /login, ohne Recht → 404, nach 12 Stunden → /login/admin', async () => {
+    melde(null, null)
+    await expect(verlangeEinrichtenSeite()).rejects.toThrow(/^REDIRECT:\/login$/)
+    melde('user_1', false)
+    await expect(verlangeEinrichtenSeite()).rejects.toThrow('NOT_FOUND')
+    melde('user_admin', true, { angemeldetVor: 12 * 60 * MINUTE })
+    await expect(verlangeEinrichtenSeite()).rejects.toThrow('REDIRECT:/login/admin')
   })
 })
 
