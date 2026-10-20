@@ -56,11 +56,11 @@ describe('sendAdminSicherheitEmail', () => {
   })
 
   it('E-Mail-Code der Einrichtung: der Code im Text, nie im Betreff; kein Link', async () => {
-    await email.sendAdminSicherheitEmail('admin@example.com', 'einrichtungscode', { geraet: 'Windows · Chrome', zeitpunkt: ZEITPUNKT, code: '482913' })
+    await email.sendAdminSicherheitEmail('admin@example.com', 'einrichtungscode', { geraet: 'Windows · Chrome', zeitpunkt: ZEITPUNKT, code: 'QXJZKW' })
     const aufruf = sendMock.mock.calls[0][0] as { subject: string; html: string }
 
-    expect(aufruf.html).toContain('482913')
-    expect(aufruf.subject).not.toContain('482913')
+    expect(aufruf.html).toContain('QXJZKW')
+    expect(aufruf.subject).not.toContain('QXJZKW')
     expect(aufruf.html).not.toMatch(/<a\s/i)
   })
 })

@@ -649,7 +649,8 @@ describe('E-Mail-Code der Einrichtung', () => {
     if (!code) throw new Error('kein Code verschickt')
     expect(await prisma.einmalLink.count({ where: { userId: konto.id, tokenHash: { contains: code } } })).toBe(0)
 
-    const falsch = code === '111111' ? '222222' : '111111'
+    // Falscher Code zur Laufzeit aus dem echten abgeleitet (letzte Ziffer +1) — kein Code im Quelltext.
+    const falsch = code.replace(/\d$/, (z) => String((Number(z) + 1) % 10))
     expect(await pruefeEinrichtungscode({ code: falsch })).toHaveProperty('error')
     expect(await pruefeEinrichtungscode({ code })).toEqual({ ok: true })
     expect(await pruefeEinrichtungscode({ code })).toHaveProperty('error')

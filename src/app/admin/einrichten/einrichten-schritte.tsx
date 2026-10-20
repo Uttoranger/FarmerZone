@@ -31,12 +31,15 @@ type SchrittArt = 'fertig' | 'aktiv' | 'spaeter'
 
 function Schritt({ art, titel, satz, children }: { art: SchrittArt; titel: string; satz?: string | null; children?: React.ReactNode }): React.JSX.Element {
   return (
-    <li className={cn('flex gap-3.5 rounded-2xl border p-4', art === 'aktiv' ? 'border-accent/45 bg-card' : 'border-border bg-card', art === 'spaeter' && 'opacity-70')}>
+    // Kommende Schritte gedämpft nur über Tokens (Seitenfläche, gestrichelter Kreis, Schloss) wie im
+    // Mockup — keine Deckkraft: Sie zöge die Nebenzeile unter 4,5:1 Kontrast (Axe, Runde 1).
+    <li className={cn('flex gap-3.5 rounded-2xl border p-4', art === 'aktiv' ? 'border-accent/45 bg-card' : art === 'fertig' ? 'border-border bg-card' : 'border-border bg-background')}>
       <span
         aria-hidden="true"
         className={cn(
           'flex size-8 shrink-0 items-center justify-center rounded-full border',
-          art === 'fertig' ? 'border-accent bg-accent text-accent-foreground' : 'border-border text-muted-foreground'
+          art === 'fertig' ? 'border-accent bg-accent text-accent-foreground' : 'border-border text-muted-foreground',
+          art === 'spaeter' && 'border-2 border-dashed'
         )}
       >
         {art === 'fertig' ? <Check className="size-4" strokeWidth={2.2} /> : art === 'spaeter' ? <Lock className="size-3.5" strokeWidth={1.8} /> : <KeyRound className="size-4" strokeWidth={1.8} />}
@@ -222,7 +225,7 @@ export function EinrichtenSchritte({ ansicht }: { ansicht: EinrichtenAnsicht }):
         <Schritt
           art={passkeyDa ? (ansicht.ersatzcodes > 0 ? 'fertig' : 'aktiv') : 'spaeter'}
           titel={passkeyDa && ansicht.ersatzcodes > 0 ? EINRICHTEN_TEXT.ersatzcodesGesichert : EINRICHTEN_TEXT.schrittErsatzcodes}
-          satz={EINRICHTEN_TEXT.schrittErsatzcodesSatz}
+          satz={passkeyDa && ansicht.ersatzcodes > 0 ? null : EINRICHTEN_TEXT.schrittErsatzcodesSatz}
         >
           {passkeyDa && ansicht.ersatzcodes === 0 && (
             <button type="button" onClick={ersatzcodesErstellen} disabled={laeuft} className={cn(KNOPF_GRUEN, 'self-start')}>

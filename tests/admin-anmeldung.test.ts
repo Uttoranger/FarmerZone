@@ -188,24 +188,24 @@ describe('Ersatzcodes', () => {
   })
 
   it('getippte Form egal: Kleinbuchstaben, Leerzeichen, Strich — falsche Länge oder Zeichen: null', () => {
-    expect(normalisiereErsatzcode(' jme9 qufd ')).toBe('JME9QUFD')
-    expect(normalisiereErsatzcode('JME9-QUFD')).toBe('JME9QUFD')
-    expect(normalisiereErsatzcode('JME9-QUF')).toBeNull()
+    expect(normalisiereErsatzcode(' jmea qufd ')).toBe('JMEAQUFD')
+    expect(normalisiereErsatzcode('JMEA-QUFD')).toBe('JMEAQUFD')
+    expect(normalisiereErsatzcode('JMEA-QUF')).toBeNull()
     expect(normalisiereErsatzcode('JMEO-QUFD')).toBeNull()
   })
 
   it('der Hash: HMAC, je Konto verschieden, gleich für jede Schreibweise — der Code steht nicht darin', async () => {
-    const a = await ersatzcodeHash('geheim', 'konto-a', 'jme9-qufd')
+    const a = await ersatzcodeHash('geheim', 'konto-a', 'jmea-qufd')
     expect(a).toMatch(/^[0-9a-f]{64}$/)
-    expect(a).toBe(await ersatzcodeHash('geheim', 'konto-a', 'JME9QUFD'))
-    expect(a).not.toBe(await ersatzcodeHash('geheim', 'konto-b', 'JME9-QUFD'))
-    expect(a).not.toBe(await ersatzcodeHash('anderes', 'konto-a', 'JME9-QUFD'))
-    expect(a.toUpperCase()).not.toContain('JME9')
+    expect(a).toBe(await ersatzcodeHash('geheim', 'konto-a', 'JMEAQUFD'))
+    expect(a).not.toBe(await ersatzcodeHash('geheim', 'konto-b', 'JMEA-QUFD'))
+    expect(a).not.toBe(await ersatzcodeHash('anderes', 'konto-a', 'JMEA-QUFD'))
+    expect(a.toUpperCase()).not.toContain('JMEA')
   })
 
   it('die Datei enthält die Codes und keinen Namen eines Kontos', () => {
-    const datei = ersatzcodeDatei(['JME9-QUFD', 'DAQW-MCJV'], '20.10. um 10:00')
-    expect(datei).toContain('JME9-QUFD')
+    const datei = ersatzcodeDatei(['JMEA-QUFD', 'DAQW-MCJV'], '20.10. um 10:00')
+    expect(datei).toContain('JMEA-QUFD')
     expect(datei).toContain('DAQW-MCJV')
     expect(datei).not.toContain('@')
   })
