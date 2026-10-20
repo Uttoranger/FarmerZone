@@ -45,7 +45,8 @@ import { LEISE } from '@/components/hof-bestellungen/stil'
 const HANDY_SCHIRM = 304
 const WEB_RAHMEN_HOEHE = 760
 
-type Link = { pfad: string; link: string; stand: string } | { fehler: string }
+/** `quelle`: für welche Quelle die Adresse erzeugt wurde — der Titel des Rahmens folgt ihr erst, wenn sie sichtbar ist. */
+type Link = { pfad: string; link: string; stand: string; quelle: VorschauQuelle } | { fehler: string }
 
 export type VorschauBand = 'entwurf' | 'live' | 'geplant'
 
@@ -184,6 +185,7 @@ export function StartseiteVorschau({
   const [stand, setStand] = useState<StandWahl>(standStandard)
   const [link, setLink] = useState<Link | null>(null)
   const [sichtbar, setSichtbar] = useState<string | null>(null)
+  const [sichtbareQuelle, setSichtbareQuelle] = useState<VorschauQuelle | null>(null)
   const [aktualisiert, setAktualisiert] = useState<string | null>(null)
   const quelle: VorschauQuelle = festeQuelle ?? gewaehlt
   const band: VorschauBand = festesBand ?? (quelle === 'entwurf' ? 'entwurf' : 'live')
@@ -199,7 +201,7 @@ export function StartseiteVorschau({
     // Der Block in Bearbeitung zählt nur im Entwurf — live zeigt nur, was live ist.
     void erzeugeStartseitenVorschau({ stand: standGilt, quelle, blockEntwurfId: quelle === 'entwurf' ? blockEntwurfId : null }).then((ergebnis) => {
       if (!gueltig) return
-      setLink('error' in ergebnis ? { fehler: ergebnis.error } : { pfad: ergebnis.pfad, link: ergebnis.link, stand: ergebnis.stand })
+      setLink('error' in ergebnis ? { fehler: ergebnis.error } : { pfad: ergebnis.pfad, link: ergebnis.link, stand: ergebnis.stand, quelle })
     })
     return () => {
       gueltig = false
@@ -218,6 +220,7 @@ export function StartseiteVorschau({
 
   const oeffnen = link && 'link' in link ? link.link : null
   const gewuenscht = link && 'pfad' in link ? link.pfad : null
+  const gewuenschteQuelle = link && 'pfad' in link ? link.quelle : quelle
   const { rahmen, laedt } = vorschauRahmen(sichtbar, gewuenscht)
 
   /** Die neue Adresse ist fertig: an die Stelle des alten Rahmens scrollen, dann tauschen. */
@@ -226,6 +229,8 @@ export function StartseiteVorschau({
     if (pfad === sichtbar || pfad !== gewuenscht) return
     neu.contentWindow?.scrollTo({ top: scrollNachNeuladen(lageIm(alt)), behavior: 'instant' })
     setSichtbar(pfad)
+    // Der Titel wechselt mit dem neuen Stand, nicht mit der Wahl im Segment: Bis dahin zeigt der Rahmen noch die alte Quelle.
+    setSichtbareQuelle(gewuenschteQuelle)
     setAktualisiert(uhrzeitInWien(new Date()))
   }
 
@@ -292,7 +297,7 @@ export function StartseiteVorschau({
         sichtbar={sichtbar}
         laedt={laedt}
         band={band}
-        titel={`${T.rahmenTitel} · ${vorschauQuelleText(quelle)}`}
+        titel={`${T.rahmenTitel} · ${vorschauQuelleText(sichtbareQuelle ?? quelle)}`}
         onGeladen={geladen}
       />
       <p role="status" className="min-h-[1.25rem] text-[12.5px] font-medium text-foreground">

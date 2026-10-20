@@ -124,6 +124,7 @@ vi.mock('@/server/actions/startseite', () => ({
 }))
 
 import { ADMIN_STARTSEITE_TEXT } from '@/lib/startseite-gestalten'
+import { ENTWURF_TEXT } from '@/lib/startseite-fassung'
 import { StartseiteVorschau } from '@/components/admin/startseite-vorschau'
 
 /** Freitag, 16. Oktober 2026, 21:04 in Wien. */
@@ -151,6 +152,22 @@ function findeMitProp(knoten: unknown, prop: string): Record<string, unknown> | 
   if (!props) return null
   if (prop in props) return props
   return findeMitProp(props.children, prop)
+}
+
+/** Das Segment mit dieser Beschriftung (Gerät, Quelle, Stand): sein Rückruf wählt um. */
+function findeSegment(knoten: unknown, beschriftung: string): { onWertChange: (wert: string) => void } | null {
+  if (knoten == null || typeof knoten !== 'object') return null
+  if (Array.isArray(knoten)) {
+    for (const kind of knoten) {
+      const fund = findeSegment(kind, beschriftung)
+      if (fund) return fund
+    }
+    return null
+  }
+  const props = (knoten as { props?: Record<string, unknown> }).props
+  if (!props) return null
+  if (props.beschriftung === beschriftung && typeof props.onWertChange === 'function') return props as { onWertChange: (wert: string) => void }
+  return findeSegment(props.children, beschriftung)
 }
 
 const rahmen = (): RahmenProps => findeMitProp(pruefstand.baum(), 'onGeladen') as unknown as RahmenProps
@@ -307,5 +324,28 @@ describe('StartseiteVorschau — neu laden ohne leeren Rahmen, an derselben Stel
     expect(sichtbar.scrollTo).not.toHaveBeenCalled()
     expect(ueberholt.scrollTo).not.toHaveBeenCalled()
     expect(rahmen()).toMatchObject({ sichtbar: '/?vorschau=v1&sig=s', laedt: true })
+  })
+})
+
+describe('StartseiteVorschau — der Titel des Rahmens wechselt mit dem neuen Stand (Nr. 121)', () => {
+  it('bleibt „Entwurf“, solange der Entwurf noch sichtbar ist, und wird „Live“ erst beim Tausch nach dem Laden', async () => {
+    pruefstand.starte(vorschau(0))
+    await erledigt()
+    rahmen().onGeladen('/?vorschau=v1&sig=s', fenster().element, undefined)
+    pruefstand.rendere()
+    expect(rahmen().titel).toBe(`Vorschau der Startseite · ${ENTWURF_TEXT.entwurf}`)
+
+    // „Live“ gewählt: Die neue Adresse lädt, der Rahmen zeigt noch den Entwurf – und heißt auch so.
+    findeSegment(pruefstand.baum(), ENTWURF_TEXT.quelleBeschriftung)?.onWertChange('live')
+    pruefstand.rendere()
+    await erledigt()
+    expect(rahmen()).toMatchObject({ rahmen: ['/?vorschau=v1&sig=s', '/?vorschau=v2&sig=s'], sichtbar: '/?vorschau=v1&sig=s', laedt: true })
+    expect(rahmen().titel).toBe(`Vorschau der Startseite · ${ENTWURF_TEXT.entwurf}`)
+    expect(aktionen.erzeuge.mock.calls.at(-1)?.[0]).toMatchObject({ quelle: 'live' })
+
+    // Fertig geladen und getauscht: jetzt steht der Rahmen für Live.
+    rahmen().onGeladen('/?vorschau=v2&sig=s', fenster().element, fenster().element)
+    pruefstand.rendere()
+    expect(rahmen()).toMatchObject({ sichtbar: '/?vorschau=v2&sig=s', titel: `Vorschau der Startseite · ${ENTWURF_TEXT.live}` })
   })
 })

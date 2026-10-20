@@ -121,6 +121,18 @@ describe('Mosaik unter lg', () => {
     expect(uebersicht(1)).not.toContain('Tippen öffnet')
   })
 
+  it('„wischen blättert“ steht nur dort, wo es keine Pfeile gibt – mit der Maus (pointer-fine) steht „Pfeile blättern“ (Nr. 121)', () => {
+    const html = uebersicht(8)
+    const touch = html.match(/<span class="([^"]*)">Tippen öffnet die Bildansicht – wischen blättert durch alle 8\.<\/span>/)
+    const maus = html.match(/<span class="([^"]*)">Tippen öffnet die Bildansicht – Pfeile blättern durch alle 8\.<\/span>/)
+    // Gegenprobe: Beide Fassungen müssen gefunden werden, sonst beweist der Rest nichts.
+    expect(touch).not.toBeNull()
+    expect(maus).not.toBeNull()
+    expect(touch?.[1]).toContain('pointer-fine:hidden')
+    expect(maus?.[1]).toMatch(/(^| )hidden( |$)/)
+    expect(maus?.[1]).toContain('pointer-fine:inline')
+  })
+
   it('ab lg das Raster wie bisher: bis zu sechs Kacheln, auf der sechsten „+N"', () => {
     const html = uebersicht(8)
     const raster = html.slice(html.lastIndexOf('<ul'), html.lastIndexOf('</ul>'))

@@ -285,7 +285,7 @@ export function HoefeAnsicht({
         {HOEFE_SEITE.regel} {SERVICEGEBUEHR_NUR_NEUE} {NUMMER_HINWEIS}
       </p>
 
-      <HofAktionDialog aktion={aktion} vergebenePlaetze={vergebenePlaetze} onClose={() => setAktion(null)} />
+      <HofAktionDialog aktion={aktion} onClose={() => setAktion(null)} />
       <ServicegebuehrDialog hof={gebuehrHof} onClose={() => setGebuehrHof(null)} />
       <GruendungBisDialog hof={gruendungHof} onClose={() => setGruendungHof(null)} />
       <GruendungAusnehmenDialog hof={ausnehmenHof} onClose={() => setAusnehmenHof(null)} />

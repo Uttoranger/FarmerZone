@@ -34,11 +34,6 @@ export function HofAktionDialog({
   onClose,
 }: {
   aktion: HofAktion | null
-  /**
-   * Nicht mehr gelesen (Nr. 116): Platz und Ende kommen fertig vom Server
-   * (`hof.freischaltHinweis`, mit den Plätzen der Einstellung statt der festen 12).
-   */
-  vergebenePlaetze?: number
   onClose: () => void
 }): React.JSX.Element {
   const [laeuft, startTransition] = useTransition()

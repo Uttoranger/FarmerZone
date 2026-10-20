@@ -17,8 +17,10 @@ import { describe, it, expect } from 'vitest'
 import {
   GRUENDUNG_BIS_STANDARD,
   GRUENDUNG_EINSTELLUNG_STANDARD,
+  alleGruendungsplaetzeVergeben,
   bildeGruendungBis,
   folgenDerAenderung,
+  freischaltHinweis,
   gruendungAlleVergeben,
   gruendungsplaetze,
   wiederAufnahmeMoeglich,
@@ -189,7 +191,7 @@ describe('gruendungAenderung — Menü und Bestätigung', () => {
     const hoefe = reihe(4, { 2: { gruendungAusgenommen: true } })
     const a = gruendungAenderung(hoefe[1] as HofFuerFolgen, hoefe, 3, STANDARD)
     expect(a.gesperrt).toBe(gruendungAlleVergeben(3))
-    expect(a.gesperrt).toBe('Alle 3 Plätze sind vergeben – erst muss ein Platz frei werden.')
+    expect(a.gesperrt).toBe('Alle 3 Gründungsplätze sind vergeben – erst muss ein Platz frei werden.')
     expect(a.saetze).toEqual([])
   })
 })
@@ -217,5 +219,19 @@ describe('Warteliste, Zähler und „zuletzt geändert“', () => {
     expect(gruendungZuletztText(am, 'Test Admin')).toBe('zuletzt geändert von Test Admin am 14. Okt')
     expect(gruendungZuletztText(am, null)).toBe('zuletzt geändert von einem gelöschten Konto am 14. Okt')
     expect(gruendungZuletztText(null, 'Test Admin')).toBeNull()
+  })
+})
+
+describe('„Alle Plätze vergeben“ – ein Wortlaut (Nr. 121)', () => {
+  it('der Hinweis im Freischalt-Dialog, die Sperre im Menü und die Action bauen ihren Satz aus derselben Funktion', () => {
+    const wartend = { id: 'hof_99', gruendungPlatz: null, gruendungBis: null, gruendungAusgenommen: false }
+    const einstellung = { ...GRUENDUNG_EINSTELLUNG_STANDARD, plaetze: 3 }
+    const hinweis = freischaltHinweis(wartend, reihe(3), einstellung, new Date('2026-10-20T10:00:00.000Z'))
+    expect(hinweis.ton).toBe('orange')
+    expect(hinweis.text).toContain(alleGruendungsplaetzeVergeben(3))
+    expect(gruendungAlleVergeben(3)).toContain(alleGruendungsplaetzeVergeben(3))
+    // Gegenprobe: Mit einem freien Platz steht der Satz nirgends.
+    const frei = freischaltHinweis(wartend, reihe(2), einstellung, new Date('2026-10-20T10:00:00.000Z'))
+    expect(frei.text).not.toContain(alleGruendungsplaetzeVergeben(3))
   })
 })

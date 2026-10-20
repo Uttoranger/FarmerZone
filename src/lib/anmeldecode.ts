@@ -27,6 +27,16 @@ export const ANMELDECODE_GUELTIG_SEKUNDEN = 10 * 60
 export const ANMELDECODE_MAX_VERSUCHE = 5
 
 /**
+ * Wie lange der Link zum neuen Passwort gilt. Better Auth
+ * (`resetPasswordTokenExpiresIn`), die Mail, das Formular „Passwort vergessen“
+ * und „Das war ich nicht“ nehmen DIESE Zahl – nie eine eigene „1 Stunde“ im Text.
+ */
+export const PASSWORT_LINK_STUNDEN = 1
+export const PASSWORT_LINK_SEKUNDEN = PASSWORT_LINK_STUNDEN * 60 * 60
+/** Die Dauer, wie sie im Satz steht: „1 Stunde“, „2 Stunden“. */
+export const PASSWORT_LINK_DAUER_TEXT = PASSWORT_LINK_STUNDEN === 1 ? '1 Stunde' : `${PASSWORT_LINK_STUNDEN} Stunden`
+
+/**
  * Better Auth bremst Anfordern und Prüfen je IP und Pfad. 3 je Minute: Wer
  * sich einmal vertippt, kommt durch; eine Schleife nicht. Im Speicher der
  * Instanz; dieselbe Grenze zählt danach die Datenbank über alle Instanzen
@@ -125,10 +135,10 @@ export function codeVersandErlaubt(rolle: string | null | undefined): boolean {
  *   und die Freischaltung frei, NIE /account: Das gilt nur für Kundinnen
  *   (`kundinnenKonto`), sonst erreichte ein Hof mit der Adresse einer Kundin
  *   deren Abos. Bei einem vorher unbestätigten Konto
- * (ruhende Altkonten) steht in der Sitzung bis zu fünf Minuten noch der alte
- * Stand (Cookie-Cache) — deshalb nie mit `session.user` aufrufen, sondern
- * über `bestaetigteAdresse` (src/server/kunden-adresse.ts) mit dem frischen
- * Stand aus der Datenbank.
+ * (ruhende Altkonten) stand in der Sitzung bis Nr. 114 bis zu fünf Minuten noch
+ * der alte Stand (Cookie-Cache, seit Nr. 114 aus) — darum geht der Aufruf über
+ * `bestaetigteAdresse` (src/server/kunden-adresse.ts) mit dem Stand aus der
+ * Datenbank, nicht mit `session.user`.
  */
 export function adresseBestaetigt(nutzer: { emailVerified?: boolean | null } | null | undefined): boolean {
   return nutzer?.emailVerified === true

@@ -3,6 +3,7 @@ import { uhrzeitInWien } from '@/lib/fristen'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { tagVersetzt } from '@/lib/kalender'
 import { MARKE } from '@/lib/marke'
+import { PASSWORT_LINK_DAUER_TEXT } from '@/lib/anmeldecode'
 import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 
 /*
@@ -256,8 +257,8 @@ export const NICHT_ICH_TEXT = {
   doch: 'Doch, das war ich',
   vorab: 'Erst dieser Knopf meldet ab – ein Programm, das Links in Mails vorab öffnet, löst nichts aus.',
   fertigTitel: 'Alle Geräte sind abgemeldet',
-  // „1 Stunde" = resetPasswordTokenExpiresIn in src/lib/auth.ts (wie die Mail password-reset.tsx).
-  fertigSatz: 'Wir haben dir eine E-Mail mit einem Link für ein neues Passwort geschickt. Der Link gilt 1 Stunde.',
+  // Die Dauer ist die des Links in der Mail (PASSWORT_LINK_STUNDEN, auch resetPasswordTokenExpiresIn in src/lib/auth.ts).
+  fertigSatz: `Wir haben dir eine E-Mail mit einem Link für ein neues Passwort geschickt. Der Link gilt ${PASSWORT_LINK_DAUER_TEXT}.`,
   fertigOhneMail: 'Leg über „Passwort vergessen" auf der Anmeldeseite ein neues Passwort fest.',
   // Statt fertigSatz für einen Admin mit Passkey (Register N20, Nr. 115) — mit
   // fertigTitel darüber: „Alle Geräte sind abgemeldet. Melde dich mit deinem Passkey wieder an."

@@ -31,7 +31,6 @@ import {
 import type { KennzahlDaten } from '@/lib/admin-seiten'
 import { adminHofZeile, type AdminHofZeile } from '@/lib/admin-hoefe'
 import { wartelistePlatzZeile } from '@/lib/admin-hoefe-seite'
-import { vergebeneGruendungsplaetze } from '@/lib/gruendungshof'
 import { wienKalendertag } from '@/lib/kalender'
 import { datumKurz } from '@/lib/verkauf-eintragen'
 import { UMGEBUNG } from '@/lib/umgebung-server'
@@ -53,7 +52,7 @@ const SPALTE = cn(KARTE, 'flex min-w-0 flex-col overflow-hidden dark:ring-1 dark
 type Detail =
   | { art: 'antwort'; faden: AdminFaden }
   | { art: 'meldung'; meldung: AdminMeldungDetail; duplikate: Awaited<ReturnType<typeof getDuplikateVon>> }
-  | { art: 'hof'; hof: HofAufgabeRoh; zeile: AdminHofZeile | null; vergeben: number }
+  | { art: 'hof'; hof: HofAufgabeRoh; zeile: AdminHofZeile | null }
   | { art: 'erstattung'; erstattung: ErstattungAufgabeRoh; zahlungAdresse: string | null }
 
 export type EingangDaten = {
@@ -71,13 +70,10 @@ export type EingangDaten = {
  * adminHofZeile, Plätze aus der Einstellung — Nr. 116), damit Rückfrage und
  * Sperre dasselbe sagen. Nur wenn eine Hof-Aufgabe gewählt ist.
  */
-async function ladeHofZeile(hofId: string, jetzt: Date): Promise<{ zeile: AdminHofZeile | null; vergeben: number }> {
+async function ladeHofZeile(hofId: string, jetzt: Date): Promise<{ zeile: AdminHofZeile | null }> {
   const [farms, { plaetze }] = await Promise.all([getAdminFarms(jetzt), leseGruendungEinstellung(prisma)])
   const hof = farms.find((f) => f.id === hofId)
-  return {
-    zeile: hof ? adminHofZeile(hof, { gruendungsplatz: null, maxPlaetze: plaetze }, jetzt) : null,
-    vergeben: vergebeneGruendungsplaetze(farms, plaetze),
-  }
+  return { zeile: hof ? adminHofZeile(hof, { gruendungsplatz: null, maxPlaetze: plaetze }, jetzt) : null }
 }
 
 /**
@@ -159,7 +155,7 @@ function Zeile({ e, filter, aktiv, jetzt }: { e: EingangEintrag; filter: Eingang
 }
 
 /** Die Aufgabe „Hof wartet" (Mockup admin-postfach): Kopf, Platz, Prüfliste, Regel, Freischalten/Ablehnen. */
-function HofSpalte({ hof, zeile, vergeben, jetzt }: { hof: HofAufgabeRoh; zeile: AdminHofZeile | null; vergeben: number; jetzt: Date }): React.JSX.Element {
+function HofSpalte({ hof, zeile, jetzt }: { hof: HofAufgabeRoh; zeile: AdminHofZeile | null; jetzt: Date }): React.JSX.Element {
   const platz = wartelistePlatzZeile(hof, hof.platz)
   return (
     <div className="flex flex-col gap-4 p-4 md:p-5">
@@ -192,7 +188,7 @@ function HofSpalte({ hof, zeile, vergeben, jetzt }: { hof: HofAufgabeRoh; zeile:
         ))}
       </ul>
       <p className={cn('text-[12.5px] leading-relaxed', LEISE)}>{EINGANG_TEXT.hofRegel}</p>
-      {zeile && <PostfachHofAktionen hof={zeile} vergebenePlaetze={vergeben} />}
+      {zeile && <PostfachHofAktionen hof={zeile} />}
     </div>
   )
 }
@@ -200,16 +196,13 @@ function HofSpalte({ hof, zeile, vergeben, jetzt }: { hof: HofAufgabeRoh; zeile:
 function DetailSpalte({ detail, wuensche, jetzt }: { detail: Detail | null; wuensche: WunschBuendel[] | null; jetzt: Date }): React.JSX.Element {
   if (detail?.art === 'antwort') return <FadenSpalte faden={detail.faden} jetzt={jetzt} />
   if (detail?.art === 'meldung') return <MeldungEntscheidenSpalte m={detail.meldung} jetzt={jetzt} duplikate={detail.duplikate} />
-  if (detail?.art === 'hof') return <HofSpalte hof={detail.hof} zeile={detail.zeile} vergeben={detail.vergeben} jetzt={jetzt} />
+  if (detail?.art === 'hof') return <HofSpalte hof={detail.hof} zeile={detail.zeile} jetzt={jetzt} />
   if (detail?.art === 'erstattung') {
-    // „Erstattung erledigt" (Nr. 105) unter der Spalte aus Nr. 95 — in deren Polster, damit es wie ein Teil davon steht.
+    // „Erstattung erledigt" (Nr. 105) steht in der Spalte aus Nr. 95, im selben Abstand wie ihre übrigen Teile.
     return (
-      <>
-        <PostfachErstattungSpalte e={detail.erstattung} zahlungAdresse={detail.zahlungAdresse} jetzt={jetzt} />
-        <div className="flex flex-col px-4 pb-4 md:px-5 md:pb-5">
-          <ErstattungErledigt key={detail.erstattung.id} orderId={detail.erstattung.id} />
-        </div>
-      </>
+      <PostfachErstattungSpalte e={detail.erstattung} zahlungAdresse={detail.zahlungAdresse} jetzt={jetzt}>
+        <ErstattungErledigt key={detail.erstattung.id} orderId={detail.erstattung.id} />
+      </PostfachErstattungSpalte>
     )
   }
   return (

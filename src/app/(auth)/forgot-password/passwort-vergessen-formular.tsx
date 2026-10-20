@@ -4,6 +4,7 @@ import { useId, useState } from 'react'
 import Link from 'next/link'
 import { Loader2, MailCheck } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
+import { PASSWORT_LINK_DAUER_TEXT } from '@/lib/anmeldecode'
 import { cn } from '@/lib/utils'
 import { FEHLER_TEXT, FELD, FELD_LABEL, HINWEIS_TEXT, KNOPF_ORANGE, TEXTKNOPF } from '@/components/anmelden/stil'
 
@@ -59,7 +60,7 @@ export function PasswortVergessenFormular(): React.JSX.Element {
         <p role="status" aria-live="polite" className="text-[14.5px] leading-normal text-foreground">
           Falls ein Konto mit dieser E-Mail existiert, haben wir dir einen Link geschickt.
         </p>
-        <p className={HINWEIS_TEXT}>Der Link ist 1 Stunde gültig. Schau auch im Spam-Ordner nach.</p>
+        <p className={HINWEIS_TEXT}>{`Der Link ist ${PASSWORT_LINK_DAUER_TEXT} gültig. Schau auch im Spam-Ordner nach.`}</p>
         <Link href="/login" className={TEXTKNOPF}>
           Zurück zur Anmeldung
         </Link>
