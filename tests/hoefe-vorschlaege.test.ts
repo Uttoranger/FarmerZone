@@ -24,7 +24,7 @@ import { baueAngebotsZeile, kategorieChips, type AngebotsZeile } from '@/lib/ber
 import { LEERER_HOEFE_FILTER } from '@/schemas/hoefe-filter'
 import type { ProductCategoryValue } from '@/schemas/product'
 
-const FILTER = { ...LEERER_HOEFE_FILTER, bezugspunkt: null, umkreis: null }
+const FILTER = { ...LEERER_HOEFE_FILTER, bezugspunkt: null, umkreis: null, jetzt: new Date('2026-10-21T08:00:00Z') }
 
 function zeile(name: string, category: ProductCategoryValue): AngebotsZeile {
   return { name, category, subcategory: null, labels: [], tiere: [], grundpreis: null, grossgebinde: null }

@@ -10,6 +10,7 @@
  */
 import { MELDUNG_ART_LABEL, ersteZeile, type MeldungArt, type MeldungFuerHof, type MeldungTon } from '@/lib/meldung'
 import { wienKalendertag } from '@/lib/kalender'
+import { UNBEKANNTES_GERAET, geraeteTeile } from '@/lib/geraete'
 import { datumKurz } from '@/lib/verkauf-eintragen'
 
 export const MEINE_MELDUNGEN_HREF = '/meldungen'
@@ -106,42 +107,15 @@ export function meldungenStand(meldungen: readonly MeldungFuerHof[]): { offen: n
 /**
  * Das Gerät in Worten für „Das schicken wir automatisch mit" („Chrome,
  * Windows"). Nur Anzeige — mitgeschickt wird die volle Browserangabe wie
- * bisher. Reihenfolge zählt: Edge und Opera nennen sich auch „Chrome", Chrome
- * nennt sich auch „Safari".
+ * bisher. Erkannt wird in src/lib/geraete.ts (`geraeteTeile`), dieselbe Kette
+ * wie bei „Angemeldete Geräte“; hier nur die Form für Meldungen.
  */
 export function geraetKurz(userAgent: string): string {
-  const ua = userAgent.trim()
-  if (ua === '') return '–'
-  const browser = /Edg(e|A|iOS)?\//.test(ua)
-    ? 'Edge'
-    : /OPR\/|Opera/.test(ua)
-      ? 'Opera'
-      : /SamsungBrowser\//.test(ua)
-        ? 'Samsung Internet'
-        : /Firefox\/|FxiOS\//.test(ua)
-          ? 'Firefox'
-          : /Chrome\/|CriOS\//.test(ua)
-            ? 'Chrome'
-            : /Safari\//.test(ua)
-              ? 'Safari'
-              : null
-  const system = /iPhone/.test(ua)
-    ? 'iPhone'
-    : /iPad/.test(ua)
-      ? 'iPad'
-      : /Android/.test(ua)
-        ? 'Android'
-        : /Windows/.test(ua)
-          ? 'Windows'
-          : /CrOS/.test(ua)
-            ? 'ChromeOS'
-            : /Mac OS X|Macintosh/.test(ua)
-              ? 'macOS'
-              : /Linux/.test(ua)
-                ? 'Linux'
-                : null
-  const teile = [browser, system].filter((t): t is string => t !== null)
-  return teile.length > 0 ? teile.join(', ') : 'Unbekanntes Gerät'
+  if (userAgent.trim() === '') return '–'
+  const { system, browser } = geraeteTeile(userAgent)
+  // Für Meldungen heißt der Mac „macOS“; geraetName (Liste der Geräte) sagt „Mac“.
+  const teile = [browser, system === 'Mac' ? 'macOS' : system].filter((t): t is string => t !== null)
+  return teile.length > 0 ? teile.join(', ') : UNBEKANNTES_GERAET
 }
 
 /** Die Seite ohne Herkunft („/orders?filter=heute") — die Herkunft ist immer die eigene Seite. */

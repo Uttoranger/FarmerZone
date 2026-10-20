@@ -36,7 +36,7 @@ import { sendHofAntwortAnTeam } from '@/lib/email'
 import { DB_BREMSEN, fensterBeginn } from '@/lib/bremse-datenbank'
 import { antworteAlsHof, markiereErstattungErledigt } from '@/server/actions/postfach'
 import { zaehleOffenImEingang } from '@/server/queries/postfach'
-import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf } from './setup/basis'
+import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf, machePasskeyAdmin } from './setup/basis'
 
 afterEach(async () => {
   vi.mocked(headers).mockResolvedValue(new Headers() as never)
@@ -51,7 +51,7 @@ async function alsSitzung(cookie: string): Promise<void> {
 
 async function erstelleAdmin(): Promise<{ cookie: string }> {
   const { ownerId, cookie } = await erstelleHofMitAnmeldung({ name: 'Testhof Admin' })
-  await prisma.user.update({ where: { id: ownerId }, data: { isAdmin: true } })
+  await machePasskeyAdmin(ownerId)
   return { cookie }
 }
 

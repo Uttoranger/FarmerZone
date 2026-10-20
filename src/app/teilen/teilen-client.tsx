@@ -34,12 +34,6 @@ export function TeilenClient({
   hofSlug,
 }: {
   hofSlug: string
-  /**
-   * Ungelesen seit Nr. 108: Das ersetzte Titelbild wird beim Hochladen nicht
-   * mehr gelöscht (Register N17, Ergänzung). Steht noch hier, weil
-   * teilen/page.tsx es reicht — fällt mit der nächsten Änderung dort weg.
-   */
-  bisherigesTitelbild?: string | null
 }) {
   // null = Ablage wird noch gelesen
   const [fotos, setFotos] = useState<File[] | null>(null)

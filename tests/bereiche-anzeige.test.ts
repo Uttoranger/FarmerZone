@@ -321,7 +321,7 @@ describe('berechneHofAuswahl mit Bereich — Liste und Karte teilen die Menge', 
     hof('Futterhof', [heu({ grundpreis: { wert: 0.3, einheit: 'KG', preis: 9, menge: 30 } })]),
     hof('Gemischter Hof', [eier(), heu({ grundpreis: { wert: 0.12, einheit: 'KG', preis: 36, menge: 300 } })]),
   ]
-  const BASIS = { ...LEERER_HOEFE_FILTER, bezugspunkt: null, umkreis: null }
+  const BASIS = { ...LEERER_HOEFE_FILTER, bezugspunkt: null, umkreis: null, jetzt: new Date('2026-10-21T08:00:00Z') }
 
   it('Futtermittel: nur Futterhöfe — die Karte liest dieselbe Liste', () => {
     const { gefiltert } = berechneHofAuswahl(HOEFE, { ...BASIS, bereich: 'FUTTERMITTEL' })
@@ -368,6 +368,7 @@ describe('URL-Zustand von /hoefe', () => {
       sortierung: 'GRUNDPREIS',
       suchtext: 'heu',
       suchMarken: ['Heu, gepresst', 'Stroh'],
+      abholung: 'wochenende',
       ansicht: 'karte',
     }
     expect(lies(schreibeHoefeFilter(filter))).toEqual(filter)

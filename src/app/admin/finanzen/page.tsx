@@ -34,6 +34,7 @@ import { KARTE, KICKER, LEISE } from '@/components/hof-bestellungen/stil'
 import { ADMIN_RAHMEN, AdminFehler } from '@/components/admin/admin-teile'
 import { Kennzahlen } from '@/components/admin/kennzahlen'
 import { Seitenkopf } from '@/components/admin/seitenkopf'
+import { LadeInhalt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { Unterreiter } from '@/components/admin/unterreiter'
 import { DiagrammLegende, FinanzenDiagramm } from './finanzen-diagramm'
 import { KostenListe } from './kosten-liste'
@@ -144,116 +145,120 @@ export default async function AdminFinanzenPage({
 
   return (
     <div className={cn(ADMIN_RAHMEN, 'flex flex-col gap-5')}>
-      <Seitenkopf
-        titel={FINANZEN_SEITE.titel}
-        satz={FINANZEN_SEITE.satz}
-        // Leise, nur wenn eine gezeigte Zahl eine Testzahlung auslässt (finanzseiteLaesstTestzahlungenAus, Register Z4).
-        hinweis={daten.testzahlungenHinweis}
-        rechts={
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <ZeitraumUmschalter
-              aktiv="monat"
-              monatHref={finanzenAdresse({ monat: daten.monat, reiter })}
-              jahrHref={finanzenJahrAdresse({ jahr: Number(daten.monat.slice(0, 4)), reiter })}
-            />
-            {/* Links statt Knöpfe: Der Monat steht in der Adresse, also ist er
-                teilbar und der Zurück-Pfeil des Browsers tut das Richtige. */}
-            <nav aria-label="Monat wählen" className="flex items-center gap-1.5">
-              <ZeitraumPfeil
-                href={daten.vorigerMonat === null ? null : finanzenAdresse({ monat: daten.vorigerMonat, reiter })}
-                beschriftung="Vorheriger Monat"
-                richtung="zurueck"
+      <LadeRahmen>
+        <Seitenkopf
+          titel={FINANZEN_SEITE.titel}
+          satz={FINANZEN_SEITE.satz}
+          // Leise, nur wenn eine gezeigte Zahl eine Testzahlung auslässt (finanzseiteLaesstTestzahlungenAus, Register Z4).
+          hinweis={daten.testzahlungenHinweis}
+          rechts={
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <ZeitraumUmschalter
+                aktiv="monat"
+                monatHref={finanzenAdresse({ monat: daten.monat, reiter })}
+                jahrHref={finanzenJahrAdresse({ jahr: Number(daten.monat.slice(0, 4)), reiter })}
               />
-              <span className="min-w-[9.5rem] text-center text-[15px] font-semibold text-foreground" aria-current="page">
-                {daten.bezeichnung}
-              </span>
-              <ZeitraumPfeil
-                href={daten.naechsterMonat === null ? null : finanzenAdresse({ monat: daten.naechsterMonat, reiter })}
-                beschriftung="Nächster Monat"
-                richtung="vor"
-              />
-            </nav>
-          </div>
-        }
-      />
-
-      <Kennzahlen beschriftung={FINANZEN_SEITE.kennzahlen} eintraege={kennzahlen} />
-
-      <Unterreiter beschriftung={FINANZEN_SEITE.reiter} eintraege={finanzenUnterreiter(daten.monat)} aktiv={reiter} />
-
-      {reiter === 'monat' && (
-        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)]">
-          <section aria-labelledby="traegt-titel" className={cn(KARTE, 'flex flex-col gap-4 p-4 md:p-[18px]')}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 id="traegt-titel" className="font-heading text-[17px] font-semibold text-foreground">
-                Wann trägt sich die Plattform?
-              </h2>
-              <DiagrammLegende />
+              {/* Links statt Knöpfe: Der Monat steht in der Adresse, also ist er
+                  teilbar und der Zurück-Pfeil des Browsers tut das Richtige. */}
+              <nav aria-label="Monat wählen" className="flex items-center gap-1.5">
+                <ZeitraumPfeil
+                  href={daten.vorigerMonat === null ? null : finanzenAdresse({ monat: daten.vorigerMonat, reiter })}
+                  beschriftung="Vorheriger Monat"
+                  richtung="zurueck"
+                />
+                <span className="min-w-[9.5rem] text-center text-[15px] font-semibold text-foreground" aria-current="page">
+                  {daten.bezeichnung}
+                </span>
+                <ZeitraumPfeil
+                  href={daten.naechsterMonat === null ? null : finanzenAdresse({ monat: daten.naechsterMonat, reiter })}
+                  beschriftung="Nächster Monat"
+                  richtung="vor"
+                />
+              </nav>
             </div>
-            <FinanzenDiagramm punkte={daten.verlauf} />
-            <p className="text-[14px] leading-relaxed text-foreground">
-              {kostendeckungSatz({
-                schnittCents: daten.schnittCents,
-                brauchtBestellungen: daten.brauchtBestellungen,
-                bezeichnung: daten.bezeichnung,
-                bestellungen: einnahmen.bestellungen,
-              })}
-            </p>
-            {geschafft !== null && geschafft > 0 && (
-              <ProgressBar
-                beschriftung={`${einnahmen.bestellungen} von ${geschafft} Bestellungen`}
-                wert={Math.min(einnahmen.bestellungen, geschafft)}
-                max={geschafft}
-              />
-            )}
-          </section>
-
-          <section aria-labelledby="einnahmen-titel" className={cn(KARTE, 'p-4 md:p-[18px]')}>
-            <h2 id="einnahmen-titel" className={KICKER}>
-              Einnahmen im Einzelnen
-            </h2>
-            <dl className="mt-2 text-[14px] [&>div]:flex [&>div]:items-baseline [&>div]:justify-between [&>div]:gap-3 [&>div]:border-t [&>div]:border-border [&>div]:py-2.5">
-              <div>
-                <dt className="text-foreground">{EINNAHMEN_ONLINE_LABEL}</dt>
-                <dd className="font-semibold text-foreground tabular-nums">{formatEuro(centsAlsEuro(einnahmen.eingezogenCents))}</dd>
-              </div>
-              <div>
-                <dt className="text-foreground">{EINNAHMEN_VOR_ORT_LABEL}</dt>
-                <dd className="font-semibold text-foreground tabular-nums">{formatEuro(centsAlsEuro(einnahmen.geschuldetCents))}</dd>
-              </div>
-              {/* „Provision" nur, wenn sie im Monat nicht 0 ist: Farm.platformFeePercent
-                  steht im Pilot auf 0, und eine Nullzeile ist Rauschen. */}
-              {einnahmen.provisionCents !== 0 && (
-                <div>
-                  <dt className="text-foreground">{EINNAHMEN_PROVISION_LABEL}</dt>
-                  <dd className="font-semibold text-foreground tabular-nums">{formatEuro(centsAlsEuro(einnahmen.provisionCents))}</dd>
-                </div>
-              )}
-            </dl>
-            <p className={cn('mt-1 text-[13px]', LEISE)}>
-              erwartet: {formatEuro(centsAlsEuro(einnahmen.erwartetCents))} aus{' '}
-              {einnahmen.offeneBestellungen === 1 ? '1 offenen Bestellung' : `${einnahmen.offeneBestellungen} offenen Bestellungen`}
-            </p>
-          </section>
-        </div>
-      )}
-
-      {reiter === 'kosten' && (
-        <div className="max-w-[560px]">
-          <KostenListe monat={daten.monat} bezeichnung={daten.bezeichnung} posten={daten.posten} summeCents={kosten.cents} />
-        </div>
-      )}
-
-      {(reiter === 'auszahlungen' || reiter === 'entfallen') && (
-        <EmptyState
-          symbol={Wallet}
-          titel={finanzenReiterLabel(reiter)}
-          satz={FINANZEN_REITER_OHNE_INHALT}
-          ausweg={{ ohne: 'Zu diesem Reiter hat die Finanzseite keine Zahlen; es gibt nichts, wohin der Weg führen könnte' }}
+          }
         />
-      )}
 
-      <p className={cn('text-[12.5px] leading-relaxed', LEISE)}>{FINANZEN_FUSSZEILE}</p>
+        <LadeInhalt className="flex flex-col gap-5">
+          <Kennzahlen beschriftung={FINANZEN_SEITE.kennzahlen} eintraege={kennzahlen} />
+
+          <Unterreiter beschriftung={FINANZEN_SEITE.reiter} eintraege={finanzenUnterreiter(daten.monat)} aktiv={reiter} ladePunkt />
+
+          {reiter === 'monat' && (
+            <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)]">
+              <section aria-labelledby="traegt-titel" className={cn(KARTE, 'flex flex-col gap-4 p-4 md:p-[18px]')}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 id="traegt-titel" className="font-heading text-[17px] font-semibold text-foreground">
+                    Wann trägt sich die Plattform?
+                  </h2>
+                  <DiagrammLegende />
+                </div>
+                <FinanzenDiagramm punkte={daten.verlauf} />
+                <p className="text-[14px] leading-relaxed text-foreground">
+                  {kostendeckungSatz({
+                    schnittCents: daten.schnittCents,
+                    brauchtBestellungen: daten.brauchtBestellungen,
+                    bezeichnung: daten.bezeichnung,
+                    bestellungen: einnahmen.bestellungen,
+                  })}
+                </p>
+                {geschafft !== null && geschafft > 0 && (
+                  <ProgressBar
+                    beschriftung={`${einnahmen.bestellungen} von ${geschafft} Bestellungen`}
+                    wert={Math.min(einnahmen.bestellungen, geschafft)}
+                    max={geschafft}
+                  />
+                )}
+              </section>
+
+              <section aria-labelledby="einnahmen-titel" className={cn(KARTE, 'p-4 md:p-[18px]')}>
+                <h2 id="einnahmen-titel" className={KICKER}>
+                  Einnahmen im Einzelnen
+                </h2>
+                <dl className="mt-2 text-[14px] [&>div]:flex [&>div]:items-baseline [&>div]:justify-between [&>div]:gap-3 [&>div]:border-t [&>div]:border-border [&>div]:py-2.5">
+                  <div>
+                    <dt className="text-foreground">{EINNAHMEN_ONLINE_LABEL}</dt>
+                    <dd className="font-semibold text-foreground tabular-nums">{formatEuro(centsAlsEuro(einnahmen.eingezogenCents))}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-foreground">{EINNAHMEN_VOR_ORT_LABEL}</dt>
+                    <dd className="font-semibold text-foreground tabular-nums">{formatEuro(centsAlsEuro(einnahmen.geschuldetCents))}</dd>
+                  </div>
+                  {/* „Provision" nur, wenn sie im Monat nicht 0 ist: Farm.platformFeePercent
+                      steht im Pilot auf 0, und eine Nullzeile ist Rauschen. */}
+                  {einnahmen.provisionCents !== 0 && (
+                    <div>
+                      <dt className="text-foreground">{EINNAHMEN_PROVISION_LABEL}</dt>
+                      <dd className="font-semibold text-foreground tabular-nums">{formatEuro(centsAlsEuro(einnahmen.provisionCents))}</dd>
+                    </div>
+                  )}
+                </dl>
+                <p className={cn('mt-1 text-[13px]', LEISE)}>
+                  erwartet: {formatEuro(centsAlsEuro(einnahmen.erwartetCents))} aus{' '}
+                  {einnahmen.offeneBestellungen === 1 ? '1 offenen Bestellung' : `${einnahmen.offeneBestellungen} offenen Bestellungen`}
+                </p>
+              </section>
+            </div>
+          )}
+
+          {reiter === 'kosten' && (
+            <div className="max-w-[560px]">
+              <KostenListe monat={daten.monat} bezeichnung={daten.bezeichnung} posten={daten.posten} summeCents={kosten.cents} />
+            </div>
+          )}
+
+          {(reiter === 'auszahlungen' || reiter === 'entfallen') && (
+            <EmptyState
+              symbol={Wallet}
+              titel={finanzenReiterLabel(reiter)}
+              satz={FINANZEN_REITER_OHNE_INHALT}
+              ausweg={{ ohne: 'Zu diesem Reiter hat die Finanzseite keine Zahlen; es gibt nichts, wohin der Weg führen könnte' }}
+            />
+          )}
+
+          <p className={cn('text-[12.5px] leading-relaxed', LEISE)}>{FINANZEN_FUSSZEILE}</p>
+        </LadeInhalt>
+      </LadeRahmen>
     </div>
   )
 }

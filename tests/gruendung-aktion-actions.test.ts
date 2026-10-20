@@ -15,9 +15,11 @@ vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn(), unstable_cache: (fn: unknown) => fn }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/email', () => ({ sendFreischaltungEmail: vi.fn(async () => ({})) }))
-vi.mock('@/lib/prisma', () => {
+vi.mock('@/lib/prisma', async () => {
   const prisma: Record<string, unknown> = {
     farm: { findUnique: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), update: vi.fn() },
+    // Die Wache liest seit Nr. 115 die Pflicht „erst Passkey“ (tests/admin-sitzung.ts).
+    ...(await import('./admin-sitzung')).passkeyAttrappen(),
     user: { findUnique: vi.fn() },
     plattformEinstellung: { findUnique: vi.fn(), updateMany: vi.fn() },
     nachricht: { findFirst: vi.fn(async () => null) },
@@ -38,6 +40,7 @@ import { GRUENDUNG_AKTION_VORBEI } from '@/schemas/gruendung'
 import { nimmWiederAuf, schreibeZusagenFest } from '@/server/actions/gruendung'
 import { approveFarmAction } from '@/server/actions/admin'
 import { setzeAbzeichenSichtbar } from '@/server/actions/abzeichen'
+import { adminSitzung } from './admin-sitzung'
 
 type Fn = ReturnType<typeof vi.fn>
 const getSession = vi.mocked(auth.api.getSession)
@@ -86,7 +89,7 @@ const FEST = { gruendungFestAm: new Date('2026-10-19T06:00:00.000Z') }
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers({ now: new Date('2026-10-19T10:00:00+02:00'), toFake: ['Date'] })
-  getSession.mockResolvedValue({ user: { id: 'admin_1' } } as never)
+  getSession.mockResolvedValue(adminSitzung('admin_1') as never)
   db.user.findUnique.mockResolvedValue({ isAdmin: true })
   db.farm.updateMany.mockResolvedValue({ count: 1 })
   db.plattformEinstellung.updateMany.mockResolvedValue({ count: 1 })
@@ -226,7 +229,7 @@ describe('nimmWiederAuf nach dem Festschreiben', () => {
     db.farm.findMany.mockResolvedValue([hof(1, { gruendungPlatz: 1 }), hof(2, { gruendungAusgenommen: true, gruendungBis: new Date('2030-01-31T00:00:00.000Z') })])
     expect(await nimmWiederAuf({ farmId: 'hof_2' })).toEqual({ ok: true })
     expect(db.farm.updateMany).toHaveBeenCalledWith({
-      where: { id: 'hof_2', gruendungAusgenommen: true, approvedAt: { not: null }, archivedAt: null },
+      where: { id: 'hof_2', gruendungAusgenommen: true, istTesthof: false, approvedAt: { not: null }, archivedAt: null },
       data: expect.objectContaining({ gruendungAusgenommen: false, gruendungPlatz: 2, gruendungBis: new Date('2030-01-31T00:00:00.000Z') }),
     })
   })
@@ -234,7 +237,7 @@ describe('nimmWiederAuf nach dem Festschreiben', () => {
 
 describe('setzeAbzeichenSichtbar — nur der eigene Hof mit Platz', () => {
   beforeEach(() => {
-    getSession.mockResolvedValue({ user: { id: 'u_1' } } as never)
+    getSession.mockResolvedValue(adminSitzung('u_1') as never)
     db.farm.findUnique.mockResolvedValue({ id: 'hof_1', name: 'Testhof A', slug: 'testhof-a', logoUrl: null, logoAusschnitt: null })
   })
 

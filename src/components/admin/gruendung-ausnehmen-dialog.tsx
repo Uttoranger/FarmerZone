@@ -8,6 +8,7 @@ import { GRUENDUNG_AUSNEHMEN_TEXT, type GruendungAenderung } from '@/lib/admin-h
 import { cn } from '@/lib/utils'
 import { BestellDialog, DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { useFrischBestaetigt } from '@/components/admin/frisch-bestaetigen'
 
 /** Ein Hof, wie die Bestätigung ihn braucht — Sätze und Haken fertig vom Server (gruendungAenderung). */
 export type GruendungAusnehmenHof = { id: string; name: string; aenderung: GruendungAenderung }
@@ -29,6 +30,9 @@ function Bestaetigung({ hof, onClose }: { hof: GruendungAusnehmenHof | null; onC
   const [laeuft, startTransition] = useTransition()
   const [fehler, setFehler] = useState<string | null>(null)
   const [zugestimmt, setZugestimmt] = useState(false)
+  // Ausnehmen und Wiederaufnahme sind heikel (Register N20): frisch mit Passkey bestätigt.
+  const frischAusnehmen = useFrischBestaetigt(nimmAusGruendung)
+  const frischWiederAuf = useFrischBestaetigt(nimmWiederAuf)
   const aenderung = hof?.aenderung ?? null
 
   function bestaetigen() {
@@ -37,8 +41,8 @@ function Bestaetigung({ hof, onClose }: { hof: GruendungAusnehmenHof | null; onC
     startTransition(async () => {
       const ergebnis =
         aenderung.richtung === 'ausnehmen'
-          ? await nimmAusGruendung({ farmId: hof.id, bestaetigt: aenderung.haken && zugestimmt })
-          : await nimmWiederAuf({ farmId: hof.id })
+          ? await frischAusnehmen.ausfuehren({ farmId: hof.id, bestaetigt: aenderung.haken && zugestimmt })
+          : await frischWiederAuf.ausfuehren({ farmId: hof.id })
       if ('error' in ergebnis) {
         setFehler(ergebnis.error)
         return
@@ -63,6 +67,8 @@ function Bestaetigung({ hof, onClose }: { hof: GruendungAusnehmenHof | null; onC
         gesperrt: aenderung === null || (aenderung.haken && !zugestimmt),
       }}
     >
+      {frischAusnehmen.dialog}
+      {frischWiederAuf.dialog}
       {aenderung && (
         <div className="flex flex-col gap-3.5">
           <p className="text-[14px] leading-relaxed text-foreground">{aenderung.saetze.join(' ')}</p>

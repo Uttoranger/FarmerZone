@@ -575,13 +575,13 @@ export function freischaltHinweis(
   if (hof.gruendungAusgenommen) return ohnePlatz('Der Hof ist ausgenommen')
   if (einstellung.festAm === null) {
     const platz = vergebeneGruendungsplaetze(hoefe, einstellung.plaetze) + 1
-    if (platz > einstellung.plaetze) return ohnePlatz(`Alle ${einstellung.plaetze} Gründungsplätze sind vergeben`)
+    if (platz > einstellung.plaetze) return ohnePlatz(alleGruendungsplaetzeVergeben(einstellung.plaetze))
     return { ton: 'gruen', text: `Dieser Hof belegt ${gruendungshofLabel(platz)}. ${baueGruendungsZusage(hof.gruendungBis ?? einstellung.bis)}` }
   }
   const zusage = zusageBeiFreischaltung(hof, hoefe, einstellung, jetzt)
   if (zusage === null) {
     const vergeben = gruendungsplaetze(hoefe).size
-    return ohnePlatz(vergeben >= einstellung.plaetze ? `Alle ${einstellung.plaetze} Gründungsplätze sind vergeben` : 'Die Aktion ist vorbei')
+    return ohnePlatz(vergeben >= einstellung.plaetze ? alleGruendungsplaetzeVergeben(einstellung.plaetze) : 'Die Aktion ist vorbei')
   }
   const satz = zusage.neu ? `Dieser Hof belegt ${gruendungshofLabel(zusage.platz)}.` : `Dieser Hof behält ${gruendungshofLabel(zusage.platz)}.`
   return { ton: 'gruen', text: `${satz} ${baueGruendungsZusage(bildeGruendungBis(zusage.bisTag))}` }
@@ -795,17 +795,31 @@ export const ABZEICHEN_TEXT = {
  */
 export const GRUENDUNGSPLAETZE_SPERRE: bigint = BigInt(0x4b32_0109)
 
-/** Die Marke in der Spalte Gründungshof (Wortliste: „ausgenommen“). */
-export const GRUENDUNG_AUSGENOMMEN_MARKE = 'ausgenommen · Testhof'
+/** Die Marke in der Spalte Gründungshof (Wortliste: „ausgenommen“) — seit Nr. 119 ohne „Testhof“: Ausgenommen heißt nur „zählt nicht für die Plätze“. */
+export const GRUENDUNG_AUSGENOMMEN_MARKE = 'ausgenommen'
+
+/** Die Marke eines Testhofs (Register N21, Wortliste: „Testhof“) — seine Zeile zeigt nur sie, nie zusätzlich „ausgenommen“. */
+export const TESTHOF_MARKE = 'Testhof'
+
+/** Der Grund am ausgegrauten „Wieder als Gründungshof zählen“ und der Satz der Action (Register N21: ein Testhof ist immer ausgenommen). */
+export const TESTHOF_ZAEHLT_NIE = 'Ein Testhof zählt nie als Gründungshof.'
+
+/** Der Hinweis oben auf der Hofseite eines Testhofs (Register N21) — Bestellen bleibt möglich. */
+export const TESTHOF_HINWEIS = 'Testhof – nur zum Ausprobieren. Er erscheint nicht in der Suche.'
 
 /** Wie viele freigeschaltete, nicht stillgelegte Höfe ausgenommen sind — „· k ausgenommen“ in Admin › Höfe und Einstellungen. */
 export function zaehleAusgenommene(hoefe: readonly HofFuerPlatz[]): number {
   return hoefe.filter((h) => h.approvedAt !== null && h.archivedAt === null && h.gruendungAusgenommen).length
 }
 
+/** „Alle Plätze vergeben“ – der EINE Wortlaut, aus dem der Freischalt-Hinweis, die Sperre im Menü und die Action ihren Satz bauen (Nr. 121). */
+export function alleGruendungsplaetzeVergeben(plaetze: number): string {
+  return `Alle ${plaetze} Gründungsplätze sind vergeben`
+}
+
 /** Alle Plätze vergeben — Satz der Action und Grund am ausgegrauten Menüeintrag. */
 export function gruendungAlleVergeben(plaetze: number): string {
-  return `Alle ${plaetze} Plätze sind vergeben – erst muss ein Platz frei werden.`
+  return `${alleGruendungsplaetzeVergeben(plaetze)} – erst muss ein Platz frei werden.`
 }
 
 /**

@@ -339,7 +339,7 @@ export function TeilenFenster({
                 onClick={() => schalte(e.id)}
                 title={e.name}
                 className={cn(
-                  "relative inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-semibold before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']",
+                  "relative inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-semibold before:absolute before:inset-x-0 before:-inset-y-[5px] before:content-['']",
                   an ? 'border-accent bg-accent/20 text-foreground' : 'border-border text-muted-foreground',
                   e.ausverkauft && 'border-dashed font-normal line-through',
                   FOKUS_RAHMEN

@@ -37,7 +37,7 @@ import { setzeGruendungBisAction } from '@/server/actions/admin'
 import { ladeGruendungBis } from '@/server/queries/admin'
 import { ladeEinstellungenUebersicht, ladeKonditionenHof, ladeTarifStand } from '@/server/queries/einstellungen'
 import { ladeTarifZeile } from '@/server/hofbereich'
-import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf } from './setup/basis'
+import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf, machePasskeyAdmin } from './setup/basis'
 
 const MIGRATION = readFileSync(join(process.cwd(), 'prisma', 'migrations', '20261012120000_gruendung_bis', 'migration.sql'), 'utf8')
 
@@ -113,7 +113,7 @@ describe('Spalte Farm.gruendungBis', () => {
 describe('setzeGruendungBisAction mit echter Admin-Anmeldung', () => {
   it('speichert den Tag als DATE, schreibt bedingt auch auf ein gesetztes Datum und setzt nur mit Zustimmung zurück', async () => {
     const { ownerId, cookie } = await erstelleHofMitAnmeldung()
-    await prisma.user.update({ where: { id: ownerId }, data: { isAdmin: true } })
+    await machePasskeyAdmin(ownerId)
     const { farm } = await erstelleHof({ approvedAt: FRUEH })
     vi.mocked(headers).mockResolvedValue(new Headers({ cookie }) as never)
 

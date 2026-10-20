@@ -192,6 +192,8 @@ export const MELDUNG_GEAENDERT = 'Die Meldung hat sich inzwischen geändert — 
 export const MELDUNG_VERWEIS_GEAENDERT = 'Die Meldung oder ihre Hauptmeldung hat sich inzwischen geändert — lade die Seite neu und entscheide noch einmal.'
 /** Die Triage-Notiz — das Admin-Formular und die Schreibroute halten dieselbe Grenze. */
 export const TRIAGE_NOTIZ_MAX = 2000
+/** Die Antwort an den Hof, der gemeldet hat – das einzige Triage-Feld, das der Hof sieht. Schema und Formular nehmen dieselbe Zahl. */
+export const ANTWORT_AN_MELDER_MAX = 500
 export const MELDUNGEN_PRO_STUNDE = 5
 
 /** Die sichtbare Ablehnung des Stundenzählers — hier, weil actions/meldung.ts ("use server") keine Konstanten exportieren darf. */

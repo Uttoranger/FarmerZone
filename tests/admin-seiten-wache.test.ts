@@ -24,6 +24,12 @@
  *    Prüfung im Aufruf). Eine neue Route ohne beides fällt hier auf, eine Ausnahme, die doch prüft, auch.
  *    Eine Datei, die eine Adresse ausliefert (`page`, `route`, `manifest`, `icon`, `sitemap` …), ist
  *    nur `page.tsx` oder `route.ts` — sonst gäbe es einen Weg am Layout und an dieser Wache vorbei.
+ *  - Admin nur mit Passkey (Register N20; Nr. 115): Die Pflicht „erst Passkey"
+ *    prüft JEDE Seite selbst — jede ruft `verlangeAdminSeite()` OHNE Argument,
+ *    nur die Pflichtseite /admin/einrichten `verlangeEinrichtenSeite()` (lässt
+ *    die offene Pflicht durch, eine Sitzung ohne Passkey nicht — Runde 3);
+ *    ladeAdminbereich (Layout) mit `verlangeAdminShell()`. Im Pflicht-Zustand
+ *    und in einer Sitzung ohne Passkey lädt das Layout keine Zähler.
  *  - Gegenproben: Schnipsel ohne Wache und mit Wache an zweiter Stelle.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -45,7 +51,15 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', () => ({
-  prisma: { user: { findUnique: vi.fn() }, farm: { count: vi.fn() }, meldung: { count: vi.fn() }, order: { count: vi.fn() }, $queryRaw: vi.fn() },
+  prisma: {
+    user: { findUnique: vi.fn() },
+    farm: { count: vi.fn() },
+    meldung: { count: vi.fn() },
+    order: { count: vi.fn() },
+    $queryRaw: vi.fn(),
+    passkey: { aggregate: vi.fn() },
+    adminErsatzcode: { aggregate: vi.fn(async () => ({ _max: { benutztAm: null } })) },
+  },
 }))
 
 import { ladeAdminbereich } from '@/server/adminbereich'
@@ -54,6 +68,7 @@ import { GET as meldungenUmleitung } from '@/app/admin/meldungen/route'
 import { GET as meldungUmleitung } from '@/app/admin/meldungen/[id]/route'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { adminSitzung } from './admin-sitzung'
 
 const WURZEL = process.cwd()
 const ADMIN = join(WURZEL, 'src/app/admin')
@@ -97,7 +112,7 @@ function importiertAls(datei: ts.SourceFile, modul: string, exportName: string):
   return null
 }
 
-/** Ob die erste Anweisung `await <name>()` ist — allein oder als Initialisierer. */
+/** Ob die erste Anweisung `await <name>()` ohne Argument ist — allein oder als Initialisierer. */
 function ersteIstAwait(fn: ts.FunctionDeclaration, name: string): boolean {
   const erste = fn.body?.statements[0]
   if (!erste) return false
@@ -108,11 +123,16 @@ function ersteIstAwait(fn: ts.FunctionDeclaration, name: string): boolean {
   }
   if (!ausdruck || !ts.isAwaitExpression(ausdruck)) return false
   const aufruf = ausdruck.expression
-  return ts.isCallExpression(aufruf) && ts.isIdentifier(aufruf.expression) && aufruf.expression.text === name && aufruf.arguments.length === 0
+  if (!ts.isCallExpression(aufruf) || !ts.isIdentifier(aufruf.expression) || aufruf.expression.text !== name) return false
+  return aufruf.arguments.length === 0
 }
 
 /** Was an der Wache fehlt — leer heißt gedeckt. */
-function wachenMaengel(quelltext: string, opt: { modul: string; exportName: string; funktionName: 'default' | string }, pfad = 'schnipsel.tsx'): string[] {
+function wachenMaengel(
+  quelltext: string,
+  opt: { modul: string; exportName: string; funktionName: 'default' | string },
+  pfad = 'schnipsel.tsx'
+): string[] {
   const datei = lies(quelltext, pfad)
   const name = importiertAls(datei, opt.modul, opt.exportName)
   if (!name) return [`${pfad}: ${opt.exportName} nicht aus '${opt.modul}' importiert`]
@@ -124,12 +144,19 @@ function wachenMaengel(quelltext: string, opt: { modul: string; exportName: stri
 }
 
 const SEITE = { modul: '@/server/admin-wache', exportName: 'verlangeAdminSeite', funktionName: 'default' } as const
+/** Die Wache der Pflichtseite: offene Pflicht durch, Sitzung ohne Passkey bei erledigter Pflicht → /login/admin. */
+const EINRICHTEN = { modul: '@/server/admin-wache', exportName: 'verlangeEinrichtenSeite', funktionName: 'default' } as const
 const SEITEN = [...seiten(ADMIN)]
+/** Die EINE Seite, die ohne Passkey öffnet (Register N20): die Pflichtseite. */
+const PFLICHTSEITE = join(ADMIN, 'einrichten', 'page.tsx')
 
 describe('jede Seite unter /admin', () => {
-  it('es gibt die sechs Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 93 die Einstellungen, seit Nr. 94 die Startseite, seit Nr. 103 Betrieb; /admin/meldungen leitet seit Nr. 101 als Route Handler um und prüft trotzdem)', () => {
+  it('es gibt die neun Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 93 die Einstellungen, seit Nr. 94 die Startseite, seit Nr. 103 Betrieb, seit Nr. 115 Bestätigen, Einrichten und Einstellungen › Anmeldung; /admin/meldungen leitet seit Nr. 101 als Route Handler um und prüft trotzdem)', () => {
     expect(SEITEN.map((p) => relative(ADMIN, p).split(sep).join('/')).sort()).toEqual([
+      'bestaetigen/page.tsx',
       'betrieb/page.tsx',
+      'einrichten/page.tsx',
+      'einstellungen/anmeldung/page.tsx',
       'einstellungen/page.tsx',
       'finanzen/page.tsx',
       'page.tsx',
@@ -138,9 +165,25 @@ describe('jede Seite unter /admin', () => {
     ])
   })
 
-  it('ruft als erste Anweisung `await verlangeAdminSeite()` auf', () => {
-    const maengel = SEITEN.flatMap((p) => wachenMaengel(readFileSync(p, 'utf8'), SEITE, relative(WURZEL, p)))
+  it('ruft als erste Anweisung `await verlangeAdminSeite()` OHNE Argument auf — die Pflicht prüft jede Seite selbst (N20), außer /admin/einrichten', () => {
+    const maengel = SEITEN.filter((p) => p !== PFLICHTSEITE).flatMap((p) => wachenMaengel(readFileSync(p, 'utf8'), SEITE, relative(WURZEL, p)))
     expect(maengel).toEqual([])
+  })
+
+  it('nur die Pflichtseite /admin/einrichten ruft als erste Anweisung `await verlangeEinrichtenSeite()` — nicht mehr die Seiten-Wache mit `ohnePasskey`', () => {
+    const quelle = readFileSync(PFLICHTSEITE, 'utf8')
+    expect(wachenMaengel(quelle, EINRICHTEN, relative(WURZEL, PFLICHTSEITE))).toEqual([])
+    expect(quelle).not.toContain('ohnePasskey: true')
+  })
+
+  it('Gegenprobe: ein Argument fällt unter der Regel aller Seiten auf; die Pflichtseite mit der Seiten-Wache, mit Argument oder an zweiter Stelle auch', () => {
+    const kopf = "import { verlangeAdminSeite, verlangeEinrichtenSeite } from '@/server/admin-wache'\n"
+    expect(wachenMaengel(`${kopf}export default async function S() { await verlangeAdminSeite({ ohnePasskey: true })\n return null }`, SEITE)).toHaveLength(1)
+    expect(wachenMaengel(`${kopf}export default async function S() { await verlangeEinrichtenSeite()\n return null }`, SEITE)).toHaveLength(1)
+    expect(wachenMaengel(`${kopf}export default async function S() { await verlangeAdminSeite()\n return null }`, EINRICHTEN)).toHaveLength(1)
+    expect(wachenMaengel(`${kopf}export default async function S() { await verlangeEinrichtenSeite({ ohnePasskey: true })\n return null }`, EINRICHTEN)).toHaveLength(1)
+    expect(wachenMaengel(`${kopf}export default async function S() { const j = new Date()\n await verlangeEinrichtenSeite()\n return j }`, EINRICHTEN)).toHaveLength(1)
+    expect(wachenMaengel(`${kopf}export default async function S() { const { pflicht } = await verlangeEinrichtenSeite()\n return pflicht }`, EINRICHTEN)).toEqual([])
   })
 
   it('die Umleitungen /admin/meldungen und /admin/meldungen/[id] (Route Handler, Nr. 101) prüfen als erste Anweisung im GET', () => {
@@ -293,9 +336,9 @@ describe('das Layout mit der AdminShell', () => {
     expect(wachenMaengel(quelle, { modul: '@/server/adminbereich', exportName: 'ladeAdminbereich', funktionName: 'default' })).toEqual([])
   })
 
-  it('ladeAdminbereich prüft als erste Anweisung mit verlangeAdminSeite', () => {
+  it('ladeAdminbereich prüft als erste Anweisung mit verlangeAdminShell() — lässt Pflicht und Sitzung ohne Passkey durch (ohne Zähler), das Layout umhüllt auch die Pflichtseite', () => {
     const quelle = readFileSync(join(WURZEL, 'src/server/adminbereich.ts'), 'utf8')
-    expect(wachenMaengel(quelle, { ...SEITE, funktionName: 'ladeAdminbereich' }, 'src/server/adminbereich.ts')).toEqual([])
+    expect(wachenMaengel(quelle, { modul: '@/server/admin-wache', exportName: 'verlangeAdminShell', funktionName: 'ladeAdminbereich' }, 'src/server/adminbereich.ts')).toEqual([])
   })
 })
 
@@ -326,8 +369,11 @@ describe('ladeAdminbereich — Verhalten', () => {
   // zaehleUngelesenTeam (Postfach, Nr. 87): Fäden mit ungelesener Antwort eines Hofs.
   const ungelesenTeam = vi.mocked(prisma.$queryRaw)
 
+  const passkeyAggregate = vi.mocked(prisma.passkey.aggregate)
+
   beforeEach(() => {
     vi.clearAllMocks()
+    passkeyAggregate.mockResolvedValue({ _count: { _all: 1 }, _max: { createdAt: new Date(0) } } as never)
     farmCount.mockResolvedValue(2 as never)
     meldungCount.mockResolvedValue(3 as never)
     orderCount.mockResolvedValue(1 as never)
@@ -352,7 +398,7 @@ describe('ladeAdminbereich — Verhalten', () => {
   })
 
   it('Admin ohne Hof: Name und Zähler — wartende Höfe; am Postfach „Offen" im Eingang (N14), kein Weg zum Hof', async () => {
-    getSession.mockResolvedValue({ user: { id: 'u1' } } as never)
+    getSession.mockResolvedValue(adminSitzung('u1') as never)
     userFindUnique
       .mockResolvedValueOnce({ isAdmin: true } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
@@ -365,10 +411,34 @@ describe('ladeAdminbereich — Verhalten', () => {
     expect(orderCount).toHaveBeenCalledWith({ where: { erstattungOffenSeit: { not: null } } })
   })
 
+  it('Admin ohne Passkey (Pflicht, N20): die Shell mit Name, aber ohne Zähler und Betriebshinweis — nichts gezählt', async () => {
+    getSession.mockResolvedValue(adminSitzung('u1') as never)
+    passkeyAggregate.mockResolvedValue({ _count: { _all: 0 }, _max: { createdAt: null } } as never)
+    userFindUnique
+      .mockResolvedValueOnce({ isAdmin: true } as never)
+      .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
+    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, betrieb: null })
+    expect(farmCount).not.toHaveBeenCalled()
+    expect(meldungCount).not.toHaveBeenCalled()
+    expect(orderCount).not.toHaveBeenCalled()
+    expect(ungelesenTeam).not.toHaveBeenCalled()
+  })
+
+  it('Sitzung ohne Passkey (das Konto hat einen, N20): die Shell ohne Zähler — die Seite leitet zur Admin-Anmeldung um', async () => {
+    getSession.mockResolvedValue({ user: { id: 'u1' }, session: { id: 'sitzung-u1', createdAt: new Date(), passkeyAm: null } } as never)
+    userFindUnique
+      .mockResolvedValueOnce({ isAdmin: true } as never)
+      .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
+    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, betrieb: null })
+    expect(farmCount).not.toHaveBeenCalled()
+    expect(meldungCount).not.toHaveBeenCalled()
+    expect(ungelesenTeam).not.toHaveBeenCalled()
+  })
+
   // Nr. 41 (Register N1): „← Mein Hof" und die Konto-Plakette nur mit eigenem Hof —
   // frisch aus der Datenbank, mit derselben Regel wie die Shell (kontoHatHof).
   it('Admin mit eigenem Hof (Rolle FARMER): hatHof — gelesen werden nur Name, Rolle und die Hof-Kennung', async () => {
-    getSession.mockResolvedValue({ user: { id: 'u1' } } as never)
+    getSession.mockResolvedValue(adminSitzung('u1') as never)
     userFindUnique
       .mockResolvedValueOnce({ isAdmin: true } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'FARMER', farm: { id: 'f1' } } as never)
@@ -380,7 +450,7 @@ describe('ladeAdminbereich — Verhalten', () => {
   })
 
   it('Rolle FARMER ohne Hof: kein Weg zum Hof (der Hofbereich führte erst nach /onboarding)', async () => {
-    getSession.mockResolvedValue({ user: { id: 'u1' } } as never)
+    getSession.mockResolvedValue(adminSitzung('u1') as never)
     userFindUnique
       .mockResolvedValueOnce({ isAdmin: true } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'FARMER', farm: null } as never)
@@ -395,7 +465,8 @@ describe('/admin/meldungen — Umleitung in den Reiter „Meldungen" (echter 308
 
   beforeEach(() => {
     vi.clearAllMocks()
-    getSession.mockResolvedValue({ user: { id: 'u1' } } as never)
+    getSession.mockResolvedValue(adminSitzung('u1') as never)
+    vi.mocked(prisma.passkey.aggregate).mockResolvedValue({ _count: { _all: 1 }, _max: { createdAt: new Date(0) } } as never)
   })
 
   it('Admin: 308 auf den Reiter — die alten Filter gibt es dort nicht', async () => {
@@ -419,7 +490,8 @@ describe('/admin/meldungen/[id] — Umleitung in die Spalte „Meldung entscheid
 
   beforeEach(() => {
     vi.clearAllMocks()
-    getSession.mockResolvedValue({ user: { id: 'u1' } } as never)
+    getSession.mockResolvedValue(adminSitzung('u1') as never)
+    vi.mocked(prisma.passkey.aggregate).mockResolvedValue({ _count: { _all: 1 }, _max: { createdAt: new Date(0) } } as never)
   })
 
   it('Admin: 308 auf /admin/postfach?art=meldung&meldung=<id> — auch mit der Kurznummer', async () => {

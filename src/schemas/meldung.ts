@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import {
   BUENDEL_STAND_WAHL,
+  ANTWORT_AN_MELDER_MAX,
   MELDUNGEN_VON,
   MELDUNG_ARTEN,
   MELDUNG_KENNUNG_MAX,
@@ -65,7 +66,7 @@ export const triageEingabeSchema = z.object({
   triageNotiz: leerZuNull(TRIAGE_NOTIZ_MAX, 'Notiz'),
   duplikatVonId: leerZuNull(40, 'Duplikat von'),
   sprintName: leerZuNull(60, 'Sprint'),
-  antwortAnMelder: leerZuNull(500, 'Antwort'),
+  antwortAnMelder: leerZuNull(ANTWORT_AN_MELDER_MAX, 'Antwort'),
   // Der Stand, auf dem das Formular aufbaut. Seit die Schreibroute (CLI,
   // Deployment) ebenfalls schreibt, speichert die Action nur, wenn Status und
   // Notiz noch so sind — jede Änderung der Route hängt eine Zeile an die Notiz.
@@ -139,7 +140,7 @@ export const trennenSchema = z.object({ meldungId: meldungIdSchema })
  */
 export const ablegenSchema = z.object({
   meldungId: meldungIdSchema,
-  antwort: z.string(MELDUNG_KLICK_TEXT.ablegenPflicht).trim().min(1, MELDUNG_KLICK_TEXT.ablegenPflicht).max(500, 'Antwort: höchstens 500 Zeichen'),
+  antwort: z.string(MELDUNG_KLICK_TEXT.ablegenPflicht).trim().min(1, MELDUNG_KLICK_TEXT.ablegenPflicht).max(ANTWORT_AN_MELDER_MAX, `Antwort: höchstens ${ANTWORT_AN_MELDER_MAX} Zeichen`),
   vorherStatus: z.enum(MELDUNG_STATUS, { message: UNBEKANNTE_MELDUNG }),
 })
 
@@ -152,7 +153,7 @@ export const buendelStandSchema = z.object({
   clusterKey: z.string('Dieses Bündel gibt es nicht mehr – lade die Seite neu.').trim().min(1, 'Dieses Bündel gibt es nicht mehr – lade die Seite neu.').max(60, 'Bündel-Stichwort: höchstens 60 Zeichen'),
   stand: z.enum(BUENDEL_STAND_WAHL, { message: 'Wähl einen Stand.' }),
   sprintName: leerZuNull(60, 'Geplant in'),
-  antwort: leerZuNull(500, 'Antwort'),
+  antwort: leerZuNull(ANTWORT_AN_MELDER_MAX, 'Antwort'),
   bescheid: z.enum(BESCHEID_WAHL, { message: 'Wähl, wem du Bescheid gibst.' }),
 })
 

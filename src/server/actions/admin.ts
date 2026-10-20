@@ -4,7 +4,7 @@ import { revalidatePath, updateTag } from 'next/cache'
 import * as Sentry from '@sentry/nextjs'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { verlangeAdminAktion } from '@/server/admin-wache'
+import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import {
   FARM_REJECT_APPROVED_MESSAGE,
   FARM_REJECT_HAS_DATA_MESSAGE,
@@ -243,6 +243,9 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
  * offline" verschickt, würde mehr beschädigen als erklären.
  */
 export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?: string }> {
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  const frisch = await verlangeFrischeBestaetigung()
+  if ('error' in frisch) return { error: frisch.error }
   const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
 
@@ -279,6 +282,9 @@ export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?
  * Status-Beiträge, Abos (am Hof) sowie Sessions und Accounts (am User).
  */
 export async function rejectFarmAction(farmId: string): Promise<{ error?: string }> {
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  const frisch = await verlangeFrischeBestaetigung()
+  if ('error' in frisch) return { error: frisch.error }
   const guard = await verlangeAdminAktion()
   if ('error' in guard) return { error: guard.error }
 
@@ -469,15 +475,6 @@ export async function setzeGruendungBisAction(
   return {}
 }
 
-/**
- * Triage einer Meldung im Fehlerbriefkasten (Sprint fehlerbriefkasten, Teil D).
- *
- * Der Schreibweg des Menschen für ALLE Triage-Felder, auch die Art. Daneben
- * gibt es nur die Schreibroute /api/triage/status, die genau vier Status
- * setzen kann und nie die Art (Sprint Briefkasten-Rückkopplung). Ein Duplikat-Verweis
- * muss auf eine bestehende, andere Meldung zeigen; sonst stünde ein toter Link
- * in der Triage. antwortAnMelder ist das einzige Triage-Feld, das der Hof sieht.
- */
 const KEINE_KETTE = 'Diese Meldung ist selbst ein Duplikat – nimm ihre Hauptmeldung.'
 
 /**
@@ -510,6 +507,15 @@ async function schreibeTriageMitVerweis(meldungId: string, triage: TriageEingabe
     WHERE ${Prisma.join(bedingungen, ' AND ')}`
 }
 
+/**
+ * Triage einer Meldung im Fehlerbriefkasten (Sprint fehlerbriefkasten, Teil D).
+ *
+ * Der Schreibweg des Menschen für ALLE Triage-Felder, auch die Art. Daneben
+ * gibt es nur die Schreibroute /api/triage/status, die genau vier Status
+ * setzen kann und nie die Art (Sprint Briefkasten-Rückkopplung). Ein Duplikat-Verweis
+ * muss auf eine bestehende, andere Meldung zeigen; sonst stünde ein toter Link
+ * in der Triage. antwortAnMelder ist das einzige Triage-Feld, das der Hof sieht.
+ */
 export async function triageMeldungAction(
   meldungId: string,
   eingabe: {

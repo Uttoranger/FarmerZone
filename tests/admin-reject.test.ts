@@ -23,9 +23,11 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 // dieselbe Mock-Grenze wie in farm-approval.test.ts
 vi.mock('@/lib/email', () => ({ sendFreischaltungEmail: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
-vi.mock('@/lib/prisma', () => ({
+vi.mock('@/lib/prisma', async () => ({
   prisma: {
     farm: { findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    // Die Wache liest seit Nr. 115 die Pflicht „erst Passkey“ (tests/admin-sitzung.ts).
+    ...(await import('./admin-sitzung')).passkeyAttrappen(),
     user: { findUnique: vi.fn(), delete: vi.fn() },
     order: { count: vi.fn() },
     orderItem: { count: vi.fn() },
@@ -37,6 +39,7 @@ vi.mock('@/lib/prisma', () => ({
 import { rejectFarmAction } from '@/server/actions/admin'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { adminSitzung } from './admin-sitzung'
 import {
   FARM_REJECT_APPROVED_MESSAGE,
   FARM_REJECT_HAS_DATA_MESSAGE,
@@ -65,7 +68,7 @@ const WARTENDER_HOF = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  getSession.mockResolvedValue({ user: { id: 'admin_1' } } as never)
+  getSession.mockResolvedValue(adminSitzung('admin_1') as never)
   userFindUnique.mockResolvedValue({ isAdmin: true } as never)
   farmFindUnique.mockResolvedValue(WARTENDER_HOF as never)
   orderCount.mockResolvedValue(0 as never)
@@ -97,7 +100,7 @@ describe('rejectFarmAction — Zugriff', () => {
   })
 
   it('liest das Admin-Recht aus der Datenbank, nicht aus der Session', async () => {
-    getSession.mockResolvedValue({ user: { id: 'user_1', isAdmin: true } } as never)
+    getSession.mockResolvedValue(adminSitzung('user_1', { isAdmin: true }) as never)
     userFindUnique.mockResolvedValue({ isAdmin: false } as never)
 
     const result = await rejectFarmAction('farm_1')

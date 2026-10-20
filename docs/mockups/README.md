@@ -21,11 +21,12 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
-| `web-k1-entdecken-einstieg.html` | K1 · Entdecken – Einstieg | `/hoefe` | Umbau | 1440×1180 |
+| `web-k1-entdecken-einstieg.html` | K1 · Entdecken – Einstieg · Hofkarte, Abholzeile, Filter Abholung und Seitenfuß: siehe `system-k1-entdecken-v2.html` | `/hoefe` | Umbau | 1440×1180 |
 | `web-k1-filter-futtermittel.html` | K1 · Filter Futtermittel | `/hoefe?bereich=futter` | Umbau | 1440×1100 |
 | `web-k1-suche-filter.html` | K1 · Suche + Filter | `/hoefe?q=…` | Umbau | 1440×1000 |
 | `web-k1-leerzustand.html` | K1 · Leerzustand | `/hoefe (leer)` | Zustand | 1440×1000 |
 | `system-k1-ortssuche-zustaende.html` | K1 · Ortssuche nach dem Fix: PLZ+Ort in einem, mehrere Orte zur Wahl, Standort nur ungefähr (Hinweis + GPS-Nachfrage) | `/hoefe` | Fix (Ortssuche) | 1000×560 |
+| `system-k1-entdecken-v2.html` | Vorschlag 19.10. · Entdecken v2: Hofkarte in drei Varianten (A Produktzeilen mit Preis empfohlen, B Bildkacheln, C wie heute), Abholzeile in sechs Lagen, am Handy Liste, Liste weiter unten (Hof ohne Kartenpunkt, Bildfläche ohne Foto, „Noch nicht bestellbar“, Seitenfuß), Filter-Blatt mit „Wann holst du ab?“, Karte mit Namen am Pin, Leerzustand „Heute holt hier kein Hof mehr ab“; am Computer Splitscreen mit Pin-Vorschau, Pin-Zustände, Seitenfuß, Kennzahlen; Regeln | `/hoefe` (Liste, Karte, Filter-Blatt), KundeShell (Seitenfuß) | Umbau (freigegeben 19.10.2026, Nr. 120) | 2640×3560 |
 
 ## WEB · Kunde – K2 Hof und Produkte ansehen
 
@@ -112,6 +113,8 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 | `web-h5-auswertung-abrechnung-teilen-wirkung.html` | H5 · Auswertung, Abrechnung, Teilen-Wirkung | `/analytics` | Umbau | 1440×1260 |
 | `web-h5-region-preise.html` | H5 · Region – Preise | `/region (neu, aus /analytics/umfeld)` | Umbau | 1440×1020 |
 | `web-h5-region-futter-kaufen.html` | H5 · Region – Futter kaufen | `/region?reiter=futter (neu)` | neu | 1440×1020 |
+| `system-h5-region-v2.html` | Vorschlag 19.10. · Region v2, passend zu Entdecken v2: Matrix der neun gemeinsamen Bausteine (Hofkopf, Abholzeile, Produktzeile, Bild ohne Foto, Karte, Karte am Pin, Hinweis ohne Standort, Auswahl Abholung, Leerzustand) mit dem, was eigen bleibt; Preise vergleichen am Computer (Liste mit aufgeklappter Zeile, Karte mit „Du“, Umkreis und Vorschau am Pin, vorher/nachher); Futter kaufen am Computer (Reihe „Abholung“, Liste \| Karte, Futterkarte mit Bild und Abholzeile, vorher/nachher, Leerzustand); am Handy Preise Liste und Karte, Futter Liste und Karte, ohne eigenen Standort; Regeln | `/region`, `/region?reiter=futter` | Umbau (Vorschlag) | 2640×4720 |
+| `system-h5-region-eigene-teile.html` | Vorschlag 19.10. · Region v3, die eigenen Teile: Bewertung 0–100 heute und neu (gewichtet 65 → 90) mit Vorbildern von Mobbin; Spanne-Zeile als Streifen (Punkte ohne Namen, Mitte, „Deins“ mit Lage in Worten, Eier je Stück) in allen Lagen; Futterkarte mit Größenwahl (Gebinde- und Kilopreis, „günstigster Kilopreis“, ein Knopf), Schild „laut Hof“ ohne Haken, Abholhinweise als Kennzeichen; Umkreis mit Zahl je Stufe, „So rechnen wir“, „Selbst verkaufen“ nur ohne eigenes Futter; Regeln | `/region`, `/region?reiter=futter` | Umbau (Vorschlag) | 2640×4480 |
 
 ## WEB · Hof – H6 Hilfe und Rückmeldung
 
@@ -135,8 +138,8 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
 | `mobil-k1-ueber-einen-geteilten-link.html` | K1 · Über einen geteilten Link | `Vorschaubild /[farmSlug] (OG)` | neu | 390×844 |
-| `mobil-k1-entdecken.html` | K1 · Entdecken | `/hoefe` | Umbau | 390×844 |
-| `mobil-k1-filter.html` | K1 · Filter | `/hoefe (Filter-Blatt)` | Umbau | 390×844 |
+| `mobil-k1-entdecken.html` | K1 · Entdecken · Hofkarte, Abholzeile, Filter Abholung und Seitenfuß: siehe `system-k1-entdecken-v2.html` | `/hoefe` | Umbau | 390×844 |
+| `mobil-k1-filter.html` | K1 · Filter · Hofkarte, Abholzeile, Filter Abholung und Seitenfuß: siehe `system-k1-entdecken-v2.html` | `/hoefe (Filter-Blatt)` | Umbau | 390×844 |
 
 ## MOBIL · Kunde – K2 Ansehen
 
@@ -304,11 +307,11 @@ Hinweis Nr. 101: „später“-Marken in den Postfach-Mockups zeigen das Zielbil
 
 ## GRÜNDUNGSHÖFE · Vorschlag 15.10. (Register K2, nach Mobbin- und NN/g-Bewertung)
 
-Kein Banner, sondern Bausteine: ein Satz im Lesefluss (Startseite), Pill + umbenannter Knopf + Fußnote im Kopf von /fuer-hoefe, Angebotszeile direkt über den Tarifkarten (Hofladen 0 € bis 31.12.2027, dann 19 €), ein ehrlicher Satz über dem Registrierformular („voraussichtlich Nr. 8"), einmaliger wegklickbarer Hinweis auf Heute nach der Freischaltung – keine Dauerkarte, keine seitenweite Leiste, kein Countdown. Sind alle Plätze vergeben oder ist das Datum vorbei, verschwindet alles. Zahlen aus `src/lib/gruendungshof.ts` bzw. den Admin-Einstellungen. Seit Lauf 17 (Nr. 116) gilt die Aktion „100 Gründungshöfe“: 100 Plätze, Hofladen 24 Monate ohne Grundgebühr ab dem späteren von Tarifstart und Freischaltung, Stichtag „Aktion bis“, Zähler erst ab 10 vergebenen Plätzen. Die Bausteine behalten ihre Form; die Zahlen und Sätze kommen aus `GRUENDUNG_TEXT` (Wortlaut in freigabe.md §21). Das Abzeichen zeigt `system-k2-gruendung-abzeichen.html`.
+Kein Banner, sondern Bausteine: ein Satz im Lesefluss (Startseite), Pill + umbenannter Knopf + Fußnote im Kopf von /fuer-hoefe, Angebotszeile direkt über den Tarifkarten (Hofladen 0 € bis 31.12.2027, dann 19 €), ein ehrlicher Satz über dem Registrierformular („voraussichtlich Nr. 8"), einmaliger wegklickbarer Hinweis auf Heute nach der Freischaltung (Baustein 5 (Heute-Karte) entfällt (19.10.2026)) – keine Dauerkarte, keine seitenweite Leiste, kein Countdown. Sind alle Plätze vergeben oder ist das Datum vorbei, verschwindet alles. Zahlen aus `src/lib/gruendungshof.ts` bzw. den Admin-Einstellungen. Seit Lauf 17 (Nr. 116) gilt die Aktion „100 Gründungshöfe“: 100 Plätze, Hofladen 24 Monate ohne Grundgebühr ab dem späteren von Tarifstart und Freischaltung, Stichtag „Aktion bis“, Zähler erst ab 10 vergebenen Plätzen. Die Bausteine behalten ihre Form; die Zahlen und Sätze kommen aus `GRUENDUNG_TEXT` (Wortlaut in freigabe.md §21). Das Abzeichen zeigt `system-k2-gruendung-abzeichen.html`.
 
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
-| `system-k2-gruendung-bausteine.html` | Gründungshöfe · Bausteine: Satz (dunkel/hell), Pill/Knopf/Fußnote, Preiszeile + Hofladen-Preis, Registrieren-Satz, einmaliger Hinweis, Zustände (letzter Platz, alle vergeben, Datum vorbei), Regeln | Bausteine (`components/gruendung/*`) | neu | 1760×860 |
+| `system-k2-gruendung-bausteine.html` | Gründungshöfe · Bausteine: Satz (dunkel/hell), Pill/Knopf/Fußnote, Preiszeile + Hofladen-Preis, Registrieren-Satz, einmaliger Hinweis, Zustände (letzter Platz, alle vergeben, Datum vorbei), Regeln · Baustein 5 (Heute-Karte) entfällt (19.10.2026) | Bausteine (`components/gruendung/*`) | neu | 1760×860 |
 | `web-k2-startseite-gruendung.html` | Startseite am Computer · Für-Höfe-Band mit dem Gründungssatz | `/` (Für-Höfe-Band) | Zustand | 1440×3390 |
 | `mobil-k2-startseite-gruendung.html` | Startseite am Handy · Für-Höfe-Karte mit dem Gründungssatz | `/` (Handy) | Zustand | 390×2544 |
 | `web-k2-fuer-hoefe-gruendung.html` | /fuer-hoefe am Computer · Pill, Knopf „Gründungshof werden", Fußnote; Angebotszeile über den Preisen; Hofladen 0 € bis 31.12.2027 | `/fuer-hoefe` | Zustand | 1440×3170 |

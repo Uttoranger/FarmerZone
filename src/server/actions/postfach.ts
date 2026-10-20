@@ -45,9 +45,9 @@ import {
 import { SUPPORT_EMAIL } from '@/lib/support'
 import { ZU_LANG } from '@/lib/eingabegrenzen'
 import { PLATTFORM_EINSTELLUNG_ID, PLATTFORM_EINSTELLUNG_TAG } from '@/lib/plattform-einstellung'
-import { DB_BREMSEN, innerhalbDerGrenze } from '@/lib/bremse-datenbank'
-import { bremseUeberAlleInstanzen, zaehleVersuche } from '@/server/bremse-datenbank'
-import { verlangeAdminAktion } from '@/server/admin-wache'
+import { DB_BREMSEN } from '@/lib/bremse-datenbank'
+import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
+import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import {
   empfaengerTokenHash,
@@ -136,21 +136,14 @@ function hofSeitenNeu(unterhaltungId: string): void {
 /**
  * Die Drossel der Mail „Ein Hof hat geantwortet" (Register N14, Ergänzung;
  * Nr. 105): höchstens eine je Faden und voller Stunde, gezählt über alle
- * Instanzen (DB_BREMSEN.antwortHofMail). Fail-open wie die Bremse selbst:
- * Ist der Zähler nicht erreichbar, geht die Mail — lieber eine zu viel als
- * keine. Gemeldet wird nur die Klasse mit der Kennung des Fadens.
+ * Instanzen (DB_BREMSEN.antwortHofMail). Über dieselbe Bremse wie alle
+ * anderen (`bremseUeberAlleInstanzen`): Sie wartet höchstens
+ * DB_BREMSE_ZEITLIMIT_MS (1,5 s) auf den Zähler. Ist er nicht erreichbar oder
+ * zu langsam, geht die Mail (fail-open) — lieber eine zu viel als keine; die
+ * Bremse meldet dann die Klasse des Fehlers an Sentry (Nr. 121).
  */
 async function antwortMailFrei(unterhaltungId: string, jetzt: Date): Promise<boolean> {
-  const bremse = DB_BREMSEN.antwortHofMail
-  try {
-    const [stand] = await zaehleVersuche([{ bremse, merkmal: unterhaltungId }], jetzt)
-    return innerhalbDerGrenze(stand, bremse.max)
-  } catch (err) {
-    const meldung = new Error('Postfach: Drossel nicht erreichbar, E-Mail geht trotzdem')
-    meldung.name = err instanceof Error ? err.name : 'Unbekannt'
-    Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'postfach', aufgabe: 'antwort-team-drossel' }, extra: { kennung: unterhaltungId } })
-    return true
-  }
+  return bremseUeberAlleInstanzen([{ bremse: DB_BREMSEN.antwortHofMail, merkmal: unterhaltungId }], jetzt)
 }
 
 // ─── Hof ─────────────────────────────────────────────────────────────────────
@@ -355,6 +348,9 @@ export async function markiereGelesenTeam(eingabe: unknown): Promise<Ergebnis> {
  * (keine offene Erstattung) gilt dann schon.
  */
 export async function markiereErstattungErledigt(eingabe: unknown): Promise<Ergebnis> {
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  const frisch = await verlangeFrischeBestaetigung()
+  if ('error' in frisch) return { error: frisch.error }
   const geprueft = erstattungErledigtSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: satzAus(geprueft.error) }
 

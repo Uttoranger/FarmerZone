@@ -22,6 +22,7 @@ import {
 import { EmptyState } from '@/components/ui/empty-state'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { LadeInhalt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
@@ -80,41 +81,43 @@ export default async function PostfachPage({
           ausweg={{ ohne: 'Höfe beginnen keine Unterhaltung (Register N12): Nachrichten schreibt nur das Team, Probleme und Wünsche gehen über die Meldungsseite' }}
         />
       ) : (
-        <>
+        <LadeRahmen>
           <FilterChipReihe beschriftung={POSTFACH_TEXT.filterBeschriftung}>
-            <FilterChip href={postfachFilterHref('alle')} aktiv={filter === 'alle'}>
+            <FilterChip href={postfachFilterHref('alle')} aktiv={filter === 'alle'} ladePunkt>
               {POSTFACH_TEXT.alle}
             </FilterChip>
-            <FilterChip href={postfachFilterHref('ungelesen')} aktiv={filter === 'ungelesen'}>
+            <FilterChip href={postfachFilterHref('ungelesen')} aktiv={filter === 'ungelesen'} ladePunkt>
               {POSTFACH_TEXT.ungelesen}
             </FilterChip>
           </FilterChipReihe>
-          {zeilen.length === 0 ? (
-            <EmptyState
-              symbol={CheckCheck}
-              titel={POSTFACH_ALLES_GELESEN.titel}
-              satz={POSTFACH_ALLES_GELESEN.satz}
-              ausweg={
-                <Link
-                  href={postfachFilterHref('alle')}
-                  className={cn('inline-flex min-h-11 items-center rounded-full border border-border px-4 text-sm font-semibold hover:bg-muted', FOKUS_RAHMEN)}
-                >
-                  {POSTFACH_ALLES_GELESEN.ausweg}
-                </Link>
-              }
-            />
-          ) : (
-            <ul className="overflow-hidden rounded-2xl border border-border bg-card dark:ring-1 dark:ring-border">
-              {zeilen.map((zeile) => (
-                <li key={zeile.id} className="border-b border-border last:border-0">
-                  <PostfachZeile zeile={zeile} />
-                </li>
-              ))}
-            </ul>
-          )}
-          {/* Nur mit Fäden: Leer sagt der EmptyState dasselbe (DESIGN_SYSTEM „Leerzustände"). */}
-          <p className="text-[12.5px] leading-relaxed text-muted-foreground">{POSTFACH_TEXT.erklaerung}</p>
-        </>
+          <LadeInhalt className="flex flex-col gap-4">
+            {zeilen.length === 0 ? (
+              <EmptyState
+                symbol={CheckCheck}
+                titel={POSTFACH_ALLES_GELESEN.titel}
+                satz={POSTFACH_ALLES_GELESEN.satz}
+                ausweg={
+                  <Link
+                    href={postfachFilterHref('alle')}
+                    className={cn('inline-flex min-h-11 items-center rounded-full border border-border px-4 text-sm font-semibold hover:bg-muted', FOKUS_RAHMEN)}
+                  >
+                    {POSTFACH_ALLES_GELESEN.ausweg}
+                  </Link>
+                }
+              />
+            ) : (
+              <ul className="overflow-hidden rounded-2xl border border-border bg-card dark:ring-1 dark:ring-border">
+                {zeilen.map((zeile) => (
+                  <li key={zeile.id} className="border-b border-border last:border-0">
+                    <PostfachZeile zeile={zeile} />
+                  </li>
+                ))}
+              </ul>
+            )}
+            {/* Nur mit Fäden: Leer sagt der EmptyState dasselbe (DESIGN_SYSTEM „Leerzustände"). */}
+            <p className="text-[12.5px] leading-relaxed text-muted-foreground">{POSTFACH_TEXT.erklaerung}</p>
+          </LadeInhalt>
+        </LadeRahmen>
       )}
     </div>
   )

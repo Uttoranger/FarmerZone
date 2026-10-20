@@ -25,7 +25,13 @@
  * Bestehende Kundenseiten nutzen weiter KundenKopf (src/lib/kunden-kopf.ts);
  * für seinen Knopf gilt kopfKnopf aus dieser Quelle — dieselben drei
  * Varianten wie in der KundeShell.
+ *
+ * Seit Nr. 120 (Register N22) auch die Ziele des Seitenfußs (SEITENFUSS):
+ * Impressum, Datenschutz, AGB und „Problem melden" auf jeder Seite der
+ * Kundschaft, am Computer dazu die Wege der Kopfzeile.
  */
+import { AGB_LINK_TEXT, AGB_PFAD } from '@/lib/rechtstexte/agb-einbindung'
+import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 
 export type KundenNavId = 'entdecken' | 'so-gehts' | 'fuer-hoefe' | 'bestellungen' | 'anmelden' | 'mein-hof' | 'konto'
 
@@ -69,6 +75,26 @@ export const SCHON_DABEI = { frage: 'Schon dabei?', link: ANMELDEN.label, href: 
  * die Navigation keine Fachregeln lädt.
  */
 const BESTELLUNGEN: KundenNavPunkt = { id: 'bestellungen', label: 'Meine Bestellungen', kurz: 'Bestellungen', href: '/bestellungen' }
+
+/** Ein Link im Seitenfuß: Ziel und Wort, sonst nichts. */
+export type FussLink = { href: string; label: string }
+
+/**
+ * Der Seitenfuß (Register N22, Board system-k1-entdecken-v2): `rechtlich` auf
+ * jeder Seite der Kundschaft, am Handy wie am Computer — das erfüllt „AGB-Link
+ * in jeder Fußzeile" (O4); `wege` nur am Computer (am Handy führt die
+ * Unterleiste). AGB-Pfad und -Wort kommen aus der Einbindung der AGB, „Problem
+ * melden" aus der Fehlerseite — eine Quelle je Wort.
+ */
+export const SEITENFUSS: { rechtlich: readonly FussLink[]; wege: readonly FussLink[] } = {
+  rechtlich: [
+    { href: '/impressum', label: 'Impressum' },
+    { href: '/datenschutz', label: 'Datenschutz' },
+    { href: AGB_PFAD, label: AGB_LINK_TEXT },
+    { href: '/problem-melden', label: PROBLEM_MELDEN },
+  ],
+  wege: [ENTDECKEN, FUER_HOEFE, SO_GEHTS].map(({ href, label }) => ({ href, label })),
+}
 
 export type KundenLeistenPlatz = { art: 'punkt'; punkt: KundenNavPunkt } | { art: 'warenkorb' }
 

@@ -4,11 +4,12 @@ import { useId, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Mail, MessageCircle, Trash2, BellOff, ExternalLink, LogOut } from 'lucide-react'
+import { Mail, MessageCircle, Trash2, BellOff, ExternalLink, LogOut, ShieldCheck } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { cn } from '@/lib/utils'
 import { updateSubscription, deleteCustomerAccount } from '@/server/actions/subscriptions'
 import { ABO_TEXT } from '@/lib/abo-bestaetigung'
+import { ADMIN_ANMELDEN_TEXT, ADMIN_PFAD } from '@/lib/admin-anmeldung'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Button } from '@/components/ui/button'
@@ -42,6 +43,8 @@ interface SubscriptionRow {
 interface Props {
   user: { id: string; email: string }
   subscriptions: SubscriptionRow[]
+  /** Konto mit Admin-Recht (frisch aus der Datenbank, Register N20): der Link „Zum Admin-Bereich". */
+  adminBereich?: boolean
 }
 
 const ETIKETT = 'text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase'
@@ -52,7 +55,7 @@ const KNOPF_ZERSTOEREND = cn(
   FOKUS_RAHMEN
 )
 
-export function ProfileClient({ user, subscriptions: initialSubs }: Props): React.JSX.Element {
+export function ProfileClient({ user, subscriptions: initialSubs, adminBereich = false }: Props): React.JSX.Element {
   const [subs, setSubs] = useState(initialSubs)
   const [isPending, startTransition] = useTransition()
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -138,6 +141,13 @@ export function ProfileClient({ user, subscriptions: initialSubs }: Props): Reac
           Abmelden
         </button>
       </div>
+
+      {adminBereich && (
+        <Link href={ADMIN_PFAD.bereich} className={cn(KNOPF_RAHMEN, 'self-start')}>
+          <ShieldCheck className="size-4" strokeWidth={1.7} aria-hidden="true" />
+          {ADMIN_ANMELDEN_TEXT.zumAdminBereich}
+        </Link>
+      )}
 
       {/* Abonnements */}
       <section aria-labelledby="abos-titel" className="flex flex-col gap-3">

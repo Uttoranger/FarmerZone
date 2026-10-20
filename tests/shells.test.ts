@@ -276,13 +276,25 @@ describe('KundeShell', () => {
   })
 
   // Nr. 41: Am Handy braucht „Anmelden" den Platz oben rechts — Hell/Dunkel steht dort am Seitenfuß.
-  it.each(['gast', 'kunde', 'hof'] as const)('Hell/Dunkel am Handy am Seitenfuß, als letzter Teil des Inhalts (Sitzung: %s)', (sitzung) => {
+  // Nr. 120 (Register N22): Der Seitenfuß steht nach dem Inhalt, mit Impressum, Datenschutz, AGB und „Problem melden".
+  it.each(['gast', 'kunde', 'hof'] as const)('Seitenfuß nach dem Inhalt: die vier Links, am Handy Hell/Dunkel (Sitzung: %s)', (sitzung) => {
     const html = kunde(sitzung)
-    const inhalt = abschnitt(html, '<main', '</main>')
-    const fuss = inhalt.slice(inhalt.indexOf('Inhalt der Seite'))
+    expect(html.indexOf('<footer')).toBeGreaterThan(html.indexOf('</main>'))
+    const fuss = abschnitt(html, '<footer', '</footer>')
+    for (const href of ['/impressum', '/datenschutz', '/agb', '/problem-melden']) expect(fuss, href).toContain(`href="${href}"`)
     expect(fuss).toContain('aria-label="Dunkelmodus einschalten"')
     // Gegenprobe: Die Zeile fehlt im Kopf — dort steht vor der Hydration nur der Platzhalter des runden Schalters.
     expect(abschnitt(html, '<header', '</header>')).not.toContain('aria-label="Dunkelmodus einschalten"')
+  })
+
+  it('der Seitenfuß hält unten Platz für die Unterleiste frei, die Fokus-Seite ohne Unterleiste trägt ihn auch', () => {
+    const fuss = abschnitt(kunde('gast'), '<footer', '>')
+    expect(fuss).toMatch(/\bpb-28\b/)
+    expect(fuss).toMatch(/\bmd:pb-0\b/)
+    pfad.aktuell = '/hof-beispiel/produkt/p1'
+    const ohneLeiste = renderToStaticMarkup(el(KundeShell, { sitzung: 'gast', unterleiste: false }))
+    expect(ohneLeiste).toContain('data-slot="seitenfuss"')
+    expect(ohneLeiste).not.toContain('data-slot="bottom-nav"')
   })
 
   // Nr. 14: „Bestellungen finden" (/bestellungen) ist das Ziel für alle — im Kopf und in der Leiste.
@@ -330,6 +342,8 @@ describe('KundeShell', () => {
     expect(html).toMatch(/<h1[^>]*>Warenkorb<\/h1>/)
     expect(html).not.toContain('data-slot="bottom-nav"')
     expect(html.match(/Zur Kasse/g)).toHaveLength(1)
+    // Kasse und Bestätigung: kein Seitenfuß — dort steht der AGB-Satz unter dem Kaufknopf (Register N22, O4).
+    expect(html).not.toContain('data-slot="seitenfuss"')
   })
 })
 
@@ -444,6 +458,8 @@ describe('kein Big Bang', () => {
     '(auth)/reset-password/page.tsx',
     // Nr. 114: „Das war ich nicht" (neu, KundeShell ohne Unterleiste wie die Bestätigungsseite).
     'sicherheit/nicht-ich/page.tsx',
+    // Nr. 120: nur der Seitenfuß (KundeFuss, Register N22) — die Seite selbst bleibt bei KundenKopf.
+    '(public)/datenschutz/page.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {
@@ -452,6 +468,19 @@ describe('kein Big Bang', () => {
       if (UMGESTELLT.includes(pfad)) continue
       expect(pfad, datei).toMatch(/^intern\//)
     }
+  })
+
+  // Nr. 120 (Register N22): Der Seitenfuß hängt an der KundeShell — jede Route, die sie trägt, hat ihn.
+  // „Fertig, wenn": /hoefe, Hofseite, /bestellungen, /fuer-hoefe und die Startseite; /datenschutz bindet ihn selbst ein.
+  it('Seitenfuß auf jeder Seite der Kundschaft: über die KundeShell, /datenschutz selbst', () => {
+    const mitKundeShell = UMGESTELLT.filter((p) => /\bKundeShell(MitSitzung)?\b/.test(readFileSync(join(wurzel, p), 'utf8')))
+    for (const p of ['page.tsx', '(public)/hoefe/page.tsx', '(public)/[farmSlug]/page.tsx', '(public)/bestellungen/page.tsx', '(public)/fuer-hoefe/page.tsx']) {
+      expect(mitKundeShell, p).toContain(p)
+    }
+    expect(readFileSync(join(wurzel, '(public)/datenschutz/page.tsx'), 'utf8')).toMatch(/<KundeFuss \/>/)
+    expect(readFileSync(join(process.cwd(), 'src/components/shells/kunde-shell.tsx'), 'utf8')).toMatch(/<KundeFuss\b/)
+    // Gegenprobe: Eine Seite nur mit der Fokus-Shell zählt nicht.
+    expect(/\bKundeShell(MitSitzung)?\b/.test("import { KundeFokusShell } from '@/components/shells/kunde-shell'")).toBe(false)
   })
 
   it('die umgestellten Routen binden ihre Shell wirklich ein', () => {

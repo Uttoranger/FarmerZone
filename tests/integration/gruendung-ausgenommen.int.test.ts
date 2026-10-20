@@ -37,7 +37,7 @@ import { GRUENDUNG_AUSNEHMEN_ZUSTIMMUNG_FEHLT } from '@/schemas/gruendung'
 import { nimmAusGruendung, nimmWiederAuf } from '@/server/actions/gruendung'
 import { approveFarmAction } from '@/server/actions/admin'
 import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
-import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf, erstelleProdukt } from './setup/basis'
+import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf, erstelleProdukt, machePasskeyAdmin } from './setup/basis'
 
 const MIGRATION = readFileSync(join(process.cwd(), 'prisma', 'migrations', '20261016120000_gruendung_ausgenommen', 'migration.sql'), 'utf8')
 
@@ -63,7 +63,7 @@ afterEach(async () => {
 /** Ein Admin mit echter Sitzung — das Cookie geht über das gemockte headers() an die Action. */
 async function alsAdmin(): Promise<string> {
   const { ownerId, cookie } = await erstelleHofMitAnmeldung()
-  await prisma.user.update({ where: { id: ownerId }, data: { isAdmin: true } })
+  await machePasskeyAdmin(ownerId)
   vi.mocked(headers).mockResolvedValue(new Headers({ cookie }) as never)
   return ownerId
 }

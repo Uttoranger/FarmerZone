@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
+import { isAdminUser } from '@/server/queries/admin'
+import { ADMIN_PFAD } from '@/lib/admin-anmeldung'
 import { STANDARD_ZIEL_NACH_CODE } from '@/lib/anmeldecode'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { AnmeldenSeite } from '@/components/anmelden/anmelden-seite'
@@ -24,6 +26,11 @@ export const metadata: Metadata = {
  *
  * Die Kundenkarte daneben führt nach der Anmeldung immer auf „Mein Konto" —
  * ein `?ziel=` liest nur /account/login.
+ *
+ * Ein Konto mit Admin-Recht ohne Hof (Rolle nicht FARMER; Register N20,
+ * Nr. 115) geht nach /admin — das Recht frisch aus der Datenbank. Vorher
+ * schickte /dashboard es hierher zurück, und es kam nie in den Admin-Bereich.
+ * Dort greift die Pflicht (erst Passkey).
  */
 export default async function LoginPage(): Promise<React.JSX.Element> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -31,6 +38,7 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
   if (session?.user) {
     const role = (session.user as typeof session.user & { role: string }).role
     if (role === 'FARMER') redirect('/dashboard')
+    if (await isAdminUser(session.user.id)) redirect(ADMIN_PFAD.bereich)
   }
 
   return (

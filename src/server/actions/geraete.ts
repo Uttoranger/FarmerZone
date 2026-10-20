@@ -54,7 +54,8 @@ export async function meldeAlleAnderenAb(): Promise<AbmeldenAntwort> {
   return { ok: true, abgemeldet: count }
 }
 
-export type NichtIchAntwort = { ok: true; passwortMail: boolean } | { error: 'ungueltig' | 'zu-viele' }
+/** `passkey`: ein Admin mit Passkey (Register N20) — für ihn gibt es keinen Link für ein neues Passwort, die Seite sagt „Melde dich mit deinem Passkey wieder an". */
+export type NichtIchAntwort = { ok: true; passwortMail: boolean; passkey?: true } | { error: 'ungueltig' | 'zu-viele' }
 
 // Je IP, wie alle Speicher-Grenzen nur in Produktion und je Instanz
 // (ARCHITECTURE §3 „Öffentliche Server Action").
@@ -90,8 +91,14 @@ export async function meldeAllesAbNichtIch(eingabe: unknown): Promise<NichtIchAn
   // fände den Link schon verbraucht. /settings/account liest ohnehin frisch.
 
   // Die Adresse frisch aus der Datenbank, nie aus der Anfrage.
-  const konto = await prisma.user.findUnique({ where: { id: link.userId }, select: { email: true } })
+  const konto = await prisma.user.findUnique({
+    where: { id: link.userId },
+    select: { email: true, isAdmin: true, _count: { select: { passkeys: true } } },
+  })
   if (!konto) return { ok: true, passwortMail: false }
+  // Admin mit Passkey (N20, Nr. 115): „Passwort vergessen" schickt ihm nichts
+  // — also gar nicht erst anstoßen; er meldet sich mit dem Passkey wieder an.
+  if (konto.isAdmin && konto._count.passkeys > 0) return { ok: true, passwortMail: false, passkey: true }
   try {
     await auth.api.requestPasswordReset({ body: { email: konto.email, redirectTo: '/reset-password' } })
     return { ok: true, passwortMail: true }

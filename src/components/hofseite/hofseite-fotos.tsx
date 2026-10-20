@@ -122,7 +122,13 @@ export function HofseiteFotos({
             )
           })}
         </ul>
-        {hinweis && <p className="text-xs text-muted-foreground">{hinweis}</p>}
+        {/* „Wischen" nur, wo es keine Pfeile gibt: dieselbe Bedingung wie die Pfeile der Bildansicht (pointer-fine). */}
+        {hinweis && (
+          <p className="text-xs text-muted-foreground">
+            <span className="pointer-fine:hidden">{hinweis.touch}</span>
+            <span className="hidden pointer-fine:inline">{hinweis.maus}</span>
+          </p>
+        )}
       </div>
 
       {/* Ab lg: das Raster wie bisher, bis zu sechs Kacheln, auf der letzten „+N". */}

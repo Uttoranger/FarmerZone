@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { CalendarDays, Check, ChevronRight, CircleMinus, CirclePlus, Ellipsis, Eye, Search, Star, Store, Undo2 } from 'lucide-react'
+import { CalendarDays, Check, ChevronRight, CircleMinus, CirclePlus, Ellipsis, Eye, FlaskConical, FlaskConicalOff, MapPinOff, Search, Star, Store, Undo2 } from 'lucide-react'
 import {
   HOF_FILTER_LABEL,
   HOF_FILTER_WERTE,
@@ -27,12 +27,13 @@ import {
   waehleHoefeReiter,
   wartelistePlatzZeile,
   type GruendungAenderung,
+  type TesthofAenderung,
 } from '@/lib/admin-hoefe-seite'
 import { hoefeAnsichtAus } from '@/schemas/admin-hoefe'
 import { hoefeReiterAus } from '@/schemas/admin-reiter'
 import { aktivitaetsTeile, istOhneInhalt, AKTIVITAET_LEER, type FarmAktivitaet } from '@/lib/farm-aktivitaet'
 import { DE_ADMIN_KLAERUNG, LAND_LABEL } from '@/lib/laender'
-import { GRUENDUNG_AUSGENOMMEN_MARKE, GRUENDUNG_BIS_MARKE, GRUENDUNG_BIS_TITEL, type GruendungAnzeige } from '@/lib/gruendungshof'
+import { GRUENDUNG_AUSGENOMMEN_MARKE, GRUENDUNG_BIS_MARKE, GRUENDUNG_BIS_TITEL, TESTHOF_MARKE, type GruendungAnzeige } from '@/lib/gruendungshof'
 import { HOFNAME_MAX } from '@/lib/eingabegrenzen'
 import { mitAnzahl } from '@/lib/format'
 import type { MeldungTon } from '@/lib/meldung'
@@ -58,6 +59,7 @@ import { HofAktionDialog, type HofAktion } from './hof-aktion-dialog'
 import { ServicegebuehrDialog } from './servicegebuehr-dialog'
 import { GruendungBisDialog, type GruendungsHof } from './gruendung-bis-dialog'
 import { GruendungAusnehmenDialog, type GruendungAusnehmenHof } from './gruendung-ausnehmen-dialog'
+import { TesthofDialog, type TesthofHof } from './testhof-dialog'
 
 /**
  * `gruendung`: das wirksame Gründungs-Ende (Nr. 62), null ohne Gründungsplatz.
@@ -67,6 +69,8 @@ import { GruendungAusnehmenDialog, type GruendungAusnehmenHof } from './gruendun
  * `gruendungAenderung`: Menüeintrag und Bestätigung „Nicht als / Wieder als
  * Gründungshof zählen“ (Register K2, Nr. 109) — nur für freigeschaltete, nicht
  * stillgelegte Höfe, sonst null. `gruendungZuletzt`: „zuletzt geändert von … am …“.
+ * `testhofAenderung`: Menüeintrag und Bestätigung „Als Testhof markieren“ bzw.
+ * „Kein Testhof mehr“ (Register N21, Nr. 119) — null ohne Eintrag.
  */
 export type AdminHof = AdminHofZeile & {
   aktivitaet: FarmAktivitaet
@@ -74,6 +78,7 @@ export type AdminHof = AdminHofZeile & {
   platzBeiFreischaltung: number | null
   gruendungAenderung: GruendungAenderung | null
   gruendungZuletzt: string | null
+  testhofAenderung: TesthofAenderung | null
 }
 
 export type NeueMeldung = { id: string; art: string; artTon: MeldungTon; titel: string }
@@ -116,6 +121,7 @@ export function HoefeAnsicht({
   const [gebuehrHof, setGebuehrHof] = useState<AdminHof | null>(null)
   const [gruendungHof, setGruendungHof] = useState<GruendungsHof | null>(null)
   const [ausnehmenHof, setAusnehmenHof] = useState<GruendungAusnehmenHof | null>(null)
+  const [testhofHof, setTesthofHof] = useState<TesthofHof | null>(null)
 
   const wartende = hoefe.filter((h) => h.status.id === 'wartet')
   const zahlen = zaehleHofFilter(hoefe)
@@ -254,8 +260,22 @@ export function HoefeAnsicht({
             keinTreffer
           ) : (
             <>
-              <Tabelle hoefe={liste} onGebuehr={setGebuehrHof} onGruendung={setGruendungHof} onAusnehmen={setAusnehmenHof} onAktion={setAktion} />
-              <Karten hoefe={liste} onGebuehr={setGebuehrHof} onGruendung={setGruendungHof} onAusnehmen={setAusnehmenHof} onAktion={setAktion} />
+              <Tabelle
+                hoefe={liste}
+                onGebuehr={setGebuehrHof}
+                onGruendung={setGruendungHof}
+                onAusnehmen={setAusnehmenHof}
+                onTesthof={setTesthofHof}
+                onAktion={setAktion}
+              />
+              <Karten
+                hoefe={liste}
+                onGebuehr={setGebuehrHof}
+                onGruendung={setGruendungHof}
+                onAusnehmen={setAusnehmenHof}
+                onTesthof={setTesthofHof}
+                onAktion={setAktion}
+              />
             </>
           )}
         </section>
@@ -265,10 +285,11 @@ export function HoefeAnsicht({
         {HOEFE_SEITE.regel} {SERVICEGEBUEHR_NUR_NEUE} {NUMMER_HINWEIS}
       </p>
 
-      <HofAktionDialog aktion={aktion} vergebenePlaetze={vergebenePlaetze} onClose={() => setAktion(null)} />
+      <HofAktionDialog aktion={aktion} onClose={() => setAktion(null)} />
       <ServicegebuehrDialog hof={gebuehrHof} onClose={() => setGebuehrHof(null)} />
       <GruendungBisDialog hof={gruendungHof} onClose={() => setGruendungHof(null)} />
       <GruendungAusnehmenDialog hof={ausnehmenHof} onClose={() => setAusnehmenHof(null)} />
+      <TesthofDialog hof={testhofHof} onClose={() => setTesthofHof(null)} />
     </div>
   )
 }
@@ -323,6 +344,7 @@ function WartenderHof({ hof, onAktion }: { hof: AdminHof; onAktion: (a: HofAktio
               {platzZeile.text}
             </p>
           )}
+          <KartenpunktZeile text={hof.kartenpunktZeile} />
           <p className={cn('mt-0.5 flex flex-wrap gap-x-3 text-[12.5px]', LEISE)}>
             <span>E-Mail bestätigt: {hof.emailBestaetigtText}</span>
             {hof.nummer && <span>Betriebsnummer {hof.nummer}</span>}
@@ -385,11 +407,26 @@ type ZeilenProps = {
   onGebuehr: (hof: AdminHof) => void
   onGruendung: (hof: GruendungsHof) => void
   onAusnehmen: (hof: GruendungAusnehmenHof) => void
+  onTesthof: (hof: TesthofHof) => void
   onAktion: (a: HofAktion) => void
 }
 
 /** Die Rückrufe des Menüs ⋯ einer Hofzeile. */
-type MenueProps = Pick<ZeilenProps, 'onGruendung' | 'onAusnehmen' | 'onAktion'>
+type MenueProps = Pick<ZeilenProps, 'onGruendung' | 'onAusnehmen' | 'onTesthof' | 'onAktion'>
+
+/**
+ * „Kein Kartenpunkt – …“ (Nr. 119): leise wie die Platz-Zeile der Warteliste,
+ * nie orange — ein Hinweis, keine Sperre; Freischalten bleibt möglich.
+ */
+function KartenpunktZeile({ text }: { text: string | null }): React.JSX.Element | null {
+  if (text === null) return null
+  return (
+    <p className="mt-1 flex items-center gap-1.5 text-[12.5px] font-medium text-muted-foreground">
+      <MapPinOff className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+      {text}
+    </p>
+  )
+}
 
 /** „Standard" oder „abweichend" neben dem wirksamen Ende. */
 function gruendungMarke(gruendung: GruendungAnzeige): string {
@@ -399,12 +436,13 @@ function gruendungMarke(gruendung: GruendungAnzeige): string {
 /**
  * Die Zelle „Gründungshof“ (Register N15, Mockup): „★ Nr. 3 · bis 30.06.2027“,
  * darunter leise die Marke „Standard“ bzw. „abweichend“, daneben „ändern“ —
- * ohne Platz „kein Gründungshof“, ausgenommen die Marke „ausgenommen ·
- * Testhof“ (Register K2, Nr. 109).
+ * ohne Platz „kein Gründungshof“, ausgenommen die Marke „ausgenommen“
+ * (Register K2, Nr. 109), ein Testhof nur die Marke „Testhof“ (Register N21).
  */
 function GruendungZelle({ hof, onGruendung }: { hof: AdminHof; onGruendung: (hof: GruendungsHof) => void }): React.JSX.Element {
   const zelle = gruendungshofZelle(hof)
   const gruendung = hof.gruendung
+  if (hof.istTesthof) return <StatusBadge status="neutral">{TESTHOF_MARKE}</StatusBadge>
   if (hof.gruendungAusgenommen) return <StatusBadge status="neutral">{GRUENDUNG_AUSGENOMMEN_MARKE}</StatusBadge>
   if (!zelle) return <span className={LEISE}>{GRUENDUNGSHOF_SPALTE.kein}</span>
   return (
@@ -431,7 +469,7 @@ function GruendungZelle({ hof, onGruendung }: { hof: AdminHof; onGruendung: (hof
 }
 
 /** Ab 1024 px: die Tabelle aus dem Mockup. */
-function Tabelle({ hoefe, onGebuehr, onGruendung, onAusnehmen, onAktion }: ZeilenProps): React.JSX.Element {
+function Tabelle({ hoefe, onGebuehr, onGruendung, onAusnehmen, onTesthof, onAktion }: ZeilenProps): React.JSX.Element {
   const kopf = 'px-3.5 py-2.5 text-left text-[11px] font-semibold tracking-[0.1em] whitespace-nowrap text-muted-foreground uppercase'
   return (
     <div className={cn(KARTE, 'hidden overflow-hidden lg:block')}>
@@ -474,6 +512,7 @@ function Tabelle({ hoefe, onGebuehr, onGruendung, onAusnehmen, onAktion }: Zeile
                 <p className={cn('truncate text-[12.5px]', LEISE)} title={`/${hof.slug}`}>
                   /{hof.slug}
                 </p>
+                <KartenpunktZeile text={hof.kartenpunktZeile} />
               </td>
               <td className="px-3.5 py-2.5">
                 <StatusBadge status={hof.status.ton}>{hof.status.text}</StatusBadge>
@@ -506,7 +545,7 @@ function Tabelle({ hoefe, onGebuehr, onGruendung, onAusnehmen, onAktion }: Zeile
                   </>
                 )}</td>
               <td className="px-2 py-1.5 text-right">
-                <MehrMenue hof={hof} onGruendung={onGruendung} onAusnehmen={onAusnehmen} onAktion={onAktion} />
+                <MehrMenue hof={hof} onGruendung={onGruendung} onAusnehmen={onAusnehmen} onTesthof={onTesthof} onAktion={onAktion} />
               </td>
             </tr>
           ))}
@@ -517,7 +556,7 @@ function Tabelle({ hoefe, onGebuehr, onGruendung, onAusnehmen, onAktion }: Zeile
 }
 
 /** Unter 1024 px: je Hof eine Karte (nichts scrollt quer). */
-function Karten({ hoefe, onGebuehr, onGruendung, onAusnehmen, onAktion }: ZeilenProps): React.JSX.Element {
+function Karten({ hoefe, onGebuehr, onGruendung, onAusnehmen, onTesthof, onAktion }: ZeilenProps): React.JSX.Element {
   return (
     <ul className="flex flex-col gap-3 lg:hidden">
       {hoefe.map((hof) => (
@@ -528,17 +567,20 @@ function Karten({ hoefe, onGebuehr, onGruendung, onAusnehmen, onAktion }: Zeilen
                 {hof.name}
               </p>
               <p className={cn('truncate text-[12.5px]', LEISE)}>/{hof.slug}</p>
+              <KartenpunktZeile text={hof.kartenpunktZeile} />
             </div>
             <StatusBadge status={hof.status.ton} className="shrink-0">
               {hof.status.text}
             </StatusBadge>
-            <MehrMenue hof={hof} onGruendung={onGruendung} onAusnehmen={onAusnehmen} onAktion={onAktion} />
+            <MehrMenue hof={hof} onGruendung={onGruendung} onAusnehmen={onAusnehmen} onTesthof={onTesthof} onAktion={onAktion} />
           </div>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[13px] sm:grid-cols-4">
             <div>
               <dt className={LEISE}>{GRUENDUNGSHOF_SPALTE.titel}</dt>
               <dd className="text-foreground">
-                {hof.gruendungAusgenommen ? (
+                {hof.istTesthof ? (
+                  <StatusBadge status="neutral">{TESTHOF_MARKE}</StatusBadge>
+                ) : hof.gruendungAusgenommen ? (
                   <StatusBadge status="neutral">{GRUENDUNG_AUSGENOMMEN_MARKE}</StatusBadge>
                 ) : hof.gruendungsplatz !== null ? (
                   `Nr. ${hof.gruendungsplatz}`
@@ -621,13 +663,16 @@ function StripeZeichen({ bereit }: { bereit: boolean }): React.JSX.Element {
 /**
  * „⋯": Hofseite ansehen, „Gründungshof bis …“, „Nicht als / Wieder als
  * Gründungshof zählen …“ (Register K2, Nr. 109 — ausgegraut mit Grund, wenn
- * kein Platz frei ist) und Freigabe zurücknehmen — selten, deshalb nicht als
- * eigener Knopf. Darunter leise, wer zuletzt aus- oder wieder aufgenommen hat.
+ * kein Platz frei ist oder der Hof ein Testhof ist), „Als Testhof markieren …“
+ * bzw. „Kein Testhof mehr …“ (Register N21, Nr. 119) und Freigabe zurücknehmen
+ * — selten, deshalb nicht als eigener Knopf. Darunter leise, wer zuletzt aus-
+ * oder wieder aufgenommen hat.
  */
-function MehrMenue({ hof, onGruendung, onAusnehmen, onAktion }: { hof: AdminHof } & MenueProps): React.JSX.Element {
+function MehrMenue({ hof, onGruendung, onAusnehmen, onTesthof, onAktion }: { hof: AdminHof } & MenueProps): React.JSX.Element {
   const oeffentlich = hof.status.id !== 'stillgelegt'
   const gruendung = hof.gruendung
   const aenderung = hof.gruendungAenderung
+  const testhof = hof.testhofAenderung
   const symbol = 'size-4 shrink-0 text-muted-foreground'
   return (
     <DropdownMenu>
@@ -665,6 +710,16 @@ function MehrMenue({ hof, onGruendung, onAusnehmen, onAktion }: { hof: AdminHof 
         )}
         {/* Der Grund in voller Schrift UNTER dem ausgegrauten Eintrag — im Eintrag selbst wäre er zu blass zum Lesen. */}
         {aenderung?.gesperrt && <p className="px-2.5 pb-1.5 pl-9 text-[12px] leading-snug text-muted-foreground">{aenderung.gesperrt}</p>}
+        {testhof && (
+          <DropdownMenuItem onClick={() => onTesthof({ id: hof.id, name: hof.name, aenderung: testhof })}>
+            {testhof.richtung === 'markieren' ? (
+              <FlaskConical className={symbol} strokeWidth={1.7} aria-hidden="true" />
+            ) : (
+              <FlaskConicalOff className={symbol} strokeWidth={1.7} aria-hidden="true" />
+            )}
+            {testhof.menue}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={() => onAktion({ hof, art: 'revoke' })}>
           <Undo2 className={symbol} strokeWidth={1.7} aria-hidden="true" />
           Freigabe zurücknehmen

@@ -15,7 +15,7 @@ import { HofAktionDialog, type HofAktion } from './hof-aktion-dialog'
  * Titel des Knopfs und in der Prüfliste. Nach dem Dialog lädt die Seite neu:
  * Eine erledigte Aufgabe verschwindet aus dem Eingang.
  */
-export function PostfachHofAktionen({ hof, vergebenePlaetze }: { hof: AdminHofZeile; vergebenePlaetze: number }): React.JSX.Element {
+export function PostfachHofAktionen({ hof }: { hof: AdminHofZeile }): React.JSX.Element {
   const router = useRouter()
   const [aktion, setAktion] = useState<HofAktion | null>(null)
   return (
@@ -30,7 +30,6 @@ export function PostfachHofAktionen({ hof, vergebenePlaetze }: { hof: AdminHofZe
       </div>
       <HofAktionDialog
         aktion={aktion}
-        vergebenePlaetze={vergebenePlaetze}
         onClose={() => {
           setAktion(null)
           router.refresh()

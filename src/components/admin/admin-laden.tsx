@@ -78,20 +78,6 @@ export function HoefeLaden(): React.JSX.Element {
   )
 }
 
-export function FinanzenLaden(): React.JSX.Element {
-  return (
-    <Rahmen>
-      <MusterKopf breite="w-36" rechts="md:w-60" />
-      <MusterKennzahlen anzahl={5} />
-      <Chips breiten={[22, 22, 30, 40]} />
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)]">
-        <div className="h-80 rounded-2xl border border-border bg-card" />
-        <div className="h-80 rounded-2xl border border-border bg-card" />
-      </div>
-    </Rahmen>
-  )
-}
-
 /** Die Seiten, die nur ihren Kopf haben (Startseite bis Nr. 96): der Kopf des Musters und eine leere Fläche. */
 export function KopfLaden(): React.JSX.Element {
   return (

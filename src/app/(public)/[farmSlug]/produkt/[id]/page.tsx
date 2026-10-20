@@ -55,7 +55,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   if (!seo) return PRODUKT_NICHT_GEFUNDEN
   const { farm, ansicht } = await ladeHofseiteGeteilt(farmSlug, suche)
   // Wie auf der Hofseite: Die Vorschau-Adresse bleibt ganz fern; das Produkt
-  // eines ausgenommenen Hofs (Testhof) nur aus dem Index.
+  // eines Testhofs (Register N21) nur aus dem Index.
   const robots = ansicht.noindex ? { robots: { index: false, follow: false } } : !seo.indexieren ? { robots: { index: false, follow: true } } : {}
   const produkt = farm ? sichtbaresProdukt(farm.products, id) : null
   if (!farm || !produkt) return { ...PRODUKT_NICHT_GEFUNDEN, ...robots }

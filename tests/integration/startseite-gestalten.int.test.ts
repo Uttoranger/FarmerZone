@@ -36,7 +36,7 @@ import { NEUER_BLOCK, REIHENFOLGE_FEHLER_TEXT, STANDARD_REIHENFOLGE } from '@/li
 import { loescheStartseitenBlock, speichereEntwurf } from '@/server/actions/startseite'
 import { ladeVorschauZeilen } from '@/server/queries/startseite'
 import type { StartseitenBlockEingabe } from '@/schemas/startseite'
-import { erstelleHof, erstelleHofMitAnmeldung, raeumeAuf } from './setup/basis'
+import { erstelleHof, erstelleHofMitAnmeldung, raeumeAuf, machePasskeyAdmin } from './setup/basis'
 
 const MIGRATION = readFileSync(join(process.cwd(), 'prisma', 'migrations', '20261015140000_startseite_gestalten', 'migration.sql'), 'utf8')
 const SEED_IDS = STANDARD_REIHENFOLGE.map((art) => `startseite-${art.toLowerCase().replace(/_/g, '-')}`)
@@ -63,7 +63,7 @@ afterEach(async () => {
 /** Ein Admin mit echter Sitzung — das Cookie geht über das gemockte headers() an die Action. */
 async function alsAdmin(): Promise<string> {
   const { ownerId, cookie } = await erstelleHofMitAnmeldung()
-  await prisma.user.update({ where: { id: ownerId }, data: { isAdmin: true } })
+  await machePasskeyAdmin(ownerId)
   vi.mocked(headers).mockResolvedValue(new Headers({ cookie }) as never)
   return ownerId
 }

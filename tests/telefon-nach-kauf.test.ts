@@ -102,6 +102,7 @@ const HOF: PublicFarm = {
   serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
   betriebsstatus: null,
   gruendungshof: false,
+  istTesthof: false,
   gruendungSeit: null,
   abzeichenBlatt: null,
   products: [produkt('p_karotten', 'Karotten'), produkt('p_lauch', 'Lauch')],

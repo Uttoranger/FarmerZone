@@ -3,6 +3,7 @@ import { uhrzeitInWien } from '@/lib/fristen'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { tagVersetzt } from '@/lib/kalender'
 import { MARKE } from '@/lib/marke'
+import { PASSWORT_LINK_DAUER_TEXT } from '@/lib/anmeldecode'
 import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 
 /*
@@ -96,9 +97,20 @@ export const UNBEKANNTES_GERAET = 'Unbekanntes Gerät'
  * „Chrome, Windows" — eine andere Form für einen anderen Zweck.)
  */
 export function geraetName(userAgent: string | null): string {
-  const ua = (userAgent ?? '').trim()
-  const teile = [systemVon(ua), browserVon(ua)].filter((t): t is string => t !== null)
+  const { system, browser } = geraeteTeile(userAgent ?? '')
+  const teile = [system, browser].filter((t): t is string => t !== null)
   return teile.length > 0 ? teile.join(' · ') : UNBEKANNTES_GERAET
+}
+
+/**
+ * Die erkannten Teile einer Browserangabe – EINE Erkennungskette für
+ * `geraetName` („iPhone · Safari“) und `geraetKurz` in src/lib/hof-hilfe.ts
+ * („Safari, iPhone“): Wer eine neue Browser- oder Systemart ergänzt, tut es nur
+ * in `systemVon` bzw. `browserVon`. Nur feste Wörter, nie die Angabe selbst.
+ */
+export function geraeteTeile(userAgent: string): { system: string | null; browser: string | null } {
+  const ua = userAgent.trim()
+  return { system: systemVon(ua), browser: browserVon(ua) }
 }
 
 /** Für das Symbol der Zeile: Handy (auch Tablet) oder Computer. */
@@ -256,9 +268,12 @@ export const NICHT_ICH_TEXT = {
   doch: 'Doch, das war ich',
   vorab: 'Erst dieser Knopf meldet ab – ein Programm, das Links in Mails vorab öffnet, löst nichts aus.',
   fertigTitel: 'Alle Geräte sind abgemeldet',
-  // „1 Stunde" = resetPasswordTokenExpiresIn in src/lib/auth.ts (wie die Mail password-reset.tsx).
-  fertigSatz: 'Wir haben dir eine E-Mail mit einem Link für ein neues Passwort geschickt. Der Link gilt 1 Stunde.',
+  // Die Dauer ist die des Links in der Mail (PASSWORT_LINK_STUNDEN, auch resetPasswordTokenExpiresIn in src/lib/auth.ts).
+  fertigSatz: `Wir haben dir eine E-Mail mit einem Link für ein neues Passwort geschickt. Der Link gilt ${PASSWORT_LINK_DAUER_TEXT}.`,
   fertigOhneMail: 'Leg über „Passwort vergessen" auf der Anmeldeseite ein neues Passwort fest.',
+  // Statt fertigSatz für einen Admin mit Passkey (Register N20, Nr. 115) — mit
+  // fertigTitel darüber: „Alle Geräte sind abgemeldet. Melde dich mit deinem Passkey wieder an."
+  fertigPasskey: 'Melde dich mit deinem Passkey wieder an.',
   fertigHinweis:
     'Kommt die Mail nicht an oder hat jemand dein Postfach übernommen? Ändere zuerst das Passwort deines E-Mail-Postfachs und schreib uns dann über',
   problemMelden: PROBLEM_MELDEN,

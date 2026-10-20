@@ -206,6 +206,21 @@ export function hofPasst(hof: HofMitAngebot, f: ProduktFilter): boolean {
   return f.bereich === 'LEBENSMITTEL' && !hatProduktfilter(f) && hof.angebot.length === 0
 }
 
+/**
+ * Kann man bei diesem Hof gerade bestellen (Register N22)? Nur mit mindestens
+ * einem kaufbaren Produkt (`angebot`, istKaufbar) UND einer kommenden
+ * Abholzeit. Die Abholzeiten wiederholen sich jede Woche: Wer eine aktive hat,
+ * hat immer eine kommende, die man noch bestellen kann (naechsteAbholung findet
+ * sie spätestens in sieben Tagen). Die Pause zählt bewusst NICHT hinein — sie
+ * hat ihre eigene orange Zeile. Ein nicht bestellbarer Hof bleibt an seinem
+ * Platz in der Liste (hofPasst, AGB §3, O4) und trägt nur eine andere Zeile.
+ * Fehlen die Abholzeiten ganz (Cache-Eintrag von vor Nr. 120), gilt er als
+ * nicht bestellbar.
+ */
+export function istBestellbar(hof: { angebot: readonly unknown[]; abholfenster?: readonly unknown[] }): boolean {
+  return hof.angebot.length > 0 && (hof.abholfenster?.length ?? 0) > 0
+}
+
 export function filtereNachAngebot<H extends HofMitAngebot>(hoefe: H[], f: ProduktFilter): H[] {
   return hoefe.filter((h) => hofPasst(h, f))
 }

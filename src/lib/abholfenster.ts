@@ -50,6 +50,18 @@ export function abholSchluessel(wahl: Abholwahl): string {
   return `${wahl.datum}|${wahl.start}|${wahl.ende}`
 }
 
+/**
+ * Kann man ein Fenster an diesem Wiener Kalendertag noch bestellen? Nur, solange
+ * sein Bestellschluss — der Beginn des Fensters (src/lib/fristen.ts) — nach
+ * `jetzt` liegt. EINE Regel für die Kasse (unten) und die Übersicht
+ * (naechsteAbholung und der Filter „Abholung" in src/lib/hofuebersicht.ts,
+ * Register N22): Ein laufendes Fenster zählt nirgends mehr als bestellbar.
+ */
+export function istFensterBestellbar(kalendertag: string, startTime: string, jetzt: Date): boolean {
+  const schluss = wienerZeitpunkt(kalendertag, startTime)
+  return schluss !== null && schluss.getTime() > jetzt.getTime()
+}
+
 /** Alle wählbaren Fenster ab jetzt, nach Tag und Beginn sortiert. */
 export function angeboteneAbholfenster<S extends AbholSlot>(slots: readonly S[], jetzt: Date): AngebotenesFenster<S>[] {
   const aktiv = slots.filter((s) => s.isActive !== false)
@@ -60,8 +72,7 @@ export function angeboteneAbholfenster<S extends AbholSlot>(slots: readonly S[],
     const tag = wochentagVon(datum)
     for (const slot of aktiv) {
       if (slot.dayOfWeek !== tag) continue
-      const schluss = wienerZeitpunkt(datum, slot.startTime)
-      if (!schluss || schluss.getTime() <= jetzt.getTime()) continue
+      if (!istFensterBestellbar(datum, slot.startTime, jetzt)) continue
       fenster.push({ datum, start: slot.startTime, ende: slot.endTime, slot })
     }
   }

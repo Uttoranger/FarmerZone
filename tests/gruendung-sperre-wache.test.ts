@@ -5,11 +5,13 @@
  * die Vergabe zurück) und `speichereGruendungEinstellung`. Ohne die Sperre
  * könnten zwei Wege gleichzeitig denselben letzten Platz vergeben.
  * `archiveFarm` und `revokeFarmApprovalAction` ändern keinen Platz (sie setzen
- * nur `archivedAt` bzw. `approvedAt: null`) und brauchen sie nicht.
+ * nur `archivedAt` bzw. `approvedAt: null`) und brauchen sie nicht. Seit Nr. 119
+ * (Register N21) zählt auch `istTesthof`: Markieren gibt einen Platz frei,
+ * Zurücknehmen öffnet den Weg zur Wiederaufnahme — beide unter der Sperre.
  *
  * Geprüft am Syntaxbaum von TypeScript: je Funktion in src/server/actions/ die
  * Eigenschaften `approvedAt` (Wert nicht `null`), `gruendungAusgenommen`,
- * `gruendungPlatz` in einem Objekt unter `data`; trifft eine zu, muss die
+ * `gruendungPlatz`, `istTesthof` in einem Objekt unter `data`; trifft eine zu, muss die
  * Funktion die Sperre nennen. Gegenprobe mit Attrappen.
  */
 import { readdirSync, readFileSync } from 'node:fs'
@@ -33,7 +35,7 @@ function funktionen(quelltext: string): Fund[] {
         for (const eigenschaft of k.initializer.properties) {
           if (!ts.isPropertyAssignment(eigenschaft) || !ts.isIdentifier(eigenschaft.name)) continue
           const name = eigenschaft.name.text
-          if (name === 'gruendungAusgenommen' || name === 'gruendungPlatz') treffer = true
+          if (name === 'gruendungAusgenommen' || name === 'gruendungPlatz' || name === 'istTesthof') treffer = true
           if (name === 'approvedAt' && eigenschaft.initializer.kind !== ts.SyntaxKind.NullKeyword) treffer = true
         }
       }
@@ -67,7 +69,7 @@ describe('Wache: wer Plätze vergeben kann, nimmt die Sperre der Gründungsplät
   })
 
   it('die Wache sieht die Wege tatsächlich — Freischalten, Ausnehmen, Wiederaufnahme, Festschreiben schreiben', () => {
-    for (const name of ['approveFarmAction', 'nimmAusGruendung', 'nimmWiederAuf', 'schreibeZusagenFest']) {
+    for (const name of ['approveFarmAction', 'nimmAusGruendung', 'nimmWiederAuf', 'schreibeZusagenFest', 'markiereAlsTesthof', 'nimmTesthofZurueck']) {
       expect(alle.find((f) => f.name === name)?.schreibt, name).toBe(true)
     }
     // archiveFarm und revokeFarmApprovalAction schreiben keinen Platz — sie brauchen keine Sperre.
@@ -83,5 +85,7 @@ describe('Wache: wer Plätze vergeben kann, nimmt die Sperre der Gründungsplät
     )
     expect(mit).toEqual([{ name: 'y', schreibt: true, sperre: true }])
     expect(funktionen('export async function z() { await prisma.farm.update({ data: { approvedAt: null } }) }')[0]?.schreibt).toBe(false)
+    // Nr. 119: Auch nur das Testhof-Merkmal zu schreiben verlangt die Sperre (Zurücknehmen schreibt nichts anderes).
+    expect(funktionen('export async function t() { await prisma.farm.updateMany({ data: { istTesthof: false } }) }')).toEqual([{ name: 't', schreibt: true, sperre: false }])
   })
 })

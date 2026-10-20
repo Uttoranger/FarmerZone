@@ -5,7 +5,7 @@ import { draftMode } from 'next/headers'
 import type { Prisma, StartseiteArt } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { verlangeAdminAktion } from '@/server/admin-wache'
-import { OEFFENTLICH_SICHTBAR } from '@/server/queries/farm'
+import { IN_LISTEN_SICHTBAR } from '@/server/queries/farm'
 import { ladeEntwurfAdmin, leseEntwurf, leseFassung, leseQuelle, naechsterTermin, type AdminStartseitenZeile } from '@/server/queries/startseite'
 import { erzeugeVorschauAbfrage } from '@/server/startseite-vorschau'
 import { blobSpeicherAusSchluessel, istEigeneStartseitenBildUrl } from '@/lib/upload-pfade'
@@ -126,7 +126,7 @@ export async function speichereEntwurf(eingabe: unknown): Promise<EntwurfGespeic
     if (!liveAb || (block.liveBisTag && !liveBis)) return { error: STARTSEITE_SAETZE.umstellung }
     daten = blockDaten(block, liveAb, liveBis)
     if (daten.farmIds.length > 0) {
-      const freigeschaltet = await prisma.farm.count({ where: { id: { in: daten.farmIds }, ...OEFFENTLICH_SICHTBAR } })
+      const freigeschaltet = await prisma.farm.count({ where: { id: { in: daten.farmIds }, ...IN_LISTEN_SICHTBAR } })
       if (freigeschaltet !== daten.farmIds.length) return { error: SATZ.hoefe }
     }
   }

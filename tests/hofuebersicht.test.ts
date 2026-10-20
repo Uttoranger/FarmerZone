@@ -32,6 +32,7 @@ vi.mock('@/lib/prisma', () => ({
 
 import {
   getOeffentlicheHoefe,
+  IN_LISTEN_SICHTBAR,
   OEFFENTLICH_SICHTBAR,
   VORSCHAU_LADE_DECKEL,
 } from '@/server/queries/farm'
@@ -145,13 +146,32 @@ describe('naechsteAbholung', () => {
     expect(a).toMatchObject({ dayOfWeek: 4, tageVoraus: 1 })
   })
 
-  it('ein noch laufendes Fenster zählt heute noch', () => {
+  // Register N22 (Nr. 120): Bestellen geht nur bis zum Beginn — ein laufendes Fenster ist nicht mehr bestellbar.
+  it('ein laufendes Fenster zählt nicht mehr — es kommt erst in einer Woche wieder', () => {
     const a = naechsteAbholung(
       [{ dayOfWeek: 3, startTime: '11:00', endTime: '13:00' }],
       MITTWOCH_MITTAG
     )
 
-    expect(a).toMatchObject({ dayOfWeek: 3, tageVoraus: 0 })
+    expect(a).toMatchObject({ dayOfWeek: 3, tageVoraus: 7 })
+  })
+
+  it('beginnt das Fenster in einer Minute, zählt es heute; hat es vor einer Minute begonnen, nicht mehr', () => {
+    const fenster = [{ dayOfWeek: 3, startTime: '12:01', endTime: '14:00' }]
+    expect(naechsteAbholung(fenster, MITTWOCH_MITTAG)).toMatchObject({ tageVoraus: 0 })
+    expect(naechsteAbholung(fenster, { wochentag: 3, uhrzeit: '12:01' })).toMatchObject({ tageVoraus: 7 })
+    expect(naechsteAbholung(fenster, { wochentag: 3, uhrzeit: '12:02' })).toMatchObject({ tageVoraus: 7 })
+  })
+
+  it('ein laufendes Fenster weicht dem nächsten bestellbaren am selben Tag', () => {
+    const a = naechsteAbholung(
+      [
+        { dayOfWeek: 3, startTime: '11:00', endTime: '13:00' },
+        { dayOfWeek: 3, startTime: '16:00', endTime: '18:00' },
+      ],
+      MITTWOCH_MITTAG
+    )
+    expect(a).toMatchObject({ startTime: '16:00', tageVoraus: 0 })
   })
 
   it('gibt es nur das vergangene Fenster, kommt es mit sieben Tagen wieder', () => {
@@ -336,16 +356,18 @@ describe('getOeffentlicheHoefe — die Query', () => {
     produktZeilen.mockResolvedValue([] as never)
   })
 
-  it('fragt EXAKT mit dem öffentlichen Filter der Einzelseite an — wartende und stillgelegte Höfe können ihn nicht passieren', async () => {
+  it('fragt EXAKT mit dem Filter der Listen an — wartende, stillgelegte Höfe und Testhöfe können ihn nicht passieren', async () => {
     farmFindMany.mockResolvedValue([] as never)
 
     await getOeffentlicheHoefe({ wochentag: 3, uhrzeit: '12:00' })
 
     expect(farmFindMany).toHaveBeenCalledTimes(1)
     const args = farmFindMany.mock.calls[0]![0]!
-    // Die GETEILTE Konstante ist die Parität mit getPublicFarm: Beide Queries
-    // bauen ihr where daraus — hier wird ihr Inhalt festgenagelt.
-    expect(args.where).toBe(OEFFENTLICH_SICHTBAR)
+    // Die GETEILTE Konstante: OEFFENTLICH_SICHTBAR ist die Parität mit
+    // getPublicFarm, IN_LISTEN_SICHTBAR nimmt dazu jeden Testhof heraus
+    // (Register N21, Nr. 119) — hier wird der Inhalt beider festgenagelt.
+    expect(args.where).toBe(IN_LISTEN_SICHTBAR)
+    expect(IN_LISTEN_SICHTBAR).toEqual({ isActive: true, archivedAt: null, approvedAt: { not: null }, istTesthof: false })
     expect(OEFFENTLICH_SICHTBAR).toEqual({ isActive: true, archivedAt: null, approvedAt: { not: null } })
     // Nur VERFÜGBARE Produkte (Kategorien UND Produktfotos speisen sich
     // daraus), Termine nur aus aktiven Fenstern, höchstens vier
@@ -392,7 +414,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
     // Produktsuche (suchNamen).
     expect(produktZeilen).toHaveBeenCalledTimes(1)
     expect(produktZeilen.mock.calls[0]![0]).toEqual({
-      where: { isAvailable: true, farm: OEFFENTLICH_SICHTBAR },
+      where: { isAvailable: true, farm: IN_LISTEN_SICHTBAR },
       orderBy: PRODUCT_ORDER_BY,
       select: {
         farmId: true,
@@ -497,6 +519,8 @@ describe('getOeffentlicheHoefe — die Query', () => {
       slug: 'hof-mueller',
       kategorien: ['MILCH', 'EIER'],
       naechsteAbholung: { dayOfWeek: 5, tageVoraus: 2 },
+      // Die Abholzeiten selbst, für die Uhr des Browsers (Register N22).
+      abholfenster: [{ dayOfWeek: 5, startTime: '14:00', endTime: '16:00' }],
       // Titelbild, Galerie, dann HÖCHSTENS DREI Produktfotos (p4 fällt).
       fotos: ['titel.jpg', 'g1.jpg', 'p1.jpg', 'p2.jpg', 'p3.jpg'],
       // Die Suchnamen: ALLE Zeilen mit Bestand über der Reservierung — der

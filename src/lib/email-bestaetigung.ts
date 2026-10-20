@@ -13,8 +13,8 @@
  * (approveFarmAction), denn einen anderen Weg in die Öffentlichkeit gibt es
  * nicht. Anmelden und Einrichten (Texte, Abholzeiten) bleiben erlaubt.
  * Entschieden wird immer nach dem FRISCHEN Stand in der Datenbank
- * (src/server/email-bestaetigung.ts), nie nach `session.user.emailVerified`
- * (Cookie-Cache, ARCHITECTURE §5).
+ * (src/server/email-bestaetigung.ts), nicht nach `session.user.emailVerified`
+ * (bis Nr. 114 wegen des Cookie-Caches, der seit Nr. 114 aus ist; ARCHITECTURE §5).
  */
 
 /**

@@ -103,6 +103,13 @@ export const DB_BREMSEN = {
   codeFehlerMailStunde: { zweck: 'code-fehler-mail-stunde', max: 1, fensterMs: STUNDE_MS },
   codeFehlerMailTag: { zweck: 'code-fehler-mail-tag', max: 1, fensterMs: TAG_MS },
   passwortFehlerMail: { zweck: 'passwort-fehler-mail', max: 1, fensterMs: TAG_MS },
+  // Admin-Anmeldung (Register N20; Nr. 115), ohne erste Stufe und FAIL-CLOSED
+  // (antwortet die Datenbank nicht: gebremst): Jeder Versuch zählt, auch ein
+  // richtiger. Ersatzcodes je Adresse (adressMerkmal) und Stunde — gleich für
+  // Adressen, die es nicht gibt (src/lib/auth.ts); der E-Mail-Code der
+  // Einrichtung je Konto und Stunde (src/server/actions/admin-anmeldung.ts).
+  adminErsatzcode: { zweck: 'admin-ersatzcode', max: 5, fensterMs: STUNDE_MS },
+  adminEinrichtungscode: { zweck: 'admin-einrichtungscode', max: 5, fensterMs: STUNDE_MS },
 } as const satisfies Record<string, DbBremse>
 
 /** Welche Bremsen je Art zählen: Codes je Stunde und je Tag, Passwörter je Stunde. */

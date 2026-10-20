@@ -236,6 +236,7 @@ describe('berechneHofAuswahl — die Verdrahtung der Übersicht als Ganzes', () 
     kategorien: [] as ProductCategoryValue[],
     bezugspunkt: null,
     umkreis: null,
+    jetzt: new Date('2026-10-21T08:00:00Z'),
   }
   const HOEFE = [
     hof('Biohof Huber', ['Freilandeier', 'Brot'], ['EIER', 'BROT']),

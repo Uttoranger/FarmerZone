@@ -51,4 +51,12 @@ describe('Aufgabe Erstattung offen', () => {
     expect(seite).toContain(EINGANG_TEXT.ohneZahlung)
     expect(seite).toContain(EINGANG_TEXT.erstattungMail(EINGANG_TEXT.erstattungKopf('HM-2610-TEST')))
   })
+
+  it('trägt den Knopf „Erstattung erledigt“ als Kind – am Ende der Spalte, nach dem Ausweg (Nr. 121)', () => {
+    const knopf = createElement('button', null, EINGANG_TEXT.erstattungErledigt)
+    const mit = renderToStaticMarkup(createElement(PostfachErstattungSpalte, { e: ERSTATTUNG, zahlungAdresse: null, jetzt: JETZT }, knopf))
+    expect(mit.indexOf(EINGANG_TEXT.erstattungErledigt)).toBeGreaterThan(mit.indexOf(EINGANG_TEXT.ohneZahlung))
+    // Gegenprobe: ohne Kind steht der Knopf nicht da.
+    expect(html(ERSTATTUNG, null)).not.toContain(EINGANG_TEXT.erstattungErledigt)
+  })
 })
