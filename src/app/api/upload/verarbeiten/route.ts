@@ -1,7 +1,7 @@
 import { put, del } from '@vercel/blob'
 import { NextResponse, type NextRequest } from 'next/server'
 import { headers } from 'next/headers'
-import sharp from 'sharp'
+import sharp, { type Sharp } from 'sharp'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
@@ -14,6 +14,7 @@ import {
   startseitenZielPfad,
   zielPfad,
 } from '@/lib/upload-pfade'
+import { BILD_PIXEL_GRENZE, formatFuerSharp, istPixelGrenzeFehler, sperreFremdeLader } from '@/lib/bild-format'
 import { UPLOAD_GESPERRT_TEXT } from '@/lib/email-bestaetigung'
 import { emailBestaetigungOffen } from '@/server/email-bestaetigung'
 import { isAdminUser } from '@/server/queries/admin'
@@ -27,12 +28,60 @@ import { isAdminUser } from '@/server/queries/admin'
  * Canvas-Sperre und keine Geräte-Eigenheit, die dazwischenfunkt.
  */
 
+// Dritte Schicht gegen fremde Formate (Sicherheitsupdate 20.10.2026, hinter
+// Token-Liste und formatFuerSharp): Alle Lader von libvips sind gesperrt, nur
+// JPEG, PNG, WebP und HEIF frei. Rutscht trotz der Byte-Prüfung unten einmal
+// ein SVG, GIF oder TIFF durch, lehnt libvips es ab, statt es zu lesen. Gilt
+// für den ganzen Prozess — diese Route liest nur Fotos dieser vier Formate.
+// Teilt sie sich einen Prozess mit anderen Nutzern von sharp (etwa in
+// pnpm dev), trifft es dort nichts Gebrauchtes: Das Teilen-Bild gibt sharp nur
+// eigene Fotos (JPEG, PNG oder WebP nach bildFormat), die WebP-Illustrationen
+// und das PNG von ImageResponse; die Bildoptimierung von Next.js
+// (/_next/image) bekommt bei uns JPEG, PNG und WebP, SVG optimiert sie nicht.
+sperreFremdeLader(sharp)
+
 // sharp ist ein nativer Baustein und läuft nicht im Edge-Runtime.
 export const runtime = 'nodejs'
 
 // Ein 25-MB-Original zu holen, zu drehen, zu verkleinern und zurückzuschreiben
 // dauert länger als die Voreinstellung von 10 Sekunden hergibt.
 export const maxDuration = 60
+
+/** Warum ein Original nicht verarbeitet wird — jede Art hat ihre eigene Antwort (ablehnung). */
+type Ablehnung = 'fremdes-format' | 'zu-gross' | 'zu-klein'
+
+function ablehnung(art: Ablehnung): NextResponse {
+  if (art === 'zu-klein') {
+    return NextResponse.json({ error: 'Bild zu klein', code: 'BILD_ZU_KLEIN', art: 'format' }, { status: 422 })
+  }
+  if (art === 'zu-gross') {
+    return NextResponse.json({ error: 'Bild zu groß', code: 'BILD_ZU_GROSS', art: 'format' }, { status: 422 })
+  }
+  return NextResponse.json({ error: 'Format nicht lesbar', art: 'format' }, { status: 415 })
+}
+
+/**
+ * Was ein Fehler von sharp bedeutet: Mehr Pixel als die Grenze meldet sharp
+ * schon beim Lesen des Kopfs — das Foto ist zu groß, nicht unlesbar. Jeder
+ * andere Fehler heißt, sharp hat die Bytes nicht als Bild lesen können.
+ */
+function ablehnungFuer(fehler: unknown): NextResponse {
+  return ablehnung(istPixelGrenzeFehler(fehler) ? 'zu-gross' : 'fremdes-format')
+}
+
+/**
+ * sharp nur für ein Original, das formatFuerSharp als JPEG, PNG, WebP oder
+ * HEIF erkennt — sonst null, und sharp sieht die Bytes nie (Sicherheitsupdate
+ * 20.10.2026). Das ist die Prüfung vor JEDEM sharp() dieser Route
+ * (tests/sharp-wache.test.ts): Schon metadata() läse den Kopf mit dem Lader
+ * von libvips, bei SVG mit librsvg.
+ * `limitInputPixels` begrenzt Speicher und Rechenzeit; ein zu großes Foto
+ * wirft beim ersten Lesen (ablehnungFuer).
+ */
+function ladeErlaubtesBild(bytes: ArrayBuffer): Sharp | null {
+  if (formatFuerSharp(bytes) === null) return null
+  return sharp(Buffer.from(bytes), { limitInputPixels: BILD_PIXEL_GRENZE })
+}
 
 /**
  * EXIF-Drehung MUSS zuerst passieren.
@@ -43,8 +92,10 @@ export const maxDuration = 60
  * falsche. Der Browser hat das früher stillschweigend mitgemacht, weil er beim
  * Zeichnen ohnehin dreht — der Server tut das nicht von selbst.
  */
-async function verkleinern(bytes: ArrayBuffer, maxLangeSeite: number): Promise<Buffer> {
-  return sharp(Buffer.from(bytes))
+async function verkleinern(bytes: ArrayBuffer, maxLangeSeite: number): Promise<Buffer | Ablehnung> {
+  const bild = ladeErlaubtesBild(bytes)
+  if (!bild) return 'fremdes-format'
+  return bild
     .rotate()
     .resize({
       width: maxLangeSeite,
@@ -60,7 +111,7 @@ async function verkleinern(bytes: ArrayBuffer, maxLangeSeite: number): Promise<B
 /** Das Bild noch einmal holen und als WebP ablegen; das Original fällt in jedem Ausgang weg. */
 async function verarbeiteUndLege(
   url: string,
-  bearbeite: (bytes: ArrayBuffer) => Promise<Buffer | 'zu-klein'>,
+  bearbeite: (bytes: ArrayBuffer) => Promise<Buffer | Ablehnung>,
   ziel: string,
   aufraeumen: () => Promise<void>
 ): Promise<NextResponse> {
@@ -69,15 +120,13 @@ async function verarbeiteUndLege(
     if (!antwort.ok) {
       return NextResponse.json({ error: 'Original nicht lesbar', art: 'server' }, { status: 502 })
     }
-    let fertig: Buffer | 'zu-klein'
+    let fertig: Buffer | Ablehnung
     try {
       fertig = await bearbeite(await antwort.arrayBuffer())
-    } catch {
-      return NextResponse.json({ error: 'Format nicht lesbar', art: 'format' }, { status: 415 })
+    } catch (fehler) {
+      return ablehnungFuer(fehler)
     }
-    if (fertig === 'zu-klein') {
-      return NextResponse.json({ error: 'Bild zu klein', code: 'BILD_ZU_KLEIN', art: 'format' }, { status: 422 })
-    }
+    if (typeof fertig === 'string') return ablehnung(fertig)
     const blob = await put(ziel, fertig, {
       access: 'public',
       addRandomSuffix: true,
@@ -110,7 +159,8 @@ async function verarbeiteStartseitenBild(userId: string, url: string): Promise<N
   return verarbeiteUndLege(
     url,
     async (bytes) => {
-      const bild = sharp(Buffer.from(bytes))
+      const bild = ladeErlaubtesBild(bytes)
+      if (!bild) return 'fremdes-format'
       const { width, height } = await bild.metadata()
       // Die kürzere Kante ändert sich durch die EXIF-Drehung nicht.
       const kante = Math.min(width ?? 0, height ?? 0)
@@ -196,15 +246,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     const bytes = await antwort.arrayBuffer()
 
-    let fertig: Buffer
+    let fertig: Buffer | Ablehnung
     try {
       fertig = await verkleinern(bytes, MAX_LONG_SIDE[zweck])
-    } catch {
+    } catch (fehler) {
       // sharp hat die Bytes in der Hand gehabt und sie nicht als Bild lesen
       // können. DAS ist der Formatfehler — bewiesen, nicht geraten. Ein echtes
-      // HEIF-Foto landet hier, weil sharp auf Vercel kein HEIF kann.
-      return NextResponse.json({ error: 'Format nicht lesbar', art: 'format' }, { status: 415 })
+      // HEIC-Foto landet hier, weil sharp auf Vercel kein HEVC kann. Einzige
+      // Ausnahme: zu viele Pixel, dann bekommt der Hof seinen eigenen Satz.
+      return ablehnungFuer(fehler)
     }
+    // Ein fremdes Format (die ersten Bytes zeigen kein erlaubtes Bild) bekommt
+    // dieselbe Antwort wie ein unlesbares Bild.
+    if (typeof fertig === 'string') return ablehnung(fertig)
 
     const blob = await put(zielPfad(farm.id, zweck), fertig, {
       access: 'public',

@@ -8,7 +8,7 @@ Stand: 2026-10. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 
 | Paket | Version | Kritisch für KI |
 |---|---|---|
-| `next` | **16.2.6** | App Router. `after()` verfügbar. Keine Pages-Router-Muster. |
+| `next` / `eslint-config-next` | **16.4.2** (genau, beide gleich) | App Router. `after()` verfügbar. Keine Pages-Router-Muster. `poweredByHeader: false` in `next.config.ts`. |
 | `react` / `react-dom` | **19.2.4** | Server Components Standard. `useActionState`, kein `useFormState`. `useOptimistic` für vorgezogene Zustände (Vorbild: `src/components/products/im-shop-schalter.tsx`). |
 | `typescript` | ^5 | `strict: true` |
 | `prisma` / `@prisma/client` | **^7.8.0** | Treiber-Adapter Pflicht (s. u.) |
@@ -18,6 +18,8 @@ Stand: 2026-10. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 | `better-auth` | ^1.6.23 | Sessions, kein NextAuth |
 | `@better-auth/passkey` | **1.6.23** (genau, gleich `better-auth`) | Passkey-Anmeldung für Admins (N20). Offizielles Plugin von better-auth — keine eigene WebAuthn-Logik. Installiert vor Nr. 115, importiert erst dort. |
 | `stripe` | ^22.1.1 | Connect + Webhooks |
+| `sharp` | **^0.35.5** | Nur serverseitig (Upload-Verarbeitung, Teilen-Bild, Skripte). Override `sharp@<0.35.5` in `pnpm-workspace.yaml`, damit auch `next` kein älteres zieht. Fremde Formate: ARCHITECTURE, Uploads. |
+| `@vercel/blob` | ^2.8.0 | Verlangt undici `^6.23.0`; in der 6er-Reihe hält es der Override `undici@<6.27.0: '^6.27.0'`. Bringt `@vercel/oidc` mit. |
 | `vitest` | ^4.1.10 | Node-Umgebung, kein jsdom |
 | `pnpm` | **10.33.0** | Exklusiv |
 | Node | **22** | CI-Version |
@@ -34,6 +36,9 @@ Stand: 2026-10. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 - Fehlerliste heißt `error.issues`, nicht `error.errors`.
 
 **pnpm-Einstellungen:** `overrides` und `allowBuilds` stehen in `pnpm-workspace.yaml`, **nicht** im Feld `"pnpm"` der `package.json` — das Feld ist abgekündigt. Ein neuer Sicherheits-Override kommt dorthin; danach muss er im Kopf von `pnpm-lock.yaml` unter `overrides:` stehen.
+- **Ziel eines neuen Overrides mit `^`, nicht mit `>=`:** pnpm ersetzt jede Anforderung, deren Bereich sich mit dem Wähler `paket@<x.y.z` überschneidet, durch das Ziel. Steht dort `>=`, nimmt pnpm die neueste Version — auch eine neue Hauptversion (unter 1.0: eine neue Nebenversion). `^x.y.z` hebt ältere Reihen genauso an und bleibt in der Reihe des Ziels. Verlauf: DEVELOPMENT, Sicherheitsupdate 20.10.2026. Ausnahmen mit `>=`: `sharp@<0.35.5: '>=0.35.5'` (neu, so beauftragt; greift derzeit nicht, weil next 16.4.2 selbst `^0.35.5` verlangt) und aus dem Bestand `hono@<4.12.25` und `ws@>=8.0.0 <8.21.0` — die Umstellung auf `^` kommt in einen eigenen Auftrag.
+
+**sharp 0.35:** ESM mit eigenen Typen. Den Typ als benannten Import holen (`import sharp, { type Sharp } from 'sharp'`), den Namensraum `sharp.Sharp` gibt es nicht mehr. `sharp.block`/`sharp.unblock` gelten für den ganzen Prozess; eine Attrappe in Tests braucht beide (`Object.assign(vi.fn(…), { block: vi.fn(), unblock: vi.fn() })`). `withGainMap()` ist da, fehlt aber in den Typen von 0.35.5.
 
 **Sentry-Quelltextkarten (`@sentry/nextjs` 10.66):** `withSentryConfig` in `next.config.ts` trägt `org: 'farmerzone'` und `project: 'javascript-nextjs'` fest; geheim ist nur `authToken`, gelesen aus `process.env.SENTRY_AUTH_TOKEN` (Build-Werkzeug, deshalb nicht über `@/lib/env`; in Vercel für Production und Preview). Keine `SENTRY_URL`: Der Organisations-Token (`sntrys_…`) trägt die Adresse seiner Region (de.sentry.io), und sentry-cli zieht sie der voreingestellten sentry.io vor. `sourcemaps.deleteSourcemapsAfterUpload: true` löscht die Karten nach dem Upload — ausgeliefert werden sie nie. Ohne Token überspringt der Build den Upload und bleibt grün. Das Upload-Programm kommt aus dem Einrichtungs-Skript von `@sentry/cli`; es muss deshalb in `allowBuilds` stehen (pnpm 10.33 liest nur diese Liste, `onlyBuiltDependencies` gibt es nicht mehr daneben). Fehlt es dort, meldet `pnpm ignored-builds` das Paket.
 

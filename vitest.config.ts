@@ -17,6 +17,13 @@ export default defineConfig({
     // nichts zum Signieren. Der Wert ist beliebig: die Token-Tests erzeugen
     // und prüfen im selben Lauf, sie hängen an keiner festen Signatur.
     env: { BETTER_AUTH_SECRET: 'vitest-secret-nicht-fuer-produktion' },
+    // PFLICHT: tests/sharp-lader-sperre.test.ts sperrt die Lader von libvips für
+    // den ganzen Prozess (sharp.block). Worker-Threads teilen sich libvips —
+    // dann können parallel laufende sharp-Tests wie tests/marke-bilder.test.ts
+    // je nach Zeitablauf scheitern (TESTING_GUIDELINES §4).
+    // Jede Testdatei braucht deshalb einen eigenen Prozess (Standard von
+    // Vitest 4, hier festgehalten, damit niemand ihn für Tempo umstellt).
+    pool: 'forks',
   },
   resolve: {
     alias: {

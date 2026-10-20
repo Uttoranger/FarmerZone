@@ -16,6 +16,13 @@
  *    erreichbares Bild.
  *  - Antwortet die Route mit 422 `BILD_ZU_KLEIN`, liest der Hof den Satz mit
  *    der Mindestkante aus `STARTSEITE_MIN_KANTE` (eine Quelle).
+ *  - Antwortet sie mit 422 `BILD_ZU_GROSS` (Pixelgrenze, Sicherheitsupdate
+ *    20.10.2026), liest er den Satz `BILD_ZU_GROSS_TEXT`, und eine Serie nennt
+ *    den Kurzgrund `BILD_ZU_GROSS_KURZ` statt „Format nicht unterstützt".
+ *  - Der Browser gibt dem Bildspeicher den Typ aus den ersten Bytes mit, nie
+ *    den des Geräts oder der Dateiendung: Ein GIF scheiterte sonst schon am
+ *    Speicher (Token-Liste) mit einer falschen Meldung, statt an der Route mit
+ *    der Formatmeldung.
  *
  * Gemockt ist nur die Infrastruktur: Sitzung, Datenbank, Blob-Speicher (eine
  * Menge von Adressen), sharp und fetch. Die Guards der Route laufen echt.
@@ -59,13 +66,23 @@ vi.mock('@vercel/blob/client', () => ({
     return { url }
   }),
 }))
-vi.mock('sharp', () => ({ default: vi.fn(() => s.kette) }))
+// block/unblock: Die Route sperrt beim Laden die fremden Lader (Sicherheitsupdate 20.10.2026).
+vi.mock('sharp', () => ({ default: Object.assign(vi.fn(() => s.kette), { block: vi.fn(), unblock: vi.fn() }) }))
 
 import { NextRequest } from 'next/server'
 import { del, put } from '@vercel/blob'
+import { upload } from '@vercel/blob/client'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { BILD_ZU_KLEIN_TEXT, STARTSEITE_MIN_KANTE } from '@/lib/upload-pfade'
+import {
+  BILD_ZU_GROSS_KURZ,
+  BILD_ZU_GROSS_TEXT,
+  BILD_ZU_KLEIN_TEXT,
+  ERLAUBTE_UPLOAD_TYPEN,
+  STARTSEITE_MIN_KANTE,
+  uploadInhaltsTyp,
+} from '@/lib/upload-pfade'
+import { bildFehlerMeldung } from '@/lib/upload-fehler'
 import { ladeFotoHoch } from '@/components/shared/image-upload'
 import { POST as verarbeitenPOST } from '@/app/api/upload/verarbeiten/route'
 
@@ -80,8 +97,14 @@ function anfrage(daten: object): NextRequest {
 }
 
 /** Ein Foto, wie es der Produktdialog nach pruefeLesbarkeit hält (die Kopie). */
-function kopie(): File {
-  return new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], 'Hof Test Eier.jpg', { type: 'image/jpeg' })
+function kopie(inhalt: number[] = [0xff, 0xd8, 0xff, 0xe0], typ = 'image/jpeg', name = 'Hof Test Eier.jpg'): File {
+  return new File([new Uint8Array(inhalt)], name, { type: typ })
+}
+
+/** Mit welchem Typ der Browser das Original an den Bildspeicher gab. */
+function hochgeladenAls(): unknown {
+  const aufruf = vi.mocked(upload).mock.calls.at(-1)
+  return (aufruf?.[2] as { contentType?: string } | undefined)?.contentType
 }
 
 /** fetch im Browser: unsere zwei Routen — die Verarbeitung ist die echte — und das Original aus dem Speicher. */
@@ -89,7 +112,8 @@ function netz(verarbeiten: (init: RequestInit) => Promise<Response>) {
   return vi.fn(async (adresse: string, init: RequestInit = {}) => {
     if (adresse === '/api/upload/token') return Response.json({ farmId: HOF })
     if (adresse === '/api/upload/verarbeiten') return verarbeiten(init)
-    if (s.speicher.has(adresse)) return new Response(Buffer.from('bild'))
+    // Ein JPEG-Kopf: Die Route prüft die ersten Bytes vor sharp (Sicherheitsupdate 20.10.2026).
+    if (s.speicher.has(adresse)) return new Response(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10]))
     return new Response(null, { status: 404 })
   })
 }
@@ -168,6 +192,19 @@ describe('Satz für zu kleine Bilder (Startseite, 422 BILD_ZU_KLEIN)', () => {
     expect(BILD_ZU_KLEIN_TEXT).toContain(`mindestens ${STARTSEITE_MIN_KANTE} Pixel`)
   })
 
+  it('ladeFotoHoch wirft bei 422 BILD_ZU_GROSS den Satz für zu große Fotos (Sicherheitsupdate 20.10.2026)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      netz(async () => Response.json({ error: 'Bild zu groß', code: 'BILD_ZU_GROSS', art: 'format' }, { status: 422 }))
+    )
+
+    const fehler = await ladeFotoHoch(kopie(), 'product', { bereitsKopiert: true }).catch((e: unknown) => e as Error)
+
+    expect((fehler as Error).message).toBe(BILD_ZU_GROSS_TEXT)
+    // In einer Serie (Galerie) steht der Kurzgrund in der Sammelmeldung.
+    expect(bildFehlerMeldung(fehler).kurz).toBe(BILD_ZU_GROSS_KURZ)
+  })
+
   it('Gegenprobe: ein anderer Formatfehler (415) behält seinen eigenen Text', async () => {
     vi.stubGlobal('fetch', netz(async () => Response.json({ error: 'Format nicht lesbar', art: 'format' }, { status: 415 })))
 
@@ -175,5 +212,31 @@ describe('Satz für zu kleine Bilder (Startseite, 422 BILD_ZU_KLEIN)', () => {
 
     expect(fehler).toBeInstanceOf(Error)
     expect((fehler as Error).message).not.toBe(BILD_ZU_KLEIN_TEXT)
+    expect((fehler as Error).message).not.toBe(BILD_ZU_GROSS_TEXT)
+    expect(bildFehlerMeldung(fehler).kurz).not.toBe(BILD_ZU_GROSS_KURZ)
+  })
+})
+
+describe('Typ für den Bildspeicher aus den ersten Bytes (Sicherheitsupdate 20.10.2026)', () => {
+  it('ein JPEG geht als image/jpeg, auch wenn das Gerät keinen oder einen schiefen Typ meldet', async () => {
+    vi.stubGlobal('fetch', netz(echteRoute))
+    await ladeFotoHoch(kopie([0xff, 0xd8, 0xff, 0xe0], ''), 'product', { bereitsKopiert: true })
+    expect(hochgeladenAls()).toBe('image/jpeg')
+    await ladeFotoHoch(kopie([0xff, 0xd8, 0xff, 0xe0], 'image/jpg'), 'product', { bereitsKopiert: true })
+    expect(hochgeladenAls()).toBe('image/jpeg')
+  })
+
+  it('ein fremdes Format (GIF) geht als application/octet-stream — die Route lehnt es an den Bytes ab, nicht der Speicher', async () => {
+    vi.stubGlobal('fetch', netz(echteRoute))
+    await ladeFotoHoch(kopie([0x47, 0x49, 0x46, 0x38, 0x39, 0x61], 'image/gif', 'bild.gif'), 'product', { bereitsKopiert: true })
+    expect(hochgeladenAls()).toBe('application/octet-stream')
+  })
+
+  it('jeder Typ, den der Browser angibt, steht auf der Liste des Tokens', () => {
+    for (const format of ['jpeg', 'png', 'webp', 'heic', null] as const) {
+      expect(ERLAUBTE_UPLOAD_TYPEN, String(format)).toContain(uploadInhaltsTyp(format))
+    }
+    expect(uploadInhaltsTyp('png')).toBe('image/png')
+    expect(uploadInhaltsTyp('webp')).toBe('image/webp')
   })
 })

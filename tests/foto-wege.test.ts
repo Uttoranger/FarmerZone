@@ -78,6 +78,20 @@ describe('bildFormat — an den ersten Bytes', () => {
     expect(bildFormat(bytes(0, 0, 0, 0x14, 'ftyp', 'mif1', 0, 0, 0, 0, 'mif1', 'avif'))).toBe('heic')
   })
 
+  it('ein ftyp-Kasten zählt nur mit plausibler Größe (Sicherheitsupdate 20.10.2026)', () => {
+    // Ein gzip-Kopf: Die ersten vier Bytes sind keine Kastengröße, auch wenn
+    // dahinter zufällig 'ftyp' und 'heic' stehen — der Server gäbe sonst ein
+    // fremdes Format an sharp weiter.
+    expect(bildFormat(bytes(0x1f, 0x8b, 0x08, 0x08, 'ftyp', 'heic', 0, 0, 0, 0, 'mif1'))).toBeNull()
+    // Kein Vielfaches von 4, kleiner als der feste Teil, 0 oder größer als jeder echte Kasten.
+    expect(bildFormat(bytes(0, 0, 0, 0x19, 'ftyp', 'heic', 0, 0, 0, 0, 'mif1'))).toBeNull()
+    expect(bildFormat(bytes(0, 0, 0, 0x0c, 'ftyp', 'heic', 0, 0, 0, 0))).toBeNull()
+    expect(bildFormat(bytes(0, 0, 0, 0, 'ftyp', 'heic', 0, 0, 0, 0, 'mif1'))).toBeNull()
+    expect(bildFormat(bytes(0, 0, 0x01, 0, 'ftyp', 'heic', 0, 0, 0, 0, 'mif1'))).toBeNull()
+    // Gegenprobe: derselbe Kopf mit echter Größe ist HEIC.
+    expect(bildFormat(bytes(0, 0, 0, 0x18, 'ftyp', 'heic', 0, 0, 0, 0, 'mif1', 'heic'))).toBe('heic')
+  })
+
   it('kennt Text, Leeres und Kurzes nicht', () => {
     expect(bildFormat(bytes('hello world!'))).toBeNull()
     expect(bildFormat(bytes())).toBeNull()

@@ -3,7 +3,13 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { MAX_ORIGINAL_BYTES, STARTSEITE_ORIGINAL_PREFIX, STARTSEITE_UPLOAD_KENNUNG, originalPrefix } from '@/lib/upload-pfade'
+import {
+  ERLAUBTE_UPLOAD_TYPEN,
+  MAX_ORIGINAL_BYTES,
+  STARTSEITE_ORIGINAL_PREFIX,
+  STARTSEITE_UPLOAD_KENNUNG,
+  originalPrefix,
+} from '@/lib/upload-pfade'
 import { UPLOAD_GESPERRT_TEXT } from '@/lib/email-bestaetigung'
 import { emailBestaetigungOffen } from '@/server/email-bestaetigung'
 import { isAdminUser } from '@/server/queries/admin'
@@ -97,7 +103,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (pathname.startsWith(STARTSEITE_ORIGINAL_PREFIX)) {
           if (!(await adminDerSitzung())) throw new Error('Kein Zugriff')
           return {
-            allowedContentTypes: ['image/*', 'application/octet-stream'],
+            allowedContentTypes: [...ERLAUBTE_UPLOAD_TYPEN],
             maximumSizeInBytes: MAX_ORIGINAL_BYTES,
             addRandomSuffix: true,
             tokenPayload: JSON.stringify({ zweck: 'startseite' }),
@@ -118,13 +124,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
 
         return {
-          // Großzügig mit Absicht: Android liefert für Dateien aus manchen
-          // Alben einen leeren oder falschen MIME-Typ. Eine strenge Liste hier
-          // würde einwandfreie Fotos abweisen, ohne je hineingesehen zu haben —
-          // genau der Fehler, den die letzten Sprints aufgeräumt haben. Die
-          // ECHTE Formatprüfung macht sharp in der Verarbeitungs-Route, an den
-          // Bytes statt an einer Behauptung.
-          allowedContentTypes: ['image/*', 'application/octet-stream'],
+          // Nur die vier Formate, die die Verarbeitung liest (Sicherheitsupdate
+          // 20.10.2026; vorher `image/*`, das auch SVG durchließ). Dazu
+          // `application/octet-stream`: So schickt der Browser alles, was die
+          // ersten Bytes nicht als JPEG, PNG oder WebP ausweisen
+          // (uploadInhaltsTyp) — ohne ihn wiese der Speicher solche Dateien
+          // mit falscher Meldung ab, ohne je hineingesehen zu haben. Die ECHTE
+          // Formatprüfung macht die Verarbeitungs-Route an den Bytes
+          // (src/lib/bild-format.ts), bevor sharp sie sieht.
+          allowedContentTypes: [...ERLAUBTE_UPLOAD_TYPEN],
           maximumSizeInBytes: MAX_ORIGINAL_BYTES,
           addRandomSuffix: true,
           tokenPayload: JSON.stringify({ farmId: farm.id }),

@@ -5,6 +5,7 @@
  *  - Jede Seite ist gegen Einbetten gesperrt (X-Frame-Options DENY) — auch die
  *    Hofseite ohne Parameter, ihre Unterseiten und jede andere Route, selbst
  *    mit ?vorschau=1.
+ *  - Kein „X-Powered-By" (poweredByHeader: false, Sicherheitsupdate 20.10.2026).
  *  - Nur die Hofseite MIT ?vorschau=1 darf sich selbst einbetten
  *    (SAMEORIGIN, frame-ancestors 'self'): der Editor zeigt sie im iframe.
  *  - Ebenso die Startseite MIT ?vorschau (Register N16, Nr. 96): Admin ›
@@ -330,3 +331,18 @@ describe('Einbetten — die Liste „einbettbar mit Parameter"', () => {
   })
 })
 
+
+// Sicherheitsupdate 20.10.2026: Next schickt ohne diese Einstellung „X-Powered-By: Next.js"
+// mit jeder Antwort — eine Auskunft über die Technik, die niemand braucht.
+describe('Kein X-Powered-By', () => {
+  it('die Konfiguration schaltet den Header ab', async () => {
+    const { default: konfiguration } = await import('../next.config')
+    expect(konfiguration.poweredByHeader).toBe(false)
+  })
+
+  it('und keine eigene Regel setzt ihn wieder', () => {
+    for (const regel of regeln) {
+      expect(regel.headers.map((h) => h.key.toLowerCase()), regel.source).not.toContain('x-powered-by')
+    }
+  })
+})

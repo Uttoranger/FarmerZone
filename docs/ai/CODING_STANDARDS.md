@@ -425,7 +425,9 @@ gegen `background` **und** gegen `card`.
 - **Das Bildformat wird an den ersten Bytes entschieden** (`bildFormat`), nie am
   MIME-Typ oder Dateinamen. HEIC wird nie hochgeladen (`BildFehler('heic')`, ohne
   Fachwort für den Bauern); über die Dateien-App muss es ein Bild sein. Beides in
-  der Lese-Stufe (`pruefeLesbarkeit`), bevor der Transfer beginnt.
+  der Lese-Stufe (`pruefeLesbarkeit`), bevor der Transfer beginnt. Dieselbe
+  Erkennung liefert den Typ für den Bildspeicher (`uploadInhaltsTyp`) und das Tor
+  vor sharp auf dem Server (`formatFuerSharp`) — es gibt nur die eine.
 - **Übertragen wird nur die Kopie, nie die Datei vom Gerät.** `pruefeLesbarkeit`
   liest das Foto nach der Probe einmal ganz und gibt es als `File` im Speicher
   zurück; Formatprüfung und Upload nehmen nur diese Kopie. Ein Aufrufer, der die

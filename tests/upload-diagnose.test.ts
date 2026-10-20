@@ -5,7 +5,7 @@
  * Anlass JAVASCRIPT-NEXTJS-2: Jeder Transferfehler hieß „Verbindung
  * unterbrochen", und der Originalfehler ging verloren. Die Zuordnung ist hier
  * als reine Funktion festgehalten, ohne Mock. Die Meldungstexte des SDK
- * stehen 1:1 wie in @vercel/blob 2.4.0 (Präfix aus dem BlobError-Konstruktor).
+ * stehen 1:1 wie in @vercel/blob 2.4.0 bis 2.8.1 (Präfix aus dem BlobError-Konstruktor).
  */
 import { describe, expect, it } from 'vitest'
 import {

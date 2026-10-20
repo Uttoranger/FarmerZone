@@ -35,7 +35,8 @@ vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', () => ({ prisma: { farm: { findUnique: vi.fn() }, user: { findUnique: vi.fn() } } }))
 vi.mock('@vercel/blob', () => ({ put: vi.fn(async (pfad: string) => ({ url: `https://speicher.public.blob.vercel-storage.com/${pfad}` })), del: vi.fn() }))
-vi.mock('sharp', () => ({ default: vi.fn(() => s.kette) }))
+// block/unblock: Die Route sperrt beim Laden die fremden Lader (Sicherheitsupdate 20.10.2026).
+vi.mock('sharp', () => ({ default: Object.assign(vi.fn(() => s.kette), { block: vi.fn(), unblock: vi.fn() }) }))
 vi.mock('@vercel/blob/client', () => ({
   handleUpload: vi.fn(async ({ onBeforeGenerateToken }: { onBeforeGenerateToken: (p: string) => Promise<unknown> }) => {
     await onBeforeGenerateToken(s.pfad.wert)
@@ -78,7 +79,8 @@ function alsHof(): void {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(Buffer.from('bild'))))
+  // Ein JPEG-Kopf: Seit dem Sicherheitsupdate (20.10.2026) prüft die Route die ersten Bytes vor sharp.
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10]))))
   s.kette.metadata.mockResolvedValue({ width: 2400, height: 1800 })
   s.pfad.wert = 'startseite/originale/foto.jpg'
 })

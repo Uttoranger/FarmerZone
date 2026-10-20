@@ -67,7 +67,8 @@ export type LeseDiagnose = {
 const BLOB_PRAEFIX = 'Vercel Blob: '
 
 /**
- * Die BlobError-Unterklassen aus @vercel/blob 2.4.0, am Anfang ihrer Meldung
+ * Die BlobError-Unterklassen aus @vercel/blob 2.4.0 (in 2.8.1 unverändert,
+ * nachgesehen am 20.10.2026), am Anfang ihrer Meldung
  * erkannt.
  *
  * Der Name hilft nicht: BlobError setzt keinen `name`, die Unterklassen sind
@@ -252,7 +253,7 @@ export function ordneTransferFehler(fehler: unknown, abgebrochen: boolean): Tran
 
 /**
  * Das SDK hat den Upload-Token bei unserer Route nicht bekommen. Wortlaut aus
- * @vercel/blob 2.4.0 (retrieveClientToken): mit doppeltem Leerzeichen bei
+ * @vercel/blob 2.4.0 bis 2.8.1 (retrieveClientToken): mit doppeltem Leerzeichen bei
  * einer Ablehnung, mit einfachem, wenn die Antwort kein JSON war.
  */
 function istTokenAbruf(fehler: unknown): boolean {
