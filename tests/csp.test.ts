@@ -18,6 +18,7 @@ import {
   cspBerichtAdresse,
   cspBerichtArt,
   istNeueCspMeldung,
+  merkeCspMeldung,
   leseCspMeldungen,
   sentryHost,
 } from '@/lib/csp'
@@ -188,6 +189,9 @@ describe('istNeueCspMeldung — entdoppeln je Instanz', () => {
   it('dieselbe Meldung höchstens einmal je Stunde; anderer Pfad oder Host zählt neu', () => {
     const gesehen = new Map<string, number>()
     expect(istNeueCspMeldung(gesehen, m, T)).toBe(true)
+    // Fragen allein merkt nichts — erst die weitergegebene Meldung (nach den Bremsen) wird gemerkt.
+    expect(istNeueCspMeldung(gesehen, m, T)).toBe(true)
+    merkeCspMeldung(gesehen, m, T)
     expect(istNeueCspMeldung(gesehen, m, T + 59 * 60_000)).toBe(false)
     expect(istNeueCspMeldung(gesehen, { ...m, pfad: '/hoefe' }, T)).toBe(true)
     expect(istNeueCspMeldung(gesehen, { ...m, host: 'inline' }, T)).toBe(true)
@@ -196,12 +200,12 @@ describe('istNeueCspMeldung — entdoppeln je Instanz', () => {
 
   it('hält höchstens 500 Einträge — Abgelaufenes zuerst, dann das Älteste', () => {
     const gesehen = new Map<string, number>()
-    istNeueCspMeldung(gesehen, { ...m, pfad: '/alt' }, T - 2 * 60 * 60_000)
-    for (let i = 0; gesehen.size < CSP_ENTDOPPELN_MAX; i += 1) istNeueCspMeldung(gesehen, { ...m, pfad: `/p${i}` }, T)
-    istNeueCspMeldung(gesehen, { ...m, pfad: '/neu' }, T)
+    merkeCspMeldung(gesehen, { ...m, pfad: '/alt' }, T - 2 * 60 * 60_000)
+    for (let i = 0; gesehen.size < CSP_ENTDOPPELN_MAX; i += 1) merkeCspMeldung(gesehen, { ...m, pfad: `/p${i}` }, T)
+    merkeCspMeldung(gesehen, { ...m, pfad: '/neu' }, T)
     expect(gesehen.size).toBe(CSP_ENTDOPPELN_MAX)
     expect([...gesehen.keys()].some((k) => k.endsWith('|/alt'))).toBe(false)
-    istNeueCspMeldung(gesehen, { ...m, pfad: '/neu2' }, T)
+    merkeCspMeldung(gesehen, { ...m, pfad: '/neu2' }, T)
     expect(gesehen.size).toBe(CSP_ENTDOPPELN_MAX)
     expect([...gesehen.keys()].some((k) => k.endsWith('|/p0'))).toBe(false)
   })

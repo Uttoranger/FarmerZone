@@ -221,15 +221,30 @@ export function leseCspMeldungen(art: CspBerichtArt, roh: unknown): CspMeldung[]
 export const CSP_ENTDOPPELN_MS = 60 * 60_000
 /** Höchstens so viele Meldungen merkt sich eine Instanz. */
 export const CSP_ENTDOPPELN_MAX = 500
+/**
+ * Höchstens so viele neue Meldungen gibt eine Anfrage weiter (Runde 1). Eine
+ * Anfrage im Format reports+json trägt viele Einträge; jede weitergegebene
+ * zählt in beiden Bremsen einzeln, und mehr als ein paar Datenbankabfragen je
+ * Anfrage soll ein Absender nicht auslösen. Was liegen bleibt, ist nicht
+ * gemerkt und kommt mit der nächsten Meldung des Browsers wieder.
+ */
+export const CSP_MELDUNGEN_JE_ANFRAGE = 5
+
+const entdoppelSchluessel = (meldung: CspMeldung): string => `${meldung.anweisung}|${meldung.host}|${meldung.pfad}`
+
+/** true = neu, false = in der letzten Stunde schon weitergegeben. Merkt nichts (das macht `merkeCspMeldung`). */
+export function istNeueCspMeldung(gesehen: ReadonlyMap<string, number>, meldung: CspMeldung, jetztMs: number): boolean {
+  const zuletzt = gesehen.get(entdoppelSchluessel(meldung))
+  return zuletzt === undefined || jetztMs - zuletzt >= CSP_ENTDOPPELN_MS
+}
 
 /**
- * true = neu (und jetzt gemerkt), false = in der letzten Stunde schon gesehen.
- * Ist der Speicher voll, geht erst Abgelaufenes, dann das Älteste.
+ * Merkt eine weitergegebene Meldung — erst nach den Bremsen, sonst bliebe eine
+ * gebremste Meldung eine Stunde stumm. Ist der Speicher voll, geht erst
+ * Abgelaufenes, dann das Älteste.
  */
-export function istNeueCspMeldung(gesehen: Map<string, number>, meldung: CspMeldung, jetztMs: number): boolean {
-  const schluessel = `${meldung.anweisung}|${meldung.host}|${meldung.pfad}`
-  const zuletzt = gesehen.get(schluessel)
-  if (zuletzt !== undefined && jetztMs - zuletzt < CSP_ENTDOPPELN_MS) return false
+export function merkeCspMeldung(gesehen: Map<string, number>, meldung: CspMeldung, jetztMs: number): void {
+  const schluessel = entdoppelSchluessel(meldung)
   gesehen.delete(schluessel)
   if (gesehen.size >= CSP_ENTDOPPELN_MAX) {
     for (const [k, t] of gesehen) if (jetztMs - t >= CSP_ENTDOPPELN_MS) gesehen.delete(k)
@@ -239,5 +254,4 @@ export function istNeueCspMeldung(gesehen: Map<string, number>, meldung: CspMeld
     }
   }
   gesehen.set(schluessel, jetztMs)
-  return true
 }

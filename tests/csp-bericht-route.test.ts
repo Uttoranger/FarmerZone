@@ -8,13 +8,17 @@
  *    anderen Art, 413 auch ohne Längenangabe beim Lesen.
  *  - An Sentry geht nur Anweisung, Host und der gekürzte Pfad (Stufe warning, Tags, Fingerprint, Pfad
  *    in extra, ohne Anfrage-Daten) — keine Query, kein Ausschnitt, kein Referrer.
- *  - Entdoppeln vor den Bremsen: Dieselbe Meldung fragt keine Bremse und geht kein zweites Mal raus.
+ *  - Entdoppeln vor den Bremsen: Dieselbe Meldung fragt keine Bremse und geht kein zweites Mal raus;
+ *    gemerkt wird sie erst, wenn beide Bremsen sie durchließen.
  *  - Erste Stufe im Speicher (30 je Minute und IP), danach die Datenbank; ist sie voll, geht nichts raus.
- *  - Die Antwort ist immer 204 ohne Inhalt, auch bei kaputtem Inhalt.
+ *  - Beide Bremsen zählen je weitergegebener Meldung, nicht je Anfrage — eine Anfrage mit vielen
+ *    verschiedenen Einträgen bringt nicht mehr zu Sentry, als die Grenze erlaubt (Runde 1).
+ *  - Die Antwort ist immer 204 ohne Inhalt, auch bei kaputtem Inhalt und abgebrochenem Datenstrom.
  */
 import type { NextRequest } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DB_BREMSEN } from '@/lib/bremse-datenbank'
+import { CSP_MELDUNGEN_JE_ANFRAGE } from '@/lib/csp'
 
 const sentry = vi.hoisted(() => ({ captureMessage: vi.fn(), captureException: vi.fn() }))
 vi.mock('@sentry/nextjs', () => sentry)
@@ -54,6 +58,19 @@ function cspReport(blockiert: string, seite = 'https://example.com/hof-test?vors
     },
   })
 }
+
+/** Eine Anfrage im Format der Reporting API mit je einem Verstoß an jedem der genannten Hosts. */
+function reportsAnfrage(hosts: string[]): NextRequest {
+  const eintraege = hosts.map((host) => ({
+    type: 'csp-violation',
+    url: 'https://example.com/hoefe',
+    body: { effectiveDirective: 'img-src', blockedURL: `https://${host}/` },
+  }))
+  return anfrage(JSON.stringify(eintraege), 'application/reports+json')
+}
+
+/** n verschiedene erfundene Hosts, ab `ab` durchgezählt. */
+const hosts = (n: number, ab = 0): string[] => Array.from({ length: n }, (_, i) => `h${ab + i}.example.org`)
 
 /** Was jede Sentry-Meldung über den Scope setzt. */
 function gemeldet(): Array<{ text: unknown; level?: unknown; tags?: unknown; fingerprint?: unknown; extras?: unknown; prozessoren: unknown[] }> {
@@ -125,6 +142,13 @@ describe('An Sentry nur die erlaubten Felder', () => {
     ])
   })
 
+  it('bricht der Absender den Datenstrom ab: 204, nichts an Sentry', async () => {
+    const abgebrochen = new ReadableStream<Uint8Array>({ start: (c) => c.error(new Error('abgebrochen')) })
+    const init = { method: 'POST', headers: { 'content-type': 'application/csp-report', 'x-forwarded-for': IP }, body: abgebrochen, duplex: 'half' }
+    await istLeer204(await POST(new Request('http://localhost:3000/api/csp-bericht', init as RequestInit) as NextRequest))
+    expect(sentry.captureMessage).not.toHaveBeenCalled()
+  })
+
   it('kaputter Inhalt: 204, nichts an Sentry', async () => {
     await istLeer204(await POST(anfrage('{kein json')))
     await istLeer204(await POST(anfrage(JSON.stringify({ anders: true }))))
@@ -153,5 +177,38 @@ describe('Entdoppeln und Bremsen', () => {
     db.bremseUeberAlleInstanzen.mockResolvedValue(false)
     await istLeer204(await POST(anfrage(cspReport('eval'))))
     expect(sentry.captureMessage).not.toHaveBeenCalled()
+  })
+
+  it('eine Anfrage mit vielen verschiedenen Einträgen: jede weitergegebene Meldung zählt, höchstens wenige je Anfrage', async () => {
+    await istLeer204(await POST(reportsAnfrage(hosts(40))))
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(CSP_MELDUNGEN_JE_ANFRAGE)
+    // Die Datenbank zählt je weitergegebener Meldung einmal, nicht einmal je Anfrage.
+    expect(db.bremseUeberAlleInstanzen).toHaveBeenCalledTimes(CSP_MELDUNGEN_JE_ANFRAGE)
+  })
+
+  it('viele solche Anfragen: bei Sentry kommen höchstens 30 je Minute und IP an', async () => {
+    for (let i = 0; i < 20; i += 1) await istLeer204(await POST(reportsAnfrage(hosts(40, i * 40))))
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(DB_BREMSEN.cspBerichtIp.max)
+  })
+
+  it('die Bremse über alle Instanzen zählt je Meldung — ist sie mitten in der Anfrage voll, geht der Rest nicht raus', async () => {
+    db.bremseUeberAlleInstanzen.mockResolvedValueOnce(true).mockResolvedValueOnce(true).mockResolvedValue(false)
+    await istLeer204(await POST(reportsAnfrage(hosts(CSP_MELDUNGEN_JE_ANFRAGE))))
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(2)
+    expect(db.bremseUeberAlleInstanzen).toHaveBeenCalledTimes(3)
+  })
+
+  it('gemerkt wird erst nach den Bremsen: eine gebremste Meldung geht beim nächsten Mal raus', async () => {
+    db.bremseUeberAlleInstanzen.mockResolvedValueOnce(false)
+    await istLeer204(await POST(anfrage(cspReport('eval'))))
+    expect(sentry.captureMessage).not.toHaveBeenCalled()
+    await istLeer204(await POST(anfrage(cspReport('eval'))))
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(1)
+  })
+
+  it('derselbe Eintrag zweimal in einer Anfrage geht einmal raus und zählt einmal', async () => {
+    await istLeer204(await POST(reportsAnfrage(['doppelt.example.org', 'doppelt.example.org'])))
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(1)
+    expect(db.bremseUeberAlleInstanzen).toHaveBeenCalledTimes(1)
   })
 })

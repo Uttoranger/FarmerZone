@@ -1,7 +1,15 @@
 import * as Sentry from '@sentry/nextjs'
 import { NextResponse, type NextRequest } from 'next/server'
 import { DB_BREMSEN } from '@/lib/bremse-datenbank'
-import { CSP_BERICHT_MAX_BYTES, cspBerichtArt, istNeueCspMeldung, leseCspMeldungen } from '@/lib/csp'
+import {
+  CSP_BERICHT_MAX_BYTES,
+  CSP_MELDUNGEN_JE_ANFRAGE,
+  cspBerichtArt,
+  istNeueCspMeldung,
+  leseCspMeldungen,
+  merkeCspMeldung,
+  type CspMeldung,
+} from '@/lib/csp'
 import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
 import { ohneAnfrage } from '@/lib/sentry-hygiene'
 import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
@@ -14,6 +22,11 @@ import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
  * Kürzen → Entdoppeln im Speicher → Bremse im Speicher → Bremse über die
  * Datenbank → Sentry. Billiges zuerst: Eine Meldung, die diese Instanz in der
  * letzten Stunde schon weitergab, kostet keine Datenbankabfrage.
+ *
+ * Die Schritte 5 bis 8 laufen je Meldung: Eine Anfrage kann viele Einträge
+ * tragen, die Grenze „30 je Minute und IP" gilt aber für das, was bei Sentry
+ * ankommt — darum zählt jede weitergegebene Meldung in beiden Bremsen einzeln,
+ * höchstens `CSP_MELDUNGEN_JE_ANFRAGE` je Anfrage (Runde 1).
  *
  * Die Meldung ist Fremdtext (jeder kann hierher schicken): Es bleiben nur
  * Anweisung, Schema und Host bzw. Stichwort und der Pfad der Seite
@@ -55,8 +68,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const art = cspBerichtArt(request.headers.get('content-type'))
   if (!art) return new NextResponse(null, { status: 415 })
 
-  // 3. Lesen
-  const text = await leseBegrenzt(request, CSP_BERICHT_MAX_BYTES)
+  // 3. Lesen — bricht der Absender den Datenstrom ab, wirft read(); auch dann 204, denn
+  // ein Abbruch ist kein Fehler dieser Seite und gehört nicht zu Sentry.
+  let text: string | null
+  try {
+    text = await leseBegrenzt(request, CSP_BERICHT_MAX_BYTES)
+  } catch {
+    return OHNE_INHALT()
+  }
   if (text === null) return new NextResponse(null, { status: 413 })
 
   // 4. Kürzen — kaputter Inhalt ergibt keine Meldung.
@@ -68,26 +87,32 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
   const meldungen = leseCspMeldungen(art, roh)
 
-  // 5. Entdoppeln im Speicher
   const jetztMs = Date.now()
-  const neue = meldungen.filter((meldung) => istNeueCspMeldung(GESEHEN, meldung, jetztMs))
-  if (neue.length === 0) return OHNE_INHALT()
-
-  // 6. und 7. Bremse im Speicher, dann über alle Instanzen
   const ip = getClientIp(request.headers)
-  if (!ERSTE_STUFE.check(`csp-bericht:${ip}`)) return OHNE_INHALT()
-  if (!(await bremseUeberAlleInstanzen([{ bremse: DB_BREMSEN.cspBerichtIp, merkmal: ip }]))) return OHNE_INHALT()
-
-  // 8. Sentry — ohne Anfrage-Daten (Kopfzeilen der Meldung), gruppiert nach Anweisung und Host.
-  for (const { anweisung, host, pfad } of neue) {
-    Sentry.captureMessage('CSP-Verstoß (nur beobachtet)', (scope) =>
-      scope
-        .setLevel('warning')
-        .setTags({ bereich: 'csp', anweisung, host })
-        .setFingerprint(['csp', anweisung, host])
-        .setExtras({ pfad })
-        .addEventProcessor(ohneAnfrage)
-    )
+  let weitergegeben = 0
+  for (const meldung of meldungen) {
+    if (weitergegeben >= CSP_MELDUNGEN_JE_ANFRAGE) break
+    // 5. Entdoppeln im Speicher — gemerkt wird erst nach den Bremsen (unten).
+    if (!istNeueCspMeldung(GESEHEN, meldung, jetztMs)) continue
+    // 6. und 7. Bremse im Speicher, dann über alle Instanzen — je Meldung ein Treffer.
+    if (!ERSTE_STUFE.check(`csp-bericht:${ip}`)) break
+    if (!(await bremseUeberAlleInstanzen([{ bremse: DB_BREMSEN.cspBerichtIp, merkmal: ip }]))) break
+    merkeCspMeldung(GESEHEN, meldung, jetztMs)
+    // 8. Sentry
+    meldeAnSentry(meldung)
+    weitergegeben += 1
   }
   return OHNE_INHALT()
+}
+
+/** Ohne Anfrage-Daten (Kopfzeilen der Meldung), gruppiert nach Anweisung und Host. */
+function meldeAnSentry({ anweisung, host, pfad }: CspMeldung): void {
+  Sentry.captureMessage('CSP-Verstoß (nur beobachtet)', (scope) =>
+    scope
+      .setLevel('warning')
+      .setTags({ bereich: 'csp', anweisung, host })
+      .setFingerprint(['csp', anweisung, host])
+      .setExtras({ pfad })
+      .addEventProcessor(ohneAnfrage)
+  )
 }
