@@ -144,19 +144,21 @@ async function loadReorderItems(token: string, farmId: string): Promise<ReorderI
  * GENAU diesem Hof gehört (ladeAktivenBeitrag) — hinten dazu; die Seite stellt
  * ihn oben hin (ordneBeitraege). Scheitert das Laden, fehlt nur der Abschnitt —
  * die Seite mit Produkten und Korb bleibt (Fehler inline statt der 500 für
- * alles); der Fehler geht nach Sentry. Die Vorschau im Bauern-Bereich ist
+ * alles); der Fehler geht nach Sentry, und `fehler` sagt der Seite, dass sie zu
+ * `?beitrag=` nichts sagen kann („nicht mehr aktuell“ stimmte nicht: Der
+ * Beitrag kann aktiv sein, Nr. 134). Die Vorschau im Bauern-Bereich ist
  * dieselbe Route (?vorschau=1) und bekommt deshalb dieselbe Liste.
  */
-async function ladeBeitraege(farmId: string, kennung: string | null): Promise<ActiveStatusPost[]> {
+async function ladeBeitraege(farmId: string, kennung: string | null): Promise<{ beitraege: ActiveStatusPost[]; fehler: boolean }> {
   try {
     const neueste = await getActiveStatusPosts(farmId, HOFSEITE_BEITRAEGE_MAX)
-    if (kennung === null || neueste.some((beitrag) => beitrag.id === kennung)) return neueste
+    if (kennung === null || neueste.some((beitrag) => beitrag.id === kennung)) return { beitraege: neueste, fehler: false }
     const geteilt = await ladeAktivenBeitrag(farmId, kennung)
-    return geteilt ? [...neueste, geteilt] : neueste
+    return { beitraege: geteilt ? [...neueste, geteilt] : neueste, fehler: false }
   } catch (err) {
     unstable_rethrow(err)
     Sentry.captureException(err, { tags: { bereich: 'hofseite-beitrag' } })
-    return []
+    return { beitraege: [], fehler: true }
   }
 }
 
@@ -184,7 +186,7 @@ async function Hofseite({ farmSlug, suche, geo }: { farmSlug: string; suche: Suc
   if (!farm) notFound()
 
   // `?beitrag=` ist eine Systemgrenze: Was nicht passt, wird verworfen (Zod).
-  const beitraege = await ladeBeitraege(farm.id, beitragKennungSchema.parse(suche[BEITRAG_PARAMETER]))
+  const { beitraege, fehler: beitraegeFehler } = await ladeBeitraege(farm.id, beitragKennungSchema.parse(suche[BEITRAG_PARAMETER]))
   // Wo Kaufen nicht wirkt (Vorschau), gibt es keinen Korb — also auch nichts,
   // was ein Nachbestell-Link hineinlegen dürfte (korbErlaubt, src/lib/hofseite-vorschau.ts).
   const reorder = nachbestellToken(suche.reorder)
@@ -200,6 +202,7 @@ async function Hofseite({ farmSlug, suche, geo }: { farmSlug: string; suche: Suc
         // dem Server und stehen so nicht in den Seitendaten der Client-Komponente.
         farm={entferneKontaktdaten(farm)}
         beitraege={beitraege}
+        beitraegeFehler={beitraegeFehler}
         reorderItems={reorderItems}
         ansicht={ansicht}
         jetzt={jetzt.toISOString()}

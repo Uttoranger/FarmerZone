@@ -4,7 +4,6 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import {
-  Leaf, CalendarDays, Tag, MessageCircle,
   Home, Mail,
   ArrowRight, CheckCircle, Check,
   Camera, Crop, Loader2, X,
@@ -18,6 +17,7 @@ import type { BildAusschnitt as BildAusschnittWert } from '@/schemas/bild-aussch
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { BEITRAG_ANLAESSE, BEITRAG_ANLASS, type BeitragAnlass } from '@/lib/beitrag-anlass'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { formatEuro } from '@/lib/format'
 import { renderStatusBodyWithChip } from '@/lib/status-body'
@@ -28,19 +28,13 @@ import { TeilenFenster } from '@/components/teilen/teilen-fenster'
 import { ladeBeitragFenster } from '@/components/teilen/beitrag-teilen'
 import type { TeilenFensterBeitrag } from '@/lib/teilen-fenster'
 
-type Anlass = 'FRESH_PRODUCT' | 'NEW_SEASON' | 'PROMOTION' | 'ANNOUNCEMENT'
-
-const ANLASS_OPTIONS: { value: Anlass; label: string; icon: React.ReactNode }[] = [
-  { value: 'FRESH_PRODUCT', label: 'Frisches Produkt', icon: <Leaf className="size-5" aria-hidden="true" /> },
-  { value: 'NEW_SEASON',    label: 'Neue Saison',      icon: <CalendarDays className="size-5" aria-hidden="true" /> },
-  { value: 'PROMOTION',     label: 'Aktion',           icon: <Tag className="size-5" aria-hidden="true" /> },
-  { value: 'ANNOUNCEMENT',  label: 'Mitteilung',       icon: <MessageCircle className="size-5" aria-hidden="true" /> },
-]
+// Wort und Symbol je Anlass kommen aus BEITRAG_ANLASS (Register F8) — dieselben wie an der Marke über dem Beitrag.
+const ANLASS_OPTIONS = BEITRAG_ANLAESSE.map((value) => ({ value, ...BEITRAG_ANLASS[value] }))
 
 // Marke in der Vorschau (nur Anzeige). Seit Nr. 22e in der HofShell: Tokens
 // statt Tailwind-Palette — Schrift in der Zustandsfarbe des Themes, Fläche
 // getönt (wie StatusBadge), damit sie in beiden Themes 4,5:1 hält.
-const ANLASS_COLOR: Record<Anlass, string> = {
+const ANLASS_COLOR: Record<BeitragAnlass, string> = {
   FRESH_PRODUCT: 'text-status-fertig bg-accent/15',
   NEW_SEASON:    'text-status-fertig bg-accent/15',
   PROMOTION:     'text-status-offen bg-primary/15',
@@ -60,7 +54,7 @@ interface Props {
   // Datum, normale Mail-Logik, Frequenzschutz unverändert)
   prefill?: { anlass: string; title: string; body: string; photoUrl: string | null } | null
   // Vorgewählter Anlass aus `?anlass=` (Nr. 129, schon geprüft) — sticht den der Vorlage.
-  anlass?: Anlass | null
+  anlass?: BeitragAnlass | null
 }
 
 // ── Visual stepper ──────────────────────────────────────────────────────────
@@ -111,11 +105,8 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
   const [step, setStep] = useState(1)
 
   // Form state — Startwerte aus der Vorlage (?from=…), sonst leer
-  const [anlass, setAnlass] = useState<Anlass>(
-    anlassVorwahl ??
-      (prefill && ['FRESH_PRODUCT', 'NEW_SEASON', 'PROMOTION', 'ANNOUNCEMENT'].includes(prefill.anlass)
-        ? (prefill.anlass as Anlass)
-        : 'FRESH_PRODUCT')
+  const [anlass, setAnlass] = useState<BeitragAnlass>(
+    anlassVorwahl ?? BEITRAG_ANLAESSE.find((a) => a === prefill?.anlass) ?? 'FRESH_PRODUCT'
   )
   const [title, setTitle] = useState(prefill?.title ?? '')
   const [body, setBody] = useState(prefill?.body ?? '')
@@ -219,7 +210,7 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
     })
   }
 
-  const anlassMeta = ANLASS_OPTIONS.find((o) => o.value === anlass)!
+  const AnlassSymbol = BEITRAG_ANLASS[anlass].symbol
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -252,8 +243,8 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                         : 'border-border text-muted-foreground hover:border-border/80 hover:bg-muted/40',
                     )}
                   >
-                    {opt.icon}
-                    <span className="flex-1">{opt.label}</span>
+                    <opt.symbol className="size-5" aria-hidden="true" />
+                    <span className="flex-1">{opt.wort}</span>
                     {anlass === opt.value && <Check className="size-4 shrink-0 text-status-fertig" aria-hidden="true" />}
                   </button>
                 ))}
@@ -526,8 +517,8 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                   ANLASS_COLOR[anlass],
                 )}
               >
-                {anlassMeta.icon}
-                {anlassMeta.label}
+                <AnlassSymbol className="size-5" aria-hidden="true" />
+                {BEITRAG_ANLASS[anlass].wort}
               </span>
               <h2 className="font-heading text-lg font-semibold text-foreground mb-2">{title}</h2>
               {/* Owner-Vorschau zeigt den Platzhalter als Chip (Status-Paket E) —

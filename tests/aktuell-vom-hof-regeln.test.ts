@@ -96,6 +96,13 @@ describe('ordneBeitraege — Karte, Zeilen, „Neuester“ (Register F8)', () =>
     expect(ordneBeitraege([], 'weg')).toEqual({ anordnung: null, nichtMehrAktuell: true })
   })
 
+  it('scheiterte das Laden (beitraegeFehler), sagt die Seite nichts über den Beitrag — wie ohne Beiträge, ohne Satz (Nr. 134)', () => {
+    expect(ordneBeitraege([], 'weg', true)).toEqual({ anordnung: null, nichtMehrAktuell: false })
+    // Gegenprobe: Ohne den Merker ist es derselbe Fall mit Satz.
+    expect(ordneBeitraege([], 'weg', false)).toEqual({ anordnung: null, nichtMehrAktuell: true })
+    expect(ordneBeitraege([], 'weg')).toEqual({ anordnung: null, nichtMehrAktuell: true })
+  })
+
   it('ein einzelner Beitrag ist der neueste, ohne Zeilen', () => {
     const { anordnung } = ordneBeitraege([b('n1')], null)
     expect(anordnung).toMatchObject({ karteIstNeuester: true, neuester: null, zeilen: [], anzahl: 1 })

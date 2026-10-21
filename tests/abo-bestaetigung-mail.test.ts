@@ -12,6 +12,7 @@
  */
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
 import { MARKE } from '@/lib/marke'
+import { BEITRAG_ANLAESSE, BEITRAG_ANLASS } from '@/lib/beitrag-anlass'
 
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
@@ -121,6 +122,21 @@ describe('Werbliche Mail: der Knopf führt zum Beitrag (Register T5, Ergänzung 
     const html = gesendet().html
     expect(html).toContain(`href="${appUrl}/hof-test"`)
     expect(html).not.toContain('beitrag=')
+  })
+})
+
+describe('Werbliche Mail: das Anlass-Wort kommt aus BEITRAG_ANLASS (Nr. 134)', () => {
+  it('jeder Anlass steht mit seinem Wort in der Mail', async () => {
+    for (const anlass of BEITRAG_ANLAESSE) {
+      sendMock.mockClear()
+      await email.sendStatusUpdateEmail({ ...BEITRAG, anlass })
+      expect(gesendet().html, anlass).toContain(BEITRAG_ANLASS[anlass].wort)
+    }
+  })
+
+  it('Gegenprobe: ein unbekannter Anlass gilt als Mitteilung', async () => {
+    await email.sendStatusUpdateEmail({ ...BEITRAG, anlass: 'UNBEKANNT' })
+    expect(gesendet().html).toContain(BEITRAG_ANLASS.ANNOUNCEMENT.wort)
   })
 })
 

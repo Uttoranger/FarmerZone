@@ -23,6 +23,7 @@ import {
   umschalterBis,
 } from '@/lib/mein-hof-ansicht'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
+import { AKTUELL_ANKER, springeZuAktuell } from '@/lib/hofseite-kunde'
 import { GESPEICHERT_TEXT, MEIN_HOF_REITER_HOFBEREICH } from '@/lib/bauern-navigation'
 
 describe('Texte', () => {
@@ -78,7 +79,17 @@ describe('kundenAnsichtAdresse — was der Rahmen zeigt', () => {
   it('der passende Reiter der echten Hofseite: Übersicht, Produkte, Beiträge', () => {
     expect(kundenAnsichtAdresse('hof-test', 'hofseite')).toBe('/hof-test?vorschau=1')
     expect(kundenAnsichtAdresse('hof-test', 'produkte')).toBe('/hof-test?vorschau=1&reiter=produkte')
-    expect(kundenAnsichtAdresse('hof-test', 'beitraege')).toBe('/hof-test?vorschau=1&reiter=beitraege')
+  })
+
+  it('Beiträge: direkt die Übersicht mit „Aktuell vom Hof“ (#aktuell), ohne Umweg über ?reiter=beitraege (Nr. 134)', () => {
+    const adresse = kundenAnsichtAdresse('hof-test', 'beitraege')
+    expect(adresse).toBe(`/hof-test?vorschau=1#${AKTUELL_ANKER}`)
+    expect(adresse).not.toContain('reiter=')
+  })
+
+  it('Gegenprobe: ein alter Link ?reiter=beitraege springt weiter zu „Aktuell vom Hof“', () => {
+    expect(springeZuAktuell('beitraege', true)).toBe(true)
+    expect(springeZuAktuell('beitraege', false)).toBe(false)
   })
 
   it('immer die Vorschau der Hofseite (vorschauLink) — kein Nachbau, keine zweite Adresse', () => {

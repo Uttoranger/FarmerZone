@@ -14,10 +14,14 @@
  * Systemuhr, großzügig (TESTING_GUIDELINES §1).
  */
 import { afterEach, describe, expect, it } from 'vitest'
-import type { Prisma } from '@prisma/client'
+import type { Prisma, ProductCategory } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { leseNeuigkeiten } from '@/server/queries/neuigkeiten'
-import { getOeffentlicheHoefe } from '@/server/queries/farm'
+import { getOeffentlicheHoefe, IN_LISTEN_SICHTBAR } from '@/server/queries/farm'
+import { AKTIVER_BEITRAG, NEUESTER_BEITRAG_ZUERST } from '@/server/queries/status-posts'
+import { PRODUCT_ORDER_BY } from '@/server/queries/products'
+import { NEUIGKEITEN_TAGE, waehleNeuigkeiten, type Neuigkeit } from '@/lib/startseite-gestalten'
+import { leseAusschnitt } from '@/schemas/bild-ausschnitt'
 import { INT_PRAEFIX, erstelleHof, erstelleProdukt, raeumeAuf } from './setup/basis'
 
 afterEach(async () => {
@@ -90,6 +94,98 @@ describe('leseNeuigkeiten — „Neu bei den Höfen“', () => {
   it('ohne Beitrag leer', async () => {
     await erstelleHof()
     expect(eigene(await leseNeuigkeiten(new Date()))).toEqual([])
+  })
+})
+
+/**
+ * Die Abfrage, wie sie bis Nr. 133 las: ohne Obergrenze, je Beitrag alle Produkte des Hofs,
+ * die Kategorien erst danach mit einem Set entdoppelt. Der Vergleich hält fest, dass die
+ * schlankere Fassung (Obergrenze, nur das Feld `category` mit distinct) dasselbe liefert.
+ */
+async function alteAbfrage(jetzt: Date): Promise<Neuigkeit[]> {
+  const ab = new Date(jetzt.getTime() - NEUIGKEITEN_TAGE * 24 * 60 * 60_000)
+  const beitraege = await prisma.statusPost.findMany({
+    where: { AND: [AKTIVER_BEITRAG(jetzt), { publishedAt: { gte: ab } }, { farm: { ...IN_LISTEN_SICHTBAR, isPaused: false } }] },
+    orderBy: NEUESTER_BEITRAG_ZUERST,
+    select: {
+      id: true, title: true, anlass: true, photoUrl: true, fotoAusschnitt: true, publishedAt: true, expiresAt: true,
+      farm: {
+        select: {
+          name: true, slug: true,
+          products: { where: { isAvailable: true, category: { not: null } }, orderBy: PRODUCT_ORDER_BY, select: { category: true } },
+        },
+      },
+    },
+  })
+  return waehleNeuigkeiten(
+    beitraege.map((b) => ({
+      id: b.id,
+      titel: b.title,
+      anlass: b.anlass,
+      foto: b.photoUrl,
+      fotoAusschnitt: leseAusschnitt(b.fotoAusschnitt),
+      veroeffentlicht: b.publishedAt!.toISOString(),
+      endet: b.expiresAt?.toISOString() ?? null,
+      hof: {
+        name: b.farm.name,
+        slug: b.farm.slug,
+        kategorien: [...new Set(b.farm.products.flatMap((p) => (p.category ? [p.category] : [])))],
+      },
+    }))
+  )
+}
+
+async function produktMit(farmId: string, category: ProductCategory | null, imShop = true): Promise<void> {
+  const produkt = await erstelleProdukt(farmId)
+  await prisma.product.update({ where: { id: produkt.id }, data: { category, isAvailable: imShop } })
+}
+
+describe('leseNeuigkeiten — gleiches Ergebnis wie die Abfrage ohne Obergrenze (Nr. 134)', () => {
+  it('20 Beiträge von 8 Höfen: dieselbe Liste, dieselben Kategorien in derselben Reihenfolge', async () => {
+    const hoefe = []
+    for (const buchstabe of 'ABCDEFGH') {
+      const { farm } = await erstelleHof({ name: `Testhof ${buchstabe}` })
+      hoefe.push(farm)
+    }
+    // Kategorien doppelt, ohne Kategorie und nicht im Shop: Nur die im Shop zählen, je Kategorie einmal.
+    for (const [i, farm] of hoefe.entries()) {
+      await produktMit(farm.id, 'GEMUESE')
+      await produktMit(farm.id, i % 2 === 0 ? 'EIER' : 'HONIG')
+      await produktMit(farm.id, 'GEMUESE')
+      await produktMit(farm.id, null)
+      await produktMit(farm.id, 'FLEISCH', false)
+    }
+    // 20 Beiträge, Hof A bis D mit mehr als einem; alle neuer als jeder Seed-Beitrag.
+    const verteilung = [0, 1, 2, 3, 0, 4, 1, 5, 0, 6, 2, 7, 0, 1, 3, 4, 5, 6, 7, 2]
+    for (const [k, hof] of verteilung.entries()) {
+      await beitrag(hoefe[hof].id, `Beitrag ${k + 1}`, { publishedAt: vor((k + 1) * 60_000) })
+    }
+
+    const jetzt = new Date()
+    const neu = await leseNeuigkeiten(jetzt)
+    const alt = await alteAbfrage(jetzt)
+
+    expect(neu).toEqual(alt)
+    expect(neu).toHaveLength(6)
+    expect(new Set(neu.map((n) => n.hof.slug)).size).toBe(6)
+    expect(neu[0]).toMatchObject({ titel: 'Beitrag 1', hof: { name: 'Testhof A', kategorien: ['GEMUESE', 'EIER'] } })
+  })
+
+  it('ein Hof mit sehr vielen Beiträgen verdrängt die anderen nicht: sechs Höfe, je einer', async () => {
+    const { farm: viel } = await erstelleHof({ name: 'Testhof Viel' })
+    const anderen = []
+    for (let n = 1; n <= 7; n++) anderen.push((await erstelleHof({ name: `Testhof ${n}` })).farm)
+    await prisma.statusPost.createMany({
+      data: Array.from({ length: 60 }, (_, i) => ({
+        farmId: viel.id, title: `Viel ${i + 1}`, body: 'Erfundener Text.', anlass: 'NEW_SEASON' as const, publishedAt: vor((i + 1) * 1000),
+      })),
+    })
+    for (const [n, farm] of anderen.entries()) await beitrag(farm.id, `Hof ${n + 1}`, { publishedAt: vor(2 * STUNDE + n * 60_000) })
+
+    const liste = await leseNeuigkeiten(new Date())
+
+    expect(liste.map((n) => n.titel)).toEqual(['Viel 1', 'Hof 1', 'Hof 2', 'Hof 3', 'Hof 4', 'Hof 5'])
+    expect(await alteAbfrage(new Date())).toEqual(liste)
   })
 })
 

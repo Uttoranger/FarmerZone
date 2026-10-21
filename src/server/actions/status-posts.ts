@@ -12,6 +12,7 @@ import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
 import * as Sentry from '@sentry/nextjs'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
+import { beitragIdImLink } from '@/lib/teilen-fenster'
 import { NEUIGKEITEN_CACHE_TAG } from '@/lib/startseite-gestalten'
 import {
   BEITRAG_FELDER_MIT_SATZ,
@@ -178,8 +179,8 @@ export async function publishStatusPost(
             anlass: data.anlass,
             photoUrl: data.photoUrl,
             // Der Knopf führt zu genau diesem Beitrag (T5) — nur, wenn er auf der
-            // Hofseite steht; sonst sagte die Seite „nicht mehr aktuell“.
-            beitragId: data.showOnFarmPage ? post.id : undefined,
+            // Hofseite steht (dieselbe Regel wie der WhatsApp-Link je Person).
+            beitragId: beitragIdImLink({ id: post.id, showOnFarmPage: data.showOnFarmPage }),
             abmeldeToken: generateUnsubscribeToken(sub.customerEmail, farm.id),
           })
         }

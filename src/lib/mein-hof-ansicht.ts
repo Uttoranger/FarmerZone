@@ -11,7 +11,7 @@
  * in ihr Bündel.
  */
 import { BEITRAEGE_HREF, GESPEICHERT_TEXT, MEIN_HOF_REITER_HOFBEREICH, type MeinHofReiterAlleId } from '@/lib/bauern-navigation'
-import { AKTUELL_VOM_HOF_TEXT } from '@/lib/hofseite-kunde'
+import { AKTUELL_ANKER, AKTUELL_VOM_HOF_TEXT } from '@/lib/hofseite-kunde'
 import { NEUER_BEITRAG_HREF, laeuftNochText, type DeinBeitrag } from '@/lib/heute'
 import { reiterAdresse } from '@/lib/hofseite-kunde'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
@@ -73,23 +73,30 @@ export function kundinAdresse(reiter: MeinHofReiterAlleId): string {
   return ansichtAdresse(pfad, suche, 'kundin')
 }
 
-/** Welcher Reiter der Hofseite zu welchem Reiter von Mein Hof gehört. */
+/**
+ * Welcher Reiter der Hofseite zu welchem Reiter von Mein Hof gehört. Beiträge
+ * gibt es dort nicht mehr als Reiter (Nr. 128): Sie stehen in der Übersicht
+ * als „Aktuell vom Hof“, das Ziel springt mit dem Anker dorthin.
+ */
 const HOFSEITEN_REITER: Record<MeinHofReiterAlleId, HofReiterId> = {
   produkte: 'produkte',
   hofseite: 'uebersicht',
-  beitraege: 'beitraege',
+  beitraege: 'uebersicht',
 }
 
 /**
  * Was die Kundenansicht im Rahmen zeigt: die echte Hofseite in der
  * Vorschau (vorschauLink, ARCHITECTURE §4 „Die Hofseite gibt es genau
  * einmal"), geöffnet auf dem passenden Reiter — Produkte zeigt den Reiter
- * Produkte der Hofseite. Gibt es den Reiter dort nicht (kein Beitrag), zeigt
- * die Hofseite die Übersicht (aktiverReiter).
+ * Produkte der Hofseite, Beiträge die Übersicht bei „Aktuell vom Hof“. Gibt es
+ * keinen aktiven Beitrag, bleibt die Seite oben (der Anker findet nichts).
  */
 export function kundenAnsichtAdresse(slug: string, reiter: MeinHofReiterAlleId): string {
   const [pfad, suche = ''] = vorschauLink(slug).split('?')
-  return reiterAdresse(pfad, suche, HOFSEITEN_REITER[reiter])
+  const adresse = reiterAdresse(pfad, suche, HOFSEITEN_REITER[reiter])
+  // Direkt auf die Übersicht mit Anker statt über `?reiter=beitraege` (Nr. 134): Das war ein Umweg
+  // mit Sprung per Skript. Alte Links mit `?reiter=beitraege` bleiben gültig (springeZuAktuell).
+  return reiter === 'beitraege' ? `${adresse}#${AKTUELL_ANKER}` : adresse
 }
 
 /**

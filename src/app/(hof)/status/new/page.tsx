@@ -7,8 +7,7 @@ import { getStatusTemplate } from '@/server/queries/status-posts'
 import { prisma } from '@/lib/prisma'
 import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
 import { berechneMailabstandBeginn } from '@/lib/beitrag-mailabstand'
-import { BEITRAG_ANLAESSE } from '@/lib/beitrag-anlass'
-import { z } from 'zod'
+import { anlassParameterSchema } from '@/schemas/beitrag-anlass'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { StatusNewClient } from './status-new-client'
 import { MARKE } from '@/lib/marke'
@@ -28,9 +27,6 @@ export const dynamic = 'force-dynamic'
  * (UnterseitenKopf, seit Nr. 44 am Handy fest oben; die h1 trägt der
  * Assistent je Schritt selbst).
  */
-
-/** `?anlass=` (Nr. 129, Anstoß in Heute) ist Fremddaten: nur ein Anlass aus beitrag-anlass.ts, sonst verworfen. */
-const anlassParameterSchema = z.enum(BEITRAG_ANLAESSE).nullable().catch(null)
 
 export default async function StatusNewPage({
   searchParams,
