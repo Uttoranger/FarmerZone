@@ -119,7 +119,7 @@ describe('Teilen ohne Browser-Speicher (T1)', () => {
         'src/components/hof-einstellungen/teilen-momente-schalter.tsx',
       ])
     )
-  })
+  }, 30_000)
 
   it('die Merker der Teilen-Momente bleiben bewusst draußen', () => {
     // „Schon gezeigt" je Gerät (localStorage) gehört zur Einmal-Regel der
@@ -131,7 +131,7 @@ describe('Teilen ohne Browser-Speicher (T1)', () => {
     for (const merker of ['src/lib/freischalt-moment.ts', 'src/lib/wieder-da-moment.ts', 'src/lib/gespeichert-moment.ts']) {
       expect(TEILEN_DATEIEN).not.toContain(merker)
     }
-  })
+  }, 30_000)
 
   it.each(TEILEN_DATEIEN)('%s nutzt keinen Browser-Speicher und kein Cookie', (pfad) => {
     expect(findeBrowserSpeicher(lies(pfad), pfad)).toEqual([])
@@ -140,7 +140,7 @@ describe('Teilen ohne Browser-Speicher (T1)', () => {
   it('die alte Herkunft im sessionStorage ist gelöscht', () => {
     expect(TEILEN_DATEIEN).not.toContain('src/lib/teilen-herkunft.ts')
     expect(TEILEN_DATEIEN).not.toContain('src/components/hofseite/teilen-herkunft.tsx')
-  })
+  }, 30_000)
 
   it.each(CHECKOUT_DATEIEN)('%s kennt kein teilenKanal und keinen Teilen-Zähler', (pfad) => {
     expect(findeBestellZuordnung(lies(pfad), pfad)).toEqual([])

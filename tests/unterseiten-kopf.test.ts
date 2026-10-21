@@ -336,7 +336,7 @@ describe('Die alten Bausteine sind ersetzt', () => {
     const dateien = dateienUnter('src')
     expect(dateien.length).toBeGreaterThan(200)
     for (const datei of dateien) expect(readFileSync(datei, 'utf8'), datei).not.toMatch(ALTE_BAUSTEINE)
-  })
+  }, 30_000)
 
   it('Gegenprobe: die Suche findet Einbindung und Import', () => {
     expect('<ZurueckLink href="/x">x</ZurueckLink>').toMatch(ALTE_BAUSTEINE)

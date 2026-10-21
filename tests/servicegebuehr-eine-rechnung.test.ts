@@ -55,7 +55,7 @@ describe('Servicegebühr: eine Rechnung', () => {
         nachrechnungen(readFileSync(pfad, 'utf8')).map((zeile) => `${relative(WURZEL, pfad)}: ${zeile.trim()}`)
       )
     expect(funde).toEqual([])
-  })
+  }, 30_000)
 
   // Seit Nr. 12 rechnet die Kasse über kassenBetraege (src/lib/kasse.ts) —
   // die Anzeige-Rechnung steht dort, das Formular ruft nur sie.

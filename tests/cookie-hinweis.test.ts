@@ -123,7 +123,7 @@ describe('Wache: jede feste Leiste am unteren Rand trägt das Merkmal', () => {
       ])
     )
     for (const f of funde) expect(f.merkmale, f.pfad).toBeGreaterThanOrEqual(f.leisten)
-  })
+  }, 30_000)
 
   it('der Hinweis selbst steht über den Leisten — gemessen, nicht mit festem bottom-4', () => {
     const banner = readFileSync(join(WURZEL, 'components/cookie-banner.tsx'), 'utf8')

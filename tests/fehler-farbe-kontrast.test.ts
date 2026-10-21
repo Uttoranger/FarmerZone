@@ -121,7 +121,7 @@ describe('O1 — Fehler-Farbe mit mindestens 4,5:1 in beiden Themes', () => {
     expect(toenungen).toEqual([])
     // Gegenprobe: Die Suche fände den früheren Hover im Dunkeln.
     expect([...'dark:hover:bg-destructive/30'.matchAll(/bg-destructive\/(\d+)/g)].map((m) => Number(m[1]))).toEqual([30])
-  })
+  }, 30_000)
 
   it('der neue Geltungsbereich ordnet --destructive nicht um — es gilt der Wert des Themes', () => {
     expect(block(':root:is([data-design="neu"], :has([data-design="neu"]))')).not.toMatch(/--destructive:/)

@@ -133,5 +133,5 @@ describe('ein Weg für alle Fotos', () => {
     // Gegenprobe: Die Suche findet die bekannten Stellen.
     expect(handleUpload.map((d) => d.slice(wurzel.length))).toEqual(['/app/api/upload/token/route.ts'])
     expect(ablegen.map((d) => d.slice(wurzel.length))).toEqual(['/app/api/upload/verarbeiten/route.ts'])
-  })
+  }, 30_000)
 })

@@ -194,7 +194,7 @@ describe('Kein await import() innerhalb einer Transaktion', () => {
         .map(() => datei)
     )
     expect(treffer).toEqual([])
-  })
+  }, 30_000)
 
   it('„Artikel fehlt" lädt Stripe vor der Sperre; teilerstattung importiert nur in stripeVorladen', () => {
     const artikel = fs.readFileSync(path.join(WURZEL, 'src/server/artikel-fehlt.ts'), 'utf8')

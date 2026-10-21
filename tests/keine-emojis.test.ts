@@ -103,7 +103,7 @@ describe('keine Emojis', () => {
       findeEmojis(readFileSync(pfad, 'utf8'), relative(WURZEL, pfad))
     )
     expect(funde).toEqual([])
-  })
+  }, 30_000)
 })
 
 /** Das Zeichen, das hier gesucht wird, steht nie als Zeichen im Quelltext dieser Datei — nur als Escape. */

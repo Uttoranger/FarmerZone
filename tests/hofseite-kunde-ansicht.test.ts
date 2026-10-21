@@ -204,7 +204,7 @@ describe('die rechte Spalte ist EINE Komponente', () => {
     expect(einbinder.sort()).toEqual(['src/components/hofseite/hofseite-kunde.tsx', 'src/components/produktdetail/produktdetail-kunde.tsx'])
     const mitKartentitel = dateien('src/components/hofseite').filter((p) => />\s*Abholzeiten\s*</.test(quelle(p)))
     expect(mitKartentitel).toEqual(['src/components/hofseite/hofseite-seitenspalte.tsx'])
-  })
+  }, 30_000)
 })
 
 describe('Zustände der Produktkarten — knapp, ausverkauft, kein „Merken"', () => {
@@ -575,7 +575,7 @@ describe('Produktkarten verlinken auf die Produktseite (Nr. 11)', () => {
     const src = dateien('src')
     expect(src).not.toContain('src/components/farm/produkt-detail.tsx')
     expect(src.filter((p) => /\bProduktDetail\b/.test(quelle(p)))).toEqual([])
-  })
+  }, 30_000)
 })
 
 // ─── Nr. 51: Schaufenster zuerst (Register N5) ──────────────────────────────

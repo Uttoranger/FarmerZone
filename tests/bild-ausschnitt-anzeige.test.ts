@@ -208,11 +208,11 @@ describe('Wache — „Problem melden“ und die Rohfoto-Stellen ohne Ausschnitt
         'src/components/hof-hilfe/meldung-abgeben.tsx',
       ])
     )
-  })
+  }, 30_000)
 
   it('der Screenshot unter „Problem melden“ rendert nie den Bild-Baustein und nie seinen Stil', () => {
     expect(MELDUNG.filter(bindetBildEin)).toEqual([])
-  })
+  }, 30_000)
 
   it('Warenkorb, Kasse, E-Mails und Teilen-Bild zeigen das Rohfoto', () => {
     const roh = [

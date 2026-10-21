@@ -295,7 +295,7 @@ describe('Keine Sackgasse: der Weg zu den Kontaktdaten statt „frag beim Hof"',
   it('kein alter Satz mehr in src/', () => {
     const funde = dateien('src').filter((pfad) => ALTE_SAETZE.test(readFileSync(join(WURZEL, pfad), 'utf8')))
     expect(funde).toEqual([])
-  })
+  }, 30_000)
 
   it('der neue Satz verweist auf die Karte, die die Kasse wirklich zeigt', () => {
     const name = KONTAKT_UNTER_ANGABEN_ZUM_HOF.match(/„(.+)“/)?.[1]

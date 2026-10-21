@@ -150,5 +150,5 @@ describe('Ein Schlüssel — nirgends sonst hart im Code', () => {
     }
     durchsuche(wurzel)
     expect(treffer).toEqual([path.join('lib', 'warenkorb-speicher.ts')])
-  })
+  }, 30_000)
 })

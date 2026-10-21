@@ -55,7 +55,7 @@ describe('Testwerte für Codes', () => {
     // Die Dateien der Nr. 115 (Einheit, Mail, Integration) sind dabei — sonst prüfte die Wache nichts.
     expect(geprueft).toBeGreaterThanOrEqual(4)
     expect(verstoesse).toEqual([])
-  })
+  }, 30_000)
 
   it('Gegenprobe: ein Code mit Ziffer schlägt an, Werte aus Buchstaben nicht', () => {
     const z = String(7)

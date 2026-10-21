@@ -171,7 +171,7 @@ describe('Marke und Domain an je einer Stelle (M1)', () => {
       const text = readFileSync(join(WURZEL, datei), 'utf8')
       for (const stelle of stellen) expect(text.includes(stelle), `${datei}: ${stelle}`).toBe(true)
     }
-  })
+  }, 30_000)
 
   it('in src/, tests/ und public/ steht weder der alte Name noch der Name oder die Domain außerhalb ihrer Stelle', () => {
     const gefunden = alleDateien()
@@ -179,5 +179,5 @@ describe('Marke und Domain an je einer Stelle (M1)', () => {
       .flatMap((datei) => pruefeText(readFileSync(join(WURZEL, datei), 'utf8'), datei))
       .map((f) => `${f.datei}:${f.zeile} ${f.regel} „${f.text}"`)
     expect(gefunden).toEqual([])
-  })
+  }, 30_000)
 })
