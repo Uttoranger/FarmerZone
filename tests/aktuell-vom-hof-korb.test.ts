@@ -72,7 +72,7 @@ const KAROTTEN: PublicProduct = {
   id: 'p_karotten', name: 'Karotten', description: null, imageUrl: null, bildAusschnitt: null, category: 'GEMUESE', categoryImageUrl: null,
   price: 2.4, unit: 'KG', unitSize: 1, stock: 8, isAvailable: true, allergens: [], isOrganic: false, requiresCool: false,
   requiresFreezer: false, seasonStart: null, seasonEnd: null, unavailableReason: null, subcategory: null, labels: [],
-  abgabe: 'ALLE', futter: null, familieId: null, brennmaterial: null,
+  abgabe: 'ALLE', futter: null, familieId: null, brennmaterial: null, abholhinweise: [],
 }
 const HOF: PublicFarm = {
   id: 'farm_test', slug: 'hof-test', name: 'Testhof A', ownerName: 'Erika Muster', description: 'Gemüse', address: 'Musterweg 1',

@@ -5,7 +5,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import { futterDaten, ladeHofRegistrierung, revalidiereProdukte } from '@/server/produkte-schreiben'
+import { abholhinweiseDaten, futterDaten, ladeHofRegistrierung, revalidiereProdukte } from '@/server/produkte-schreiben'
 import { brennmaterialFamilieSchema, futterFamilieSchema } from '@/schemas/produktfamilie'
 import { FUTTER_BESTAETIGUNG_FEHLT, gebindeSperre } from '@/lib/futter-registrierung'
 import { RESTFEUCHTE_JE_TROCKNUNG, gelagertSeitAus, groessenProduktname } from '@/lib/verkaufsgroessen'
@@ -95,6 +95,8 @@ export async function legeFutterFamilieAn(eingabe: unknown): Promise<FamilieErge
           subcategory: v.subcategory,
           labels: v.bio ? ['BIO'] : [],
           abgabe: v.abgabe,
+          // Jede Größe übernimmt die Hinweise der Familie wie Bio, Abgabe und Kennzeichnung.
+          abholhinweise: abholhinweiseDaten(v.category, v.abholhinweise),
           price: g.price,
           vatRate: mwstStandard(v.category),
           unit: g.unit,

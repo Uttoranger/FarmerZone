@@ -22,11 +22,17 @@
  *  - Seiten mit Token in der Adresse schicken keinen Referrer und stehen in
  *    keinem Suchindex — seit Nr. 54 auch /reset-password, wie /verify; die mit
  *    Nr. 54 umgezogenen Seiten behalten ihre Header.
+ *  - CSP zum Beobachten (Register G8, Nr. 125): Nur im Produktions-Build trägt
+ *    jede Seite `Content-Security-Policy-Report-Only` aus src/lib/csp.ts; gemeldet
+ *    wird nur bei VERCEL_ENV=production (mit `Reporting-Endpoints`). Die Seiten
+ *    mit `no-referrer`, Bestellseite samt Kalender, die Bestätigung der Zustellung,
+ *    alles unter /api/ und jede Adresse mit einem heiklen Query-Wert melden nie.
+ *    Die bisherigen Header bleiben in jeder Umgebung unverändert.
  *
  * Gematcht wird mit Nexts eigenem Pfadvergleich (path-to-regexp), nicht mit
  * einer Nachbildung — so gilt auch die Lookahead-Schreibweise der Quelle.
  */
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, vi } from 'vitest'
 import { readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { getPathMatch } from 'next/dist/shared/lib/router/utils/path-match'
@@ -52,9 +58,9 @@ beforeAll(async () => {
  * überschreiben frühere (Next-Doku „headers"). Pfad und `has` vergleicht
  * Nexts eigener Code (path-to-regexp, matchHas), nicht eine Nachbildung.
  */
-function headerFuer(pfad: string, query: Record<string, string | string[]> = {}): Record<string, string> {
+function headerFuer(pfad: string, query: Record<string, string | string[]> = {}, liste: Regel[] = regeln): Record<string, string> {
   const ergebnis: Record<string, string> = {}
-  for (const regel of regeln) {
+  for (const regel of liste) {
     if (!getPathMatch(regel.source)(pfad)) continue
     // Ohne Header und Cookies — unsere Regeln fragen nur die Query.
     if (regel.has && !matchHas({ headers: {} } as never, query, regel.has as never)) continue
@@ -344,5 +350,142 @@ describe('Kein X-Powered-By', () => {
     for (const regel of regeln) {
       expect(regel.headers.map((h) => h.key.toLowerCase()), regel.source).not.toContain('x-powered-by')
     }
+  })
+})
+
+
+// ─── CSP zum Beobachten (Register G8, Nr. 125) ──────────────────────────────
+
+const CSP = 'Content-Security-Policy-Report-Only'
+
+/** Die Regeln einer Umgebung — headers() liest die Umgebung erst beim Aufruf (wie beim Build). */
+async function regelnFuer(umgebung: Record<string, string>): Promise<Regel[]> {
+  for (const [name, wert] of Object.entries(umgebung)) vi.stubEnv(name, wert)
+  try {
+    const { default: konfiguration } = await import('../next.config')
+    return (await konfiguration.headers!()) as Regel[]
+  } finally {
+    vi.unstubAllEnvs()
+  }
+}
+
+/** Je Seite mit `no-referrer` ein Beispiel — der Test prüft, dass es genau diese zehn Regeln trifft. */
+const OHNE_REFERRER_BEISPIELE = [
+  '/hof-test/confirm/bestellungA',
+  '/hof-test/bestaetigen/TokenAbcDef',
+  '/bestellungen',
+  '/verify',
+  '/sicherheit/nicht-ich',
+  '/reset-password',
+  '/account/neuigkeiten-bestaetigen',
+  '/account/unsubscribe',
+  '/api/abmelden',
+  '/api/orders/confirm/TokenAbcDef',
+]
+const WEITERE_NIE_MELDEN = ['/hof-test/bestellung/bestellungA', '/hof-test/bestellung/bestellungA/kalender', '/admin/postfach/zustellung/bestaetigen', '/api/csp-bericht', '/api/checkout']
+const HEIKLE_WERTE = ['s', 'sig', 'token', 't', 'code', 'vorschau', 'reorder']
+const MIT_MELDUNG = ['/', '/hoefe', '/hof-test', '/hof-test/produkt/produkt-a', '/hof-test/checkout', '/region', '/products']
+
+describe('CSP zum Beobachten (G8)', () => {
+  let produktion: Regel[] = []
+  let vorschau: Regel[] = []
+  let entwicklung: Regel[] = []
+
+  beforeAll(async () => {
+    produktion = await regelnFuer({ NODE_ENV: 'production', VERCEL_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://example.com', NEXT_PUBLIC_SENTRY_DSN: 'https://schluesselAbc@o4501.ingest.de.sentry.io/4502' })
+    vorschau = await regelnFuer({ NODE_ENV: 'production', VERCEL_ENV: 'preview' })
+    entwicklung = await regelnFuer({ NODE_ENV: 'development' })
+  }, 30_000)
+
+  it('in next dev und in Tests keine CSP — sie gilt nur im Produktions-Build', () => {
+    for (const liste of [regeln, entwicklung]) {
+      expect(liste.flatMap((r) => r.headers.map((h) => h.key))).not.toContain(CSP)
+      expect(liste.flatMap((r) => r.headers.map((h) => h.key))).not.toContain('Reporting-Endpoints')
+    }
+  })
+
+  it('Report-Only mit Meldung auf Startseite, /hoefe, Hofseite, Produktseite und Kasse — samt Reporting-Endpoints', () => {
+    for (const pfad of MIT_MELDUNG) {
+      const h = headerFuer(pfad, {}, produktion)
+      expect(h[CSP], pfad).toContain("default-src 'self'")
+      expect(h[CSP], pfad).toContain('report-uri /api/csp-bericht')
+      expect(h[CSP], pfad).toContain('report-to csp')
+      expect(h[CSP], pfad).toContain('https://o4501.ingest.de.sentry.io')
+      expect(h['Reporting-Endpoints'], pfad).toBe('csp="https://example.com/api/csp-bericht"')
+      // Nie die scharfe Policy: Die einzige echte CSP bleibt frame-ancestors der Vorschau-Rahmen.
+      expect(h['Content-Security-Policy'], pfad).toBeUndefined()
+    }
+  })
+
+  it('genau zehn Seiten mit no-referrer — und jede davon meldet nie', () => {
+    const ohneReferrer = produktion.filter((r) => r.headers.some((h) => h.key === 'Referrer-Policy' && h.value === 'no-referrer'))
+    expect(ohneReferrer).toHaveLength(OHNE_REFERRER_BEISPIELE.length)
+    for (const regel of ohneReferrer) {
+      expect(OHNE_REFERRER_BEISPIELE.some((b) => getPathMatch(regel.source)(b)), regel.source).toBe(true)
+    }
+    for (const pfad of [...OHNE_REFERRER_BEISPIELE, ...WEITERE_NIE_MELDEN]) {
+      const h = headerFuer(pfad, {}, produktion)
+      expect(h[CSP], pfad).toContain("default-src 'self'")
+      expect(h[CSP], pfad).not.toContain('report-uri')
+      expect(h[CSP], pfad).not.toContain('report-to')
+    }
+  })
+
+  it('jede Adresse mit einem heiklen Query-Wert meldet nie — ?beitrag= und ?tab= schon (Gegenprobe)', () => {
+    for (const pfad of MIT_MELDUNG) {
+      for (const schluessel of HEIKLE_WERTE) {
+        const h = headerFuer(pfad, { [schluessel]: 'abc', q: 'suche' }, produktion)
+        expect(h[CSP], `${pfad}?${schluessel}=`).toContain("default-src 'self'")
+        expect(h[CSP], `${pfad}?${schluessel}=`).not.toContain('report-uri')
+      }
+      for (const harmlos of ['beitrag', 'tab', 'q']) {
+        expect(headerFuer(pfad, { [harmlos]: 'abc' }, produktion)[CSP], `${pfad}?${harmlos}=`).toContain('report-uri')
+      }
+    }
+  })
+
+  it('ohne https-Adresse der App meldet die Produktion nur über report-uri — ohne report-to und Reporting-Endpoints', async () => {
+    const ohneAdresse = await regelnFuer({ NODE_ENV: 'production', VERCEL_ENV: 'production', NEXT_PUBLIC_APP_URL: 'http://localhost:3000' })
+    const h = headerFuer('/hoefe', {}, ohneAdresse)
+    expect(h[CSP]).toContain('report-uri /api/csp-bericht')
+    expect(h[CSP]).not.toContain('report-to')
+    expect(h['Reporting-Endpoints']).toBeUndefined()
+  })
+
+  it('auf Vorschauen nur in der Konsole: keine Meldung, kein Reporting-Endpoints, dazu die Vercel-Toolbar', () => {
+    for (const pfad of MIT_MELDUNG) {
+      const h = headerFuer(pfad, {}, vorschau)
+      expect(h[CSP], pfad).toContain('https://vercel.live')
+      expect(h[CSP], pfad).not.toContain('report-uri')
+      expect(h['Reporting-Endpoints'], pfad).toBeUndefined()
+    }
+    expect(headerFuer('/', {}, produktion)[CSP]).not.toContain('vercel.live')
+  })
+
+  it('die bisherigen Header bleiben in jeder Umgebung unverändert — auch die Vorschau-Rahmen', () => {
+    const ohneCsp = (h: Record<string, string>) => Object.fromEntries(Object.entries(h).filter(([k]) => k !== CSP && k !== 'Reporting-Endpoints'))
+    const faelle: [string, Record<string, string>][] = [
+      ...[...MIT_MELDUNG, ...OHNE_REFERRER_BEISPIELE, ...WEITERE_NIE_MELDEN].map((p): [string, Record<string, string>] => [p, {}]),
+      ['/hof-test', { vorschau: '1' }],
+      ['/', { vorschau: 'aW5oYWx0', sig: 'ab12' }],
+      ['/sicherheit/nicht-ich', { t: 'abc' }],
+    ]
+    for (const [pfad, query] of faelle) {
+      const vorher = headerFuer(pfad, query)
+      expect(ohneCsp(headerFuer(pfad, query, produktion)), pfad).toEqual(vorher)
+      expect(ohneCsp(headerFuer(pfad, query, vorschau)), pfad).toEqual(vorher)
+    }
+    expect(headerFuer('/hof-test', { vorschau: '1' }, produktion)['Content-Security-Policy']).toBe("frame-ancestors 'self'")
+    expect(produktion.filter(oeffnetEinbetten)).toHaveLength(EINBETTBAR_MIT_PARAMETER.length)
+  })
+
+  it('alle Regeln „nie melden" stehen NACH der allgemeinen — sonst überschriebe sie sie', () => {
+    const allgemein = produktion.findIndex((r) => r.headers.some((h) => h.key === CSP && h.value.includes('report-uri')))
+    const ohne = produktion.map((r, i) => [r, i] as const).filter(([r]) => r.headers.some((h) => h.key === CSP && !h.value.includes('report-uri')))
+    expect(allgemein).toBeGreaterThanOrEqual(0)
+    expect(ohne.length).toBe(OHNE_REFERRER_BEISPIELE.length + 4 + HEIKLE_WERTE.length)
+    for (const [, i] of ohne) expect(i).toBeGreaterThan(allgemein)
+    // je Query-Wert eine eigene Regel: `has` verknüpft seine Einträge mit UND
+    for (const [r] of ohne) expect(r.has?.length ?? 0).toBeLessThanOrEqual(1)
   })
 })

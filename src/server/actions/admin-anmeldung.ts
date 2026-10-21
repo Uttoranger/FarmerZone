@@ -10,13 +10,14 @@ import { prisma } from '@/lib/prisma'
 import { env } from '@/lib/env'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { createRateLimiter } from '@/lib/rate-limit'
-import { DB_BREMSE_ZEITLIMIT_MS, DB_BREMSEN, innerhalbDerGrenze } from '@/lib/bremse-datenbank'
+import { DB_BREMSEN } from '@/lib/bremse-datenbank'
 import { einmalLinkZweck, geraetName } from '@/lib/geraete'
 import {
   ADMIN_AKTION_FEHLER,
   ADMIN_ANMELDEN_FEHLER,
   ADMIN_PFAD,
   ANMELDEART,
+  EINRICHTEN_SITZUNG_MINUTEN,
   EINRICHTEN_TEXT,
   EINRICHTUNGSCODE_ART,
   EINRICHTUNGSCODE_GUELTIG_MINUTEN,
@@ -27,7 +28,7 @@ import {
 } from '@/lib/admin-anmeldung'
 import { ersatzcodeHash, erzeugeErsatzcodes } from '@/lib/ersatzcodes'
 import { einmalTokenHash, loeseEinmalLinkEin } from '@/server/geraete'
-import { zaehleVersuche } from '@/server/bremse-datenbank'
+import { adminBremseVoll } from '@/server/admin-bremse'
 import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
 
 /*
@@ -57,35 +58,12 @@ async function eigeneSitzung(): Promise<{ userId: string; sitzungId: string; ang
 /** Die Einrichtung mit E-Mail-Code geht nur für den ersten Passkey, in einer Sitzung mit Passwort (höchstens 15 Minuten) und im 24-Stunden-Fenster. */
 function einrichtenMitCodeErlaubt(sitzung: { angemeldetAm: Date; anmeldeart: string | null }, adminSeit: Date | null, passkeys: number, jetzt: Date): boolean {
   const alter = jetzt.getTime() - sitzung.angemeldetAm.getTime()
-  return passkeys === 0 && sitzung.anmeldeart === ANMELDEART.passwort && alter >= 0 && alter <= 15 * MINUTE_MS && einrichtenOffen(adminSeit, jetzt)
+  return passkeys === 0 && sitzung.anmeldeart === ANMELDEART.passwort && alter >= 0 && alter <= EINRICHTEN_SITZUNG_MINUTEN * MINUTE_MS && einrichtenOffen(adminSeit, jetzt)
 }
 
 /** Der Text, über den der Code gehasht wird: Zweck (mit Sitzung), Konto und Code (Freigabe §21 Punkt 3). */
 function codeText(zweck: string, userId: string, code: string): string {
   return `${zweck}|${userId}|${code}`
-}
-
-/**
- * Eine Bremse FAIL-CLOSED (wie in src/lib/auth.ts): Jeder Versuch zählt;
- * antwortet die Datenbank nicht rechtzeitig, gilt sie als voll.
- */
-async function einrichtungscodeGebremst(userId: string): Promise<boolean> {
-  const bremse = DB_BREMSEN.adminEinrichtungscode
-  let timer: ReturnType<typeof setTimeout> | undefined
-  try {
-    const frist = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error('Bremse: Zeitlimit')), DB_BREMSE_ZEITLIMIT_MS)
-    })
-    const [stand] = await Promise.race([zaehleVersuche([{ bremse, merkmal: userId }]), frist])
-    return !innerhalbDerGrenze(stand, bremse.max)
-  } catch (err) {
-    const meldung = new Error('Bremse der Admin-Anmeldung nicht gezählt')
-    meldung.name = err instanceof Error ? err.name : 'Unbekannt'
-    Sentry.captureException(meldung, { level: 'warning', tags: { aufgabe: 'admin-bremse', zweck: bremse.zweck } })
-    return true
-  } finally {
-    clearTimeout(timer)
-  }
 }
 
 /** Mail an das eigene Konto nach der Antwort; wirft nie, Fehler nur mit Art nach Sentry. */
@@ -166,7 +144,7 @@ export async function pruefeEinrichtungscode(eingabe: unknown): Promise<AktionsA
   if ('error' in wache) return wache
   const sitzung = await eigeneSitzung()
   if (!sitzung) return { error: 'Nicht angemeldet.' }
-  if (await einrichtungscodeGebremst(sitzung.userId)) return { error: ADMIN_ANMELDEN_FEHLER.zuViele }
+  if (await adminBremseVoll(DB_BREMSEN.adminEinrichtungscode, sitzung.userId)) return { error: ADMIN_ANMELDEN_FEHLER.zuViele }
 
   const zweck = einmalLinkZweck(EINRICHTUNGSCODE_ART, sitzung.sitzungId)
   const treffer = await loeseEinmalLinkEin(codeText(zweck, sitzung.userId, v.data.code), EINRICHTUNGSCODE_ART, new Date())

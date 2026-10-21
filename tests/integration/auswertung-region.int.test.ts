@@ -142,7 +142,8 @@ describe('Futter kaufen — öffentliche registrierte Höfe im Umkreis', () => {
     const sackerl = await futter(gut.id, { name: 'Heu 1 kg-Sackerl', verpackung: 'ABGEPACKT_ETIKETT', unit: 'STUECK', price: '2.50' })
     for (const f of [nichtFrei, pausiert, ohneNummer, weit, stillgelegt, eigen]) await futter(f.id)
 
-    const daten = await getFutterKaufen(eigen.id, 25)
+    // Mo, 19. Okt 2026, 10:00 in Wien — ein Parameter, nicht die Systemuhr.
+    const daten = await getFutterKaufen(eigen.id, new Date('2026-10-19T08:00:00Z'))
     expect(daten?.eigenerStandort).toBe(true)
     if (!daten?.eigenerStandort) return
 
@@ -150,19 +151,23 @@ describe('Futter kaufen — öffentliche registrierte Höfe im Umkreis', () => {
     expect(ids).toContain(gut.id)
     for (const f of [nichtFrei, pausiert, ohneNummer, weit, stillgelegt, eigen]) expect(ids).not.toContain(f.id)
 
-    const ansicht = baueFutterKaufen({ ...daten, filter: { km: 25, art: null, menge: null }, jetzt: { wochentag: 1, uhrzeit: '10:00' } })
-    const meine = ansicht.angebote.filter((a) => a.hofName === 'Futterhof')
+    const ansicht = baueFutterKaufen({ ...daten, filter: { km: 25, art: null, menge: null, abholung: null }, jetzt: new Date('2026-10-19T08:00:00Z') })
+    const meine = ansicht.angebote.filter((a) => a.hof.name === 'Futterhof')
     expect(meine.flatMap((a) => a.groessen.map((g) => g.id))).toEqual([ballen.id])
     expect(JSON.stringify(ansicht)).not.toContain(sackerl.id)
-    expect(meine[0].schild).toBe('Futtermittelbetrieb · LFBIS 0000000')
+    expect(meine[0].schild).toBe('Futtermittelbetrieb · LFBIS 0000000 · laut Hof')
 
+    // Seit Nr. 123 (Karte, N23) tragen die Höfe ihren Kartenpunkt wie auf /hoefe — sonst nur, was die Liste zeigt.
     const text = JSON.stringify(daten)
-    expect(text).not.toMatch(/Teststraße|@example\.com|\+43 660|latitude|longitude/)
+    expect(text).not.toMatch(/Teststraße|@example\.com|\+43 660|address|phone|email/i)
+    expect(Object.keys(daten.hoefe.find((h) => h.id === gut.id) ?? {}).sort()).toEqual(
+      ['abholfenster', 'betriebsnummer', 'betriebsstatus', 'city', 'entfernungKm', 'fotos', 'id', 'kategorien', 'latitude', 'longitude', 'name', 'postalCode', 'slug'].sort()
+    )
   })
 
   it('ohne eigenen Standort: nur der Hinweis', async () => {
     const { farm } = await erstelleHof({ latitude: null, longitude: null })
-    expect(await getFutterKaufen(farm.id, 25)).toEqual({ eigenerStandort: false })
-    expect(await getFutterKaufen('int-gibt-es-nicht', 25)).toBeNull()
+    expect(await getFutterKaufen(farm.id, new Date('2026-10-19T08:00:00Z'))).toEqual({ eigenerStandort: false })
+    expect(await getFutterKaufen('int-gibt-es-nicht', new Date('2026-10-19T08:00:00Z'))).toBeNull()
   })
 })

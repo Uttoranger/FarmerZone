@@ -43,10 +43,16 @@ const FUTTER: FutterKaufenEingabe = {
       id: 'hof-a',
       slug: 'bergbauernhof',
       name: 'Bergbauernhof',
+      postalCode: '1234',
+      city: 'Beispielort',
+      latitude: 48,
+      longitude: 14,
       entfernungKm: 6,
       betriebsnummer: 'LFBIS 1234567',
       betriebsstatus: 'PRIMAERPRODUKTION',
       abholfenster: [{ dayOfWeek: 6, startTime: '08:00', endTime: '12:00' }],
+      fotos: [],
+      kategorien: ['HEU_STROH'],
     },
   ],
   produkte: [
@@ -56,12 +62,17 @@ const FUTTER: FutterKaufenEingabe = {
       name: 'Heu Rundballen',
       familieId: 'f1',
       category: 'HEU_STROH',
+      subcategory: 'WIESENHEU',
       price: 45,
       isAvailable: true,
       stock: 3,
       reservedStock: 0,
       verpackung: 'LOSE_BALLEN',
       futter: { nettoMenge: 250, nettoEinheit: 'KG', betriebsnummer: '1234567' },
+      abholhinweise: [],
+      foto: null,
+      fotoAusschnitt: null,
+      illustration: null,
     },
     {
       id: 'klein',
@@ -69,26 +80,33 @@ const FUTTER: FutterKaufenEingabe = {
       name: 'Heu Kleinballen',
       familieId: 'f1',
       category: 'HEU_STROH',
+      subcategory: 'WIESENHEU',
       price: 4.5,
       isAvailable: true,
       stock: 3,
       reservedStock: 0,
       verpackung: 'LOSE_BALLEN',
       futter: { nettoMenge: 15, nettoEinheit: 'KG', betriebsnummer: '1234567' },
+      abholhinweise: [],
+      foto: null,
+      fotoAusschnitt: null,
+      illustration: null,
     },
   ],
   ohneStandort: [],
   abgeschnitten: false,
-  filter: { km: 25, art: null, menge: null },
-  jetzt: { wochentag: 6, uhrzeit: '07:00' },
+  eigen: { name: 'Sonnhof', latitude: 48, longitude: 14, sichtbar: true, betriebsnummer: null, betriebsstatus: null, futter: [] },
+  filter: { km: 25, art: null, menge: null, abholung: null },
+  // Sa, 24. Okt 2026, 07:00 in Wien.
+  jetzt: new Date('2026-10-24T05:00:00Z'),
 }
 
 describe('Futter kaufen: die Links tragen ?kaeufer=betrieb', () => {
-  it('„Bestellen" und jede Größe führen mit dem Parameter zur Produktseite', () => {
+  it('„Bestellen" führt für jede Größe mit dem Parameter zur Produktseite genau dieser Größe', () => {
     const [karte] = baueFutterKaufen(FUTTER).angebote
-    expect(karte.bestellenHref).toBe('/bergbauernhof/produkt/klein?kaeufer=betrieb')
-    const hrefs = [karte.bestellenHref, ...karte.groessen.map((g) => g.href)]
-    expect(hrefs).toHaveLength(3)
+    expect(karte.groessen.find((g) => g.id === karte.vorgewaehlt)?.kaufLink).toBe('/bergbauernhof/produkt/rund?kaeufer=betrieb')
+    const hrefs = karte.groessen.map((g) => g.kaufLink)
+    expect(hrefs).toEqual(['/bergbauernhof/produkt/rund?kaeufer=betrieb', '/bergbauernhof/produkt/klein?kaeufer=betrieb'])
     for (const href of hrefs) {
       expect(leseKaeuferVorbelegung(suche(href).get(KAEUFER_PARAMETER) ?? undefined)).toBe('betrieb')
     }

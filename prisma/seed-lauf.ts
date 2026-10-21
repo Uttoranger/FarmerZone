@@ -180,6 +180,7 @@ async function produkt(prisma: SeedPrisma, farmId: string, p: SeedProdukt): Prom
     labels: p.labels,
     allergens: p.allergene ?? [],
     abgabe: p.abgabe ?? 'ALLE',
+    abholhinweise: p.abholhinweise ?? [],
     requiresCool: p.kuehlpflichtig === true,
     requiresFreezer: p.gefrierpflichtig === true,
     seasonStart: p.saisonVon ?? null,

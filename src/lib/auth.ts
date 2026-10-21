@@ -31,8 +31,9 @@ import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { GERAETE_COOKIE, GERAETE_COOKIE_OPTIONEN, einmalLinkZweck, geraetName } from '@/lib/geraete'
 import { env } from '@/lib/env'
 import { MARKE } from '@/lib/marke'
-import { DB_BREMSE_ZEITLIMIT_MS, DB_BREMSEN, adressMerkmal, innerhalbDerGrenze, type DbBremse } from '@/lib/bremse-datenbank'
-import { zaehleVersuche } from '@/server/bremse-datenbank'
+import { DB_BREMSEN, adressMerkmal } from '@/lib/bremse-datenbank'
+import { adminBremseVoll } from '@/server/admin-bremse'
+import { AUTH_BREMSE_SPEICHER } from '@/server/auth-bremse'
 import {
   ADMIN_ANMELDEN_FEHLER,
   ANMELDEART,
@@ -247,29 +248,6 @@ async function adminMitPasskey(email: string): Promise<boolean> {
 }
 
 /**
- * Eine Bremse der Admin-Anmeldung, FAIL-CLOSED: Jeder Versuch zählt; antwortet
- * die Datenbank nicht (oder nicht rechtzeitig), gilt sie als voll. Gemeldet
- * wird nur die Art des Fehlers, nie das Merkmal.
- */
-async function adminBremseVoll(bremse: DbBremse, merkmal: string): Promise<boolean> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  try {
-    const frist = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error('Bremse: Zeitlimit')), DB_BREMSE_ZEITLIMIT_MS)
-    })
-    const [stand] = await Promise.race([zaehleVersuche([{ bremse, merkmal }]), frist])
-    return !innerhalbDerGrenze(stand, bremse.max)
-  } catch (err) {
-    const meldung = new Error('Bremse der Admin-Anmeldung nicht gezählt')
-    meldung.name = err instanceof Error ? err.name : 'Unbekannt'
-    Sentry.captureException(meldung, { level: 'warning', tags: { aufgabe: 'admin-bremse', zweck: bremse.zweck } })
-    return true
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-/**
  * Mail „Admin-Sicherheit" (Passkey hinzugefügt, Ersatzcode benutzt) nach der
  * Antwort — mit Gerät und Uhrzeit, ohne Link zum Anmelden. Wirft nie: Ein
  * Fehler geht ohne Adresse nach Sentry, die Anmeldung ist längst durch.
@@ -415,6 +393,10 @@ export const auth = betterAuth({
     enabled: process.env.NODE_ENV === 'production',
     window: AUTH_RATE_LIMIT_WINDOW_SECONDS,
     max: AUTH_RATE_LIMIT_MAX,
+    // Zählt über alle Instanzen in RateLimitZaehler (Register R1, Ergänzung
+    // Nr. 125). Antwortet die Datenbank nicht, zählt die Instanz für sich wie
+    // vorher — nie offen (src/server/auth-bremse.ts).
+    customStorage: AUTH_BREMSE_SPEICHER,
     customRules: {
       // KEIN Limit fürs Session-Lesen: Der Browser fragt get-session bei
       // vielen Seitenwechseln ab (useSession in Shells und Formularen); die

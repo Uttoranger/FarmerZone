@@ -396,6 +396,18 @@ describe('updateProduct — Pflicht-Bestätigung bei Futter (E10a, Nr. 23)', () 
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 
+  it('Abholhinweise: dieselbe Wahl in anderer Folge braucht keinen Haken, eine andere Wahl schon (E10a)', async () => {
+    const mitHinweisen = { ...heu, abholhinweise: ['ANHAENGER_NOETIG', 'FRONTLADER'] }
+    await updateProduct('p_heu', mitHinweisen as never)
+    const produkt = (tx.product.updateMany.mock.calls[0][0] as { data: Record<string, unknown> }).data
+    const gespeichert = await gespeichertesHeu()
+    productFindFirst.mockResolvedValue({ ...gespeichert, abholhinweise: produkt.abholhinweise } as never)
+    const ohne = { ...mitHinweisen, futter: { ...heu.futter, bestaetigt: false } }
+
+    expect(await updateProduct('p_heu', { ...ohne, abholhinweise: ['FRONTLADER', 'ANHAENGER_NOETIG'] } as never)).toEqual({ ok: true })
+    expect(await updateProduct('p_heu', { ...ohne, abholhinweise: ['FRONTLADER'] } as never)).toMatchObject({ code: 'BESTAETIGUNG' })
+  })
+
   it('nur Preis und Vorrat geändert ohne Haken: gespeichert, die alte Bestätigung bleibt', async () => {
     productFindFirst.mockResolvedValue((await gespeichertesHeu()) as never)
 
@@ -434,5 +446,35 @@ describe('updateProduct — Pflicht-Bestätigung bei Futter (E10a, Nr. 23)', () 
 
     expect(ergebnis).toEqual({ ok: true })
     expect(tx.futterKennzeichnung.deleteMany).toHaveBeenCalledWith({ where: { productId: 'p_heu' } })
+  })
+})
+
+describe('Abholhinweise (N23, Nr. 123)', () => {
+  it('ein Futter speichert seine Hinweise — geordnet wie die Auswahl, egal in welcher Folge getippt', async () => {
+    const ergebnis = await updateProduct('p_heu', { ...heu, abholhinweise: ['NACH_ABSPRACHE', 'ANHAENGER_NOETIG'] } as never)
+
+    expect(ergebnis).toEqual({ ok: true })
+    const aufruf = tx.product.updateMany.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(aufruf.data.abholhinweise).toEqual(['ANHAENGER_NOETIG', 'NACH_ABSPRACHE'])
+  })
+
+  it('ein Produkt aus dem Hofladen bekommt eine leere Liste, auch wenn das Formular welche mitschickt', async () => {
+    await updateProduct('p_1', { ...basis, abholhinweise: ['ANHAENGER_NOETIG'] } as never)
+    await createProduct({ ...basis, abholhinweise: ['FRONTLADER'] } as never)
+
+    expect((tx.product.updateMany.mock.calls[0][0] as { data: Record<string, unknown> }).data.abholhinweise).toEqual([])
+    expect((productCreate.mock.calls[0][0] as { data: Record<string, unknown> }).data.abholhinweise).toEqual([])
+  })
+
+  it('ein Wechsel weg vom Futter leert die Hinweise', async () => {
+    await updateProduct('p_heu', { ...heu, category: 'SONSTIGES', subcategory: null, futter: null, abgabe: 'ALLE', abholhinweise: ['FRONTLADER'] } as never)
+
+    expect((tx.product.updateMany.mock.calls[0][0] as { data: Record<string, unknown> }).data.abholhinweise).toEqual([])
+  })
+
+  it('doppelte oder unbekannte Hinweise weist das Schema ab — nichts geschrieben', async () => {
+    expect(await updateProduct('p_heu', { ...heu, abholhinweise: ['FRONTLADER', 'FRONTLADER'] } as never)).toEqual({ error: 'Bitte prüfe deine Eingaben.' })
+    expect(await updateProduct('p_heu', { ...heu, abholhinweise: ['STAUBARM'] } as never)).toEqual({ error: 'Bitte prüfe deine Eingaben.' })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 })

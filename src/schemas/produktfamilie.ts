@@ -21,7 +21,7 @@ import {
   namePasstFuerGroessen,
 } from '@/lib/verkaufsgroessen'
 import { PRODUKTNAME_MAX, VORRAT_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
-import { FUTTER_FEHLER, futterKennzeichnungSchema, nettoMengeZahl, preisZahl } from '@/schemas/product'
+import { FUTTER_FEHLER, abholhinweiseSchema, futterKennzeichnungSchema, nettoMengeZahl, preisZahl } from '@/schemas/product'
 
 /*
  * Futter und Brennmaterial mit Verkaufsgrößen (Register E3, E10, E11; Gate 6,
@@ -101,6 +101,8 @@ export const futterFamilieSchema = z
     subcategory: z.preprocess((v) => (v === '' || v === undefined ? null : v), z.enum(PRODUCT_SUBCATEGORY_VALUES).nullable()),
     bio: z.boolean().default(false),
     abgabe: z.enum(ABGABE_VALUES).default('ALLE'),
+    // Wie Bio und Abgabe für alle Größen der Familie gleich (N23, Nr. 123).
+    abholhinweise: abholhinweiseSchema,
     kennzeichnung: familienKennzeichnungSchema,
     groessen: z.array(futterGroesseSchema).min(1, FAMILIE_FEHLER.groessen).max(GROESSEN_MAX, FAMILIE_FEHLER.zuVieleGroessen),
   })

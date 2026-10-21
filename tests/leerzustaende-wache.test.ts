@@ -243,7 +243,7 @@ const BEKANNT_OHNE: Array<{ datei: string; titel: string }> = [
   { datei: 'src/components/admin/briefkasten-teile.tsx', titel: 'WUNSCHLISTE_LEER.titel' },
   { datei: 'src/components/admin/meldungen-teile.tsx', titel: 'WUENSCHE_LEER.titel' },
   { datei: 'src/components/analytics/umfeld-anzeige.tsx', titel: 'Noch keine Höfe zum Vergleichen' },
-  { datei: 'src/components/region/futter-kaufen-ansicht.tsx', titel: 'Gerade kein Futter in der Nähe' },
+  { datei: 'src/components/region/futter-kaufen-ansicht.tsx', titel: 'leer.titel' },
   { datei: 'src/components/heute/heute-teile.tsx', titel: 'HEUTE_NIEMAND' },
   { datei: 'src/app/(hof)/postfach/page.tsx', titel: 'POSTFACH_LEER.titel' },
   { datei: 'src/app/admin/postfach/rundschreiben-reiter.tsx', titel: 'RUNDSCHREIBEN_LEER.titel' },

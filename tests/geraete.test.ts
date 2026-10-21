@@ -12,6 +12,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
+  GERAETE_TEXT,
   UNBEKANNTES_GERAET,
   alleAnderenSatz,
   bezugAusZweck,
@@ -21,6 +22,7 @@ import {
   einmalTokenSchema,
   geraeteZeilen,
   geraetArt,
+  geraeteHinweise,
   geraetName,
   gueltigeGeraeteKennung,
   merktGeraete,
@@ -160,5 +162,29 @@ describe('Einmal-Links', () => {
     for (const fremd of ['A'.repeat(42), 'A'.repeat(44), `${'A'.repeat(42)}+`, 42]) {
       expect(einmalTokenSchema.safeParse(fremd).success, String(fremd)).toBe(false)
     }
+  })
+})
+
+describe('Hinweis und Zusatz im Blatt: eine Fassung für Höfe, eine für Admins (Nr. 126, Register N20)', () => {
+  it('für Höfe bleibt der Text, wie er war', () => {
+    expect(geraeteHinweise(false)).toEqual({
+      hinweis: 'Ein Gerät kennst du nicht? Melde es ab und ändere danach dein Passwort. Wir zeigen nur Gerät und Browser – keinen Ort, keine IP-Adresse.',
+      blattZusatz: 'Auf den anderen Geräten musst du dich danach neu anmelden. Kennst du ein Gerät nicht, ändere danach dein Passwort.',
+    })
+  })
+
+  it('für Admins kommt der Hinweis auf die Passkeys dazu', () => {
+    expect(geraeteHinweise(true)).toEqual({
+      hinweis:
+        'Ein Gerät kennst du nicht? Melde es ab, ändere danach dein Passwort und prüf deine Passkeys. Wir zeigen nur Gerät und Browser – keinen Ort, keine IP-Adresse.',
+      blattZusatz: 'Auf den anderen Geräten musst du dich danach neu anmelden. Kennst du ein Gerät nicht, ändere danach dein Passwort und prüf deine Passkeys.',
+    })
+  })
+
+  it('beide Fassungen stehen in EINER Quelle: GERAETE_TEXT, die Hof-Fassung ist die dort ohne Zusatz', () => {
+    expect(geraeteHinweise(false).hinweis).toBe(GERAETE_TEXT.hinweis)
+    expect(geraeteHinweise(false).blattZusatz).toBe(GERAETE_TEXT.blattZusatz)
+    expect(geraeteHinweise(true).hinweis).toBe(GERAETE_TEXT.admin.hinweis)
+    expect(geraeteHinweise(true).blattZusatz).toBe(GERAETE_TEXT.admin.blattZusatz)
   })
 })

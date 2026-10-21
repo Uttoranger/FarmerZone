@@ -152,6 +152,12 @@ function erlaubt(fund: Fund, text: string): boolean {
   if (fund.pfad === 'src/server/startseite-vorschau.ts') {
     return fund.art === 'Adresse im Text' && imRumpf(code, 'function alsAbfrage(', fund.stelle)
   }
+  // Die CSP zum Beobachten (Register G8, Nr. 125): `vorschau` steht in der Liste der Query-Werte, bei denen keine
+  // Meldung hinausgeht (der signierte Inhalt stünde sonst darin). Die Header-Regel liest den Wert nie — erlaubt nur
+  // als Eintrag von NIE_MELDEN_PARAMETER.
+  if (fund.pfad === 'src/lib/csp.ts' && fund.art === 'Literal') {
+    return /^export const NIE_MELDEN_PARAMETER = \[[^\]]*\] as const$/.test(zeileVon(code, fund.stelle))
+  }
   // Die eine Ausnahme: die Breite der Vorschau-Spalte heißt `vorschau` (Ergebnis von editorSpalten, Nr. 73) —
   // eine Eigenschaft eines Ergebnisses, kein Parameter der Adresse. Nur im Editor und nur als `spalten.vorschau`.
   if (fund.pfad === 'src/components/farmer/hofseite-editor.tsx' && fund.art === 'Eigenschaft') {
@@ -317,7 +323,7 @@ function produkt(id: string, name: string, sichtbar: boolean): PublicProduct {
     price: 3.5, unit: 'kg', unitSize: 1, stock: 10, isAvailable: sichtbar, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null,
+    familieId: null, brennmaterial: null, abholhinweise: [],
   }
 }
 

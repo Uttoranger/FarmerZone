@@ -55,7 +55,7 @@ function produkt(id: string, name: string, stock = 10): PublicProduct {
     price: 3.2, unit: 'KG', unitSize: 1, stock, isAvailable: true, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null,
+    familieId: null, brennmaterial: null, abholhinweise: [],
   }
 }
 const PRODUKTE = [produkt('p_kuerbis', 'Hokkaido-Kürbis'), produkt('p_nuss', 'Butternut', 0), produkt('p_apfel', 'Äpfel Topaz'), produkt('p_eier', 'Freilandeier')]

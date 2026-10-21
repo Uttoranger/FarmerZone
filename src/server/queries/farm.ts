@@ -5,6 +5,7 @@ import { hofAdresse, hofZustand, titelbildFoto, type HofZustand } from '@/lib/me
 import { APP_URL } from '@/lib/umgebung-server'
 import { categoryImagePath } from '@/lib/product-image'
 import { zuProduktDto } from '@/lib/produkt-dto'
+import type { AbholhinweisValue } from '@/lib/abholhinweise'
 import { DEFAULT_SECTIONS, type SectionConfig } from './appearance'
 import { leseAusschnitt, type BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { PRODUCT_ORDER_BY } from './products'
@@ -69,6 +70,8 @@ export type PublicProduct = {
   familieId: string | null
   /** Seit Nr. 11 (E11): Angaben zu Brennmaterial, null ohne. */
   brennmaterial: PublicBrennmaterial | null
+  /** Seit Nr. 123 (N23): Abholhinweise eines Futters für die Produktseite; sonst leer. */
+  abholhinweise: AbholhinweisValue[]
 }
 
 /**
@@ -302,6 +305,8 @@ const OEFFENTLICHES_PRODUKT_SELECT = {
   },
   // Seit Nr. 11: Produktfamilie (E3) und Brennmaterial (E11) für die Produktseite.
   familieId: true,
+  // Seit Nr. 123: Abholhinweise eines Futters für die Produktseite (N23).
+  abholhinweise: true,
   brennmaterial: {
     select: {
       holzart: true,
