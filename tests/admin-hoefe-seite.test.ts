@@ -18,6 +18,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { adminHofZeile, zaehleHofFilter, type AdminHofZeile, type HofRohdaten } from '@/lib/admin-hoefe'
+import { hofRohdaten } from './fabrik/hof-rohdaten'
 import {
   GRUENDUNGSHOF_SPALTE,
   GRUENDUNGSPLATZ_WARTELISTE,
@@ -40,33 +41,16 @@ const MAX = 12
 const EINSTELLUNG = { ...GRUENDUNG_EINSTELLUNG_STANDARD, plaetze: MAX }
 
 function roh(id: string, ueber: Partial<HofRohdaten> = {}): HofRohdaten {
-  return {
+  return hofRohdaten({
     id,
     name: `Hof ${id}`,
     slug: `hof-${id}`,
     ownerEmail: `${id}@example.com`,
-    emailBestaetigt: true,
-    emailBestaetigungOffen: false,
     createdAt: new Date('2026-09-01T09:00:00+02:00'),
     approvedAt: new Date('2026-09-02T09:00:00+02:00'),
-    archivedAt: null,
-    land: 'AT',
-    serviceFeePercent: 5,
-    serviceFeeMinCents: 50,
-    serviceFeeActiveFrom: null,
-    monat: { bestellungen: 0, gebuehrOnlineCents: 0, gebuehrBarCents: 0, gebuehrEntfallenCents: 0 },
-    monatBezeichnung: 'Oktober 2026',
     stripeBereit: true,
-    onlineAn: true,
-    isPaused: false,
-    betriebsnummer: null,
-    sepaErteilt: false,
-    gruendungAusgenommen: false,
-    istTesthof: false,
-    hatKartenpunkt: true,
-    produktImShop: true,
     ...ueber,
-  }
+  })
 }
 
 const zeile = (r: HofRohdaten, platz: number | null = null): AdminHofZeile => adminHofZeile(r, { gruendungsplatz: platz, maxPlaetze: MAX }, JETZT)

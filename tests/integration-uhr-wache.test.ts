@@ -9,7 +9,10 @@
  * Beweist (Quelltext von `tests/integration/`, TypeScript-Syntaxbaum, kein Netz): Jeder Aufruf von
  * `vi.setSystemTime` und jedes `vi.useFakeTimers({ now })` trägt entweder ein Datums-Literal
  * (`new Date('…')`, auch über eine `const` derselben Datei) vor dem 20.10.2026 — oder die Datei berührt
- * Better Auth gar nicht. Berührt heißt: Import von `@/lib/auth` oder `better-auth`, Zeilen in `session`
+ * Better Auth gar nicht. Seit Nr. 127 (Regelvorschlag 121) gilt dasselbe für die Uhr-Schritte: In einer Datei
+ * mit Better Auth steht `vi.advanceTimersByTime(<Zahl als Literal>)` nur, wenn die Datei eine feste Uhr in
+ * der Vergangenheit stellt und der Schritt sie nicht über den 20.10.2026 hebt; `vi.advanceTimersToNextTimer`
+ * und `vi.runAllTimers` (ohne Obergrenze) stehen dort nie. Berührt heißt: Import von `@/lib/auth` oder `better-auth`, Zeilen in `session`
  * oder `verification` (Prisma oder SQL) oder ein Helfer aus `setup/basis.ts`, der Better Auth ruft
  * (die Wache liest ihn dort aus dem Quelltext). Alles andere schlägt an, auch eine Variable in einer
  * Datei mit Better Auth. Kommentare zählen nicht.
@@ -18,8 +21,10 @@
  * Eine Datei, die sie nicht mehr braucht, fällt als veraltet auf.
  *
  * Gegenprobe: Text-Attrappen — ein Literal in der Zukunft, eine Variable und eine Uhr ohne Literal
- * in einer Datei mit Better Auth schlagen an (Import, dynamischer Import, Prisma-Zeilen, SQL, Helfer);
- * ein Literal in der Vergangenheit (auch über eine `const`) und jede Uhr in einer Datei ohne Better Auth nicht.
+ * in einer Datei mit Better Auth schlagen an (Import, dynamischer Import, Prisma-Zeilen, SQL, Helfer),
+ * ebenso ein Schritt ohne feste Uhr, mit Variable, über den Stichtag oder mit `runAllTimers`;
+ * ein Literal in der Vergangenheit (auch über eine `const`), ein kleiner Schritt nach einer festen Uhr und
+ * jede Uhr in einer Datei ohne Better Auth nicht.
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -132,29 +137,70 @@ function konstantenVon(sf: ts.SourceFile): Map<string, ts.Expression> {
   return konstanten
 }
 
-type UhrAufruf = { zeile: number; text: string; zeitpunkt: number | null }
+/** Uhr-Schritte, deren Weite die Zahl im Aufruf bestimmt; die übrigen springen ohne Obergrenze. */
+const SCHRITT_MIT_ZAHL = ['advanceTimersByTime', 'advanceTimersByTimeAsync']
+const SCHRITT_OHNE_GRENZE = [
+  'advanceTimersToNextTimer',
+  'advanceTimersToNextTimerAsync',
+  'runAllTimers',
+  'runAllTimersAsync',
+  'runOnlyPendingTimers',
+  'runOnlyPendingTimersAsync',
+]
 
-/** Alle Stellen, die die Uhr stellen: `vi.setSystemTime(x)` und `vi.useFakeTimers({ now: x })`. */
+type UhrAufruf = {
+  zeile: number
+  text: string
+  art: 'stellen' | 'schritt'
+  /** Stellen: Zeitpunkt des Literals (ms). */
+  zeitpunkt: number | null
+  /** Schritt: Weite in ms, wenn die Zahl ein Literal ist. */
+  schritt: number | null
+}
+
+/** Wert eines Zahlen-Literals, auch `60 * 1_000` oder `(2 + 3) * 1000`; sonst `null` (Variable, Aufruf, …). */
+function zahlLiteral(ausdruck: ts.Expression): number | null {
+  const k = ohneHuelle(ausdruck)
+  if (ts.isNumericLiteral(k)) return Number(k.text)
+  if (!ts.isBinaryExpression(k)) return null
+  const links = zahlLiteral(k.left)
+  const rechts = zahlLiteral(k.right)
+  if (links === null || rechts === null) return null
+  switch (k.operatorToken.kind) {
+    case ts.SyntaxKind.PlusToken: return links + rechts
+    case ts.SyntaxKind.MinusToken: return links - rechts
+    case ts.SyntaxKind.AsteriskToken: return links * rechts
+    default: return null
+  }
+}
+
+/** Alle Stellen, die die Uhr stellen oder weiterschieben: `vi.setSystemTime(x)`, `vi.useFakeTimers({ now: x })`, `vi.advanceTimersByTime(n)` u. a. */
 function findeUhrAufrufe(sf: ts.SourceFile): UhrAufruf[] {
   const konstanten = konstantenVon(sf)
   const treffer: UhrAufruf[] = []
-  const merke = (knoten: ts.Node, wert: ts.Expression) =>
+  const merke = (knoten: ts.Node, rest: Pick<UhrAufruf, 'art' | 'zeitpunkt' | 'schritt'>) =>
     treffer.push({
       zeile: sf.getLineAndCharacterOfPosition(knoten.getStart(sf)).line + 1,
       text: knoten.getText(sf).split('\n')[0].trim(),
-      zeitpunkt: literalZeitpunkt(wert, konstanten),
+      ...rest,
     })
+  const stelle = (knoten: ts.Node, wert: ts.Expression) =>
+    merke(knoten, { art: 'stellen', zeitpunkt: literalZeitpunkt(wert, konstanten), schritt: null })
   besuche(sf, (k) => {
     if (!ts.isCallExpression(k) || !ts.isPropertyAccessExpression(k.expression)) return
     const ziel = k.expression
     if (!ts.isIdentifier(ziel.expression) || ziel.expression.text !== 'vi') return
-    if (ziel.name.text === 'setSystemTime' && k.arguments[0]) merke(k, k.arguments[0])
+    if (ziel.name.text === 'setSystemTime' && k.arguments[0]) stelle(k, k.arguments[0])
+    if (SCHRITT_MIT_ZAHL.includes(ziel.name.text)) {
+      merke(k, { art: 'schritt', zeitpunkt: null, schritt: k.arguments[0] ? zahlLiteral(k.arguments[0]) : null })
+    }
+    if (SCHRITT_OHNE_GRENZE.includes(ziel.name.text)) merke(k, { art: 'schritt', zeitpunkt: null, schritt: null })
     if (ziel.name.text === 'useFakeTimers') {
       const optionen = k.arguments[0] && ohneHuelle(k.arguments[0])
       if (!optionen || !ts.isObjectLiteralExpression(optionen)) return
       for (const eigenschaft of optionen.properties) {
-        if (ts.isPropertyAssignment(eigenschaft) && ts.isIdentifier(eigenschaft.name) && eigenschaft.name.text === 'now') merke(k, eigenschaft.initializer)
-        if (ts.isShorthandPropertyAssignment(eigenschaft) && eigenschaft.name.text === 'now') merke(k, eigenschaft.name)
+        if (ts.isPropertyAssignment(eigenschaft) && ts.isIdentifier(eigenschaft.name) && eigenschaft.name.text === 'now') stelle(k, eigenschaft.initializer)
+        if (ts.isShorthandPropertyAssignment(eigenschaft) && eigenschaft.name.text === 'now') stelle(k, eigenschaft.name)
       }
     }
   })
@@ -166,9 +212,22 @@ function uhrVerstoesse(quelltext: string, helfer: Set<string>, name = 'attrappe.
   const sf = parse(quelltext, name)
   const aufrufe = findeUhrAufrufe(sf)
   if (aufrufe.length === 0 || !beruehrtBetterAuth(sf, helfer)) return []
-  return aufrufe
-    .filter((a) => a.zeitpunkt === null || a.zeitpunkt >= STICHTAG_MS)
+  const verstoesse = aufrufe
+    .filter((a) => a.art === 'stellen' && (a.zeitpunkt === null || a.zeitpunkt >= STICHTAG_MS))
     .map((a) => `${name}:${a.zeile} ${a.text} — ${a.zeitpunkt === null ? 'kein Datums-Literal' : 'Literal nach dem 20.10.2026'}`)
+  // Die späteste feste Uhr in der Vergangenheit; ab ihr darf ein Schritt nicht über den Stichtag führen.
+  // Quelltext-Reihenfolge ist keine Ausführungsreihenfolge (Helfer stehen über dem beforeEach): Es zählt die Datei.
+  const feste = aufrufe.flatMap((a) => (a.art === 'stellen' && a.zeitpunkt !== null && a.zeitpunkt < STICHTAG_MS ? [a.zeitpunkt] : []))
+  const spaeteste = feste.length > 0 ? Math.max(...feste) : null
+  for (const a of aufrufe.filter((x) => x.art === 'schritt')) {
+    const grund =
+      a.schritt === null ? 'Schritt ohne Zahl als Literal'
+      : spaeteste === null ? 'Schritt ohne feste Uhr in der Vergangenheit'
+      : spaeteste + a.schritt >= STICHTAG_MS ? 'Schritt führt über den 20.10.2026'
+      : null
+    if (grund) verstoesse.push(`${name}:${a.zeile} ${a.text} — ${grund}`)
+  }
+  return verstoesse
 }
 
 function dateienUnter(ordner: string): string[] {
@@ -241,6 +300,48 @@ describe('Uhr-Wache für tests/integration/ (Nr. 112)', () => {
       expect(uhrVerstoesse(`${MIT_AUTH}vi.setSystemTime(new Date('2026-10-14T10:00:00.000Z'))`, KEINE_HELFER)).toEqual([])
       const ueberConst = `${MIT_AUTH}const JETZT = new Date('2026-10-14T10:00:00.000Z')\nvi.useFakeTimers({ now: JETZT })\nvi.setSystemTime(JETZT)`
       expect(uhrVerstoesse(ueberConst, KEINE_HELFER)).toEqual([])
+    })
+
+    describe('Uhr-Schritte (Nr. 127, Regelvorschlag 121)', () => {
+      const FEST = `vi.useFakeTimers({ now: new Date('2026-10-14T10:00:00.000Z') })\n`
+
+      it('schlägt bei einem Schritt ohne feste Uhr in der Vergangenheit an', () => {
+        expect(uhrVerstoesse(`${MIT_AUTH}vi.advanceTimersByTime(1_000)`, KEINE_HELFER)).toHaveLength(1)
+        // Eine Uhr in der Zukunft ist keine feste Uhr in der Vergangenheit: der Schritt UND die Uhr schlagen an.
+        const zukunft = `${MIT_AUTH}vi.setSystemTime(new Date('2027-01-01'))\nvi.advanceTimersByTime(1_000)`
+        expect(uhrVerstoesse(zukunft, KEINE_HELFER)).toHaveLength(2)
+      })
+
+      it('schlägt bei einem Schritt ohne Zahl als Literal an (Variable, Aufruf, Async-Form)', () => {
+        expect(uhrVerstoesse(`${MIT_AUTH}${FEST}vi.advanceTimersByTime(wartezeit)`, KEINE_HELFER)).toHaveLength(1)
+        expect(uhrVerstoesse(`${MIT_AUTH}${FEST}vi.advanceTimersByTime(Date.now())`, KEINE_HELFER)).toHaveLength(1)
+        expect(uhrVerstoesse(`${MIT_AUTH}${FEST}await vi.advanceTimersByTimeAsync(wartezeit)`, KEINE_HELFER)).toHaveLength(1)
+        expect(uhrVerstoesse(`${MIT_AUTH}${FEST}vi.advanceTimersByTime()`, KEINE_HELFER)).toHaveLength(1)
+      })
+
+      it('schlägt bei advanceTimersToNextTimer und runAllTimers an: sie springen ohne Obergrenze', () => {
+        for (const aufruf of ['vi.advanceTimersToNextTimer()', 'vi.runAllTimers()', 'await vi.runAllTimersAsync()', 'vi.runOnlyPendingTimers()']) {
+          expect(uhrVerstoesse(`${MIT_AUTH}${FEST}${aufruf}`, KEINE_HELFER), aufruf).toHaveLength(1)
+        }
+      })
+
+      it('schlägt bei einem Schritt an, der über den 20.10.2026 führt', () => {
+        const sechsTage = `${MIT_AUTH}${FEST}vi.advanceTimersByTime(6 * 24 * 60 * 60_000)`
+        expect(uhrVerstoesse(sechsTage, KEINE_HELFER)).toEqual([expect.stringContaining('führt über den 20.10.2026')])
+      })
+
+      it('lässt einen kleinen Schritt nach einer festen Uhr durch, auch als Rechnung aus Literalen', () => {
+        expect(uhrVerstoesse(`${MIT_AUTH}${FEST}vi.advanceTimersByTime(1_000)`, KEINE_HELFER)).toEqual([])
+        expect(uhrVerstoesse(`${MIT_AUTH}${FEST}vi.advanceTimersByTime(11 * 60_000)`, KEINE_HELFER)).toEqual([])
+        expect(uhrVerstoesse(`${MIT_AUTH}${FEST}await vi.advanceTimersByTimeAsync((2 + 3) * 1000)`, KEINE_HELFER)).toEqual([])
+        // Die Uhr darf unter dem Schritt stehen: Helfer stehen im Quelltext über dem beforeEach.
+        const helferZuerst = `${MIT_AUTH}function weiter() { vi.advanceTimersByTime(1_000) }\n${FEST}`
+        expect(uhrVerstoesse(helferZuerst, KEINE_HELFER)).toEqual([])
+      })
+
+      it('lässt jeden Schritt in einer Datei ohne Better Auth durch', () => {
+        expect(uhrVerstoesse(`vi.advanceTimersByTime(wartezeit)\nvi.runAllTimers()`, KEINE_HELFER)).toEqual([])
+      })
     })
 
     it('lässt jede Uhr in einer Datei ohne Better Auth durch', () => {

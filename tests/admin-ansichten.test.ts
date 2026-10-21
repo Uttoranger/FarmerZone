@@ -53,6 +53,7 @@ import { GruendungBisDialog } from '@/components/admin/gruendung-bis-dialog'
 import { GruendungAusnehmenDialog } from '@/components/admin/gruendung-ausnehmen-dialog'
 import { GRUENDUNG_AUSNEHMEN_TEXT, gruendungAenderung } from '@/lib/admin-hoefe-seite'
 import { adminHofZeile, FREISCHALTUNG_STRIPE_OFFEN_TEXT, KEIN_KARTENPUNKT_TEXT, type HofRohdaten } from '@/lib/admin-hoefe'
+import { hofRohdaten } from './fabrik/hof-rohdaten'
 import { GRUENDUNG_BIS_STANDARD, GRUENDUNG_EINSTELLUNG_STANDARD, freischaltHinweis, gruendungsKonditionenText, type GruendungAnzeige } from '@/lib/gruendungshof'
 
 const JETZT = new Date('2026-10-07T10:00:00+02:00')
@@ -63,33 +64,7 @@ beforeEach(() => {
 })
 
 function hof(ueber: Partial<HofRohdaten>, platz: number | null = null, gruendung: GruendungAnzeige | null = null, platzBeiFreischaltung: number | null = null): AdminHof {
-  const roh: HofRohdaten = {
-    id: 'farm_1',
-    name: 'Hof Test',
-    slug: 'hof-test',
-    ownerEmail: 'max@example.com',
-    emailBestaetigt: true,
-    emailBestaetigungOffen: false,
-    createdAt: new Date('2026-10-06T09:00:00+02:00'),
-    approvedAt: null,
-    archivedAt: null,
-    land: 'AT',
-    serviceFeePercent: 5,
-    serviceFeeMinCents: 50,
-    serviceFeeActiveFrom: null,
-    monat: { bestellungen: 0, gebuehrOnlineCents: 0, gebuehrBarCents: 0, gebuehrEntfallenCents: 0 },
-    monatBezeichnung: 'Oktober 2026',
-    stripeBereit: false,
-    onlineAn: true,
-    isPaused: false,
-    betriebsnummer: null,
-    sepaErteilt: false,
-    gruendungAusgenommen: false,
-    istTesthof: false,
-    hatKartenpunkt: true,
-    produktImShop: true,
-    ...ueber,
-  }
+  const roh = hofRohdaten(ueber)
   return { ...adminHofZeile(roh, { gruendungsplatz: platz, maxPlaetze: 12 }, JETZT), aktivitaet: { ...LEER, produkte: 2 }, gruendung, platzBeiFreischaltung, gruendungAenderung: null, gruendungZuletzt: null, testhofAenderung: null }
 }
 

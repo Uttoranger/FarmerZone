@@ -197,3 +197,36 @@ describe('Pins per Tastatur und die Vorschau am Computer', () => {
     })
   }
 })
+
+// Nr. 127 (Regelvorschlag 120, freigegeben 20.10.2026): /hoefe ist statisch (5 min Zwischenspeicher, Register N19).
+// Eine Zeitangabe aus der Uhr des Servers ist dort bis zum nächsten Rendern falsch — Zeitlogik nur über `useUhr`.
+const UHR_DATEI = 'src/components/hoefe/use-uhr.ts'
+/** Die Uhr ablesen: `new Date()` ohne Argument und `Date.now()`. `new Date(wert)` wandelt nur um. */
+const UHR_ABLESEN = /\bnew\s+Date\(\s*\)|\bDate\.now\s*\(/
+
+/** Dateien unter `src/components/hoefe/`, die die Uhr direkt ablesen (Kommentare zählen nicht). */
+function liestUhrDirekt(dateien: Array<{ pfad: string; text: string }>): string[] {
+  return dateien.filter((d) => UHR_ABLESEN.test(ohneKommentare(d.text))).map((d) => d.pfad).sort()
+}
+
+describe('Zeit in src/components/hoefe nur über useUhr (Nr. 120)', () => {
+  it('new Date() und Date.now() stehen dort nur in use-uhr.ts', () => {
+    const dateien = alleDateien('src/components/hoefe').map((pfad) => ({ pfad, text: quelle(pfad) }))
+    expect(dateien.length).toBeGreaterThan(5)
+    expect(liestUhrDirekt(dateien)).toEqual([UHR_DATEI])
+  })
+
+  it('Gegenprobe: das Muster findet beide Schreibweisen, auch in einer neuen Datei', () => {
+    const neu = (text: string) => liestUhrDirekt([{ pfad: 'src/components/hoefe/neu.tsx', text }, { pfad: UHR_DATEI, text: 'Date.now()' }])
+    expect(neu('const jetzt = new Date()')).toEqual(['src/components/hoefe/neu.tsx', UHR_DATEI])
+    expect(neu('const t = Date.now()')).toEqual(['src/components/hoefe/neu.tsx', UHR_DATEI])
+    expect(neu('const jetzt = new  Date( )')).toContain('src/components/hoefe/neu.tsx')
+  })
+
+  it('Gegenprobe: Umwandlung mit Argument und Kommentare schlagen nicht an', () => {
+    const neu = (text: string) => liestUhrDirekt([{ pfad: 'src/components/hoefe/neu.tsx', text }])
+    expect(neu('const d = new Date(iso)')).toEqual([])
+    expect(neu('// nie new Date() beim Rendern\nconst x = 1')).toEqual([])
+    expect(neu('/* Date.now() */ const x = 1')).toEqual([])
+  })
+})

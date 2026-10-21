@@ -3,12 +3,29 @@ name: CI
 on:
   push:
     branches: [main]
+  # Auch gestapelte PRs bekommen die CI (Register G3, Nr. 127): Der Sammel-PR und die
+  # Nummern des Nachtlaufs zielen auf integration/**, docs/** und nacht/** statt auf
+  # main; Fehler im Zusammenspiel sollen vor dem Sammel-PR auffallen. Das Muster
+  # gilt für den Basis-Branch des PRs. Wird die Basis eines PRs nachträglich
+  # umgestellt, startet die CI nicht neu: danach einmal pushen. Nie
+  # pull_request_target (CLAUDE.md §2, tests/workflows-wache.test.ts).
   pull_request:
-    branches: [main]
+    branches: ['main', 'integration/**', 'docs/**', 'nacht/**']
+
+# Ein neuer Push bricht den laufenden Lauf desselben PRs ab; auf main hat jeder Lauf
+# seine eigene Gruppe (den Commit) und wird nie abgebrochen.
+concurrency:
+  group: "ci-${{ github.event.pull_request.number || github.sha }}"
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   ci:
     runs-on: ubuntu-latest
+    # Dauer der letzten 25 abgeschlossenen Läufe (bis 21.10.2026): kürzester 2,6,
+    # Median 4,6, längster 6,1 Minuten. 20 ist rund das Dreifache des längsten —
+    # ein langsamer Runner oder ein kalter Cache bricht nicht ab, ein hängender
+    # Lauf kostet aber nicht die Vorgabe von 360 Minuten.
+    timeout-minutes: 20
     env:
       # Dummy-Werte, keine echten Secrets: `next build` importiert Module, die
       # Stripe/Prisma/Auth beim Laden instanziieren und dafür gesetzte
@@ -92,6 +109,9 @@ jobs:
   # Hosts durch.
   integration:
     runs-on: ubuntu-latest
+    # Letzte 25 Läufe (bis 21.10.2026): kürzester 2,9, Median 3,6, längster 4,5
+    # Minuten; 15 ist das Dreifache des längsten (Begründung beim Job ci).
+    timeout-minutes: 15
 
     services:
       postgres:

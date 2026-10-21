@@ -54,7 +54,8 @@ import { HofShell } from '@/components/shells/hof-shell'
 import { KundeFokusShell, KundeShell } from '@/components/shells/kunde-shell'
 import { AdminShell } from '@/components/shells/admin-shell'
 import { hofNavigation } from '@/lib/bauern-navigation'
-import { kundenNavigation, type KundenSitzung } from '@/lib/kunden-navigation'
+import { kundenNavigation, SEITENFUSS, type KundenSitzung } from '@/lib/kunden-navigation'
+import { MARKE } from '@/lib/marke'
 import { ADMIN_KONTO, ADMIN_REITER, ADMIN_ZURUECK } from '@/lib/admin-navigation'
 import { ADMIN_POSTFACH_TEXT, POSTFACH_HREF, POSTFACH_TEXT } from '@/lib/postfach'
 
@@ -285,6 +286,35 @@ describe('KundeShell', () => {
     expect(fuss).toContain('aria-label="Dunkelmodus einschalten"')
     // Gegenprobe: Die Zeile fehlt im Kopf — dort steht vor der Hydration nur der Platzhalter des runden Schalters.
     expect(abschnitt(html, '<header', '</header>')).not.toContain('aria-label="Dunkelmodus einschalten"')
+  })
+
+  // Nr. 127 (Register N22, Ergänzung): Am Computer hat jede Seite der Kundschaft genau einen Fuß, diesen. Der
+  // Fuß der Startseite erscheint nur am Handy; darum führt der Seitenfuß hier alles, was am Computer sonst
+  // fehlte: die Marke und die Wege. „Für Höfe" führt zu /fuer-hoefe (das /register und /konditionen
+  // verlinkt), „Anmelden" steht im Kopf — der Seitenfuß hat keine zweite Anmeldung.
+  it.each(['gast', 'kunde', 'hof'] as const)('Seitenfuß am Computer: Wortmarke und die Wege, nie verborgen; „Anmelden" nur im Kopf (Sitzung: %s)', (sitzung) => {
+    const html = kunde(sitzung)
+    // `print:hidden` (nur beim Drucken) ist erlaubt; am Bildschirm ist der Seitenfuß nie verborgen.
+    const klassen = abschnitt(html, '<footer', '>').match(/class="([^"]*)"/)?.[1].split(/\s+/) ?? []
+    expect(klassen).toContain('border-t')
+    expect(klassen).not.toContain('hidden')
+    expect(klassen).not.toContain('md:hidden')
+    const fuss = abschnitt(html, '<footer', '</footer>')
+    expect(fuss.match(new RegExp(`text-brand-text">${MARKE}</span>`, 'g'))).toHaveLength(1)
+    const wege = abschnitt(fuss, 'aria-label="Mehr entdecken"', '</nav>')
+    expect(linkTag(wege, '/fuer-hoefe')).toBeDefined()
+    expect(wege).toMatch(/<a [^>]*href="\/fuer-hoefe"[^>]*>Für Höfe<\/a>/)
+    for (const text of ['Höfe entdecken', 'So funktioniert’s']) expect(wege).toContain(`>${text}</a>`)
+    expect(fuss).not.toContain('Anmelden')
+    // Gegenprobe: Ohne Sitzung steht „Anmelden" dort, wo es hingehört — im Kopf.
+    if (sitzung === 'gast') expect(abschnitt(html, '<header', '</header>')).toContain('>Anmelden<')
+  })
+
+  it('/fuer-hoefe, das Ziel von „Für Höfe", verlinkt Registrierung und Konditionen', () => {
+    const text = readFileSync(join(process.cwd(), 'src/components/fuer-hoefe/fuer-hoefe-abschnitte.tsx'), 'utf8')
+    expect(text).toContain('href="/register"')
+    expect(text).toContain('href="/konditionen"')
+    expect(SEITENFUSS.wege).toContainEqual({ href: '/fuer-hoefe', label: 'Für Höfe' })
   })
 
   it('der Seitenfuß hält unten Platz für die Unterleiste frei, die Fokus-Seite ohne Unterleiste trägt ihn auch', () => {

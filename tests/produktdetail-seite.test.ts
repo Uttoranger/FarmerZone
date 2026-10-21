@@ -59,6 +59,7 @@ import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
 import { KundeShell, type KundeShellProps } from '@/components/shells/kunde-shell'
 import { ProduktdetailKunde } from '@/components/produktdetail/produktdetail-kunde'
 import type { PublicFarm, PublicFutter, PublicProduct } from '@/server/queries/farm'
+import { publicFarm } from './fabrik/public-farm'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
 import { findeElement, inhaltHinterSuspense } from './element-suche'
 
@@ -97,19 +98,8 @@ function produkt(id: string, teil: Partial<PublicProduct> = {}): PublicProduct {
 }
 
 const HEU = { category: 'HEU_STROH' as const, familieId: 'fam_heu' }
-const HOF: PublicFarm = {
-  id: 'farm_test', slug: 'hof-test', name: 'Hof Test', ownerName: 'Erika Muster',
-  description: 'Gemüse aus Musterdorf', address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf',
-  phone: '+43 660 0000000', email: 'hof@example.com', logoUrl: null, logoAusschnitt: null, bannerUrl: null,
-  tagline: null, foundedYear: null, aboutText: null, bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50, bannerAusschnitt: null,
-  sectionsConfig: [], farmValues: [], farmPhotos: [],
-  acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,
-  serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
+const HOF: PublicFarm = publicFarm({
   betriebsstatus: 'PRIMAERPRODUKTION',
-  gruendungshof: false,
-  istTesthof: false,
-  gruendungSeit: null,
-  abzeichenBlatt: null,
   products: [
     produkt('p_1kg', { ...HEU, name: 'Bergwiesen-Heu 1 kg-Sackerl', price: 2.5, futter: futter(1) }),
     produkt('p_5kg', { ...HEU, name: 'Bergwiesen-Heu 5 kg-Sack', price: 8, stock: 3, futter: futter(5), description: 'Fein und staubarm.' }),
@@ -118,8 +108,7 @@ const HOF: PublicFarm = {
     produkt('p_karotten', { name: 'Karotten' }),
     produkt('p_versteckt', { name: 'Versteckt', isAvailable: false }),
   ],
-  pickupSlots: [{ dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }],
-}
+})
 
 const KUNDIN: SeitenAnsicht = { art: 'kundin', noindex: false, kaufen: true }
 
