@@ -7,6 +7,8 @@ import { getStatusTemplate } from '@/server/queries/status-posts'
 import { prisma } from '@/lib/prisma'
 import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
 import { berechneMailabstandBeginn } from '@/lib/beitrag-mailabstand'
+import { BEITRAG_ANLAESSE } from '@/lib/beitrag-anlass'
+import { z } from 'zod'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { StatusNewClient } from './status-new-client'
 import { MARKE } from '@/lib/marke'
@@ -27,10 +29,13 @@ export const dynamic = 'force-dynamic'
  * Assistent je Schritt selbst).
  */
 
+/** `?anlass=` (Nr. 129, Anstoß in Heute) ist Fremddaten: nur ein Anlass aus beitrag-anlass.ts, sonst verworfen. */
+const anlassParameterSchema = z.enum(BEITRAG_ANLAESSE).nullable().catch(null)
+
 export default async function StatusNewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string }>
+  searchParams: Promise<{ from?: string; anlass?: string | string[] }>
 }) {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect('/login')
@@ -40,8 +45,10 @@ export default async function StatusNewPage({
 
   // Vorlage-Muster: ?from={id} lädt einen Alt-Status als Vorbefüllung —
   // serverseitig und farm-gescoped (Ownership); fremde/ungültige ID → null
-  const { from } = await searchParams
+  const { from, anlass: anlassRoh } = await searchParams
   const template = await getStatusTemplate(farm.id, from)
+  // Vorgewählter Anlass aus dem Anstoß in Heute; kommen `from` und `anlass`, gelten beide (der Anlass sticht den der Vorlage).
+  const anlass = anlassParameterSchema.parse(anlassRoh ?? null)
 
   // Ein Zeitpunkt für Abfrage und Anzeige (CODING_STANDARDS §2): Der Assistent
   // rechnet „vor n Tagen" mit demselben jetzt, nie mit der Uhr des Browsers.
@@ -75,6 +82,7 @@ export default async function StatusNewPage({
         jetzt={jetzt.toISOString()}
         farmSlug={farm.id}
         prefill={template}
+        anlass={anlass}
       />
     </div>
   )

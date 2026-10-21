@@ -16,6 +16,7 @@ import {
   REIHENFOLGE_FEHLER_TEXT,
   STARTSEITE_CACHE_TAG,
   felderDerVorlage,
+  neueZusatzArt,
   pruefeReihenfolge,
   standText,
   standZeitpunkt,
@@ -99,6 +100,8 @@ export type EntwurfGespeichert = {
   blockId: string | null
   /** Die Zeile eines neu angelegten Blocks — der Browser ersetzt damit `NEUER_BLOCK`. */
   zeilenId: string | null
+  /** Hinzugefügte Zusatz-Abschnitte (Nr. 129): Kennung aus NEUER_ABSCHNITT → Kennung der neuen Zeile. */
+  neueAbschnitte: Record<string, string>
   gespeichertAm: string
 }
 
@@ -136,21 +139,28 @@ export async function speichereEntwurf(eingabe: unknown): Promise<EntwurfGespeic
   if (reihenfolge.filter((r) => r.id === NEUER_BLOCK).length > 1 || (neuIndex >= 0) !== neuerBlock) {
     return { error: SATZ.veraltet }
   }
+  // Ein hinzugefügter Zusatz-Abschnitt (Nr. 129) steht wie ein neuer Block unter einer festen Kennung (NEUER_ABSCHNITT).
+  const neueZusatz = reihenfolge.filter((r) => neueZusatzArt(r.id) !== null).map((r) => r.id)
+  if (new Set(neueZusatz).size !== neueZusatz.length) return { error: SATZ.veraltet }
+  const istNeu = (id: string): boolean => id === NEUER_BLOCK || neueZusatzArt(id) !== null
   const speicher = blobSpeicherAusSchluessel(process.env.BLOB_READ_WRITE_TOKEN)
 
   const ergebnis = await prisma.$transaction(async (tx): Promise<Omit<EntwurfGespeichert, 'gespeichertAm'> | { error: string }> => {
+    // Zwei Admins fügen denselben Abschnitt gleichzeitig hinzu: Die Sperre auf allen Zeilen reiht die zweite
+    // Speicherung hinter die erste, und deren neue Zeile steht dann in der Liste unten — „veraltet“ statt doppelt.
+    if (neueZusatz.length > 0) await tx.$queryRaw`SELECT "id" FROM "StartseiteAbschnitt" FOR UPDATE`
     const zeilen = await tx.startseiteAbschnitt.findMany({
       select: { id: true, art: true, blockId: true, block: { select: { bildUrl: true } } },
     })
     const nachId = new Map(zeilen.map((z) => [z.id, z]))
-    const bekannte = reihenfolge.filter((r) => r.id !== NEUER_BLOCK).map((r) => r.id)
+    const bekannte = reihenfolge.filter((r) => !istNeu(r.id)).map((r) => r.id)
     if (new Set(bekannte).size !== bekannte.length || bekannte.length !== zeilen.length || bekannte.some((id) => !nachId.has(id))) {
       return { error: SATZ.veraltet }
     }
 
-    // Jede Kennung außer NEUER_BLOCK steht nach der Prüfung oben in nachId.
+    // Jede Kennung außer den neuen steht nach der Prüfung oben in nachId.
     const liste = reihenfolge.map((r) => ({
-      art: (r.id === NEUER_BLOCK ? 'BLOCK' : nachId.get(r.id)?.art) as StartseiteArt,
+      art: (r.id === NEUER_BLOCK ? 'BLOCK' : (neueZusatzArt(r.id) ?? nachId.get(r.id)?.art)) as StartseiteArt,
       sichtbar: r.sichtbar,
     }))
     const fehler = pruefeReihenfolge(liste)
@@ -179,11 +189,18 @@ export async function speichereEntwurf(eingabe: unknown): Promise<EntwurfGespeic
     }
 
     // Nacheinander, nie Promise.all im Transaktions-Client (CODING_STANDARDS §4).
+    const neueAbschnitte: Record<string, string> = {}
     for (const [position, r] of reihenfolge.entries()) {
       if (r.id === NEUER_BLOCK) continue
+      const zusatz = neueZusatzArt(r.id)
+      if (zusatz) {
+        const zeile = await tx.startseiteAbschnitt.create({ data: { art: zusatz, position, sichtbar: r.sichtbar }, select: { id: true } })
+        neueAbschnitte[r.id] = zeile.id
+        continue
+      }
       await tx.startseiteAbschnitt.update({ where: { id: r.id }, data: { position, sichtbar: r.sichtbar } })
     }
-    return { ok: true, blockId, zeilenId }
+    return { ok: true, blockId, zeilenId, neueAbschnitte }
   })
 
   if ('error' in ergebnis) return ergebnis

@@ -19,7 +19,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
-vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: vi.fn() }))
@@ -45,7 +45,9 @@ vi.mock('@/lib/prisma', () => ({
 }))
 
 import { type Prisma, StatusPostAnlass } from '@prisma/client'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
+import { NEUIGKEITEN_CACHE_TAG } from '@/lib/startseite-gestalten'
 import * as Sentry from '@sentry/nextjs'
 import { deleteStatusPost, expireStatusPost, publishStatusPost, setzeWhatsAppGetippt } from '@/server/actions/status-posts'
 import { BEITRAG_PRODUKT_FREMD, STATUS_POST_ANLASS_VALUES } from '@/schemas/status-post'
@@ -79,6 +81,36 @@ beforeEach(() => {
   sp.create.mockResolvedValue({ id: 'post_1' } as never)
   sp.updateMany.mockResolvedValue({ count: 1 } as never)
   sp.deleteMany.mockResolvedValue({ count: 1 } as never)
+})
+
+describe('Zwischenspeicher: Marke auf /hoefe und „Neu bei den Höfen“ (Nr. 129, N22/N16)', () => {
+  // Der Mock zählt: Jede der drei Aktionen leert BEIDE Etiketten genau einmal — sonst stünde die Marke bis zu fünf Minuten falsch.
+  const etiketten = (): string[] => vi.mocked(updateTag).mock.calls.map(([tag]) => tag).sort()
+  const beide = [HOEFE_CACHE_TAG, NEUIGKEITEN_CACHE_TAG].sort()
+
+  it('Veröffentlichen leert die Hofliste und „Neu bei den Höfen“', async () => {
+    expect((await publishStatusPost(beitrag() as never)).postId).toBe('post_1')
+    expect(etiketten()).toEqual(beide)
+  })
+
+  it('Deaktivieren leert beide — die Marke geht ohne Warten', async () => {
+    expect(await expireStatusPost('post_1')).toEqual({})
+    expect(etiketten()).toEqual(beide)
+  })
+
+  it('Löschen leert beide', async () => {
+    expect(await deleteStatusPost('post_1')).toEqual({})
+    expect(etiketten()).toEqual(beide)
+  })
+
+  it('Gegenprobe: ohne Treffer (fremder Beitrag) und mit ungültiger Eingabe bleibt der Speicher', async () => {
+    sp.updateMany.mockResolvedValue({ count: 0 } as never)
+    sp.deleteMany.mockResolvedValue({ count: 0 } as never)
+    await expireStatusPost('post_fremd')
+    await deleteStatusPost('post_fremd')
+    await publishStatusPost(beitrag({ title: '' }) as never)
+    expect(updateTag).not.toHaveBeenCalled()
+  })
 })
 
 describe('Anlässe', () => {

@@ -221,6 +221,7 @@ describe('/hoefe: der Satz zur Reihenfolge unter der Liste', () => {
     suchNamen: [],
     fotos: [],
     gruendungshof: false,
+    neuerBeitrag: null,
   })
 
   const uebersicht = (suche = ''): string => {

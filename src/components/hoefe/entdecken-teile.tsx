@@ -14,6 +14,7 @@ import {
   formatiereEntfernung,
   type AbholFenster,
   type Bezugspunkt,
+  type NeuerBeitrag,
   type UmkreisStufe,
   type VorschauProdukt,
 } from '@/lib/hofuebersicht'
@@ -33,6 +34,7 @@ import { HofBildflaeche } from '@/components/hoefe/hof-bildflaeche'
 import { HofKopf } from '@/components/hoefe/hof-kopf'
 import { Vorschaubild } from '@/components/hoefe/hof-vorschaubild'
 import { Abholzeile } from '@/components/hoefe/abholzeile'
+import { BeitragMarke } from '@/components/hoefe/beitrag-marke'
 import { Abzeichen } from '@/components/ui/abzeichen'
 
 /*
@@ -245,6 +247,8 @@ export type KartenHof = {
   longitude: number | null
   /** Abzeichen „Gründungshof“ (Register K2, Nr. 116) — nur Ja/Nein, nie die Nummer. */
   gruendungshof: boolean
+  /** Der neueste aktive Beitrag (höchstens sieben Tage alt) — die Marke am Bild (Register N22, Nr. 129); fehlt er, keine Marke. */
+  neuerBeitrag?: NeuerBeitrag | null
 }
 
 /**
@@ -288,6 +292,11 @@ export function HofKarte({
   const ziel = hofseitenLink(hof.slug, bereich)
   const bilder = hofIllustrationen(hof.kategorien)
   const ohneKartenpunkt = hof.latitude == null || hof.longitude == null
+  // Die Marke „Neu · vor …“ am Bild (Nr. 129): Ihr Satz für den Screenreader hängt am einen Link der Karte.
+  const markeId = hof.neuerBeitrag ? `beitrag-marke-${hof.slug}` : undefined
+  const marke = (kompakt: boolean, className: string) => (
+    <BeitragMarke beitrag={hof.neuerBeitrag} jetzt={jetzt} beschreibungId={`beitrag-marke-${hof.slug}`} kompakt={kompakt} className={className} />
+  )
   return (
     <article
       data-pausiert={hof.isPaused ? 'ja' : undefined}
@@ -302,6 +311,7 @@ export function HofKarte({
           type="button"
           onClick={onAuswaehlen}
           aria-label={`${hof.name} auf der Karte zeigen`}
+          aria-describedby={markeId}
           // Die Überlagerung fängt den Zeiger — sie trägt den vollen Namen.
           title={hof.name}
           className={cn('absolute inset-0 rounded-2xl', FOKUS_RAHMEN_INNEN)}
@@ -310,6 +320,7 @@ export function HofKarte({
         <Link
           href={ziel}
           aria-label={`${hof.name} ansehen`}
+          aria-describedby={markeId}
           title={hof.name}
           className={cn('absolute inset-0 rounded-2xl', FOKUS_RAHMEN_INNEN)}
         />
@@ -336,18 +347,23 @@ export function HofKarte({
             className="pointer-events-none relative h-[150px] w-full rounded-t-2xl"
           />
         ))}
+      {/* Am Bild oben links, über Streifen und Fläche, durchlässig für Zeiger und Wischen — keine zweite Zeile. */}
+      {!split && marke(false, 'absolute top-2.5 left-2.5 z-10')}
 
       {/* Über der Überlagerung (relative), aber durchlässig für den Zeiger:
           Klicks landen auf ihr, und Axe kann Schrift und Fläche messen. */}
       <div className="pointer-events-none relative flex items-start gap-3.5 p-3">
         {split && (
-          <Vorschaubild
-            foto={hof.fotos[0] ?? null}
-            illustration={bilder[0]}
-            sizes="116px"
-            gedaempft={hof.isPaused}
-            className="h-[100px] w-[116px] rounded-xl"
-          />
+          <span className="relative shrink-0">
+            <Vorschaubild
+              foto={hof.fotos[0] ?? null}
+              illustration={bilder[0]}
+              sizes="116px"
+              gedaempft={hof.isPaused}
+              className="h-[100px] w-[116px] rounded-xl"
+            />
+            {marke(true, 'absolute bottom-1.5 left-1.5')}
+          </span>
         )}
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">

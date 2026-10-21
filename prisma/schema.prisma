@@ -1409,6 +1409,9 @@ enum StartseiteArt {
   FRAGEN
   FUSS
   BLOCK
+  // Zusätzlicher Abschnitt „Neu bei den Höfen“ (Register N16, Ergänzung Nr. 129):
+  // keine Zeile aus der Migration, Admin fügt ihn hinzu (ZUSATZ_ARTEN).
+  NEUIGKEITEN
 }
 
 // Die vier Vorlagen eines Blocks (components/startseite/bloecke) — neue nur

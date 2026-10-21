@@ -22,6 +22,7 @@ import { wienerZeitpunkt } from '@/lib/fristen'
 import { tagVersetzt, wochentagVon } from '@/lib/kalender'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { formatTagKurz } from '@/lib/format'
+import { vorWieLange } from '@/lib/hofseite-kunde'
 import {
   abGrundpreis,
   fasseAngebotZusammen,
@@ -43,6 +44,39 @@ import {
  * der Cache bliebe dann einfach stehen.
  */
 export const HOEFE_CACHE_TAG = 'oeffentliche-hoefe'
+
+/**
+ * Der neueste aktive Beitrag eines Hofs (AKTIVER_BEITRAG), höchstens
+ * NEUER_BEITRAG_TAGE alt — das Feld `neuerBeitrag` des Eintrags der Hofliste
+ * (Register N22, Ergänzung Nr. 129). Nur der Titel und die Zeitpunkte als
+ * ISO-Text: Die Liste ist zwischengespeichert, „vor …“ und das Ende rechnet
+ * der Browser (beitragMarke mit useUhr).
+ */
+export type NeuerBeitrag = { titel: string; veroeffentlicht: string; endet: string | null }
+
+/** So lange trägt die Hofkarte nach einem Beitrag die Marke „Neu · vor …“. */
+export const NEUER_BEITRAG_TAGE = 7
+
+const STUNDE_MS = 60 * 60_000
+
+/**
+ * Die Marke „Neu · vor 2 Std.“ an der Hofkarte und der Satz für den
+ * Screenreader („Neuer Beitrag vor 2 Stunden: <Titel>“) — oder null: nach
+ * sieben Tagen, mit dem Ende des Beitrags und für einen Zeitpunkt in der
+ * Zukunft. Gerechnet mit der Uhr des Browsers, darum verschwindet die Marke
+ * auch dann, wenn der Zwischenspeicher älter ist.
+ */
+export function beitragMarke(beitrag: NeuerBeitrag | null | undefined, jetzt: Date): { kurz: string; satz: string } | null {
+  if (!beitrag) return null
+  const t = jetzt.getTime()
+  const seit = t - Date.parse(beitrag.veroeffentlicht)
+  if (seit < 0 || seit >= NEUER_BEITRAG_TAGE * 24 * STUNDE_MS) return null
+  if (beitrag.endet !== null && Date.parse(beitrag.endet) <= t) return null
+  const stunden = Math.floor(seit / STUNDE_MS)
+  const tage = Math.floor(stunden / 24)
+  const kurz = stunden < 1 ? 'heute' : stunden < 24 ? `vor ${stunden} Std.` : tage === 1 ? 'vor 1 Tag' : `vor ${tage} Tagen`
+  return { kurz: `Neu · ${kurz}`, satz: `Neuer Beitrag ${vorWieLange(beitrag.veroeffentlicht, jetzt.toISOString())}: ${beitrag.titel}` }
+}
 
 export type AbholFenster = {
   /** 0=Sonntag … 6=Samstag — wie PickupSlot.dayOfWeek und JS getDay(). */

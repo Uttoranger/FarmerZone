@@ -15,6 +15,7 @@ import { hofZustand } from '@/lib/mein-hof'
 import { summeCent, UMSATZ_TEXT, type UmsatzBuchung } from '@/lib/umsatz'
 import { onlineZahlungPausiert } from '@/lib/stripe-konto'
 import type { MarkeArt } from '@/lib/marke-art'
+import { BEITRAG_ANLAESSE, type BeitragAnlass } from '@/lib/beitrag-anlass'
 
 // ─── Tage ───────────────────────────────────────────────────────────────────
 
@@ -641,7 +642,7 @@ export function teilenSatz(angebot: readonly string[], fenster: NaechstesFenster
 
 // ─── Aufbau ─────────────────────────────────────────────────────────────────
 
-export type HeuteBlock = 'postfach' | 'stripe' | 'packliste' | 'teilen' | 'braucht-dich' | 'zu-tun' | 'naechste-abholung' | 'woche'
+export type HeuteBlock = 'postfach' | 'stripe' | 'packliste' | 'beitrag' | 'teilen' | 'braucht-dich' | 'zu-tun' | 'naechste-abholung' | 'woche'
 
 /**
  * Welche Blöcke wo stehen (freigabe.md §12 Nr. 45). Oben höchstens EIN Kasten
@@ -658,21 +659,31 @@ export type HeuteBlock = 'postfach' | 'stripe' | 'packliste' | 'teilen' | 'brauc
  * nach „Braucht dich") und beginnt mit „Zu tun" (Nr. 53): EINE Liste statt
  * „Erste Schritte" oben und „Deine Hofseite" unten — was noch einzurichten
  * ist, danach die Zahlen.
+ *
+ * „Dein Beitrag“ (Register E12, Ergänzung Nr. 129) steht in der Hauptspalte
+ * nach Packliste und „Braucht dich“, vor der Teilen-Zeile — nie oben, ohne
+ * Punkt an der Glocke: Das Tagesgeschäft und was eine Handlung verlangt,
+ * gehen vor (N11).
  */
 export function heuteAufbau({
   stripeHinweis,
   teilen,
   zuTun,
   postfach,
+  beitrag = false,
 }: {
   stripeHinweis: boolean
   teilen: boolean
   zuTun: boolean
   /** Ungelesenes vom Team im Postfach (Register N12, Nr. 87): Die Karte steht dann als erster Block der Hauptspalte. */
   postfach: boolean
+  /** „Dein Beitrag“ oder der Anstoß (beitragBlock) — dann der Block 'beitrag'. */
+  beitrag?: boolean
 }): { oben: HeuteBlock[]; haupt: HeuteBlock[]; seite: HeuteBlock[] } {
   const oben: HeuteBlock[] = stripeHinweis ? ['stripe'] : []
-  const haupt: HeuteBlock[] = teilen ? ['packliste', 'braucht-dich', 'teilen'] : ['packliste', 'braucht-dich']
+  const haupt: HeuteBlock[] = ['packliste', 'braucht-dich']
+  if (beitrag) haupt.push('beitrag')
+  if (teilen) haupt.push('teilen')
   if (postfach) haupt.unshift('postfach')
   const seite: HeuteBlock[] = zuTun ? ['zu-tun', 'naechste-abholung', 'woche'] : ['naechste-abholung', 'woche']
   return { oben, haupt, seite }
@@ -719,4 +730,96 @@ export function wochenBalken(balken: readonly { label: string; cent: number }[],
     heute: i === heuteIndex,
     hoeheProzent: hoechster > 0 ? Math.round((Math.max(0, b.cent) * 100) / hoechster) : 0,
   }))
+}
+
+// ─── „Dein Beitrag“ (Register E12, Ergänzung Nr. 129) ───────────────────────
+
+/** Ohne Beitrag in so vielen Tagen (und mit Produkten im Shop) kommt der Anstoß. */
+export const ANSTOSS_NACH_TAGEN = 14
+
+/** Wohin „Neuer Beitrag“ führt — mit Anlass vorgewählt über `?anlass=` (/status/new liest ihn mit Zod). */
+export const NEUER_BEITRAG_HREF = '/status/new'
+
+export function neuerBeitragHref(anlass?: BeitragAnlass): string {
+  return anlass ? `${NEUER_BEITRAG_HREF}?anlass=${anlass}` : NEUER_BEITRAG_HREF
+}
+
+/** Die Wörter der Karte und des Anstoßes — Board system-k2-beitraege-v2, Abschnitt 5. */
+export const DEIN_BEITRAG_TEXT = {
+  titel: 'Dein Beitrag',
+  wo: 'steht oben auf deiner Hofseite',
+  ansehen: 'Ansehen',
+  neu: 'Neuer Beitrag',
+  ohneEnde: 'ohne Ende',
+  email: (n: number): string => `per E-Mail an ${n}`,
+  whatsapp: (n: number): string => `per WhatsApp an ${n} geschickt`,
+  anstossTitel: 'Was gibt’s Neues am Hof?',
+  anstossSatz: 'Ein kurzer Beitrag steht oben auf deiner Hofseite. Auf Wunsch schickst du ihn auch an deine Abonnenten.',
+} as const
+
+/** Der laufende Beitrag für die Karte — Zeitpunkte als ISO-Text, Zahlen nur, die es schon gibt. */
+export type DeinBeitrag = {
+  id: string
+  titel: string
+  anlass: BeitragAnlass
+  foto: string | null
+  veroeffentlicht: string
+  endet: string | null
+  /** An wie viele Abonnentinnen die Mail ging (emailRecipientCount). */
+  emailAnzahl: number
+  /** Wie viele Personen die WhatsApp geöffnet bekamen (Länge von whatsappGetippt, Register W1). */
+  whatsappAnzahl: number
+}
+
+const STUNDE_MS = 60 * 60_000
+
+function mitEinheit(n: number, eins: string, viele: string): string {
+  return `${n} ${n === 1 ? eins : viele}`
+}
+
+/** „seit 2 Stunden“, „seit 1 Tag“, „seit wenigen Minuten“ — gerechnet mit dem Zeitpunkt der Seite. */
+export function seitWannText(veroeffentlicht: string, jetzt: Date): string {
+  const stunden = Math.floor((jetzt.getTime() - Date.parse(veroeffentlicht)) / STUNDE_MS)
+  if (stunden < 1) return 'seit wenigen Minuten'
+  if (stunden < 24) return `seit ${mitEinheit(stunden, 'Stunde', 'Stunden')}`
+  return `seit ${mitEinheit(Math.floor(stunden / 24), 'Tag', 'Tagen')}`
+}
+
+/** „läuft noch 6 Tage“, „läuft noch 3 Stunden“ bzw. „ohne Ende“ — abgerundet, nie mehr versprochen, als bleibt. */
+export function laeuftNochText(endet: string | null, jetzt: Date): string {
+  if (endet === null) return DEIN_BEITRAG_TEXT.ohneEnde
+  const stunden = Math.floor((Date.parse(endet) - jetzt.getTime()) / STUNDE_MS)
+  if (stunden < 1) return 'läuft noch unter 1 Stunde'
+  if (stunden < 24) return `läuft noch ${mitEinheit(stunden, 'Stunde', 'Stunden')}`
+  return `läuft noch ${mitEinheit(Math.floor(stunden / 24), 'Tag', 'Tage')}`
+}
+
+/** Die Zeile unter dem Titel: „Neue Saison · seit 2 Stunden · läuft noch 6 Tage“. */
+export function deinBeitragZeile(beitrag: Pick<DeinBeitrag, 'veroeffentlicht' | 'endet'>, anlassWort: string, jetzt: Date): string {
+  return [anlassWort, seitWannText(beitrag.veroeffentlicht, jetzt), laeuftNochText(beitrag.endet, jetzt)].join(' · ')
+}
+
+/** E-Mail- und WhatsApp-Zahl — je nur, wenn sie größer als null ist. */
+export function versandZeilen(beitrag: Pick<DeinBeitrag, 'emailAnzahl' | 'whatsappAnzahl'>): { art: 'email' | 'whatsapp'; text: string }[] {
+  const zeilen: { art: 'email' | 'whatsapp'; text: string }[] = []
+  if (beitrag.emailAnzahl > 0) zeilen.push({ art: 'email', text: DEIN_BEITRAG_TEXT.email(beitrag.emailAnzahl) })
+  if (beitrag.whatsappAnzahl > 0) zeilen.push({ art: 'whatsapp', text: DEIN_BEITRAG_TEXT.whatsapp(beitrag.whatsappAnzahl) })
+  return zeilen
+}
+
+/**
+ * Was der Block 'beitrag' zeigt: mit laufendem Beitrag (AKTIVER_BEITRAG, also
+ * auch „Auf der Hofseite zeigen“ — die Karte sagt „steht oben auf deiner
+ * Hofseite“) die Karte; ohne, wenn 14 Tage kein Beitrag veröffentlicht wurde
+ * (oder nie) und der Hof Produkte im Shop hat, den Anstoß; sonst nichts.
+ * „Nicht jetzt“ entfällt (Freigabe §1, Abweichung 2: bräuchte eine Spalte).
+ */
+export function beitragBlock(daten: { aktiv: DeinBeitrag | null; beitragInFrist: boolean; produkteImShop: boolean }): 'karte' | 'anstoss' | null {
+  if (daten.aktiv) return 'karte'
+  return !daten.beitragInFrist && daten.produkteImShop ? 'anstoss' : null
+}
+
+/** Die vier Anlässe des Anstoßes als Links auf „Neuer Beitrag“, in der Reihenfolge des Assistenten. */
+export function anstossLinks(): { anlass: BeitragAnlass; href: string }[] {
+  return BEITRAG_ANLAESSE.map((anlass) => ({ anlass, href: neuerBeitragHref(anlass) }))
 }

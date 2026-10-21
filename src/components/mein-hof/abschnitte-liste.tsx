@@ -1,10 +1,12 @@
 'use client'
 
 import { useCallback, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Check, ChevronRight } from 'lucide-react'
+import { CalendarDays, Check, ChevronRight } from 'lucide-react'
 import { zeilenWieAufDerHofseite, type HofseiteFortschritt, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
 import { schildTon } from '@/lib/mein-hof'
+import type { aktuellZeile } from '@/lib/mein-hof-ansicht'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 import type { FarmSettings } from '@/server/queries/farm'
 import type { AppearanceData } from '@/server/queries/appearance'
@@ -37,6 +39,12 @@ type Props = {
   hof: AbschnittHof
   einstellungen: FarmSettings
   auftritt: AppearanceData
+  /**
+   * „Aktuell vom Hof“ als erste Zeile (Register E12, Nr. 129; aktuellZeile in
+   * src/lib/mein-hof-ansicht.ts) — der laufende Beitrag bzw. „Kein Beitrag“.
+   * Fehlt die Angabe, steht die Zeile nicht da.
+   */
+  aktuell?: ReturnType<typeof aktuellZeile>
 }
 
 /** Der Stand einer Zeile: ein grünes Häkchen (fertig) oder ihr Schild („Fehlt", „Online fehlt", „Pausiert"). */
@@ -50,7 +58,7 @@ function Stand({ zeile }: { zeile: HofseiteZeile }): React.JSX.Element {
   )
 }
 
-export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt }: Props): React.JSX.Element {
+export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, aktuell }: Props): React.JSX.Element {
   const router = useRouter()
   const ansicht = useMeinHofAnsicht()
   const zeilen = zeilenWieAufDerHofseite(fortschritt)
@@ -118,6 +126,28 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt }: P
       </section>
 
       <ol aria-label="Abschnitte der Hofseite" className="flex flex-col gap-2.5">
+        {aktuell && (
+          // Wie auf der Hofseite oben: der laufende Beitrag. Verwaltet wird unter Mein Hof › Beiträge — darum ein Link, kein Blatt.
+          <li data-bearbeiten-zeile="aktuell" className="relative flex items-center gap-2.5 rounded-xl border border-border bg-card py-2 pr-1.5 pl-3">
+            <CalendarDays className="size-4 shrink-0 text-status-fertig" strokeWidth={1.8} aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[14px] leading-snug font-semibold text-foreground">{aktuell.titel}</p>
+              <p className="mt-0.5 truncate text-[12.5px] text-muted-foreground">{aktuell.wert}</p>
+            </div>
+            <Link
+              href={aktuell.link.href}
+              title={`${aktuell.titel}: ${aktuell.wert}`}
+              className={cn(
+                "inline-flex min-h-11 shrink-0 items-center gap-0.5 rounded-lg px-1.5 text-[13.5px] font-semibold whitespace-nowrap text-brand-text after:absolute after:inset-0 after:rounded-xl after:content-['']",
+                FOKUS_RAHMEN
+              )}
+            >
+              <span className="sr-only">{aktuell.titel}: </span>
+              {aktuell.link.text}
+              <ChevronRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
+            </Link>
+          </li>
+        )}
         {zeilen.map((z) => (
           <li key={z.id} data-bearbeiten-zeile={z.id} className="relative flex items-center gap-2.5 rounded-xl border border-border bg-card py-2 pr-1.5 pl-3">
             <div className="min-w-0 flex-1">
