@@ -41,7 +41,10 @@ function useThemeUmschalter(): {
   return {
     montiert,
     dunkel,
-    beschriftung: dunkel ? 'Hellen Modus einschalten' : 'Dunkelmodus einschalten',
+    // Erst nach dem Einhängen richtet sich die Beschriftung nach dem Modus: Vor dem Einhängen — Server und erstes
+    // Rendern im Browser — gilt die Beschriftung, die der Server schreibt, weil er den Modus nicht kennt. Sonst
+    // stimmen aria-label und title beim Hydrieren nicht überein, und React gleicht Attribute nicht mehr an.
+    beschriftung: montiert && dunkel ? 'Hellen Modus einschalten' : 'Dunkelmodus einschalten',
     umschalten: () => setTheme(dunkel ? 'light' : 'dark'),
   }
 }

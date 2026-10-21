@@ -153,15 +153,16 @@ describe('Hydrieren – Teile mit dem Darstellungsmodus des Browsers', () => {
     expect(ergebnis.container.querySelector('button')?.getAttribute('aria-label')).toBe('Hellen Modus einschalten')
   })
 
-  // FUND (Nr. 135): Die Zeile setzt aria-label und title schon beim ersten Rendern im Browser nach dem Modus (`beschriftung`),
-  // der Server kennt ihn nicht — React meldet die Abweichung und gleicht Attribute nicht an. Im dunklen Modus bliebe so
-  // „Dunkelmodus einschalten“ am Knopf stehen, während der Text „Heller Modus“ lautet. Behoben ist es mit `beschriftung`
-  // erst nach `montiert` (src/components/shared/theme-umschalter.tsx liegt nicht in den Grenzen von Nr. 135, Rückgabe an
-  // den Dirigenten). Ist das behoben, schlägt dieser Fall fehl: dann `it.fails` zu `it` machen.
-  it.fails('ThemeUmschalterZeile: „Darstellung“ im Server-HTML, danach das Wort zum Modus des Browsers', async () => {
+  // Fund aus Nr. 135: Die Beschriftung am Knopf richtete sich schon beim ersten Rendern im Browser nach dem Modus, den der Server nicht kennt.
+  it('ThemeUmschalterZeile: „Darstellung“ im Server-HTML, danach das Wort zum Modus des Browsers', async () => {
     const ergebnis = await pruefeHydrieren(createElement(ThemeUmschalterZeile), { imBrowser: () => localStorage.setItem('theme', 'dark') })
     expect(ergebnis.serverHtml).toContain('Darstellung')
+    expect(ergebnis.meldungen).toEqual([])
     expect(ergebnis.container.textContent).toBe('Heller Modus')
+    // Im Browser ist es dunkel: Beschriftung und Tooltip bieten den hellen Modus an.
+    const knopf = ergebnis.container.querySelector('button')
+    expect(knopf?.getAttribute('aria-label')).toBe('Hellen Modus einschalten')
+    expect(knopf?.getAttribute('title')).toBe('Hellen Modus einschalten')
   })
 })
 
