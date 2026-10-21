@@ -27,7 +27,7 @@ import { FreischaltMoment } from '@/components/heute/freischalt-moment'
 import { BeitragAnstoss, DeinBeitragKarte } from '@/components/heute/dein-beitrag'
 import { StartbildschirmKarte } from '@/components/heute/startbildschirm-karte'
 import { ERSTE_SCHRITTE_AUS_COOKIE, ersteSchritteAnzeige, ersteSchritteAusgeblendet } from '@/lib/erste-schritte'
-import { beitragBlock, datumLang, heuteAufbau, teilenSatz, vergleichText, type HeuteBlock } from '@/lib/heute'
+import { beitragBlock, datumLang, entferneBeitragErinnerung, heuteAufbau, teilenSatz, vergleichText, type HeuteBlock } from '@/lib/heute'
 import { freischaltMomentMoeglich } from '@/lib/freischalt-moment'
 import { getTeilenFensterDaten } from '@/server/queries/teilen-bild'
 import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
@@ -100,6 +100,8 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   const teilen = heute.hof.sichtbar
   // Karte mit dem laufenden Beitrag, der Anstoß oder nichts (beitragBlock).
   const beitragArt = deinBeitrag ? beitragBlock(deinBeitrag) : null
+  // Steht der Anstoß, entfällt in „Braucht dich“ die Erinnerung an einen Beitrag (N11, Nr. 134): nie zwei Erinnerungen an dieselbe Sache.
+  const brauchtDichEintraege = entferneBeitragErinnerung(heute.brauchtDich, beitragArt)
   const aufbau = heuteAufbau({
     // „pausiert" (Notbremse) oder „einrichten" (Register Z1) — nie beide; der eine Kasten oben, auch über dem Balken der Shell.
     // Dieselbe Antwort nimmt die Online-Zahlung aus „Zu tun" (getHeute rechnet sie einmal).
@@ -139,7 +141,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
         leer={{ abholfenster: heute.naechstesFenster?.fenster ?? null }}
       />
     ),
-    'braucht-dich': <BrauchtDichKarte eintraege={heute.brauchtDich} packlisteLeer={heute.abholungen.length === 0} />,
+    'braucht-dich': <BrauchtDichKarte eintraege={brauchtDichEintraege} packlisteLeer={heute.abholungen.length === 0} />,
     'zu-tun': (
       <ZuTunKarte
         aufgaben={heute.zuTun.aufgaben}

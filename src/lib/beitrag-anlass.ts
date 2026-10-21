@@ -8,9 +8,9 @@
  * steht sie nur unter dem Namen, unter dem Fachregeln und Adressen (etwa
  * `?anlass=` für „Neuer Beitrag“) sie nehmen — keine zweite Liste.
  *
- * Weitere Kopien der Wörter (Assistent „Neuer Beitrag“, Mail an
- * Abonnentinnen, Teilen-Bild) stehen noch an ihren Stellen und ziehen in
- * einem späteren Lauf hierher (Bericht 128, Nacharbeit).
+ * Die Wörter stehen nur hier (Nr. 134): Assistent „Neuer Beitrag“, Mail an
+ * Abonnentinnen, Teilen-Bild und das Bild der Route /api/status-image lesen sie
+ * von hier; tests/anlass-woerter-wache.test.ts hält das fest.
  */
 import { CalendarDays, Leaf, MessageCircle, Tag, type LucideIcon } from 'lucide-react'
 import { STATUS_POST_ANLASS_VALUES } from '@/schemas/status-post'

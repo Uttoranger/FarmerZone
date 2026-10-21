@@ -188,11 +188,7 @@ const AUSNAHMEN: Ausnahme[] = [
     grund: 'Kopfzeile des Exports für den Kurator: scripts/briefkasten.ts (istExport) erkennt den Export an „# Briefkasten“ — der Kopf wechselt nur zusammen mit der CLI (Bericht 86)',
   },
   // Mitteilung (Register N12)
-  { datei: 'src/app/(hof)/status/new/status-new-client.tsx', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach' },
-  { datei: 'src/app/api/status-image/[id]/route.tsx', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach' },
-  { datei: 'src/lib/beitrag-anlass.ts', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach — seit Nr. 128 an einer Stelle (BEITRAG_ANLASS)' },
-  { datei: 'src/emails/status-update.tsx', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach' },
-  { datei: 'src/lib/teilen-bild.ts', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach' },
+  { datei: 'src/lib/beitrag-anlass.ts', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach — seit Nr. 134 die einzige Stelle (BEITRAG_ANLASS; tests/anlass-woerter-wache.test.ts)' },
   // Newsletter (Register N12)
   {
     datei: 'src/app/(public)/datenschutz/page.tsx',

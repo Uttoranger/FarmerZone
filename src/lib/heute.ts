@@ -17,6 +17,7 @@ import { summeCent, UMSATZ_TEXT, type UmsatzBuchung } from '@/lib/umsatz'
 import { onlineZahlungPausiert } from '@/lib/stripe-konto'
 import type { MarkeArt } from '@/lib/marke-art'
 import { BEITRAG_ANLAESSE, type BeitragAnlass } from '@/lib/beitrag-anlass'
+import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 
 // ─── Tage ───────────────────────────────────────────────────────────────────
 
@@ -764,6 +765,8 @@ export type DeinBeitrag = {
   titel: string
   anlass: BeitragAnlass
   foto: string | null
+  /** Ausschnitt und Filter des Fotos (Register N17) — schon geprüft; null = das Foto steht ganz wie heute. Heute zeigt dasselbe wie die Hofseite (Nr. 134). */
+  fotoAusschnitt: BildAusschnitt | null
   veroeffentlicht: string
   endet: string | null
   /** An wie viele Abonnentinnen die Mail ging (emailRecipientCount). */
@@ -814,6 +817,18 @@ export function versandZeilen(beitrag: Pick<DeinBeitrag, 'emailAnzahl' | 'whatsa
 export function beitragBlock(daten: { aktiv: DeinBeitrag | null; beitragInFrist: boolean; produkteImShop: boolean }): 'karte' | 'anstoss' | null {
   if (daten.aktiv) return 'karte'
   return !daten.beitragInFrist && daten.produkteImShop ? 'anstoss' : null
+}
+
+/**
+ * Steht der Anstoß für einen Beitrag, entfällt in „Braucht dich“ die Erinnerung
+ * an einen Beitrag (Register N11, Ergänzung Nr. 134): Es gibt nie zwei
+ * Erinnerungen an dieselbe Sache. Zwischen 6 und 14 Tagen ohne Beitrag steht noch
+ * kein Anstoß, dort bleibt die Erinnerung, wie sie ist; ebenso neben der Karte
+ * mit dem laufenden Beitrag. `brauchtDich` wird in der Abfrage gebaut,
+ * `beitragBlock` erst auf der Seite — darum eine eigene Funktion dazwischen.
+ */
+export function entferneBeitragErinnerung(eintraege: readonly BrauchtDichEintrag[], beitragArt: 'karte' | 'anstoss' | null): BrauchtDichEintrag[] {
+  return beitragArt === 'anstoss' ? eintraege.filter((e) => e.art !== 'status') : [...eintraege]
 }
 
 /** Die vier Anlässe des Anstoßes als Links auf „Neuer Beitrag“, in der Reihenfolge des Assistenten. */

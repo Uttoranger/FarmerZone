@@ -64,6 +64,7 @@ const AKTIV: DeinBeitrag = {
   titel: 'Die ersten Kürbisse sind da',
   anlass: BEITRAG_ANLAESSE[0],
   foto: null,
+  fotoAusschnitt: null,
   veroeffentlicht: new Date(JETZT.getTime() - 2 * 60 * 60_000).toISOString(),
   endet: new Date(JETZT.getTime() + 6 * TAG + 60_000).toISOString(),
   emailAnzahl: 0,

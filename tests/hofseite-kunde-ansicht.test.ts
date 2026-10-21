@@ -116,10 +116,10 @@ const KUNDIN: Ansicht = { art: 'kundin', kaufen: true }
 /** Der Zeitpunkt, den page.tsx einmal auf dem Server bestimmt (Nachbesserung 1: kein Date.now() beim Rendern). */
 const JETZT = '2026-10-02T08:00:00.000Z'
 
-function seite({ suche = '', farm = HOF, beitraege = [STATUS], ansicht = KUNDIN, jetzt = JETZT }: { suche?: string; farm?: PublicFarm; beitraege?: ActiveStatusPost[]; ansicht?: Ansicht; jetzt?: string } = {}): string {
+function seite({ suche = '', farm = HOF, beitraege = [STATUS], beitraegeFehler = false, ansicht = KUNDIN, jetzt = JETZT }: { suche?: string; farm?: PublicFarm; beitraege?: ActiveStatusPost[]; beitraegeFehler?: boolean; ansicht?: Ansicht; jetzt?: string } = {}): string {
   adresse.suche = suche
   return renderToStaticMarkup(
-    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, beitraege, reorderItems: [], ansicht, jetzt }))
+    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, beitraege, beitraegeFehler, reorderItems: [], ansicht, jetzt }))
   )
 }
 
@@ -387,6 +387,16 @@ describe('„Aktuell vom Hof" in der Übersicht (Register F8, N5)', () => {
     const leer = seite({ beitraege: [], suche: 'beitrag=gibtesnicht' })
     expect(leer).toContain('Dieser Beitrag ist nicht mehr aktuell.')
     expect(leer).not.toContain('id="aktuell"')
+  })
+
+  it('?beitrag= und das Laden der Beiträge scheiterte: kein Satz „nicht mehr aktuell“ (den Beitrag kann es geben), die Seite wie ohne Beiträge (Nr. 134)', () => {
+    const html = seite({ beitraege: [], beitraegeFehler: true, suche: 'beitrag=statusmitte' })
+    expect(html).not.toContain('Dieser Beitrag ist nicht mehr aktuell.')
+    expect(html).not.toContain('id="aktuell"')
+    // Produkte und Korb bleiben: Die Seite zeigt sich wie ohne Beiträge.
+    expect(html).toContain('Karotten')
+    // Gegenprobe: ohne den Merker derselbe Aufruf mit dem Satz.
+    expect(seite({ beitraege: [], suche: 'beitrag=statusmitte' })).toContain('Dieser Beitrag ist nicht mehr aktuell.')
   })
 
   it('?beitrag= mit unzulässigen Zeichen wird verworfen — kein Satz, die normale Übersicht', () => {

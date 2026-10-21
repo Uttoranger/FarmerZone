@@ -3,17 +3,11 @@ import { Text, Link, Img } from '@react-email/components'
 import { EmailLayout, h1, bodyText, ctaButton, MAIL_FARBE } from './_layout'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
 import { beitragLink } from '@/lib/teilen-fenster'
-
-const ANLASS_LABEL: Record<string, string> = {
-  FRESH_PRODUCT: 'Frisches Produkt',
-  NEW_SEASON: 'Neue Saison',
-  PROMOTION: 'Aktion',
-  ANNOUNCEMENT: 'Mitteilung',
-}
+import { BEITRAG_ANLAESSE, BEITRAG_ANLASS, type BeitragAnlass } from '@/lib/beitrag-anlass'
 
 // Farben aus der Mail-Palette (_layout.tsx): Grün für Frisches und Saison,
 // Orange für Aktionen, neutral für Mitteilungen — Schrift und Fläche je Anlass.
-const ANLASS_FARBE: Record<string, { schrift: string; flaeche: string }> = {
+const ANLASS_FARBE: Record<BeitragAnlass, { schrift: string; flaeche: string }> = {
   FRESH_PRODUCT: { schrift: MAIL_FARBE.gruen, flaeche: MAIL_FARBE.gruenFlaeche },
   NEW_SEASON: { schrift: MAIL_FARBE.gruen, flaeche: MAIL_FARBE.gruenFlaeche },
   PROMOTION: { schrift: MAIL_FARBE.orangeText, flaeche: MAIL_FARBE.orangeFlaeche },
@@ -50,8 +44,10 @@ export function StatusUpdateEmail({
 }: StatusUpdateEmailProps) {
   const hofUrl = `${appUrl}/${farmSlug}`
   const farmUrl = beitragId ? beitragLink(hofUrl, beitragId) : hofUrl
-  const anlassLabel = ANLASS_LABEL[anlass] ?? 'Mitteilung'
-  const anlassFarbe = ANLASS_FARBE[anlass] ?? ANLASS_FARBE.ANNOUNCEMENT
+  // Die Mail nimmt den Anlass als Text (opts.anlass in lib/email.ts); ein unbekannter gilt als Mitteilung.
+  const anlassArt: BeitragAnlass = BEITRAG_ANLAESSE.find((a) => a === anlass) ?? 'ANNOUNCEMENT'
+  const anlassLabel = BEITRAG_ANLASS[anlassArt].wort
+  const anlassFarbe = ANLASS_FARBE[anlassArt]
 
   return (
     <EmailLayout

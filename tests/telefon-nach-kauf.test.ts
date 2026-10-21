@@ -113,7 +113,7 @@ async function seitenProps(art: 'kundin' | 'vorschau'): Promise<Record<string, u
 function hofseite(farm: PublicFarm = HOF): string {
   // Absichtlich der Hof MIT Telefon und E-Mail: Auch wenn sie einmal
   // durchrutschten, zeigt die Komponente sie nicht.
-  return renderToStaticMarkup(createElement(HofseiteKunde, { farm, beitraege: [], reorderItems: [], ansicht: KUNDIN, jetzt: JETZT }))
+  return renderToStaticMarkup(createElement(HofseiteKunde, { farm, beitraege: [], beitraegeFehler: false, reorderItems: [], ansicht: KUNDIN, jetzt: JETZT }))
 }
 
 describe('Hofseite: Telefon und E-Mail gehen nicht an die Client-Komponente', () => {
