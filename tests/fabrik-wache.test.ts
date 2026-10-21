@@ -137,8 +137,7 @@ function schluesselMengen(): Record<string, Schluessel> {
 }
 
 /** Alle Objekt-Literale eines Quelltexts, die als einer der Fabrik-Typen geschrieben sind, mit der Zahl ihrer eigenen Felder. */
-function typisierteLiterale(quelltext: string, name = 'attrappe.ts'): Array<{ stelle: string; typ: string; felder: number }> {
-  const sf = parse(quelltext, name)
+function typisierteLiterale(quelltext: string, name = 'attrappe.ts', sf = parse(quelltext, name)): Array<{ stelle: string; typ: string; felder: number }> {
   const funde: Array<{ stelle: string; typ: string; felder: number }> = []
   besuche(sf, (k) => {
     if (!ts.isObjectLiteralExpression(k)) return
@@ -160,9 +159,8 @@ function typisierteLiterale(quelltext: string, name = 'attrappe.ts'): Array<{ st
  */
 const MIN_FELDER_DES_TYPS = MAX_EIGENE_FELDER + 1
 
-function literaleOhneTypangabe(quelltext: string, name = 'attrappe.ts'): Array<{ stelle: string; typ: string }> {
+function literaleOhneTypangabe(quelltext: string, name = 'attrappe.ts', sf = parse(quelltext, name)): Array<{ stelle: string; typ: string }> {
   const mengen = schluesselMengen()
-  const sf = parse(quelltext, name)
   const funde: Array<{ stelle: string; typ: string }> = []
   besuche(sf, (k) => {
     if (!ts.isObjectLiteralExpression(k) || typisiertAls(k) !== null) return
@@ -182,10 +180,29 @@ function literaleOhneTypangabe(quelltext: string, name = 'attrappe.ts'): Array<{
 
 /** Die ausgeschriebenen Literale (mit Typangabe: mehr als MAX_EIGENE_FELDER eigene Felder; ohne: siehe oben), je als „Datei:Zeile Typ“. Leer = keines. */
 function ausgeschriebeneLiterale(quelltext: string, name = 'attrappe.ts'): string[] {
+  // Einmal parsen, beide Erkennungen auf demselben Baum.
+  const sf = parse(quelltext, name)
   return [
-    ...typisierteLiterale(quelltext, name).filter((l) => l.felder > MAX_EIGENE_FELDER),
-    ...literaleOhneTypangabe(quelltext, name),
+    ...typisierteLiterale(quelltext, name, sf).filter((l) => l.felder > MAX_EIGENE_FELDER),
+    ...literaleOhneTypangabe(quelltext, name, sf),
   ].map((l) => `${l.stelle} ${l.typ}`)
+}
+
+/**
+ * Vorfilter vor dem Parsen (Sammel-PR Lauf 19: der Lauf über alle Testdateien brauchte auf dem CI-Runner mehr als die
+ * 5 s Zeitgrenze). Verlustfrei, weil jede Erkennung oben einen Text voraussetzt, der dann in der Datei steht: Mit
+ * Typangabe steht der Name eines Fabrik-Typs da, ohne Typangabe mindestens ein Feld, das nur der Typ kennt.
+ */
+function kannFundHaben(quelltext: string): boolean {
+  return Object.keys(FABRIKEN).some((typ) => quelltext.includes(typ)) || vorfilterMuster().test(quelltext)
+}
+
+let vorfilterMerker: RegExp | undefined
+
+/** Ein Feld, das nur ein Fabrik-Typ kennt, als ganzes Wort (auch als Kurzform `{ feld }`). */
+function vorfilterMuster(): RegExp {
+  vorfilterMerker ??= new RegExp(`\\b(?:${Object.values(schluesselMengen()).flatMap((m) => [...m.nurImTyp]).join('|')})\\b`)
+  return vorfilterMerker
 }
 
 function dateienUnter(ordner: string): string[] {
@@ -199,9 +216,12 @@ describe('Fabrik-Wache: ein neues Feld im Typ bricht nur die Fabrik (Nr. 119)', 
     const funde = dateienUnter(ORDNER)
       .map((pfad) => ({ name: relative(ORDNER, pfad).split(sep).join('/'), pfad }))
       .filter((d) => !d.name.startsWith('fabrik/') && d.name !== 'fabrik-wache.test.ts')
-      .flatMap((d) => ausgeschriebeneLiterale(readFileSync(d.pfad, 'utf8'), d.name))
+      .map((d) => ({ ...d, text: readFileSync(d.pfad, 'utf8') }))
+      .filter((d) => kannFundHaben(d.text))
+      .flatMap((d) => ausgeschriebeneLiterale(d.text, d.name))
     expect(funde, 'Die Fabrik nehmen: publicFarm({ … }) aus tests/fabrik/public-farm.ts bzw. hofRohdaten({ … }) aus tests/fabrik/hof-rohdaten.ts (auch ein Literal ohne Typangabe mit mindestens neun Feldern des Typs ist ein Nachbau)').toEqual([])
-  })
+    // Liest alle Testdateien: im vollen Lauf auf dem CI-Runner langsamer als einzeln, wie die übrigen Quelltext-Wachen.
+  }, 30_000)
 
   it('die Fabriken liegen dort, wo FABRIKEN sie nennt, und schreiben das Literal je einmal aus', () => {
     for (const [typ, pfad] of Object.entries(FABRIKEN)) {
@@ -301,6 +321,29 @@ describe('Fabrik-Wache: ein neues Feld im Typ bricht nur die Fabrik (Nr. 119)', 
     it('bleibt nicht blind: jeder Typ hat mindestens ein Feld, das die Datenbankzeile `Farm` nicht kennt', () => {
       // Sonst fände die Wache keinen Nachbau ohne Typangabe mehr (sie hielte jedes Literal für eine Datenbankzeile).
       for (const [typ, m] of Object.entries(mengen)) expect([...m.nurImTyp].length, typ).toBeGreaterThan(0)
+    })
+  })
+
+  describe('Vorfilter vor dem Parsen', () => {
+    const mengen = schluesselMengen()
+    const alsLiteral = (felder: Iterable<string>) => `{ ${[...felder].map((f) => `${f}: 1`).join(', ')} }`
+
+    it('lässt jede Schreibweise mit Fund durch – mit und ohne Typangabe, für beide Typen', () => {
+      const faelle = [
+        `const farm: PublicFarm = ${alsLiteral(mengen.PublicFarm!.alle)}`,
+        `const farm = { name: 'Testhof A' } as unknown as PublicFarm`,
+        `const roh = ${alsLiteral(mengen.HofRohdaten!.alle)} satisfies HofRohdaten`,
+        `vi.mocked(getPublicFarm).mockResolvedValue(${alsLiteral(mengen.PublicFarm!.alle)})`,
+        `vi.mocked(getAdminFarms).mockResolvedValue([${alsLiteral(mengen.HofRohdaten!.alle)}])`,
+      ]
+      for (const text of faelle) {
+        expect(ausgeschriebeneLiterale(text), text).not.toEqual([])
+        expect(kannFundHaben(text), text).toBe(true)
+      }
+    })
+
+    it('Gegenprobe: eine Datei ohne Typnamen und ohne Feld, das nur ein Typ kennt, wird gar nicht geparst', () => {
+      expect(kannFundHaben(`const zeile = { id: 'p1', name: 'Karotten', price: 2.4 }`)).toBe(false)
     })
   })
 
