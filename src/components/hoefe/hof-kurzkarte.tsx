@@ -44,15 +44,8 @@ type Gemeinsam = {
   id: string
 }
 
-/** Der Inhalt unter dem Kopf: frei als `children` — oder die Kurzform von /hoefe (Abholzeile, zwei Produktzeilen). */
-type TooltipInhalt =
-  | { children: ReactNode }
-  | {
-      /** Die Schaufenster-Auswahl (waehleVorschauImBereich, zwei Zeilen). */
-      schaufenster: { produkte: VorschauProdukt[] }
-      /** Der Zeitpunkt des Servers beim Bauen der Seite (ISO-Text) — für die Abholzeile. */
-      jetzt: string
-    }
+/** Der Inhalt unter dem Kopf der Pin-Vorschau: frei als `children` — auf /hoefe `KurzkartenInhalt` (Abholzeile, zwei Produktzeilen). */
+type TooltipInhalt = { children: ReactNode }
 
 export type HofKurzkarteProps =
   | (Gemeinsam & { art?: 'tooltip' } & TooltipInhalt)
@@ -140,7 +133,7 @@ export function HofKurzkarte(props: HofKurzkarteProps): React.JSX.Element {
       )}
       <div className="flex flex-col gap-1 p-3.5">
         <HofKopf hof={hof} als="p" />
-        {'children' in props ? props.children : <KurzkartenInhalt hof={hof} schaufenster={props.schaufenster} jetzt={props.jetzt} />}
+        {props.children}
         <ZumHof hof={hof} bereich={bereich} imTabWeg={false} />
       </div>
     </div>
