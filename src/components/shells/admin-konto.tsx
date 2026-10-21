@@ -15,20 +15,22 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLinkIt
 /*
  * „Abmelden" im Kopf der AdminShell (Register N20, Nr. 126): am Computer ein
  * Knopf neben der Konto-Plakette, am Handy ein Menü hinter der Plakette — die
- * Kopfzeile ist dort schon voll. Beides geht denselben Weg wie die HofShell:
- * `fuehreAbmeldenAus` (src/lib/abmelden.ts), nur mit dem Ziel der Admin-
- * Anmeldung (`ADMIN_ABMELDEN`). Beide Teile sind 44 px hoch.
+ * Kopfzeile ist dort schon voll. Beides geht über `useAbmelden`, den seit
+ * Nr. 132 auch die HofShell nutzt: `fuehreAbmeldenAus` (src/lib/abmelden.ts),
+ * hier mit dem Ziel der Admin-Anmeldung (`ADMIN_ABMELDEN`). Beide Teile sind
+ * 44 px hoch.
  */
 
 /** Der Kreis mit den Initialen — 32 px sichtbar, die Fläche darum ist die 44 px große Tippfläche. */
 export const PLAKETTEN_KREIS = 'flex size-8 shrink-0 items-center justify-center rounded-full bg-border text-[12px] font-semibold text-foreground'
 
 /**
- * Der Ablauf hinter „Abmelden": Better Auth meldet ab, danach zur Anmeldung der
- * Admins. `ersatz` gibt es nur in der Vorschau unter /intern — dort sitzt ein
- * echter Admin vor der Shell und darf nicht abgemeldet werden.
+ * Der Ablauf hinter „Abmelden" in beiden Shells (Nr. 132): Better Auth meldet
+ * ab, danach zum `ziel` der Shell (AdminShell /login/admin, HofShell /login).
+ * `ersatz` gibt es nur in der Vorschau unter /intern — dort sitzt ein echter
+ * Admin vor der Shell und darf nicht abgemeldet werden.
  */
-function useAbmelden(ersatz?: () => void): () => Promise<void> {
+export function useAbmelden(ziel: string, ersatz?: () => void): () => Promise<void> {
   const router = useRouter()
   return () =>
     fuehreAbmeldenAus({
@@ -36,7 +38,7 @@ function useAbmelden(ersatz?: () => void): () => Promise<void> {
       abmelden: () => signOut(),
       beiFehler: (satz) => toast.error(satz),
       danach: () => {
-        router.push(ADMIN_ABMELDEN.ziel)
+        router.push(ziel)
         router.refresh()
       },
     })
@@ -48,7 +50,7 @@ function useAbmelden(ersatz?: () => void): () => Promise<void> {
  * als Tooltip; ab 1024 px steht das Wort da.
  */
 export function AdminAbmeldenKnopf({ ersatz }: { ersatz?: () => void }): React.JSX.Element {
-  const abmelden = useAbmelden(ersatz)
+  const abmelden = useAbmelden(ADMIN_ABMELDEN.ziel, ersatz)
   return (
     <button
       type="button"
@@ -68,10 +70,22 @@ export function AdminAbmeldenKnopf({ ersatz }: { ersatz?: () => void }): React.J
 /**
  * Bis 767 px: Die Plakette öffnet ein Menü mit „Konto und Sicherheit" (nur mit
  * eigenem Hof — die Seite liegt im Hofbereich) und „Abmelden". Der Name des
- * Auslösers beginnt mit den sichtbaren Initialen (WCAG 2.5.3).
+ * Auslösers beginnt mit den sichtbaren Initialen (WCAG 2.5.3). `menueZiel`
+ * (Nr. 132): das Element im Kopf der Shell, in das das Menü gehängt wird — so
+ * liegt es in der Landmarke `header` statt frei im `<body>` (Axe „region").
  */
-export function AdminKontoMenue({ anzeige, hatHof, ersatz }: { anzeige: string; hatHof: boolean; ersatz?: () => void }): React.JSX.Element {
-  const abmelden = useAbmelden(ersatz)
+export function AdminKontoMenue({
+  anzeige,
+  hatHof,
+  ersatz,
+  menueZiel,
+}: {
+  anzeige: string
+  hatHof: boolean
+  ersatz?: () => void
+  menueZiel?: React.RefObject<HTMLElement | null>
+}): React.JSX.Element {
+  const abmelden = useAbmelden(ADMIN_ABMELDEN.ziel, ersatz)
   const initialen = hofInitialen(anzeige)
   return (
     <DropdownMenu>
@@ -83,7 +97,7 @@ export function AdminKontoMenue({ anzeige, hatHof, ersatz }: { anzeige: string; 
           {initialen}
         </span>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent align="end" className="w-64" container={menueZiel}>
         {hatHof && (
           <DropdownMenuLinkItem render={<Link href={ADMIN_KONTO.href} />} className="min-h-11">
             <UserRound className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />

@@ -296,9 +296,9 @@ export const REGISTRIERUNG_GESPERRT = 'Einen Passkey kannst du hier gerade nicht
  * der Anmeldung mit Ersatzcode — nach dem `code` der Antwort (Server: die
  * Codes aus src/lib/auth.ts und des Plugins; Browser: WebAuthnError).
  */
-export function passkeyFehlerText(fehler: { status?: number } | null | undefined): string {
-  // Better Auth schickt den Code mit, sein Fehlertyp kennt ihn nicht immer.
-  const code = (fehler as { code?: unknown } | null | undefined)?.code
+export function passkeyFehlerText(fehler: { status?: number; code?: unknown } | null | undefined): string {
+  // `unknown`: Better Auth schickt den Code mit, sein Fehlertyp kennt ihn nicht immer.
+  const code = fehler?.code
   switch (typeof code === 'string' ? code : undefined) {
     case 'PASSKEY_FREMDES_KONTO':
       return ADMIN_ANMELDEN_FEHLER.fremdesKonto

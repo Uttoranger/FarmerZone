@@ -350,7 +350,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 ## src/components/shells
 
-- src/components/shells/admin-konto.tsx · AdminAbmeldenKnopf, AdminKontoMenue, PLAKETTEN_KREIS · „Abmelden" im Kopf der AdminShell (Register N20, Nr. 126): am Computer ein Knopf neben der Konto-Plakette, am Handy ein Menü hinter der Plakette — die Kopfzeile ist dort schon voll. · genutzt
+- src/components/shells/admin-konto.tsx · AdminAbmeldenKnopf, AdminKontoMenue, PLAKETTEN_KREIS, useAbmelden · „Abmelden" im Kopf der AdminShell (Register N20, Nr. 126): am Computer ein Knopf neben der Konto-Plakette, am Handy ein Menü hinter der Plakette — die Kopfzeile ist dort schon voll. · genutzt
 - src/components/shells/admin-shell.tsx · AdminShell, type AdminShellProps · Die Shell des Betreiber-Bereichs im neuen Design (Gate 2): eigene Kopfzeile mit den Reitern Höfe · Postfach · Startseite · Finanzen · Einstellungen (Register N15; Höfe und Postfach mit Zählern) und … · genutzt
 - src/components/shells/hof-shell.tsx · HofShell, PersonZeile, type HofShellProps · Die Shell des Hofbereichs im neuen Design (Gate 2). Ordnung, aktive Punkte und „Admin nur für Betreiber" kommen aus src/lib/bauern-navigation.ts (hofNavigation) — Seitenleiste und Handy lesen … · genutzt
 - src/components/shells/kunde-fuss.tsx · KundeFuss · Der Seitenfuß (Register N22, Wortliste: „Seitenfuß", nicht „Footer"; Board system-k1-entdecken-v2): Impressum, Datenschutz, AGB und „Problem melden" auf jeder Seite der KundeShell — das erfüllt … · genutzt
