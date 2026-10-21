@@ -19,6 +19,10 @@ import { cn } from '@/lib/utils'
  *
  * Gezeichnet wird über die Spanne der Höfe hinaus, wenn „Deins" außerhalb
  * liegt — die Skala reicht dann bis zu deinem Wert (Board: „über der Spanne").
+ * Kleinst- und Höchstwert stehen auch dann unter den Enden der SPANNE, nicht
+ * unter den Enden der Spur: sonst läse man unter „Deins" den Höchst- bzw.
+ * Kleinstwert der Höfe als deinen Preis. Liegen die Enden zu eng, steht ein
+ * gemeinsames „von – bis" unter der Spanne.
  */
 
 /** Innenrand der Spur: So weit stehen die äußeren Punkte von der Kante. */
@@ -29,12 +33,25 @@ function links(anteil: number): CSSProperties {
   return { left: `calc(${RAND_PX}px + ${anteil} * (100% - ${2 * RAND_PX}px))` }
 }
 
+/** Unter diesem Abstand (Anteil der Spur) passen zwei Beschriftungen nicht nebeneinander. */
+const ENDEN_MIN_ABSTAND = 0.35
+
+/** Eine Beschriftung unter ihrer Stelle: nahe am Rand bündig, sonst mittig — so ragt sie nicht aus dem Bild. */
+function unterDerStelle(anteil: number): CSSProperties {
+  const verschiebung = anteil < 0.15 ? '0%' : anteil > 0.85 ? '-100%' : '-50%'
+  return { ...links(anteil), transform: `translateX(${verschiebung})` }
+}
+
+const ENDE_KLASSE = 'absolute top-[33px] text-[11px] leading-[14px] whitespace-nowrap text-muted-foreground tabular-nums'
+
 export function PreisStreifen({ streifen, className }: { streifen: PreisStreifenDaten; className?: string }): React.JSX.Element {
   const { werte, kleinst, hoechst, mitte, deins } = streifen
   const von = deins === null ? kleinst : Math.min(kleinst, deins)
   const bis = deins === null ? hoechst : Math.max(hoechst, deins)
   // Ein Streifen gibt es nur mit verschiedenen Werten (src/lib/umfeld.ts) — bis > von.
   const anteil = (wert: number) => (wert - von) / (bis - von)
+  const kleinstAnteil = anteil(kleinst)
+  const hoechstAnteil = anteil(hoechst)
 
   return (
     <span role="img" aria-label={streifen.satz} className={cn('relative block h-12 shrink-0', className)}>
@@ -74,8 +91,21 @@ export function PreisStreifen({ streifen, className }: { streifen: PreisStreifen
           </span>
         </>
       )}
-      <span className="absolute top-[33px] left-0 text-[11px] leading-[14px] text-muted-foreground tabular-nums">{streifen.kleinstText}</span>
-      <span className="absolute top-[33px] right-0 text-[11px] leading-[14px] text-muted-foreground tabular-nums">{streifen.hoechstText}</span>
+      {hoechstAnteil - kleinstAnteil < ENDEN_MIN_ABSTAND ? (
+        <span data-ende="spanne" className={ENDE_KLASSE} style={unterDerStelle((kleinstAnteil + hoechstAnteil) / 2)}>
+          {streifen.kleinstText} – {streifen.hoechstText}
+        </span>
+      ) : (
+        <>
+          {/* Liegt „Deins" innerhalb, sind die Enden der Spanne die Enden der Spur. */}
+          <span data-ende="kleinst" className={cn(ENDE_KLASSE, kleinstAnteil === 0 && 'left-0')} style={kleinstAnteil === 0 ? undefined : unterDerStelle(kleinstAnteil)}>
+            {streifen.kleinstText}
+          </span>
+          <span data-ende="hoechst" className={cn(ENDE_KLASSE, hoechstAnteil === 1 && 'right-0')} style={hoechstAnteil === 1 ? undefined : unterDerStelle(hoechstAnteil)}>
+            {streifen.hoechstText}
+          </span>
+        </>
+      )}
     </span>
   )
 }
