@@ -864,6 +864,7 @@ describe('das Server-HTML: die ganze Hofliste, ungefiltert, mit Links auf die Ho
     suchNamen: ['Bauernbrot'],
     fotos: [],
     gruendungshof: false,
+    neuerBeitrag: null,
   })
 
   it('beide Höfe mit Link — auf dem Server gilt der leere Filter (kein window, kein Wurf)', () => {

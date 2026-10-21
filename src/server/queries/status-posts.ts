@@ -89,6 +89,16 @@ export const AKTIVER_BEITRAG = (jetzt: Date): Prisma.StatusPostWhereInput => ({
   OR: [{ expiresAt: null }, { expiresAt: { gt: jetzt } }],
 })
 
+/**
+ * Die Reihenfolge der aktiven Beiträge, der neueste zuerst. Bei gleicher
+ * Veröffentlichungszeit entscheidet die Kennung: Die Reihenfolge ist nie Zufall,
+ * und kein Beitrag springt zwischen zwei Aufrufen über die Grenze. EINE Fassung
+ * für alle, die „den neuesten“ Beitrag nennen (Hofseite, Heute, Mein Hof, Marke
+ * auf /hoefe, „Neu bei den Höfen“) — sonst nennt bei Gleichstand eine Stelle
+ * einen anderen Beitrag als den, der oben auf der Hofseite steht.
+ */
+export const NEUESTER_BEITRAG_ZUERST: Prisma.StatusPostOrderByWithRelationInput[] = [{ publishedAt: 'desc' }, { id: 'desc' }]
+
 /** Nur, was die Karte zeigt: Der Beitrag ist öffentlich, sein Versand (Empfänger, Zähler) nicht. */
 const HOFSEITE_BEITRAG_SELECT = {
   id: true,
@@ -124,9 +134,7 @@ function alsHofseitenBeitrag(post: HofseiteBeitragRoh): ActiveStatusPost {
 export async function getActiveStatusPosts(farmId: string, anzahl: number): Promise<ActiveStatusPost[]> {
   const posts = await prisma.statusPost.findMany({
     where: { farmId, AND: [AKTIVER_BEITRAG(new Date())] },
-    // Bei gleicher Veröffentlichungszeit entscheidet die Kennung: Die Reihenfolge
-    // ist nie Zufall, und kein Beitrag springt zwischen zwei Aufrufen über die Grenze.
-    orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
+    orderBy: NEUESTER_BEITRAG_ZUERST,
     take: anzahl,
     select: HOFSEITE_BEITRAG_SELECT,
   })

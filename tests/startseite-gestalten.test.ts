@@ -15,13 +15,22 @@
  *    (außer dem Block in Bearbeitung der Vorschau), Ausgeblendetes nie.
  *  - Link nur relativ; Grenzen und Pflichtfelder je Vorlage im Schema.
  *  - Die Listen der Arten und Vorlagen decken genau die Prisma-Enums ab.
+ *  - Zusatz-Abschnitt „Neu bei den Höfen“ (Nr. 129, N16): erlaubt, nicht
+ *    verlangt, höchstens einmal, nur nach HOEFE und vor FUSS; Auswahl der
+ *    Reihe (ein Beitrag je Hof, höchstens sechs) und was der Browser ausblendet.
  */
 import { describe, expect, it } from 'vitest'
 import { StartseiteArt, StartseiteVorlage } from '@prisma/client'
 import {
+  NEUER_ABSCHNITT,
+  NEUIGKEITEN_MAX,
   STANDARD_REIHENFOLGE,
   VORLAGEN,
+  ZUSATZ_ARTEN,
   darfVerschieben,
+  neueZusatzArt,
+  sichtbareNeuigkeiten,
+  waehleNeuigkeiten,
   istLive,
   istRelativerLink,
   pruefeReihenfolge,
@@ -40,7 +49,7 @@ import { STARTSEITE_SAETZE, startseitenBlockSchema, type StartseitenBlockEingabe
 describe('Arten und Vorlagen', () => {
   it('kennen genau die Werte der Prisma-Enums — ein neuer Wert fällt sofort auf', () => {
     expect([...VORLAGEN].sort()).toEqual(Object.values(StartseiteVorlage).sort())
-    expect([...STANDARD_REIHENFOLGE, 'BLOCK'].sort()).toEqual(Object.values(StartseiteArt).sort())
+    expect([...STANDARD_REIHENFOLGE, ...ZUSATZ_ARTEN, 'BLOCK'].sort()).toEqual(Object.values(StartseiteArt).sort())
   })
 })
 
@@ -87,6 +96,42 @@ describe('pruefeReihenfolge', () => {
     const doppelt = standard()
     doppelt.splice(3, 0, { art: 'FUTTER', sichtbar: true })
     expect(pruefeReihenfolge(doppelt)).toBe('abschnitt-doppelt')
+  })
+
+  it('Zusatz „Neu bei den Höfen“: ohne gültig, mit gültig — an jeder Stelle nach den Höfen und vor dem Fuß, auch ausgeblendet', () => {
+    const NEU: ListenEintrag = { art: 'NEUIGKEITEN', sichtbar: true }
+    expect(pruefeReihenfolge(standard())).toBeNull()
+    const liste = standard()
+    for (let stelle = 2; stelle < liste.length; stelle++) {
+      const mit = [...liste.slice(0, stelle), NEU, ...liste.slice(stelle)]
+      expect(pruefeReihenfolge(mit), `Stelle ${stelle}`).toBeNull()
+      expect(pruefeReihenfolge(mit.map((e) => (e.art === 'NEUIGKEITEN' ? { ...e, sichtbar: false } : e)))).toBeNull()
+    }
+    // Mit einem Block zwischen Kopf und Höfen.
+    expect(pruefeReihenfolge([liste[0], BLOCK, liste[1], NEU, ...liste.slice(2)])).toBeNull()
+  })
+
+  it('Zusatz höchstens einmal und nie vor den Höfen, nie über dem Kopf, nie unter dem Fuß', () => {
+    const NEU: ListenEintrag = { art: 'NEUIGKEITEN', sichtbar: true }
+    const liste = standard()
+    expect(pruefeReihenfolge([...liste.slice(0, 2), NEU, NEU, ...liste.slice(2)])).toBe('abschnitt-doppelt')
+    expect(pruefeReihenfolge([...liste.slice(0, 2), NEU, ...liste.slice(2, 5), NEU, ...liste.slice(5)])).toBe('abschnitt-doppelt')
+    expect(pruefeReihenfolge([liste[0], NEU, ...liste.slice(1)])).toBe('hoefe-nicht-unter-kopf')
+    expect(pruefeReihenfolge([NEU, ...liste])).toBe('kopf-nicht-oben')
+    expect(pruefeReihenfolge([...liste, NEU])).toBe('fuss-nicht-unten')
+  })
+
+  it('der Zusatz lässt sich verschieben, aber nicht über die Höfe', () => {
+    const liste: ListenEintrag[] = [...standard().slice(0, 2), { art: 'NEUIGKEITEN', sichtbar: true }, ...standard().slice(2)]
+    expect(darfVerschieben(liste, 2, 1)).toBe(true)
+    expect(darfVerschieben(liste, 2, -1)).toBe(false)
+  })
+
+  it('die Kennung eines hinzugefügten Zusatzes führt zur Art zurück, jede andere nicht', () => {
+    for (const art of ZUSATZ_ARTEN) expect(neueZusatzArt(NEUER_ABSCHNITT[art])).toBe(art)
+    expect(neueZusatzArt('neu')).toBeNull()
+    expect(neueZusatzArt('NEUIGKEITEN')).toBeNull()
+    expect(neueZusatzArt('startseite-kopf')).toBeNull()
   })
 
   it('lässt Kopf, Höfe und Fuß nicht ausblenden, alle anderen schon', () => {
@@ -316,5 +361,37 @@ describe('startseitenBlockSchema', () => {
     expect(satz({ liveAbTag: '2027-03-28', liveAbUhrzeit: '02:30' })).toBe(STARTSEITE_SAETZE.umstellung)
     // Ohne Uhrzeit gilt „bis" bis zum Ende des Tages.
     expect(satz({ liveBisTag: '2026-10-01', liveBisUhrzeit: null })).toBeNull()
+  })
+})
+
+describe('„Neu bei den Höfen“ — Auswahl und Anzeige (Nr. 129, N16)', () => {
+  const beitrag = (id: string, slug: string) => ({ id, hof: { slug } })
+
+  it('höchstens ein Beitrag je Hof — der erste (neueste) bleibt, die Reihenfolge der Zeit auch', () => {
+    const liste = [beitrag('a1', 'hof-a'), beitrag('b1', 'hof-b'), beitrag('a2', 'hof-a'), beitrag('c1', 'hof-c')]
+    expect(waehleNeuigkeiten(liste).map((b) => b.id)).toEqual(['a1', 'b1', 'c1'])
+  })
+
+  it('höchstens sechs, auch bei mehr Höfen', () => {
+    const liste = Array.from({ length: 9 }, (_, i) => beitrag(`b${i}`, `hof-${i}`))
+    expect(NEUIGKEITEN_MAX).toBe(6)
+    expect(waehleNeuigkeiten(liste).map((b) => b.id)).toEqual(['b0', 'b1', 'b2', 'b3', 'b4', 'b5'])
+  })
+
+  it('leer bleibt leer', () => {
+    expect(waehleNeuigkeiten([])).toEqual([])
+  })
+
+  it('der Browser blendet Abgelaufenes und über 14 Tage Altes aus — auf die Millisekunde', () => {
+    const jetzt = new Date('2026-10-20T10:00:00.000Z')
+    const n = (id: string, veroeffentlicht: string, endet: string | null) => ({ id, veroeffentlicht, endet })
+    const liste = [
+      n('ohne-ende', '2026-10-19T10:00:00.000Z', null),
+      n('endet-gleich', '2026-10-19T10:00:00.000Z', '2026-10-20T10:00:00.000Z'),
+      n('endet-danach', '2026-10-19T10:00:00.000Z', '2026-10-20T10:00:00.001Z'),
+      n('genau-14-tage', '2026-10-06T10:00:00.000Z', null),
+      n('zu-alt', '2026-10-06T09:59:59.999Z', null),
+    ]
+    expect(sichtbareNeuigkeiten(liste, jetzt).map((x) => x.id)).toEqual(['ohne-ende', 'endet-danach', 'genau-14-tage'])
   })
 })

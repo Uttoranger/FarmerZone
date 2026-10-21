@@ -16,6 +16,10 @@
  *    am Cache vorbei (mussFrischLesen).
  *  - Das Band der Vorschau nennt Quelle und Tag; nach einer Speicherung steht
  *    nie ein leerer Rahmen, und es stehen höchstens zwei (Nr. 106).
+ *  - Nr. 129 (N16, „Neu bei den Höfen“ als Zusatz): Eine gespeicherte Fassung
+ *    von vor dem Lauf (samt Block) und der Entwurf aus den Zeilen der Migration
+ *    bleiben gültig und rendern unverändert; der Zusatz geht durch das Format
+ *    höchstens einmal und nach den Höfen.
  */
 import { describe, expect, it } from 'vitest'
 import {
@@ -329,5 +333,87 @@ describe('Vorschau des Entwurfs (Nacharbeit 99, Register N16 Nr. 106)', () => {
     expect(vorschauRahmen('/a', '/c')).toEqual({ rahmen: ['/a', '/c'], laedt: true })
     // Scheitert der Link, bleibt das alte Bild.
     expect(vorschauRahmen('/a', null)).toEqual({ rahmen: ['/a'], laedt: false })
+  })
+})
+
+describe('Zusatz-Abschnitt „Neu bei den Höfen“ (Nr. 129, N16)', () => {
+  /** Eine Fassung, wie sie vor diesem Lauf gespeichert wurde (JSON aus StartseiteFassung.inhalt): Block, ein Abschnitt aus, einer verschoben. */
+  const GESPEICHERT_HEUTE = {
+    v: 1,
+    zeilen: [
+      { art: 'KOPF', sichtbar: true },
+      { art: 'BLOCK', sichtbar: true, block: { id: 'b-ostern', vorlage: 'HINWEISBAND', titel: 'Winterpause bis Februar', farmIds: [], liveAb: '2026-10-01T04:00:00.000Z' } },
+      { art: 'HOEFE', sichtbar: true },
+      { art: 'FUER_HOEFE', sichtbar: true },
+      { art: 'FUTTER', sichtbar: true },
+      { art: 'BRENNMATERIAL', sichtbar: false },
+      { art: 'SO_FUNKTIONIERTS', sichtbar: true },
+      { art: 'FRAGEN', sichtbar: true },
+      { art: 'FUSS', sichtbar: true },
+    ],
+  }
+
+  it('eine gespeicherte Fassung von heute bleibt gültig und rendert wie vorher', () => {
+    const inhalt = fassungInhaltSchema.parse(JSON.parse(JSON.stringify(GESPEICHERT_HEUTE)))
+    const gerendert = zuRendern(zeilenAusFassung(inhalt, new Map()), JETZT, { brennmaterialSaison: true })
+    expect(gerendert.map((e) => (e.art === 'BLOCK' ? `BLOCK:${e.block.id}` : e.art))).toEqual([
+      'KOPF',
+      'BLOCK:b-ostern',
+      'HOEFE',
+      'FUER_HOEFE',
+      'FUTTER',
+      'SO_FUNKTIONIERTS',
+      'FRAGEN',
+      'FUSS',
+    ])
+  })
+
+  it('der Entwurf aus den acht Zeilen der Migration bleibt gültig und rendert gleich — mit und ohne Block', () => {
+    const ohne = STANDARD_REIHENFOLGE.map((art) => ({ art, sichtbar: true, block: null }))
+    const blockZeile = {
+      art: 'BLOCK' as const,
+      sichtbar: true,
+      block: {
+        id: 'b-entwurf',
+        vorlage: 'SAISONKARTE' as const,
+        ueberzeile: null,
+        titel: 'Kürbis, Äpfel und Most',
+        text: null,
+        bildUrl: null,
+        linkUrl: null,
+        linkText: null,
+        farmIds: [],
+        kategorie: null,
+        liveAb: '2026-10-01T04:00:00.000Z',
+        liveBis: null,
+      },
+    }
+    const mit = [ohne[0], ohne[1], blockZeile, ...ohne.slice(2)]
+    // Wie GESPEICHERT_HEUTE: gültig UND derselbe Weg bis zur Seite — Entwurf → Fassung → Zeilen → gerendert.
+    const gerendert = (entwurf: typeof mit) => {
+      const inhalt = fassungInhaltSchema.parse(JSON.parse(JSON.stringify(fassungAusEntwurf(entwurf))))
+      return zuRendern(zeilenAusFassung(inhalt, new Map()), JETZT, { brennmaterialSaison: true }).map((e) => (e.art === 'BLOCK' ? `BLOCK:${e.block.id}` : e.art))
+    }
+    const standard = ['KOPF', 'HOEFE', 'FUTTER', 'BRENNMATERIAL', 'SO_FUNKTIONIERTS', 'FUER_HOEFE', 'FRAGEN', 'FUSS']
+    expect(gerendert(ohne)).toEqual(standard)
+    expect(gerendert(mit)).toEqual(['KOPF', 'HOEFE', 'BLOCK:b-entwurf', ...standard.slice(2)])
+    expect(fassungInhaltSchema.safeParse(mitBlock()).success).toBe(true)
+  })
+
+  it('mit dem Zusatz nach den Höfen gültig und an seiner Stelle gerendert — ausgeblendet nicht', () => {
+    const [kopf, hoefe, ...rest] = standardFassung().zeilen
+    const mit: FassungInhalt = { v: 1, zeilen: [kopf, hoefe, { art: 'NEUIGKEITEN', sichtbar: true }, ...rest] }
+    expect(fassungInhaltSchema.safeParse(mit).success).toBe(true)
+    const arten = (f: FassungInhalt) => zuRendern(zeilenAusFassung(f, new Map()), JETZT, { brennmaterialSaison: false }).map((e) => e.art)
+    expect(arten(mit)).toEqual(['KOPF', 'HOEFE', 'NEUIGKEITEN', 'FUTTER', 'SO_FUNKTIONIERTS', 'FUER_HOEFE', 'FRAGEN', 'FUSS'])
+    const aus: FassungInhalt = { v: 1, zeilen: [kopf, hoefe, { art: 'NEUIGKEITEN', sichtbar: false }, ...rest] }
+    expect(arten(aus)).toEqual(['KOPF', 'HOEFE', 'FUTTER', 'SO_FUNKTIONIERTS', 'FUER_HOEFE', 'FRAGEN', 'FUSS'])
+  })
+
+  it('der Zusatz doppelt oder vor den Höfen ist kein gültiger Inhalt — die Seite fiele auf den Standard zurück', () => {
+    const [kopf, hoefe, ...rest] = standardFassung().zeilen
+    const neu = { art: 'NEUIGKEITEN' as const, sichtbar: true }
+    expect(fassungInhaltSchema.safeParse({ v: 1, zeilen: [kopf, hoefe, neu, neu, ...rest] }).success).toBe(false)
+    expect(fassungInhaltSchema.safeParse({ v: 1, zeilen: [kopf, neu, hoefe, ...rest] }).success).toBe(false)
   })
 })

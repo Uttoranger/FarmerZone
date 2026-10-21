@@ -1,5 +1,8 @@
+import { Suspense } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { unstable_rethrow } from 'next/navigation'
+import * as Sentry from '@sentry/nextjs'
 import { Check, ChevronDown, HandCoins, MapPin } from 'lucide-react'
 import {
   BRENNMATERIAL_ADRESSE,
@@ -24,6 +27,9 @@ import { MARKE } from '@/lib/marke'
 import type { GruendungSeiten } from '@/lib/gruendungshof'
 import { gruendungFuerSeiten } from '@/server/queries/plattform-einstellung'
 import { GruendungSatz } from '@/components/gruendung/satz'
+import { NeuBeiDenHoefen } from '@/components/startseite/neu-bei-den-hoefen'
+import { ladeNeuigkeiten } from '@/server/queries/neuigkeiten'
+import { schonGemeldet } from '@/server/oeffentlich-lesen'
 
 /*
  * Die Abschnitte der Startseite unter „Höfe in deiner Nähe", in der Reihenfolge
@@ -430,6 +436,23 @@ export function StartseiteFuss({ jahr }: { jahr: number }): React.JSX.Element {
 export type AbschnittProps = { jetzt: Date }
 
 /**
+ * „Neu bei den Höfen“ (Nr. 129) mit seinen Daten aus dem Datencache. Ein
+ * Ladefehler nimmt nur den Abschnitt weg, nie die Startseite (wie die
+ * Hofkarten in page.tsx); gemeldet wird er trotzdem.
+ */
+async function NeuBeiDenHoefenGeladen({ jetzt }: AbschnittProps) {
+  let neuigkeiten: Awaited<ReturnType<typeof ladeNeuigkeiten>>
+  try {
+    neuigkeiten = await ladeNeuigkeiten()
+  } catch (err) {
+    unstable_rethrow(err)
+    if (!schonGemeldet(err)) Sentry.captureException(err, { tags: { bereich: 'startseite-neuigkeiten' } })
+    return null
+  }
+  return <NeuBeiDenHoefen neuigkeiten={neuigkeiten} jetzt={jetzt.toISOString()} />
+}
+
+/**
  * Die Abschnitte dieser Datei je Art (Register N16, Nr. 96): page.tsx rendert
  * die Liste aus Admin › Startseite darüber. Kopf und „Höfe in deiner Nähe"
  * stehen in eigenen Dateien und brauchen die Höfe der Seite — die rendert
@@ -443,4 +466,9 @@ export const STARTSEITE_ABSCHNITTE = {
   FUER_HOEFE: () => <FuerHoefeBand />,
   FRAGEN: ({ jetzt }) => <Fragen jetzt={jetzt} />,
   FUSS: ({ jetzt }) => <StartseiteFuss jahr={jetzt.getFullYear()} />,
+  NEUIGKEITEN: ({ jetzt }) => (
+    <Suspense fallback={null}>
+      <NeuBeiDenHoefenGeladen jetzt={jetzt} />
+    </Suspense>
+  ),
 } satisfies Record<Exclude<AbschnittArt, 'KOPF' | 'HOEFE'>, (props: AbschnittProps) => React.ReactNode>

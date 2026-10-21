@@ -752,7 +752,7 @@ describe('Aufbau der Seite', () => {
   })
 
   it('die Höfe hinter Suspense mit Skelett — Kopf und Suche warten nicht auf die Datenbank', () => {
-    expect(seite).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>\s*<HofKartenGeladen \/>/)
+    expect(seite).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>\s*<HofKartenGeladen jetzt=\{jetzt\} \/>/)
   })
 
   it('die Karte hinter Suspense: bis die Höfe da sind, das Land ohne Pins (Nr. 59)', () => {

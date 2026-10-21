@@ -140,3 +140,22 @@ describe('Hinweis, wo Produkte liegen', () => {
     expect(zeichne(1112).match(/verwaltest du links/g)).toHaveLength(1)
   })
 })
+
+describe('„Aktuell vom Hof“ (Register E12, Nr. 129, Runde 1)', () => {
+  const AKTUELL = { titel: 'Aktuell vom Hof', wert: 'Die ersten Kürbisse sind da · läuft noch 6 Tage', link: { text: 'Beiträge', href: '/farm-page?reiter=beitraege' } }
+
+  it('steht ab lg als erste Zeile vor den Gruppen — ein Link zu Mein Hof › Beiträge, keine Zeile zum Aufklappen', () => {
+    const html = renderToStaticMarkup(
+      createElement(HofseiteEditor, { fortschritt, hof, einstellungen: {} as FarmSettings, auftritt: {} as AppearanceData, aktuell: AKTUELL })
+    )
+    const zeile = html.indexOf('data-bearbeiten-zeile="aktuell"')
+    expect(zeile).toBeGreaterThan(-1)
+    expect(zeile).toBeLessThan(html.indexOf('hofseite-gruppe-'))
+    expect(html).toContain('Die ersten Kürbisse sind da · läuft noch 6 Tage')
+    expect(html).toMatch(/<a [^>]*href="\/farm-page\?reiter=beitraege"[^>]*>.*Beiträge/)
+  })
+
+  it('Gegenprobe: ohne Angabe keine Zeile', () => {
+    expect(zeichne(1112)).not.toContain('data-bearbeiten-zeile="aktuell"')
+  })
+})

@@ -15,6 +15,11 @@
  *    in der Datenbank nichts — weder Positionen noch Blöcke.
  *  - Ein Block mit einem nicht freigeschalteten Hof wird nicht angelegt.
  *  - Löschen nimmt die Zeile des Blocks mit (Cascade).
+ *  - Nr. 129 (N16): „Neu bei den Höfen“ hinzufügen legt beim Speichern genau
+ *    EINE Zeile an (Migration 20261021110000_startseite_neuigkeiten), sichtbar
+ *    in der Vorschau des Entwurfs; ein zweites Hinzufügen ist nicht möglich,
+ *    auch nicht gleichzeitig aus zwei Fenstern. Die Zeile räumt jeder Test
+ *    selbst weg — andere Nummern laufen mit einem Prisma-Client ohne den Wert.
  *
  * Die acht Zeilen sind geteilter Zustand der Test-Datenbank: Jeder Test stellt
  * sie im afterEach wieder her und löscht seine Blöcke.
@@ -32,7 +37,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
-import { NEUER_BLOCK, REIHENFOLGE_FEHLER_TEXT, STANDARD_REIHENFOLGE } from '@/lib/startseite-gestalten'
+import { NEUER_ABSCHNITT, NEUER_BLOCK, REIHENFOLGE_FEHLER_TEXT, STANDARD_REIHENFOLGE } from '@/lib/startseite-gestalten'
 import { loescheStartseitenBlock, speichereEntwurf } from '@/server/actions/startseite'
 import { ladeVorschauZeilen } from '@/server/queries/startseite'
 import type { StartseitenBlockEingabe } from '@/schemas/startseite'
@@ -54,6 +59,8 @@ afterEach(async () => {
   vi.mocked(headers).mockResolvedValue(new Headers() as never)
   await prisma.startseiteBlock.deleteMany({ where: { erstelltVonUserId: { startsWith: 'int-' } } })
   await prisma.startseiteBlock.deleteMany({ where: { titel: { startsWith: 'int-' } } })
+  // Nr. 129: Die Zeile „Neu bei den Höfen“ gibt es nur aus diesen Tests — sie bliebe sonst für alle Nummern stehen.
+  await prisma.startseiteAbschnitt.deleteMany({ where: { art: 'NEUIGKEITEN' } })
   for (const [position, id] of SEED_IDS.entries()) {
     await prisma.startseiteAbschnitt.update({ where: { id }, data: { position, sichtbar: true } })
   }
@@ -178,5 +185,58 @@ describe('speichereEntwurf', () => {
     expect(await loescheStartseitenBlock({ blockId })).toEqual({ ok: true })
     expect(await prisma.startseiteAbschnitt.count({ where: { blockId } })).toBe(0)
     expect(await prisma.startseiteBlock.count({ where: { id: blockId } })).toBe(0)
+  })
+})
+
+describe('„Neu bei den Höfen“ hinzufügen (Nr. 129)', () => {
+  const NEU = NEUER_ABSCHNITT.NEUIGKEITEN
+  /** Die Liste mit dem neuen Abschnitt direkt unter „Höfe in deiner Nähe“. */
+  const mitNeuem = (zeilen: { id: string }[]) => [
+    { id: zeilen[0].id, sichtbar: true },
+    { id: zeilen[1].id, sichtbar: true },
+    { id: NEU, sichtbar: true },
+    ...zeilen.slice(2).map((z) => ({ id: z.id, sichtbar: true })),
+  ]
+
+  it('legt beim Speichern genau eine Zeile an, an ihrer Stelle, sichtbar in der Vorschau des Entwurfs', async () => {
+    await alsAdmin()
+    const ergebnis = await speichereEntwurf({ reihenfolge: mitNeuem(await zustand()), block: null })
+    expect(ergebnis).toMatchObject({ ok: true })
+    const neueId = 'neueAbschnitte' in ergebnis ? ergebnis.neueAbschnitte[NEU] : undefined
+
+    const nachher = await zustand()
+    expect(nachher.map((z) => z.art)).toEqual(['KOPF', 'HOEFE', 'NEUIGKEITEN', 'FUTTER', 'BRENNMATERIAL', 'SO_FUNKTIONIERTS', 'FUER_HOEFE', 'FRAGEN', 'FUSS'])
+    expect(nachher[2]).toMatchObject({ id: neueId, position: 2, sichtbar: true, blockId: null })
+    expect((await ladeVorschauZeilen({ quelle: 'entwurf', datum: JETZT })).map((z) => z.art)).toContain('NEUIGKEITEN')
+  })
+
+  it('ein zweites Hinzufügen ist nicht möglich — es bleibt eine Zeile, und mit ihrer Kennung geht das Speichern weiter', async () => {
+    await alsAdmin()
+    const erstes = await speichereEntwurf({ reihenfolge: mitNeuem(await zustand()), block: null })
+    expect(erstes).toMatchObject({ ok: true })
+    const mit = await zustand()
+
+    // Ein zweites Hinzufügen (die Liste kennt die neue Zeile schon): doppelt.
+    const zweites = [...mit.map((z) => ({ id: z.id, sichtbar: true }))]
+    zweites.splice(3, 0, { id: NEU, sichtbar: true })
+    expect(await speichereEntwurf({ reihenfolge: zweites, block: null })).toEqual({ error: REIHENFOLGE_FEHLER_TEXT['abschnitt-doppelt'] })
+    // Ein Fenster mit altem Stand (ohne die neue Zeile): veraltet.
+    expect(await speichereEntwurf({ reihenfolge: mitNeuem(mit.filter((z) => z.art !== 'NEUIGKEITEN')), block: null })).toMatchObject({ error: expect.stringContaining('inzwischen geändert') })
+    expect(await prisma.startseiteAbschnitt.count({ where: { art: 'NEUIGKEITEN' } })).toBe(1)
+
+    // Ausblenden geht wie bei jeder anderen Zeile.
+    const aus = mit.map((z) => ({ id: z.id, sichtbar: z.art !== 'NEUIGKEITEN' }))
+    expect(await speichereEntwurf({ reihenfolge: aus, block: null })).toMatchObject({ ok: true })
+    expect((await zustand()).find((z) => z.art === 'NEUIGKEITEN')?.sichtbar).toBe(false)
+  })
+
+  it('zwei Fenster fügen gleichzeitig hinzu: genau eine Zeile — das zweite bekommt einen Satz', async () => {
+    await alsAdmin()
+    const reihenfolge = mitNeuem(await zustand())
+    const ergebnisse = await Promise.all([speichereEntwurf({ reihenfolge, block: null }), speichereEntwurf({ reihenfolge, block: null })])
+    // Welches gewinnt, entscheidet die Maschine — der Zustand muss in jeder Verschränkung gelten.
+    expect(ergebnisse.filter((e) => 'ok' in e)).toHaveLength(1)
+    expect(ergebnisse.filter((e) => 'error' in e)).toHaveLength(1)
+    expect(await prisma.startseiteAbschnitt.count({ where: { art: 'NEUIGKEITEN' } })).toBe(1)
   })
 })
