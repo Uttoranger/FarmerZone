@@ -96,19 +96,29 @@ describe('Umfeld-Karte — erst beim Umschalten geladen', () => {
 })
 
 describe('Links auf fremde Hofseiten — Liste und Pin-Karte', () => {
-  it('nehmen den fertigen Link aus src/lib/umfeld.ts und bauen keinen eigenen', () => {
+  it('nehmen den fertigen Link aus src/lib/umfeld.ts bzw. den der HofKurzkarte und bauen keinen eigenen', () => {
     // Den Bereich-Parameter (bereich=futter) setzt hofseitenLink; welche Links
     // entstehen, prüft tests/umfeld.test.ts. Baute eine Komponente einen
     // Hof-Link selbst — als href oder für router.push —, fiele der Parameter
-    // dort still weg.
+    // dort still weg. Die Karte am Pin ist seit Nr. 124 die HofKurzkarte der
+    // Art „region": Sie baut „Zum Hof" aus Slug und dem Bereich, den die Karte
+    // ihr gibt (N23).
     const lies = (datei: string) => fs.readFileSync(path.join(WURZEL, 'src/components/analytics', datei), 'utf8')
     const liste = lies('umfeld-liste.tsx')
     const karte = lies('umfeld-karte.tsx')
     expect(liste).toMatch(/href=\{hof\.link\}/)
-    expect(karte).toMatch(/href=\{gewaehlt\.link\}/)
+    expect(karte).toMatch(/<HofKurzkarte\s+art="region"/)
+    expect(karte).toMatch(/bereich=\{karte\.bereich\}/)
+    expect(fs.readFileSync(path.join(WURZEL, 'src/components/hoefe/hof-kurzkarte.tsx'), 'utf8')).toMatch(/href=\{hofseitenLink\(hof\.slug, bereich\)\}/)
     for (const text of [liste, karte]) {
-      expect(text).not.toMatch(/\$\{[^}]*slug[^}]*\}/)
+      expect(text).not.toMatch(/href=\{`/)
       expect(text).not.toMatch(/hofseitenLink/)
+      expect(text).not.toMatch(/router\.push\(`/)
     }
+  })
+
+  it('die Pins tragen ihren Namen (Regel von /hoefe) — und keinen Preis', () => {
+    const karte = fs.readFileSync(path.join(WURZEL, 'src/components/analytics/umfeld-karte.tsx'), 'utf8')
+    expect(karte).toMatch(/karte\.pins\.map\(\(\{ slug, nummer, lat, lon, name \}\) => \(\{ slug, nummer, lat, lon, name \}\)\)/)
   })
 })

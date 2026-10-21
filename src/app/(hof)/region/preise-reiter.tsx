@@ -20,7 +20,8 @@ export async function PreiseReiter({ farm, suche }: { farm: { id: string; name: 
   const filter = leseUmfeldFilter(suche)
   let daten: Awaited<ReturnType<typeof getUmfeld>> | undefined
   try {
-    daten = await getUmfeld(farm.id, filter.km)
+    // Immer bis 50 km — Umkreis und Zahl je Stufe rechnet src/lib/umfeld.ts (N23).
+    daten = await getUmfeld(farm.id)
   } catch (err) {
     Sentry.captureException(err, { tags: { bereich: 'region', seite: 'preise' }, extra: { farmId: farm.id } })
   }

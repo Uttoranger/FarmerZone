@@ -87,8 +87,9 @@ const dezimal = (n: number) => new Decimal(n)
 function produktZeilen(h: SeedHof, nurImShop: boolean) {
   return h.produkte
     .filter((p) => !nurImShop || p.imShop)
-    .map((p) => ({
+    .map((p, i) => ({
       farmId: h.slug,
+      id: `${h.slug}-${i}`,
       name: p.name,
       category: p.category,
       subcategory: p.subcategory,
@@ -99,6 +100,8 @@ function produktZeilen(h: SeedHof, nurImShop: boolean) {
       // Der Seed schreibt keine Reservierung — die Spalte steht auf 0.
       reservedStock: 0,
       futter: p.futter ? { nettoMenge: dezimal(p.futter.nettoMenge), nettoEinheit: p.futter.nettoEinheit } : null,
+      imageUrl: null,
+      bildAusschnitt: null,
     }))
 }
 
@@ -115,9 +118,14 @@ vi.mock('@/lib/prisma', () => ({
           id,
           slug,
           name,
+          // Die Seed-PLZ ist für das Umfeld ohne Belang — erfunden wie alles hier.
+          postalCode: '5280',
           city,
           latitude,
           longitude,
+          bannerUrl: null,
+          bannerType: 'COLOR',
+          farmPhotos: [],
         }))
       ),
     },
@@ -135,10 +143,11 @@ import { baueUmfeld, baueUmfeldKarte, hoefeMitAngebotIm } from '@/lib/umfeld'
 
 const PILOTHOF = 'hof-mueller'
 
+/** Die Query lädt immer 50 km (N23); den gewählten Umkreis schneidet die reine Funktion — hier wie dort nach Entfernung. */
 async function umfeld(km: 10 | 25 | 50) {
-  const daten = await getUmfeld(PILOTHOF, km)
+  const daten = await getUmfeld(PILOTHOF)
   if (!daten?.eigenerStandort) throw new Error('Der Pilothof braucht einen Standort')
-  return daten
+  return { ...daten, hoefe: daten.hoefe.filter((h) => h.entfernungKm <= km) }
 }
 
 describe('Umfeld des Pilothofs im Testdatensatz', () => {
@@ -160,7 +169,17 @@ describe('Umfeld des Pilothofs im Testdatensatz', () => {
     expect(slugs).not.toContain('hof-wartend')
     expect(slugs).not.toContain('hof-ohne-standort')
     expect(daten.ohneStandort).toHaveLength(1)
-    expect(daten.abgeschnitten).toBe(false)
+    expect(daten.abgeschnittenAbKm).toBeNull()
+  })
+
+  it('zählt je Stufe des Umkreises die Höfe, die die Liste dort zählen würde — aus einem Laden bis 50 km', async () => {
+    const daten = await getUmfeld(PILOTHOF)
+    if (!daten?.eigenerStandort) throw new Error('Der Pilothof braucht einen Standort')
+    // Dieselben Zahlen wie die Tabelle oben — jetzt aus EINER Abfrage, unabhängig vom gewählten Umkreis.
+    for (const km of [10, 25, 50] as const) {
+      expect(baueUmfeld({ ...daten, bereich: 'LEBENSMITTEL', km }).zahlen).toEqual({ 10: 4, 25: 11, 50: 20 })
+      expect(baueUmfeld({ ...daten, bereich: 'FUTTERMITTEL', km }).zahlen).toEqual({ 10: 4, 25: 13, 50: 23 })
+    }
   })
 
   it('die Box schneidet keinen Hof knapp an der Grenze ab — die exakte Entfernung entscheidet', async () => {
@@ -186,7 +205,7 @@ describe('Umfeld des Pilothofs im Testdatensatz', () => {
     const { zeilen } = baueUmfeld({ ...daten, bereich: 'FUTTERMITTEL', km: 25 })
     const heu = zeilen.find((z) => z.titel === 'Wiesenheu')
     expect(heu?.anzahlHoefe).toBe(12)
-    expect(heu?.preise.map((p) => p.klasse)).toEqual(['Kleingebinde', 'Großgebinde'])
+    expect(heu?.preise.map((p) => p.klasse)).toEqual(['Kleingebinde bis 25 kg', 'Großgebinde über 25 kg'])
     // Der Pilothof verkauft Kleinballen à 15 kg — „Deins" steht in der Klasse Klein.
     expect(heu?.preise[0].deins).not.toBeNull()
     expect(heu?.preise[1].deins).toBeNull()
