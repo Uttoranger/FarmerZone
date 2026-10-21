@@ -66,6 +66,7 @@ vi.mock('@/components/hofseite/produkt-karte', () => ({
 
 import { FarmPageView } from '@/components/farm/farm-page-view'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
+import { publicFarm } from './fabrik/public-farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 
 const KAROTTEN: PublicProduct = {
@@ -74,15 +75,7 @@ const KAROTTEN: PublicProduct = {
   requiresFreezer: false, seasonStart: null, seasonEnd: null, unavailableReason: null, subcategory: null, labels: [],
   abgabe: 'ALLE', futter: null, familieId: null, brennmaterial: null, abholhinweise: [],
 }
-const HOF: PublicFarm = {
-  id: 'farm_test', slug: 'hof-test', name: 'Testhof A', ownerName: 'Erika Muster', description: 'Gemüse', address: 'Musterweg 1',
-  postalCode: '4900', city: 'Musterdorf', phone: '+43 660 0000000', email: 'hof@example.com', logoUrl: null, logoAusschnitt: null,
-  bannerUrl: null, tagline: null, foundedYear: null, aboutText: null, bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50,
-  bannerAusschnitt: null, sectionsConfig: [], farmValues: [], farmPhotos: [], acceptsOnline: true, acceptsOnsite: true,
-  stripeAccountReady: true, isPaused: false, pauseMessage: null, serviceFeePercent: 5, serviceFeeMinCents: 50,
-  serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z', betriebsstatus: null, gruendungshof: false, istTesthof: false,
-  gruendungSeit: null, abzeichenBlatt: null, products: [KAROTTEN], pickupSlots: [{ dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }],
-}
+const HOF: PublicFarm = publicFarm({ name: 'Testhof A', description: 'Gemüse', products: [KAROTTEN] })
 const BEITRAG: ActiveStatusPost = {
   id: 'bneu', title: 'Neue Karotten', body: 'Frisch vom Feld.', anlass: 'FRESH_PRODUCT', photoUrl: null, fotoAusschnitt: null,
   linkedProductIds: ['p_karotten'], publishedAt: '2026-10-02T06:00:00.000Z',

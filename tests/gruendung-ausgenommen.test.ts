@@ -31,8 +31,19 @@ import { GRUENDUNG_AUSNEHMEN_TEXT, gruendungAenderung, gruendungZuletztText, pla
 
 const STANDARD = GRUENDUNG_BIS_STANDARD
 
+/**
+ * Ein Hof mit dem, was das Menü zusätzlich liest: `istTesthof` ist Pflicht (Nr. 127).
+ *
+ * Bewusst NICHT über `hofRohdaten` (tests/fabrik): `gruendungAenderung` verlangt `HofFuerFolgen`, und dort steht
+ * `gruendungBis` — `HofRohdaten` hat dieses Feld nicht (der Typecheck sagt: „Property 'gruendungBis' is missing in type
+ * 'HofRohdaten'“). Der echte Aufrufer (admin/page.tsx) gibt die Zeile aus `getAdminFarms` (`AdminFarm`), nicht
+ * `HofRohdaten`. Diese Datei prüft reine Regeln über genau den Schnitt, den sie lesen (`HofFuerFolgen`); ein neues
+ * Pflichtfeld dort bricht nur `hof()` unten, ein neues Feld in `HofRohdaten` gar nichts.
+ */
+type HofMitTesthof = HofFuerFolgen & { istTesthof: boolean }
+
 /** Hof n, freigeschaltet am n. Jänner 2026 — die Reihenfolge der Plätze ist die der Nummern. */
-function hof(n: number, ueber: Partial<HofFuerFolgen> = {}): HofFuerFolgen {
+function hof(n: number, ueber: Partial<HofMitTesthof> = {}): HofMitTesthof {
   return {
     id: `hof_${String(n).padStart(2, '0')}`,
     name: `Testhof ${String.fromCharCode(64 + n)}`,
@@ -40,12 +51,13 @@ function hof(n: number, ueber: Partial<HofFuerFolgen> = {}): HofFuerFolgen {
     createdAt: new Date(Date.UTC(2025, 0, 1)),
     archivedAt: null,
     gruendungAusgenommen: false,
+    istTesthof: false,
     gruendungBis: null,
     ...ueber,
   }
 }
 
-const reihe = (n: number, ueber: Record<number, Partial<HofFuerFolgen>> = {}): HofFuerFolgen[] =>
+const reihe = (n: number, ueber: Record<number, Partial<HofMitTesthof>> = {}): HofMitTesthof[] =>
   Array.from({ length: n }, (_, i) => hof(i + 1, ueber[i + 1]))
 
 describe('gruendungsplaetze mit ausgenommenem Hof', () => {
@@ -131,7 +143,7 @@ describe('folgenDerAenderung — Wiederaufnahme', () => {
 describe('gruendungAenderung — Menü und Bestätigung', () => {
   it('Ausnehmen mit Platz: Sätze in Zahlen, Haken, oranger Knopf-Text', () => {
     const hoefe = reihe(3)
-    const a = gruendungAenderung(hoefe[1] as HofFuerFolgen, hoefe, 12, STANDARD)
+    const a = gruendungAenderung(hoefe[1] as HofMitTesthof, hoefe, 12, STANDARD)
     expect(a).toMatchObject({
       richtung: 'ausnehmen',
       menue: GRUENDUNG_AUSNEHMEN_TEXT.menue.ausnehmen,
@@ -150,32 +162,32 @@ describe('gruendungAenderung — Menü und Bestätigung', () => {
 
   it('ein Hof, der neu Gründungshof wird, steht ausdrücklich da — mit seinem eigenen Ende', () => {
     const hoefe = reihe(4, { 4: { gruendungBis: bildeGruendungBis('2028-06-30') } })
-    const a = gruendungAenderung(hoefe[0] as HofFuerFolgen, hoefe, 3, STANDARD)
+    const a = gruendungAenderung(hoefe[0] as HofMitTesthof, hoefe, 3, STANDARD)
     expect(a.saetze).toContain('Neu Gründungshof: Testhof D rückt auf Platz 3 und läuft dann bis 30. Juni 2028 ohne Grundgebühr.')
     expect(a.saetze.at(-1)).toBe('Danach sind alle 3 Plätze vergeben.')
   })
 
   it('höchstens drei Höfe beim Nachrücken, dann „und n weitere“', () => {
     const hoefe = reihe(7)
-    const a = gruendungAenderung(hoefe[0] as HofFuerFolgen, hoefe, 12, STANDARD)
+    const a = gruendungAenderung(hoefe[0] as HofMitTesthof, hoefe, 12, STANDARD)
     expect(a.saetze[1]).toBe('Testhof B rückt auf Nr. 1, Testhof C auf Nr. 2, Testhof D auf Nr. 3 – und 3 weitere rücken je eine Nummer vor.')
     // Gegenprobe: genau drei — ohne „weitere“.
     const drei = reihe(4)
-    expect(gruendungAenderung(drei[0] as HofFuerFolgen, drei, 12, STANDARD).saetze[1]).toBe(
+    expect(gruendungAenderung(drei[0] as HofMitTesthof, drei, 12, STANDARD).saetze[1]).toBe(
       'Testhof B rückt auf Nr. 1, Testhof C auf Nr. 2 und Testhof D auf Nr. 3.'
     )
   })
 
   it('Ausnehmen ohne Platz: kein Haken', () => {
     const hoefe = reihe(4)
-    const a = gruendungAenderung(hoefe[3] as HofFuerFolgen, hoefe, 3, STANDARD)
+    const a = gruendungAenderung(hoefe[3] as HofMitTesthof, hoefe, 3, STANDARD)
     expect(a.haken).toBe(false)
     expect(a.saetze[0]).toBe('Testhof D hält gerade keinen Gründungsplatz – an den Plätzen ändert sich nichts.')
   })
 
   it('Wiederaufnahme: „Nr. 2 → Nr. 3 – die Zusage bleibt“, höchstens drei, kein Haken', () => {
     const hoefe = reihe(6, { 1: { gruendungAusgenommen: true } })
-    const a = gruendungAenderung(hoefe[0] as HofFuerFolgen, hoefe, 12, STANDARD)
+    const a = gruendungAenderung(hoefe[0] as HofMitTesthof, hoefe, 12, STANDARD)
     expect(a).toMatchObject({ richtung: 'aufnehmen', menue: GRUENDUNG_AUSNEHMEN_TEXT.menue.aufnehmen, gesperrt: null, haken: false, knopf: 'Wieder zählen' })
     expect(a.saetze).toEqual([
       'Testhof A bekommt Platz Nr. 1 – Hofladen ohne Grundgebühr bis 31. Dezember 2027.',
@@ -189,7 +201,7 @@ describe('gruendungAenderung — Menü und Bestätigung', () => {
 
   it('Wiederaufnahme bei vollen Plätzen: ausgegraut mit dem Satz aus der Einstellung', () => {
     const hoefe = reihe(4, { 2: { gruendungAusgenommen: true } })
-    const a = gruendungAenderung(hoefe[1] as HofFuerFolgen, hoefe, 3, STANDARD)
+    const a = gruendungAenderung(hoefe[1] as HofMitTesthof, hoefe, 3, STANDARD)
     expect(a.gesperrt).toBe(gruendungAlleVergeben(3))
     expect(a.gesperrt).toBe('Alle 3 Gründungsplätze sind vergeben – erst muss ein Platz frei werden.')
     expect(a.saetze).toEqual([])

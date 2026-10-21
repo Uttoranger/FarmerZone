@@ -58,7 +58,6 @@ export function HoefeSuche({
   kompakt = false,
   suchtext,
   vorschlaege,
-  status,
   bezugspunkt,
   ankunftsText = '',
   onSuchtext,
@@ -72,8 +71,6 @@ export function HoefeSuche({
   kompakt?: boolean
   suchtext: string
   vorschlaege: readonly ProduktVorschlag[]
-  /** Die Ansage fürs Vorlesen („3 Treffer gefunden."); leer ohne Suche. */
-  status: string
   bezugspunkt: Bezugspunkt | null
   /** Der Suchtext, mit dem die Kundin abgesendet ankam (Startseite, Kopfzeile, 404) — wird einmal wie Enter aufgelöst. */
   ankunftsText?: string
@@ -243,11 +240,8 @@ export function HoefeSuche({
               })}
             </ul>
           )}
-          {/* Dauerhaft im Baum, sonst verpasst der Screenreader die erste Änderung.
-              Sichtbar ändert sich die Liste selbst, deshalb sr-only. */}
-          <p role="status" className="sr-only">
-            {status}
-          </p>
+          {/* Keine eigene Ansage der Trefferzahl: Die Zahlzeile über der Liste (hoefe-client.tsx, role="status")
+              sagt sie an — eine zweite Region las jede Änderung doppelt vor (Nr. 127). */}
         </form>
 
         {/* Solange der Hinweis „Standort nur ungefähr" offen ist, bleibt der Knopf stehen und die grüne Karte wartet (Mockup

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { MEIN_HOF_REITER_HOFBEREICH, type MeinHofReiterAlleId } from '@/lib/bauern-navigation'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { LadePunkt } from '@/components/ui/lade-punkt'
 import { cn } from '@/lib/utils'
 
 /*
@@ -14,6 +15,10 @@ import { cn } from '@/lib/utils'
  *
  * Reiter links gruppiert wie im Mockup; „Beiträge · N" mit der Zahl aller
  * eigenen Beiträge (zaehleBeitraege), keine Produktzahl.
+ *
+ * Ladepunkt statt Skelett (Nr. 127): Ein Wechsel des Reiters lässt den Inhalt
+ * stehen; der gewählte Reiter zeigt einen kleinen Punkt, und der Inhalt trägt
+ * `aria-busy` (MeinHofAnsicht → LadeRahmen/LadeInhalt).
  */
 export function MeinHofReiterLeiste({
   aktiv,
@@ -38,7 +43,7 @@ export function MeinHofReiterLeiste({
             scroll={false}
             aria-current={istAktiv ? 'page' : undefined}
             className={cn(
-              '-mb-px inline-flex min-h-12 items-center border-b-2 px-0.5 text-[15px] whitespace-nowrap transition-colors duration-[250ms]',
+              'relative -mb-px inline-flex min-h-12 items-center border-b-2 px-0.5 text-[15px] whitespace-nowrap transition-colors duration-[250ms]',
               istAktiv ? 'border-foreground font-semibold text-foreground' : 'border-transparent font-medium text-muted-foreground hover:text-foreground',
               reiter.nurUnterMd && 'md:hidden',
               FOKUS_RAHMEN,
@@ -47,6 +52,8 @@ export function MeinHofReiterLeiste({
           >
             {reiter.label}
             {reiter.id === 'beitraege' && ` · ${beitraegeZahl}`}
+            {/* Der Punkt sitzt neben dem Wort, nicht darauf: zwischen den Reitern ist Platz (gap-7). */}
+            <LadePunkt className="-right-2.5" />
           </Link>
         )
       })}

@@ -67,6 +67,7 @@ import { KAEUFER_VORSCHAU, type KartenVorschau } from '@/lib/hofseite-kunde'
 import { TESTHOF_HINWEIS } from '@/lib/gruendungshof'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
+import { publicFarm } from './fabrik/public-farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import type { ProductCategoryValue } from '@/lib/taxonomie'
 
@@ -92,19 +93,8 @@ function produkt(id: string, name: string, category: ProductCategoryValue | null
   }
 }
 
-const HOF: PublicFarm = {
-  id: 'farm_test', slug: 'hof-test', name: 'Hof Test', ownerName: 'Erika Muster',
-  description: 'Gemüse aus Musterdorf', address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf',
-  phone: '+43 660 0000000', email: 'hof@example.com', logoUrl: null, logoAusschnitt: null, bannerUrl: null,
-  tagline: null, foundedYear: null, aboutText: 'Ein kleiner Familienbetrieb.', bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50, bannerAusschnitt: null,
-  sectionsConfig: [], farmValues: [], farmPhotos: [],
-  acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,
-  serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
-  betriebsstatus: null,
-  gruendungshof: false,
-  istTesthof: false,
-  gruendungSeit: null,
-  abzeichenBlatt: null,
+const HOF: PublicFarm = publicFarm({
+  aboutText: 'Ein kleiner Familienbetrieb.',
   products: [
     produkt('p_holz', 'Buchenscheite', 'BRENNHOLZ'),
     produkt('p_heu', 'Bergwiesen-Heu', 'HEU_STROH'),
@@ -112,8 +102,7 @@ const HOF: PublicFarm = {
     produkt('p_honig', 'Blütenhonig', 'HONIG', 0),
     produkt('p_karotten', 'Karotten', 'GEMUESE'),
   ],
-  pickupSlots: [{ dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }],
-}
+})
 
 const STATUS: ActiveStatusPost = {
   id: 'status_1', title: 'Neue Ernte', body: 'Frische Karotten ab Freitag.', anlass: 'ANNOUNCEMENT',

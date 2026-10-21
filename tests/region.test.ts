@@ -78,6 +78,7 @@ const produkt = (id: string, name: string, category: VorschauProdukt['category']
   imageUrl: null,
   bildAusschnitt: null,
   category,
+  subcategory: null,
   verfuegbar: true,
 })
 const EINTRAG: ListenEintrag & { slug: string } = {

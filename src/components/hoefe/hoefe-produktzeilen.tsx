@@ -28,8 +28,8 @@ function preisZeile(p: VorschauProdukt): string {
  * aber der gestreckte Link/Knopf der Karte fängt ihn ohnehin ab).
  *
  * Fehlt ein Produktbild, steht seit Nr. 120 die Illustration der Kategorie da
- * (illustrationPfad, dieselbe Quelle wie Produktseite und Teilen-Bild,
- * Register N22) — vorher der Anfangsbuchstabe auf Sandfläche.
+ * (illustrationPfad mit Kategorie UND Unterkategorie, dieselbe Quelle wie
+ * Produktseite und Teilen-Bild, Register N22; Unterkategorie seit Nr. 127) — vorher der Anfangsbuchstabe auf Sandfläche.
  *
  * AUSVERKAUFT wird gedämpft, aber NICHT verblasst: Ein `opacity` über die
  * ganze Zeile zöge den ohnehin gedeckten Preis auf rund 2,6:1 Kontrast — er
@@ -102,7 +102,7 @@ export function HoefeProduktzeilen({
             </span>
           ) : (
             <HofBildflaeche
-              bilder={[illustrationPfad(produkt.category)]}
+              bilder={[illustrationPfad(produkt.category, produkt.subcategory)]}
               sizes={`${bildKante}px`}
               gedaempft={!produkt.verfuegbar}
               fuellen

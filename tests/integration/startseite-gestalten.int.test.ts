@@ -170,7 +170,7 @@ describe('speichereEntwurf', () => {
     const { farm } = await erstelleHof({ approvedAt: null })
     const vorher = await zustand()
     const reihenfolge = [{ id: vorher[0].id, sichtbar: true }, { id: NEUER_BLOCK, sichtbar: true }, ...vorher.slice(1).map((z) => ({ id: z.id, sichtbar: true }))]
-    expect(await speichereEntwurf({ reihenfolge, block: block({ vorlage: 'HOEFE_AUSWAHL', farmIds: [farm.id] }) })).toEqual({ error: 'Wähle nur freigeschaltete Höfe.' })
+    expect(await speichereEntwurf({ reihenfolge, block: block({ vorlage: 'HOEFE_AUSWAHL', farmIds: [farm.id] }) })).toEqual({ error: 'Wähle nur freigeschaltete Höfe, keine Testhöfe.' })
     expect(await zustand()).toEqual(vorher)
   })
 

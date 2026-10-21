@@ -23,14 +23,14 @@ vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOu
 
 import { generateMetadata } from '@/app/(public)/[farmSlug]/page'
 import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
-import type { PublicFarm } from '@/server/queries/farm'
+import { publicFarm } from './fabrik/public-farm'
 
 const lade = vi.mocked(ladeHofseiteGeteilt)
 const KURZ = 'Gemüse und Eier aus Musterdorf'
 
 /** Beschreibung der Metadaten und der Teilen-Vorschau für einen Hof mit diesen beiden Texten. */
 async function beschreibungen(aboutText: string | null, description = KURZ): Promise<{ meta: unknown; vorschau: unknown }> {
-  const farm = { name: 'Hof Test', slug: 'hof-test', city: 'Musterdorf', products: [], aboutText, description } as unknown as PublicFarm
+  const farm = publicFarm({ aboutText, description })
   lade.mockResolvedValue({ farm, ansicht: { art: 'kundin', noindex: false, kaufen: true } })
   const meta = await generateMetadata({ params: Promise.resolve({ farmSlug: 'hof-test' }), searchParams: Promise.resolve({}) })
   return { meta: meta.description, vorschau: (meta.openGraph as { description?: string } | undefined)?.description }

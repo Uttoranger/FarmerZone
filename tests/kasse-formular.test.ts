@@ -62,50 +62,20 @@ import { ANGABEN_ZUM_HOF_TITEL } from '@/lib/stripe-konto'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import { SITZUNG_SCHLUESSEL, WARENKORB_SCHLUESSEL } from '@/lib/warenkorb-speicher'
 import type { PublicFarm } from '@/server/queries/farm'
+import { publicFarm } from './fabrik/public-farm'
 
 // Montag, 5. Oktober 2026, 10:00 Uhr in Wien — vor dem Bar-Stichtag (Register B1).
 const JETZT = new Date('2026-10-05T08:00:00.000Z')
 const STRIPE_SATZ = 'Im nächsten Schritt bezahlst du sicher über Stripe.'
 
-const HOF: PublicFarm = {
-  id: 'farm_test',
-  slug: 'hof-test',
-  name: 'Hof Test',
+const HOF: PublicFarm = publicFarm({
   ownerName: 'Max Mustermann',
   description: '',
   address: 'Feldweg 1',
   postalCode: '4910',
   city: 'Ried',
-  phone: '+43 660 0000000',
-  email: 'hof@example.com',
-  logoUrl: null,
-  logoAusschnitt: null,
-  bannerUrl: null,
-  tagline: null,
-  foundedYear: null,
-  aboutText: null,
-  bannerType: 'GRADIENT',
-  bannerValue: null,
-  bannerFocusY: 50, bannerAusschnitt: null,
-  sectionsConfig: [],
-  farmValues: [],
-  farmPhotos: [],
-  acceptsOnline: true,
-  acceptsOnsite: true,
-  stripeAccountReady: true,
-  isPaused: false,
-  pauseMessage: null,
-  serviceFeePercent: 5,
-  serviceFeeMinCents: 50,
-  serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
-  betriebsstatus: null,
-  gruendungshof: false,
-  istTesthof: false,
-  gruendungSeit: null,
-  abzeichenBlatt: null,
-  products: [],
   pickupSlots: [{ dayOfWeek: 6, startTime: '14:00', endTime: '16:00' }],
-}
+})
 
 // Zwei Eier-Packungen à € 4,90: Warenpreis € 9,80, online mind. € 0,50 Gebühr.
 const SPEICHER: Record<string, string> = {

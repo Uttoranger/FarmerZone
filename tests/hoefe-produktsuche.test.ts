@@ -36,6 +36,7 @@ function produkt(teil: Partial<VorschauProdukt> & { name: string }): VorschauPro
     imageUrl: null,
     bildAusschnitt: null,
     category: null,
+    subcategory: null,
     verfuegbar: true,
     ...teil,
   }

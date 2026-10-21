@@ -15,7 +15,7 @@
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import type { ProductCategoryValue } from '@/schemas/product'
 import type { AbholungWahl, HoefeFilter } from '@/schemas/hoefe-filter'
-import { ANZEIGE_BEREICHE, anzeigeBereichVon, type AnzeigeBereich } from '@/lib/taxonomie'
+import { ANZEIGE_BEREICHE, anzeigeBereichVon, type AnzeigeBereich, type ProductSubcategoryValue } from '@/lib/taxonomie'
 import { DAY_NAMES } from '@/lib/pickup-slot-rules'
 import { istFensterBestellbar } from '@/lib/abholfenster'
 import { wienerZeitpunkt } from '@/lib/fristen'
@@ -317,6 +317,8 @@ export type VorschauProdukt = {
   /** Ausschnitt des Produktfotos (Register N17, Nr. 98), schon geprüft; null = wie heute. */
   bildAusschnitt: BildAusschnitt | null
   category: ProductCategoryValue | null
+  /** Die Unterkategorie (Sorte): Ohne Foto zeigt die Produktzeile ihre Illustration (illustrationPfad, Nr. 127). */
+  subcategory: ProductSubcategoryValue | null
   /** Bestand abzüglich Reservierung — false heißt „derzeit aus". */
   verfuegbar: boolean
 }

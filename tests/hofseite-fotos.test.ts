@@ -124,10 +124,12 @@ describe('Mosaik unter lg', () => {
   it('„wischen blättert“ steht nur dort, wo es keine Pfeile gibt – mit der Maus (pointer-fine) steht „Pfeile blättern“ (Nr. 121)', () => {
     const html = uebersicht(8)
     const touch = html.match(/<span class="([^"]*)">Tippen öffnet die Bildansicht – wischen blättert durch alle 8\.<\/span>/)
-    const maus = html.match(/<span class="([^"]*)">Tippen öffnet die Bildansicht – Pfeile blättern durch alle 8\.<\/span>/)
+    const maus = html.match(/<span class="([^"]*)">Klicken öffnet die Bildansicht – Pfeile blättern durch alle 8\.<\/span>/)
     // Gegenprobe: Beide Fassungen müssen gefunden werden, sonst beweist der Rest nichts.
     expect(touch).not.toBeNull()
     expect(maus).not.toBeNull()
+    // Nr. 127: Mit der Maus klickt man, man tippt nicht — die Maus-Fassung sagt „Klicken“, die Handy-Fassung bleibt bei „Tippen“.
+    expect(html).not.toContain('Tippen öffnet die Bildansicht – Pfeile')
     expect(touch?.[1]).toContain('pointer-fine:hidden')
     expect(maus?.[1]).toMatch(/(^| )hidden( |$)/)
     expect(maus?.[1]).toContain('pointer-fine:inline')

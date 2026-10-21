@@ -38,6 +38,8 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
+  // Die Reiter tragen seit Nr. 127 den Ladepunkt (useLinkStatus) — hier lädt nie etwas.
+  useLinkStatus: () => ({ pending: false }),
 }))
 // Nur die Aufrufe zählen: welcher Toast mit welcher Kennung.
 const toast = vi.hoisted(() => ({ custom: vi.fn(), success: vi.fn(), dismiss: vi.fn() }))
