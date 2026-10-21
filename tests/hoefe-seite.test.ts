@@ -240,9 +240,80 @@ describe('Hofkarte A', () => {
   })
 })
 
+/**
+ * Das Markup der Pin-Vorschau von /hoefe, wie es VOR dem Umbau des Rahmens war (Stand d9c0c2b, Kurzform mit `schaufenster`
+ * und `jetzt` im Rahmen), an denselben Testdaten wie unten. Absichtlich ein Schnappschuss, obwohl TESTING_GUIDELINES §1 sie
+ * sonst meidet: Auftrag Nr. 133 Punkt 1 verlangt den Beleg, dass der Umbau /hoefe nicht verändert. Ändert jemand die
+ * Vorschau gewollt, ersetzt er diesen Text durch das neue Markup — mit Bild im Bericht.
+ */
+const KURZFORM_VORHER = [
+  '<link rel="preload" as="image" href="/categories/eier.webp"/>',
+  '<link rel="preload" as="image" href="/categories/brot.webp"/>',
+  '<div id="vorschau-1" role="tooltip" style="width:288px" class="overflow-hidden rounded-2xl border border-border bg-card text-left shadow-lg">',
+  '<span data-slot="hof-bildflaeche" class="flex justify-center overflow-hidden bg-muted dark:ring-1 dark:ring-border h-[104px] w-full">',
+  '<span class="relative h-full min-w-0 aspect-square shrink">',
+  '<img src="/categories/eier.webp" alt=""/>',
+  '</span>',
+  '<span class="relative h-full min-w-0 aspect-square shrink">',
+  '<img src="/categories/brot.webp" alt=""/>',
+  '</span>',
+  '</span>',
+  '<div class="flex flex-col gap-1 p-3.5">',
+  '<div class="flex items-start gap-2">',
+  '<p class="line-clamp-2 min-w-0 flex-1 font-heading text-[17px] leading-snug font-semibold break-words text-foreground">Hof Test</p>',
+  '<span class="shrink-0 pt-0.5 text-[13px] text-muted-foreground">2,1 km</span>',
+  '</div>',
+  '<p class="truncate text-[13px] text-muted-foreground">1010 Wien</p>',
+  '<p data-abholung="heute" class="flex items-center gap-1.5 text-[13px] text-status-fertig font-semibold">',
+  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock size-3.5 shrink-0" aria-hidden="true">',
+  '<circle cx="12" cy="12" r="10">',
+  '</circle>',
+  '<path d="M12 6v6l4 2">',
+  '</path>',
+  '</svg>',
+  '<span class="min-w-0">Abholung heute 15:00–18:00</span>',
+  '</p>',
+  '<div class="mt-2 space-y-1.5">',
+  '<div class="flex items-center gap-2">',
+  '<div class="min-w-0 flex-1">',
+  '<div class="flex items-baseline gap-1.5">',
+  '<p class="min-w-0 truncate text-sm text-foreground">Freilandeier</p>',
+  '</div>',
+  '<p class="text-xs text-muted-foreground">€ 4,20 / Stück</p>',
+  '</div>',
+  '<span data-slot="hof-bildflaeche" class="flex justify-center overflow-hidden bg-muted dark:ring-1 dark:ring-border shrink-0 rounded-lg size-10">',
+  '<span class="relative h-full min-w-0 flex-1">',
+  '<img src="/categories/eier.webp" alt=""/>',
+  '</span>',
+  '</span>',
+  '</div>',
+  '<div class="flex items-center gap-2">',
+  '<div class="min-w-0 flex-1">',
+  '<div class="flex items-baseline gap-1.5">',
+  '<p class="min-w-0 truncate text-sm text-foreground">Bauernbrot</p>',
+  '</div>',
+  '<p class="text-xs text-muted-foreground">€ 4,20 / Stück</p>',
+  '</div>',
+  '<span data-slot="hof-bildflaeche" class="flex justify-center overflow-hidden bg-muted dark:ring-1 dark:ring-border shrink-0 rounded-lg size-10">',
+  '<span class="relative h-full min-w-0 flex-1">',
+  '<img src="/categories/eier.webp" alt=""/>',
+  '</span>',
+  '</span>',
+  '</div>',
+  '</div>',
+  '<a href="/hof-test" tabindex="-1" class="mt-1 inline-flex min-h-11 items-center gap-0.5 self-start rounded-lg text-[13.5px] font-semibold text-status-fertig hover:underline outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-ring">Zum Hof<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right size-4" aria-hidden="true">',
+  '<path d="m9 18 6-6-6-6">',
+  '</path>',
+  '</svg>',
+  '</a>',
+  '</div>',
+  '</div>',
+].join('')
+
 describe('HofKurzkarte — die Pin-Vorschau am Computer', () => {
-  // So baut hoefe-client.tsx die Vorschau: der Rahmen nimmt den Inhalt als `children`. Der Rahmen hat keine Hooks, darum
-  // als Funktion aufgerufen — createElement mit `children` im Props-Objekt verbietet die Lint-Regel, als drittes Argument der Typ.
+  // So baut hoefe-client.tsx die Vorschau: der Rahmen nimmt den Inhalt als `children`. Der Rahmen (art „tooltip") hat keine Hooks,
+  // darum als Funktion aufgerufen — `createElement` mit `children` im Props-Objekt verbietet die Lint-Regel, als drittes
+  // Argument der Typ. Bekommt der Rahmen einmal einen Hook, wirft dieser Aufruf und der Test wird rot, nicht still falsch.
   const hofMitEntfernung = { ...HOF, entfernungKm: 2.1 }
   const kurz = html(
     HofKurzkarte({
@@ -252,6 +323,10 @@ describe('HofKurzkarte — die Pin-Vorschau am Computer', () => {
       children: createElement(KurzkartenInhalt, { hof: hofMitEntfernung, schaufenster: { produkte: DREI.produkte.slice(0, 2) }, jetzt: JETZT }),
     })
   )
+
+  it('das Markup ist Byte für Byte das von vor dem Umbau des Rahmens (Nr. 133 Punkt 1)', () => {
+    expect(kurz).toBe(KURZFORM_VORHER)
+  })
 
   it('ein role="tooltip" mit Name, Entfernung, Ort, Abholzeile und zwei Produktzeilen mit 40er-Bildern', () => {
     expect(kurz).toContain('id="vorschau-1" role="tooltip"')
