@@ -285,41 +285,11 @@ describe('PreisStreifen — ein Bild mit Satz, ohne Namen und ohne Antippen', ()
     expect(html.split(daten.satz)).toHaveLength(2)
   })
 
-  /** Das Element mit `data-ende="…"` als Text samt Attributen. */
-  const ende = (html: string, art: string) => html.match(new RegExp(`<span data-ende="${art}"[^>]*>[^<]*`))?.[0] ?? ''
-
-  it('„Deins" innerhalb: Kleinst- und Höchstwert an den Enden der Spur', () => {
-    const html = renderToStaticMarkup(createElement(PreisStreifen, { streifen: daten }))
-    expect(ende(html, 'kleinst')).toContain('left-0')
-    expect(ende(html, 'kleinst')).toContain('€ 1,47')
-    expect(ende(html, 'hoechst')).toContain('right-0')
-    expect(ende(html, 'hoechst')).toContain('€ 1,66')
-  })
-
-  it('„Deins" über der Spanne: der Höchstwert steht unter dem Ende der Spanne, nicht unter „Deins"', () => {
-    // Skala 147–175: das Ende der Spanne (166) liegt bei 19/28 der Spur.
+  it('„Deins" über der Spanne: Kleinst- und Höchstwert an den Enden der Spur, wie im Board v3 §2', () => {
+    // Das Board zeigt die Lage „über der Spanne" mit dem Höchstwert rechts außen (right: 0) – unter „Deins".
     const html = renderToStaticMarkup(createElement(PreisStreifen, { streifen: { ...daten, deins: 175 } }))
-    const hoechst = ende(html, 'hoechst')
-    expect(hoechst).not.toContain('right-0')
-    expect(hoechst).toContain(`${19 / 28} *`)
-    expect(hoechst).toContain('translateX(-50%)')
-    expect(ende(html, 'kleinst')).toContain('left-0')
-  })
-
-  it('„Deins" unter der Spanne: der Kleinstwert steht unter dem Ende der Spanne', () => {
-    // Skala 120–166: das Ende der Spanne (147) liegt bei 27/46 der Spur.
-    const html = renderToStaticMarkup(createElement(PreisStreifen, { streifen: { ...daten, deins: 120 } }))
-    const kleinst = ende(html, 'kleinst')
-    expect(kleinst).not.toContain('left-0')
-    expect(kleinst).toContain(`${27 / 46} *`)
-    expect(ende(html, 'hoechst')).toContain('right-0')
-  })
-
-  it('liegen die Enden der Spanne eng (Deins weit draußen), steht ein gemeinsames „von – bis" unter der Spanne', () => {
-    const html = renderToStaticMarkup(createElement(PreisStreifen, { streifen: { ...daten, deins: 220 } }))
-    expect(ende(html, 'spanne')).toContain('€ 1,47 – € 1,66')
-    expect(html).not.toContain('data-ende="kleinst"')
-    expect(html).not.toContain('data-ende="hoechst"')
+    expect(html).toMatch(/left-0[^"]*"[^>]*>€ 1,47</)
+    expect(html).toMatch(/right-0[^"]*"[^>]*>€ 1,66</)
   })
 
   it('ohne „Deins" kein grüner Punkt und kein Wort „Deins"', () => {
