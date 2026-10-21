@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Building2, ChevronLeft, Leaf, PauseCircle, ShieldCheck, ShoppingBasket } from 'lucide-react'
+import { Building2, ChevronLeft, Leaf, PauseCircle, ShoppingBasket } from 'lucide-react'
 import { toast } from 'sonner'
 import type { PublicProduct } from '@/server/queries/farm'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
@@ -50,6 +50,8 @@ import { RaummassErklaerung } from '@/components/shared/raummass-erklaerung'
 import { raummassErklaeren } from '@/lib/verkaufsgroessen'
 import { futterVerantwortung, futterVerantwortungImKorb } from '@/lib/futter-registrierung'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
+import { FutterSchild } from '@/components/produkte/futter-schild'
+import { AbholhinweisZeile } from '@/components/region/futter-abholhinweise'
 import { kassenAdresse } from '@/lib/kasse'
 import { mitKaeuferVorbelegung, type KaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 
@@ -280,12 +282,10 @@ export function ProduktdetailKunde({
 
               {knapp && <p className="text-[13px] font-medium text-muted-foreground">{knapp}</p>}
 
-              {schild && (
-                <p className="flex items-center gap-1.5 text-[12.5px] font-medium text-status-fertig">
-                  <ShieldCheck className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-                  {schild}
-                </p>
-              )}
+              {schild && <FutterSchild text={schild} />}
+
+              {/* Abholhinweise des Futters (N23, Nr. 123) — derselbe Baustein wie in „Futter kaufen". */}
+              {produkt.abholhinweise.length > 0 && <AbholhinweisZeile hinweise={produkt.abholhinweise.map((hinweis) => ({ hinweis }))} />}
 
               {/* Kacheln nach Platz statt fester Spalten: In der schmalen Textspalte ab 1024 px brach „Ofenfertig“ sonst mitten im Wort. */}
               {brennmaterial.length > 0 && (

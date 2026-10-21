@@ -88,7 +88,7 @@ function produkt(id: string, name: string): PublicProduct {
     price: 4.5, unit: 'STUECK', unitSize: null, stock: 20, isAvailable: true, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null,
+    familieId: null, brennmaterial: null, abholhinweise: [],
   }
 }
 

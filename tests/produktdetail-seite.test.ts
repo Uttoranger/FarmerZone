@@ -91,7 +91,7 @@ function produkt(id: string, teil: Partial<PublicProduct> = {}): PublicProduct {
     price: 4.5, unit: 'STUECK', unitSize: null, stock: 20, isAvailable: true, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null,
+    familieId: null, brennmaterial: null, abholhinweise: [],
     ...teil,
   }
 }
@@ -269,7 +269,7 @@ describe('Menge, Vorrat, Korb', () => {
 describe('Schild, Kennzeichnung, Gleich mit abholen', () => {
   it('E9: Schild mit LFBIS-Nummer, Kennzeichnung „laut Angabe des Hofs", nie „geprüft"', async () => {
     const html = await seite('p_5kg')
-    expect(html).toContain('Futtermittelbetrieb · LFBIS 1234567')
+    expect(html).toContain('Futtermittelbetrieb · LFBIS 1234567 · laut Hof')
     expect(html).toContain('1234567 (laut Angabe des Hofs)')
     expect(html).not.toMatch(/geprüft/i)
   })

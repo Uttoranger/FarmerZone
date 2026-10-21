@@ -25,6 +25,7 @@ import {
   type Gebinde,
 } from '@/lib/futter-registrierung'
 import {
+  abholhinweiseDaten,
   futterDaten,
   ladeHofRegistrierung,
   revalidiereProdukte,
@@ -85,6 +86,7 @@ function produktDaten(v: ProductFormData) {
     subcategory: v.subcategory ?? null,
     labels: bereinigeSiegel(v.labels),
     abgabe: v.abgabe,
+    abholhinweise: abholhinweiseDaten(v.category ?? null, v.abholhinweise),
     countsTowardLimit: v.countsTowardLimit,
     price: v.price,
     vatRate: v.vatRate,

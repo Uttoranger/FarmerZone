@@ -317,7 +317,7 @@ function produkt(id: string, name: string, sichtbar: boolean): PublicProduct {
     price: 3.5, unit: 'kg', unitSize: 1, stock: 10, isAvailable: sichtbar, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null,
+    familieId: null, brennmaterial: null, abholhinweise: [],
   }
 }
 

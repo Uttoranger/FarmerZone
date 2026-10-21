@@ -397,6 +397,7 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
       unavailableReason: null,
       familieId: null,
       verpackung: null,
+      abholhinweise: [],
       sperre: null,
       ...teil,
     }
