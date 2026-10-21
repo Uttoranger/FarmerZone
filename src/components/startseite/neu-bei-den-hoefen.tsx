@@ -70,7 +70,7 @@ export function NeuBeiDenHoefen({ neuigkeiten, jetzt }: { neuigkeiten: readonly 
             </button>
           </span>
         </div>
-        <ul ref={reihe} className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:gap-6 md:px-0">
+        <ul ref={reihe} className="-mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:scroll-px-0 md:gap-6 md:px-0">
           {sichtbar.map((n) => {
             const anlass = BEITRAG_ANLASS[n.anlass]
             return (
