@@ -24,6 +24,7 @@ Freigabe: `docs/nachtlauf/freigabe.md` §24 (im Chat erteilt am 21.10.2026). Dir
 | 124 | Region · Preise vergleichen – nachgezogen, Leitplanken geschlossen (N23) | [#329](https://github.com/Uttoranger/FarmerZone/pull/329) | main | nein | nein | Nachziehen (Dirigent) + Leitplanken 0 + Nachrunde Dirigent (Bericht) · 1 gezielter Durchgang | [Vorschau](https://farmer-zone-git-nacht-2026-10-20124-preise-ver-429d22-bierbaron.vercel.app) |
 | Sammel | 130–136 (ohne 124) | [#343](https://github.com/Uttoranger/FarmerZone/pull/343) | main | nein | ja (135) | – | [Vorschau](https://farmer-zone-git-integration-lauf20-bierbaron.vercel.app) |
 
+- **Basis** heißt Abzweig (wie in Lauf 19). Ziel der Einzel-PRs ist `main`, bei #342 `integration/lauf20` – dort ist #342 schon gemergt (`87f68f9`) und kommt mit dem Sammel-PR auf main.
 - **CI auf den PRs** (`ci` und `integration`): #335, #336, #337, #339, #340, #341 und #329 beim ersten Lauf grün. **#338** war im Job `integration` einmal rot – ein Wackler, der nicht von 133 kommt (Abschnitt 2, „Sammelstand-Fix“); der eine Neustart war grün, mit Kommentar im PR. **#342** (gestapelt auf `integration/lauf20`) bekam die CI selbst (G3) – grün.
 - **Vorschau und Entwicklungsdatenbank:** Kein PR bringt eine Migration; die Vorschau-Builds spielen nichts ein. Aus dem Nachtlauf lief kein Befehl gegen die Entwicklungsdatenbank.
 
@@ -34,14 +35,14 @@ Freigabe: `docs/nachtlauf/freigabe.md` §24 (im Chat erteilt am 21.10.2026). Dir
 - **Regel 3 auf dem Zwischenstand (`f5efd6e`, Schema seitdem unverändert):** frische lokale Datenbank, 34 Migrationen eingespielt (wie auf main), `migrate status` „up to date“, zweiter `migrate deploy` ohne Arbeit, `migrate diff --exit-code` = 0 (Datenbank = Schema), RLS auf allen Tabellen; die Wegwerf-Datenbank ist gelöscht.
 - **Pakete (nur 135, nur Entwicklung):** `yaml` 2.9.1 und `jsdom` 30.1.2. Lockfile: 30 neue Pakete, alle aus den Bäumen der zwei; keine bestehende Version geändert; fünf Schlüssel nur durch Peer-Zusätze umbenannt. `pnpm install --frozen-lockfile` läuft.
 
-### Merge-Reihenfolge (`integration/lauf20` von main `c9d860f`, jeweils `--no-ff`)
-1. Doku-PR `docs/lauf20` (`d9c0c2b`, Basis aller Nummern außer 136)
-2. 130 (`1da202c`), 132 (`93af753`)
-3. 131 (`b1cb8c0`), 133 (`7b933e2`)
-4. Sammelstand-Fix am Abmelde-Test (`97da4c6`)
-5. 134 (`6f365ef`)
-6. 135 (`964a101`) – danach der volle lokale Lauf auf `f5efd6e` als Bedingung für 136: typecheck grün, lint 0 Fehler, 517 Dateien / 9635 Tests, Integration 70 Dateien / 621 Tests
-7. 136 (`c9e7726`, zweigte von `f5efd6e` ab)
+### Merge-Reihenfolge (`integration/lauf20` von main `c9d860f`)
+1. Doku-PR `docs/lauf20` (`d9c0c2b`, Basis aller Nummern außer 136) – der Branch beginnt auf diesem Commit (vorgespult, kein Merge-Commit)
+2. per `--no-ff`: 130 (`1da202c`), 132 (`93af753`)
+3. per `--no-ff`: 131 (`b1cb8c0`), 133 (`7b933e2`)
+4. Sammelstand-Fix am Abmelde-Test (`97da4c6`, eigener Commit auf `integration/lauf20`)
+5. per `--no-ff`: 134 (`6f365ef`)
+6. per `--no-ff`: 135 (`964a101`) – danach der volle lokale Lauf auf `f5efd6e` als Bedingung für 136: typecheck grün, lint 0 Fehler, 517 Dateien / 9635 Tests, Integration 70 Dateien / 621 Tests
+7. per `--no-ff`: 136 (`c9e7726`, zweigte von `f5efd6e` ab)
 8. danach der Morgenbericht mit `status.md`
 
 ### Konflikte und Auflösung
@@ -150,7 +151,7 @@ Die drei Lücken (Morgenbericht 19 §3), geschlossen:
 ### 135 · Pakete und Test des Hydrierens
 - **Node:** lokal v22.22.2, im letzten CI-Lauf auf main 22.23.3 (Schritt `setup-node`, Eingabe 22) – beide ≥ 22.22.2.
 - **Lockfile:** `1 file changed, 296 insertions(+), 13 deletions(-)`; 1197 → 1227 Pakete (+30), keine bestehende Version geändert oder entfernt, alle neuen im Baum von `yaml` oder `jsdom`. Fünf Schlüssel nur durch Peer-Zusätze umbenannt (`vite`, `vitest`, `@vitest/mocker` und – weil sie `vitest` als Peer führen – `better-auth`, `@better-auth/passkey`). `pnpm install --frozen-lockfile` auf frischem Stand und in der CI grün.
-- **Neue Unterpakete mit Veröffentlichung** (pnpm-Metadaten): yaml 2.9.1 (11.09.2026) · jsdom 30.1.2 (04.10.2026) · @asamuzakjp/css-color 7.1.3 (02.10.) · @asamuzakjp/dom-selector 9.2.4 (03.10.) · @bramus/specificity 2.4.3 (05.10., das jüngste) · @csstools/color-helpers 6.1.2 (25.09.) · css-calc 3.4.3 (02.10.) · css-color-parser 4.2.6 (02.10.) · css-parser-algorithms 4.0.2 (01.10.) · css-syntax-patches-for-csstree 1.1.15 (01.10.) · css-tokenizer 4.0.2 (25.09.) · @exodus/bytes 1.16.0 (22.09.) · bidi-js 1.1.0 (06.09.) · data-urls 8.0.0 (04.10.) · decimal.js 10.6.0 (06.07.2025) · entities 8.1.0 (07.09.) · html-encoding-sniffer 7.0.0 (21.09.) · is-potential-custom-element-name 1.0.1 (2021) · lru-cache 11.5.3 (18.09.) · parse5 8.0.1 (19.04.) · saxes 6.0.0 (2021) · tough-cookie 6.0.2 (07.07.) · tr46 7.0.0 (04.10.) · undici 8.11.2 (24.09.) · w3c-xmlserializer 6.0.0 (21.09.) · webidl-conversions 8.0.1 (02.01.) · whatwg-mimetype 5.0.0 (20.01.) · whatwg-url 17.2.0 (04.10.) · xml-name-validator 5.0.0 (2023) · xmlchars 2.2.0 (2019); 2026 wenn nichts anderes steht. Alle älter als 14 Tage (jüngstes 05.10. gegen 21.10.).
+- **Neue Unterpakete mit Veröffentlichung** (pnpm-Metadaten): yaml 2.9.1 (11.09.2026) · jsdom 30.1.2 (04.10.2026) · @asamuzakjp/css-color 7.1.3 (02.10.) · @asamuzakjp/dom-selector 9.2.4 (03.10.) · @bramus/specificity 2.4.3 (05.10., das jüngste) · @csstools/color-helpers 6.1.2 (25.09.) · css-calc 3.4.3 (02.10.) · css-color-parser 4.2.6 (02.10.) · css-parser-algorithms 4.0.2 (01.10.) · css-syntax-patches-for-csstree 1.1.15 (01.10.) · css-tokenizer 4.0.2 (25.09.) · @exodus/bytes 1.16.0 (22.09.) · bidi-js 1.1.0 (06.09.) · data-urls 8.0.0 (04.10.) · decimal.js 10.6.0 (06.07.2025) · entities 8.1.0 (07.09.) · html-encoding-sniffer 7.0.0 (21.09.) · is-potential-custom-element-name 1.0.1 (07.04.2021) · lru-cache 11.5.3 (18.09.) · parse5 8.0.1 (19.04.) · saxes 6.0.0 (07.11.2021) · tough-cookie 6.0.2 (07.07.) · tr46 7.0.0 (04.10.) · undici 8.11.2 (24.09.) · w3c-xmlserializer 6.0.0 (21.09.) · webidl-conversions 8.0.1 (02.01.) · whatwg-mimetype 5.0.0 (20.01.) · whatwg-url 17.2.0 (04.10.) · xml-name-validator 5.0.0 (12.11.2023) · xmlchars 2.2.0 (06.09.2019); 2026 wenn nichts anderes steht. Alle älter als 14 Tage (jüngstes 05.10. gegen 21.10.).
 - **Laufzeit** von `tests/hydrieren.test.ts`: 6,5–7,5 s (davon Import 4,1 s) – unter 10 s, keine eigene Zeitgrenze.
 - **Geprüfte Teile:** `Abholzeile` (Server 12:00, Browser 13:00), `BeitragMarke`, `ThemeUmschalter` und `ThemeUmschalterZeile`, `CookieBanner` (mit und ohne gespeichertes „Verstanden“), die Zahl im Korb der Kopfzeile (`KundenKopf`), `MeinHofAnsicht` und ein Rahmen um `useSchmalerAls`/`useMindestbreite`; dazu gewählt: `StartbildschirmKarte` (Anzeigemodus über `matchMedia` und `navigator`), `useCart` (Korb im Browser-Speicher, Geldweg), `useHoefeAdresse` (Filter von /hoefe aus der Adresse). Je Teil eine Gegenprobe (direktes Lesen statt `useSyncExternalStore` → genau ein Fall rot).
 - **Fund:** Die Zeile des Darstellungs-Umschalters schrieb `aria-label` und `title` beim ersten Rendern im Browser schon nach dem Modus; React gleicht Attribute beim Hydrieren nicht an, im dunklen Modus blieb „Dunkelmodus einschalten“ am Knopf. Behoben in Runde 1 (Beschriftung erst nach dem Einhängen), mit Grenzerweiterung (Abschnitt 9).
@@ -173,7 +174,7 @@ Die drei Lücken (Morgenbericht 19 §3), geschlossen:
 | 131 | Bilder mit „heute“ hängen an der Uhrzeit des Laufs (Fenster beginnt 15:00). | **Text:** Die Lesemappe nennt bei zeitabhängigen Bildern die späteste Uhrzeit. Eine Prüfung ist nicht sinnvoll. | `docs/nachtlauf.md` 4a Punkt 6 b |
 | 132 | Ein Portal an den `<body>` liegt außerhalb jeder Landmarke; der Fund kam erst im Bild-Durchgang. | **Prüfung:** Quelltext-Wache „jedes `DropdownMenuContent` in Shells und Admin gibt `container` mit“, mit Gegenprobe; danach ein Satz in DESIGN_SYSTEM. | `tests/menue-ziel.test.ts` erweitern |
 | 133 | Der Auftrag verlangte den Beleg „Markup bleibt gleich“, TESTING_GUIDELINES §1 verbietet Schnappschüsse. | **Text:** ein Satz für den Umbau-Beleg (eingefrorener Text, Stand-Commit im Kommentar). | `docs/ai/TESTING_GUIDELINES.md` |
-| 134 | Die Freigabe nannte „page.tsx gibt es mit“, aber nicht die Dateien dazwischen – zwei Grenzerweiterungen. | **Prüfung vor Textregel:** Die Lesemappe zählt bei jedem durchgereichten Feld den Weg von der Abfrage bis zur Komponente per `git grep` auf. | Lesemappen-Vorlage, dann `docs/nachtlauf.md` |
+| 134 | Die Freigabe nannte „page.tsx gibt es mit“, aber nicht die Dateien dazwischen – zwei Wege lagen außerhalb der Grenze: eine Grenzerweiterung (`farm-page-view.tsx`), ein Umweg (eigene Abfrage in `send-whatsapp/page.tsx` statt `getStatusPostForWhatsApp`). | **Prüfung vor Textregel:** Die Lesemappe zählt bei jedem durchgereichten Feld den Weg von der Abfrage bis zur Komponente per `git grep` auf. | Lesemappen-Vorlage, dann `docs/nachtlauf.md` |
 | 135 | Eine Attribut-Abweichung beim Hydrieren fiel keinem Test auf, bis ein Test die Server-Seite wirklich ohne Browser rendert. | **Prüfung:** Wache, die jede Datei unter `src/` mit `useSyncExternalStore` gegen die Liste in `tests/hydrieren.test.ts` hält (neue Datei nennt sie mit Namen). | TESTING_GUIDELINES §2 |
 | 124 | Die Wortwache las Quelltext, nicht den sichtbaren Text – wiederverwendete Bausteine und der geschlossene Dialog blieben außen vor. | **Prüfung, umgesetzt für Region:** Wachen über Nutzertext rendern ihn (`renderToStaticMarkup`, Gegenprobe mit einem Wort in einem Baustein). | TESTING_GUIDELINES §2 |
 | Sammelstand (Dirigent) | Ein Test „falscher Token“ setzte die letzten zwei Zeichen auf einen festen Wert; bei zufälliger Adresse war der Token in 1 von 256 Läufen unverändert gültig. | **Prüfung:** Ein verfälschter Wert wird immer sicher anders (Zeichen tauschen statt festsetzen); eine Wache auf `slice(0, -n)}` + Literal in Tests mit Gegenprobe wäre möglich. | `tests/` (Muster), dann TESTING_GUIDELINES |
@@ -224,10 +225,13 @@ Die Bilder liegen im Sammel-PR unter `docs/nachtlauf/berichte/bilder/<nr>/`; das
   - 134: `src/components/farm/farm-page-view.tsx` reicht den Merker `beitraegeFehler` von der Seite an `HofseiteKunde` durch (eine optionale Eigenschaft) – ohne sie käme er nie an.
   - 135: `src/components/shared/theme-umschalter.tsx`, nur der Hook `useThemeUmschalter` – der Fix für den Fund des Hydrier-Tests (eine Zeile).
   - Sammelstand: `tests/integration/abmelden.int.test.ts` – Fix des 1:256-Wacklers (nur Testcode).
+- **134 und 135: je ein kurzer Eintrag in `DEVELOPMENT.md`** – angewiesen in der Lesemappe des Dirigenten, obwohl die Freigabe-Grenzen beider Nummern die Datei nicht nennen. Anders als die Erweiterungen oben berührt diese Datei auch eine andere Nummer (131 und 136 schreiben sie in ihrer Grenze); die Textkonflikte löste der Sammel-PR nach seiner Regel (Abschnitt 2, beide Seiten behalten). 132 und 133 schrieben dort nichts (Abschnitt 10).
 - **133:** bewusster Schnappschuss `KURZFORM_VORHER` (Markup der Pin-Vorschau) – der Auftrag verlangt den bleibenden Vergleich, TESTING_GUIDELINES §1 will sonst keine Schnappschüsse.
 - **134:** Für die Bilder wurde in der lokalen Test-Datenbank ein erfundener Beitrag angelegt und über den bestehenden Weg „Löschen“ der App entfernt (Mails nur ins Log, Z3); der Hinweis lautete „ohne Zeilen zu löschen“, der Seed-Hof hatte aber keinen Beitrag zum Zurückdatieren.
 - **132:** Der Punkt in `docs/betrieb/stripe-live.md` steht wörtlich; nur die Klammer „(Stripe-Doku wie oben)“ nennt die Quelle ausgeschrieben, weil „wie oben“ dort auf nichts zeigt.
 - **130:** Die Commit-Zeile „Co-Authored-By“ des Umsetzers nennt sein eigenes Modell (der Umsetzer lief mit Sonnet).
+- **136:** Die Wache `tests/regelvorschlag-herkunft-wache.test.ts` aus Runde 1 (`3eef10f`) lag außerhalb der Grenze und ist in Runde 2 wieder entfernt (ohne Grenzerweiterung); die vier Datumsangaben in `docs/nachtlauf.md` bleiben. Willst du sie haben, holt `git show 3eef10f:tests/regelvorschlag-herkunft-wache.test.ts` sie zurück – als eigener Auftrag.
+- **136 und 124:** Die Commits `85e4872` (136) und `e3b436e` (124) tragen das Präfix `test:`, das CLAUDE.md §5 nicht kennt. Der Fehler lag im Rahmen des Dirigenten; der Rahmen ist korrigiert, die Commits sind nicht umgeschrieben (kein Amend, kein Force-Push).
 
 ## 10. Nacharbeit („Sollte“/„Kann“), gesammelt
 - **130:** Der Wackler in `code-bremse.int` bleibt unerklärt (25 Läufe grün); der Fall prüft beim Tagesfenster nur „mindestens 10“. Altlasten neben dem Diff: zwei absolute lokale Pfade in `tests/gefahr-blocken.test.ts` (Z. 88, 148) und die Annahme, dass das Temp-Verzeichnis kein Repository ist.
@@ -251,7 +255,7 @@ Die Bilder liegen im Sammel-PR unter `docs/nachtlauf/berichte/bilder/<nr>/`; das
 - **136:** nichts in der Vorschau; die CI auf #342 ist grün. Lokal: `pnpm vitest run tests/next-config-importe-wache.test.ts tests/zeitgrenzen-wache.test.ts tests/fabrik-wache.test.ts`.
 
 **Merge:**
-1. Den Sammel-PR [#343](https://github.com/Uttoranger/FarmerZone/pull/343) **per Merge-Commit** (nicht Squash). Die Einzel-PRs #335–#341 und #342 gelten danach als gemergt.
+1. Den Sammel-PR [#343](https://github.com/Uttoranger/FarmerZone/pull/343) **per Merge-Commit** (nicht Squash). Die Einzel-PRs #335–#341 gelten danach als gemergt; #342 ist schon in `integration/lauf20` gemergt (`87f68f9`) und kommt mit dem Sammel-PR auf main.
 2. Danach die **CI auf `main`** ansehen: Sie muss wieder grün sein (130).
 3. **124 (#329) erst nach der rechtlichen Prüfung der Spanne (N23).** Die Leitplanken als Prüfungen stehen in Abschnitt 4 (124).
 
