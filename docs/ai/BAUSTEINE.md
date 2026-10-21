@@ -630,7 +630,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 ## src/server
 
-- src/server/abholfenster.ts · AbholfensterVoll, ausgebuchteAbholfenster, imAbholfenster, pruefeAbholfenster, type AbholPruefung, type HofFenster, type HofSlot · Die Abholfenster gegen die Datenbank: Welche Fenster der Hof anbietet, entscheidet src/lib/abholfenster.ts; hier wird geladen und gezählt. · genutzt
+- src/server/abholfenster.ts · AbholfensterVoll, alsAbholFenster, ausgebuchteAbholfenster, ausgebuchteTage, fensterSchluessel, imAbholfenster, pruefeAbholfenster, type AbholPruefung, type AusgebuchteTage, type AusgebuchtesFenster, type HofFenster, type HofSlot · Die Abholfenster gegen die Datenbank: Welche Fenster der Hof anbietet, entscheidet src/lib/abholfenster.ts; hier wird geladen und gezählt. · genutzt
 - src/server/abo-anmeldung.ts · EMAIL_ABO_STAND, WERBEMAIL_EMPFAENGER, bestaetigeEmailAbo, ladeAboBestaetigung, loeseOffeneAnfrageAuf, meldeAboMitTokenAb, meldeEmailAboAn, type AboBestaetigungsStand · Double-Opt-in für werbliche Mails (Register S11, Nachtlauf Nr. 38) — der Datenbank-Teil. · genutzt
 - src/server/admin-bremse.ts · adminBremseVoll · Eine Bremse der Admin-Anmeldung, FAIL-CLOSED (Register N20, Nr. 126): Jeder Versuch zählt; antwortet die Datenbank nicht (oder nicht innerhalb der Frist), gilt die Bremse als voll — `true` heißt … · genutzt
 - src/server/admin-wache.ts · adminPflichtOffen, frischOderBestaetigen, ladeEinrichtenStand, verlangeAdminAktion, verlangeAdminSeite, verlangeAdminShell, verlangeEinrichtenSeite, verlangeFrischeBestaetigung, type AdminWacheOptionen, type EinrichtenStand · Die Admin-Prüfung — EINE Stelle für Seiten und Aktionen. · genutzt

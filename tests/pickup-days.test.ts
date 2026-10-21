@@ -59,6 +59,14 @@ describe('nextPickupDays', () => {
     expect(days[0].times).toBe('8–11 · 15–18 Uhr')
   })
 
+  // Register N19, Ergänzung 21.10.2026 (Nr. 131).
+  it('lässt einen vollen Tag weg und zeigt den nächsten; ein anderes Fenster am selben Tag bleibt', () => {
+    const volleMittwoch = { ...MI, ausgebuchtAm: ['2026-07-22'] }
+    expect(nextPickupDays([volleMittwoch, SA], 2, NOW).map((d) => d.kalendertag)).toEqual(['2026-07-25', '2026-07-29'])
+    const [mittwoch] = nextPickupDays([volleMittwoch, { dayOfWeek: 3, startTime: '19:00', endTime: '20:00' }], 1, NOW)
+    expect(mittwoch).toMatchObject({ kalendertag: '2026-07-22', times: '19–20 Uhr' })
+  })
+
   it('ohne Slots keine Karten', () => {
     expect(nextPickupDays([], 3, NOW)).toEqual([])
   })

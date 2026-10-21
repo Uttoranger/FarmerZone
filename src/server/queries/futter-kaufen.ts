@@ -7,6 +7,7 @@ import { categoryImagePath } from '@/lib/product-image'
 import type { EigenerFutterHof, FutterHof, FutterProdukt } from '@/lib/futter-kaufen'
 import { leseAusschnitt } from '@/schemas/bild-ausschnitt'
 import { IN_LISTEN_SICHTBAR, UEBERSICHT_HOF_SELECT, UEBERSICHT_ZEILEN_SELECT, baueHofUebersicht } from './farm'
+import { ausgebuchteTage } from '@/server/abholfenster'
 import { PRODUCT_ORDER_BY } from './products'
 
 /**
@@ -133,7 +134,7 @@ export async function getFutterKaufen(farmId: string, jetzt: Date): Promise<Futt
 
   const { nah, ohneStandort, abgeschnitten } = waehleHoefeImUmkreis(punkt, kandidaten, GROESSTER_UMKREIS, farmId)
   const ids = [...nah, ...ohneStandort].map((h) => h.id)
-  const [produkte, zeilen, eigenesFutter] = await Promise.all([
+  const [produkte, zeilen, eigenesFutter, ausgebucht] = await Promise.all([
     ids.length === 0
       ? []
       : prisma.product.findMany({
@@ -154,9 +155,14 @@ export async function getFutterKaufen(farmId: string, jetzt: Date): Promise<Futt
       orderBy: PRODUCT_ORDER_BY,
       select: FUTTER_PRODUKT_SELECT,
     }),
+    // Volle Abholfenster genau wie /hoefe (Register N19, Ergänzung 21.10.2026), nur für die Höfe der Liste.
+    ausgebuchteTage(
+      nah.map((h) => h.id),
+      jetzt
+    ),
   ])
 
-  const uebersicht = new Map(baueHofUebersicht(nah, zeilen, wienJetzt(jetzt)).map((e) => [e.slug, e]))
+  const uebersicht = new Map(baueHofUebersicht(nah, zeilen, wienJetzt(jetzt), ausgebucht).map((e) => [e.slug, e]))
   const nummerJeHof = new Map([...nah, ...ohneStandort].map((h) => [h.id, h.betriebsnummer]))
 
   return {
@@ -174,7 +180,8 @@ export async function getFutterKaufen(farmId: string, jetzt: Date): Promise<Futt
         entfernungKm: h.entfernungKm,
         betriebsnummer: h.betriebsnummer,
         betriebsstatus: h.betriebsstatus,
-        abholfenster: eintrag?.abholfenster ?? h.pickupSlots,
+        // Ohne Eintrag gilt „keine Abholzeit“, wie auf /hoefe — nie die rohen Zeilen ohne volle Tage (Nr. 131).
+        abholfenster: eintrag?.abholfenster ?? [],
         fotos: eintrag?.fotos ?? [],
         kategorien: eintrag?.kategorien ?? [],
       }
