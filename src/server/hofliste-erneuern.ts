@@ -1,3 +1,8 @@
+/**
+ * Hofliste nach dem Anlegen und nach jedem Storno einer Bestellung erneuern,
+ * wenn ihr Hof eine aktive Abholzeit mit Höchstzahl hat (Register N19,
+ * Ergänzung 21.10.2026). Warum über `nachDerAntwort`: Kommentar an `erneuere`.
+ */
 import * as Sentry from '@sentry/nextjs'
 import { revalidateTag } from 'next/cache'
 import { prisma } from '@/lib/prisma'
@@ -45,7 +50,7 @@ function erneuere(hatHoechstzahl: () => Promise<boolean>): void {
       if (!(await hatHoechstzahl())) return
       revalidateTag(HOEFE_CACHE_TAG, { expire: 0 })
     } catch (err) {
-      const meldung = new Error('Hofliste nach einer Bestellung nicht erneuert')
+      const meldung = new Error('Hofliste nicht erneuert')
       meldung.name = fehlerKlasse(err)
       Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'hofliste' } })
     }

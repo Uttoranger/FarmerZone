@@ -99,6 +99,8 @@ describe('erneuereHoflisteNachStorno', () => {
     expect(Sentry.captureException).toHaveBeenCalledTimes(1)
     const [meldung, kontext] = vi.mocked(Sentry.captureException).mock.calls[0] as [Error, unknown]
     expect(meldung.name).toBe('TypeError')
+    // Neutral gefasst: gleich, ob eine Bestellung oder ein Storno das Erneuern ausgelöst hat.
+    expect(meldung.message).toBe('Hofliste nicht erneuert')
     expect(kontext).toEqual({ level: 'warning', tags: { bereich: 'hofliste' } })
     expect(JSON.stringify([meldung.message, kontext])).not.toContain('order_geheim')
   })

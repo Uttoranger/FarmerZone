@@ -10,8 +10,10 @@
  * einem `data`-Objekt `status: 'CANCELLED'` schreibt (auch `OrderStatus.CANCELLED`
  * und `{ set: 'CANCELLED' }`), steht in einer Funktion, die
  * `erneuereHoflisteNachStorno` ruft — und zwar direkt in ihr, nicht in einem
- * Rückruf darin (etwa dem der Transaktion): nach dem Commit, nie in der offenen
- * Transaktion. Lesende Vergleiche (`where: { status: 'CANCELLED' }`) zählen nicht.
+ * Rückruf darin (etwa dem der Transaktion). Mehr belegt sie nicht: Ein Aufruf
+ * VOR `await prisma.$transaction(…)` ginge durch; dass er nach dem Commit
+ * steht, bleibt Sache der Aufrufer (Kommentar in src/server/hofliste-erneuern.ts).
+ * Lesende Vergleiche (`where: { status: 'CANCELLED' }`) zählen nicht.
  *
  * Gegenprobe: Text-Attrappen ohne Aufruf, mit Aufruf im Transaktions-Rückruf
  * und in der Enum-Form schlagen an; der richtige Aufbau und ein lesendes
@@ -102,7 +104,7 @@ function stornoStellen(quelltext: string, pfad = 'schnipsel.ts'): Befund[] {
 
 describe('Wache: jeder Storno erneuert die Hofliste', () => {
   // Liest und parst ganz src/ (TESTING_GUIDELINES §4: eigenes Limit nur an diesem it).
-  it('jede Stelle in src/, die eine Bestellung auf CANCELLED setzt, ruft danach erneuereHoflisteNachStorno', () => {
+  it('jede Stelle in src/, die eine Bestellung auf CANCELLED setzt, ruft erneuereHoflisteNachStorno, nicht im Rückruf der Transaktion', () => {
     const alle: Befund[] = []
     for (const pfad of quelldateien(join(WURZEL, 'src'))) {
       alle.push(...stornoStellen(readFileSync(pfad, 'utf8'), relative(WURZEL, pfad).split(sep).join('/')))

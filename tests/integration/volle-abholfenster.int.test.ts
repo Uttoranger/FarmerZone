@@ -6,7 +6,8 @@
  * - `ausgebuchteTage` zählt viele Höfe mit ZWEI Abfragen (Abholzeiten mit
  *   Höchstzahl, ein groupBy) — und mit einer, wenn keiner eine Höchstzahl hat.
  * - Ein Storno macht das Fenster wieder frei.
- * - Kasse, Liste und Hofseite nennen am selben Bestand dieselben vollen Fenster.
+ * - Kasse, Liste und Hofseite nennen am selben Bestand dieselben vollen Fenster —
+ *   auch bei mehreren Terminen; die Kasse in der Reihenfolge wie bisher.
  * - Ein Testhof (N21): Die Kasse zeigt „ausgebucht“, die Liste zeigt ihn nicht.
  * - Ein Wurf beim Erneuern der Hofliste lässt die Bestellung bestehen.
  *
@@ -39,7 +40,7 @@ vi.mock('@/lib/nach-der-antwort', () => ({
 import { POST as checkout } from '@/app/api/checkout/route'
 import { prisma } from '@/lib/prisma'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
-import { wochentagVon } from '@/lib/kalender'
+import { tagVersetzt, wochentagVon } from '@/lib/kalender'
 import { ausgebuchteAbholfenster, ausgebuchteTage, fensterSchluessel } from '@/server/abholfenster'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
 import { getOeffentlicheHoefe } from '@/server/queries/farm'
@@ -83,18 +84,29 @@ async function hof(max: number | null, abweichend: { istTesthof?: boolean } = {}
   return { farm, produkt }
 }
 
-/** Eine Barbestellung für morgen 15–18 Uhr über die echte Route; liefert die Bestellung. */
-async function bestelle(farm: { id: string; slug: string }, produktId: string) {
+type Termin = { datum: string; start: string; ende: string }
+
+/** Eine Barbestellung über die echte Route (ohne `termin`: morgen 15–18 Uhr); liefert die Bestellung. */
+async function bestelle(farm: { id: string; slug: string }, produktId: string, termin?: Termin) {
   const sitzung = intKennung('sitzung')
   await setzeHalt(produktId, sitzung, 1)
   const antwort = await checkout(
-    checkoutAnfrage({ farm, sessionId: sitzung, positionen: [{ productId: produktId, name: 'Testprodukt', quantity: 1, unitPrice: 10 }] })
+    checkoutAnfrage({
+      farm,
+      sessionId: sitzung,
+      positionen: [{ productId: produktId, name: 'Testprodukt', quantity: 1, unitPrice: 10 }],
+      ...(termin ? { pickupDate: termin.datum, zusatz: { pickupTimeStart: termin.start, pickupTimeEnd: termin.ende } } : {}),
+    })
   )
   expect(antwort.status).toBe(200)
   return prisma.order.findFirstOrThrow({ where: { farmId: farm.id }, orderBy: { createdAt: 'desc' } })
 }
 
 const MORGEN_FENSTER = () => ({ dayOfWeek: wochentagVon(morgenInWien()), startTime: '15:00', endTime: '18:00' })
+
+/** Die vollen Termine eines Eintrags bzw. der Hofseite als Schlüssel wie in der Kasse, sortiert. */
+const alsSchluessel = (fenster: ReadonlyArray<{ startTime: string; endTime: string; ausgebuchtAm?: readonly string[] }>) =>
+  fenster.flatMap((f) => (f.ausgebuchtAm ?? []).map((tag) => `${tag}|${f.startTime}|${f.endTime}`)).sort()
 
 describe('ausgebuchteTage — die eine Zählung für viele Höfe', () => {
   it('zählt mehrere Höfe mit zwei Abfragen, ohne Höchstzahl mit einer', async () => {
@@ -152,13 +164,54 @@ describe('Kasse, Liste und Hofseite — dieselben vollen Fenster', () => {
     const eintrag = (await getOeffentlicheHoefe()).find((h) => h.slug === farm.slug)
     const { farm: hofseite } = await ladeHofseite(farm.slug, {})
 
-    const alsSchluessel = (fenster: ReadonlyArray<{ startTime: string; endTime: string; ausgebuchtAm?: readonly string[] }>) =>
-      fenster.flatMap((f) => (f.ausgebuchtAm ?? []).map((tag) => `${tag}|${f.startTime}|${f.endTime}`)).sort()
     expect(kasse).toEqual([`${morgenInWien()}|15:00|18:00`])
     expect(alsSchluessel(eintrag?.abholfenster ?? [])).toEqual(kasse)
     expect(alsSchluessel(hofseite?.pickupSlots ?? [])).toEqual(kasse)
     // Die anderen sechs Abholzeiten tragen das Feld gar nicht (der Zwischenspeicher wächst nicht).
     expect(eintrag?.abholfenster.filter((f) => 'ausgebuchtAm' in f)).toHaveLength(1)
+  })
+
+  it('nennen auch vier volle Termine gleich — die Kasse Zeichen für Zeichen wie bisher (Tag, dann Beginn)', async () => {
+    const morgen = morgenInWien()
+    const uebermorgen = tagVersetzt(morgen, 1)
+    const inAchtTagen = tagVersetzt(morgen, 7)
+    const { farm } = await erstelleHof({ pickupSlots: { create: [] } })
+    // Absichtlich in umgekehrter Reihenfolge angelegt: erst übermorgen, dann
+    // morgen der spätere Beginn vor dem früheren.
+    for (const slot of [
+      { dayOfWeek: wochentagVon(uebermorgen), startTime: '08:00', endTime: '10:00' },
+      { dayOfWeek: wochentagVon(morgen), startTime: '14:00', endTime: '16:00' },
+      { dayOfWeek: wochentagVon(morgen), startTime: '09:00', endTime: '11:00' },
+    ]) {
+      await prisma.pickupSlot.create({ data: { ...slot, farmId: farm.id, maxOrders: 1 } })
+    }
+    const produkt = await erstelleProdukt(farm.id, { stock: 10 })
+    // Das Fenster um 09:00 ist morgen UND in acht Tagen voll: In der Map steht es
+    // mit beiden Tagen vor den anderen zwei — erst die Sortierung der Kasse
+    // ordnet die Termine nach Tag, dann Beginn.
+    for (const termin of [
+      { datum: inAchtTagen, start: '09:00', ende: '11:00' },
+      { datum: uebermorgen, start: '08:00', ende: '10:00' },
+      { datum: morgen, start: '14:00', ende: '16:00' },
+      { datum: morgen, start: '09:00', ende: '11:00' },
+    ]) {
+      await bestelle(farm, produkt.id, termin)
+    }
+    const jetzt = new Date()
+
+    const kasse = await ausgebuchteAbholfenster(farm.id, jetzt)
+    const eintrag = (await getOeffentlicheHoefe()).find((h) => h.slug === farm.slug)
+    const { farm: hofseite } = await ladeHofseite(farm.slug, {})
+
+    expect(kasse).toEqual([
+      `${morgen}|09:00|11:00`,
+      `${morgen}|14:00|16:00`,
+      `${uebermorgen}|08:00|10:00`,
+      `${inAchtTagen}|09:00|11:00`,
+    ])
+    expect(alsSchluessel(eintrag?.abholfenster ?? [])).toEqual(kasse)
+    expect(alsSchluessel(hofseite?.pickupSlots ?? [])).toEqual(kasse)
+    expect(eintrag?.abholfenster.filter((f) => 'ausgebuchtAm' in f)).toHaveLength(3)
   })
 
   it('ein Testhof mit vollem Fenster: Die Kasse zeigt „ausgebucht“, die Liste zeigt ihn nicht', async () => {
