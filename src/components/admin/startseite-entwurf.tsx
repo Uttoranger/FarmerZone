@@ -301,6 +301,10 @@ export function useStartseitenEntwurf({
       return
     }
     if (antwort.zeilenId && antwort.blockId) uebernimm(mitNeuerKennung(aktuell.current, antwort.zeilenId, antwort.blockId))
+    // Ein hinzugefügter Zusatz-Abschnitt (Nr. 129) trägt ab jetzt die Kennung seiner Zeile — sonst legte die nächste Speicherung ihn noch einmal an.
+    if (Object.keys(antwort.neueAbschnitte).length > 0) {
+      uebernimm({ zeilen: aktuell.current.zeilen.map((z) => ({ ...z, id: antwort.neueAbschnitte[z.id] ?? z.id })) })
+    }
     setSpeicherungen((n) => n + 1)
     fehlerFrei.current = blockFehler === null
     if (blockFehler) setStand({ art: 'fehler', text: blockFehler })

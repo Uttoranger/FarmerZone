@@ -63,6 +63,7 @@ import { EntdeckenFilterblatt } from '@/components/hoefe/entdecken-filterblatt'
 import { SUCHFELD_TEXT, abholungReihe, kategorieReihe, leerzustand, standortUngefaehrText } from '@/lib/hoefe-entdecken'
 import { HofKurzkarte } from '@/components/hoefe/hof-kurzkarte'
 import type { VorschauProdukt } from '@/lib/hofuebersicht'
+import { illustrationPfad } from '@/lib/taxonomie'
 import { grundpreisAusKennzeichnung, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
 import { LEERER_HOEFE_FILTER, SUCHTEXT_MAX, type HoefeFilter } from '@/schemas/hoefe-filter'
 import { HoefeClient } from '@/components/hoefe/hoefe-client'
@@ -112,7 +113,7 @@ const HOF: KartenHof = {
 
 const TREFFER_HOF: TrefferHof = { ...HOF, entfernungKm: 4.2 }
 
-const vorschauProdukt = (id: string, name: string, imageUrl: string | null = null): VorschauProdukt => ({
+const vorschauProdukt = (id: string, name: string, imageUrl: string | null = null, teil: Partial<VorschauProdukt> = {}): VorschauProdukt => ({
   id,
   name,
   price: 4.2,
@@ -121,7 +122,9 @@ const vorschauProdukt = (id: string, name: string, imageUrl: string | null = nul
   imageUrl,
   bildAusschnitt: null,
   category: 'EIER',
+  subcategory: null,
   verfuegbar: true,
+  ...teil,
 })
 const DREI = { produkte: [vorschauProdukt('a', 'Freilandeier'), vorschauProdukt('b', 'Bauernbrot'), vorschauProdukt('c', 'Honig')], weitere: 6 }
 const KEINE = { produkte: [], weitere: 0 }
@@ -204,6 +207,19 @@ describe('Hofkarte A', () => {
     expect(zeilen).not.toMatch(/>F<\/span>/)
     // Gegenprobe: mit Foto das Foto.
     expect(karte({ schaufenster: { produkte: [vorschauProdukt('a', 'Freilandeier', '/eier.jpg')], weitere: 0 } })).toContain('src="/eier.jpg"')
+  })
+
+  // Nr. 127: Dieselbe Quelle wie Produktseite und Teilen-Bild: illustrationPfad(Kategorie, Unterkategorie).
+  it('fehlt das Foto, steht die Illustration der UNTERkategorie, wenn es eine gibt — sonst die der Kategorie', () => {
+    const mitSorte = vorschauProdukt('k', 'Bergkäse', null, { category: 'MILCH', subcategory: 'KAESE' })
+    const ohneSorte = vorschauProdukt('m', 'Milch', null, { category: 'MILCH' })
+    expect(illustrationPfad('MILCH', 'KAESE')).not.toBe(illustrationPfad('MILCH'))
+    const html1 = karte({ schaufenster: { produkte: [mitSorte], weitere: 0 } })
+    expect(html1.slice(html1.indexOf('Bergkäse'))).toContain(`<img src="${illustrationPfad('MILCH', 'KAESE')}" alt=""/>`)
+    // Gegenprobe: ohne Sorte die Illustration der Kategorie, nicht die der Sorte.
+    const html2 = karte({ schaufenster: { produkte: [ohneSorte], weitere: 0 } })
+    expect(html2.slice(html2.indexOf('Milch'))).toContain(`<img src="${illustrationPfad('MILCH')}" alt=""/>`)
+    expect(html2).not.toContain(illustrationPfad('MILCH', 'KAESE'))
   })
 
   it('noch nicht bestellbar (kein kaufbares Produkt oder keine Abholzeit): graue Zeile statt Abholzeile, die Pause geht vor', () => {
@@ -465,7 +481,6 @@ describe('beide Themes: nur Tokens in den Teilen von Entdecken', () => {
 const SUCHE = {
   suchtext: '',
   vorschlaege: [],
-  status: '',
   bezugspunkt: null,
   onSuchtext: () => {},
   onUebernehmen: () => {},
@@ -644,9 +659,10 @@ describe('Kartenmodus am Handy: Suche · Filter · Liste in einer Zeile (Nr. 52)
     expect(suche).toContain('role="combobox"')
     expect(suche).not.toContain('Standort nutzen')
     expect(suche).not.toContain('Nichts wird gespeichert.')
-    // Live-Regionen stehen dauerhaft im Baum, sonst verpasst der Screenreader die erste Änderung.
-    expect(suche).toContain('id="umkreis-meldung"')
-    expect(suche).toMatch(/<p role="status" class="sr-only">/)
+    // Die Live-Region zum Umkreis steht dauerhaft im Baum, sonst verpasst der Screenreader die erste Änderung.
+    // Eine zweite, die die Trefferzahl noch einmal ansagt, gibt es seit Nr. 127 nicht mehr (Zahlzeile, s. u.).
+    expect(suche).toMatch(/<p class="sr-only" role="status" id="umkreis-meldung">/)
+    expect(suche.match(/role="status"/g)).toHaveLength(1)
     // Gegenprobe: ohne kompakt steht der Knopf da.
     expect(html(createElement(HoefeSuche, SUCHE))).toContain('Standort nutzen')
   })
@@ -864,6 +880,7 @@ describe('das Server-HTML: die ganze Hofliste, ungefiltert, mit Links auf die Ho
     suchNamen: ['Bauernbrot'],
     fotos: [],
     gruendungshof: false,
+    neuerBeitrag: null,
   })
 
   it('beide Höfe mit Link — auf dem Server gilt der leere Filter (kein window, kein Wurf)', () => {
@@ -881,6 +898,19 @@ describe('das Server-HTML: die ganze Hofliste, ungefiltert, mit Links auf die Ho
     const heute = { ...hof('hof-a', 'Hof Anfang'), abholfenster: [{ dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }] }
     const seite = html(createElement(HoefeClient, { hoefe: [heute, hof('hof-b', 'Hof Berg')], jetzt: JETZT }))
     expect(seite).toContain('<p role="status" class="text-[13px] text-muted-foreground">2 Höfe · 1 holt heute ab · nach Freischaltung</p>')
+  })
+
+  // Nr. 127 (Nacharbeit 120): Die Trefferzahl sagt EINE Live-Region an, die Zahlzeile. Die zweite unter dem
+  // Suchfeld („3 Treffer gefunden.") sagte dasselbe noch einmal — Screenreader lasen jede Änderung doppelt.
+  it('die Trefferzahl wird nur einmal angesagt: die Zahlzeile; daneben nur die Meldung zum Umkreis', () => {
+    const regionen = (markup: string) => markup.match(/<(?:p|span)\b[^>]*\brole="status"[^>]*>/g) ?? []
+    const seite = html(createElement(HoefeClient, { hoefe: [hof('hof-a', 'Hof Anfang'), hof('hof-b', 'Hof Berg')], jetzt: JETZT }))
+    expect(regionen(seite)).toHaveLength(2)
+    expect(regionen(seite).filter((r) => r.includes('id="umkreis-meldung"'))).toHaveLength(1)
+    // Genau eine trägt die Zahl (die Zahlzeile).
+    expect(seite).toContain('<p role="status" class="text-[13px] text-muted-foreground">2 Höfe')
+    // Gegenprobe: Eine zweite Region wie die alte, ohne Kennung, würde mitgezählt.
+    expect(regionen(`${seite}<p role="status" class="sr-only">2 Treffer gefunden.</p>`)).toHaveLength(3)
   })
 
   it('am Handy die Reihe „Abholung" über der Liste — eine Liste von Links mit aria-current, keine Radiogruppe', () => {

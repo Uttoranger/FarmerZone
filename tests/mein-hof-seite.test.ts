@@ -28,6 +28,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
+  // Die Reiter tragen seit Nr. 127 den Ladepunkt (useLinkStatus) — hier lädt nie etwas.
+  useLinkStatus: () => ({ pending: false }),
 }))
 vi.mock('@/server/actions/status-posts', () => ({ expireStatusPost: vi.fn(), deleteStatusPost: vi.fn() }))
 vi.mock('@/server/actions/teilen-fenster', () => ({ ladeTeilenFensterBeitragAction: vi.fn() }))
@@ -35,7 +37,7 @@ vi.mock('next/image', () => ({
   default: (props: { src: string; alt: string }) => createElement('img', { src: props.src, alt: props.alt }),
 }))
 
-import { MEIN_HOF_REITER_HOFBEREICH, meinHofReiterAus } from '@/lib/bauern-navigation'
+import { BEITRAEGE_HREF, MEIN_HOF_REITER_HOFBEREICH, meinHofReiterAus } from '@/lib/bauern-navigation'
 import { meinHofReiterSchema } from '@/schemas/mein-hof-reiter'
 import { beitraegeUebersicht, type BeitragQuelle } from '@/lib/mein-hof-beitraege'
 import { formatZahl } from '@/lib/format'
@@ -143,7 +145,9 @@ describe('Beiträge-Übersicht', () => {
 
 describe('Liste: Ziele in den Einstellungen bzw. in Mein Hof', () => {
   it('jede Zeile hat ein Ziel, und das Ziel ist eine Seite unter (hof): eine Einstellungsseite oder Mein Hof (Nr. 50)', () => {
-    for (const id of hofseiteZeileIdSchema.options) {
+    // „Aktuell vom Hof“ (Nr. 129) zählt nicht zum Fortschritt; verwaltet wird es in Mein Hof › Beiträge.
+    expect(EINSTELLUNG_FUER_ZEILE.aktuell).toBe(BEITRAEGE_HREF)
+    for (const id of hofseiteZeileIdSchema.options.filter((zeile) => zeile !== 'aktuell')) {
       const ziel = EINSTELLUNG_FUER_ZEILE[id]
       expect(ziel, id).toMatch(/^\/settings\/[a-z-]+$|^\/farm-page$/)
       expect(existsSync(join(process.cwd(), `src/app/(hof)${ziel}/page.tsx`)), ziel).toBe(true)
@@ -306,7 +310,9 @@ describe('Tokens statt Farbwerte', () => {
     'src/components/farmer/hofseite-vorschau-rahmen.tsx',
     'src/app/(hof)/layout.tsx',
     'src/app/(hof)/farm-page/page.tsx',
-    'src/app/(hof)/farm-page/loading.tsx',
+    'src/components/mein-hof/mein-hof-laden.tsx',
+    'src/components/mein-hof/mein-hof-ansicht.tsx',
+    'src/components/mein-hof/reiter-leiste.tsx',
   ]
 
   it.each(dateien)('%s: keine Farbliterale, kein black/white, keine Bestandspalette app-*', (datei) => {

@@ -68,13 +68,29 @@ function importiertAusWache(quelle: ts.SourceFile, name: string): boolean {
   )
 }
 
+/** Wie oft ruft der Körper `<name>(…)` auf, gleich wo (auch verschachtelt)? */
+function zaehleAufrufe(wurzel: ts.Node, name: string): number {
+  let anzahl = 0
+  const besuche = (knoten: ts.Node): void => {
+    if (ts.isCallExpression(knoten) && ts.isIdentifier(knoten.expression) && knoten.expression.text === name) anzahl += 1
+    ts.forEachChild(knoten, besuche)
+  }
+  besuche(wurzel)
+  return anzahl
+}
+
 /** Was an einer heiklen Action fehlt — leer heißt gedeckt. */
 function aktionsMaengel(quelltext: string, name: string): string[] {
   const quelle = datei(quelltext)
   if (!importiertAusWache(quelle, 'verlangeFrischeBestaetigung')) return [`${name}: verlangeFrischeBestaetigung nicht aus '@/server/admin-wache'`]
   const fn = funktion(quelle, name)
   if (!fn) return [`${name}: nicht gefunden`]
-  return istAwaitAufruf(fn.body?.statements[0], 'verlangeFrischeBestaetigung') ? [] : [`${name}: erste Anweisung ist nicht \`await verlangeFrischeBestaetigung()\``]
+  if (!istAwaitAufruf(fn.body?.statements[0], 'verlangeFrischeBestaetigung')) return [`${name}: erste Anweisung ist nicht \`await verlangeFrischeBestaetigung()\``]
+  // Eine Wache je Aktion (Nr. 126): Sie prüft schon alles von verlangeAdminAktion, userId und sitzungId liefert sie mit.
+  const maengel: string[] = []
+  if (zaehleAufrufe(fn, 'verlangeFrischeBestaetigung') !== 1) maengel.push(`${name}: verlangeFrischeBestaetigung wird mehr als einmal aufgerufen`)
+  if (zaehleAufrufe(fn, 'verlangeAdminAktion') > 0) maengel.push(`${name}: ruft zusätzlich verlangeAdminAktion — eine zweite Wache dahinter ist überflüssig`)
+  return maengel
 }
 
 /** Ruft eine Oberfläche die Action nur über useFrischBestaetigt? */
@@ -116,6 +132,10 @@ describe('Gegenproben — die Suche schlägt an', () => {
     expect(aktionsMaengel(`${kopf}export async function a() { const g = await verlangeAdminAktion()\n const f = await verlangeFrischeBestaetigung()\n return f }`, 'a')).toHaveLength(1)
     expect(aktionsMaengel("import { verlangeFrischeBestaetigung } from '@/lib/falsch'\nexport async function a() { await verlangeFrischeBestaetigung() }", 'a')).toHaveLength(1)
     expect(aktionsMaengel(`${kopf}export async function a() { const f = await verlangeFrischeBestaetigung()\n return f }`, 'a')).toEqual([])
+    // Eine Wache je Aktion (Nr. 126): eine zweite Wache dahinter oder eine zweite Frage an dieselbe schlägt an.
+    expect(aktionsMaengel(`${kopf}export async function a() { const f = await verlangeFrischeBestaetigung()\n const g = await verlangeAdminAktion()\n return [f, g] }`, 'a')).toHaveLength(1)
+    expect(aktionsMaengel(`${kopf}export async function a() { const f = await verlangeFrischeBestaetigung()\n const g = await verlangeFrischeBestaetigung()\n return [f, g] }`, 'a')).toHaveLength(1)
+    expect(aktionsMaengel(`${kopf}export async function a() { const f = await verlangeFrischeBestaetigung()\n return async () => verlangeAdminAktion() }`, 'a')).toHaveLength(1)
   })
 
   it('erkennt eine Oberfläche, die die Action direkt ruft oder gar nicht umhüllt', () => {

@@ -24,6 +24,7 @@ describe('Beiträge der Hofseite: höchstens fünf (F8)', () => {
 
     await getActiveStatusPosts('farm_test', HOFSEITE_BEITRAEGE_MAX)
 
-    expect(vi.mocked(prisma.statusPost.findMany).mock.calls[0]?.[0]).toMatchObject({ take: 5, where: { farmId: 'farm_test', showOnFarmPage: true } })
+    // Die Bedingung „aktiv“ steht seit Nr. 128 an EINER Stelle (AKTIVER_BEITRAG), als Element der AND-Liste.
+    expect(vi.mocked(prisma.statusPost.findMany).mock.calls[0]?.[0]).toMatchObject({ take: 5, where: { farmId: 'farm_test', AND: [{ showOnFarmPage: true }] } })
   })
 })

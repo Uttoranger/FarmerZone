@@ -16,6 +16,7 @@ import { formatAbGrundpreis } from '@/lib/format'
 import { HoefeProduktzeilen } from '@/components/hoefe/hoefe-produktzeilen'
 import { HofBildflaeche } from '@/components/hoefe/hof-bildflaeche'
 import { Abholzeile } from '@/components/hoefe/abholzeile'
+import { BeitragMarke } from '@/components/hoefe/beitrag-marke'
 import { hofIllustrationen, zentrierterIndex } from '@/lib/hoefe-anzeige'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
 
@@ -154,6 +155,8 @@ export default function HoefeKarussell({
             <Link
               href={hofseitenLink(hof.slug, bereich)}
               aria-label={`${hof.name} ansehen`}
+              // Die Marke „Neu · vor …“ (Nr. 129): ihr Satz für den Screenreader am Link der Karte.
+              aria-describedby={hof.neuerBeitrag ? `beitrag-marke-karussell-${hof.slug}` : undefined}
               // Der Link liegt über dem gekappten Namen und fängt den Zeiger —
               // er trägt deshalb den vollen Namen als title.
               title={hof.name}
@@ -173,7 +176,7 @@ export default function HoefeKarussell({
                   className="size-10 shrink-0 rounded-full"
                 />
               )}
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="truncate font-heading text-base font-semibold text-foreground">
                   {hof.name}
                 </p>
@@ -188,6 +191,8 @@ export default function HoefeKarussell({
                   )}
                 </p>
               </div>
+              {/* Am runden Bild in derselben Zeile — keine zweite Zeile, durchlässig für den Zeiger. */}
+              <BeitragMarke beitrag={hof.neuerBeitrag} jetzt={jetzt} beschreibungId={`beitrag-marke-karussell-${hof.slug}`} kompakt className="shrink-0" />
             </div>
 
             {hof.abGrundpreis && (

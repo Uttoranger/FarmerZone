@@ -1,6 +1,7 @@
 /**
  * Lesen rund um Beiträge (StatusPost): die Liste im Reiter „Beiträge", die
- * Beiträge der Hofseite (Register F8), die Vorlage für „Neuer Beitrag" und
+ * Beiträge der Hofseite (Register F8: „Aktuell vom Hof“, AKTIVER_BEITRAG,
+ * `?beitrag=`), die Vorlage für „Neuer Beitrag" und
  * die WhatsApp-Abonnentinnen samt Tipp-Liste (Register W1) — wer WhatsApp
  * vom Hof bekommt, steht hier EINMAL (`whatsAppAbonnentinnen`, als SQL für
  * setzeWhatsAppGetippt `whatsAppAbonnentinSql`).
@@ -73,27 +74,47 @@ export async function getStatusPostsForFarm(farmId: string): Promise<StatusPostS
 }
 
 /**
- * Die Beiträge, die die Hofseite zeigt (Register F8): veröffentlicht, nicht
- * abgelaufen und mit „Auf der Hofseite zeigen“ — der neueste zuerst, höchstens
- * `anzahl`. Die Frist gilt hier beim Lesen, kein Cron räumt sie weg.
+ * Ein aktiver Beitrag (Register F8) — EINE Bedingung für die Hofseite
+ * („Aktuell vom Hof“, `?beitrag=`) und alles, was Beiträge außerhalb zeigt
+ * (Nr. 129: Marke auf /hoefe, „Neu bei den Höfen“): veröffentlicht, nicht
+ * abgelaufen und „Auf der Hofseite zeigen“. Die Frist gilt beim Lesen, kein
+ * Cron räumt sie weg — darum mit dem Zeitpunkt der Anfrage.
+ *
+ * Die Form trägt ein eigenes `OR`: neben einer eigenen Bedingung mit `OR`
+ * nicht ausbreiten, sondern als Element einer `AND`-Liste nehmen.
  */
-export async function getActiveStatusPosts(farmId: string, anzahl: number): Promise<ActiveStatusPost[]> {
-  const now = new Date()
-  const posts = await prisma.statusPost.findMany({
-    where: {
-      farmId,
-      publishedAt: { lte: now },
-      showOnFarmPage: true,
-      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-    },
-    // Bei gleicher Veröffentlichungszeit entscheidet die Kennung: Die Reihenfolge
-    // ist nie Zufall, und kein Beitrag springt zwischen zwei Aufrufen über die Grenze.
-    orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
-    take: anzahl,
-    // Nur, was die Karte zeigt: Der Beitrag ist öffentlich, sein Versand (Empfänger, Zähler) nicht.
-    select: { id: true, title: true, body: true, anlass: true, photoUrl: true, fotoAusschnitt: true, linkedProductIds: true, publishedAt: true },
-  })
-  return posts.map((post) => ({
+export const AKTIVER_BEITRAG = (jetzt: Date): Prisma.StatusPostWhereInput => ({
+  publishedAt: { lte: jetzt },
+  showOnFarmPage: true,
+  OR: [{ expiresAt: null }, { expiresAt: { gt: jetzt } }],
+})
+
+/**
+ * Die Reihenfolge der aktiven Beiträge, der neueste zuerst. Bei gleicher
+ * Veröffentlichungszeit entscheidet die Kennung: Die Reihenfolge ist nie Zufall,
+ * und kein Beitrag springt zwischen zwei Aufrufen über die Grenze. EINE Fassung
+ * für alle, die „den neuesten“ Beitrag nennen (Hofseite, Heute, Mein Hof, Marke
+ * auf /hoefe, „Neu bei den Höfen“) — sonst nennt bei Gleichstand eine Stelle
+ * einen anderen Beitrag als den, der oben auf der Hofseite steht.
+ */
+export const NEUESTER_BEITRAG_ZUERST: Prisma.StatusPostOrderByWithRelationInput[] = [{ publishedAt: 'desc' }, { id: 'desc' }]
+
+/** Nur, was die Karte zeigt: Der Beitrag ist öffentlich, sein Versand (Empfänger, Zähler) nicht. */
+const HOFSEITE_BEITRAG_SELECT = {
+  id: true,
+  title: true,
+  body: true,
+  anlass: true,
+  photoUrl: true,
+  fotoAusschnitt: true,
+  linkedProductIds: true,
+  publishedAt: true,
+} satisfies Prisma.StatusPostSelect
+
+type HofseiteBeitragRoh = Prisma.StatusPostGetPayload<{ select: typeof HOFSEITE_BEITRAG_SELECT }>
+
+function alsHofseitenBeitrag(post: HofseiteBeitragRoh): ActiveStatusPost {
+  return {
     id: post.id,
     title: post.title,
     body: post.body,
@@ -101,9 +122,37 @@ export async function getActiveStatusPosts(farmId: string, anzahl: number): Prom
     photoUrl: post.photoUrl,
     fotoAusschnitt: leseAusschnitt(post.fotoAusschnitt),
     linkedProductIds: post.linkedProductIds,
-    // Sicher: `publishedAt: { lte: now }` schließt Entwürfe (null) aus.
+    // Sicher: AKTIVER_BEITRAG verlangt `publishedAt: { lte: jetzt }` und schließt Entwürfe (null) aus.
     publishedAt: post.publishedAt!.toISOString(),
-  }))
+  }
+}
+
+/**
+ * Die Beiträge, die die Hofseite zeigt (Register F8): aktiv nach
+ * AKTIVER_BEITRAG — der neueste zuerst, höchstens `anzahl`.
+ */
+export async function getActiveStatusPosts(farmId: string, anzahl: number): Promise<ActiveStatusPost[]> {
+  const posts = await prisma.statusPost.findMany({
+    where: { farmId, AND: [AKTIVER_BEITRAG(new Date())] },
+    orderBy: NEUESTER_BEITRAG_ZUERST,
+    take: anzahl,
+    select: HOFSEITE_BEITRAG_SELECT,
+  })
+  return posts.map(alsHofseitenBeitrag)
+}
+
+/**
+ * Der Beitrag aus `?beitrag=<id>` (Register F8/T5, Nr. 128): nur, wenn er GENAU
+ * diesem Hof gehört und aktiv ist — Hof, Kennung und AKTIVER_BEITRAG in EINER
+ * Abfrage. Abgelaufen, gelöscht, von einem anderen Hof oder unbekannt: null,
+ * ohne Unterschied — die Seite verrät nicht, ob es ihn gab.
+ */
+export async function ladeAktivenBeitrag(farmId: string, beitragId: string): Promise<ActiveStatusPost | null> {
+  const post = await prisma.statusPost.findFirst({
+    where: { id: beitragId, farmId, AND: [AKTIVER_BEITRAG(new Date())] },
+    select: HOFSEITE_BEITRAG_SELECT,
+  })
+  return post ? alsHofseitenBeitrag(post) : null
 }
 
 // Vorlage-Muster (nachlese-6): lädt einen Alt-Status als Vorbefüllung für den

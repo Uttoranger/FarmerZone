@@ -10,7 +10,7 @@
  */
 import { TEILEN_BILD_PRODUKTE_MAX, type TeilenAuswahlEintrag } from '@/lib/teilen-bild'
 import { TEILEN_PARAMETER, TEILEN_ZAEHLUNG_HINWEIS, type TeilenKanalCode } from '@/lib/teilen-kanal'
-import { REITER_PARAMETER } from '@/schemas/hofseite-reiter'
+import { BEITRAG_PARAMETER } from '@/schemas/hofseite-reiter'
 import { einzeiligerFremdtext } from '@/lib/fremdtext'
 import { stripStatusVariables } from '@/lib/status-body'
 import { BEITRAG_TEXT_MAX, BEITRAG_TITEL_MAX } from '@/lib/eingabegrenzen'
@@ -66,25 +66,27 @@ export type KanalZiel =
 /**
  * Der geteilte Link mit dem Kürzel seines Kanals — dasselbe `?k=` wie
  * `teilenLink`, auch wenn der Link schon eine Abfrage trägt (Beitrag-Modus:
- * `?reiter=beitraege&k=wa`). Die Hofseite entfernt nur `k` und behält den
- * Reiter (`teilenBesuchAusAdresse`).
+ * `?beitrag=<id>&k=wa`). Die Hofseite entfernt nur `k` und behält den
+ * Beitrag (`teilenBesuchAusAdresse`).
  */
 export function linkMitKanal(link: string, kanal: TeilenKanalCode): string {
   return `${link}${link.includes('?') ? '&' : '?'}${TEILEN_PARAMETER}=${kanal}`
 }
 
 /**
- * Der Link eines Beitrags (T5): der Reiter „Beiträge" der Hofseite, nicht die
- * Übersicht. Gilt für die volle Adresse und für die Anzeige im Feld.
+ * Der Link eines Beitrags (T5, Ergänzung Nr. 128): die Übersicht der Hofseite
+ * mit genau diesem Beitrag oben (`?beitrag=<id>`, „Aktuell vom Hof“), nicht
+ * mehr ein Reiter. Gilt für die volle Adresse, für die Anzeige im Feld und
+ * für die Mail an Abonnentinnen (emails/status-update.tsx).
  */
-export function beitragLink(hofLink: string): string {
-  return `${hofLink}?${REITER_PARAMETER}=beitraege`
+export function beitragLink(hofLink: string, beitragId: string): string {
+  return `${hofLink}?${BEITRAG_PARAMETER}=${encodeURIComponent(beitragId)}`
 }
 
 /**
  * Wohin ein Kanal führt. Jeder Link trägt sein Kürzel (`?k=`), damit die
  * Zählung weiß, woher ein Besuch kam — sonst nichts (S8). Der Link kommt aus
- * den Daten des Fensters: die Hofseite bzw. ihr Reiter „Beiträge".
+ * den Daten des Fensters: die Hofseite bzw. der Beitrag darauf (`?beitrag=`).
  */
 export function kanalZiel(
   kanal: (typeof FENSTER_KANAELE)[number]['kanal'],
@@ -112,9 +114,9 @@ export function kanalZiel(
 type TeilenFensterGrund = {
   hofName: string
   slug: string
-  /** Der geteilte Link ohne Kürzel (APP_URL): die Hofseite, im Beitrag-Modus ihr Reiter „Beiträge". */
+  /** Der geteilte Link ohne Kürzel (APP_URL): die Hofseite, im Beitrag-Modus mit `?beitrag=<id>` (beitragLink). */
   link: string
-  /** So steht der Link im Feld: Host und Pfad ohne https:// (Domain/hof-test bzw. Domain/hof-test?reiter=beitraege). */
+  /** So steht der Link im Feld: Host und Pfad ohne https:// (Domain/hof-test bzw. Domain/hof-test?beitrag=<id>). */
   adresse: string
   auswahl: TeilenAuswahlEintrag[]
   textVorschlag: string

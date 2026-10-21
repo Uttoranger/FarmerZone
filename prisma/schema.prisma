@@ -289,6 +289,14 @@ enum Verpackung {
   ABGEPACKT_ETIKETT
 }
 
+// Abholhinweise eines Futters (Register N23, Nr. 123): eine feste Auswahl statt
+// Freitext im Untertitel — leichter zu lesen und später filterbar.
+enum Abholhinweis {
+  ANHAENGER_NOETIG
+  FRONTLADER
+  NACH_ABSPRACHE
+}
+
 // Trocknungsgrad von Brennmaterial (E11), wie im Formular-Mockup:
 // ofenfertig (unter 20 % Restfeuchte), lufttrocken (20–25 %), frisch (zum
 // selbst Trocknen). Die Prozentangabe steht in BrennmaterialAngaben.restfeuchteMax.
@@ -723,6 +731,10 @@ model Product {
   familieId     String?
   verpackung    Verpackung?
   brennmaterial BrennmaterialAngaben?
+  // abholhinweise (Register N23, Nr. 123): feste Angaben des Hofs zur Abholung
+  // eines Futters (Anhänger nötig, Frontlader, nach Absprache). Gespeichert nur
+  // im Bereich Futtermittel, sonst immer leer; Texte in src/lib/abholhinweise.ts.
+  abholhinweise Abholhinweis[] @default([])
 
   // Lebensmittel-spezifisch
   allergens       String[] @default([])
@@ -1409,6 +1421,9 @@ enum StartseiteArt {
   FRAGEN
   FUSS
   BLOCK
+  // Zusätzlicher Abschnitt „Neu bei den Höfen“ (Register N16, Ergänzung Nr. 129):
+  // keine Zeile aus der Migration, Admin fügt ihn hinzu (ZUSATZ_ARTEN).
+  NEUIGKEITEN
 }
 
 // Die vier Vorlagen eines Blocks (components/startseite/bloecke) — neue nur

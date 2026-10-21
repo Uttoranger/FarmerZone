@@ -7,6 +7,7 @@ import {
   CalendarCheck,
   Check,
   Compass,
+  FlaskConical,
   Info,
   Package,
   Plus,
@@ -38,6 +39,7 @@ import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { KarteLaedt } from '@/components/karte/karte-laedt'
 import { SHELL_VARIANTEN } from './shell/[variante]/varianten'
 import { HOF_NEU_KNOPF, HOF_NEU_KNOPF_NAME } from '@/lib/bauern-navigation'
+import { TESTHOF_HINWEIS } from '@/lib/gruendungshof'
 
 /*
  * Die Vorschau der Bausteine aus Gate 2. Jeder Baustein steht mit seinen
@@ -229,7 +231,7 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
             </GroessenWahl>
           </Abschnitt>
 
-          <Abschnitt id="hinweis" titel="Hinweiskarte" satz="Grün für Kundensachen und Gutes, Orange für Hofsachen und Offenes.">
+          <Abschnitt id="hinweis" titel="Hinweiskarte" satz="Grün für Kundensachen und Gutes, Orange für Hofsachen und Offenes, Neutral für ruhige Hinweise ohne Wertung.">
             <Hinweiskarte
               ton="gruen"
               symbol={Compass}
@@ -244,6 +246,7 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
             <Hinweiskarte ton="orange" symbol={Info} titel="Online-Zahlung pausiert">
               Kundinnen können gerade nur bar bei Abholung bezahlen.
             </Hinweiskarte>
+            <Hinweiskarte ton="neutral" symbol={FlaskConical}>{TESTHOF_HINWEIS}</Hinweiskarte>
           </Abschnitt>
 
           <Abschnitt id="karte-laedt" titel="Karte lädt" satz="Platzhalter beider Karten, solange die Kartenbibliothek nachlädt — in der Größe der Karte, kein Spinner.">

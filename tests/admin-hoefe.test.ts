@@ -35,37 +35,20 @@ import {
 import { hoefeAnsichtAus } from '@/schemas/admin-hoefe'
 import { FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/lib/email-bestaetigung'
 import { SERVICEGEBUEHR_STANDARD_PROZENT } from '@/lib/konditionen'
+import { hofRohdaten } from './fabrik/hof-rohdaten'
 
 const JETZT = new Date('2026-10-07T10:00:00+02:00')
 
 function roh(ueber: Partial<HofRohdaten> = {}): HofRohdaten {
-  return {
-    id: 'farm_1',
-    name: 'Hof Test',
-    slug: 'hof-test',
-    ownerEmail: 'max@example.com',
-    emailBestaetigt: true,
-    emailBestaetigungOffen: false,
+  return hofRohdaten({
     createdAt: new Date('2026-10-05T09:00:00+02:00'),
     approvedAt: new Date('2026-10-06T09:00:00+02:00'),
-    archivedAt: null,
-    land: 'AT',
-    serviceFeePercent: 5,
-    serviceFeeMinCents: 50,
     serviceFeeActiveFrom: new Date('2026-10-01T00:00:00+02:00'),
     monat: { bestellungen: 4, gebuehrOnlineCents: 120, gebuehrBarCents: 0, gebuehrEntfallenCents: 0 },
-    monatBezeichnung: 'Oktober 2026',
     stripeBereit: true,
-    onlineAn: true,
-    isPaused: false,
     betriebsnummer: '1234567',
-    sepaErteilt: false,
-    gruendungAusgenommen: false,
-    istTesthof: false,
-    hatKartenpunkt: true,
-    produktImShop: true,
     ...ueber,
-  }
+  })
 }
 
 describe('freischaltSperre', () => {

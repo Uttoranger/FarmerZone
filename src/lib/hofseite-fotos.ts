@@ -93,14 +93,15 @@ export function deckelText(weitere: number, anzahl: number): { plus: string; all
 
 /**
  * Die leise Zeile unter dem Mosaik — erst ab zwei Fotos, mit einem gibt es
- * nichts zu blättern. Zwei Fassungen, weil „wischen" nur am Handy stimmt: Mit
- * der Maus blättern die Pfeile der Bildansicht (nur bei `pointer-fine`, siehe
- * bildansicht.tsx). Welche zu sehen ist, entscheidet die Komponente per CSS.
+ * nichts zu blättern. Zwei Fassungen, weil „tippen" und „wischen" nur am Handy
+ * stimmen: Mit der Maus klickt man, und die Pfeile der Bildansicht blättern
+ * (nur bei `pointer-fine`, siehe bildansicht.tsx). Welche zu sehen ist,
+ * entscheidet die Komponente per CSS.
  */
 export function fotosHinweis(anzahl: number): { touch: string; maus: string } | null {
   if (anzahl < 2) return null
   return {
     touch: `Tippen öffnet die Bildansicht – wischen blättert durch alle ${anzahl}.`,
-    maus: `Tippen öffnet die Bildansicht – Pfeile blättern durch alle ${anzahl}.`,
+    maus: `Klicken öffnet die Bildansicht – Pfeile blättern durch alle ${anzahl}.`,
   }
 }

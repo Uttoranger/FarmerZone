@@ -8,7 +8,8 @@
  * Kein Import aus Datenbank oder Umgebung: Das Admin-Formular (Browser) nimmt
  * dieselben Grenzen und Regeln wie Action und Seite.
  */
-import type { ProductCategory, StartseiteArt, StartseiteVorlage } from '@prisma/client'
+import type { ProductCategory, StartseiteArt, StartseiteVorlage, StatusPostAnlass } from '@prisma/client'
+import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { tagVersetzt } from '@/lib/kalender'
 import { uhrzeitInWien, wienerZeitpunkt } from '@/lib/fristen'
@@ -39,6 +40,36 @@ export const STANDARD_REIHENFOLGE: readonly AbschnittArt[] = [
 /** Fest: immer sichtbar, nicht verschiebbar (KOPF zuerst, HOEFE direkt danach, FUSS zuletzt). */
 export const FESTE_ARTEN: readonly AbschnittArt[] = ['KOPF', 'HOEFE', 'FUSS']
 
+/**
+ * Zusätzliche Abschnitte (Register N16, Ergänzung Nr. 129): Admin fügt sie in
+ * Admin › Startseite hinzu, die Migration legt keine Zeile an. Sie stehen
+ * bewusst NICHT in STANDARD_REIHENFOLGE — sonst wären alle gespeicherten
+ * Fassungen und der Entwurf ohne sie ungültig (pruefeReihenfolge verlangt jede
+ * Standard-Art genau einmal), Speichern scheiterte, und die Live-Startseite
+ * fiele auf den Standard zurück. Eine Zusatz-Art steht höchstens einmal in
+ * der Liste, irgendwo nach HOEFE und vor FUSS, und darf fehlen.
+ */
+export const ZUSATZ_ARTEN = ['NEUIGKEITEN'] as const satisfies readonly AbschnittArt[]
+
+export type ZusatzArt = (typeof ZUSATZ_ARTEN)[number]
+
+export function istZusatzArt(art: unknown): art is ZusatzArt {
+  return (ZUSATZ_ARTEN as readonly unknown[]).includes(art)
+}
+
+/**
+ * Die Kennung, unter der ein hinzugefügter, noch nicht gespeicherter
+ * Zusatz-Abschnitt in der Reihenfolge steht — derselbe Weg wie NEUER_BLOCK:
+ * Beim Speichern des Entwurfs legt der Server die Zeile an und gibt ihre
+ * Kennung zurück.
+ */
+export const NEUER_ABSCHNITT: Record<ZusatzArt, string> = { NEUIGKEITEN: 'neu-neuigkeiten' }
+
+/** Die Zusatz-Art zu einer Kennung aus NEUER_ABSCHNITT — sonst null. */
+export function neueZusatzArt(kennung: string): ZusatzArt | null {
+  return ZUSATZ_ARTEN.find((art) => NEUER_ABSCHNITT[art] === kennung) ?? null
+}
+
 export function istFest(art: StartseiteArt): boolean {
   return (FESTE_ARTEN as readonly StartseiteArt[]).includes(art)
 }
@@ -53,6 +84,7 @@ export const ABSCHNITT_TEXT: Record<AbschnittArt, { titel: string; satz: string 
   FUER_HOEFE: { titel: 'Für Höfe', satz: 'Band mit Registrieren' },
   FRAGEN: { titel: 'Fragen', satz: 'häufige Fragen' },
   FUSS: { titel: 'Fuß', satz: 'Links, Rechtliches' },
+  NEUIGKEITEN: { titel: 'Neu bei den Höfen', satz: 'neueste Beiträge der Höfe, letzte 14 Tage' },
 }
 
 // ─── Vorlagen und Grenzen ───────────────────────────────────────────────────
@@ -144,10 +176,12 @@ export const REIHENFOLGE_FEHLER_TEXT: Record<ReihenfolgeFehler, string> = {
 }
 
 /**
- * Prüft eine ganze Liste: jeder Abschnitt genau einmal, KOPF zuerst, FUSS
- * zuletzt, HOEFE als erster Abschnitt nach dem KOPF (Blöcke dürfen dazwischen,
- * Mockup admin-startseite-gestalten), die festen sichtbar. Der Server prüft
- * damit jedes Speichern — nicht nur das Formular.
+ * Prüft eine ganze Liste: jeder Standard-Abschnitt genau einmal, KOPF zuerst,
+ * FUSS zuletzt, HOEFE als erster Abschnitt nach dem KOPF (Blöcke dürfen
+ * dazwischen, Mockup admin-startseite-gestalten), die festen sichtbar. Eine
+ * Zusatz-Art (ZUSATZ_ARTEN) höchstens einmal und nie vor HOEFE — die Plätze
+ * nach FUSS und vor KOPF schließen die Regeln für KOPF und FUSS schon aus.
+ * Der Server prüft damit jedes Speichern — nicht nur das Formular.
  */
 export function pruefeReihenfolge(liste: readonly ListenEintrag[]): ReihenfolgeFehler | null {
   const abschnitte = liste.filter((e) => e.art !== 'BLOCK')
@@ -155,6 +189,9 @@ export function pruefeReihenfolge(liste: readonly ListenEintrag[]): ReihenfolgeF
     const anzahl = abschnitte.filter((e) => e.art === art).length
     if (anzahl === 0) return 'abschnitt-fehlt'
     if (anzahl > 1) return 'abschnitt-doppelt'
+  }
+  for (const art of ZUSATZ_ARTEN) {
+    if (abschnitte.filter((e) => e.art === art).length > 1) return 'abschnitt-doppelt'
   }
   if (liste[0]?.art !== 'KOPF') return 'kopf-nicht-oben'
   if (liste[liste.length - 1]?.art !== 'FUSS') return 'fuss-nicht-unten'
@@ -336,6 +373,8 @@ export const ADMIN_STARTSEITE_TEXT = {
   fest: 'fest',
   automatik: 'Automatik',
   einfuegen: 'Block einfügen',
+  /** Hinzufügen eines Zusatz-Abschnitts (Nr. 129) — im selben Menü wie „Block einfügen“, solange es ihn nicht gibt. */
+  abschnittEinfuegen: (titel: string) => `„${titel}“ einfügen`,
   bibliothek: 'Block einfügen · Vorlagen',
   bibliothekRegel: 'Mehr Vorlagen nur über einen Lauf – jede ist eine Komponente im Design-System, kein freies Layout.',
   blockNeu: 'Neuer Block',
@@ -355,3 +394,71 @@ export const ADMIN_STARTSEITE_TEXT = {
   vorschauLaedt: 'Vorschau wird aktualisiert',
   rahmenTitel: 'Vorschau der Startseite',
 } as const
+
+// ─── „Neu bei den Höfen“ (Register N16, Ergänzung Nr. 129) ──────────────────
+
+/**
+ * Das Etikett des Datencaches von „Neu bei den Höfen“ (src/server/queries/
+ * neuigkeiten.ts). Veröffentlichen, Deaktivieren und Löschen eines Beitrags
+ * leeren es; der Eintrag trägt zusätzlich HOEFE_CACHE_TAG, damit Pausieren,
+ * Testhof und Entzug der Freischaltung ihn ebenfalls erneuern.
+ */
+export const NEUIGKEITEN_CACHE_TAG = 'neu-bei-den-hoefen'
+
+/** Wie alt ein Beitrag höchstens sein darf, um in der Reihe zu stehen. */
+export const NEUIGKEITEN_TAGE = 14
+
+/** Höchstens so viele Karten — je Hof eine. */
+export const NEUIGKEITEN_MAX = 6
+
+/** Die Wörter des Abschnitts — Titel derselbe wie in Admin › Startseite. */
+export const NEUIGKEITEN_TEXT = {
+  titel: ABSCHNITT_TEXT.NEUIGKEITEN.titel,
+  satz: 'Was die Höfe in den letzten 14 Tagen erzählt haben',
+  zurueck: 'Zurück',
+  weiter: 'Weiter',
+} as const
+
+/**
+ * Eine Karte der Reihe — nur, was sie zeigt: Titel, Anlass, Foto samt
+ * Ausschnitt, Zeitpunkte (ISO-Text, aus dem Datencache kommen Texte), Hofname,
+ * Slug und die Kategorien für die Bildfläche ohne Foto. Kein Text des Beitrags.
+ */
+export type Neuigkeit = {
+  id: string
+  titel: string
+  anlass: StatusPostAnlass
+  foto: string | null
+  fotoAusschnitt: BildAusschnitt | null
+  veroeffentlicht: string
+  endet: string | null
+  hof: { name: string; slug: string; kategorien: ProductCategory[] }
+}
+
+/**
+ * Höchstens ein Beitrag je Hof (der erste, also der neueste — die Abfrage
+ * liefert nach Zeit absteigend) und höchstens `max` insgesamt. Keine Rangliste:
+ * Die Reihenfolge bleibt die der Zeit.
+ */
+export function waehleNeuigkeiten<T extends { hof: { slug: string } }>(beitraege: readonly T[], max: number = NEUIGKEITEN_MAX): T[] {
+  const gesehen = new Set<string>()
+  const auswahl: T[] = []
+  for (const beitrag of beitraege) {
+    if (auswahl.length >= max) break
+    if (gesehen.has(beitrag.hof.slug)) continue
+    gesehen.add(beitrag.hof.slug)
+    auswahl.push(beitrag)
+  }
+  return auswahl
+}
+
+/**
+ * Was der Browser zeigt: Die Liste kommt aus einem bis zu fünf Minuten alten
+ * Datencache — ein inzwischen abgelaufener oder über 14 Tage alter Beitrag
+ * fällt mit der Uhr des Browsers heraus (useUhr).
+ */
+export function sichtbareNeuigkeiten<T extends { veroeffentlicht: string; endet: string | null }>(liste: readonly T[], jetzt: Date): T[] {
+  const t = jetzt.getTime()
+  const grenze = t - NEUIGKEITEN_TAGE * 24 * 60 * 60_000
+  return liste.filter((n) => Date.parse(n.veroeffentlicht) >= grenze && (n.endet === null || Date.parse(n.endet) > t))
+}

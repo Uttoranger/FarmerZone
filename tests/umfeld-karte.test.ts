@@ -63,7 +63,11 @@ const AUSWERTUNG = [
   'src/app/(hof)/analytics/page.tsx',
   'src/app/(hof)/analytics/umfeld/page.tsx',
   'src/app/(hof)/region/page.tsx',
-  'src/app/(hof)/region/loading.tsx',
+  // Seit Nr. 122 die beiden Teile der Seite; region/loading.tsx gibt es nicht mehr (Ladepunkt statt Skelett).
+  'src/app/(hof)/region/preise-reiter.tsx',
+  'src/app/(hof)/region/futter-reiter.tsx',
+  // Beide Reiter binden den Zustand ohne Standort ein (Nr. 122) — auch er lädt die Karte nicht statisch.
+  'src/app/(hof)/region/ohne-standort.tsx',
 ]
 
 describe('Umfeld-Karte — erst beim Umschalten geladen', () => {

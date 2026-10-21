@@ -1,5 +1,6 @@
 import type {
   Abgabe,
+  Abholhinweis,
   Betriebsstatus,
   Futtermittelart,
   KaeuferArt,
@@ -202,6 +203,8 @@ export type SeedProdukt = {
   labels: ProductLabel[]
   allergene?: string[]
   abgabe?: Abgabe
+  /** Abholhinweise eines Futters (N23, Nr. 123); ohne Angabe keine. */
+  abholhinweise?: Abholhinweis[]
   kuehlpflichtig?: boolean
   gefrierpflichtig?: boolean
   saisonVon?: number
@@ -328,6 +331,7 @@ const HOF_A: SeedHof = {
       labels: [],
       zaehltZurGrenze: false,
       futter: wiesenheu(300),
+      abholhinweise: ['ANHAENGER_NOETIG', 'FRONTLADER'],
     },
     {
       id: 'prod-a-stroh',
@@ -343,6 +347,7 @@ const HOF_A: SeedHof = {
       subcategory: 'STROH',
       labels: [],
       zaehltZurGrenze: false,
+      abholhinweise: ['ANHAENGER_NOETIG', 'NACH_ABSPRACHE'],
       futter: {
         futtermittelart: 'EINZELFUTTERMITTEL',
         zielTierarten: ['RIND', 'PFERD', 'SCHAF_ZIEGE'],

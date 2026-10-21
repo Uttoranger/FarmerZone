@@ -2,7 +2,8 @@ import { revalidatePath, updateTag } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { istGebindeGesperrt, type HofRegistrierung } from '@/lib/futter-registrierung'
-import { BEREICH_KATEGORIEN } from '@/lib/taxonomie'
+import { BEREICH_KATEGORIEN, istFuttermittel, type ProductCategoryValue } from '@/lib/taxonomie'
+import { ordneAbholhinweise, type AbholhinweisValue } from '@/lib/abholhinweise'
 import type { FutterKennzeichnungFormData } from '@/schemas/product'
 
 /*
@@ -33,6 +34,18 @@ export function revalidiereProdukte(farmSlug: string): void {
   // zweites Argument und warnt ohne es; updateTag gilt für Server Actions, gibt
   // „lies deine eigene Schreibung" und braucht kein Profil.
   updateTag(HOEFE_CACHE_TAG)
+}
+
+/**
+ * Die Abholhinweise, wie sie in die Spalte gehen (Register N23, Nr. 123): nur
+ * im Bereich Futtermittel, sonst immer die leere Liste — auch wenn ein
+ * Formular für ein anderes Produkt welche mitschickt oder ein Futter die
+ * Kategorie wechselt. Geordnet in der Folge der Auswahl (ordneAbholhinweise).
+ * Eine geänderte Wahl verlangt beim Bearbeiten den Haken neu wie jede
+ * Produktangabe außer Preis, Vorrat, Foto und Sichtbarkeit (E10a).
+ */
+export function abholhinweiseDaten(category: ProductCategoryValue | null, hinweise: readonly AbholhinweisValue[]): AbholhinweisValue[] {
+  return istFuttermittel(category) ? ordneAbholhinweise(hinweise) : []
 }
 
 /** Eine Kennzeichnung, die ein Schema durchgelassen hat — dort ist die Futtermittelart gesetzt. */

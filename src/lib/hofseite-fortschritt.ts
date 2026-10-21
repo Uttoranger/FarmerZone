@@ -17,9 +17,10 @@
  */
 import type { SchildFarbe } from '@/lib/mein-hof'
 import { HOFSEITE_HREF, titelbildFoto } from '@/lib/mein-hof'
+import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
 import { formatSlotTime, type WeeklySlot } from '@/lib/pickup-days'
 import { ABHOLZEITEN_FEHLEN_ZEILE } from '@/lib/pickup-slot-rules'
-import { ueberUnsText } from '@/lib/hofseite-kunde'
+import { AKTUELL_ANKER, AKTUELL_VOM_HOF_TEXT, ueberUnsText } from '@/lib/hofseite-kunde'
 import { formatiereTelefon } from '@/lib/telefon-anzeige'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 
@@ -119,6 +120,8 @@ export const ZEILE_TITEL: Record<HofseiteZeileId, string> = {
   kontakt: 'Kontakt',
   bestellungen: 'Bestellungen',
   abschnitte: 'Abschnitte der Hofseite',
+  // Keine Zeile des Fortschritts, nur die erste Zeile mit Link (Nr. 129) — der Name der Hofseite.
+  aktuell: AKTUELL_VOM_HOF_TEXT.titel,
 }
 
 const FEHLT = { text: 'Fehlt', farbe: 'bernstein' } as const
@@ -368,6 +371,8 @@ export const ZIEL_ABSCHNITT: Record<HofseiteZeileId, string> = {
   kontakt: 'kontakt',
   bestellungen: 'bestellungen',
   abschnitte: 'abschnitte',
+  // Der Abschnitt „Aktuell vom Hof“ (Nr. 128); ohne laufenden Beitrag gibt es ihn nicht, dann markiert nichts.
+  aktuell: AKTUELL_ANKER,
 }
 
 /**
@@ -394,6 +399,8 @@ export const EINSTELLUNG_FUER_ZEILE: Record<HofseiteZeileId, string> = {
   kontakt: '/settings/profile',
   bestellungen: '/settings/pause',
   abschnitte: HOFSEITE_HREF,
+  // Beiträge verwaltet Mein Hof › Beiträge; nie ein fehlender Punkt, denn „Aktuell vom Hof“ zählt nicht zum Fortschritt.
+  aktuell: BEITRAEGE_HREF,
 }
 
 /**

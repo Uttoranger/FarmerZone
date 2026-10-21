@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, LogOut, Monitor, MonitorSmartphone, Smartphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { GERAETE_TEXT, alleAnderenSatz, type GeraeteZeile } from '@/lib/geraete'
+import { GERAETE_TEXT, alleAnderenSatz, geraeteHinweise, type GeraeteZeile } from '@/lib/geraete'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { meldeAlleAnderenAb, meldeGeraetAb, type AbmeldenAntwort } from '@/server/actions/geraete'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,13 +24,16 @@ import { KNOPF_ORANGE, KNOPF_ORANGE_RAHMEN, KNOPF_RAHMEN } from '@/components/ho
  * src/server/geraete.ts); hier wird nur gezeigt und abgemeldet. Abmelden
  * wirkt sofort — die Sitzung wird überall frisch gelesen (kein Cookie-Cache).
  * Auch für Admin › Einstellungen › Anmeldung (Nr. 115): ohne Bezug auf
- * den Hofbereich, die Liste lädt nach dem Abmelden über router.refresh neu.
+ * den Hofbereich, die Liste lädt nach dem Abmelden über router.refresh neu;
+ * dort mit `fuerAdmin` (Nr. 126): Hinweis und Zusatz nennen auch die Passkeys.
  */
 
 const KNOPF_KLEIN = cn(KNOPF_RAHMEN, 'min-h-11 shrink-0 px-4 text-[13px] font-semibold')
 
-export function AngemeldeteGeraete({ zeilen }: { zeilen: readonly GeraeteZeile[] }): React.JSX.Element {
+export function AngemeldeteGeraete({ zeilen, fuerAdmin = false }: { zeilen: readonly GeraeteZeile[]; fuerAdmin?: boolean }): React.JSX.Element {
   const router = useRouter()
+  // Im Admin-Bereich kommt der Blick auf die Passkeys dazu (N20); für Höfe bleibt der Text, wie er war.
+  const hinweise = geraeteHinweise(fuerAdmin)
   const breit = useMindestbreite(768)
   const [laeuft, starte] = useTransition()
   const [abmeldend, setAbmeldend] = useState<string | null>(null)
@@ -125,7 +128,7 @@ export function AngemeldeteGeraete({ zeilen }: { zeilen: readonly GeraeteZeile[]
           </button>
         )}
 
-        <p className="text-xs leading-relaxed text-muted-foreground">{GERAETE_TEXT.hinweis}</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">{hinweise.hinweis}</p>
       </CardContent>
 
       {breit ? (
@@ -133,7 +136,7 @@ export function AngemeldeteGeraete({ zeilen }: { zeilen: readonly GeraeteZeile[]
           <DialogContent className="sm:max-w-[480px]">
             <DialogTitle className="font-heading text-xl leading-tight font-semibold">{frage.titel}</DialogTitle>
             <DialogDescription className="text-sm leading-relaxed text-foreground">{frage.satz}</DialogDescription>
-            <p className="text-[13px] leading-relaxed text-muted-foreground">{GERAETE_TEXT.blattZusatz}</p>
+            <p className="text-[13px] leading-relaxed text-muted-foreground">{hinweise.blattZusatz}</p>
             <DialogFooter>
               <button type="button" onClick={() => setFrageOffen(false)} disabled={laeuft} className={KNOPF_RAHMEN}>
                 {GERAETE_TEXT.abbrechen}
@@ -147,7 +150,7 @@ export function AngemeldeteGeraete({ zeilen }: { zeilen: readonly GeraeteZeile[]
           <SheetBlatt>
             <SheetTitle className="font-heading text-xl leading-tight font-semibold">{frage.titel}</SheetTitle>
             <SheetDescription className="text-sm leading-relaxed text-foreground">{frage.satz}</SheetDescription>
-            <p className="text-[13px] leading-relaxed text-muted-foreground">{GERAETE_TEXT.blattZusatz}</p>
+            <p className="text-[13px] leading-relaxed text-muted-foreground">{hinweise.blattZusatz}</p>
             {frage.knopf}
             <SheetClose disabled={laeuft} className={cn(KNOPF_RAHMEN, 'w-full')}>
               {GERAETE_TEXT.abbrechen}

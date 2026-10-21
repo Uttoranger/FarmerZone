@@ -90,6 +90,21 @@ afterEach(() => {
 })
 
 describe('legeFutterFamilieAn', () => {
+  it('jede Größe übernimmt die Abholhinweise der Familie, geordnet (N23, Nr. 123)', async () => {
+    await legeFutterFamilieAn({ ...HEU, abholhinweise: ['NACH_ABSPRACHE', 'ANHAENGER_NOETIG'] })
+
+    expect(angelegt().map((p) => p.abholhinweise)).toEqual(Array(4).fill(['ANHAENGER_NOETIG', 'NACH_ABSPRACHE']))
+  })
+
+  it('ohne Angabe bekommt jede Größe die leere Liste; doppelte Hinweise weist das Schema ab', async () => {
+    await legeFutterFamilieAn(HEU)
+    expect(angelegt().map((p) => p.abholhinweise)).toEqual(Array(4).fill([]))
+
+    vi.clearAllMocks()
+    expect(await legeFutterFamilieAn({ ...HEU, abholhinweise: ['FRONTLADER', 'FRONTLADER'] })).toEqual({ error: 'Bitte prüfe deine Eingaben.' })
+    expect(productCreate).not.toHaveBeenCalled()
+  })
+
   it('Heu mit vier Größen, ohne BAES-Meldung: Ballen online, Sackerl und Sack als Entwurf', async () => {
     const ergebnis = await legeFutterFamilieAn(HEU)
 

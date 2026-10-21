@@ -466,7 +466,7 @@ describe('baueUmfeld — Hinweise und Leere', () => {
       ohneStandort: [{ produkte: [heu(8, 20)] }, { produkte: [produkt({ category: 'EIER' })] }],
       abgeschnitten: false,
     })
-    expect(ansicht.hinweise).toEqual(['1 Hof ohne Standort nicht berücksichtigt.'])
+    expect(ansicht.hinweise).toEqual(['1 Hof hat noch keinen Standort auf der Karte und fehlt hier.'])
   })
 
   it('meldet den Deckel', () => {

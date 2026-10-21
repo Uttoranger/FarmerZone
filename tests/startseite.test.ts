@@ -636,11 +636,12 @@ describe('Abschnitte', () => {
     expect(text).toContain(`© 2026 ${MARKE}`)
   })
 
-  // Nr. 120 Runde 2: „Höfe entdecken" und „So funktioniert's" stehen am Computer im
-  // Seitenfuß direkt darunter (SEITENFUSS.wege, erst ab md). Am Handy führt der
-  // Seitenfuß sie nicht, und die Produktseite hat dort keine Unterleiste — also
-  // bleibt die Spalte mit der Marke, nur am Computer ausgeblendet.
-  describe('Wege im Fuß: am Handy in der Spalte der Marke, am Computer im Seitenfuß', () => {
+  // Nr. 120 Runde 2 und Nr. 127 (Register N22, Ergänzung): Am Computer hat jede Seite der Kundschaft genau
+  // einen Fuß, den Seitenfuß (KundeFuss; dort stehen „Höfe entdecken", „Für Höfe" und „So funktioniert's"
+  // ab md). Der Fuß der Startseite erscheint nur am Handy — der ganze <footer> ist ab md verborgen. Am
+  // Handy führt der Seitenfuß die Wege nicht, und die Produktseite hat dort keine Unterleiste; also
+  // bleibt der Fuß mit der Spalte der Marke, wie er war.
+  describe('Wege im Fuß: der Fuß der Startseite nur am Handy, am Computer der Seitenfuß', () => {
     const WEGE = ['href="/hoefe', 'href="/#so-funktionierts"'] as const
     /** Die Klassen aller umschließenden Kästen des Tags mit `marke` (samt diesem Tag): ein Stapel über die Tags davor. */
     function klassenVor(text: string, marke: string): string[] {
@@ -653,6 +654,8 @@ describe('Abschnitte', () => {
       }
       return stapel.join(' ').split(/\s+/).filter(Boolean)
     }
+    /** Klassen, die am Computer verbergen — `print:hidden` (nur beim Drucken) zählt nicht. */
+    const verbirgt = (klasse: string) => klasse === 'hidden' || klasse === 'md:hidden'
     const startseite = html(createElement(StartseiteFuss, { jahr: 2026 }))
     const seitenfuss = html(createElement(KundeFuss))
 
@@ -664,11 +667,15 @@ describe('Abschnitte', () => {
       for (const wort of ['Höfe entdecken', 'So funktioniert’s']) expect(spalte).toContain(`>${wort}</a>`)
     })
 
-    it('die Spalte der Marke ist nur am Computer verborgen (md:hidden), „Für Höfe" nicht (Gegenprobe)', () => {
-      expect(klassenVor(startseite, `aria-label="${MARKE}"`)).toContain('md:hidden')
-      expect(klassenVor(startseite, 'aria-label="Für Höfe"')).not.toContain('md:hidden')
+    it('der ganze Fuß der Startseite ist ab md verborgen — die Spalten brauchen keine eigene Klasse mehr', () => {
+      expect(klassenVor(startseite, '<footer')).toContain('md:hidden')
       // Am Handy stehen beide Spalten nebeneinander wie vor Runde 1.
-      expect(startseite).toMatch(/class="grid grid-cols-2 gap-6 md:flex md:gap-\[70px\]"/)
+      expect(startseite).toMatch(/class="grid grid-cols-2 gap-6"/)
+      for (const marke of [`aria-label="${MARKE}"`, 'aria-label="Für Höfe"']) {
+        expect(klassenVor(startseite, marke).filter(verbirgt), marke).toEqual(['md:hidden'])
+      }
+      // Gegenprobe: Der Seitenfuß selbst ist nie verborgen — er ist der eine Fuß am Computer.
+      expect(klassenVor(seitenfuss, '<footer').filter(verbirgt)).toEqual([])
     })
 
     it('der Seitenfuß führt die Wege nur ab md — zusammen steht jeder Weg genau einmal sichtbar', () => {
@@ -685,6 +692,53 @@ describe('Abschnitte', () => {
       const rechtlich = klassenVor(seitenfuss, 'href="/agb"')
       expect(rechtlich).not.toContain('hidden')
       expect(rechtlich).not.toContain('md:hidden')
+    })
+  })
+
+  // Nr. 127: „Für Höfe" im Seitenfuß führt zu /fuer-hoefe (dort stehen /register und /konditionen), „Anmelden" steht im Kopf.
+  describe('Am Computer genau ein Fuß mit der Wortmarke: /, Hofseite, Produktseite, /fuer-hoefe', () => {
+    const WORTMARKE = `text-brand-text">${MARKE}</span>`
+    type Fuss = { klassen: string[]; wortmarken: number }
+    /** Alle <footer> eines Markups mit ihren Klassen und der Zahl der Wortmarken darin. */
+    function fuesse(markup: string): Fuss[] {
+      return [...markup.matchAll(/<footer\b([^>]*)>([\s\S]*?)<\/footer>/g)].map(([, kopf, inhalt]) => ({
+        klassen: (/class="([^"]*)"/.exec(kopf)?.[1] ?? '').split(/\s+/).filter(Boolean),
+        wortmarken: inhalt.split(WORTMARKE).length - 1,
+      }))
+    }
+    /** Am Computer (ab md) sichtbar: weder `hidden` noch `md:hidden` am <footer>. */
+    const amComputerSichtbar = (f: Fuss) => !f.klassen.includes('hidden') && !f.klassen.includes('md:hidden')
+    /** Eine Kundenseite wie die vier Routen sie bauen: der Fuß der Startseite im Inhalt, der Seitenfuß der Shell danach. */
+    const seite = (): string => html(createElement('div', null, createElement('main', null, createElement(StartseiteFuss, { jahr: 2026 })), createElement(KundeFuss)))
+
+    it('am Computer ist genau ein Fuß sichtbar, und er trägt genau eine Wortmarke — der Seitenfuß', () => {
+      const alle = fuesse(seite())
+      expect(alle).toHaveLength(2)
+      const sichtbar = alle.filter(amComputerSichtbar)
+      expect(sichtbar).toHaveLength(1)
+      expect(sichtbar[0].wortmarken).toBe(1)
+      expect(sichtbar[0].klassen).toContain('print:hidden')
+      // Am Handy bleibt der Fuß der Startseite sichtbar, wie er war: beide Füße tragen die Wortmarke.
+      expect(alle.reduce((n, f) => n + f.wortmarken, 0)).toBe(2)
+    })
+
+    it('Gegenprobe: ohne md:hidden am Fuß der Startseite stünden am Computer zwei Füße mit zwei Wortmarken', () => {
+      const alt = fuesse(seite().replace('border-t border-border py-10 md:hidden', 'border-t border-border py-10'))
+      expect(alt.filter(amComputerSichtbar)).toHaveLength(2)
+      expect(alt.filter(amComputerSichtbar).reduce((n, f) => n + f.wortmarken, 0)).toBe(2)
+    })
+
+    it('alle vier Seiten setzen den Fuß der Startseite genau einmal in die Shell, und die Shell setzt den Seitenfuß', () => {
+      const seiten = ['src/app/(public)/fuer-hoefe/page.tsx', 'src/app/(public)/[farmSlug]/page.tsx', 'src/app/(public)/[farmSlug]/produkt/[id]/page.tsx']
+      for (const datei of seiten) {
+        const text = code(datei)
+        expect(text.match(/<StartseiteFuss\b/g), datei).toHaveLength(1)
+        expect(text, datei).toMatch(/<KundeShellMitSitzung\b/)
+      }
+      // Die Startseite baut ihn als Abschnitt FUSS (STARTSEITE_ABSCHNITTE) in derselben Shell.
+      expect(code('src/app/page.tsx')).toContain('STARTSEITE_ABSCHNITTE[eintrag.art]')
+      expect(code('src/components/startseite/startseite-abschnitte.tsx').match(/<StartseiteFuss\b/g)).toHaveLength(1)
+      expect(code('src/components/shells/kunde-shell.tsx')).toMatch(/<KundeFuss\b/)
     })
   })
 
@@ -752,7 +806,7 @@ describe('Aufbau der Seite', () => {
   })
 
   it('die Höfe hinter Suspense mit Skelett — Kopf und Suche warten nicht auf die Datenbank', () => {
-    expect(seite).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>\s*<HofKartenGeladen \/>/)
+    expect(seite).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>\s*<HofKartenGeladen jetzt=\{jetzt\} \/>/)
   })
 
   it('die Karte hinter Suspense: bis die Höfe da sind, das Land ohne Pins (Nr. 59)', () => {

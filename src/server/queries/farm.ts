@@ -5,6 +5,7 @@ import { hofAdresse, hofZustand, titelbildFoto, type HofZustand } from '@/lib/me
 import { APP_URL } from '@/lib/umgebung-server'
 import { categoryImagePath } from '@/lib/product-image'
 import { zuProduktDto } from '@/lib/produkt-dto'
+import type { AbholhinweisValue } from '@/lib/abholhinweise'
 import { DEFAULT_SECTIONS, type SectionConfig } from './appearance'
 import { leseAusschnitt, type BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { PRODUCT_ORDER_BY } from './products'
@@ -23,14 +24,17 @@ import type {
 import { baueAngebotsZeile, fasseAngebotZusammen, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
 import { anzeigeBereichVon, betriebsnummerFuerAnzeige, type AnzeigeBereich } from '@/lib/taxonomie'
 import {
+  NEUER_BEITRAG_TAGE,
   baueFotostreifen,
   naechsteAbholung,
   wienJetzt,
   type AbholFenster,
   type NaechsteAbholung,
+  type NeuerBeitrag,
   type OrtsZeit,
   type VorschauProdukt,
 } from '@/lib/hofuebersicht'
+import { AKTIVER_BEITRAG, NEUESTER_BEITRAG_ZUERST } from './status-posts'
 
 export type PublicProduct = {
   id: string
@@ -66,6 +70,8 @@ export type PublicProduct = {
   familieId: string | null
   /** Seit Nr. 11 (E11): Angaben zu Brennmaterial, null ohne. */
   brennmaterial: PublicBrennmaterial | null
+  /** Seit Nr. 123 (N23): Abholhinweise eines Futters für die Produktseite; sonst leer. */
+  abholhinweise: AbholhinweisValue[]
 }
 
 /**
@@ -299,6 +305,8 @@ const OEFFENTLICHES_PRODUKT_SELECT = {
   },
   // Seit Nr. 11: Produktfamilie (E3) und Brennmaterial (E11) für die Produktseite.
   familieId: true,
+  // Seit Nr. 123: Abholhinweise eines Futters für die Produktseite (N23).
+  abholhinweise: true,
   brennmaterial: {
     select: {
       holzart: true,
@@ -733,126 +741,134 @@ export type HofUebersichtEintrag = {
   fotos: string[]
   /** Abzeichen „Gründungshof“ (Register K2, Nr. 116) — nur Ja/Nein, nie die Nummer. */
   gruendungshof: boolean
+  /** Der neueste aktive Beitrag, höchstens sieben Tage alt (Register N22, Ergänzung Nr. 129) — die Marke „Neu · vor …“ an der Hofkarte; null ohne. */
+  neuerBeitrag: NeuerBeitrag | null
 }
 
 /**
- * ALLE öffentlich sichtbaren Höfe — Filter wie getPublicFarm oben
- * (isActive, archivedAt: null, approvedAt not null), dazu kein Testhof
- * (IN_LISTEN_SICHTBAR, Register N21): Was dort die Einzelseite sperrt, hält
- * den Hof auch aus der Übersicht. EINE Query mit Einbindungen,
- * kein N+1; die Kategorie- und Termin-Ableitung ist reine, getestete Logik
- * (src/lib/hofuebersicht.ts).
+ * Der neueste aktive Beitrag (AKTIVER_BEITRAG) eines Hofs, höchstens
+ * NEUER_BEITRAG_TAGE alt — als Einbindung der Hof-Abfrage der Hofliste (kein
+ * N+1, keine zweite Abfrage). Nur Titel und Zeitpunkte, kein Text.
  */
-export async function getOeffentlicheHoefe(
-  jetzt: OrtsZeit = wienJetzt()
-): Promise<HofUebersichtEintrag[]> {
-  // Läuft PARALLEL zur Hauptabfrage — sie hängt nicht von deren Ergebnis ab,
-  // und /hoefe cacht das Ergebnis fünf Minuten (unstable_cache in der Seite):
-  // Der Aufwand fällt höchstens alle fünf Minuten an, nicht je Besuch.
-  const zeilenJeHof = prisma.product.findMany({
-    where: { isAvailable: true, farm: IN_LISTEN_SICHTBAR },
+function neuerBeitragEinbindung(jetzt: Date) {
+  return {
+    where: { AND: [AKTIVER_BEITRAG(jetzt), { publishedAt: { gte: new Date(jetzt.getTime() - NEUER_BEITRAG_TAGE * 24 * 60 * 60_000) } }] },
+    orderBy: NEUESTER_BEITRAG_ZUERST,
+    take: 1,
+    select: { title: true, publishedAt: true, expiresAt: true },
+  } satisfies Prisma.Farm$statusPostsArgs
+}
+
+type NeuerBeitragRoh = { title: string; publishedAt: Date | null; expiresAt: Date | null }
+
+function alsNeuerBeitrag(roh: NeuerBeitragRoh | undefined): NeuerBeitrag | null {
+  if (!roh?.publishedAt) return null
+  return { titel: roh.title, veroeffentlicht: roh.publishedAt.toISOString(), endet: roh.expiresAt?.toISOString() ?? null }
+}
+
+/** Die schmalen Zeilen ALLER verfügbaren Produkte — Inhalt der Abfrage `zeilenJeHof` in getOeffentlicheHoefe (seit Nr. 122 benannt, damit Region den eigenen Eintrag genau so baut). */
+export const UEBERSICHT_ZEILEN_SELECT = {
+  farmId: true,
+  category: true,
+  subcategory: true,
+  labels: true,
+  imageUrl: true,
+  bildAusschnitt: true,
+  name: true,
+  price: true,
+  stock: true,
+  reservedStock: true,
+  futter: { select: { zielTierarten: true, nettoMenge: true, nettoEinheit: true } },
+  // Seit Nr. 09 zeigt die Produktsuche Produkte statt Höfe: Kennung,
+  // Einheit und Gebinde für die Preiszeile — aus DIESER ungedeckelten
+  // Abfrage, nicht aus den acht Vorschau-Zeilen (falsches Negativ ab
+  // Platz neun, wie oben bei den Suchnamen).
+  id: true,
+  unit: true,
+  unitSize: true,
+} as const satisfies Prisma.ProductSelect
+
+/** Die Felder je Hof — Inhalt der Hof-Abfrage in getOeffentlicheHoefe (seit Nr. 122 benannt, wie oben). */
+export const UEBERSICHT_HOF_SELECT = {
+  // id/approvedAt/createdAt werden (noch) NICHT angezeigt: Zusammen mit
+  // archivedAt (hier durch den Filter konstant null) sind sie die
+  // Eingabe von gruendungsplaetze() (src/lib/gruendungshof.ts,
+  // HofFuerPlatz) — die spätere Gründungshof-Kennzeichnung braucht damit
+  // KEINEN Query-Umbau, nur eine Anzeige.
+  id: true,
+  approvedAt: true,
+  createdAt: true,
+  // Abzeichen (Nr. 116): nur für das Ja/Nein unten, die Nummer verlässt die Abfrage nicht.
+  gruendungPlatz: true,
+  gruendungAusgenommen: true,
+  gruendungAbzeichenZeigen: true,
+  slug: true,
+  name: true,
+  postalCode: true,
+  city: true,
+  logoUrl: true,
+  logoAusschnitt: true,
+  latitude: true,
+  longitude: true,
+  isPaused: true,
+  bannerUrl: true,
+  bannerType: true,
+  // Die ersten vier Galerie-Fotos für den Fotostreifen — mehr lädt die
+  // Query nie (Deckel siehe baueFotostreifen).
+  farmPhotos: {
+    orderBy: { sortOrder: 'asc' },
+    take: 4,
+    select: { url: true },
+  },
+  // EINE products-Einbindung für DREI Ableitungen: Produktfotos des
+  // Streifens, die Produktvorschau der Karte und (bis zu ihrer Deckelung,
+  // siehe unten) die Kategorien — Prisma erlaubt dieselbe Relation nicht
+  // zweimal im selben select. Sie wurde ERWEITERT, nicht dupliziert.
+  products: {
+    where: { isAvailable: true },
+    // Stabile Reihenfolge (Repo-Konvention der Hofseite): Ohne orderBy
+    // wären „die ersten drei" Produktfotos DB-launisch und der Streifen
+    // wechselte zwischen zwei Ladevorgängen sein Gesicht.
     orderBy: PRODUCT_ORDER_BY,
-    // name/stock/reservedStock speisen die PRODUKTSUCHE (suchNamen unten):
-    // Sie muss ALLE verfügbaren Produkte eines Hofes kennen — die auf acht
-    // gedeckelten Vorschau-Zeilen würden einen Hof, der das Gesuchte erst
-    // ab Platz neun führt, als falsches Negativ verstecken. Der
-    // Kategoriefilter hat genau dieses Loch bewusst nicht (siehe unten) —
-    // die Suche bekommt dieselbe Vollständigkeit aus DERSELBEN Abfrage,
-    // keine zweite Server-Runde.
-    // Seit Bereiche 2 zusätzlich alles, was Facetten und Kilopreis brauchen:
-    // Sorte, Siegel, Preis und aus der Kennzeichnung Tiere und Nettomenge.
+    take: VORSCHAU_LADE_DECKEL,
     select: {
-      farmId: true,
-      category: true,
-      subcategory: true,
-      labels: true,
-      imageUrl: true,
-      bildAusschnitt: true,
+      id: true,
       name: true,
       price: true,
-      stock: true,
-      reservedStock: true,
-      futter: { select: { zielTierarten: true, nettoMenge: true, nettoEinheit: true } },
-      // Seit Nr. 09 zeigt die Produktsuche Produkte statt Höfe: Kennung,
-      // Einheit und Gebinde für die Preiszeile — aus DIESER ungedeckelten
-      // Abfrage, nicht aus den acht Vorschau-Zeilen (falsches Negativ ab
-      // Platz neun, wie oben bei den Suchnamen).
-      id: true,
       unit: true,
       unitSize: true,
+      stock: true,
+      reservedStock: true,
+      category: true,
+      // Nr. 127: Ohne Foto zeigt die Produktzeile die Illustration der Unterkategorie (illustrationPfad).
+      subcategory: true,
+      imageUrl: true,
+      bildAusschnitt: true,
     },
-  })
+  },
+  // Die Gesamtzahl der verfügbar geschalteten Produkte — die Zeile
+  // „+ n weitere" muss auch dann stimmen, wenn oben gedeckelt wurde.
+  _count: { select: { products: { where: { isAvailable: true } } } },
+  pickupSlots: {
+    where: { isActive: true },
+    select: { dayOfWeek: true, startTime: true, endTime: true },
+  },
+} as const satisfies Prisma.FarmSelect
 
-  const hoefe = await prisma.farm.findMany({
-    where: IN_LISTEN_SICHTBAR,
-    // Freischalt-Reihenfolge, die ältesten zuerst — stabil und fair, ohne
-    // eine Rangfrage zu eröffnen, die diese Fassung nicht beantworten will.
-    orderBy: { approvedAt: 'asc' },
-    select: {
-      // id/approvedAt/createdAt werden (noch) NICHT angezeigt: Zusammen mit
-      // archivedAt (hier durch den Filter konstant null) sind sie die
-      // Eingabe von gruendungsplaetze() (src/lib/gruendungshof.ts,
-      // HofFuerPlatz) — die spätere Gründungshof-Kennzeichnung braucht damit
-      // KEINEN Query-Umbau, nur eine Anzeige.
-      id: true,
-      approvedAt: true,
-      createdAt: true,
-      // Abzeichen (Nr. 116): nur für das Ja/Nein unten, die Nummer verlässt die Abfrage nicht.
-      gruendungPlatz: true,
-      gruendungAusgenommen: true,
-      gruendungAbzeichenZeigen: true,
-      slug: true,
-      name: true,
-      postalCode: true,
-      city: true,
-      logoUrl: true,
-      logoAusschnitt: true,
-      latitude: true,
-      longitude: true,
-      isPaused: true,
-      bannerUrl: true,
-      bannerType: true,
-      // Die ersten vier Galerie-Fotos für den Fotostreifen — mehr lädt die
-      // Query nie (Deckel siehe baueFotostreifen).
-      farmPhotos: {
-        orderBy: { sortOrder: 'asc' },
-        take: 4,
-        select: { url: true },
-      },
-      // EINE products-Einbindung für DREI Ableitungen: Produktfotos des
-      // Streifens, die Produktvorschau der Karte und (bis zu ihrer Deckelung,
-      // siehe unten) die Kategorien — Prisma erlaubt dieselbe Relation nicht
-      // zweimal im selben select. Sie wurde ERWEITERT, nicht dupliziert.
-      products: {
-        where: { isAvailable: true },
-        // Stabile Reihenfolge (Repo-Konvention der Hofseite): Ohne orderBy
-        // wären „die ersten drei" Produktfotos DB-launisch und der Streifen
-        // wechselte zwischen zwei Ladevorgängen sein Gesicht.
-        orderBy: PRODUCT_ORDER_BY,
-        take: VORSCHAU_LADE_DECKEL,
-        select: {
-          id: true,
-          name: true,
-          price: true,
-          unit: true,
-          unitSize: true,
-          stock: true,
-          reservedStock: true,
-          category: true,
-          imageUrl: true,
-          bildAusschnitt: true,
-        },
-      },
-      // Die Gesamtzahl der verfügbar geschalteten Produkte — die Zeile
-      // „+ n weitere" muss auch dann stimmen, wenn oben gedeckelt wurde.
-      _count: { select: { products: { where: { isAvailable: true } } } },
-      pickupSlots: {
-        where: { isActive: true },
-        select: { dayOfWeek: true, startTime: true, endTime: true },
-      },
-    },
-  })
+type UebersichtZeile = Prisma.ProductGetPayload<{ select: typeof UEBERSICHT_ZEILEN_SELECT }>
+type UebersichtHof = Prisma.FarmGetPayload<{ select: typeof UEBERSICHT_HOF_SELECT }>
 
+/**
+ * Baut aus den Höfen und ihren schmalen Zeilen die Einträge der Hofliste —
+ * der Zusammenbau von getOeffentlicheHoefe, seit Nr. 122 benannt: Region baut
+ * den eigenen Eintrag damit genau so wie /hoefe (src/server/queries/region.ts).
+ */
+export function baueHofUebersicht(
+  // statusPosts nur aus getOeffentlicheHoefe (neuerBeitragEinbindung); ohne sie kein neuer Beitrag.
+  hoefe: readonly (UebersichtHof & { statusPosts?: NeuerBeitragRoh[] })[],
+  schmaleZeilen: readonly UebersichtZeile[],
+  jetzt: OrtsZeit
+): HofUebersichtEintrag[] {
   // Was die Deckelung oben NICHT verlieren darf: Kategorien, Produktfotos
   // und Suchnamen hängen an ALLEN verfügbaren Produkten, nicht an den
   // ersten acht.
@@ -870,7 +886,6 @@ export async function getOeffentlicheHoefe(
   // Alles liefert EINE schmale Zeilen-Abfrage über alle Höfe (kein N+1) —
   // und keine zweite Einbindung derselben Relation, die Prisma im selben
   // select ohnehin verbietet.
-  const schmaleZeilen = await zeilenJeHof
   const angebotJeHof = new Map<string, AngebotsProdukt[]>()
   const produktFotosJeHof = new Map<string, string[]>()
   const jeBereich = new Map<string, Record<AnzeigeBereich, number>>()
@@ -936,6 +951,7 @@ export async function getOeffentlicheHoefe(
         imageUrl: p.imageUrl,
         bildAusschnitt: leseAusschnitt(p.bildAusschnitt),
         category: p.category,
+        subcategory: p.subcategory,
         // „Verfügbar" heißt: Es ist noch etwas da, das nicht schon reserviert
         // ist. Siehe VORSCHAU-VERFÜGBARKEIT im Kopf dieser Datei.
         verfuegbar: p.stock - p.reservedStock > 0,
@@ -955,8 +971,51 @@ export async function getOeffentlicheHoefe(
         produktFotos: produktFotosJeHof.get(hof.id) ?? [],
       }),
       gruendungshof: zeigtAbzeichen(hof),
+      neuerBeitrag: alsNeuerBeitrag(hof.statusPosts?.[0]),
     }
   })
+}
+
+/**
+ * ALLE öffentlich sichtbaren Höfe — Filter wie getPublicFarm oben
+ * (isActive, archivedAt: null, approvedAt not null), dazu kein Testhof
+ * (IN_LISTEN_SICHTBAR, Register N21): Was dort die Einzelseite sperrt, hält
+ * den Hof auch aus der Übersicht. EINE Query mit Einbindungen,
+ * kein N+1; die Kategorie- und Termin-Ableitung ist reine, getestete Logik
+ * (src/lib/hofuebersicht.ts).
+ */
+export async function getOeffentlicheHoefe(
+  jetzt: OrtsZeit = wienJetzt(),
+  // Für den neuen Beitrag (Nr. 129): Die Frist von AKTIVER_BEITRAG gilt beim Lesen.
+  zeitpunkt: Date = new Date()
+): Promise<HofUebersichtEintrag[]> {
+  // Läuft PARALLEL zur Hauptabfrage — sie hängt nicht von deren Ergebnis ab,
+  // und /hoefe cacht das Ergebnis fünf Minuten (unstable_cache in der Seite):
+  // Der Aufwand fällt höchstens alle fünf Minuten an, nicht je Besuch.
+  const zeilenJeHof = prisma.product.findMany({
+    where: { isAvailable: true, farm: IN_LISTEN_SICHTBAR },
+    orderBy: PRODUCT_ORDER_BY,
+    // name/stock/reservedStock speisen die PRODUKTSUCHE (suchNamen unten):
+    // Sie muss ALLE verfügbaren Produkte eines Hofes kennen — die auf acht
+    // gedeckelten Vorschau-Zeilen würden einen Hof, der das Gesuchte erst
+    // ab Platz neun führt, als falsches Negativ verstecken. Der
+    // Kategoriefilter hat genau dieses Loch bewusst nicht (siehe unten) —
+    // die Suche bekommt dieselbe Vollständigkeit aus DERSELBEN Abfrage,
+    // keine zweite Server-Runde.
+    // Seit Bereiche 2 zusätzlich alles, was Facetten und Kilopreis brauchen:
+    // Sorte, Siegel, Preis und aus der Kennzeichnung Tiere und Nettomenge.
+    select: UEBERSICHT_ZEILEN_SELECT,
+  })
+
+  const hoefe = await prisma.farm.findMany({
+    where: IN_LISTEN_SICHTBAR,
+    // Freischalt-Reihenfolge, die ältesten zuerst — stabil und fair, ohne
+    // eine Rangfrage zu eröffnen, die diese Fassung nicht beantworten will.
+    orderBy: { approvedAt: 'asc' },
+    select: { ...UEBERSICHT_HOF_SELECT, statusPosts: neuerBeitragEinbindung(zeitpunkt) },
+  })
+
+  return baueHofUebersicht(hoefe, await zeilenJeHof, jetzt)
 }
 
 /** Was der Kopf von „Mein Hof" zeigt (components/mein-hof/seitenkopf.tsx). */

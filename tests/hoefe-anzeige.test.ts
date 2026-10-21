@@ -7,8 +7,12 @@
  * bewegt?".
  */
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
 import {
   KARTEN_KACHELN,
+  PIN_FOKUS,
+  PIN_GRUEN,
+  UMKREIS_KREIS,
   KARTE_LAEDT,
   LEERE_LAGE,
   TREFFERFLAECHE,
@@ -76,6 +80,31 @@ describe('pinZustand', () => {
 
   it('der gewählte Pin bleibt gewählt, auch wenn der Zeiger über ihm steht', () => {
     expect(pinZustand('hof-a', { ausgewaehlt: 'hof-a', hervorgehoben: 'hof-a' })).toBe('ausgewaehlt')
+  })
+})
+
+// Nr. 127 (Nacharbeit 120): Das Grün der Pins ist EINE benannte Konstante. Es meint das Karten-Grün auf den hellen
+// Kacheln (folgt dem Modus nicht); die Foto-Knöpfe im Kopf und das Teilen-Bild meinen die Markenfarbe, auch wenn
+// der Wert heute gleich ist — sie tragen ihr eigenes Token bzw. ihre eigene Ausnahme.
+describe('das Grün der Pins — eine Konstante', () => {
+  it('Scheibe, Rand, Nummer, Umkreis und Fokusring nehmen PIN_GRUEN', () => {
+    expect(pinDarstellung('ausgewaehlt').hintergrund).toBe(PIN_GRUEN)
+    expect(pinDarstellung('hervorgehoben').rand).toBe(PIN_GRUEN)
+    expect(pinDarstellung('normal')).toMatchObject({ schrift: PIN_GRUEN, rand: PIN_GRUEN })
+    expect(UMKREIS_KREIS).toMatchObject({ rand: PIN_GRUEN, flaeche: PIN_GRUEN })
+    // Tailwind liest Klassen nur als ganzen Text: Der Fokusring trägt das Grün als Literal — hier hält es die Gleichheit fest.
+    expect(PIN_FOKUS).toContain(`focus-visible:outline-[${PIN_GRUEN}]`)
+  })
+
+  /** Wie oft der Wert als Text im Quelltext steht (Kommentare mitgezählt, deshalb zählt die Wache nur Code-Zeilen). */
+  const vorkommen = (quelltext: string, wert: string) =>
+    quelltext.split('\n').filter((z) => !/^\s*(\/\/|\*|\/\*)/.test(z)).join('\n').split(wert).length - 1
+
+  it('der Wert steht im Quelltext nur zweimal: als Konstante und als Literal im Fokusring', () => {
+    const quelltext = readFileSync('src/lib/hoefe-anzeige.ts', 'utf8')
+    expect(vorkommen(quelltext, PIN_GRUEN)).toBe(2)
+    // Gegenprobe: Ein weiterer Pin-Wert mit dem Literal würde mitgezählt.
+    expect(vorkommen(`${quelltext}\nconst x = { rand: '${PIN_GRUEN}' }`, PIN_GRUEN)).toBe(3)
   })
 })
 

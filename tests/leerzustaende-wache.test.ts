@@ -227,6 +227,8 @@ const AUSNAHMEN: Ausnahme[] = [
   // Seit Nr. 120 (Register N22) steht der Hinweis AUF der Karte, der Text in src/lib/hoefe-anzeige.ts (kartenpunktHinweis).
   { datei: 'src/lib/hoefe-anzeige.ts', text: /^Ein Hof hat noch keinen Kartenpunkt – (du findest ihn in der Liste\.|Nr\.)$/, art: 'C', grund: 'Hinweis auf der Karte (ein Hof fehlt dort); die Liste ist da, kein Leerzustand' },
   { datei: 'src/lib/hoefe-anzeige.ts', text: /^Höfe haben noch keinen Kartenpunkt – (du findest sie in der Liste\.|Nr\.)$/, art: 'C', grund: 'Hinweis auf der Karte (mehrere Höfe fehlen dort); die Liste ist da, kein Leerzustand' },
+  // Seit Nr. 122 (Register N23) EIN Hinweis für beide Reiter von Region (ohneStandortHinweis), über Liste und Karte.
+  { datei: 'src/lib/region.ts', text: /^(hat|haben) noch keinen Standort auf der Karte und (fehlt|fehlen) hier\.$/, art: 'C', grund: 'Hinweis über Liste und Karte von Region (Höfe ohne Standort fehlen dort); die Liste ist da, kein Leerzustand' },
   { datei: 'src/app/(hof)/status/new/status-new-client.tsx', text: 'Noch keine Abonnenten', art: 'C', grund: 'Zählzeile des Kanals „Per E-Mail an Abonnenten“ (der Schalter bleibt gesperrt), kein Leerzustand' },
   { datei: 'src/emails/order-cancelled.tsx', text: 'Da noch keine Zahlung erfolgt ist, entstehen dir keine Kosten.', art: 'C', grund: 'Satz in der Stornomail, kein Leerzustand' },
   { datei: 'src/components/teilen/teilen-fenster.tsx', text: /^Noch keine Produkte im Shop/, art: 'C', grund: 'Hinweissatz in der Karte des Teilen-Fensters, kein Leerzustand; die Datei gehört zu Nr. 76' },
@@ -241,7 +243,7 @@ const BEKANNT_OHNE: Array<{ datei: string; titel: string }> = [
   { datei: 'src/components/admin/briefkasten-teile.tsx', titel: 'WUNSCHLISTE_LEER.titel' },
   { datei: 'src/components/admin/meldungen-teile.tsx', titel: 'WUENSCHE_LEER.titel' },
   { datei: 'src/components/analytics/umfeld-anzeige.tsx', titel: 'Noch keine Höfe zum Vergleichen' },
-  { datei: 'src/components/region/futter-kaufen-ansicht.tsx', titel: 'Gerade kein Futter in der Nähe' },
+  { datei: 'src/components/region/futter-kaufen-ansicht.tsx', titel: 'leer.titel' },
   { datei: 'src/components/heute/heute-teile.tsx', titel: 'HEUTE_NIEMAND' },
   { datei: 'src/app/(hof)/postfach/page.tsx', titel: 'POSTFACH_LEER.titel' },
   { datei: 'src/app/admin/postfach/rundschreiben-reiter.tsx', titel: 'RUNDSCHREIBEN_LEER.titel' },

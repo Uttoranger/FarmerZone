@@ -33,6 +33,10 @@ const DATEIEN = [
   'src/app/admin/postfach/page.tsx',
   'src/app/admin/postfach/meldungen-reiter.tsx',
   'src/components/admin/briefkasten-teile.tsx',
+  // Seit Nr. 125 (G8): CSP-Meldungen sind Fremdtext des Browsers; an Sentry gehen nur Anweisung,
+  // Host und gekürzter Pfad, nie Ausschnitt, Referrer oder Query.
+  'src/lib/csp.ts',
+  'src/app/api/csp-bericht/route.ts',
   ...readdirSync(join(WURZEL, 'src/components/admin'))
     .filter((n) => n.startsWith('meldungen-'))
     .map((n) => `src/components/admin/${n}`),

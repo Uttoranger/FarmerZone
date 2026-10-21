@@ -1,25 +1,10 @@
 'use client'
 
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import {
-  CalendarDays,
-  Check,
-  ChevronRight,
-  FlaskConical,
-  Leaf,
-  MapPin,
-  MessageCircle,
-  Navigation,
-  PauseCircle,
-  Share2,
-  ShoppingBasket,
-  Sprout,
-  Tag,
-  type LucideIcon,
-} from 'lucide-react'
+import { Check, ChevronRight, Clock, FlaskConical, MapPin, Navigation, PauseCircle, Share2, ShoppingBasket, Sprout } from 'lucide-react'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
@@ -27,12 +12,17 @@ import { FUTTER_ABSCHNITT_ANKER, angezeigterBereich } from '@/lib/bereiche-anzei
 import { buildMapsUrl } from '@/lib/customer-links'
 import { hofInitialen } from '@/lib/hof-initialen'
 import {
+  AKTUELL_ANKER,
+  AKTUELL_VOM_HOF_TEXT,
+  adresseOhneBeitrag,
   aktiverReiter,
   alleProdukteText,
-  beitragZeitText,
   gebuehrHinweisFuerHof,
   hofseiteReiter,
+  ordneBeitraege,
   reiterAdresse,
+  scrollVerhalten,
+  springeZuAktuell,
   ueberUnsText,
   verfuegbarText,
   zahlungsarten,
@@ -46,9 +36,8 @@ import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
 import { titelbildAusschnitt } from '@/lib/titelbild'
 import { bildStil } from '@/lib/bild-ausschnitt'
 import { kundenPausenText } from '@/lib/shop-pause'
-import { stripStatusVariables } from '@/lib/status-body'
 import { anzeigeBereichVon } from '@/lib/taxonomie'
-import { REITER_PARAMETER } from '@/schemas/hofseite-reiter'
+import { BEITRAG_PARAMETER, REITER_PARAMETER, beitragKennungSchema } from '@/schemas/hofseite-reiter'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -56,7 +45,8 @@ import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useRueckwegKlick } from '@/components/shared/kunden-kopf'
 import { teileHof } from '@/components/shared/hof-teilen'
-import { ProductGrid, useBereichWunsch } from '@/components/farm/product-grid'
+import { ProductGrid, useBereichWunsch, type InDenKorb } from '@/components/farm/product-grid'
+import { AktuellVomHof } from '@/components/hofseite/aktuell-vom-hof'
 import { VorschauImRahmen } from '@/components/farm/vorschau-im-rahmen'
 import { HofseiteSeitenspalte } from '@/components/hofseite/hofseite-seitenspalte'
 import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
@@ -77,14 +67,15 @@ import { TESTHOF_HINWEIS } from '@/lib/gruendungshof'
  * echte Navigation zeigt.
  *
  * Aufbau: Rückweg, Titelbild mit Name und Aktionen, Pausen-Hinweis, Reiter
- * Übersicht · Produkte · Beiträge (in der Adresse, ?reiter=, geschrieben per
+ * Übersicht · Produkte (in der Adresse, ?reiter=, geschrieben per
  * replaceState), darunter zweispaltig ab 1024 px: der Inhalt des Reiters und
  * die rechte Spalte (EINE Komponente, hofseite-seitenspalte.tsx). Das
  * Produktraster bleibt in jedem Reiter an derselben Stelle eingehängt — Korb
  * und Nachbestell-Link überstehen so den Wechsel. Die Karten führen zur
- * Produktseite (Nr. 11). Unter lg steht in der Übersicht zuerst das
- * Schaufenster (Register N5, Nr. 51): Fotomosaik, bis zu vier Produkte,
- * „Alle Produkte (n)"; danach rechte Spalte und Über uns.
+ * Produktseite (Nr. 11). In der Übersicht steht zuerst „Aktuell vom Hof“
+ * (Register F8/N5, Nr. 128: die aktiven Beiträge, aktuell-vom-hof.tsx), unter
+ * lg danach das Schaufenster (Register N5, Nr. 51): Fotomosaik, bis zu vier
+ * Produkte, „Alle Produkte (n)"; danach rechte Spalte und Über uns.
  *
  * Was entschieden wird (Reiter, Abschnitte, Zustände, Zahlung, Gebühr), steht
  * in src/lib/hofseite-kunde.ts und bereiche-anzeige.ts.
@@ -100,12 +91,14 @@ type ReorderItem = { productId: string; productName: string; quantity: number }
  */
 export type HofseiteHof = Omit<PublicFarm, 'phone' | 'email'>
 
-const ANLASS: Record<string, { label: string; symbol: LucideIcon }> = {
-  FRESH_PRODUCT: { label: 'Frisches Produkt', symbol: Leaf },
-  NEW_SEASON: { label: 'Neue Saison', symbol: CalendarDays },
-  PROMOTION: { label: 'Aktion', symbol: Tag },
-  ANNOUNCEMENT: { label: 'Mitteilung', symbol: MessageCircle },
-}
+/*
+ * Die Zeilen des Rasters ab lg in der linken Spalte — als ganze Klassen
+ * (Tailwind liest nur ganze Wörter): „Aktuell vom Hof“, Über uns und der
+ * Inhalt stehen je in einer eigenen Zeile, die rechte Spalte reicht über alle.
+ */
+const ZEILE_AB = ['lg:row-start-1', 'lg:row-start-2', 'lg:row-start-3'] as const
+const ZEILEN_SPANNE = ['', 'lg:row-span-2', 'lg:row-span-3'] as const
+const ZEILEN_RASTER = ['', 'lg:grid-rows-[auto_1fr] lg:gap-y-[26px]', 'lg:grid-rows-[auto_auto_1fr] lg:gap-y-[26px]'] as const
 
 const KARTE = 'rounded-2xl border border-border bg-card p-[22px]'
 const UMRISS_KNOPF = cn(
@@ -130,7 +123,10 @@ export function HofseiteKunde({
   jetzt,
 }: {
   farm: HofseiteHof
-  /** Die aktiven Beiträge, der neueste zuerst (Register F8) — page.tsx lädt höchstens fünf. */
+  /**
+   * Die aktiven Beiträge, der neueste zuerst (Register F8) — page.tsx lädt die
+   * fünf neuesten und hängt einen älteren aus `?beitrag=` an (ordneBeitraege).
+   */
   beitraege: ActiveStatusPost[]
   reorderItems?: ReorderItem[]
   ansicht: Pick<SeitenAnsicht, 'art' | 'kaufen'>
@@ -158,13 +154,32 @@ export function HofseiteKunde({
   const zurueck = rueckweg(kundenSeite, false)
   const beimZurueck = useRueckwegKlick(kundenSeite, 'zeile')
 
-  // Hat der Hof den Abschnitt Status ausgeblendet, gibt es auch den Reiter nicht.
+  // Hat der Hof den Abschnitt Status ausgeblendet, gibt es auch „Aktuell vom Hof“ nicht.
   const gezeigteBeitraege = sichtbar('status') ? beitraege : []
   // EINE Zahl für den Reiter „Produkte · n" und „Alle Produkte (n)": alles, was der Reiter Produkte zeigt.
   const produktAnzahl = produkte.length
-  const reiter = hofseiteReiter({ produktAnzahl, beitragAnzahl: gezeigteBeitraege.length })
+  const reiter = hofseiteReiter({ produktAnzahl })
   const offen = aktiverReiter({ reiter: suche.get(REITER_PARAMETER), bereich: suche.get('bereich') }, reiter)
   const schaufenster = zeigeSchaufenster(offen, produktAnzahl)
+
+  // „Aktuell vom Hof“ (Register F8, Nr. 128): nur in der Übersicht. `?beitrag=`
+  // ist eine Systemgrenze — dieselbe Prüfung wie in page.tsx, die den Beitrag lädt.
+  const { anordnung, nichtMehrAktuell } = ordneBeitraege(gezeigteBeitraege, beitragKennungSchema.parse(suche.get(BEITRAG_PARAMETER)))
+  const mitAktuell = offen === 'uebersicht' && anordnung !== null
+  const mitHinweis = offen === 'uebersicht' && nichtMehrAktuell
+
+  // Ein alter Link `?reiter=beitraege` springt einmal zu „Aktuell vom Hof“ —
+  // ohne Abschnitt bleibt die Seite oben; mit reduzierter Bewegung ohne Animation.
+  const zuAktuell = springeZuAktuell(suche.get(REITER_PARAMETER), mitAktuell)
+  useEffect(() => {
+    if (!zuAktuell) return
+    const reduziert = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    document.getElementById(AKTUELL_ANKER)?.scrollIntoView({ behavior: scrollVerhalten(reduziert), block: 'start' })
+  }, [zuAktuell])
+
+  // Der Weg in den Korb der Produktkarten (ProductGrid, `inDenKorb`) — das „+“
+  // in „Aktuell vom Hof“ nimmt GENAU ihn, kein zweiter Warenkorb.
+  const korbWeg = useRef<InDenKorb>(null)
 
   // ?bereich=futter: einmal zum Futter-Abschnitt springen — nicht bei jedem
   // späteren Wechsel in den Reiter Produkte.
@@ -202,6 +217,15 @@ export function HofseiteKunde({
       // Wohin die Seite gehört, hat der Anker oben entschieden.
       if (fokusAufReiter) document.querySelector<HTMLElement>(`[data-reiter="${id}"]`)?.focus({ preventScroll: true })
     }
+  }
+
+  // „Neuester: …“: dieselbe Seite ohne ?beitrag= — wie ein Reiterwechsel ohne
+  // Server-Aufruf, der neueste steht dann oben. Der Link verschwindet mit dem
+  // Wechsel; der Fokus geht auf die Überschrift des Abschnitts.
+  function zeigeNeuesten(e: { preventDefault: () => void }) {
+    e.preventDefault()
+    window.history.replaceState(null, '', adresseOhneBeitrag(pfad, window.location.search))
+    document.getElementById('aktuell-titel')?.focus({ preventScroll: true })
   }
 
   const rueckwegZeile = (
@@ -249,6 +273,11 @@ export function HofseiteKunde({
   // Ab lg mit Schaufenster ein Raster aus zwei Zeilen: Über uns oben links,
   // das Schaufenster darunter, die rechte Spalte über beide (siehe unten).
   const zweiZeilen = schaufenster && zeigeUeberUns
+  // „Aktuell vom Hof“ (samt Satz „nicht mehr aktuell“) steht ab lg oben links
+  // in einer eigenen Zeile darüber (Register N5, Ergänzung Nr. 128).
+  const mitAktuellTeil = mitAktuell || mitHinweis
+  const oben = mitAktuellTeil ? 1 : 0
+  const zeilen = oben + (zweiZeilen ? 2 : 1)
 
   const seitenspalte = (
     <HofseiteSeitenspalte
@@ -260,14 +289,14 @@ export function HofseiteKunde({
       jetzt={jetzt}
       produkte={produkte}
       // Am Handy nur in der Übersicht (Mockup mobil-k2-hofseite) — nach dem Schaufenster (Register N5), ohne Schaufenster vor dem Inhalt.
-      className={cn('lg:col-start-2 lg:row-start-1', zweiZeilen && 'lg:row-span-2', offen !== 'uebersicht' && 'hidden lg:flex')}
+      className={cn('lg:col-start-2 lg:row-start-1', ZEILEN_SPANNE[zeilen - 1], offen !== 'uebersicht' && 'hidden lg:flex')}
     />
   )
 
   // EINE Karte Über uns — sie steht je nach Fall an genau einer Stelle (siehe unten), nie doppelt.
   const ueberUnsKarte = zeigeUeberUns ? (
     // data-abschnitt: Ziel der Markierung aus Mein Hof für Über uns, Gründungsjahr und Werte (ZIEL_ABSCHNITT, Nr. 50).
-    <section data-abschnitt="ueberuns" aria-labelledby="ueber-uns" className={cn(KARTE, 'flex flex-col gap-2.5', schaufenster && 'lg:col-start-1 lg:row-start-1')}>
+    <section data-abschnitt="ueberuns" aria-labelledby="ueber-uns" className={cn(KARTE, 'flex flex-col gap-2.5', schaufenster && cn('lg:col-start-1', ZEILE_AB[oben]))}>
       <h2 id="ueber-uns" className="font-heading text-xl font-semibold text-foreground">
         Über uns
       </h2>
@@ -292,6 +321,30 @@ export function HofseiteKunde({
         </ul>
       )}
     </section>
+  ) : null
+
+  // Unter lg nach Knöpfen und Reiter, vor dem Schaufenster; ab lg oben links.
+  // Der Satz steht über dem Abschnitt — auch, wenn es keinen aktiven Beitrag gibt.
+  const aktuellTeil = mitAktuellTeil ? (
+    <div className="flex min-w-0 flex-col gap-3 lg:col-start-1 lg:row-start-1">
+      {mitHinweis && (
+        <Hinweiskarte ton="neutral" symbol={Clock}>
+          {AKTUELL_VOM_HOF_TEXT.nichtMehrAktuell}
+        </Hinweiskarte>
+      )}
+      {anordnung && mitAktuell && (
+        <AktuellVomHof
+          anordnung={anordnung}
+          jetzt={jetzt}
+          produkte={produkte}
+          mitPlus={mitKorb && !farm.isPaused}
+          onInDenKorb={(p) => korbWeg.current?.(p)}
+          produktLink={(id) => produktLink(farm.slug, id, ansicht.art === 'vorschau')}
+          neuesterHref={adresseOhneBeitrag(pfad, suche.toString())}
+          onNeuester={zeigeNeuesten}
+        />
+      )}
+    </div>
   ) : null
 
   return (
@@ -434,25 +487,27 @@ export function HofseiteKunde({
       </nav>
 
       {/* ── Inhalt und rechte Spalte ──
-          Unter lg in der Übersicht zuerst das Schaufenster (Register N5):
-          Fotomosaik, bis zu vier Produkte, „Alle Produkte (n)"; danach die
-          rechte Spalte und Über uns. Der Quelltext hat unter lg genau diese
-          Reihenfolge — Tastatur und Screenreader folgen ihr, kein `order`.
-          Ab lg stellt das Raster die Teile an ihren alten Ort: Über uns oben
-          links (Zeile 1), das Schaufenster darunter (Zeile 2, mit dem Abstand
-          26 px wie bisher), die rechte Spalte über beide Zeilen. Ohne
-          Schaufenster (andere Reiter, keine Produkte) bleibt alles wie bisher:
-          die Spalte im Quelltext zuerst, Über uns oben in der Inhaltsspalte.
-          Über uns und die Spalte stehen dabei je an genau EINER Stelle. */}
+          In der Übersicht zuerst „Aktuell vom Hof“ (Register F8/N5, Nr. 128),
+          unter lg danach das Schaufenster (Register N5): Fotomosaik, bis zu
+          vier Produkte, „Alle Produkte (n)"; danach die rechte Spalte und Über
+          uns. Der Quelltext hat unter lg genau diese Reihenfolge — Tastatur und
+          Screenreader folgen ihr, kein `order`. Ab lg stellt das Raster die
+          Teile an ihren Ort: „Aktuell vom Hof“ oben links (eigene Zeile), Über
+          uns darunter, dann das Schaufenster (Abstand 26 px wie bisher), die
+          rechte Spalte über alle Zeilen. Ohne Schaufenster (andere Reiter,
+          keine Produkte) steht die Spalte im Quelltext vor dem Inhalt, Über uns
+          oben in der Inhaltsspalte. Jeder Teil steht an genau EINER Stelle. */}
       <div
         className={cn(
           'mx-auto flex max-w-[1200px] flex-col gap-[26px] px-4 pt-6 pb-12 md:px-6 md:pt-7 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_360px]',
-          zweiZeilen && 'lg:grid-rows-[auto_1fr] lg:gap-y-[26px]'
+          ZEILEN_RASTER[zeilen - 1]
         )}
       >
+        {aktuellTeil}
+
         {!schaufenster && seitenspalte}
 
-        <div className={cn('flex min-w-0 flex-col gap-[26px] lg:col-start-1', zweiZeilen ? 'lg:row-start-2' : 'lg:row-start-1')}>
+        <div className={cn('flex min-w-0 flex-col gap-[26px] lg:col-start-1', ZEILE_AB[zeilen - 1])}>
           {!schaufenster && ueberUnsKarte}
 
           {offen === 'uebersicht' && sichtbar('gallery') ? (
@@ -478,8 +533,6 @@ export function HofseiteKunde({
             </div>
           ) : null}
 
-          {offen === 'beitraege' ? <Beitraege beitraege={gezeigteBeitraege} jetzt={jetzt} /> : null}
-
           <div id="produkte">
             <ProductGrid
               products={produkte}
@@ -497,6 +550,7 @@ export function HofseiteKunde({
               // Karten führen zur Produktseite (Nr. 11) — aus der Vorschau in deren Vorschau.
               produktLink={(id) => produktLink(farm.slug, id, ansicht.art === 'vorschau')}
               platzUnten={!schaufenster}
+              inDenKorb={korbWeg}
             />
           </div>
 
@@ -518,63 +572,5 @@ export function HofseiteKunde({
         {schaufenster && ueberUnsKarte}
       </div>
     </>
-  )
-}
-
-/**
- * Die Beiträge des Hofs im Reiter „Beiträge“ (Register F8): alle aktiven, der
- * neueste zuerst mit „Aktuell“. Wie viele es höchstens sind, sagt die Abfrage
- * (HOFSEITE_BEITRAEGE_MAX), nicht die Anzeige.
- */
-function Beitraege({ beitraege, jetzt }: { beitraege: ActiveStatusPost[]; jetzt: string }): ReactNode {
-  return (
-    <ul className="flex flex-col gap-3">
-      {beitraege.map((beitrag, index) => (
-        <li key={beitrag.id}>
-          <Beitrag beitrag={beitrag} neuester={index === 0} jetzt={jetzt} />
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-/** Ein Beitrag des Hofs; der neueste trägt „Aktuell“ und den grünen Rahmen (Mockup mobil-k2-hofseite-beitraege-alle-aktiven). */
-function Beitrag({ beitrag, neuester, jetzt }: { beitrag: ActiveStatusPost; neuester: boolean; jetzt: string }): ReactNode {
-  const anlass = ANLASS[beitrag.anlass] ?? ANLASS.ANNOUNCEMENT
-  const Symbol = anlass.symbol
-  // Eine Kennung je Karte: Mehrere Beiträge auf einer Seite dürfen sich nicht dieselbe teilen.
-  const titelId = `beitrag-titel-${beitrag.id}`
-  return (
-    <article aria-labelledby={titelId} className={cn(KARTE, 'flex flex-col gap-3', neuester && 'border-accent')}>
-      <div className="flex flex-wrap items-center justify-between gap-x-2.5 gap-y-1">
-        {/* Symbol und Anlass in EINER Zeile: StatusBadge setzt seinen Inhalt in einen Block, ein Symbol stünde sonst über dem Wort (Mockup: daneben). */}
-        <StatusBadge status="fertig">
-          <span className="inline-flex items-center gap-1">
-            <Symbol className="size-3 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-            {anlass.label}
-          </span>
-        </StatusBadge>
-        <span className="text-[13px] text-muted-foreground">{beitragZeitText(neuester, beitrag.publishedAt, jetzt)}</span>
-      </div>
-      <h2 id={titelId} className="font-heading text-xl font-semibold break-words text-foreground">
-        {beitrag.title}
-      </h2>
-      <p className="text-[14.5px] leading-relaxed whitespace-pre-wrap break-words text-muted-foreground">
-        {stripStatusVariables(beitrag.body)}
-      </p>
-      {beitrag.photoUrl && (
-        <div className="relative aspect-[3/2] max-h-72 w-full overflow-hidden rounded-xl bg-muted">
-          {/* Mit Ausschnitt füllt das Foto den Rahmen; ohne steht es ganz wie bisher (Register N17, Nr. 98). */}
-          <Image
-            src={beitrag.photoUrl}
-            alt={beitrag.title}
-            fill
-            sizes="(min-width: 1024px) 760px, 100vw"
-            className={beitrag.fotoAusschnitt ? 'object-cover' : 'object-contain'}
-            style={bildStil(beitrag.fotoAusschnitt)}
-          />
-        </div>
-      )}
-    </article>
   )
 }

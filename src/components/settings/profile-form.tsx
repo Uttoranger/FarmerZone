@@ -354,8 +354,9 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         {/* Die Karte dauerhaft unter den Adressfeldern — beide Richtungen:
             Die Suche fährt die Karte, das Schieben füllt die Adresse. Die
             ruhige Zeile darüber steht hier statt in der Karte: Sie ist schon da,
-            während die Karte nachlädt, und schiebt danach nichts mehr. */}
-        <div>
+            während die Karte nachlädt, und schiebt danach nichts mehr.
+            Ziel von „Standort auf der Karte setzen" in Region (STANDORT_ANKER, Nr. 122). */}
+        <div id="standort" className="scroll-mt-6">
           {hinweis && <p className="mb-2 text-xs text-muted-foreground">{hinweis}</p>}
           <StandortKarte
             start={start}

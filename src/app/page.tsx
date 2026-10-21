@@ -100,9 +100,10 @@ const ladeStartseitenHoefe = cache(async (): Promise<
   }
 })
 
-async function HofKartenGeladen() {
+/** `jetzt` für die Marke „Neu · vor …“ am Bild (Register N22, Nr. 129): einmal von der Seite, den Rest rechnet der Browser. */
+async function HofKartenGeladen({ jetzt }: { jetzt: Date }) {
   const daten = await ladeStartseitenHoefe()
-  return daten === 'fehler' ? <HofKartenFehler /> : <HofKarten hoefe={daten.hoefe} />
+  return daten === 'fehler' ? <HofKartenFehler /> : <HofKarten hoefe={daten.hoefe} jetzt={jetzt.toISOString()} />
 }
 
 /** Ohne Daten (Fehler) nur das Land — den Fehler sagen die Hofkarten darunter. */
@@ -142,7 +143,7 @@ function Eintrag({ eintrag, jetzt }: { eintrag: RenderEintrag; jetzt: Date }) {
       return (
         <HoefeInDerNaehe>
           <Suspense fallback={<HofKartenSkelett />}>
-            <HofKartenGeladen />
+            <HofKartenGeladen jetzt={jetzt} />
           </Suspense>
         </HoefeInDerNaehe>
       )

@@ -6,14 +6,18 @@ import { toast } from 'sonner'
 import { CalendarDays, ChevronDown, ChevronUp, Eye, EyeOff, Info, Plus, Send } from 'lucide-react'
 import type { StartseiteVorlage } from '@prisma/client'
 import {
+  ABSCHNITT_TEXT,
   ADMIN_STARTSEITE_TEXT as T,
   BLOCK_ZUSTAND_TEXT,
+  NEUER_ABSCHNITT,
   NEUER_BLOCK,
+  ZUSATZ_ARTEN,
   blockZustand,
   darfVerschieben,
   istFest,
   standZeitpunkt,
   verschiebe,
+  type ZusatzArt,
 } from '@/lib/startseite-gestalten'
 import {
   ENTWURF_TEXT as E,
@@ -86,21 +90,40 @@ function schluesselVon(zeile: Zeile): string {
 
 // ─── Die Liste ──────────────────────────────────────────────────────────────
 
-function EinfuegePunkt({ onEinfuegen, gesperrt }: { onEinfuegen: () => void; gesperrt: boolean }): React.JSX.Element {
+const EINFUEGEN_KNOPF = cn(
+  'flex min-h-11 w-full items-center gap-2 px-4 text-[13.5px] font-semibold text-status-fertig transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50',
+  FOKUS_RAHMEN
+)
+
+/**
+ * Das Menü zum Hinzufügen: „Block einfügen“ und — solange es ihn im Entwurf
+ * nicht gibt — je Zusatz-Abschnitt eine Zeile (Nr. 129, „Neu bei den Höfen“).
+ * Hinzugefügt wird er wie ein neuer Block: Die Zeile steht sofort im Entwurf,
+ * gespeichert wird mit der nächsten Speicherung.
+ */
+function EinfuegePunkt({
+  onEinfuegen,
+  zusatz,
+  onZusatz,
+  gesperrt,
+}: {
+  onEinfuegen: () => void
+  zusatz: readonly ZusatzArt[]
+  onZusatz: (art: ZusatzArt) => void
+  gesperrt: boolean
+}): React.JSX.Element {
   return (
     <li className="border-t border-border">
-      <button
-        type="button"
-        onClick={onEinfuegen}
-        disabled={gesperrt}
-        className={cn(
-          'flex min-h-11 w-full items-center gap-2 px-4 text-[13.5px] font-semibold text-status-fertig transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50',
-          FOKUS_RAHMEN
-        )}
-      >
+      <button type="button" onClick={onEinfuegen} disabled={gesperrt} className={EINFUEGEN_KNOPF}>
         <Plus className="size-4" strokeWidth={1.8} aria-hidden="true" />
         {T.einfuegen}
       </button>
+      {zusatz.map((art) => (
+        <button key={art} type="button" onClick={() => onZusatz(art)} disabled={gesperrt} className={EINFUEGEN_KNOPF}>
+          <Plus className="size-4" strokeWidth={1.8} aria-hidden="true" />
+          {T.abschnittEinfuegen(ABSCHNITT_TEXT[art].titel)}
+        </button>
+      ))}
     </li>
   )
 }
@@ -204,6 +227,12 @@ function AbschnittsListe({
   onEinfuegen: (nachIndex: number) => void
 }): React.JSX.Element {
   const hatNeuen = zeilen.some((z) => z.id === NEUER_BLOCK)
+  // Jeder Zusatz-Abschnitt höchstens einmal: Steht er schon in der Liste, fehlt er im Menü.
+  const zusatz = ZUSATZ_ARTEN.filter((art) => !zeilen.some((z) => z.art === art))
+  function fuegeZusatzEin(nachIndex: number, art: ZusatzArt) {
+    const neu: Zeile = { id: NEUER_ABSCHNITT[art], art, sichtbar: true, block: null }
+    onZeilen([...zeilen.slice(0, nachIndex + 1), neu, ...zeilen.slice(nachIndex + 1)])
+  }
   const hoefeIndex = zeilen.findIndex((z) => z.art === 'HOEFE')
   const fussIndex = zeilen.findIndex((z) => z.art === 'FUSS')
   return (
@@ -227,9 +256,11 @@ function AbschnittsListe({
             marke={marken.get(schluesselVon(zeile))}
             punktDanach={index === hoefeIndex || index === fussIndex - 1}
             gesperrt={hatNeuen}
+            zusatz={zusatz}
             onZeilen={onZeilen}
             onWaehlen={onWaehlen}
             onEinfuegen={onEinfuegen}
+            onZusatz={(art) => fuegeZusatzEin(index, art)}
           />
         ))}
       </ul>
@@ -243,9 +274,11 @@ function ListenEintrag({
   zeilen,
   punktDanach,
   gesperrt,
+  zusatz,
   onZeilen,
   onWaehlen,
   onEinfuegen,
+  onZusatz,
   ...rest
 }: {
   zeile: Zeile
@@ -256,9 +289,11 @@ function ListenEintrag({
   marke: { text: string; ton: 'tun' | 'laeuft' } | undefined
   punktDanach: boolean
   gesperrt: boolean
+  zusatz: readonly ZusatzArt[]
   onZeilen: (zeilen: Zeile[]) => void
   onWaehlen: (zeile: Zeile) => void
   onEinfuegen: (nachIndex: number) => void
+  onZusatz: (art: ZusatzArt) => void
 }): React.JSX.Element {
   return (
     <>
@@ -271,7 +306,7 @@ function ListenEintrag({
         onAuge={() => onZeilen(zeilen.map((z, i) => (i === index ? { ...z, sichtbar: !z.sichtbar } : z)))}
         onWaehlen={() => onWaehlen(zeile)}
       />
-      {punktDanach && <EinfuegePunkt gesperrt={gesperrt} onEinfuegen={() => onEinfuegen(index)} />}
+      {punktDanach && <EinfuegePunkt gesperrt={gesperrt} onEinfuegen={() => onEinfuegen(index)} zusatz={zusatz} onZusatz={onZusatz} />}
     </>
   )
 }

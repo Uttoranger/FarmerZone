@@ -20,9 +20,10 @@ Stand 2026-09-25: 100 Testdateien / ~1.600 Tests in `tests/` (Unit),
 | `tests/` | Unit | `.test.ts` |
 | `tests/integration/` | Integration | `.int.test.ts` |
 | `e2e/` | E2E (noch nicht vorhanden) | außerhalb von `tests/` |
+| `tests/fabrik/` | Fabriken für nachgebaute Typen (keine Tests, §5) | `<typ>.ts` |
 
 Keine weiteren Unterordner, kein `.spec.ts`. Innerhalb eines Ordners bleibt es
-flach; `tests/integration/setup/` enthält nur Hilfsmittel, keine Tests.
+flach; `tests/integration/setup/` und `tests/fabrik/` enthalten nur Hilfsmittel, keine Tests.
 
 **Der `exclude` in `vitest.config.ts` ist Pflicht, keine Geschmacksfrage:**
 `tests/**/*.test.ts` passt auch auf `tests/integration/*.int.test.ts`. Ohne
@@ -51,7 +52,7 @@ Wer eine Frist auf die Sekunde prüfen will, tut das an der reinen Funktion in
 `src/lib/reservierung.ts` — dort ist `jetzt` ein Parameter. Für die Unit-Schicht
 bleibt Abschnitt 4 unverändert in Kraft.
 
-**Eine feste Uhr (`vi.setSystemTime`, `vi.useFakeTimers({ now })`) steht in `tests/integration/` nur auf einem Datums-Literal in der Vergangenheit** (`new Date('…')` vor dem 20.10.2026, auch über eine `const` derselben Datei) — es sei denn, die Datei berührt Better Auth gar nicht (kein Import von `@/lib/auth`, keine Zeilen in `session` oder `verification`, kein Helfer aus `setup/basis.ts`, der Better Auth ruft). Better Auth räumt beim Lesen nach der Uhr ab, die gerade läuft; bei einer Uhr in der Zukunft verschwänden Codes und Sitzungen anderer Nummern in der geteilten Test-Datenbank. Die Wache `tests/integration-uhr-wache.test.ts` prüft es mit Gegenprobe; ihr Bestand steht dort mit Grund und darf nur schrumpfen (Nr. 112, Morgenbericht 17, freigegeben 19.10.2026).
+**Eine feste Uhr (`vi.setSystemTime`, `vi.useFakeTimers({ now })`) steht in `tests/integration/` nur auf einem Datums-Literal in der Vergangenheit** (`new Date('…')` vor dem 20.10.2026, auch über eine `const` derselben Datei) — es sei denn, die Datei berührt Better Auth gar nicht (kein Import von `@/lib/auth`, keine Zeilen in `session` oder `verification`, kein Helfer aus `setup/basis.ts`, der Better Auth ruft). Better Auth räumt beim Lesen nach der Uhr ab, die gerade läuft; bei einer Uhr in der Zukunft verschwänden Codes und Sitzungen anderer Nummern in der geteilten Test-Datenbank. Die Wache `tests/integration-uhr-wache.test.ts` prüft es mit Gegenprobe; ihr Bestand steht dort mit Grund und darf nur schrumpfen (Nr. 112, Morgenbericht 17, freigegeben 19.10.2026). **Uhr-Schritte** (`vi.advanceTimersByTime`) stehen in einer Datei mit Better Auth nur mit einer Zahl als Literal und nur bei einer festen Uhr in der Vergangenheit, `vi.advanceTimersToNextTimer` und `vi.runAllTimers` dort nie (Wache `tests/integration-uhr-wache.test.ts`; Nr. 121, Regelvorschlag in Nr. 127, freigegeben 20.10.2026).
 
 **Rate-Limit in beiden Schichten aus, und zwar nicht aus Bequemlichkeit:**
 `enforceRateLimit` kehrt bei `NODE_ENV !== 'production'` sofort zurück, bevor ein
@@ -153,6 +154,7 @@ Typänderung und `DROP TABLE` lässt sie nur mit einem begründeten Marker durch
 - Kein unsichtbares U+FEFF mitten in Dateien unter `src/` und `tests/`: Wer ein BOM braucht, schreibt `\uFEFF` (Wache in `tests/keine-emojis.test.ts`; Regelvorschlag 103, Lauf 16; gebaut mit Nr. 118).
 - Vor jeder Behauptung „0 Treffer“ (Inventur, Wache, Suche für einen Bericht) läuft das Suchmuster als Test an einem Beispiel, das es finden muss – die Inventur zählte sonst nur drei von vier Muster-Schreibweisen (Regelvorschlag 110, Lauf 16); jede Wache hat dafür ihre Gegenprobe.
 - Wachen aus Nr. 118, jede mit einer Gegenprobe, die anschlägt: keine `loading.tsx` neben einer Seite mit Filtern in der Adresse (`loading-filter-wache`), kein `key` an einem iframe außer in der Liste aus `vorschauRahmen` (`vorschau-rahmen-wache`), `del(` aus `@vercel/blob` nur in den benannten Wegen (`blob-loeschen-wache`), kein doppelter Absatz in `docs/ai` (`doku-doppelte-absaetze`); wie `admin-seiten-wache` vergleichen sie gegen das Dateisystem und nennen eine neue Datei mit Namen.
+- In `src/components/hoefe/**` stehen `new Date()` und `Date.now()` nur in `use-uhr.ts`; Zeitlogik läuft dort über `useUhr` — /hoefe ist statisch (5 Minuten Zwischenspeicher, Register N19), eine Zeitangabe aus der Uhr des Servers wäre bis zum nächsten Rendern falsch. Wache in `tests/karte-wache.test.ts`, mit Gegenprobe (Nr. 120, Regelvorschlag in Nr. 127, freigegeben 20.10.2026).
 
 ### Nicht testen
 - Prisma selbst, Next.js selbst, Stripe selbst.
@@ -175,6 +177,8 @@ vi.mock('next/cache')        // 13
 vi.mock('@vercel/blob')      // 3
 ```
 Alles, was Netz, DB oder Request-Kontext braucht.
+
+**Wer ein Paket mit Sicherheitsfunktion (Better Auth und seine Plugins, Stripe, WebAuthn, sharp) mit `vi.mock` ersetzt, prüft denselben Weg mindestens einmal echt, als Integrationstest oder mit echter Signatur (Vorbild `tests/integration/admin-passkey.int.test.ts:119`)** (Wache `tests/paket-mock-wache.test.ts`; Nr. 115, Regelvorschlag in Nr. 127, freigegeben 20.10.2026).
 
 **Dynamische Importe greifen genauso** — `vi.mock('@/lib/email')` gilt auch für `await import('@/lib/email')` (ARCHITECTURE §4 „Schwere Module nur dynamisch"). Nur der Zeitpunkt verschiebt sich: Ein Nachlauf (`nachDerAntwort`) ruft die Versandfunktion erst, nachdem der Import aufgelöst ist — also nach dem Ende der Action. Deshalb:
 - „Mail ging raus": `await vi.waitFor(() => expect(sendX).toHaveBeenCalledWith(…))`.
@@ -250,7 +254,7 @@ in einen ungültigen Schlüssel statt in echtes Geld.
 - Telefon: `+43 660 0000000` — mehrere Nummern unterscheiden sich in der Vorwahl (664, 676, 699), der Teilnehmerteil bleibt genullt (Wache `tests/telefonnummern-wache.test.ts`).
 - Keine echten Stripe-IDs, keine echten Tokens — auch keine abgelaufenen.
 - Erfundene Tokens und Codes in Tests aus Buchstaben, nicht aus langen Ziffernfolgen (sonst schlägt die Telefonnummern-Wache an) (Nr. 113, Morgenbericht 17, freigegeben 19.10.2026).
-- Faktoren für Testobjekte lokal in der Testdatei halten, keine geteilte Fixture-Datei ohne Not.
+- **Für Typen, die in mehr als drei Testdateien nachgebaut werden, gibt es eine Fabrik in `tests/fabrik/<typ>.ts`; sonst bleiben Faktoren lokal** (Wache `tests/fabrik-wache.test.ts`; Nr. 119, Regelvorschlag in Nr. 127, freigegeben 20.10.2026).
 - **Integrationsschicht: alles trägt das Präfix `int-`** — Hof-Slug, Produkt-ID,
   Sitzungs-ID, E-Mail-Adresse. Das Präfix ist die Sicherung, an der `raeumeAuf()`
   hängt; wer daran vorbei anlegt, lässt Daten stehen. Faktoren dafür in

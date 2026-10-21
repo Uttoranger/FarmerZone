@@ -55,6 +55,7 @@ function produkt(teil: Record<string, unknown> = {}) {
     stock: 5,
     reservedStock: 0,
     category: 'MILCH',
+    subcategory: null,
     imageUrl: null,
     ...teil,
   }
@@ -398,6 +399,8 @@ describe('getOeffentlicheHoefe — die Query', () => {
         stock: true,
         reservedStock: true,
         category: true,
+        // Nr. 127: Ohne Foto zeigt die Produktzeile die Illustration der Unterkategorie (illustrationPfad).
+        subcategory: true,
         imageUrl: true,
         bildAusschnitt: true,
       },
@@ -560,6 +563,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
             stock: 4,
             reservedStock: 0,
             category: 'MILCH',
+            subcategory: 'KAESE',
             imageUrl: 'kaese.jpg',
           }),
           // Bestand da, aber vollständig reserviert → „derzeit aus".
@@ -584,6 +588,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
         imageUrl: 'kaese.jpg',
         bildAusschnitt: null,
         category: 'MILCH',
+        subcategory: 'KAESE',
         verfuegbar: true,
       },
       {
@@ -595,6 +600,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
         imageUrl: null,
         bildAusschnitt: null,
         category: 'EIER',
+        subcategory: null,
         verfuegbar: false,
       },
       {
@@ -606,6 +612,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
         imageUrl: null,
         bildAusschnitt: null,
         category: 'BROT',
+        subcategory: null,
         verfuegbar: true,
       },
     ])

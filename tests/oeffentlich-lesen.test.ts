@@ -269,7 +269,8 @@ describe('meldeFehleranzeige — die Seite liefert ihre Fehleranzeige aus (Nr. 5
 const SRC = join(process.cwd(), 'src')
 const HELFER = 'leseOeffentlichMitWiederholung'
 /** Die einzigen Stellen, die wiederholen dürfen — öffentliche Lesepfade. */
-const ERLAUBT = ['server/queries/oeffentliche-hoefe.ts']
+// Nr. 129: „Neu bei den Höfen“ (Startseite) liest wie die Hofliste nur, zwischengespeichert.
+const ERLAUBT = ['server/queries/neuigkeiten.ts', 'server/queries/oeffentliche-hoefe.ts']
 const SCHREIBEN = /\$transaction|\$executeRaw|\.(create|createMany|createManyAndReturn|update|updateMany|upsert|delete|deleteMany)\(/
 
 function dateien(ordner: string): string[] {
@@ -329,6 +330,12 @@ describe('Wache: Wiederholen nur auf öffentlichen Lesepfaden', () => {
   it('die wiederholte Abfrage liest nur: getOeffentlicheHoefe ohne Schreiben und ohne Transaktion', () => {
     const koerper = rumpf(readFileSync(join(SRC, 'server/queries/farm.ts'), 'utf8'), 'getOeffentlicheHoefe')
     expect(koerper).toContain('prisma.farm.findMany(')
+    expect(koerper).not.toMatch(SCHREIBEN)
+  })
+
+  it('die wiederholte Abfrage von „Neu bei den Höfen“ liest nur: leseNeuigkeiten ohne Schreiben und ohne Transaktion', () => {
+    const koerper = rumpf(readFileSync(join(SRC, 'server/queries/neuigkeiten.ts'), 'utf8'), 'leseNeuigkeiten')
+    expect(koerper).toContain('prisma.statusPost.findMany(')
     expect(koerper).not.toMatch(SCHREIBEN)
   })
 

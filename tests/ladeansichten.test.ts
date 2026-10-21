@@ -230,8 +230,21 @@ const OHNE_EIGENE = new Set(['src/app/(farmer)/analytics', 'src/app/(farmer)/ana
  * (`LadeRahmen`/`LadeInhalt`, `ladePunkt` am Link). Eine eigene `loading.tsx`
  * wäre genau das Skelett pro Klick; beim ersten Aufruf greift der Rückfall der
  * Gruppe. Die Liste darf nur kleiner werden – und nie ohne Ladepunkt in der Seite.
+ * Region seit Nr. 122 (N23): `LadeRahmen` in der Seite, `LadeInhalt` und der Ladepunkt
+ * am Reiter in den beiden Teilen der Seite (preise-reiter.tsx, futter-reiter.tsx).
+ * Seit Nr. 127 (Nacharbeit 121): Mein Hof (`LadeRahmen` und `LadeInhalt` in `MeinHofAnsicht`, der
+ * Ladepunkt an den Reitern in `MeinHofReiterLeiste` – zwei Stufen unter der Seite) und die Bestellung
+ * (`BestellungenAnsicht` wie die Liste; der Ladepunkt sitzt zusätzlich an der Zeile der Liste, denn die
+ * Zeilen öffnen diese Route, und das Skelett war dort die einzige Rückmeldung).
  */
-const LADEPUNKT_STATT_SKELETT = new Set(['src/app/(hof)/postfach', 'src/app/(hof)/orders', 'src/app/(hof)/analytics'])
+const LADEPUNKT_STATT_SKELETT = new Set([
+  'src/app/(hof)/postfach',
+  'src/app/(hof)/orders',
+  'src/app/(hof)/orders/[orderId]',
+  'src/app/(hof)/analytics',
+  'src/app/(hof)/region',
+  'src/app/(hof)/farm-page',
+])
 
 /** Alle Ordner unter `wurzel` mit einer page.tsx. */
 function routenOrdner(wurzel: string): string[] {
@@ -246,7 +259,7 @@ function routenOrdner(wurzel: string): string[] {
 }
 
 /** Die Ladeansicht samt der Bauteile, die sie aus src/components bzw. relativ einbindet. */
-function ladeansichtMitTeilen(datei: string): string {
+function ladeansichtMitTeilen(datei: string, tiefe = 1): string {
   const text = liesDatei(datei)
   const teile = [...text.matchAll(/from '(@\/components\/[^']+|\.{1,2}\/[^']+)'/g)].map(([, spez]) => {
     const basis = spez.startsWith('@/')
@@ -254,7 +267,9 @@ function ladeansichtMitTeilen(datei: string): string {
       : path.join(path.dirname(datei), spez)
     return ['.tsx', '.ts', '/loading.tsx'].map((e) => basis + e).find((k) => existiert(k))
   })
-  return [text, ...teile.filter((t): t is string => t !== undefined).map(liesDatei)].join('\n')
+  // `tiefe` 2: auch die Bauteile der Bauteile (der Ladepunkt sitzt bei Mein Hof im Reiter des Kopfs).
+  const gefunden = teile.filter((t): t is string => t !== undefined)
+  return [text, ...gefunden.map((t) => (tiefe > 1 ? ladeansichtMitTeilen(t, tiefe - 1) : liesDatei(t)))].join('\n')
 }
 
 describe('Ladeansichten — jede Route im Hofbereich und im Bestand hat eine eigene', () => {
@@ -277,10 +292,10 @@ describe('Ladeansichten — jede Route im Hofbereich und im Bestand hat eine eig
     it(`${route} zeigt einen Ladepunkt statt des Skeletts – ohne loading.tsx, mit LadeRahmen, LadeInhalt und ladePunkt`, () => {
       expect(routen, `${route} gibt es nicht mehr – aus LADEPUNKT_STATT_SKELETT nehmen`).toContain(route)
       expect(existiert(`${route}/loading.tsx`), `${route}/loading.tsx steht neben dem Ladepunkt`).toBe(false)
-      const seite = ladeansichtMitTeilen(`${route}/page.tsx`)
+      const seite = ladeansichtMitTeilen(`${route}/page.tsx`, 2)
       // Der Punkt sitzt am Link: als Prop (`ladePunkt` am FilterChip) oder als `<LadePunkt />` im Link.
       for (const teil of ['LadeRahmen', 'LadeInhalt']) expect(seite, `${route}: ${teil} fehlt`).toContain(teil)
-      expect(seite, `${route}: kein Ladepunkt am Link`).toMatch(/ladePunkt|<LadePunkt \/>/)
+      expect(seite, `${route}: kein Ladepunkt am Link`).toMatch(/ladePunkt|<LadePunkt\b/)
     })
   }
 
@@ -307,8 +322,34 @@ describe('Ladeansichten — jede Route im Hofbereich und im Bestand hat eine eig
     }
   })
 
-  it('/status zeigt während der Umleitung die Form des Ziels (Mein Hof, Reiter Beiträge)', () => {
-    expect(liesDatei('src/app/(hof)/status/loading.tsx')).toMatch(/from '\.\.\/farm-page\/loading'/)
+  // Nr. 127: /farm-page hat keine eigene loading.tsx mehr (Ladepunkt statt Skelett); das Skelett von Mein Hof lebt als
+  // Bauteil weiter, damit die Routen, die nur umleiten, die Form ihres Ziels zeigen (ARCHITECTURE §4).
+  it('/status und /settings/appearance zeigen während der Umleitung die Form des Ziels (Mein Hof) – aus dem Bauteil, nicht aus farm-page/loading', () => {
+    expect(existiert('src/app/(hof)/farm-page/loading.tsx')).toBe(false)
+    expect(existiert('src/components/mein-hof/mein-hof-laden.tsx')).toBe(true)
+    for (const datei of ['src/app/(hof)/status/loading.tsx', 'src/app/(hof)/settings/appearance/loading.tsx']) {
+      const text = liesDatei(datei)
+      expect(text, datei).toMatch(/from '@\/components\/mein-hof\/mein-hof-laden'/)
+      expect(text, datei).not.toMatch(/farm-page\/loading/)
+    }
+    // Das Skelett selbst bleibt ein Skelett: Platzhalter in Kartenform, aria-busy, kein Spinner.
+    const laden = liesDatei('src/components/mein-hof/mein-hof-laden.tsx')
+    expect(laden).toContain('animate-pulse')
+    expect(laden).toContain('aria-busy')
+    expect(laden).not.toMatch(SPINNER)
+  })
+
+  it('Mein Hof: Der Ladepunkt sitzt an jedem Reiter, und die Zeilen der Bestellungen tragen ihn auch', () => {
+    expect(liesDatei('src/components/mein-hof/reiter-leiste.tsx')).toMatch(/<LadePunkt\b/)
+    const ansicht = liesDatei('src/components/mein-hof/mein-hof-ansicht.tsx')
+    expect(ansicht).toContain('<LadeRahmen>')
+    expect(ansicht).toContain('<LadeInhalt')
+    // Die Zeile einer Bestellung ist ein Link auf /orders/[orderId]: Ohne Skelett braucht sie den Punkt.
+    const zeile = liesDatei('src/components/hof-bestellungen/bestellungen-ansicht.tsx')
+    const ab = zeile.slice(zeile.indexOf('function ListenZeile'))
+    expect(ab.slice(0, ab.indexOf('</Link>'))).toMatch(/<LadePunkt\b/)
+    // Gegenprobe: Die Suche kennt den Fall ohne Punkt.
+    expect('<Link href={href}><span>Zeile</span></Link>').not.toMatch(/<LadePunkt\b/)
   })
 
   it('Hof und Bestand: Zugang prüft das Layout der Gruppe, vor jeder Ladeansicht', () => {

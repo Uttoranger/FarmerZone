@@ -68,6 +68,7 @@ import { ProduktKarte } from '@/components/hofseite/produkt-karte'
 import { BildansichtEbene } from '@/components/hofseite/bildansicht'
 import { LebensmittelVorschau } from '@/components/products/lebensmittel-vorschau'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
+import { publicFarm } from './fabrik/public-farm'
 import type { KartenZustand } from '@/lib/bereiche-anzeige'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 
@@ -85,7 +86,7 @@ function produkt(id: string, teil: Partial<PublicProduct> = {}): PublicProduct {
     price: 4.5, unit: 'STUECK', unitSize: null, stock: 20, isAvailable: true, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null,
+    familieId: null, brennmaterial: null, abholhinweise: [],
     ...teil,
   }
 }
@@ -144,22 +145,7 @@ describe('Produktkarte — der Ausschnitt am Foto', () => {
 })
 
 describe('Produktseite — der Ausschnitt am Foto', () => {
-  const HOF: PublicFarm = {
-    id: 'farm_test', slug: 'hof-test', name: 'Hof Test', ownerName: 'Erika Muster',
-    description: 'Eier aus Musterdorf', address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf',
-    phone: '+43 660 0000000', email: 'hof@example.com', logoUrl: null, logoAusschnitt: null, bannerUrl: null,
-    tagline: null, foundedYear: null, aboutText: null, bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50, bannerAusschnitt: null,
-    sectionsConfig: [], farmValues: [], farmPhotos: [],
-    acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,
-    serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
-    betriebsstatus: 'PRIMAERPRODUKTION',
-    gruendungshof: false,
-    istTesthof: false,
-    gruendungSeit: null,
-    abzeichenBlatt: null,
-    products: [],
-    pickupSlots: [{ dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }],
-  }
+  const HOF: PublicFarm = publicFarm({ description: 'Eier aus Musterdorf', betriebsstatus: 'PRIMAERPRODUKTION' })
 
   async function seite(p: PublicProduct): Promise<string> {
     vi.mocked(ladeHofseiteGeteilt).mockResolvedValue({ farm: { ...HOF, products: [p] }, ansicht: { art: 'kundin', noindex: false, kaufen: true } })

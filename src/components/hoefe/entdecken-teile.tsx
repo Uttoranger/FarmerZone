@@ -1,4 +1,3 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import { ChevronRight, MapPinOff, SearchX, Store, X } from 'lucide-react'
 import type { HoefeFilter } from '@/schemas/hoefe-filter'
@@ -15,6 +14,7 @@ import {
   formatiereEntfernung,
   type AbholFenster,
   type Bezugspunkt,
+  type NeuerBeitrag,
   type UmkreisStufe,
   type VorschauProdukt,
 } from '@/lib/hofuebersicht'
@@ -22,8 +22,6 @@ import { hofseitenLink, istBestellbar, type AngebotsProdukt } from '@/lib/bereic
 import { SIEGEL, illustrationPfad, type AnzeigeBereich, type ProductCategoryValue } from '@/lib/taxonomie'
 import { formatGrundpreis, formatGrundpreisZeile, formatKilopreis } from '@/lib/format'
 import { hofIllustrationen } from '@/lib/hoefe-anzeige'
-import { bildStil } from '@/lib/bild-ausschnitt'
-import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
@@ -33,7 +31,10 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import HoefeFotostreifen from '@/components/hoefe/hoefe-fotostreifen'
 import { HoefeProduktzeilen } from '@/components/hoefe/hoefe-produktzeilen'
 import { HofBildflaeche } from '@/components/hoefe/hof-bildflaeche'
+import { HofKopf } from '@/components/hoefe/hof-kopf'
+import { Vorschaubild } from '@/components/hoefe/hof-vorschaubild'
 import { Abholzeile } from '@/components/hoefe/abholzeile'
+import { BeitragMarke } from '@/components/hoefe/beitrag-marke'
 import { Abzeichen } from '@/components/ui/abzeichen'
 
 /*
@@ -217,46 +218,8 @@ export function AktiveFilterZeile({
   )
 }
 
-/** Das Bild einer Karte: Foto oder, ohne Foto, die Illustration der Kategorie (Register N22; vorher Initialen). */
-function Vorschaubild({
-  foto,
-  ausschnitt = null,
-  illustration,
-  sizes,
-  gedaempft,
-  className,
-}: {
-  foto: string | null
-  /** Ausschnitt eines Produktfotos (Register N17, Nr. 98); die Fotos des Hofs stehen wie heute. */
-  ausschnitt?: BildAusschnitt | null
-  /** Ohne Foto: der Pfad der Illustration (hofIllustrationen bzw. illustrationPfad). */
-  illustration: string
-  sizes: string
-  gedaempft: boolean
-  className?: string
-}) {
-  if (!foto) {
-    return <HofBildflaeche bilder={[illustration]} sizes={sizes} gedaempft={gedaempft} fuellen className={cn('shrink-0', className)} />
-  }
-  return (
-    <span className={cn('relative block shrink-0 overflow-hidden bg-muted', className)}>
-      <Image
-        src={foto}
-        alt=""
-        fill
-        sizes={sizes}
-        // Ausgegraut wird nur das Bild — eine Deckkraft über dem Text drückte
-        // ihn unter 4,5:1 (Axe color-contrast).
-        className={cn('object-cover', gedaempft && 'opacity-60 grayscale')}
-        // Gedämpft ohne Filter des Hofs: Ein Inline-Filter überschriebe sonst die Klasse grayscale.
-        style={bildStil(ausschnitt, { filter: !gedaempft })}
-      />
-    </span>
-  )
-}
-
 /** „Nicht auf der Karte" — ein Hof ohne Kartenpunkt steht nur in der Liste (Register N22). */
-function OhneKartenpunkt(): React.JSX.Element {
+export function OhneKartenpunkt(): React.JSX.Element {
   return (
     <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
       <MapPinOff className="size-3.5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
@@ -284,6 +247,8 @@ export type KartenHof = {
   longitude: number | null
   /** Abzeichen „Gründungshof“ (Register K2, Nr. 116) — nur Ja/Nein, nie die Nummer. */
   gruendungshof: boolean
+  /** Der neueste aktive Beitrag (höchstens sieben Tage alt) — die Marke am Bild (Register N22, Nr. 129); fehlt er, keine Marke. */
+  neuerBeitrag?: NeuerBeitrag | null
 }
 
 /**
@@ -327,6 +292,11 @@ export function HofKarte({
   const ziel = hofseitenLink(hof.slug, bereich)
   const bilder = hofIllustrationen(hof.kategorien)
   const ohneKartenpunkt = hof.latitude == null || hof.longitude == null
+  // Die Marke „Neu · vor …“ am Bild (Nr. 129): Ihr Satz für den Screenreader hängt am einen Link der Karte.
+  const markeId = hof.neuerBeitrag ? `beitrag-marke-${hof.slug}` : undefined
+  const marke = (kompakt: boolean, className: string) => (
+    <BeitragMarke beitrag={hof.neuerBeitrag} jetzt={jetzt} beschreibungId={`beitrag-marke-${hof.slug}`} kompakt={kompakt} className={className} />
+  )
   return (
     <article
       data-pausiert={hof.isPaused ? 'ja' : undefined}
@@ -341,6 +311,7 @@ export function HofKarte({
           type="button"
           onClick={onAuswaehlen}
           aria-label={`${hof.name} auf der Karte zeigen`}
+          aria-describedby={markeId}
           // Die Überlagerung fängt den Zeiger — sie trägt den vollen Namen.
           title={hof.name}
           className={cn('absolute inset-0 rounded-2xl', FOKUS_RAHMEN_INNEN)}
@@ -349,6 +320,7 @@ export function HofKarte({
         <Link
           href={ziel}
           aria-label={`${hof.name} ansehen`}
+          aria-describedby={markeId}
           title={hof.name}
           className={cn('absolute inset-0 rounded-2xl', FOKUS_RAHMEN_INNEN)}
         />
@@ -375,39 +347,29 @@ export function HofKarte({
             className="pointer-events-none relative h-[150px] w-full rounded-t-2xl"
           />
         ))}
+      {/* Am Bild oben links, über Streifen und Fläche, durchlässig für Zeiger und Wischen — keine zweite Zeile. */}
+      {!split && marke(false, 'absolute top-2.5 left-2.5 z-10')}
 
       {/* Über der Überlagerung (relative), aber durchlässig für den Zeiger:
           Klicks landen auf ihr, und Axe kann Schrift und Fläche messen. */}
       <div className="pointer-events-none relative flex items-start gap-3.5 p-3">
         {split && (
-          <Vorschaubild
-            foto={hof.fotos[0] ?? null}
-            illustration={bilder[0]}
-            sizes="116px"
-            gedaempft={hof.isPaused}
-            className="h-[100px] w-[116px] rounded-xl"
-          />
+          <span className="relative shrink-0">
+            <Vorschaubild
+              foto={hof.fotos[0] ?? null}
+              illustration={bilder[0]}
+              sizes="116px"
+              gedaempft={hof.isPaused}
+              className="h-[100px] w-[116px] rounded-xl"
+            />
+            {marke(true, 'absolute bottom-1.5 left-1.5')}
+          </span>
         )}
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           {/* Klein über dem Namen, kein eigener Knopf — die ganze Karte bleibt der Link (Nr. 116). */}
           {hof.gruendungshof && <Abzeichen groesse="klein" className="self-start" />}
-          <div className="flex items-start gap-2">
-            <h2
-              className={cn(
-                'line-clamp-2 min-w-0 flex-1 font-heading text-[17px] leading-snug font-semibold break-words',
-                hof.isPaused ? 'text-muted-foreground' : 'text-foreground'
-              )}
-            >
-              {hof.name}
-            </h2>
-            {hof.entfernungKm !== null && (
-              <span className="shrink-0 pt-0.5 text-[13px] text-muted-foreground">{formatiereEntfernung(hof.entfernungKm)}</span>
-            )}
-          </div>
-          <p className="truncate text-[13px] text-muted-foreground">
-            {hof.postalCode} {hof.city}
-          </p>
+          <HofKopf hof={hof} als="h2" gedaempft={hof.isPaused} />
           {ohneKartenpunkt && <OhneKartenpunkt />}
           <Abholzeile fenster={hof.abholfenster} isPaused={hof.isPaused} bestellbar={istBestellbar(hof)} jetzt={jetzt} />
           <HoefeProduktzeilen produkte={schaufenster.produkte} weitere={schaufenster.weitere} />

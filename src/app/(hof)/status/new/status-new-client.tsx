@@ -59,6 +59,8 @@ interface Props {
   // sich der Wizard exakt wie eine neue Erstellung (neuer Status, heutiges
   // Datum, normale Mail-Logik, Frequenzschutz unverändert)
   prefill?: { anlass: string; title: string; body: string; photoUrl: string | null } | null
+  // Vorgewählter Anlass aus `?anlass=` (Nr. 129, schon geprüft) — sticht den der Vorlage.
+  anlass?: Anlass | null
 }
 
 // ── Visual stepper ──────────────────────────────────────────────────────────
@@ -103,16 +105,17 @@ function Stepper({ step }: { step: number }) {
   )
 }
 
-export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt, prefill }: Props) {
+export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt, prefill, anlass: anlassVorwahl = null }: Props) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [step, setStep] = useState(1)
 
   // Form state — Startwerte aus der Vorlage (?from=…), sonst leer
   const [anlass, setAnlass] = useState<Anlass>(
-    prefill && ['FRESH_PRODUCT', 'NEW_SEASON', 'PROMOTION', 'ANNOUNCEMENT'].includes(prefill.anlass)
-      ? (prefill.anlass as Anlass)
-      : 'FRESH_PRODUCT'
+    anlassVorwahl ??
+      (prefill && ['FRESH_PRODUCT', 'NEW_SEASON', 'PROMOTION', 'ANNOUNCEMENT'].includes(prefill.anlass)
+        ? (prefill.anlass as Anlass)
+        : 'FRESH_PRODUCT')
   )
   const [title, setTitle] = useState(prefill?.title ?? '')
   const [body, setBody] = useState(prefill?.body ?? '')

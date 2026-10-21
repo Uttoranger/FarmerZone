@@ -7,8 +7,8 @@
  *    Reihenfolge des Hofs, Sonstiges zuletzt, dann EIN Abschnitt Futtermittel
  *    und EIN Abschnitt Brennmaterial; der Futter-Abschnitt hat einen festen
  *    Anker — das Ziel von ?bereich=futter.
- *  - Reiter Übersicht · Produkte · Beiträge: Beiträge nur mit Beitrag;
- *    ?reiter= aus der Adresse wird geprüft, Unsinn fällt still auf die
+ *  - Reiter Übersicht · Produkte (seit Nr. 128 ohne „Beiträge“): ?reiter= aus
+ *    der Adresse wird geprüft, Unsinn und der alte Reiter fallen still auf die
  *    Übersicht; ?bereich=futter öffnet die Produkte.
  *  - Zustände der Produktkarte aus dem echten Bestand (knapp, ausverkauft,
  *    pausiert) — deckungsgleich mit dem Kaufknopf; „Merken" gibt es nicht.
@@ -101,34 +101,31 @@ describe('kategorieAbschnitte — E1: eine Seite mit Abschnitten statt Umschalte
   })
 })
 
-describe('Reiter — Übersicht · Produkte · Beiträge', () => {
-  it('Beiträge nur ab einem Beitrag, mit der Zahl wie die Produkte (Register F8)', () => {
-    expect(hofseiteReiter({ produktAnzahl: 10, beitragAnzahl: 0 })).toEqual([
+describe('Reiter — Übersicht · Produkte (seit Nr. 128 ohne „Beiträge“, Register F8)', () => {
+  it('zwei Reiter, auch mit Beiträgen — die stehen als „Aktuell vom Hof“ in der Übersicht', () => {
+    expect(hofseiteReiter({ produktAnzahl: 10 })).toEqual([
       { id: 'uebersicht', label: 'Übersicht' },
       { id: 'produkte', label: 'Produkte · 10' },
     ])
-    expect(hofseiteReiter({ produktAnzahl: 0, beitragAnzahl: 3 }).map((r) => r.label)).toEqual(['Übersicht', 'Produkte', 'Beiträge · 3'])
-    expect(hofseiteReiter({ produktAnzahl: 5, beitragAnzahl: 1 }).at(-1)).toEqual({ id: 'beitraege', label: 'Beiträge · 1' })
+    expect(hofseiteReiter({ produktAnzahl: 0 }).map((r) => r.label)).toEqual(['Übersicht', 'Produkte'])
   })
 
-  const MIT_BEITRAG = hofseiteReiter({ produktAnzahl: 3, beitragAnzahl: 2 })
-  const OHNE_BEITRAG = hofseiteReiter({ produktAnzahl: 3, beitragAnzahl: 0 })
+  const REITER = hofseiteReiter({ produktAnzahl: 3 })
 
   it('ohne Angabe die Übersicht; ein gültiger Reiter aus der Adresse gilt', () => {
-    expect(aktiverReiter({ reiter: null, bereich: null }, MIT_BEITRAG)).toBe('uebersicht')
-    expect(aktiverReiter({ reiter: 'produkte', bereich: null }, MIT_BEITRAG)).toBe('produkte')
-    expect(aktiverReiter({ reiter: 'beitraege', bereich: null }, MIT_BEITRAG)).toBe('beitraege')
+    expect(aktiverReiter({ reiter: null, bereich: null }, REITER)).toBe('uebersicht')
+    expect(aktiverReiter({ reiter: 'produkte', bereich: null }, REITER)).toBe('produkte')
   })
 
-  it('Unsinn und Reiter, die es nicht gibt, fallen still auf die Übersicht', () => {
-    expect(aktiverReiter({ reiter: 'admin', bereich: null }, MIT_BEITRAG)).toBe('uebersicht')
-    expect(aktiverReiter({ reiter: 'beitraege', bereich: null }, OHNE_BEITRAG)).toBe('uebersicht')
+  it('Unsinn fällt still auf die Übersicht — auch der alte Reiter „Beiträge“ (alte Links landen bei „Aktuell vom Hof“)', () => {
+    expect(aktiverReiter({ reiter: 'admin', bereich: null }, REITER)).toBe('uebersicht')
+    expect(aktiverReiter({ reiter: 'beitraege', bereich: null }, REITER)).toBe('uebersicht')
   })
 
   it('?bereich=futter (Links von /hoefe und Umfeld) öffnet die Produkte — ein gewählter Reiter sticht', () => {
-    expect(aktiverReiter({ reiter: null, bereich: 'futter' }, OHNE_BEITRAG)).toBe('produkte')
-    expect(aktiverReiter({ reiter: 'uebersicht', bereich: 'futter' }, OHNE_BEITRAG)).toBe('uebersicht')
-    expect(aktiverReiter({ reiter: null, bereich: 'quatsch' }, OHNE_BEITRAG)).toBe('uebersicht')
+    expect(aktiverReiter({ reiter: null, bereich: 'futter' }, REITER)).toBe('produkte')
+    expect(aktiverReiter({ reiter: 'uebersicht', bereich: 'futter' }, REITER)).toBe('uebersicht')
+    expect(aktiverReiter({ reiter: null, bereich: 'quatsch' }, REITER)).toBe('uebersicht')
   })
 
   it('die Adresse eines Reiters behält die übrigen Parameter, die Übersicht trägt keinen', () => {
@@ -172,14 +169,13 @@ describe('Schaufenster unter lg (Register N5, Nr. 51)', () => {
 
   it('„Alle Produkte (n)" nennt dieselbe Zahl wie der Reiter Produkte', () => {
     expect(alleProdukteText(12)).toBe('Alle Produkte (12)')
-    expect(hofseiteReiter({ produktAnzahl: 12, beitragAnzahl: 0 })[1]?.label).toBe('Produkte · 12')
+    expect(hofseiteReiter({ produktAnzahl: 12 })[1]?.label).toBe('Produkte · 12')
   })
 
   it('ein Schaufenster nur in der Übersicht und nur mit Produkten', () => {
     expect(zeigeSchaufenster('uebersicht', 3)).toBe(true)
     expect(zeigeSchaufenster('uebersicht', 0)).toBe(false)
     expect(zeigeSchaufenster('produkte', 3)).toBe(false)
-    expect(zeigeSchaufenster('beitraege', 3)).toBe(false)
   })
 })
 

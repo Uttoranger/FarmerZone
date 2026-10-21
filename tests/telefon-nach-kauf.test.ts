@@ -72,6 +72,7 @@ import { HofErreichen } from '@/components/bestaetigung/hof-erreichen'
 import { KONTAKT_NACH_DEM_KAUF } from '@/lib/hofseite-kunde'
 import { KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
+import { publicFarm } from './fabrik/public-farm'
 import { findeElement, inhaltHinterSuspense } from './element-suche'
 
 const WURZEL = process.cwd()
@@ -88,26 +89,14 @@ function produkt(id: string, name: string): PublicProduct {
     price: 4.5, unit: 'STUECK', unitSize: null, stock: 20, isAvailable: true, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null,
+    familieId: null, brennmaterial: null, abholhinweise: [],
   }
 }
 
-const HOF: PublicFarm = {
-  id: 'farm_test', slug: 'hof-test', name: 'Hof Test', ownerName: 'Erika Muster',
-  description: 'Gemüse aus Musterdorf', address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf',
-  phone: TELEFON, email: EMAIL, logoUrl: null, logoAusschnitt: null, bannerUrl: null,
-  tagline: null, foundedYear: null, aboutText: 'Ein kleiner Familienbetrieb.', bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50, bannerAusschnitt: null,
-  sectionsConfig: [], farmValues: [], farmPhotos: [],
-  acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,
-  serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
-  betriebsstatus: null,
-  gruendungshof: false,
-  istTesthof: false,
-  gruendungSeit: null,
-  abzeichenBlatt: null,
+const HOF: PublicFarm = publicFarm({
+  phone: TELEFON, email: EMAIL, aboutText: 'Ein kleiner Familienbetrieb.',
   products: [produkt('p_karotten', 'Karotten'), produkt('p_lauch', 'Lauch')],
-  pickupSlots: [{ dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }],
-}
+})
 
 const JETZT = '2026-10-02T08:00:00.000Z'
 const KUNDIN = { art: 'kundin' as const, kaufen: true }

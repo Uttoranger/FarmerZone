@@ -332,9 +332,10 @@ export type GruendungAenderung = {
  * Gerechnet mit `folgenDerAenderung` aus derselben Liste wie die Plätze und
  * der Zahl der Plätze aus der Einstellung (nie die feste 12). Ein Testhof
  * (Register N21) ist immer ausgenommen: Wieder zählen ist ausgegraut, mit
- * demselben Satz, mit dem `nimmWiederAuf` ablehnt. `istTesthof` fehlt: kein Testhof.
+ * demselben Satz, mit dem `nimmWiederAuf` ablehnt. `istTesthof` ist Pflicht (Nr. 127):
+ * Ein Aufrufer, der es vergisst, würde einen Testhof wieder zählen lassen.
  */
-export function gruendungAenderung<T extends HofFuerFolgen & { istTesthof?: boolean }>(
+export function gruendungAenderung<T extends HofFuerFolgen & { istTesthof: boolean }>(
   hof: T,
   hoefe: readonly T[],
   plaetze: number,
@@ -346,7 +347,7 @@ export function gruendungAenderung<T extends HofFuerFolgen & { istTesthof?: bool
   return {
     richtung,
     menue: t.menue[richtung],
-    gesperrt: hof.istTesthof === true ? TESTHOF_ZAEHLT_NIE : folgen.moeglich ? null : gruendungAlleVergeben(plaetze),
+    gesperrt: hof.istTesthof ? TESTHOF_ZAEHLT_NIE : folgen.moeglich ? null : gruendungAlleVergeben(plaetze),
     titel: t.titel[richtung](hof.name),
     saetze: folgen.moeglich ? folgenSaetze(hof, folgen, plaetze, standardBis) : [],
     hinweise: richtung === 'ausnehmen' ? [t.keineNachricht, t.zurueck] : [t.keineNachricht, folgen.fest ? t.nummerFest : t.nummer],

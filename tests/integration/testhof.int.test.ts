@@ -193,7 +193,7 @@ describe('Sichtbarkeit an echten Zeilen', () => {
     // erstelleHof trägt eine Betriebsnummer — ohne sie stünde keiner der beiden in Futter kaufen.
     const { testhof, ausgenommen } = await zweiHoefe()
     const { farm: eigen } = await erstelleHof(ORT)
-    const daten = await getFutterKaufen(eigen.id, 10)
+    const daten = await getFutterKaufen(eigen.id, new Date('2026-10-19T08:00:00Z'))
     if (!daten?.eigenerStandort) throw new Error('Futter kaufen ohne Standort')
     const ids = daten.hoefe.map((h) => h.id)
     expect(ids).not.toContain(testhof.id)
@@ -241,7 +241,7 @@ describe('Sichtbarkeit an echten Zeilen', () => {
       liveBisTag: null,
       liveBisUhrzeit: null,
     }
-    expect(await speichereEntwurf({ reihenfolge, block })).toEqual({ error: 'Wähle nur freigeschaltete Höfe.' })
+    expect(await speichereEntwurf({ reihenfolge, block })).toEqual({ error: 'Wähle nur freigeschaltete Höfe, keine Testhöfe.' })
     expect(await prisma.startseiteBlock.count({ where: { titel: 'int-Testhof gewählt' } })).toBe(0)
   })
 })

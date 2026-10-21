@@ -157,6 +157,22 @@ describe('Seitenfuß: Impressum, Datenschutz, AGB, Problem melden', () => {
     expect(html).not.toContain(`href="${AGB_PFAD}"`)
     expect(renderToStaticMarkup(createElement(KundeFuss))).toContain(`href="${AGB_PFAD}"`)
   })
+
+  // Nr. 127 (Register N22, Ergänzung): Der Fuß der Startseite ist am Computer verborgen — die AGB bleiben
+  // dort trotzdem erreichbar, weil der Seitenfuß sie führt und nie verborgen ist; am Handy gilt dasselbe
+  // (der Seitenfuß steht unter dem Fuß der Startseite). In JEDEM sichtbaren Fuß ist der Weg zu den AGB da.
+  it('die AGB sind in jedem Fuß erreichbar: am Computer im Seitenfuß, am Handy im Seitenfuß unter dem Fuß der Startseite', () => {
+    const fuss = renderToStaticMarkup(createElement(KundeFuss))
+    expect(fuss).toContain(`href="${AGB_PFAD}"`)
+    const klassen = (markup: string) => markup.match(/<footer[^>]*class="([^"]*)"/)?.[1].split(/\s+/) ?? []
+    expect(klassen(fuss)).toContain('border-t')
+    expect(klassen(fuss)).not.toContain('hidden')
+    expect(klassen(fuss)).not.toContain('md:hidden')
+    // Gegenprobe: Der Fuß der Startseite ist ab md verborgen und führt die AGB nicht — sie hängen allein am Seitenfuß.
+    const startseite = renderToStaticMarkup(createElement(StartseiteFuss, { jahr: 2026 }))
+    expect(klassen(startseite)).toContain('md:hidden')
+    expect(startseite).not.toContain(`href="${AGB_PFAD}"`)
+  })
 })
 
 describe('Bestellbestätigung per Mail: eine Zeile mit Link auf die AGB', () => {
@@ -221,6 +237,7 @@ describe('/hoefe: der Satz zur Reihenfolge unter der Liste', () => {
     suchNamen: [],
     fotos: [],
     gruendungshof: false,
+    neuerBeitrag: null,
   })
 
   const uebersicht = (suche = ''): string => {

@@ -211,7 +211,7 @@ export async function getTeilenFensterDaten(farmId: string, jetzt: Date): Promis
 
 /**
  * Die Daten des Teilen-Fensters für EINEN eigenen Beitrag (Register T5):
- * Bild und Text aus dem Beitrag, Link auf den Reiter „Beiträge", die
+ * Bild und Text aus dem Beitrag, Link auf den Beitrag oben in der Übersicht (`?beitrag=`), die
  * verknüpften Produkte vorbelegt, die WhatsApp-Abonnentinnen live (dieselbe
  * Zahl wie der Knopf im Reiter, W1) und die Mail-Empfänger vom
  * Veröffentlichen. Der Beitrag muss dem Hof der Sitzung gehören (Besitz in
@@ -252,8 +252,8 @@ export async function ladeTeilenFensterBeitrag(farmId: string, postId: string, j
     art: 'beitrag',
     hofName: daten.hofName,
     slug: quelle.hof.slug,
-    link: beitragLink(hof.url),
-    adresse: beitragLink(hof.anzeige),
+    link: beitragLink(hof.url, beitrag.id),
+    adresse: beitragLink(hof.anzeige, beitrag.id),
     auswahl,
     textVorschlag: beitragTextVorschlag(beitrag.title, beitrag.body, daten.abholung),
     beitragId: beitrag.id,

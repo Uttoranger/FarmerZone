@@ -838,6 +838,8 @@ export async function sendStatusUpdateEmail(opts: {
   body: string
   anlass: string
   photoUrl?: string
+  /** Der Beitrag, auf den der Knopf führt (`?beitrag=<id>`, Register T5) — nur, wenn er auf der Hofseite steht. */
+  beitragId?: string
   /** Signierter Abmelde-Token (generateUnsubscribeToken) — ohne Ablauf. */
   abmeldeToken: string
 }): Promise<void> {
@@ -850,6 +852,7 @@ export async function sendStatusUpdateEmail(opts: {
       body: opts.body,
       anlass: opts.anlass,
       photoUrl: opts.photoUrl,
+      beitragId: opts.beitragId,
       unsubscribeUrl: `${APP_URL}${abmeldeSeitenPfad(opts.abmeldeToken)}`,
       appUrl: APP_URL,
     })

@@ -23,14 +23,25 @@ import { MARKE } from '@/lib/marke'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
+  // Umkreis und Reiter tragen seit Nr. 122 den Ladepunkt (useLinkStatus) — hier lädt nie etwas.
+  useLinkStatus: () => ({ pending: false }),
 }))
 const umgeleitet = vi.fn((ziel: string) => {
   throw new Error(`NEXT_REDIRECT:${ziel}`)
 })
-vi.mock('next/navigation', () => ({ redirect: (ziel: string) => umgeleitet(ziel) }))
+// Futter kaufen liest seit Nr. 123 die Ansicht aus der Adresse (Liste | Karte im Browser).
+const suchParameter = vi.hoisted(() => ({ wert: new URLSearchParams() }))
+vi.mock('next/navigation', () => ({
+  redirect: (ziel: string) => umgeleitet(ziel),
+  usePathname: () => '/region',
+  useSearchParams: () => suchParameter.wert,
+}))
+// Die Karte kommt per dynamic import erst beim Umschalten — hier ein Platzhalter mit Merkmal.
+vi.mock('next/dynamic', () => ({ default: () => () => createElement('div', { 'data-karte': 'futter' }) }))
+vi.mock('next/image', () => ({ default: ({ src, alt }: { src: string; alt: string }) => createElement('img', { src, alt }) }))
 
 import { REGION_HREF, hofAktiverPunkt, hofNavigation } from '@/lib/bauern-navigation'
-import { futterKaufenLink, leseFutterKaufenFilter, leseRegionReiter, regionReiterLink } from '@/schemas/region'
+import { futterKaufenLink, leseFutterAnsicht, leseFutterKaufenFilter, leseRegionReiter, regionReiterLink } from '@/schemas/region'
 import { umfeldLink, umfeldUmleitung } from '@/schemas/umfeld-filter'
 import UmfeldUmleitung from '@/app/(hof)/analytics/umfeld/page'
 import { RegionKopf } from '@/components/region/region-kopf'
@@ -61,18 +72,30 @@ describe('Adresse von /region', () => {
     expect(leseRegionReiter(undefined)).toBe('preise')
   })
 
-  it('Futter-Filter: Umkreis, Art, Menge nur aus erlaubten Werten', () => {
-    expect(leseFutterKaufenFilter({ km: '50', art: 'HEU_STROH', menge: 'gross' })).toEqual({ km: 50, art: 'HEU_STROH', menge: 'gross' })
-    expect(leseFutterKaufenFilter({ km: '7', art: 'EIER', menge: 'riesig' })).toEqual({ km: 25, art: null, menge: null })
+  it('Futter-Filter: Umkreis, Art, Menge und Abholung nur aus erlaubten Werten', () => {
+    expect(leseFutterKaufenFilter({ km: '50', art: 'HEU_STROH', menge: 'gross', abholung: 'wochenende' })).toEqual({
+      km: 50,
+      art: 'HEU_STROH',
+      menge: 'gross',
+      abholung: 'wochenende',
+    })
+    expect(leseFutterKaufenFilter({ km: '7', art: 'EIER', menge: 'riesig', abholung: 'gestern' })).toEqual({ km: 25, art: null, menge: null, abholung: null })
     // Die Altlast ist kein wählbarer Filter.
     expect(leseFutterKaufenFilter({ art: 'FUTTERMITTEL' }).art).toBeNull()
+    expect(leseFutterAnsicht('karte')).toBe('karte')
+    expect(leseFutterAnsicht('<script>')).toBe('liste')
   })
 
-  it('Links: Standards ausgelassen, der Umkreis geht beim Reiterwechsel mit', () => {
-    expect(futterKaufenLink({ km: 25, art: null, menge: null })).toBe('/region?reiter=futter&km=25')
-    expect(futterKaufenLink({ km: 10, art: 'GETREIDE_KOERNER', menge: 'klein' })).toBe('/region?reiter=futter&km=10&art=GETREIDE_KOERNER&menge=klein')
+  it('Links: Standards ausgelassen, Umkreis, Ansicht und Abholung gehen beim Reiterwechsel mit', () => {
+    const alles = { km: 25, art: null, menge: null, abholung: null } as const
+    expect(futterKaufenLink(alles)).toBe('/region?reiter=futter&km=25')
+    expect(futterKaufenLink({ km: 10, art: 'GETREIDE_KOERNER', menge: 'klein', abholung: 'morgen' }, 'karte')).toBe(
+      '/region?reiter=futter&km=10&art=GETREIDE_KOERNER&menge=klein&abholung=morgen&ansicht=karte'
+    )
     expect(regionReiterLink('preise', 50)).toBe('/region?km=50')
+    expect(regionReiterLink('preise', 50, { ansicht: 'karte', abholung: 'heute' })).toBe('/region?km=50&ansicht=karte')
     expect(regionReiterLink('futter', 50)).toBe('/region?reiter=futter&km=50')
+    expect(regionReiterLink('futter', 10, { ansicht: 'karte', abholung: 'heute' })).toBe('/region?reiter=futter&km=10&abholung=heute&ansicht=karte')
     expect(umfeldLink({ km: 10, bereich: 'FUTTERMITTEL' })).toBe('/region?km=10&bereich=futter')
   })
 })
@@ -98,7 +121,8 @@ describe('/analytics/umfeld leitet nach /region um', () => {
 describe('Routen und Navigation', () => {
   it('Region und Auswertung liegen unter (hof), (farmer)/analytics gibt es nicht mehr', () => {
     expect(gibt('src/app/(farmer)/analytics')).toBe(false)
-    for (const datei of ['analytics/page.tsx', 'analytics/umfeld/page.tsx', 'region/page.tsx', 'region/loading.tsx']) {
+    // Seit Nr. 122 ohne region/loading.tsx (Ladepunkt statt Skelett), die Reiter in eigenen Teilen der Seite.
+    for (const datei of ['analytics/page.tsx', 'analytics/umfeld/page.tsx', 'region/page.tsx', 'region/preise-reiter.tsx', 'region/futter-reiter.tsx']) {
       expect(gibt(`src/app/(hof)/${datei}`), datei).toBe(true)
     }
   })
@@ -132,47 +156,90 @@ describe('Karten im neuen Design', () => {
     expect(html).toContain('href="/region?km=25"')
   })
 
-  it('Futter kaufen: Schild nach E9, Bestellen führt zur Produktseite, Filter sind Links', () => {
+  it('Futter kaufen: Schild „· laut Hof" ohne Haken, Bestellen führt zur Produktseite der vorgewählten Größe, Filter sind Links', () => {
+    const filter = { km: 25, art: null, menge: null, abholung: null } as const
+    const groesse = (id: string, name: string, price: number, nettoMenge: number) => ({
+      id,
+      farmId: 'h',
+      name,
+      familieId: 'f',
+      category: 'HEU_STROH' as const,
+      subcategory: 'WIESENHEU' as const,
+      price,
+      isAvailable: true,
+      stock: 2,
+      reservedStock: 0,
+      verpackung: 'LOSE_BALLEN' as const,
+      futter: { nettoMenge, nettoEinheit: 'KG' as const, betriebsnummer: '1234567' },
+      abholhinweise: ['ANHAENGER_NOETIG' as const],
+      foto: null,
+      fotoAusschnitt: null,
+      illustration: '/categories/heu.webp',
+    })
     const ansicht = baueFutterKaufen({
       hoefe: [
         {
           id: 'h',
           slug: 'testhof',
-          name: 'Testhof',
+          name: 'Testhof A',
+          postalCode: '1234',
+          city: 'Beispielort',
+          latitude: 48,
+          longitude: 14,
           entfernungKm: 3,
           betriebsnummer: 'LFBIS 1234567',
           betriebsstatus: 'PRIMAERPRODUKTION',
           abholfenster: [],
+          fotos: [],
+          kategorien: ['HEU_STROH'],
         },
       ],
-      produkte: [
-        {
-          id: 'p',
-          farmId: 'h',
-          name: 'Heu Rundballen',
-          familieId: null,
-          category: 'HEU_STROH',
-          price: 40,
-          isAvailable: true,
-          stock: 2,
-          reservedStock: 0,
-          verpackung: 'LOSE_BALLEN',
-          futter: { nettoMenge: 250, nettoEinheit: 'KG', betriebsnummer: '1234567' },
-        },
-      ],
+      produkte: [groesse('p', 'Heu Kleinballen', 4.5, 15), groesse('q', 'Heu Rundballen', 40, 250)],
       ohneStandort: [],
       abgeschnitten: false,
-      filter: { km: 25, art: null, menge: null },
-      jetzt: { wochentag: 1, uhrzeit: '10:00' },
+      eigen: { name: 'Sonnhof', latitude: 48, longitude: 14, sichtbar: true, betriebsnummer: null, betriebsstatus: null, futter: [] },
+      filter,
+      jetzt: new Date('2026-10-19T08:00:00Z'),
     })
-    const html = renderToStaticMarkup(createElement(FutterKaufenAnsicht, { ansicht, filter: { km: 25, art: null, menge: null } }))
-    expect(html).toContain('Futtermittelbetrieb · LFBIS 1234567')
-    expect(html).not.toMatch(/geprüft/i)
-    // Seit Nr. 29 mit `?kaeufer=betrieb`: Die Kasse belegt „Betrieb" vor.
+    const html = renderToStaticMarkup(
+      createElement(FutterKaufenAnsicht, { ansicht, filter, ansichtBeimLaden: 'liste', jetzt: '2026-10-19T08:00:00.000Z' })
+    )
+    expect(html).toContain('Futtermittelbetrieb · LFBIS 1234567 · laut Hof')
+    expect(html).not.toMatch(/geprüft|registriert/i)
+    expect(html).not.toMatch(/lucide-(shield-check|badge-check|circle-check|check-circle)/)
+    expect(html).toContain('lucide-shield')
+    // Seit Nr. 29 mit `?kaeufer=betrieb`: Die Kasse belegt „Betrieb" vor. Vorgewählt ist die erste kaufbare Größe.
     expect(html).toContain('href="/testhof/produkt/p?kaeufer=betrieb"')
+    expect(html).toContain('Bestellen · Kleinballen · € 4,50')
+    expect(html).toMatch(/<fieldset[^>]*><legend[^>]*>Größe<\/legend>/)
+    expect(html).toContain('günstigster Kilopreis')
+    expect(html).toContain('Anhänger nötig')
     expect(html).toContain('href="/region?reiter=futter&amp;km=25&amp;art=HEU_STROH"')
+    expect(html).toContain('href="/region?reiter=futter&amp;km=25&amp;abholung=morgen"')
+    expect(html).toContain('aria-label="Umkreis, Zahl der Angebote je Stufe"')
+    expect(html).toContain('aria-label="Höfe mit LFBIS-Nummer"')
     expect(html).toContain('href="/products?neu=1&amp;bereich=futter"')
     expect(html).not.toMatch(/#[0-9a-f]{3,6}\b|rgb\(/i)
+    expect(html).not.toContain('data-karte')
+  })
+
+  it('Futter kaufen: `?ansicht=karte` gilt beim Laden — die Karte statt der Liste, die Links tragen die Ansicht mit', () => {
+    const filter = { km: 25, art: null, menge: null, abholung: null } as const
+    const ansicht = baueFutterKaufen({
+      hoefe: [],
+      produkte: [],
+      ohneStandort: [],
+      abgeschnitten: false,
+      eigen: { name: 'Sonnhof', latitude: 48, longitude: 14, sichtbar: true, betriebsnummer: null, betriebsstatus: null, futter: [] },
+      filter,
+      jetzt: new Date('2026-10-19T08:00:00Z'),
+    })
+    const html = renderToStaticMarkup(createElement(FutterKaufenAnsicht, { ansicht, filter, ansichtBeimLaden: 'karte', jetzt: '2026-10-19T08:00:00.000Z' }))
+    expect(html).toContain('data-karte="futter"')
+    expect(html).toContain('href="/region?reiter=futter&amp;km=50&amp;ansicht=karte"')
+    // Gegenprobe: als Liste ohne Karte.
+    const liste = renderToStaticMarkup(createElement(FutterKaufenAnsicht, { ansicht, filter, ansichtBeimLaden: 'liste', jetzt: '2026-10-19T08:00:00.000Z' }))
+    expect(liste).not.toContain('data-karte')
   })
 
   it('Servicegebühren dieses Monats vor dem Stichtag: Summe, Bar-Ausnahme, keine Lastschrift', () => {

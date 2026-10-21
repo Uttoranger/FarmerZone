@@ -4,6 +4,7 @@ import { Check, Lock, Plus, X } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { ABHOLHINWEIS_SYMBOL, ABHOLHINWEIS_TEXT, ABHOLHINWEIS_VALUES, ABHOLUNG_ABSCHNITT, schalteAbholhinweis, type AbholhinweisValue } from '@/lib/abholhinweise'
 import { cn } from '@/lib/utils'
 
 /*
@@ -191,6 +192,55 @@ export function Wahl({
       {aktiv && <Check className="size-3.5 shrink-0 text-status-fertig" strokeWidth={2} aria-hidden="true" />}
       {children}
     </button>
+  )
+}
+
+/**
+ * Der Abschnitt „Abholung" (Register N23, Nr. 123; Board
+ * system-h5-region-eigene-teile §3): drei Ankreuzfelder als Chips in einem
+ * fieldset mit legend, je 44 px, gewählt wie `Wahl` mit Haken. Darunter der
+ * Satz, dass die Kundschaft die Abholzeit wie immer selbst wählt. Im
+ * Futter-Formular (neue Familie, alle Größen) und im Produktdialog
+ * (Bearbeiten) derselbe Baustein — Wörter und Symbole aus
+ * src/lib/abholhinweise.ts.
+ */
+export function AbholhinweisWahl({
+  wert,
+  onWert,
+}: {
+  wert: readonly AbholhinweisValue[]
+  onWert: (neu: AbholhinweisValue[]) => void
+}): React.JSX.Element {
+  return (
+    <fieldset className="flex min-w-0 flex-col gap-2" data-feld="abholhinweise">
+      <legend className="text-[15px] font-semibold text-foreground">{ABHOLUNG_ABSCHNITT.titel}</legend>
+      <div className="flex flex-wrap gap-2">
+        {ABHOLHINWEIS_VALUES.map((hinweis) => {
+          const aktiv = wert.includes(hinweis)
+          const Symbol = ABHOLHINWEIS_SYMBOL[hinweis]
+          return (
+            <label
+              key={hinweis}
+              className={cn(
+                'inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full border px-4 text-[13.5px] font-medium text-foreground transition-colors duration-[250ms]',
+                aktiv ? 'border-[1.5px] border-accent bg-accent/15' : 'border-border bg-background hover:bg-muted',
+                // Der Fokus liegt auf dem verborgenen Ankreuzfeld — sichtbar wird er an der Pille.
+                'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring has-[:focus-visible]:outline-solid'
+              )}
+            >
+              <input type="checkbox" className="sr-only" checked={aktiv} onChange={() => onWert(schalteAbholhinweis(wert, hinweis))} />
+              {aktiv ? (
+                <Check className="size-3.5 shrink-0 text-status-fertig" strokeWidth={2} aria-hidden="true" />
+              ) : (
+                <Symbol className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.8} aria-hidden="true" />
+              )}
+              {ABHOLHINWEIS_TEXT[hinweis]}
+            </label>
+          )
+        })}
+      </div>
+      <p className="text-[12.5px] leading-snug text-muted-foreground">{ABHOLUNG_ABSCHNITT.satz}</p>
+    </fieldset>
   )
 }
 
