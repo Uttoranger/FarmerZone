@@ -18,7 +18,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
-vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 // Seit Nachbesserung 2 (Nr. 19) fragt der Storno vor der Vollerstattung, ob
 // Stripe schon Erstattungen kennt — hier keine.
@@ -42,6 +42,8 @@ vi.mock('@/lib/prisma', () => {
       farm: { findUnique: vi.fn() },
       order,
       product,
+      // Nach dem Storno fragt das Erneuern der Hofliste nach einer Höchstzahl (Nr. 131) — hier keine.
+      pickupSlot: { findFirst: vi.fn(async () => null) },
       // Standard: der Rückruf bekommt dieselben Fakes. Der Test, der die
       // Transaktion selbst beweist, ersetzt das durch EIGENE tx-Fakes.
       $transaction: vi.fn(async (arg: unknown) => {

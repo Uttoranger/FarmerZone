@@ -30,6 +30,7 @@ import { bestaetigungsPfad } from '@/lib/bestell-link'
 import { AbholfensterVoll, imAbholfenster, pruefeAbholfenster } from '@/server/abholfenster'
 import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
+import { erneuereHoflisteNachBestellung } from '@/server/hofliste-erneuern'
 import {
   CODE_ZAHLUNG_NICHT_MOEGLICH,
   hofKontoUnbekanntText,
@@ -723,6 +724,11 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+
+  // 9b. Die Bestellung steht (Transaktion vorbei): Füllt sie ein Fenster mit
+  //     Höchstzahl, die Hofliste nach der Antwort erneuern (Register N19,
+  //     Ergänzung 21.10.2026) — ein Fehler dabei berührt die Bestellung nie.
+  erneuereHoflisteNachBestellung(abholung.fenster.slot.maxOrders)
 
   // 10. Die Halte der Sitzung werden erst frei, wenn die Bestellung steht —
   //     online also NACH dem PaymentIntent (11a). Scheitert Stripe, wird die

@@ -34,6 +34,9 @@ import { leseOeffentlichMitWiederholung } from '@/server/oeffentlich-lesen'
  * Abzeichen, Admin — und seit Nr. 129 Veröffentlichen, Deaktivieren und
  * Löschen eines Beitrags (src/server/actions/status-posts.ts). Das
  * automatische Ablaufen eines Beitrags deckt der Browser über `endet` ab.
+ * Seit Nr. 131 auch nach dem Anlegen und Stornieren einer Bestellung bei
+ * Höfen mit Höchstzahl — dort mit `revalidateTag(…, { expire: 0 })` nach der
+ * Antwort, weil der Weg auch beim Rendern läuft (src/server/hofliste-erneuern.ts).
  *
  * EINE WIEDERHOLUNG bei einem Verbindungsabbruch (Nr. 47): Beim Neubau im
  * Hintergrund scheiterte die Anmeldung am Pooler gelegentlich mit
