@@ -64,8 +64,9 @@ export function BestaetigenKarte({ weiter }: { weiter: string }): React.JSX.Elem
         {laeuft ? <Loader2 className="size-4 animate-spin" strokeWidth={1.8} aria-hidden="true" /> : <KeyRound className="size-4" strokeWidth={1.8} aria-hidden="true" />}
         {laeuft ? FRISCH_TEXT.knopfLaeuft : FRISCH_TEXT.knopf}
       </button>
-      {/* Der Bereich steht schon da, bevor etwas drinsteht: Nur so sagt ihn ein Screenreader an. */}
-      <p role="status" className="flex items-center gap-2 text-[14px] font-medium text-foreground empty:hidden">
+      {/* Der Bereich steht schon da, bevor etwas drinsteht: Nur so sagt ihn ein Screenreader an.
+          Leer nur unsichtbar (sr-only), nicht ausgeblendet – display:none nähme ihn aus dem Baum. */}
+      <p role="status" className="flex items-center gap-2 text-[14px] font-medium text-foreground empty:sr-only">
         {gestartet && (
           <>
             <Download className="size-4 shrink-0 text-status-fertig" strokeWidth={1.8} aria-hidden="true" />

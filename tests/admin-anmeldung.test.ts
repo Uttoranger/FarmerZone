@@ -179,6 +179,8 @@ describe('passkeyFehlerText', () => {
     expect(satz).not.toBe(ADMIN_ANMELDEN_FEHLER.allgemein)
   })
 
+  // Liest bewusst den Text des Fremdpakets: Bricht dieser Test nach einem Update, den Code des
+  // Passkey-Clients nachlesen und den Fall in passkeyFehlerText anpassen – nicht den Test löschen.
   it('Gegenprobe: Der Code ist wirklich der des Passkey-Clients (Version 1.6.23 nachgelesen) und des Browser-Pakets', () => {
     const client = readFileSync(join(process.cwd(), 'node_modules/@better-auth/passkey/dist/client.mjs'), 'utf8')
     expect(client).toContain('e.code === "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED"')

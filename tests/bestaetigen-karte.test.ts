@@ -108,6 +108,10 @@ describe('Karte „Mit Passkey bestätigen“ — Hinweis zum Download', () => {
     expect(html).not.toMatch(/<button[^>]*\sdisabled=""/)
     // Der Bereich ist schon da, bevor etwas drinsteht — nur so sagt ihn ein Screenreader an.
     expect(html).toMatch(/<p[^>]*role="status"[^>]*><\/p>/)
+    // Leer nur unsichtbar, nicht ausgeblendet: display:none nähme ihn aus dem Zugänglichkeitsbaum.
+    const status = html.match(/<p[^>]*role="status"[^>]*>/)?.[0] ?? ''
+    expect(status).toContain('empty:sr-only')
+    expect(status).not.toMatch(/\bempty:hidden\b/)
   })
 
   it('beim Start des Downloads: „Der Download startet …“ als role="status", der Knopf gesperrt', () => {
