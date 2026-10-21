@@ -41,6 +41,7 @@ Mit dem Live-Schlüssel verschwinden alle drei von selbst. Den Modus liest die A
   Nach dem Neu-Einrichten kennt die Datenbank nur noch die neue Kennung. Die alte steht dann nur im Laufzeit-Protokoll („[Stripe] Hof-Konto neu eingerichtet …“), und das bewahrt Vercel je nach Plan nur kurz auf.
 - [ ] Die Höfe vorab informieren: Sobald du Bescheid gibst (erst nach der Probe mit EINEM Hof in Schritt 9), öffnen sie einmal Einstellungen → Zahlung und richten die Online-Zahlung neu ein (etwa 10 Minuten). Vorher nicht neu einrichten.
 - [ ] Eine ruhige Stunde wählen, ohne laufende Abholung und möglichst ohne Online-Bestellungen: Wer während des Neu-Bauens in Schritt 8 online bestellt, zahlt noch im Testmodus, zählt aber schon als Umsatz (Bau-Fenster, siehe Schritt 4 `STRIPE_LIVE_AB`).
+- [ ] Ist im Stripe-Dashboard Link eingeschaltet, brauchen frame-src und connect-src zusätzlich `https://link.com` und `https://*.link.com`, img-src `https://*.link.com` (Stripe-Doku „Integration security guide“, Abschnitt „Content Security Policy › Stripe.js“, docs.stripe.com/security/guide, abgerufen 21.10.2026; `src/lib/csp.ts`, Register G8). Erst danach die CSP scharf schalten.
 
 ## 1. Stripe-Konto live aktivieren
 

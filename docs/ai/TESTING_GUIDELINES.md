@@ -111,6 +111,7 @@ pnpm test:integration                        # Integration (braucht .env.test)
   Poolers stellt eine Hülle um `pg.Pool.prototype.query` her (Vorbild
   `tests/integration/oeffentlich-lesen.int.test.ts`). Prisma und Adapter
   bleiben echt; beide Hüllen kommen im `afterAll` wieder weg.
+- Die Login-Bremse von Better Auth zählt über alle Instanzen in `RateLimitZaehler` (R1-Ergänzung 20.10.2026); Tests mit mehr als drei Anmeldungen je 10 s brauchen eigene Schlüssel bzw. eine feste Uhr (tests/integration/auth-bremse.int.test.ts).
 
 ### Folge der Node-Umgebung
 - **Kein DOM, keine Interaktion.** Keine Testing-Library, kein Klicken, kein Snapshot von JSX.

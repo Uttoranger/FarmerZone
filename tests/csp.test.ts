@@ -10,6 +10,9 @@
  *    /bestaetigen/, /confirm/, /bestellung/ als :id) — Query, Fragment, Ausschnitt, Referrer und die
  *    ganze Policy fallen weg; beide Formate (report-uri und Reporting API).
  *  - Entdoppeln: dieselbe Meldung höchstens einmal je Stunde, höchstens 500 Einträge.
+ *  - Die Stripe-Hosts (G8, Ergänzung Nr. 132) stehen genau in ihren Anweisungen und in keiner anderen —
+ *    auch mit Meldungen, Toolbar und Sentry; Link, Google Maps und *.stripe.com fehlen. Gegenprobe:
+ *    Ein Stripe-Host in einer fremden Anweisung oder ein fehlender schlägt an.
  */
 import { describe, expect, it } from 'vitest'
 import {
@@ -43,12 +46,12 @@ describe('baueCsp', () => {
     expect(kacheln).toBe('https://tile.openstreetmap.org')
     expect(Object.fromEntries(p)).toEqual({
       'default-src': ["'self'"],
-      'script-src': ["'self'", "'unsafe-inline'", 'https://js.stripe.com'],
+      'script-src': ["'self'", "'unsafe-inline'", 'https://js.stripe.com', 'https://*.js.stripe.com'],
       'style-src': ["'self'", "'unsafe-inline'"],
       'img-src': ["'self'", 'data:', 'blob:', kacheln, 'https://*.public.blob.vercel-storage.com'],
       'font-src': ["'self'"],
-      'connect-src': ["'self'", 'https://vercel.com'],
-      'frame-src': ['https://js.stripe.com'],
+      'connect-src': ["'self'", 'https://vercel.com', 'https://api.stripe.com'],
+      'frame-src': ['https://js.stripe.com', 'https://*.js.stripe.com', 'https://hooks.stripe.com'],
       'worker-src': ["'self'", 'blob:'],
       'object-src': ["'none'"],
       'base-uri': ["'self'"],
@@ -87,6 +90,7 @@ describe('baueCsp', () => {
       "'self'",
       'https://o4501.ingest.de.sentry.io',
       'https://vercel.com',
+      'https://api.stripe.com',
     ])
     expect(baueCsp({ melden: true, sentryDsn: DSN })).not.toContain('abcdefSchluessel')
     expect(baueCsp({ melden: true, sentryDsn: DSN })).not.toContain('4502')
@@ -102,6 +106,43 @@ describe('baueCsp', () => {
       expect(vorschau.get(anweisung), anweisung).toContain('https://vercel.live')
     }
     expect(baueCsp({ melden: true })).not.toContain('vercel.live')
+  })
+})
+
+describe('Stripe-Hosts (Register G8, Ergänzung Nr. 132)', () => {
+  /** Wo welcher Stripe-Host stehen darf — Stripe-Doku „Integration security guide › Content Security Policy › Stripe.js". */
+  const ERWARTET = {
+    'connect-src': ['https://api.stripe.com'],
+    'frame-src': ['https://js.stripe.com', 'https://*.js.stripe.com', 'https://hooks.stripe.com'],
+    'script-src': ['https://js.stripe.com', 'https://*.js.stripe.com'],
+  }
+
+  /** Jede Anweisung mit ihren Stripe-Quellen; Anweisungen ohne fehlen. */
+  function stripeJeAnweisung(policy: string): Record<string, string[]> {
+    const funde = [...zerlege(policy)].map(([name, quellen]) => [name, quellen.filter((q) => /stripe\.com/i.test(q))] as const)
+    return Object.fromEntries(funde.filter(([, quellen]) => quellen.length > 0))
+  }
+
+  it('stehen genau in connect-src, frame-src und script-src — in jeder Spielart der Policy', () => {
+    for (const optionen of [
+      { melden: false },
+      { melden: true, berichtAdresse: 'https://example.com/api/csp-bericht', sentryDsn: DSN },
+      { melden: false, toolbar: true },
+    ]) {
+      expect(stripeJeAnweisung(baueCsp(optionen)), JSON.stringify(optionen)).toEqual(ERWARTET)
+    }
+  })
+
+  it('Link, Google Maps und *.stripe.com für Bilder kommen nicht dazu', () => {
+    const policy = baueCsp({ melden: true, berichtAdresse: 'https://example.com/api/csp-bericht', toolbar: true, sentryDsn: DSN })
+    for (const fehlt of ['link.com', 'maps.googleapis.com', 'https://*.stripe.com']) expect(policy).not.toContain(fehlt)
+  })
+
+  it('Gegenprobe: ein Stripe-Host in einer fremden Anweisung oder ein fehlender schlägt an', () => {
+    const policy = baueCsp({ melden: false })
+    expect(stripeJeAnweisung(policy.replace("img-src 'self'", "img-src 'self' https://*.stripe.com"))).not.toEqual(ERWARTET)
+    expect(stripeJeAnweisung(policy.replace(' https://hooks.stripe.com', ''))).not.toEqual(ERWARTET)
+    expect(stripeJeAnweisung(policy.replace("connect-src 'self'", "connect-src 'self' https://js.stripe.com"))).not.toEqual(ERWARTET)
   })
 })
 

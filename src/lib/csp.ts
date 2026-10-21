@@ -12,10 +12,19 @@ import { z } from 'zod'
  * `'unsafe-inline'`.
  *
  * JEDER HOST HAT EINE QUELLE (nicht geraten):
- *  - https://js.stripe.com — ORIGIN in @stripe/stripe-js (dist/index.mjs):
- *    Stripe.js und seine Elemente laden von dort. Die Stripe-Doku „Content
- *    Security Policy" war beim Bau nicht erreichbar; weitere Stripe-Hosts
- *    kommen erst, wenn die Meldungen sie zeigen.
+ *  - Die Stripe-Hosts (Register G8, Ergänzung Nr. 132) — Quelle für jeden:
+ *    Stripe-Doku „Integration security guide“, Abschnitt „Content Security
+ *    Policy › Stripe.js“, docs.stripe.com/security/guide, abgerufen 21.10.2026.
+ *     - https://js.stripe.com und https://*.js.stripe.com in script-src und
+ *       frame-src: Stripe.js und die Rahmen seiner Elemente (auch ORIGIN in
+ *       @stripe/stripe-js, dist/index.mjs).
+ *     - https://api.stripe.com in connect-src: die Aufrufe von Stripe.js.
+ *     - https://hooks.stripe.com in frame-src: die Bestätigung mit 3-D-Secure.
+ *    Bewusst NICHT: https://maps.googleapis.com (nur mit eigenem Google-
+ *    Schlüssel im Address Element — wir nutzen nur das PaymentElement), die
+ *    Hosts von Link (erst, wenn Link eingeschaltet wird: docs/betrieb/
+ *    stripe-live.md, „0. Vorher“) und https://*.stripe.com in img-src (steht
+ *    in der Doku nur für Checkout und die Connect-Komponenten).
  *  - die Kartenkacheln — die Herkunft von KARTEN_KACHELN.url
  *    (src/lib/hoefe-anzeige.ts); tests/csp.test.ts hält beide gleich.
  *  - https://*.public.blob.vercel-storage.com — Fotos aus dem Bildspeicher
@@ -33,6 +42,9 @@ export const CSP_BERICHT_PFAD = '/api/csp-bericht'
 export const CSP_BERICHT_GRUPPE = 'csp'
 
 const STRIPE_JS = 'https://js.stripe.com'
+const STRIPE_JS_UNTER = 'https://*.js.stripe.com'
+const STRIPE_API = 'https://api.stripe.com'
+const STRIPE_3DS = 'https://hooks.stripe.com'
 const BLOB_BILDER = 'https://*.public.blob.vercel-storage.com'
 const BLOB_UPLOAD = 'https://vercel.com'
 const VERCEL_TOOLBAR = 'https://vercel.live'
@@ -92,12 +104,12 @@ export function baueCsp({ melden, berichtAdresse = null, toolbar: mitToolbar = f
   const sentry = sentryHost(sentryDsn)
   const anweisungen: [string, string[]][] = [
     ['default-src', ["'self'"]],
-    ['script-src', ["'self'", "'unsafe-inline'", STRIPE_JS, ...toolbar]],
+    ['script-src', ["'self'", "'unsafe-inline'", STRIPE_JS, STRIPE_JS_UNTER, ...toolbar]],
     ['style-src', ["'self'", "'unsafe-inline'", ...toolbar]],
     ['img-src', ["'self'", 'data:', 'blob:', KARTEN_HOST, BLOB_BILDER, ...toolbar]],
     ['font-src', ["'self'", ...toolbar]],
-    ['connect-src', ["'self'", ...(sentry ? [sentry] : []), BLOB_UPLOAD, ...toolbar]],
-    ['frame-src', [STRIPE_JS, ...toolbar]],
+    ['connect-src', ["'self'", ...(sentry ? [sentry] : []), BLOB_UPLOAD, STRIPE_API, ...toolbar]],
+    ['frame-src', [STRIPE_JS, STRIPE_JS_UNTER, STRIPE_3DS, ...toolbar]],
     ['worker-src', ["'self'", 'blob:']],
     ['object-src', ["'none'"]],
     ['base-uri', ["'self'"]],
