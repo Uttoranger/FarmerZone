@@ -243,11 +243,9 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
  * offline" verschickt, würde mehr beschädigen als erklären.
  */
 export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?: string }> {
-  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
   const frisch = await verlangeFrischeBestaetigung()
   if ('error' in frisch) return { error: frisch.error }
-  const guard = await verlangeAdminAktion()
-  if ('error' in guard) return { error: guard.error }
 
   const farm = await prisma.farm.findUnique({ where: { id: farmId }, select: { slug: true } })
   if (!farm) return { error: 'Hof nicht gefunden.' }
@@ -282,11 +280,9 @@ export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?
  * Status-Beiträge, Abos (am Hof) sowie Sessions und Accounts (am User).
  */
 export async function rejectFarmAction(farmId: string): Promise<{ error?: string }> {
-  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
   const frisch = await verlangeFrischeBestaetigung()
   if ('error' in frisch) return { error: frisch.error }
-  const guard = await verlangeAdminAktion()
-  if ('error' in guard) return { error: guard.error }
 
   const farm = await prisma.farm.findUnique({
     where: { id: farmId },

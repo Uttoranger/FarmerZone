@@ -18,6 +18,7 @@ import { ABMELDEN_FEHLGESCHLAGEN, ABMELDEN_IN_VORSCHAU, fuehreAbmeldenAus } from
 const signOut = vi.fn()
 const toast = vi.fn()
 const hofShellProps: Array<{ onAbmelden?: () => void }> = []
+const adminShellProps: Array<{ onAbmelden?: () => void }> = []
 
 vi.mock('@/lib/auth-client', () => ({ signOut: () => signOut() }))
 vi.mock('sonner', () => ({ toast: Object.assign((satz: string) => toast(satz), { error: (satz: string) => toast(satz) }) }))
@@ -36,6 +37,14 @@ vi.mock('@/components/shells/hof-shell', () => ({
   },
 }))
 
+// Ebenso die AdminShell (Nr. 126): Auch dort sitzt vor der Vorschau ein echter Admin.
+vi.mock('@/components/shells/admin-shell', () => ({
+  AdminShell: (props: { onAbmelden?: () => void; children?: ReactNode }) => {
+    adminShellProps.push(props)
+    return createElement('div', { 'data-admin-shell': '' }, props.children)
+  },
+}))
+
 function schritte(abmelden: () => Promise<unknown>, ersatz?: () => void) {
   return { abmelden: vi.fn(abmelden), beiFehler: vi.fn(), danach: vi.fn(), ersatz }
 }
@@ -43,6 +52,7 @@ function schritte(abmelden: () => Promise<unknown>, ersatz?: () => void) {
 beforeEach(() => {
   vi.clearAllMocks()
   hofShellProps.length = 0
+  adminShellProps.length = 0
 })
 
 describe('fuehreAbmeldenAus', () => {
@@ -98,10 +108,24 @@ describe('Shell-Vorschau unter /intern', () => {
     expect(signOut).not.toHaveBeenCalled()
   }, 30_000)
 
+  it('die AdminShell bekommt einen Ersatz: Hinweis statt Abmelden (Nr. 126)', async () => {
+    const { ShellVorschau } = await import('@/app/intern/bausteine/shell/[variante]/shell-vorschau')
+    renderToStaticMarkup(createElement(ShellVorschau, { variante: 'admin' }))
+    const onAbmelden = adminShellProps.at(-1)?.onAbmelden
+    expect(onAbmelden).toBeTypeOf('function')
+
+    onAbmelden?.()
+
+    expect(toast).toHaveBeenCalledWith(ABMELDEN_IN_VORSCHAU)
+    expect(signOut).not.toHaveBeenCalled()
+  }, 30_000)
+
   it('Gegenprobe: die Kunden-Vorschau rendert keine HofShell', async () => {
     const { ShellVorschau } = await import('@/app/intern/bausteine/shell/[variante]/shell-vorschau')
     const html = renderToStaticMarkup(createElement(ShellVorschau, { variante: 'kunde' }))
     expect(html).not.toContain('data-hof-shell')
+    expect(html).not.toContain('data-admin-shell')
     expect(hofShellProps).toHaveLength(0)
+    expect(adminShellProps).toHaveLength(0)
   }, 30_000)
 })

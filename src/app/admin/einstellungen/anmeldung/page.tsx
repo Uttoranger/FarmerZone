@@ -65,7 +65,7 @@ export default async function AdminAnmeldungPage(): Promise<React.JSX.Element> {
         jetztText={anmeldeZeitpunkt(jetzt)}
       />
       {/* Der Baustein trägt seine eigene Überschrift „Angemeldete Geräte". */}
-      <AngemeldeteGeraete zeilen={geraete} />
+      <AngemeldeteGeraete zeilen={geraete} fuerAdmin />
       <p className="text-[12.5px] leading-snug text-muted-foreground">{T.regel}</p>
     </div>
   )

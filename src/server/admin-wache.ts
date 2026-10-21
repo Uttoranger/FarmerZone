@@ -214,6 +214,11 @@ export async function verlangeAdminAktion(optionen: AdminWacheOptionen = {}): Pr
  * zurück. Sonst `{ error: 'frisch' }`: useFrischBestaetigt
  * (src/components/admin/frisch-bestaetigen.tsx) öffnet dann den Dialog und
  * wiederholt die Aktion nach der Bestätigung genau einmal.
+ *
+ * Eine heikle Aktion ruft NUR diese Wache (Nr. 126): Sie fragt dieselbe
+ * `pruefe()` wie verlangeAdminAktion und gibt `userId` und `sitzungId` mit —
+ * eine zweite Wache dahinter läse dieselbe Datenbank noch einmal und könnte
+ * nichts Neues sagen (tests/admin-heikel-eine-wache.test.ts).
  */
 export async function verlangeFrischeBestaetigung(
   optionen: AdminWacheOptionen = {}

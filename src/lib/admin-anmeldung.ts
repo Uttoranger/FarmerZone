@@ -56,6 +56,13 @@ export const ADMIN_PFAD = {
   bestaetigen: '/admin/bestaetigen',
 } as const
 
+/**
+ * So lange bleibt „Mit Passkey bestätigen“ nach der Bestätigung eines Exports
+ * gesperrt (Nr. 126): Die Seite bleibt beim Download stehen, ein zweiter Klick
+ * finge sonst eine zweite Bestätigung und einen zweiten Download an.
+ */
+export const DOWNLOAD_SPERRE_MS = 3000
+
 /** Antwort einer Admin-Aktion, die erst nach einer frischen Bestätigung geht — useFrischBestaetigt öffnet dann den Dialog. */
 export const FRISCH_FEHLER = 'frisch'
 
@@ -276,6 +283,8 @@ export const ADMIN_ANMELDEN_FEHLER = {
   ersatzcodeFalsch: 'Diese Kombination aus E-Mail und Ersatzcode passt nicht.',
   zuViele: 'Das waren zu viele Versuche. Warte eine Stunde und probier es dann noch einmal.',
   nichtVerfuegbar: 'Die Anmeldung mit Passkey ist gerade nicht verfügbar. Versuch es später noch einmal.',
+  /** Zweiter Einrichtversuch auf demselben Gerät (Nr. 126): Der Browser kennt den Passkey des Kontos schon. */
+  schonRegistriert: 'Dieses Gerät hat schon einen Passkey für dein Konto. Nimm ein anderes Gerät oder melde dich mit dem Passkey an.',
   allgemein: 'Das hat nicht geklappt. Versuch es noch einmal.',
 } as const
 
@@ -305,6 +314,9 @@ export function passkeyFehlerText(fehler: { status?: number } | null | undefined
       return ADMIN_ANMELDEN_FEHLER.nichtVerfuegbar
     case 'PASSKEY_NICHT_ERLAUBT':
       return REGISTRIERUNG_GESPERRT
+    // InvalidStateError des Browsers: @simplewebauthn/browser nennt ihn so, der Passkey-Client reicht den Code durch.
+    case 'ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED':
+      return ADMIN_ANMELDEN_FEHLER.schonRegistriert
     case 'AUTH_CANCELLED':
     case 'REGISTRATION_CANCELLED':
     case 'ERROR_CEREMONY_ABORTED':
@@ -387,6 +399,8 @@ export const FRISCH_TEXT = {
   nichtBestaetigt: 'Nicht bestätigt – die Aktion ist nicht passiert.',
   seitentitel: 'Bestätigen',
   seitenSatz: 'Der Download geht erst nach einer frischen Bestätigung mit deinem Passkey.',
+  /** Nach der Bestätigung eines Exports (role="status"): Der Browser lädt die Datei, die Seite bleibt stehen. */
+  downloadStartet: 'Der Download startet …',
   weiter: 'Weiter',
 } as const
 

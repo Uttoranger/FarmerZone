@@ -3,7 +3,7 @@
 import { revalidatePath, updateTag } from 'next/cache'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
+import { verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { ladeHoefeFuerFestschreiben, ladeHoefeFuerGruendung, leseGruendungEinstellung } from '@/server/queries/admin'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { STARTSEITE_CACHE_TAG } from '@/lib/startseite-gestalten'
@@ -77,11 +77,9 @@ function revalidiereGruendung(): void {
  * das Ende bleibt gespeichert — eine spätere Wiederaufnahme wird nie kürzer.
  */
 export async function nimmAusGruendung(eingabe: unknown): Promise<Ergebnis> {
-  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
   const frisch = await verlangeFrischeBestaetigung()
   if ('error' in frisch) return { error: frisch.error }
-  const guard = await verlangeAdminAktion()
-  if ('error' in guard) return { error: guard.error }
 
   const parsed = nimmAusGruendungSchema.safeParse(eingabe)
   if (!parsed.success) return { error: GRUENDUNG_EINGABE_UNGUELTIG }
@@ -98,7 +96,7 @@ export async function nimmAusGruendung(eingabe: unknown): Promise<Ergebnis> {
 
     const { count } = await tx.farm.updateMany({
       where: { id: farmId, gruendungAusgenommen: false, approvedAt: { not: null }, archivedAt: null },
-      data: { gruendungAusgenommen: true, gruendungPlatz: null, gruendungGeaendertAm: new Date(), gruendungGeaendertVonUserId: guard.userId },
+      data: { gruendungAusgenommen: true, gruendungPlatz: null, gruendungGeaendertAm: new Date(), gruendungGeaendertVonUserId: frisch.userId },
     })
     return count === 0 ? { error: GRUENDUNG_AUSNEHMEN_GEAENDERT } : { ok: true }
   })
@@ -117,11 +115,9 @@ export async function nimmAusGruendung(eingabe: unknown): Promise<Ergebnis> {
  * Bedingt geschrieben (`gruendungAusgenommen: true`).
  */
 export async function nimmWiederAuf(eingabe: unknown): Promise<Ergebnis> {
-  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
   const frisch = await verlangeFrischeBestaetigung()
   if ('error' in frisch) return { error: frisch.error }
-  const guard = await verlangeAdminAktion()
-  if ('error' in guard) return { error: guard.error }
 
   const parsed = nimmWiederAufSchema.safeParse(eingabe)
   if (!parsed.success) return { error: GRUENDUNG_EINGABE_UNGUELTIG }
@@ -157,7 +153,7 @@ export async function nimmWiederAuf(eingabe: unknown): Promise<Ergebnis> {
 
       const { count } = await tx.farm.updateMany({
         where: { id: farmId, gruendungAusgenommen: true, istTesthof: false, approvedAt: { not: null }, archivedAt: null },
-        data: { gruendungAusgenommen: false, ...platz, gruendungGeaendertAm: new Date(), gruendungGeaendertVonUserId: guard.userId },
+        data: { gruendungAusgenommen: false, ...platz, gruendungGeaendertAm: new Date(), gruendungGeaendertVonUserId: frisch.userId },
       })
       return count === 0 ? { error: GRUENDUNG_AUSNEHMEN_GEAENDERT } : { ok: true }
     })
@@ -184,11 +180,9 @@ export async function nimmWiederAuf(eingabe: unknown): Promise<Ergebnis> {
  * Keine Nachricht, keine Mail: Für die Höfe ändert sich nur das Datum.
  */
 export async function schreibeZusagenFest(eingabe: unknown): Promise<Ergebnis> {
-  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
   const frisch = await verlangeFrischeBestaetigung()
   if ('error' in frisch) return { error: frisch.error }
-  const guard = await verlangeAdminAktion()
-  if ('error' in guard) return { error: guard.error }
 
   const parsed = schreibeZusagenFestSchema.safeParse(eingabe)
   if (!parsed.success) return { error: GRUENDUNG_EINGABE_UNGUELTIG }
@@ -208,7 +202,7 @@ export async function schreibeZusagenFest(eingabe: unknown): Promise<Ergebnis> {
       // die Migration sie an; fehlt sie doch, gibt es nichts festzuschreiben.
       const { count } = await tx.plattformEinstellung.updateMany({
         where: { id: PLATTFORM_EINSTELLUNG_ID, gruendungFestAm: null },
-        data: { gruendungFestAm: new Date(), geaendertVonUserId: guard.userId },
+        data: { gruendungFestAm: new Date(), geaendertVonUserId: frisch.userId },
       })
       if (count === 0) return { error: TEXT.festschreibenSchon }
 
@@ -261,11 +255,9 @@ function revalidiereTesthof(slug: string): void {
  * markieren ändert nichts, auch nicht „geändert am“. Keine Nachricht an den Hof.
  */
 export async function markiereAlsTesthof(eingabe: unknown): Promise<Ergebnis> {
-  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
   const frisch = await verlangeFrischeBestaetigung()
   if ('error' in frisch) return { error: frisch.error }
-  const guard = await verlangeAdminAktion()
-  if ('error' in guard) return { error: guard.error }
 
   const parsed = markiereAlsTesthofSchema.safeParse(eingabe)
   if (!parsed.success) return { error: GRUENDUNG_EINGABE_UNGUELTIG }
@@ -286,11 +278,11 @@ export async function markiereAlsTesthof(eingabe: unknown): Promise<Ergebnis> {
       data: {
         istTesthof: true,
         testhofGeaendertAm: jetzt,
-        testhofGeaendertVonUserId: guard.userId,
+        testhofGeaendertVonUserId: frisch.userId,
         gruendungAusgenommen: true,
         gruendungPlatz: null,
         gruendungGeaendertAm: jetzt,
-        gruendungGeaendertVonUserId: guard.userId,
+        gruendungGeaendertVonUserId: frisch.userId,
       },
     })
     if (count === 0) return { error: GRUENDUNG_AUSNEHMEN_GEAENDERT }
@@ -310,11 +302,9 @@ export async function markiereAlsTesthof(eingabe: unknown): Promise<Ergebnis> {
  * geschrieben (`istTesthof: true`): Zweimal zurücknehmen ändert nichts.
  */
 export async function nimmTesthofZurueck(eingabe: unknown): Promise<Ergebnis> {
-  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
   const frisch = await verlangeFrischeBestaetigung()
   if ('error' in frisch) return { error: frisch.error }
-  const guard = await verlangeAdminAktion()
-  if ('error' in guard) return { error: guard.error }
 
   const parsed = nimmTesthofZurueckSchema.safeParse(eingabe)
   if (!parsed.success) return { error: GRUENDUNG_EINGABE_UNGUELTIG }
@@ -324,7 +314,7 @@ export async function nimmTesthofZurueck(eingabe: unknown): Promise<Ergebnis> {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${GRUENDUNGSPLAETZE_SPERRE})`
     const { count } = await tx.farm.updateMany({
       where: { id: farmId, istTesthof: true },
-      data: { istTesthof: false, testhofGeaendertAm: new Date(), testhofGeaendertVonUserId: guard.userId },
+      data: { istTesthof: false, testhofGeaendertAm: new Date(), testhofGeaendertVonUserId: frisch.userId },
     })
     if (count === 0) return { error: GRUENDUNG_AUSNEHMEN_GEAENDERT }
     const { slug } = await tx.farm.findUniqueOrThrow({ where: { id: farmId }, select: { slug: true } })

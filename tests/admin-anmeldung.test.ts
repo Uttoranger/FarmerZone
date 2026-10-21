@@ -6,6 +6,8 @@
  * frische Bestätigung (Fall c), 12 Stunden Admin-Sitzung.
  */
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   ADMIN_ANMELDEN_FEHLER,
   REGISTRIERUNG_GESPERRT,
@@ -20,7 +22,8 @@ import {
   sichererWeiterPfad,
   type RegistrierungsLage,
 } from '@/lib/admin-anmeldung'
-import { ERSATZCODE_ALPHABET, ERSATZCODE_ANZAHL, ersatzcodeDatei, ersatzcodeHash, erzeugeErsatzcode, erzeugeErsatzcodes, normalisiereErsatzcode } from '@/lib/ersatzcodes'
+import { ERSATZCODE_ALPHABET, ERSATZCODE_ANZAHL, ersatzcodeAnmeldenSchema, ersatzcodeDatei, ersatzcodeHash, erzeugeErsatzcode, erzeugeErsatzcodes, normalisiereErsatzcode } from '@/lib/ersatzcodes'
+import { emailSchema } from '@/schemas/email'
 
 const JETZT = new Date('2026-10-20T10:00:00Z')
 const MINUTE = 60_000
@@ -164,6 +167,23 @@ describe('passkeyFehlerText', () => {
     expect(passkeyFehlerText({ status: 429 })).toBe(ADMIN_ANMELDEN_FEHLER.zuViele)
     expect(passkeyFehlerText({ status: 500 })).toBe(ADMIN_ANMELDEN_FEHLER.allgemein)
   })
+
+  // Zweiter Einrichtversuch auf demselben Gerät (Nr. 126): Der Browser kennt die Passkeys des Kontos
+  // (excludeCredentials) und wirft InvalidStateError; @simplewebauthn/browser macht daraus diesen Code,
+  // und der Passkey-Client reicht ihn mit Status 400 weiter.
+  it('Gerät hat den Passkey schon: ein eigener Satz mit Ausweg statt „Das hat nicht geklappt“', () => {
+    const satz = passkeyFehlerText({ code: 'ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED', status: 400 } as { status: number })
+
+    expect(satz).toBe('Dieses Gerät hat schon einen Passkey für dein Konto. Nimm ein anderes Gerät oder melde dich mit dem Passkey an.')
+    expect(satz).toBe(ADMIN_ANMELDEN_FEHLER.schonRegistriert)
+    expect(satz).not.toBe(ADMIN_ANMELDEN_FEHLER.allgemein)
+  })
+
+  it('Gegenprobe: Der Code ist wirklich der des Passkey-Clients (Version 1.6.23 nachgelesen) und des Browser-Pakets', () => {
+    const client = readFileSync(join(process.cwd(), 'node_modules/@better-auth/passkey/dist/client.mjs'), 'utf8')
+    expect(client).toContain('e.code === "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED"')
+    expect(client).toMatch(/code: e\.code,[\s\S]{0,120}status: 400/)
+  })
 })
 
 describe('Ersatzcodes', () => {
@@ -201,6 +221,36 @@ describe('Ersatzcodes', () => {
     expect(a).not.toBe(await ersatzcodeHash('geheim', 'konto-b', 'JMEA-QUFD'))
     expect(a).not.toBe(await ersatzcodeHash('anderes', 'konto-a', 'JMEA-QUFD'))
     expect(a.toUpperCase()).not.toContain('JMEA')
+  })
+
+  describe('Systemgrenze der Anmeldung mit Ersatzcode: die Adresse', () => {
+    const parse = (email: unknown) => ersatzcodeAnmeldenSchema.safeParse({ email, code: 'JMEA-QUFD' })
+
+    it('eine gültige Adresse geht durch emailSchema: ohne Ränder, klein geschrieben', () => {
+      const geprueft = parse('  Admin@Example.COM ')
+
+      expect(geprueft.success && geprueft.data.email).toBe('admin@example.com')
+      expect(geprueft.success && geprueft.data.email).toBe(emailSchema().parse('  Admin@Example.COM '))
+    })
+
+    it('eine Adresse mit falschem Format wird nicht abgewiesen, sondern bleibt eine unbekannte Adresse: dieselbe allgemeine Antwort, nichts zum Ablesen', () => {
+      for (const roh of ['kein format', 'ohne-at.example.com', '@example.com', ' Zwei@@Example.com ']) {
+        const geprueft = parse(roh)
+        expect(geprueft.success, roh).toBe(true)
+        // Wie vor Nr. 126 ohne Rand und klein — der Endpunkt sucht dann ohne Treffer und antwortet wie bei jeder unbekannten Adresse.
+        expect(geprueft.success && geprueft.data.email, roh).toBe(roh.trim().toLowerCase())
+      }
+    })
+
+    it('zu lang oder gar keine Zeichenkette: ebenfalls kein eigener Fehler, die Adresse ist höchstens 254 Zeichen lang', () => {
+      const lang = parse(`${'a'.repeat(300)}@example.com`)
+      expect(lang.success && lang.data.email.length).toBeLessThanOrEqual(254)
+      expect(parse(42).success && parse(42)).toMatchObject({ data: { email: '' } })
+    })
+
+    it('der Code bleibt eine Zeichenkette bis 40 Zeichen', () => {
+      expect(ersatzcodeAnmeldenSchema.safeParse({ email: 'admin@example.com', code: 'x'.repeat(41) }).success).toBe(false)
+    })
   })
 
   it('die Datei enthält die Codes und keinen Namen eines Kontos', () => {

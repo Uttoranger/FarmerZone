@@ -5499,6 +5499,16 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Tests:** `pool: 'forks'` steht jetzt ausdrücklich in `vitest.config.ts` (Regel in TESTING_GUIDELINES §4) — `tests/sharp-lader-sperre.test.ts` sperrt die Lader für den ganzen Prozess, mit Worker-Threads scheiterte daneben `tests/marke-bilder.test.ts` in zwei von drei Läufen.
 - **Für die Zukunft:** Next.js kündigt Sicherheits-Releases vorab an. Wer die Ankündigung sieht, plant das Update ein, statt auf die 14 Tage zu warten — Vorschlag für eine Ergänzung von G6 steht im PR, nicht im Register.
 
+## Admin-Nacharbeit aus Nr. 115 (Register N20; Nr. 126, Lauf 19, 21.10.2026)
+
+- **Eine Wache je heikler Aktion:** Die acht heiklen Actions (`revokeFarmApprovalAction`, `rejectFarmAction`, die fünf der Gründung, `markiereErstattungErledigt`) riefen nach `verlangeFrischeBestaetigung` noch einmal `verlangeAdminAktion` — dieselbe `pruefe()`, dieselbe Datenbank, nichts Neues. Jetzt steht nur noch die eine Wache; `userId` kommt aus ihrem Ergebnis. Die drei CSV-Exporte bleiben bei `verlangeAdminAktion`, dann `frischOderBestaetigen` (nur so kommt die Ablehnung mit dem Kopf der Route). `tests/admin-heikel-eine-wache.test.ts` zählt die Aufrufe an der echten Wache, `tests/frisch-bestaetigung-wache.test.ts` hält es am Quelltext fest.
+- **Ein fail-closed-Helfer:** `adminBremseVoll` (vorher wörtlich zweimal: `auth.ts` und `admin-anmeldung.ts`) steht in `src/server/admin-bremse.ts`. Bei einem Fehler oder nach `DB_BREMSE_ZEITLIMIT_MS` gilt die Bremse als voll; nach Sentry gehen nur Art des Fehlers und Zweck. Das Gegenstück zur zweiten Stufe über alle Instanzen, die bei einem Ausfall offen lässt (R1).
+- **Adresse beim Ersatzcode:** `ersatzcodeAnmeldenSchema` nimmt `emailSchema()`. Eine Eingabe mit falschem Format wird nicht mit einem eigenen Fehler abgewiesen (`.catch`), sondern bleibt eine unbekannte Adresse — dieselbe Antwort, eine eigene Bremse je Eingabe wie vorher. Wäre sie ein 400, ließe sich an der Antwort ablesen, ob eine Eingabe als Adresse gilt.
+- **Abmelden im Admin-Bereich:** Die AdminShell hatte keinen Weg dafür — ein Betreiber ohne Hof gar keinen. Jetzt ein Knopf neben der Plakette (ab 768 px) und ein Menü hinter der Plakette (darunter); Ziel `/login/admin`, Ablauf `fuehreAbmeldenAus` wie in der HofShell, in der Vorschau unter /intern der Ersatz. Die Tippfläche der Reiter ist 44 px (sichtbar 38).
+- **Zweiter Einrichtversuch:** Der Browser meldet `InvalidStateError`, `@simplewebauthn/browser` macht daraus `ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED`, der Passkey-Client reicht den Code mit Status 400 durch (nachgelesen in `@better-auth/passkey` 1.6.23); `passkeyFehlerText` hat dafür einen eigenen Satz.
+- **Download:** Auf /admin/bestaetigen steht nach der Bestätigung „Der Download startet …“ (`role="status"`), der Knopf bleibt 3 Sekunden gesperrt.
+- **Geräte-Texte:** Hinweis und Zusatz im Blatt tragen im Admin-Bereich den Blick auf die Passkeys (`GERAETE_TEXT.admin`, `geraeteHinweise`, Parameter `fuerAdmin`); für Höfe bleibt alles, wie es war.
+
 ## Nützliche Befehle
 
 ```bash
