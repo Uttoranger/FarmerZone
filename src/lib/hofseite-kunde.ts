@@ -412,13 +412,18 @@ export type BeitragsAnordnung<B> = {
  * gelöscht, anderer Hof, unbekannt), zeigt die Übersicht alles wie ohne
  * Kennung und sagt nur, dass der Beitrag nicht mehr aktuell ist. Zusammen
  * stehen nie mehr als fünf Beiträge da.
+ *
+ * Scheiterte das Laden der Beiträge (`beitraegeFehler`, Nr. 134), weiß die Seite
+ * nichts über den Beitrag aus der Adresse — er kann aktiv sein. Dann entfällt
+ * der Satz, und die Übersicht zeigt sich wie ohne Beiträge.
  */
 export function ordneBeitraege<B extends { id: string }>(
   beitraege: readonly B[],
-  kennung: string | null
+  kennung: string | null,
+  beitraegeFehler = false
 ): { anordnung: BeitragsAnordnung<B> | null; nichtMehrAktuell: boolean } {
   const geteilt = kennung === null ? undefined : beitraege.find((b) => b.id === kennung)
-  const nichtMehrAktuell = kennung !== null && geteilt === undefined
+  const nichtMehrAktuell = !beitraegeFehler && kennung !== null && geteilt === undefined
   const [neuester] = beitraege
   if (neuester === undefined) return { anordnung: null, nichtMehrAktuell }
   const karte = geteilt ?? neuester

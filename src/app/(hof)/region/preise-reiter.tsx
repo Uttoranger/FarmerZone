@@ -50,7 +50,7 @@ export async function PreiseReiter({ farm, suche }: { farm: { id: string; name: 
   return (
     <div className={REGION_RAHMEN}>
       <div className="flex flex-col gap-4 md:gap-[18px]">
-        <RegionKopf reiter="preise" km={filter.km} ladePunkt />
+        <RegionKopf reiter="preise" km={filter.km} ansicht={filter.ansicht} ladePunkt />
         <LadeInhalt>{inhalt}</LadeInhalt>
       </div>
     </div>

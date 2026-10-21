@@ -165,7 +165,7 @@ describe('Umfeld des Pilothofs im Testdatensatz', () => {
 
   it('die Box schneidet keinen Hof knapp an der Grenze ab — die exakte Entfernung entscheidet', async () => {
     const zehn = (await umfeld(10)).hoefe.map((h) => h.slug)
-    expect(zehn).toContain('kirchbauernhof') // 9,80 km
+    expect(zehn).toContain('kirchbauernhof') // 9,81 km
     expect(zehn).not.toContain('wengerhof') // 10,24 km
     const fuenfundzwanzig = (await umfeld(25)).hoefe.map((h) => h.slug)
     expect(fuenfundzwanzig).toContain('weilbachhof') // 24,41 km

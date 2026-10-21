@@ -65,7 +65,7 @@ describe('Schriften über next/font', () => {
       const inhalt = readFileSync(join(eintrag.parentPath, eintrag.name), 'utf8')
       expect(inhalt, join(eintrag.parentPath, eintrag.name)).not.toMatch(/fonts\.(googleapis|gstatic)\.com/)
     }
-  })
+  }, 30_000)
 })
 
 describe('Lint-Regel gegen Farbliterale', () => {

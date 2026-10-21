@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { wienJetzt } from '@/lib/hofuebersicht'
+import { ausgebuchteTage } from '@/server/abholfenster'
 import { PRODUCT_ORDER_BY } from './products'
 import {
   IN_LISTEN_SICHTBAR,
@@ -21,14 +22,17 @@ import {
  * freigeschaltet, stillgelegt) — dann zeigt Region einen Satz statt der Karte.
  */
 export async function ladeEigenenListeneintrag(farmId: string): Promise<HofUebersichtEintrag | null> {
-  const [hof, zeilen] = await Promise.all([
+  const jetzt = new Date()
+  const [hof, zeilen, ausgebucht] = await Promise.all([
     prisma.farm.findFirst({ where: { ...IN_LISTEN_SICHTBAR, id: farmId }, select: UEBERSICHT_HOF_SELECT }),
     prisma.product.findMany({
       where: { isAvailable: true, farmId, farm: IN_LISTEN_SICHTBAR },
       orderBy: PRODUCT_ORDER_BY,
       select: UEBERSICHT_ZEILEN_SELECT,
     }),
+    // Die vollen Abholfenster des eigenen Hofs, wie auf /hoefe (Register N19, Ergänzung 21.10.2026).
+    ausgebuchteTage([farmId], jetzt),
   ])
   if (!hof) return null
-  return baueHofUebersicht([hof], zeilen, wienJetzt())[0] ?? null
+  return baueHofUebersicht([hof], zeilen, wienJetzt(jetzt), ausgebucht)[0] ?? null
 }

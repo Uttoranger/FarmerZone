@@ -20,7 +20,9 @@ Stand: 2026-10. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 | `stripe` | ^22.1.1 | Connect + Webhooks |
 | `sharp` | **^0.35.5** | Nur serverseitig (Upload-Verarbeitung, Teilen-Bild, Skripte). Override `sharp@<0.35.5` in `pnpm-workspace.yaml`, damit auch `next` kein älteres zieht. Fremde Formate: ARCHITECTURE, Uploads. |
 | `@vercel/blob` | ^2.8.0 | Verlangt undici `^6.23.0`; in der 6er-Reihe hält es der Override `undici@<6.27.0: '^6.27.0'`. Bringt `@vercel/oidc` mit. |
-| `vitest` | ^4.1.10 | Node-Umgebung, kein jsdom |
+| `vitest` | ^4.1.10 | Node-Umgebung; die eine Ausnahme ist `tests/hydrieren.test.ts` mit jsdom (Nr. 135, G6-Ergänzung 21.10.2026) |
+| `jsdom` | ^30.1.2 (Entwicklungspaket) | Nur für `tests/hydrieren.test.ts` (`// @vitest-environment jsdom`, TESTING_GUIDELINES §1). Verlangt Node ≥ 22.22.2 (`engines`); 30.1.3 ist noch keine 14 Tage alt und braucht ein `undici`, das es auch nicht ist. |
+| `yaml` | ^2.9.1 (Entwicklungspaket) | YAML-Parser der Wachen über `.github/workflows/` (`tests/yaml-lader.ts`, `parse`). Liest YAML 1.2: `on` bleibt der Text „on“. Ohne Abhängigkeiten; ersetzt den Umweg über das `js-yaml` von ESLint. |
 | `pnpm` | **10.33.0** | Exklusiv |
 | Node | **22** | CI-Version |
 
@@ -58,6 +60,7 @@ Stand: 2026-10. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
   eigene Schreibung". Es **wirft** außerhalb einer Server Action, also auch in
   Route-Handlern — dort bleibt `revalidateTag` mit zweitem Argument. Dazu neu:
   `refresh()` aktualisiert nur den Client-Cache, keine Daten.
+- Ein Helfer, der in Action, Route, Cron und beim Rendern einer Seite gleich läuft, nimmt `revalidateTag(tag, { expire: 0 })` über `nachDerAntwort` statt `updateTag`; beim Rendern wirft jede Cache-Entwertung (src/server/hofliste-erneuern.ts, N19-Ergänzung 21.10.2026).
 - **`revalidatePath` erreicht keinen `unstable_cache`-Eintrag.** Wer einen solchen
   Cache anlegt, gibt ihm ein `tags` — ohne Etikett gibt es keinen Weg, ihn vor
   Ablauf zu leeren. Vorbild: `src/app/(public)/hoefe/page.tsx` mit

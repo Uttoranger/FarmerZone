@@ -48,12 +48,25 @@ describe('ladeLaufendenBeitrag und ladeDeinenBeitrag — eine Regel für den lau
       titel: 'Die ersten Kürbisse sind da',
       anlass: 'NEW_SEASON',
       foto: null,
+      fotoAusschnitt: null,
       veroeffentlicht: neu.publishedAt?.toISOString(),
       endet: neu.expiresAt?.toISOString(),
       emailAnzahl: 3,
       whatsappAnzahl: 2,
     })
     expect((await ladeDeinenBeitrag(farm.id, JETZT)).aktiv).toEqual(laufend)
+  })
+
+  // Heute zeigt das Foto mit demselben Ausschnitt wie die Hofseite (Nr. 134): gelesen und geprüft wie dort.
+  it('das Foto kommt mit seinem Ausschnitt — ein ungültiger Wert wird zu null, wie auf der Hofseite', async () => {
+    const { farm } = await erstelleHof()
+    const ausschnitt = { fokusX: 30, fokusY: 70, zoom: 150, filter: 'WARM' }
+    await beitrag(farm.id, 'Mit Foto', { photoUrl: '/categories/gemuese.webp', fotoAusschnitt: ausschnitt })
+    expect((await ladeLaufendenBeitrag(farm.id, JETZT))?.fotoAusschnitt).toEqual(ausschnitt)
+    expect((await getActiveStatusPosts(farm.id, 1))[0].fotoAusschnitt).toEqual(ausschnitt)
+
+    await prisma.statusPost.updateMany({ where: { farmId: farm.id }, data: { fotoAusschnitt: { fokusX: 500, zoom: 1 } } })
+    expect((await ladeLaufendenBeitrag(farm.id, JETZT))?.fotoAusschnitt).toBeNull()
   })
 
   // Die Karte sagt „steht oben auf deiner Hofseite“: Bei gleicher Veröffentlichungszeit muss

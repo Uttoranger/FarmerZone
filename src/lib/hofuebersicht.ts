@@ -17,6 +17,7 @@ import type { ProductCategoryValue } from '@/schemas/product'
 import type { AbholungWahl, HoefeFilter } from '@/schemas/hoefe-filter'
 import { ANZEIGE_BEREICHE, anzeigeBereichVon, type AnzeigeBereich, type ProductSubcategoryValue } from '@/lib/taxonomie'
 import { DAY_NAMES } from '@/lib/pickup-slot-rules'
+import { ABHOL_VORLAUF_TAGE } from '@/lib/pickup-days'
 import { istFensterBestellbar } from '@/lib/abholfenster'
 import { wienerZeitpunkt } from '@/lib/fristen'
 import { tagVersetzt, wochentagVon } from '@/lib/kalender'
@@ -29,6 +30,7 @@ import {
   filtereNachAngebot,
   istBestellbar,
   sortiereNachGrundpreis,
+  type AngebotVorhanden,
   type AngebotsZeile,
   type Grundpreis,
 } from '@/lib/bereiche-anzeige'
@@ -83,10 +85,16 @@ export type AbholFenster = {
   dayOfWeek: number
   startTime: string
   endTime: string
+  /** Die Wiener Kalendertage (JJJJ-MM-TT) im Vorlauf, an denen die Abholzeit voll
+   *  ist (`maxOrders` erreicht, Register N19, Ergänzung 21.10.2026) — nur bei
+   *  solchen Abholzeiten, sonst fehlt das Feld. Gezählt auf dem Server
+   *  (`ausgebuchteTage`, src/server/abholfenster.ts); die Regeln unten
+   *  überspringen diese Termine. */
+  ausgebuchtAm?: readonly string[]
 }
 
-/** „Jetzt" in österreichischer Ortszeit: Wochentag (0=So) + „HH:MM". */
-export type OrtsZeit = { wochentag: number; uhrzeit: string }
+/** „Jetzt" in österreichischer Ortszeit: Wiener Kalendertag (JJJJ-MM-TT), Wochentag (0=So) und „HH:MM". */
+export type OrtsZeit = { kalendertag: string; wochentag: number; uhrzeit: string }
 
 /** Löst den Moment in Europe/Vienna auf — der eine unreine Baustein. */
 export function wienJetzt(moment: Date = new Date()): OrtsZeit {
@@ -100,6 +108,7 @@ export function wienJetzt(moment: Date = new Date()): OrtsZeit {
   const wert = (typ: string) => teile.find((t) => t.type === typ)?.value ?? ''
   const wochentage = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
   return {
+    kalendertag: kalendertagInWien(moment),
     wochentag: Math.max(0, wochentage.indexOf(wert('weekday'))),
     uhrzeit: `${wert('hour')}:${wert('minute')}`,
   }
@@ -120,22 +129,18 @@ export function sammleKategorien(
 }
 
 export type NaechsteAbholung = AbholFenster & {
-  /** 0 = heute, 1 = morgen, … 6; 7 = das heutige Fenster ist schon vorbei
-   *  und kommt erst in einer Woche wieder. */
+  /** 0 = heute, 1 = morgen, … bis 13 (ABHOL_VORLAUF_TAGE): 7 = dasselbe
+   *  Fenster in einer Woche (das heutige ist schon vorbei oder voll), ab 8 ein
+   *  späterer Termin, weil die früheren voll sind (Register N19, Ergänzung
+   *  21.10.2026). */
   tageVoraus: number
+  /** Der Wiener Kalendertag des Termins (JJJJ-MM-TT). */
+  kalendertag: string
 }
 
-/**
- * Ein Sonntag in einer Woche ohne Zeitumstellung (Jänner 2026): Von dort aus
- * hat jeder Wochentag einen festen Kalendertag (bezugstag). Die Übersicht kennt
- * von „jetzt" nur Wochentag und Uhrzeit (OrtsZeit), die Regel der Kasse
- * (istFensterBestellbar) rechnet mit Kalendertag und Zeitpunkt — am selben
- * Wiener Tag ohne Umstellung kommt für jeden Tag dasselbe heraus.
- */
-const BEZUGS_SONNTAG = '2026-01-04'
-
-function bezugstag(wochentag: number): string {
-  return tagVersetzt(BEZUGS_SONNTAG, wochentag)
+/** Ist dieser Termin des Fensters voll? Die Tage zählt der Server (`ausgebuchtAm`). */
+function istAusgebucht(fenster: AbholFenster, kalendertag: string): boolean {
+  return fenster.ausgebuchtAm?.includes(kalendertag) ?? false
 }
 
 /**
@@ -144,24 +149,32 @@ function bezugstag(wochentag: number): string {
  * Bestellschluss der Kasse (istFensterBestellbar in src/lib/abholfenster.ts,
  * EINE Regel). Bis Nr. 120 zählte ein laufendes Fenster bis zu seinem Ende;
  * bestellen konnte man darin aber nicht mehr, die Übersicht versprach also
- * einen Termin, den die Kasse ablehnte. Ohne Fenster: null.
+ * einen Termin, den die Kasse ablehnte.
+ *
+ * Volle Termine (`ausgebuchtAm`, Register N19, Ergänzung 21.10.2026) zählen
+ * ebenso nicht: Gerechnet wird mit dem echten Wiener Kalendertag, nur im
+ * Vorlauf der Kasse (ABHOL_VORLAUF_TAGE) — weiter voraus kennt niemand die
+ * vollen Tage. Ohne Fenster oder sind alle Termine im Vorlauf voll: null.
  */
 export function naechsteAbholung(
   fenster: readonly AbholFenster[],
   jetzt: OrtsZeit
 ): NaechsteAbholung | null {
-  const heute = bezugstag(jetzt.wochentag)
-  const moment = wienerZeitpunkt(heute, jetzt.uhrzeit)
+  const moment = wienerZeitpunkt(jetzt.kalendertag, jetzt.uhrzeit)
   let beste: NaechsteAbholung | null = null
   for (const f of fenster) {
-    let tageVoraus = (f.dayOfWeek - jetzt.wochentag + 7) % 7
-    if (tageVoraus === 0 && !(moment && istFensterBestellbar(heute, f.startTime, moment))) tageVoraus = 7
-    if (
-      beste === null ||
-      tageVoraus < beste.tageVoraus ||
-      (tageVoraus === beste.tageVoraus && f.startTime < beste.startTime)
-    ) {
-      beste = { ...f, tageVoraus }
+    for (let tageVoraus = (f.dayOfWeek - jetzt.wochentag + 7) % 7; tageVoraus < ABHOL_VORLAUF_TAGE; tageVoraus += 7) {
+      const kalendertag = tagVersetzt(jetzt.kalendertag, tageVoraus)
+      if (tageVoraus === 0 && !(moment && istFensterBestellbar(kalendertag, f.startTime, moment))) continue
+      if (istAusgebucht(f, kalendertag)) continue
+      if (
+        beste === null ||
+        tageVoraus < beste.tageVoraus ||
+        (tageVoraus === beste.tageVoraus && f.startTime < beste.startTime)
+      ) {
+        beste = { dayOfWeek: f.dayOfWeek, startTime: f.startTime, endTime: f.endTime, tageVoraus, kalendertag }
+      }
+      break
     }
   }
   return beste
@@ -169,11 +182,15 @@ export function naechsteAbholung(
 
 /** „Heute 14:00–16:00", „Morgen …", sonst „Freitag 14:00–16:00". Bei
  *  tageVoraus 7 wäre der nackte Wochentagsname der HEUTIGE — das läse sich
- *  wie das bereits vorbeie Fenster, deshalb ausdrücklich „in einer Woche". */
+ *  wie das bereits vorbeie Fenster, deshalb ausdrücklich „in einer Woche".
+ *  Ab 8 Tagen (die früheren Termine sind voll) Wochentag und Datum aus dem
+ *  Kalendertag („Do, 22. Okt 09:00–12:00", formatTagKurz) — der Wochentag
+ *  allein meinte sonst die kommende Woche. */
 export function formatiereAbholung(a: NaechsteAbholung): string {
   if (a.tageVoraus === 0) return `Heute ${a.startTime}–${a.endTime}`
   if (a.tageVoraus === 1) return `Morgen ${a.startTime}–${a.endTime}`
   if (a.tageVoraus === 7) return `${DAY_NAMES[a.dayOfWeek]} in einer Woche, ${a.startTime}–${a.endTime}`
+  if (a.tageVoraus > 7) return `${formatTagKurz(a.kalendertag)} ${a.startTime}–${a.endTime}`
   return `${DAY_NAMES[a.dayOfWeek]} ${a.startTime}–${a.endTime}`
 }
 
@@ -195,15 +212,16 @@ export type AbholLage =
  * Die Lage zu Fenstern, Pause und Zeitpunkt — Wiener Zeit. Fehlt `fenster`
  * (ein Cache-Eintrag von vor Nr. 120 trug sie nicht), ist die Lage „keine".
  * Baut auf naechsteAbholung auf, damit Übersicht und Startseite dieselbe Zeit
- * nennen.
+ * nennen — auch das Überspringen voller Termine (N19, Ergänzung 21.10.2026):
+ * Ist das Fenster von heute voll, zeigt die Zeile das nächste freie; sind
+ * alle im Vorlauf voll, ist die Lage „keine".
  */
 export function abholLage(fenster: readonly AbholFenster[] | undefined, isPaused: boolean, jetzt: Date): AbholLage {
   if (isPaused) return { art: 'pause' }
   const naechste = naechsteAbholung(fenster ?? [], wienJetzt(jetzt))
   if (!naechste) return { art: 'keine' }
-  const kalendertag = tagVersetzt(kalendertagInWien(jetzt), naechste.tageVoraus)
   const art = naechste.tageVoraus === 0 ? 'heute' : naechste.tageVoraus === 1 ? 'morgen' : naechste.tageVoraus <= 6 ? 'wochentag' : 'spaeter'
-  return { art, fenster: naechste, kalendertag }
+  return { art, fenster: naechste, kalendertag: naechste.kalendertag }
 }
 
 /** Die Wörter der Abholzeile und der Zeilen daneben — EINE Quelle für Liste, Karussell und Pin-Vorschau. */
@@ -242,18 +260,20 @@ export function tageDerAbholwahl(wahl: AbholungWahl, jetzt: Date): string[] {
   return [tagVersetzt(heute, 6 - wochentag), tagVersetzt(heute, 7 - wochentag)]
 }
 
-/** Hat der Hof an einem dieser Kalendertage ein Fenster, das man jetzt noch bestellen kann? */
+/** Hat der Hof an einem dieser Kalendertage ein Fenster, das man jetzt noch bestellen kann — begonnen und voll zählen nicht (N19, Ergänzung 21.10.2026)? */
 export function holtAbAn(fenster: readonly AbholFenster[] | undefined, tage: readonly string[], jetzt: Date): boolean {
   return tage.some((tag) => {
     const wochentag = wochentagVon(tag)
-    return (fenster ?? []).some((f) => f.dayOfWeek === wochentag && istFensterBestellbar(tag, f.startTime, jetzt))
+    return (fenster ?? []).some(
+      (f) => f.dayOfWeek === wochentag && istFensterBestellbar(tag, f.startTime, jetzt) && !istAusgebucht(f, tag)
+    )
   })
 }
 
 /** Was der Filter „Abholung" von einem Hof braucht. */
 export type AbholHof = {
   isPaused: boolean
-  angebot: readonly unknown[]
+  angebot: AngebotVorhanden
   abholfenster?: readonly AbholFenster[]
 }
 

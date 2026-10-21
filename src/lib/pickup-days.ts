@@ -5,7 +5,13 @@ import { uhrzeitInWien } from '@/lib/fristen'
 import { tagVersetzt, wochentagVon } from '@/lib/kalender'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 
-export type WeeklySlot = { dayOfWeek: number; startTime: string; endTime: string }
+export type WeeklySlot = {
+  dayOfWeek: number
+  startTime: string
+  endTime: string
+  /** Die vollen Wiener Kalendertage im Vorlauf (Register N19, Ergänzung 21.10.2026, `ausgebuchteTage`); fehlt bei Fenstern ohne vollen Tag. */
+  ausgebuchtAm?: readonly string[]
+}
 
 /**
  * So weit voraus wird angeboten: heute und die 13 Tage danach. Gilt für die
@@ -36,7 +42,12 @@ export function formatSlotTime(t: string): string {
 
 // Nächste `count` Abholtage innerhalb von 14 Tagen. Heute zählt nur, solange
 // mindestens ein Zeitfenster noch nicht vorbei ist. Slots pro Tag nach Beginn
-// sortiert, mehrere Fenster mit " · " verbunden.
+// sortiert, mehrere Fenster mit " · " verbunden. Ein volles Fenster
+// (`ausgebuchtAm`, N19-Ergänzung 21.10.2026) fällt an seinem Tag weg; sind alle
+// Fenster eines Tages voll, fällt der Tag weg wie ein Tag ohne Fenster.
+//
+// BEKANNTE GRENZE: Heute zählt ein laufendes Fenster bis zu seinem Ende, die
+// Kasse nimmt nur bis zum Beginn an (istFensterBestellbar) — nicht Teil von Nr. 131.
 //
 // WIENER KALENDER UND UHR (Nr. 46, Runde 1), mit denselben Helfern wie die
 // Kasse (`angeboteneAbholfenster`, `abholKacheln`): Vorher galt die Uhr des
@@ -56,7 +67,7 @@ export function nextPickupDays(
 
   for (let offset = 0; offset < ABHOL_VORLAUF_TAGE && days.length < count; offset++) {
     const kalendertag = tagVersetzt(heute, offset)
-    let daySlots = slots.filter((s) => s.dayOfWeek === wochentagVon(kalendertag))
+    let daySlots = slots.filter((s) => s.dayOfWeek === wochentagVon(kalendertag) && !s.ausgebuchtAm?.includes(kalendertag))
     if (offset === 0) daySlots = daySlots.filter((s) => s.endTime > jetztHm)
     if (daySlots.length === 0) continue
 

@@ -13,7 +13,7 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { EmptyState } from '@/components/ui/empty-state'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
-import { teilenLink } from '@/lib/teilen-kanal'
+import { beitragLinkMitKanal } from '@/lib/teilen-fenster'
 import {
   WHATSAPP_VERSAND_TEXT as TEXT,
   nachSeitenEreignis,
@@ -28,6 +28,8 @@ interface Props {
   title: string
   body: string
   farmSlug: string
+  /** Steht der Beitrag auf der Hofseite? Nur dann führt der Link zu genau diesem Beitrag (Register T5). */
+  showOnFarmPage: boolean
   abonnentinnen: Abonnentin[]
   /** Wer laut Datenbank schon geöffnet bekam (Abonnements-IDs). */
   getippt: string[]
@@ -41,7 +43,7 @@ const APP_URL = typeof window !== 'undefined' ? window.location.origin : PRODUKT
  * (nachSeitenEreignis) — nie per Zeitschaltung. Der Zustand kommt vom Server:
  * Jede Antwort der Action bringt die Liste, wie sie in der Datenbank steht.
  */
-export function WhatsAppTapClient({ postId, title, body, farmSlug, abonnentinnen, getippt: anfangs }: Props) {
+export function WhatsAppTapClient({ postId, title, body, farmSlug, showOnFarmPage, abonnentinnen, getippt: anfangs }: Props) {
   const [getippt, setGetippt] = useState<string[]>(anfangs)
   const [fehler, setFehler] = useState<string | null>(null)
   const [, startTransition] = useTransition()
@@ -105,7 +107,8 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, abonnentinnen
   function buildWaUrl(person: Abonnentin): string | null {
     const firstName = person.name.split(' ')[0]
     // Mit ?k=wa: Besuche aus dieser Nachricht zählen für WhatsApp (Gate 7, T1; ohne Kennung der Person).
-    const farmUrl = teilenLink(APP_URL, farmSlug, 'wa')
+    // Dazu genau dieser Beitrag (T5), wenn er auf der Hofseite steht — dieselbe Regel wie in der Mail.
+    const farmUrl = beitragLinkMitKanal(`${APP_URL}/${farmSlug}`, { id: postId, showOnFarmPage }, 'wa')
     const message = `Hallo ${firstName}!\n\n*${title}*\n\n${body}\n\nMehr auf: ${farmUrl}`
     return whatsAppLink(person.phone, message)
   }

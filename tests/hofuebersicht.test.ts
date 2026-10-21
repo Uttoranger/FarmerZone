@@ -27,6 +27,9 @@ vi.mock('@/lib/prisma', () => ({
     // die Kategorien und Fotos seiner hinteren Produkte (siehe
     // Kommentar in queries/farm.ts).
     product: { findMany: vi.fn() },
+    // Volle Abholfenster (Nr. 131, ausgebuchteTage): ohne Höchstzahl nur die erste Abfrage.
+    pickupSlot: { findMany: vi.fn().mockResolvedValue([]) },
+    order: { groupBy: vi.fn() },
   },
 }))
 
@@ -121,7 +124,7 @@ describe('sammleKategorien', () => {
 
 describe('naechsteAbholung', () => {
   // Mittwoch, 12:00 Ortszeit.
-  const MITTWOCH_MITTAG = { wochentag: 3, uhrzeit: '12:00' }
+  const MITTWOCH_MITTAG = { kalendertag: '2026-10-14', wochentag: 3, uhrzeit: '12:00' }
 
   it('nimmt das nächste anstehende Fenster der Woche', () => {
     const a = naechsteAbholung(
@@ -160,8 +163,8 @@ describe('naechsteAbholung', () => {
   it('beginnt das Fenster in einer Minute, zählt es heute; hat es vor einer Minute begonnen, nicht mehr', () => {
     const fenster = [{ dayOfWeek: 3, startTime: '12:01', endTime: '14:00' }]
     expect(naechsteAbholung(fenster, MITTWOCH_MITTAG)).toMatchObject({ tageVoraus: 0 })
-    expect(naechsteAbholung(fenster, { wochentag: 3, uhrzeit: '12:01' })).toMatchObject({ tageVoraus: 7 })
-    expect(naechsteAbholung(fenster, { wochentag: 3, uhrzeit: '12:02' })).toMatchObject({ tageVoraus: 7 })
+    expect(naechsteAbholung(fenster, { ...MITTWOCH_MITTAG, uhrzeit: '12:01' })).toMatchObject({ tageVoraus: 7 })
+    expect(naechsteAbholung(fenster, { ...MITTWOCH_MITTAG, uhrzeit: '12:02' })).toMatchObject({ tageVoraus: 7 })
   })
 
   it('ein laufendes Fenster weicht dem nächsten bestellbaren am selben Tag', () => {
@@ -187,7 +190,7 @@ describe('naechsteAbholung', () => {
   it('über den Wochenwechsel: Samstag sieht das Sonntags-Fenster als morgen', () => {
     const a = naechsteAbholung(
       [{ dayOfWeek: 0, startTime: '09:00', endTime: '11:00' }],
-      { wochentag: 6, uhrzeit: '18:00' }
+      { kalendertag: '2026-10-17', wochentag: 6, uhrzeit: '18:00' }
     )
 
     expect(a).toMatchObject({ dayOfWeek: 0, tageVoraus: 1 })
@@ -213,20 +216,75 @@ describe('naechsteAbholung', () => {
 describe('formatiereAbholung', () => {
   it('sagt Heute, Morgen, sonst den Wochentag', () => {
     expect(
-      formatiereAbholung({ dayOfWeek: 3, startTime: '14:00', endTime: '16:00', tageVoraus: 0 })
+      formatiereAbholung({ dayOfWeek: 3, startTime: '14:00', endTime: '16:00', tageVoraus: 0, kalendertag: '2026-10-14' })
     ).toBe('Heute 14:00–16:00')
     expect(
-      formatiereAbholung({ dayOfWeek: 4, startTime: '09:00', endTime: '11:00', tageVoraus: 1 })
+      formatiereAbholung({ dayOfWeek: 4, startTime: '09:00', endTime: '11:00', tageVoraus: 1, kalendertag: '2026-10-15' })
     ).toBe('Morgen 09:00–11:00')
     expect(
-      formatiereAbholung({ dayOfWeek: 5, startTime: '14:00', endTime: '16:00', tageVoraus: 2 })
+      formatiereAbholung({ dayOfWeek: 5, startTime: '14:00', endTime: '16:00', tageVoraus: 2, kalendertag: '2026-10-16' })
     ).toBe('Freitag 14:00–16:00')
   })
 
   it('sagt beim vergangenen heutigen Fenster ausdrücklich „in einer Woche" — nie den nackten heutigen Wochentag', () => {
     expect(
-      formatiereAbholung({ dayOfWeek: 3, startTime: '08:00', endTime: '10:00', tageVoraus: 7 })
+      formatiereAbholung({ dayOfWeek: 3, startTime: '08:00', endTime: '10:00', tageVoraus: 7, kalendertag: '2026-10-21' })
     ).toBe('Mittwoch in einer Woche, 08:00–10:00')
+  })
+})
+
+// Register N19, Ergänzung 21.10.2026 (Nr. 131): Ein voller Termin (ausgebuchtAm) zählt nicht.
+describe('naechsteAbholung und formatiereAbholung — volle Abholfenster', () => {
+  // Mittwoch, 14. Okt 2026, 08:00 in Wien (Sommerzeit, UTC+2).
+  const MI_8 = new Date('2026-10-14T06:00:00Z')
+  const fenster = (dayOfWeek: number, ausgebuchtAm?: string[]) => ({
+    dayOfWeek,
+    startTime: '09:00',
+    endTime: '12:00',
+    ...(ausgebuchtAm ? { ausgebuchtAm } : {}),
+  })
+
+  it('ist das Fenster von heute voll, nennt sie das von morgen', () => {
+    const a = naechsteAbholung([fenster(3, ['2026-10-14']), fenster(4)], wienJetzt(MI_8))
+    expect(a).toMatchObject({ dayOfWeek: 4, tageVoraus: 1, kalendertag: '2026-10-15' })
+    expect(a && formatiereAbholung(a)).toBe('Morgen 09:00–12:00')
+  })
+
+  it('sind heute und morgen voll, nennt sie übermorgen', () => {
+    const a = naechsteAbholung([fenster(3, ['2026-10-14']), fenster(4, ['2026-10-15']), fenster(5)], wienJetzt(MI_8))
+    expect(a).toMatchObject({ dayOfWeek: 5, tageVoraus: 2, kalendertag: '2026-10-16' })
+    expect(a && formatiereAbholung(a)).toBe('Freitag 09:00–12:00')
+  })
+
+  it('sind alle Termine im Vorlauf voll, gilt der Hof als ohne Abholzeit', () => {
+    // Mittwochs: heute und in einer Woche — der 28. Okt liegt schon außerhalb der 14 Tage.
+    expect(naechsteAbholung([fenster(3, ['2026-10-14', '2026-10-21'])], wienJetzt(MI_8))).toBeNull()
+  })
+
+  it('liegt der nächste freie Termin 8 bis 13 Tage voraus, nennt sie Wochentag und Datum', () => {
+    const a = naechsteAbholung([fenster(4, ['2026-10-15'])], wienJetzt(MI_8))
+    expect(a).toMatchObject({ dayOfWeek: 4, tageVoraus: 8, kalendertag: '2026-10-22' })
+    expect(a && formatiereAbholung(a)).toBe('Do, 22. Okt 09:00–12:00')
+  })
+
+  it('ein Fenster ohne Höchstzahl (ohne ausgebuchtAm) zählt wie bisher', () => {
+    const a = naechsteAbholung([fenster(3)], wienJetzt(MI_8))
+    expect(a).toEqual({ dayOfWeek: 3, startTime: '09:00', endTime: '12:00', tageVoraus: 0, kalendertag: '2026-10-14' })
+    // Ein voller Tag eines ANDEREN Fensters berührt es nicht.
+    expect(naechsteAbholung([fenster(3), fenster(4, ['2026-10-15'])], wienJetzt(MI_8))).toMatchObject({ tageVoraus: 0 })
+  })
+
+  it('über die Zeitumstellung (letzter Sonntag im Oktober): der echte Wiener Kalendertag', () => {
+    // Samstag, 24. Okt, 20:00 in Wien (UTC+2); in der Nacht springt die Uhr auf UTC+1.
+    const samstag = wienJetzt(new Date('2026-10-24T18:00:00Z'))
+    expect(naechsteAbholung([fenster(0)], samstag)).toMatchObject({ tageVoraus: 1, kalendertag: '2026-10-25' })
+    // Der Sonntag der Umstellung ist voll: der nächste Sonntag, mit Datum.
+    const a = naechsteAbholung([fenster(0, ['2026-10-25'])], samstag)
+    expect(a).toMatchObject({ tageVoraus: 8, kalendertag: '2026-11-01' })
+    expect(a && formatiereAbholung(a)).toBe('So, 1. Nov 09:00–12:00')
+    // Sonntag 00:30 in Wien (noch UTC+2) ist schon der 25. — heute, nicht morgen.
+    expect(wienJetzt(new Date('2026-10-24T22:30:00Z'))).toEqual({ kalendertag: '2026-10-25', wochentag: 0, uhrzeit: '00:30' })
+    expect(naechsteAbholung([fenster(0)], wienJetzt(new Date('2026-10-24T22:30:00Z')))).toMatchObject({ tageVoraus: 0, kalendertag: '2026-10-25' })
   })
 })
 
@@ -234,6 +292,7 @@ describe('wienJetzt', () => {
   it('löst einen UTC-Moment nach österreichischer Ortszeit auf', () => {
     // Freitag 23:30 UTC im Sommer = Samstag 01:30 in Wien.
     expect(wienJetzt(new Date('2026-08-28T23:30:00Z'))).toEqual({
+      kalendertag: '2026-08-29',
       wochentag: 6,
       uhrzeit: '01:30',
     })
@@ -242,11 +301,13 @@ describe('wienJetzt', () => {
   it('auch im Winter (UTC+1) und exakt um Mitternacht — nie „24:xx"', () => {
     // Donnerstag 23:30 UTC im Januar = Freitag 00:30 in Wien.
     expect(wienJetzt(new Date('2026-01-15T23:30:00Z'))).toEqual({
+      kalendertag: '2026-01-16',
       wochentag: 5,
       uhrzeit: '00:30',
     })
     // Mitternacht Wien: hourCycle h23 liefert 00, nicht 24 (h24-Falle).
     expect(wienJetzt(new Date('2026-08-25T22:00:00Z'))).toEqual({
+      kalendertag: '2026-08-26',
       wochentag: 3,
       uhrzeit: '00:00',
     })
@@ -360,7 +421,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
   it('fragt EXAKT mit dem Filter der Listen an — wartende, stillgelegte Höfe und Testhöfe können ihn nicht passieren', async () => {
     farmFindMany.mockResolvedValue([] as never)
 
-    await getOeffentlicheHoefe({ wochentag: 3, uhrzeit: '12:00' })
+    await getOeffentlicheHoefe({ kalendertag: '2026-10-14', wochentag: 3, uhrzeit: '12:00' })
 
     expect(farmFindMany).toHaveBeenCalledTimes(1)
     const args = farmFindMany.mock.calls[0]![0]!
@@ -452,7 +513,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
       { farmId: 'farm_1', category: 'GETREIDE_KOERNER', subcategory: 'HAFER', labels: [], imageUrl: null, name: 'Hafer', price: 20, stock: 2, reservedStock: 2, futter: { zielTierarten: ['PFERD'], nettoMenge: 25, nettoEinheit: 'KG' } },
     ] as never)
 
-    const [hof] = await getOeffentlicheHoefe({ wochentag: 3, uhrzeit: '12:00' })
+    const [hof] = await getOeffentlicheHoefe({ kalendertag: '2026-10-14', wochentag: 3, uhrzeit: '12:00' })
 
     expect(hof!.kategorien).toEqual(['EIER'])
     expect(hof!.suchNamen).toEqual(['Eier'])
@@ -465,7 +526,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
       { farmId: 'farm_1', id: 'prod_heu', unit: 'BALLEN', unitSize: null, category: 'HEU_STROH', subcategory: 'WIESENHEU', labels: ['BIO'], imageUrl: 'heu.jpg', name: 'Heu', price: 45, stock: 3, reservedStock: 0, futter: { zielTierarten: ['PFERD', 'RIND'], nettoMenge: 300, nettoEinheit: 'KG' } },
     ] as never)
 
-    const [hof] = await getOeffentlicheHoefe({ wochentag: 3, uhrzeit: '12:00' })
+    const [hof] = await getOeffentlicheHoefe({ kalendertag: '2026-10-14', wochentag: 3, uhrzeit: '12:00' })
 
     expect(hof!.angebot).toEqual([
       {
@@ -516,7 +577,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
       { farmId: 'farm_1', category: null, imageUrl: 'p4.jpg', name: 'Brot', stock: 1, reservedStock: 0 },
     ] as never)
 
-    const hoefe = await getOeffentlicheHoefe({ wochentag: 3, uhrzeit: '12:00' })
+    const hoefe = await getOeffentlicheHoefe({ kalendertag: '2026-10-14', wochentag: 3, uhrzeit: '12:00' })
 
     expect(hoefe[0]).toMatchObject({
       slug: 'hof-mueller',
@@ -576,7 +637,7 @@ describe('getOeffentlicheHoefe — die Query', () => {
       }),
     ] as never)
 
-    const [hof] = await getOeffentlicheHoefe({ wochentag: 3, uhrzeit: '12:00' })
+    const [hof] = await getOeffentlicheHoefe({ kalendertag: '2026-10-14', wochentag: 3, uhrzeit: '12:00' })
 
     expect(hof!.produkte).toEqual([
       {

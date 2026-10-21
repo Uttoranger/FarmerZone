@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { getHofBesitzer, getOwnerFarm, getPublicFarm, type PublicFarm } from '@/server/queries/farm'
 import { ansichtsModus, type SeitenAnsicht, type Suchparameter } from '@/lib/ansichts-modus'
 import { gibVerwaisteFreiFuerSlug } from '@/server/verwaiste-bestellungen'
+import { alsAbholFenster, ausgebuchteTage } from '@/server/abholfenster'
 import { ladeAbzeichenBlatt } from '@/server/queries/plattform-einstellung'
 
 /**
@@ -31,10 +32,16 @@ export async function ladeHofseite(
     angemeldeterNutzer: async () => (await auth.api.getSession({ headers: await headers() }))?.user.id ?? null,
     besitzer: () => getHofBesitzer(farmSlug),
   })
-  const geladen = besitzerVorFreigabe ? await getOwnerFarm(besitzerVorFreigabe) : await getPublicFarm(farmSlug)
+  const hof = besitzerVorFreigabe ? await getOwnerFarm(besitzerVorFreigabe) : await getPublicFarm(farmSlug)
   // Der Besitzer hat genau einen Hof (ownerId ist eindeutig) — der Abgleich
   // ist eine Absicherung, keine Unterscheidung.
-  if (!geladen || geladen.slug !== farmSlug) return { farm: null, ansicht }
+  if (!hof || hof.slug !== farmSlug) return { farm: null, ansicht }
+  // „Nächste Abholung" lässt volle Fenster weg (Register N19, Ergänzung
+  // 21.10.2026): gezählt wie in der Kasse, NACH der Freigabe verwaister
+  // Bestellungen oben — getPublicFarm/getOwnerFarm zählen selbst nicht (Mein
+  // Hof liest getOwnerFarm auch). Die zweite Abfrage läuft nur bei einer Höchstzahl.
+  const voll = (await ausgebuchteTage([hof.id], new Date())).get(hof.id)
+  const geladen = voll ? { ...hof, pickupSlots: hof.pickupSlots.map((s) => alsAbholFenster(s, voll)) } : hof
   // Abzeichen (Register K2, Nr. 116): Das Erklär-Blatt nennt die Plätze und —
   // solange der Zähler läuft — die freien. Nur für Gründungshöfe, aus dem Cache
   // (ladeAbzeichenBlatt); ohne Zahlen (Ladefehler) zeigt die Seite das Etikett ohne Blatt.

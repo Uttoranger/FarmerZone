@@ -3,14 +3,17 @@ import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { LadePunkt } from '@/components/ui/lade-punkt'
 import type { UmfeldKm } from '@/lib/umfeld'
-import { regionReiterLink, type RegionReiter } from '@/schemas/region'
+import type { AbholungWahl } from '@/schemas/hoefe-filter'
+import { regionReiterLink, type FutterAnsichtWahl, type RegionReiter } from '@/schemas/region'
 
 /*
  * Kopf von /region (Nachtlauf Nr. 22c, Mockups web-h5-region-preise und
  * web-h5-region-futter-kaufen): h1 „Region", ein Satz, darunter die Reiter
  * „Preise vergleichen" | „Futter kaufen". Die Reiter sind Links mit eigener
  * Adresse (?reiter=futter), damit Zurück, Neuladen und Teilen im richtigen
- * landen — wie die Reiter von Mein Hof. Der Umkreis geht beim Wechsel mit.
+ * landen — wie die Reiter von Mein Hof. Beim Wechsel gehen der Umkreis, die
+ * Ansicht (Liste | Karte) und für „Futter kaufen" die Abholung mit (Nr. 133,
+ * Rest aus 123): Wer in der Karte steht, bleibt in der Karte.
  * Solange der neue Reiter lädt, zeigt er den Ladepunkt (Nr. 122, Register
  * N14): Die alte Ansicht bleibt stehen, statt als Skelett aufzublitzen.
  */
@@ -25,10 +28,16 @@ const REITER: readonly { id: RegionReiter; label: string }[] = [
 export function RegionKopf({
   reiter,
   km,
+  ansicht = 'liste',
+  abholung = null,
   ladePunkt = false,
 }: {
   reiter: RegionReiter | null
   km: UmfeldKm
+  /** Die Ansicht der gerade offenen Seite — sie geht mit zum anderen Reiter. */
+  ansicht?: FutterAnsichtWahl
+  /** Der Abholungs-Filter von „Futter kaufen"; „Preise vergleichen" kennt ihn nicht (der Link lässt ihn weg). */
+  abholung?: AbholungWahl | null
   /** Der Ladepunkt am gewählten Reiter, solange er lädt — braucht einen `LadeRahmen` drumherum (wie `Unterreiter`). */
   ladePunkt?: boolean
 }): React.JSX.Element {
@@ -44,7 +53,7 @@ export function RegionKopf({
           return (
             <Link
               key={r.id}
-              href={regionReiterLink(r.id, km)}
+              href={regionReiterLink(r.id, km, { ansicht, abholung })}
               aria-current={gewaehlt ? 'page' : undefined}
               className={cn(
                 'relative -mb-px inline-flex min-h-11 items-center border-b-2 px-0.5 text-[15px] transition-colors duration-[250ms]',

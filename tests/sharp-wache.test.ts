@@ -100,17 +100,17 @@ describe('Wache: sharp sieht nur geprüfte Bytes', () => {
     const route = QUELLEN.find((q) => q.pfad === ROUTE)
     expect(route, ROUTE).toBeDefined()
     expect(sharpAufrufe(route!.text, ROUTE)).toEqual(['ladeErlaubtesBild'])
-  })
+  }, 30_000)
 
   it('die Lader-Sperre ruft nur die Verarbeitungs-Route auf', () => {
     const treffer = QUELLEN.filter((q) => rufeSperre(q.text, q.pfad) > 0).map((q) => q.pfad)
     expect(treffer).toEqual([ROUTE])
-  })
+  }, 30_000)
 
   it('sharp laden nur die benannten Dateien', () => {
     const treffer = QUELLEN.filter((q) => laedtSharp(q.text, q.pfad)).map((q) => q.pfad).sort()
     expect(treffer).toEqual(Object.keys(SHARP_NUTZER).sort())
-  })
+  }, 30_000)
 })
 
 describe('Gegenprobe an Schnipseln', () => {

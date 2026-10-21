@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { erneuereHoflisteNachStorno } from '@/server/hofliste-erneuern'
 
 /**
  * Eine Bestellung beenden, die noch auf ihre Zahlung oder Bestätigung wartet,
@@ -15,10 +16,13 @@ import { prisma } from '@/lib/prisma'
  * Fehler dazwischen lässt beides ungeschehen, und eine Wiederholung findet
  * die Bestellung unverändert vor.
  *
- * Gibt zurück, ob DIESER Aufruf storniert hat.
+ * Gibt zurück, ob DIESER Aufruf storniert hat. Danach — nach dem Commit, nie
+ * in der Transaktion — erneuert `erneuereHoflisteNachStorno` die Hofliste
+ * (Register N19, Ergänzung 21.10.2026): Dieser Weg läuft in Route, Webhook,
+ * Cron, Action und über `gibVerwaisteFreiOhneRisiko` beim Rendern von Seiten.
  */
 export async function storniereUnbezahlteBestellung(orderId: string, grund: string): Promise<boolean> {
-  return prisma.$transaction(async (tx) => {
+  const storniert = await prisma.$transaction(async (tx) => {
     const jetzt = new Date()
     const { count } = await tx.order.updateMany({
       where: { id: orderId, status: 'PENDING_CONFIRMATION' },
@@ -45,4 +49,6 @@ export async function storniereUnbezahlteBestellung(orderId: string, grund: stri
     }
     return true
   })
+  if (storniert) erneuereHoflisteNachStorno(orderId)
+  return storniert
 }

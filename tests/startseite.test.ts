@@ -123,7 +123,7 @@ const IM_AUSSCHNITT = [
   { latitude: 48.1, longitude: 12.95 },
 ] as const
 const WEIT_DRAUSSEN = { latitude: 47.2, longitude: 15.4 } as const
-const HEUTE_NACHMITTAG = { dayOfWeek: 1, startTime: '15:00', endTime: '18:00', tageVoraus: 0 } as const
+const HEUTE_NACHMITTAG = { dayOfWeek: 1, startTime: '15:00', endTime: '18:00', tageVoraus: 0, kalendertag: '2026-10-19' } as const
 
 describe('Metadaten', () => {
   it('Titel und Beschreibung nennen Futter — Open Graph und Twitter-Karte sagen dasselbe', () => {
@@ -215,7 +215,7 @@ describe('waehleStartseitenHoefe', () => {
 
   it('stellt pausierte Höfe ans Ende und sagt es statt einer Abholzeit', () => {
     const auswahl = waehleStartseitenHoefe([
-      hof({ slug: 'pause', isPaused: true, naechsteAbholung: { dayOfWeek: 1, startTime: '15:00', endTime: '18:00', tageVoraus: 0 } }),
+      hof({ slug: 'pause', isPaused: true, naechsteAbholung: { dayOfWeek: 1, startTime: '15:00', endTime: '18:00', tageVoraus: 0, kalendertag: '2026-10-19' } }),
       hof({ slug: 'offen' }),
     ])
     expect(auswahl.map((h) => h.slug)).toEqual(['offen', 'pause'])
@@ -226,7 +226,7 @@ describe('waehleStartseitenHoefe', () => {
     const [eintrag] = waehleStartseitenHoefe([
       hof({
         slug: 'x',
-        naechsteAbholung: { dayOfWeek: 1, startTime: '15:00', endTime: '18:00', tageVoraus: 0 },
+        naechsteAbholung: { dayOfWeek: 1, startTime: '15:00', endTime: '18:00', tageVoraus: 0, kalendertag: '2026-10-19' },
         fotos: ['/titelbild.jpg', '/zweites.jpg'],
       }),
     ])

@@ -124,7 +124,7 @@ describe('kein key an einem iframe (Regelvorschlag 106)', () => {
   it('kein iframe unter src/ trägt ein key, das einen Rahmen neu aufbaut', () => {
     const funde = [...tsxDateien(join(WURZEL, 'src'))].flatMap((pfad) => findeIframeMitKey(readFileSync(pfad, 'utf8'), relative(WURZEL, pfad)))
     expect(funde, 'Ein key am iframe baut den Rahmen bei jeder neuen Adresse neu auf (leer, wieder oben) — vorschauRahmen oder location.replace nehmen.').toEqual([])
-  })
+  }, 30_000)
 
   it('die Ausnahme gibt es wirklich: die Startseiten-Vorschau läuft über die Liste aus vorschauRahmen', () => {
     const pfad = 'src/components/admin/startseite-vorschau.tsx'

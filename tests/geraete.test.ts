@@ -173,12 +173,13 @@ describe('Hinweis und Zusatz im Blatt: eine Fassung für Höfe, eine für Admins
     })
   })
 
-  it('für Admins kommt der Hinweis auf die Passkeys dazu', () => {
+  it('für Admins geht der Hinweis auf die Passkeys — ohne Passwort, das ist bei Konten mit Passkey gesperrt (F10, Nr. 132)', () => {
     expect(geraeteHinweise(true)).toEqual({
       hinweis:
-        'Ein Gerät kennst du nicht? Melde es ab, ändere danach dein Passwort und prüf deine Passkeys. Wir zeigen nur Gerät und Browser – keinen Ort, keine IP-Adresse.',
-      blattZusatz: 'Auf den anderen Geräten musst du dich danach neu anmelden. Kennst du ein Gerät nicht, ändere danach dein Passwort und prüf deine Passkeys.',
+        'Ein Gerät kennst du nicht? Melde es ab und prüf deine Passkeys – entferne jeden, den du nicht kennst. Wir zeigen nur Gerät und Browser – keinen Ort, keine IP-Adresse.',
+      blattZusatz: 'Auf den anderen Geräten musst du dich danach neu anmelden. Kennst du ein Gerät nicht, prüf danach deine Passkeys.',
     })
+    expect(JSON.stringify(geraeteHinweise(true))).not.toContain('Passwort')
   })
 
   it('beide Fassungen stehen in EINER Quelle: GERAETE_TEXT, die Hof-Fassung ist die dort ohne Zusatz', () => {

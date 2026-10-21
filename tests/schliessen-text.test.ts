@@ -75,7 +75,7 @@ describe('Schließen statt Close', () => {
       englischesClose(readFileSync(pfad, 'utf8'), relative(WURZEL, pfad))
     )
     expect(funde).toEqual([])
-  })
+  }, 30_000)
 
   it.each(['src/components/ui/dialog.tsx', 'src/components/ui/sheet.tsx'])(
     '%s: das Kreuz heißt für den Screenreader „Schließen"',

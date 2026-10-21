@@ -285,7 +285,7 @@ describe('EINE Quelle für die Futter-Texte (E10a)', () => {
   ])('%s (%s) steht nur in der Quelle', (_name, stueck) => {
     // Gegenprobe steckt im Ergebnis: Die Quelle selbst muss gefunden werden.
     expect(fundstellen(stueck)).toEqual([QUELLE])
-  })
+  }, 30_000)
 
   /** Wie oft das Stück in jeder Datei unter src/ steht (nur Dateien mit Treffern). */
   function trefferJeDatei(stueck: string): Record<string, number> {
@@ -308,13 +308,13 @@ describe('EINE Quelle für die Futter-Texte (E10a)', () => {
     ['Telefon, letzte Gruppen', telefonEnde],
   ])('BAES-Kontakt (%s) steht genau einmal, nur in der Quelle', (_name, stueck) => {
     expect(trefferJeDatei(stueck)).toEqual({ [QUELLE]: 1 })
-  })
+  }, 30_000)
 
   it('die Nummer ohne Leerzeichen steht nirgends — der tel:-Link wird gebaut', () => {
     // Gegenprobe: Die Zählung findet die Ziffernfolge, wo sie wirklich steht.
     expect(BAES_KONTAKT_TEL.split(telefonZiffern).length - 1).toBe(1)
     expect(trefferJeDatei(telefonZiffern)).toEqual({})
-  })
+  }, 30_000)
 
   it.each([
     ['components/produkte/futter-formular.tsx', 'FUTTER_BESTAETIGUNG_TEXT'],

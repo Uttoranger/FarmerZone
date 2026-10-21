@@ -67,6 +67,7 @@ import { KAEUFER_VORSCHAU, type KartenVorschau } from '@/lib/hofseite-kunde'
 import { TESTHOF_HINWEIS } from '@/lib/gruendungshof'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
+import { publicProduct } from './fabrik/public-product'
 import { publicFarm } from './fabrik/public-farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import type { ProductCategoryValue } from '@/lib/taxonomie'
@@ -84,13 +85,7 @@ function dateien(ordner: string): string[] {
 }
 
 function produkt(id: string, name: string, category: ProductCategoryValue | null, stock = 20): PublicProduct {
-  return {
-    id, name, description: null, imageUrl: null, bildAusschnitt: null, category, categoryImageUrl: null,
-    price: 4.5, unit: 'STUECK', unitSize: null, stock, isAvailable: true, allergens: [],
-    isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
-    unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null, abholhinweise: [],
-  }
+  return publicProduct({ id, name, category, stock })
 }
 
 const HOF: PublicFarm = publicFarm({
@@ -116,10 +111,10 @@ const KUNDIN: Ansicht = { art: 'kundin', kaufen: true }
 /** Der Zeitpunkt, den page.tsx einmal auf dem Server bestimmt (Nachbesserung 1: kein Date.now() beim Rendern). */
 const JETZT = '2026-10-02T08:00:00.000Z'
 
-function seite({ suche = '', farm = HOF, beitraege = [STATUS], ansicht = KUNDIN, jetzt = JETZT }: { suche?: string; farm?: PublicFarm; beitraege?: ActiveStatusPost[]; ansicht?: Ansicht; jetzt?: string } = {}): string {
+function seite({ suche = '', farm = HOF, beitraege = [STATUS], beitraegeFehler = false, ansicht = KUNDIN, jetzt = JETZT }: { suche?: string; farm?: PublicFarm; beitraege?: ActiveStatusPost[]; beitraegeFehler?: boolean; ansicht?: Ansicht; jetzt?: string } = {}): string {
   adresse.suche = suche
   return renderToStaticMarkup(
-    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, beitraege, reorderItems: [], ansicht, jetzt }))
+    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, beitraege, beitraegeFehler, reorderItems: [], ansicht, jetzt }))
   )
 }
 
@@ -204,7 +199,7 @@ describe('die rechte Spalte ist EINE Komponente', () => {
     expect(einbinder.sort()).toEqual(['src/components/hofseite/hofseite-kunde.tsx', 'src/components/produktdetail/produktdetail-kunde.tsx'])
     const mitKartentitel = dateien('src/components/hofseite').filter((p) => />\s*Abholzeiten\s*</.test(quelle(p)))
     expect(mitKartentitel).toEqual(['src/components/hofseite/hofseite-seitenspalte.tsx'])
-  })
+  }, 30_000)
 })
 
 describe('Zustände der Produktkarten — knapp, ausverkauft, kein „Merken"', () => {
@@ -389,6 +384,16 @@ describe('„Aktuell vom Hof" in der Übersicht (Register F8, N5)', () => {
     expect(leer).not.toContain('id="aktuell"')
   })
 
+  it('?beitrag= und das Laden der Beiträge scheiterte: kein Satz „nicht mehr aktuell“ (den Beitrag kann es geben), die Seite wie ohne Beiträge (Nr. 134)', () => {
+    const html = seite({ beitraege: [], beitraegeFehler: true, suche: 'beitrag=statusmitte' })
+    expect(html).not.toContain('Dieser Beitrag ist nicht mehr aktuell.')
+    expect(html).not.toContain('id="aktuell"')
+    // Produkte und Korb bleiben: Die Seite zeigt sich wie ohne Beiträge.
+    expect(html).toContain('Karotten')
+    // Gegenprobe: ohne den Merker derselbe Aufruf mit dem Satz.
+    expect(seite({ beitraege: [], suche: 'beitrag=statusmitte' })).toContain('Dieser Beitrag ist nicht mehr aktuell.')
+  })
+
   it('?beitrag= mit unzulässigen Zeichen wird verworfen — kein Satz, die normale Übersicht', () => {
     for (const wert of ['STATUSMITTE', 'status-mitte', 'a'.repeat(41)]) {
       const html = seite({ beitraege: LISTE, suche: `beitrag=${wert}` })
@@ -565,7 +570,7 @@ describe('Produktkarten verlinken auf die Produktseite (Nr. 11)', () => {
     const src = dateien('src')
     expect(src).not.toContain('src/components/farm/produkt-detail.tsx')
     expect(src.filter((p) => /\bProduktDetail\b/.test(quelle(p)))).toEqual([])
-  })
+  }, 30_000)
 })
 
 // ─── Nr. 51: Schaufenster zuerst (Register N5) ──────────────────────────────

@@ -118,6 +118,7 @@ const ALLE_PRODUKTE_KNOPF = cn(
 export function HofseiteKunde({
   farm,
   beitraege,
+  beitraegeFehler,
   reorderItems,
   ansicht,
   jetzt,
@@ -128,6 +129,12 @@ export function HofseiteKunde({
    * fünf neuesten und hängt einen älteren aus `?beitrag=` an (ordneBeitraege).
    */
   beitraege: ActiveStatusPost[]
+  /**
+   * Das Laden der Beiträge ist gescheitert (page.tsx, ladeBeitraege): Die Seite
+   * zeigt sich wie ohne Beiträge und sagt zu `?beitrag=` nichts — den Beitrag
+   * kann es geben (Nr. 134).
+   */
+  beitraegeFehler: boolean
   reorderItems?: ReorderItem[]
   ansicht: Pick<SeitenAnsicht, 'art' | 'kaufen'>
   /**
@@ -164,7 +171,11 @@ export function HofseiteKunde({
 
   // „Aktuell vom Hof“ (Register F8, Nr. 128): nur in der Übersicht. `?beitrag=`
   // ist eine Systemgrenze — dieselbe Prüfung wie in page.tsx, die den Beitrag lädt.
-  const { anordnung, nichtMehrAktuell } = ordneBeitraege(gezeigteBeitraege, beitragKennungSchema.parse(suche.get(BEITRAG_PARAMETER)))
+  const { anordnung, nichtMehrAktuell } = ordneBeitraege(
+    gezeigteBeitraege,
+    beitragKennungSchema.parse(suche.get(BEITRAG_PARAMETER)),
+    beitraegeFehler
+  )
   const mitAktuell = offen === 'uebersicht' && anordnung !== null
   const mitHinweis = offen === 'uebersicht' && nichtMehrAktuell
 

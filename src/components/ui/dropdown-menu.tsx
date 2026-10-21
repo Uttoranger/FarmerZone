@@ -24,15 +24,25 @@ function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props): React.JSX
   return <MenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
 }
 
+/**
+ * `container` (Nr. 132): Wohin das Portal das Menü hängt — ohne Angabe wie
+ * bisher an den `<body>`, also außerhalb jeder Landmarke (Axe „region"). Die
+ * Shells geben ein Element in ihrem Kopf bzw. ihrer Seitenleiste mit; es darf
+ * nicht in einem Kasten mit `overflow` stecken, sonst wird das Menü
+ * abgeschnitten.
+ */
 function DropdownMenuContent({
   className,
   side = "bottom",
   align = "start",
   sideOffset = 6,
+  container,
   ...props
-}: MenuPrimitive.Popup.Props & Pick<MenuPrimitive.Positioner.Props, "side" | "align" | "sideOffset">): React.JSX.Element {
+}: MenuPrimitive.Popup.Props &
+  Pick<MenuPrimitive.Positioner.Props, "side" | "align" | "sideOffset"> &
+  Pick<MenuPrimitive.Portal.Props, "container">): React.JSX.Element {
   return (
-    <DropdownMenuPortal>
+    <DropdownMenuPortal container={container}>
       <MenuPrimitive.Positioner side={side} align={align} sideOffset={sideOffset} className="z-50 outline-none">
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"

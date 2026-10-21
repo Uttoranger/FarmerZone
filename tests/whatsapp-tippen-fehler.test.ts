@@ -69,11 +69,13 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 import { toast } from 'sonner'
 import { setzeWhatsAppGetippt } from '@/server/actions/status-posts'
 import { WHATSAPP_VERSAND_TEXT, type Abonnentin } from '@/lib/whatsapp-versand'
+import { teilenKanalAus } from '@/lib/teilen-kanal'
+import { beitragKennungSchema } from '@/schemas/hofseite-reiter'
 import { WhatsAppTapClient } from '@/app/(hof)/status/[id]/send-whatsapp/whatsapp-tap-client'
 
 const ANNA: Abonnentin = { id: 'cabo00000000000000000001', name: 'Anna Muster', phone: '+43 660 0000000' }
 const BERTA: Abonnentin = { id: 'cabo00000000000000000002', name: 'Berta Muster', phone: '+43 664 0000000' }
-const PROPS = { postId: 'cpost0000000000000000001', title: 'Neue Eier', body: 'Frisch gelegt.', farmSlug: 'hof-test' }
+const PROPS = { postId: 'cpost0000000000000000001', title: 'Neue Eier', body: 'Frisch gelegt.', farmSlug: 'hof-test', showOnFarmPage: true }
 
 type Knoten = { type?: unknown; key?: unknown; props?: Record<string, unknown> }
 
@@ -85,9 +87,9 @@ function elemente(knoten: unknown): Knoten[] {
   return element.props ? [element, ...elemente(element.props.children)] : []
 }
 
-function rendere(abonnentinnen: Abonnentin[], getippt: string[]): ReactElement {
+function rendere(abonnentinnen: Abonnentin[], getippt: string[], props: Partial<typeof PROPS> = {}): ReactElement {
   pruefstand.beginne()
-  return WhatsAppTapClient({ ...PROPS, abonnentinnen, getippt })
+  return WhatsAppTapClient({ ...PROPS, ...props, abonnentinnen, getippt })
 }
 
 /** Wer laut Liste geöffnet ist: die Zeilen (Schlüssel = Abonnements-ID) mit dem Wort „Geöffnet". */
@@ -158,5 +160,29 @@ describe('Tipp-Liste: die Nummer einheitlich', () => {
     expect(zeilen).toContain('+43 660 000 0000')
     expect(zeilen).toContain('keine Angabe')
     expect(zeilen).not.toContain('0660 0000000')
+  })
+})
+
+describe('Tipp-Liste: der Link in der Nachricht (Register T5)', () => {
+  /** Die Adresse hinter „Mehr auf:“ in der Nachricht, die der wa.me-Link vorbereitet. */
+  function linkInDerNachricht(props: Partial<typeof PROPS> = {}): string {
+    const href = elemente(rendere([ANNA], [], props)).find((e) => e.type === 'a')?.props?.href
+    const text = new URL(String(href)).searchParams.get('text') ?? ''
+    return text.split('Mehr auf: ')[1]
+  }
+
+  it('öffnet genau diesen Beitrag und zählt als WhatsApp — in der Reihenfolge des Teilen-Fensters', () => {
+    const link = linkInDerNachricht()
+    const adresse = new URL(link)
+    expect(adresse.pathname).toBe('/hof-test')
+    expect(beitragKennungSchema.parse(adresse.searchParams.get('beitrag'))).toBe(PROPS.postId)
+    expect(teilenKanalAus(adresse.searchParams.get('k'))).toBe('WHATSAPP')
+    expect(link.endsWith(`?beitrag=${PROPS.postId}&k=wa`)).toBe(true)
+  })
+
+  it('steht der Beitrag nicht auf der Hofseite, ist es der Link ohne Beitrag (sonst sagte die Seite „nicht mehr aktuell“)', () => {
+    const link = linkInDerNachricht({ showOnFarmPage: false })
+    expect(link.endsWith('/hof-test?k=wa')).toBe(true)
+    expect(new URL(link).searchParams.has('beitrag')).toBe(false)
   })
 })

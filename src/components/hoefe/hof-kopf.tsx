@@ -6,7 +6,10 @@ import { Vorschaubild } from '@/components/hoefe/hof-vorschaubild'
  * Der Kopf eines Hofs (Register N22, N23): Name in Serif (höchstens zwei
  * Zeilen), rechts die Entfernung, darunter PLZ und Ort. EINE Quelle für die
  * Hofkarte der Liste, die kurze Hofkarte am Pin und Region — vorher stand er
- * in jeder Karte als eigene Kopie.
+ * in jeder Karte als eigene Kopie. Karussell (hoefe-karussell.tsx) und
+ * Produkttreffer (`ProduktZeile` in entdecken-teile.tsx) haben bewusst ihren
+ * eigenen Kopf: Sie sind keine Hofkarten, dort ist das Produkt bzw. die Reihe
+ * die Hauptsache (Register F10).
  *
  * Ohne `bild` sind es zwei Geschwister (Zeile mit Name und Entfernung, Zeile
  * mit dem Ort) — die Karte stapelt sie in ihrer Spalte, so bleibt /hoefe

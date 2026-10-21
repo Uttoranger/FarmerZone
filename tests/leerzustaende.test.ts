@@ -159,7 +159,7 @@ describe('Auswertung — Umsatzkarte', () => {
 })
 
 describe('WhatsApp — keine Abonnentin', () => {
-  const basis = { postId: 'p1', title: 'Frische Eier', body: 'Heute neu im Shop.', farmSlug: 'hof-test', getippt: [] }
+  const basis = { postId: 'p1', title: 'Frische Eier', body: 'Heute neu im Shop.', farmSlug: 'hof-test', showOnFarmPage: true, getippt: [] }
   const anzahlH1 = (h: string) => (h.match(/<h1\b/g) ?? []).length
 
   it('ohne Abonnentin: EmptyState mit Titel, Satz und dem Weg zurück zu den Beiträgen; sein Titel ist die eine h1', () => {

@@ -34,6 +34,7 @@ import { fotoAlt } from '@/components/hofseite/bildansicht'
 import { ProduktKarte } from '@/components/hofseite/produkt-karte'
 import { titelbildAusschnitt } from '@/lib/titelbild'
 import type { PublicFarmPhoto, PublicProduct } from '@/server/queries/farm'
+import { publicProduct } from './fabrik/public-product'
 
 const FOTO = 'https://blob.example/titel.jpg'
 
@@ -82,12 +83,8 @@ describe('Hoffotos', () => {
 })
 
 describe('Produktkarte', () => {
-  const produkt = (teil: Partial<PublicProduct>): PublicProduct => ({
-    id: 'p_eier', name: 'Freilandeier', description: null, imageUrl: null, bildAusschnitt: null, category: 'EIER', categoryImageUrl: '/categories/eier.webp',
-    price: 4.5, unit: 'STUECK', unitSize: null, stock: 20, isAvailable: true, allergens: [], isOrganic: false, requiresCool: false, requiresFreezer: false,
-    seasonStart: null, seasonEnd: null, unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null, familieId: null, brennmaterial: null, abholhinweise: [],
-    ...teil,
-  })
+  const produkt = (teil: Partial<PublicProduct>): PublicProduct =>
+    publicProduct({ id: 'p_eier', name: 'Freilandeier', category: 'EIER', categoryImageUrl: '/categories/eier.webp', ...teil })
   const karte = (p: PublicProduct) =>
     renderToStaticMarkup(
       createElement(ProduktKarte, { produkt: p, zustand: { art: 'kaufbar' }, imKorb: 0, wirdHinzugefuegt: false, href: '/hof-test/produkt/p_eier', onInDenKorb: () => {}, onMenge: () => {} })

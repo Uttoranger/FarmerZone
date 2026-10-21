@@ -94,7 +94,10 @@ describe('POST /api/abmelden', () => {
     const vorhanden = await abo(farm.id, email)
     const token = generateUnsubscribeToken(email, farm.id)
 
-    const antwort = await POST(einKlick(`${token.slice(0, -2)}00`))
+    // Das letzte Zeichen der Signatur sicher tauschen: Die Adresse ist je Lauf neu, und mit „letzte zwei
+    // Zeichen → 00“ war der Token in 1 von 256 Läufen unverändert gültig (CI-Wackler, Lauf 20).
+    const falsch = `${token.slice(0, -1)}${token.endsWith('0') ? '1' : '0'}`
+    const antwort = await POST(einKlick(falsch))
 
     expect(antwort.status).toBe(400)
     expect(await stand(vorhanden.id)).toMatchObject({ optInEmail: true, optInWhatsApp: true })

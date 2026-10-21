@@ -1,36 +1,26 @@
 /**
- * YAML-Parser für Wachen über `.github/workflows/` (Nr. 127).
+ * YAML-Parser für Wachen über `.github/workflows/` (Nr. 127, umgestellt mit Nr. 135, G6-Ergänzung 21.10.2026).
  *
- * Das Projekt führt kein YAML-Paket (G6: keine neuen Pakete im Lauf). `js-yaml` liegt aber im Lockfile,
- * weil ESLint es braucht (eslint → @eslint/eslintrc → js-yaml). Der Lader folgt genau dieser Kette, statt
- * eine Datei in `node_modules/.pnpm` beim Namen zu nennen. Fällt eine Stufe weg (anderes Layout, neue
- * ESLint-Version ohne js-yaml), bricht jede Wache, die ihn nutzt, mit diesem Satz — dann ist `yaml` als
- * Entwicklungspaket zu beantragen, nicht der Lader zu flicken.
+ * Gelesen wird mit dem Entwicklungspaket `yaml`. Es liest wie js-yaml 4 standardmäßig YAML 1.2: `on` bleibt
+ * der Text „on“, kein Wahrheitswert (anders als in YAML 1.1). Das hält ein Fall in
+ * `tests/workflows-yaml-wache.test.ts` fest. Der Umweg über das `js-yaml` von ESLint entfällt.
  */
-import { createRequire } from 'node:module'
-import { join } from 'node:path'
+import { parse, YAMLParseError } from 'yaml'
 
-export type YamlParser = { load(text: string): unknown }
-
-let parser: YamlParser | null = null
-
-/** Der Parser von js-yaml 4: `load` liest YAML 1.2 (`on` bleibt der Text „on“, kein Wahrheitswert). */
-export function ladeYamlParser(): YamlParser {
-  if (parser) return parser
-  try {
-    const vomProjekt = createRequire(join(process.cwd(), 'package.json'))
-    const vonEslint = createRequire(vomProjekt.resolve('eslint/package.json'))
-    const vonEslintrc = createRequire(vonEslint.resolve('@eslint/eslintrc/package.json'))
-    parser = vonEslintrc('js-yaml') as YamlParser
-    return parser
-  } catch (fehler) {
-    throw new Error(
-      `Kein YAML-Parser gefunden (Kette eslint → @eslint/eslintrc → js-yaml): ${fehler instanceof Error ? fehler.message : String(fehler)}. Das Paket "yaml" als Entwicklungspaket beantragen (G6).`,
-    )
-  }
-}
-
-/** YAML-Text → Wert; wirft bei ungültigem YAML (Meldung des Parsers mit Zeile und Spalte). */
+/**
+ * YAML-Text → Wert; wirft bei ungültigem YAML mit „(Zeile:Spalte)“ am Ende der Meldung.
+ * `yaml` selbst schreibt „at line 6, column 14“; die Wachen erwarten wie bei js-yaml „(6:14)“.
+ */
 export function leseYaml(text: string): unknown {
-  return ladeYamlParser().load(text)
+  try {
+    return parse(text)
+  } catch (fehler) {
+    if (fehler instanceof YAMLParseError) {
+      const ort = fehler.linePos?.[0]
+      // Erste Zeile der Meldung ohne das „at line …, column …:“, das die Position doppelt nennen würde.
+      const meldung = fehler.message.split('\n')[0].replace(/ at line \d+, column \d+:?$/, '')
+      throw new Error(ort ? `${meldung} (${ort.line}:${ort.col})` : meldung, { cause: fehler })
+    }
+    throw fehler
+  }
 }

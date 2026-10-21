@@ -84,6 +84,29 @@ export function beitragLink(hofLink: string, beitragId: string): string {
 }
 
 /**
+ * Die Kennung, die ein Link auf einen Beitrag trägt (T5, F8): nur, wenn der
+ * Beitrag auf der Hofseite steht. Sonst sagte die Seite „nicht mehr aktuell“,
+ * obwohl es den Beitrag gibt. EINE Regel für die Mail an Abonnentinnen
+ * (server/actions/status-posts.ts) und den WhatsApp-Link je Person
+ * (beitragLinkMitKanal); das Teilen-Fenster und die Karten auf Heute und der
+ * Startseite zeigen nur Beiträge, die schon auf der Hofseite stehen.
+ */
+export function beitragIdImLink(beitrag: { id: string; showOnFarmPage: boolean }): string | undefined {
+  return beitrag.showOnFarmPage ? beitrag.id : undefined
+}
+
+/**
+ * Der Link je Person in WhatsApp (T5): die Hofseite mit genau diesem Beitrag
+ * (`beitragLink`) und dem Kürzel des Kanals (`linkMitKanal`) — in der
+ * Reihenfolge des Teilen-Fensters, `?beitrag=<id>&k=wa`. Steht der Beitrag
+ * nicht auf der Hofseite (beitragIdImLink), ist es die Hofseite mit `?k=wa`.
+ */
+export function beitragLinkMitKanal(hofLink: string, beitrag: { id: string; showOnFarmPage: boolean }, kanal: TeilenKanalCode): string {
+  const beitragId = beitragIdImLink(beitrag)
+  return linkMitKanal(beitragId ? beitragLink(hofLink, beitragId) : hofLink, kanal)
+}
+
+/**
  * Wohin ein Kanal führt. Jeder Link trägt sein Kürzel (`?k=`), damit die
  * Zählung weiß, woher ein Besuch kam — sonst nichts (S8). Der Link kommt aus
  * den Daten des Fensters: die Hofseite bzw. der Beitrag darauf (`?beitrag=`).

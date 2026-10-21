@@ -48,15 +48,10 @@ import { AktuellVomHof } from '@/components/hofseite/aktuell-vom-hof'
 import { ordneBeitraege } from '@/lib/hofseite-kunde'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import type { PublicProduct } from '@/server/queries/farm'
+import { publicProduct } from './fabrik/public-product'
 
 function produkt(id: string, name: string, stock = 10): PublicProduct {
-  return {
-    id, name, description: null, imageUrl: null, bildAusschnitt: null, category: 'GEMUESE', categoryImageUrl: null,
-    price: 3.2, unit: 'KG', unitSize: 1, stock, isAvailable: true, allergens: [],
-    isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
-    unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null, abholhinweise: [],
-  }
+  return publicProduct({ id, name, price: 3.2, unit: 'KG', unitSize: 1, stock })
 }
 const PRODUKTE = [produkt('p_kuerbis', 'Hokkaido-Kürbis'), produkt('p_nuss', 'Butternut', 0), produkt('p_apfel', 'Äpfel Topaz'), produkt('p_eier', 'Freilandeier')]
 

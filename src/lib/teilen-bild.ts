@@ -24,6 +24,7 @@ import { BEITRAG_TEXT_MAX, BEITRAG_TITEL_MAX, HOFNAME_MAX, PRODUKTNAME_MAX } fro
 import { centsAlsEuro, formatEuro, formatTagKurz } from '@/lib/format'
 import { stripStatusVariables } from '@/lib/status-body'
 import { gemeinsamerAnfang } from '@/lib/produktdetail'
+import { BEITRAG_ANLASS } from '@/lib/beitrag-anlass'
 import { abholungText, naechstesAbholfenster, type HeuteFenster } from '@/lib/heute'
 import type { TeilenBildFormat } from '@/lib/teilen-kanal'
 
@@ -177,14 +178,6 @@ export function teilenBildAuswahl(
   return listen.find((liste) => liste && liste.length > 0 && bildProdukte(produkte, hof, liste).length > 0) ?? null
 }
 
-/** Der Anlass eines Beitrags als Wort für die Vorzeile — wie auf der Hofseite und in der Mail. */
-export const BEITRAG_ANLASS_TEXT: Record<StatusPostAnlass, string> = {
-  FRESH_PRODUCT: 'Frisches Produkt',
-  NEW_SEASON: 'Neue Saison',
-  PROMOTION: 'Aktion',
-  ANNOUNCEMENT: 'Mitteilung',
-}
-
 /** So lang darf der Text eines Beitrags im Bild höchstens sein (zwei Sätze, gekürzt). */
 export const TEILEN_BILD_BEITRAG_TEXT_MAX = 160
 
@@ -271,7 +264,7 @@ export function teilenBildDaten(eingabe: {
     ...(hof.gruendungshof ? { gruendungshof: true as const } : {}),
     ...(beitrag && {
       beitrag: {
-        anlass: BEITRAG_ANLASS_TEXT[beitrag.anlass],
+        anlass: BEITRAG_ANLASS[beitrag.anlass].wort,
         titel: einzeiligerFremdtext(beitrag.title, BEITRAG_TITEL_MAX),
         text: beitragKurztext(beitrag.body),
       },

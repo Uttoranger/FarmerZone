@@ -27,7 +27,8 @@ vi.mock('next/image', () => ({
 }))
 
 import { prisma } from '@/lib/prisma'
-import { kanalZiel, PLAKAT_PFAD, schalteAuswahl, startAuswahl, FENSTER_KANAELE } from '@/lib/teilen-fenster'
+import { beitragIdImLink, beitragLink, beitragLinkMitKanal, kanalZiel, PLAKAT_PFAD, schalteAuswahl, startAuswahl, FENSTER_KANAELE } from '@/lib/teilen-fenster'
+import { teilenKanalAus, teilenLink } from '@/lib/teilen-kanal'
 import { plakatBezahlen, type TeilenAuswahlEintrag } from '@/lib/teilen-bild'
 import { getPlakatDaten } from '@/server/queries/teilen-bild'
 import { QrPlakat } from '@/components/teilen/qr-plakat'
@@ -184,7 +185,29 @@ describe('Heute öffnet das Teilen-Fenster', () => {
     expect(karte).toContain('<HofTeilenKnopf')
   })
 
-  it('der WhatsApp-Versand eines Beitrags trägt ?k=wa', () => {
-    expect(quelle('src/app/(hof)/status/[id]/send-whatsapp/whatsapp-tap-client.tsx')).toContain("teilenLink(APP_URL, farmSlug, 'wa')")
+  it('der WhatsApp-Versand eines Beitrags trägt ?k=wa — über die Regel neben beitragLink', () => {
+    expect(quelle('src/app/(hof)/status/[id]/send-whatsapp/whatsapp-tap-client.tsx')).toContain("beitragLinkMitKanal(`${APP_URL}/${farmSlug}`")
+  })
+})
+
+describe('Link auf einen Beitrag: eine Regel für Mail und WhatsApp (Register T5)', () => {
+  const HOF = 'https://agrilo.at/hof-test'
+
+  it('die Kennung trägt der Link nur, wenn der Beitrag auf der Hofseite steht', () => {
+    expect(beitragIdImLink({ id: 'cbeitrag', showOnFarmPage: true })).toBe('cbeitrag')
+    expect(beitragIdImLink({ id: 'cbeitrag', showOnFarmPage: false })).toBeUndefined()
+  })
+
+  it('der Link je Person: genau dieser Beitrag, danach das Kürzel des Kanals (wie im Teilen-Fenster)', () => {
+    const link = beitragLinkMitKanal(HOF, { id: 'cbeitrag', showOnFarmPage: true }, 'wa')
+    expect(link).toBe('https://agrilo.at/hof-test?beitrag=cbeitrag&k=wa')
+    expect(link).toBe(`${beitragLink(HOF, 'cbeitrag')}&k=wa`)
+    expect(teilenKanalAus(new URL(link).searchParams.get('k'))).toBe('WHATSAPP')
+  })
+
+  it('Gegenprobe: ohne „auf der Hofseite“ ist es der Link ohne Beitrag — wie teilenLink', () => {
+    const link = beitragLinkMitKanal(HOF, { id: 'cbeitrag', showOnFarmPage: false }, 'wa')
+    expect(link).toBe('https://agrilo.at/hof-test?k=wa')
+    expect(link).toBe(teilenLink('https://agrilo.at', 'hof-test', 'wa'))
   })
 })

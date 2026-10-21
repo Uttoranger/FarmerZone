@@ -5,18 +5,12 @@ import { stripStatusVariables } from '@/lib/status-body'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { MARKE } from '@/lib/marke'
 import { MARKE_RUNDUNG_PROZENT, ladeMarkeDataUrl } from '@/lib/marke-bild'
+import { BEITRAG_ANLASS } from '@/lib/beitrag-anlass'
 
 export const runtime = 'nodejs'
 
 /** Die Bildmarke im Fuß: 64 px, über der Grenze von 48 px, also die volle Fassung. */
 const MARKE_KANTE = 64
-
-const ANLASS_LABEL: Record<string, string> = {
-  FRESH_PRODUCT: 'Frisches Produkt',
-  NEW_SEASON: 'Neue Saison',
-  PROMOTION: 'Aktion',
-  ANNOUNCEMENT: 'Mitteilung',
-}
 
 export async function GET(
   _req: NextRequest,
@@ -33,7 +27,7 @@ export async function GET(
     return new Response('Not found', { status: 404 })
   }
 
-  const anlassLabel = ANLASS_LABEL[post.anlass] ?? 'Mitteilung'
+  const anlassLabel = BEITRAG_ANLASS[post.anlass].wort
   const cleanBody = stripStatusVariables(post.body)
   const displayBody = cleanBody.length > 180 ? cleanBody.slice(0, 180) + '…' : cleanBody
   // Die Bildmarke als Bild aus public/marke (Register M1, Nr. 92): Satori zeichnet SVG als <img>, gezeichnet wird sie nirgends.

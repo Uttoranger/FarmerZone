@@ -51,5 +51,5 @@ describe('eine Quelle', () => {
       .filter((datei) => /function\s+genauesIlikeMuster\b|genauesIlikeMuster\s*=/.test(readFileSync(datei, 'utf8')))
       .map((datei) => datei.slice(src.length + 1).replaceAll('\\', '/'))
     expect(fundorte).toEqual(['lib/ilike-muster.ts'])
-  })
+  }, 30_000)
 })

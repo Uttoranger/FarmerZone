@@ -96,14 +96,24 @@ function zahlFuer(reiter: AdminReiter, zahlen: AdminShellProps['zahlen']): { anz
  * schickte das Konto auf /login —, daneben der Knopf „Abmelden". Am Handy
  * öffnet dieselbe Plakette ein Menü mit beidem (admin-konto.tsx).
  */
-function KontoPlakette({ anzeige, hatHof, onAbmelden }: { anzeige: string; hatHof: boolean; onAbmelden?: () => void }): React.JSX.Element {
+function KontoPlakette({
+  anzeige,
+  hatHof,
+  onAbmelden,
+  menueZiel,
+}: {
+  anzeige: string
+  hatHof: boolean
+  onAbmelden?: () => void
+  menueZiel: React.RefObject<HTMLElement | null>
+}): React.JSX.Element {
   const initialen = hofInitialen(anzeige)
   // Der Name beginnt mit dem, was man sieht (WCAG 2.5.3 „Label in Name"):
   // Wer per Sprache „MM antippen" sagt, trifft den Link.
   const beschriftung = `${initialen} – ${ADMIN_KONTO.label} (angemeldet: ${anzeige})`
   return (
     <>
-      <AdminKontoMenue anzeige={anzeige} hatHof={hatHof} ersatz={onAbmelden} />
+      <AdminKontoMenue anzeige={anzeige} hatHof={hatHof} ersatz={onAbmelden} menueZiel={menueZiel} />
       <div className="hidden items-center gap-0.5 md:flex lg:gap-1.5">
         {hatHof ? (
           <Link
@@ -145,6 +155,8 @@ export function AdminShell({
   // Am Handy ist die Reiter-Zeile breiter als der Bildschirm: Der gewählte Reiter
   // soll nicht außerhalb stehen. Nur die Zeile scrollt (scrollLeft), nie die Seite.
   const reiterZeile = useRef<HTMLElement>(null)
+  // Hierhin hängt das Konto-Menü am Handy (Nr. 132): in den Kopf statt frei in den <body>.
+  const menueZiel = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const zeile = reiterZeile.current
     const gewaehlt = zeile?.querySelector<HTMLElement>('[aria-current]')
@@ -219,9 +231,12 @@ export function AdminShell({
               </Link>
             )}
             <ThemeUmschalter className={cn('rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN)} />
-            <KontoPlakette anzeige={anzeige} hatHof={hatHof} onAbmelden={onAbmelden} />
+            <KontoPlakette anzeige={anzeige} hatHof={hatHof} onAbmelden={onAbmelden} menueZiel={menueZiel} />
           </div>
         </div>
+        {/* Ziel des Konto-Menüs: ohne Höhe, außerhalb der scrollenden Reiterzeile — der Kopf hat kein
+            overflow, transform oder backdrop-filter, das Menü wird also nicht abgeschnitten. */}
+        <div ref={menueZiel} data-menue-ziel="" />
         {/* Betriebsleiste (Register Z3): welcher Stripe-Modus gilt. Eine eigene Zeile
             unter dem Kopf statt in ihm: Die Kopfzeile ist am Handy und bis 1024 px
             schon voll. Rechts seit Nr. 103 der Hinweis auf eine offene Warnung

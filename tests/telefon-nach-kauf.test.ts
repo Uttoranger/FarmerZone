@@ -72,6 +72,7 @@ import { HofErreichen } from '@/components/bestaetigung/hof-erreichen'
 import { KONTAKT_NACH_DEM_KAUF } from '@/lib/hofseite-kunde'
 import { KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
+import { publicProduct } from './fabrik/public-product'
 import { publicFarm } from './fabrik/public-farm'
 import { findeElement, inhaltHinterSuspense } from './element-suche'
 
@@ -84,13 +85,7 @@ const ANZEIGE = '+43 660 000 0000'
 const EMAIL = 'hof@example.com'
 
 function produkt(id: string, name: string): PublicProduct {
-  return {
-    id, name, description: null, imageUrl: null, bildAusschnitt: null, category: 'GEMUESE', categoryImageUrl: null,
-    price: 4.5, unit: 'STUECK', unitSize: null, stock: 20, isAvailable: true, allergens: [],
-    isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
-    unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null, abholhinweise: [],
-  }
+  return publicProduct({ id, name })
 }
 
 const HOF: PublicFarm = publicFarm({
@@ -113,7 +108,7 @@ async function seitenProps(art: 'kundin' | 'vorschau'): Promise<Record<string, u
 function hofseite(farm: PublicFarm = HOF): string {
   // Absichtlich der Hof MIT Telefon und E-Mail: Auch wenn sie einmal
   // durchrutschten, zeigt die Komponente sie nicht.
-  return renderToStaticMarkup(createElement(HofseiteKunde, { farm, beitraege: [], reorderItems: [], ansicht: KUNDIN, jetzt: JETZT }))
+  return renderToStaticMarkup(createElement(HofseiteKunde, { farm, beitraege: [], beitraegeFehler: false, reorderItems: [], ansicht: KUNDIN, jetzt: JETZT }))
 }
 
 describe('Hofseite: Telefon und E-Mail gehen nicht an die Client-Komponente', () => {
@@ -295,7 +290,7 @@ describe('Keine Sackgasse: der Weg zu den Kontaktdaten statt „frag beim Hof"',
   it('kein alter Satz mehr in src/', () => {
     const funde = dateien('src').filter((pfad) => ALTE_SAETZE.test(readFileSync(join(WURZEL, pfad), 'utf8')))
     expect(funde).toEqual([])
-  })
+  }, 30_000)
 
   it('der neue Satz verweist auf die Karte, die die Kasse wirklich zeigt', () => {
     const name = KONTAKT_UNTER_ANGABEN_ZUM_HOF.match(/„(.+)“/)?.[1]

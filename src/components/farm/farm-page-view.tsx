@@ -124,6 +124,8 @@ type Props = {
   farm: HofseiteHof
   /** Die aktiven Beiträge, der neueste zuerst (Register F8). */
   beitraege: ActiveStatusPost[]
+  /** Das Laden der Beiträge ist gescheitert (page.tsx): Die Seite sagt zu `?beitrag=` nichts (Nr. 134). */
+  beitraegeFehler?: boolean
   reorderItems?: ReorderItem[]
   /**
    * Wer die öffentliche Seite sieht, entschieden von `ansichtsModus`
@@ -141,8 +143,17 @@ type Props = {
 
 const FUER_KUNDINNEN: Pick<SeitenAnsicht, 'art' | 'kaufen'> = { art: 'kundin', kaufen: true }
 
-export function FarmPageView({ farm, beitraege, reorderItems, ansicht = FUER_KUNDINNEN, jetzt }: Props) {
+export function FarmPageView({ farm, beitraege, beitraegeFehler = false, reorderItems, ansicht = FUER_KUNDINNEN, jetzt }: Props) {
   // Ohne Zeitpunkt vom Server (kein Aufrufer heute) die eigene Uhr — dann
   // kann „vor N Stunden" zwischen Server und Browser abweichen.
-  return <HofseiteKunde farm={farm} beitraege={beitraege} reorderItems={reorderItems} ansicht={ansicht} jetzt={jetzt ?? new Date().toISOString()} />
+  return (
+    <HofseiteKunde
+      farm={farm}
+      beitraege={beitraege}
+      beitraegeFehler={beitraegeFehler}
+      reorderItems={reorderItems}
+      ansicht={ansicht}
+      jetzt={jetzt ?? new Date().toISOString()}
+    />
+  )
 }

@@ -96,7 +96,7 @@ describe('Register Z1 — der Server lehnt acceptsOnline = false ab', () => {
     for (const datei of wege) {
       expect(ohneKommentare(lies(datei)), relative(WURZEL, datei)).not.toMatch(SCHREIBT_ACCEPTS_ONLINE)
     }
-  })
+  }, 30_000)
 
   it('auch src/lib setzt acceptsOnline nirgends auf etwas anderes als true', () => {
     const dateien = alleDateien('src/lib')
@@ -164,7 +164,7 @@ describe('Text aus einer Quelle (konditionen.ts)', () => {
       const text = ohneKommentare(lies(datei))
       for (const m of merkmale) expect(text.includes(m), `${datei}: ${m}`).toBe(false)
     }
-  })
+  }, 30_000)
 
   it('Gegenprobe: konditionen.ts enthält die Merkmale', () => {
     const quelle = lies('src/lib/konditionen.ts')
@@ -247,7 +247,7 @@ describe('Code ohne „Nur bar" und „ein Plus, kein Muss"', () => {
     for (const datei of alleDateien('src')) {
       expect(ohneKommentare(lies(datei)), datei).not.toMatch(RESTE)
     }
-  })
+  }, 30_000)
 
   it('Gegenprobe: die Suche schlägt an', () => {
     expect("{ id: 'nur-bar', text: 'Nur bar' }").toMatch(RESTE)

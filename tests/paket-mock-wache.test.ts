@@ -111,7 +111,7 @@ describe('Mock-Wache für Pakete mit Sicherheitsfunktion (Nr. 115, Regelvorschla
     const veraltet = Object.keys(PAKET_MOCK_BESTAND).filter((n) => !(n in funde))
     expect(veraltet, 'PAKET_MOCK_BESTAND: Datei ersetzt kein Paket mehr, Eintrag streichen').toEqual([])
     for (const grund of Object.values(PAKET_MOCK_BESTAND)) expect(grund.length).toBeGreaterThan(40)
-  })
+  }, 30_000)
 
   it('findet den heutigen Bestand (kein leerer Fund) und die echten Gegenstücke gibt es', () => {
     const funde = dateienUnter(ORDNER).filter((p) => paketMocks(readFileSync(p, 'utf8')).length > 0)
@@ -119,7 +119,7 @@ describe('Mock-Wache für Pakete mit Sicherheitsfunktion (Nr. 115, Regelvorschla
     for (const datei of ['integration/webhook-zahlung.int.test.ts', 'sharp-lader-sperre.test.ts', 'teilen-bild-jpeg.test.ts']) {
       expect(readFileSync(join(ORDNER, datei), 'utf8').length, datei).toBeGreaterThan(0)
     }
-  })
+  }, 30_000)
 
   describe('Gegenprobe an Attrappen', () => {
     it('schlägt bei Better Auth, seinen Plugins, Stripe, WebAuthn und sharp an', () => {

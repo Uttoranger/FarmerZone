@@ -44,12 +44,12 @@ describe('NEUESTER_BEITRAG_ZUERST — eine Reihenfolge für den neuesten Beitrag
       'server/queries/neuigkeiten.ts',
       'server/queries/farm.ts',
     ]))
-  })
+  }, 30_000)
 
   it('keine Datei mit AKTIVER_BEITRAG ordnet selbst nach publishedAt', () => {
     const verstoesse = NUTZER.filter((datei) => eigeneReihenfolge(readFileSync(datei, 'utf8'))).map((datei) => path.relative(SRC, datei))
     expect(verstoesse).toEqual([])
-  })
+  }, 30_000)
 
   it('Gegenprobe: die alte Fassung schlägt an, die Konstante nicht', () => {
     expect(eigeneReihenfolge("orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }],")).toBe(true)

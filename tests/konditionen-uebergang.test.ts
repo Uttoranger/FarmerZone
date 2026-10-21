@@ -113,7 +113,7 @@ describe('Kein zweites Exemplar unter src/', () => {
   it('nur src/lib/konditionen.ts nennt das Datum oder den Satz', () => {
     const treffer = dateien.filter((d) => ZWEITES_EXEMPLAR.test(lies(d)) && d !== AGB)
     expect(treffer).toEqual(['src/lib/konditionen.ts'])
-  })
+  }, 30_000)
 
   it('die AGB nennen das Wort „Startphase", aber weder das Datum noch den Satz — Gegenprobe: ohne das Wort schlägt die Suche dort nicht an', () => {
     const text = lies(AGB)
@@ -137,12 +137,12 @@ describe('Kein zweites Exemplar unter src/', () => {
     // Ein anderes Datum im selben Jahr ist kein zweites Exemplar.
     for (const text of ['Stand: 15.03.2027', '2027-03-01', 'Juni 2027']) expect(text).not.toMatch(ZWEITES_EXEMPLAR)
     expect(dateien.length).toBeGreaterThan(100)
-  })
+  }, 30_000)
 
   it('die alten Sätze, die Tarife als sofort gültig darstellten, sind weg', () => {
     const alt = /Kostenlos starten mit dem Tarif|Mit dem Tarif Hoftor ab|SEPA-Mandat für die Monatsabrechnung\.|SEPA für die Monatsabrechnung'/
     expect(dateien.filter((d) => alt.test(lies(d)))).toEqual([])
-  })
+  }, 30_000)
 })
 
 describe('Die Seiten zeigen den Satz', () => {

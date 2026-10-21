@@ -12,13 +12,17 @@
  *  - Der Anstoß nur ohne laufenden Beitrag, ohne Beitrag in 14 Tagen und mit
  *    Produkten im Shop — mit den vier Anlässen als Links mit `?anlass=`.
  *  - Mein Hof: die Zeile mit und ohne Beitrag.
+ *  - Steht der Anstoß, entfällt in „Braucht dich“ die Erinnerung an einen Beitrag
+ *    (N11, Ergänzung Nr. 134): nie zwei Erinnerungen an dieselbe Sache.
+ *  - Die Karte trägt ihre Überschrift als h2 wie die übrigen Karten von Heute und
+ *    zeigt das Foto mit dem Ausschnitt der Hofseite (bildStil).
  */
 import { describe, expect, it, vi } from 'vitest'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 vi.mock('next/image', () => ({
-  default: (p: { src: string; alt: string }) => createElement('img', { src: p.src, alt: p.alt }),
+  default: (p: { src: string; alt: string; style?: Record<string, string> }) => createElement('img', { src: p.src, alt: p.alt, style: p.style }),
 }))
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode } & Record<string, unknown>) =>
@@ -31,7 +35,9 @@ import {
   ANSTOSS_NACH_TAGEN,
   anstossLinks,
   beitragBlock,
+  brauchtDich,
   deinBeitragZeile,
+  entferneBeitragErinnerung,
   heuteAufbau,
   laeuftNochText,
   seitWannText,
@@ -39,6 +45,9 @@ import {
   type DeinBeitrag,
 } from '@/lib/heute'
 import { BEITRAG_ANLAESSE } from '@/lib/beitrag-anlass'
+import { statusReminder } from '@/lib/dashboard-hints'
+import { bildStil } from '@/lib/bild-ausschnitt'
+import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { aktuellZeile } from '@/lib/mein-hof-ansicht'
 import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
 import { BeitragAnstoss, DeinBeitragKarte } from '@/components/heute/dein-beitrag'
@@ -53,6 +62,7 @@ const BEITRAG: DeinBeitrag = {
   titel: 'Die ersten Kürbisse sind da',
   anlass: 'NEW_SEASON',
   foto: null,
+  fotoAusschnitt: null,
   veroeffentlicht: vor(2 * STUNDE),
   endet: nach(6 * 24 * STUNDE + 22 * STUNDE),
   emailAnzahl: 24,
@@ -156,6 +166,91 @@ describe('Die Karte und der Anstoß, gerendert', () => {
     expect(anstoss).toContain('Ein kurzer Beitrag steht oben auf deiner Hofseite.')
     for (const anlass of BEITRAG_ANLAESSE) expect(anstoss).toContain(`href="/status/new?anlass=${anlass}"`)
     expect(anstoss).not.toContain('Nicht jetzt')
+  })
+})
+
+describe('Die Karte: Überschrift und Foto (Nr. 134)', () => {
+  const html = (beitrag: DeinBeitrag) => renderToStaticMarkup(createElement(DeinBeitragKarte, { beitrag, hofSlug: 'testhof-a', jetzt: JETZT.toISOString() }))
+  const AUSSCHNITT: BildAusschnitt = { fokusX: 30, fokusY: 70, zoom: 150, filter: 'WARM' }
+
+  it('„Dein Beitrag“ ist eine h2, auf die die Karte zeigt — wie „Braucht dich“ und die Packliste; der Anstoß ebenso', () => {
+    const karte = html(BEITRAG)
+    expect(karte).toMatch(/<h2 id="heute-dein-beitrag"[^>]*>Dein Beitrag<\/h2>/)
+    expect(karte).toContain('aria-labelledby="heute-dein-beitrag"')
+    expect(renderToStaticMarkup(createElement(BeitragAnstoss))).toMatch(/<h2 id="heute-anstoss"/)
+  })
+
+  it('das Foto steht mit Fokus, Zoom und Filter der Hofseite (bildStil) — nicht anders als in „Aktuell vom Hof“', () => {
+    const karte = html({ ...BEITRAG, foto: 'https://blob.example/kuerbis.jpg', fotoAusschnitt: AUSSCHNITT })
+    expect(karte).toContain('object-position:30% 70%')
+    expect(karte).toContain('transform:scale(1.5)')
+    expect(karte).toContain('transform-origin:30% 70%')
+    // Der Filter kommt aus derselben Regel: Er steht im Stil, sobald bildStil ihn setzt.
+    expect(bildStil(AUSSCHNITT).filter).toBeTruthy()
+    expect(karte).toContain(`filter:${bildStil(AUSSCHNITT).filter}`)
+  })
+
+  it('Gegenprobe: ohne Ausschnitt steht das Foto wie vorher, ohne Stil', () => {
+    const karte = html({ ...BEITRAG, foto: 'https://blob.example/kuerbis.jpg', fotoAusschnitt: null })
+    expect(karte).toContain('src="https://blob.example/kuerbis.jpg"')
+    expect(karte).not.toContain('object-position')
+    expect(karte).not.toContain('transform:')
+  })
+})
+
+describe('„Braucht dich“ ohne Doppelung mit dem Anstoß (N11, Ergänzung Nr. 134)', () => {
+  const TAG = 24 * STUNDE
+  const LEER = { ueberfaellig: { anzahl: 0, juengste: [] }, ausverkauft: [], ohneKategorie: [] }
+
+  /** Was „Braucht dich“ zeigt, wenn der letzte Beitrag `tage` her ist (null = nie einer) — gerechnet wie Heute. */
+  function eintraege(tage: number | null, produkteImShop = true, aktiv: DeinBeitrag | null = null): string[] {
+    const letzter = tage === null ? null : new Date(JETZT.getTime() - tage * TAG)
+    const liste = brauchtDich({ ...LEER, statusErinnerung: statusReminder(letzter, JETZT) })
+    const art = beitragBlock({
+      aktiv,
+      beitragInFrist: tage !== null && tage <= ANSTOSS_NACH_TAGEN,
+      produkteImShop,
+    })
+    return entferneBeitragErinnerung(liste, art).map((e) => e.art)
+  }
+
+  it('5 Tage ohne Beitrag: keine Erinnerung (noch nicht fällig), kein Anstoß', () => {
+    expect(eintraege(5)).toEqual([])
+  })
+
+  it('10 Tage: der Anstoß steht noch nicht, also bleibt die Erinnerung, wie sie ist', () => {
+    expect(eintraege(10)).toEqual(['status'])
+  })
+
+  it('15 Tage: der Anstoß steht, die Erinnerung entfällt', () => {
+    expect(eintraege(15)).toEqual([])
+  })
+
+  it('nie ein Beitrag: der Anstoß steht, die Erinnerung entfällt', () => {
+    expect(eintraege(null)).toEqual([])
+  })
+
+  it('keine Produkte im Shop: kein Anstoß, also bleibt die Erinnerung — 15 Tage und nie', () => {
+    expect(eintraege(15, false)).toEqual(['status'])
+    expect(eintraege(null, false)).toEqual(['status'])
+  })
+
+  it('mit laufendem Beitrag (Karte) bleibt die Erinnerung: Nur der Anstoß ersetzt sie', () => {
+    expect(eintraege(10, true, BEITRAG)).toEqual(['status'])
+  })
+
+  it('die übrigen Einträge bleiben und behalten ihre Reihenfolge', () => {
+    const liste = brauchtDich({
+      ueberfaellig: { anzahl: 0, juengste: [] },
+      ausverkauft: [{ id: 'p1', name: 'Erfundene Eier' }],
+      ohneKategorie: [{ id: 'p2', name: 'Erfundener Honig' }],
+      statusErinnerung: 'never',
+    })
+    expect(liste.map((e) => e.art)).toEqual(['ausverkauft', 'ohne-kategorie', 'status'])
+    expect(entferneBeitragErinnerung(liste, 'anstoss').map((e) => e.art)).toEqual(['ausverkauft', 'ohne-kategorie'])
+    // Gegenprobe: Ohne Anstoß ändert sich nichts.
+    expect(entferneBeitragErinnerung(liste, null)).toEqual(liste)
+    expect(entferneBeitragErinnerung(liste, 'karte')).toEqual(liste)
   })
 })
 

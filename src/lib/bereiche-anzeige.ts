@@ -207,6 +207,13 @@ export function hofPasst(hof: HofMitAngebot, f: ProduktFilter): boolean {
 }
 
 /**
+ * Das Angebot eines Hofs, so weit `istBestellbar` es liest: ob es eines gibt, nicht welches. Bewusst nicht
+ * `readonly AngebotsZeile[]` — die Futter-Karte füllt dieselbe Stelle mit ihren eigenen Zeilen (`FutterAngebot`,
+ * `alsAbholHof` in `futter-kaufen.ts`) und fragt dieselbe Regel.
+ */
+export type AngebotVorhanden = readonly unknown[]
+
+/**
  * Kann man bei diesem Hof gerade bestellen (Register N22)? Nur mit mindestens
  * einem kaufbaren Produkt (`angebot`, istKaufbar) UND einer kommenden
  * Abholzeit. Die Abholzeiten wiederholen sich jede Woche: Wer eine aktive hat,
@@ -217,7 +224,7 @@ export function hofPasst(hof: HofMitAngebot, f: ProduktFilter): boolean {
  * Fehlen die Abholzeiten ganz (Cache-Eintrag von vor Nr. 120), gilt er als
  * nicht bestellbar.
  */
-export function istBestellbar(hof: { angebot: readonly unknown[]; abholfenster?: readonly unknown[] }): boolean {
+export function istBestellbar(hof: { angebot: AngebotVorhanden; abholfenster?: readonly unknown[] }): boolean {
   return hof.angebot.length > 0 && (hof.abholfenster?.length ?? 0) > 0
 }
 

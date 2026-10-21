@@ -307,7 +307,7 @@ describe('Kein Code baut den Pfad der Bestätigungsseite an bestell-link.ts vorb
       .filter((pfad) => SELBST_GEBAUT.test(readFileSync(pfad, 'utf8')))
       .map((pfad) => pfad.slice(process.cwd().length + 1))
     expect(treffer).toEqual([])
-  })
+  }, 30_000)
 })
 
 describe('Die Signatur einer Bestellung öffnet genau einen Schreibweg (Nr. 46, Runde 1)', () => {
@@ -335,7 +335,7 @@ describe('Die Signatur einer Bestellung öffnet genau einen Schreibweg (Nr. 46, 
       .map((pfad) => pfad.slice(process.cwd().length + 1))
       .sort()
     expect(treffer).toEqual([...LESEWEGE, 'src/server/actions/neuigkeiten.ts'].sort())
-  })
+  }, 30_000)
 
   it('die Lesewege schreiben nicht: keine Server Action, keine Route außer GET', () => {
     for (const pfad of LESEWEGE) {

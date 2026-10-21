@@ -7,6 +7,7 @@ import { Mail, MessageCircle, Plus } from 'lucide-react'
 import { BEITRAG_ANLASS } from '@/lib/beitrag-anlass'
 import { DEIN_BEITRAG_TEXT, anstossLinks, deinBeitragZeile, neuerBeitragHref, versandZeilen, type DeinBeitrag } from '@/lib/heute'
 import { beitragLink } from '@/lib/teilen-fenster'
+import { bildStil } from '@/lib/bild-ausschnitt'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { BeitragTeilenKnopf } from '@/components/teilen/beitrag-teilen'
@@ -34,16 +35,18 @@ export function DeinBeitragKarte({ beitrag, hofSlug, jetzt }: { beitrag: DeinBei
   const versand = versandZeilen(beitrag)
   return (
     <section aria-labelledby="heute-dein-beitrag" className={cn(KARTE, 'flex flex-col gap-3 px-4 py-3.5 md:px-[18px]')}>
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span id="heute-dein-beitrag" className="text-[15px] font-semibold">
+      {/* h2 wie die übrigen Karten von Heute (Packliste, Braucht dich); der Zusatz steht daneben, nicht in der Überschrift. */}
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <h2 id="heute-dein-beitrag" className="text-[15px] font-semibold">
           {DEIN_BEITRAG_TEXT.titel}
-        </span>
+        </h2>
         <span className="text-[12.5px] text-muted-foreground">{DEIN_BEITRAG_TEXT.wo}</span>
-      </p>
+      </div>
       <div className="flex items-start gap-3">
         <span className="relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-muted">
           {beitrag.foto ? (
-            <Image src={beitrag.foto} alt="" fill sizes="56px" className="object-cover" />
+            // Mit Fokus, Zoom und Filter wie in „Aktuell vom Hof“ — sonst zeigte Heute einen anderen Ausschnitt als die Hofseite.
+            <Image src={beitrag.foto} alt="" fill sizes="56px" className="object-cover" style={bildStil(beitrag.fotoAusschnitt)} />
           ) : (
             <Symbol className="size-6 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
           )}
