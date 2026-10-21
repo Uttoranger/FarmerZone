@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { ladeDeinenBeitrag, ladeLaufendenBeitrag } from '@/server/queries/dashboard'
+import { getActiveStatusPosts } from '@/server/queries/status-posts'
 import { erstelleHof, erstelleProdukt, raeumeAuf } from './setup/basis'
 
 afterEach(async () => {
@@ -53,6 +54,21 @@ describe('ladeLaufendenBeitrag und ladeDeinenBeitrag — eine Regel für den lau
       whatsappAnzahl: 2,
     })
     expect((await ladeDeinenBeitrag(farm.id, JETZT)).aktiv).toEqual(laufend)
+  })
+
+  // Die Karte sagt „steht oben auf deiner Hofseite“: Bei gleicher Veröffentlichungszeit muss
+  // derselbe Beitrag gewinnen wie auf der Hofseite (getActiveStatusPosts), sonst nennen Heute und
+  // Mein Hof einen anderen. Ohne Ende, damit er auch zur Systemuhr der Hofseiten-Abfrage läuft.
+  it('gleicher Zeitpunkt: derselbe Beitrag wie oben auf der Hofseite', async () => {
+    const { farm } = await erstelleHof()
+    const zeitpunkt = vor(2 * STUNDE)
+    await beitrag(farm.id, 'Erster', { publishedAt: zeitpunkt, expiresAt: null })
+    await beitrag(farm.id, 'Zweiter', { publishedAt: zeitpunkt, expiresAt: null })
+
+    const oben = (await getActiveStatusPosts(farm.id, 1))[0]
+    expect(oben).toBeDefined()
+    expect((await ladeLaufendenBeitrag(farm.id, JETZT))?.id).toBe(oben.id)
+    expect((await ladeDeinenBeitrag(farm.id, JETZT)).aktiv?.id).toBe(oben.id)
   })
 
   it('nur der eigene Hof — ein fremder Beitrag und ein fremdes Produkt zählen nie', async () => {

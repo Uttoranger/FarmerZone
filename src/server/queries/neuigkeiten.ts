@@ -4,7 +4,7 @@ import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { NEUIGKEITEN_CACHE_TAG, NEUIGKEITEN_TAGE, waehleNeuigkeiten, type Neuigkeit } from '@/lib/startseite-gestalten'
 import { leseAusschnitt } from '@/schemas/bild-ausschnitt'
 import { leseOeffentlichMitWiederholung } from '@/server/oeffentlich-lesen'
-import { AKTIVER_BEITRAG } from '@/server/queries/status-posts'
+import { AKTIVER_BEITRAG, NEUESTER_BEITRAG_ZUERST } from '@/server/queries/status-posts'
 import { IN_LISTEN_SICHTBAR } from '@/server/queries/farm'
 import { PRODUCT_ORDER_BY } from '@/server/queries/products'
 
@@ -24,8 +24,8 @@ export async function leseNeuigkeiten(jetzt: Date): Promise<Neuigkeit[]> {
   const beitraege = await prisma.statusPost.findMany({
     // AKTIVER_BEITRAG trägt ein eigenes OR — darum als Element der AND-Liste.
     where: { AND: [AKTIVER_BEITRAG(jetzt), { publishedAt: { gte: ab } }, { farm: { ...IN_LISTEN_SICHTBAR, isPaused: false } }] },
-    // Bei gleicher Zeit fest geordnet, sonst wechselte der Beitrag eines Hofs zwischen zwei Abfragen.
-    orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }],
+    // Bei gleicher Zeit wie auf der Hofseite geordnet: Je Hof zählt derselbe Beitrag, der dort oben steht.
+    orderBy: NEUESTER_BEITRAG_ZUERST,
     select: {
       id: true,
       title: true,

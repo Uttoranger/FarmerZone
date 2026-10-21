@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { ANSTOSS_NACH_TAGEN, type DeinBeitrag } from '@/lib/heute'
-import { AKTIVER_BEITRAG } from '@/server/queries/status-posts'
+import { AKTIVER_BEITRAG, NEUESTER_BEITRAG_ZUERST } from '@/server/queries/status-posts'
 
 export async function getFarmForUser(userId: string) {
   return prisma.farm.findUnique({
@@ -25,7 +25,7 @@ export async function getFarmForUser(userId: string) {
 export async function ladeLaufendenBeitrag(farmId: string, jetzt: Date): Promise<DeinBeitrag | null> {
   const aktiv = await prisma.statusPost.findFirst({
     where: { AND: [{ farmId }, AKTIVER_BEITRAG(jetzt)] },
-    orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }],
+    orderBy: NEUESTER_BEITRAG_ZUERST,
     select: { id: true, title: true, anlass: true, photoUrl: true, publishedAt: true, expiresAt: true, emailRecipientCount: true, whatsappGetippt: true },
   })
   if (!aktiv) return null
