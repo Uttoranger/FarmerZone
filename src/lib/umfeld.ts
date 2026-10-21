@@ -682,7 +682,9 @@ export function baueUmfeldKarte(eingabe: UmfeldEingabe & { eigenerStandort: { la
  * Die Texte von „Preise vergleichen" an EINER Stelle (Board v3 §4). „So
  * rechnen wir" steht wie im Board — außer „oder Stück": Eier je Stück ist
  * zurückgestellt bis zum Pilot (Register N23, Änderung 21.10.2026), der Satz
- * sagte sonst etwas, das nicht stimmt.
+ * sagte sonst etwas, das nicht stimmt. Punkt 3 zählt nur („kleinsten
+ * Grundpreis") und wertet nicht („günstigstes Angebot" tat es): Die Wache in
+ * tests/umfeld-leitplanken.test.ts kennt „günstig" am Wortanfang.
  */
 export const UMFELD_TEXT = {
   hinweis: 'Höfe in deinem Umkreis, die gerade verkaufen.',
@@ -690,7 +692,7 @@ export const UMFELD_TEXT = {
   soRechnenWir: [
     'Luftlinie ab deinem Hof, im Umkreis, den du oben wählst.',
     'Nur Höfe, die gerade verkaufen. Pausierte Höfe und Höfe ohne Standort zählen nicht.',
-    'Je Hof zählt sein günstigstes Angebot einer Sorte – ein Hof mit drei Heusorten zählt einmal.',
+    'Je Hof zählt in einer Sorte das Angebot mit dem kleinsten Grundpreis – ein Hof mit drei Heusorten zählt einmal.',
     'Verglichen wird der Preis je Kilo oder Liter. Die Mitte ist der mittlere Wert, nicht der Durchschnitt.',
     `Alles steht auch auf den Hofseiten. ${MARKE} empfiehlt keine Preise.`,
   ],
