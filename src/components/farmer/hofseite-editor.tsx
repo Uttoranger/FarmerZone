@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   AlignLeft,
   BadgeCheck,
+  CalendarDays,
   Check,
   ChevronRight,
   Clock3,
@@ -25,6 +26,7 @@ import type { FarmSettings } from '@/server/queries/farm'
 import type { AppearanceData } from '@/server/queries/appearance'
 import { type HofseiteFortschritt, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
+import type { aktuellZeile } from '@/lib/mein-hof-ansicht'
 import {
   EDITOR_ABSTAND,
   EDITOR_LISTE_HANDY_MAX,
@@ -66,6 +68,8 @@ type Props = {
   hof: AbschnittHof
   einstellungen: FarmSettings
   auftritt: AppearanceData
+  /** „Aktuell vom Hof“ als erste Zeile (Register E12, Nr. 129) — wie in der Liste unter lg; fehlt die Angabe, steht sie nicht da. */
+  aktuell?: ReturnType<typeof aktuellZeile>
 }
 
 const SYMBOL: Record<HofseiteZeileId, LucideIcon> = {
@@ -137,7 +141,7 @@ function Zeile({
   )
 }
 
-export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Props): React.JSX.Element {
+export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt, aktuell }: Props): React.JSX.Element {
   const router = useRouter()
   // Nur eine Zeile offen zugleich — und genau die markiert die Vorschau.
   const [offen, setOffen] = useState<HofseiteZeileId | null>(null)
@@ -203,6 +207,33 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Pr
           </div>
           <p className="mt-3 text-sm text-muted-foreground">{fortschritt.satz}</p>
         </div>
+
+        {aktuell && (
+          // Wie auf der Hofseite oben: der laufende Beitrag. Verwaltet wird unter Mein Hof › Beiträge — darum ein Link, keine Zeile zum Aufklappen.
+          <ul aria-label={aktuell.titel} className="overflow-hidden rounded-2xl border border-border bg-card">
+            <li data-bearbeiten-zeile="aktuell" className="relative flex min-h-14 items-center gap-3 px-4 py-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-muted text-status-fertig">
+                <CalendarDays className="size-4" strokeWidth={1.7} aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-foreground">{aktuell.titel}</span>
+                <span className="block truncate text-[13px] text-muted-foreground">{aktuell.wert}</span>
+              </span>
+              <Link
+                href={aktuell.link.href}
+                title={`${aktuell.titel}: ${aktuell.wert}`}
+                className={cn(
+                  "inline-flex min-h-11 shrink-0 items-center gap-0.5 rounded-lg px-1.5 text-sm font-semibold whitespace-nowrap text-brand-text after:absolute after:inset-0 after:content-['']",
+                  FOKUS_RAHMEN
+                )}
+              >
+                <span className="sr-only">{aktuell.titel}: </span>
+                {aktuell.link.text}
+                <ChevronRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
+              </Link>
+            </li>
+          </ul>
+        )}
 
         {fortschritt.gruppen.map((gruppe) => (
           <section key={gruppe.id} aria-labelledby={`hofseite-gruppe-${gruppe.id}`}>

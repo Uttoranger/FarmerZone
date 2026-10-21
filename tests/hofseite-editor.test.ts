@@ -40,11 +40,11 @@ describe('/farm-page', () => {
 
   it('unter lg die Liste „Bearbeiten" (Nr. 50), ab lg der Editor — beide mit denselben Daten', () => {
     expect(seite).toMatch(
-      /<div className="lg:hidden">[\s\S]*?<h1 className="sr-only">Hofseite bearbeiten<\/h1>\s*<AbschnitteListe fortschritt=\{fortschritt\} hof=\{hof\} einstellungen=\{einstellungen\} auftritt=\{auftritt\} \/>/
+      /<div className="lg:hidden">[\s\S]*?<h1 className="sr-only">Hofseite bearbeiten<\/h1>\s*<AbschnitteListe fortschritt=\{fortschritt\} hof=\{hof\} einstellungen=\{einstellungen\} auftritt=\{auftritt\} aktuell=\{aktuell\} \/>/
     )
     // Die alte Hofseite mit Stiften und die Checkliste sind dort entfallen (Register N4).
     expect(seite).not.toMatch(/FarmPageClient|ChecklisteKompakt|FarmPageView/)
-    expect(seite).toContain('<HofseiteEditor fortschritt={fortschritt} hof={hof} einstellungen={einstellungen} auftritt={auftritt} />')
+    expect(seite).toContain('<HofseiteEditor fortschritt={fortschritt} hof={hof} einstellungen={einstellungen} auftritt={auftritt} aktuell={aktuell} />')
     // Ab lg trägt der Editor-Block die H1 der Seite — nur für Screenreader; sichtbar ist der Hofname im Kopf.
     expect(seite).toMatch(/<div className="hidden px-8 pb-12 lg:block">[\s\S]*?<h1 className="sr-only">Hofseite bearbeiten<\/h1>\s*<HofseiteEditor/)
   })

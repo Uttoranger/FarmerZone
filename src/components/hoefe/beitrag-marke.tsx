@@ -8,7 +8,8 @@ import { useUhr } from '@/components/hoefe/use-uhr'
 /**
  * Die Marke „Neu · vor 2 Std.“ am Bild der Hofkarte (Register N22, Ergänzung
  * Nr. 129; Board system-k2-beitraege-v2, Abschnitt 4) — EIN Baustein für die
- * Liste auf /hoefe (HofKarte) und das Karussell der Karte.
+ * Liste auf /hoefe (HofKarte), das Karussell der Karte und die Hofkarten der
+ * Startseite (HofKarten, „Höfe in deiner Nähe“).
  *
  * Gerechnet mit der Uhr des Browsers (useUhr, wie die Abholzeile): Die Liste
  * ist bis zu zehn Minuten alt, die Marke verschwindet trotzdem nach sieben
@@ -18,7 +19,9 @@ import { useUhr } from '@/components/hoefe/use-uhr'
  * hält der Kontrast auf jedem Foto und jeder Illustration, in beiden Themes.
  * Die sichtbare Marke ist für den Screenreader verborgen; der Satz „Neuer
  * Beitrag vor 2 Stunden: <Titel>“ steht unter `beschreibungId` und hängt per
- * aria-describedby am Link der Karte — die Karte bleibt EIN Link.
+ * aria-describedby am Link der Karte — die Karte bleibt EIN Link. Ist die
+ * Marke nach der Uhr des Browsers schon weg, bleibt die Kennung als leerer
+ * Text stehen: Der Verweis am Link zeigt nie ins Leere.
  */
 export function BeitragMarke({
   beitrag,
@@ -38,7 +41,7 @@ export function BeitragMarke({
 }): React.JSX.Element | null {
   const uhr = useUhr(jetzt)
   const marke = beitragMarke(beitrag, uhr)
-  if (!marke) return null
+  if (!marke) return beitrag ? <span id={beschreibungId} hidden /> : null
   return (
     <>
       <span

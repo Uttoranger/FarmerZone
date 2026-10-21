@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { Kicker } from '@/components/startseite/kicker'
 import { Abzeichen } from '@/components/ui/abzeichen'
+import { BeitragMarke } from '@/components/hoefe/beitrag-marke'
 
 /*
  * „Höfe in deiner Nähe" (Mockups web-k0-startseite, mobil-k0-startseite):
@@ -92,8 +93,13 @@ function Abholung({ hof, praefix = '' }: { hof: StartseitenHof; praefix?: string
   )
 }
 
-/** Die Hofkarten — am Handy waagrecht zum Wischen, im Browser eine Reihe. */
-export function HofKarten({ hoefe }: { hoefe: readonly StartseitenHof[] }): React.JSX.Element {
+/**
+ * Die Hofkarten — am Handy waagrecht zum Wischen, im Browser eine Reihe.
+ * Mit `jetzt` (Zeitpunkt der Seite, ISO-Text) trägt das Bild die Marke
+ * „Neu · vor …“ (BeitragMarke, Register N22, Nr. 129); ohne (Block
+ * „Höfe-Auswahl“) keine Marke.
+ */
+export function HofKarten({ hoefe, jetzt }: { hoefe: readonly StartseitenHof[]; jetzt?: string }): React.JSX.Element {
   if (hoefe.length === 0) {
     // Leerzustand mit Ausweg (DESIGN_SYSTEM, „Zustände"): Noch gibt es keine
     // Höfe zu zeigen — wer selbst einen hat, kann den Anfang machen.
@@ -124,12 +130,25 @@ export function HofKarten({ hoefe }: { hoefe: readonly StartseitenHof[] }): Reac
           <Link
             href={`/${hof.slug}`}
             title={hof.name}
+            // Der Satz der Marke für den Screenreader hängt am einen Link der Karte.
+            aria-describedby={jetzt !== undefined && hof.neuerBeitrag ? `beitrag-marke-startseite-${hof.slug}` : undefined}
             className={cn(
               'flex h-full flex-col overflow-hidden rounded-[18px] border border-border bg-card transition-colors duration-[250ms] hover:border-foreground/30',
               FOKUS_RAHMEN
             )}
           >
-            <HofBild hof={hof} sizes="(min-width: 1024px) 285px, (min-width: 768px) 50vw, 250px" className="h-[130px] w-full" />
+            <span className="relative block">
+              <HofBild hof={hof} sizes="(min-width: 1024px) 285px, (min-width: 768px) 50vw, 250px" className="h-[130px] w-full" />
+              {/* Am Bild oben links, wie auf /hoefe — keine zweite Zeile. */}
+              {jetzt !== undefined && (
+                <BeitragMarke
+                  beitrag={hof.neuerBeitrag}
+                  jetzt={jetzt}
+                  beschreibungId={`beitrag-marke-startseite-${hof.slug}`}
+                  className="absolute top-2.5 left-2.5"
+                />
+              )}
+            </span>
             <span className="flex min-w-0 flex-col gap-1.5 px-4 py-3.5">
               {/* Abzeichen klein über dem Namen (Register K2, Nr. 116) — die Karte bleibt der Link. */}
               {hof.gruendungshof && <Abzeichen groesse="klein" className="self-start" />}

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import * as Sentry from '@sentry/nextjs'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
@@ -6,6 +7,8 @@ import { getFarmSettings, getMeinHofKopf, getOwnerFarm } from '@/server/queries/
 import { getAppearanceData } from '@/server/queries/appearance'
 import { getStatusPostsForFarm, zaehleWhatsAppAbonnentinnen } from '@/server/queries/status-posts'
 import { zaehleBeitraege } from '@/server/queries/mein-hof-zahl'
+import { ladeDeinenBeitrag } from '@/server/queries/dashboard'
+import { aktuellZeile } from '@/lib/mein-hof-ansicht'
 import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 import { beitraegeUebersicht } from '@/lib/mein-hof-beitraege'
 import { meinHofReiterAus } from '@/lib/bauern-navigation'
@@ -88,13 +91,21 @@ export default async function FarmPageOwnerRoute({
     )
   }
 
-  const [kopf, beitraegeZahl, einstellungen, auftritt] = await Promise.all([
+  const jetzt = new Date()
+  const [kopf, beitraegeZahl, einstellungen, auftritt, deinBeitrag] = await Promise.all([
     getMeinHofKopf(session.user.id),
     zaehleBeitraege(farm.id),
     getFarmSettings(session.user.id),
     getAppearanceData(session.user.id),
+    // „Aktuell vom Hof“ als erste Zeile (Register E12, Nr. 129): Ein Ladefehler nimmt nur die Zeile weg, nie Mein Hof.
+    ladeDeinenBeitrag(farm.id, jetzt).catch((err: unknown) => {
+      Sentry.captureException(err, { tags: { bereich: 'dein-beitrag', seite: 'mein-hof' }, extra: { farmId: farm.id } })
+      return null
+    }),
   ])
   if (!einstellungen || !auftritt) redirect('/onboarding')
+  // Ohne Daten (Fehler) keine Zeile — „Kein Beitrag“ wäre dann falsch.
+  const aktuell = deinBeitrag ? aktuellZeile(deinBeitrag.aktiv, jetzt) : undefined
 
   const fortschritt = hofseiteFortschritt(hofseiteStand(farm, einstellungen))
   // Nur, was die Bausteine brauchen — kein Date und kein Decimal über die Grenze (CODING_STANDARDS §2).
@@ -129,7 +140,7 @@ export default async function FarmPageOwnerRoute({
         <div className="lg:hidden">
           <div className="mx-auto max-w-3xl px-4 pt-5 pb-12 md:px-8">
             <h1 className="sr-only">Hofseite bearbeiten</h1>
-            <AbschnitteListe fortschritt={fortschritt} hof={hof} einstellungen={einstellungen} auftritt={auftritt} />
+            <AbschnitteListe fortschritt={fortschritt} hof={hof} einstellungen={einstellungen} auftritt={auftritt} aktuell={aktuell} />
           </div>
         </div>
       </MeinHofAnsicht>
@@ -138,7 +149,7 @@ export default async function FarmPageOwnerRoute({
       <div className="hidden px-8 pb-12 lg:block">
         {/* Sichtbar ist der Hofname im Kopf; die H1 hört nur der Screenreader. */}
         <h1 className="sr-only">Hofseite bearbeiten</h1>
-        <HofseiteEditor fortschritt={fortschritt} hof={hof} einstellungen={einstellungen} auftritt={auftritt} />
+        <HofseiteEditor fortschritt={fortschritt} hof={hof} einstellungen={einstellungen} auftritt={auftritt} aktuell={aktuell} />
       </div>
     </>
   )

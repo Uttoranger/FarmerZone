@@ -357,3 +357,15 @@ describe('Titelbild — das kleine Logo der Browser-Vorschau (Nr. 108, Runde 1)'
     expect(element?.props).toHaveProperty('logoAusschnitt', null)
   })
 })
+
+describe('„Aktuell vom Hof“ unter lg (Register E12, Nr. 129, Runde 1)', () => {
+  it('erste Zeile der Liste mit Titel, „läuft noch …“ und „Beiträge ›“; ohne Angabe keine Zeile', () => {
+    const html = renderToStaticMarkup(
+      createElement(AbschnitteListe, { fortschritt: hofseiteFortschritt(STAND), hof: HOF, einstellungen: EINSTELLUNGEN, auftritt: AUFTRITT, aktuell: { titel: 'Aktuell vom Hof', wert: 'Die ersten Kürbisse sind da · läuft noch 6 Tage', link: { text: 'Beiträge', href: '/farm-page?reiter=beitraege' } } })
+    )
+    expect(html.indexOf('data-bearbeiten-zeile="aktuell"')).toBeLessThan(html.indexOf('data-bearbeiten-zeile="titelbild"'))
+    expect(html).toContain('Die ersten Kürbisse sind da · läuft noch 6 Tage')
+    expect(html).toMatch(/<a [^>]*href="\/farm-page\?reiter=beitraege"/)
+    expect(liste()).not.toContain('data-bearbeiten-zeile="aktuell"')
+  })
+})

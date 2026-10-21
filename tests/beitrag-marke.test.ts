@@ -12,6 +12,11 @@
  *    Bild, der Satz „Neuer Beitrag vor 2 Stunden: <Titel>“ hängt per
  *    aria-describedby am EINEN Link bzw. Knopf der Karte. Gegenprobe ohne
  *    Beitrag und nach sieben Tagen: keine Marke, kein Verweis.
+ *  - Die Hofkarten der Startseite („Höfe in deiner Nähe“, Runde 1): dieselbe
+ *    Liste reicht `neuerBeitrag` ohne zweite Abfrage durch
+ *    (waehleStartseitenHoefe), dieselbe Marke am Bild, der Satz am einen Link;
+ *    die Seite reicht ihren Zeitpunkt weiter. Gegenprobe ohne Beitrag bzw.
+ *    ohne Zeitpunkt (Block „Höfe-Auswahl“): keine Marke, kein Verweis.
  */
 import { describe, expect, it, vi } from 'vitest'
 import { createElement, type ComponentProps, type ReactNode } from 'react'
@@ -31,6 +36,10 @@ vi.mock('next/link', () => ({
 import { NEUER_BEITRAG_TAGE, beitragMarke, type NeuerBeitrag } from '@/lib/hofuebersicht'
 import { HofKarte, type KartenHof } from '@/components/hoefe/entdecken-teile'
 import HoefeKarussell from '@/components/hoefe/hoefe-karussell'
+import { HofKarten } from '@/components/startseite/hoefe-in-der-naehe'
+import { waehleStartseitenHoefe, type StartseitenHofEingabe } from '@/lib/startseite'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 const STUNDE = 3_600_000
 const JETZT = '2026-10-20T10:00:00.000Z'
@@ -121,6 +130,9 @@ describe('HofKarte mit Marke', () => {
     const alt = karte({ hof: { ...HOF, neuerBeitrag: { ...KUERBIS, veroeffentlicht: vor(7 * 24 * STUNDE) } } })
     expect(alt).not.toContain('Neu ·')
     expect(alt).not.toContain(SATZ)
+    // Der Verweis am Link zeigt trotzdem auf ein vorhandenes (leeres) Element, nie ins Leere.
+    expect(alt).toMatch(/<a [^>]*aria-describedby="beitrag-marke-testhof-a"/)
+    expect(alt).toContain('<span id="beitrag-marke-testhof-a" hidden=""></span>')
   })
 })
 
@@ -146,5 +158,50 @@ describe('Karussell der Karte mit Marke', () => {
     expect(html).toContain('Neu · vor 2 Std.')
     expect(html).toContain(`<span id="beitrag-marke-karussell-testhof-a" hidden="">${SATZ}</span>`)
     expect(html).toMatch(/<a [^>]*aria-describedby="beitrag-marke-karussell-testhof-a"/)
+  })
+})
+
+describe('Hofkarten der Startseite mit Marke („Höfe in deiner Nähe“)', () => {
+  const EINGABE: StartseitenHofEingabe = {
+    slug: 'testhof-a',
+    name: 'Testhof A',
+    postalCode: '4910',
+    city: 'Teststadt',
+    isPaused: false,
+    kategorien: ['EIER'],
+    naechsteAbholung: null,
+    fotos: [],
+    latitude: null,
+    longitude: null,
+  }
+
+  it('die Auswahl reicht `neuerBeitrag` aus derselben Liste durch — ohne Beitrag null', () => {
+    const [mit, ohne] = waehleStartseitenHoefe([{ ...EINGABE, neuerBeitrag: KUERBIS }, { ...EINGABE, slug: 'testhof-b' }])
+    expect(mit?.neuerBeitrag).toEqual(KUERBIS)
+    expect(ohne?.neuerBeitrag).toBeNull()
+  })
+
+  it('Marke am Bild, der Satz hängt am einen Link der Karte', () => {
+    const html = renderToStaticMarkup(createElement(HofKarten, { hoefe: waehleStartseitenHoefe([{ ...EINGABE, neuerBeitrag: KUERBIS }]), jetzt: JETZT }))
+    expect(html).toContain('Neu · vor 2 Std.')
+    expect(html).toContain(`<span id="beitrag-marke-startseite-testhof-a" hidden="">${SATZ}</span>`)
+    expect(html).toMatch(/<a [^>]*aria-describedby="beitrag-marke-startseite-testhof-a"/)
+    expect(html.match(/<a /g)).toHaveLength(1)
+  })
+
+  it('Gegenprobe: ohne Beitrag oder ohne Zeitpunkt keine Marke und kein Verweis', () => {
+    for (const html of [
+      renderToStaticMarkup(createElement(HofKarten, { hoefe: waehleStartseitenHoefe([EINGABE]), jetzt: JETZT })),
+      renderToStaticMarkup(createElement(HofKarten, { hoefe: waehleStartseitenHoefe([{ ...EINGABE, neuerBeitrag: KUERBIS }]) })),
+    ]) {
+      expect(html).not.toContain('Neu ·')
+      expect(html).not.toContain('aria-describedby')
+    }
+  })
+
+  it('die Startseite reicht ihren Zeitpunkt an die Hofkarten weiter', () => {
+    const seite = readFileSync(join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(seite).toMatch(/<HofKarten hoefe=\{daten\.hoefe\} jetzt=\{jetzt\.toISOString\(\)\} \/>/)
+    expect(seite).toMatch(/<HofKartenGeladen jetzt=\{jetzt\} \/>/)
   })
 })
