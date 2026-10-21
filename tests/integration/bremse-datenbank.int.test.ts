@@ -31,6 +31,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { bremsSchluessel, DB_BREMSEN, fensterBeginn, type DbBremse } from '@/lib/bremse-datenbank'
 import { bremseUeberAlleInstanzen, zaehleVersuche } from '@/server/bremse-datenbank'
+import { AUTH_BREMSE_ZWECK } from '@/server/auth-bremse'
 import { intKennung, raeumeAuf } from './setup/basis'
 
 const nachlauf = vi.hoisted(() => ({ aufgaben: [] as Array<() => Promise<void>> }))
@@ -259,7 +260,7 @@ describe('Anmeldecode über HTTP in Produktion', () => {
     geloeschteSchluessel.push(...[ipA, ipB, ipC].map((ip) => bremsSchluessel(GEHEIMNIS, bremse.zweck, ip)))
     // Seit Nr. 125 zählt auch Better Auths eigene Bremse in der Tabelle (Zweck „auth", Schlüssel IP|Pfad):
     // ohne Aufräumen stieße ein zweiter Lauf im selben Fenster an deren Grenze.
-    geloeschteSchluessel.push(...[ipA, ipB, ipC].map((ip) => bremsSchluessel(GEHEIMNIS, 'auth', `${ip}|/email-otp/send-verification-otp`)))
+    geloeschteSchluessel.push(...[ipA, ipB, ipC].map((ip) => bremsSchluessel(GEHEIMNIS, AUTH_BREMSE_ZWECK, `${ip}|/email-otp/send-verification-otp`)))
     await prisma.rateLimitZaehler.deleteMany({ where: { schluessel: { in: geloeschteSchluessel } } })
     const adressen = Array.from({ length: 5 }, () => `${intKennung('kundin')}@example.com`)
     for (const email of adressen) {

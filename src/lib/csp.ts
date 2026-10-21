@@ -232,16 +232,18 @@ export const CSP_MELDUNGEN_JE_ANFRAGE = 5
 
 const entdoppelSchluessel = (meldung: CspMeldung): string => `${meldung.anweisung}|${meldung.host}|${meldung.pfad}`
 
-/** true = neu, false = in der letzten Stunde schon weitergegeben. Merkt nichts (das macht `merkeCspMeldung`). */
+/** true = neu, false = in der letzten Stunde schon weitergegeben bzw. gerade vorgemerkt. Merkt nichts (das macht `merkeCspMeldung`). */
 export function istNeueCspMeldung(gesehen: ReadonlyMap<string, number>, meldung: CspMeldung, jetztMs: number): boolean {
   const zuletzt = gesehen.get(entdoppelSchluessel(meldung))
   return zuletzt === undefined || jetztMs - zuletzt >= CSP_ENTDOPPELN_MS
 }
 
 /**
- * Merkt eine weitergegebene Meldung — erst nach den Bremsen, sonst bliebe eine
- * gebremste Meldung eine Stunde stumm. Ist der Speicher voll, geht erst
- * Abgelaufenes, dann das Älteste.
+ * Merkt eine Meldung vor — die Route tut das vor dem ersten `await` auf die
+ * Bremsen, damit eine gleichzeitige Anfrage derselben Instanz sie schon als
+ * gesehen zählt. Lässt eine Bremse sie nicht durch, nimmt `vergissCspMeldung`
+ * die Vormerkung zurück; sonst bliebe eine gebremste Meldung eine Stunde
+ * stumm. Ist der Speicher voll, geht erst Abgelaufenes, dann das Älteste.
  */
 export function merkeCspMeldung(gesehen: Map<string, number>, meldung: CspMeldung, jetztMs: number): void {
   const schluessel = entdoppelSchluessel(meldung)
@@ -254,4 +256,9 @@ export function merkeCspMeldung(gesehen: Map<string, number>, meldung: CspMeldun
     }
   }
   gesehen.set(schluessel, jetztMs)
+}
+
+/** Nimmt eine Vormerkung zurück, wenn eine Bremse die Meldung nicht durchließ. */
+export function vergissCspMeldung(gesehen: Map<string, number>, meldung: CspMeldung): void {
+  gesehen.delete(entdoppelSchluessel(meldung))
 }

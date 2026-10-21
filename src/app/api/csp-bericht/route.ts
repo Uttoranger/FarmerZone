@@ -8,6 +8,7 @@ import {
   istNeueCspMeldung,
   leseCspMeldungen,
   merkeCspMeldung,
+  vergissCspMeldung,
   type CspMeldung,
 } from '@/lib/csp'
 import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
@@ -92,12 +93,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   let weitergegeben = 0
   for (const meldung of meldungen) {
     if (weitergegeben >= CSP_MELDUNGEN_JE_ANFRAGE) break
-    // 5. Entdoppeln im Speicher — gemerkt wird erst nach den Bremsen (unten).
+    // 5. Entdoppeln im Speicher. Vorgemerkt wird vor dem ersten await: Eine
+    // gleichzeitige Anfrage derselben Instanz mit derselben Meldung zählt sie so
+    // schon als gesehen. Lässt eine Bremse sie nicht durch, wird die Vormerkung
+    // zurückgenommen — dann geht sie beim nächsten Mal raus.
     if (!istNeueCspMeldung(GESEHEN, meldung, jetztMs)) continue
-    // 6. und 7. Bremse im Speicher, dann über alle Instanzen — je Meldung ein Treffer.
-    if (!ERSTE_STUFE.check(`csp-bericht:${ip}`)) break
-    if (!(await bremseUeberAlleInstanzen([{ bremse: DB_BREMSEN.cspBerichtIp, merkmal: ip }]))) break
     merkeCspMeldung(GESEHEN, meldung, jetztMs)
+    // 6. und 7. Bremse im Speicher, dann über alle Instanzen — je Meldung ein Treffer.
+    if (!ERSTE_STUFE.check(`csp-bericht:${ip}`) || !(await bremseUeberAlleInstanzen([{ bremse: DB_BREMSEN.cspBerichtIp, merkmal: ip }]))) {
+      vergissCspMeldung(GESEHEN, meldung)
+      break
+    }
     // 8. Sentry
     meldeAnSentry(meldung)
     weitergegeben += 1

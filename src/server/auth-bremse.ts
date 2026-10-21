@@ -141,7 +141,7 @@ export async function verbrauche(
  * verlangt sie trotzdem. Sie lesen und schreiben den Ersatz im Arbeitsspeicher
  * — fiele `consume` je weg, zählte die Instanz für sich, nie offen.
  */
-export const AUTH_BREMS_SPEICHER: BetterAuthRateLimitStorage = {
+export const AUTH_BREMSE_SPEICHER: BetterAuthRateLimitStorage = {
   get: async (schluessel) => {
     const eintrag = ZUSTAND_DIESER_INSTANZ.ersatz.get(schluessel)
     return eintrag ? { key: schluessel, count: eintrag.zaehler, lastRequest: eintrag.fensterStartMs } : null

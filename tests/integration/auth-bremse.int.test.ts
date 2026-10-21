@@ -19,6 +19,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { DB_BREMSEN, adressMerkmal, bremsSchluessel } from '@/lib/bremse-datenbank'
+import { AUTH_BREMSE_ZWECK } from '@/server/auth-bremse'
 import { intKennung, raeumeAuf } from './setup/basis'
 
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
@@ -37,7 +38,7 @@ const MITTE = new Date('2026-10-07T12:00:05.000Z')
 const erzeugt: string[] = []
 /** Der Schlüssel in der Tabelle für einen Schlüssel von Better Auth — und merken fürs Aufräumen. */
 function tabellenSchluessel(betterAuthSchluessel: string): string {
-  const s = bremsSchluessel(GEHEIMNIS, 'auth', betterAuthSchluessel)
+  const s = bremsSchluessel(GEHEIMNIS, AUTH_BREMSE_ZWECK, betterAuthSchluessel)
   erzeugt.push(s)
   return s
 }

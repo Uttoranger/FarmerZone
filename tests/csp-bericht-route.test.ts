@@ -8,8 +8,9 @@
  *    anderen Art, 413 auch ohne Längenangabe beim Lesen.
  *  - An Sentry geht nur Anweisung, Host und der gekürzte Pfad (Stufe warning, Tags, Fingerprint, Pfad
  *    in extra, ohne Anfrage-Daten) — keine Query, kein Ausschnitt, kein Referrer.
- *  - Entdoppeln vor den Bremsen: Dieselbe Meldung fragt keine Bremse und geht kein zweites Mal raus;
- *    gemerkt wird sie erst, wenn beide Bremsen sie durchließen.
+ *  - Entdoppeln vor den Bremsen: Dieselbe Meldung fragt keine Bremse und geht kein zweites Mal raus,
+ *    auch nicht aus einer gleichzeitigen Anfrage (Vormerkung vor dem await); lässt eine Bremse sie
+ *    nicht durch, wird die Vormerkung zurückgenommen.
  *  - Erste Stufe im Speicher (30 je Minute und IP), danach die Datenbank; ist sie voll, geht nichts raus.
  *  - Beide Bremsen zählen je weitergegebener Meldung, nicht je Anfrage — eine Anfrage mit vielen
  *    verschiedenen Einträgen bringt nicht mehr zu Sentry, als die Grenze erlaubt (Runde 1).
@@ -198,12 +199,25 @@ describe('Entdoppeln und Bremsen', () => {
     expect(db.bremseUeberAlleInstanzen).toHaveBeenCalledTimes(3)
   })
 
-  it('gemerkt wird erst nach den Bremsen: eine gebremste Meldung geht beim nächsten Mal raus', async () => {
+  it('eine gebremste Meldung: die Vormerkung wird zurückgenommen, beim nächsten Mal geht sie raus', async () => {
     db.bremseUeberAlleInstanzen.mockResolvedValueOnce(false)
     await istLeer204(await POST(anfrage(cspReport('eval'))))
     expect(sentry.captureMessage).not.toHaveBeenCalled()
     await istLeer204(await POST(anfrage(cspReport('eval'))))
     expect(sentry.captureMessage).toHaveBeenCalledTimes(1)
+  })
+
+  it('zwei gleichzeitige Anfragen mit derselben Meldung: einmal an Sentry, einmal gezählt', async () => {
+    // Die Datenbank antwortet erst, wenn beide Anfragen laufen — ohne Vormerkung vor dem await gingen beide raus.
+    let freigeben: (wert: boolean) => void = () => {}
+    db.bremseUeberAlleInstanzen.mockImplementationOnce(() => new Promise<boolean>((ok) => (freigeben = ok)))
+    const erste = POST(anfrage(cspReport('eval')))
+    const zweite = POST(anfrage(cspReport('eval')))
+    await istLeer204(await zweite)
+    freigeben(true)
+    await istLeer204(await erste)
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(1)
+    expect(db.bremseUeberAlleInstanzen).toHaveBeenCalledTimes(1)
   })
 
   it('derselbe Eintrag zweimal in einer Anfrage geht einmal raus und zählt einmal', async () => {
