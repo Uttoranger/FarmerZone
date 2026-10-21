@@ -191,8 +191,11 @@ const TELEFON_AM_WORT_MUSTER = new RegExp(
  *  (src/lib/bestell-link.ts) — ein Zugangsgeheimnis; `reorder` trägt den
  *  selbsttragenden Nachbestell-Token (reorder-token.ts), gleiche Lage;
  *  `sig` ist dieselbe Signatur für die Bestätigungsseite (bestaetigungsPfad);
- *  `otp` der Anmeldecode der Kundinnen (E7, src/lib/anmeldecode.ts). */
-const HEIKLE_PARAMETER = /token|code|secret|email|pathname|reorder|otp|^(s|sig)$/i
+ *  `otp` der Anmeldecode der Kundinnen (E7, src/lib/anmeldecode.ts); `t` der
+ *  Einmal-Token von „Das war ich nicht" (/sicherheit/nicht-ich, Nr. 114) — nur
+ *  als ganzer Name, `?tab=` bleibt; `vorschau` der signierte Inhalt der
+ *  Startseiten-Vorschau (Nr. 125, dieselbe Liste wie die CSP „nie melden"). */
+const HEIKLE_PARAMETER = /token|code|secret|email|pathname|reorder|otp|vorschau|^(s|sig|t)$/i
 
 /** Der Anmeldecode im Text (6 Ziffern) — nur, wo „Code" oder „OTP" als
  *  eigenes Wort direkt davorsteht: Zehn Minuten lang ist er ein Zugang wie

@@ -33,6 +33,7 @@ import { env } from '@/lib/env'
 import { MARKE } from '@/lib/marke'
 import { DB_BREMSE_ZEITLIMIT_MS, DB_BREMSEN, adressMerkmal, innerhalbDerGrenze, type DbBremse } from '@/lib/bremse-datenbank'
 import { zaehleVersuche } from '@/server/bremse-datenbank'
+import { AUTH_BREMSE_SPEICHER } from '@/server/auth-bremse'
 import {
   ADMIN_ANMELDEN_FEHLER,
   ANMELDEART,
@@ -415,6 +416,10 @@ export const auth = betterAuth({
     enabled: process.env.NODE_ENV === 'production',
     window: AUTH_RATE_LIMIT_WINDOW_SECONDS,
     max: AUTH_RATE_LIMIT_MAX,
+    // Zählt über alle Instanzen in RateLimitZaehler (Register R1, Ergänzung
+    // Nr. 125). Antwortet die Datenbank nicht, zählt die Instanz für sich wie
+    // vorher — nie offen (src/server/auth-bremse.ts).
+    customStorage: AUTH_BREMSE_SPEICHER,
     customRules: {
       // KEIN Limit fürs Session-Lesen: Der Browser fragt get-session bei
       // vielen Seitenwechseln ab (useSession in Shells und Formularen); die
