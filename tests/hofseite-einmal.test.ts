@@ -67,6 +67,7 @@ import { KundenansichtKnopf } from '@/components/mein-hof/kundenansicht-knopf'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
 import { publicFarm } from './fabrik/public-farm'
+import { publicProduct } from './fabrik/public-product'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 
 const WURZEL = process.cwd()
@@ -319,13 +320,7 @@ describe('FarmPageView bindet genau eine Stelle ein', () => {
 // ── Keine Bearbeitungs-Elemente auf der Hofseite, Korb nur für Kundinnen ───
 
 function produkt(id: string, name: string, sichtbar: boolean): PublicProduct {
-  return {
-    id, name, description: null, imageUrl: null, bildAusschnitt: null, category: null, categoryImageUrl: null,
-    price: 3.5, unit: 'kg', unitSize: 1, stock: 10, isAvailable: sichtbar, allergens: [],
-    isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
-    unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null, abholhinweise: [],
-  }
+  return publicProduct({ id, name, category: null, price: 3.5, unit: 'kg', unitSize: 1, stock: 10, isAvailable: sichtbar })
 }
 
 /** Ein Hof, an dem jedes Bearbeitungs-Element etwas zu tun hätte: pausiert, mit Status, Fotos und Produkten. */

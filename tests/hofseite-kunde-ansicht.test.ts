@@ -67,6 +67,7 @@ import { KAEUFER_VORSCHAU, type KartenVorschau } from '@/lib/hofseite-kunde'
 import { TESTHOF_HINWEIS } from '@/lib/gruendungshof'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
+import { publicProduct } from './fabrik/public-product'
 import { publicFarm } from './fabrik/public-farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import type { ProductCategoryValue } from '@/lib/taxonomie'
@@ -84,13 +85,7 @@ function dateien(ordner: string): string[] {
 }
 
 function produkt(id: string, name: string, category: ProductCategoryValue | null, stock = 20): PublicProduct {
-  return {
-    id, name, description: null, imageUrl: null, bildAusschnitt: null, category, categoryImageUrl: null,
-    price: 4.5, unit: 'STUECK', unitSize: null, stock, isAvailable: true, allergens: [],
-    isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
-    unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null, abholhinweise: [],
-  }
+  return publicProduct({ id, name, category, stock })
 }
 
 const HOF: PublicFarm = publicFarm({

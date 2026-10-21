@@ -16,6 +16,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PublicProduct } from '@/server/queries/farm'
+import { publicProduct } from './fabrik/public-product'
 import type { CartItem, Warenkorb } from '@/lib/use-cart'
 import { useCart } from '@/lib/use-cart'
 import { ProductGrid } from '@/components/farm/product-grid'
@@ -160,13 +161,7 @@ const HOF_ID = 'farm_test'
 const HOF_SLUG = 'hof-test'
 
 function produkt(id: string, name: string): PublicProduct {
-  return {
-    id, name, description: null, imageUrl: null, bildAusschnitt: null, category: null, categoryImageUrl: null,
-    price: 3.5, unit: 'kg', unitSize: 1, stock: 10, isAvailable: true, allergens: [],
-    isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
-    unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null, abholhinweise: [],
-  }
+  return publicProduct({ id, name, category: null, price: 3.5, unit: 'kg', unitSize: 1, stock: 10 })
 }
 
 const EIER = produkt('prod_eier', 'Eier')

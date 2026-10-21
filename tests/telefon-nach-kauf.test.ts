@@ -72,6 +72,7 @@ import { HofErreichen } from '@/components/bestaetigung/hof-erreichen'
 import { KONTAKT_NACH_DEM_KAUF } from '@/lib/hofseite-kunde'
 import { KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
+import { publicProduct } from './fabrik/public-product'
 import { publicFarm } from './fabrik/public-farm'
 import { findeElement, inhaltHinterSuspense } from './element-suche'
 
@@ -84,13 +85,7 @@ const ANZEIGE = '+43 660 000 0000'
 const EMAIL = 'hof@example.com'
 
 function produkt(id: string, name: string): PublicProduct {
-  return {
-    id, name, description: null, imageUrl: null, bildAusschnitt: null, category: 'GEMUESE', categoryImageUrl: null,
-    price: 4.5, unit: 'STUECK', unitSize: null, stock: 20, isAvailable: true, allergens: [],
-    isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
-    unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null, abholhinweise: [],
-  }
+  return publicProduct({ id, name })
 }
 
 const HOF: PublicFarm = publicFarm({

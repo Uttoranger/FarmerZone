@@ -30,6 +30,7 @@ import {
   filtereNachAngebot,
   istBestellbar,
   sortiereNachGrundpreis,
+  type AngebotVorhanden,
   type AngebotsZeile,
   type Grundpreis,
 } from '@/lib/bereiche-anzeige'
@@ -272,7 +273,7 @@ export function holtAbAn(fenster: readonly AbholFenster[] | undefined, tage: rea
 /** Was der Filter „Abholung" von einem Hof braucht. */
 export type AbholHof = {
   isPaused: boolean
-  angebot: readonly unknown[]
+  angebot: AngebotVorhanden
   abholfenster?: readonly AbholFenster[]
 }
 

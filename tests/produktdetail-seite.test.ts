@@ -60,6 +60,7 @@ import { KundeShell, type KundeShellProps } from '@/components/shells/kunde-shel
 import { ProduktdetailKunde } from '@/components/produktdetail/produktdetail-kunde'
 import type { PublicFarm, PublicFutter, PublicProduct } from '@/server/queries/farm'
 import { publicFarm } from './fabrik/public-farm'
+import { publicProduct } from './fabrik/public-product'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
 import { findeElement, inhaltHinterSuspense } from './element-suche'
 
@@ -87,14 +88,7 @@ function futter(nettoMenge: number): PublicFutter {
 }
 
 function produkt(id: string, teil: Partial<PublicProduct> = {}): PublicProduct {
-  return {
-    id, name: `Produkt ${id}`, description: null, imageUrl: null, bildAusschnitt: null, category: 'GEMUESE', categoryImageUrl: null,
-    price: 4.5, unit: 'STUECK', unitSize: null, stock: 20, isAvailable: true, allergens: [],
-    isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
-    unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null, abholhinweise: [],
-    ...teil,
-  }
+  return publicProduct({ id, name: `Produkt ${id}`, ...teil })
 }
 
 const HEU = { category: 'HEU_STROH' as const, familieId: 'fam_heu' }

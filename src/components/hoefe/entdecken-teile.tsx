@@ -18,7 +18,7 @@ import {
   type UmkreisStufe,
   type VorschauProdukt,
 } from '@/lib/hofuebersicht'
-import { hofseitenLink, istBestellbar, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
+import { hofseitenLink, istBestellbar, type AngebotVorhanden, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
 import { SIEGEL, illustrationPfad, type AnzeigeBereich, type ProductCategoryValue } from '@/lib/taxonomie'
 import { formatGrundpreis, formatGrundpreisZeile, formatKilopreis } from '@/lib/format'
 import { hofIllustrationen } from '@/lib/hoefe-anzeige'
@@ -240,7 +240,7 @@ export type KartenHof = {
   /** Die aktiven Abholzeiten; die Abholzeile rechnet daraus mit der Uhr des Browsers. */
   abholfenster?: readonly AbholFenster[]
   /** Das kaufbare Angebot — nur, ob es eines gibt, zählt hier (istBestellbar). */
-  angebot: readonly unknown[]
+  angebot: AngebotVorhanden
   fotos: string[]
   entfernungKm: number | null
   latitude: number | null
@@ -403,7 +403,7 @@ export type TrefferHof = {
   city: string
   isPaused: boolean
   abholfenster?: readonly AbholFenster[]
-  angebot: readonly unknown[]
+  angebot: AngebotVorhanden
   entfernungKm: number | null
 }
 
