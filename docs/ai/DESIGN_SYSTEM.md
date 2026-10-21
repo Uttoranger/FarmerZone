@@ -129,7 +129,7 @@ Für jede Sache gibt es in Nutzertexten genau ein Wort (Register N8): in Beschri
 | Termin, den die Kundin gewählt hat | Abholtermin | Zeitfenster, Abholslot | „Bitte wähle einen Abholtermin.“ |
 | Wie viel von einem Produkt da ist | Vorrat | Bestand, Lagerstand, Lager | „Wir konnten den Vorrat nicht speichern.“ |
 | Was ein Hof auf seiner Hofseite und an seine Abonnentinnen schreibt | Beitrag | Status, Post, Neuigkeit | „Neuer Beitrag“ |
-| Die Liste dieser Beiträge (Reiter in Mein Hof und auf der Hofseite) | Beiträge | | „Beiträge · 2“ |
+| Die Liste dieser Beiträge (Reiter in Mein Hof) | Beiträge | | „Beiträge · 2“ |
 | Tür für Fehler, Wünsche und Fragen, bei Kundschaft und Höfen | Problem melden | Hilfe und Rückmeldung, Fehler melden | „Problem melden“ (die Übersicht des Hofs heißt weiter „Meine Meldungen“) |
 | Kundschaft in Beschriftungen, Reitern und Kennzahlen | Kunden | Käufer, Käufern | „Kunden“, „12 Kunden“ |
 | Kundschaft in ganzen Sätzen | die Kundin, deine Kundinnen | Käufer, Käufern | „Sag deinen Kundinnen Bescheid.“ |

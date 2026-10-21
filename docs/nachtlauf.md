@@ -194,6 +194,14 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 128 | Beiträge v2 · „Aktuell vom Hof“ auf der Hofseite (von `docs/lauf19`) | `freigabe.md` §23 | F8, N5, T5 |
 | 129 | Beiträge v2 · Marke auf der Hofkarte, „Neu bei den Höfen“, „Dein Beitrag“ in Heute (vom Zwischenstand `integration/lauf19` mit 122 und 128; Migration) | `freigabe.md` §23 | N22, N16, E12 |
 | Sammel 19 (ohne 124) | Sammel-PR `integration/lauf19` | `freigabe.md` §23 | G3 |
+| 130 | CI auf main und ein Wackler (von `docs/lauf20`) | `freigabe.md` §24 | G4 |
+| 131 | Volle Abholfenster in Hofliste und Hofseite (von `docs/lauf20`) | `freigabe.md` §24 | N19 |
+| 132 | Sicherheit und Admin, Nacharbeit aus 125 und 126 (von `docs/lauf20`) | `freigabe.md` §24 | G8, N20 |
+| 133 | Region-Nacharbeit und Seed (von `docs/lauf20`) | `freigabe.md` §24 | G9, F10 |
+| 134 | Beiträge-Nacharbeit aus 128 und 129 (von `docs/lauf20`) | `freigabe.md` §24 | T5, F8, N11, G4 |
+| 135 | Pakete `yaml` und `jsdom`, Test des Hydrierens (von `docs/lauf20`; zwei Entwicklungspakete) | `freigabe.md` §24 | G6 |
+| 136 | Regelvorschläge aus Morgenbericht 19, Zeitgrenzen und Reste (vom Zwischenstand `integration/lauf20`) | `freigabe.md` §24 | G4, G3 |
+| Sammel 20 | Sammel-PR `integration/lauf20` | `freigabe.md` §24 | G3 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
@@ -291,6 +299,15 @@ Zwei Migrationen mit festen Namen (`20261020100000_testhof` in 119, `20261020110
 - Ist 122 nach zwei Runden nicht fertig (Entwurf), entfallen 123 und 124; ist 128 nicht fertig, entfällt 129. Entfällt 125 (Sicherheits-PR fehlt), ist Welle 1 122 ∥ 128 ∥ 126.
 
 Zwei Migrationen mit festen Namen (`20261021100000_abholhinweise` in 123, `20261021110000_startseite_neuigkeiten` in 129), nur Expand, ohne Seed, ohne Datenänderung, nach Regel 3 mit dem Schema des Basis-Branchs als `--from-schema`; 123 und 129 laufen auf getrennten Zweigen und berühren getrennte Modelle. Kein neues Paket (G6). Priorität 125 → 122 → 128 → 123 → 124 → 129 → 126 → 127: 125 muss fertig werden, 124 darf Entwurf bleiben, 126 und 127 sind die letzten. Nie zwei Nummern an derselben Code-Datei außerhalb der Grenzen (`freigabe.md` §23).
+
+**Reihenfolge in Lauf 20** (`freigabe.md` §24, Haltepunkt Sammel-PR): Doku-PR → Regel-Inventur (G4) → 130 ∥ 131 ∥ 132 → 134, 133, 135 → Leitplanken von 124 → 136 → Sammel-PR. Die Branches:
+- 130, 131 und 132 zweigen von `docs/lauf20` ab; ein Workflow je Nummer, höchstens drei Umsetzer gleichzeitig.
+- Jeder frei werdende Platz geht an die nächste startbereite Nummer in dieser Reihenfolge: 134, 133 und 135 (alle von `docs/lauf20`), danach die Leitplanken von 124 (auf dem Branch der 124, nachdem der Dirigent main hineingeholt hat).
+- 136 zweigt zuletzt vom Zwischenstand `integration/lauf20` ab und startet erst, wenn 130–135 fertig, Entwurf oder entfallen sind. Der Dirigent merged sie dafür in den Zwischenstand; dort läuft zuerst ein voller lokaler Lauf (typecheck, lint, test und test:integration), und er muss grün sein. Sonst fassen 136 und eine andere Nummer dieselben Dateien an.
+- Die Regel-Inventur (Register G4, nur lesen, Ergebnis im Morgenbericht) steht vor der ersten Nummer; wie sie läuft und wie der Dirigent 124 nachzieht, steht in `freigabe.md` §24 („Regel-Inventur“, „124 nachziehen“).
+- 124 (PR #329) wird in diesem Lauf nicht gemergt und kommt nicht in den Sammel-PR; der Sammel-PR prüft nur, ob sie sich auf seinem Stand sauber mergen lässt.
+
+Keine Migration. Zwei neue Entwicklungspakete, nur in 135 (`yaml` 2.9.1 und `jsdom` 30.1.2, je genau diese Version, G6). Priorität 130 → 132 → 131 → 134 → 133 → 135 → Leitplanken von 124 → 136: 130 und 132 müssen fertig werden, 136 ist die letzte Nummer. Nie zwei Nummern an derselben Datei außerhalb der Grenzen (`freigabe.md` §24).
 
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 
