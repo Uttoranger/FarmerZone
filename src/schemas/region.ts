@@ -3,10 +3,13 @@ import { BEREICH_KATEGORIEN } from '@/lib/taxonomie'
 import { UMFELD_KM, type UmfeldKm } from '@/lib/umfeld'
 import { REGION_HREF } from '@/lib/bauern-navigation'
 import { UMFELD_STANDARD_KM } from '@/schemas/umfeld-filter'
+import { ABHOLUNG_VALUES, type AbholungWahl } from '@/schemas/hoefe-filter'
 
 /**
  * Die Adresse von /region (Nachtlauf Nr. 22c, Gate 8): welcher Reiter offen
- * ist und — im Reiter „Futter kaufen" — Umkreis, Futterart und Menge.
+ * ist und — im Reiter „Futter kaufen" — Umkreis, Futterart, Menge, seit
+ * Nr. 123 (N23) auch Abholung (dieselben Werte wie /hoefe, ABHOLUNG_VALUES)
+ * und die Ansicht Liste | Karte.
  * „Preise vergleichen" behält seine Angaben aus `umfeld-filter.ts` (km,
  * bereich, ansicht); beide Reiter teilen nur den Umkreis.
  *
@@ -33,12 +36,20 @@ export type FutterKaufenFilter = {
   art: FutterArt | null
   /** null = alle Mengen. */
   menge: FutterMenge | null
+  /** null = alle Tage; sonst heute, morgen oder Wochenende — der Server rechnet (N23). */
+  abholung: AbholungWahl | null
 }
+
+/** Liste oder Karte — Zustand der Seite, kein Filter: `?ansicht=karte` gilt beim Laden, gewechselt wird im Browser. */
+export const FUTTER_ANSICHT_VALUES = ['liste', 'karte'] as const
+export type FutterAnsichtWahl = (typeof FUTTER_ANSICHT_VALUES)[number]
 
 const reiterSchema = z.enum(REGION_REITER_VALUES)
 const kmSchema = z.coerce.number().pipe(z.literal([...UMFELD_KM]))
 const artSchema = z.enum(FUTTER_ART_VALUES)
 const mengeSchema = z.enum(FUTTER_MENGE_VALUES)
+const abholungSchema = z.enum(ABHOLUNG_VALUES)
+const ansichtSchema = z.enum(FUTTER_ANSICHT_VALUES)
 
 /** Nexts searchParams: ein Wert, mehrere oder keiner. Mehrere zählen nicht — der erste gilt. */
 type Roh = string | string[] | null | undefined
@@ -53,29 +64,46 @@ export function leseRegionReiter(wert: Roh): RegionReiter {
   return reiter.success ? reiter.data : 'preise'
 }
 
-export function leseFutterKaufenFilter(params: { km?: Roh; art?: Roh; menge?: Roh }): FutterKaufenFilter {
+export function leseFutterKaufenFilter(params: { km?: Roh; art?: Roh; menge?: Roh; abholung?: Roh }): FutterKaufenFilter {
   const km = kmSchema.safeParse(erster(params.km))
   const art = artSchema.safeParse(erster(params.art))
   const menge = mengeSchema.safeParse(erster(params.menge))
+  const abholung = abholungSchema.safeParse(erster(params.abholung))
   return {
     km: km.success ? km.data : UMFELD_STANDARD_KM,
     art: art.success ? art.data : null,
     menge: menge.success ? menge.data : null,
+    abholung: abholung.success ? abholung.data : null,
   }
 }
 
-/** Der Link in „Futter kaufen" mit genau diesem Umkreis, dieser Art und Menge (Standards ausgelassen). */
-export function futterKaufenLink(filter: FutterKaufenFilter): string {
+/** Die Ansicht beim Laden; ohne oder mit Unsinn die Liste. */
+export function leseFutterAnsicht(wert: Roh): FutterAnsichtWahl {
+  const ansicht = ansichtSchema.safeParse(erster(wert))
+  return ansicht.success ? ansicht.data : 'liste'
+}
+
+/** Der Link in „Futter kaufen" mit genau diesem Umkreis, dieser Art, Menge, Abholung und Ansicht (Standards ausgelassen). */
+export function futterKaufenLink(filter: FutterKaufenFilter, ansicht: FutterAnsichtWahl = 'liste'): string {
   const teile = ['reiter=futter', `km=${filter.km}`]
   if (filter.art) teile.push(`art=${filter.art}`)
   if (filter.menge) teile.push(`menge=${filter.menge}`)
+  if (filter.abholung) teile.push(`abholung=${filter.abholung}`)
+  if (ansicht === 'karte') teile.push('ansicht=karte')
   return `${REGION_HREF}?${teile.join('&')}`
 }
 
 /**
  * Der Link auf einen Reiter — der Umkreis geht mit, damit „25 km" beim
- * Wechsel stehen bleibt; alles andere gehört nur zu seinem Reiter.
+ * Wechsel stehen bleibt; ebenso die Ansicht (beide Reiter haben Liste |
+ * Karte) und in „Futter kaufen" die Abholung. Art und Menge gehören nur zu
+ * ihrem Reiter.
  */
-export function regionReiterLink(reiter: RegionReiter, km: UmfeldKm): string {
-  return reiter === 'futter' ? futterKaufenLink({ km, art: null, menge: null }) : `${REGION_HREF}?km=${km}`
+export function regionReiterLink(
+  reiter: RegionReiter,
+  km: UmfeldKm,
+  { ansicht = 'liste', abholung = null }: { ansicht?: FutterAnsichtWahl; abholung?: AbholungWahl | null } = {}
+): string {
+  if (reiter === 'futter') return futterKaufenLink({ km, art: null, menge: null, abholung }, ansicht)
+  return `${REGION_HREF}?km=${km}${ansicht === 'karte' ? '&ansicht=karte' : ''}`
 }

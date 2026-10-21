@@ -568,32 +568,52 @@ export function leerzustand(eingabe: {
   }
 }
 
-const ABHOLUNG_LEER_TITEL: Record<AbholungWahl, string> = {
-  heute: 'Heute holt hier kein Hof mehr ab',
-  morgen: 'Morgen holt hier kein Hof ab',
-  wochenende: 'Am Wochenende holt hier kein Hof ab',
+const ABHOLUNG_LEER_ANFANG: Record<AbholungWahl, string> = {
+  heute: 'Heute holt hier kein Hof mehr',
+  morgen: 'Morgen holt hier kein Hof',
+  wochenende: 'Am Wochenende holt hier kein Hof',
+}
+
+/** Die Knöpfe zum nächsten Tag mit Abholung — für die Tage, die der Filter kennt. */
+export const ABHOLUNG_ZEIGEN = { heute: 'Heute zeigen', morgen: 'Morgen zeigen' } as const
+
+/**
+ * Wo die Sätze stehen: auf /hoefe „in deiner Nähe" mit dem Satz zum
+ * Bestellen; in Region › Futter kaufen (Nr. 123, N23) mit „Futter" im Titel
+ * und dem Umkreis („im Umkreis von 25 km").
+ */
+export type AbholungLeerOrt = { was?: string; wo: string; bestellsatz: boolean }
+
+const ABHOLUNG_LEER_HOEFE: AbholungLeerOrt = { wo: 'in deiner Nähe', bestellsatz: true }
+
+/**
+ * Die Sätze, wenn der Filter „Abholung" die Liste geleert hat (Board, Handy
+ * 5) — EINE Fassung für /hoefe und Region › Futter kaufen: der Titel, ein
+ * Satz mit dem nächsten Tag, an dem Höfe abholen, und welcher Tag sich zeigen
+ * lässt („Heute zeigen" bzw. „Morgen zeigen"); liegt der Tag später, gibt es
+ * keinen Filter dafür (`zeige` null).
+ */
+export function abholungLeerSaetze(
+  wahl: AbholungWahl,
+  naechster: NaechsterAbholtag | null,
+  ort: AbholungLeerOrt
+): { titel: string; satz: string; zeige: keyof typeof ABHOLUNG_ZEIGEN | null } {
+  const titel = `${ABHOLUNG_LEER_ANFANG[wahl]}${ort.was ? ` ${ort.was}` : ''} ab`
+  if (!naechster) return { titel, satz: 'In den nächsten Tagen holt hier kein Hof ab.', zeige: null }
+  const bestellen = ort.bestellsatz ? ` – du kannst ${naechster.versatz === 0 ? 'noch' : 'schon jetzt'} bestellen` : ''
+  const satz = `${tagImSatz(naechster)} ${holen(naechster.anzahl)} ${mitAnzahl(naechster.anzahl, 'Hof', 'Höfe')} ${ort.wo} ab${bestellen}.`
+  return { titel, satz, zeige: naechster.versatz === 0 ? 'heute' : naechster.versatz === 1 ? 'morgen' : null }
 }
 
 /**
- * Der Filter „Abholung" hat die Liste geleert (Board, Handy 5): ein Satz mit
- * dem nächsten Tag, an dem Höfe abholen, und ein Knopf dorthin — „Heute
- * zeigen" bzw. „Morgen zeigen"; liegt der Tag später, gibt es keinen Filter
- * dafür, dann „Alle Tage".
+ * Der Filter „Abholung" hat die Liste geleert: die Sätze aus
+ * abholungLeerSaetze und ein Knopf zum nächsten Tag; liegt der Tag später,
+ * „Alle Tage".
  */
 function abholungLeer(filter: HoefeFilter, wahl: AbholungWahl, naechster: NaechsterAbholtag | null): Leerzustand {
-  const titel = ABHOLUNG_LEER_TITEL[wahl]
-  const alleTage: LeerAusweg = { art: 'link', label: ABHOLUNG_TEXT.alle, ziel: { ...filter, abholung: null } }
-  if (!naechster) {
-    return { titel, satz: 'In den nächsten Tagen holt hier kein Hof ab.', ausweg: alleTage }
-  }
-  const satz = `${tagImSatz(naechster)} ${holen(naechster.anzahl)} ${mitAnzahl(naechster.anzahl, 'Hof', 'Höfe')} in deiner Nähe ab – du kannst ${naechster.versatz === 0 ? 'noch' : 'schon jetzt'} bestellen.`
-  if (naechster.versatz === 0) {
-    return { titel, satz, ausweg: { art: 'link', label: 'Heute zeigen', ziel: { ...filter, abholung: 'heute' } } }
-  }
-  if (naechster.versatz === 1) {
-    return { titel, satz, ausweg: { art: 'link', label: 'Morgen zeigen', ziel: { ...filter, abholung: 'morgen' } } }
-  }
-  return { titel, satz, ausweg: alleTage }
+  const { titel, satz, zeige } = abholungLeerSaetze(wahl, naechster, ABHOLUNG_LEER_HOEFE)
+  if (zeige) return { titel, satz, ausweg: { art: 'link', label: ABHOLUNG_ZEIGEN[zeige], ziel: { ...filter, abholung: zeige } } }
+  return { titel, satz, ausweg: { art: 'link', label: ABHOLUNG_TEXT.alle, ziel: { ...filter, abholung: null } } }
 }
 
 // ─── Ein Suchfeld „Ort oder Produkt" (Nr. 46) ───────────────────────────────

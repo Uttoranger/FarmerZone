@@ -96,6 +96,7 @@ import {
   formatBestand,
 } from '@/lib/format'
 import { KategorieSheet } from './kategorie-sheet'
+import { AbholhinweisWahl } from '@/components/produkte/familien-teile'
 import { LebensmittelVorschau } from './lebensmittel-vorschau'
 import { produktBereich } from '@/lib/produkte-hof'
 import { KAEUFER_VORSCHAU } from '@/lib/hofseite-kunde'
@@ -247,6 +248,7 @@ const EMPTY_DEFAULTS: ProductFormData = {
   // „Ausgangswert wiederherstellen" (docs/ai/CODING_STANDARDS.md, Formulare).
   futter: null,
   abgabe: 'ALLE',
+  abholhinweise: [],
   countsTowardLimit: true,
   // NaN statt 0: Das Preisfeld startet leer, und die Prüfung meldet „Bitte gib
   // einen Preis ein" statt „größer als 0" für eine Null, die niemand getippt hat.
@@ -293,6 +295,7 @@ function toFormDefaults(p: ProductData): Partial<ProductFormData> {
         }
       : null,
     abgabe: p.abgabe,
+    abholhinweise: p.abholhinweise,
     countsTowardLimit: p.countsTowardLimit,
     price: p.price,
     vatRate: p.vatRate,
@@ -749,6 +752,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
     } else {
       form.setValue('futter', null, { shouldDirty: true })
       form.setValue('abgabe', 'ALLE', { shouldDirty: true })
+      // Abholhinweise gibt es nur bei Futter — der Server speichert sonst ohnehin eine leere Liste.
+      form.setValue('abholhinweise', [], { shouldDirty: true })
       form.clearErrors(['futter', 'abgabe'])
     }
   }
@@ -1903,6 +1908,16 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                                 Fütterungsempfehlung oder Lagerhinweis vom Anhänger, falls vorhanden.
                               </FormDescription>
                               <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="abholhinweise"
+                          render={({ field }) => (
+                            <FormItem>
+                              <AbholhinweisWahl wert={field.value ?? []} onWert={field.onChange} />
                             </FormItem>
                           )}
                         />

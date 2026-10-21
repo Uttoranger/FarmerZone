@@ -324,7 +324,8 @@ describe('Die Seite in zwei Teilen', () => {
     expect(seite).toMatch(/<FutterReiter farm=\{farm\} suche=\{suche\} \/> : <PreiseReiter farm=\{farm\} suche=\{suche\} \/>/)
     expect(seite).not.toMatch(/getUmfeld|getFutterKaufen/)
     expect(quelle('src/app/(hof)/region/preise-reiter.tsx')).toContain('getUmfeld(farm.id, filter.km)')
-    expect(quelle('src/app/(hof)/region/futter-reiter.tsx')).toContain('getFutterKaufen(farm.id, filter.km)')
+    // Seit Nr. 123 lädt Futter kaufen einmal 50 km und filtert in der reinen Funktion (N23).
+    expect(quelle('src/app/(hof)/region/futter-reiter.tsx')).toContain('getFutterKaufen(farm.id, jetzt)')
   })
 
   it('beide Reiter nennen Höfe ohne Standort mit demselben Satz', () => {

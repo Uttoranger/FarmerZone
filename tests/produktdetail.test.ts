@@ -52,7 +52,7 @@ function produkt(id: string, teil: Partial<PublicProduct> = {}): PublicProduct {
     categoryImageUrl: null, price: 4.5, unit: 'STUECK', unitSize: null, stock: 20, isAvailable: true,
     allergens: [], isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null,
+    familieId: null, brennmaterial: null, abholhinweise: [],
     ...teil,
   }
 }
@@ -222,15 +222,15 @@ describe('Vorrat und Menge', () => {
 describe('Schild nach E9', () => {
   const heu = produkt('heu', { category: 'HEU_STROH', futter: futter() })
 
-  it('LFBIS: „Futtermittelbetrieb · LFBIS <Nummer>", sofort, ohne Prüfvermerk', () => {
+  it('LFBIS: „Futtermittelbetrieb · LFBIS <Nummer> · laut Hof", sofort, ohne Prüfvermerk (E9-Ergänzung, Nr. 123)', () => {
     const schild = futterSchild(heu, 'PRIMAERPRODUKTION')
-    expect(schild).toBe('Futtermittelbetrieb · LFBIS 1234567')
+    expect(schild).toBe('Futtermittelbetrieb · LFBIS 1234567 · laut Hof')
     expect(schild).not.toMatch(/geprüft/i)
   })
 
   it('steht das Kürzel schon in der Nummer, steht es nicht doppelt da', () => {
     for (const nummer of ['LFBIS 1234567', 'lfbis: 1234567', 'LFBIS-1234567']) {
-      expect(futterSchild(produkt('heu', { category: 'HEU_STROH', futter: futter({ betriebsnummer: nummer }) }), 'PRIMAERPRODUKTION')).toBe('Futtermittelbetrieb · LFBIS 1234567')
+      expect(futterSchild(produkt('heu', { category: 'HEU_STROH', futter: futter({ betriebsnummer: nummer }) }), 'PRIMAERPRODUKTION')).toBe('Futtermittelbetrieb · LFBIS 1234567 · laut Hof')
     }
   })
 

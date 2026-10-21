@@ -5525,6 +5525,15 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Actions-Wache:** Sie prüft jetzt auch, dass das Ergebnis von `getSession` bzw. der Admin-Wache gleich danach ausgewertet wird; `meldungAbsenden` läuft bewusst ohne Sitzung (`SITZUNG_FREIWILLIG`).
 - **Dev-Log (Nacharbeit 115):** Next 16.4.2 schreibt in `next dev` jeden Aufruf einer Server-Funktion samt Argumenten ins Terminal; `logging.serverFunctions: false` in `next.config.ts` schaltet das ab. Ohne `RESEND_API_KEY` landen Mails (mit Codes) weiter im Log: Lokale Dev-Logs nicht teilen, sie können E-Mail-Codes enthalten.
 
+## Region · Futter kaufen (Register N23, E9-Ergänzung umgesetzt; Nr. 123, Nachtlauf 19)
+
+- **Warum:** Ein Hof kauft hier für seine Tiere — er soll Größen vergleichen, die Abholung sehen und mit einem Knopf genau die gewählte Größe bestellen können. Das Schild mit Haken las sich wie „geprüft"; die Plattform prüft die LFBIS-Nummer nicht (E9).
+- **Abholhinweise:** neue Spalte `Product.abholhinweise` (Aufzählung `Abholhinweis`, Migration `20261021100000_abholhinweise`, nur Expand, NOT NULL mit leerer Liste). Prisma legt Listen ohne NOT NULL an; die Freigabe verlangt es, mit DEFAULT bekommt jede bestehende Zeile die leere Liste. Gespeichert nur im Bereich Futtermittel; eine geänderte Wahl verlangt den Haken neu (E10a, wie Abgabe und Name) — der Vergleich `brauchtNeueBestaetigung` liest Listen ohne Reihenfolge. Es gibt keinen Weg, einer bestehenden Familie eine Größe hinzuzufügen: „neue Größe" heißt, jede Größe einer neuen Familie übernimmt die Hinweise.
+- **Eine Abfrage, 50 km:** `getFutterKaufen` lädt einmal den größten Umkreis, Höfe samt PLZ, Ort, Fotos, Kategorien und Abholzeiten über `UEBERSICHT_*_SELECT` und `baueHofUebersicht` (wie /hoefe), die Größen in `PRODUCT_ORDER_BY` (wie die Produktseite). Umkreis, Zahl je Stufe (`zaehleJeStufe`), Abholung (`holtAbAnTagen`/`tageDerAbholwahl`) und die Karten rechnet `baueFutterKaufen`.
+- **Größen:** Reihenfolge des Hofs, vorgewählt die erste kaufbare, „derzeit aus" nicht wählbar; ein Angebot ohne kaufbare Größe steht nicht da. „Günstigster Kilopreis" erst bei mehr als 5 % Abstand zur zweitgünstigsten kaufbaren Größe, verglichen über Kreuz in ganzen Zahlen (Cent × Tausendstel) — mit Gleitkomma wäre € 3,80 / 20 kg gegen € 4,00 / 20 kg knapp über der Grenze gelandet.
+- **Leerzustand mit Abholung:** `abholungLeer` aus /hoefe ist jetzt `abholungLeerSaetze` (exportiert, parametrisiert mit Ort und Zusatz), /hoefe unverändert (Tests grün). „Futter kaufen" ergänzt nach „Morgen zeigen" den größeren Umkreis, beim größten „Alle Tage".
+- **Schild:** `futterSchild` endet auf „· laut Hof"; `FutterSchild` zeichnet es neutral mit `Shield` an drei Stellen (Futter kaufen, Produktseite, Vorschau im Formular). „Selbst verkaufen" steht nur ohne eigenes Futter; mit Futter und sichtbar eine Zeile mit Link, als Testhof nichts.
+
 ## Nützliche Befehle
 
 ```bash

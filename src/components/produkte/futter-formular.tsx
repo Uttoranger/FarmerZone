@@ -2,7 +2,6 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { ShieldCheck } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { Stepper } from '@/components/ui/stepper'
 import { DezimalFeld } from '@/components/shared/dezimal-feld'
@@ -50,9 +49,12 @@ import {
 import { formatEuro, formatGrundpreisNetto, formatZahl, einheitLabel } from '@/lib/format'
 import { VORRAT_MAX } from '@/lib/eingabegrenzen'
 import { futterSchild } from '@/lib/produktdetail'
+import type { AbholhinweisValue } from '@/lib/abholhinweise'
+import { FutterSchild } from '@/components/produkte/futter-schild'
 import { zusammensetzungVorbelegung } from '@/components/products/produkt-abschnitte'
 import { cn } from '@/lib/utils'
 import {
+  AbholhinweisWahl,
   Abschnitt,
   EINGABE,
   EigeneGroesseKnopf,
@@ -145,6 +147,7 @@ export function FutterFormular({
   const [subcategory, setSubcategory] = useState<ProductSubcategoryValue | null>(null)
   const [bio, setBio] = useState(false)
   const [nurBetriebe, setNurBetriebe] = useState(false)
+  const [abholhinweise, setAbholhinweise] = useState<AbholhinweisValue[]>([])
   const [kennzeichnung, setKennzeichnung] = useState<Kennzeichnung>(KENNZEICHNUNG_LEER)
   const [zeilen, setZeilen] = useState<Zeile[]>(() =>
     FUTTER_VORLAGEN.filter((v) => FUTTER_VORLAGEN_START.includes(v.id)).map((v, i) => zeileAus(v, `s${i}`))
@@ -159,6 +162,7 @@ export function FutterFormular({
     subcategory,
     bio,
     abgabe: nurBetriebe ? 'NUR_BETRIEBE' : 'ALLE',
+    abholhinweise,
     kennzeichnung,
     groessen: zeilen.map(({ bezeichnung, verpackung, unit, nettoMenge, price, stock }) => ({
       bezeichnung,
@@ -424,6 +428,8 @@ export function FutterFormular({
         {nurBetriebe && <p className="text-xs text-muted-foreground">Wer bestellt, muss im Checkout eine Betriebsnummer angeben.</p>}
       </Abschnitt>
 
+      <AbholhinweisWahl wert={abholhinweise} onWert={setAbholhinweise} />
+
       <Abschnitt
         id="futter-kennzeichnung"
         titel={KENNZEICHNUNG_TITEL}
@@ -603,12 +609,7 @@ function KaeuferVorschau({
       <p className="text-xs text-muted-foreground">
         {sichtbar.length === 1 ? '1 Größe sichtbar' : `${formatZahl(sichtbar.length)} Größen sichtbar`}
       </p>
-      {schild && (
-        <p className="flex items-center gap-1.5 text-[12.5px] font-medium text-status-fertig">
-          <ShieldCheck className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-          {schild}
-        </p>
-      )}
+      {schild && <FutterSchild text={schild} />}
       {sichtbar.length > 0 && (
         <ul className="flex flex-wrap gap-1.5">
           {sichtbar.map((z) => (
