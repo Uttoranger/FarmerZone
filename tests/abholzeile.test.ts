@@ -84,6 +84,15 @@ describe('abholLage — die sechs Lagen des Boards ohne „jetzt"', () => {
     expect(abholLage(donnerstag, false, new Date('2026-10-21T22:00:00Z'))).toMatchObject({ art: 'heute', kalendertag: '2026-10-22' }) // Do 00:00
   })
 
+  // Register N19, Ergänzung 21.10.2026 (Nr. 131).
+  it('ist das Fenster von heute voll, zeigt die Zeile das nächste freie; sind alle voll, wie ohne Abholzeit', () => {
+    const heuteVoll = fenster(3, '11:00', '14:00')
+    const lage = abholLage([{ ...heuteVoll, ausgebuchtAm: ['2026-10-21'] }, fenster(4, '09:00', '12:00')], false, MITTWOCH_10)
+    expect(lage).toMatchObject({ art: 'morgen', kalendertag: '2026-10-22' })
+    expect(abholzeileText(lage)).toBe('Abholung morgen 09:00–12:00')
+    expect(abholLage([{ ...heuteVoll, ausgebuchtAm: ['2026-10-21', '2026-10-28'] }], false, MITTWOCH_10)).toEqual({ art: 'keine' })
+  })
+
   it('Pause schlägt jedes Fenster; ohne Fenster — auch ohne das Feld (alter Cache-Eintrag) — „keine"', () => {
     expect(abholLage([MI_15], true, MITTWOCH_10)).toEqual({ art: 'pause' })
     expect(abholzeileText({ art: 'pause' })).toBe('Macht gerade Pause – Bestellen geht bald wieder')
@@ -108,6 +117,16 @@ describe('tageDerAbholwahl und holtAbAn — der Filter „Abholung"', () => {
     expect(holtAbAn([MI_15], ['2026-10-21'], new Date('2026-10-21T13:00:00Z'))).toBe(false)
     expect(holtAbAn([MI_15], ['2026-10-22'], MITTWOCH_10)).toBe(false)
     expect(holtAbAn(undefined, ['2026-10-21'], MITTWOCH_10)).toBe(false)
+  })
+
+  // Register N19, Ergänzung 21.10.2026 (Nr. 131): dieselbe Regel wie die Abholzeile, ohne eigenen Code.
+  it('„heute" zählt einen Hof nicht mit, dessen einziges Fenster heute voll ist', () => {
+    const voll = { ...MI_15, ausgebuchtAm: ['2026-10-21'] }
+    const hof = { isPaused: false, angebot: [{}], abholfenster: [voll] }
+    expect(holtAbAnTagen(hof, tageDerAbholwahl('heute', MITTWOCH_10), MITTWOCH_10)).toBe(false)
+    expect(holtAbAnTagen({ ...hof, abholfenster: [MI_15] }, tageDerAbholwahl('heute', MITTWOCH_10), MITTWOCH_10)).toBe(true)
+    // In einer Woche ist dasselbe Fenster wieder frei.
+    expect(holtAbAn([voll], ['2026-10-28'], MITTWOCH_10)).toBe(true)
   })
 
   it('ein nicht bestellbarer oder pausierter Hof erfüllt keinen Abholung-Filter', () => {

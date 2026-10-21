@@ -22,8 +22,16 @@ vi.mock('@/server/queries/farm', () => ({
   getOwnerFarm: vi.fn(),
   getPublicFarm: vi.fn(),
 }))
+// Volle Abholfenster (Nr. 131): gezählt wird in ausgebuchteTage (eigene Integrationstests), hier nur die Weitergabe.
+vi.mock('@/lib/prisma', () => ({ prisma: {} }))
+vi.mock('@/server/abholfenster', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/server/abholfenster')>()),
+  ausgebuchteTage: vi.fn(async () => new Map()),
+}))
 
 import { ladeHofseite } from '@/server/hofseite-vorschau'
+import { ausgebuchteTage } from '@/server/abholfenster'
+import { gibVerwaisteFreiFuerSlug } from '@/server/verwaiste-bestellungen'
 import { auth } from '@/lib/auth'
 import { getHofBesitzer, getOwnerFarm, getPublicFarm } from '@/server/queries/farm'
 
@@ -100,5 +108,47 @@ describe('freigegebener Hof', () => {
     getSession.mockResolvedValue({ user: { id: HOF.ownerId } } as never)
     const { ansicht } = await ladeHofseite('hof-neu', { vorschau: '1' })
     expect(JSON.stringify(ansicht)).not.toContain(HOF.ownerId)
+  })
+})
+
+// Register N19, Ergänzung 21.10.2026 (Nr. 131): „Nächste Abholung" der Hof- und Produktseite.
+describe('volle Abholfenster', () => {
+  const MIT_ZEITEN = {
+    ...HOF,
+    pickupSlots: [
+      { dayOfWeek: 4, startTime: '09:00', endTime: '12:00' },
+      { dayOfWeek: 5, startTime: '09:00', endTime: '12:00' },
+    ],
+  }
+  const VOLL = new Map([
+    [HOF.id, new Map([['4|09:00|12:00', { dayOfWeek: 4, startTime: '09:00', endTime: '12:00', ausgebuchtAm: ['2026-10-22'] }]])],
+  ])
+
+  it('füllt ausgebuchtAm nach der Freigabe verwaister Bestellungen — für getPublicFarm und getOwnerFarm', async () => {
+    vi.mocked(ausgebuchteTage).mockResolvedValue(VOLL)
+    publicFarm.mockResolvedValue(MIT_ZEITEN as never)
+    ownerFarm.mockResolvedValue(MIT_ZEITEN as never)
+    getSession.mockResolvedValue({ user: { id: HOF.ownerId } } as never)
+
+    for (const suche of [{}, { vorschau: '1' }]) {
+      const { farm } = await ladeHofseite('hof-neu', suche)
+      expect(farm?.pickupSlots).toEqual([
+        { dayOfWeek: 4, startTime: '09:00', endTime: '12:00', ausgebuchtAm: ['2026-10-22'] },
+        { dayOfWeek: 5, startTime: '09:00', endTime: '12:00' },
+      ])
+    }
+    expect(publicFarm).toHaveBeenCalledTimes(1)
+    expect(ownerFarm).toHaveBeenCalledTimes(1)
+    expect(ausgebuchteTage).toHaveBeenCalledWith([HOF.id], expect.any(Date))
+    // Erst freigeben, dann zählen — wie die Kasse.
+    expect(vi.mocked(gibVerwaisteFreiFuerSlug).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(ausgebuchteTage).mock.invocationCallOrder[0] ?? 0
+    )
+  })
+
+  it('ohne volle Abholzeit bleibt der Hof unverändert, ohne das Feld', async () => {
+    vi.mocked(ausgebuchteTage).mockResolvedValue(new Map())
+    publicFarm.mockResolvedValue(MIT_ZEITEN as never)
+    expect((await ladeHofseite('hof-neu', {})).farm).toBe(MIT_ZEITEN)
   })
 })

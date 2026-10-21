@@ -35,6 +35,7 @@ import {
   type VorschauProdukt,
 } from '@/lib/hofuebersicht'
 import { AKTIVER_BEITRAG, NEUESTER_BEITRAG_ZUERST } from './status-posts'
+import { alsAbholFenster, ausgebuchteTage, type AusgebuchteTage } from '@/server/abholfenster'
 
 export type PublicProduct = {
   id: string
@@ -117,6 +118,8 @@ export type PublicPickupSlot = {
   dayOfWeek: number
   startTime: string
   endTime: string
+  /** Die vollen Wiener Kalendertage im Vorlauf (Register N19, Ergänzung 21.10.2026) — nur auf der Hof- und Produktseite gefüllt (`ladeHofseite`), nie von `getPublicFarm`/`getOwnerFarm` selbst. */
+  ausgebuchtAm?: readonly string[]
 }
 
 export type PublicFarmValue = {
@@ -862,12 +865,15 @@ type UebersichtHof = Prisma.FarmGetPayload<{ select: typeof UEBERSICHT_HOF_SELEC
  * Baut aus den Höfen und ihren schmalen Zeilen die Einträge der Hofliste —
  * der Zusammenbau von getOeffentlicheHoefe, seit Nr. 122 benannt: Region baut
  * den eigenen Eintrag damit genau so wie /hoefe (src/server/queries/region.ts).
+ * `ausgebucht` sind die vollen Abholfenster derselben Höfe (`ausgebuchteTage`,
+ * Register N19, Ergänzung 21.10.2026) — alle drei Aufrufer zählen damit.
  */
 export function baueHofUebersicht(
   // statusPosts nur aus getOeffentlicheHoefe (neuerBeitragEinbindung); ohne sie kein neuer Beitrag.
   hoefe: readonly (UebersichtHof & { statusPosts?: NeuerBeitragRoh[] })[],
   schmaleZeilen: readonly UebersichtZeile[],
-  jetzt: OrtsZeit
+  jetzt: OrtsZeit,
+  ausgebucht: AusgebuchteTage
 ): HofUebersichtEintrag[] {
   // Was die Deckelung oben NICHT verlieren darf: Kategorien, Produktfotos
   // und Suchnamen hängen an ALLEN verfügbaren Produkten, nicht an den
@@ -931,6 +937,9 @@ export function baueHofUebersicht(
   return hoefe.map((hof) => {
     const angebot = angebotJeHof.get(hof.id) ?? []
     const { kategorien, suchNamen } = fasseAngebotZusammen(angebot)
+    // Ausdrücklich gebaut statt der rohen Zeilen: Wochentag, Beginn, Ende und
+    // nur bei vollen Abholzeiten `ausgebuchtAm` — der Zwischenspeicher wächst sonst nicht.
+    const abholfenster = hof.pickupSlots.map((s) => alsAbholFenster(s, ausgebucht.get(hof.id)))
     return {
       slug: hof.slug,
       name: hof.name,
@@ -959,8 +968,8 @@ export function baueHofUebersicht(
       produkteGesamt: hof._count.products,
       produkteJeBereich: jeBereich.get(hof.id) ?? { LEBENSMITTEL: 0, FUTTERMITTEL: 0 },
       suchNamen,
-      naechsteAbholung: naechsteAbholung(hof.pickupSlots, jetzt),
-      abholfenster: hof.pickupSlots,
+      naechsteAbholung: naechsteAbholung(abholfenster, jetzt),
+      abholfenster,
       fotos: baueFotostreifen({
         bannerUrl: hof.bannerUrl,
         bannerType: hof.bannerType,
@@ -1014,8 +1023,14 @@ export async function getOeffentlicheHoefe(
     orderBy: { approvedAt: 'asc' },
     select: { ...UEBERSICHT_HOF_SELECT, statusPosts: neuerBeitragEinbindung(zeitpunkt) },
   })
+  // Volle Abholfenster nur der Höfe dieser Abfrage — die Zählung filtert die
+  // Sichtbarkeit nicht selbst (Register N19, Ergänzung 21.10.2026; N21).
+  const ausgebucht = await ausgebuchteTage(
+    hoefe.map((h) => h.id),
+    zeitpunkt
+  )
 
-  return baueHofUebersicht(hoefe, await zeilenJeHof, jetzt)
+  return baueHofUebersicht(hoefe, await zeilenJeHof, jetzt, ausgebucht)
 }
 
 /** Was der Kopf von „Mein Hof" zeigt (components/mein-hof/seitenkopf.tsx). */

@@ -58,6 +58,7 @@ Stand: 2026-10. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
   eigene Schreibung". Es **wirft** außerhalb einer Server Action, also auch in
   Route-Handlern — dort bleibt `revalidateTag` mit zweitem Argument. Dazu neu:
   `refresh()` aktualisiert nur den Client-Cache, keine Daten.
+- Ein Helfer, der in Action, Route, Cron und beim Rendern einer Seite gleich läuft, nimmt `revalidateTag(tag, { expire: 0 })` über `nachDerAntwort` statt `updateTag`; beim Rendern wirft jede Cache-Entwertung (src/server/hofliste-erneuern.ts, N19-Ergänzung 21.10.2026).
 - **`revalidatePath` erreicht keinen `unstable_cache`-Eintrag.** Wer einen solchen
   Cache anlegt, gibt ihm ein `tags` — ohne Etikett gibt es keinen Weg, ihn vor
   Ablauf zu leeren. Vorbild: `src/app/(public)/hoefe/page.tsx` mit

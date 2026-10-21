@@ -28,8 +28,8 @@ const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
 describe('ladeOeffentlicheHoefe', () => {
   it('ein Eintrag unter HOEFE_CACHE_TAG, fünf Minuten, mit Etikett', () => {
-    // 'v4' (Nr. 127: `subcategory` in den Produktzeilen; 'v3' Nr. 129, 'v2' Nr. 120): Ein Eintrag von vor dem Deploy ohne `subcategory` wird nie gelesen.
-    expect(aufrufe).toEqual([{ schluessel: [HOEFE_CACHE_TAG, 'v4'], optionen: { revalidate: 300, tags: [HOEFE_CACHE_TAG] } }])
+    // 'v5' (Nr. 131: `ausgebuchtAm` und `kalendertag`; 'v4' Nr. 127, 'v3' Nr. 129, 'v2' Nr. 120): Ein Eintrag von vor dem Deploy ohne die vollen Tage wird nie gelesen.
+    expect(aufrufe).toEqual([{ schluessel: [HOEFE_CACHE_TAG, 'v5'], optionen: { revalidate: 300, tags: [HOEFE_CACHE_TAG] } }])
   })
 
   it('liefert die öffentlichen Höfe', async () => {

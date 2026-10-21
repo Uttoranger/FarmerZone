@@ -21,7 +21,9 @@ import { leseOeffentlichMitWiederholung } from '@/server/oeffentlich-lesen'
  * Abholung wird mit den Daten gecacht und altert höchstens fünf Minuten. Auf
  * /hoefe rechnet der Browser sie seit Nr. 120 aus `abholfenster` neu.
  *
- * DER SCHLÜSSELTEIL 'v4' (Nr. 127: `subcategory` in den Produktzeilen der
+ * DER SCHLÜSSELTEIL 'v5' (Nr. 131: `ausgebuchtAm` an den Abholfenstern und
+ * `kalendertag` an `naechsteAbholung`, Register N19, Ergänzung 21.10.2026;
+ * 'v4' Nr. 127: `subcategory` in den Produktzeilen der
  * Vorschau; 'v3' Nr. 129, 'v2' seit Nr. 120, wie 'fassung-v1' der Startseite
  * seit Nr. 99): Ein Eintrag von vor dem Deploy trägt kein `subcategory` (bzw.
  * kein `neuerBeitrag`, kein `abholfenster`) — mit dem neuen Schlüssel wird er
@@ -32,6 +34,9 @@ import { leseOeffentlichMitWiederholung } from '@/server/oeffentlich-lesen'
  * Abzeichen, Admin — und seit Nr. 129 Veröffentlichen, Deaktivieren und
  * Löschen eines Beitrags (src/server/actions/status-posts.ts). Das
  * automatische Ablaufen eines Beitrags deckt der Browser über `endet` ab.
+ * Seit Nr. 131 auch nach dem Anlegen und Stornieren einer Bestellung bei
+ * Höfen mit Höchstzahl — dort mit `revalidateTag(…, { expire: 0 })` nach der
+ * Antwort, weil der Weg auch beim Rendern läuft (src/server/hofliste-erneuern.ts).
  *
  * EINE WIEDERHOLUNG bei einem Verbindungsabbruch (Nr. 47): Beim Neubau im
  * Hintergrund scheiterte die Anmeldung am Pooler gelegentlich mit
@@ -40,7 +45,7 @@ import { leseOeffentlichMitWiederholung } from '@/server/oeffentlich-lesen'
  */
 export const ladeOeffentlicheHoefe = unstable_cache(
   () => leseOeffentlichMitWiederholung('oeffentliche-hoefe', () => getOeffentlicheHoefe()),
-  [HOEFE_CACHE_TAG, 'v4'],
+  [HOEFE_CACHE_TAG, 'v5'],
   {
     revalidate: 300,
     tags: [HOEFE_CACHE_TAG],

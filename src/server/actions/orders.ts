@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import type { OrderForEmail } from '@/lib/email'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import { erneuereHoflisteNachStorno } from '@/server/hofliste-erneuern'
 import * as Sentry from '@sentry/nextjs'
 import type { OrderStatus } from '@prisma/client'
 import {
@@ -541,6 +542,8 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
   })
 
   if (!storno) return { error: 'Diese Bestellung ist schon storniert oder abgeholt.' }
+  // Nach dem Commit: ein volles Abholfenster kann frei werden (Register N19, Ergänzung 21.10.2026).
+  erneuereHoflisteNachStorno(orderId)
 
   // Dieselbe Rechnung wie im Storno-Dialog (src/lib/storno.ts) — aus dem Stand
   // unter der Sperre. Nur online bezahlt gibt es Beträge, sonst null.
