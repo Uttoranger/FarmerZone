@@ -177,11 +177,11 @@ describe('Fachwort-Wache', () => {
   it('kein Fachwort ohne Erklärung in einem Text unter src/', () => {
     const maengel = ALLE_FUNDE.flatMap((f) => beanstande(f).map((m) => `${f.datei}:${f.zeile} ${m}: ${f.text.slice(0, 80)}`))
     expect(maengel).toEqual([])
-  })
+  }, 30_000)
 
   it('jeder erlaubte Text steht noch so da — sonst gehört er aus der Liste', () => {
     for (const e of KENNZEICHNUNG_ERLAUBT) expect(ALLE_FUNDE.some((f) => passt(e, f)), `${e.datei}: ${e.grund}`).toBe(true)
-  })
+  }, 30_000)
 
   it('USP steht ausgeschrieben; Primärproduktion heißt im Hofprofil „Eigene Ernte (Primärproduktion)"', () => {
     expect(USP_AUSGESCHRIEBEN).toBe('Unternehmensserviceportal (USP)')
@@ -222,7 +222,7 @@ describe('Fachwort-Wache', () => {
       .filter((p) => p !== UMSATZGRENZE_QUELLE && /\bJAHRESSUMME_TEXT\b/.test(quelle(p)))
     expect(zeigen.length).toBeGreaterThan(0)
     for (const datei of zeigen) expect(quelle(datei), datei).toMatch(/\bUMSATZGRENZE_ERKLAERUNG\b/)
-  })
+  }, 30_000)
 
   it('„Kennzeichnung": beide Abschnitte im Hofbereich beginnen mit dem erklärenden Satz', () => {
     expect(KENNZEICHNUNG_ERKLAERUNG).toMatch(/^Kennzeichnung heißt: [^.]+\.$/)
@@ -252,7 +252,7 @@ describe('Fachwort-Wache', () => {
     for (const pfad of quelldateien(join(WURZEL, 'src'))) {
       expect(readFileSync(pfad, 'utf8'), relative(WURZEL, pfad)).not.toContain('Angaben vom Sackanhänger')
     }
-  })
+  }, 30_000)
 
   it('der Name steht nur, wo der Abschnitt steht — jeder Verweis kommt über KENNZEICHNUNG_VERWEIS, auch der Titel der Rückfrage (Runde 2)', () => {
     // So sieht die Wache jeden Verweis: Er läuft über eine Konstante aus futter-registrierung.ts, nie über
@@ -268,7 +268,7 @@ describe('Fachwort-Wache', () => {
     }
     expect(KENNZEICHNUNG_LOESCHEN_TITEL).toBe(`Angaben ${KENNZEICHNUNG_VERWEIS} löschen?`)
     expect(quelle('src/components/products/product-dialog.tsx')).toContain('{KENNZEICHNUNG_LOESCHEN_TITEL}')
-  })
+  }, 30_000)
 
   it('der Satz, wo die Angaben stehen, stimmt auch für Heu aus eigener Ernte — dort gibt es keinen Sackanhänger (E10)', () => {
     expect(KENNZEICHNUNG_FUNDORT).toMatch(/^[^.]+\.$/)

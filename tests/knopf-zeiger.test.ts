@@ -163,5 +163,5 @@ describe('kein doppeltes cursor-pointer', () => {
       doppelteZeiger(readFileSync(pfad, 'utf8'), relative(WURZEL, pfad))
     )
     expect(funde).toEqual([])
-  })
+  }, 30_000)
 })

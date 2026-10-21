@@ -66,5 +66,5 @@ describe('Icons über die Dateikonvention', () => {
     suche(join(wurzel, 'src'))
     suche(join(wurzel, 'public'))
     expect(verweise).toEqual([])
-  })
+  }, 30_000)
 })

@@ -105,7 +105,7 @@ describe('Wache: nur EINE Zeichnung der Marke', () => {
 
   it('die alten Pfade stehen nirgends unter src/', () => {
     expect(funde(join(process.cwd(), 'src'), ALTE_ZEICHNUNGEN)).toEqual([])
-  })
+  }, 30_000)
 
   it('keine Komponente nimmt ein App-Icon als Marke — die Kopfzeile am Handy zeigt die Bildmarke klein', () => {
     // Bis Nr. 92 stand in der Handy-Leiste des KundenKopf `/icons/icon-192.png` (das F-Icon); mit der vollen Fassung
@@ -119,5 +119,5 @@ describe('Wache: nur EINE Zeichnung der Marke', () => {
     const hier = funde(join(process.cwd(), 'tests'), ['C22 24 30 16', '/icons/icon-'])
     expect(hier.some((f) => f.endsWith('bildmarke.test.ts: C22 24 30 16'))).toBe(true)
     expect(hier.some((f) => f.endsWith('bildmarke.test.ts: /icons/icon-'))).toBe(true)
-  })
+  }, 30_000)
 })

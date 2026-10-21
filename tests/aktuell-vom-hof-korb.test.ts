@@ -67,14 +67,10 @@ vi.mock('@/components/hofseite/produkt-karte', () => ({
 import { FarmPageView } from '@/components/farm/farm-page-view'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
 import { publicFarm } from './fabrik/public-farm'
+import { publicProduct } from './fabrik/public-product'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 
-const KAROTTEN: PublicProduct = {
-  id: 'p_karotten', name: 'Karotten', description: null, imageUrl: null, bildAusschnitt: null, category: 'GEMUESE', categoryImageUrl: null,
-  price: 2.4, unit: 'KG', unitSize: 1, stock: 8, isAvailable: true, allergens: [], isOrganic: false, requiresCool: false,
-  requiresFreezer: false, seasonStart: null, seasonEnd: null, unavailableReason: null, subcategory: null, labels: [],
-  abgabe: 'ALLE', futter: null, familieId: null, brennmaterial: null, abholhinweise: [],
-}
+const KAROTTEN: PublicProduct = publicProduct({ id: 'p_karotten', name: 'Karotten', price: 2.4, unit: 'KG', unitSize: 1, stock: 8 })
 const HOF: PublicFarm = publicFarm({ name: 'Testhof A', description: 'Gemüse', products: [KAROTTEN] })
 const BEITRAG: ActiveStatusPost = {
   id: 'bneu', title: 'Neue Karotten', body: 'Frisch vom Feld.', anlass: 'FRESH_PRODUCT', photoUrl: null, fotoAusschnitt: null,

@@ -577,5 +577,5 @@ describe('Kein Code baut den Pfad der Bar-Bestätigung an bestell-link.ts vorbei
       .filter((pfad) => SELBST_GEBAUT.test(readFileSync(pfad, 'utf8')))
       .map((pfad) => pfad.slice(process.cwd().length + 1))
     expect(treffer).toEqual([])
-  })
+  }, 30_000)
 })

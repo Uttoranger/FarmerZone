@@ -5,13 +5,13 @@
  * mehr als drei Testdateien nachgebaut werden, bekommen EINE Fabrik in `tests/fabrik/<typ>.ts`; sonst bleiben Faktoren
  * lokal. Die Fabrik liefert bei jedem Aufruf ein frisches, vollständiges Objekt, die Testdatei überschreibt nur, was sie
  * prüft (`publicFarm({ isPaused: true })`, `hofRohdaten({ stripeBereit: true })`). Ein neues Pflichtfeld im Typ bricht
- * dann nur die Fabrik. Heute: `PublicFarm`, `HofRohdaten`.
+ * dann nur die Fabrik. Heute: `PublicFarm`, `HofRohdaten`, `PublicProduct` (Nr. 136, Regelvorschlag in Nr. 127).
  *
  * Ursache (Nr. 119): `PublicFarm` und `HofRohdaten` bekamen Pflichtfelder; elf Testdateien bauten den Typ
  * selbst nach und mussten je eine Zeile bekommen — Konfliktfläche für parallele Nummern.
  *
  * Beweist (Quelltext von `tests/`, TypeScript-Syntaxbaum, kein Netz): Außerhalb von `tests/fabrik/` steht
- * kein Objekt-Literal, das als `PublicFarm` oder `HofRohdaten` ausgeschrieben ist — weder als
+ * kein Objekt-Literal, das als `PublicFarm`, `HofRohdaten` oder `PublicProduct` ausgeschrieben ist — weder als
  * `const x: Typ = { … }`, noch als `{ … } as Typ` / `as unknown as Typ` / `satisfies Typ`, noch als
  * Rückgabewert einer Funktion mit diesem Rückgabetyp. Ein Literal, das nur wenige Felder setzt
  * (höchstens MAX_EIGENE_FELDER, etwa `{ ...HOF, isPaused: false }`), übernimmt den Rest aus einem
@@ -40,6 +40,7 @@ import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { hofRohdaten } from './fabrik/hof-rohdaten'
 import { publicFarm } from './fabrik/public-farm'
+import { publicProduct } from './fabrik/public-product'
 
 const ORDNER = join(process.cwd(), 'tests')
 
@@ -50,6 +51,14 @@ const MAX_EIGENE_FELDER = 8
 const FABRIKEN: Record<string, string> = {
   PublicFarm: 'tests/fabrik/public-farm.ts',
   HofRohdaten: 'tests/fabrik/hof-rohdaten.ts',
+  PublicProduct: 'tests/fabrik/public-product.ts',
+}
+
+/** Typ → das Prisma-Modell seiner Datenbankzeile. Was die Zeile hat, ist kein Merkmal des öffentlichen Typs. */
+const DATENBANK_MODELL: Record<string, string> = {
+  PublicFarm: 'Farm',
+  HofRohdaten: 'Farm',
+  PublicProduct: 'Product',
 }
 
 /** Die Namen der eigenen Felder eines Literals (Spreads zählen nicht); Name als Bezeichner oder Text. */
@@ -59,10 +68,10 @@ function feldNamen(literal: ts.ObjectLiteralExpression): string[] {
   )
 }
 
-/** Die Felder der Datenbankzeile `Farm` aus dem Schema — was sie hat, ist kein Merkmal des öffentlichen Typs. */
-function datenbankFelder(): Set<string> {
+/** Die Felder der Datenbankzeile (`Farm`, `Product`) aus dem Schema — was sie hat, ist kein Merkmal des öffentlichen Typs. */
+function datenbankFelder(modell: string): Set<string> {
   const schema = readFileSync(join(process.cwd(), 'prisma/schema.prisma'), 'utf8')
-  const rumpf = /^model Farm \{([\s\S]*?)^\}/m.exec(schema)?.[1] ?? ''
+  const rumpf = new RegExp(`^model ${modell} \\{([\\s\\S]*?)^\\}`, 'm').exec(schema)?.[1] ?? ''
   return new Set(rumpf.split('\n').flatMap((zeile) => /^\s+([a-zA-Z]\w*)\s/.exec(zeile)?.slice(1) ?? []))
 }
 
@@ -120,16 +129,19 @@ type Schluessel = { alle: Set<string>; nurImTyp: Set<string> }
 
 let schluesselMerker: Record<string, Schluessel> | undefined
 
-/** Je Fabrik-Typ: alle seine Felder (aus dem Literal der Fabrik) und die davon, die eine Datenbankzeile `Farm` nicht kennt. */
+/** Je Fabrik-Typ: alle seine Felder (aus dem Literal der Fabrik) und die davon, die die Datenbankzeile seines Modells nicht kennt. */
 function schluesselMengen(): Record<string, Schluessel> {
   if (schluesselMerker) return schluesselMerker
-  const datenbank = datenbankFelder()
   schluesselMerker = Object.fromEntries(
     Object.entries(FABRIKEN).map(([typ, pfad]) => {
       const alle = new Set<string>()
       besuche(parse(readFileSync(join(process.cwd(), pfad), 'utf8'), pfad), (k) => {
         if (ts.isObjectLiteralExpression(k) && typisiertAls(k) === typ) feldNamen(k).forEach((n) => alle.add(n))
       })
+      const modell = DATENBANK_MODELL[typ]
+      // Eine neue Fabrik nennt ihr Modell; ohne Eintrag verglichen wir still mit der falschen Zeile.
+      if (modell === undefined) throw new Error(`${typ} steht in FABRIKEN, aber nicht in DATENBANK_MODELL`)
+      const datenbank = datenbankFelder(modell)
       return [typ, { alle, nurImTyp: new Set([...alle].filter((n) => !datenbank.has(n))) }]
     }),
   )
@@ -155,7 +167,9 @@ function typisierteLiterale(quelltext: string, name = 'attrappe.ts', sf = parse(
  * (`createElement(Kopf, { hof: { … } })`) —, die einen der Typen nachbauen. Ohne TypeChecker erkennt man sie an den
  * Feldern: Ein Literal mit mindestens MIN_FELDER_DES_TYPS Feldern des Typs, darunter eines, das nur der Typ kennt (nicht
  * die Datenbankzeile `Farm`), ist ein Nachbau. Eine Datenbankzeile teilt viele Felder mit dem Typ, hat aber keines, das
- * nur er kennt, und bleibt erlaubt.
+ * nur er kennt, und bleibt erlaubt. Ebenso ein Literal mit einem Feld, das der Typ nicht kennt (Nr. 136): Es könnte
+ * als dieser Typ gar nicht übersetzt werden, es baut einen anderen nach (`ProductData` der Produktliste teilt 25 von
+ * 26 Feldern mit `PublicProduct` und hat `categoryImageUrl`).
  */
 const MIN_FELDER_DES_TYPS = MAX_EIGENE_FELDER + 1
 
@@ -170,8 +184,9 @@ function literaleOhneTypangabe(quelltext: string, name = 'attrappe.ts', sf = par
         typ,
         gemeinsam: [...namen].filter((n) => m.alle.has(n)).length,
         nurImTyp: [...namen].filter((n) => m.nurImTyp.has(n)).length,
+        fremd: [...namen].filter((n) => !m.alle.has(n)).length,
       }))
-      .filter((t) => t.gemeinsam >= MIN_FELDER_DES_TYPS && t.nurImTyp > 0)
+      .filter((t) => t.gemeinsam >= MIN_FELDER_DES_TYPS && t.nurImTyp > 0 && t.fremd === 0)
       .sort((a, b) => b.gemeinsam - a.gemeinsam)[0]
     if (beste) funde.push({ stelle: `${name}:${sf.getLineAndCharacterOfPosition(k.getStart(sf)).line + 1}`, typ: beste.typ })
   })
@@ -212,14 +227,14 @@ function dateienUnter(ordner: string): string[] {
 }
 
 describe('Fabrik-Wache: ein neues Feld im Typ bricht nur die Fabrik (Nr. 119)', () => {
-  it('kein Test schreibt PublicFarm oder HofRohdaten noch einmal aus', () => {
+  it('kein Test schreibt PublicFarm, HofRohdaten oder PublicProduct noch einmal aus', () => {
     const funde = dateienUnter(ORDNER)
       .map((pfad) => ({ name: relative(ORDNER, pfad).split(sep).join('/'), pfad }))
       .filter((d) => !d.name.startsWith('fabrik/') && d.name !== 'fabrik-wache.test.ts')
       .map((d) => ({ ...d, text: readFileSync(d.pfad, 'utf8') }))
       .filter((d) => kannFundHaben(d.text))
       .flatMap((d) => ausgeschriebeneLiterale(d.text, d.name))
-    expect(funde, 'Die Fabrik nehmen: publicFarm({ … }) aus tests/fabrik/public-farm.ts bzw. hofRohdaten({ … }) aus tests/fabrik/hof-rohdaten.ts (auch ein Literal ohne Typangabe mit mindestens neun Feldern des Typs ist ein Nachbau)').toEqual([])
+    expect(funde, 'Die Fabrik nehmen: publicFarm({ … }) aus tests/fabrik/public-farm.ts bzw. hofRohdaten({ … }) aus tests/fabrik/hof-rohdaten.ts bzw. publicProduct({ … }) aus tests/fabrik/public-product.ts (auch ein Literal ohne Typangabe mit mindestens neun Feldern des Typs ist ein Nachbau)').toEqual([])
     // Liest alle Testdateien: im vollen Lauf auf dem CI-Runner langsamer als einzeln, wie die übrigen Quelltext-Wachen.
   }, 30_000)
 
@@ -243,6 +258,8 @@ describe('Fabrik-Wache: ein neues Feld im Typ bricht nur die Fabrik (Nr. 119)', 
         `const HOF = { ${FELDER} } satisfies PublicFarm`,
         `function roh(): HofRohdaten { return { ${FELDER} } }`,
         `const roh = (): HofRohdaten => ({ ${FELDER} })`,
+        `const KAROTTEN: PublicProduct = { ${FELDER} }`,
+        `function produkt(id: string): PublicProduct { return { ${FELDER}, id } }`,
       ]
       for (const text of faelle) expect(ausgeschriebeneLiterale(text), text).toHaveLength(1)
     })
@@ -265,6 +282,9 @@ describe('Fabrik-Wache: ein neues Feld im Typ bricht nur die Fabrik (Nr. 119)', 
         `const HOF_OFFEN: PublicFarm = { ...HOF, isPaused: false }`,
         `const hof: PublicFarm = { ...HOF, products: HOF.products.map((p) => p) }`,
         `const hof = publicFarm({ isPaused: true })`,
+        `const p = publicProduct({ id: 'p_eier', name: 'Freilandeier', stock: 0 })`,
+        `const p: PublicProduct = { ...EIER, stock: 0 }`,
+        `const teil: Partial<PublicProduct> = { ${FELDER} }`,
         `const roh = hofRohdaten({ stripeBereit: true })`,
         `const x: Partial<PublicFarm> = { ${FELDER} }`,
         `const foto: PublicFarmPhoto = { ${FELDER} }`,
@@ -282,7 +302,9 @@ describe('Fabrik-Wache: ein neues Feld im Typ bricht nur die Fabrik (Nr. 119)', 
     const alsLiteral = (felder: Iterable<string>) => `{ ${[...felder].map((f) => `${f}: 1`).join(', ')} }`
     const farm = [...mengen.PublicFarm!.alle]
     const roh = [...mengen.HofRohdaten!.alle]
-    const datenbank = [...datenbankFelder()]
+    const produkt = [...mengen.PublicProduct!.alle]
+    const datenbank = [...datenbankFelder('Farm')]
+    const produktZeile = [...datenbankFelder('Product')]
 
     it('schlägt an: vollständiges Literal als Argument und als Eigenschaft einer Komponente, für beide Typen', () => {
       const faelle = [
@@ -290,6 +312,8 @@ describe('Fabrik-Wache: ein neues Feld im Typ bricht nur die Fabrik (Nr. 119)', 
         [`render(createElement(Kopf, { hof: ${alsLiteral(farm)}, aktiv: true }))`, 'PublicFarm'],
         [`vi.mocked(getAdminFarms).mockResolvedValue([${alsLiteral(roh)}])`, 'HofRohdaten'],
         [`render(createElement(Zeile, { hof: ${alsLiteral(roh)} }))`, 'HofRohdaten'],
+        [`vi.mocked(getPublicFarm).mockResolvedValue({ products: [${alsLiteral(produkt)}] })`, 'PublicProduct'],
+        [`render(createElement(Karte, { produkt: ${alsLiteral(produkt)} }))`, 'PublicProduct'],
       ] as const
       for (const [text, typ] of faelle) expect(ausgeschriebeneLiterale(text, 'neu.test.ts'), text).toEqual([`neu.test.ts:1 ${typ}`])
     })
@@ -307,18 +331,20 @@ describe('Fabrik-Wache: ein neues Feld im Typ bricht nur die Fabrik (Nr. 119)', 
       expect(ausgeschriebeneLiterale(`g(${alsLiteral(acht)})`), 'acht').toEqual([])
     })
 
-    it('lässt durch: eine Datenbankzeile (alle Felder von `Farm`, keines nur im Typ), kurze Literale, fremde Felder', () => {
+    it('lässt durch: eine Datenbankzeile (alle Felder von `Farm` bzw. `Product`, keines nur im Typ), kurze Literale, fremde Felder', () => {
       for (const text of [
         `vi.mocked(prisma.farm.findUnique).mockResolvedValue(${alsLiteral(datenbank)})`,
+        `vi.mocked(prisma.product.findMany).mockResolvedValue([${alsLiteral(produktZeile)}])`,
         `g(${alsLiteral(farm.filter((f) => mengen.PublicFarm!.nurImTyp.has(f)))})`,
         `g({ ...HOF, ${[...mengen.PublicFarm!.nurImTyp].map((f) => `${f}: 1`).join(', ')}, isPaused: true })`,
         `g(${alsLiteral(Array.from({ length: 30 }, (_, i) => `x${i}`))})`,
+        `g(${alsLiteral([...produkt, 'countsTowardLimit', 'vatRate', 'reservedStock'])})`,
       ]) {
         expect(ausgeschriebeneLiterale(text), text).toEqual([])
       }
     })
 
-    it('bleibt nicht blind: jeder Typ hat mindestens ein Feld, das die Datenbankzeile `Farm` nicht kennt', () => {
+    it('bleibt nicht blind: jeder Typ hat mindestens ein Feld, das die Datenbankzeile seines Modells nicht kennt', () => {
       // Sonst fände die Wache keinen Nachbau ohne Typangabe mehr (sie hielte jedes Literal für eine Datenbankzeile).
       for (const [typ, m] of Object.entries(mengen)) expect([...m.nurImTyp].length, typ).toBeGreaterThan(0)
     })
@@ -353,12 +379,15 @@ describe('Fabrik-Wache: ein neues Feld im Typ bricht nur die Fabrik (Nr. 119)', 
       expect(publicFarm().pickupSlots).not.toBe(publicFarm().pickupSlots)
       expect(hofRohdaten().createdAt).not.toBe(hofRohdaten().createdAt)
       expect(hofRohdaten().monat).not.toBe(hofRohdaten().monat)
+      expect(publicProduct()).not.toBe(publicProduct())
+      expect(publicProduct().labels).not.toBe(publicProduct().labels)
     })
 
     it('überschreiben genau das, was die Testdatei nennt', () => {
       expect(publicFarm({ isPaused: true, name: 'Testhof A' })).toMatchObject({ isPaused: true, name: 'Testhof A', slug: 'hof-test' })
       expect(hofRohdaten({ stripeBereit: true }).stripeBereit).toBe(true)
       expect(hofRohdaten().stripeBereit).toBe(false)
+      expect(publicProduct({ id: 'p_eier', stock: 0 })).toMatchObject({ id: 'p_eier', stock: 0, name: 'Testprodukt', isAvailable: true })
     })
   })
 })

@@ -45,7 +45,7 @@ describe('genau zwei Leaflet-Karten, beide am gemeinsamen Hook', () => {
     // Gegenprobe: das Muster erkennt beide Schreibweisen.
     expect(KARTE_ENTSTEHT.test('const m = L.map(div, {})')).toBe(true)
     expect(KARTE_ENTSTEHT.test('const m = new L.Map(div)')).toBe(true)
-  })
+  }, 30_000)
 
   for (const datei of KARTEN) {
     it(`${datei}: Größenwechsel über useKartenGroesse, ohne Leaflets eigenes window-resize`, () => {

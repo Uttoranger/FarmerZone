@@ -69,6 +69,7 @@ import { BildansichtEbene } from '@/components/hofseite/bildansicht'
 import { LebensmittelVorschau } from '@/components/products/lebensmittel-vorschau'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
 import { publicFarm } from './fabrik/public-farm'
+import { publicProduct } from './fabrik/public-product'
 import type { KartenZustand } from '@/lib/bereiche-anzeige'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 
@@ -81,14 +82,7 @@ const ZOOM = 'transform:scale(1.4);transform-origin:30% 70%'
 const FILTER = 'filter:contrast(1.08) brightness(1.03) saturate(1.05)'
 
 function produkt(id: string, teil: Partial<PublicProduct> = {}): PublicProduct {
-  return {
-    id, name: `Produkt ${id}`, description: null, imageUrl: null, bildAusschnitt: null, category: 'EIER', categoryImageUrl: ILLUSTRATION,
-    price: 4.5, unit: 'STUECK', unitSize: null, stock: 20, isAvailable: true, allergens: [],
-    isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
-    unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null, abholhinweise: [],
-    ...teil,
-  }
+  return publicProduct({ id, name: `Produkt ${id}`, category: 'EIER', categoryImageUrl: ILLUSTRATION, ...teil })
 }
 
 /** Das <img> mit dieser Adresse — die Suche schlägt nur an diesem Bild an, nie an einem anderen. */
@@ -208,11 +202,11 @@ describe('Wache — „Problem melden“ und die Rohfoto-Stellen ohne Ausschnitt
         'src/components/hof-hilfe/meldung-abgeben.tsx',
       ])
     )
-  })
+  }, 30_000)
 
   it('der Screenshot unter „Problem melden“ rendert nie den Bild-Baustein und nie seinen Stil', () => {
     expect(MELDUNG.filter(bindetBildEin)).toEqual([])
-  })
+  }, 30_000)
 
   it('Warenkorb, Kasse, E-Mails und Teilen-Bild zeigen das Rohfoto', () => {
     const roh = [

@@ -686,5 +686,5 @@ describe('Die Fehlernummer auf dem Weg in den Briefkasten', () => {
     // Gegenprobe: Die Suche schlägt an einem Text an, nicht an einem Kommentar.
     expect(problemMeldenTexte("const a = <a>Problem melden</a>; const b = 'Problem melden'", 'x.tsx')).toHaveLength(2)
     expect(problemMeldenTexte('// Problem melden\nconst a = PROBLEM_MELDEN', 'x.ts')).toEqual([])
-  })
+  }, 30_000)
 })

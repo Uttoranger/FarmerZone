@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ChevronRight, X } from 'lucide-react'
 import type { AbholFenster, VorschauProdukt } from '@/lib/hofuebersicht'
-import { hofseitenLink, istBestellbar } from '@/lib/bereiche-anzeige'
+import { hofseitenLink, istBestellbar, type AngebotVorhanden } from '@/lib/bereiche-anzeige'
 import { hofIllustrationen } from '@/lib/hoefe-anzeige'
 import type { AnzeigeBereich, ProductCategoryValue } from '@/lib/taxonomie'
 import { cn } from '@/lib/utils'
@@ -30,7 +30,7 @@ export type KurzkartenHof = {
   isPaused: boolean
   kategorien: ProductCategoryValue[]
   abholfenster?: readonly AbholFenster[]
-  angebot: readonly unknown[]
+  angebot: AngebotVorhanden
   fotos: string[]
   entfernungKm: number | null
 }

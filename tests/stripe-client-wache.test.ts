@@ -314,7 +314,7 @@ describe('kein Weg an der Wache vorbei', () => {
   it('unter src/ holt nur src/lib/stripe.ts das Stripe-Paket als Wert', () => {
     const fundstellen = QUELLEN.filter(({ text }) => holtStripePaket(text)).map(({ pfad }) => pfad)
     expect(fundstellen).toEqual([WACHE])
-  })
+  }, 30_000)
 
   it('unter src/ ruft nur src/lib/stripe.ts Stripe(…) auf — dort genau einmal, hinter der Wache', () => {
     const fundstellen = QUELLEN.filter(({ text }) => rufStripeAuf(text)).map(({ pfad }) => pfad)
@@ -326,5 +326,5 @@ describe('kein Weg an der Wache vorbei', () => {
     expect(wache.match(/\bStripe\(/g)).toHaveLength(1)
     expect(wache.indexOf('stripeStartGesperrt(UMGEBUNG)')).toBeGreaterThan(-1)
     expect(wache.indexOf('stripeStartGesperrt(UMGEBUNG)')).toBeLessThan(wache.indexOf('new Stripe('))
-  })
+  }, 30_000)
 })

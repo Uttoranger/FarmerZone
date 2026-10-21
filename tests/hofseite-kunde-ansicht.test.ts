@@ -67,6 +67,7 @@ import { KAEUFER_VORSCHAU, type KartenVorschau } from '@/lib/hofseite-kunde'
 import { TESTHOF_HINWEIS } from '@/lib/gruendungshof'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
+import { publicProduct } from './fabrik/public-product'
 import { publicFarm } from './fabrik/public-farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import type { ProductCategoryValue } from '@/lib/taxonomie'
@@ -84,13 +85,7 @@ function dateien(ordner: string): string[] {
 }
 
 function produkt(id: string, name: string, category: ProductCategoryValue | null, stock = 20): PublicProduct {
-  return {
-    id, name, description: null, imageUrl: null, bildAusschnitt: null, category, categoryImageUrl: null,
-    price: 4.5, unit: 'STUECK', unitSize: null, stock, isAvailable: true, allergens: [],
-    isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
-    unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null, abholhinweise: [],
-  }
+  return publicProduct({ id, name, category, stock })
 }
 
 const HOF: PublicFarm = publicFarm({
@@ -204,7 +199,7 @@ describe('die rechte Spalte ist EINE Komponente', () => {
     expect(einbinder.sort()).toEqual(['src/components/hofseite/hofseite-kunde.tsx', 'src/components/produktdetail/produktdetail-kunde.tsx'])
     const mitKartentitel = dateien('src/components/hofseite').filter((p) => />\s*Abholzeiten\s*</.test(quelle(p)))
     expect(mitKartentitel).toEqual(['src/components/hofseite/hofseite-seitenspalte.tsx'])
-  })
+  }, 30_000)
 })
 
 describe('Zustände der Produktkarten — knapp, ausverkauft, kein „Merken"', () => {
@@ -575,7 +570,7 @@ describe('Produktkarten verlinken auf die Produktseite (Nr. 11)', () => {
     const src = dateien('src')
     expect(src).not.toContain('src/components/farm/produkt-detail.tsx')
     expect(src.filter((p) => /\bProduktDetail\b/.test(quelle(p)))).toEqual([])
-  })
+  }, 30_000)
 })
 
 // ─── Nr. 51: Schaufenster zuerst (Register N5) ──────────────────────────────

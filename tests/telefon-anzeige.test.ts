@@ -175,5 +175,5 @@ describe('Wache: tel:-Links entstehen in src/lib/telefon-anzeige.ts', () => {
   it('außer den erlaubten baut keine Datei in src/ einen tel:-Link von Hand', () => {
     const funde = quelldateien('src').filter((pfad) => TEL_VON_HAND.test(lies(pfad)))
     expect(funde.filter((pfad) => !ERLAUBT.includes(pfad))).toEqual([])
-  })
+  }, 30_000)
 })

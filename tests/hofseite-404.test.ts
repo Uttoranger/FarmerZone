@@ -88,6 +88,7 @@ import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
 import { FarmPageView } from '@/components/farm/farm-page-view'
 import { OEFFENTLICH_SICHTBAR, type PublicFarm, type PublicProduct } from '@/server/queries/farm'
 import { publicFarm } from './fabrik/public-farm'
+import { publicProduct } from './fabrik/public-product'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
 import { findeElement, inhaltHinterSuspense } from './element-suche'
 
@@ -96,13 +97,7 @@ const TELEFON = '+43 660 0000000'
 const KUNDIN: SeitenAnsicht = { art: 'kundin', noindex: false, kaufen: true }
 
 function produkt(id: string, teil: Partial<PublicProduct> = {}): PublicProduct {
-  return {
-    id, name: `Produkt ${id}`, description: null, imageUrl: null, bildAusschnitt: null, category: 'GEMUESE', categoryImageUrl: null,
-    price: 4.5, unit: 'STUECK', unitSize: null, stock: 20, isAvailable: true, allergens: [],
-    isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
-    unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null, familieId: null, brennmaterial: null, abholhinweise: [],
-    ...teil,
-  }
+  return publicProduct({ id, name: `Produkt ${id}`, ...teil })
 }
 
 const HOF: PublicFarm = publicFarm({

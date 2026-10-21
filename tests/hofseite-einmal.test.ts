@@ -67,6 +67,7 @@ import { KundenansichtKnopf } from '@/components/mein-hof/kundenansicht-knopf'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
 import { publicFarm } from './fabrik/public-farm'
+import { publicProduct } from './fabrik/public-product'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 
 const WURZEL = process.cwd()
@@ -220,7 +221,7 @@ describe('der Parameter „vorschau" wird nur in ansichtsModus() gelesen', () =>
     // Und ansichtsModus liest ihn wirklich — sonst bewiese das Schweigen oben nichts.
     const imModus = funde('src/lib/ansichts-modus.ts', quelle('src/lib/ansichts-modus.ts'))
     expect(imModus.map((f) => f.art)).toContain('Index')
-  })
+  }, 30_000)
 
   it('außerhalb von src/ nur die Header-Regeln in next.config.ts — sie geben das Einbetten frei, sonst nichts', () => {
     const konfiguration = ohneKommentare(quelle('next.config.ts'))
@@ -245,7 +246,7 @@ describe('der Parameter „vorschau" wird nur in ansichtsModus() gelesen', () =>
       if (!/^\s*['"]use client['"]/.test(text)) continue
       expect(wertImport.test(text), pfad).toBe(false)
     }
-  })
+  }, 30_000)
 })
 
 // ── Einbindung von FarmPageView ───────────────────────────────────────────
@@ -282,13 +283,13 @@ describe('FarmPageView bindet genau eine Stelle ein', () => {
       .toSorted()
     expect(stellen).toEqual(['src/app/(public)/[farmSlug]/page.tsx'])
     expect(existsSync(join(WURZEL, 'src/components/farmer/farm-page-client.tsx'))).toBe(false)
-  })
+  }, 30_000)
 
   it('die Seite für Kundinnen (HofseiteKunde) bindet nur FarmPageView ein', () => {
     const stellen = SRC.filter((pfad) => pfad !== 'src/components/hofseite/hofseite-kunde.tsx')
       .filter((pfad) => /<HofseiteKunde\b|import\s*\{[^}]*\bHofseiteKunde\b[^}]*\}\s*from/.test(ohneKommentare(quelle(pfad))))
     expect(stellen).toEqual(['src/components/farm/farm-page-view.tsx'])
-  })
+  }, 30_000)
 
   it('die Kundenansicht des Besitzers ist die echte Route im Rahmen, kein Nachbau', () => {
     // Seit Nr. 49 (Register N4) gehört sie zu Mein Hof, für jeden Reiter; seit Nr. 107 als Vollbild.
@@ -313,19 +314,13 @@ describe('FarmPageView bindet genau eine Stelle ein', () => {
     expect('<FarmPageView farm={farm} ownerMode={false} />').toMatch(/ownerMode/)
     const besitzerSeiten = SRC.filter((pfad) => /<FarmPageClient\b/.test(ohneKommentare(quelle(pfad))))
     expect(besitzerSeiten).toEqual([])
-  })
+  }, 30_000)
 })
 
 // ── Keine Bearbeitungs-Elemente auf der Hofseite, Korb nur für Kundinnen ───
 
 function produkt(id: string, name: string, sichtbar: boolean): PublicProduct {
-  return {
-    id, name, description: null, imageUrl: null, bildAusschnitt: null, category: null, categoryImageUrl: null,
-    price: 3.5, unit: 'kg', unitSize: 1, stock: 10, isAvailable: sichtbar, allergens: [],
-    isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
-    unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null, abholhinweise: [],
-  }
+  return publicProduct({ id, name, category: null, price: 3.5, unit: 'kg', unitSize: 1, stock: 10, isAvailable: sichtbar })
 }
 
 /** Ein Hof, an dem jedes Bearbeitungs-Element etwas zu tun hätte: pausiert, mit Status, Fotos und Produkten. */

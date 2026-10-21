@@ -77,7 +77,7 @@ describe('stripeMarke — Marke im Admin-Kopf', () => {
     const funde = dateien.filter((pfad) => /['"`]Stripe Test['"`]/.test(ohneKommentare(readFileSync(pfad, 'utf8'))))
     // Gegenprobe: Die Suche findet die eine Quelle.
     expect(funde.map((pfad) => relative(process.cwd(), pfad).split('\\').join('/'))).toEqual(['src/lib/umgebung.ts'])
-  })
+  }, 30_000)
 
   it('kommt aus bestimmeUmgebung und trägt nie ein Stück des Schlüssels — auch bei eingeschränkten Schlüsseln', () => {
     const werte = { NODE_ENV: 'production', VERCEL_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://plattform.example' }

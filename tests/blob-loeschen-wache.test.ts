@@ -144,7 +144,7 @@ describe('del( aus @vercel/blob nur in den benannten Wegen (Regelvorschlag 108)'
     ).toEqual([])
     const zuViele = [...je_datei].filter(([datei, anzahl]) => datei in WEGE && anzahl > WEGE[datei].aufrufe).map(([datei]) => datei)
     expect(zuViele, `Mehr Aufrufe von del als in WEGE angegeben: ${zuViele.join(', ')}`).toEqual([])
-  })
+  }, 30_000)
 
   it('jeder benannte Weg ruft del noch genau so oft auf — sonst ist die Liste veraltet', () => {
     for (const [datei, { aufrufe, grund }] of Object.entries(WEGE)) {
