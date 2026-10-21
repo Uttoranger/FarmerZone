@@ -8,7 +8,7 @@
     "build": "prisma generate && next build",
     "vercel-build": "prisma migrate deploy && prisma generate && next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --cache --cache-strategy content --cache-location node_modules/.cache/eslint/",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

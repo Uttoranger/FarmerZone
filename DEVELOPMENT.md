@@ -5594,6 +5594,21 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **`AngebotVorhanden`:** ein benannter Typ in `src/lib/bereiche-anzeige.ts` für das, was `istBestellbar` vom Angebot liest (gibt es eines, nicht welches); fünf Stellen nutzen ihn statt `readonly unknown[]`. Kein Unterschied im Verhalten.
 - **Texte in `docs/nachtlauf.md`:** 122, 123, 124, 129 und die G3-Ergänzung (nach dem Umstellen der Basis einmal pushen) stehen dort; der doppelte Satz zur CI gestapelter PRs steht nur noch in §4 Schritt 5.
 
+## Tempo der Werkzeuge (Tempo-Plan Schritt 1, 21.10.2026)
+
+- **Vitest nimmt Kerne − 1 Worker:** im Lauf `max(Kerne − 1, 1)` (vitest 4.1.10, `getDefaultThreadsCount`), auf dem Laufrechner mit 4 Kernen also 3 – je Lauf, egal wie viele Agenten gleichzeitig testen. Drei gleichzeitige volle Läufe starten so 9 Prozesse auf 4 Kernen. Die Messung unten zeigt dasselbe Bild wie die Zeitüberschreitungen unter Last in Lauf 19 und 20 (Morgenbericht 20 §7). Im Nachtlauf nimmt deshalb jeder Umsetzer `--maxWorkers` nach `docs/nachtlauf.md` 4a Punkt 2; Stop-Hook und CI bleiben ohne Begrenzung. `pool: 'forks'` bleibt (sharp, TESTING_GUIDELINES §4); Threads sind nur gemessen.
+- **Lint-Cache mit content-Strategie:** `pnpm lint` ruft `eslint --cache --cache-strategy content --cache-location node_modules/.cache/eslint/`. `content` statt `metadata`, weil Worktrees und Checkouts die Änderungszeit der Dateien neu setzen: Nach `touch` auf alle Dateien blieb der warme Lauf bei 3,2 s. ESLint speichert je Datei einen Hash aus ESLint-Version, Node-Version und Konfiguration und prüft neu, sobald sich einer davon ändert. Die Regeln sind nicht typbasiert und lesen keine anderen Dateien. Lücke: Plugins gehen nur mit Name und – falls das Plugin sie nennt – Version in den Hash; bei `react`, `import` und `@next/next` fehlt die Version, und die React-Version steht auf `detect`. Ein Update dieser Pakete (auch von `next`/`eslint-config-next`) bei gleicher Konfiguration verwirft den Cache also nicht, unveränderte Dateien behielten ihr altes Ergebnis; danach `node_modules/.cache/eslint/` löschen. Weil die Ortsangabe ein Ordner ist, legt ESLint je Arbeitsverzeichnis eine eigene Datei an (`.cache_<Hash>`). Die CI stellt den Ordner nie wieder her (`setup-node` mit `cache: pnpm` speichert nur den Paketspeicher von pnpm) und prüft immer frisch; `tests/lint-cache-wache.test.ts` hält Skript und Workflows fest.
+- **typecheck ist schon inkrementell:** `"incremental": true` in `tsconfig.json`; auch `tsc --noEmit` schreibt `tsconfig.tsbuildinfo`.
+- **Messwerte** (Laufrechner mit 4 Kernen, ohne andere Agenten; warm und „test allein“ als Median aus drei Läufen, kalt, parallel und Threads je ein Lauf):
+
+| Messung | vorher | nachher |
+|---|---|---|
+| typecheck kalt / warm | 87,5 s / 12,0 s | unverändert (Befehl gleich) |
+| lint kalt / warm | 80,1 s bei jedem Lauf (kein Cache) | 79,1 s / 3,2 s |
+| test allein | 242,1 s, keine Zeitüberschreitung | unverändert (Befehl gleich) |
+| drei volle Testläufe gleichzeitig (je ein Worktree) | ohne Begrenzung: 626 s, alle drei rot (3 Zeitüberschreitungen, eine Laufzeit-Grenze gerissen) | mit `--maxWorkers=1`: 687 s, alle grün, keine Zeitüberschreitung |
+| test allein mit `--pool=threads` (nur gemessen) | 232,7 s, grün | – |
+
 ## Nützliche Befehle
 
 ```bash
