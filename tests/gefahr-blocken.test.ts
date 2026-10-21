@@ -14,6 +14,12 @@
  * `--check` bleibt erlaubt). Der Hinweis zu `db push` nennt `migrate diff`. Die
  * übrigen Regeln des Hooks sind stichprobenhaft mitgeprüft, damit die neuen sie
  * nicht verdecken.
+ *
+ * Jeder Aufruf bekommt ein Temp-Repository auf einem Feature-Branch als `cwd`
+ * (Nr. 130, G4): Ohne eigenes Verzeichnis prüft der Hook den Branch des
+ * Prozess-Verzeichnisses — beim Push auf main steht dort der Checkout der CI
+ * auf main, und die erlaubten Commit-Fälle bekämen Exit 2. In einem PR ist der
+ * Stand losgelöst, darum fiel das nur auf main auf.
  */
 import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
@@ -23,14 +29,49 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 const HOOK = path.resolve(__dirname, '..', '.claude/hooks/gefahr-blocken.mjs')
 
-function lauf(command: string, cwd?: string) {
+let wurzel = ''
+let aufMain = ''
+let aufFeature = ''
+let keinRepo = ''
+
+/** Ein leeres Repository auf dem genannten Branch — ohne Konfiguration des Rechners, ohne Netz. */
+function repo(ordner: string, branch: string): string {
+  const pfad = path.join(wurzel, ordner)
+  const r = spawnSync('git', ['init', '-q', '-b', branch, pfad], {
+    env: { PATH: process.env.PATH ?? '', HOME: wurzel, GIT_CONFIG_NOSYSTEM: '1', NODE_ENV: 'test' },
+    encoding: 'utf8',
+  })
+  expect(r.status, r.stderr).toBe(0)
+  return pfad
+}
+
+beforeAll(() => {
+  wurzel = mkdtempSync(path.join(tmpdir(), 'gefahr-blocken-'))
+  aufMain = repo('auf-main', 'main')
+  aufFeature = repo('auf-feature', 'feature/etwas')
+  keinRepo = path.join(wurzel, 'kein-repo')
+  mkdirSync(keinRepo)
+})
+
+afterAll(() => {
+  rmSync(wurzel, { recursive: true, force: true })
+})
+
+/** Startet den Hook mit dieser Eingabe; `prozessOrdner` ist das Verzeichnis des Prozesses (sonst das des Testlaufs). */
+function starte(eingabe: object, prozessOrdner?: string) {
   const r = spawnSync(process.execPath, [HOOK], {
-    input: JSON.stringify({ tool_name: 'Bash', tool_input: { command }, ...(cwd && { cwd }) }),
+    input: JSON.stringify(eingabe),
     // Bewusst eine leere Umgebung plus PATH: der Hook darf nichts aus der des Testlaufs erben.
     env: { PATH: process.env.PATH ?? '', NODE_ENV: 'test' },
     encoding: 'utf8',
+    ...(prozessOrdner && { cwd: prozessOrdner }),
   })
   return { code: r.status, grund: r.stderr }
+}
+
+/** `cwd` ist das Feld der Eingabe (bei Claude Code der Ordner der Sitzung); Standard: ein Feature-Branch. */
+function lauf(command: string, cwd: string = aufFeature) {
+  return starte({ tool_name: 'Bash', tool_input: { command }, cwd })
 }
 
 const GRUND = 'Blockiert: Schiebt alle lokalen Branches auf das öffentliche Repo. Nur den eigenen Branch pushen.'
@@ -472,34 +513,6 @@ describe('gefahr-blocken — Hinweis zu db push', () => {
 })
 
 describe('gefahr-blocken — Commit auf main', () => {
-  let wurzel = ''
-  let aufMain = ''
-  let aufFeature = ''
-  let keinRepo = ''
-
-  /** Ein leeres Repository auf dem genannten Branch — ohne Konfiguration des Rechners, ohne Netz. */
-  function repo(ordner: string, branch: string): string {
-    const pfad = path.join(wurzel, ordner)
-    const r = spawnSync('git', ['init', '-q', '-b', branch, pfad], {
-      env: { PATH: process.env.PATH ?? '', HOME: wurzel, GIT_CONFIG_NOSYSTEM: '1', NODE_ENV: 'test' },
-      encoding: 'utf8',
-    })
-    expect(r.status, r.stderr).toBe(0)
-    return pfad
-  }
-
-  beforeAll(() => {
-    wurzel = mkdtempSync(path.join(tmpdir(), 'gefahr-blocken-'))
-    aufMain = repo('auf-main', 'main')
-    aufFeature = repo('auf-feature', 'feature/etwas')
-    keinRepo = path.join(wurzel, 'kein-repo')
-    mkdirSync(keinRepo)
-  })
-
-  afterAll(() => {
-    rmSync(wurzel, { recursive: true, force: true })
-  })
-
   it('blockt jeden Commit im Ordner auf main — auch mit Optionen und in einer Kette', () => {
     for (const befehl of [
       'git commit -m "feat: etwas"',
@@ -556,5 +569,17 @@ describe('gefahr-blocken — Commit auf main', () => {
 
   it('lässt einen Commit durch, wo kein Repository ist (Branch unbekannt) — das entscheidet git selbst', () => {
     expect(lauf('git commit -m x', keinRepo).code).toBe(0)
+  })
+
+  // Die Lage der CI beim Push auf main (Nr. 130): Der Prozess steht im Checkout auf main, die Eingabe nennt den Ordner
+  // der Sitzung. Der Hook nimmt den Ordner der Eingabe — nur ohne ihn bliebe das Prozess-Verzeichnis.
+  it('nimmt den Ordner aus der Eingabe, nicht das Verzeichnis des Prozesses (Lage der CI auf main)', () => {
+    const eingabe = { tool_name: 'Bash', tool_input: { command: 'git commit -m x' } }
+    expect(starte({ ...eingabe, cwd: aufFeature }, aufMain).code).toBe(0)
+
+    // Gegenprobe: ohne `cwd` in der Eingabe gilt das Verzeichnis des Prozesses — auf main also Exit 2.
+    const ohne = starte(eingabe, aufMain)
+    expect(ohne.code).toBe(2)
+    expect(ohne.grund).toContain('Auf main wird nie direkt committet')
   })
 })
