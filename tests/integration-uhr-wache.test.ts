@@ -6,6 +6,10 @@
  * gelten in der geteilten Test-Datenbank Codes und Sitzungen anderer Nummern als abgelaufen und sind
  * weg — mitten in deren Lauf.
  *
+ * Die Regel selbst steht in TESTING_GUIDELINES §1 (je ein Satz zur festen Uhr und zu den Uhr-Schritten); die Gründe
+ * stehen hier: Der Schritt `advanceTimersByTime(<Zahl>)` rückt die feste Uhr um einen bekannten Betrag und darf sie nicht
+ * über den 20.10.2026 heben; `advanceTimersToNextTimer` und `runAllTimers` springen ohne Obergrenze, also nie.
+ *
  * Beweist (Quelltext von `tests/integration/`, TypeScript-Syntaxbaum, kein Netz): Jeder Aufruf von
  * `vi.setSystemTime` und jedes `vi.useFakeTimers({ now })` trägt entweder ein Datums-Literal
  * (`new Date('…')`, auch über eine `const` derselben Datei) vor dem 20.10.2026 — oder die Datei berührt

@@ -1,10 +1,14 @@
 /**
  * Fabrik-Wache (Nr. 127, Regelvorschlag 119, freigegeben 20.10.2026).
  *
+ * Die Regel (TESTING_GUIDELINES §5, ersetzt „keine geteilte Fixture-Datei ohne Not“ für diese Fälle): Typen, die in
+ * mehr als drei Testdateien nachgebaut werden, bekommen EINE Fabrik in `tests/fabrik/<typ>.ts`; sonst bleiben Faktoren
+ * lokal. Die Fabrik liefert bei jedem Aufruf ein frisches, vollständiges Objekt, die Testdatei überschreibt nur, was sie
+ * prüft (`publicFarm({ isPaused: true })`, `hofRohdaten({ stripeBereit: true })`). Ein neues Pflichtfeld im Typ bricht
+ * dann nur die Fabrik. Heute: `PublicFarm`, `HofRohdaten`.
+ *
  * Ursache (Nr. 119): `PublicFarm` und `HofRohdaten` bekamen Pflichtfelder; elf Testdateien bauten den Typ
- * selbst nach und mussten je eine Zeile bekommen — Konfliktfläche für parallele Nummern. Seitdem gibt es
- * für Typen, die in mehr als drei Testdateien nachgebaut werden, EINE Fabrik in `tests/fabrik/<typ>.ts`
- * (TESTING_GUIDELINES §5).
+ * selbst nach und mussten je eine Zeile bekommen — Konfliktfläche für parallele Nummern.
  *
  * Beweist (Quelltext von `tests/`, TypeScript-Syntaxbaum, kein Netz): Außerhalb von `tests/fabrik/` steht
  * kein Objekt-Literal, das als `PublicFarm` oder `HofRohdaten` ausgeschrieben ist — weder als
@@ -12,12 +16,23 @@
  * Rückgabewert einer Funktion mit diesem Rückgabetyp. Ein Literal, das nur wenige Felder setzt
  * (höchstens MAX_EIGENE_FELDER, etwa `{ ...HOF, isPaused: false }`), übernimmt den Rest aus einem
  * vollständigen Hof und ist erlaubt — ein neues Pflichtfeld bricht es nicht. Ein langes Literal mit
- * `...ueber` (der alte Aufbau der Admin-Tests) zählt als Nachbau. Damit bricht ein neues Feld im Typ nur
- * noch die Fabrik (der Typecheck zeigt es dort).
+ * `...ueber` (der alte Aufbau der Admin-Tests) zählt als Nachbau.
  *
- * Gegenprobe: Attrappen mit jeder Schreibweise schlagen an, ebenso ein langes Literal mit Spread; ein
- * kurzes Literal mit Spread, ein Aufruf der Fabrik und ein Literal eines anderen Typs nicht; die Fabriken
- * liefern frische Objekte und lassen sich überschreiben.
+ * Auch ohne Typangabe (Runde 1): Ein Literal als Argument (`mockResolvedValue({ … })`) oder als Wert einer Eigenschaft
+ * (`createElement(Kopf, { hof: { … } })`) ist ein Nachbau, wenn es mindestens MIN_FELDER_DES_TYPS Felder des Typs hat
+ * und darunter eines, das nur der Typ kennt (die Felder kommen aus dem Literal der Fabrik, das Gegenstück aus
+ * `model Farm` in `prisma/schema.prisma`). Eine Datenbankzeile teilt viele Felder mit dem Typ, hat aber keines davon
+ * allein, und bleibt erlaubt. Das ist eine Näherung ohne TypeChecker — Grenzen siehe unten.
+ *
+ * NICHT erkannt (offen, Nacharbeit): ein Nachbau ohne Typangabe mit weniger als MIN_FELDER_DES_TYPS Feldern des Typs
+ * oder ganz ohne ein Feld, das nur der Typ kennt; ein Objekt, das nur aus Spreads (`{ ...a, ...b }`) besteht, weil
+ * nur eigene Felder zählen. Ein Typ, dessen Felder alle in der Datenbankzeile vorkommen, bräuchte den TypeChecker
+ * (`ts.Program`); der Test „bleibt nicht blind“ meldet das.
+ *
+ * Gegenprobe: Attrappen mit jeder Schreibweise schlagen an, ebenso ein langes Literal mit Spread und ein Literal
+ * ohne Typangabe (Argument, Eigenschaft; beide Typen); ein kurzes Literal mit Spread, ein Aufruf der Fabrik, eine
+ * Datenbankzeile und ein Literal eines anderen Typs nicht; die Fabriken liefern frische Objekte und lassen sich
+ * überschreiben.
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
@@ -35,6 +50,20 @@ const MAX_EIGENE_FELDER = 8
 const FABRIKEN: Record<string, string> = {
   PublicFarm: 'tests/fabrik/public-farm.ts',
   HofRohdaten: 'tests/fabrik/hof-rohdaten.ts',
+}
+
+/** Die Namen der eigenen Felder eines Literals (Spreads zählen nicht); Name als Bezeichner oder Text. */
+function feldNamen(literal: ts.ObjectLiteralExpression): string[] {
+  return literal.properties.flatMap((p) =>
+    !ts.isSpreadAssignment(p) && p.name !== undefined && (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name)) ? [p.name.text] : [],
+  )
+}
+
+/** Die Felder der Datenbankzeile `Farm` aus dem Schema — was sie hat, ist kein Merkmal des öffentlichen Typs. */
+function datenbankFelder(): Set<string> {
+  const schema = readFileSync(join(process.cwd(), 'prisma/schema.prisma'), 'utf8')
+  const rumpf = /^model Farm \{([\s\S]*?)^\}/m.exec(schema)?.[1] ?? ''
+  return new Set(rumpf.split('\n').flatMap((zeile) => /^\s+([a-zA-Z]\w*)\s/.exec(zeile)?.slice(1) ?? []))
 }
 
 function parse(quelltext: string, name = 'attrappe.ts'): ts.SourceFile {
@@ -87,6 +116,26 @@ function ueberUnknown(literal: ts.ObjectLiteralExpression): boolean {
   return false
 }
 
+type Schluessel = { alle: Set<string>; nurImTyp: Set<string> }
+
+let schluesselMerker: Record<string, Schluessel> | undefined
+
+/** Je Fabrik-Typ: alle seine Felder (aus dem Literal der Fabrik) und die davon, die eine Datenbankzeile `Farm` nicht kennt. */
+function schluesselMengen(): Record<string, Schluessel> {
+  if (schluesselMerker) return schluesselMerker
+  const datenbank = datenbankFelder()
+  schluesselMerker = Object.fromEntries(
+    Object.entries(FABRIKEN).map(([typ, pfad]) => {
+      const alle = new Set<string>()
+      besuche(parse(readFileSync(join(process.cwd(), pfad), 'utf8'), pfad), (k) => {
+        if (ts.isObjectLiteralExpression(k) && typisiertAls(k) === typ) feldNamen(k).forEach((n) => alle.add(n))
+      })
+      return [typ, { alle, nurImTyp: new Set([...alle].filter((n) => !datenbank.has(n))) }]
+    }),
+  )
+  return schluesselMerker
+}
+
 /** Alle Objekt-Literale eines Quelltexts, die als einer der Fabrik-Typen geschrieben sind, mit der Zahl ihrer eigenen Felder. */
 function typisierteLiterale(quelltext: string, name = 'attrappe.ts'): Array<{ stelle: string; typ: string; felder: number }> {
   const sf = parse(quelltext, name)
@@ -102,11 +151,41 @@ function typisierteLiterale(quelltext: string, name = 'attrappe.ts'): Array<{ st
   return funde
 }
 
-/** Die ausgeschriebenen Literale (mehr als MAX_EIGENE_FELDER eigene Felder), je als „Datei:Zeile Typ“. Leer = keines. */
+/**
+ * Literale OHNE eigene Typangabe — als Argument (`mockResolvedValue({ … })`) oder als Wert einer Eigenschaft
+ * (`createElement(Kopf, { hof: { … } })`) —, die einen der Typen nachbauen. Ohne TypeChecker erkennt man sie an den
+ * Feldern: Ein Literal mit mindestens MIN_FELDER_DES_TYPS Feldern des Typs, darunter eines, das nur der Typ kennt (nicht
+ * die Datenbankzeile `Farm`), ist ein Nachbau. Eine Datenbankzeile teilt viele Felder mit dem Typ, hat aber keines, das
+ * nur er kennt, und bleibt erlaubt.
+ */
+const MIN_FELDER_DES_TYPS = MAX_EIGENE_FELDER + 1
+
+function literaleOhneTypangabe(quelltext: string, name = 'attrappe.ts'): Array<{ stelle: string; typ: string }> {
+  const mengen = schluesselMengen()
+  const sf = parse(quelltext, name)
+  const funde: Array<{ stelle: string; typ: string }> = []
+  besuche(sf, (k) => {
+    if (!ts.isObjectLiteralExpression(k) || typisiertAls(k) !== null) return
+    const namen = new Set(feldNamen(k))
+    const beste = Object.entries(mengen)
+      .map(([typ, m]) => ({
+        typ,
+        gemeinsam: [...namen].filter((n) => m.alle.has(n)).length,
+        nurImTyp: [...namen].filter((n) => m.nurImTyp.has(n)).length,
+      }))
+      .filter((t) => t.gemeinsam >= MIN_FELDER_DES_TYPS && t.nurImTyp > 0)
+      .sort((a, b) => b.gemeinsam - a.gemeinsam)[0]
+    if (beste) funde.push({ stelle: `${name}:${sf.getLineAndCharacterOfPosition(k.getStart(sf)).line + 1}`, typ: beste.typ })
+  })
+  return funde
+}
+
+/** Die ausgeschriebenen Literale (mit Typangabe: mehr als MAX_EIGENE_FELDER eigene Felder; ohne: siehe oben), je als „Datei:Zeile Typ“. Leer = keines. */
 function ausgeschriebeneLiterale(quelltext: string, name = 'attrappe.ts'): string[] {
-  return typisierteLiterale(quelltext, name)
-    .filter((l) => l.felder > MAX_EIGENE_FELDER)
-    .map((l) => `${l.stelle} ${l.typ}`)
+  return [
+    ...typisierteLiterale(quelltext, name).filter((l) => l.felder > MAX_EIGENE_FELDER),
+    ...literaleOhneTypangabe(quelltext, name),
+  ].map((l) => `${l.stelle} ${l.typ}`)
 }
 
 function dateienUnter(ordner: string): string[] {
@@ -121,7 +200,7 @@ describe('Fabrik-Wache: ein neues Feld im Typ bricht nur die Fabrik (Nr. 119)', 
       .map((pfad) => ({ name: relative(ORDNER, pfad).split(sep).join('/'), pfad }))
       .filter((d) => !d.name.startsWith('fabrik/') && d.name !== 'fabrik-wache.test.ts')
       .flatMap((d) => ausgeschriebeneLiterale(readFileSync(d.pfad, 'utf8'), d.name))
-    expect(funde, 'Die Fabrik nehmen: publicFarm({ … }) aus tests/fabrik/public-farm.ts bzw. hofRohdaten({ … }) aus tests/fabrik/hof-rohdaten.ts').toEqual([])
+    expect(funde, 'Die Fabrik nehmen: publicFarm({ … }) aus tests/fabrik/public-farm.ts bzw. hofRohdaten({ … }) aus tests/fabrik/hof-rohdaten.ts (auch ein Literal ohne Typangabe mit mindestens neun Feldern des Typs ist ein Nachbau)').toEqual([])
   })
 
   it('die Fabriken liegen dort, wo FABRIKEN sie nennt, und schreiben das Literal je einmal aus', () => {
@@ -173,6 +252,51 @@ describe('Fabrik-Wache: ein neues Feld im Typ bricht nur die Fabrik (Nr. 119)', 
       ]) {
         expect(ausgeschriebeneLiterale(text), text).toEqual([])
       }
+    })
+  })
+
+  describe('Literal ohne eigene Typangabe (Nr. 127, Runde 1)', () => {
+    // Tests sind `.ts` (Vitest nimmt nur `tests/**/*.test.ts`): Statt `hof={{ … }}` steht das Literal als Wert einer
+    // Eigenschaft in `createElement(Kopf, { hof: { … } })`, oder als Argument von `mockResolvedValue({ … })`.
+    const mengen = schluesselMengen()
+    const alsLiteral = (felder: Iterable<string>) => `{ ${[...felder].map((f) => `${f}: 1`).join(', ')} }`
+    const farm = [...mengen.PublicFarm!.alle]
+    const roh = [...mengen.HofRohdaten!.alle]
+    const datenbank = [...datenbankFelder()]
+
+    it('schlägt an: vollständiges Literal als Argument und als Eigenschaft einer Komponente, für beide Typen', () => {
+      const faelle = [
+        [`vi.mocked(getPublicFarm).mockResolvedValue(${alsLiteral(farm)})`, 'PublicFarm'],
+        [`render(createElement(Kopf, { hof: ${alsLiteral(farm)}, aktiv: true }))`, 'PublicFarm'],
+        [`vi.mocked(getAdminFarms).mockResolvedValue([${alsLiteral(roh)}])`, 'HofRohdaten'],
+        [`render(createElement(Zeile, { hof: ${alsLiteral(roh)} }))`, 'HofRohdaten'],
+      ] as const
+      for (const [text, typ] of faelle) expect(ausgeschriebeneLiterale(text, 'neu.test.ts'), text).toEqual([`neu.test.ts:1 ${typ}`])
+    })
+
+    it('schlägt an der Grenze an: neun Felder des Typs, darunter eines, das nur der Typ kennt', () => {
+      const nur = [...mengen.PublicFarm!.nurImTyp][0]!
+      const neun = [nur, ...farm.filter((f) => f !== nur).slice(0, MAX_EIGENE_FELDER)]
+      expect(neun).toHaveLength(MAX_EIGENE_FELDER + 1)
+      expect(ausgeschriebeneLiterale(`g(${alsLiteral(neun)})`), 'neun').toEqual(['attrappe.ts:1 PublicFarm'])
+      expect(ausgeschriebeneLiterale(`g(${alsLiteral(neun.slice(1))})`), 'acht').toEqual([])
+    })
+
+    it('lässt durch: eine Datenbankzeile (alle Felder von `Farm`, keines nur im Typ), kurze Literale, fremde Felder', () => {
+      for (const text of [
+        `vi.mocked(prisma.farm.findUnique).mockResolvedValue(${alsLiteral(datenbank)})`,
+        `g(${alsLiteral(farm.filter((f) => mengen.PublicFarm!.nurImTyp.has(f)))})`,
+        `g(${alsLiteral([...mengen.PublicFarm!.nurImTyp, ...farm.slice(0, MAX_EIGENE_FELDER - 3)])})`,
+        `g({ ...HOF, ${[...mengen.PublicFarm!.nurImTyp].map((f) => `${f}: 1`).join(', ')}, isPaused: true })`,
+        `g(${alsLiteral(Array.from({ length: 30 }, (_, i) => `x${i}`))})`,
+      ]) {
+        expect(ausgeschriebeneLiterale(text), text).toEqual([])
+      }
+    })
+
+    it('bleibt nicht blind: jeder Typ hat mindestens ein Feld, das die Datenbankzeile `Farm` nicht kennt', () => {
+      // Sonst fände die Wache keinen Nachbau ohne Typangabe mehr (sie hielte jedes Literal für eine Datenbankzeile).
+      for (const [typ, m] of Object.entries(mengen)) expect([...m.nurImTyp].length, typ).toBeGreaterThan(0)
     })
   })
 

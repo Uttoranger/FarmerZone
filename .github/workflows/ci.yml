@@ -10,7 +10,7 @@ on:
   # umgestellt, startet die CI nicht neu: danach einmal pushen. Nie
   # pull_request_target (CLAUDE.md §2, tests/workflows-wache.test.ts).
   pull_request:
-    branches: ['main', 'integration/**', 'docs/**', 'nacht/**']
+    branches: [main, 'integration/**', 'docs/**', 'nacht/**']
 
 # Ein neuer Push bricht den laufenden Lauf desselben PRs ab; auf main hat jeder Lauf
 # seine eigene Gruppe (den Commit) und wird nie abgebrochen.

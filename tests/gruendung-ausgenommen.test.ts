@@ -31,7 +31,15 @@ import { GRUENDUNG_AUSNEHMEN_TEXT, gruendungAenderung, gruendungZuletztText, pla
 
 const STANDARD = GRUENDUNG_BIS_STANDARD
 
-/** Ein Hof mit dem, was das Menü zusätzlich liest: `istTesthof` ist Pflicht (Nr. 127). */
+/**
+ * Ein Hof mit dem, was das Menü zusätzlich liest: `istTesthof` ist Pflicht (Nr. 127).
+ *
+ * Bewusst NICHT über `hofRohdaten` (tests/fabrik): `gruendungAenderung` verlangt `HofFuerFolgen`, und dort steht
+ * `gruendungBis` — `HofRohdaten` hat dieses Feld nicht (der Typecheck sagt: „Property 'gruendungBis' is missing in type
+ * 'HofRohdaten'“). Der echte Aufrufer (admin/page.tsx) gibt die Zeile aus `getAdminFarms` (`AdminFarm`), nicht
+ * `HofRohdaten`. Diese Datei prüft reine Regeln über genau den Schnitt, den sie lesen (`HofFuerFolgen`); ein neues
+ * Pflichtfeld dort bricht nur `hof()` unten, ein neues Feld in `HofRohdaten` gar nichts.
+ */
 type HofMitTesthof = HofFuerFolgen & { istTesthof: boolean }
 
 /** Hof n, freigeschaltet am n. Jänner 2026 — die Reihenfolge der Plätze ist die der Nummern. */

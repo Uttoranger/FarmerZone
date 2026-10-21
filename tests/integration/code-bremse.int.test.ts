@@ -17,7 +17,9 @@
  *  - Anmeldung und „Bestellungen finden" zählen zusammen; ein richtiger Code
  *    bzw. ein richtiges Passwort zählt nicht.
  *  - Gleichzeitig: Von 20 falschen Codes bzw. Passwörtern werden genau 10
- *    geprüft — gezählt wird VOR dem Prüfen (Nachbesserung Runde 2).
+ *    geprüft — gezählt wird VOR dem Prüfen (Nachbesserung Runde 2). Der
+ *    Zählerstand danach ist mindestens 10; „genau 10“ gilt nur nacheinander.
+ *    Ein Wackler (einmal 11 im ganzen Lauf) ist OFFEN, siehe den Fall selbst.
  *  - 30 falsche Codes am Tag pausieren bis zum Ende des Tagesfensters.
  *  - Passwort: 10 falsch → 429 mit Satz; „Passwort vergessen" geht weiter, ein
  *    erfolgreiches Zurücksetzen löscht den Zähler, das neue Passwort meldet an.
@@ -306,15 +308,16 @@ describe('falsche Codes je Adresse — über alle Codes', () => {
     const geprueft = ergebnisse.filter((e) => !e.ok && e.code === 'INVALID_OTP').length
     expect(geprueft).toBe(10)
     expect(ergebnisse.filter((e) => !e.ok && e.status === 429)).toHaveLength(20 - geprueft)
-    // Der Zustand, der in ALLEN Verschränkungen gilt (TESTING_GUIDELINES §1): zehn geprüft, der Rest abgelehnt, und das
-    // Tagesfenster zählt nie weniger als die zehn geprüften Versuche. „Genau 10“ gilt nur, wenn jede Rückgabe eines
-    // abgelehnten Versuchs gelingt: Sie ist ein eigener Schreibvorgang, der unter Last scheitern darf (Deadlock zwischen
-    // gleichzeitigen Zählungen, Zeitlimit) – der Versuch bleibt dann gezählt, zur sicheren Seite (gibVersuchZurueck in
-    // src/server/bremse-datenbank.ts). Das war der Wackler dieser Datei: einzeln 10, im ganzen Lauf mehr. Dass die
-    // Ablehnungen das Fenster nicht füllen, zeigt die ruhige Folge oben (11 nacheinander → Stand 10).
+    // Zugesichert ist nur, was in ALLEN Verschränkungen gilt (TESTING_GUIDELINES §1): zehn geprüft, der Rest abgelehnt,
+    // und das Tagesfenster zählt mindestens die zehn geprüften Versuche. Eine Obergrenze steht absichtlich nicht da: Mehr
+    // als 20 Versuche gab es nie, `toBeLessThanOrEqual(20)` konnte nicht rot werden und täuschte eine Prüfung nur vor.
+    // OFFEN (Nr. 127, Runde 1): Der Wackler dieser Datei ist damit NICHT behoben, nur ehrlich benannt. Mit festen Tagen
+    // stand das Tagesfenster einmal auf 11 statt 10, im ganzen Lauf, einzeln nie. VERMUTUNG, ohne Beleg: Die Rückgabe
+    // eines abgelehnten Versuchs (gibVersuchZurueck in src/server/bremse-datenbank.ts) ist ein eigener Schreibvorgang und
+    // scheitert unter Last; der Versuch bleibt dann gezählt, zur sicheren Seite. Gemessen hat das niemand. „Genau 10“
+    // zeigt nur die ruhige Folge oben (11 nacheinander → Stand 10).
     const tag = await stand(DB_BREMSEN.codeFehlerTag.zweck, email)
     expect(tag).toBeGreaterThanOrEqual(10)
-    expect(tag).toBeLessThanOrEqual(20)
   })
 
   it('eine Mail je Pause: zwei Fehlversuche, die beide Stand 10 sehen, schicken genau eine (Drossel in der Datenbank)', async () => {
@@ -382,10 +385,9 @@ describe('falsche Passwörter je Adresse', () => {
     const geprueft = ergebnisse.filter((e) => !e.ok && e.status === 401).length
     expect(geprueft).toBe(10)
     expect(ergebnisse.filter((e) => !e.ok && e.status === 429)).toHaveLength(20 - geprueft)
-    // Wie bei den Codes: nie weniger als die zehn geprüften; „genau 10“ nur, wenn jede Rückgabe gelingt (s. o.).
+    // Wie bei den Codes: mindestens die zehn geprüften, keine Obergrenze; der Wackler (11 statt 10) ist offen (s. o.).
     const stand10 = await stand(DB_BREMSEN.passwortFehler.zweck, email)
     expect(stand10).toBeGreaterThanOrEqual(10)
-    expect(stand10).toBeLessThanOrEqual(20)
   })
 
   it('ein richtiges Passwort zählt nicht: 9 falsch, richtig, noch 1 falsch — erst dann pausiert', async () => {

@@ -90,7 +90,12 @@ describe('Workflow-Wache — Gegenprobe: die Prüfung schlägt an', () => {
 const PULL_REQUEST_BASEN = ['main', 'integration/**', 'docs/**', 'nacht/**']
 const CI_GRUPPE = 'ci-${{ github.event.pull_request.number || github.sha }}'
 const CI_ABBRUCH = "${{ github.event_name == 'pull_request' }}"
-/** Obergrenze der Zeitgrenze: längster Lauf der letzten 25 war 6,1 Minuten (Job ci); dreifach, aufgerundet, ist 20. */
+/**
+ * Die Schranke für `timeout-minutes` je Job, nicht der Sollwert: 30. Die Werte in ci.yml (20 und 15) sind rund das
+ * Dreifache des längsten Laufs der letzten 25 (ci 6,1 Minuten, integration 4,5). Darüber ist die Zeitgrenze kein Schutz
+ * mehr vor einem hängenden Lauf (GitHub-Vorgabe: 360 Minuten) — wer sie über 30 hebt, stößt hier an und klärt zuerst,
+ * warum der Lauf so lange braucht.
+ */
 const MAX_TIMEOUT_MINUTEN = 30
 
 const alsObjekt = (wert: unknown): Record<string, unknown> | null =>

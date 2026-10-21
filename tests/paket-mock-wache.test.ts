@@ -4,6 +4,8 @@
  * Ursache (Nr. 115): Ein `vi.mock` auf ein Paket erreicht Abhängigkeiten nicht, die außerhalb von Vite
  * laden (`@simplewebauthn/server` unter Better Auth); die Attrappe wäre wirkungslos geblieben, der Test
  * grün und der Weg ungeprüft. Wer ein solches Paket ersetzt, prüft denselben Weg mindestens einmal echt.
+ * Die Regel selbst steht als ein Satz in TESTING_GUIDELINES §3; was sie ausmacht (Bestand mit Grund, nur schrumpfen),
+ * steht hier.
  *
  * Beweist (Quelltext von `tests/`, TypeScript-Syntaxbaum, kein Netz): Ein `vi.mock` / `vi.doMock` auf
  * Better Auth und seine Plugins, Stripe, WebAuthn oder sharp steht nur in Dateien aus PAKET_MOCK_BESTAND —
