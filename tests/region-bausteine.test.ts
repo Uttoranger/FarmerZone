@@ -99,7 +99,7 @@ const HOF: KurzkartenHof = {
   entfernungKm: 6.2,
 }
 const produkt = (id: string, name: string): VorschauProdukt => ({
-  id, name, price: 4.2, unit: 'STUECK', unitSize: null, imageUrl: null, bildAusschnitt: null, category: 'EIER', verfuegbar: true,
+  id, name, price: 4.2, unit: 'STUECK', unitSize: null, imageUrl: null, bildAusschnitt: null, category: 'EIER', subcategory: null, verfuegbar: true,
 })
 
 describe('HofKurzkarte — die kurze Hofkarte am Pin in zwei Arten', () => {

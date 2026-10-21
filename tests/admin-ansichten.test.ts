@@ -376,6 +376,7 @@ describe('Bestätigung „Nicht als / Wieder als Gründungshof zählen“ (Regis
     createdAt: T(1),
     archivedAt: null,
     gruendungAusgenommen,
+    istTesthof: false,
     gruendungBis: null,
   })
   const render = (n: number, hoefe: ReturnType<typeof platzHof>[], plaetze = 12): string => {

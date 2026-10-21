@@ -21,9 +21,10 @@ import { leseOeffentlichMitWiederholung } from '@/server/oeffentlich-lesen'
  * Abholung wird mit den Daten gecacht und altert höchstens fünf Minuten. Auf
  * /hoefe rechnet der Browser sie seit Nr. 120 aus `abholfenster` neu.
  *
- * DER SCHLÜSSELTEIL 'v3' (Nr. 129; 'v2' seit Nr. 120, wie 'fassung-v1' der
- * Startseite seit Nr. 99): Ein Eintrag von vor dem Deploy trägt kein
- * `neuerBeitrag` (bzw. kein `abholfenster`) — mit dem neuen Schlüssel wird er
+ * DER SCHLÜSSELTEIL 'v4' (Nr. 127: `subcategory` in den Produktzeilen der
+ * Vorschau; 'v3' Nr. 129, 'v2' seit Nr. 120, wie 'fassung-v1' der Startseite
+ * seit Nr. 99): Ein Eintrag von vor dem Deploy trägt kein `subcategory` (bzw.
+ * kein `neuerBeitrag`, kein `abholfenster`) — mit dem neuen Schlüssel wird er
  * nie gelesen, die erste Anfrage danach lädt neu. Jede neue Form braucht
  * einen neuen Schlüssel, denn der Datenspeicher überlebt Deploys.
  *
@@ -39,7 +40,7 @@ import { leseOeffentlichMitWiederholung } from '@/server/oeffentlich-lesen'
  */
 export const ladeOeffentlicheHoefe = unstable_cache(
   () => leseOeffentlichMitWiederholung('oeffentliche-hoefe', () => getOeffentlicheHoefe()),
-  [HOEFE_CACHE_TAG, 'v3'],
+  [HOEFE_CACHE_TAG, 'v4'],
   {
     revalidate: 300,
     tags: [HOEFE_CACHE_TAG],

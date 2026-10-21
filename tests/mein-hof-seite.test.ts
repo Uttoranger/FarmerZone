@@ -28,6 +28,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
+  // Die Reiter tragen seit Nr. 127 den Ladepunkt (useLinkStatus) — hier lädt nie etwas.
+  useLinkStatus: () => ({ pending: false }),
 }))
 vi.mock('@/server/actions/status-posts', () => ({ expireStatusPost: vi.fn(), deleteStatusPost: vi.fn() }))
 vi.mock('@/server/actions/teilen-fenster', () => ({ ladeTeilenFensterBeitragAction: vi.fn() }))
@@ -306,7 +308,9 @@ describe('Tokens statt Farbwerte', () => {
     'src/components/farmer/hofseite-vorschau-rahmen.tsx',
     'src/app/(hof)/layout.tsx',
     'src/app/(hof)/farm-page/page.tsx',
-    'src/app/(hof)/farm-page/loading.tsx',
+    'src/components/mein-hof/mein-hof-laden.tsx',
+    'src/components/mein-hof/mein-hof-ansicht.tsx',
+    'src/components/mein-hof/reiter-leiste.tsx',
   ]
 
   it.each(dateien)('%s: keine Farbliterale, kein black/white, keine Bestandspalette app-*', (datei) => {

@@ -840,6 +840,8 @@ export const UEBERSICHT_HOF_SELECT = {
       stock: true,
       reservedStock: true,
       category: true,
+      // Nr. 127: Ohne Foto zeigt die Produktzeile die Illustration der Unterkategorie (illustrationPfad).
+      subcategory: true,
       imageUrl: true,
       bildAusschnitt: true,
     },
@@ -949,6 +951,7 @@ export function baueHofUebersicht(
         imageUrl: p.imageUrl,
         bildAusschnitt: leseAusschnitt(p.bildAusschnitt),
         category: p.category,
+        subcategory: p.subcategory,
         // „Verfügbar" heißt: Es ist noch etwas da, das nicht schon reserviert
         // ist. Siehe VORSCHAU-VERFÜGBARKEIT im Kopf dieser Datei.
         verfuegbar: p.stock - p.reservedStock > 0,

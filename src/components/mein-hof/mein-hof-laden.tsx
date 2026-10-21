@@ -1,5 +1,9 @@
 /*
- * Ladeansicht von „Mein Hof" (Nachtlauf Nr. 16). Die HofShell steht durch
+ * Ladeansicht von „Mein Hof" (Nachtlauf Nr. 16). Seit Nr. 127 hat /farm-page keine
+ * eigene loading.tsx mehr (Ladepunkt statt Skelett beim Wechsel der Reiter, wie
+ * Postfach und Bestellungen); das Skelett lebt hier weiter für die Routen, die nur
+ * in Mein Hof umleiten (/status, /settings/appearance), und steht dort für die Form
+ * des Ziels (ARCHITECTURE §4). Die HofShell steht durch
  * das Layout, gewartet wird nur auf den Inhalt. Gleiche Maße wie die
  * fertige Seite: Kopf (unter lg Karte mit Streifen, ab lg Zeile 80 px),
  * Reiter 48 px (unter md mit „Produkte", Nr. 49), unter lg direkt darunter
@@ -13,7 +17,7 @@
  * Farbstaffelung im neuen Design: bg-border für Überschriften, bg-muted für
  * Zweitzeilen und Flächen (die Bestandspalette --app-* gilt hier nicht).
  */
-export default function MeinHofLaden(): React.JSX.Element {
+export function MeinHofLaden(): React.JSX.Element {
   return (
     <div className="animate-pulse" aria-busy="true">
       <div className="mx-auto max-w-3xl px-4 pt-5 md:px-8 md:pt-7 lg:max-w-none">

@@ -188,7 +188,9 @@ export function StartseiteVorschau({
   const [sichtbareQuelle, setSichtbareQuelle] = useState<VorschauQuelle | null>(null)
   const [aktualisiert, setAktualisiert] = useState<string | null>(null)
   const quelle: VorschauQuelle = festeQuelle ?? gewaehlt
-  const band: VorschauBand = festesBand ?? (quelle === 'entwurf' ? 'entwurf' : 'live')
+  // Das Band folgt wie der Titel dem, was der Rahmen zeigt (`sichtbareQuelle`), nicht der Wahl im Segment (Nr. 127):
+  // Solange die neue Adresse lädt, steht noch der alte Stand da – und heißt auch so.
+  const band: VorschauBand = festesBand ?? ((sichtbareQuelle ?? quelle) === 'entwurf' ? 'entwurf' : 'live')
 
   const optionen = (['heute', 'woche', 'block', 'termin'] as const).filter(
     (w) => (w !== 'block' || (quelle === 'entwurf' ? blockMoeglich.entwurf : blockMoeglich.live)) && (w !== 'termin' || termin !== null)

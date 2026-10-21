@@ -56,7 +56,7 @@ import {
 
 const SATZ = {
   veraltet: 'Die Startseite wurde inzwischen geändert. Lade die Seite neu und versuch es noch einmal.',
-  hoefe: 'Wähle nur freigeschaltete Höfe.',
+  hoefe: 'Wähle nur freigeschaltete Höfe, keine Testhöfe.',
   bild: 'Dieses Bild konnten wir nicht übernehmen. Bitte lade es noch einmal hoch.',
   keinBlock: 'Es ist gerade kein Block geplant.',
   keinTermin: 'Es ist gerade nichts geplant.',

@@ -24,10 +24,13 @@
  *  - In der Tabelle steht keine Adresse, nur Zweck + HMAC.
  *
  * Feste Uhr (nur `Date`): Die Fenster sind fest — über eine Stundengrenze
- * hinweg zählte ein Test sonst in zwei Fenster. Sie steht GESTERN: Better
- * Auth räumt beim Lesen abgelaufene Verification-Zeilen weg, nach seiner
- * Uhr — eine Uhr in der Zukunft löschte in der geteilten Test-Datenbank
- * Codes, die noch gelten. Aufräumen: Zählerzeilen über ihre Schlüssel, Codes
+ * hinweg zählte ein Test sonst in zwei Fenster. Sie steht auf einem festen Tag
+ * in der Vergangenheit (14.10.2026) und rückt nur in festen Schritten
+ * (`vi.advanceTimersByTime`): Better Auth räumt beim Lesen abgelaufene
+ * Verification-Zeilen weg, nach seiner Uhr — eine Uhr in der Zukunft löschte
+ * in der geteilten Test-Datenbank Codes, die noch gelten. Dieselben Tage jeden
+ * Lauf, nichts hängt mehr an der echten Uhr (Wache `integration-uhr-wache`).
+ * Aufräumen: Zählerzeilen über ihre Schlüssel, Codes
  * über `otp-int-`, Konten über `raeumeAuf`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -71,11 +74,12 @@ vi.mock('@/lib/email', () => ({
 
 import { auth } from '@/lib/auth'
 
-// Gestern, mitten in der Stunde 09–10 UTC (vor den Fake-Timern berechnet).
-const GESTERN = new Date(Date.now() - 24 * 60 * 60_000).toISOString().slice(0, 10)
-const FEST = new Date(`${GESTERN}T09:20:00.000Z`)
-const STUNDENENDE = new Date(`${GESTERN}T10:00:00.000Z`)
-const TAGESENDE = new Date(new Date(`${GESTERN}T00:00:00.000Z`).getTime() + 24 * 60 * 60_000)
+// Feste Zeitpunkte in der Vergangenheit (Nr. 127, Regelvorschlag 121; vorher „gestern“ aus der echten Uhr):
+// mitten in der Stunde 09–10 UTC am 14.10.2026, vor dem Stichtag der Uhr-Wache. Das Tagesfenster endet am 15.10. um 0 Uhr UTC.
+const TAG = '2026-10-14'
+const FEST = new Date('2026-10-14T09:20:00.000Z')
+const STUNDENENDE = new Date('2026-10-14T10:00:00.000Z')
+const TAGESENDE = new Date('2026-10-15T00:00:00.000Z')
 const BIS = uhrzeitInWien(STUNDENENDE)
 const adressen: string[] = []
 
@@ -115,7 +119,8 @@ async function mitPasswort(email: string, password: string): Promise<Ergebnis> {
 async function fordereAn(email: string): Promise<string | null> {
   // Die Uhr steht: Ohne Schritt trügen alter und neuer Code dieselbe
   // Anlagezeit, und Better Auth fände beim Prüfen womöglich den alten.
-  vi.setSystemTime(new Date(Date.now() + 1_000))
+  // Ein fester Schritt von einer Sekunde (Wache: Zahl als Literal, nach einer festen Uhr in der Vergangenheit).
+  vi.advanceTimersByTime(1_000)
   await auth.api.sendVerificationOTP({ body: { email, type: 'sign-in' } })
   await arbeiteNachlaufAb()
   return post.codes.findLast((c) => c.email === email)?.code ?? null
@@ -226,6 +231,9 @@ describe('falsche Codes je Adresse — über alle Codes', () => {
     expect(antworten.hof[10]).toMatchObject({ ok: false, status: 429, code: ZU_VIELE_FALSCHE_CODES, pauseBis: BIS })
     expect(await stand(DB_BREMSEN.codeFehlerStunde.zweck, hof)).toBe(10)
     expect(await stand(DB_BREMSEN.codeFehlerStunde.zweck, unbekannt)).toBe(10)
+    // Die abgelehnten Versuche füllen auch das Tagesfenster nicht (nacheinander gelingt jede Rückgabe – deterministisch).
+    expect(await stand(DB_BREMSEN.codeFehlerTag.zweck, hof)).toBe(10)
+    expect(await stand(DB_BREMSEN.codeFehlerTag.zweck, unbekannt)).toBe(10)
 
     // Mail nur an das Konto, das es gibt — nie an eine unbekannte Adresse.
     await arbeiteNachlaufAb()
@@ -246,7 +254,7 @@ describe('falsche Codes je Adresse — über alle Codes', () => {
       for (let i = 0; i < 7; i++) folge.push(await mitCodeUeberHttp(email, falscherCode(erster ?? '')))
       // Ein neuer Code, der abläuft (er gilt 10 Minuten).
       const zweiter = await fordereAn(email)
-      vi.setSystemTime(new Date(Date.now() + 11 * 60_000))
+      vi.advanceTimersByTime(11 * 60_000)
       folge.push(await mitCodeUeberHttp(email, falscherCode(zweiter ?? '')))
       // Bis in die Pause: 10 gezählt, der 11. pausiert.
       for (let i = 0; i < 3; i++) folge.push(await mitCodeUeberHttp(email, '000000'))
@@ -278,7 +286,7 @@ describe('falsche Codes je Adresse — über alle Codes', () => {
   it('30 falsche Codes am Tag pausieren bis zum Ende des Tagesfensters, auch in einer neuen Stunde', async () => {
     const email = neueAdresse()
     for (const stunde of ['06', '07', '08']) {
-      const zeit = new Date(`${GESTERN}T${stunde}:30:00.000Z`)
+      const zeit = new Date(`${TAG}T${stunde}:30:00.000Z`)
       for (let i = 0; i < 10; i++) {
         const vorab = await zaehleVersuchVorab('code', email, zeit)
         if (!vorab.gesperrt) zaehleAlsFehlversuch(vorab.versuch)
@@ -290,7 +298,7 @@ describe('falsche Codes je Adresse — über alle Codes', () => {
     expect(await mitCode(email, '000000')).toMatchObject({ status: 429, pauseBis: `morgen um ${uhrzeitInWien(TAGESENDE)}` })
   })
 
-  it('gleichzeitig: von 20 falschen Codes werden genau 10 geprüft — die Ablehnungen füllen das Tagesfenster nicht', async () => {
+  it('gleichzeitig: von 20 falschen Codes werden genau 10 geprüft — der Rest wird abgelehnt', async () => {
     // Gezählt wird VOR dem Prüfen (Nachbesserung Runde 2): Getrennt gelesen und
     // erst danach gezählt, sahen alle gleichzeitigen Versuche noch Stand 0.
     const email = neueAdresse('niemand')
@@ -298,7 +306,15 @@ describe('falsche Codes je Adresse — über alle Codes', () => {
     const geprueft = ergebnisse.filter((e) => !e.ok && e.code === 'INVALID_OTP').length
     expect(geprueft).toBe(10)
     expect(ergebnisse.filter((e) => !e.ok && e.status === 429)).toHaveLength(20 - geprueft)
-    expect(await stand(DB_BREMSEN.codeFehlerTag.zweck, email)).toBe(10)
+    // Der Zustand, der in ALLEN Verschränkungen gilt (TESTING_GUIDELINES §1): zehn geprüft, der Rest abgelehnt, und das
+    // Tagesfenster zählt nie weniger als die zehn geprüften Versuche. „Genau 10“ gilt nur, wenn jede Rückgabe eines
+    // abgelehnten Versuchs gelingt: Sie ist ein eigener Schreibvorgang, der unter Last scheitern darf (Deadlock zwischen
+    // gleichzeitigen Zählungen, Zeitlimit) – der Versuch bleibt dann gezählt, zur sicheren Seite (gibVersuchZurueck in
+    // src/server/bremse-datenbank.ts). Das war der Wackler dieser Datei: einzeln 10, im ganzen Lauf mehr. Dass die
+    // Ablehnungen das Fenster nicht füllen, zeigt die ruhige Folge oben (11 nacheinander → Stand 10).
+    const tag = await stand(DB_BREMSEN.codeFehlerTag.zweck, email)
+    expect(tag).toBeGreaterThanOrEqual(10)
+    expect(tag).toBeLessThanOrEqual(20)
   })
 
   it('eine Mail je Pause: zwei Fehlversuche, die beide Stand 10 sehen, schicken genau eine (Drossel in der Datenbank)', async () => {
@@ -366,7 +382,10 @@ describe('falsche Passwörter je Adresse', () => {
     const geprueft = ergebnisse.filter((e) => !e.ok && e.status === 401).length
     expect(geprueft).toBe(10)
     expect(ergebnisse.filter((e) => !e.ok && e.status === 429)).toHaveLength(20 - geprueft)
-    expect(await stand(DB_BREMSEN.passwortFehler.zweck, email)).toBe(10)
+    // Wie bei den Codes: nie weniger als die zehn geprüften; „genau 10“ nur, wenn jede Rückgabe gelingt (s. o.).
+    const stand10 = await stand(DB_BREMSEN.passwortFehler.zweck, email)
+    expect(stand10).toBeGreaterThanOrEqual(10)
+    expect(stand10).toBeLessThanOrEqual(20)
   })
 
   it('ein richtiges Passwort zählt nicht: 9 falsch, richtig, noch 1 falsch — erst dann pausiert', async () => {

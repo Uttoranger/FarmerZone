@@ -298,6 +298,17 @@ describe('Quelltext der Bausteine', () => {
     }
   })
 
+  // Nr. 127 (Nacharbeit 119): Die Vorschau zeigt jeden Ton der Hinweiskarte, auch `neutral` (Testhof, Register N21).
+  it('die Vorschau zeigt die Hinweiskarte in jedem Ton, den der Baustein kennt', () => {
+    const baustein = quelle('src/components/ui/hinweiskarte.tsx')
+    const toene = [...(/type Ton = ([^\n]+)/.exec(baustein)?.[1] ?? '').matchAll(/'([a-z]+)'/g)].map((m) => m[1])
+    expect(toene).toEqual(['gruen', 'orange', 'neutral'])
+    const seite = quelle('src/app/intern/bausteine/bausteine-vorschau.tsx')
+    for (const ton of toene) expect(seite, ton).toMatch(new RegExp(`<Hinweiskarte[^>]*\\bton="${ton}"`))
+    // Gegenprobe: Die Suche findet einen Ton, der fehlt — ein Ton, den es nicht gibt, steht nicht in der Vorschau.
+    expect(seite).not.toMatch(/<Hinweiskarte[^>]*\bton="rot"/)
+  })
+
   it('das Blatt mit Griff ist eine zusätzliche Variante: SheetContent bleibt, SheetBlatt trägt den Griff', () => {
     const sheet = quelle('src/components/ui/sheet.tsx')
     expect(sheet).toMatch(/function SheetContent\(/)

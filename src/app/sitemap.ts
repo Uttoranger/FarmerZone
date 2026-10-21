@@ -12,8 +12,9 @@ import { metadatenBasis } from '@/lib/vorschaubild'
  *
  * Statisch, stündlich neu gebaut: Ein neuer Hof erscheint spätestens nach
  * einer Stunde. Drin stehen nur die festen öffentlichen Seiten und die Höfe,
- * die auch indexiert werden (öffentlich, mindestens ein Produkt im Shop, nicht
- * ausgenommen — `ladeSitemapHoefe`), mit ihren Produkten im Shop. Nie eine
+ * die auch indexiert werden (in Listen sichtbar, also kein Testhof — `istTesthof`,
+ * Register N21 —, mindestens ein Produkt im Shop — `ladeSitemapHoefe`), mit ihren
+ * Produkten im Shop. Ein nur aus der Gründung ausgenommener Hof steht drin. Nie eine
  * private Seite, eine Seite mit Token oder eine Adresse mit Parametern
  * (tests/sitemap.test.ts gleicht mit `PRIVATE_BEREICHE` aus src/lib/robots.ts ab).
  *

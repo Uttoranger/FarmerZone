@@ -18,7 +18,8 @@
  * Datei mit Better Auth. Kommentare zählen nicht.
  *
  * Bestand: Was die Regel verletzt, steht in UHR_BESTAND — je Datei mit Grund. Die Liste schrumpft:
- * Eine Datei, die sie nicht mehr braucht, fällt als veraltet auf.
+ * Eine Datei, die sie nicht mehr braucht, fällt als veraltet auf. Sie ist seit Nr. 127 leer (code-bremse.int
+ * stellt feste Tage und rückt in festen Schritten); sie bleibt als Ort für einen Fall, der nicht anders geht.
  *
  * Gegenprobe: Text-Attrappen — ein Literal in der Zukunft, eine Variable und eine Uhr ohne Literal
  * in einer Datei mit Better Auth schlagen an (Import, dynamischer Import, Prisma-Zeilen, SQL, Helfer),
@@ -37,11 +38,8 @@ const BASIS = join(ORDNER, 'setup/basis.ts')
 /** Ab diesem Tag (UTC) gilt ein Literal als Zukunft (Regelvorschlag 112, freigegeben 19.10.2026). */
 const STICHTAG_MS = Date.UTC(2026, 9, 20)
 
-/** Dateien, die die Regel heute verletzen, je mit Grund. Nur schrumpfen. */
-const UHR_BESTAND: Record<string, string> = {
-  'code-bremse.int.test.ts':
-    'Die Uhr steht auf GESTERN, zur Laufzeit aus der echten Uhr gerechnet (immer Vergangenheit, Nr. 112), die Schritte darin sind relativ; ein Literal gäbe es nur mit einem festen Tag — Umbau offen (Lauf 19)',
-}
+/** Dateien, die die Regel heute verletzen, je mit Grund. Nur schrumpfen — seit Nr. 127 ist der Bestand leer. */
+const UHR_BESTAND: Record<string, string> = {}
 
 const AUTH_MODUL = /^(@\/lib\/auth(\/.*)?|better-auth(\/.*)?|@better-auth\/.*)$/
 const BASIS_MODUL = /(^|\/)setup\/basis$/

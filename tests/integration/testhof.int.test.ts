@@ -241,7 +241,7 @@ describe('Sichtbarkeit an echten Zeilen', () => {
       liveBisTag: null,
       liveBisUhrzeit: null,
     }
-    expect(await speichereEntwurf({ reihenfolge, block })).toEqual({ error: 'Wähle nur freigeschaltete Höfe.' })
+    expect(await speichereEntwurf({ reihenfolge, block })).toEqual({ error: 'Wähle nur freigeschaltete Höfe, keine Testhöfe.' })
     expect(await prisma.startseiteBlock.count({ where: { titel: 'int-Testhof gewählt' } })).toBe(0)
   })
 })

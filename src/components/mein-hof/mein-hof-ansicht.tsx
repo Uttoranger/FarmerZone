@@ -7,6 +7,7 @@ import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 import { useSchmalerAls } from '@/lib/use-mindestbreite'
 import { meldeGespeichertAnsehen } from '@/components/mein-hof/gespeichert-ansehen'
 import { KundenansichtVollbild, useKundenansicht } from '@/components/mein-hof/kundenansicht-vollbild'
+import { LadeInhalt, LadeRahmen } from '@/components/ui/lade-punkt'
 
 /*
  * Die Kundenansicht von „Mein Hof" unter lg (Nachtlauf Nr. 49, Register N4;
@@ -81,8 +82,11 @@ export function MeinHofAnsicht({
 
   return (
     <Steuerung.Provider value={steuerung}>
-      {kopf}
-      {children}
+      {/* Ladepunkt statt Skelett beim Wechsel der Reiter (Nr. 127): Der Inhalt bleibt stehen, bis der neue da ist; der Reiter im Kopf zeigt den Punkt. */}
+      <LadeRahmen>
+        {kopf}
+        <LadeInhalt>{children}</LadeInhalt>
+      </LadeRahmen>
       <KundenansichtVollbild
         offen={kundenansicht.offen}
         adresse={kundenAnsichtAdresse(slug, reiter)}

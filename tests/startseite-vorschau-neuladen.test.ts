@@ -135,6 +135,7 @@ type RahmenProps = {
   sichtbar: string | null
   laedt: boolean
   titel: string
+  band: string
   onGeladen: (pfad: string, neu: HTMLIFrameElement, alt: HTMLIFrameElement | undefined) => void
 }
 
@@ -327,13 +328,14 @@ describe('StartseiteVorschau — neu laden ohne leeren Rahmen, an derselben Stel
   })
 })
 
-describe('StartseiteVorschau — der Titel des Rahmens wechselt mit dem neuen Stand (Nr. 121)', () => {
-  it('bleibt „Entwurf“, solange der Entwurf noch sichtbar ist, und wird „Live“ erst beim Tausch nach dem Laden', async () => {
+describe('StartseiteVorschau — Titel und Band des Rahmens wechseln mit dem neuen Stand (Nr. 121, Band seit Nr. 127)', () => {
+  it('bleiben „Entwurf“, solange der Entwurf noch sichtbar ist, und werden „Live“ erst beim Tausch nach dem Laden', async () => {
     pruefstand.starte(vorschau(0))
     await erledigt()
     rahmen().onGeladen('/?vorschau=v1&sig=s', fenster().element, undefined)
     pruefstand.rendere()
     expect(rahmen().titel).toBe(`Vorschau der Startseite · ${ENTWURF_TEXT.entwurf}`)
+    expect(rahmen().band).toBe('entwurf')
 
     // „Live“ gewählt: Die neue Adresse lädt, der Rahmen zeigt noch den Entwurf – und heißt auch so.
     findeSegment(pruefstand.baum(), ENTWURF_TEXT.quelleBeschriftung)?.onWertChange('live')
@@ -341,11 +343,13 @@ describe('StartseiteVorschau — der Titel des Rahmens wechselt mit dem neuen St
     await erledigt()
     expect(rahmen()).toMatchObject({ rahmen: ['/?vorschau=v1&sig=s', '/?vorschau=v2&sig=s'], sichtbar: '/?vorschau=v1&sig=s', laedt: true })
     expect(rahmen().titel).toBe(`Vorschau der Startseite · ${ENTWURF_TEXT.entwurf}`)
+    // Das Band „Entwurf/Live“ über dem Rahmen sagt dasselbe wie der Titel: Es zeigt noch den Entwurf, also steht dort „Entwurf“.
+    expect(rahmen().band).toBe('entwurf')
     expect(aktionen.erzeuge.mock.calls.at(-1)?.[0]).toMatchObject({ quelle: 'live' })
 
     // Fertig geladen und getauscht: jetzt steht der Rahmen für Live.
     rahmen().onGeladen('/?vorschau=v2&sig=s', fenster().element, fenster().element)
     pruefstand.rendere()
-    expect(rahmen()).toMatchObject({ sichtbar: '/?vorschau=v2&sig=s', titel: `Vorschau der Startseite · ${ENTWURF_TEXT.live}` })
+    expect(rahmen()).toMatchObject({ sichtbar: '/?vorschau=v2&sig=s', titel: `Vorschau der Startseite · ${ENTWURF_TEXT.live}`, band: 'live' })
   })
 })
