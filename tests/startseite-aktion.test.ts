@@ -189,7 +189,7 @@ describe('Höfe und Bild', () => {
     vi.mocked(prisma.farm.count).mockResolvedValue(1 as never)
     const liste = [reihenfolge()[0], { id: NEUER_BLOCK, sichtbar: true }, ...reihenfolge().slice(1)]
     const ergebnis = await speichereEntwurf({ reihenfolge: liste, block: block({ vorlage: 'HOEFE_AUSWAHL', farmIds: ['f1', 'f-gesperrt'] }) })
-    expect(ergebnis).toEqual({ error: 'Wähle nur freigeschaltete Höfe.' })
+    expect(ergebnis).toEqual({ error: 'Wähle nur freigeschaltete Höfe, keine Testhöfe.' })
     const frage = vi.mocked(prisma.farm.count).mock.calls[0]?.[0] as { where: { approvedAt: unknown; isActive: unknown; archivedAt: unknown } }
     expect(frage.where).toMatchObject({ approvedAt: { not: null }, isActive: true, archivedAt: null })
     nichtsGeschrieben()

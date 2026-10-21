@@ -13,7 +13,7 @@
 import type { ProductCategoryValue } from '@/schemas/product'
 import { LEERER_HOEFE_FILTER, schreibeHoefeFilter, type HoefeFilter } from '@/schemas/hoefe-filter'
 import { KATEGORIE_LABEL } from '@/lib/taxonomie'
-import { formatiereAbholung, type NaechsteAbholung } from '@/lib/hofuebersicht'
+import { formatiereAbholung, type NaechsteAbholung, type NeuerBeitrag } from '@/lib/hofuebersicht'
 import {
   SERVICEGEBUEHR_STANDARD_MIND_CENTS,
   SERVICEGEBUEHR_STANDARD_PROZENT,
@@ -132,6 +132,8 @@ export type StartseitenHofEingabe = {
   longitude: number | null
   /** Abzeichen „Gründungshof“ (Register K2, Nr. 116) — nur Ja/Nein; fehlt es, ohne Abzeichen. */
   gruendungshof?: boolean
+  /** Der neueste aktive Beitrag, höchstens 7 Tage alt (Register N22, Nr. 129) — aus derselben Liste, keine zweite Abfrage. */
+  neuerBeitrag?: NeuerBeitrag | null
 }
 
 /** Eine Karte unter „Höfe in deiner Nähe" — fertig zum Zeichnen, ohne Decimal und Date. */
@@ -152,6 +154,8 @@ export type StartseitenHof = {
   lage: GeoPunkt | null
   /** Abzeichen „Gründungshof“ über dem Namen (Nr. 116) — fehlt es (Platzhalter im Admin), ohne Abzeichen. */
   gruendungshof?: boolean
+  /** Für die Marke „Neu · vor …“ am Bild (BeitragMarke, Register N22) — fehlt es (Admin), ohne Marke. */
+  neuerBeitrag?: NeuerBeitrag | null
 }
 
 /** Die Lage aus der Liste: nur mit beiden Koordinaten. */
@@ -182,6 +186,7 @@ function bereiteStartseitenHof(hof: StartseitenHofEingabe): StartseitenHof {
     foto: hof.fotos[0] ?? null,
     lage: leseLage(hof),
     gruendungshof: hof.gruendungshof === true,
+    neuerBeitrag: hof.neuerBeitrag ?? null,
   }
 }
 

@@ -123,6 +123,8 @@ const pruefstand = vi.hoisted(() => {
     useOptimistic<T>(stand: T): [T, () => void] {
       return [stand, () => {}]
     },
+    // Der Weg in den Korb nach außen (Nr. 128) — hier ohne Abnehmer, er zählt keine Zelle.
+    useImperativeHandle(): void {},
   }
 })
 
@@ -135,6 +137,7 @@ vi.mock('react', async (importOriginal) => ({
   useSyncExternalStore: pruefstand.useSyncExternalStore,
   useTransition: pruefstand.useTransition,
   useOptimistic: pruefstand.useOptimistic,
+  useImperativeHandle: pruefstand.useImperativeHandle,
 }))
 
 // Das echte useCart, nur umhüllt: was der Hook zuletzt geliefert hat — auch aus dem Produktraster heraus.
@@ -162,7 +165,7 @@ function produkt(id: string, name: string): PublicProduct {
     price: 3.5, unit: 'kg', unitSize: 1, stock: 10, isAvailable: true, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null,
+    familieId: null, brennmaterial: null, abholhinweise: [],
   }
 }
 

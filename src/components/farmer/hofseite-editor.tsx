@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   AlignLeft,
   BadgeCheck,
+  CalendarDays,
   Check,
   ChevronRight,
   Clock3,
@@ -25,6 +26,7 @@ import type { FarmSettings } from '@/server/queries/farm'
 import type { AppearanceData } from '@/server/queries/appearance'
 import { type HofseiteFortschritt, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
+import type { AktuellZeile } from '@/lib/mein-hof-ansicht'
 import {
   EDITOR_ABSTAND,
   EDITOR_LISTE_HANDY_MAX,
@@ -66,6 +68,8 @@ type Props = {
   hof: AbschnittHof
   einstellungen: FarmSettings
   auftritt: AppearanceData
+  /** „Aktuell vom Hof“ als erste Zeile (Register E12, Nr. 129) — wie in der Liste unter lg; fehlt die Angabe, steht sie nicht da. */
+  aktuell?: AktuellZeile
 }
 
 const SYMBOL: Record<HofseiteZeileId, LucideIcon> = {
@@ -82,7 +86,10 @@ const SYMBOL: Record<HofseiteZeileId, LucideIcon> = {
   kontakt: Phone,
   bestellungen: ShoppingBag,
   abschnitte: LayoutList,
+  aktuell: CalendarDays,
 }
+
+const ZeichenAktuell = SYMBOL.aktuell
 
 // ── Zeile und Gruppe ──────────────────────────────────────────────────────────
 
@@ -137,7 +144,7 @@ function Zeile({
   )
 }
 
-export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Props): React.JSX.Element {
+export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt, aktuell }: Props): React.JSX.Element {
   const router = useRouter()
   // Nur eine Zeile offen zugleich — und genau die markiert die Vorschau.
   const [offen, setOffen] = useState<HofseiteZeileId | null>(null)
@@ -203,6 +210,42 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt }: Pr
           </div>
           <p className="mt-3 text-sm text-muted-foreground">{fortschritt.satz}</p>
         </div>
+
+        {aktuell && (
+          // Wie auf der Hofseite oben: der laufende Beitrag. Ein Tipp auf die Zeile markiert den Abschnitt in der
+          // Vorschau — wie jede Zeile über `offen` (Kennung `aktuell`, Freigabe 129.4, Runde 2). Verwaltet wird
+          // unter Mein Hof › Beiträge: darum daneben der Link statt eines Bausteins zum Aufklappen.
+          <ul aria-label={aktuell.titel} className="overflow-hidden rounded-2xl border border-border bg-card">
+            <li data-bearbeiten-zeile="aktuell" className={cn('flex min-h-14 items-center gap-1 pr-3', offen === 'aktuell' && 'bg-muted/30')}>
+              <button
+                type="button"
+                onClick={() => umschalten('aktuell')}
+                aria-pressed={offen === 'aktuell'}
+                title={`${aktuell.titel}: ${aktuell.wert}`}
+                className={cn('flex min-h-14 min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-left transition-colors hover:bg-muted', FOKUS_RAHMEN_INNEN)}
+              >
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-muted text-status-fertig">
+                  <ZeichenAktuell className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-foreground">{aktuell.titel}</span>
+                  <span className="block truncate text-[13px] text-muted-foreground">{aktuell.wert}</span>
+                </span>
+              </button>
+              <Link
+                href={aktuell.link.href}
+                className={cn(
+                  'inline-flex min-h-11 shrink-0 items-center gap-0.5 rounded-lg px-1.5 text-sm font-semibold whitespace-nowrap text-brand-text',
+                  FOKUS_RAHMEN
+                )}
+              >
+                <span className="sr-only">{aktuell.titel}: </span>
+                {aktuell.link.text}
+                <ChevronRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
+              </Link>
+            </li>
+          </ul>
+        )}
 
         {fortschritt.gruppen.map((gruppe) => (
           <section key={gruppe.id} aria-labelledby={`hofseite-gruppe-${gruppe.id}`}>

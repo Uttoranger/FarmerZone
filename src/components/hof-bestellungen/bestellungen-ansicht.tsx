@@ -4,7 +4,7 @@ import type { BestellungenSeite, HofBestellDetail, HofListenEintrag } from '@/se
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
-import { LadeInhalt, LadeRahmen } from '@/components/ui/lade-punkt'
+import { LadeInhalt, LadePunkt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
@@ -143,7 +143,7 @@ function ListenZeile({
       aria-current={gewaehlt && !nurBreit ? 'page' : undefined}
       title={eintrag.kunde}
       className={cn(
-        'flex min-h-[64px] items-center gap-3 rounded-[13px] border px-3.5 py-3 transition-colors duration-[250ms] hover:bg-muted',
+        'relative flex min-h-[64px] items-center gap-3 rounded-[13px] border px-3.5 py-3 transition-colors duration-[250ms] hover:bg-muted',
         !gewaehlt && 'border-border bg-card',
         // Hell trägt der grüne Rand allein: eine grüne Tönung drückte den leisen Text unter 4,5:1.
         gewaehlt && !nurBreit && 'border-accent/60 bg-card dark:bg-accent/10',
@@ -170,6 +170,8 @@ function ListenZeile({
         {eintrag.marke.text}
       </Marke>
       <ChevronRight className={cn('size-4 shrink-0 lg:hidden', LEISE)} strokeWidth={1.7} aria-hidden="true" />
+      {/* Ohne Skelett auf /orders/[orderId] ist dieser Punkt die Rückmeldung, bis die Bestellung da ist (Nr. 127). */}
+      <LadePunkt />
     </Link>
   )
 }

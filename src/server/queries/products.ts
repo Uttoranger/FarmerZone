@@ -15,6 +15,7 @@ import type {
   Verpackung,
 } from '@prisma/client'
 import { leseAusschnitt, type BildAusschnitt } from '@/schemas/bild-ausschnitt'
+import type { AbholhinweisValue } from '@/lib/abholhinweise'
 
 // Einheitliche Produkt-Reihenfolge (Sprint 17K): manuelle sortOrder,
 // createdAt als stabile Sekundärsortierung; ausgeblendete Produkte
@@ -86,6 +87,8 @@ export type ProductData = {
   familieId: string | null
   /** Seit Nr. 20 (E10): Verpackung des Gebindes, an der die Sperre hängt; null = keine Angabe. */
   verpackung: Verpackung | null
+  /** Seit Nr. 123 (N23): Abholhinweise eines Futters; bei anderen Produkten leer. */
+  abholhinweise: AbholhinweisValue[]
   /**
    * Seit Nr. 20 (S7): Warum diese Größe ohne Registrierung nicht in den Shop
    * darf („Wird erst sichtbar mit …"), sonst null. Nur getProdukteSeite kennt
@@ -146,6 +149,7 @@ export async function getProductsForFarm(farmId: string): Promise<ProductData[]>
     unavailableReason: p.unavailableReason,
     familieId: p.familieId,
     verpackung: p.verpackung,
+    abholhinweise: p.abholhinweise,
     sperre: null,
   }))
 }

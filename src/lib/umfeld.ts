@@ -433,6 +433,7 @@ function alsVorschau(p: UmfeldProdukt): VorschauProdukt {
     imageUrl: p.imageUrl,
     bildAusschnitt: p.bildAusschnitt,
     category: p.category,
+    subcategory: p.subcategory,
     verfuegbar: p.kaufbar,
   }
 }
@@ -680,8 +681,8 @@ export function baueUmfeldKarte(eingabe: UmfeldEingabe & { eigenerStandort: { la
 /**
  * Die Texte von „Preise vergleichen" an EINER Stelle (Board v3 §4). „So
  * rechnen wir" steht wie im Board — außer „oder Stück": Eier je Stück ist
- * gestoppt (Freigabe Nr. 124 Punkt 3, Bericht 124), der Satz sagte sonst
- * etwas, das nicht stimmt.
+ * zurückgestellt bis zum Pilot (Register N23, Änderung 21.10.2026), der Satz
+ * sagte sonst etwas, das nicht stimmt.
  */
 export const UMFELD_TEXT = {
   hinweis: 'Höfe in deinem Umkreis, die gerade verkaufen.',

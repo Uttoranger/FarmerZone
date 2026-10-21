@@ -1,5 +1,8 @@
+import { Suspense } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { unstable_rethrow } from 'next/navigation'
+import * as Sentry from '@sentry/nextjs'
 import { Check, ChevronDown, HandCoins, MapPin } from 'lucide-react'
 import {
   BRENNMATERIAL_ADRESSE,
@@ -24,6 +27,9 @@ import { MARKE } from '@/lib/marke'
 import type { GruendungSeiten } from '@/lib/gruendungshof'
 import { gruendungFuerSeiten } from '@/server/queries/plattform-einstellung'
 import { GruendungSatz } from '@/components/gruendung/satz'
+import { NeuBeiDenHoefen } from '@/components/startseite/neu-bei-den-hoefen'
+import { ladeNeuigkeiten } from '@/server/queries/neuigkeiten'
+import { schonGemeldet } from '@/server/oeffentlich-lesen'
 
 /*
  * Die Abschnitte der Startseite unter „Höfe in deiner Nähe", in der Reihenfolge
@@ -357,19 +363,18 @@ export function Fragen({ jetzt }: { jetzt: Date }): React.JSX.Element {
 
 // Impressum, Datenschutz, AGB und „Problem melden" stehen seit Nr. 120 im
 // Seitenfuß der KundeShell (KundeFuss, Register N22) direkt darunter — hier
-// nicht noch einmal. „Höfe entdecken" und „So funktioniert's" führt der
-// Seitenfuß nur am Computer (SEITENFUSS.wege, ab md); am Handy nicht, und die
-// Produktseite hat dort keine Unterleiste. Darum bleibt die Spalte der Marke
-// und ist nur am Computer verborgen (`nurHandy`), damit dort nichts doppelt
-// steht.
+// nicht noch einmal. Seit Nr. 127 (N22, Ergänzung) hat jede Seite am Computer
+// genau einen Fuß: den Seitenfuß, der dort auch „Höfe entdecken", „Für Höfe"
+// (→ /fuer-hoefe mit Registrierung und Konditionen) und „So funktioniert's"
+// führt; „Anmelden" steht im Kopf. Dieser Fuß gilt darum nur am Handy: Der
+// Seitenfuß führt die Wege dort nicht, und die Produktseite hat keine
+// Unterleiste. Die AGB bleiben in jedem Fuß erreichbar (O4).
 const FUSS_SPALTEN: readonly {
   titel: string
-  nurHandy?: boolean
   links: readonly { href: string; text: string }[]
 }[] = [
   {
     titel: MARKE,
-    nurHandy: true,
     links: [
       { href: hoefeAdresse(), text: 'Höfe entdecken' },
       { href: '/#so-funktionierts', text: 'So funktioniert’s' },
@@ -387,11 +392,12 @@ const FUSS_SPALTEN: readonly {
   },
 ]
 
+/** Der Fuß der Startseite, nur am Handy (ab md verborgen): Am Computer steht der Seitenfuß der KundeShell. */
 export function StartseiteFuss({ jahr }: { jahr: number }): React.JSX.Element {
   return (
-    <footer className="border-t border-border py-10 md:pt-10 md:pb-[46px]">
-      <div className={cn(CONTAINER, 'flex flex-col gap-8 md:flex-row md:gap-[70px]')}>
-        <div className="flex flex-col gap-2.5 md:w-[300px]">
+    <footer className="border-t border-border py-10 md:hidden">
+      <div className={cn(CONTAINER, 'flex flex-col gap-8')}>
+        <div className="flex flex-col gap-2.5">
           {/* Der Fuß steht nicht im ersten Blick — vorab geladen wird die Marke nur in der Kopfzeile. */}
           <Wortmarke priority={false} />
           <p className="text-[13px] leading-normal text-muted-foreground">
@@ -399,9 +405,9 @@ export function StartseiteFuss({ jahr }: { jahr: number }): React.JSX.Element {
           </p>
           <p className="text-xs text-muted-foreground">© {jahr} {MARKE}</p>
         </div>
-        <div className="grid grid-cols-2 gap-6 md:flex md:gap-[70px]">
+        <div className="grid grid-cols-2 gap-6">
           {FUSS_SPALTEN.map((spalte) => (
-            <nav key={spalte.titel} aria-label={spalte.titel} className={cn('flex flex-col gap-1', spalte.nurHandy && 'md:hidden')}>
+            <nav key={spalte.titel} aria-label={spalte.titel} className="flex flex-col gap-1">
               <p className="text-[13px] font-semibold">{spalte.titel}</p>
               <ul className="flex flex-col">
                 {spalte.links.map((link) => (
@@ -430,6 +436,23 @@ export function StartseiteFuss({ jahr }: { jahr: number }): React.JSX.Element {
 export type AbschnittProps = { jetzt: Date }
 
 /**
+ * „Neu bei den Höfen“ (Nr. 129) mit seinen Daten aus dem Datencache. Ein
+ * Ladefehler nimmt nur den Abschnitt weg, nie die Startseite (wie die
+ * Hofkarten in page.tsx); gemeldet wird er trotzdem.
+ */
+async function NeuBeiDenHoefenGeladen({ jetzt }: AbschnittProps) {
+  let neuigkeiten: Awaited<ReturnType<typeof ladeNeuigkeiten>>
+  try {
+    neuigkeiten = await ladeNeuigkeiten()
+  } catch (err) {
+    unstable_rethrow(err)
+    if (!schonGemeldet(err)) Sentry.captureException(err, { tags: { bereich: 'startseite-neuigkeiten' } })
+    return null
+  }
+  return <NeuBeiDenHoefen neuigkeiten={neuigkeiten} jetzt={jetzt.toISOString()} />
+}
+
+/**
  * Die Abschnitte dieser Datei je Art (Register N16, Nr. 96): page.tsx rendert
  * die Liste aus Admin › Startseite darüber. Kopf und „Höfe in deiner Nähe"
  * stehen in eigenen Dateien und brauchen die Höfe der Seite — die rendert
@@ -443,4 +466,9 @@ export const STARTSEITE_ABSCHNITTE = {
   FUER_HOEFE: () => <FuerHoefeBand />,
   FRAGEN: ({ jetzt }) => <Fragen jetzt={jetzt} />,
   FUSS: ({ jetzt }) => <StartseiteFuss jahr={jetzt.getFullYear()} />,
+  NEUIGKEITEN: ({ jetzt }) => (
+    <Suspense fallback={null}>
+      <NeuBeiDenHoefenGeladen jetzt={jetzt} />
+    </Suspense>
+  ),
 } satisfies Record<Exclude<AbschnittArt, 'KOPF' | 'HOEFE'>, (props: AbschnittProps) => React.ReactNode>

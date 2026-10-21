@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { cookies, headers } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
 import { auth } from '@/lib/auth'
-import { getFarmForUser } from '@/server/queries/dashboard'
+import { getFarmForUser, ladeDeinenBeitrag } from '@/server/queries/dashboard'
 import { getHeute } from '@/server/queries/heute'
 import { ladeFaedenHof } from '@/server/queries/postfach'
 import { heutePostfach } from '@/lib/postfach'
@@ -24,9 +24,10 @@ import {
   ZuTunKarte,
 } from '@/components/heute/heute-teile'
 import { FreischaltMoment } from '@/components/heute/freischalt-moment'
+import { BeitragAnstoss, DeinBeitragKarte } from '@/components/heute/dein-beitrag'
 import { StartbildschirmKarte } from '@/components/heute/startbildschirm-karte'
 import { ERSTE_SCHRITTE_AUS_COOKIE, ersteSchritteAnzeige, ersteSchritteAusgeblendet } from '@/lib/erste-schritte'
-import { datumLang, heuteAufbau, teilenSatz, vergleichText, type HeuteBlock } from '@/lib/heute'
+import { beitragBlock, datumLang, heuteAufbau, teilenSatz, vergleichText, type HeuteBlock } from '@/lib/heute'
 import { freischaltMomentMoeglich } from '@/lib/freischalt-moment'
 import { getTeilenFensterDaten } from '@/server/queries/teilen-bild'
 import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
@@ -72,13 +73,18 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   // eine verfallene Bestellung und ihre noch gebundene Ware. getHeute wartet
   // nur mit diesen Abfragen auf die Freigabe, alle anderen laufen daneben
   // (Nachtlauf Nr. 31); der Cookie ebenso.
-  const [heute, cookieJar, faeden] = await Promise.all([
+  const [heute, cookieJar, faeden, deinBeitrag] = await Promise.all([
     getHeute(farm.id, jetzt, gibVerwaisteFreiOhneRisiko(farm.id, jetzt)),
     cookies(),
     // Postfach (Register N12, Nr. 87): Ein Ladefehler nimmt nur die Karte weg, nie Heute — gemeldet ohne Nachrichtentext.
     ladeFaedenHof(farm.id).catch((err: unknown) => {
       Sentry.captureException(err, { tags: { bereich: 'postfach', seite: 'heute' }, extra: { farmId: farm.id } })
       return []
+    }),
+    // „Dein Beitrag“ (Register E12, Nr. 129): Ein Ladefehler nimmt nur den Block weg, nie Heute.
+    ladeDeinenBeitrag(farm.id, jetzt).catch((err: unknown) => {
+      Sentry.captureException(err, { tags: { bereich: 'dein-beitrag', seite: 'heute' }, extra: { farmId: farm.id } })
+      return null
     }),
   ])
   const postfach = heutePostfach(faeden, jetzt)
@@ -92,6 +98,8 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
 
   // Teilen nur, solange Kunden den Hof sehen und bei ihm bestellen können (heuteHofSichtbar).
   const teilen = heute.hof.sichtbar
+  // Karte mit dem laufenden Beitrag, der Anstoß oder nichts (beitragBlock).
+  const beitragArt = deinBeitrag ? beitragBlock(deinBeitrag) : null
   const aufbau = heuteAufbau({
     // „pausiert" (Notbremse) oder „einrichten" (Register Z1) — nie beide; der eine Kasten oben, auch über dem Balken der Shell.
     // Dieselbe Antwort nimmt die Online-Zahlung aus „Zu tun" (getHeute rechnet sie einmal).
@@ -99,6 +107,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
     teilen,
     zuTun: zuTunZeigen === 'karte',
     postfach: postfach !== null,
+    beitrag: beitragArt !== null,
   })
   const satz = teilenSatz(heute.angebot, heute.naechstesFenster?.fenster ?? null)
   // Teilen-Fenster und „letzte Woche … über deine Links" (Nr. 21, Gate 7) —
@@ -115,6 +124,12 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
     ) : (
       heute.stripeEinrichten && <StripeEinrichtenHinweis />
     ),
+    beitrag:
+      beitragArt === 'karte' && deinBeitrag?.aktiv ? (
+        <DeinBeitragKarte beitrag={deinBeitrag.aktiv} hofSlug={farm.slug} jetzt={jetzt.toISOString()} />
+      ) : (
+        beitragArt === 'anstoss' && <BeitragAnstoss />
+      ),
     teilen: teilen && <TeilenKarte hofName={farm.name} hofSlug={farm.slug} satz={satz} fenster={fenster} wirkung={wirkungSatz} />,
     packliste: (
       <Packliste

@@ -18,6 +18,15 @@
  * Gegenprobe: Text-Attrappen — eine Action ohne Prüfung, mit Prüfung nur im Kommentar und eine Funktion,
  * die eine andere ohne Prüfung ruft, schlagen an; die direkte Prüfung, die über einen Helfer (auch zweistufig)
  * und die Admin-Prüfung nicht, ebenso wenig eine Funktion, die nicht exportiert ist.
+ *
+ * Seit Nr. 125 auch: Das ERGEBNIS wird ausgewertet. Aufrufen allein genügt nicht — wer das Ergebnis von
+ * `getSession` bzw. der Admin-Wache verwirft oder erst nach einem Schreiben prüft, ändert trotzdem für jeden.
+ * Ausgewertet heißt: `const x = await prüfung()` und gleich die NÄCHSTE Anweisung ist `if (… x …) return|throw`
+ * (darin `!x`, `x?.user`, `'error' in x`, `&&`/`||` …), oder der Aufruf steht selbst in einer solchen
+ * Bedingung, oder er wird unverändert zurückgegeben. Dasselbe gilt für einen Helfer der Datei, der bei
+ * fehlender Sitzung einen Wert zurückgibt statt zu werfen (`hofDerSitzung` → null): Sein Ergebnis wertet der
+ * Aufrufer genauso aus. Wer bewusst auch ohne Sitzung weiterläuft, steht mit Grund in SITZUNG_FREIWILLIG.
+ * Gegenprobe: verworfenes, ungeprüftes und zu spät geprüftes Ergebnis schlagen an.
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -44,6 +53,14 @@ const OEFFENTLICH: Ausnahme[] = [
   { datei: 'startseite.ts', name: 'beendeStartseitenVorschau', grund: 'Schaltet nur den Vorschau-Modus im eigenen Browser aus; ohne Sitzung gibt es nichts zu beenden und nichts zu schützen' },
   { datei: 'subscriptions.ts', name: 'bestaetigeNeuigkeiten', grund: 'Der Link in der Bestätigungsmail trägt ein signiertes Token; die Abonnentin ist nicht angemeldet' },
   { datei: 'subscriptions.ts', name: 'unsubscribeWithToken', grund: 'Der Abmeldelink in der Mail trägt ein signiertes Token; die Abonnentin ist nicht angemeldet' },
+]
+
+/**
+ * Sitzung freiwillig (Nr. 125): Die Action prüft die Sitzung, läuft aber bewusst auch ohne sie weiter — die
+ * Sitzung entscheidet nur über Zusätze. Eine Ausnahme, die doch auswertet, fällt als veraltet auf.
+ */
+const SITZUNG_FREIWILLIG: Ausnahme[] = [
+  { datei: 'meldung.ts', name: 'meldungAbsenden', grund: 'Kundinnen ohne Konto melden ein Problem genauso wie Höfe; die Sitzung entscheidet nur über Screenshot und Stundengrenze des Hofs' },
 ]
 
 /**
@@ -115,9 +132,75 @@ function ohnePruefung(quelltext: string, pfad = 'schnipsel.ts'): string[] {
   return [...alle].filter(([name, f]) => f.exportiert && !erreicht(name)).map(([name]) => name)
 }
 
+/** Endet der Zweig mit return oder throw — als einzelne Anweisung oder als letzte im Block? */
+function brichtAb(zweig: ts.Statement): boolean {
+  if (ts.isReturnStatement(zweig) || ts.isThrowStatement(zweig)) return true
+  if (!ts.isBlock(zweig)) return false
+  const letzte = zweig.statements[zweig.statements.length - 1]
+  return letzte !== undefined && brichtAb(letzte)
+}
+
+/** Wirft der Zweig (der Aufrufer bekommt nie „keine Sitzung") oder gibt er einen Wert zurück? */
+function abbruchArt(zweig: ts.Statement): 'wirft' | 'gibt-zurueck' {
+  const letzte = ts.isBlock(zweig) ? zweig.statements[zweig.statements.length - 1] : zweig
+  return letzte !== undefined && ts.isThrowStatement(letzte) ? 'wirft' : 'gibt-zurueck'
+}
+
+function erwaehnt(knoten: ts.Node, name: string): boolean {
+  if (ts.isIdentifier(knoten) && knoten.text === name) return true
+  return ts.forEachChild(knoten, (kind) => erwaehnt(kind, name) || undefined) ?? false
+}
+
+/** Wie eine Prüfstelle ausgewertet wird — siehe Kopf. 'weiter' = unverändert zurückgegeben. */
+function auswertung(aufruf: ts.CallExpression): 'wirft' | 'gibt-zurueck' | 'weiter' | 'fehlt' {
+  const ausdruck: ts.Node = ts.isAwaitExpression(aufruf.parent) ? aufruf.parent : aufruf
+  if (ts.isReturnStatement(ausdruck.parent)) return 'weiter'
+  for (let n: ts.Node = ausdruck; !ts.isBlock(n.parent) && !ts.isSourceFile(n.parent); n = n.parent) {
+    const p = n.parent
+    if (ts.isIfStatement(p) && p.expression === n) return brichtAb(p.thenStatement) ? abbruchArt(p.thenStatement) : 'fehlt'
+  }
+  const deklaration = ausdruck.parent
+  if (!ts.isVariableDeclaration(deklaration) || !ts.isIdentifier(deklaration.name) || deklaration.initializer !== ausdruck) return 'fehlt'
+  const anweisung = deklaration.parent.parent
+  const block = anweisung.parent
+  if (!ts.isVariableStatement(anweisung) || !(ts.isBlock(block) || ts.isSourceFile(block))) return 'fehlt'
+  const naechste = block.statements[block.statements.indexOf(anweisung) + 1]
+  if (naechste === undefined || !ts.isIfStatement(naechste) || !erwaehnt(naechste.expression, deklaration.name.text)) return 'fehlt'
+  return brichtAb(naechste.thenStatement) ? abbruchArt(naechste.thenStatement) : 'fehlt'
+}
+
+/** Die Funktionen einer Datei mit einer Prüfstelle, deren Ergebnis nicht ausgewertet wird. */
+function ohneAuswertung(quelltext: string, pfad = 'schnipsel.ts'): string[] {
+  const datei = ts.createSourceFile(pfad, quelltext, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const alle = funktionen(datei)
+  // Helfer, die bei fehlender Sitzung einen Wert zurückgeben (oder das Ergebnis weiterreichen) — bis nichts mehr dazukommt.
+  const nullbar = new Set<string>()
+  const pruefstellen = (knoten: ts.Node): ts.CallExpression[] => {
+    const liste: ts.CallExpression[] = []
+    const besuche = (k: ts.Node): void => {
+      if (ts.isCallExpression(k) && (istSitzungspruefung(k) || (ts.isIdentifier(k.expression) && nullbar.has(k.expression.text)))) liste.push(k)
+      ts.forEachChild(k, besuche)
+    }
+    besuche(knoten)
+    return liste
+  }
+  for (let neu = true; neu; ) {
+    neu = false
+    for (const [name, f] of alle) {
+      if (f.exportiert || nullbar.has(name)) continue
+      if (pruefstellen(f.knoten).some((c) => ['gibt-zurueck', 'weiter'].includes(auswertung(c)))) {
+        nullbar.add(name)
+        neu = true
+      }
+    }
+  }
+  return [...alle].filter(([, f]) => pruefstellen(f.knoten).some((c) => auswertung(c) === 'fehlt')).map(([name]) => name)
+}
+
 const dateien = readdirSync(ORDNER).filter((n) => n.endsWith('.ts'))
 const quellen = new Map(dateien.map((n) => [n, readFileSync(join(ORDNER, n), 'utf8')]))
 const ungeprueft = dateien.flatMap((n) => ohnePruefung(quellen.get(n)!, n).map((name) => ({ datei: n, name })))
+const unausgewertet = dateien.flatMap((n) => ohneAuswertung(quellen.get(n)!, n).map((name) => ({ datei: n, name })))
 
 describe('Actions-Wache — jede Server Action prüft die Sitzung', () => {
   it('sieht die Action-Dateien, und jede beginnt mit use server', () => {
@@ -172,5 +255,47 @@ describe('Actions-Wache — Gegenprobe: die Suche schlägt an', () => {
 
   it('zählt ein export { … } nach der Deklaration mit', () => {
     expect(ohnePruefung("'use server'\nasync function a() { return 1 }\nexport { a }")).toEqual(['a'])
+  })
+})
+
+describe('Actions-Wache — das Ergebnis der Prüfung wird ausgewertet (Nr. 125)', () => {
+  it('jede Prüfstelle wertet ihr Ergebnis gleich danach aus — außer SITZUNG_FREIWILLIG mit Grund', () => {
+    const verstoesse = unausgewertet.filter((u) => !SITZUNG_FREIWILLIG.some((a) => a.datei === u.datei && a.name === u.name)).map((u) => `${u.datei}: ${u.name}`)
+    expect(verstoesse, 'Gleich nach der Prüfung: if (!sitzung?.user) return … bzw. if (\'error\' in wache) return … — oder mit Grund in SITZUNG_FREIWILLIG').toEqual([])
+  })
+
+  it('hat keine veraltete Ausnahme in SITZUNG_FREIWILLIG, und jeder Grund steht in ganzen Worten', () => {
+    const veraltet = SITZUNG_FREIWILLIG.filter((a) => !unausgewertet.some((u) => u.datei === a.datei && u.name === a.name)).map((a) => `${a.datei}: ${a.name}`)
+    expect(veraltet).toEqual([])
+    for (const a of SITZUNG_FREIWILLIG) {
+      expect(a.grund.split(' ').length, `${a.datei} ${a.name}`).toBeGreaterThanOrEqual(8)
+      expect(OEFFENTLICH.some((o) => o.datei === a.datei && o.name === a.name), `${a.name} prüft die Sitzung, steht also nicht in OEFFENTLICH`).toBe(false)
+    }
+  })
+
+  it('Gegenprobe: verworfenes, ungeprüftes und zu spät geprüftes Ergebnis schlagen an', () => {
+    expect(ohneAuswertung("'use server'\nexport async function a() { await auth.api.getSession({ headers: await headers() })\n await db.x.delete() }")).toEqual(['a'])
+    expect(ohneAuswertung("'use server'\nexport async function b() { const s = await auth.api.getSession()\n await db.x.update({ where: { id: s.user.id } }) }")).toEqual(['b'])
+    expect(ohneAuswertung("'use server'\nexport async function c() { const g = await verlangeAdminAktion()\n await db.x.delete()\n if ('error' in g) return g }")).toEqual(['c'])
+    expect(ohneAuswertung("'use server'\nexport async function d() { const s = await auth.api.getSession()\n if (s?.user) { log() }\n await db.x.create() }")).toEqual(['d'])
+    expect(ohneAuswertung("'use server'\nexport async function e() { void (await verlangeFrischeBestaetigung())\n return 1 }")).toEqual(['e'])
+  })
+
+  it('Gegenprobe: ein Helfer, der bei fehlender Sitzung null gibt, verlangt die Auswertung beim Aufrufer', () => {
+    const helfer = "'use server'\nasync function hof() { const s = await auth.api.getSession()\n if (!s?.user) return null\n return s.user.id }\n"
+    expect(ohneAuswertung(helfer + 'export async function a() { const h = await hof()\n await db.x.create({ data: { h } }) }')).toEqual(['a'])
+    expect(ohneAuswertung(helfer + "export async function b() { const h = await hof()\n if (!h) return { error: 'x' }\n await db.x.create({ data: { h } }) }")).toEqual([])
+    const weiter = "'use server'\nasync function sitzung() { return auth.api.getSession() }\n"
+    expect(ohneAuswertung(weiter + 'export async function c() { const s = await sitzung()\n return s.user.id }')).toEqual(['c'])
+    expect(ohneAuswertung(weiter + 'export async function d() { const s = await sitzung()\n if (!s) return null\n return s.user.id }')).toEqual([])
+  })
+
+  it('lässt die üblichen Formen durch: if … return, if … throw, Prüfung in der Bedingung, werfender Helfer', () => {
+    expect(ohneAuswertung("'use server'\nexport async function a() { const s = await auth.api.getSession({ headers: await headers() })\n if (!s?.user) return { error: 'x' }\n await db.x.delete() }")).toEqual([])
+    expect(ohneAuswertung("'use server'\nexport async function b() { const g = await verlangeAdminAktion()\n if ('error' in g) return { error: g.error }\n await db.x.delete() }")).toEqual([])
+    expect(ohneAuswertung("'use server'\nexport async function c() { if (!(await auth.api.getSession())) throw new Error('x')\n await db.x.delete() }")).toEqual([])
+    expect(ohneAuswertung("'use server'\nexport async function d() { const f = await verlangeFrischeBestaetigung()\n if ('error' in f) { log()\n return f } }")).toEqual([])
+    const werfend = "'use server'\nasync function hof() { const s = await auth.api.getSession()\n if (!s?.user) throw new Error('x')\n return 1 }\n"
+    expect(ohneAuswertung(werfend + 'export async function e() { const id = await hof()\n await db.x.delete({ where: { id } }) }')).toEqual([])
   })
 })

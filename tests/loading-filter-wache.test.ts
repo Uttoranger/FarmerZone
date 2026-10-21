@@ -12,7 +12,8 @@
  *    (`searchParams` in der `page.tsx`, `useSearchParams()` in einer Datei daneben), steht in AUSNAHMEN — mit
  *    Art und Grund. Eine neue Seite dieser Art fällt hier mit ihrem Namen auf. Nr. 121 hat fünf Seiten vom Bestand
  *    genommen (Hof › Postfach, Bestellungen, Auswertung, Admin › Einstellungen und Finanzen), Nr. 122 Region
- *    (Ladepunkt statt Skelett, Register N23); zwei bleiben mit Grund.
+ *    (Ladepunkt statt Skelett, Register N23), Nr. 127 die letzten beiden (Mein Hof und die Bestellung): Der Bestand
+ *    ist leer.
  *  - Jede Ausnahme gibt es noch: Ist die `loading.tsx` weg oder liest die Seite die Adresse nicht mehr, fällt
  *    die Zeile als veraltet auf und muss raus.
  *  - /hoefe liest seit N19 (Entdecken statisch) keine Adresse mehr und behält seine `loading.tsx` ohne Ausnahme.
@@ -22,9 +23,9 @@
  * Zwei Arten von Ausnahmen:
  *  - 'kein-filter': Die Adresse trägt einen Wert, der sich beim Klicken auf der Seite nicht ändert (Token aus
  *    einer Mail, Kennung aus einem Link, Rückkehr von Stripe, Startwert) — kein Skelett pro Klick.
- *  - 'bestand': Die Seite filtert wirklich in der Adresse und zeigt bei jedem Klick das Skelett. Das ist ein
- *    Bestand aus der Zeit vor Nr. 105; er darf nur schrumpfen — Umbau nach dem Muster des Postfachs (Ladepunkt,
- *    `aria-busy`, alte Liste bleibt); Rest siehe die Gründe unten (Nr. 121, Lauf 19).
+ *  - 'bestand': Die Seite filtert wirklich in der Adresse und zeigt bei jedem Klick das Skelett. Das war ein
+ *    Bestand aus der Zeit vor Nr. 105; er ist seit Nr. 127 leer und darf nicht wieder wachsen — ein neuer Fall
+ *    wird nach dem Muster des Postfachs gebaut (Ladepunkt, `aria-busy`, alte Liste bleibt).
  */
 import { describe, it, expect, afterAll } from 'vitest'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -49,8 +50,6 @@ const AUSNAHMEN: Record<string, { art: Art; grund: string }> = {
   'src/app/(public)/problem-melden': { art: 'kein-filter', grund: 'Die Adresse trägt die Kennung des Fehlers aus einem Link.' },
   'src/app/account/neuigkeiten-bestaetigen': { art: 'kein-filter', grund: 'Die Adresse trägt den Token aus der Bestätigungs-Mail.' },
   'src/app/sicherheit/nicht-ich': { art: 'kein-filter', grund: 'Die Adresse trägt den Token aus der Mail „Neue Anmeldung“.' },
-  'src/app/(hof)/farm-page': { art: 'bestand', grund: 'Der Reiter (?reiter=) wechselt per Link; jeder Klick zeigt das Skelett. /status zeigt dieselbe Ladeansicht (tests/ladeansichten.test.ts) – Umbau erst mit eigener Komponente (Lauf 19).' },
-  'src/app/(hof)/orders/[orderId]': { art: 'bestand', grund: 'Die Liste neben der Bestellung filtert in der Adresse (?filter=); jeder Klick zeigt das Skelett. Die Zeilen der Liste öffnen diese Route, ihr Skelett ist dort die einzige Rückmeldung – erst mit Ladepunkt an der Zeile (Lauf 19).' },
 }
 
 /** Liest dieser Quelltext die Adresse der Seite — `searchParams` (Seiten-Eigenschaft) oder `useSearchParams()`? */
@@ -128,6 +127,10 @@ describe('loading.tsx neben einer Seite mit Filtern in der Adresse (Regelvorschl
     const gefunden = new Set(ordnerMitLadebildUndAdresse(APP, WURZEL))
     const veraltet = Object.keys(AUSNAHMEN).filter((ordner) => !gefunden.has(ordner))
     expect(veraltet, `Veraltete Ausnahme (loading.tsx oder Adresse in der Seite fehlt): ${veraltet.join(', ')} — aus AUSNAHMEN nehmen.`).toEqual([])
+  })
+
+  it('der Bestand ist leer und bleibt es: Jede Ausnahme ist ein Wert in der Adresse, der beim Klicken nicht wechselt (Nr. 127)', () => {
+    expect(Object.entries(AUSNAHMEN).filter(([, a]) => a.art === 'bestand').map(([ordner]) => ordner)).toEqual([])
   })
 
   it('jede Ausnahme hat einen Grund, und die Ordner gibt es', () => {

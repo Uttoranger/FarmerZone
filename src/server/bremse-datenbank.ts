@@ -80,8 +80,12 @@ class BremseZeitlimit extends Error {
   }
 }
 
-/** Ein Versprechen mit Verfallszeit; der Timer wird in jedem Ausgang aufgeräumt. */
-function mitFrist<T>(arbeit: Promise<T>, ms: number): Promise<T> {
+/**
+ * Ein Versprechen mit Verfallszeit; der Timer wird in jedem Ausgang aufgeräumt.
+ * Exportiert für die Login-Bremse (src/server/auth-bremse.ts, Nr. 125): eine
+ * Zeitgrenze für alle Bremsen, keine zweite Kopie.
+ */
+export function mitFrist<T>(arbeit: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const ablauf = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new BremseZeitlimit()), ms)

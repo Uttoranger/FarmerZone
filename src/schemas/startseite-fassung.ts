@@ -9,6 +9,7 @@ import {
   UEBERZEILE_MAX,
   VORLAGEN,
   istRelativerLink,
+  istZusatzArt,
   pruefeReihenfolge,
   type AbschnittArt,
 } from '@/lib/startseite-gestalten'
@@ -34,8 +35,9 @@ import {
 
 const KENNUNG = z.string().min(1).max(40)
 
+/** Ein Standard-Abschnitt oder ein Zusatz-Abschnitt (Nr. 129: „Neu bei den Höfen“) — die Zahl regelt pruefeReihenfolge. */
 function istAbschnittArt(wert: unknown): wert is AbschnittArt {
-  return (STANDARD_REIHENFOLGE as readonly unknown[]).includes(wert)
+  return (STANDARD_REIHENFOLGE as readonly unknown[]).includes(wert) || istZusatzArt(wert)
 }
 
 /** Ein Zeitpunkt als ISO-Text (UTC, wie toISOString ihn schreibt). */

@@ -85,7 +85,7 @@ describe('Produktkarte', () => {
   const produkt = (teil: Partial<PublicProduct>): PublicProduct => ({
     id: 'p_eier', name: 'Freilandeier', description: null, imageUrl: null, bildAusschnitt: null, category: 'EIER', categoryImageUrl: '/categories/eier.webp',
     price: 4.5, unit: 'STUECK', unitSize: null, stock: 20, isAvailable: true, allergens: [], isOrganic: false, requiresCool: false, requiresFreezer: false,
-    seasonStart: null, seasonEnd: null, unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null, familieId: null, brennmaterial: null,
+    seasonStart: null, seasonEnd: null, unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null, familieId: null, brennmaterial: null, abholhinweise: [],
     ...teil,
   })
   const karte = (p: PublicProduct) =>

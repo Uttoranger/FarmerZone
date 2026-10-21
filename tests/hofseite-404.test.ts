@@ -87,6 +87,7 @@ import { ProduktSkelett } from '@/app/(public)/[farmSlug]/produkt/[id]/produkt-s
 import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
 import { FarmPageView } from '@/components/farm/farm-page-view'
 import { OEFFENTLICH_SICHTBAR, type PublicFarm, type PublicProduct } from '@/server/queries/farm'
+import { publicFarm } from './fabrik/public-farm'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
 import { findeElement, inhaltHinterSuspense } from './element-suche'
 
@@ -99,20 +100,13 @@ function produkt(id: string, teil: Partial<PublicProduct> = {}): PublicProduct {
     id, name: `Produkt ${id}`, description: null, imageUrl: null, bildAusschnitt: null, category: 'GEMUESE', categoryImageUrl: null,
     price: 4.5, unit: 'STUECK', unitSize: null, stock: 20, isAvailable: true, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
-    unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null, familieId: null, brennmaterial: null,
+    unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null, familieId: null, brennmaterial: null, abholhinweise: [],
     ...teil,
   }
 }
 
-const HOF: PublicFarm = {
-  id: 'farm_test', slug: 'hof-test', name: 'Hof Test', ownerName: 'Erika Muster',
-  description: 'Gemüse aus Musterdorf', address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf',
-  phone: TELEFON, email: 'hof@example.com', logoUrl: null, logoAusschnitt: null, bannerUrl: null,
-  tagline: null, foundedYear: null, aboutText: null, bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50, bannerAusschnitt: null,
-  sectionsConfig: [], farmValues: [], farmPhotos: [],
-  acceptsOnline: true, acceptsOnsite: true, stripeAccountReady: true, isPaused: false, pauseMessage: null,
-  serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: null, betriebsstatus: null,
-  gruendungshof: false, gruendungSeit: null, abzeichenBlatt: null, istTesthof: false,
+const HOF: PublicFarm = publicFarm({
+  phone: TELEFON, serviceFeeActiveFrom: null,
   products: [
     produkt('p_eier', { name: 'Freilandeier', category: 'EIER', price: 4.5, stock: 0 }),
     produkt('p_karotten', { name: 'Karotten', category: 'GEMUESE' }),
@@ -121,7 +115,7 @@ const HOF: PublicFarm = {
     produkt('p_aus', { name: 'Versteckt', category: 'MILCH', isAvailable: false }),
   ],
   pickupSlots: [],
-}
+})
 
 /** Ein öffentlicher Hof in der schlanken Abfrage: ohne Ausnahme, mit Produkten im Shop. */
 const OEFFENTLICH = { istTesthof: false, latitude: null, longitude: null, _count: { products: 4 } }

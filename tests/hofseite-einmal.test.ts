@@ -66,6 +66,7 @@ import { MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
 import { KundenansichtKnopf } from '@/components/mein-hof/kundenansicht-knopf'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
+import { publicFarm } from './fabrik/public-farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 
 const WURZEL = process.cwd()
@@ -151,6 +152,12 @@ function erlaubt(fund: Fund, text: string): boolean {
   // gelesen nur über vorschauParameterSchema — die Hofseite und ansichtsModus berührt er nicht.
   if (fund.pfad === 'src/server/startseite-vorschau.ts') {
     return fund.art === 'Adresse im Text' && imRumpf(code, 'function alsAbfrage(', fund.stelle)
+  }
+  // Die CSP zum Beobachten (Register G8, Nr. 125): `vorschau` steht in der Liste der Query-Werte, bei denen keine
+  // Meldung hinausgeht (der signierte Inhalt stünde sonst darin). Die Header-Regel liest den Wert nie — erlaubt nur
+  // als Eintrag von NIE_MELDEN_PARAMETER.
+  if (fund.pfad === 'src/lib/csp.ts' && fund.art === 'Literal') {
+    return /^export const NIE_MELDEN_PARAMETER = \[[^\]]*\] as const$/.test(zeileVon(code, fund.stelle))
   }
   // Die eine Ausnahme: die Breite der Vorschau-Spalte heißt `vorschau` (Ergebnis von editorSpalten, Nr. 73) —
   // eine Eigenschaft eines Ergebnisses, kein Parameter der Adresse. Nur im Editor und nur als `spalten.vorschau`.
@@ -317,23 +324,18 @@ function produkt(id: string, name: string, sichtbar: boolean): PublicProduct {
     price: 3.5, unit: 'kg', unitSize: 1, stock: 10, isAvailable: sichtbar, allergens: [],
     isOrganic: false, requiresCool: false, requiresFreezer: false, seasonStart: null, seasonEnd: null,
     unavailableReason: null, subcategory: null, labels: [], abgabe: 'ALLE', futter: null,
-    familieId: null, brennmaterial: null,
+    familieId: null, brennmaterial: null, abholhinweise: [],
   }
 }
 
 /** Ein Hof, an dem jedes Bearbeitungs-Element etwas zu tun hätte: pausiert, mit Status, Fotos und Produkten. */
-const HOF: PublicFarm = {
-  id: 'farm_test', slug: 'hof-test', name: 'Hof Test', ownerName: 'Erika Muster',
-  description: 'Gemüse aus Musterdorf', address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf',
-  phone: '+43 660 0000000', email: 'hof@example.com', logoUrl: null, logoAusschnitt: null, bannerUrl: null,
-  tagline: null, foundedYear: null, aboutText: null, bannerType: 'GRADIENT', bannerValue: null, bannerFocusY: 50, bannerAusschnitt: null,
-  sectionsConfig: [], farmValues: [], farmPhotos: [{ id: 'foto_1', url: '/foto.jpg', caption: null, sortOrder: 0, ausschnitt: null }],
-  acceptsOnline: false, acceptsOnsite: true, stripeAccountReady: false, isPaused: true, pauseMessage: null,
-  serviceFeePercent: 0, serviceFeeMinCents: 0, serviceFeeActiveFrom: null, betriebsstatus: null,
-  gruendungshof: false, gruendungSeit: null, abzeichenBlatt: null, istTesthof: false,
+const HOF: PublicFarm = publicFarm({
+  farmPhotos: [{ id: 'foto_1', url: '/foto.jpg', caption: null, sortOrder: 0, ausschnitt: null }],
+  acceptsOnline: false, stripeAccountReady: false, isPaused: true,
+  serviceFeePercent: 0, serviceFeeMinCents: 0, serviceFeeActiveFrom: null,
   products: [produkt('prod_1', 'Kartoffeln', true), produkt('prod_2', 'Zwiebeln', false)],
   pickupSlots: [{ dayOfWeek: 5, startTime: '15:00', endTime: '18:00' }],
-}
+})
 
 /** Derselbe Hof, offen — dort zählt, ob Kaufen wirkt. */
 const HOF_OFFEN: PublicFarm = { ...HOF, isPaused: false }

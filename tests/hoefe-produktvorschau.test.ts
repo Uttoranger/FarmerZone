@@ -21,6 +21,7 @@ function p(teil: Partial<VorschauProdukt> & { id: string }): VorschauProdukt {
     imageUrl: null,
     bildAusschnitt: null,
     category: null,
+    subcategory: null,
     verfuegbar: true,
     ...teil,
   }

@@ -104,7 +104,7 @@ vi.mock('react', async (importOriginal) => ({
 }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), addBreadcrumb: vi.fn() }))
 
-import { STANDARD_REIHENFOLGE, verschiebe } from '@/lib/startseite-gestalten'
+import { NEUER_ABSCHNITT, STANDARD_REIHENFOLGE, verschiebe } from '@/lib/startseite-gestalten'
 import { aenderungenText, standardFassung } from '@/lib/startseite-fassung'
 import type { StartseiteSpeichernEingabe } from '@/schemas/startseite'
 import { neueBlockWerte, useStartseitenEntwurf, type Zeile } from '@/components/admin/startseite-entwurf'
@@ -119,7 +119,7 @@ let zuletzt: Ergebnis
 const speichere = vi.fn<(eingabe: StartseiteSpeichernEingabe) => Promise<Antwort>>()
 
 function gespeichert(teil: Partial<Extract<Antwort, { ok: true }>> = {}): Antwort {
-  return { ok: true, blockId: null, zeilenId: null, gespeichertAm: '2026-10-15T18:41:00.000Z', ...teil }
+  return { ok: true, blockId: null, zeilenId: null, neueAbschnitte: {}, gespeichertAm: '2026-10-15T18:41:00.000Z', ...teil }
 }
 
 /** Eine Handlung von außen, danach rendern wie React. */
@@ -207,6 +207,24 @@ describe('useStartseitenEntwurf', () => {
     expect(zweite.filter((r) => !r.sichtbar).map((r) => r.id)).toEqual(['z-futter', 'z-brennmaterial', 'z-fragen'])
     await warte(5_000)
     expect(speichere).toHaveBeenCalledTimes(2)
+  })
+
+  it('„Neu bei den Höfen“ hinzufügen (Nr. 129): geht mit der nächsten Speicherung hinaus und trägt danach die Kennung seiner Zeile', async () => {
+    speichere.mockResolvedValueOnce(gespeichert({ neueAbschnitte: { [NEUER_ABSCHNITT.NEUIGKEITEN]: 'zeile-neuigkeiten' } }))
+    const neu: Zeile = { id: NEUER_ABSCHNITT.NEUIGKEITEN, art: 'NEUIGKEITEN', sichtbar: true, block: null }
+    tue((e) => e.aendereZeilen([e.zeilen[0], e.zeilen[1], neu, ...e.zeilen.slice(2)]))
+    expect(zuletzt.aenderungen[0]).toMatchObject({ art: 'neu', titel: 'Neu bei den Höfen' })
+
+    await warte(800)
+    expect(speichere.mock.calls[0]?.[0].reihenfolge.map((r) => r.id)).toContain(NEUER_ABSCHNITT.NEUIGKEITEN)
+    expect(zuletzt.zeilen[2]).toMatchObject({ id: 'zeile-neuigkeiten', art: 'NEUIGKEITEN' })
+
+    // Die nächste Speicherung nennt die Zeile mit ihrer Kennung — der Server legte sonst keine zweite an, sondern wiese ab.
+    tue((e) => e.aendereZeilen(augeAn('NEUIGKEITEN', e)))
+    await warte(800)
+    const zweite = speichere.mock.calls[1]?.[0].reihenfolge ?? []
+    expect(zweite.map((r) => r.id)).not.toContain(NEUER_ABSCHNITT.NEUIGKEITEN)
+    expect(zweite.find((r) => r.id === 'zeile-neuigkeiten')).toEqual({ id: 'zeile-neuigkeiten', sichtbar: false })
   })
 
   it('gibt einem neuen Block nach der ersten Speicherung seine Kennung', async () => {

@@ -13,7 +13,9 @@
  *  - Gegenprobe: die alte Zeile aus lebenszeichen.yml schlägt an, ebenso „ #“ und die Form `- run:`;
  *    der Wert in einfachen Anführungszeichen (die echte Zeile der Datei), ein `run: |`-Block und ein Befehl
  *    ohne Doppelpunkt nicht.
- * Grenze: Geprüft wird nur die Zeile mit `run:` und Wert — so schreiben wir Workflows. Ein Wert erst in der
+ * Seit Nr. 127 liest ein echter YAML-Parser (`tests/yaml-lader.ts`) jede Datei vollständig: ungültiges YAML,
+ * auch dort, wo die Zeilenprüfung nichts sieht (Folgezeilen, Kurzformen), macht den Test rot.
+ * Grenze der Zeilenprüfung: Geprüft wird nur die Zeile mit `run:` und Wert — so schreiben wir Workflows. Ein Wert erst in der
  * nächsten Zeile, Folgezeilen eines mehrzeiligen ungeschützten Werts und die Kurzform `- { run: … }` sieht
  * die Wache nicht (heute in keinem Workflow); dafür bräuchte es einen YAML-Parser.
  */
@@ -21,6 +23,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { PRODUKTION_HOST } from '@/lib/umgebung'
+import { leseYaml } from './yaml-lader'
 
 const ORDNER = '.github/workflows'
 
@@ -92,5 +95,31 @@ describe('Workflows – Gegenproben', () => {
 
   it('Kommentare, die von run: erzählen, schlagen nicht an', () => {
     expect(pruefeRunZeilen('x.yml', '# Das Secret steht nur unter env:, nie direkt in der run:-Zeile.')).toEqual([])
+  })
+})
+
+describe('Workflows – jede Datei ist gültiges YAML (Parser, Nr. 127)', () => {
+  it('der Parser liest jede Datei in .github/workflows/ ohne Fehler und findet einen Namen und Jobs', () => {
+    for (const name of DATEIEN) {
+      const text = readFileSync(join(process.cwd(), ORDNER, name), 'utf8')
+      const dokument = leseYaml(text) as { name?: unknown; jobs?: unknown } | null
+      expect(dokument, name).not.toBeNull()
+      expect(typeof dokument?.name, `${name}: name`).toBe('string')
+      expect(Object.keys((dokument?.jobs ?? {}) as object).length, `${name}: jobs`).toBeGreaterThan(0)
+    }
+  })
+
+  it('Gegenprobe: die alte Zeile aus lebenszeichen.yml (ungeschützter Doppelpunkt) bricht den Parser', () => {
+    const BEFEHL = `curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" https://${PRODUKTION_HOST}/api/lebenszeichen`
+    const alt = ['name: Attrappe', 'jobs:', '  a:', '    runs-on: ubuntu-latest', '    steps:', `      - run: ${BEFEHL}`].join('\n')
+    // Der Parser nennt die Zeile des Fehlers (Zeile 6 = die run-Zeile).
+    expect(() => leseYaml(alt)).toThrow(/\(6:\d+\)/)
+    // Derselbe Befehl in einfachen Anführungszeichen ist gültig.
+    expect(() => leseYaml(alt.replace(`run: ${BEFEHL}`, `run: '${BEFEHL}'`))).not.toThrow()
+  })
+
+  it('Gegenprobe: „ #“ im ungeschützten Wert schneidet still ab — der Parser liest nur den Anfang', () => {
+    const dokument = leseYaml('run: pnpm test # alle Tests') as { run: string }
+    expect(dokument.run).toBe('pnpm test')
   })
 })

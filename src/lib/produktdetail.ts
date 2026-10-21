@@ -244,9 +244,12 @@ export function groessenKacheln(familie: readonly DetailProdukt[], isPaused: boo
 // ─── Schild (E9) ────────────────────────────────────────────────────────────
 
 /**
- * Das Schild unter einem Futtermittel: „Futtermittelbetrieb · LFBIS <Nummer>"
- * (E9). Die Plattform prüft die Nummer nicht — der Hof bestätigt sie selbst,
- * das Schild erscheint sofort, ohne „geprüft". Nur, wenn der Hof als
+ * Das Schild unter einem Futtermittel: „Futtermittelbetrieb · LFBIS <Nummer>
+ * · laut Hof" (E9, Ergänzung 20.10.2026, Nr. 123). Die Plattform prüft die
+ * Nummer nicht — der Hof gibt sie selbst an, das Schild erscheint sofort, ohne
+ * „geprüft"; „laut Hof" sagt das im Schild selbst, wie schon „(laut Angabe
+ * des Hofs)" in der Kennzeichnung. Gezeichnet nur von `FutterSchild`
+ * (neutral, ohne Haken). Nur, wenn der Hof als
  * Primärproduktion eingetragen ist: Nur dann ist die Nummer eine LFBIS-Nummer
  * (BETRIEBSSTATUS in taxonomie.ts). Registrierte und zugelassene Betriebe
  * haben eine andere Nummer — deren Wortlaut ist nicht entschieden, also kein
@@ -260,7 +263,7 @@ export function futterSchild(
   // Höfe tippen die Nummer oft samt Kürzel ein („LFBIS 1234567") — das Kürzel steht schon im Wortlaut.
   const nummer = p.futter?.betriebsnummer?.trim().replace(/^LFBIS[\s:.-]*/i, '')
   if (!nummer || betriebsstatus !== 'PRIMAERPRODUKTION') return null
-  return `Futtermittelbetrieb · LFBIS ${nummer}`
+  return `Futtermittelbetrieb · LFBIS ${nummer} · laut Hof`
 }
 
 // ─── Gleich mit abholen ─────────────────────────────────────────────────────

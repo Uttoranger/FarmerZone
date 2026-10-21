@@ -1,7 +1,7 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { Prisma } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -11,6 +11,8 @@ import { generateUnsubscribeToken } from '@/lib/unsubscribe'
 import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
 import * as Sentry from '@sentry/nextjs'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
+import { NEUIGKEITEN_CACHE_TAG } from '@/lib/startseite-gestalten'
 import {
   BEITRAG_FELDER_MIT_SATZ,
   BEITRAG_PRODUKT_FREMD,
@@ -61,6 +63,17 @@ function meldeFehler(schritt: Schritt, err: unknown): void {
 function baueBeitragsSeitenNeu(slug: string): void {
   revalidatePath('/farm-page')
   revalidatePath(`/${slug}`)
+}
+
+/**
+ * Die Marke an der Hofkarte (/hoefe, N22) und „Neu bei den Höfen“ (Startseite,
+ * N16) sind zwischengespeichert (Nr. 129): Veröffentlichen, Deaktivieren und
+ * Löschen leeren beide Einträge, damit die Marke ohne Warten kommt bzw. geht.
+ * updateTag statt revalidateTag: In Next 16 verlangt revalidateTag ein Profil.
+ */
+function erneuereListen(): void {
+  updateTag(HOEFE_CACHE_TAG)
+  updateTag(NEUIGKEITEN_CACHE_TAG)
 }
 
 export async function publishStatusPost(
@@ -164,6 +177,9 @@ export async function publishStatusPost(
             body: personalBody,
             anlass: data.anlass,
             photoUrl: data.photoUrl,
+            // Der Knopf führt zu genau diesem Beitrag (T5) — nur, wenn er auf der
+            // Hofseite steht; sonst sagte die Seite „nicht mehr aktuell“.
+            beitragId: data.showOnFarmPage ? post.id : undefined,
             abmeldeToken: generateUnsubscribeToken(sub.customerEmail, farm.id),
           })
         }
@@ -175,6 +191,7 @@ export async function publishStatusPost(
     // Revalidate public farm page (ISR bust)
     const farmSlug = await prisma.farm.findUnique({ where: { id: farm.id }, select: { slug: true } })
     if (farmSlug) revalidatePath(`/${farmSlug.slug}`)
+    erneuereListen()
 
     return { postId: post.id, emailCount: emailSubscribers.length }
   } catch (err) {
@@ -258,6 +275,7 @@ export async function expireStatusPost(postId: string): Promise<{ error?: string
     if (count === 0) return { error: BEITRAG_WEG }
     // Der Beitrag verschwindet auch von der öffentlichen Hofseite (Hinweis 22e).
     baueBeitragsSeitenNeu(farm.slug)
+    erneuereListen()
     return {}
   } catch (err) {
     meldeFehler('deaktivieren', err)
@@ -275,6 +293,7 @@ export async function deleteStatusPost(postId: string): Promise<{ error?: string
     const { count } = await prisma.statusPost.deleteMany({ where: { id: id.data, farmId: farm.id } })
     if (count === 0) return { error: BEITRAG_WEG }
     baueBeitragsSeitenNeu(farm.slug)
+    erneuereListen()
     return {}
   } catch (err) {
     meldeFehler('loeschen', err)

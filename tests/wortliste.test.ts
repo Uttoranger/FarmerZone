@@ -190,7 +190,7 @@ const AUSNAHMEN: Ausnahme[] = [
   // Mitteilung (Register N12)
   { datei: 'src/app/(hof)/status/new/status-new-client.tsx', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach' },
   { datei: 'src/app/api/status-image/[id]/route.tsx', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach' },
-  { datei: 'src/components/hofseite/hofseite-kunde.tsx', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach' },
+  { datei: 'src/lib/beitrag-anlass.ts', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach — seit Nr. 128 an einer Stelle (BEITRAG_ANLASS)' },
   { datei: 'src/emails/status-update.tsx', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach' },
   { datei: 'src/lib/teilen-bild.ts', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach' },
   // Newsletter (Register N12)

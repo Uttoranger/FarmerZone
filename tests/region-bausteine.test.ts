@@ -99,7 +99,7 @@ const HOF: KurzkartenHof = {
   entfernungKm: 6.2,
 }
 const produkt = (id: string, name: string): VorschauProdukt => ({
-  id, name, price: 4.2, unit: 'STUECK', unitSize: null, imageUrl: null, bildAusschnitt: null, category: 'EIER', verfuegbar: true,
+  id, name, price: 4.2, unit: 'STUECK', unitSize: null, imageUrl: null, bildAusschnitt: null, category: 'EIER', subcategory: null, verfuegbar: true,
 })
 
 describe('HofKurzkarte — die kurze Hofkarte am Pin in zwei Arten', () => {
@@ -325,7 +325,8 @@ describe('Die Seite in zwei Teilen', () => {
     expect(seite).not.toMatch(/getUmfeld|getFutterKaufen/)
     // Seit Nr. 124 lädt Preise vergleichen immer bis 50 km (Zahl je Stufe, N23); den Umkreis schneidet src/lib/umfeld.ts.
     expect(quelle('src/app/(hof)/region/preise-reiter.tsx')).toContain('getUmfeld(farm.id)')
-    expect(quelle('src/app/(hof)/region/futter-reiter.tsx')).toContain('getFutterKaufen(farm.id, filter.km)')
+    // Seit Nr. 123 lädt Futter kaufen einmal 50 km und filtert in der reinen Funktion (N23).
+    expect(quelle('src/app/(hof)/region/futter-reiter.tsx')).toContain('getFutterKaufen(farm.id, jetzt)')
   })
 
   it('beide Reiter nennen Höfe ohne Standort mit demselben Satz', () => {

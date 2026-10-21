@@ -1,4 +1,4 @@
-import MeinHofLaden from '../../farm-page/loading'
+import { MeinHofLaden } from '@/components/mein-hof/mein-hof-laden'
 
 /**
  * /settings/appearance leitet seit Nr. 50 in Mein Hof um (Register N4).

@@ -175,7 +175,8 @@ describe('Liste „Bearbeiten"', () => {
   it('jede Zeile genau einmal, in der Reihenfolge der Hofseite', () => {
     const ids = [...liste().matchAll(/data-bearbeiten-zeile="([a-z-]+)"/g)].map((m) => m[1])
     expect(ids).toEqual(HOFSEITE_REIHENFOLGE)
-    expect(ids.toSorted()).toEqual(hofseiteZeileIdSchema.options.toSorted())
+    // Ohne `aktuell` (Nr. 129): Die erste Zeile „Aktuell vom Hof“ kommt nur mit Angabe (Test unten).
+    expect(ids.toSorted()).toEqual(hofseiteZeileIdSchema.options.filter((id) => id !== 'aktuell').toSorted())
   })
 
   it('jede Zeile zeigt ihren Stand und „Bearbeiten" — der Knopf nennt die Zeile', () => {
@@ -212,10 +213,12 @@ describe('Liste „Bearbeiten"', () => {
 })
 
 describe('Bausteine im Blatt und im Editor', () => {
-  const FORMULARE = hofseiteZeileIdSchema.options.filter((id) => !SOFORT_GESPEICHERT.has(id))
+  // `aktuell` (Nr. 129) markiert nur die Vorschau und hat keinen Baustein — verwaltet wird unter Mein Hof › Beiträge.
+  const BAUSTEIN_ZEILEN = hofseiteZeileIdSchema.options.filter((id) => id !== 'aktuell')
+  const FORMULARE = BAUSTEIN_ZEILEN.filter((id) => !SOFORT_GESPEICHERT.has(id))
 
   it('jede Zeile hat ihren Baustein — in beiden Darstellungen', () => {
-    for (const id of hofseiteZeileIdSchema.options) {
+    for (const id of BAUSTEIN_ZEILEN) {
       for (const darstellung of ['zeile', 'blatt'] as const) {
         expect(inhalt(id, darstellung), `${id} ${darstellung}`).toContain('data-app-palette="neu"')
       }
@@ -355,5 +358,17 @@ describe('Titelbild — das kleine Logo der Browser-Vorschau (Nr. 108, Runde 1)'
     const element = titelbild({ ...AUFTRITT, logoUrl: '/logo.jpg' })
     expect(element).not.toBeNull()
     expect(element?.props).toHaveProperty('logoAusschnitt', null)
+  })
+})
+
+describe('„Aktuell vom Hof“ unter lg (Register E12, Nr. 129, Runde 1)', () => {
+  it('erste Zeile der Liste mit Titel, „läuft noch …“ und „Beiträge ›“; ohne Angabe keine Zeile', () => {
+    const html = renderToStaticMarkup(
+      createElement(AbschnitteListe, { fortschritt: hofseiteFortschritt(STAND), hof: HOF, einstellungen: EINSTELLUNGEN, auftritt: AUFTRITT, aktuell: { titel: 'Aktuell vom Hof', wert: 'Die ersten Kürbisse sind da · läuft noch 6 Tage', link: { text: 'Beiträge', href: '/farm-page?reiter=beitraege' } } })
+    )
+    expect(html.indexOf('data-bearbeiten-zeile="aktuell"')).toBeLessThan(html.indexOf('data-bearbeiten-zeile="titelbild"'))
+    expect(html).toContain('Die ersten Kürbisse sind da · läuft noch 6 Tage')
+    expect(html).toMatch(/<a [^>]*href="\/farm-page\?reiter=beitraege"/)
+    expect(liste()).not.toContain('data-bearbeiten-zeile="aktuell"')
   })
 })

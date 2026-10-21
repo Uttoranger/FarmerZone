@@ -90,6 +90,14 @@ export function pinZustand(slug: string, lage: AuswahlLage): PinZustand {
   return 'normal'
 }
 
+/**
+ * Das Grün der Pins, ihres Umkreises und ihres Fokusrings — EINE Zahl (Nr. 127).
+ * Es ist das Karten-Grün auf den hellen Kacheln und folgt dem Modus bewusst nicht
+ * (siehe pinDarstellung). Das Grün der Foto-Knöpfe im Kopf und des Teilen-Bilds
+ * meint die Markenfarbe, nicht diese Karten-Farbe; sie nehmen nicht diese Konstante.
+ */
+export const PIN_GRUEN = '#2D5F3F'
+
 export type PinDarstellung = {
   groesse: number
   hintergrund: string
@@ -109,12 +117,12 @@ export type PinDarstellung = {
  */
 export function pinDarstellung(zustand: PinZustand): PinDarstellung {
   if (zustand === 'ausgewaehlt') {
-    return { groesse: 34, hintergrund: '#2D5F3F', schrift: '#FFFFFF', rand: '#FFFFFF' }
+    return { groesse: 34, hintergrund: PIN_GRUEN, schrift: '#FFFFFF', rand: '#FFFFFF' }
   }
   if (zustand === 'hervorgehoben') {
-    return { groesse: 31, hintergrund: '#E8F0E2', schrift: '#1F4630', rand: '#2D5F3F' }
+    return { groesse: 31, hintergrund: '#E8F0E2', schrift: '#1F4630', rand: PIN_GRUEN }
   }
-  return { groesse: 28, hintergrund: '#FFFFFF', schrift: '#2D5F3F', rand: '#2D5F3F' }
+  return { groesse: 28, hintergrund: '#FFFFFF', schrift: PIN_GRUEN, rand: PIN_GRUEN }
 }
 
 /**
@@ -133,7 +141,7 @@ export const EIGENER_PIN = {
 } as const
 
 /** Der Umkreis um den eigenen Hof: gestrichelt im Hof-Grün, kaum Fläche. */
-export const UMKREIS_KREIS = { rand: '#2D5F3F', flaeche: '#2D5F3F', flaechenDeckung: 0.06 } as const
+export const UMKREIS_KREIS = { rand: PIN_GRUEN, flaeche: PIN_GRUEN, flaechenDeckung: 0.06 } as const
 
 // ─── Karussell-Snap ─────────────────────────────────────────────────────────
 
@@ -236,7 +244,9 @@ export function pinBeschriftung(pin: Pick<PinPunkt, 'nummer' | 'name'>): string 
 /**
  * Der Fokusring eines Pins (Tab): ein Ring innerhalb der Trefferfläche, im
  * Hof-Grün der Pins — er sitzt auf den hellen Kacheln und folgt dem Modus
- * nicht (wie die Pins selbst, siehe pinDarstellung).
+ * nicht (wie die Pins selbst, siehe pinDarstellung). Das Grün steht hier als
+ * Literal, weil Tailwind Klassen nur als ganzen Text liest; es ist PIN_GRUEN
+ * (tests/hoefe-anzeige.test.ts hält die Gleichheit fest).
  */
 export const PIN_FOKUS =
   'outline-none focus-visible:outline-3 focus-visible:outline-solid focus-visible:-outline-offset-[6px] focus-visible:outline-[#2D5F3F]'

@@ -220,7 +220,7 @@ describe('Routen in der HofShell', () => {
     const seite = quelle('src/app/(hof)/settings/appearance/page.tsx')
     expect(seite).toMatch(/redirect\(EINSTELLUNG_MEIN_AUFTRITT\.href\)/)
     expect(seite).not.toMatch(/permanentRedirect\(/)
-    expect(quelle('src/app/(hof)/settings/appearance/loading.tsx')).toContain("from '../../farm-page/loading'")
+    expect(quelle('src/app/(hof)/settings/appearance/loading.tsx')).toContain("from '@/components/mein-hof/mein-hof-laden'")
   })
 })
 

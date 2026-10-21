@@ -221,7 +221,6 @@ export function HoefeClient({
     gefiltert,
     vorschlaege,
     suchbegriffe,
-    sucheAktiv,
     sucheLeertDieListe,
     abholungLeertDieListe,
     abholBasis,
@@ -325,8 +324,6 @@ export function HoefeClient({
     if (el) eintraege.current.set(slug, el)
     else eintraege.current.delete(slug)
   }
-
-  const statusText = sucheAktiv ? (anzahl === 0 ? leer.titel + '.' : `${zahlText} gefunden.`) : ''
 
   const umkreisSegment = bezugspunkt && (
     <Segment
@@ -541,7 +538,6 @@ export function HoefeClient({
       kompakt={kompakt}
       suchtext={filter.suchtext}
       vorschlaege={vorschlaege}
-      status={statusText}
       bezugspunkt={bezugspunkt}
       ankunftsText={ankunftsText ?? ''}
       onSuchtext={(wert) => setzeFilter({ suchtext: wert })}

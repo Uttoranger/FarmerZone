@@ -14,6 +14,8 @@ import type { UserRole } from '@prisma/client'
 import { ADMIN_POSTFACH_HREF } from '@/lib/postfach'
 import { BRIEFKASTEN_HREF } from '@/lib/admin-briefkasten'
 import { ADMIN_BETRIEB_HREF } from '@/lib/betrieb'
+import { ABMELDEN_LABEL } from '@/lib/bauern-navigation'
+import { ADMIN_PFAD } from '@/lib/admin-anmeldung'
 
 export type AdminReiterId = 'hoefe' | 'postfach' | 'startseite' | 'finanzen' | 'betrieb' | 'einstellungen'
 
@@ -50,6 +52,13 @@ export const ADMIN_ZURUECK = { label: 'Zu meinem Hof', kurz: 'Mein Hof', href: '
 
 /** Die Initialen-Plakette rechts im Kopf führt zu „Konto und Sicherheit" (Passwort, Darstellung, Hof stilllegen). */
 export const ADMIN_KONTO = { label: 'Konto und Sicherheit', href: '/settings/account' } as const
+
+/**
+ * „Abmelden" im Kopf der AdminShell (Register N20, Nr. 126): dasselbe Wort wie
+ * in der HofShell, aber das Ziel danach ist die Anmeldung der Admins — mit
+ * Passkey —, nicht /login (dort gibt es für dieses Konto kein Passwort mehr).
+ */
+export const ADMIN_ABMELDEN = { label: ABMELDEN_LABEL, ziel: ADMIN_PFAD.anmelden } as const
 
 /**
  * Ob der Kopf des Admins Wege in den Hofbereich zeigt: „← Mein Hof" und die

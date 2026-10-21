@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { notFound, unstable_rethrow } from 'next/navigation'
 import type { Metadata } from 'next'
 import * as Sentry from '@sentry/nextjs'
-import { getActiveStatusPosts, type ActiveStatusPost } from '@/server/queries/status-posts'
+import { getActiveStatusPosts, ladeAktivenBeitrag, type ActiveStatusPost } from '@/server/queries/status-posts'
 import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
 import { pruefeHofseiteGeteilt, type HofSeo } from '@/server/queries/seo'
 import { verifyReorderToken } from '@/lib/reorder-token'
@@ -18,6 +18,7 @@ import { ladeTeilenVorschau } from '@/server/queries/teilen-bild'
 import type { Suchparameter } from '@/lib/ansichts-modus'
 import type { PublicFarm } from '@/server/queries/farm'
 import { nachbestellToken } from '@/schemas/nachbestellung'
+import { BEITRAG_PARAMETER, beitragKennungSchema } from '@/schemas/hofseite-reiter'
 import { FarmPageView } from '@/components/farm/farm-page-view'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { StartseiteFuss } from '@/components/startseite/startseite-abschnitte'
@@ -137,15 +138,21 @@ async function loadReorderItems(token: string, farmId: string): Promise<ReorderI
 }
 
 /**
- * Die aktiven Beiträge des Hofs (Register F8: höchstens fünf, der neueste
- * zuerst). Scheitert das Laden, fehlt nur der Reiter „Beiträge" — die Seite mit
- * Produkten und Korb bleibt (Fehler inline statt der 500 für alles); der Fehler
- * geht nach Sentry. Die Vorschau im Bauern-Bereich ist dieselbe Route
- * (?vorschau=1) und bekommt deshalb dieselbe Liste.
+ * Die aktiven Beiträge des Hofs für „Aktuell vom Hof“ (Register F8: höchstens
+ * fünf, der neueste zuerst). Trägt die Adresse `?beitrag=<id>` (geprüft) und
+ * ist der Beitrag nicht unter den fünf, kommt er — nur wenn er aktiv ist und
+ * GENAU diesem Hof gehört (ladeAktivenBeitrag) — hinten dazu; die Seite stellt
+ * ihn oben hin (ordneBeitraege). Scheitert das Laden, fehlt nur der Abschnitt —
+ * die Seite mit Produkten und Korb bleibt (Fehler inline statt der 500 für
+ * alles); der Fehler geht nach Sentry. Die Vorschau im Bauern-Bereich ist
+ * dieselbe Route (?vorschau=1) und bekommt deshalb dieselbe Liste.
  */
-async function ladeBeitraege(farmId: string): Promise<ActiveStatusPost[]> {
+async function ladeBeitraege(farmId: string, kennung: string | null): Promise<ActiveStatusPost[]> {
   try {
-    return await getActiveStatusPosts(farmId, HOFSEITE_BEITRAEGE_MAX)
+    const neueste = await getActiveStatusPosts(farmId, HOFSEITE_BEITRAEGE_MAX)
+    if (kennung === null || neueste.some((beitrag) => beitrag.id === kennung)) return neueste
+    const geteilt = await ladeAktivenBeitrag(farmId, kennung)
+    return geteilt ? [...neueste, geteilt] : neueste
   } catch (err) {
     unstable_rethrow(err)
     Sentry.captureException(err, { tags: { bereich: 'hofseite-beitrag' } })
@@ -176,7 +183,8 @@ async function Hofseite({ farmSlug, suche, geo }: { farmSlug: string; suche: Suc
   // 404-Ansicht kommt dann hinter dem Skelett, mit Status 200 und noindex.
   if (!farm) notFound()
 
-  const beitraege = await ladeBeitraege(farm.id)
+  // `?beitrag=` ist eine Systemgrenze: Was nicht passt, wird verworfen (Zod).
+  const beitraege = await ladeBeitraege(farm.id, beitragKennungSchema.parse(suche[BEITRAG_PARAMETER]))
   // Wo Kaufen nicht wirkt (Vorschau), gibt es keinen Korb — also auch nichts,
   // was ein Nachbestell-Link hineinlegen dürfte (korbErlaubt, src/lib/hofseite-vorschau.ts).
   const reorder = nachbestellToken(suche.reorder)

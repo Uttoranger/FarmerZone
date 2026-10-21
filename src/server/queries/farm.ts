@@ -5,6 +5,7 @@ import { hofAdresse, hofZustand, titelbildFoto, type HofZustand } from '@/lib/me
 import { APP_URL } from '@/lib/umgebung-server'
 import { categoryImagePath } from '@/lib/product-image'
 import { zuProduktDto } from '@/lib/produkt-dto'
+import type { AbholhinweisValue } from '@/lib/abholhinweise'
 import { DEFAULT_SECTIONS, type SectionConfig } from './appearance'
 import { leseAusschnitt, type BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { PRODUCT_ORDER_BY } from './products'
@@ -23,14 +24,17 @@ import type {
 import { baueAngebotsZeile, fasseAngebotZusammen, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
 import { anzeigeBereichVon, betriebsnummerFuerAnzeige, type AnzeigeBereich } from '@/lib/taxonomie'
 import {
+  NEUER_BEITRAG_TAGE,
   baueFotostreifen,
   naechsteAbholung,
   wienJetzt,
   type AbholFenster,
   type NaechsteAbholung,
+  type NeuerBeitrag,
   type OrtsZeit,
   type VorschauProdukt,
 } from '@/lib/hofuebersicht'
+import { AKTIVER_BEITRAG, NEUESTER_BEITRAG_ZUERST } from './status-posts'
 
 export type PublicProduct = {
   id: string
@@ -66,6 +70,8 @@ export type PublicProduct = {
   familieId: string | null
   /** Seit Nr. 11 (E11): Angaben zu Brennmaterial, null ohne. */
   brennmaterial: PublicBrennmaterial | null
+  /** Seit Nr. 123 (N23): Abholhinweise eines Futters für die Produktseite; sonst leer. */
+  abholhinweise: AbholhinweisValue[]
 }
 
 /**
@@ -299,6 +305,8 @@ const OEFFENTLICHES_PRODUKT_SELECT = {
   },
   // Seit Nr. 11: Produktfamilie (E3) und Brennmaterial (E11) für die Produktseite.
   familieId: true,
+  // Seit Nr. 123: Abholhinweise eines Futters für die Produktseite (N23).
+  abholhinweise: true,
   brennmaterial: {
     select: {
       holzart: true,
@@ -733,6 +741,29 @@ export type HofUebersichtEintrag = {
   fotos: string[]
   /** Abzeichen „Gründungshof“ (Register K2, Nr. 116) — nur Ja/Nein, nie die Nummer. */
   gruendungshof: boolean
+  /** Der neueste aktive Beitrag, höchstens sieben Tage alt (Register N22, Ergänzung Nr. 129) — die Marke „Neu · vor …“ an der Hofkarte; null ohne. */
+  neuerBeitrag: NeuerBeitrag | null
+}
+
+/**
+ * Der neueste aktive Beitrag (AKTIVER_BEITRAG) eines Hofs, höchstens
+ * NEUER_BEITRAG_TAGE alt — als Einbindung der Hof-Abfrage der Hofliste (kein
+ * N+1, keine zweite Abfrage). Nur Titel und Zeitpunkte, kein Text.
+ */
+function neuerBeitragEinbindung(jetzt: Date) {
+  return {
+    where: { AND: [AKTIVER_BEITRAG(jetzt), { publishedAt: { gte: new Date(jetzt.getTime() - NEUER_BEITRAG_TAGE * 24 * 60 * 60_000) } }] },
+    orderBy: NEUESTER_BEITRAG_ZUERST,
+    take: 1,
+    select: { title: true, publishedAt: true, expiresAt: true },
+  } satisfies Prisma.Farm$statusPostsArgs
+}
+
+type NeuerBeitragRoh = { title: string; publishedAt: Date | null; expiresAt: Date | null }
+
+function alsNeuerBeitrag(roh: NeuerBeitragRoh | undefined): NeuerBeitrag | null {
+  if (!roh?.publishedAt) return null
+  return { titel: roh.title, veroeffentlicht: roh.publishedAt.toISOString(), endet: roh.expiresAt?.toISOString() ?? null }
 }
 
 /** Die schmalen Zeilen ALLER verfügbaren Produkte — Inhalt der Abfrage `zeilenJeHof` in getOeffentlicheHoefe (seit Nr. 122 benannt, damit Region den eigenen Eintrag genau so baut). */
@@ -809,6 +840,8 @@ export const UEBERSICHT_HOF_SELECT = {
       stock: true,
       reservedStock: true,
       category: true,
+      // Nr. 127: Ohne Foto zeigt die Produktzeile die Illustration der Unterkategorie (illustrationPfad).
+      subcategory: true,
       imageUrl: true,
       bildAusschnitt: true,
     },
@@ -831,7 +864,8 @@ type UebersichtHof = Prisma.FarmGetPayload<{ select: typeof UEBERSICHT_HOF_SELEC
  * den eigenen Eintrag damit genau so wie /hoefe (src/server/queries/region.ts).
  */
 export function baueHofUebersicht(
-  hoefe: readonly UebersichtHof[],
+  // statusPosts nur aus getOeffentlicheHoefe (neuerBeitragEinbindung); ohne sie kein neuer Beitrag.
+  hoefe: readonly (UebersichtHof & { statusPosts?: NeuerBeitragRoh[] })[],
   schmaleZeilen: readonly UebersichtZeile[],
   jetzt: OrtsZeit
 ): HofUebersichtEintrag[] {
@@ -917,6 +951,7 @@ export function baueHofUebersicht(
         imageUrl: p.imageUrl,
         bildAusschnitt: leseAusschnitt(p.bildAusschnitt),
         category: p.category,
+        subcategory: p.subcategory,
         // „Verfügbar" heißt: Es ist noch etwas da, das nicht schon reserviert
         // ist. Siehe VORSCHAU-VERFÜGBARKEIT im Kopf dieser Datei.
         verfuegbar: p.stock - p.reservedStock > 0,
@@ -936,6 +971,7 @@ export function baueHofUebersicht(
         produktFotos: produktFotosJeHof.get(hof.id) ?? [],
       }),
       gruendungshof: zeigtAbzeichen(hof),
+      neuerBeitrag: alsNeuerBeitrag(hof.statusPosts?.[0]),
     }
   })
 }
@@ -949,7 +985,9 @@ export function baueHofUebersicht(
  * (src/lib/hofuebersicht.ts).
  */
 export async function getOeffentlicheHoefe(
-  jetzt: OrtsZeit = wienJetzt()
+  jetzt: OrtsZeit = wienJetzt(),
+  // Für den neuen Beitrag (Nr. 129): Die Frist von AKTIVER_BEITRAG gilt beim Lesen.
+  zeitpunkt: Date = new Date()
 ): Promise<HofUebersichtEintrag[]> {
   // Läuft PARALLEL zur Hauptabfrage — sie hängt nicht von deren Ergebnis ab,
   // und /hoefe cacht das Ergebnis fünf Minuten (unstable_cache in der Seite):
@@ -974,7 +1012,7 @@ export async function getOeffentlicheHoefe(
     // Freischalt-Reihenfolge, die ältesten zuerst — stabil und fair, ohne
     // eine Rangfrage zu eröffnen, die diese Fassung nicht beantworten will.
     orderBy: { approvedAt: 'asc' },
-    select: UEBERSICHT_HOF_SELECT,
+    select: { ...UEBERSICHT_HOF_SELECT, statusPosts: neuerBeitragEinbindung(zeitpunkt) },
   })
 
   return baueHofUebersicht(hoefe, await zeilenJeHof, jetzt)
