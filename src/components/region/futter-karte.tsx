@@ -69,7 +69,8 @@ export function FutterKarte({ angebot, jetzt }: { angebot: FutterAngebot; jetzt:
         <GroessenRadios angebot={angebot} gewaehlt={groesse.id} onWahl={setGewaehlt} />
       ) : (
         <p className="text-[12.5px] text-muted-foreground tabular-nums">
-          {[groesse.name, groesse.preis, groesse.kilopreis].filter(Boolean).join(' · ')}
+          {/* Heißt die Größe wie das Angebot (Einzelprodukt), steht der Name nicht ein zweites Mal da. */}
+          {[groesse.name !== angebot.name ? groesse.name : null, groesse.preis, groesse.kilopreis].filter(Boolean).join(' · ')}
         </p>
       )}
 
@@ -121,6 +122,8 @@ function GroessenFeld({
         'relative flex min-h-[58px] min-w-0 items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition-colors duration-[250ms]',
         groesse.kaufbar ? 'cursor-pointer hover:bg-muted' : 'cursor-not-allowed bg-muted',
         gewaehlt ? 'border-[1.5px] border-accent bg-accent/12 hover:bg-accent/12' : 'border-border',
+        // Die Marke ragt über den oberen Rand ins Feld — Platz darunter, damit sie den Namen nicht verdeckt.
+        groesse.guenstigster && 'pt-4',
         // Der Fokus liegt auf dem verborgenen Radioknopf — sichtbar wird er am Feld.
         'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring has-[:focus-visible]:outline-solid'
       )}
@@ -153,7 +156,8 @@ function GroessenFeld({
         </span>
       </span>
       {groesse.guenstigster && (
-        <Marke art="erledigt" className="absolute -top-2.5 right-2 px-2 text-[10.5px]">
+        // Grün wie im Board (Art „läuft"); eine Angabe zum Angebot, kein eigener Zustand — keine neue Farbe (G5).
+        <Marke art="laeuft" className="absolute -top-2.5 right-2 px-2 text-[10.5px]">
           {FUTTER_KARTE_TEXT.guenstigster}
         </Marke>
       )}
