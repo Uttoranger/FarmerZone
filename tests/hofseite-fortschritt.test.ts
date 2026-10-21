@@ -76,8 +76,10 @@ describe('Aufbau', () => {
     expect(alleZeilen(VOLL).filter((z) => z.freiwillig).map((z) => z.id)).toEqual(['tagline', 'werte'])
   })
 
-  it('die Zeilen-Kennungen sind genau die der Nachricht an die Vorschau', () => {
-    expect(alleZeilen(VOLL).map((z) => z.id)).toEqual(hofseiteZeileIdSchema.options)
+  it('die Zeilen-Kennungen sind genau die der Nachricht an die Vorschau — außer `aktuell`', () => {
+    // „Aktuell vom Hof“ markiert nur (Nr. 129, Runde 2): eine Zeile mit Link, kein Teil des Fortschritts.
+    expect(alleZeilen(VOLL).map((z) => z.id)).toEqual(hofseiteZeileIdSchema.options.filter((id) => id !== 'aktuell'))
+    expect(hofseiteZeileIdSchema.options).toContain('aktuell')
   })
 
   it('jede Zeile hat ein Ziel in der Vorschau', () => {
@@ -109,7 +111,8 @@ describe('Reihenfolge der Hofseite (Liste „Bearbeiten" unter lg, Nr. 50)', () 
   const AUF_DER_SEITE = ['titelbild', 'bestellungen', 'abschnitte', 'fotos', 'abholung', 'kontakt', 'ueberuns']
 
   it('jede Zeile genau einmal', () => {
-    expect(HOFSEITE_REIHENFOLGE.toSorted()).toEqual(hofseiteZeileIdSchema.options.toSorted())
+    // Ohne `aktuell` (Nr. 129): Die Zeile steht in Liste und Editor als eigene erste Zeile, nicht im Fortschritt.
+    expect(HOFSEITE_REIHENFOLGE.toSorted()).toEqual(hofseiteZeileIdSchema.options.filter((id) => id !== 'aktuell').toSorted())
   })
 
   it('in der Reihenfolge, in der die Abschnitte auf der Hofseite stehen', () => {

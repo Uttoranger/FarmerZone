@@ -34,7 +34,7 @@ import {
   type OrtsZeit,
   type VorschauProdukt,
 } from '@/lib/hofuebersicht'
-import { AKTIVER_BEITRAG } from './status-posts'
+import { AKTIVER_BEITRAG, NEUESTER_BEITRAG_ZUERST } from './status-posts'
 
 export type PublicProduct = {
   id: string
@@ -753,7 +753,7 @@ export type HofUebersichtEintrag = {
 function neuerBeitragEinbindung(jetzt: Date) {
   return {
     where: { AND: [AKTIVER_BEITRAG(jetzt), { publishedAt: { gte: new Date(jetzt.getTime() - NEUER_BEITRAG_TAGE * 24 * 60 * 60_000) } }] },
-    orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }],
+    orderBy: NEUESTER_BEITRAG_ZUERST,
     take: 1,
     select: { title: true, publishedAt: true, expiresAt: true },
   } satisfies Prisma.Farm$statusPostsArgs

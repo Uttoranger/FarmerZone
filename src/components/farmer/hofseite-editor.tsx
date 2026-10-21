@@ -26,7 +26,7 @@ import type { FarmSettings } from '@/server/queries/farm'
 import type { AppearanceData } from '@/server/queries/appearance'
 import { type HofseiteFortschritt, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
-import type { aktuellZeile } from '@/lib/mein-hof-ansicht'
+import type { AktuellZeile } from '@/lib/mein-hof-ansicht'
 import {
   EDITOR_ABSTAND,
   EDITOR_LISTE_HANDY_MAX,
@@ -69,7 +69,7 @@ type Props = {
   einstellungen: FarmSettings
   auftritt: AppearanceData
   /** „Aktuell vom Hof“ als erste Zeile (Register E12, Nr. 129) — wie in der Liste unter lg; fehlt die Angabe, steht sie nicht da. */
-  aktuell?: ReturnType<typeof aktuellZeile>
+  aktuell?: AktuellZeile
 }
 
 const SYMBOL: Record<HofseiteZeileId, LucideIcon> = {
@@ -86,7 +86,10 @@ const SYMBOL: Record<HofseiteZeileId, LucideIcon> = {
   kontakt: Phone,
   bestellungen: ShoppingBag,
   abschnitte: LayoutList,
+  aktuell: CalendarDays,
 }
+
+const ZeichenAktuell = SYMBOL.aktuell
 
 // ── Zeile und Gruppe ──────────────────────────────────────────────────────────
 
@@ -209,21 +212,30 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt, aktu
         </div>
 
         {aktuell && (
-          // Wie auf der Hofseite oben: der laufende Beitrag. Verwaltet wird unter Mein Hof › Beiträge — darum ein Link, keine Zeile zum Aufklappen.
+          // Wie auf der Hofseite oben: der laufende Beitrag. Ein Tipp auf die Zeile markiert den Abschnitt in der
+          // Vorschau — wie jede Zeile über `offen` (Kennung `aktuell`, Freigabe 129.4, Runde 2). Verwaltet wird
+          // unter Mein Hof › Beiträge: darum daneben der Link statt eines Bausteins zum Aufklappen.
           <ul aria-label={aktuell.titel} className="overflow-hidden rounded-2xl border border-border bg-card">
-            <li data-bearbeiten-zeile="aktuell" className="relative flex min-h-14 items-center gap-3 px-4 py-3">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-muted text-status-fertig">
-                <CalendarDays className="size-4" strokeWidth={1.7} aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-foreground">{aktuell.titel}</span>
-                <span className="block truncate text-[13px] text-muted-foreground">{aktuell.wert}</span>
-              </span>
+            <li data-bearbeiten-zeile="aktuell" className={cn('flex min-h-14 items-center gap-1 pr-3', offen === 'aktuell' && 'bg-muted/30')}>
+              <button
+                type="button"
+                onClick={() => umschalten('aktuell')}
+                aria-pressed={offen === 'aktuell'}
+                title={`${aktuell.titel}: ${aktuell.wert}`}
+                className={cn('flex min-h-14 min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-left transition-colors hover:bg-muted', FOKUS_RAHMEN_INNEN)}
+              >
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-muted text-status-fertig">
+                  <ZeichenAktuell className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-foreground">{aktuell.titel}</span>
+                  <span className="block truncate text-[13px] text-muted-foreground">{aktuell.wert}</span>
+                </span>
+              </button>
               <Link
                 href={aktuell.link.href}
-                title={`${aktuell.titel}: ${aktuell.wert}`}
                 className={cn(
-                  "inline-flex min-h-11 shrink-0 items-center gap-0.5 rounded-lg px-1.5 text-sm font-semibold whitespace-nowrap text-brand-text after:absolute after:inset-0 after:content-['']",
+                  'inline-flex min-h-11 shrink-0 items-center gap-0.5 rounded-lg px-1.5 text-sm font-semibold whitespace-nowrap text-brand-text',
                   FOKUS_RAHMEN
                 )}
               >

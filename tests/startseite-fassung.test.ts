@@ -368,9 +368,35 @@ describe('Zusatz-Abschnitt „Neu bei den Höfen“ (Nr. 129, N16)', () => {
     ])
   })
 
-  it('der Entwurf aus den acht Zeilen der Migration bleibt gültig — mit und ohne Block', () => {
-    const zeilen = STANDARD_REIHENFOLGE.map((art) => ({ art, sichtbar: true, block: null }))
-    expect(fassungInhaltSchema.safeParse(fassungAusEntwurf(zeilen)).success).toBe(true)
+  it('der Entwurf aus den acht Zeilen der Migration bleibt gültig und rendert gleich — mit und ohne Block', () => {
+    const ohne = STANDARD_REIHENFOLGE.map((art) => ({ art, sichtbar: true, block: null }))
+    const blockZeile = {
+      art: 'BLOCK' as const,
+      sichtbar: true,
+      block: {
+        id: 'b-entwurf',
+        vorlage: 'SAISONKARTE' as const,
+        ueberzeile: null,
+        titel: 'Kürbis, Äpfel und Most',
+        text: null,
+        bildUrl: null,
+        linkUrl: null,
+        linkText: null,
+        farmIds: [],
+        kategorie: null,
+        liveAb: '2026-10-01T04:00:00.000Z',
+        liveBis: null,
+      },
+    }
+    const mit = [ohne[0], ohne[1], blockZeile, ...ohne.slice(2)]
+    // Wie GESPEICHERT_HEUTE: gültig UND derselbe Weg bis zur Seite — Entwurf → Fassung → Zeilen → gerendert.
+    const gerendert = (entwurf: typeof mit) => {
+      const inhalt = fassungInhaltSchema.parse(JSON.parse(JSON.stringify(fassungAusEntwurf(entwurf))))
+      return zuRendern(zeilenAusFassung(inhalt, new Map()), JETZT, { brennmaterialSaison: true }).map((e) => (e.art === 'BLOCK' ? `BLOCK:${e.block.id}` : e.art))
+    }
+    const standard = ['KOPF', 'HOEFE', 'FUTTER', 'BRENNMATERIAL', 'SO_FUNKTIONIERTS', 'FUER_HOEFE', 'FRAGEN', 'FUSS']
+    expect(gerendert(ohne)).toEqual(standard)
+    expect(gerendert(mit)).toEqual(['KOPF', 'HOEFE', 'BLOCK:b-entwurf', ...standard.slice(2)])
     expect(fassungInhaltSchema.safeParse(mitBlock()).success).toBe(true)
   })
 

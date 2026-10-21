@@ -7,7 +7,7 @@ import { getFarmSettings, getMeinHofKopf, getOwnerFarm } from '@/server/queries/
 import { getAppearanceData } from '@/server/queries/appearance'
 import { getStatusPostsForFarm, zaehleWhatsAppAbonnentinnen } from '@/server/queries/status-posts'
 import { zaehleBeitraege } from '@/server/queries/mein-hof-zahl'
-import { ladeDeinenBeitrag } from '@/server/queries/dashboard'
+import { ladeLaufendenBeitrag } from '@/server/queries/dashboard'
 import { aktuellZeile } from '@/lib/mein-hof-ansicht'
 import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 import { beitraegeUebersicht } from '@/lib/mein-hof-beitraege'
@@ -92,20 +92,21 @@ export default async function FarmPageOwnerRoute({
   }
 
   const jetzt = new Date()
-  const [kopf, beitraegeZahl, einstellungen, auftritt, deinBeitrag] = await Promise.all([
+  const [kopf, beitraegeZahl, einstellungen, auftritt, laufend] = await Promise.all([
     getMeinHofKopf(session.user.id),
     zaehleBeitraege(farm.id),
     getFarmSettings(session.user.id),
     getAppearanceData(session.user.id),
-    // „Aktuell vom Hof“ als erste Zeile (Register E12, Nr. 129): Ein Ladefehler nimmt nur die Zeile weg, nie Mein Hof.
-    ladeDeinenBeitrag(farm.id, jetzt).catch((err: unknown) => {
+    // „Aktuell vom Hof“ als erste Zeile (Register E12, Nr. 129): nur der laufende Beitrag, nicht die
+    // Abfragen für den Anstoß in Heute. Ein Ladefehler nimmt nur die Zeile weg, nie Mein Hof.
+    ladeLaufendenBeitrag(farm.id, jetzt).catch((err: unknown) => {
       Sentry.captureException(err, { tags: { bereich: 'dein-beitrag', seite: 'mein-hof' }, extra: { farmId: farm.id } })
-      return null
+      return undefined
     }),
   ])
   if (!einstellungen || !auftritt) redirect('/onboarding')
-  // Ohne Daten (Fehler) keine Zeile — „Kein Beitrag“ wäre dann falsch.
-  const aktuell = deinBeitrag ? aktuellZeile(deinBeitrag.aktiv, jetzt) : undefined
+  // Ohne Daten (Fehler) keine Zeile — „Kein Beitrag“ wäre dann falsch; null heißt: kein laufender Beitrag.
+  const aktuell = laufend === undefined ? undefined : aktuellZeile(laufend, jetzt)
 
   const fortschritt = hofseiteFortschritt(hofseiteStand(farm, einstellungen))
   // Nur, was die Bausteine brauchen — kein Date und kein Decimal über die Grenze (CODING_STANDARDS §2).

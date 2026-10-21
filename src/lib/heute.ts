@@ -11,6 +11,7 @@ import { tagVersetzt, wienKalendertag } from '@/lib/kalender'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { wienerZeitpunkt } from '@/lib/fristen'
 import { formatSlotTime } from '@/lib/pickup-days'
+import { mitAnzahl } from '@/lib/format'
 import { hofZustand } from '@/lib/mein-hof'
 import { summeCent, UMSATZ_TEXT, type UmsatzBuchung } from '@/lib/umsatz'
 import { onlineZahlungPausiert } from '@/lib/stripe-konto'
@@ -773,16 +774,12 @@ export type DeinBeitrag = {
 
 const STUNDE_MS = 60 * 60_000
 
-function mitEinheit(n: number, eins: string, viele: string): string {
-  return `${n} ${n === 1 ? eins : viele}`
-}
-
 /** „seit 2 Stunden“, „seit 1 Tag“, „seit wenigen Minuten“ — gerechnet mit dem Zeitpunkt der Seite. */
 export function seitWannText(veroeffentlicht: string, jetzt: Date): string {
   const stunden = Math.floor((jetzt.getTime() - Date.parse(veroeffentlicht)) / STUNDE_MS)
   if (stunden < 1) return 'seit wenigen Minuten'
-  if (stunden < 24) return `seit ${mitEinheit(stunden, 'Stunde', 'Stunden')}`
-  return `seit ${mitEinheit(Math.floor(stunden / 24), 'Tag', 'Tagen')}`
+  if (stunden < 24) return `seit ${mitAnzahl(stunden, 'Stunde', 'Stunden')}`
+  return `seit ${mitAnzahl(Math.floor(stunden / 24), 'Tag', 'Tagen')}`
 }
 
 /** „läuft noch 6 Tage“, „läuft noch 3 Stunden“ bzw. „ohne Ende“ — abgerundet, nie mehr versprochen, als bleibt. */
@@ -790,8 +787,8 @@ export function laeuftNochText(endet: string | null, jetzt: Date): string {
   if (endet === null) return DEIN_BEITRAG_TEXT.ohneEnde
   const stunden = Math.floor((Date.parse(endet) - jetzt.getTime()) / STUNDE_MS)
   if (stunden < 1) return 'läuft noch unter 1 Stunde'
-  if (stunden < 24) return `läuft noch ${mitEinheit(stunden, 'Stunde', 'Stunden')}`
-  return `läuft noch ${mitEinheit(Math.floor(stunden / 24), 'Tag', 'Tage')}`
+  if (stunden < 24) return `läuft noch ${mitAnzahl(stunden, 'Stunde', 'Stunden')}`
+  return `läuft noch ${mitAnzahl(Math.floor(stunden / 24), 'Tag', 'Tage')}`
 }
 
 /** Die Zeile unter dem Titel: „Neue Saison · seit 2 Stunden · läuft noch 6 Tage“. */
