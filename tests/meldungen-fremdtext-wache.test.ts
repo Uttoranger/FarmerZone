@@ -17,8 +17,8 @@ import { describe, expect, it } from 'vitest'
 
 const WURZEL = process.cwd()
 
-/** Felder und Namen, die Fremdtext oder eine Adresse tragen. */
-const FREMDTEXT = new Set(['text', 'ersteZeile', 'antwort', 'antwortAnMelder', 'triageNotiz', 'customerEmail', 'grund', 'adressen', 'kundinnen', 'wort'])
+/** Felder und Namen, die Fremdtext oder eine Adresse tragen; seit Nr. 132 auch `roh`, der rohe Inhalt einer CSP-Meldung (api/csp-bericht/route.ts). */
+const FREMDTEXT = new Set(['text', 'ersteZeile', 'antwort', 'antwortAnMelder', 'triageNotiz', 'customerEmail', 'grund', 'adressen', 'kundinnen', 'wort', 'roh'])
 
 const DATEIEN = [
   'src/lib/meldung.ts',
@@ -104,6 +104,11 @@ describe('Wache: kein Meldungstext in Sentry oder in einer Server-Log-Zeile', ()
     expect(fremdtextInProtokoll('Sentry.captureException(err, { extra: { antwort } })', 'b.ts')).toHaveLength(1)
     expect(fremdtextInProtokoll('console.error("an", m.customerEmail)', 'c.ts')).toHaveLength(1)
     expect(fremdtextInProtokoll('Sentry.addBreadcrumb({ message: ersteZeile(m.text) })', 'd.ts')).toHaveLength(1)
+  })
+
+  it('Gegenprobe: der rohe Inhalt einer CSP-Meldung (`roh`, api/csp-bericht) schlägt an — im Log wie in Sentry', () => {
+    expect(fremdtextInProtokoll('console.warn("CSP-Meldung", roh)', 'src/app/api/csp-bericht/route.ts')).toHaveLength(1)
+    expect(fremdtextInProtokoll('Sentry.captureMessage("CSP", { extra: { roh } })', 'src/app/api/csp-bericht/route.ts')).toHaveLength(1)
   })
 
   it('Gegenprobe: Kennung, Status und Zahlen gehen durch', () => {

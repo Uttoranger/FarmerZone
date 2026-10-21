@@ -11,14 +11,21 @@
  *  - In der Tabelle steht nur „auth:" + gekürzter HMAC — keine IP, kein Pfad.
  *  - Über Better Auth selbst (auth.handler, NODE_ENV=production): Zwei geladene auth-Module teilen
  *    sich die Grenze der Anmeldung; der vierte Versuch bekommt 429 mit X-Retry-After.
+ *  - Datenbank aus (Nr. 132, R1): Die Verbindung wird abgewiesen bzw. bleibt länger als 1,5 s stumm —
+ *    echt, über einen eigenen Prisma-Client auf eine tote Adresse. Die Instanz zählt dann für sich
+ *    (der vierte Versuch ist gesperrt, keine Zeile in der Tabelle), eine zweite Instanz für sich, nie
+ *    offen. Gegenprobe im Fall: Das Zählen ohne Rückfall wirft — der Ausfall ist echt; ohne den
+ *    Rückfall in `verbrauche` wäre der Fall rot (geprüft, Bericht 132).
  *
  * Feste Uhr nur als Parameter auf einem Zeitpunkt in der Vergangenheit; der HTTP-Fall läuft auf der
  * Systemuhr und wartet dafür ein frisches Fenster ab. Aufräumen: genau die Schlüssel, die die Fälle
  * erzeugen (HMAC aus Zweck und Merkmal).
  */
+import { createServer, type AddressInfo, type Server, type Socket } from 'node:net'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
-import { DB_BREMSEN, adressMerkmal, bremsSchluessel } from '@/lib/bremse-datenbank'
+import { DB_BREMSEN, DB_BREMSE_ZEITLIMIT_MS, adressMerkmal, bremsSchluessel } from '@/lib/bremse-datenbank'
 import { AUTH_BREMSE_ZWECK } from '@/server/auth-bremse'
 import { intKennung, raeumeAuf } from './setup/basis'
 
@@ -138,6 +145,100 @@ describe('Zählen über alle Instanzen', () => {
       expect(z.schluessel).not.toContain('/email-otp')
     }
   })
+})
+
+describe('Datenbank aus: die Instanz zählt für sich, nie offen (R1)', () => {
+  /** src/lib/prisma.ts merkt den Client außerhalb der Produktion in globalThis — für die tote Instanz kurz beiseite. */
+  const ablage = globalThis as unknown as { prisma: unknown }
+
+  type Ausfall = { adresse: string; aufraeumen: () => Promise<void> }
+
+  async function lausche(server: Server): Promise<number> {
+    await new Promise<void>((fertig) => server.listen(0, '127.0.0.1', fertig))
+    return (server.address() as AddressInfo).port
+  }
+  const schliesse = (server: Server) => new Promise<void>((fertig) => server.close(() => fertig()))
+
+  /** Abgewiesen: ein Port, auf dem gerade nichts lauscht (eben belegt und wieder frei). */
+  async function abgewiesen(): Promise<Ausfall> {
+    const server = createServer()
+    const port = await lausche(server)
+    await schliesse(server)
+    return { adresse: `postgresql://int:int@127.0.0.1:${port}/int`, aufraeumen: async () => {} }
+  }
+
+  /** Stumm: Die Verbindung kommt zustande, aber die Datenbank antwortet nie — die Abfrage hängt über 1,5 s. */
+  async function stumm(): Promise<Ausfall> {
+    const offen = new Set<Socket>()
+    const server = createServer((verbindung) => {
+      offen.add(verbindung)
+      verbindung.on('close', () => offen.delete(verbindung))
+    })
+    const port = await lausche(server)
+    return {
+      adresse: `postgresql://int:int@127.0.0.1:${port}/int`,
+      aufraeumen: async () => {
+        for (const verbindung of offen) verbindung.destroy()
+        await schliesse(server)
+      },
+    }
+  }
+
+  /** Eine „Instanz", deren Prisma-Client auf die tote Adresse zeigt — gebaut wie im Betrieb (src/lib/prisma.ts liest DATABASE_URL beim Laden). */
+  async function instanzOhneDatenbank(adresse: string) {
+    const bisher = ablage.prisma
+    ablage.prisma = undefined
+    vi.stubEnv('DATABASE_URL', adresse)
+    try {
+      vi.resetModules()
+      const bremse = await import('@/server/auth-bremse')
+      const datenbank = await import('@/server/bremse-datenbank')
+      const { prisma: toterClient } = await import('@/lib/prisma')
+      expect(toterClient).not.toBe(prisma)
+      return { bremse, datenbank, toterClient }
+    } finally {
+      ablage.prisma = bisher
+      vi.unstubAllEnvs()
+    }
+  }
+
+  const FAELLE = [
+    { art: 'Verbindung abgewiesen', baue: abgewiesen, ip: '203.0.113.41' },
+    { art: 'Datenbank stumm über 1,5 s', baue: stumm, ip: '203.0.113.42' },
+  ] as const
+
+  for (const { art, baue, ip } of FAELLE) {
+    it(`${art}: der vierte Versuch ist gesperrt, jede Instanz zählt für sich, keine Zeile in der Tabelle`, async () => {
+      vi.clearAllMocks()
+      const schluessel = `${ip}|/sign-in/email`
+      const tabelle = tabellenSchluessel(schluessel)
+      const ausfall = await baue()
+      const a = await instanzOhneDatenbank(ausfall.adresse)
+      const b = await instanzOhneDatenbank(ausfall.adresse)
+      try {
+        // Der Ausfall ist echt: Ohne Rückfall wirft das Zählen (Fehler bzw. Zeitgrenze).
+        const bremse = { zweck: AUTH_BREMSE_ZWECK, max: REGEL.max, fensterMs: REGEL.window * 1000 }
+        await expect(a.datenbank.mitFrist(a.datenbank.zaehleVersuche([{ bremse, merkmal: schluessel }], MITTE), DB_BREMSE_ZEITLIMIT_MS)).rejects.toThrow()
+
+        const versucheA = []
+        for (let i = 0; i < 5; i += 1) versucheA.push(await a.bremse.verbrauche(schluessel, REGEL, MITTE))
+        const ersterVonB = await b.bremse.verbrauche(schluessel, REGEL, MITTE)
+
+        expect(versucheA.map((v) => v.allowed)).toEqual([true, true, true, false, false])
+        expect(versucheA[3].retryAfter).toBe(5)
+        expect(ersterVonB).toEqual({ allowed: true, retryAfter: null })
+        expect(await prisma.rateLimitZaehler.count({ where: { schluessel: tabelle } })).toBe(0)
+        // Gemeldet nur ein fester Satz mit der Fehlerklasse, höchstens einmal je Instanz und Minute — nie IP oder Pfad.
+        const meldungen = vi.mocked(Sentry.captureException).mock.calls.map(([fehler]) => fehler as Error)
+        expect(meldungen).toHaveLength(2)
+        for (const m of meldungen) expect(m.message).toBe('Login-Bremse zählt je Instanz: Datenbank nicht erreichbar')
+        expect(JSON.stringify(meldungen.map((m) => [m.name, m.message]))).not.toContain('203.0.113')
+      } finally {
+        await ausfall.aufraeumen()
+        await Promise.all([a.toterClient.$disconnect(), b.toterClient.$disconnect()])
+      }
+    }, 60_000)
+  }
 })
 
 describe('Über Better Auth in Produktion', () => {

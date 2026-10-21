@@ -53,7 +53,7 @@ export function JetztMessen({ texte }: { texte: JetztMessenTexte }): React.JSX.E
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
-      <p role="status" className="min-w-0 text-[12.5px] leading-snug text-muted-foreground empty:hidden">
+      <p role="status" className="min-w-0 text-[12.5px] leading-snug text-muted-foreground empty:sr-only">
         {satz}
       </p>
       <button type="button" onClick={messen} disabled={misst} aria-busy={misst} className={cn(KNOPF_RAHMEN, 'gap-2 font-semibold disabled:opacity-60')}>

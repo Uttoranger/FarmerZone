@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import {
   BarChart3,
   CalendarCheck,
@@ -24,9 +24,6 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react'
-import { toast } from 'sonner'
-import { signOut } from '@/lib/auth-client'
-import { fuehreAbmeldenAus } from '@/lib/abmelden'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
 import {
@@ -65,6 +62,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
 import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
+import { useAbmelden } from '@/components/shells/admin-konto'
 import { NEU_SYMBOL } from '@/components/hofbereich/neu-symbol'
 import { TarifZeile } from '@/components/hofbereich/tarif-zeile'
 
@@ -254,7 +252,6 @@ export function HofShell({
   children,
 }: HofShellProps): React.JSX.Element {
   const pathname = usePathname()
-  const router = useRouter()
   const nav = hofNavigation({ isAdmin })
   const neuAnlegen = nav.neu.filter((p) => p.gruppe === 'anlegen')
   const neuAnderes = nav.neu.filter((p) => p.gruppe === 'anderes')
@@ -282,17 +279,10 @@ export function HofShell({
     return () => breit.removeEventListener('change', beiWechsel)
   }, [])
 
-  async function abmelden() {
-    await fuehreAbmeldenAus({
-      ersatz: onAbmelden,
-      abmelden: () => signOut(),
-      beiFehler: (satz) => toast.error(satz),
-      danach: () => {
-        router.push('/login')
-        router.refresh()
-      },
-    })
-  }
+  // Derselbe Hook wie in der AdminShell (Nr. 132), nur mit dem Ziel des Hofbereichs.
+  const abmelden = useAbmelden('/login', onAbmelden)
+  // Hierhin hängt das Menü „Neu" (Nr. 132): in die Seitenleiste statt frei in den <body>.
+  const menueZiel = useRef<HTMLDivElement>(null)
 
   const abmeldenKnopf = (klassen: string) => (
     <button
@@ -343,7 +333,7 @@ export function HofShell({
                 aria-hidden="true"
               />
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-72">
+            <DropdownMenuContent className="w-72" container={menueZiel}>
               <DropdownMenuGroup>
                 <DropdownMenuLabel>{HOF_NEU_TITEL}</DropdownMenuLabel>
                 {neuAnlegen.map((punkt) => (
@@ -416,6 +406,9 @@ export function HofShell({
             </div>
           </nav>
         </div>
+        {/* Ziel des Menüs „Neu": in der Landmarke, aber außerhalb des scrollenden Kastens darüber —
+            dessen overflow schnitte das 288 px breite Menü an der 264 px breiten Leiste ab. */}
+        <div ref={menueZiel} data-menue-ziel="" />
       </aside>
 
       <main id={INHALT_ID} tabIndex={-1} className="min-w-0 pb-28 outline-none md:pb-0 md:pl-[264px] print:pb-0 print:pl-0">
