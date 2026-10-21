@@ -6,7 +6,7 @@
  * gelten in der geteilten Test-Datenbank Codes und Sitzungen anderer Nummern als abgelaufen und sind
  * weg — mitten in deren Lauf.
  *
- * Die Regel selbst steht in TESTING_GUIDELINES §1 (je ein Satz zur festen Uhr und zu den Uhr-Schritten); die Gründe
+ * Die Regel zu den Uhr-Schritten steht als ein Satz in TESTING_GUIDELINES §1 (die zur festen Uhr, Nr. 112, daneben); die Gründe
  * stehen hier: Der Schritt `advanceTimersByTime(<Zahl>)` rückt die feste Uhr um einen bekannten Betrag und darf sie nicht
  * über den 20.10.2026 heben; `advanceTimersToNextTimer` und `runAllTimers` springen ohne Obergrenze, also nie.
  *

@@ -274,19 +274,23 @@ describe('Fabrik-Wache: ein neues Feld im Typ bricht nur die Fabrik (Nr. 119)', 
       for (const [text, typ] of faelle) expect(ausgeschriebeneLiterale(text, 'neu.test.ts'), text).toEqual([`neu.test.ts:1 ${typ}`])
     })
 
-    it('schlägt an der Grenze an: neun Felder des Typs, darunter eines, das nur der Typ kennt', () => {
+    // Ein festes Grenzpaar: genau EIN Feld, das nur der Typ kennt, plus Felder, die auch `Farm` hat. So hängt die
+    // Gegenprobe nur an der Feldzahl und nicht daran, wie viele berechnete Felder `PublicFarm` gerade hat.
+    it('schlägt an der Grenze an: neun Felder des Typs, darunter eines, das nur der Typ kennt – acht nicht', () => {
       const nur = [...mengen.PublicFarm!.nurImTyp][0]!
-      const neun = [nur, ...farm.filter((f) => f !== nur).slice(0, MAX_EIGENE_FELDER)]
+      const auchInFarm = farm.filter((f) => !mengen.PublicFarm!.nurImTyp.has(f))
+      const neun = [nur, ...auchInFarm.slice(0, MAX_EIGENE_FELDER)]
+      const acht = [nur, ...auchInFarm.slice(0, MAX_EIGENE_FELDER - 1)]
       expect(neun).toHaveLength(MAX_EIGENE_FELDER + 1)
+      expect(acht).toHaveLength(MAX_EIGENE_FELDER)
       expect(ausgeschriebeneLiterale(`g(${alsLiteral(neun)})`), 'neun').toEqual(['attrappe.ts:1 PublicFarm'])
-      expect(ausgeschriebeneLiterale(`g(${alsLiteral(neun.slice(1))})`), 'acht').toEqual([])
+      expect(ausgeschriebeneLiterale(`g(${alsLiteral(acht)})`), 'acht').toEqual([])
     })
 
     it('lässt durch: eine Datenbankzeile (alle Felder von `Farm`, keines nur im Typ), kurze Literale, fremde Felder', () => {
       for (const text of [
         `vi.mocked(prisma.farm.findUnique).mockResolvedValue(${alsLiteral(datenbank)})`,
         `g(${alsLiteral(farm.filter((f) => mengen.PublicFarm!.nurImTyp.has(f)))})`,
-        `g(${alsLiteral([...mengen.PublicFarm!.nurImTyp, ...farm.slice(0, MAX_EIGENE_FELDER - 3)])})`,
         `g({ ...HOF, ${[...mengen.PublicFarm!.nurImTyp].map((f) => `${f}: 1`).join(', ')}, isPaused: true })`,
         `g(${alsLiteral(Array.from({ length: 30 }, (_, i) => `x${i}`))})`,
       ]) {
