@@ -122,4 +122,13 @@ describe('Workflows – jede Datei ist gültiges YAML (Parser, Nr. 127)', () => 
     const dokument = leseYaml('run: pnpm test # alle Tests') as { run: string }
     expect(dokument.run).toBe('pnpm test')
   })
+
+  it('YAML 1.2: „on:“ bleibt der Text „on“, kein Wahrheitswert (Nr. 135)', () => {
+    // GitHub liest YAML 1.2, und die Wachen suchen den Schlüssel „on“. In YAML 1.1 würde er zu `true`.
+    const dokument = leseYaml(readFileSync(join(process.cwd(), ORDNER, 'ci.yml'), 'utf8')) as Record<string, unknown>
+    expect(Object.keys(dokument)).toContain('on')
+    expect(Object.keys(dokument)).not.toContain('true')
+    expect(leseYaml('on: push')).toEqual({ on: 'push' })
+    expect(leseYaml('wert: on')).toEqual({ wert: 'on' })
+  })
 })
