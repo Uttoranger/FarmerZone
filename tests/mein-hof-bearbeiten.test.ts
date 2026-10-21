@@ -175,7 +175,8 @@ describe('Liste „Bearbeiten"', () => {
   it('jede Zeile genau einmal, in der Reihenfolge der Hofseite', () => {
     const ids = [...liste().matchAll(/data-bearbeiten-zeile="([a-z-]+)"/g)].map((m) => m[1])
     expect(ids).toEqual(HOFSEITE_REIHENFOLGE)
-    expect(ids.toSorted()).toEqual(hofseiteZeileIdSchema.options.toSorted())
+    // Ohne `aktuell` (Nr. 129): Die erste Zeile „Aktuell vom Hof“ kommt nur mit Angabe (Test unten).
+    expect(ids.toSorted()).toEqual(hofseiteZeileIdSchema.options.filter((id) => id !== 'aktuell').toSorted())
   })
 
   it('jede Zeile zeigt ihren Stand und „Bearbeiten" — der Knopf nennt die Zeile', () => {
@@ -212,10 +213,12 @@ describe('Liste „Bearbeiten"', () => {
 })
 
 describe('Bausteine im Blatt und im Editor', () => {
-  const FORMULARE = hofseiteZeileIdSchema.options.filter((id) => !SOFORT_GESPEICHERT.has(id))
+  // `aktuell` (Nr. 129) markiert nur die Vorschau und hat keinen Baustein — verwaltet wird unter Mein Hof › Beiträge.
+  const BAUSTEIN_ZEILEN = hofseiteZeileIdSchema.options.filter((id) => id !== 'aktuell')
+  const FORMULARE = BAUSTEIN_ZEILEN.filter((id) => !SOFORT_GESPEICHERT.has(id))
 
   it('jede Zeile hat ihren Baustein — in beiden Darstellungen', () => {
-    for (const id of hofseiteZeileIdSchema.options) {
+    for (const id of BAUSTEIN_ZEILEN) {
       for (const darstellung of ['zeile', 'blatt'] as const) {
         expect(inhalt(id, darstellung), `${id} ${darstellung}`).toContain('data-app-palette="neu"')
       }

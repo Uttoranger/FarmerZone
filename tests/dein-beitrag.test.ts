@@ -90,12 +90,17 @@ describe('Die Zeile der Karte', () => {
     expect(laeuftNochText(nach(24 * STUNDE - 1), JETZT)).toBe('läuft noch 23 Stunden')
     expect(laeuftNochText(nach(24 * STUNDE), JETZT)).toBe('läuft noch 1 Tag')
     expect(laeuftNochText(nach(STUNDE - 1), JETZT)).toBe('läuft noch unter 1 Stunde')
+    // Einzahl und Mehrzahl (mitAnzahl, src/lib/format.ts): die Texte bleiben, wie sie waren.
+    expect(laeuftNochText(nach(STUNDE), JETZT)).toBe('läuft noch 1 Stunde')
+    expect(laeuftNochText(nach(2 * 24 * STUNDE), JETZT)).toBe('läuft noch 2 Tage')
   })
 
   it('seit wann: Minuten, Stunden, Tage', () => {
     expect(seitWannText(vor(STUNDE - 1), JETZT)).toBe('seit wenigen Minuten')
     expect(seitWannText(vor(STUNDE), JETZT)).toBe('seit 1 Stunde')
     expect(seitWannText(vor(3 * 24 * STUNDE), JETZT)).toBe('seit 3 Tagen')
+    expect(seitWannText(vor(24 * STUNDE), JETZT)).toBe('seit 1 Tag')
+    expect(seitWannText(vor(2 * STUNDE), JETZT)).toBe('seit 2 Stunden')
   })
 
   it('E-Mail- und WhatsApp-Zahl nur über null', () => {

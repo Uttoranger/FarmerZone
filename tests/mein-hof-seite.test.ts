@@ -35,7 +35,7 @@ vi.mock('next/image', () => ({
   default: (props: { src: string; alt: string }) => createElement('img', { src: props.src, alt: props.alt }),
 }))
 
-import { MEIN_HOF_REITER_HOFBEREICH, meinHofReiterAus } from '@/lib/bauern-navigation'
+import { BEITRAEGE_HREF, MEIN_HOF_REITER_HOFBEREICH, meinHofReiterAus } from '@/lib/bauern-navigation'
 import { meinHofReiterSchema } from '@/schemas/mein-hof-reiter'
 import { beitraegeUebersicht, type BeitragQuelle } from '@/lib/mein-hof-beitraege'
 import { formatZahl } from '@/lib/format'
@@ -143,7 +143,9 @@ describe('Beiträge-Übersicht', () => {
 
 describe('Liste: Ziele in den Einstellungen bzw. in Mein Hof', () => {
   it('jede Zeile hat ein Ziel, und das Ziel ist eine Seite unter (hof): eine Einstellungsseite oder Mein Hof (Nr. 50)', () => {
-    for (const id of hofseiteZeileIdSchema.options) {
+    // „Aktuell vom Hof“ (Nr. 129) zählt nicht zum Fortschritt; verwaltet wird es in Mein Hof › Beiträge.
+    expect(EINSTELLUNG_FUER_ZEILE.aktuell).toBe(BEITRAEGE_HREF)
+    for (const id of hofseiteZeileIdSchema.options.filter((zeile) => zeile !== 'aktuell')) {
       const ziel = EINSTELLUNG_FUER_ZEILE[id]
       expect(ziel, id).toMatch(/^\/settings\/[a-z-]+$|^\/farm-page$/)
       expect(existsSync(join(process.cwd(), `src/app/(hof)${ziel}/page.tsx`)), ziel).toBe(true)

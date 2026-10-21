@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { CalendarDays, Check, ChevronRight } from 'lucide-react'
 import { zeilenWieAufDerHofseite, type HofseiteFortschritt, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
 import { schildTon } from '@/lib/mein-hof'
-import type { aktuellZeile } from '@/lib/mein-hof-ansicht'
+import type { AktuellZeile } from '@/lib/mein-hof-ansicht'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 import type { FarmSettings } from '@/server/queries/farm'
 import type { AppearanceData } from '@/server/queries/appearance'
@@ -44,7 +44,7 @@ type Props = {
    * src/lib/mein-hof-ansicht.ts) — der laufende Beitrag bzw. „Kein Beitrag“.
    * Fehlt die Angabe, steht die Zeile nicht da.
    */
-  aktuell?: ReturnType<typeof aktuellZeile>
+  aktuell?: AktuellZeile
 }
 
 /** Der Stand einer Zeile: ein grünes Häkchen (fertig) oder ihr Schild („Fehlt", „Online fehlt", „Pausiert"). */

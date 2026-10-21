@@ -124,19 +124,19 @@ export function gespeichertHinweisId(abschnitt: GespeichertAbschnitt | null): st
 
 // ─── „Aktuell vom Hof“ in Mein Hof › Hofseite (Register E12, Nr. 129) ───────
 
+/** Die Zeile „Aktuell vom Hof“, wie Liste (unter lg) und Editor (ab lg) sie zeichnen. */
+export type AktuellZeile = { titel: string; wert: string; link: { text: string; href: string } }
+
 /**
  * Die erste Zeile der Teile der Hofseite: Die Hofseite zeigt den laufenden
  * Beitrag oben („Aktuell vom Hof“, F8), also steht er auch hier zuerst — mit
  * „läuft noch …“ und dem Weg zu Mein Hof › Beiträge, wo er verwaltet wird.
  * Ohne laufenden Beitrag „Kein Beitrag“ und „Neuer Beitrag ›“ (das „›“ zeichnet
- * die Liste als Symbol). Eine Zeile mit
- * Link, kein Abschnitt zum Bearbeiten — darum keine neue Kennung der
- * Markierung (hofseiteZeileIdSchema).
+ * die Liste als Symbol). Eine Zeile mit Link, kein Abschnitt zum Bearbeiten;
+ * die Markierung in der Vorschau läuft über die Kennung `aktuell` in
+ * hofseiteZeileIdSchema (Freigabe 129.4, Runde 2) — wie jede Zeile.
  */
-export function aktuellZeile(
-  beitrag: Pick<DeinBeitrag, 'titel' | 'endet'> | null,
-  jetzt: Date
-): { titel: string; wert: string; link: { text: string; href: string } } {
+export function aktuellZeile(beitrag: Pick<DeinBeitrag, 'titel' | 'endet'> | null, jetzt: Date): AktuellZeile {
   if (!beitrag) return { titel: AKTUELL_VOM_HOF_TEXT.titel, wert: 'Kein Beitrag', link: { text: 'Neuer Beitrag', href: NEUER_BEITRAG_HREF } }
   return {
     titel: AKTUELL_VOM_HOF_TEXT.titel,
