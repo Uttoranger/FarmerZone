@@ -46,6 +46,8 @@ vi.mock('@/lib/umgebung-server', async (importOriginal) => {
 })
 vi.mock('next/navigation', () => ({
   usePathname: () => '/admin/betrieb',
+  // useRouter braucht das „Abmelden“ der Shell (Nr. 126); geklickt wird hier nicht.
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
   redirect: vi.fn((ziel: string) => {
     throw new Error(`REDIRECT:${ziel}`)
   }),

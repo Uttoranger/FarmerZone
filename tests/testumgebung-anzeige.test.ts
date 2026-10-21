@@ -23,7 +23,8 @@ import { bestimmeUmgebung, PRODUKTION_ADRESSE, type Umgebung } from '@/lib/umgeb
 
 const zustand = vi.hoisted(() => ({ umgebung: null as Umgebung | null }))
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/admin' }))
+// useRouter braucht das „Abmelden“ der Shell (Nr. 126); geklickt wird hier nicht.
+vi.mock('next/navigation', () => ({ usePathname: () => '/admin', useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }))
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))

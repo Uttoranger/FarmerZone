@@ -496,6 +496,19 @@ describe('Ersatzcode', () => {
     expect({ status: unbekannt.status, text: unbekannt.text }).toEqual({ status: nochmal.status, text: nochmal.text })
   })
 
+  it('eine Adresse mit falschem Format bekommt dieselbe Antwort wie eine unbekannte — nichts zum Ablesen (Nr. 126)', async () => {
+    const buchstaben = Math.random().toString(36).slice(2, 10).replace(/[0-9]/g, 'x')
+    const unbekannt = `int-niemand-${buchstaben}@example.com`
+    const kaputt = `int kein format ${buchstaben}`
+    adressen.push(unbekannt, kaputt)
+
+    const a = await http(new Map(), '/admin-ersatzcode/anmelden', { email: unbekannt, code: 'JMEA-QUFD' })
+    const b = await http(new Map(), '/admin-ersatzcode/anmelden', { email: kaputt, code: 'JMEA-QUFD' })
+
+    expect(a.status).toBe(401)
+    expect({ status: b.status, text: b.text }).toEqual({ status: a.status, text: a.text })
+  })
+
   it('gebremst: nach 5 Versuchen je Adresse und Stunde 429 — auch mit dem richtigen Code', async () => {
     const admin = await adminMitPasskey()
     await mitCodes(admin.id, ['WPKG-EKHA'])

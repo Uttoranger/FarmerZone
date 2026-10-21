@@ -177,10 +177,27 @@ export const GERAETE_TEXT = {
   blattTitel: 'Alle anderen Geräte abmelden?',
   blattZusatz:
     'Auf den anderen Geräten musst du dich danach neu anmelden. Kennst du ein Gerät nicht, ändere danach dein Passwort.',
+  /**
+   * Dieselben zwei Sätze für den Admin-Bereich (Register N20, Nr. 126): Dort
+   * kommt der Blick auf die Passkeys dazu — wer ein fremdes Gerät findet, soll
+   * auch prüfen, ob jemand einen Passkey angelegt hat. Welche Fassung gilt,
+   * sagt `geraeteHinweise`.
+   */
+  admin: {
+    hinweis:
+      'Ein Gerät kennst du nicht? Melde es ab, ändere danach dein Passwort und prüf deine Passkeys. Wir zeigen nur Gerät und Browser – keinen Ort, keine IP-Adresse.',
+    blattZusatz:
+      'Auf den anderen Geräten musst du dich danach neu anmelden. Kennst du ein Gerät nicht, ändere danach dein Passwort und prüf deine Passkeys.',
+  },
   abbrechen: 'Abbrechen',
   einenMoment: 'Einen Moment …',
   fehler: 'Das hat nicht geklappt. Bitte versuch es noch einmal.',
 } as const
+
+/** Hinweis unter der Liste und Zusatz im Blatt — für Höfe (unverändert) oder für den Admin-Bereich. */
+export function geraeteHinweise(fuerAdmin: boolean): { hinweis: string; blattZusatz: string } {
+  return fuerAdmin ? GERAETE_TEXT.admin : { hinweis: GERAETE_TEXT.hinweis, blattZusatz: GERAETE_TEXT.blattZusatz }
+}
 
 /** „A und B", „A, B und C" — gleiche Namen einmal, mit Anzahl. */
 function aufzaehlung(namen: readonly string[]): string {

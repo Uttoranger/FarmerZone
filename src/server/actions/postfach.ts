@@ -348,14 +348,11 @@ export async function markiereGelesenTeam(eingabe: unknown): Promise<Ergebnis> {
  * (keine offene Erstattung) gilt dann schon.
  */
 export async function markiereErstattungErledigt(eingabe: unknown): Promise<Ergebnis> {
-  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt.
+  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
   const frisch = await verlangeFrischeBestaetigung()
   if ('error' in frisch) return { error: frisch.error }
   const geprueft = erstattungErledigtSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: satzAus(geprueft.error) }
-
-  const guard = await verlangeAdminAktion()
-  if ('error' in guard) return { error: guard.error }
 
   await prisma.order.updateMany({
     where: { id: geprueft.data.orderId, erstattungOffenSeit: { not: null } },

@@ -1,5 +1,7 @@
 import { z } from 'zod'
+import { EMAIL_MAX } from '@/lib/eingabegrenzen'
 import { MARKE } from '@/lib/marke'
+import { emailSchema } from '@/schemas/email'
 
 /*
  * Ersatzcodes eines Admin-Kontos (Register N20; Nr. 115, Freigabe §21 Punkt 6):
@@ -77,9 +79,27 @@ export async function ersatzcodeHash(geheimnis: string, userId: string, code: st
   return hex(await globalThis.crypto.subtle.sign('HMAC', schluessel, kodierer.encode(`ersatzcode:${userId}:${normal}`)))
 }
 
-/** Systemgrenze der Anmeldung mit Ersatzcode (POST /api/auth/admin-ersatzcode/anmelden). */
+/**
+ * Was kein Adresse-Format hat, bleibt eine unbekannte Adresse: ohne Rand, klein
+ * und höchstens so lang wie eine Adresse — der Endpunkt sucht damit ohne Treffer
+ * und zählt sie auf der Bremse wie jede andere Eingabe.
+ */
+function alsUnbekannteAdresse(roh: unknown): string {
+  return typeof roh === 'string' ? roh.trim().toLowerCase().slice(0, EMAIL_MAX) : ''
+}
+
+/**
+ * Systemgrenze der Anmeldung mit Ersatzcode (POST /api/auth/admin-ersatzcode/anmelden).
+ *
+ * Die Adresse geht durch `emailSchema` (eine Regel für jede Adresse). Scheitert
+ * sie dort — falsches Format, zu lang —, wird sie NICHT mit einem eigenen
+ * Fehler abgewiesen: Das wäre eine zweite Antwort neben „Diese Kombination
+ * passt nicht“, und aus Unterschieden zwischen den Antworten ließe sich etwas
+ * ablesen. Sie bekommt dieselbe allgemeine Antwort wie eine unbekannte
+ * Adresse (Nr. 126, Register N20).
+ */
 export const ersatzcodeAnmeldenSchema = z.object({
-  email: z.string().trim().toLowerCase().max(254),
+  email: emailSchema().catch((ctx) => alsUnbekannteAdresse(ctx.input)),
   code: z.string().max(40),
 })
 

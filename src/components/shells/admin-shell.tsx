@@ -17,6 +17,7 @@ import { Wortmarke } from '@/components/shared/wortmarke'
 import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
 import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
 import { ADMIN_RAHMEN } from '@/components/admin/admin-teile'
+import { AdminAbmeldenKnopf, AdminKontoMenue, PLAKETTEN_KREIS } from '@/components/shells/admin-konto'
 import { MARKE } from '@/lib/marke'
 import { ADMIN_POSTFACH_TEXT } from '@/lib/postfach'
 import { ADMIN_BETRIEB_HREF, BETRIEB_TEXT, warnungenText, type BetriebHinweis } from '@/lib/betrieb'
@@ -45,6 +46,10 @@ import { ADMIN_BETRIEB_HREF, BETRIEB_TEXT, warnungenText, type BetriebHinweis } 
  * der Z3-Korrektur (15.10.2026, Nr. 94) nicht mehr: Die Testumgebung wurde
  * nie eingerichtet.
  *
+ * Seit Nr. 126 (Register N20) „Abmelden": am Computer ein Knopf neben der
+ * Plakette, am Handy öffnet die Plakette ein Menü (components/shells/admin-konto.tsx)
+ * — derselbe Weg wie in der HofShell, danach /login/admin.
+ *
  * Seit Nr. 103 (Register N15/N18) der Reiter Betrieb: ein Punkt am Reiter und
  * rechts in der Betriebsleiste der Hinweis mit Link, solange eine Warnung
  * offen ist. Ob, entscheidet der Server (ladeAdminbereich, nur in der
@@ -70,6 +75,11 @@ export type AdminShellProps = {
   stripeMarke?: StripeMarke | null
   /** Register N15/N18: offene Warnungen von Admin › Betrieb — Punkt am Reiter und Hinweis in der Betriebsleiste. */
   betrieb?: BetriebHinweis | null
+  /**
+   * Nur für die Vorschau unter /intern: ersetzt das echte Abmelden, damit der
+   * Admin vor der Vorschau nicht abgemeldet wird (wie bei der HofShell).
+   */
+  onAbmelden?: () => void
   children: ReactNode
 }
 
@@ -80,35 +90,41 @@ function zahlFuer(reiter: AdminReiter, zahlen: AdminShellProps['zahlen']): { anz
 }
 
 /**
- * Die Initialen der angemeldeten Person — mit eigenem Hof ein Link auf
- * „Konto und Sicherheit" (44 px Fläche, der Kreis bleibt 32 px). Ohne Hof
- * kein Link: Die Seite liegt im Hofbereich und schickte das Konto auf /login.
+ * Die Initialen der angemeldeten Person und „Abmelden". Am Computer: mit
+ * eigenem Hof ein Link auf „Konto und Sicherheit" (44 px Fläche, der Kreis
+ * bleibt 32 px), ohne Hof kein Link — die Seite liegt im Hofbereich und
+ * schickte das Konto auf /login —, daneben der Knopf „Abmelden". Am Handy
+ * öffnet dieselbe Plakette ein Menü mit beidem (admin-konto.tsx).
  */
-function KontoPlakette({ anzeige, hatHof }: { anzeige: string; hatHof: boolean }): React.JSX.Element {
-  const kreis = 'flex size-8 shrink-0 items-center justify-center rounded-full bg-border text-[12px] font-semibold text-foreground'
-  if (!hatHof) {
-    return (
-      <span title={`Angemeldet: ${anzeige}`} className={kreis}>
-        <span aria-hidden="true">{hofInitialen(anzeige)}</span>
-        <span className="sr-only">Angemeldet: {anzeige}</span>
-      </span>
-    )
-  }
+function KontoPlakette({ anzeige, hatHof, onAbmelden }: { anzeige: string; hatHof: boolean; onAbmelden?: () => void }): React.JSX.Element {
   const initialen = hofInitialen(anzeige)
   // Der Name beginnt mit dem, was man sieht (WCAG 2.5.3 „Label in Name"):
   // Wer per Sprache „MM antippen" sagt, trifft den Link.
   const beschriftung = `${initialen} – ${ADMIN_KONTO.label} (angemeldet: ${anzeige})`
   return (
-    <Link
-      href={ADMIN_KONTO.href}
-      aria-label={beschriftung}
-      title={beschriftung}
-      className={cn('flex size-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-muted', FOKUS_RAHMEN)}
-    >
-      <span aria-hidden="true" className={kreis}>
-        {initialen}
-      </span>
-    </Link>
+    <>
+      <AdminKontoMenue anzeige={anzeige} hatHof={hatHof} ersatz={onAbmelden} />
+      <div className="hidden items-center gap-0.5 md:flex lg:gap-1.5">
+        {hatHof ? (
+          <Link
+            href={ADMIN_KONTO.href}
+            aria-label={beschriftung}
+            title={beschriftung}
+            className={cn('flex size-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-muted', FOKUS_RAHMEN)}
+          >
+            <span aria-hidden="true" className={PLAKETTEN_KREIS}>
+              {initialen}
+            </span>
+          </Link>
+        ) : (
+          <span title={`Angemeldet: ${anzeige}`} className={PLAKETTEN_KREIS}>
+            <span aria-hidden="true">{initialen}</span>
+            <span className="sr-only">Angemeldet: {anzeige}</span>
+          </span>
+        )}
+        <AdminAbmeldenKnopf ersatz={onAbmelden} />
+      </div>
+    </>
   )
 }
 
@@ -119,6 +135,7 @@ export function AdminShell({
   testbetrieb = false,
   stripeMarke = null,
   betrieb = null,
+  onAbmelden,
   children,
 }: AdminShellProps): React.JSX.Element {
   const pathname = usePathname()
@@ -151,7 +168,7 @@ export function AdminShell({
             </StatusBadge>
           </div>
 
-          <nav ref={reiterZeile} aria-label="Admin-Bereiche" className="order-last -mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pb-1 md:order-none md:mx-0 md:ml-5 md:w-auto md:p-0">
+          <nav ref={reiterZeile} aria-label="Admin-Bereiche" className="order-last -mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pt-[3px] pb-1 md:order-none md:mx-0 md:ml-5 md:w-auto md:px-0 md:py-[3px]">
             <ul className="flex gap-2 md:gap-1">
               {ADMIN_REITER.map((reiter) => {
                 const istAktiv = aktiv === reiter.id
@@ -162,9 +179,11 @@ export function AdminShell({
                       href={reiter.href}
                       aria-current={istAktiv ? (pathname === reiter.href ? 'page' : 'true') : undefined}
                       className={cn(
-                        'flex h-[38px] items-center gap-2 rounded-full px-4 text-[14px] whitespace-nowrap transition-colors duration-[250ms]',
+                        // Sichtbar 38 px, die Trefferfläche 44 px (WCAG 2.5.8): wie chip.tsx über ein Pseudo-Element.
+                        // Es misst vom Innenrand — der 1-px-Rahmen (auch der unsichtbare am aktiven Reiter) zählt nicht mit, darum 4 statt 3 px.
+                        "relative flex h-[38px] items-center gap-2 rounded-full px-4 text-[14px] whitespace-nowrap transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-[4px] before:content-['']",
                         istAktiv
-                          ? 'bg-foreground font-semibold text-background'
+                          ? 'border border-foreground bg-foreground font-semibold text-background'
                           : 'border border-border font-medium text-foreground hover:bg-muted md:border-transparent',
                         FOKUS_RAHMEN
                       )}
@@ -200,7 +219,7 @@ export function AdminShell({
               </Link>
             )}
             <ThemeUmschalter className={cn('rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN)} />
-            <KontoPlakette anzeige={anzeige} hatHof={hatHof} />
+            <KontoPlakette anzeige={anzeige} hatHof={hatHof} onAbmelden={onAbmelden} />
           </div>
         </div>
         {/* Betriebsleiste (Register Z3): welcher Stripe-Modus gilt. Eine eigene Zeile

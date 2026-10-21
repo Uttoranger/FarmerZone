@@ -100,9 +100,12 @@ describe('Wache: kein ungeprüfter Endpunkt in den Postfach-Actions', () => {
     koerper: quelle.slice(treffer.index, alle[i + 1]?.index ?? quelle.length),
   }))
   const namen = new Set(exporte.map((e) => e.name))
-  /** Prüft selbst (Admin bzw. Hof der Sitzung) oder ruft nur einen Export, der selbst prüft. */
+  /**
+   * Prüft selbst (Admin bzw. Hof der Sitzung) oder ruft nur einen Export, der selbst prüft.
+   * `verlangeFrischeBestaetigung` gilt wie `verlangeAdminAktion`: Sie prüft alles davon und dazu die frische Bestätigung (Nr. 126).
+   */
   function geprueft(koerper: string): boolean {
-    if (/await (verlangeAdminAktion|hofDerSitzung)\(\)/.test(koerper)) return true
+    if (/await (verlangeAdminAktion|verlangeFrischeBestaetigung|hofDerSitzung)\(\)/.test(koerper)) return true
     return [...koerper.matchAll(/await (\w+)\(/g)].some((t) => t[1] !== undefined && namen.has(t[1]) && geprueft(exporte.find((e) => e.name === t[1])!.koerper))
   }
 
