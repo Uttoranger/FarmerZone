@@ -61,7 +61,7 @@ import { HoefeSuche, StandortUngefaehr } from '@/components/hoefe/hoefe-suche'
 import type { Ortssuche } from '@/components/hoefe/use-ortssuche'
 import { EntdeckenFilterblatt } from '@/components/hoefe/entdecken-filterblatt'
 import { SUCHFELD_TEXT, abholungReihe, kategorieReihe, leerzustand, standortUngefaehrText } from '@/lib/hoefe-entdecken'
-import { HofKurzkarte } from '@/components/hoefe/hof-kurzkarte'
+import { HofKurzkarte, KurzkartenInhalt } from '@/components/hoefe/hof-kurzkarte'
 import type { VorschauProdukt } from '@/lib/hofuebersicht'
 import { illustrationPfad } from '@/lib/taxonomie'
 import { grundpreisAusKennzeichnung, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
@@ -241,13 +241,15 @@ describe('Hofkarte A', () => {
 })
 
 describe('HofKurzkarte — die Pin-Vorschau am Computer', () => {
+  // So baut hoefe-client.tsx die Vorschau: der Rahmen nimmt den Inhalt als `children`. Der Rahmen hat keine Hooks, darum
+  // als Funktion aufgerufen — createElement mit `children` im Props-Objekt verbietet die Lint-Regel, als drittes Argument der Typ.
+  const hofMitEntfernung = { ...HOF, entfernungKm: 2.1 }
   const kurz = html(
-    createElement(HofKurzkarte, {
-      hof: { ...HOF, entfernungKm: 2.1 },
+    HofKurzkarte({
+      hof: hofMitEntfernung,
       bereich: 'LEBENSMITTEL',
-      schaufenster: { produkte: DREI.produkte.slice(0, 2) },
-      jetzt: JETZT,
       id: 'vorschau-1',
+      children: createElement(KurzkartenInhalt, { hof: hofMitEntfernung, schaufenster: { produkte: DREI.produkte.slice(0, 2) }, jetzt: JETZT }),
     })
   )
 

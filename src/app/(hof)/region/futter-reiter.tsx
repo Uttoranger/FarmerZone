@@ -32,7 +32,7 @@ export async function FutterReiter({ farm, suche }: { farm: { id: string }; such
   return (
     <div className={REGION_RAHMEN}>
       <div className="flex flex-col gap-4 md:gap-[18px]">
-        <RegionKopf reiter="futter" km={filter.km} ladePunkt />
+        <RegionKopf reiter="futter" km={filter.km} ansicht={ansicht} abholung={filter.abholung} ladePunkt />
         <LadeInhalt>
           {daten === undefined ? (
             <RegionFehler nochmal={futterKaufenLink(filter, ansicht)} />

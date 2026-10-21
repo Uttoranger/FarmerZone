@@ -1532,17 +1532,17 @@ type Nachbar = {
  * Inhaber erfunden. Entfernungen zum Pilothof in Braunau am Inn:
  *     1.0 km  Innbogenhof  (Haselbach, AT)
  *     3.3 km  Auhof  (Ranshofen, AT)
- *     9.8 km  Kirchbauernhof  (Mauerkirchen, AT)
+ *     9.8 km  Kirchbauernhof  (Weng im Innkreis, AT)
  *    10.2 km  Wengerhof  (Weng im Innkreis, AT)
- *    12.3 km  Moosbauernhof  (Uttendorf, AT)
  *    13.9 km  Waldbauernhof  (Handenberg, AT)
  *    14.8 km  Bachgutshof  (Sankt Georgen am Fillmannsbach, AT)
+ *    16.5 km  Kobernaußerhof  (Schalchen, AT)
  *    17.4 km  Schalchnerhof  (Schalchen, AT)
+ *    18.4 km  Moosbauernhof  (Mattighofen, AT)
  *    18.5 km  Kapellenhof  (Maria Schmolln, AT)
  *    18.7 km  Achleitenhof  (Hochburg-Ach, AT)
  *    21.8 km  Innleitenhof  (Sankt Georgen bei Obernberg am Inn, AT)
  *    22.7 km  Marktbauernhof  (Obernberg am Inn, AT)
- *    23.1 km  Kobernaußerhof  (Munderfing, AT)
  *    23.9 km  Seebauernhof  (Moosdorf, AT)
  *    24.4 km  Weilbachhof  (Weilbach, AT)
  *    25.2 km  Höhenbauernhof  (Wippenham, AT)
@@ -1594,12 +1594,12 @@ const NACHBARN: Nachbar[] = [
     name: 'Kirchbauernhof',
     inhaber: { email: 'bauer-03@example.com', name: 'Sabine Hofstätter', telefon: '+43 660 0000103' },
     adresse: 'Kirchbauernweg 3',
-    plz: '5270',
-    ort: 'Mauerkirchen',
+    plz: '4952',
+    ort: 'Weng im Innkreis',
     land: 'AT',
     bezirk: 'Braunau am Inn',
-    breite: 48.1917,
-    laenge: 13.1334,
+    breite: 48.2351,
+    laenge: 13.1720,
     sorten: ['HEU_KLEIN', 'ERDAEPFEL', 'BROT'],
   },
   {
@@ -1620,12 +1620,12 @@ const NACHBARN: Nachbar[] = [
     name: 'Moosbauernhof',
     inhaber: { email: 'bauer-05@example.com', name: 'Claudia Ebner', telefon: '+43 660 0000105' },
     adresse: 'Moosbauernweg 5',
-    plz: '5261',
-    ort: 'Uttendorf',
+    plz: '5230',
+    ort: 'Mattighofen',
     land: 'AT',
     bezirk: 'Braunau am Inn',
-    breite: 48.1589,
-    laenge: 13.1218,
+    breite: 48.1073,
+    laenge: 13.1508,
     sorten: ['MILCH', 'KAESE', 'EIER'],
   },
   {
@@ -1724,12 +1724,12 @@ const NACHBARN: Nachbar[] = [
     name: 'Kobernaußerhof',
     inhaber: { email: 'bauer-13@example.com', name: 'Elisabeth Wimmer', telefon: '+43 660 0000113' },
     adresse: 'Kobernaußerweg 13',
-    plz: '5222',
-    ort: 'Munderfing',
+    plz: '5231',
+    ort: 'Schalchen',
     land: 'AT',
     bezirk: 'Braunau am Inn',
-    breite: 48.0704,
-    laenge: 13.1816,
+    breite: 48.1292,
+    laenge: 13.1572,
     sorten: ['HEU_RUND', 'GERSTE_SACK', 'MINERAL'],
   },
   {
