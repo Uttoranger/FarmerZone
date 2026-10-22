@@ -6,6 +6,8 @@ import { PauseCircle, PlayCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
+import { PAUSENACHRICHT_MAX } from '@/lib/eingabegrenzen'
 import { setPause } from '@/server/actions/farm'
 import { KNOPF_GRUEN, KNOPF_ORANGE_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speichern'
@@ -125,6 +127,8 @@ export function PauseClient({
           rows={3}
           placeholder="Ich bin im Urlaub bis ..."
         />
+        {/* Zähler statt maxLength: Eingefügtes würde sonst stumm abgeschnitten (CODING_STANDARDS §8). */}
+        <ZeichenZaehler laenge={message.length} max={PAUSENACHRICHT_MAX} />
         <Button
           onClick={handleSaveMessage}
           disabled={isPending}
