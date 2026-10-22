@@ -78,8 +78,10 @@ describe('ein Kopf, eine Hülle (Reiter an derselben Stelle)', () => {
     expect(produkte).toMatch(/<div className=\{cn\(MEIN_HOF_KOPF_HUELLE, 'md:hidden'\)\}>\s*<MeinHofKopf /)
     // Unter lg rendert der Seitenkopf genau diesen Baustein, ohne eigenen Abstand davor.
     expect(quelle('src/components/mein-hof/seitenkopf.tsx')).toMatch(/<header className="print:hidden lg:mb-6">\s*\{[^}]*\}\s*<div className="lg:hidden">\s*<MeinHofKopf /)
-    // Gegenprobe: Eine eigene Hülle auf /products (wie bis Nr. 142) fiele auf.
-    expect('<div className="px-4 pt-5 md:hidden">\n          <MeinHofKopf ').not.toMatch(/<div className=\{cn\(MEIN_HOF_KOPF_HUELLE, 'md:hidden'\)\}>\s*<MeinHofKopf /)
+    // Gegenprobe am echten Quelltext: Eine eigene Hülle auf /products (wie bis Nr. 142) fiele auf.
+    const eigeneHuelle = produkte.replace("<div className={cn(MEIN_HOF_KOPF_HUELLE, 'md:hidden')}>", '<div className="px-4 pt-5 md:hidden">')
+    expect(eigeneHuelle).not.toBe(produkte)
+    expect(eigeneHuelle).not.toMatch(/<div className=\{cn\(MEIN_HOF_KOPF_HUELLE, 'md:hidden'\)\}>\s*<MeinHofKopf /)
     expect(MEIN_HOF_KOPF_HUELLE).toBe('mx-auto max-w-3xl px-4 pt-5 md:px-8 md:pt-7 lg:max-w-none')
   })
 
@@ -235,8 +237,11 @@ describe('Zähler der Pausen-Nachricht (Nacharbeit 137): getrimmt wie im Server'
     expect(html).not.toContain('Bitte kürzen')
     // Gegenprobe: ein Zeichen mehr im Inneren ist zu lang.
     expect(zaehler(`  ${genau}x `)).toContain('Bitte kürzen')
-    // „ abc “ zählt 3 — der Zähler zeigt sich erst ab 80 %, darum gerechnet wie im Quelltext.
-    expect(' abc '.trim().length).toBe(3)
+    // An der Schwelle (80 % = 240): 239 Zeichen mit Rand bleiben unsichtbar, ungetrimmt wären es 259.
+    const knapp = 'x'.repeat((PAUSENACHRICHT_MAX * 4) / 5 - 1)
+    expect(zaehler(`          ${knapp}          `)).not.toContain(` / ${PAUSENACHRICHT_MAX}`)
+    // Gegenprobe: ein Zeichen mehr im Inneren, und der Zähler steht mit der getrimmten Zahl.
+    expect(zaehler(`          ${knapp}x          `)).toContain(`${knapp.length + 1} / ${PAUSENACHRICHT_MAX}<`)
     expect(quelle('src/components/settings/pause-client.tsx')).toContain('<ZeichenZaehler laenge={message.trim().length} max={PAUSENACHRICHT_MAX} />')
   })
 })

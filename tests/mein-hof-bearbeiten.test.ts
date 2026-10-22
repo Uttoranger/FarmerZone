@@ -165,6 +165,37 @@ function inhalt(id: HofseiteZeileId, darstellung: 'zeile' | 'blatt', auftritt: A
   )
 }
 
+/**
+ * Alle sr-only-Elemente, die in einem abschneidenden Element (truncate, line-clamp, overflow-hidden)
+ * stehen, ohne dass dieses Element oder ein Element dazwischen `relative` (bzw. absolute/fixed/sticky)
+ * ist — dann bezieht sich das absolute sr-only auf einen Vorfahren außerhalb und entkommt dem Schnitt.
+ */
+function srOhneHalt(html: string): string[] {
+  const stapel: string[] = []
+  const treffer: string[] = []
+  for (const m of html.matchAll(/<(\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?)>/g)) {
+    const [, zu, tag, attribute, selbst] = m
+    if (zu) {
+      stapel.pop()
+      continue
+    }
+    if (selbst || /^(img|input|br|hr|meta|link|source)$/i.test(tag)) continue
+    const klasse = /\bclass="([^"]*)"/.exec(attribute)?.[1] ?? ''
+    if (/(^| )sr-only( |$)/.test(klasse)) {
+      for (let i = stapel.length - 1; i >= 0; i--) {
+        const k = stapel[i].split(' ')
+        if (k.some((c) => c === 'relative' || c === 'absolute' || c === 'fixed' || c === 'sticky')) break
+        if (k.some((c) => c === 'truncate' || c.startsWith('line-clamp-') || c === 'overflow-hidden')) {
+          treffer.push(stapel[i])
+          break
+        }
+      }
+    }
+    stapel.push(klasse)
+  }
+  return treffer
+}
+
 describe('Liste „Bearbeiten"', () => {
   const VOLLSTAENDIG: HofseiteStand = {
     ...STAND,
@@ -234,6 +265,18 @@ describe('Liste „Bearbeiten"', () => {
     expect(zeileVon('adresse')).not.toContain('data-slot="status-badge"')
     // Der volle Wert steht im title.
     expect(zeileVon('kontakt')).toMatch(/title="Kontakt: \+43 660 000 0000 · hof@example\.com"/)
+  })
+
+  it('kein waagerechtes Scrollen: jedes sr-only in einem abschneidenden Span hat dort einen relative-Halt (Nr. 143, Runde 1)', () => {
+    // Ohne positionierten Vorfahren steht das absolute sr-only am Ende des langen Werts und fällt aus
+    // dem abgeschnittenen Bereich — die Seite wurde bei 390 px 1158 px breit (sichter).
+    const lang = 'Ein sehr langer Text über den Hof, der in einer Zeile nie Platz hat '.repeat(4)
+    const html = liste({ ...STAND, description: lang, aboutText: lang, address: lang })
+    expect(srOhneHalt(html)).toEqual([])
+    expect(html.match(/class="sr-only"/g)?.length).toBeGreaterThanOrEqual(24)
+    // Gegenprobe: Ohne `relative` am abschneidenden Span fiele jedes „. Bearbeiten" auf.
+    const ohne = html.replaceAll('relative text-[12.5px]', 'text-[12.5px]')
+    expect(srOhneHalt(ohne)).toHaveLength(12)
   })
 
   it('in Worten ohne Fachbegriff: „Leitspruch und Gründungsjahr", nicht „Tagline"', () => {

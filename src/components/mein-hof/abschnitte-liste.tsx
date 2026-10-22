@@ -73,11 +73,12 @@ function Zeile({ zeile, umbrechen, onOeffne }: { zeile: HofseiteZeile; umbrechen
         className={cn('flex min-h-14 w-full items-center gap-2.5 py-2 pr-2.5 pl-3.5 text-left hover:bg-muted/60', FOKUS_RAHMEN, 'focus-visible:-outline-offset-2')}
       >
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="text-[14px] leading-snug font-semibold text-foreground">
+          {/* `relative` hält das absolute sr-only im Span — sonst steht es am Ende eines langen Werts außerhalb des Schnitts, und die Seite scrollt waagerecht (Nr. 143, Runde 1). */}
+          <span className="relative text-[14px] leading-snug font-semibold text-foreground">
             {zeile.titel}
             <span className="sr-only">: </span>
           </span>
-          <span className={cn('text-[12.5px] text-muted-foreground', umbrechen ? 'line-clamp-2 leading-snug' : 'truncate')}>
+          <span className={cn('relative text-[12.5px] text-muted-foreground', umbrechen ? 'line-clamp-2 leading-snug' : 'truncate')}>
             {zeile.wert}
             <span className="sr-only">. Bearbeiten</span>
           </span>
