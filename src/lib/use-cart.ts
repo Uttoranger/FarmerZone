@@ -12,6 +12,8 @@ import {
   schreibeWarenkorb,
   warenkorbAnzahl,
 } from '@/lib/warenkorb-speicher'
+import { centsAlsEuro } from '@/lib/format'
+import { korbBetraege } from '@/lib/hofseite-kunde'
 
 export type CartItem = WarenkorbPosition
 
@@ -173,7 +175,9 @@ export function useCart(farmId: string, farmSlug: string): Warenkorb {
   }
 
   const count = warenkorbAnzahl(items)
-  const total = items.reduce((s, i) => s + i.price * i.quantity, 0)
+  // In ganzen Cent auf dem Weg des Checkouts (korbBetraege), nie price × Menge in Fließkomma —
+  // nur Anzeige, verbindlich rechnet der Checkout mit den Preisen aus der Datenbank.
+  const total = centsAlsEuro(korbBetraege(items).summeCents)
 
   return { items, count, total, isHydrated, addItem, updateQuantity, removeItem, clearCart }
 }

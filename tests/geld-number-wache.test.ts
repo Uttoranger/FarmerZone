@@ -4,15 +4,16 @@
  * gespeichert ist; in reinen Funktionen rechnet es in ganzen Cent, die Servergrenze wandelt über Decimal-Methoden.
  *
  * Ursache: Die Regel hatte keine Prüfung. Die Inventur fand per Suchbefehl drei Stellen mit `Number()` auf einem
- * Geldwert (Nr. 139, Bericht: Weg der Zahl bis zum Ende, Beleg je Stelle). Zwei sind Anzeige. Die dritte
- * (`produkt-dto.ts`) ist Anzeige und Vorbelegung des Preisfelds im Formular der Höfe und hat einen offenen Weg über die
- * Paketpreis-Hilfe in den gespeicherten Preis (siehe Eintrag im Bestand). Ein vierter, neuer Weg — etwa
- * `Number(order.totalAmount) * 1.049` — bliebe sonst unbemerkt.
+ * Geldwert (Nr. 139, Bericht: Weg der Zahl bis zum Ende). Zwei sind Anzeige. Die dritte (`produkt-dto.ts`) ist Anzeige
+ * und Vorbelegung des Preisfelds im Formular der Höfe; die Paketpreis-Hilfe dort rechnet seit dem Fix aus Nr. 139 in
+ * ganzen Cent über Decimal. Ein vierter, neuer Weg — etwa `Number(order.totalAmount) * 1.049` — bliebe sonst
+ * unbemerkt. Geld × Nicht-Zahl ohne `Number()` (der Fehler der Paketpreis-Hilfe) prüft
+ * `tests/geld-fliesskomma-wache.test.ts`.
  *
  * Beweist (Quelltext von `src/`, TypeScript-Syntaxbaum, kein Netz): Jeder Aufruf `Number(<Ausdruck>)`, dessen LETZTER
  * Name im Ausdruck nach Geld klingt, steht nur an einer Stelle aus GELD_NUMBER_BESTAND — je Eintrag Datei, Ausdruck,
- * Anzahl und Grund (ein zweiter Aufruf derselben Art in derselben Datei ist eine neue Stelle). Stützt sich ein Grund
- * auf Stellen im Code (Belege), müssen diese noch dort stehen. Geldnamen sind die Wortstämme price, amount, total, fee, betrag, preis, cents (groß und klein), aber nicht
+ * Anzahl und Grund (ein zweiter Aufruf derselben Art in derselben Datei ist eine neue Stelle). Geldnamen und der letzte
+ * Name stehen in `tests/geld-namen.ts`: die Wortstämme price, amount, total, fee, betrag, preis, cents (groß und klein), aber nicht
  * `percent`/`prozent` (`serviceFeePercent` ist ein Satz, kein Betrag). Der letzte Name: `p.price` → `price`,
  * `item.totalPrice` → `totalPrice`, `betrag.toString()` → `betrag` (Wert-Methoden wie `toString`, `toFixed`, `toNumber`
  * zählen nicht als Name), `preise[i]` → `preise`, `zeile['price']` → `price`; bei `+ - * /`, `?:`, `??` und `||` zählt
@@ -21,7 +22,7 @@
  *
  * GRENZE: Die Wache sieht nur Namen. Eine Zahl mit neutralem Namen (`zahlOderNull`, `wert`, `x`, ein Rückgabewert einer
  * Hilfsfunktion) findet sie nicht, ebenso wenig `parseFloat`, `+wert`, `Decimal#toNumber()` oder eine Rechnung mit
- * `price * quantity` ohne `Number()`. Verbindlich bleibt CODING_STANDARDS §2 (Decimal für Geld, ganze Cent in reinen
+ * `price * quantity` ohne `Number()` (die meldet `tests/geld-fliesskomma-wache.test.ts`). Verbindlich bleibt CODING_STANDARDS §2 (Decimal für Geld, ganze Cent in reinen
  * Funktionen, Int-Cent an Stripe); die Wache fängt nur den häufigsten Fehlgriff.
  *
  * Gegenprobe (Quelltext im Speicher, keine Datei im Repository wird verändert): Eine neue Datei mit
@@ -33,24 +34,10 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
+import { endnamen, klingtNachGeld } from './geld-namen'
 
 const WURZEL = process.cwd()
 const ORDNER = join(WURZEL, 'src')
-
-/** Wortstämme, die einen Geldwert benennen. */
-const GELD_STAMM = /price|amount|total|fee|betrag|preis|cents/i
-/** Ein Satz in Prozent ist kein Betrag, auch wenn `fee` im Namen steht. */
-const KEIN_GELD = /percent|prozent/i
-/** Methoden, die nur den Wert in eine andere Form bringen: Der Name davor ist der Name des Werts. */
-const WERT_METHODEN = new Set(['toString', 'toFixed', 'toPrecision', 'valueOf', 'toNumber', 'toDecimalPlaces'])
-
-/** Eine Textstelle, die der Grund eines Eintrags als Weg der Zahl nennt; fehlt sie, stimmt der Grund nicht mehr. */
-interface Beleg {
-  /** Pfad ab der Wurzel des Repositories, mit `/`. */
-  datei: string
-  /** Wortlaut im Quelltext (ein Ausschnitt genügt). */
-  text: string
-}
 
 interface BestandEintrag {
   /** Pfad ab der Wurzel des Repositories, mit `/`. */
@@ -60,15 +47,13 @@ interface BestandEintrag {
   /** Wie oft der Ausdruck in der Datei vorkommt; ein zweiter Aufruf ist eine neue Stelle und muss eigens begründet werden. */
   anzahl: number
   grund: string
-  /** Stellen im Code, auf die der Grund sich stützt (Weg der Zahl über die Anzeige hinaus). */
-  belege?: readonly Beleg[]
 }
 
 /**
  * Stellen unter `src/`, an denen `Number()` einen Geldwert in eine Zahl wandelt. Die Kasse nimmt den Preis aus dem Korb
  * nur zum Abgleich auf den Cent über Decimal (`preisAbweichungen`, order-totals.ts) und rechnet danach nur mit dem
- * Preis aus der Datenbank (api/checkout/route.ts). Zwei Stellen sind nur Anzeige; bei `produkt-dto.ts` steht ein
- * offener Weg im Grund. Nur schrumpfen.
+ * Preis aus der Datenbank (api/checkout/route.ts). Zwei Stellen sind nur Anzeige, `produkt-dto.ts` ist Anzeige und
+ * Vorbelegung des Preisfelds. Nur schrumpfen.
  */
 const GELD_NUMBER_BESTAND: readonly BestandEintrag[] = [
   {
@@ -90,13 +75,7 @@ const GELD_NUMBER_BESTAND: readonly BestandEintrag[] = [
     ausdruck: 'p.price',
     anzahl: 1,
     grund:
-      'Anzeige und Vorbelegung des Preisfelds im Formular der Höfe (Decimal(10,2) → Zahl → Feld ist verlustfrei). Zur Kasse geht der Korb-Preis nur zum Abgleich auf den Cent über Decimal (preisAbweichungen); die Kasse rechnet mit dem Preis aus der Datenbank. OFFEN (Nr. 139, Bericht, Geld-Fund beim Dirigenten): Die Paketpreis-Hilfe im Formular rechnet aus dem Feldwert in Fließkomma einen neuen Preis, den der Hof mit „Nein" ins Preisfeld und damit in den gespeicherten Produktpreis übernimmt',
-    belege: [
-      { datei: 'src/components/products/product-dialog.tsx', text: 'price: p.price,' },
-      { datei: 'src/components/products/product-dialog.tsx', text: 'paketpreisAntworten(werte.price' },
-      { datei: 'src/components/products/produkt-preis.ts', text: 'Math.round(price * size * 100) / 100' },
-      { datei: 'src/components/products/product-dialog.tsx', text: "form.setValue('price', preisAntworten.paketpreis" },
-    ],
+      'Anzeige und Vorbelegung des Preisfelds im Formular der Höfe (Decimal(10,2) → Zahl → Feld ist verlustfrei). Zur Kasse geht der Korb-Preis nur zum Abgleich auf den Cent über Decimal (preisAbweichungen); die Kasse rechnet mit dem Preis aus der Datenbank. Die Paketpreis-Hilfe im Formular rechnet seit dem Fix aus Nr. 139 in ganzen Cent über Decimal (calcLineTotal → decimalZuCents)',
   },
 ]
 
@@ -104,38 +83,6 @@ interface Fund {
   datei: string
   zeile: number
   ausdruck: string
-}
-
-function ohneHuelle(ausdruck: ts.Expression): ts.Expression {
-  let k = ausdruck
-  while (ts.isParenthesizedExpression(k) || ts.isAsExpression(k) || ts.isSatisfiesExpression(k) || ts.isNonNullExpression(k) || ts.isTypeAssertionExpression(k)) {
-    k = k.expression
-  }
-  return k
-}
-
-/** Die letzten Namen eines Ausdrucks: einer je Zugriffskette, bei Rechnung und Auswahl einer je Teil. */
-function endnamen(ausdruck: ts.Expression): string[] {
-  const k = ohneHuelle(ausdruck)
-  if (ts.isIdentifier(k)) return [k.text]
-  if (ts.isPropertyAccessExpression(k)) return [k.name.text]
-  if (ts.isElementAccessExpression(k)) {
-    const index = k.argumentExpression
-    return ts.isStringLiteralLike(index) ? [index.text] : endnamen(k.expression)
-  }
-  if (ts.isCallExpression(k)) {
-    const ziel = ohneHuelle(k.expression)
-    if (ts.isPropertyAccessExpression(ziel)) return WERT_METHODEN.has(ziel.name.text) ? endnamen(ziel.expression) : [ziel.name.text]
-    return endnamen(ziel)
-  }
-  if (ts.isBinaryExpression(k)) return [...endnamen(k.left), ...endnamen(k.right)]
-  if (ts.isConditionalExpression(k)) return [...endnamen(k.whenTrue), ...endnamen(k.whenFalse)]
-  if (ts.isPrefixUnaryExpression(k)) return endnamen(k.operand)
-  return []
-}
-
-function klingtNachGeld(name: string): boolean {
-  return GELD_STAMM.test(name) && !KEIN_GELD.test(name)
 }
 
 /** Alle `Number(<Geldname>)` eines Quelltexts, mit Zeile und Ausdruck. */
@@ -182,13 +129,6 @@ function pruefeGeldNumber(
     return n < b.anzahl ? [`${b.datei} Number(${b.ausdruck}) (${n} von ${b.anzahl})`] : []
   })
   return { neu, veraltet }
-}
-
-/** Belege aus dem Bestand, die im Code nicht mehr stehen: Der Grund stützt sich auf eine Stelle, die es nicht mehr gibt. */
-function fehlendeBelege(quellen: ReadonlyMap<string, string>, bestand: readonly BestandEintrag[] = GELD_NUMBER_BESTAND): string[] {
-  return bestand.flatMap((b) =>
-    (b.belege ?? []).filter((beleg) => !(quellen.get(beleg.datei) ?? '').includes(beleg.text)).map((beleg) => `${beleg.datei}: ${beleg.text}`),
-  )
 }
 
 function dateienUnter(ordner: string): string[] {
@@ -257,26 +197,6 @@ describe('Geld-Number-Wache — Gegenprobe am echten Bestand', () => {
     }
     const erfunden = [...GELD_NUMBER_BESTAND, { datei: 'src/lib/gibt-es-nicht.ts', ausdruck: 'x.price', anzahl: 1, grund: 'erfunden für die Gegenprobe, keine Stelle im Code' }]
     expect(pruefeGeldNumber(quellenAusSrc(), erfunden).veraltet).toEqual(['src/lib/gibt-es-nicht.ts Number(x.price)'])
-  }, 30_000)
-})
-
-describe('Geld-Number-Wache — der Weg im Grund steht am Code (Belege)', () => {
-  const dto = GELD_NUMBER_BESTAND.find((b) => b.datei === 'src/lib/produkt-dto.ts')
-
-  it('der Eintrag zu produkt-dto.ts nennt den Weg in das Preisfeld und die Paketpreis-Hilfe, und jeder Beleg steht noch im Code', () => {
-    expect(dto?.belege?.map((b) => b.datei)).toEqual(expect.arrayContaining(['src/components/products/product-dialog.tsx', 'src/components/products/produkt-preis.ts']))
-    expect(fehlendeBelege(quellenAusSrc())).toEqual([])
-  }, 30_000)
-
-  it('schlägt an, wenn ein Beleg im Code fehlt (die Stelle wurde umgebaut, der Grund stimmt nicht mehr)', () => {
-    expect(dto?.belege?.length ?? 0).toBeGreaterThan(0)
-    for (const beleg of dto?.belege ?? []) {
-      const quellen = new Map(quellenAusSrc())
-      const text = quellen.get(beleg.datei)
-      expect(text, `${beleg.datei} muss unter src/ liegen`).toBeDefined()
-      quellen.set(beleg.datei, (text ?? '').replaceAll(beleg.text, 'ersetzt'))
-      expect(fehlendeBelege(quellen), beleg.text).toEqual([`${beleg.datei}: ${beleg.text}`])
-    }
   }, 30_000)
 })
 

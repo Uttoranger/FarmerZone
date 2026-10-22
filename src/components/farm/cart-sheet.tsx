@@ -12,7 +12,8 @@ import {
 } from '@/components/ui/sheet'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
-import { formatEuro, formatGrundpreis } from '@/lib/format'
+import { centsAlsEuro, formatEuro, formatGrundpreis } from '@/lib/format'
+import { korbBetraege } from '@/lib/hofseite-kunde'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
@@ -52,6 +53,9 @@ const MENGEN_KNOPF = cn(
  * Kaufen ist Grün (accent), Text und Symbole aus den Tokens.
  */
 export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHref, onUpdateQuantity, onRemoveItem, gebuehrKorb = null, futterHinweis = [], kaufSperre }: Props) {
+  // Zeilensummen in ganzen Cent auf dem Weg des Checkouts (korbBetraege, wie im Mini-Warenkorb),
+  // nie price × Menge in Fließkomma — verbindlich rechnet der Checkout mit den Preisen aus der Datenbank.
+  const { zeilenCents } = korbBetraege(items)
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
@@ -125,7 +129,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
                 {/* Line total + remove */}
                 <div className="shrink-0 flex flex-col items-end gap-2">
                   <span className="text-sm font-semibold text-foreground tabular-nums">
-                    {formatEuro(item.price * item.quantity)}
+                    {formatEuro(centsAlsEuro(zeilenCents.get(item.productId) ?? 0))}
                   </span>
                   <button
                     type="button"
