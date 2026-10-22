@@ -251,27 +251,6 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
       ) : (
         <>
           <div className="flex flex-col gap-3 md:flex-row md:items-center">
-            <label className={cn('relative md:order-last md:block md:w-[260px]', sucheOffen ? 'block' : 'hidden')}>
-              <span className="sr-only">Produkt suchen</span>
-              <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-              <input
-                ref={sucheFeld}
-                id={sucheId}
-                type="search"
-                value={suche}
-                onChange={(e) => {
-                  // Länger als ein Produktname kann kein Treffer sein — die Adresse bleibt kurz.
-                  const wert = e.target.value.slice(0, PRODUKTNAME_MAX)
-                  setSuche(wert)
-                  schreibeAdresse(filterAdresse(ansicht.filter, wert))
-                }}
-                placeholder="Produkt suchen …"
-                className={cn(
-                  'h-11 w-full rounded-full border border-border bg-card pr-4 pl-10 text-base text-foreground placeholder:text-muted-foreground md:h-9 md:text-[13px]',
-                  FOKUS_RAHMEN
-                )}
-              />
-            </label>
             <div className="-mx-4 flex items-center gap-2 pr-4 md:mx-0 md:min-w-0 md:flex-1 md:pr-0">
               <FilterChipReihe beschriftung="Produkte filtern" className="mx-0 min-w-0 flex-1">
                 {sichtbareProdukteFilter(zahlen, ansicht.filter).map((f) => {
@@ -308,6 +287,28 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
                 <Search className="size-4" strokeWidth={1.7} aria-hidden="true" />
               </button>
             </div>
+            {/* Im DOM hinter den Filtern (ab md rechts, wie vorher); unter md sichtbar darüber — der Fokus folgt auf die Lupe. */}
+            <label className={cn('relative max-md:order-first md:block md:w-[260px]', sucheOffen ? 'block' : 'hidden')}>
+              <span className="sr-only">Produkt suchen</span>
+              <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+              <input
+                ref={sucheFeld}
+                id={sucheId}
+                type="search"
+                value={suche}
+                onChange={(e) => {
+                  // Länger als ein Produktname kann kein Treffer sein — die Adresse bleibt kurz.
+                  const wert = e.target.value.slice(0, PRODUKTNAME_MAX)
+                  setSuche(wert)
+                  schreibeAdresse(filterAdresse(ansicht.filter, wert))
+                }}
+                placeholder="Produkt suchen …"
+                className={cn(
+                  'h-11 w-full rounded-full border border-border bg-card pr-4 pl-10 text-base text-foreground placeholder:text-muted-foreground md:h-9 md:text-[13px]',
+                  FOKUS_RAHMEN
+                )}
+              />
+            </label>
           </div>
 
           {gefiltert.length === 0 ? (

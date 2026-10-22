@@ -34,7 +34,7 @@ export function vorratGrenzSatz(unit: string, unitSize: number | null): string {
  *
  * Form nach DESIGN_SYSTEM „Dialoge und Blätter", nicht nach dem Board: kein
  * Kreuz, „Speichern" über die volle Breite, „Abbrechen" als Textknopf darunter,
- * „Ausverkauft" als Umriss darüber. Das Feld nimmt `inputMode="numeric"` —
+ * „Ausverkauft" als Umriss darüber; „Speichern" grün wie im Board. Das Feld nimmt `inputMode="numeric"` —
  * der Vorrat ist eine ganze Zahl (das Board zeigt `decimal`).
  */
 export function VorratBlatt({
@@ -170,7 +170,8 @@ export function VorratBlatt({
             disabled={laeuft}
             aria-busy={laeuft || undefined}
             onClick={() => void speichern(anzeige)}
-            className="h-12 w-full rounded-[14px] text-[15px] font-semibold"
+            // Grün wie im Board (Bildschirm B) und wie die Hauptaktionen der Bestellungen.
+            className="h-12 w-full rounded-[14px] bg-accent text-[15px] font-semibold text-accent-foreground hover:bg-accent/90"
           >
             {laeuft ? 'Speichert …' : 'Speichern'}
           </Button>

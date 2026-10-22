@@ -349,6 +349,15 @@ describe('Vorrat-Blatt', () => {
     expect(router.refresh).toHaveBeenCalledTimes(1)
   })
 
+  it('„Speichern" grün wie im Board (Token accent), „Ausverkauft" als Umriss', () => {
+    oeffne()
+    const speichern = String(knopf('Speichern').className)
+    expect(speichern).toContain('bg-accent')
+    expect(speichern).toContain('text-accent-foreground')
+    expect(knopf('Ausverkauft').variant).toBe('outline')
+    expect(String(knopf('Ausverkauft').className)).not.toContain('bg-accent')
+  })
+
   it('„Ausverkauft" speichert sofort 0', async () => {
     setzeVorrat.mockResolvedValueOnce({ ok: true, vorrat: 0, wiederDa: false })
     const { onSchliessen } = oeffne({ stock: 12 })

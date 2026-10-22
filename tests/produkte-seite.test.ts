@@ -22,7 +22,7 @@
  *    Adresse an.
  *  - /products liegt in (hof), der Bestand (farmer) hat es nicht mehr.
  */
-import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement, type ReactNode } from 'react'
@@ -481,6 +481,11 @@ describe('Route in der HofShell', () => {
 // ─── Darstellung (serverseitig gerendert, ohne DOM — TESTING_GUIDELINES §1) ──
 
 describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
+  // Ein Filter aus der Adresse gilt nur für seinen Fall, auch wenn rendere wirft.
+  afterEach(() => {
+    navigation.filter = null
+  })
+
   // Schweres Modul (Ansicht samt Dialogen und Formularen) einmal kalt laden —
   // nicht im ersten Test, dessen 5-s-Grenze es sonst reißt (TESTING_GUIDELINES §4).
   beforeAll(async () => {
@@ -595,7 +600,6 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
   it('„Nicht im Shop" filtert: einfache Liste, das Schild steht dann an der Zeile', async () => {
     navigation.filter = 'entwuerfe'
     const { zeilen } = teile(await rendere(liste))
-    navigation.filter = null
     expect(zeilen).toContain('>Nicht im Shop<')
     expect(zeilen).not.toContain('Braucht dich')
   })
@@ -609,6 +613,19 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
     expect(await rendere(liste, 'karotten')).toMatch(/<button[^>]*aria-label="Produkt suchen"[^>]*aria-expanded="true"/)
   })
 
+  it('die Suche steht im DOM hinter den Filtern: ab md wie vorher rechts, unter md sichtbar oben — der Fokus folgt der Lupe', async () => {
+    const html = await rendere(liste, 'karotten')
+    const filter = html.indexOf('aria-label="Produkte filtern"')
+    const lupe = html.indexOf('aria-label="Produkt suchen"')
+    const feld = html.indexOf('type="search"')
+    expect(filter).toBeGreaterThan(0)
+    expect(lupe).toBeGreaterThan(filter)
+    expect(feld).toBeGreaterThan(lupe)
+    // Sichtbar nach oben nur unter md; ab md bleibt die Reihenfolge des DOM (WCAG 2.4.3).
+    expect(html).toMatch(/<label class="[^"]*max-md:order-first[^"]*">/)
+    expect(html).not.toContain('md:order-last')
+  })
+
   it('lange Namen: höchstens zwei Zeilen, der volle Name im title', async () => {
     const html = await rendere(liste)
     expect(html).toContain(`title="${lang}"`)
@@ -618,7 +635,6 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
   it('Filter aus der Adresse (alter Wert entwuerfe): nur, was nicht im Shop steht', async () => {
     navigation.filter = 'entwuerfe'
     const html = await rendere(liste)
-    navigation.filter = null
     expect(html).toContain('Vorrat Bergwiesen')
     expect(html).not.toContain('Vorrat Karotten')
   })
