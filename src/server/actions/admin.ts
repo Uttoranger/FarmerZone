@@ -257,6 +257,8 @@ export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?
 
   await prisma.farm.update({ where: { id: farmId }, data: { approvedAt: null } })
   revalidateAll(farm.slug)
+  // Höfe-Liste und Startseite lesen über den Fünf-Minuten-Cache: Der Hof verschwindet dort sofort.
+  updateTag(HOEFE_CACHE_TAG)
   return {}
 }
 

@@ -1,11 +1,12 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getOpenOrdersCount } from '@/server/queries/orders'
 import { GRUENDUNGSPLAETZE_SPERRE } from '@/lib/gruendungshof'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 
 async function getAuthFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -43,6 +44,8 @@ export async function archiveFarm(): Promise<ArchiveResult> {
   revalidatePath('/settings/account')
   revalidatePath('/', 'layout')
   revalidatePath(`/${farm.slug}`)
+  // Die Hofliste (/hoefe, Startseite) zeigt nur Höfe, die nicht stillgelegt sind — aus ihrem Zwischenspeicher.
+  updateTag(HOEFE_CACHE_TAG)
   return {}
 }
 
@@ -71,5 +74,7 @@ export async function reactivateFarm(): Promise<ArchiveResult> {
   revalidatePath('/settings/account')
   revalidatePath('/', 'layout')
   revalidatePath(`/${farm.slug}`)
+  // Die Hofliste (/hoefe, Startseite) zeigt nur Höfe, die nicht stillgelegt sind — aus ihrem Zwischenspeicher.
+  updateTag(HOEFE_CACHE_TAG)
   return {}
 }

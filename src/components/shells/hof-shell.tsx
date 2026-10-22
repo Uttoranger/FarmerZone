@@ -50,6 +50,7 @@ import { BottomNav, BottomNavLink, BottomNavMitte, bottomNavEintragKlassen, mitt
 import { SidebarEintrag, SidebarGruppe } from '@/components/ui/sidebar-gruppe'
 import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { Zaehler } from '@/components/ui/zaehler'
+import { MenueZielAnbieter } from '@/components/ui/menue-ziel'
 import { Sheet, SheetBlatt, SheetClose, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import {
   DropdownMenu,
@@ -310,85 +311,56 @@ export function HofShell({
       <SprungLink />
 
       {/* ===== Browser: Seitenleiste ===== */}
-      <aside
-        aria-label="Hofbereich"
-        className="hidden border-r border-border bg-card md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-[264px] md:flex-col print:hidden"
-      >
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-3.5">
-          <Hofkarte hofName={hofName} hofSlug={hofSlug} />
+      {/* Der Anbieter nur um die Seitenleiste, nicht um <main>: Ihr Ziel liegt in der Leiste, die unter md versteckt ist —
+          ein Menü im Inhalt hinge sonst unsichtbar dort (Nr. 140). */}
+      <MenueZielAnbieter ziel={menueZiel}>
+        <aside
+          aria-label="Hofbereich"
+          className="hidden border-r border-border bg-card md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-[264px] md:flex-col print:hidden"
+        >
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-3.5">
+            <Hofkarte hofName={hofName} hofSlug={hofSlug} />
 
-          {/* Volle Breite, deshalb Radius 13 statt Pille (DESIGN_SYSTEM „Form"). */}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className={cn(
-                'group mt-3.5 flex min-h-11 w-full items-center gap-[11px] rounded-[13px] border border-primary-foreground/25 bg-primary px-3.5 text-left text-[14.5px] font-semibold text-primary-foreground shadow-[inset_0_-1px_0_0] shadow-primary-foreground/20 transition-colors duration-[250ms] hover:bg-primary/90',
-                FOKUS_RAHMEN
-              )}
-            >
-              <Plus className="size-[17px] shrink-0" strokeWidth={2.2} aria-hidden="true" />
-              <span className="flex-1">{HOF_NEU_KNOPF}</span>
-              <ChevronDown
-                className="size-3.5 shrink-0 opacity-75 transition-transform group-data-[popup-open]:rotate-180"
-                strokeWidth={2}
-                aria-hidden="true"
-              />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-72" container={menueZiel}>
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>{HOF_NEU_TITEL}</DropdownMenuLabel>
-                {neuAnlegen.map((punkt) => (
-                  <DropdownMenuLinkItem key={punkt.id} render={<Link href={punkt.href} />}>
-                    <NeuInhalt punkt={punkt} />
-                  </DropdownMenuLinkItem>
-                ))}
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>{HOF_NEU_ANDERES_TITEL}</DropdownMenuLabel>
-                {neuAnderes.map((punkt) => (
-                  <DropdownMenuLinkItem key={punkt.id} render={<Link href={punkt.href} />}>
-                    <NeuInhalt punkt={punkt} />
-                  </DropdownMenuLinkItem>
-                ))}
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <nav aria-label="Hauptnavigation" className="mt-3.5 flex flex-1 flex-col">
-            <SidebarGruppe>
-              {nav.haupt.map((punkt) => (
-                <SidebarEintrag
-                  key={punkt.id}
-                  href={punkt.href}
-                  label={punkt.label}
-                  symbol={SYMBOL[punkt.id]}
-                  aktuell={hofAriaAktuell(pathname, punkt)}
-                  zahl={zahlFuer(punkt, zahlen)}
-                  zahlWofuer={zahlWofuer(punkt)}
+            {/* Volle Breite, deshalb Radius 13 statt Pille (DESIGN_SYSTEM „Form"). */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={cn(
+                  'group mt-3.5 flex min-h-11 w-full items-center gap-[11px] rounded-[13px] border border-primary-foreground/25 bg-primary px-3.5 text-left text-[14.5px] font-semibold text-primary-foreground shadow-[inset_0_-1px_0_0] shadow-primary-foreground/20 transition-colors duration-[250ms] hover:bg-primary/90',
+                  FOKUS_RAHMEN
+                )}
+              >
+                <Plus className="size-[17px] shrink-0" strokeWidth={2.2} aria-hidden="true" />
+                <span className="flex-1">{HOF_NEU_KNOPF}</span>
+                <ChevronDown
+                  className="size-3.5 shrink-0 opacity-75 transition-transform group-data-[popup-open]:rotate-180"
+                  strokeWidth={2}
+                  aria-hidden="true"
                 />
-              ))}
-            </SidebarGruppe>
-            <SidebarGruppe titel={VERKAUF_UND_KUNDEN_TITEL}>
-              {nav.verkaufUndKunden.map((punkt) => (
-                <SidebarEintrag
-                  key={punkt.id}
-                  href={punkt.href}
-                  label={punkt.label}
-                  symbol={SYMBOL[punkt.id]}
-                  aktuell={hofAriaAktuell(pathname, punkt)}
-                />
-              ))}
-            </SidebarGruppe>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-72" container={menueZiel}>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>{HOF_NEU_TITEL}</DropdownMenuLabel>
+                  {neuAnlegen.map((punkt) => (
+                    <DropdownMenuLinkItem key={punkt.id} render={<Link href={punkt.href} />}>
+                      <NeuInhalt punkt={punkt} />
+                    </DropdownMenuLinkItem>
+                  ))}
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>{HOF_NEU_ANDERES_TITEL}</DropdownMenuLabel>
+                  {neuAnderes.map((punkt) => (
+                    <DropdownMenuLinkItem key={punkt.id} render={<Link href={punkt.href} />}>
+                      <NeuInhalt punkt={punkt} />
+                    </DropdownMenuLinkItem>
+                  ))}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-            {tarifZeile && (
-              <div className="mt-auto pt-4">
-                <TarifZeile daten={tarifZeile} ziel={nav.tarif.ziel} ort="seitenleiste" />
-              </div>
-            )}
-            <div className={cn('flex flex-col gap-1 border-t border-border pt-3', tarifZeile ? 'mt-3' : 'mt-auto')}>
-              <PersonZeile name={personName} />
+            <nav aria-label="Hauptnavigation" className="mt-3.5 flex flex-1 flex-col">
               <SidebarGruppe>
-                {nav.unten.map((punkt) => (
+                {nav.haupt.map((punkt) => (
                   <SidebarEintrag
                     key={punkt.id}
                     href={punkt.href}
@@ -397,19 +369,52 @@ export function HofShell({
                     aktuell={hofAriaAktuell(pathname, punkt)}
                     zahl={zahlFuer(punkt, zahlen)}
                     zahlWofuer={zahlWofuer(punkt)}
-                    klein
                   />
                 ))}
               </SidebarGruppe>
-              <ThemeUmschalterZeile className={cn('min-h-11 gap-[11px] rounded-xl py-2 text-[14px] text-foreground hover:bg-muted', FOKUS_RAHMEN)} />
-              {abmeldenKnopf(cn('min-h-11 rounded-xl px-3 text-[14px]', FOKUS_RAHMEN))}
-            </div>
-          </nav>
-        </div>
-        {/* Ziel des Menüs „Neu": in der Landmarke, aber außerhalb des scrollenden Kastens darüber —
-            dessen overflow schnitte das 288 px breite Menü an der 264 px breiten Leiste ab. */}
-        <div ref={menueZiel} data-menue-ziel="" />
-      </aside>
+              <SidebarGruppe titel={VERKAUF_UND_KUNDEN_TITEL}>
+                {nav.verkaufUndKunden.map((punkt) => (
+                  <SidebarEintrag
+                    key={punkt.id}
+                    href={punkt.href}
+                    label={punkt.label}
+                    symbol={SYMBOL[punkt.id]}
+                    aktuell={hofAriaAktuell(pathname, punkt)}
+                  />
+                ))}
+              </SidebarGruppe>
+
+              {tarifZeile && (
+                <div className="mt-auto pt-4">
+                  <TarifZeile daten={tarifZeile} ziel={nav.tarif.ziel} ort="seitenleiste" />
+                </div>
+              )}
+              <div className={cn('flex flex-col gap-1 border-t border-border pt-3', tarifZeile ? 'mt-3' : 'mt-auto')}>
+                <PersonZeile name={personName} />
+                <SidebarGruppe>
+                  {nav.unten.map((punkt) => (
+                    <SidebarEintrag
+                      key={punkt.id}
+                      href={punkt.href}
+                      label={punkt.label}
+                      symbol={SYMBOL[punkt.id]}
+                      aktuell={hofAriaAktuell(pathname, punkt)}
+                      zahl={zahlFuer(punkt, zahlen)}
+                      zahlWofuer={zahlWofuer(punkt)}
+                      klein
+                    />
+                  ))}
+                </SidebarGruppe>
+                <ThemeUmschalterZeile className={cn('min-h-11 gap-[11px] rounded-xl py-2 text-[14px] text-foreground hover:bg-muted', FOKUS_RAHMEN)} />
+                {abmeldenKnopf(cn('min-h-11 rounded-xl px-3 text-[14px]', FOKUS_RAHMEN))}
+              </div>
+            </nav>
+          </div>
+          {/* Ziel des Menüs „Neu": in der Landmarke, aber außerhalb des scrollenden Kastens darüber —
+              dessen overflow schnitte das 288 px breite Menü an der 264 px breiten Leiste ab. */}
+          <div ref={menueZiel} data-menue-ziel="" />
+        </aside>
+      </MenueZielAnbieter>
 
       <main id={INHALT_ID} tabIndex={-1} className="min-w-0 pb-28 outline-none md:pb-0 md:pl-[264px] print:pb-0 print:pl-0">
         {children}

@@ -101,7 +101,7 @@ describe('Onboarding weicht reservierten Slugs aus', () => {
     ownerName: 'Erika Muster',
     description: 'Beschreibung',
     address: 'Weg 1',
-    postalCode: '5270',
+    postalCode: '4020',
     city: 'Musterdorf',
     phone: '+43 660 0000000',
     email: 'hof@example.com',

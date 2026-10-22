@@ -1,7 +1,7 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -16,6 +16,8 @@ import {
 } from '@/lib/geokodierung'
 import { LAND_GENITIV, alsLand, type Land } from '@/lib/laender'
 import { profileSchema, profilBearbeitenSchema } from '@/schemas/hofprofil'
+import { pauseSchema } from '@/schemas/pause'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { ABSCHNITT_SPEICHERN_TEXT, profilBasis } from '@/lib/abschnitt-stand'
 import { nimmGesperrteAusDemShop, revalidiereProdukte } from '@/server/produkte-schreiben'
 
@@ -125,6 +127,9 @@ export async function updateProfile(data: ProfileFormData): Promise<ProfileResul
   // Der Kartenpunkt zählt in die Erste-Schritte-Liste der Übersicht.
   revalidatePath('/dashboard')
   revalidatePath(`/${farm.slug}`)
+  // Die Hofliste (/hoefe, Startseite) zeigt Name, Ort und Kartenpunkt aus
+  // ihrem eigenen Zwischenspeicher — revalidatePath erreicht ihn nicht (N24-Ergänzung).
+  updateTag(HOEFE_CACHE_TAG)
   return {}
 }
 
@@ -221,6 +226,8 @@ export async function addPickupSlot(data: SlotFormData): Promise<SlotResult> {
 
   revalidatePath('/settings/pickup-slots')
   revalidatePath(`/${farm.slug}`)
+  // Abholzeile, Filter und „bestellbar“ der Hofliste rechnen aus den aktiven Abholzeiten.
+  updateTag(HOEFE_CACHE_TAG)
   return {}
 }
 
@@ -234,6 +241,8 @@ export async function deletePickupSlot(slotId: string): Promise<SlotResult> {
 
   revalidatePath('/settings/pickup-slots')
   revalidatePath(`/${farm.slug}`)
+  // Abholzeile, Filter und „bestellbar“ der Hofliste rechnen aus den aktiven Abholzeiten.
+  updateTag(HOEFE_CACHE_TAG)
   return {}
 }
 
@@ -248,6 +257,8 @@ export async function togglePickupSlotActive(slotId: string, isActive: boolean):
 
   revalidatePath('/settings/pickup-slots')
   revalidatePath(`/${farm.slug}`)
+  // Abholzeile, Filter und „bestellbar“ der Hofliste rechnen aus den aktiven Abholzeiten.
+  updateTag(HOEFE_CACHE_TAG)
   return {}
 }
 
@@ -259,18 +270,25 @@ export async function setPause(isPaused: boolean, pauseMessage: string): Promise
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
 
+  // Mit der gespeicherten Nachricht des eigenen Hofs, nie mit einem Wert aus
+  // dem Browser: Ein Altwert über der Grenze darf unverändert bleiben.
+  const parsed = pauseSchema(farm.pauseMessage).safeParse({ isPaused, pauseMessage })
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Daten' }
+
   await prisma.farm.update({
     where: { id: farm.id },
     data: {
-      isPaused,
+      isPaused: parsed.data.isPaused,
       // Die Nachricht gilt unabhängig vom Status: Der Hof schreibt sie oft vor,
       // solange der Shop noch läuft, und will sie nach dem Urlaub wiederverwenden.
       // Früher wurde sie ohne Pause verworfen — trotz „Nachricht gespeichert".
-      pauseMessage: pauseMessage.trim() || null,
+      pauseMessage: parsed.data.pauseMessage || null,
     },
   })
 
   revalidatePath('/settings/pause')
   revalidatePath(`/${farm.slug}`)
+  // Die Hofliste zeigt „Macht gerade Pause“ aus ihrem Zwischenspeicher.
+  updateTag(HOEFE_CACHE_TAG)
   return {}
 }

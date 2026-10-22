@@ -182,7 +182,7 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
 | `mobil-h1-einrichten.html` | H1 · Einrichten | `/onboarding` | Umbau | 390×980 |
-| `mobil-h1-mein-hof.html` | H1 · Mein Hof | `/farm-page` | Umbau | 390×844 |
+| `mobil-h1-mein-hof.html` | H1 · Mein Hof · abgelöst durch system-h1-mein-hof-v3 (freigegeben 22.10.2026, Nr. 143/144) | `/farm-page` | Umbau | 390×844 |
 | `mobil-h1-einstellungen-konditionen-v2.html` | H1 · Einstellungen › Konditionen, Fassung 2 | `/settings/konditionen` | Umbau (Nr. 61) | 390×1800 |
 | `mobil-h1-titelbild-ausschnitt.html` | H1 · Titelbild am Handy: Blatt mit Rahmen „Computer“, Zoom, Vorschau „So sieht es im Browser aus“ (Hofseite am Computer verkleinert) und „So sieht es am Handy aus“, Wahl füllen/ganz, Filter, Speichern | `/farm-page` (Blatt unter lg) | neu (Nr. 97) | 390×1280 |
 
@@ -190,7 +190,8 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
-| `mobil-h2-produkte.html` | H2 · Produkte | `/products` | Umbau | 390×844 |
+| `mobil-h2-produkte.html` | H2 · Produkte · abgelöst durch system-h1-mein-hof-v3 (freigegeben 22.10.2026, Nr. 143/144) | `/products` | Umbau | 390×844 |
+| `system-h1-mein-hof-v3.html` | Vorschlag 21.10. · H1/H2 Mein Hof am Handy v3, bewertet (Menüführung 66 → 94, Übersicht 48 → 92) mit Vorbildern von Mobbin: ein Kopf mit Titelbild-Streifen, Teilen, Kundenansicht und Zustandszeile (Nimmt Bestellungen an · Pausiert · Noch nicht bestellbar · Noch nicht freigegeben) für alle drei Reiter; Produkte mit „Braucht dich“ zuerst, Vorrat mit Einheit als Knopf und Blatt zum Ändern, Abzeichen nur bei Ausnahmen; Pausieren im Kopf mit Bestätigung; Hofseite mit „Hofseite vollständig“ bzw. „Noch n Punkte offen“ und Gruppen nach dem Ort auf der Seite; Bausteine, Regeln, Technik, Register-Vorschlag (N3, N4, E12, N8) | `/products`, `/farm-page` (unter 1024 px) | Umbau (freigegeben 22.10.2026, Nr. 143–144) | 2640×3990 |
 | `mobil-h2-neu-was-legst-du-an.html` | H2 · Neu: Was legst du an? | `Neu-Menü` | neu | 390×844 |
 | `mobil-h2-neues-produkt.html` | H2 · Neues Produkt | `/products (Formular Lebensmittel)` | Umbau | 390×844 |
 | `mobil-h2-neues-produkt-grenze-hoftor.html` | H2 · Neues Produkt: Grenze im Hoftor (ab 1.2.2027) | `/products (Formular)` | Zustand (Gate 8, O8) | 390×844 |

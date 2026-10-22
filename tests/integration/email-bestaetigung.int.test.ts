@@ -174,7 +174,9 @@ describe('Registrieren und Bestätigen', () => {
     const { id } = await neuerHof()
     await arbeiteNachlaufAb()
     const echt = tokenAus(versand.links[0]?.link ?? '')
-    const gefaelscht = `${echt.slice(0, -4)}AAAA`
+    // Ein Zeichen der Signatur sicher tauschen, nicht festsetzen. Das vorletzte, denn das letzte Zeichen einer
+    // 43-stelligen Signatur trägt zwei Auffüllbits: ein Tausch dort kann dieselbe Signatur ergeben.
+    const gefaelscht = `${echt.slice(0, -2)}${echt.at(-2) === 'A' ? 'B' : 'A'}${echt.slice(-1)}`
 
     expect(await aktionen.bestaetigeEmail({ token: gefaelscht })).toMatchObject({ code: 'UNGUELTIG' })
     expect((await prisma.user.findUniqueOrThrow({ where: { id } })).emailVerified).toBe(false)

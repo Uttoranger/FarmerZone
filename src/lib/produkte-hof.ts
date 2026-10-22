@@ -12,7 +12,7 @@
  * Filterwert in der Adresse bleibt `entwuerfe`, damit alte Links gelten.
  */
 import { NICHT_IM_SHOP, produktZustand } from '@/lib/produkt-sichtbarkeit'
-import { formatMenge, formatZahl, mitAnzahl } from '@/lib/format'
+import { formatMenge, formatZahl, hofVorratText, mitAnzahl } from '@/lib/format'
 import { KATEGORIE_LABEL, istFuttermittel, type ProductCategoryValue } from '@/lib/taxonomie'
 import { abholungText, type NaechstesFenster } from '@/lib/heute'
 import { teilenMomenteAn } from '@/lib/teilen-momente'
@@ -32,7 +32,7 @@ export type ProduktStatus = { text: string; ton: ProduktStatusTon }
  * „N Größen warten auf Meldung" gehört zu Gate 6 (Futter-Sperre je Gebinde)
  * und kommt mit Nr. 20.
  */
-export function produktStatus(p: { isAvailable: boolean; stock: number }): ProduktStatus {
+export function produktStatus(p: { isAvailable: boolean; stock: number; unit: string; unitSize: number | null }): ProduktStatus {
   const zustand = produktZustand(p)
   switch (zustand.art) {
     case 'nicht-im-shop':
@@ -40,7 +40,8 @@ export function produktStatus(p: { isAvailable: boolean; stock: number }): Produ
     case 'ausverkauft':
       return { text: 'Ausverkauft', ton: 'neutral' }
     case 'knapp':
-      return { text: `Nur noch ${formatZahl(zustand.bestand)}`, ton: 'offen' }
+      // Mit der Einheit des Vorrats (N25): „Nur noch 3 kg", bei Gebinden „Nur noch 2 Pakete".
+      return { text: `Nur noch ${hofVorratText(zustand.bestand, p.unit, p.unitSize)}`, ton: 'offen' }
     case 'im-shop':
       return { text: 'Sichtbar', ton: 'fertig' }
   }
@@ -138,6 +139,62 @@ export function filterAdresse(filter: ProdukteFilter, suche: string): string {
   return `/products${rest ? `?${rest}` : ''}`
 }
 
+// ─── Abschnitte der Karten-Zeilen (Register N25) ────────────────────────────
+
+/**
+ * Was am Ende der Abschnitte steht: im Filter „Alle" eine Zeile „Nicht im
+ * Shop · n" (ein Link auf den Filter), unter einem Bereichsfilter die
+ * ausgeblendeten Produkte dieses Bereichs mit ihren Zeilen.
+ */
+export type NichtImShopAbschnitt<T> = { art: 'zeile'; zahl: number } | { art: 'zeilen'; produkte: T[] }
+
+export type ProdukteAbschnitte<T> =
+  | { art: 'liste'; produkte: T[] }
+  | { art: 'abschnitte'; brauchtDich: T[]; imShop: T[]; nichtImShop: NichtImShopAbschnitt<T> | null }
+
+/**
+ * Die Karten-Zeilen unter 1024 px (Board system-h1-mein-hof-v3, Bildschirm A):
+ * zuerst „Braucht dich" — im Shop und ausverkauft, dann wenig Vorrat (dieselbe
+ * Grenze wie bei der Kundin, `produktZustand`), dann ein Hinweis mit
+ * Handlung —, danach „Im Shop" in der Reihenfolge des Hofs (`PRODUCT_ORDER_BY`,
+ * wie geladen). Innerhalb gleicher Art bleibt die eigene Reihenfolge; kein
+ * Produkt steht zweimal. Mit einer Suche und im Filter „Nicht im Shop" gibt
+ * es eine einfache Liste: Wer sucht, will den Treffer, keine Sortierung.
+ *
+ * Größen bleiben je eine Zeile (eigenes Produkt mit `familieId`) — anders als
+ * das Board („4 Größen"): Zusammenfassen bräuchte eine eigene Ansicht der Größen.
+ *
+ * `hatHandlung` reicht die Ansicht herein: `produktHinweise` liegt in
+ * src/components/products/, und src/lib importiert nichts aus den Komponenten.
+ */
+export function produkteAbschnitte<T extends FilterProdukt & { name: string; stock: number }>(
+  produkte: readonly T[],
+  ansicht: ProdukteAnsicht,
+  hatHandlung: (produkt: T) => boolean
+): ProdukteAbschnitte<T> {
+  if (ansicht.filter === 'entwuerfe' || ansicht.suche.trim() !== '') {
+    return { art: 'liste', produkte: filtereProdukte(produkte, ansicht) }
+  }
+  const imFilter = produkte.filter((p) => passtZuProdukteFilter(p, ansicht.filter))
+  const imShopAlle = imFilter.filter((p) => p.isAvailable)
+  const art = (p: T) => produktZustand(p).art
+  const ausverkauft = imShopAlle.filter((p) => art(p) === 'ausverkauft')
+  const knapp = imShopAlle.filter((p) => art(p) === 'knapp')
+  const mitHinweis = imShopAlle.filter((p) => art(p) === 'im-shop' && hatHandlung(p))
+  const brauchtDich = [...ausverkauft, ...knapp, ...mitHinweis]
+  const imShop = imShopAlle.filter((p) => !brauchtDich.includes(p))
+
+  let nichtImShop: NichtImShopAbschnitt<T> | null = null
+  if (ansicht.filter === 'alle') {
+    const zahl = zaehleProdukteFilter(produkte).entwuerfe
+    if (zahl > 0) nichtImShop = { art: 'zeile', zahl }
+  } else {
+    const ausgeblendet = imFilter.filter((p) => !p.isAvailable)
+    if (ausgeblendet.length > 0) nichtImShop = { art: 'zeilen', produkte: ausgeblendet }
+  }
+  return { art: 'abschnitte', brauchtDich, imShop, nichtImShop }
+}
+
 // ─── „Wieder da" ────────────────────────────────────────────────────────────
 
 /** Der Anlass des Moments: Der Vorrat wechselt von 0 auf mehr als 0. */
@@ -215,5 +272,8 @@ export function gespeichertTexte(name: string, fenster: NaechstesFenster | null)
   }
 }
 
-/** Der Satz unter der Tabelle (Mockup). */
+/** Der Satz unter der Tabelle (Mockup) — nur ab 1024 px, wo − und + in der Zeile stehen. */
 export const VORRAT_HINWEIS = 'Vorrat direkt hier ändern. Bei 0 wird das Produkt automatisch als ausverkauft angezeigt – nicht gelöscht.'
+
+/** Derselbe Platz unter 1024 px: Dort ändert ein Tipp auf den Vorrat ihn im Blatt (N25). */
+export const VORRAT_HINWEIS_ZEILEN = 'Tipp auf den Vorrat, um ihn zu ändern. Bei 0 steht das Produkt als ausverkauft da – es wird nicht gelöscht.'
