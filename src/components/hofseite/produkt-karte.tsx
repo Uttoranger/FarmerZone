@@ -6,11 +6,10 @@ import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import type { PublicProduct } from '@/server/queries/farm'
 import { formatGrundpreis } from '@/lib/format'
-import { knappText, type KartenZustand } from '@/lib/bereiche-anzeige'
+import { knappText, ruhenderKnopfText, type KartenZustand } from '@/lib/bereiche-anzeige'
 import { KAEUFER_VORSCHAU, stepperObergrenze, type KartenVorschau } from '@/lib/hofseite-kunde'
 import { zweitePreiszeile } from '@/lib/produktdetail'
 import { produktInitiale } from '@/lib/hofuebersicht'
-import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
 import { bildStil } from '@/lib/bild-ausschnitt'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { cn } from '@/lib/utils'
@@ -81,7 +80,7 @@ type MusterKarte = {
  * (/[hof]/produkt/[id]) — die eine Darstellung der Produktdetails; das Blatt
  * von vorher gibt es nicht mehr. Die zweite Preiszeile kommt aus derselben
  * Regel wie dort (zweitePreiszeile). Den Zustand (knapp, ausverkauft,
- * pausiert) entscheidet kartenZustand, die Karte zeigt ihn nur: knapp als
+ * pausiert, nicht bestellbar — Kaufsperre, N24) entscheidet kartenZustand, die Karte zeigt ihn nur: knapp als
  * orangene Marke „Nur noch …", ausverkauft ausgegraut — nie über opacity auf
  * Text (Kontrast). Ohne „Merken" (E8, S11).
  *
@@ -149,11 +148,7 @@ export function ProduktKarte(props: KaufKarte | MusterKarte): React.JSX.Element 
           </button>
         ) : (
           <span className="max-w-32 rounded-full bg-muted px-3 py-1.5 text-center text-xs text-muted-foreground md:max-w-none">
-            {zustand.art === 'pausiert'
-              ? SHOP_PAUSED_BUTTON_LABEL
-              : zustand.art === 'nicht-verfuegbar'
-                ? zustand.grund
-                : 'Ausverkauft'}
+            {ruhenderKnopfText(zustand)}
           </span>
         )
       }

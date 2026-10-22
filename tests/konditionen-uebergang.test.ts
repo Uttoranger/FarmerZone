@@ -179,6 +179,7 @@ describe('Die Seiten zeigen den Satz', () => {
             hofseite: { erledigt: 7, gesamt: 11, fehlend: ['Logo'] },
             produkte: 0,
             stripeBereit: false,
+            abholzeitAktiv: true,
             freigeschaltet: false,
           },
         }),

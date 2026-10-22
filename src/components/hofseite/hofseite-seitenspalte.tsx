@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
 import { futterVerantwortungImKorb, type FutterAbgabe } from '@/lib/futter-registrierung'
+import type { KaufSperre } from '@/lib/bereiche-anzeige'
+import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 
 /*
  * Die rechte Spalte der Hofseite — EINE Komponente (Gate 4, Kernpunkt):
@@ -34,10 +36,13 @@ import { futterVerantwortungImKorb, type FutterAbgabe } from '@/lib/futter-regis
 export type SeitenspalteHof = {
   id: string
   slug: string
+  /** Für den Hinweis zur Kaufsperre im Mini-Warenkorb. */
+  name: string
   address: string
   postalCode: string
   city: string
-  isPaused: boolean
+  /** Die Nachricht des Hofs zur Pause — der Hinweis im Mini-Warenkorb nennt sie wie die Seite. */
+  pauseMessage: string | null
   pickupSlots: PublicPickupSlot[]
 }
 
@@ -52,6 +57,7 @@ const TEXTLINK = cn(
 
 export function HofseiteSeitenspalte({
   hof,
+  sperre,
   zahlungsarten,
   gebuehrKurz,
   gebuehrKorb,
@@ -62,6 +68,8 @@ export function HofseiteSeitenspalte({
   className,
 }: {
   hof: SeitenspalteHof
+  /** Die Kaufsperre der Seite (kaufSperre, Register N24) — einmal auf dem Server gerechnet. */
+  sperre: KaufSperre
   zahlungsarten: readonly Zahlungsart[]
   /** „Preise zzgl. 5 % Servicegebühr …" — null, wenn der Hof gerade gebührenfrei ist. */
   gebuehrKurz: string | null
@@ -83,10 +91,11 @@ export function HofseiteSeitenspalte({
 
   return (
     <aside aria-label="Abholung, Zahlung und Anfahrt" className={cn('flex flex-col gap-[18px]', className)}>
-      {mitKorb && <MiniWarenkorb farmId={hof.id} slug={hof.slug} gebuehrKorb={gebuehrKorb} produkte={produkte} kasseHref={kasseHref} />}
+      {mitKorb && <MiniWarenkorb hof={hof} sperre={sperre} gebuehrKorb={gebuehrKorb} produkte={produkte} kasseHref={kasseHref} />}
 
-      {/* Bei Pause keine Termine: Ankündigen, was man nicht buchen kann, wäre ein leeres Versprechen. */}
-      {!hof.isPaused && tage.length > 0 && (
+      {/* Mit Kaufsperre (Pause, keine Abholzeit, ausgebucht) keine Termine: Ankündigen, was man nicht
+          buchen kann, wäre ein leeres Versprechen — auch ein heute noch laufendes Fenster nicht. */}
+      {sperre === null && tage.length > 0 && (
         <section aria-labelledby="naechste-abholung" className={KARTE}>
           <h2 id="naechste-abholung" className={KARTEN_TITEL}>
             Nächste Abholung
@@ -186,21 +195,25 @@ export function HofseiteSeitenspalte({
  * Der Mini-Warenkorb (DESIGN_SYSTEM, „Kaufstrecke"): sobald etwas im Korb
  * dieses Hofs liegt, oben in der rechten Spalte, klebend. Liest den Korb aus
  * dem Speicher (useWarenkorbVomHof) — geschrieben wird nur über useCart im
- * Produktraster, das danach WARENKORB_EREIGNIS meldet.
+ * Produktraster, das danach WARENKORB_EREIGNIS meldet. Mit Kaufsperre
+ * (Register N24) steht statt „Zur Kasse“ der Hinweis mit dem Grund: Die Kasse
+ * nähme die Bestellung ohnehin nicht an. Nur der Titel (`kurz`): Den Satz trägt
+ * schon die Karte oben auf derselben Seite — ein Zustand, eine Fassung.
  */
 function MiniWarenkorb({
-  farmId,
-  slug,
+  hof,
+  sperre,
   gebuehrKorb,
   produkte,
   kasseHref,
 }: {
-  farmId: string
-  slug: string
+  hof: SeitenspalteHof
+  sperre: KaufSperre
   gebuehrKorb: string | null
   produkte: readonly (FutterAbgabe & { id: string })[]
   kasseHref?: string
 }): ReactNode {
+  const { id: farmId, slug } = hof
   const positionen = useWarenkorbVomHof(farmId)
   if (positionen.length === 0) return null
   const anzahl = warenkorbAnzahl(positionen)
@@ -235,15 +248,19 @@ function MiniWarenkorb({
         {gebuehrKorb && <span className="text-[13px] font-normal text-muted-foreground">&nbsp;{gebuehrKorb}</span>}
       </p>
       <FutterVerantwortung saetze={futterVerantwortungImKorb(positionen, produkte)} />
-      <Link
-        href={kasseHref ?? `/${slug}/checkout`}
-        className={cn(
-          'flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 text-[14.5px] font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
-          FOKUS_RAHMEN
-        )}
-      >
-        Zur Kasse
-      </Link>
+      {sperre !== null ? (
+        <KaufSperreHinweis sperre={sperre} hofName={hof.name} pauseMessage={hof.pauseMessage} kurz />
+      ) : (
+        <Link
+          href={kasseHref ?? `/${slug}/checkout`}
+          className={cn(
+            'flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 text-[14.5px] font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
+            FOKUS_RAHMEN
+          )}
+        >
+          Zur Kasse
+        </Link>
+      )}
     </section>
   )
 }

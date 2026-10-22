@@ -366,7 +366,7 @@ const VORSCHAU: Ansicht = { art: 'vorschau', kaufen: false }
 /** Genau so, wie die Hofseite FarmPageView rendert — in der KundeShell, mit der Ansicht aus ansichtsModus. */
 function hofseite(ansicht: Ansicht, farm: PublicFarm = HOF): string {
   return renderToStaticMarkup(
-    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, beitraege: [STATUS], reorderItems: [], ansicht }))
+    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, beitraege: [STATUS], reorderItems: [], ansicht, sperre: null }))
   )
 }
 

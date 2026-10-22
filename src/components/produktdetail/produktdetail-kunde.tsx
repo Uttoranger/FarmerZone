@@ -3,12 +3,12 @@
 import { useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Building2, ChevronLeft, Leaf, PauseCircle, ShoppingBasket } from 'lucide-react'
+import { Building2, ChevronLeft, Leaf, ShoppingBasket } from 'lucide-react'
 import { toast } from 'sonner'
 import type { PublicProduct } from '@/server/queries/farm'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
 import { formatEuro, formatGrundpreis, formatKategorie } from '@/lib/format'
-import { kartenZustand, knappText } from '@/lib/bereiche-anzeige'
+import { kartenZustand, knappText, ruhenderKnopfText, type KaufSperre } from '@/lib/bereiche-anzeige'
 import { gebuehrHinweisFuerHof, mengeAbgelehntText, zahlungsarten } from '@/lib/hofseite-kunde'
 import { VORSCHAU_KAUF_HINWEIS, korbErlaubt } from '@/lib/hofseite-vorschau'
 import {
@@ -30,7 +30,6 @@ import {
 } from '@/lib/produktdetail'
 import { produktInitiale } from '@/lib/hofuebersicht'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
-import { SHOP_PAUSED_BUTTON_LABEL, kundenPausenText } from '@/lib/shop-pause'
 import { SIEGEL } from '@/lib/taxonomie'
 import type { KundenSeite } from '@/lib/kunden-kopf'
 import { useCart } from '@/lib/use-cart'
@@ -45,6 +44,7 @@ import { useRueckwegKlick } from '@/components/shared/kunden-kopf'
 import { CartSheet } from '@/components/farm/cart-sheet'
 import type { HofseiteHof } from '@/components/hofseite/hofseite-kunde'
 import { HofseiteSeitenspalte } from '@/components/hofseite/hofseite-seitenspalte'
+import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import { GleichMitAbholen, Kennzeichnung } from '@/components/produktdetail/produktdetail-teile'
 import { RaummassErklaerung } from '@/components/shared/raummass-erklaerung'
 import { raummassErklaeren } from '@/lib/verkaufsgroessen'
@@ -84,6 +84,7 @@ export function ProduktdetailKunde({
   ansicht,
   kaeufer = null,
   jetzt,
+  sperre,
 }: {
   /** Der Hof ohne Telefon und E-Mail (Nr. 70): Die Seite entfernt sie auf dem Server, wie bei der Hofseite. */
   farm: HofseiteHof
@@ -96,6 +97,8 @@ export function ProduktdetailKunde({
   kaeufer?: KaeuferVorbelegung | null
   /** Zeitpunkt der Anfrage (ISO) vom Server — Gebührensatz und Abholtage rechnen davon (Hydration). */
   jetzt: string
+  /** Die Kaufsperre (Register N24), einmal auf dem Server mit `jetzt` gerechnet (kaufSperre in page.tsx). */
+  sperre: KaufSperre
 }): React.JSX.Element | null {
   const produkte = farm.products
   const einstieg = useMemo(() => sichtbaresProdukt(produkte, produktId), [produkte, produktId])
@@ -119,7 +122,7 @@ export function ProduktdetailKunde({
   if (!einstieg) return null
 
   const produkt = gewaehlteGroesse(familie, einstieg, gewaehlt)
-  const zustand = kartenZustand(produkt, farm.isPaused)
+  const zustand = kartenZustand(produkt, sperre)
   const kaufbar = zustand.art === 'kaufbar' || zustand.art === 'knapp'
   // Mit den Zahlarten des Hofs und der Bar-Ausnahme bis zum SEPA-Start (B1).
   const gebuehr = gebuehrHinweisFuerHof(farm, new Date(jetzt))
@@ -176,10 +179,10 @@ export function ProduktdetailKunde({
   const brennmaterial = produkt.brennmaterial ? brennmaterialZeilen(produkt.brennmaterial) : []
   const beschreibung = produkt.description?.trim() ?? ''
   const zweite = zweitePreiszeile(produkt)
-  const kacheln = groessenKacheln(familie, farm.isPaused)
+  const kacheln = groessenKacheln(familie, sperre)
   const mitGrundpreis = kacheln.some((k) => k.grundpreis)
   const vorrat = vorratText(produkt, zustand)
-  const mitnehmen = gleichMitAbholen(produkte, produkt, farm.isPaused)
+  const mitnehmen = gleichMitAbholen(produkte, produkt, sperre)
   // Raummeter und Schüttraummeter erklärt die Seite beim ersten Vorkommen (DESIGN_SYSTEM, Nr. 20).
   const raummass = raummassErklaeren((familie.length > 0 ? familie : [produkt]).map((p) => p.unit))
   // Bei jedem Futter der Verantwortungs-Hinweis (E10a), bei „nur an Betriebe" mit Zusatz.
@@ -311,12 +314,9 @@ export function ProduktdetailKunde({
             </div>
           </section>
 
-          {/* Pause: Der Hof bleibt sichtbar, nur gekauft wird nicht. */}
-          {farm.isPaused && (
-            <Hinweiskarte ton="orange" symbol={PauseCircle} titel={`${farm.name} pausiert gerade.`}>
-              <span className="break-words">{kundenPausenText(farm.pauseMessage)}</span>
-            </Hinweiskarte>
-          )}
+          {/* Kaufsperre (Pause, keine Abholzeit, ausgebucht — Register N24): Das Produkt bleibt sichtbar,
+              nur gekauft wird nicht; dieselbe Karte wie auf der Hofseite. */}
+          <KaufSperreHinweis sperre={sperre} hofName={farm.name} pauseMessage={farm.pauseMessage} />
 
           {/* ── Kaufen ── */}
           <section aria-labelledby="kaufen-titel" className={cn(KARTE, 'flex flex-col gap-3.5 p-4 md:px-5 md:py-[18px]')}>
@@ -388,7 +388,7 @@ export function ProduktdetailKunde({
                   </>
                 ) : (
                   <p className="flex min-h-[46px] flex-1 items-center justify-center rounded-full bg-muted px-4 text-center text-sm text-muted-foreground md:flex-none">
-                    {zustand.art === 'pausiert' ? SHOP_PAUSED_BUTTON_LABEL : zustand.art === 'nicht-verfuegbar' ? zustand.grund : 'Ausverkauft'}
+                    {ruhenderKnopfText(zustand)}
                   </p>
                 )}
                 {gebuehr && kaufbar && <p className="hidden max-w-60 text-xs leading-snug text-muted-foreground md:block">{gebuehr.produkte}</p>}
@@ -421,6 +421,7 @@ export function ProduktdetailKunde({
         {/* Ab 1024 px die rechte Spalte der Hofseite — dieselbe Komponente, mit dem Mini-Warenkorb. */}
         <HofseiteSeitenspalte
           hof={farm}
+          sperre={sperre}
           zahlungsarten={zahlungsarten(farm)}
           gebuehrKurz={gebuehr?.kurz ?? null}
           gebuehrKorb={gebuehr?.korb ?? null}
@@ -444,6 +445,7 @@ export function ProduktdetailKunde({
           onRemoveItem={removeItem}
           gebuehrKorb={gebuehr?.korb ?? null}
           futterHinweis={futterVerantwortungImKorb(items, produkte)}
+          kaufSperre={{ sperre, hofName: farm.name, pauseMessage: farm.pauseMessage }}
         />
       )}
     </>

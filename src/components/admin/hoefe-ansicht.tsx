@@ -8,6 +8,7 @@ import {
   HOF_FILTER_LABEL,
   HOF_FILTER_WERTE,
   NUMMER_HINWEIS,
+  NUR_MIT_TREFFERN,
   ONLINE_AUS_TEXT,
   SERVICEGEBUEHR_NUR_NEUE,
   filtereHoefe,
@@ -225,7 +226,7 @@ export function HoefeAnsicht({
           </h2>
           {reiter === 'alle' && (
             <FilterChipReihe beschriftung="Höfe filtern">
-              {HOF_FILTER_WERTE.filter((f) => (f !== 'stillgelegt' && f !== 'online-aus') || zahlen[f] > 0).map((f) => {
+              {HOF_FILTER_WERTE.filter((f) => !NUR_MIT_TREFFERN.has(f) || zahlen[f] > 0).map((f) => {
                 const ziel = adresse({ filter: f })
                 return (
                   <FilterChip

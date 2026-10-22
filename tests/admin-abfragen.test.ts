@@ -56,6 +56,8 @@ function dbZeile(ueber: Record<string, unknown> = {}) {
     _count: { products: 0, farmPhotos: 0, pickupSlots: 0 },
     // Seit Nr. 116: ob ein Produkt im Shop ist (Freischalten).
     products: [],
+    // Seit der Z1-Ergänzung (21.10.2026): ob es eine aktive Abholzeit gibt.
+    pickupSlots: [],
     ...ueber,
   }
 }

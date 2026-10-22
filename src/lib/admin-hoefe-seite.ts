@@ -102,7 +102,7 @@ export function hoefeUnterreiter(stand: { wartende: number; alle: number; gruend
 
 // ─── Kennzahlen ──────────────────────────────────────────────────────────────
 
-type ZeileFuerZahlen = Pick<AdminHofZeile, 'name' | 'slug' | 'status' | 'stripeFehlt' | 'onlineAus'>
+type ZeileFuerZahlen = Pick<AdminHofZeile, 'name' | 'slug' | 'status' | 'stripeFehlt' | 'onlineAus' | 'abholzeitFehlt'>
 
 /**
  * Warten · Online · Pausiert · Ohne Zahlung · Gründungsplätze (Mockup, Register

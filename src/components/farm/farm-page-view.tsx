@@ -34,6 +34,7 @@ import { updateFarmBannerAction } from '@/server/actions/appearance'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { HofseiteKunde, type HofseiteHof } from '@/components/hofseite/hofseite-kunde'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
+import type { KaufSperre } from '@/lib/bereiche-anzeige'
 
 // ── Titelbild: Knöpfe für Mein Hof ────────────────────────────────────────────
 
@@ -139,11 +140,13 @@ type Props = {
    * setzt ihn immer.
    */
   jetzt?: string
+  /** Die Kaufsperre (Register N24) — page.tsx rechnet sie einmal mit `jetzt` (kaufSperre). */
+  sperre: KaufSperre
 }
 
 const FUER_KUNDINNEN: Pick<SeitenAnsicht, 'art' | 'kaufen'> = { art: 'kundin', kaufen: true }
 
-export function FarmPageView({ farm, beitraege, beitraegeFehler = false, reorderItems, ansicht = FUER_KUNDINNEN, jetzt }: Props) {
+export function FarmPageView({ farm, beitraege, beitraegeFehler = false, reorderItems, ansicht = FUER_KUNDINNEN, jetzt, sperre }: Props) {
   // Ohne Zeitpunkt vom Server (kein Aufrufer heute) die eigene Uhr — dann
   // kann „vor N Stunden" zwischen Server und Browser abweichen.
   return (
@@ -154,6 +157,7 @@ export function FarmPageView({ farm, beitraege, beitraegeFehler = false, reorder
       reorderItems={reorderItems}
       ansicht={ansicht}
       jetzt={jetzt ?? new Date().toISOString()}
+      sperre={sperre}
     />
   )
 }

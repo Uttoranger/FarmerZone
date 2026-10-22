@@ -566,11 +566,13 @@ describe('kilopreisNetto — die eine Rechenstelle', () => {
 })
 
 describe('zeigeKaufknopf — Hofseite', () => {
-  it('sichtbar, Bestand und kein Pause-Modus', () => {
-    expect(zeigeKaufknopf({ isAvailable: true, stock: 1 }, false)).toBe(true)
-    expect(zeigeKaufknopf({ isAvailable: true, stock: 0 }, false)).toBe(false)
-    expect(zeigeKaufknopf({ isAvailable: false, stock: 5 }, false)).toBe(false)
-    expect(zeigeKaufknopf({ isAvailable: true, stock: 5 }, true)).toBe(false)
+  it('sichtbar, Bestand und keine Kaufsperre (Pause, keine Abholzeit, ausgebucht — N24)', () => {
+    expect(zeigeKaufknopf({ isAvailable: true, stock: 1 }, null)).toBe(true)
+    expect(zeigeKaufknopf({ isAvailable: true, stock: 0 }, null)).toBe(false)
+    expect(zeigeKaufknopf({ isAvailable: false, stock: 5 }, null)).toBe(false)
+    for (const sperre of ['pause', 'keine-abholzeit', 'ausgebucht'] as const) {
+      expect(zeigeKaufknopf({ isAvailable: true, stock: 5 }, sperre), sperre).toBe(false)
+    }
   })
 })
 

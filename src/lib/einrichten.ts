@@ -17,11 +17,13 @@
  *    stehen.
  *
  * Stripe-Pflicht (Register Z1): „Hof online stellen" — die Freischaltung —
- * geht erst mit fertigem Stripe-Konto. Hier steht es nur als Zustand; die
- * Schranke selbst sitzt im Server (freischaltSperre in approveFarmAction).
+ * geht erst mit fertigem Stripe-Konto und (Ergänzung 21.10.2026) mit einer
+ * aktiven Abholzeit. Hier steht es nur als Zustand; die Schranke selbst sitzt
+ * im Server (freischaltSperre in approveFarmAction).
  */
 import { aufzaehlung } from '@/lib/hofseite-fortschritt'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
+import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
 
 export type EinrichtenDaten = {
   /** Name aus dem Konto (User.name). */
@@ -42,6 +44,8 @@ export type EinrichtenDaten = {
     produkte: number
     /** stripeKontoBereit — Zahlungen UND Auszahlungen frei. */
     stripeBereit: boolean
+    /** Mindestens eine aktive Abholzeit — ohne sie kein Freischalten (Register Z1, Ergänzung 21.10.2026). */
+    abholzeitAktiv: boolean
     /** approvedAt gesetzt (nur der Betreiber setzt es). */
     freigeschaltet: boolean
   } | null
@@ -223,15 +227,27 @@ export function einrichtenStand(daten: EinrichtenDaten): EinrichtenStand {
             zustand: 'gesperrt',
             aktion: { art: 'link', href: '/settings/payments', label: ONLINE_ZAHLUNG_EINRICHTEN_TITEL, primaer: false },
           }
-        : {
-            id: 'freischaltung',
-            titel: 'Prüfung und Freischaltung',
-            titelKurz: 'Freischaltung',
-            text: 'Wir schauen kurz drüber und melden uns per E-Mail – dann ist dein Hof öffentlich.',
-            textKurz: 'wir melden uns per E-Mail',
-            zustand: hof ? 'wartet' : 'gesperrt',
-            aktion: null,
-          }
+        : hof && !hof.abholzeitAktiv
+          ? {
+              // Z1, Ergänzung 21.10.2026: ohne aktive Abholzeit kann niemand bestellen —
+              // derselbe Grund wie in freischaltSperre, in der Reihenfolge nach Stripe.
+              id: 'freischaltung',
+              titel: 'Prüfung und Freischaltung',
+              titelKurz: 'Freischaltung',
+              text: 'Geht erst mit einer Abholzeit – danach schauen wir drüber und schalten deinen Hof frei.',
+              textKurz: 'erst mit einer Abholzeit',
+              zustand: 'gesperrt',
+              aktion: { art: 'link', href: ABHOLZEITEN_FEHLEN.aktion.href, label: ABHOLZEITEN_FEHLEN.aktion.text, primaer: false },
+            }
+          : {
+              id: 'freischaltung',
+              titel: 'Prüfung und Freischaltung',
+              titelKurz: 'Freischaltung',
+              text: 'Wir schauen kurz drüber und melden uns per E-Mail – dann ist dein Hof öffentlich.',
+              textKurz: 'wir melden uns per E-Mail',
+              zustand: hof ? 'wartet' : 'gesperrt',
+              aktion: null,
+            }
 
   const schritte = [konto, hofSchritt, produkte, zahlung, sepa, freischaltung].map((s, i) => ({ ...s, nummer: i + 1 }))
   const zaehlend = schritte.filter((s) => s.zustand !== 'hinweis')

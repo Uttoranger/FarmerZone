@@ -275,11 +275,14 @@ const ZAHLWEG_BAR = 'bar am Hof · Bestätigung per E-Mail'
  * „… · bar am Hof · Bestätigung per E-Mail". Den Termin schreibt `abholSatz`;
  * ohne gewählten Termin steht dort die Bitte, einen zu wählen. „bar am Hof"
  * nur, wenn die Kasse bar anbietet (`bar`, aus `kassenZahlweg`): Ohne
- * angebotene Zahlart steht nur der Termin da.
+ * angebotene Zahlart steht nur der Termin da. Mit Kaufsperre (`gesperrt`, Register
+ * N24) gibt es nichts zu wählen — die Karte oben nennt den Grund, hier steht nur
+ * noch der Zahlweg (leer, wenn es keinen gibt).
  */
-export function kaufknopfZeile(k: { termin: string | null; online: boolean; bar: boolean }): string {
-  const abholung = k.termin ? `Abholung ${k.termin}` : 'Wähl noch, wann du abholst'
+export function kaufknopfZeile(k: { termin: string | null; online: boolean; bar: boolean; gesperrt?: boolean }): string {
   const zahlweg = k.online ? ZAHLWEG_ONLINE : k.bar ? ZAHLWEG_BAR : null
+  if (k.gesperrt) return zahlweg ?? ''
+  const abholung = k.termin ? `Abholung ${k.termin}` : 'Wähl noch, wann du abholst'
   return zahlweg ? `${abholung} · ${zahlweg}` : abholung
 }
 

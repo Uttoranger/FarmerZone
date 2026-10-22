@@ -62,7 +62,7 @@ vi.mock('@/server/actions/products', () => ({ updateProductImageAction: vi.fn(),
 import { FarmPageView } from '@/components/farm/farm-page-view'
 import { ProduktKarte } from '@/components/hofseite/produkt-karte'
 import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
-import { kartenZustand } from '@/lib/bereiche-anzeige'
+import { kartenZustand, kaufSperre } from '@/lib/bereiche-anzeige'
 import { KAEUFER_VORSCHAU, type KartenVorschau } from '@/lib/hofseite-kunde'
 import { TESTHOF_HINWEIS } from '@/lib/gruendungshof'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
@@ -114,7 +114,8 @@ const JETZT = '2026-10-02T08:00:00.000Z'
 function seite({ suche = '', farm = HOF, beitraege = [STATUS], beitraegeFehler = false, ansicht = KUNDIN, jetzt = JETZT }: { suche?: string; farm?: PublicFarm; beitraege?: ActiveStatusPost[]; beitraegeFehler?: boolean; ansicht?: Ansicht; jetzt?: string } = {}): string {
   adresse.suche = suche
   return renderToStaticMarkup(
-    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, beitraege, beitraegeFehler, reorderItems: [], ansicht, jetzt }))
+    // Die Kaufsperre wie page.tsx: einmal, mit demselben Zeitpunkt (Register N24).
+    createElement(KundeShellMitSitzung, null, createElement(FarmPageView, { farm, beitraege, beitraegeFehler, reorderItems: [], ansicht, jetzt, sperre: kaufSperre(farm, new Date(jetzt)) }))
   )
 }
 
@@ -521,7 +522,7 @@ describe('Stepper der Produktkarte endet am Bestand', () => {
     const p = { ...HOF.products[4]!, stock }
     return renderToStaticMarkup(
       createElement(ProduktKarte, {
-        produkt: p, zustand: kartenZustand(p, false), imKorb, wirdHinzugefuegt: false,
+        produkt: p, zustand: kartenZustand(p, null), imKorb, wirdHinzugefuegt: false,
         href: '/hof-test/produkt/p_karotten', onInDenKorb: () => {}, onMenge: () => {},
       })
     )
@@ -713,7 +714,7 @@ describe('ProduktKarte: Vorschau-Variante (muster) ohne Link und ohne Korb (Nr. 
     const p = HOF.products[4]!
     const html = renderToStaticMarkup(
       createElement(ProduktKarte, {
-        produkt: p, zustand: kartenZustand(p, false), imKorb: 0, wirdHinzugefuegt: false,
+        produkt: p, zustand: kartenZustand(p, null), imKorb: 0, wirdHinzugefuegt: false,
         href: '/hof-test/produkt/p_karotten', onInDenKorb: () => {}, onMenge: () => {},
       })
     )

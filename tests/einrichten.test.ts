@@ -17,6 +17,7 @@ function mitHof(hof: Partial<NonNullable<EinrichtenDaten['hof']>> = {}): Einrich
       hofseite: { erledigt: 7, gesamt: 11, fehlend: ['Logo', 'Über uns', 'Fotos', 'Titelbild'] },
       produkte: 0,
       stripeBereit: false,
+      abholzeitAktiv: true,
       freigeschaltet: false,
       ...hof,
     },
@@ -105,6 +106,18 @@ describe('einrichtenStand — mit Hof', () => {
     const s = schritt(mitHof(), 'freischaltung')
     expect(s).toMatchObject({ zustand: 'gesperrt', aktion: { art: 'link', href: '/settings/payments', primaer: false } })
     expect(s.text).toContain('Online-Zahlung')
+  })
+
+  it('ohne aktive Abholzeit nennt die Freischaltung den neuen Grund — nach E-Mail und Stripe, wie freischaltSperre (Z1-Ergänzung)', () => {
+    const s = schritt(mitHof({ stripeBereit: true, abholzeitAktiv: false }), 'freischaltung')
+    expect(s).toMatchObject({ zustand: 'gesperrt', aktion: { art: 'link', href: '/settings/pickup-slots', label: 'Abholzeiten eintragen', primaer: false } })
+    expect(s.text).toBe('Geht erst mit einer Abholzeit – danach schauen wir drüber und schalten deinen Hof frei.')
+    expect(s.textKurz).toBe('erst mit einer Abholzeit')
+    // Stripe und E-Mail stechen.
+    expect(schritt(mitHof({ abholzeitAktiv: false }), 'freischaltung').aktion).toMatchObject({ href: '/settings/payments' })
+    expect(schritt({ ...mitHof({ stripeBereit: true, abholzeitAktiv: false }), emailOffen: true }, 'freischaltung').aktion).toMatchObject({ href: '/verify' })
+    // Ein freigeschalteter Hof bleibt erledigt, auch ohne Abholzeit (keine Datenänderung).
+    expect(schritt(mitHof({ stripeBereit: true, abholzeitAktiv: false, freigeschaltet: true }), 'freischaltung').zustand).toBe('erledigt')
   })
 
   it('Freischaltung wartet mit Stripe auf den Betreiber, bis approvedAt gesetzt ist', () => {

@@ -104,6 +104,8 @@ export type AdminFarmRow = {
   gruendungFest: boolean
   /** Mindestens ein Produkt im Shop (`IM_SHOP_WHERE`) — Bedingung fürs Freischalten (Register K2, Nr. 116). */
   produktImShop: boolean
+  /** Mindestens eine aktive Abholzeit (`isActive: true`) — Bedingung fürs Freischalten, sonst Marke „Abholzeit fehlt“ (Z1, Ergänzung 21.10.2026). */
+  abholzeitAktiv: boolean
   /** Was der Freischalt-Dialog zur Gründung sagt (nur wartende Höfe), mit den Plätzen der Einstellung. */
   freischaltHinweis: FreischaltHinweis | null
 }
@@ -239,6 +241,8 @@ export async function getAdminFarms(
         owner: { select: { email: true, emailVerified: true, createdAt: true } },
         _count: { select: { products: true, farmPhotos: true, pickupSlots: true } },
         products: { where: IM_SHOP_WHERE, select: { id: true }, take: 1 },
+        // Z1, Ergänzung 21.10.2026: ob es eine aktive Abholzeit gibt — nur ob, nie welche (wie in Hofliste und Kasse).
+        pickupSlots: { where: { isActive: true }, select: { id: true }, take: 1 },
       },
       orderBy: { createdAt: 'desc' },
     }),
@@ -295,6 +299,7 @@ export async function getAdminFarms(
     hatKartenpunkt: f.latitude !== null && f.longitude !== null,
     gruendungFest: fest,
     produktImShop: f.products.length > 0,
+    abholzeitAktiv: f.pickupSlots.length > 0,
     freischaltHinweis: f.approvedAt === null ? freischaltHinweis(f, platzListe, einstellung, jetzt) : null,
   }))
 
