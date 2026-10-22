@@ -277,7 +277,7 @@ in einen ungültigen Schlüssel statt in echtes Geld.
 - Neue Fachregel → Test im selben Commit. Kein "Tests kommen später".
 - Bugfix → zuerst der Test, der den Bug reproduziert, dann der Fix.
 - Geänderte Fachregel → bestehende Tests anpassen, **nicht löschen**. Wer einen Test löscht, begründet das im Bericht.
-- Roter Test wird **nie** mit `.skip` stillgelegt. Entweder reparieren oder melden.
+- Roter Test wird **nie** mit `.skip` stillgelegt. Entweder reparieren oder melden (geprüft von tests/test-ueberspringen-wache.test.ts: auch kein `.only`, `.todo`, `xit`; `skipIf`/`runIf` nur mit Grund in der Liste der Wache).
 - `pnpm test` muss vor jedem Commit grün sein – im Nachtlauf vor jedem Push (Register G10).
 
 ### Bekannte Umgebungsfallen
