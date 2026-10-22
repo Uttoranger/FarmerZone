@@ -14,7 +14,8 @@
  * und dass die Fehlernummer sauber in den Briefkasten kommt.
  *
  * Das Aussehen selbst (Abmessungen, beide Themes, 375 px) ist in dieser
- * Umgebung nicht prüfbar: kein jsdom, kein Rendering (TESTING_GUIDELINES §1).
+ * Umgebung nicht prüfbar: Diese Datei läuft in `node` und rendert nicht (TESTING_GUIDELINES §1).
+ * jsdom gibt es seit Nr. 135 als Entwicklungspaket, nur dieser Test nutzt es nicht.
  * Dafür steht die Checkliste im PR.
  */
 import fs from 'node:fs'

@@ -7,8 +7,9 @@
  *
  * Geprüft wird die Reihenfolge, die src/lib/foto-feld.ts festhält: Geleert wird
  * beim Klick, gelesen wird nach der Auswahl. Ein Rendering-Test ist in dieser
- * Umgebung nicht möglich (TESTING_GUIDELINES §1: `node`, kein jsdom) — die
- * Verdrahtung in den Bauteilen hält deshalb je ein Quelltext-Test fest, nach
+ * Umgebung nicht möglich (TESTING_GUIDELINES §1: `node`; jsdom gibt es seit Nr. 135
+ * als Entwicklungspaket, nur dieser Test nutzt es nicht, es hydriert allein
+ * tests/hydrieren.test.ts) — die Verdrahtung in den Bauteilen hält deshalb je ein Quelltext-Test fest, nach
  * dem Muster aus tests/upload-lesen.test.ts.
  */
 import fs from 'node:fs'
