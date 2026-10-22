@@ -98,32 +98,42 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
                     unitSize={item.unitSize}
                     className="text-[11px] text-muted-foreground"
                   />
+                  {/* Mit Kaufsperre lehnt /api/reserve jede neue Menge ab (Nr. 145): Dann steht die Menge nur als
+                      Zahl da, Entfernen bleibt — sonst brächte jeder Tipp auf „+“ oder „−“ eine Ablehnung. */}
                   {/* Menge: sichtbar kleine Kreise, Trefferfläche 44 px */}
-                  <div className="-ml-2 flex items-center">
-                    <button
-                      type="button"
-                      onClick={() => onUpdateQuantity(item.productId, item.quantity - 1)}
-                      aria-label={`${item.name}: eins weniger`}
-                      className={MENGEN_KNOPF}
-                    >
-                      <span className="flex size-7 items-center justify-center rounded-full border border-border">
-                        <Minus className="size-3" aria-hidden="true" />
+                  {kaufSperre.sperre !== null ? (
+                    <div className="flex h-11 items-center">
+                      <span className="text-sm font-medium tabular-nums" aria-label={`Menge: ${item.quantity}`}>
+                        {item.quantity}
                       </span>
-                    </button>
-                    <span className="w-5 text-center text-sm font-medium tabular-nums" aria-label={`Menge: ${item.quantity}`}>
-                      {item.quantity}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => onUpdateQuantity(item.productId, item.quantity + 1)}
-                      aria-label={`${item.name}: eins mehr`}
-                      className={MENGEN_KNOPF}
-                    >
-                      <span className="flex size-7 items-center justify-center rounded-full border border-border">
-                        <Plus className="size-3" aria-hidden="true" />
+                    </div>
+                  ) : (
+                    <div className="-ml-2 flex items-center">
+                      <button
+                        type="button"
+                        onClick={() => onUpdateQuantity(item.productId, item.quantity - 1)}
+                        aria-label={`${item.name}: eins weniger`}
+                        className={MENGEN_KNOPF}
+                      >
+                        <span className="flex size-7 items-center justify-center rounded-full border border-border">
+                          <Minus className="size-3" aria-hidden="true" />
+                        </span>
+                      </button>
+                      <span className="w-5 text-center text-sm font-medium tabular-nums" aria-label={`Menge: ${item.quantity}`}>
+                        {item.quantity}
                       </span>
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => onUpdateQuantity(item.productId, item.quantity + 1)}
+                        aria-label={`${item.name}: eins mehr`}
+                        className={MENGEN_KNOPF}
+                      >
+                        <span className="flex size-7 items-center justify-center rounded-full border border-border">
+                          <Plus className="size-3" aria-hidden="true" />
+                        </span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Line total + remove */}

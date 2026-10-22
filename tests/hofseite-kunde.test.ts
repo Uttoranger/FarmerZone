@@ -363,6 +363,17 @@ describe('mengeAbgelehntText — was die Kundin liest, wenn der Hof keine Menge 
     expect(mengeAbgelehntText('Ungültige Parameter')).toBe('Wir konnten die Menge nicht ändern. Versuch es gleich noch einmal.')
     expect(mengeAbgelehntText(undefined)).toBe('Wir konnten die Menge nicht ändern. Versuch es gleich noch einmal.')
   })
+
+  // Nr. 145: /api/reserve lehnt bei einer Kaufsperre mit dem Titel aus kaufSperreHinweis ab.
+  it('die Titel der Kaufsperre kommen unverändert durch', () => {
+    expect(mengeAbgelehntText('Noch nicht bestellbar.')).toBe('Noch nicht bestellbar.')
+    expect(mengeAbgelehntText('Gerade ausgebucht.')).toBe('Gerade ausgebucht.')
+  })
+
+  it('Gegenprobe: ein ähnlicher, aber unbekannter Text wird weiter zum Satz „Wir konnten …“', () => {
+    expect(mengeAbgelehntText('Noch nicht bestellbar')).toBe('Wir konnten die Menge nicht ändern. Versuch es gleich noch einmal.')
+    expect(mengeAbgelehntText('Gerade ausgebucht. Sonst noch was?')).toBe('Wir konnten die Menge nicht ändern. Versuch es gleich noch einmal.')
+  })
 })
 
 describe('beitragZeitText — „Aktuell“ nur am neuesten Beitrag (Register F8)', () => {

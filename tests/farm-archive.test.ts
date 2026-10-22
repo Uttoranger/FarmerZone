@@ -25,6 +25,8 @@ vi.mock('@/server/abholfenster', async (original) => ({
     ok: true,
     fenster: { datum: '', start: '', ende: '', slot: { id: 'slot_1', dayOfWeek: 0, startTime: '', endTime: '', maxOrders: null, isActive: true } },
   })),
+  // /api/reserve zählt seit Nr. 145 die vollen Tage für die Kaufsperre: hier keine.
+  ausgebuchteTage: vi.fn(async () => new Map()),
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -169,7 +171,8 @@ beforeEach(() => {
   productFindUnique.mockResolvedValue({
     id: 'prod_1', stock: 10, isAvailable: true, name: 'Eier',
     unit: 'STUECK', unitSize: null,
-    farm: { isPaused: false, archivedAt: null, approvedAt: FREIGESCHALTET },
+    // id, name und eine aktive Abholzeit für die Kaufsperre in /api/reserve (Nr. 145).
+    farm: { id: 'farm_1', name: 'Testhof A', isPaused: false, archivedAt: null, approvedAt: FREIGESCHALTET, pickupSlots: [{ dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }] },
   } as never)
   productUpdate.mockResolvedValue({} as never)
   reservationAggregate.mockResolvedValue({ _sum: { quantity: null } } as never)

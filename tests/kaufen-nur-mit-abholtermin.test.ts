@@ -472,6 +472,24 @@ describe('Korb-Blatt (unter 1024 px der einzige Weg zur Kasse): statt „Zur Kas
     expect(leer).toContain('Dein Warenkorb ist leer.')
     expect(leer).not.toContain(TEXT.keineSatz)
   })
+
+  // Nr. 145: Mit Sperre lehnt /api/reserve jede neue Menge ab — Knöpfe dafür brächten bei jedem Tipp eine Ablehnung.
+  it('mit Sperre: keine Knöpfe „eins mehr“/„eins weniger“, die Menge steht als Zahl, Entfernen bleibt', () => {
+    for (const sperre of ['keine-abholzeit', 'ausgebucht', 'pause'] as const) {
+      const html = blatt(sperre)
+      expect(html, sperre).not.toContain('Karotten: eins mehr')
+      expect(html, sperre).not.toContain('Karotten: eins weniger')
+      expect(html, sperre).toContain('Menge: 2')
+      expect(html, sperre).toContain('Karotten aus dem Korb nehmen')
+    }
+  })
+
+  it('Gegenprobe: ohne Sperre stehen beide Mengen-Knöpfe und Entfernen da', () => {
+    const frei = blatt(null)
+    expect(frei).toContain('Karotten: eins mehr')
+    expect(frei).toContain('Karotten: eins weniger')
+    expect(frei).toContain('Karotten aus dem Korb nehmen')
+  })
 })
 
 describe('Kasse: die Sperre rechnet der Server, einmal, aus der einen Zählung', () => {

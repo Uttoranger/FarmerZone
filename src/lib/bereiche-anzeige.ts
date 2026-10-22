@@ -220,16 +220,16 @@ export type AngebotVorhanden = readonly unknown[]
 
 /**
  * Kann man bei diesem Hof gerade bestellen (Register N22)? Nur mit mindestens
- * einem kaufbaren Produkt (`angebot`, istKaufbar) UND einer kommenden
- * Abholzeit. Die Abholzeiten wiederholen sich jede Woche: Wer eine aktive hat,
- * hat immer eine kommende, die man noch bestellen kann (naechsteAbholung findet
- * sie spätestens in sieben Tagen). Die Pause zählt bewusst NICHT hinein — sie
- * hat ihre eigene orange Zeile. Ein nicht bestellbarer Hof bleibt an seinem
+ * einem kaufbaren Produkt (`angebot`, istKaufbar) UND einer aktiven
+ * Abholzeit. Ein Hof mit aktiven Abholzeiten kann im Vorlauf trotzdem
+ * ausgebucht sein (volle Abholfenster, N19-Ergänzung); das zeigt
+ * `naechsteAbholung` bzw. `kaufSperre`, nicht diese Regel. Die Pause zählt
+ * bewusst NICHT hinein — sie hat ihre eigene orange Zeile. Ein nicht bestellbarer Hof bleibt an seinem
  * Platz in der Liste (hofPasst, AGB §3, O4) und trägt nur eine andere Zeile.
  * Fehlen die Abholzeiten ganz (Cache-Eintrag von vor Nr. 120), gilt er als
  * nicht bestellbar.
  */
-export function istBestellbar(hof: { angebot: AngebotVorhanden; abholfenster?: readonly unknown[] }): boolean {
+export function istBestellbar(hof: { angebot: AngebotVorhanden; abholfenster?: readonly AbholFenster[] }): boolean {
   return hof.angebot.length > 0 && (hof.abholfenster?.length ?? 0) > 0
 }
 

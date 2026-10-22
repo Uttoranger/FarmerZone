@@ -5660,6 +5660,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Warum eine zweite Wache:** Die Number-Wache aus Nr. 139 konnte den Fehler nicht finden, dort stand kein `Number()`. `tests/geld-fliesskomma-wache.test.ts` meldet jede Multiplikation Geld × Nicht-Zahl unter `src/` außerhalb ihres Bestands (vier Stellen, alle Anzeige oder ganze Zahlen); das Umrechnen mit einer festen Zahl (`price * 100`) bleibt erlaubt. Wortstämme und „letzter Name“ stehen für beide Wachen in `tests/geld-namen.ts`. Die „Belege am Code“ der Number-Wache sind gestrichen (Morgenbericht 21 §8): Sie verglichen Text und wären bei jedem Umbau ohne Aussage rot geworden.
 - **Tests:** Vollprobe aller Cent-Preise von 0,01 bis 50,00 € mal 1,5, 2,5, 12,5, 1,125 und 7,75 gegen eine Referenz in ganzen Zahlen (0 Abweichungen, die alte Formel weicht ab), Korb und Korb-Blatt prüfen den Zahlenwert 3.3, nicht den Text.
 
+## Kaufsperre beim Reservieren und im Korb-Blatt (Register N24, Ergänzung 22.10.2026; Nr. 145, Lauf 22)
+
+- **Lücke:** `/api/reserve` prüfte Stilllegung, Freischaltung und Pause, aber nicht die Kaufsperre. Ohne buchbaren Abholtermin ließ sich Ware bis zu 15 Minuten reservieren; bezahlen ging nicht (die Kasse lehnt ab), Geld war nie betroffen, aber die Ware war blockiert.
+- **Fix:** Die Route lädt vom Hof `id`, `name` und die aktiven Abholzeiten und rechnet nach der Pause und vor dem Bestand `kaufSperre` aus derselben Zählung wie die Kasse (`ausgebuchteTage`, `alsAbholFenster`). Reihenfolge: Stilllegung → Freischaltung → Pause → Kaufsperre → Bestand. Bei einer Sperre 409 mit dem Titel aus `kaufSperreHinweis` („Noch nicht bestellbar.“ bzw. „Gerade ausgebucht.“); `mengeAbgelehntText` lässt beide Titel durch, damit die Kundin am Stepper den Grund liest statt „Wir konnten …“. Die Wache `tests/kaufsperre-wache.test.ts` kennt die Route als Stelle, die `kaufSperre` aufruft.
+- **Korb-Blatt:** Mit Sperre stehen keine Knöpfe „eins mehr“/„eins weniger“ mehr, die Menge steht nur als Zahl, Entfernen bleibt — jeder Tipp hätte sonst eine Ablehnung gebracht. Zeilensumme und Hinweis im Fuß unverändert.
+- **Nacharbeit:** `istBestellbar` liest `abholfenster` jetzt als `readonly AbholFenster[]`, der Kommentar sagt, dass ein Hof mit aktiven Abholzeiten trotzdem ausgebucht sein kann (N19-Ergänzung). In ARCHITECTURE.md steht der Satz zur sofortigen Erneuerung der Hofliste hinter dem Satz „… leeren beide (…)“.
+
 ## Nützliche Befehle
 
 ```bash

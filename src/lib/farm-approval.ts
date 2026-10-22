@@ -16,6 +16,9 @@
 // Begründung: Der dauerhafte Zustand sticht den administrativen, und beide
 // stechen den vorübergehenden. So bekommt niemand ein „bald wieder da", wo
 // gar nichts wiederkommt.
+// Die Kaufsperre (kein buchbarer Abholtermin, Register N24) steht nur in
+// /api/reserve hinter der Pause und vor dem Bestand; die Kasse prüft den
+// Termin selbst (`pruefeAbholfenster`, `imAbholfenster`).
 //
 // Durchsetzungs-Doktrin (wie bei Pause und Stilllegung): Die Sperre wird
 // SERVERSEITIG erzwungen und nicht durch ausgeblendete Schaltflächen.
