@@ -32,7 +32,7 @@ Bei **jeder** Codeänderung lesen.
 - `any` ist **verboten**. Auch `as any`, `@ts-ignore`, `@ts-expect-error` ohne Begründungskommentar.
 - Unbekanntes ist `unknown` + Zod-Parse, nie `any`.
 - Der Rückgabetyp ist **Pflicht** für exportierte Funktionen in `src/lib`, `src/server` und `src/schemas`; React-Komponenten sind ausgenommen (Inventur 7, Morgenbericht 20 §3, freigegeben 21.10.2026).
-- Keine nicht-null-Assertion `!`, außer mit der Begründung als Kommentar in derselben Zeile.
+- Keine nicht-null-Assertion `!`, außer mit der Begründung als Kommentar in derselben Zeile (Inventur 7, Morgenbericht 20 §3, freigegeben 21.10.2026).
 - Typen aus Prisma ableiten, nicht abschreiben: `Prisma.OrderGetPayload<…>`.
 - Keine Typduplikate: Zod-Schema ist die Quelle → `type X = z.infer<typeof xSchema>`.
 

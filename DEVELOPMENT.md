@@ -5642,7 +5642,8 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Was:** Die Regel-Inventur aus Morgenbericht 20 §3 ist umgesetzt (Nr. 1, 2, 4, 7–15, der Text zu 18) und die Regelvorschläge 131, 133, 134 und 124 stehen als Text. Gekürzt wurde nur, was doppelt stand oder von einer Prüfung abgedeckt ist; je Kürzung nennt Bericht 141 die Fundstelle.
 - **Sentry:** Die Mechanik der Bereinigung (Fehlertext, Freitext, Adressen, Zuweisungen, Lesarten, Nummernreste) steht nur noch im JSDoc der Funktionen in `src/lib/sentry-hygiene.ts` und in `tests/sentry-hygiene-{felder,sdk,vergleich,wachstum}.test.ts`; CODING_STANDARDS §4 hält die Regeln für Aufrufer fest (was in `tags`, `extra`, Kontexte und Span-Attribute darf, `ersetzeVorab`, Mehrfund zuletzt, jedes `Sentry.init` mit `bereinigeEreignis`).
 - **Abweichungen vom Vorschlag der Inventur:** ARCHITECTURE §5 „Zahlungen“ bleibt die ausführliche Stelle zu den Testzahlungen (CODING_STANDARDS verweist nur); keine Testdatei wurde verschoben, lose Hilfsdateien in `tests/` stehen mit Namen in TESTING_GUIDELINES §1 (`tests/fabrik/` ist für Fabriken nachgebauter Typen festgelegt).
-- **Maß:** CODING_STANDARDS und TESTING_GUIDELINES zusammen 79 747 → 71 078 Zeichen (`wc -m`). Zahlen von Testdateien und Mocks stehen nicht mehr im Text; wo eine Zahl hilft, steht der Befehl, der sie zählt.
+- **Maß:** CODING_STANDARDS und TESTING_GUIDELINES zusammen 79 747 → 71 137 Zeichen (`wc -m`). Zahlen von Testdateien und Mocks stehen nicht mehr im Text; wo eine Zahl hilft, steht der Befehl, der sie zählt.
+- **Herkunft (Nachbesserung Runde 1):** `tests/regeln-herkunft-wache.test.ts` hält fest, dass die Sätze, die Nr. 141 geschärft oder neu geschrieben hat, ihre Herkunft und ein Datum tragen (G4); ein umformulierter Satz fällt dort als „nicht gefunden“ auf. Anlass: Die `!`-Regel in CODING_STANDARDS §2 hatte den Vermerk vergessen.
 
 ## Nützliche Befehle
 
