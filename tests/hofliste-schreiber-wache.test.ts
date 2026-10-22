@@ -33,6 +33,8 @@
  * `farm.update({ data: { ...(neu && { bannerUrl: neu }) } })` ohne `updateTag`
  * schlagen an, ebenso ein Aufruf nur im Transaktions-Rückruf; der richtige
  * Aufbau, ein lesendes `where` und ein Feld, das die Liste nicht zeigt, nicht.
+ * Der Vergleich mit `AUSNAHMEN` (`luecken`) meldet an einer Attrappe einen
+ * Befund ohne Ausnahme und jede Ausnahme, die keinen Befund mehr trifft.
  * Keine Datei im Repository wird dafür verändert.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
@@ -190,6 +192,19 @@ function hoflisteSchreiber(quelltext: string, pfad = 'schnipsel.ts'): Befund[] {
   return befunde
 }
 
+/**
+ * Vergleicht die Befunde mit den Ausnahmen: welche Funktion ohne Erneuern keine
+ * Ausnahme hat, und welche Ausnahme keinen Befund ohne Erneuern mehr trifft
+ * (die Funktion erneuert inzwischen selbst, schreibt nichts mehr oder ist weg).
+ */
+function luecken(befunde: Befund[], ausnahmen: Record<string, string>): { ohneUpdateTag: string[]; veraltet: string[] } {
+  const ohneErneuern = befunde.filter((b) => !b.erneuert).map((b) => b.funktion)
+  return {
+    ohneUpdateTag: ohneErneuern.filter((f) => !(f in ausnahmen)),
+    veraltet: Object.keys(ausnahmen).filter((f) => !ohneErneuern.includes(f)),
+  }
+}
+
 describe('Wache: jede Action, die etwas schreibt, das die Hofliste zeigt, erneuert sie sofort', () => {
   // Parst jede Datei unter src/server/actions (Freigabe Lauf 21 §2: Zeitgrenze an genau diesem it).
   it('jede solche exportierte Action in src/server/actions ruft updateTag(HOEFE_CACHE_TAG), Ausnahmen nur mit Grund', () => {
@@ -213,10 +228,25 @@ describe('Wache: jede Action, die etwas schreibt, das die Hofliste zeigt, erneue
       expect(funktionen).toContain(bekannt)
     }
 
-    const ohneErneuern = alle.filter((b) => !b.erneuert).map((b) => b.funktion)
-    expect(ohneErneuern.filter((f) => !(f in AUSNAHMEN)), 'ohne updateTag(HOEFE_CACHE_TAG)').toEqual([])
-    expect(Object.keys(AUSNAHMEN).filter((f) => !ohneErneuern.includes(f)), 'veraltete Ausnahme').toEqual([])
+    const { ohneUpdateTag, veraltet } = luecken(alle, AUSNAHMEN)
+    expect(ohneUpdateTag, 'ohne updateTag(HOEFE_CACHE_TAG)').toEqual([])
+    expect(veraltet, 'veraltete Ausnahme').toEqual([])
   }, 30_000)
+
+  it('Gegenprobe: ein Befund ohne Ausnahme und eine Ausnahme, die nicht mehr gebraucht wird, schlagen an', () => {
+    const befunde: Befund[] = [
+      { funktion: 'a.ts#erneuert', erneuert: true },
+      { funktion: 'a.ts#ohne', erneuert: false },
+      { funktion: 'a.ts#ausgenommen', erneuert: false },
+    ]
+    const ausnahmen = {
+      'a.ts#ausgenommen': 'gebraucht',
+      'a.ts#erneuert': 'erneuert inzwischen selbst',
+      'a.ts#weg': 'Funktion gibt es nicht mehr',
+    }
+    expect(luecken(befunde, ausnahmen)).toEqual({ ohneUpdateTag: ['a.ts#ohne'], veraltet: ['a.ts#erneuert', 'a.ts#weg'] })
+    expect(luecken(befunde.slice(0, 1), {})).toEqual({ ohneUpdateTag: [], veraltet: [] })
+  })
 
   it('Gegenprobe: neue Funktionen ohne updateTag schlagen an — Abholzeit, Pause in Kurzform, Titelbild im bedingten Spread', () => {
     const abholzeit = `export async function a(farmId: string) {

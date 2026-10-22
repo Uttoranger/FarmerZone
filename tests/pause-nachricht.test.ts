@@ -16,7 +16,8 @@
  *     unveränderter Altwert darüber sperrt das Umschalten nicht (PauseClient
  *     schickt die Nachricht beim Umschalten mit).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, expectTypeOf, vi, beforeEach } from 'vitest'
+import type { z } from 'zod'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
@@ -30,6 +31,7 @@ vi.mock('@/lib/prisma', () => ({
 import { setPause } from '@/server/actions/farm'
 import { kundenPausenText, SHOP_PAUSED_FALLBACK } from '@/lib/shop-pause'
 import { PAUSENACHRICHT_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
+import { pauseSchema, type PauseEingabe } from '@/schemas/pause'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -102,6 +104,13 @@ describe('setPause — die Nachricht hat eine Grenze', () => {
     vi.mocked(prisma.farm.findUnique).mockResolvedValue({ id: 'farm_1', slug: 'hof-test', isPaused: true, pauseMessage: altwert } as never)
     expect(await setPause(false, `${altwert}y`)).toEqual({ error: ZU_LANG.pausenachricht })
     expect(farmUpdate).not.toHaveBeenCalled()
+  })
+
+  it('der Typ der Eingabe kommt aus dem Schema, nicht von Hand (CODING_STANDARDS §2)', () => {
+    // Prüft der Typecheck: pauseSchema gibt das Objekt-Schema selbst zurück, aus dem
+    // PauseEingabe abgeleitet ist — kein undurchsichtiges z.ZodType<…> mit einem Typ daneben.
+    expectTypeOf(pauseSchema).returns.toHaveProperty('shape')
+    expectTypeOf<z.infer<ReturnType<typeof pauseSchema>>>().toEqualTypeOf<PauseEingabe>()
   })
 })
 
