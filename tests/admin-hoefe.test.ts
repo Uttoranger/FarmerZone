@@ -16,9 +16,13 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  ABHOLZEIT_FEHLT_TEXT,
+  FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT,
+  FREISCHALTUNG_PRODUKT_OFFEN_TEXT,
   FREISCHALTUNG_STRIPE_OFFEN_TEXT,
   HOF_FILTER_LABEL,
   SERVICEGEBUEHR_NUR_NEUE,
+  abholzeitFehlt,
   adminHofZeile,
   filtereHoefe,
   freischaltSperre,
@@ -53,24 +57,24 @@ function roh(ueber: Partial<HofRohdaten> = {}): HofRohdaten {
 
 describe('freischaltSperre', () => {
   it('ohne bestätigte E-Mail: der Satz aus S3 — vor Stripe, wie der Server', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: true, stripeBereit: false, produktImShop: false })).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
+    expect(freischaltSperre({ emailBestaetigungOffen: true, stripeBereit: false, produktImShop: false, abholzeitAktiv: true })).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
   })
   it('ohne fertiges Stripe-Konto: gesperrt mit Grund (Register Z1)', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false, produktImShop: true })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false, produktImShop: true, abholzeitAktiv: true })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
   })
   it('ohne Produkt im Shop: gesperrt mit dem Satz der Freigabe (Register K2, Nr. 116) — nach E-Mail und Stripe', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true, produktImShop: false })).toBe(
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true, produktImShop: false, abholzeitAktiv: true })).toBe(
       'Noch kein Produkt im Shop – Freischalten erst mit mindestens einem Produkt.'
     )
-    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false, produktImShop: false })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false, produktImShop: false, abholzeitAktiv: true })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
   })
   it('mit Stripe, bestätigter E-Mail und einem Produkt im Shop: nichts im Weg', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true, produktImShop: true })).toBeNull()
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true, produktImShop: true, abholzeitAktiv: true })).toBeNull()
   })
   it('ein Hof, der früher „nur bar" wählen konnte, ist ohne Stripe gesperrt — die Wahl zählt nicht mehr (Z1)', () => {
     // Die Regel kennt acceptsOnline nicht: Auch ein Bestandshof mit
     // acceptsOnline=false bekommt ohne Stripe keine Freischaltung.
-    const hof = { emailBestaetigungOffen: false, stripeBereit: false, produktImShop: true, acceptsOnline: false }
+    const hof = { emailBestaetigungOffen: false, stripeBereit: false, produktImShop: true, abholzeitAktiv: true, acceptsOnline: false }
     expect(freischaltSperre(hof)).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
   })
   it('die Warteliste zeigt denselben Satz: ein wartender Hof ohne Produkt im Shop trägt ihn als Sperre (adminHofZeile)', () => {
@@ -80,8 +84,47 @@ describe('freischaltSperre', () => {
   })
 })
 
+describe('Abholzeit vor dem Freischalten (Register Z1, Ergänzung 21.10.2026)', () => {
+  const bereit = { emailBestaetigungOffen: false, stripeBereit: true, produktImShop: true, abholzeitAktiv: true }
+
+  it('ohne aktive Abholzeit gesperrt, mit dem Satz der Freigabe', () => {
+    expect(freischaltSperre({ ...bereit, abholzeitAktiv: false })).toBe(FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT)
+    expect(FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT).toBe('Erst freischalten, wenn der Hof eine Abholzeit eingetragen hat – sonst kann niemand bestellen.')
+  })
+  it('nach E-Mail, Stripe und Produkt — die Gründe davor stechen', () => {
+    expect(freischaltSperre({ ...bereit, emailBestaetigungOffen: true, abholzeitAktiv: false })).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
+    expect(freischaltSperre({ ...bereit, stripeBereit: false, abholzeitAktiv: false })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
+    expect(freischaltSperre({ ...bereit, produktImShop: false, abholzeitAktiv: false })).toBe(FREISCHALTUNG_PRODUKT_OFFEN_TEXT)
+  })
+  it('Gegenprobe: mit aktiver Abholzeit nichts im Weg', () => {
+    expect(freischaltSperre(bereit)).toBeNull()
+  })
+  it('die Warteliste zeigt denselben Satz (adminHofZeile)', () => {
+    expect(adminHofZeile(roh({ approvedAt: null, abholzeitAktiv: false }), { gruendungsplatz: null, maxPlaetze: 12 }, JETZT).sperre).toBe(
+      FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT
+    )
+  })
+  it('„Abholzeit fehlt": nur freigeschaltete, nicht stillgelegte Höfe ohne aktive Abholzeit', () => {
+    const basis = { approvedAt: JETZT, archivedAt: null, abholzeitAktiv: false }
+    expect(abholzeitFehlt(basis)).toBe(true)
+    expect(abholzeitFehlt({ ...basis, abholzeitAktiv: true })).toBe(false)
+    // Wartende haben ihre Sperre (freischaltSperre), Stillgelegte sind vom Netz.
+    expect(abholzeitFehlt({ ...basis, approvedAt: null })).toBe(false)
+    expect(abholzeitFehlt({ ...basis, archivedAt: JETZT })).toBe(false)
+  })
+  it('ein schon freigeschalteter Hof ohne Abholzeit bleibt freigeschaltet: Marke „Abholzeit fehlt", keine Sperre', () => {
+    const zeile = adminHofZeile(roh({ abholzeitAktiv: false }), { gruendungsplatz: null, maxPlaetze: 12 }, JETZT)
+    expect(zeile.abholzeitFehlt).toBe(true)
+    expect(zeile.status).toEqual({ id: 'abholzeit-fehlt', text: ABHOLZEIT_FEHLT_TEXT, ton: 'offen' })
+    expect(zeile.sperre).toBeNull()
+    expect(ABHOLZEIT_FEHLT_TEXT).toBe('Abholzeit fehlt')
+    // Gegenprobe: mit Abholzeit online.
+    expect(adminHofZeile(roh(), { gruendungsplatz: null, maxPlaetze: 12 }, JETZT)).toMatchObject({ abholzeitFehlt: false, status: { id: 'online' } })
+  })
+})
+
 describe('hofStatus', () => {
-  const basis = { approvedAt: JETZT, archivedAt: null, isPaused: false, stripeBereit: true, onlineAn: true }
+  const basis = { approvedAt: JETZT, archivedAt: null, isPaused: false, stripeBereit: true, onlineAn: true, abholzeitAktiv: true }
   it('stillgelegt sticht alles', () => {
     expect(hofStatus({ ...basis, archivedAt: JETZT, approvedAt: null, isPaused: true }).id).toBe('stillgelegt')
   })
@@ -94,6 +137,12 @@ describe('hofStatus', () => {
   it('freigeschaltet ohne Stripe: „Stripe fehlt" (orange, kein Rot), sonst online (grün)', () => {
     expect(hofStatus({ ...basis, stripeBereit: false })).toEqual({ id: 'stripe-fehlt', text: 'Stripe fehlt', ton: 'offen' })
     expect(hofStatus(basis)).toEqual({ id: 'online', text: 'Online', ton: 'fertig' })
+  })
+  it('freigeschaltet ohne aktive Abholzeit: „Abholzeit fehlt" (orange) — nach Pause und „Stripe fehlt", vor „Online-Zahlung aus"', () => {
+    expect(hofStatus({ ...basis, abholzeitAktiv: false })).toEqual({ id: 'abholzeit-fehlt', text: 'Abholzeit fehlt', ton: 'offen' })
+    expect(hofStatus({ ...basis, abholzeitAktiv: false, stripeBereit: false }).id).toBe('stripe-fehlt')
+    expect(hofStatus({ ...basis, abholzeitAktiv: false, isPaused: true }).id).toBe('pausiert')
+    expect(hofStatus({ ...basis, abholzeitAktiv: false, onlineAn: false }).id).toBe('abholzeit-fehlt')
   })
   it('Stripe fertig, Online aber aus (Bestandshof vor Z1): „Online-Zahlung aus" (neutral)', () => {
     expect(hofStatus({ ...basis, onlineAn: false })).toEqual({ id: 'online-aus', text: 'Online-Zahlung aus', ton: 'neutral' })
@@ -129,12 +178,13 @@ describe('onlineAus', () => {
 })
 
 describe('Filter und Suche', () => {
-  const zeile = (name: string, id: ReturnType<typeof hofStatus>['id'], stripeFehlt = false, onlineAus = false) => ({
+  const zeile = (name: string, id: ReturnType<typeof hofStatus>['id'], stripeFehlt = false, onlineAus = false, abholzeitFehlt = false) => ({
     name,
     slug: name.toLowerCase(),
     status: { id, text: '', ton: 'neutral' as const },
     stripeFehlt,
     onlineAus,
+    abholzeitFehlt,
   })
   const hoefe = [
     zeile('Lindenhof', 'online'),
@@ -143,6 +193,9 @@ describe('Filter und Suche', () => {
     // Pausiert und ohne Stripe: Der Filter „Stripe fehlt" findet ihn trotzdem.
     zeile('Wiesenhof', 'pausiert', true),
     zeile('Moorhof', 'online-aus', false, true),
+    zeile('Auhof', 'abholzeit-fehlt', false, false, true),
+    // Pausiert und ohne aktive Abholzeit: Der Filter „Abholzeit fehlt" findet ihn trotzdem.
+    zeile('Talhof', 'pausiert', false, false, true),
     zeile('Neuhof', 'wartet'),
     zeile('Althof', 'stillgelegt'),
   ]
@@ -156,7 +209,12 @@ describe('Filter und Suche', () => {
     expect(filtereHoefe(hoefe, { filter: 'pausiert', suche: 'linden' })).toEqual([])
   })
   it('zählt je Filter ohne die wartenden', () => {
-    expect(zaehleHofFilter(hoefe)).toEqual({ alle: 6, online: 1, pausiert: 2, 'stripe-fehlt': 2, 'online-aus': 1, stillgelegt: 1 })
+    expect(zaehleHofFilter(hoefe)).toEqual({ alle: 8, online: 1, pausiert: 3, 'stripe-fehlt': 2, 'abholzeit-fehlt': 2, 'online-aus': 1, stillgelegt: 1 })
+  })
+  it('„Abholzeit fehlt" fragt das Kennzeichen wie „Stripe fehlt" — auch ein pausierter Hof steht drin (Z1-Ergänzung)', () => {
+    expect(filtereHoefe(hoefe, { filter: 'abholzeit-fehlt', suche: '' }).map((h) => h.name)).toEqual(['Auhof', 'Talhof'])
+    expect(HOF_FILTER_LABEL['abholzeit-fehlt']).toBe(ABHOLZEIT_FEHLT_TEXT)
+    expect(hoefeAnsichtAus(new URLSearchParams('filter=abholzeit-fehlt'))).toEqual({ filter: 'abholzeit-fehlt', suche: '' })
   })
   it('„Online-Zahlung aus" findet der Betreiber über einen eigenen Filter', () => {
     expect(filtereHoefe(hoefe, { filter: 'online-aus', suche: '' }).map((h) => h.name)).toEqual(['Moorhof'])

@@ -10,11 +10,17 @@
  *     Hofs, sonst den Rückfall — Hofseite und Vorschau denselben Satz. (Der
  *     Hinweis für den Hof im Bearbeitungsmodus der Hofseite, pausenBanner, ist
  *     mit diesem Modus entfallen, Nr. 50 Runde 1.)
+ *   - Die Nachricht steht öffentlich auf der Hofseite und hat eine Grenze
+ *     (PAUSENACHRICHT_MAX, Register N24-Ergänzung 22.10.2026, Nr. 137): Eine
+ *     geänderte zu lange Nachricht wird abgelehnt und nichts geschrieben; ein
+ *     unveränderter Altwert darüber sperrt das Umschalten nicht (PauseClient
+ *     schickt die Nachricht beim Umschalten mit).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, expectTypeOf, vi, beforeEach } from 'vitest'
+import type { z } from 'zod'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
-vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -24,6 +30,8 @@ vi.mock('@/lib/prisma', () => ({
 
 import { setPause } from '@/server/actions/farm'
 import { kundenPausenText, SHOP_PAUSED_FALLBACK } from '@/lib/shop-pause'
+import { PAUSENACHRICHT_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
+import { pauseSchema, type PauseEingabe } from '@/schemas/pause'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -68,6 +76,41 @@ describe('setPause — die Nachricht bleibt', () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(null as never)
     expect(await setPause(true, 'Urlaub')).toEqual({ error: 'Nicht angemeldet' })
     expect(farmUpdate).not.toHaveBeenCalled()
+  })
+})
+
+describe('setPause — die Nachricht hat eine Grenze', () => {
+  it('lehnt eine geänderte Nachricht über der Grenze ab und schreibt nichts', async () => {
+    const zuLang = 'x'.repeat(PAUSENACHRICHT_MAX + 1)
+    expect(await setPause(true, zuLang)).toEqual({ error: ZU_LANG.pausenachricht })
+    expect(farmUpdate).not.toHaveBeenCalled()
+  })
+
+  it('speichert eine Nachricht mit genau der Grenze', async () => {
+    const genau = 'x'.repeat(PAUSENACHRICHT_MAX)
+    expect(await setPause(true, genau)).toEqual({})
+    expect(gespeicherteNachricht()).toBe(genau)
+  })
+
+  it('ein unveränderter Altwert über der Grenze sperrt das Fortsetzen nicht', async () => {
+    const altwert = 'x'.repeat(PAUSENACHRICHT_MAX + 1)
+    vi.mocked(prisma.farm.findUnique).mockResolvedValue({ id: 'farm_1', slug: 'hof-test', isPaused: true, pauseMessage: altwert } as never)
+    expect(await setPause(false, altwert)).toEqual({})
+    expect(farmUpdate.mock.calls.at(-1)?.[0]).toMatchObject({ data: { isPaused: false, pauseMessage: altwert } })
+  })
+
+  it('ein geänderter Altwert muss die Grenze einhalten', async () => {
+    const altwert = 'x'.repeat(PAUSENACHRICHT_MAX + 1)
+    vi.mocked(prisma.farm.findUnique).mockResolvedValue({ id: 'farm_1', slug: 'hof-test', isPaused: true, pauseMessage: altwert } as never)
+    expect(await setPause(false, `${altwert}y`)).toEqual({ error: ZU_LANG.pausenachricht })
+    expect(farmUpdate).not.toHaveBeenCalled()
+  })
+
+  it('der Typ der Eingabe kommt aus dem Schema, nicht von Hand (CODING_STANDARDS §2)', () => {
+    // Prüft der Typecheck: pauseSchema gibt das Objekt-Schema selbst zurück, aus dem
+    // PauseEingabe abgeleitet ist — kein undurchsichtiges z.ZodType<…> mit einem Typ daneben.
+    expectTypeOf(pauseSchema).returns.toHaveProperty('shape')
+    expectTypeOf<z.infer<ReturnType<typeof pauseSchema>>>().toEqualTypeOf<PauseEingabe>()
   })
 })
 

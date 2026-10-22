@@ -84,7 +84,7 @@ beforeEach(() => {
 
 function rendere(): void {
   renderToStaticMarkup(
-    createElement(FarmPageView, { farm: HOF, beitraege: [BEITRAG], reorderItems: [], ansicht: { art: 'kundin', kaufen: true }, jetzt: '2026-10-02T08:00:00.000Z' })
+    createElement(FarmPageView, { farm: HOF, beitraege: [BEITRAG], reorderItems: [], ansicht: { art: 'kundin', kaufen: true }, jetzt: '2026-10-02T08:00:00.000Z', sperre: null })
   )
 }
 

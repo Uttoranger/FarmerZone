@@ -114,7 +114,7 @@ describe('Produktfamilie (E3)', () => {
   })
 
   it('Kacheln: Größe, Menge, Preis je Gebinde, Kilopreis und Vorrat', () => {
-    const kacheln = groessenKacheln(produktFamilie(produkte, produkte[0]!), false)
+    const kacheln = groessenKacheln(produktFamilie(produkte, produkte[0]!), null)
     expect(kacheln.map((k) => k.name)).toEqual(['1 kg-Sackerl', '5 kg-Sack', 'Rundballen'])
     // Steht die Menge schon im Namen („5 kg-Sack"), steht sie nicht noch einmal darunter.
     expect(kacheln[1]).toMatchObject({ id: 'p_5kg', hinweis: null, preis: '€ 8,00', grundpreis: '€ 1,60 / kg', vorrat: 'nur noch 3 Stück', zustand: 'knapp' })
@@ -124,17 +124,20 @@ describe('Produktfamilie (E3)', () => {
 
   it('ohne gemeinsamen Namensanfang heißt die Kachel wie das Produkt', () => {
     const familie = [produkt('a', { familieId: 'f', name: 'Kleinballen' }), produkt('b', { familieId: 'f', name: 'Rundballen' })]
-    expect(groessenKacheln(familie, false).map((k) => k.name)).toEqual(['Kleinballen', 'Rundballen'])
+    expect(groessenKacheln(familie, null).map((k) => k.name)).toEqual(['Kleinballen', 'Rundballen'])
   })
 
   it('ohne Familie keine Kacheln — und kein Hängen', () => {
-    expect(groessenKacheln([], false)).toEqual([])
-    expect(groessenKacheln([produkt('einzeln', { name: 'Eier' })], false).map((k) => k.name)).toEqual(['Eier'])
+    expect(groessenKacheln([], null)).toEqual([])
+    expect(groessenKacheln([produkt('einzeln', { name: 'Eier' })], null).map((k) => k.name)).toEqual(['Eier'])
   })
 
-  it('pausiert: kein „ausverkauft" erfunden, die Kachel bleibt wählbar', () => {
-    const kacheln = groessenKacheln(produktFamilie(produkte, produkte[0]!), true)
-    expect(kacheln[0]).toMatchObject({ zustand: 'normal', vorrat: null })
+  it('mit Kaufsperre (Pause, keine Abholzeit, ausgebucht — N24): kein „ausverkauft" erfunden, die Kachel bleibt wählbar', () => {
+    for (const sperre of ['pause', 'keine-abholzeit', 'ausgebucht'] as const) {
+      const kacheln = groessenKacheln(produktFamilie(produkte, produkte[0]!), sperre)
+      expect(kacheln[0], sperre).toMatchObject({ zustand: 'normal', vorrat: null })
+      expect(kacheln[2], sperre).toMatchObject({ zustand: 'normal', vorrat: null })
+    }
   })
 })
 
@@ -179,7 +182,7 @@ describe('Vorrat und Menge', () => {
   it('dieselbe Schwelle wie die Hofseiten-Karte: knapp ab 5, ausverkauft bei 0', () => {
     const vorrat = (stock: number) => {
       const p = produkt('p', { stock })
-      return vorratText(p, kartenZustand(p, false))
+      return vorratText(p, kartenZustand(p, null))
     }
     expect(vorrat(6)).toBe('noch 6 Stück')
     expect(vorrat(5)).toBe('nur noch 5 Stück')
@@ -189,12 +192,12 @@ describe('Vorrat und Menge', () => {
 
   it('Gebinde zählen als Gebinde', () => {
     const p = produkt('p', { stock: 4, unit: 'KG', unitSize: 2 })
-    expect(vorratText(p, kartenZustand(p, false))).toBe('nur noch 4 × 2 kg')
+    expect(vorratText(p, kartenZustand(p, null))).toBe('nur noch 4 × 2 kg')
   })
 
-  it('pausiert: kein Vorrat', () => {
+  it('mit Kaufsperre: kein Vorrat', () => {
     const p = produkt('p')
-    expect(vorratText(p, kartenZustand(p, true))).toBeNull()
+    for (const sperre of ['pause', 'keine-abholzeit', 'ausgebucht'] as const) expect(vorratText(p, kartenZustand(p, sperre)), sperre).toBeNull()
   })
 
   it('die Mengengrenze ist der Bestand abzüglich dessen, was schon im Korb liegt', () => {
@@ -252,15 +255,15 @@ describe('„Gleich mit abholen"', () => {
   ]
 
   it('andere sichtbare Produkte, nie die eigene Familie, je Familie eins, Kaufbares zuerst, höchstens drei', () => {
-    expect(gleichMitAbholen(produkte, einstieg, false).map((p) => p.id)).toEqual(['p_stroh1', 'p_eier', 'p_karotten'])
+    expect(gleichMitAbholen(produkte, einstieg, null).map((p) => p.id)).toEqual(['p_stroh1', 'p_eier', 'p_karotten'])
   })
 
   it('reicht Kaufbares nicht, füllt Ausverkauftes auf', () => {
-    expect(gleichMitAbholen(produkte, einstieg, false, 5).map((p) => p.id)).toEqual(['p_stroh1', 'p_eier', 'p_karotten', 'p_leer'])
+    expect(gleichMitAbholen(produkte, einstieg, null, 5).map((p) => p.id)).toEqual(['p_stroh1', 'p_eier', 'p_karotten', 'p_leer'])
   })
 
-  it('pausiert: nichts zum Mitnehmen', () => {
-    expect(gleichMitAbholen(produkte, einstieg, true)).toEqual([])
+  it('mit Kaufsperre (Pause, keine Abholzeit, ausgebucht — N24): nichts zum Mitnehmen', () => {
+    for (const sperre of ['pause', 'keine-abholzeit', 'ausgebucht'] as const) expect(gleichMitAbholen(produkte, einstieg, sperre), sperre).toEqual([])
   })
 })
 

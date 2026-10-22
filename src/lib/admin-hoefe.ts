@@ -26,6 +26,9 @@ export const FREISCHALTUNG_STRIPE_OFFEN_TEXT = 'Stripe fehlt – Freischalten er
 /** Register K2, Änderung Nr. 116: Freischalten erst mit mindestens einem Produkt im Shop (Wortlaut der Freigabe). */
 export const FREISCHALTUNG_PRODUKT_OFFEN_TEXT = 'Noch kein Produkt im Shop – Freischalten erst mit mindestens einem Produkt.'
 
+/** Register Z1, Ergänzung 21.10.2026: Freischalten erst mit mindestens einer aktiven Abholzeit (Wortlaut des Auftrags). */
+export const FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT = 'Erst freischalten, wenn der Hof eine Abholzeit eingetragen hat – sonst kann niemand bestellen.'
+
 /**
  * Das bedingte Schreiben der Freischaltung traf nichts: Zwischen Lesen und
  * Schreiben ist Stripe weggefallen, oder jemand hat den Hof schon
@@ -45,11 +48,20 @@ export const FREISCHALTUNG_GEAENDERT_TEXT =
  * - Dann mindestens ein Produkt im Shop (Register K2, Änderung Nr. 116): Ein
  *   Gründungsplatz zählt erst mit der Freischaltung — ein leerer Hof soll
  *   keinen belegen. „Im Shop“ wie überall (`IM_SHOP_WHERE`, isAvailable).
+ * - Dann mindestens eine aktive Abholzeit (Register Z1, Ergänzung 21.10.2026):
+ *   Ohne sie kann niemand bestellen (Hofseite und Kasse sperren, N24). „Aktiv“
+ *   wie in Hofliste und Kasse (`isActive: true`).
  */
-export function freischaltSperre(hof: { emailBestaetigungOffen: boolean; stripeBereit: boolean; produktImShop: boolean }): string | null {
+export function freischaltSperre(hof: {
+  emailBestaetigungOffen: boolean
+  stripeBereit: boolean
+  produktImShop: boolean
+  abholzeitAktiv: boolean
+}): string | null {
   if (hof.emailBestaetigungOffen) return FREISCHALTUNG_EMAIL_OFFEN_TEXT
   if (!hof.stripeBereit) return FREISCHALTUNG_STRIPE_OFFEN_TEXT
   if (!hof.produktImShop) return FREISCHALTUNG_PRODUKT_OFFEN_TEXT
+  if (!hof.abholzeitAktiv) return FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT
   return null
 }
 
@@ -63,6 +75,19 @@ export const STRIPE_FEHLT_TEXT = 'Stripe fehlt'
  */
 export function stripeFehlt(hof: { approvedAt: Date | null; archivedAt: Date | null; stripeBereit: boolean }): boolean {
   return hof.approvedAt !== null && hof.archivedAt === null && !hof.stripeBereit
+}
+
+/** Das Kennzeichen für freigeschaltete Höfe ohne aktive Abholzeit (Z1, Ergänzung 21.10.2026) — Marke und Filter. */
+export const ABHOLZEIT_FEHLT_TEXT = 'Abholzeit fehlt'
+
+/**
+ * Ein freigeschalteter Hof ohne aktive Abholzeit (Register Z1, Ergänzung
+ * 21.10.2026): Er bleibt freigeschaltet (keine Datenänderung), seine Hofseite
+ * nimmt aber keine Bestellung an (N24) — der Betreiber soll ihn ansprechen.
+ * Wartende haben dafür ihre Sperre (freischaltSperre), stillgelegte sind vom Netz.
+ */
+export function abholzeitFehlt(hof: { approvedAt: Date | null; archivedAt: Date | null; abholzeitAktiv: boolean }): boolean {
+  return hof.approvedAt !== null && hof.archivedAt === null && !hof.abholzeitAktiv
 }
 
 /** Das Kennzeichen für Bestandshöfe mit Stripe, aber `acceptsOnline` false — neutral, kein Mangel des Kontos. */
@@ -90,7 +115,7 @@ export function onlineAus(hof: { approvedAt: Date | null; archivedAt: Date | nul
   return hof.approvedAt !== null && hof.archivedAt === null && hof.stripeBereit && !hof.onlineAn
 }
 
-export type HofStatusId = 'wartet' | 'stillgelegt' | 'pausiert' | 'stripe-fehlt' | 'online-aus' | 'online'
+export type HofStatusId = 'wartet' | 'stillgelegt' | 'pausiert' | 'stripe-fehlt' | 'abholzeit-fehlt' | 'online-aus' | 'online'
 
 /** Der Ton einer Marke — dieselben Werte wie StatusBadge (components/ui/status-badge.tsx). */
 export type HofTon = 'offen' | 'fertig' | 'neutral'
@@ -103,7 +128,9 @@ export type HofStatus = { id: HofStatusId; text: string; ton: HofTon }
  * nehmen die Hofseite vom Netz und stechen alles andere; Pausiert ist ein
  * Wunsch des Hofs (der Filter „Stripe fehlt" findet einen pausierten Hof ohne
  * Stripe trotzdem, er fragt `stripeFehlt`). Orange, nie Rot: Der Hof ist
- * online, der Betreiber kann nachfassen.
+ * online, der Betreiber kann nachfassen. „Abholzeit fehlt“ (Z1, Ergänzung
+ * 21.10.2026) steht nach „Stripe fehlt“ — der Filter findet ihn auch dahinter,
+ * er fragt `abholzeitFehlt`.
  */
 export function hofStatus(hof: {
   approvedAt: Date | null
@@ -111,40 +138,47 @@ export function hofStatus(hof: {
   isPaused: boolean
   stripeBereit: boolean
   onlineAn: boolean
+  abholzeitAktiv: boolean
 }): HofStatus {
   if (hof.archivedAt) return { id: 'stillgelegt', text: 'Stillgelegt', ton: 'neutral' }
   if (hof.approvedAt === null) return { id: 'wartet', text: 'Wartet', ton: 'offen' }
   if (hof.isPaused) return { id: 'pausiert', text: 'Pausiert', ton: 'neutral' }
   if (!hof.stripeBereit) return { id: 'stripe-fehlt', text: STRIPE_FEHLT_TEXT, ton: 'offen' }
+  if (!hof.abholzeitAktiv) return { id: 'abholzeit-fehlt', text: ABHOLZEIT_FEHLT_TEXT, ton: 'offen' }
   if (!hof.onlineAn) return { id: 'online-aus', text: ONLINE_AUS_TEXT, ton: 'neutral' }
   return { id: 'online', text: 'Online', ton: 'fertig' }
 }
 
-/** Die Filter über der Hofliste (Mockup: Alle · Online · Pausiert · Ohne Zahlung → „Stripe fehlt"), dazu Stillgelegt. */
-export const HOF_FILTER_WERTE = ['alle', 'online', 'pausiert', 'stripe-fehlt', 'online-aus', 'stillgelegt'] as const
+/** Die Filter über der Hofliste (Mockup: Alle · Online · Pausiert · Ohne Zahlung → „Stripe fehlt"), dazu „Abholzeit fehlt“ (Z1-Ergänzung) und Stillgelegt. */
+export const HOF_FILTER_WERTE = ['alle', 'online', 'pausiert', 'stripe-fehlt', 'abholzeit-fehlt', 'online-aus', 'stillgelegt'] as const
 export type HofFilter = (typeof HOF_FILTER_WERTE)[number]
+
+/** Filter, die das Mockup nicht zeigt: Ihr Chip erscheint nur, wenn ein Hof dazu passt — sonst bleibt die Zeile wie im Mockup. */
+export const NUR_MIT_TREFFERN: ReadonlySet<HofFilter> = new Set(['abholzeit-fehlt', 'online-aus', 'stillgelegt'])
 
 export const HOF_FILTER_LABEL: Record<HofFilter, string> = {
   alle: 'Alle',
   online: 'Online',
   pausiert: 'Pausiert',
   'stripe-fehlt': STRIPE_FEHLT_TEXT,
+  'abholzeit-fehlt': ABHOLZEIT_FEHLT_TEXT,
   'online-aus': ONLINE_AUS_TEXT,
   stillgelegt: 'Stillgelegt',
 }
 
-const FILTER_STATUS: Record<Exclude<HofFilter, 'alle' | 'stripe-fehlt' | 'online-aus'>, HofStatusId> = {
+const FILTER_STATUS: Record<Exclude<HofFilter, 'alle' | 'stripe-fehlt' | 'abholzeit-fehlt' | 'online-aus'>, HofStatusId> = {
   online: 'online',
   pausiert: 'pausiert',
   stillgelegt: 'stillgelegt',
 }
 
-type FilterHof = { name: string; slug: string; status: HofStatus; stripeFehlt: boolean; onlineAus: boolean }
+type FilterHof = { name: string; slug: string; status: HofStatus; stripeFehlt: boolean; onlineAus: boolean; abholzeitFehlt: boolean }
 
-/** Passt ein Hof zu einem Filter? „Stripe fehlt" fragt das Kennzeichen, die übrigen den Status. */
+/** Passt ein Hof zu einem Filter? „Stripe fehlt" und „Abholzeit fehlt" fragen das Kennzeichen, die übrigen den Status. */
 function passtZumFilter(hof: FilterHof, filter: HofFilter): boolean {
   if (filter === 'alle') return true
   if (filter === 'stripe-fehlt') return hof.stripeFehlt
+  if (filter === 'abholzeit-fehlt') return hof.abholzeitFehlt
   if (filter === 'online-aus') return hof.onlineAus
   return hof.status.id === FILTER_STATUS[filter]
 }
@@ -170,7 +204,7 @@ export function filtereHoefe<T extends FilterHof>(hoefe: readonly T[], ansicht: 
 
 /** Die Zahl hinter jedem Filter-Chip — ohne Suche, wie in der Kundenliste. */
 export function zaehleHofFilter(hoefe: readonly FilterHof[]): Record<HofFilter, number> {
-  const zahlen: Record<HofFilter, number> = { alle: 0, online: 0, pausiert: 0, 'stripe-fehlt': 0, 'online-aus': 0, stillgelegt: 0 }
+  const zahlen: Record<HofFilter, number> = { alle: 0, online: 0, pausiert: 0, 'stripe-fehlt': 0, 'abholzeit-fehlt': 0, 'online-aus': 0, stillgelegt: 0 }
   for (const h of hoefe) {
     if (h.status.id === 'wartet') continue
     for (const f of HOF_FILTER_WERTE) {
@@ -264,6 +298,8 @@ export type HofRohdaten = {
   hatKartenpunkt: boolean
   /** Mindestens ein Produkt im Shop — Bedingung fürs Freischalten (Register K2, Nr. 116). */
   produktImShop: boolean
+  /** Mindestens eine aktive Abholzeit — Bedingung fürs Freischalten und Kennzeichen „Abholzeit fehlt“ (Z1, Ergänzung 21.10.2026). */
+  abholzeitAktiv: boolean
   /** Zusagen festgeschrieben (Nr. 116) — dann ändert Zurücknehmen keinen Platz. Fehlt es: nein. */
   gruendungFest?: boolean
   /** Was der Freischalt-Dialog zur Gründung sagt — fertig vom Server (getAdminFarms), nur für wartende Höfe. */
@@ -305,6 +341,8 @@ export type AdminHofZeile = {
   onlineAn: boolean
   /** Freigeschaltet, Stripe fertig, Online aber aus (onlineAus). */
   onlineAus: boolean
+  /** Freigeschaltet, aber ohne aktive Abholzeit (abholzeitFehlt, Z1-Ergänzung). */
+  abholzeitFehlt: boolean
   sepaErteilt: boolean
   nummer: string | null
   istDeutsch: boolean
@@ -349,6 +387,7 @@ export function adminHofZeile(
     stripeFehlt: stripeFehlt(hof),
     onlineAn: hof.onlineAn,
     onlineAus: onlineAus(hof),
+    abholzeitFehlt: abholzeitFehlt(hof),
     sepaErteilt: hof.sepaErteilt,
     nummer: nummerAnzeige(hof.betriebsnummer),
     istDeutsch: hof.land === 'DE',

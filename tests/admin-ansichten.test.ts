@@ -111,6 +111,17 @@ describe('Höfe und Freischaltung', () => {
     expect(html).not.toContain('filter=online-aus')
   })
 
+  it('freigeschaltet ohne aktive Abholzeit: Marke und Filter „Abholzeit fehlt" (Z1, Ergänzung 21.10.2026)', () => {
+    const html = render([hof({ name: 'Moorhof', approvedAt: JETZT, stripeBereit: true, abholzeitAktiv: false }, 1)])
+    expect(html.match(/>Abholzeit fehlt</g)?.length).toBeGreaterThanOrEqual(3)
+    expect(html).toContain('filter=abholzeit-fehlt')
+  })
+
+  it('Gegenprobe: ohne solche Höfe kein Filter „Abholzeit fehlt" – der Chip steht nicht im Mockup, er kommt nur mit Treffern', () => {
+    const html = render([hof({ name: 'Sonnhof', approvedAt: JETZT, stripeBereit: true }, 1)])
+    expect(html).not.toContain('filter=abholzeit-fehlt')
+  })
+
   it('Gegenprobe: mit Stripe steht kein „Stripe fehlt" in der Liste', () => {
     const html = render([hof({ name: 'Sonnhof', approvedAt: JETZT, stripeBereit: true }, 1)])
     expect(html).not.toContain('>Stripe fehlt</span>')

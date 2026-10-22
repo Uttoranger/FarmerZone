@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useOptimistic, useState, useTransition } from 'react'
+import { useCallback, useId, useOptimistic, useRef, useState, useTransition } from 'react'
+import { flushSync } from 'react-dom'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { Lock, Package, Plus, Search, Sparkles } from 'lucide-react'
+import { ChevronRight, Lock, Package, Plus, Search, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -16,6 +17,7 @@ import { ImShopSchalter } from '@/components/products/im-shop-schalter'
 import { ProductDialog } from '@/components/products/product-dialog'
 import { produktHinweise } from '@/components/products/produkt-hinweise'
 import { VorratFeld } from '@/components/produkte/vorrat-feld'
+import { VorratBlatt } from '@/components/produkte/vorrat-blatt'
 import { WasLegstDuAn } from '@/components/produkte/was-legst-du-an'
 import { FutterFormular } from '@/components/produkte/futter-formular'
 import { BrennmaterialFormular } from '@/components/produkte/brennmaterial-formular'
@@ -25,9 +27,11 @@ import type { ProductData } from '@/server/queries/products'
 import {
   PRODUKTE_FILTER_LABEL,
   VORRAT_HINWEIS,
+  VORRAT_HINWEIS_ZEILEN,
   filterAdresse,
   filtereProdukte,
   produktStatus,
+  produkteAbschnitte,
   PRODUKTE_LEER,
   produkteKopfzeile,
   sichtbareProdukteFilter,
@@ -36,15 +40,17 @@ import {
   gespeichertMomentMoeglich,
   gespeichertTexte,
   zaehleProdukteFilter,
+  type ProdukteAbschnitte,
   type ProduktAngelegt,
   type WiederDaTexte,
 } from '@/lib/produkte-hof'
+import { IM_SHOP, NICHT_IM_SHOP, produktZustand } from '@/lib/produkt-sichtbarkeit'
 import { browserSpeicher, leseWiederDaGezeigt, merkeWiederDaGezeigt, wiederDaOeffnen } from '@/lib/wieder-da-moment'
 import { gespeichertOeffnen, leseGespeichertGezeigt, merkeGespeichertGezeigt } from '@/lib/gespeichert-moment'
 import { GESPEICHERT_HINWEIS } from '@/lib/teilen-momente'
 import { produkteAnsichtAus } from '@/schemas/produkte-filter'
 import type { NeuBereich } from '@/schemas/url-auftrag'
-import { formatEuro, formatGebinde, formatKategorie } from '@/lib/format'
+import { formatEuro, formatGebinde, formatKategorie, formatZahl, hofVorratText } from '@/lib/format'
 import { wienWochenMontag } from '@/lib/kalender'
 import { PRODUKTNAME_MAX } from '@/lib/eingabegrenzen'
 import type { KategorieVorschlag } from '@/lib/taxonomie'
@@ -67,10 +73,23 @@ type Props = {
 
 type DialogZustand = { open: boolean; product: ProductData | null; vorwahl: NeuBereich | null }
 
+/** Das Vorrat-Blatt: welches Produkt, ob offen; `runde` zählt je Öffnen, damit jedes Öffnen frisch beginnt. */
+type VorratBlattZustand = { id: string; offen: boolean; runde: number }
+
+/** Hinweise mit Handlung stellen ein Produkt unter „Braucht dich" — „Unterkategorie ergänzen" ist nur ein leiser Hinweis. */
+const hatHandlung = (product: ProductData): boolean => produktHinweise(product).some((h) => h.art !== 'unterkategorie-ergaenzen')
+
+/** Der Vorrat-Knopf eines Produkts in den Karten-Zeilen — gesucht, wenn das Blatt schließt. */
+function vorratKnopf(id: string): HTMLElement | null {
+  return document.querySelector<HTMLElement>(`[data-vorrat-knopf="${CSS.escape(id)}"]`)
+}
+
 /*
  * Produkte im neuen Design (Gate 5, Nachtlauf Nr. 18; Mockups web-h2-produkte,
  * mobil-h2-produkte). Ab 1024 px eine Tabelle (Produkt · Einheit · Preis ·
- * Vorrat · Status · Sichtbar), darunter Karten-Zeilen wie im Handy-Mockup.
+ * Vorrat · Status · Sichtbar), darunter Karten-Zeilen nach dem Board
+ * system-h1-mein-hof-v3 (Register N25): „Braucht dich" zuerst, Schilder nur
+ * bei Ausnahmen, der Vorrat als Knopf, geändert im Vorrat-Blatt.
  * Was eine Zeile sagt, entscheidet src/lib/produkte-hof.ts; hier wird nur
  * angeordnet.
  *
@@ -89,6 +108,11 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
   const [loeschtGerade, setLoeschtGerade] = useState(false)
   // Ein Moment zur Zeit: „wieder da" (Vorrat 0 → mehr) oder „gespeichert" (neu angelegt, Nr. 30).
   const [moment, setMoment] = useState<{ art: 'wieder-da' | 'gespeichert'; texte: WiederDaTexte } | null>(null)
+  const [vorratBlatt, setVorratBlatt] = useState<VorratBlattZustand | null>(null)
+  // Unter md ist die Suche eine Lupe; steht schon eine Suche in der Adresse, ist das Feld offen.
+  const [sucheOffen, setSucheOffen] = useState(ansicht.suche !== '')
+  const sucheFeld = useRef<HTMLInputElement>(null)
+  const sucheId = useId()
 
   useUrlAuftrag((auftrag) => {
     setWaehlerOffen(false)
@@ -109,6 +133,8 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
   const products = serverProdukte.map((p) => (vorgezogen[p.id] === undefined ? p : { ...p, isAvailable: vorgezogen[p.id] }))
   const zahlen = zaehleProdukteFilter(products)
   const gefiltert = filtereProdukte(products, { filter: ansicht.filter, suche })
+  const abschnitte = produkteAbschnitte(products, { filter: ansicht.filter, suche }, hatHandlung)
+  const blattProdukt = vorratBlatt ? products.find((p) => p.id === vorratBlatt.id) : undefined
 
   function schreibeAdresse(adresse: string) {
     // null als Zustand: Next gleicht useSearchParams ab (ARCHITECTURE §4, State-Regeln).
@@ -166,6 +192,20 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
     }
   }
 
+  function lupe() {
+    if (sucheOffen) {
+      // Zu heißt ohne Suche — sonst filterte ein Wort, das niemand mehr sieht.
+      setSucheOffen(false)
+      setSuche('')
+      schreibeAdresse(filterAdresse(ansicht.filter, ''))
+      return
+    }
+    // Erst sichtbar machen, dann fokussieren: Ein verstecktes Feld nimmt keinen Fokus.
+    flushSync(() => setSucheOffen(true))
+    sucheFeld.current?.focus()
+  }
+
+  const vorratOeffnen = (product: ProductData) => setVorratBlatt((b) => ({ id: product.id, offen: true, runde: (b?.runde ?? 0) + 1 }))
   const oeffnen = (product: ProductData) => () => setDialog({ open: true, product, vorwahl: null })
   const dialogSchliessen = () => setDialog({ open: false, product: null, vorwahl: null })
   // Futter und Brennmaterial legt man mit Verkaufsgrößen an (Nr. 20, eigene
@@ -191,10 +231,11 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
   const kopfzeile = produkteKopfzeile(products)
   return (
     <div className="flex flex-col gap-4 md:gap-[18px]">
-      <header className="flex items-end gap-3">
+      {/* Unter md sagt es der Reiter: Die Überschrift hört nur der Screenreader, die Zahl steht im Filter „Alle · n" (N25). */}
+      <header className="flex items-end gap-3 max-md:sr-only">
         <div className="min-w-0">
           <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Produkte</h1>
-          {kopfzeile && <p className="text-[13px] leading-normal text-muted-foreground">{kopfzeile}</p>}
+          {kopfzeile && <p className="text-[13px] leading-normal text-muted-foreground max-md:hidden">{kopfzeile}</p>}
         </div>
         {/* Am Handy legt das Plus der Unterleiste an (Mockup mobil-h2-produkte). */}
         {products.length > 0 && neuKnopf('ml-auto hidden md:inline-flex')}
@@ -210,30 +251,49 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
       ) : (
         <>
           <div className="flex flex-col gap-3 md:flex-row md:items-center">
-            <FilterChipReihe beschriftung="Produkte filtern" className="min-w-0 md:flex-1">
-              {sichtbareProdukteFilter(zahlen, ansicht.filter).map((f) => {
-                const adresse = filterAdresse(f, suche)
-                const mitZahl = f === 'alle' || f === 'entwuerfe'
-                return (
-                  <FilterChip
-                    key={f}
-                    href={adresse}
-                    aktiv={ansicht.filter === f}
-                    onNavigate={(e) => {
-                      e.preventDefault()
-                      schreibeAdresse(adresse)
-                    }}
-                  >
-                    {PRODUKTE_FILTER_LABEL[f]}
-                    {mitZahl && <span className="ml-1 tabular-nums">· {zahlen[f]}</span>}
-                  </FilterChip>
-                )
-              })}
-            </FilterChipReihe>
-            <label className="relative block md:w-[260px]">
+            <div className="-mx-4 flex items-center gap-2 pr-4 md:mx-0 md:min-w-0 md:flex-1 md:pr-0">
+              <FilterChipReihe beschriftung="Produkte filtern" className="mx-0 min-w-0 flex-1">
+                {sichtbareProdukteFilter(zahlen, ansicht.filter).map((f) => {
+                  const adresse = filterAdresse(f, suche)
+                  const mitZahl = f === 'alle' || f === 'entwuerfe'
+                  return (
+                    <FilterChip
+                      key={f}
+                      href={adresse}
+                      aktiv={ansicht.filter === f}
+                      onNavigate={(e) => {
+                        e.preventDefault()
+                        schreibeAdresse(adresse)
+                      }}
+                    >
+                      {PRODUKTE_FILTER_LABEL[f]}
+                      {mitZahl && <span className="ml-1 tabular-nums">· {zahlen[f]}</span>}
+                    </FilterChip>
+                  )
+                })}
+              </FilterChipReihe>
+              {/* Unter md die Lupe am Ende der Filter (Board, Bildschirm A); ab md steht das Feld. */}
+              <button
+                type="button"
+                onClick={lupe}
+                aria-label="Produkt suchen"
+                aria-expanded={sucheOffen}
+                aria-controls={sucheId}
+                className={cn(
+                  'flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-foreground hover:bg-muted md:hidden',
+                  FOKUS_RAHMEN
+                )}
+              >
+                <Search className="size-4" strokeWidth={1.7} aria-hidden="true" />
+              </button>
+            </div>
+            {/* Im DOM hinter den Filtern (ab md rechts, wie vorher); unter md sichtbar darüber — der Fokus folgt auf die Lupe. */}
+            <label className={cn('relative max-md:order-first md:block md:w-[260px]', sucheOffen ? 'block' : 'hidden')}>
               <span className="sr-only">Produkt suchen</span>
               <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
               <input
+                ref={sucheFeld}
+                id={sucheId}
                 type="search"
                 value={suche}
                 onChange={(e) => {
@@ -279,10 +339,17 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
                 setzeVorgezogen={setzeVorgezogen}
                 onWiederDa={momentPruefen}
               />
-              <Zeilen produkte={gefiltert} oeffnen={oeffnen} onWiederDa={momentPruefen} />
+              <Zeilen
+                abschnitte={abschnitte}
+                oeffnen={oeffnen}
+                onVorrat={vorratOeffnen}
+                nichtImShopAdresse={filterAdresse('entwuerfe', '')}
+                zuAdresse={schreibeAdresse}
+              />
             </>
           )}
-          <p className="text-[12.5px] leading-normal text-muted-foreground">{VORRAT_HINWEIS}</p>
+          <p className="text-[12.5px] leading-normal text-muted-foreground max-lg:hidden">{VORRAT_HINWEIS}</p>
+          <p className="text-[12.5px] leading-normal text-muted-foreground lg:hidden">{VORRAT_HINWEIS_ZEILEN}</p>
         </>
       )}
 
@@ -329,6 +396,19 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* EINMAL hier, nicht in der Zeile: Wechselt das Produkt beim Speichern den Abschnitt, bleiben Fokus, Satz und Moment. */}
+      {vorratBlatt && blattProdukt && (
+        <VorratBlatt
+          key={`${blattProdukt.id}-${vorratBlatt.runde}`}
+          produkt={blattProdukt}
+          offen={vorratBlatt.offen}
+          bild={<ProduktBild product={blattProdukt} className="size-11 rounded-[10px]" />}
+          onSchliessen={() => setVorratBlatt((b) => (b ? { ...b, offen: false } : null))}
+          onWiederDa={(vorrat) => momentPruefen(blattProdukt, vorrat)}
+          fokusZiel={() => vorratKnopf(blattProdukt.id)}
+        />
+      )}
 
       {moment?.art === 'wieder-da' && <WiederDaMoment texte={moment.texte} hof={hof} onSchliessen={momentSchliessen} />}
       {moment?.art === 'gespeichert' && (
@@ -418,30 +498,123 @@ function Tabelle({
   )
 }
 
-/** Unter 1024 px: Karten-Zeilen wie im Handy-Mockup — Bild, Name, Einheit · Preis, Status, Vorrat. */
-function Zeilen({ produkte, oeffnen, onWiederDa }: ZeilenProps): React.JSX.Element {
-  return (
-    <ul className="flex flex-col gap-2.5 lg:hidden">
-      {produkte.map((product) => {
-        const status = produktStatus(product)
-        return (
-          <li key={product.id} className="flex items-center gap-2.5 rounded-[13px] border border-border bg-card p-2.5">
-            <ProduktBild product={product} className="size-[46px] rounded-xl" />
-            <div className="min-w-0 flex-1">
-              <NamenKnopf product={product} onOeffnen={oeffnen(product)} />
-              <p className="truncate text-xs text-muted-foreground">
-                {formatGebinde(product.unit, product.unitSize)} · {formatEuro(product.price)}
-              </p>
-              <StatusBadge status={status.ton} className="mt-1 whitespace-nowrap">
-                {status.text}
-              </StatusBadge>
-              <Hinweise product={product} onOeffnen={oeffnen(product)} />
-            </div>
-            <VorratFeld productId={product.id} name={product.name} stock={product.stock} onWiederDa={(v) => onWiederDa(product, v)} />
-          </li>
-        )
-      })}
+/**
+ * Unter 1024 px: Karten-Zeilen nach dem Board (Register N25) — „Braucht dich",
+ * „Im Shop" und am Ende „Nicht im Shop"; mit Suche und im Filter „Nicht im
+ * Shop" eine einfache Liste (`produkteAbschnitte`). Leere Abschnitte entfallen.
+ */
+function Zeilen({
+  abschnitte,
+  oeffnen,
+  onVorrat,
+  nichtImShopAdresse,
+  zuAdresse,
+}: {
+  abschnitte: ProdukteAbschnitte<ProductData>
+  oeffnen: (product: ProductData) => () => void
+  onVorrat: (product: ProductData) => void
+  nichtImShopAdresse: string
+  zuAdresse: (adresse: string) => void
+}): React.JSX.Element {
+  const id = useId()
+  const zeilen = (produkte: ProductData[], ueberschrift?: string) => (
+    <ul aria-labelledby={ueberschrift} className="overflow-hidden rounded-2xl border border-border bg-card">
+      {produkte.map((product) => (
+        <ProduktZeile key={product.id} product={product} onOeffnen={oeffnen(product)} onVorrat={() => onVorrat(product)} />
+      ))}
     </ul>
+  )
+  if (abschnitte.art === 'liste') return <div className="lg:hidden">{zeilen(abschnitte.produkte)}</div>
+
+  const { brauchtDich, imShop, nichtImShop } = abschnitte
+  const kopf = (kennung: string, titel: string, zusatz: string, ton?: 'offen') => (
+    <div className="flex items-baseline gap-2 px-1 pb-2">
+      <h2 id={kennung} className={cn('text-xs font-bold tracking-[1px] uppercase', ton === 'offen' ? 'text-status-offen' : 'text-muted-foreground')}>
+        {titel}
+      </h2>
+      <span className="text-[12.5px] text-muted-foreground">{zusatz}</span>
+    </div>
+  )
+  return (
+    <div className="flex flex-col gap-4 lg:hidden">
+      {brauchtDich.length > 0 && (
+        <section>
+          {kopf(`${id}-braucht`, 'Braucht dich', formatZahl(brauchtDich.length), 'offen')}
+          {zeilen(brauchtDich, `${id}-braucht`)}
+        </section>
+      )}
+      {imShop.length > 0 && (
+        <section>
+          {kopf(`${id}-shop`, IM_SHOP, `${formatZahl(imShop.length)} · deine Reihenfolge`)}
+          {zeilen(imShop, `${id}-shop`)}
+        </section>
+      )}
+      {nichtImShop?.art === 'zeilen' && (
+        <section>
+          {kopf(`${id}-nicht`, NICHT_IM_SHOP, formatZahl(nichtImShop.produkte.length))}
+          {zeilen(nichtImShop.produkte, `${id}-nicht`)}
+        </section>
+      )}
+      {nichtImShop?.art === 'zeile' && (
+        // Ein Link auf den bestehenden Filter, im Browser angewandt wie die Chips.
+        <Link
+          href={nichtImShopAdresse}
+          prefetch={false}
+          onNavigate={(e) => {
+            e.preventDefault()
+            zuAdresse(nichtImShopAdresse)
+          }}
+          className={cn('flex min-h-12 items-center gap-2.5 rounded-[14px] border border-dashed border-border px-3.5 text-sm text-foreground hover:bg-muted', FOKUS_RAHMEN)}
+        >
+          {`${NICHT_IM_SHOP} · ${formatZahl(nichtImShop.zahl)}`}
+          <span className="flex-1" />
+          <ChevronRight className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+        </Link>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Eine Karten-Zeile: Bild, Name (bis zwei Zeilen), Gebinde · Preis, ein Schild
+ * nur bei einer Ausnahme (ausverkauft, wenig, nicht im Shop — kein „Sichtbar"),
+ * die Hinweise; rechts der Vorrat als Knopf mit Zahl und Einheit.
+ */
+function ProduktZeile({ product, onOeffnen, onVorrat }: { product: ProductData; onOeffnen: () => void; onVorrat: () => void }): React.JSX.Element {
+  const status = produktStatus(product)
+  const ausnahme = produktZustand(product).art !== 'im-shop'
+  const vorrat = hofVorratText(product.stock, product.unit, product.unitSize)
+  return (
+    <li className="flex items-center gap-3 border-t border-border py-2.5 pr-2.5 pl-3 first:border-t-0">
+      <ProduktBild product={product} className="size-12 rounded-[10px]" />
+      <div className="flex min-w-0 flex-1 flex-col items-start gap-[3px]">
+        <NamenKnopf product={product} onOeffnen={onOeffnen} />
+        <p className="max-w-full truncate text-[12.5px] text-muted-foreground">
+          {formatGebinde(product.unit, product.unitSize)} · {formatEuro(product.price)}
+        </p>
+        {ausnahme && (
+          <StatusBadge status={status.ton} className="whitespace-nowrap">
+            {status.text}
+          </StatusBadge>
+        )}
+        <Hinweise product={product} onOeffnen={onOeffnen} />
+      </div>
+      <button
+        type="button"
+        data-vorrat-knopf={product.id}
+        onClick={onVorrat}
+        aria-label={`Vorrat ${product.name}: ${vorrat}. Ändern`}
+        className={cn(
+          'flex min-h-12 min-w-20 shrink-0 flex-col items-center justify-center gap-px rounded-xl border bg-background px-2.5 text-foreground hover:bg-muted',
+          // Bei 0 trägt der Rahmen den Ton „offen" (Board: Ausverkauft, Rahmen orange).
+          product.stock <= 0 ? 'border-status-offen' : 'border-border',
+          FOKUS_RAHMEN
+        )}
+      >
+        <span className="text-[15px] font-bold whitespace-nowrap">{vorrat}</span>
+        <span className="text-[10.5px] font-medium text-muted-foreground">Vorrat</span>
+      </button>
+    </li>
   )
 }
 

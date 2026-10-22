@@ -6,6 +6,7 @@ import { pruefeProduktseiteGeteilt } from '@/server/queries/seo'
 import type { Suchparameter } from '@/lib/ansichts-modus'
 import { gewaehlteGroesse, produktFamilie, produktMetadaten, produktPfad, sichtbaresProdukt } from '@/lib/produktdetail'
 import { entferneKontaktdaten } from '@/lib/hofseite-kunde'
+import { kaufSperre } from '@/lib/bereiche-anzeige'
 import { hofTitelbildVorschau, metadatenBasis } from '@/lib/vorschaubild'
 import { UMGEBUNG } from '@/lib/umgebung-server'
 import { OG_LOCALE, jsonLdSicher, produktJsonLd } from '@/lib/json-ld'
@@ -104,6 +105,9 @@ async function Produktseite({ farmSlug, id, suche }: { farmSlug: string; id: str
   // Einmal hier, auf dem Server: Gebührensatz und Abholtage rechnen in Server
   // und Browser vom selben Zeitpunkt (sonst Hydration-Abweichung).
   const jetzt = new Date()
+  // Die Kaufsperre (Register N24) wie auf der Hofseite: einmal, mit demselben Zeitpunkt und den vollen
+  // Tagen aus ladeHofseite.
+  const sperre = kaufSperre(farm, jetzt)
 
   return (
     <KundeShellMitSitzung unterleiste={false}>
@@ -116,6 +120,7 @@ async function Produktseite({ farmSlug, id, suche }: { farmSlug: string; id: str
         ansicht={{ art: ansicht.art, kaufen: ansicht.kaufen }}
         kaeufer={kaeufer}
         jetzt={jetzt.toISOString()}
+        sperre={sperre}
       />
       {/* Strukturierte Daten (Nr. 117): Preis und Verfügbarkeit des Einstiegs, auf dem Server gebaut. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSicher(produktJsonLd(einstieg, farm, metadatenBasis(UMGEBUNG.appUrl))) }} />

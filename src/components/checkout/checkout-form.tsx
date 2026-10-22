@@ -19,6 +19,7 @@ import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_UNGUELTIG, CODE_ABHOLF
 import { BETRIEBSNACHWEIS_FEHLER, CODE_BETRIEBSNACHWEIS_FEHLT } from '@/lib/betriebsnachweis'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { CartItem } from '@/lib/use-cart'
+import type { KaufSperre } from '@/lib/bereiche-anzeige'
 import {
   SITZUNG_SCHLUESSEL,
   WARENKORB_ANKER,
@@ -59,6 +60,7 @@ import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
 import { AgbSatz } from '@/components/rechtstexte/agb-stuecke'
 import { StripeZahlung } from './stripe-payment'
 import { AngabenZumHof, hofAdresse, type AngabenHof } from './angaben-zum-hof'
+import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import {
   AbholWahl,
   AktionsLeiste,
@@ -153,11 +155,18 @@ export function CheckoutForm({
   nurBetriebeIds,
   vorbelegung,
   ausgebuchteAbholfenster,
+  sperre,
   testbetrieb = false,
 }: {
   farm: PublicFarm
   /** Fenster mit erreichter Höchstzahl (abholSchluessel) — vom Server gezählt. */
   ausgebuchteAbholfenster: string[]
+  /**
+   * Die Kaufsperre (Register N24), einmal auf dem Server aus derselben Zählung gerechnet
+   * (checkout/page.tsx) — nie aus der Uhr des Browsers. Mit Sperre steht die Hinweiskarte oben
+   * und der Kaufknopf ruht; prüfen tut weiter /api/checkout. Pause kommt hier nicht an (404).
+   */
+  sperre: KaufSperre
   /** Produkte dieses Hofs mit abgabe = NUR_BETRIEBE — aus der DB, nicht aus dem Korb. */
   nurBetriebeIds: string[]
   /** Ist der Besteller selbst ein Hof: Käuferart Betrieb und seine Nummer (Konzept 6.4). */
@@ -568,6 +577,8 @@ export function CheckoutForm({
         uebersichtZuletzt
         korb={
           <div className="flex flex-col gap-3">
+            {/* Oben dieselbe Karte wie auf Hof- und Produktseite (N24). */}
+            <KaufSperreHinweis sperre={sperre} hofName={farm.name} pauseMessage={farm.pauseMessage} />
             <KorbKarte
               hofName={farm.name}
               positionen={korbPositionen}
@@ -613,9 +624,9 @@ export function CheckoutForm({
             }
             online={online}
             wirdGesendet={isPending}
-            gesperrt={isPending || kacheln.length === 0 || zahlarten.length === 0}
+            gesperrt={isPending || kacheln.length === 0 || zahlarten.length === 0 || sperre !== null}
             gesamt={gesamt}
-            fussnote={kaufknopfZeile({ termin: gewaehlt ? abholSatz(gewaehlt) : null, online, bar: zahlweg === 'ONSITE_CASH' })}
+            fussnote={kaufknopfZeile({ termin: gewaehlt ? abholSatz(gewaehlt) : null, online, bar: zahlweg === 'ONSITE_CASH', gesperrt: sperre !== null })}
           />
         }
       >
@@ -637,9 +648,11 @@ export function CheckoutForm({
               </h2>
               <p className={cn(HINWEIS, 'min-w-0 text-[13px] break-words md:text-right')}>{hofAdresse(farm)}</p>
             </div>
+            {/* Mit Kaufsperre nennt die Karte oben den Grund schon — hier nur noch der Weg zum Hof
+                (DESIGN_SYSTEM: Ein Zustand hat eine Fassung, auf der ganzen Seite). */}
             {kacheln.length === 0 ? (
               <p className="text-[13.5px] text-muted-foreground">
-                Gerade gibt es keine Abholzeiten. {KONTAKT_UNTER_ANGABEN_ZUM_HOF}
+                {sperre === null ? `Gerade gibt es keine Abholzeiten. ${KONTAKT_UNTER_ANGABEN_ZUM_HOF}` : KONTAKT_UNTER_ANGABEN_ZUM_HOF}
               </p>
             ) : (
               <AbholWahl kacheln={kacheln} feld={form.register('pickupSlotKey')} fehler={fehlerAm.pickupSlotKey?.message} />
@@ -841,7 +854,7 @@ export function KassenAbschluss({
             `Zahlungspflichtig bestellen · ${gesamt}`
           )}
         </button>
-        <p className={cn(HINWEIS, 'text-center md:text-left')}>{fussnote}</p>
+        {fussnote && <p className={cn(HINWEIS, 'text-center md:text-left')}>{fussnote}</p>}
         {/* Register O4: Die AGB gelten, der Hof ist Vertragspartner, und mit dem Tippen auf den
             Knopf fällt die Zustimmung zur sofortigen Ausführung — ohne Haken. Der Link öffnet
             in einem neuen Tab, damit Kasse und Reservierung stehen bleiben. */}

@@ -31,6 +31,7 @@ import {
   kartenZustand,
   kategorieAbschnitte,
   knappText,
+  ruhenderKnopfText,
   zeigeKaufknopf,
 } from '@/lib/bereiche-anzeige'
 import {
@@ -141,13 +142,15 @@ describe('uebersichtProdukte — das Schaufenster der Übersicht', () => {
 
   it('zuerst Kaufbares in der Reihenfolge des Hofs, Ausverkauftes füllt nur auf', () => {
     const liste = [ware('a', 0), ware('b', 3), ware('c', 0), ware('d', 9), ware('e', 1)]
-    expect(uebersichtProdukte(liste, false).map((x) => x.name)).toEqual(['b', 'd', 'e'])
-    expect(uebersichtProdukte([ware('a', 0), ware('b', 3)], false).map((x) => x.name)).toEqual(['b', 'a'])
+    expect(uebersichtProdukte(liste, null).map((x) => x.name)).toEqual(['b', 'd', 'e'])
+    expect(uebersichtProdukte([ware('a', 0), ware('b', 3)], null).map((x) => x.name)).toEqual(['b', 'a'])
+    // Mit Kaufsperre (N24) ist nichts kaufbar: die Reihenfolge des Hofs bleibt.
+    expect(uebersichtProdukte(liste, 'keine-abholzeit').map((x) => x.name)).toEqual(['a', 'b', 'c'])
   })
 
-  it('„N verfügbar" zählt, was man in den Korb legen kann — pausiert nichts', () => {
-    expect(verfuegbarText([ware('a', 0), ware('b', 3), ware('c', 2)], false)).toBe('2 verfügbar')
-    expect(verfuegbarText([ware('b', 3)], true)).toBeNull()
+  it('„N verfügbar" zählt, was man in den Korb legen kann — mit Kaufsperre nichts', () => {
+    expect(verfuegbarText([ware('a', 0), ware('b', 3), ware('c', 2)], null)).toBe('2 verfügbar')
+    for (const sperre of ['pause', 'keine-abholzeit', 'ausgebucht'] as const) expect(verfuegbarText([ware('b', 3)], sperre), sperre).toBeNull()
   })
 })
 
@@ -157,9 +160,9 @@ describe('Schaufenster unter lg (Register N5, Nr. 51)', () => {
   it('bis zu vier Produkte — die Auswahl bleibt uebersichtProdukte: Kaufbares zuerst, in der Reihenfolge des Hofs', () => {
     const liste = [ware('a', 0), ware('b', 3), ware('c', 0), ware('d', 9), ware('e', 1), ware('f', 2)]
     expect(SCHAUFENSTER_PRODUKTE).toBe(4)
-    expect(uebersichtProdukte(liste, false, SCHAUFENSTER_PRODUKTE).map((x) => x.name)).toEqual(['b', 'd', 'e', 'f'])
+    expect(uebersichtProdukte(liste, null, SCHAUFENSTER_PRODUKTE).map((x) => x.name)).toEqual(['b', 'd', 'e', 'f'])
     // Reicht das Kaufbare nicht, füllt Ausverkauftes auf — wie bisher.
-    expect(uebersichtProdukte([ware('a', 0), ware('b', 3)], false, SCHAUFENSTER_PRODUKTE).map((x) => x.name)).toEqual(['b', 'a'])
+    expect(uebersichtProdukte([ware('a', 0), ware('b', 3)], null, SCHAUFENSTER_PRODUKTE).map((x) => x.name)).toEqual(['b', 'a'])
   })
 
   it('Anzahl je Breite: am Handy alle vier, ab md die ersten drei — ab lg wie bisher UEBERSICHT_PRODUKTE', () => {
@@ -183,32 +186,44 @@ describe('kartenZustand — knapp und ausverkauft aus dem echten Bestand', () =>
   const produkt = (stock: number, isAvailable = true) => ({ stock, isAvailable, unavailableReason: null })
 
   it('genug Bestand: kaufbar; bis fünf: knapp mit Bestand; null: ausverkauft', () => {
-    expect(kartenZustand(produkt(12), false)).toEqual({ art: 'kaufbar' })
-    expect(kartenZustand(produkt(5), false)).toEqual({ art: 'knapp', bestand: 5 })
-    expect(kartenZustand(produkt(1), false)).toEqual({ art: 'knapp', bestand: 1 })
-    expect(kartenZustand(produkt(0), false)).toEqual({ art: 'ausverkauft' })
+    expect(kartenZustand(produkt(12), null)).toEqual({ art: 'kaufbar' })
+    expect(kartenZustand(produkt(5), null)).toEqual({ art: 'knapp', bestand: 5 })
+    expect(kartenZustand(produkt(1), null)).toEqual({ art: 'knapp', bestand: 1 })
+    expect(kartenZustand(produkt(0), null)).toEqual({ art: 'ausverkauft' })
   })
 
   it('pausiert sticht alles; nicht im Shop nennt den Grund des Hofs', () => {
-    expect(kartenZustand(produkt(12), true)).toEqual({ art: 'pausiert' })
-    expect(kartenZustand(produkt(0), true)).toEqual({ art: 'pausiert' })
-    expect(kartenZustand({ stock: 4, isAvailable: false, unavailableReason: 'Ab Mai' }, false)).toEqual({
+    expect(kartenZustand(produkt(12), 'pause')).toEqual({ art: 'pausiert' })
+    expect(kartenZustand(produkt(0), 'pause')).toEqual({ art: 'pausiert' })
+    expect(kartenZustand({ stock: 4, isAvailable: false, unavailableReason: 'Ab Mai' }, null)).toEqual({
       art: 'nicht-verfuegbar',
       grund: 'Ab Mai',
     })
-    expect(kartenZustand({ stock: 4, isAvailable: false, unavailableReason: null }, false)).toEqual({
+    expect(kartenZustand({ stock: 4, isAvailable: false, unavailableReason: null }, null)).toEqual({
       art: 'nicht-verfuegbar',
       grund: 'Nicht verfügbar',
     })
   })
 
+  it('keine Abholzeit oder ausgebucht (N24): nicht bestellbar — nichts ist ausverkauft, der Knopf heißt „Nicht bestellbar“', () => {
+    for (const sperre of ['keine-abholzeit', 'ausgebucht'] as const) {
+      expect(kartenZustand(produkt(12), sperre), sperre).toEqual({ art: 'nicht-bestellbar' })
+      expect(kartenZustand(produkt(0), sperre), sperre).toEqual({ art: 'nicht-bestellbar' })
+      expect(ruhenderKnopfText(kartenZustand(produkt(12), sperre))).toBe('Nicht bestellbar')
+    }
+    // Gegenprobe: die übrigen Beschriftungen aus derselben Stelle.
+    expect(ruhenderKnopfText(kartenZustand(produkt(12), 'pause'))).toBe('Pausiert')
+    expect(ruhenderKnopfText(kartenZustand(produkt(0), null))).toBe('Ausverkauft')
+    expect(ruhenderKnopfText(kartenZustand({ stock: 4, isAvailable: false, unavailableReason: 'Ab Mai' }, null))).toBe('Ab Mai')
+  })
+
   it('der Kaufknopf erscheint genau bei kaufbar und knapp — eine Regel mit zeigeKaufknopf', () => {
     for (const stock of [0, 1, 5, 6, 40]) {
       for (const isAvailable of [true, false]) {
-        for (const isPaused of [true, false]) {
-          const art = kartenZustand({ stock, isAvailable, unavailableReason: null }, isPaused).art
-          expect(art === 'kaufbar' || art === 'knapp', `${stock}/${isAvailable}/${isPaused}`).toBe(
-            zeigeKaufknopf({ stock, isAvailable }, isPaused)
+        for (const sperre of [null, 'pause', 'keine-abholzeit', 'ausgebucht'] as const) {
+          const art = kartenZustand({ stock, isAvailable, unavailableReason: null }, sperre).art
+          expect(art === 'kaufbar' || art === 'knapp', `${stock}/${isAvailable}/${sperre}`).toBe(
+            zeigeKaufknopf({ stock, isAvailable }, sperre)
           )
         }
       }

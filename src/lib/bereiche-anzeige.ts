@@ -40,6 +40,11 @@ import {
 import type { GebindeWahl, HoefeFilter } from '@/schemas/hoefe-filter'
 import { formatMenge, formatZahl, kilopreisNetto } from '@/lib/format'
 import { produktZustand } from '@/lib/produkt-sichtbarkeit'
+import { ABHOL_VORLAUF_TAGE } from '@/lib/pickup-days'
+import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
+// Nur zur Laufzeit einer Funktion gebraucht: hofuebersicht.ts bindet dieses Modul selbst ein, der Kreis
+// ist harmlos, solange keine Konstante auf Modulebene von dort liest (naechsteAbholung, wienJetzt sind Funktionen).
+import { naechsteAbholung, wienJetzt, type AbholFenster } from '@/lib/hofuebersicht'
 
 // ─── Kaufbar ────────────────────────────────────────────────────────────────
 
@@ -228,6 +233,55 @@ export function istBestellbar(hof: { angebot: AngebotVorhanden; abholfenster?: r
   return hof.angebot.length > 0 && (hof.abholfenster?.length ?? 0) > 0
 }
 
+// ─── Kaufsperre (Register N24) ──────────────────────────────────────────────
+
+/**
+ * Warum man bei einem Hof gerade nicht kaufen kann — oder null. EINE Regel für
+ * alle Kaufwege der Hof- und Produktseite, den Mini-Warenkorb und die Kasse
+ * (Register N24); dieselben Gründe, aus denen die Hofliste „Noch nicht
+ * bestellbar“ bzw. keine Abholung zeigt:
+ *  - 'pause': Der Hof pausiert. Sticht alles andere — die Pause hat ihre eigene
+ *    Karte mit dem Text des Hofs.
+ *  - 'keine-abholzeit': keine aktive Abholzeit (die Abfragen liefern nur aktive,
+ *    `isActive: true`).
+ *  - 'ausgebucht': Es gibt aktive Abholzeiten, aber `naechsteAbholung` findet im
+ *    Vorlauf (`ABHOL_VORLAUF_TAGE`) keinen freien Termin, den man noch bestellen
+ *    kann — volle Tage aus `ausgebuchtAm` (N19, Ergänzung 21.10.2026).
+ *
+ * `jetzt` ist der Zeitpunkt, den die Seite einmal auf dem Server bestimmt — keine
+ * eigene Uhr, also kein Unterschied beim Hydrieren. Verbindlich bleibt der
+ * Server (`/api/checkout`, `imAbholfenster`); die Sperre erspart der Kundin nur
+ * einen Korb, den sie nicht abholen kann.
+ */
+export type KaufSperre = null | 'pause' | 'keine-abholzeit' | 'ausgebucht'
+
+export function kaufSperre(hof: { isPaused: boolean; pickupSlots: readonly AbholFenster[] }, jetzt: Date): KaufSperre {
+  if (hof.isPaused) return 'pause'
+  if (hof.pickupSlots.length === 0) return 'keine-abholzeit'
+  return naechsteAbholung(hof.pickupSlots, wienJetzt(jetzt)) === null ? 'ausgebucht' : null
+}
+
+/** Die Beschriftung des ruhenden Kaufknopfs ohne Abholtermin — analog zu SHOP_PAUSED_BUTTON_LABEL. */
+export const KAUFSPERRE_KNOPF = 'Nicht bestellbar'
+
+/** „2 Wochen“ — aus dem Vorlauf gerechnet, nie als Zahl im Text. */
+function vorlaufInWochen(): string {
+  const wochen = Math.floor(ABHOL_VORLAUF_TAGE / 7)
+  return wochen === 1 ? 'der nächsten Woche' : `der nächsten ${wochen} Wochen`
+}
+
+/**
+ * Titel und Satz der Hinweiskarte bei 'keine-abholzeit' und 'ausgebucht' — EINE
+ * Quelle für Hofseite, Produktseite, Mini-Warenkorb und Kasse. Die Pause hat
+ * ihre eigenen Texte (shop-pause.ts).
+ */
+export function kaufSperreHinweis(sperre: 'keine-abholzeit' | 'ausgebucht', hofName: string): { titel: string; satz: string } {
+  if (sperre === 'keine-abholzeit') {
+    return { titel: 'Noch nicht bestellbar.', satz: `${hofName} hat gerade keine Abholzeit eingetragen. Schau bald wieder vorbei.` }
+  }
+  return { titel: 'Gerade ausgebucht.', satz: `Alle Abholzeiten ${vorlaufInWochen()} sind voll. Schau bald wieder vorbei.` }
+}
+
 export function filtereNachAngebot<H extends HofMitAngebot>(hoefe: H[], f: ProduktFilter): H[] {
   return hoefe.filter((h) => hofPasst(h, f))
 }
@@ -350,15 +404,16 @@ export function sortiereNachGrundpreis<H extends HofMitAngebot>(hoefe: H[], f: P
 // ─── Hofseite: Kaufknopf ────────────────────────────────────────────────────
 
 /**
- * Zeigt die Hofseite den Kaufknopf? Sichtbar, Bestand über null, Shop nicht
- * pausiert. Bewusst OHNE Reservierungen anderer: Die Hofseite kennt sie
- * nicht (reservedStock wird nirgends beschrieben, echte Halte liegen in
- * StockReservation); ob die Menge frei ist, entscheidet /api/reserve beim
- * Hinzufügen — und der Checkout. istKaufbar oben gilt für die Übersicht.
- * Eine Stelle für Produktkarte UND Produktdetail.
+ * Zeigt die Hofseite den Kaufknopf? Sichtbar, Bestand über null, keine
+ * Kaufsperre (Pause, keine Abholzeit, ausgebucht — kaufSperre, N24). Bewusst
+ * OHNE Reservierungen anderer: Die Hofseite kennt sie nicht (reservedStock
+ * wird nirgends beschrieben, echte Halte liegen in StockReservation); ob die
+ * Menge frei ist, entscheidet /api/reserve beim Hinzufügen — und der Checkout.
+ * istKaufbar oben gilt für die Übersicht. Eine Stelle für Produktkarte UND
+ * Produktdetail.
  */
-export function zeigeKaufknopf(p: { isAvailable: boolean; stock: number }, isPaused: boolean): boolean {
-  return p.isAvailable && p.stock > 0 && !isPaused
+export function zeigeKaufknopf(p: { isAvailable: boolean; stock: number }, sperre: KaufSperre): boolean {
+  return p.isAvailable && p.stock > 0 && sperre === null
 }
 
 /**
@@ -378,13 +433,16 @@ export type KartenZustand =
   | { art: 'knapp'; bestand: number }
   | { art: 'ausverkauft' }
   | { art: 'pausiert' }
+  /** Keine Abholzeit oder ausgebucht (kaufSperre, N24): nichts ist ausverkauft, nur nicht bestellbar. */
+  | { art: 'nicht-bestellbar' }
   | { art: 'nicht-verfuegbar'; grund: string }
 
 export function kartenZustand(
   p: { isAvailable: boolean; stock: number; unavailableReason: string | null },
-  isPaused: boolean
+  sperre: KaufSperre
 ): KartenZustand {
-  if (isPaused) return { art: 'pausiert' }
+  if (sperre === 'pause') return { art: 'pausiert' }
+  if (sperre !== null) return { art: 'nicht-bestellbar' }
   const zustand = produktZustand(p)
   switch (zustand.art) {
     case 'nicht-im-shop':
@@ -396,6 +454,18 @@ export function kartenZustand(
     case 'im-shop':
       return { art: 'kaufbar' }
   }
+}
+
+/**
+ * Was statt des Kaufknopfs steht — EINE Stelle für Produktkarte und
+ * Produktseite: „Pausiert“, „Nicht bestellbar“, der Grund des Hofs, sonst
+ * „Ausverkauft“.
+ */
+export function ruhenderKnopfText(zustand: KartenZustand): string {
+  if (zustand.art === 'pausiert') return SHOP_PAUSED_BUTTON_LABEL
+  if (zustand.art === 'nicht-bestellbar') return KAUFSPERRE_KNOPF
+  if (zustand.art === 'nicht-verfuegbar') return zustand.grund
+  return 'Ausverkauft'
 }
 
 /** „Nur noch 3 kg" · „Nur noch 3 Stück" · „Nur noch 3 × 2 kg" — der Bestand zählt Gebinde, wo es eines gibt. */

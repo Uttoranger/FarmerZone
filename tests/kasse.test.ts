@@ -193,6 +193,13 @@ describe('kaufknopfZeile — Termin und Zahlweg unter dem Kaufknopf (N10)', () =
   it('ohne gewählten Termin die Bitte, einen zu wählen', () => {
     expect(kaufknopfZeile({ termin: null, online: true, bar: false })).toBe('Wähl noch, wann du abholst · Bezahlung sicher über Stripe')
   })
+
+  it('mit Kaufsperre (N24) nur noch der Zahlweg – keine Aufforderung, einen Termin zu wählen', () => {
+    expect(kaufknopfZeile({ termin: null, online: false, bar: true, gesperrt: true })).toBe('bar am Hof · Bestätigung per E-Mail')
+    expect(kaufknopfZeile({ termin: null, online: false, bar: false, gesperrt: true })).toBe('')
+    // Auch ein schon gewählter Termin fällt weg; online bleibt nur der Zahlweg.
+    expect(kaufknopfZeile({ termin, online: true, bar: false, gesperrt: true })).toBe('Bezahlung sicher über Stripe')
+  })
 })
 
 describe('onlineAus: Stripe kennt das Konto des Hofs nicht (Register Z2, Nr. 42)', () => {

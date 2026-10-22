@@ -5,9 +5,10 @@ import { auth } from '@/lib/auth'
 import { getPublicFarmGeteilt } from '@/server/queries/farm'
 import { getBetriebsVorbelegung, getNurBetriebeProduktIds } from '@/server/queries/products'
 import { CheckoutForm } from '@/components/checkout/checkout-form'
-import { ausgebuchteAbholfenster } from '@/server/abholfenster'
+import { alsAbholFenster, ausgebuchteSchluessel, ausgebuchteTage } from '@/server/abholfenster'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { kassenVorbelegung } from '@/lib/kasse'
+import { kaufSperre } from '@/lib/bereiche-anzeige'
 import { KAEUFER_PARAMETER, leseKaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 import { TESTBETRIEB } from '@/lib/umgebung-server'
 
@@ -32,7 +33,7 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
   const kaeufer = leseKaeuferVorbelegung(suche[KAEUFER_PARAMETER])
   const farm = await getPublicFarmGeteilt(farmSlug)
 
-  if (!farm || farm.isPaused) notFound()
+  if (!farm) notFound()
 
   // Abschnitt „Betrieb" (Sprint Bereiche 1): welche Produkte nur an Betriebe
   // gehen, und — ist der Besteller selbst ein Hof — die Vorbelegung. Die
@@ -46,11 +47,18 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
 
   // Volle Abholfenster (maxOrders erreicht) zeigt das Formular ausgegraut —
   // dieselbe Zählung, mit der /api/checkout ablehnt (src/server/abholfenster.ts).
-  const [nurBetriebeIds, ausHof, ausgebucht] = await Promise.all([
+  const jetzt = new Date()
+  const [nurBetriebeIds, ausHof, volleTage] = await Promise.all([
     getNurBetriebeProduktIds(farm.id),
     session?.user ? getBetriebsVorbelegung(session.user.id) : Promise.resolve(null),
-    ausgebuchteAbholfenster(farm.id, new Date()),
+    ausgebuchteTage([farm.id], jetzt),
   ])
+  const voll = volleTage.get(farm.id)
+  // Die Kaufsperre (Register N24) einmal hier, aus derselben Zählung wie die ausgegrauten Termine —
+  // das Formular rechnet sie nicht selbst. Verbindlich bleibt /api/checkout.
+  const sperre = kaufSperre({ isPaused: farm.isPaused, pickupSlots: farm.pickupSlots.map((s) => alsAbholFenster(s, voll)) }, jetzt)
+  // Pause: wie bisher keine Kasse — die Pause sticht in kaufSperre alles andere.
+  if (sperre === 'pause') notFound()
 
   // Die Fokus-Shell (Nachtlauf Nr. 12) rendert CheckoutForm selbst: Ihr
   // „Zurück" hängt am Zustand im Browser — hinaus zum Hof nur, solange keine
@@ -61,7 +69,8 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
       farm={farm}
       nurBetriebeIds={nurBetriebeIds}
       vorbelegung={kassenVorbelegung(ausHof, kaeufer)}
-      ausgebuchteAbholfenster={ausgebucht}
+      ausgebuchteAbholfenster={ausgebuchteSchluessel(voll)}
+      sperre={sperre}
       testbetrieb={TESTBETRIEB}
     />
   )

@@ -122,6 +122,8 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
       owner: { select: { email: true, emailVerified: true, createdAt: true } },
       // Register K2, Änderung Nr. 116: mindestens ein Produkt im Shop — nur ob, nie welches.
       products: { where: IM_SHOP_WHERE, select: { id: true }, take: 1 },
+      // Register Z1, Ergänzung 21.10.2026: die Zahl der aktiven Abholzeiten — „aktiv“ wie in Hofliste und Kasse.
+      _count: { select: { pickupSlots: { where: { isActive: true } } } },
     },
   })
   if (!farm) return { error: 'Hof nicht gefunden.' }
@@ -135,11 +137,14 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
   //   mit acceptsOnline false aus der Zeit, als „nur bar" noch ging. Das ist
   //   die serverseitige Schranke für „Hof online stellen".
   // - Register K2 (Nr. 116): mindestens ein Produkt im Shop.
+  // - Register Z1, Ergänzung 21.10.2026: mindestens eine aktive Abholzeit —
+  //   ohne sie nimmt die Hofseite keine Bestellung an (N24).
   // Bereits freigeschaltete Höfe berührt das nicht; es wirkt nur auf diesen Klick.
   const sperre = freischaltSperre({
     emailBestaetigungOffen: bestaetigungOffen(farm.owner),
     stripeBereit: farm.stripeAccountReady === true,
     produktImShop: farm.products.length > 0,
+    abholzeitAktiv: farm._count.pickupSlots > 0,
   })
   if (sperre) return { error: sperre }
 
@@ -155,14 +160,14 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
       const einstellung = await leseGruendungEinstellung(tx)
       // Bedingt schreiben, nicht blind: Die Freischalt-Sperre oben beruht auf einem Lesestand.
       // Fällt Stripe dazwischen weg (account.updated), nimmt der Hof sein letztes
-      // Produkt aus dem Shop oder schaltet ein zweiter Klick schon frei, trifft das
-      // Schreiben nichts — dann keine Mail, sondern eine Meldung (ARCHITECTURE:
-      // der Statuswechsel ist die Sperre).
+      // Produkt aus dem Shop, schaltet er seine letzte Abholzeit ab oder schaltet ein
+      // zweiter Klick schon frei, trifft das Schreiben nichts — dann keine Mail,
+      // sondern eine Meldung (ARCHITECTURE: der Statuswechsel ist die Sperre).
       // Der Zeitpunkt entsteht NACH der Sperre: Er bestimmt die Reihenfolge der
       // Plätze, und ein Weg, der vor uns vergeben hat, steht so immer vor uns.
       const jetzt = new Date()
       const { count } = await tx.farm.updateMany({
-        where: { id: farmId, stripeAccountReady: true, approvedAt: null, products: { some: IM_SHOP_WHERE } },
+        where: { id: farmId, stripeAccountReady: true, approvedAt: null, products: { some: IM_SHOP_WHERE }, pickupSlots: { some: { isActive: true } } },
         data: { approvedAt: jetzt },
       })
       if (count === 0) return null
@@ -252,6 +257,8 @@ export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?
 
   await prisma.farm.update({ where: { id: farmId }, data: { approvedAt: null } })
   revalidateAll(farm.slug)
+  // Höfe-Liste und Startseite lesen über den Fünf-Minuten-Cache: Der Hof verschwindet dort sofort.
+  updateTag(HOEFE_CACHE_TAG)
   return {}
 }
 

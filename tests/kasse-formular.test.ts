@@ -19,6 +19,9 @@
  *    Zeile unter dem Knopf folgen der Zahlart des Formulars.
  *  - Bar: „entfällt", „Zahlungspflichtig bestellen", kein Stripe-Satz,
  *    „bar am Hof · Bestätigung per E-Mail".
+ *  - Kaufsperre (Register N24): Ohne aktive Abholzeit oder ausgebucht steht die
+ *    Hinweiskarte oben und der Kaufknopf ist gesperrt; die Prüfung im Server
+ *    bleibt davon unberührt.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createElement, type ReactNode } from 'react'
@@ -62,6 +65,7 @@ import { ANGABEN_ZUM_HOF_TITEL } from '@/lib/stripe-konto'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import { SITZUNG_SCHLUESSEL, WARENKORB_SCHLUESSEL } from '@/lib/warenkorb-speicher'
 import type { PublicFarm } from '@/server/queries/farm'
+import type { KaufSperre } from '@/lib/bereiche-anzeige'
 import { publicFarm } from './fabrik/public-farm'
 
 // Montag, 5. Oktober 2026, 10:00 Uhr in Wien — vor dem Bar-Stichtag (Register B1).
@@ -88,7 +92,7 @@ const SPEICHER: Record<string, string> = {
 }
 
 /** Ein frischer Aufbau der Kasse — jeder Effekt läuft dafür wieder einmal. */
-function kasse(hof: PublicFarm, optionen: { testbetrieb?: boolean; nurBetriebeIds?: string[] } = {}): string {
+function kasse(hof: PublicFarm, optionen: { testbetrieb?: boolean; nurBetriebeIds?: string[]; sperre?: KaufSperre } = {}): string {
   pruefstand.gelaufen.clear()
   return renderToStaticMarkup(
     createElement(CheckoutForm, {
@@ -96,9 +100,16 @@ function kasse(hof: PublicFarm, optionen: { testbetrieb?: boolean; nurBetriebeId
       nurBetriebeIds: optionen.nurBetriebeIds ?? [],
       vorbelegung: null,
       ausgebuchteAbholfenster: [],
+      sperre: optionen.sperre ?? null,
       testbetrieb: optionen.testbetrieb,
     })
   )
+}
+
+/** Das Tag des Kaufknopfs (type="submit") — gesperrt oder nicht. */
+function kaufknopf(html: string): string {
+  const stelle = html.indexOf('type="submit"')
+  return html.slice(html.lastIndexOf('<button', stelle), html.indexOf('>', stelle) + 1)
 }
 
 beforeEach(() => {
@@ -177,5 +188,52 @@ describe('Kasse glätten (N10): das ganze Formular', () => {
       expect(html).not.toContain('Ein Korb pro Hof')
       expect(html).not.toContain(BAR_OHNE_GEBUEHR_HINWEIS)
     }
+  })
+})
+
+describe('Kaufsperre in der Kasse (Register N24)', () => {
+  for (const [sperre, titel, satz] of [
+    ['keine-abholzeit', 'Noch nicht bestellbar.', 'Hof Test hat gerade keine Abholzeit eingetragen. Schau bald wieder vorbei.'],
+    ['ausgebucht', 'Gerade ausgebucht.', 'Alle Abholzeiten der nächsten 2 Wochen sind voll. Schau bald wieder vorbei.'],
+  ] as const) {
+    it(`${sperre}: dieselbe Hinweiskarte oben, der Kaufknopf gesperrt`, () => {
+      const html = kasse(HOF, { sperre })
+      expect(html).toContain(titel)
+      expect(html).toContain(satz)
+      // Oben: vor dem Korb.
+      expect(html.indexOf(titel)).toBeLessThan(html.indexOf('id="kasse-korb"'))
+      expect(kaufknopf(html)).toMatch(/\bdisabled=""/)
+    })
+  }
+
+  it('ohne Abholzeit sagt die Kasse den Zustand einmal: die Karte oben, unter „Abholung wählen“ nur der Weg zum Hof', () => {
+    const html = kasse({ ...HOF, pickupSlots: [] }, { sperre: 'keine-abholzeit' })
+    expect(html.split('hat gerade keine Abholzeit eingetragen').length - 1).toBe(1)
+    expect(html).not.toContain('Gerade gibt es keine Abholzeiten.')
+    const abholung = html.slice(html.indexOf('id="kasse-abholung"'), html.indexOf('id="kasse-daten"'))
+    expect(abholung).toContain(`stehen unter „${ANGABEN_ZUM_HOF_TITEL}“`)
+  })
+
+  it('mit Sperre fordert die Zeile unter dem Kaufknopf nicht zum Wählen auf – es gibt nichts zu wählen', () => {
+    const html = kasse({ ...HOF, pickupSlots: [] }, { sperre: 'keine-abholzeit' })
+    expect(html).not.toContain('Wähl noch, wann du abholst')
+  })
+
+  it('Gegenprobe: ohne Sperre und ohne gewählten Termin steht die Aufforderung unter dem Kaufknopf', () => {
+    expect(kasse(HOF)).toContain('Wähl noch, wann du abholst')
+  })
+
+  it('Gegenprobe: ohne Abholzeit und ohne Sperre bleibt der Satz unter „Abholung wählen“', () => {
+    const html = kasse({ ...HOF, pickupSlots: [] })
+    expect(html.split('Gerade gibt es keine Abholzeiten.').length - 1).toBe(1)
+    expect(html).not.toContain('hat gerade keine Abholzeit eingetragen')
+  })
+
+  it('Gegenprobe: ohne Sperre kein Hinweis, der Kaufknopf frei', () => {
+    const html = kasse(HOF)
+    expect(html).not.toContain('Noch nicht bestellbar.')
+    expect(html).not.toContain('Gerade ausgebucht.')
+    expect(kaufknopf(html)).toContain('type="submit"')
+    expect(kaufknopf(html)).not.toMatch(/\bdisabled=""/)
   })
 })

@@ -100,6 +100,8 @@ export async function saveAppearanceAction(
   revalidatePath(`/${farm.slug}`)
   // Seit Nr. 50 wird der Auftritt in Mein Hof bearbeitet; /settings/appearance leitet nur noch um.
   revalidatePath('/farm-page')
+  // Logo und Titelbild stehen auch in der Hofliste (/hoefe, Startseite) — deren eigener Zwischenspeicher.
+  updateTag(HOEFE_CACHE_TAG)
 
   return {}
 }
@@ -139,6 +141,8 @@ export async function updateFarmBannerAction(
 
   revalidatePath(`/${farm.slug}`)
   revalidatePath('/farm-page')
+  // Das Titelbild steht auch in der Hofliste — deren eigener Zwischenspeicher (wie beim Logo).
+  updateTag(HOEFE_CACHE_TAG)
 
   return {}
 }

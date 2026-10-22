@@ -212,15 +212,22 @@ export function alsAbholFenster(slot: Wochenfenster, voll: ReadonlyMap<string, A
 }
 
 /**
- * Die ausgebuchten Fenster der nächsten Tage als Schlüssel (`abholSchluessel`)
- * — der Checkout zeigt sie ausgegraut. Aus `ausgebuchteTage`, damit Kasse,
- * Hofliste und Hofseite dieselben vollen Fenster nennen; Reihenfolge wie
- * `angeboteneAbholfenster` (Tag, dann Beginn).
+ * Die vollen Tage EINES Hofs (sein Eintrag aus `ausgebuchteTage`) als Schlüssel
+ * (`abholSchluessel`) — der Checkout zeigt sie ausgegraut. Reihenfolge wie
+ * `angeboteneAbholfenster` (Tag, dann Beginn). Ohne Eintrag leer.
  */
-export async function ausgebuchteAbholfenster(farmId: string, jetzt: Date): Promise<string[]> {
-  const volle = (await ausgebuchteTage([farmId], jetzt)).get(farmId)
+export function ausgebuchteSchluessel(volle: ReadonlyMap<string, AusgebuchtesFenster> | undefined): string[] {
   return [...(volle?.values() ?? [])]
     .flatMap((f) => f.ausgebuchtAm.map((datum) => ({ datum, start: f.startTime, ende: f.endTime })))
     .sort((a, b) => a.datum.localeCompare(b.datum) || a.start.localeCompare(b.start))
     .map(abholSchluessel)
+}
+
+/**
+ * Die ausgebuchten Fenster der nächsten Tage als Schlüssel — aus `ausgebuchteTage`,
+ * damit Kasse, Hofliste und Hofseite dieselben vollen Fenster nennen. Die Kasse
+ * selbst zählt einmal und nimmt daraus Schlüssel UND Kaufsperre (Register N24).
+ */
+export async function ausgebuchteAbholfenster(farmId: string, jetzt: Date): Promise<string[]> {
+  return ausgebuchteSchluessel((await ausgebuchteTage([farmId], jetzt)).get(farmId))
 }

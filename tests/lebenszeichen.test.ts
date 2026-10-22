@@ -55,7 +55,7 @@ describe('Lebenszeichen — Zugang (fail-closed)', () => {
   })
 
   it('falsches Token — gleich lang, anders lang, ohne „Bearer“: 401, keine Abfrage', async () => {
-    for (const kopf of [`Bearer ${TOKEN.slice(0, -1)}X`, `Bearer ${TOKEN}0`, TOKEN, 'Bearer ']) {
+    for (const kopf of [`Bearer ${TOKEN.slice(0, -1)}${TOKEN.endsWith('X') ? 'Y' : 'X'}`, `Bearer ${TOKEN}0`, TOKEN, 'Bearer ']) {
       expect((await GET(anfrage(kopf))).status, kopf).toBe(401)
     }
     expect(db.ablaufLauf.findMany).not.toHaveBeenCalled()

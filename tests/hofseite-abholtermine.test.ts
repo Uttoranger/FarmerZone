@@ -13,6 +13,7 @@ vi.mock('next/link', () => ({
 }))
 
 import { HofseiteSeitenspalte, type SeitenspalteHof } from '@/components/hofseite/hofseite-seitenspalte'
+import type { KaufSperre } from '@/lib/bereiche-anzeige'
 
 // Mittwoch, 22. Juli 2026, 10 Uhr in der Zeit des Rechners — in Wien derselbe Tag (nextPickupDays rechnet in Wiener Zeit).
 const JETZT = new Date(2026, 6, 22, 10, 0, 0).toISOString()
@@ -20,19 +21,20 @@ const JETZT = new Date(2026, 6, 22, 10, 0, 0).toISOString()
 const HOF: SeitenspalteHof = {
   id: 'farm-1',
   slug: 'hof-test',
+  name: 'Hof Test',
   address: 'Feldweg 1',
   postalCode: '4910',
   city: 'Beispieldorf',
-  isPaused: false,
+  pauseMessage: null,
   pickupSlots: [
     { dayOfWeek: 3, startTime: '15:00', endTime: '18:00' },
     { dayOfWeek: 6, startTime: '09:00', endTime: '12:00' },
   ],
 }
 
-function spalte(hof: SeitenspalteHof = HOF): string {
+function spalte(hof: SeitenspalteHof = HOF, sperre: KaufSperre = null): string {
   return renderToStaticMarkup(
-    createElement(HofseiteSeitenspalte, { hof, zahlungsarten: [], gebuehrKurz: null, gebuehrKorb: null, mitKorb: false, jetzt: JETZT })
+    createElement(HofseiteSeitenspalte, { hof, sperre, zahlungsarten: [], gebuehrKurz: null, gebuehrKorb: null, mitKorb: false, jetzt: JETZT })
   )
 }
 
@@ -65,7 +67,9 @@ describe('Nächste Abholung: Termine als Text mit Datum', () => {
     expect((zeilen.match(/<li/g) ?? []).length).toBe(3)
   })
 
-  it('bei Pause keine Termine — Ankündigen, was man nicht buchen kann, wäre ein leeres Versprechen', () => {
-    expect(naechsteAbholung(spalte({ ...HOF, isPaused: true }))).toBe('')
+  it('mit Kaufsperre (Pause, keine Abholzeit, ausgebucht — N24) keine Termine — Ankündigen, was man nicht buchen kann, wäre ein leeres Versprechen', () => {
+    for (const sperre of ['pause', 'keine-abholzeit', 'ausgebucht'] as const) expect(naechsteAbholung(spalte(HOF, sperre)), sperre).toBe('')
+    // Gegenprobe: ohne Sperre stehen sie da.
+    expect(naechsteAbholung(spalte(HOF, null))).not.toBe('')
   })
 })

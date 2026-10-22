@@ -4,6 +4,7 @@ import * as React from "react"
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
 
 import { cn } from "@/lib/utils"
+import { useMenueZiel } from "@/components/ui/menue-ziel"
 
 /*
  * Das Aufklappmenü im shadcn-Stil über Base UI (wie sheet.tsx und dialog.tsx):
@@ -25,11 +26,11 @@ function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props): React.JSX
 }
 
 /**
- * `container` (Nr. 132): Wohin das Portal das Menü hängt — ohne Angabe wie
- * bisher an den `<body>`, also außerhalb jeder Landmarke (Axe „region"). Die
- * Shells geben ein Element in ihrem Kopf bzw. ihrer Seitenleiste mit; es darf
- * nicht in einem Kasten mit `overflow` stecken, sonst wird das Menü
- * abgeschnitten.
+ * `container` (Nr. 132): Wohin das Portal das Menü hängt. Ohne Angabe nimmt
+ * es den Zielort der Shell aus dem Kontext (`MenueZielAnbieter`, ein Element
+ * in ihrer Landmarke), ohne Anbieter wie bisher den `<body>` — also außerhalb
+ * jeder Landmarke (Axe „region"). Das Ziel darf nicht in einem Kasten mit
+ * `overflow` stecken, sonst wird das Menü abgeschnitten.
  */
 function DropdownMenuContent({
   className,
@@ -41,8 +42,9 @@ function DropdownMenuContent({
 }: MenuPrimitive.Popup.Props &
   Pick<MenuPrimitive.Positioner.Props, "side" | "align" | "sideOffset"> &
   Pick<MenuPrimitive.Portal.Props, "container">): React.JSX.Element {
+  const menueZiel = useMenueZiel()
   return (
-    <DropdownMenuPortal container={container}>
+    <DropdownMenuPortal container={container === undefined ? (menueZiel ?? undefined) : container}>
       <MenuPrimitive.Positioner side={side} align={align} sideOffset={sideOffset} className="z-50 outline-none">
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"
