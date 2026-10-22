@@ -11,9 +11,9 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   UMFELD_HOEFE_DECKEL,
   UMFELD_KM,
+  NICHT_VERGLEICHBAR_TEXT,
   baueUmfeldKarte,
   gezaehlteHoefe,
-  guenstigsterGrundpreis,
   baueUmfeld,
   baueUmfeldZeilen,
   bewerteProdukt,
@@ -26,7 +26,8 @@ import {
   type UmfeldProdukt,
 } from '@/lib/umfeld'
 import { ERDRADIUS_KM, UMKREIS_STUFEN, entfernungKm } from '@/lib/hofuebersicht'
-import { EIGENER_PIN, pinDarstellung } from '@/lib/hoefe-anzeige'
+import { EIGENER_PIN, hofIllustrationen, pinDarstellung } from '@/lib/hoefe-anzeige'
+import { hofseitenLink } from '@/lib/bereiche-anzeige'
 import { preisAnzeigeVon } from '@/lib/taxonomie'
 import { leseUmfeldAnsicht, leseUmfeldFilter, umfeldLink } from '@/schemas/umfeld-filter'
 import { bereichAusParameter } from '@/schemas/hoefe-filter'
@@ -49,17 +50,25 @@ function punktIn(start: { lat: number; lon: number }, km: number, peilung: numbe
   return { lat: grad(phi2), lon: grad(lambda2) }
 }
 
-function produkt(teil: Partial<UmfeldProdukt>): UmfeldProdukt {
+let produktNummer = 0
+/** Ein Produkt mit Preis in Euro (`price`) — die Query liefert ganze Cent aus dem Decimal. */
+function produkt(teil: Partial<UmfeldProdukt> & { price?: number }): UmfeldProdukt {
+  const { price = 10, ...rest } = teil
+  produktNummer += 1
   return {
+    id: `prod-${produktNummer}`,
     name: 'Produkt',
     category: null,
     subcategory: null,
-    price: 10,
+    preisCents: Math.round(price * 100),
     unit: 'KG',
     unitSize: null,
     nettoMenge: null,
     nettoEinheit: null,
-    ...teil,
+    imageUrl: null,
+    bildAusschnitt: null,
+    kaufbar: true,
+    ...rest,
   }
 }
 
@@ -71,10 +80,23 @@ const heu = (preis: number, kg: number, name = 'Heu') =>
 let hofNummer = 0
 beforeEach(() => {
   hofNummer = 0
+  produktNummer = 0
 })
 function hof(entfernungKm: number, produkte: UmfeldProdukt[], teil: Partial<UmfeldHof> = {}): UmfeldHof {
   hofNummer += 1
-  return { slug: `hof-${hofNummer}`, name: `Hof ${hofNummer}`, ort: 'Testort', lat: 48.25, lon: 13.05, entfernungKm, produkte, ...teil }
+  return {
+    slug: `hof-${hofNummer}`,
+    name: `Hof ${hofNummer}`,
+    postalCode: '1234',
+    city: 'Testort',
+    lat: 48.25,
+    lon: 13.05,
+    entfernungKm,
+    fotos: [],
+    kategorien: [],
+    produkte,
+    ...teil,
+  }
 }
 
 const FUTTER: UmfeldEingabe = { bereich: 'FUTTERMITTEL', km: 25, eigeneProdukte: [], hoefe: [], eigenerSlug: 'hof-mueller' }
@@ -187,6 +209,7 @@ describe('bewerteProdukt — Grundpreis in der Einheit der Zeile', () => {
     expect(bewerteProdukt(heu(45, 300), 'FUTTERMITTEL', preisAnzeigeVon('HEU_STROH', 'WIESENHEU'))).toEqual({
       wert: 150,
       klasse: 'GROSS',
+      grund: null,
     })
   })
 
@@ -197,32 +220,32 @@ describe('bewerteProdukt — Grundpreis in der Einheit der Zeile', () => {
     expect(wertung.klasse).toBe('KLEIN')
   })
 
-  it('Hofladen je Kilo bzw. Liter, ohne Gebindeklasse', () => {
+  it('Hofladen je Kilo bzw. Liter in ganzen Cent, ohne Gebindeklasse', () => {
     const kaese = produkt({ category: 'MILCH', subcategory: 'KAESE', price: 18, unit: 'KG', unitSize: 1 })
     const milch = produkt({ category: 'MILCH', subcategory: 'TRINKMILCH', price: 1.4, unit: 'LITER', unitSize: 1 })
     const honig = produkt({ category: 'HONIG', subcategory: 'BLUETENHONIG', price: 8, unit: 'G', unitSize: 500 })
-    expect(bewerteProdukt(kaese, 'LEBENSMITTEL', preisAnzeigeVon('MILCH', 'KAESE'))).toEqual({ wert: 18, klasse: null })
-    expect(bewerteProdukt(milch, 'LEBENSMITTEL', preisAnzeigeVon('MILCH', 'TRINKMILCH'))).toEqual({ wert: 1.4, klasse: null })
-    expect(bewerteProdukt(honig, 'LEBENSMITTEL', preisAnzeigeVon('HONIG', 'BLUETENHONIG'))).toEqual({ wert: 16, klasse: null })
+    expect(bewerteProdukt(kaese, 'LEBENSMITTEL', preisAnzeigeVon('MILCH', 'KAESE'))).toEqual({ wert: 1800, klasse: null, grund: null })
+    expect(bewerteProdukt(milch, 'LEBENSMITTEL', preisAnzeigeVon('MILCH', 'TRINKMILCH'))).toEqual({ wert: 140, klasse: null, grund: null })
+    expect(bewerteProdukt(honig, 'LEBENSMITTEL', preisAnzeigeVon('HONIG', 'BLUETENHONIG'))).toEqual({ wert: 1600, klasse: null, grund: null })
   })
 
   it('Liter in einer Kilo-Zeile sind nicht vergleichbar — kein Liter-gleich-Kilo', () => {
     const fluessig = produkt({ category: 'ERGAENZUNGSFUTTER', price: 30, unit: 'KG', nettoMenge: 20, nettoEinheit: 'LITER' })
-    expect(bewerteProdukt(fluessig, 'FUTTERMITTEL', preisAnzeigeVon('ERGAENZUNGSFUTTER', null)).wert).toBeNull()
+    expect(bewerteProdukt(fluessig, 'FUTTERMITTEL', preisAnzeigeVon('ERGAENZUNGSFUTTER', null))).toMatchObject({ wert: null, grund: NICHT_VERGLEICHBAR_TEXT.LITER_KILO })
     const honigImGlasLiter = produkt({ category: 'HONIG', price: 8, unit: 'LITER', unitSize: 0.5 })
-    expect(bewerteProdukt(honigImGlasLiter, 'LEBENSMITTEL', preisAnzeigeVon('HONIG', null)).wert).toBeNull()
+    expect(bewerteProdukt(honigImGlasLiter, 'LEBENSMITTEL', preisAnzeigeVon('HONIG', null))).toMatchObject({ wert: null, grund: NICHT_VERGLEICHBAR_TEXT.LITER_KILO })
   })
 
   it('im Futter zählt nur die Kennzeichnung — ohne Nettomenge kein Preis und keine Klasse', () => {
     const ohne = produkt({ category: 'GETREIDE_KOERNER', subcategory: 'MAIS', price: 0.3, unit: 'KG' })
-    expect(bewerteProdukt(ohne, 'FUTTERMITTEL', preisAnzeigeVon('GETREIDE_KOERNER', 'MAIS'))).toEqual({ wert: null, klasse: null })
+    expect(bewerteProdukt(ohne, 'FUTTERMITTEL', preisAnzeigeVon('GETREIDE_KOERNER', 'MAIS'))).toMatchObject({ wert: null, klasse: null })
   })
 
-  it('Stück, Paket und Raummeter sind nicht vergleichbar', () => {
+  it('Stück, Paket und Raummeter sind nicht vergleichbar — mit Grund', () => {
     const anzeige = preisAnzeigeVon('BROT', null)
-    expect(bewerteProdukt(produkt({ category: 'BROT', unit: 'STUECK' }), 'LEBENSMITTEL', anzeige).wert).toBeNull()
-    expect(bewerteProdukt(produkt({ category: 'EIER', unit: 'PAKET', unitSize: 10 }), 'LEBENSMITTEL', anzeige).wert).toBeNull()
-    expect(bewerteProdukt(produkt({ category: 'BRENNHOLZ', unit: 'M3', unitSize: 1 }), 'LEBENSMITTEL', anzeige).wert).toBeNull()
+    expect(bewerteProdukt(produkt({ category: 'BROT', unit: 'STUECK' }), 'LEBENSMITTEL', anzeige)).toMatchObject({ wert: null, grund: NICHT_VERGLEICHBAR_TEXT.STUECK })
+    expect(bewerteProdukt(produkt({ category: 'EIER', unit: 'PAKET', unitSize: 10 }), 'LEBENSMITTEL', anzeige)).toMatchObject({ wert: null, grund: NICHT_VERGLEICHBAR_TEXT.PAKET })
+    expect(bewerteProdukt(produkt({ category: 'BRENNHOLZ', unit: 'M3', unitSize: 1 }), 'LEBENSMITTEL', anzeige)).toMatchObject({ wert: null, grund: 'Preis je m³, nicht vergleichbar' })
   })
 })
 
@@ -269,7 +292,9 @@ describe('baueUmfeldZeilen — Spanne, Mitte, ein Wert je Hof', () => {
   it('Spanne von billig bis teuer, Mitte als Median, in der Einheit der Zeile', () => {
     // Kleinballen 20 kg: 8 € → 400 €/t, 7 € → 350 €/t, 9 € → 450 €/t
     const [zeile] = baueUmfeldZeilen({ ...FUTTER, hoefe: [hof(1, [heu(8, 20)]), hof(2, [heu(7, 20)]), hof(3, [heu(9, 20)])] })
-    expect(zeile.preise).toEqual([{ klasse: null, spanne: '€ 350 – 450 / t', mitte: 'Mitte € 400', anzahlHoefe: 3, deins: null }])
+    expect(zeile.preise).toMatchObject([
+      { klasse: null, spanne: '€ 350 – 450 / t', mitte: 'Mitte € 400', zusatz: null, anzahlHoefe: 3, deins: null, lage: null, streifen: { werte: [350, 400, 450], mitte: 400 } },
+    ])
   })
 
   it('je Hof zählt sein günstigster Wert der Klasse — drei Heusorten zählen nicht dreifach', () => {
@@ -283,13 +308,15 @@ describe('baueUmfeldZeilen — Spanne, Mitte, ein Wert je Hof', () => {
 
   it('ein einzelner Hof zeigt einen Wert statt einer Spanne und keine Mitte', () => {
     const [zeile] = baueUmfeldZeilen({ ...FUTTER, hoefe: [hof(1, [heu(45, 300)])] })
-    expect(zeile.preise).toEqual([{ klasse: null, spanne: '€ 150 / t', mitte: null, anzahlHoefe: 1, deins: null }])
+    expect(zeile.preise).toEqual([
+      { klasse: null, spanne: '€ 150 / t', mitte: null, zusatz: 'nur 1 Angebot im Umkreis', anzahlHoefe: 1, deins: null, lage: null, streifen: null },
+    ])
     expect(zeile.anzahlText).toBe('1 Hof')
   })
 
   it('ohne echte Spanne keine Mitte — gleiche Beträge stünden sonst doppelt da', () => {
     const [zeile] = baueUmfeldZeilen({ ...FUTTER, hoefe: [hof(1, [heu(8, 20)]), hof(2, [heu(8.001, 20)])] })
-    expect(zeile.preise[0]).toMatchObject({ spanne: '€ 400 / t', mitte: null, anzahlHoefe: 2 })
+    expect(zeile.preise[0]).toMatchObject({ spanne: '€ 400 / t', mitte: null, anzahlHoefe: 2, streifen: null })
   })
 
   it('im Hofladen mit Cent: € je Kilo', () => {
@@ -305,9 +332,9 @@ describe('baueUmfeldZeilen — Gebindeklassen', () => {
       ...FUTTER,
       hoefe: [hof(1, [heu(8, 20), heu(45, 300)]), hof(2, [heu(42, 300)])],
     })
-    expect(zeile.preise).toEqual([
-      { klasse: 'Kleingebinde', spanne: '€ 400 / t', mitte: null, anzahlHoefe: 1, deins: null },
-      { klasse: 'Großgebinde', spanne: '€ 140 – 150 / t', mitte: 'Mitte € 145', anzahlHoefe: 2, deins: null },
+    expect(zeile.preise).toMatchObject([
+      { klasse: 'Kleingebinde bis 25 kg', spanne: '€ 400 / t', mitte: null, anzahlHoefe: 1, deins: null, streifen: null },
+      { klasse: 'Großgebinde über 25 kg', spanne: '€ 140 – 150 / t', mitte: 'Mitte € 145', anzahlHoefe: 2, deins: null, streifen: { werte: [140, 150] } },
     ])
   })
 
@@ -334,20 +361,20 @@ describe('baueUmfeldZeilen — Gebindeklassen', () => {
 describe('baueUmfeldZeilen — „Deins"', () => {
   it('steht in derselben Einheit neben der Spanne', () => {
     const [zeile] = baueUmfeldZeilen({ ...FUTTER, eigeneProdukte: [heu(7.5, 20)], hoefe: [hof(1, [heu(8, 20)])] })
-    expect(zeile.preise[0].deins).toBe('€ 375 / t')
+    expect(zeile.preise[0].deins).toBe('Deins € 375 / t')
     expect(zeile.eigenesProdukt).toBe(true)
   })
 
   it('mehrere eigene Produkte in einer Klasse ergeben eine Spanne', () => {
     const [zeile] = baueUmfeldZeilen({ ...FUTTER, eigeneProdukte: [heu(7, 20), heu(9, 20)], hoefe: [hof(1, [heu(8, 20)])] })
-    expect(zeile.preise[0].deins).toBe('€ 350 – 450 / t')
+    expect(zeile.preise[0].deins).toBe('Deins € 350 – 450 / t')
   })
 
   it('gehört in seine Klasse — auch wenn nur du dort anbietest', () => {
     const [zeile] = baueUmfeldZeilen({ ...FUTTER, eigeneProdukte: [heu(45, 300)], hoefe: [hof(1, [heu(8, 20)])] })
-    expect(zeile.preise).toEqual([
-      { klasse: 'Kleingebinde', spanne: '€ 400 / t', mitte: null, anzahlHoefe: 1, deins: null },
-      { klasse: 'Großgebinde', spanne: null, mitte: null, anzahlHoefe: 0, deins: '€ 150 / t' },
+    expect(zeile.preise).toMatchObject([
+      { klasse: 'Kleingebinde bis 25 kg', spanne: '€ 400 / t', mitte: null, anzahlHoefe: 1, deins: null },
+      { klasse: 'Großgebinde über 25 kg', spanne: null, mitte: null, zusatz: null, anzahlHoefe: 0, deins: 'Deins € 150 / t', lage: null, streifen: null },
     ])
   })
 
@@ -370,7 +397,7 @@ describe('baueUmfeldZeilen — nicht vergleichbar', () => {
       hoefe: [hof(1, [produkt({ category: 'BROT', unit: 'STUECK' })]), hof(2, [produkt({ category: 'BROT', unit: 'STUECK' })])],
     })
     expect(zeile.preise).toEqual([])
-    expect(zeile.hinweis).toBe('Preis je Stück, nicht vergleichbar')
+    expect(zeile.hinweis).toBe('Preis je Stück, nicht vergleichbar – ohne Gewicht je Stück.')
     expect(zeile.anzahlText).toBe('2 Höfe')
   })
 
@@ -414,33 +441,34 @@ describe('baueUmfeldZeilen — Sortierung', () => {
 })
 
 describe('baueUmfeldZeilen — aufgeklappte Zeile', () => {
-  it('Höfe nach Entfernung, mit Hofseiten-Link und Produkten nach Preis', () => {
+  it('Höfe nach Entfernung, mit Kopf, Hofseiten-Link und genau dem Produkt, das in dieser Zeile zählt', () => {
     const [zeile] = baueUmfeldZeilen({
       ...FUTTER,
       hoefe: [
-        hof(2.34, [heu(9, 20, 'Heu teuer'), heu(7, 20, 'Heu billig')], { slug: 'nah', name: 'Nahhof', ort: 'Nahdorf' }),
-        hof(14.1, [heu(8, 20)], { slug: 'weit', name: 'Weithof', ort: 'Weitdorf' }),
+        hof(2.34, [heu(9, 20, 'Heu teuer'), heu(7, 20, 'Heu billig')], { slug: 'nah', name: 'Nahhof', city: 'Nahdorf', kategorien: ['HEU_STROH'], fotos: ['/foto.jpg'] }),
+        hof(14.1, [heu(8, 20)], { slug: 'weit', name: 'Weithof', city: 'Weitdorf', kategorien: ['HEU_STROH'] }),
       ],
     })
-    expect(zeile.hoefe).toEqual([
-      {
-        slug: 'nah',
-        name: 'Nahhof',
-        ort: 'Nahdorf',
-        entfernung: '2,3 km',
-        link: '/nah?bereich=futter',
-        produkte: [
-          { name: 'Heu billig', preis: '€ 350 / t' },
-          { name: 'Heu teuer', preis: '€ 450 / t' },
-        ],
-      },
-      { slug: 'weit', name: 'Weithof', ort: 'Weitdorf', entfernung: '14 km', link: '/weit?bereich=futter', produkte: [{ name: 'Heu', preis: '€ 400 / t' }] },
+    expect(zeile.hoefe).toMatchObject([
+      { slug: 'nah', name: 'Nahhof', postalCode: '1234', city: 'Nahdorf', entfernungKm: 2.34, foto: '/foto.jpg', link: '/nah?bereich=futter' },
+      { slug: 'weit', name: 'Weithof', city: 'Weitdorf', entfernungKm: 14.1, foto: null, illustration: hofIllustrationen(['HEU_STROH'])[0], link: '/weit?bereich=futter' },
     ])
+    // Je Hof zählt sein günstigstes Angebot — und nur das steht als Produktzeile da (Preis je Gebinde wie auf /hoefe).
+    expect(zeile.hoefe[0].produkte).toMatchObject([{ name: 'Heu billig', price: 7, unit: 'BALLEN', verfuegbar: true }])
+    expect(zeile.hoefe[1].produkte.map((p) => p.name)).toEqual(['Heu'])
   })
 
-  it('ein nicht vergleichbares Produkt steht mit seinem Namen da, ohne Preis', () => {
-    const [zeile] = baueUmfeldZeilen({ ...HOFLADEN, hoefe: [hof(1, [produkt({ name: 'Bauernbrot', category: 'BROT', unit: 'STUECK' })])] })
-    expect(zeile.hoefe[0].produkte).toEqual([{ name: 'Bauernbrot', preis: 'nicht vergleichbar' }])
+  it('zählt ein Hof in beiden Klassen, stehen beide Produkte da — in der Reihenfolge der Hofseite', () => {
+    const [zeile] = baueUmfeldZeilen({ ...FUTTER, hoefe: [hof(1, [heu(45, 300, 'Rundballen'), heu(8, 20, 'Kleinballen')])] })
+    expect(zeile.hoefe[0].produkte.map((p) => p.name)).toEqual(['Rundballen', 'Kleinballen'])
+  })
+
+  it('ohne vergleichbares Produkt steht das erste der Zeile da', () => {
+    const [zeile] = baueUmfeldZeilen({
+      ...HOFLADEN,
+      hoefe: [hof(1, [produkt({ name: 'Bauernbrot', category: 'BROT', unit: 'STUECK' }), produkt({ name: 'Weckerl', category: 'BROT', unit: 'STUECK' })])],
+    })
+    expect(zeile.hoefe[0].produkte.map((p) => p.name)).toEqual(['Bauernbrot'])
     expect(zeile.hoefe[0].link).toBe(`/${zeile.hoefe[0].slug}`)
   })
 })
@@ -464,30 +492,55 @@ describe('baueUmfeld — Hinweise und Leere', () => {
       ...FUTTER,
       hoefe: [hof(1, [heu(8, 20)])],
       ohneStandort: [{ produkte: [heu(8, 20)] }, { produkte: [produkt({ category: 'EIER' })] }],
-      abgeschnitten: false,
+      abgeschnittenAbKm: null,
     })
     expect(ansicht.hinweise).toEqual(['1 Hof hat noch keinen Standort auf der Karte und fehlt hier.'])
   })
 
-  it('meldet den Deckel', () => {
-    const ansicht = baueUmfeld({ ...FUTTER, hoefe: [hof(1, [heu(8, 20)])], ohneStandort: [], abgeschnitten: true })
-    expect(ansicht.hinweise).toEqual(['Mehr als 200 Höfe im Umkreis — berücksichtigt sind die 200 nächsten.'])
+  it('meldet den Deckel — aber nur, wenn der gewählte Umkreis über den letzten geladenen Hof reicht', () => {
+    const satz = 'Mehr als 200 Höfe im Umkreis — berücksichtigt sind die 200 nächsten.'
+    const mit = (km: 10 | 25 | 50, abgeschnittenAbKm: number | null) =>
+      baueUmfeld({ ...FUTTER, km, hoefe: [hof(1, [heu(8, 20)])], ohneStandort: [], abgeschnittenAbKm }).hinweise
+    expect(mit(25, 18)).toEqual([satz])
+    expect(mit(25, 25)).toEqual([satz])
+    expect(mit(10, 18)).toEqual([])
+    expect(mit(50, null)).toEqual([])
+  })
+
+  it('zählt je Stufe die Höfe, die die Liste dort zählen würde — im gewählten Bereich, ohne den eigenen Hof', () => {
+    const eier = produkt({ category: 'EIER', unit: 'PAKET', unitSize: 10 })
+    const hoefe = [
+      hof(4, [heu(8, 20)]),
+      hof(10, [heu(8, 20)]),
+      hof(10.01, [heu(8, 20), eier]),
+      hof(30, [eier]),
+      hof(49, [heu(8, 20)]),
+      hof(2, [heu(8, 20)], { slug: FUTTER.eigenerSlug }),
+    ]
+    // Die Grenze schließt ein (10 km zählt bei 10 km) — und die Zahl hängt nie am gewählten Umkreis.
+    for (const km of UMFELD_KM) {
+      expect(baueUmfeld({ ...FUTTER, km, hoefe, ohneStandort: [], abgeschnittenAbKm: null }).zahlen).toEqual({ 10: 2, 25: 3, 50: 4 })
+      expect(baueUmfeld({ ...HOFLADEN, km, hoefe, ohneStandort: [], abgeschnittenAbKm: null }).zahlen).toEqual({ 10: 0, 25: 1, 50: 2 })
+    }
+    // Liste und Zahl zählen dieselben Höfe.
+    expect(baueUmfeld({ ...FUTTER, km: 10, hoefe, ohneStandort: [], abgeschnittenAbKm: null }).zeilen[0].anzahlHoefe).toBe(2)
   })
 
   it('sagt bei leerem Umkreis, was fehlt, und schlägt 50 km vor', () => {
-    expect(baueUmfeld({ ...FUTTER, ohneStandort: [], abgeschnitten: false })).toEqual({
+    expect(baueUmfeld({ ...FUTTER, ohneStandort: [], abgeschnittenAbKm: null })).toEqual({
       zeilen: [],
+      zahlen: { 10: 0, 25: 0, 50: 0 },
       hinweise: [],
       leer: 'Im Umkreis von 25 km bietet gerade niemand Futtermittel an.',
       weiterUmkreis: 50,
     })
-    expect(baueUmfeld({ ...HOFLADEN, km: 10, ohneStandort: [], abgeschnitten: false }).leer).toBe(
+    expect(baueUmfeld({ ...HOFLADEN, km: 10, ohneStandort: [], abgeschnittenAbKm: null }).leer).toBe(
       'Im Umkreis von 10 km bietet gerade niemand etwas aus dem Hofladen an.'
     )
   })
 
   it('schlägt bei 50 km keinen größeren Umkreis vor', () => {
-    expect(baueUmfeld({ ...FUTTER, km: 50, ohneStandort: [], abgeschnitten: false }).weiterUmkreis).toBeNull()
+    expect(baueUmfeld({ ...FUTTER, km: 50, ohneStandort: [], abgeschnittenAbKm: null }).weiterUmkreis).toBeNull()
   })
 })
 
@@ -570,45 +623,41 @@ describe('baueUmfeldKarte — Pins genau für die Höfe, die die Liste zählt', 
     expect(karte.zentrum).toEqual({ ...BRAUNAU, radiusKm: 10 })
   })
 
-  it('Pins nach Entfernung nummeriert, mit Hofseiten-Link im Bereich', () => {
+  it('Pins nach Entfernung nummeriert, mit Namen, Entfernung und dem Bereich für „Zum Hof"', () => {
     const karte = baueUmfeldKarte({
       ...FUTTER,
-      hoefe: [hof(14.1, [heu(8, 20)], { slug: 'weit' }), hof(2.34, [heu(9, 20)], { slug: 'nah' })],
+      hoefe: [hof(14.1, [heu(8, 20)], { slug: 'weit', name: 'Weithof' }), hof(2.34, [heu(9, 20)], { slug: 'nah', name: 'Nahhof' })],
       eigenerStandort: BRAUNAU,
     })
-    expect(karte.pins.map((p) => [p.slug, p.nummer, p.entfernung, p.link])).toEqual([
-      ['nah', 1, '2,3 km', '/nah?bereich=futter'],
-      ['weit', 2, '14 km', '/weit?bereich=futter'],
+    expect(karte.pins.map((p) => [p.slug, p.name, p.nummer, p.entfernungKm])).toEqual([
+      ['nah', 'Nahhof', 1, 2.34],
+      ['weit', 'Weithof', 2, 14.1],
     ])
+    expect(karte.bereich).toBe('FUTTERMITTEL')
+  })
+
+  it('die Karte am Pin: die ersten zwei kaufbaren Produkte des Bereichs in der Reihenfolge der Hofseite', () => {
+    const eier = produkt({ name: 'Eier', category: 'EIER', unit: 'PAKET', unitSize: 10 })
+    const produkte = [
+      heu(9, 20, 'Heu teuer'),
+      eier,
+      { ...heu(3, 20, 'Heu derzeit aus'), kaufbar: false },
+      heu(4, 20, 'Heu billig'),
+      heu(6, 20, 'Heu dritt'),
+    ]
+    const [pin] = baueUmfeldKarte({ ...FUTTER, hoefe: [hof(1, produkte, { postalCode: '1234', city: 'Testort' })], eigenerStandort: BRAUNAU }).pins
+    expect(pin.produkte.map((p) => p.name)).toEqual(['Heu teuer', 'Heu billig'])
+    expect(pin.produkte.every((p) => p.verfuegbar)).toBe(true)
+    expect(pin).toMatchObject({ postalCode: '1234', city: 'Testort', fotos: [], kategorien: [] })
+    // Im Hofladen dieselbe Regel — dort steht das Eier-Paket.
+    const [hofladen] = baueUmfeldKarte({ ...HOFLADEN, hoefe: [hof(1, produkte)], eigenerStandort: BRAUNAU }).pins
+    expect(hofladen.produkte.map((p) => p.name)).toEqual(['Eier'])
   })
 
   it('ohne Höfe keine Pins — das Zentrum bleibt', () => {
     const karte = baueUmfeldKarte({ ...FUTTER, eigenerStandort: { lat: 48, lon: 13 } })
     expect(karte.pins).toEqual([])
     expect(karte.zentrum.radiusKm).toBe(25)
-  })
-})
-
-describe('guenstigsterGrundpreis — die Zeile unter dem Pin', () => {
-  it('der günstigste Kilopreis im Bereich, in der Einheit seiner Zeile und mit der Sorte', () => {
-    const stroh = produkt({ category: 'HEU_STROH', subcategory: 'STROH', price: 28, unit: 'BALLEN', nettoMenge: 250, nettoEinheit: 'KG' })
-    // Heu: 8 € / 20 kg = 0,40 €/kg · Stroh: 28 € / 250 kg = 0,112 €/kg
-    expect(guenstigsterGrundpreis([heu(8, 20), stroh], 'FUTTERMITTEL')).toBe('Stroh · € 112 / t')
-  })
-
-  it('vergleicht nie Liter gegen Kilo — Kilopreise gehen vor', () => {
-    const milch = produkt({ category: 'MILCH', subcategory: 'TRINKMILCH', price: 1.4, unit: 'LITER', unitSize: 1 })
-    const erdaepfel = produkt({ category: 'GEMUESE', subcategory: 'ERDAEPFEL', price: 20, unit: 'KG', unitSize: 10 })
-    // In beiden Reihenfolgen — der Kilopreis gewinnt, egal was zuerst kommt.
-    expect(guenstigsterGrundpreis([milch, erdaepfel], 'LEBENSMITTEL')).toBe('Erdäpfel · € 2,00 / kg')
-    expect(guenstigsterGrundpreis([erdaepfel, milch], 'LEBENSMITTEL')).toBe('Erdäpfel · € 2,00 / kg')
-    expect(guenstigsterGrundpreis([milch], 'LEBENSMITTEL')).toBe('Trinkmilch · € 1,40 / L')
-  })
-
-  it('nur im gewählten Bereich, und null ohne vergleichbares Produkt', () => {
-    const brot = produkt({ category: 'BROT', unit: 'STUECK' })
-    expect(guenstigsterGrundpreis([heu(8, 20)], 'LEBENSMITTEL')).toBeNull()
-    expect(guenstigsterGrundpreis([brot], 'LEBENSMITTEL')).toBeNull()
   })
 })
 
@@ -620,7 +669,8 @@ describe('Links auf fremde Hofseiten — im Futter direkt beim Futter', () => {
     const eingabe = { ...FUTTER, bereich, hoefe }
     return {
       liste: baueUmfeldZeilen(eingabe).flatMap((z) => z.hoefe.map((h) => h.link)),
-      pins: baueUmfeldKarte({ ...eingabe, eigenerStandort: BRAUNAU }).pins.map((p) => p.link),
+      // „Zum Hof" baut die HofKurzkarte aus Slug und Bereich der Karte — dieselbe Funktion wie die Liste.
+      pins: (({ pins, bereich: b }) => pins.map((p) => hofseitenLink(p.slug, b)))(baueUmfeldKarte({ ...eingabe, eigenerStandort: BRAUNAU })),
     }
   }
 

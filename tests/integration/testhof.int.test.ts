@@ -182,7 +182,7 @@ describe('Sichtbarkeit an echten Zeilen', () => {
   it('Region › Umfeld: der Testhof fehlt im Umkreis, der Nachbar daneben steht da', async () => {
     const { testhof, ausgenommen } = await zweiHoefe()
     const { farm: eigen } = await erstelleHof(ORT)
-    const umfeld = await getUmfeld(eigen.id, 10)
+    const umfeld = await getUmfeld(eigen.id)
     if (!umfeld || !umfeld.eigenerStandort) throw new Error('Umfeld ohne Standort')
     const slugs = umfeld.hoefe.map((h) => h.slug)
     expect(slugs).not.toContain(testhof.slug)

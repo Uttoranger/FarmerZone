@@ -323,7 +323,8 @@ describe('Die Seite in zwei Teilen', () => {
     expect(seite).toContain("redirect('/onboarding')")
     expect(seite).toMatch(/<FutterReiter farm=\{farm\} suche=\{suche\} \/> : <PreiseReiter farm=\{farm\} suche=\{suche\} \/>/)
     expect(seite).not.toMatch(/getUmfeld|getFutterKaufen/)
-    expect(quelle('src/app/(hof)/region/preise-reiter.tsx')).toContain('getUmfeld(farm.id, filter.km)')
+    // Seit Nr. 124 lädt Preise vergleichen immer bis 50 km (Zahl je Stufe, N23); den Umkreis schneidet src/lib/umfeld.ts.
+    expect(quelle('src/app/(hof)/region/preise-reiter.tsx')).toContain('getUmfeld(farm.id)')
     // Seit Nr. 123 lädt Futter kaufen einmal 50 km und filtert in der reinen Funktion (N23).
     expect(quelle('src/app/(hof)/region/futter-reiter.tsx')).toContain('getFutterKaufen(farm.id, jetzt)')
   })
