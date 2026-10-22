@@ -5688,6 +5688,12 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Liste „Bearbeiten“:** Stand als Zeile bzw. Karte „Noch n Punkte offen“ mit genau den offenen Zeilen (Abholzeiten zuerst), dann Gruppen nach dem Ort auf der Seite (`ORTS_GRUPPEN`, `zeilenNachOrt`). „Bestellungen“ steht unter lg nicht mehr in der Liste, zählt aber weiter („11 von 11“), weil Heute, Einrichten, Einstellungen und Postfach den Fortschritt lesen.
 - **Reiter ohne Zahl:** `zaehleBeitraege` (src/server/queries/mein-hof-zahl.ts) hatte danach keinen Aufrufer mehr und ist entfallen.
 
+## Wache für Pfade in den Regeltexten, Reste aus 135, 140 und 141 (Register G4, Ergänzung 22.10.2026; Nr. 147, Lauf 22)
+
+- **Pfade:** `tests/docs-pfade-wache.test.ts` liest `docs/ai/*.md` (ohne das erzeugte `BAUSTEINE.md`) und `CLAUDE.md` und prüft jeden Pfad in Backticks, der mit `tests/`, `src/`, `scripts/`, `prisma/`, `.claude/` oder `.github/` beginnt (dazu die Wurzeldateien), auf Dasein. Zeilenangaben und Satzzeichen fallen vorher weg, eine Klammer gehört zum Pfad (`src/app/(hof)`), `{a,b}` wird aufgefächert, ein Muster mit `*` braucht einen Treffer, `<…>` ist ein Platzhalter. Zählweise: verschiedene Pfade je Datei; am 22.10.2026 655 (536 verschieden), darunter 9 Muster und 4 Platzhalter; keiner zeigte ins Leere, der Bestand (`BESTAND`, nur schrumpfen) ist leer. Nicht Teil der Wache (F11): Herkunftsvermerke und das Datum von Regelsätzen.
+- **Integration:** `tests/test-ueberspringen-wache.test.ts` belegt, dass ihre Liste Dateien aus `tests/integration/` enthält.
+- **Kommentare:** Die Aussagen „kein jsdom“ und „ohne YAML-Paket“ in vier Testdateien stimmen seit Nr. 135 nur halb und sagen jetzt, was die Datei tut; `/pruefen` nennt den Rückgabetyp mit seinen Orten; der Satz zu Datum mit Uhrzeit steht im JSDoc von `TELEFON_NUMMER`. Kein Ergebnis ändert sich.
+
 ## Nützliche Befehle
 
 ```bash

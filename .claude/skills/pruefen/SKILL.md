@@ -19,7 +19,7 @@ Gehe diese Liste durch und beantworte jeden Punkt mit Fundstelle oder "sauber":
 
 ### Typisierung
 - [ ] `any`, `as any`, `@ts-ignore` oder unbegründetes `!` im Diff?
-- [ ] Exportierte Funktionen mit explizitem Rückgabetyp?
+- [ ] Exportierte Funktionen in `src/lib`, `src/server` und `src/schemas` mit explizitem Rückgabetyp (React-Komponenten ausgenommen)?
 - [ ] Typen aus Zod abgeleitet statt doppelt geschrieben?
 
 ### Systemgrenzen

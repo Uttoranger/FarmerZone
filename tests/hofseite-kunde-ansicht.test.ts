@@ -260,8 +260,8 @@ describe('Kein Reiter „Beiträge" mehr (Register F8, Nr. 128)', () => {
   })
 
   it('der Sprung zu „Aktuell vom Hof" hängt an EINER Regel, mit reduzierter Bewegung ohne Animation', () => {
-    // Verdrahtungswache über den Quelltext: Ohne jsdom (G6, kein neues Paket) läuft der
-    // Effekt hier nicht; die Regeln selbst prüft tests/aktuell-vom-hof-regeln.test.ts.
+    // Verdrahtungswache über den Quelltext: jsdom gibt es seit Nr. 135 als Entwicklungspaket,
+    // diese Datei nutzt es nicht, deshalb läuft der Effekt hier nicht; die Regeln selbst prüft tests/aktuell-vom-hof-regeln.test.ts.
     const text = quelle('src/components/hofseite/hofseite-kunde.tsx')
     expect(text).toMatch(/springeZuAktuell\(suche\.get\(REITER_PARAMETER\), mitAktuell\)/)
     expect(text).toMatch(/prefers-reduced-motion: reduce/)
