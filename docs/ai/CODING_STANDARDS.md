@@ -38,7 +38,7 @@ Bei **jeder** Codeänderung lesen.
 
 ### Geld
 - Prisma speichert Preise als `Decimal(10,2)`.
-- **Nie** `Number(decimal)` für Rechnungen, die addiert oder multipliziert werden. Rundungsfehler landen auf der Rechnung des Hofs.
+- **Nie** `Number(decimal)` für Rechnungen, die addiert oder multipliziert werden. Rundungsfehler landen auf der Rechnung des Hofs (`tests/geld-number-wache.test.ts` meldet `Number()` auf Geldnamen unter `src/`).
 - **In reinen Funktionen wird Geld in ganzen Cent (Int) gerechnet; `Decimal` ↔ Cent nur an der Servergrenze, über Decimal-Methoden.**
   Ein Modul in `src/lib/` darf `prisma` nicht importieren (→ `ARCHITECTURE.md` §1),
   und `Prisma.Decimal` käme genau von dort. Also: die Servergrenze wandelt einmal
