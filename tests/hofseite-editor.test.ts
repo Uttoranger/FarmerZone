@@ -51,8 +51,8 @@ describe('/farm-page', () => {
 
   it('der Kopf steht genau einmal je Reiter', () => {
     // Zwei Zweige, die sich ausschließen: Beiträge kehrt vorher zurück.
-    const beitraege = seite.slice(seite.indexOf("if (reiter === 'beitraege')"), seite.indexOf('const [kopf, beitraegeZahl'))
-    const hofseite = seite.slice(seite.indexOf('const [kopf, beitraegeZahl'))
+    const beitraege = seite.slice(seite.indexOf("if (reiter === 'beitraege')"), seite.indexOf('const [kopf, zustand, einstellungen'))
+    const hofseite = seite.slice(seite.indexOf('const [kopf, zustand, einstellungen'))
     expect(beitraege.match(/<MeinHofSeitenkopf [^>]*aktiv="beitraege"/g)).toHaveLength(1)
     expect(hofseite.match(/<MeinHofSeitenkopf /g)).toHaveLength(1)
     expect(hofseite).toMatch(/<MeinHofSeitenkopf [^>]*aktiv="hofseite"/)

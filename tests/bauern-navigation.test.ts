@@ -180,8 +180,10 @@ describe('Mein Hof', () => {
   })
 
   it('Produkte trägt die Reiterleiste als ersten Reiter — nur unter md, ab md bleibt die Seite, wie sie war', () => {
+    // Seit Nr. 143 im Kopf von Mein Hof (mein-hof-kopf.tsx), der auf /products unter md steht.
     const seite = quelle('src/app/(hof)/products/page.tsx')
-    expect(seite).toMatch(/<MeinHofReiterLeiste[^>]*aktiv="produkte"[^>]*nurUnterMd/)
+    expect(seite).toMatch(/<MeinHofKopf [^>]*aktiv="produkte"/)
+    expect(quelle('src/components/mein-hof/mein-hof-kopf.tsx')).toMatch(/<MeinHofReiterLeiste aktiv=\{aktiv\} nurUnterMd=\{aktiv === 'produkte'\}/)
   })
 
   it('Produkte trägt den Kopf nicht, sondern eine eigene Überschrift', () => {

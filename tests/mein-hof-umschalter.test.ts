@@ -71,14 +71,16 @@ function ansicht(reiter: 'produkte' | 'hofseite' | 'beitraege', suche = '', kopf
 
 describe('Reiterleiste', () => {
   const leiste = (aktiv: 'produkte' | 'hofseite' | 'beitraege', nurUnterMd = false) =>
-    renderToStaticMarkup(createElement(MeinHofReiterLeiste, { aktiv, beitraegeZahl: 3, nurUnterMd }))
+    renderToStaticMarkup(createElement(MeinHofReiterLeiste, { aktiv, nurUnterMd }))
 
-  it('Produkte · Hofseite · Beiträge · N als Links, in dieser Reihenfolge, der aktive mit aria-current', () => {
+  it('Produkte · Hofseite · Beiträge als Links, in dieser Reihenfolge, der aktive mit aria-current — ohne Zahl (E12, Nr. 143)', () => {
     const html = leiste('produkte')
     expect([...html.matchAll(/<a href="([^"]+)"/g)].map((t) => t[1])).toEqual(['/products', '/farm-page', '/farm-page?reiter=beitraege'])
     expect(html).toMatch(/<a href="\/products"[^>]*aria-current="page"/)
     expect(html).not.toMatch(/<a href="\/farm-page"[^>]*aria-current/)
-    expect(html).toContain('Beiträge · 3')
+    // Der Reiter „Beiträge“ trägt keine Zahl mehr, auf allen Breiten (E12, Ergänzung 22.10.2026).
+    expect(html).toMatch(/>Beiträge</)
+    expect(html).not.toMatch(/Beiträge ·/)
     expect(leiste('beitraege')).toMatch(/<a href="\/farm-page\?reiter=beitraege"[^>]*aria-current="page"/)
   })
 
@@ -167,27 +169,27 @@ describe('„Kundenansicht" im Kopf', () => {
     expect(html).toContain('Kundenansicht')
   })
 
-  it('der Kopf nimmt den Knopf unter lg; ab lg bleibt der Link in den neuen Tab', () => {
+  it('der Kopf am Handy nimmt den Knopf (unter lg in seitenkopf.tsx); ab lg bleibt der Link in den neuen Tab', () => {
+    expect(quelle('src/components/mein-hof/mein-hof-kopf.tsx')).toContain('<KundenansichtKnopf slug={hof.slug}')
     const kopf = quelle('src/components/mein-hof/seitenkopf.tsx')
-    expect(kopf).toContain('<KundenansichtKnopf slug={hof.slug}')
-    expect(kopf).toMatch(/breit \? \(\s*<a href=\{vorschauLink\(hof\.slug\)\} target="_blank"/)
+    expect(kopf).toMatch(/<div className="lg:hidden">\s*<MeinHofKopf /)
+    expect(kopf).toMatch(/<a href=\{vorschauLink\(hof\.slug\)\} target="_blank"/)
+    // Gegenprobe: Ab lg steht kein Knopf für das Vollbild in der Zeile.
+    expect(kopf).not.toContain('<KundenansichtKnopf')
   })
 
-  it('auf /products steht derselbe Knopf unter den Reitern — nur unter md, als Knopf mit dem Vollbild (Nr. 118)', () => {
+  it('auf /products steht derselbe Kopf mit dem Knopf — nur unter md, als Knopf mit dem Vollbild (Nr. 118, seit Nr. 143 im Kopf)', () => {
     /** Der `kopf` der Seite: das, was MeinHofAnsicht über dem Inhalt zeigt. */
     const kopfDerSeite = (seite: string): string => /kopf=\{([\s\S]*?)\n      \}\n    >/.exec(seite)?.[1] ?? ''
-    /** Steht der Knopf im Kopf, in demselben Kasten wie die Reiter, der ab md verschwindet? */
-    const knopfNurUnterMd = (kopf: string): boolean =>
-      /<div className="[^"]*\bmd:hidden\b[^"]*">[\s\S]*<MeinHofReiterLeiste[\s\S]*<KundenansichtKnopf slug=\{farm\.slug\}/.test(kopf)
+    /** Steht der Kopf von Mein Hof in einem Kasten, der ab md verschwindet? */
+    const kopfNurUnterMd = (kopf: string): boolean => /<div className=\{cn\(MEIN_HOF_KOPF_HUELLE, 'md:hidden'\)\}>\s*<MeinHofKopf [^>]*aktiv="produkte"/.test(kopf)
 
     const seite = quelle('src/app/(hof)/products/page.tsx')
-    expect(kopfDerSeite(seite)).toContain('<MeinHofReiterLeiste aktiv="produkte"')
-    expect(knopfNurUnterMd(kopfDerSeite(seite))).toBe(true)
-    // Gegenprobe: ohne den Knopf bzw. außerhalb des md:hidden-Kastens schlägt die Suche an.
-    expect(knopfNurUnterMd(kopfDerSeite(seite.replace(/\s*<KundenansichtKnopf[^>]*\/>/, '')))).toBe(false)
-    expect(knopfNurUnterMd(kopfDerSeite(seite.replace('px-4 pt-5 md:hidden', 'px-4 pt-5')))).toBe(false)
+    expect(kopfNurUnterMd(kopfDerSeite(seite))).toBe(true)
+    // Gegenprobe: außerhalb des md:hidden-Kastens schlägt die Suche an.
+    expect(kopfNurUnterMd(kopfDerSeite(seite.replace("cn(MEIN_HOF_KOPF_HUELLE, 'md:hidden')", 'MEIN_HOF_KOPF_HUELLE')))).toBe(false)
     // Der Knopf kommt aus dem Baustein von Mein Hof, nicht aus einem eigenen Link in einen neuen Tab.
-    expect(seite).toContain("from '@/components/mein-hof/kundenansicht-knopf'")
+    expect(quelle('src/components/mein-hof/mein-hof-kopf.tsx')).toContain("from '@/components/mein-hof/kundenansicht-knopf'")
     expect(seite).not.toContain('vorschauLink')
   })
 

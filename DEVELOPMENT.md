@@ -5680,6 +5680,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Beitrag für WhatsApp aus einer Abfrage:** `getStatusPostForWhatsApp` liefert `showOnFarmPage`, die Seite fragt nicht mehr selbst bei Prisma. Der Link im Teilen-Fenster (`ladeTeilenFensterBeitrag`) nimmt `beitragIdImLink`, wie die Mail.
 - **Kleinigkeiten:** Typ `BeitragBlockArt` in `src/lib/heute.ts` statt doppelt; Kopfkommentar von `src/lib/hofuebersicht.ts` nennt Kalendertag und volle Termine; `tests/produkte-handlung.test.ts` beweist `hatHandlung` im Render.
 
+## Mein Hof v3: ein Kopf für alle Reiter, Pause im Kopf, Hofseite in Gruppen (Register N3, N4, E12, Ergänzungen 22.10.2026; Nr. 143, Lauf 22)
+
+- **Warum:** Am Handy sahen die drei Reiter von Mein Hof verschieden aus (Karte mit Titelbild nur auf Hofseite und Beiträge, auf /products nur Reiter und „Kundenansicht“ in anderer Hülle) — die Reiter sprangen beim Wechsel. Ob der Hof Bestellungen annimmt, stand nur im Schild und in der Zeile „Bestellungen“ mitten in der Liste. Board system-h1-mein-hof-v3 (Bildschirme C–F).
+- **Eine Rechnung für den eigenen Hof:** `ladeMeinHofZustand` (src/server/mein-hof-zustand.ts) lädt Pause, Nachricht, aktive Abholzeiten, die vollen Tage (`ausgebuchteTage`) und die Produkte und rechnet `kaufSperre`, `naechsteAbholung` und `istKaufbar` wie Kasse und Hofliste. Der Zustand folgt der Bedingung des Balkens der Shell, nicht `hofZustand` allein: Bei `isActive = false` ohne Freigabe sagte `hofZustand` „aus“, der Balken „wartet“ — sonst stünde derselbe Zustand zweimal da. `zustandsZeile` (src/lib/mein-hof.ts) macht daraus Titel, Satz und Knopf. `naechstesAbholfenster` bleibt für Heute; der Moment „Ware wieder da“ auf /products rechnet weiter damit (src/server/queries/products.ts) — bei einem vollen Fenster können auf derselben Seite zwei Angaben „nächste Abholung“ verschieden sein (bekannt, nicht in Nr. 143).
+- **Pausieren mit Bestätigung, Fortsetzen sofort:** EIN Knopf an derselben Stelle (`PausierenBlatt`), damit der Fokus nach dem Pausieren auf „Fortsetzen“ landet. `PauseClient` (ab lg und auf /settings/pause) schaltet weiter ohne Bestätigung; beide nehmen die Meldungen aus `PAUSE_MELDUNG`, und der Zähler zählt die getrimmte Nachricht wie der Server (Nacharbeit 137).
+- **Liste „Bearbeiten“:** Stand als Zeile bzw. Karte „Noch n Punkte offen“ mit genau den offenen Zeilen (Abholzeiten zuerst), dann Gruppen nach dem Ort auf der Seite (`ORTS_GRUPPEN`, `zeilenNachOrt`). „Bestellungen“ steht unter lg nicht mehr in der Liste, zählt aber weiter („11 von 11“), weil Heute, Einrichten, Einstellungen und Postfach den Fortschritt lesen.
+- **Reiter ohne Zahl:** `zaehleBeitraege` (src/server/queries/mein-hof-zahl.ts) hatte danach keinen Aufrufer mehr und ist entfallen.
+
 ## Nützliche Befehle
 
 ```bash
