@@ -106,7 +106,7 @@ describe('Kartenpunkt-Zeile', () => {
   })
 
   it('sperrt das Freischalten nicht: freischaltSperre kennt den Kartenpunkt nicht', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true, produktImShop: true })).toBeNull()
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true, produktImShop: true, abholzeitAktiv: true })).toBeNull()
   })
 })
 

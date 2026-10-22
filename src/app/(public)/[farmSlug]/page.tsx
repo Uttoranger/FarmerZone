@@ -11,6 +11,7 @@ import { hofVorschaubild, metadatenBasis } from '@/lib/vorschaubild'
 import { UMGEBUNG } from '@/lib/umgebung-server'
 import { OG_LOCALE, hofJsonLd, jsonLdSicher } from '@/lib/json-ld'
 import { sammleKategorien } from '@/lib/hofuebersicht'
+import { kaufSperre } from '@/lib/bereiche-anzeige'
 import { KATEGORIE_LABEL, PRODUCT_CATEGORY_VALUES } from '@/lib/taxonomie'
 import { teilenVorschauText } from '@/lib/teilen-bild'
 import { HOFSEITE_BEITRAEGE_MAX, entferneKontaktdaten, ueberUnsText } from '@/lib/hofseite-kunde'
@@ -194,6 +195,9 @@ async function Hofseite({ farmSlug, suche, geo }: { farmSlug: string; suche: Suc
   // Einmal hier, auf dem Server: Gebührensatz und „vor 2 Tagen" rechnen in
   // Server und Browser vom selben Zeitpunkt (sonst Hydration-Abweichung).
   const jetzt = new Date()
+  // Die Kaufsperre (Register N24) einmal je Seite, mit demselben Zeitpunkt und den vollen Tagen, die
+  // ladeHofseite schon gezählt hat — alle Kaufwege der Seite lesen nur dieses Ergebnis.
+  const sperre = kaufSperre(farm, jetzt)
 
   return (
     <KundeShellMitSitzung>
@@ -206,6 +210,7 @@ async function Hofseite({ farmSlug, suche, geo }: { farmSlug: string; suche: Suc
         reorderItems={reorderItems}
         ansicht={ansicht}
         jetzt={jetzt.toISOString()}
+        sperre={sperre}
       />
       {/* Strukturierte Daten (Nr. 117): auf dem Server gebaut — Koordinaten und volle Adresse gehen nicht an die Client-Komponente. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSicher(hofJsonLd(farm, geo, metadatenBasis(UMGEBUNG.appUrl))) }} />

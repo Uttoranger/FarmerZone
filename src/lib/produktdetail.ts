@@ -26,6 +26,7 @@ import {
   kennzeichnungsZeilen,
   zeigeKaufknopf,
   type KartenZustand,
+  type KaufSperre,
   type KennzeichnungsEingabe,
   type KennzeichnungsZeile,
 } from '@/lib/bereiche-anzeige'
@@ -156,6 +157,7 @@ export function vorratText(p: Pick<DetailProdukt, 'stock' | 'unit' | 'unitSize'>
     case 'ausverkauft':
       return 'ausverkauft'
     case 'pausiert':
+    case 'nicht-bestellbar':
     case 'nicht-verfuegbar':
       return null
   }
@@ -220,15 +222,16 @@ export type GroessenKachelDaten = {
  * Grundpreis und Vorrat. Der Name ist der Produktname ohne den Anfang, den
  * alle Größen teilen — so steht „5 kg-Sack" auf der Kachel, wenn die Größen
  * „Bergwiesen-Heu 5 kg-Sack" heißen; heißen sie ganz verschieden, bleibt der
- * Name. Pausiert ist nichts ausverkauft, nur nicht kaufbar.
+ * Name. Mit Kaufsperre (Pause, keine Abholzeit, ausgebucht — kaufSperre, N24)
+ * ist nichts ausverkauft, nur nicht kaufbar.
  */
-export function groessenKacheln(familie: readonly DetailProdukt[], isPaused: boolean): GroessenKachelDaten[] {
+export function groessenKacheln(familie: readonly DetailProdukt[], sperre: KaufSperre): GroessenKachelDaten[] {
   const anfang = gemeinsamerAnfang(familie.map((p) => p.name))
   return familie.map((p) => {
     const rest = p.name.trim().split(/\s+/).slice(anfang).join(' ')
     const name = rest || p.name
     const menge = gebindeMenge(p)
-    const zustand = kartenZustand(p, isPaused)
+    const zustand = kartenZustand(p, sperre)
     return {
       id: p.id,
       name,
@@ -275,15 +278,15 @@ export const GLEICH_MIT_ABHOLEN = 3
  * „Gleich mit abholen – eine Bestellung, eine Gebühr": andere sichtbare
  * Produkte desselben Hofs, nie die eigene Familie, je Familie nur eine Größe
  * (die Kachel führt zur Größenwahl), Kaufbares zuerst in der Reihenfolge des
- * Hofs. Pausiert: nichts — mitnehmen lässt sich gerade nichts.
+ * Hofs. Mit Kaufsperre (kaufSperre, N24): nichts — mitnehmen lässt sich gerade nichts.
  */
 export function gleichMitAbholen<P extends { id: string; isAvailable: boolean; stock: number; familieId: string | null }>(
   produkte: readonly P[],
   produkt: P,
-  isPaused: boolean,
+  sperre: KaufSperre,
   anzahl: number = GLEICH_MIT_ABHOLEN
 ): P[] {
-  if (isPaused) return []
+  if (sperre !== null) return []
   const familien = new Set<string>()
   if (produkt.familieId) familien.add(produkt.familieId)
   const kandidaten: P[] = []
@@ -295,8 +298,8 @@ export function gleichMitAbholen<P extends { id: string; isAvailable: boolean; s
     }
     kandidaten.push(p)
   }
-  const kaufbar = kandidaten.filter((p) => zeigeKaufknopf(p, false))
-  const rest = kandidaten.filter((p) => !zeigeKaufknopf(p, false))
+  const kaufbar = kandidaten.filter((p) => zeigeKaufknopf(p, null))
+  const rest = kandidaten.filter((p) => !zeigeKaufknopf(p, null))
   return [...kaufbar, ...rest].slice(0, anzahl)
 }
 

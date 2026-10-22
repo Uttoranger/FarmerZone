@@ -4,11 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Check, ChevronRight, Clock, FlaskConical, MapPin, Navigation, PauseCircle, Share2, ShoppingBasket, Sprout } from 'lucide-react'
+import { Check, ChevronRight, Clock, FlaskConical, MapPin, Navigation, Share2, ShoppingBasket, Sprout } from 'lucide-react'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
-import { FUTTER_ABSCHNITT_ANKER, angezeigterBereich } from '@/lib/bereiche-anzeige'
+import { FUTTER_ABSCHNITT_ANKER, angezeigterBereich, type KaufSperre } from '@/lib/bereiche-anzeige'
 import { buildMapsUrl } from '@/lib/customer-links'
 import { hofInitialen } from '@/lib/hof-initialen'
 import {
@@ -35,7 +35,6 @@ import { rueckweg, type KundenSeite } from '@/lib/kunden-kopf'
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
 import { titelbildAusschnitt } from '@/lib/titelbild'
 import { bildStil } from '@/lib/bild-ausschnitt'
-import { kundenPausenText } from '@/lib/shop-pause'
 import { anzeigeBereichVon } from '@/lib/taxonomie'
 import { BEITRAG_PARAMETER, REITER_PARAMETER, beitragKennungSchema } from '@/schemas/hofseite-reiter'
 import { cn } from '@/lib/utils'
@@ -49,6 +48,7 @@ import { ProductGrid, useBereichWunsch, type InDenKorb } from '@/components/farm
 import { AktuellVomHof } from '@/components/hofseite/aktuell-vom-hof'
 import { VorschauImRahmen } from '@/components/farm/vorschau-im-rahmen'
 import { HofseiteSeitenspalte } from '@/components/hofseite/hofseite-seitenspalte'
+import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
 import { Titelbild } from '@/components/hofseite/titelbild'
 import { Abzeichen, AbzeichenKnopf } from '@/components/ui/abzeichen'
@@ -66,7 +66,8 @@ import { TESTHOF_HINWEIS } from '@/lib/gruendungshof'
  * KundeShell legt die Seite herum (page.tsx), damit auch die Vorschau die
  * echte Navigation zeigt.
  *
- * Aufbau: Rückweg, Titelbild mit Name und Aktionen, Pausen-Hinweis, Reiter
+ * Aufbau: Rückweg, Titelbild mit Name und Aktionen, Hinweis zur Kaufsperre
+ * (Pause, keine Abholzeit, ausgebucht — kaufSperre, Register N24), Reiter
  * Übersicht · Produkte (in der Adresse, ?reiter=, geschrieben per
  * replaceState), darunter zweispaltig ab 1024 px: der Inhalt des Reiters und
  * die rechte Spalte (EINE Komponente, hofseite-seitenspalte.tsx). Das
@@ -122,6 +123,7 @@ export function HofseiteKunde({
   reorderItems,
   ansicht,
   jetzt,
+  sperre,
 }: {
   farm: HofseiteHof
   /**
@@ -143,6 +145,12 @@ export function HofseiteKunde({
    * Uhr beim Rendern — sonst wichen Server und Browser ab (Hydration).
    */
   jetzt: string
+  /**
+   * Die Kaufsperre (Register N24), einmal auf dem Server mit `jetzt` gerechnet
+   * (kaufSperre in page.tsx). Alle Kaufwege der Seite lesen sie — Kaufknöpfe,
+   * „+“ in „Aktuell vom Hof“, „Jetzt bestellen“, Mini-Warenkorb —, nie die Pause selbst.
+   */
+  sperre: KaufSperre
 }): React.JSX.Element {
   const suche = useSearchParams()
   const pfad = usePathname()
@@ -277,8 +285,8 @@ export function HofseiteKunde({
   const foto = titelbildFoto(farm)
   const ueberUns = sichtbar('about') ? (ueberUnsText(farm) ?? '') : ''
   const werte = sichtbar('values') ? farm.farmValues.slice(0, 6) : []
-  const verfuegbar = verfuegbarText(produkte, farm.isPaused)
-  const kannBestellen = produkte.length > 0 && !farm.isPaused
+  const verfuegbar = verfuegbarText(produkte, sperre)
+  const kannBestellen = produkte.length > 0 && sperre === null
 
   const zeigeUeberUns = offen === 'uebersicht' && Boolean(ueberUns || werte.length > 0 || farm.foundedYear)
   // Ab lg mit Schaufenster ein Raster aus zwei Zeilen: Über uns oben links,
@@ -293,6 +301,7 @@ export function HofseiteKunde({
   const seitenspalte = (
     <HofseiteSeitenspalte
       hof={farm}
+      sperre={sperre}
       zahlungsarten={zahlungsarten(farm)}
       gebuehrKurz={gebuehr?.kurz ?? null}
       gebuehrKorb={gebuehr?.korb ?? null}
@@ -348,7 +357,7 @@ export function HofseiteKunde({
           anordnung={anordnung}
           jetzt={jetzt}
           produkte={produkte}
-          mitPlus={mitKorb && !farm.isPaused}
+          mitPlus={mitKorb && sperre === null}
           onInDenKorb={(p) => korbWeg.current?.(p)}
           produktLink={(id) => produktLink(farm.slug, id, ansicht.art === 'vorschau')}
           neuesterHref={adresseOhneBeitrag(pfad, suche.toString())}
@@ -456,12 +465,12 @@ export function HofseiteKunde({
         </div>
       </div>
 
-      {/* Pause: Der Hof bleibt sichtbar, nur die Kaufwege sind zu (Knöpfe in den Karten). */}
-      {farm.isPaused && (
-        <div data-abschnitt="bestellungen" className="mx-auto max-w-[1200px] px-4 pt-5 md:px-6">
-          <Hinweiskarte ton="orange" symbol={PauseCircle} titel={`${farm.name} pausiert gerade.`}>
-            <span className="break-words">{kundenPausenText(farm.pauseMessage)}</span>
-          </Hinweiskarte>
+      {/* Kaufsperre (Pause, keine Abholzeit, ausgebucht — Register N24): Der Hof und seine Produkte bleiben
+          sichtbar und in ihrer Reihenfolge, nur die Kaufwege sind zu. Die Karte nennt den Grund; das Ziel
+          der Markierung aus Mein Hof („Bestellungen“, Pause) trägt sie nur bei Pause. */}
+      {sperre !== null && (
+        <div data-abschnitt={sperre === 'pause' ? 'bestellungen' : undefined} className="mx-auto max-w-[1200px] px-4 pt-5 md:px-6">
+          <KaufSperreHinweis sperre={sperre} hofName={farm.name} pauseMessage={farm.pauseMessage} />
         </div>
       )}
 
@@ -549,9 +558,11 @@ export function HofseiteKunde({
               products={produkte}
               farmId={farm.id}
               farmSlug={farm.slug}
+              hofName={farm.name}
+              pauseMessage={farm.pauseMessage}
               initialReorderItems={reorderItems && reorderItems.length > 0 ? reorderItems : undefined}
               ownerMode={false}
-              isPaused={farm.isPaused}
+              sperre={sperre}
               kaufen={ansicht.kaufen}
               teil={offen === 'uebersicht' ? 'auswahl' : offen === 'produkte' ? 'alle' : 'keins'}
               gebuehrHinweis={gebuehr?.produkte ?? null}

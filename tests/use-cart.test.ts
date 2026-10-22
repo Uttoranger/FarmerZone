@@ -13,6 +13,9 @@
  * Aufruf), Effekte nach dem Rendern, wenn sich ihre Abhängigkeiten ändern. Die
  * Komponente läuft als Funktion, Kinder rendert er nicht. /api/reserve ist
  * gemockt, der Browser-Speicher eine Map.
+ *
+ * Dazu (Register N24): Mit Kaufsperre legt der Nachbestell-Link nichts in den
+ * Korb — dieselbe Regel wie der Kaufknopf.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PublicProduct } from '@/server/queries/farm'
@@ -20,6 +23,7 @@ import { publicProduct } from './fabrik/public-product'
 import type { CartItem, Warenkorb } from '@/lib/use-cart'
 import { useCart } from '@/lib/use-cart'
 import { ProductGrid } from '@/components/farm/product-grid'
+import type { KaufSperre } from '@/lib/bereiche-anzeige'
 import { WARENKORB_SCHLUESSEL, leseWarenkorb } from '@/lib/warenkorb-speicher'
 
 const pruefstand = vi.hoisted(() => {
@@ -284,15 +288,43 @@ describe('useCart: Aufrufe hintereinander aus demselben Render', () => {
 
 describe('Nachbestell-Link im Produktraster', () => {
   function rastereMit(...nachbestellt: Array<[PublicProduct, number]>): void {
+    rastereMitSperre(null, ...nachbestellt)
+  }
+
+  function rastereMitSperre(sperre: KaufSperre, ...nachbestellt: Array<[PublicProduct, number]>): void {
     // Props einmal bauen: Eine neue Produktliste je Rendern wäre ein neuer Server-Stand.
     const props = {
       products: [EIER, MEHL, HONIG],
       farmId: HOF_ID,
       farmSlug: HOF_SLUG,
+      sperre,
+      hofName: 'Testhof A',
+      pauseMessage: null,
       initialReorderItems: nachbestellt.map(([p, quantity]) => ({ productId: p.id, productName: p.name, quantity })),
     }
     pruefstand.starte(() => ProductGrid(props))
   }
+
+  // Register N24: Der Link liest dieselbe Regel wie der Kaufknopf (zeigeKaufknopf mit der Sperre) — bei
+  // Pause, ohne Abholzeit und ausgebucht legt er nichts in den Korb und reserviert nichts.
+  for (const sperre of ['pause', 'keine-abholzeit', 'ausgebucht'] as const) {
+    it(`mit Kaufsperre „${sperre}“: nichts im Korb, keine Reservierung`, async () => {
+      rastereMitSperre(sperre, [EIER, 2], [MEHL, 1])
+      await pruefstand.zuRuhe()
+
+      expect(reserviere).not.toHaveBeenCalled()
+      expect(korb().items).toEqual([])
+      expect(gespeichert()).toBeNull()
+    })
+  }
+
+  it('Gegenprobe: dieselben Positionen ohne Sperre landen im Korb', async () => {
+    rastereMitSperre(null, [EIER, 2], [MEHL, 1])
+    await pruefstand.zuRuhe()
+
+    expect(reservierungen()).toEqual([[EIER.id, 2], [MEHL.id, 1]])
+    expect(inhalt(korb().items)).toEqual([[EIER.id, 2], [MEHL.id, 1]])
+  })
 
   it('legt zwei Produkte in den Korb — keine Reservierung ohne Position', async () => {
     rastereMit([EIER, 2], [MEHL, 1])

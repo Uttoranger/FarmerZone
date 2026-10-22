@@ -14,11 +14,10 @@ import { WARENKORB_ANKER } from '@/lib/warenkorb-speicher'
 import { MONTH_SHORT, seasonLabel } from '@/schemas/product'
 import { formatEuro, formatGrundpreis, formatGrundpreisNetto, mitAnzahl } from '@/lib/format'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
-import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
 import { VORSCHAU_KAUF_HINWEIS, korbErlaubt } from '@/lib/hofseite-vorschau'
 import { produktZustand, streifenText, type ProduktZustand } from '@/lib/produkt-sichtbarkeit'
 import { ImShopSchalter } from '@/components/products/im-shop-schalter'
-import { kartenZustand, kategorieAbschnitte, zeigeKaufknopf } from '@/lib/bereiche-anzeige'
+import { kartenZustand, kategorieAbschnitte, ruhenderKnopfText, zeigeKaufknopf, type KaufSperre } from '@/lib/bereiche-anzeige'
 import { SCHAUFENSTER_PRODUKTE, mengeAbgelehntText, oeffnetKorbHier, stehtNurAmHandy, uebersichtProdukte } from '@/lib/hofseite-kunde'
 import { bereichAusParameter } from '@/schemas/hoefe-filter'
 import type { AnzeigeBereich } from '@/lib/taxonomie'
@@ -44,8 +43,15 @@ type Props = {
   initialReorderItems?: ReorderItem[]
   ownerMode?: boolean
   mode?: 'edit' | 'preview'
-  /** Shop pausiert: Kauf-Schaltflächen sind tot (Durchsetzung liegt am Server). */
-  isPaused?: boolean
+  /**
+   * Die Kaufsperre (Pause, keine Abholzeit, ausgebucht — kaufSperre, Register N24):
+   * Kauf-Schaltflächen und der Nachbestell-Link sind tot (Durchsetzung liegt am Server).
+   * Ohne Angabe keine Sperre.
+   */
+  sperre?: KaufSperre
+  /** Hofname und Pausen-Nachricht (Farm.pauseMessage) für den Hinweis zur Kaufsperre im Korb-Blatt. */
+  hofName: string
+  pauseMessage: string | null
   /**
    * Wechselt in die Kundenansicht — aus dem Bearbeitungsmodus der Hofseite
    * (bis Nr. 49 aus farm-page-client.tsx, wo `mode` lebte; seit Nr. 50 ohne
@@ -308,7 +314,7 @@ function ProductCard({
   isAddingId,
   ownerMode = false,
   isEditMode = false,
-  isPaused = false,
+  sperre = null,
   setzeSichtbarkeit,
 }: {
   product: PublicProduct
@@ -318,11 +324,11 @@ function ProductCard({
   isAddingId: string | null
   ownerMode?: boolean
   isEditMode?: boolean
-  isPaused?: boolean
+  sperre?: KaufSperre
   /** Vorgezogener Sichtbarkeitsstand im Eltern-Bauteil — nur im Bearbeitungsmodus. */
   setzeSichtbarkeit?: (imShop: boolean) => void
 }) {
-  const canBuy = zeigeKaufknopf(product, isPaused)
+  const canBuy = zeigeKaufknopf(product, sperre)
   const isAdding = isAddingId === product.id
   const zustand = produktZustand(product)
   const dim = isEditMode && !product.isAvailable ? 0.55 : 1
@@ -469,11 +475,7 @@ function ProductCard({
               className="w-full h-10 flex items-center justify-center rounded-lg text-xs px-2 text-center"
               style={{ background: 'color-mix(in srgb, var(--app-chip) 95%, transparent)', color: 'var(--app-chip-ink)' }}
             >
-              {isPaused
-                ? SHOP_PAUSED_BUTTON_LABEL
-                : !product.isAvailable
-                  ? product.unavailableReason || 'Nicht verfügbar'
-                  : 'Ausverkauft'}
+              {ruhenderKnopfText(kartenZustand(product, sperre))}
             </div>
           )}
         </div>
@@ -503,7 +505,9 @@ export function ProductGrid({
   initialReorderItems,
   ownerMode = false,
   mode = 'preview',
-  isPaused = false,
+  sperre = null,
+  hofName,
+  pauseMessage,
   onVorschau,
   kaufen = true,
   teil = 'alle',
@@ -602,8 +606,9 @@ export function ProductGrid({
     async function prefill() {
       let prefilled = false
       for (const ri of initialReorderItems!) {
+        // Dieselbe Regel wie der Kaufknopf: Mit Kaufsperre (N24) legt auch der Link nichts in den Korb.
         const product = products.find(
-          (p) => p.id === ri.productId && p.isAvailable && p.stock > 0,
+          (p) => p.id === ri.productId && zeigeKaufknopf(p, sperre),
         )
         if (!product) continue
         const result = await addItem(
@@ -703,7 +708,7 @@ export function ProductGrid({
     return (
       <ProduktKarte
         produkt={p}
-        zustand={kartenZustand(p, isPaused)}
+        zustand={kartenZustand(p, sperre)}
         imKorb={imKorb(p.id)}
         wirdHinzugefuegt={addingId === p.id}
         href={produktLink(p.id)}
@@ -757,7 +762,7 @@ export function ProductGrid({
           // eine Reihe aus drei Kacheln, ab lg wie bisher — die Anzahl je
           // Breite über Klassen (stehtNurAmHandy), nie gemessen.
           <ul className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-2 xl:grid-cols-3">
-            {uebersichtProdukte(displayProducts, isPaused, SCHAUFENSTER_PRODUKTE).map((p, i) => (
+            {uebersichtProdukte(displayProducts, sperre, SCHAUFENSTER_PRODUKTE).map((p, i) => (
               <li key={p.id} className={stehtNurAmHandy(i) ? 'md:hidden' : undefined}>
                 {karte(p)}
               </li>
@@ -835,7 +840,7 @@ export function ProductGrid({
                 isAddingId={addingId}
                 ownerMode={ownerMode}
                 isEditMode={isEditMode}
-                isPaused={isPaused}
+                sperre={sperre}
                 setzeSichtbarkeit={(imShop) => setzeVorgezogen({ id: p.id, imShop })}
               />
             </SortableProductCard>
@@ -847,7 +852,7 @@ export function ProductGrid({
               isAddingId={addingId}
               ownerMode={ownerMode}
               isEditMode={isEditMode}
-              isPaused={isPaused}
+              sperre={sperre}
               setzeSichtbarkeit={(imShop) => setzeVorgezogen({ id: p.id, imShop })}
             />
           )
@@ -898,6 +903,7 @@ export function ProductGrid({
           onRemoveItem={removeItem}
           gebuehrKorb={gebuehrKorb}
           futterHinweis={futterVerantwortungImKorb(items, products)}
+          kaufSperre={{ sperre, hofName, pauseMessage }}
         />
       )}
     </>

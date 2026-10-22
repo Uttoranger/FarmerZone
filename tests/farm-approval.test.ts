@@ -72,7 +72,7 @@ import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
 import { EMAIL_BESTAETIGUNG_STICHTAG, FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/lib/email-bestaetigung'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
-import { FREISCHALTUNG_GEAENDERT_TEXT, FREISCHALTUNG_STRIPE_OFFEN_TEXT } from '@/lib/admin-hoefe'
+import { FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT, FREISCHALTUNG_GEAENDERT_TEXT, FREISCHALTUNG_STRIPE_OFFEN_TEXT } from '@/lib/admin-hoefe'
 import { adminSitzung } from './admin-sitzung'
 
 /**
@@ -356,6 +356,8 @@ describe('Freigabe-Actions', () => {
       slug: 'testhof',
       // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
       products: [{ id: 'p_1' }],
+      // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
+      _count: { pickupSlots: 1 },
       stripeAccountReady: true,
       // Konto vor dem Stichtag, unbestätigt: bestehende Höfe bleiben unberührt (17b).
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: false },
@@ -378,6 +380,8 @@ describe('Freigabe-Actions', () => {
       slug: 'testhof',
       // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
       products: [{ id: 'p_1' }],
+      // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
+      _count: { pickupSlots: 1 },
       stripeAccountReady: true,
       // Konto vor dem Stichtag, unbestätigt: bestehende Höfe bleiben unberührt (17b).
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: false },
@@ -402,6 +406,8 @@ describe('Freigabe-Actions', () => {
       slug: 'testhof',
       // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
       products: [{ id: 'p_1' }],
+      // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
+      _count: { pickupSlots: 1 },
       stripeAccountReady: true,
       // Konto vor dem Stichtag, unbestätigt: bestehende Höfe bleiben unberührt (17b).
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: false },
@@ -421,6 +427,8 @@ describe('Freigabe-Actions', () => {
       slug: 'testhof',
       // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
       products: [{ id: 'p_1' }],
+      // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
+      _count: { pickupSlots: 1 },
       owner: { email: 'bauer@testhof.at', createdAt: new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() + 1), emailVerified: false },
     } as never)
 
@@ -438,6 +446,8 @@ describe('Freigabe-Actions', () => {
       slug: 'testhof',
       // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
       products: [{ id: 'p_1' }],
+      // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
+      _count: { pickupSlots: 1 },
       stripeAccountReady: true,
       owner: { email: 'bauer@testhof.at', createdAt: new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() + 1), emailVerified: true },
     } as never)
@@ -453,6 +463,8 @@ describe('Freigabe-Actions', () => {
       slug: 'testhof',
       // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
       products: [{ id: 'p_1' }],
+      // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
+      _count: { pickupSlots: 1 },
       stripeAccountReady: false,
       acceptsOnline: true,
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
@@ -472,6 +484,8 @@ describe('Freigabe-Actions', () => {
       slug: 'testhof',
       // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
       products: [{ id: 'p_1' }],
+      // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
+      _count: { pickupSlots: 1 },
       stripeAccountReady: false,
       acceptsOnline: false,
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
@@ -491,6 +505,8 @@ describe('Freigabe-Actions', () => {
       slug: 'testhof',
       // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
       products: [{ id: 'p_1' }],
+      // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
+      _count: { pickupSlots: 1 },
       stripeAccountReady: true,
       acceptsOnline: true,
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
@@ -516,6 +532,8 @@ describe('Freigabe-Actions', () => {
       slug: 'testhof',
       // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
       products: [{ id: 'p_1' }],
+      // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
+      _count: { pickupSlots: 1 },
       stripeAccountReady: true,
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
     } as never)
@@ -524,7 +542,28 @@ describe('Freigabe-Actions', () => {
 
     const arg = farmUpdateMany.mock.calls[0][0] as { where: Record<string, unknown> }
     expect(arg.where).toMatchObject({ id: 'farm_1', stripeAccountReady: true, approvedAt: null })
+    // Z1-Ergänzung (21.10.2026): auch die aktive Abholzeit steht in der Bedingung — schaltet der Hof
+    // seine letzte zwischen Lesen und Schreiben ab, trifft das Schreiben nichts.
+    expect(arg.where).toMatchObject({ pickupSlots: { some: { isActive: true } } })
     expect(farmUpdate).not.toHaveBeenCalled()
+  })
+
+  it('schaltet einen Hof ohne aktive Abholzeit NICHT frei (Z1-Ergänzung) — der Satz der Freigabe, nichts geschrieben', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    farmFindUnique.mockResolvedValue({
+      name: 'Testhof',
+      slug: 'testhof',
+      products: [{ id: 'p_1' }],
+      _count: { pickupSlots: 0 },
+      stripeAccountReady: true,
+      owner: { email: 'hof@example.com', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
+    } as never)
+
+    expect(await approveFarmAction('farm_1')).toEqual({ error: FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT })
+    expect(farmUpdateMany).not.toHaveBeenCalled()
+    // Gezählt werden nur aktive Abholzeiten — dieselbe Bedingung wie Hofliste und Kasse.
+    const arg = farmFindUnique.mock.calls[0][0] as { select: { _count: unknown } }
+    expect(arg.select._count).toEqual({ select: { pickupSlots: { where: { isActive: true } } } })
   })
 
   it('trifft das bedingte Schreiben nichts (Stripe inzwischen weg oder schon frei), kommt eine Meldung — keine Mail', async () => {
@@ -534,6 +573,8 @@ describe('Freigabe-Actions', () => {
       slug: 'testhof',
       // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
       products: [{ id: 'p_1' }],
+      // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
+      _count: { pickupSlots: 1 },
       stripeAccountReady: true,
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
     } as never)
@@ -562,6 +603,8 @@ describe('Freigabe-Actions', () => {
       slug: 'testhof',
       // Seit Nr. 116: mindestens ein Produkt im Shop (Register K2).
       products: [{ id: 'p_1' }],
+      // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
+      _count: { pickupSlots: 1 },
       stripeAccountReady: false,
       owner: { email: 'bauer@testhof.at', createdAt: new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() + 1), emailVerified: false },
     } as never)

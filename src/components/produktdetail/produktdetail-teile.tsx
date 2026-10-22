@@ -90,7 +90,8 @@ export function GleichMitAbholen({
       </div>
       <ul className="grid gap-3 sm:grid-cols-3">
         {produkte.map((p) => {
-          const kaufbar = zeigeKaufknopf(p, false)
+          // Ohne Sperre: Mit Kaufsperre ist die Liste leer (gleichMitAbholen, N24), hier zählt nur der Vorrat.
+          const kaufbar = zeigeKaufknopf(p, null)
           const alles = imKorb(p.id) >= p.stock
           return (
             <li key={p.id}>

@@ -10,7 +10,7 @@
  * Gebührensatz in servicegebuehr.ts.
  */
 import { formatEuro, formatZahl, mitAnzahl } from '@/lib/format'
-import { zeigeKaufknopf } from '@/lib/bereiche-anzeige'
+import { zeigeKaufknopf, type KaufSperre } from '@/lib/bereiche-anzeige'
 import { calcLineTotal, decimalZuCents } from '@/lib/order-totals'
 import { BAR_OHNE_GEBUEHR_HINWEIS } from '@/lib/konditionen'
 import {
@@ -133,17 +133,17 @@ export function alleProdukteText(anzahl: number): string {
  */
 export function uebersichtProdukte<P extends { isAvailable: boolean; stock: number }>(
   produkte: readonly P[],
-  isPaused: boolean,
+  sperre: KaufSperre,
   anzahl: number = UEBERSICHT_PRODUKTE
 ): P[] {
-  const kaufbar = produkte.filter((p) => zeigeKaufknopf(p, isPaused))
-  const rest = produkte.filter((p) => !zeigeKaufknopf(p, isPaused))
+  const kaufbar = produkte.filter((p) => zeigeKaufknopf(p, sperre))
+  const rest = produkte.filter((p) => !zeigeKaufknopf(p, sperre))
   return [...kaufbar, ...rest].slice(0, anzahl)
 }
 
-/** „10 verfügbar" — wie viele man gerade in den Korb legen kann. */
-export function verfuegbarText(produkte: readonly { isAvailable: boolean; stock: number }[], isPaused: boolean): string | null {
-  const n = produkte.filter((p) => zeigeKaufknopf(p, isPaused)).length
+/** „10 verfügbar" — wie viele man gerade in den Korb legen kann; mit Kaufsperre (N24) keins. */
+export function verfuegbarText(produkte: readonly { isAvailable: boolean; stock: number }[], sperre: KaufSperre): string | null {
+  const n = produkte.filter((p) => zeigeKaufknopf(p, sperre)).length
   return n > 0 ? `${formatZahl(n)} verfügbar` : null
 }
 
@@ -456,7 +456,7 @@ export function beitragProdukte<P extends { id: string; isAvailable: boolean; st
   const nachId = new Map(produkte.map((p) => [p.id, p]))
   const verknuepft = linkedProductIds.flatMap((id) => {
     const produkt = nachId.get(id)
-    return produkt ? [{ produkt, ausverkauft: !zeigeKaufknopf(produkt, false) }] : []
+    return produkt ? [{ produkt, ausverkauft: !zeigeKaufknopf(produkt, null) }] : []
   })
   return [...verknuepft.filter((z) => !z.ausverkauft), ...verknuepft.filter((z) => z.ausverkauft)].slice(0, AKTUELL_PRODUKTE_MAX)
 }

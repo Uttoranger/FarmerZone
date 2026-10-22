@@ -52,6 +52,8 @@ function dbZeile(overrides: Record<string, unknown> = {}) {
     _count: { products: 3, farmPhotos: 2, pickupSlots: 1 },
     // Seit Nr. 116: ob ein Produkt im Shop ist (Freischalten).
     products: [{ id: 'p_1' }],
+    // Seit der Z1-Ergänzung (21.10.2026): ob es eine aktive Abholzeit gibt.
+    pickupSlots: [{ id: 's_1' }],
     ...overrides,
   }
 }
@@ -68,6 +70,7 @@ function leereZeile(overrides: Record<string, unknown> = {}) {
     _count: { products: 0, farmPhotos: 0, pickupSlots: 0 },
     // Seit Nr. 116: ob ein Produkt im Shop ist (Freischalten).
     products: [],
+    pickupSlots: [],
     ...overrides,
   })
 }

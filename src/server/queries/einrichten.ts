@@ -48,6 +48,8 @@ export async function ladeEinrichtenHof(ownerId: string): Promise<EinrichtenHof 
     hofseite: { erledigt: fortschritt.erledigt, gesamt: fortschritt.gesamt, fehlend: fortschritt.fehlend },
     produkte,
     stripeBereit: farm.stripeAccountReady,
+    // getOwnerFarm liefert nur aktive Abholzeiten — dieselbe Bedingung wie approveFarmAction (Z1-Ergänzung).
+    abholzeitAktiv: farm.pickupSlots.length > 0,
     freigeschaltet: hof.approvedAt !== null,
   }
 }

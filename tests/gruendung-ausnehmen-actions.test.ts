@@ -209,6 +209,8 @@ describe('approveFarmAction nimmt dieselbe Sperre', () => {
       owner: { email: 'hof@example.com', emailVerified: true, createdAt: new Date('2026-01-01T00:00:00Z') },
       // Seit Nr. 116: mindestens ein Produkt im Shop.
       products: [{ id: 'p_1' }],
+      // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
+      _count: { pickupSlots: 1 },
     })
   })
 
@@ -221,7 +223,7 @@ describe('approveFarmAction nimmt dieselbe Sperre', () => {
     expect(sperre).toBeLessThan(schreiben)
     expect(schreiben).toBeLessThan(db.farm.findMany.mock.invocationCallOrder[0] ?? 0)
     expect(db.farm.updateMany).toHaveBeenCalledWith({
-      where: { id: 'neu', stripeAccountReady: true, approvedAt: null, products: { some: { isAvailable: true } } },
+      where: { id: 'neu', stripeAccountReady: true, approvedAt: null, products: { some: { isAvailable: true } }, pickupSlots: { some: { isActive: true } } },
       data: { approvedAt: expect.any(Date) },
     })
     // Mit Platz (2 von 12): die eine Gründungs-Nachricht.

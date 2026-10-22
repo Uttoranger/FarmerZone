@@ -157,7 +157,7 @@ describe('approveFarmAction nach dem Festschreiben', () => {
     einstellung(FEST)
     db.farm.findUnique.mockImplementation(async ({ select }: { select: Record<string, unknown> }) =>
       'owner' in select
-        ? { name: 'Testhof A', slug: 'testhof-a', stripeAccountReady: true, products: [{ id: 'p_1' }], owner: { email: 'hof@example.com', emailVerified: true, createdAt: new Date('2026-01-01T00:00:00Z') } }
+        ? { name: 'Testhof A', slug: 'testhof-a', stripeAccountReady: true, products: [{ id: 'p_1' }], _count: { pickupSlots: 1 }, owner: { email: 'hof@example.com', emailVerified: true, createdAt: new Date('2026-01-01T00:00:00Z') } }
         : { gruendungPlatz: null, gruendungBis: null, gruendungAusgenommen: false }
     )
   })
@@ -177,7 +177,7 @@ describe('approveFarmAction nach dem Festschreiben', () => {
   it('erneute Freigabe nach Entzug: Platz und Ende bleiben, nichts daran geschrieben', async () => {
     db.farm.findUnique.mockImplementation(async ({ select }: { select: Record<string, unknown> }) =>
       'owner' in select
-        ? { name: 'Testhof A', slug: 'testhof-a', stripeAccountReady: true, products: [{ id: 'p_1' }], owner: { email: 'hof@example.com', emailVerified: true, createdAt: new Date('2026-01-01T00:00:00Z') } }
+        ? { name: 'Testhof A', slug: 'testhof-a', stripeAccountReady: true, products: [{ id: 'p_1' }], _count: { pickupSlots: 1 }, owner: { email: 'hof@example.com', emailVerified: true, createdAt: new Date('2026-01-01T00:00:00Z') } }
         : { gruendungPlatz: 7, gruendungBis: new Date('2029-04-30T00:00:00.000Z'), gruendungAusgenommen: false }
     )
     db.farm.findMany.mockResolvedValue([hof(1, { gruendungPlatz: 1 })])
@@ -188,7 +188,7 @@ describe('approveFarmAction nach dem Festschreiben', () => {
   it('Platz ohne gespeichertes Ende: die Nachricht nennt das Ende der Konditionen (Standard), nichts geschrieben', async () => {
     db.farm.findUnique.mockImplementation(async ({ select }: { select: Record<string, unknown> }) =>
       'owner' in select
-        ? { name: 'Testhof A', slug: 'testhof-a', stripeAccountReady: true, products: [{ id: 'p_1' }], owner: { email: 'hof@example.com', emailVerified: true, createdAt: new Date('2026-01-01T00:00:00Z') } }
+        ? { name: 'Testhof A', slug: 'testhof-a', stripeAccountReady: true, products: [{ id: 'p_1' }], _count: { pickupSlots: 1 }, owner: { email: 'hof@example.com', emailVerified: true, createdAt: new Date('2026-01-01T00:00:00Z') } }
         : { gruendungPlatz: 7, gruendungBis: null, gruendungAusgenommen: false }
     )
     db.farm.findMany.mockResolvedValue([hof(1, { gruendungPlatz: 1 }), hof(9, { id: 'neu', gruendungPlatz: 7 })])

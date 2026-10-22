@@ -44,7 +44,7 @@ const T = AKTUELL_VOM_HOF_TEXT
 type ProduktWeg = {
   /** Die Produktliste der Hofseite (im Shop) — „Dazu im Hofladen“ nimmt nur daraus. */
   produkte: readonly PublicProduct[]
-  /** „+“ nur, wo Kaufen wirkt und der Hof nicht pausiert — wie bei allen Kaufwegen. */
+  /** „+“ nur, wo Kaufen wirkt und keine Kaufsperre gilt (kaufSperre: Pause, keine Abholzeit, ausgebucht — N24) — wie bei allen Kaufwegen. */
   mitPlus: boolean
   onInDenKorb: InDenKorb
   /** Die Produktseite (in der Vorschau des Hofs bleibt sie in der Vorschau). */
