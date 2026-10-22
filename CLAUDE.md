@@ -159,7 +159,8 @@ Eine Regel hier widerlegt? **Nicht heimlich abweichen** — melden.
 - **Gefährliche Befehle werden blockiert** (`prisma db push`, Force-Push,
   `.env` committen, Push auf `main`, Commit auf `main`, Push aller Branches mit `--all`/`--mirror`,
   `git stash`, `prettier --write`, `npm install`, `yarn add`/`yarn install`, rekursives Löschen von
-  /, ~, $HOME, ., .. oder *, Commit ohne erlaubtes Präfix, `prisma migrate deploy` ohne
+  /, ~, $HOME, $PWD, ., .., * oder einer Befehlsersetzung, Commit ohne erlaubtes Präfix,
+  `docs:`-Commit mit Code, `prisma migrate deploy` ohne
   `DATABASE_URL` und `DIRECT_URL` auf localhost im selben Befehl).
 - **Ein Zug endet nicht bei rotem Typecheck, rotem Lint oder roten Tests.**
 

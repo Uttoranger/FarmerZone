@@ -7,7 +7,7 @@
  * Geld oder Daten kostet und nicht zurücknehmbar ist.
  */
 import { execFileSync } from 'node:child_process'
-import { readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 let eingabe = ''
@@ -77,8 +77,10 @@ function ersetzungsEnde(text, von, schluss) {
 }
 
 /**
- * Zerlegt eine Befehlszeile wie die Shell in einfache Befehle. Jeder ist `{ woerter, ersetzungen, tiefe }`:
+ * Zerlegt eine Befehlszeile wie die Shell in einfache Befehle. Jeder ist `{ woerter, ersetzungen, tiefe, ersetzungFolgt }`:
  * seine Wörter ohne Anführungszeichen, die Texte der Befehlsersetzungen in seinen Wörtern und die Klammerstufe.
+ * `ersetzungFolgt` sagt, dass der Befehl an einer Ersetzung OHNE Anführungszeichen endet (`rm -rf $(pwd)`, auch mit
+ * Gravis): Ihr Ergebnis wäre sein nächstes Wort, das die Zerlegung sonst verlöre (Nr. 146).
  * Getrennt wird außerhalb von Anführungszeichen an ; & | ( ) Gravis und Zeilenwechsel; ein # am Wortanfang
  * beginnt einen Kommentar. Ein Text in Anführungszeichen bleibt ein Wort (`sh -c "a; b"` ist ein Befehl mit einem
  * Text als Argument) — aber `$(…)` und Gravis darin führt die Shell aus: ihr Inhalt steht in `ersetzungen` und
@@ -97,9 +99,9 @@ function einfacheBefehle(text) {
     if (wort !== null) woerter.push(wort)
     wort = null
   }
-  const befehlEnde = () => {
+  const befehlEnde = (ersetzungFolgt = false) => {
     wortEnde()
-    if (woerter.length > 0) befehle.push({ woerter, ersetzungen, tiefe })
+    if (woerter.length > 0) befehle.push({ woerter, ersetzungen, tiefe, ersetzungFolgt })
     woerter = []
     ersetzungen = []
   }
@@ -127,7 +129,7 @@ function einfacheBefehle(text) {
     } else if (z === '#' && wort === null) {
       while (i + 1 < text.length && text[i + 1] !== '\n') i++
     } else if (z === '\n' || ';&|()`'.includes(z)) {
-      befehlEnde()
+      befehlEnde((z === '(' && (wort ?? '').endsWith('$')) || (z === '`' && !gravisOffen))
       if (z === '(' || (z === '`' && !gravisOffen)) tiefe++
       else if (z === ')' || z === '`') tiefe = Math.max(0, tiefe - 1)
       if (z === '`') gravisOffen = !gravisOffen
@@ -249,9 +251,19 @@ const LOESCH_ZIELE = new Set(['.', '..', './', '../', './*', '.*'])
 // (`${HOME:?}`, `${HOME:-…}`); `${HOME:+…}` ist nicht der Heimatordner.
 const HEIMATORDNER = /^\$(?:HOME|\{HOME(?::?[-?=][^}]*)?\})(?:\/|$)/
 
+// `$PWD`, `${PWD}` und `$OLDPWD` (auch mit Ersatzwert) sind der aktuelle bzw. vorige Ordner, womöglich das ganze
+// Repository (Nr. 146). Die Gruppe hält, was nach den Schrägstrichen folgt: Mit festem Unterordner zählt nur er.
+const ARBEITSORDNER = /^\$(?:(?:OLD)?PWD|\{(?:OLD)?PWD(?::?[-?=][^}]*)?\})(?:\/+([\s\S]*))?$/
+
 // Ein Ziel, das mit `*` beginnt (`*`, `*/`, `*.log`), blockte schon das Muster vor Nr. 138; das bleibt so (Runde 1).
-const istGeschuetztesZiel = (ziel) =>
-  ziel.startsWith('/') || ziel.startsWith('~') || ziel.startsWith('*') || HEIMATORDNER.test(ziel) || LOESCH_ZIELE.has(ziel)
+// Ein Ziel mit Befehlsersetzung (`"$(pwd)"`, Gravis) ist geschützt: Was sie liefert, sieht der Hook nicht (Nr. 146).
+function istGeschuetztesZiel(ziel) {
+  if (ziel.startsWith('/') || ziel.startsWith('~') || ziel.startsWith('*') || HEIMATORDNER.test(ziel) || LOESCH_ZIELE.has(ziel)) return true
+  if (ziel.includes('$(') || ziel.includes('`')) return true
+  const ordner = ARBEITSORDNER.exec(ziel)
+  // `"$PWD/.next"` gilt wie `.next`, `"$PWD/"` und `"$PWD/."` wie der Ordner selbst.
+  return ordner !== null && (!ordner[1] || istGeschuetztesZiel(ordner[1]))
+}
 
 /**
  * Löscht `befehl` irgendwo rekursiv ein geschütztes Ziel (Nr. 138, Inventur 5)? Rekursiv ist `rm` mit `r` oder `R`
@@ -263,7 +275,7 @@ const istGeschuetztesZiel = (ziel) =>
  * Option bis `--`. Eine Umleitung (`> /dev/null`) ist kein Ziel.
  */
 function rekursivesLoeschen(befehl) {
-  for (const { woerter: alle } of einfacheBefehle(befehl)) {
+  for (const { woerter: alle, ersetzungFolgt } of einfacheBefehle(befehl)) {
     // Ein Wort mit Leerraum stand in Anführungszeichen oder ist eine Ersetzung: selbst als Befehl prüfen.
     if (alle.some((wort) => /\s/.test(wort) && rekursivesLoeschen(wort))) return true
     const stelle = alle.findIndex((wort) => basename(wort) === 'rm')
@@ -283,7 +295,8 @@ function rekursivesLoeschen(befehl) {
       } else if (optionenOffen && /^-./.test(wort)) rekursiv ||= /[rR]/.test(wort)
       else if (wort) ziele.push(wort)
     }
-    if (rekursiv && ziele.some(istGeschuetztesZiel)) return true
+    // Endet der Befehl an einer Ersetzung ohne Anführungszeichen, ist ihr Ergebnis ein weiteres Ziel (Nr. 146).
+    if (rekursiv && (ersetzungFolgt || ziele.some(istGeschuetztesZiel))) return true
   }
   return false
 }
@@ -320,7 +333,8 @@ const regeln = [
   {
     // Ein Ziel mit + davor (`git push origin +feature`) überschreibt die Historie wie --force (Nr. 138).
     // Wie die Regeln für main und --all auch mit globalen Optionen davor (`git -C <ordner> push …`).
-    muster: new RegExp(GIT + String.raw`push\b[^|;&]*(?:--force(?!-with-lease)|\s-f\b|\s["']?\+(?=[^\s"']))`),
+    // Force steckt auch in einer Gruppe kurzer Optionen (`-uf`, `-fu`, `-vf`; Nr. 146); `--force-with-lease` bleibt frei.
+    muster: new RegExp(GIT + String.raw`push\b[^|;&]*(?:--force(?!-with-lease)|\s-[A-Za-z]*f[A-Za-z]*\b|\s["']?\+(?=[^\s"']))`),
     grund:
       'Force-Push überschreibt Historie auf einem öffentlichen Repo. Nicht ohne ' +
       'ausdrückliche Anweisung des Menschen.',
@@ -369,8 +383,13 @@ const ohneAnfuehrung = (t) => t.replace(/^["']|["']$/g, '')
  */
 function ordnerDesCommits(befehl, treffer, arbeitsordner) {
   const optionC = treffer[1].match(/-C\s+(\S+)/)
-  const cdOrdner = [...befehl.slice(0, treffer.index).matchAll(/(?:^|[;&|(\n])\s*cd\s+(\S+)/g)].pop()?.[1]
-  return resolve(arbeitsordner, ohneAnfuehrung(cdOrdner ?? '.'), ohneAnfuehrung(optionC?.[1] ?? '.'))
+  return resolve(ordnerVor(befehl, treffer.index, arbeitsordner), ohneAnfuehrung(optionC?.[1] ?? '.'))
+}
+
+/** Der Ordner an dieser Stelle des Befehls: das letzte `cd <ordner>` davor, sonst der Arbeitsordner des Aufrufs. */
+function ordnerVor(befehl, stelle, arbeitsordner) {
+  const cdOrdner = [...befehl.slice(0, stelle).matchAll(/(?:^|[;&|(\n])\s*cd\s+(\S+)/g)].pop()?.[1]
+  return resolve(arbeitsordner, ohneAnfuehrung(cdOrdner ?? '.'))
 }
 
 /**
@@ -473,10 +492,154 @@ function ersteNachrichtenZeile(woerter, befehl, stelle, ordner) {
 function commitOhnePraefix(befehl, arbeitsordner) {
   for (const treffer of befehl.matchAll(COMMIT)) {
     const stelle = treffer.index + treffer[0].length
-    // Die Wörter des Commits bis zum Ende seines einfachen Befehls; das vorangestellte x steht für „commit“.
-    const woerter = einfacheBefehle('x' + befehl.slice(stelle))[0].woerter.slice(1)
+    const woerter = commitWoerter(befehl, stelle)
     const zeile = ersteNachrichtenZeile(woerter, befehl, stelle, ordnerDesCommits(befehl, treffer, arbeitsordner))
     if (zeile && !ERLAUBTE_PRAEFIXE.some((praefix) => zeile.startsWith(praefix))) return true
+  }
+  return false
+}
+
+// Die Wörter des Commits bis zum Ende seines einfachen Befehls; das vorangestellte x steht für „commit“.
+const commitWoerter = (befehl, stelle) => einfacheBefehle('x' + befehl.slice(stelle))[0].woerter.slice(1)
+
+// Optionen von git commit mit Wert: kurz als Rest der Gruppe oder nächstes Wort, kurz nur angehängt, lang.
+const COMMIT_WERT_KURZ = 'mFCct'
+const COMMIT_WERT_ANGEHAENGT = 'uS'
+const COMMIT_WERT_LANG = new Set(['message', 'file', 'author', 'date', 'reuse-message', 'reedit-message', 'fixup', 'squash', 'template', 'cleanup', 'trailer', 'pathspec-from-file'])
+
+/**
+ * Pfade und Schalter in den Wörtern eines `git commit`: `pfade` sind die Wörter, die keine Option und kein Wert
+ * einer Option sind (`-F nachricht-docs.txt` nennt keinen Pfad), `alle` steht für `-a`/`--all`, `dazu` für
+ * `-i`/`--include` (dann zählen die vorgemerkten Dateien neben den Pfaden). Eine Umleitung ist kein Pfad.
+ */
+function commitPfade(woerter) {
+  const pfade = []
+  let alle = false
+  let dazu = false
+  let optionenOffen = true
+  for (let i = 0; i < woerter.length; i++) {
+    const wort = woerter[i]
+    if (!optionenOffen) pfade.push(wort)
+    else if (wort === '--') optionenOffen = false
+    else if (/^\d*[<>]/.test(wort)) {
+      if (/^\d*[<>]+$/.test(wort)) i++
+    } else if (wort.startsWith('--')) {
+      const name = wort.slice(2).split('=')[0]
+      alle ||= name === 'all'
+      dazu ||= name === 'include'
+      if (COMMIT_WERT_LANG.has(name) && !wort.includes('=')) i++
+    } else if (/^-./.test(wort)) {
+      for (let k = 1; k < wort.length; k++) {
+        alle ||= wort[k] === 'a'
+        dazu ||= wort[k] === 'i'
+        if (COMMIT_WERT_ANGEHAENGT.includes(wort[k])) break
+        if (COMMIT_WERT_KURZ.includes(wort[k])) {
+          if (k === wort.length - 1) i++
+          break
+        }
+      }
+    } else pfade.push(wort)
+  }
+  return { pfade, alle, dazu }
+}
+
+/**
+ * Die Pfade der `git add` im Befehl vor `bis`, absolut — oder `[]` für `git add -A` ohne Pfad (das ganze Repository).
+ * Ein relativer Pfad gilt ab dem Ordner des `git add` (`-C`, sonst `basis`). `-u` und `-p` zählen nicht (bekannte Lücke).
+ */
+function hinzugefuegtePfade(befehl, bis, basis) {
+  const gruppen = []
+  for (const { woerter: alle } of einfacheBefehle(befehl.slice(0, bis))) {
+    let k = 0
+    while (k < alle.length && zuweisung(alle[k])) k++
+    if (basename(alle[k] ?? '') !== 'git') continue
+    let ordner = basis
+    for (k++; k < alle.length && alle[k].startsWith('-'); k++) {
+      if (alle[k] === '-C') ordner = resolve(ordner, alle[++k] ?? '.')
+      else if (alle[k] === '-c') k++
+    }
+    if (alle[k] !== 'add') continue
+    const pfade = []
+    let ganz = false
+    let optionenOffen = true
+    for (const wort of alle.slice(k + 1)) {
+      if (optionenOffen && wort === '--') optionenOffen = false
+      else if (optionenOffen && /^-./.test(wort)) ganz ||= wort === '-A' || wort === '--all' || wort === '--no-ignore-removal'
+      else if (!/^\d*[<>]/.test(wort)) pfade.push(resolve(ordner, wort))
+    }
+    if (pfade.length > 0) gruppen.push(pfade)
+    else if (ganz) gruppen.push([])
+  }
+  return gruppen
+}
+
+/** Ruft git im Ordner auf: ohne optionale Sperren (der Hook läuft neben anderen git-Aufrufen), Meldungen auf Englisch. */
+function gitAusgabe(ordner, args) {
+  return execFileSync('git', ['-C', ordner, ...args], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', LC_ALL: 'C' },
+  })
+}
+
+/** Die Pfade aus `git status --porcelain -z` (relativ zur Wurzel); bei Umbenennungen steht der alte Name dahinter. */
+function statusPfade(ordner, args) {
+  const felder = gitAusgabe(ordner, ['status', '--porcelain', '-z', ...args]).split('\0')
+  const pfade = []
+  for (let i = 0; i < felder.length; i++) {
+    if (!felder[i]) continue
+    pfade.push(felder[i].slice(3))
+    if (felder[i][0] === 'R' || felder[i][0] === 'C') i++
+  }
+  return pfade
+}
+
+const namensListe = (text) => text.split('\0').filter(Boolean)
+
+/**
+ * Die Dateien, die dieser Commit trägt (relativ zur Wurzel) — oder null bei einem Merge-Commit. Nennt der Befehl Pfade,
+ * committet git nur diese (`--only`); sonst die vorgemerkten, bei `-a` dazu die geänderten verfolgten. Dazu kommen die
+ * Dateien eines `git add` davor, die beim Prüfen noch nicht vorgemerkt sind. Wirft, wenn git sie nicht nennen kann.
+ */
+function dateienDesCommits(woerter, befehl, treffer, ordner, basis) {
+  if (existsSync(resolve(ordner, gitAusgabe(ordner, ['rev-parse', '--git-path', 'MERGE_HEAD']).trim()))) return null
+  const { pfade, alle, dazu } = commitPfade(woerter)
+  const hinzu = new Set(hinzugefuegtePfade(befehl, treffer.index, basis).flatMap((p) => statusPfade(ordner, p.length ? ['--', ...p] : [])))
+  if (pfade.length > 0 && !dazu) {
+    // Nur was zugleich unter den Pfaden des Commits liegt, kommt aus dem `git add` in den Commit.
+    const unterPfaden = statusPfade(ordner, ['--', ...pfade])
+    return [...statusPfade(ordner, ['--untracked-files=no', '--', ...pfade]), ...unterPfaden.filter((p) => hinzu.has(p))]
+  }
+  const dateien = [...namensListe(gitAusgabe(ordner, ['diff', '--cached', '--name-only', '-z'])), ...hinzu]
+  if (alle) dateien.push(...namensListe(gitAusgabe(ordner, ['diff', '--name-only', '-z'])))
+  if (dazu) dateien.push(...statusPfade(ordner, ['--untracked-files=no', '--', ...pfade]))
+  return dateien
+}
+
+// Doku ist, was unter docs/ liegt oder auf .md endet (Bilder der Berichte liegen unter docs/).
+const istDoku = (datei) => datei.startsWith('docs/') || datei.endsWith('.md')
+
+/**
+ * Trägt ein `git commit`, dessen Nachricht mit `docs:` beginnt, eine Datei, die keine Doku ist (Nr. 146, Regelvorschlag
+ * Dirigent 3)? Der Hook ist eine Hilfe gegen Versehen, keine CI prüft den Inhalt: Außerhalb eines Repositorys und bei
+ * einem Merge-Commit gibt es nichts zu prüfen; kann git die Dateien nicht nennen, geht der Commit mit Grund auf stderr durch.
+ */
+function docsCommitMitCode(befehl, arbeitsordner) {
+  for (const treffer of befehl.matchAll(COMMIT)) {
+    const stelle = treffer.index + treffer[0].length
+    const woerter = commitWoerter(befehl, stelle)
+    const ordner = ordnerDesCommits(befehl, treffer, arbeitsordner)
+    if (!ersteNachrichtenZeile(woerter, befehl, stelle, ordner)?.startsWith('docs:')) continue
+    let dateien
+    try {
+      dateien = dateienDesCommits(woerter, befehl, treffer, ordner, ordnerVor(befehl, treffer.index, arbeitsordner))
+    } catch (fehler) {
+      if (!/not a git repository/i.test(String(fehler?.stderr ?? ''))) {
+        console.error(`Hinweis: Der Hook konnte die Dateien für den docs:-Commit nicht bestimmen (${fehler?.code ?? 'git-Fehler'}); er lässt ihn durch.`)
+      }
+      continue
+    }
+    if (dateien?.some((datei) => !istDoku(datei))) return true
   }
   return false
 }
@@ -517,6 +680,13 @@ if (branchDesCommits(geprueft, arbeitsordner) === 'main') {
 // Nach der Prüfung auf main: Ein Commit auf main behält seinen eigenen Grund, auch ohne Präfix.
 if (commitOhnePraefix(geprueft, arbeitsordner)) {
   console.error('Blockiert: Commit-Texte beginnen mit feat:, fix:, docs:, chore:, refactor: oder WIP: (CLAUDE.md §5).')
+  process.exit(2)
+}
+
+if (docsCommitMitCode(geprueft, arbeitsordner)) {
+  console.error(
+    'Blockiert: Ein docs:-Commit trägt nur Doku (Dateien unter docs/ oder .md). Code gehört in einen fix:-, feat:- oder chore:-Commit.'
+  )
   process.exit(2)
 }
 process.exit(0)

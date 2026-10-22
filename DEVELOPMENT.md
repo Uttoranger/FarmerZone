@@ -5667,6 +5667,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Korb-Blatt:** Mit Sperre stehen keine Knöpfe „eins mehr“/„eins weniger“ mehr, die Menge steht nur als Zahl, Entfernen bleibt — jeder Tipp hätte sonst eine Ablehnung gebracht. Zeilensumme und Hinweis im Fuß unverändert.
 - **Nacharbeit:** `istBestellbar` liest `abholfenster` jetzt als `readonly AbholFenster[]`, der Kommentar sagt, dass ein Hof mit aktiven Abholzeiten trotzdem ausgebucht sein kann (N19-Ergänzung). In ARCHITECTURE.md steht der Satz zur sofortigen Erneuerung der Hofliste hinter dem Satz „… leeren beide (…)“.
 
+## Hook: Force in Gruppen, Ersetzung als Löschziel, `docs:` nur mit Doku (Register G4; Nr. 146, Lauf 22, 22.10.2026)
+
+- **Force:** Eine Gruppe kurzer Optionen von `git push` mit `f` (`-uf`, `-fu`, `-vf`) zählt als Force; `--force-with-lease` bleibt frei, `--force-if-includes` blockt wie bisher.
+- **Löschziel:** Ein Ziel mit Befehlsersetzung (`"$(pwd)"`, Gravis) ist geschützt, ebenso `$PWD`, `${PWD}` und `$OLDPWD` allein oder mit `/`; mit festem Unterordner zählt nur er (`"$PWD/.next"` wie `.next`). Ohne Anführungszeichen trennt der Zerleger an `(` und am Gravis — darum merkt sich ein einfacher Befehl, dass er an einer Ersetzung endet (`ersetzungFolgt`); die übrigen Regeln lesen das Feld nicht.
+- **`docs:` nur mit Doku:** Beginnt die erste Zeile mit `docs:`, liest der Hook die Dateien des Commits über git: Pfade im Befehl (dann nur sie, wie `--only`), sonst die vorgemerkten, bei `-a` die geänderten verfolgten, dazu die aus einem `git add` davor. Doku ist, was unter `docs/` liegt oder auf `.md` endet. Merge-Commits und Ordner ohne Repository sind ausgenommen; kann git die Dateien nicht nennen, geht der Commit mit Hinweis auf stderr durch. Lücken: `git add -u`/`-p`, `git rm` und `--amend` im selben Befehl. Anlass: ein `docs:`-Commit mit einer Lint-Korrektur in Lauf 21.
+- **Gegenprobe als Testhilfe:** `tests/gefahr-blocken.test.ts` nimmt den Hook aus `GEFAHR_HOOK`, sonst den echten; die Regel steht in TESTING_GUIDELINES §2.
+
 ## Nützliche Befehle
 
 ```bash
