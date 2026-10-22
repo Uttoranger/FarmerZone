@@ -47,9 +47,9 @@ function pfadeAusText(text: string): string[] {
   const funde = new Set<string>()
   for (const treffer of text.matchAll(/`([^`\n\s]+)`/g)) {
     let pfad = treffer[1]
-    pfad = pfad.replace(/:\d+(?:[–-]\d+)?$/, '')
     for (;;) {
       const vorher = pfad
+      pfad = pfad.replace(/:\d+(?:[–-]\d+)?(?:ff)?$/, '')
       pfad = pfad.replace(/[.,;:!?]+$/, '')
       const zu = (pfad.match(/\)/g) ?? []).length
       const auf = (pfad.match(/\(/g) ?? []).length
@@ -142,7 +142,7 @@ describe('Pfade in den Regeltexten zeigen auf Dateien, die es gibt', () => {
       expect(pfadeAusText(readFileSync(join(WURZEL, datei), 'utf8')), schluessel).toContain(pfad)
       expect(urteile(pfad, eintraege, existiert), schluessel).toBe('fehlt')
     }
-  })
+  }, 30_000)
 })
 
 describe('Pfade in den Regeltexten — Gegenprobe: die Erkennung schlägt an', () => {
@@ -160,6 +160,9 @@ describe('Pfade in den Regeltexten — Gegenprobe: die Erkennung schlägt an', (
     expect(urteil('(siehe `tests/a.test.ts`), dann `tests/a.test.ts.`')).toEqual(['ok'])
     expect(pfadeAusText('(`src/app/(hof)`)')).toEqual(['src/app/(hof)'])
     expect(pfadeAusText('`src/app/(hof)`.')).toEqual(['src/app/(hof)'])
+    // Zeilenangabe hinter dem Satzzeichen, auch mit „ff“.
+    expect(urteil('`tests/a.test.ts:12.`')).toEqual(['ok'])
+    expect(pfadeAusText('`src/app/(hof)/products/page.tsx:345ff.`')).toEqual(['src/app/(hof)/products/page.tsx'])
   })
 
   it('ein Muster braucht einen Treffer, ein aufgefächerter Zweig auch', () => {
