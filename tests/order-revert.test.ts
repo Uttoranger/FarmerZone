@@ -69,7 +69,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   nachlauf.length = 0
   getSession.mockResolvedValue({ user: { id: 'user_1' } } as never)
-  farmFindUnique.mockResolvedValue({ id: 'farm_1', name: 'Testhof', slug: 'testhof', email: 'hof@test.local', ownerName: 'Franz', address: 'Weg 1', postalCode: '5270', city: 'Mauerkirchen', phone: '' } as never)
+  farmFindUnique.mockResolvedValue({ id: 'farm_1', name: 'Testhof', slug: 'testhof', email: 'hof@test.local', ownerName: 'Franz', address: 'Weg 1', postalCode: '4020', city: 'Linz', phone: '' } as never)
   orderUpdate.mockResolvedValue({} as never)
   orderUpdateMany.mockResolvedValue({ count: 1 } as never)
 })

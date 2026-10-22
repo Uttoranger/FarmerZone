@@ -48,7 +48,7 @@ function treffer(lat: string, lon: string, name: string, land?: string) {
 
 describe('istPostleitzahl — vier oder fünf Stellen', () => {
   it('österreichische PLZ (vier Stellen) und deutsche PLZ (fünf Stellen)', () => {
-    expect(istPostleitzahl('5261')).toBe(true) //  Uttendorf, AT
+    expect(istPostleitzahl('4020')).toBe(true) //  Linz, AT
     expect(istPostleitzahl('84359')).toBe(true) // Simbach am Inn, DE
   })
 
