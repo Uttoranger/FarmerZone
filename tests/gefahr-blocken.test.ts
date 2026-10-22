@@ -20,9 +20,16 @@
  * Prozess-Verzeichnisses — beim Push auf main steht dort der Checkout der CI
  * auf main, und die erlaubten Commit-Fälle bekämen Exit 2. In einem PR ist der
  * Stand losgelöst, darum fiel das nur auf main auf.
+ *
+ * Nr. 138 (Inventur 5 und 17, Regelvorschlag „Commit-Präfix“): rekursives Löschen
+ * in jeder Schreibweise, Push auf main in jeder Form des Ziels (ohne Fehlalarm bei
+ * `main-fix`), `.env`-Vorlagen auf `.example` und das Präfix der Commit-Nachricht
+ * nach CLAUDE.md §5. Die Fälle sind erfundener Text und laufen nie in einer Shell.
+ * Die bestehenden Commit-Fälle ohne Präfix stehen deshalb auf `-m "fix: …"` — ihre
+ * Aussage bleibt gleich.
  */
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -162,7 +169,7 @@ describe('gefahr-blocken — git stash in jeder Form', () => {
     'git status',
     'git diff --stat',
     'git log --oneline -5',
-    'git commit -m "Zwischenstand statt git stash"',
+    'git commit -m "fix: Zwischenstand statt git stash"',
     'echo "git stash ist verboten"',
     'grep -rn "git stash" CLAUDE.md',
     'git add tests/gefahr-blocken.test.ts',
@@ -196,7 +203,7 @@ describe('gefahr-blocken — prettier --write', () => {
     'pnpm exec prettier --list-different .',
     // Text, der den Befehl nur nennt (Commit-Nachricht, echo, grep), ist kein Aufruf.
     'echo "prettier --write ist verboten"',
-    'git commit -m "kein prettier --write mehr im Ablauf"',
+    'git commit -m "fix: kein prettier --write mehr im Ablauf"',
     'grep -rn "prettier --write" CLAUDE.md',
   ]) {
     it(`lässt durch: ${befehl}`, () => {
@@ -347,7 +354,7 @@ describe('gefahr-blocken — prisma migrate deploy nur gegen eine ausdrücklich 
   for (const befehl of [
     // Text, der den Aufruf nur nennt (Commit-Nachricht, echo, grep), ist kein Aufruf.
     'echo "prisma migrate deploy ist gesperrt"',
-    'git commit -m "migrate deploy nur lokal"',
+    'git commit -m "fix: migrate deploy nur lokal"',
     'grep -rn "prisma migrate deploy" docs/nachtlauf.md',
     // Andere Unterbefehle von migrate und das lokale Bauen.
     'pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code',
@@ -530,8 +537,8 @@ describe('gefahr-blocken — Commit auf main', () => {
   it('findet den Ordner über git -C und cd, auch wenn der Aufruf in einem anderen Ordner läuft', () => {
     expect(lauf(`git -C ${aufMain} commit -m x`, aufFeature).code).toBe(2)
     expect(lauf(`cd ${aufMain} && git commit -m x`, aufFeature).code).toBe(2)
-    expect(lauf(`git -C ${aufFeature} commit -m x`, aufMain).code).toBe(0)
-    expect(lauf(`cd ${aufFeature} && git commit -m x`, aufMain).code).toBe(0)
+    expect(lauf(`git -C ${aufFeature} commit -m "fix: x"`, aufMain).code).toBe(0)
+    expect(lauf(`cd ${aufFeature} && git commit -m "fix: x"`, aufMain).code).toBe(0)
   })
 
   it('blockt den Commit, wenn der Befehl vorher auf main wechselt', () => {
@@ -540,25 +547,25 @@ describe('gefahr-blocken — Commit auf main', () => {
   })
 
   it('lässt den Commit auf einem Feature-Branch durch', () => {
-    for (const befehl of ['git commit -m "feat: etwas"', 'git commit --amend --no-edit', 'git add x && git commit -m y']) {
+    for (const befehl of ['git commit -m "feat: etwas"', 'git commit --amend --no-edit', 'git add x && git commit -m "fix: y"']) {
       expect(lauf(befehl, aufFeature).code, befehl).toBe(0)
     }
   })
 
   it('lässt den Commit durch, wenn der Befehl zuerst einen Feature-Branch anlegt', () => {
-    expect(lauf('git switch -c feature/neu && git commit -m x', aufMain).code).toBe(0)
-    expect(lauf('git checkout -b fix/neu && git commit -m x', aufMain).code).toBe(0)
+    expect(lauf('git switch -c feature/neu && git commit -m "fix: x"', aufMain).code).toBe(0)
+    expect(lauf('git checkout -b fix/neu && git commit -m "fix: x"', aufMain).code).toBe(0)
   })
 
   it('nimmt beim Anlegen mit Startpunkt den neuen Branch, nicht den Startpunkt', () => {
-    expect(lauf('git checkout -b fix/neu main && git commit -m x', aufMain).code).toBe(0)
-    expect(lauf('git switch -c feature/neu main && git commit -m x', aufMain).code).toBe(0)
-    expect(lauf('git checkout -B fix/neu origin/main && git commit -m x', aufMain).code).toBe(0)
+    expect(lauf('git checkout -b fix/neu main && git commit -m "fix: x"', aufMain).code).toBe(0)
+    expect(lauf('git switch -c feature/neu main && git commit -m "fix: x"', aufMain).code).toBe(0)
+    expect(lauf('git checkout -B fix/neu origin/main && git commit -m "fix: x"', aufMain).code).toBe(0)
   })
 
   it('löst ein relatives git -C nach einem cd gegen das cd-Ziel auf', () => {
     expect(lauf(`cd ${wurzel} && git -C auf-main commit -m x`, keinRepo).code).toBe(2)
-    expect(lauf(`cd ${wurzel} && git -C auf-feature commit -m x`, keinRepo).code).toBe(0)
+    expect(lauf(`cd ${wurzel} && git -C auf-feature commit -m "fix: x"`, keinRepo).code).toBe(0)
   })
 
   it('lässt auf main alles andere durch, was kein Commit ist', () => {
@@ -568,13 +575,13 @@ describe('gefahr-blocken — Commit auf main', () => {
   })
 
   it('lässt einen Commit durch, wo kein Repository ist (Branch unbekannt) — das entscheidet git selbst', () => {
-    expect(lauf('git commit -m x', keinRepo).code).toBe(0)
+    expect(lauf('git commit -m "fix: x"', keinRepo).code).toBe(0)
   })
 
   // Die Lage der CI beim Push auf main (Nr. 130): Der Prozess steht im Checkout auf main, die Eingabe nennt den Ordner
   // der Sitzung. Der Hook nimmt den Ordner der Eingabe — nur ohne ihn bliebe das Prozess-Verzeichnis.
   it('nimmt den Ordner aus der Eingabe, nicht das Verzeichnis des Prozesses (Lage der CI auf main)', () => {
-    const eingabe = { tool_name: 'Bash', tool_input: { command: 'git commit -m x' } }
+    const eingabe = { tool_name: 'Bash', tool_input: { command: 'git commit -m "fix: x"' } }
     expect(starte({ ...eingabe, cwd: aufFeature }, aufMain).code).toBe(0)
 
     // Gegenprobe: ohne `cwd` in der Eingabe gilt das Verzeichnis des Prozesses — auf main also Exit 2.
@@ -582,4 +589,267 @@ describe('gefahr-blocken — Commit auf main', () => {
     expect(ohne.code).toBe(2)
     expect(ohne.grund).toContain('Auf main wird nie direkt committet')
   })
+})
+
+// Nr. 138, Punkt 1 (Inventur 5): Das alte Muster kannte nur die Reihenfolge `-r…` und nur ein Ziel direkt danach.
+describe('gefahr-blocken — rekursives Löschen in jeder Schreibweise (Nr. 138, Inventur 5)', () => {
+  for (const befehl of [
+    'rm -rf /x',
+    'rm -fr /x',
+    'rm -r -f /x',
+    'rm -Rf /x',
+    'rm -rfv /x',
+    'rm --recursive --force /x',
+    'rm -rf ~',
+    'rm -rf "$HOME"',
+    'rm -rf .',
+    'rm -rf ./',
+    'rm -rf ../',
+    'rm -rf *',
+    'rm -rf ./*',
+    'rm -rf .*',
+    'rm -rf build /',
+    'rm -rf -- /',
+    '/bin/rm -rf /',
+    'command rm -rf /',
+    'find . -exec rm -rf / \\;',
+    // Weitere Schreibweisen derselben Option und derselben Ziele.
+    'rm -rf ..',
+    'rm -rf ~/projekt',
+    'rm -rf ${HOME}',
+    "rm -rf '${HOME}'",
+    'rm -rf "$HOME/projekt"',
+    'rm -R /x',
+    'rm --rec -f /x',
+    'rm /x -rf',
+    '/usr/bin/rm -rf /x',
+    'sudo rm -rf /x',
+    'xargs rm -rf /x',
+    '\\rm -rf /x',
+    'rm -rf .next && rm -rf /x',
+    'out=$(rm -rf /x)',
+    'sh -c "cd build && rm -rf /x"',
+    // Text, der den Aufruf nur nennt, blockt wie bisher mit (gewollt vorsichtig).
+    'echo "rm -rf ~"',
+  ]) {
+    it(`blockt: ${befehl}`, () => {
+      const r = lauf(befehl)
+      expect(r.code).toBe(2)
+      expect(r.grund).toContain('Destruktives Löschen')
+    })
+  }
+
+  for (const befehl of [
+    'rm -rf ./node_modules',
+    'rm -rf node_modules',
+    'rm -rf .next',
+    'rm datei.txt',
+    'rm -f ./x',
+    // Die Form aus docs/nachtlauf.md 4a Punkt 6: Der Ordner steht in einer Variablen, das Ziel beginnt nicht mit /.
+    'rm -rf "${WT:?}/.next"',
+    // Eine Umleitung ist kein Ziel.
+    'rm -rf .next > /dev/null 2>&1',
+    // Ohne rekursive Option löscht rm keinen Ordner.
+    'rm -f /tmp/notiz.txt',
+    // Wo der Text in Anführungszeichen endet, enden auch die Ziele: Der Pfad gehört zu grep.
+    'grep -rn "rm -rf" /tmp/notizen',
+  ]) {
+    it(`lässt durch: ${befehl}`, () => {
+      expect(lauf(befehl).code).toBe(0)
+    })
+  }
+})
+
+// Nr. 138, Punkt 2: `main` zählt nur als ganzer Name (davor Leerzeichen, +, :, refs/heads/ oder ein Anführungszeichen).
+describe('gefahr-blocken — Push auf main ohne Lücke, ohne Fehlalarm (Nr. 138)', () => {
+  for (const befehl of [
+    'git push origin main',
+    'git push origin HEAD:main',
+    'git push origin HEAD:refs/heads/main',
+    'git push origin refs/heads/main',
+    'git push origin :main',
+    'git push origin --delete main',
+    'git push -u origin main',
+    // Weitere Schreibweisen desselben Ziels und globale Optionen vor push.
+    'git push origin -d main',
+    'git push --set-upstream origin main',
+    'git push origin main:main',
+    'git push origin feature/x:refs/heads/main',
+    'git push origin "main"',
+    'git -C ../anderer-ordner push origin HEAD:main',
+  ]) {
+    it(`blockt: ${befehl}`, () => {
+      const r = lauf(befehl)
+      expect(r.code).toBe(2)
+      expect(r.grund).toContain('Direktes Pushen auf main')
+    })
+  }
+
+  // Ein Ziel mit + davor überschreibt die Historie wie --force — auch auf main greift deshalb zuerst die Force-Regel.
+  for (const befehl of ['git push origin +main', 'git push origin +feature', 'git push origin +HEAD:feature/x', 'git -C ../anderer-ordner push --force origin feature/x']) {
+    it(`blockt als Force-Push: ${befehl}`, () => {
+      const r = lauf(befehl)
+      expect(r.code).toBe(2)
+      expect(r.grund).toContain('Force-Push')
+    })
+  }
+
+  for (const befehl of [
+    'git push origin main-fix',
+    'git push origin feature/main',
+    'git push origin feature/main-x',
+    'git push -u origin nacht/2026-10-22/137-kaufsperre',
+    'git push origin main2',
+    'git push origin mainline',
+    'git push origin main_alt',
+    'git push origin main.alt',
+    'git push origin HEAD:refs/heads/main-fix',
+  ]) {
+    it(`lässt durch: ${befehl}`, () => {
+      expect(lauf(befehl).code).toBe(0)
+    })
+  }
+})
+
+// Nr. 138, Punkt 3: Eine Datei, deren Name auf .example endet, ist eine Vorlage mit Platzhaltern und gehört ins Repository.
+describe('gefahr-blocken — .env nie ins Repository, Vorlagen auf .example schon (Nr. 138)', () => {
+  for (const befehl of [
+    'git add .env',
+    'git add .env.local',
+    'git add .env.test',
+    'git add .env.test.example .env.local',
+    'git add .env.example.alt',
+    'git commit -m "fix: x" .env.local',
+  ]) {
+    it(`blockt: ${befehl}`, () => {
+      const r = lauf(befehl)
+      expect(r.code).toBe(2)
+      expect(r.grund).toContain('Eine .env-Datei darf nie ins Repository')
+    })
+  }
+
+  for (const befehl of ['git add .env.example', 'git add .env.test.example']) {
+    it(`lässt durch: ${befehl}`, () => {
+      expect(lauf(befehl).code).toBe(0)
+    })
+  }
+})
+
+// Nr. 138, Punkt 4 (Inventur 17): db push, Force-Push, Push auf main und npm/yarn sind bewusst NICHT an den Befehlsanfang
+// gebunden — eine Bindung übersähe Schreibweisen wie `env git push --force` oder Backticks. Sie blocken deshalb auch Text,
+// der den Befehl nur nennt (echo, grep, -m "…"), gewollt vorsichtig wie bei stash. Ausweg ist der Tipp „Commit- und
+// PR-Texte über eine Datei“ (docs/nachtlauf/freigabe.md): Text mit dem Write-Werkzeug in eine Datei, dann
+// `git commit -F <datei>` bzw. `gh pr create --body-file <datei>`.
+describe('gefahr-blocken — bloßer Text bei db push, Force-Push, Push auf main und npm (gewollt vorsichtig, Nr. 138)', () => {
+  // Zusammengesetzt, damit dieser Test selbst nicht vom Hook der Sitzung gesperrt wird.
+  const dbPush = ['prisma db', 'push'].join(' ')
+
+  for (const [befehl, grund] of [
+    [`echo "${dbPush} ist verboten"`, 'db push ist in diesem Projekt verboten'],
+    ['grep -rn "git push --force" docs', 'Force-Push'],
+    ['git commit -m "fix: nie git push origin main"', 'Direktes Pushen auf main'],
+    ['echo "npm install zod"', 'Paketmanager ist pnpm'],
+  ] as const) {
+    it(`blockt auch bloßen Text (gewollt vorsichtig): ${befehl}`, () => {
+      const r = lauf(befehl)
+      expect(r.code).toBe(2)
+      expect(r.grund).toContain(grund)
+    })
+  }
+
+  for (const befehl of ['yarn add x', 'yarn install']) {
+    it(`blockt: ${befehl}`, () => {
+      const r = lauf(befehl)
+      expect(r.code).toBe(2)
+      expect(r.grund).toContain('Paketmanager ist pnpm')
+    })
+  }
+
+  for (const befehl of [
+    'pnpm exec prisma db pull',
+    'git push --force-with-lease origin feature/x',
+    'git push origin feature/x',
+    'pnpm install',
+    // Der Hook blockt pnpm add bewusst nicht: Fragen vor jeder neuen Abhängigkeit bleibt Pflicht (CLAUDE.md §2).
+    'pnpm add left-pad',
+  ]) {
+    it(`lässt durch: ${befehl}`, () => {
+      expect(lauf(befehl).code).toBe(0)
+    })
+  }
+})
+
+// Nr. 138, Punkt 5 (Regelvorschlag aus Morgenbericht 20 §6): erste Zeile der ersten Nachricht je Commit.
+describe('gefahr-blocken — Commit-Präfix nach CLAUDE.md §5 (Nr. 138)', () => {
+  const PRAEFIX_GRUND = 'Blockiert: Commit-Texte beginnen mit feat:, fix:, docs:, chore:, refactor: oder WIP: (CLAUDE.md §5).'
+
+  beforeAll(() => {
+    writeFileSync(path.join(aufFeature, 'nachricht-test.txt'), 'test: x\n\nText\n')
+    writeFileSync(path.join(aufFeature, 'nachricht-docs.txt'), 'docs: x\n')
+    writeFileSync(path.join(aufFeature, 'nachricht-merge.txt'), 'Merge origin/nacht/2026-10-22/137-kaufsperre in integration/lauf21\n')
+  })
+
+  for (const befehl of [
+    'git commit -m "test: x"',
+    'git commit -m "Kaufsperre"',
+    'git commit -F nachricht-test.txt',
+    // Weitere Schreibweisen: -am, --message, --file, zweites -m, Here-Document, Text ohne Doppelpunkt.
+    'git commit -am "test: x"',
+    'git commit --message="test: x"',
+    'git commit --message "Kaufsperre"',
+    'git commit --amend -m "Kaufsperre"',
+    'git commit --file=nachricht-test.txt',
+    'git commit -m "x" -m "fix: y"',
+    'git commit -m "fixes: x"',
+    'git commit -m "Merge-Konflikt gelöst"',
+    'git add x && git commit -m "test: x"',
+    ['git commit -F - <<EOF', 'test: x', 'EOF'].join('\n'),
+    ['git commit -m "$(cat <<\'EOF\'', 'test: x', '', 'Text', 'EOF', ')"'].join('\n'),
+  ]) {
+    it(`blockt: ${befehl}`, () => {
+      const r = lauf(befehl)
+      expect(r.code).toBe(2)
+      expect(r.grund.trim()).toBe(PRAEFIX_GRUND)
+    })
+  }
+
+  it('findet den Ordner über git -C und cd — auch für den Pfad hinter -F', () => {
+    expect(lauf(`git -C ${aufFeature} commit -m "x"`, keinRepo).grund.trim()).toBe(PRAEFIX_GRUND)
+    expect(lauf(`cd ${aufFeature} && git commit -F nachricht-test.txt`, keinRepo).grund.trim()).toBe(PRAEFIX_GRUND)
+    expect(lauf(`git -C ${aufFeature} commit -F nachricht-docs.txt`, keinRepo).code).toBe(0)
+    expect(lauf(`cd ${aufFeature} && git commit -F nachricht-merge.txt`, keinRepo).code).toBe(0)
+  })
+
+  it('prüft zuerst den Commit auf main — der behält seinen Grund', () => {
+    const r = lauf('git commit -m "test: x"', aufMain)
+    expect(r.code).toBe(2)
+    expect(r.grund).toContain('Auf main wird nie direkt committet')
+  })
+
+  for (const befehl of [
+    'git commit -m "fix: x"',
+    'git commit -m "WIP: x"',
+    'git commit -F nachricht-docs.txt',
+    'git commit -F nachricht-merge.txt',
+    // Eine Datei, die sich nicht lesen lässt, und eine Variable kann der Hook nicht sehen — git entscheidet selbst.
+    'git commit -F fehlt.txt',
+    'git commit -m "$MSG"',
+    'git commit -m "feat: x"',
+    'git commit -m "docs: x"',
+    'git commit -m "chore: x"',
+    'git commit -m "refactor: x"',
+    'git commit -m "fix: x" -m "Text"',
+    'git commit -am "fix: x"',
+    'git commit -m "Merge origin/nacht/2026-10-22/137-kaufsperre in integration/lauf21"',
+    ['git commit -F - <<EOF', 'fix: x', 'EOF'].join('\n'),
+    ["cat <<'EOF' | git commit -F -", 'docs: x', 'EOF'].join('\n'),
+    // Ohne -m oder -F gibt es keine Nachricht zu prüfen; git merge prüft der Hook nicht.
+    'git commit --no-edit',
+    'git commit --amend --no-edit',
+    'git merge --no-ff -m "x" origin/nacht/2026-10-22/137-kaufsperre',
+  ]) {
+    it(`lässt durch: ${befehl}`, () => {
+      expect(lauf(befehl).code).toBe(0)
+    })
+  }
 })

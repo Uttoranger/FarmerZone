@@ -7,7 +7,7 @@
  * Geld oder Daten kostet und nicht zurücknehmbar ist.
  */
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 let eingabe = ''
@@ -243,6 +243,48 @@ function deployOhneLokaleAdressen(befehl, geerbt = new Map()) {
   return false
 }
 
+// Ziele, die rekursiv gelöscht nie richtig sind: wörtlich verglichen, kein Muster — `.next` und `./node_modules` bleiben frei.
+const LOESCH_ZIELE = new Set(['.', '..', './', '../', '*', './*', '.*'])
+// `$HOME` und `${HOME}` wie `~`: auch mit einem Pfad dahinter (`"$HOME/projekt"`).
+const HEIMATORDNER = /^\$(?:HOME|\{HOME\})(?:\/|$)/
+
+const istGeschuetztesZiel = (ziel) => ziel.startsWith('/') || ziel.startsWith('~') || HEIMATORDNER.test(ziel) || LOESCH_ZIELE.has(ziel)
+
+/**
+ * Löscht `befehl` irgendwo rekursiv ein geschütztes Ziel (Nr. 138, Inventur 5)? Rekursiv ist `rm` mit `r` oder `R`
+ * in einer Gruppe kurzer Optionen (`-rf`, `-fr`, `-Rf`, `-r -f`) oder mit `--recursive` (auch abgekürzt, wie getopt
+ * es annimmt: `--rec`). Wie bisher NICHT an den Befehlsanfang gebunden: `rm` zählt an jeder Stelle eines einfachen
+ * Befehls, auch mit Pfad (`/bin/rm`) und hinter `command`, `sudo`, `xargs` oder `-exec`; Text in Anführungszeichen
+ * (`sh -c "…"`, `echo "…"`, `-m "…"`) wird als Befehl mitgelesen — gewollt vorsichtig. Wo der Text endet, enden
+ * auch die Ziele: `grep "rm -rf" /x` löscht nichts. GNU rm ordnet Optionen um (`rm /x -rf`), darum zählt jede
+ * Option bis `--`. Eine Umleitung (`> /dev/null`) ist kein Ziel.
+ */
+function rekursivesLoeschen(befehl) {
+  for (const { woerter: alle } of einfacheBefehle(befehl)) {
+    // Ein Wort mit Leerraum stand in Anführungszeichen oder ist eine Ersetzung: selbst als Befehl prüfen.
+    if (alle.some((wort) => /\s/.test(wort) && rekursivesLoeschen(wort))) return true
+    const stelle = alle.findIndex((wort) => basename(wort) === 'rm')
+    if (stelle < 0) continue
+    const woerter = alle.slice(stelle + 1)
+    let rekursiv = false
+    let optionenOffen = true
+    const ziele = []
+    for (let i = 0; i < woerter.length; i++) {
+      const wort = woerter[i]
+      if (optionenOffen && wort === '--') optionenOffen = false
+      else if (/^\d*[<>]/.test(wort)) {
+        if (/^\d*[<>]+$/.test(wort)) i++ // das Ziel der Umleitung steht im nächsten Wort
+      } else if (optionenOffen && wort.startsWith('--')) {
+        const name = wort.slice(2).split('=')[0]
+        rekursiv ||= name.length > 0 && 'recursive'.startsWith(name)
+      } else if (optionenOffen && /^-./.test(wort)) rekursiv ||= /[rR]/.test(wort)
+      else if (wort) ziele.push(wort)
+    }
+    if (rekursiv && ziele.some(istGeschuetztesZiel)) return true
+  }
+  return false
+}
+
 const regeln = [
   {
     muster: /prisma\s+db\s+push/,
@@ -273,13 +315,16 @@ const regeln = [
       'der Aufruf schreibt Dateien nach fremden Vorgaben um. Formatiere von Hand im Stil der Datei.',
   },
   {
-    muster: /git\s+push\b[^|;&]*(--force(?!-with-lease)|\s-f\b)/,
+    // Ein Ziel mit + davor (`git push origin +feature`) überschreibt die Historie wie --force (Nr. 138).
+    // Wie die Regeln für main und --all auch mit globalen Optionen davor (`git -C <ordner> push …`).
+    muster: new RegExp(GIT + String.raw`push\b[^|;&]*(?:--force(?!-with-lease)|\s-f\b|\s["']?\+(?=[^\s"']))`),
     grund:
       'Force-Push überschreibt Historie auf einem öffentlichen Repo. Nicht ohne ' +
       'ausdrückliche Anweisung des Menschen.',
   },
   {
-    muster: /git\s+(commit|add)\b[^|;&]*\.env(?!\.example)/,
+    // Jede Datei, deren Name auf .example endet, ist eine Vorlage mit Platzhaltern (`.env.test.example`, Nr. 138).
+    muster: /git\s+(commit|add)\b[^|;&]*\.env(?![\w.-]*\.example(?![\w.-]))/,
     grund:
       'Eine .env-Datei darf nie ins Repository — das Repo ist öffentlich. ' +
       'Nur .env.example mit Platzhaltern gehört in den Commit.',
@@ -292,13 +337,15 @@ const regeln = [
     grund: 'Schiebt alle lokalen Branches auf das öffentliche Repo. Nur den eigenen Branch pushen.',
   },
   {
-    muster: /git\s+push\b[^|;&]*\s(origin\s+)?main\b/,
+    // Ziel main in jeder Form: main, +main, refs/heads/main, <quelle>:main, :main (Löschen), --delete main (Nr. 138).
+    // main zählt nur als ganzer Name — `main-fix`, `main2`, `feature/main` gehen durch.
+    muster: new RegExp(GIT + String.raw`push\b[^|;&]*(?:[\s+:"']|refs\/heads\/)main(?![\w./-])`),
     grund:
       'Direktes Pushen auf main ist nicht vorgesehen. Feature-Branch anlegen, ' +
       'committen, PR öffnen — der Mensch merged.',
   },
   {
-    muster: /rm\s+-rf?\s+(\/|~|\.\s*$|\*)/,
+    pruefe: rekursivesLoeschen,
     grund: 'Destruktives Löschen im Projektbaum. Bitte den Menschen fragen.',
   },
   {
@@ -309,6 +356,20 @@ const regeln = [
   },
 ]
 
+// Ein `git commit` am Befehlsanfang; die Gruppe hält die globalen Optionen zwischen git und commit (`-C <ordner>`).
+const COMMIT = new RegExp(BEFEHLSANFANG + String.raw`git((?:\s+(?:-C|-c)\s+\S+|\s+--[\w-]+(?:=\S+)?)*)\s+commit\b`, 'g')
+const ohneAnfuehrung = (t) => t.replace(/^["']|["']$/g, '')
+
+/**
+ * Der Ordner, in dem dieser Treffer von COMMIT läuft: `git -C <ordner>`, sonst das letzte `cd <ordner>` davor, sonst
+ * der Arbeitsordner des Aufrufs. Ein relatives `-C` gilt ab dem Ordner des `cd` davor, wie in der Shell.
+ */
+function ordnerDesCommits(befehl, treffer, arbeitsordner) {
+  const optionC = treffer[1].match(/-C\s+(\S+)/)
+  const cdOrdner = [...befehl.slice(0, treffer.index).matchAll(/(?:^|[;&|(\n])\s*cd\s+(\S+)/g)].pop()?.[1]
+  return resolve(arbeitsordner, ohneAnfuehrung(cdOrdner ?? '.'), ohneAnfuehrung(optionC?.[1] ?? '.'))
+}
+
 /**
  * Der Branch, auf dem ein `git commit` in `befehl` landen würde — oder null, wenn er sich nicht
  * bestimmen lässt (kein Repository, kein git, losgelöster HEAD). Ordner: `git -C <ordner>`, sonst das
@@ -316,12 +377,10 @@ const regeln = [
  * Branch an oder wechselt (`git switch -c x && git commit`), zählt dieser.
  */
 function branchDesCommits(befehl, arbeitsordner) {
-  const commit = new RegExp(BEFEHLSANFANG + String.raw`git((?:\s+(?:-C|-c)\s+\S+|\s+--[\w-]+(?:=\S+)?)*)\s+commit\b`, 'g')
-  const treffer = [...befehl.matchAll(commit)]
+  const treffer = [...befehl.matchAll(COMMIT)]
   if (treffer.length === 0) return undefined
   const letzter = treffer[treffer.length - 1]
   const davor = befehl.slice(0, letzter.index)
-  const ohneAnfuehrung = (t) => t.replace(/^["']|["']$/g, '')
 
   const gewechselt = [...davor.matchAll(/\bgit(?:\s+(?:-C|-c)\s+\S+)*\s+(?:checkout|switch)\b([^;&|\n]*)/g)]
     .map((m) => m[1].trim().split(/\s+/))
@@ -336,12 +395,8 @@ function branchDesCommits(befehl, arbeitsordner) {
     .pop()
   if (gewechselt) return gewechselt
 
-  const optionC = letzter[1].match(/-C\s+(\S+)/)
-  const cdOrdner = [...davor.matchAll(/(?:^|[;&|(\n])\s*cd\s+(\S+)/g)].pop()?.[1]
-  // Ein relatives `-C` gilt ab dem Ordner des `cd` davor, wie in der Shell.
-  const ordner = resolve(arbeitsordner, ohneAnfuehrung(cdOrdner ?? '.'), ohneAnfuehrung(optionC?.[1] ?? '.'))
   try {
-    return execFileSync('git', ['-C', ordner, 'symbolic-ref', '--short', '-q', 'HEAD'], {
+    return execFileSync('git', ['-C', ordnerDesCommits(befehl, letzter, arbeitsordner), 'symbolic-ref', '--short', '-q', 'HEAD'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim() || null
@@ -350,13 +405,85 @@ function branchDesCommits(befehl, arbeitsordner) {
   }
 }
 
+// CLAUDE.md §5, dazu `WIP:` für Zwischenstände (docs/nachtlauf.md 4a Punkt 2) und Merge-Commits des Dirigenten.
+const ERLAUBTE_PRAEFIXE = ['feat:', 'fix:', 'docs:', 'chore:', 'refactor:', 'WIP:', 'Merge ']
+// Der Kopf eines Here-Documents (`<<EOF`, `<<'EOF'`, `<<-EOF`), kein Here-String (`<<<`).
+const DOKUMENT_KOPF = /(?<!<)<<(-?)\s*(['"]?)([\w-]+)\2(?!<)/
+
+/** Die Betreffzeile: die erste Zeile mit Inhalt — führende Leerzeilen nimmt git selbst weg. */
+const ersteZeile = (text) => text.split('\n').find((zeile) => zeile.trim())?.trim() ?? ''
+
+/** Erste Zeile des Here-Documents, dessen Kopf in der Zeile um `stelle` steht — oder undefined ohne Kopf. */
+function ersteZeileDesDokuments(text, stelle) {
+  const anfang = text.lastIndexOf('\n', stelle - 1) + 1
+  const ende = text.indexOf('\n', stelle)
+  const kopf = ende < 0 ? null : DOKUMENT_KOPF.exec(text.slice(anfang, ende))
+  if (!kopf) return undefined
+  const zeilen = []
+  for (const zeile of text.slice(ende + 1).split('\n')) {
+    if ((kopf[1] ? zeile.replace(/^\t+/, '') : zeile) === kopf[3]) break
+    zeilen.push(zeile)
+  }
+  return ersteZeile(zeilen.join('\n'))
+}
+
+/**
+ * Die erste Zeile der ersten Nachricht in den Wörtern eines Commits — oder undefined, wenn der Hook sie nicht sehen
+ * kann. `-m`, `--message`, `-am` (auch angehängt: `-mText`, `--message=Text`) zählen wörtlich; bei
+ * `-m "$(cat <<'EOF' …)"` und bei `-F -` mit Here-Document zählt die erste Zeile des Dokuments; `-F <datei>` bzw.
+ * `--file=<datei>` liest die Datei relativ zum Ordner des Commits. Nicht sichtbar und deshalb durchgelassen: eine
+ * andere Ersetzung oder Variable am Anfang (`-m "$MSG"`), `-F -` ohne Here-Document und eine Datei, die sich nicht
+ * lesen lässt — dann scheitert git selbst.
+ */
+function ersteNachrichtenZeile(woerter, befehl, stelle, ordner) {
+  for (let i = 0; i < woerter.length; i++) {
+    if (woerter[i] === '--') return undefined
+    const lang = /^--(message|file)(?:=([\s\S]*))?$/.exec(woerter[i])
+    const kurz = /^-[A-Za-z]*?([mF])([\s\S]*)$/.exec(woerter[i])
+    if (!lang && !kurz) continue
+    const datei = lang ? lang[1] === 'file' : kurz[1] === 'F'
+    const wert = (lang ? lang[2] : kurz[2] || undefined) ?? woerter[i + 1]
+    if (wert === undefined) return undefined
+    if (!datei) {
+      if (/^\$\(\s*cat\s+<</.test(wert)) return ersteZeileDesDokuments(wert, 0)
+      return /^[$`]/.test(wert) ? undefined : ersteZeile(wert)
+    }
+    if (wert === '-') return ersteZeileDesDokuments(befehl, stelle)
+    try {
+      const pfad = resolve(ordner, wert)
+      // Nur eine gewöhnliche Datei: Ein Gerät (/dev/zero) oder eine benannte Pipe hielte den Hook sonst an.
+      return statSync(pfad).isFile() ? ersteZeile(readFileSync(pfad, 'utf8')) : undefined
+    } catch {
+      return undefined
+    }
+  }
+  return undefined
+}
+
+/**
+ * Trägt ein `git commit` in `befehl` eine Nachricht, deren erste Zeile nicht mit einem erlaubten Präfix beginnt
+ * (Nr. 138, Regelvorschlag aus Morgenbericht 20 §6)? Erkannt wie in branchDesCommits (Befehlsanfang, auch
+ * `git -C <ordner> commit`); geprüft wird jeder Commit, je Commit die erste Nachricht. Ohne `-m`/`-F`
+ * (`--no-edit`, `git merge`) gibt es nichts zu prüfen.
+ */
+function commitOhnePraefix(befehl, arbeitsordner) {
+  for (const treffer of befehl.matchAll(COMMIT)) {
+    const stelle = treffer.index + treffer[0].length
+    // Die Wörter des Commits bis zum Ende seines einfachen Befehls; das vorangestellte x steht für „commit“.
+    const woerter = einfacheBefehle('x' + befehl.slice(stelle))[0].woerter.slice(1)
+    const zeile = ersteNachrichtenZeile(woerter, befehl, stelle, ordnerDesCommits(befehl, treffer, arbeitsordner))
+    if (zeile && !ERLAUBTE_PRAEFIXE.some((praefix) => zeile.startsWith(praefix))) return true
+  }
+  return false
+}
+
 // Den Text eines Here-Documents liest der Hook bewusst MIT (Nachtrag Dirigent, Lauf 17): Drei Anläufe in
 // Nr. 118, ihn als Daten auszunehmen, öffneten jeweils neue Lücken. Der Fehlalarm aus Nr. 110 (eine
 // Commit-Nachricht, deren Zeile mit „git stash“ beginnt) bleibt deshalb; Vorsicht geht vor (Lauf 18).
 const geprueft = befehl
 
 for (const regel of regeln) {
-  if (regel.muster.test(geprueft)) {
+  if (regel.muster ? regel.muster.test(geprueft) : regel.pruefe(geprueft)) {
     console.error(`Blockiert: ${regel.grund}`)
     process.exit(2)
   }
@@ -380,6 +507,12 @@ if (branchDesCommits(geprueft, arbeitsordner) === 'main') {
     'Blockiert: Auf main wird nie direkt committet. Lege zuerst einen Feature-Branch an ' +
       '(`git switch -c <branch>`), committe dort und öffne einen PR — der Mensch merged.'
   )
+  process.exit(2)
+}
+
+// Nach der Prüfung auf main: Ein Commit auf main behält seinen eigenen Grund, auch ohne Präfix.
+if (commitOhnePraefix(geprueft, arbeitsordner)) {
+  console.error('Blockiert: Commit-Texte beginnen mit feat:, fix:, docs:, chore:, refactor: oder WIP: (CLAUDE.md §5).')
   process.exit(2)
 }
 process.exit(0)
