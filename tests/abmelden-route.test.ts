@@ -103,7 +103,7 @@ describe('POST — die Ein-Klick-Abmeldung des Mailprogramms', () => {
 
   it.each([
     ['ohne Token', null],
-    ['mit falscher Signatur', `${TOKEN.slice(0, -1)}0`],
+    ['mit falscher Signatur', `${TOKEN.slice(0, -1)}${TOKEN.endsWith('0') ? '1' : '0'}`],
     ['mit Unsinn', 'kein-token'],
     ['mit leerem Token', ''],
   ])('%s: 400 mit festem Satz, nichts geschrieben', async (_fall, token) => {

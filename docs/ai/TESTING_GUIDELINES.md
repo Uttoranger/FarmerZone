@@ -256,6 +256,7 @@ in einen ungültigen Schlüssel statt in echtes Geld.
 - Telefon: `+43 660 0000000` — mehrere Nummern unterscheiden sich in der Vorwahl (664, 676, 699), der Teilnehmerteil bleibt genullt (Wache `tests/telefonnummern-wache.test.ts`).
 - Keine echten Stripe-IDs, keine echten Tokens — auch keine abgelaufenen.
 - Erfundene Tokens und Codes in Tests aus Buchstaben, nicht aus langen Ziffernfolgen (sonst schlägt die Telefonnummern-Wache an) (Nr. 113, Morgenbericht 17, freigegeben 19.10.2026).
+- Ein verfälschter Wert ist immer sicher anders: Zeichen tauschen, nicht festsetzen (`${t.slice(0, -1)}${t.endsWith('0') ? '1' : '0'}`, nie `${t.slice(0, -1)}0`) — bei einem zufälligen Token wäre der feste Wert in einem von 256 Läufen unverändert gültig; bei einem Token mit base64url-Signatur nicht das letzte Zeichen tauschen (Auffüllbits). Geprüft von tests/test-ueberspringen-wache.test.ts; Regelvorschlag aus Morgenbericht 20 §6, freigegeben 21.10.2026.
 - **Für Typen, die in mehr als drei Testdateien nachgebaut werden, gibt es eine Fabrik in `tests/fabrik/<typ>.ts`; sonst bleiben Faktoren lokal** (Wache `tests/fabrik-wache.test.ts`; Nr. 119, Regelvorschlag in Nr. 127, freigegeben 20.10.2026).
 - **Integrationsschicht: alles trägt das Präfix `int-`** — Hof-Slug, Produkt-ID,
   Sitzungs-ID, E-Mail-Adresse. Das Präfix ist die Sicherung, an der `raeumeAuf()`
