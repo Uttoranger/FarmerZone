@@ -369,6 +369,19 @@ export function bestandLabel(unit: string, unitSize?: number | { toString(): str
 }
 
 /**
+ * Der Vorrat in den Wörtern des Hofs (Register N25): „53 kg", „8 Stück",
+ * „6 Ballen", mit Gebinde „14 Pakete" bzw. „1 Paket". Gezählt wird, was der
+ * Vorrat zählt — wie `bestandLabel`: Ballen und Big Bags je Stück, ein
+ * Gebinde als Paket. Die Kundin liest dasselbe als „2 × 500 g" (`formatMenge`);
+ * beide zählen dieselben Pakete.
+ */
+export function hofVorratText(stock: number, unit: string, unitSize?: number | { toString(): string } | null): string {
+  const size = gebindeGroesse(unitSize)
+  if (!istGrossgebindeEinheit(unit) && size && size !== 1) return mitAnzahl(stock, 'Paket', 'Pakete')
+  return formatMenge(stock, unit, null)
+}
+
+/**
  * Was der Paketbestand in der Einheit bedeutet: 10 Pakete à 2 kg → „20 kg".
  * Nur bei Maßeinheit und Gebinde ungleich 1 — bei Stück und Paket sagt die
  * Rechnung nichts (6er-Pack Eier × 30 sind keine „180 Pakete"). Sonst null.

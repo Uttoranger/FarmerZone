@@ -37,6 +37,7 @@ vi.mock('next/headers', () => ({
 
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
+  updateTag: vi.fn(),
 }))
 
 vi.mock('@vercel/blob', () => ({

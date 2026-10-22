@@ -1,13 +1,14 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { del } from '@vercel/blob'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 import { farmFotoHinzufuegenSchema, farmFotoUnterschriftSchema } from '@/schemas/farm-foto'
 import { BILDUNTERSCHRIFT_MAX } from '@/lib/eingabegrenzen'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 
 const GALLERY_LIMIT = 8
 const BLOB_HOST = /\.public\.blob\.vercel-storage\.com\//
@@ -50,6 +51,9 @@ export async function addFarmPhotoAction(input: unknown): Promise<{ photo?: { id
   })
 
   revalidate(farm.slug)
+  // Die Hofliste zeigt die ersten vier Fotos aus ihrem Zwischenspeicher. Bewusst nicht in
+  // revalidate(): Die Bildunterschrift (updateFarmPhotoCaptionAction) liest die Liste nicht.
+  updateTag(HOEFE_CACHE_TAG)
   return { photo }
 }
 
@@ -112,6 +116,7 @@ export async function deleteFarmPhotoAction(id: string): Promise<{ error?: strin
   )
 
   revalidate(farm.slug)
+  updateTag(HOEFE_CACHE_TAG)
   return {}
 }
 
@@ -147,6 +152,8 @@ export async function reorderPhotosAction(ids: string[]): Promise<{ error?: stri
   )
 
   revalidate(farm.slug)
+  // Auch für moveFarmPhotoAction, die hier aufgeht.
+  updateTag(HOEFE_CACHE_TAG)
   return {}
 }
 

@@ -1,7 +1,6 @@
 # TESTING_GUIDELINES
 
-Stand 2026-09-25: 100 Testdateien / ~1.600 Tests in `tests/` (Unit),
-5 Dateien / 15 Tests in `tests/integration/` (Integration).
+Wie viele Testdateien es gibt, zählt `pnpm vitest list --filesOnly | wc -l` (Unit) bzw. `ls tests/integration/*.int.test.ts | wc -l` (Integration); die Zahl der Tests nennt das Ende von `pnpm test` (Inventur 4, Morgenbericht 20 §3, freigegeben 21.10.2026).
 
 ---
 
@@ -9,7 +8,7 @@ Stand 2026-09-25: 100 Testdateien / ~1.600 Tests in `tests/` (Unit),
 
 - Runner: **Vitest 4**. Zwei Konfigurationen: `vitest.config.ts` (Unit),
   `vitest.integration.config.ts` (Integration).
-- Umgebung: **`node`** — kein jsdom, kein happy-dom. Die eine Ausnahme: `tests/hydrieren.test.ts` läuft mit jsdom (`// @vitest-environment jsdom`, Paket `jsdom` als Entwicklungspaket, G6-Ergänzung 21.10.2026).
+- Umgebung: **`node`** — kein jsdom, kein happy-dom. Die Ausnahme: `tests/hydrieren.test.ts` läuft mit jsdom (`// @vitest-environment jsdom`, Paket `jsdom` als Entwicklungspaket, G6-Ergänzung 21.10.2026).
 - Alias `@/` → `src/`.
 - `BETTER_AUTH_SECRET` wird von der Config gesetzt; Token-Tests brauchen nichts weiter.
 
@@ -21,9 +20,9 @@ Stand 2026-09-25: 100 Testdateien / ~1.600 Tests in `tests/` (Unit),
 | `tests/integration/` | Integration | `.int.test.ts` |
 | `e2e/` | E2E (noch nicht vorhanden) | außerhalb von `tests/` |
 | `tests/fabrik/` | Fabriken für nachgebaute Typen (keine Tests, §5) | `<typ>.ts` |
+| `tests/fixtures/` | Beispieldateien, die ein Test liest (keine Tests) | beliebig |
 
-Keine weiteren Unterordner, kein `.spec.ts`. Innerhalb eines Ordners bleibt es
-flach; `tests/integration/setup/` und `tests/fabrik/` enthalten nur Hilfsmittel, keine Tests.
+Keine weiteren Unterordner, kein `.spec.ts`. Innerhalb eines Ordners bleibt es flach; `tests/integration/setup/`, `tests/fabrik/` und `tests/fixtures/` enthalten nur Hilfsmittel, keine Tests. **Lose Hilfsdateien** in `tests/` (`*.ts` ohne `.test`) sind erlaubt und stehen mit Namen da: `admin-sitzung.ts`, `element-suche.ts`, `finanzen-jahr-daten.ts`, `hydrieren-hilfe.ts`, `yaml-lader.ts`; eine neue kommt in diese Liste. Nach `tests/fabrik/` gehören nur Fabriken nachgebauter Typen (Inventur 14, Morgenbericht 20 §3, freigegeben 21.10.2026).
 
 **Der `exclude` in `vitest.config.ts` ist Pflicht, keine Geschmacksfrage:**
 `tests/**/*.test.ts` passt auch auf `tests/integration/*.int.test.ts`. Ohne
@@ -40,10 +39,10 @@ laufendes Postgres. `exclude` **ersetzt** die Vorgabe von Vitest, deshalb muss
 | Better Auth | gemockt | **echt** — Anmeldung mit Passwort, Sitzung aus der Datenbank |
 | Rate-Limit | aus | aus (siehe unten) |
 | Resend, Stripe, Nominatim, Vercel Blob | gemockt | gemockt |
-| Zeit | Parameter oder `vi.useFakeTimers()` | **Systemuhr** — siehe unten |
+| Zeit | Parameter oder `vi.useFakeTimers()` | **Systemuhr** (Ausnahme, siehe unten und §4) |
 | Laufzeit | Millisekunden | Sekunden |
 
-**Zeit in der Integrationsschicht: die einzige Ausnahme von Abschnitt 4.** Über die
+**Zeit in der Integrationsschicht: eine der Ausnahmen von der Uhr (§4 „Ausnahmen von der Uhr“).** Über die
 Handler-Grenze ist `jetzt` nicht injizierbar — der Handler setzt seinen Zeitpunkt
 selbst (`const now = new Date()`), und ein Request trägt keinen Parameter dafür.
 Die Integrationstests hängen deshalb an der Systemuhr. Damit das nie zu Flackern
@@ -114,12 +113,12 @@ pnpm test:integration                        # Integration (braucht .env.test)
 - Die Login-Bremse von Better Auth zählt über alle Instanzen in `RateLimitZaehler` (R1-Ergänzung 20.10.2026); Tests mit mehr als drei Anmeldungen je 10 s brauchen eigene Schlüssel bzw. eine feste Uhr (tests/integration/auth-bremse.int.test.ts).
 
 ### Folge der Node-Umgebung
-- **Kein DOM, keine Interaktion.** Keine Testing-Library, kein Klicken, kein Snapshot von JSX. Die eine Ausnahme ist `tests/hydrieren.test.ts` (jsdom, siehe unten): Dort wird nur hydriert und der Baum danach gelesen, nicht geklickt.
-- **Serverseitig rendern geht** — mit `renderToStaticMarkup` aus `react-dom/server` (schon Abhängigkeit, kein neues Paket). Nur für Architektur-Aussagen der Art „dieses Element erscheint in diesem Modus nie": `next/navigation`, `next/image`, `next/link` und die Server-Aktionen per `vi.mock` ersetzen, die echte Komponente rendern, im HTML nach Merkmalen suchen — und immer eine Gegenprobe rendern, in der jedes Merkmal vorkommen muss, und zwar aus der Komponente, die das Merkmal trägt — sonst beweist ein leerer Fund nichts. Merkmale sind Texte, `aria-label`, die Kennung eines Symbols (`lucide-pencil`) oder eine per `vi.mock` ersetzte Teilkomponente — keine Layout-Klassen, kein Vergleich ganzer HTML-Abschnitte: Das wäre ein Schnappschuss, und „Reine Darstellung" bleibt ungetestet (§2). Vorbild: `tests/hofseite-einmal.test.ts`. Effekte laufen dabei nicht; Verhalten bleibt Sache der reinen Funktionen.
-- **Ein Formular absenden geht auch ohne DOM** (seit Nr. 65, Vorbild `tests/hof-profil-absenden.test.ts`): das echte Formular einmal mit `renderToStaticMarkup` rendern; `useForm` per `vi.mock('react-hook-form', importOriginal)` nur umhüllen, um das Formular und den Absende-Griff festzuhalten, den die Komponente selbst baut (`handleSubmit(onSubmit)`); `useTransition` per `vi.mock('react', importOriginal)` so ersetzen, dass der Rückruf läuft (auf dem Server wirft `startTransition`) und der Test auf ihn wartet. Dann Felder mit `setValue` setzen und absenden — Schema (zodResolver), `onSubmit` und Maßstab bleiben echt, nachgebildet ist nur die Grenze zur Aktion; geprüft wird, was dort ankommt. Zustand, der nach dem Rendern gesetzt wird, verpufft (React auf dem Server) — eine Anzeige danach bleibt ungeprüft. Gegenprobe: die Komponente kurz auf den alten Weg stellen, der Test muss rot werden.
-- **Einen Hook samt Effekten prüfen geht auch ohne DOM** (seit Nr. 71, Vorbild `tests/use-cart.test.ts`): Ein Prüfstand in `vi.hoisted` ersetzt per `vi.mock('react', importOriginal)` nur die Hooks, die die Komponente nutzt — Zustand je Aufrufstelle (Setzen mit Wert oder Updater), Rendern nach einer Änderung von außen erst danach, sofortiges Neurendern bei einer Änderung im Rendern, Effekte nach dem Rendern bei geänderten Abhängigkeiten. Die Komponente läuft als Funktion, Kinder rendert er nicht; Speicher, `window` und `fetch` kommen per `vi.stubGlobal`. Was der Hook liefert, hält ein Umhüllen des echten Hooks fest (wie `useForm` oben). Gedacht für Fehler, die an einem Render hängen (Funktionen aus einem alten Render, Aufrufe hintereinander) — Fachregeln bleiben reine Funktionen in `src/lib/`. Gegenprobe: Der Test muss auf dem alten Stand rot sein.
+- **Kein DOM, keine Interaktion.** Keine Testing-Library, kein Klicken, kein Snapshot von JSX. Die Ausnahme ist `tests/hydrieren.test.ts` (jsdom, siehe unten): Dort wird nur hydriert und der Baum danach gelesen, nicht geklickt.
+- **Serverseitig rendern geht** — mit `renderToStaticMarkup` aus `react-dom/server` (schon Abhängigkeit, kein neues Paket). Nur für Architektur-Aussagen der Art „dieses Element erscheint in diesem Modus nie": `next/navigation`, `next/image`, `next/link` und die Server-Aktionen per `vi.mock` ersetzen, die echte Komponente rendern, im HTML nach Merkmalen suchen — und immer eine Gegenprobe (§2) rendern, in der jedes Merkmal vorkommen muss, und zwar aus der Komponente, die das Merkmal trägt. Merkmale sind Texte, `aria-label`, die Kennung eines Symbols (`lucide-pencil`) oder eine per `vi.mock` ersetzte Teilkomponente — keine Layout-Klassen, kein Vergleich ganzer HTML-Abschnitte: Das wäre ein Schnappschuss, und „Reine Darstellung" bleibt ungetestet (§2). **Ausnahme:** der Beleg eines Umbaus — ein eingefrorener Text mit dem Stand-Commit im Kommentar, nur wenn die Freigabe den Beleg „bleibt gleich“ verlangt (Regelvorschlag 133, Morgenbericht 20 §6, freigegeben 21.10.2026). Vorbild: `tests/hofseite-einmal.test.ts`. Effekte laufen dabei nicht; Verhalten bleibt Sache der reinen Funktionen.
+- **Ein Formular absenden geht auch ohne DOM** (seit Nr. 65, Vorbild `tests/hof-profil-absenden.test.ts`): das echte Formular einmal mit `renderToStaticMarkup` rendern; `useForm` per `vi.mock('react-hook-form', importOriginal)` nur umhüllen, um das Formular und den Absende-Griff festzuhalten, den die Komponente selbst baut (`handleSubmit(onSubmit)`); `useTransition` per `vi.mock('react', importOriginal)` so ersetzen, dass der Rückruf läuft (auf dem Server wirft `startTransition`) und der Test auf ihn wartet. Dann Felder mit `setValue` setzen und absenden — Schema (zodResolver), `onSubmit` und Maßstab bleiben echt, nachgebildet ist nur die Grenze zur Aktion; geprüft wird, was dort ankommt. Zustand, der nach dem Rendern gesetzt wird, verpufft (React auf dem Server) — eine Anzeige danach bleibt ungeprüft. Gegenprobe (§2): die Komponente kurz auf den alten Weg stellen.
+- **Einen Hook samt Effekten prüfen geht auch ohne DOM** (seit Nr. 71, Vorbild `tests/use-cart.test.ts`): Ein Prüfstand in `vi.hoisted` ersetzt per `vi.mock('react', importOriginal)` nur die Hooks, die die Komponente nutzt — Zustand je Aufrufstelle (Setzen mit Wert oder Updater), Rendern nach einer Änderung von außen erst danach, sofortiges Neurendern bei einer Änderung im Rendern, Effekte nach dem Rendern bei geänderten Abhängigkeiten. Die Komponente läuft als Funktion, Kinder rendert er nicht; Speicher, `window` und `fetch` kommen per `vi.stubGlobal`. Was der Hook liefert, hält ein Umhüllen des echten Hooks fest (wie `useForm` oben). Gedacht für Fehler, die an einem Render hängen (Funktionen aus einem alten Render, Aufrufe hintereinander) — Fachregeln bleiben reine Funktionen in `src/lib/`. Gegenprobe (§2): der alte Stand.
 - **Eine Seite, die erst nach einem Effekt ihren Inhalt zeigt, ganz rendern** (seit Nr. 82, Vorbild `tests/kasse-formular.test.ts`: die Kasse liest den Korb im Effekt aus dem localStorage, auf dem Server stünde nur das Skelett): `vi.mock('react', importOriginal)` ersetzt nur `useEffect` so, dass jeder Effekt einmal je Quelltext sofort beim Rendern läuft — React rendert mit dem gesetzten Zustand neu; die Merkliste je Aufbau leeren. `localStorage`, `fetch` (offen lassen) und die Uhr (`vi.useFakeTimers`) gestellt, `window` als `globalThis`. Bibliotheken behalten das echte React. Geprüft wird das HTML (Reihenfolge, Texte, Zustand der Vorbelegung), mit Gegenprobe, dass nicht das Skelett kam (Regelvorschlag 82, Lauf 12; bestätigt 13.10.2026). **Grenzen des Prüfstands:** Er merkt sich einen Effekt an seinem Quelltext (`toString`) — zwei Effekte mit gleichem Text laufen nur einmal; er kennt keine Abhängigkeiten (jeder Effekt läuft genau einmal, ein geänderter Wert löst nichts neu aus) und kein Aufräumen (die zurückgegebene Funktion läuft nie); ein Effekt, der den Zustand einer ANDEREN Komponente setzt, wirkt nicht — React verwirft ein `setState` in eine fremde Komponente während des Renderns. Was davon abhängt, prüft eine reine Funktion oder der Hook-Prüfstand darüber.
-- Teile, die mit Uhr, Breite oder Browser-Speicher rechnen, stehen in tests/hydrieren.test.ts (jsdom); ein neues solches Teil kommt dort dazu (G6-Ergänzung 21.10.2026). Die Hilfe `tests/hydrieren-hilfe.ts` rendert den Server-Teil ohne `window`, `document`, `navigator`, `localStorage` und `matchMedia` (`renderToString`), hydriert das HTML danach mit `hydrateRoot` in `act` und wirft bei jeder Meldung von `onRecoverableError` oder `console.error`. Was der Browser später kennt (Uhr, Breite, Speicher, Adresse), setzt der Fall in `imBrowser`, nach dem Server-Teil; sonst sähen beide Seiten dieselbe Uhr. Jeder Fall bekommt eine Gegenprobe: das Teil kurz auf direktes Lesen stellen (`typeof window === 'undefined' ? … : lesen()` statt `useSyncExternalStore`), der Fall muss rot werden. Komponenten mit `next/navigation`, `next/link` oder `next/image` bekommen dieselben Attrappen wie in den übrigen Tests.
+- Teile, die mit Uhr, Breite oder Browser-Speicher rechnen, stehen in tests/hydrieren.test.ts (jsdom); ein neues solches Teil kommt dort dazu (G6-Ergänzung 21.10.2026). Die Hilfe `tests/hydrieren-hilfe.ts` rendert den Server-Teil ohne `window`, `document`, `navigator`, `localStorage` und `matchMedia` (`renderToString`), hydriert das HTML danach mit `hydrateRoot` in `act` und wirft bei jeder Meldung von `onRecoverableError` oder `console.error`. Was der Browser später kennt (Uhr, Breite, Speicher, Adresse), setzt der Fall in `imBrowser`, nach dem Server-Teil; sonst sähen beide Seiten dieselbe Uhr. Jeder Fall bekommt eine Gegenprobe (§2): das Teil kurz auf direktes Lesen stellen (`typeof window === 'undefined' ? … : lesen()` statt `useSyncExternalStore`). Komponenten mit `next/navigation`, `next/link` oder `next/image` bekommen dieselben Attrappen wie in den übrigen Tests.
 - **Kein E2E vorhanden.** Kein Playwright, kein Cypress.
 - Wer Verhalten testen will, muss die Entscheidung **aus der Komponente herausziehen** — genau der Grund für die Schichtung in `ARCHITECTURE.md`.
 - Testing-Library oder Playwright **nicht eigenmächtig einführen**. Vorschlagen und fragen.
@@ -138,8 +137,10 @@ pnpm test:integration                        # Integration (braucht .env.test)
 | Jeder Token-/Signaturweg — ein „Token nur hier"-Test zählt die Stellen im Syntaxbaum von TypeScript (kein Regex-Kommentarfilter: der hielt `//host` für einen Kommentar), mit einer Gegenprobe je Leckweg, auch für Wege ohne den Namen des Tokens (`document.URL`) | `geheimnis.test.ts`, `alte-seiten-neues-design.test.ts` |
 | Jeder behobene Bug | ein Test, der ihn vorher gefangen hätte |
 | Jede Migration gegen das Deploy-Fenster | `migrationen-wache.test.ts` |
-| Jede Architektur-Regel, die sich am Quelltext prüfen lässt (wer was einbindet, wo ein Parameter gelesen wird) — mit Gegenprobe, dass die Suche anschlägt | `hofseite-einmal.test.ts`, `design-tokens.test.ts`, `decrement-wache.test.ts`, `workflows-wache.test.ts`, `palette-klassen-wache.test.ts`, `actions-sitzung-wache.test.ts`, `svg-bild-ohne-link.test.ts` |
+| Jede Architektur-Regel, die sich am Quelltext prüfen lässt (wer was einbindet, wo ein Parameter gelesen wird) — mit Gegenprobe | `hofseite-einmal.test.ts`, `design-tokens.test.ts`, `decrement-wache.test.ts`, `workflows-wache.test.ts`, `palette-klassen-wache.test.ts`, `actions-sitzung-wache.test.ts`, `svg-bild-ohne-link.test.ts` |
 | Jeder Geldweg, bei dem die Datenbank die Antwort gibt, **zusätzlich** in der Integrationsschicht | `checkout-bestand.int.test.ts`, `storno-nebenlaeufig.int.test.ts` |
+
+**Jede Wache und jeder Prüfstand hat eine Gegenprobe** (Pflicht, einmal hier): Der Test läuft einmal an einem Beispiel, das er finden muss bzw. das ihn rot machen muss — die Suche an einem Schnipsel mit dem Verstoß, der Prüfstand an der Komponente auf dem alten Weg. Ein leerer Fund beweist sonst nichts; das gilt auch vor jeder Behauptung „0 Treffer“ (Inventur, Wache, Suche für einen Bericht): Die Inventur zählte sonst nur drei von vier Muster-Schreibweisen (Regelvorschlag 110, Lauf 16; hier zusammengeführt, Inventur 13, Morgenbericht 20 §3, freigegeben 21.10.2026). Die übrigen Stellen in diesem Dokument verweisen auf diese Pflicht oder nennen nur ihr Beispiel.
 
 Die **Migrationswache** ist ein normaler Unit-Test der Suite (reine Dateiarbeit,
 ohne Datenbank) — sie läuft bei `pnpm test` und damit im Stop-Hook. Sie schlägt
@@ -154,9 +155,10 @@ Typänderung und `DROP TABLE` lässt sie nur mit einem begründeten Marker durch
 - Attrappen für `next/og` liefern ein echtes PNG als Körper — Text ergäbe 503, weil sharp ihn nicht lesen kann (Regelvorschlag 76, Lauf 12; freigegeben 13.10.2026; verschoben aus ARCHITECTURE.md „Vorschaubild und Icons").
 - Telefonnummern-Wache (`tests/telefonnummern-wache.test.ts`): ein Test über `src/`, `tests/`, `docs/` und `DEVELOPMENT.md` findet Nummern mit nicht genulltem Teilnehmerteil, auch in sich selbst; Ausnahmen je Nummer mit Grund, z. B. die Nummer des BAES — die Liste führt eine Kennung (SHA-256 der Ziffern) statt der Nummer, und die Gegenproben setzen ihre Ziffer erst zur Laufzeit ein (Dirigenten-Vorschlag, Lauf 12; freigegeben 13.10.2026; gebaut in Nr. 85). Testnummern unterscheiden sich in der Vorwahl („+43 660 000 0000“, „+43 664 000 0000“), nie in den Ziffern dahinter. SVG-Pfaddaten (`d="M…"`) überspringt die Wache grundsätzlich, eine Ausnahme dafür gibt es nicht.
 - Kein unsichtbares U+FEFF mitten in Dateien unter `src/` und `tests/`: Wer ein BOM braucht, schreibt `\uFEFF` (Wache in `tests/keine-emojis.test.ts`; Regelvorschlag 103, Lauf 16; gebaut mit Nr. 118).
-- Vor jeder Behauptung „0 Treffer“ (Inventur, Wache, Suche für einen Bericht) läuft das Suchmuster als Test an einem Beispiel, das es finden muss – die Inventur zählte sonst nur drei von vier Muster-Schreibweisen (Regelvorschlag 110, Lauf 16); jede Wache hat dafür ihre Gegenprobe.
-- Wachen aus Nr. 118, jede mit einer Gegenprobe, die anschlägt: keine `loading.tsx` neben einer Seite mit Filtern in der Adresse (`loading-filter-wache`), kein `key` an einem iframe außer in der Liste aus `vorschauRahmen` (`vorschau-rahmen-wache`), `del(` aus `@vercel/blob` nur in den benannten Wegen (`blob-loeschen-wache`), kein doppelter Absatz in `docs/ai` (`doku-doppelte-absaetze`); wie `admin-seiten-wache` vergleichen sie gegen das Dateisystem und nennen eine neue Datei mit Namen.
+- Wachen aus Nr. 118, jede mit Gegenprobe (siehe oben): keine `loading.tsx` neben einer Seite mit Filtern in der Adresse (`loading-filter-wache`), kein `key` an einem iframe außer in der Liste aus `vorschauRahmen` (`vorschau-rahmen-wache`), `del(` aus `@vercel/blob` nur in den benannten Wegen (`blob-loeschen-wache`), kein doppelter Absatz in `docs/ai` (`doku-doppelte-absaetze`); wie `admin-seiten-wache` vergleichen sie gegen das Dateisystem und nennen eine neue Datei mit Namen.
 - In `src/components/hoefe/**` stehen `new Date()` und `Date.now()` nur in `use-uhr.ts`; Zeitlogik läuft dort über `useUhr` — /hoefe ist statisch (5 Minuten Zwischenspeicher, Register N19), eine Zeitangabe aus der Uhr des Servers wäre bis zum nächsten Rendern falsch. Wache in `tests/karte-wache.test.ts`, mit Gegenprobe (Nr. 120, Regelvorschlag in Nr. 127, freigegeben 20.10.2026).
+- Jede Datei mit `useSyncExternalStore` hat einen Fall in tests/hydrieren.test.ts oder steht dort mit Grund unter den Ausnahmen (geprüft; Regelvorschlag 135 aus Morgenbericht 20, freigegeben 21.10.2026).
+- Eine Wache über Nutzertext prüft den gerenderten Text (`renderToStaticMarkup`), nicht nur den Quelltext; Gegenprobe mit einem Wort in einem wiederverwendeten Baustein (Regelvorschlag 124, Morgenbericht 20 §6, freigegeben 21.10.2026).
 
 ### Nicht testen
 - Prisma selbst, Next.js selbst, Stripe selbst.
@@ -170,15 +172,15 @@ Typänderung und `DROP TABLE` lässt sie nur mit einem begründeten Marker durch
 
 ### Gemockt werden darf — Infrastruktur
 ```ts
-vi.mock('@/lib/prisma')      // 27 Dateien
-vi.mock('@/lib/auth')        // 15
-vi.mock('@/lib/email')       // 14
-vi.mock('@/lib/stripe')      // 8
-vi.mock('next/headers')      // 15
-vi.mock('next/cache')        // 13
-vi.mock('@vercel/blob')      // 3
+vi.mock('@/lib/prisma')
+vi.mock('@/lib/auth')
+vi.mock('@/lib/email')
+vi.mock('@/lib/stripe')
+vi.mock('next/headers')
+vi.mock('next/cache')
+vi.mock('@vercel/blob')
 ```
-Alles, was Netz, DB oder Request-Kontext braucht.
+Alles, was Netz, DB oder Request-Kontext braucht. Wie viele Dateien ein Modul ersetzen, zählt `git grep -l -F "vi.mock('@/lib/prisma'" tests | wc -l` (Inventur 4, Morgenbericht 20 §3, freigegeben 21.10.2026).
 
 **Wer ein Paket mit Sicherheitsfunktion (Better Auth und seine Plugins, Stripe, WebAuthn, sharp) mit `vi.mock` ersetzt, prüft denselben Weg mindestens einmal echt, als Integrationstest oder mit echter Signatur (Vorbild `tests/integration/admin-passkey.int.test.ts:119`)** (Wache `tests/paket-mock-wache.test.ts`; Nr. 115, Regelvorschlag in Nr. 127, freigegeben 20.10.2026).
 
@@ -197,7 +199,7 @@ Alles, was Netz, DB oder Request-Kontext braucht.
 - **Nie** eine Fachregel aus `src/lib/` mocken, wenn ihr Ergebnis die Aussage des Tests ist.
 - **Nie** Zod-Validierung mocken oder umgehen. Ungültige Eingabe muss echt durchs Schema.
 - **Nie** Geldrechnung mocken. Beträge echt durchrechnen lassen.
-- **Nie** die Zeit implizit lassen: `jetzt` als Parameter übergeben oder `vi.useFakeTimers()`. Kein Test darf von der Systemuhr abhängen. (Einzige Ausnahme: die Integrationsschicht, wo `jetzt` über die Handler-Grenze nicht injizierbar ist — Abschnitt 1 nennt die Bedingung dafür.)
+- **Nie** die Zeit implizit lassen: `jetzt` als Parameter übergeben oder `vi.useFakeTimers()`. Kein Test darf von der Systemuhr abhängen (Ausnahmen: §4 „Ausnahmen von der Uhr“).
 - **Nie** eine Berechtigungsprüfung wegmocken, um "an die eigentliche Logik zu kommen". Genau die Prüfung ist die Logik.
 
 ### Regel
@@ -236,7 +238,8 @@ in einen ungültigen Schlüssel statt in echtes Geld.
 - Reihenfolge-Unabhängigkeit: Jeder Test muss allein laufen.
 - **Schwere Module echt importieren** (z. B. `@/lib/email` mit React und allen Vorlagen): einmal je Datei in `beforeAll` mit eigenem Timeout (`30_000`), nie in jedem Test. Ein kalter Import im Test zählt gegen das 5-s-Limit und reißt es, sobald parallel gearbeitet wird. `vi.resetModules()` nur, wo ein Modul Umgebungswerte auf Modulebene liest oder dort veränderlichen Zustand hält (etwa einen gemerkten Abruf) — dann ebenfalls in `beforeAll`, eine Instanz je Variante (Vorbild: `tests/email-sendraw.test.ts`, `tests/upload-ursache.test.ts`). Das Testlimit nie global anheben.
 - **Statische Wachen, die ganz `src/` lesen und parsen** (TypeScript-Parser über jede Datei): eigenes Limit `30_000` nur an genau diesem `it`, mit einem Satz, warum. Eine Wache, die nur wenige Dateien liest, bleibt beim Standard. (geprüft von tests/zeitgrenzen-wache.test.ts; Regelvorschlag Sammel 19, 21.10.2026)
-- **Laufzeit-Tests gegen quadratische Muster** (Regex, Schleifen über Fremdtext) messen mit `performance.now()` gegen eine großzügige Grenze (Vorbild `tests/sentry-hygiene-felder.test.ts`: 500 ms für Millisekunden-Arbeit). Das ist die eine erlaubte Abhängigkeit von der Uhr: Gemessen wird die Dauer, nie ein Datum. Wo eine feste Grenze ein Wachstum nicht zeigt, misst ein Wachstumstest das Verhältnis t(4N)/t(N) gegen 8 (linear etwa 4, quadratisch 16): Texte vorab gebaut, beide Größen abwechselnd, je Größe der Median aus drei Läufen, bei einem Ausreißer bis zu drei Versuche (Vorbild `tests/sentry-hygiene-wachstum.test.ts`, seit Nr. 64).
+- **Ausnahmen von der Uhr** (Inventur 13, Morgenbericht 20 §3, freigegeben 21.10.2026): Kein Test hängt von der Systemuhr ab — `jetzt` ist ein Parameter, oder die Uhr steht fest (`vi.useFakeTimers()`, `vi.setSystemTime`). Es gibt zwei Ausnahmen: (1) die Integrationsschicht, wo `jetzt` über die Handler-Grenze nicht injizierbar ist (Bedingungen: §1, „Zeit in der Integrationsschicht“); (2) Laufzeit- und Wachstumsmessungen, die die Dauer messen, nie ein Datum (nächster Punkt).
+- **Laufzeit-Tests gegen quadratische Muster** (Regex, Schleifen über Fremdtext) messen mit `performance.now()` gegen eine großzügige Grenze (Vorbild `tests/sentry-hygiene-felder.test.ts`: 500 ms für Millisekunden-Arbeit). Das ist die zweite Ausnahme von der Uhr (Punkt davor): Gemessen wird die Dauer, nie ein Datum. Wo eine feste Grenze ein Wachstum nicht zeigt, misst ein Wachstumstest das Verhältnis t(4N)/t(N) gegen 8 (linear etwa 4, quadratisch 16): Texte vorab gebaut, beide Größen abwechselnd, je Größe der Median aus drei Läufen, bei einem Ausreißer bis zu drei Versuche (Vorbild `tests/sentry-hygiene-wachstum.test.ts`, seit Nr. 64).
 - **Prozessweiter nativer Zustand** (etwa `sharp.block`, das die Lader von libvips für den ganzen Prozess sperrt) nur in einer eigenen Testdatei, die ihn in `afterAll` aufhebt, und nur, solange jede Datei in einem eigenen Prozess läuft: `pool: 'forks'` in `vitest.config.ts` bleibt stehen (Vorbild `tests/sharp-lader-sperre.test.ts`). Mit Worker-Threads teilen sich parallele Dateien den Zustand.
 - **Modul-Zustand, den Tests gegeneinander verschieben würden** (gemerkte Meldungen, Bremsen): Die Funktion nimmt den Zustand als optionalen letzten Parameter, die Aufrufer lassen ihn weg; jeder Test gibt einen frischen mit (Vorbild `neueBremsMeldungen` in `tests/bremse-datenbank.test.ts`), die Zeit als Parameter. Die Verdrahtung mit dem Zustand des Moduls prüft EIN frisch geladenes Modul (`vi.resetModules()` in `beforeAll`, die Attrappen danach ebenfalls neu importieren). `vi.resetModules()` leert das Register der Mocks nicht: Attrappen aus `vi.mock` bleiben dieselben Funktionen — wer je Fall frisch lädt, leert vorher ihre Aufrufe (`vi.clearAllMocks()`, Vorbild `tests/hoefe-fehleranzeige.test.ts`).
 
@@ -256,6 +259,7 @@ in einen ungültigen Schlüssel statt in echtes Geld.
 - Telefon: `+43 660 0000000` — mehrere Nummern unterscheiden sich in der Vorwahl (664, 676, 699), der Teilnehmerteil bleibt genullt (Wache `tests/telefonnummern-wache.test.ts`).
 - Keine echten Stripe-IDs, keine echten Tokens — auch keine abgelaufenen.
 - Erfundene Tokens und Codes in Tests aus Buchstaben, nicht aus langen Ziffernfolgen (sonst schlägt die Telefonnummern-Wache an) (Nr. 113, Morgenbericht 17, freigegeben 19.10.2026).
+- Ein verfälschter Wert ist immer sicher anders: Zeichen tauschen, nicht festsetzen (geprüft; Regelvorschlag aus Morgenbericht 20 §6, freigegeben 21.10.2026).
 - **Für Typen, die in mehr als drei Testdateien nachgebaut werden, gibt es eine Fabrik in `tests/fabrik/<typ>.ts`; sonst bleiben Faktoren lokal** (Wache `tests/fabrik-wache.test.ts`; Nr. 119, Regelvorschlag in Nr. 127, freigegeben 20.10.2026).
 - **Integrationsschicht: alles trägt das Präfix `int-`** — Hof-Slug, Produkt-ID,
   Sitzungs-ID, E-Mail-Adresse. Das Präfix ist die Sicherung, an der `raeumeAuf()`
@@ -277,8 +281,8 @@ in einen ungültigen Schlüssel statt in echtes Geld.
 - Neue Fachregel → Test im selben Commit. Kein "Tests kommen später".
 - Bugfix → zuerst der Test, der den Bug reproduziert, dann der Fix.
 - Geänderte Fachregel → bestehende Tests anpassen, **nicht löschen**. Wer einen Test löscht, begründet das im Bericht.
-- Roter Test wird **nie** mit `.skip` stillgelegt. Entweder reparieren oder melden.
-- `pnpm test` muss vor jedem Commit grün sein.
+- Roter Test wird **nie** mit `.skip` stillgelegt. Entweder reparieren oder melden (geprüft von tests/test-ueberspringen-wache.test.ts).
+- `pnpm test` muss vor jedem Commit grün sein – im Nachtlauf vor jedem Push (Register G10).
 
 ### Bekannte Umgebungsfallen
 - `prisma generate` braucht Netzzugriff auf `binaries.prisma.sh`. Ist er blockiert, scheitern vier Testdateien mit `Cannot find module '.prisma/client/default'`. Das ist **kein** Codefehler — vor der Fehlersuche `pnpm db:generate` prüfen.
