@@ -16,6 +16,7 @@ import {
 import { heldKandidaten, produktBildQuelle, type BildQuelle } from '@/lib/teilen-bild-quellen'
 import { hofAdresse } from '@/lib/mein-hof'
 import {
+  beitragIdImLink,
   beitragLink,
   beitragTextVorschlag,
   beitragVorbelegung,
@@ -241,6 +242,9 @@ export async function ladeTeilenFensterBeitrag(farmId: string, postId: string, j
     zaehleWhatsAppAbonnentinnen(farmId),
   ])
   if (!quelle || !beitrag || !beitragDarfInsBild(beitrag, farmId, jetzt)) return null
+  // Dieselbe Regel wie in der Mail und im WhatsApp-Link (T5, F8); `beitragDarfInsBild` verlangt `showOnFarmPage` schon.
+  const beitragId = beitragIdImLink(beitrag)
+  if (!beitragId) return null
   const hof = hofAdresse(APP_URL, quelle.hof.slug)
   const daten = teilenBildDaten({ hof: quelle.hof, produkte: quelle.produkte, slots: quelle.slots, auswahl: null, adresse: hof.anzeige, jetzt })
   const auswahl = quelle.hof.isPaused ? [] : teilenAuswahl(quelle.produkte, quelle.hof)
@@ -252,8 +256,8 @@ export async function ladeTeilenFensterBeitrag(farmId: string, postId: string, j
     art: 'beitrag',
     hofName: daten.hofName,
     slug: quelle.hof.slug,
-    link: beitragLink(hof.url, beitrag.id),
-    adresse: beitragLink(hof.anzeige, beitrag.id),
+    link: beitragLink(hof.url, beitragId),
+    adresse: beitragLink(hof.anzeige, beitragId),
     auswahl,
     textVorschlag: beitragTextVorschlag(beitrag.title, beitrag.body, daten.abholung),
     beitragId: beitrag.id,

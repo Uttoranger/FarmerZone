@@ -5660,6 +5660,12 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Warum eine zweite Wache:** Die Number-Wache aus Nr. 139 konnte den Fehler nicht finden, dort stand kein `Number()`. `tests/geld-fliesskomma-wache.test.ts` meldet jede Multiplikation Geld × Nicht-Zahl unter `src/` außerhalb ihres Bestands (vier Stellen, alle Anzeige oder ganze Zahlen); das Umrechnen mit einer festen Zahl (`price * 100`) bleibt erlaubt. Wortstämme und „letzter Name“ stehen für beide Wachen in `tests/geld-namen.ts`. Die „Belege am Code“ der Number-Wache sind gestrichen (Morgenbericht 21 §8): Sie verglichen Text und wären bei jedem Umbau ohne Aussage rot geworden.
 - **Tests:** Vollprobe aller Cent-Preise von 0,01 bis 50,00 € mal 1,5, 2,5, 12,5, 1,125 und 7,75 gegen eine Referenz in ganzen Zahlen (0 Abweichungen, die alte Formel weicht ab), Korb und Korb-Blatt prüfen den Zahlenwert 3.3, nicht den Text.
 
+## Nacharbeit im Code aus Lauf 20 und 21 (Nr. 148, Lauf 22, 22.10.2026)
+
+- **Menüeinträge 44 px im Baustein:** `ITEM` in `src/components/ui/dropdown-menu.tsx` trägt `min-h-11`; die örtlichen Regeln in der Hofliste und im Konto-Menü sind weg. Damit sind auch „Mehr zu …“ bei den Meldungen und „+ Neu“ in der Seitenleiste 44 px hoch. `tests/menue-hoehe.test.ts` prüft den Baustein und meldet jede örtliche Höhe am Menüeintrag.
+- **Beitrag für WhatsApp aus einer Abfrage:** `getStatusPostForWhatsApp` liefert `showOnFarmPage`, die Seite fragt nicht mehr selbst bei Prisma. Der Link im Teilen-Fenster (`ladeTeilenFensterBeitrag`) nimmt `beitragIdImLink`, wie die Mail.
+- **Kleinigkeiten:** Typ `BeitragBlockArt` in `src/lib/heute.ts` statt doppelt; Kopfkommentar von `src/lib/hofuebersicht.ts` nennt Kalendertag und volle Termine; `tests/produkte-handlung.test.ts` beweist `hatHandlung` im Render.
+
 ## Nützliche Befehle
 
 ```bash

@@ -208,6 +208,7 @@ describe('getStatusPostForWhatsApp und zaehleWhatsAppAbonnentinnen', () => {
 
     const daten = await getStatusPostForWhatsApp(farm.id, beitrag.id)
 
+    expect(daten?.showOnFarmPage).toBe(beitrag.showOnFarmPage)
     expect(daten?.getippt).toEqual([anna.id])
     expect(daten?.abonnentinnen.map((a) => a.id)).toEqual([anna.id, berta.id])
     expect(Object.keys(daten?.abonnentinnen[0] ?? {}).sort()).toEqual(['id', 'name', 'phone'])

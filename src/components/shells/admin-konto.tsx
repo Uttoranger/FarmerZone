@@ -99,12 +99,12 @@ export function AdminKontoMenue({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64" container={menueZiel}>
         {hatHof && (
-          <DropdownMenuLinkItem render={<Link href={ADMIN_KONTO.href} />} className="min-h-11">
+          <DropdownMenuLinkItem render={<Link href={ADMIN_KONTO.href} />}>
             <UserRound className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
             {ADMIN_KONTO.label}
           </DropdownMenuLinkItem>
         )}
-        <DropdownMenuItem onClick={abmelden} className="min-h-11">
+        <DropdownMenuItem onClick={abmelden}>
           <LogOut className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
           {ADMIN_ABMELDEN.label}
         </DropdownMenuItem>
