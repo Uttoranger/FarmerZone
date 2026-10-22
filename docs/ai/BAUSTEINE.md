@@ -405,6 +405,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/lade-punkt.tsx · LadeInhalt, LadePunkt, LadeRahmen · Laden ohne Ladebild (Register N14, Ergänzung; Nr. 105; Mockup admin-postfach-ruhig): Ein Wechsel über einen Link lässt den bisherigen Inhalt stehen, bis der neue da ist. · genutzt
 - src/components/ui/list-row.tsx · ListGruppe, ListRow · ListGruppe: Zeilen auf einer Karte, durch feine Linien getrennt — wie das Mehr-Blatt und die Bestellliste in den Mockups. · genutzt
 - src/components/ui/marke.tsx · Marke · Die Marke: ein Zustand als kurzes Wort auf seiner Bedeutungsfarbe (Register G5) — tun (die Kundin oder der Hof muss etwas tun), läuft, erledigt, abgebrochen. · genutzt
+- src/components/ui/menue-ziel.tsx · MenueZielAnbieter, useMenueZiel, type MenueZiel · Der Zielort für das Portal der Menüs (Regelvorschlag 132 aus Morgenbericht 20, freigegeben 21.10.2026). · genutzt
 - src/components/ui/password-input.tsx · PasswordInput · kein Zweck vermerkt · genutzt
 - src/components/ui/progress-bar.tsx · ProgressBar · ProgressBar: Fortschritt als Balken, z. B. „Deine Hofseite · 64 %". · genutzt
 - src/components/ui/segment.tsx · Segment, type SegmentOption · Segment: ein Umschalter mit genau einer Wahl („Handy | Web", „10 km | 25 km | 50 km"). · genutzt
