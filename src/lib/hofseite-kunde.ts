@@ -10,7 +10,7 @@
  * Gebührensatz in servicegebuehr.ts.
  */
 import { formatEuro, formatZahl, mitAnzahl } from '@/lib/format'
-import { zeigeKaufknopf, type KaufSperre } from '@/lib/bereiche-anzeige'
+import { kaufSperreHinweis, zeigeKaufknopf, type KaufSperre } from '@/lib/bereiche-anzeige'
 import { calcLineTotal, decimalZuCents } from '@/lib/order-totals'
 import { BAR_OHNE_GEBUEHR_HINWEIS } from '@/lib/konditionen'
 import {
@@ -319,7 +319,15 @@ export function stepperObergrenze(bestand: number, imKorb: number): number {
 }
 
 const MENGE_NICHT_GEAENDERT = 'Wir konnten die Menge nicht ändern. Versuch es gleich noch einmal.'
-const VERSTAENDLICH = new Set<string>([SHOP_PAUSED_MESSAGE, FARM_ARCHIVED_MESSAGE, FARM_NOT_APPROVED_MESSAGE])
+// Die Titel der Kaufsperre schickt /api/reserve bei 409 (Nr. 145) — aus kaufSperreHinweis, nie als eigenes
+// Literal; der Hofname steht nur im Satz, nicht im Titel.
+const VERSTAENDLICH = new Set<string>([
+  SHOP_PAUSED_MESSAGE,
+  FARM_ARCHIVED_MESSAGE,
+  FARM_NOT_APPROVED_MESSAGE,
+  kaufSperreHinweis('keine-abholzeit', '').titel,
+  kaufSperreHinweis('ausgebucht', '').titel,
+])
 
 /**
  * Was die Kundin liest, wenn /api/reserve eine neue Menge ablehnt — statt

@@ -683,7 +683,7 @@ function MehrMenue({ hof, onGruendung, onAusnehmen, onTesthof, onAktion }: { hof
       >
         <Ellipsis className="size-5" strokeWidth={1.7} aria-hidden="true" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72 max-w-[calc(100vw-2rem)] [&_[role=menuitem]]:min-h-11">
+      <DropdownMenuContent align="end" className="w-72 max-w-[calc(100vw-2rem)]">
         {oeffentlich && (
           <DropdownMenuLinkItem render={<a href={`/${hof.slug}`} target="_blank" rel="noopener noreferrer" />}>
             <Eye className={symbol} strokeWidth={1.7} aria-hidden="true" />

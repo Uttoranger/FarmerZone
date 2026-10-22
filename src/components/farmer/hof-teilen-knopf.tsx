@@ -13,17 +13,20 @@ export function HofTeilenKnopf({
   slug,
   className,
   label = 'Hof teilen',
+  nurSymbol = false,
 }: {
   name: string
   slug: string
   className?: string
   /** Die kompakte Zeile ab lg sagt nur „Teilen" — der Hof steht daneben. */
   label?: string
+  /** Runder Knopf nur mit Symbol im Titelbild-Streifen am Handy (Nr. 143); das Wort trägt dann `aria-label`. */
+  nurSymbol?: boolean
 }): React.JSX.Element {
   return (
-    <button type="button" onClick={() => void teileHof({ name, slug })} className={className}>
+    <button type="button" onClick={() => void teileHof({ name, slug })} className={className} aria-label={nurSymbol ? label : undefined}>
       <Share2 className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-      {label}
+      {!nurSymbol && label}
     </button>
   )
 }

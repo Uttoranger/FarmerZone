@@ -7,13 +7,13 @@
  * kein Zeitplan, bei jedem Push ein roter Lauf. „ #“ beginnt dort einen Kommentar und schneidet den Befehl
  * still ab. Beides fällt in keinem Test der App auf, nur bei GitHub.
  *
- * Beweist (jede .yml/.yaml in .github/workflows/, Zeile für Zeile, ohne YAML-Paket):
+ * Beweist (jede .yml/.yaml in .github/workflows/, Zeile für Zeile; der Zeilenteil liest ohne YAML-Paket, der Parser steht im zweiten Teil):
  *  - Eine Zeile `run: <wert>` (auch `- run:`), deren Wert nicht mit ', ", | oder > beginnt, enthält weder
  *    „: “ (bzw. einen Doppelpunkt am Zeilenende) noch „ #“. Ein Befund nennt Datei und Zeile.
  *  - Gegenprobe: die alte Zeile aus lebenszeichen.yml schlägt an, ebenso „ #“ und die Form `- run:`;
  *    der Wert in einfachen Anführungszeichen (die echte Zeile der Datei), ein `run: |`-Block und ein Befehl
  *    ohne Doppelpunkt nicht.
- * Seit Nr. 127 liest ein echter YAML-Parser (`tests/yaml-lader.ts`) jede Datei vollständig: ungültiges YAML,
+ * Seit Nr. 127 liest ein echter YAML-Parser (`tests/yaml-lader.ts`, das Entwicklungspaket `yaml` seit Nr. 135) jede Datei vollständig: ungültiges YAML,
  * auch dort, wo die Zeilenprüfung nichts sieht (Folgezeilen, Kurzformen), macht den Test rot.
  * Grenze der Zeilenprüfung: Geprüft wird nur die Zeile mit `run:` und Wert — so schreiben wir Workflows. Ein Wert erst in der
  * nächsten Zeile, Folgezeilen eines mehrzeiligen ungeschützten Werts und die Kurzform `- { run: … }` sieht

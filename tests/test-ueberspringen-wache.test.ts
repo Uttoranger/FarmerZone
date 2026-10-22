@@ -117,7 +117,7 @@ function testdateien(ordner: string): string[] {
 }
 
 /** Liest und parst jede Datei unter `tests/`, die ein Stichwort enthält (das spart das Parsen der meisten). */
-function alleFunde(): { geprueft: number; funde: Fund[] } {
+function alleFunde(): { geprueft: number; dateien: string[]; funde: Fund[] } {
   const stichwoerter = ['skip', 'only', 'todo', 'runIf', 'xit', 'xtest', 'xdescribe']
   const dateien = testdateien(join(WURZEL, 'tests'))
   const funde = dateien.flatMap((pfad) => {
@@ -125,7 +125,12 @@ function alleFunde(): { geprueft: number; funde: Fund[] } {
     if (!stichwoerter.some((wort) => text.includes(wort))) return []
     return findeStilllegungen(text, relative(WURZEL, pfad).split(sep).join('/'))
   })
-  return { geprueft: dateien.length, funde }
+  return { geprueft: dateien.length, dateien: dateien.map((pfad) => relative(WURZEL, pfad).split(sep).join('/')), funde }
+}
+
+/** Wahr, wenn die Liste mindestens eine Integrationsdatei (`tests/integration/*.int.test.ts`) enthält. */
+function enthaeltIntegration(dateien: string[]): boolean {
+  return dateien.some((pfad) => pfad.startsWith('tests/integration/') && pfad.endsWith('.int.test.ts'))
 }
 
 /** `x.slice(0, -n)` mit einer Zahl n: schneidet die letzten n Zeichen ab. */
@@ -172,11 +177,13 @@ function findeFestgesetzteEnden(text: string, name: string): Festsetzung[] {
 describe('Tests überspringen — keine stillgelegten Tests unter tests/', () => {
   it('kein .skip, .only, .todo, xit oder xdescribe; skipIf und runIf nur in der Liste mit Grund', () => {
     // Liest und parst jede Datei unter tests/ (TESTING_GUIDELINES §4: Zeitgrenze 30_000 an genau diesem it).
-    const { geprueft, funde } = alleFunde()
+    const { geprueft, dateien, funde } = alleFunde()
 
     // Nicht blind: Die Wache sah die Unit-Tests, die Integrationsschicht und sich selbst.
     expect(geprueft).toBeGreaterThan(400)
     expect(funde.map((f) => f.datei)).not.toContain('tests/test-ueberspringen-wache.test.ts')
+    // Nacharbeit 140 (Nr. 147): Die gelesene Liste enthält nachweislich Dateien aus `tests/integration/`.
+    expect(enthaeltIntegration(dateien)).toBe(true)
 
     const still = funde.filter((f) => f.art === 'stilllegung')
     expect(still.map((f) => `${f.datei}:${f.zeile} ${f.text}`)).toEqual([])
@@ -223,6 +230,13 @@ describe('Tests überspringen — Gegenprobe: die Erkennung schlägt an', () => 
   it('meldet skipIf und runIf als bedingt, damit die Liste entscheidet', () => {
     expect(finde("it.skipIf(process.platform === 'win32')('ist ausführbar', () => {})")).toEqual([['bedingt', 'it….skipIf']])
     expect(finde("describe.runIf(process.env.CI)('nur in der CI', () => {})")).toEqual([['bedingt', 'describe….runIf']])
+  })
+
+  it('die Liste der gelesenen Dateien muss die Integrationsschicht enthalten', () => {
+    expect(enthaeltIntegration(['tests/a.test.ts', 'tests/integration/b.int.test.ts'])).toBe(true)
+    // Ohne `tests/integration/` in der Liste wird der Fall oben rot.
+    expect(enthaeltIntegration(['tests/a.test.ts', 'tests/b.test.ts'])).toBe(false)
+    expect(enthaeltIntegration(['tests/integration/hilfe.ts'])).toBe(false)
   })
 
   it('schlägt nicht an bei Kommentaren, Zeichenketten und fremden Objekten', () => {

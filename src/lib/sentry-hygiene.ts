@@ -144,7 +144,8 @@ const IN_KENNUNG = String.raw`(?:(?<=${KENNUNG_ANFANG}(?=${CUID_FORM})[a-z0-9]{1
 /** Eine Telefonnummer: +43 664 123 4567, 0664/1234567, (0664) 1234567 … — eine
  *  führende +/0/(0-Gruppe und danach mindestens sieben weitere Ziffern mit
  *  üblichen Trennzeichen (höchstens drei am Stück). Bewusst konservativ:
- *  Datumsangaben (01.09.2026), Uhrzeiten und Postleitzahlen bleiben stehen. */
+ *  Datumsangaben (01.09.2026), Uhrzeiten und Postleitzahlen bleiben stehen.
+ *  Ein Datum mit Uhrzeit gilt dagegen noch als Nummer (bekannte Grenze, Nr. 141). */
 const TELEFON_NUMMER = String.raw`(?:\+|\(?0)\d(?:[\s/\-.()]{0,3}\d){7,}`
 
 /** Vor jeder Nummer: Die Vorschau lässt jede Stelle sofort fallen, an der keine

@@ -211,6 +211,7 @@ export async function getStatusPostForWhatsApp(
   id: string
   title: string
   body: string
+  showOnFarmPage: boolean
   farm: { name: string; slug: string }
   getippt: string[]
   abonnentinnen: Abonnentin[]
@@ -221,6 +222,7 @@ export async function getStatusPostForWhatsApp(
       id: true,
       title: true,
       body: true,
+      showOnFarmPage: true,
       whatsappGetippt: true,
       farm: { select: { name: true, slug: true } },
     },

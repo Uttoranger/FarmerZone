@@ -10,7 +10,10 @@
  * ZEITZONE: Die Abholfenster sind österreichische Ortszeiten („14:00"),
  * der Server läuft aber in UTC. Deshalb rechnen die Funktionen nie mit
  * `Date` selbst, sondern bekommen „jetzt" als bereits nach Europe/Vienna
- * aufgelösten Wochentag + Uhrzeit — die Auflösung macht wienJetzt().
+ * aufgelösten Wochentag, Uhrzeit und Kalendertag (`OrtsZeit`) — die
+ * Auflösung macht wienJetzt(). Seit Nr. 131 trägt auch `NaechsteAbholung`
+ * den Wiener Kalendertag, und `naechsteAbholung` überspringt volle Termine
+ * (`ausgebuchtAm`).
  */
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import type { ProductCategoryValue } from '@/schemas/product'

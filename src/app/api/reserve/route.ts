@@ -6,6 +6,8 @@ import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { gibVerwaisteFreiFuerProdukte } from '@/server/verwaiste-bestellungen'
+import { alsAbholFenster, ausgebuchteTage } from '@/server/abholfenster'
+import { kaufSperre, kaufSperreHinweis } from '@/lib/bereiche-anzeige'
 
 const MAX_MENGE = 10_000
 
@@ -64,13 +66,23 @@ export async function POST(request: NextRequest) {
 
     // 2. Verify product exists and is available
     // Pausen- und Stilllegungs-Zustand kommen über den Hof-Join: der Request
-    // kennt nur die productId, und ein zweiter Query wäre unnötig.
+    // kennt nur die productId, und ein zweiter Query wäre unnötig. Die aktiven
+    // Abholzeiten braucht die Kaufsperre (2d), wie in der Kasse.
     const product = await prisma.product.findUnique({
       where: { id: productId },
       select: {
         stock: true,
         isAvailable: true,
-        farm: { select: { isPaused: true, archivedAt: true, approvedAt: true } },
+        farm: {
+          select: {
+            id: true,
+            name: true,
+            isPaused: true,
+            archivedAt: true,
+            approvedAt: true,
+            pickupSlots: { where: { isActive: true }, select: { dayOfWeek: true, startTime: true, endTime: true } },
+          },
+        },
       },
     })
 
@@ -94,6 +106,19 @@ export async function POST(request: NextRequest) {
     // Bestandsrechnung und vor dem upsert, das die Reservierung anlegt.
     if (product.farm.isPaused) {
       return NextResponse.json({ error: SHOP_PAUSED_MESSAGE }, { status: 409 })
+    }
+
+    // 2d. Kaufsperre (Register N24) — nach der Pause, vor dem Bestand: Ohne
+    // buchbaren Abholtermin nimmt die Kasse nichts an, also wird auch keine Ware
+    // blockiert. Dieselbe Regel und Zählung wie die Kasse (checkout/page.tsx);
+    // die verwaisten Bestellungen des Hofs hat Schritt 0 schon freigegeben.
+    const { farm } = product
+    const voll = (await ausgebuchteTage([farm.id], now)).get(farm.id)
+    // Die Pause ist oben schon beantwortet; die Sperre kann hier nur „keine
+    // Abholzeit" oder „ausgebucht" sein.
+    const sperre = kaufSperre({ isPaused: false, pickupSlots: farm.pickupSlots.map((s) => alsAbholFenster(s, voll)) }, now)
+    if (sperre === 'keine-abholzeit' || sperre === 'ausgebucht') {
+      return NextResponse.json({ error: kaufSperreHinweis(sperre, farm.name).titel }, { status: 409 })
     }
 
     // 3. Count stock reserved by OTHER sessions (excluding this session)

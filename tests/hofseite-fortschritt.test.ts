@@ -9,17 +9,21 @@
  *  - Abholzeiten als „Fr 15–18 · Sa 9–12", Montag zuerst.
  *  - Pausiert ist ein Zustand mit eigenem Wort, kein Fehlen.
  *  - Jede Zeile hat ein Ziel in der Vorschau und eins für die Einstellungen.
- *  - Unter lg stehen die Zeilen in der Reihenfolge der Hofseite (Nr. 50).
+ *  - Unter lg stehen die Zeilen in der Reihenfolge der Hofseite (Nr. 50), seit
+ *    Nr. 143 in vier Gruppen nach dem Ort auf der Seite; die offenen, gezählten
+ *    Zeilen stehen vorher in der Karte „offen“, Abholzeiten zuerst (zeilenNachOrt).
  */
 import { describe, it, expect } from 'vitest'
 import { hofseiteZeileIdSchema } from '@/schemas/hofseite-vorschau'
 import {
   EINSTELLUNG_FUER_ZEILE,
   HOFSEITE_REIHENFOLGE,
+  ORTS_GRUPPEN,
   ZIEL_ABSCHNITT,
   abholzeitenKurz,
   hofseiteFortschritt,
   hofseiteStand,
+  zeilenNachOrt,
   zeilenWieAufDerHofseite,
   type HofseiteStand,
 } from '@/lib/hofseite-fortschritt'
@@ -140,6 +144,49 @@ describe('Reihenfolge der Hofseite (Liste „Bearbeiten" unter lg, Nr. 50)', () 
     const zeilen = zeilenWieAufDerHofseite(hofseiteFortschritt(VOLL))
     expect(zeilen.map((z) => z.id)).toEqual(HOFSEITE_REIHENFOLGE)
     expect(zeilen.find((z) => z.id === 'werte')?.wert).toBe('Regional · Saisonal')
+  })
+})
+
+describe('zeilenNachOrt (Liste „Bearbeiten" unter lg, Nr. 143, Register N4)', () => {
+  // Logo, Über uns und Abholzeiten fehlen (gezählt), Leitspruch fehlt (freiwillig).
+  const OFFEN: HofseiteStand = { ...VOLL, logoUrl: null, aboutText: null, description: '', abholzeiten: [], tagline: null, foundedYear: null }
+  const ids = (zeilen: readonly { id: string }[]) => zeilen.map((z) => z.id)
+
+  it('die Gruppen sind die Reihenfolge der Hofseite ohne „Bestellungen“', () => {
+    expect(ORTS_GRUPPEN.flatMap((g) => g.zeilen)).toEqual(HOFSEITE_REIHENFOLGE.filter((id) => id !== 'bestellungen'))
+    expect(ORTS_GRUPPEN.map((g) => g.titel)).toEqual(['Oben auf der Seite', 'Aufbau und Fotos', 'Abholen und Bezahlen', 'Über uns'])
+  })
+
+  it('offen, Gruppen und „Bestellungen“ ergeben jede Zeile genau einmal', () => {
+    for (const stand of [VOLL, OFFEN]) {
+      const { offen, gruppen } = zeilenNachOrt(hofseiteFortschritt(stand))
+      const alle = [...ids(offen), ...gruppen.flatMap((g) => ids(g.zeilen)), 'bestellungen']
+      expect(alle.toSorted()).toEqual([...HOFSEITE_REIHENFOLGE].toSorted())
+      // In jeder Gruppe die Reihenfolge der Seite.
+      for (const g of gruppen) expect(ids(g.zeilen)).toEqual(HOFSEITE_REIHENFOLGE.filter((id) => ids(g.zeilen).includes(id)))
+    }
+  })
+
+  it('offen sind genau die gezählten fehlenden Zeilen — Abholzeiten zuerst, dann in der Reihenfolge der Seite', () => {
+    const f = hofseiteFortschritt(OFFEN)
+    const { offen, gruppen } = zeilenNachOrt(f)
+    expect(ids(offen)).toEqual(['abholzeiten', 'logo', 'name', 'ueber-uns'])
+    expect(offen.map((z) => z.titel).toSorted()).toEqual([...f.fehlend].toSorted())
+    // Der freiwillige Leitspruch fehlt auch, steht aber in seiner Gruppe, nicht in der Karte.
+    expect(ids(gruppen.find((g) => g.id === 'oben')?.zeilen ?? [])).toEqual(['titelbild', 'tagline', 'adresse'])
+    // Gegenprobe: Ohne die Regel „Abholzeiten zuerst“ stünde das Logo vorn.
+    expect(ids(zeilenWieAufDerHofseite(f).filter((z) => !z.fertig && !z.freiwillig))[0]).toBe('logo')
+  })
+
+  it('bei 100 % ist nichts offen; eine offene Zeile verlässt ihre Gruppe', () => {
+    const { offen, gruppen } = zeilenNachOrt(hofseiteFortschritt(VOLL))
+    expect(offen).toEqual([])
+    expect(gruppen).toHaveLength(4)
+    const ohneUeberUns = zeilenNachOrt(hofseiteFortschritt({ ...VOLL, aboutText: null, description: '', werte: [] }))
+    // Über uns ist offen, Werte freiwillig — die Gruppe „Über uns“ behält nur die Werte.
+    expect(ids(ohneUeberUns.gruppen.find((g) => g.id === 'ueber-uns')?.zeilen ?? [])).toEqual(['werte'])
+    const nurOffen = zeilenNachOrt(hofseiteFortschritt({ ...VOLL, abholzeiten: [], phone: '' }))
+    expect(ids(nurOffen.gruppen.find((g) => g.id === 'abholen-bezahlen')?.zeilen ?? [])).toEqual(['zahlung'])
   })
 })
 

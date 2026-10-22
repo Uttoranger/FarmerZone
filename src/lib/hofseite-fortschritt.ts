@@ -435,3 +435,43 @@ export function zeilenWieAufDerHofseite(fortschritt: HofseiteFortschritt): Hofse
   const alle = fortschritt.gruppen.flatMap((g) => g.zeilen)
   return HOFSEITE_REIHENFOLGE.flatMap((id) => alle.filter((z) => z.id === id))
 }
+
+export type HofseiteOrtId = 'oben' | 'aufbau-fotos' | 'abholen-bezahlen' | 'ueber-uns'
+
+/**
+ * Die Liste „Bearbeiten“ unter lg in vier Gruppen nach dem Ort auf der Hofseite
+ * (Register N4, Ergänzung 22.10.2026; Nr. 143). Jede Zeile außer „Bestellungen“
+ * steht in genau einer Gruppe, in der Reihenfolge von HOFSEITE_REIHENFOLGE —
+ * „Bestellungen“ (Pause) lebt unter lg im Kopf (N3-Ergänzung) und zählt weiter
+ * im Fortschritt mit. Ab lg bleiben die Gruppen des Editors (GRUPPEN_TITEL).
+ */
+export const ORTS_GRUPPEN: readonly { id: HofseiteOrtId; titel: string; zeilen: readonly HofseiteZeileId[] }[] = [
+  { id: 'oben', titel: 'Oben auf der Seite', zeilen: ['titelbild', 'logo', 'name', 'tagline', 'adresse'] },
+  { id: 'aufbau-fotos', titel: 'Aufbau und Fotos', zeilen: ['abschnitte', 'fotos'] },
+  { id: 'abholen-bezahlen', titel: 'Abholen und Bezahlen', zeilen: ['abholzeiten', 'zahlung', 'kontakt'] },
+  { id: 'ueber-uns', titel: 'Über uns', zeilen: ['ueber-uns', 'werte'] },
+]
+
+/** Zuerst in der Karte „offen“: Ohne Abholzeiten kann niemand kaufen (Register N24). */
+const ZUERST_OFFEN: HofseiteZeileId = 'abholzeiten'
+
+/**
+ * Die Liste „Bearbeiten“ unter lg: oben die offenen, gezählten Zeilen (nicht fertig,
+ * nicht freiwillig — `fehlend` trägt nur die Titel) mit den Abholzeiten zuerst, dann in
+ * der Reihenfolge der Seite; darunter die übrigen Zeilen in ihren Gruppen nach dem Ort.
+ * Eine offene Zeile steht nicht noch einmal in ihrer Gruppe, leere Gruppen entfallen.
+ */
+export function zeilenNachOrt(fortschritt: HofseiteFortschritt): {
+  offen: HofseiteZeile[]
+  gruppen: { id: HofseiteOrtId; titel: string; zeilen: HofseiteZeile[] }[]
+} {
+  const zeilen = zeilenWieAufDerHofseite(fortschritt)
+  const istOffen = (z: HofseiteZeile) => !z.fertig && !z.freiwillig
+  const offen = zeilen.filter(istOffen).toSorted((a, b) => Number(b.id === ZUERST_OFFEN) - Number(a.id === ZUERST_OFFEN))
+  const gruppen = ORTS_GRUPPEN.map((g) => ({
+    id: g.id,
+    titel: g.titel,
+    zeilen: zeilen.filter((z) => g.zeilen.includes(z.id) && !istOffen(z)),
+  })).filter((g) => g.zeilen.length > 0)
+  return { offen, gruppen }
+}

@@ -474,6 +474,9 @@ describe('Route in der HofShell', () => {
     const seite = quelle('src/app/(hof)/products/page.tsx')
     expect(seite).toContain('gibVerwaisteFreiOhneRisiko')
     expect(seite.indexOf('gibVerwaisteFreiOhneRisiko(')).toBeLessThan(seite.indexOf('getProdukteSeite('))
+    // Auch der Kopf (Nr. 143) zählt die vollen Abholfenster erst danach — nicht im selben Promise.all.
+    expect(seite).toMatch(/await gibVerwaisteFreiOhneRisiko\(farm\.id\)[\s\S]*Promise\.all\(\[[\s\S]*ladeMeinHofZustand\(farm\.id, jetzt\)/)
+    expect(seite).not.toMatch(/Promise\.all\(\[[^\]]*gibVerwaisteFreiOhneRisiko/)
     expect(seite).not.toMatch(/from '@\/components\/shells\//)
   })
 })

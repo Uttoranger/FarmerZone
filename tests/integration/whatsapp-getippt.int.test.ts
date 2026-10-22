@@ -208,10 +208,23 @@ describe('getStatusPostForWhatsApp und zaehleWhatsAppAbonnentinnen', () => {
 
     const daten = await getStatusPostForWhatsApp(farm.id, beitrag.id)
 
+    expect(daten?.showOnFarmPage).toBe(true)
     expect(daten?.getippt).toEqual([anna.id])
     expect(daten?.abonnentinnen.map((a) => a.id)).toEqual([anna.id, berta.id])
     expect(Object.keys(daten?.abonnentinnen[0] ?? {}).sort()).toEqual(['id', 'name', 'phone'])
     expect(await zaehleWhatsAppAbonnentinnen(farm.id)).toBe(2)
+  })
+
+  it('showOnFarmPage kommt aus der Zeile, nicht als fester Wert', async () => {
+    const { farm } = await erstelleHof()
+    const sichtbar = await prisma.statusPost.create({
+      data: { farmId: farm.id, title: 'A', body: 'a', publishedAt: new Date(), showOnFarmPage: true },
+    })
+    const versteckt = await prisma.statusPost.create({
+      data: { farmId: farm.id, title: 'B', body: 'b', publishedAt: new Date(), showOnFarmPage: false },
+    })
+    expect((await getStatusPostForWhatsApp(farm.id, sichtbar.id))?.showOnFarmPage).toBe(true)
+    expect((await getStatusPostForWhatsApp(farm.id, versteckt.id))?.showOnFarmPage).toBe(false)
   })
 
   it('ein Beitrag eines anderen Hofs liefert nichts', async () => {

@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { CalendarDays, Check, ChevronRight } from 'lucide-react'
-import { zeilenWieAufDerHofseite, type HofseiteFortschritt, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
+import { zeilenNachOrt, zeilenWieAufDerHofseite, type HofseiteFortschritt, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
 import { schildTon } from '@/lib/mein-hof'
 import type { AktuellZeile } from '@/lib/mein-hof-ansicht'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
@@ -19,13 +19,18 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 
 /*
- * „Bearbeiten" in Mein Hof unter lg (Nachtlauf Nr. 50, Register N4; Mockup
- * mobil-h1-mein-hof): oben der Stand „Zu n von 11 fertig", darunter jede
- * Zeile der Hofseite in der Reihenfolge, in der Kundinnen sie sehen
- * (HOFSEITE_REIHENFOLGE) — mit ihrem Stand (Häkchen oder Schild) und
- * „Bearbeiten". Bearbeitet wird in einem Blatt von unten, mit denselben
- * Bausteinen wie der Editor ab lg (AbschnittInhalt). Die alte Hofseite mit
- * Stiften (FarmPageView im Bearbeitungsmodus) ist hier entfallen.
+ * „Bearbeiten" in Mein Hof unter lg (Nachtlauf Nr. 50, Register N4; seit
+ * Nr. 143 nach dem Board system-h1-mein-hof-v3, Bildschirme E und F, N4-Ergänzung
+ * 22.10.2026): oben der Stand — bei 100 % nur die Zeile „Hofseite vollständig",
+ * sonst die Karte „Noch n Punkte offen" mit genau diesen Zeilen (Abholzeiten
+ * zuerst) —, dann „Aktuell vom Hof", dann die übrigen Zeilen in vier Gruppen nach
+ * dem Ort auf der Seite (zeilenNachOrt), je EINE Karte mit Trennlinien. Die Zeile
+ * „Bestellungen" (Pause) lebt im Kopf und steht hier nicht.
+ *
+ * Jede Zeile ist EIN Knopf: Titel, Wert, Schild (nur bei der Marke einer
+ * gezählten Zeile), Pfeil. „Bearbeiten" hört nur der Screenreader. Bearbeitet
+ * wird in einem Blatt von unten, mit denselben Bausteinen wie der Editor ab lg
+ * (AbschnittInhalt).
  *
  * Nach dem Speichern „Gespeichert · Ansehen" (Nr. 49): „Ansehen" schließt ein
  * offenes Blatt und schaltet dann auf „So sieht’s die Kundin", die den
@@ -47,14 +52,45 @@ type Props = {
   aktuell?: AktuellZeile
 }
 
-/** Der Stand einer Zeile: ein grünes Häkchen (fertig) oder ihr Schild („Fehlt", „Online fehlt", „Pausiert"). */
-function Stand({ zeile }: { zeile: HofseiteZeile }): React.JSX.Element {
-  if (zeile.marke) return <StatusBadge status={schildTon(zeile.marke.farbe)}>{zeile.marke.text}</StatusBadge>
+/** „Noch 3 Punkte offen", „Noch 1 Punkt offen". */
+function offenTitel(n: number): string {
+  return n === 1 ? 'Noch 1 Punkt offen' : `Noch ${n} Punkte offen`
+}
+
+/**
+ * Eine Zeile als Knopf. Der Wert steht in einer Zeile (gekürzt, ganz im title),
+ * in der Karte „offen" bis zwei Zeilen. Ein Schild nur bei der Marke einer
+ * gezählten Zeile — Freiwilliges sagt es im Wert („Freiwillig — …").
+ */
+function Zeile({ zeile, umbrechen, onOeffne }: { zeile: HofseiteZeile; umbrechen: boolean; onOeffne: (id: HofseiteZeileId) => void }) {
+  const schild = zeile.freiwillig ? null : zeile.marke
   return (
-    <span className="flex size-[21px] shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
-      <Check className="size-3" strokeWidth={2.6} aria-hidden="true" />
-      <span className="sr-only">fertig</span>
-    </span>
+    <li data-bearbeiten-zeile={zeile.id} className="border-t border-border first:border-t-0">
+      <button
+        type="button"
+        onClick={() => onOeffne(zeile.id)}
+        title={`${zeile.titel}: ${zeile.wert}`}
+        className={cn('flex min-h-14 w-full items-center gap-2.5 py-2 pr-2.5 pl-3.5 text-left hover:bg-muted/60', FOKUS_RAHMEN, 'focus-visible:-outline-offset-2')}
+      >
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          {/* `relative` hält das absolute sr-only im Span — sonst steht es am Ende eines langen Werts außerhalb des Schnitts, und die Seite scrollt waagerecht (Nr. 143, Runde 1). */}
+          <span className="relative text-[14px] leading-snug font-semibold text-foreground">
+            {zeile.titel}
+            <span className="sr-only">: </span>
+          </span>
+          <span className={cn('relative text-[12.5px] text-muted-foreground', umbrechen ? 'line-clamp-2 leading-snug' : 'truncate')}>
+            {zeile.wert}
+            <span className="sr-only">. Bearbeiten</span>
+          </span>
+        </span>
+        {schild && (
+          <StatusBadge status={schildTon(schild.farbe)} className="self-start">
+            {schild.text}
+          </StatusBadge>
+        )}
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+      </button>
+    </li>
   )
 }
 
@@ -108,70 +144,78 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
   }
 
   const zeile = zeilen.find((z) => z.id === imBlatt) ?? null
+  const { offen: offeneZeilen, gruppen } = zeilenNachOrt(fortschritt)
+  const vollstaendig = offeneZeilen.length === 0
 
   return (
-    <div className="flex flex-col gap-3">
-      <section aria-labelledby="bearbeiten-stand" className="rounded-2xl border border-border bg-card p-4">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 id="bearbeiten-stand" className="font-heading text-[17px] font-semibold text-foreground">
-            Zu {fortschritt.erledigt} von {fortschritt.gesamt} fertig
-          </h2>
-          <p className="shrink-0 text-[13px] font-semibold text-status-fertig tabular-nums">{fortschritt.prozent} %</p>
-        </div>
-        {/* Der Wert steht daneben als Text; der Balken ist Veranschaulichung. */}
-        <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-          <div className="h-full rounded-full bg-accent" style={{ width: `${fortschritt.prozent}%` }} />
-        </div>
-        <p className="mt-2.5 text-[13.5px] text-muted-foreground">{fortschritt.satz}</p>
-      </section>
+    <div className="flex flex-col gap-2.5">
+      {vollstaendig ? (
+        <p className="flex min-h-12 items-center gap-2.5 rounded-[14px] border border-accent/50 bg-accent/15 px-3.5 text-[14px]">
+          <span aria-hidden="true" className="flex size-[22px] shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+            <Check className="size-3" strokeWidth={2.6} />
+          </span>
+          <span className="font-semibold text-foreground">Hofseite vollständig</span>
+          <span className="text-[13px] text-muted-foreground">
+            · {fortschritt.erledigt} von {fortschritt.gesamt}
+          </span>
+        </p>
+      ) : (
+        <section aria-labelledby="bearbeiten-stand" className="overflow-hidden rounded-2xl border border-primary/45 bg-card">
+          <div className="flex flex-col gap-2.5 px-3.5 pt-3.5 pb-3">
+            <div className="flex items-baseline gap-2.5">
+              <h2 id="bearbeiten-stand" className="flex-1 font-heading text-[17px] font-semibold text-foreground">
+                {offenTitel(offeneZeilen.length)}
+              </h2>
+              <p className="shrink-0 text-[13px] font-semibold text-muted-foreground tabular-nums">
+                {fortschritt.erledigt} von {fortschritt.gesamt}
+              </p>
+            </div>
+            {/* Der Wert steht daneben als Text; der Balken ist Veranschaulichung. */}
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+              <div className="h-full rounded-full bg-accent" style={{ width: `${fortschritt.prozent}%` }} />
+            </div>
+          </div>
+          <ul className="border-t border-border">
+            {offeneZeilen.map((z) => (
+              <Zeile key={z.id} zeile={z} umbrechen onOeffne={oeffne} />
+            ))}
+          </ul>
+        </section>
+      )}
 
-      <ol aria-label="Abschnitte der Hofseite" className="flex flex-col gap-2.5">
-        {aktuell && (
-          // Wie auf der Hofseite oben: der laufende Beitrag. Verwaltet wird unter Mein Hof › Beiträge — darum ein Link, kein Blatt.
-          <li data-bearbeiten-zeile="aktuell" className="relative flex items-center gap-2.5 rounded-xl border border-border bg-card py-2 pr-1.5 pl-3">
-            <CalendarDays className="size-4 shrink-0 text-status-fertig" strokeWidth={1.8} aria-hidden="true" />
-            <div className="min-w-0 flex-1">
-              <p className="text-[14px] leading-snug font-semibold text-foreground">{aktuell.titel}</p>
-              <p className="mt-0.5 truncate text-[12.5px] text-muted-foreground">{aktuell.wert}</p>
-            </div>
-            <Link
-              href={aktuell.link.href}
-              title={`${aktuell.titel}: ${aktuell.wert}`}
-              className={cn(
-                "inline-flex min-h-11 shrink-0 items-center gap-0.5 rounded-lg px-1.5 text-[13.5px] font-semibold whitespace-nowrap text-brand-text after:absolute after:inset-0 after:rounded-xl after:content-['']",
-                FOKUS_RAHMEN
-              )}
-            >
-              <span className="sr-only">{aktuell.titel}: </span>
-              {aktuell.link.text}
-              <ChevronRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            </Link>
-          </li>
-        )}
-        {zeilen.map((z) => (
-          <li key={z.id} data-bearbeiten-zeile={z.id} className="relative flex items-center gap-2.5 rounded-xl border border-border bg-card py-2 pr-1.5 pl-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-[14px] leading-snug font-semibold text-foreground">{z.titel}</p>
-              <p className="mt-0.5 truncate text-[12.5px] text-muted-foreground">{z.wert}</p>
-            </div>
-            <Stand zeile={z} />
-            {/* Die ganze Zeile ist der Knopf (::after über der Karte); der volle Wert steht im title. */}
-            <button
-              type="button"
-              onClick={() => oeffne(z.id)}
-              title={`${z.titel}: ${z.wert}`}
-              className={cn(
-                "inline-flex min-h-11 shrink-0 items-center gap-0.5 rounded-lg px-1.5 text-[13.5px] font-semibold text-brand-text after:absolute after:inset-0 after:rounded-xl after:content-['']",
-                FOKUS_RAHMEN
-              )}
-            >
-              <span className="sr-only">{z.titel}: </span>
-              Bearbeiten
-              <ChevronRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            </button>
-          </li>
-        ))}
-      </ol>
+      {aktuell && (
+        // Wie auf der Hofseite oben: der laufende Beitrag. Verwaltet wird unter Mein Hof › Beiträge — darum ein Link, kein Blatt.
+        <Link
+          href={aktuell.link.href}
+          data-bearbeiten-zeile="aktuell"
+          title={`${aktuell.titel}: ${aktuell.wert}`}
+          className={cn('flex min-h-14 items-center gap-2.5 rounded-2xl border border-border bg-card py-2 pr-2.5 pl-3.5 hover:bg-muted/60', FOKUS_RAHMEN)}
+        >
+          <CalendarDays className="size-4 shrink-0 text-status-fertig" strokeWidth={1.8} aria-hidden="true" />
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-[14px] leading-snug font-semibold text-foreground">
+              {aktuell.titel}
+              <span className="sr-only">: </span>
+            </span>
+            <span className="truncate text-[12.5px] text-muted-foreground">{aktuell.wert}</span>
+          </span>
+          <span className="shrink-0 text-[13.5px] font-semibold text-brand-text">{aktuell.link.text}</span>
+          <ChevronRight className="size-4 shrink-0 text-brand-text" strokeWidth={1.7} aria-hidden="true" />
+        </Link>
+      )}
+
+      {gruppen.map((g) => (
+        <section key={g.id} aria-labelledby={`bearbeiten-ort-${g.id}`} className="flex flex-col">
+          <h2 id={`bearbeiten-ort-${g.id}`} className="px-1 pt-3.5 pb-2 text-xs font-bold tracking-[1px] text-muted-foreground uppercase">
+            {g.titel}
+          </h2>
+          <ul className="overflow-hidden rounded-2xl border border-border bg-card">
+            {g.zeilen.map((z) => (
+              <Zeile key={z.id} zeile={z} umbrechen={false} onOeffne={oeffne} />
+            ))}
+          </ul>
+        </section>
+      ))}
 
       <Sheet
         open={offen !== null}
