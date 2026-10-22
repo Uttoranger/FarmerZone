@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import { redirect, notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getStatusPostForWhatsApp } from '@/server/queries/status-posts'
@@ -37,11 +36,8 @@ export default async function SendWhatsAppPage({ params }: Props) {
 
   const { id } = await params
   // Ob der Beitrag auf der Hofseite steht, bestimmt den Link in der Nachricht (Register T5). Besitz in der WHERE-Klausel wie bei der Liste.
-  const [data, aufHofseite] = await Promise.all([
-    getStatusPostForWhatsApp(farm.id, id),
-    prisma.statusPost.findFirst({ where: { id, farmId: farm.id }, select: { showOnFarmPage: true } }),
-  ])
-  if (!data || !aufHofseite) notFound()
+  const data = await getStatusPostForWhatsApp(farm.id, id)
+  if (!data) notFound()
 
   return (
     <div className="mx-auto max-w-xl px-4 pt-5 pb-12 md:px-8 md:pt-7">
@@ -51,7 +47,7 @@ export default async function SendWhatsAppPage({ params }: Props) {
         title={data.title}
         body={data.body}
         farmSlug={data.farm.slug}
-        showOnFarmPage={aufHofseite.showOnFarmPage}
+        showOnFarmPage={data.showOnFarmPage}
         abonnentinnen={data.abonnentinnen}
         getippt={data.getippt}
       />

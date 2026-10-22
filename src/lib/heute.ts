@@ -807,6 +807,9 @@ export function versandZeilen(beitrag: Pick<DeinBeitrag, 'emailAnzahl' | 'whatsa
   return zeilen
 }
 
+/** Was der Block „Beitrag“ zeigt: die Karte, den Anstoß oder nichts. */
+export type BeitragBlockArt = 'karte' | 'anstoss' | null
+
 /**
  * Was der Block 'beitrag' zeigt: mit laufendem Beitrag (AKTIVER_BEITRAG, also
  * auch „Auf der Hofseite zeigen“ — die Karte sagt „steht oben auf deiner
@@ -814,7 +817,7 @@ export function versandZeilen(beitrag: Pick<DeinBeitrag, 'emailAnzahl' | 'whatsa
  * (oder nie) und der Hof Produkte im Shop hat, den Anstoß; sonst nichts.
  * „Nicht jetzt“ entfällt (Freigabe §1, Abweichung 2: bräuchte eine Spalte).
  */
-export function beitragBlock(daten: { aktiv: DeinBeitrag | null; beitragInFrist: boolean; produkteImShop: boolean }): 'karte' | 'anstoss' | null {
+export function beitragBlock(daten: { aktiv: DeinBeitrag | null; beitragInFrist: boolean; produkteImShop: boolean }): BeitragBlockArt {
   if (daten.aktiv) return 'karte'
   return !daten.beitragInFrist && daten.produkteImShop ? 'anstoss' : null
 }
@@ -827,7 +830,7 @@ export function beitragBlock(daten: { aktiv: DeinBeitrag | null; beitragInFrist:
  * mit dem laufenden Beitrag. `brauchtDich` wird in der Abfrage gebaut,
  * `beitragBlock` erst auf der Seite — darum eine eigene Funktion dazwischen.
  */
-export function entferneBeitragErinnerung(eintraege: readonly BrauchtDichEintrag[], beitragArt: 'karte' | 'anstoss' | null): BrauchtDichEintrag[] {
+export function entferneBeitragErinnerung(eintraege: readonly BrauchtDichEintrag[], beitragArt: BeitragBlockArt): BrauchtDichEintrag[] {
   return beitragArt === 'anstoss' ? eintraege.filter((e) => e.art !== 'status') : [...eintraege]
 }
 

@@ -5674,6 +5674,12 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **`docs:` nur mit Doku:** Beginnt die erste Zeile mit `docs:`, liest der Hook die Dateien des Commits über git: Pfade im Befehl (dann nur sie, wie `--only`), sonst die vorgemerkten, bei `-a` die geänderten verfolgten, dazu die aus einem `git add` davor. Doku ist, was unter `docs/` liegt oder auf `.md` endet. Merge-Commits und Ordner ohne Repository sind ausgenommen; kann git die Dateien nicht nennen, geht der Commit mit Hinweis auf stderr durch. Lücken: `git add -u`/`-p`, `git rm` und `--amend` im selben Befehl. Anlass: ein `docs:`-Commit mit einer Lint-Korrektur in Lauf 21.
 - **Gegenprobe als Testhilfe:** `tests/gefahr-blocken.test.ts` nimmt den Hook aus `GEFAHR_HOOK`, sonst den echten; die Regel steht in TESTING_GUIDELINES §2.
 
+## Nacharbeit im Code aus Lauf 20 und 21 (Nr. 148, Lauf 22, 22.10.2026)
+
+- **Menüeinträge 44 px im Baustein:** `ITEM` in `src/components/ui/dropdown-menu.tsx` trägt `min-h-11`; die örtlichen Regeln in der Hofliste und im Konto-Menü sind weg. Damit sind auch „Mehr zu …“ bei den Meldungen und „+ Neu“ in der Seitenleiste 44 px hoch. `tests/menue-hoehe.test.ts` prüft den Baustein und meldet jede örtliche Höhe am Menüeintrag (liest den Tag bis zum schließenden `>`, auch mit `render={<Link … />}` und `=>`; Gegenprobe mit dem alten Quelltext). Die Prüfungen zum WhatsApp-Beitrag und zum Teilen-Link stehen in `tests/beitrag-eine-abfrage.test.ts`.
+- **Beitrag für WhatsApp aus einer Abfrage:** `getStatusPostForWhatsApp` liefert `showOnFarmPage`, die Seite fragt nicht mehr selbst bei Prisma. Der Link im Teilen-Fenster (`ladeTeilenFensterBeitrag`) nimmt `beitragIdImLink`, wie die Mail.
+- **Kleinigkeiten:** Typ `BeitragBlockArt` in `src/lib/heute.ts` statt doppelt; Kopfkommentar von `src/lib/hofuebersicht.ts` nennt Kalendertag und volle Termine; `tests/produkte-handlung.test.ts` beweist `hatHandlung` im Render.
+
 ## Nützliche Befehle
 
 ```bash
