@@ -75,6 +75,9 @@ export function VorratBlatt({
     const ausgang = await senden(ziel)
     // Abgewiesen (inzwischen bestellt) oder Fehler: Das Blatt bleibt offen, der Satz steht darin.
     if (ausgang.art === 'ok' || ausgang.art === 'unveraendert') onSchliessen()
+    // Der gedrückte Knopf war während der Anfrage gesperrt und hat den Fokus an body verloren:
+    // zurück an den Anfang des Blatts; den Satz sagt die Live-Region an.
+    else if (ausgang.art === 'abgewiesen') titel.current?.focus()
   }
 
   function nachDemSchliessen(): void {
