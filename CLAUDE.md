@@ -44,7 +44,7 @@ Kein Commit mit rotem Typecheck, rotem Lint (Fehler; Warnungen dürfen bleiben) 
 - **Niemals** Bestandsabzug mit blindem `decrement`. Immer `updateMany` mit `stock >= Menge` als Bedingung, sonst läuft der Bestand ins Minus (`tests/decrement-wache.test.ts` meldet jedes andere `decrement` unter `src/`).
 - **Niemals** eine gültige Bestellung wegen eines fehlgeschlagenen Nachlaufs (Mail, Sentry, Analytics) zurückrollen.
 - **Niemals** eine Reservierung ohne Fristprüfung durchwinken. Frist gilt beim **Lesen**, nicht durch den Cron.
-- **Niemals** Geldbeträge in `number` rechnen, wo `Decimal` gespeichert ist → `docs/ai/CODING_STANDARDS.md`.
+- **Niemals** Geldbeträge in `number` rechnen, wo `Decimal` gespeichert ist → `docs/ai/CODING_STANDARDS.md` (`tests/geld-number-wache.test.ts` meldet `Number()` auf Geldnamen unter `src/`, `tests/geld-fliesskomma-wache.test.ts` Geld × Nicht-Zahl).
 
 ### Sicherheit
 - **Das Repository ist öffentlich.** Keine echten Namen, Adressen, Telefonnummern, E-Mails oder Keys in Code, Seed, Kommentaren, Tests oder Commit-Messages.

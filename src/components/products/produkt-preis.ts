@@ -8,6 +8,7 @@
  * angebracht ist — alles rein, damit es ohne Browser prüfbar bleibt.
  */
 import {
+  centsAlsEuro,
   einheitLabel,
   formatEuro,
   formatGrundpreis,
@@ -18,6 +19,7 @@ import {
   istMassEinheit,
 } from '@/lib/format'
 import { KAEUFER_VORSCHAU, type KartenVorschau } from '@/lib/hofseite-kunde'
+import { calcLineTotal, decimalZuCents } from '@/lib/order-totals'
 import {
   NETTO_EINHEIT_LABEL,
   illustrationPfad,
@@ -131,8 +133,11 @@ export const PAKETPREIS_FRAGE = 'Ist das der Preis für das ganze Paket?'
  * Die zwei Antworten auf die Rückfrage, mit Beträgen im Wortlaut:
  *   ja:   „Ja, das Paket kostet € 50,00"        → Preis bleibt
  *   nein: „Nein, € 50,00 ist der Preis je kg"   → Preis wird Gebindepreis
- * `paketpreis` ist der Betrag, den „Nein" einträgt: Einheitspreis × Gebinde,
- * auf Cent gerundet.
+ * `paketpreis` ist der Betrag, den „Nein" einträgt und der mit dem Speichern
+ * zum Produktpreis wird: Einheitspreis × Gebinde, exakt in ganzen Cent über
+ * Decimal und kaufmännisch gerundet (CODING_STANDARDS §2), auf demselben Weg wie
+ * Korb und Kasse — 0,15 € × 1,5 = 0,23 €. In Fließkomma läge das Produkt knapp
+ * unter dem halben Cent und würde zu Lasten des Hofs abgerundet (Nr. 139).
  */
 export function paketpreisAntworten(
   price: number,
@@ -143,7 +148,7 @@ export function paketpreisAntworten(
   return {
     ja: `Ja, das Paket kostet ${formatEuro(price)}`,
     nein: `Nein, ${formatEuro(price)} ist der Preis je ${einheitLabel(unit)}`,
-    paketpreis: Math.round(price * size * 100) / 100,
+    paketpreis: centsAlsEuro(decimalZuCents(calcLineTotal(price, size))),
   }
 }
 

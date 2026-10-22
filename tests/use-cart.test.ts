@@ -356,3 +356,23 @@ describe('Nachbestell-Link im Produktraster', () => {
     expect(gespeichert()).toEqual({ farmId: HOF_ID, inhalt: [[EIER.id, 2], [MEHL.id, 1]] })
   })
 })
+
+/**
+ * Nr. 139: `total` rechnet in ganzen Cent auf dem Weg des Checkouts (korbBetraege), nicht `price * quantity` in
+ * Fließkomma. Geprüft wird der Zahlenwert: formatEuro zeigte auch 3,3000000000000003 als „€ 3,30“.
+ */
+describe('useCart: Summe in ganzen Cent (Nr. 139)', () => {
+  it('3 × 1,10 € ergibt als Zahl genau 3.3', async () => {
+    pruefstand.starte(NurKorb)
+    const brot = publicProduct({ id: 'prod_brot', name: 'Brot', category: null, price: 1.1, unit: 'Stück', unitSize: 1, stock: 10 })
+    await korb().addItem(position(brot), 3)
+    await pruefstand.zuRuhe()
+
+    expect(korb().total).toBe(3.3)
+  })
+
+  it('Gegenprobe: Die alte Rechnung in Fließkomma ergibt 3.3000000000000003', () => {
+    const alt = [{ price: 1.1, quantity: 3 }].reduce((s, i) => s + i.price * i.quantity, 0)
+    expect(alt).toBe(3.3000000000000003)
+  })
+})

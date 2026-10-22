@@ -5652,6 +5652,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Abweichungen vom Vorschlag der Inventur:** ARCHITECTURE §5 „Zahlungen“ bleibt die ausführliche Stelle zu den Testzahlungen (CODING_STANDARDS verweist nur); keine Testdatei wurde verschoben, lose Hilfsdateien in `tests/` stehen mit Namen in TESTING_GUIDELINES §1 (`tests/fabrik/` ist für Fabriken nachgebauter Typen festgelegt).
 - **Maß:** CODING_STANDARDS und TESTING_GUIDELINES zusammen 79 747 → 71 137 Zeichen (`wc -m`). Zahlen von Testdateien und Mocks stehen nicht mehr im Text; wo eine Zahl hilft, steht der Befehl, der sie zählt.
 
+## Paketpreis in ganzen Cent, Korb in Cent, Wachen gegen Geld in Fließkomma (Nr. 139 mit Geld-Fund; /fix, 22.10.2026)
+
+- **Ursache:** `paketpreisAntworten` (src/components/products/produkt-preis.ts) rechnete den Betrag, den „Nein, … ist der Preis je …“ ins Preisfeld schreibt, als `Math.round(price * size * 100) / 100` in Fließkomma. Liegt das Ergebnis genau auf einem halben Cent, liegt das Produkt knapp darunter und wird abgerundet: 0,15 € × 1,5 ergab 0,22 € statt 0,23 €, 0,29 € × 12,5 ergab 3,62 € statt 3,63 €. Mit dem Speichern wurde der Betrag zum Produktpreis, mit dem die Kasse abrechnet.
+- **Auswirkung:** höchstens 1 Cent je Gebinde, immer zu Lasten des Hofs, nur bei Gebindegrößen über 1 mit Nachkommastellen (bei ganzzahligen Größen stimmte das Ergebnis; die Rückfrage kommt nur über 1). Kein gespeicherter Preis ist betroffen, denn es gibt kein Produkt mit einer Gebindegröße über 1 mit Nachkommastellen. Eine Korrektur von Daten braucht es nicht.
+- **Fix:** `paketpreis = centsAlsEuro(decimalZuCents(calcLineTotal(price, size)))` — exakt über Decimal, kaufmännisch auf ganze Cent, derselbe Weg wie Korb und Kasse. Dazu der Korb (nur Anzeige, gegen CODING_STANDARDS §2): `useCart` rechnet `total` aus `korbBetraege(items).summeCents`, das Korb-Blatt die Zeilensumme aus `zeilenCents` statt `price * quantity` (3 × 1,10 € war 3,3000000000000003; `formatEuro` zeigte trotzdem „€ 3,30“).
+- **Warum eine zweite Wache:** Die Number-Wache aus Nr. 139 konnte den Fehler nicht finden, dort stand kein `Number()`. `tests/geld-fliesskomma-wache.test.ts` meldet jede Multiplikation Geld × Nicht-Zahl unter `src/` außerhalb ihres Bestands (vier Stellen, alle Anzeige oder ganze Zahlen); das Umrechnen mit einer festen Zahl (`price * 100`) bleibt erlaubt. Wortstämme und „letzter Name“ stehen für beide Wachen in `tests/geld-namen.ts`. Die „Belege am Code“ der Number-Wache sind gestrichen (Morgenbericht 21 §8): Sie verglichen Text und wären bei jedem Umbau ohne Aussage rot geworden.
+- **Tests:** Vollprobe aller Cent-Preise von 0,01 bis 50,00 € mal 1,5, 2,5, 12,5, 1,125 und 7,75 gegen eine Referenz in ganzen Zahlen (0 Abweichungen, die alte Formel weicht ab), Korb und Korb-Blatt prüfen den Zahlenwert 3.3, nicht den Text.
+
 ## Nützliche Befehle
 
 ```bash

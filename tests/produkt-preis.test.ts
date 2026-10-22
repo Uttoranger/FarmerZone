@@ -106,6 +106,67 @@ describe('paketpreisAntworten', () => {
   it('ohne Gebinde bleibt der Preis, wie er ist', () => {
     expect(paketpreisAntworten(50, 'KG', null).paketpreis).toBe(50)
   })
+
+  it('wirft nicht beim leeren Preisfeld (NaN ist der Startwert des Formulars)', () => {
+    expect(() => paketpreisAntworten(Number.NaN, 'KG', 1.5)).not.toThrow()
+  })
+})
+
+/**
+ * Nr. 139, Geld-Fund: Der Paketpreis rundete auf einem halben Cent ab, weil `price * size` in Fließkomma knapp darunter
+ * liegt (0,15 × 1,5 = 0,22499…). Er entsteht jetzt exakt in ganzen Cent über Decimal (CODING_STANDARDS §2), auf
+ * demselben Weg wie Korb und Kasse; kaufmännisch gerundet.
+ */
+describe('paketpreisAntworten — exakt in ganzen Cent (Nr. 139)', () => {
+  /** Gebindegrößen mit Nachkommastellen als Bruch, damit die Referenz nur mit ganzen Zahlen rechnet. */
+  const GROESSEN: ReadonlyArray<{ wert: number; zaehler: bigint; nenner: bigint }> = [
+    { wert: 1.5, zaehler: BigInt(3), nenner: BigInt(2) },
+    { wert: 2.5, zaehler: BigInt(5), nenner: BigInt(2) },
+    { wert: 12.5, zaehler: BigInt(25), nenner: BigInt(2) },
+    { wert: 1.125, zaehler: BigInt(9), nenner: BigInt(8) },
+    { wert: 7.75, zaehler: BigInt(31), nenner: BigInt(4) },
+  ]
+
+  /** Referenz in ganzen Zahlen: Cent × Bruch, kaufmännisch auf ganze Cent (ab ,5 auf). */
+  function referenzCents(preisCents: number, zaehler: bigint, nenner: bigint): number {
+    const zaehlerGesamt = BigInt(preisCents) * zaehler
+    return Number((BigInt(2) * zaehlerGesamt + nenner) / (BigInt(2) * nenner))
+  }
+
+  /** Die alte Formel vor dem Fix, nur hier als Gegenprobe: rechnet in Fließkomma und rundet auf halben Cent ab. */
+  function alterPaketpreis(price: number, size: number): number {
+    return Math.round(price * size * 100) / 100
+  }
+
+  function abweichungen(rechne: (price: number, size: number) => number): string[] {
+    const falsch: string[] = []
+    for (let cents = 1; cents <= 5000; cents++) {
+      for (const g of GROESSEN) {
+        const erwartet = referenzCents(cents, g.zaehler, g.nenner) / 100
+        const ist = rechne(cents / 100, g.wert)
+        if (ist !== erwartet) falsch.push(`${cents / 100} × ${g.wert}: ${ist} statt ${erwartet}`)
+      }
+    }
+    return falsch
+  }
+
+  it('halbe Cent runden auf: 0,15 × 1,5 = 0,23 und weitere Fälle', () => {
+    expect(paketpreisAntworten(0.15, 'KG', 1.5).paketpreis).toBe(0.23)
+    expect(paketpreisAntworten(0.29, 'KG', 12.5).paketpreis).toBe(3.63)
+    expect(paketpreisAntworten(0.05, 'KG', 1.5).paketpreis).toBe(0.08)
+    expect(paketpreisAntworten(50, 'KG', 2).paketpreis).toBe(100)
+    expect(paketpreisAntworten(2.4, 'KG', 1.125).paketpreis).toBe(2.7)
+  })
+
+  it('Vollprobe: alle Cent-Preise von 0,01 bis 50,00 € mal fünf Gebindegrößen stimmen mit der Referenz überein', () => {
+    expect(abweichungen((price, size) => paketpreisAntworten(price, 'KG', size).paketpreis)).toEqual([])
+  })
+
+  it('Gegenprobe: Dieselbe Vollprobe mit der alten Formel weicht ab', () => {
+    const falsch = abweichungen(alterPaketpreis)
+    expect(falsch.length).toBeGreaterThan(0)
+    expect(falsch).toContain('0.15 × 1.5: 0.22 statt 0.23')
+  })
 })
 
 describe('kaeuferVorschau — die Karte „So sehen Kunden dein Produkt" aus den Formularwerten (Nr. 51)', () => {
