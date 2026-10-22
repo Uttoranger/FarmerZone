@@ -81,7 +81,6 @@ const AUSNAHMEN: Record<string, Ausnahme> = {
   },
   'src/lib/meldung.ts': { stellen: ['github.com/Uttoranger/FarmerZone/pull/'], grund: REPO },
   'tests/meldung.test.ts': { stellen: ['github.com/Uttoranger/FarmerZone/pull/'], grund: REPO },
-  'tests/gefahr-blocken.test.ts': { stellen: ['/home/user/FarmerZone '], grund: 'Pfad des Repos in einem Beispielbefehl — bleibt technischer Name (M1)' },
   'tests/bestellverfolgung.test.ts': {
     stellen: ['@farmerzone'],
     grund: 'UID der Kalendereinträge (src/lib/kalender.ts) — bleibt, siehe dort',

@@ -5660,6 +5660,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Warum eine zweite Wache:** Die Number-Wache aus Nr. 139 konnte den Fehler nicht finden, dort stand kein `Number()`. `tests/geld-fliesskomma-wache.test.ts` meldet jede Multiplikation Geld × Nicht-Zahl unter `src/` außerhalb ihres Bestands (vier Stellen, alle Anzeige oder ganze Zahlen); das Umrechnen mit einer festen Zahl (`price * 100`) bleibt erlaubt. Wortstämme und „letzter Name“ stehen für beide Wachen in `tests/geld-namen.ts`. Die „Belege am Code“ der Number-Wache sind gestrichen (Morgenbericht 21 §8): Sie verglichen Text und wären bei jedem Umbau ohne Aussage rot geworden.
 - **Tests:** Vollprobe aller Cent-Preise von 0,01 bis 50,00 € mal 1,5, 2,5, 12,5, 1,125 und 7,75 gegen eine Referenz in ganzen Zahlen (0 Abweichungen, die alte Formel weicht ab), Korb und Korb-Blatt prüfen den Zahlenwert 3.3, nicht den Text.
 
+## Hook: Force in Gruppen, Ersetzung als Löschziel, `docs:` nur mit Doku (Register G4; Nr. 146, Lauf 22, 22.10.2026)
+
+- **Force:** Eine Gruppe kurzer Optionen von `git push` mit `f` (`-uf`, `-fu`, `-vf`) zählt als Force; `--force-with-lease` bleibt frei, `--force-if-includes` blockt wie bisher.
+- **Löschziel:** Ein Ziel mit Befehlsersetzung (`"$(pwd)"`, Gravis) ist geschützt, ebenso `$PWD`, `${PWD}` und `$OLDPWD` allein oder mit `/`; mit festem Unterordner zählt nur er (`"$PWD/.next"` wie `.next`). Ohne Anführungszeichen trennt der Zerleger an `(` und am Gravis — darum merkt sich ein einfacher Befehl, dass er an einer Ersetzung endet (`ersetzungFolgt`); die übrigen Regeln lesen das Feld nicht.
+- **`docs:` nur mit Doku:** Beginnt die erste Zeile mit `docs:`, liest der Hook die Dateien des Commits über git: Pfade im Befehl (dann nur sie, wie `--only`), sonst die vorgemerkten, bei `-a` die geänderten verfolgten, dazu die aus einem `git add` davor. Doku ist, was unter `docs/` liegt oder auf `.md` endet. Merge-Commits und Ordner ohne Repository sind ausgenommen; kann git die Dateien nicht nennen, geht der Commit mit Hinweis auf stderr durch. Lücken: `git add -u`/`-p`, `git rm` und `--amend` im selben Befehl. Anlass: ein `docs:`-Commit mit einer Lint-Korrektur in Lauf 21.
+- **Gegenprobe als Testhilfe:** `tests/gefahr-blocken.test.ts` nimmt den Hook aus `GEFAHR_HOOK`, sonst den echten; die Regel steht in TESTING_GUIDELINES §2.
+
 ## Nützliche Befehle
 
 ```bash

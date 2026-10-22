@@ -27,6 +27,15 @@
  * nach CLAUDE.md §5. Die Fälle sind erfundener Text und laufen nie in einer Shell.
  * Die bestehenden Commit-Fälle ohne Präfix stehen deshalb auf `-m "fix: …"` — ihre
  * Aussage bleibt gleich.
+ *
+ * Nr. 146 (Nacharbeit 138, Regelvorschlag Dirigent 3): Force als Gruppe kurzer
+ * Optionen (`-uf`), eine Befehlsersetzung oder `$PWD` als Löschziel und ein
+ * `docs:`-Commit, der nur Doku tragen darf (in Repositories im Temp-Ordner).
+ *
+ * Gegenprobe gegen den alten Hook (G4-Ergänzung 22.10.2026): `GEFAHR_HOOK` nennt
+ * eine Kopie des Hooks aus der Basis, z. B. aus `git show origin/main:.claude/hooks/gefahr-blocken.mjs`;
+ * die roten Fälle sind, was der alte Hook falsch einordnet. In der CI ist die
+ * Variable nie gesetzt — der erste Fall unten ist dann bewusst rot.
  */
 import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -34,12 +43,16 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-const HOOK = path.resolve(__dirname, '..', '.claude/hooks/gefahr-blocken.mjs')
+const ECHTER_HOOK = path.resolve(__dirname, '..', '.claude/hooks/gefahr-blocken.mjs')
+const HOOK = process.env.GEFAHR_HOOK ? path.resolve(process.env.GEFAHR_HOOK) : ECHTER_HOOK
+// Ein Ordner im Temp-Verzeichnis, der nicht da sein muss: Die Regeln für --all und stash lesen nur den Befehl.
+const ANDERER_ORDNER = path.join(tmpdir(), 'gefahr-blocken-anderer-ordner')
 
 let wurzel = ''
 let aufMain = ''
 let aufFeature = ''
 let keinRepo = ''
+let ohneRepo = ''
 
 /** Ein leeres Repository auf dem genannten Branch — ohne Konfiguration des Rechners, ohne Netz. */
 function repo(ordner: string, branch: string): string {
@@ -58,18 +71,27 @@ beforeAll(() => {
   aufFeature = repo('auf-feature', 'feature/etwas')
   keinRepo = path.join(wurzel, 'kein-repo')
   mkdirSync(keinRepo)
+  // Ein eigener Ordner statt tmpdir() selbst: Das Temp-Verzeichnis könnte in einem Repository liegen (Nr. 146).
+  ohneRepo = mkdtempSync(path.join(tmpdir(), 'gefahr-blocken-ohne-repo-'))
 })
 
 afterAll(() => {
   rmSync(wurzel, { recursive: true, force: true })
+  rmSync(ohneRepo, { recursive: true, force: true })
+})
+
+describe('gefahr-blocken — welcher Hook läuft', () => {
+  it('ohne GEFAHR_HOOK der echte Hook (mit gesetzter Variable bewusst rot: erwarteter Fund der Gegenprobe)', () => {
+    expect(HOOK).toBe(ECHTER_HOOK)
+  })
 })
 
 /** Startet den Hook mit dieser Eingabe; `prozessOrdner` ist das Verzeichnis des Prozesses (sonst das des Testlaufs). */
-function starte(eingabe: object, prozessOrdner?: string) {
+function starte(eingabe: object, prozessOrdner?: string, umgebung: Record<string, string> = {}) {
   const r = spawnSync(process.execPath, [HOOK], {
     input: JSON.stringify(eingabe),
     // Bewusst eine leere Umgebung plus PATH: der Hook darf nichts aus der des Testlaufs erben.
-    env: { PATH: process.env.PATH ?? '', NODE_ENV: 'test' },
+    env: { PATH: process.env.PATH ?? '', NODE_ENV: 'test', ...umgebung },
     encoding: 'utf8',
     ...(prozessOrdner && { cwd: prozessOrdner }),
   })
@@ -79,6 +101,13 @@ function starte(eingabe: object, prozessOrdner?: string) {
 /** `cwd` ist das Feld der Eingabe (bei Claude Code der Ordner der Sitzung); Standard: ein Feature-Branch. */
 function lauf(command: string, cwd: string = aufFeature) {
   return starte({ tool_name: 'Bash', tool_input: { command }, cwd })
+}
+
+/** Im Ordner ohne Repository; git sucht nicht über dessen Eltern-Ordner hinaus nach einem (Nr. 146). */
+function laufOhneRepo(command: string) {
+  return starte({ tool_name: 'Bash', tool_input: { command }, cwd: ohneRepo }, undefined, {
+    GIT_CEILING_DIRECTORIES: path.dirname(ohneRepo),
+  })
 }
 
 const GRUND = 'Blockiert: Schiebt alle lokalen Branches auf das öffentliche Repo. Nur den eigenen Branch pushen.'
@@ -92,7 +121,7 @@ describe('gefahr-blocken — git push --all und --mirror', () => {
     'git push -u --all origin',
     'git push --mirror origin',
     'git push --all --dry-run',
-    'git -C /home/user/FarmerZone push --all',
+    `git -C ${ANDERER_ORDNER} push --all`,
     'git -c push.default=current push --mirror',
     'git --no-pager push --all',
     'pnpm test && git push --all',
@@ -152,7 +181,7 @@ describe('gefahr-blocken — git stash in jeder Form', () => {
     'git stash list',
     'git stash drop',
     'git stash show -p',
-    'git -C /home/user/FarmerZone stash',
+    `git -C ${ANDERER_ORDNER} stash`,
     'git --no-pager stash list',
     'pnpm test && git stash',
     'git status; git stash pop',
@@ -381,8 +410,7 @@ describe('gefahr-blocken — prisma migrate deploy nur gegen eine ausdrücklich 
 })
 
 describe('gefahr-blocken — Here-Documents liest der Hook mit (bewusst, Nachtrag Dirigent Lauf 17)', () => {
-  // Kein Repository im Ordner: Der Branch-Test des Hooks soll hier nichts mitentscheiden.
-  const ohneRepo = tmpdir()
+  // Kein Repository im Ordner (`ohneRepo`, Nr. 146): Der Branch-Test des Hooks soll hier nichts mitentscheiden.
   // Der Fehlalarm aus Nr. 110 bleibt: Eine Commit-Nachricht, deren Zeile mit „git stash“ beginnt, blockt der Hook.
   // Drei Anläufe in Nr. 118, den Text eines Here-Documents als Daten auszunehmen, öffneten jeweils neue Lücken
   // (zuletzt ließ eine Nachricht mit „<<'EOF'“ in Anführungszeichen den Befehl danach durch). Vorsicht geht vor;
@@ -390,12 +418,12 @@ describe('gefahr-blocken — Here-Documents liest der Hook mit (bewusst, Nachtra
 
   it('blockt eine Commit-Nachricht, deren Zeile mit „git stash“ beginnt (bekannter Fehlalarm, gewollt vorsichtig)', () => {
     const befehl = ['git commit -m "$(cat <<\'EOF\'', 'docs: Regel ergänzt', '', 'git stash ist verboten', 'EOF', ')"'].join('\n')
-    expect(lauf(befehl, ohneRepo).code).toBe(2)
+    expect(laufOhneRepo(befehl).code).toBe(2)
   })
 
   it('blockt, wenn „<<\'EOF\'“ nur in Anführungszeichen steht und danach ein verbotener Befehl folgt (Lücke aus Runde 2)', () => {
-    expect(lauf(['git commit -m "Hook liest <<\'EOF\' jetzt"', 'git stash'].join('\n'), ohneRepo).code).toBe(2)
-    expect(lauf(['cat "notiz <<\'EOF\'.txt"', 'git stash'].join('\n'), ohneRepo).code).toBe(2)
+    expect(laufOhneRepo(['git commit -m "Hook liest <<\'EOF\' jetzt"', 'git stash'].join('\n')).code).toBe(2)
+    expect(laufOhneRepo(['cat "notiz <<\'EOF\'.txt"', 'git stash'].join('\n')).code).toBe(2)
   })
 
   it('blockt, was ein Dokument an eine Shell, einen Interpreter oder eine Datei zum Ausführen gibt', () => {
@@ -404,22 +432,22 @@ describe('gefahr-blocken — Here-Documents liest der Hook mit (bewusst, Nachtra
       ["cat <<'EOF' > a.sh && chmod +x a.sh && ./a.sh", 'git stash', 'EOF'],
       ["cat <<'EOF' | tee a.sh && ./a.sh", 'git stash', 'EOF'],
     ]) {
-      expect(lauf(befehl.join('\n'), ohneRepo).code, befehl[0]).toBe(2)
+      expect(laufOhneRepo(befehl.join('\n')).code, befehl[0]).toBe(2)
     }
   })
 
   it('prüft den Befehl vor und nach dem Dokument weiter', () => {
-    expect(lauf(["cat > notiz.txt <<'EOF'", 'nur Text', 'EOF', 'git stash'].join('\n'), ohneRepo).code).toBe(2)
-    expect(lauf(['git stash && cat <<\'EOF\'', 'nur Text', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
+    expect(laufOhneRepo(["cat > notiz.txt <<'EOF'", 'nur Text', 'EOF', 'git stash'].join('\n')).code).toBe(2)
+    expect(laufOhneRepo(['git stash && cat <<\'EOF\'', 'nur Text', 'EOF'].join('\n')).code).toBe(2)
   })
 
   it('liest den Text ohne Quote am Begrenzer weiter mit: Die Shell führt $(…) darin aus', () => {
-    expect(lauf(['cat <<EOF', 'git stash', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
+    expect(laufOhneRepo(['cat <<EOF', 'git stash', 'EOF'].join('\n')).code).toBe(2)
   })
 
   it('liest den Text mit, wenn das Dokument an eine Shell geht', () => {
-    expect(lauf(['bash <<\'EOF\'', 'git stash', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
-    expect(lauf(['sh -s <<\'EOF\'', 'pnpm exec prettier --write .', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
+    expect(laufOhneRepo(['bash <<\'EOF\'', 'git stash', 'EOF'].join('\n')).code).toBe(2)
+    expect(laufOhneRepo(['sh -s <<\'EOF\'', 'pnpm exec prettier --write .', 'EOF'].join('\n')).code).toBe(2)
   })
 
   // Prüfung Runde 1: Der Text bleibt Befehl, sobald das Dokument ausgeführt wird — auch wenn der Aufruf, der es
@@ -427,10 +455,10 @@ describe('gefahr-blocken — Here-Documents liest der Hook mit (bewusst, Nachtra
   it('liest den Text mit, wenn das Dokument hinter dem Begrenzer an eine Shell geht', () => {
     for (const ziel of ['bash', 'sh', 'zsh -s', 'sudo bash', 'env sh -e', 'xargs -0 sh -c', 'source /dev/stdin']) {
       const befehl = [`cat <<'EOF' | ${ziel}`, 'git stash', 'EOF'].join('\n')
-      expect(lauf(befehl, ohneRepo).code, befehl).toBe(2)
+      expect(laufOhneRepo(befehl).code, befehl).toBe(2)
     }
-    expect(lauf(["cat <<'EOF' | tee neu.sh | bash", 'git stash', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
-    expect(lauf(["cat <<'EOF' > neu.sh && bash neu.sh", 'git stash', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
+    expect(laufOhneRepo(["cat <<'EOF' | tee neu.sh | bash", 'git stash', 'EOF'].join('\n')).code).toBe(2)
+    expect(laufOhneRepo(["cat <<'EOF' > neu.sh && bash neu.sh", 'git stash', 'EOF'].join('\n')).code).toBe(2)
   })
 
   // Prüfung Runde 2: Der Ausführer wird nicht an seinem Namen erkannt. Hinter einer Pipe darf nur ein Leser stehen,
@@ -451,14 +479,14 @@ describe('gefahr-blocken — Here-Documents liest der Hook mit (bewusst, Nachtra
       'tclsh',
     ]) {
       const befehl = [`cat <<'EOF' | ${ziel}`, 'git stash', 'EOF'].join('\n')
-      expect(lauf(befehl, ohneRepo).code, befehl).toBe(2)
+      expect(laufOhneRepo(befehl).code, befehl).toBe(2)
     }
   })
 
   it('liest den Text mit, wenn die Hülle vor dem Begrenzer einen Pfad oder eine Variable hat', () => {
     for (const kopf of ['/bin/bash -c "$(cat <<\'EOF\'', 'sudo /bin/sh -c "$(cat <<\'EOF\'', '$SHELL -c "$(cat <<\'EOF\'', '/usr/bin/python3 -c "$(cat <<\'EOF\'']) {
       const befehl = [kopf, 'git stash', 'EOF', ')"'].join('\n')
-      expect(lauf(befehl, ohneRepo).code, kopf).toBe(2)
+      expect(laufOhneRepo(befehl).code, kopf).toBe(2)
     }
   })
 
@@ -467,20 +495,20 @@ describe('gefahr-blocken — Here-Documents liest der Hook mit (bewusst, Nachtra
     const dbPush = ['prisma db', 'push'].join(' ')
     for (const leser of ['node -', 'python3 -', 'perl', 'ruby', 'deno run -', 'bun run -', 'tsx -', 'psql', 'sqlite3 db.sqlite']) {
       const befehl = [`${leser} <<'EOF'`, `execSync("pnpm exec ${dbPush}")`, 'EOF'].join('\n')
-      expect(lauf(befehl, ohneRepo).code, befehl).toBe(2)
+      expect(laufOhneRepo(befehl).code, befehl).toBe(2)
     }
   })
 
   it('liest den Text mit, wenn eine Befehlsersetzung ihn ausführt (eval, bash -c, source <(…))', () => {
     for (const kopf of ['eval "$(cat <<\'EOF\'', 'bash -c "$(cat <<\'EOF\'', 'source <(cat <<\'EOF\'', 'FOO=1 sh -c "$(cat <<\'EOF\'']) {
       const befehl = [kopf, 'git stash', 'EOF', ')"'].join('\n')
-      expect(lauf(befehl, ohneRepo).code, kopf).toBe(2)
+      expect(laufOhneRepo(befehl).code, kopf).toBe(2)
     }
   })
 
   it('liest den Text mit, wenn der Leser unbekannt ist', () => {
     // Nur die Leser, die den Text bloß speichern oder weitergeben, gelten als Daten; alles andere bleibt Befehl.
-    expect(lauf(["tclsh <<'EOF'", 'git stash', 'EOF'].join('\n'), ohneRepo).code).toBe(2)
+    expect(laufOhneRepo(["tclsh <<'EOF'", 'git stash', 'EOF'].join('\n')).code).toBe(2)
   })
 
   it('blockt heute auch Daten, die nur gespeichert oder weitergegeben werden (Fehlalarm aus Nr. 110 – Ziel für Lauf 18)', () => {
@@ -494,17 +522,17 @@ describe('gefahr-blocken — Here-Documents liest der Hook mit (bewusst, Nachtra
       "gh pr create --title t --body-file - <<'EOF'",
     ]) {
       const befehl = [kopf, 'git stash', 'pnpm exec prettier --write .', 'EOF', ...(kopf.includes('$(') ? [')"'] : [])].join('\n')
-      expect(lauf(befehl, ohneRepo).code, kopf).toBe(2)
+      expect(laufOhneRepo(befehl).code, kopf).toBe(2)
     }
   })
 
   it('hält einen Here-String (<<<) nicht für ein Dokument', () => {
-    expect(lauf(['cat <<< "Text"', 'git stash'].join('\n'), ohneRepo).code).toBe(2)
+    expect(laufOhneRepo(['cat <<< "Text"', 'git stash'].join('\n')).code).toBe(2)
   })
 
   it('Gegenprobe: ein Dokument ohne verbotenen Text geht durch', () => {
     const befehl = ['git commit -m "$(cat <<\'EOF\'', 'docs: Regel ergänzt', '', 'nur Text', 'EOF', ')"'].join('\n')
-    expect(lauf(befehl, ohneRepo).code).toBe(0)
+    expect(laufOhneRepo(befehl).code).toBe(0)
   })
 })
 
@@ -862,4 +890,216 @@ describe('gefahr-blocken — Commit-Präfix nach CLAUDE.md §5 (Nr. 138)', () =>
       expect(lauf(befehl).code).toBe(0)
     })
   }
+})
+
+// Nr. 146, Punkt 1 (Nacharbeit 138): `\s-f\b` sah nur ein alleinstehendes f nach dem Strich.
+describe('gefahr-blocken — Force als Gruppe kurzer Optionen (Nr. 146)', () => {
+  for (const befehl of [
+    'git push -uf origin feature/x',
+    'git push -fu origin feature/x',
+    'git push -vf origin x',
+    'git push -f origin x',
+    'git push --force-if-includes origin x',
+    'git -C ../anderer-ordner push -uf origin feature/x',
+  ]) {
+    it(`blockt: ${befehl}`, () => {
+      const r = lauf(befehl)
+      expect(r.code).toBe(2)
+      expect(r.grund).toContain('Force-Push')
+    })
+  }
+
+  for (const befehl of [
+    'git push -u origin feature/x',
+    'git push --force-with-lease origin feature/x',
+    'git push --follow-tags origin feature/x',
+    'git push -u origin fix/feld-pruefen',
+  ]) {
+    it(`lässt durch: ${befehl}`, () => {
+      expect(lauf(befehl).code).toBe(0)
+    })
+  }
+})
+
+// Nr. 146, Punkt 2 (Nacharbeit 138): Das Ziel ist der aktuelle Ordner, womöglich das ganze Repository.
+describe('gefahr-blocken — Befehlsersetzung und $PWD als Löschziel (Nr. 146)', () => {
+  for (const befehl of [
+    'rm -rf "$(pwd)"',
+    'rm -rf $(pwd)',
+    'rm -rf `pwd`',
+    'rm -rf "`pwd`"',
+    'rm -rf "$PWD"',
+    'rm -rf $PWD',
+    'rm -rf "${PWD}/"',
+    'rm -rf "$OLDPWD"',
+    'rm -rf "$(git rev-parse --show-toplevel)"',
+    'rm -rf "$(pwd)/.next"',
+    'rm -rf $(pwd)/.next',
+    'rm -rf "$PWD/."',
+    'rm -rf "$PWD/*"',
+    'cd build && rm -rf "$(pwd)" && cd ..',
+  ]) {
+    it(`blockt: ${befehl}`, () => {
+      const r = lauf(befehl)
+      expect(r.code).toBe(2)
+      expect(r.grund).toContain('Destruktives Löschen')
+    })
+  }
+
+  for (const befehl of [
+    'rm -rf "$PWD/.next"',
+    'rm -rf "${PWD}/node_modules"',
+    'rm -rf "${WT:?}/.next"',
+    'rm -rf .next',
+    'rm -rf node_modules',
+    'echo "$(pwd)"',
+    'echo $(pwd)',
+    'rm -f "$(pwd)/notiz.txt"',
+    'cd "$(git rev-parse --show-toplevel)" && rm -rf .next',
+  ]) {
+    it(`lässt durch: ${befehl}`, () => {
+      expect(lauf(befehl).code).toBe(0)
+    })
+  }
+})
+
+// Nr. 146, Punkt 3 (Regelvorschlag Dirigent 3, Morgenbericht 21 §5): In Lauf 21 trug ein `docs:`-Commit Code.
+describe('gefahr-blocken — ein docs:-Commit trägt nur Doku (Nr. 146)', () => {
+  const DOKU_GRUND =
+    'Blockiert: Ein docs:-Commit trägt nur Doku (Dateien unter docs/ oder .md). Code gehört in einen fix:-, feat:- oder chore:-Commit.'
+  const IDENTITAET = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com']
+  let nummer = 0
+
+  function git(ordner: string, ...args: string[]) {
+    const r = spawnSync('git', [...IDENTITAET, '-C', ordner, ...args], {
+      env: { PATH: process.env.PATH ?? '', HOME: wurzel, GIT_CONFIG_NOSYSTEM: '1', NODE_ENV: 'test' },
+      encoding: 'utf8',
+    })
+    expect(r.status, r.stderr).toBe(0)
+    return r.stdout
+  }
+
+  function schreibe(ordner: string, datei: string, inhalt: string) {
+    mkdirSync(path.dirname(path.join(ordner, datei)), { recursive: true })
+    writeFileSync(path.join(ordner, datei), inhalt)
+  }
+
+  /** Ein Repository auf einem Feature-Branch mit einem ersten Commit: src/x.ts und docs/a.md sind verfolgt. */
+  function docsRepo(): string {
+    const ordner = repo(`docs-${++nummer}`, 'feature/doku')
+    schreibe(ordner, 'src/x.ts', 'export const x = 1\n')
+    schreibe(ordner, 'docs/a.md', '# A\n')
+    schreibe(ordner, 'nachricht-docs.txt', 'docs: x\n')
+    git(ordner, 'add', 'src/x.ts', 'docs/a.md')
+    git(ordner, 'commit', '-q', '-m', 'chore: Anfang')
+    return ordner
+  }
+
+  const codeGeaendert = (ordner: string) => schreibe(ordner, 'src/x.ts', 'export const x = 2\n')
+  const dokuGeaendert = (ordner: string) => schreibe(ordner, 'docs/a.md', '# A\n\nNeu\n')
+
+  it('blockt docs: mit vorgemerkter src/x.ts', () => {
+    const ordner = docsRepo()
+    codeGeaendert(ordner)
+    git(ordner, 'add', 'src/x.ts')
+    const r = lauf('git commit -m "docs: x"', ordner)
+    expect(r.code).toBe(2)
+    expect(r.grund.trim()).toBe(DOKU_GRUND)
+  })
+
+  it('blockt docs: mit vorgemerkter src/x.ts neben Doku, auch mit -F und Here-Document', () => {
+    const ordner = docsRepo()
+    codeGeaendert(ordner)
+    dokuGeaendert(ordner)
+    git(ordner, 'add', 'src/x.ts', 'docs/a.md')
+    expect(lauf('git commit -F nachricht-docs.txt', ordner).grund.trim()).toBe(DOKU_GRUND)
+    expect(lauf(['git commit -F - <<EOF', 'docs: x', 'EOF'].join('\n'), ordner).code).toBe(2)
+    expect(lauf(['git commit -m "$(cat <<\'EOF\'', 'docs: x', '', 'Text', 'EOF', ')"'].join('\n'), ordner).code).toBe(2)
+  })
+
+  it('blockt git add src/x.ts && git commit -m "docs: x" (die Datei ist beim Prüfen noch nicht vorgemerkt)', () => {
+    const ordner = docsRepo()
+    codeGeaendert(ordner)
+    expect(lauf('git add src/x.ts && git commit -m "docs: x"', ordner).grund.trim()).toBe(DOKU_GRUND)
+  })
+
+  it('blockt git add mit einer neuen Datei und git add . vor dem Commit', () => {
+    const ordner = docsRepo()
+    schreibe(ordner, 'src/neu.ts', 'export const neu = 1\n')
+    expect(lauf('git add src/neu.ts && git commit -m "docs: x"', ordner).code).toBe(2)
+    expect(lauf('git add . && git commit -m "docs: x"', ordner).code).toBe(2)
+    expect(lauf('git add -A && git commit -m "docs: x"', path.join(ordner, 'docs')).code).toBe(2)
+  })
+
+  it('blockt git commit -am "docs: x" bei geänderter src/x.ts', () => {
+    const ordner = docsRepo()
+    codeGeaendert(ordner)
+    expect(lauf('git commit -am "docs: x"', ordner).grund.trim()).toBe(DOKU_GRUND)
+    expect(lauf('git commit --all -m "docs: x"', ordner).code).toBe(2)
+  })
+
+  it('findet das Repository über git -C und cd', () => {
+    const ordner = docsRepo()
+    codeGeaendert(ordner)
+    git(ordner, 'add', 'src/x.ts')
+    expect(lauf(`git -C ${ordner} commit -m "docs: x"`, keinRepo).code).toBe(2)
+    expect(lauf(`cd ${ordner} && git commit -m "docs: x"`, keinRepo).code).toBe(2)
+  })
+
+  it('lässt docs: mit docs/a.md, CLAUDE.md und einem Bild unter docs/ durch', () => {
+    const ordner = docsRepo()
+    dokuGeaendert(ordner)
+    schreibe(ordner, 'CLAUDE.md', '# Regeln\n')
+    schreibe(ordner, 'docs/nachtlauf/berichte/bilder/x.jpg', 'kein echtes Bild')
+    git(ordner, 'add', 'docs/a.md', 'CLAUDE.md', 'docs/nachtlauf/berichte/bilder/x.jpg')
+    expect(lauf('git commit -m "docs: x"', ordner).code).toBe(0)
+  })
+
+  it('lässt git commit -m "docs: x" docs/a.md durch, auch wenn daneben src/x.ts vorgemerkt ist (nur der Pfad zählt)', () => {
+    const ordner = docsRepo()
+    codeGeaendert(ordner)
+    dokuGeaendert(ordner)
+    git(ordner, 'add', 'src/x.ts')
+    expect(lauf('git commit -m "docs: x" docs/a.md', ordner).code).toBe(0)
+    expect(lauf('git commit -m "docs: x" -- docs/', ordner).code).toBe(0)
+    // Gegenprobe: Mit dem Code-Pfad blockt derselbe Befehl.
+    expect(lauf('git commit -m "docs: x" docs/a.md src/x.ts', ordner).code).toBe(2)
+  })
+
+  it('lässt git add -A docs/ && git commit -m "docs: x" durch, wenn src/x.ts nur geändert ist', () => {
+    const ordner = docsRepo()
+    codeGeaendert(ordner)
+    dokuGeaendert(ordner)
+    expect(lauf('git add -A docs/ && git commit -m "docs: x"', ordner).code).toBe(0)
+    expect(lauf('git add . && git commit -m "docs: x"', path.join(ordner, 'docs')).code).toBe(0)
+  })
+
+  it('lässt git commit -F nachricht-docs.txt mit vorgemerkter docs/a.md durch (der Wert von -F ist kein Pfad)', () => {
+    const ordner = docsRepo()
+    dokuGeaendert(ordner)
+    git(ordner, 'add', 'docs/a.md')
+    expect(lauf('git commit -F nachricht-docs.txt', ordner).code).toBe(0)
+    expect(lauf('git commit -m "docs: x" -m "src/x.ts geht nicht mit"', ordner).code).toBe(0)
+  })
+
+  it('lässt fix: mit src/x.ts und einen Merge-Commit durch', () => {
+    const ordner = docsRepo()
+    codeGeaendert(ordner)
+    git(ordner, 'add', 'src/x.ts')
+    expect(lauf('git commit -m "fix: x"', ordner).code).toBe(0)
+    expect(lauf('git commit -m "Merge origin/nacht/x in integration/lauf22"', ordner).code).toBe(0)
+    // Ein Merge, der gerade abgeschlossen wird: MERGE_HEAD steht im Repository.
+    writeFileSync(path.join(ordner, '.git', 'MERGE_HEAD'), git(ordner, 'rev-parse', 'HEAD'))
+    expect(lauf('git commit -m "docs: x"', ordner).code).toBe(0)
+  })
+
+  it('lässt durch, wo kein Repository ist, und wo git fehlt (mit Grund auf stderr)', () => {
+    expect(laufOhneRepo('git commit -m "docs: x"').code).toBe(0)
+    const ordner = docsRepo()
+    codeGeaendert(ordner)
+    git(ordner, 'add', 'src/x.ts')
+    const r = starte({ tool_name: 'Bash', tool_input: { command: 'git commit -m "docs: x"' }, cwd: ordner }, undefined, { PATH: '' })
+    expect(r.code).toBe(0)
+    expect(r.grund).toContain('docs:-Commit nicht bestimmen')
+  })
 })
