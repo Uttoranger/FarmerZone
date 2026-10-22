@@ -631,6 +631,12 @@ describe('gefahr-blocken — rekursives Löschen in jeder Schreibweise (Nr. 138,
     'sh -c "cd build && rm -rf /x"',
     // Text, der den Aufruf nur nennt, blockt wie bisher mit (gewollt vorsichtig).
     'echo "rm -rf ~"',
+    // Ein Ziel, das mit * beginnt, blockt wie vor Nr. 138 (Runde 1): */ löscht alle Unterordner.
+    'rm -rf */',
+    'rm -rf *.log',
+    // Auch die Schreibweisen mit Ersatzwert sind der Heimatordner.
+    'rm -rf "${HOME:?}"',
+    'rm -rf ${HOME:-/tmp/x}',
   ]) {
     it(`blockt: ${befehl}`, () => {
       const r = lauf(befehl)
@@ -805,6 +811,8 @@ describe('gefahr-blocken — Commit-Präfix nach CLAUDE.md §5 (Nr. 138)', () =>
     'git add x && git commit -m "test: x"',
     ['git commit -F - <<EOF', 'test: x', 'EOF'].join('\n'),
     ['git commit -m "$(cat <<\'EOF\'', 'test: x', '', 'Text', 'EOF', ')"'].join('\n'),
+    // Das F gehört zum Wert von -S (Schlüssel), das spätere -m zählt.
+    'git commit -SF -m "test: x"',
   ]) {
     it(`blockt: ${befehl}`, () => {
       const r = lauf(befehl)
@@ -847,6 +855,8 @@ describe('gefahr-blocken — Commit-Präfix nach CLAUDE.md §5 (Nr. 138)', () =>
     'git commit --no-edit',
     'git commit --amend --no-edit',
     'git merge --no-ff -m "x" origin/nacht/2026-10-22/137-kaufsperre',
+    // Das m gehört zum Wert von -u (Modus), keine Nachricht.
+    'git commit -unormal -m "fix: x"',
   ]) {
     it(`lässt durch: ${befehl}`, () => {
       expect(lauf(befehl).code).toBe(0)

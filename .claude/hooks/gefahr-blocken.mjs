@@ -244,11 +244,14 @@ function deployOhneLokaleAdressen(befehl, geerbt = new Map()) {
 }
 
 // Ziele, die rekursiv gelöscht nie richtig sind: wörtlich verglichen, kein Muster — `.next` und `./node_modules` bleiben frei.
-const LOESCH_ZIELE = new Set(['.', '..', './', '../', '*', './*', '.*'])
-// `$HOME` und `${HOME}` wie `~`: auch mit einem Pfad dahinter (`"$HOME/projekt"`).
-const HEIMATORDNER = /^\$(?:HOME|\{HOME\})(?:\/|$)/
+const LOESCH_ZIELE = new Set(['.', '..', './', '../', './*', '.*'])
+// `$HOME` und `${HOME}` wie `~`: auch mit einem Pfad dahinter (`"$HOME/projekt"`) und mit Ersatzwert
+// (`${HOME:?}`, `${HOME:-…}`); `${HOME:+…}` ist nicht der Heimatordner.
+const HEIMATORDNER = /^\$(?:HOME|\{HOME(?::?[-?=][^}]*)?\})(?:\/|$)/
 
-const istGeschuetztesZiel = (ziel) => ziel.startsWith('/') || ziel.startsWith('~') || HEIMATORDNER.test(ziel) || LOESCH_ZIELE.has(ziel)
+// Ein Ziel, das mit `*` beginnt (`*`, `*/`, `*.log`), blockte schon das Muster vor Nr. 138; das bleibt so (Runde 1).
+const istGeschuetztesZiel = (ziel) =>
+  ziel.startsWith('/') || ziel.startsWith('~') || ziel.startsWith('*') || HEIMATORDNER.test(ziel) || LOESCH_ZIELE.has(ziel)
 
 /**
  * Löscht `befehl` irgendwo rekursiv ein geschütztes Ziel (Nr. 138, Inventur 5)? Rekursiv ist `rm` mit `r` oder `R`
@@ -439,7 +442,8 @@ function ersteNachrichtenZeile(woerter, befehl, stelle, ordner) {
   for (let i = 0; i < woerter.length; i++) {
     if (woerter[i] === '--') return undefined
     const lang = /^--(message|file)(?:=([\s\S]*))?$/.exec(woerter[i])
-    const kurz = /^-[A-Za-z]*?([mF])([\s\S]*)$/.exec(woerter[i])
+    // Optionen mit Wert (-S, -u, -C, -c, -t) nehmen den Rest der Gruppe als Wert: `-unormal` ist keine Nachricht.
+    const kurz = /^-(?:(?![SuCctmF])[A-Za-z])*([mF])([\s\S]*)$/.exec(woerter[i])
     if (!lang && !kurz) continue
     const datei = lang ? lang[1] === 'file' : kurz[1] === 'F'
     const wert = (lang ? lang[2] : kurz[2] || undefined) ?? woerter[i + 1]
