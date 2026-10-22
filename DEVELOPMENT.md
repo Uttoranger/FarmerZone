@@ -5609,6 +5609,17 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 | drei volle Testläufe gleichzeitig (je ein Worktree) | ohne Begrenzung: 626 s, alle drei rot (3 Zeitüberschreitungen, eine Laufzeit-Grenze gerissen) | mit `--maxWorkers=1`: 687 s, alle grün, keine Zeitüberschreitung |
 | test allein mit `--pool=threads` (nur gemessen) | 232,7 s, grün | – |
 
+
+## Produkte am Handy: „Braucht dich“ zuerst, Vorrat im Blatt (Nr. 144, Nachtlauf 21, Register N25)
+
+- **Warum:** Am Handy stand jedes Produkt mit Schild „Sichtbar“ und − und + in der Zeile; Ausverkauftes und Knappes musste der Hof suchen, ein Tipp daneben änderte und speicherte den Vorrat, und „Nur noch 3“ hatte keine Einheit (die Kundin liest „Nur noch 3 kg“). Board `system-h1-mein-hof-v3`, Bildschirme A und B; „Vorrat im Blatt“ gewählt am 22.10.2026.
+- **Abschnitte** (`produkteAbschnitte`, `src/lib/produkte-hof.ts`): zuerst „Braucht dich“ (im Shop und ausverkauft, dann bis `LOW_STOCK_THRESHOLD`, dann ein Hinweis mit Handlung aus `produktHinweise` — die Ansicht reicht `hatHandlung` herein, weil src/lib nichts aus den Komponenten importiert), dann „Im Shop“ in der geladenen Reihenfolge, am Ende im Filter „Alle“ die Zeile „Nicht im Shop · n“ als Link auf den Filter, unter einem Bereichsfilter die ausgeblendeten Produkte des Bereichs. Mit Suche und im Filter „Nicht im Shop“ eine einfache Liste. Größen bleiben je eine Zeile (Abweichung vom Board „4 Größen“: Zusammenfassen bräuchte eine eigene Ansicht der Größen).
+- **Vorrat mit Einheit** (`hofVorratText`, `src/lib/format.ts`): zählt wie `bestandLabel` — Ballen und Big Bags je Stück, ein Gebinde als Paket („14 Pakete“, „1 Paket“), sonst die Einheit. `produktStatus` schreibt damit „Nur noch …“, auch in der Tabelle; das ist die einzige Änderung ab 1024 px. Bei einem Gebinde liest der Hof „Nur noch 2 Pakete“, die Kundin „Nur noch 2 × 500 g“ — beide zählen dieselben Pakete.
+- **Eine Logik zum Setzen:** Die Schleife aus `VorratFeld` (Warteschlange, `vorher`, Antworten) ist jetzt die reine Funktion `erzeugeVorratSchleife` in `use-vorrat-setzen.ts`; `useVorratSetzen` hängt sie an React (Zustand, `router.refresh` bei GEAENDERT, `onWiederDa`). Tabelle (`VorratFeld`) und Blatt (`VorratBlatt`) nutzen beide den Hook. Die Schleife entsteht beim ersten Senden im Handler: Im Render darf kein Ref an eine Funktion gehen (`react-hooks/refs`).
+- **Das Blatt steht einmal in der Ansicht,** nicht in der Zeile: Wechselt ein Produkt beim Speichern den Abschnitt, baut React die Zeile neu (anderes `ul`), ein Blatt darin verlöre Fokus, Satz und den Moment. Den Fokus gibt `finalFocus` als Funktion an den Vorrat-Knopf zurück (`data-vorrat-knopf`, beim Schließen gesucht); stand er nach dem Neubau auf `body`, holt `onOpenChangeComplete` ihn zurück. Der Moment „wieder da“ kommt erst danach. Jedes Öffnen zählt eine Runde im Schlüssel, damit ein alter Fehlersatz nicht stehen bleibt.
+- **Stepper:** reicht `inputMode` nur durch, wenn er gesetzt ist — ein `undefined` hätte die Wahl von Base UI für alle anderen Stepper überschrieben. Die große Darstellung (56 px, große Zahl, Einheit daneben) nutzt nur das Blatt.
+- **Tests ohne DOM:** `tests/vorrat-setzen.test.ts` prüft die reine Schleife mit nachgebautem `setzeVorrat` und spielt `VorratFeld` und `VorratBlatt` im Hook-Prüfstand durch (Knöpfe über ihren Text im Elementbaum gedrückt). Gegenprobe mit neun Eingriffen in Schleife und Blatt, jeder rot.
+
 ## Nützliche Befehle
 
 ```bash
