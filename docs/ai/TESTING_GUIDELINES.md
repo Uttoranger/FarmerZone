@@ -157,6 +157,7 @@ Typänderung und `DROP TABLE` lässt sie nur mit einem begründeten Marker durch
 - Vor jeder Behauptung „0 Treffer“ (Inventur, Wache, Suche für einen Bericht) läuft das Suchmuster als Test an einem Beispiel, das es finden muss – die Inventur zählte sonst nur drei von vier Muster-Schreibweisen (Regelvorschlag 110, Lauf 16); jede Wache hat dafür ihre Gegenprobe.
 - Wachen aus Nr. 118, jede mit einer Gegenprobe, die anschlägt: keine `loading.tsx` neben einer Seite mit Filtern in der Adresse (`loading-filter-wache`), kein `key` an einem iframe außer in der Liste aus `vorschauRahmen` (`vorschau-rahmen-wache`), `del(` aus `@vercel/blob` nur in den benannten Wegen (`blob-loeschen-wache`), kein doppelter Absatz in `docs/ai` (`doku-doppelte-absaetze`); wie `admin-seiten-wache` vergleichen sie gegen das Dateisystem und nennen eine neue Datei mit Namen.
 - In `src/components/hoefe/**` stehen `new Date()` und `Date.now()` nur in `use-uhr.ts`; Zeitlogik läuft dort über `useUhr` — /hoefe ist statisch (5 Minuten Zwischenspeicher, Register N19), eine Zeitangabe aus der Uhr des Servers wäre bis zum nächsten Rendern falsch. Wache in `tests/karte-wache.test.ts`, mit Gegenprobe (Nr. 120, Regelvorschlag in Nr. 127, freigegeben 20.10.2026).
+- Jede Datei mit `useSyncExternalStore` hat einen Fall in tests/hydrieren.test.ts oder steht dort mit Grund unter den Ausnahmen (geprüft; Regelvorschlag 135 aus Morgenbericht 20, freigegeben 21.10.2026).
 
 ### Nicht testen
 - Prisma selbst, Next.js selbst, Stripe selbst.
