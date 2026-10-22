@@ -5,6 +5,7 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { MenueZielAnbieter } from "@/components/ui/menue-ziel"
 import { XIcon } from "lucide-react"
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
@@ -50,32 +51,35 @@ function DialogContent({
   return (
     <DialogPortal>
       <DialogOverlay />
-      <DialogPrimitive.Popup
-        data-slot="dialog-content"
-        className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-3xl bg-popover p-6 text-sm text-popover-foreground shadow-[0_16px_40px_oklch(0.18_0.03_150_/_0.12)] ring-1 ring-border/60 duration-150 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-          className
-        )}
-        {...props}
-      >
-        {children}
-        {showCloseButton && (
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
-            render={
-              <Button
-                variant="ghost"
-                className="absolute top-2 right-2"
-                size="icon-sm"
+      {/* Kein Ziel der Shell: Ein Menü im modalen Dialog bleibt im Popup (Nr. 140, menue-ziel.tsx). */}
+      <MenueZielAnbieter ziel={null}>
+        <DialogPrimitive.Popup
+          data-slot="dialog-content"
+          className={cn(
+            "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-3xl bg-popover p-6 text-sm text-popover-foreground shadow-[0_16px_40px_oklch(0.18_0.03_150_/_0.12)] ring-1 ring-border/60 duration-150 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+            className
+          )}
+          {...props}
+        >
+          {children}
+          {showCloseButton && (
+            <DialogPrimitive.Close
+              data-slot="dialog-close"
+              render={
+                <Button
+                  variant="ghost"
+                  className="absolute top-2 right-2"
+                  size="icon-sm"
+                />
+              }
+            >
+              <XIcon
               />
-            }
-          >
-            <XIcon
-            />
-            <span className="sr-only">Schließen</span>
-          </DialogPrimitive.Close>
-        )}
-      </DialogPrimitive.Popup>
+              <span className="sr-only">Schließen</span>
+            </DialogPrimitive.Close>
+          )}
+        </DialogPrimitive.Popup>
+      </MenueZielAnbieter>
     </DialogPortal>
   )
 }

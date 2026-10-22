@@ -18,6 +18,7 @@ import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
 import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
 import { ADMIN_RAHMEN } from '@/components/admin/admin-teile'
 import { AdminAbmeldenKnopf, AdminKontoMenue, PLAKETTEN_KREIS } from '@/components/shells/admin-konto'
+import { MenueZielAnbieter } from '@/components/ui/menue-ziel'
 import { MARKE } from '@/lib/marke'
 import { ADMIN_POSTFACH_TEXT } from '@/lib/postfach'
 import { ADMIN_BETRIEB_HREF, BETRIEB_TEXT, warnungenText, type BetriebHinweis } from '@/lib/betrieb'
@@ -155,7 +156,8 @@ export function AdminShell({
   // Am Handy ist die Reiter-Zeile breiter als der Bildschirm: Der gewählte Reiter
   // soll nicht außerhalb stehen. Nur die Zeile scrollt (scrollLeft), nie die Seite.
   const reiterZeile = useRef<HTMLElement>(null)
-  // Hierhin hängt das Konto-Menü am Handy (Nr. 132): in den Kopf statt frei in den <body>.
+  // Hierhin hängen die Menüs (Nr. 132): in den Kopf statt frei in den <body>. Das Konto-Menü bekommt das Ziel von Hand,
+  // alle Menüs im Inhalt (Hofliste, Meldungen) über den Anbieter um Kopf und Inhalt.
   const menueZiel = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const zeile = reiterZeile.current
@@ -167,112 +169,114 @@ export function AdminShell({
 
   return (
     <div data-design="neu" className="min-h-dvh bg-background text-foreground">
-      <SprungLink />
-      <header className="border-b border-border bg-card print:hidden">
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 px-4 py-2 sm:gap-x-3 md:min-h-16 md:flex-nowrap md:gap-x-[18px] md:px-8">
-          <div className="flex min-h-11 items-center gap-2.5">
-            <Link href="/admin" aria-label={`${MARKE} Admin – Übersicht der Höfe`} className={cn('rounded-md', FOKUS_RAHMEN)}>
-              <Wortmarke />
-            </Link>
-            {/* Am schmalen Handy passt die Marke nicht neben Rückweg und Hell/Dunkel in eine Zeile; die Reiter darunter sagen ohnehin, wo man ist. */}
-            <StatusBadge status="offen" className="hidden min-[400px]:inline-flex">
-              Admin
-            </StatusBadge>
-          </div>
-
-          <nav ref={reiterZeile} aria-label="Admin-Bereiche" className="order-last -mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pt-[3px] pb-1 md:order-none md:mx-0 md:ml-5 md:w-auto md:px-0 md:py-[3px]">
-            <ul className="flex gap-2 md:gap-1">
-              {ADMIN_REITER.map((reiter) => {
-                const istAktiv = aktiv === reiter.id
-                const zahl = zahlFuer(reiter, zahlen)
-                return (
-                  <li key={reiter.id}>
-                    <Link
-                      href={reiter.href}
-                      aria-current={istAktiv ? (pathname === reiter.href ? 'page' : 'true') : undefined}
-                      className={cn(
-                        // Sichtbar 38 px, die Trefferfläche 44 px (WCAG 2.5.8): wie chip.tsx über ein Pseudo-Element.
-                        // Es misst vom Innenrand — der 1-px-Rahmen (auch der unsichtbare am aktiven Reiter) zählt nicht mit, darum 4 statt 3 px.
-                        "relative flex h-[38px] items-center gap-2 rounded-full px-4 text-[14px] whitespace-nowrap transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-[4px] before:content-['']",
-                        istAktiv
-                          ? 'border border-foreground bg-foreground font-semibold text-background'
-                          : 'border border-border font-medium text-foreground hover:bg-muted md:border-transparent',
-                        FOKUS_RAHMEN
-                      )}
-                    >
-                      {reiter.label}
-                      <Zaehler anzahl={zahl.anzahl} wofuer={zahl.wofuer} />
-                      {reiter.warnpunkt && betrieb && (
-                        <span role="img" aria-label={warnungenText(betrieb.anzahl)} className="size-2 shrink-0 rounded-full bg-primary" />
-                      )}
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
-          </nav>
-
-          {/* Rechts als eine Gruppe: Am Handy passen Marke, „← Mein Hof", Hell/Dunkel
-              und Plakette ab 375 px in eine Zeile; ist es noch schmaler, rutscht die
-              Gruppe geschlossen unter die Marke statt einzeln umzubrechen. Bis
-              1023 px der Kurzname — neben den Reitern bräche „Zu meinem Hof" sonst um. */}
-          <div className="ml-auto flex items-center gap-0.5 md:gap-1.5 lg:gap-3">
-            {hatHof && (
-              <Link
-                href={ADMIN_ZURUECK.href}
-                className={cn(
-                  'inline-flex min-h-11 items-center gap-1 rounded-full px-1.5 text-[14px] font-semibold whitespace-nowrap text-brand-text hover:bg-muted md:gap-1.5 md:px-3',
-                  FOKUS_RAHMEN
-                )}
-              >
-                <ArrowLeft className="size-4" strokeWidth={1.7} aria-hidden="true" />
-                <span className="lg:hidden">{ADMIN_ZURUECK.kurz}</span>
-                <span className="hidden lg:inline">{ADMIN_ZURUECK.label}</span>
+      <MenueZielAnbieter ziel={menueZiel}>
+        <SprungLink />
+        <header className="border-b border-border bg-card print:hidden">
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 px-4 py-2 sm:gap-x-3 md:min-h-16 md:flex-nowrap md:gap-x-[18px] md:px-8">
+            <div className="flex min-h-11 items-center gap-2.5">
+              <Link href="/admin" aria-label={`${MARKE} Admin – Übersicht der Höfe`} className={cn('rounded-md', FOKUS_RAHMEN)}>
+                <Wortmarke />
               </Link>
-            )}
-            <ThemeUmschalter className={cn('rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN)} />
-            <KontoPlakette anzeige={anzeige} hatHof={hatHof} onAbmelden={onAbmelden} menueZiel={menueZiel} />
-          </div>
-        </div>
-        {/* Ziel des Konto-Menüs: ohne Höhe, außerhalb der scrollenden Reiterzeile — der Kopf hat kein
-            overflow, transform oder backdrop-filter, das Menü wird also nicht abgeschnitten. */}
-        <div ref={menueZiel} data-menue-ziel="" />
-        {/* Betriebsleiste (Register Z3): welcher Stripe-Modus gilt. Eine eigene Zeile
-            unter dem Kopf statt in ihm: Die Kopfzeile ist am Handy und bis 1024 px
-            schon voll. Rechts seit Nr. 103 der Hinweis auf eine offene Warnung
-            (Register N15). Ohne Marke und ohne Warnung keine Leiste. */}
-        {(stripeMarke || betrieb) && (
-          <div className="flex min-h-11 items-center gap-3 border-t border-border px-4 md:px-8">
-            {stripeMarke && <StatusBadge status={stripeMarke.ton}>{stripeMarke.text}</StatusBadge>}
-            {betrieb && (
-              <Link
-                href={ADMIN_BETRIEB_HREF}
-                className={cn(
-                  'ml-auto inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md text-[13px] font-semibold text-status-offen hover:underline',
-                  FOKUS_RAHMEN
-                )}
-              >
-                <TriangleAlert className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
-                <span className="truncate sm:hidden">{betrieb.kurz}</span>
-                <span className="hidden truncate sm:inline">{BETRIEB_TEXT.leiste(betrieb.text)}</span>
-              </Link>
-            )}
-          </div>
-        )}
-      </header>
+              {/* Am schmalen Handy passt die Marke nicht neben Rückweg und Hell/Dunkel in eine Zeile; die Reiter darunter sagen ohnehin, wo man ist. */}
+              <StatusBadge status="offen" className="hidden min-[400px]:inline-flex">
+                Admin
+              </StatusBadge>
+            </div>
 
-      <main id={INHALT_ID} tabIndex={-1} className="px-4 py-5 outline-none md:px-8 md:py-7">
-        {/* Testbetrieb (Register Z2): über jeder Admin-Seite, in ihrer Breite.
-            Mit Live-Schlüssel ist TESTBETRIEB false — die Karte verschwindet von selbst. */}
-        {testbetrieb && (
-          <div className={cn(ADMIN_RAHMEN, 'mb-5')}>
-            <Hinweiskarte ton="orange" symbol={CircleAlert}>
-              {TESTBETRIEB_TEXT.admin}
-            </Hinweiskarte>
+            <nav ref={reiterZeile} aria-label="Admin-Bereiche" className="order-last -mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 pt-[3px] pb-1 md:order-none md:mx-0 md:ml-5 md:w-auto md:px-0 md:py-[3px]">
+              <ul className="flex gap-2 md:gap-1">
+                {ADMIN_REITER.map((reiter) => {
+                  const istAktiv = aktiv === reiter.id
+                  const zahl = zahlFuer(reiter, zahlen)
+                  return (
+                    <li key={reiter.id}>
+                      <Link
+                        href={reiter.href}
+                        aria-current={istAktiv ? (pathname === reiter.href ? 'page' : 'true') : undefined}
+                        className={cn(
+                          // Sichtbar 38 px, die Trefferfläche 44 px (WCAG 2.5.8): wie chip.tsx über ein Pseudo-Element.
+                          // Es misst vom Innenrand — der 1-px-Rahmen (auch der unsichtbare am aktiven Reiter) zählt nicht mit, darum 4 statt 3 px.
+                          "relative flex h-[38px] items-center gap-2 rounded-full px-4 text-[14px] whitespace-nowrap transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-[4px] before:content-['']",
+                          istAktiv
+                            ? 'border border-foreground bg-foreground font-semibold text-background'
+                            : 'border border-border font-medium text-foreground hover:bg-muted md:border-transparent',
+                          FOKUS_RAHMEN
+                        )}
+                      >
+                        {reiter.label}
+                        <Zaehler anzahl={zahl.anzahl} wofuer={zahl.wofuer} />
+                        {reiter.warnpunkt && betrieb && (
+                          <span role="img" aria-label={warnungenText(betrieb.anzahl)} className="size-2 shrink-0 rounded-full bg-primary" />
+                        )}
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            </nav>
+
+            {/* Rechts als eine Gruppe: Am Handy passen Marke, „← Mein Hof", Hell/Dunkel
+                und Plakette ab 375 px in eine Zeile; ist es noch schmaler, rutscht die
+                Gruppe geschlossen unter die Marke statt einzeln umzubrechen. Bis
+                1023 px der Kurzname — neben den Reitern bräche „Zu meinem Hof" sonst um. */}
+            <div className="ml-auto flex items-center gap-0.5 md:gap-1.5 lg:gap-3">
+              {hatHof && (
+                <Link
+                  href={ADMIN_ZURUECK.href}
+                  className={cn(
+                    'inline-flex min-h-11 items-center gap-1 rounded-full px-1.5 text-[14px] font-semibold whitespace-nowrap text-brand-text hover:bg-muted md:gap-1.5 md:px-3',
+                    FOKUS_RAHMEN
+                  )}
+                >
+                  <ArrowLeft className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                  <span className="lg:hidden">{ADMIN_ZURUECK.kurz}</span>
+                  <span className="hidden lg:inline">{ADMIN_ZURUECK.label}</span>
+                </Link>
+              )}
+              <ThemeUmschalter className={cn('rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN)} />
+              <KontoPlakette anzeige={anzeige} hatHof={hatHof} onAbmelden={onAbmelden} menueZiel={menueZiel} />
+            </div>
           </div>
-        )}
-        {children}
-      </main>
+          {/* Ziel des Konto-Menüs: ohne Höhe, außerhalb der scrollenden Reiterzeile — der Kopf hat kein
+              overflow, transform oder backdrop-filter, das Menü wird also nicht abgeschnitten. */}
+          <div ref={menueZiel} data-menue-ziel="" />
+          {/* Betriebsleiste (Register Z3): welcher Stripe-Modus gilt. Eine eigene Zeile
+              unter dem Kopf statt in ihm: Die Kopfzeile ist am Handy und bis 1024 px
+              schon voll. Rechts seit Nr. 103 der Hinweis auf eine offene Warnung
+              (Register N15). Ohne Marke und ohne Warnung keine Leiste. */}
+          {(stripeMarke || betrieb) && (
+            <div className="flex min-h-11 items-center gap-3 border-t border-border px-4 md:px-8">
+              {stripeMarke && <StatusBadge status={stripeMarke.ton}>{stripeMarke.text}</StatusBadge>}
+              {betrieb && (
+                <Link
+                  href={ADMIN_BETRIEB_HREF}
+                  className={cn(
+                    'ml-auto inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md text-[13px] font-semibold text-status-offen hover:underline',
+                    FOKUS_RAHMEN
+                  )}
+                >
+                  <TriangleAlert className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+                  <span className="truncate sm:hidden">{betrieb.kurz}</span>
+                  <span className="hidden truncate sm:inline">{BETRIEB_TEXT.leiste(betrieb.text)}</span>
+                </Link>
+              )}
+            </div>
+          )}
+        </header>
+
+        <main id={INHALT_ID} tabIndex={-1} className="px-4 py-5 outline-none md:px-8 md:py-7">
+          {/* Testbetrieb (Register Z2): über jeder Admin-Seite, in ihrer Breite.
+              Mit Live-Schlüssel ist TESTBETRIEB false — die Karte verschwindet von selbst. */}
+          {testbetrieb && (
+            <div className={cn(ADMIN_RAHMEN, 'mb-5')}>
+              <Hinweiskarte ton="orange" symbol={CircleAlert}>
+                {TESTBETRIEB_TEXT.admin}
+              </Hinweiskarte>
+            </div>
+          )}
+          {children}
+        </main>
+      </MenueZielAnbieter>
     </div>
   )
 }

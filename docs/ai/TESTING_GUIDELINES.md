@@ -157,6 +157,7 @@ Typänderung und `DROP TABLE` lässt sie nur mit einem begründeten Marker durch
 - Vor jeder Behauptung „0 Treffer“ (Inventur, Wache, Suche für einen Bericht) läuft das Suchmuster als Test an einem Beispiel, das es finden muss – die Inventur zählte sonst nur drei von vier Muster-Schreibweisen (Regelvorschlag 110, Lauf 16); jede Wache hat dafür ihre Gegenprobe.
 - Wachen aus Nr. 118, jede mit einer Gegenprobe, die anschlägt: keine `loading.tsx` neben einer Seite mit Filtern in der Adresse (`loading-filter-wache`), kein `key` an einem iframe außer in der Liste aus `vorschauRahmen` (`vorschau-rahmen-wache`), `del(` aus `@vercel/blob` nur in den benannten Wegen (`blob-loeschen-wache`), kein doppelter Absatz in `docs/ai` (`doku-doppelte-absaetze`); wie `admin-seiten-wache` vergleichen sie gegen das Dateisystem und nennen eine neue Datei mit Namen.
 - In `src/components/hoefe/**` stehen `new Date()` und `Date.now()` nur in `use-uhr.ts`; Zeitlogik läuft dort über `useUhr` — /hoefe ist statisch (5 Minuten Zwischenspeicher, Register N19), eine Zeitangabe aus der Uhr des Servers wäre bis zum nächsten Rendern falsch. Wache in `tests/karte-wache.test.ts`, mit Gegenprobe (Nr. 120, Regelvorschlag in Nr. 127, freigegeben 20.10.2026).
+- Jede Datei mit `useSyncExternalStore` hat einen Fall in tests/hydrieren.test.ts oder steht dort mit Grund unter den Ausnahmen (geprüft; Regelvorschlag 135 aus Morgenbericht 20, freigegeben 21.10.2026).
 
 ### Nicht testen
 - Prisma selbst, Next.js selbst, Stripe selbst.
@@ -256,6 +257,7 @@ in einen ungültigen Schlüssel statt in echtes Geld.
 - Telefon: `+43 660 0000000` — mehrere Nummern unterscheiden sich in der Vorwahl (664, 676, 699), der Teilnehmerteil bleibt genullt (Wache `tests/telefonnummern-wache.test.ts`).
 - Keine echten Stripe-IDs, keine echten Tokens — auch keine abgelaufenen.
 - Erfundene Tokens und Codes in Tests aus Buchstaben, nicht aus langen Ziffernfolgen (sonst schlägt die Telefonnummern-Wache an) (Nr. 113, Morgenbericht 17, freigegeben 19.10.2026).
+- Ein verfälschter Wert ist immer sicher anders: Zeichen tauschen, nicht festsetzen (geprüft; Regelvorschlag aus Morgenbericht 20 §6, freigegeben 21.10.2026).
 - **Für Typen, die in mehr als drei Testdateien nachgebaut werden, gibt es eine Fabrik in `tests/fabrik/<typ>.ts`; sonst bleiben Faktoren lokal** (Wache `tests/fabrik-wache.test.ts`; Nr. 119, Regelvorschlag in Nr. 127, freigegeben 20.10.2026).
 - **Integrationsschicht: alles trägt das Präfix `int-`** — Hof-Slug, Produkt-ID,
   Sitzungs-ID, E-Mail-Adresse. Das Präfix ist die Sicherung, an der `raeumeAuf()`
@@ -277,7 +279,7 @@ in einen ungültigen Schlüssel statt in echtes Geld.
 - Neue Fachregel → Test im selben Commit. Kein "Tests kommen später".
 - Bugfix → zuerst der Test, der den Bug reproduziert, dann der Fix.
 - Geänderte Fachregel → bestehende Tests anpassen, **nicht löschen**. Wer einen Test löscht, begründet das im Bericht.
-- Roter Test wird **nie** mit `.skip` stillgelegt. Entweder reparieren oder melden.
+- Roter Test wird **nie** mit `.skip` stillgelegt. Entweder reparieren oder melden (geprüft von tests/test-ueberspringen-wache.test.ts).
 - `pnpm test` muss vor jedem Commit grün sein – im Nachtlauf vor jedem Push (Register G10).
 
 ### Bekannte Umgebungsfallen
