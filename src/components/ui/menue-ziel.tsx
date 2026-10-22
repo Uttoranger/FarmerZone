@@ -19,7 +19,7 @@ export type MenueZiel = React.RefObject<HTMLElement | null>
 const MenueZielKontext = React.createContext<MenueZiel | null>(null)
 
 /** Stellt das Ziel für die Menüs bereit, die darunter rendern (`null`: dort kein Ziel, das Menü hängt am <body>). */
-export function MenueZielAnbieter({ ziel, children }: { ziel: MenueZiel | null; children: React.ReactNode }): React.JSX.Element {
+export function MenueZielAnbieter({ ziel, children }: { ziel: MenueZiel | null; children?: React.ReactNode }): React.JSX.Element {
   return <MenueZielKontext.Provider value={ziel}>{children}</MenueZielKontext.Provider>
 }
 

@@ -153,7 +153,7 @@ describe('Menüs im Inhalt nehmen den Zielort aus dem Kontext (Nr. 140)', () => 
   })
 
   it('unter ziel={null} (Dialog, Blatt) bleibt das Menü am body, auch mitten in der AdminShell', () => {
-    rendere(AdminShell, ADMIN, createElement(MenueZielAnbieter, { ziel: null, children: menueImInhalt() }))
+    rendere(AdminShell, ADMIN, createElement(MenueZielAnbieter, { ziel: null }, menueImInhalt()))
     expect(portalZiele).toHaveLength(2)
     expect(istRef(portalZiele[0])).toBe(true)
     expect(portalZiele[1]).toBeUndefined()
