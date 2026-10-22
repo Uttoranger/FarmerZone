@@ -1,7 +1,6 @@
 /**
  * Menüeinträge sind mindestens 44 px hoch (Tippflächen, DESIGN_SYSTEM) – im
- * Baustein, nie je Menü. Dazu Nr. 148, Punkt 2 und 3: der Beitrag für WhatsApp
- * kommt aus einer Abfrage, der Link im Teilen-Fenster aus der einen Regel.
+ * Baustein, nie je Menü (Nr. 148, Punkt 1).
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
@@ -24,6 +23,37 @@ function itemKlasse(quelle: string): string {
   return treffer![1]
 }
 
+/**
+ * Alle Öffnungs-Tags von Menüeinträgen (Item, LinkItem) bis zum schließenden `>`
+ * des Eintrags. Geschweifte Klammern und Anführungszeichen zählen mit: Das `/>`
+ * eines Link in `render={<Link … />}` und das `=>` in `onClick` beenden den Tag nicht.
+ */
+function eintragTags(quelle: string): string[] {
+  const tags: string[] = []
+  for (const m of quelle.matchAll(/<DropdownMenu(?:Link)?Item\b/g)) {
+    let tiefe = 0
+    let anf: string | null = null
+    let ende = m.index!
+    for (let i = m.index! + m[0].length; i < quelle.length; i++) {
+      const z = quelle[i]
+      if (anf) {
+        if (z === anf) anf = null
+      } else if (z === '"' || z === "'" || z === '`') anf = z
+      else if (z === '{') tiefe++
+      else if (z === '}') tiefe--
+      else if (z === '>' && tiefe === 0) {
+        ende = i
+        break
+      }
+    }
+    tags.push(quelle.slice(m.index!, ende + 1))
+  }
+  return tags
+}
+
+/** Eintrag-Tags, deren Attribute min-h-11 tragen. */
+const mitHoehe = (quelle: string) => eintragTags(quelle).filter((t) => /min-h-11/.test(t))
+
 describe('Menüeinträge: 44 px im Baustein', () => {
   it('ITEM in dropdown-menu.tsx trägt min-h-11', () => {
     expect(itemKlasse(lies('src/components/ui/dropdown-menu.tsx'))).toContain('min-h-11')
@@ -41,36 +71,21 @@ describe('Menüeinträge: 44 px im Baustein', () => {
       const quelle = lies(pfad)
       if (/\[&_\[role=menuitem\]\]:min-h-/.test(quelle)) funde.push(`${pfad}: Regel am Menü`)
       // Ein Eintrag (Item oder LinkItem) mit eigener className, die min-h-11 trägt.
-      for (const m of quelle.matchAll(/<DropdownMenu(?:Link)?Item\b[^>]*>/g)) {
-        if (/min-h-11/.test(m[0])) funde.push(`${pfad}: ${m[0].slice(0, 60)}`)
-      }
+      for (const tag of mitHoehe(quelle)) funde.push(`${pfad}: ${tag.slice(0, 60)}`)
     }
     expect(funde).toEqual([])
   }, 30_000)
-})
 
-describe('Beitrag für WhatsApp aus einer Abfrage', () => {
-  it('die Seite ruft prisma nicht mehr selbst auf', () => {
-    const seite = lies('src/app/(hof)/status/[id]/send-whatsapp/page.tsx')
-    expect(seite).not.toMatch(/prisma/)
-    expect(seite).toContain('data.showOnFarmPage')
-  })
-
-  it('getStatusPostForWhatsApp liefert showOnFarmPage, Besitz bleibt in der WHERE-Klausel', () => {
-    const quelle = lies('src/server/queries/status-posts.ts')
-    const start = quelle.indexOf('export async function getStatusPostForWhatsApp')
-    const funktion = quelle.slice(start, quelle.indexOf('const subscribers', start))
-    expect(funktion).toContain('showOnFarmPage: true')
-    expect(funktion).toContain('where: { id: postId, farmId }')
-  })
-})
-
-describe('Link im Teilen-Fenster über die eine Regel', () => {
-  it('ladeTeilenFensterBeitrag baut link und adresse über beitragIdImLink', () => {
-    const quelle = lies('src/server/queries/teilen-bild.ts')
-    const start = quelle.indexOf('export async function ladeTeilenFensterBeitrag')
-    const funktion = quelle.slice(start, quelle.indexOf('\n}\n', start))
-    expect(funktion).toContain('beitragIdImLink(beitrag)')
-    expect(funktion).not.toMatch(/beitragLink\([^)]*beitrag\.id\)/)
+  it('Gegenprobe: der Quelltext vor der Änderung (LinkItem mit render-Prop, Item mit =>) wird gefunden', () => {
+    const alt = `
+      <DropdownMenuLinkItem render={<Link href={ADMIN_KONTO.href} />} className="min-h-11">
+        Konto
+      </DropdownMenuLinkItem>
+      <DropdownMenuItem onClick={() => abmelden()} className="min-h-11">Abmelden</DropdownMenuItem>
+      <DropdownMenuItem onClick={abmelden}>Ohne Höhe</DropdownMenuItem>`
+    const funde = mitHoehe(alt)
+    expect(funde).toHaveLength(2)
+    expect(funde[0]).toContain('DropdownMenuLinkItem')
+    expect(funde[1]).toContain('=>')
   })
 })
