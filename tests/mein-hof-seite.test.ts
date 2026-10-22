@@ -33,6 +33,9 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('@/server/actions/status-posts', () => ({ expireStatusPost: vi.fn(), deleteStatusPost: vi.fn() }))
 vi.mock('@/server/actions/teilen-fenster', () => ({ ladeTeilenFensterBeitragAction: vi.fn() }))
+// Der Kopf am Handy (Nr. 143) trägt Pausieren/Fortsetzen — hier wird nichts geschaltet.
+vi.mock('@/server/actions/farm', () => ({ setPause: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
 vi.mock('next/image', () => ({
   default: (props: { src: string; alt: string }) => createElement('img', { src: props.src, alt: props.alt }),
 }))
@@ -221,14 +224,15 @@ describe('Kopf und Reiter (neues Design)', () => {
   }
 
   const rendere = (aktiv: 'hofseite' | 'beitraege', k: MeinHofKopfDaten = kopf) =>
-    renderToStaticMarkup(createElement(MeinHofSeitenkopf, { hof: k, aktiv, beitraegeZahl: 2 }))
+    renderToStaticMarkup(createElement(MeinHofSeitenkopf, { hof: k, aktiv, zustand: null }))
 
-  it('Reiter als Links mit aria-current, Zahl hinter „Beiträge"', () => {
+  it('Reiter als Links mit aria-current, ohne Zahl hinter „Beiträge" (E12, Nr. 143)', () => {
     const html = rendere('beitraege')
     expect(html).toContain('href="/farm-page"')
     expect(html).toMatch(/href="\/farm-page\?reiter=beitraege"[^>]*aria-current="page"/)
     expect(html).not.toMatch(/href="\/farm-page"[^>]*aria-current/)
-    expect(html).toContain('Beiträge · 2')
+    expect(html).toContain('>Beiträge<')
+    expect(html).not.toMatch(/Beiträge ·/)
   })
 
   it('öffentlich: Kundenansicht (Vorschau in neuem Tab) und Teilen; Zustand als StatusBadge', () => {
@@ -313,6 +317,9 @@ describe('Tokens statt Farbwerte', () => {
     'src/components/mein-hof/mein-hof-laden.tsx',
     'src/components/mein-hof/mein-hof-ansicht.tsx',
     'src/components/mein-hof/reiter-leiste.tsx',
+    'src/components/mein-hof/mein-hof-kopf.tsx',
+    'src/components/mein-hof/pausieren-blatt.tsx',
+    'src/app/(hof)/products/loading.tsx',
   ]
 
   it.each(dateien)('%s: keine Farbliterale, kein black/white, keine Bestandspalette app-*', (datei) => {

@@ -13,8 +13,9 @@ import { cn } from '@/lib/utils'
  * Den Hinweis, wo Produkte liegen, trägt seit Nr. 73 (Register N7) der Editor
  * am Ende seiner Liste (components/farmer/hofseite-editor.tsx), nicht die Leiste.
  *
- * Reiter links gruppiert wie im Mockup; „Beiträge · N" mit der Zahl aller
- * eigenen Beiträge (zaehleBeitraege), keine Produktzahl.
+ * Reiter links gruppiert wie im Mockup; ohne Zahl, auf allen Breiten (Register
+ * E12, Ergänzung 22.10.2026; Nr. 143) — den laufenden Beitrag nennt die erste
+ * Zeile von Mein Hof › Hofseite.
  *
  * Ladepunkt statt Skelett (Nr. 127): Ein Wechsel des Reiters lässt den Inhalt
  * stehen; der gewählte Reiter zeigt einen kleinen Punkt, und der Inhalt trägt
@@ -22,12 +23,10 @@ import { cn } from '@/lib/utils'
  */
 export function MeinHofReiterLeiste({
   aktiv,
-  beitraegeZahl,
   nurUnterMd = false,
   className,
 }: {
   aktiv: MeinHofReiterAlleId
-  beitraegeZahl: number
   /** Auf /products: die ganze Leiste nur unter md — ab md ist Produkte ein eigener Punkt der Seitenleiste (N3). */
   nurUnterMd?: boolean
   className?: string
@@ -51,7 +50,6 @@ export function MeinHofReiterLeiste({
             )}
           >
             {reiter.label}
-            {reiter.id === 'beitraege' && ` · ${beitraegeZahl}`}
             {/* Der Punkt sitzt neben dem Wort, nicht darauf: zwischen den Reitern ist Platz (gap-7). */}
             <LadePunkt className="-right-2.5" />
           </Link>

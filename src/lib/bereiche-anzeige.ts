@@ -264,8 +264,12 @@ export function kaufSperre(hof: { isPaused: boolean; pickupSlots: readonly Abhol
 /** Die Beschriftung des ruhenden Kaufknopfs ohne Abholtermin — analog zu SHOP_PAUSED_BUTTON_LABEL. */
 export const KAUFSPERRE_KNOPF = 'Nicht bestellbar'
 
-/** „2 Wochen“ — aus dem Vorlauf gerechnet, nie als Zahl im Text. */
-function vorlaufInWochen(): string {
+/**
+ * „der nächsten 2 Wochen“ — aus dem Vorlauf gerechnet, nie als Zahl im Text. Exportiert für den
+ * Satz „Gerade ausgebucht“ im Kopf von Mein Hof (zustandsZeile, src/lib/mein-hof.ts, Nr. 143):
+ * derselbe Vorlauf wie in der Karte der Kundin, kein Nachbau.
+ */
+export function vorlaufInWochen(): string {
   const wochen = Math.floor(ABHOL_VORLAUF_TAGE / 7)
   return wochen === 1 ? 'der nächsten Woche' : `der nächsten ${wochen} Wochen`
 }

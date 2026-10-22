@@ -22,3 +22,13 @@ export const SHOP_PAUSED_BUTTON_LABEL = 'Pausiert'
 export function kundenPausenText(pauseMessage: string | null | undefined): string {
   return pauseMessage?.trim() || SHOP_PAUSED_FALLBACK
 }
+
+/**
+ * Die Meldungen nach dem Umschalten, an den Hof gerichtet — EINE Quelle für das Blatt
+ * „Bestellungen pausieren?“ und „Fortsetzen“ im Kopf von Mein Hof (pausieren-blatt.tsx) und
+ * den Umschalter auf /settings/pause und im Editor (pause-client.tsx, Nr. 143).
+ */
+export const PAUSE_MELDUNG = {
+  pausiert: 'Bestellungen pausiert',
+  fortgesetzt: 'Du nimmst wieder Bestellungen an',
+} as const

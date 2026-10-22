@@ -1,7 +1,10 @@
 /**
- * Der Kopf von „Mein Hof" (components/mein-hof/seitenkopf.tsx) — was er über
- * den Hof sagt. Rein und ohne Datenbank prüfbar (tests/mein-hof.test.ts).
+ * Der Kopf von „Mein Hof" (components/mein-hof/seitenkopf.tsx, unter lg
+ * mein-hof-kopf.tsx) — was er über den Hof sagt. Rein und ohne Datenbank
+ * prüfbar (tests/mein-hof.test.ts, tests/mein-hof-zustand.test.ts).
  */
+import { vorlaufInWochen, type KaufSperre } from '@/lib/bereiche-anzeige'
+import { ABHOLZEILE_TEXT, formatiereAbholung, type NaechsteAbholung } from '@/lib/hofuebersicht'
 
 /**
  * Die Adresse von Mein Hof, Reiter Hofseite — EINE Quelle. Hier statt in der
@@ -108,4 +111,77 @@ export function hofAdresse(appUrl: string, slug: string): { anzeige: string; url
     // Kein gültiger Ursprung (z. B. leer) — dann steht die Adresse eben roh da.
   }
   return { anzeige: `${host}/${slug}`, url }
+}
+
+// ─── Zustandszeile im Kopf am Handy (Register N3, Ergänzung 22.10.2026; Nr. 143) ──
+
+/**
+ * Die Wörter der Zustandszeile, an den Hof gerichtet — EINE Quelle. Die Karte der
+ * Kundin (`kaufSperreHinweis`) spricht von „{Hof} hat …“ und steht hier nicht; der
+ * Titel „Noch nicht bestellbar“ ist derselbe wie auf /hoefe (ABHOLZEILE_TEXT), der
+ * Vorlauf derselbe wie in der Karte der Kundin (vorlaufInWochen).
+ */
+export const ZUSTANDSZEILE_TEXT = {
+  aus: { titel: NOCH_NICHT_FREIGEGEBEN.text, satz: 'Kundinnen sehen deinen Hof nach der Freigabe.' },
+  pausiert: { titel: 'Pausiert', satz: 'Bestellen kann gerade niemand.', knopf: 'Fortsetzen' },
+  keineAbholzeit: { titel: ABHOLZEILE_TEXT.nichtBestellbar, satz: 'Es fehlen Abholzeiten.', knopf: 'Eintragen' },
+  ausgebucht: { titel: 'Gerade ausgebucht', satz: `Alle Abholzeiten ${vorlaufInWochen()} sind voll.`, knopf: 'Abholzeiten' },
+  keinProdukt: { titel: ABHOLZEILE_TEXT.nichtBestellbar, satz: 'Kein Produkt ist gerade zu kaufen.', knopf: 'Produkte' },
+  nimmtAn: { titel: 'Nimmt Bestellungen an', satz: 'Nächste Abholung: ', knopf: 'Pausieren' },
+} as const
+
+/** Was der Knopf der Zeile tut — die Adresse bzw. die Handlung wählt der Kopf (mein-hof-kopf.tsx). */
+export type ZustandsKnopfArt = 'fortsetzen' | 'pausieren' | 'eintragen' | 'abholzeiten' | 'produkte'
+
+export type ZustandsZeile = {
+  ton: 'gruen' | 'orange' | 'grau'
+  titel: string
+  satz: string
+  knopf: null | { art: ZustandsKnopfArt; text: string }
+}
+
+/**
+ * Die Zustandszeile im Kopf von Mein Hof am Handy, oder null. Reihenfolge:
+ *  - stillgelegt und „wartet auf Freigabe“ → null: Das sagt schon der Balken über
+ *    jeder Seite der HofShell (eine Fassung je Zustand, DESIGN_SYSTEM). `zustand`
+ *    kommt dafür mit der Bedingung des Balkens (ladeMeinHofZustand), nicht aus
+ *    hofZustand allein.
+ *  - aus (freigeschaltet, aber nicht aktiv) → grau, ohne Knopf.
+ *  - pausiert → Fortsetzen; keine Abholzeit → Eintragen; ausgebucht → Abholzeiten;
+ *    kein kaufbares Produkt → Produkte (dieselbe Regel wie `istBestellbar` auf /hoefe).
+ *  - sonst → grün mit der nächsten Abholung im Hausformat und „Pausieren“.
+ * `sperre` und `naechste` rechnet der Server aus denselben Fenstern (kaufSperre,
+ * naechsteAbholung) — wie bei der Kundin.
+ */
+export function zustandsZeile({
+  zustand,
+  sperre,
+  naechste,
+  kaufbar,
+}: {
+  zustand: HofZustandArt
+  sperre: KaufSperre
+  naechste: NaechsteAbholung | null
+  kaufbar: boolean
+}): ZustandsZeile | null {
+  const t = ZUSTANDSZEILE_TEXT
+  if (zustand === 'stillgelegt' || zustand === 'wartet') return null
+  if (zustand === 'aus') return { ton: 'grau', ...t.aus, knopf: null }
+  if (zustand === 'pausiert') return { ton: 'orange', titel: t.pausiert.titel, satz: t.pausiert.satz, knopf: { art: 'fortsetzen', text: t.pausiert.knopf } }
+  if (sperre === 'keine-abholzeit') {
+    return { ton: 'orange', titel: t.keineAbholzeit.titel, satz: t.keineAbholzeit.satz, knopf: { art: 'eintragen', text: t.keineAbholzeit.knopf } }
+  }
+  // Ohne nächste Abholung ist alles im Vorlauf voll — dieselbe Rechnung wie kaufSperre.
+  if (sperre === 'ausgebucht' || naechste === null) {
+    return { ton: 'orange', titel: t.ausgebucht.titel, satz: t.ausgebucht.satz, knopf: { art: 'abholzeiten', text: t.ausgebucht.knopf } }
+  }
+  if (!kaufbar) {
+    return { ton: 'orange', titel: t.keinProdukt.titel, satz: t.keinProdukt.satz, knopf: { art: 'produkte', text: t.keinProdukt.knopf } }
+  }
+  return {
+    ton: 'gruen',
+    titel: t.nimmtAn.titel,
+    satz: `${t.nimmtAn.satz}${formatiereAbholung(naechste)}`,
+    knopf: { art: 'pausieren', text: t.nimmtAn.knopf },
+  }
 }
