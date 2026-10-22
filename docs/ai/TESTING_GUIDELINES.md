@@ -278,7 +278,7 @@ in einen ungültigen Schlüssel statt in echtes Geld.
 - Bugfix → zuerst der Test, der den Bug reproduziert, dann der Fix.
 - Geänderte Fachregel → bestehende Tests anpassen, **nicht löschen**. Wer einen Test löscht, begründet das im Bericht.
 - Roter Test wird **nie** mit `.skip` stillgelegt. Entweder reparieren oder melden.
-- `pnpm test` muss vor jedem Commit grün sein.
+- `pnpm test` muss vor jedem Commit grün sein – im Nachtlauf vor jedem Push (Register G10).
 
 ### Bekannte Umgebungsfallen
 - `prisma generate` braucht Netzzugriff auf `binaries.prisma.sh`. Ist er blockiert, scheitern vier Testdateien mit `Cannot find module '.prisma/client/default'`. Das ist **kein** Codefehler — vor der Fehlersuche `pnpm db:generate` prüfen.

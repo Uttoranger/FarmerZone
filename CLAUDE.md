@@ -34,7 +34,7 @@ Solo-Entwickler, ein Pilothof. **Produktivsystem mit echten Bestellungen und ech
   Nicht Teil von `pnpm test`, nicht Teil des Stop-Hooks; in der CI ein eigener Job.
 
 **Vor jedem Commit verpflichtend:** `pnpm typecheck && pnpm lint && pnpm test`.
-Kein Commit mit rotem Typecheck, rotem Lint (Fehler; Warnungen dürfen bleiben) oder roten Tests. Keine Ausnahme, auch nicht "nur ein Formatfehler".
+Kein Commit mit rotem Typecheck, rotem Lint (Fehler; Warnungen dürfen bleiben) oder roten Tests. Keine Ausnahme, auch nicht "nur ein Formatfehler" – außer im Nachtlauf nach Register G10: Ein Zwischen-Commit, der nicht gepusht wird, prüft mit `pnpm typecheck`, `pnpm lint` und `pnpm vitest related --run <geänderte Dateien>`; vor jedem Push und vor jedem PR läuft der volle Lauf, ein Push mit rotem vollem Lauf ist verboten.
 
 ---
 
