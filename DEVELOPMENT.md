@@ -5609,6 +5609,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 | drei volle Testläufe gleichzeitig (je ein Worktree) | ohne Begrenzung: 626 s, alle drei rot (3 Zeitüberschreitungen, eine Laufzeit-Grenze gerissen) | mit `--maxWorkers=1`: 687 s, alle grün, keine Zeitüberschreitung |
 | test allein mit `--pool=threads` (nur gemessen) | 232,7 s, grün | – |
 
+## Hofliste sofort erneuern, Pausen-Nachricht mit Grenze (Register N24, Ergänzung 22.10.2026; Nr. 137, Lauf 21)
+
+- **Umfang:** nur Punkt 3 und 4 der Freigabe. Der Fix „Kaufen nur mit Abholtermin“ (PR #345) war beim Start nicht auf main; Reservieren mit Kaufsperre, Korb-Blatt und der Kommentar in `istBestellbar` entfallen bis dahin (Freigabe „Stand“).
+- **Warum Hofliste:** 14 Actions schrieben Felder, die /hoefe und die Startseite zeigen (Name, Ort, Kartenpunkt, Abholzeiten, Pause, Fotos, Titelbild, Stilllegung, entzogene Freigabe), riefen aber nur `revalidatePath`. Der Eintrag unter `HOEFE_CACHE_TAG` alterte bis zu fünf Minuten weiter; kaufen blieb trotzdem richtig gesperrt, weil Hof- und Produktseite bei jedem Aufruf neu rechnen und der Server prüft.
+- **Fix:** `updateTag(HOEFE_CACHE_TAG)` nach dem Schreiben in jeder dieser Actions, in farm-photos.ts nicht im gemeinsamen Helfer `revalidate()` (die Bildunterschrift liest die Liste nicht); `moveFarmPhotoAction` geht in `reorderPhotosAction` auf. Alle Aufrufer sind Client-Komponenten oder Actions — `updateTag` wirft außerhalb einer Server-Action.
+- **Wache:** `tests/hofliste-schreiber-wache.test.ts` sucht im Syntaxbaum je exportierter Funktion unter `src/server/actions/` Schreiben auf `pickupSlot`/`farmPhoto` und `farm.update(Many)` mit einem Feld der Liste (auch Kurzform und bedingte Spreads) und verlangt `updateTag(HOEFE_CACHE_TAG)` direkt in der Funktion. Vier Ausnahmen mit Grund (`createOnboardingSlots`, `updateFarmPhotoCaptionAction`, `markiereAlsTesthof`, `nimmTesthofZurueck`); Helfer und `data` aus Variablen sieht sie nicht.
+- **Pausen-Nachricht:** `PAUSENACHRICHT_MAX = 300`, `ZU_LANG.pausenachricht`, `pauseSchema` (src/schemas/pause.ts) mit der gespeicherten Nachricht aus der Datenbank: Ein unveränderter Altwert darüber bleibt erlaubt, denn PauseClient schickt die Nachricht beim Umschalten mit. Geprüft wird der Text ohne Ränder, so wie er gespeichert wird. Am Feld steht `ZeichenZaehler`, kein `maxLength`. Die längste gespeicherte Nachricht in Produktion hatte 51 Zeichen (gezählt am 22.10.2026).
+
 ## Nützliche Befehle
 
 ```bash
