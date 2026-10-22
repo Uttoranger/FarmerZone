@@ -24,6 +24,7 @@ Vom Dirigenten laufend ergänzt (freigabe.md §25, §0 „Zeitbuch“). Rechner:
 - Zwischenstand eec51d8 voll grün (525/9882, Integration 70/621), gepusht; 141 Start 13:16
 - 141 Workflow Ende 14:17, PR 14:19
 - Sammelstand voll grün 14:25 (525/9882, 3 Worker 3,3 min), Integration 70/621 14:30, Regel 3 grün; CI #353 grün; Morgenbericht-Entwurf 14:31
+- Sammel-PR #354 angelegt 14:49, CI grün 14:56; Nachtrag Morgenbericht 14:57
 
 ## Nr. 137
 
@@ -198,3 +199,7 @@ Vom Dirigenten laufend ergänzt (freigabe.md §25, §0 „Zeitbuch“). Rechner:
 - sammel voller Lauf Ende 14:25:22 gruen (sammel-final)
 - sammel Integration Beginn 14:25:22
 - sammel Integration Ende 14:30:30 rc=0
+- sammel voller Lauf Beginn 14:45:15 (sammel-doku, maxWorkers=3)
+- sammel voller Lauf Ende 14:48:29 gruen (sammel-doku)
+- Sammel-PR angelegt 14:49
+- sammel CI des Sammel-PR #354 14:49–14:56 grün (ci, integration)

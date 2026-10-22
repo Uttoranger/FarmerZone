@@ -9,8 +9,8 @@ Freigabe: `docs/nachtlauf/freigabe.md` §25 (im Chat erteilt am 21. und 22.10.20
   - Betroffen sind nur Gebindegrößen über 1 mit Nachkommastellen. Die Abweichung geht immer nach unten, also zu Lasten des Hofs. Beispiel: 0,15 € × 1,5 ergibt 0,22 € statt 0,23 €.
   - Zwei unabhängige Prüfer konnten den Fund nicht widerlegen. Nach der Freigabe gibt es keinen Fix in diesem Lauf; deine Entscheidung steht in Abschnitt 9.
 - **Keine Migration, kein neues Paket.** Regel 3 auf frischer Datenbank: 34 Migrationen wie auf main, `migrate diff` leer, keine Tabelle ohne RLS.
-- **Fertig und im Sammel-PR dieser Sammel-PR (`integration/lauf21`):** Doku-PR, 137, 138, 140, 142, 144 und 141.
-- **Stand des Sammel-PR:** Merges, voller Lauf (525 Dateien / 9882 Tests), ganze Integration (70 / 621) und Regel 3 grün; die CI des Sammel-PR startet mit dem Anlegen (Ergebnis wird hier nachgetragen).
+- **Fertig und im Sammel-PR [#354](https://github.com/Uttoranger/FarmerZone/pull/354):** Doku-PR, 137, 138, 140, 142, 144 und 141.
+- **Stand des Sammel-PR:** Merges, voller Lauf (525 Dateien / 9882 Tests), ganze Integration (70 / 621) und Regel 3 grün; **CI des Sammel-PR grün** (`ci` und `integration`, 14:49–14:56).
 
 ## 1. PRs
 
@@ -25,9 +25,9 @@ Freigabe: `docs/nachtlauf/freigabe.md` §25 (im Chat erteilt am 21. und 22.10.20
 | 140 | Wachen aus Inventur und Regelvorschlägen (G4) | [#352](https://github.com/Uttoranger/FarmerZone/pull/352) | `docs/lauf21` | nein | nein | 1 + Nachrunde Dirigent · 1 gezielter Durchgang | [Vorschau](https://farmer-zone-git-nacht-2026-10-22140-wachen-bierbaron.vercel.app) |
 | 141 | Regeln kürzen und schärfen (G4) | [#353](https://github.com/Uttoranger/FarmerZone/pull/353) | `integration/lauf21` (mit allen anderen) | nein | nein | 2 · 1 gezielter Durchgang + 2 Nachprüfungen | [Vorschau](https://farmer-zone-git-nacht-2026-10-22141-regeln-kuerzen-bierbaron.vercel.app) |
 | 143 | Mein Hof v3 – **entfällt** (Fix nicht auf main) | – | – | – | – | – | – |
-| Sammel | Doku-PR, 137, 138, 142, 144, 140, 141 (ohne 139) | dieser Sammel-PR (`integration/lauf21`) | main | nein | nein | – | [Vorschau](https://farmer-zone-git-integration-lauf21-bierbaron.vercel.app) |
+| Sammel | Doku-PR, 137, 138, 142, 144, 140, 141 (ohne 139) | [#354](https://github.com/Uttoranger/FarmerZone/pull/354) | main | nein | nein | – | [Vorschau](https://farmer-zone-git-integration-lauf21-bierbaron.vercel.app) |
 
-- **CI auf den PRs** (`ci` und `integration`): #346–#353 je `ci` und `integration` grün, jeweils beim ersten Lauf.
+- **CI auf den PRs** (`ci` und `integration`): #346–#354 je `ci` und `integration` grün, jeweils beim ersten Lauf.
 - **Vorschau und Entwicklungsdatenbank:** Kein PR bringt eine Migration; aus dem Nachtlauf lief kein Befehl gegen die Entwicklungsdatenbank.
 
 ## 2. Sammel-PR
@@ -197,7 +197,7 @@ Wiener Zeit, 22.10.2026. Rechner: **4 Kerne**.
 | 142 | 11:58 | 12:32 | 34 min | 31 | rund 10 (vom Werkzeug nach seiner Zeitgrenze abgebrochen, Neustart erst 12:19) · 8,9 (grün) | 0 | 0,8/2,5 |
 | 141 | 13:16 | 14:17 | 61 min | 23 | 7,8 · 8,0 · 8,0 (grün) | 2 (12 · 10) | 0,7/6,4 · 0,7/4,2 · 0,6/4,1 |
 | Zwischenstand | 11:41 | 13:16 | – | – | 10,5 (mit 137, 1 Worker) · 4,9 (vor 141, 2 Worker); Integration ganz 5,5 und 5,1 | – | – |
-| Sammel | 14:22 | danach Bericht und PR | – | – | 3,3 (3 Worker, grün); Integration ganz 5,1; Regel 3 | – | – |
+| Sammel | 14:22 | PR #354 14:49, CI grün 14:56 | – | – | 3,3 (3 Worker, grün); Integration ganz 5,1; Regel 3 | – | – |
 
 **Wartezeit auf die CI:** praktisch keine.
 - Vor 142 lief die CI von #348 (11:40–11:46) gleichzeitig mit dem lokalen Lauf im Zwischenstand (11:41–11:57). Gewartet wurde auf diesen Lauf.
@@ -286,7 +286,7 @@ Nur 144 macht Bilder (§0); 137 hätte das Korb-Blatt gezeigt, das mit Punkt 2 e
 - **141:** nichts in der Vorschau. Lokal: `wc -m docs/ai/CODING_STANDARDS.md docs/ai/TESTING_GUIDELINES.md` → zusammen 71 137 statt 79 747; eine gekürzte Regel (z. B. Zuweisungen mit „token“) steht im JSDoc von `ersetzeZuweisungen`.
 
 **Merge:**
-1. Den Sammel-PR dieser Sammel-PR (`integration/lauf21`) **per Merge-Commit** (nicht Squash). Danach gelten die Einzel-PRs als gemergt. 142 ist schon in `integration/lauf21` gemergt und kommt mit dem Sammel-PR auf main.
+1. Den Sammel-PR [#354](https://github.com/Uttoranger/FarmerZone/pull/354) **per Merge-Commit** (nicht Squash). Danach gelten die Einzel-PRs als gemergt. 142 ist schon in `integration/lauf21` gemergt und kommt mit dem Sammel-PR auf main.
 2. Danach die **CI auf `main`** ansehen.
 3. **Ab dem Merge gilt der neue Hook** (138). Commit-Texte beginnen mit `feat:`, `fix:`, `docs:`, `chore:`, `refactor:` oder `WIP:`, Merge-Commits mit „Merge “; bei `-F <datei>` liest der Hook die erste Zeile der Datei. Eine Zeile `git commit -m …` in einem Here-Document wird mitgeprüft (gewollt vorsichtig). Das rekursive Löschen ist in jeder Schreibweise gesperrt.
 4. **139** (#347) erst nach deiner Entscheidung (Abschnitt 9).
