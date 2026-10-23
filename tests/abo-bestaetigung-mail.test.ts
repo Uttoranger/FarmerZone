@@ -111,6 +111,19 @@ describe('Werbliche Mail (Beitrag per Mail)', () => {
   })
 })
 
+describe('Werbliche Mail: Ergebnis je Mail (Nr. 149)', () => {
+  it('gibt das Ergebnis des Versands zurück — angenommen mit id', async () => {
+    expect(await email.sendStatusUpdateEmail(BEITRAG)).toEqual({ id: 'email_1' })
+  })
+
+  it('Gegenprobe: ein Resend-Fehler kommt als error zurück, nicht still', async () => {
+    sendMock.mockResolvedValue({ data: null, error: { name: 'rate_limit_exceeded', message: 'Too many requests' } })
+    const ergebnis = await email.sendStatusUpdateEmail(BEITRAG)
+    expect(ergebnis.id).toBeUndefined()
+    expect(ergebnis.error).toContain('rate_limit_exceeded')
+  })
+})
+
 describe('Werbliche Mail: der Knopf führt zum Beitrag (Register T5, Ergänzung Nr. 128)', () => {
   it('mit Kennung zur Übersicht mit genau diesem Beitrag oben (?beitrag=<id>)', async () => {
     await email.sendStatusUpdateEmail({ ...BEITRAG, beitragId: 'cbeitragaaaa' })

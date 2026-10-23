@@ -15,8 +15,12 @@
  *  - Verknüpfte Produkte nur vom eigenen Hof (Nr. 35): eine Abfrage mit
  *    `{ id: { in }, farmId }`; eine fremde oder unbekannte Kennung lehnt den
  *    ganzen Beitrag mit einem Satz ab, statt still etwas zu speichern.
+ *  - Mails nach der Antwort (Nr. 149): Die Action wartet nicht auf den
+ *    Versand (Nachlauf gesammelt und selbst abgearbeitet), ein Fehler stoppt
+ *    die übrigen nicht, am Ende steht die Zahl der angenommenen Mails; die
+ *    Sperre ist dieselbe Bedingung wie auf der Seite (mailSperreWo).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
@@ -25,6 +29,9 @@ vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: vi.fn() }))
 vi.mock('@/server/bild-url', () => ({ BILD_NICHT_UEBERNOMMEN: 'Bild nicht übernommen', bildUrlErlaubt: vi.fn(async () => true) }))
 vi.mock('@/lib/email', () => ({ sendStatusUpdateEmail: vi.fn() }))
+// Der Nachlauf wird gesammelt: So ist belegt, dass die Action vor dem Versand antwortet.
+const { nachlauf } = vi.hoisted(() => ({ nachlauf: [] as (() => Promise<void>)[] }))
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: (aufgabe: () => Promise<void>) => void nachlauf.push(aufgabe) }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     $queryRaw: vi.fn(),
@@ -54,6 +61,13 @@ import { BEITRAG_PRODUKT_FREMD, STATUS_POST_ANLASS_VALUES } from '@/schemas/stat
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
+import { sendStatusUpdateEmail } from '@/lib/email'
+import { mailSperreWo } from '@/lib/beitrag-mailabstand'
+
+/** Arbeitet den gesammelten Nachlauf ab, wie es after() nach der Antwort täte. */
+async function arbeiteNachlaufAb(): Promise<void> {
+  for (const aufgabe of nachlauf.splice(0)) await aufgabe()
+}
 
 const HOF = { id: 'farm_1', name: 'Testhof', slug: 'testhof', logoUrl: null }
 const sp = vi.mocked(prisma.statusPost)
@@ -75,6 +89,8 @@ const beitrag = (mehr: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  nachlauf.length = 0
+  vi.mocked(sendStatusUpdateEmail).mockResolvedValue({ id: 'mail_1' })
   vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'user_1' } } as never)
   vi.mocked(getFarmForUser).mockResolvedValue(HOF as never)
   vi.mocked(prisma.farm.findUnique).mockResolvedValue({ slug: 'testhof', name: 'Testhof' } as never)
@@ -339,8 +355,8 @@ describe('publishStatusPost — die Mail verlinkt genau diesen Beitrag (Register
     vi.mocked(prisma.order.findMany).mockResolvedValue([] as never)
     sp.findFirst.mockResolvedValue(null as never)
     await publishStatusPost(beitrag({ sendEmail: true, showOnFarmPage }) as never)
-    const { sendStatusUpdateEmail } = await import('@/lib/email')
-    await vi.waitFor(() => expect(sendStatusUpdateEmail).toHaveBeenCalledTimes(1))
+    await arbeiteNachlaufAb()
+    expect(sendStatusUpdateEmail).toHaveBeenCalledTimes(1)
     return vi.mocked(sendStatusUpdateEmail).mock.calls[0]![0]
   }
 
@@ -445,5 +461,97 @@ describe('publishStatusPost — verknüpfte Produkte nur vom eigenen Hof', () =>
     expect(BEITRAG_PRODUKT_FREMD).toMatch(/Produkt/)
     expect(BEITRAG_PRODUKT_FREMD).toMatch(/Lade die Seite neu/)
     expect(BEITRAG_PRODUKT_FREMD).not.toMatch(/ID|farmId|Invalid/)
+  })
+})
+
+describe('publishStatusPost — Mails nach der Antwort, ehrliche Zahl (Nr. 149)', () => {
+  const JETZT = new Date('2026-10-23T08:00:00.000Z')
+  const abos = (...adressen: string[]) =>
+    vi.mocked(prisma.customerFarmSubscription.findMany).mockResolvedValue(adressen.map((customerEmail) => ({ customerEmail, customerPhone: null })) as never)
+
+  beforeEach(() => {
+    vi.useFakeTimers({ now: JETZT, toFake: ['Date'] })
+    vi.mocked(prisma.order.findMany).mockResolvedValue([] as never)
+    sp.findFirst.mockResolvedValue(null as never)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('die Action wartet nicht auf den Versand: Antwort mit der geplanten Zahl, noch keine Mail', async () => {
+    abos('a@example.com', 'b@example.com', 'c@example.com')
+
+    const antwort = await publishStatusPost(beitrag({ sendEmail: true }) as never)
+
+    expect(antwort).toEqual({ postId: 'post_1', emailCount: 3 })
+    expect(sendStatusUpdateEmail).not.toHaveBeenCalled()
+    expect(sp.create.mock.calls[0]![0].data).toMatchObject({ sentViaEmail: true, emailRecipientCount: 3 })
+    expect(nachlauf).toHaveLength(1)
+
+    await arbeiteNachlaufAb()
+    expect(sendStatusUpdateEmail).toHaveBeenCalledTimes(3)
+  })
+
+  it('eine Mail scheitert: die übrigen gehen raus, am Ende steht die Zahl der angenommenen', async () => {
+    abos('wurf@example.com', 'eins@example.com', 'resend@example.com', 'gesperrt@example.com', 'zwei@example.com')
+    vi.mocked(sendStatusUpdateEmail).mockImplementation(async ({ to }) => {
+      if (to === 'wurf@example.com') throw new Error('Vorlage kaputt für wurf@example.com')
+      if (to === 'resend@example.com') return { error: 'rate_limit_exceeded' }
+      if (to === 'gesperrt@example.com') return { gesperrt: true }
+      return { id: `mail-${to}` }
+    })
+
+    expect(fehlerVon(await publishStatusPost(beitrag({ sendEmail: true }) as never))).toBeUndefined()
+    await arbeiteNachlaufAb()
+
+    expect(vi.mocked(sendStatusUpdateEmail).mock.calls.map(([d]) => d.to)).toHaveLength(5)
+    expect(sp.updateMany).toHaveBeenCalledOnce()
+    expect(sp.updateMany).toHaveBeenCalledWith({ where: { id: 'post_1', farmId: HOF.id }, data: { emailRecipientCount: 2 } })
+    // Wurf und Resend-Fehler gehen an Sentry, gesperrt (Z3) nicht — nie mit Adresse.
+    const meldungen = vi.mocked(Sentry.captureException).mock.calls
+    expect(meldungen).toHaveLength(2)
+    for (const [fehler, kontext] of meldungen) {
+      expect((kontext as { tags: Record<string, string> }).tags).toMatchObject({ aktion: 'beitrag', schritt: 'versand' })
+      expect(JSON.stringify([(fehler as Error).message, kontext])).not.toContain('example.com')
+    }
+  })
+
+  it('keine Mail angenommen → 0 am Beitrag (dann sperrt er nicht)', async () => {
+    abos('a@example.com', 'b@example.com')
+    vi.mocked(sendStatusUpdateEmail).mockResolvedValue({ gesperrt: true })
+
+    await publishStatusPost(beitrag({ sendEmail: true }) as never)
+    await arbeiteNachlaufAb()
+
+    expect(sp.updateMany).toHaveBeenCalledWith({ where: { id: 'post_1', farmId: HOF.id }, data: { emailRecipientCount: 0 } })
+  })
+
+  it('bricht der Versand vorher ab, bleibt die geplante Zahl stehen (kein Schreiben), Sentry bekommt den Schritt', async () => {
+    abos('a@example.com')
+    await publishStatusPost(beitrag({ sendEmail: true }) as never)
+    vi.mocked(prisma.farm.findUnique).mockRejectedValueOnce(new Error('Verbindung weg'))
+
+    await arbeiteNachlaufAb()
+
+    expect(sendStatusUpdateEmail).not.toHaveBeenCalled()
+    expect(sp.updateMany).not.toHaveBeenCalled()
+    expect(vi.mocked(Sentry.captureException).mock.calls[0]![1]).toMatchObject({ tags: { schritt: 'versand' } })
+  })
+
+  it('die Sperre fragt mailSperreWo mit dem Zeitpunkt der Anfrage — dieselbe Bedingung wie die Seite', async () => {
+    abos('a@example.com')
+    await publishStatusPost(beitrag({ sendEmail: true }) as never)
+    expect(sp.findFirst.mock.calls[0]![0]).toMatchObject({ where: mailSperreWo(HOF.id, JETZT) })
+  })
+
+  it('Gegenprobe: greift die Sperre, keine Abonnentinnen-Abfrage, kein Versand, 0 am Beitrag', async () => {
+    abos('a@example.com')
+    sp.findFirst.mockResolvedValue({ id: 'frueher' } as never)
+
+    expect(await publishStatusPost(beitrag({ sendEmail: true }) as never)).toEqual({ postId: 'post_1', emailCount: 0 })
+
+    expect(prisma.customerFarmSubscription.findMany).not.toHaveBeenCalled()
+    expect(nachlauf).toHaveLength(0)
+    expect(sp.create.mock.calls[0]![0].data).toMatchObject({ sentViaEmail: false, emailRecipientCount: 0 })
   })
 })

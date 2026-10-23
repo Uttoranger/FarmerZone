@@ -92,7 +92,8 @@ const MARKE: Record<BeitragGruppeId, BeitragEintrag['marke']> = {
  * Veröffentlichen gibt es seit Nr. 67 nicht mehr.
  */
 function wege(b: BeitragQuelle): string {
-  const email = b.sentViaEmail && `${formatZahl(b.emailRecipientCount)} per E-Mail`
+  // „per E-Mail" nur, wenn mindestens eine Mail angenommen wurde (Nr. 149, wie teilen-bild).
+  const email = b.sentViaEmail && b.emailRecipientCount > 0 && `${formatZahl(b.emailRecipientCount)} per E-Mail`
   const zusaetzlich = [email, b.whatsappGetippt.length > 0 && 'WhatsApp'].filter((w): w is string => Boolean(w))
   return zusaetzlich.length === 0 ? 'Nur auf der Hofseite' : aufzaehlung(['Hofseite', ...zusaetzlich])
 }

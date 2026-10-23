@@ -14,6 +14,8 @@ import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { beitragIdImLink } from '@/lib/teilen-fenster'
 import { NEUIGKEITEN_CACHE_TAG } from '@/lib/startseite-gestalten'
+import { beitragLaeuftBis, mailSperreWo } from '@/lib/beitrag-mailabstand'
+import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import {
   BEITRAG_FELDER_MIT_SATZ,
   BEITRAG_PRODUKT_FREMD,
@@ -37,7 +39,8 @@ const UNERWARTET = {
   loeschen: 'Wir konnten den Beitrag gerade nicht löschen. Bitte versuch es noch einmal.',
   whatsapp: 'Wir konnten den Stand gerade nicht speichern. Bitte versuch es noch einmal.',
 } as const
-type Schritt = keyof typeof UNERWARTET
+/** `versand` hat keinen Satz: Die Mails gehen nach der Antwort, der Hof liest dazu nichts mehr. */
+type Schritt = keyof typeof UNERWARTET | 'versand'
 const EINGABE_UNGUELTIG = 'Da stimmt etwas mit dem Beitrag nicht. Lade die Seite neu und versuch es noch einmal.'
 
 /** Der Hof der Anmeldung — `null` ohne Sitzung oder ohne Hof. */
@@ -109,15 +112,12 @@ export async function publishStatusPost(
       if (eigene.length !== produktIds.length) return { error: BEITRAG_PRODUKT_FREMD }
     }
     const now = new Date()
-    const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const expiresAt = beitragLaeuftBis(now)
 
-    // Email subscribers — with frequency protection (farm-level: 1 email per 7 days)
+    // Mail-Sperre: dieselbe Bedingung wie die Seite „Neuer Beitrag" (mailSperreWo, Nr. 149).
     let emailSubscribers: { customerEmail: string; customerPhone: string | null }[] = []
     if (data.sendEmail) {
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-      const recentSend = await prisma.statusPost.findFirst({
-        where: { farmId: farm.id, sentViaEmail: true, publishedAt: { gte: sevenDaysAgo } },
-      })
+      const recentSend = await prisma.statusPost.findFirst({ where: mailSperreWo(farm.id, now), select: { id: true } })
       if (!recentSend) {
         // Nur Bestand und bestätigte Anmeldungen (Double-Opt-in, S11, Nr. 38).
         emailSubscribers = await prisma.customerFarmSubscription.findMany({
@@ -148,43 +148,13 @@ export async function publishStatusPost(
       },
     })
 
-    // Send emails asynchronously (fire + don't block)
+    // Der Beitrag steht mit der GEPLANTEN Zahl — sie sperrt, bis der Versand
+    // die angenommenen Mails einträgt (Nr. 149). Die Mails gehen erst nach der
+    // Antwort hinaus: Vorher wartete der Hof auf jede einzelne.
     if (emailSubscribers.length > 0) {
-      const farmFull = await prisma.farm.findUnique({
-        where: { id: farm.id },
-        select: { name: true, slug: true },
-      })
-
-      // Get customer names for personalisation
-      const nameRows = await prisma.order.findMany({
-        where: { farmId: farm.id, customerEmail: { in: emailSubscribers.map((s) => s.customerEmail) } },
-        select: { customerEmail: true, customerName: true },
-        distinct: ['customerEmail'],
-        orderBy: { createdAt: 'desc' },
-      })
-      const nameMap = new Map(nameRows.map((r) => [r.customerEmail.toLowerCase(), r.customerName.split(' ')[0]]))
-
-      if (farmFull) {
-        const { sendStatusUpdateEmail } = await import('@/lib/email')
-        for (const sub of emailSubscribers) {
-          const firstName = nameMap.get(sub.customerEmail.toLowerCase()) ?? ''
-          const personalBody = data.body.replace(/\{Vorname\}/gi, firstName)
-          // Aus dem Token baut der Versand Abmeldelink und Abmelde-Kopfzeilen (Nr. 47).
-          await sendStatusUpdateEmail({
-            to: sub.customerEmail,
-            farmName: farmFull.name,
-            farmSlug: farmFull.slug,
-            title: data.title,
-            body: personalBody,
-            anlass: data.anlass,
-            photoUrl: data.photoUrl,
-            // Der Knopf führt zu genau diesem Beitrag (T5) — nur, wenn er auf der
-            // Hofseite steht (dieselbe Regel wie der WhatsApp-Link je Person).
-            beitragId: beitragIdImLink({ id: post.id, showOnFarmPage: data.showOnFarmPage }),
-            abmeldeToken: generateUnsubscribeToken(sub.customerEmail, farm.id),
-          })
-        }
-      }
+      const empfaenger = emailSubscribers.map((s) => s.customerEmail)
+      const farmId = farm.id
+      nachDerAntwort(() => versendeBeitragsMails({ postId: post.id, farmId, empfaenger, data }))
     }
 
     // Die Beiträge stehen seit Nr. 22e im Reiter von Mein Hof (/status leitet dorthin um).
@@ -198,6 +168,68 @@ export async function publishStatusPost(
   } catch (err) {
     meldeFehler('veroeffentlichen', err)
     return { error: UNERWARTET.veroeffentlichen }
+  }
+}
+
+/**
+ * Die Mails zu einem Beitrag, nach der Antwort (Nr. 149). Jede Mail hat ihr
+ * eigenes try/catch: Ein Fehler geht an Sentry (Schritt `versand`, nie
+ * Adresse oder Token) und hält die übrigen nicht auf. Am Ende steht am
+ * Beitrag die Zahl der ANGENOMMENEN Mails (mit `id`); gesperrte (Z3) und
+ * gescheiterte zählen nicht. Bricht die Funktion vorher ab, bleibt die
+ * geplante Zahl stehen — dann hält die Sperre, statt doppelt zu schreiben.
+ */
+async function versendeBeitragsMails(auftrag: {
+  postId: string
+  farmId: string
+  empfaenger: string[]
+  data: BeitragVeroeffentlichenEingabe
+}): Promise<void> {
+  const { postId, farmId, empfaenger, data } = auftrag
+  try {
+    const farmFull = await prisma.farm.findUnique({ where: { id: farmId }, select: { name: true, slug: true } })
+    if (!farmFull) return
+
+    // Vornamen für {Vorname} im Text
+    const nameRows = await prisma.order.findMany({
+      where: { farmId, customerEmail: { in: empfaenger } },
+      select: { customerEmail: true, customerName: true },
+      distinct: ['customerEmail'],
+      orderBy: { createdAt: 'desc' },
+    })
+    const nameMap = new Map(nameRows.map((r) => [r.customerEmail.toLowerCase(), r.customerName.split(' ')[0]]))
+
+    const { sendStatusUpdateEmail } = await import('@/lib/email')
+    let angenommen = 0
+    // Nacheinander: Resend begrenzt die Anfragen je Sekunde.
+    for (const an of empfaenger) {
+      try {
+        const firstName = nameMap.get(an.toLowerCase()) ?? ''
+        const ergebnis = await sendStatusUpdateEmail({
+          to: an,
+          farmName: farmFull.name,
+          farmSlug: farmFull.slug,
+          title: data.title,
+          body: data.body.replace(/\{Vorname\}/gi, firstName),
+          anlass: data.anlass,
+          photoUrl: data.photoUrl,
+          // Der Knopf führt zu genau diesem Beitrag (T5) — nur, wenn er auf der
+          // Hofseite steht (dieselbe Regel wie der WhatsApp-Link je Person).
+          beitragId: beitragIdImLink({ id: postId, showOnFarmPage: data.showOnFarmPage }),
+          // Aus dem Token baut der Versand Abmeldelink und Abmelde-Kopfzeilen (Nr. 47).
+          abmeldeToken: generateUnsubscribeToken(an, farmId),
+        })
+        if (ergebnis.id) angenommen += 1
+        // Ein Resend-Fehler kommt als Ergebnis, nicht als Wurf; gesperrt (Z3) ist kein Fehler.
+        else if (ergebnis.error) meldeFehler('versand', Object.assign(new Error('Resend'), { name: 'ResendFehler' }))
+      } catch (err) {
+        meldeFehler('versand', err)
+      }
+    }
+
+    await prisma.statusPost.updateMany({ where: { id: postId, farmId }, data: { emailRecipientCount: angenommen } })
+  } catch (err) {
+    meldeFehler('versand', err)
   }
 }
 
