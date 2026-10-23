@@ -115,6 +115,10 @@ export const DB_BREMSEN = {
   // Stufe im Speicher (src/app/api/csp-bericht/route.ts) — so schreibt nicht
   // jede Meldung in die Datenbank.
   cspBerichtIp: { zweck: 'csp-bericht-ip', max: 30, fensterMs: MINUTE_MS },
+  // Stripe-Konto in einem anderen Land als der Hof (Nr. 152): höchstens einmal
+  // je Hof und Tag nach Sentry, Merkmal ist die Hof-ID. Eigener Zweck, damit
+  // die Zähler von „Konto unbekannt" und „Konto-Land" nie ineinanderlaufen.
+  stripeKontoLand: { zweck: 'stripe-konto-land', max: 1, fensterMs: TAG_MS },
 } as const satisfies Record<string, DbBremse>
 
 /** Welche Bremsen je Art zählen: Codes je Stunde und je Tag, Passwörter je Stunde. */

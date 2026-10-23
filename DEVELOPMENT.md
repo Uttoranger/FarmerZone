@@ -5694,6 +5694,12 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Integration:** `tests/test-ueberspringen-wache.test.ts` belegt, dass ihre Liste Dateien aus `tests/integration/` enthält.
 - **Kommentare:** Die Aussagen „kein jsdom“ und „ohne YAML-Paket“ in vier Testdateien stimmen seit Nr. 135 nur halb und sagen jetzt, was die Datei tut; `/pruefen` nennt den Rückgabetyp mit seinen Orten; der Satz zu Datum mit Uhrzeit steht im JSDoc von `TELEFON_NUMMER`. Kein Ergebnis ändert sich.
 
+## Stripe-Konto im Land des Hofs (Register Z1, Ergänzung 23.10.2026; Nr. 152, Lauf 23)
+
+- **Anlegen:** `createConnectAccount` legt das Konto im Land des Hofs an (`STRIPE_LAND[alsLand(farm.country)]`, Tabelle in `src/lib/laender.ts`); fehlt das Land, gilt AT wie bisher. Währung und Beträge bleiben unverändert.
+- **Bestand:** Ein bestehendes Konto ändert sich nie (Stripe stellt das Land nicht um). `meldeAbweichendesKontoLand` (`src/server/hofkonto-unbekannt.ts`) meldet eine Abweichung höchstens einmal je Hof und Tag an Sentry (Bremse `stripeKontoLand`), nur mit Hof-ID und den Länderkürzeln; Aufrufer sind `checkConnectStatus` und die Rückkehr aus dem Onboarding. Der Hinweis für deutsche Höfe bleibt.
+- **Offen:** Wer Stripe vor der Landwahl einrichtet, bekommt ein AT-Konto; `src/lib/json-ld.ts` setzt `addressCountry: 'AT'` auch für deutsche Höfe (beides eigene Aufträge).
+
 ## Nützliche Befehle
 
 ```bash

@@ -4,7 +4,8 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { istUnzugaenglichesStripeKonto, stripeKontoBereit } from '@/lib/stripe-konto'
-import { vermerkeUnbekanntesHofKonto } from '@/server/hofkonto-unbekannt'
+import { meldeAbweichendesKontoLand, vermerkeUnbekanntesHofKonto } from '@/server/hofkonto-unbekannt'
+import { alsLand } from '@/lib/laender'
 
 export async function GET(request: NextRequest) {
   const accountId = request.nextUrl.searchParams.get('account_id')
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
   // beliebiger Aufruf den Bereit-Status eines fremden Hofes umschreiben.
   const farm = await prisma.farm.findUnique({
     where: { ownerId: session.user.id },
-    select: { id: true, stripeAccountId: true },
+    select: { id: true, country: true, stripeAccountId: true },
   })
   if (!farm || farm.stripeAccountId !== accountId) {
     return NextResponse.redirect(new URL('/settings/payments?stripe=error', request.url))
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
     const account = await stripe.accounts.retrieve(accountId)
     // Dieselbe Regel wie account.updated (src/lib/stripe-konto.ts).
     const ready = stripeKontoBereit(account)
+    await meldeAbweichendesKontoLand(farm.id, account.country, alsLand(farm.country))
 
     await prisma.farm.update({
       where: { id: farm.id },
