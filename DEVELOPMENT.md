@@ -5748,6 +5748,12 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Fix:** `bestaetigungZeigtPerson(status)` (`src/lib/bestaetigung.ts`) ist wahr genau für `LAUFENDE_STATUS`. Die Hauptabfrage lädt weder Name noch E-Mail; nach `gibVerwaisteFreiOhneRisiko` holt `adresseSolangeOffen` die E-Mail nur für eine laufende Bestellung, mit `status: { in: LAUFENDE_STATUS }` in derselben Abfrage (schließt der Hof dazwischen ab, kommt keine Adresse). Ohne Adresse entfällt bei „bezahlt“ der Teil „Die Bestätigung ist unterwegs an …“; die Karte sagt „an die Adresse deiner Bestellung“.
 - **Unverändert:** `neuigkeitenErlaubt` (Karte und Action bleiben eine Regel, die Anmeldung nach der Abholung bleibt möglich), Status, Abholung, Positionen, Kontakt des Hofs, „Erneut senden“ (Nr. 151).
 
+## Kleinkram im Hofbereich: Packliste, Abholzeit rückgängig, Bestätigen ohne Umweg (Seitenkarte P6, P10, P8; Nr. 157, Lauf 23, 23.10.2026)
+
+- **Packliste (P6):** Die Druckseite gibt verwaiste Bestellungen mit demselben `jetzt` frei wie /dashboard, bevor sie liest; eine verfallene Bestellung steht nicht mehr auf dem Papier.
+- **Abholzeit rückgängig (P10):** Löschen ist endgültig (`Order` hängt nicht an `PickupSlot`), `farm.ts` bleibt unverändert. Der Toast „Abholzeit gelöscht“ trägt für eine AKTIVE Zeit „Rückgängig“ (sechs Sekunden), auch in Mein Hof (dort statt „Gespeichert · Ansehen“); der Klick legt die Zeit über `addPickupSlot` mit Tag, Beginn, Ende und `maxOrders` neu an. Eine pausierte Zeit behält den bisherigen Toast, sie käme sonst aktiv zurück. Die Texte stehen in `ABHOLZEIT_GELOESCHT` (`src/lib/pickup-slot-rules.ts`).
+- **Bestätigen ohne Umweg (P8):** Abgemeldet zeigt die Karte nach dem Bestätigen gleich das Formular der Hof-Anmeldung (`NachBestaetigung`); `HofAnmeldung` bekommt die optionale Prop `ziel` (nur `/onboarding`, fest im Code, nie aus der Adresse). Keine Adresse in der URL, nichts vorausgefüllt.
+
 ## Nützliche Befehle
 
 ```bash

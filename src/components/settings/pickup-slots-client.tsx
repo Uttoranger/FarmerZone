@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { EmptyState } from '@/components/ui/empty-state'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { addPickupSlot, deletePickupSlot, togglePickupSlotActive } from '@/server/actions/farm'
-import { findSlotError, DAY_NAMES, ABHOLZEITEN_FEHLEN, ABHOLZEITEN_FORMULAR_ID } from '@/lib/pickup-slot-rules'
+import { findSlotError, DAY_NAMES, ABHOLZEITEN_FEHLEN, ABHOLZEITEN_FORMULAR_ID, ABHOLZEIT_GELOESCHT } from '@/lib/pickup-slot-rules'
 import type { FarmSettings } from '@/server/queries/farm'
 
 type Slot = FarmSettings['pickupSlots'][number]
@@ -141,22 +141,45 @@ export function PickupSlotsClient({
     })
   }
 
-  function handleDelete(slotId: string) {
+  function handleDelete(slot: Slot) {
     // Optimistisch: sofort ausblenden, bei Server-Fehler zurückrollen
     const prev = slots
-    setSlots((s) => s.filter((x) => x.id !== slotId))
+    setSlots((s) => s.filter((x) => x.id !== slot.id))
     startTransition(async () => {
-      const res = await deletePickupSlot(slotId)
+      const res = await deletePickupSlot(slot.id)
       if (res.error) {
         setSlots(prev)
         toast.error(res.error)
       } else {
-        if (meldeErfolg) meldeErfolg()
-        else toast.success('Abholzeit gelöscht')
+        if (slot.isActive) {
+          // „Rückgängig" legt die Zeit neu an — aktiv. Eine pausierte käme
+          // sonst aktiv zurück, sie behält den bisherigen Toast.
+          toast.success(ABHOLZEIT_GELOESCHT.text, {
+            duration: ABHOLZEIT_GELOESCHT.dauerMs,
+            action: { label: ABHOLZEIT_GELOESCHT.rueckgaengig, onClick: () => void holeZurueck(slot) },
+          })
+        } else if (meldeErfolg) meldeErfolg()
+        else toast.success(ABHOLZEIT_GELOESCHT.text)
         router.refresh()
         onGespeichert?.()
       }
     })
+  }
+
+  async function holeZurueck(slot: Slot) {
+    const res = await addPickupSlot({
+      dayOfWeek: slot.dayOfWeek,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      maxOrders: slot.maxOrders,
+    })
+    if (res.error) {
+      toast.error(res.error)
+      return
+    }
+    toast.success(ABHOLZEIT_GELOESCHT.zurueck)
+    router.refresh()
+    onGespeichert?.()
   }
 
   function handleToggle(slot: Slot) {
@@ -206,7 +229,7 @@ export function PickupSlotsClient({
               <SlotRow
                 key={slot.id}
                 slot={slot}
-                onDelete={() => handleDelete(slot.id)}
+                onDelete={() => handleDelete(slot)}
                 onToggle={() => handleToggle(slot)}
               />
             ))}
