@@ -320,10 +320,20 @@ export function StartseiteVorschau({
         titel={`${T.rahmenTitel} · ${vorschauQuelleText(sichtbareQuelle ?? quelle)}`}
         onGeladen={geladen}
       />
-      {hinweisText && (
-        <p role="status" className="flex items-start gap-1.5 text-[12.5px] leading-snug font-medium text-status-offen">
-          <Info className="mt-px size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
-          {hinweisText}
+      {/* Die Live-Region steht immer da, nur ihr Inhalt wechselt: Eine Region, die erst mit ihrem Text
+          entsteht, sagen viele Screenreader nicht an. Leer hebt -mt-3 den Abstand der Spalte auf, damit
+          der Aufbau gleich bleibt. Ohne `hinweis` (unter 1024 px) gibt es sie nicht — dort bleibt alles wie vorher. */}
+      {hinweis && (
+        <p
+          role="status"
+          className={cn('flex items-start gap-1.5 text-[12.5px] leading-snug font-medium text-status-offen', !hinweisText && '-mt-3')}
+        >
+          {hinweisText && (
+            <>
+              <Info className="mt-px size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+              {hinweisText}
+            </>
+          )}
         </p>
       )}
       <p role="status" className="min-h-[1.25rem] text-[12.5px] font-medium text-foreground">

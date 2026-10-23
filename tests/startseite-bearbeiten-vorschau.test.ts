@@ -164,8 +164,13 @@ describe('Admin › Startseite ab 1024 px', () => {
     // Die Liste steht an Stelle des Formulars nur unter 1024 px (lg:hidden).
     expect(html).toMatch(/class="[^"]*lg:hidden[^"]*"><section aria-labelledby="abschnitte-titel"/)
     expect(stand.vorschauProps.filter((p) => p.quelle === undefined)).toHaveLength(1)
+    // Von der Prop an den Aufruf von erzeugeStartseitenVorschau ({ blockEntwurfId: 'block-7' }): der Fall
+    // „bei offenem Block geht blockEntwurfId an die Action“ in tests/startseite-vorschau-neuladen.test.ts
+    // führt den Effekt im Prüfstand aus (renderToStaticMarkup führt keine Effekte aus).
     expect(stand.vorschauProps[0]).toMatchObject({ blockEntwurfId: 'block-7' })
     expect(html).not.toContain('Noch nicht in der Vorschau')
+    // Die Live-Region steht leer schon da (sonst sagt ein Screenreader den ersten Hinweis nicht an).
+    expect(html).toMatch(/<p role="status" class="[^"]*text-status-offen[^"]*-mt-3"><\/p>/)
   })
 
   it('Gegenprobe ohne offenen Block: Liste und Vorschau, kein Formular, keine Kennung', () => {
@@ -182,6 +187,8 @@ describe('Admin › Startseite ab 1024 px', () => {
     expect(html).toContain(T.blockNeu)
     expect(html).toContain(T.kundin)
     expect(html).toContain(ENTWURF_TEXT.nochNichtInVorschau(STARTSEITE_SAETZE.titel))
+    // Der Satz steht IN der Live-Region, die auch ohne Hinweis da wäre — ohne den Ausgleich -mt-3.
+    expect(html).toMatch(/<p role="status" class="[^"]*text-status-offen"><svg[^]*?Noch nicht in der Vorschau/)
   })
 
   it('ein gespeicherter Block mit Fehler der Speicherung: derselbe Satz unter der Vorschau wie im Formular', () => {

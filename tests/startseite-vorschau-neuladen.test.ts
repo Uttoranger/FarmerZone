@@ -251,6 +251,20 @@ describe('StartseiteVorschau — neue Adresse je Speicherung, Draft Mode bleibt 
   })
 })
 
+describe('StartseiteVorschau — der Block in Bearbeitung (Nr. 155)', () => {
+  it('bei offenem Block geht blockEntwurfId an die Action, live nie', async () => {
+    pruefstand.starte(vorschau(0, 'block-7'))
+    await erledigt()
+    expect(aktionen.erzeuge).toHaveBeenCalledTimes(1)
+    expect(aktionen.erzeuge.mock.calls[0]?.[0]).toEqual({ stand: 'heute', quelle: 'entwurf', blockEntwurfId: 'block-7' })
+
+    // Gegenprobe: Quelle „Live“ zeigt nur, was live ist — die Kennung geht nicht mit.
+    findeSegment(pruefstand.baum(), ENTWURF_TEXT.quelleBeschriftung)?.onWertChange('live')
+    await erledigt()
+    expect(aktionen.erzeuge.mock.calls.at(-1)?.[0]).toEqual({ stand: 'heute', quelle: 'live', blockEntwurfId: null })
+  })
+})
+
 describe('StartseiteVorschau — neu laden ohne leeren Rahmen, an derselben Stelle', () => {
   it('lässt den alten Rahmen stehen, bis der neue geladen ist, scrollt ihn an dieselbe Stelle und tauscht dann', async () => {
     pruefstand.starte(vorschau(0))
