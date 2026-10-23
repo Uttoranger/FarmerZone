@@ -38,13 +38,13 @@ export function beitragLaeuftBis(jetzt: Date): Date {
  * abgebrochener Versand weiter sperrt. Ging keine einzige Mail hinaus (0),
  * darf der Hof es gleich noch einmal versuchen.
  */
-export function mailSperreWo(farmId: string, jetzt: Date) {
+export function mailSperreWo(farmId: string, jetzt: Date): Prisma.StatusPostWhereInput {
   return {
     farmId,
     sentViaEmail: true,
     emailRecipientCount: { gt: 0 },
     publishedAt: { gte: berechneMailabstandBeginn(jetzt) },
-  } satisfies Prisma.StatusPostWhereInput
+  }
 }
 
 /**
