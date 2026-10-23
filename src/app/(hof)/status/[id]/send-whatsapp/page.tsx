@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { redirect, notFound } from 'next/navigation'
-import { headers } from 'next/headers'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getStatusPostForWhatsApp } from '@/server/queries/status-posts'
@@ -28,11 +27,10 @@ interface Props {
 }
 
 export default async function SendWhatsAppPage({ params }: Props) {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  const { userId } = await verlangeHofDerSitzung()
 
-  const farm = await getFarmForUser(session.user.id)
-  if (!farm) redirect('/login')
+  const farm = await getFarmForUser(userId)
+  if (!farm) redirect('/onboarding')
 
   const { id } = await params
   // Ob der Beitrag auf der Hofseite steht, bestimmt den Link in der Nachricht (Register T5). Besitz in der WHERE-Klausel wie bei der Liste.

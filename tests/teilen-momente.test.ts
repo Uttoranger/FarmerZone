@@ -261,7 +261,8 @@ describe('Schalter auf /settings/teilen', () => {
 
   it('die Seite liest den Schalter des eigenen Hofs und hat eine Ladeansicht', () => {
     const seite = readFileSync(join(process.cwd(), 'src/app/(hof)/settings/teilen/page.tsx'), 'utf8')
-    expect(seite).toContain('ladeTeilenMomente(session.user.id)')
+    expect(seite).toContain('await verlangeHofDerSitzung()')
+    expect(seite).toContain('ladeTeilenMomente(userId)')
     expect(seite).toContain('<TeilenMomenteSchalter anfangsAn={teilenMomenteAn(hof)} />')
     expect(readFileSync(join(process.cwd(), 'src/app/(hof)/settings/teilen/loading.tsx'), 'utf8')).toContain('aria-busy="true"')
   })

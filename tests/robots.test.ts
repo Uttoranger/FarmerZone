@@ -1,8 +1,8 @@
 /**
  * robots.txt (Register N19, Filter-Falle auf /hoefe): Crawler dürfen alles außer /hoefe mit
  * Parametern — jede Filterkombination ist eine eigene Adresse — und den privaten Bereichen.
- * Die Bereiche stehen in EINER Konstante; sie deckt jeden geschützten Pfad aus src/proxy.ts
- * ab (am Quelltext gelesen wie in tests/proxy-pfade.test.ts).
+ * Die Bereiche stehen in EINER Konstante; sie deckt jeden geschützten Pfad des Proxys ab
+ * (FARMER_PATHS aus src/lib/hof-pfade.ts, seit Nr. 156 importiert statt am Quelltext gelesen).
  *
  * Geprüft wird mit einem kleinen Leser nach RFC 9309 (Präfix, `$` am Ende, die längste
  * passende Regel gewinnt, bei Gleichstand Allow) — so, wie Google und Bing die Datei lesen —
@@ -19,9 +19,7 @@ vi.mock('@/lib/umgebung-server', () => ({ UMGEBUNG: umgebung }))
 
 import robots from '@/app/robots'
 import { HOEFE_MIT_PARAMETERN, PRIVATE_BEREICHE, gesperrtePfade } from '@/lib/robots'
-
-const proxy = readFileSync(join(process.cwd(), 'src/proxy.ts'), 'utf8')
-const FARMER_PATHS = [...(/const FARMER_PATHS = \[([\s\S]*?)\]/.exec(proxy)?.[1] ?? '').matchAll(/'([^']+)'/g)].map((m) => m[1])
+import { FARMER_PATHS } from '@/lib/hof-pfade'
 
 type Regel = { erlaubt: boolean; muster: string }
 
@@ -93,7 +91,7 @@ describe('robots.txt', () => {
     expect(darfErsteRegel([{ erlaubt: true, muster: '/' }, ...regeln], '/hoefe?kat=EIER')).toBe(true)
   })
 
-  it('sperrt jeden geschützten Pfad aus src/proxy.ts — die Konstante kennt sie alle', () => {
+  it('sperrt jeden geschützten Pfad aus FARMER_PATHS — die Konstante kennt sie alle', () => {
     expect(FARMER_PATHS).toContain('/dashboard')
     expect(FARMER_PATHS).toContain('/postfach')
     for (const pfad of FARMER_PATHS) {

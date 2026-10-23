@@ -1,9 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { Printer } from 'lucide-react'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getPlakatDaten } from '@/server/queries/teilen-bild'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
@@ -35,10 +34,9 @@ const KNOPF_ORANGE = cn(
  * Adresse der Hofseite mit ?k=qr — das gedruckte Blatt bleibt gültig.
  */
 export default async function PlakatPage(): Promise<React.JSX.Element> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  const { userId } = await verlangeHofDerSitzung()
 
-  const farm = await getFarmForUser(session.user.id)
+  const farm = await getFarmForUser(userId)
   if (!farm) redirect('/onboarding')
 
   const daten = await getPlakatDaten(farm.id)

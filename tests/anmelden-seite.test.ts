@@ -283,7 +283,8 @@ describe('Routen', () => {
 
   it('/login behält die Sitzungsprüfung und zeigt die Hofkarte aktiv', () => {
     const quelle = readFileSync(join(process.cwd(), 'src/app/(auth)/login/page.tsx'), 'utf8')
-    expect(quelle).toContain("redirect('/dashboard')")
+    // Seit Nr. 156 zum geprüften Rücksprung (Standard /dashboard), Verhalten in tests/hof-ruecksprung.test.ts.
+    expect(quelle).toContain('redirect(zielNachHofAnmeldung(')
     expect(quelle).toContain('aktiv="hof"')
     expect(quelle).toContain('KundeShellMitSitzung')
   })

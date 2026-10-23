@@ -319,7 +319,7 @@ describe('Seite ohne Standort — der Teil, den beide Reiter einbinden', () => {
 describe('Die Seite in zwei Teilen', () => {
   it('page.tsx prüft Sitzung, Hof und Reiter und gibt ab; die Abfragen stehen in den Teilen', () => {
     const seite = quelle('src/app/(hof)/region/page.tsx')
-    expect(seite).toContain("redirect('/login')")
+    expect(seite).toContain('await verlangeHofDerSitzung()')
     expect(seite).toContain("redirect('/onboarding')")
     expect(seite).toMatch(/<FutterReiter farm=\{farm\} suche=\{suche\} \/> : <PreiseReiter farm=\{farm\} suche=\{suche\} \/>/)
     expect(seite).not.toMatch(/getUmfeld|getFutterKaufen/)

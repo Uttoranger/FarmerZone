@@ -1,10 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
 import { CheckCheck, Inbox } from 'lucide-react'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { ladeFaedenHof } from '@/server/queries/postfach'
 import {
@@ -46,9 +45,8 @@ export default async function PostfachPage({
 }: {
   searchParams: Promise<{ filter?: string | string[] }>
 }): Promise<React.JSX.Element> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
-  const farm = await getFarmForUser(session.user.id)
+  const { userId } = await verlangeHofDerSitzung()
+  const farm = await getFarmForUser(userId)
   if (!farm) redirect('/onboarding')
 
   const filter = postfachFilterAus((await searchParams).filter)

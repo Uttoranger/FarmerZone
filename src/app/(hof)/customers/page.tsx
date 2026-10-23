@@ -1,8 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getCustomersForFarm, type CustomerSummary } from '@/server/queries/customers'
 import { KundenAnsicht } from '@/components/hof-kunden/kunden-ansicht'
@@ -24,10 +23,9 @@ export const dynamic = 'force-dynamic'
  * Filter, Suche und Sortierung liest die Ansicht selbst aus der Adresse.
  */
 export default async function CustomersPage(): Promise<React.JSX.Element> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  const { userId } = await verlangeHofDerSitzung()
 
-  const farm = await getFarmForUser(session.user.id)
+  const farm = await getFarmForUser(userId)
   if (!farm) redirect('/onboarding')
 
   let kunden: CustomerSummary[] | null = null

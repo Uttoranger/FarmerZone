@@ -5708,6 +5708,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Klartext-Zweig:** Bestellungen von vor dem Deploy tragen den Token im Klartext und bestätigen weiter. Bestätigen kann ein Klartext-Token höchstens zwei Stunden nach dem Deploy: Die Frist einer Barbestellung ist höchstens zwei Stunden nach der Bestellung (früher, wenn der Bestellschluss davor liegt; `fristVon`). Stornierte behalten ihren Wert — Klartext bleibt also auch danach in der Datenbank. Folgeauftrag (braucht die Freigabe der Projektleitung, Datenänderung in der Produktion): Klartext-Zweig aus `tokenKandidaten` entfernen und die übrigen Klartext-Werte (alles ohne Präfix `h1:`) auf `null` setzen.
 - **Zweiter Schreibweg über die Signatur:** „Erneut senden“ nutzt wie die Neuigkeiten die Signatur der Bestätigungsseite (Freigabe §27). Der Wächter in `tests/bestaetigung-zugang.test.ts` kennt jetzt beide Wege.
 
+## Hofbereich: Rücksprung nach der Anmeldung, eine Wache „Hof der Sitzung“ (Seitenkarte P7 und P9; Nr. 156, Lauf 23, 23.10.2026)
+
+- **Ursache:** Proxy, `ladeHofbereich` und rund 25 Seiten unter `(hof)` leiteten ohne Sitzung auf `/login` ohne Ziel; nach der Anmeldung landete der Hof immer in Heute, auch wenn er gerade eine Bestellung offen hatte. Ohne Hof führten fünf Seiten auf `/login` statt `/onboarding`, `/settings/payments` gab eine leere Seite zurück.
+- **Fix:** `FARMER_PATHS` steht in `src/lib/hof-pfade.ts` (eine Liste für Proxy, robots.txt und Tests). Der Proxy setzt auf Hof-Pfaden den Kopf `x-hof-pfad` und schickt Abgemeldete auf `/login?von=<pfad>`. `verlangeHofDerSitzung` prüft in jeder Seite und in `ladeHofbereich` (Sitzung und Hof je Anfrage einmal über React `cache`). `zielNachHofAnmeldung` lässt neben `/teilen` und `/verify` jeden Pfad des Hofbereichs zu, nur den Pfad, ohne Query (kann Kennungen tragen). `/login` schickt einen schon angemeldeten Hof zum geprüften Ziel.
+- **Warum der Kopf trotz Überschreiben geprüft wird:** Der Proxy ist die einzige Stelle, die ihn setzt; fiele er einmal weg (Matcher-Lücke), käme der Wert sonst ungeprüft vom Browser. Darum dieselbe Prüfung wie für `von`.
+- Die Druckseiten unter `(farmer)` bleiben ohne die Wache in der Seite; ihr Layout prüft über `ladeHofbereich`.
+
 ## Nützliche Befehle
 
 ```bash

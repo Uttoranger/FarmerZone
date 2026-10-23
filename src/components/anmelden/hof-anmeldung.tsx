@@ -22,7 +22,8 @@ const DEV_ACCOUNTS = [
  * Die Hof-Anmeldung mit E-Mail und Passwort (rechte Karte im Mockup
  * web-k0-anmelden-kunde-code-hof-passwort). Verhalten unverändert aus dem
  * bisherigen login-client.tsx übernommen: signIn.email, derselbe Fehlertext,
- * Rückkehr nur nach /teilen (zielNachHofAnmeldung), der Schnellzugang nur in
+ * Rückkehr nur geprüft über zielNachHofAnmeldung (/teilen, /verify, seit Nr. 156
+ * Pfade des Hofbereichs aus ?von=), der Schnellzugang nur in
  * der Entwicklungsumgebung. Neu ist nur die Gestalt.
  */
 export function HofAnmeldung(): React.JSX.Element {

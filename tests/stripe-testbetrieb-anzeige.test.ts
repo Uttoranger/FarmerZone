@@ -26,6 +26,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const zustand = vi.hoisted(() => ({ testbetrieb: false }))
 
 vi.mock('next/navigation', () => ({
+  redirect: vi.fn((ziel: string) => {
+    throw new Error(`redirect:${ziel}`)
+  }),
   usePathname: () => '/admin',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
 }))
@@ -34,6 +37,8 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn(async () => ({ user: { id: 'user_1' } })) } } }))
+// Die Wache selbst prüft tests/hof-ruecksprung.test.ts (Nr. 156); hier nur die Seite.
+vi.mock('@/server/hofbereich', () => ({ verlangeHofDerSitzung: vi.fn(async () => ({ userId: 'user_1', farmId: 'hof_1' })) }))
 vi.mock('@/lib/prisma', () => ({ prisma: { farm: { findUnique: vi.fn() } } }))
 vi.mock('@/lib/umgebung-server', () => ({
   get TESTBETRIEB() {

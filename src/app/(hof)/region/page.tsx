@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { leseRegionReiter } from '@/schemas/region'
 import { LadeRahmen } from '@/components/ui/lade-punkt'
@@ -31,10 +30,9 @@ type Suche = Record<string, string | string[] | undefined>
  * Ladepunkt am gewählten Reiter bzw. Umkreis (Muster Admin › Postfach, Nr. 105).
  */
 export default async function RegionPage({ searchParams }: { searchParams: Promise<Suche> }): Promise<React.JSX.Element> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  const { userId } = await verlangeHofDerSitzung()
 
-  const farm = await getFarmForUser(session.user.id)
+  const farm = await getFarmForUser(userId)
   if (!farm) redirect('/onboarding')
 
   const suche = await searchParams

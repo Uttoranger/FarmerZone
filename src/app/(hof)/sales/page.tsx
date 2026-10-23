@@ -1,8 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getMeistverkaufteProduktIds, getSalesOverview } from '@/server/queries/manual-sales'
 import { getProductsForFarm } from '@/server/queries/products'
@@ -27,10 +26,9 @@ export const dynamic = 'force-dynamic'
  * Vorrat — für den Schalter „Vorrat abziehen“, Nr. 39).
  */
 export default async function SalesPage(): Promise<React.JSX.Element> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  const { userId } = await verlangeHofDerSitzung()
 
-  const farm = await getFarmForUser(session.user.id)
+  const farm = await getFarmForUser(userId)
   if (!farm) redirect('/onboarding')
 
   let daten: React.ComponentProps<typeof VerkaeufeAnsicht> | null = null
@@ -39,7 +37,7 @@ export default async function SalesPage(): Promise<React.JSX.Element> {
       getSalesOverview(farm.id, new Date()),
       getProductsForFarm(farm.id),
       getMeistverkaufteProduktIds(farm.id),
-      getStripeReadiness(session.user.id),
+      getStripeReadiness(userId),
     ])
     daten = {
       overview,
