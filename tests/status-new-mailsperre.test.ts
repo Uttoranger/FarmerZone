@@ -11,6 +11,8 @@ import { createElement } from 'react'
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn(async () => ({ user: { id: 'user_1' } })) } } }))
+// Seit Nr. 156 fragt die Seite den Hof der Sitzung über verlangeHofDerSitzung, nicht mehr selbst.
+vi.mock('@/server/hofbereich', () => ({ verlangeHofDerSitzung: vi.fn(async () => ({ userId: 'user_1', farmId: 'farm_1' })) }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: vi.fn(async () => ({ id: 'farm_1' })) }))
 vi.mock('@/server/queries/status-posts', () => ({ getStatusTemplate: vi.fn(async () => null) }))
 vi.mock('@/components/hofbereich/unterseiten-kopf', () => ({ UnterseitenKopf: () => null }))
