@@ -5715,6 +5715,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Warum der Kopf trotz Überschreiben geprüft wird:** Der Proxy ist die einzige Stelle, die ihn setzt; fiele er einmal weg (Matcher-Lücke), käme der Wert sonst ungeprüft vom Browser. Darum dieselbe Prüfung wie für `von`.
 - Die Druckseiten unter `(farmer)` bleiben ohne die Wache in der Seite; ihr Layout prüft über `ladeHofbereich`.
 
+## Beitrags-Mails nach der Antwort, ein Fehler stoppt nicht alle, ehrliche Zahl (Seitenkarte P3; Nr. 149, Lauf 23, 23.10.2026)
+
+- **Lücke:** `publishStatusPost` schickte jede Beitrags-Mail nacheinander in derselben Anfrage (der Kommentar „fire + don't block“ stimmte nicht); der Hof wartete auf alle. `sendStatusUpdateEmail` gab `void` zurück, Resend-Fehler und Mails, die die Post-Sperre (Z3) aufhält, blieben stumm, und am Beitrag stand immer die geplante Zahl. Die 7-Tage-Sperre rechneten Action und Seite „Neuer Beitrag“ getrennt.
+- **Fix:** Die Schleife läuft über `nachDerAntwort` (`versendeBeitragsMails`), jede Mail mit eigenem try/catch; ein Wurf oder Resend-Fehler geht über `meldeFehler('versand', …)` an Sentry (fester Text, Fehlerklasse, nie Adresse oder Token) und hält die übrigen nicht auf. `sendStatusUpdateEmail` gibt das `VersandErgebnis` zurück; angenommen ist eine Mail mit `id`. Der Beitrag entsteht mit der GEPLANTEN Zahl, am Ende schreibt der Versand die angenommenen (`updateMany` mit `id` und `farmId`); bricht er vorher ab, bleibt die geplante Zahl und die Sperre hält. Post-Sperre und Abmelde-Kopfzeilen unverändert, kein `maxDuration`.
+- **Eine Sperre:** `mailSperreWo(farmId, jetzt)` (`src/lib/beitrag-mailabstand.ts`): `sentViaEmail` UND `emailRecipientCount > 0` UND jünger als `MAILABSTAND_TAGE`; Action und Seite fragen damit. Die Laufzeit eines Beitrags (`expiresAt`) hat eine eigene Konstante `BEITRAG_LAUFZEIT_TAGE` (7). Die Meldung nach dem Veröffentlichen sagt „wird an n Abos verschickt“ (`mailVersandMeldung`); Mein Hof › Beiträge nennt „per E-Mail“ nur bei `emailRecipientCount > 0`, wie das Teilen-Fenster.
+- **Laufzeit:** Vorlage bauen kostet lokal rund 2 ms je Mail; den Rest macht die Antwort von Resend. Messwerte und die Grenze in Abos stehen im Bericht `docs/nachtlauf/berichte/149.md`.
+
 ## Nützliche Befehle
 
 ```bash

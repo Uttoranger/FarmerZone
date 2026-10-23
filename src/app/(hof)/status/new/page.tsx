@@ -5,7 +5,7 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { getStatusTemplate } from '@/server/queries/status-posts'
 import { prisma } from '@/lib/prisma'
 import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
-import { berechneMailabstandBeginn } from '@/lib/beitrag-mailabstand'
+import { mailSperreWo } from '@/lib/beitrag-mailabstand'
 import { anlassParameterSchema } from '@/schemas/beitrag-anlass'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { StatusNewClient } from './status-new-client'
@@ -56,13 +56,11 @@ export default async function StatusNewPage({
     }),
     // Dieselben Empfänger wie beim Versand: Bestand und bestätigte Anmeldungen (S11).
     prisma.customerFarmSubscription.count({ where: { farmId: farm.id, ...WERBEMAIL_EMPFAENGER } }),
+    // Dieselbe Sperre wie beim Versand (mailSperreWo, Nr. 149); der neueste Beitrag nennt die Tage.
     prisma.statusPost.findFirst({
-      where: {
-        farmId: farm.id,
-        sentViaEmail: true,
-        publishedAt: { gte: berechneMailabstandBeginn(jetzt) },
-      },
+      where: mailSperreWo(farm.id, jetzt),
       select: { publishedAt: true },
+      orderBy: { publishedAt: 'desc' },
     }),
   ])
 

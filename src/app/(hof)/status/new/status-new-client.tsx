@@ -21,7 +21,7 @@ import { BEITRAG_ANLAESSE, BEITRAG_ANLASS, type BeitragAnlass } from '@/lib/beit
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { formatEuro } from '@/lib/format'
 import { renderStatusBodyWithChip } from '@/lib/status-body'
-import { MAILABSTAND_TAGE } from '@/lib/beitrag-mailabstand'
+import { MAILABSTAND_TAGE, mailVersandMeldung } from '@/lib/beitrag-mailabstand'
 import { tageSeit } from '@/lib/hof-kunden'
 import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
 import { TeilenFenster } from '@/components/teilen/teilen-fenster'
@@ -203,7 +203,7 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
       const parts: string[] = []
       if (showOnFarmPage) parts.push('auf der Hof-Seite')
       if (sendEmail && !emailBlocked && (res.emailCount ?? 0) > 0)
-        parts.push(`${res.emailCount} E-Mails versendet`)
+        parts.push(mailVersandMeldung(res.emailCount ?? 0))
       toast.success(`Beitrag veröffentlicht${parts.length ? ' — ' + parts.join(', ') : ''}`)
       // Direkt in den Reiter — /status leitet seit Nr. 22e ohnehin dorthin um.
       router.push(BEITRAEGE_HREF)

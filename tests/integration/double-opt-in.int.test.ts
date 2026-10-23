@@ -180,7 +180,7 @@ describe('Migration 20261007180000_double_opt_in', () => {
       VALUES (${intKennung('abo')}, ${email}, ${hof.farm.id}, true, false, now())`
 
     expect(await beitragPerMail(hof)).toMatchObject({ emailCount: 1 })
-    expect(empfaengerDerBeitragsmails()).toEqual([email])
+    await vi.waitFor(() => expect(empfaengerDerBeitragsmails()).toEqual([email]))
   })
 
   it('Deploy-Fenster: setzt alter Code den Haken auf einer angefragten Anmeldung, bleibt sie ohne Werbung', async () => {
@@ -235,7 +235,7 @@ describe('Neue Anmeldung auf der Bestätigungsseite', () => {
     expect(vi.mocked(sendAboBestaetigung).mock.calls[0]![1]).toMatchObject({ hofName: 'Hof Test' })
 
     expect(await beitragPerMail(hof)).toMatchObject({ emailCount: 1 })
-    expect(empfaengerDerBeitragsmails()).toEqual([bestand])
+    await vi.waitFor(() => expect(empfaengerDerBeitragsmails()).toEqual([bestand]))
     // Der Bestand bleibt unverändert.
     expect(await abo(hof.farm.id, bestand)).toMatchObject({ optInEmail: true, emailOptInAngefragtAm: null, emailOptInBestaetigtAm: null })
   })
@@ -252,6 +252,7 @@ describe('Neue Anmeldung auf der Bestätigungsseite', () => {
     expect(bestaetigt.emailOptInBestaetigtAm).toBeInstanceOf(Date)
 
     expect(await beitragPerMail(hof)).toMatchObject({ emailCount: 1 })
+    await vi.waitFor(() => expect(vi.mocked(sendStatusUpdateEmail)).toHaveBeenCalledOnce())
     const [mail] = vi.mocked(sendStatusUpdateEmail).mock.calls.map(([daten]) => daten)
     expect(mail!.to).toBe(email)
     // Seit Nr. 47 bekommt der Versand den Token und baut daraus Link und
@@ -461,7 +462,7 @@ describe('Ausschalten und Abmelden lösen die offene Anfrage auf (Nachbesserung 
 
     expect(await bestaetigeNeuigkeiten({ token: neuerLink })).toEqual({ ok: true, hofName: 'Hof Test' })
     expect(await beitragPerMail(hof)).toMatchObject({ emailCount: 1 })
-    expect(empfaengerDerBeitragsmails()).toEqual([email])
+    await vi.waitFor(() => expect(empfaengerDerBeitragsmails()).toEqual([email]))
   })
 
   it('der WhatsApp-Schalter löst bei einer wartenden Anmeldung keine zweite Bestätigungsmail aus', async () => {
