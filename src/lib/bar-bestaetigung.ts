@@ -82,8 +82,9 @@ export function barTokenHash(token: string): string {
  *
  * Der zweite Wert, der Klartext, hält Bestellungen von vor dem Deploy von
  * Nr. 151 (23.10.2026) gültig — ihre Mails tragen den Token, die Datenbank
- * auch. Ihre Frist ist spätestens mit dem Abholtag vorbei; danach fällt der
- * Zweig mit einem eigenen Auftrag weg (Bericht Nr. 151), zusammen mit dem
+ * auch. Der Klartext einer offenen Bestellung bestätigt höchstens bis zum
+ * Ende der Barfrist (`fristVon`, höchstens zwei Stunden nach der Bestellung);
+ * danach fällt der Zweig mit einem eigenen Auftrag weg (Bericht Nr. 151), zusammen mit dem
  * Leeren der übrigen Klartext-Werte.
  */
 export function tokenKandidaten(token: string): string[] {
