@@ -9,6 +9,7 @@ import {
   bestaetigungsBloecke,
   bestaetigungsKopf,
   bestaetigungsZustand,
+  bestaetigungZeigtPerson,
   bestellSchritte,
   neuigkeitenErlaubt,
 } from '@/lib/bestaetigung'
@@ -33,13 +34,14 @@ import { BarLinkErneutSenden } from '@/components/bestaetigung/bar-link-erneut-s
 import { barLinkErneutMoeglich } from '@/lib/bar-bestaetigung'
 import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
+import { LAUFENDE_STATUS } from '@/lib/bestellungen-finden'
 
 interface Props {
   params: Promise<{ farmSlug: string; orderId: string }>
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
-// Eine Seite mit Name, E-Mail und Bestellung: nie in einen Suchindex, und die
+// Eine Seite mit E-Mail (solange offen) und Bestellung: nie in einen Suchindex, und die
 // signierte Adresse geht beim Klick auf einen Link nicht als Referrer mit
 // (dazu der Header in next.config.ts).
 export const metadata: Metadata = {
@@ -98,8 +100,8 @@ async function getOrder(orderId: string) {
       totalAmount: true,
       serviceFeeCents: true,
       serviceFeeRefundedAt: true,
-      customerName: true,
-      customerEmail: true,
+      // Keine Personendaten hier (Nr. 153): Den Namen zeigt die Seite nie, die
+      // E-Mail holt `adresseSolangeOffen` nur für eine laufende Bestellung.
       createdAt: true,
       cancelReason: true,
       pickupDate: true,
@@ -134,6 +136,20 @@ async function getOrder(orderId: string) {
   })
 }
 
+/**
+ * Die E-Mail der Kundin, nur solange die Bestellung läuft (Register S17
+ * Punkt 3, Nr. 153). Der Status-Filter steht in der Abfrage selbst: Schließt
+ * der Hof die Bestellung zwischen beiden Abfragen ab, kommt keine Adresse.
+ */
+async function adresseSolangeOffen(orderId: string, status: Parameters<typeof bestaetigungZeigtPerson>[0]) {
+  if (!bestaetigungZeigtPerson(status)) return null
+  const person = await prisma.order.findUnique({
+    where: { id: orderId, status: { in: [...LAUFENDE_STATUS] } },
+    select: { customerEmail: true },
+  })
+  return person?.customerEmail ?? null
+}
+
 export default async function ConfirmPage({ params, searchParams }: Props) {
   const { farmSlug, orderId } = await params
   const { sig, redirect_status } = bestaetigungsParameterSchema.parse(await searchParams)
@@ -153,6 +169,10 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
   // kein laufender Bestätigungs-Ablauf dran.
   if (!order || order.farm.slug !== farmSlug || order.farm.archivedAt) notFound()
 
+  // Erst nach gibVerwaisteFreiOhneRisiko: Eine verfallene Barbestellung ist
+  // dann schon storniert und bekommt keine Adresse mehr.
+  const customerEmail = await adresseSolangeOffen(order.id, order.status)
+
   // „Bezahlt" und „bestätigt" nur aus der Datenbank; redirect_status ist
   // höchstens ein Hinweis (src/lib/bestaetigung.ts).
   const zustand = bestaetigungsZustand(order, redirect_status)
@@ -167,7 +187,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
   const kopf = bestaetigungsKopf(zustand, {
     status: order.status,
     paymentMethod: order.paymentMethod,
-    customerEmail: order.customerEmail,
+    customerEmail,
     hofName: order.farm.name,
   })
   const schritte = bestellSchritte(order, jetzt)
@@ -238,7 +258,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
             Kennung und Signatur stehen ohnehin in der Adresse dieser Seite; welche
             Adresse angemeldet wird, nimmt der Server aus der Bestellung. */}
         {neuigkeiten && (
-          <NeuigkeitenKarte orderId={order.id} sig={sig} hofName={order.farm.name} email={order.customerEmail} />
+          <NeuigkeitenKarte orderId={order.id} sig={sig} hofName={order.farm.name} email={customerEmail ?? undefined} />
         )}
 
         <Aktionen>

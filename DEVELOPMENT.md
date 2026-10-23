@@ -5735,6 +5735,12 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Bestand:** Ein bestehendes Konto ändert sich nie (Stripe stellt das Land nicht um). `meldeAbweichendesKontoLand` (`src/server/hofkonto-unbekannt.ts`) meldet eine Abweichung höchstens einmal je Hof und Tag an Sentry (Bremse `stripeKontoLand`), nur mit Hof-ID und den Länderkürzeln; Aufrufer sind `checkConnectStatus` und die Rückkehr aus dem Onboarding. Der Hinweis für deutsche Höfe bleibt.
 - **Offen:** Wer Stripe vor der Landwahl einrichtet, bekommt ein AT-Konto; `src/lib/json-ld.ts` setzt `addressCountry: 'AT'` auch für deutsche Höfe (beides eigene Aufträge).
 
+## Bestätigungsseite ohne Personendaten nach Abschluss (Register S17 Punkt 3; Nr. 153, Lauf 23, 23.10.2026)
+
+- **Lücke (Seitenkarte S5):** Der signierte Link der Bestätigungsseite läuft nie ab (bewusst, `bestell-link.ts`). Die Seite lud `customerName` (nie angezeigt) und `customerEmail` und zeigte die Adresse auch nach Abholung im Kopfsatz („unterwegs an …“) und in der Karte „Neuigkeiten vom Hof“. Wer den Link später fand oder bekam, las die Adresse der Kundin.
+- **Fix:** `bestaetigungZeigtPerson(status)` (`src/lib/bestaetigung.ts`) ist wahr genau für `LAUFENDE_STATUS`. Die Hauptabfrage lädt weder Name noch E-Mail; nach `gibVerwaisteFreiOhneRisiko` holt `adresseSolangeOffen` die E-Mail nur für eine laufende Bestellung, mit `status: { in: LAUFENDE_STATUS }` in derselben Abfrage (schließt der Hof dazwischen ab, kommt keine Adresse). Ohne Adresse entfällt bei „bezahlt“ der Teil „Die Bestätigung ist unterwegs an …“; die Karte sagt „an die Adresse deiner Bestellung“.
+- **Unverändert:** `neuigkeitenErlaubt` (Karte und Action bleiben eine Regel, die Anmeldung nach der Abholung bleibt möglich), Status, Abholung, Positionen, Kontakt des Hofs, „Erneut senden“ (Nr. 151).
+
 ## Nützliche Befehle
 
 ```bash
