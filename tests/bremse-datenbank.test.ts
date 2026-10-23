@@ -49,6 +49,7 @@ import { MELDUNGEN_PRO_STUNDE } from '@/lib/meldung'
 import {
   anmeldecodeGebremst,
   bremseCheckout,
+  bremseReservieren,
   bremseUeberAlleInstanzen,
   neueBremsMeldungen,
   raeumeBremsZaehlerAuf,
@@ -103,6 +104,13 @@ describe('Grenzen je Weg = die der ersten Stufe', () => {
       expect(b.max).toBe(CHECKOUT_RESERVE_MAX_PER_WINDOW)
       expect(b.fensterMs).toBe(RATE_LIMIT_WINDOW_MS)
     }
+  })
+
+  it('Reservieren und Halte erneuern (Nr. 150): 20 je Minute je IP — wie enforceRateLimit beider Routen', () => {
+    expect(DB_BREMSEN.reserveIp.max).toBe(CHECKOUT_RESERVE_MAX_PER_WINDOW)
+    expect(DB_BREMSEN.reserveIp.fensterMs).toBe(RATE_LIMIT_WINDOW_MS)
+    // Ein eigener Zweck: Checkout und Reservieren teilen sich keinen Zähler.
+    expect(DB_BREMSEN.reserveIp.zweck).not.toBe(DB_BREMSEN.checkoutIp.zweck)
   })
 
   it('Anmeldecode und Bestellungen finden: 3 je Minute je IP, 5 Codes je Adresse in 15 Minuten', () => {
@@ -476,6 +484,48 @@ describe('bremseCheckout — zweite Stufe in /api/checkout', () => {
     vi.stubEnv('NODE_ENV', 'production')
     queryRaw.mockRejectedValue(new Error('weg'))
     expect(await bremseCheckout(anfrage(), 'int-sitzung-1', JETZT)).toBeNull()
+  })
+})
+
+describe('bremseReservieren — zweite Stufe in /api/reserve und /api/warenkorb/pruefen (Nr. 150)', () => {
+  const anfrage = (pfad = '/api/reserve') => new Request(`http://localhost${pfad}`, { headers: { 'x-forwarded-for': IP } })
+
+  it('außerhalb der Produktion: null, keine Abfrage', async () => {
+    expect(await bremseReservieren(anfrage(), JETZT)).toBeNull()
+    expect(queryRaw).not.toHaveBeenCalled()
+  })
+
+  it('innerhalb der Grenze: null — gezählt wird je IP unter reserve-ip, ohne IP im Klartext', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    datenbankZaehlt(() => CHECKOUT_RESERVE_MAX_PER_WINDOW)
+    expect(await bremseReservieren(anfrage(), JETZT)).toBeNull()
+    const schluessel = sqlWerte(queryRaw.mock.calls[0]).filter((w): w is string => typeof w === 'string')
+    expect(schluessel).toEqual([bremsSchluessel('vitest-secret-nicht-fuer-produktion', 'reserve-ip', IP)])
+    expect(schluessel.join()).not.toContain(IP)
+  })
+
+  it('beide Routen treffen denselben Schlüssel', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    datenbankZaehlt()
+    await bremseReservieren(anfrage('/api/reserve'), JETZT)
+    await bremseReservieren(anfrage('/api/warenkorb/pruefen'), JETZT)
+    const [a, b] = queryRaw.mock.calls.map((c) => sqlWerte(c).find((w) => typeof w === 'string'))
+    expect(a).toBe(b)
+  })
+
+  it('über der Grenze: 429 mit dem Text der ersten Stufe und Retry-After bis zum Fensterende', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    datenbankZaehlt(() => CHECKOUT_RESERVE_MAX_PER_WINDOW + 1)
+    const antwort = await bremseReservieren(anfrage(), JETZT)
+    expect(antwort?.status).toBe(429)
+    expect(antwort?.headers.get('Retry-After')).toBe('30')
+    expect(await antwort?.json()).toEqual({ error: ZU_VIELE_ANFRAGEN })
+  })
+
+  it('Datenbankfehler: null — fail-open, die erste Stufe wirkt weiter', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    queryRaw.mockRejectedValue(new Error('weg'))
+    expect(await bremseReservieren(anfrage(), JETZT)).toBeNull()
   })
 })
 

@@ -5694,6 +5694,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Integration:** `tests/test-ueberspringen-wache.test.ts` belegt, dass ihre Liste Dateien aus `tests/integration/` enthält.
 - **Kommentare:** Die Aussagen „kein jsdom“ und „ohne YAML-Paket“ in vier Testdateien stimmen seit Nr. 135 nur halb und sagen jetzt, was die Datei tut; `/pruefen` nennt den Rückgabetyp mit seinen Orten; der Satz zu Datum mit Uhrzeit steht im JSDoc von `TELEFON_NUMMER`. Kein Ergebnis ändert sich.
 
+## Reservieren über alle Instanzen gebremst (Register S17 Punkt 1; Nr. 150, Lauf 23, 23.10.2026)
+
+- **Lücke:** `/api/reserve` und `/api/warenkorb/pruefen` bremsten nur im Speicher der Instanz (`enforceRateLimit`, 20 je Minute und IP). Auf Vercel hat jede warme Instanz ihr eigenes Fenster; über viele Instanzen ließ sich deutlich öfter reservieren bzw. Halte erneuern.
+- **Fix:** Ein Eintrag `reserveIp` in `DB_BREMSEN` (20 je Minute, wie `checkoutIp`) und die Hilfe `bremseReservieren` (src/server/bremse-datenbank.ts, Muster `bremseCheckout`, nur in Produktion, fail-open). Beide Routen zählen in DENSELBEN Zähler je IP — wer zwischen den Wegen wechselt, bekommt nicht die doppelte Menge. Über der Grenze 429 mit `ZU_VIELE_ANFRAGEN` und `Retry-After` bis zum Ende des Minutenfensters.
+- **Reihenfolge:** /api/reserve: Speicher-Bremse je IP → Parsen → Speicher-Bremse je Sitzung → Datenbank → Fristfreigabe → Aufräumen → Stilllegung → Freischaltung → Pause → Kaufsperre → Bestand. /api/warenkorb/pruefen: Speicher-Bremse → Parsen → Datenbank → wie bisher. Kaputte Anfragen zählen nicht; wer gebremst ist, erfährt nichts über den Hof.
+- **Offen (Bericht 150):** `/api/warenkorb/pruefen` legt Halte ohne die Prüfkette von `/api/reserve` und ohne `MAX_MENGE` an (Vorschlag: eine gemeinsame Prüfkette); eine einzelne Sitzung kann weiter den ganzen Bestand halten und erneuern (Vorschlag zur Entscheidung: Obergrenze je Sitzung); viele Kundinnen hinter einer gemeinsamen Adresse teilen sich die Grenze.
+
 ## Nützliche Befehle
 
 ```bash
