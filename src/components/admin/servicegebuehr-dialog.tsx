@@ -9,6 +9,7 @@ import { PROZENT_UNGUELTIG } from '@/schemas/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { BestellDialog, DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { FELD, FELD_LABEL, TEXT_GRUEN } from '@/components/hof-bestellungen/stil'
+import { useFrischBestaetigt } from '@/components/admin/frisch-bestaetigen'
 
 /**
  * Die Servicegebühr eines Hofs einstellen (Sprint servicegebuehr, Teil E; im
@@ -28,6 +29,8 @@ export function ServicegebuehrDialog({ hof, onClose }: { hof: AdminHofZeile | nu
 function Formular({ hof, onClose }: { hof: AdminHofZeile | null; onClose: () => void }): React.JSX.Element {
   const [laeuft, startTransition] = useTransition()
   const [fehler, setFehler] = useState<string | null>(null)
+  // Die Servicegebühr ändern ist heikel (Register N20, Ergänzung 23.10.2026): frisch mit Passkey bestätigt.
+  const frischSpeichern = useFrischBestaetigt(setServiceFeeAction)
   // Formularzustand als Text — <input type="number"> liefert Text. An den
   // Server gehen nur Zahlen (prozentsatzEingabe, mindestgebuehrCent); er
   // prüft ohnehin (servicegebuehrEinstellungSchema).
@@ -52,7 +55,7 @@ function Formular({ hof, onClose }: { hof: AdminHofZeile | null; onClose: () => 
       return
     }
     startTransition(async () => {
-      const ergebnis = await setServiceFeeAction(hof.id, {
+      const ergebnis = await frischSpeichern.ausfuehren(hof.id, {
         percent: prozentsatz,
         minCents: mindest,
         activeFrom: giltAb,
@@ -77,6 +80,7 @@ function Formular({ hof, onClose }: { hof: AdminHofZeile | null; onClose: () => 
       breite="breit"
       hauptaktion={{ text: 'Speichern', onClick: speichern, ton: 'gruen', laeuft }}
     >
+      {frischSpeichern.dialog}
       {hof && (
         <form
           className="flex flex-col gap-4"

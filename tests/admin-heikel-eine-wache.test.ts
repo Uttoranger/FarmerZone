@@ -18,8 +18,8 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
-vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
+vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()), draftMode: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn(), unstable_cache: (f: unknown) => f }))
 // admin.ts zieht @/lib/email herein (server-only) — dieselbe Mock-Grenze wie in admin-reject.test.ts.
 vi.mock('@/lib/email', () => ({ sendFreischaltungEmail: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
@@ -50,9 +50,14 @@ import { prisma } from '@/lib/prisma'
 import { ADMIN_AKTION_FEHLER, FRISCH_FEHLER, FRISCH_MINUTEN } from '@/lib/admin-anmeldung'
 import { GRUENDUNG_EINGABE_UNGUELTIG } from '@/schemas/gruendung'
 import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
-import { revokeFarmApprovalAction, rejectFarmAction } from '@/server/actions/admin'
+import { approveFarmAction, revokeFarmApprovalAction, rejectFarmAction, setServiceFeeAction, setzeGruendungBisAction } from '@/server/actions/admin'
 import { markiereAlsTesthof, nimmAusGruendung, nimmTesthofZurueck, nimmWiederAuf, schreibeZusagenFest } from '@/server/actions/gruendung'
-import { markiereErstattungErledigt } from '@/server/actions/postfach'
+import { fuegeEmpfaengerHinzu, markiereErstattungErledigt, sendeRundschreiben } from '@/server/actions/postfach'
+import { veroeffentlicheStartseite } from '@/server/actions/startseite'
+import { EINSTELLUNG_UNGUELTIG } from '@/schemas/servicegebuehr'
+import { STARTSEITE_SAETZE } from '@/schemas/startseite'
+import { POSTFACH_FEHLER } from '@/lib/postfach'
+import { ZUSTELLUNG_FEHLER } from '@/lib/zustellung'
 import { adminSitzung } from './admin-sitzung'
 
 type Fn = ReturnType<typeof vi.fn>
@@ -81,6 +86,13 @@ const AKTIONEN: Array<{ name: string; rufe: () => Promise<unknown>; danach: unkn
   { name: 'schreibeZusagenFest', rufe: () => schreibeZusagenFest(null), danach: { error: GRUENDUNG_EINGABE_UNGUELTIG } },
   { name: 'markiereAlsTesthof', rufe: () => markiereAlsTesthof(null), danach: { error: GRUENDUNG_EINGABE_UNGUELTIG } },
   { name: 'nimmTesthofZurueck', rufe: () => nimmTesthofZurueck(null), danach: { error: GRUENDUNG_EINGABE_UNGUELTIG } },
+  // Ergänzung 23.10.2026 (Nr. 154): Die Wache steht vor der Prüfung der Eingabe.
+  { name: 'approveFarmAction', rufe: () => approveFarmAction('hof_1'), danach: { error: 'Hof nicht gefunden.' } },
+  { name: 'setServiceFeeAction', rufe: () => setServiceFeeAction('hof_1', null as never), danach: { error: EINSTELLUNG_UNGUELTIG } },
+  { name: 'setzeGruendungBisAction', rufe: () => setzeGruendungBisAction('hof_1', null as never), danach: { error: EINSTELLUNG_UNGUELTIG } },
+  { name: 'sendeRundschreiben', rufe: () => sendeRundschreiben(null), danach: { error: POSTFACH_FEHLER.eingabe } },
+  { name: 'fuegeEmpfaengerHinzu', rufe: () => fuegeEmpfaengerHinzu(null), danach: { error: ZUSTELLUNG_FEHLER.email } },
+  { name: 'veroeffentlicheStartseite', rufe: () => veroeffentlicheStartseite(null), danach: { error: STARTSEITE_SAETZE.ungueltig } },
   { name: 'markiereErstattungErledigt', rufe: () => markiereErstattungErledigt({ orderId: BESTELLUNG }), danach: { ok: true }, schreibt: true },
 ]
 

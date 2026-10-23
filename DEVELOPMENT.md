@@ -5694,6 +5694,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Integration:** `tests/test-ueberspringen-wache.test.ts` belegt, dass ihre Liste Dateien aus `tests/integration/` enthält.
 - **Kommentare:** Die Aussagen „kein jsdom“ und „ohne YAML-Paket“ in vier Testdateien stimmen seit Nr. 135 nur halb und sagen jetzt, was die Datei tut; `/pruefen` nennt den Rückgabetyp mit seinen Orten; der Satz zu Datum mit Uhrzeit steht im JSDoc von `TELEFON_NUMMER`. Kein Ergebnis ändert sich.
 
+## Frische Bestätigung für wirksame Admin-Aktionen (Register N20, Ergänzung 23.10.2026; Nr. 154, Lauf 23)
+
+- **Lücke (Seitenkarte S4):** Freischalten, Servicegebühr, „Gründungshof bis“, Rundschreiben, Startseite veröffentlichen und einen Empfänger der Zustellung hinzufügen prüften nur `verlangeAdminAktion`. Wer eine offene Admin-Sitzung (bis 12 Stunden) in die Hand bekam, konnte damit Höfe öffentlich schalten, Gebühren ändern, an alle Höfe schreiben oder eine fremde Adresse für die Betriebsmails eintragen.
+- **Fix:** Die sechs Actions rufen als erste Anweisung `verlangeFrischeBestaetigung()`, die Prüfung der Eingabe folgt danach (bei `sendeRundschreiben` und `fuegeEmpfaengerHinzu` vorher umgekehrt). Die Oberflächen (Höfe-Dialog, Servicegebühr, „Gründungshof bis“, Zustellung, Rundschreiben, Startseite) rufen sie nur über `useFrischBestaetigt`; der Dialog hängt im offenen Dialog bzw. in der Karte. `VeroeffentlichenDialog` nimmt dafür `children` an.
+- **Bescheid an die Höfe:** `setzeBuendelStandAction` schickte ihn über `sendeRundschreiben` — mit der neuen Wache wäre er nach 5 Minuten gescheitert. Der Versand liegt jetzt als `verschickeRundschreiben(eingabe, userId)` in `src/server/rundschreiben.ts` (ohne `'use server'`, nicht aufrufbar); beide Wege rufen ihn hinter ihrer eigenen Wache, die Optionen des Bescheids sind unverändert. Das Schema prüft auch den Bescheid.
+- **Tests:** Die Listen in `tests/frisch-bestaetigung-wache.test.ts` und `tests/admin-heikel-eine-wache.test.ts` kennen die sechs; je Action ein Fall „nicht mehr frisch → `{ error: 'frisch' }`, nichts geschrieben“ (`alteAdminSitzung` in `tests/admin-sitzung.ts`); der Hook-Prüfstand mit genau einem zweiten Aufruf; `tests/integration/bescheid-ohne-frische.int.test.ts` zeigt den Bescheid bei einer Sitzung, die 10 Minuten alt ist, und die Gegenprobe.
+
 ## Nützliche Befehle
 
 ```bash

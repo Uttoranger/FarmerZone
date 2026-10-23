@@ -18,7 +18,8 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/email', () => ({ sendRaw: vi.fn(async () => ({ id: 'mail' })), sendFreischaltungEmail: vi.fn() }))
-vi.mock('@/server/actions/postfach', () => ({ sendeRundschreiben: vi.fn() }))
+// Der Bescheid läuft über den Versand ohne eigene Wache (Register N20, Ergänzung 23.10.2026; Nr. 154).
+vi.mock('@/server/rundschreiben', () => ({ verschickeRundschreiben: vi.fn() }))
 const nachlauf = vi.hoisted(() => ({ aufgaben: [] as (() => Promise<void>)[] }))
 vi.mock('@/lib/nach-der-antwort', () => ({
   nachDerAntwort: (aufgabe: () => Promise<void>) => {
@@ -43,7 +44,7 @@ import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { sendRaw } from '@/lib/email'
-import { sendeRundschreiben } from '@/server/actions/postfach'
+import { verschickeRundschreiben } from '@/server/rundschreiben'
 import { MELDUNG_KLICK_TEXT, WUENSCHE_TEXT } from '@/lib/meldung'
 import { legeMeldungAbAction, setzeBuendelStandAction } from '@/server/actions/admin'
 import { adminSitzung } from './admin-sitzung'
@@ -71,7 +72,7 @@ describe('Stand für alle — das Rundschreiben scheitert nach dem Speichern', (
   })
 
   it('wirft es: Neuladen und Kundinnen-Mail laufen trotzdem, nach Sentry nur die Klasse, zurück der Satz', async () => {
-    vi.mocked(sendeRundschreiben).mockRejectedValue(new RangeError('Erfundene Antwort an die Höfe'))
+    vi.mocked(verschickeRundschreiben).mockRejectedValue(new RangeError('Erfundene Antwort an die Höfe'))
     const ergebnis = await setzeBuendelStandAction({ clusterKey: 'abholzeiten', stand: 'umgesetzt', antwort: 'Erfundene Antwort an die Höfe', bescheid: 'hoefe' })
 
     expect(ergebnis).toEqual({ error: WUENSCHE_TEXT.bescheidNichtGesendet })
@@ -86,12 +87,17 @@ describe('Stand für alle — das Rundschreiben scheitert nach dem Speichern', (
   })
 
   it('meldet es einen Fehler: dasselbe — erst Neuladen und Mail, dann der Satz', async () => {
-    vi.mocked(sendeRundschreiben).mockResolvedValue({ error: 'Für diese Auswahl gibt es keinen Hof.' })
+    vi.mocked(verschickeRundschreiben).mockResolvedValue({ error: 'Für diese Auswahl gibt es keinen Hof.' })
     const ergebnis = await setzeBuendelStandAction({ clusterKey: 'abholzeiten', stand: 'umgesetzt', antwort: 'Erfundene Antwort', bescheid: 'hoefe' })
 
     expect(ergebnis).toEqual({ error: WUENSCHE_TEXT.bescheidNichtGesendet })
     expect(revalidatePath).toHaveBeenCalledWith('/admin/postfach')
     expect(nachlauf.aufgaben).toHaveLength(1)
+    // Die Kennung des Admins kommt aus der Wache dieser Aktion; die Optionen des Bescheids bleiben (nur Postfach, ohne Antwort).
+    expect(vi.mocked(verschickeRundschreiben)).toHaveBeenCalledWith(
+      expect.objectContaining({ perMail: false, antwortMoeglich: false, empfaenger: { art: 'ausgewaehlt', hofIds: ['hof-a'] } }),
+      'admin_1'
+    )
   })
 })
 

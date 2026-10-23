@@ -22,6 +22,7 @@ import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
 import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
+import { useFrischBestaetigt } from '@/components/admin/frisch-bestaetigen'
 
 type Hof = { id: string; name: string; ort: string }
 
@@ -79,6 +80,8 @@ export function RundschreibenFormular({ hoefe, zahlen }: { hoefe: readonly Hof[]
   const [antwortMoeglich, setAntwortMoeglich] = useState(antwortMoeglichStandard('INFO'))
   const [meldung, setMeldung] = useState<{ art: 'ok' | 'fehler'; text: string } | null>(null)
   const [laeuft, starte] = useTransition()
+  // Ein Rundschreiben senden ist heikel (Register N20, Ergänzung 23.10.2026): frisch mit Passkey bestätigt.
+  const frischSenden = useFrischBestaetigt(sendeRundschreiben)
 
   const anzahl = an === 'ausgewaehlt' ? gewaehlt.length : zahlen[an]
   const treffer = useMemo(() => {
@@ -95,7 +98,7 @@ export function RundschreibenFormular({ hoefe, zahlen }: { hoefe: readonly Hof[]
     if (laeuft) return
     const empfaenger: EmpfaengerRegel = an === 'ausgewaehlt' ? { art: 'ausgewaehlt', hofIds: gewaehlt } : { art: an }
     starte(async () => {
-      const ergebnis = await sendeRundschreiben({ titel, text, art: wichtig ? 'WICHTIG' : 'INFO', link, perMail, antwortMoeglich, empfaenger })
+      const ergebnis = await frischSenden.ausfuehren({ titel, text, art: wichtig ? 'WICHTIG' : 'INFO', link, perMail, antwortMoeglich, empfaenger })
       if ('error' in ergebnis) {
         setMeldung({ art: 'fehler', text: ergebnis.error })
         return
@@ -115,6 +118,7 @@ export function RundschreibenFormular({ hoefe, zahlen }: { hoefe: readonly Hof[]
   return (
     // Wer weiterschreibt, sieht den Satz zum letzten Senden nicht mehr (Eingaben melden sich hier).
     <form onSubmit={absenden} onInput={() => setMeldung(null)} className="mt-3 flex flex-col gap-4">
+      {frischSenden.dialog}
       <fieldset className="flex flex-col gap-2">
         <legend className={cn(BESCHRIFTUNG, 'mb-2')}>{ADMIN_POSTFACH_TEXT.an}</legend>
         <div className="flex flex-wrap gap-2">

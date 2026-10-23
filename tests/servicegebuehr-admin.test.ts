@@ -39,7 +39,8 @@ import { MINDESTGEBUEHR_UNGUELTIG } from '@/lib/admin-hoefe'
 import { centsAlsEuro, formatEuro } from '@/lib/format'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { adminSitzung } from './admin-sitzung'
+import { adminSitzung, alteAdminSitzung } from './admin-sitzung'
+import { FRISCH_FEHLER } from '@/lib/admin-anmeldung'
 
 const getSession = vi.mocked(auth.api.getSession)
 const userFindUnique = vi.mocked(prisma.user.findUnique)
@@ -80,6 +81,13 @@ describe('setServiceFeeAction — Zugriff', () => {
     userFindUnique.mockResolvedValue({ isAdmin: false } as never)
     const result = await setServiceFeeAction('farm_1', GUELTIG)
     expect(result.error).toBe('Kein Zugriff.')
+    expect(farmUpdate).not.toHaveBeenCalled()
+  })
+
+  it('ohne frische Bestätigung (N20, Ergänzung 23.10.2026): { error: frisch }, nichts geschrieben', async () => {
+    getSession.mockResolvedValue(alteAdminSitzung('user_1') as never)
+    expect(await setServiceFeeAction('farm_1', GUELTIG)).toEqual({ error: FRISCH_FEHLER })
+    expect(farmFindUnique).not.toHaveBeenCalled()
     expect(farmUpdate).not.toHaveBeenCalled()
   })
 

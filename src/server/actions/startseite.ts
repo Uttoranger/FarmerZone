@@ -4,7 +4,7 @@ import { revalidatePath, updateTag } from 'next/cache'
 import { draftMode } from 'next/headers'
 import type { Prisma, StartseiteArt } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { verlangeAdminAktion } from '@/server/admin-wache'
+import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { IN_LISTEN_SICHTBAR } from '@/server/queries/farm'
 import { ladeEntwurfAdmin, leseEntwurf, leseFassung, leseQuelle, naechsterTermin, type AdminStartseitenZeile } from '@/server/queries/startseite'
 import { erzeugeVorschauAbfrage } from '@/server/startseite-vorschau'
@@ -240,7 +240,8 @@ export async function loescheStartseitenBlock(eingabe: unknown): Promise<{ ok: t
 export async function veroeffentlicheStartseite(
   eingabe: unknown
 ): Promise<{ ok: true; id: string; liveAb: string; text: string } | { error: string }> {
-  const guard = await verlangeAdminAktion()
+  // Heikle Aktion (Register N20, Ergänzung 23.10.2026): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion.
+  const guard = await verlangeFrischeBestaetigung()
   if ('error' in guard) return { error: guard.error }
   const geprueft = veroeffentlichenSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: STARTSEITE_SAETZE.ungueltig }
