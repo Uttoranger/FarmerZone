@@ -1,8 +1,7 @@
 import type { Metadata } from 'next'
 import * as Sentry from '@sentry/nextjs'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmSettings, getMeinHofKopf, getOwnerFarm } from '@/server/queries/farm'
 import { getAppearanceData } from '@/server/queries/appearance'
 import { getStatusPostsForFarm, zaehleWhatsAppAbonnentinnen } from '@/server/queries/status-posts'
@@ -64,10 +63,9 @@ export default async function FarmPageOwnerRoute({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }): Promise<React.JSX.Element> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  const { userId } = await verlangeHofDerSitzung()
 
-  const farm = await getOwnerFarm(session.user.id)
+  const farm = await getOwnerFarm(userId)
   if (!farm) redirect('/onboarding')
 
   const reiter = meinHofReiterAus((await searchParams)[MEIN_HOF_REITER_PARAMETER])
@@ -77,7 +75,7 @@ export default async function FarmPageOwnerRoute({
 
   if (reiter === 'beitraege') {
     const [kopf, zustand, beitraege, whatsappAbonnentinnen] = await Promise.all([
-      getMeinHofKopf(session.user.id),
+      getMeinHofKopf(userId),
       ladeMeinHofZustand(farm.id, jetzt),
       getStatusPostsForFarm(farm.id),
       zaehleWhatsAppAbonnentinnen(farm.id),
@@ -104,10 +102,10 @@ export default async function FarmPageOwnerRoute({
   }
 
   const [kopf, zustand, einstellungen, auftritt, laufend] = await Promise.all([
-    getMeinHofKopf(session.user.id),
+    getMeinHofKopf(userId),
     ladeMeinHofZustand(farm.id, jetzt),
-    getFarmSettings(session.user.id),
-    getAppearanceData(session.user.id),
+    getFarmSettings(userId),
+    getAppearanceData(userId),
     // „Aktuell vom Hof“ als erste Zeile (Register E12, Nr. 129): nur der laufende Beitrag, nicht die
     // Abfragen für den Anstoß in Heute. Ein Ladefehler nimmt nur die Zeile weg, nie Mein Hof.
     ladeLaufendenBeitrag(farm.id, jetzt).catch((err: unknown) => {

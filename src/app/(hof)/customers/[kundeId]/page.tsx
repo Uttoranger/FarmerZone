@@ -1,8 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound, permanentRedirect, redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { findeKundenAdressen, getCustomerDetail, kundeIdFuer, type CustomerDetail } from '@/server/queries/customers'
 import { KUNDE_ID_MUSTER, alteKundenAdresse } from '@/lib/kunden-id'
@@ -29,10 +28,9 @@ interface Props {
  * eine erratene oder fremde Kennung ergibt 404, nie eine fremde Kundin.
  */
 export default async function CustomerDetailPage({ params }: Props): Promise<React.JSX.Element> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  const { userId } = await verlangeHofDerSitzung()
 
-  const farm = await getFarmForUser(session.user.id)
+  const farm = await getFarmForUser(userId)
   if (!farm) redirect('/onboarding')
 
   const { kundeId } = await params

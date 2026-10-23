@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import type { Metadata } from 'next'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmSettings } from '@/server/queries/farm'
 import { PickupSlotsClient } from '@/components/settings/pickup-slots-client'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
@@ -21,11 +20,10 @@ export const metadata: Metadata = { title: `${TITEL} — ${MARKE}` }
  * (Nr. 44): Abholzeiten legt man meist mehrere nacheinander an.
  */
 export default async function PickupSlotsPage(): Promise<React.JSX.Element> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  const { userId } = await verlangeHofDerSitzung()
 
-  const farm = await getFarmSettings(session.user.id)
-  if (!farm) redirect('/login')
+  const farm = await getFarmSettings(userId)
+  if (!farm) redirect('/onboarding')
 
   return (
     <div className={UNTERSEITE_RAHMEN}>

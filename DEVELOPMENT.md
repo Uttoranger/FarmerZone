@@ -5694,6 +5694,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Integration:** `tests/test-ueberspringen-wache.test.ts` belegt, dass ihre Liste Dateien aus `tests/integration/` enthält.
 - **Kommentare:** Die Aussagen „kein jsdom“ und „ohne YAML-Paket“ in vier Testdateien stimmen seit Nr. 135 nur halb und sagen jetzt, was die Datei tut; `/pruefen` nennt den Rückgabetyp mit seinen Orten; der Satz zu Datum mit Uhrzeit steht im JSDoc von `TELEFON_NUMMER`. Kein Ergebnis ändert sich.
 
+## Hofbereich: Rücksprung nach der Anmeldung, eine Wache „Hof der Sitzung“ (Seitenkarte P7 und P9; Nr. 156, Lauf 23, 23.10.2026)
+
+- **Ursache:** Proxy, `ladeHofbereich` und rund 25 Seiten unter `(hof)` leiteten ohne Sitzung auf `/login` ohne Ziel; nach der Anmeldung landete der Hof immer in Heute, auch wenn er gerade eine Bestellung offen hatte. Ohne Hof führten fünf Seiten auf `/login` statt `/onboarding`, `/settings/payments` gab eine leere Seite zurück.
+- **Fix:** `FARMER_PATHS` steht in `src/lib/hof-pfade.ts` (eine Liste für Proxy, robots.txt und Tests). Der Proxy setzt auf Hof-Pfaden den Kopf `x-hof-pfad` und schickt Abgemeldete auf `/login?von=<pfad>`. `verlangeHofDerSitzung` prüft in jeder Seite und in `ladeHofbereich` (Sitzung und Hof je Anfrage einmal über React `cache`). `zielNachHofAnmeldung` lässt neben `/teilen` und `/verify` jeden Pfad des Hofbereichs zu, nur den Pfad, ohne Query (kann Kennungen tragen). `/login` schickt einen schon angemeldeten Hof zum geprüften Ziel.
+- **Warum der Kopf trotz Überschreiben geprüft wird:** Der Proxy ist die einzige Stelle, die ihn setzt; fiele er einmal weg (Matcher-Lücke), käme der Wert sonst ungeprüft vom Browser. Darum dieselbe Prüfung wie für `von`.
+- Die Druckseiten unter `(farmer)` bleiben ohne die Wache in der Seite; ihr Layout prüft über `ladeHofbereich`.
+
 ## Nützliche Befehle
 
 ```bash

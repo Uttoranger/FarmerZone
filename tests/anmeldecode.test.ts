@@ -324,12 +324,14 @@ describe('zielNachAnmeldung — keine offene Weiterleitung', () => {
 })
 
 describe('zielNachHofAnmeldung', () => {
-  it('führt zum Dashboard, nur /teilen darf als Rückkehr stehen', () => {
+  it('führt zum Dashboard; /teilen und seit Nr. 156 Pfade des Hofbereichs dürfen als Rückkehr stehen', () => {
     expect(zielNachHofAnmeldung(null)).toBe('/dashboard')
     expect(zielNachHofAnmeldung('/teilen')).toBe('/teilen')
     expect(zielNachHofAnmeldung('/teilen/../admin')).toBe('/dashboard')
     expect(zielNachHofAnmeldung('https://boese.example.com')).toBe('/dashboard')
-    expect(zielNachHofAnmeldung('/products')).toBe('/dashboard')
+    // Seit Nr. 156 ein Ziel (FARMER_PATHS); alle Fälle in tests/hof-ruecksprung.test.ts.
+    expect(zielNachHofAnmeldung('/products')).toBe('/products')
+    expect(zielNachHofAnmeldung('/admin')).toBe('/dashboard')
   })
 
   it('/verify darf als Rückkehr stehen — genau dieser Pfad (Nr. 17b, „Erneut senden" nach dem Anmelden)', () => {

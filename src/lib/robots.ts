@@ -8,6 +8,8 @@
  * die niemandem nützen.
  */
 
+import { FARMER_PATHS } from '@/lib/hof-pfade'
+
 /**
  * Entdecken mit Filtern: Jede Filterkombination ist eine eigene Adresse — ein
  * Crawler fände unbegrenzt viele (19.10.2026: 622.000 Aufrufe an einem Tag).
@@ -17,22 +19,10 @@ export const HOEFE_MIT_PARAMETERN = '/hoefe?'
 
 /**
  * Die angemeldeten und privaten Bereiche. Der Hofbereich sind genau die Pfade
- * aus FARMER_PATHS in src/proxy.ts — tests/robots.test.ts gleicht beide ab.
+ * aus FARMER_PATHS (src/lib/hof-pfade.ts, dieselbe Liste wie im Proxy).
  */
 export const PRIVATE_BEREICHE = [
-  '/dashboard',
-  '/orders',
-  '/products',
-  '/sales',
-  '/analytics',
-  '/settings',
-  '/customers',
-  '/farm-page',
-  '/status',
-  '/fehler-melden',
-  '/meldungen',
-  '/region',
-  '/postfach',
+  ...FARMER_PATHS,
   '/admin',
   '/account',
   '/intern',

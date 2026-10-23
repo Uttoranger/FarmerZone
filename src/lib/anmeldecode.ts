@@ -21,6 +21,7 @@
  * (FALSCHE_CODES_JE_STUNDE unten, Register E7, Ergänzung).
  */
 import { tagInWorten, uhrzeitInWien } from '@/lib/fristen'
+import { istHofPfad } from '@/lib/hof-pfade'
 
 export const ANMELDECODE_LAENGE = 6
 export const ANMELDECODE_GUELTIG_SEKUNDEN = 10 * 60
@@ -422,14 +423,43 @@ export function zielNachAnmeldung(roh: unknown, standard: string = STANDARD_ZIEL
 }
 
 /**
- * Wohin es nach der Hof-Anmeldung geht: ins Dashboard. Ausnahmen sind
- * /teilen — es schickt Abgemeldete mit ?von=/teilen her, damit geteilte Fotos
- * nach dem Anmelden nicht in der Ablage stranden — und /verify (Nr. 17b:
- * „Erneut senden" braucht die Anmeldung). Streng auf genau diese Pfade
- * geprüft, nie ein Ziel aus der Adresse ungeprüft.
+ * Wohin es nach der Hof-Anmeldung geht. Ausnahmen wie bisher sind /teilen —
+ * es schickt Abgemeldete mit ?von=/teilen her, damit geteilte Fotos nach dem
+ * Anmelden nicht in der Ablage stranden — und /verify (Nr. 17b: „Erneut
+ * senden" braucht die Anmeldung), beide genau so.
+ *
+ * Seit Nr. 156 (Seitenkarte P7) auch zurück auf die Seite des Hofbereichs, von
+ * der die Anmeldung kam (Proxy und verlangeHofDerSitzung hängen ?von= an):
+ * erst die allgemeine Prüfung (zielNachAnmeldung — fremde Rechner, Punkt-
+ * Segmente, /api), dann nur der Pfad ohne Query und Anker (ein Query-Teil
+ * kann Kennungen tragen), nur einfache Zeichen und nur ein Pfad aus
+ * FARMER_PATHS. Sonst das Dashboard — nie ein Ziel aus der Adresse ungeprüft.
  */
 const HOF_RUECKKEHR_ZIELE: readonly string[] = ['/teilen', '/verify']
+const HOF_STANDARD_ZIEL = '/dashboard'
+const HOF_PFAD_ZEICHEN = /^\/[A-Za-z0-9/_-]+$/
+
+/** Der geprüfte Pfad des Hofbereichs oder null — gemeinsam für Ziel und Anmeldeadresse. */
+function hofRuecksprungPfad(von: string | null): string | null {
+  const geprueft = zielNachAnmeldung(von, '')
+  if (geprueft === '') return null
+  const pfad = geprueft.split(/[?#]/)[0]
+  return HOF_PFAD_ZEICHEN.test(pfad) && istHofPfad(pfad) ? pfad : null
+}
 
 export function zielNachHofAnmeldung(von: string | null): string {
-  return von !== null && HOF_RUECKKEHR_ZIELE.includes(von) ? von : '/dashboard'
+  if (von !== null && HOF_RUECKKEHR_ZIELE.includes(von)) return von
+  return hofRuecksprungPfad(von) ?? HOF_STANDARD_ZIEL
+}
+
+/**
+ * Die Anmeldeadresse mit Rücksprung (Nr. 156): `/login?von=<pfad>` nur mit
+ * einem geprüften Pfad des Hofbereichs, sonst `/login` ohne Ziel. Der Pfad
+ * besteht nach der Prüfung nur aus einfachen Zeichen und braucht keine
+ * Kodierung. Für den Proxy (Pfad der Anfrage) und die Wache (Kopf x-hof-pfad,
+ * der trotz Überschreiben im Proxy als Eingabe gilt).
+ */
+export function hofAnmeldeAdresse(pfad: string | null): string {
+  const geprueft = hofRuecksprungPfad(pfad)
+  return geprueft === null ? '/login' : `/login?von=${geprueft}`
 }

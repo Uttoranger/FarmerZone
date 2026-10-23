@@ -1,8 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { einstellungenBereiche, EINSTELLUNGEN_TITEL, type EinstellungBereich } from '@/lib/hof-einstellungen'
 import { ladeEinstellungenUebersicht } from '@/server/queries/einstellungen'
 import { EinstellungenUebersicht } from '@/components/hof-einstellungen/einstellungen-uebersicht'
@@ -21,13 +20,12 @@ export const dynamic = 'force-dynamic'
  * ein Bereich sagt, entscheidet einstellungenBereiche.
  */
 export default async function SettingsPage(): Promise<React.JSX.Element> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  const { userId } = await verlangeHofDerSitzung()
 
   let bereiche: EinstellungBereich[] | null = null
   let gefunden = true
   try {
-    const daten = await ladeEinstellungenUebersicht(session.user.id)
+    const daten = await ladeEinstellungenUebersicht(userId)
     if (daten) bereiche = einstellungenBereiche(daten, new Date())
     else gefunden = false
   } catch (err) {

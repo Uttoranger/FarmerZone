@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getStatusTemplate } from '@/server/queries/status-posts'
 import { prisma } from '@/lib/prisma'
@@ -33,11 +32,10 @@ export default async function StatusNewPage({
 }: {
   searchParams: Promise<{ from?: string; anlass?: string | string[] }>
 }) {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  const { userId } = await verlangeHofDerSitzung()
 
-  const farm = await getFarmForUser(session.user.id)
-  if (!farm) redirect('/login')
+  const farm = await getFarmForUser(userId)
+  if (!farm) redirect('/onboarding')
 
   // Vorlage-Muster: ?from={id} lädt einen Alt-Status als Vorbefüllung —
   // serverseitig und farm-gescoped (Ownership); fremde/ungültige ID → null

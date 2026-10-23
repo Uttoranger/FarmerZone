@@ -1,7 +1,7 @@
-import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { CircleAlert, CircleCheck, Clock } from 'lucide-react'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { prisma } from '@/lib/prisma'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -19,11 +19,9 @@ import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = { title: `Zahlung — ${MARKE}` }
 
-async function getFarmPaymentData() {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) return null
+async function getFarmPaymentData(userId: string) {
   return prisma.farm.findUnique({
-    where: { ownerId: session.user.id },
+    where: { ownerId: userId },
     select: {
       stripeAccountId: true,
       stripeAccountReady: true,
@@ -58,10 +56,12 @@ export default async function PaymentsPage({
   searchParams,
 }: {
   searchParams: Promise<{ stripe?: string }>
-}): Promise<React.JSX.Element | null> {
+}): Promise<React.JSX.Element> {
   const { stripe: stripeStatus } = await searchParams
-  const farm = await getFarmPaymentData()
-  if (!farm) return null
+  const { userId } = await verlangeHofDerSitzung()
+  // Nie mehr eine leere Seite (Nr. 156): ohne Hof wie jede Hof-Seite nach Einrichten.
+  const farm = await getFarmPaymentData(userId)
+  if (!farm) redirect('/onboarding')
   const hinweis = zahlungHinweis({
     rueckmeldung: stripeStatus,
     stripeBereit: farm.stripeAccountReady,

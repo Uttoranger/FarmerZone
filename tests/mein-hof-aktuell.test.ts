@@ -36,6 +36,8 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@sentry/nextjs', () => ({ captureException }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: async () => ({ user: { id: 'nutzerin-a' } }) } } }))
+// Die Wache selbst prüft tests/hof-ruecksprung.test.ts (Nr. 156); hier nur die Seite.
+vi.mock('@/server/hofbereich', () => ({ verlangeHofDerSitzung: vi.fn(async () => ({ userId: 'nutzerin-a', farmId: 'hof-a' })) }))
 vi.mock('@/server/queries/farm', () => ({
   getOwnerFarm: async () => ({ id: 'hof-a', slug: 'testhof-a', name: 'Testhof A', isPaused: false }),
   getMeinHofKopf: async () => ({ adresse: { anzeige: '' } }),

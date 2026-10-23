@@ -136,7 +136,7 @@ describe('Routen und Navigation', () => {
   it('beide Seiten fragen mit der farmId aus der Sitzung, nie aus der Adresse', () => {
     for (const datei of ['src/app/(hof)/region/page.tsx', 'src/app/(hof)/analytics/page.tsx']) {
       const text = quelle(datei)
-      expect(text).toContain('getFarmForUser(session.user.id)')
+      expect(text).toContain('getFarmForUser(userId)')
       expect(text).not.toMatch(/searchParams\)?\.(farmId|hof)/)
     }
   })
