@@ -16,14 +16,22 @@
  *
  * Gelesen wird der Text des Elementbaums, wie in tests/bestellverfolgung-zugang.test.ts.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/prisma', () => ({
-  prisma: { order: { findUnique: vi.fn(), updateMany: vi.fn() } },
+  prisma: { order: { findUnique: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() } },
 }))
+// „Erneut senden" ist eine Client-Komponente mit useActionState — hier zählt
+// nur, OB die Seite sie zeigt (Nr. 151).
+vi.mock('@/components/bestaetigung/bar-link-erneut-senden', async () => {
+  const { createElement } = await import('react')
+  return {
+    BarLinkErneutSenden: ({ orderId }: { orderId: string }) => createElement('span', null, `ERNEUT:${orderId}`),
+  }
+})
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendOrderConfirmation: vi.fn(), sendOrderConfirmedToFarmer: vi.fn() }))
 
@@ -33,6 +41,7 @@ import { bestellSignatur } from '@/lib/bestell-link'
 import { prisma } from '@/lib/prisma'
 
 const findUnique = vi.mocked(prisma.order.findUnique)
+const findFirst = vi.mocked(prisma.order.findFirst)
 const updateMany = vi.mocked(prisma.order.updateMany)
 
 /** Eine Bestellung, wie die Seite sie liest — mit erfundenen Daten. */
@@ -107,6 +116,7 @@ const GUELTIG = bestellSignatur('order-1')
 beforeEach(() => {
   vi.clearAllMocks()
   findUnique.mockResolvedValue(bestellung() as never)
+  findFirst.mockResolvedValue(bestellung() as never)
 })
 
 describe('Bestätigungsseite — Zugang nur mit Signatur', () => {
@@ -258,6 +268,46 @@ describe('Bestätigungsseite — Zustand nur aus der Datenbank', () => {
   })
 })
 
+describe('„Mail nicht bekommen? Erneut senden" (Nr. 151) — nur bei einer offenen Barbestellung', () => {
+  const IN_DER_FRIST = new Date('2026-10-02T08:30:00Z')
+  const NACH_DER_FRIST = new Date('2026-10-02T10:30:00Z')
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(IN_DER_FRIST)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('offen, bar: der Knopf steht da', async () => {
+    expect(await seite({ sig: GUELTIG })).toContain('ERNEUT:order-1')
+  })
+
+  it('offen, Karte beim Hof: der Knopf steht da', async () => {
+    findUnique.mockResolvedValue(bestellung({ paymentMethod: 'ONSITE_CARD' }) as never)
+    expect(await seite({ sig: GUELTIG })).toContain('ERNEUT:order-1')
+  })
+
+  it('ohne gültige Signatur: kein Knopf', async () => {
+    expect(await seite({ sig: 'f'.repeat(64) })).not.toContain('ERNEUT')
+  })
+
+  it.each([
+    ['bestätigt', { status: 'CONFIRMED' }],
+    ['storniert', { status: 'CANCELLED', cancelReason: 'Von der Kundin vor der Bestätigung storniert' }],
+    ['online', { paymentMethod: 'ONLINE', paymentStatus: 'PENDING' }],
+  ])('%s: kein Knopf', async (_name, teil) => {
+    findUnique.mockResolvedValue(bestellung(teil) as never)
+    expect(await seite({ sig: GUELTIG })).not.toContain('ERNEUT')
+  })
+
+  it('nach der Frist: kein Knopf, auch wenn noch niemand aufgeräumt hat', async () => {
+    vi.setSystemTime(NACH_DER_FRIST)
+    expect(await seite({ sig: GUELTIG })).not.toContain('ERNEUT')
+  })
+})
+
 describe('Bestätigungslink aus der Mail (/api/orders/confirm/[token])', () => {
   // Seit H3 bestätigt der Link nicht mehr selbst: Er führt zur Seite mit dem
   // Knopf (/{hof}/bestaetigen/{token}); erst der Knopf bestätigt und leitet
@@ -310,7 +360,7 @@ describe('Kein Code baut den Pfad der Bestätigungsseite an bestell-link.ts vorb
   }, 30_000)
 })
 
-describe('Die Signatur einer Bestellung öffnet genau einen Schreibweg (Nr. 46, Runde 1)', () => {
+describe('Die Signatur einer Bestellung öffnet genau zwei Schreibwege (Nr. 46, Runde 1; Nr. 151)', () => {
   /** Alle .ts/.tsx unter src/, rekursiv. */
   function quellen(ordner: string): string[] {
     return readdirSync(ordner).flatMap((name) => {
@@ -328,13 +378,16 @@ describe('Die Signatur einer Bestellung öffnet genau einen Schreibweg (Nr. 46, 
     'src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx',
   ]
 
-  it('lesen: Bestätigungsseite, Bestellseite, Kalender — schreiben: nur meldeNeuigkeitenAn (bestell-link.ts nennt ihn)', () => {
+  it('lesen: Bestätigungsseite, Bestellseite, Kalender — schreiben: nur meldeNeuigkeitenAn und sendeBarLinkErneut', () => {
     const treffer = quellen(join(process.cwd(), 'src'))
       .filter((pfad) => !pfad.endsWith(join('lib', 'bestell-link.ts')))
       .filter((pfad) => PRUEFT_SIGNATUR.test(ohneKommentare(readFileSync(pfad, 'utf8'))))
       .map((pfad) => pfad.slice(process.cwd().length + 1))
       .sort()
-    expect(treffer).toEqual([...LESEWEGE, 'src/server/actions/neuigkeiten.ts'].sort())
+    // Zweiter Schreibweg seit Nr. 151 (Register S17 Punkt 2, Freigabe §27):
+    // „Erneut senden" (sendeBarLinkErneut) — Mail nur an die Adresse der
+    // Bestellung, nur offen, drei je Tag, immer dieselbe Antwort.
+    expect(treffer).toEqual([...LESEWEGE, 'src/server/actions/bar-bestaetigung.ts', 'src/server/actions/neuigkeiten.ts'].sort())
   }, 30_000)
 
   it('die Lesewege schreiben nicht: keine Server Action, keine Route außer GET', () => {

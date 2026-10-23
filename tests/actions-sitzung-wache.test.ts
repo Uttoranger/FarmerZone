@@ -40,6 +40,7 @@ type Ausnahme = { datei: string; name: string; grund: string }
 /** Öffentliche Wege: ohne Konto aufrufbar, der Schutz ist ein Token, ein Code oder die Bremse. */
 const OEFFENTLICH: Ausnahme[] = [
   { datei: 'bar-bestaetigung.ts', name: 'bestaetigeBarBestellung', grund: 'Der Link in der Mail an die Kundin trägt ein signiertes Token, das die Bestellung bestimmt; eine Sitzung gibt es nicht' },
+  { datei: 'bar-bestaetigung.ts', name: 'sendeBarLinkErneut', grund: 'Freigabe §27 (Nr. 151, S17 Punkt 2): die Signatur der Bestätigungsseite statt einer Sitzung; Mail nur an die Adresse der Bestellung, nur offen, Bremse je Bestellung, immer dieselbe Antwort' },
   { datei: 'bar-bestaetigung.ts', name: 'storniereBarBestellung', grund: 'Der Link in der Mail an die Kundin trägt ein signiertes Token, das die Bestellung bestimmt; eine Sitzung gibt es nicht' },
   { datei: 'bestellungen-finden.ts', name: 'fordereBestellCodeAn', grund: 'Wer seine Bestellungen finden will, hat kein Konto; der Besitz der Adresse wird mit einem Code bewiesen, dazu Bremse' },
   { datei: 'bestellungen-finden.ts', name: 'zeigeBestellungen', grund: 'Wer seine Bestellungen finden will, hat kein Konto; der Besitz der Adresse wird mit einem Code bewiesen, dazu Bremse' },

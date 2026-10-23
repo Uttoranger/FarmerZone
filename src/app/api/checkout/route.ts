@@ -39,6 +39,7 @@ import {
 } from '@/lib/stripe-konto'
 import { vermerkeUnbekanntesHofKonto } from '@/server/hofkonto-unbekannt'
 import { CODE_ZAHLART_NICHT_ANGEBOTEN, ZAHLART_NICHT_ANGEBOTEN, zahlartFuerNeueBestellung } from '@/lib/kasse'
+import { barTokenHash } from '@/lib/bar-bestaetigung'
 import {
   pruefeBetriebsnachweis,
   betriebsnummerFuerBestellung,
@@ -808,10 +809,12 @@ export async function POST(request: NextRequest) {
 
   // 11b. ONSITE — Bestätigungs-Token jetzt, E-Mail NACH der Antwort.
   await gibHalteFrei()
+  // Gespeichert wird nur der Hash (Register S17 Punkt 2, Nr. 151) — der
+  // Token selbst steht allein in der Mail.
   const confirmationToken = nanoid(32)
   await prisma.order.update({
     where: { id: order.id },
-    data: { confirmationToken },
+    data: { confirmationToken: barTokenHash(confirmationToken) },
   })
 
   // Der Versand hängt an Resend und dauert Sekunden. Er gehört nicht in die
