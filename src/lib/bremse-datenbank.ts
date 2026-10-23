@@ -1,5 +1,6 @@
 import { createHmac } from 'crypto'
 import { NEUIGKEITEN_JE_BESTELLUNG_UND_TAG } from '@/lib/abo-bestaetigung'
+import { BAR_LINK_JE_BESTELLUNG_UND_TAG } from '@/lib/bar-bestaetigung'
 import {
   ANMELDECODE_RATE_LIMIT,
   CODE_ANFORDERUNGEN_JE_ADRESSE,
@@ -115,6 +116,11 @@ export const DB_BREMSEN = {
   // Stufe im Speicher (src/app/api/csp-bericht/route.ts) — so schreibt nicht
   // jede Meldung in die Datenbank.
   cspBerichtIp: { zweck: 'csp-bericht-ip', max: 30, fensterMs: MINUTE_MS },
+  // „Mail nicht bekommen? Erneut senden" auf der Bestätigungsseite (Register
+  // S17 Punkt 2, Nr. 151): je Bestellung und Tag, wie `neuigkeitenBestellung`
+  // ohne erste Stufe — die Grenze schützt das Postfach hinter der Bestellung.
+  // Merkmal ist die Bestell-ID.
+  barLinkBestellung: { zweck: 'bar-link-bestellung', max: BAR_LINK_JE_BESTELLUNG_UND_TAG, fensterMs: TAG_MS },
 } as const satisfies Record<string, DbBremse>
 
 /** Welche Bremsen je Art zählen: Codes je Stunde und je Tag, Passwörter je Stunde. */

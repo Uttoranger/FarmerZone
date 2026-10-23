@@ -29,6 +29,8 @@ import {
 import { HofErreichen } from '@/components/bestaetigung/hof-erreichen'
 import { HofTeilenKarte } from '@/components/bestaetigung/hof-teilen-karte'
 import { NeuigkeitenKarte } from '@/components/bestaetigung/neuigkeiten-karte'
+import { BarLinkErneutSenden } from '@/components/bestaetigung/bar-link-erneut-senden'
+import { barLinkErneutMoeglich } from '@/lib/bar-bestaetigung'
 import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 
@@ -196,6 +198,9 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
         <BestaetigungKopf kopf={kopf} />
 
         {bloecke.fristHinweis && <FristHinweis bis={`${tagInWorten(frist, jetzt)}, ${uhrzeitInWien(frist)} Uhr`} />}
+
+        {/* Nr. 151: Die Mail mit dem Bestätigungslink neu anfordern — nur solange die Barbestellung offen ist. */}
+        {barLinkErneutMoeglich(order, jetzt) && <BarLinkErneutSenden orderId={order.id} sig={sig} />}
 
         {bloecke.abholkarte && (
           <AbholKarte

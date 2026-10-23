@@ -4,7 +4,16 @@
  * dazu das Schema des Tokens aus der Adresse. Ohne Mock, `jetzt` als Parameter.
  */
 import { describe, it, expect } from 'vitest'
-import { barBestaetigungsAnsicht, GRUND_KUNDIN_STORNIERT, type BarBestellung } from '@/lib/bar-bestaetigung'
+import {
+  BAR_LINK_JE_BESTELLUNG_UND_TAG,
+  barBestaetigungsAnsicht,
+  barLinkErneutMoeglich,
+  barTokenHash,
+  GRUND_KUNDIN_STORNIERT,
+  tokenKandidaten,
+  type BarBestellung,
+} from '@/lib/bar-bestaetigung'
+import { DB_BREMSEN } from '@/lib/bremse-datenbank'
 import { GRUND_NICHT_BESTAETIGT, fristVon } from '@/lib/fristen'
 import { barBestaetigungsTokenSchema } from '@/schemas/bar-bestaetigung'
 
@@ -102,5 +111,51 @@ describe('barBestaetigungsTokenSchema — der Token aus der Adresse', () => {
     expect(barBestaetigungsTokenSchema.safeParse(null).success).toBe(false)
     expect(barBestaetigungsTokenSchema.safeParse(undefined).success).toBe(false)
     expect(barBestaetigungsTokenSchema.safeParse(['V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k']).success).toBe(false)
+  })
+})
+
+describe('barTokenHash — nur der Hash in der Datenbank (S17 Punkt 2, Nr. 151)', () => {
+  const TOKEN = 'V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k'
+
+  it('gleich für denselben Token, verschieden für einen anderen, nie der Token selbst', () => {
+    expect(barTokenHash(TOKEN)).toBe(barTokenHash(TOKEN))
+    expect(barTokenHash(TOKEN)).not.toBe(barTokenHash(`${TOKEN.slice(0, -1)}${TOKEN.endsWith('k') ? 'm' : 'k'}`))
+    expect(barTokenHash(TOKEN)).not.toContain(TOKEN)
+    expect(barTokenHash(TOKEN)).toMatch(/^h1:[0-9a-f]{64}$/)
+  })
+
+  it('ein gespeicherter Wert besteht das Token-Schema nie — Gegenprobe: der Token besteht es', () => {
+    expect(barBestaetigungsTokenSchema.safeParse(TOKEN).success).toBe(true)
+    expect(barBestaetigungsTokenSchema.safeParse(barTokenHash(TOKEN)).success).toBe(false)
+  })
+
+  it('tokenKandidaten: zuerst der Hash, dann der Klartext älterer Bestellungen', () => {
+    expect(tokenKandidaten(TOKEN)).toEqual([barTokenHash(TOKEN), TOKEN])
+  })
+})
+
+describe('barLinkErneutMoeglich — „Erneut senden" nur bei einer offenen Barbestellung', () => {
+  const IN_DER_FRIST = new Date('2026-10-02T08:30:00Z')
+  const offen = (teil: Partial<BarBestellung> = {}, archivedAt: Date | null = null) => ({
+    ...bestellung(teil),
+    farm: { archivedAt },
+  })
+
+  it('offen, bar oder Karte beim Hof: ja', () => {
+    expect(barLinkErneutMoeglich(offen(), IN_DER_FRIST)).toBe(true)
+    expect(barLinkErneutMoeglich(offen({ paymentMethod: 'ONSITE_CARD' }), IN_DER_FRIST)).toBe(true)
+  })
+
+  it('online, bestätigt, storniert, verfallen oder stillgelegter Hof: nein', () => {
+    expect(barLinkErneutMoeglich(offen({ paymentMethod: 'ONLINE' }), IN_DER_FRIST)).toBe(false)
+    expect(barLinkErneutMoeglich(offen({ status: 'CONFIRMED' }), IN_DER_FRIST)).toBe(false)
+    expect(barLinkErneutMoeglich(offen({ status: 'CANCELLED', cancelReason: GRUND_KUNDIN_STORNIERT }), IN_DER_FRIST)).toBe(false)
+    expect(barLinkErneutMoeglich(offen(), new Date(fristVon(bestellung()).getTime() + MINUTE))).toBe(false)
+    expect(barLinkErneutMoeglich(offen({}, new Date('2026-10-01T00:00:00Z')), IN_DER_FRIST)).toBe(false)
+  })
+
+  it('die Bremse: höchstens drei je Bestellung und Tag', () => {
+    expect(BAR_LINK_JE_BESTELLUNG_UND_TAG).toBe(3)
+    expect(DB_BREMSEN.barLinkBestellung).toMatchObject({ max: 3, fensterMs: 24 * 60 * 60 * 1000 })
   })
 })

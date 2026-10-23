@@ -5694,6 +5694,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Integration:** `tests/test-ueberspringen-wache.test.ts` belegt, dass ihre Liste Dateien aus `tests/integration/` enthält.
 - **Kommentare:** Die Aussagen „kein jsdom“ und „ohne YAML-Paket“ in vier Testdateien stimmen seit Nr. 135 nur halb und sagen jetzt, was die Datei tut; `/pruefen` nennt den Rückgabetyp mit seinen Orten; der Satz zu Datum mit Uhrzeit steht im JSDoc von `TELEFON_NUMMER`. Kein Ergebnis ändert sich.
 
+## Barbestätigung: Link nur als Hash, „Erneut senden“ (Register S17 Punkt 2; Nr. 151, Lauf 23, 23.10.2026)
+
+- **Warum:** Der Bestätigungs-Token einer Barbestellung stand im Klartext in `Order.confirmationToken`. Wer die Tabelle lesen konnte (Sicherung, Auszug, Werkzeug), konnte damit fremde Bestellungen bestätigen oder stornieren. Und wer die Mail nicht bekam, hatte keinen Weg zu einem neuen Link.
+- **Jetzt:** Der Checkout speichert nur `barTokenHash(token)`; Seite, Knöpfe und alter Mail-Link suchen über `tokenKandidaten` (Hash, dann Klartext). Auf der Bestätigungsseite einer offenen Barbestellung steht „Mail nicht bekommen? Erneut senden“; die Action schreibt den Hash eines neuen Tokens bedingt auf den gelesenen Wert und mailt nur bei Erfolg, an die Adresse der Bestellung, höchstens dreimal je Bestellung und Tag. Die Mail selbst ist unverändert, die Post-Sperre (Z3) bleibt.
+- **Klartext-Zweig:** Bestellungen von vor dem Deploy tragen den Token im Klartext und bestätigen weiter. Bestätigen kann ein Klartext-Token höchstens zwei Stunden nach dem Deploy: Die Frist einer Barbestellung ist höchstens zwei Stunden nach der Bestellung (früher, wenn der Bestellschluss davor liegt; `fristVon`). Stornierte behalten ihren Wert — Klartext bleibt also auch danach in der Datenbank. Folgeauftrag (braucht die Freigabe der Projektleitung, Datenänderung in der Produktion): Klartext-Zweig aus `tokenKandidaten` entfernen und die übrigen Klartext-Werte (alles ohne Präfix `h1:`) auf `null` setzen.
+- **Zweiter Schreibweg über die Signatur:** „Erneut senden“ nutzt wie die Neuigkeiten die Signatur der Bestätigungsseite (Freigabe §27). Der Wächter in `tests/bestaetigung-zugang.test.ts` kennt jetzt beide Wege.
+
 ## Nützliche Befehle
 
 ```bash

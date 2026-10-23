@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { barBestaetigungsPfad } from '@/lib/bestell-link'
+import { tokenKandidaten } from '@/lib/bar-bestaetigung'
 import { barBestaetigungsTokenSchema } from '@/schemas/bar-bestaetigung'
 
 /**
@@ -20,8 +21,9 @@ export async function GET(
   const eingabe = barBestaetigungsTokenSchema.safeParse((await params).token)
   if (!eingabe.success) return NextResponse.redirect(new URL('/', request.url))
 
-  const order = await prisma.order.findUnique({
-    where: { confirmationToken: eingabe.data },
+  // Hash oder (ältere Bestellungen) Klartext — wie Seite und Knöpfe (Nr. 151).
+  const order = await prisma.order.findFirst({
+    where: { confirmationToken: { in: tokenKandidaten(eingabe.data) } },
     select: { farm: { select: { slug: true } } },
   })
   if (!order) return NextResponse.redirect(new URL('/', request.url))

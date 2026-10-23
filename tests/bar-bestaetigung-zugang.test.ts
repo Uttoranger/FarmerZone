@@ -27,7 +27,7 @@ import { NextRequest } from 'next/server'
 const { nachlauf } = vi.hoisted(() => ({ nachlauf: [] as Array<() => Promise<void>> }))
 
 vi.mock('@/lib/prisma', () => ({
-  prisma: { order: { findUnique: vi.fn(), updateMany: vi.fn() } },
+  prisma: { order: { findFirst: vi.fn(), updateMany: vi.fn() } },
 }))
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: vi.fn() }))
 vi.mock('@/server/unbezahlte-bestellung', () => ({ storniereUnbezahlteBestellung: vi.fn() }))
@@ -60,7 +60,7 @@ import { revalidatePath } from 'next/cache'
 import BestaetigenSeite, { metadata } from '@/app/(public)/[farmSlug]/bestaetigen/[token]/page'
 import { GET as mailLink } from '@/app/api/orders/confirm/[token]/route'
 import { bestaetigeBarBestellung, storniereBarBestellung } from '@/server/actions/bar-bestaetigung'
-import { GRUND_KUNDIN_STORNIERT } from '@/lib/bar-bestaetigung'
+import { GRUND_KUNDIN_STORNIERT, LINK_UNGUELTIG_SATZ, barTokenHash } from '@/lib/bar-bestaetigung'
 import { GRUND_NICHT_BESTAETIGT } from '@/lib/fristen'
 import { bestellLinkGilt } from '@/lib/bestell-link'
 import { prisma } from '@/lib/prisma'
@@ -68,7 +68,7 @@ import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
 import { sendOrderConfirmation, sendOrderConfirmedToFarmer } from '@/lib/email'
 
-const findUnique = vi.mocked(prisma.order.findUnique)
+const findFirst = vi.mocked(prisma.order.findFirst)
 const updateMany = vi.mocked(prisma.order.updateMany)
 const freigabe = vi.mocked(gibVerwaisteFreiOhneRisiko)
 const stornieren = vi.mocked(storniereUnbezahlteBestellung)
@@ -202,12 +202,18 @@ function erwarteSignierteBestaetigungsseite(ziel: string | null) {
   expect(bestellLinkGilt('order-1', url.searchParams.get('sig') ?? '')).toBe(true)
 }
 
+function mailLinkKlick(token = TOKEN) {
+  return mailLink(new NextRequest(`http://localhost:3000/api/orders/confirm/${token}`), {
+    params: Promise.resolve({ token }),
+  })
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   nachlauf.length = 0
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(IN_DER_FRIST)
-  findUnique.mockResolvedValue(bestellung() as never)
+  findFirst.mockResolvedValue(bestellung() as never)
   updateMany.mockResolvedValue({ count: 1 } as never)
   stornieren.mockResolvedValue(true)
 })
@@ -240,7 +246,7 @@ describe('Mail-Link (GET /api/orders/confirm/[token]) — leitet nur weiter', ()
   })
 
   it('unbekannter Token: zur Startseite, ohne zu schreiben', async () => {
-    findUnique.mockResolvedValue(null as never)
+    findFirst.mockResolvedValue(null as never)
 
     const antwort = await klick()
 
@@ -251,7 +257,7 @@ describe('Mail-Link (GET /api/orders/confirm/[token]) — leitet nur weiter', ()
   it('ein Token in falscher Form fragt die Datenbank gar nicht erst', async () => {
     await klick('kurz')
 
-    expect(findUnique).not.toHaveBeenCalled()
+    expect(findFirst).not.toHaveBeenCalled()
   })
 })
 
@@ -288,11 +294,11 @@ describe('Seite /{hof}/bestaetigen/{token}', () => {
     const text = await seite('a b')
 
     expect(text).toContain('Dieser Link gilt nicht mehr')
-    expect(findUnique).not.toHaveBeenCalled()
+    expect(findFirst).not.toHaveBeenCalled()
   })
 
   it('unbekannter (schon benutzter) Token: „gilt nicht mehr", ohne Bestelldaten', async () => {
-    findUnique.mockResolvedValue(null as never)
+    findFirst.mockResolvedValue(null as never)
 
     const text = await seite()
 
@@ -318,7 +324,7 @@ describe('Seite /{hof}/bestaetigen/{token}', () => {
   })
 
   it('storniert: „storniert", keine Knöpfe, keine Positionen', async () => {
-    findUnique.mockResolvedValue(bestellung({ status: 'CANCELLED', cancelReason: GRUND_KUNDIN_STORNIERT }) as never)
+    findFirst.mockResolvedValue(bestellung({ status: 'CANCELLED', cancelReason: GRUND_KUNDIN_STORNIERT }) as never)
 
     const text = await seite()
 
@@ -328,7 +334,7 @@ describe('Seite /{hof}/bestaetigen/{token}', () => {
   })
 
   it('schon bestätigt: weiter zur signierten Bestätigungsseite', async () => {
-    findUnique.mockResolvedValue(bestellung({ status: 'CONFIRMED' }) as never)
+    findFirst.mockResolvedValue(bestellung({ status: 'CONFIRMED' }) as never)
 
     erwarteSignierteBestaetigungsseite(await weiterleitungVon(seite()))
   })
@@ -361,7 +367,7 @@ describe('Seite /{hof}/bestaetigen/{token} — ohne gültigen Token führt der W
   })
 
   it('unbekannter Token', async () => {
-    findUnique.mockResolvedValue(null as never)
+    findFirst.mockResolvedValue(null as never)
     erwarteAusweg(await seitenLinks(TOKEN, 'fremder-hof'))
   })
 
@@ -370,12 +376,12 @@ describe('Seite /{hof}/bestaetigen/{token} — ohne gültigen Token führt der W
   })
 
   it('stillgelegter Hof', async () => {
-    findUnique.mockResolvedValue(bestellung({ farm: { ...bestellung().farm, archivedAt: new Date('2026-01-01') } }) as never)
+    findFirst.mockResolvedValue(bestellung({ farm: { ...bestellung().farm, archivedAt: new Date('2026-01-01') } }) as never)
     erwarteAusweg(await seitenLinks())
   })
 
   it('eine Online-Bestellung mit Token (Ansicht „ungueltig")', async () => {
-    findUnique.mockResolvedValue(bestellung({ paymentMethod: 'ONLINE' }) as never)
+    findFirst.mockResolvedValue(bestellung({ paymentMethod: 'ONLINE' }) as never)
     erwarteAusweg(await seitenLinks())
   })
 
@@ -392,7 +398,12 @@ describe('Knopf „Ja, ich hole verbindlich ab" — bestaetigeBarBestellung', ()
 
     expect(updateMany).toHaveBeenCalledTimes(1)
     const aufruf = updateMany.mock.calls[0][0] as { where: Record<string, unknown>; data: Record<string, unknown> }
-    expect(aufruf.where).toMatchObject({ id: 'order-1', status: 'PENDING_CONFIRMATION', confirmationToken: TOKEN })
+    // Hash oder (ältere Bestellung) Klartext — beides aus tokenKandidaten (Nr. 151).
+    expect(aufruf.where).toMatchObject({
+      id: 'order-1',
+      status: 'PENDING_CONFIRMATION',
+      confirmationToken: { in: [barTokenHash(TOKEN), TOKEN] },
+    })
     expect(aufruf.data).toMatchObject({ status: 'CONFIRMED', confirmationToken: null })
     expect(aufruf.data.confirmedAt).toEqual(IN_DER_FRIST)
   })
@@ -478,7 +489,7 @@ describe('Knopf „Ja, ich hole verbindlich ab" — bestaetigeBarBestellung', ()
   })
 
   it('verfallen und schon storniert: bestätigt nie', async () => {
-    findUnique.mockResolvedValue(bestellung({ status: 'CANCELLED', cancelReason: GRUND_NICHT_BESTAETIGT }) as never)
+    findFirst.mockResolvedValue(bestellung({ status: 'CANCELLED', cancelReason: GRUND_NICHT_BESTAETIGT }) as never)
 
     await weiterleitungVon(bestaetigeBarBestellung({}, formular()))
 
@@ -495,7 +506,7 @@ describe('Knopf „Ja, ich hole verbindlich ab" — bestaetigeBarBestellung', ()
   })
 
   it('unbekannter Token: verständlicher Satz, nichts geschrieben', async () => {
-    findUnique.mockResolvedValue(null as never)
+    findFirst.mockResolvedValue(null as never)
 
     const antwort = await bestaetigeBarBestellung({}, formular())
 
@@ -508,7 +519,7 @@ describe('Knopf „Ja, ich hole verbindlich ab" — bestaetigeBarBestellung', ()
       const antwort = await bestaetigeBarBestellung({}, daten)
       expect(antwort.error).toBeTruthy()
     }
-    expect(findUnique).not.toHaveBeenCalled()
+    expect(findFirst).not.toHaveBeenCalled()
   })
 })
 
@@ -540,7 +551,7 @@ describe('Knopf „Doch nicht – Bestellung stornieren" — storniereBarBestell
   })
 
   it('eine schon bestätigte Bestellung storniert der Link nicht (das macht der Hof)', async () => {
-    findUnique.mockResolvedValue(bestellung({ status: 'CONFIRMED' }) as never)
+    findFirst.mockResolvedValue(bestellung({ status: 'CONFIRMED' }) as never)
 
     await weiterleitungVon(storniereBarBestellung({}, formular()))
 
@@ -548,12 +559,50 @@ describe('Knopf „Doch nicht – Bestellung stornieren" — storniereBarBestell
   })
 
   it('unbekannter Token: verständlicher Satz, nichts storniert', async () => {
-    findUnique.mockResolvedValue(null as never)
+    findFirst.mockResolvedValue(null as never)
 
     const antwort = await storniereBarBestellung({}, formular())
 
     expect(antwort.error).toMatch(/gilt nicht mehr/)
     expect(stornieren).not.toHaveBeenCalled()
+  })
+})
+
+describe('Nur der Hash in der Datenbank (Nr. 151) — alle Leser suchen Hash und Klartext', () => {
+  const GESUCHT = { confirmationToken: { in: [barTokenHash(TOKEN), TOKEN] } }
+
+  it('Seite, Knöpfe und alter Mail-Link fragen nach Hash ODER Klartext — nie nur nach dem Klartext', async () => {
+    await seite()
+    await weiterleitungVon(bestaetigeBarBestellung({}, formular()))
+    await weiterleitungVon(storniereBarBestellung({}, formular()))
+    await mailLinkKlick()
+
+    expect(findFirst.mock.calls.length).toBeGreaterThanOrEqual(5)
+    for (const [frage] of findFirst.mock.calls) {
+      expect((frage as { where: unknown }).where).toEqual(GESUCHT)
+    }
+  })
+
+  it('der gespeicherte Hash als Token eingegeben: falsche Form, keine Datenbankabfrage, „gilt nicht mehr"', async () => {
+    const gespeichert = barTokenHash(TOKEN)
+
+    const text = await seite(gespeichert)
+    const antwort = await bestaetigeBarBestellung({}, formular(gespeichert))
+
+    expect(text).toContain('Dieser Link gilt nicht mehr')
+    expect(antwort.error).toMatch(/gilt nicht mehr/)
+    expect(findFirst).not.toHaveBeenCalled()
+    expect(updateMany).not.toHaveBeenCalled()
+  })
+
+  it('ungültiger Link: Seite und Knopf sagen denselben Satz aus einer Quelle', async () => {
+    findFirst.mockResolvedValue(null as never)
+
+    const text = await seite()
+    const antwort = await bestaetigeBarBestellung({}, formular())
+
+    expect(text).toContain(LINK_UNGUELTIG_SATZ)
+    expect(antwort.error).toContain(LINK_UNGUELTIG_SATZ)
   })
 })
 
