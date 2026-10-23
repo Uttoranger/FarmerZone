@@ -5655,3 +5655,257 @@ Fertig, wenn:
    * Merge: den Sammel-PR per Merge-Commit (nicht Squash); danach die CI auf main ansehen. Ab dem Merge gilt der Hook aus 146 (`docs:` nur mit Doku).
    * Nach dem Merge: Ab 28.10. die CSP-Meldungen in Sentry ansehen (Tag `bereich:csp`) und den Auftrag „CSP scharf“ freigeben. Vorher im Stripe-Dashboard nachsehen, ob Link an ist (docs/betrieb/stripe-live.md, „0. Vorher“).
    * Entscheidungen für Lauf 23: Backups der Produktion; Größen zusammenfassen; die Liste „Nicht in diesem Lauf“.
+
+## 27. Lauf 23 (uttoranger, im Chat erteilt, 23.10.2026)
+
+Geschrieben auf main fced3b5 (23.10.2026 19:36, Mockups 23.10.; davor 85853f5 #361 Sammel-PR Lauf 22). Grundlage ist die Seitenkarte vom 23.10.2026: ein Durchgang durch alle Routen, Abläufe und Seiteneffekte, statisch aus dem Code gelesen. Jede Nummer wurde am 23.10. ein zweites Mal gegen den Code geprüft (drei Prüfer); die Funde stehen eingearbeitet in den Nummern. Im Betrieb ist nichts davon ausprobiert. Jede Ausgangslage unten ist deshalb vor dem Bau am Code zu bestätigen. Weicht sie ab: STOPP für die Nummer, Bericht.
+
+Stand der Produktion:
+- Stripe läuft im Testmodus, kein Lauf schaltet um.
+- Die CSP läuft weiter nur zum Beobachten (G8).
+- Testhöfe markiert nur die Projektleitung (N21).
+- PR #329 (Nr. 124, Preise vergleichen) läuft getrennt und bleibt unberührt. Läuft er in derselben Nacht, berühren sich nur Doku-Dateien (DEVELOPMENT.md, DESIGN_SYSTEM.md, docs/mockups/README.md, Register); die Projektleitung merged nacheinander.
+
+Arbeite als Dirigent nach docs/nachtlauf.md: §2 Regeln, §4 Ablauf je Gate, 4a Tempo, §5 Stoppen, §6 Morgenbericht. Dieser Text ist die Freigabe.
+- Lauf 23 ist ein Härtungslauf ohne neue Funktion für die Kundschaft. Es gibt keine Regel-Inventur.
+- Die Nummern 149–157 sind neu. 102 bleibt für die Sammelbestellung reserviert.
+- Es gelten G10 und die G10-Ergänzung vom 22.10.2026. §0 gilt wie in Lauf 22 (freigabe.md §26, „§0 Tempo“), mit der Zuordnung für diesen Lauf unten. Der Dirigent führt ein Zeitbuch (docs/nachtlauf/berichte/zeitbuch-lauf23.md).
+- Tests folgen docs/ai/TESTING_GUIDELINES.md: Umgebung `node`, kein DOM, kein Klicken. Für Hooks der Prüfstand wie tests/use-cart.test.ts, für Seiten `renderToStaticMarkup` mit Merkmalen und Gegenprobe, für Formulare das Muster aus tests/hof-profil-absenden.test.ts. Fachregeln als reine Funktionen in src/lib/.
+
+Zuerst der Doku-PR (Branch docs/lauf23 von main, model: sonnet). Er enthält:
+- **Freigabe:**
+  - diesen Text wörtlich als „## 27. Lauf 23 (uttoranger, im Chat erteilt, 23.10.2026)“ in docs/nachtlauf/freigabe.md
+  - in docs/nachtlauf.md §3 die Zeilen 149–157 und „Sammel 23“ nach „Sammel 22“, je mit dem Titel aus „Die Nummern“, „`freigabe.md` §27“ und dem Register-Kürzel
+  - den Absatz „Reihenfolge in Lauf 23“ nach dem Absatz zu Lauf 22: keine Migration, kein Paket; Wellen und Priorität wie unten
+- **docs/nachtlauf/status.md:**
+  - Die Zeilen 143 (Lauf 22), 145–148 und „Sammel 22“ tragen „gemergt (#361)“.
+  - Neu sind die Zeilen 149–157 und „Sammel 23“, Status „offen“.
+- **docs/entscheidungen.md:** die Einträge unter „Entscheidungen“ (unten) wörtlich, dazu die Zeile „Stand Lauf 23“.
+- **docs/ai/TECH_STACK.md §5:** Der Satz „Cron im Hobby-Tarif: einmal täglich“ stimmt seit 19.10.2026 nicht mehr (Vercel Pro, src/lib/betrieb.ts:30). Neu: „Cron: Seit 19.10.2026 läuft das Projekt auf Vercel Pro. Nie eine Frist oder Geschäftsregel von einem Cron abhängig machen. Cron ist Aufräumer, nie die Wahrheit.“
+- **Commit- und PR-Texte** immer über eine Datei (Write, dann `git commit -F` bzw. `gh pr create --body-file`), Präfixe nach CLAUDE.md §5. Das gilt für den ganzen Lauf.
+
+Stand – vor dem Start prüfen, sonst STOPP und melden:
+- main enthält #361 (85853f5 oder später). `pnpm install --frozen-lockfile` läuft, `pnpm typecheck` und `pnpm test` sind grün, `pnpm lint` hat 0 Fehler.
+- /api/reserve prüft die Kaufsperre (Nr. 145: `kaufSperre` in src/app/api/reserve/route.ts). Fehlt das: 150 entfällt.
+- Vorschau und Produktion laufen mit Stripe im Testmodus.
+
+In diesem Lauf gibt es KEINE Migration, KEIN neues Paket und KEINE neue Variable. Braucht eine Nummer eines davon: STOPP für die Nummer, mit Vorschlag in den Bericht. Der Sammel-PR prüft trotzdem nach Regel 3 (frische lokale Datenbank, `migrate deploy`, danach `migrate diff … --exit-code` leer). Keine Nummer setzt Variablen in Vercel.
+
+Reicht das Budget nicht, gilt diese Priorität: 151 → 154 → 149 → 155 → 156 → 150 → 153 → 152 → 157.
+
+Nicht in diesem Lauf (bei der Projektleitung bzw. in eigenen Aufträgen):
+- **Rücktritt nach der Abholung erstatten** (Seitenkarte P1): kommt mit dem eigenen Auftrag Widerrufsfunktion nach § 13a FAGG und Rücktrittshinweis in der Kasse (Vormerkung 23.10., Funde 1 und 4), nach der Klärung mit dem Anwalt. Die Erstattung über die Plattform (Destination Charge) gehört dort hinein.
+- **Datenschutzerklärung, Abschnitt 10** (Magic Link statt Code; Seitenkarte P2): Rechtstexte ändert kein Lauf (O4). Das kommt mit dem Datenschutz-Fix nach #210/#236, zusammen mit Cloudflare (Go-Live-Checkliste A).
+- **CSP scharf schalten** (S1): eigener Auftrag ab 28.10. (G8). 155 bereitet nur `frame-src` vor.
+- **Eigenes Geheimnis für Links in Mails** (Seitenkarte S3): eigener Auftrag. Er betrifft jeden Link in Mails, auch den Abmeldelink; die Vorarbeit (Formate, Schemas, vier Dateien) steht in der Vormerkung vom 23.10.
+- **Obergrenze je Warenkorb-Sitzung beim Reservieren:** Entscheidung der Projektleitung nach dem Bericht zu 150.
+- **Servicegebühr und Zuschlagsverbot, Rolle bei der Zahlung:** Entscheidung der Projektleitung (Go-Live-Checkliste A1, A2).
+- Toter Code aus der Seitenkarte (`magicLink`-Plugin samt `customer-magic-link.tsx`, `src/emails/newsletter.tsx`, ungenutzte Actions in `onboarding.ts`, wirkungslose `revalidatePath('/admin/meldungen…')`, der veraltete Kommentar „Bekannte Lücke“ in src/app/api/stripe/webhook/route.ts): eigener Aufräum-Auftrag.
+
+### Entscheidungen (uttoranger, im Chat 23.10.2026 – mit diesem Start freigegeben; wörtlich ins Register)
+- „S17 · Härtung aus der Seitenkarte (23.10.2026): (1) Reservieren und das Erneuern im Warenkorb werden über alle Instanzen gebremst: höchstens 20 Anfragen je Minute und Adresse, für beide Wege gemeinsam. (2) Der Bestätigungslink einer Barbestellung wird nur als Hash gespeichert; die Kundin kann ihn auf der Bestätigungsseite erneut anfordern, höchstens dreimal je Bestellung und Tag, nur an die Adresse der Bestellung, und der neue Link ersetzt den alten. (3) Die Bestätigungsseite zeigt die E-Mail-Adresse der Kundin nur, solange die Bestellung offen ist; danach zeigt sie keine Personendaten. Die Anmeldung für Neuigkeiten vom Hof bleibt dort möglich, ohne die Adresse zu nennen.“
+- „N20 · Ergänzung (23.10.2026): Auch Freischalten, Servicegebühr ändern, ‚Gründungshof bis‘ ändern, Rundschreiben senden, Startseite veröffentlichen und einen Empfänger der Zustellung hinzufügen verlangen eine frische Bestätigung mit Passkey (höchstens 5 Minuten alt). Der Bescheid an die Höfe beim Stand eines Bündels in Postfach › Meldungen läuft über denselben Versand wie ein Rundschreiben, aber mit der Wache seiner eigenen Aktion; er verlangt keine eigene frische Bestätigung.“
+- „Z1 · Ergänzung (23.10.2026): Das Stripe-Konto eines Hofs wird im Land des Hofs angelegt (`farm.country`, AT oder DE), nicht fest in Österreich. Ein bestehendes Konto bleibt; weicht sein Land ab, erfährt es der Betreiber.“
+- „N16 · Ergänzung (23.10.2026): Ab 1024 px steht bei offenem Block das Formular mit den Vorlagen links an Stelle der Abschnittsliste; die Vorschau ‚So sieht’s die Kundin‘ bleibt rechts sichtbar und zeigt den Block in Bearbeitung unabhängig von seinem Zeitraum. Abweichung vom Mockup admin-startseite-entwurf freigegeben. Grund: Meldung der Projektleitung, die Vorschau reagiere beim Bearbeiten nicht.“
+- „G8 · Ergänzung (23.10.2026): `frame-src` erlaubt zusätzlich `'self'` für unsere eigenen Vorschau-Rahmen (Mein Hof, Admin › Startseite). `frame-ancestors` bleibt eng: DENY, außer der Hofseite mit `?vorschau=1` und der Startseite mit `?vorschau`.“
+- Stand-Zeile: „Stand Lauf 23 (uttoranger, 23.10.2026): S17 (Härtung aus der Seitenkarte) und die Ergänzungen zu N20 (frische Bestätigung), Z1 (Land des Stripe-Kontos), N16 (Vorschau beim Bearbeiten) und G8 (eigene Rahmen) sind entschieden und in Nr. 149–157 eingeplant (freigabe.md §27). Lauf 23 hat keine Migration, kein neues Paket und keine neue Variable. Nicht in diesem Lauf: Widerrufsfunktion und Rücktritt nach Abholung (eigener Auftrag nach anwaltlicher Klärung), Datenschutzerklärung Abschnitt 10 (O4), CSP scharf (ab 28.10.), eigenes Geheimnis für Links (eigener Auftrag), Obergrenze je Warenkorb-Sitzung (Entscheidung nach Bericht 150), Servicegebühr und Rolle bei der Zahlung, Aufräumen toter Code.“
+
+### §0 Zuordnung für diesen Lauf
+- **Modell:** Doku-PR, 152 und 157 mit Sonnet; 149, 150, 151, 153, 154, 155 und 156 mit Opus. tester und sichter mit Sonnet, pruefer mit Opus, höchstens 22 Schritte je Aufruf.
+- **Prüfdurchgänge:** ein voller Durchgang für 150, 151, 154, 155 und 156; gezielt für 149, 152, 153 und 157 (jede Änderung an Verhalten oder Abfrage hat einen Test mit Gegenprobe).
+- **pnpm test:integration:** 150 und 151 GANZ (Kaufweg); 149 tests/integration/double-opt-in.int.test.ts; 154 die Postfach-Dateien (postfach.int, postfach-eingang.int) und der neue Test zum Bescheid; 152, 153, 155, 156, 157 nur, wenn sie eine Integrationsdatei ändern; im Sammel-PR ganz.
+- **Bilder** (Umsetzer selbst nach 4a Punkt 6 b, ein Durchgang): 151 (390 hell: Bestätigungsseite einer offenen Barbestellung mit „Erneut senden“, vor und nach dem Senden); 153 (390 hell: abgeholte Bestellung ohne Personendaten); 155 (1440 hell und dunkel: Admin › Startseite mit offenem Block und Vorschau; nach „Fertig“ mit Hinweiszeile; als Admin mit virtuellem Authenticator wie Nr. 115); 157 (390 hell: Toast „Abholzeit gelöscht · Rückgängig“; /verify nach dem Bestätigen, abgemeldet). Sonst keine.
+- **Lesemappe** je Nummer wie 4a Punkt 1, mit den Register-Einträgen, die etwas ausschließen (149: T5, S11, Z3; 150: N24, R1; 151: Z3, die Post-Sperre bleibt; 152: Z1; 154: N20, N14; 155: N16, G8; 156: E7, N1; 157: N24).
+
+### §1 Warteschlange (fest)
+Doku-PR → Welle 1: 151 ∥ 154 ∥ 149 (alle von docs/lauf23, höchstens drei Umsetzer gleichzeitig). Danach vergibt der Dirigent jeden frei werdenden Platz in dieser Reihenfolge:
+1. 156 (von docs/lauf23)
+2. 150 (von docs/lauf23)
+3. 152 (von docs/lauf23)
+4. 155 vom Zwischenstand integration/lauf23, erst wenn 154 fertig ist (beide ändern src/components/admin/startseite-gestalten.tsx)
+5. 153 vom Zwischenstand, erst wenn 151 fertig ist (beide ändern die Bestätigungsseite)
+6. 157 vom Zwischenstand, erst wenn 156 fertig ist (beide ändern src/components/anmelden/hof-anmeldung.tsx bzw. den Hofbereich)
+Für 153, 155 und 157 merged der Dirigent die fertigen Nummern in den Zwischenstand, keine Entwürfe (G3); danach dort ein voller lokaler Lauf (typecheck, lint, test, test:integration), grün. Ist die Vorgängerin Entwurf oder entfallen, startet die Nummer von docs/lauf23 und nennt das im Bericht.
+
+Dann der Sammel-PR (Haltepunkt). Branches nacht/<datum>/<nr>-<kurz>.
+
+**Dateigrenzen:** Jede Nummer nennt unten ihre Dateien. Nie zwei Nummern an derselben Datei außerhalb dieser Grenzen; Erweiterungen nur nach 4a, mit Nennung im Morgenbericht.
+- Bewusst geteilt, gestapelt: 151 → 153 (Bestätigungsseite src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx); 154 → 155 (src/components/admin/startseite-gestalten.tsx); 156 → 157 (src/components/anmelden/hof-anmeldung.tsx).
+- Bewusst geteilt, parallel:
+  - src/lib/bremse-datenbank.ts: 150, 151 und 152 je ein eigener Eintrag mit eigenem `zweck` am Ende von `DB_BREMSEN`, mit eigenem Kommentar (tests/bremse-datenbank.test.ts verlangt eindeutige `zweck`).
+  - src/app/(hof)/status/new/page.tsx: 149 NUR die Abfrage `recentEmail`, 156 NUR die Wache.
+  - DEVELOPMENT.md (je ein Eintrag), docs/ai/ARCHITECTURE.md (je eigener Absatz), docs/ai/BAUSTEINE.md nur über `pnpm bausteine`.
+
+### Die Nummern
+
+#### 149 Beitrags-Mails nach der Antwort, ein Fehler stoppt nicht alle, ehrliche Zahl (Seitenkarte P3) – Opus, gezielt, keine Migration, von docs/lauf23
+Ausgangslage (main fced3b5, suchen, nicht raten):
+- `publishStatusPost` (src/server/actions/status-posts.ts) legt den Beitrag mit `sentViaEmail` und `emailRecipientCount` = geplante Zahl an (Z. ~135–149). Danach schickt es in derselben Anfrage jede Mail nacheinander mit `await sendStatusUpdateEmail` (Schleife Z. ~169–186). Der Kommentar „asynchronously (fire + don't block)“ (Z. ~151) stimmt nicht.
+- `sendStatusUpdateEmail` (src/lib/email.ts:~833) gibt `void` zurück; `send` verwirft das Ergebnis von `sendRaw`, und `sendRaw` wirft nie. Resend-Fehler und Mails, die die Post-Sperre (Z3) aufhält, bleiben heute stumm, und die Zahl am Beitrag ist immer die geplante. Werfen kann nur das Laden der Vorlage.
+- Die 7-Tage-Sperre wird zweimal getrennt gerechnet: in der Action (Z. ~117–120, nur `sentViaEmail`) und auf der Seite src/app/(hof)/status/new/page.tsx (Abfrage `recentEmail`, Z. ~61–68), die danach im Client den Schalter abstellt (status-new-client.tsx).
+- `expiresAt` (Z. ~112) ist die Laufzeit des Beitrags, nicht der Mailabstand. `MAILABSTAND_TAGE` steht in src/lib/beitrag-mailabstand.ts, `nachDerAntwort` in src/lib/nach-der-antwort.ts.
+1. **Ergebnis je Mail:** `sendStatusUpdateEmail` gibt das `VersandErgebnis` von `sendRaw` zurück (src/lib/email.ts, NUR diese Funktion). Angenommen ist eine Mail mit `id`; `gesperrt` (Z3) und `error` zählen nicht.
+2. **Versand nach der Antwort:** Die Schleife läuft über `nachDerAntwort`, weiter über `sendStatusUpdateEmail` (Post-Sperre Z3 und Abmelde-Kopfzeilen bleiben). Jede Mail hat ihr eigenes try/catch. Ein Fehler geht über `meldeFehler` mit einem neuen Schritt `'versand'` an Sentry (bestehende Hygiene: nie Adresse, nie Token) und stoppt die übrigen nicht.
+3. **Zahl:** Der Beitrag wird wie heute mit der GEPLANTEN Zahl angelegt. Am Ende schreibt der Versand die Zahl der angenommenen Mails (`updateMany` mit `id` und `farmId`). Bricht die Funktion ab, bleibt die geplante Zahl stehen, und die Sperre hält. Nur wenn keine Mail angenommen wurde, steht 0.
+4. **Eine Sperre:** `mailSperreWo(farmId, jetzt)` in src/lib/beitrag-mailabstand.ts: `sentViaEmail: true` UND `emailRecipientCount > 0` UND jünger als `MAILABSTAND_TAGE`. Action und Seite nutzen sie beide. `expiresAt` bekommt eine eigene Konstante (Wert 7) neben `MAILABSTAND_TAGE`.
+5. **Meldung an den Hof:** `emailCount` bleibt die geplante Zahl; die Meldung sagt „wird an n Abos verschickt“ statt „verschickt“ (Text aus einer Quelle). In Mein Hof › Beiträge steht „per E-Mail“ nur bei `emailRecipientCount > 0`, wie in src/lib/teilen-bild.ts.
+6. **Laufzeit:** Kein `maxDuration` für /status/new; der Versand läuft in der Standard-Laufzeit der Funktion. Im Bericht: gemessene Zeit je Mail und ab wie vielen Abos das eng wird.
+Dateien: src/server/actions/status-posts.ts, src/lib/email.ts (NUR `sendStatusUpdateEmail`), src/lib/beitrag-mailabstand.ts, src/app/(hof)/status/new/page.tsx (NUR die Abfrage `recentEmail`), status-new-client.tsx (NUR der Meldungstext), src/lib/mein-hof-beitraege.ts (NUR die Bedingung „per E-Mail“, Z. ~95), tests/integration/double-opt-in.int.test.ts (NUR das Warten mit `vi.waitFor`), die Tests dazu, DEVELOPMENT.md.
+Tests: eine Mail scheitert → die übrigen gehen raus, die Action gibt kein `error`; Zahl am Ende = angenommene Mails (gesperrte und fehlerhafte zählen nicht); Sperre greift bei `emailRecipientCount = 1`, nicht bei 0 (Gegenprobe); Seite und Action nutzen dieselbe Bedingung; die Action wartet nicht auf den Versand (Attrappe von `nachDerAntwort`).
+Fertig, wenn: grün. Vorschau (Entwicklungsdatenbank): Beitrag mit Mail an zwei erfundene Abos unter TEST_EMPFAENGER → beide Mails kommen, „Beiträge“ zeigt 2 (prüft der Mensch).
+
+#### 150 Reservieren über alle Instanzen bremsen (Seitenkarte S2, S17 Punkt 1) – Opus, ein voller Durchgang, keine Migration, von docs/lauf23
+Ausgangslage:
+- /api/reserve und /api/warenkorb/pruefen bremsen nur im Speicher der Instanz (`enforceRateLimit`, 20 je Minute und IP, src/lib/rate-limit.ts); /api/reserve hat dazu eine Speicher-Bremse je Sitzung (Z. ~51).
+- /api/warenkorb/pruefen LEGT Halte an (`upsert` mit `create`, src/server/warenkorb.ts:~115–119), bis 100 Produkte je Aufruf, ohne die Prüfkette von /api/reserve (Stilllegung, Freischaltung, Pause, Kaufsperre) und ohne `MAX_MENGE`.
+- Vorhanden: `bremseUeberAlleInstanzen` (src/server/bremse-datenbank.ts:~142, gibt nur wahr/falsch), `bremseCheckout` (nur in Produktion), `DB_BREMSEN` mit `checkoutIp` (src/lib/bremse-datenbank.ts), `bremsSchluessel`.
+1. Ein neuer Eintrag `reserveIp` in `DB_BREMSEN` (20 je Minute, wie `checkoutIp`). BEIDE Routen zählen über ihn gemeinsam (`bremseUeberAlleInstanzen`), nur in Produktion wie `bremseCheckout`. Schlüssel über `bremsSchluessel` (kein Klartext der IP).
+2. Antwort bei Bremse: 429 mit `ZU_VIELE_ANFRAGEN` und `Retry-After` = Ende des Minutenfensters.
+3. Reihenfolge in /api/reserve: Speicher-Bremsen → Parsen → DB-Bremse → Fristfreigabe → Aufräumen → Stilllegung → Freischaltung → Pause → Kaufsperre → Bestand. In /api/warenkorb/pruefen: Speicher-Bremse → Parsen → DB-Bremse → wie heute.
+4. Nur in den Bericht, als Fund mit Vorschlag:
+   - /api/warenkorb/pruefen legt Halte ohne die Prüfkette von /api/reserve und ohne `MAX_MENGE` an. Vorschlag: eine gemeinsame Prüfkette für beide Routen.
+   - Eine einzige Sitzung kann den ganzen Bestand halten und immer wieder erneuern; die Bremse ändert daran nichts. Vorschlag zur Entscheidung: eine Obergrenze je Sitzung (bedenken: Futter in großen Mengen für andere Höfe).
+   - Viele Kundinnen hinter einer gemeinsamen Adresse (Mobilfunk, Büro) teilen sich die Grenze.
+Dateien: src/app/api/reserve/route.ts, src/app/api/warenkorb/pruefen/route.ts, src/lib/bremse-datenbank.ts (NUR der Eintrag), src/server/bremse-datenbank.ts (NUR eine Hilfe `bremseReservieren`, falls nötig), tests/reservations.test.ts, tests/bremse-datenbank.test.ts, tests/bremse-verdrahtung.test.ts, die Integration der Bremse, docs/ai/ARCHITECTURE.md (NUR der Absatz zu den Bremsen), DEVELOPMENT.md.
+Tests: mit `vi.stubEnv('NODE_ENV', 'production')` und durchlassender Attrappe von `enforceRateLimit`: 21. Anfrage derselben Adresse im Fenster über reserve und pruefen zusammen → 429, kein `upsert`; Reihenfolge (stillgelegter Hof bei voller Bremse → 429 zuerst); Verdrahtung beider Routen (Muster tests/bremse-verdrahtung.test.ts); jede mit Gegenprobe. Integration wie bremse-datenbank.int.test.ts (zwei simulierte Instanzen). `pnpm test:integration` ganz.
+Fertig, wenn: grün; der Bericht nennt die zwei Vorschläge aus Punkt 4.
+
+#### 151 Barbestätigung: Link nur als Hash, „Erneut senden“ (Seitenkarte P4 und S6, S17 Punkt 2) – Opus, ein voller Durchgang, keine Migration, von docs/lauf23
+Ausgangslage:
+- /api/checkout erzeugt den Token mit `nanoid(32)` und speichert ihn im Klartext in `Order.confirmationToken` (`String? @unique`, Z. ~811–814); die Mail bekommt ihn (Z. ~869).
+- Gelesen wird er in src/server/actions/bar-bestaetigung.ts (Z. ~33/34, ~89, ~146/147), zweimal in src/app/(public)/[farmSlug]/bestaetigen/[token]/page.tsx (Z. ~54, ~58/59) und in src/app/api/orders/confirm/[token]/route.ts (Z. ~23/24). Weitere Leser gibt es nicht (Skripte und Seed geprüft).
+- Das Token-Schema ist `^[A-Za-z0-9_-]{8,64}$` (src/schemas/bar-bestaetigung.ts).
+- `sendOnsiteConfirmation` hat einen Aufrufer (Checkout Z. ~835). Vorhanden: `bestellLinkGilt`, `barBestaetigungsAnsicht`, `fristVon`, die Drossel `neuigkeitenBestellung`.
+1. **Nur der Hash:**
+   - `barTokenHash(token)` in src/lib/bar-bestaetigung.ts: `'h1:'` + SHA-256 hex über `'bar-bestaetigung:'` + Token. Der Doppelpunkt besteht das Token-Schema nie; ein gespeicherter Wert taugt also nicht als Token.
+   - `tokenKandidaten(token)` = `[barTokenHash(token), token]`, aus einer Quelle. Alle Leser nutzen `findFirst({ where: { confirmationToken: { in: tokenKandidaten(token) } } })` statt `findUnique`; das bedingte Schreiben beim Bestätigen (Action Z. ~85–93) nimmt denselben Filter.
+   - Der Checkout speichert den Hash, die Mail trägt den Token.
+   - Der Klartext-Zweig hält Bestellungen von vor dem Deploy gültig. Er fällt mit einem späteren Auftrag weg (Kommentar mit Datum, Bericht). Die Spalte bleibt, wie sie ist.
+2. **Erneut senden:**
+   - Auf der Bestätigungsseite (src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx) erscheint der Textknopf „Mail nicht bekommen? Erneut senden“ genau dann, wenn `barBestaetigungsAnsicht(order, jetzt) === 'offen'` und der Hof nicht stillgelegt ist (ONSITE_CASH und ONSITE_CARD). Der Select von `getOrder` hat die nötigen Felder.
+   - Neue Server Action `sendeBarLinkErneut(vorher, formular: FormData)` in src/server/actions/bar-bestaetigung.ts, mit `useActionState` wie `BarBestaetigenKnoepfe`; `orderId` und `sig` kommen als versteckte Felder und laufen durch Zod. Sie:
+     - prüft `bestellLinkGilt(orderId, sig)` und dieselbe Bedingung wie der Knopf, sonst die neutrale Antwort;
+     - bremst über einen neuen Eintrag `barLinkBestellung` in `DB_BREMSEN` (3 je Bestellung und Tag, Merkmal die Bestell-ID, ohne erste Stufe, wie `neuigkeitenBestellung`);
+     - liest den aktuellen Wert und schreibt den Hash des neuen Tokens nur mit `updateMany({ where: { id, status: 'PENDING_CONFIRMATION', paymentMethod: { not: 'ONLINE' }, confirmationToken: alterWert } })`. Mail nur bei `count === 1`, sonst die neutrale Antwort ohne Mail. So gewinnt bei zwei gleichzeitigen Anforderungen genau eine (der Wechsel ist die Sperre, ARCHITECTURE §5). Der alte Link gilt danach nicht mehr.
+     - schickt `sendOnsiteConfirmation` an die Adresse DER Bestellung, nie an eine eingegebene, über `nachDerAntwort`; an Sentry nur die Bestell-ID. Die Mail-Daten baut eine Hilfe `barMailBestellung` aus dem Select von `leseBestellung`, die Bestätigen und erneutes Senden gemeinsam nutzen (gleiche Felder wie beim Checkout).
+     - antwortet immer gleich: „Wenn die Bestellung noch offen ist, ist eine neue Mail unterwegs.“
+3. **Alter Link:** Die Seite und die Action sagen bei ungültigem Link in einem Satz aus einer Quelle: „… Hast du schon bestätigt oder einen neuen Link angefordert? Nimm den Link aus der neuesten Mail.“
+4. Die Mail selbst ändert sich nicht. Die Post-Sperre Z3 bleibt. Fokus und Meldung nach DESIGN_SYSTEM.
+5. Nur in den Bericht: Stornierte Bestellungen behalten ihren Wert; Klartext bleibt also auch nach jeder Frist in der Datenbank. Vorschlag für den Folgeauftrag: Klartext-Zweig entfernen und übrige Klartext-Werte auf `null` setzen. Das ist eine Datenänderung in der Produktion und braucht die Freigabe der Projektleitung.
+Dateien: src/app/api/checkout/route.ts (NUR das Speichern des Tokens), src/server/actions/bar-bestaetigung.ts, src/app/(public)/[farmSlug]/bestaetigen/[token]/page.tsx, src/app/api/orders/confirm/[token]/route.ts, src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx (NUR der Knopf), eine neue Komponente für den Knopf unter src/components/bestaetigung/, src/lib/bar-bestaetigung.ts, src/lib/bremse-datenbank.ts (NUR der Eintrag), tests/bar-bestaetigung-zugang.test.ts und die übrigen Tests, docs/ai/ARCHITECTURE.md (NUR der Absatz zur Barbestätigung), DEVELOPMENT.md.
+Tests: neue Bestellung speichert keinen Klartext (Gegenprobe); der gespeicherte Wert als Token eingegeben → ungültig; alter Klartext-Token bestätigt weiter; neuer Token bestätigt; nach „erneut senden“ gilt der alte Link nicht mehr; zwei parallele Anforderungen → eine Mail; vierte Anforderung am Tag → keine Mail, gleiche Antwort; falsche Signatur → keine Mail, gleiche Antwort; bestätigte oder stornierte Bestellung → kein Knopf, keine Mail. Mindestens ein Integrationstest legt die Bestellung über /api/checkout an und nimmt den Token aus dem Aufruf von `sendOnsiteConfirmation` (Muster checkout-idempotenz.int.test.ts). `pnpm test:integration` ganz.
+Fertig, wenn: grün; Bild nach §0. Vorschau: Barbestellung mit erfundener Adresse unter TEST_EMPFAENGER, „erneut senden“ → neue Mail, alter Link zeigt den Satz aus Punkt 3, neuer bestätigt (prüft der Mensch).
+
+#### 152 Stripe-Konto im Land des Hofs (Seitenkarte P5, Z1-Ergänzung) – Sonnet, gezielt, keine Migration, von docs/lauf23
+Ausgangslage:
+- `createConnectAccount` (src/server/actions/stripe-connect.ts:~84) legt jedes Konto mit `country: 'AT'` an; es ist der einzige `accounts.create` im Code. `getAuthenticatedFarm` (Z. ~17–27) lädt `country` nicht.
+- Höfe tragen `country` aus `LAENDER` (`AT`, `DE`, src/lib/laender.ts), geprüft über `alsLand`; das Onboarding legt jeden Hof mit `AT` an (onboarding.ts, Default im Schema).
+- Das Konto wird nach dem Stripe-Onboarding in /api/stripe/return/route.ts (Z. ~34) und bei „Status prüfen“ in `checkConnectStatus` (Z. ~171) abgerufen. Muster für eine gedrosselte Betreiber-Meldung: src/server/hofkonto-unbekannt.ts mit `stripeKontoUnbekannt`.
+- Währung ist fest `eur`, Destination Charge ohne `on_behalf_of`; für AT und DE ändert sich kein Betrag.
+1. `getAuthenticatedFarm` wählt `country` mit. Das Land kommt über `alsLand(farm.country)` (fehlt es, gilt `'AT'`). Eine Zuordnung `STRIPE_LAND: Record<Land, 'AT' | 'DE'>` in src/lib/laender.ts neben `LAND_CODE`.
+2. Ein bestehendes Konto ändert sich nicht. `meldeAbweichendesKontoLand(farmId, kontoLand, hofLand)` in src/server/hofkonto-unbekannt.ts (ohne `'use server'`, wirft nie, neue Drossel `stripeKontoLand` einmal je Hof und Tag, nur die Hof-ID) meldet eine Abweichung an Sentry. Aufrufer: `checkConnectStatus` und /api/stripe/return/route.ts (dort das Select um `country` ergänzen).
+3. Der Hinweis für deutsche Höfe (`DE_VORBEREITUNG_HINWEIS`) bleibt, wie er ist.
+4. Nur in den Bericht: Wer Stripe vor der Landwahl im Hofprofil einrichtet, bekommt weiter ein AT-Konto (Stripe stellt das Land danach nicht um); Vorschlag für einen eigenen Auftrag: das Land vor „Einrichten“ zeigen. Nebenfund: src/lib/json-ld.ts setzt `addressCountry: 'AT'` auch für deutsche Höfe.
+Dateien: src/server/actions/stripe-connect.ts, src/app/api/stripe/return/route.ts (NUR Select und Aufruf), src/server/hofkonto-unbekannt.ts (NUR die neue Funktion), src/lib/laender.ts (NUR die Zuordnung), src/lib/bremse-datenbank.ts (NUR der Eintrag), die Tests, DEVELOPMENT.md.
+Tests: Hof DE → `stripe.accounts.create` mit `country: 'DE'`, Hof AT → `'AT'`, Hof ohne `country` → `'AT'` (Attrappe von Stripe, nie ein echter Aufruf); Gegenprobe mit festem `'AT'` rot; abweichendes Konto-Land → eine Meldung, am selben Tag keine zweite.
+Fertig, wenn: grün. Nichts in der Vorschau, das Konten anlegt.
+
+#### 153 Bestätigungsseite ohne Personendaten nach Abschluss (Seitenkarte S5, S17 Punkt 3) – Opus, gezielt, keine Migration, vom Zwischenstand nach 151
+Ausgangslage:
+- Die signierte Bestätigung (src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx) lädt `customerName` und `customerEmail` (Z. ~99–100); der Link läuft nie ab (src/lib/bestell-link.ts, bewusst).
+- `customerName` wird nirgends angezeigt. Die E-Mail steht im Kopfsatz (`bestaetigungsKopf` in src/lib/bestaetigung.ts:~193 bei „bezahlt“, ~223 bei „Bestätigung offen“) und in der Karte „Neuigkeiten vom Hof“ (Seite Z. ~235–237, src/components/bestaetigung/neuigkeiten-karte.tsx:~92).
+- Eine Online-Bestellung mit `paymentStatus PAID` gilt auch nach Abholung oder Nicht-Abholung als „bezahlt“ (bestaetigung.ts:~39).
+- `neuigkeitenErlaubt` ist EINE Regel für die Karte und die Action `meldeNeuigkeitenAn` (bestaetigung.ts:~300–323, neuigkeiten.ts:~92) und erlaubt die Anmeldung auch nach der Abholung.
+- Die offenen Status stehen in `LAUFENDE_STATUS` (src/lib/bestellungen-finden.ts:~150); bestellungen-finden.ts importiert schon aus bestaetigung.ts.
+- /bestellung/[id] und die Kalender-Route laden keine Personendaten.
+1. `bestaetigungZeigtPerson(status)` in src/lib/bestaetigung.ts: wahr genau für `LAUFENDE_STATUS`. Die Liste wird nur im Funktionsrumpf gelesen (Importzyklus), kein neues Literal.
+2. `getOrder` lädt `customerName` nie mehr (er wird nicht gezeigt) und `customerEmail` nicht im ersten Select. Erst nach `gibVerwaisteFreiOhneRisiko` und nur wenn `bestaetigungZeigtPerson(order.status)` gilt, holt eine zweite Abfrage `customerEmail` mit `where: { id, status: { in: LAUFENDE_STATUS } }`.
+3. `bestaetigungsKopf` nimmt `customerEmail: string | null`. Ohne Adresse entfällt bei „bezahlt“ der Teil „Die Bestätigung ist unterwegs an …“.
+4. Die Karte „Neuigkeiten vom Hof“ bleibt nach Abschluss, aber ohne Adresse: `email` wird optional, der Satz lautet dann „an die Adresse deiner Bestellung“. `neuigkeitenErlaubt` bleibt unverändert, Karte und Action bleiben eine Regel.
+5. Alles andere bleibt (Status, Abholung, Positionen, Kontakt des Hofs).
+Dateien: die Seite, src/lib/bestaetigung.ts (NUR `bestaetigungZeigtPerson` und der Kopfsatz), src/components/bestaetigung/neuigkeiten-karte.tsx (NUR dieser Satz), tests/bestaetigung.test.ts, tests/bestaetigung-zugang.test.ts (die Attrappe unterscheidet nach `select` und `where`; „nicht im Select“ prüft die Aufruf-Argumente; Kommentar Z. ~40 anpassen), DEVELOPMENT.md.
+Tests: abgeholt, storniert, nicht abgeholt → keine Adresse im gerenderten HTML und nicht im Select (Gegenprobe mit offenem Status); offen → wie heute; Karte nach Abschluss ohne Adresse, Action weiter erlaubt.
+Fertig, wenn: grün; Bild nach §0.
+
+#### 154 Frische Bestätigung für wirksame Admin-Aktionen (Seitenkarte S4, N20-Ergänzung) – Opus, ein voller Durchgang, keine Migration, von docs/lauf23
+Ausgangslage:
+- Diese Actions prüfen nur `verlangeAdminAktion`: `approveFarmAction` (admin.ts:~113), `setServiceFeeAction` (~362), `setzeGruendungBisAction` (~429), `sendeRundschreiben` (postfach.ts:~380), `fuegeEmpfaengerHinzu` (~450), `veroeffentlicheStartseite` (startseite.ts:~243). `sendeRundschreiben` und `fuegeEmpfaengerHinzu` prüfen heute zuerst die Eingabe.
+- `verlangeFrischeBestaetigung` steht in admin-wache.ts:~223, `useFrischBestaetigt` in src/components/admin/frisch-bestaetigen.tsx:~66; Aufrufer rendern den `dialog`, den der Hook zurückgibt.
+- Die Listen der frischen Aktionen stehen in tests/frisch-bestaetigung-wache.test.ts (`HEIKLE_AKTIONEN`, `OBERFLAECHEN`; die Wache sucht per Regex nach `useFrischBestaetigt(name`) und tests/admin-heikel-eine-wache.test.ts (`AKTIONEN`). ARCHITECTURE.md:~113 verlangt die Wache als erste Anweisung.
+- Aufrufer im Browser: hof-aktion-dialog.tsx (auch über postfach-aufgabe-hof.tsx), servicegebuehr-dialog.tsx, gruendung-bis-dialog.tsx, postfach-zustellung.tsx, startseite-gestalten.tsx (`veroeffentlichen()`, Aufruf Z. ~461; `VeroeffentlichenDialog` Z. ~654–667 aus startseite-veroeffentlichen.tsx) unter src/components/admin/ sowie src/app/admin/postfach/rundschreiben-formular.tsx. Kein Formular ruft eine der Actions über `action=` auf.
+- Auf dem Server ruft `setzeBuendelStandAction` (admin.ts:~701, Wache `verlangeAdminAktion`) für den Bescheid an die Höfe `sendeRundschreiben` auf (~742).
+1. **Wache:** Die sechs Actions wechseln auf `await verlangeFrischeBestaetigung()` als ERSTE Anweisung; die Prüfung der Eingabe folgt danach. Keine zweite Wache.
+2. **Bescheid nicht brechen:** Der Teil von `sendeRundschreiben` nach der Wache zieht als `verschickeRundschreiben(daten, userId)` in eine neue src/server/rundschreiben.ts (ohne `'use server'`, also nicht aufrufbar). `sendeRundschreiben` = frische Wache + dieser Aufruf. `setzeBuendelStandAction` ruft `verschickeRundschreiben` mit `guard.userId` und behält ihre Wache (N20-Ergänzung). Die Optionen des Bescheids bleiben wie heute.
+3. **Browser:** Die Aufrufer laufen über `useFrischBestaetigt(<Action>)` mit der Action als Bezeichner; in der Datei steht danach kein direkter Aufruf der Action mehr. Der `dialog` des Hooks gehört in den Baum des offenen Dialogs. Für die Startseite bekommt `VeroeffentlichenDialog` einen Platz für eingebettete Inhalte; eingebunden wird er bei Z. ~654–667, NIE im Aufbau der Seite (der gehört 155).
+4. Die sechs kommen in `HEIKLE_AKTIONEN`, `OBERFLAECHEN` und `AKTIONEN`. Die Attrappen der Wache in tests/startseite-aktion, servicegebuehr-admin, gruendung-bis-admin und farm-approval (.test.ts) ziehen mit.
+5. Keine andere Action ändert ihre Wache. DESIGN_SYSTEM ändert sich nicht; der Dialog ist derselbe.
+Dateien: src/server/actions/admin.ts, postfach.ts, startseite.ts (je NUR die Wache der genannten Actions; admin.ts zusätzlich der Aufruf in `setzeBuendelStandAction`), neue src/server/rundschreiben.ts, die Aufrufer hof-aktion-dialog.tsx, servicegebuehr-dialog.tsx, gruendung-bis-dialog.tsx, postfach-zustellung.tsx, startseite-gestalten.tsx (NUR `veroeffentlichen` und das Einhängen des Dialogs), startseite-veroeffentlichen.tsx (alle unter src/components/admin/) sowie src/app/admin/postfach/rundschreiben-formular.tsx, je NUR der Aufruf; die Tests; docs/ai/ARCHITECTURE.md (NUR die Liste der frischen Aktionen); DEVELOPMENT.md.
+Tests: je Action ohne frische Bestätigung → `{ error: 'frisch' }`, nichts geschrieben, keine Mail; mit → wirkt (Gegenprobe). `useFrischBestaetigt` im Hook-Prüfstand: nach `'frisch'` kommt der Dialog, nach Bestätigung genau ein zweiter Aufruf. Integration: Der Bescheid zu einem Bündel kommt auch bei einer Sitzung an, die älter als 5 Minuten ist; die Postfach-Integrationstests bleiben grün.
+Fertig, wenn: grün. Vorschau (Entwicklungsdatenbank, als Admin): einen wartenden Hof freischalten, länger als 5 Minuten nach der Anmeldung → Passkey-Abfrage, danach freigeschaltet (prüft der Mensch).
+
+#### 155 Admin › Startseite: Vorschau bleibt beim Bearbeiten eines Blocks sichtbar; die CSP erlaubt unsere eigenen Rahmen (Meldung der Projektleitung 23.10.2026; N16- und G8-Ergänzung) – Opus, ein voller Durchgang, keine Migration, vom Zwischenstand nach 154
+Ausgangslage:
+- src/components/admin/startseite-gestalten.tsx um Z. 605–622: Ab 1024 px ERSETZT das Block-Formular die Vorschau (`blockOffen ? <BlockFormular …/> : breit && vorschau`). Wer einen Block bearbeitet, sieht keine Vorschau.
+- Die Vorschau zeigt Blöcke nur, wenn sie am gewählten Tag live sind; die Ausnahme ist der Block in Bearbeitung (`zuRendern` in src/lib/startseite-gestalten.ts um Z. 342, `blockEntwurfId`). Am Computer ist bei sichtbarer Vorschau nie ein Block offen; ein Block, der erst später beginnt, fehlt darum nach „Fertig“ bei „Stand am: heute“.
+- Ein Block, der die Prüfung nicht besteht (`speicherEingabe` in src/components/admin/startseite-entwurf.tsx, z. B. Titel fehlt), wird nicht gespeichert; die Vorschau liest den Entwurf aus der Datenbank und kann ihn dann nicht zeigen.
+- src/lib/csp.ts, `baueCsp`: `frame-src` nennt nur Stripe und die Toolbar, nicht `'self'`; tests/csp.test.ts hält genau diese Liste fest. Heute nur gemeldet (Sentry JAVASCRIPT-NEXTJS-F: frame-src, /farm-page). Mit der scharfen CSP (ab 28.10.) wären beide Vorschau-Rahmen blockiert.
+- Am 23.10. steht der Entwurf in Produktion und Entwicklung auf der Standard-Reihenfolge, ohne Block und ohne veröffentlichte Fassung.
+1. **Aufbau ab 1024 px:** Linke Spalte (480 px): ohne offenen Block wie heute (Liste, Hinweis „Im Entwurf gespeichert“, Änderungen); mit offenem Block `BlockFormular` und darunter `Bibliothek`. Rechte Spalte: immer `vorschau`. `StartseiteVorschau` steht für ab 1024 px an GENAU einer Stelle im Baum, außerhalb jedes Zweigs, der vom offenen Block abhängt, ohne `key`-Wechsel. So läuft beim Öffnen und Schließen eines Blocks kein `beendeStartseitenVorschau`, und der sichtbare Rahmen bleibt stehen (Muster `vorschauRahmen`, Nr. 106; tests/vorschau-rahmen-wache.test.ts bleibt grün). Unter 1024 px bleibt alles wie heute (Leiste „Vorschau“, Blatt).
+2. **Was die Vorschau zeigt:**
+   - Bei offenem Block geht `blockEntwurfId` mit, wie heute. Nach jeder Speicherung (Ruhe 800 ms, `speicherungen`) lädt der Rahmen neu, und der Block steht unabhängig von seinem Zeitraum da.
+   - Ist der offene Block noch nicht gespeichert (neu und ungültig, oder `blockFehler`), steht unter der Vorschau: „Noch nicht in der Vorschau: <Grund>“, mit demselben Text wie im Formular.
+   - Nach „Fertig“: Ist der eben geschlossene Block am gezeigten Tag nicht live, steht unter der Vorschau „„<Titel>“ ist an diesem Tag nicht zu sehen – live ab <Tag, Uhrzeit Wien>.“ Die Zeile bleibt bis zur nächsten Änderung oder zum nächsten Wechsel von „Stand am“.
+   - Welche Zeile gilt, entscheidet eine reine Funktion `vorschauHinweis(…)` in src/lib/startseite-fassung.ts. Texte bei `ADMIN_STARTSEITE_TEXT` bzw. `ENTWURF_TEXT`.
+3. **CSP** (src/lib/csp.ts): `frame-src` bekommt `'self'` zuerst. Die Policy bleibt Report-Only (G8). `frame-ancestors` auf den eingebetteten Seiten bleibt (DENY, außer Hofseite mit `?vorschau=1` und `/` mit `?vorschau`). tests/csp.test.ts zieht mit, Gegenprobe ohne `'self'`.
+4. Signatur, Draft Mode und Admin-Prüfung der Vorschau (src/server/startseite-vorschau.ts, `erzeugeStartseitenVorschau`, `beendeStartseitenVorschau`) bleiben unberührt. Der Weg „Veröffentlichen“ mit der frischen Bestätigung aus 154 bleibt, wie 154 ihn gebaut hat.
+Dateien: src/components/admin/startseite-gestalten.tsx (NUR Aufbau und Vorschau; „Veröffentlichen“ gehört 154), src/components/admin/startseite-vorschau.tsx (NUR die Hinweiszeilen unter dem Rahmen), src/lib/startseite-fassung.ts bzw. src/lib/startseite-gestalten.ts (NUR `vorschauHinweis` und Texte), src/lib/csp.ts (NUR `frame-src`), tests/csp.test.ts, die Tests der Startseite, docs/ai/DESIGN_SYSTEM.md (NUR der Absatz Admin › Startseite), docs/mockups/README.md (NUR in der Zeile `admin-startseite-entwurf.html`, Spalte Arbeit: „· ab 1024 px Formular links bei offenem Block (Nr. 155, N16)“), DEVELOPMENT.md.
+Tests (TESTING_GUIDELINES, ohne DOM): `vorschauHinweis` für ungültigen neuen Block, Block später live, Block heute live, kein Block; die Seite mit offenem Block per `renderToStaticMarkup` (Prüfstand wie tests/use-cart.test.ts bzw. tests/kasse-formular.test.ts, Actions per `vi.mock`) → Merkmale des Formulars UND der Überschrift „So sieht’s die Kundin“ im HTML, Gegenprobe ohne offenen Block; eine Quelltext-Wache: `StartseiteVorschau` steht in startseite-gestalten.tsx für ab 1024 px genau einmal und nicht in einem Zweig mit `blockOffen` oder `entwurf.block`, ohne `key` (Gegenprobe mit dem heutigen Stand rot); bei offenem Block geht `blockEntwurfId` an `erzeugeStartseitenVorschau`. Die bestehenden Tests zu Vorschau und Entwurf bleiben grün.
+Fertig, wenn: grün; Bilder nach §0; die Abweichung vom Mockup steht mit Bild im Bericht. Vorschau (Entwicklungsdatenbank, als Admin, 1440): Block einfügen (Saisonkarte), Titel tippen → rechts erscheint der Block nach höchstens 2 s, Band „Entwurf“, „Vorschau aktualisiert · hh:mm“; „Live ab“ auf nächste Woche → er bleibt sichtbar, solange er offen ist; „Fertig“ → links wieder die Liste, darunter die Hinweiszeile; Titel leeren → „Noch nicht in der Vorschau: …“; Mein Hof › Vorschau lädt wie vorher; die Antwort-Header nennen `frame-src 'self' …` (prüft der Mensch).
+
+#### 156 Hofbereich: Rücksprung nach der Anmeldung, eine Wache „Hof der Sitzung“ (Seitenkarte P7 und P9) – Opus, ein voller Durchgang, keine Migration, von docs/lauf23
+Ausgangslage:
+- src/proxy.ts (Z. ~34) leitet ohne Cookie auf `/login` ohne Ziel. `FARMER_PATHS` steht in src/proxy.ts:~6 (nicht exportiert); eine Kopie steht als `PRIVATE_BEREICHE` in src/lib/robots.ts:~22. tests/proxy-pfade.test.ts und tests/robots.test.ts lesen die Liste per Regex aus proxy.ts.
+- `ladeHofbereich` (src/server/hofbereich.ts:~55–61) leitet bei abgelaufener Sitzung ohne Ziel um; ein Layout kennt seinen Pfad nicht und rendert beim Wechsel zwischen Seiten im Browser nicht neu.
+- `zielNachHofAnmeldung` (src/lib/anmeldecode.ts:~431–435) lässt nur `/teilen` und `/verify` zu; anmeldecode.ts läuft auch im Browser. login/page.tsx (Z. ~40) leitet einen schon angemeldeten Hof fest nach `/dashboard`.
+- Ohne Hof leiten /settings/pause, /settings/pickup-slots, /settings/profile, /status/new und /status/[id]/send-whatsapp auf `/login`, die übrigen auf `/onboarding`; /settings/payments gibt `null` zurück. Rund 19 weitere Seiten unter (hof) leiten selbst mit `redirect('/login')` ohne Ziel um (z. B. orders, orders/[orderId], sales).
+1. **Eine Liste:** `FARMER_PATHS` zieht in eine neue Datei unter src/lib/ (im Browser lauffähig, ohne Server-Importe). proxy.ts und robots.ts importieren sie; tests/proxy-pfade.test.ts und tests/robots.test.ts lesen sie über den Import statt per Regex.
+2. **Ziel prüfen:** `zielNachHofAnmeldung(von)`: zuerst `zielNachAnmeldung(von, '')` (leer → `/dashboard`); danach nur der Pfad ohne `?` und `#`, nur wenn er auf `^/[A-Za-z0-9/_-]+$` passt und gleich einem Eintrag aus `FARMER_PATHS` ist oder mit Eintrag + `/` beginnt; sonst `/dashboard`. Kein Query-Teil im Ziel (kann Kennungen tragen). Die bisherigen Ziele `/teilen` und `/verify` bleiben.
+3. **Rücksprung:** Der Proxy setzt auf jedem Hof-Pfad, mit und ohne Cookie, den Kopf `x-hof-pfad` mit dem Pfad über `NextResponse.next({ request: { headers } })` mit `set`; ein mitgeschickter Wert wird so überschrieben. Ohne Cookie leitet er auf `/login?von=<pfad>`. Der Kopf gilt trotzdem als Eingabe: Er kommt nur geprüft wie `von` in eine Adresse, sonst `/login` ohne Ziel, und wird nie geloggt. login/page.tsx leitet einen schon angemeldeten Hof nach `zielNachHofAnmeldung(von)`.
+4. **Eine Wache:** `verlangeHofDerSitzung()` in src/server/hofbereich.ts: keine Sitzung oder nicht FARMER → `/login?von=<geprüfter Pfad aus x-hof-pfad>`, kein Hof → `/onboarding`; sie gibt `{ userId, farmId }` zurück. ALLE page.tsx unter (hof), die heute selbst Sitzung oder Hof prüfen, nutzen sie (NUR die Wache; die Lader der Seiten bleiben). Findet ein Lader danach nichts, geht es nach `/onboarding`. /settings/payments zeigt nie mehr eine leere Seite. Die Druckseiten unter (farmer) bleiben (157 fasst eine an).
+Dateien: src/proxy.ts, src/lib/robots.ts (NUR der Import der Liste), neue Datei für `FARMER_PATHS` in src/lib/, src/server/hofbereich.ts, src/lib/anmeldecode.ts (NUR `zielNachHofAnmeldung` und die Ziele), src/app/(auth)/login/page.tsx (NUR die Weiterleitung eines angemeldeten Hofs) und src/components/anmelden/hof-anmeldung.tsx (NUR das Weiterreichen von `von`, falls nötig), die page.tsx unter (hof) mit eigener Prüfung (NUR die Wache; src/app/(hof)/status/new/page.tsx ist mit 149 geteilt), tests/proxy-pfade.test.ts, tests/robots.test.ts und die Tests dazu, docs/ai/ARCHITECTURE.md (NUR der Absatz zu Zugang und Wachen, auch Z. ~238 „Bauern-Bereich: Navigation“), DEVELOPMENT.md.
+Tests: `/orders/abc` ohne Cookie → `/login?von=/orders/abc`; nach der Anmeldung dorthin; `von=//fremd.example`, `von=https://…`, `von=/admin`, `/orders/../admin`, `/orders/%2e%2e/admin`, `/ordersx` → `/dashboard`; `/orders?x=1` → `/orders` (Gegenproben); ein mitgeschickter Kopf `x-hof-pfad` wird überschrieben; abgelaufene Sitzung → Ziel erhalten; jede Seite unter (hof) ohne Hof → `/onboarding`, ohne Sitzung → `/login?von=…` (eine Quelltext-Wache listet die Seiten).
+Fertig, wenn: grün; der Bericht listet die geänderten Seiten. Vorschau: angemeldet eine Bestellung öffnen, Cookie löschen, neu laden → Anmeldung → zurück auf derselben Bestellung (prüft der Mensch).
+
+#### 157 Kleinkram im Hofbereich: Packliste, Abholzeit rückgängig, Bestätigen ohne Umweg (Seitenkarte P6, P10, P8) – Sonnet, gezielt, keine Migration, vom Zwischenstand nach 156
+Jeder Punkt ist klein und für sich. Ist einer größer als beschrieben: STOPP für den Punkt, Bericht, die anderen laufen weiter.
+1. **Packliste:** src/app/(farmer)/orders/today/print/page.tsx ruft `await gibVerwaisteFreiOhneRisiko(farm.id, jetzt)` mit demselben `jetzt` vor `findMany` auf, wie /dashboard. Test: eine verfallene Bestellung steht nicht auf der Liste (Gegenprobe).
+2. **Abholzeit rückgängig:**
+   - Ausgangslage: `Order` hängt nicht an `PickupSlot`; Löschen ist endgültig (src/server/actions/farm.ts:~234–246). `addPickupSlot` legt eine Zeit immer aktiv an und gibt keine Kennung zurück. In Mein Hof ersetzt `meldeErfolg` den Toast (pickup-slots-client.tsx:~154).
+   - Nach dem Löschen einer AKTIVEN Zeit kommt der Toast „Abholzeit gelöscht“ mit „Rückgängig“ (Muster der Bestellungen), auch in Mein Hof. „Rückgängig“ legt die Zeit mit dayOfWeek, startTime, endTime und maxOrders über `addPickupSlot` neu an. `onGespeichert` läuft nach dem Löschen und nach dem Rückgängig. Beim Löschen einer pausierten Zeit bleibt der bisherige Toast (sie käme sonst aktiv zurück). farm.ts bleibt unverändert. Texte aus einer Quelle.
+   - Test: Hook-Prüfstand wie tests/use-cart.test.ts, mit Attrappen von `sonner` und den Actions: der Klick auf die Toast-Aktion ruft `addPickupSlot` mit den vier Werten auf; Gegenprobe: pausierte Zeit, keine Aktion.
+3. **Bestätigen ohne Umweg:**
+   - Ausgangslage: Der Zustand „bestätigt, abgemeldet“ steht in src/components/email-bestaetigung/bestaetigen-karte.tsx:~38–56 (eingebunden von src/app/(auth)/verify/page.tsx). `HofAnmeldung` liest `von` aus der Adresse (hof-anmeldung.tsx:~40) und kennt kein festes Ziel.
+   - Ist die E-Mail bestätigt und niemand angemeldet, zeigt die Karte direkt das Formular der Hof-Anmeldung statt nur des Links. `HofAnmeldung` bekommt eine optionale Prop `ziel`, fest im Code (`/onboarding`), nie aus der Adresse; ohne Prop wie heute. Keine Adresse in der URL und nicht vorausgefüllt (Personendaten).
+   - Test: Die Ansicht nach dem Bestätigen wird eine eigene Komponente in bestaetigen-karte.tsx; `renderToStaticMarkup` mit `HofAnmeldung` per `vi.mock` als Merkmal (mit `ziel="/onboarding"`); Gegenprobe: angemeldet zeigt den Link /onboarding.
+Dateien: die Druckseite, src/components/settings/pickup-slots-client.tsx (NUR Löschen und Toast), src/components/email-bestaetigung/bestaetigen-karte.tsx (NUR der Zustand nach dem Bestätigen), src/components/anmelden/hof-anmeldung.tsx (NUR die Prop `ziel`; geteilt mit 156, gestapelt), die Tests, DEVELOPMENT.md.
+Fertig, wenn: grün; Bilder nach §0.
+
+### §2 Regeln für alle Nummern
+- Es gelten die Regeln aus Lauf 22 (freigabe.md §26, „§2 Regeln für alle Nummern“) unverändert: keine Migration, kein Paket, nie Produktion oder Live-Schlüssel, keine schreibenden Aufrufe an Stripe, Resend, Vercel, Supabase, Sentry, GitHub oder DNS, Mails nur über die Post-Sperre (Z3), Rechtstexte unverändert (O4), keine Personendaten, Codes, Token, IPs oder Secrets in Code, Logs, Tests, Berichten oder Bildern.
+- **Sicherheit, zusätzlich:** Keine Nummer lockert eine bestehende Prüfung. 149 (Sperre), 150, 151, 153, 154, 155 (nur `frame-src 'self'`, Report-Only) und 156 machen Prüfungen strenger oder halten sie, nie weicher. Jede Antwort, die etwas über eine Bestellung oder ein Konto verraten könnte, bleibt in allen Fällen gleich (151, 153). Berichte beschreiben Funde als Ursache, Auswirkung und Fix, ohne Anleitung zum Ausnutzen.
+- **Geld:** Kein Betrag wird neu gerechnet. Ändert sich durch eine Nummer ein Betrag: Geld-Fund, STOPP, Bericht zuerst.
+
+### §3 Checkliste je PR
+Wie Lauf 22 (freigabe.md §26, §3), mit „Migration: nein · Paket: nein · neue Variable: nein“ und „Alle Einstiege geprüft“ für: 149 alle Stellen, die die Mail-Sperre rechnen oder die Zahl zeigen; 150 alle Wege, die reservieren oder Halte erneuern; 151 alle Leser von `confirmationToken`; 154 alle Aufrufer der sechs Actions, auch auf dem Server; 155 alle Rahmen, die eigene Seiten einbetten; 156 alle Seiten unter (hof).
+
+### §4 Morgenbericht (morgenbericht-<datum>-lauf23.md)
+Wie Lauf 22, dazu:
+- **Ganz oben:** je Nummer, ob die Ausgangslage am Code bestätigt war.
+- **149:** gemessene Zeit je Mail und ab wie vielen Abos die Laufzeit eng wird.
+- **150:** die Reihenfolge der Prüfungen; die zwei Vorschläge (gemeinsame Prüfkette für pruefen; Obergrenze je Sitzung) zur Entscheidung.
+- **151:** wie lange Klartext-Token noch gelten (Frist), und der Vorschlag für den Folgeauftrag (Datenänderung mit Freigabe).
+- **152:** Land vor „Einrichten“ und `addressCountry` als Vorschläge.
+- **154:** Tabelle der Admin-Actions mit Wache vorher → nachher, dazu `setzeBuendelStandAction`.
+- **155:** die Abweichung vom Mockup mit Bild.
+- **156:** die Liste der Seiten mit der neuen Wache.
+- **„Für dich zu tun“:** Abnahmen aus „Fertig, wenn“; 152: im Stripe-Testmodus einen DE-Testhof einrichten und eine Testzahlung bis zur Überweisung durchspielen; Merge des Sammel-PR per Merge-Commit; danach die Abnahme von 151, 154 und 155 in der Produktion mit Stripe im Testmodus.

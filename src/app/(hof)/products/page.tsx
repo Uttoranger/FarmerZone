@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getProdukteSeite } from '@/server/queries/products'
 import { getMeinHofKopf } from '@/server/queries/farm'
@@ -35,10 +34,9 @@ export const metadata: Metadata = {
  */
 
 export default async function ProductsPage(): Promise<React.JSX.Element> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  const { userId } = await verlangeHofDerSitzung()
 
-  const farm = await getFarmForUser(session.user.id)
+  const farm = await getFarmForUser(userId)
   if (!farm) redirect('/onboarding')
 
   // Frist gilt beim Lesen: Verwaiste Bestellungen geben ihre Ware frei, bevor
@@ -50,7 +48,7 @@ export default async function ProductsPage(): Promise<React.JSX.Element> {
   const jetzt = new Date()
   const [seite, kopf, zustand] = await Promise.all([
     getProdukteSeite(farm.id, jetzt),
-    getMeinHofKopf(session.user.id),
+    getMeinHofKopf(userId),
     ladeMeinHofZustand(farm.id, jetzt),
   ])
   // Derselbe Besitzer wie getFarmForUser oben — ohne Hof gibt es auch keinen Kopf.

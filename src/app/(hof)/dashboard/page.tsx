@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
-import { cookies, headers } from 'next/headers'
+import { cookies } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser, ladeDeinenBeitrag } from '@/server/queries/dashboard'
 import { getHeute } from '@/server/queries/heute'
 import { ladeFaedenHof } from '@/server/queries/postfach'
@@ -57,10 +57,9 @@ export const metadata: Metadata = {
  * Raster darunter; „Zu tun" geht dort über beide Spalten.
  */
 export default async function HeutePage(): Promise<React.JSX.Element> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  const { userId } = await verlangeHofDerSitzung()
 
-  const farm = await getFarmForUser(session.user.id)
+  const farm = await getFarmForUser(userId)
   if (!farm) redirect('/onboarding')
 
   // Ein Zeitpunkt für die ganze Seite: Datum, Tag, Woche und Zeitfenster passen zusammen.

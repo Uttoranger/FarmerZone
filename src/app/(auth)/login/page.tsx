@@ -4,7 +4,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { isAdminUser } from '@/server/queries/admin'
 import { ADMIN_PFAD } from '@/lib/admin-anmeldung'
-import { STANDARD_ZIEL_NACH_CODE } from '@/lib/anmeldecode'
+import { STANDARD_ZIEL_NACH_CODE, zielNachHofAnmeldung } from '@/lib/anmeldecode'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { AnmeldenSeite } from '@/components/anmelden/anmelden-seite'
 
@@ -31,13 +31,24 @@ export const metadata: Metadata = {
  * Nr. 115) geht nach /admin — das Recht frisch aus der Datenbank. Vorher
  * schickte /dashboard es hierher zurück, und es kam nie in den Admin-Bereich.
  * Dort greift die Pflicht (erst Passkey).
+ *
+ * Ein schon angemeldeter Hof geht seit Nr. 156 dorthin, wohin ihn `?von=`
+ * schickt (Rücksprung aus dem Hofbereich) — nur geprüft über
+ * zielNachHofAnmeldung, sonst /dashboard.
  */
-export default async function LoginPage(): Promise<React.JSX.Element> {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ von?: string | string[] }>
+}): Promise<React.JSX.Element> {
   const session = await auth.api.getSession({ headers: await headers() })
 
   if (session?.user) {
     const role = (session.user as typeof session.user & { role: string }).role
-    if (role === 'FARMER') redirect('/dashboard')
+    if (role === 'FARMER') {
+      const { von } = await searchParams
+      redirect(zielNachHofAnmeldung(typeof von === 'string' ? von : null))
+    }
     if (await isAdminUser(session.user.id)) redirect(ADMIN_PFAD.bereich)
   }
 

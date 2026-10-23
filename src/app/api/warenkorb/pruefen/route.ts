@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { enforceRateLimit } from '@/lib/rate-limit'
+import { bremseReservieren } from '@/server/bremse-datenbank'
 import { pruefeSitzungsWarenkorb, erneuereHalte, loescheHalte } from '@/server/warenkorb'
 import { gibVerwaisteFreiFuerProdukte } from '@/server/verwaiste-bestellungen'
 
@@ -46,6 +47,12 @@ export async function POST(request: NextRequest) {
   }
 
   const { sessionId, items } = parsed.data
+
+  // Zweite Stufe über alle Instanzen (Register S17 Punkt 1): derselbe Zähler je
+  // IP wie /api/reserve — auch das Erneuern hält Ware fest. Vor der Fristfreigabe
+  // und vor jedem Schreiben.
+  const ueberAlleInstanzen = await bremseReservieren(request)
+  if (ueberAlleInstanzen) return ueberAlleInstanzen
 
   try {
     const jetzt = new Date()

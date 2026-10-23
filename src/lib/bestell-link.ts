@@ -14,9 +14,11 @@ import { env } from '@/lib/env'
 // nach Wochen den Kaufbeleg oder die Abholadresse nachschlagen will, darf
 // nicht vor einer abgelaufenen Signatur stehen.
 //
-// WAS DER LINK DARF: Lesen einer einzelnen Bestellung — und seit Nr. 46 genau
-// EINEN Schreibweg: die Anmeldung „Neuigkeiten vom Hof per E-Mail" auf der
-// Bestätigungsseite (`meldeNeuigkeitenAn`). Ein abgefangener Link — oder der
+// WAS DER LINK DARF: Lesen einer einzelnen Bestellung — und genau ZWEI
+// Schreibwege: seit Nr. 46 die Anmeldung „Neuigkeiten vom Hof per E-Mail" auf
+// der Bestätigungsseite (`meldeNeuigkeitenAn`), seit Nr. 151 (Freigabe §27)
+// „Mail nicht bekommen? Erneut senden" (`sendeBarLinkErneut`, höchstens drei
+// Mails je Bestellung und Tag). Zur Anmeldung: Ein abgefangener Link — oder der
 // eigene Link zu einer Bestellung mit fremder Adresse — kann damit nur eine
 // Bestätigungsmail an die Adresse DER Bestellung auslösen, nie an eine andere;
 // angemeldet ist erst, wer in dieser Mail klickt (Double-Opt-in, S11). Dazu:
@@ -24,8 +26,9 @@ import { env } from '@/lib/env'
 // Anfragen je Bestellung und UTC-Tag (Datenbank-Bremse, an der Tagesgrenze bis
 // zu doppelt), ein Link je Abo und zehn
 // Minuten, immer dieselbe Antwort, und an der Bestellung ändert sich nichts
-// (docs/ai/ARCHITECTURE.md §5). Jeder weitere Schreibweg braucht ein eigenes
-// Token mit eigenem Zweck, nicht diese Signatur.
+// (docs/ai/ARCHITECTURE.md §5). Ein dritter Schreibweg braucht ein eigenes
+// Token mit eigenem Zweck oder eine ausdrückliche Freigabe, nicht einfach
+// diese Signatur.
 const SECRET = env.BETTER_AUTH_SECRET
 
 // Domänen-Präfix gegen Verwechslung: reorder-token und unsubscribe signieren

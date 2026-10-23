@@ -15,6 +15,7 @@
  *
  * Rein, ohne Datenbank (tests/bar-bestaetigung.test.ts).
  */
+import { createHash } from 'crypto'
 import type { OrderStatus } from '@prisma/client'
 import { GRUND_NICHT_BESTAETIGT, istVerwaist, type FristBestellung } from '@/lib/fristen'
 
@@ -50,3 +51,75 @@ export function barBestaetigungsAnsicht(bestellung: BarBestellung | null, jetzt:
   }
   return 'erledigt'
 }
+
+/*
+ * NUR DER HASH IN DER DATENBANK (Register S17 Punkt 2, Nr. 151). Der Token aus
+ * der Mail ist die einzige Berechtigung zum Bestätigen und Stornieren. Stünde
+ * er im Klartext in `Order.confirmationToken`, könnte jeder, der die Tabelle
+ * lesen kann (Sicherung, Auszug, Datenbank-Werkzeug), fremde Bestellungen
+ * bestätigen. Darum speichert der Checkout nur den Hash; die Mail trägt den
+ * Token.
+ *
+ * SHA-256 ohne Geheimnis genügt: Der Token hat 32 Zeichen aus nanoid (rund
+ * 190 Bit) — nachrechnen lässt er sich nicht. Das Präfix „bar-bestaetigung:"
+ * trennt diesen Zweck von jedem anderen Hash im Haus; „h1:" vorn trägt die
+ * Fassung und enthält einen Doppelpunkt, den das Token-Schema
+ * (src/schemas/bar-bestaetigung.ts) nie durchlässt. Ein gespeicherter Wert
+ * taugt also nie selbst als Token.
+ */
+const HASH_FASSUNG = 'h1:'
+const HASH_ZWECK = 'bar-bestaetigung:'
+
+/** Der gespeicherte Wert zu einem Token aus der Mail. */
+export function barTokenHash(token: string): string {
+  return HASH_FASSUNG + createHash('sha256').update(HASH_ZWECK + token).digest('hex')
+}
+
+/**
+ * Die Werte, unter denen eine Bestellung zu diesem Token stehen kann — EINE
+ * Quelle für alle Leser (Seite, Knöpfe, alter Mail-Link):
+ * `confirmationToken: { in: tokenKandidaten(token) }`.
+ *
+ * Der zweite Wert, der Klartext, hält Bestellungen von vor dem Deploy von
+ * Nr. 151 (23.10.2026) gültig — ihre Mails tragen den Token, die Datenbank
+ * auch. Der Klartext einer offenen Bestellung bestätigt höchstens bis zum
+ * Ende der Barfrist (`fristVon`, höchstens zwei Stunden nach der Bestellung);
+ * danach fällt der Zweig mit einem eigenen Auftrag weg (Bericht Nr. 151), zusammen mit dem
+ * Leeren der übrigen Klartext-Werte.
+ */
+export function tokenKandidaten(token: string): string[] {
+  return [barTokenHash(token), token]
+}
+
+/** Wie oft „Erneut senden" je Bestellung und Tag eine Mail auslöst (S17 Punkt 2). */
+export const BAR_LINK_JE_BESTELLUNG_UND_TAG = 3
+
+/**
+ * Gibt es „Mail nicht bekommen? Erneut senden"? Nur für eine offene
+ * Barbestellung (bar oder Karte beim Hof, in der Frist) bei einem Hof, der
+ * nicht stillgelegt ist. EINE Regel für den Knopf auf der Bestätigungsseite
+ * und die Action `sendeBarLinkErneut`.
+ */
+export function barLinkErneutMoeglich(
+  bestellung: BarBestellung & { farm: { archivedAt: Date | null } },
+  jetzt: Date
+): boolean {
+  if (bestellung.farm.archivedAt) return false
+  if (bestellung.paymentMethod !== 'ONSITE_CASH' && bestellung.paymentMethod !== 'ONSITE_CARD') return false
+  return barBestaetigungsAnsicht(bestellung, jetzt) === 'offen'
+}
+
+/**
+ * Was Seite und Knöpfe bei einem Link sagen, der nicht (mehr) gilt — seit
+ * Nr. 151 auch nach „Erneut senden": Der neue Link ersetzt den alten.
+ */
+export const LINK_UNGUELTIG_TITEL = 'Dieser Link gilt nicht mehr'
+export const LINK_UNGUELTIG_SATZ =
+  'Hast du schon bestätigt oder einen neuen Link angefordert? Nimm den Link aus der neuesten Mail.'
+
+/**
+ * Die eine Antwort auf „Erneut senden" — in jedem Fall dieselbe (gesendet,
+ * gebremst, Link falsch, Bestellung nicht mehr offen): Sie verrät nichts über
+ * die Bestellung.
+ */
+export const BAR_LINK_ERNEUT_ANTWORT = 'Wenn die Bestellung noch offen ist, ist eine neue Mail unterwegs.'

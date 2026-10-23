@@ -1,8 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import type { KonditionenHof } from '@/lib/hof-einstellungen'
 import { ladeKonditionenHof } from '@/server/queries/einstellungen'
 import { ladeAbzeichenSchalter } from '@/server/queries/farm'
@@ -23,14 +22,13 @@ export const dynamic = 'force-dynamic'
  * dieses Hofs. Die Admin-Freischaltung (Gründungsplatz) bleibt unberührt.
  */
 export default async function KonditionenEinstellungenPage(): Promise<React.JSX.Element> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  const { userId } = await verlangeHofDerSitzung()
 
   let hof: KonditionenHof | null = null
   let abzeichen: { zeigen: boolean } | null = null
   let gefunden = true
   try {
-    const [geladen, schalter] = await Promise.all([ladeKonditionenHof(session.user.id), ladeAbzeichenSchalter(session.user.id)])
+    const [geladen, schalter] = await Promise.all([ladeKonditionenHof(userId), ladeAbzeichenSchalter(userId)])
     hof = geladen
     abzeichen = schalter
     gefunden = hof !== null

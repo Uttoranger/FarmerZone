@@ -1,8 +1,8 @@
-import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import type { Metadata } from 'next'
 import { Mail, Shield, Trash2 } from 'lucide-react'
 import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung, zurHofAnmeldung } from '@/server/hofbereich'
 import { getFarmArchiveState } from '@/server/queries/farm'
 import { ladeAngemeldeteGeraete } from '@/server/geraete'
 import { AngemeldeteGeraete } from '@/components/konto/angemeldete-geraete'
@@ -31,12 +31,15 @@ const TEXTLINK = 'font-medium text-brand-text underline underline-offset-2 break
  * Seit Nr. 114 (E7, Ergänzung) nach dem Passwort die angemeldeten Geräte.
  */
 export default async function AccountPage(): Promise<React.JSX.Element> {
+  const { userId } = await verlangeHofDerSitzung()
+  // Login-Adresse und Kennung dieser Sitzung (Geräte) braucht nur diese Seite —
+  // die Wache gibt bewusst nur userId und farmId heraus.
   const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  if (!session?.user) return zurHofAnmeldung()
 
   const [farm, geraete] = await Promise.all([
-    getFarmArchiveState(session.user.id),
-    ladeAngemeldeteGeraete(session.user.id, session.session.id, new Date()),
+    getFarmArchiveState(userId),
+    ladeAngemeldeteGeraete(userId, session.session.id, new Date()),
   ])
 
   // Vorausgefüllte Support-Anfragen: Anliegen, Hof-Slug und Login-Adresse

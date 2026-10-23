@@ -42,3 +42,23 @@ export function passkeyAttrappen(): {
     adminErsatzcode: { aggregate: vi.fn(async () => ({ _max: { benutztAm: null } })) },
   }
 }
+
+/**
+ * Wie adminSitzung, aber die letzte Bestätigung mit Passkey liegt `minuten`
+ * zurück (Standard 6, also nicht mehr frisch) — für die Gegenprobe der
+ * heiklen Aktionen (Register N20): Die Wache antwortet `{ error: 'frisch' }`.
+ */
+export function alteAdminSitzung(userId: string, minuten = 6): unknown {
+  return {
+    user: { id: userId },
+    session: {
+      id: `sitzung-${userId}`,
+      get createdAt(): Date {
+        return new Date(Date.now() - minuten * 60_000)
+      },
+      get passkeyAm(): Date {
+        return new Date(Date.now() - minuten * 60_000)
+      },
+    },
+  }
+}

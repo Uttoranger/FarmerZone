@@ -6,7 +6,7 @@ import { Clock, LinkIcon, XCircle } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { formatEuro, formatPosition } from '@/lib/format'
 import { bestaetigungsPfad } from '@/lib/bestell-link'
-import { barBestaetigungsAnsicht } from '@/lib/bar-bestaetigung'
+import { LINK_UNGUELTIG_SATZ, LINK_UNGUELTIG_TITEL, barBestaetigungsAnsicht, tokenKandidaten } from '@/lib/bar-bestaetigung'
 import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
 import { zahlungsAnzeige } from '@/lib/bestellstatus'
 import { SERVICEGEBUEHR_BEZEICHNUNG, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
@@ -50,13 +50,17 @@ export default async function BarBestaetigenSeite({ params }: Props) {
   if (!eingabe.success) return <LinkUngueltig />
   const token = eingabe.data
 
+  // Gespeichert ist nur der Hash des Tokens (Nr. 151); ältere Bestellungen
+  // tragen noch den Klartext — `tokenKandidaten` findet beide.
+  const gesucht = { confirmationToken: { in: tokenKandidaten(token) } }
+
   // Frist gilt beim Lesen (src/lib/fristen.ts): erst freigeben, dann lesen.
-  const vorab = await prisma.order.findUnique({ where: { confirmationToken: token }, select: { farmId: true } })
+  const vorab = await prisma.order.findFirst({ where: gesucht, select: { farmId: true } })
   if (!vorab) return <LinkUngueltig />
   await gibVerwaisteFreiOhneRisiko(vorab.farmId)
 
-  const order = await prisma.order.findUnique({
-    where: { confirmationToken: token },
+  const order = await prisma.order.findFirst({
+    where: gesucht,
     select: {
       id: true,
       status: true,
@@ -200,7 +204,7 @@ function Rahmen({ hofSlug, hofName, children }: { hofSlug: string; hofName: stri
 }
 
 /**
- * Token unbekannt (schon benutzt, abgetippt), falsch geformt oder unter
+ * Token unbekannt (schon benutzt, durch einen neuen ersetzt, abgetippt), falsch geformt oder unter
  * fremder Hofadresse: kein Hof, keine Bestellung — nicht einmal, ob es sie
  * gibt. Der Kopf führt zur Hofübersicht.
  */
@@ -209,10 +213,9 @@ function LinkUngueltig() {
     <KundeFokusShell titel={TITEL} zurueck={{ href: '/hoefe', label: 'Zurück zu den Höfen' }}>
       <div className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-2.5 px-4 pt-10 pb-8 text-center md:pt-[60px]">
         <LinkIcon className="size-12 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
-        <h2 className="font-heading text-[22px] font-semibold text-foreground md:text-[28px]">Dieser Link gilt nicht mehr</h2>
-        <p className="text-[15px] leading-normal text-muted-foreground">
-          Hast du schon bestätigt? Dann findest du deine Bestellung in der Bestätigungsmail. Sonst bestell einfach neu.
-        </p>
+        <h2 className="font-heading text-[22px] font-semibold text-foreground md:text-[28px]">{LINK_UNGUELTIG_TITEL}</h2>
+        {/* Derselbe Satz wie in den Knöpfen — seit Nr. 151 ersetzt ein neu angeforderter Link den alten. */}
+        <p className="text-[15px] leading-normal text-muted-foreground">{LINK_UNGUELTIG_SATZ}</p>
         <Link
           href="/hoefe"
           className={cn(

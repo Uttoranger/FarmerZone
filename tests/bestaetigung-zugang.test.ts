@@ -7,6 +7,8 @@
  *    keinen Namen, keine E-Mail, keine Artikel, keine Beträge — und fragt die
  *    Datenbank gar nicht erst (die Bestell-ID ist ratbar und steht u. a. in
  *    den Stripe-Metadaten).
+ *  - Mit Signatur: den Namen fragt die Seite nie ab, die E-Mail nur für eine
+ *    laufende Bestellung, mit Status-Filter in der Abfrage (Nr. 153).
  *  - ?confirmed=true und ?redirect_status=succeeded ändern den angezeigten
  *    Zustand nicht; „bestätigt" und „bezahlt" kommen nur aus der Datenbank.
  *  - Jeder Weg zur Seite trägt eine gültige Signatur: Checkout-Antwort
@@ -16,26 +18,50 @@
  *
  * Gelesen wird der Text des Elementbaums, wie in tests/bestellverfolgung-zugang.test.ts.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/prisma', () => ({
-  prisma: { order: { findUnique: vi.fn(), updateMany: vi.fn() } },
+  prisma: { order: { findUnique: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() } },
 }))
+// „Erneut senden" ist eine Client-Komponente mit useActionState — hier zählt
+// nur, OB die Seite sie zeigt (Nr. 151).
+vi.mock('@/components/bestaetigung/bar-link-erneut-senden', async () => {
+  const { createElement } = await import('react')
+  return {
+    BarLinkErneutSenden: ({ orderId }: { orderId: string }) => createElement('span', null, `ERNEUT:${orderId}`),
+  }
+})
+// Die Karte „Neuigkeiten vom Hof" ist eine Client-Komponente — hier zählt nur,
+// OB sie steht und welche Adresse die Seite ihr gibt (Nr. 153).
+vi.mock('@/components/bestaetigung/neuigkeiten-karte', async () => {
+  const { createElement } = await import('react')
+  return {
+    NeuigkeitenKarte: ({ email }: { email?: string }) => createElement('span', null, `KARTE:${email ?? 'ohne Adresse'}`),
+  }
+})
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendOrderConfirmation: vi.fn(), sendOrderConfirmedToFarmer: vi.fn() }))
 
 import ConfirmPage from '@/app/(public)/[farmSlug]/confirm/[orderId]/page'
 import { GET as bestaetigeLink } from '@/app/api/orders/confirm/[token]/route'
 import { bestellSignatur } from '@/lib/bestell-link'
+import { LAUFENDE_STATUS } from '@/lib/bestellungen-finden'
+import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { prisma } from '@/lib/prisma'
 
 const findUnique = vi.mocked(prisma.order.findUnique)
+const findFirst = vi.mocked(prisma.order.findFirst)
 const updateMany = vi.mocked(prisma.order.updateMany)
 
-/** Eine Bestellung, wie die Seite sie liest — mit erfundenen Daten. */
+/**
+ * Eine Bestellung mit allen Feldern, die eine Abfrage der Seite verlangen
+ * könnte — erfundene Daten. Was die Seite davon bekommt, entscheidet die
+ * Attrappe `datenbank` nach `select` und `where` (Nr. 153): Name und E-Mail
+ * stehen hier, damit ein Fund im HTML beweist, dass die Seite sie abgefragt hat.
+ */
 function bestellung(teil: Record<string, unknown> = {}) {
   return {
     id: 'order-1',
@@ -104,9 +130,29 @@ async function seite(suche: Record<string, string | undefined>, orderId = 'order
 
 const GUELTIG = bestellSignatur('order-1')
 
+type Frage = { where?: { id?: string; status?: { in?: readonly string[] } }; select?: Record<string, unknown> }
+
+/**
+ * Die Attrappe der Datenbank (Nr. 153): Sie liefert genau die Felder aus
+ * `select` (oberste Ebene) und beachtet einen Status-Filter in `where` — so
+ * wie Prisma. Ohne Select käme alles; die Seite fragt nie ohne.
+ */
+function datenbank(order: Record<string, unknown>) {
+  findUnique.mockImplementation((async (frage: Frage) => {
+    const erlaubt = frage.where?.status?.in
+    if (erlaubt && !erlaubt.includes(String(order.status))) return null
+    if (!frage.select) return order
+    return Object.fromEntries(Object.keys(frage.select).filter((k) => k in order).map((k) => [k, order[k]]))
+  }) as never)
+}
+
+/** Alle Selects, die die Seite an die Datenbank geschickt hat. */
+const selects = () => findUnique.mock.calls.map(([frage]) => (frage as Frage).select ?? {})
+
 beforeEach(() => {
   vi.clearAllMocks()
-  findUnique.mockResolvedValue(bestellung() as never)
+  datenbank(bestellung())
+  findFirst.mockResolvedValue(bestellung() as never)
 })
 
 describe('Bestätigungsseite — Zugang nur mit Signatur', () => {
@@ -165,7 +211,7 @@ describe('Bestätigungsseite — „Hof erreichen" nur hinter der Signatur (Nr. 
     bestellung({ status: 'CONFIRMED', farm: { ...bestellung().farm, ...KONTAKT }, ...teil })
 
   it('Bestellung steht: Satz, Nummer und E-Mail des Hofs', async () => {
-    findUnique.mockResolvedValue(steht() as never)
+    datenbank(steht())
     const text = await seite({ sig: GUELTIG })
     expect(text).toContain('Hof erreichen')
     expect(text).toContain('Kommst du später oder kannst du nicht kommen? Sag dem Hof kurz Bescheid.')
@@ -174,14 +220,14 @@ describe('Bestätigungsseite — „Hof erreichen" nur hinter der Signatur (Nr. 
   })
 
   it('Telefon und E-Mail des Hofs stehen in der Abfrage der Bestellung, die erst nach der Signatur läuft', async () => {
-    findUnique.mockResolvedValue(steht() as never)
+    datenbank(steht())
     await seite({ sig: GUELTIG })
     const mitHof = findUnique.mock.calls.map(([frage]) => frage).find((frage) => 'farm' in (frage.select ?? {}))
     expect(mitHof).toMatchObject({ select: { farm: { select: { phone: true, email: true } } } })
   })
 
   it('ohne oder mit falscher Signatur: kein „Hof erreichen", keine Nummer — und keine Abfrage', async () => {
-    findUnique.mockResolvedValue(steht() as never)
+    datenbank(steht())
     for (const suche of [{}, { sig: 'f'.repeat(64) }]) {
       const text = await seite(suche)
       expect(text).not.toContain('Hof erreichen')
@@ -193,7 +239,7 @@ describe('Bestätigungsseite — „Hof erreichen" nur hinter der Signatur (Nr. 
   })
 
   it('bar noch nicht bestätigt: keine Karte — erst, wenn die Bestellung steht', async () => {
-    findUnique.mockResolvedValue(steht({ status: 'PENDING_CONFIRMATION' }) as never)
+    datenbank(steht({ status: 'PENDING_CONFIRMATION' }))
     const text = await seite({ sig: GUELTIG })
     expect(text).toContain('HT-0210-A4F2')
     expect(text).not.toContain('Hof erreichen')
@@ -211,13 +257,13 @@ describe('Bestätigungsseite — Zustand nur aus der Datenbank', () => {
   })
 
   it('bestätigt in der Datenbank: „bestätigt", auch ohne Parameter', async () => {
-    findUnique.mockResolvedValue(bestellung({ status: 'CONFIRMED' }) as never)
+    datenbank(bestellung({ status: 'CONFIRMED' }))
 
     expect(await seite({ sig: GUELTIG })).toContain('Bestellung bestätigt')
   })
 
   it('?redirect_status=succeeded vor dem Webhook: „Zahlung wird geprüft", nicht „erfolgreich"', async () => {
-    findUnique.mockResolvedValue(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PENDING' }) as never)
+    datenbank(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PENDING' }))
 
     const text = await seite({ sig: GUELTIG, redirect_status: 'succeeded' })
 
@@ -226,15 +272,13 @@ describe('Bestätigungsseite — Zustand nur aus der Datenbank', () => {
   })
 
   it('bezahlt in der Datenbank: „Zahlung erfolgreich"', async () => {
-    findUnique.mockResolvedValue(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PAID', status: 'PAID' }) as never)
+    datenbank(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PAID', status: 'PAID' }))
 
     expect(await seite({ sig: GUELTIG })).toContain('Zahlung erfolgreich')
   })
 
   it('eine stornierte Online-Bestellung wird durch ?redirect_status=succeeded nicht „erfolgreich"', async () => {
-    findUnique.mockResolvedValue(
-      bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PENDING', status: 'CANCELLED' }) as never
-    )
+    datenbank(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PENDING', status: 'CANCELLED' }))
 
     const text = await seite({ sig: GUELTIG, redirect_status: 'succeeded' })
 
@@ -243,7 +287,7 @@ describe('Bestätigungsseite — Zustand nur aus der Datenbank', () => {
   })
 
   it('Online und noch nicht bezahlt: die Zahlungszeile sagt „Noch offen", nicht „bezahlt"', async () => {
-    findUnique.mockResolvedValue(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PENDING' }) as never)
+    datenbank(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PENDING' }))
 
     const text = await seite({ sig: GUELTIG })
 
@@ -252,9 +296,121 @@ describe('Bestätigungsseite — Zustand nur aus der Datenbank', () => {
   })
 
   it('ein unbekannter redirect_status ist kein Hinweis', async () => {
-    findUnique.mockResolvedValue(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PENDING' }) as never)
+    datenbank(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PENDING' }))
 
     expect(await seite({ sig: GUELTIG, redirect_status: 'paid' })).not.toContain('Zahlung wird geprüft')
+  })
+})
+
+describe('„Mail nicht bekommen? Erneut senden" (Nr. 151) — nur bei einer offenen Barbestellung', () => {
+  const IN_DER_FRIST = new Date('2026-10-02T08:30:00Z')
+  const NACH_DER_FRIST = new Date('2026-10-02T10:30:00Z')
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(IN_DER_FRIST)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('offen, bar: der Knopf steht da', async () => {
+    expect(await seite({ sig: GUELTIG })).toContain('ERNEUT:order-1')
+  })
+
+  it('offen, Karte beim Hof: der Knopf steht da', async () => {
+    datenbank(bestellung({ paymentMethod: 'ONSITE_CARD' }))
+    expect(await seite({ sig: GUELTIG })).toContain('ERNEUT:order-1')
+  })
+
+  it('ohne gültige Signatur: kein Knopf', async () => {
+    expect(await seite({ sig: 'f'.repeat(64) })).not.toContain('ERNEUT')
+  })
+
+  it.each([
+    ['bestätigt', { status: 'CONFIRMED' }],
+    ['storniert', { status: 'CANCELLED', cancelReason: 'Von der Kundin vor der Bestätigung storniert' }],
+    ['online', { paymentMethod: 'ONLINE', paymentStatus: 'PENDING' }],
+  ])('%s: kein Knopf', async (_name, teil) => {
+    datenbank(bestellung(teil))
+    expect(await seite({ sig: GUELTIG })).not.toContain('ERNEUT')
+  })
+
+  it('nach der Frist: kein Knopf, auch wenn noch niemand aufgeräumt hat', async () => {
+    vi.setSystemTime(NACH_DER_FRIST)
+    expect(await seite({ sig: GUELTIG })).not.toContain('ERNEUT')
+  })
+})
+
+describe('Nach Abschluss keine Personendaten (Register S17 Punkt 3, Nr. 153)', () => {
+  const ADRESSE = 'max@example.org'
+  const NAME = 'Max Mustermann'
+
+  it('kein Select der Seite verlangt je den Namen der Kundin — auch bei einer offenen Bestellung', async () => {
+    await seite({ sig: GUELTIG })
+    expect(selects().length).toBeGreaterThan(0)
+    for (const select of selects()) expect(select).not.toHaveProperty('customerName')
+  })
+
+  it.each([
+    ['abgeholt (online bezahlt)', { status: 'PICKED_UP', paymentMethod: 'ONLINE', paymentStatus: 'PAID' }],
+    ['abgeholt (bar)', { status: 'PICKED_UP', paymentStatus: 'PAID' }],
+    ['storniert', { status: 'CANCELLED', cancelReason: 'Vom Hof storniert' }],
+    ['storniert (online bezahlt)', { status: 'CANCELLED', paymentMethod: 'ONLINE', paymentStatus: 'PAID' }],
+    ['nicht abgeholt', { status: 'NOT_PICKED_UP', paymentMethod: 'ONLINE', paymentStatus: 'PAID' }],
+  ])('%s: keine Adresse im HTML und in keinem Select — die Bestellung steht weiter da', async (_name, teil) => {
+    datenbank(bestellung(teil))
+    const text = await seite({ sig: GUELTIG })
+    expect(text).not.toContain(ADRESSE)
+    expect(text).not.toContain(NAME)
+    for (const select of selects()) expect(select).not.toHaveProperty('customerEmail')
+    expect(text).toContain('HT-0210-A4F2')
+    expect(text).toContain('Bergkäse')
+  })
+
+  it('abgeholt und online bezahlt: die Karte „Neuigkeiten vom Hof" bleibt — ohne Adresse', async () => {
+    datenbank(bestellung({ status: 'PICKED_UP', paymentMethod: 'ONLINE', paymentStatus: 'PAID' }))
+    const text = await seite({ sig: GUELTIG })
+    expect(text).toContain('Abgeholt – danke für deinen Einkauf!')
+    expect(text).toContain('KARTE:ohne Adresse')
+    expect(text).not.toContain('unterwegs an')
+  })
+
+  it.each([
+    // Bar offen: Die Frist der erfundenen Bestellung ist vorbei, die Karte steht nicht (neuigkeitenErlaubt) — der Kopf nennt die Adresse.
+    ['bar offen', {}, false],
+    ['online bezahlt', { status: 'PAID', paymentMethod: 'ONLINE', paymentStatus: 'PAID' }, true],
+    ['bar bestätigt', { status: 'CONFIRMED' }, true],
+    ['abholbereit', { status: 'READY', paymentMethod: 'ONLINE', paymentStatus: 'PAID' }, true],
+  ])('Gegenprobe %s: die Adresse steht wie bisher — geholt mit Status-Filter, erst nach der Fristfreigabe', async (_name, teil, karte) => {
+    datenbank(bestellung(teil))
+    const text = await seite({ sig: GUELTIG })
+    expect(text).toContain(ADRESSE)
+    if (karte) expect(text).toContain(`KARTE:${ADRESSE}`)
+    const mitAdresse = findUnique.mock.calls.filter(([frage]) => 'customerEmail' in ((frage as Frage).select ?? {}))
+    expect(mitAdresse).toHaveLength(1)
+    expect(mitAdresse[0][0]).toEqual({
+      where: { id: 'order-1', status: { in: LAUFENDE_STATUS } },
+      select: { customerEmail: true },
+    })
+    // Die Hauptabfrage (mit Hof) kennt die Adresse nicht.
+    const mitHof = selects().find((select) => 'farm' in select)
+    expect(mitHof).not.toHaveProperty('customerEmail')
+    // Erst nach gibVerwaisteFreiOhneRisiko — sonst sähe eine verfallene Bestellung noch „offen" aus.
+    const freigabe = vi.mocked(gibVerwaisteFreiOhneRisiko).mock.invocationCallOrder[0]
+    const adressFrage = findUnique.mock.invocationCallOrder[findUnique.mock.calls.findIndex(([f]) => 'customerEmail' in ((f as Frage).select ?? {}))]
+    expect(freigabe).toBeLessThan(adressFrage)
+  })
+
+  it('schließt die Bestellung zwischen den Abfragen ab: keine Adresse — der Status-Filter gilt in der Abfrage selbst', async () => {
+    const offen = bestellung({ status: 'PAID', paymentMethod: 'ONLINE', paymentStatus: 'PAID' })
+    datenbank(offen)
+    const vorher = findUnique.getMockImplementation()
+    findUnique.mockImplementation((async (frage: Frage) =>
+      frage.select && 'customerEmail' in frage.select ? null : vorher?.(frage as never)) as never)
+    const text = await seite({ sig: GUELTIG })
+    expect(text).not.toContain(ADRESSE)
+    expect(text).toContain('Zahlung erfolgreich')
   })
 })
 
@@ -310,7 +466,7 @@ describe('Kein Code baut den Pfad der Bestätigungsseite an bestell-link.ts vorb
   }, 30_000)
 })
 
-describe('Die Signatur einer Bestellung öffnet genau einen Schreibweg (Nr. 46, Runde 1)', () => {
+describe('Die Signatur einer Bestellung öffnet genau zwei Schreibwege (Nr. 46, Runde 1; Nr. 151)', () => {
   /** Alle .ts/.tsx unter src/, rekursiv. */
   function quellen(ordner: string): string[] {
     return readdirSync(ordner).flatMap((name) => {
@@ -328,13 +484,16 @@ describe('Die Signatur einer Bestellung öffnet genau einen Schreibweg (Nr. 46, 
     'src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx',
   ]
 
-  it('lesen: Bestätigungsseite, Bestellseite, Kalender — schreiben: nur meldeNeuigkeitenAn (bestell-link.ts nennt ihn)', () => {
+  it('lesen: Bestätigungsseite, Bestellseite, Kalender — schreiben: nur meldeNeuigkeitenAn und sendeBarLinkErneut', () => {
     const treffer = quellen(join(process.cwd(), 'src'))
       .filter((pfad) => !pfad.endsWith(join('lib', 'bestell-link.ts')))
       .filter((pfad) => PRUEFT_SIGNATUR.test(ohneKommentare(readFileSync(pfad, 'utf8'))))
       .map((pfad) => pfad.slice(process.cwd().length + 1))
       .sort()
-    expect(treffer).toEqual([...LESEWEGE, 'src/server/actions/neuigkeiten.ts'].sort())
+    // Zweiter Schreibweg seit Nr. 151 (Register S17 Punkt 2, Freigabe §27):
+    // „Erneut senden" (sendeBarLinkErneut) — Mail nur an die Adresse der
+    // Bestellung, nur offen, drei je Tag, immer dieselbe Antwort.
+    expect(treffer).toEqual([...LESEWEGE, 'src/server/actions/bar-bestaetigung.ts', 'src/server/actions/neuigkeiten.ts'].sort())
   }, 30_000)
 
   it('die Lesewege schreiben nicht: keine Server Action, keine Route außer GET', () => {

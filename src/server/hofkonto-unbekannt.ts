@@ -67,3 +67,40 @@ export async function vermerkeUnbekanntesHofKonto(
     // Telemetrie scheitert leise.
   }
 }
+
+/**
+ * Das Stripe-Konto eines Hofs liegt in einem anderen Land als der Hof
+ * (Nachtlauf 23, Nr. 152) — typisch ein Konto, das vor der Landwahl mit
+ * Österreich angelegt wurde. Es ändert sich NICHTS am Konto (Stripe stellt
+ * das Land nicht um, ein stilles Ersetzen ließe Geld hängen): Der Betreiber
+ * bekommt eine Meldung, höchstens einmal je Hof und Tag, nur mit Hof-ID und
+ * den beiden Länderkürzeln — wie bei `vermerkeUnbekanntesHofKonto`. Fehlt das
+ * Konto-Land oder stimmt es überein, passiert nichts. Wirft nie.
+ */
+export async function meldeAbweichendesKontoLand(
+  farmId: string,
+  kontoLand: string | null | undefined,
+  hofLand: string,
+  jetzt: Date = new Date()
+): Promise<void> {
+  try {
+    if (!kontoLand) return
+    const konto = kontoLand.toUpperCase()
+    if (konto === hofLand) return
+
+    let melden = true
+    try {
+      melden = await bremseUeberAlleInstanzen([{ bremse: DB_BREMSEN.stripeKontoLand, merkmal: farmId }], jetzt)
+    } catch {
+      melden = true
+    }
+    if (!melden) return
+    Sentry.captureMessage('Stripe-Konto eines Hofs liegt in einem anderen Land als der Hof', {
+      level: 'warning',
+      tags: { aufgabe: 'stripe-konto', grund: 'konto_land_abweichend' },
+      extra: { farmId, kontoLand: konto, hofLand },
+    })
+  } catch {
+    // Telemetrie scheitert leise.
+  }
+}

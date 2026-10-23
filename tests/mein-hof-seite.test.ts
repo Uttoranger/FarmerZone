@@ -140,6 +140,8 @@ describe('Beiträge-Übersicht', () => {
     expect(eintrag({ publishedAt: vor2Tagen, sentViaEmail: true, emailRecipientCount: 1200 }).zeile).toBe(`vor 2 Tagen · Hofseite und ${formatZahl(1200)} per E-Mail`)
     // Ohne E-Mail-Versand keine Zahl, auch wenn eine im Datensatz stünde.
     expect(eintrag({ publishedAt: vor2Tagen, emailRecipientCount: 5 }).zeile).toBe('vor 2 Tagen · Nur auf der Hofseite')
+    // Nr. 149: Ging keine Mail hinaus (0 angenommen), steht kein „per E-Mail" — wie im Teilen-Fenster.
+    expect(eintrag({ publishedAt: vor2Tagen, sentViaEmail: true, emailRecipientCount: 0 }).zeile).toBe('vor 2 Tagen · Nur auf der Hofseite')
     // Entwürfe gingen an niemanden.
     expect(eintrag({ isDraft: true, sentViaEmail: true, emailRecipientCount: 5 }).zeile).toBe('Noch nicht veröffentlicht')
     expect(eintrag({ isDraft: true }).zeile).toBe('Noch nicht veröffentlicht')

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { enforceRateLimit } from '@/lib/rate-limit'
+import { bremseReservieren } from '@/server/bremse-datenbank'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
@@ -50,6 +51,14 @@ export async function POST(request: NextRequest) {
   // Bestand eines Hofes blockieren.
   const sitzungsLimit = enforceRateLimit('reserve', request, sessionId)
   if (sitzungsLimit) return sitzungsLimit
+
+  // Zweite Stufe über alle Instanzen (Register S17 Punkt 1): ein Zähler je IP,
+  // gemeinsam mit /api/warenkorb/pruefen. Nach dem Parsen — kaputte Anfragen
+  // kosten keine Datenbankabfrage —, vor der Fristfreigabe und jeder Hof-Prüfung:
+  // Wer gebremst ist, erfährt nichts über den Hof und löst kein Schreiben aus.
+  const ueberAlleInstanzen = await bremseReservieren(request)
+  if (ueberAlleInstanzen) return ueberAlleInstanzen
+
   const now = new Date()
   const expiresAt = new Date(now.getTime() + RESERVATION_TTL_MS)
 

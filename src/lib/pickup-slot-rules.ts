@@ -117,3 +117,12 @@ export const ABHOLZEITEN_FEHLEN_ZEILE = 'Noch keine — erst dann können Kundin
 
 /** Die Kennung des ersten Felds im Formular „Neue Abholzeit“ (Wochentag): Der Knopf des Leerzustands springt dorthin, das Feld trägt sie. */
 export const ABHOLZEITEN_FORMULAR_ID = 'dayOfWeek'
+
+/** Texte des Toasts nach dem Löschen einer aktiven Abholzeit (Nr. 157): eine Quelle für Oberfläche und Test. */
+export const ABHOLZEIT_GELOESCHT = {
+  text: 'Abholzeit gelöscht',
+  rueckgaengig: 'Rückgängig',
+  zurueck: 'Abholzeit wiederhergestellt',
+  /** Wie die Bestell-Aktionen: sechs Sekunden Zeit zum Zurücknehmen. */
+  dauerMs: 6000,
+} as const

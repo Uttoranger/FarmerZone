@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import type { Metadata } from 'next'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { ladeTeilenMomente } from '@/server/queries/einstellungen'
 import { teilenMomenteAn, TEILEN_MOMENTE_SATZ, TEILEN_MOMENTE_TITEL } from '@/lib/teilen-momente'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
@@ -18,10 +17,9 @@ export const dynamic = 'force-dynamic'
  * gespeichert). Nur der eigene Hof; geschrieben wird über setzeTeilenMomente.
  */
 export default async function TeilenMomentePage(): Promise<React.JSX.Element> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  const { userId } = await verlangeHofDerSitzung()
 
-  const hof = await ladeTeilenMomente(session.user.id)
+  const hof = await ladeTeilenMomente(userId)
   if (!hof) redirect('/onboarding')
 
   return (

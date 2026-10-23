@@ -22,10 +22,12 @@ const DEV_ACCOUNTS = [
  * Die Hof-Anmeldung mit E-Mail und Passwort (rechte Karte im Mockup
  * web-k0-anmelden-kunde-code-hof-passwort). Verhalten unverändert aus dem
  * bisherigen login-client.tsx übernommen: signIn.email, derselbe Fehlertext,
- * Rückkehr nur nach /teilen (zielNachHofAnmeldung), der Schnellzugang nur in
- * der Entwicklungsumgebung. Neu ist nur die Gestalt.
+ * Rückkehr nur geprüft über zielNachHofAnmeldung (/teilen, /verify, seit Nr. 156
+ * Pfade des Hofbereichs aus ?von=), der Schnellzugang nur in
+ * der Entwicklungsumgebung. Neu ist nur die Gestalt. Die optionale Prop `ziel`
+ * (Nr. 157) legt das Ziel nach der Anmeldung fest; ohne sie gilt `?von=`.
  */
-export function HofAnmeldung(): React.JSX.Element {
+export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' } = {}): React.JSX.Element {
   const router = useRouter()
   const emailId = useId()
   const passwortId = useId()
@@ -37,7 +39,8 @@ export function HofAnmeldung(): React.JSX.Element {
   const [laedt, setLaedt] = useState(false)
 
   function weiter(): void {
-    router.push(zielNachHofAnmeldung(new URLSearchParams(window.location.search).get('von')))
+    // `ziel` ist fest im Code gesetzt (Karte nach dem Bestätigen), nie aus der Adresse.
+    router.push(ziel ?? zielNachHofAnmeldung(new URLSearchParams(window.location.search).get('von')))
     router.refresh()
   }
 

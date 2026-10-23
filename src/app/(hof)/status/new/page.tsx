@@ -1,12 +1,11 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getStatusTemplate } from '@/server/queries/status-posts'
 import { prisma } from '@/lib/prisma'
 import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
-import { berechneMailabstandBeginn } from '@/lib/beitrag-mailabstand'
+import { mailSperreWo } from '@/lib/beitrag-mailabstand'
 import { anlassParameterSchema } from '@/schemas/beitrag-anlass'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { StatusNewClient } from './status-new-client'
@@ -33,11 +32,10 @@ export default async function StatusNewPage({
 }: {
   searchParams: Promise<{ from?: string; anlass?: string | string[] }>
 }) {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  const { userId } = await verlangeHofDerSitzung()
 
-  const farm = await getFarmForUser(session.user.id)
-  if (!farm) redirect('/login')
+  const farm = await getFarmForUser(userId)
+  if (!farm) redirect('/onboarding')
 
   // Vorlage-Muster: ?from={id} lädt einen Alt-Status als Vorbefüllung —
   // serverseitig und farm-gescoped (Ownership); fremde/ungültige ID → null
@@ -58,13 +56,11 @@ export default async function StatusNewPage({
     }),
     // Dieselben Empfänger wie beim Versand: Bestand und bestätigte Anmeldungen (S11).
     prisma.customerFarmSubscription.count({ where: { farmId: farm.id, ...WERBEMAIL_EMPFAENGER } }),
+    // Dieselbe Sperre wie beim Versand (mailSperreWo, Nr. 149); der neueste Beitrag nennt die Tage.
     prisma.statusPost.findFirst({
-      where: {
-        farmId: farm.id,
-        sentViaEmail: true,
-        publishedAt: { gte: berechneMailabstandBeginn(jetzt) },
-      },
+      where: mailSperreWo(farm.id, jetzt),
       select: { publishedAt: true },
+      orderBy: { publishedAt: 'desc' },
     }),
   ])
 

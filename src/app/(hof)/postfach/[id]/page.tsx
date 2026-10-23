@@ -1,9 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { ladeFadenHof } from '@/server/queries/postfach'
 import { ANTWORT_NICHT_MOEGLICH, POSTFACH_TEXT, fadenEintraege, istNeuFuer, neuesteDerAnderenSeite, rundschreibenVomText } from '@/lib/postfach'
@@ -39,9 +38,8 @@ export const dynamic = 'force-dynamic'
  * ohne Rundschreiben (Gründungs-Nachricht) bleibt beantwortbar.
  */
 export default async function FadenPage({ params }: { params: Promise<{ id: string }> }): Promise<React.JSX.Element> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
-  const farm = await getFarmForUser(session.user.id)
+  const { userId } = await verlangeHofDerSitzung()
+  const farm = await getFarmForUser(userId)
   if (!farm) redirect('/onboarding')
 
   // URL-Parameter mit Zod (CODING_STANDARDS §3): keine cuid, kein Faden — wie ?faden= im Admin.

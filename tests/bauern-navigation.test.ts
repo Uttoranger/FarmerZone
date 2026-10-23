@@ -176,7 +176,7 @@ describe('Mein Hof', () => {
       expect(reiter.href.split('?')[0]).toBe('/farm-page')
       expect(meinHof, reiter.id).toMatch(new RegExp(`<MeinHofSeitenkopf[^>]*aktiv="${reiter.id}"`))
     }
-    expect(meinHof).toContain('getMeinHofKopf(session.user.id)')
+    expect(meinHof).toContain('getMeinHofKopf(userId)')
   })
 
   it('Produkte trägt die Reiterleiste als ersten Reiter — nur unter md, ab md bleibt die Seite, wie sie war', () => {

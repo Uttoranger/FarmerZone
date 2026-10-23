@@ -75,7 +75,8 @@ import { EMAIL_BESTAETIGUNG_STICHTAG, FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/l
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT, FREISCHALTUNG_GEAENDERT_TEXT, FREISCHALTUNG_STRIPE_OFFEN_TEXT } from '@/lib/admin-hoefe'
-import { adminSitzung } from './admin-sitzung'
+import { adminSitzung, alteAdminSitzung } from './admin-sitzung'
+import { FRISCH_FEHLER } from '@/lib/admin-anmeldung'
 
 /**
  * Seit dem Checkout-Sprint prüft POST /api/checkout die Reservierungsfrist und
@@ -645,6 +646,17 @@ describe('Freigabe-Actions', () => {
 
     expect(result.error).toBe('Kein Zugriff.')
     expect(farmUpdate).not.toHaveBeenCalled()
+  })
+
+  it('Freischalten ohne frische Bestätigung (N20, Ergänzung 23.10.2026): { error: frisch }, nichts gelesen, geschrieben oder gemailt', async () => {
+    getSession.mockResolvedValue(alteAdminSitzung('user_1') as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+
+    expect(await approveFarmAction('farm_1')).toEqual({ error: FRISCH_FEHLER })
+
+    expect(farmFindUnique).not.toHaveBeenCalled()
+    expect(farmUpdateMany).not.toHaveBeenCalled()
+    expect(freischaltMail).not.toHaveBeenCalled()
   })
 
   it('lehnt ohne Session ab', async () => {

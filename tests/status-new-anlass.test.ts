@@ -13,6 +13,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn(async () => ({ user: { id: 'user-a' } })) } } }))
+// Die Wache selbst prüft tests/hof-ruecksprung.test.ts (Nr. 156); hier nur die Seite.
+vi.mock('@/server/hofbereich', () => ({ verlangeHofDerSitzung: vi.fn(async () => ({ userId: 'user-a', farmId: 'farm-a' })) }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: vi.fn(async () => ({ id: 'farm-a', slug: 'testhof-a', name: 'Testhof A' })) }))
 vi.mock('@/server/queries/status-posts', () => ({ getStatusTemplate: vi.fn(async () => null) }))
 vi.mock('@/server/abo-anmeldung', () => ({ WERBEMAIL_EMPFAENGER: {} }))

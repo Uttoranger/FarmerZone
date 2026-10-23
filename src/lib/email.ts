@@ -842,7 +842,7 @@ export async function sendStatusUpdateEmail(opts: {
   beitragId?: string
   /** Signierter Abmelde-Token (generateUnsubscribeToken) — ohne Ablauf. */
   abmeldeToken: string
-}): Promise<void> {
+}): Promise<VersandErgebnis> {
   const { StatusUpdateEmail } = await import('@/emails/status-update')
   const html = await toHtml(
     React.createElement(StatusUpdateEmail, {
@@ -857,7 +857,8 @@ export async function sendStatusUpdateEmail(opts: {
       appUrl: APP_URL,
     })
   )
-  await send(opts.to, `${opts.farmName}: ${opts.title}`, html, { headers: listUnsubscribeKoepfe(APP_URL, opts.abmeldeToken) })
+  // Das Ergebnis zählt der Aufrufer (Nr. 149): angenommen ist nur eine Mail mit `id`.
+  return sendRaw(opts.to, `${opts.farmName}: ${opts.title}`, html, { headers: listUnsubscribeKoepfe(APP_URL, opts.abmeldeToken) })
 }
 
 /** Storno → Kunde */

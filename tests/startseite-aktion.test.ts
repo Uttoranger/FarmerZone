@@ -83,7 +83,8 @@ import {
   zieheFassungZurueck,
 } from '@/server/actions/startseite'
 import type { StartseitenBlockEingabe } from '@/schemas/startseite'
-import { adminSitzung } from './admin-sitzung'
+import { adminSitzung, alteAdminSitzung } from './admin-sitzung'
+import { FRISCH_FEHLER } from '@/lib/admin-anmeldung'
 
 type Fn = ReturnType<typeof vi.fn>
 type TxMock = {
@@ -365,6 +366,14 @@ describe('veroeffentlicheStartseite', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled()
     expect(prisma.startseiteFassung.updateMany).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
+  })
+
+  it('schreibt ohne frische Bestätigung nichts (N20, Ergänzung 23.10.2026): { error: frisch }', async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(alteAdminSitzung('admin-1') as never)
+    expect(await veroeffentlicheStartseite({ wann: 'jetzt' })).toEqual({ error: FRISCH_FEHLER })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+    expect(updateTag).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 
   it('schreibt die Fassung aus dem Entwurf in EINER Transaktion, mit dem Admin aus der Sitzung', async () => {

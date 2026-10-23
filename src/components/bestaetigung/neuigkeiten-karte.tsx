@@ -27,8 +27,11 @@ export function NeuigkeitenKarte({
   orderId: string
   sig: string
   hofName: string
-  /** Die Adresse der Bestellung — nur angezeigt, nie zurückgeschickt. */
-  email: string
+  /**
+   * Die Adresse der Bestellung — nur angezeigt, nie zurückgeschickt. Fehlt,
+   * sobald die Bestellung abgeschlossen ist (Register S17 Punkt 3, Nr. 153).
+   */
+  email?: string
 }): React.JSX.Element {
   const [laeuft, starte] = useTransition()
   const [stand, setStand] = useState<{ art: 'offen' } | { art: 'danke' } | { art: 'fehler'; text: string }>({ art: 'offen' })
@@ -89,7 +92,7 @@ export function NeuigkeitenKarte({
           </button>
           {/* E-Mail-Adressen sind bis 254 Zeichen lang und haben keine Leerzeichen. */}
           <p className="text-[12.5px] leading-normal [overflow-wrap:anywhere] text-muted-foreground">
-            {NEUIGKEITEN_TEXT.bestaetigen[0]} {email} {NEUIGKEITEN_TEXT.bestaetigen[1]}
+            {NEUIGKEITEN_TEXT.bestaetigen[0]} {email ?? 'die Adresse deiner Bestellung'} {NEUIGKEITEN_TEXT.bestaetigen[1]}
           </p>
         </div>
       )}

@@ -91,6 +91,7 @@ export function VeroeffentlichenDialog({
   laeuft,
   fehler,
   onVeroeffentlichen,
+  children,
 }: {
   offen: boolean
   onOffenChange: (offen: boolean) => void
@@ -101,6 +102,8 @@ export function VeroeffentlichenDialog({
   laeuft: boolean
   fehler: string | null
   onVeroeffentlichen: (eingabe: VeroeffentlichenEingabe) => void
+  /** Eingebettet in den Inhalt — der Dialog der frischen Bestätigung (useFrischBestaetigt) verschachtelt sich hier. */
+  children?: React.ReactNode
 }): React.JSX.Element {
   const id = useId()
   const heute = kalendertagInWien(new Date(jetzt))
@@ -127,6 +130,7 @@ export function VeroeffentlichenDialog({
         onClick: () => onVeroeffentlichen(wann === 'jetzt' ? { wann: 'jetzt' } : { wann: 'termin', datum, uhrzeit }),
       }}
     >
+      {children}
       <AenderungsListe aenderungen={aenderungen} />
       <fieldset className="flex min-w-0 flex-col gap-2">
         <legend className="mb-2 text-[13px] font-semibold text-muted-foreground">{E.wann}</legend>

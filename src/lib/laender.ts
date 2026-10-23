@@ -31,6 +31,14 @@ export const LAND_GENITIV: Record<Land, string> = {
 /** Der ISO-Code für Nominatim (Kleinschreibung, wie der Dienst ihn erwartet). */
 export const LAND_CODE: Record<Land, string> = { AT: 'at', DE: 'de' }
 
+/**
+ * Das Land, in dem Stripe ein neues Hof-Konto anlegt (Nr. 152): das Land des
+ * Hofs. Stripe stellt das Land eines Kontos danach nicht mehr um, deshalb
+ * zählt der Moment des Anlegens. Als Tabelle, damit ein drittes Land hier
+ * eine Entscheidung erzwingt statt still AT zu bekommen.
+ */
+export const STRIPE_LAND: Record<Land, 'AT' | 'DE'> = { AT: 'AT', DE: 'DE' }
+
 /** Beide Codes für die Umkreissuche: `countrycodes=at,de` — die Kundin darf
  *  über die Grenze suchen, ohne das Land anzugeben. */
 export const UMKREIS_LAENDER_CODES = LAENDER.map((l) => LAND_CODE[l]).join(',')

@@ -16,6 +16,9 @@ import { GRUND_NICHT_BESTAETIGT, fristVon, istVerwaist, tagInWorten, uhrzeitInWi
 import { kalendertagInWien } from '@/lib/servicegebuehr'
 import { tagVersetzt } from '@/lib/kalender'
 import { bestellStatusAnzeige } from '@/lib/bestellstatus'
+// Zyklus: bestellungen-finden.ts importiert abholZeitText von hier. Die Liste
+// wird deshalb nur im Funktionsrumpf gelesen, nie beim Laden des Moduls.
+import { LAUFENDE_STATUS } from '@/lib/bestellungen-finden'
 
 export type BestaetigungsZustand =
   | 'bezahlt'
@@ -160,8 +163,20 @@ export type BestaetigungsKopf = {
 export type KopfBestellung = {
   status: OrderStatus
   paymentMethod: PaymentMethod
-  customerEmail: string
+  /** `null`, sobald die Bestellung abgeschlossen ist (bestaetigungZeigtPerson). */
+  customerEmail: string | null
   hofName: string
+}
+
+/**
+ * Darf die Bestätigungsseite Personendaten der Kundin zeigen (Register S17
+ * Punkt 3, Nr. 153)? Nur, solange die Bestellung läuft. Der signierte Link
+ * läuft nie ab (bestell-link.ts) und kann weitergegeben oder im Verlauf
+ * gefunden werden — nach Abholung, Storno oder Nicht-Abholung braucht ihn
+ * niemand mehr, um zu erfahren, an welche Adresse etwas ging.
+ */
+export function bestaetigungZeigtPerson(status: OrderStatus): boolean {
+  return LAUFENDE_STATUS.includes(status)
 }
 
 /** Überschrift für Bestellungen, die stehen — sie folgt dem Status, nicht dem Zeitpunkt des Besuchs. */
@@ -190,7 +205,10 @@ export function bestaetigungsKopf(zustand: BestaetigungsZustand | null, order: K
         ton: 'gruen',
         symbol: 'haken',
         titel: titelLaufend(order.status),
-        satz: `Zahlung erfolgreich. ${weiter(order)} Die Bestätigung ist unterwegs an ${order.customerEmail}.`,
+        // Ohne Adresse (abgeschlossen) entfällt nur der Hinweis auf die Mail.
+        satz: `Zahlung erfolgreich. ${weiter(order)}${
+          order.customerEmail ? ` Die Bestätigung ist unterwegs an ${order.customerEmail}.` : ''
+        }`,
       }
     case 'bestaetigt':
       return {
@@ -220,7 +238,8 @@ export function bestaetigungsKopf(zustand: BestaetigungsZustand | null, order: K
         ton: 'orange',
         symbol: 'uhr',
         titel: 'Fast geschafft – bitte bestätige per E-Mail',
-        satz: `Wir haben dir an ${order.customerEmail} einen Link geschickt. Erst mit deiner Bestätigung packt ${order.hofName} deine Bestellung.`,
+        // Ohne Adresse nur, wenn der Status zwischen den Abfragen der Seite wechselte — nie „an null".
+        satz: `Wir haben dir ${order.customerEmail ? `an ${order.customerEmail} ` : ''}einen Link geschickt. Erst mit deiner Bestätigung packt ${order.hofName} deine Bestellung.`,
       }
     case 'verfallen':
       return {
