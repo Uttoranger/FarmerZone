@@ -6,7 +6,8 @@ import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NEU_EINRICHTEN_KURZ, istUnzugaenglichesStripeKonto, neuEinrichtenSchluessel, stripeKontoBereit } from '@/lib/stripe-konto'
-import { vermerkeUnbekanntesHofKonto } from '@/server/hofkonto-unbekannt'
+import { meldeAbweichendesKontoLand, vermerkeUnbekanntesHofKonto } from '@/server/hofkonto-unbekannt'
+import { STRIPE_LAND, alsLand } from '@/lib/laender'
 import { APP_URL } from '@/lib/umgebung-server'
 import { onlineZahlungEinschaltenSchema } from '@/schemas/online-zahlung'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
@@ -21,6 +22,7 @@ async function getAuthenticatedFarm() {
       name: true,
       slug: true,
       email: true,
+      country: true,
       stripeAccountId: true,
       stripeAccountReady: true,
     },
@@ -81,7 +83,8 @@ export async function createConnectAccount(): Promise<{ error?: string }> {
   const publicUrl = getPublicUrl()
   const parameter: Stripe.AccountCreateParams = {
     type: 'express',
-    country: 'AT',
+    // Das Land des Hofs (Nr. 152); fehlt es, gilt AT wie bisher.
+    country: STRIPE_LAND[alsLand(farm.country)],
     email: farm.email,
     business_type: 'individual',
     capabilities: {
@@ -190,6 +193,7 @@ export async function checkConnectStatus(): Promise<{ ready: boolean; error?: st
   }
   // Dieselbe Regel wie account.updated (src/lib/stripe-konto.ts).
   const ready = stripeKontoBereit(account)
+  await meldeAbweichendesKontoLand(farm.id, account.country, alsLand(farm.country))
 
   await prisma.farm.update({
     where: { id: farm.id },

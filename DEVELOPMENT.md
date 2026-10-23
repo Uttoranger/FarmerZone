@@ -5729,6 +5729,12 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Reihenfolge:** /api/reserve: Speicher-Bremse je IP → Parsen → Speicher-Bremse je Sitzung → Datenbank → Fristfreigabe → Aufräumen → Stilllegung → Freischaltung → Pause → Kaufsperre → Bestand. /api/warenkorb/pruefen: Speicher-Bremse → Parsen → Datenbank → wie bisher. Kaputte Anfragen zählen nicht; wer gebremst ist, erfährt nichts über den Hof.
 - **Offen (Bericht 150):** `/api/warenkorb/pruefen` legt Halte ohne die Prüfkette von `/api/reserve` und ohne `MAX_MENGE` an (Vorschlag: eine gemeinsame Prüfkette); eine einzelne Sitzung kann weiter den ganzen Bestand halten und erneuern (Vorschlag zur Entscheidung: Obergrenze je Sitzung); viele Kundinnen hinter einer gemeinsamen Adresse teilen sich die Grenze.
 
+## Stripe-Konto im Land des Hofs (Register Z1, Ergänzung 23.10.2026; Nr. 152, Lauf 23)
+
+- **Anlegen:** `createConnectAccount` legt das Konto im Land des Hofs an (`STRIPE_LAND[alsLand(farm.country)]`, Tabelle in `src/lib/laender.ts`); fehlt das Land, gilt AT wie bisher. Währung und Beträge bleiben unverändert.
+- **Bestand:** Ein bestehendes Konto ändert sich nie (Stripe stellt das Land nicht um). `meldeAbweichendesKontoLand` (`src/server/hofkonto-unbekannt.ts`) meldet eine Abweichung höchstens einmal je Hof und Tag an Sentry (Bremse `stripeKontoLand`), nur mit Hof-ID und den Länderkürzeln; Aufrufer sind `checkConnectStatus` und die Rückkehr aus dem Onboarding. Der Hinweis für deutsche Höfe bleibt.
+- **Offen:** Wer Stripe vor der Landwahl einrichtet, bekommt ein AT-Konto; `src/lib/json-ld.ts` setzt `addressCountry: 'AT'` auch für deutsche Höfe (beides eigene Aufträge).
+
 ## Nützliche Befehle
 
 ```bash

@@ -39,7 +39,10 @@ vi.mock('@/lib/stripe', () => ({
     accountLinks: { create: vi.fn() },
   },
 }))
-vi.mock('@/server/hofkonto-unbekannt', () => ({ vermerkeUnbekanntesHofKonto: vi.fn(async () => undefined) }))
+vi.mock('@/server/hofkonto-unbekannt', () => ({
+  vermerkeUnbekanntesHofKonto: vi.fn(async () => undefined),
+  meldeAbweichendesKontoLand: vi.fn(async () => undefined),
+}))
 
 import { NextRequest } from 'next/server'
 import { revalidatePath } from 'next/cache'
