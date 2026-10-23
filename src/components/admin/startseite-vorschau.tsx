@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowUpRight, CalendarDays } from 'lucide-react'
+import { ArrowUpRight, CalendarDays, Info } from 'lucide-react'
 import { ADMIN_STARTSEITE_TEXT as T, STAND_TEXT, type StandWahl } from '@/lib/startseite-gestalten'
 import { ENTWURF_TEXT, scrollNachNeuladen, vorschauQuelleText, vorschauRahmen } from '@/lib/startseite-fassung'
 import { uhrzeitInWien } from '@/lib/fristen'
@@ -166,6 +166,8 @@ export function StartseiteVorschau({
   geraetStandard = 'web',
   standStandard = 'heute',
   band: festesBand,
+  hinweis,
+  onStandWechsel,
 }: {
   /** Fest (Zeitplan) — sonst wählt das Segment Entwurf | Live. */
   quelle?: VorschauQuelle
@@ -179,6 +181,13 @@ export function StartseiteVorschau({
   geraetStandard?: VorschauGeraet
   standStandard?: StandWahl
   band?: VorschauBand
+  /**
+   * Die Zeile unter dem Rahmen beim Bearbeiten (Nr. 155, vorschauHinweis):
+   * je nach gezeigtem Tag — nur für den Entwurf, live zeigt nur, was live ist.
+   */
+  hinweis?: (stand: StandWahl) => string | null
+  /** „Stand am“ gewechselt — die Zeile nach „Fertig“ gilt bis dahin. */
+  onStandWechsel?: () => void
 }): React.JSX.Element {
   const [geraet, setGeraet] = useState<VorschauGeraet>(geraetStandard)
   const [gewaehlt, setGewaehlt] = useState<'entwurf' | 'live'>('entwurf')
@@ -220,6 +229,7 @@ export function StartseiteVorschau({
     []
   )
 
+  const hinweisText = quelle === 'entwurf' ? (hinweis?.(standGilt) ?? null) : null
   const oeffnen = link && 'link' in link ? link.link : null
   const gewuenscht = link && 'pfad' in link ? link.pfad : null
   const gewuenschteQuelle = link && 'pfad' in link ? link.quelle : quelle
@@ -269,7 +279,15 @@ export function StartseiteVorschau({
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Segment beschriftung="Stand am" optionen={optionen.map((w) => ({ wert: w, label: STAND_TEXT[w] }))} wert={standGilt} onWertChange={(w) => setStand(w as StandWahl)} />
+        <Segment
+          beschriftung="Stand am"
+          optionen={optionen.map((w) => ({ wert: w, label: STAND_TEXT[w] }))}
+          wert={standGilt}
+          onWertChange={(w) => {
+            setStand(w as StandWahl)
+            onStandWechsel?.()
+          }}
+        />
         <span className="flex-1" />
         {oeffnen && (
           <a
@@ -302,6 +320,22 @@ export function StartseiteVorschau({
         titel={`${T.rahmenTitel} · ${vorschauQuelleText(sichtbareQuelle ?? quelle)}`}
         onGeladen={geladen}
       />
+      {/* Die Live-Region steht immer da, nur ihr Inhalt wechselt: Eine Region, die erst mit ihrem Text
+          entsteht, sagen viele Screenreader nicht an. Leer hebt -mt-3 den Abstand der Spalte auf, damit
+          der Aufbau gleich bleibt. Ohne `hinweis` (unter 1024 px) gibt es sie nicht — dort bleibt alles wie vorher. */}
+      {hinweis && (
+        <p
+          role="status"
+          className={cn('flex items-start gap-1.5 text-[12.5px] leading-snug font-medium text-status-offen', !hinweisText && '-mt-3')}
+        >
+          {hinweisText && (
+            <>
+              <Info className="mt-px size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+              {hinweisText}
+            </>
+          )}
+        </p>
+      )}
       <p role="status" className="min-h-[1.25rem] text-[12.5px] font-medium text-foreground">
         {aktualisiert && T.vorschauAktualisiert(aktualisiert)}
       </p>

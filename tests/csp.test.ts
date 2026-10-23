@@ -17,6 +17,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CSP_ENTDOPPELN_MAX,
+  CSP_HEADER,
   baueCsp,
   cspBerichtAdresse,
   cspBerichtArt,
@@ -51,7 +52,7 @@ describe('baueCsp', () => {
       'img-src': ["'self'", 'data:', 'blob:', kacheln, 'https://*.public.blob.vercel-storage.com'],
       'font-src': ["'self'"],
       'connect-src': ["'self'", 'https://vercel.com', 'https://api.stripe.com'],
-      'frame-src': ['https://js.stripe.com', 'https://*.js.stripe.com', 'https://hooks.stripe.com'],
+      'frame-src': ["'self'", 'https://js.stripe.com', 'https://*.js.stripe.com', 'https://hooks.stripe.com'],
       'worker-src': ["'self'", 'blob:'],
       'object-src': ["'none'"],
       'base-uri': ["'self'"],
@@ -249,5 +250,33 @@ describe('istNeueCspMeldung — entdoppeln je Instanz', () => {
     merkeCspMeldung(gesehen, { ...m, pfad: '/neu2' }, T)
     expect(gesehen.size).toBe(CSP_ENTDOPPELN_MAX)
     expect([...gesehen.keys()].some((k) => k.endsWith('|/p0'))).toBe(false)
+  })
+})
+
+describe('eigene Rahmen (Register G8, Ergänzung 23.10.2026; Nr. 155)', () => {
+  /** Lässt die Policy unsere eigenen Vorschau-Rahmen (Mein Hof, Admin › Startseite) zu — 'self' als erste Quelle von frame-src? */
+  const eigeneRahmen = (policy: string): boolean => zerlege(policy).get('frame-src')?.[0] === "'self'"
+
+  it("frame-src nennt 'self' zuerst — in jeder Spielart der Policy, die Stripe-Hosts bleiben", () => {
+    for (const optionen of [
+      { melden: false },
+      { melden: true, berichtAdresse: 'https://example.com/api/csp-bericht', sentryDsn: DSN },
+      { melden: false, toolbar: true },
+    ]) {
+      const policy = baueCsp(optionen)
+      expect(eigeneRahmen(policy), JSON.stringify(optionen)).toBe(true)
+      expect(zerlege(policy).get('frame-src')).toEqual(expect.arrayContaining(['https://js.stripe.com', 'https://*.js.stripe.com', 'https://hooks.stripe.com']))
+    }
+  })
+
+  it("Gegenprobe: dieselbe Policy ohne 'self' in frame-src fällt durch", () => {
+    const ohne = baueCsp({ melden: false }).replace("frame-src 'self' ", 'frame-src ')
+    expect(ohne).toContain('frame-src https://js.stripe.com')
+    expect(eigeneRahmen(ohne)).toBe(false)
+  })
+
+  it('bleibt zum Beobachten und regelt nicht, wer uns einbettet (frame-ancestors steht in next.config.ts)', () => {
+    expect(CSP_HEADER).toBe('Content-Security-Policy-Report-Only')
+    expect(baueCsp({ melden: true, berichtAdresse: 'https://example.com/api/csp-bericht', toolbar: true })).not.toContain('frame-ancestors')
   })
 })

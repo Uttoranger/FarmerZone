@@ -5735,6 +5735,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Bestand:** Ein bestehendes Konto ändert sich nie (Stripe stellt das Land nicht um). `meldeAbweichendesKontoLand` (`src/server/hofkonto-unbekannt.ts`) meldet eine Abweichung höchstens einmal je Hof und Tag an Sentry (Bremse `stripeKontoLand`), nur mit Hof-ID und den Länderkürzeln; Aufrufer sind `checkConnectStatus` und die Rückkehr aus dem Onboarding. Der Hinweis für deutsche Höfe bleibt.
 - **Offen:** Wer Stripe vor der Landwahl einrichtet, bekommt ein AT-Konto; `src/lib/json-ld.ts` setzt `addressCountry: 'AT'` auch für deutsche Höfe (beides eigene Aufträge).
 
+## Admin › Startseite: Vorschau beim Bearbeiten, eigene Rahmen in der CSP (Register N16 und G8, Ergänzungen 23.10.2026; Nr. 155, Lauf 23)
+
+- **Anlass:** Meldung der Projektleitung, die Vorschau reagiere beim Bearbeiten nicht. Ursache: Ab 1024 px ersetzte das Block-Formular die Vorschau (`blockOffen ? <BlockFormular/> : breit && vorschau`). Wer einen Block bearbeitete, sah keine Vorschau; beim Schließen hängte React sie neu ein (frischer Rahmen, `beendeStartseitenVorschau` beim Öffnen). Und weil bei sichtbarer Vorschau nie ein Block offen war, fehlte ein später beginnender Block nach „Fertig“ bei „Stand am: heute“ ohne Erklärung.
+- **Aufbau:** Bei offenem Block steht das Formular samt Bibliothek links (480 px) an Stelle der Liste (die Liste ist ab 1024 px `lg:hidden`), rechts bleibt `StartseiteVorschau` an genau einer Stelle im Baum, ohne `key`. Unter 1024 px bleibt es beim Alten (Formular unter der Liste, Vorschau im Blatt). Eine Wache über den Syntaxbaum hält das fest (`tests/startseite-bearbeiten-vorschau.test.ts`).
+- **Hinweiszeile:** `vorschauHinweis` in `src/lib/startseite-fassung.ts` entscheidet: offener Block nicht gespeichert (neu und ungültig, oder Fehler der Speicherung) → „Noch nicht in der Vorschau: <Grund>“; nach „Fertig“ und am gezeigten Tag nicht live → „„<Titel>“ ist an diesem Tag nicht zu sehen – live ab …“ (bzw. „live bis …“, wenn er schon vorbei ist). Den Tag rechnet die Seite mit `standZeitpunkt` ab dem Zeitpunkt von „Fertig“; die Zeile gilt bis zur nächsten Änderung oder zum Wechsel von „Stand am“, nur bei der Quelle Entwurf.
+- **CSP:** `frame-src` nennt `'self'` zuerst (die Rahmen von Mein Hof und Admin › Startseite); die Policy bleibt Report-Only, `frame-ancestors` unverändert. Signatur, Draft Mode und Admin-Prüfung der Vorschau sind unberührt.
+
 ## Nützliche Befehle
 
 ```bash

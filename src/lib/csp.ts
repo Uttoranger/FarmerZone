@@ -34,6 +34,8 @@ import { z } from 'zod'
  *  - der Sentry-Host — nur aus NEXT_PUBLIC_SENTRY_DSN beim Build, nur der Host.
  *  - Vercel Analytics läuft über dieselbe Adresse (/_vercel/insights): 'self'.
  *  - https://vercel.live — die Vercel-Toolbar, nur auf Vorschauen.
+ *  - 'self' in frame-src — die eigenen Vorschau-Rahmen (Mein Hof, Admin ›
+ *    Startseite; Register G8, Ergänzung 23.10.2026, Nr. 155).
  */
 
 export const CSP_HEADER = 'Content-Security-Policy-Report-Only'
@@ -109,7 +111,9 @@ export function baueCsp({ melden, berichtAdresse = null, toolbar: mitToolbar = f
     ['img-src', ["'self'", 'data:', 'blob:', KARTEN_HOST, BLOB_BILDER, ...toolbar]],
     ['font-src', ["'self'", ...toolbar]],
     ['connect-src', ["'self'", ...(sentry ? [sentry] : []), BLOB_UPLOAD, STRIPE_API, ...toolbar]],
-    ['frame-src', [STRIPE_JS, STRIPE_JS_UNTER, STRIPE_3DS, ...toolbar]],
+    // 'self' zuerst: unsere eigenen Vorschau-Rahmen (Mein Hof, Admin › Startseite; Register G8, Ergänzung 23.10.2026).
+    // Wer uns einbetten darf, regelt frame-ancestors in next.config.ts — das bleibt eng.
+    ['frame-src', ["'self'", STRIPE_JS, STRIPE_JS_UNTER, STRIPE_3DS, ...toolbar]],
     ['worker-src', ["'self'", 'blob:']],
     ['object-src', ["'none'"]],
     ['base-uri', ["'self'"]],
