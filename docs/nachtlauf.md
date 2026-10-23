@@ -217,6 +217,16 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 147 | Wachen und Regeltexte: Pfade in docs/ai, Überspringen auch in der Integration, Reste aus 135 und 141 (vom Zwischenstand `integration/lauf22`) | `freigabe.md` §26 | G4 |
 | 148 | Nacharbeit im Code aus Lauf 20 und 21: Menüeinträge 44 px, Beiträge, Kommentare, Render-Fall (von `docs/lauf22`) | `freigabe.md` §26 | G4 |
 | Sammel 22 | Sammel-PR `integration/lauf22` | `freigabe.md` §26 | G3, G10 |
+| 149 | Beitrags-Mails nach der Antwort, ein Fehler stoppt nicht alle, ehrliche Zahl (von `docs/lauf23`) | `freigabe.md` §27 | S11, Z3 |
+| 150 | Reservieren über alle Instanzen bremsen (von `docs/lauf23`) | `freigabe.md` §27 | S17, R1 |
+| 151 | Barbestätigung: Link nur als Hash, „Erneut senden“ (von `docs/lauf23`) | `freigabe.md` §27 | S17, Z3 |
+| 152 | Stripe-Konto im Land des Hofs (von `docs/lauf23`) | `freigabe.md` §27 | Z1 |
+| 153 | Bestätigungsseite ohne Personendaten nach Abschluss (vom Zwischenstand `integration/lauf23`) | `freigabe.md` §27 | S17 |
+| 154 | Frische Bestätigung für wirksame Admin-Aktionen (von `docs/lauf23`) | `freigabe.md` §27 | N20 |
+| 155 | Admin › Startseite: Vorschau bleibt beim Bearbeiten eines Blocks sichtbar; die CSP erlaubt unsere eigenen Rahmen (vom Zwischenstand `integration/lauf23`) | `freigabe.md` §27 | N16, G8 |
+| 156 | Hofbereich: Rücksprung nach der Anmeldung, eine Wache „Hof der Sitzung“ (von `docs/lauf23`) | `freigabe.md` §27 | E7, N1 |
+| 157 | Kleinkram im Hofbereich: Packliste, Abholzeit rückgängig, Bestätigen ohne Umweg (vom Zwischenstand `integration/lauf23`) | `freigabe.md` §27 | N24 |
+| Sammel 23 | Sammel-PR `integration/lauf23` | `freigabe.md` §27 | G3, G10 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
@@ -340,6 +350,14 @@ Keine Migration, kein neues Paket. Priorität 138 → 137 → 139 → 143 → 14
 - 124 (PR #329) bleibt in diesem Lauf unberührt, bis die rechtliche Prüfung da ist.
 
 Keine Migration, kein neues Paket. Priorität 145 → 143 → 146 → 148 → 147: 145 und 143 müssen fertig werden, 147 ist die letzte Nummer. Nie zwei Nummern an derselben Datei außerhalb der Grenzen (`freigabe.md` §26).
+
+**Reihenfolge in Lauf 23** (`freigabe.md` §27, Haltepunkt Sammel-PR): Doku-PR → Welle 1: 151 ∥ 154 ∥ 149 → frei werdende Plätze: 156, 150, 152, dann 155, 153, 157 → Sammel-PR. Die Branches heißen `nacht/2026-10-23/<nr>-<kurz>`:
+- 151, 154 und 149 zweigen von `docs/lauf23` ab; ein Workflow je Nummer, höchstens drei Umsetzer gleichzeitig.
+- Jeder frei werdende Platz geht an die nächste startbereite Nummer in dieser Reihenfolge: 156, 150 und 152 (alle von `docs/lauf23`), dann 155 (vom Zwischenstand `integration/lauf23` nach 154), 153 (vom Zwischenstand nach 151) und 157 (vom Zwischenstand nach 156).
+- Für 155, 153 und 157 merged der Dirigent die fertige Vorgängerin in den Zwischenstand (keine Entwürfe); dort läuft zuerst ein voller lokaler Lauf (typecheck, lint, test und test:integration), und er muss grün sein. Ist die Vorgängerin Entwurf oder entfallen, startet die Nummer von `docs/lauf23` und nennt das im Bericht.
+- 124 (PR #329) bleibt in diesem Lauf unberührt.
+
+Keine Migration, kein neues Paket, keine neue Variable. Priorität 151 → 154 → 149 → 155 → 156 → 150 → 153 → 152 → 157. Nie zwei Nummern an derselben Datei außerhalb der Grenzen (`freigabe.md` §27).
 
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 
