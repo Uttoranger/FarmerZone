@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { BestellDialog, DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { FELD, FELD_LABEL, TEXT_GRUEN } from '@/components/hof-bestellungen/stil'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { useFrischBestaetigt } from '@/components/admin/frisch-bestaetigen'
 
 /** Ein Gründungshof, wie der Dialog ihn braucht — nur Höfe mit Platz haben ein Ende. */
 export type GruendungsHof = { id: string; name: string; gruendung: GruendungAnzeige }
@@ -33,6 +34,8 @@ export function GruendungBisDialog({ hof, onClose }: { hof: GruendungsHof | null
 function Formular({ hof, onClose }: { hof: GruendungsHof | null; onClose: () => void }): React.JSX.Element {
   const [laeuft, startTransition] = useTransition()
   const [fehler, setFehler] = useState<string | null>(null)
+  // „Gründungshof bis“ ändern ist heikel (Register N20, Ergänzung 23.10.2026): frisch mit Passkey bestätigt.
+  const frischSpeichern = useFrischBestaetigt(setzeGruendungBisAction)
   // Leer heißt Standard; ein eigenes Datum steht als Tag im Feld.
   const [tag, setTag] = useState(hof?.gruendung.abweichend ? hof.gruendung.bisTag : '')
   const [zugestimmt, setZugestimmt] = useState(false)
@@ -49,7 +52,7 @@ function Formular({ hof, onClose }: { hof: GruendungsHof | null; onClose: () => 
     if (!hof) return
     setFehler(null)
     startTransition(async () => {
-      const ergebnis = await setzeGruendungBisAction(hof.id, { gruendungBis: tag, bestaetigt: verkuerzt && zugestimmt })
+      const ergebnis = await frischSpeichern.ausfuehren(hof.id, { gruendungBis: tag, bestaetigt: verkuerzt && zugestimmt })
       if (ergebnis.error) {
         setFehler(ergebnis.error)
         return
@@ -69,6 +72,7 @@ function Formular({ hof, onClose }: { hof: GruendungsHof | null; onClose: () => 
       unterzeile={hof?.name}
       hauptaktion={{ text: 'Speichern', onClick: speichern, ton: 'gruen', laeuft, gesperrt: verkuerzt && !zugestimmt }}
     >
+      {frischSpeichern.dialog}
       {hof && (
         <form
           className="flex flex-col gap-4"

@@ -75,7 +75,7 @@ describe('Servicegebühr-Dialog — Quelltext', () => {
   })
 
   it('bei null: Satz im Dialog und KEIN Aufruf des Servers', () => {
-    const block = /const mindest = mindestgebuehrCent\(mindestEuro\)([\s\S]*?)setServiceFeeAction\(/.exec(QUELLE)?.[1] ?? ''
+    const block = /const mindest = mindestgebuehrCent\(mindestEuro\)([\s\S]*?)frischSpeichern\.ausfuehren\(/.exec(QUELLE)?.[1] ?? ''
     expect(block).toMatch(/if \(mindest === null\)/)
     expect(block).toMatch(/setFehler\(MINDESTGEBUEHR_UNGUELTIG\)/)
     expect(block).toMatch(/return/)
@@ -88,7 +88,7 @@ describe('Servicegebühr-Dialog — Quelltext', () => {
 
   it('schickt den Prozentsatz als Zahl, nie als Text; bei null ein Satz und kein Aufruf', () => {
     expect(QUELLE).toMatch(/const prozentsatz = prozentsatzEingabe\(prozent\)/)
-    const block = /const prozentsatz = prozentsatzEingabe\(prozent\)([\s\S]*?)setServiceFeeAction\(/.exec(QUELLE)?.[1] ?? ''
+    const block = /const prozentsatz = prozentsatzEingabe\(prozent\)([\s\S]*?)frischSpeichern\.ausfuehren\(/.exec(QUELLE)?.[1] ?? ''
     expect(block).toMatch(/if \(prozentsatz === null\)/)
     expect(block).toMatch(/setFehler\(PROZENT_UNGUELTIG\)/)
     expect(QUELLE).toMatch(/percent: prozentsatz,/)

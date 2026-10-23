@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { KARTE, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
+import { useFrischBestaetigt } from '@/components/admin/frisch-bestaetigen'
 
 /** Eine weitere Adresse, wie die Seite sie zeigt — ohne Token, ohne Ablauf. */
 export type EmpfaengerAnzeige = { id: string; email: string; bestaetigt: boolean; zeile: string }
@@ -65,13 +66,15 @@ export function PostfachZustellung({
   const [listenSatz, setListenSatz] = useState<Meldung>(null)
   const [regelSatz, setRegelSatz] = useState<Meldung>(null)
   const [laeuft, starte] = useTransition()
+  // Einen Empfänger hinzufügen ist heikel (Register N20, Ergänzung 23.10.2026): frisch mit Passkey bestätigt.
+  const frischHinzufuegen = useFrischBestaetigt(fuegeEmpfaengerHinzu)
   const geaendert = SCHALTBARE_ARTEN.some((art) => entwurf[art] !== regeln[art])
 
   function hinzufuegen(ereignis: FormEvent<HTMLFormElement>): void {
     ereignis.preventDefault()
     if (laeuft) return
     starte(async () => {
-      const ergebnis = await fuegeEmpfaengerHinzu({ email })
+      const ergebnis = await frischHinzufuegen.ausfuehren({ email })
       if ('error' in ergebnis) {
         setListenSatz({ art: 'fehler', text: ergebnis.error })
         return
@@ -111,6 +114,7 @@ export function PostfachZustellung({
   return (
     <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-[18px]">
       <section aria-labelledby={`${id}-empfaenger`} className={cn(KARTE, 'flex min-w-0 flex-col gap-3 px-4 py-4 md:px-5 dark:ring-1 dark:ring-border')}>
+        {frischHinzufuegen.dialog}
         <div>
           <h2 id={`${id}-empfaenger`} className={UEBERSCHRIFT}>
             {ZUSTELLUNG_TEXT.empfaengerTitel}

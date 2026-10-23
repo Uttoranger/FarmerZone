@@ -48,6 +48,7 @@ import { Seitenkopf } from './seitenkopf'
 import { StartseiteVorschau, VorschauFenster } from './startseite-vorschau'
 import { BlockFormular, Bibliothek, UEBERSCHRIFT, VORLAGE_SYMBOL, ZUSTAND_MARKE, titelVon } from './startseite-block-formular'
 import { AenderungsListe, VeroeffentlichenDialog } from './startseite-veroeffentlichen'
+import { useFrischBestaetigt } from './frisch-bestaetigen'
 import { StartseiteZeitplan, type ZeitplanAktion } from './startseite-zeitplan'
 import {
   blockWerteAus,
@@ -451,6 +452,9 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
     })
   }
 
+  // Veröffentlichen ist heikel (Register N20, Ergänzung 23.10.2026): frisch mit Passkey bestätigt.
+  const frischVeroeffentlichen = useFrischBestaetigt(veroeffentlicheStartseite)
+
   function veroeffentlichen(eingabe: VeroeffentlichenEingabe) {
     setDialogFehler(null)
     startTransition(async () => {
@@ -458,7 +462,7 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
         setDialogFehler(entwurf.stand.art === 'fehler' ? entwurf.stand.text : E.nichtGespeichert)
         return
       }
-      const ergebnis = await veroeffentlicheStartseite(eingabe)
+      const ergebnis = await frischVeroeffentlichen.ausfuehren(eingabe)
       if ('error' in ergebnis) {
         setDialogFehler(ergebnis.error)
         return
@@ -664,7 +668,9 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
         laeuft={laeuft}
         fehler={dialogFehler}
         onVeroeffentlichen={veroeffentlichen}
-      />
+      >
+        {frischVeroeffentlichen.dialog}
+      </VeroeffentlichenDialog>
 
       <VorschauFenster
         offen={fassungVorschau !== null}

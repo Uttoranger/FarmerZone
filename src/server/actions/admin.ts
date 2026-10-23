@@ -17,7 +17,7 @@ import { BUENDEL_STAND_STATUS, MELDUNG_GEAENDERT, MELDUNG_VERWEIS_GEAENDERT, WUE
 import { MEINE_MELDUNGEN_HREF } from '@/lib/hof-hilfe'
 import { MARKE_TEAM } from '@/lib/marke'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
-import { sendeRundschreiben } from '@/server/actions/postfach'
+import { verschickeRundschreiben } from '@/server/rundschreiben'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
 import { FREISCHALTUNG_GEAENDERT_TEXT, freischaltSperre } from '@/lib/admin-hoefe'
 import {
@@ -110,7 +110,8 @@ async function legeGruendungsNachrichtAn(farmId: string, zusage: { platz: number
  * die Zusage-Mail) läuft automatisch.
  */
 export async function approveFarmAction(farmId: string): Promise<{ error?: string }> {
-  const guard = await verlangeAdminAktion()
+  // Heikle Aktion (Register N20, Ergänzung 23.10.2026): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion.
+  const guard = await verlangeFrischeBestaetigung()
   if ('error' in guard) return { error: guard.error }
 
   const farm = await prisma.farm.findUnique({
@@ -359,7 +360,8 @@ export async function setServiceFeeAction(
   farmId: string,
   eingabe: { percent: unknown; minCents: unknown; activeFrom: unknown }
 ): Promise<{ error?: string }> {
-  const guard = await verlangeAdminAktion()
+  // Heikle Aktion (Register N20, Ergänzung 23.10.2026): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion.
+  const guard = await verlangeFrischeBestaetigung()
   if ('error' in guard) return { error: guard.error }
 
   const parsed = servicegebuehrEinstellungSchema.safeParse(eingabe)
@@ -426,7 +428,8 @@ export async function setzeGruendungBisAction(
   farmId: string,
   eingabe: { gruendungBis: unknown; bestaetigt: unknown }
 ): Promise<{ error?: string }> {
-  const guard = await verlangeAdminAktion()
+  // Heikle Aktion (Register N20, Ergänzung 23.10.2026): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion.
+  const guard = await verlangeFrischeBestaetigung()
   if ('error' in guard) return { error: guard.error }
 
   const jetzt = new Date()
@@ -739,15 +742,19 @@ export async function setzeBuendelStandAction(eingabe: unknown): Promise<Buendel
       // Eigener try (Nr. 105, Nacharbeit 101): Der Stand ist schon gespeichert —
       // scheitert das Rundschreiben, laufen Kundinnen-Mail und Neuladen trotzdem.
       try {
-        const gesendet = await sendeRundschreiben({
-          titel: WUENSCHE_TEXT.bescheidTitel,
-          text: antwort,
-          art: 'INFO',
-          link: MEINE_MELDUNGEN_HREF,
-          perMail: false,
-          antwortMoeglich: false,
-          empfaenger: { art: 'ausgewaehlt', hofIds },
-        })
+        // Derselbe Versand wie ein Rundschreiben, aber mit der Wache DIESER Aktion (N20, Ergänzung 23.10.2026) — keine eigene frische Bestätigung.
+        const gesendet = await verschickeRundschreiben(
+          {
+            titel: WUENSCHE_TEXT.bescheidTitel,
+            text: antwort,
+            art: 'INFO',
+            link: MEINE_MELDUNGEN_HREF,
+            perMail: false,
+            antwortMoeglich: false,
+            empfaenger: { art: 'ausgewaehlt', hofIds },
+          },
+          guard.userId
+        )
         // Die Rundschreiben-Logik schreibt nur nicht stillgelegten Höfen — gezählt wird, wer die Nachricht wirklich bekam.
         if ('error' in gesendet) hofBescheidGescheitert = true
         else geschrieben.hoefe = gesendet.empfaenger

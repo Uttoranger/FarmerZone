@@ -124,6 +124,25 @@ describe('useFrischBestaetigt', () => {
     expect(aktion).toHaveBeenCalledTimes(1)
   })
 
+  it('ein Aufruf (Nr. 154, z. B. Freischalten): nach „frisch" der Dialog, nach der Bestätigung genau ein zweiter Aufruf mit denselben Argumenten', async () => {
+    const aktion = aktionErstFrisch()
+    passkey.signIn.mockResolvedValue({ data: {}, error: null })
+    starte(aktion)
+
+    const ergebnis = zuletzt.ausfuehren('hof_1')
+    await pruefstand.zuRuhe()
+    expect(dialog().offen).toBe(true)
+    expect(aktion).toHaveBeenCalledTimes(1)
+
+    dialog().onBestaetigen()
+    expect(await ergebnis).toEqual({ ok: true, id: 'hof_1' })
+    await pruefstand.zuRuhe()
+
+    expect(aktion).toHaveBeenCalledTimes(2)
+    expect(aktion.mock.calls.map(([id]) => id)).toEqual(['hof_1', 'hof_1'])
+    expect(dialog().offen).toBe(false)
+  })
+
   it('zwei Aufrufe aus demselben Render: EIN Dialog, nach der Bestätigung jeder genau einmal wiederholt', async () => {
     const aktion = aktionErstFrisch()
     passkey.signIn.mockResolvedValue({ data: {}, error: null })

@@ -38,7 +38,8 @@ export function HofAktionDialog({
 }): React.JSX.Element {
   const [laeuft, startTransition] = useTransition()
   const [fehler, setFehler] = useState<string | null>(null)
-  // Zurücknehmen und Ablehnen sind heikel (Register N20): frisch mit Passkey bestätigt.
+  // Freischalten, Zurücknehmen und Ablehnen sind heikel (Register N20, Ergänzung 23.10.2026): frisch mit Passkey bestätigt.
+  const frischFreischalten = useFrischBestaetigt(approveFarmAction)
   const frischZuruecknehmen = useFrischBestaetigt(revokeFarmApprovalAction)
   const frischAblehnen = useFrischBestaetigt(rejectFarmAction)
   const art = aktion?.art ?? 'approve'
@@ -56,7 +57,7 @@ export function HofAktionDialog({
     startTransition(async () => {
       const ergebnis =
         art === 'approve'
-          ? await approveFarmAction(hof.id)
+          ? await frischFreischalten.ausfuehren(hof.id)
           : art === 'revoke'
             ? await frischZuruecknehmen.ausfuehren(hof.id)
             : await frischAblehnen.ausfuehren(hof.id)
@@ -87,6 +88,7 @@ export function HofAktionDialog({
       unterzeile={hof?.name}
       hauptaktion={{ text: KNOPF[art], onClick: ausfuehren, ton: art === 'approve' ? 'gruen' : 'orange', laeuft }}
     >
+      {frischFreischalten.dialog}
       {frischZuruecknehmen.dialog}
       {frischAblehnen.dialog}
       <div className="flex flex-col gap-3 text-[14px] text-muted-foreground">

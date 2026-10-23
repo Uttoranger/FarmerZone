@@ -19,10 +19,7 @@ import {
   POSTFACH_HREF,
   POSTFACH_TEXT,
   TAG_MS,
-  empfaengerFuer,
   fadenHref,
-  nachrichtArtVon,
-  type EmpfaengerRegel,
 } from '@/lib/postfach'
 import {
   empfaengerEntfernenSchema,
@@ -30,7 +27,6 @@ import {
   erstattungErledigtSchema,
   gelesenSchema,
   hofAntwortSchema,
-  rundschreibenSchema,
   teamAntwortSchema,
   zustellRegelnSpeichernSchema,
 } from '@/schemas/postfach'
@@ -48,12 +44,12 @@ import { PLATTFORM_EINSTELLUNG_ID, PLATTFORM_EINSTELLUNG_TAG } from '@/lib/platt
 import { DB_BREMSEN } from '@/lib/bremse-datenbank'
 import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
+import { verschickeRundschreiben, type RundschreibenErgebnis } from '@/server/rundschreiben'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import {
   empfaengerTokenHash,
   ladeAntwortFuerTeam,
   ladeBetreiberEmpfaenger,
-  ladeEmpfaengerHoefe,
   ladeMailEmpfaenger,
   ladeZustellung,
 } from '@/server/queries/postfach'
@@ -362,67 +358,17 @@ export async function markiereErstattungErledigt(eingabe: unknown): Promise<Erge
   return { ok: true }
 }
 
-export type RundschreibenErgebnis = { ok: true; empfaenger: number } | { error: string }
-
 /**
- * Ein Rundschreiben senden: Die Empfänger rechnet der Server aus der Regel
- * (empfaengerFuer über die nicht stillgelegten Höfe) — nie eine Liste aus dem
- * Browser übernehmen. In EINER Transaktion: das Rundschreiben, je Empfänger
- * genau ein Faden (Unique farmId + rundschreibenId) mit der ersten Nachricht
- * vom Team. Mit Haken gehen danach die E-Mails raus; letzteMailAm belegt die
- * Stunde schon in der Transaktion.
+ * Ein Rundschreiben senden (Register N12): heikel (Register N20, Ergänzung
+ * 23.10.2026) — erst die frische Bestätigung mit Passkey, dann die Eingabe
+ * und der Versand in verschickeRundschreiben (src/server/rundschreiben.ts,
+ * ohne 'use server'). Der Bescheid an die Höfe in setzeBuendelStandAction
+ * ruft den Versand direkt, mit der Wache seiner eigenen Aktion.
  */
 export async function sendeRundschreiben(eingabe: unknown): Promise<RundschreibenErgebnis> {
-  const geprueft = rundschreibenSchema.safeParse(eingabe)
-  if (!geprueft.success) return { error: satzAus(geprueft.error) }
-  const { titel, text, art, link, perMail, antwortMoeglich, empfaenger } = geprueft.data
-
-  const guard = await verlangeAdminAktion()
-  if ('error' in guard) return { error: guard.error }
-
-  const hofIds = empfaengerFuer(empfaenger, await ladeEmpfaengerHoefe())
-  if (hofIds.length === 0) return { error: POSTFACH_FEHLER.keineEmpfaenger }
-  // Gespeichert wird, wen das Senden wirklich traf — bei „Ausgewählte" die geprüften Kennungen.
-  const regel: EmpfaengerRegel = empfaenger.art === 'ausgewaehlt' ? { art: 'ausgewaehlt', hofIds } : empfaenger
-
-  const jetzt = new Date()
-  const faeden = await prisma.$transaction(async (tx) => {
-    const rundschreiben = await tx.rundschreiben.create({
-      data: { titel, text, linkUrl: link, art, perMail, antwortMoeglich, empfaengerRegel: regel, empfaenger: hofIds.length, gesendetAm: jetzt, erstelltVonUserId: guard.userId },
-      select: { id: true },
-    })
-    const angelegt = await tx.unterhaltung.createManyAndReturn({
-      data: hofIds.map((farmId) => ({ farmId, rundschreibenId: rundschreiben.id, letzteNachrichtAm: jetzt, letzteMailAm: perMail ? jetzt : null })),
-      select: { id: true },
-    })
-    await tx.nachricht.createMany({
-      data: angelegt.map((f) => ({ unterhaltungId: f.id, vonFarmId: null, text, linkUrl: link, art: nachrichtArtVon(art), createdAt: jetzt })),
-    })
-    return angelegt.map((f) => f.id)
-  })
-
-  if (perMail) {
-    nachDerAntwort(async () => {
-      try {
-        const empfaengerListe = await ladeMailEmpfaenger(faeden)
-        const { sendPostfachMail } = await import('@/lib/email')
-        let gescheitert = 0
-        // Nacheinander: Resend begrenzt die Anfragen je Sekunde, und ein Fehler bei einem Hof hält die übrigen nicht auf.
-        for (const e of empfaengerListe) {
-          const ergebnis = await sendPostfachMail({ art: 'rundschreiben', an: e.email, titel, text, link, unterhaltungId: e.unterhaltungId })
-          if (ergebnis.error) gescheitert += 1
-        }
-        if (gescheitert > 0) meldeNachlauf(new Error(`${gescheitert} gescheitert`), 'rundschreiben-mail', String(faeden.length))
-      } catch (err) {
-        meldeNachlauf(err, 'rundschreiben-mail', String(faeden.length))
-      }
-    })
-  }
-
-  revalidatePath(ADMIN_POSTFACH_HREF)
-  revalidatePath(POSTFACH_HREF)
-  revalidatePath('/dashboard')
-  return { ok: true, empfaenger: faeden.length }
+  const frisch = await verlangeFrischeBestaetigung()
+  if ('error' in frisch) return { error: frisch.error }
+  return verschickeRundschreiben(eingabe, frisch.userId)
 }
 
 // ─── Zustellung (Register N14, Nr. 95) ───────────────────────────────────────
@@ -439,6 +385,9 @@ export type HinzufuegenErgebnis = { ok: true; email: string } | { error: string 
  * Die Mail geht nach der Antwort; ein Fehler meldet nur die Klasse.
  */
 export async function fuegeEmpfaengerHinzu(eingabe: unknown): Promise<HinzufuegenErgebnis> {
+  // Heikle Aktion (Register N20, Ergänzung 23.10.2026): nur frisch mit Passkey bestätigt, vor der Prüfung der Eingabe.
+  const guard = await verlangeFrischeBestaetigung()
+  if ('error' in guard) return { error: guard.error }
   const geprueft = empfaengerHinzufuegenSchema.safeParse(eingabe)
   if (!geprueft.success) {
     // Nur die eigenen Sätze des Schemas (Format, ZU_LANG); jeder andere Zod-Text (Englisch) wird zum festen Satz.
@@ -446,9 +395,6 @@ export async function fuegeEmpfaengerHinzu(eingabe: unknown): Promise<Hinzufuege
     return { error: satz === ZU_LANG.email ? ZU_LANG.email : ZUSTELLUNG_FEHLER.email }
   }
   const { email } = geprueft.data
-
-  const guard = await verlangeAdminAktion()
-  if ('error' in guard) return { error: guard.error }
 
   if (email === SUPPORT_EMAIL.toLowerCase()) return { error: ZUSTELLUNG_FEHLER.schonFest }
   if (process.env.NODE_ENV === 'production' && !hinzufuegenDrossel.check(guard.userId)) return { error: ZUSTELLUNG_FEHLER.zuViele }

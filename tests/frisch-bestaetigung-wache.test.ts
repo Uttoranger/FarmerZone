@@ -19,16 +19,23 @@ import ts from 'typescript'
 const lies = (pfad: string): string => readFileSync(join(process.cwd(), pfad), 'utf8')
 
 const HEIKLE_AKTIONEN: Array<{ datei: string; namen: string[] }> = [
-  { datei: 'src/server/actions/admin.ts', namen: ['revokeFarmApprovalAction', 'rejectFarmAction'] },
+  // Ergänzung 23.10.2026 (Nr. 154): Freischalten, Servicegebühr, „Gründungshof bis", Rundschreiben, Empfänger, Startseite.
+  { datei: 'src/server/actions/admin.ts', namen: ['revokeFarmApprovalAction', 'rejectFarmAction', 'approveFarmAction', 'setServiceFeeAction', 'setzeGruendungBisAction'] },
   { datei: 'src/server/actions/gruendung.ts', namen: ['nimmAusGruendung', 'nimmWiederAuf', 'schreibeZusagenFest', 'markiereAlsTesthof', 'nimmTesthofZurueck'] },
-  { datei: 'src/server/actions/postfach.ts', namen: ['markiereErstattungErledigt'] },
+  { datei: 'src/server/actions/postfach.ts', namen: ['markiereErstattungErledigt', 'sendeRundschreiben', 'fuegeEmpfaengerHinzu'] },
+  { datei: 'src/server/actions/startseite.ts', namen: ['veroeffentlicheStartseite'] },
   { datei: 'src/server/actions/admin-anmeldung.ts', namen: ['erstelleErsatzcodes', 'entfernePasskey', 'pruefeFrischFuerPasskey'] },
 ]
 
 const EXPORTE = ['src/app/admin/finanzen/export/route.ts', 'src/app/admin/betrieb/export/route.ts', 'src/app/admin/betrieb/bilder-export/route.ts']
 
 const OBERFLAECHEN: Array<{ datei: string; aktionen: string[] }> = [
-  { datei: 'src/components/admin/hof-aktion-dialog.tsx', aktionen: ['revokeFarmApprovalAction', 'rejectFarmAction'] },
+  { datei: 'src/components/admin/hof-aktion-dialog.tsx', aktionen: ['revokeFarmApprovalAction', 'rejectFarmAction', 'approveFarmAction'] },
+  { datei: 'src/components/admin/servicegebuehr-dialog.tsx', aktionen: ['setServiceFeeAction'] },
+  { datei: 'src/components/admin/gruendung-bis-dialog.tsx', aktionen: ['setzeGruendungBisAction'] },
+  { datei: 'src/components/admin/postfach-zustellung.tsx', aktionen: ['fuegeEmpfaengerHinzu'] },
+  { datei: 'src/components/admin/startseite-gestalten.tsx', aktionen: ['veroeffentlicheStartseite'] },
+  { datei: 'src/app/admin/postfach/rundschreiben-formular.tsx', aktionen: ['sendeRundschreiben'] },
   { datei: 'src/components/admin/gruendung-ausnehmen-dialog.tsx', aktionen: ['nimmAusGruendung', 'nimmWiederAuf'] },
   { datei: 'src/components/admin/testhof-dialog.tsx', aktionen: ['markiereAlsTesthof', 'nimmTesthofZurueck'] },
   { datei: 'src/components/admin/einstellungen-gruendung.tsx', aktionen: ['schreibeZusagenFest'] },

@@ -39,7 +39,8 @@ import {
 import { EINSTELLUNG_UNGUELTIG } from '@/schemas/servicegebuehr'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { adminSitzung } from './admin-sitzung'
+import { adminSitzung, alteAdminSitzung } from './admin-sitzung'
+import { FRISCH_FEHLER } from '@/lib/admin-anmeldung'
 
 const getSession = vi.mocked(auth.api.getSession)
 const userFindUnique = vi.mocked(prisma.user.findUnique)
@@ -127,6 +128,13 @@ describe('setzeGruendungBisAction — Zugriff', () => {
     getSession.mockResolvedValue(adminSitzung('user_1', { isAdmin: true }) as never)
     userFindUnique.mockResolvedValue({ isAdmin: false } as never)
     expect(await setzeGruendungBisAction('farm_1', { gruendungBis: '2028-06-30', bestaetigt: false })).toEqual({ error: 'Kein Zugriff.' })
+    expect(farmUpdateMany).not.toHaveBeenCalled()
+  })
+
+  it('ohne frische Bestätigung (N20, Ergänzung 23.10.2026): { error: frisch }, nichts gelesen und nichts geschrieben', async () => {
+    getSession.mockResolvedValue(alteAdminSitzung('user_1') as never)
+    expect(await setzeGruendungBisAction('farm_1', { gruendungBis: '2028-06-30', bestaetigt: false })).toEqual({ error: FRISCH_FEHLER })
+    expect(farmFindUnique).not.toHaveBeenCalled()
     expect(farmUpdateMany).not.toHaveBeenCalled()
   })
 
