@@ -2,17 +2,30 @@
  * Was die Bestätigungsseite über eine Bestellung sagt (src/lib/bestaetigung.ts)
  * — nur aus dem Datenbankstand; Stripes redirect_status ist höchstens ein Hinweis.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import { createElement, type ReactNode } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+
+// Die Karte „Neuigkeiten vom Hof" (Nr. 153): nur ihr Satz zur Adresse wird hier gerendert.
+vi.mock('@/server/actions/neuigkeiten', () => ({ meldeNeuigkeitenAn: vi.fn() }))
+vi.mock('next/link', () => ({
+  default: ({ href, children }: { href: string; children?: ReactNode }) => createElement('a', { href }, children),
+}))
+
 import {
   abholZeitText,
   bestaetigungsBloecke,
   bestaetigungsKopf,
+  bestaetigungZeigtPerson,
   bestaetigungsZustand,
   bestellSchritte,
   neuigkeitenErlaubt,
   type NeuigkeitenBestellung,
 } from '@/lib/bestaetigung'
 import { GRUND_NICHT_BESTAETIGT, GRUND_ZAHLUNG_VERFALLEN, fristVon, uhrzeitInWien } from '@/lib/fristen'
+import { LAUFENDE_STATUS } from '@/lib/bestellungen-finden'
+import { NEUIGKEITEN_TEXT } from '@/lib/abo-bestaetigung'
+import { NeuigkeitenKarte } from '@/components/bestaetigung/neuigkeiten-karte'
 
 type Bestellung = Parameters<typeof bestaetigungsZustand>[0]
 
@@ -326,6 +339,65 @@ describe('neuigkeitenErlaubt — EINE Regel für die Karte und die Action (N2, N
 
   it('die Blöcke der Seite kennen die Anmeldung nicht mehr selbst — eine Quelle', () => {
     expect(bestaetigungsBloecke('bezahlt', 'PAID')).not.toHaveProperty('neuigkeiten')
+  })
+})
+
+describe('Personendaten nur, solange die Bestellung offen ist (Register S17 Punkt 3, Nr. 153)', () => {
+  const ABGESCHLOSSEN = ['PICKED_UP', 'CANCELLED', 'NOT_PICKED_UP'] as const
+
+  it('bestaetigungZeigtPerson: wahr genau für die laufenden Status', () => {
+    for (const status of LAUFENDE_STATUS) expect(bestaetigungZeigtPerson(status), status).toBe(true)
+    for (const status of ABGESCHLOSSEN) expect(bestaetigungZeigtPerson(status), status).toBe(false)
+  })
+
+  const kopfOrder = (teil: Partial<Parameters<typeof bestaetigungsKopf>[1]> = {}) => ({
+    status: 'PICKED_UP' as const,
+    paymentMethod: 'ONLINE' as const,
+    customerEmail: null,
+    hofName: 'Hof Beispiel',
+    ...teil,
+  })
+
+  it('bezahlt und abgeholt, ohne Adresse: kein „unterwegs an …" — Dank und Zahlung bleiben', () => {
+    const kopf = bestaetigungsKopf('bezahlt', kopfOrder())
+    expect(kopf.titel).toBe('Abgeholt – danke für deinen Einkauf!')
+    expect(kopf.satz).toBe('Zahlung erfolgreich. Schön, dass du direkt beim Hof eingekauft hast.')
+    expect(kopf.satz).not.toContain('unterwegs')
+  })
+
+  it('bar offen ohne Adresse (Status wechselte zwischen den Abfragen): nie „an null"', () => {
+    const kopf = bestaetigungsKopf('bestaetigung-offen', kopfOrder({ status: 'PENDING_CONFIRMATION', paymentMethod: 'ONSITE_CASH' }))
+    expect(kopf.satz).toBe('Wir haben dir einen Link geschickt. Erst mit deiner Bestätigung packt Hof Beispiel deine Bestellung.')
+  })
+
+  it('Gegenprobe: mit Adresse steht der Satz wie bisher', () => {
+    const kopf = bestaetigungsKopf('bezahlt', kopfOrder({ status: 'PAID', customerEmail: 'erika@example.org' }))
+    expect(kopf.satz).toContain('Die Bestätigung ist unterwegs an erika@example.org.')
+  })
+
+  it('die Karte ohne Adresse: „an die Adresse deiner Bestellung" — mit Adresse wie bisher', () => {
+    const karte = (email?: string) =>
+      renderToStaticMarkup(createElement(NeuigkeitenKarte, { orderId: 'order-1', sig: 'a'.repeat(64), hofName: 'Hof Test', email }))
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+    const ohne = karte()
+    expect(ohne).toContain(`${NEUIGKEITEN_TEXT.bestaetigen[0]} die Adresse deiner Bestellung ${NEUIGKEITEN_TEXT.bestaetigen[1]}`)
+    expect(ohne).not.toContain('@')
+    expect(karte('erika@example.org')).toContain(`${NEUIGKEITEN_TEXT.bestaetigen[0]} erika@example.org ${NEUIGKEITEN_TEXT.bestaetigen[1]}`)
+  })
+
+  it('die Anmeldung bleibt nach der Abholung erlaubt — eine Regel, unabhängig von der Anzeige der Adresse', () => {
+    const abgeholt: NeuigkeitenBestellung = {
+      paymentMethod: 'ONLINE',
+      paymentStatus: 'PAID',
+      status: 'PICKED_UP',
+      cancelReason: null,
+      createdAt: new Date('2026-10-05T08:00:00Z'),
+      pickupDate: new Date('2026-10-06T12:00:00Z'),
+      pickupTimeStart: '15:00',
+    }
+    expect(bestaetigungZeigtPerson(abgeholt.status)).toBe(false)
+    expect(neuigkeitenErlaubt(abgeholt, new Date('2026-10-07T08:00:00Z'))).toBe(true)
   })
 })
 

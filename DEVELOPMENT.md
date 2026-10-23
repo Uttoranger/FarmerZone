@@ -5742,6 +5742,12 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Hinweiszeile:** `vorschauHinweis` in `src/lib/startseite-fassung.ts` entscheidet: offener Block nicht gespeichert (neu und ungültig, oder Fehler der Speicherung) → „Noch nicht in der Vorschau: <Grund>“; nach „Fertig“ und am gezeigten Tag nicht live → „„<Titel>“ ist an diesem Tag nicht zu sehen – live ab …“ (bzw. „live bis …“, wenn er schon vorbei ist). Den Tag rechnet die Seite mit `standZeitpunkt` ab dem Zeitpunkt von „Fertig“; die Zeile gilt bis zur nächsten Änderung oder zum Wechsel von „Stand am“, nur bei der Quelle Entwurf.
 - **CSP:** `frame-src` nennt `'self'` zuerst (die Rahmen von Mein Hof und Admin › Startseite); die Policy bleibt Report-Only, `frame-ancestors` unverändert. Signatur, Draft Mode und Admin-Prüfung der Vorschau sind unberührt.
 
+## Bestätigungsseite ohne Personendaten nach Abschluss (Register S17 Punkt 3; Nr. 153, Lauf 23, 23.10.2026)
+
+- **Lücke (Seitenkarte S5):** Der signierte Link der Bestätigungsseite läuft nie ab (bewusst, `bestell-link.ts`). Die Seite lud `customerName` (nie angezeigt) und `customerEmail` und zeigte die Adresse auch nach Abholung im Kopfsatz („unterwegs an …“) und in der Karte „Neuigkeiten vom Hof“. Wer den Link später fand oder bekam, las die Adresse der Kundin.
+- **Fix:** `bestaetigungZeigtPerson(status)` (`src/lib/bestaetigung.ts`) ist wahr genau für `LAUFENDE_STATUS`. Die Hauptabfrage lädt weder Name noch E-Mail; nach `gibVerwaisteFreiOhneRisiko` holt `adresseSolangeOffen` die E-Mail nur für eine laufende Bestellung, mit `status: { in: LAUFENDE_STATUS }` in derselben Abfrage (schließt der Hof dazwischen ab, kommt keine Adresse). Ohne Adresse entfällt bei „bezahlt“ der Teil „Die Bestätigung ist unterwegs an …“; die Karte sagt „an die Adresse deiner Bestellung“.
+- **Unverändert:** `neuigkeitenErlaubt` (Karte und Action bleiben eine Regel, die Anmeldung nach der Abholung bleibt möglich), Status, Abholung, Positionen, Kontakt des Hofs, „Erneut senden“ (Nr. 151).
+
 ## Nützliche Befehle
 
 ```bash
