@@ -316,7 +316,7 @@ Diese Regeln sind fachlich, nicht technisch. Verletzung kostet Geld oder Vertrau
 | Bremse | Wege | Zählt | Fällt die Datenbank aus |
 |---|---|---|---|
 | Better Auth (`rateLimit`, `AUTH_BREMSE_SPEICHER`) | alle Pfade unter `/api/auth` außer `/get-session`: Anmeldung, Registrierung, Passwort, Codes (feste Regeln, Regeln der Plugins, `customRules`) | `RateLimitZaehler`, Zweck `auth`, je IP und Pfad, nur in Produktion | je Instanz im Arbeitsspeicher weiter |
-| R1, zweite Stufe (`bremseUeberAlleInstanzen`, `DB_BREMSEN`) | Anmeldecode, Registrierung, Problem melden, Bestellungen finden, Checkout, Postfach, CSP-Meldungen | nach der ersten Stufe im Speicher, `RateLimitZaehler` je Zweck | lässt durch (fail-open), die erste Stufe wirkt |
+| R1, zweite Stufe (`bremseUeberAlleInstanzen`, `DB_BREMSEN`) | Anmeldecode, Registrierung, Problem melden, Bestellungen finden, Checkout, Reservieren und Halte erneuern, Postfach, CSP-Meldungen | nach der ersten Stufe im Speicher, `RateLimitZaehler` je Zweck | lässt durch (fail-open), die erste Stufe wirkt |
 | Fehlversuche je Adresse (`zaehleVersuchVorab`, `FEHLVERSUCH_BREMSEN`) | falsche Codes und Passwörter (E7) | `RateLimitZaehler`, in jeder Umgebung | gesperrt (fail-closed) |
 | Admin (`DB_BREMSEN.adminErsatzcode`, `adminEinrichtungscode`) | Ersatzcode, Einrichtungscode (N20) | jeder Versuch, ohne erste Stufe | gesperrt (fail-closed) |
 
