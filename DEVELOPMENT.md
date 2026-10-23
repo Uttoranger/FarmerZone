@@ -5722,6 +5722,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Eine Sperre:** `mailSperreWo(farmId, jetzt)` (`src/lib/beitrag-mailabstand.ts`): `sentViaEmail` UND `emailRecipientCount > 0` UND jünger als `MAILABSTAND_TAGE`; Action und Seite fragen damit. Die Laufzeit eines Beitrags (`expiresAt`) hat eine eigene Konstante `BEITRAG_LAUFZEIT_TAGE` (7). Die Meldung nach dem Veröffentlichen sagt „wird an n Abos verschickt“ (`mailVersandMeldung`); Mein Hof › Beiträge nennt „per E-Mail“ nur bei `emailRecipientCount > 0`, wie das Teilen-Fenster.
 - **Laufzeit:** Vorlage bauen kostet lokal rund 2 ms je Mail; den Rest macht die Antwort von Resend. Messwerte und die Grenze in Abos stehen im Bericht `docs/nachtlauf/berichte/149.md`.
 
+## Reservieren über alle Instanzen gebremst (Register S17 Punkt 1; Nr. 150, Lauf 23, 23.10.2026)
+
+- **Lücke:** `/api/reserve` und `/api/warenkorb/pruefen` bremsten nur im Speicher der Instanz (`enforceRateLimit`, 20 je Minute und IP). Auf Vercel hat jede warme Instanz ihr eigenes Fenster; über viele Instanzen ließ sich deutlich öfter reservieren bzw. Halte erneuern.
+- **Fix:** Ein Eintrag `reserveIp` in `DB_BREMSEN` (20 je Minute, wie `checkoutIp`) und die Hilfe `bremseReservieren` (src/server/bremse-datenbank.ts, Muster `bremseCheckout`, nur in Produktion, fail-open). Beide Routen zählen in DENSELBEN Zähler je IP — wer zwischen den Wegen wechselt, bekommt nicht die doppelte Menge. Über der Grenze 429 mit `ZU_VIELE_ANFRAGEN` und `Retry-After` bis zum Ende des Minutenfensters.
+- **Reihenfolge:** /api/reserve: Speicher-Bremse je IP → Parsen → Speicher-Bremse je Sitzung → Datenbank → Fristfreigabe → Aufräumen → Stilllegung → Freischaltung → Pause → Kaufsperre → Bestand. /api/warenkorb/pruefen: Speicher-Bremse → Parsen → Datenbank → wie bisher. Kaputte Anfragen zählen nicht; wer gebremst ist, erfährt nichts über den Hof.
+- **Offen (Bericht 150):** `/api/warenkorb/pruefen` legt Halte ohne die Prüfkette von `/api/reserve` und ohne `MAX_MENGE` an (Vorschlag: eine gemeinsame Prüfkette); eine einzelne Sitzung kann weiter den ganzen Bestand halten und erneuern (Vorschlag zur Entscheidung: Obergrenze je Sitzung); viele Kundinnen hinter einer gemeinsamen Adresse teilen sich die Grenze.
+
 ## Nützliche Befehle
 
 ```bash

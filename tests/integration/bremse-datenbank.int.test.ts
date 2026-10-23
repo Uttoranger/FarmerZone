@@ -20,6 +20,11 @@
  *    der Tabelle (HMAC der IP); hat eine andere Instanz die 3 Codes einer IP
  *    schon verbraucht, lehnt diese Instanz mit 429 ab und legt keinen Code
  *    an — eine frische IP kommt durch.
+ *  - Reservieren über HTTP in Produktion (Nr. 150, Register S17 Punkt 1):
+ *    Zwei Instanzen, die eine ruft /api/reserve, die andere
+ *    /api/warenkorb/pruefen — beide zählen in dieselbe Zeile `reserve-ip`
+ *    (HMAC der IP). Die 21. Anfrage bekommt 429, obwohl keine Instanz im
+ *    eigenen Speicher an ihre Grenze stößt; eine frische IP kommt durch.
  *
  * Aufräumen: Zwecke dieser Tests beginnen mit `int-` (Präfix-Regel aus
  * basis.ts); die Zeilen des HTTP-Tests werden über ihren Schlüssel gelöscht.
@@ -288,5 +293,49 @@ describe('Anmeldecode über HTTP in Produktion', () => {
     // 3. Gegenprobe: eine frische IP kommt durch.
     expect((await anfordern(auth, ipC, adressen[4])).status).toBe(200)
     expect(await prisma.verification.count({ where: { identifier: `sign-in-otp-${adressen[4]}` } })).toBe(1)
+  }, 90_000)
+})
+
+describe('Reservieren über HTTP in Produktion (Nr. 150)', () => {
+  const ip = '192.0.2.150'
+  const anfrage = (pfad: string, body: unknown, von = ip) =>
+    new NextRequest(`http://localhost${pfad}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-forwarded-for': von },
+      body: JSON.stringify(body),
+    })
+  // Ein Produkt, das es nicht gibt: Die Bremse sitzt vor dem Hof-Lesen, danach
+  // antwortet /api/reserve mit 409 — gezählt ist die Anfrage trotzdem.
+  const reservieren = (von = ip) =>
+    anfrage('/api/reserve', { productId: intKennung('kein-produkt'), quantity: 1, sessionId: intKennung('sitzung') }, von)
+  const pruefen = () => anfrage('/api/warenkorb/pruefen', { sessionId: intKennung('sitzung'), items: [] })
+
+  it('reserve und pruefen auf zwei Instanzen teilen sich die 20 je Minute — die 21. bekommt 429', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    const bremse = DB_BREMSEN.reserveIp
+    const frisch = '192.0.2.151'
+    geloeschteSchluessel.push(bremsSchluessel(GEHEIMNIS, bremse.zweck, ip), bremsSchluessel(GEHEIMNIS, bremse.zweck, frisch))
+    await prisma.rateLimitZaehler.deleteMany({ where: { schluessel: { in: geloeschteSchluessel } } })
+
+    await frischesFenster(bremse.fensterMs)
+    vi.resetModules()
+    const instanzA = await import('@/app/api/reserve/route')
+    vi.resetModules()
+    const instanzB = await import('@/app/api/warenkorb/pruefen/route')
+
+    for (let i = 0; i < 10; i += 1) {
+      expect((await instanzA.POST(reservieren())).status).toBe(409)
+      expect((await instanzB.POST(pruefen())).status).toBe(200)
+    }
+    const zeile = await prisma.rateLimitZaehler.findFirst({ where: { schluessel: bremsSchluessel(GEHEIMNIS, bremse.zweck, ip) } })
+    expect(zeile?.zaehler).toBe(20)
+
+    const gebremst = await instanzA.POST(reservieren())
+    expect(gebremst.status).toBe(429)
+    expect(Number(gebremst.headers.get('Retry-After'))).toBeGreaterThan(0)
+    expect((await instanzB.POST(pruefen())).status).toBe(429)
+
+    // Gegenprobe: eine frische IP kommt durch (bis zum Hof-Lesen, das 409 sagt).
+    expect((await instanzA.POST(reservieren(frisch))).status).toBe(409)
   }, 90_000)
 })

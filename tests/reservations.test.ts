@@ -8,16 +8,44 @@
  * Route nichts — 409 mit dem Titel aus kaufSperreHinweis, geprüft nach der Pause
  * und vor dem Bestand.
  *
- * Prisma ist gemockt — keine DB-Zugriffe.
+ * Nr. 150 (Register S17 Punkt 1): /api/reserve und /api/warenkorb/pruefen
+ * zählen in Produktion über alle Instanzen in DENSELBEN Zähler je IP
+ * (`reserveIp`, 20 je Minute). Die 21. Anfrage über beide Wege zusammen
+ * bekommt 429 mit Retry-After bis zum Fensterende, und nichts wird gehalten;
+ * die Bremse sitzt nach dem Parsen und vor jeder Hof-Prüfung.
+ *
+ * Prisma ist gemockt — keine DB-Zugriffe. Die Zählung der zweiten Stufe
+ * stellt eine Attrappe von `$queryRaw` (ein Zähler je Schlüssel); echt prüft
+ * sie tests/integration/bremse-datenbank.int.test.ts.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    $queryRaw: vi.fn(),
     stockReservation: { deleteMany: vi.fn(), aggregate: vi.fn(), upsert: vi.fn() },
     product: { findUnique: vi.fn() },
   },
+}))
+
+// Die erste Stufe (Speicher je Instanz) lässt hier durch, damit die zweite
+// allein entscheidet — ihre eigenen Tests stehen in tests/rate-limit*.test.ts.
+vi.mock('@/lib/rate-limit', async (original) => ({
+  ...(await original<typeof import('@/lib/rate-limit')>()),
+  enforceRateLimit: vi.fn(() => null),
+}))
+vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
+// Der Abgleich im Warenkorb hat eigene Tests (warenkorb-*.test.ts); hier zählt
+// nur, ob /api/warenkorb/pruefen bis zum Erneuern der Halte kommt.
+vi.mock('@/server/warenkorb', () => ({
+  pruefeSitzungsWarenkorb: vi.fn(async () => ({
+    befund: { positionen: [], etwasAbgelaufen: false, etwasGeaendert: false },
+    meldung: null,
+    berichtigt: [],
+  })),
+  erneuereHalte: vi.fn(async () => null),
+  loescheHalte: vi.fn(async () => undefined),
 }))
 
 // Die Freigabe verwaister Bestellungen hat eigene Tests
@@ -31,7 +59,11 @@ vi.mock('@/server/abholfenster', async (original) => ({
 }))
 
 import { POST } from '@/app/api/reserve/route'
+import { POST as pruefenPOST } from '@/app/api/warenkorb/pruefen/route'
 import { prisma } from '@/lib/prisma'
+import { erneuereHalte } from '@/server/warenkorb'
+import { gibVerwaisteFreiFuerProdukte } from '@/server/verwaiste-bestellungen'
+import { DB_BREMSEN, ZU_VIELE_ANFRAGEN, bremsSchluessel } from '@/lib/bremse-datenbank'
 import { ausgebuchteTage, fensterSchluessel } from '@/server/abholfenster'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
@@ -308,5 +340,143 @@ describe('Kaufsperre (Nr. 145, Register N24): ohne buchbaren Abholtermin wird ni
       name: true,
       pickupSlots: { where: { isActive: true }, select: { dayOfWeek: true, startTime: true, endTime: true } },
     })
+  })
+})
+
+describe('Bremse über alle Instanzen (Nr. 150, Register S17 Punkt 1)', () => {
+  // Mitten in einem Minutenfenster: noch 30 Sekunden bis zum Ende.
+  const JETZT = new Date('2026-10-19T08:00:30.000Z')
+  const IP = '203.0.113.9'
+  const queryRaw = vi.mocked(prisma.$queryRaw)
+  let staende: Map<string, number>
+
+  /** Die Attrappe zählt je Schlüssel hoch wie das INSERT … ON CONFLICT — ein Speicher für „alle Instanzen". */
+  function datenbankZaehlt(vorab = 0) {
+    staende = new Map()
+    queryRaw.mockImplementation((async (...args: unknown[]) => {
+      const werte = (args[1] as { values: unknown[] }).values
+      const schluessel = werte.filter((w): w is string => typeof w === 'string')
+      return schluessel.map((s) => {
+        const stand = (staende.get(s) ?? vorab) + 1
+        staende.set(s, stand)
+        return { schluessel: s, zaehler: stand }
+      })
+    }) as never)
+  }
+
+  function reservieren(ip = IP) {
+    return new NextRequest('http://localhost/api/reserve', {
+      method: 'POST',
+      body: JSON.stringify(validBody),
+      headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
+    })
+  }
+
+  function pruefen(ip = IP) {
+    return new NextRequest('http://localhost/api/warenkorb/pruefen', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId: 'sess_a', items: [{ productId: 'prod_1', quantity: 2 }] }),
+      headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
+    })
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({ now: JETZT, toFake: ['Date'] })
+    vi.stubEnv('NODE_ENV', 'production')
+    datenbankZaehlt()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllEnvs()
+  })
+
+  it('beide Wege zählen zusammen: 20 gehen durch, die 21. bekommt 429 und hält nichts', async () => {
+    for (let i = 0; i < 10; i += 1) {
+      expect((await POST(reservieren())).status).toBe(200)
+      expect((await pruefenPOST(pruefen())).status).toBe(200)
+    }
+    expect(upsert).toHaveBeenCalledTimes(10)
+    expect(erneuereHalte).toHaveBeenCalledTimes(10)
+    // Ein einziger Schlüssel für beide Routen — Zweck im Klartext, die IP nur als HMAC.
+    expect([...staende.keys()]).toHaveLength(1)
+    expect([...staende.keys()][0]).toMatch(/^reserve-ip:[0-9a-f]{32}$/)
+
+    const res = await POST(reservieren())
+    expect(res.status).toBe(429)
+    expect(res.headers.get('Retry-After')).toBe('30')
+    expect(await res.json()).toEqual({ error: ZU_VIELE_ANFRAGEN })
+    expect(upsert).toHaveBeenCalledTimes(10)
+
+    const res2 = await pruefenPOST(pruefen())
+    expect(res2.status).toBe(429)
+    expect(res2.headers.get('Retry-After')).toBe('30')
+    expect(erneuereHalte).toHaveBeenCalledTimes(10)
+  })
+
+  it('Gegenprobe: eine andere Adresse hat ihren eigenen Zähler', async () => {
+    // Die erste Adresse hat ihre 20 im Fenster schon verbraucht.
+    staende.set(bremsSchluessel(process.env.BETTER_AUTH_SECRET!, DB_BREMSEN.reserveIp.zweck, IP), 20)
+    expect((await POST(reservieren())).status).toBe(429)
+    expect((await POST(reservieren('203.0.113.10'))).status).toBe(200)
+    expect(upsert).toHaveBeenCalledTimes(1)
+  })
+
+  it('Reihenfolge: ein stillgelegter Hof bei voller Bremse bekommt 429 — vor Fristfreigabe und Hof-Lesen', async () => {
+    datenbankZaehlt(20)
+    productFindUnique.mockResolvedValue({
+      stock: 10,
+      isAvailable: true,
+      farm: { ...HOF, archivedAt: new Date('2026-09-01T00:00:00.000Z') },
+    } as never)
+
+    const res = await POST(reservieren())
+
+    expect(res.status).toBe(429)
+    expect(gibVerwaisteFreiFuerProdukte).not.toHaveBeenCalled()
+    expect(deleteMany).not.toHaveBeenCalled()
+    expect(productFindUnique).not.toHaveBeenCalled()
+    expect(upsert).not.toHaveBeenCalled()
+  })
+
+  it('Gegenprobe: derselbe stillgelegte Hof mit freier Bremse bekommt die Meldung der Stilllegung', async () => {
+    datenbankZaehlt(19)
+    productFindUnique.mockResolvedValue({
+      stock: 10,
+      isAvailable: true,
+      farm: { ...HOF, archivedAt: new Date('2026-09-01T00:00:00.000Z') },
+    } as never)
+
+    const res = await POST(reservieren())
+
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toBe(FARM_ARCHIVED_MESSAGE)
+  })
+
+  it('pruefen bei voller Bremse: 429 vor der Fristfreigabe, kein Erneuern der Halte', async () => {
+    datenbankZaehlt(20)
+
+    const res = await pruefenPOST(pruefen())
+
+    expect(res.status).toBe(429)
+    expect(gibVerwaisteFreiFuerProdukte).not.toHaveBeenCalled()
+    expect(erneuereHalte).not.toHaveBeenCalled()
+  })
+
+  it('ungültige Anfragen zählen nicht: erst parsen, dann bremsen', async () => {
+    const kaputt = new NextRequest('http://localhost/api/reserve', {
+      method: 'POST',
+      body: JSON.stringify({ ...validBody, quantity: 0 }),
+      headers: { 'content-type': 'application/json', 'x-forwarded-for': IP },
+    })
+    expect((await POST(kaputt)).status).toBe(400)
+    expect(queryRaw).not.toHaveBeenCalled()
+  })
+
+  it('außerhalb der Produktion keine zweite Stufe — keine Abfrage', async () => {
+    vi.stubEnv('NODE_ENV', 'test')
+    datenbankZaehlt(20)
+    expect((await POST(reservieren())).status).toBe(200)
+    expect((await pruefenPOST(pruefen())).status).toBe(200)
+    expect(queryRaw).not.toHaveBeenCalled()
   })
 })

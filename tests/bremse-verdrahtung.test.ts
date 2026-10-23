@@ -11,6 +11,10 @@
  *    beim Anmelden VOR der Rollenprüfung.
  *  - Checkout: NACH enforceRateLimit mit Sitzung, VOR der Fristfreigabe und
  *    jedem Schreiben.
+ *  - Reservieren und Halte erneuern (Nr. 150): in /api/reserve NACH beiden
+ *    Speicher-Bremsen und dem Parsen, VOR Fristfreigabe, Aufräumen und den
+ *    Hof-Prüfungen; in /api/warenkorb/pruefen NACH Speicher-Bremse und
+ *    Parsen, VOR Fristfreigabe und Erneuern.
  *  - Gegenprobe: Die Muster schlagen an einer vertauschten Reihenfolge an.
  */
 import { readFileSync } from 'node:fs'
@@ -97,5 +101,57 @@ describe('Checkout — zweite Stufe in /api/checkout', () => {
     expect(inReihenfolge(post, ['await bremseCheckout(', "enforceRateLimit('checkout', request, data.sessionId)"])).toBe(
       false
     )
+  })
+})
+
+describe('Reservieren — zweite Stufe in /api/reserve (Nr. 150)', () => {
+  const route = quelle('src', 'app', 'api', 'reserve', 'route.ts')
+  const post = route.slice(route.indexOf('export async function POST'))
+
+  it('Speicher-Bremsen → Parsen → Datenbank → Fristfreigabe → Aufräumen → Stilllegung → Freischaltung → Pause → Kaufsperre → Bestand', () => {
+    expect(
+      inReihenfolge(post, [
+        "enforceRateLimit('reserve', request)",
+        'bodySchema.safeParse(body)',
+        "enforceRateLimit('reserve', request, sessionId)",
+        'await bremseReservieren(request)',
+        'if (ueberAlleInstanzen) return ueberAlleInstanzen',
+        'gibVerwaisteFreiFuerProdukte([productId], now)',
+        'prisma.stockReservation.deleteMany',
+        'product.farm.archivedAt',
+        'product.farm.approvedAt',
+        'product.farm.isPaused',
+        'kaufSperre(',
+        'prisma.stockReservation.aggregate',
+        'prisma.stockReservation.upsert',
+      ])
+    ).toBe(true)
+  })
+
+  it('Gegenprobe: nach der Fristfreigabe stünde sie falsch', () => {
+    expect(inReihenfolge(post, ['gibVerwaisteFreiFuerProdukte(', 'await bremseReservieren('])).toBe(false)
+  })
+})
+
+describe('Reservieren — zweite Stufe in /api/warenkorb/pruefen (Nr. 150)', () => {
+  const route = quelle('src', 'app', 'api', 'warenkorb', 'pruefen', 'route.ts')
+  const post = route.slice(route.indexOf('export async function POST'))
+
+  it('Speicher-Bremse → Parsen → Datenbank → Fristfreigabe → Abgleich → Erneuern', () => {
+    expect(
+      inReihenfolge(post, [
+        "enforceRateLimit('warenkorb-pruefen', request)",
+        'bodySchema.safeParse(body)',
+        'await bremseReservieren(request)',
+        'if (ueberAlleInstanzen) return ueberAlleInstanzen',
+        'gibVerwaisteFreiFuerProdukte(',
+        'pruefeSitzungsWarenkorb(',
+        'erneuereHalte(',
+      ])
+    ).toBe(true)
+  })
+
+  it('Gegenprobe: vor dem Parsen stünde sie falsch', () => {
+    expect(inReihenfolge(post, ['await bremseReservieren(', 'bodySchema.safeParse(body)'])).toBe(false)
   })
 })

@@ -121,6 +121,13 @@ export const DB_BREMSEN = {
   // ohne erste Stufe — die Grenze schützt das Postfach hinter der Bestellung.
   // Merkmal ist die Bestell-ID.
   barLinkBestellung: { zweck: 'bar-link-bestellung', max: BAR_LINK_JE_BESTELLUNG_UND_TAG, fensterMs: TAG_MS },
+
+  // Reservieren und Halte erneuern (Register S17 Punkt 1, Nr. 150): EIN Zähler
+  // je IP für /api/reserve und /api/warenkorb/pruefen zusammen, 20 in der
+  // Minute wie die erste Stufe beider Routen (bremseReservieren in
+  // src/server/bremse-datenbank.ts). Nur je IP — eine Grenze je Sitzung ist
+  // eine offene Entscheidung der Projektleitung.
+  reserveIp: { zweck: 'reserve-ip', ...CHECKOUT_JE_MINUTE },
 } as const satisfies Record<string, DbBremse>
 
 /** Welche Bremsen je Art zählen: Codes je Stunde und je Tag, Passwörter je Stunde. */

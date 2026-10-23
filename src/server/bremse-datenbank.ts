@@ -175,6 +175,24 @@ export async function bremseCheckout(
 }
 
 /**
+ * Reservieren und Halte erneuern (Register S17 Punkt 1, Nr. 150): zweite
+ * Stufe nach `enforceRateLimit` in /api/reserve und /api/warenkorb/pruefen.
+ * Beide Routen zählen in DENSELBEN Zähler je IP (`reserveIp`, 20 in der
+ * Minute über alle Instanzen) — wer zwischen den Wegen wechselt, bekommt
+ * nicht die doppelte Menge. Nur in Produktion, wie die erste Stufe; fail-open
+ * wie jede zweite Stufe. null = weiter, sonst die 429-Antwort der ersten Stufe.
+ */
+export async function bremseReservieren(request: Request, jetzt: Date = new Date()): Promise<NextResponse | null> {
+  if (process.env.NODE_ENV !== 'production') return null
+  const bremse = DB_BREMSEN.reserveIp
+  if (await bremseUeberAlleInstanzen([{ bremse, merkmal: getClientIp(request.headers) }], jetzt)) return null
+  return NextResponse.json(
+    { error: ZU_VIELE_ANFRAGEN },
+    { status: 429, headers: { 'Retry-After': String(sekundenBisFensterEnde(jetzt, bremse.fensterMs)) } }
+  )
+}
+
+/**
  * Anmeldecode, zweite Stufe im before-Hook von auth.ts — die erste Stufe
  * (Better Auth je IP und Pfad, `codeAnforderungen` je Adresse) ist da schon
  * gelaufen. Anfordern zählt je IP und je Adresse, Anmelden mit Code je IP.
