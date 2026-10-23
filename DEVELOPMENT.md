@@ -5735,6 +5735,12 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Bestand:** Ein bestehendes Konto ändert sich nie (Stripe stellt das Land nicht um). `meldeAbweichendesKontoLand` (`src/server/hofkonto-unbekannt.ts`) meldet eine Abweichung höchstens einmal je Hof und Tag an Sentry (Bremse `stripeKontoLand`), nur mit Hof-ID und den Länderkürzeln; Aufrufer sind `checkConnectStatus` und die Rückkehr aus dem Onboarding. Der Hinweis für deutsche Höfe bleibt.
 - **Offen:** Wer Stripe vor der Landwahl einrichtet, bekommt ein AT-Konto; `src/lib/json-ld.ts` setzt `addressCountry: 'AT'` auch für deutsche Höfe (beides eigene Aufträge).
 
+## Kleinkram im Hofbereich: Packliste, Abholzeit rückgängig, Bestätigen ohne Umweg (Seitenkarte P6, P10, P8; Nr. 157, Lauf 23, 23.10.2026)
+
+- **Packliste (P6):** Die Druckseite gibt verwaiste Bestellungen mit demselben `jetzt` frei wie /dashboard, bevor sie liest; eine verfallene Bestellung steht nicht mehr auf dem Papier.
+- **Abholzeit rückgängig (P10):** Löschen ist endgültig (`Order` hängt nicht an `PickupSlot`), `farm.ts` bleibt unverändert. Der Toast „Abholzeit gelöscht“ trägt für eine AKTIVE Zeit „Rückgängig“ (sechs Sekunden), auch in Mein Hof (dort statt „Gespeichert · Ansehen“); der Klick legt die Zeit über `addPickupSlot` mit Tag, Beginn, Ende und `maxOrders` neu an. Eine pausierte Zeit behält den bisherigen Toast, sie käme sonst aktiv zurück. Die Texte stehen in `ABHOLZEIT_GELOESCHT` (`src/lib/pickup-slot-rules.ts`).
+- **Bestätigen ohne Umweg (P8):** Abgemeldet zeigt die Karte nach dem Bestätigen gleich das Formular der Hof-Anmeldung (`NachBestaetigung`); `HofAnmeldung` bekommt die optionale Prop `ziel` (nur `/onboarding`, fest im Code, nie aus der Adresse). Keine Adresse in der URL, nichts vorausgefüllt.
+
 ## Nützliche Befehle
 
 ```bash

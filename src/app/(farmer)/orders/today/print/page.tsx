@@ -12,6 +12,7 @@ import { formatDatumLang, formatEuro } from '@/lib/format'
 import { uhrzeitInWien } from '@/lib/fristen'
 import { abholtage, abholWhere, datumLang } from '@/lib/heute'
 import { MARKE } from '@/lib/marke'
+import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,6 +54,9 @@ export default async function PrintPacklistPage() {
   // Dieselbe Bedingung wie „Heute abholen" auf /dashboard, mit Wiener
   // Tagesgrenze: Bildschirm und Papier zeigen dieselben Bestellungen.
   const jetzt = new Date()
+  // Verfallene, unbezahlte Bestellungen vorher freigeben (wie /dashboard, mit
+  // demselben jetzt): Das Papier zeigt nur, was der Bildschirm auch zeigt.
+  await gibVerwaisteFreiOhneRisiko(farm.id, jetzt)
   const orders = await prisma.order.findMany({
     where: abholWhere(farm.id, abholtage(jetzt).heute),
     include: {

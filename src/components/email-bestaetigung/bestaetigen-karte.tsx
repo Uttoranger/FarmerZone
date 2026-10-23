@@ -6,6 +6,7 @@ import { CircleCheck, Loader2, MailCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { HofAnmeldung } from '@/components/anmelden/hof-anmeldung'
 import { bestaetigeEmail } from '@/server/actions/email-bestaetigung'
 
 /*
@@ -21,6 +22,42 @@ const KNOPF = cn(
 const KNOPF_ORANGE = cn(KNOPF, 'border border-primary-foreground/30 bg-primary text-primary-foreground')
 const TEXTLINK = cn('inline-flex min-h-11 items-center rounded-full px-1 text-[14px] font-semibold text-status-fertig hover:underline', FOKUS_RAHMEN)
 
+/**
+ * Der Zustand nach dem Bestätigen (Nr. 157). Abgemeldet steht gleich das
+ * Formular der Hof-Anmeldung da, mit festem Ziel /onboarding — kein Umweg über
+ * /login und keine Adresse in der URL, nichts vorausgefüllt (Personendaten).
+ */
+export function NachBestaetigung({
+  angemeldet,
+  ueberschrift,
+}: {
+  angemeldet: boolean
+  ueberschrift: React.Ref<HTMLHeadingElement>
+}): React.JSX.Element {
+  return (
+    <section aria-labelledby="verify-titel" className="flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <CircleCheck className="mt-1 size-6 shrink-0 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
+        <div className="min-w-0">
+          <h2 id="verify-titel" ref={ueberschrift} tabIndex={-1} className="font-heading text-[22px] leading-tight font-semibold outline-none md:text-2xl">
+            Danke, deine E-Mail ist bestätigt
+          </h2>
+          <p className="mt-1 text-[14px] text-muted-foreground">
+            {angemeldet ? 'Jetzt kannst du Fotos hochladen, und wir können deinen Hof freischalten.' : 'Melde dich an, dann kannst du Fotos hochladen, und wir können deinen Hof freischalten.'}
+          </p>
+        </div>
+      </div>
+      {angemeldet ? (
+        <Link href="/onboarding" className={KNOPF_ORANGE}>
+          Weiter zum Einrichten
+        </Link>
+      ) : (
+        <HofAnmeldung ziel="/onboarding" />
+      )}
+    </section>
+  )
+}
+
 export function BestaetigenKarte({ token, angemeldet }: { token: string; angemeldet: boolean }): React.JSX.Element {
   const [laedt, starte] = useTransition()
   const [stand, setStand] = useState<'offen' | 'bestaetigt' | { fehler: string }>('offen')
@@ -35,26 +72,7 @@ export function BestaetigenKarte({ token, angemeldet }: { token: string; angemel
     })
   }
 
-  if (stand === 'bestaetigt') {
-    return (
-      <section aria-labelledby="verify-titel" className="flex flex-col gap-4">
-        <div className="flex items-start gap-3">
-          <CircleCheck className="mt-1 size-6 shrink-0 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
-          <div className="min-w-0">
-            <h2 id="verify-titel" ref={ueberschrift} tabIndex={-1} className="font-heading text-[22px] leading-tight font-semibold outline-none md:text-2xl">
-              Danke, deine E-Mail ist bestätigt
-            </h2>
-            <p className="mt-1 text-[14px] text-muted-foreground">
-              Jetzt kannst du Fotos hochladen, und wir können deinen Hof freischalten.
-            </p>
-          </div>
-        </div>
-        <Link href={angemeldet ? '/onboarding' : '/login?von=/verify'} className={KNOPF_ORANGE}>
-          {angemeldet ? 'Weiter zum Einrichten' : 'Anmelden'}
-        </Link>
-      </section>
-    )
-  }
+  if (stand === 'bestaetigt') return <NachBestaetigung angemeldet={angemeldet} ueberschrift={ueberschrift} />
 
   return (
     <section aria-labelledby="verify-titel" className="flex flex-col gap-4">
