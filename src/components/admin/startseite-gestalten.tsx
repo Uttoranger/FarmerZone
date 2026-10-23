@@ -17,6 +17,7 @@ import {
   istFest,
   standZeitpunkt,
   verschiebe,
+  type StandWahl,
   type ZusatzArt,
 } from '@/lib/startseite-gestalten'
 import {
@@ -26,7 +27,9 @@ import {
   liveText,
   standardFassung,
   terminText,
+  vorschauHinweis,
   zeilenMarken,
+  type VorschauHinweisLage,
 } from '@/lib/startseite-fassung'
 import type { FassungInhalt, VeroeffentlichenEingabe } from '@/schemas/startseite-fassung'
 import { cn } from '@/lib/utils'
@@ -51,10 +54,12 @@ import { AenderungsListe, VeroeffentlichenDialog } from './startseite-veroeffent
 import { useFrischBestaetigt } from './frisch-bestaetigen'
 import { StartseiteZeitplan, type ZeitplanAktion } from './startseite-zeitplan'
 import {
+  alsDaten,
   blockWerteAus,
   entwurfInhalt,
   mitOffenemBlock,
   neueBlockWerte,
+  speicherEingabe,
   useStartseitenEntwurf,
   type SpeicherStand,
   type Zeile,
@@ -66,8 +71,13 @@ import {
  * mobil-admin-startseite-entwurf). Seitenkopf mit Bearbeiten · Zeitplan ·
  * Verlauf. Bearbeiten: oben die Statusleiste (Entwurf, Änderungen gegenüber
  * live, gespeichert, Live und Geplant, „Entwurf verwerfen“, „Veröffentlichen
- * …“), links die Abschnittsliste mit Marken je Zeile, rechts die Vorschau
- * oder — solange ein Block offen ist — sein Formular. Am Handy die
+ * …“), links die Abschnittsliste mit Marken je Zeile, rechts die Vorschau.
+ * Ab 1024 px steht bei offenem Block sein Formular links an Stelle der Liste,
+ * die Vorschau bleibt rechts stehen (Register N16, Ergänzung 23.10.2026;
+ * Nr. 155) — an GENAU einer Stelle im Baum, unabhängig vom offenen Block:
+ * Sonst hängte React sie beim Öffnen aus (beendeStartseitenVorschau) und der
+ * Rahmen begänne leer. Unter 1024 px steht das Formular unter der Liste, die
+ * Vorschau im Blatt. Am Handy die
  * Statuskarte oben und unten eine feste Leiste Vorschau · Veröffentlichen …,
  * Vorschau und Dialog als Blatt.
  *
@@ -382,6 +392,8 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
   const [fassungVorschau, setFassungVorschau] = useState<Extract<ZeitplanAktion, { art: 'vorschau' }> | { art: 'ansehen-live' } | null>(null)
   const [verwerfen, setVerwerfen] = useState(false)
   const [aktionFehler, setAktionFehler] = useState<string | null>(null)
+  /** Der eben mit „Fertig“ geschlossene Block und wann — für die Zeile unter der Vorschau (vorschauHinweis, Nr. 155). */
+  const [nachFertig, setNachFertig] = useState<{ block: NonNullable<VorschauHinweisLage['geschlossen']>; um: string } | null>(null)
   const [laeuft, startTransition] = useTransition()
 
   const angezeigt = mitOffenemBlock(entwurf.zeilen, entwurf.block)
@@ -410,12 +422,39 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
 
   function oeffne(zeile: Zeile) {
     if (zeile.id === NEUER_BLOCK || zeile.id === entwurf.block?.zeilenId) return
+    setNachFertig(null)
     nachSpeichern(() => entwurf.oeffneBlock(blockWerteAus(zeile)))
+  }
+
+  /** „Fertig“: erst speichern, dann zu — der Block behält für die Zeile unter der Vorschau Titel und Zeitraum. */
+  function fertig() {
+    const offen = entwurf.block
+    if (!offen) return
+    nachSpeichern(() => {
+      const { titel, liveAb, liveBis } = alsDaten(offen, [])
+      setNachFertig({ block: { titel, liveAb, liveBis }, um: new Date().toISOString() })
+      entwurf.oeffneBlock(null)
+    })
+  }
+
+  /** Eine Änderung an der Liste: die Zeile nach „Fertig“ gilt nur bis dahin. */
+  function aendereZeilen(neu: Zeile[]) {
+    setNachFertig(null)
+    entwurf.aendereZeilen(neu)
+  }
+
+  /** Was unter der Vorschau steht — je nach gezeigtem Tag (Nr. 155). */
+  function hinweis(stand: StandWahl): string | null {
+    const offen = blockOffen && { neu: !blockOffen.id, pruefung: speicherEingabe([], blockOffen).fehler, fehler: blockFehler }
+    const um = nachFertig ? new Date(nachFertig.um) : null
+    const tag = um && standZeitpunkt(stand, um, bloeckeEntwurf, termin ? new Date(termin) : null)
+    return vorschauHinweis({ offen: offen || null, geschlossen: nachFertig?.block ?? null, tag })
   }
 
   /** Ein neuer Block nach der Zeile `nachIndex` (Standard: nach „Höfe in deiner Nähe"). Gespeichert wird er mit der ersten Eingabe. */
   function fuegeEin(nachIndex: number, vorlage: StartseiteVorlage = 'SAISONKARTE') {
     if (entwurf.zeilen.some((z) => z.id === NEUER_BLOCK)) return
+    setNachFertig(null)
     nachSpeichern(() => {
       const neu: Zeile = { id: NEUER_BLOCK, art: 'BLOCK', sichtbar: true, block: null }
       const zeilen = entwurf.zeilen
@@ -482,6 +521,7 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
         return
       }
       entwurf.setzeZurueck(ergebnis.zeilen)
+      setNachFertig(null)
       setVerwerfen(false)
       setAnsicht('bearbeiten')
       toast.success(satz)
@@ -517,6 +557,9 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
       blockEntwurfId={entwurf.block?.id ?? null}
       neuLaden={entwurf.speicherungen}
       geraetStandard={breit ? 'web' : 'handy'}
+      // Die Hinweiszeile gibt es nur ab 1024 px (N16, Ergänzung 23.10.2026) — darunter bleibt das Blatt wie vorher.
+      hinweis={breit ? hinweis : undefined}
+      onStandWechsel={() => setNachFertig(null)}
     />
   )
 
@@ -583,13 +626,14 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
           </section>
 
           <div className="flex flex-col gap-[22px] lg:flex-row lg:items-start">
-            <div className="flex w-full shrink-0 flex-col gap-3 lg:w-[480px]">
+            {/* Ab 1024 px weicht die Liste dem offenen Block; darunter bleibt sie über dem Formular (wie vor Nr. 155). */}
+            <div className={cn('flex w-full shrink-0 flex-col gap-3 lg:w-[480px]', blockOffen && 'lg:hidden')}>
               <AbschnittsListe
                 zeilen={angezeigt}
                 jetzt={jetzt}
                 aktivId={entwurf.block?.zeilenId ?? null}
                 marken={marken}
-                onZeilen={entwurf.aendereZeilen}
+                onZeilen={aendereZeilen}
                 onWaehlen={oeffne}
                 onEinfuegen={(nachIndex) => fuegeEin(nachIndex)}
               />
@@ -605,26 +649,25 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
               </div>
             </div>
 
-            <div className="flex min-w-0 flex-1 flex-col gap-3.5">
-              {blockOffen ? (
-                <>
-                  <BlockFormular
-                    werte={blockOffen}
-                    zeilen={angezeigt}
-                    daten={daten}
-                    jetzt={jetzt}
-                    fehler={blockFehler}
-                    loescht={laeuft}
-                    onWerte={entwurf.aendereBlock}
-                    onFertig={() => nachSpeichern(() => entwurf.oeffneBlock(null))}
-                    onLoeschen={loeschen}
-                  />
-                  <Bibliothek onVorlage={waehleVorlage} />
-                </>
-              ) : (
-                breit && vorschau
-              )}
-            </div>
+            {blockOffen && (
+              <div className="flex w-full min-w-0 shrink-0 flex-col gap-3.5 lg:w-[480px]">
+                <BlockFormular
+                  werte={blockOffen}
+                  zeilen={angezeigt}
+                  daten={daten}
+                  jetzt={jetzt}
+                  fehler={blockFehler}
+                  loescht={laeuft}
+                  onWerte={entwurf.aendereBlock}
+                  onFertig={fertig}
+                  onLoeschen={loeschen}
+                />
+                <Bibliothek onVorlage={waehleVorlage} />
+              </div>
+            )}
+
+            {/* Die Vorschau ab 1024 px: immer hier, nie in einem Zweig des offenen Blocks, ohne key (Nr. 155). */}
+            {breit && <div className="flex min-w-0 flex-1 flex-col gap-3.5">{vorschau}</div>}
           </div>
 
           {/* Am Handy: feste Leiste unten, 48 px, über der Safe-Area (Mockup mobil-admin-startseite-entwurf).

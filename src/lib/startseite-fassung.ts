@@ -21,6 +21,7 @@ import {
   type AbschnittArt,
   type StartseitenBlockDaten,
   type StartseitenZeile,
+  istLive,
   standText,
 } from '@/lib/startseite-gestalten'
 import type { VorschauQuelle } from '@/schemas/startseite'
@@ -525,6 +526,11 @@ export const ENTWURF_TEXT = {
   bandLive: `LIVE · SO SIEHT ES ${PRODUKTION_HOST.toUpperCase()} GERADE`,
   bandGeplant: 'GEPLANT · SO SIEHT ES AB DEM TERMIN AUS',
   quelleBeschriftung: 'Was die Vorschau zeigt',
+  /** Unter der Vorschau, solange der offene Block nicht gespeichert ist — derselbe Satz wie im Formular (Nr. 155). */
+  nochNichtInVorschau: (grund: string) => `Noch nicht in der Vorschau: ${grund}`,
+  /** Unter der Vorschau nach „Fertig“, wenn der Block am gezeigten Tag nicht live ist (Nr. 155). */
+  nichtZuSehenAb: (titel: string, ab: string) => `„${titel}“ ist an diesem Tag nicht zu sehen – live ab ${ab}.`,
+  nichtZuSehenBis: (titel: string, bis: string) => `„${titel}“ ist an diesem Tag nicht zu sehen – live bis ${bis}.`,
 } as const
 
 /** „Zurückziehen geht bis 09:00.“ unter dem Dialog. */
@@ -598,4 +604,41 @@ export function vorschauRahmen(sichtbar: string | null, gewuenscht: string | nul
  */
 export function scrollNachNeuladen(alt: { pfadname: string; scrollY: number } | null): number {
   return alt !== null && alt.pfadname === '/' ? Math.max(0, Math.round(alt.scrollY)) : 0
+}
+
+// ─── Hinweis unter der Vorschau beim Bearbeiten (Register N16, Ergänzung 23.10.2026; Nr. 155) ─
+
+export type VorschauHinweisLage = {
+  /**
+   * Der offene Block: `neu` = noch nie gespeichert, `pruefung` = der Satz des
+   * Schemas für seinen jetzigen Stand (null = gültig), `fehler` = der Satz der
+   * letzten Speicherung, wie ihn das Formular zeigt.
+   */
+  offen: { neu: boolean; pruefung: string | null; fehler: string | null } | null
+  /** Der eben mit „Fertig“ geschlossene Block — bis zur nächsten Änderung oder zum nächsten Wechsel von „Stand am“. */
+  geschlossen: { titel: string; liveAb: string; liveBis: string | null } | null
+  /** Der Tag, den die Vorschau zeigt (null: es gibt ihn nicht). */
+  tag: Date | null
+}
+
+/**
+ * Welche Zeile unter „So sieht’s die Kundin“ steht. Die Vorschau liest den
+ * Entwurf aus der Datenbank: Ein offener Block, der nicht gespeichert ist
+ * (neu und ungültig, oder die letzte Speicherung scheiterte), fehlt dort —
+ * das sagt die Zeile mit dem Grund. Ein gespeicherter offener Block steht da,
+ * egal wann er live ist (blockEntwurfId, zuRendern). Nach „Fertig“ gilt
+ * wieder sein Zeitraum: Ist er am gezeigten Tag nicht live, sagt die Zeile
+ * warum er fehlt.
+ */
+export function vorschauHinweis({ offen, geschlossen, tag }: VorschauHinweisLage): string | null {
+  if (offen) {
+    const grund = offen.fehler ?? (offen.neu ? offen.pruefung : null)
+    return grund === null ? null : ENTWURF_TEXT.nochNichtInVorschau(grund)
+  }
+  if (!geschlossen || !tag) return null
+  const liveAb = new Date(geschlossen.liveAb)
+  const liveBis = geschlossen.liveBis ? new Date(geschlossen.liveBis) : null
+  if (istLive({ liveAb, liveBis }, tag)) return null
+  if (liveAb.getTime() > tag.getTime() || !liveBis) return ENTWURF_TEXT.nichtZuSehenAb(geschlossen.titel, terminText(liveAb))
+  return ENTWURF_TEXT.nichtZuSehenBis(geschlossen.titel, terminText(liveBis))
 }
