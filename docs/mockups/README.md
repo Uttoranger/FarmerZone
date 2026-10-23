@@ -2,7 +2,7 @@
 
 Eigenständige HTML-Dateien, direkt im Browser zu öffnen. Alle Farben, Abstände, Radien und Texte stehen als Inline-Styles im Markup und dürfen exakt ausgelesen werden. Geteilte Bausteine (Seitenleiste, eingebettete Seiten in Vorschauen und Dialogen) sind zur Ansicht eingebettet; im Code sind sie **eine** Komponente.
 
-Stand 15.10.2026: Alle Mockups zeigen die Marke Agrilo (Bildmarke klein + Wort, Register M1, Nr. 92), die Hof-Seitenleiste mit Postfach und Tarif-Zeile (Nr. 61, 86/87), die Handy-Leiste Heute · Bestellungen · Neu · Mein Hof · Mehr (N3), das Mehr-Blatt mit Postfach und Produkten, die Startseite mit Regionskarte (Nr. 59) und die Hofseite ohne Telefonnummer vor dem Kauf (Nr. 60). Die Kasse (Nr. 82) und das Hof-Postfach (Nr. 86/87) stehen jetzt in den Kernzeilen K3 und H6.
+Stand 23.10.2026 (aufgeräumt nach Lauf 22): Die Kernabschnitte zeigen den gebauten Stand; die Gründungshöfe, die Bilder, Entdecken v2, Region v2/v3, Beiträge v2, Mein Hof v3, Betrieb und die Anmeldung stehen jetzt in ihren Abschnitten. Abgelöste Mockups stehen unten unter ARCHIV (nicht mehr bauen), offene Vorschläge und Ideen darüber. Seit 15.10.2026 zeigen alle Mockups die Marke Agrilo (Bildmarke klein + Wort, Register M1, Nr. 92), die Hof-Seitenleiste mit Postfach und Tarif-Zeile (Nr. 61, 86/87), die Handy-Leiste Heute · Bestellungen · Neu · Mein Hof · Mehr (N3), das Mehr-Blatt mit Postfach und Produkten, die Startseite mit Regionskarte (Nr. 59) und die Hofseite ohne Telefonnummer vor dem Kauf (Nr. 60). Die Kasse (Nr. 82) und das Hof-Postfach (Nr. 86/87) stehen jetzt in den Kernzeilen K3 und H6.
 
 Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Paare stehen in `../ai/DESIGN_SYSTEM.md`. Beispieldaten (Höfe, Namen, Preise, Nummern) sind Platzhalter.
 
@@ -16,6 +16,7 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 |---|---|---|---|---|
 | `web-k0-startseite.html` | K0 · Startseite | `/` | Umbau | 1440×3360 |
 | `web-k0-anmelden-kunde-code-hof-passwort.html` | K0 · Anmelden (Kunde Code, Hof Passwort) | `/account/login, /login` | Umbau | 1440×860 |
+| `web-k2-startseite-gruendung.html` | Startseite am Computer · Für-Höfe-Band mit dem Gründungssatz | `/` (Für-Höfe-Band) | Zustand | 1440×3390 |
 
 ## WEB · Kunde – K1 Finden
 
@@ -63,6 +64,8 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 |---|---|---|---|---|
 | `web-h0-fuer-hoefe.html` | H0 · Für Höfe | `/fuer-hoefe (neu)` | neu | 1440×3080 |
 | `web-h0-hof-registrieren.html` | H0 · Hof registrieren | `/register` | Umbau | 1440×1000 |
+| `web-k2-fuer-hoefe-gruendung.html` | /fuer-hoefe am Computer · Pill, Knopf „Gründungshof werden", Fußnote; Angebotszeile über den Preisen; Hofladen 0 € bis 31.12.2027 | `/fuer-hoefe` | Zustand | 1440×3170 |
+| `web-k2-registrieren-gruendung.html` | Hof registrieren am Computer · Satz über dem Formular mit voraussichtlicher Nummer | `/register` | Zustand | 1440×1070 |
 
 ## WEB · Hof – H1 Starten und Hof einrichten
 
@@ -111,10 +114,9 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
 | `web-h5-auswertung-abrechnung-teilen-wirkung.html` | H5 · Auswertung, Abrechnung, Teilen-Wirkung | `/analytics` | Umbau | 1440×1260 |
-| `web-h5-region-preise.html` | H5 · Region – Preise · abgelöst durch system-h5-region-v2 und -eigene-teile (Lauf 19) | `/region (neu, aus /analytics/umfeld)` | Umbau | 1440×1020 |
-| `web-h5-region-futter-kaufen.html` | H5 · Region – Futter kaufen · abgelöst durch system-h5-region-v2 und -eigene-teile (Lauf 19) | `/region?reiter=futter (neu)` | neu | 1440×1020 |
-| `system-h5-region-v2.html` | Vorschlag 19.10. · Region v2, passend zu Entdecken v2: Matrix der neun gemeinsamen Bausteine (Hofkopf, Abholzeile, Produktzeile, Bild ohne Foto, Karte, Karte am Pin, Hinweis ohne Standort, Auswahl Abholung, Leerzustand) mit dem, was eigen bleibt; Preise vergleichen am Computer (Liste mit aufgeklappter Zeile, Karte mit „Du“, Umkreis und Vorschau am Pin, vorher/nachher); Futter kaufen am Computer (Reihe „Abholung“, Liste \| Karte, Futterkarte mit Bild und Abholzeile, vorher/nachher, Leerzustand); am Handy Preise Liste und Karte, Futter Liste und Karte, ohne eigenen Standort; Regeln | `/region`, `/region?reiter=futter` | Umbau (freigegeben 20.10.2026, Nr. 122–124; Abweichungen in freigabe.md §23; bestätigt 21.10.2026 (Register F10)) | 2640×4720 |
-| `system-h5-region-eigene-teile.html` | Vorschlag 19.10. · Region v3, die eigenen Teile: Bewertung 0–100 heute und neu (gewichtet 65 → 90) mit Vorbildern von Mobbin; Spanne-Zeile als Streifen (Punkte ohne Namen, Mitte, „Deins“ mit Lage in Worten, Eier je Stück) in allen Lagen; Futterkarte mit Größenwahl (Gebinde- und Kilopreis, „günstigster Kilopreis“, ein Knopf), Schild „laut Hof“ ohne Haken, Abholhinweise als Kennzeichen; Umkreis mit Zahl je Stufe, „So rechnen wir“, „Selbst verkaufen“ nur ohne eigenes Futter; Regeln | `/region`, `/region?reiter=futter` | Umbau (freigegeben 20.10.2026, Nr. 122–124; Abweichungen in freigabe.md §23; bestätigt 21.10.2026 (Register F10)) | 2640×4480 |
+| `system-h5-region-v2.html` | Vorschlag 19.10. · Region v2, passend zu Entdecken v2: Matrix der neun gemeinsamen Bausteine (Hofkopf, Abholzeile, Produktzeile, Bild ohne Foto, Karte, Karte am Pin, Hinweis ohne Standort, Auswahl Abholung, Leerzustand) mit dem, was eigen bleibt; Preise vergleichen am Computer (Liste mit aufgeklappter Zeile, Karte mit „Du“, Umkreis und Vorschau am Pin, vorher/nachher); Futter kaufen am Computer (Reihe „Abholung“, Liste \| Karte, Futterkarte mit Bild und Abholzeile, vorher/nachher, Leerzustand); am Handy Preise Liste und Karte, Futter Liste und Karte, ohne eigenen Standort; Regeln · „Preise vergleichen“: abgelöst durch `system-h5-region-preisband.html` (Vorschlag 23.10., Nr. 124 noch offen) | `/region`, `/region?reiter=futter` | Umbau (freigegeben 20.10.2026, Nr. 122–124; Abweichungen in freigabe.md §23; bestätigt 21.10.2026 (Register F10)) | 2640×4720 |
+| `system-h5-region-eigene-teile.html` | Vorschlag 19.10. · Region v3, die eigenen Teile: Bewertung 0–100 heute und neu (gewichtet 65 → 90) mit Vorbildern von Mobbin; Spanne-Zeile als Streifen (Punkte ohne Namen, Mitte, „Deins“ mit Lage in Worten, Eier je Stück) in allen Lagen; Futterkarte mit Größenwahl (Gebinde- und Kilopreis, „günstigster Kilopreis“, ein Knopf), Schild „laut Hof“ ohne Haken, Abholhinweise als Kennzeichen; Umkreis mit Zahl je Stufe, „So rechnen wir“, „Selbst verkaufen“ nur ohne eigenes Futter; Regeln · „Preise vergleichen“: abgelöst durch `system-h5-region-preisband.html` (Vorschlag 23.10., Nr. 124 noch offen) | `/region`, `/region?reiter=futter` | Umbau (freigegeben 20.10.2026, Nr. 122–124; Abweichungen in freigabe.md §23; bestätigt 21.10.2026 (Register F10)) | 2640×4480 |
+| `system-h5-region-preisband.html` | Vorschlag 23.10. · Preise vergleichen v2, bewertet 69 → 94 mit Vorbildern von Mobbin: Vergleich erst ab 5 anderen Höfen je Sorte und Gebindeklasse; je Sorte eine große Zahl „€ 1,45 – 1,62 / L“ und der Satz „verlangt mindestens die Hälfte der Höfe“ (Bereich der Hälfte, keine Mitte, kein kleinster und größter Wert, kein Lage-Wort); Band ohne Spur und ohne Zahlen, „Deins € …“ am Punkt, gepunktet bei außerhalb, mehrere eigene Produkte als Marke; oben „Vergleich für 2 von 9 Sorten.“ mit einem Link auf 50 km, Sorten ohne Vergleich gesammelt unter „Noch zu wenige Höfe“; Futter je Gebindeklasse ein Eintrag; zugeklappt, von Hand aufklappbar; Kundschaft auf /hoefe als kompakte Karte ohne Band; Pilot, Laden, Fehler, hell; Regeln, Technik, Entscheidungen | `/region` (Reiter Preise), `/hoefe` (Karte über den Ergebnissen) | Vorschlag (Nr. 124, PR #329; drei Punkte zur Bestätigung) | 2640×4400 |
 
 ## WEB · Hof – H6 Hilfe und Rückmeldung
 
@@ -132,6 +134,8 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 |---|---|---|---|---|
 | `mobil-k0-startseite.html` | K0 · Startseite | `/` | Umbau | 390×2500 |
 | `mobil-k0-anmelden-mit-code.html` | K0 · Anmelden mit Code | `/account/login` | Umbau | 390×844 |
+| `mobil-k2-startseite-gruendung.html` | Startseite am Handy · Für-Höfe-Karte mit dem Gründungssatz | `/` (Handy) | Zustand | 390×2544 |
+| `mobil-k0-startseite-saisonblock.html` | K0 · Startseite am Handy mit Saisonblock (Vorlage Saisonkarte mit Bild) zwischen Kopf und „Höfe in deiner Nähe“ | `/` (Handy) | Zustand | 390×900 |
 
 ## MOBIL · Kunde – K1 Finden
 
@@ -149,7 +153,6 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 | `mobil-k2-produkte.html` | K2 · Produkte | `/[farmSlug] Reiter Produkte` | Umbau | 390×844 |
 | `mobil-k2-futter-groesse-waehlen.html` | K2 · Futter: Größe wählen | `/[farmSlug]/produkt/[id] (neu)` | neu | 390×844 |
 | `mobil-k2-brennmaterial-brennholz.html` | K2 · Brennmaterial: Brennholz | `/[farmSlug]/produkt/[id] (neu)` | neu | 390×844 |
-| `mobil-k2-hofseite-beitraege-alle-aktiven.html` | K2 · Hofseite › Beiträge: alle aktiven, neuester zuerst · abgelöst durch system-k2-beitraege-v2 (Reiter „Beiträge“ entfällt) | `/[farmSlug]?reiter=beitraege` | Umbau (Nr. 68) | 390×844 |
 | `system-k2-beitraege-v2.html` | Vorschlag 20.10. · K2 Beiträge v2, bewertet 35 → 92 mit Vorbildern von Mobbin: „Aktuell vom Hof“ oben in der Übersicht statt Reiter „Beiträge“ (Handy: Übersicht, „Weiterlesen“, geteilter Link mit `?beitrag=`; Computer), „Dazu im Hofladen“ mit den verknüpften Produkten, Marke „Neu · vor …“ an der Hofkarte auf /hoefe, Baustein „Neu bei den Höfen“ für die Startseite, „Dein Beitrag“ in Heute und Anstoß ohne Beitrag, „Aktuell vom Hof“ in Mein Hof › Hofseite; Regeln, Daten, Register-Vorschlag (F8, N5, N22, N16) | `/[farmSlug]`, `/hoefe`, `/`, `/dashboard`, `/farm-page` | Umbau (freigegeben 20.10.2026, Nr. 128–129; Abweichungen in freigabe.md §23; bestätigt 21.10.2026 (Register F10)) | 2640×4900 |
 | `mobil-k2-hofseite-fotos-mosaik.html` | Hofseite am Handy › Übersicht: Fotos als Mosaik (1 groß + 2 klein, „+5 · alle 8 Fotos“) statt Streifen | `/<slug>` (Handy) | Umbau (Nr. 107) – ersetzt den Fotostreifen in `mobil-k2-hofseite.html` | 390×844 |
 | `mobil-k2-hofseite-bildansicht.html` | Bildansicht am Handy: Vollbild, „3 / 8“, wischen, Leiste zum Springen, Schließen | `/<slug>` (Bildansicht) | Umbau (Nr. 107) | 390×844 |
@@ -176,13 +179,14 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 |---|---|---|---|---|
 | `mobil-h0-fuer-hoefe.html` | H0 · Für Höfe | `/fuer-hoefe (neu)` | neu | 390×1660 |
 | `mobil-h0-registrieren.html` | H0 · Registrieren | `/register` | Umbau | 390×844 |
+| `mobil-k2-fuer-hoefe-gruendung.html` | /fuer-hoefe am Handy · Pill, Knopf, Fußnote; Angebotszeile vor der Preiskarte | `/fuer-hoefe (Handy)` | Zustand | 390×1830 |
+| `mobil-k2-registrieren-gruendung.html` | Hof registrieren am Handy · Satz über dem Formular | `/register (Handy)` | Zustand | 390×844 |
 
 ## MOBIL · Hof – H1 Starten
 
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
 | `mobil-h1-einrichten.html` | H1 · Einrichten | `/onboarding` | Umbau | 390×980 |
-| `mobil-h1-mein-hof.html` | H1 · Mein Hof · abgelöst durch system-h1-mein-hof-v3 (freigegeben 22.10.2026, Nr. 143/144) | `/farm-page` | Umbau | 390×844 |
 | `mobil-h1-einstellungen-konditionen-v2.html` | H1 · Einstellungen › Konditionen, Fassung 2 | `/settings/konditionen` | Umbau (Nr. 61) | 390×1800 |
 | `mobil-h1-titelbild-ausschnitt.html` | H1 · Titelbild am Handy: Blatt mit Rahmen „Computer“, Zoom, Vorschau „So sieht es im Browser aus“ (Hofseite am Computer verkleinert) und „So sieht es am Handy aus“, Wahl füllen/ganz, Filter, Speichern | `/farm-page` (Blatt unter lg) | neu (Nr. 97) | 390×1280 |
 
@@ -190,7 +194,6 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
-| `mobil-h2-produkte.html` | H2 · Produkte · abgelöst durch system-h1-mein-hof-v3 (freigegeben 22.10.2026, Nr. 143/144) | `/products` | Umbau | 390×844 |
 | `system-h1-mein-hof-v3.html` | Vorschlag 21.10. · H1/H2 Mein Hof am Handy v3, bewertet (Menüführung 66 → 94, Übersicht 48 → 92) mit Vorbildern von Mobbin: ein Kopf mit Titelbild-Streifen, Teilen, Kundenansicht und Zustandszeile (Nimmt Bestellungen an · Pausiert · Noch nicht bestellbar · Noch nicht freigegeben) für alle drei Reiter; Produkte mit „Braucht dich“ zuerst, Vorrat mit Einheit als Knopf und Blatt zum Ändern, Abzeichen nur bei Ausnahmen; Pausieren im Kopf mit Bestätigung; Hofseite mit „Hofseite vollständig“ bzw. „Noch n Punkte offen“ und Gruppen nach dem Ort auf der Seite; Bausteine, Regeln, Technik, Register-Vorschlag (N3, N4, E12, N8) | `/products`, `/farm-page` (unter 1024 px) | Umbau (freigegeben 22.10.2026, Nr. 143–144) | 2640×3990 |
 | `mobil-h2-neu-was-legst-du-an.html` | H2 · Neu: Was legst du an? | `Neu-Menü` | neu | 390×844 |
 | `mobil-h2-neues-produkt.html` | H2 · Neues Produkt | `/products (Formular Lebensmittel)` | Umbau | 390×844 |
@@ -267,8 +270,9 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 | `system-h1-kundenansicht-handy.html` | Kundenansicht am Handy: heute zwei Leisten, Vorschlag Vollbild-Blatt mit Band „Kundenansicht · Fertig“ und nur der Leiste der Kundschaft | `/farm-page` (Handy, Kundenansicht) | Umbau (Nr. 107, N4 ergänzt) | 960×1090 |
 | `system-h1-angemeldete-geraete.html` | Lauf 17 · Angemeldete Geräte: Konto und Sicherheit am Handy und am Computer mit „Angemeldete Geräte“ (einzeln oder „Alle anderen abmelden“), Blatt zum Bestätigen, Mail „Neue Anmeldung bei deinem Hof-Konto“, Seite „Das warst nicht du?“ mit Knopf und Seite danach, Code-Anmeldung „Zu viele falsche Codes“; Regeln | `/settings/account`, Mail, `/sicherheit/nicht-ich` (neu), `/account/login` | neu (Nr. 112, 114) | 2400×2140 |
 | `system-k2-gruendung-abzeichen.html` | Aktion 100 · Abzeichen „Gründungshof“: drei Wege verglichen (A Etikett empfohlen), Lagen des Etiketts (dunkel, hell, auf Foto, Fokus), Hofseite am Handy mit Etikett und Erklär-Blatt, Höfe-Liste am Handy und am Computer, Hofseite am Computer mit Sprechblase, Heute-Karte und Schalter „Abzeichen zeigen“ für den Hof, Teilen-Bild mit Etikett; Regeln | `/<slug>`, `/hoefe`, `/settings/konditionen`, Teilen-Bild der Hofseite | neu (Nr. 116, K2 ergänzt) | 2500×3060 |
+| `system-k2-gruendung-bausteine.html` | Gründungshöfe · Bausteine: Satz (dunkel/hell), Pill/Knopf/Fußnote, Preiszeile + Hofladen-Preis, Registrieren-Satz, einmaliger Hinweis, Zustände (letzter Platz, alle vergeben, Datum vorbei), Regeln · Baustein 5 (Heute-Karte) entfällt (19.10.2026) | Bausteine (`components/gruendung/*`) | neu | 1760×860 |
 
-## ADMIN · Betreiber – Stand Lauf 14 (15.10.)
+## ADMIN · Betreiber
 
 Ein Seitenmuster für alle Admin-Seiten: Seitenkopf (Titel + ein Satz + rechts die Hauptaktion oder der Monat) · Kennzahlen-Zeile · Unterreiter (zweite Ebene als Pillen) · Inhalt · Regel-Zeile in leiser Schrift. Reiter in der Kopfzeile: Höfe · Postfach · Startseite · Finanzen · Betrieb (neu, Nr. 103; Punkt bei offener Warnung) · Einstellungen. Die älteren Admin-Mockups zeigen noch fünf Reiter; maßgeblich für Reiter und Betriebsleiste ist `admin-betrieb.html`. Unter den Reitern die Betriebsleiste mit „Stripe Test" (Register Z2) – ohne Link „Zur Testumgebung", weil es keine gibt (Z3, Korrektur 15.10.). Betriebsleiste: rechts ein Hinweis bei offener Warnung („Bilder-Speicher bei 82 % – ansehen“, Link auf `/admin/betrieb`), sonst nichts. Einstellungen sind Gruppen (Gründungshöfe · Plattform), jede mit eigenem Speichern und Protokollzeile; der Stripe-Modus steht in Admin › Betrieb.
 
@@ -283,9 +287,6 @@ Ein Seitenmuster für alle Admin-Seiten: Seitenkopf (Titel + ein Satz + rechts d
 | `system-postfach-prozess.html` | Schaubild: Quellen (Hof, Kundschaft, System) → Eingang (drei Arten mit eigenem Weg) → Zustellung (Regeln, Empfänger, Wochenbericht); Ausgang Rundschreiben → Hof-Postfach → Antwort zurück in den Eingang; Hof-Seite spiegelbildlich | Konzept (`docs/konzepte/`) | Konzept | 1760×1250 |
 | `admin-finanzen.html` | Admin · Finanzen: Monat im Seitenkopf, Kennzahlen (Grundgebühren 0 € in der Gründungsphase), Unterreiter Monat · Kosten · Auszahlungen · Entfallene Gebühren, Verlauf, Kosten | `/admin/finanzen` | Umbau | 1440×900 |
 | `admin-einstellungen.html` | Admin · Einstellungen › Gründungshöfe: Gruppen links (Gründungshöfe · Plattform; Betrieb seit Nr. 103 als eigener Reiter, admin-betrieb), rechts Plätze/Vergeben/Frei, Plätze gesamt, Kostenlos bis (Standard), Schalter „Auf den Seiten zeigen", Vorschau des Satzes und der Pill, Protokoll | `/admin/einstellungen` (neu) | neu | 1440×1010 |
-| `admin-startseite-gestalten.html` | Lauf 14 · Admin › Startseite: Abschnittsliste (Kopf, Höfe, Fuß fest; ziehen = Reihenfolge, Auge = aus/ein), Einfügepunkte „Block einfügen“, Block bearbeiten (Vorlage, Überzeile, Titel, Text, Bild, Link, Live ab/bis Wiener Zeit), Vorlagen-Bibliothek (Saisonkarte mit Bild, Hinweisband, Höfe-Auswahl, Kategorie-Hinweis) – Konzept in der Lauf-13-Vormerkung (StartseiteAbschnitt + StartseiteBlock, Migration + Seed) | `/admin/startseite` (neu) | ersetzt durch Nr. 99 (Entwurf); Speichern ging dort sofort live | 1440×1100 |
-| `admin-startseite-vorschau.html` | Lauf 14 · Admin › Startseite, Umschalter „So sieht’s die Kundin“: Handy/Web, „Stand am“ (Heute · +1 Woche · nächster Block), echte Startseite mit den Blöcken des Tages plus Block in Bearbeitung, signierter Vorschau-Link (1 h) | `/admin/startseite?ansicht=vorschau` (neu) | ersetzt durch Nr. 99 (Entwurf); Speichern ging dort sofort live | 1440×1040 |
-| `mobil-k0-startseite-saisonblock.html` | Lauf 14 · Startseite am Handy mit Saisonblock (Vorlage Saisonkarte mit Bild) zwischen Kopf und „Höfe in deiner Nähe“ | `/` (Handy) | Zustand | 390×900 |
 | `admin-mobil-unterwegs-freischalten.html` | Admin am Handy · Höfe: Reiter unter dem Kopf, Kennzahlen, Warteliste mit Gründungsplatz | `/admin (Handy)` | Umbau | 390×844 |
 | `admin-mobil-einstellungen.html` | Admin am Handy · Einstellungen: Gruppen als Liste (ohne Benachrichtigungen – die sind Postfach › Zustellung), Gründungshöfe aufgeklappt | `/admin/einstellungen (Handy)` | neu | 390×844 |
 | `admin-startseite-entwurf.html` | Admin · Startseite: Statusleiste Entwurf/Live/Geplant, Abschnittsliste mit Änderungsmarken, automatisch im Entwurf gespeichert, Vorschau „So sieht’s die Kundin“ mit Entwurf · Live und Stand am | `/admin/startseite` | Umbau (Nr. 99, N16 geändert) | 1440×1100 |
@@ -307,21 +308,9 @@ Ein Seitenmuster für alle Admin-Seiten: Seitenkopf (Titel + ein Satz + rechts d
 
 Hinweis Nr. 101: „später“-Marken in den Postfach-Mockups zeigen das Zielbild (Folgeauftrag mit Feld für KI-Vorschläge) und werden in Nr. 101 nicht gebaut.
 
-## GRÜNDUNGSHÖFE · Vorschlag 15.10. (Register K2, nach Mobbin- und NN/g-Bewertung)
-
-Kein Banner, sondern Bausteine: ein Satz im Lesefluss (Startseite), Pill + umbenannter Knopf + Fußnote im Kopf von /fuer-hoefe, Angebotszeile direkt über den Tarifkarten (Hofladen 0 € bis 31.12.2027, dann 19 €), ein ehrlicher Satz über dem Registrierformular („voraussichtlich Nr. 8"), einmaliger wegklickbarer Hinweis auf Heute nach der Freischaltung (Baustein 5 (Heute-Karte) entfällt (19.10.2026)) – keine Dauerkarte, keine seitenweite Leiste, kein Countdown. Sind alle Plätze vergeben oder ist das Datum vorbei, verschwindet alles. Zahlen aus `src/lib/gruendungshof.ts` bzw. den Admin-Einstellungen. Seit Lauf 17 (Nr. 116) gilt die Aktion „100 Gründungshöfe“: 100 Plätze, Hofladen 24 Monate ohne Grundgebühr ab dem späteren von Tarifstart und Freischaltung, Stichtag „Aktion bis“, Zähler erst ab 10 vergebenen Plätzen. Die Bausteine behalten ihre Form; die Zahlen und Sätze kommen aus `GRUENDUNG_TEXT` (Wortlaut in freigabe.md §21). Das Abzeichen zeigt `system-k2-gruendung-abzeichen.html`.
-
-| Datei | Bildschirm | Route im Code | Arbeit | Größe |
-|---|---|---|---|---|
-| `system-k2-gruendung-bausteine.html` | Gründungshöfe · Bausteine: Satz (dunkel/hell), Pill/Knopf/Fußnote, Preiszeile + Hofladen-Preis, Registrieren-Satz, einmaliger Hinweis, Zustände (letzter Platz, alle vergeben, Datum vorbei), Regeln · Baustein 5 (Heute-Karte) entfällt (19.10.2026) | Bausteine (`components/gruendung/*`) | neu | 1760×860 |
-| `web-k2-startseite-gruendung.html` | Startseite am Computer · Für-Höfe-Band mit dem Gründungssatz | `/` (Für-Höfe-Band) | Zustand | 1440×3390 |
-| `mobil-k2-startseite-gruendung.html` | Startseite am Handy · Für-Höfe-Karte mit dem Gründungssatz | `/` (Handy) | Zustand | 390×2544 |
-| `web-k2-fuer-hoefe-gruendung.html` | /fuer-hoefe am Computer · Pill, Knopf „Gründungshof werden", Fußnote; Angebotszeile über den Preisen; Hofladen 0 € bis 31.12.2027 | `/fuer-hoefe` | Zustand | 1440×3170 |
-| `mobil-k2-fuer-hoefe-gruendung.html` | /fuer-hoefe am Handy · Pill, Knopf, Fußnote; Angebotszeile vor der Preiskarte | `/fuer-hoefe (Handy)` | Zustand | 390×1830 |
-| `web-k2-registrieren-gruendung.html` | Hof registrieren am Computer · Satz über dem Formular mit voraussichtlicher Nummer | `/register` | Zustand | 1440×1070 |
-| `mobil-k2-registrieren-gruendung.html` | Hof registrieren am Handy · Satz über dem Formular | `/register (Handy)` | Zustand | 390×844 |
-
 ## Hinweise
+
+Gründungshöfe (Register K2, Nr. 93 und 116): Kein Banner, sondern Bausteine: ein Satz im Lesefluss (Startseite), Pill + umbenannter Knopf + Fußnote im Kopf von /fuer-hoefe, Angebotszeile direkt über den Tarifkarten (Hofladen 0 € bis 31.12.2027, dann 19 €), ein ehrlicher Satz über dem Registrierformular („voraussichtlich Nr. 8"), einmaliger wegklickbarer Hinweis auf Heute nach der Freischaltung (Baustein 5 (Heute-Karte) entfällt (19.10.2026)) – keine Dauerkarte, keine seitenweite Leiste, kein Countdown. Sind alle Plätze vergeben oder ist das Datum vorbei, verschwindet alles. Zahlen aus `src/lib/gruendungshof.ts` bzw. den Admin-Einstellungen. Seit Lauf 17 (Nr. 116) gilt die Aktion „100 Gründungshöfe“: 100 Plätze, Hofladen 24 Monate ohne Grundgebühr ab dem späteren von Tarifstart und Freischaltung, Stichtag „Aktion bis“, Zähler erst ab 10 vergebenen Plätzen. Die Bausteine behalten ihre Form; die Zahlen und Sätze kommen aus `GRUENDUNG_TEXT` (Wortlaut in freigabe.md §21). Das Abzeichen zeigt `system-k2-gruendung-abzeichen.html`.
 
 Wortliste (gilt für alle Oberflächen, Admin und Hof): **Postfach** = der eine Ort, an dem alles ankommt; **Nachricht** = ein Eintrag; **Rundschreiben** = eine Nachricht vom Team an viele Höfe; **Unterhaltung** = der Faden aus Nachricht und Antworten; **Meldung** = Fehler, Wunsch oder Frage an das Team. Nicht mehr: Briefkasten, Post, Chat, Mitteilung, Benachrichtigung. Verbindlich steht die Wortliste in `../ai/DESIGN_SYSTEM.md`.
 
@@ -329,12 +318,28 @@ Geparkt bleiben Unterhaltungen zwischen Höfen (K3/T8) und Anzeige im Umkreis; �
 
 ## IDEEN (nicht entschieden, nicht bauen)
 
+Sammelbestellung: Aufträge 102a/102b sind vorbereitet und am 23.10.2026 zurückgestellt. Geparkt und nur auf dem Canvas: Anmeldung der Höfe ohne Passwort (SMS-Anbieter und Vertrag zur Auftragsverarbeitung offen).
+
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
-| `idee-web-k2-sammelbestellung.html` | Kunde · Sammelbestellung: Produktseite mit Balken, Frist, Karte hinterlegen, „Alles oder nichts“ | – | Idee (Fassung 2) | 1440×1040 |
-| `idee-mobil-k2-sammelbestellung.html` | Kunde am Handy · Sammelbestellung mit den Zuständen | – | Idee (Fassung 2) | 390×2010 |
-| `idee-mobil-k3-sammelbestellung-mitmachen.html` | Kunde am Handy · Mitmachen: Karte hinterlegen, heute € 0, Zustimmung als Satz, EPS per Link | – | Idee (Fassung 2) | 390×1000 |
-| `idee-email-sammelbestellung.html` | E-Mails · dabei, geschafft, Zahlung fehlgeschlagen, nicht erreicht (nichts abgebucht), Hof macht trotzdem | – | Idee (Fassung 2) | 1780×760 |
-| `idee-mobil-h2-sammelbestellung-anlegen.html` | Hof · Neue Sammelbestellung | – | Idee | 390×1360 |
-| `idee-mobil-h3-sammelbestellung-entscheiden.html` | Hof · Frist vorbei: trotzdem, verlängern, absagen | – | Idee | 390×960 |
-| `idee-system-sammelbestellung.html` | System · Ablauf mit Abbuchung bei Durchführung, vier Geldwege, Vorbilder | – | Idee (Fassung 2) | 1760×860 |
+| `idee-web-k2-sammelbestellung.html` | Kunde · Sammelbestellung: Produktseite mit Balken, Frist, Karte hinterlegen, „Alles oder nichts“ | – | Idee, zurückgestellt 23.10.2026 | 1440×1040 |
+| `idee-mobil-k2-sammelbestellung.html` | Kunde am Handy · Sammelbestellung mit den Zuständen | – | Idee, zurückgestellt 23.10.2026 | 390×2010 |
+| `idee-mobil-k3-sammelbestellung-mitmachen.html` | Kunde am Handy · Mitmachen: Karte hinterlegen, heute € 0, Zustimmung als Satz, EPS per Link | – | Idee, zurückgestellt 23.10.2026 | 390×1000 |
+| `idee-email-sammelbestellung.html` | E-Mails · dabei, geschafft, Zahlung fehlgeschlagen, nicht erreicht (nichts abgebucht), Hof macht trotzdem | – | Idee, zurückgestellt 23.10.2026 | 1780×760 |
+| `idee-mobil-h2-sammelbestellung-anlegen.html` | Hof · Neue Sammelbestellung | – | Idee, zurückgestellt 23.10.2026 | 390×1360 |
+| `idee-mobil-h3-sammelbestellung-entscheiden.html` | Hof · Frist vorbei: trotzdem, verlängern, absagen | – | Idee, zurückgestellt 23.10.2026 | 390×960 |
+| `idee-system-sammelbestellung.html` | System · Ablauf mit Abbuchung bei Durchführung, vier Geldwege, Vorbilder | – | Idee, zurückgestellt 23.10.2026 | 1760×860 |
+
+## ARCHIV (abgelöst – nicht mehr bauen)
+
+Nur zum Nachschlagen. Maßgeblich ist das Mockup in der Spalte Arbeit. Auf dem Canvas liegen diese Boards auf der Seite „Archiv“.
+
+| Datei | Bildschirm | Route im Code | Arbeit | Größe |
+|---|---|---|---|---|
+| `web-h5-region-preise.html` | H5 · Region – Preise | `/region (neu, aus /analytics/umfeld)` | abgelöst durch `system-h5-region-v2.html` und `system-h5-region-eigene-teile.html` (Nr. 122/123) | 1440×1020 |
+| `web-h5-region-futter-kaufen.html` | H5 · Region – Futter kaufen | `/region?reiter=futter (neu)` | abgelöst durch `system-h5-region-v2.html` und `system-h5-region-eigene-teile.html` (Nr. 122/123) | 1440×1020 |
+| `mobil-k2-hofseite-beitraege-alle-aktiven.html` | K2 · Hofseite › Beiträge: alle aktiven, neuester zuerst | `/[farmSlug]?reiter=beitraege` | abgelöst durch `system-k2-beitraege-v2.html` (Nr. 128, Reiter „Beiträge“ entfällt) | 390×844 |
+| `mobil-h1-mein-hof.html` | H1 · Mein Hof | `/farm-page` | abgelöst durch `system-h1-mein-hof-v3.html` (Nr. 143) | 390×844 |
+| `mobil-h2-produkte.html` | H2 · Produkte | `/products` | abgelöst durch `system-h1-mein-hof-v3.html` (Nr. 144) | 390×844 |
+| `admin-startseite-gestalten.html` | Lauf 14 · Admin › Startseite: Abschnittsliste (Kopf, Höfe, Fuß fest; ziehen = Reihenfolge, Auge = aus/ein), Einfügepunkte „Block einfügen“, Block bearbeiten (Vorlage, Überzeile, Titel, Text, Bild, Link, Live ab/bis Wiener Zeit), Vorlagen-Bibliothek (Saisonkarte mit Bild, Hinweisband, Höfe-Auswahl, Kategorie-Hinweis) – Konzept in der Lauf-13-Vormerkung (StartseiteAbschnitt + StartseiteBlock, Migration + Seed) | `/admin/startseite` (neu) | abgelöst durch `admin-startseite-entwurf.html` (Nr. 99) | 1440×1100 |
+| `admin-startseite-vorschau.html` | Lauf 14 · Admin › Startseite, Umschalter „So sieht’s die Kundin“: Handy/Web, „Stand am“ (Heute · +1 Woche · nächster Block), echte Startseite mit den Blöcken des Tages plus Block in Bearbeitung, signierter Vorschau-Link (1 h) | `/admin/startseite?ansicht=vorschau` (neu) | abgelöst durch `admin-startseite-entwurf.html` (Nr. 99) | 1440×1040 |
