@@ -1,10 +1,9 @@
-import { createHmac, timingSafeEqual } from 'crypto'
-import { env } from '@/lib/env'
+import { pruefeLink, signiereLink } from '@/lib/link-signatur'
 
 // Der signierte Bestell-Link: /{farmSlug}/bestellung/{orderId}?s={signatur}
 //
-// Dasselbe HMAC-Muster wie reorder-token.ts und unsubscribe.ts (Geheimnis aus
-// dem validierten env-Modul, Hex-Signatur, Vergleich in konstanter Zeit) —
+// Signiert über src/lib/link-signatur.ts wie reorder-token.ts und unsubscribe.ts
+// (seit Nr. 166 mit eigenem Geheimnis und Kennung, alte Links gelten weiter) —
 // nur schlanker: Die Bestell-ID steht bereits im Pfad, deshalb trägt der
 // Query-Parameter NUR die Signatur statt eines selbsttragenden Tokens.
 //
@@ -29,25 +28,18 @@ import { env } from '@/lib/env'
 // (docs/ai/ARCHITECTURE.md §5). Ein dritter Schreibweg braucht ein eigenes
 // Token mit eigenem Zweck oder eine ausdrückliche Freigabe, nicht einfach
 // diese Signatur.
-const SECRET = env.BETTER_AUTH_SECRET
-
-// Domänen-Präfix gegen Verwechslung: reorder-token und unsubscribe signieren
-// mit DEMSELBEN Geheimnis. Ohne Präfix wäre HMAC("orderId") von einem
-// hypothetischen anderen Link-Typ über dieselbe ID nicht unterscheidbar —
-// mit Präfix gilt jede Signatur nur für genau diesen Zweck.
+// Domänen-Präfix gegen Verwechslung mit den anderen Links derselben
+// Signatur-Stelle: Die Signatur gilt nur für genau diesen Zweck.
 const ZWECK = 'bestellung-ansehen'
 
 export function bestellSignatur(orderId: string): string {
-  return createHmac('sha256', SECRET).update(`${ZWECK}:${orderId}`).digest('hex')
+  return signiereLink(ZWECK, orderId)
 }
 
-// Vergleich in konstanter Zeit: ein `!==` bricht beim ersten abweichenden
-// Zeichen ab und verrät über die Laufzeit, wie viele Zeichen stimmten.
+// Vergleich in konstanter Zeit (pruefeLink): ein `!==` verriete über die
+// Laufzeit, wie viele Zeichen stimmten.
 export function bestellLinkGilt(orderId: string, signatur: string): boolean {
-  const a = Buffer.from(signatur, 'utf8')
-  const b = Buffer.from(bestellSignatur(orderId), 'utf8')
-  if (a.length !== b.length) return false
-  return timingSafeEqual(a, b)
+  return pruefeLink(ZWECK, orderId, signatur)
 }
 
 /** Der Pfad der Bestellseite samt Signatur — für Mails und interne Links. */

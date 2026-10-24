@@ -13,10 +13,8 @@ import {
 import { EINSTELLUNG_UNGUELTIG, GILT_AB_UNGUELTIG, PROZENT_UNGUELTIG, servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { ablegenSchema, buendelStandSchema, triageEingabeSchema, trennenSchema, zusammenfassenSchema, type TriageEingabe } from '@/schemas/meldung'
-import { BUENDEL_STAND_STATUS, MELDUNG_GEAENDERT, MELDUNG_VERWEIS_GEAENDERT, WUENSCHE_TEXT, bescheidMailHtml, triageAufruf, type TriageStand } from '@/lib/meldung'
+import { BUENDEL_STAND_STATUS, MELDUNG_GEAENDERT, MELDUNG_VERWEIS_GEAENDERT, WUENSCHE_TEXT, triageAufruf, type TriageStand } from '@/lib/meldung'
 import { MEINE_MELDUNGEN_HREF } from '@/lib/hof-hilfe'
-import { MARKE_TEAM } from '@/lib/marke'
-import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { verschickeRundschreiben } from '@/server/rundschreiben'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
 import { FREISCHALTUNG_GEAENDERT_TEXT, freischaltSperre } from '@/lib/admin-hoefe'
@@ -220,17 +218,13 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
   // Ohne Platz (oder ausgenommen) keine Nachricht.
   if (freigabe.zusage) await legeGruendungsNachrichtAn(farmId, freigabe.zusage)
 
-  // Die Zusage an den Hof — NACH dem erfolgreichen Update. Ein Mail-Fehler
-  // darf die Freischaltung nicht scheitern lassen: Der Hof ist ab hier
-  // öffentlich, die Nachricht lässt sich notfalls von Hand nachholen.
+  // Die Zusage an den Hof — NACH dem erfolgreichen Update, als Auftrag der
+  // Warteschlange (Wichtig, Nr. 159). Ein Fehler darf die Freischaltung nicht
+  // scheitern lassen: Der Hof ist ab hier öffentlich, die Nachricht lässt
+  // sich notfalls von Hand nachholen.
   try {
-    // Erst hier geladen (Nr. 31): /admin bindet diese Actions ein.
-    const { sendFreischaltungEmail } = await import('@/lib/email')
-    await sendFreischaltungEmail({
-      name: farm.name,
-      slug: farm.slug,
-      ownerEmail: farm.owner.email,
-    })
+    const [{ stelleMailEin }, { freischaltungAuftrag }] = await Promise.all([import('@/server/mail-warteschlange'), import('@/server/mail-arten/hof')])
+    await stelleMailEin(freischaltungAuftrag(farmId, new Date()))
   } catch (e) {
     // Log-Hygiene wie in onboarding.ts: nur außerhalb der Produktion.
     if (process.env.NODE_ENV !== 'production') {
@@ -671,19 +665,19 @@ function meldeHofBescheid(err: unknown): void {
   Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'meldungen', aufgabe: 'bescheid-hoefe' } })
 }
 
-/** Die Betriebsmail an Kundinnen mit Adresse für Rückfragen — nur über sendRaw (Post-Sperre Z3), nacheinander. */
-async function schreibeKundinnen(adressen: readonly string[], antwort: string): Promise<void> {
+/**
+ * Die Betriebsmail an Kundinnen mit Adresse für Rückfragen — je Kundin EIN
+ * Auftrag der Warteschlange (Kann warten, Nr. 159), nie eine Schleife über
+ * den Versand. Je Adresse zählt eine Meldung: Wer mehrere Wünsche im Bündel
+ * hat, bekommt den Bescheid einmal. Adresse und Antwort lädt der Renderer
+ * aus der Meldung.
+ */
+async function schreibeKundinnen(meldungIds: readonly string[], gespeichertAm: Date): Promise<void> {
   try {
-    const { sendRaw } = await import('@/lib/email')
-    const html = bescheidMailHtml(antwort, MARKE_TEAM)
-    let gescheitert = 0
-    for (const an of adressen) {
-      const ergebnis = await sendRaw(an, WUENSCHE_TEXT.bescheidTitel, html)
-      if (ergebnis.error) gescheitert += 1
-    }
-    if (gescheitert > 0) meldeBescheid(new Error('gescheitert'), gescheitert)
+    const [{ stelleMailEin }, { bescheidAuftraege }] = await Promise.all([import('@/server/mail-warteschlange'), import('@/server/mail-arten/kundin')])
+    await stelleMailEin(bescheidAuftraege(meldungIds, gespeichertAm))
   } catch (err) {
-    meldeBescheid(err, adressen.length)
+    meldeBescheid(err, meldungIds.length)
   }
 }
 
@@ -695,7 +689,7 @@ async function schreibeKundinnen(adressen: readonly string[], antwort: string): 
  * die Antwort, damit ihr Hof sie bei seiner Meldung liest. Bescheid an die
  * Höfe über die bestehende Rundschreiben-Logik mit „Ausgewählte" (eine
  * Nachricht je Hof, kein Massenmail), an Kundinnen mit Adresse als
- * Betriebsmail nach der Antwort. Ein gescheiterter Bescheid dreht den
+ * Betriebsmail (je Kundin ein Auftrag der Warteschlange, Nr. 159). Ein gescheiterter Bescheid dreht den
  * gespeicherten Stand nicht zurück; die Kundinnen-Mail und das Neuladen
  * laufen trotzdem, erst danach kommt der Satz (Nr. 105). Die 90-Tage-Uhr
  * (triagedAt) läuft nur neu, wo sich der Stand ändert; zurück auf Gesammelt
@@ -734,7 +728,8 @@ export async function setzeBuendelStandAction(eingabe: unknown): Promise<Buendel
   if (!betroffen) return { error: 'Dieses Bündel gibt es nicht mehr – lade die Seite neu.' }
 
   const hofIds = [...new Set(betroffen.flatMap((m) => (m.farmId ? [m.farmId] : [])))]
-  const kundinnen = [...new Set(betroffen.flatMap((m) => (!m.farmId && m.customerEmail ? [m.customerEmail.trim().toLowerCase()] : [])))]
+  // Je Adresse eine Meldung — eine Kundin bekommt den Bescheid einmal.
+  const kundinnen = [...new Map(betroffen.flatMap((m) => (!m.farmId && m.customerEmail ? [[m.customerEmail.trim().toLowerCase(), m.id] as const] : []))).values()]
   const geschrieben = { hoefe: 0, kundinnen: 0 }
   let hofBescheidGescheitert = false
   if (bescheid === 'hoefe' && antwort !== null) {
@@ -763,7 +758,7 @@ export async function setzeBuendelStandAction(eingabe: unknown): Promise<Buendel
         meldeHofBescheid(err)
       }
     }
-    if (kundinnen.length > 0) nachDerAntwort(() => schreibeKundinnen(kundinnen, antwort))
+    if (kundinnen.length > 0) await schreibeKundinnen(kundinnen, jetzt)
     geschrieben.kundinnen = kundinnen.length
   }
 

@@ -5,14 +5,17 @@ import {
   VERLAUF_TAGE,
   TREND_TAGE,
   betriebHinweis,
+  monatsBeginn,
   utcMonatsbeginn,
   utcTag,
   utcTagVersetzt,
   type AblaufLaufDaten,
   type BetriebHinweis,
   type Messung,
+  type WartendeMail,
 } from '@/lib/betrieb'
 import { betriebArtSchema } from '@/schemas/betrieb-messung'
+import { VORRANG } from '@/schemas/mail-auftrag'
 
 /*
  * Lesen für Admin › Betrieb (Register N18, Nr. 103). Gerechnet wird in
@@ -72,10 +75,10 @@ export async function letzteMessungAm(mitBeginn = false): Promise<Date | null> {
   return zeile?.gemessenAm ?? null
 }
 
-/** Die E-Mail-Zahl eines Monats bis heute und die eigenen Auflistungen des Bild-Speichers im Monat. */
+/** Die E-Mails im Abrechnungszeitraum von Resend bis heute (ab dem 17., Nr. 162) und die eigenen Auflistungen des Bild-Speichers im Kalendermonat. */
 export async function summeImMonat(art: 'mails' | 'bilderAuflistungen', jetzt: Date): Promise<number> {
   const summe = await prisma.betriebMessung.aggregate({
-    where: { art, tag: { gte: utcMonatsbeginn(jetzt) } },
+    where: { art, tag: { gte: monatsBeginn(art, jetzt) } },
     _sum: { wert: true },
   })
   return summe._sum.wert === null ? 0 : alsZahl(summe._sum.wert)
@@ -125,11 +128,30 @@ export async function ladeAlleMessungen(): Promise<Array<Pick<Messung, 'tag' | '
 }
 
 /**
- * Für Punkt und Hinweis der AdminShell (Register N15): offene Warnungen und
- * der Herzschlag — zwei kleine Abfragen ohne Rechnung, die Regel steht in
- * `betriebHinweis`. Ruft nur ladeAdminbereich, und nur in der Produktion.
+ * Für Punkt und Hinweis der AdminShell (Register N15): offene Warnungen,
+ * der Herzschlag und seit Nr. 161 die älteste wartende wichtige Mail — drei
+ * kleine Abfragen ohne Rechnung, die Regel steht in `betriebHinweis`. Ruft nur ladeAdminbereich, und nur in der Produktion.
  */
 export async function ladeBetriebHinweis(jetzt: Date): Promise<BetriebHinweis | null> {
-  const [warnungen, laeufe] = await Promise.all([prisma.betriebWarnung.findMany({ where: { stufe: { gt: 0 } }, select: { art: true, stufe: true } }), ladeLaeufe()])
-  return betriebHinweis(warnungen, laeufe, jetzt)
+  const [warnungen, laeufe, wartend] = await Promise.all([
+    prisma.betriebWarnung.findMany({ where: { stufe: { gt: 0 } }, select: { art: true, stufe: true } }),
+    ladeLaeufe(),
+    ladeAeltesteWichtige(),
+  ])
+  return betriebHinweis(warnungen, laeufe, jetzt, wartend)
+}
+
+/**
+ * Seit wann die älteste wichtige Mail wartet (offen oder in Arbeit, Weg
+ * „Wichtig“) und ob sie zu einer Bestellung gehört — für die Betriebsleiste
+ * und das Lebenszeichen (Nr. 161). Eine kleine Abfrage über den Index
+ * (`status`, `vorrang`, …); gelesen werden nur Zeit und ob es eine Bestellung gibt.
+ */
+export async function ladeAeltesteWichtige(): Promise<WartendeMail | null> {
+  const zeile = await prisma.mailAuftrag.findFirst({
+    where: { status: { in: ['offen', 'in_arbeit'] }, vorrang: VORRANG.wichtig },
+    orderBy: { erstelltAm: 'asc' },
+    select: { erstelltAm: true, bestellungId: true },
+  })
+  return zeile ? { erstelltAm: zeile.erstelltAm, zuBestellung: zeile.bestellungId !== null } : null
 }

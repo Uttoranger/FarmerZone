@@ -10,6 +10,9 @@
  *   auch bei mehreren Terminen; die Kasse in der Reihenfolge wie bisher.
  * - Ein Testhof (N21): Die Kasse zeigt „ausgebucht“, die Liste zeigt ihn nicht.
  * - Ein Wurf beim Erneuern der Hofliste lässt die Bestellung bestehen.
+ * - Seit Nr. 163 (Register N19, Ergänzung 24.10.2026) erneuert nur, wer das
+ *   Fenster voll macht oder ein volles wieder frei — gezählt an der echten
+ *   Datenbank wie in der Kasse.
  *
  * Bestellt wird über die echte Route (/api/checkout) für morgen 15–18 Uhr
  * (`checkoutAnfrage`). Der Nachlauf wird gesammelt und selbst abgearbeitet
@@ -152,6 +155,17 @@ describe('ausgebuchteTage — die eine Zählung für viele Höfe', () => {
     await arbeiteNachlaufAb()
     expect(cache.revalidateTag).toHaveBeenCalledWith(HOEFE_CACHE_TAG, { expire: 0 })
   })
+
+  it('ein Storno in einem Fenster, das nicht voll war, erneuert nicht (Nr. 163)', async () => {
+    const { farm, produkt } = await hof(2)
+    const bestellung = await bestelle(farm, produkt.id)
+    await arbeiteNachlaufAb()
+    expect(cache.revalidateTag).not.toHaveBeenCalled()
+
+    expect(await storniereUnbezahlteBestellung(bestellung.id, 'Test')).toBe(true)
+    await arbeiteNachlaufAb()
+    expect(cache.revalidateTag).not.toHaveBeenCalled()
+  })
 })
 
 describe('Kasse, Liste und Hofseite — dieselben vollen Fenster', () => {
@@ -224,11 +238,23 @@ describe('Kasse, Liste und Hofseite — dieselben vollen Fenster', () => {
 })
 
 describe('Erneuern der Hofliste nach dem Anlegen', () => {
-  it('erneuert bei einem Fenster mit Höchstzahl; ein Wurf dabei lässt die Bestellung bestehen', async () => {
+  it('ein Platz bleibt → erneuert nicht; die Bestellung, die das Fenster voll macht, erneuert (Nr. 163)', async () => {
+    const { farm, produkt } = await hof(2)
+    await bestelle(farm, produkt.id)
+    await arbeiteNachlaufAb()
+    expect(cache.revalidateTag).not.toHaveBeenCalled()
+
+    await bestelle(farm, produkt.id)
+    await arbeiteNachlaufAb()
+    expect(cache.revalidateTag).toHaveBeenCalledTimes(1)
+    expect(cache.revalidateTag).toHaveBeenCalledWith(HOEFE_CACHE_TAG, { expire: 0 })
+  })
+
+  it('erneuert, wenn das Fenster voll wird; ein Wurf dabei lässt die Bestellung bestehen', async () => {
     cache.revalidateTag.mockImplementation(() => {
       throw new Error('Erneuern gescheitert')
     })
-    const { farm, produkt } = await hof(3)
+    const { farm, produkt } = await hof(1)
 
     const bestellung = await bestelle(farm, produkt.id)
     await arbeiteNachlaufAb()

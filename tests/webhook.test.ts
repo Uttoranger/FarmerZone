@@ -9,7 +9,7 @@
  * dem Zustand heraus, für den es gilt (bedingtes `updateMany`). Dieselben
  * Fälle gegen die echte Datenbank: tests/integration/webhook-zahlung.int.test.ts.
  *
- * Stripe-Signaturprüfung, Prisma, E-Mail und Sentry sind gemockt — kein
+ * Stripe-Signaturprüfung, Prisma, die Warteschlange und Sentry sind gemockt — kein
  * Netzwerk, keine DB.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -24,19 +24,20 @@ vi.mock('@/lib/stripe', () => ({
   },
 }))
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const prisma = {
     webhookEvent: { findUnique: vi.fn(), create: vi.fn() },
     order: { findUnique: vi.fn(), updateMany: vi.fn() },
     farm: { findFirst: vi.fn(), update: vi.fn() },
-  },
-}))
+    // Die Transaktion arbeitet auf denselben Attrappen — geprüft wird, WAS darin geschieht.
+    $transaction: vi.fn(),
+  }
+  prisma.$transaction.mockImplementation(async (arbeit: (tx: typeof prisma) => Promise<unknown>) => arbeit(prisma))
+  return { prisma }
+})
 
-vi.mock('@/lib/email', () => ({
-  sendOrderConfirmation: vi.fn(),
-  sendOrderPaidToFarmer: vi.fn(),
-  sendZahlungZuSpaet: vi.fn(),
-}))
+// Die Mails sind seit Nr. 159 Aufträge der Warteschlange.
+vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn() }))
 
 vi.mock('@/server/unbezahlte-bestellung', () => ({
   storniereUnbezahlteBestellung: vi.fn(),
@@ -48,7 +49,7 @@ import * as Sentry from '@sentry/nextjs'
 import { POST } from '@/app/api/stripe/webhook/route'
 import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
-import { sendOrderConfirmation, sendOrderPaidToFarmer, sendZahlungZuSpaet } from '@/lib/email'
+import { stelleMailEin } from '@/server/mail-warteschlange'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
 
 const constructEvent = vi.mocked(stripe.webhooks.constructEvent)
@@ -58,6 +59,12 @@ const webhookEventCreate = vi.mocked(prisma.webhookEvent.create)
 const orderFindUnique = vi.mocked(prisma.order.findUnique)
 const orderUpdateMany = vi.mocked(prisma.order.updateMany)
 const stornieren = vi.mocked(storniereUnbezahlteBestellung)
+const einstellen = vi.mocked(stelleMailEin)
+
+/** Die Arten aller eingestellten Aufträge, in Reihenfolge. */
+function eingestellteArten(): string[] {
+  return einstellen.mock.calls.flatMap(([a]) => (Array.isArray(a) ? a : [a]).map((x) => (x as { art: string }).art))
+}
 
 function makeRequest(body = '{}', headers: Record<string, string> = { 'stripe-signature': 'sig_test' }) {
   return new NextRequest('http://localhost/api/stripe/webhook', {
@@ -83,6 +90,7 @@ const succeededEvent = (id = 'evt_success_1') => piEvent('payment_intent.succeed
 
 const orderFixture = {
   id: 'order_1',
+  farmId: 'farm_1',
   orderNumber: 'TST-0101-AAAA',
   status: 'PAID',
   paymentStatus: 'PAID',
@@ -113,9 +121,8 @@ beforeEach(() => {
   orderUpdateMany.mockResolvedValue({ count: 1 })
   stornieren.mockResolvedValue(true)
   erstatten.mockResolvedValue({ id: 're_test_1', amount: 3400 } as never)
-  vi.mocked(sendOrderConfirmation).mockResolvedValue(undefined)
-  vi.mocked(sendOrderPaidToFarmer).mockResolvedValue(undefined)
-  vi.mocked(sendZahlungZuSpaet).mockResolvedValue(undefined)
+  einstellen.mockResolvedValue(1)
+  vi.mocked(prisma.$transaction).mockImplementation((async (arbeit: (tx: typeof prisma) => Promise<unknown>) => arbeit(prisma)) as never)
 })
 
 afterEach(() => {
@@ -123,7 +130,7 @@ afterEach(() => {
 })
 
 describe('payment_intent.succeeded', () => {
-  it('setzt die Bestellung BEDINGT auf PAID, verschickt beide Mails, persistiert das Event und antwortet 200', async () => {
+  it('setzt die Bestellung BEDINGT auf PAID, stellt beide Mails in DERSELBEN Transaktion ein, persistiert das Event und antwortet 200', async () => {
     constructEvent.mockReturnValue(succeededEvent())
 
     const res = await POST(makeRequest())
@@ -134,8 +141,15 @@ describe('payment_intent.succeeded', () => {
       where: { stripePaymentIntentId: 'pi_test_1', status: 'PENDING_CONFIRMATION' },
       data: expect.objectContaining({ status: 'PAID', paymentStatus: 'PAID' }),
     })
-    await vi.waitFor(() => expect(sendOrderPaidToFarmer).toHaveBeenCalledTimes(1))
-    expect(sendOrderConfirmation).toHaveBeenCalledTimes(1)
+    expect(einstellen).toHaveBeenCalledTimes(1)
+    const [auftraege, tx] = einstellen.mock.calls[0]!
+    expect(auftraege).toEqual([
+      expect.objectContaining({ art: 'bestellung-bestaetigung', vorrang: 1, schluessel: 'bestellung-bestaetigung:order_1', bestellungId: 'order_1', farmId: 'farm_1' }),
+      expect.objectContaining({ art: 'bestellung-bezahlt-hof', vorrang: 1, schluessel: 'bestellung-bezahlt-hof:order_1', bestellungId: 'order_1', farmId: 'farm_1' }),
+    ])
+    // Mit dem Transaktions-Client, nach dem Statuswechsel.
+    expect(tx).toBe(prisma)
+    expect(orderUpdateMany.mock.invocationCallOrder[0]).toBeLessThan(einstellen.mock.invocationCallOrder[0]!)
     expect(webhookEventCreate).toHaveBeenCalledWith({
       data: { stripeEventId: 'evt_success_1', type: 'payment_intent.succeeded' },
     })
@@ -151,7 +165,7 @@ describe('payment_intent.succeeded', () => {
     expect(await res.json()).toEqual({ received: true, skipped: true })
     expect(orderFindUnique).not.toHaveBeenCalled()
     expect(orderUpdateMany).not.toHaveBeenCalled()
-    expect(sendOrderConfirmation).not.toHaveBeenCalled()
+    expect(einstellen).not.toHaveBeenCalled()
     expect(webhookEventCreate).not.toHaveBeenCalled()
   })
 
@@ -165,24 +179,14 @@ describe('payment_intent.succeeded', () => {
     expect(webhookEventCreate).not.toHaveBeenCalled()
   })
 
-  it('bleibt erfolgreich (200 + Event persistiert), wenn eine Mail WIRFT — und der Hof bekommt seine trotzdem', async () => {
+  it('scheitert das Einstellen: 500, Event NICHT persistiert — der Statuswechsel rollt mit zurück, Stripe stellt erneut zu', async () => {
     constructEvent.mockReturnValue(succeededEvent())
-    // Nicht nur Resend-Fehler (die fängt sendRaw), auch ein Wurf beim Rendern
-    // oder beim Token darf keine 500 und damit keine Doppel-Mails auslösen.
-    vi.mocked(sendOrderConfirmation).mockRejectedValue(new Error('Render kaputt'))
+    einstellen.mockRejectedValue(new Error('DB weg'))
 
     const res = await POST(makeRequest())
 
-    expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ received: true })
-    expect(webhookEventCreate).toHaveBeenCalledTimes(1)
-    await vi.waitFor(() => expect(sendOrderPaidToFarmer).toHaveBeenCalledTimes(1))
-    await vi.waitFor(() =>
-      expect(Sentry.captureException).toHaveBeenCalledWith(
-        expect.any(Error),
-        expect.objectContaining({ extra: { orderId: 'order_1' } })
-      )
-    )
+    expect(res.status).toBe(500)
+    expect(webhookEventCreate).not.toHaveBeenCalled()
   })
 
   it('behandelt parallele Zustellung (Unique-Verletzung beim Persistieren) als skipped, nicht als Fehler', async () => {
@@ -208,7 +212,7 @@ describe('payment_intent.succeeded', () => {
 
     expect(res.status).toBe(200)
     expect(erstatten).not.toHaveBeenCalled()
-    expect(sendOrderConfirmation).not.toHaveBeenCalled()
+    expect(einstellen).not.toHaveBeenCalled()
     expect(webhookEventCreate).toHaveBeenCalledTimes(1)
   })
 
@@ -238,9 +242,19 @@ describe('payment_intent.succeeded', () => {
         expect.any(String),
         expect.objectContaining({ level: 'error', extra: { orderId: 'order_1' } })
       )
-      await vi.waitFor(() => expect(sendZahlungZuSpaet).toHaveBeenCalledWith(stornierteUnbezahlte, 3400))
-      expect(sendOrderConfirmation).not.toHaveBeenCalled()
-      expect(sendOrderPaidToFarmer).not.toHaveBeenCalled()
+      // Vermerk und Auftrag in einer Transaktion; der Betrag ist der, den Stripe erstattet hat.
+      expect(einstellen).toHaveBeenCalledTimes(1)
+      expect(einstellen.mock.calls[0]).toEqual([
+        expect.objectContaining({
+          art: 'zahlung-zu-spaet',
+          vorrang: 1,
+          schluessel: 'zahlung-zu-spaet:order_1',
+          bezug: { orderId: 'order_1', erstattetCents: '3400' },
+          bestellungId: 'order_1',
+        }),
+        prisma,
+      ])
+      expect(eingestellteArten()).toEqual(['zahlung-zu-spaet'])
     })
 
     it('ohne Gebühr auf der Zahlung kein refund_application_fee', async () => {
@@ -268,7 +282,7 @@ describe('payment_intent.succeeded', () => {
         expect.any(Error),
         expect.objectContaining({ tags: expect.objectContaining({ grund: 'erstattung_offen' }) })
       )
-      expect(sendZahlungZuSpaet).not.toHaveBeenCalled()
+      expect(einstellen).not.toHaveBeenCalled()
     })
 
     it('hat eine parallele Zustellung den Vermerk schon gesetzt: keine zweite Mail', async () => {
@@ -281,8 +295,7 @@ describe('payment_intent.succeeded', () => {
 
       expect(res.status).toBe(200)
       expect(erstatten).toHaveBeenCalledTimes(1)
-      await new Promise((r) => setTimeout(r, 0))
-      expect(sendZahlungZuSpaet).not.toHaveBeenCalled()
+      expect(einstellen).not.toHaveBeenCalled()
     })
 
     it('scheitert nur der Vermerk: trotzdem 200 und Mail — das Geld ist zurück', async () => {
@@ -295,7 +308,7 @@ describe('payment_intent.succeeded', () => {
 
       expect(res.status).toBe(200)
       expect(webhookEventCreate).toHaveBeenCalledTimes(1)
-      await vi.waitFor(() => expect(sendZahlungZuSpaet).toHaveBeenCalledTimes(1))
+      expect(eingestellteArten()).toEqual(['zahlung-zu-spaet'])
     })
   })
 
@@ -308,7 +321,7 @@ describe('payment_intent.succeeded', () => {
 
     expect(res.status).toBe(200)
     expect(erstatten).not.toHaveBeenCalled()
-    expect(sendZahlungZuSpaet).not.toHaveBeenCalled()
+    expect(einstellen).not.toHaveBeenCalled()
   })
 })
 

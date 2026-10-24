@@ -34,6 +34,7 @@ import { zeigtAbzeichen } from '@/lib/gruendungshof'
 import { ABZEICHEN_SELECT, OEFFENTLICH_SICHTBAR } from '@/server/queries/farm'
 import { PRODUCT_ORDER_BY } from '@/server/queries/products'
 import { zaehleWhatsAppAbonnentinnen } from '@/server/queries/status-posts'
+import { gesendeteBeitragsMails } from '@/server/mail-arten/beitrag'
 
 export type TeilenBildQuelle = {
   farmId: string
@@ -237,11 +238,14 @@ export async function ladeTeilenFensterBeitrag(farmId: string, postId: string, j
         sentViaEmail: true,
         emailRecipientCount: true,
         whatsappGetippt: true,
+        createdAt: true,
       },
     }),
     zaehleWhatsAppAbonnentinnen(farmId),
   ])
   if (!quelle || !beitrag || !beitragDarfInsBild(beitrag, farmId, jetzt)) return null
+  // „n per E-Mail" aus der Warteschlange — eine Quelle (Nr. 159).
+  const emailAnzahl = (await gesendeteBeitragsMails([beitrag])).get(beitrag.id) ?? beitrag.emailRecipientCount
   // Dieselbe Regel wie in der Mail und im WhatsApp-Link (T5, F8); `beitragDarfInsBild` verlangt `showOnFarmPage` schon.
   const beitragId = beitragIdImLink(beitrag)
   if (!beitragId) return null
@@ -265,7 +269,7 @@ export async function ladeTeilenFensterBeitrag(farmId: string, postId: string, j
     vorbelegt: beitragVorbelegung(auswahl, quelle.produkte, beitrag.linkedProductIds),
     ohneFoto: auswahl.filter((_, i) => quellen[i].art !== 'foto').map((e) => e.id),
     ...beitragWhatsApp(beitrag.id, abonnentinnen, beitrag.whatsappGetippt.length),
-    email: beitrag.sentViaEmail && beitrag.emailRecipientCount > 0 ? { anzahl: beitrag.emailRecipientCount } : null,
+    email: beitrag.sentViaEmail && emailAnzahl > 0 ? { anzahl: emailAnzahl } : null,
   }
 }
 

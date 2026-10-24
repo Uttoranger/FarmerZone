@@ -50,8 +50,8 @@ export default async function BarBestaetigenSeite({ params }: Props) {
   if (!eingabe.success) return <LinkUngueltig />
   const token = eingabe.data
 
-  // Gespeichert ist nur der Hash des Tokens (Nr. 151); ältere Bestellungen
-  // tragen noch den Klartext — `tokenKandidaten` findet beide.
+  // Gespeichert ist nur der Hash des Tokens (Nr. 151); ein Klartext-Wert
+  // findet nichts mehr (Nr. 164) — `tokenKandidaten` liefert nur den Hash.
   const gesucht = { confirmationToken: { in: tokenKandidaten(token) } }
 
   // Frist gilt beim Lesen (src/lib/fristen.ts): erst freigeben, dann lesen.

@@ -102,22 +102,17 @@ export async function createFarm(data: {
     })
 
     // Betreiber-Benachrichtigung: der Hof wartet ab jetzt auf die Freigabe
-    // (approvedAt bleibt null). Ein Mailfehler darf die Hof-Anlage NICHT
-    // scheitern lassen — der Bauer hat seinen Hof, die Freischaltung findet
-    // der Betreiber auch über /admin.
+    // (approvedAt bleibt null). Je Empfänger ein Auftrag der Warteschlange
+    // (Wichtig, Nr. 159); Empfänger und Regel aus der Zustellung (Register
+    // N14, Nr. 95). Ein Fehler darf die Hof-Anlage NICHT scheitern lassen —
+    // der Bauer hat seinen Hof, die Freischaltung findet der Betreiber auch
+    // über /admin.
     try {
-      const { sendNewFarmNotification } = await import('@/lib/email')
-      // Empfänger und Regel aus der Zustellung (Register N14, Nr. 95).
-      const { ladeBetreiberEmpfaenger } = await import('@/server/queries/postfach')
-      await sendNewFarmNotification(
-        {
-          id: farm.id,
-          name: farm.name,
-          slug: farm.slug,
-          ownerEmail: session.user.email,
-        },
-        await ladeBetreiberEmpfaenger('hofWartet')
-      )
+      const [{ stelleMailEin }, { betreiberAuftraege, betreiberKennungen }] = await Promise.all([
+        import('@/server/mail-warteschlange'),
+        import('@/server/mail-arten/betreiber'),
+      ])
+      await stelleMailEin(betreiberAuftraege('neuer-hof', farm.id, await betreiberKennungen('hofWartet'), { farmId: farm.id }, { farmId: farm.id }))
     } catch (err) {
       console.error('[createFarm] Benachrichtigung fehlgeschlagen:', err)
       // Log-Hygiene wie in src/lib/auth.ts: Hofname und Adresse nur außerhalb

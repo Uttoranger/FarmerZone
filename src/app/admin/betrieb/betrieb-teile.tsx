@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
-import { ChevronRight, Database, Download, ExternalLink, Image as BildSymbol, ImageOff, LineChart, Mail, TriangleAlert, Upload, type LucideIcon } from 'lucide-react'
+import { ChevronRight, Database, Download, ExternalLink, Image as BildSymbol, ImageOff, LineChart, List, Mail, TriangleAlert, Upload, type LucideIcon } from 'lucide-react'
 import {
+  ADMIN_BETRIEB_HREF,
+  ADMIN_BETRIEB_MAILS_HREF,
   BETRIEB_TEXT,
   BILDER_EXPORT_HREF,
   NUR_IM_DASHBOARD,
@@ -31,6 +33,8 @@ import { Chip } from '@/components/ui/chip'
 import { Marke } from '@/components/ui/marke'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { EmptyState } from '@/components/ui/empty-state'
+import { LadeInhalt, LadeRahmen } from '@/components/ui/lade-punkt'
+import { Unterreiter } from '@/components/admin/unterreiter'
 import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
 
 /*
@@ -46,7 +50,7 @@ import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellunge
 
 const H2 = 'font-heading text-[17px] font-semibold text-foreground'
 
-const KACHEL_SYMBOL: Record<KachelId, LucideIcon> = { bilder: BildSymbol, datenbank: Database, mailsHeute: Mail, bildVorgaenge: Upload }
+const KACHEL_SYMBOL: Record<KachelId, LucideIcon> = { bilder: BildSymbol, datenbank: Database, mailsHeute: Mail, bildVorgaenge: Upload, hofliste: List }
 
 /** Orange ab 80 %, sonst Grün — der Ton kommt aus der Fachregel (`warnt`), die Farbe aus den Status-Tokens. */
 function tonText(warnt: boolean): string {
@@ -56,11 +60,48 @@ function tonText(warnt: boolean): string {
 // ─── Kopf und Warnkarte ──────────────────────────────────────────────────────
 
 /**
+ * Die Unterreiter „Überblick · E-Mails“ (Nr. 161) unter dem Seitenkopf, mit
+ * der Zahl offener Fälle aus „Braucht dich“ an E-Mails (null = nicht geladen,
+ * dann ohne Zahl). Der Wechsel lässt den Inhalt stehen und zeigt am Reiter den
+ * Ladepunkt (`LadeRahmen`, Muster Postfach) — darum hat /admin/betrieb seit
+ * Nr. 161 keine loading.tsx mehr (tests/loading-filter-wache.test.ts).
+ */
+export function BetriebUnterreiter({ aktiv, offen, children }: { aktiv: 'ueberblick' | 'mails'; offen: number | null; children: ReactNode }): React.JSX.Element {
+  return (
+    <LadeRahmen>
+      <div className="flex flex-col gap-4 lg:gap-[18px]">
+        <Unterreiter
+          beschriftung={BETRIEB_TEXT.reiter}
+          aktiv={aktiv}
+          ladePunkt
+          eintraege={[
+            { id: 'ueberblick', label: BETRIEB_TEXT.reiterUeberblick, href: ADMIN_BETRIEB_HREF },
+            { id: 'mails', label: BETRIEB_TEXT.reiterMails, href: ADMIN_BETRIEB_MAILS_HREF, ...(offen ? { zahl: String(offen) } : {}) },
+          ]}
+        />
+        <LadeInhalt>{children}</LadeInhalt>
+      </div>
+    </LadeRahmen>
+  )
+}
+
+/**
  * Die Warnkarte über den Kacheln, solange eine Stufe offen ist (Mockup: „1 Warnung: Bilder-Speicher bei 82 %“).
  * `ohneVerwendung`: der Knopf zur Karte „Bilder ohne Verwendung“ (Nr. 104) — je Breite ein Anker, weil die Karte
  * ab 1024 px rechts und am Handy unter den Abläufen steht.
  */
-export function Warnkarte({ eintraege, gruen, ohneVerwendung = false }: { eintraege: readonly WarnEintrag[]; gruen: string; ohneVerwendung?: boolean }): React.JSX.Element {
+export function Warnkarte({
+  eintraege,
+  gruen,
+  ohneVerwendung = false,
+  aktionen,
+}: {
+  eintraege: readonly WarnEintrag[]
+  gruen: string
+  ohneVerwendung?: boolean
+  /** Knöpfe unter den Sätzen (E-Mails, Nr. 161: „Jetzt schicken“ und „Ansehen“). */
+  aktionen?: ReactNode
+}): React.JSX.Element {
   const einzeln = eintraege.length === 1
   return (
     <section aria-labelledby="betrieb-warnung" className="flex gap-3 rounded-2xl border border-primary/45 bg-primary/12 p-4 md:p-5">
@@ -78,6 +119,7 @@ export function Warnkarte({ eintraege, gruen, ohneVerwendung = false }: { eintra
           </p>
         ))}
         <p className={cn('text-[12.5px] leading-snug', LEISE)}>{gruen}</p>
+        {aktionen && <div className="mt-1.5 flex flex-wrap gap-2">{aktionen}</div>}
         {ohneVerwendung && (
           <div className="mt-1.5 flex flex-wrap gap-2">
             <a href={`#${OHNE_VERWENDUNG_ANKER.breit}`} className={cn(KNOPF_RAHMEN, 'hidden font-semibold lg:inline-flex')}>
@@ -101,7 +143,18 @@ export function Warnkarte({ eintraege, gruen, ohneVerwendung = false }: { eintra
  * Text; über 100 % bleibt der Balken voll. Neu statt ProgressBar, weil der
  * Baustein keinen Warnstrich kennt und seine Beschriftung selbst zeichnet.
  */
-export function GrenzBalken({ titel, anteil, warnt }: { titel: string; anteil: number | null; warnt: boolean }): React.JSX.Element {
+export function GrenzBalken({
+  titel,
+  anteil,
+  warnt,
+  strich = STUFEN[0],
+}: {
+  titel: string
+  anteil: number | null
+  warnt: boolean
+  /** Wo der Strich steht, in % — sonst bei 80 % (Warn-Mail); E-Mails heute bei 70 % (Kann warten pausiert, Nr. 161). */
+  strich?: number
+}): React.JSX.Element {
   const breite = anteil === null ? 0 : Math.min(100, Math.max(0, anteil))
   return (
     <div
@@ -114,7 +167,7 @@ export function GrenzBalken({ titel, anteil, warnt }: { titel: string; anteil: n
       className="relative h-2 rounded-full bg-muted"
     >
       <div className={cn('h-full rounded-full', warnt ? 'bg-primary' : 'bg-accent')} style={{ width: `${breite}%` }} />
-      <span aria-hidden="true" className="absolute -top-1 -bottom-1 w-0.5 -translate-x-1/2 rounded-full bg-foreground/60" style={{ left: `${STUFEN[0]}%` }} />
+      <span aria-hidden="true" className="absolute -top-1 -bottom-1 w-0.5 -translate-x-1/2 rounded-full bg-foreground/60" style={{ left: `${strich}%` }} />
     </div>
   )
 }
@@ -122,12 +175,21 @@ export function GrenzBalken({ titel, anteil, warnt }: { titel: string; anteil: n
 function KachelKarte({ kachel: k, ohneVerwendung }: { kachel: Kachel; ohneVerwendung: string | null }): React.JSX.Element {
   const Symbol = KACHEL_SYMBOL[k.id]
   return (
-    <article className={cn(KARTE, 'flex min-w-0 flex-col gap-2.5 p-4', k.warnt && 'border-primary/60')}>
+    <article className={cn(KARTE, 'relative flex min-w-0 flex-col gap-2.5 p-4', k.warnt && 'border-primary/60')}>
       <div className="flex min-w-0 items-center gap-2.5">
         <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
           <Symbol className="size-4" strokeWidth={1.8} />
         </span>
-        <h3 className="min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground">{k.titel}</h3>
+        <h3 className="min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground">
+          {/* E-Mails heute führt zum Unterreiter E-Mails (Nr. 161): der Titel als Link über die ganze Kachel. */}
+          {k.href ? (
+            <a href={k.href} className={cn('rounded-sm after:absolute after:inset-0 after:rounded-2xl hover:underline', FOKUS_RAHMEN)}>
+              {k.titel}
+            </a>
+          ) : (
+            k.titel
+          )}
+        </h3>
         <Chip className="hidden shrink-0 font-semibold lg:inline-flex">{k.tarif}</Chip>
         {k.prozent && <span className={cn('shrink-0 text-[14px] font-semibold tabular-nums lg:hidden', tonText(k.warnt))}>{k.prozent}</span>}
       </div>
@@ -396,7 +458,8 @@ export function TarifeInhalt({ stripeMarke }: { stripeMarke: StripeMarke | null 
 
 /**
  * Die Karte „Vercel-Ausgaben“ (Nr. 113; nach dem Muster „Tarife und
- * Grenzen“): die letzte Meldung von Spend Management bzw. „Unter 50 % …“,
+ * Grenzen“): die letzte Meldung von Spend Management, „Unter 50 % (letzte
+ * Meldung …)“ oder „Noch keine Meldung …“ (Nr. 162),
  * dazu der Link nach Vercel › Usage. Ab 1024 px in einer Karte, am Handy in
  * einer Klappkarte.
  */

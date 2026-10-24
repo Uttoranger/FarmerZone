@@ -18,6 +18,10 @@ vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn(), addBreadcrumb: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: vi.fn() }))
+// „n per E-Mail" zählt seit Nr. 159 die Warteschlange (tests/mail-auftraege.test.ts); hier gilt die Zahl am Beitrag.
+vi.mock('@/server/mail-arten/beitrag', () => ({
+  gesendeteBeitragsMails: vi.fn(async (beitraege: Array<{ id: string; emailRecipientCount: number }>) => new Map(beitraege.map((b) => [b.id, b.emailRecipientCount]))),
+}))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findFirst: vi.fn() },

@@ -340,6 +340,20 @@ export async function raeumeAuf(): Promise<void> {
       where: { schluessel: { in: faeden.map(({ id }) => bremsSchluessel(env.BETTER_AUTH_SECRET, DB_BREMSEN.antwortHofMail.zweck, id)) } },
     })
   }
+  // Mail-Aufträge der Testbestellungen und Testhöfe (Nr. 159) — ohne
+  // Fremdschlüssel räumt sie nichts mit weg; offen geblieben, holte sie der
+  // Worker der nächsten Datei.
+  const testHoefe = await prisma.farm.findMany({ where: { slug: { startsWith: INT_PRAEFIX } }, select: { id: true } })
+  await prisma.mailAuftrag.deleteMany({
+    where: {
+      OR: [
+        { bestellungId: { in: kennungen.map(({ id }) => id) } },
+        { farmId: { in: testHoefe.map(({ id }) => id) } },
+        // Aufträge zu Testobjekten mit Präfix im Schlüssel (Meldungen, Nachrichten): `bescheid:int-meldung-…`.
+        { schluessel: { contains: `:${INT_PRAEFIX}` } },
+      ],
+    },
+  })
   await prisma.order.deleteMany({ where: testBestellungen })
   await prisma.stockReservation.deleteMany({
     where: { sessionId: { startsWith: INT_PRAEFIX } },
@@ -370,4 +384,33 @@ export async function raeumeAuf(): Promise<void> {
         `Besser vor dem Löschen des Kontos über die gemerkten Kennungen wegräumen (TESTING_GUIDELINES §5).`
     )
   }
+}
+
+/*
+ * Die Aufträge der Mail-Warteschlange, wie ein Test sie liest (Nr. 159): nur
+ * die eingestellten (Wichtig, Kann warten), ohne die Protokollzeilen direkter
+ * Mails. Geprüft werden Art, Weg, Schlüssel, Bestellung und Bezug — der Stand
+ * hängt am Worker, der im Test womöglich schon lief (gesperrt, Z3).
+ */
+
+export type AuftragZeile = {
+  art: string
+  vorrang: number
+  schluessel: string
+  bestellungId: string | null
+  farmId: string | null
+  bezug: Prisma.JsonValue
+}
+
+export async function auftraege(where: Prisma.MailAuftragWhereInput): Promise<AuftragZeile[]> {
+  return prisma.mailAuftrag.findMany({
+    where: { ...where, vorrang: { gt: 0 } },
+    orderBy: [{ erstelltAm: 'asc' }, { schluessel: 'asc' }],
+    select: { art: true, vorrang: true, schluessel: true, bestellungId: true, farmId: true, bezug: true },
+  })
+}
+
+/** Die Arten der Aufträge zu einer Bestellung, sortiert. */
+export async function artenZu(bestellungId: string): Promise<string[]> {
+  return (await auftraege({ bestellungId })).map((a) => a.art).sort()
 }

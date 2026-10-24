@@ -3,9 +3,10 @@
  * revertReady (READY → PAID/CONFIRMED, Herleitung über paymentStatus) und
  * revertPickedUp (PICKED_UP → READY, pickedUpAt geleert; die Zahlung nach
  * zahlungNachRueckweg, seit Nr. 32 — Fälle in tests/rueckweg-zahlung.test.ts).
- * revertPickedUp verschickt KEINE Mail; revertReady nur mit Haken und erst
- * NACH der Antwort (Nr. 35): im Nachlauf, mit try, ein Fehler geht ohne
- * Adresse nach Sentry und kippt den Statuswechsel nicht.
+ * revertPickedUp verschickt KEINE Mail; revertReady nur mit Haken, als Auftrag
+ * der Warteschlange (Nr. 159; verschickt wird nach der Antwort), mit try: ein
+ * Fehler beim Einstellen geht ohne Adresse nach Sentry und kippt den
+ * Statuswechsel nicht (Nr. 35).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -13,14 +14,10 @@ vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/stripe', () => ({ stripe: {} }))
-vi.mock('@/lib/email', () => ({
-  sendOrderReady: vi.fn(),
-  sendOrderCancelled: vi.fn(),
-  sendOrderNotReady: vi.fn(),
-}))
+vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
-// Der Nachlauf wird gesammelt statt gestartet: So prüft der Test, dass die
-// Mail erst NACH der Antwort läuft, und startet sie dann selbst.
+// Der Nachlauf wird gesammelt statt gestartet: Die Action selbst startet
+// keinen mehr (der Worker läuft nach dem Einstellen).
 const nachlauf: Array<() => Promise<void>> = []
 vi.mock('@/lib/nach-der-antwort', () => ({
   nachDerAntwort: (aufgabe: () => Promise<void>) => {
@@ -31,6 +28,8 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findUnique: vi.fn() },
     order: { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    // Rückweg und Auftrag in einer Transaktion (Nr. 159) — hier durchgereicht.
+    $transaction: vi.fn(),
   },
 }))
 
@@ -38,7 +37,7 @@ import * as Sentry from '@sentry/nextjs'
 import { revertReady, revertPickedUp } from '@/server/actions/orders'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { sendOrderReady, sendOrderCancelled, sendOrderNotReady } from '@/lib/email'
+import { stelleMailEin } from '@/server/mail-warteschlange'
 
 const getSession = vi.mocked(auth.api.getSession)
 const farmFindUnique = vi.mocked(prisma.farm.findUnique)
@@ -48,6 +47,7 @@ const orderUpdate = vi.mocked(prisma.order.update)
 // Statusfilter), damit sie eine inzwischen stornierte Bestellung nie
 // zurückholen. Das unbedingte update bleibt ungenutzt.
 const orderUpdateMany = vi.mocked(prisma.order.updateMany)
+const einstellen = vi.mocked(stelleMailEin)
 
 const EMAIL_ORDER = {
   id: 'order_1',
@@ -72,6 +72,7 @@ beforeEach(() => {
   farmFindUnique.mockResolvedValue({ id: 'farm_1', name: 'Testhof', slug: 'testhof', email: 'hof@test.local', ownerName: 'Franz', address: 'Weg 1', postalCode: '4020', city: 'Linz', phone: '' } as never)
   orderUpdate.mockResolvedValue({} as never)
   orderUpdateMany.mockResolvedValue({ count: 1 } as never)
+  vi.mocked(prisma.$transaction).mockImplementation((async (rueckruf: (tx: unknown) => Promise<unknown>) => rueckruf(prisma)) as never)
 })
 
 describe('revertReady', () => {
@@ -120,74 +121,45 @@ describe('revertReady', () => {
     })
   })
 
-  it('Haken AN (Standard) → sendOrderNotReady genau einmal, sonst keine Mail', async () => {
+  it('Haken AN (Standard) → genau ein Auftrag „nicht-abholbereit" (Wichtig, mit bestellungId), sonst keiner', async () => {
     orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PAID' } as never)
     await revertReady('order_1')
-    for (const aufgabe of nachlauf) await aufgabe()
-    expect(sendOrderNotReady).toHaveBeenCalledTimes(1)
-    expect(sendOrderNotReady).toHaveBeenCalledWith(
-      expect.objectContaining({ customerEmail: 'kundin@test.local', orderNumber: 'TH-1907-TEST' })
-    )
-    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
-    await vi.dynamicImportSettled()
-    expect(sendOrderReady).not.toHaveBeenCalled()
-    expect(sendOrderCancelled).not.toHaveBeenCalled()
-  })
-
-  it('Haken AUS → Mail-Mock bleibt still', async () => {
-    orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PENDING' } as never)
-    const result = await revertReady('order_1', false)
-    expect(result).toEqual({})
-    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
-    await vi.dynamicImportSettled()
-    expect(sendOrderNotReady).not.toHaveBeenCalled()
-    expect(sendOrderReady).not.toHaveBeenCalled()
-    expect(sendOrderCancelled).not.toHaveBeenCalled()
-  })
-
-  it('abgelehnter Rückschritt verschickt auch mit Haken keine Mail', async () => {
-    orderFindFirst.mockResolvedValue(null)
-    await revertReady('order_confirmed', true)
-    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
-    await vi.dynamicImportSettled()
-    expect(sendOrderNotReady).not.toHaveBeenCalled()
-  })
-
-  it('die Mail läuft erst NACH der Antwort (Nachlauf), nicht im Antwortpfad', async () => {
-    orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PAID' } as never)
-    const result = await revertReady('order_1')
-    expect(result).toEqual({})
-    await vi.dynamicImportSettled()
-    expect(sendOrderNotReady).not.toHaveBeenCalled()
-    expect(nachlauf).toHaveLength(1)
-
-    for (const aufgabe of nachlauf) await aufgabe()
-    expect(sendOrderNotReady).toHaveBeenCalledTimes(1)
-  })
-
-  it('Haken AUS → kein Nachlauf', async () => {
-    orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PAID' } as never)
-    await revertReady('order_1', false)
+    expect(einstellen).toHaveBeenCalledTimes(1)
+    const auftrag = einstellen.mock.calls[0]![0] as { art: string; vorrang: number; schluessel: string; bestellungId: string; farmId: string; bezug: unknown }
+    expect(auftrag).toMatchObject({ art: 'nicht-abholbereit', vorrang: 1, bestellungId: 'order_1', farmId: 'farm_1', bezug: { orderId: 'order_1' } })
+    // Zurück und wieder bereit darf wieder schreiben: der Zeitpunkt macht den Schlüssel eindeutig.
+    expect(auftrag.schluessel).toMatch(/^nicht-abholbereit:order_1:\d+$/)
+    // Nach dem Statuswechsel, in derselben Transaktion.
+    expect(orderUpdateMany.mock.invocationCallOrder[0]).toBeLessThan(einstellen.mock.invocationCallOrder[0]!)
+    expect(einstellen.mock.calls[0]![1]).toBe(prisma)
     expect(nachlauf).toHaveLength(0)
   })
 
-  it('Mailfehler: Statuswechsel bleibt, Antwort ohne Fehler, Sentry ohne Adresse', async () => {
+  it('Haken AUS → kein Auftrag', async () => {
     orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PENDING' } as never)
-    vi.mocked(sendOrderNotReady).mockRejectedValueOnce(new Error('Resend gestört'))
+    const result = await revertReady('order_1', false)
+    expect(result).toEqual({})
+    expect(einstellen).not.toHaveBeenCalled()
+  })
+
+  it('abgelehnter Rückschritt stellt auch mit Haken nichts ein', async () => {
+    orderFindFirst.mockResolvedValue(null)
+    await revertReady('order_confirmed', true)
+    expect(einstellen).not.toHaveBeenCalled()
+  })
+
+  it('Fehler beim Einstellen: die Transaktion scheitert, nichts gespeichert, Hinweis an den Hof, Sentry ohne Adresse', async () => {
+    orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PENDING' } as never)
+    einstellen.mockRejectedValueOnce(new Error('DB weg'))
 
     const result = await revertReady('order_1')
-    expect(result).toEqual({})
-    expect(orderUpdateMany).toHaveBeenCalledTimes(1)
-
-    // Der Nachlauf wirft nicht weiter — der Fehler landet in Sentry.
-    for (const aufgabe of nachlauf) await expect(aufgabe()).resolves.toBeUndefined()
+    // Rückweg und Auftrag sind eine Transaktion (Nr. 159): beides oder keins.
+    expect(result).toEqual({ error: 'Wir konnten die Änderung nicht speichern. Versuch es bitte gleich noch einmal.' })
     expect(Sentry.captureException).toHaveBeenCalledTimes(1)
     const gemeldet = JSON.stringify(vi.mocked(Sentry.captureException).mock.calls[0]?.[1])
     expect(gemeldet).toContain('order_1')
     expect(gemeldet).not.toContain('kundin@test.local')
     expect(gemeldet).not.toContain('Anna')
-    // Kein Rückweg in die Datenbank: nichts zurückgerollt, nichts erneut geschrieben.
-    expect(orderUpdateMany).toHaveBeenCalledTimes(1)
     expect(orderUpdate).not.toHaveBeenCalled()
   })
 })
@@ -238,13 +210,9 @@ describe('revertPickedUp', () => {
     expect(updateArg.data).not.toHaveProperty('paidAt')
   })
 
-  it('bleibt mailfrei — auch die neue Update-Mail wird NIE verschickt', async () => {
+  it('bleibt mailfrei — auch die neue Update-Mail wird NIE eingestellt', async () => {
     orderFindFirst.mockResolvedValue({ id: 'order_1' } as never)
     await revertPickedUp('order_1')
-    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
-    await vi.dynamicImportSettled()
-    expect(sendOrderReady).not.toHaveBeenCalled()
-    expect(sendOrderCancelled).not.toHaveBeenCalled()
-    expect(sendOrderNotReady).not.toHaveBeenCalled()
+    expect(einstellen).not.toHaveBeenCalled()
   })
 })

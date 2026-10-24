@@ -21,7 +21,7 @@ import { AdminAbmeldenKnopf, AdminKontoMenue, PLAKETTEN_KREIS } from '@/componen
 import { MenueZielAnbieter } from '@/components/ui/menue-ziel'
 import { MARKE } from '@/lib/marke'
 import { ADMIN_POSTFACH_TEXT } from '@/lib/postfach'
-import { ADMIN_BETRIEB_HREF, BETRIEB_TEXT, warnungenText, type BetriebHinweis } from '@/lib/betrieb'
+import { BETRIEB_TEXT, warnungenText, type BetriebHinweis } from '@/lib/betrieb'
 
 /*
  * Die Shell des Betreiber-Bereichs im neuen Design (Gate 2): eigene
@@ -243,13 +243,14 @@ export function AdminShell({
           {/* Betriebsleiste (Register Z3): welcher Stripe-Modus gilt. Eine eigene Zeile
               unter dem Kopf statt in ihm: Die Kopfzeile ist am Handy und bis 1024 px
               schon voll. Rechts seit Nr. 103 der Hinweis auf eine offene Warnung
-              (Register N15). Ohne Marke und ohne Warnung keine Leiste. */}
+              (Register N15). Ohne Marke und ohne Warnung keine Leiste. Seit Nr. 161
+              nennt er eine wartende wichtige Mail und führt dann zu Betrieb › E-Mails. */}
           {(stripeMarke || betrieb) && (
             <div className="flex min-h-11 items-center gap-3 border-t border-border px-4 md:px-8">
               {stripeMarke && <StatusBadge status={stripeMarke.ton}>{stripeMarke.text}</StatusBadge>}
               {betrieb && (
                 <Link
-                  href={ADMIN_BETRIEB_HREF}
+                  href={betrieb.href}
                   className={cn(
                     'ml-auto inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md text-[13px] font-semibold text-status-offen hover:underline',
                     FOKUS_RAHMEN

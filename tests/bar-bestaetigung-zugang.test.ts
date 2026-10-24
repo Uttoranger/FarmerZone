@@ -11,10 +11,11 @@
  *    nicht passt, zeigt nur „gilt nicht mehr", ohne Datenbank bei falscher Form.
  *  - Erst der Knopf (Server Action, POST) bestätigt: bedingt auf
  *    PENDING_CONFIRMATION UND den Token, nur innerhalb der Frist (`fristVon`),
- *    der Token wird dabei gelöscht. Mails erst nach der Antwort.
+ *    der Token wird dabei gelöscht. Die Mails an Kundin und Hof sind Aufträge
+ *    der Warteschlange in derselben Transaktion (Nr. 159).
  *  - „Doch nicht" storniert über `storniereUnbezahlteBestellung`.
  *
- * Prisma, Mail, Sentry und die Freigabe verwaister Bestellungen sind
+ * Prisma, Warteschlange, Sentry und die Freigabe verwaister Bestellungen sind
  * gemockt; die Fachregel (src/lib/bar-bestaetigung.ts, src/lib/fristen.ts)
  * läuft echt. Zeit über vi.useFakeTimers().
  */
@@ -26,12 +27,13 @@ import { NextRequest } from 'next/server'
 
 const { nachlauf } = vi.hoisted(() => ({ nachlauf: [] as Array<() => Promise<void>> }))
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: { order: { findFirst: vi.fn(), updateMany: vi.fn() } },
-}))
+vi.mock('@/lib/prisma', () => {
+  const prisma = { order: { findFirst: vi.fn(), updateMany: vi.fn() }, $transaction: vi.fn() }
+  return { prisma }
+})
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: vi.fn() }))
 vi.mock('@/server/unbezahlte-bestellung', () => ({ storniereUnbezahlteBestellung: vi.fn() }))
-vi.mock('@/lib/email', () => ({ sendOrderConfirmation: vi.fn(), sendOrderConfirmedToFarmer: vi.fn() }))
+vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 // Der Nachlauf wird gesammelt statt sofort gestartet — so ist prüfbar, dass
@@ -66,12 +68,13 @@ import { bestellLinkGilt } from '@/lib/bestell-link'
 import { prisma } from '@/lib/prisma'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
-import { sendOrderConfirmation, sendOrderConfirmedToFarmer } from '@/lib/email'
+import { stelleMailEin } from '@/server/mail-warteschlange'
 
 const findFirst = vi.mocked(prisma.order.findFirst)
 const updateMany = vi.mocked(prisma.order.updateMany)
 const freigabe = vi.mocked(gibVerwaisteFreiOhneRisiko)
 const stornieren = vi.mocked(storniereUnbezahlteBestellung)
+const einstellen = vi.mocked(stelleMailEin)
 
 const TOKEN = 'V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k'
 /** Bestellt am 02.10.2026 um 10:00 Wiener Zeit — Frist 12:00 (zwei Stunden). */
@@ -216,6 +219,8 @@ beforeEach(() => {
   findFirst.mockResolvedValue(bestellung() as never)
   updateMany.mockResolvedValue({ count: 1 } as never)
   stornieren.mockResolvedValue(true)
+  // Die Transaktion arbeitet auf denselben Attrappen.
+  vi.mocked(prisma.$transaction).mockImplementation((async (arbeit: (tx: typeof prisma) => Promise<unknown>) => arbeit(prisma)) as never)
 })
 
 afterEach(() => {
@@ -232,9 +237,7 @@ describe('Mail-Link (GET /api/orders/confirm/[token]) — leitet nur weiter', ()
     await klick()
 
     expect(updateMany).not.toHaveBeenCalled()
-    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
-    await vi.dynamicImportSettled()
-    expect(sendOrderConfirmation).not.toHaveBeenCalled()
+    expect(einstellen).not.toHaveBeenCalled()
     expect(nachlauf).toHaveLength(0)
   })
 
@@ -398,11 +401,11 @@ describe('Knopf „Ja, ich hole verbindlich ab" — bestaetigeBarBestellung', ()
 
     expect(updateMany).toHaveBeenCalledTimes(1)
     const aufruf = updateMany.mock.calls[0][0] as { where: Record<string, unknown>; data: Record<string, unknown> }
-    // Hash oder (ältere Bestellung) Klartext — beides aus tokenKandidaten (Nr. 151).
+    // Nur der Hash — aus tokenKandidaten (Nr. 151, Klartext entfällt seit Nr. 164).
     expect(aufruf.where).toMatchObject({
       id: 'order-1',
       status: 'PENDING_CONFIRMATION',
-      confirmationToken: { in: [barTokenHash(TOKEN), TOKEN] },
+      confirmationToken: { in: [barTokenHash(TOKEN)] },
     })
     expect(aufruf.data).toMatchObject({ status: 'CONFIRMED', confirmationToken: null })
     expect(aufruf.data.confirmedAt).toEqual(IN_DER_FRIST)
@@ -419,30 +422,24 @@ describe('Knopf „Ja, ich hole verbindlich ab" — bestaetigeBarBestellung', ()
     expect(freigabe.mock.invocationCallOrder[0]).toBeLessThan(updateMany.mock.invocationCallOrder[0])
   })
 
-  it('Mails erst nach der Antwort — an Kundin und Hof, je einmal', async () => {
+  it('Mails als Aufträge an Kundin und Hof, je einer, in DERSELBEN Transaktion nach dem Statuswechsel — kein Versand im Antwortpfad', async () => {
     await weiterleitungVon(bestaetigeBarBestellung({}, formular()))
 
-    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
-    await vi.dynamicImportSettled()
-    expect(sendOrderConfirmation).not.toHaveBeenCalled()
-    expect(sendOrderConfirmedToFarmer).not.toHaveBeenCalled()
-
-    for (const aufgabe of nachlauf) await aufgabe()
-
-    expect(sendOrderConfirmation).toHaveBeenCalledTimes(1)
-    expect(sendOrderConfirmedToFarmer).toHaveBeenCalledTimes(1)
-    // Der Bestellzeitpunkt geht mit: Die Mail an den Hof entscheidet daran die Bar-Ausnahme (Register B1).
-    expect(sendOrderConfirmedToFarmer).toHaveBeenCalledWith(expect.objectContaining({ createdAt: BESTELLT }))
+    expect(einstellen).toHaveBeenCalledTimes(1)
+    const [auftraege, tx] = einstellen.mock.calls[0]!
+    expect(auftraege).toEqual([
+      expect.objectContaining({ art: 'bestellung-bestaetigung', vorrang: 1, schluessel: 'bestellung-bestaetigung:order-1', bestellungId: 'order-1', farmId: 'farm-1' }),
+      expect.objectContaining({ art: 'bar-bestaetigt-hof', vorrang: 1, schluessel: 'bar-bestaetigt-hof:order-1', bestellungId: 'order-1', farmId: 'farm-1' }),
+    ])
+    expect(tx).toBe(prisma)
+    expect(updateMany.mock.invocationCallOrder[0]).toBeLessThan(einstellen.mock.invocationCallOrder[0]!)
+    expect(nachlauf).toHaveLength(0)
   })
 
-  it('eine gescheiterte Mail geht nach Sentry und hält die andere nicht auf', async () => {
-    vi.mocked(sendOrderConfirmation).mockRejectedValueOnce(new Error('Resend gestört'))
-    await weiterleitungVon(bestaetigeBarBestellung({}, formular()))
-
-    for (const aufgabe of nachlauf) await aufgabe()
-
-    expect(sendOrderConfirmedToFarmer).toHaveBeenCalledTimes(1)
-    expect(Sentry.captureException).toHaveBeenCalledTimes(1)
+  it('scheitert das Einstellen, wirft die Transaktion — die Bestätigung ist nicht gespeichert, kein Weiterleiten', async () => {
+    einstellen.mockRejectedValueOnce(new Error('DB weg'))
+    await expect(bestaetigeBarBestellung({}, formular())).rejects.toThrow('DB weg')
+    expect(Sentry.captureException).not.toHaveBeenCalled()
   })
 
   it('nach der Frist: bestätigt NICHT, keine Mail — die Seite zeigt „verfallen"', async () => {
@@ -501,6 +498,7 @@ describe('Knopf „Ja, ich hole verbindlich ab" — bestaetigeBarBestellung', ()
 
     const ziel = await weiterleitungVon(bestaetigeBarBestellung({}, formular()))
 
+    expect(einstellen).not.toHaveBeenCalled()
     expect(nachlauf).toHaveLength(0)
     erwarteSignierteBestaetigungsseite(ziel)
   })
@@ -568,10 +566,10 @@ describe('Knopf „Doch nicht – Bestellung stornieren" — storniereBarBestell
   })
 })
 
-describe('Nur der Hash in der Datenbank (Nr. 151) — alle Leser suchen Hash und Klartext', () => {
-  const GESUCHT = { confirmationToken: { in: [barTokenHash(TOKEN), TOKEN] } }
+describe('Nur der Hash in der Datenbank (Nr. 151) — alle Leser suchen nur den Hash', () => {
+  const GESUCHT = { confirmationToken: { in: [barTokenHash(TOKEN)] } }
 
-  it('Seite, Knöpfe und alter Mail-Link fragen nach Hash ODER Klartext — nie nur nach dem Klartext', async () => {
+  it('Seite, Knöpfe und alter Mail-Link fragen nach dem Hash — nie nach dem Klartext', async () => {
     await seite()
     await weiterleitungVon(bestaetigeBarBestellung({}, formular()))
     await weiterleitungVon(storniereBarBestellung({}, formular()))

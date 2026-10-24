@@ -15,6 +15,8 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vites
 const { sendMock, zaehleMail } = vi.hoisted(() => ({ sendMock: vi.fn(), zaehleMail: vi.fn() }))
 
 vi.mock('server-only', () => ({}))
+// Das Mail-Protokoll (Nr. 158) bindet Prisma; hier geht es nur um die Mail selbst.
+vi.mock('@/server/mail-warteschlange', () => ({ protokolliereSofortMail: vi.fn() }))
 vi.mock('resend', () => ({
   Resend: class {
     emails = { send: sendMock }
@@ -59,35 +61,35 @@ describe('sendRaw zählt verschickte Mails', () => {
       reihenfolge.push('zaehlen')
     })
 
-    expect(await mitKey.sendRaw('kunde@example.com', 'Betreff', '<p>Hallo</p>')).toEqual({ id: 'email_1' })
+    expect(await mitKey.sendRaw('kunde@example.com', 'Betreff', '<p>Hallo</p>', { art: 'testmail' })).toEqual({ id: 'email_1' })
     expect(reihenfolge).toEqual(['versand', 'zaehlen'])
   })
 
   it('ein Fehler beim Zählen stoppt die Mail nicht und wirft nicht — Sentry bekommt nur die Klasse', async () => {
     zaehleMail.mockRejectedValue(Object.assign(new Error('Verbindung zu kunde@example.com weg'), { name: 'PrismaClientInitializationError' }))
 
-    expect(await mitKey.sendRaw('kunde@example.com', 'Deine Bestellung', '<p>Hallo</p>')).toEqual({ id: 'email_1' })
+    expect(await mitKey.sendRaw('kunde@example.com', 'Deine Bestellung', '<p>Hallo</p>', { art: 'testmail' })).toEqual({ id: 'email_1' })
     const [gemeldet, kontext] = vi.mocked(Sentry.captureException).mock.calls[0] as [Error, Record<string, unknown>]
     expect([gemeldet.name, gemeldet.message]).toEqual(['PrismaClientInitializationError', 'Betrieb: Mail nicht gezählt'])
     expect(JSON.stringify(kontext)).not.toMatch(/example\.com|Bestellung/)
   })
 
   it('der Log-Modus ohne RESEND_API_KEY zählt nicht', async () => {
-    await ohneKey.sendRaw('kunde@example.com', 'Betreff', '<p>Hallo</p>')
+    await ohneKey.sendRaw('kunde@example.com', 'Betreff', '<p>Hallo</p>', { art: 'testmail' })
     await vi.dynamicImportSettled()
     expect(sendMock).not.toHaveBeenCalled()
     expect(zaehleMail).not.toHaveBeenCalled()
   })
 
   it('gesperrte Post (Register Z3, außerhalb der Produktion an eine fremde Adresse) zählt nicht', async () => {
-    expect(await mitKey.sendRaw('kunde@example.org', 'Betreff', '<p>Hallo</p>')).toEqual({ gesperrt: true })
+    expect(await mitKey.sendRaw('kunde@example.org', 'Betreff', '<p>Hallo</p>', { art: 'testmail' })).toEqual({ gesperrt: true })
     await vi.dynamicImportSettled()
     expect(zaehleMail).not.toHaveBeenCalled()
   })
 
   it('ein Fehler von Resend zählt nicht', async () => {
     sendMock.mockResolvedValue({ data: null, error: { message: 'domain not verified' } })
-    await mitKey.sendRaw('kunde@example.com', 'Betreff', '<p>Hallo</p>')
+    await mitKey.sendRaw('kunde@example.com', 'Betreff', '<p>Hallo</p>', { art: 'testmail' })
     await vi.dynamicImportSettled()
     expect(zaehleMail).not.toHaveBeenCalled()
   })

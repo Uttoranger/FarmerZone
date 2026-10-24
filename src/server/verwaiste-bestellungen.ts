@@ -1,6 +1,5 @@
 import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
-import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { GRUND_NICHT_BESTAETIGT, GRUND_ZAHLUNG_VERFALLEN, fristVon, istVerwaist } from '@/lib/fristen'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
 
@@ -90,10 +89,7 @@ export async function gibVerwaisteBestellungenFrei(jetzt: Date, farmId?: string)
       pickupDate: true,
       pickupTimeStart: true,
       stripePaymentIntentId: true,
-      orderNumber: true,
-      customerName: true,
-      customerEmail: true,
-      farm: { select: { name: true } },
+      farmId: true,
     },
   })
 
@@ -121,19 +117,18 @@ export async function gibVerwaisteBestellungenFrei(jetzt: Date, farmId?: string)
         // Lag die Frist lange zurück (Altfall vor diesem Fix), keine Mail:
         // Eine Nachricht zu einer Wochen alten Bestellung verwirrt mehr, als sie hilft.
         if (jetzt.getTime() - fristVon(bestellung).getTime() > MAIL_HOECHSTENS_MS) continue
-        nachDerAntwort(async () => {
-          try {
-            // Erst hier geladen (Nr. 31): Die Seiten, die freigeben, ziehen den
-            // E-Mail-Versand sonst bei jedem Kaltstart mit.
-            const { sendBestellungVerfallen } = await import('@/lib/email')
-            await sendBestellungVerfallen(bestellung)
-          } catch (err) {
-            Sentry.captureException(err, {
-              tags: { aufgabe: 'verwaiste-bestellungen', mail: 'bestellung_verfallen' },
-              extra: { orderId: bestellung.id },
-            })
-          }
-        })
+        // Ein Auftrag der Warteschlange (Wichtig, Nr. 159) — erst nach dem
+        // gelungenen Storno, die Stornierung selbst kippt ein Fehler hier nicht.
+        try {
+          // Erst hier geladen (Nr. 31): Die Seiten, die freigeben, brauchen die Warteschlange sonst nie.
+          const [{ stelleMailEin }, { bestellMailAuftrag }] = await Promise.all([import('@/server/mail-warteschlange'), import('@/server/mail-arten/bestellung')])
+          await stelleMailEin(bestellMailAuftrag('verfallen', bestellung))
+        } catch (err) {
+          Sentry.captureException(err, {
+            tags: { aufgabe: 'verwaiste-bestellungen', mail: 'bestellung_verfallen' },
+            extra: { orderId: bestellung.id },
+          })
+        }
       }
     } catch (err) {
       ergebnis.fehler += 1

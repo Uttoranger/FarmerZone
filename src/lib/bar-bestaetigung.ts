@@ -16,6 +16,7 @@
  * Rein, ohne Datenbank (tests/bar-bestaetigung.test.ts).
  */
 import { createHash } from 'crypto'
+import { nanoid } from 'nanoid'
 import type { OrderStatus } from '@prisma/client'
 import { GRUND_NICHT_BESTAETIGT, istVerwaist, type FristBestellung } from '@/lib/fristen'
 
@@ -67,12 +68,27 @@ export function barBestaetigungsAnsicht(bestellung: BarBestellung | null, jetzt:
  * (src/schemas/bar-bestaetigung.ts) nie durchlässt. Ein gespeicherter Wert
  * taugt also nie selbst als Token.
  */
-const HASH_FASSUNG = 'h1:'
+/** Das Präfix jedes gespeicherten Hashs — das Aufräumen leert alle Werte ohne es (Nr. 164). */
+export const BAR_HASH_PRAEFIX = 'h1:'
 const HASH_ZWECK = 'bar-bestaetigung:'
 
 /** Der gespeicherte Wert zu einem Token aus der Mail. */
 export function barTokenHash(token: string): string {
-  return HASH_FASSUNG + createHash('sha256').update(HASH_ZWECK + token).digest('hex')
+  return BAR_HASH_PRAEFIX + createHash('sha256').update(HASH_ZWECK + token).digest('hex')
+}
+
+/** Länge des Tokens aus der Mail — dieselbe in Kasse, „Erneut senden“ und beim Support (Nr. 167). */
+export const BAR_TOKEN_LAENGE = 32
+
+/**
+ * Ein neuer Token für den Bestätigungslink und sein gespeicherter Wert (S17):
+ * Der Token geht nur in die Mail, `hash` in `Order.confirmationToken`.
+ * Dieselbe Erzeugung wie in der Kasse (`nanoid(32)`, src/app/api/checkout)
+ * — seit Nr. 167 als eigene Funktion für „Nochmal schicken“ im Admin.
+ */
+export function neuerBarToken(): { token: string; hash: string } {
+  const token = nanoid(BAR_TOKEN_LAENGE)
+  return { token, hash: barTokenHash(token) }
 }
 
 /**
@@ -80,15 +96,13 @@ export function barTokenHash(token: string): string {
  * Quelle für alle Leser (Seite, Knöpfe, alter Mail-Link):
  * `confirmationToken: { in: tokenKandidaten(token) }`.
  *
- * Der zweite Wert, der Klartext, hält Bestellungen von vor dem Deploy von
- * Nr. 151 (23.10.2026) gültig — ihre Mails tragen den Token, die Datenbank
- * auch. Der Klartext einer offenen Bestellung bestätigt höchstens bis zum
- * Ende der Barfrist (`fristVon`, höchstens zwei Stunden nach der Bestellung);
- * danach fällt der Zweig mit einem eigenen Auftrag weg (Bericht Nr. 151), zusammen mit dem
- * Leeren der übrigen Klartext-Werte.
+ * Nur der Hash (Nr. 164, Register S17): Der Klartext älterer Bestellungen
+ * galt nur bis zum Ende der Barfrist; das tägliche Aufräumen
+ * (src/server/aufraeumen.ts) setzt die übrig gebliebenen Klartext-Werte auf
+ * leer. Die Liste bleibt eine Liste, damit die Leser nicht umgebaut werden.
  */
 export function tokenKandidaten(token: string): string[] {
-  return [barTokenHash(token), token]
+  return [barTokenHash(token)]
 }
 
 /** Wie oft „Erneut senden" je Bestellung und Tag eine Mail auslöst (S17 Punkt 2). */

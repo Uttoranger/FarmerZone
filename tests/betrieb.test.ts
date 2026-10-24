@@ -185,6 +185,17 @@ describe('ablaufStand — pünktlich, überfällig, Fehler, noch kein Lauf', () 
     expect(wannText(aufraeumen, T('2026-11-16T12:00:00Z'))).toBe('täglich ab 04:00')
     expect(wannText(ABLAEUFE[3], T('2026-10-16T12:00:00Z'))).toBe('montags ab 07:00')
   })
+
+  it('die Mail-Warteschlange (N26, Nr. 158): „jede Minute“, überfällig nach 10 Minuten — Gegenprobe täglich', () => {
+    const mails = ABLAEUFE.find((a) => a.name === 'mails')
+    expect(mails).toMatchObject({ pfad: '/api/cron/mails', zeitplan: '* * * * *', rhythmus: 'minuetlich' })
+    if (!mails) return
+    expect(wannText(mails, T('2026-10-16T12:00:00Z'))).toBe('jede Minute')
+    const l = lauf('2026-10-16T12:00:00Z')
+    expect(ablaufStand(mails, l, T('2026-10-16T12:10:00Z'))).toBe('puenktlich')
+    expect(ablaufStand(mails, l, T('2026-10-16T12:10:00.001Z'))).toBe('ueberfaellig')
+    expect(ablaufStand(ABLAEUFE[0], l, T('2026-10-16T12:10:00.001Z'))).toBe('puenktlich')
+  })
 })
 
 describe('grenzSchritt — Speicher (Bilder, Datenbank)', () => {
@@ -257,7 +268,8 @@ describe('ablaufSchritt', () => {
 
 describe('Hinweis der Shell (Punkt und Betriebsleiste, Register N15)', () => {
   const jetzt = T('2026-10-16T08:00:00Z')
-  const gut = new Map(ABLAEUFE.map((a) => [a.name, lauf('2026-10-16T03:00:00Z')]))
+  // Die Mail-Warteschlange läuft jede Minute (Nr. 158) — pünktlich heißt hier: vor 2 Minuten.
+  const gut = new Map(ABLAEUFE.map((a) => [a.name, lauf(a.rhythmus === 'minuetlich' ? '2026-10-16T07:58:00Z' : '2026-10-16T03:00:00Z')]))
 
   it('nichts offen → null (kein Punkt)', () => {
     expect(betriebHinweis([{ art: 'bilder', stufe: 0 }], gut, jetzt)).toBeNull()
@@ -265,14 +277,14 @@ describe('Hinweis der Shell (Punkt und Betriebsleiste, Register N15)', () => {
   })
 
   it('eine Warnung → „1 Warnung“ mit dem Wert; die höhere Stufe steht vorn', () => {
-    expect(betriebHinweis([{ art: 'bilder', stufe: 1 }], gut, jetzt)).toEqual({ anzahl: 1, text: 'Bilder-Speicher über 80 %', kurz: 'Bilder über 80 %' })
+    expect(betriebHinweis([{ art: 'bilder', stufe: 1 }], gut, jetzt)).toEqual({ anzahl: 1, text: 'Bilder-Speicher über 80 %', kurz: 'Bilder über 80 %', href: '/admin/betrieb' })
     expect(betriebHinweis([{ art: 'bilder', stufe: 1 }, { art: 'datenbank', stufe: 2 }], gut, jetzt)).toMatchObject({ anzahl: 2, text: 'Datenbank über 95 %' })
   })
 
   it('ein überfälliger Ablauf ohne Warnzeile zählt mit — so fällt auch ein ganz ausgefallener Lauf auf', () => {
     const alt = new Map(gut)
     alt.set('betrieb', lauf('2026-10-14T04:00:00Z'))
-    expect(betriebHinweis([], alt, jetzt)).toEqual({ anzahl: 1, text: 'Ablauf „Messung (Betrieb)“ ausgefallen', kurz: 'Ablauf ausgefallen' })
+    expect(betriebHinweis([], alt, jetzt)).toEqual({ anzahl: 1, text: 'Ablauf „Messung (Betrieb)“ ausgefallen', kurz: 'Ablauf ausgefallen', href: '/admin/betrieb' })
   })
 })
 
@@ -297,9 +309,11 @@ describe('Kacheln und Warnkarte', () => {
       m('2026-10-02', 'mails', 389),
     ]
     const [bilder, db, mails] = betriebKacheln(messungen, jetzt)
-    expect(db).toMatchObject({ wert: '46 MB', prozent: '9 %', warnt: false, hinweis: null })
+    // Supabase Pro (Nr. 162): 46 MB von 8 GB.
+    expect(db).toMatchObject({ wert: '46 MB', prozent: '0 %', warnt: false, hinweis: null })
     expect(bilder.hinweis).toMatch(/^Stand vom Do,\s15\.\sOkt/)
-    expect(mails.zeile).toMatch(/^Monat: 412 von 3\s000 \(13\s%\) · zählt je Empfänger$/)
+    // Der Monat der E-Mails ist der Abrechnungszeitraum von Resend (Nr. 162): ab dem 17. Sep.
+    expect(mails.zeile).toMatch(/^Monat 17\. Sep – 16\. Okt: 412 von 3\s000 \(13\s%\) · zählt je Empfänger$/)
   })
 
   it('ein Monatswert aus dem Vormonat gilt nicht mehr', () => {
@@ -335,10 +349,10 @@ describe('„Jetzt messen“, Achse, Mail, CSV', () => {
   })
 
   it('Warn-Mail: Betreff mit Wert und Stufe, nur Zahlen und feste Namen', () => {
-    const mail = betriebMail({ art: 'grenze', wert: 'datenbank', anteil: 82.4, stand: '412 MB von 500 MB sind belegt', trend: null, ohneVerwendungBytes: null })
+    const mail = betriebMail({ art: 'grenze', wert: 'datenbank', anteil: 82.4, stand: '6,6 GB von 8 GB sind belegt', trend: null, ohneVerwendungBytes: null })
     expect(mail.betreff).toBe('Betrieb: Datenbank bei 82 %')
-    expect(mail.absaetze[0]).toMatch(/^412 MB von 500 MB sind belegt\. Bei 500 MB ist die Datenbank nur noch lesbar/)
-    expect(betriebMail({ art: 'grenze', wert: 'datenbank', anteil: 100, stand: '500 MB von 500 MB sind belegt', trend: null, ohneVerwendungBytes: null }).betreff).toBe(
+    expect(mail.absaetze[0]).toMatch(/^6,6 GB von 8 GB sind belegt\. Bei 8 GB ist der inklusive Speicher voll – die Datenbank wächst weiter und kostet ab dann extra\.$/)
+    expect(betriebMail({ art: 'grenze', wert: 'datenbank', anteil: 100, stand: '8 GB von 8 GB sind belegt', trend: null, ohneVerwendungBytes: null }).betreff).toBe(
       'Betrieb: Datenbank voll'
     )
     expect(betriebMail({ art: 'ablauf', name: 'verwaisteBestellungen', stand: 'fehler', zuletzt: 'heute 05:31', stundenSeit: 1, wann: 'täglich ab 05:30' }).betreff).toBe(
@@ -368,8 +382,8 @@ describe('Vercel Pro — Bilder ohne feste Grenze (Nr. 113)', () => {
     expect(vorgaenge).toMatchObject({ anteil: null, prozent: null, warnt: false, ohneGrenze: 'nutzungsbasiert (Pro) – zählt zum Ausgabenlimit' })
     expect(`${bilder.von} ${bilder.zeile} ${bilder.kurz}`).not.toMatch(/%|von 1 GB|sperrt Vercel alle Bilder/)
     expect(bilder.satz).toBe('Keine Sperre bei einer Menge – erst bei 100 % des Ausgabenlimits pausiert Vercel das Projekt.')
-    // Gegenprobe: die Datenbank (Supabase Free) behält Grenze, Prozent und Balken.
-    expect(db).toMatchObject({ prozent: '9 %', ohneGrenze: null })
+    // Gegenprobe: die Datenbank (Supabase Pro, 8 GB) behält Grenze, Prozent und Balken.
+    expect(db).toMatchObject({ prozent: '0 %', ohneGrenze: null })
   })
 
   it('ohne Grenze keine Warnstufe für Bilder: eine alte Stufe (Hobby) geht still auf 0, sonst nichts', () => {
@@ -382,7 +396,7 @@ describe('Vercel Pro — Bilder ohne feste Grenze (Nr. 113)', () => {
     expect(betriebVerlauf([m('2026-10-19', 'bilderBytes', 5_000_000_000)], jetzt).linien.map((l) => l.id)).toEqual(['datenbank', 'mailsMonat'])
     const vercel = TARIF_ZEILEN.find((t) => t.dienst === 'Vercel')
     expect(`${vercel?.marke}, ${vercel?.satz}`).toMatch(/^Pro · nutzungsbasiert, Ausgabenlimit in Spend Management\./)
-    expect(GRENZE).toMatchObject({ bilderBytes: null, bildVorgaengeMonat: null, bildUebertragungBytesMonat: null, datenbankBytes: 500_000_000 })
+    expect(GRENZE).toMatchObject({ bilderBytes: null, bildVorgaengeMonat: null, bildUebertragungBytesMonat: null, datenbankBytes: 8_000_000_000 })
   })
 })
 
@@ -416,7 +430,7 @@ describe('Vercel-Ausgaben — Abrechnungszeitraum, Stufe, Karte, Mail (Nr. 113)'
     expect(formatDollar(123456)).toMatch(/^1\s234,56 \$$/)
   })
 
-  it('Karte: die jüngste Meldung im laufenden Zeitraum, sonst „Unter 50 %“ — eine aus dem alten Zeitraum zählt nicht', () => {
+  it('Karte: die jüngste Meldung im laufenden Zeitraum, sonst „Unter 50 % (letzte Meldung …)“ — eine aus dem alten Zeitraum zählt nicht', () => {
     const jetzt = T('2026-10-25T10:00:00Z')
     const karte = vercelAusgabenKarte(
       [m('2026-10-21', 'vercelAusgaben', 2510), m('2026-10-21', 'vercelLimit', 5000), m('2026-10-23', 'vercelAusgaben', 3800), m('2026-10-23', 'vercelLimit', 5000)],
@@ -426,7 +440,7 @@ describe('Vercel-Ausgaben — Abrechnungszeitraum, Stufe, Karte, Mail (Nr. 113)'
     expect(karte.satz).toMatch(/^Zuletzt gemeldet: 38 \$ von 50 \$ \(76 %\) am Fr,\s23\.\sOkt$/)
     expect(vercelAusgabenKarte([m('2026-10-18', 'vercelAusgaben', 4000), m('2026-10-18', 'vercelLimit', 5000)], jetzt)).toEqual({
       gemeldet: false,
-      satz: 'Unter 50 % – Vercel meldet erst ab 50 % des Limits.',
+      satz: 'Unter 50 % (letzte Meldung 18. Okt).',
       kurz: 'Unter 50 %',
     })
   })
@@ -460,7 +474,9 @@ describe('Warn-Mail: Bilder ohne Verwendung (Nacharbeit 104, Nr. 113)', () => {
     const ohne = betriebMail({ art: 'grenze', wert: 'bilder', anteil: 82, stand: '820 MB sind belegt', trend: null, ohneVerwendungBytes: null })
     expect(ohne.hilft).toBe('Vercel Pro, dort gibt es keine harte Sperre.')
     // Andere Werte nennen die Bilder nie.
-    expect(betriebMail({ art: 'grenze', wert: 'datenbank', anteil: 82, stand: '410 MB von 500 MB sind belegt', trend: null, ohneVerwendungBytes: 214_000_000 }).hilft).toBe('Supabase Pro mit 8 GB.')
+    expect(betriebMail({ art: 'grenze', wert: 'datenbank', anteil: 82, stand: '6,6 GB von 8 GB sind belegt', trend: null, ohneVerwendungBytes: 214_000_000 }).hilft).toBe(
+      'Unter „Größte Tabellen“ auf der Seite Betrieb steht, was wächst.'
+    )
   })
 })
 

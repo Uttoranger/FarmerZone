@@ -4,13 +4,17 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
-import type { OrderForEmail } from '@/lib/email'
-import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import { stelleMailEin, type EinstellAuftrag } from '@/server/mail-warteschlange'
+import { artikelFehltMailAuftrag, bestellMailAuftrag, stornoMailAuftrag, trageStornoErstattungEin } from '@/server/mail-arten/bestellung'
+import { betreiberAuftraege, betreiberKennungen, erstattungOffenBezug } from '@/server/mail-arten/betreiber'
+import { erstattungOffenInhalt } from '@/lib/erstattung-offen'
+import type { ErstattungOffenFall } from '@/schemas/mail-auftrag'
 import { erneuereHoflisteNachStorno } from '@/server/hofliste-erneuern'
 import * as Sentry from '@sentry/nextjs'
-import type { OrderStatus } from '@prisma/client'
+import type { OrderStatus, Prisma } from '@prisma/client'
 import {
   nachTeilerstattung,
+  onlineBezahlt,
   plattformgebuehrCents,
   restNachTeilerstattung,
   stornoBetraege,
@@ -63,6 +67,10 @@ export type ArtikelFehltErgebnis = StornoErgebnis & {
 const BESTELLUNG_INZWISCHEN_GEAENDERT =
   'Die Bestellung wurde inzwischen geändert, zum Beispiel storniert. Lade die Seite neu.'
 
+// Statuswechsel und Mail-Auftrag sind eine Transaktion — scheitert sie, ist
+// nichts gespeichert und der Hof tippt einfach noch einmal.
+const STATUS_NICHT_GESPEICHERT = 'Wir konnten die Änderung nicht speichern. Versuch es bitte gleich noch einmal.'
+
 async function getAuthFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return null
@@ -76,57 +84,9 @@ async function getAuthFarm() {
   })
 }
 
-type DbOrder = {
-  id: string
-  orderNumber: string
-  customerName: string
-  customerEmail: string
-  customerPhone: string
-  totalAmount: { toString(): string }
-  /** Servicegebühr-Snapshot in Cent (Order.serviceFeeCents). */
-  serviceFeeCents?: number
-  pickupDate: Date
-  pickupTimeStart: string
-  pickupTimeEnd: string
-  paymentMethod: string
-  stripePaymentIntentId?: string | null
-  items: Array<{
-    productName: string
-    quantity: number
-    unitPrice: { toString(): string }
-    totalPrice: { toString(): string }
-    product?: { unit: string; unitSize: { toString(): string } | null } | null
-  }>
-}
-
 type FarmInfo = {
   id: string; name: string; slug: string; email: string; ownerName: string
   address: string; postalCode: string; city: string; phone: string
-}
-
-function toEmailOrder(order: DbOrder, farm: FarmInfo): OrderForEmail {
-  return {
-    id: order.id,
-    orderNumber: order.orderNumber,
-    customerName: order.customerName,
-    customerEmail: order.customerEmail,
-    customerPhone: order.customerPhone,
-    totalAmount: order.totalAmount,
-    serviceFeeCents: order.serviceFeeCents ?? 0,
-    pickupDate: order.pickupDate,
-    pickupTimeStart: order.pickupTimeStart,
-    pickupTimeEnd: order.pickupTimeEnd,
-    paymentMethod: order.paymentMethod,
-    stripePaymentIntentId: order.stripePaymentIntentId,
-    farm,
-    items: order.items.map(i => ({
-      productName: i.productName,
-      quantity: i.quantity,
-      unitPrice: i.unitPrice,
-      totalPrice: i.totalPrice,
-      product: i.product ?? null,
-    })),
-  }
 }
 
 const ORDER_EMAIL_SELECT = {
@@ -168,21 +128,24 @@ const PACKBAR: OrderStatus[] = ['PAID', 'CONFIRMED', 'IN_PREPARATION']
 const LAUFEND: OrderStatus[] = ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY']
 
 /*
- * E-Mail und Stripe kommen erst im Aufruf per `await import()` (Nachtlauf
- * Nr. 31, ARCHITECTURE §4): Diese Actions binden die Bestellseiten ein, und
- * ein statischer Import legte Resend, React Email, alle Vorlagen und das
- * Stripe-SDK in jeden Kaltstart von /orders — auch ohne Mail und ohne Storno.
+ * Stripe kommt erst im Aufruf per `await import()` (Nachtlauf Nr. 31,
+ * ARCHITECTURE §4): Diese Actions binden die Bestellseiten ein, und ein
+ * statischer Import legte das Stripe-SDK in jeden Kaltstart von /orders.
+ * Mails verschickt hier keine Action mehr selbst: Sie stellen einen Auftrag
+ * in die Warteschlange (Register N26, Nr. 159), der Worker verschickt.
  */
 
-/** Ein Mailfehler kippt keinen Statuswechsel — nur gemeldet, ohne Kundendaten. */
-function mailNachDerAntwort(art: string, orderId: string, senden: () => Promise<void>): void {
-  nachDerAntwort(async () => {
-    try {
-      await senden()
-    } catch (err) {
-      Sentry.captureException(err, { tags: { aktion: 'bestellmail', art }, extra: { orderId } })
-    }
-  })
+/**
+ * Stellt die Mail(s) eines schon gespeicherten Statuswechsels ein. Ein Fehler
+ * dabei kippt den Wechsel nicht (CLAUDE.md §2) — nur gemeldet, ohne
+ * Kundendaten. Kein eigener Versand, deshalb im Antwortpfad: ein Insert.
+ */
+async function stelleEinOhneRisiko(art: string, orderId: string, auftraege: () => Promise<EinstellAuftrag | EinstellAuftrag[]>): Promise<void> {
+  try {
+    await stelleMailEin(await auftraege())
+  } catch (err) {
+    Sentry.captureException(err, { tags: { aktion: 'bestellmail', art }, extra: { orderId } })
+  }
 }
 
 export async function markAsReady(orderId: string): Promise<ActionResult> {
@@ -198,16 +161,24 @@ export async function markAsReady(orderId: string): Promise<ActionResult> {
   // Bedingt (S2, ARCHITECTURE §6 Altlast): Ein Storno zwischen Lesen und
   // Schreiben darf nicht überschrieben werden — sonst stünde eine stornierte
   // Bestellung als abholbereit da.
-  const { count } = await prisma.order.updateMany({
-    where: { id: orderId, farmId: farm.id, status: { in: PACKBAR } },
-    data: { status: 'READY' },
-  })
+  // Statuswechsel und Mail-Auftrag in EINER Transaktion: Ein gespeichertes
+  // „abholbereit" hat immer seinen Auftrag. Abholbereit kann sich wiederholen
+  // (zurück und wieder bereit): der Zeitpunkt macht den Schlüssel eindeutig.
+  let count: number
+  try {
+    count = await prisma.$transaction(async (tx) => {
+      const { count: geaendert } = await tx.order.updateMany({
+        where: { id: orderId, farmId: farm.id, status: { in: PACKBAR } },
+        data: { status: 'READY' },
+      })
+      if (geaendert > 0) await stelleMailEin(bestellMailAuftrag('abholbereit', { id: orderId, farmId: farm.id }, new Date()), tx)
+      return geaendert
+    })
+  } catch (err) {
+    Sentry.captureException(err, { tags: { aktion: 'markAsReady' }, extra: { orderId } })
+    return { error: STATUS_NICHT_GESPEICHERT }
+  }
   if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
-
-  mailNachDerAntwort('abholbereit', orderId, async () => {
-    const { sendOrderReady } = await import('@/lib/email')
-    await sendOrderReady(toEmailOrder(order, farm))
-  })
 
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)
@@ -282,23 +253,27 @@ export async function revertReady(
   // Bedingt geschrieben, nicht nach der Leseprüfung blind: Wird die Bestellung
   // zwischen Lesen und Schreiben storniert, holte ein unbedingtes update sie
   // zurück ins Leben — und ein zweiter Storno buchte den Bestand erneut zurück.
-  const { count } = await prisma.order.updateMany({
-    where: { id: orderId, farmId: farm.id, status: 'READY' },
-    data: { status: previous },
-  })
-  if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
-
   // Kunden-Info nur auf Wunsch (Haken im Dialog, Standard AN): neutrales
   // "Kurzes Update" — relativiert die bereits verschickte Abholbereit-Mail.
-  // Erst nach der Antwort und mit try (Nr. 35): Vorher lief der Versand im
-  // Antwortpfad nach dem schon geschriebenen Status — ein Mailfehler warf aus
-  // der Action, obwohl die Bestellung längst zurückgesetzt war.
-  if (notifyCustomer) {
-    mailNachDerAntwort('nicht_abholbereit', orderId, async () => {
-      const { sendOrderNotReady } = await import('@/lib/email')
-      await sendOrderNotReady(toEmailOrder(order, farm))
+  // Der Auftrag in derselben Transaktion wie der Rückweg (Nr. 159): beides
+  // oder keins. Verschickt wird nach der Antwort.
+  let count: number
+  try {
+    count = await prisma.$transaction(async (tx) => {
+      const { count: geaendert } = await tx.order.updateMany({
+        where: { id: orderId, farmId: farm.id, status: 'READY' },
+        data: { status: previous },
+      })
+      if (geaendert > 0 && notifyCustomer) {
+        await stelleMailEin(bestellMailAuftrag('nicht-abholbereit', { id: orderId, farmId: farm.id }, new Date()), tx)
+      }
+      return geaendert
     })
+  } catch (err) {
+    Sentry.captureException(err, { tags: { aktion: 'revertReady' }, extra: { orderId } })
+    return { error: STATUS_NICHT_GESPEICHERT }
   }
+  if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)
@@ -410,45 +385,19 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Sto
  */
 type ErstattungsPfad = 'voll' | 'rest' | 'unbekannt'
 
-type Handbuchung = { anweisung: string; betraege: Array<{ label: string; cents: number }> }
+/** Welcher Fall von „Erstattung offen" beim Storno vorliegt, mit den Beträgen — Satz und Anweisung aus src/lib/erstattung-offen.ts. */
+type Handbuchung = { fall: ErstattungOffenFall; kundinCents?: number; hofCents?: number }
 
 /**
  * Was der Betreiber von Hand tun muss, wenn die Erstattung eines Stornos
  * scheitert — passend zum Weg, der wirklich genommen wurde. Die Anweisung
- * geht an Sentry und in die Mail an den Betreiber.
+ * geht an Sentry und (über den Fall) in die Mail an den Betreiber.
  */
 function handbuchungFuer(pfad: ErstattungsPfad, rest: RestStorno | null, betraege: StornoBetraege): Handbuchung {
-  if (pfad === 'rest' && rest) {
-    return {
-      anweisung:
-        'Teilerstattung, KEINE Vollerstattung: der Kundin den Rest über den Betrag erstatten (ohne reverse_transfer, ohne refund_application_fee) und vom Hof den Betrag per Rückbuchung der Überweisung holen. Vorher in Stripe prüfen, was davon schon gebucht ist.',
-      betraege: [
-        { label: 'An die Kundin erstatten', cents: rest.erstattungCents },
-        { label: 'Vom Hof zurückbuchen', cents: rest.vomHofCents },
-      ],
-    }
-  }
-  if (pfad === 'rest') {
-    return {
-      anweisung:
-        'Teilerstattung, KEINE Vollerstattung: Beträge erst aus den Stripe-Buchungen bestimmen – Kundin = bezahlt laut Stripe − alle Teilerstattungen, Hof = Warenpreis der Bestellung − Provision − alle Teil-Rückbuchungen. Buchungen ohne Zuordnung und einen abweichenden bezahlten Betrag vorher klären.',
-      betraege: [],
-    }
-  }
-  if (pfad === 'voll') {
-    return {
-      anweisung: 'Überweisung zurückbuchen und Plattformgebühr erstatten',
-      betraege: [
-        { label: 'An die Kundin erstatten', cents: betraege.erstattetCents },
-        { label: 'Davon vom Hof (über die Rückbuchung der Überweisung)', cents: betraege.vomHofCents },
-      ],
-    }
-  }
-  return {
-    anweisung:
-      'Stand bei Stripe unbekannt: erst prüfen, ob es zu dieser Zahlung schon Erstattungen gibt. Keine → Überweisung zurückbuchen und Plattformgebühr erstatten; sonst Teilerstattung mit festen Beträgen (Rest).',
-    betraege: [],
-  }
+  if (pfad === 'rest' && rest) return { fall: 'storno_rest', kundinCents: rest.erstattungCents, hofCents: rest.vomHofCents }
+  if (pfad === 'rest') return { fall: 'storno_rest_ohne_betraege' }
+  if (pfad === 'voll') return { fall: 'storno_voll', kundinCents: betraege.erstattetCents, hofCents: betraege.vomHofCents }
+  return { fall: 'storno_unbekannt' }
 }
 
 /** Was der Betreiber bei „Artikel fehlt" von Hand prüft — je Grund, warum nichts gebucht wurde. */
@@ -498,48 +447,61 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
   // Warenpreis beim Hof (markAsNotPickedUp); ein Storno danach erstattete ihn
   // voll und buchte Ware zurück, die nie zurückkam. Die Oberfläche bietet es
   // dort schon nicht an — der Server muss es genauso sehen.
-  const storno = await prisma.$transaction(async (tx) => {
-    const { count } = await tx.order.updateMany({
-      where: {
-        id: orderId,
-        farmId: farm.id,
-        status: { notIn: ['CANCELLED', 'PICKED_UP', 'NOT_PICKED_UP'] },
-      },
-      data: {
-        status: 'CANCELLED',
-        cancelledAt: new Date(),
-        cancelReason: reason ?? null,
-        // Der Vermerk hängt am Stand VOR der Sperre — unbedenklich: „Artikel
-        // fehlt" senkt eine Gebühr nie auf 0 (Mindestgebühr), und
-        // serviceFeeRefundedAt setzen nur Status-gesperrte Wege.
-        // Servicegebühr entfällt auch bei Storno: online steckt sie in der vollen
-        // Erstattung unten (Stripe erstattet den ganzen Zahlungsbetrag), bar wurde
-        // sie nie kassiert. Der Vermerk hält den Snapshot ehrlich — Admin-Spalte
-        // „entfallen" heute, Monatsabrechnung (Sprint 3) später.
-        ...(order.serviceFeeCents > 0 && !order.serviceFeeRefundedAt
-          ? { serviceFeeRefundedAt: new Date() }
-          : {}),
-      },
-    })
-    if (count === 0) return null
-
-    // Beträge und Positionen FRISCH, unter der Zeilensperre des Statuswechsels:
-    // Hat „Artikel fehlt" (src/server/artikel-fehlt.ts) kurz davor Warenpreis,
-    // Gebühr und Erstattung geändert, rechnet der Storno mit dem neuen Stand —
-    // nie mit dem Stand vor dem Warten auf die Sperre.
-    const stand = await tx.order.findFirst({ where: { id: orderId }, select: STORNO_STAND })
-    if (!stand) throw new Error('Storno: Bestellung nach der Sperre nicht lesbar')
-
-    // Fehlende Artikel (E14) gehen nicht zurück in den Vorrat — sie waren nie da.
-    for (const item of stand.items) {
-      if (item.fehltSeit) continue
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { stock: { increment: item.quantity } },
+  let storno: Prisma.OrderGetPayload<{ select: typeof STORNO_STAND }> | null
+  try {
+    storno = await prisma.$transaction(async (tx) => {
+      const { count } = await tx.order.updateMany({
+        where: {
+          id: orderId,
+          farmId: farm.id,
+          status: { notIn: ['CANCELLED', 'PICKED_UP', 'NOT_PICKED_UP'] },
+        },
+        data: {
+          status: 'CANCELLED',
+          cancelledAt: new Date(),
+          cancelReason: reason ?? null,
+          // Der Vermerk hängt am Stand VOR der Sperre — unbedenklich: „Artikel
+          // fehlt" senkt eine Gebühr nie auf 0 (Mindestgebühr), und
+          // serviceFeeRefundedAt setzen nur Status-gesperrte Wege.
+          // Servicegebühr entfällt auch bei Storno: online steckt sie in der vollen
+          // Erstattung unten (Stripe erstattet den ganzen Zahlungsbetrag), bar wurde
+          // sie nie kassiert. Der Vermerk hält den Snapshot ehrlich — Admin-Spalte
+          // „entfallen" heute, Monatsabrechnung (Sprint 3) später.
+          ...(order.serviceFeeCents > 0 && !order.serviceFeeRefundedAt
+            ? { serviceFeeRefundedAt: new Date() }
+            : {}),
+        },
       })
-    }
-    return stand
-  })
+      if (count === 0) return null
+
+      // Beträge und Positionen FRISCH, unter der Zeilensperre des Statuswechsels:
+      // Hat „Artikel fehlt" (src/server/artikel-fehlt.ts) kurz davor Warenpreis,
+      // Gebühr und Erstattung geändert, rechnet der Storno mit dem neuen Stand —
+      // nie mit dem Stand vor dem Warten auf die Sperre.
+      const stand = await tx.order.findFirst({ where: { id: orderId }, select: STORNO_STAND })
+      if (!stand) throw new Error('Storno: Bestellung nach der Sperre nicht lesbar')
+
+      // Fehlende Artikel (E14) gehen nicht zurück in den Vorrat — sie waren nie da.
+      for (const item of stand.items) {
+        if (item.fehltSeit) continue
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: item.quantity } },
+        })
+      }
+      // Die Storno-Mail als Auftrag in DERSELBEN Transaktion (Nr. 159, Punkt
+      // 1): gespeicherte Stornierung ⇔ Auftrag. Online bezahlt steht der Betrag
+      // erst nach Stripe fest — dann trägt der Auftrag `ausstehend`, der Betrag
+      // kommt unten nach (trageStornoErstattungEin). Scheitert das Einstellen,
+      // rollt der Storno zurück und der Hof versucht es noch einmal.
+      await stelleMailEin(stornoMailAuftrag({ id: orderId, farmId: farm.id }, onlineBezahlt(stand)), tx)
+      return stand
+    })
+  } catch (err) {
+    // Zurückgerollt: nichts storniert, nichts zurückgebucht, kein Auftrag.
+    Sentry.captureException(err, { tags: { aktion: 'cancelOrder', grund: 'nicht_gespeichert' }, extra: { orderId } })
+    return { error: 'Wir konnten die Bestellung nicht stornieren. Versuch es bitte gleich noch einmal.' }
+  }
 
   if (!storno) return { error: 'Diese Bestellung ist schon storniert oder abgeholt.' }
   // Nach dem Commit: ein volles Abholfenster kann frei werden (Register N19, Ergänzung 21.10.2026).
@@ -564,7 +526,8 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
   // Zustand, nur das Geld steht noch aus. paymentStatus bleibt dann PAID:
   // das Enum kennt kein „Erstattung ausstehend" (Vorschlag: REFUND_PENDING,
   // nicht eigenmächtig angelegt — Schema-Änderung nur mit Freigabe).
-  let refundAmount: number | null = null
+  // Was Stripe der Kundin erstattet hat, in Cent — null = keine Erstattung (bar, unbezahlt) oder offen.
+  let erstattetStripeCents: number | null = null
   let erstattungOffen = false
   let festeBetraege: RestStorno | null = null
   // Für die Handbuchung, falls Stripe scheitert: welcher Weg genommen wurde
@@ -631,7 +594,7 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
             })
           },
         })
-        refundAmount = erstattet / 100
+        erstattetStripeCents = erstattet
         festeBetraege = { erstattungCents: erstattet, vomHofCents }
         try {
           // Alles, was Stripe erstattet hat — auch eine Teilerstattung, deren
@@ -684,7 +647,7 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
         if (!erstattungZaehlt(refund.status)) {
           throw new StripeStandUnklar('erstattung_gescheitert', { orderId: order.id, status: refund.status ?? 'unbekannt', refundId: refund.id })
         }
-        refundAmount = refund.amount / 100
+        erstattetStripeCents = refund.amount
       }
     } catch (err) {
       console.error('[cancelOrder] Stripe refund failed:', err)
@@ -700,7 +663,7 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
         extra: {
           ...(err instanceof StripeStandUnklar ? err.extra : {}),
           orderId,
-          handerstattung: handbuchungOffen.anweisung,
+          handerstattung: erstattungOffenInhalt(handbuchungOffen.fall, handbuchungOffen).handanweisung,
           ...(rest ? { erstattungCents: rest.erstattungCents, vomHofCents: rest.vomHofCents } : {}),
         },
       })
@@ -739,7 +702,7 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
     // nur paymentStatus steht falsch auf PAID. Das bekommt der Betreiber
     // über Sentry zu sehen, nicht der Hof als „Erstattung fehlgeschlagen".
     // Mit dem Erstatten ist auch die Aufgabe „Erstattung offen" erledigt.
-    if (refundAmount !== null) {
+    if (erstattetStripeCents !== null) {
       try {
         await prisma.order.update({
           where: { id: orderId },
@@ -754,44 +717,36 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
     }
   }
 
-  // Nichts Langsames im Antwortpfad, und ein Mailfehler kippt keine gültige
-  // Stornierung. Bei OFFENER Erstattung keine Mail: Die Vorlage liest „keine
-  // Erstattung" als Vor-Ort-Zahlung und schriebe „Da du vor Ort bezahlst,
-  // entstehen dir keine Kosten" — an eine Kundin, die online bezahlt hat und
-  // noch nichts zurückbekam. Wie vor diesem Fix: gescheiterte Erstattung →
-  // keine Storno-Mail; der Betreiber meldet sich mit der Erstattung.
-  if (!erstattungOffen) {
-    nachDerAntwort(async () => {
-      // Frisch gelesen: Hat „Artikel fehlt" kurz vor dem Storno Beträge
-      // geändert, zeigt die Mail den Stand, aus dem storniert wurde.
-      const fuerMail =
-        (await prisma.order.findFirst({ where: { id: orderId, farmId: farm.id }, select: ORDER_EMAIL_SELECT })) ?? order
-      const { sendOrderCancelled } = await import('@/lib/email')
-      await sendOrderCancelled(toEmailOrder(fuerMail, farm), refundAmount, reason)
-    })
+  // Was aus der Erstattung wurde, in den Storno-Auftrag (eingestellt schon in
+  // der Transaktion oben): der Betrag, den Stripe gebucht hat, oder „offen" —
+  // dann geht keine Storno-Mail, der Betreiber meldet sich mit der Erstattung.
+  // Ein Fehler hier kippt den Storno nicht; der Auftrag bleibt `ausstehend`
+  // und endet nach den Wiederholungen sichtbar als gescheitert.
+  if (storno.stripePaymentIntentId && betraege) {
+    const ausgang = erstattungOffen || erstattetStripeCents === null ? ('offen' as const) : { erstattetCents: erstattetStripeCents }
+    try {
+      await trageStornoErstattungEin(orderId, ausgang)
+    } catch (err) {
+      Sentry.captureException(err, { tags: { aktion: 'bestellmail', art: 'storniert', grund: 'erstattung_eintragen' }, extra: { orderId } })
+    }
   }
 
   // Offenes Geld meldet sich auch beim Betreiber per Mail — der Hof kann
-  // nicht erstatten (kein Zugang zum Plattformkonto). Nach der Antwort; ein
-  // Mailfehler rollt nichts zurück. Ohne Daten der Kundin.
+  // nicht erstatten (kein Zugang zum Plattformkonto). Je Empfänger ein
+  // Auftrag; ein Fehler rollt nichts zurück. Ohne Daten der Kundin: Der
+  // Auftrag trägt nur Fall, Beträge und die Bestellung.
   if (handbuchungOffen) {
     const hand = handbuchungOffen
-    mailNachDerAntwort('erstattung_offen', orderId, async () => {
-      // Empfänger aus der Zustellung (Register N14): „Erstattung offen" geht immer, auch bei Regel „aus".
-      const { ladeBetreiberEmpfaenger } = await import('@/server/queries/postfach')
-      await (await import('@/lib/email')).sendErstattungOffen(
-        {
-          was: 'Der Hof hat die Bestellung storniert, die Erstattung über Stripe hat aber nicht geklappt. Die Bestellung ist storniert, das Geld steht noch aus.',
-          bestellId: orderId,
-          bestellnummer: order.orderNumber,
-          hofName: farm.name,
-          betraege: hand.betraege,
-          handanweisung: hand.anweisung,
-          stripeKennung: null,
-        },
-        await ladeBetreiberEmpfaenger('erstattungOffen')
+    // Empfänger aus der Zustellung (Register N14): „Erstattung offen" geht immer, auch bei Regel „aus".
+    await stelleEinOhneRisiko('erstattung_offen', orderId, async () =>
+      betreiberAuftraege(
+        'erstattung-offen',
+        `storno-${orderId}`,
+        await betreiberKennungen('erstattungOffen'),
+        erstattungOffenBezug({ fall: hand.fall, orderId, refundId: null, kundinCents: hand.kundinCents, hofCents: hand.hofCents }),
+        { bestellungId: orderId, farmId: farm.id }
       )
-    })
+    )
   }
 
   revalidatePath('/orders')
@@ -807,7 +762,7 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
   }
   // Vor Ort bezahlt (oder online nie bezahlt): nichts erstattet, nichts vom Hof abgezogen.
   if (festeBetraege) return { erstattetCents: festeBetraege.erstattungCents, vomHofCents: festeBetraege.vomHofCents }
-  return betraege && refundAmount !== null
+  return betraege && erstattetStripeCents !== null
     ? { erstattetCents: betraege.erstattetCents, vomHofCents: betraege.vomHofCents }
     : { erstattetCents: 0, vomHofCents: 0 }
 }
@@ -876,27 +831,20 @@ export async function meldeArtikelFehlt(input: unknown): Promise<ArtikelFehltErg
   }
 
   const { rechnung } = ausgang
-  // Daten für die Mail erst NACH dem Schreiben gelesen: Mail und Datenbank
-  // zeigen denselben Stand.
-  const fuerMail = await prisma.order.findFirst({ where: { id: orderId, farmId: farm.id }, select: ORDER_EMAIL_SELECT })
-  const position = fuerMail?.items.find((i) => i.id === itemId)
-  if (fuerMail && position) {
-    mailNachDerAntwort('artikel_fehlt', orderId, async () =>
-      (await import('@/lib/email')).sendArtikelFehlt(toEmailOrder(fuerMail, farm), {
-        position: {
-          productName: position.productName,
-          quantity: position.quantity,
-          unitPrice: position.unitPrice,
-          totalPrice: position.totalPrice,
-          product: position.product ?? null,
-        },
-        zahlung: rechnung.zahlung,
+  // Der Auftrag trägt die Beträge der Rechnung beim Speichern — nie neu
+  // gerechnet; Bestellung und Position lädt der Renderer nach dem Schreiben
+  // frisch, Mail und Datenbank zeigen denselben Stand.
+  await stelleEinOhneRisiko('artikel_fehlt', orderId, async () =>
+    artikelFehltMailAuftrag(
+      { id: orderId, farmId: farm.id },
+      {
+        itemId,
         bisherCents: rechnung.bisherWarenCents + rechnung.bisherGebuehrCents,
         neuCents: rechnung.neuGesamtCents,
         erstattetCents: rechnung.zahlung === 'online' ? ausgang.erstattetCents : null,
-      })
+      }
     )
-  }
+  )
 
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)

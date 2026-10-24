@@ -32,11 +32,11 @@ export function beitragLaeuftBis(jetzt: Date): Date {
 /**
  * Die EINE Bedingung der Mail-Sperre (Nr. 149) — für die Action beim
  * Versand und für die Seite „Neuer Beitrag", die danach den Schalter
- * abstellt. Es sperrt nur ein Beitrag, der wirklich Mails hinausgebracht hat:
- * `emailRecipientCount` schreibt der Versand am Ende mit der Zahl der
- * angenommenen Mails; vorher steht die geplante Zahl, sodass ein
- * abgebrochener Versand weiter sperrt. Ging keine einzige Mail hinaus (0),
- * darf der Hof es gleich noch einmal versuchen.
+ * abstellt. Es sperrt ein Beitrag, sobald er Aufträge in der Mail-Warteschlange
+ * hat (Nr. 159): `emailRecipientCount` ist die Zahl der Aufträge, geschrieben in
+ * derselben Transaktion wie sie. Ohne Abo (0) darf der Hof es gleich noch
+ * einmal versuchen. Wie viele davon hinausgingen, zählt
+ * `gesendeteBeitragsMails` (src/server/mail-arten/beitrag.ts).
  */
 export function mailSperreWo(farmId: string, jetzt: Date): Prisma.StatusPostWhereInput {
   return {

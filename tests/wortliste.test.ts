@@ -209,6 +209,25 @@ const AUSNAHMEN: Ausnahme[] = [
     text: /Handel oder Lager\)/,
     grund: 'Lager als Tätigkeit bei der BAES-Registrierung (Lagerung von Futtermitteln), nicht der Vorrat',
   },
+  // Bounce, Beschwerde, Erneut versuchen (N8-Ergänzung 24.10.2026, Nr. 161)
+  {
+    datei: 'src/lib/betrieb-mails.ts',
+    wort: 'Bounce',
+    text: /\(Bounce: das Postfach weist die Mail zurück\)/,
+    grund: 'Regel-Zeile von Betrieb › E-Mails: Das Fachwort steht genau einmal erklärt (Freigabe Nr. 161 Punkt 2)',
+  },
+  {
+    datei: 'src/app/(public)/datenschutz/page.tsx',
+    wort: 'Beschwerde',
+    text: /Datenschutzbehörde Beschwerde einzulegen/,
+    grund: 'Rechtsbegriff der Datenschutzerklärung (Beschwerde bei der Aufsichtsbehörde), keine Spam-Meldung',
+  },
+  {
+    datei: 'src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx',
+    wort: 'Erneut versuchen',
+    text: 'Erneut versuchen',
+    grund: 'Kundin nach einer abgelehnten Zahlung: zurück zur Kasse — keine Mail, nicht „Jetzt schicken“ (das Wort gilt auf Admin-Seiten)',
+  },
   // Käufer
   {
     datei: 'src/app/(public)/impressum/page.tsx',

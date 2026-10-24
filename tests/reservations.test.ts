@@ -37,8 +37,12 @@ vi.mock('@/lib/rate-limit', async (original) => ({
 }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 // Der Abgleich im Warenkorb hat eigene Tests (warenkorb-*.test.ts); hier zählt
-// nur, ob /api/warenkorb/pruefen bis zum Erneuern der Halte kommt.
-vi.mock('@/server/warenkorb', () => ({
+// nur, ob /api/warenkorb/pruefen bis zum Erneuern der Halte kommt. Die
+// Prüfkette des Hofs (pruefeKaufbarkeitHof, Nr. 165) läuft für /api/reserve
+// echt — die Fälle unten prüfen sie über die Route.
+vi.mock('@/server/warenkorb', async (original) => ({
+  ...(await original<typeof import('@/server/warenkorb')>()),
+  hofSperrenFuerProdukte: vi.fn(async () => new Map()),
   pruefeSitzungsWarenkorb: vi.fn(async () => ({
     befund: { positionen: [], etwasAbgelaufen: false, etwasGeaendert: false },
     meldung: null,

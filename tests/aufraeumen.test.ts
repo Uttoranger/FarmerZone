@@ -3,8 +3,9 @@
  * Nr. 104), am Syntaxbaum von TypeScript, nicht an Regex über den Rohtext.
  *
  * Beweist:
- *  - Gelöscht wird nur in den fünf Tabellen mit fester Grenze (Session,
- *    Verification, WebhookEvent, BetriebMessung, seit Nr. 114 EinmalLink), je
+ *  - Gelöscht wird nur in den sechs Tabellen mit fester Grenze (Session,
+ *    Verification, WebhookEvent, BetriebMessung, seit Nr. 114 EinmalLink, seit
+ *    Nr. 158 MailAuftrag), je
  *    EIN deleteMany mit `where`; die Melde-Vermerke (MELDE_VERMERK_TYP) sind
  *    ausgenommen.
  *  - Keine Bestellung, kein Konto, kein Hof wird je angefasst: kein
@@ -27,7 +28,7 @@ const WURZEL = process.cwd()
 
 /** Je Datei: welche Empfänger von delete/deleteMany erlaubt sind. */
 const DATEIEN: Record<string, readonly string[]> = {
-  'src/server/aufraeumen.ts': ['prisma.session', 'prisma.verification', 'prisma.webhookEvent', 'prisma.betriebMessung', 'prisma.einmalLink'],
+  'src/server/aufraeumen.ts': ['prisma.session', 'prisma.verification', 'prisma.webhookEvent', 'prisma.betriebMessung', 'prisma.einmalLink', 'prisma.mailAuftrag'],
   'src/server/betrieb-bilder.ts': [],
   'src/app/api/cron/cleanup-reservations/route.ts': ['prisma.stockReservation'],
   'src/app/admin/betrieb/bilder-export/route.ts': [],
@@ -78,11 +79,12 @@ describe('Aufräumen und Bilder ohne Verwendung löschen nur, was sie dürfen', 
     expect(pruefe(lies(pfad), erlaubt).maengel).toEqual([])
   })
 
-  it('aufraeumen.ts: je EIN deleteMany mit where für die fünf Tabellen', () => {
+  it('aufraeumen.ts: je EIN deleteMany mit where für die sechs Tabellen', () => {
     const { loeschen } = pruefe(lies('src/server/aufraeumen.ts'), DATEIEN['src/server/aufraeumen.ts'])
     expect(loeschen.map((l) => l.empfaenger).sort()).toEqual([
       'prisma.betriebMessung',
       'prisma.einmalLink',
+      'prisma.mailAuftrag',
       'prisma.session',
       'prisma.verification',
       'prisma.webhookEvent',
@@ -99,6 +101,14 @@ describe('Aufräumen und Bilder ohne Verwendung löschen nur, was sie dürfen', 
     const webhook = loeschen.find((l) => l.empfaenger === 'prisma.webhookEvent')
     expect(webhook?.argument?.getText()).toMatch(/type:\s*\{\s*not:\s*MELDE_VERMERK_TYP\s*\}/)
     expect(quelle).toContain("import { MELDE_VERMERK_TYP } from '@/server/erstattung-gescheitert'")
+  })
+})
+
+describe('Der eine Schritt auf Bestellungen schreibt nur (Nr. 164)', () => {
+  it('aufraeumen.ts: genau ein order.updateMany, der nur confirmationToken auf null setzt; kein order.update*, kein order.delete*', () => {
+    const quelle = lies('src/server/aufraeumen.ts')
+    expect(quelle.match(/prisma\.order\.\w+\(/g)).toEqual(['prisma.order.updateMany('])
+    expect(quelle).toMatch(/data:\s*\{\s*confirmationToken:\s*null\s*\}/)
   })
 })
 
