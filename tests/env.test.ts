@@ -54,6 +54,22 @@ describe('validateEnv', () => {
     expect(validateEnv({ ...complete, TRIAGE_TOKEN: 'tok-123' }).TRIAGE_TOKEN).toBe('tok-123')
   })
 
+  it('LINK_SECRET ist optional, aber gesetzt mindestens 32 Zeichen lang (Nr. 166)', () => {
+    const lang = 'abcdefghijklmnopqrstuvwxyzabcdef'
+    expect(validateEnv(complete).LINK_SECRET).toBeUndefined()
+    expect(validateEnv({ ...complete, LINK_SECRET: '  ' }).LINK_SECRET).toBeUndefined()
+    expect(validateEnv({ ...complete, LINK_SECRET: lang }).LINK_SECRET).toBe(lang)
+    // Gegenprobe: zu kurz ist ein Start-Fehler, der nur den Namen nennt
+    let meldung = ''
+    try {
+      validateEnv({ ...complete, LINK_SECRET: lang.slice(1) })
+    } catch (fehler) {
+      meldung = fehler instanceof Error ? fehler.message : String(fehler)
+    }
+    expect(meldung).toMatch(/LINK_SECRET/)
+    expect(meldung).not.toContain('abcdef')
+  })
+
   it('Adresse und Vercel-Systemvariablen sind optional — ein Deploy ohne sie startet', () => {
     const env = validateEnv(complete)
     expect(env.NEXT_PUBLIC_APP_URL).toBeUndefined()

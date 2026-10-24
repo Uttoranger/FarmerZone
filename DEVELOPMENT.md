@@ -5831,6 +5831,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Stände:** Auch „gesperrt“ und „ohne Schlüssel“ lassen sich nochmal schicken — in der Vorschau steht jede Mail so, und die Abnahme braucht den Knopf; die neue Zeile entscheidet dort wieder dasselbe. Nur eine Mail, die noch unterwegs ist, hat stattdessen „Jetzt schicken“.
 - **Kann warten nur als Summe:** Eine Liste aller Beitragsmails wäre eine Liste der Abonnentinnen eines Hofs. Einzeln erscheinen sie nur in der Suche per Adresse, ohne Knopf.
 
+## Eigenes Geheimnis für Links mit Schlüsselkennung (Register S17, Ergänzung 24.10.2026; Nr. 166, Lauf 24)
+
+- **Warum:** Bestell-Link, Nachbestell-Token und Abmeldelink waren mit `BETTER_AUTH_SECRET` signiert, demselben Geheimnis wie die Sitzungen, ohne Kennung (Seitenkarte S3). Ein Tausch des Sitzungs-Geheimnisses hätte jeden Link in jedem Postfach ungültig gemacht — und ein Leck eines der beiden traf beide.
+- **Wie:** Eine Stelle, `src/lib/link-signatur.ts` (`signiereLink`, `pruefeLink`). Mit `LINK_SECRET` tragen neue Signaturen `2.` vor dem Hex; ohne Kennung prüft sie mit `BETTER_AUTH_SECRET` wie bisher. Ohne `LINK_SECRET` bleibt alles wie vorher. Die drei Dateien behalten ihre Schnittstelle; Renderer, Seiten und Actions gehen über sie und blieben unverändert.
+- **Altes Format genau erhalten:** Nur der Bestell-Link hatte ein Zweck-Präfix (`bestellung-ansehen:`); Nachbestell- und Abmelde-Token signierten den nackten Inhalt. Ohne Kennung bleibt das so, mit Kennung trägt jeder Zweck sein Präfix (`nachbestellen:`, `abmelden:`). Die Tokens werden am ersten Punkt getrennt (Base64url hat keinen Punkt), damit `<inhalt>.2.<hex>` geht.
+- **Formprüfung:** Die beiden Schemas mit `sig` (`src/schemas/bestaetigung.ts`, `src/schemas/abo.ts`) ließen nur 64 Hex durch; sie nehmen jetzt auch `2.` davor, sonst zeigte die Bestätigungsseite mit `LINK_SECRET` nur „eingegangen“.
+- **Bleibt:** `bremsSchluessel` (Bremsen) und der Hash des Bar-Tokens hängen nicht an Links in Mails und bleiben, wie sie sind. Der Double-Opt-in-Link (`abo-bestaetigung-token.ts`, 7 Tage) gehört nicht zu den drei Dateien und signiert weiter mit `BETTER_AUTH_SECRET`.
+
 ## Nützliche Befehle
 
 ```bash

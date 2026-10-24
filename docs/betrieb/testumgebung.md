@@ -47,6 +47,7 @@ Vercel → Settings → Environment Variables → „Add". Umgebung **Preview**,
 
 - **`NEXT_PUBLIC_APP_URL` nie für alle Vorschauen anlegen**, nur für `staging`. Die App weist in einer Vorschau nur `agrilo.at` ab, nicht `test.agrilo.at`: Für alle Vorschauen gesetzt, schickten sonst alle ihre Links in die Testumgebung.
 - **Alles andere erbt die Testumgebung von Preview** und bleibt unverändert: `DATABASE_URL` (Entwicklungsdatenbank) und die Stripe-Test-Schlüssel. Für `staging` nichts davon überschreiben, schon gar keinen Live-Schlüssel (außerhalb der Produktion startet Stripe damit gar nicht, Register Z2).
+- **`LINK_SECRET`** (Nr. 166) erbt die Testumgebung von Preview – den Preview-Wert, getrennt von Production (`docs/betrieb/stripe-live.md`, Abschnitt 4. und 5.). Für `staging` nicht eigens anlegen; fehlt er in Preview, signieren die Links wie bisher.
 - **Ohne `RESEND_API_KEY`** kommt in der Testumgebung kein Anmeldecode für Kundinnen an, denn auf Vercel steht er nie im Log. Höfe melden sich mit Passwort an, das geht auch ohne Mail.
 - **Anmeldungen bleiben getrennt:** Die Cookies gelten nur für `test.agrilo.at`, nie für `agrilo.at`. Die Konten sind die der Entwicklungsdatenbank.
 - **Migrationen:** Ein Build von `staging` spielt die Migrationen von `main` in die Entwicklungsdatenbank ein (`vercel-build`), wie jede Vorschau.

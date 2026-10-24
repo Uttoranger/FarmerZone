@@ -8,10 +8,10 @@ import { z } from 'zod'
  * Hinweis. Ein kaputter Parameter wird so nie zum Fehler und nie zum Zugang.
  */
 export const bestaetigungsParameterSchema = z.object({
-  /** HMAC-SHA256 in Hex (src/lib/bestell-link.ts). Ob sie gilt, prüft bestellLinkGilt. */
+  /** HMAC-SHA256 in Hex, mit LINK_SECRET mit Kennung `2.` davor (src/lib/link-signatur.ts). Ob sie gilt, prüft bestellLinkGilt. */
   sig: z
     .string()
-    .regex(/^[0-9a-f]{64}$/)
+    .regex(/^(?:2\.)?[0-9a-f]{64}$/)
     .optional()
     .catch(undefined),
   /** Stripes Rückmeldung an der return_url — nur ein Hinweis, nie der Zahlungsstand. */

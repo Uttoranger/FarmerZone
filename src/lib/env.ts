@@ -62,6 +62,16 @@ const serverEnvSchema = z.object({
   // Nur in Production. Fehlt es oder ist der Base64-Teil leer, antwortet die
   // Route 503 und vermerkt nichts (fail-closed).
   RESEND_WEBHOOK_SECRET: optional(),
+  // OPTIONAL (Register S17, Ergänzung 24.10.2026, Nr. 166): Das eigene
+  // Geheimnis der Links in Mails (src/lib/link-signatur.ts, Kennung `2.`).
+  // Fehlt es, signieren die Links weiter mit BETTER_AUTH_SECRET wie bisher.
+  // Gesetzt, aber kürzer als 32 Zeichen, ist ein Start-Fehler: Ein zu kurzes
+  // Geheimnis soll nie still Links signieren. Preview und Production je mit
+  // eigenem Wert.
+  LINK_SECRET: z.preprocess(
+    (wert) => (typeof wert === 'string' && wert.trim() ? wert : undefined),
+    z.string().min(32).optional()
+  ),
   // OPTIONAL: Die öffentliche Adresse der App — in Produktion und, seit Nr. 43
   // (Register Z3), beim Branch staging (Testumgebung, nur https). Andere
   // Previews und lokal leiten ihre Adresse aus den Vercel-Systemvariablen
