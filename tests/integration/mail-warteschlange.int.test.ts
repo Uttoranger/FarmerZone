@@ -10,6 +10,8 @@
  *  - 4xx → sofort gescheitert; eine kaputte Mail nimmt den Stapel nicht mit
  *  - zwei Worker gleichzeitig → jede Mail genau einmal (SKIP LOCKED + Sperre)
  *  - abgelaufene Belegung → neu geholt
+ *  - fremde Belegung (neu geholt) → das Ergebnis des ersten Laufs wird nicht geschrieben
+ *  - Belegung zu knapp → keine Anfrage, Freigabe; abgebrochener Lauf → eigene Anfrage mit seinem Schlüssel
  *  - Tageskontingent ab 70 % → Kann warten bleibt liegen, Wichtig geht
  *  - abgemeldetes Abo → verworfen (echter Renderer „beitrag“)
  *  - Post-Sperre (Z3) → gesperrt; ohne Schlüssel → ohne_schluessel, kein neuer Versuch
@@ -27,7 +29,15 @@ import { utcTagesbeginn } from '@/lib/betrieb'
 import { empfaengerFingerabdruck } from '@/lib/mail-empfaenger'
 import { VORRANG } from '@/schemas/mail-auftrag'
 import type { RendererTabelle } from '@/server/mail-arten'
-import { arbeiteWarteschlange, holeFaelligeSeite, stelleMailEin, type EinstellAuftrag } from '@/server/mail-warteschlange'
+import {
+  arbeiteWarteschlange,
+  BELEGT_MS,
+  BELEGUNG_REST_MS,
+  holeFaelligeSeite,
+  stapelSchluessel,
+  stelleMailEin,
+  type EinstellAuftrag,
+} from '@/server/mail-warteschlange'
 import { erstelleHof, intKennung, raeumeAuf } from './setup/basis'
 
 type StapelPayload = Array<{ to: string; subject: string; html: string; headers?: Record<string, string> }>
@@ -258,6 +268,88 @@ describe('Worker', () => {
     expect(await mitAdresse('@example.com')).toEqual([])
     // … die Gegenprobe über dieselbe Abfrage findet den Fingerabdruck.
     expect((await mitAdresse(empfaengerFingerabdruck(direkt))).map((z) => z.id)).toEqual([protokoll.id])
+  })
+})
+
+describe('Belegung und Abbruch', () => {
+  const abholbereit = (orderId: string) => ({ an: `${orderId}@example.com`, betreff: 'Abholbereit', html: '<p>abholbereit</p>' })
+
+  it('Belegung abgelaufen und von einem zweiten Worker neu geholt → das Ergebnis des ersten wird nicht geschrieben; Gegenprobe: der Nachbar derselben Seite schon', async () => {
+    const k = intKennung('fremd')
+    await stelleMailEin([wichtig(`${k}-fremd`), wichtig(`${k}-eigen`)])
+    let zweiteBelegung: Date | null = null
+    const renderer: RendererTabelle = {
+      ...FAKE,
+      abholbereit: async (b) => {
+        if (b.orderId === `${k}-fremd` && zweiteBelegung === null) {
+          // Der erste Lauf hängt: Seine Belegung läuft ab, ein zweiter Worker holt die Zeile neu.
+          await prisma.mailAuftrag.update({ where: { schluessel: `${k}-fremd:w` }, data: { belegtBis: new Date(Date.now() - 1_000) } })
+          const zweiter = await holeFaelligeSeite(new Date(), true)
+          expect(zweiter.map((z) => z.id)).toEqual([(await zeile(`${k}-fremd:w`)).id])
+          zweiteBelegung = zweiter[0].belegtBis
+        }
+        return abholbereit(b.orderId)
+      },
+    }
+    await arbeiteWarteschlange({ biszeitMs: 20_000, renderer, grenze: OHNE_GRENZE, abstandMs: 0 })
+    const fremd = await zeile(`${k}-fremd:w`)
+    expect(fremd).toMatchObject({ status: 'in_arbeit', gesendetAm: null, resendId: null, empfaengerHash: null })
+    expect(fremd.belegtBis?.getTime()).toBe((zweiteBelegung as Date | null)?.getTime())
+    expect(await zeile(`${k}-eigen:w`)).toMatchObject({ status: 'gesendet', belegtBis: null })
+  })
+
+  it('Belegung zu knapp → keine Anfrage an Resend; frische wieder offen, abgebrochene mit ihrer alten Belegung; Gegenprobe: mit genug Zeit gehen beide', async () => {
+    const k = intKennung('knapp')
+    await stelleMailEin([wichtig(`${k}-frisch`), wichtig(`${k}-alt`)])
+    const alteBelegung = new Date(Date.now() - 1_000)
+    await prisma.mailAuftrag.update({ where: { schluessel: `${k}-alt:w` }, data: { status: 'in_arbeit', belegtBis: alteBelegung } })
+    const echtesJetzt = Date.now.bind(Date)
+    let uhr: { mockRestore: () => void } | null = null
+    const renderer: RendererTabelle = {
+      ...FAKE,
+      abholbereit: async (b) => {
+        // Das Rendern hat (scheinbar) fast die ganze Belegung verbraucht.
+        uhr ??= vi.spyOn(Date, 'now').mockImplementation(() => echtesJetzt() + BELEGT_MS - BELEGUNG_REST_MS + 1_000)
+        return abholbereit(b.orderId)
+      },
+    }
+    try {
+      await arbeiteWarteschlange({ biszeitMs: 20_000, renderer, grenze: OHNE_GRENZE, abstandMs: 0 })
+    } finally {
+      ;(uhr as { mockRestore: () => void } | null)?.mockRestore()
+    }
+    expect(batchMock).not.toHaveBeenCalled()
+    expect(await zeile(`${k}-frisch:w`)).toMatchObject({ status: 'offen', belegtBis: null, versuche: 0, gesendetAm: null })
+    const alt = await zeile(`${k}-alt:w`)
+    expect(alt).toMatchObject({ status: 'in_arbeit', versuche: 0, gesendetAm: null })
+    expect(alt.belegtBis?.getTime()).toBe(alteBelegung.getTime())
+
+    await arbeite()
+    expect((await zeile(`${k}-frisch:w`)).status).toBe('gesendet')
+    expect((await zeile(`${k}-alt:w`)).status).toBe('gesendet')
+  })
+
+  it('abgebrochener Lauf → seine Aufträge gehen als eigene Anfrage mit seinem Idempotenz-Schlüssel; Gegenprobe: ein neuer Auftrag derselben Seite geht getrennt mit anderem', async () => {
+    const k = intKennung('abbruch')
+    await stelleMailEin([wichtig(`${k}-a`), wichtig(`${k}-b`)])
+    await prisma.mailAuftrag.updateMany({ where: { schluessel: { startsWith: k } }, data: { naechsterVersuchAm: new Date(Date.now() - BELEGT_MS - 10_000) } })
+    // Der erste Lauf holte die Seite, verschickte sie und brach vor dem Schreiben ab: Seine Belegung ist abgelaufen.
+    const ersterLauf = await holeFaelligeSeite(new Date(Date.now() - BELEGT_MS - 5_000), true)
+    expect(ersterLauf).toHaveLength(2)
+    const schluesselErsterLauf = stapelSchluessel(ersterLauf)
+    await stelleMailEin(wichtig(`${k}-neu`))
+
+    await arbeite()
+    const anfragen = batchMock.mock.calls.map(([payload, optionen]) => ({
+      an: (payload as StapelPayload).map((m) => m.to).sort(),
+      schluessel: (optionen as { idempotencyKey: string }).idempotencyKey,
+    }))
+    expect(anfragen).toHaveLength(2)
+    expect(anfragen).toContainEqual({ an: [`${k}-a@example.com`, `${k}-b@example.com`], schluessel: schluesselErsterLauf })
+    const neu = anfragen.find((a) => a.an.includes(`${k}-neu@example.com`))
+    expect(neu?.an).toEqual([`${k}-neu@example.com`])
+    expect(neu?.schluessel).not.toBe(schluesselErsterLauf)
+    expect(await prisma.mailAuftrag.count({ where: { schluessel: { startsWith: k }, status: 'gesendet' } })).toBe(3)
   })
 })
 

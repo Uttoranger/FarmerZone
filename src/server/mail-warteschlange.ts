@@ -37,6 +37,12 @@ export const SEITE = 100
 export const ABSTAND_MS = 200
 /** So lange gehört ein geholter Auftrag dem Worker; danach gilt er wieder als offen. */
 export const BELEGT_MS = 2 * 60_000
+/**
+ * So viel Belegung muss vor einer Anfrage an Resend noch übrig sein (Anfrage
+ * plus Schreiben der Ergebnisse). Sonst geht die Anfrage nicht mehr hinaus:
+ * Ein zweiter Worker könnte die Aufträge sonst schon neu geholt haben.
+ */
+export const BELEGUNG_REST_MS = 30_000
 /** Wartezeit vor der n-ten Wiederholung nach 429/5xx; danach gescheitert. */
 export const WIEDERHOLUNG_MINUTEN = [1, 5, 15, 60, 240] as const
 /** „Kann warten“ pausiert ab 70 % der Tagesgrenze bzw. 90 % der Grenze des Abrechnungszeitraums (N26). */
@@ -80,6 +86,9 @@ export async function stelleMailEin(auftraege: EinstellAuftrag | readonly Einste
     })),
     skipDuplicates: true,
   })
+  // Mit `db = tx` läuft der Worker unter Umständen vor dem Commit und sieht
+  // diese Aufträge noch nicht — dann nimmt sie der nächste Lauf (Cron jede
+  // Minute) mit. Verloren geht keiner, er kommt nur bis zu einer Minute später.
   nachDerAntwort(async () => {
     try {
       await arbeiteWarteschlange({ biszeitMs: 45_000 })
@@ -160,7 +169,24 @@ export type WorkerErgebnis = {
   ohneSchluessel: number
 }
 
-type Geholt = { id: string; art: string; vorrang: number; bezug: unknown; versuche: number }
+type Geholt = {
+  id: string
+  art: string
+  vorrang: number
+  bezug: unknown
+  versuche: number
+  /** Die eigene Belegung — genau dieser Wert steht in der Zeile, solange sie uns gehört. */
+  belegtBis: Date
+  /** Belegung eines abgebrochenen Laufs (Zeile war „in Arbeit“, Belegung abgelaufen), sonst null. */
+  vorherBelegtBis: Date | null
+}
+
+/** Ob die eigene Belegung für eine weitere Anfrage an Resend samt Schreiben noch reicht. */
+export function belegungReicht(belegtBis: Date, jetztMs: number): boolean {
+  return belegtBis.getTime() - jetztMs >= BELEGUNG_REST_MS
+}
+
+type Versand = { auftrag: Geholt; mail: StapelMail; hash: string }
 
 /** Was nach einem Auftrag in die Zeile kommt — eine Anweisung je Seite schreibt alle. */
 type Ausgang = {
@@ -231,7 +257,7 @@ async function arbeite(optionen: WorkerOptionen, start: number): Promise<WorkerE
     ergebnis.seiten += 1
 
     const ausgaenge: Ausgang[] = []
-    const versand: { auftrag: Geholt; mail: StapelMail; hash: string }[] = []
+    const versand: Versand[] = []
     const schluesselDa = email.hatResendSchluessel()
     for (const auftrag of seite) {
       const fertig = (status: Ausgang['status'], fehlerCode: string | null, hash: string | null = null): void => {
@@ -267,12 +293,19 @@ async function arbeite(optionen: WorkerOptionen, start: number): Promise<WorkerE
       else versand.push({ auftrag, mail, hash })
     }
 
-    if (versand.length > 0) {
-      const antwort = await nachAbstand(() => email.versendeStapel(versand.map((v) => v.mail), stapelSchluessel(versand.map((v) => v.auftrag))))
+    // Eine Seite trägt EINE Belegung (alle Zeilen mit demselben belegtBis).
+    const belegtBis = seite[0].belegtBis
+    const freizugeben: Geholt[] = []
+    const versende = async (gruppe: readonly Versand[]): Promise<void> => {
+      if (!belegungReicht(belegtBis, Date.now())) {
+        freizugeben.push(...gruppe.map((v) => v.auftrag))
+        return
+      }
+      const antwort = await nachAbstand(() => email.versendeStapel(gruppe.map((v) => v.mail), stapelSchluessel(gruppe.map((v) => v.auftrag))))
       if (antwort.ok) {
-        versand.forEach((v, i) => ausgaenge.push(gesendet(v.auftrag, antwort.ids[i] ?? null, v.hash)))
-      } else if (laesstSichWiederholen(antwort.statusCode) || versand.length === 1) {
-        for (const v of versand) {
+        gruppe.forEach((v, i) => ausgaenge.push(gesendet(v.auftrag, antwort.ids[i] ?? null, v.hash)))
+      } else if (laesstSichWiederholen(antwort.statusCode) || gruppe.length === 1) {
+        for (const v of gruppe) {
           ausgaenge.push(
             laesstSichWiederholen(antwort.statusCode) ? wiederholung(v.auftrag, antwort.code, v.hash, jetzt) : gescheitert(v.auftrag, antwort.code, v.hash)
           )
@@ -280,7 +313,11 @@ async function arbeite(optionen: WorkerOptionen, start: number): Promise<WorkerE
       } else {
         // Strikte Prüfung lehnt den ganzen Stapel ab, wenn eine Mail nicht
         // passt — dann einzeln, damit eine kaputte nicht 99 andere mitnimmt.
-        for (const v of versand) {
+        for (const v of gruppe) {
+          if (!belegungReicht(belegtBis, Date.now())) {
+            freizugeben.push(v.auftrag)
+            continue
+          }
           const einzeln = await nachAbstand(() => email.versendeStapel([v.mail], `mail-${v.auftrag.id}-${v.auftrag.versuche}`))
           if (einzeln.ok) ausgaenge.push(gesendet(v.auftrag, einzeln.ids[0] ?? null, v.hash))
           else if (laesstSichWiederholen(einzeln.statusCode)) ausgaenge.push(wiederholung(v.auftrag, einzeln.code, v.hash, jetzt))
@@ -288,8 +325,11 @@ async function arbeite(optionen: WorkerOptionen, start: number): Promise<WorkerE
         }
       }
     }
+    for (const gruppe of nachBelegung(versand)) await versende(gruppe)
 
-    await schreibeAusgaenge(ausgaenge, new Date())
+    const geschrieben = await schreibeAusgaenge(ausgaenge, new Date(), belegtBis)
+    if (geschrieben < ausgaenge.length) meldeFehler('Mail-Warteschlange: Belegung verloren, Ergebnis nicht geschrieben', new Error('belegung_verloren'))
+    await gibFrei(freizugeben, belegtBis)
     for (const a of ausgaenge) zaehle(ergebnis, a)
   }
   return ergebnis
@@ -300,28 +340,77 @@ async function arbeite(optionen: WorkerOptionen, start: number): Promise<WorkerE
  * `FOR UPDATE SKIP LOCKED`: Zwei Worker bekommen nie dieselbe Zeile.
  * Fällig = offen und an der Reihe, oder in Arbeit mit abgelaufener Belegung
  * (ein abgebrochener Lauf). Wichtig zuerst, dann nach dem nächsten Versuch.
+ *
+ * Die Belegung ist zugleich die Kennung dieses Laufs: Jedes Schreiben danach
+ * verlangt genau diesen `belegtBis`. Ein später Lauf, dessen Zeilen ein
+ * anderer inzwischen neu geholt hat, schreibt so nichts mehr. Eindeutig ist
+ * der Wert, weil eine Zeile erst nach Ablauf neu geholt wird — der zweite
+ * `belegtBis` liegt also immer später als der erste.
  */
 export async function holeFaelligeSeite(jetzt: Date, auchKannWarten: boolean): Promise<Geholt[]> {
   const belegtBis = new Date(jetzt.getTime() + BELEGT_MS)
-  const zeilen = await prisma.$queryRaw<Geholt[]>`
-    UPDATE "MailAuftrag" SET "status" = 'in_arbeit', "belegtBis" = ${belegtBis}
-    WHERE "id" IN (
-      SELECT "id" FROM "MailAuftrag"
+  const zeilen = await prisma.$queryRaw<Omit<Geholt, 'belegtBis'>[]>`
+    WITH kandidaten AS (
+      SELECT "id", CASE WHEN "status" = 'in_arbeit' THEN "belegtBis" END AS "vorherBelegtBis"
+      FROM "MailAuftrag"
       WHERE ("vorrang" = ${VORRANG.wichtig} OR (${auchKannWarten} AND "vorrang" = ${VORRANG.kannWarten}))
         AND (("status" = 'offen' AND "naechsterVersuchAm" <= ${jetzt}) OR ("status" = 'in_arbeit' AND "belegtBis" < ${jetzt}))
       ORDER BY "vorrang", "naechsterVersuchAm"
       LIMIT ${SEITE}
       FOR UPDATE SKIP LOCKED
     )
-    RETURNING "id", "art", "vorrang", "bezug", "versuche"`
-  return zeilen.sort((a, b) => a.vorrang - b.vorrang)
+    UPDATE "MailAuftrag" AS m SET "status" = 'in_arbeit', "belegtBis" = ${belegtBis}
+    FROM kandidaten k
+    WHERE m."id" = k."id"
+    RETURNING m."id", m."art", m."vorrang", m."bezug", m."versuche", k."vorherBelegtBis"`
+  return zeilen.map((z) => ({ ...z, belegtBis })).sort((a, b) => a.vorrang - b.vorrang)
 }
 
-/** Schreibt die Ausgänge einer Seite in EINER Anweisung (unnest) — 100 Einzel-Updates je Seite wären der Engpass. */
-async function schreibeAusgaenge(ausgaenge: readonly Ausgang[], jetzt: Date): Promise<void> {
-  if (ausgaenge.length === 0) return
-  const spalte = <K extends keyof Ausgang>(k: K) => ausgaenge.map((a) => a[k])
+/**
+ * Teilt den Versand einer Seite nach der Belegung, aus der die Aufträge
+ * kommen: frische Aufträge in einen Stapel, jeden abgebrochenen Lauf in einen
+ * eigenen. Bricht ein Lauf nach dem Versand ab, kommt seine Seite so wieder
+ * als eigene Anfrage mit demselben Idempotenz-Schlüssel (`stapelSchluessel`
+ * über dieselben Kennungen und Versuche) — und nicht vermischt mit neuen
+ * Aufträgen, deren Schlüssel Resend nie gesehen hätte.
+ */
+function nachBelegung(versand: readonly Versand[]): Versand[][] {
+  const gruppen = new Map<string, Versand[]>()
+  for (const v of versand) {
+    const kennung = v.auftrag.vorherBelegtBis === null ? 'frisch' : String(v.auftrag.vorherBelegtBis.getTime())
+    gruppen.set(kennung, [...(gruppen.get(kennung) ?? []), v])
+  }
+  return [...gruppen.values()]
+}
+
+/**
+ * Gibt Aufträge frei, die dieser Lauf nicht mehr verschickt hat (Belegung zu
+ * knapp) — nur solange die Belegung noch uns gehört. Frische werden wieder
+ * offen; Aufträge eines abgebrochenen Laufs bekommen dessen alte, abgelaufene
+ * Belegung zurück, damit der nächste Lauf sie wieder als solche erkennt.
+ */
+async function gibFrei(auftraege: readonly Geholt[], belegtBis: Date): Promise<void> {
+  if (auftraege.length === 0) return
   await prisma.$executeRaw`
+    UPDATE "MailAuftrag" AS m SET
+      "status" = CASE WHEN v.vorher IS NULL THEN 'offen' ELSE 'in_arbeit' END,
+      "belegtBis" = v.vorher::timestamp(3)
+    FROM unnest(
+      ${auftraege.map((a) => a.id)}::text[],
+      ${auftraege.map((a) => a.vorherBelegtBis?.toISOString() ?? null)}::text[]
+    ) AS v(id, vorher)
+    WHERE m."id" = v.id AND m."status" = 'in_arbeit' AND m."belegtBis" = ${belegtBis}`
+}
+
+/**
+ * Schreibt die Ausgänge einer Seite in EINER Anweisung (unnest) — 100
+ * Einzel-Updates je Seite wären der Engpass. Nur Zeilen mit der eigenen
+ * Belegung; gibt zurück, wie viele geschrieben wurden.
+ */
+async function schreibeAusgaenge(ausgaenge: readonly Ausgang[], jetzt: Date, belegtBis: Date): Promise<number> {
+  if (ausgaenge.length === 0) return 0
+  const spalte = <K extends keyof Ausgang>(k: K) => ausgaenge.map((a) => a[k])
+  return prisma.$executeRaw`
     UPDATE "MailAuftrag" AS m SET
       "status" = v.status,
       "versuche" = v.versuche,
@@ -336,7 +425,7 @@ async function schreibeAusgaenge(ausgaenge: readonly Ausgang[], jetzt: Date): Pr
       ${ausgaenge.map((a) => a.naechsterVersuchAm?.toISOString() ?? null)}::text[],
       ${spalte('fehlerCode')}::text[], ${spalte('empfaengerHash')}::text[], ${spalte('resendId')}::text[]
     ) AS v(id, status, versuche, naechster, code, hash, rid)
-    WHERE m."id" = v.id AND m."status" = 'in_arbeit'`
+    WHERE m."id" = v.id AND m."status" = 'in_arbeit' AND m."belegtBis" = ${belegtBis}`
 }
 
 /** Mails des UTC-Tags und des Abrechnungszeitraums aus dem Zähler von Admin › Betrieb. */
@@ -373,11 +462,23 @@ function wiederholung(a: Geholt, code: string, hash: string | null, jetzt: Date)
 
 /**
  * Idempotenz-Schlüssel einer Stapel-Anfrage: aus Kennung und Versuch jeder
- * Mail. Bricht ein Lauf nach dem Versand ab und holt der nächste dieselben
- * Aufträge, schickt Resend sie nicht ein zweites Mal (24 Stunden lang).
+ * Mail, sortiert (die Reihenfolge aus RETURNING ist nicht fest). Bricht ein
+ * Lauf nach dem Versand ab, schickt der nächste dieselben Aufträge als
+ * eigene Anfrage (`nachBelegung`) — Resend verschickt sie nicht ein zweites
+ * Mal (24 Stunden lang).
+ *
+ * Grenze: Der Schutz greift nur, wenn dieselben Mails wieder zusammen
+ * hinausgehen. Teilt das Seitenlimit den abgebrochenen Lauf auf zwei Seiten
+ * oder fällt beim neuen Rendern eine Mail weg (z. B. abgemeldet), ist der
+ * Schlüssel ein anderer, und diese Mails können ein zweites Mal hinausgehen.
+ * Ganz schließen ließe sich das nur mit einer gespeicherten Kennung der
+ * Anfrage je Auftrag (Schema-Änderung).
  */
-function stapelSchluessel(auftraege: readonly Geholt[]): string {
-  const roh = auftraege.map((a) => `${a.id}:${a.versuche}`).join(',')
+export function stapelSchluessel(auftraege: readonly Pick<Geholt, 'id' | 'versuche'>[]): string {
+  const roh = auftraege
+    .map((a) => `${a.id}:${a.versuche}`)
+    .sort()
+    .join(',')
   return `mail-stapel-${createHash('sha256').update(roh).digest('hex').slice(0, 40)}`
 }
 

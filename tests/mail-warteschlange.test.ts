@@ -25,7 +25,15 @@ vi.mock('@/lib/prisma', () => ({ prisma: db }))
 vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 
-import { kannWartenPausiert, laesstSichWiederholen, naechsterVersuch, stelleMailEin } from '@/server/mail-warteschlange'
+import {
+  BELEGUNG_REST_MS,
+  belegungReicht,
+  kannWartenPausiert,
+  laesstSichWiederholen,
+  naechsterVersuch,
+  stapelSchluessel,
+  stelleMailEin,
+} from '@/server/mail-warteschlange'
 import { bezugSchemaFuer, VORRANG } from '@/schemas/mail-auftrag'
 import { rendereBeitrag } from '@/server/mail-arten/beitrag'
 import { setzeVorname, vornameFuer, vornamenAusBestellungen } from '@/server/beitrag-vorname'
@@ -64,6 +72,22 @@ describe('Wiederholung nach 429/5xx', () => {
   it('429, 5xx und Netzfehler lassen sich wiederholen, jeder andere 4xx nicht', () => {
     expect([429, 500, 503, null].map(laesstSichWiederholen)).toEqual([true, true, true, true])
     expect([400, 403, 422].map(laesstSichWiederholen)).toEqual([false, false, false])
+  })
+})
+
+describe('Belegung und Idempotenz-Schlüssel', () => {
+  it('vor einer Anfrage müssen noch 30 s Belegung übrig sein; Gegenprobe: 1 ms weniger reicht nicht', () => {
+    const belegtBis = new Date('2026-10-24T10:02:00.000Z')
+    expect(belegungReicht(belegtBis, belegtBis.getTime() - BELEGUNG_REST_MS)).toBe(true)
+    expect(belegungReicht(belegtBis, belegtBis.getTime() - BELEGUNG_REST_MS + 1)).toBe(false)
+  })
+
+  it('der Stapel-Schlüssel hängt an Kennungen und Versuchen, nicht an der Reihenfolge; Gegenprobe: ein anderer Versuch gibt einen anderen', () => {
+    const a = { id: 'a1', versuche: 0 }
+    const b = { id: 'b2', versuche: 1 }
+    expect(stapelSchluessel([a, b])).toBe(stapelSchluessel([b, a]))
+    expect(stapelSchluessel([a, b])).toMatch(/^mail-stapel-[0-9a-f]{40}$/)
+    expect(stapelSchluessel([a, { ...b, versuche: 2 }])).not.toBe(stapelSchluessel([a, b]))
   })
 })
 
