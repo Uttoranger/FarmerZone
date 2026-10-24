@@ -27,9 +27,6 @@ import { STARTSEITE_ORIGINAL_PREFIX, STARTSEITE_ZIEL_PREFIX, type UploadZweck } 
 
 // ─── Tarife und Grenzen ──────────────────────────────────────────────────────
 
-/** Die Tarife der Dienste (Stand 19.10.2026: Vercel Pro). Nach einem Tarifwechsel NUR hier ändern. */
-export const TARIFE = { vercel: 'PRO', supabase: 'FREE', resend: 'FREE' } as const
-
 /** Die Namen der Tarife, wie sie auf der Seite stehen. */
 const TARIF_NAME: Record<'HOBBY' | 'PRO' | 'FREE', string> = { HOBBY: 'Hobby', PRO: 'Pro', FREE: 'Free' }
 
@@ -39,6 +36,15 @@ const TARIF_NAME: Record<'HOBBY' | 'PRO' | 'FREE', string> = { HOBBY: 'Hobby', P
  * warnt früher, nie später. `null` = keine feste Grenze: Bei Vercel Pro ist
  * der Bild-Speicher nutzungsbasiert (bezahlt aus dem Pro-Guthaben, darüber
  * zählt er zum Ausgabenlimit aus Spend Management; Nr. 113).
+ *
+ * Supabase Pro (Stand 24.10.2026, supabase.com/pricing): 8 GB Speicher je
+ * Projekt inklusive, darüber wächst er automatisch und kostet je GB extra;
+ * 250 GB Übertragung im Monat inklusive; tägliche Sicherung, 7 Tage
+ * aufbewahrt; keine Pause. Die 8 GB bleiben die Grenze der Warnstufen — ab da
+ * kostet es Geld, gesperrt wird nichts.
+ *
+ * Resend Pro (Stand 24.10.2026, resend.com/pricing): keine Tagesgrenze
+ * (`mailsTag: null` — keine Prozent, keine Tageswarnung), 50.000 im Monat.
  */
 export const GRENZEN = {
   vercel: {
@@ -47,26 +53,53 @@ export const GRENZEN = {
   },
   supabase: {
     FREE: { datenbankBytes: 500_000_000, uebertragungBytesMonat: 5_000_000_000 },
+    PRO: { datenbankBytes: 8_000_000_000, uebertragungBytesMonat: 250_000_000_000 },
   },
   resend: {
     FREE: { mailsTag: 100, mailsMonat: 3_000 },
+    PRO: { mailsTag: null, mailsMonat: 50_000 },
   },
 } as const
 
-/** Die Grenzen bei Vercel — je Tarif eine Zahl oder keine (null). */
-type VercelGrenzen = { bilderBytes: number | null; bildVorgaengeMonat: number | null; uebertragungBytesMonat: number | null }
-const VERCEL_GRENZEN: VercelGrenzen = GRENZEN.vercel[TARIFE.vercel]
+/** Je Dienst ein Tarif aus GRENZEN. */
+export type Tarife = { vercel: keyof typeof GRENZEN.vercel; supabase: keyof typeof GRENZEN.supabase; resend: keyof typeof GRENZEN.resend }
 
-/** Die Grenzen der Tarife von heute — daran misst die Seite, daran warnt die Mail. null = keine feste Grenze (keine Prozente, keine Warnstufe). */
-export const GRENZE = {
-  bilderBytes: VERCEL_GRENZEN.bilderBytes,
-  bildVorgaengeMonat: VERCEL_GRENZEN.bildVorgaengeMonat,
-  bildUebertragungBytesMonat: VERCEL_GRENZEN.uebertragungBytesMonat,
-  datenbankBytes: GRENZEN.supabase[TARIFE.supabase].datenbankBytes,
-  datenbankUebertragungBytesMonat: GRENZEN.supabase[TARIFE.supabase].uebertragungBytesMonat,
-  mailsTag: GRENZEN.resend[TARIFE.resend].mailsTag,
-  mailsMonat: GRENZEN.resend[TARIFE.resend].mailsMonat,
-} as const
+/**
+ * Die Tarife der Dienste (Stand 24.10.2026: Vercel Pro seit 19.10., Supabase
+ * Pro seit 24.10.). Nach einem Tarifwechsel NUR hier ändern. Resend bleibt
+ * Free, bis die Projektleitung umstellt — dann genügt `resend: 'PRO'`.
+ */
+export const TARIFE: Tarife = { vercel: 'PRO', supabase: 'PRO', resend: 'FREE' }
+
+/** Die Grenzen eines Tarifs: daran misst die Seite, daran warnt die Mail. null = keine feste Grenze (keine Prozente, keine Warnstufe). */
+export type Grenze = {
+  bilderBytes: number | null
+  bildVorgaengeMonat: number | null
+  bildUebertragungBytesMonat: number | null
+  datenbankBytes: number
+  datenbankUebertragungBytesMonat: number
+  mailsTag: number | null
+  mailsMonat: number
+}
+
+/** Die Grenzen zu Tarifen — ein Parameter, damit die Texte jedes Tarifs ohne Umschalten prüfbar sind. */
+export function grenzeFuer(tarife: Tarife): Grenze {
+  const vercel = GRENZEN.vercel[tarife.vercel]
+  const supabase = GRENZEN.supabase[tarife.supabase]
+  const resend = GRENZEN.resend[tarife.resend]
+  return {
+    bilderBytes: vercel.bilderBytes,
+    bildVorgaengeMonat: vercel.bildVorgaengeMonat,
+    bildUebertragungBytesMonat: vercel.uebertragungBytesMonat,
+    datenbankBytes: supabase.datenbankBytes,
+    datenbankUebertragungBytesMonat: supabase.uebertragungBytesMonat,
+    mailsTag: resend.mailsTag,
+    mailsMonat: resend.mailsMonat,
+  }
+}
+
+/** Die Grenzen der Tarife von heute. */
+export const GRENZE: Grenze = grenzeFuer(TARIFE)
 
 /** Der Satz statt Prozent und Balken, wo der Tarif keine feste Grenze kennt (Nr. 113). */
 const OHNE_GRENZE = `nutzungsbasiert (${TARIF_NAME.PRO}) – zählt zum Ausgabenlimit`
@@ -201,6 +234,43 @@ export function utcTagesbeginn(jetzt: Date): Date {
 /** 0 Uhr UTC am Ersten des Monats. */
 export function utcMonatsbeginn(jetzt: Date): Date {
   return new Date(`${utcTag(jetzt).slice(0, 7)}-01T00:00:00.000Z`)
+}
+
+/** Beginn eines Abrechnungszeitraums, der am `tag` jedes Monats um 0 Uhr UTC beginnt: dieser Monat, davor der Vormonat. */
+function zeitraumBeginnAm(jetzt: Date, tag: number): Date {
+  const jahr = jetzt.getUTCFullYear()
+  const monat = jetzt.getUTCMonth()
+  const diesen = Date.UTC(jahr, monat, tag)
+  // Date.UTC rechnet Monat −1 ins Vorjahr um (Januar → Dezember).
+  return new Date(jetzt.getTime() >= diesen ? diesen : Date.UTC(jahr, monat - 1, tag))
+}
+
+/**
+ * Der Tag, an dem bei Resend ein neuer Abrechnungszeitraum beginnt (Register
+ * N18, Ergänzung 24.10.2026): Der Monat der E-Mails läuft vom 17. zum 17.,
+ * nicht im Kalendermonat. Resend beginnt zur Uhrzeit des Vertragsbeginns
+ * (heute 20:23 UTC); 0 Uhr UTC zählt die Stunden davor schon zum neuen
+ * Zeitraum — die Warnung kommt so früher, nie später.
+ */
+export const RESEND_ABRECHNUNG_TAG = 17
+
+/** Beginn des laufenden Abrechnungszeitraums bei Resend: der 17. dieses Monats, vor dem 17. der des Vormonats (0 Uhr UTC). */
+export function resendAbrechnungsBeginn(jetzt: Date): Date {
+  return zeitraumBeginnAm(jetzt, RESEND_ABRECHNUNG_TAG)
+}
+
+/** Ende des laufenden Abrechnungszeitraums bei Resend (ausschließlich): der Beginn des nächsten. */
+export function resendAbrechnungsEnde(jetzt: Date): Date {
+  const beginn = resendAbrechnungsBeginn(jetzt)
+  return new Date(Date.UTC(beginn.getUTCFullYear(), beginn.getUTCMonth() + 1, RESEND_ABRECHNUNG_TAG))
+}
+
+/**
+ * Wo der Monat eines Werts beginnt: E-Mails im Abrechnungszeitraum von Resend,
+ * alles andere (Bild-Vorgänge, eigene Auflistungen) im Kalendermonat.
+ */
+export function monatsBeginn(art: 'mails' | 'mailsMonat' | 'bildVorgaenge' | 'bilderAuflistungen', jetzt: Date): Date {
+  return art === 'mails' || art === 'mailsMonat' ? resendAbrechnungsBeginn(jetzt) : utcMonatsbeginn(jetzt)
 }
 
 /** Ein UTC-Tag (JJJJ-MM-TT) um n Tage versetzt. */
@@ -340,8 +410,9 @@ export type Ablauf = {
 }
 
 /**
- * Die Abläufe aus vercel.json (Hobby: höchstens täglich, Start irgendwann in
- * der genannten Stunde). Der Wochenlauf heißt nach der Wortliste „Wochenbericht
+ * Die Abläufe aus vercel.json (Vercel Pro seit 19.10.2026: Start in der
+ * genannten Minute; unter Hobby waren es höchstens täglich und irgendwann in
+ * der Stunde). Der Wochenlauf heißt nach der Wortliste „Wochenbericht
  * (Postfach)“ — das alte Wort steht in keinem Nutzertext mehr (Register N12).
  */
 export const ABLAEUFE: readonly Ablauf[] = [
@@ -380,9 +451,10 @@ export const ABLAEUFE: readonly Ablauf[] = [
 ]
 
 /**
- * Ab wann ein Ablauf überfällig ist, gemessen vom letzten Start: Hobby
- * startet irgendwann in der genannten Stunde — zwischen zwei Läufen liegen
- * bis zu 24 h 59 min, also 26 h Spielraum; wöchentlich 8 Tage.
+ * Ab wann ein Ablauf überfällig ist, gemessen vom letzten Start: täglich
+ * 26 h, wöchentlich 8 Tage. Vercel Pro startet in der genannten Minute; die
+ * zwei Stunden Spielraum (aus der Hobby-Zeit, als ein Lauf irgendwann in der
+ * Stunde begann) fangen einen verzögerten Start ab, ohne Fehlalarm.
  */
 export const UEBERFAELLIG_NACH_MS: Record<Rhythmus, number> = {
   taeglich: 26 * 60 * 60 * 1000,
@@ -499,10 +571,18 @@ const NICHTS: WarnSchritt = { tun: 'nichts' }
  * Monatswerte (E-Mails, Bild-Vorgänge): je Monat einmal je Stufe, keine
  * Entwarnung, der neue Monat beginnt still bei 0. E-Mails je Tag (`anteil` ist
  * der VORTAG): ein Hinweis am Morgen, einmal je Tag, keine Entwarnung.
- * Ohne feste Grenze (`anteilProzent` null, Vercel Pro) gibt es keine Stufe:
- * Eine noch offene aus dem alten Tarif geht still auf 0.
+ * Ohne feste Grenze (`anteilProzent` null: Vercel Pro, Resend Pro je Tag)
+ * gibt es keine Stufe: Eine noch offene aus dem alten Tarif geht still auf 0.
+ * `monatsbeginn`: wo der Monat des Werts beginnt (`monatsBeginn` — bei den
+ * E-Mails der Abrechnungszeitraum von Resend, Nr. 162).
  */
-export function grenzSchritt(regel: GrenzRegel, bisher: WarnStand, anteilProzent: number | null, jetzt: Date): WarnSchritt {
+export function grenzSchritt(
+  regel: GrenzRegel,
+  bisher: WarnStand,
+  anteilProzent: number | null,
+  jetzt: Date,
+  monatsbeginn: Date = utcMonatsbeginn(jetzt)
+): WarnSchritt {
   const bisherStufe = bisher?.stufe ?? 0
   if (anteilProzent === null) return bisherStufe > 0 ? { tun: 'still' } : NICHTS
   const ziel = stufe(anteilProzent)
@@ -511,7 +591,7 @@ export function grenzSchritt(regel: GrenzRegel, bisher: WarnStand, anteilProzent
     return ziel > bisherStufe ? { tun: 'warnen', stufe: ziel as Exclude<Stufe, 0> } : NICHTS
   }
   if (regel === 'monat') {
-    const imMonat = bisher !== null && bisher.gemeldetAm.getTime() >= utcMonatsbeginn(jetzt).getTime() ? bisherStufe : 0
+    const imMonat = bisher !== null && bisher.gemeldetAm.getTime() >= monatsbeginn.getTime() ? bisherStufe : 0
     if (ziel > imMonat) return { tun: 'warnen', stufe: ziel as Exclude<Stufe, 0> }
     return bisherStufe > 0 && imMonat === 0 ? { tun: 'still' } : NICHTS
   }
@@ -543,11 +623,7 @@ export const VERCEL_SCHWELLEN = [50, 75, 100] as const
 
 /** Der Beginn des laufenden Abrechnungszeitraums: der 19. dieses Monats, vor dem 19. der des Vormonats (UTC). */
 export function abrechnungsBeginn(jetzt: Date): Date {
-  const jahr = jetzt.getUTCFullYear()
-  const monat = jetzt.getUTCMonth()
-  const diesen = Date.UTC(jahr, monat, VERCEL_ABRECHNUNG_TAG)
-  // Date.UTC rechnet Monat −1 ins Vorjahr um (Januar → Dezember).
-  return new Date(jetzt.getTime() >= diesen ? diesen : Date.UTC(jahr, monat - 1, VERCEL_ABRECHNUNG_TAG))
+  return zeitraumBeginnAm(jetzt, VERCEL_ABRECHNUNG_TAG)
 }
 
 /** Die Stufe einer Meldung von Spend Management: 50 % → 1, 75 % → 2, 100 % → 3, darunter keine. */
@@ -579,45 +655,93 @@ function ausgabenText(ausgabenCent: number, limitCent: number): string {
 // ─── Texte: Grenzwerte ───────────────────────────────────────────────────────
 
 /**
- * Je Grenzwert: Name im Satz, Grenze als Text und was bei 100 % passiert.
- * „Vercel Pro hilft“ gilt nur, solange der Tarif eine Grenze hat — ohne
- * Grenze gibt es für diese Werte keine Warnung, die den Satz zeigte.
+ * Was Supabase je Tarif sagt — EINE Quelle für Kachel, Tarif-Zeile, Warnkarte
+ * und Warn-Mail (Nr. 162). Free sperrt bei der Grenze (nur noch lesbar) und
+ * pausiert ohne Zugriff; Pro wächst über die 8 GB hinaus und kostet ab dann
+ * extra, sichert täglich und pausiert nie. Alle Zahlen aus GRENZEN.
  */
-export const GRENZ_TEXT: Record<GrenzWert, { name: string; kurz: string; voll: string; hilft: string | null }> = {
-  bilder: {
-    name: 'Bilder-Speicher',
-    kurz: 'Bilder',
-    voll:
-      GRENZE.bilderBytes === null
-        ? OHNE_SPERRE
-        : `Bei ${speicherText(GRENZE.bilderBytes)} sperrt Vercel alle Bilder für 30 Tage – Hofseiten und Produkte zeigen dann keine Fotos.`,
-    hilft: 'Vercel Pro, dort gibt es keine harte Sperre.',
-  },
-  datenbank: {
-    name: 'Datenbank',
-    kurz: 'Datenbank',
-    voll: `Bei ${speicherText(GRENZE.datenbankBytes)} ist die Datenbank nur noch lesbar – keine neuen Bestellungen.`,
-    hilft: 'Supabase Pro mit 8 GB.',
-  },
-  mailsMonat: {
-    name: 'E-Mails im Monat',
-    kurz: 'E-Mails',
-    voll: `Bei ${formatZahl(GRENZE.mailsMonat)} im Monat geht bis zum Monatsende keine E-Mail mehr hinaus.`,
-    hilft: null,
-  },
-  bildVorgaenge: {
-    name: 'Bild-Vorgänge im Monat',
-    kurz: 'Bild-Vorgänge',
-    voll: GRENZE.bildVorgaengeMonat === null ? OHNE_SPERRE : `Bei ${formatZahl(GRENZE.bildVorgaengeMonat)} im Monat sperrt Vercel alle Bilder für 30 Tage.`,
-    hilft: 'Vercel Pro, dort gibt es keine harte Sperre.',
-  },
-  mailsTag: {
-    name: 'E-Mails gestern',
-    kurz: 'E-Mails',
-    voll: `Bei ${formatZahl(GRENZE.mailsTag)} am Tag gehen weitere E-Mails erst nach 0 Uhr UTC hinaus.`,
-    hilft: null,
-  },
+function supabaseTexte(tarif: Tarife['supabase']): {
+  marke: string
+  ton: MarkeArt
+  satz: string
+  kachel: string
+  kachelKurz: string
+  voll: string
+  hilft: string
+} {
+  const g = GRENZEN.supabase[tarif]
+  const speicher = speicherText(g.datenbankBytes)
+  const uebertragung = speicherText(g.uebertragungBytesMonat)
+  if (tarif === 'FREE') {
+    return {
+      marke: `${TARIF_NAME.FREE} · ohne Sicherung`,
+      ton: 'tun',
+      satz: `Datenbank ${speicher}, ${uebertragung} Übertragung. Pausiert nach 7 Tagen ohne Zugriff.`,
+      kachel: `Bei ${speicher} nur noch lesbar – keine neuen Bestellungen.`,
+      kachelKurz: `Bei ${speicher} nur noch lesbar.`,
+      voll: `Bei ${speicher} ist die Datenbank nur noch lesbar – keine neuen Bestellungen.`,
+      hilft: `Supabase ${TARIF_NAME.PRO} mit ${speicherText(GRENZEN.supabase.PRO.datenbankBytes)}.`,
+    }
+  }
+  return {
+    marke: `${TARIF_NAME.PRO} · tägliche Sicherung (7 Tage)`,
+    ton: 'erledigt',
+    satz: `Datenbank ${speicher} inklusive, ${uebertragung} Übertragung im Monat – darüber kostet es extra.`,
+    kachel: `${speicher} inklusive, darüber wächst der Speicher automatisch und kostet extra.`,
+    kachelKurz: `${speicher} inklusive, darüber kostet es extra.`,
+    voll: `Bei ${speicher} ist der inklusive Speicher voll – die Datenbank wächst weiter und kostet ab dann extra.`,
+    hilft: 'Unter „Größte Tabellen“ auf der Seite Betrieb steht, was wächst.',
+  }
 }
+
+/** Der Satz, wenn der Tarif keine Tagesgrenze kennt (Resend Pro, Nr. 162). */
+const OHNE_TAGESGRENZE = 'Keine Tagesgrenze – es zählt nur der Monat.'
+
+export type GrenzText = { name: string; kurz: string; voll: string; hilft: string | null }
+
+/**
+ * Je Grenzwert: Name im Satz, Grenze als Text und was bei 100 % passiert —
+ * für die Tarife `tarife` (Standard: die von heute). „Vercel Pro hilft“ gilt
+ * nur, solange der Tarif eine Grenze hat — ohne Grenze gibt es für diese
+ * Werte keine Warnung, die den Satz zeigte.
+ */
+export function grenzTexte(tarife: Tarife = TARIFE): Record<GrenzWert, GrenzText> {
+  const grenze = grenzeFuer(tarife)
+  const supabase = supabaseTexte(tarife.supabase)
+  return {
+    bilder: {
+      name: 'Bilder-Speicher',
+      kurz: 'Bilder',
+      voll:
+        grenze.bilderBytes === null
+          ? OHNE_SPERRE
+          : `Bei ${speicherText(grenze.bilderBytes)} sperrt Vercel alle Bilder für 30 Tage – Hofseiten und Produkte zeigen dann keine Fotos.`,
+      hilft: 'Vercel Pro, dort gibt es keine harte Sperre.',
+    },
+    datenbank: { name: 'Datenbank', kurz: 'Datenbank', voll: supabase.voll, hilft: supabase.hilft },
+    mailsMonat: {
+      name: 'E-Mails im Monat',
+      kurz: 'E-Mails',
+      voll: `Bei ${formatZahl(grenze.mailsMonat)} im Monat geht bis zum ${RESEND_ABRECHNUNG_TAG}. keine E-Mail mehr hinaus.`,
+      hilft: null,
+    },
+    bildVorgaenge: {
+      name: 'Bild-Vorgänge im Monat',
+      kurz: 'Bild-Vorgänge',
+      voll: grenze.bildVorgaengeMonat === null ? OHNE_SPERRE : `Bei ${formatZahl(grenze.bildVorgaengeMonat)} im Monat sperrt Vercel alle Bilder für 30 Tage.`,
+      hilft: 'Vercel Pro, dort gibt es keine harte Sperre.',
+    },
+    mailsTag: {
+      name: 'E-Mails gestern',
+      kurz: 'E-Mails',
+      voll: grenze.mailsTag === null ? OHNE_TAGESGRENZE : `Bei ${formatZahl(grenze.mailsTag)} am Tag gehen weitere E-Mails erst nach 0 Uhr UTC hinaus.`,
+      hilft: null,
+    },
+  }
+}
+
+/** Die Texte der Grenzwerte im Tarif von heute. */
+export const GRENZ_TEXT: Record<GrenzWert, GrenzText> = grenzTexte()
 
 /** „Bilder-Speicher bei 82 %“ bzw. „Bilder-Speicher voll“ — Titel von Warnkarte und Mail. */
 export function grenzTitel(wert: GrenzWert, anteilProzent: number): string {
@@ -731,7 +855,7 @@ export const BETRIEB_TEXT = {
   ablaeufeSpalten: { ablauf: 'Ablauf', wann: 'Wann', zuletzt: 'Zuletzt', dauer: 'Dauer', stand: 'Stand' },
   ablaeufePuenktlich: (puenktlich: number, von: number): string => `${puenktlich} von ${von} pünktlich`,
   ablaeufeRegel:
-    '= mehr als 26 Stunden (täglich) bzw. 8 Tage (wöchentlich) ohne Lauf – Vercel startet einen Ablauf irgendwann in der genannten Stunde.',
+    '= mehr als 26 Stunden (täglich) bzw. 8 Tage (wöchentlich) ohne Lauf – zwei Stunden Spielraum, falls Vercel einen Lauf verzögert.',
   ablaeufeRegelFehler:
     '= der Lauf ist gescheitert (Fehlerklasse in Sentry, ohne Inhalt). Beides schickt eine Warn-Mail; jeder Ablauf prüft nach seinem Lauf die anderen.',
   ablaeufeAufraeumen: '„Aufräumen“ = Reservierungen, Bremse, abgelaufene Sitzungen und Codes, alte Webhook-Ereignisse und Messungen.',
@@ -760,10 +884,16 @@ export const BETRIEB_TEXT = {
   // Vercel Pro und Vercel-Ausgaben (Nr. 113; Karte nach dem Muster „Tarife und Grenzen“)
   ohneGrenze: OHNE_GRENZE,
   belegt: 'belegt',
+  /** „von …“ der Kachel E-Mails heute, wenn der Tarif keine Tagesgrenze kennt (Resend Pro, Nr. 162). */
+  ohneTagesgrenze: 'ohne Tagesgrenze',
   imMonat: 'im Monat',
   vercelTitel: 'Vercel-Ausgaben',
   vercelGemeldet: (ausgaben: string, tag: string): string => `Zuletzt gemeldet: ${ausgaben} am ${tag}`,
-  vercelUnter50: 'Unter 50 % – Vercel meldet erst ab 50 % des Limits.',
+  /** Nie eine Meldung von Spend Management (Nr. 162): Ob die Meldung eingerichtet ist, sieht nur Vercel. */
+  vercelKeineMeldung: 'Noch keine Meldung von Vercel. Vercel meldet erst ab 50 % des Limits – ob die Meldung eingerichtet ist, steht in Vercel › Settings › Billing.',
+  vercelKeineMeldungKurz: 'Noch keine Meldung',
+  /** Eine Meldung aus einem früheren Abrechnungszeitraum, im laufenden keine (Nr. 162). */
+  vercelUnter50: (tag: string): string => `Unter 50 % (letzte Meldung ${tag}).`,
   vercelUnter50Kurz: 'Unter 50 %',
   vercelLink: 'Vercel › Usage',
 } as const
@@ -811,23 +941,29 @@ const VERCEL_TARIF: Record<(typeof TARIFE)['vercel'] | 'HOBBY', Omit<TarifZeile,
   },
 }
 
-export const TARIF_ZEILEN: readonly TarifZeile[] = [
-  { dienst: 'Vercel', ...VERCEL_TARIF[TARIFE.vercel] },
-  {
-    dienst: 'Supabase',
-    marke: `${TARIF_NAME[TARIFE.supabase]} · ohne Sicherung`,
-    ton: 'tun',
-    satz: `Datenbank ${speicherText(GRENZE.datenbankBytes)}, ${speicherText(GRENZE.datenbankUebertragungBytesMonat)} Übertragung. Pausiert nach 7 Tagen ohne Zugriff.`,
-  },
-  {
-    dienst: 'Resend',
-    marke: TARIF_NAME[TARIFE.resend],
-    ton: 'erledigt',
-    satz: `${formatZahl(GRENZE.mailsTag)} E-Mails am Tag, ${formatZahl(GRENZE.mailsMonat)} im Monat.`,
-  },
-]
+/** Die Zeilen von „Tarife und Grenzen“ für die Tarife `tarife` (Standard: die von heute) — Texte je Tarif aus `supabaseTexte` und GRENZEN. */
+export function tarifZeilen(tarife: Tarife = TARIFE): TarifZeile[] {
+  const grenze = grenzeFuer(tarife)
+  const supabase = supabaseTexte(tarife.supabase)
+  const imMonat = `im Monat (ab dem ${RESEND_ABRECHNUNG_TAG}.)`
+  return [
+    { dienst: 'Vercel', ...VERCEL_TARIF[tarife.vercel] },
+    { dienst: 'Supabase', marke: supabase.marke, ton: supabase.ton, satz: supabase.satz },
+    {
+      dienst: 'Resend',
+      marke: TARIF_NAME[tarife.resend],
+      ton: 'erledigt',
+      satz:
+        grenze.mailsTag === null
+          ? `Keine Tagesgrenze, ${formatZahl(grenze.mailsMonat)} E-Mails ${imMonat}.`
+          : `${formatZahl(grenze.mailsTag)} E-Mails am Tag, ${formatZahl(grenze.mailsMonat)} ${imMonat}.`,
+    },
+  ]
+}
 
-/** Kurzzeile der zugeklappten Karte am Handy: „Vercel Hobby · Supabase Free · Resend Free“. */
+export const TARIF_ZEILEN: readonly TarifZeile[] = tarifZeilen()
+
+/** Kurzzeile der zugeklappten Karte am Handy: „Vercel Pro · Supabase Pro · Resend Free“. */
 export const TARIFE_KURZ = `Vercel ${TARIF_NAME[TARIFE.vercel]} · Supabase ${TARIF_NAME[TARIFE.supabase]} · Resend ${TARIF_NAME[TARIFE.resend]}`
 
 /**
@@ -843,7 +979,7 @@ export const NUR_IM_DASHBOARD = [
     satz: `Datenübertragung, Bild-Übertragung${GRENZE.bildUebertragungBytesMonat === null ? '' : ` (${speicherText(GRENZE.bildUebertragungBytesMonat)})`}, Funktionen`,
     href: VERCEL_USAGE_HREF,
   },
-  { titel: 'Supabase › Usage', satz: 'Übertragung (5 GB), aktive Konten', href: 'https://supabase.com/dashboard/org/_/usage' },
+  { titel: 'Supabase › Usage', satz: `Übertragung (${speicherText(GRENZE.datenbankUebertragungBytesMonat)}), aktive Konten`, href: 'https://supabase.com/dashboard/org/_/usage' },
   { titel: 'Sentry › Stats', satz: 'Kontingent der Fehlermeldungen', href: 'https://sentry.io/stats/' },
   { titel: 'Resend › Usage', satz: 'Zustellquote, Bounces', href: 'https://resend.com/settings/usage' },
 ] as const
@@ -1129,10 +1265,17 @@ function reihe(messungen: readonly Messung[], art: BetriebArt): VerlaufPunkt[] {
   return messungen.filter((m) => m.art === art).map((m) => ({ tag: m.tag, wert: m.wert }))
 }
 
-/** E-Mails eines Monats bis einschließlich `tag`. */
+/** E-Mails im Abrechnungszeitraum von Resend bis einschließlich `tag` (ab dem 17., Nr. 162). */
 function mailsImMonatBis(messungen: readonly Messung[], tag: string): number {
-  const monat = tag.slice(0, 7)
-  return messungen.filter((m) => m.art === 'mails' && m.tag.slice(0, 7) === monat && m.tag <= tag).reduce((s, m) => s + m.wert, 0)
+  const ab = utcTag(resendAbrechnungsBeginn(new Date(`${tag}T00:00:00.000Z`)))
+  return messungen.filter((m) => m.art === 'mails' && m.tag >= ab && m.tag <= tag).reduce((s, m) => s + m.wert, 0)
+}
+
+/** „17. Okt – 16. Nov“: der laufende Abrechnungszeitraum von Resend, erster und letzter Tag (UTC). */
+function resendZeitraumText(jetzt: Date): string {
+  const tagText = (d: Date): string => `${d.getUTCDate()}. ${MONAT_KURZ[d.getUTCMonth()]}`
+  const letzter = new Date(resendAbrechnungsEnde(jetzt).getTime() - TAG_MS)
+  return `${tagText(resendAbrechnungsBeginn(jetzt))} – ${tagText(letzter)}`
 }
 
 /** Der Tag der letzten Messung (aus MESS_ARTEN) — daran sieht eine Kachel, ob ihr Wert von heute ist. */
@@ -1155,35 +1298,43 @@ function trendZeile(verlauf: readonly VerlaufPunkt[], grenze: number | null, heu
 /**
  * Die vier Kacheln (Mockup admin-betrieb): Bilder, Datenbank, E-Mails heute,
  * Bild-Vorgänge. Ohne feste Grenze (Vercel Pro, Nr. 113) zeigen Bilder und
- * Bild-Vorgänge den Wert ohne Prozent und Balken, dafür den Satz `ohneGrenze`.
+ * Bild-Vorgänge den Wert ohne Prozent und Balken, dafür den Satz `ohneGrenze`;
+ * ebenso E-Mails heute ohne Tagesgrenze (Resend Pro). Der Monat der E-Mails
+ * ist der Abrechnungszeitraum von Resend, die Kachel nennt Beginn und Ende
+ * (Nr. 162). `tarife` nur für Tests anderer Tarife.
  */
-export function betriebKacheln(messungen: readonly Messung[], jetzt: Date): Kachel[] {
+export function betriebKacheln(messungen: readonly Messung[], jetzt: Date, tarife: Tarife = TARIFE): Kachel[] {
+  const grenze = grenzeFuer(tarife)
+  const supabase = supabaseTexte(tarife.supabase)
   const heute = utcTag(jetzt)
   const messtag = letzterMesstag(messungen)
   const hinweisFuer = (m: Messung | null, leer: string): string | null =>
     m === null ? leer : messtag !== null && m.tag < messtag ? BETRIEB_TEXT.standVom(formatTagKurz(m.tag)) : null
 
-  const bilderGrenze = GRENZE.bilderBytes
+  const bilderGrenze = grenze.bilderBytes
   const bilder = letzter(messungen, 'bilderBytes')
   const dateien = letzter(messungen, 'bilderDateien')
   const bilderAnteil = bilder && bilderGrenze !== null ? anteil(bilder.wert, bilderGrenze) : null
   const bilderTrend = trendZeile(reihe(messungen, 'bilderBytes'), bilderGrenze, heute)
 
   const db = letzter(messungen, 'datenbankBytes')
-  const dbAnteil = db ? anteil(db.wert, GRENZE.datenbankBytes) : null
-  const dbTrend = trendZeile(reihe(messungen, 'datenbankBytes'), GRENZE.datenbankBytes, heute)
+  const dbAnteil = db ? anteil(db.wert, grenze.datenbankBytes) : null
+  const dbTrend = trendZeile(reihe(messungen, 'datenbankBytes'), grenze.datenbankBytes, heute)
 
   const mailsHeute = messungen.find((m) => m.art === 'mails' && m.tag === heute)?.wert ?? 0
   const mailsMonat = mailsImMonatBis(messungen, heute)
-  const mailsAnteil = anteil(mailsHeute, GRENZE.mailsTag)
-  const mailsMonatAnteil = anteil(mailsMonat, GRENZE.mailsMonat)
+  const mailsTagGrenze = grenze.mailsTag
+  // Ohne Tagesgrenze (Resend Pro) kein Anteil des Tages — dann warnt nur der Monat.
+  const mailsAnteil = mailsTagGrenze === null ? null : anteil(mailsHeute, mailsTagGrenze)
+  const zeitraum = resendZeitraumText(jetzt)
+  const mailsMonatAnteil = anteil(mailsMonat, grenze.mailsMonat)
 
   const vorgaenge = letzter(messungen, 'bildVorgaengeMonat')
   // Ein Monatswert aus dem Vormonat gilt nicht mehr.
   const vorgaengeHeute = vorgaenge && vorgaenge.tag.slice(0, 7) === heute.slice(0, 7) ? vorgaenge : null
   const uploads = letzter(messungen, 'bilderUploadsMonat')
   const uploadsImMonat = uploads && uploads.tag.slice(0, 7) === heute.slice(0, 7) ? uploads.wert : 0
-  const vorgaengeGrenze = GRENZE.bildVorgaengeMonat
+  const vorgaengeGrenze = grenze.bildVorgaengeMonat
   const vorgaengeAnteil = vorgaengeHeute && vorgaengeGrenze !== null ? anteil(vorgaengeHeute.wert, vorgaengeGrenze) : null
   const bilderSperre = bilderGrenze === null ? null : `Bei ${speicherText(bilderGrenze)} sperrt Vercel alle Bilder für 30 Tage.`
 
@@ -1192,7 +1343,7 @@ export function betriebKacheln(messungen: readonly Messung[], jetzt: Date): Kach
       id: 'bilder',
       titel: 'Bilder',
       untertitel: null,
-      tarif: `Vercel ${TARIF_NAME[TARIFE.vercel]}`,
+      tarif: `Vercel ${TARIF_NAME[tarife.vercel]}`,
       wert: bilder ? speicherText(bilder.wert) : null,
       von: bilderGrenze === null ? BETRIEB_TEXT.belegt : `von ${speicherText(bilderGrenze)}`,
       anteil: bilderAnteil,
@@ -1208,39 +1359,39 @@ export function betriebKacheln(messungen: readonly Messung[], jetzt: Date): Kach
       id: 'datenbank',
       titel: 'Datenbank',
       untertitel: null,
-      tarif: `Supabase ${TARIF_NAME[TARIFE.supabase]}`,
+      tarif: `Supabase ${TARIF_NAME[tarife.supabase]}`,
       wert: db ? speicherText(db.wert) : null,
-      von: `von ${speicherText(GRENZE.datenbankBytes)}`,
+      von: `von ${speicherText(grenze.datenbankBytes)}`,
       anteil: dbAnteil,
       prozent: dbAnteil === null ? null : prozentText(dbAnteil),
       ohneGrenze: null,
       warnt: dbAnteil !== null && stufe(dbAnteil) > 0,
       zeile: dbTrend,
-      satz: `Bei ${speicherText(GRENZE.datenbankBytes)} nur noch lesbar – keine neuen Bestellungen.`,
-      kurz: `${dbTrend}. Bei ${speicherText(GRENZE.datenbankBytes)} nur noch lesbar.`,
+      satz: supabase.kachel,
+      kurz: `${dbTrend}. ${supabase.kachelKurz}`,
       hinweis: hinweisFuer(db, BETRIEB_TEXT.nochNichtGemessen),
     },
     {
       id: 'mailsHeute',
       titel: 'E-Mails heute',
       untertitel: 'Resend-Tag ab 0 Uhr UTC',
-      tarif: `Resend ${TARIF_NAME[TARIFE.resend]}`,
+      tarif: `Resend ${TARIF_NAME[tarife.resend]}`,
       wert: formatZahl(mailsHeute),
-      von: `von ${formatZahl(GRENZE.mailsTag)}`,
+      von: mailsTagGrenze === null ? BETRIEB_TEXT.ohneTagesgrenze : `von ${formatZahl(mailsTagGrenze)}`,
       anteil: mailsAnteil,
-      prozent: prozentText(mailsAnteil),
-      ohneGrenze: null,
-      warnt: stufe(mailsAnteil) > 0 || stufe(mailsMonatAnteil) > 0,
-      zeile: `Monat: ${formatZahl(mailsMonat)} von ${formatZahl(GRENZE.mailsMonat)} (${prozentText(mailsMonatAnteil)}) · zählt je Empfänger`,
-      satz: GRENZ_TEXT.mailsTag.voll,
-      kurz: `Monat ${formatZahl(mailsMonat)} von ${formatZahl(GRENZE.mailsMonat)} · zählt je Empfänger.`,
+      prozent: mailsAnteil === null ? null : prozentText(mailsAnteil),
+      ohneGrenze: mailsTagGrenze === null ? OHNE_TAGESGRENZE : null,
+      warnt: (mailsAnteil !== null && stufe(mailsAnteil) > 0) || stufe(mailsMonatAnteil) > 0,
+      zeile: `Monat ${zeitraum}: ${formatZahl(mailsMonat)} von ${formatZahl(grenze.mailsMonat)} (${prozentText(mailsMonatAnteil)}) · zählt je Empfänger`,
+      satz: grenzTexte(tarife).mailsTag.voll,
+      kurz: `Monat ${zeitraum}: ${formatZahl(mailsMonat)} von ${formatZahl(grenze.mailsMonat)} · zählt je Empfänger.`,
       hinweis: null,
     },
     {
       id: 'bildVorgaenge',
       titel: 'Bild-Vorgänge',
       untertitel: null,
-      tarif: `Vercel ${TARIF_NAME[TARIFE.vercel]}`,
+      tarif: `Vercel ${TARIF_NAME[tarife.vercel]}`,
       wert: vorgaengeHeute ? `≈ ${formatZahl(vorgaengeHeute.wert)}` : null,
       von: vorgaengeGrenze === null ? BETRIEB_TEXT.imMonat : `von ${formatZahl(vorgaengeGrenze)} ${BETRIEB_TEXT.imMonat}`,
       anteil: vorgaengeAnteil,
@@ -1330,10 +1481,12 @@ export type VercelAusgabenKarte = {
 }
 
 /**
- * Die Karte „Vercel-Ausgaben“ (Nr. 113): die jüngste Meldung von Spend
- * Management im laufenden Abrechnungszeitraum — „Zuletzt gemeldet: … am …“;
- * ohne Meldung „Unter 50 % …“ (Vercel meldet erst ab 50 % des Limits). Kein
- * Abruf der Vercel-API: Die Zahlen kommen nur über den Webhook.
+ * Die Karte „Vercel-Ausgaben“ (Nr. 113, ehrlich seit Nr. 162): die jüngste
+ * Meldung von Spend Management im laufenden Abrechnungszeitraum — „Zuletzt
+ * gemeldet: … am …“; mit einer Meldung nur aus einem früheren Zeitraum
+ * „Unter 50 % (letzte Meldung …)“; ganz ohne Meldung „Noch keine Meldung“ —
+ * nie „Unter 50 %“ ohne Beleg. Gelesen wird, was die Seite lädt (90 Tage).
+ * Kein Abruf der Vercel-API: Die Zahlen kommen nur über den Webhook.
  */
 export function vercelAusgabenKarte(messungen: readonly Messung[], jetzt: Date): VercelAusgabenKarte {
   const ab = utcTag(abrechnungsBeginn(jetzt))
@@ -1342,7 +1495,14 @@ export function vercelAusgabenKarte(messungen: readonly Messung[], jetzt: Date):
     'vercelAusgaben'
   )
   const limit = ausgaben ? messungen.find((m) => m.art === 'vercelLimit' && m.tag === ausgaben.tag) : undefined
-  if (!ausgaben || !limit) return { gemeldet: false, satz: BETRIEB_TEXT.vercelUnter50, kurz: BETRIEB_TEXT.vercelUnter50Kurz }
+  if (!ausgaben || !limit) {
+    const frueher = letzter(
+      messungen.filter((m) => m.tag < ab),
+      'vercelAusgaben'
+    )
+    if (frueher === null) return { gemeldet: false, satz: BETRIEB_TEXT.vercelKeineMeldung, kurz: BETRIEB_TEXT.vercelKeineMeldungKurz }
+    return { gemeldet: false, satz: BETRIEB_TEXT.vercelUnter50(tagMitMonat(new Date(`${frueher.tag}T12:00:00.000Z`), jetzt)), kurz: BETRIEB_TEXT.vercelUnter50Kurz }
+  }
   const betrag = ausgabenText(ausgaben.wert, limit.wert)
   return { gemeldet: true, satz: BETRIEB_TEXT.vercelGemeldet(betrag, formatTagKurz(ausgaben.tag)), kurz: betrag }
 }
@@ -1394,7 +1554,8 @@ export function warnEintraege(
     if (wert === 'bildVorgaenge') return kacheln.find((k) => k.id === 'bildVorgaenge')?.anteil ?? null
     if (wert === 'mailsMonat') return anteil(mailsImMonatBis(messungen, utcTag(jetzt)), GRENZE.mailsMonat)
     const gestern = utcTagVersetzt(utcTag(jetzt), -1)
-    return anteil(messungen.find((m) => m.art === 'mails' && m.tag === gestern)?.wert ?? 0, GRENZE.mailsTag)
+    const tagGrenze = GRENZE.mailsTag
+    return tagGrenze === null ? null : anteil(messungen.find((m) => m.art === 'mails' && m.tag === gestern)?.wert ?? 0, tagGrenze)
   }
   const mailSatz = (am: Date): string =>
     kalendertagInWien(am) === kalendertagInWien(jetzt) ? BETRIEB_TEXT.warnMail(uhrzeitInWien(am)) : BETRIEB_TEXT.warnMailAm(zuletztText(am, jetzt))
@@ -1454,6 +1615,8 @@ export const BETRIEB_MAIL_TEXT = { kopf: 'Betrieb', hilft: 'Was hilft:', knopf: 
 
 const FUSS_SPEICHER = `Diese Mail kommt einmal je Stufe (80 %, 95 %, voll) und noch einmal, wenn der Wert wieder unter ${ENTWARNUNG_UNTER} % liegt. Abschalten lässt sie sich nicht – es geht um den Betrieb der Plattform.`
 const FUSS_MONAT = 'Diese Mail kommt einmal je Stufe (80 %, 95 %, voll) und Monat; der neue Monat beginnt still bei 0. Abschalten lässt sie sich nicht – es geht um den Betrieb der Plattform.'
+/** Die E-Mails zählen im Abrechnungszeitraum von Resend (Nr. 162). */
+const FUSS_MAILS_MONAT = `Diese Mail kommt einmal je Stufe (80 %, 95 %, voll) und Abrechnungszeitraum von Resend; der neue Zeitraum beginnt am ${RESEND_ABRECHNUNG_TAG}. still bei 0. Abschalten lässt sie sich nicht – es geht um den Betrieb der Plattform.`
 const FUSS_TAG = 'Dieser Hinweis kommt höchstens einmal am Morgen, wenn der Vortag 80 % erreicht hat. Abschalten lässt er sich nicht – es geht um den Betrieb der Plattform.'
 const FUSS_ABLAUF = 'Höchstens eine Mail je Ablauf und Tag. Sobald er wieder läuft, kommt eine kurze Entwarnung.'
 const FUSS_VERCEL = `Diese Mail kommt einmal je Stufe (50 %, 75 %, 100 %) und Abrechnungszeitraum; der neue Zeitraum beginnt am ${VERCEL_ABRECHNUNG_TAG}. still bei 0. Abschalten lässt sie sich nicht – es geht um den Betrieb der Plattform.`
@@ -1483,7 +1646,7 @@ export function betriebMail(anlass: BetriebMailAnlass): BetriebMail {
       // Derselbe Satz wie in der Warnkarte der Seite — mit den Bildern ohne Verwendung, sobald sie gezählt sind.
       hilft: hilftSatz(anlass.wert, anlass.ohneVerwendungBytes),
       knopf,
-      fuss: regel === 'speicher' ? FUSS_SPEICHER : regel === 'monat' ? FUSS_MONAT : FUSS_TAG,
+      fuss: regel === 'speicher' ? FUSS_SPEICHER : anlass.wert === 'mailsMonat' ? FUSS_MAILS_MONAT : regel === 'monat' ? FUSS_MONAT : FUSS_TAG,
     }
   }
   if (anlass.art === 'vercelAusgaben') {
@@ -1546,7 +1709,7 @@ export function grenzStandText(wert: GrenzWert, zahl: number): string {
   if (wert === 'mailsMonat') return `${formatZahl(zahl)} von ${formatZahl(GRENZE.mailsMonat)} E-Mails in diesem Monat`
   if (wert === 'bildVorgaenge')
     return vorgaenge === null ? `≈ ${formatZahl(zahl)} Bild-Vorgänge in diesem Monat` : `≈ ${formatZahl(zahl)} von ${formatZahl(vorgaenge)} Bild-Vorgängen in diesem Monat`
-  return `${formatZahl(zahl)} von ${formatZahl(GRENZE.mailsTag)} E-Mails gestern`
+  return GRENZE.mailsTag === null ? `${formatZahl(zahl)} E-Mails gestern` : `${formatZahl(zahl)} von ${formatZahl(GRENZE.mailsTag)} E-Mails gestern`
 }
 
 // ─── CSV ─────────────────────────────────────────────────────────────────────

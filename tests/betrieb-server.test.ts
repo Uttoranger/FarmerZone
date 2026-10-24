@@ -232,7 +232,7 @@ describe('Grenzen: Vercel Pro und Mail nach der Antwort (Nr. 113)', () => {
   const zeile = (art: string, wert: number) => ({ tag: new Date('2026-10-16T00:00:00.000Z'), art, wert: BigInt(wert), gemessenAm: JETZT })
 
   beforeEach(() => {
-    db.betriebMessung.findMany.mockResolvedValue([zeile('datenbankBytes', 410_000_000), zeile('bilderBytes', 5_000_000_000)])
+    db.betriebMessung.findMany.mockResolvedValue([zeile('datenbankBytes', 6_560_000_000), zeile('bilderBytes', 5_000_000_000)])
     db.betriebMessung.aggregate.mockResolvedValue({ _sum: { wert: null } })
     db.betriebWarnung.findMany.mockResolvedValue([{ art: 'bilder', stufe: 1, seit: new Date('2026-10-01T04:00:00Z'), gemeldetAm: new Date('2026-10-01T04:00:00Z') }])
     db.$queryRaw.mockImplementation(async (teile: TemplateStringsArray, ...werte: unknown[]) => [{ art: String(werte[0]) }])
@@ -255,5 +255,35 @@ describe('Grenzen: Vercel Pro und Mail nach der Antwort (Nr. 113)', () => {
 
     for (const aufgabe of nachlauf.aufgaben.splice(0)) await aufgabe()
     expect(sendBetriebWarnung).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Monatsfenster der E-Mails: Abrechnungszeitraum von Resend (Nr. 162)', () => {
+  const zeile = (art: string, wert: number) => ({ tag: new Date('2026-10-16T00:00:00.000Z'), art, wert: BigInt(wert), gemessenAm: JETZT })
+
+  beforeEach(() => {
+    db.betriebMessung.findMany.mockResolvedValue([zeile('datenbankBytes', 15_000_000)])
+    // 2.600 von 3.000 E-Mails im Zeitraum = 86 % → Stufe 1.
+    db.betriebMessung.aggregate.mockResolvedValue({ _sum: { wert: BigInt(2_600) } })
+    db.betriebWarnung.findMany.mockResolvedValue([{ art: 'mailsMonat', stufe: 1, seit: new Date('2026-10-02T04:00:00Z'), gemeldetAm: new Date('2026-10-02T04:00:00Z') }])
+    db.$queryRaw.mockImplementation(async (teile: TemplateStringsArray, ...werte: unknown[]) => [{ art: String(werte[0]) }])
+  })
+
+  it('am 16.: die Summe ab dem 17. des Vormonats; eine Warnung vom 2. zählt im selben Zeitraum — keine zweite Mail', async () => {
+    expect(await pruefeGrenzen(JETZT, { produktion: true })).toBe(0)
+    expect(db.betriebMessung.aggregate).toHaveBeenCalledWith({ where: { art: 'mails', tag: { gte: new Date('2026-09-17T00:00:00.000Z') } }, _sum: { wert: true } })
+    expect(sendBetriebWarnung).not.toHaveBeenCalled()
+  })
+
+  it('am 17.: neuer Zeitraum — dieselbe Stufe warnt neu, das bedingte Setzen vergleicht mit dem 17. (Gegenprobe Kalendermonat: 1.)', async () => {
+    const am17 = new Date('2026-10-17T04:05:00.000Z')
+    db.betriebMessung.findMany.mockResolvedValue([{ ...zeile('datenbankBytes', 15_000_000), tag: new Date('2026-10-17T00:00:00.000Z') }])
+    expect(await pruefeGrenzen(am17, { produktion: true })).toBe(1)
+    expect(db.betriebMessung.aggregate).toHaveBeenCalledWith({ where: { art: 'mails', tag: { gte: new Date('2026-10-17T00:00:00.000Z') } }, _sum: { wert: true } })
+    const setzen = db.$queryRaw.mock.calls.map((c) => werteVon(c)).filter((w) => w[0] === 'mailsMonat')
+    expect(setzen).toHaveLength(1)
+    expect(setzen[0]).toContainEqual(new Date('2026-10-17T00:00:00.000Z'))
+    expect(setzen[0]).not.toContainEqual(new Date('2026-10-01T00:00:00.000Z'))
+    expect(vi.mocked(sendBetriebWarnung).mock.calls[0][0]).toMatchObject({ art: 'grenze', wert: 'mailsMonat' })
   })
 })
