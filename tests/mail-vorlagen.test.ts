@@ -18,6 +18,8 @@ import { join } from 'node:path'
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
 vi.mock('server-only', () => ({}))
+// Das Mail-Protokoll (Nr. 158) bindet Prisma; hier geht es nur um die Mail selbst.
+vi.mock('@/server/mail-warteschlange', () => ({ protokolliereSofortMail: vi.fn() }))
 vi.mock('resend', () => ({
   Resend: class {
     emails = { send: sendMock }

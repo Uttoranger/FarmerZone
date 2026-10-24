@@ -12,6 +12,8 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vites
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
 vi.mock('server-only', () => ({}))
+// Das Mail-Protokoll (Nr. 158) bindet Prisma; hier geht es nur um die Mail selbst.
+vi.mock('@/server/mail-warteschlange', () => ({ protokolliereSofortMail: vi.fn() }))
 vi.mock('resend', () => ({
   Resend: class {
     emails = { send: sendMock }
@@ -49,7 +51,7 @@ describe('sendRaw wirft nie', () => {
     sendMock.mockResolvedValue({ data: { id: 'email_1' }, error: null })
     const { sendRaw } = mitKey
 
-    const result = await sendRaw('kunde@example.com', 'Test', '<p>Hallo</p>')
+    const result = await sendRaw('kunde@example.com', 'Test', '<p>Hallo</p>', { art: 'testmail' })
 
     expect(result).toEqual({ id: 'email_1' })
   })
@@ -58,7 +60,7 @@ describe('sendRaw wirft nie', () => {
     sendMock.mockRejectedValue(new Error('ECONNRESET'))
     const { sendRaw } = mitKey
 
-    await expect(sendRaw('kunde@example.com', 'Test', '<p>Hallo</p>')).resolves.toEqual({
+    await expect(sendRaw('kunde@example.com', 'Test', '<p>Hallo</p>', { art: 'testmail' })).resolves.toEqual({
       error: 'ECONNRESET',
     })
   })
@@ -67,7 +69,7 @@ describe('sendRaw wirft nie', () => {
     sendMock.mockResolvedValue({ data: null, error: { message: 'domain not verified' } })
     const { sendRaw } = mitKey
 
-    const result = await sendRaw('kunde@example.com', 'Test', '<p>Hallo</p>')
+    const result = await sendRaw('kunde@example.com', 'Test', '<p>Hallo</p>', { art: 'testmail' })
 
     expect(result.error).toContain('domain not verified')
     expect(result.id).toBeUndefined()
@@ -76,7 +78,7 @@ describe('sendRaw wirft nie', () => {
   it('läuft ohne RESEND_API_KEY im Log-Modus (kein Throw, kein Versand)', async () => {
     const { sendRaw } = ohneKey
 
-    const result = await sendRaw('kunde@example.com', 'Test', '<p>Hallo</p>')
+    const result = await sendRaw('kunde@example.com', 'Test', '<p>Hallo</p>', { art: 'testmail' })
 
     expect(result.error).toContain('RESEND_API_KEY')
     expect(sendMock).not.toHaveBeenCalled()

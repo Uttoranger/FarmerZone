@@ -105,12 +105,13 @@ describe('vercel.json', () => {
     expect(konfig.ignoreCommand).toBe('bash scripts/vercel-ignore.sh')
   })
 
-  it('führt die vier Zeitpläne unverändert weiter', () => {
+  it('führt die vier Zeitpläne unverändert weiter, dazu die Mail-Warteschlange jede Minute (Nr. 158)', () => {
     expect(konfig.crons).toEqual([
       { path: '/api/cron/cleanup-reservations', schedule: '0 3 * * *' },
       { path: '/api/cron/verwaiste-bestellungen', schedule: '30 3 * * *' },
       { path: '/api/cron/betrieb', schedule: '0 4 * * *' },
       { path: '/api/cron/briefkasten', schedule: '0 5 * * 1' },
+      { path: '/api/cron/mails', schedule: '* * * * *' },
     ])
   })
 })

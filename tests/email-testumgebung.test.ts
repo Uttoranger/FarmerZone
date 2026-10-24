@@ -21,6 +21,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi, t
 const { sendMock, captureMessage } = vi.hoisted(() => ({ sendMock: vi.fn(), captureMessage: vi.fn() }))
 
 vi.mock('server-only', () => ({}))
+// Das Mail-Protokoll (Nr. 158) bindet Prisma; hier geht es nur um die Mail selbst.
+vi.mock('@/server/mail-warteschlange', () => ({ protokolliereSofortMail: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureMessage, captureException: vi.fn() }))
 vi.mock('resend', () => ({
   Resend: class {
@@ -78,35 +80,35 @@ const geloggt = (): string => log.mock.calls.map((aufruf: unknown[]) => aufruf.j
 
 describe('Vorschau: Post nur an freigegebene Adressen', () => {
   it('verschickt an eine Adresse aus TEST_EMPFAENGER', async () => {
-    const ergebnis = await vorschau.sendRaw('tester@example.org', 'Test', '<p>Hallo</p>')
+    const ergebnis = await vorschau.sendRaw('tester@example.org', 'Test', '<p>Hallo</p>', { art: 'testmail' })
 
     expect(ergebnis).toEqual({ id: 'email_1' })
     expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({ to: 'tester@example.org' }))
   })
 
   it('vergleicht ohne Rücksicht auf Groß-/Kleinschreibung und Ränder', async () => {
-    await vorschau.sendRaw('  ZWEITE@example.NET ', 'Test', '<p>Hallo</p>')
+    await vorschau.sendRaw('  ZWEITE@example.NET ', 'Test', '<p>Hallo</p>', { art: 'testmail' })
 
     expect(sendMock).toHaveBeenCalledTimes(1)
   })
 
   it('verschickt an jede Adresse von example.com (Seed- und Testkonten)', async () => {
-    await vorschau.sendRaw('bauer-01@example.com', 'Test', '<p>Hallo</p>')
+    await vorschau.sendRaw('bauer-01@example.com', 'Test', '<p>Hallo</p>', { art: 'testmail' })
 
     expect(sendMock).toHaveBeenCalledTimes(1)
   })
 
   it('verschickt NICHT an eine fremde Adresse und sagt das im Ergebnis', async () => {
-    const ergebnis = await vorschau.sendRaw('kundin@example.org', 'Test', '<p>Hallo</p>')
+    const ergebnis = await vorschau.sendRaw('kundin@example.org', 'Test', '<p>Hallo</p>', { art: 'testmail' })
 
     expect(ergebnis).toEqual({ gesperrt: true })
     expect(sendMock).not.toHaveBeenCalled()
   })
 
   it('zählt gesperrte Mails mit — und schreibt dabei keine Adresse und keinen Betreff ins Log', async () => {
-    await vorschau.sendRaw('kundin@example.org', 'Deine Bestellung 4711', '<p>Hallo</p>')
+    await vorschau.sendRaw('kundin@example.org', 'Deine Bestellung 4711', '<p>Hallo</p>', { art: 'testmail' })
     const erster = geloggt()
-    await vorschau.sendRaw('andere-kundin@example.org', 'Deine Bestellung 4712', '<p>Hallo</p>')
+    await vorschau.sendRaw('andere-kundin@example.org', 'Deine Bestellung 4712', '<p>Hallo</p>', { art: 'testmail' })
     const beide = geloggt()
 
     expect(erster).toMatch(/Nicht verschickt/)
@@ -120,7 +122,7 @@ describe('Vorschau: Post nur an freigegebene Adressen', () => {
   })
 
   it('lässt mehrere Adressen in einem Feld nie durch — auch nicht mit einer von example.com dahinter', async () => {
-    const ergebnis = await vorschau.sendRaw('kundin@example.org, test@example.com', 'Test', '<p>Hallo</p>')
+    const ergebnis = await vorschau.sendRaw('kundin@example.org, test@example.com', 'Test', '<p>Hallo</p>', { art: 'testmail' })
 
     expect(ergebnis).toEqual({ gesperrt: true })
     expect(sendMock).not.toHaveBeenCalled()
@@ -129,14 +131,14 @@ describe('Vorschau: Post nur an freigegebene Adressen', () => {
 
 describe('Wie die Produktion gebaut, aber ohne VERCEL_ENV=production (fail-closed)', () => {
   it('verschickt nicht an eine fremde Adresse — wie außerhalb der Produktion', async () => {
-    const ergebnis = await produktionOhneVercel.sendRaw('kundin@example.org', 'Test', '<p>Hallo</p>')
+    const ergebnis = await produktionOhneVercel.sendRaw('kundin@example.org', 'Test', '<p>Hallo</p>', { art: 'testmail' })
 
     expect(ergebnis).toEqual({ gesperrt: true })
     expect(sendMock).not.toHaveBeenCalled()
   })
 
   it('verschickt weiter an Testkonten von example.com', async () => {
-    await produktionOhneVercel.sendRaw('bauer-01@example.com', 'Test', '<p>Hallo</p>')
+    await produktionOhneVercel.sendRaw('bauer-01@example.com', 'Test', '<p>Hallo</p>', { art: 'testmail' })
 
     expect(sendMock).toHaveBeenCalledTimes(1)
   })
@@ -146,8 +148,8 @@ describe('Wie die Produktion gebaut, aber ohne VERCEL_ENV=production (fail-close
     const frisch = await ladeMit({ VERCEL_ENV: '', RESEND_API_KEY: 're_test_dummy', TEST_EMPFAENGER: '' })
     captureMessage.mockReset()
 
-    await frisch.sendRaw('kundin@example.org', 'Deine Bestellung 4711', '<p>Hallo</p>')
-    await frisch.sendRaw('andere-kundin@example.org', 'Deine Bestellung 4712', '<p>Hallo</p>')
+    await frisch.sendRaw('kundin@example.org', 'Deine Bestellung 4711', '<p>Hallo</p>', { art: 'testmail' })
+    await frisch.sendRaw('andere-kundin@example.org', 'Deine Bestellung 4712', '<p>Hallo</p>', { art: 'testmail' })
 
     expect(captureMessage).toHaveBeenCalledTimes(1)
     const gemeldet = JSON.stringify(captureMessage.mock.calls)
@@ -158,7 +160,7 @@ describe('Wie die Produktion gebaut, aber ohne VERCEL_ENV=production (fail-close
 
 describe('Gegenproben', () => {
   it('Produktions-Deployment bei Vercel: verschickt an jede Adresse, ohne Meldung', async () => {
-    const ergebnis = await produktion.sendRaw('kundin@example.org', 'Test', '<p>Hallo</p>')
+    const ergebnis = await produktion.sendRaw('kundin@example.org', 'Test', '<p>Hallo</p>', { art: 'testmail' })
 
     expect(ergebnis).toEqual({ id: 'email_1' })
     expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({ to: 'kundin@example.org' }))
@@ -167,13 +169,13 @@ describe('Gegenproben', () => {
   })
 
   it('Vorschau: die gewollte Sperre meldet nichts an Sentry', async () => {
-    await vorschau.sendRaw('kundin@example.org', 'Test', '<p>Hallo</p>')
+    await vorschau.sendRaw('kundin@example.org', 'Test', '<p>Hallo</p>', { art: 'testmail' })
 
     expect(captureMessage).not.toHaveBeenCalled()
   })
 
   it('ohne RESEND_API_KEY bleibt der Log-Modus, wie er war — auch in der Vorschau', async () => {
-    const ergebnis = await vorschauOhneKey.sendRaw('kundin@example.org', 'Test', '<p>Hallo</p>')
+    const ergebnis = await vorschauOhneKey.sendRaw('kundin@example.org', 'Test', '<p>Hallo</p>', { art: 'testmail' })
 
     expect(ergebnis.error).toContain('RESEND_API_KEY')
     expect(ergebnis.gesperrt).toBeUndefined()

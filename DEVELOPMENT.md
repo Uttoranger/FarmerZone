@@ -5754,6 +5754,15 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Abholzeit rückgängig (P10):** Löschen ist endgültig (`Order` hängt nicht an `PickupSlot`), `farm.ts` bleibt unverändert. Der Toast „Abholzeit gelöscht“ trägt für eine AKTIVE Zeit „Rückgängig“ (sechs Sekunden), auch in Mein Hof (dort statt „Gespeichert · Ansehen“); der Klick legt die Zeit über `addPickupSlot` mit Tag, Beginn, Ende und `maxOrders` neu an. Eine pausierte Zeit behält den bisherigen Toast, sie käme sonst aktiv zurück. Die Texte stehen in `ABHOLZEIT_GELOESCHT` (`src/lib/pickup-slot-rules.ts`).
 - **Bestätigen ohne Umweg (P8):** Abgemeldet zeigt die Karte nach dem Bestätigen gleich das Formular der Hof-Anmeldung (`NachBestaetigung`); `HofAnmeldung` bekommt die optionale Prop `ziel` (nur `/onboarding`, fest im Code, nie aus der Adresse). Keine Adresse in der URL, nichts vorausgefüllt.
 
+## Mail-Warteschlange und Protokoll (Register N26; Nr. 158, Lauf 24, 24.10.2026)
+
+- **Warum:** Jede Mail ging einzeln über `resend.emails.send` und hing an der Anfrage; ein Beitrag an viele Abos lief als Schleife im Nachlauf, ohne Wiederholung bei 429 und ohne Vorrang. Jetzt gibt es die Tabelle `MailAuftrag` (eine Migration, Expand) als Warteschlange und als Protokoll.
+- **Wege:** Sofort (Code, Einmal-Link, Bestätigungslink) geht weiter direkt über `sendRaw` und steht nur als Zeile im Protokoll (`vorrang` 0); Wichtig (1) und Kann warten (2) stellt `stelleMailEin` ein, der Worker `arbeiteWarteschlange` verschickt sie. Das Umstellen der einzelnen Mails auf die Warteschlange ist Nr. 159; Nr. 158 bringt Tabelle, Worker, Protokoll, Cron und den Renderer „beitrag“.
+- **Worker:** Advisory-Lock in einer Transaktion (eine Sitzungssperre ginge über den Pooler nicht sicher zurück), Seiten zu 100 mit `FOR UPDATE SKIP LOCKED`, Versand als `batch.send` (headers je Mail, ein Idempotenz-Schlüssel je Anfrage, strikte Prüfung; lehnt Resend den Stapel mit 4xx ab, gehen die Mails einzeln). 200 ms zwischen zwei Anfragen: höchstens 500 Mails je Sekunde, 30.000 je Minute — gemessen 5.020 Mails in 10,2 s gegen echtes Postgres mit Resend-Attrappe (Bericht 158).
+- **Wiederholung:** 429, 5xx und Netzfehler nach 1, 5, 15, 60 und 240 Minuten, danach gescheitert; jeder andere 4xx sofort. Ohne `RESEND_API_KEY` `ohne_schluessel`, kein neuer Versuch.
+- **Kontingent:** Kann warten bleibt liegen ab 70 % der Tagesgrenze oder 90 % des Monats; der Monat ist bis Nr. 162 noch der Kalendermonat (Stelle „Abrechnungszeitraum aus 162“).
+- **Keine Adresse in der Tabelle:** Der Renderer lädt Adresse und Inhalt frisch; gespeichert werden nur Kennungen und ein Fingerabdruck (`empfaengerFingerabdruck`, HMAC mit Zweck `mail-empfaenger:`) für die Support-Suche. Nach 90 Tagen löscht das Aufräumen die Zeile; es gibt auch hängengebliebene Aufträge wieder frei.
+
 ## Nützliche Befehle
 
 ```bash

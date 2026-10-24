@@ -17,6 +17,8 @@ import { BEITRAG_ANLAESSE, BEITRAG_ANLASS } from '@/lib/beitrag-anlass'
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
 vi.mock('server-only', () => ({}))
+// Das Mail-Protokoll (Nr. 158) bindet Prisma; hier geht es nur um die Mail selbst.
+vi.mock('@/server/mail-warteschlange', () => ({ protokolliereSofortMail: vi.fn() }))
 vi.mock('resend', () => ({
   Resend: class {
     emails = { send: sendMock }
@@ -175,6 +177,7 @@ describe('Transaktionsmails tragen keine Abmelde-Kopfzeilen', () => {
     const quelle = readFileSync(join(process.cwd(), 'src/lib/email.ts'), 'utf8')
     const stellen = [...quelle.matchAll(/listUnsubscribeKoepfe\(/g)].map((t) => quelle.lastIndexOf('export async function', t.index))
     expect(stellen).toHaveLength(1)
-    expect(quelle.slice(stellen[0], stellen[0] + 60)).toContain('export async function sendStatusUpdateEmail(')
+    // Gebaut wird die werbliche Mail in baueBeitragMail (Nr. 158) — für sendStatusUpdateEmail und den Renderer „beitrag“.
+    expect(quelle.slice(stellen[0], stellen[0] + 60)).toContain('export async function baueBeitragMail(')
   })
 })
