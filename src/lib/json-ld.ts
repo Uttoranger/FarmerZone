@@ -10,6 +10,7 @@
  */
 // Decimal aus dem Browser-Einstieg der Prisma-Runtime — wie src/lib/order-totals.ts.
 import { Decimal } from '@prisma/client/runtime/index-browser'
+import { alsLand } from '@/lib/laender'
 import { MARKE } from '@/lib/marke'
 import { titelbildFoto } from '@/lib/mein-hof'
 import type { DecimalEingabe } from '@/lib/order-totals'
@@ -54,6 +55,8 @@ type HofFuerJsonLd = {
   bannerType: string
   bannerUrl: string | null
   logoUrl: string | null
+  /** "AT" oder "DE" (Farm.country); fehlt es oder ist es unbekannt, gilt AT. */
+  country?: string | null
 }
 
 /**
@@ -78,7 +81,8 @@ export function hofJsonLd(
       streetAddress: hof.address,
       postalCode: hof.postalCode,
       addressLocality: hof.city,
-      addressCountry: 'AT',
+      // Das Land des Hofs, nicht fest AT (Nr. 152): ein deutscher Hof steht sonst falsch in den Suchergebnissen.
+      addressCountry: alsLand(hof.country),
     },
     ...(geo && { geo: { '@type': 'GeoCoordinates', latitude: geo.latitude, longitude: geo.longitude } }),
   }

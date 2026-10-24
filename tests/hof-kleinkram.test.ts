@@ -61,7 +61,7 @@ vi.mock('@/server/actions/email-bestaetigung', () => ({ bestaetigeEmail: vi.fn()
 
 import PrintPacklistPage from '@/app/(farmer)/orders/today/print/page'
 import { PickupSlotsClient } from '@/components/settings/pickup-slots-client'
-import { NachBestaetigung } from '@/components/email-bestaetigung/bestaetigen-karte'
+import { NachBestaetigung, NeuerLinkWeg } from '@/components/email-bestaetigung/bestaetigen-karte'
 import { ABHOLZEIT_GELOESCHT } from '@/lib/pickup-slot-rules'
 
 function quelle(pfad: string): string {
@@ -189,6 +189,21 @@ describe('Abholzeit löschen mit „Rückgängig" (P10)', () => {
     expect(onGespeichert).toHaveBeenCalledTimes(1)
   })
 
+  it('wirft das Zurückholen (etwa ohne Netz), steht der Satz aus der einen Quelle da und die Seite lädt nicht neu', async () => {
+    m.addPickupSlot.mockRejectedValue(new Error('Failed to fetch'))
+    const onGespeichert = vi.fn()
+    await loesche(AKTIV, { onGespeichert })
+    m.refresh.mockClear()
+
+    m.toast.success.mock.calls[0][1].action.onClick()
+    await flush()
+
+    expect(m.toast.error).toHaveBeenCalledWith(ABHOLZEIT_GELOESCHT.zurueckFehler)
+    expect(m.toast.success).toHaveBeenCalledTimes(1)
+    expect(m.refresh).not.toHaveBeenCalled()
+    expect(onGespeichert).toHaveBeenCalledTimes(1)
+  })
+
   it('Gegenprobe: pausierte Zeit behält den bisherigen Toast, ohne Aktion', async () => {
     const meldeErfolg = vi.fn()
     await loesche(PAUSIERT, { meldeErfolg })
@@ -225,13 +240,29 @@ describe('Bestätigen ohne Umweg (P8)', () => {
     expect(html).not.toContain('hof-anmeldung')
   })
 
+  it('„schon bestätigt", abgemeldet: nach dem Fehler dasselbe Formular mit Ziel /verify, kein Link auf /login', () => {
+    const html = renderToStaticMarkup(createElement(NeuerLinkWeg, { angemeldet: false }))
+
+    expect(html).toContain('data-merkmal="hof-anmeldung"')
+    expect(html).toContain('data-ziel="/verify"')
+    expect(html).not.toContain('/login')
+  })
+
+  it('Gegenprobe: angemeldet bleibt es beim Link „Neuen Link anfordern" auf /verify, ohne Formular', () => {
+    const html = renderToStaticMarkup(createElement(NeuerLinkWeg, { angemeldet: true }))
+
+    expect(html).toContain('href="/verify"')
+    expect(html).toContain('Neuen Link anfordern')
+    expect(html).not.toContain('hof-anmeldung')
+  })
+
   it('das Ziel steht fest im Code und kommt nie aus der Adresse', () => {
     const karte = quelle('src/components/email-bestaetigung/bestaetigen-karte.tsx')
     expect(karte).toContain('ziel="/onboarding"')
     expect(karte).not.toContain('searchParams')
     expect(karte).not.toContain('location')
     const anmeldung = quelle('src/components/anmelden/hof-anmeldung.tsx')
-    expect(anmeldung).toContain("ziel?: '/onboarding'")
+    expect(anmeldung).toContain("ziel?: '/onboarding' | '/verify'")
     expect(anmeldung).toContain('ziel ?? zielNachHofAnmeldung(')
   })
 })

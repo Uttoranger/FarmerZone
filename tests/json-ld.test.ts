@@ -55,6 +55,14 @@ describe('absoluteAdresse', () => {
 })
 
 describe('hofJsonLd', () => {
+  it('addressCountry kommt aus dem Land des Hofs: DE bleibt DE, AT bleibt AT, Unbekanntes und Fehlendes werden AT (Nr. 164)', () => {
+    expect(hofJsonLd({ ...HOF, country: 'DE' }, null, BASIS).address).toMatchObject({ addressCountry: 'DE' })
+    expect(hofJsonLd({ ...HOF, country: 'AT' }, null, BASIS).address).toMatchObject({ addressCountry: 'AT' })
+    expect(hofJsonLd({ ...HOF, country: 'XX' }, null, BASIS).address).toMatchObject({ addressCountry: 'AT' })
+    expect(hofJsonLd(HOF, null, BASIS).address).toMatchObject({ addressCountry: 'AT' })
+  })
+
+
   it('LocalBusiness mit Adresse, voller URL und Titelbild — nie Telefon oder E-Mail, auch wenn der Hof sie trägt', () => {
     const daten = hofJsonLd(HOF, null, BASIS)
     const text = JSON.stringify(daten)
