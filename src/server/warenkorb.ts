@@ -1,5 +1,11 @@
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { istGebindeGesperrt } from '@/lib/futter-registrierung'
+import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
+import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
+import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
+import { kaufSperre, kaufSperreHinweis } from '@/lib/bereiche-anzeige'
+import { alsAbholFenster, ausgebuchteTage } from '@/server/abholfenster'
 import {
   pruefeWarenkorb,
   befundMeldung,
@@ -34,11 +40,117 @@ export type WarenkorbPruefung = {
   berichtigt: WarenkorbPosition[]
 }
 
-/** Liest Bestandslage und eigene Halte und wendet die Regeln an. Schreibt nichts. */
+// ─── Prüfkette je Hof (Register N24, Ergänzung 24.10.2026; Nr. 165) ─────────
+
+/**
+ * Was vom Hof gebraucht wird, um zu entscheiden, ob man bei ihm gerade kaufen
+ * kann — nur die AKTIVEN Abholzeiten, wie in der Kasse.
+ */
+export const HOF_KAUFBARKEIT_AUSWAHL = {
+  id: true,
+  name: true,
+  isPaused: true,
+  archivedAt: true,
+  approvedAt: true,
+  pickupSlots: { where: { isActive: true }, select: { dayOfWeek: true, startTime: true, endTime: true } },
+} satisfies Prisma.FarmSelect
+
+export type HofZurKaufbarkeit = Prisma.FarmGetPayload<{ select: typeof HOF_KAUFBARKEIT_AUSWAHL }>
+
+export type HofSperrGrund = 'stillgelegt' | 'nicht-freigeschaltet' | 'pause' | 'keine-abholzeit' | 'ausgebucht'
+
+/** Der Grund und der Satz, den die Kundin liest — dieselben Sätze wie bisher in /api/reserve. */
+export type HofSperre = { grund: HofSperrGrund; text: string }
+
+/**
+ * Die Prüfkette für mehrere Höfe: je Hof der ERSTE Grund, aus dem man bei ihm
+ * nicht kaufen kann; bestellbare Höfe fehlen in der Antwort.
+ *
+ * Reihenfolge (verbindlich, gleich für /api/reserve und /api/warenkorb/pruefen):
+ *  1. Stilllegung — der dauerhafte Zustand sticht den vorübergehenden
+ *     (src/lib/farm-archive.ts),
+ *  2. Freischaltung — nach der Stilllegung, vor der Pause (src/lib/farm-approval.ts),
+ *  3. Pause,
+ *  4. Kaufsperre (keine Abholzeit, ausgebucht) — dieselbe Regel und Zählung
+ *     wie die Kasse (`kaufSperre`, `ausgebuchteTage`).
+ * Die vollen Tage werden EINMAL gezählt, und nur für Höfe, die 1–3 bestehen:
+ * Wer schon pausiert, kostet keine Abfrage. Die verwaisten Bestellungen gibt der
+ * Aufrufer vorher frei (Frist gilt beim Lesen), sonst zählte ein Fenster voll,
+ * das die Kasse annähme.
+ */
+export async function pruefeKaufbarkeitHoefe(
+  hoefe: readonly HofZurKaufbarkeit[],
+  jetzt: Date
+): Promise<Map<string, HofSperre>> {
+  const sperren = new Map<string, HofSperre>()
+  const offen: HofZurKaufbarkeit[] = []
+  for (const hof of hoefe) {
+    if (sperren.has(hof.id) || offen.some((h) => h.id === hof.id)) continue
+    if (hof.archivedAt) sperren.set(hof.id, { grund: 'stillgelegt', text: FARM_ARCHIVED_MESSAGE })
+    else if (!hof.approvedAt) sperren.set(hof.id, { grund: 'nicht-freigeschaltet', text: FARM_NOT_APPROVED_MESSAGE })
+    else if (hof.isPaused) sperren.set(hof.id, { grund: 'pause', text: SHOP_PAUSED_MESSAGE })
+    else offen.push(hof)
+  }
+  if (offen.length === 0) return sperren
+
+  const volle = await ausgebuchteTage(
+    offen.map((h) => h.id),
+    jetzt
+  )
+  for (const hof of offen) {
+    const voll = volle.get(hof.id)
+    // Die Pause ist oben schon beantwortet; die Sperre kann hier nur „keine
+    // Abholzeit" oder „ausgebucht" sein.
+    const sperre = kaufSperre({ isPaused: false, pickupSlots: hof.pickupSlots.map((s) => alsAbholFenster(s, voll)) }, jetzt)
+    if (sperre === 'keine-abholzeit' || sperre === 'ausgebucht') {
+      sperren.set(hof.id, { grund: sperre, text: kaufSperreHinweis(sperre, hof.name).titel })
+    }
+  }
+  return sperren
+}
+
+/** Die Prüfkette für EINEN Hof (/api/reserve): null, wenn man bei ihm kaufen kann. */
+export async function pruefeKaufbarkeitHof(hof: HofZurKaufbarkeit, jetzt: Date): Promise<HofSperre | null> {
+  return (await pruefeKaufbarkeitHoefe([hof], jetzt)).get(hof.id) ?? null
+}
+
+/**
+ * Die Sperren der Höfe hinter diesen Produkten, je Produkt (für den Warenkorb).
+ * Unbekannte Produkte fehlen — sie fallen im Abgleich ohnehin als „weg“.
+ */
+export async function hofSperrenFuerProdukte(
+  productIds: readonly string[],
+  jetzt: Date
+): Promise<Map<string, HofSperre>> {
+  const ids = [...new Set(productIds)]
+  if (ids.length === 0) return new Map()
+  const produkte = await prisma.product.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, farm: { select: HOF_KAUFBARKEIT_AUSWAHL } },
+  })
+  const jeHof = await pruefeKaufbarkeitHoefe(
+    produkte.map((p) => p.farm),
+    jetzt
+  )
+  const jeProdukt = new Map<string, HofSperre>()
+  for (const p of produkte) {
+    const sperre = jeHof.get(p.farm.id)
+    if (sperre) jeProdukt.set(p.id, sperre)
+  }
+  return jeProdukt
+}
+
+/**
+ * Liest Bestandslage und eigene Halte und wendet die Regeln an. Schreibt nichts.
+ * `gesperrt`: Produkte, deren Hof die Prüfkette nicht besteht (Nr. 165) — sie
+ * zählen wie ausgeblendet und fallen aus dem Korb. Der Checkout gibt keine mit,
+ * er prüft Hof und Abholfenster selbst.
+ */
 export async function pruefeSitzungsWarenkorb(
   positionen: readonly WarenkorbPosition[],
   sessionId: string,
-  jetzt: Date = new Date()
+  jetzt: Date = new Date(),
+  gesperrt: ReadonlySet<string> = new Set()
 ): Promise<WarenkorbPruefung> {
   if (positionen.length === 0) {
     const leer = pruefeWarenkorb([], [], [], jetzt)
@@ -84,7 +196,7 @@ export async function pruefeSitzungsWarenkorb(
     verfuegbar: p.stock - (fremdSumme.get(p.id) ?? 0),
     // Gesperrt zählt wie ausgeblendet: Die Position fällt mit der bekannten
     // Meldung aus dem Korb, bevor der Checkout Bestand bucht.
-    verkaeuflich: p.isAvailable && !istGebindeGesperrt(p, p.farm),
+    verkaeuflich: p.isAvailable && !istGebindeGesperrt(p, p.farm) && !gesperrt.has(p.id),
   }))
 
   const befund = pruefeWarenkorb(positionen, eigeneHalte, lage, jetzt)

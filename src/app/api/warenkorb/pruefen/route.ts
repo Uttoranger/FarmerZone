@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { bremseReservieren } from '@/server/bremse-datenbank'
-import { pruefeSitzungsWarenkorb, erneuereHalte, loescheHalte } from '@/server/warenkorb'
+import { pruefeSitzungsWarenkorb, erneuereHalte, loescheHalte, hofSperrenFuerProdukte } from '@/server/warenkorb'
+import { MAX_MENGE } from '@/lib/reservierung'
 import { gibVerwaisteFreiFuerProdukte } from '@/server/verwaiste-bestellungen'
 
 /**
@@ -12,6 +13,11 @@ import { gibVerwaisteFreiFuerProdukte } from '@/server/verwaiste-bestellungen'
  * Die Route SCHREIBT nur Reservierungen dieser Sitzung: Sie erneuert die Halte
  * für das, was bleibt, und räumt die für das weg, was nicht mehr geht. Sie legt
  * keine Bestellung an, ändert keinen Bestand und fasst keine fremde Sitzung an.
+ *
+ * Die Höfe prüft sie mit derselben Kette wie /api/reserve (Nr. 165, Register
+ * N24): Stilllegung → Freischaltung → Pause → Kaufsperre. Besteht ein Hof
+ * nicht, hält der Warenkorb bei ihm nichts mehr fest — sonst hielte ein Korb
+ * aus der Zeit vor einer Pause die Ware weiter.
  *
  * Antwort: die berichtigten Positionen und — falls nötig — EINE Meldung im
  * Klartext. Der Browser zeigt dann den aktuellen Warenkorb samt Grund, statt
@@ -24,7 +30,8 @@ const bodySchema = z.object({
     .array(
       z.object({
         productId: z.string().min(1),
-        quantity: z.number().int().positive(),
+        // Dieselbe Obergrenze wie /api/reserve: Auch das Erneuern hält Ware fest.
+        quantity: z.number().int().positive().max(MAX_MENGE),
       })
     )
     .max(100),
@@ -59,7 +66,14 @@ export async function POST(request: NextRequest) {
     // Frist gilt beim Lesen: erst verwaiste Bestellungen freigeben, dann den
     // Bestand prüfen. Ein Fehler darin bleibt gemeldet, nie die Antwort.
     await gibVerwaisteFreiFuerProdukte(items.map((i) => i.productId), jetzt)
-    const { befund, meldung, berichtigt } = await pruefeSitzungsWarenkorb(items, sessionId, jetzt)
+    // Die Prüfkette je Hof nach der Fristfreigabe (wie /api/reserve): Positionen
+    // eines gesperrten Hofs gelten im Abgleich als nicht möglich.
+    const sperren = await hofSperrenFuerProdukte(items.map((i) => i.productId), jetzt)
+    const pruefung = await pruefeSitzungsWarenkorb(items, sessionId, jetzt, new Set(sperren.keys()))
+    const { befund, berichtigt } = pruefung
+    // Der Grund steht vorn, die Folge (entfernt, abgelaufen) dahinter — je Grund einmal.
+    const gruende = [...new Set([...sperren.values()].map((s) => s.text))]
+    const meldung = [...gruende, pruefung.meldung].filter((t): t is string => !!t).join(' ') || null
 
     // Halte nachführen: erneuern, was bleibt; löschen, was rausfällt.
     const entfallen = befund.positionen.filter((p) => p.moeglich === 0).map((p) => p.productId)
@@ -73,7 +87,10 @@ export async function POST(request: NextRequest) {
       etwasAbgelaufen: befund.etwasAbgelaufen,
       etwasGeaendert: befund.etwasGeaendert,
       items: berichtigt,
-      positionen: befund.positionen,
+      positionen: befund.positionen.map((p) => {
+        const sperre = sperren.get(p.productId)
+        return sperre ? { ...p, grund: sperre.text } : p
+      }),
     })
   } catch (e) {
     console.error('[/api/warenkorb/pruefen]', e)
