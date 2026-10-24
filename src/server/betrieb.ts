@@ -7,6 +7,10 @@ import {
   ABLAEUFE,
   GRENZ_REGEL,
   GRENZ_WERTE,
+  GRENZE,
+  MAIL_PRUEFUNG_ALLE_MS,
+  MAIL_PRUEFUNG_ART,
+  MAIL_WARN_ARTEN,
   MESS_ARTEN,
   MESS_BEGINN_ART,
   VERCEL_WARN_ART,
@@ -45,6 +49,8 @@ import {
   type WarnStand,
 } from '@/lib/betrieb'
 import { ladeLaeufe, ladeMessungenFuerPruefung, ladeWarnungen, summeImMonat } from '@/server/queries/betrieb'
+import { ladeMailZaehler, ladeQuoten, ladeWarteschlange } from '@/server/queries/mails'
+import { mailWarnLage, mailWarnSchritt } from '@/lib/betrieb-mails'
 import { ladeBetreiberEmpfaenger } from '@/server/queries/postfach'
 import { ohneVerwendungMesswerte } from '@/server/betrieb-bilder'
 import { getOeffentlicheHoefe } from '@/server/queries/farm'
@@ -388,6 +394,66 @@ export async function pruefeGrenzen(
     }
   }
   if (vercelSchritt(warnStandVon(warnungen, VERCEL_WARN_ART), 0, jetzt).tun === 'still') await setzeNullVorZeitraum(jetzt)
+  return mails
+}
+
+/**
+ * Belegt den Merker der Mail-Prüfung in EINER Anweisung (Muster
+ * `beginneMessung`): true nur, wenn die letzte Prüfung mindestens 10 Minuten
+ * zurückliegt (oder heute noch keine war). Zwei gleichzeitige Läufe prüfen so
+ * nur einmal.
+ */
+export async function beginneMailPruefung(jetzt: Date): Promise<boolean> {
+  const ab = new Date(jetzt.getTime() - MAIL_PRUEFUNG_ALLE_MS)
+  const getroffen = await prisma.$queryRaw<Array<{ art: string }>>`
+    INSERT INTO "BetriebMessung" ("tag", "art", "wert", "gemessenAm")
+    VALUES (${utcTag(jetzt)}::date, ${MAIL_PRUEFUNG_ART}::text, 0::bigint, ${jetzt}::timestamp(3))
+    ON CONFLICT ("tag", "art") DO UPDATE SET "gemessenAm" = EXCLUDED."gemessenAm"
+    WHERE "BetriebMessung"."gemessenAm" <= ${ab}::timestamp(3)
+    RETURNING "art"`
+  return getroffen.length > 0
+}
+
+/**
+ * Die Warnungen der Mail-Warteschlange (Register N18, Ergänzung 24.10.2026;
+ * Nr. 161) — nach dem Ablauf „E-Mails“, höchstens alle 10 Minuten (eigene
+ * Drossel), nur in der Produktion:
+ *
+ *  - eine wichtige Mail wartet über 5 Minuten, die Warteschlange hängt über
+ *    15 Minuten, abgelehnt über 2 % bzw. Spam gemeldet über 0,05 % in 7 Tagen
+ *    (ab 50 Mails) — je höchstens eine Mail am Tag, still auf 0, sobald es
+ *    nicht mehr gilt (`mailWarnSchritt`);
+ *  - das Kontingent des Abrechnungszeitraums 80/95/100 % — dieselbe Regel und
+ *    dieselbe Zeile wie im Mess-Lauf (`mailsMonat`), die bedingte Anweisung
+ *    verhindert eine zweite Mail.
+ *
+ * Erst die Stufe bedingt setzen, nur nach getroffener Zeile die Warn-Mail
+ * (direkt, nicht über die Warteschlange — N18-Ergänzung). Gibt die Zahl der
+ * Mails zurück.
+ */
+export async function pruefeMailWarnungen(jetzt: Date = new Date(), { produktion = UMGEBUNG.vercelProduktion }: Optionen = {}): Promise<number> {
+  if (!produktion) return 0
+  if (!(await beginneMailPruefung(jetzt))) return 0
+  const [warnungen, zaehler, quoten] = await Promise.all([ladeWarnungen(), ladeMailZaehler(jetzt), ladeQuoten(jetzt)])
+  const mailsImMonat = zaehler.imZeitraum
+  const schlange = await ladeWarteschlange(jetzt, zaehler)
+  const lage = mailWarnLage(schlange, quoten, jetzt)
+  let mails = 0
+  for (const art of MAIL_WARN_ARTEN) {
+    const schritt = mailWarnSchritt(lage[art].gilt, warnStandVon(warnungen, art), jetzt)
+    if (schritt.tun === 'warnen' && (await setzeStufe(art, 1, 'ablauf', jetzt))) {
+      await sendeWarnMail({ art: 'mails', warnung: art, wert: lage[art].wert })
+      mails += 1
+    } else if (schritt.tun === 'still') {
+      await setzeNull(art)
+    }
+  }
+  const anteilMonat = anteil(mailsImMonat, GRENZE.mailsMonat)
+  const schritt = grenzSchritt('monat', warnStandVon(warnungen, 'mailsMonat'), anteilMonat, jetzt, monatsBeginnVon('mailsMonat', jetzt))
+  if (schritt.tun === 'warnen' && (await setzeStufe('mailsMonat', schritt.stufe, 'monat', jetzt))) {
+    await sendeWarnMail({ art: 'grenze', wert: 'mailsMonat', anteil: anteilMonat, stand: grenzStandText('mailsMonat', mailsImMonat), trend: null, ohneVerwendungBytes: null })
+    mails += 1
+  }
   return mails
 }
 

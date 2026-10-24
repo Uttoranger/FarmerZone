@@ -182,6 +182,17 @@ const HOFLISTE_GRENZE_TEXT = `${HOFLISTE_GRENZE_BYTES / 1e6} MB`
  */
 export const MESS_BEGINN_ART = 'messBeginn'
 
+/**
+ * Der Merker „die Mail-Warnungen wurden geprüft“ (Nr. 161, Register N18,
+ * Ergänzung 24.10.2026): eine Zeile je UTC-Tag in BetriebMessung, die der
+ * Ablauf „E-Mails“ in EINER Anweisung belegt — geprüft wird höchstens alle
+ * 10 Minuten, obwohl der Ablauf jede Minute läuft. Wie MESS_BEGINN_ART kein
+ * Messwert und nicht in BETRIEB_ARTEN.
+ */
+export const MAIL_PRUEFUNG_ART = 'mailPruefung'
+/** Höchstens so oft prüft der Ablauf „E-Mails“ die Mail-Warnungen. */
+export const MAIL_PRUEFUNG_ALLE_MS = 10 * 60 * 1000
+
 /** „Jetzt messen“ misst nicht neu, wenn die letzte Messung jünger ist (jede Messung listet den Bild-Speicher). */
 export const NEU_MESSEN_AB_MS = 10 * 60 * 1000
 
@@ -588,8 +599,44 @@ export function grenzeVon(wert: GrenzWert): number | null {
 /** Die Art der Warnung für die Vercel-Ausgaben (Nr. 113). */
 export const VERCEL_WARN_ART = 'vercelAusgaben'
 
-/** Der Schlüssel in BetriebWarnung: ein Grenzwert, `ablauf:<name>` oder die Vercel-Ausgaben. */
-export type WarnArt = GrenzWert | `ablauf:${AblaufName}` | typeof VERCEL_WARN_ART
+// ─── Warnungen der Mail-Warteschlange (Register N18, Ergänzung 24.10.2026; Nr. 161) ───
+
+/** Eine wichtige Mail (Bestellung, Hof, Betreiber) wartet länger als so viele Minuten → Warnung. */
+export const MAIL_WARTET_MINUTEN = 5
+/** Ein fälliger Auftrag liegt länger als so viele Minuten ungeholt → die Warteschlange hängt. */
+export const MAIL_HAENGT_MINUTEN = 15
+/** Das Lebenszeichen antwortet 503, wenn eine wichtige Mail länger als so viele Minuten wartet. */
+export const LEBENSZEICHEN_MAIL_MINUTEN = 15
+/** Warnung ab diesem Anteil abgelehnter Mails (Bounce) in 7 Tagen, in %. */
+export const ABGELEHNT_WARN_PROZENT = 2
+/** Warnung ab diesem Anteil als Spam gemeldeter Mails in 7 Tagen, in %. */
+export const SPAM_WARN_PROZENT = 0.05
+/** Die Grenzen von Resend: darüber droht die Sperre des Kontos (resend.com, Stand 24.10.2026). */
+export const RESEND_ABGELEHNT_GRENZE_PROZENT = 4
+export const RESEND_SPAM_GRENZE_PROZENT = 0.08
+/** Eine Quote zählt erst ab so vielen Mails in 7 Tagen — darunter macht eine Mail schon Prozente. */
+export const QUOTE_AB_MAILS = 50
+/** Das Fenster der Zustellquoten. */
+export const QUOTE_TAGE = 7
+
+/** Die Warnungen der Mail-Warteschlange, je eine Zeile in BetriebWarnung (Stufe 1 = offen). */
+export const MAIL_WARN_ARTEN = ['mail:wartet', 'mail:haengt', 'mail:abgelehnt', 'mail:spam'] as const
+export type MailWarnArt = (typeof MAIL_WARN_ARTEN)[number]
+
+export function istMailWarnArt(art: string): art is MailWarnArt {
+  return (MAIL_WARN_ARTEN as readonly string[]).includes(art)
+}
+
+/** Hinweis in der Betriebsleiste und Titel in der Warnkarte des Überblicks — aus der gespeicherten Warnung, ohne Zahl. */
+export const MAIL_WARN_TEXT: Record<MailWarnArt, { text: string; kurz: string }> = {
+  'mail:wartet': { text: `Eine wichtige Mail wartet länger als ${MAIL_WARTET_MINUTEN} Minuten`, kurz: 'Mail wartet' },
+  'mail:haengt': { text: `Die Warteschlange hängt länger als ${MAIL_HAENGT_MINUTEN} Minuten`, kurz: 'Warteschlange hängt' },
+  'mail:abgelehnt': { text: `Mehr als ${formatDezimal(ABGELEHNT_WARN_PROZENT, 0)} % der Mails abgelehnt`, kurz: 'Mails abgelehnt' },
+  'mail:spam': { text: `Mehr als ${formatDezimal(SPAM_WARN_PROZENT, 2)} % der Mails als Spam gemeldet`, kurz: 'Spam gemeldet' },
+}
+
+/** Der Schlüssel in BetriebWarnung: ein Grenzwert, `ablauf:<name>`, die Vercel-Ausgaben oder eine Mail-Warnung. */
+export type WarnArt = GrenzWert | `ablauf:${AblaufName}` | typeof VERCEL_WARN_ART | MailWarnArt
 
 export function ablaufWarnArt(name: AblaufName): WarnArt {
   return `ablauf:${name}`
@@ -815,6 +862,7 @@ export function warnHinweis(art: string, gespeicherteStufe: number): { text: str
     return { text: `Ablauf „${ablauf?.text ?? 'unbekannt'}“ ausgefallen`, kurz: 'Ablauf ausgefallen' }
   }
   if (art === VERCEL_WARN_ART) return { text: `Vercel-Ausgaben ${VERCEL_STUFE_HINWEIS[s]}`, kurz: `Vercel ${VERCEL_STUFE_HINWEIS[s]}` }
+  if (istMailWarnArt(art)) return MAIL_WARN_TEXT[art]
   const wert = (GRENZ_WERTE as readonly string[]).includes(art) ? (art as GrenzWert) : null
   if (!wert) return { text: 'Warnung offen', kurz: 'Warnung' }
   return { text: `${GRENZ_TEXT[wert].name} ${STUFE_HINWEIS[s]}`, kurz: `${GRENZ_TEXT[wert].kurz} ${STUFE_HINWEIS[s]}` }
@@ -825,8 +873,19 @@ export function warnungenText(anzahl: number): string {
   return `${anzahl} ${anzahl === 1 ? 'Warnung' : 'Warnungen'}`
 }
 
-/** Was die Shell über offene Warnungen weiß: wie viele und der Hinweis zur ersten. */
-export type BetriebHinweis = { anzahl: number; text: string; kurz: string }
+/** Was die Shell über offene Warnungen weiß: wie viele, der Hinweis zur ersten und wohin er führt (E-Mails oder Überblick). */
+export type BetriebHinweis = { anzahl: number; text: string; kurz: string; href: string }
+
+/** Die älteste wartende wichtige Mail für die Betriebsleiste (Nr. 161): wie lange schon und ob sie zu einer Bestellung gehört. */
+export type WartendeMail = { erstelltAm: Date; zuBestellung: boolean }
+
+/** „Eine Bestellmail wartet seit 7 Min.“ — live aus der Warteschlange, nur ab MAIL_WARTET_MINUTEN. */
+export function wartendeMailHinweis(mail: WartendeMail | null, jetzt: Date): { text: string; kurz: string } | null {
+  if (mail === null) return null
+  const minuten = Math.floor((jetzt.getTime() - mail.erstelltAm.getTime()) / 60_000)
+  if (minuten < MAIL_WARTET_MINUTEN) return null
+  return { text: `${mail.zuBestellung ? 'Eine Bestellmail' : 'Eine wichtige Mail'} wartet seit ${formatZahl(minuten)} Min.`, kurz: `Mail wartet ${formatZahl(minuten)} Min.` }
+}
 
 /** Die Rangfolge einer Warnung: höhere Stufe zuerst, dann in der Reihenfolge der Seite. */
 export function warnRang(art: string, gespeicherteStufe: number): number {
@@ -842,7 +901,8 @@ export function warnRang(art: string, gespeicherteStufe: number): number {
 export function betriebHinweis(
   warnungen: ReadonlyArray<{ art: string; stufe: number }>,
   laeufe: ReadonlyMap<string, AblaufLaufDaten>,
-  jetzt: Date
+  jetzt: Date,
+  wartend: WartendeMail | null = null
 ): BetriebHinweis | null {
   const offen = warnungen.filter((w) => w.stufe > 0).map((w) => ({ art: w.art, stufe: w.stufe }))
   for (const ablauf of ABLAEUFE) {
@@ -850,14 +910,23 @@ export function betriebHinweis(
     if (offen.some((w) => w.art === art)) continue
     if (ablaufStand(ablauf, laeufe.get(ablauf.name) ?? null, jetzt) === 'ueberfaellig') offen.push({ art, stufe: 1 })
   }
+  // Eine wartende wichtige Mail (Nr. 161) steht vorn: Eine Kundin wartet gerade auf ihre Bestellmail.
+  // Sie zählt einmal, auch wenn die Warnung „mail:wartet“ schon gespeichert ist.
+  const mail = wartendeMailHinweis(wartend, jetzt)
+  if (mail) {
+    const ohneWartet = offen.filter((w) => w.art !== 'mail:wartet')
+    return { anzahl: ohneWartet.length + 1, ...mail, href: ADMIN_BETRIEB_MAILS_HREF }
+  }
   if (offen.length === 0) return null
   offen.sort((a, b) => warnRang(a.art, a.stufe) - warnRang(b.art, b.stufe))
-  return { anzahl: offen.length, ...warnHinweis(offen[0].art, offen[0].stufe) }
+  return { anzahl: offen.length, ...warnHinweis(offen[0].art, offen[0].stufe), href: istMailWarnArt(offen[0].art) ? ADMIN_BETRIEB_MAILS_HREF : ADMIN_BETRIEB_HREF }
 }
 
 // ─── Texte: Seite ────────────────────────────────────────────────────────────
 
 export const ADMIN_BETRIEB_HREF = '/admin/betrieb'
+/** Unterreiter „E-Mails“ (Nr. 161). */
+export const ADMIN_BETRIEB_MAILS_HREF = '/admin/betrieb?reiter=mails'
 export const BETRIEB_EXPORT_HREF = '/admin/betrieb/export'
 /** „Liste als CSV“ der Bilder ohne Verwendung (Nr. 104). */
 export const BILDER_EXPORT_HREF = '/admin/betrieb/bilder-export'
@@ -946,6 +1015,11 @@ export const BETRIEB_TEXT = {
   vercelUnter50: (tag: string): string => `Unter 50 % (letzte Meldung ${tag}).`,
   vercelUnter50Kurz: 'Unter 50 %',
   vercelLink: 'Vercel › Usage',
+  // Unterreiter (Nr. 161)
+  reiter: 'Ansicht von Betrieb',
+  reiterUeberblick: 'Überblick',
+  reiterMails: 'E-Mails',
+  mailWarnungSiehe: 'Die Einzelheiten stehen unter E-Mails.',
 } as const
 
 export const STAND_TEXT: Record<AblaufStand, string> = {
@@ -1302,6 +1376,8 @@ export type Kachel = {
   kurz: string
   /** Wenn der Wert nicht von der letzten Messung stammt (oder es keinen gibt). */
   hinweis: string | null
+  /** Wohin die Kachel führt (E-Mails heute → Unterreiter E-Mails, Nr. 161). */
+  href?: string
 }
 
 /** Der letzte Wert einer Art und von welchem Tag. */
@@ -1444,6 +1520,7 @@ export function betriebKacheln(messungen: readonly Messung[], jetzt: Date, tarif
       satz: grenzTexte(tarife).mailsTag.voll,
       kurz: `Monat ${zeitraum}: ${formatZahl(mailsMonat)} von ${formatZahl(grenze.mailsMonat)} · zählt je Empfänger.`,
       hinweis: null,
+      href: ADMIN_BETRIEB_MAILS_HREF,
     },
     {
       id: 'bildVorgaenge',
@@ -1647,6 +1724,9 @@ export function warnEintraege(
         titel: a === null ? warnHinweis(w.art, w.stufe).text : grenzTitel(wert, a),
         saetze: [GRENZ_TEXT[wert].voll, ...(hilft ? [`${BETRIEB_MAIL_TEXT.hilft} ${hilft}`] : []), mailSatz(w.gemeldetAm)],
       })
+    } else if (istMailWarnArt(w.art)) {
+      // Die genaue Lage (wie lange, welche Mail, welche Quote) steht im Unterreiter E-Mails.
+      eintraege.push({ art: w.art, titel: MAIL_WARN_TEXT[w.art].text, saetze: [BETRIEB_TEXT.mailWarnungSiehe, mailSatz(w.gemeldetAm)] })
     } else if (w.art === VERCEL_WARN_ART) {
       const karte = vercelAusgabenKarte(messungen, jetzt)
       eintraege.push({
@@ -1682,6 +1762,8 @@ export type BetriebMailAnlass =
   | { art: 'ablaufWieder'; name: AblaufName }
   /** Spend Management meldet 50, 75 oder 100 % des Ausgabenlimits (Nr. 113) — Beträge in ganzen Cent. */
   | { art: 'vercelAusgaben'; stufe: Exclude<Stufe, 0>; ausgabenCent: number; limitCent: number }
+  /** Eine Warnung der Mail-Warteschlange (Nr. 161) — `wert` fertig geschrieben: „7 Minuten“ bzw. „2,4 %“. */
+  | { art: 'mails'; warnung: MailWarnArt; wert: string }
 
 export type BetriebMail = { betreff: string; titel: string; absaetze: string[]; hilft: string | null; knopf: string; fuss: string }
 
@@ -1695,6 +1777,33 @@ const FUSS_MAILS_MONAT = `Diese Mail kommt einmal je Stufe (80 %, 95 %, voll) un
 const FUSS_TAG = 'Dieser Hinweis kommt höchstens einmal am Morgen, wenn der Vortag 80 % erreicht hat. Abschalten lässt er sich nicht – es geht um den Betrieb der Plattform.'
 const FUSS_ABLAUF = 'Höchstens eine Mail je Ablauf und Tag. Sobald er wieder läuft, kommt eine kurze Entwarnung.'
 const FUSS_VERCEL = `Diese Mail kommt einmal je Stufe (50 %, 75 %, 100 %) und Abrechnungszeitraum; der neue Zeitraum beginnt am ${VERCEL_ABRECHNUNG_TAG}. still bei 0. Abschalten lässt sie sich nicht – es geht um den Betrieb der Plattform.`
+
+/** Die Mail-Warnungen kommen höchstens einmal je Warnung und Tag, keine Entwarnung (Nr. 161). */
+const FUSS_MAILS = 'Diese Mail kommt höchstens einmal je Warnung und Tag. Abschalten lässt sie sich nicht – es geht um den Betrieb der Plattform.'
+
+/** Titel, Satz und „Was hilft“ der Warn-Mail je Mail-Warnung (Register N18, Ergänzung 24.10.2026). */
+const MAIL_WARN_MAIL: Record<MailWarnArt, { titel: (wert: string) => string; satz: string; hilft: string }> = {
+  'mail:wartet': {
+    titel: (wert) => `Eine wichtige Mail wartet seit ${wert}`,
+    satz: `Mails zu Bestellungen und an Höfe gehen sonst in Sekunden hinaus. ${MARKE} versucht es von selbst weiter.`,
+    hilft: 'Unter Betrieb › E-Mails steht der Grund. Wenn es eilt: dort „Jetzt schicken“.',
+  },
+  'mail:haengt': {
+    titel: (wert) => `Die Warteschlange hängt seit ${wert}`,
+    satz: 'Fällige Mails werden nicht mehr abgeholt – der Ablauf „E-Mails“ läuft nicht oder bricht ab.',
+    hilft: 'Unter Betrieb › Abläufe nachsehen, wann „E-Mails“ zuletzt lief; den Fehler zeigen Vercel › Logs.',
+  },
+  'mail:abgelehnt': {
+    titel: (wert) => `${wert} der Mails abgelehnt`,
+    satz: `In den letzten ${QUOTE_TAGE} Tagen haben Postfächer mehr als ${formatDezimal(ABGELEHNT_WARN_PROZENT, 0)} % der Mails zurückgewiesen. Ab ${formatDezimal(RESEND_ABGELEHNT_GRENZE_PROZENT, 0)} % sperrt Resend das Konto.`,
+    hilft: `Abos mit abgelehnten Mails meldet ${MARKE} selbst ab. Bei Mails zu Bestellungen nach der richtigen Adresse fragen.`,
+  },
+  'mail:spam': {
+    titel: (wert) => `${wert} der Mails als Spam gemeldet`,
+    satz: `In den letzten ${QUOTE_TAGE} Tagen wurden mehr als ${formatDezimal(SPAM_WARN_PROZENT, 2)} % der Mails als Spam gemeldet. Ab ${formatDezimal(RESEND_SPAM_GRENZE_PROZENT, 2)} % sperrt Resend das Konto.`,
+    hilft: 'Wer Spam meldet, ist schon abgemeldet. Beiträge und Rundschreiben seltener schicken.',
+  },
+}
 
 /** Der Satz bei 100 % des Ausgabenlimits (Freigabe Nr. 113, wörtlich). */
 const VERCEL_PAUSIERT = 'Vercel pausiert das Projekt – die Seite ist offline, bis du fortsetzt oder das Limit erhöhst.'
@@ -1737,6 +1846,11 @@ export function betriebMail(anlass: BetriebMailAnlass): BetriebMail {
       knopf,
       fuss: FUSS_VERCEL,
     }
+  }
+  if (anlass.art === 'mails') {
+    const text = MAIL_WARN_MAIL[anlass.warnung]
+    const titel = text.titel(anlass.wert)
+    return { betreff: `Betrieb: ${titel}`, titel, absaetze: [text.satz], hilft: text.hilft, knopf, fuss: FUSS_MAILS }
   }
   if (anlass.art === 'entwarnung') {
     const name = GRENZ_TEXT[anlass.wert].name

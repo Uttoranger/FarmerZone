@@ -31,6 +31,7 @@ vi.mock('@/lib/prisma', async () => ({
     user: { findUnique: vi.fn() },
     session: { deleteMany: vi.fn() },
     order: { updateMany: vi.fn() },
+    mailAuftrag: { updateMany: vi.fn() },
     $transaction: vi.fn(),
     $executeRaw: vi.fn(),
   },
@@ -54,6 +55,8 @@ import { approveFarmAction, revokeFarmApprovalAction, rejectFarmAction, setServi
 import { markiereAlsTesthof, nimmAusGruendung, nimmTesthofZurueck, nimmWiederAuf, schreibeZusagenFest } from '@/server/actions/gruendung'
 import { fuegeEmpfaengerHinzu, markiereErstattungErledigt, sendeRundschreiben } from '@/server/actions/postfach'
 import { veroeffentlicheStartseite } from '@/server/actions/startseite'
+import { schickeMailJetztAction, verwirfMailAction } from '@/server/actions/betrieb'
+import { MAIL_TEXT } from '@/lib/betrieb-mails'
 import { EINSTELLUNG_UNGUELTIG } from '@/schemas/servicegebuehr'
 import { STARTSEITE_SAETZE } from '@/schemas/startseite'
 import { POSTFACH_FEHLER } from '@/lib/postfach'
@@ -66,6 +69,7 @@ const db = prisma as unknown as {
   passkey: { aggregate: Fn }
   user: { findUnique: Fn }
   order: { updateMany: Fn }
+  mailAuftrag: { updateMany: Fn }
   $transaction: Fn
 }
 const getSession = vi.mocked(auth.api.getSession)
@@ -94,6 +98,9 @@ const AKTIONEN: Array<{ name: string; rufe: () => Promise<unknown>; danach: unkn
   { name: 'fuegeEmpfaengerHinzu', rufe: () => fuegeEmpfaengerHinzu(null), danach: { error: ZUSTELLUNG_FEHLER.email } },
   { name: 'veroeffentlicheStartseite', rufe: () => veroeffentlicheStartseite(null), danach: { error: STARTSEITE_SAETZE.ungueltig } },
   { name: 'markiereErstattungErledigt', rufe: () => markiereErstattungErledigt({ orderId: BESTELLUNG }), danach: { ok: true }, schreibt: true },
+  // Nr. 161: Jetzt schicken und Verwerfen in Admin › Betrieb › E-Mails.
+  { name: 'schickeMailJetztAction', rufe: () => schickeMailJetztAction(null), danach: { error: MAIL_TEXT.eingabeUngueltig } },
+  { name: 'verwirfMailAction', rufe: () => verwirfMailAction(null), danach: { error: MAIL_TEXT.eingabeUngueltig } },
 ]
 
 /** Eine Sitzung mit Passkey, zuletzt vor `minuten` Minuten bestätigt. */
@@ -144,6 +151,7 @@ function nichtsGeschrieben(): void {
   expect(db.farm.updateMany).not.toHaveBeenCalled()
   expect(db.farm.delete).not.toHaveBeenCalled()
   expect(db.order.updateMany).not.toHaveBeenCalled()
+  expect(db.mailAuftrag.updateMany).not.toHaveBeenCalled()
   expect(db.$transaction).not.toHaveBeenCalled()
 }
 

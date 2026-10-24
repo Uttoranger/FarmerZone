@@ -10,12 +10,15 @@
  *    Mail-Warteschlange in den letzten 10 Minuten ok lief;
  *  - sonst 503 mit den NAMEN der fehlenden Abläufe — nichts sonst (keine
  *    Zeit, keine Fehlerklasse); ein täglicher Ablauf ohne Zeile fehlt
- *    (fail-closed), nur der wöchentliche hat ohne Zeile Schonfrist.
+ *    (fail-closed), nur der wöchentliche hat ohne Zeile Schonfrist;
+ *  - seit Nr. 161 auch 503 mit `mailWartet: true`, wenn eine wichtige Mail
+ *    länger als 15 Minuten wartet — ohne Art, Zeit oder Bezug; 15 Minuten
+ *    genau sind noch 200 (Gegenprobe).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const db = vi.hoisted(() => ({ ablaufLauf: { findMany: vi.fn() } }))
+const db = vi.hoisted(() => ({ ablaufLauf: { findMany: vi.fn() }, mailAuftrag: { findFirst: vi.fn() } }))
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
 
 import { GET } from '@/app/api/lebenszeichen/route'
@@ -43,6 +46,7 @@ beforeEach(() => {
   vi.setSystemTime(JETZT)
   vi.stubEnv('LEBENSZEICHEN_TOKEN', TOKEN)
   db.ablaufLauf.findMany.mockResolvedValue(ALLE_PUENKTLICH)
+  db.mailAuftrag.findFirst.mockResolvedValue(null)
 })
 
 afterEach(() => {
@@ -135,5 +139,28 @@ describe('Lebenszeichen — Abläufe', () => {
   it('Gegenprobe: nur der wöchentliche Ablauf ohne Zeile fehlt nicht (nach dem Deploy bis Montag): 200', async () => {
     db.ablaufLauf.findMany.mockResolvedValue([...ALLE_PUENKTLICH.slice(0, 3), MAILS])
     expect((await GET(anfrage(`Bearer ${TOKEN}`))).status).toBe(200)
+  })
+})
+
+describe('Lebenszeichen — wartende wichtige Mail (Nr. 161)', () => {
+  const wartetSeit = (minuten: number) => ({ erstelltAm: new Date(JETZT.getTime() - minuten * 60_000), bestellungId: 'bestellung_1' })
+
+  it('eine wichtige Mail wartet 16 Minuten: 503 mit mailWartet — ohne Art, Zeit oder Kennung', async () => {
+    db.mailAuftrag.findFirst.mockResolvedValue(wartetSeit(16))
+    const antwort = await GET(anfrage(`Bearer ${TOKEN}`))
+    expect(antwort.status).toBe(503)
+    expect(await antwort.json()).toEqual({ fehlen: [], mailWartet: true })
+    // Gefragt wird nur nach wartenden wichtigen Mails, die älteste zuerst.
+    expect(db.mailAuftrag.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: { in: ['offen', 'in_arbeit'] }, vorrang: 1 }, orderBy: { erstelltAm: 'asc' } })
+    )
+  })
+
+  it('Gegenprobe: 15 Minuten genau sind noch 200; ein fehlender Ablauf steht weiter mit Namen da', async () => {
+    db.mailAuftrag.findFirst.mockResolvedValue(wartetSeit(15))
+    expect((await GET(anfrage(`Bearer ${TOKEN}`))).status).toBe(200)
+    db.mailAuftrag.findFirst.mockResolvedValue(wartetSeit(30))
+    db.ablaufLauf.findMany.mockResolvedValue(ALLE_PUENKTLICH.slice(0, 4))
+    expect(await (await GET(anfrage(`Bearer ${TOKEN}`))).json()).toEqual({ fehlen: ['mails'], mailWartet: true })
   })
 })

@@ -17,7 +17,7 @@ const db = vi.hoisted(() => ({
 const { nachDerAntwort, arbeite, mitHerzschlag } = vi.hoisted(() => ({
   nachDerAntwort: vi.fn(),
   arbeite: vi.fn(),
-  mitHerzschlag: vi.fn(async (_name: string, lauf: () => Promise<unknown>) => lauf()),
+  mitHerzschlag: vi.fn(async (...args: [name: string, lauf: () => Promise<unknown>, danach?: (jetzt: Date) => Promise<unknown>]) => args[1]()),
 }))
 
 vi.mock('server-only', () => ({}))
@@ -200,7 +200,9 @@ describe('Vorname: eine Hilfe für direkten Versand und Renderer', () => {
 })
 
 describe('Cron /api/cron/mails', () => {
-  vi.doMock('@/server/betrieb', () => ({ mitHerzschlag }))
+  const pruefeAblaeufe = vi.fn(async () => 0)
+  const pruefeMailWarnungen = vi.fn(async () => 0)
+  vi.doMock('@/server/betrieb', () => ({ mitHerzschlag, pruefeAblaeufe, pruefeMailWarnungen }))
 
   async function rufe(authorization?: string) {
     vi.doMock('@/server/mail-warteschlange', () => ({ arbeiteWarteschlange: arbeite }))
@@ -221,9 +223,22 @@ describe('Cron /api/cron/mails', () => {
     arbeite.mockResolvedValue({ gelaufen: true, seiten: 1, gesendet: 3 })
     const antwort = await rufe('Bearer cron-test-geheim')
     expect(antwort.status).toBe(200)
-    expect(mitHerzschlag).toHaveBeenCalledWith('mails', expect.any(Function))
+    expect(mitHerzschlag).toHaveBeenCalledWith('mails', expect.any(Function), expect.any(Function))
     expect(arbeite).toHaveBeenCalledWith({ biszeitMs: 50_000 })
     expect(await antwort.json()).toMatchObject({ gelaufen: true, gesendet: 3 })
+    vi.unstubAllEnvs()
+  })
+
+  it('danach (Nr. 161): erst die anderen Abläufe, dann die Mail-Warnungen — mit demselben Zeitpunkt', async () => {
+    vi.stubEnv('CRON_SECRET', 'cron-test-geheim')
+    arbeite.mockResolvedValue({ gelaufen: true, seiten: 0, gesendet: 0 })
+    await rufe('Bearer cron-test-geheim')
+    const danach = mitHerzschlag.mock.calls.at(-1)?.[2] as (jetzt: Date) => Promise<unknown>
+    const jetzt = new Date('2026-10-24T08:00:00.000Z')
+    await danach(jetzt)
+    expect(pruefeAblaeufe).toHaveBeenCalledWith(jetzt)
+    expect(pruefeMailWarnungen).toHaveBeenCalledWith(jetzt)
+    expect(pruefeAblaeufe.mock.invocationCallOrder[0]).toBeLessThan(pruefeMailWarnungen.mock.invocationCallOrder[0])
     vi.unstubAllEnvs()
   })
 })

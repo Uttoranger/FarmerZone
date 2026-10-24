@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { env } from '@/lib/env'
 import { geheimnisGleich } from '@/lib/geheimnis'
-import { fehlendeAblaeufe } from '@/lib/betrieb'
-import { ladeLaeufe } from '@/server/queries/betrieb'
+import { LEBENSZEICHEN_MAIL_MINUTEN, fehlendeAblaeufe } from '@/lib/betrieb'
+import { wichtigeMailHaengt } from '@/lib/betrieb-mails'
+import { ladeAeltesteWichtige, ladeLaeufe } from '@/server/queries/betrieb'
 
 /*
  * Das Lebenszeichen (Register N18, Nr. 113): die tägliche Prüfung von außen,
@@ -19,7 +20,9 @@ import { ladeLaeufe } from '@/server/queries/betrieb'
  * Antwort: 200 `{ ok: true }`, wenn jeder tägliche Ablauf in den letzten 26
  * Stunden und der wöchentliche in den letzten 8 Tagen ok lief (gleiche Regel
  * wie Admin › Betrieb, `ablaufStand`); sonst 503 mit den NAMEN der fehlenden
- * Abläufe — keine Zeiten, keine Fehlerklassen, nichts sonst.
+ * Abläufe — keine Zeiten, keine Fehlerklassen, nichts sonst. Seit Nr. 161
+ * auch 503 mit `mailWartet: true`, wenn eine wichtige Mail länger als 15
+ * Minuten wartet (`wichtigeMailHaengt`) — ohne Art, Zeit oder Bezug.
  */
 const KOPF = { 'Cache-Control': 'no-store' } as const
 
@@ -30,7 +33,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: KOPF })
   }
 
-  const fehlen = fehlendeAblaeufe(await ladeLaeufe(), new Date())
-  if (fehlen.length > 0) return NextResponse.json({ fehlen }, { status: 503, headers: KOPF })
+  const jetzt = new Date()
+  const [laeufe, wartend] = await Promise.all([ladeLaeufe(), ladeAeltesteWichtige()])
+  const fehlen = fehlendeAblaeufe(laeufe, jetzt)
+  // Nr. 161: Eine wichtige Mail, die länger als 15 Minuten wartet, ist ein Ausfall — auch wenn alle Abläufe laufen.
+  const mailWartet = wichtigeMailHaengt(wartend?.erstelltAm ?? null, jetzt, LEBENSZEICHEN_MAIL_MINUTEN)
+  if (fehlen.length > 0 || mailWartet) return NextResponse.json({ fehlen, ...(mailWartet ? { mailWartet: true } : {}) }, { status: 503, headers: KOPF })
   return NextResponse.json({ ok: true }, { headers: KOPF })
 }
