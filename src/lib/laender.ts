@@ -39,6 +39,15 @@ export const LAND_CODE: Record<Land, string> = { AT: 'at', DE: 'de' }
  */
 export const STRIPE_LAND: Record<Land, 'AT' | 'DE'> = { AT: 'AT', DE: 'DE' }
 
+/**
+ * Der Satz über „Mit Stripe einrichten" (Nr. 164): In welchem Land das
+ * Konto angelegt wird, bevor der Hof auf den Knopf tippt. Stripe lässt das
+ * Land nachträglich nicht mehr ändern (Register Z1).
+ */
+export function stripeLandSatz(land: Land): string {
+  return `Dein Stripe-Konto wird in ${LAND_LABEL[land]} angelegt. Stimmt das Land? Sonst zuerst in den Hofdaten ändern.`
+}
+
 /** Beide Codes für die Umkreissuche: `countrycodes=at,de` — die Kundin darf
  *  über die Grenze suchen, ohne das Land anzugeben. */
 export const UMKREIS_LAENDER_CODES = LAENDER.map((l) => LAND_CODE[l]).join(',')

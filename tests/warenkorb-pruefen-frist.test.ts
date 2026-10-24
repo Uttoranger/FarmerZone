@@ -11,6 +11,11 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/rate-limit', () => ({ enforceRateLimit: vi.fn(() => null) }))
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiFuerProdukte: vi.fn() }))
+// Die Zählung der vollen Tage ist gestellt (keine), die Prüfkette des Hofs läuft echt.
+vi.mock('@/server/abholfenster', async (original) => ({
+  ...(await original<typeof import('@/server/abholfenster')>()),
+  ausgebuchteTage: vi.fn(async () => new Map()),
+}))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     product: { findMany: vi.fn() },
@@ -24,6 +29,17 @@ import { neueFrist } from '@/lib/reservierung'
 
 const JETZT = new Date('2026-10-05T08:00:00.000Z')
 let bestand = 10
+// Ein bestellbarer Hof (Prüfkette, Nr. 165): freigeschaltet, nicht pausiert, mit freier Abholzeit.
+const HOF = {
+  id: 'hof_1',
+  name: 'Testhof',
+  isPaused: false,
+  archivedAt: null,
+  approvedAt: new Date('2026-01-01T00:00:00.000Z'),
+  pickupSlots: [{ dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }],
+  betriebsnummer: null,
+  betriebsstatus: null,
+}
 
 function anfrage(): NextRequest {
   return new NextRequest('http://localhost/api/warenkorb/pruefen', {
@@ -38,7 +54,7 @@ beforeEach(() => {
   vi.useFakeTimers({ now: JETZT, toFake: ['Date'] })
   bestand = 10
   vi.mocked(prisma.product.findMany).mockImplementation((() =>
-    Promise.resolve([{ id: 'eier', stock: bestand, isAvailable: true }])) as never)
+    Promise.resolve([{ id: 'eier', stock: bestand, isAvailable: true, farm: HOF }])) as never)
   vi.mocked(prisma.stockReservation.findMany).mockImplementation(((a: unknown) => {
     const sitzung = (a as { where?: { sessionId?: unknown } })?.where?.sessionId
     if (sitzung && typeof sitzung === 'object') return Promise.resolve([])

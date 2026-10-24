@@ -26,6 +26,8 @@ const db = vi.hoisted(() => ({
   betriebMessung: { findFirst: vi.fn(), findMany: vi.fn() },
   betriebWarnung: { findMany: vi.fn() },
   ablaufLauf: { findMany: vi.fn() },
+  // Die älteste wartende wichtige Mail für die Betriebsleiste (Nr. 161) — sonst keine.
+  mailAuftrag: { findFirst: vi.fn(async () => null) },
 }))
 
 vi.mock('@/server/admin-wache', () => wache)
@@ -134,8 +136,25 @@ describe('Punkt und Hinweis der Shell (ladeAdminbereich)', () => {
 
   it('in der Produktion mit offener Warnung: „1 Warnung“ samt Hinweis', async () => {
     umgebung.vercelProduktion = true
-    expect((await ladeAdminbereich()).betrieb).toEqual({ anzahl: 1, text: 'Bilder-Speicher über 80 %', kurz: 'Bilder über 80 %' })
+    expect((await ladeAdminbereich()).betrieb).toEqual({ anzahl: 1, text: 'Bilder-Speicher über 80 %', kurz: 'Bilder über 80 %', href: '/admin/betrieb' })
     expect(db.betriebWarnung.findMany).toHaveBeenCalledWith({ where: { stufe: { gt: 0 } }, select: { art: true, stufe: true } })
+  })
+
+  it('eine Bestellmail wartet seit 7 Minuten (Nr. 161): der Hinweis nennt sie zuerst und führt zu Betrieb › E-Mails', async () => {
+    umgebung.vercelProduktion = true
+    db.mailAuftrag.findFirst.mockResolvedValueOnce({ erstelltAm: new Date(Date.now() - 7 * 60_000 - 1000), bestellungId: 'bestellung_1' } as never)
+    expect((await ladeAdminbereich()).betrieb).toEqual({
+      anzahl: 2,
+      text: 'Eine Bestellmail wartet seit 7 Min.',
+      kurz: 'Mail wartet 7 Min.',
+      href: '/admin/betrieb?reiter=mails',
+    })
+  })
+
+  it('Gegenprobe: eine wichtige Mail seit 4 Minuten nennt der Hinweis nicht — er bleibt bei der Warnung', async () => {
+    umgebung.vercelProduktion = true
+    db.mailAuftrag.findFirst.mockResolvedValueOnce({ erstelltAm: new Date(Date.now() - 4 * 60_000), bestellungId: null } as never)
+    expect((await ladeAdminbereich()).betrieb).toMatchObject({ anzahl: 1, text: 'Bilder-Speicher über 80 %', href: '/admin/betrieb' })
   })
 
   it('scheitert die Abfrage, fehlt nur der Punkt — Sentry mit festem Satz, ohne Inhalt', async () => {
@@ -155,10 +174,16 @@ describe('AdminShell: Punkt am Reiter und Hinweis in der Betriebsleiste', () => 
     renderToStaticMarkup(createElement(Shell, { personName: 'Max Mustermann', hatHof: false, zahlen: { hoefe: 0, briefkasten: 0 }, betrieb }))
 
   it('mit Warnung: Punkt mit „1 Warnung“ und der Hinweis als Link nach Admin › Betrieb', () => {
-    const html = render({ anzahl: 1, text: 'Bilder-Speicher über 80 %', kurz: 'Bilder über 80 %' })
+    const html = render({ anzahl: 1, text: 'Bilder-Speicher über 80 %', kurz: 'Bilder über 80 %', href: '/admin/betrieb' })
     expect(html).toContain('aria-label="1 Warnung"')
     expect(html).toContain('Bilder-Speicher über 80 % – ansehen')
     expect(html).toMatch(/<a [^>]*href="\/admin\/betrieb"[^>]*>(?:(?!<\/a>)[\s\S])*Bilder über 80 %/)
+  })
+
+  it('eine wartende Mail führt zu Betrieb › E-Mails (Nr. 161)', () => {
+    const html = render({ anzahl: 1, text: 'Eine Bestellmail wartet seit 7 Min.', kurz: 'Mail wartet 7 Min.', href: '/admin/betrieb?reiter=mails' })
+    expect(html).toContain('Eine Bestellmail wartet seit 7 Min. – ansehen')
+    expect(html).toMatch(/<a [^>]*href="\/admin\/betrieb\?reiter=mails"[^>]*>(?:(?!<\/a>)[\s\S])*Mail wartet 7 Min\./)
   })
 
   it('Gegenprobe: ohne Warnung weder Punkt noch Hinweis — der Reiter Betrieb steht trotzdem da', () => {

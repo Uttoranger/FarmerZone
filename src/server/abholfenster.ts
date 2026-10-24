@@ -55,8 +55,12 @@ function ladeSlots(farmId: string): Promise<HofSlot[]> {
  */
 const BELEGT: Prisma.OrderWhereInput = { status: { not: 'CANCELLED' } }
 
-/** Belegte Plätze dieses Hofs für Tag (Wiener Kalendertag) und Fenster. */
-function belegung(db: Db, farmId: string, wahl: Abholwahl): Promise<number> {
+/**
+ * Belegte Plätze dieses Hofs für Tag (Wiener Kalendertag) und Fenster. Seit
+ * Nr. 163 exportiert: Das Erneuern der Hofliste zählt damit wie die Kasse
+ * (src/server/hofliste-erneuern.ts, Register N19, Ergänzung 24.10.2026).
+ */
+export function belegung(db: Db, farmId: string, wahl: Abholwahl): Promise<number> {
   const tag = wienerTag(wahl.datum)
   return db.order.count({
     where: {

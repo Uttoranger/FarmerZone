@@ -19,22 +19,22 @@ vi.mock('@/lib/stripe', () => ({
   stripe: { paymentIntents: { retrieve: vi.fn(), cancel: vi.fn() } },
 }))
 vi.mock('@/lib/email', () => ({
-  sendBestellungVerfallen: vi.fn(),
-  sendOrderConfirmation: vi.fn(),
-  sendOrderConfirmedToFarmer: vi.fn(),
   sendOnsiteConfirmation: vi.fn(),
 }))
+// Die Mail „verfallen“ ist seit Nr. 159 ein Auftrag der Warteschlange (echt in
+// der Datenbank); den Worker danach braucht dieser Test nicht.
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
 
 import { NextRequest } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
+import { barTokenHash } from '@/lib/bar-bestaetigung'
 import { gibVerwaisteBestellungenFrei, gibVerwaisteFreiFuerSlug } from '@/server/verwaiste-bestellungen'
 import { POST as reservieren } from '@/app/api/reserve/route'
 import { bestaetigeBarBestellung, storniereBarBestellung } from '@/server/actions/bar-bestaetigung'
 import { POST as bestellen } from '@/app/api/checkout/route'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import { sendBestellungVerfallen } from '@/lib/email'
-import { checkoutAnfrage, erstelleHof, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
+import { artenZu, auftraege, checkoutAnfrage, erstelleHof, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
 
 const holen = vi.mocked(stripe.paymentIntents.retrieve)
 const abbrechen = vi.mocked(stripe.paymentIntents.cancel)
@@ -71,6 +71,9 @@ async function offeneBestellung(eingabe: {
   const produkt = await erstelleProdukt(farm.id, { stock: eingabe.bestand ?? BESTAND_NACH_CHECKOUT })
   const paymentIntentId = eingabe.zahlart === 'ONLINE' && eingabe.mitIntent !== false ? intKennung('pi') : null
 
+  // Wie im Checkout: Der Klartext steht nur im Knopf-Link, die Datenbank hält den Hash.
+  const token = eingabe.zahlart === 'ONLINE' ? null : intKennung('token')
+
   const bestellung = await prisma.order.create({
     data: {
       orderNumber: intKennung('bestellung').toUpperCase(),
@@ -87,7 +90,7 @@ async function offeneBestellung(eingabe: {
       paymentMethod: eingabe.zahlart,
       paymentStatus: 'PENDING',
       stripePaymentIntentId: paymentIntentId,
-      confirmationToken: eingabe.zahlart === 'ONLINE' ? null : intKennung('token'),
+      confirmationToken: token === null ? null : barTokenHash(token),
       platformFeeAmount: 0,
       serviceFeeCents: 100,
       serviceFeePercentApplied: 4.9,
@@ -107,7 +110,7 @@ async function offeneBestellung(eingabe: {
     },
   })
 
-  return { farm, produkt, bestellung, paymentIntentId }
+  return { farm, produkt, bestellung, paymentIntentId, token }
 }
 
 async function bestand(produktId: string) {
@@ -139,9 +142,8 @@ describe('online — Zahlungsfrist 30 Minuten', () => {
     expect(danach.cancelledAt).not.toBeNull()
     expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT + MENGE)
     // Online gibt es keine Mail — die Kundin hat die Zahlung selbst nicht abgeschlossen.
-    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
     await vi.dynamicImportSettled()
-    expect(sendBestellungVerfallen).not.toHaveBeenCalled()
+    expect(await artenZu(bestellung.id)).toEqual([])
   })
 
   it('noch in der Frist: unberührt, Stripe wird nicht gefragt', async () => {
@@ -249,7 +251,11 @@ describe('bar — Bestätigungsfrist 2 Stunden', () => {
     expect((await zustand(bestellung.id)).status).toBe('CANCELLED')
     expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT + MENGE)
     expect(holen).not.toHaveBeenCalled()
-    await vi.waitFor(() => expect(sendBestellungVerfallen).toHaveBeenCalledTimes(1))
+    // Ein Auftrag (Wichtig) mit der Bestellung — Nr. 158 ließ sie hier noch aus.
+    await vi.dynamicImportSettled()
+    expect(await auftraege({ bestellungId: bestellung.id })).toEqual([
+      { art: 'verfallen', vorrang: 1, schluessel: `verfallen:${bestellung.id}`, bestellungId: bestellung.id, farmId: farm.id, bezug: { orderId: bestellung.id } },
+    ])
   })
 
   it('Altfall (Frist seit über zwei Tagen vorbei): storniert, Bestand zurück, aber keine Mail', async () => {
@@ -263,10 +269,8 @@ describe('bar — Bestätigungsfrist 2 Stunden', () => {
 
     expect((await zustand(bestellung.id)).status).toBe('CANCELLED')
     expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT + MENGE)
-    await new Promise((r) => setTimeout(r, 50))
-    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
     await vi.dynamicImportSettled()
-    expect(sendBestellungVerfallen).not.toHaveBeenCalled()
+    expect(await artenZu(bestellung.id)).toEqual([])
   })
 
   it('in der Frist: unberührt', async () => {
@@ -275,9 +279,8 @@ describe('bar — Bestätigungsfrist 2 Stunden', () => {
     await gibVerwaisteBestellungenFrei(new Date(), farm.id)
 
     expect((await zustand(bestellung.id)).status).toBe('PENDING_CONFIRMATION')
-    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
     await vi.dynamicImportSettled()
-    expect(sendBestellungVerfallen).not.toHaveBeenCalled()
+    expect(await artenZu(bestellung.id)).toEqual([])
   })
 })
 
@@ -292,9 +295,9 @@ describe('Wiederholung und Nebenläufigkeit', () => {
 
     expect(await bestand(bar.produkt.id)).toBe(BESTAND_NACH_CHECKOUT + MENGE)
     expect(await bestand(online.produkt.id)).toBe(BESTAND_NACH_CHECKOUT + MENGE)
-    await vi.waitFor(() => expect(sendBestellungVerfallen).toHaveBeenCalledTimes(1))
-    await new Promise((r) => setTimeout(r, 50))
-    expect(sendBestellungVerfallen).toHaveBeenCalledTimes(1)
+    await vi.dynamicImportSettled()
+    expect(await artenZu(bar.bestellung.id)).toEqual(['verfallen'])
+    expect(await artenZu(online.bestellung.id)).toEqual([])
   })
 
   it('mit farmId: nur dieser Hof', async () => {
@@ -367,9 +370,9 @@ describe('Frist gilt beim Lesen — Bestätigung per Knopf (H3)', () => {
   }
 
   it('nach der Frist: verfällt statt zu bestätigen, Ware zurück', async () => {
-    const { produkt, bestellung } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 121 })
+    const { produkt, bestellung, token } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 121 })
 
-    const { ziel } = await knopf(bestaetigeBarBestellung, bestellung.confirmationToken!)
+    const { ziel } = await knopf(bestaetigeBarBestellung, token!)
 
     expect(ziel).toContain('/bestaetigen/')
     expect((await zustand(bestellung.id)).status).toBe('CANCELLED')
@@ -377,9 +380,9 @@ describe('Frist gilt beim Lesen — Bestätigung per Knopf (H3)', () => {
   })
 
   it('in der Frist: bestätigt, Token verbraucht, Bestand bleibt gebucht', async () => {
-    const { produkt, bestellung } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 30 })
+    const { produkt, bestellung, token } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 30 })
 
-    const { ziel } = await knopf(bestaetigeBarBestellung, bestellung.confirmationToken!)
+    const { ziel } = await knopf(bestaetigeBarBestellung, token!)
 
     // Weiter zur signierten Bestätigungsseite, die den Stand aus der
     // Datenbank liest (tests/bestaetigung-zugang.test.ts).
@@ -391,8 +394,8 @@ describe('Frist gilt beim Lesen — Bestätigung per Knopf (H3)', () => {
   })
 
   it('zwei Klicks gleichzeitig: einmal bestätigt, der Token gilt danach nicht mehr', async () => {
-    const { bestellung } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 30 })
-    const token = bestellung.confirmationToken!
+    const { bestellung, token: klartext } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 30 })
+    const token = klartext!
 
     await Promise.all([knopf(bestaetigeBarBestellung, token), knopf(bestaetigeBarBestellung, token)])
 
@@ -401,8 +404,8 @@ describe('Frist gilt beim Lesen — Bestätigung per Knopf (H3)', () => {
   })
 
   it('„Doch nicht": storniert, Ware zurück, bestätigen geht danach nicht mehr', async () => {
-    const { produkt, bestellung } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 30 })
-    const token = bestellung.confirmationToken!
+    const { produkt, bestellung, token: klartext } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 30 })
+    const token = klartext!
 
     await knopf(storniereBarBestellung, token)
     await knopf(bestaetigeBarBestellung, token)

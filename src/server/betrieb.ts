@@ -7,6 +7,10 @@ import {
   ABLAEUFE,
   GRENZ_REGEL,
   GRENZ_WERTE,
+  GRENZE,
+  MAIL_PRUEFUNG_ALLE_MS,
+  MAIL_PRUEFUNG_ART,
+  MAIL_WARN_ARTEN,
   MESS_ARTEN,
   MESS_BEGINN_ART,
   VERCEL_WARN_ART,
@@ -22,6 +26,7 @@ import {
   grenzeVon,
   neuMessenAb,
   ohneVerwendungKarte,
+  monatsBeginn,
   utcMonatsbeginn,
   utcTag,
   utcTagesbeginn,
@@ -44,8 +49,11 @@ import {
   type WarnStand,
 } from '@/lib/betrieb'
 import { ladeLaeufe, ladeMessungenFuerPruefung, ladeWarnungen, summeImMonat } from '@/server/queries/betrieb'
+import { ladeMailZaehler, ladeQuoten, ladeWarteschlange } from '@/server/queries/mails'
+import { mailWarnLage, mailWarnSchritt } from '@/lib/betrieb-mails'
 import { ladeBetreiberEmpfaenger } from '@/server/queries/postfach'
 import { ohneVerwendungMesswerte } from '@/server/betrieb-bilder'
+import { getOeffentlicheHoefe } from '@/server/queries/farm'
 
 /*
  * Admin › Betrieb im Hintergrund (Register N18, Nr. 103): messen, Herzschlag,
@@ -115,7 +123,19 @@ export async function listeBilder(): Promise<{ dateien: BildDatei[]; auflistunge
 
 // ─── Messen ──────────────────────────────────────────────────────────────────
 
-export type MessErgebnis = { gemessen: BetriebArt[]; fehler: Array<'bilder' | 'datenbank'> }
+export type MessErgebnis = { gemessen: BetriebArt[]; fehler: Array<'bilder' | 'datenbank' | 'hofliste'> }
+
+/**
+ * Die Hofliste, wie sie im Zwischenspeicher steht (Nr. 163, Register N19,
+ * Ergänzung 24.10.2026): `getOeffentlicheHoefe` OHNE Cache — gemessen wird,
+ * was `ladeOeffentlicheHoefe` speichern müsste, auch wenn Vercel den Eintrag
+ * schon nicht mehr nimmt. Bytes des JSON in UTF-8 (Umlaute zählen doppelt) und
+ * die Zahl der Höfe. Nur lesen.
+ */
+export async function messeHofliste(): Promise<{ bytes: number; hoefe: number }> {
+  const liste = await getOeffentlicheHoefe()
+  return { bytes: Buffer.byteLength(JSON.stringify(liste)), hoefe: liste.length }
+}
 
 /** Schreibt die Werte eines UTC-Tags in EINER Anweisung (upsert auf tag+art: ein zweiter Lauf am selben Tag überschreibt). */
 async function schreibeMessungen(tag: string, werte: ReadonlyArray<readonly [BetriebArt, number]>, jetzt: Date): Promise<void> {
@@ -161,7 +181,7 @@ export async function beginneMessung(jetzt: Date): Promise<boolean> {
 }
 
 /**
- * Misst Datenbank und Bild-Speicher und schreibt je Wert eine Zeile
+ * Misst Datenbank, Bild-Speicher und (seit Nr. 163) die Hofliste und schreibt je Wert eine Zeile
  * BetriebMessung für den UTC-Tag. Wirft nicht wegen einer Quelle: Deren
  * Fehlerklasse geht nach Sentry (ohne Inhalt), die anderen laufen weiter.
  * Nur in der Produktion zählt sie aus DERSELBEN Auflistung die Bilder ohne
@@ -207,20 +227,37 @@ export async function messeBetrieb(jetzt: Date = new Date(), { produktion = UMGE
     meldeFehler('Betrieb: Bild-Speicher nicht gemessen', err, { quelle: 'bilder' })
   }
 
+  try {
+    const { bytes, hoefe } = await messeHofliste()
+    werte.push(['hoflisteBytes', bytes], ['hoflisteHoefe', hoefe])
+  } catch (err) {
+    fehler.push('hofliste')
+    meldeFehler('Betrieb: Hofliste nicht gemessen', err, { quelle: 'hofliste' })
+  }
+
   if (werte.length > 0) await schreibeMessungen(tag, werte, jetzt)
   return { gemessen: werte.map(([art]) => art), fehler }
 }
 
 // ─── Warnen ──────────────────────────────────────────────────────────────────
 
+/** Wo der Monat einer Warnart beginnt — nur E-Mails im Monat zählen im Abrechnungszeitraum von Resend (Nr. 162). */
+function monatsBeginnVon(art: WarnArt, jetzt: Date): Date {
+  return monatsBeginn(art === 'mailsMonat' ? 'mailsMonat' : 'bildVorgaenge', jetzt)
+}
+
 /** Die Regel einer Warnart: Grenzwert, Ablauf oder Vercel-Ausgaben (je Abrechnungszeitraum, Nr. 113). */
 type WarnRegel = GrenzRegel | 'ablauf' | 'abrechnung'
 
-/** Die Bedingung, unter der eine Warnung (neu) gesetzt wird — als SQL in derselben Anweisung wie das Setzen. */
-function warnBedingung(regel: WarnRegel, jetzt: Date): Prisma.Sql {
+/**
+ * Die Bedingung, unter der eine Warnung (neu) gesetzt wird — als SQL in
+ * derselben Anweisung wie das Setzen. Der Monat beginnt je Art: E-Mails im
+ * Abrechnungszeitraum von Resend, Bild-Vorgänge im Kalendermonat (Nr. 162).
+ */
+function warnBedingung(regel: WarnRegel, jetzt: Date, art: WarnArt): Prisma.Sql {
   if (regel === 'abrechnung') return Prisma.sql`("BetriebWarnung"."stufe" < EXCLUDED."stufe" OR "BetriebWarnung"."gemeldetAm" < ${abrechnungsBeginn(jetzt)})`
   if (regel === 'speicher') return Prisma.sql`"BetriebWarnung"."stufe" < EXCLUDED."stufe"`
-  if (regel === 'monat') return Prisma.sql`("BetriebWarnung"."stufe" < EXCLUDED."stufe" OR "BetriebWarnung"."gemeldetAm" < ${utcMonatsbeginn(jetzt)})`
+  if (regel === 'monat') return Prisma.sql`("BetriebWarnung"."stufe" < EXCLUDED."stufe" OR "BetriebWarnung"."gemeldetAm" < ${monatsBeginnVon(art, jetzt)})`
   if (regel === 'tag') return Prisma.sql`"BetriebWarnung"."gemeldetAm" < ${utcTagesbeginn(jetzt)}`
   return Prisma.sql`("BetriebWarnung"."stufe" = 0 OR "BetriebWarnung"."gemeldetAm" < ${utcTagesbeginn(jetzt)})`
 }
@@ -238,7 +275,7 @@ async function setzeStufe(art: WarnArt, neu: Exclude<Stufe, 0>, regel: WarnRegel
       "stufe" = EXCLUDED."stufe",
       "gemeldetAm" = EXCLUDED."gemeldetAm",
       "seit" = CASE WHEN "BetriebWarnung"."stufe" = 0 THEN EXCLUDED."seit" ELSE "BetriebWarnung"."seit" END
-    WHERE ${warnBedingung(regel, jetzt)}
+    WHERE ${warnBedingung(regel, jetzt, art)}
     RETURNING "art"`
   return getroffen.length > 0
 }
@@ -297,13 +334,14 @@ function grenzStand(wert: GrenzWert, messungen: readonly Messung[], mailsImMonat
   if (wert === 'bilder') return mitAnteil(vonHeute('bilderBytes'))
   if (wert === 'datenbank') return mitAnteil(vonHeute('datenbankBytes'))
   if (wert === 'bildVorgaenge') return mitAnteil(vonHeute('bildVorgaengeMonat'))
+  if (wert === 'hofliste') return mitAnteil(vonHeute('hoflisteBytes'))
   if (wert === 'mailsMonat') return mitAnteil(mailsImMonat)
   const gestern = utcTagVersetzt(heute, -1)
   return mitAnteil(messungen.find((m) => m.art === 'mails' && m.tag === gestern)?.wert ?? 0)
 }
 
 function trendFuer(wert: GrenzWert, messungen: readonly Messung[], jetzt: Date): string | null {
-  const art: BetriebArt | null = wert === 'bilder' ? 'bilderBytes' : wert === 'datenbank' ? 'datenbankBytes' : null
+  const art: BetriebArt | null = wert === 'bilder' ? 'bilderBytes' : wert === 'datenbank' ? 'datenbankBytes' : wert === 'hofliste' ? 'hoflisteBytes' : null
   const grenze = grenzeVon(wert)
   if (!art || grenze === null) return null
   const t = vollIn(
@@ -338,7 +376,7 @@ export async function pruefeGrenzen(
     const stand = grenzStand(wert, messungen, mailsImMonat, jetzt)
     if (stand === null) continue
     const regel = GRENZ_REGEL[wert]
-    const schritt = grenzSchritt(regel, warnStandVon(warnungen, wert), stand.anteil, jetzt)
+    const schritt = grenzSchritt(regel, warnStandVon(warnungen, wert), stand.anteil, jetzt, monatsBeginnVon(wert, jetzt))
     // grenzSchritt warnt und entwarnt nur mit Anteil; ohne Grenze kommt höchstens „still“.
     const anteilHeute = stand.anteil ?? 0
     if (schritt.tun === 'warnen' && (await setzeStufe(wert, schritt.stufe, regel, jetzt))) {
@@ -356,6 +394,66 @@ export async function pruefeGrenzen(
     }
   }
   if (vercelSchritt(warnStandVon(warnungen, VERCEL_WARN_ART), 0, jetzt).tun === 'still') await setzeNullVorZeitraum(jetzt)
+  return mails
+}
+
+/**
+ * Belegt den Merker der Mail-Prüfung in EINER Anweisung (Muster
+ * `beginneMessung`): true nur, wenn die letzte Prüfung mindestens 10 Minuten
+ * zurückliegt (oder heute noch keine war). Zwei gleichzeitige Läufe prüfen so
+ * nur einmal.
+ */
+export async function beginneMailPruefung(jetzt: Date): Promise<boolean> {
+  const ab = new Date(jetzt.getTime() - MAIL_PRUEFUNG_ALLE_MS)
+  const getroffen = await prisma.$queryRaw<Array<{ art: string }>>`
+    INSERT INTO "BetriebMessung" ("tag", "art", "wert", "gemessenAm")
+    VALUES (${utcTag(jetzt)}::date, ${MAIL_PRUEFUNG_ART}::text, 0::bigint, ${jetzt}::timestamp(3))
+    ON CONFLICT ("tag", "art") DO UPDATE SET "gemessenAm" = EXCLUDED."gemessenAm"
+    WHERE "BetriebMessung"."gemessenAm" <= ${ab}::timestamp(3)
+    RETURNING "art"`
+  return getroffen.length > 0
+}
+
+/**
+ * Die Warnungen der Mail-Warteschlange (Register N18, Ergänzung 24.10.2026;
+ * Nr. 161) — nach dem Ablauf „E-Mails“, höchstens alle 10 Minuten (eigene
+ * Drossel), nur in der Produktion:
+ *
+ *  - eine wichtige Mail wartet über 5 Minuten, die Warteschlange hängt über
+ *    15 Minuten, abgelehnt über 2 % bzw. Spam gemeldet über 0,05 % in 7 Tagen
+ *    (ab 50 Mails) — je höchstens eine Mail am Tag, still auf 0, sobald es
+ *    nicht mehr gilt (`mailWarnSchritt`);
+ *  - das Kontingent des Abrechnungszeitraums 80/95/100 % — dieselbe Regel und
+ *    dieselbe Zeile wie im Mess-Lauf (`mailsMonat`), die bedingte Anweisung
+ *    verhindert eine zweite Mail.
+ *
+ * Erst die Stufe bedingt setzen, nur nach getroffener Zeile die Warn-Mail
+ * (direkt, nicht über die Warteschlange — N18-Ergänzung). Gibt die Zahl der
+ * Mails zurück.
+ */
+export async function pruefeMailWarnungen(jetzt: Date = new Date(), { produktion = UMGEBUNG.vercelProduktion }: Optionen = {}): Promise<number> {
+  if (!produktion) return 0
+  if (!(await beginneMailPruefung(jetzt))) return 0
+  const [warnungen, zaehler, quoten] = await Promise.all([ladeWarnungen(), ladeMailZaehler(jetzt), ladeQuoten(jetzt)])
+  const mailsImMonat = zaehler.imZeitraum
+  const schlange = await ladeWarteschlange(jetzt, zaehler)
+  const lage = mailWarnLage(schlange, quoten, jetzt)
+  let mails = 0
+  for (const art of MAIL_WARN_ARTEN) {
+    const schritt = mailWarnSchritt(lage[art].gilt, warnStandVon(warnungen, art), jetzt)
+    if (schritt.tun === 'warnen' && (await setzeStufe(art, 1, 'ablauf', jetzt))) {
+      await sendeWarnMail({ art: 'mails', warnung: art, wert: lage[art].wert })
+      mails += 1
+    } else if (schritt.tun === 'still') {
+      await setzeNull(art)
+    }
+  }
+  const anteilMonat = anteil(mailsImMonat, GRENZE.mailsMonat)
+  const schritt = grenzSchritt('monat', warnStandVon(warnungen, 'mailsMonat'), anteilMonat, jetzt, monatsBeginnVon('mailsMonat', jetzt))
+  if (schritt.tun === 'warnen' && (await setzeStufe('mailsMonat', schritt.stufe, 'monat', jetzt))) {
+    await sendeWarnMail({ art: 'grenze', wert: 'mailsMonat', anteil: anteilMonat, stand: grenzStandText('mailsMonat', mailsImMonat), trend: null, ohneVerwendungBytes: null })
+    mails += 1
+  }
   return mails
 }
 

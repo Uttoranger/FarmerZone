@@ -7,15 +7,14 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { whatsAppAbonnentinSql } from '@/server/queries/status-posts'
-import { generateUnsubscribeToken } from '@/lib/unsubscribe'
 import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
 import * as Sentry from '@sentry/nextjs'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
-import { beitragIdImLink } from '@/lib/teilen-fenster'
 import { NEUIGKEITEN_CACHE_TAG } from '@/lib/startseite-gestalten'
 import { beitragLaeuftBis, mailSperreWo } from '@/lib/beitrag-mailabstand'
-import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import { stelleMailEin } from '@/server/mail-warteschlange'
+import { beitragAuftraege } from '@/server/mail-arten/beitrag'
 import {
   BEITRAG_FELDER_MIT_SATZ,
   BEITRAG_PRODUKT_FREMD,
@@ -39,8 +38,7 @@ const UNERWARTET = {
   loeschen: 'Wir konnten den Beitrag gerade nicht löschen. Bitte versuch es noch einmal.',
   whatsapp: 'Wir konnten den Stand gerade nicht speichern. Bitte versuch es noch einmal.',
 } as const
-/** `versand` hat keinen Satz: Die Mails gehen nach der Antwort, der Hof liest dazu nichts mehr. */
-type Schritt = keyof typeof UNERWARTET | 'versand'
+type Schritt = keyof typeof UNERWARTET
 const EINGABE_UNGUELTIG = 'Da stimmt etwas mit dem Beitrag nicht. Lade die Seite neu und versuch es noch einmal.'
 
 /** Der Hof der Anmeldung — `null` ohne Sitzung oder ohne Hof. */
@@ -115,14 +113,14 @@ export async function publishStatusPost(
     const expiresAt = beitragLaeuftBis(now)
 
     // Mail-Sperre: dieselbe Bedingung wie die Seite „Neuer Beitrag" (mailSperreWo, Nr. 149).
-    let emailSubscribers: { customerEmail: string; customerPhone: string | null }[] = []
+    let abos: { id: string }[] = []
     if (data.sendEmail) {
       const recentSend = await prisma.statusPost.findFirst({ where: mailSperreWo(farm.id, now), select: { id: true } })
       if (!recentSend) {
-        // Nur Bestand und bestätigte Anmeldungen (Double-Opt-in, S11, Nr. 38).
-        emailSubscribers = await prisma.customerFarmSubscription.findMany({
+        // Nur Bestand und bestätigte Anmeldungen (Double-Opt-in, S11, Nr. 38) — der Renderer prüft beim Versand noch einmal.
+        abos = await prisma.customerFarmSubscription.findMany({
           where: { farmId: farm.id, ...WERBEMAIL_EMPFAENGER },
-          select: { customerEmail: true, customerPhone: true },
+          select: { id: true },
         })
       }
     }
@@ -132,30 +130,34 @@ export async function publishStatusPost(
     // sie beim Öffnen live liest (W1) — sentViaWhatsApp und
     // whatsappRecipientCount werden hier nicht mehr gesetzt (Vorgabe der Spalten).
 
-    const post = await prisma.statusPost.create({
-      data: {
-        farmId: farm.id,
-        title: data.title,
-        body: data.body,
-        anlass: data.anlass,
-        photoUrl: data.photoUrl ?? null,
-        linkedProductIds: produktIds,
-        showOnFarmPage: data.showOnFarmPage,
-        publishedAt: now,
-        expiresAt,
-        sentViaEmail: data.sendEmail && emailSubscribers.length > 0,
-        emailRecipientCount: emailSubscribers.length,
-      },
+    // Beitrag und je Abo ein Auftrag der Warteschlange (Kann warten, Nr. 159)
+    // in EINER Transaktion: Ein Beitrag mit Haken hat immer seine Aufträge,
+    // und ohne Beitrag gibt es keine. `emailRecipientCount` ist die Zahl der
+    // Aufträge — sie sperrt den Kanal für sieben Tage, sobald es Aufträge gibt
+    // (mailSperreWo). Wie viele davon hinausgingen, zählt
+    // `gesendeteBeitragsMails` aus der Warteschlange. Die Action wartet auf
+    // keine Mail: Der Worker verschickt nach der Antwort.
+    const post = await prisma.$transaction(async (tx) => {
+      const angelegt = await tx.statusPost.create({
+        data: {
+          farmId: farm.id,
+          title: data.title,
+          body: data.body,
+          anlass: data.anlass,
+          photoUrl: data.photoUrl ?? null,
+          linkedProductIds: produktIds,
+          showOnFarmPage: data.showOnFarmPage,
+          publishedAt: now,
+          expiresAt,
+          sentViaEmail: data.sendEmail && abos.length > 0,
+          emailRecipientCount: abos.length,
+        },
+      })
+      if (abos.length > 0) {
+        await stelleMailEin(beitragAuftraege(angelegt, abos.map((a) => a.id)), tx)
+      }
+      return angelegt
     })
-
-    // Der Beitrag steht mit der GEPLANTEN Zahl — sie sperrt, bis der Versand
-    // die angenommenen Mails einträgt (Nr. 149). Die Mails gehen erst nach der
-    // Antwort hinaus: Vorher wartete der Hof auf jede einzelne.
-    if (emailSubscribers.length > 0) {
-      const empfaenger = emailSubscribers.map((s) => s.customerEmail)
-      const farmId = farm.id
-      nachDerAntwort(() => versendeBeitragsMails({ postId: post.id, farmId, empfaenger, data }))
-    }
 
     // Die Beiträge stehen seit Nr. 22e im Reiter von Mein Hof (/status leitet dorthin um).
     revalidatePath('/farm-page')
@@ -164,72 +166,10 @@ export async function publishStatusPost(
     if (farmSlug) revalidatePath(`/${farmSlug.slug}`)
     erneuereListen()
 
-    return { postId: post.id, emailCount: emailSubscribers.length }
+    return { postId: post.id, emailCount: abos.length }
   } catch (err) {
     meldeFehler('veroeffentlichen', err)
     return { error: UNERWARTET.veroeffentlichen }
-  }
-}
-
-/**
- * Die Mails zu einem Beitrag, nach der Antwort (Nr. 149). Jede Mail hat ihr
- * eigenes try/catch: Ein Fehler geht an Sentry (Schritt `versand`, nie
- * Adresse oder Token) und hält die übrigen nicht auf. Am Ende steht am
- * Beitrag die Zahl der ANGENOMMENEN Mails (mit `id`); gesperrte (Z3) und
- * gescheiterte zählen nicht. Bricht die Funktion vorher ab, bleibt die
- * geplante Zahl stehen — dann hält die Sperre, statt doppelt zu schreiben.
- */
-async function versendeBeitragsMails(auftrag: {
-  postId: string
-  farmId: string
-  empfaenger: string[]
-  data: BeitragVeroeffentlichenEingabe
-}): Promise<void> {
-  const { postId, farmId, empfaenger, data } = auftrag
-  try {
-    const farmFull = await prisma.farm.findUnique({ where: { id: farmId }, select: { name: true, slug: true } })
-    if (!farmFull) return
-
-    // Vornamen für {Vorname} im Text
-    const nameRows = await prisma.order.findMany({
-      where: { farmId, customerEmail: { in: empfaenger } },
-      select: { customerEmail: true, customerName: true },
-      distinct: ['customerEmail'],
-      orderBy: { createdAt: 'desc' },
-    })
-    const nameMap = new Map(nameRows.map((r) => [r.customerEmail.toLowerCase(), r.customerName.split(' ')[0]]))
-
-    const { sendStatusUpdateEmail } = await import('@/lib/email')
-    let angenommen = 0
-    // Nacheinander: Resend begrenzt die Anfragen je Sekunde.
-    for (const an of empfaenger) {
-      try {
-        const firstName = nameMap.get(an.toLowerCase()) ?? ''
-        const ergebnis = await sendStatusUpdateEmail({
-          to: an,
-          farmName: farmFull.name,
-          farmSlug: farmFull.slug,
-          title: data.title,
-          body: data.body.replace(/\{Vorname\}/gi, firstName),
-          anlass: data.anlass,
-          photoUrl: data.photoUrl,
-          // Der Knopf führt zu genau diesem Beitrag (T5) — nur, wenn er auf der
-          // Hofseite steht (dieselbe Regel wie der WhatsApp-Link je Person).
-          beitragId: beitragIdImLink({ id: postId, showOnFarmPage: data.showOnFarmPage }),
-          // Aus dem Token baut der Versand Abmeldelink und Abmelde-Kopfzeilen (Nr. 47).
-          abmeldeToken: generateUnsubscribeToken(an, farmId),
-        })
-        if (ergebnis.id) angenommen += 1
-        // Ein Resend-Fehler kommt als Ergebnis, nicht als Wurf; gesperrt (Z3) ist kein Fehler.
-        else if (ergebnis.error) meldeFehler('versand', Object.assign(new Error('Resend'), { name: 'ResendFehler' }))
-      } catch (err) {
-        meldeFehler('versand', err)
-      }
-    }
-
-    await prisma.statusPost.updateMany({ where: { id: postId, farmId }, data: { emailRecipientCount: angenommen } })
-  } catch (err) {
-    meldeFehler('versand', err)
   }
 }
 

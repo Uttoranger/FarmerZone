@@ -9,7 +9,8 @@
  *    bekommen nur die Antwort.
  *  - Bescheid an die Höfe: je Hof genau eine Nachricht (Hof zweimal im Bündel
  *    und Duplikat-Melder eingeschlossen); die Kundin mit Adresse bekommt die
- *    Betriebsmail erst im Nachlauf, über sendRaw.
+ *    Betriebsmail als Auftrag der Warteschlange (Kann warten, Nr. 159), je
+ *    Adresse einer — kein Versand in der Anfrage.
  *  - Zusammenfassen ohne Selbstreferenz und ohne Kette, Trennen nur bei einem
  *    Duplikat; der Hof des Duplikats liest „Bereits bekannt" und nach dem
  *    Erledigen der Hauptmeldung „Bereits bekannt · Behoben".
@@ -27,6 +28,8 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 
+// Der echte Teil von email.ts (Renderer, Worker) bindet 'server-only'.
+vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
@@ -37,19 +40,19 @@ vi.mock('@/lib/nach-der-antwort', () => ({
     nachlauf.aufgaben.push(aufgabe)
   },
 }))
-vi.mock('@/lib/email', () => ({
-  sendRaw: vi.fn(async () => ({ id: 'int-mail' })),
-  sendPostfachMail: vi.fn(async () => ({ id: 'int-mail' })),
-}))
+// Der Bescheid an Kundinnen wird gerendert wie beim Versand; verschickt wird nichts (Post-Sperre Z3, und der Worker läuft nicht).
+vi.mock('@/lib/email', async (original) => ({ ...(await original<typeof import('@/lib/email')>()), sendRaw: vi.fn(async () => ({ id: 'int-mail' })) }))
 
 import { headers } from 'next/headers'
 import type { MeldungArt, MeldungStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { sendRaw, sendPostfachMail } from '@/lib/email'
+import { sendRaw } from '@/lib/email'
+import { RENDERER } from '@/server/mail-arten'
+import { bezugSchemaFuer } from '@/schemas/mail-auftrag'
 import { WUENSCHE_TEXT, kiEntscheidung, waehleZuLoeschende } from '@/lib/meldung'
 import { fasseZusammenAction, legeMeldungAbAction, setzeBuendelStandAction, trenneDuplikatAction, triageMeldungAction } from '@/server/actions/admin'
 import { findeHauptmeldungen, findeLoeschKandidaten, getMeldungenFuerHof } from '@/server/queries/meldung'
-import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf, machePasskeyAdmin } from './setup/basis'
+import { auftraege, erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf, machePasskeyAdmin } from './setup/basis'
 
 const meldungIds: string[] = []
 // Better Auth vergibt die Kennung des Kontos selbst (ohne „int-") — die Rundschreiben des Bescheids hängen an ihr.
@@ -108,10 +111,6 @@ async function legeMeldungAn(daten: {
   return id
 }
 
-async function arbeiteNachlaufAb(): Promise<void> {
-  for (const aufgabe of nachlauf.aufgaben.splice(0)) await aufgabe()
-}
-
 describe('Stand für alle', () => {
   it('schreibt nur die Meldungen des Bündels und nur mit Admin', async () => {
     const admin = await erstelleAdmin()
@@ -160,7 +159,7 @@ describe('Stand für alle', () => {
     const kundin = `${intKennung('kundin')}@example.com`
     const a1 = await legeMeldungAn({ clusterKey: k, farmId: hofA.id })
     await legeMeldungAn({ clusterKey: k, farmId: hofA.id })
-    await legeMeldungAn({ clusterKey: k, customerEmail: kundin })
+    const vonKundin = await legeMeldungAn({ clusterKey: k, customerEmail: kundin })
     await legeMeldungAn({ clusterKey: k })
     await legeMeldungAn({ art: 'FEHLER', status: 'DUPLIKAT', duplikatVonId: a1, farmId: hofB.id })
 
@@ -175,13 +174,12 @@ describe('Stand für alle', () => {
       expect(f.nachrichten[0]).toMatchObject({ vonFarmId: null, text: 'Erfundene Antwort: ist jetzt da.' })
       expect(f.rundschreiben).toMatchObject({ titel: WUENSCHE_TEXT.bescheidTitel, perMail: false, antwortMoeglich: false })
     }
-    // Kein Massenmail an die Höfe; die Kundin erst nach der Antwort.
-    expect(sendPostfachMail).not.toHaveBeenCalled()
+    // Kein Massenmail an die Höfe, kein Versand in der Anfrage: die Kundin bekommt EINEN Auftrag (Kann warten).
     expect(sendRaw).not.toHaveBeenCalled()
-    await arbeiteNachlaufAb()
-    expect(sendRaw).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(sendRaw).mock.calls[0]?.[0]).toBe(kundin)
-    expect(vi.mocked(sendRaw).mock.calls[0]?.[1]).toBe(WUENSCHE_TEXT.bescheidTitel)
+    const bescheide = await auftraege({ art: 'bescheid', bezug: { path: ['meldungId'], equals: vonKundin } })
+    expect(bescheide).toEqual([expect.objectContaining({ vorrang: 2, bezug: { meldungId: vonKundin } })])
+    const mail = await RENDERER.bescheid!(bezugSchemaFuer('bescheid').parse(bescheide[0]!.bezug))
+    expect(mail).toMatchObject({ an: kundin, betreff: WUENSCHE_TEXT.bescheidTitel })
     expect(await prisma.rundschreiben.count({ where: { erstelltVonUserId: admin.userId } })).toBe(1)
   })
 })

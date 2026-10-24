@@ -3,9 +3,8 @@
  * src/lib/email.ts — nur das Resend-SDK gemockt, Inhalt wie im
  * Produktions-Deployment (VERCEL_ENV=production, Post-Sperre Z3 offen).
  *
- * Beweist: Jede Betreiber-Mail geht an jede Adresse der Liste, die der
- * Aufrufer aus empfaengerFuer hereinreicht — eine leere Liste (Regel aus)
- * heißt: keine Mail, auch kein Rendern. Die Bestätigungsmail trägt den Link
+ * Beweist: Jede Betreiber-Mail wird für eine Adresse gebaut (je Adresse ein
+ * Auftrag, Nr. 159) und verschickt nicht selbst. Die Bestätigungsmail trägt den Link
  * auf die Bestätigungsseite und keinen Hofnamen; die Antwort-Mail zeigt den
  * Fremdtext nur escaped und führt in den Eingang.
  */
@@ -14,6 +13,8 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vites
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
 vi.mock('server-only', () => ({}))
+// Das Mail-Protokoll (Nr. 158) bindet Prisma; hier geht es nur um die Mail selbst.
+vi.mock('@/server/mail-warteschlange', () => ({ protokolliereSofortMail: vi.fn() }))
 vi.mock('resend', () => ({
   Resend: class {
     emails = { send: sendMock }
@@ -41,12 +42,6 @@ beforeEach(() => {
   sendMock.mockResolvedValue({ data: { id: 'email_1' }, error: null })
 })
 
-const LISTE = [SUPPORT_EMAIL, 'team@example.com']
-
-function empfaenger(): string[] {
-  return sendMock.mock.calls.map(([m]) => (m as { to: string }).to)
-}
-
 const NUR_AUFGABE = { antworten: 0, meldungen: 0, hoefe: 1, erstattungen: 0 }
 
 const ERSTATTUNG = {
@@ -59,60 +54,54 @@ const ERSTATTUNG = {
   stripeKennung: null,
 }
 
-describe('Betreiber-Mails an die Liste', () => {
-  it('„Erstattung offen" geht an jede Adresse der Liste, nacheinander', async () => {
-    await email.sendErstattungOffen(ERSTATTUNG, LISTE)
-    expect(empfaenger()).toEqual(LISTE)
-    expect((sendMock.mock.calls[0]?.[0] as { subject: string }).subject).toBe('Erstattung offen – Bestellung HT-1510-TEST')
-  })
+const MELDUNG = {
+  id: 'meldung-1',
+  kurznummer: 'meldung1',
+  text: 'Erfunden.',
+  seiteUrl: '/dashboard',
+  userAgent: 'Test',
+  viewport: '390x844',
+  diagKennung: null,
+  farmName: 'Hof Beispiel',
+  screenshotUrl: null,
+  createdAt: new Date('2026-10-15T08:00:00Z'),
+}
 
-  it('leere Liste (Regel aus): keine Mail', async () => {
-    await email.sendNewFarmNotification({ id: 'hof-1', name: 'Hof Beispiel', slug: 'hof-beispiel', ownerEmail: 'hof@example.com' }, [])
-    await email.sendMeldungNotification(
-      {
-        id: 'meldung-1',
-        kurznummer: 'meldung1',
-        text: 'Erfunden.',
-        seiteUrl: '/dashboard',
-        userAgent: 'Test',
-        viewport: '390x844',
-        diagKennung: null,
-        farmName: null,
-        screenshotUrl: null,
-        createdAt: new Date('2026-10-15T08:00:00Z'),
-      },
-      []
-    )
-    await email.sendBriefkastenZusammenfassung({ neu: 1, liegenGeblieben: 0, offen: 1, neueste: [], geloescht: 0, eingang: NUR_AUFGABE }, [])
+/*
+ * Seit Nr. 159 baut email.ts jede Betreiber-Mail für EINE Adresse; je Adresse
+ * der Liste stellt der Aufrufer einen Auftrag ein (betreiberAuftraege,
+ * tests/mail-auftraege.test.ts), der Worker verschickt.
+ */
+describe('Betreiber-Mails an eine Adresse der Liste', () => {
+  it('„Erstattung offen": an die Adresse, Betreff mit der Bestellnummer', async () => {
+    const mail = await email.baueErstattungOffen(ERSTATTUNG, SUPPORT_EMAIL)
+    expect(mail.an).toBe(SUPPORT_EMAIL)
+    expect(mail.betreff).toBe('Erstattung offen – Bestellung HT-1510-TEST')
+    expect(mail.html).toContain('An die Kundin erstatten')
     expect(sendMock).not.toHaveBeenCalled()
   })
 
-  it('die Fehlermeldung führt in den Eingang (Filter Meldung), nicht mehr auf /admin/meldungen', async () => {
-    await email.sendMeldungNotification(
-      {
-        id: 'meldung-1',
-        kurznummer: 'meldung1',
-        text: 'Erfunden.',
-        seiteUrl: '/dashboard',
-        userAgent: 'Test',
-        viewport: '390x844',
-        diagKennung: null,
-        farmName: 'Hof Beispiel',
-        screenshotUrl: null,
-        createdAt: new Date('2026-10-15T08:00:00Z'),
-      },
-      ['team@example.com']
+  it('neuer Hof: Hofname und Zeitpunkt der Anmeldung, nicht des Versands', async () => {
+    const mail = await email.baueNewFarmNotification(
+      { id: 'hof-1', name: 'Hof Beispiel', slug: 'hof-beispiel', ownerEmail: 'hof@example.com', createdAt: new Date('2026-10-15T08:00:00Z') },
+      'team@example.com'
     )
-    const html = (sendMock.mock.calls[0]?.[0] as { html: string }).html
+    expect(mail.betreff).toBe('Neuer Hof wartet auf Freischaltung: Hof Beispiel')
+    expect(mail.html).toContain('15.10.2026')
+  })
+
+  it('die Fehlermeldung führt in den Eingang (Filter Meldung), nicht mehr auf /admin/meldungen', async () => {
+    const { html } = await email.baueMeldungNotification(MELDUNG, 'team@example.com')
     expect(html).toContain('/admin/postfach?art=meldung&amp;meldung=meldung-1')
     expect(html).not.toContain('/admin/meldungen/')
   })
 
   it('der Wochenbericht nennt in einer Zeile, was im Eingang offen ist, und führt zu „Offen"', async () => {
-    await email.sendBriefkastenZusammenfassung({ neu: 0, liegenGeblieben: 0, offen: 0, neueste: [], geloescht: 0, eingang: NUR_AUFGABE }, LISTE)
-    expect(empfaenger()).toEqual(LISTE)
-    const { subject, html } = sendMock.mock.calls[0]?.[0] as { subject: string; html: string }
-    expect(subject).toBe(ZUSTELLUNG_MAIL_TEXT.wochenberichtBetreff(offenSatz(NUR_AUFGABE)))
+    const { betreff, html } = await email.baueBriefkastenZusammenfassung(
+      { neu: 0, liegenGeblieben: 0, offen: 0, neueste: [], geloescht: 0, eingang: NUR_AUFGABE },
+      'team@example.com'
+    )
+    expect(betreff).toBe(ZUSTELLUNG_MAIL_TEXT.wochenberichtBetreff(offenSatz(NUR_AUFGABE)))
     expect(html).toContain(`${EINGANG_TEXT.offenTitel}: ${offenSatz(NUR_AUFGABE)}`)
     expect(offenSatz(NUR_AUFGABE)).toBe('0 Antworten · 0 Meldungen · 1 Aufgabe')
     // Der Meldungsteil bleibt.
@@ -120,11 +109,10 @@ describe('Betreiber-Mails an die Liste', () => {
     expect(html).toContain('/admin/postfach"')
   })
 
-  it('ein Fehler bei einer Adresse hält die übrigen nicht auf', async () => {
-    sendMock.mockResolvedValueOnce({ data: null, error: { message: 'kaputt' } })
-    const ergebnis = await email.sendBetreiberTestmail(LISTE)
-    expect(empfaenger()).toEqual(LISTE)
-    expect(ergebnis).toEqual({ gesendet: 1, gescheitert: 1 })
+  it('die Testmail führt in den Eingang', async () => {
+    const mail = await email.baueBetreiberTestmail('team@example.com')
+    expect(mail.betreff).toBe(ZUSTELLUNG_MAIL_TEXT.testBetreff)
+    expect(mail.html).toContain('/admin/postfach')
   })
 })
 
@@ -144,21 +132,14 @@ describe('Bestätigungsmail (Double-Opt-in)', () => {
 
 describe('Antwort eines Hofs an das Team', () => {
   it('zeigt Hof, Titel und den Text escaped und führt in den Faden im Eingang', async () => {
-    const ergebnis = await email.sendHofAntwortAnTeam(['team@example.com'], {
+    const mail = await email.baueHofAntwortAnTeam('team@example.com', {
       hofName: 'Hof Beispiel',
       titel: 'Abrechnung',
       text: 'Erfunden <b>fett</b>',
       unterhaltungId: 'ckfaden000000000000000000',
     })
-    expect(ergebnis).toEqual({ gesendet: 1, gescheitert: 0 })
-    const mail = sendMock.mock.calls[0]?.[0] as { subject: string; html: string }
-    expect(mail.subject).toBe('Antwort von Hof Beispiel: Abrechnung')
+    expect(mail.betreff).toBe('Antwort von Hof Beispiel: Abrechnung')
     expect(mail.html).toContain('Erfunden &lt;b&gt;fett&lt;/b&gt;')
     expect(mail.html).toContain('/admin/postfach?art=antwort&amp;id=antwort-ckfaden000000000000000000')
-  })
-
-  it('ohne Empfänger (Regel „nur Zähler") keine Mail', async () => {
-    expect(await email.sendHofAntwortAnTeam([], { hofName: 'Hof', titel: 'T', text: 'x', unterhaltungId: 'u' })).toEqual({ gesendet: 0, gescheitert: 0 })
-    expect(sendMock).not.toHaveBeenCalled()
   })
 })

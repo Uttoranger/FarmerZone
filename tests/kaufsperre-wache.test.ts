@@ -6,8 +6,9 @@
  * Geprüft wird der Syntaxbaum jeder Datei unter `src/components/hofseite`, `src/components/produktdetail` und
  * `src/components/farm`: Kein Bezeichner und keine Zeichenkette `isPaused` — weder `farm.isPaused` noch ein Prop
  * `isPaused={…}` noch `{ isPaused }`. Die Sperre selbst rechnen die Seiten einmal auf dem Server
- * (`kaufSperre(` in page.tsx von Hofseite, Produktseite und Kasse) — und /api/reserve, bevor es Ware
- * reserviert (Nr. 145).
+ * (`kaufSperre(` in page.tsx von Hofseite, Produktseite und Kasse) — und die Prüfkette der Höfe in
+ * src/server/warenkorb.ts, die /api/reserve (Nr. 145) und /api/warenkorb/pruefen vor jedem Halt rufen (Nr. 165;
+ * dass beide Routen sie rufen, prüft tests/bremse-verdrahtung.test.ts).
  *
  * Gegenprobe: Schnipsel mit `isPaused` am Kaufknopf, als Prop, entpackt und als Zugriff mit Klammern schlagen an;
  * ein Kommentar und ein längerer Name nicht. Der Aufruf `kaufSperre(` wird erkannt, im Kommentar nicht.
@@ -19,7 +20,7 @@ import { describe, expect, it } from 'vitest'
 
 const WURZEL = process.cwd()
 const ORDNER = ['src/components/hofseite', 'src/components/produktdetail', 'src/components/farm']
-const SEITEN = ['src/app/(public)/[farmSlug]/page.tsx', 'src/app/(public)/[farmSlug]/produkt/[id]/page.tsx', 'src/app/(public)/[farmSlug]/checkout/page.tsx', 'src/app/api/reserve/route.ts']
+const SEITEN = ['src/app/(public)/[farmSlug]/page.tsx', 'src/app/(public)/[farmSlug]/produkt/[id]/page.tsx', 'src/app/(public)/[farmSlug]/checkout/page.tsx', 'src/server/warenkorb.ts']
 
 function* quelldateien(ordner: string): Generator<string> {
   for (const name of readdirSync(ordner)) {
@@ -74,7 +75,7 @@ describe('Kaufwege lesen die Sperre, nicht die Pause (Register N24)', () => {
     expect(verstoesse).toEqual([])
   })
 
-  it('Hofseite, Produktseite, Kasse und /api/reserve rechnen die Sperre auf dem Server mit kaufSperre', () => {
+  it('Hofseite, Produktseite, Kasse und die Prüfkette der Höfe rechnen die Sperre auf dem Server mit kaufSperre', () => {
     for (const seite of SEITEN) expect(ruftKaufSperre(readFileSync(join(WURZEL, seite), 'utf8')), seite).toBe(true)
   })
 

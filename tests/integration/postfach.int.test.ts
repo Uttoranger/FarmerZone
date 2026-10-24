@@ -33,27 +33,21 @@ vi.mock('@/lib/nach-der-antwort', () => ({
     nachlauf.aufgaben.push(aufgabe)
   },
 }))
-vi.mock('@/lib/email', () => ({
-  sendPostfachMail: vi.fn(async () => ({ id: 'int-mail' })),
-  sendHofAntwortAnTeam: vi.fn(async () => ({ gesendet: 1, gescheitert: 0 })),
-}))
+// Die Postfach-Mails sind seit Nr. 159 Aufträge der Warteschlange (echt in der Datenbank).
 
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
-import { sendHofAntwortAnTeam, sendPostfachMail } from '@/lib/email'
 import { empfaengerFuer, zaehleUngelesen, POSTFACH_FEHLER } from '@/lib/postfach'
 import { antworteAlsHof, antworteAlsTeam, markiereGelesen, markiereGelesenTeam, sendeRundschreiben } from '@/server/actions/postfach'
 import { ladeEmpfaengerHoefe, ladeFadenHof, ladeFaedenHof, zaehleUngelesenHof, zaehleUngelesenTeam } from '@/server/queries/postfach'
-import { erstelleHof, erstelleHofMitAnmeldung, erstelleProdukt, raeumeAuf, machePasskeyAdmin } from './setup/basis'
+import { auftraege, erstelleHof, erstelleHofMitAnmeldung, erstelleProdukt, raeumeAuf, machePasskeyAdmin } from './setup/basis'
 
 const MIGRATION = readFileSync(join(process.cwd(), 'prisma', 'migrations', '20261013210000_postfach', 'migration.sql'), 'utf8')
 
 afterEach(async () => {
   vi.mocked(headers).mockResolvedValue(new Headers() as never)
-  vi.mocked(sendPostfachMail).mockClear()
-  vi.mocked(sendHofAntwortAnTeam).mockClear()
   nachlauf.aufgaben.length = 0
   await prisma.rundschreiben.deleteMany({ where: { titel: { startsWith: 'int-' } } })
   await raeumeAuf()
@@ -113,11 +107,10 @@ describe('Rundschreiben senden (Fan-out)', () => {
     for (const n of nachrichten) expect(n).toMatchObject({ vonFarmId: null, art: 'WICHTIG', linkUrl: '/settings/pickup-slots' })
     expect(await prisma.unterhaltung.count({ where: { farmId: still.id } })).toBe(0)
 
-    // Die Mails laufen erst nach der Antwort — je Faden eine.
-    expect(sendPostfachMail).not.toHaveBeenCalled()
-    await arbeiteNachlaufAb()
-    expect(sendPostfachMail).toHaveBeenCalledTimes(2)
-    expect(vi.mocked(sendPostfachMail).mock.calls.map(([m]) => m.art)).toEqual(['rundschreiben', 'rundschreiben'])
+    // Kein Versand in der Anfrage: je Faden ein Auftrag (Kann warten), in derselben Transaktion wie die Fäden.
+    const zeilen = await auftraege({ art: 'rundschreiben', farmId: { in: [a.id, b.id, still.id] } })
+    expect(zeilen.map((z) => (z.bezug as { unterhaltungId: string }).unterhaltungId).sort()).toEqual([...faeden.values()].sort())
+    expect(zeilen.map((z) => z.vorrang)).toEqual([2, 2])
   })
 
   it('ohne Haken keine Mail; ohne Admin-Recht kein Rundschreiben', async () => {
@@ -125,7 +118,7 @@ describe('Rundschreiben senden (Fan-out)', () => {
     const { farm: a, cookie: hofCookie } = await erstelleHofMitAnmeldung()
     await sendeAn(adminCookie, [a.id])
     await arbeiteNachlaufAb()
-    expect(sendPostfachMail).not.toHaveBeenCalled()
+    expect(await auftraege({ art: 'rundschreiben', farmId: a.id })).toEqual([])
 
     await alsSitzung(hofCookie)
     const ergebnis = await sendeRundschreiben({ titel: 'int-Fremd', text: 'Erfunden.', art: 'INFO', link: '', perMail: false, antwortMoeglich: false, empfaenger: { art: 'alle' } })
@@ -238,11 +231,16 @@ describe('E-Mail zur Antwort des Teams', () => {
     expect(await antworteAlsHof({ unterhaltungId: faden, text: 'Erfundene Antwort des Hofs.' })).toEqual({ ok: true })
 
     await arbeiteNachlaufAb()
-    expect(sendPostfachMail).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(sendPostfachMail).mock.calls[0][0]).toMatchObject({ art: 'antwort', unterhaltungId: faden, link: '/products' })
+    // Genau ein Auftrag „postfach" an den Hof (Wichtig), zu einer Antwort des Teams mit Link.
+    const anDenHof = await auftraege({ art: 'postfach', farmId: hof.id })
+    expect(anDenHof).toHaveLength(1)
+    const teamNachricht = await prisma.nachricht.findUniqueOrThrow({ where: { id: (anDenHof[0]!.bezug as { nachrichtId: string }).nachrichtId } })
+    expect(teamNachricht).toMatchObject({ unterhaltungId: faden, vonFarmId: null, linkUrl: '/products' })
     // Die Antwort des Hofs geht an die Empfängerliste des Teams (Zustellung, N14), nie an den Hof.
-    expect(sendHofAntwortAnTeam).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(sendHofAntwortAnTeam).mock.calls[0]![1]).toMatchObject({ unterhaltungId: faden, text: 'Erfundene Antwort des Hofs.' })
+    const anDasTeam = (await auftraege({ art: 'antwort-an-team', farmId: hof.id })).filter((z) => (z.bezug as { empfaengerId: string }).empfaengerId === 'support')
+    expect(anDasTeam).toHaveLength(1)
+    const hofNachricht = await prisma.nachricht.findUniqueOrThrow({ where: { id: (anDasTeam[0]!.bezug as { nachrichtId: string }).nachrichtId } })
+    expect(hofNachricht).toMatchObject({ unterhaltungId: faden, text: 'Erfundene Antwort des Hofs.' })
     expect(await prisma.nachricht.count({ where: { unterhaltungId: faden, vonFarmId: null, art: 'WICHTIG' } })).toBe(4)
   })
 })

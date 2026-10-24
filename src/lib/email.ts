@@ -19,10 +19,13 @@ import { ABO_BESTAETIGUNG_GUELTIG_TAGE } from '@/lib/abo-bestaetigung'
 import { env } from '@/lib/env'
 import { darfMailEmpfangen, leseTestEmpfaenger, sperrtTrotzProduktion } from '@/lib/testumgebung'
 import { abmeldeSeitenPfad, listUnsubscribeKoepfe } from '@/lib/abmelde-link'
-import { MARKE } from '@/lib/marke'
+import { MARKE, MARKE_TEAM } from '@/lib/marke'
+import { WUENSCHE_TEXT, bescheidMailHtml } from '@/lib/meldung'
 import { EINGANG_TEXT, POSTFACH_MAIL_TEXT, eingangAdresse, eingangMeldungAdresse, fadenHref, offenSatz, type EingangZahlen } from '@/lib/postfach'
 import { ZUSTELLUNG_MAIL_TEXT, bestaetigenPfad } from '@/lib/zustellung'
 import { ADMIN_BETRIEB_HREF, betriebMail, fehlerKlasse, type BetriebMailAnlass } from '@/lib/betrieb'
+import { empfaengerFingerabdruck } from '@/lib/mail-empfaenger'
+import type { MailArt, MailStatus } from '@/schemas/mail-auftrag'
 
 const apiKey = process.env.RESEND_API_KEY
 const FROM = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
@@ -113,10 +116,17 @@ async function htmlOderFehler(
 export type VersandErgebnis = { id?: string; error?: string; gesperrt?: true }
 
 /**
- * Zusätzliche Kopfzeilen einer Mail — heute nur die Abmelde-Kopfzeilen
+ * Was jede Mail mitbringt (Register N26, Nr. 158): ihre Art (Pflicht — der Typ
+ * erzwingt sie, damit jede Mail im Protokoll steht), die Bestellung, zu der sie
+ * gehört, und zusätzliche Kopfzeilen — heute nur die Abmelde-Kopfzeilen
  * werblicher Mails (List-Unsubscribe, RFC 8058, Nr. 47).
  */
-type MailOptionen = { headers?: Record<string, string> }
+/**
+ * `farmId` und `nochmalVon` nur für das Protokoll (Nr. 167): der Hof für den
+ * Filter in „Alle Mails“, die ursprüngliche Mail beim Nochmal-Schicken durch
+ * den Support (dann steht die Zeile als „vom Support“).
+ */
+export type MailOptionen = { art: MailArt; bestellungId?: string; farmId?: string; nochmalVon?: string; headers?: Record<string, string> }
 
 /**
  * Zählt eine verschickte Mail für Admin › Betrieb (Register N18, Nr. 103) —
@@ -141,47 +151,145 @@ async function zaehleVersand(): Promise<void> {
   }
 }
 
-export async function sendRaw(
+/**
+ * Die Post-Sperre (Register Z3) — die EINE Stelle, die über den Versand
+ * entscheidet: `sendRaw` und der Worker der Warteschlange
+ * (src/server/mail-warteschlange.ts) fragen beide hier. false = nicht
+ * verschicken; gezählt wird nur, nie eine Adresse notiert.
+ */
+export function postSperreLaesstDurch(to: string): boolean {
+  if (darfMailEmpfangen(to, UMGEBUNG, TEST_EMPFAENGER)) return true
+  nichtVerschickt += 1
+  // Hier stehen weder Adresse noch Betreff im Log: Beide können eine Person
+  // nennen, und die Testumgebung schreibt in die Vercel-Logs.
+  console.log(
+    `[E-Mail] Nicht verschickt: Empfänger steht nicht in TEST_EMPFAENGER (außerhalb des Produktions-Deployments). Bisher ${nichtVerschickt} in dieser Instanz.`
+  )
+  meldeSperreTrotzProduktion()
+  return false
+}
+
+/** Ob ein Schlüssel für Resend da ist — ohne ihn verschickt nichts (Vorschau, lokal). */
+export function hatResendSchluessel(): boolean {
+  return Boolean(apiKey)
+}
+
+/**
+ * Der kurze Fehlercode einer Antwort von Resend (`name`, z. B.
+ * `rate_limit_exceeded`) — nie deren Nachricht, die eine Adresse tragen kann.
+ */
+function resendFehlerCode(fehler: { name?: unknown }): string {
+  return typeof fehler.name === 'string' && /^[a-z_]{1,60}$/.test(fehler.name) ? fehler.name : 'unbekannt'
+}
+
+/**
+ * Jede direkte Mail als Zeile im Protokoll (Register N26, Nr. 158; vorrang 0)
+ * — per `await import()` wie der Zähler, damit email.ts selbst nie Prisma
+ * bindet. Fail-open: Scheitert das Protokoll, ist die Mail trotzdem hinaus
+ * (CLAUDE.md §2); nach Sentry geht nur die Fehlerklasse unter festem Satz.
+ */
+async function protokolliere(
   to: string,
-  subject: string,
-  html: string,
-  optionen: MailOptionen = {}
-): Promise<VersandErgebnis> {
+  optionen: MailOptionen,
+  ergebnis: { status: Extract<MailStatus, 'gesendet' | 'gescheitert' | 'gesperrt' | 'ohne_schluessel'>; resendId?: string; fehlerCode?: string }
+): Promise<void> {
+  try {
+    const { protokolliereSofortMail } = await import('@/server/mail-warteschlange')
+    await protokolliereSofortMail({
+      art: optionen.art,
+      bestellungId: optionen.bestellungId,
+      farmId: optionen.farmId,
+      nochmalVon: optionen.nochmalVon,
+      empfaengerHash: empfaengerFingerabdruck(to),
+      ...ergebnis,
+    })
+  } catch (err) {
+    try {
+      const meldung = new Error('Mail-Protokoll: Zeile nicht geschrieben')
+      meldung.name = fehlerKlasse(err)
+      Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'mail-protokoll', art: optionen.art } })
+    } catch {
+      // Telemetrie scheitert leise — die Mail ist schon entschieden.
+    }
+  }
+}
+
+export async function sendRaw(to: string, subject: string, html: string, optionen: MailOptionen): Promise<VersandErgebnis> {
   if (!apiKey) {
     console.log(`[E-Mail] KEIN API-KEY — würde senden: "${subject}" → ${logEmpfaenger(to)}`)
+    await protokolliere(to, optionen, { status: 'ohne_schluessel' })
     return { error: 'RESEND_API_KEY nicht gesetzt' }
   }
   // Nach dem Log-Modus, damit lokal ohne Schlüssel alles bleibt, wie es war.
-  // Hier stehen weder Adresse noch Betreff im Log: Beide können eine Person
-  // nennen, und die Testumgebung schreibt in die Vercel-Logs.
-  if (!darfMailEmpfangen(to, UMGEBUNG, TEST_EMPFAENGER)) {
-    nichtVerschickt += 1
-    console.log(
-      `[E-Mail] Nicht verschickt: Empfänger steht nicht in TEST_EMPFAENGER (außerhalb des Produktions-Deployments). Bisher ${nichtVerschickt} in dieser Instanz.`
-    )
-    meldeSperreTrotzProduktion()
+  if (!postSperreLaesstDurch(to)) {
+    await protokolliere(to, optionen, { status: 'gesperrt' })
     return { gesperrt: true }
   }
   console.log(`[E-Mail] Sende: "${subject}" → ${logEmpfaenger(to)} (from: ${FROM})`)
+  let ergebnis: VersandErgebnis
   try {
     // Im try: Scheitert schon das Laden des SDK, bleibt es beim { error } — sendRaw wirft nie.
     const resend = await resendClient(apiKey)
     const result = await resend.emails.send({ from: FROM, to, subject, html, ...(optionen.headers ? { headers: optionen.headers } : {}) })
     if (result.error) {
       console.error(`[E-Mail] Resend-Fehler: ${JSON.stringify(result.error)}`)
+      await protokolliere(to, optionen, { status: 'gescheitert', fehlerCode: resendFehlerCode(result.error) })
       return { error: JSON.stringify(result.error) }
     }
     console.log(`[E-Mail] ✓ Gesendet, ID: ${result.data?.id}`)
     await zaehleVersand()
-    return { id: result.data?.id }
+    ergebnis = { id: result.data?.id }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error(`[E-Mail] Exception: ${msg}`)
+    await protokolliere(to, optionen, { status: 'gescheitert', fehlerCode: 'ausnahme' })
     return { error: msg }
+  }
+  await protokolliere(to, optionen, { status: 'gesendet', resendId: ergebnis.id })
+  return ergebnis
+}
+
+/** Eine fertige Mail für den Stapelversand des Workers — die Adresse lebt nur im Speicher, nie in der Tabelle. */
+export type StapelMail = { an: string; betreff: string; html: string; headers?: Record<string, string> }
+
+/**
+ * Ergebnis eines Stapels: `ok` mit einer Resend-ID je Mail in derselben
+ * Reihenfolge, sonst Status und kurzer Code (429/5xx/null = später nochmal).
+ */
+export type StapelErgebnis = { ok: true; ids: string[] } | { ok: false; statusCode: number | null; code: string }
+
+/**
+ * Bis zu 100 Mails in EINER Anfrage an Resend (`batch.send`, Nr. 158) — nur
+ * für den Worker der Warteschlange, der vorher die Post-Sperre über
+ * `postSperreLaesstDurch` geprüft hat. `batch.send` nimmt je Mail dieselben
+ * Felder wie `emails.send` ohne Anhänge und ohne Termin, also auch `headers`;
+ * der Idempotenz-Schlüssel gilt für die ganze Anfrage. Strikte Prüfung (alles
+ * oder nichts): So gehört die n-te ID sicher zur n-ten Mail. Gezählt wird
+ * jede angenommene Mail wie bei sendRaw. Wirft nie.
+ */
+export async function versendeStapel(mails: readonly StapelMail[], idempotenzSchluessel: string): Promise<StapelErgebnis> {
+  if (!apiKey) return { ok: false, statusCode: null, code: 'ohne_schluessel' }
+  try {
+    const resend = await resendClient(apiKey)
+    const result = await resend.batch.send(
+      mails.map((m) => ({ from: FROM, to: m.an, subject: m.betreff, html: m.html, ...(m.headers ? { headers: m.headers } : {}) })),
+      { idempotencyKey: idempotenzSchluessel }
+    )
+    if (result.error) {
+      console.error(`[E-Mail] Resend-Fehler im Stapel: ${resendFehlerCode(result.error)} (${result.error.statusCode ?? 'ohne Status'})`)
+      return { ok: false, statusCode: result.error.statusCode, code: resendFehlerCode(result.error) }
+    }
+    const ids = result.data.data.map((d) => d.id)
+    console.log(`[E-Mail] ✓ Stapel gesendet: ${ids.length} Mails`)
+    for (let i = 0; i < ids.length; i += 1) await zaehleVersand()
+    return { ok: true, ids }
+  } catch (err) {
+    console.error(`[E-Mail] Exception im Stapel: ${fehlerKlasse(err)}`)
+    return { ok: false, statusCode: null, code: 'ausnahme' }
   }
 }
 
-async function send(to: string, subject: string, html: string, optionen?: MailOptionen): Promise<void> {
+async function send(to: string, subject: string, html: string, optionen: MailOptionen): Promise<void> {
   await sendRaw(to, subject, html, optionen)
 }
 
@@ -189,17 +297,18 @@ async function send(to: string, subject: string, html: string, optionen?: MailOp
 export type ListenErgebnis = { gesendet: number; gescheitert: number }
 
 /**
- * Eine Betreiber-Mail an jede Adresse der Empfängerliste (Register N14, Nr.
- * 95): Wer sie bekommt, entscheidet `empfaengerFuer` (src/lib/zustellung.ts)
- * und reicht der Aufrufer herein — diese Datei liest nie selbst die
- * Datenbank. Nacheinander (Resend begrenzt die Anfragen je Sekunde), jede
- * über sendRaw mit der Post-Sperre (Z3); ein Fehler bei einer Adresse hält die
- * übrigen nicht auf. Eine leere Liste heißt: Die Regel ist aus — keine Mail.
+ * Die Warn-Mail des Betriebs an jede Adresse der Empfängerliste — seit Nr. 159
+ * der einzige Aufrufer: Warn-Mails gehen direkt, nicht über die Warteschlange
+ * (N18-Ergänzung), damit eine hängende Warteschlange sie nicht mitnimmt. Alle
+ * anderen Betreiber-Mails stellt der Aufrufer je Adresse ein
+ * (src/server/mail-arten/betreiber.ts). Nacheinander, jede über sendRaw mit der
+ * Post-Sperre (Z3); ein Fehler bei einer Adresse hält die übrigen nicht auf.
+ * Eine leere Liste heißt: keine Mail.
  */
-async function sendeAnListe(an: readonly string[], subject: string, html: string): Promise<ListenErgebnis> {
+async function sendeAnListe(an: readonly string[], subject: string, html: string, art: MailArt): Promise<ListenErgebnis> {
   const ergebnis: ListenErgebnis = { gesendet: 0, gescheitert: 0 }
   for (const adresse of an) {
-    const versand = await sendRaw(adresse, subject, html)
+    const versand = await sendRaw(adresse, subject, html, { art })
     if (versand.error) ergebnis.gescheitert += 1
     else if (versand.id) ergebnis.gesendet += 1
   }
@@ -324,7 +433,7 @@ function betraege(order: OrderForEmail): { warenpreis: number; gebuehr: number; 
 export async function sendMagicLinkEmail(email: string, url: string, firstName?: string): Promise<void> {
   const { CustomerMagicLinkEmail } = await import('@/emails/customer-magic-link')
   const html = await toHtml(React.createElement(CustomerMagicLinkEmail, { firstName, magicUrl: url }))
-  await send(email, `Dein Login-Link für ${MARKE}`, html)
+  await send(email, `Dein Login-Link für ${MARKE}`, html, { art: 'login-link' })
 }
 
 /**
@@ -340,7 +449,7 @@ export async function sendAnmeldeCodeEmail(email: string, code: string): Promise
     return React.createElement(AnmeldecodeEmail, { code, minuten })
   })
   if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, `Dein Anmeldecode für ${MARKE}`, vorlage.html)
+  return sendRaw(email, `Dein Anmeldecode für ${MARKE}`, vorlage.html, { art: 'anmeldecode' })
 }
 
 /**
@@ -355,7 +464,7 @@ export async function sendBestellCodeEmail(email: string, code: string): Promise
     return React.createElement(AnmeldecodeEmail, { code, minuten, zweck: 'bestellungen' })
   })
   if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, `Dein Code für deine Bestellungen · ${MARKE}`, vorlage.html)
+  return sendRaw(email, `Dein Code für deine Bestellungen · ${MARKE}`, vorlage.html, { art: 'bestellcode' })
 }
 
 /**
@@ -369,24 +478,20 @@ export async function sendEmailBestaetigung(email: string, url: string): Promise
     return React.createElement(EmailBestaetigungEmail, { url, stunden: BESTAETIGUNG_GUELTIG_SEKUNDEN / 3600 })
   })
   if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, `Bestätige deine E-Mail-Adresse · ${MARKE}`, vorlage.html)
+  return sendRaw(email, `Bestätige deine E-Mail-Adresse · ${MARKE}`, vorlage.html, { art: 'email-bestaetigung' })
 }
 
 /**
  * „Bitte bestätige deine Anmeldung" → wer sich für Neuigkeiten eines Hofes
  * angemeldet hat (Double-Opt-in, S11, Nr. 38). Keine werbliche Mail, deshalb
- * ohne Abmeldelink. Gibt das Versandergebnis zurück (sendRaw wirft nie).
+ * ohne Abmeldelink. Wichtig (Nr. 159): Den Link baut der Renderer beim
+ * Versand frisch aus Abo und Anfragezeitpunkt (src/server/mail-arten/abo.ts),
+ * in der Warteschlange steht er nie.
  */
-export async function sendAboBestaetigung(
-  email: string,
-  daten: { hofName: string; url: string }
-): Promise<VersandErgebnis> {
-  const vorlage = await htmlOderFehler(async () => {
-    const { AboBestaetigungEmail } = await import('@/emails/abo-bestaetigung')
-    return React.createElement(AboBestaetigungEmail, { ...daten, tage: ABO_BESTAETIGUNG_GUELTIG_TAGE })
-  })
-  if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, `Bitte bestätige deine Anmeldung · ${MARKE}`, vorlage.html)
+export async function baueAboBestaetigung(email: string, daten: { hofName: string; url: string }): Promise<StapelMail> {
+  const { AboBestaetigungEmail } = await import('@/emails/abo-bestaetigung')
+  const html = await toHtml(React.createElement(AboBestaetigungEmail, { ...daten, tage: ABO_BESTAETIGUNG_GUELTIG_TAGE }))
+  return { an: email, betreff: `Bitte bestätige deine Anmeldung · ${MARKE}`, html }
 }
 
 /**
@@ -403,14 +508,14 @@ export async function sendRegistrierungsHinweis(
   // sollen sie nicht mitziehen (Nachtlauf Nr. 31, „schwere Module nur bei Bedarf").
   const { RegistrierungHinweisEmail } = await import('@/emails/registrierung-hinweis')
   const html = await toHtml(React.createElement(RegistrierungHinweisEmail, ziele))
-  return sendRaw(email, `Jemand wollte sich mit deiner Adresse registrieren · ${MARKE}`, html)
+  return sendRaw(email, `Jemand wollte sich mit deiner Adresse registrieren · ${MARKE}`, html, { art: 'registrierungs-hinweis' })
 }
 
 /** Passwort-Reset → Bauer */
 export async function sendPasswordResetEmail(email: string, url: string): Promise<void> {
   const { PasswordResetEmail } = await import('@/emails/password-reset')
   const html = await toHtml(React.createElement(PasswordResetEmail, { resetUrl: url }))
-  await send(email, `Passwort zurücksetzen · ${MARKE}`, html)
+  await send(email, `Passwort zurücksetzen · ${MARKE}`, html, { art: 'passwort-link' })
 }
 
 /**
@@ -431,7 +536,7 @@ export async function sendZuVieleVersucheEmail(
     return React.createElement(ZuVieleVersucheEmail, { art, bis: zeitpunktFuerMail(bis) })
   })
   if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, `${ZU_VIELE_VERSUCHE_MAIL[art].betreff} · ${MARKE}`, vorlage.html)
+  return sendRaw(email, `${ZU_VIELE_VERSUCHE_MAIL[art].betreff} · ${MARKE}`, vorlage.html, { art: 'zu-viele-versuche' })
 }
 
 /**
@@ -453,7 +558,7 @@ export async function sendNeueAnmeldungEmail(
     return React.createElement(NeueAnmeldungEmail, { ...rest, wann: anmeldeZeitpunkt(zeitpunkt) })
   })
   if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, `${NEUE_ANMELDUNG_MAIL.betreff(daten.hof)} · ${MARKE}`, vorlage.html)
+  return sendRaw(email, `${NEUE_ANMELDUNG_MAIL.betreff(daten.hof)} · ${MARKE}`, vorlage.html, { art: 'neue-anmeldung' })
 }
 
 /**
@@ -476,21 +581,21 @@ export async function sendAdminSicherheitEmail(
     return React.createElement(AdminSicherheitEmail, { anlass, geraet: daten.geraet, wann: anmeldeZeitpunkt(daten.zeitpunkt), code: daten.code })
   })
   if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, `${ADMIN_SICHERHEIT_MAIL.betreff[anlass]} · ${MARKE}`, vorlage.html)
+  return sendRaw(email, `${ADMIN_SICHERHEIT_MAIL.betreff[anlass]} · ${MARKE}`, vorlage.html, { art: 'admin-sicherheit' })
 }
 
-/** Neuer Hof registriert → Betreiber (Freischaltung nötig); `an` aus empfaengerFuer('hofWartet'). */
-export async function sendNewFarmNotification(
+/** Neuer Hof registriert → EINE Betreiber-Adresse (Freischaltung nötig); die Adressen aus empfaengerFuer('hofWartet'), je Adresse ein Auftrag. */
+export async function baueNewFarmNotification(
   farm: {
     id: string
     name: string
     slug: string
     ownerEmail: string
+    createdAt: Date
   },
-  an: readonly string[]
-): Promise<void> {
-  if (an.length === 0) return
-  const registeredAt = new Date().toLocaleString('de-AT', {
+  an: string
+): Promise<StapelMail> {
+  const registeredAt = farm.createdAt.toLocaleString('de-AT', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
     timeZone: 'Europe/Vienna',
   })
@@ -504,7 +609,7 @@ export async function sendNewFarmNotification(
       registeredAt,
     })
   )
-  await sendeAnListe(an, `Neuer Hof wartet auf Freischaltung: ${farm.name}`, html)
+  return { an, betreff: `Neuer Hof wartet auf Freischaltung: ${farm.name}`, html }
 }
 
 /**
@@ -514,23 +619,23 @@ export async function sendNewFarmNotification(
  * neuen Hof, hier erfährt der Hof von seiner Freischaltung. Alle Wartetexte
  * der App versprechen diese Mail.
  */
-export async function sendFreischaltungEmail(farm: {
+export async function baueFreischaltungEmail(farm: {
   name: string
   slug: string
   ownerEmail: string
-}): Promise<void> {
+}): Promise<StapelMail> {
   const farmUrl = `${APP_URL}/${farm.slug}`
   const { FreischaltungEmail } = await import('@/emails/freischaltung')
   const html = await toHtml(React.createElement(FreischaltungEmail, { farmName: farm.name, farmUrl }))
-  await send(farm.ownerEmail, 'Dein Hof ist freigeschaltet', html)
+  return { an: farm.ownerEmail, betreff: 'Dein Hof ist freigeschaltet', html }
 }
 
 /**
- * Neue FEHLER-Meldung → Betreiber (Fehlerbriefkasten). NUR bei art FEHLER —
- * Wünsche und Fragen bleiben im Eingang (Register N14); `an` aus
- * empfaengerFuer('fehlermeldung').
+ * Neue FEHLER-Meldung → EINE Betreiber-Adresse (Fehlerbriefkasten). NUR bei
+ * art FEHLER — Wünsche und Fragen bleiben im Eingang (Register N14); die
+ * Adressen aus empfaengerFuer('fehlermeldung'), je Adresse ein Auftrag.
  */
-export async function sendMeldungNotification(
+export async function baueMeldungNotification(
   m: {
     id: string
     kurznummer: string
@@ -543,9 +648,8 @@ export async function sendMeldungNotification(
     screenshotUrl: string | null
     createdAt: Date
   },
-  an: readonly string[]
-): Promise<void> {
-  if (an.length === 0) return
+  an: string
+): Promise<StapelMail> {
   const { MeldungNotificationEmail } = await import('@/emails/meldung-notification')
   const html = await toHtml(
     React.createElement(MeldungNotificationEmail, {
@@ -564,16 +668,17 @@ export async function sendMeldungNotification(
       adminUrl: `${APP_URL}${eingangMeldungAdresse(m.id)}`,
     })
   )
-  await sendeAnListe(an, `Fehlermeldung ${m.kurznummer}${m.farmName ? ` – ${m.farmName}` : ''}`, html)
+  return { an, betreff: `Fehlermeldung ${m.kurznummer}${m.farmName ? ` – ${m.farmName}` : ''}`, html }
 }
 
 /**
- * Wochen-Zusammenfassung → Betreiber (nur wenn im Eingang etwas offen ist,
- * api/cron/briefkasten); `an` aus empfaengerFuer('wochenbericht'). Die Zeile
+ * Wochen-Zusammenfassung → EINE Betreiber-Adresse (nur wenn im Eingang etwas
+ * offen ist, api/cron/briefkasten); die Adressen aus
+ * empfaengerFuer('wochenbericht'), je Adresse ein Auftrag. Die Zeile
  * „Offen im Eingang" kommt aus derselben Zählung und demselben Satz wie die
  * Kennzahl im Eingang (offenSatz); der Meldungsteil bleibt darunter.
  */
-export async function sendBriefkastenZusammenfassung(
+export async function baueBriefkastenZusammenfassung(
   z: {
     neu: number
     liegenGeblieben: number
@@ -582,9 +687,8 @@ export async function sendBriefkastenZusammenfassung(
     geloescht: number
     eingang: EingangZahlen
   },
-  an: readonly string[]
-): Promise<void> {
-  if (an.length === 0) return
+  an: string
+): Promise<StapelMail> {
   const { eingang, ...meldungen } = z
   const { BriefkastenZusammenfassungEmail } = await import('@/emails/briefkasten-zusammenfassung')
   const html = await toHtml(
@@ -594,7 +698,7 @@ export async function sendBriefkastenZusammenfassung(
       adminUrl: `${APP_URL}${eingangAdresse('offen')}`,
     })
   )
-  await sendeAnListe(an, ZUSTELLUNG_MAIL_TEXT.wochenberichtBetreff(offenSatz(eingang)), html)
+  return { an, betreff: ZUSTELLUNG_MAIL_TEXT.wochenberichtBetreff(offenSatz(eingang)), html }
 }
 
 /** Was der Betreiber über offenes Geld erfährt — ohne Daten der Kundin. */
@@ -612,14 +716,14 @@ export type ErstattungOffenMeldung = {
 }
 
 /**
- * Erstattung offen → Betreiber (Nr. 19c): ein Storno, dessen Erstattung
- * scheiterte, oder eine Erstattung, die Stripe später als gescheitert meldet.
- * Erstatten kann nur das Plattformkonto; der Hof bekommt nur „Wir kümmern uns
- * um die Erstattung und melden uns."
+ * Erstattung offen → EINE Betreiber-Adresse (Nr. 19c): ein Storno, dessen
+ * Erstattung scheiterte, oder eine Erstattung, die Stripe später als
+ * gescheitert meldet. Erstatten kann nur das Plattformkonto; der Hof bekommt
+ * nur „Wir kümmern uns um die Erstattung und melden uns." Die Adressen aus
+ * empfaengerFuer('erstattungOffen') — diese Art ignoriert „aus" und hat immer
+ * mindestens SUPPORT_EMAIL; je Adresse ein Auftrag.
  */
-export async function sendErstattungOffen(m: ErstattungOffenMeldung, an: readonly string[]): Promise<void> {
-  // `an` aus empfaengerFuer('erstattungOffen') — diese Art ignoriert „aus" und hat immer mindestens SUPPORT_EMAIL.
-  if (an.length === 0) return
+export async function baueErstattungOffen(m: ErstattungOffenMeldung, an: string): Promise<StapelMail> {
   const { ErstattungOffenEmail } = await import('@/emails/erstattung-offen')
   const html = await toHtml(
     React.createElement(ErstattungOffenEmail, {
@@ -633,7 +737,7 @@ export async function sendErstattungOffen(m: ErstattungOffenMeldung, an: readonl
     })
   )
   // Derselbe Betreff, auf den die Aufgabe im Eingang verweist (EINGANG_TEXT.erstattungMail).
-  await sendeAnListe(an, EINGANG_TEXT.erstattungKopf(m.bestellnummer ?? m.stripeKennung ?? 'unbekannt'), html)
+  return { an, betreff: EINGANG_TEXT.erstattungKopf(m.bestellnummer ?? m.stripeKennung ?? 'unbekannt'), html }
 }
 
 /**
@@ -642,7 +746,7 @@ export async function sendErstattungOffen(m: ErstattungOffenMeldung, an: readonl
  * bar bestätigte Bestellung ist nicht „bezahlt". Ohne „Nochmal bestellen"
  * (Vertragsmail ohne Werbung, S11; Mockup web-k3-e-mails-web-mobil).
  */
-export async function sendOrderConfirmation(order: OrderForEmail): Promise<void> {
+export async function baueOrderConfirmation(order: OrderForEmail): Promise<StapelMail> {
   // Der signierte Weg zurück zur Bestellung — der einzige, den die Kundin
   // nach dem Schließen des Tabs noch hat (kein Konto, keine Historie).
   const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
@@ -665,18 +769,18 @@ export async function sendOrderConfirmation(order: OrderForEmail): Promise<void>
     orderUrl,
   }))
 
-  await send(
-    order.customerEmail,
-    `Deine Bestellung bei ${order.farm.name} – Abholung ${formatPickupDate(order.pickupDate)}`,
-    html
-  )
+  return { an: order.customerEmail, betreff: `Deine Bestellung bei ${order.farm.name} – Abholung ${formatPickupDate(order.pickupDate)}`, html }
 }
 
-/** Vor-Ort-Zahlung: Bestätigungslink → Kunde */
-export async function sendOnsiteConfirmation(
+/**
+ * Die Mail mit dem Bestätigungslink — nur gebaut. `sendOnsiteConfirmation`
+ * verschickt sie; die Vorschau in Admin › Betrieb (Nr. 167) baut sie mit
+ * einem Platzhalter statt Token und macht den Link unkenntlich.
+ */
+export async function onsiteConfirmationInhalt(
   order: OrderForEmail,
   confirmationToken: string
-): Promise<void> {
+): Promise<StapelMail> {
   // Zur Seite mit dem Knopf (H3) — der Link selbst bestätigt nichts, damit
   // Link-Scanner der Mailprogramme keine Bestellung auslösen.
   const confirmationUrl = `${APP_URL}${barBestaetigungsPfad(order.farm.slug, confirmationToken)}`
@@ -709,15 +813,30 @@ export async function sendOnsiteConfirmation(
     bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
   }))
 
-  await send(
-    order.customerEmail,
-    `Bitte bestätige deine Bestellung bei ${order.farm.name}`,
-    html
-  )
+  return { an: order.customerEmail, betreff: `Bitte bestätige deine Bestellung bei ${order.farm.name}`, html }
+}
+
+/**
+ * Vor-Ort-Zahlung: Bestätigungslink → Kunde (Sofort). `protokoll.nochmalVon`
+ * nur beim Nochmal-Schicken durch den Support (Nr. 167) — die Zeile steht dann
+ * als „vom Support“ mit Verweis auf die ursprüngliche Mail.
+ */
+export async function sendOnsiteConfirmation(
+  order: OrderForEmail,
+  confirmationToken: string,
+  protokoll: { nochmalVon?: string } = {}
+): Promise<void> {
+  const mail = await onsiteConfirmationInhalt(order, confirmationToken)
+  await send(mail.an, mail.betreff, mail.html, {
+    art: 'bar-bestaetigungslink',
+    bestellungId: order.id,
+    farmId: order.farm.id,
+    ...(protokoll.nochmalVon ? { nochmalVon: protokoll.nochmalVon } : {}),
+  })
 }
 
 /** Online-Zahlung → Bauer */
-export async function sendOrderPaidToFarmer(order: OrderForEmail): Promise<void> {
+export async function baueOrderPaidToFarmer(order: OrderForEmail): Promise<StapelMail> {
   const { NewOrderNotificationEmail } = await import('@/emails/new-order-notification')
   const html = await toHtml(React.createElement(NewOrderNotificationEmail, {
     farmerName: order.farm.ownerName,
@@ -736,15 +855,11 @@ export async function sendOrderPaidToFarmer(order: OrderForEmail): Promise<void>
     dashboardUrl: `${APP_URL}/orders`,
   }))
 
-  await send(
-    order.farm.email,
-    `Neue Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber}`,
-    html
-  )
+  return { an: order.farm.email, betreff: `Neue Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber}`, html }
 }
 
 /** Vor-Ort bestätigt → Bauer */
-export async function sendOrderConfirmedToFarmer(order: OrderForEmail): Promise<void> {
+export async function baueOrderConfirmedToFarmer(order: OrderForEmail): Promise<StapelMail> {
   const paymentLabel =
     order.paymentMethod === 'ONSITE_CASH' ? 'Bar bei Abholung' : 'Karte bei Abholung'
 
@@ -767,15 +882,15 @@ export async function sendOrderConfirmedToFarmer(order: OrderForEmail): Promise<
     dashboardUrl: `${APP_URL}/orders`,
   }))
 
-  await send(
-    order.farm.email,
-    `Neue Vor-Ort-Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber} (${paymentLabel})`,
-    html
-  )
+  return {
+    an: order.farm.email,
+    betreff: `Neue Vor-Ort-Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber} (${paymentLabel})`,
+    html,
+  }
 }
 
 /** Bauer markiert als bereit → Kunde */
-export async function sendOrderReady(order: OrderForEmail): Promise<void> {
+export async function baueOrderReady(order: OrderForEmail): Promise<StapelMail> {
   const reorderToken = generateReorderToken(order.id, order.farm.id)
   const reorderUrl = `${APP_URL}/${order.farm.slug}?reorder=${reorderToken}`
   const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
@@ -794,16 +909,12 @@ export async function sendOrderReady(order: OrderForEmail): Promise<void> {
     orderUrl,
   }))
 
-  await send(
-    order.customerEmail,
-    `${order.farm.name}: Deine Bestellung ist bereit zur Abholung`,
-    html
-  )
+  return { an: order.customerEmail, betreff: `${order.farm.name}: Deine Bestellung ist bereit zur Abholung`, html }
 }
 
 /** Fertig-Rückschritt → Kunde (optional, Haken im Dialog): neutrales Update,
  *  die Abholbereit-Mail war schon draußen und wird hiermit relativiert */
-export async function sendOrderNotReady(order: OrderForEmail): Promise<void> {
+export async function baueOrderNotReady(order: OrderForEmail): Promise<StapelMail> {
   const { OrderNotReadyEmail } = await import('@/emails/order-not-ready')
   const html = await toHtml(React.createElement(OrderNotReadyEmail, {
     orderNumber: order.orderNumber,
@@ -816,21 +927,11 @@ export async function sendOrderNotReady(order: OrderForEmail): Promise<void> {
     routeUrl: routeUrl(order),
   }))
 
-  await send(
-    order.customerEmail,
-    `Kurzes Update zu deiner Bestellung ${order.orderNumber}`,
-    html
-  )
+  return { an: order.customerEmail, betreff: `Kurzes Update zu deiner Bestellung ${order.orderNumber}`, html }
 }
 
-/**
- * Status-Update → Abonnent — die werbliche Mail (S11). Aus dem signierten
- * Abmelde-Token entstehen beide Wege hinaus: der Link im Text (Seite mit dem
- * Knopf) und seit Nr. 47 die Kopfzeilen List-Unsubscribe und
- * List-Unsubscribe-Post, mit denen das Mailprogramm selbst „Abmelden"
- * anbietet (Ein-Klick, RFC 8058). Keine Transaktionsmail trägt sie.
- */
-export async function sendStatusUpdateEmail(opts: {
+/** Was eine Beitragsmail braucht — gemeinsam für den Versand heute und den Renderer der Warteschlange (Nr. 158). */
+export type BeitragMailDaten = {
   to: string
   farmName: string
   farmSlug: string
@@ -842,7 +943,19 @@ export async function sendStatusUpdateEmail(opts: {
   beitragId?: string
   /** Signierter Abmelde-Token (generateUnsubscribeToken) — ohne Ablauf. */
   abmeldeToken: string
-}): Promise<VersandErgebnis> {
+}
+
+/**
+ * Status-Update → Abonnent — die werbliche Mail (S11). Aus dem signierten
+ * Abmelde-Token entstehen beide Wege hinaus: der Link im Text (Seite mit dem
+ * Knopf) und seit Nr. 47 die Kopfzeilen List-Unsubscribe und
+ * List-Unsubscribe-Post, mit denen das Mailprogramm selbst „Abmelden"
+ * anbietet (Ein-Klick, RFC 8058). Keine Transaktionsmail trägt sie.
+ *
+ * Seit Nr. 159 nur noch über die Warteschlange (Kann warten): Der Renderer
+ * `beitrag` (src/server/mail-arten/beitrag.ts) baut sie je Abo.
+ */
+export async function baueBeitragMail(opts: BeitragMailDaten): Promise<StapelMail> {
   const { StatusUpdateEmail } = await import('@/emails/status-update')
   const html = await toHtml(
     React.createElement(StatusUpdateEmail, {
@@ -857,32 +970,27 @@ export async function sendStatusUpdateEmail(opts: {
       appUrl: APP_URL,
     })
   )
-  // Das Ergebnis zählt der Aufrufer (Nr. 149): angenommen ist nur eine Mail mit `id`.
-  return sendRaw(opts.to, `${opts.farmName}: ${opts.title}`, html, { headers: listUnsubscribeKoepfe(APP_URL, opts.abmeldeToken) })
+  return { an: opts.to, betreff: `${opts.farmName}: ${opts.title}`, html, headers: listUnsubscribeKoepfe(APP_URL, opts.abmeldeToken) }
 }
 
-/** Storno → Kunde */
-export async function sendOrderCancelled(
+/** Storno → Kunde; `erstattetCents` nur, wenn online erstattet wurde (sonst null). */
+export async function baueOrderCancelled(
   order: OrderForEmail,
-  refundAmount: number | null,
+  erstattetCents: number | null,
   /** Der Grund aus dem Storno-Dialog (Nr. 19) — Text des Hofs, React escaped ihn. */
   cancelReason?: string | null
-): Promise<void> {
+): Promise<StapelMail> {
   const { OrderCancelledEmail } = await import('@/emails/order-cancelled')
   const html = await toHtml(React.createElement(OrderCancelledEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
     total: n(order.totalAmount),
-    refundAmount,
+    refundAmount: erstattetCents === null ? null : centsAlsEuro(erstattetCents),
     cancelReason: cancelReason ?? undefined,
   }))
 
-  await send(
-    order.customerEmail,
-    `Deine Bestellung ${order.orderNumber} wurde storniert`,
-    html
-  )
+  return { an: order.customerEmail, betreff: `Deine Bestellung ${order.orderNumber} wurde storniert`, html }
 }
 
 /**
@@ -890,7 +998,7 @@ export async function sendOrderCancelled(
  * Kundin den neuen Betrag kennt, bevor sie losfährt. Beträge kommen fertig
  * gerechnet in Cent (src/lib/artikel-fehlt.ts), die Vorlage formatiert nur.
  */
-export async function sendArtikelFehlt(
+export async function baueArtikelFehlt(
   order: OrderForEmail,
   fehlt: {
     position: OrderForEmail['items'][number]
@@ -899,7 +1007,7 @@ export async function sendArtikelFehlt(
     neuCents: number
     erstattetCents: number | null
   }
-): Promise<void> {
+): Promise<StapelMail> {
   const { ArtikelFehltEmail } = await import('@/emails/artikel-fehlt')
   const html = await toHtml(React.createElement(ArtikelFehltEmail, {
     customerName: order.customerName,
@@ -916,16 +1024,16 @@ export async function sendArtikelFehlt(
     orderUrl: `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`,
   }))
 
-  await send(order.customerEmail, `Ein Artikel fehlt in deiner Bestellung ${order.orderNumber}`, html)
+  return { an: order.customerEmail, betreff: `Ein Artikel fehlt in deiner Bestellung ${order.orderNumber}`, html }
 }
 
 /** Zahlung nach dem Storno eingegangen und sofort voll erstattet → Kunde */
-export async function sendZahlungZuSpaet(
+export async function baueZahlungZuSpaet(
   order: Pick<OrderForEmail, 'customerName' | 'customerEmail' | 'orderNumber'> & {
     farm: Pick<OrderForEmail['farm'], 'name'>
   },
   erstattetCents: number
-): Promise<void> {
+): Promise<StapelMail> {
   const { ZahlungZuSpaetEmail } = await import('@/emails/zahlung-zu-spaet')
   const html = await toHtml(React.createElement(ZahlungZuSpaetEmail, {
     customerName: order.customerName,
@@ -935,15 +1043,15 @@ export async function sendZahlungZuSpaet(
     supportEmail: SUPPORT_EMAIL,
   }))
 
-  await send(order.customerEmail, 'Deine Zahlung kam zu spät – das Geld ist zurück', html)
+  return { an: order.customerEmail, betreff: 'Deine Zahlung kam zu spät – das Geld ist zurück', html }
 }
 
 /** Vor-Ort-Bestellung nicht rechtzeitig bestätigt, Ware freigegeben → Kunde */
-export async function sendBestellungVerfallen(
+export async function baueBestellungVerfallen(
   order: Pick<OrderForEmail, 'customerName' | 'customerEmail' | 'orderNumber'> & {
     farm: Pick<OrderForEmail['farm'], 'name'>
   }
-): Promise<void> {
+): Promise<StapelMail> {
   const { BestellungVerfallenEmail } = await import('@/emails/bestellung-verfallen')
   const html = await toHtml(React.createElement(BestellungVerfallenEmail, {
     customerName: order.customerName,
@@ -951,43 +1059,52 @@ export async function sendBestellungVerfallen(
     farmName: order.farm.name,
   }))
 
-  await send(order.customerEmail, 'Deine Bestellung ist verfallen, weil sie nicht bestätigt wurde', html)
+  return { an: order.customerEmail, betreff: 'Deine Bestellung ist verfallen, weil sie nicht bestätigt wurde', html }
 }
 
 /**
  * Postfach (Register N12, Nr. 87): eine Nachricht vom Team an einen Hof per
- * E-Mail — ein Rundschreiben mit dem Haken „Betriebsmitteilung" oder eine
- * Antwort des Teams im Faden (höchstens eine je Faden und Stunde, das
- * entscheidet die Action). Nie bei Antworten des Hofs. Links der Nachricht
- * sind Wege in der App (appPfadAusLink) und bekommen hier den eigenen
- * Ursprung. Über sendRaw — die Post-Sperre (Z3) greift wie bei jeder Mail;
- * das Ergebnis geht an den Aufrufer, der einen Fehler ohne Text meldet.
+ * E-Mail — ein Rundschreiben mit dem Haken „Betriebsmitteilung" (Kann
+ * warten) oder eine Antwort des Teams im Faden (Wichtig; höchstens eine je
+ * Faden und Stunde, das entscheidet die Action). Nie bei Antworten des Hofs.
+ * Links der Nachricht sind Wege in der App (appPfadAusLink) und bekommen hier
+ * den eigenen Ursprung. Seit Nr. 159 über die Warteschlange: Text und Link
+ * lädt der Renderer frisch aus der Nachricht (src/server/mail-arten/postfach.ts).
  */
-export async function sendPostfachMail(m: {
+export async function bauePostfachMail(m: {
   art: 'rundschreiben' | 'antwort'
   an: string
   titel: string
   text: string
   link: string | null
   unterhaltungId: string
-}): Promise<VersandErgebnis> {
+}): Promise<StapelMail> {
   const props = {
     titel: m.titel,
     text: m.text,
     linkUrl: m.link ? `${APP_URL}${m.link}` : null,
     fadenUrl: `${APP_URL}${fadenHref(m.unterhaltungId)}`,
   }
-  const html = await htmlOderFehler(async () => {
-    if (m.art === 'rundschreiben') {
-      const { PostfachRundschreibenEmail } = await import('@/emails/postfach-rundschreiben')
-      return React.createElement(PostfachRundschreibenEmail, props)
-    }
+  let element: React.ReactElement
+  if (m.art === 'rundschreiben') {
+    const { PostfachRundschreibenEmail } = await import('@/emails/postfach-rundschreiben')
+    element = React.createElement(PostfachRundschreibenEmail, props)
+  } else {
     const { PostfachAntwortEmail } = await import('@/emails/postfach-antwort')
-    return React.createElement(PostfachAntwortEmail, props)
-  })
-  if (!html.ok) return { error: html.error }
+    element = React.createElement(PostfachAntwortEmail, props)
+  }
   const betreff = m.art === 'rundschreiben' ? m.titel : POSTFACH_MAIL_TEXT.antwortBetreff(m.titel)
-  return sendRaw(m.an, betreff, html.html)
+  return { an: m.an, betreff, html: await toHtml(element) }
+}
+
+/**
+ * Bescheid an eine Kundin, die einen Wunsch gemeldet hat (Register N14,
+ * Nr. 105) — Kann warten, je Meldung ein Auftrag (Nr. 159). Text und Team-Name
+ * baut `bescheidMailHtml` (src/lib/meldung.ts); die Antwort lädt der Renderer
+ * frisch aus der Meldung.
+ */
+export async function baueBescheidMail(an: string, antwort: string): Promise<StapelMail> {
+  return { an, betreff: WUENSCHE_TEXT.bescheidTitel, html: bescheidMailHtml(antwort, MARKE_TEAM) }
 }
 
 /**
@@ -1002,41 +1119,36 @@ export async function sendBetreiberBestaetigung(email: string, token: string): P
     return React.createElement(BetreiberBestaetigungEmail, { url: `${APP_URL}${bestaetigenPfad(token)}` })
   })
   if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, ZUSTELLUNG_MAIL_TEXT.bestaetigungBetreff, vorlage.html)
+  return sendRaw(email, ZUSTELLUNG_MAIL_TEXT.bestaetigungBetreff, vorlage.html, { art: 'betreiber-bestaetigung' })
 }
 
 /**
- * Ein Hof hat im Faden geantwortet → Empfängerliste (Regel „Antwort eines
- * Hofs: sofort", Register N14). Hofname und Text sind Fremdtext — React
- * escaped sie; nur an bestätigte Adressen (`an` aus empfaengerFuer).
+ * Ein Hof hat im Faden geantwortet → EINE Adresse der Empfängerliste (Regel
+ * „Antwort eines Hofs: sofort", Register N14; je Adresse ein Auftrag, Nr. 159).
+ * Hofname und Text sind Fremdtext — React escaped sie; nur an bestätigte
+ * Adressen (aus empfaengerFuer).
  */
-export async function sendHofAntwortAnTeam(
-  an: readonly string[],
+export async function baueHofAntwortAnTeam(
+  an: string,
   m: { hofName: string; titel: string; text: string; unterhaltungId: string }
-): Promise<ListenErgebnis> {
-  if (an.length === 0) return { gesendet: 0, gescheitert: 0 }
-  const vorlage = await htmlOderFehler(async () => {
-    const { BetreiberAntwortEmail } = await import('@/emails/betreiber-antwort')
-    return React.createElement(BetreiberAntwortEmail, {
+): Promise<StapelMail> {
+  const { BetreiberAntwortEmail } = await import('@/emails/betreiber-antwort')
+  const html = await toHtml(
+    React.createElement(BetreiberAntwortEmail, {
       hofName: m.hofName,
       titel: m.titel,
       text: m.text,
       url: `${APP_URL}${eingangAdresse('antwort', { art: 'antwort', id: m.unterhaltungId })}`,
     })
-  })
-  if (!vorlage.ok) return { gesendet: 0, gescheitert: an.length }
-  return sendeAnListe(an, ZUSTELLUNG_MAIL_TEXT.antwortBetreff(m.hofName, m.titel), vorlage.html)
+  )
+  return { an, betreff: ZUSTELLUNG_MAIL_TEXT.antwortBetreff(m.hofName, m.titel), html }
 }
 
-/** „Testmail an alle senden" (Postfach › Zustellung) → die ganze Liste. */
-export async function sendBetreiberTestmail(an: readonly string[]): Promise<ListenErgebnis> {
-  if (an.length === 0) return { gesendet: 0, gescheitert: 0 }
-  const vorlage = await htmlOderFehler(async () => {
-    const { BetreiberTestmailEmail } = await import('@/emails/betreiber-testmail')
-    return React.createElement(BetreiberTestmailEmail, { url: `${APP_URL}${eingangAdresse('offen')}` })
-  })
-  if (!vorlage.ok) return { gesendet: 0, gescheitert: an.length }
-  return sendeAnListe(an, ZUSTELLUNG_MAIL_TEXT.testBetreff, vorlage.html)
+/** „Testmail an alle senden" (Postfach › Zustellung) → EINE Adresse der Liste (je Adresse ein Auftrag). */
+export async function baueBetreiberTestmail(an: string): Promise<StapelMail> {
+  const { BetreiberTestmailEmail } = await import('@/emails/betreiber-testmail')
+  const html = await toHtml(React.createElement(BetreiberTestmailEmail, { url: `${APP_URL}${eingangAdresse('offen')}` }))
+  return { an, betreff: ZUSTELLUNG_MAIL_TEXT.testBetreff, html }
 }
 
 /**
@@ -1054,5 +1166,5 @@ export async function sendBetriebWarnung(anlass: BetriebMailAnlass, an: readonly
     return React.createElement(BetriebWarnungEmail, { mail, url: `${APP_URL}${ADMIN_BETRIEB_HREF}` })
   })
   if (!vorlage.ok) return { gesendet: 0, gescheitert: an.length }
-  return sendeAnListe(an, mail.betreff, vorlage.html)
+  return sendeAnListe(an, mail.betreff, vorlage.html, 'betrieb-warnung')
 }

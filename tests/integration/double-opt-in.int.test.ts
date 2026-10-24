@@ -22,14 +22,18 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+// Der echte Teil von email.ts (Renderer, Worker) bindet 'server-only'.
+vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
-vi.mock('@/lib/email', () => ({
+// Bestätigungs- und Beitragsmails sind seit Nr. 159 Aufträge der Warteschlange;
+// der Test rendert sie mit den echten Renderern (dieselbe Mail wie der Worker).
+vi.mock('@/lib/email', async (original) => ({
+  ...(await original<typeof import('@/lib/email')>()),
   sendOnsiteConfirmation: vi.fn(),
-  sendStatusUpdateEmail: vi.fn(),
-  sendAboBestaetigung: vi.fn(async () => ({ id: 'mail-1' })),
   sendAnmeldeCodeEmail: vi.fn(async () => ({ id: 'mail-2' })),
 }))
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
 vi.mock('next/navigation', () => ({
   redirect: vi.fn((ziel: string) => {
     throw new Error(`REDIRECT ${ziel}`)
@@ -46,7 +50,9 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
-import { sendAboBestaetigung, sendStatusUpdateEmail } from '@/lib/email'
+import type { StapelMail } from '@/lib/email'
+import { RENDERER } from '@/server/mail-arten'
+import { bezugSchemaFuer, type MailArt } from '@/schemas/mail-auftrag'
 import { POST as checkout } from '@/app/api/checkout/route'
 import { publishStatusPost } from '@/server/actions/status-posts'
 import type { ReactElement } from 'react'
@@ -59,7 +65,7 @@ import { ABO_BESTAETIGUNG_GUELTIG_MS } from '@/lib/abo-bestaetigung'
 import { erzeugeAboBestaetigungsToken } from '@/lib/abo-bestaetigung-token'
 import { verifyUnsubscribeToken } from '@/lib/unsubscribe'
 import NeuigkeitenBestaetigenPage from '@/app/account/neuigkeiten-bestaetigen/page'
-import { checkoutAnfrage, erstelleHofMitAnmeldung, erstelleProdukt, intKennung, raeumeAuf, setzeHalt } from './setup/basis'
+import { auftraege, checkoutAnfrage, erstelleHofMitAnmeldung, erstelleProdukt, intKennung, raeumeAuf, setzeHalt } from './setup/basis'
 
 const MIGRATION = readFileSync(
   join(process.cwd(), 'prisma', 'migrations', '20261007180000_double_opt_in', 'migration.sql'),
@@ -68,7 +74,6 @@ const MIGRATION = readFileSync(
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(sendAboBestaetigung).mockResolvedValue({ id: 'mail-1' })
 })
 
 afterEach(async () => {
@@ -134,17 +139,38 @@ async function beitragPerMail(hof: Hof): Promise<{ emailCount?: number; error?: 
   })
 }
 
-function empfaengerDerBeitragsmails(): string[] {
-  return vi.mocked(sendStatusUpdateEmail).mock.calls.map(([daten]) => daten.to)
+/** Die Mails der eingestellten Aufträge, wie der Worker sie jetzt bauen würde — verworfene (abgemeldet, unbestätigt) fehlen. */
+async function gerendert(art: MailArt, zeilen: Array<{ bezug: unknown }>): Promise<StapelMail[]> {
+  const mails: StapelMail[] = []
+  for (const zeile of zeilen) {
+    const mail = await RENDERER[art]!(bezugSchemaFuer(art).parse(zeile.bezug))
+    if (!('verworfen' in mail)) mails.push(mail)
+  }
+  return mails
 }
 
-/** Der Token aus dem Link der letzten Bestätigungsmail an diese Adresse. */
+async function beitragsMails(hof: Hof): Promise<StapelMail[]> {
+  return gerendert('beitrag', await auftraege({ art: 'beitrag', farmId: hof.farm.id }))
+}
+
+async function empfaengerDerBeitragsmails(hof: Hof): Promise<string[]> {
+  return (await beitragsMails(hof)).map((m) => m.an)
+}
+
+/** Die Aufträge „abo-bestaetigung" zum Abo dieser Adresse. */
+async function bestaetigungsAuftraege(email: string) {
+  const eintrag = await prisma.customerFarmSubscription.findFirst({ where: { customerEmail: email }, select: { id: true } })
+  return eintrag ? auftraege({ art: 'abo-bestaetigung', bezug: { path: ['aboId'], equals: eintrag.id } }) : []
+}
+
+/** Der Token aus dem Link der Bestätigungsmail an diese Adresse — gerendert wie beim Versand. */
 async function tokenAusDerMail(email: string): Promise<string> {
-  await vi.waitFor(() => expect(vi.mocked(sendAboBestaetigung).mock.calls.some(([an]) => an === email)).toBe(true))
-  const aufruf = vi.mocked(sendAboBestaetigung).mock.calls.filter(([an]) => an === email).at(-1)!
-  const token = new URL(aufruf[1].url).searchParams.get('token')
+  const [mail] = await gerendert('abo-bestaetigung', (await bestaetigungsAuftraege(email)).slice(-1))
+  if (!mail) throw new Error('Keine Bestätigungsmail')
+  expect(mail.an).toBe(email)
+  const token = /neuigkeiten-bestaetigen\?token=([^"&]+)/.exec(mail.html)?.[1]
   if (!token) throw new Error('Kein Token im Link')
-  return token
+  return decodeURIComponent(token)
 }
 
 async function bestandsAbo(farmId: string, email: string): Promise<void> {
@@ -180,7 +206,7 @@ describe('Migration 20261007180000_double_opt_in', () => {
       VALUES (${intKennung('abo')}, ${email}, ${hof.farm.id}, true, false, now())`
 
     expect(await beitragPerMail(hof)).toMatchObject({ emailCount: 1 })
-    await vi.waitFor(() => expect(empfaengerDerBeitragsmails()).toEqual([email]))
+    expect(await empfaengerDerBeitragsmails(hof)).toEqual([email])
   })
 
   it('Deploy-Fenster: setzt alter Code den Haken auf einer angefragten Anmeldung, bleibt sie ohne Werbung', async () => {
@@ -193,7 +219,7 @@ describe('Migration 20261007180000_double_opt_in', () => {
       UPDATE "CustomerFarmSubscription" SET "optInEmail" = true WHERE "customerEmail" = ${email}`
 
     expect(await beitragPerMail(hof)).toMatchObject({ emailCount: 0 })
-    expect(vi.mocked(sendStatusUpdateEmail)).not.toHaveBeenCalled()
+    expect(await empfaengerDerBeitragsmails(hof)).toEqual([])
   })
 
   it('ein zweiter Lauf der Migration ändert kein bestehendes Abo', async () => {
@@ -231,11 +257,11 @@ describe('Neue Anmeldung auf der Bestätigungsseite', () => {
     expect(angelegt.optInEmail).toBe(false)
     expect(angelegt.emailOptInAngefragtAm).toBeInstanceOf(Date)
     expect(angelegt.emailOptInBestaetigtAm).toBeNull()
-    expect(vi.mocked(sendAboBestaetigung)).toHaveBeenCalledOnce()
-    expect(vi.mocked(sendAboBestaetigung).mock.calls[0]![1]).toMatchObject({ hofName: 'Hof Test' })
+    expect(await bestaetigungsAuftraege(neu)).toHaveLength(1)
+    expect((await gerendert('abo-bestaetigung', await bestaetigungsAuftraege(neu)))[0]!.html).toContain('Hof Test')
 
     expect(await beitragPerMail(hof)).toMatchObject({ emailCount: 1 })
-    await vi.waitFor(() => expect(empfaengerDerBeitragsmails()).toEqual([bestand]))
+    expect(await empfaengerDerBeitragsmails(hof)).toEqual([bestand])
     // Der Bestand bleibt unverändert.
     expect(await abo(hof.farm.id, bestand)).toMatchObject({ optInEmail: true, emailOptInAngefragtAm: null, emailOptInBestaetigtAm: null })
   })
@@ -252,12 +278,12 @@ describe('Neue Anmeldung auf der Bestätigungsseite', () => {
     expect(bestaetigt.emailOptInBestaetigtAm).toBeInstanceOf(Date)
 
     expect(await beitragPerMail(hof)).toMatchObject({ emailCount: 1 })
-    await vi.waitFor(() => expect(vi.mocked(sendStatusUpdateEmail)).toHaveBeenCalledOnce())
-    const [mail] = vi.mocked(sendStatusUpdateEmail).mock.calls.map(([daten]) => daten)
-    expect(mail!.to).toBe(email)
-    // Seit Nr. 47 bekommt der Versand den Token und baut daraus Link und
-    // Abmelde-Kopfzeilen (src/lib/abmelde-link.ts).
-    const abmeldeToken = mail!.abmeldeToken
+    const mails = await beitragsMails(hof)
+    expect(mails).toHaveLength(1)
+    const [mail] = mails
+    expect(mail!.an).toBe(email)
+    // Seit Nr. 47 baut der Versand aus dem Token Link und Abmelde-Kopfzeilen (src/lib/abmelde-link.ts).
+    const abmeldeToken = decodeURIComponent(/token=([^>&]+)/.exec(mail!.headers?.['List-Unsubscribe'] ?? '')?.[1] ?? '')
     expect(verifyUnsubscribeToken(abmeldeToken)).toEqual({ email, farmId: hof.farm.id })
 
     expect(await unsubscribeWithToken(abmeldeToken)).toEqual({})
@@ -338,9 +364,8 @@ describe('Erneute Anmeldung', () => {
     await tokenAusDerMail(email)
 
     await bestelle(hof, email, true)
-    await vi.dynamicImportSettled()
 
-    expect(vi.mocked(sendAboBestaetigung)).toHaveBeenCalledOnce()
+    expect(await bestaetigungsAuftraege(email)).toHaveLength(1)
   })
 
   it('zwei gleichzeitige Anmeldungen verschicken nur einen Link', async () => {
@@ -353,7 +378,7 @@ describe('Erneute Anmeldung', () => {
     const schritte = await Promise.all([meldeEmailAboAn(stand, jetzt), meldeEmailAboAn(stand, jetzt)])
 
     expect(schritte.sort()).toEqual(['bestaetigung-schicken', 'gebremst'])
-    await vi.waitFor(() => expect(vi.mocked(sendAboBestaetigung)).toHaveBeenCalledOnce())
+    expect(await bestaetigungsAuftraege(email)).toHaveLength(1)
   })
 
   it('bestätigt: keine neue Bestätigung, Abo bleibt bestätigt', async () => {
@@ -362,12 +387,11 @@ describe('Erneute Anmeldung', () => {
     await bestelle(hof, email, true)
     await bestaetigeNeuigkeiten({ token: await tokenAusDerMail(email) })
     const vorher = await abo(hof.farm.id, email)
-    vi.mocked(sendAboBestaetigung).mockClear()
+    const bestaetigungenVorher = (await bestaetigungsAuftraege(email)).length
 
     await bestelle(hof, email, true)
-    await vi.dynamicImportSettled()
 
-    expect(vi.mocked(sendAboBestaetigung)).not.toHaveBeenCalled()
+    expect(await bestaetigungsAuftraege(email)).toHaveLength(bestaetigungenVorher)
     const nachher = await abo(hof.farm.id, email)
     expect(nachher.optInEmail).toBe(true)
     expect(nachher.emailOptInBestaetigtAm).toEqual(vorher.emailOptInBestaetigtAm)
@@ -433,10 +457,12 @@ describe('Ausschalten und Abmelden lösen die offene Anfrage auf (Nachbesserung 
     await tokenAusDerMail(email)
     await meldeKundinMitCodeAn(email)
     await updateSubscription(hof.farm.id, false, false)
-    vi.mocked(sendAboBestaetigung).mockClear()
+    const bestaetigungenVorher = (await bestaetigungsAuftraege(email)).length
 
     expect(await updateSubscription(hof.farm.id, true, false)).toEqual({ email: 'wartet' })
     const neuerLink = await tokenAusDerMail(email)
+    // Ein neuer Auftrag für die neue Anfrage.
+    expect(await bestaetigungsAuftraege(email)).toHaveLength(bestaetigungenVorher + 1)
 
     expect(await bestaetigeNeuigkeiten({ token: neuerLink })).toEqual({ ok: true, hofName: 'Hof Test' })
   })
@@ -451,18 +477,20 @@ describe('Ausschalten und Abmelden lösen die offene Anfrage auf (Nachbesserung 
     expect(await updateSubscription(hof.farm.id, false, false)).toEqual({ email: 'aus' })
     expect((await abo(hof.farm.id, email)).optInEmail).toBe(false)
     expect(await profilAbos()).toEqual([expect.objectContaining({ optInEmail: false, emailWartet: false })])
-    vi.mocked(sendAboBestaetigung).mockClear()
+    const bestaetigungenVorher = (await bestaetigungsAuftraege(email)).length
 
     // Sofort wieder an — keine Bremse, eine neue Anfrage.
     expect(await updateSubscription(hof.farm.id, true, false)).toEqual({ email: 'wartet' })
     const neuerLink = await tokenAusDerMail(email)
+    // Ein neuer Auftrag für die neue Anfrage.
+    expect(await bestaetigungsAuftraege(email)).toHaveLength(bestaetigungenVorher + 1)
     expect(neuerLink).not.toBe(ersterLink)
     expect(await abo(hof.farm.id, email)).toMatchObject({ optInEmail: false, emailOptInBestaetigtAm: null })
     expect(await profilAbos()).toEqual([expect.objectContaining({ optInEmail: false, emailWartet: true })])
 
     expect(await bestaetigeNeuigkeiten({ token: neuerLink })).toEqual({ ok: true, hofName: 'Hof Test' })
     expect(await beitragPerMail(hof)).toMatchObject({ emailCount: 1 })
-    await vi.waitFor(() => expect(empfaengerDerBeitragsmails()).toEqual([email]))
+    expect(await empfaengerDerBeitragsmails(hof)).toEqual([email])
   })
 
   it('der WhatsApp-Schalter löst bei einer wartenden Anmeldung keine zweite Bestätigungsmail aus', async () => {
@@ -476,12 +504,11 @@ describe('Ausschalten und Abmelden lösen die offene Anfrage auf (Nachbesserung 
       where: { customerEmail: email },
       data: { emailOptInAngefragtAm: new Date(Date.now() - 20 * 60 * 1000) },
     })
-    vi.mocked(sendAboBestaetigung).mockClear()
+    const bestaetigungenVorher = (await bestaetigungsAuftraege(email)).length
 
     expect(await updateSubscription(hof.farm.id, true, true)).toEqual({ email: 'wartet' })
-    await vi.dynamicImportSettled()
 
-    expect(vi.mocked(sendAboBestaetigung)).not.toHaveBeenCalled()
+    expect(await bestaetigungsAuftraege(email)).toHaveLength(bestaetigungenVorher)
   })
 
   it('Abmeldelink bei offener Anfrage: aufgelöst, der alte Link bestätigt nicht', async () => {
@@ -524,9 +551,11 @@ describe('Ausschalten und Abmelden lösen die offene Anfrage auf (Nachbesserung 
       where: { customerEmail: email },
       data: { emailOptInAngefragtAm: new Date(Date.now() - 20 * 60 * 1000) },
     })
-    vi.mocked(sendAboBestaetigung).mockClear()
+    const bestaetigungenVorher = (await bestaetigungsAuftraege(email)).length
     await bestelle(hof, email, true)
     const neuerLink = await tokenAusDerMail(email)
+    // Ein neuer Auftrag für die neue Anfrage.
+    expect(await bestaetigungsAuftraege(email)).toHaveLength(bestaetigungenVorher + 1)
 
     expect(await bestaetigeNeuigkeiten({ token: alterLink })).toHaveProperty('error')
     expect(await bestaetigeNeuigkeiten({ token: neuerLink })).toEqual({ ok: true, hofName: 'Hof Test' })

@@ -58,6 +58,28 @@ export function NachBestaetigung({
   )
 }
 
+/**
+ * Der Weg nach einem Fehler beim Bestätigen (Link schon benutzt oder
+ * abgelaufen). Angemeldet: zurück auf /verify, dort steht „Erneut senden".
+ * Abgemeldet: dasselbe Formular wie nach dem Bestätigen, mit festem Ziel
+ * /verify — kein Umweg über /login (Nr. 164, wie Nr. 157).
+ */
+export function NeuerLinkWeg({ angemeldet }: { angemeldet: boolean }): React.JSX.Element {
+  if (!angemeldet) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-[14px] text-muted-foreground">Melde dich an, dann schicken wir dir einen neuen Link.</p>
+        <HofAnmeldung ziel="/verify" />
+      </div>
+    )
+  }
+  return (
+    <Link href="/verify" className={TEXTLINK}>
+      Neuen Link anfordern
+    </Link>
+  )
+}
+
 export function BestaetigenKarte({ token, angemeldet }: { token: string; angemeldet: boolean }): React.JSX.Element {
   const [laedt, starte] = useTransition()
   const [stand, setStand] = useState<'offen' | 'bestaetigt' | { fehler: string }>('offen')
@@ -102,11 +124,7 @@ export function BestaetigenKarte({ token, angemeldet }: { token: string; angemel
           'E-Mail bestätigen'
         )}
       </button>
-      {typeof stand === 'object' && (
-        <Link href={angemeldet ? '/verify' : '/login?von=/verify'} className={TEXTLINK}>
-          {angemeldet ? 'Neuen Link anfordern' : 'Anmelden und neuen Link anfordern'}
-        </Link>
-      )}
+      {typeof stand === 'object' && <NeuerLinkWeg angemeldet={angemeldet} />}
     </section>
   )
 }

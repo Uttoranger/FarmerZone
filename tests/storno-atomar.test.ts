@@ -27,22 +27,24 @@ vi.mock('@/lib/stripe', () => ({
 }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 // Empfänger der Betreiber-Mail aus der Zustellung (Register N14, Nr. 95) — hier die feste Adresse.
-vi.mock('@/server/queries/postfach', () => ({ ladeBetreiberEmpfaenger: vi.fn(async () => ['support@example.com']) }))
-vi.mock('@/lib/email', () => ({
-  sendOrderReady: vi.fn(),
-  sendOrderCancelled: vi.fn(),
-  sendOrderNotReady: vi.fn(),
-  sendErstattungOffen: vi.fn(),
-}))
+vi.mock('@/server/queries/postfach', async () => {
+  const { SUPPORT_EMAIL } = await import('@/lib/support')
+  return { ladeBetreiberEmpfaenger: vi.fn(async () => [SUPPORT_EMAIL.toLowerCase()]) }
+})
+// Die Mails sind seit Nr. 159 Aufträge der Warteschlange.
+vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn() }))
 vi.mock('@/lib/prisma', () => {
-  const order = { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() }
+  // findUnique: Nach dem Storno liest das Erneuern der Hofliste den Termin (Nr. 163) — hier keiner.
+  const order = { findFirst: vi.fn(), findUnique: vi.fn(async () => null), update: vi.fn(), updateMany: vi.fn() }
   const product = { update: vi.fn() }
   return {
     prisma: {
       farm: { findUnique: vi.fn() },
       order,
       product,
-      // Nach dem Storno fragt das Erneuern der Hofliste nach einer Höchstzahl (Nr. 131) — hier keine.
+      // Nach Stripe trägt der Storno die Erstattung in seinen Auftrag nach (Nr. 159).
+      mailAuftrag: { updateMany: vi.fn(async () => ({ count: 1 })) },
+      // Nach dem Storno fragt das Erneuern der Hofliste nach einer Höchstzahl (Nr. 131, seit Nr. 163 erst nach dem Termin) — hier keine.
       pickupSlot: { findFirst: vi.fn(async () => null) },
       // Standard: der Rückruf bekommt dieselben Fakes. Der Test, der die
       // Transaktion selbst beweist, ersetzt das durch EIGENE tx-Fakes.
@@ -65,7 +67,7 @@ import {
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import { sendErstattungOffen, sendOrderCancelled } from '@/lib/email'
+import { stelleMailEin } from '@/server/mail-warteschlange'
 import * as Sentry from '@sentry/nextjs'
 
 const getSession = vi.mocked(auth.api.getSession)
@@ -76,7 +78,18 @@ const orderUpdateMany = vi.mocked(prisma.order.updateMany)
 const productUpdate = vi.mocked(prisma.product.update)
 const transaktion = vi.mocked(prisma.$transaction)
 const refundCreate = vi.mocked(stripe.refunds.create)
-const mailStorno = vi.mocked(sendOrderCancelled)
+const einstellen = vi.mocked(stelleMailEin)
+const nachtragen = vi.mocked(prisma.mailAuftrag.updateMany)
+
+/** Was der Storno nach Stripe in seinen Auftrag nachgetragen hat (Bezug je Aufruf). */
+function nachgetragen(): unknown[] {
+  return nachtragen.mock.calls.map(([arg]) => (arg as { data: { bezug: unknown } }).data.bezug)
+}
+
+/** Alle eingestellten Aufträge, flach. */
+function auftraege(): Array<{ art: string; bezug: Record<string, string>; bestellungId?: string; schluessel: string }> {
+  return einstellen.mock.calls.flatMap(([a]) => (Array.isArray(a) ? a : [a])) as never
+}
 const sentryMeldung = vi.mocked(Sentry.captureException)
 
 /** Bar-Bestellung mit zwei Positionen — ohne PaymentIntent, damit sich die
@@ -168,7 +181,7 @@ beforeEach(() => {
   } as never)
   productUpdate.mockResolvedValue({} as never)
   refundCreate.mockResolvedValue({ id: 're_1', amount: 2000 } as never)
-  mailStorno.mockResolvedValue(undefined as never)
+  einstellen.mockResolvedValue(1)
 })
 
 afterEach(() => {
@@ -306,11 +319,16 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
       // Mit dem Erstatten ist auch eine offene Erstattung erledigt (Aufgabe im Admin-Postfach, N14).
       expect.objectContaining({ data: { paymentStatus: 'REFUNDED', erstattungOffenSeit: null } })
     )
-    // Dritter Wert: der Grund aus dem Storno-Dialog (Nr. 19) — hier keiner.
-    // Die Mail läuft nach der Antwort und lädt den Versand erst dann (Nr. 31) — also abwarten.
-    await vi.waitFor(() =>
-      expect(mailStorno).toHaveBeenCalledWith(expect.objectContaining({ orderNumber: 'TH-1' }), 20, undefined)
-    )
+    // Die Storno-Mail als Auftrag IN der Storno-Transaktion (vor Stripe, also
+    // „ausstehend"), danach der Betrag, den Stripe erstattet hat (Cent); den
+    // Grund liest der Renderer an der Bestellung.
+    expect(auftraege()).toEqual([
+      expect.objectContaining({ art: 'storniert', schluessel: 'storniert:order_1', bezug: { orderId: 'order_1', erstattung: 'ausstehend' }, bestellungId: 'order_1' }),
+    ])
+    expect(einstellen.mock.calls[0]![1]).toBeDefined()
+    expect(einstellen.mock.invocationCallOrder[0]).toBeLessThan(refundCreate.mock.invocationCallOrder[0]!)
+    expect(nachgetragen()).toEqual([{ orderId: 'order_1', erstattetCents: '2000' }])
+    expect(nachtragen.mock.calls[0]![0]).toMatchObject({ where: { schluessel: 'storniert:order_1', status: { in: ['offen', 'in_arbeit'] } } })
   })
 
   it('scheitert die Erstattung: Storno bleibt, Ware bleibt zurückgebucht, KEINE Mail, Meldung an Sentry', async () => {
@@ -330,9 +348,9 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
     // Die Storno-Vorlage liest „keine Erstattung" als Vor-Ort-Zahlung und
     // schriebe „Da du vor Ort bezahlst, entstehen dir keine Kosten" — an eine
     // Kundin, die online bezahlt hat und noch nichts zurückbekam.
-    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
-    await vi.dynamicImportSettled()
-    expect(mailStorno).not.toHaveBeenCalled()
+    // Der Auftrag steht schon (Transaktion), wird aber auf „offen" gesetzt —
+    // der Renderer verwirft ihn, es geht keine Storno-Mail.
+    expect(nachgetragen()).toEqual([{ orderId: 'order_1', erstattung: 'offen' }])
     // Offenes Geld darf nicht nur im Log stehen.
     expect(sentryMeldung).toHaveBeenCalledTimes(1)
     const [, kontext] = sentryMeldung.mock.calls[0] as [unknown, { extra?: Record<string, unknown> }]
@@ -340,11 +358,16 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
     // Keine Kundendaten an Sentry (CLAUDE.md, Sicherheit).
     expect(JSON.stringify(kontext)).not.toContain('anna@example.com')
     // Der Betreiber bekommt eine Meldung — der Hof hat keinen Zugang zum
-    // Plattformkonto (Nr. 19c). Ohne Daten der Kundin.
-    await vi.waitFor(() => expect(sendErstattungOffen).toHaveBeenCalledTimes(1))
-    const [meldung, an] = vi.mocked(sendErstattungOffen).mock.calls[0]!
-    expect(meldung).toMatchObject({ bestellId: 'order_1', bestellnummer: 'TH-1' })
-    expect(an).toEqual(['support@example.com'])
+    // Plattformkonto (Nr. 19c). Ohne Daten der Kundin: je Empfänger ein
+    // Auftrag mit Fall und Beträgen (die feste Adresse heißt `support`).
+    const offen = auftraege().filter((a) => a.art === 'erstattung-offen')
+    expect(offen).toHaveLength(1)
+    const meldung = offen[0]!
+    expect(meldung).toMatchObject({
+      schluessel: 'erstattung-offen:storno-order_1:support',
+      bestellungId: 'order_1',
+      bezug: { empfaengerId: 'support', fall: 'storno_voll', orderId: 'order_1', kundinCents: '2000', hofCents: '2000' },
+    })
     // Die Aufgabe „Erstattung offen" im Admin-Postfach: bedingt gesetzt, die erste Zeit bleibt.
     expect(orderUpdateMany).toHaveBeenCalledWith({ where: { id: 'order_1', erstattungOffenSeit: null }, data: { erstattungOffenSeit: expect.any(Date) } })
     expect(JSON.stringify(meldung)).not.toContain('anna@example.com')
@@ -360,28 +383,34 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
 
     // Das Geld IST zurück — „Rückerstattung fehlgeschlagen" wäre gelogen.
     expect(result).toEqual({ erstattetCents: 2000, vomHofCents: 2000 })
-    // Dritter Wert: der Grund aus dem Storno-Dialog (Nr. 19) — hier keiner.
-    // Die Mail läuft nach der Antwort und lädt den Versand erst dann (Nr. 31) — also abwarten.
-    await vi.waitFor(() =>
-      expect(mailStorno).toHaveBeenCalledWith(expect.objectContaining({ orderNumber: 'TH-1' }), 20, undefined)
-    )
+    expect(nachgetragen()).toEqual([{ orderId: 'order_1', erstattetCents: '2000' }])
     expect(sentryMeldung).toHaveBeenCalledTimes(1)
     const [, kontext] = sentryMeldung.mock.calls[0] as [unknown, { tags?: Record<string, unknown> }]
     expect(kontext.tags).toEqual(expect.objectContaining({ grund: 'vermerk_fehlgeschlagen' }))
   })
 
-  it('der Mailversand hängt nicht im Antwortpfad — eine nie endende Mail blockiert die Stornierung nicht', async () => {
+  it('kein Versand im Antwortpfad: bar storniert steht ein Auftrag ohne Erstattung, in der Transaktion; nichts nachzutragen', async () => {
     datenbankMit({ ...barBestellung(), status: 'READY' })
-    mailStorno.mockImplementation((() => new Promise<void>(() => {})) as never)
+    expect(await cancelOrder('order_1')).toEqual({ erstattetCents: 0, vomHofCents: 0 })
+    expect(auftraege()).toEqual([expect.objectContaining({ art: 'storniert', bezug: { orderId: 'order_1' } })])
+    expect(nachtragen).not.toHaveBeenCalled()
 
-    const ergebnis = await Promise.race([
-      cancelOrder('order_1'),
-      new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), 1500)),
-    ])
+    // Gegenprobe: Scheitert das Einstellen, scheitert die Transaktion — der Hof
+    // bekommt eine Fehlermeldung statt einer Stornierung ohne Mail.
+    datenbankMit({ ...barBestellung(), status: 'READY' })
+    einstellen.mockRejectedValueOnce(new Error('DB weg'))
+    expect(await cancelOrder('order_1')).toEqual({ error: 'Wir konnten die Bestellung nicht stornieren. Versuch es bitte gleich noch einmal.' })
+    expect(sentryMeldung).toHaveBeenCalledWith(expect.any(Error), expect.objectContaining({ tags: { aktion: 'cancelOrder', grund: 'nicht_gespeichert' } }))
+  })
 
-    expect(ergebnis).toEqual({ erstattetCents: 0, vomHofCents: 0 })
-    // Gestartet wird sie trotzdem — nach der Antwort, mit dem Versand erst dann geladen (Nr. 31).
-    await vi.waitFor(() => expect(mailStorno).toHaveBeenCalledTimes(1))
+  it('scheitert nur das Nachtragen der Erstattung: Storno und Erstattung bleiben, Sentry meldet es', async () => {
+    onlineBezahlt()
+    nachtragen.mockRejectedValueOnce(new Error('connection reset'))
+    expect(await cancelOrder('order_1')).toEqual({ erstattetCents: 2000, vomHofCents: 2000 })
+    expect(sentryMeldung).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ tags: { aktion: 'bestellmail', art: 'storniert', grund: 'erstattung_eintragen' } })
+    )
   })
 })
 

@@ -15,6 +15,8 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vites
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
 vi.mock('server-only', () => ({}))
+// Das Mail-Protokoll (Nr. 158) bindet Prisma; hier geht es nur um die Mail selbst.
+vi.mock('@/server/mail-warteschlange', () => ({ protokolliereSofortMail: vi.fn() }))
 vi.mock('resend', () => ({
   Resend: class {
     emails = { send: sendMock }
@@ -26,6 +28,17 @@ import { bestellLinkGilt } from '@/lib/bestell-link'
 // Der kalte Import von email.ts zieht React und alle Vorlagen nach
 // (TESTING_GUIDELINES §4: einmal je Datei, mit eigenem Timeout).
 let email: typeof import('@/lib/email')
+
+/**
+ * Seit Nr. 159 baut email.ts diese Mail nur (Renderer der Warteschlange);
+ * `gebaut` legt das Ergebnis dorthin, wo der Test den Aufruf an Resend liest.
+ */
+function gebaut<A extends unknown[]>(baue: (...a: A) => Promise<import('@/lib/email').StapelMail>): (...a: A) => Promise<void> {
+  return async (...a) => {
+    const mail = await baue(...a)
+    sendMock({ from: 'test', to: mail.an, subject: mail.betreff, html: mail.html, ...(mail.headers ? { headers: mail.headers } : {}) })
+  }
+}
 
 beforeAll(async () => {
   vi.stubEnv('RESEND_API_KEY', 're_test_dummy')
@@ -80,8 +93,8 @@ function bestellLinks(): URL[] {
 
 describe('Kunden-Mails — jeder Link zur Bestellung ist signiert', () => {
   it.each([
-    ['Bestätigung', () => email.sendOrderConfirmation(BESTELLUNG)],
-    ['Abholbereit', () => email.sendOrderReady(BESTELLUNG)],
+    ['Bestätigung', () => gebaut(email.baueOrderConfirmation)(BESTELLUNG)],
+    ['Abholbereit', () => gebaut(email.baueOrderReady)(BESTELLUNG)],
   ])('%s', async (_name, senden) => {
     await senden()
 

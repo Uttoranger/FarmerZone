@@ -4,8 +4,9 @@ import { env } from '@/lib/env'
 import { cronBerechtigt } from '@/lib/geheimnis'
 import { screenshotsVon, waehleZuLoeschende } from '@/lib/meldung'
 import { findeHauptmeldungen, findeLoeschKandidaten, loescheMeldungen, zaehleFuerWochenlauf } from '@/server/queries/meldung'
-import { sendBriefkastenZusammenfassung } from '@/lib/email'
-import { ladeBetreiberEmpfaenger, zaehleOffenImEingang } from '@/server/queries/postfach'
+import { zaehleOffenImEingang } from '@/server/queries/postfach'
+import { stelleMailEin } from '@/server/mail-warteschlange'
+import { betreiberAuftraege, betreiberKennungen } from '@/server/mail-arten/betreiber'
 import { mitHerzschlag } from '@/server/betrieb'
 
 /**
@@ -63,11 +64,15 @@ async function wochenlauf(): Promise<Record<string, unknown>> {
   }
   const geloescht = await loescheMeldungen(zuLoeschen.map((m) => m.id))
 
-  // (a) Zusammenfassung nur, wenn im Eingang etwas offen ist
+  // (a) Zusammenfassung nur, wenn im Eingang etwas offen ist — je Empfänger
+  // ein Auftrag der Warteschlange (Wichtig, Nr. 159). Die Zahlen zählt der
+  // Renderer beim Versand frisch; nur „gelöscht" kennt allein dieser Lauf.
+  // Der Tag macht den Schlüssel eindeutig: ein zweiter Lauf am selben Tag
+  // schreibt nicht noch einmal.
   const [zaehler, eingang] = await Promise.all([zaehleFuerWochenlauf(jetzt), zaehleOffenImEingang()])
-  const an = eingang.gesamt > 0 ? await ladeBetreiberEmpfaenger('wochenbericht') : []
+  const an = eingang.gesamt > 0 ? await betreiberKennungen('wochenbericht') : []
   if (an.length > 0) {
-    await sendBriefkastenZusammenfassung({ ...zaehler, geloescht, eingang }, an)
+    await stelleMailEin(betreiberAuftraege('wochenbericht', jetzt.toISOString().slice(0, 10), an, { geloeschtAnzahl: String(geloescht) }))
   }
 
   return {

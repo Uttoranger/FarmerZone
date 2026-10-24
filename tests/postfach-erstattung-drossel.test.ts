@@ -25,7 +25,8 @@ vi.mock('@/server/queries/postfach', () => ({
   ladeAntwortFuerTeam: vi.fn(async () => ({ hofName: 'Testhof A', titel: 'Erfundener Titel' })),
 }))
 vi.mock('@/server/bremse-datenbank', () => ({ bremseUeberAlleInstanzen: vi.fn(async () => true) }))
-vi.mock('@/lib/email', () => ({ sendHofAntwortAnTeam: vi.fn(async () => ({ gesendet: 1, gescheitert: 0 })) }))
+// Die Mail an das Team ist seit Nr. 159 je Adresse ein Auftrag der Warteschlange.
+vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn(async () => 1) }))
 const nachlauf = vi.hoisted(() => ({ aufgaben: [] as (() => Promise<void>)[] }))
 vi.mock('@/lib/nach-der-antwort', () => ({
   nachDerAntwort: (aufgabe: () => Promise<void>) => {
@@ -35,7 +36,7 @@ vi.mock('@/lib/nach-der-antwort', () => ({
 vi.mock('@/lib/prisma', async () => {
   const tx = {
     unterhaltung: { updateMany: vi.fn(async () => ({ count: 1 })) },
-    nachricht: { create: vi.fn(async () => ({})) },
+    nachricht: { create: vi.fn(async () => ({ id: 'cmfnachricht000000000001' })) },
     unterhaltungStand: { createMany: vi.fn(async () => ({ count: 1 })), updateMany: vi.fn(async () => ({ count: 1 })) },
   }
   return {
@@ -44,6 +45,8 @@ vi.mock('@/lib/prisma', async () => {
       ...(await import('./admin-sitzung')).passkeyAttrappen(),
       user: { findUnique: vi.fn() },
       order: { updateMany: vi.fn() },
+      // Die Kennung der weiteren Adresse aus der Zustellung (empfaengerKennungen).
+      betreiberEmpfaenger: { findMany: vi.fn(async () => [{ id: 'cmfteam00000000000000001', email: 'team@example.com' }]) },
       $transaction: vi.fn(async (arbeit: (t: typeof tx) => Promise<unknown>) => arbeit(tx)),
     },
   }
@@ -51,7 +54,7 @@ vi.mock('@/lib/prisma', async () => {
 
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { sendHofAntwortAnTeam } from '@/lib/email'
+import { stelleMailEin } from '@/server/mail-warteschlange'
 import { bremseUeberAlleInstanzen, type Versuch } from '@/server/bremse-datenbank'
 import { DB_BREMSEN, fensterBeginn, innerhalbDerGrenze } from '@/lib/bremse-datenbank'
 import { antworteAlsHof, markiereErstattungErledigt } from '@/server/actions/postfach'
@@ -141,10 +144,10 @@ describe('Drossel: „Ein Hof hat geantwortet" höchstens einmal je Faden und vo
   it('10:05 und 10:15 → eine Mail; 11:05 → wieder eine', async () => {
     await antwortUm('2026-10-16T10:05:00Z')
     await antwortUm('2026-10-16T10:15:00Z')
-    expect(sendHofAntwortAnTeam).toHaveBeenCalledTimes(1)
+    expect(stelleMailEin).toHaveBeenCalledTimes(1)
 
     await antwortUm('2026-10-16T11:05:00Z')
-    expect(sendHofAntwortAnTeam).toHaveBeenCalledTimes(2)
+    expect(stelleMailEin).toHaveBeenCalledTimes(2)
     // Gezählt wird je Faden mit der Bremse der Mail — Merkmal ist die Kennung des Fadens.
     expect(vi.mocked(bremseUeberAlleInstanzen).mock.calls.every(([v]) => v[0]?.bremse === DB_BREMSEN.antwortHofMail && v[0]?.merkmal === FADEN)).toBe(true)
   })
@@ -152,7 +155,7 @@ describe('Drossel: „Ein Hof hat geantwortet" höchstens einmal je Faden und vo
   it('10:59 und 11:00 liegen in zwei Fenstern — je eine Mail', async () => {
     await antwortUm('2026-10-16T10:59:59Z')
     await antwortUm('2026-10-16T11:00:00Z')
-    expect(sendHofAntwortAnTeam).toHaveBeenCalledTimes(2)
+    expect(stelleMailEin).toHaveBeenCalledTimes(2)
   })
 
   it('ohne Empfänger wird nicht gezählt und nichts verschickt', async () => {
@@ -160,6 +163,6 @@ describe('Drossel: „Ein Hof hat geantwortet" höchstens einmal je Faden und vo
     vi.mocked(ladeBetreiberEmpfaenger).mockResolvedValueOnce([])
     await antwortUm('2026-10-16T10:05:00Z')
     expect(bremseUeberAlleInstanzen).not.toHaveBeenCalled()
-    expect(sendHofAntwortAnTeam).not.toHaveBeenCalled()
+    expect(stelleMailEin).not.toHaveBeenCalled()
   })
 })

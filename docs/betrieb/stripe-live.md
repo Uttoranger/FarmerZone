@@ -57,7 +57,7 @@ Mit dem Live-Schlüssel verschwinden alle drei von selbst. Den Modus liest die A
 
 ## 3. Zwei Live-Webhooks
 
-Beide Endpunkte zeigen auf **`https://farmerzone.at/api/stripe/webhook`**. Die Route prüft jede Zustellung gegen beide Secrets.
+Beide Endpunkte zeigen auf **`https://agrilo.at/api/stripe/webhook`**. Die Route prüft jede Zustellung gegen beide Secrets. Die alte Adresse farmerzone.at leitet auf agrilo.at um; Stripe folgt keiner Weiterleitung – Endpunkte immer auf agrilo.at.
 
 - [ ] **Endpunkt A – Plattform** („Ereignisse in deinem Konto“), alle Ereignisse, die `src/app/api/stripe/webhook/route.ts` verarbeitet:
 
@@ -83,7 +83,7 @@ Vercel erlaubt je Variable und Umgebung nur einen Wert. Deshalb kommt **zuerst S
 
 - [ ] Bei jeder bestehenden Variable `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` und `STRIPE_WEBHOOK_SECRET` sowie bei `STRIPE_PUBLISHABLE_KEY` (falls vorhanden; der Code liest sie nicht) die Umgebung **Production abwählen**. Übrig bleibt Preview, bei Bedarf auch Development.
 - [ ] Danach gilt: Vorschau = Test-Schlüssel, Produktion = Live-Schlüssel.
-- [ ] Die Branch-Variable `STRIPE_WEBHOOK_SECRET` für `staging` (Testumgebung, `docs/betrieb/testumgebung.md` Schritt 3) bleibt, wie sie ist. Sie gehört zum Test-Endpunkt von `test.farmerzone.at`.
+- [ ] Die Branch-Variable `STRIPE_WEBHOOK_SECRET` für `staging` (Testumgebung, `docs/betrieb/testumgebung.md` Schritt 3) bleibt, wie sie ist. Sie gehört zum Test-Endpunkt von `test.agrilo.at`.
 
 **4. Neue Variablen nur für Production**
 
@@ -104,20 +104,26 @@ Vercel erlaubt je Variable und Umgebung nur einen Wert. Deshalb kommt **zuerst S
   - Liegt der Wert **mehr als 24 Stunden in der Zukunft** (etwa ein falsches Jahr), gilt er trotzdem – bis dahin zählen alle Online-Bestellungen als Testzahlungen. Sentry meldet dann „Umgebung widersprüchlich: STRIPE_LIVE_AB liegt mehr als 24 Stunden in der Zukunft …“ (höchstens einmal je Instanz, ohne den Wert). Dann den Wert berichtigen und neu deployen.
   - **Bau-Fenster:** Online-Bestellungen zwischen dem Beginn des Redeploys und dem fertigen Deployment laufen noch über den Test-Schlüssel, liegen aber nach dem Stichtag – sie würden mitgezählt. Darum die ruhige Stunde (Schritt 0) und danach Admin → Finanzen prüfen (Schritt 8).
 
+**Unabhängig von Stripe: `LINK_SECRET` (Register S17, Nr. 166)**
+
+- [ ] `LINK_SECRET` signiert die Links in Mails (Bestellung ansehen, Nachbestellen, Abmelden). Je einen **eigenen** Wert für **Preview** und für **Production** anlegen, „Sensitive“, mindestens 32 Zeichen (`openssl rand -base64 32`), nie derselbe Wert wie `BETTER_AUTH_SECRET`. Kürzer als 32 Zeichen bricht der Start ab.
+- [ ] Reihenfolge: zuerst Preview setzen, neu deployen, in der Vorschau eine Bestellung durchspielen (Bestätigungsseite, Bestellseite aus der Mail bzw. dem Protokoll, Kalender), dann Production.
+- Ohne die Variable bleibt alles wie bisher. Mit ihr tragen neue Links `2.` vor der Signatur; alte Links aus Mails gelten weiter.
+
 ## 6. Zahlungsarten live aktivieren
 
 - [ ] Einstellungen → Zahlungsmethoden (Live-Modus): **EPS**, **Apple Pay** und **Google Pay** aktivieren, Karten sind an. Welche Wege die Kasse anbietet, entscheidet allein diese Einstellung. Stripes Zahlungsfeld zeigt nur, was hier aktiv ist und was das Gerät kann.
 
 ## 7. Apple-Pay-Domain
 
-- [ ] Einstellungen → Zahlungsmethoden → Domains (Live-Modus): **`farmerzone.at`** hinzufügen und warten, bis Stripe die Domain als bestätigt zeigt.
+- [ ] Einstellungen → Zahlungsmethoden → Domains (Live-Modus): **`agrilo.at`** hinzufügen und warten, bis Stripe die Domain als bestätigt zeigt.
   > Verlangt Stripe dafür eine Datei unter `/.well-known/`, ist das ein eigener kleiner Auftrag. Heute liegt keine solche Datei im Projekt.
 
 ## 8. Neu deployen
 
 - [ ] **Vorher:** Vercel → Settings → Environment Variables: **„Automatically expose System Environment Variables“ ist an.** Ohne den Schalter fehlt `VERCEL_ENV` zur Laufzeit, und die Modus-Wache sperrt mit dem Live-Schlüssel auch die Produktion. Gegenprobe: Server-Ereignisse der Produktion tragen in Sentry das environment `production` – zum Beispiel die heutige Warnung „Stripe TEST in Produktion“.
 - [ ] Vercel → Deployments → das aktuelle Production-Deployment **neu bauen** („Redeploy“, ohne Build-Cache). Ein Neustart allein genügt nicht: `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` wird beim Bauen in die Seiten geschrieben.
-- [ ] Danach prüfen, auf `farmerzone.at`:
+- [ ] Danach prüfen, auf `agrilo.at`:
   - [ ] Kasse (`/<hof>/checkout`): An „Online bezahlen“ steht kein „Testbetrieb: …“ mehr.
   - [ ] Admin (`/admin`): Die orange Karte „Stripe läuft im Testmodus …“ ist weg, unter dem Kopf steht „Stripe Live“ in Grün (Nr. 43).
   - [ ] Einstellungen → Zahlung: „Online-Zahlung läuft noch im Testbetrieb.“ ist weg.
@@ -129,7 +135,7 @@ Vercel erlaubt je Variable und Umgebung nur einen Wert. Deshalb kommt **zuerst S
   - [ ] Admin → Finanzen: Unter dem Titel steht leise „Testzahlungen vor dem … sind nicht mitgezählt.“ mit dem Zeitpunkt aus `STRIPE_LIVE_AB` (nur, wenn in den gezeigten Monaten eine Testzahlung sonst mitgezählt hätte). Fehlt die Zeile trotz Testzahlungen, ist der Wert ungültig – Sentry nennt den Grund.
   - [ ] Admin → Finanzen: Keine Online-Bestellung aus dem Bau-Fenster unter „Servicegebühr, online“. Gibt es doch eine, `STRIPE_LIVE_AB` auf den Zeitpunkt setzen, zu dem das neue Deployment fertig war (Vercel → Deployments, „Ready“), und noch einmal neu deployen – dann laufen alte und neue Version schon mit dem Live-Schlüssel.
   - [ ] Stripe → Webhooks: Endpunkt A und B zeigen beim ersten Ereignis eine Zustellung mit 200.
-- [ ] Im **Testmodus** von Stripe den alten Endpunkt `https://farmerzone.at/api/stripe/webhook` löschen. Die Produktion prüft jetzt gegen die Live-Secrets und würde jede Test-Zustellung mit 400 ablehnen. Der Endpunkt der Testumgebung (`test.farmerzone.at`, Nr. 43) bleibt.
+- [ ] Im **Testmodus** von Stripe den alten Endpunkt `https://agrilo.at/api/stripe/webhook` löschen. Die Produktion prüft jetzt gegen die Live-Secrets und würde jede Test-Zustellung mit 400 ablehnen. Der Endpunkt der Testumgebung (`test.agrilo.at`, Nr. 43) bleibt.
 
 ## 9. Höfe richten Stripe neu ein
 
@@ -156,6 +162,16 @@ Online-Bestellungen von vor der Umstellung sind Testzahlungen. **Barbestellungen
 - **Umgesetzt (Register Z4):** Vorschlag A, aber mit der Server-Variable `STRIPE_LIVE_AB` statt einer Konstante – zur Live-Schaltung ist keine Code-Änderung nötig, den Wert setzt du in Schritt 4. Eine Regel aus einer Quelle (`src/lib/testzahlung.ts`): Zahlart online UND angelegt vor dem Stichtag. Sie gilt für die Auswertung, die Verkäufe samt Jahressumme für die Umsatzgrenze, Heute, die Umsätze und (seit Lauf 10) die Bestellzahlen der Kunden, die Admin-Finanzen und die Admin-Hofliste. Bestellungen, Beträge, Checkout, Webhook, Erstattung und Storno bleiben unverändert; die Liste „Letzte Verkäufe“ zeigt die Bestellungen weiter.
 - **Ohne Variable bleibt alles wie vorher.** Lässt eine gezeigte Zahl eine Testzahlung aus, steht in Auswertung, Verkäufe und Admin-Finanzen leise „Testzahlungen vor dem … sind nicht mitgezählt.“
 - **Vorschlag B – Merkmal an der Bestellung (Expand-Migration)** bleibt eine Option für später: eine Spalte wie `Order.stripeLivemode`, gesetzt aus `livemode` des PaymentIntents. Sie hielte auch für die Testumgebung und weitere Umstellungen, braucht aber eine freigegebene Migration und einen eigenen Auftrag.
+
+## Anhang: Zustellmeldungen von Resend (Nr. 160)
+
+Unabhängig von der Live-Schaltung, einmal einzurichten. Ohne diesen Schritt antwortet `/api/webhooks/resend` mit 503, und Admin › Betrieb kennt keine Zustellung, keine Ablehnung und keine Spam-Meldung.
+
+- [ ] Resend → Webhooks → Endpunkt hinzufügen: **`https://agrilo.at/api/webhooks/resend`** (nie farmerzone.at – die Adresse leitet weiter, und eine Weiterleitung kommt beim Webhook nicht an).
+- [ ] Ereignisse: **`email.delivered`**, **`email.bounced`**, **`email.complained`** – keine weiteren.
+- [ ] Das Signatur-Geheimnis des Endpunkts (beginnt mit `whsec_`) in Vercel als **`RESEND_WEBHOOK_SECRET`** anlegen, **nur Production**, „Sensitive“. Danach neu deployen.
+- [ ] Prüfen: Nach der nächsten Mail zeigt Resend beim Endpunkt eine Zustellung mit 200. Ein 401 heißt: Geheimnis falsch kopiert; 503: Variable fehlt oder Deploy noch nicht durch.
+- Ein Bounce oder eine Spam-Meldung zu einem Beitrag meldet das Abo ab (E-Mail und WhatsApp aus, wie der Abmeldelink). Mails zu Bestellungen werden nur vermerkt.
 
 ## Zurück, falls nötig
 

@@ -6,7 +6,8 @@
  *  - Der Checkout speichert nur den Hash des Tokens; der Token steht allein
  *    im Aufruf von `sendOnsiteConfirmation`.
  *  - Der Token aus der Mail bestätigt, der gespeicherte Wert als Token nicht.
- *  - Eine Bestellung von vor dem Deploy (Klartext gespeichert) bestätigt weiter.
+ *  - Ein Klartext-Wert in der Spalte bestätigt nicht mehr (Nr. 164); das Aufräumen
+ *    setzt ihn auf null, lässt Hash, null und die Bestellung selbst stehen.
  *  - „Erneut senden" ersetzt den Link: der alte gilt nicht mehr, der neue
  *    bestätigt. Von zwei gleichzeitigen Anforderungen schickt genau eine eine
  *    Mail — das entscheidet die Bedingung des Schreibens in Postgres, nicht
@@ -36,6 +37,7 @@ import { prisma } from '@/lib/prisma'
 import { sendOnsiteConfirmation } from '@/lib/email'
 import { bestellSignatur } from '@/lib/bestell-link'
 import { BAR_LINK_ERNEUT_ANTWORT, barTokenHash } from '@/lib/bar-bestaetigung'
+import { raeumeAltesAuf } from '@/server/aufraeumen'
 import { bestaetigeBarBestellung, sendeBarLinkErneut } from '@/server/actions/bar-bestaetigung'
 import { checkoutAnfrage, erstelleHof, erstelleProdukt, intKennung, raeumeAuf, setzeHalt } from './setup/basis'
 
@@ -118,13 +120,29 @@ describe('Barbestätigung — nur der Hash in der Datenbank', () => {
     expect(await gespeichert(orderId)).toEqual({ status: 'CONFIRMED', confirmationToken: null })
   })
 
-  it('eine Bestellung von vor dem Deploy (Klartext gespeichert) bestätigt weiter', async () => {
-    const { orderId } = await barBestellung()
-    const alt = `alt${intKennung('tok').replace(/[^A-Za-z0-9_-]/g, '')}`.slice(0, 32)
-    await prisma.order.update({ where: { id: orderId }, data: { confirmationToken: alt } })
+  it('ein Klartext-Wert bestätigt nicht mehr; das Aufräumen leert ihn und lässt Hash und Bestellung stehen', async () => {
+    const alt = await barBestellung()
+    const klartext = `alt${intKennung('tok').replace(/[^A-Za-z0-9_-]/g, '')}`.slice(0, 32)
+    await prisma.order.update({ where: { id: alt.orderId }, data: { confirmationToken: klartext } })
+    mail.mockClear()
+    const neu = await barBestellung()
+    mail.mockClear()
+    const ohne = await barBestellung()
+    await prisma.order.update({ where: { id: ohne.orderId }, data: { confirmationToken: null } })
 
-    expect(await bestaetige(alt)).toBe(true)
-    expect((await gespeichert(orderId)).status).toBe('CONFIRMED')
+    expect(await bestaetige(klartext)).toMatch(/gilt nicht mehr/)
+    expect((await gespeichert(alt.orderId)).status).toBe('PENDING_CONFIRMATION')
+
+    const ergebnis = await raeumeAltesAuf(new Date())
+
+    // Andere Zeilen der geteilten Test-Datenbank können mitgezählt sein: mindestens unsere eine.
+    expect(ergebnis.klartextTokens).toBeGreaterThanOrEqual(1)
+    expect(await gespeichert(alt.orderId)).toEqual({ status: 'PENDING_CONFIRMATION', confirmationToken: null })
+    // Gegenprobe: ein Hash bleibt, und sein Token bestätigt weiter.
+    expect((await gespeichert(neu.orderId)).confirmationToken).toBe(barTokenHash(neu.token))
+    expect(await bestaetige(neu.token)).toBe(true)
+    // Gegenprobe: null bleibt null, die Bestellung bleibt.
+    expect(await gespeichert(ohne.orderId)).toEqual({ status: 'PENDING_CONFIRMATION', confirmationToken: null })
   })
 })
 

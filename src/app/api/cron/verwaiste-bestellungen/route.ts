@@ -7,8 +7,8 @@ import { mitHerzschlag } from '@/server/betrieb'
 
 /**
  * Das Netz unter der Frist (src/lib/fristen.ts): einmal täglich alle Höfe.
- * Aufruf durch Vercel Cron (vercel.json: `30 3 * * *`, UTC; der Hobby-Tarif
- * erlaubt nur einmal täglich).
+ * Aufruf durch Vercel Cron (vercel.json: `30 3 * * *`, UTC; täglich reicht —
+ * seit Vercel Pro wäre auch öfter möglich).
  *
  * Die Frist selbst gilt beim LESEN — wer Bestand liest, gibt vorher frei.
  * Dieser Lauf erwischt Höfe, bei denen tagelang niemand liest; ohne ihn

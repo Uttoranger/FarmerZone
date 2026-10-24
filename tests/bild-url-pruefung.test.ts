@@ -20,9 +20,12 @@ vi.mock('@sentry/nextjs', () => ({ captureMessage: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: vi.fn() }))
 vi.mock('@/lib/prisma', () => {
+  // Der Beitrag entsteht seit Nr. 159 in einer Transaktion (mit den Aufträgen der Mails) — dieselbe Attrappe darin.
+  const statusPost = { create: vi.fn(), findFirst: vi.fn() }
   const tx = {
     product: { updateMany: vi.fn() },
     futterKennzeichnung: { upsert: vi.fn(), deleteMany: vi.fn() },
+    statusPost,
   }
   return {
     prisma: {
@@ -30,7 +33,7 @@ vi.mock('@/lib/prisma', () => {
       farmPhoto: { count: vi.fn(), create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
       farmValue: { deleteMany: vi.fn(), createMany: vi.fn() },
       product: { create: vi.fn(), update: vi.fn(), findFirst: vi.fn() },
-      statusPost: { create: vi.fn(), findFirst: vi.fn() },
+      statusPost,
       customerFarmSubscription: { findMany: vi.fn() },
       $transaction: vi.fn(async (arg: unknown) =>
         typeof arg === 'function' ? (arg as (t: typeof tx) => Promise<unknown>)(tx) : Promise.all(arg as unknown[])

@@ -18,6 +18,8 @@ import { join } from 'node:path'
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
 vi.mock('server-only', () => ({}))
+// Das Mail-Protokoll (Nr. 158) bindet Prisma; hier geht es nur um die Mail selbst.
+vi.mock('@/server/mail-warteschlange', () => ({ protokolliereSofortMail: vi.fn() }))
 vi.mock('resend', () => ({
   Resend: class {
     emails = { send: sendMock }
@@ -106,21 +108,33 @@ function links(html: string): URL[] {
     .map((h) => new URL(h))
 }
 
+/**
+ * Die Mails der Warteschlange (Nr. 159) werden nur gebaut, nicht verschickt —
+ * `gebaut` legt das Ergebnis dorthin, wo `zuletzt()` auch die direkt
+ * verschickten findet (der Aufruf an Resend).
+ */
+function gebaut<A extends unknown[]>(baue: (...a: A) => Promise<import('@/lib/email').StapelMail>): (...a: A) => Promise<void> {
+  return async (...a) => {
+    const mail = await baue(...a)
+    sendMock({ to: mail.an, subject: mail.betreff, html: mail.html })
+  }
+}
+
 const BILDZEICHEN = /\p{Extended_Pictographic}|[✓✗]/u
 
 /** Mails werden später gelesen als verschickt — relative Tagesangaben veralten über Nacht. */
 const RELATIVER_TAG = /\b(heute|morgen|übermorgen|gestern)\b/i
 
 const KUNDEN_MAILS: Array<[string, () => Promise<void>]> = [
-  ['Bestätigung online', () => email.sendOrderConfirmation(bestellung())],
-  ['Bestätigung bar', () => email.sendOrderConfirmation(bestellung({ paymentMethod: 'ONSITE_CASH' }))],
+  ['Bestätigung online', () => gebaut(email.baueOrderConfirmation)(bestellung())],
+  ['Bestätigung bar', () => gebaut(email.baueOrderConfirmation)(bestellung({ paymentMethod: 'ONSITE_CASH' }))],
   ['Bitte bestätigen', () => email.sendOnsiteConfirmation(bestellung({ paymentMethod: 'ONSITE_CASH' }), 'token-1')],
-  ['Abholbereit', () => email.sendOrderReady(bestellung())],
-  ['Doch nicht abholbereit', () => email.sendOrderNotReady(bestellung())],
-  ['Storniert online', () => email.sendOrderCancelled(bestellung(), 10.82)],
-  ['Storniert bar', () => email.sendOrderCancelled(bestellung({ paymentMethod: 'ONSITE_CASH' }), null)],
-  ['Verfallen', () => email.sendBestellungVerfallen(bestellung())],
-  ['Zahlung zu spät', () => email.sendZahlungZuSpaet(bestellung(), 1082)],
+  ['Abholbereit', () => gebaut(email.baueOrderReady)(bestellung())],
+  ['Doch nicht abholbereit', () => gebaut(email.baueOrderNotReady)(bestellung())],
+  ['Storniert online', () => gebaut(email.baueOrderCancelled)(bestellung(), 1082)],
+  ['Storniert bar', () => gebaut(email.baueOrderCancelled)(bestellung({ paymentMethod: 'ONSITE_CASH' }), null)],
+  ['Verfallen', () => gebaut(email.baueBestellungVerfallen)(bestellung())],
+  ['Zahlung zu spät', () => gebaut(email.baueZahlungZuSpaet)(bestellung(), 1082)],
 ]
 
 describe.each(KUNDEN_MAILS)('Kunden-Mail „%s"', (_name, senden) => {
@@ -158,7 +172,7 @@ describe.each(KUNDEN_MAILS)('Kunden-Mail „%s"', (_name, senden) => {
 
 describe('Bestätigungs-Mail nach Mockup', () => {
   it('online: Bestellnummer (kein „Abholcode"), Positionen, Gebühr, „Online bezahlt" mit Gesamt', async () => {
-    await email.sendOrderConfirmation(bestellung())
+    await gebaut(email.baueOrderConfirmation)(bestellung())
     const { text, html } = zuletzt()
     expect(text).toContain('Danke für deine Bestellung!')
     expect(text).toContain('Bestellnummer')
@@ -175,25 +189,25 @@ describe('Bestätigungs-Mail nach Mockup', () => {
   })
 
   it('bar bestätigt: sagt nie „bezahlt", sondern was bei der Abholung mitzubringen ist', async () => {
-    await email.sendOrderConfirmation(bestellung({ paymentMethod: 'ONSITE_CASH' }))
+    await gebaut(email.baueOrderConfirmation)(bestellung({ paymentMethod: 'ONSITE_CASH' }))
     const { text } = zuletzt()
     expect(text).not.toMatch(/bezahlt|Zahlung erfolgreich/i)
     expect(text).toMatch(/Bar bei Abholung\s*€ 10,82/)
     expect(text).toContain('Bring bitte € 10,82 in bar mit.')
     // Gegenprobe: online steht „bezahlt" da.
-    await email.sendOrderConfirmation(bestellung())
+    await gebaut(email.baueOrderConfirmation)(bestellung())
     expect(zuletzt().text).toMatch(/bezahlt/i)
   })
 
   it('alte Bestellung mit Karte bei Abholung (E5): „Karte bei Abholung"', async () => {
-    await email.sendOrderConfirmation(bestellung({ paymentMethod: 'ONSITE_CARD' }))
+    await gebaut(email.baueOrderConfirmation)(bestellung({ paymentMethod: 'ONSITE_CARD' }))
     const { text } = zuletzt()
     expect(text).toMatch(/Karte bei Abholung\s*€ 10,82/)
     expect(text).not.toMatch(/bezahlt/i)
   })
 
   it('keine Werbung in der Vertragsmail: kein „Nochmal bestellen" direkt nach dem Bestellen (S11)', async () => {
-    await email.sendOrderConfirmation(bestellung())
+    await gebaut(email.baueOrderConfirmation)(bestellung())
     const { html, text } = zuletzt()
     expect(html).not.toContain('reorder=')
     expect(text).not.toContain('Nochmal bestellen')
@@ -233,7 +247,7 @@ describe('„Bitte bestätige" — Frist aus fristen.ts', () => {
 
 describe('Abholbereit-Mail (Vorlage pickup-reminder.tsx)', () => {
   it('Bestellnummer, Zeitfenster, Route — und der Hinweis, wie man dem Hof absagt', async () => {
-    await email.sendOrderReady(bestellung())
+    await gebaut(email.baueOrderReady)(bestellung())
     const { text, html } = zuletzt()
     expect(text).toContain('Deine Bestellung liegt bereit')
     expect(text).toContain('HT-0210-A4F2')
@@ -247,7 +261,7 @@ describe('Abholbereit-Mail (Vorlage pickup-reminder.tsx)', () => {
 
 describe('Neue-Bestellung-Mail an den Hof (Vorlage new-order-notification.tsx)', () => {
   it('die Nummer der Kundin steht einheitlich da, der Link wählt sie mit +43 (Nr. 81, N8)', async () => {
-    await email.sendOrderPaidToFarmer(bestellung({ customerPhone: '0660 0000000' }))
+    await gebaut(email.baueOrderPaidToFarmer)(bestellung({ customerPhone: '0660 0000000' }))
     const { text, html } = zuletzt()
     expect(text).toContain('+43 660 000 0000')
     expect(text).not.toContain('0660 0000000')
@@ -255,7 +269,7 @@ describe('Neue-Bestellung-Mail an den Hof (Vorlage new-order-notification.tsx)',
   })
 
   it('eine Nummer ohne Ziffer steht, wie sie eingegeben wurde — ohne Link', async () => {
-    await email.sendOrderPaidToFarmer(bestellung({ customerPhone: 'keine Angabe' }))
+    await gebaut(email.baueOrderPaidToFarmer)(bestellung({ customerPhone: 'keine Angabe' }))
     const { text, html } = zuletzt()
     expect(text).toContain('keine Angabe')
     expect(html).not.toContain('href="tel:')
@@ -270,14 +284,14 @@ function mitHofTelefon(telefon: string): import('@/lib/email').OrderForEmail {
 
 /** Die übrigen vier Vorlagen mit Nummer und Anruf-Link (Abholbereit und Neue Bestellung stehen oben). */
 const MAILS_MIT_NUMMER: Array<[string, (telefon: string) => Promise<void>]> = [
-  ['order-confirmed (an den Hof, Nummer der Kundin)', (telefon) => email.sendOrderConfirmedToFarmer(bestellung({ paymentMethod: 'ONSITE_CASH', customerPhone: telefon }))],
-  ['order-confirmation (Nummer des Hofs)', (telefon) => email.sendOrderConfirmation(mitHofTelefon(telefon))],
-  ['order-not-ready (Nummer des Hofs)', (telefon) => email.sendOrderNotReady(mitHofTelefon(telefon))],
+  ['order-confirmed (an den Hof, Nummer der Kundin)', (telefon) => gebaut(email.baueOrderConfirmedToFarmer)(bestellung({ paymentMethod: 'ONSITE_CASH', customerPhone: telefon }))],
+  ['order-confirmation (Nummer des Hofs)', (telefon) => gebaut(email.baueOrderConfirmation)(mitHofTelefon(telefon))],
+  ['order-not-ready (Nummer des Hofs)', (telefon) => gebaut(email.baueOrderNotReady)(mitHofTelefon(telefon))],
   [
     'artikel-fehlt (Nummer des Hofs)',
     (telefon) => {
       const b = mitHofTelefon(telefon)
-      return email.sendArtikelFehlt(b, { position: b.items[0], zahlung: 'online', bisherCents: 1082, neuCents: 632, erstattetCents: 450 })
+      return gebaut(email.baueArtikelFehlt)(b, { position: b.items[0], zahlung: 'online', bisherCents: 1082, neuCents: 632, erstattetCents: 450 })
     },
   ],
 ]

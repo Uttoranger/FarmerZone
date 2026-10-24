@@ -40,7 +40,7 @@ const BASIS = new URL('https://hof.example')
 const TELEFON = '+43 660 0000000'
 /** Ein Hof wie aus getPublicFarm — MIT Telefon und E-Mail: Der Block darf sie trotzdem nie tragen. */
 const HOF = {
-  slug: 'hof-test', name: 'Hof Test', description: 'Gemüse aus Musterdorf', address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf',
+  slug: 'hof-test', name: 'Hof Test', country: 'AT', description: 'Gemüse aus Musterdorf', address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf',
   bannerType: 'PHOTO', bannerUrl: 'https://blob.example/titel.jpg', logoUrl: '/logo.png', phone: TELEFON, email: 'hof@example.com',
 }
 const PRODUKT = { id: 'p_eier', name: 'Freilandeier', description: 'Zehn Stück', imageUrl: null, categoryImageUrl: '/categories/eier.webp', price: 4.5, stock: 3 }
@@ -55,6 +55,14 @@ describe('absoluteAdresse', () => {
 })
 
 describe('hofJsonLd', () => {
+  it('addressCountry kommt aus dem Land des Hofs: DE bleibt DE, AT bleibt AT, Unbekanntes wird AT (Nr. 164)', () => {
+    expect(hofJsonLd({ ...HOF, country: 'DE' }, null, BASIS).address).toMatchObject({ addressCountry: 'DE' })
+    expect(hofJsonLd({ ...HOF, country: 'AT' }, null, BASIS).address).toMatchObject({ addressCountry: 'AT' })
+    expect(hofJsonLd({ ...HOF, country: 'XX' }, null, BASIS).address).toMatchObject({ addressCountry: 'AT' })
+    expect(hofJsonLd(HOF, null, BASIS).address).toMatchObject({ addressCountry: 'AT' })
+    expect(hofJsonLd({ ...HOF, country: '' }, null, BASIS).address).toMatchObject({ addressCountry: 'AT' })
+  })
+
   it('LocalBusiness mit Adresse, voller URL und Titelbild — nie Telefon oder E-Mail, auch wenn der Hof sie trägt', () => {
     const daten = hofJsonLd(HOF, null, BASIS)
     const text = JSON.stringify(daten)

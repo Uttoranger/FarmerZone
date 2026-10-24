@@ -17,6 +17,8 @@ import { BEITRAG_ANLAESSE, BEITRAG_ANLASS } from '@/lib/beitrag-anlass'
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
 vi.mock('server-only', () => ({}))
+// Das Mail-Protokoll (Nr. 158) bindet Prisma; hier geht es nur um die Mail selbst.
+vi.mock('@/server/mail-warteschlange', () => ({ protokolliereSofortMail: vi.fn() }))
 vi.mock('resend', () => ({
   Resend: class {
     emails = { send: sendMock }
@@ -49,14 +51,17 @@ function gesendet(): { to: string; subject: string; html: string; headers?: Reco
   return sendMock.mock.calls[0]![0] as { to: string; subject: string; html: string; headers?: Record<string, string> }
 }
 
+/** Eine gebaute Mail der Warteschlange in der Form, die Resend bekäme. */
+function alsMail(m: import('@/lib/email').StapelMail): { to: string; subject: string; html: string; headers?: Record<string, string> } {
+  return { to: m.an, subject: m.betreff, html: m.html, headers: m.headers }
+}
+
 const LINK = 'https://plattform.example/account/neuigkeiten-bestaetigen?token=abc.def'
 const ABMELDE_TOKEN = 'xyz.123'
 
 describe('Bestätigungsmail', () => {
   it('nennt den Hof, führt auf die Seite mit dem Knopf und nennt 7 Tage', async () => {
-    expect(await email.sendAboBestaetigung('erika@example.org', { hofName: 'Hof Test', url: LINK })).toEqual({ id: 'email_1' })
-
-    const mail = gesendet()
+    const mail = alsMail(await email.baueAboBestaetigung('erika@example.org', { hofName: 'Hof Test', url: LINK }))
     expect(mail.to).toBe('erika@example.org')
     expect(mail.html).toContain('Hof Test')
     expect(mail.html).toContain(`href="${LINK.replace(/&/g, '&amp;')}"`)
@@ -66,17 +71,15 @@ describe('Bestätigungsmail', () => {
   })
 
   it('ist keine Werbemail: kein Abmeldelink, kein „Benachrichtigungen verwalten", Betreff ohne Hofname', async () => {
-    await email.sendAboBestaetigung('erika@example.org', { hofName: 'Hof Test', url: LINK })
-
-    const mail = gesendet()
+    const mail = alsMail(await email.baueAboBestaetigung('erika@example.org', { hofName: 'Hof Test', url: LINK }))
     expect(mail.html).not.toContain('unsubscribe')
     expect(mail.html).not.toContain('Benachrichtigungen verwalten')
     expect(mail.subject).toBe(`Bitte bestätige deine Anmeldung · ${MARKE}`)
   })
 
   it('Gegenprobe: ein Hofname mit HTML wird nicht als HTML eingesetzt', async () => {
-    await email.sendAboBestaetigung('erika@example.org', { hofName: '<b>Hof</b>', url: LINK })
-    expect(gesendet().html).not.toContain('<b>Hof</b>')
+    const mail = await email.baueAboBestaetigung('erika@example.org', { hofName: '<b>Hof</b>', url: LINK })
+    expect(mail.html).not.toContain('<b>Hof</b>')
   })
 })
 
@@ -92,9 +95,7 @@ const BEITRAG = {
 
 describe('Werbliche Mail (Beitrag per Mail)', () => {
   it('trägt den Abmeldelink — im Text und unten unter „Benachrichtigungen verwalten"', async () => {
-    await email.sendStatusUpdateEmail(BEITRAG)
-
-    const html = gesendet().html
+    const html = (await email.baueBeitragMail(BEITRAG)).html
     const seite = `${appUrl}/account/unsubscribe?token=${ABMELDE_TOKEN}`
     expect(html.split(`href="${seite}"`).length - 1).toBe(2)
     expect(html).toContain('Abmelden')
@@ -102,37 +103,20 @@ describe('Werbliche Mail (Beitrag per Mail)', () => {
   })
 
   it('trägt List-Unsubscribe mit der Ein-Klick-Adresse und List-Unsubscribe-Post (RFC 8058)', async () => {
-    await email.sendStatusUpdateEmail(BEITRAG)
-
-    expect(gesendet().headers).toEqual({
+    expect((await email.baueBeitragMail(BEITRAG)).headers).toEqual({
       'List-Unsubscribe': `<${appUrl}/api/abmelden?token=${ABMELDE_TOKEN}>`,
       'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
     })
   })
 })
 
-describe('Werbliche Mail: Ergebnis je Mail (Nr. 149)', () => {
-  it('gibt das Ergebnis des Versands zurück — angenommen mit id', async () => {
-    expect(await email.sendStatusUpdateEmail(BEITRAG)).toEqual({ id: 'email_1' })
-  })
-
-  it('Gegenprobe: ein Resend-Fehler kommt als error zurück, nicht still', async () => {
-    sendMock.mockResolvedValue({ data: null, error: { name: 'rate_limit_exceeded', message: 'Too many requests' } })
-    const ergebnis = await email.sendStatusUpdateEmail(BEITRAG)
-    expect(ergebnis.id).toBeUndefined()
-    expect(ergebnis.error).toContain('rate_limit_exceeded')
-  })
-})
-
 describe('Werbliche Mail: der Knopf führt zum Beitrag (Register T5, Ergänzung Nr. 128)', () => {
   it('mit Kennung zur Übersicht mit genau diesem Beitrag oben (?beitrag=<id>)', async () => {
-    await email.sendStatusUpdateEmail({ ...BEITRAG, beitragId: 'cbeitragaaaa' })
-    expect(gesendet().html).toContain(`href="${appUrl}/hof-test?beitrag=cbeitragaaaa"`)
+    expect((await email.baueBeitragMail({ ...BEITRAG, beitragId: 'cbeitragaaaa' })).html).toContain(`href="${appUrl}/hof-test?beitrag=cbeitragaaaa"`)
   })
 
   it('Gegenprobe: ohne Kennung (Beitrag nicht auf der Hofseite) zur Hofseite selbst', async () => {
-    await email.sendStatusUpdateEmail(BEITRAG)
-    const html = gesendet().html
+    const html = (await email.baueBeitragMail(BEITRAG)).html
     expect(html).toContain(`href="${appUrl}/hof-test"`)
     expect(html).not.toContain('beitrag=')
   })
@@ -141,22 +125,20 @@ describe('Werbliche Mail: der Knopf führt zum Beitrag (Register T5, Ergänzung 
 describe('Werbliche Mail: das Anlass-Wort kommt aus BEITRAG_ANLASS (Nr. 134)', () => {
   it('jeder Anlass steht mit seinem Wort in der Mail', async () => {
     for (const anlass of BEITRAG_ANLAESSE) {
-      sendMock.mockClear()
-      await email.sendStatusUpdateEmail({ ...BEITRAG, anlass })
-      expect(gesendet().html, anlass).toContain(BEITRAG_ANLASS[anlass].wort)
+      expect((await email.baueBeitragMail({ ...BEITRAG, anlass })).html, anlass).toContain(BEITRAG_ANLASS[anlass].wort)
     }
   })
 
   it('Gegenprobe: ein unbekannter Anlass gilt als Mitteilung', async () => {
-    await email.sendStatusUpdateEmail({ ...BEITRAG, anlass: 'UNBEKANNT' })
-    expect(gesendet().html).toContain(BEITRAG_ANLASS.ANNOUNCEMENT.wort)
+    expect((await email.baueBeitragMail({ ...BEITRAG, anlass: 'UNBEKANNT' })).html).toContain(BEITRAG_ANLASS.ANNOUNCEMENT.wort)
   })
 })
 
 describe('Transaktionsmails tragen keine Abmelde-Kopfzeilen', () => {
   it('Bestätigung der Anmeldung, Anmeldecode und Code für „Bestellungen finden"', async () => {
+    // Die Bestätigung baut der Renderer der Warteschlange (Nr. 159): gebaut ohne Kopfzeilen.
+    expect((await email.baueAboBestaetigung('erika@example.org', { hofName: 'Hof Test', url: LINK })).headers).toBeUndefined()
     const versand = [
-      () => email.sendAboBestaetigung('erika@example.org', { hofName: 'Hof Test', url: LINK }),
       () => email.sendAnmeldeCodeEmail('erika@example.org', '123456'),
       () => email.sendBestellCodeEmail('erika@example.org', '654321'),
     ]
@@ -175,6 +157,7 @@ describe('Transaktionsmails tragen keine Abmelde-Kopfzeilen', () => {
     const quelle = readFileSync(join(process.cwd(), 'src/lib/email.ts'), 'utf8')
     const stellen = [...quelle.matchAll(/listUnsubscribeKoepfe\(/g)].map((t) => quelle.lastIndexOf('export async function', t.index))
     expect(stellen).toHaveLength(1)
-    expect(quelle.slice(stellen[0], stellen[0] + 60)).toContain('export async function sendStatusUpdateEmail(')
+    // Gebaut wird die werbliche Mail in baueBeitragMail (Nr. 158) — seit Nr. 159 nur noch für den Renderer „beitrag“.
+    expect(quelle.slice(stellen[0], stellen[0] + 60)).toContain('export async function baueBeitragMail(')
   })
 })

@@ -6,9 +6,12 @@ import { stripe } from '@/lib/stripe'
 import { env } from '@/lib/env'
 import { prisma } from '@/lib/prisma'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
-import { sendErstattungOffen, sendOrderConfirmation, sendOrderPaidToFarmer, sendZahlungZuSpaet } from '@/lib/email'
+import { stelleMailEin } from '@/server/mail-warteschlange'
+import { bestellMailAuftrag, zahlungZuSpaetMailAuftrag } from '@/server/mail-arten/bestellung'
+import { betreiberAuftraege, betreiberKennungen, erstattungOffenBezug } from '@/server/mail-arten/betreiber'
+import { erstattungOffenInhalt } from '@/lib/erstattung-offen'
+import type { ErstattungOffenFall } from '@/schemas/mail-auftrag'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
-import { ladeBetreiberEmpfaenger } from '@/server/queries/postfach'
 import { ANLASS_VOLLSTORNO } from '@/server/teilerstattung'
 import {
   MELDE_VERMERK_TYP,
@@ -16,8 +19,6 @@ import {
   nimmGescheiterteErstattungZurueck,
   type GescheitertAusgang,
 } from '@/server/erstattung-gescheitert'
-import { formatEuro } from '@/lib/format'
-import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { stripeKontoBereit } from '@/lib/stripe-konto'
 import { istModusSperre } from '@/lib/stripe-modus'
 
@@ -127,46 +128,46 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ received: true })
 }
 
-const BESTELLUNG_FUER_MAIL = {
-  farm: {
-    select: {
-      id: true, name: true, slug: true, email: true, ownerName: true,
-      address: true, postalCode: true, city: true, phone: true,
-    },
-  },
-  items: {
-    select: {
-      productName: true, quantity: true, unitPrice: true, totalPrice: true,
-      // Einheit nur für die E-Mail-Anzeige gejoint
-      product: { select: { unit: true, unitSize: true } },
-    },
-  },
-} satisfies Prisma.OrderInclude
+/** Was die Behandlung einer Zahlung von der Bestellung liest — die Mails laden ihre Daten selbst (Renderer, Nr. 159). */
+const BESTELLUNG_STAND = { id: true, farmId: true, status: true, paymentStatus: true } satisfies Prisma.OrderSelect
+type BestellungStand = Prisma.OrderGetPayload<{ select: typeof BESTELLUNG_STAND }>
 
 /**
  * Bezahlt wird NUR aus „wartet auf Zahlung" heraus — der bedingte Wechsel ist
  * die Sperre (ARCHITECTURE.md §5). Vorher schrieb der Handler blind PAID und
  * belebte damit eine stornierte Bestellung wieder, deren Ware schon
  * zurückgebucht war.
+ *
+ * Die beiden Mails (Kundin, Hof) sind seit Nr. 159 Aufträge der
+ * Warteschlange — in DERSELBEN Transaktion wie der Statuswechsel, erst der
+ * Status, dann die Aufträge: Eine bezahlte Bestellung hat immer ihre Mails,
+ * und scheitert das Einstellen, rollt der Wechsel mit zurück (500, Stripe
+ * stellt das Ereignis erneut zu). Ein zweites Ereignis trifft count 0 und
+ * stellt nichts ein; der Schlüssel `<art>:<orderId>` hielte es ohnehin auf.
  */
 async function handlePaymentSucceeded(pi: Stripe.PaymentIntent) {
-  const { count } = await prisma.order.updateMany({
-    where: { stripePaymentIntentId: pi.id, status: 'PENDING_CONFIRMATION' },
-    data: { status: 'PAID', paymentStatus: 'PAID', paidAt: new Date() },
+  const count = await prisma.$transaction(async (tx) => {
+    const { count: bezahlt } = await tx.order.updateMany({
+      where: { stripePaymentIntentId: pi.id, status: 'PENDING_CONFIRMATION' },
+      data: { status: 'PAID', paymentStatus: 'PAID', paidAt: new Date() },
+    })
+    if (bezahlt === 1) {
+      const bestellung = await tx.order.findUnique({ where: { stripePaymentIntentId: pi.id }, select: { id: true, farmId: true } })
+      if (bestellung) {
+        await stelleMailEin([bestellMailAuftrag('bestellung-bestaetigung', bestellung), bestellMailAuftrag('bestellung-bezahlt-hof', bestellung)], tx)
+      }
+    }
+    return bezahlt
   })
+  if (count === 1) return
 
   const order = await prisma.order.findUnique({
     where: { stripePaymentIntentId: pi.id },
-    include: BESTELLUNG_FUER_MAIL,
+    select: BESTELLUNG_STAND,
   })
 
   if (!order) {
     console.error('[Webhook] Order not found for PaymentIntent:', pi.id)
-    return
-  }
-
-  if (count === 1) {
-    verschickeBezahltMails(order)
     return
   }
 
@@ -243,10 +244,7 @@ async function handlePaymentCanceled(pi: Stripe.PaymentIntent) {
  * er die Wiederholung nach einer gescheiterten Erstattung aus. Vor doppelter
  * Erstattung schützt der Schlüssel, der Vermerk sperrt nur die Mail.
  */
-async function erstatteSpaeteZahlung(
-  pi: Stripe.PaymentIntent,
-  order: Prisma.OrderGetPayload<{ include: typeof BESTELLUNG_FUER_MAIL }>
-) {
+async function erstatteSpaeteZahlung(pi: Stripe.PaymentIntent, order: BestellungStand) {
   // Alarm vor dem Geld: Der Betreiber soll den Fall sehen, auch wenn die
   // Erstattung scheitert. Nur die Bestell-ID, keine Kundendaten.
   Sentry.captureMessage('Zahlung nach dem Storno eingegangen — wird voll erstattet', {
@@ -281,27 +279,30 @@ async function erstatteSpaeteZahlung(
   // Der Vermerk ist die Sperre für die Mail: Zwei gleichzeitige Zustellungen
   // desselben Ereignisses erstatten beide (Stripe liefert über den Schlüssel
   // dieselbe Erstattung), aber nur wer den Vermerk setzt, schreibt der Kundin.
-  // Getrennt abgefangen: Scheitert nur er, ist das Geld trotzdem zurück. Ein
-  // Wurf hier hieße 500 und eine Wiederholung, die nach Ablauf des
-  // Idempotenz-Schlüssels an „schon erstattet" scheiterte.
-  let vermerkt = true
+  // Vermerk und Auftrag der Mail in EINER Transaktion (Nr. 159), erst der
+  // Vermerk. Getrennt abgefangen: Scheitert sie, ist das Geld trotzdem
+  // zurück — dann wie bisher die Mail ohne Vermerk (der Schlüssel
+  // `zahlung-zu-spaet:<orderId>` hält eine zweite auf). Ein Wurf hier hieße
+  // 500 und eine Wiederholung, die nach Ablauf des Idempotenz-Schlüssels an
+  // „schon erstattet" scheiterte.
+  const auftrag = zahlungZuSpaetMailAuftrag(order, erstattetCents)
   try {
-    const { count } = await prisma.order.updateMany({
-      where: { id: order.id, status: 'CANCELLED', paymentStatus: { in: ['PENDING', 'FAILED'] } },
-      data: { paymentStatus: 'REFUNDED' },
+    await prisma.$transaction(async (tx) => {
+      const { count } = await tx.order.updateMany({
+        where: { id: order.id, status: 'CANCELLED', paymentStatus: { in: ['PENDING', 'FAILED'] } },
+        data: { paymentStatus: 'REFUNDED' },
+      })
+      if (count === 1) await stelleMailEin(auftrag, tx)
     })
-    vermerkt = count === 1
   } catch (err) {
     Sentry.captureException(err, {
       tags: { webhook: 'payment_intent.succeeded', grund: 'vermerk_fehlgeschlagen' },
       extra: { orderId: order.id },
     })
+    await mailOhneRisiko('zahlung_zu_spaet', order.id, async () => {
+      await stelleMailEin(auftrag)
+    })
   }
-  if (!vermerkt) return
-
-  nachDerAntwort(async () => {
-    await mailOhneRisiko('zahlung_zu_spaet', order.id, () => sendZahlungZuSpaet(order, erstattetCents))
-  })
 }
 
 /**
@@ -327,8 +328,9 @@ async function handleErstattungGescheitert(refund: Stripe.Refund, typ: 'refund.f
   // Erstattung nicht (mehr), das Geld steht trotzdem aus.
   if (ausgang.art !== 'zurueckgenommen' && !(await ersteMeldung(refund.id))) return
 
-  const meldung = gescheitertMeldung(ausgang, refund)
+  const meldung = gescheitertMeldung(ausgang)
   const orderId = ausgang.bestellung?.id ?? null
+  const handanweisung = erstattungOffenInhalt(meldung.fall, { kundinCents: refund.amount }).handanweisung
   // Nur Kennungen und Beträge — keine Daten der Kundin.
   Sentry.captureMessage(meldung.titel, {
     level: 'error',
@@ -342,25 +344,20 @@ async function handleErstattungGescheitert(refund: Stripe.Refund, typ: 'refund.f
         ? { anlass: ausgang.anlass, erstattetCentsVorher: ausgang.vorherCents, erstattetCentsNachher: ausgang.nachherCents, zahlungWiederOffen: ausgang.zahlungWiederOffen }
         : {}),
       ...(ausgang.art === 'unklar' ? { unklarGrund: ausgang.grund } : {}),
-      handerstattung: meldung.handanweisung,
+      handerstattung: handanweisung,
     },
   })
+  // Je Empfänger ein Auftrag (Nr. 159); Satz und Anweisung wählt der Fall
+  // beim Versand (src/lib/erstattung-offen.ts). Empfänger aus der Zustellung
+  // (Register N14): „Erstattung offen" geht immer, auch bei Regel „aus".
+  // Nach der Antwort und abgesichert wie bisher: ein Fehler kippt das Ereignis nicht.
   nachDerAntwort(async () => {
-    await mailOhneRisiko('erstattung_offen', orderId ?? refund.id, async () =>
-      sendErstattungOffen(
-        {
-          was: meldung.was,
-          bestellId: orderId,
-          bestellnummer: ausgang.bestellung?.orderNumber ?? null,
-          hofName: ausgang.bestellung?.hofName ?? null,
-          betraege: [{ label: 'Gescheiterte Erstattung', cents: refund.amount }],
-          handanweisung: meldung.handanweisung,
-          stripeKennung: refund.id,
-        },
-        // Empfänger aus der Zustellung (Register N14): „Erstattung offen" geht immer, auch bei Regel „aus".
-        await ladeBetreiberEmpfaenger('erstattungOffen')
+    await mailOhneRisiko('erstattung_offen', orderId ?? refund.id, async () => {
+      const bezug = erstattungOffenBezug({ fall: meldung.fall, orderId, refundId: refund.id, kundinCents: refund.amount })
+      await stelleMailEin(
+        betreiberAuftraege('erstattung-offen', refund.id, await betreiberKennungen('erstattungOffen'), bezug, orderId ? { bestellungId: orderId } : {})
       )
-    )
+    })
   })
 }
 
@@ -412,85 +409,28 @@ async function ersteMeldung(refundId: string): Promise<boolean> {
   }
 }
 
-function gescheitertMeldung(
-  ausgang: Exclude<GescheitertAusgang, { art: 'nicht_gescheitert' }>,
-  refund: Stripe.Refund
-): { titel: string; grund: string; was: string; handanweisung: string } {
-  const betrag = formatEuro(centsAlsEuro(refund.amount))
+/**
+ * Titel und Grund für Sentry und der Fall für Satz und Anweisung
+ * (src/lib/erstattung-offen.ts) — eine Quelle für Sentry und Mail.
+ */
+function gescheitertMeldung(ausgang: Exclude<GescheitertAusgang, { art: 'nicht_gescheitert' }>): {
+  titel: string
+  grund: string
+  fall: ErstattungOffenFall
+} {
   if (ausgang.art === 'schon_erledigt') {
-    return {
-      titel: 'Erstattung gescheitert — in der Datenbank nicht (mehr) gezählt',
-      grund: 'erstattung_gescheitert_nicht_gezaehlt',
-      was: `Stripe meldet eine Erstattung über ${betrag} an die Kundin als gescheitert. Die App zählt sie nicht oder nicht mehr als erstattet – das Geld steht noch aus.`,
-      handanweisung:
-        'In Stripe prüfen, ob der Kundin der Betrag inzwischen auf anderem Weg erstattet wurde; sonst erneut erstatten – über Stripe ohne reverse_transfer und ohne refund_application_fee – und sie informieren.',
-    }
+    return { titel: 'Erstattung gescheitert — in der Datenbank nicht (mehr) gezählt', grund: 'erstattung_gescheitert_nicht_gezaehlt', fall: 'schon_erledigt' }
   }
   if (ausgang.art === 'zurueckgenommen' && ausgang.anlass === ANLASS_VOLLSTORNO) {
-    // Die Vollerstattung lief mit reverse_transfer und refund_application_fee
-    // (Nr. 27: mit Merkmalen). Ob Stripe Rückbuchung und Gebührenerstattung
-    // nach dem Scheitern stehen lässt, sagt das Ereignis nicht — deshalb
-    // keine Anweisung, die das voraussetzt.
-    return {
-      titel: 'Vollerstattung gescheitert — Zahlung in der App wieder offen',
-      grund: 'erstattung_gescheitert_zurueckgenommen',
-      was: `Stripe meldet die Vollerstattung über ${betrag} nach einem Storno als gescheitert. Die Bestellung bleibt storniert, in der App ist die Zahlung wieder offen – das Geld steht noch aus.`,
-      handanweisung:
-        'Vollerstattung gescheitert: In Stripe prüfen, was von der Rückbuchung der Überweisung und der Erstattung der Plattformgebühr noch steht, dann der Kundin den vollen Betrag erneut erstatten (reverse_transfer und refund_application_fee nur, wenn Überweisung und Gebühr wieder beim Hof liegen) und sie informieren.',
-    }
+    return { titel: 'Vollerstattung gescheitert — Zahlung in der App wieder offen', grund: 'erstattung_gescheitert_zurueckgenommen', fall: 'vollstorno_zurueckgenommen' }
   }
   if (ausgang.art === 'zurueckgenommen') {
-    return {
-      titel: 'Erstattung gescheitert — in der Datenbank zurückgenommen',
-      grund: 'erstattung_gescheitert_zurueckgenommen',
-      was: `Stripe meldet eine Erstattung über ${betrag} an die Kundin als gescheitert. Wir haben sie in der App zurückgenommen – das Geld steht noch aus.`,
-      handanweisung:
-        'Der Kundin den Betrag erneut erstatten – über Stripe ohne reverse_transfer und ohne refund_application_fee (die Rückbuchung vom Hof ist davon nicht betroffen) – und sie informieren. Die App zählt ihn nicht mehr als erstattet.',
-    }
+    return { titel: 'Erstattung gescheitert — in der Datenbank zurückgenommen', grund: 'erstattung_gescheitert_zurueckgenommen', fall: 'zurueckgenommen' }
   }
   if (ausgang.art === 'unklar') {
-    return {
-      titel: 'Erstattung gescheitert — Stand unklar, nichts geändert',
-      grund: 'erstattung_gescheitert_unklar',
-      was: `Stripe meldet eine Erstattung über ${betrag} dieser Bestellung als gescheitert, aber Stripe und App passen nicht zusammen. In der App wurde nichts geändert.`,
-      handanweisung: 'In Stripe prüfen, was zu dieser Zahlung wirklich erstattet ist, der Kundin den offenen Betrag von Hand erstatten und den Stand der Bestellung klären.',
-    }
+    return { titel: 'Erstattung gescheitert — Stand unklar, nichts geändert', grund: 'erstattung_gescheitert_unklar', fall: 'unklar' }
   }
-  return {
-    titel: 'Erstattung gescheitert — keiner Buchung der App zuzuordnen',
-    grund: 'erstattung_gescheitert_fremd',
-    was: `Stripe meldet eine Erstattung über ${betrag} als gescheitert, die die App keiner ihrer Buchungen zuordnen kann (z. B. ein älterer Vollstorno ohne Merkmale oder eine Erstattung von Hand). In der App wurde nichts geändert.`,
-    handanweisung:
-      'In Stripe prüfen und der Kundin den Betrag von Hand erstatten. Ein älterer Vollstorno ohne Merkmale steht in der App weiter als erstattet.',
-  }
-}
-
-function verschickeBezahltMails(order: Prisma.OrderGetPayload<{ include: typeof BESTELLUNG_FUER_MAIL }>) {
-  const emailOrder = {
-    id: order.id,
-    orderNumber: order.orderNumber,
-    customerName: order.customerName,
-    customerEmail: order.customerEmail,
-    customerPhone: order.customerPhone,
-    totalAmount: order.totalAmount,
-    serviceFeeCents: order.serviceFeeCents,
-    pickupDate: order.pickupDate,
-    pickupTimeStart: order.pickupTimeStart,
-    pickupTimeEnd: order.pickupTimeEnd,
-    paymentMethod: order.paymentMethod,
-    stripePaymentIntentId: order.stripePaymentIntentId,
-    farm: order.farm,
-    items: order.items,
-  }
-
-  // Nach der Antwort und je Mail einzeln abgesichert: Ein Mailfehler im
-  // Antwortpfad hieß 500, Stripe stellte das Ereignis erneut zu — und beide
-  // Mails gingen ein zweites Mal raus. Scheitert die Mail an die Kundin,
-  // bekommt der Hof seine trotzdem.
-  nachDerAntwort(async () => {
-    await mailOhneRisiko('bestaetigung_kundin', order.id, () => sendOrderConfirmation(emailOrder))
-    await mailOhneRisiko('bestellung_hof', order.id, () => sendOrderPaidToFarmer(emailOrder))
-  })
+  return { titel: 'Erstattung gescheitert — keiner Buchung der App zuzuordnen', grund: 'erstattung_gescheitert_fremd', fall: 'fremd' }
 }
 
 /** Ein Mailfehler wird gemeldet, nie weitergeworfen. Nur die Bestell-ID, keine Adresse. */
