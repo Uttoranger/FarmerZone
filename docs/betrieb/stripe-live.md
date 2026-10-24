@@ -57,7 +57,7 @@ Mit dem Live-Schlüssel verschwinden alle drei von selbst. Den Modus liest die A
 
 ## 3. Zwei Live-Webhooks
 
-Beide Endpunkte zeigen auf **`https://farmerzone.at/api/stripe/webhook`**. Die Route prüft jede Zustellung gegen beide Secrets.
+Beide Endpunkte zeigen auf **`https://agrilo.at/api/stripe/webhook`**. Die Route prüft jede Zustellung gegen beide Secrets. Die alte Adresse farmerzone.at leitet auf agrilo.at um; Stripe folgt keiner Weiterleitung – Endpunkte immer auf agrilo.at.
 
 - [ ] **Endpunkt A – Plattform** („Ereignisse in deinem Konto“), alle Ereignisse, die `src/app/api/stripe/webhook/route.ts` verarbeitet:
 
@@ -83,7 +83,7 @@ Vercel erlaubt je Variable und Umgebung nur einen Wert. Deshalb kommt **zuerst S
 
 - [ ] Bei jeder bestehenden Variable `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` und `STRIPE_WEBHOOK_SECRET` sowie bei `STRIPE_PUBLISHABLE_KEY` (falls vorhanden; der Code liest sie nicht) die Umgebung **Production abwählen**. Übrig bleibt Preview, bei Bedarf auch Development.
 - [ ] Danach gilt: Vorschau = Test-Schlüssel, Produktion = Live-Schlüssel.
-- [ ] Die Branch-Variable `STRIPE_WEBHOOK_SECRET` für `staging` (Testumgebung, `docs/betrieb/testumgebung.md` Schritt 3) bleibt, wie sie ist. Sie gehört zum Test-Endpunkt von `test.farmerzone.at`.
+- [ ] Die Branch-Variable `STRIPE_WEBHOOK_SECRET` für `staging` (Testumgebung, `docs/betrieb/testumgebung.md` Schritt 3) bleibt, wie sie ist. Sie gehört zum Test-Endpunkt von `test.agrilo.at`.
 
 **4. Neue Variablen nur für Production**
 
@@ -110,14 +110,14 @@ Vercel erlaubt je Variable und Umgebung nur einen Wert. Deshalb kommt **zuerst S
 
 ## 7. Apple-Pay-Domain
 
-- [ ] Einstellungen → Zahlungsmethoden → Domains (Live-Modus): **`farmerzone.at`** hinzufügen und warten, bis Stripe die Domain als bestätigt zeigt.
+- [ ] Einstellungen → Zahlungsmethoden → Domains (Live-Modus): **`agrilo.at`** hinzufügen und warten, bis Stripe die Domain als bestätigt zeigt.
   > Verlangt Stripe dafür eine Datei unter `/.well-known/`, ist das ein eigener kleiner Auftrag. Heute liegt keine solche Datei im Projekt.
 
 ## 8. Neu deployen
 
 - [ ] **Vorher:** Vercel → Settings → Environment Variables: **„Automatically expose System Environment Variables“ ist an.** Ohne den Schalter fehlt `VERCEL_ENV` zur Laufzeit, und die Modus-Wache sperrt mit dem Live-Schlüssel auch die Produktion. Gegenprobe: Server-Ereignisse der Produktion tragen in Sentry das environment `production` – zum Beispiel die heutige Warnung „Stripe TEST in Produktion“.
 - [ ] Vercel → Deployments → das aktuelle Production-Deployment **neu bauen** („Redeploy“, ohne Build-Cache). Ein Neustart allein genügt nicht: `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` wird beim Bauen in die Seiten geschrieben.
-- [ ] Danach prüfen, auf `farmerzone.at`:
+- [ ] Danach prüfen, auf `agrilo.at`:
   - [ ] Kasse (`/<hof>/checkout`): An „Online bezahlen“ steht kein „Testbetrieb: …“ mehr.
   - [ ] Admin (`/admin`): Die orange Karte „Stripe läuft im Testmodus …“ ist weg, unter dem Kopf steht „Stripe Live“ in Grün (Nr. 43).
   - [ ] Einstellungen → Zahlung: „Online-Zahlung läuft noch im Testbetrieb.“ ist weg.
@@ -129,7 +129,7 @@ Vercel erlaubt je Variable und Umgebung nur einen Wert. Deshalb kommt **zuerst S
   - [ ] Admin → Finanzen: Unter dem Titel steht leise „Testzahlungen vor dem … sind nicht mitgezählt.“ mit dem Zeitpunkt aus `STRIPE_LIVE_AB` (nur, wenn in den gezeigten Monaten eine Testzahlung sonst mitgezählt hätte). Fehlt die Zeile trotz Testzahlungen, ist der Wert ungültig – Sentry nennt den Grund.
   - [ ] Admin → Finanzen: Keine Online-Bestellung aus dem Bau-Fenster unter „Servicegebühr, online“. Gibt es doch eine, `STRIPE_LIVE_AB` auf den Zeitpunkt setzen, zu dem das neue Deployment fertig war (Vercel → Deployments, „Ready“), und noch einmal neu deployen – dann laufen alte und neue Version schon mit dem Live-Schlüssel.
   - [ ] Stripe → Webhooks: Endpunkt A und B zeigen beim ersten Ereignis eine Zustellung mit 200.
-- [ ] Im **Testmodus** von Stripe den alten Endpunkt `https://farmerzone.at/api/stripe/webhook` löschen. Die Produktion prüft jetzt gegen die Live-Secrets und würde jede Test-Zustellung mit 400 ablehnen. Der Endpunkt der Testumgebung (`test.farmerzone.at`, Nr. 43) bleibt.
+- [ ] Im **Testmodus** von Stripe den alten Endpunkt `https://agrilo.at/api/stripe/webhook` löschen. Die Produktion prüft jetzt gegen die Live-Secrets und würde jede Test-Zustellung mit 400 ablehnen. Der Endpunkt der Testumgebung (`test.agrilo.at`, Nr. 43) bleibt.
 
 ## 9. Höfe richten Stripe neu ein
 
