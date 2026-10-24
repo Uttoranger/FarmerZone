@@ -24,6 +24,9 @@ vi.mock('@/lib/prisma', () => ({
     betriebMessung: { deleteMany: vi.fn(async () => m.nichts) },
     einmalLink: { deleteMany: vi.fn(async () => m.nichts) },
     order: { updateMany: m.updateMany },
+    // Seit Nr. 158 räumt raeumeAltesAuf auch das Mail-Protokoll auf; eigene Attrappe, damit
+    // m.updateMany nur das Leeren der Klartext-Token zählt.
+    mailAuftrag: { deleteMany: vi.fn(async () => m.nichts), updateMany: vi.fn(async () => m.nichts) },
   },
 }))
 
