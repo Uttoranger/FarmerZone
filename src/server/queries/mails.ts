@@ -82,33 +82,43 @@ export async function ladeWarteschlange(jetzt: Date, zaehler: { heute: number; i
 }
 
 /**
- * „Braucht dich“ und die Kachel „Gescheitert · 24 h“: aufgegebene Aufträge
- * der letzten 24 Stunden (letzter Versuch = `naechsterVersuchAm`), Aufträge,
- * die es nach einem Fehler von selbst wieder versuchen, und solche, die
- * länger als 15 Minuten fällig liegen. Höchstens 100 — die Seite zeigt die
- * Zahl, die Liste ist zum Handeln da.
+ * Wer in „Braucht dich“ steht (Nr. 161 Punkt 6): aufgegebene Aufträge der
+ * letzten 24 Stunden (letzter Versuch = `naechsterVersuchAm`), Aufträge, die
+ * es nach einem Fehler von selbst wieder versuchen, und solche, die länger
+ * als 15 Minuten fällig liegen. Eine Bedingung für Liste, Zahl und die
+ * Aktionen „alle einer Art“ — sonst träfe „Alle n verwerfen“ auch eine
+ * Bestellbestätigung, die gerade normal wartet, und „Alle n jetzt schicken“
+ * eine Mail, die vor Wochen gescheitert ist.
  */
-export async function ladeProbleme(jetzt: Date): Promise<ProblemAuftrag[]> {
+export function problemBedingung(jetzt: Date): Prisma.MailAuftragWhereInput {
   const vor24h = new Date(jetzt.getTime() - TAG_MS)
   const haengtAb = new Date(jetzt.getTime() - MAIL_HAENGT_MINUTEN * 60_000)
+  return {
+    OR: [
+      { status: 'gescheitert', naechsterVersuchAm: { gte: vor24h } },
+      { status: 'offen', versuche: { gt: 0 } },
+      { status: 'offen', vorrang: { gt: VORRANG.sofort }, naechsterVersuchAm: { lt: haengtAb } },
+      { status: 'in_arbeit', belegtBis: { lt: haengtAb } },
+    ],
+  }
+}
+
+/**
+ * „Braucht dich“ und die Kachel „Gescheitert · 24 h“ (`problemBedingung`).
+ * Höchstens 100 — die Seite zeigt die Zahl, die Liste ist zum Handeln da.
+ */
+export async function ladeProbleme(jetzt: Date): Promise<ProblemAuftrag[]> {
   return prisma.mailAuftrag.findMany({
-    where: {
-      OR: [
-        { status: 'gescheitert', naechsterVersuchAm: { gte: vor24h } },
-        { status: 'offen', versuche: { gt: 0 } },
-        { status: 'offen', vorrang: { gt: VORRANG.sofort }, naechsterVersuchAm: { lt: haengtAb } },
-        { status: 'in_arbeit', belegtBis: { lt: haengtAb } },
-      ],
-    },
+    where: problemBedingung(jetzt),
     orderBy: { naechsterVersuchAm: 'desc' },
     take: 100,
     select: { id: true, art: true, vorrang: true, status: true, versuche: true, fehlerCode: true, erstelltAm: true, naechsterVersuchAm: true, belegtBis: true },
   })
 }
 
-/** Nur die Zahl für den Unterreiter „E-Mails“ im Überblick — dieselbe Bedingung wie `ladeProbleme`. */
+/** Nur die Zahl für den Unterreiter „E-Mails“ im Überblick — dieselbe Bedingung wie `ladeProbleme`, ohne Obergrenze. */
 export async function zaehleProbleme(jetzt: Date): Promise<number> {
-  return (await ladeProbleme(jetzt)).length
+  return prisma.mailAuftrag.count({ where: problemBedingung(jetzt) })
 }
 
 /**

@@ -9,6 +9,7 @@ import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin
 import { beginneMessung, messeUndPruefe } from '@/server/betrieb'
 import { arbeiteWarteschlange } from '@/server/mail-warteschlange'
 import { letzteMessungAm } from '@/server/queries/betrieb'
+import { problemBedingung } from '@/server/queries/mails'
 import { ADMIN_BETRIEB_HREF, BETRIEB_TEXT, fehlerKlasse } from '@/lib/betrieb'
 import { CODES_OHNE_JETZT_SCHICKEN, MAIL_TEXT } from '@/lib/betrieb-mails'
 import { uhrzeitInWien } from '@/lib/fristen'
@@ -49,8 +50,15 @@ export async function messeJetztAction(): Promise<{ ok: true; satz: string } | {
 
 // ─── E-Mails: Jetzt schicken und Verwerfen (Nr. 161, Register N26, N20) ──────
 
-function auswahlBedingung(auswahl: MailAuswahl): Prisma.MailAuftragWhereInput {
-  return 'id' in auswahl ? { id: auswahl.id } : { art: auswahl.art }
+/**
+ * Ein Auftrag über seine Kennung; „alle einer Art“ nur die, die in „Braucht
+ * dich“ stehen (`problemBedingung`, dieselbe wie die Liste) — nie eine Mail,
+ * die gerade normal wartet, und nie eine, die vor mehr als 24 Stunden
+ * gescheitert ist. Das n auf dem Knopf und die Zahl der geänderten Zeilen
+ * kommen so aus derselben Bedingung.
+ */
+function auswahlBedingung(auswahl: MailAuswahl, jetzt: Date): Prisma.MailAuftragWhereInput {
+  return 'id' in auswahl ? { id: auswahl.id } : { AND: [{ art: auswahl.art }, problemBedingung(jetzt)] }
 }
 
 /** Der Worker nach der Antwort — wie nach dem Einstellen; ein Fehler geht nach Sentry, die Zeile wartet auf den nächsten Lauf. */
@@ -84,14 +92,15 @@ export async function schickeMailJetztAction(eingabe: unknown): Promise<{ ok: tr
   const auswahl = mailAuswahlSchema.safeParse(eingabe)
   if (!auswahl.success) return { error: MAIL_TEXT.eingabeUngueltig }
 
+  const jetzt = new Date()
   const { count } = await prisma.mailAuftrag.updateMany({
     where: {
-      ...auswahlBedingung(auswahl.data),
+      ...auswahlBedingung(auswahl.data, jetzt),
       vorrang: { gt: VORRANG.sofort },
       status: { in: ['offen', 'gescheitert'] },
       OR: [{ fehlerCode: null }, { fehlerCode: { notIn: [...CODES_OHNE_JETZT_SCHICKEN] } }],
     },
-    data: { status: 'offen', versuche: 0, naechsterVersuchAm: new Date(), belegtBis: null },
+    data: { status: 'offen', versuche: 0, naechsterVersuchAm: jetzt, belegtBis: null },
   })
   revalidatePath(ADMIN_BETRIEB_HREF)
   if (count === 0) return { ok: true, satz: MAIL_TEXT.nichtsGeaendert }
@@ -112,7 +121,7 @@ export async function verwirfMailAction(eingabe: unknown): Promise<{ ok: true; s
   if (!auswahl.success) return { error: MAIL_TEXT.eingabeUngueltig }
 
   const { count } = await prisma.mailAuftrag.updateMany({
-    where: { ...auswahlBedingung(auswahl.data), status: { in: ['offen', 'gescheitert'] } },
+    where: { ...auswahlBedingung(auswahl.data, new Date()), status: { in: ['offen', 'gescheitert'] } },
     data: { status: 'verworfen', belegtBis: null },
   })
   revalidatePath(ADMIN_BETRIEB_HREF)

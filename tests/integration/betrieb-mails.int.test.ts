@@ -11,7 +11,11 @@
  *    lässt sie gar nicht durch), eine Adresse mit „_“ als Platzhalter nie;
  *  - die Rohabfragen laufen auf Postgres: Zahlen je Art (FILTER, AVG als
  *    Zahl), Verlauf je UTC-Tag (to_char), Warteschlange (ältester fälliger
- *    Auftrag), Probleme.
+ *    Auftrag), Probleme;
+ *  - „Alle n jetzt schicken“ und „Alle n verwerfen“ treffen nur, was in
+ *    „Braucht dich“ steht — ein frischer offener Auftrag derselben Art und
+ *    einer, der vor mehr als 24 Stunden gescheitert ist, bleiben unverändert
+ *    (Nachbesserung Runde 1).
  *
  * Daten: Höfe, Bestellungen und Aufträge mit `int-`, Adressen @example.com
  * (erfunden); eigene Art `int-161-…` für die Zählung je Art, damit fremde
@@ -21,10 +25,20 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { empfaengerFingerabdruck } from '@/lib/mail-empfaenger'
 import { mailSucheAus } from '@/schemas/betrieb-mails'
-import { ladeArtZahlen, ladeMailVerlauf, ladeProbleme, ladeWarteschlange, sucheMails } from '@/server/queries/mails'
+import { MAIL_TEXT } from '@/lib/betrieb-mails'
+import { ladeArtZahlen, ladeMailVerlauf, ladeProbleme, ladeWarteschlange, problemBedingung, sucheMails, zaehleProbleme } from '@/server/queries/mails'
+import { schickeMailJetztAction, verwirfMailAction } from '@/server/actions/betrieb'
 import { erstelleHof, intKennung, raeumeAuf } from './setup/basis'
 
 vi.mock('server-only', () => ({}))
+// Die Aktionen: Wache bestätigt frisch, der Worker nach der Antwort läuft hier nicht — geprüft wird nur die eine Anweisung.
+vi.mock('@/server/admin-wache', () => ({
+  verlangeAdminAktion: vi.fn(async () => ({ ok: true, userId: 'int-admin' })),
+  verlangeFrischeBestaetigung: vi.fn(async () => ({ ok: true, userId: 'int-admin', sitzungId: 'int-sitzung' })),
+}))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
+vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
 
 async function raeumeMailsAuf(): Promise<void> {
   await prisma.mailAuftrag.deleteMany({ where: { OR: [{ schluessel: { startsWith: 'int-' } }, { bestellungId: { startsWith: 'int-' } }, { art: { startsWith: 'int-161-' } }] } })
@@ -154,5 +168,67 @@ describe('Rohabfragen auf Postgres', () => {
     expect(schlange.wichtig).toBeGreaterThanOrEqual(1)
     expect(schlange.faelligSeit).toBeInstanceOf(Date)
     expect(schlange.faelligSeit!.getTime()).toBeLessThanOrEqual(vor20Min.getTime())
+  })
+})
+
+describe('Alle einer Art: nur, was in „Braucht dich“ steht', () => {
+  const vor2Tagen = (): Date => new Date(Date.now() - 2 * 86_400_000)
+
+  /** Je ein Auftrag in „Braucht dich“ (gescheitert vor 1 h, wartet nach Fehler) und zwei Gegenproben derselben Art. */
+  async function lage(art: string) {
+    const gescheitert = await auftrag({ art, status: 'gescheitert', versuche: 5, fehlerCode: 'rate_limit_exceeded', naechsterVersuchAm: new Date(Date.now() - 3_600_000) })
+    const wartetNachFehler = await auftrag({ art, versuche: 1, fehlerCode: 'rate_limit_exceeded', naechsterVersuchAm: new Date(Date.now() + 60_000) })
+    const frisch = await auftrag({ art })
+    const alt = await auftrag({ art, status: 'gescheitert', versuche: 5, fehlerCode: 'rate_limit_exceeded', naechsterVersuchAm: vor2Tagen() })
+    return { gescheitert, wartetNachFehler, frisch, alt }
+  }
+
+  /** Was in der geteilten Test-Datenbank schon von dieser Art in „Braucht dich“ liegt (sollte 0 sein) — die Zahl im Satz zählt es mit. */
+  async function schonDa(art: string): Promise<number> {
+    return prisma.mailAuftrag.count({ where: { AND: [{ art }, problemBedingung(new Date())], status: { in: ['offen', 'gescheitert'] } } })
+  }
+
+  async function stand(id: string) {
+    return prisma.mailAuftrag.findUniqueOrThrow({ where: { id }, select: { status: true, versuche: true, naechsterVersuchAm: true } })
+  }
+
+  it('Jetzt schicken: die zwei aus „Braucht dich“ — der frische und der alte bleiben, wie sie sind', async () => {
+    // Eine echte Art (das Schema lässt nur MAIL_ARTEN durch), die sonst kein Integrationstest einstellt.
+    const art = 'erstattung-offen'
+    const vorherZahl = await schonDa(art)
+    const l = await lage(art)
+    const vorherFrisch = await stand(l.frisch.id)
+    const vorherAlt = await stand(l.alt.id)
+
+    expect(await schickeMailJetztAction({ art })).toEqual({ ok: true, satz: MAIL_TEXT.geschickt(2 + vorherZahl) })
+    expect(await stand(l.gescheitert.id)).toMatchObject({ status: 'offen', versuche: 0 })
+    expect(await stand(l.wartetNachFehler.id)).toMatchObject({ status: 'offen', versuche: 0 })
+    // Gegenproben: unverändert.
+    expect(await stand(l.frisch.id)).toEqual(vorherFrisch)
+    expect(await stand(l.alt.id)).toEqual(vorherAlt)
+  })
+
+  it('Verwerfen: die zwei aus „Braucht dich“ — der frische und der alte bleiben, wie sie sind', async () => {
+    const art = 'zahlung-zu-spaet'
+    const vorherZahl = await schonDa(art)
+    const l = await lage(art)
+
+    expect(await verwirfMailAction({ art })).toEqual({ ok: true, satz: MAIL_TEXT.verworfen(2 + vorherZahl) })
+    expect((await stand(l.gescheitert.id)).status).toBe('verworfen')
+    expect((await stand(l.wartetNachFehler.id)).status).toBe('verworfen')
+    // Gegenproben: der frische wartet weiter, der alte bleibt gescheitert.
+    expect((await stand(l.frisch.id)).status).toBe('offen')
+    expect((await stand(l.alt.id)).status).toBe('gescheitert')
+  })
+
+  it('zaehleProbleme zählt mit derselben Bedingung, ohne Obergrenze', async () => {
+    const art = `int-161-${process.pid}-zahl`
+    const l = await lage(art)
+    const jetzt = new Date()
+    const ids = (await ladeProbleme(jetzt)).map((p) => p.id)
+    expect(ids).toEqual(expect.arrayContaining([l.gescheitert.id, l.wartetNachFehler.id]))
+    expect(ids).not.toContain(l.frisch.id)
+    expect(ids).not.toContain(l.alt.id)
+    expect(await zaehleProbleme(jetzt)).toBeGreaterThanOrEqual(2)
   })
 })
