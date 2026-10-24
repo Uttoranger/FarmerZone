@@ -129,6 +129,7 @@ Nach der Freigabe: hier in die Tabelle eintragen.
 
 - **Vercel, serverlos.** Kein verlässlicher Prozess-Zustand zwischen Requests. In-Memory-Zähler (z. B. `src/lib/rate-limit.ts`) gelten **pro Instanz** — bekannt und für den Pilotbetrieb akzeptiert, aber nie als harte Sicherheitsgrenze behandeln.
 - **Cron:** Seit 19.10.2026 läuft das Projekt auf Vercel Pro. Nie eine Frist oder Geschäftsregel von einem Cron abhängig machen. Cron ist Aufräumer, nie die Wahrheit.
+- **Datenbank:** Supabase läuft seit 24.10.2026 im Tarif Pro (8 GB Datenbank), Vercel seit 19.10.2026 im Tarif Pro. Die Grenzen je Tarif stehen an einer Stelle im Code (`TARIFE` in `src/lib/betrieb.ts`), nicht hier.
 - **Kein Dateisystem-Schreibzugriff.** Uploads gehen an Vercel Blob.
 - **Kalte Starts.** Nichts Teures auf Modulebene ausführen.
 - **Env-Variablen** ausschließlich über `@/lib/env` (Zod-validiert). Nie `process.env.X` direkt lesen — Ausnahmen: `NODE_ENV` und die Build-Konfiguration `next.config.ts` (läuft vor der App, `SENTRY_AUTH_TOKEN`).

@@ -5909,3 +5909,608 @@ Wie Lauf 22, dazu:
 - **155:** die Abweichung vom Mockup mit Bild.
 - **156:** die Liste der Seiten mit der neuen Wache.
 - **„Für dich zu tun“:** Abnahmen aus „Fertig, wenn“; 152: im Stripe-Testmodus einen DE-Testhof einrichten und eine Testzahlung bis zur Überweisung durchspielen; Merge des Sammel-PR per Merge-Commit; danach die Abnahme von 151, 154 und 155 in der Produktion mit Stripe im Testmodus.
+
+## 28. Lauf 24 (uttoranger, im Chat erteilt, 24.10.2026)
+
+Nachtlauf 24 – Freigabe (uttoranger, im Chat 24.10.2026)
+Geschrieben auf main ca0f695 (24.10.2026 01:17, #372 Sammel-PR Lauf 23; Production READY). Grundlage:
+
+* die Skalierungsprüfung vom 24.10.2026: Mails einzeln und an die Anfrage gebunden, Resend Free, Hofliste als ein Cache-Eintrag
+* die Plausibilisierung von Admin › Betrieb am selben Tag (Produktion nur lesend, Abgleich mit Resend, Supabase, Vercel)
+* die offenen Punkte aus Morgenbericht 23 und der Seitenkarte vom 23.10.2026
+* die Mockups `admin-betrieb-mails` (Browser und Handy, Fassung 3 vom 24.10.2026, nach Bewertung mit Nielsen, ISO 9241-110, Shneiderman, WCAG 2.2 AA und Support-Aufgabe) und `admin-betrieb-mails-alle`, `mobil-admin-betrieb-mails-alle`, `mobil-admin-betrieb-mails-nochmal` (Nr. 167)
+* der Wunsch der Projektleitung vom 24.10.2026: für den Support alle Mails sehen, wo es Sinn macht, und sie bei Bedarf nochmal schicken (Nr. 167)
+
+Ergebnis der Plausibilisierung (am 24.10.2026 geprüft, vor dem Bau am Code bestätigen):
+
+* E-Mail-Zähler stimmt. Die Produktion zählt 68 Mails seit 17.10. Resend meldet 67 im Abrechnungszeitraum ab 17.10. 20:23 UTC; eine Mail um 18:23 liegt davor. Am 23.10. zeigen beide 4.
+* Monatsfenster ist falsch. Der Code zählt den Kalendermonat (`utcMonatsbeginn`, `mailsImMonatBis`, `summeImMonat`), Resend den Abrechnungszeitraum vom 17. zum 17. (nächster Neubeginn 17.11.2026). Ab 1.11. zeigte die Seite fast 0, während Resend bis zu 3.000 zählt; die Monatswarnung käme zu spät oder gar nicht.
+* Supabase ist seit 24.10.2026 Pro (Organisation geprüft: `plan: pro`). Im Code steht noch `TARIFE.supabase = 'FREE'` (src/lib/betrieb.ts). Die Seite zeigt deshalb falsch:
+   * „von 500 MB“ statt 8 GB
+   * „Bei 500 MB nur noch lesbar“
+   * „Free · ohne Sicherung“
+   * „Pausiert nach 7 Tagen ohne Zugriff“
+   * „Übertragung (5 GB)“ beim Dashboard-Link Richtig für Pro (supabase.com/pricing, 24.10.2026): 8 GB Speicher je Projekt inklusive, darüber 0,125 $ je GB; 250 GB Übertragung im Monat, darüber 0,09 $ je GB; tägliche Sicherung, 7 Tage aufbewahrt; keine Pause.
+* Karte Vercel-Ausgaben ohne Beleg. In der Produktion gibt es keine einzige Messung `vercelAusgaben` oder `vercelLimit`, obwohl `VERCEL_AUSGABEN_SECRET` gesetzt ist. Die Karte sagt trotzdem „Unter 50 %“. Ob die Meldung bei Vercel eingerichtet ist, ließ sich nicht prüfen.
+* In Ordnung:
+   * Datenbank 15,0 MB
+   * Bilder 24,8 MB in 50 Dateien
+   * alle vier Abläufe heute pünktlich, keine offene Warnung
+* Für Abnahmen: In der Vorschau ist `RESEND_API_KEY` nicht gesetzt (nur Production). Mails lassen sich in der Vorschau nicht verschicken, auch nicht an TEST_EMPFAENGER.
+
+Weitere offene Punkte (geprüft auf main ca0f695):
+
+* /api/warenkorb/pruefen erneuert Halte ohne Prüfung von Stilllegung, Freischaltung, Pause und Kaufsperre und ohne `MAX_MENGE` (Bericht 150).
+* `tokenKandidaten` (src/lib/bar-bestaetigung.ts) nimmt weiter den Klartext an. Offene Klartext-Links liefen spätestens 2 Stunden nach dem Deploy von Nr. 151 ab (Bericht 151).
+* `src/lib/json-ld.ts:81` setzt `addressCountry: 'AT'` auch für deutsche Höfe (Bericht 152).
+* docs/betrieb/stripe-live.md (5×) und testumgebung.md (20×) nennen `farmerzone.at` bzw. `test.farmerzone.at` als Adresse für Webhooks und Prüfschritte. farmerzone.at leitet per 308 um, und Stripe folgt keiner Weiterleitung. Der Code nutzt `agrilo.at`.
+* Links in Mails sind mit `BETTER_AUTH_SECRET` signiert, demselben Geheimnis wie die Sitzungen, ohne Schlüsselkennung (Seitenkarte S3, in Lauf 23 zurückgestellt).
+* Erledigt und NICHT Teil dieses Laufs: Startseite (Nr. 155, Vorschau beim Bearbeiten, `frame-src 'self'`) ist mit #372 in der Produktion; der Halbsatz in DESIGN_SYSTEM „Entwurf und Fassung“ ist nachgezogen.
+
+Stand der Produktion: Stripe im Testmodus, CSP nur beobachtend (G8), Resend Free, Supabase Pro, Vercel Pro. Testhöfe markiert nur die Projektleitung (N21).
+Arbeite als Dirigent nach docs/nachtlauf.md: §2 Regeln, §4 Ablauf je Gate, 4a Tempo, §5 Stoppen, §6 Morgenbericht. Dieser Text ist die Freigabe.
+
+* Die Nummern 158–167 sind neu. 102 bleibt für die Sammelbestellung reserviert.
+* Es gelten G10, die G10-Ergänzung und §0 wie in Lauf 22 (freigabe.md §26), mit der Zuordnung unten. Der Dirigent führt ein Zeitbuch (docs/nachtlauf/berichte/zeitbuch-lauf24.md).
+* Genau eine Migration (Nr. 158, Expand, eine neue Tabelle).
+* Kein neues Paket.
+* Zwei neue Variablen, beide optional: `RESEND_WEBHOOK_SECRET` (Nr. 160; ohne sie antwortet der Endpunkt fail-closed) und `LINK_SECRET` (Nr. 166; ohne sie bleibt alles wie heute). Braucht eine Nummer mehr: STOPP für die Nummer, Vorschlag in den Bericht.
+
+Zuerst der Doku-PR (Branch docs/lauf24 von main, model: sonnet). Er enthält:
+
+* Freigabe:
+   * diesen Text wörtlich als „## 28. Lauf 24 (uttoranger, im Chat erteilt, 24.10.2026)“ in docs/nachtlauf/freigabe.md
+   * in docs/nachtlauf.md §3 die Zeilen 158–167 und „Sammel 24“
+   * den Absatz „Reihenfolge in Lauf 24“: eine Migration (158), kein Paket, zwei Variablen (160, 166), Wellen und Priorität wie unten
+* docs/nachtlauf/status.md: Die Zeilen 149–157 und „Sammel 23“ tragen „gemergt (#372)“. Neu sind die Zeilen 158–167 und „Sammel 24“, Status „offen“.
+* docs/entscheidungen.md:
+   * die Einträge unter „Entscheidungen“ wörtlich
+   * die Zeile „Stand Lauf 24“
+   * in der Wortliste N8 „Wichtig“, „Kann warten“ und „Sofort“ für die Wege einer Mail sowie „Jetzt schicken“ (Mail ging noch nie hinaus), „Nochmal schicken“ (Mail ging schon hinaus; nie „erneut senden“, „erneut versuchen“ oder „Resend“), „Abgelehnt“ (statt Bounce) und „Spam gemeldet“ (statt Beschwerde) auf Admin-Seiten
+* docs/mockups/README.md: fünf Zeilen, Bereich Admin › Betrieb › E-Mails: `admin-betrieb-mails.html` (1440×1750) und `mobil-admin-betrieb-mails.html` (390×3000), Route `/admin/betrieb?reiter=mails`, „neu (Nr. 161)“; `admin-betrieb-mails-alle.html` (1440×1310), `mobil-admin-betrieb-mails-alle.html` (390×1490) und `mobil-admin-betrieb-mails-nochmal.html` (390×844), Route `/admin/betrieb?reiter=mails&liste=alle`, „neu (Nr. 167)“.
+* docs/betrieb/stripe-live.md und docs/betrieb/testumgebung.md:
+   * Adressen der Produktion von `farmerzone.at` auf `agrilo.at` umstellen, die der Testumgebung von `test.farmerzone.at` auf `test.agrilo.at`: Webhook-Endpunkte, Apple-Pay-Domain, Prüfschritte.
+   * Sätze, die die Weiterleitung von farmerzone.at beschreiben, bleiben und bekommen den Zusatz „Stripe folgt keiner Weiterleitung – Endpunkte immer auf agrilo.at“.
+* docs/ai/TECH_STACK.md: Supabase Pro seit 24.10.2026; Vercel Pro seit 19.10.2026, falls dort noch Hobby steht.
+* docs/nachtlauf.md, Regeln für den Dirigenten (Regelvorschläge aus Morgenbericht 23, hiermit freigegeben):
+   * 4a Punkt 1 (Lesemappe), am Ende: „Wächter und Regelstellen, die eine genannte Funktion zählen (`git grep` auf den Namen in tests/ und docs/ai), gehören in die Grenze der Nummer (Regelvorschlag 151, Morgenbericht 23).“
+   * 4a, neuer Satz beim Zwischenstand: „Teilen sich zwei Nummern eine Datei, schreibt die spätere ihre Tests gegen den Stand der früheren (Regelvorschlag Dirigent, Morgenbericht 23).“
+   * 4a Punkt 6: „Bilder hinter der Admin-Anmeldung macht die Projektleitung in der Vorschau; ein fehlendes Admin-Bild ist kein Blocker, sondern ‚Für dich zu tun‘ (Morgenbericht 23).“
+* Commit- und PR-Texte immer über eine Datei, Präfixe nach CLAUDE.md §5. Das gilt für den ganzen Lauf.
+
+Stand – vor dem Start prüfen, sonst STOPP und melden:
+
+* main enthält #372 (ca0f695 oder später). `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint` (0 Fehler) und `pnpm test` sind grün.
+* Die fünf Mockups `docs/mockups/admin-betrieb-mails.html`, `mobil-admin-betrieb-mails.html`, `admin-betrieb-mails-alle.html`, `mobil-admin-betrieb-mails-alle.html` und `mobil-admin-betrieb-mails-nochmal.html` liegen auf main (Upload der Projektleitung; `admin-betrieb-mails` in Fassung 3, erkennbar am Knopf „Jetzt schicken“ in der Warnkarte). Fehlen sie: 161 und 167 bauen nach der Beschreibung unten und nennen das im Bericht; die anderen Nummern laufen.
+* In `node_modules/resend` (6.x) gibt es `batch.send`. Ob Batch `headers` je Mail und einen Idempotenz-Schlüssel kann, steht in den Typen; das Ergebnis kommt in den Bericht von 158. Kann Batch keine `headers`, gehen Mails mit Abmelde-Kopfzeilen (Beitrag) einzeln über `emails.send`, gedrosselt wie unten.
+* Stripe im Testmodus in Vorschau und Produktion.
+
+Reicht das Budget nicht, gilt diese Priorität: 158 → 162 → 159 → 161 → 167 → 165 → 160 → 163 → 164 → 166.
+Nicht in diesem Lauf:
+
+* Resend auf Pro umstellen (macht die Projektleitung; danach eine Zeile in `TARIFE`, siehe 162)
+* `RESEND_API_KEY` für die Vorschau (Entscheidung der Projektleitung; Post-Sperre Z3 bleibt)
+* Hofliste aufteilen (berührt N19 und N22; Entscheidung nach den Messwerten aus 163)
+* Obergrenze der reservierten Menge je Warenkorb-Sitzung (offen; Futter in großen Mengen bedenken)
+* Widerrufsfunktion (§ 13a FAGG) samt Erstattung nach der Abholung (nach anwaltlicher Klärung)
+* Datenschutzerklärung (O4; Magic Link → Code, Cloudflare)
+* CSP scharf (eigener Auftrag ab 28.10., G8)
+* Servicegebühr und Rolle bei der Zahlung
+* Aufräumen toter Code (Magic-Link-Plugin, newsletter.tsx, ungenutzte Onboarding-Actions)
+* Nochmal schicken an eine andere Adresse oder Adresse einer Bestellung ändern (eigene Entscheidung; Risiko, dass jemand fremde Bestelldaten an sich umleitet)
+* Nochmal schicken durch den Hof selbst (erst nach Erfahrung mit 167)
+
+Entscheidungen (uttoranger, im Chat 24.10.2026 – mit diesem Start freigegeben; wörtlich ins Register)
+
+* „N26 · Mails über die Warteschlange (24.10.2026): Jede Mail außer den Mails mit Code, Einmal-Link oder Bestätigungslink (Anmeldecode, Bestellcode, Passwort-Link, E-Mail bestätigen, Bar-Bestätigungslink, Admin-Sicherheit, Neue Anmeldung) geht über eine Warteschlange in der Datenbank. Kein Massenversand mehr innerhalb einer Anfrage. ‚Wichtig‘ sind Mails zu Bestellungen und an Höfe und Betreiber, ‚Kann warten‘ Beiträge, Rundschreiben und Bescheide; ‚Sofort‘ heißen die Mails mit Code oder Link, die direkt gehen. ‚Kann warten‘ pausiert, wenn das Tageskontingent zu 70 % oder das Kontingent des Abrechnungszeitraums zu 90 % verbraucht ist. Die Warteschlange speichert keine Adressen und keine Inhalte, nur Art, Bezug (Kennungen, darunter die Bestellung), Stand, Fehlercode und für die Support-Suche einen Fingerabdruck der Adresse (HMAC mit eigenem Zweck, nicht umkehrbar). Die Adresse lädt der Versand; ein abgemeldetes Abo bekommt nichts mehr. Jeder Versand, auch der direkte, steht als Zeile im Protokoll; Zeilen älter als 90 Tage löscht das Aufräumen. Resend meldet Zustellung, Bounce und Beschwerde an einen signierten Endpunkt; ein Bounce oder eine Beschwerde zu einem Abo meldet es ab. Admin › Betrieb › E-Mails zeigt Kontingent, Warteschlange, Fehler, Zustellquoten und auf Eingabe der Bestellnummer alle Mails zu dieser Bestellung (Mockup admin-betrieb-mails).“
+* „N18 · Ergänzung (24.10.2026): Der Monat der E-Mails ist der Abrechnungszeitraum von Resend (ab dem 17. jedes Monats, 0 Uhr UTC), nicht der Kalendermonat. Die Warn-Mail kennt dazu: eine wichtige Mail wartet länger als 5 Minuten, die Warteschlange hängt länger als 15 Minuten, Bounce-Quote über 2 % oder Beschwerde-Quote über 0,05 % in 7 Tagen (ab 50 Mails). Warn-Mails des Betriebs gehen direkt, nicht über die Warteschlange. Supabase läuft seit 24.10.2026 im Tarif Pro.“
+* „N19 · Ergänzung (24.10.2026): Eine Bestellung oder ein Storno erneuert die Hofliste nur, wenn dadurch ein Abholfenster voll wird oder wieder frei. Admin › Betrieb misst die Größe des Cache-Eintrags der Hofliste und warnt ab 80 % von 2 MB.“
+* „N24 · Ergänzung (24.10.2026): Auch /api/warenkorb/pruefen prüft Stilllegung, Freischaltung, Pause und Kaufsperre in derselben Reihenfolge wie /api/reserve und hält höchstens `MAX_MENGE` je Produkt. Besteht ein Hof die Prüfung nicht, erneuert der Warenkorb keinen Halt bei ihm und gibt die Halte der Sitzung bei diesem Hof frei; die Meldung nennt den Grund wie beim Reservieren.“
+* „S17 · Ergänzung (24.10.2026): Links in Mails werden mit einem eigenen Geheimnis signiert (`LINK_SECRET`) und tragen eine Schlüsselkennung; Links ohne Kennung gelten weiter mit dem bisherigen Geheimnis. Der Bestätigungslink einer Barbestellung gilt nur noch als Hash; Klartext-Werte alter Bestellungen setzt das Aufräumen auf leer.“
+* „N27 · Mails nochmal schicken (Support, 24.10.2026): Admin › Betrieb › E-Mails zeigt alle Mails der letzten 90 Tage mit Filter (Art, Stand, Zeitraum, Hof) und Suche nach Bestellnummer oder exakter E-Mail-Adresse; die Suche per Adresse findet auch Mails ohne Bestellung (z. B. Anmeldecodes) über den Fingerabdruck der Adresse. Die Adresse erscheint nur gekürzt (m•••@gmail.com) und wird bei jeder Anzeige frisch aus der Bestellung bzw. dem Hof geladen, nie im Protokoll gespeichert. Nochmal schicken geht nur für Mails zu Bestellungen und an Höfe (Weg ‚Wichtig‘) und für den Bar-Bestätigungslink, immer an die heute hinterlegte Adresse, mit dem heutigen Stand der Bestellung, mit frischer Bestätigung und höchstens 3-mal je Mail in 24 Stunden. Der Bar-Bestätigungslink bekommt dabei einen neuen Token; der alte Link gilt dann nicht mehr. Anmeldecodes, Bestellcodes, Passwort-Links und Admin-Mails schickt der Support nie; die Person fordert sie selbst neu an. Beiträge, Rundschreiben und Bescheide werden nicht nochmal geschickt (Einwilligung). Jedes Nochmal-Schicken ist eine neue Zeile im Protokoll mit Verweis auf die ursprüngliche Mail und dem Vermerk ‚vom Support‘. Eine Vorschau zeigt die Mail, wie sie heute verschickt würde, mit unkenntlich gemachten Links.“
+* „N16 · Ergänzung (24.10.2026): Ist ein eben geschlossener Block am gezeigten Tag schon vorbei, sagt die Zeile unter der Vorschau ‚… ist an diesem Tag nicht zu sehen – live bis <Tag, Uhrzeit>.‘ (bestätigt aus Bericht 155).“
+* Stand-Zeile: „Stand Lauf 24 (uttoranger, 24.10.2026): N26 (Mails über die Warteschlange) und die Ergänzungen zu N18 (Abrechnungszeitraum, Warnungen, Supabase Pro), N19 (seltener erneuern, Größe messen), N24 (Prüfkette im Warenkorb), S17 (Link-Geheimnis, Bar-Token nur als Hash) und N16 (‚live bis‘) sowie N27 (Mails nochmal schicken) sind entschieden und in Nr. 158–167 eingeplant (freigabe.md §28). Lauf 24 hat eine Migration (158, Expand), kein neues Paket und zwei optionale Variablen (`RESEND_WEBHOOK_SECRET`, `LINK_SECRET`). Nicht in diesem Lauf: Resend Pro (Projektleitung), Hofliste aufteilen (Entscheidung nach 163), Obergrenze je Warenkorb-Sitzung, Widerrufsfunktion, Datenschutzerklärung, CSP scharf, Servicegebühr, toter Code, Nochmal schicken an eine andere Adresse.“
+
+§0 Zuordnung für diesen Lauf
+
+* Modell:
+   * Doku-PR und 164 mit Sonnet.
+   * 158–163 und 165–167 mit Opus.
+   * tester und sichter mit Sonnet, pruefer mit Opus, höchstens 22 Schritte je Aufruf.
+* Prüfdurchgänge:
+   * ein voller Durchgang für 158, 159, 160, 161, 163, 165, 166 und 167
+   * gezielt für 162 und 164: jede Änderung an Verhalten oder Text hat einen Test mit Gegenprobe
+* pnpm test:integration:
+   * 158, 159 und 165 GANZ
+   * 167 GANZ
+   * 160, 161, 163 und 166 nur, wenn sie eine Integrationsdatei ändern
+   * im Sammel-PR ganz
+* Bilder:
+   * Admin-Seiten (161, 162, 167) macht die Projektleitung in der Vorschau. Das ist kein Blocker.
+   * 165: das Korb-Blatt mit einem pausierten Hof nach „Verfügbarkeit neu prüfen“ (390, hell).
+   * Sonst keine.
+* Lesemappe je Nummer wie 4a Punkt 1, mit den Einträgen, die etwas ausschließen:
+   * 158/159: Z3 (Post-Sperre bleibt die eine Stelle), S11 (Double-Opt-in), E7 (Codes nie gespeichert)
+   * 160: S16
+   * 161: N18, N20 (frische Bestätigung), Mockup admin-betrieb-mails
+   * 163: N19, N22
+   * 165: N24, R1
+   * 166: S17
+   * 167: N26, N27, N20, S17, E7, S11
+
+§1 Warteschlange (fest)
+Ablauf:
+
+* Doku-PR
+* Welle 1: 158 ∥ 162 ∥ 165, alle von docs/lauf24
+* danach in dieser Reihenfolge, je wenn ein Platz frei wird: 163, 164 (beide von docs/lauf24)
+* Ist 158 fertig: 159 ∥ 160 vom Zwischenstand integration/lauf24 (158 hineingemergt, voller lokaler Lauf grün)
+* 161 vom Zwischenstand, erst wenn 158, 160 und 162 fertig, Entwurf oder entfallen sind
+* 167 vom Zwischenstand, erst wenn 159 und 161 fertig sind (ohne 161 entfällt 167; ohne 160 zeigt 167 nur ‚gesendet‘)
+* 166 ZULETZT vom Zwischenstand, erst wenn 159, 164 und 167 fertig, Entwurf oder entfallen sind (166 fasst die Signaturen an, die 159 in den Renderern und 164 beim Bar-Token benutzen)
+* dann der Sammel-PR (Haltepunkt)
+* Branches nacht/<datum>/<nr>-<kurz>
+
+Dateien bewusst geteilt:
+
+* gestapelt:
+   * 158 → 159 (src/lib/email.ts, alle Aufrufer)
+   * 158 → 160 (Tabelle)
+   * 162 → 161 (src/lib/betrieb.ts, Admin › Betrieb)
+   * 159, 161 → 167 (Renderer, Ansicht E-Mails, src/server/queries/mails.ts)
+   * 159, 164 → 166 (src/lib/unsubscribe.ts, src/lib/bestell-link.ts, src/lib/bar-bestaetigung.ts)
+* parallel:
+   * src/lib/betrieb.ts: 162 (Tarife, Fenster, Texte) und 163 (Messart `hoflisteBytes` und Kachel), an je eigenen Stellen
+   * src/server/betrieb.ts: 163 (Messung) und 158 (Herzschlag des neuen Ablaufs), an je eigenen Stellen
+   * src/server/aufraeumen.ts: 158 (Protokoll löschen) und 164 (Klartext-Token leeren), an je eigenen Stellen
+   * src/app/api/reserve/route.ts: nur 165
+   * vercel.json: nur 158
+   * DEVELOPMENT.md: je ein Eintrag
+   * docs/ai/ARCHITECTURE.md: je eigener Absatz
+   * docs/ai/BAUSTEINE.md: nur über `pnpm bausteine`
+
+Die Nummern
+158 Mail-Warteschlange und Protokoll (N26) – Opus, ein voller Durchgang, EINE Migration (Expand), von docs/lauf24
+Ausgangslage (suchen, nicht raten):
+
+* `sendRaw` (src/lib/email.ts) verschickt jede Mail einzeln über `resend.emails.send` und zählt danach (`zaehleVersand` → src/server/betrieb-zaehler.ts).
+* Schleifen über Empfänger stehen in:
+   * src/server/actions/status-posts.ts (`versendeBeitragsMails`)
+   * src/server/rundschreiben.ts (`verschickeRundschreiben`)
+   * src/server/actions/admin.ts (`schreibeKundinnen`)
+   * `sendeAnListe` in email.ts
+* Bei 429 gibt es keine Wiederholung und keinen Vorrang. Eine Mail in `nachDerAntwort` endet mit der Funktion.
+
+1. Tabelle `MailAuftrag` (Migration nach Regel 3, nur Expand). Felder:
+   * `id`, `art` (Text, geprüft über ein Zod-Enum `MAIL_ARTEN`), `vorrang` (Int: 0 = Sofort, direkt verschickt, nur Protokoll; 1 = Wichtig; 2 = Kann warten)
+   * `schluessel` (Text, unique; fachlicher Schlüssel gegen Doppelversand, z. B. `beitrag:<postId>:<aboId>`, `bestellung-bezahlt-kundin:<orderId>`)
+   * `bestellungId` (Text, optional; die Kennung der Bestellung, zu der die Mail gehört, für die Suche in 161; kein Fremdschlüssel)
+   * `bezug` (Json, nur Kennungen, je Art mit Zod geprüft; nie Adresse, Name, Text oder Token)
+   * `status` (Text: `offen`, `in_arbeit`, `gesendet`, `gescheitert`, `gesperrt` (Post-Sperre Z3), `ohne_schluessel` (kein API-Key, Vorschau), `verworfen`)
+   * `versuche` (Int), `naechsterVersuchAm`, `belegtBis` (Sperre des Workers)
+   * `erstelltAm`, `gesendetAm?`, `resendId?` (unique), `fehlerCode?` (kurzer Code aus der Antwort von Resend, nie die Nachricht)
+   * `zugestelltAm?`, `bounceAm?`, `beschwerdeAm?` (für 160)
+   * `farmId` (Text, optional; Hof der Mail, für Filter in 167; kein Fremdschlüssel)
+   * `ausloeser` (Text: `system` oder `support`, Standard `system`) und `nochmalVon` (Text, optional; `id` der ursprünglichen Zeile) für 167
+   * `empfaengerHash` (Text, optional): HMAC-SHA256 der klein geschriebenen, getrimmten Adresse mit Zweck-Präfix `mail-empfaenger:` und dem Geheimnis der signierten Links (eine Hilfe `empfaengerFingerabdruck` in src/lib/, Vergleich nur über diese Funktion). Gesetzt vom Worker bzw. von `sendRaw` beim Versand, nie aus einem Formular. Für die Suche per Adresse in 161/167; die Adresse selbst steht nie in der Tabelle.
+   * Indizes: (`status`, `vorrang`, `naechsterVersuchAm`), (`art`, `erstelltAm`), (`erstelltAm`), (`bestellungId`), (`farmId`, `erstelltAm`), (`nochmalVon`), (`empfaengerHash`, `erstelltAm`) Keine Fremdschlüssel auf Bestellung, Abo oder Hof: Ein gelöschter Bezug darf das Protokoll nicht mitreißen und umgekehrt.
+2. Einstellen: `stelleMailEin({ art, vorrang, schluessel, bezug, bestellungId?, farmId? })` in neuer src/server/mail-warteschlange.ts.
+   * `createMany` mit `skipDuplicates` über `schluessel`, auch für viele Aufträge auf einmal (Beitrag an 5.000 Abos = ein Aufruf).
+   * Danach `nachDerAntwort(() => arbeiteWarteschlange({ biszeitMs: 45_000 }))`.
+   * Wo es eine fachliche Änderung gibt, liegt das Einstellen in derselben Transaktion (Bestellung bezahlt → Auftrag). Dann fehlt nie eine Mail zu einer gespeicherten Bestellung.
+3. Worker `arbeiteWarteschlange` (src/server/mail-warteschlange.ts):
+   * Nur ein Worker zur Zeit: `pg_try_advisory_lock` mit einer festen Zahl.
+   * Holt fällige Aufträge in Seiten zu 100, zuerst Wichtig, dann `naechsterVersuchAm`. Er setzt sie per `UPDATE … WHERE id IN (SELECT … FOR UPDATE SKIP LOCKED)` auf `in_arbeit` mit `belegtBis = jetzt + 2 min`. Abgelaufenes `belegtBis` gilt wieder als offen.
+   * Je Art lädt ein Renderer (Dateien unter src/server/mail-arten/ oder eine Tabelle von Funktionen) Adresse und Inhalt frisch aus der Datenbank und baut die Mail mit den bestehenden Vorlagen aus src/emails und src/lib/email.ts. Keine zweite Vorlage, keine doppelte Logik.
+   * Liefert der Renderer `null` (Abo abgemeldet, Double-Opt-in fehlt `WERBEMAIL_EMPFAENGER`, Bestellung gelöscht), wird der Auftrag `verworfen` mit Code.
+   * Die Post-Sperre Z3 (`darfMailEmpfangen`) prüft der Worker je Adresse über dieselbe Funktion wie `sendRaw` → `gesperrt`. Ohne `RESEND_API_KEY` → `ohne_schluessel`, kein neuer Versuch.
+   * Versand je Seite über `resend.batch.send` (bis 100), sonst einzeln (siehe „Stand“). Zwischen zwei Anfragen an Resend mindestens 200 ms: höchstens 5 von 10 Anfragen je Sekunde, der Rest bleibt für die Sofort-Mails.
+   * Erfolg → `gesendet`, `resendId`, `gesendetAm`; der Zähler `mails` zählt je angenommene Mail, wie heute.
+   * 429 oder 5xx → `offen`, `versuche + 1`, `naechsterVersuchAm` nach 1, 5, 15, 60 und 240 Minuten. Nach 5 Versuchen oder bei 4xx außer 429 → `gescheitert` mit `fehlerCode`.
+   * Kontingent: „Kann warten“ wird nicht geholt, wenn die Mails des UTC-Tags ≥ 70 % von `GRENZE.mailsTag` sind (nur mit Tagesgrenze) oder die des Abrechnungszeitraums ≥ 90 % von `GRENZE.mailsMonat` (Zeitraum aus 162; bis 162 gemergt ist, im Zwischenstand nachziehen).
+   * Der Worker endet vor `biszeitMs` und gibt die Sperre frei.
+4. Sofort-Mails ins Protokoll:
+   * `sendRaw` schreibt nach jedem Versuch eine Zeile mit `vorrang: 0` (Art, Status, `resendId`, `fehlerCode`, `bestellungId` wo vorhanden, sonst kein Bezug).
+   * Dafür bekommt `sendRaw` die Pflichtparameter `art` und optional `bestellungId`; der Typ erzwingt `art`.
+   * Fail-open: Scheitert das Protokoll, geht die Mail trotzdem (CLAUDE.md §2).
+5. Cron `/api/cron/mails` (GET, `cronBerechtigt` mit `CRON_SECRET`, `mitHerzschlag`, `maxDuration = 60`):
+   * jede Minute (`* * * * *` in vercel.json; Vercel Pro erlaubt das, im Bericht bestätigen)
+   * ruft `arbeiteWarteschlange({ biszeitMs: 50_000 })`
+   * Neuer Ablauf in `ABLAEUFE` (src/lib/betrieb.ts) mit Rhythmus `minuetlich`, überfällig nach 10 Minuten; das Lebenszeichen zählt ihn mit.
+   * Kommentare mit „Hobby: höchstens täglich“ werden berichtigt.
+6. Aufräumen: `raeumeAltesAuf` löscht `MailAuftrag` älter als 90 Tage (Konstante neben den anderen Fristen in src/lib/betrieb.ts) und setzt `in_arbeit` mit abgelaufenem `belegtBis` zurück.
+7. Doku:
+   * ARCHITECTURE, neuer Abschnitt „Mails“: welche Arten Sofort, Wichtig und Kann warten sind, Kontingent, Schlüssel, Renderer, Post-Sperre
+   * CODING_STANDARDS §4 (Regelvorschlag 149, Morgenbericht 23): keine Schleife über Mails in Actions oder Routen, Massenversand nur über `stelleMailEin`
+   * DEVELOPMENT.md
+
+Dateien:
+
+* prisma/schema.prisma und die eine Migration
+* neu: src/server/mail-warteschlange.ts, die Renderer, src/app/api/cron/mails/route.ts, src/schemas/mail-auftrag.ts
+* src/lib/email.ts (NUR `sendRaw`-Signatur, Protokoll, gemeinsame Sperre)
+* vercel.json, src/lib/betrieb.ts (NUR `ABLAEUFE`, Rhythmus, Frist), src/server/aufraeumen.ts (NUR das Protokoll)
+* die Aufrufer von `sendRaw` NUR für die Parameter
+* Tests und die genannte Doku
+
+Tests (Resend als Attrappe):
+
+* doppelter Schlüssel → ein Auftrag
+* Wichtig vor Kann warten
+* 429 → neuer Versuch mit Abstand; nach 5 Versuchen → gescheitert
+* 4xx → sofort gescheitert
+* zwei Worker gleichzeitig → jede Mail genau einmal (Integration, echtes Postgres)
+* abgelaufenes `belegtBis` → neu geholt
+* Tageskontingent über 70 % → Kann warten bleibt liegen, Wichtig geht
+* abgemeldetes Abo → verworfen
+* Post-Sperre → gesperrt
+* ohne Schlüssel → ohne_schluessel, kein neuer Versuch
+* `sendRaw` ohne `art` kompiliert nicht
+* `empfaengerHash` gesetzt bei Versand über den Worker und über `sendRaw`; nie die Adresse in irgendeiner Spalte (Gegenprobe über alle Textspalten)
+* Protokollfehler bricht den Versand nicht
+* Last: 5.000 Aufträge Kann warten und gleichzeitig 20 Wichtig → jeder wichtige ist nach einem Durchlauf gesendet; keiner doppelt, keiner verloren. Jede mit Gegenprobe. `pnpm test:integration` ganz.
+
+Fertig, wenn: grün. Der Bericht nennt die Messung aus dem Lasttest (Mails je Sekunde, Dauer für 5.000) und was `batch.send` kann.
+159 Alle Mail-Wege auf die Warteschlange (N26) – Opus, ein voller Durchgang, keine Migration, vom Zwischenstand nach 158
+
+1. Wichtig (über die Warteschlange):
+   * Bestellbestätigung und „bezahlt“ an den Hof (Webhook)
+   * Barbestellung bestätigt (Kundin und Hof)
+   * abholbereit, nicht abholbereit, storniert, Artikel fehlt, verfallen, Zahlung zu spät
+   * Erstattung offen, neuer Hof, Freischaltung, Meldung, Postfach-Mail und Antwort an das Team, Betreiber-Bestätigung und Testmail, Abo-Bestätigung (Double-Opt-in) Mit `bestellungId`, wo die Mail zu einer Bestellung gehört. Wo es eine fachliche Transaktion gibt, wird darin eingestellt (Webhook `payment_intent.succeeded`, `bestaetigeBarBestellung`, `cancelOrder` …).
+2. Kann warten (über die Warteschlange):
+   * Beitrag an Abos: `versendeBeitragsMails` entfällt; ein Auftrag je Abo, Schlüssel `beitrag:<postId>:<aboId>`
+   * Rundschreiben: ein Auftrag je Faden
+   * Bescheid an Kundinnen (`schreibeKundinnen`): ein Auftrag je Meldung
+   * `emailRecipientCount` in Mein Hof zählt die gesendeten Aufträge des Beitrags, aus einer Quelle. Die 7-Tage-Sperre (`MAILABSTAND_TAGE`) zählt einen Beitrag, sobald er Aufträge hat.
+3. Sofort (direkt; ein Token oder Code wird nie gespeichert): Anmeldecode, Bestellcode, Passwort-Link, E-Mail bestätigen, Registrierungs-Hinweis, Bar-Bestätigungslink (`sendOnsiteConfirmation`, mit `bestellungId`), Admin-Sicherheit, Neue Anmeldung, Zu viele Versuche, Betriebs-Warnung. Nur Protokoll (158 Punkt 4).
+4. Wache: Eine Quelltext-Wache prüft, dass jede `send…`-Funktion in src/lib/email.ts in genau einer der Listen SOFORT, WICHTIG oder KANN_WARTEN steht. Kein Aufruf von `sendRaw` in einer Schleife unter src/server oder src/app (Regelvorschlag 149).
+5. `sendeAnListe` entfällt, wenn danach kein Aufrufer bleibt.
+
+Dateien: alle Aufrufer der genannten Mails (src/app/api/stripe/webhook/route.ts, src/server/actions/*.ts, src/server/rundschreiben.ts, src/server/verwaiste-bestellungen.ts, src/server/abo-anmeldung.ts, src/app/api/checkout/route.ts NUR `sendOnsiteConfirmation` mit `bestellungId`), src/lib/email.ts, die Renderer aus 158, Tests, DEVELOPMENT.md.
+Tests:
+
+* je Art eingestellt mit richtigem Weg, Schlüssel und `bestellungId`
+* Rollback der Bestellung → kein Auftrag
+* Webhook zweimal → ein Auftrag
+* Beitrag an 1.000 Abos → 1.000 Aufträge, die Action wartet nicht
+* die Wache mit Gegenprobe `pnpm test:integration` ganz.
+
+Fertig, wenn: grün. Vorschau: Barbestellung und Beitrag anlegen → in Admin › Betrieb › E-Mails stehen die Aufträge als `ohne_schluessel`. Das prüft der Mensch.
+160 Zustellmeldungen von Resend (N26) – Opus, ein voller Durchgang, keine Migration, vom Zwischenstand nach 158
+
+1. Neue Route `POST /api/webhooks/resend`.
+   * Prüft die Signatur nach dem Verfahren von Resend (Svix):
+      * Kopfzeilen `svix-id`, `svix-timestamp`, `svix-signature`
+      * HMAC-SHA256 über `<id>.<timestamp>.<Rohtext>` mit dem Base64-Teil von `RESEND_WEBHOOK_SECRET` nach `whsec_`
+      * Vergleich in konstanter Zeit (`geheimnisGleich`), Zeitstempel höchstens 5 Minuten alt
+   * Kein neues Paket.
+   * Ohne Variable 503, ohne gültige Signatur 401 (fail-closed wie /api/lebenszeichen). Größenbegrenzung wie /api/csp-bericht.
+2. `email.delivered`, `email.bounced` und `email.complained` setzen `zugestelltAm`, `bounceAm` bzw. `beschwerdeAm` per `updateMany` über `resendId`. Unbekannte `resendId` und andere Ereignisse → 200 ohne Wirkung. Gelesen werden nur `type`, `created_at` und `data.email_id`; Adressen nie.
+3. Harter Bounce oder Beschwerde zu einem Auftrag mit Bezug Abo → das Abo wird abgemeldet, über dieselbe Funktion wie der Abmeldelink (eine Quelle). Bei Mails zu Bestellungen wird nur vermerkt.
+4. Doku:
+   * docs/betrieb/stripe-live.md bzw. testumgebung.md: Einrichtung bei Resend mit Adresse `https://agrilo.at/api/webhooks/resend`, den drei Ereignissen und `RESEND_WEBHOOK_SECRET`, nur Production
+   * ARCHITECTURE, DEVELOPMENT.md
+
+Dateien: die neue Route, src/lib/env.ts (NUR die Variable), src/server/mail-warteschlange.ts (NUR das Vermerken), die Funktion zum Abmelden (NUR, falls ein Server-Aufruf fehlt), Tests, die genannte Doku.
+Tests mit Gegenproben:
+
+* gültige Signatur → vermerkt
+* falsche Signatur, alter Zeitstempel, fehlende Variable → 401/503
+* Bounce zu einem Abo → abgemeldet
+* Bounce zu einer Bestellmail → nur vermerkt
+* dasselbe Ereignis zweimal → keine zweite Änderung
+
+Fertig, wenn: grün. Für dich zu tun: Webhook bei Resend anlegen und `RESEND_WEBHOOK_SECRET` in Vercel für Production setzen.
+161 Admin › Betrieb › E-Mails (N26, N18-Ergänzung) – Opus, ein voller Durchgang, keine Migration, vom Zwischenstand nach 158, 160, 162
+Mockups: docs/mockups/admin-betrieb-mails.html (1440) und mobil-admin-betrieb-mails.html (390), Fassung 3. Aufbau nach DESIGN_SYSTEM „Aufbau jeder Admin-Seite“ mit den Bausteinen von Admin › Betrieb (`Kacheln`, `Karte`, `Klappkarte`, `VerlaufDiagramm`, `Marke`). Die Zahlen im Mockup sind erfunden.
+
+1. Zugang:
+   * Admin › Betrieb bekommt Unterreiter „Überblick · E-Mails“ (`?reiter=mails`, Zod) mit Zahl offener Fälle aus „Braucht dich“.
+   * Die Kachel „E-Mails heute“ im Überblick führt dorthin. Die Betriebsleiste nennt eine wartende wichtige Mail („Eine Bestellmail wartet seit 7 Min. – ansehen“).
+   * Wache `verlangeAdminSeite`.
+   * Kopfzeile: rechts „Stand 09:42 · jede Minute neu“ und der Link „Alle Mails · 90 Tage“ (führt zu 167; bis 167 gemergt ist, fehlt der Link).
+2. Wörter (Wortliste N8):
+   * Die Wege heißen auf der Seite „Sofort“, „Wichtig“ und „Kann warten“, nie „Vorrang“ oder Zahlen. Im Code bleibt `vorrang` 0/1/2.
+   * „Jetzt schicken“ für eine Mail, die noch nie hinausging (offen oder gescheitert; setzt dieselbe Zeile auf `offen`, `versuche = 0`, `naechsterVersuchAm = jetzt`). „Nochmal schicken“ nur für eine Mail, die schon hinausging (167, neue Zeile). Nie „Erneut versuchen“.
+   * „Abgelehnt“ statt Bounce, „Spam gemeldet“ statt Beschwerde. Das Fachwort steht einmal erklärt in der Regel-Zeile.
+   * Fehler zuerst in Worten, der Code danach klein: eine Liste `FEHLER_TEXTE` in src/lib/betrieb-mails.ts (Code → Grund, Was tun, ob „Jetzt schicken“ hilft), z. B. 429 „Resend war kurz überlastet“ / „Du musst nichts tun. Wenn es eilt: jetzt schicken.“; 422 „Diese Adresse gibt es nicht“ / „Nochmal schicken hilft hier nicht – die Adresse ist falsch geschrieben.“ (ohne „Jetzt schicken“). Unbekannter Code → „Unbekannter Fehler (Code …)“.
+3. Warnkarte wie im Überblick, mit dem Satz, wann Agrilo es von selbst wieder versucht („… versucht es um 09:43 von selbst – du musst nichts tun“), und den Knöpfen „Jetzt schicken“ (frische Bestätigung) und „Ansehen“ (springt zu „Braucht dich“).
+4. Kacheln (Ton nur bei Handlungsbedarf; jede Kachel trägt ihren Zustand zusätzlich als Wort – „Im Rahmen“, „Achtung“, „1 braucht dich“, „Gut“ –, nie nur als Farbe, WCAG 1.4.1):
+   * Heute: gesendet von Tagesgrenze, mit Strich bei 70 %
+   * Abrechnungszeitraum: gesendet von Grenze, „<Beginn> bis <Ende> · noch n Tage“ (aus 162)
+   * Warteschlange: offen, aufgeteilt in „n wichtig“ und „n können warten“, ältester „seit …“
+   * Gescheitert in 24 h: „versucht es von selbst“ und „aufgegeben“
+   * Zustellung 7 Tage: zugestellt in %, „Abgelehnt“ und „Spam gemeldet“ gegen 4 % und 0,08 % (ab 50 Mails eine Quote, sonst „zu wenig Mails“)
+5. Mails suchen (Karte oben rechts, am Handy direkt unter den Unterreitern als eigenes Suchfeld `role="search"`):
+   * EIN Feld mit sichtbarem `<label>` „Bestellnummer oder E-Mail-Adresse“, über `?suche=` in der Adresse. Zod entscheidet: Muster von `orderNumber` (z. B. „HM-2611-A4F2“) → Bestellung; `email()` → Adresse (klein, getrimmt, exakt; keine Teilsuche, kein `LIKE`); sonst „Bitte eine Bestellnummer oder eine ganze E-Mail-Adresse eingeben.“ ohne Datenbankzugriff.
+   * Bestellnummer: die Bestellung (Nummer, Hof, Abholtag, Zahlart, Stand) und alle `MailAuftrag` mit ihrer `bestellungId`: Art, Weg, gesendet um, Stand und eine Zeile für erwartete, noch nicht fällige Mails (z. B. „Abholbereit · kommt, wenn der Hof packt“).
+   * Adresse: über `empfaengerFingerabdruck` (158) und `customerEmail` der Bestellungen der letzten 90 Tage; Treffer gruppiert nach Bestellung, dazu „Ohne Bestellung“ (z. B. Anmeldecode, Beitrag an ein Abo).
+   * Die Adresse erscheint nur gekürzt (`maskiereAdresse`, „k•••@example.at · aus der Bestellung“), damit du am Telefon nachfragen kannst („endet sie auf …?“). Kein Name.
+   * Ist die gesuchte Mail laut Resend zugestellt: Hinweis „Laut Resend angekommen. Findet sie die Mail nicht: zuerst im Spam- oder Werbung-Ordner nachsehen lassen.“
+   * Kein Treffer → „Keine Bestellung und kein Hof mit dieser Angabe in den letzten 90 Tagen.“ (derselbe Satz, egal ob es die Adresse sonst gibt).
+6. „Braucht dich“:
+   * gescheiterte und hängende Aufträge: Art, Weg, Stand („versucht es von selbst“ bzw. „aufgegeben“), Grund in Worten mit Code, Versuche, letzter bzw. nächster Versuch, „Was tun“-Satz aus `FEHLER_TEXTE`; ohne Adresse, Inhalt oder personenbezogene Kennung
+   * „Jetzt schicken“ (nur wo `FEHLER_TEXTE` es erlaubt) und „Verwerfen“, je mit frischer Bestätigung (`verlangeFrischeBestaetigung`, N20), für einen Auftrag oder alle einer Art. Verworfene Mails bleiben im Protokoll sichtbar.
+7. „Je Art“ (7 Tage):
+   * echte `<table>` mit `<caption>`, `<th scope="col">` und `<th scope="row">` für die Art: Art, Weg, gesendet, zugestellt, gescheitert, abgelehnt, Wartezeit (`erstelltAm` → `gesendetAm`)
+   * Auffällige zuerst (mit Fehler oder Ablehnung), höchstens 5 Zeilen, darunter „Alle n Arten zeigen“ (`?alle=1`)
+   * Namen der Arten aus einer deutschen Liste; unbekannte stehen mit Kürzel da.
+8. Warteschlange (Karte): je Weg Zahl und Alter, letzter Durchlauf („09:42 · 31 Mails in 4 s“).
+9. Verlauf 30 Tage: gesendet je Tag als Säulen, gescheitert als Punkt (`VerlaufDiagramm`); darunter ein Satz aus denselben Zahlen („Im Schnitt 49 Mails am Tag. Spitzen am … An 4 Tagen einzelne gescheiterte Mails.“), der auch als Text für Screenreader dient.
+10. Handy: Reihenfolge wie im Mockup (Fassung 3):
+   * Suchfeld (für Anrufe), Warnkarte, „Braucht dich“, Kacheln untereinander (nicht gestreckt)
+   * „Je Art“ als Liste in einer Klappkarte, „Verlauf“ und „Warteschlange“ zugeklappt
+   * Knöpfe mindestens 44 px, sichtbarer Fokusring (`:focus-visible`) auf allen Bedienelementen
+11. Warnungen nach dem Muster von `pruefeGrenzen` (`BetriebWarnung`, Stufen, Warn-Mail an die Empfänger der Art „Betrieb“, Sofort):
+   * Bedingungen:
+      * eine wichtige Mail wartet über 5 Minuten
+      * die Warteschlange ist älter als 15 Minuten
+      * abgelehnt über 2 % oder Spam gemeldet über 0,05 % (7 Tage, ab 50 Mails)
+      * Kontingent 80/95/100 % im Abrechnungszeitraum (ersetzt die Monatsregel aus N18)
+   * Geprüft in /api/cron/mails höchstens alle 10 Minuten (eigene Drossel).
+   * Das Lebenszeichen antwortet 503, wenn eine wichtige Mail über 15 Minuten wartet.
+12. Regel-Zeile: Grenzen von Resend (10 Anfragen je Sekunde, höchstens 4 % abgelehnt – „Bounce: das Postfach weist die Mail zurück“ –, 0,08 % Spam-Meldungen), welche Mails Sofort gehen, Aufbewahrung 90 Tage, „Gespeichert werden nie Adresse oder Inhalt“.
+13. Ladefehler eines Teils → nur dieser Teil zeigt `AdminFehler` (Muster `ladeTabellenSicher`).
+
+Dateien:
+
+* src/app/admin/betrieb/page.tsx (NUR Unterreiter und Zweig), neue Ansicht und Teile daneben
+* neu: src/server/queries/mails.ts, src/lib/betrieb-mails.ts (reine Funktionen und Texte), src/schemas/bestellnummer.ts (falls es kein Schema gibt)
+* neue Actions in src/server/actions/betrieb.ts
+* src/components/shells/admin-shell.tsx bzw. die Betriebsleiste (NUR der Hinweis)
+* `fehlendeAblaeufe` bzw. src/app/api/lebenszeichen/route.ts (NUR die neue Bedingung)
+* Tests, docs/ai/DESIGN_SYSTEM.md (ein Absatz Admin › Betrieb), DEVELOPMENT.md
+
+Tests:
+
+* jede Kennzahl aus einem festen Bestand, auch an der Grenze des Abrechnungszeitraums und des UTC-Tags
+* Quote unter 50 Mails → kein Prozent
+* Suche: Bestellnummer mit allen Mails der Bestellung; ganze Adresse mit anderer Groß/Kleinschreibung → Treffer; Teiladresse → kein Treffer; unbekannte Angabe → derselbe Satz; ungültiges Format → kein Datenbankzugriff; kein `LIKE`/`contains` auf Adressen (Wache)
+* `empfaengerFingerabdruck`: gleiche Adresse → gleicher Wert, anderer Zweck → anderer Wert
+* keine volle Adresse im gerenderten HTML, nur die gekürzte (Gegenprobe mit erfundener Adresse im Bestand)
+* kein „Vorrang“ oder „Erneut versuchen“ im HTML, „Bounce“ nur in der Regel-Zeile (Wache)
+* `FEHLER_TEXTE`: 422 ohne „Jetzt schicken“, unbekannter Code mit Ersatztext
+* jede Kachel hat ein Zustandswort; „Je Art“ ist eine Tabelle mit `th scope`
+* Aktionen ohne frische Bestätigung → nichts geändert
+* jede Warnung und das Lebenszeichen mit Gegenprobe
+
+Fertig, wenn: grün. Für dich zu tun: in der Vorschau als Admin bei 1440 und 390 px ansehen (hell, dunkel), Bilder in den PR; Abweichungen vom Mockup stehen im Bericht.
+162 Admin › Betrieb plausibel machen (N18-Ergänzung) – Opus, gezielt, keine Migration, von docs/lauf24
+
+1. Supabase Pro:
+   * `TARIFE.supabase = 'PRO'`. `GRENZEN.supabase.PRO = { datenbankBytes: 8_000_000_000, uebertragungBytesMonat: 250_000_000_000 }` (Stand 24.10.2026, Quelle im Kommentar).
+   * Texte je Tarif aus einer Quelle:
+      * Pro: „8 GB inklusive, darüber wächst der Speicher automatisch und kostet extra“ statt „nur noch lesbar“
+      * Tarif-Zeile: „Pro · tägliche Sicherung (7 Tage)“, ohne Ton „tun“; „Pausiert nach 7 Tagen“ nur bei Free
+      * `NUR_IM_DASHBOARD` aus `GRENZE` statt „5 GB“
+   * Warnstufen der Datenbank 80/95/100 % von 8 GB. Der Satz der Warn-Mail sagt bei Pro „kostet ab dann extra“.
+2. Resend vorbereiten:
+   * `GRENZEN.resend.PRO = { mailsTag: null, mailsMonat: 50_000 }` (Stand 24.10.2026).
+   * `mailsTag: null` heißt: keine Tagesgrenze, keine Prozent, keine Tageswarnung. Kachel und Prüfung kommen damit zurecht.
+   * `TARIFE.resend` bleibt `'FREE'`. Das Umschalten ist eine Zeile nach dem Tarifwechsel (Kommentar).
+3. Abrechnungszeitraum der Mails:
+   * `RESEND_ABRECHNUNG_TAG = 17` und `resendAbrechnungsBeginn(jetzt)` nach dem Muster `abrechnungsBeginn` (0 Uhr UTC am 17.; davor der 17. des Vormonats).
+   * `mailsImMonatBis`, `summeImMonat('mails', …)`, die Regel `monat` für `mailsMonat` und die Kachel nutzen ihn; die Kachel nennt Beginn und Ende.
+   * Bild-Vorgänge bleiben beim Kalendermonat.
+   * Kommentar: Resend beginnt zur Uhrzeit des Vertragsbeginns (heute 20:23 UTC); 0 Uhr warnt früher, nie später.
+4. Vercel-Ausgaben ehrlich:
+   * nie eine Meldung: „Noch keine Meldung von Vercel. Vercel meldet erst ab 50 % des Limits – ob die Meldung eingerichtet ist, steht in Vercel › Settings › Billing.“
+   * frühere Meldung: „Unter 50 % (letzte Meldung <Datum>).“
+   * nur mit Meldung im laufenden Zeitraum ein Betrag
+5. Veraltetes: Kommentare und Texte mit Hobby oder Free, wo Pro gilt (`ABLAEUFE`, `UEBERFAELLIG_NACH_MS`).
+6. Wache: Kein Text in src/lib/betrieb.ts enthält eine feste Grenzzahl („500 MB“, „5 GB“, „3.000“, „100 E-Mails“); alles kommt aus `GRENZE`. Mit Gegenprobe.
+
+Dateien: src/lib/betrieb.ts, src/server/betrieb.ts (NUR Fenster der Monatsregel), src/server/queries/betrieb.ts (NUR `summeImMonat`), src/app/admin/betrieb/betrieb-teile.tsx (NUR neue Felder der Karte), src/emails/betrieb-warnung.tsx (NUR der Satz), Tests, DEVELOPMENT.md.
+Tests mit Gegenprobe:
+
+* Zeitraum am 16., 17. und 18. und über den Jahreswechsel
+* Kachel bei Pro ohne „nur noch lesbar“
+* `mailsTag: null` → keine Tageswarnung
+* Vercel-Karte in den drei Fällen
+* die Wache
+
+Fertig, wenn: grün. Für dich zu tun: Admin › Betrieb in der Vorschau, die Datenbank-Kachel zeigt „von 8 GB“.
+163 Hofliste: Größe messen, warnen, seltener erneuern (N19-Ergänzung) – Opus, ein voller Durchgang, keine Migration, von docs/lauf24
+Ausgangslage:
+
+* `ladeOeffentlicheHoefe` cacht ALLE sichtbaren Höfe mit ALLEN verfügbaren Produkten (`getOeffentlicheHoefe`) als einen Eintrag. Vercel speichert Einträge über 2 MB nicht.
+* `erneuereHoflisteNachBestellung` (src/server/hofliste-erneuern.ts) lässt ihn nach JEDER Bestellung und jedem Storno eines Hofs mit Höchstzahl verfallen.
+
+1. Messen: `messeBetrieb` misst `hoflisteBytes` (`Buffer.byteLength(JSON.stringify(await getOeffentlicheHoefe()))`, ohne Cache) und `hoflisteHoefe`. Neue Arten in `BETRIEB_ARTEN` und im Schema.
+2. Kachel und Warnung:
+   * Kachel „Hofliste“ („x MB von 2 MB · n Höfe“, Trend).
+   * Stufen 80/95/100 % nach der Regel `speicher`.
+   * Warn-Satz: „Ab 2 MB speichert Vercel die Hofliste nicht mehr – jeder Aufruf von /hoefe und der Startseite lädt dann alle Höfe aus der Datenbank.“
+3. Seltener erneuern:
+   * Erneuert wird nur, wenn das Abholfenster der Bestellung dadurch voll wird (nicht stornierte Bestellungen = `maxOrders`) oder wieder frei.
+   * Gezählt wird wie in der Kasse (`imAbholfenster` / `ausgebuchteTage`, eine Quelle). Die Entscheidung trifft eine reine Funktion. Sonst altert die Liste wie bisher höchstens 5 Minuten.
+4. Messung mit Seed: 50, 200 und 500 Höfe mit je 20 Produkten (Fabrik der Integration, erfundene Namen) → Größe des Eintrags und die Zahl der Höfe, ab der 2 MB erreicht sind, in den Bericht.
+
+Dateien:
+
+* src/server/betrieb.ts (NUR die Messung), src/lib/betrieb.ts (NUR Art, Kachel, Text), src/schemas/betrieb-messung.ts
+* src/server/hofliste-erneuern.ts und seine Aufrufer (NUR die Übergabe von Fenster und Tag)
+* Tests, docs/ai/ARCHITECTURE.md (NUR der Absatz zum Zwischenspeicher der Hofliste), DEVELOPMENT.md
+
+Tests mit Gegenprobe:
+
+* Fenster wird voll → erneuert
+* ein Platz bleibt → nicht
+* volles Fenster wird frei → erneuert
+* ohne Höchstzahl → nie
+* Messung und Kachel
+
+Fertig, wenn: grün, und der Bericht nennt die gemessenen Größen.
+164 Nacharbeit aus Lauf 23 und kleine Fixe (Morgenbericht 23, „Sollte“; Seitenkarte) – Sonnet, gezielt, keine Migration, von docs/lauf24
+Jeder Punkt ist klein und für sich. Ist einer größer als beschrieben: STOPP für den Punkt, Bericht, die anderen laufen weiter.
+
+1. `holeZurueck` (src/components/settings/pickup-slots-client.tsx) fängt Fehler ab: try/catch und `toast.error` mit Text aus einer Quelle (157).
+2. /verify im Zustand „schon bestätigt, abgemeldet“ zeigt dasselbe Anmeldeformular wie nach dem Bestätigen, statt des Links auf `/login?von=/verify` (157).
+3. Kommentar in src/lib/rate-limit.ts („die übrigen Routen bleiben bei dieser einen Stufe“) berichtigen, seit 150.
+4. `addressCountry` in src/lib/json-ld.ts kommt aus dem Land des Hofs (`alsLand`, `LAND_CODE` in Großbuchstaben), nicht fest 'AT' (152).
+5. Land vor „Mit Stripe einrichten“: /settings/payments zeigt über dem Knopf den Satz „Dein Stripe-Konto wird in <Österreich|Deutschland> angelegt. Stimmt das Land? Sonst zuerst in den Hofdaten ändern.“, mit Link auf `/settings/profile`. Der Satz steht nur, solange noch kein Konto da ist (152; das Land lässt sich bei Stripe nachträglich nicht ändern).
+6. Bar-Token nur als Hash (S17-Ergänzung):
+   * `tokenKandidaten` (src/lib/bar-bestaetigung.ts) nimmt nur noch den Hash; der Klartext-Zweig und sein Kommentar entfallen.
+   * Im Aufräumen (src/server/aufraeumen.ts) setzt ein Schritt `confirmationToken` auf `null` für alle Werte ohne das Präfix des Hashs (`h1:`, prüfen). Das ist ein `updateMany`, kein Löschen von Zeilen.
+   * Im Bericht steht die Zahl der Zeilen, die der Schritt in der Entwicklungsdatenbank getroffen hätte; die Produktion nur lesend gezählt durch den Dirigenten, falls erlaubt, sonst „Für dich zu tun“.
+7. Wache gegen Actions in Actions (Regelvorschlag 154): Keine Datei unter src/server/actions/ importiert aus `@/server/actions/`. Bestehende Fälle stehen in einer Bestandsliste, die nur schrumpft. Mit Gegenprobe.
+
+Dateien: die genannten Dateien je NUR an den genannten Stellen, src/app/(hof)/settings/payments/page.tsx bzw. payments-actions.tsx (NUR der Satz), neue Wache unter tests/, Tests, DEVELOPMENT.md.
+Tests: je Punkt mit Gegenprobe; Punkt 3 hat keinen.
+165 Warenkorb prüfen mit derselben Prüfkette wie Reservieren (N24-Ergänzung) – Opus, ein voller Durchgang, keine Migration, von docs/lauf24
+Ausgangslage:
+
+* /api/warenkorb/pruefen (src/app/api/warenkorb/pruefen/route.ts) ruft `pruefeSitzungsWarenkorb` und `erneuereHalte` (src/server/warenkorb.ts). Geprüft werden nur Bestand und Frist.
+* Stilllegung, Freischaltung, Pause und Kaufsperre prüft nur /api/reserve, und dort hat `quantity` die Obergrenze `MAX_MENGE`; im Warenkorb fehlt sie.
+* Ein Korb aus der Zeit vor einer Pause oder Stilllegung hält die Ware deshalb weiter fest. Geld ist nicht betroffen, die Kasse prüft selbst.
+
+1. Die Prüfung eines Hofs (Stilllegung → Freischaltung → Pause → Kaufsperre) wird aus /api/reserve in EINE Funktion gezogen, z. B. `pruefeKaufbarkeitHof(farm, jetzt)` in src/server/warenkorb.ts oder src/server/abholfenster.ts. Sie liefert `null` oder Grund und Text, mit denselben Texten wie heute. /api/reserve nutzt sie, ohne Änderung im Verhalten (die bestehenden Tests bleiben grün).
+2. /api/warenkorb/pruefen nutzt sie je Hof der Positionen:
+   * Hof besteht nicht → keine Halte bei diesem Hof erneuern, die Halte der Sitzung bei ihm löschen (`loescheHalte`)
+   * die Positionen gelten als nicht möglich, mit dem Grund
+   * `meldung` nennt ihn wie `kaufSperreHinweis` bzw. die bestehenden Sätze zu Pause, Stilllegung und Freischaltung
+3. `quantity` im Schema der Route bekommt `.max(MAX_MENGE)` aus derselben Konstante wie /api/reserve (eine Quelle, exportiert).
+4. Das Korb-Blatt (src/components/farm/cart-sheet.tsx) und die Kasse zeigen die Meldung wie heute. Neue Texte nur, wenn ein Grund noch keinen Satz hat.
+
+Dateien: src/app/api/reserve/route.ts (NUR das Herausziehen), src/app/api/warenkorb/pruefen/route.ts, src/server/warenkorb.ts, die Quelle von `MAX_MENGE`, src/lib/hofseite-kunde.ts bzw. die Texte (NUR falls ein Satz fehlt), Tests (tests/reservations.test.ts, Tests zu warenkorb und pruefen), docs/ai/ARCHITECTURE.md (NUR der Absatz zur Kaufsperre), DEVELOPMENT.md.
+Tests mit Gegenprobe:
+
+* pausierter, stillgelegter, nicht freigeschalteter und ausgebuchter Hof → kein Halt erneuert, Halte gelöscht, Grund in der Meldung
+* gemischter Korb mit zwei Höfen → nur der gesperrte entfällt
+* `quantity` über `MAX_MENGE` → 400
+* /api/reserve unverändert (bestehende Fälle grün) `pnpm test:integration` ganz.
+
+Fertig, wenn: grün; Bild nach §0. Vorschau: Produkt in den Korb, im zweiten Tab den Hof pausieren, im Korb „Verfügbarkeit neu prüfen“ → Hinweis „pausiert“, die Ware ist frei. Das prüft der Mensch.
+166 Eigenes Geheimnis für Links mit Schlüsselkennung (S17-Ergänzung) – Opus, ein voller Durchgang, keine Migration, vom Zwischenstand ZULETZT
+Ausgangslage:
+
+* src/lib/bestell-link.ts, src/lib/reorder-token.ts und src/lib/unsubscribe.ts signieren mit `env.BETTER_AUTH_SECRET` (mit Zweck-Präfix); dasselbe Geheimnis signiert die Sitzungen.
+* Die Links in Mails laufen nicht ab.
+
+1. Neue optionale Variable `LINK_SECRET` in src/lib/env.ts (mindestens 32 Zeichen, sonst Start-Fehler wie bei den anderen). Tests nutzen erfundene Werte aus Buchstaben.
+2. Gemeinsame Hilfe `signiereLink(zweck, inhalt)` und `pruefeLink(zweck, inhalt, signatur)` in neuer src/lib/link-signatur.ts:
+   * Mit `LINK_SECRET` tragen neue Signaturen die Kennung `2.` vor dem Hex. Ohne `LINK_SECRET` bleibt alles wie heute.
+   * Die Prüfung nimmt bei Kennung `2` `LINK_SECRET`, ohne Kennung `BETTER_AUTH_SECRET`.
+   * Vergleich in konstanter Zeit, Zweck-Präfixe unverändert.
+3. Die drei Dateien nutzen die Hilfe. Ihr Verhalten nach außen ändert sich nicht: Jeder Link in einer heute verschickten Mail gilt weiter (Test mit fest erzeugter alter Signatur). Die Renderer aus 159 brauchen keine Änderung, wenn sie über die drei Dateien gehen (prüfen).
+4. Die Bremsen-Schlüssel (`bremsSchluessel`) und der Hash des Bar-Tokens bleiben, wie sie sind (Bericht).
+5. Doku: docs/ai/ARCHITECTURE.md, Abschnitt signierte Links (zwei Geheimnisse, Kennung, wie ein Tausch mit Kennung 3 geht); docs/betrieb/stripe-live.md und testumgebung.md, Abschnitt Variablen (`LINK_SECRET` getrennt für Preview und Production).
+
+Dateien: src/lib/env.ts (NUR die Variable), neue src/lib/link-signatur.ts, die drei Dateien, Tests, die genannte Doku, DEVELOPMENT.md.
+Tests mit Gegenproben:
+
+* alte Signatur gilt mit und ohne `LINK_SECRET`
+* neue mit Kennung gilt nur mit `LINK_SECRET`
+* vertauschter Zweck → ungültig
+* Kennung `2` ohne `LINK_SECRET` → ungültig
+
+Fertig, wenn: grün. Für dich zu tun: `LINK_SECRET` erst in Preview setzen, eine Bestellung durchspielen, dann in Production.
+167 Mails nochmal schicken für den Support (N27) – Opus, ein voller Durchgang, keine Migration (Felder aus 158), vom Zwischenstand nach 159 und 161
+Mockups: docs/mockups/admin-betrieb-mails-alle.html (1440), mobil-admin-betrieb-mails-alle.html und mobil-admin-betrieb-mails-nochmal.html (390). Die Zahlen und Namen im Mockup sind erfunden.
+Ausgangslage: Ab 158 steht jede Mail als Zeile in `MailAuftrag`, ohne Adresse und ohne Inhalt (nur `empfaengerHash`); die Renderer aus 158/159 bauen jede Mail frisch aus der Datenbank. Eine Seite für alle Bestellungen gibt es im Admin nicht; der Einstieg ist die Suche aus 161. Eine Tabelle für Admin-Protokolle gibt es nicht; der Vermerk steht deshalb in `MailAuftrag` (`ausloeser`, `nochmalVon`).
+
+1. Liste „Alle Mails“ als Teil der Ansicht E-Mails (`?reiter=mails&liste=alle`, Zod für alle Parameter):
+   * letzte 90 Tage, neueste zuerst, Seiten zu 50 (Cursor über `erstelltAm`, `id`)
+   * Kopf mit Pfad „Betrieb › E-Mails › Alle Mails“; am Handy „‹ E-Mails“ zurück
+   * Filter als Knöpfe mit Auswahl (am Handy in einer Klappkarte): Art, Weg, Stand (gesendet, zugestellt, offen, gescheitert, gesperrt, verworfen, abgelehnt), Zeitraum, Hof (Auswahl), Schalter „nur vom Support“; rechts die Trefferzahl
+   * Spalten: Zeit, Art (deutscher Name), Weg, Bestellnummer bzw. Hof, Stand, Versuche, Zeichen „vom Support“
+   * Mails mit Weg „Kann warten“ stehen nur als Summe je Beitrag, Rundschreiben oder Bescheid („Beitrag ‚Kürbisse sind da‘ · 412 gesendet · 3 abgelehnt“), nie als Einzelzeile mit Empfänger – außer in der Suche per Adresse, dort unter „Ohne Bestellung“ (Stand sehen, kein Knopf).
+   * Sofort-Mails mit Code oder Link stehen als Zeile ohne Bezug und ohne Adresse („Anmeldecode · gesendet · zugestellt“); sie haben keinen Knopf, sondern den Satz „Codes schickt der Support nie – die Person fordert einen neuen an“. Der häufigste Anruf („Mein Code kommt nicht“) ist damit über die Suche per Adresse beantwortbar.
+2. Suche: dasselbe Feld und dieselbe Abfrage wie 161 Punkt 5 (eine Quelle, kein zweiter Weg); Treffer gruppiert nach Bestellung (Nummer, Hof, Abholtag, Zahlart, Stand), dann „Ohne Bestellung“. Unter den Treffern ein Leerzustand-Hinweis für den Anruf: „Kein Treffer? … dann nach der Bestellnummer auf dem Beleg fragen.“
+3. Detail einer Mail (am Bildschirm als Seitenleiste rechts neben der Liste, `<aside>`, die gewählte Zeile ist markiert und `aria-current`; am Handy als Blatt von unten):
+   * Kopf: Art, Weg, Stand; Liste „An“ (gekürzt, Herkunft „aus der Bestellung“ bzw. „aus dem Hof“), „Bestellung“ (Link), „Nochmal“ (wie oft schon)
+   * Verlauf als Liste (`<ol>`): eingestellt, Versuche mit Grund und Code, an Resend übergeben, zugestellt bzw. abgelehnt oder Spam gemeldet (aus 160), alle Mails mit `nochmalVon` auf diese Zeile
+   * Ist sie zugestellt: der Spam-Ordner-Hinweis aus 161, mit „Erst dann nochmal schicken.“
+   * Empfänger nur gekürzt, frisch geladen: `maskiereAdresse` (erster Buchstabe, „•••“, Domain; neue reine Funktion in src/lib/betrieb-mails.ts, eine Quelle). Wurde die Mail abgelehnt: Hinweis „Diese Adresse hat die Mail abgelehnt. Nochmal schicken hilft meist nicht – frag nach der richtigen Adresse.“
+   * Vorschau auf Knopfdruck: der Renderer baut die Mail mit dem heutigen Stand, angezeigt in `<iframe sandbox srcdoc>` (ohne `allow-scripts`, ohne `allow-same-origin`). Jeder Link mit Signatur oder Token wird vor der Anzeige durch „[Link]“ ersetzt (Funktion `entschaerfeLinks`, Test). Die Vorschau wird nicht gespeichert und nicht protokolliert.
+4. Nochmal schicken (Action in src/server/actions/betrieb.ts, `verlangeFrischeBestaetigung`):
+   * Erlaubt nur für Arten in der Liste `NOCHMAL_ERLAUBT` (Quelltext-Wache: jede Art steht in genau einer der Listen `NOCHMAL_ERLAUBT` oder `NOCHMAL_NIE`):
+      * Kundin: Bestellbestätigung, Barbestellung bestätigt, abholbereit, nicht abholbereit, storniert, Artikel fehlt, verfallen, Zahlung zu spät, Erstattung
+      * Hof: neue bezahlte bzw. bestätigte Bestellung, Freischaltung
+      * Bar-Bestätigungslink (Sonderfall unten)
+   * `NOCHMAL_NIE`: Anmeldecode, Bestellcode, Passwort-Link, E-Mail bestätigen, Registrierungs-Hinweis, Admin-Sicherheit, Neue Anmeldung, Zu viele Versuche, Betriebs-Warnung, Betreiber-Bestätigung, Testmail, Abo-Bestätigung, Beitrag, Rundschreiben, Bescheid, Postfach
+   * Ablauf: neue Zeile über `stelleMailEin` mit derselben Art und demselben Bezug, Weg „Wichtig“, `ausloeser: 'support'`, `nochmalVon: <id>`, Schlüssel `nochmal:<id>:<n>`. Der Worker verschickt sie wie jede andere; Post-Sperre Z3 und Abmeldung gelten.
+   * Empfänger ist immer die heute hinterlegte Adresse; es gibt kein Feld für eine andere Adresse.
+   * Vor dem Schicken ein Bestätigungsschritt (am Handy Blatt, am Bildschirm Dialog, `role="dialog"` mit Fokus im Dialog): was passiert (an wen gekürzt, alter Link gilt nicht mehr – nur beim Bar-Link –, Frist bleibt, Vermerk „vom Support“), Spam-Frage, wenn zugestellt, Knopf „Mit Passkey bestätigen und schicken“ und „Abbrechen“, „Heute n von 3“.
+   * Grenze: höchstens 3-mal je ursprünglicher Mail in 24 Stunden (Zählung über `nochmalVon`), danach „Diese Mail wurde heute schon 3-mal nochmal geschickt.“
+   * Nicht möglich, wenn der Bezug fehlt (Bestellung gelöscht) oder die Mail nicht mehr passt (z. B. „abholbereit“ für eine stornierte Bestellung): Der Renderer entscheidet mit einer reinen Funktion `passtNochmal(art, bestellung)`; der Knopf ist dann aus, mit Grund.
+   * Rückmeldung: „Ist unterwegs – in 1–2 Minuten siehst du hier, ob sie angekommen ist.“
+5. Bar-Bestätigungslink nochmal (S17, E7):
+   * nur solange die Barbestellung unbestätigt und nicht verfallen ist
+   * erzeugt einen neuen Token über dieselbe Funktion wie die Kasse, speichert nur den Hash in `confirmationToken` (der alte Link gilt ab dann nicht mehr) und verschickt ihn direkt über `sendOnsiteConfirmation` (Weg Sofort, mit `ausloeser`/`nochmalVon` im Protokoll). Der Token steht nie in `MailAuftrag`.
+   * Die Frist der Bestellung ändert sich nicht.
+   * Der Dialog sagt das vorher: „Der alte Link in der ersten Mail gilt dann nicht mehr.“
+6. Mehrere auf einmal: In „Braucht dich“ (161) gibt es für gescheiterte Mails einer Art „Alle nochmal schicken“, mit denselben Regeln je Mail, höchstens 100 je Klick.
+7. Texte und Wörter: N8 („Nochmal schicken“, „vom Support“). Die Art-Namen aus der Liste von 161. Leere Zustände je Filter.
+8. Handy: Liste als Karten, Filter in einer Klappkarte, Detail als Blatt von unten; Knöpfe mindestens 44 px.
+
+Dateien:
+
+* die Ansicht E-Mails aus 161 und neue Teile daneben (Liste, Detail, Vorschau)
+* src/server/queries/mails.ts (Liste, Suche per Adresse, Detail)
+* src/lib/betrieb-mails.ts (`maskiereAdresse`, `entschaerfeLinks`, `passtNochmal`, Listen `NOCHMAL_ERLAUBT`/`NOCHMAL_NIE`, Texte)
+* src/server/actions/betrieb.ts (Nochmal schicken, Bar-Link nochmal)
+* src/server/mail-warteschlange.ts und die Renderer (NUR `ausloeser`/`nochmalVon` und die Vorschau-Funktion `baueMailVorschau`)
+* src/lib/bar-bestaetigung.ts (NUR, falls die Token-Erzeugung noch keine eigene Funktion ist)
+* Tests, docs/ai/ARCHITECTURE.md (Absatz „Mails nochmal schicken“), docs/ai/DESIGN_SYSTEM.md (NUR der Absatz Admin › Betrieb), DEVELOPMENT.md
+
+Tests mit Gegenprobe:
+
+* Liste: Filter, Seiten, Kann-warten nur als Summe, keine volle Adresse im HTML (erfundene Adresse im Bestand)
+* Suche per Adresse: Treffer, andere Groß/Kleinschreibung, Teiladresse → kein Treffer, kein `LIKE` (Wache)
+* `maskiereAdresse` mit kurzen, langen und ungewöhnlichen Adressen
+* Vorschau: kein Link mit Signatur oder Token im Ergebnis; iframe ohne `allow-scripts`
+* Nochmal schicken: erlaubte Art → neue Zeile mit `nochmalVon`, Weg Wichtig; Art aus `NOCHMAL_NIE` → abgelehnt (auch per direktem Aufruf der Action); 4. Mal in 24 h → abgelehnt; ohne frische Bestätigung → nichts; unpassender Stand → abgelehnt; abgemeldet bzw. Post-Sperre → nicht verschickt
+* Bar-Link: neuer Hash gespeichert, alter Token ungültig, neuer gültig, Frist unverändert; bestätigte oder verfallene Bestellung → abgelehnt; Token nie in `MailAuftrag`
+* Wache: jede Art in genau einer der Listen `pnpm test:integration` ganz.
+
+Fertig, wenn: grün. Vorschau (der Mensch prüft): Barbestellung anlegen, in E-Mails per Bestellnummer finden, Vorschau öffnen (Links unkenntlich), „Nochmal schicken“ → neue Zeile „vom Support“ als `ohne_schluessel`. Bilder 1440 und 390 macht die Projektleitung.
+§2 Regeln für alle Nummern
+
+* Es gelten die Regeln aus Lauf 22 (freigabe.md §26, §2) und Lauf 23 (§27, §2), mit diesen Abweichungen:
+   * eine Migration (158)
+   * zwei optionale Variablen (160, 166)
+* Mails:
+   * Nochmal schicken geht nur an die hinterlegte Adresse; kein Weg erlaubt eine andere (167).
+   * Kein Test und keine Abnahme verschickt eine echte Mail an eine echte Adresse; Resend ist in Tests eine Attrappe.
+   * Die Post-Sperre Z3 bleibt die eine Stelle, die über den Versand entscheidet.
+   * Kein Code, Token oder Link mit Token wird in `MailAuftrag` gespeichert.
+* Personendaten: `MailAuftrag` und alle Anzeigen in 161 enthalten keine Adresse, keinen Namen, keinen Inhalt. `empfaengerHash` ist ein Fingerabdruck (HMAC, nicht umkehrbar), gilt trotzdem als personenbezogen: nur für die Suche, nie angezeigt, nie exportiert, mit der Zeile nach 90 Tagen gelöscht. Fehlercodes sind kurze Codes von Resend, nie deren Nachrichtentext. Die Bestellnummer ist keine Personenangabe und darf in 161 und 167 stehen. Adressen erscheinen in 167 nur gekürzt und werden nur für die Anzeige geladen; die Suche per Adresse ist exakt und nur für Admins.
+* Geld: Kein Betrag wird neu gerechnet. Im Webhook bleibt die Reihenfolge (erst Status, dann Mail); nur die Mail wird ein Auftrag in derselben Transaktion.
+* Daten: Der Schritt aus 164 Punkt 6 ändert nur `confirmationToken` abgeschlossener oder alter Bestellungen. Er löscht keine Zeile und keinen anderen Wert. 167 ändert an einer Bestellung nur `confirmationToken` (neuer Hash beim Bar-Link), sonst nichts.
+* Sicherheit:
+   * Der Webhook aus 160 ist fail-closed; die Cron-Route ist wie die anderen geschützt.
+   * Keine Nummer lockert eine Prüfung. 164, 165, 166 und 167 machen Prüfungen strenger, nie weicher.
+   * Berichte beschreiben Funde als Ursache, Auswirkung und Fix.
+
+§3 Checkliste je PR
+Wie Lauf 22 (§26, §3), mit „Migration: nur 158 (Expand) · Paket: nein · Variable: nur 160 und 166“. „Alle Einstiege geprüft“ gilt für:
+
+* 158: alle Aufrufer von `sendRaw`
+* 159: jede `send…`-Funktion
+* 160: alle Wege, die `resendId` schreiben
+* 161: alle Kacheln und Warnungen
+* 163: alle Aufrufer von `erneuereHoflisteNachBestellung`
+* 165: alle Wege, die Halte anlegen oder erneuern
+* 166: alle Aufrufer der drei Signatur-Dateien
+* 167: jede Mail-Art (in genau einer Nochmal-Liste) und jeder Weg, der eine Adresse anzeigt
+
+§4 Morgenbericht (morgenbericht-<datum>-lauf24.md)
+Wie Lauf 23, dazu:
+
+* Ganz oben: je Nummer, ob die Ausgangslage am Code bestätigt war; Migration angewandt (Regel 3); ob die Mockups auf main lagen.
+* 158: was `batch.send` kann; Messwerte des Lasttests; Grenzen des Workers (Mails je Minute).
+* 159: Tabelle aller Mail-Arten mit Weg (Sofort, Wichtig, Kann warten).
+* 161: Abweichungen vom Mockup.
+* 163: gemessene Größen bei 50, 200 und 500 Höfen, die Grenze in Höfen, Vorschlag für „Hofliste aufteilen“.
+* 164: Zahl der Klartext-Token, die das Aufräumen leert.
+* 165: Reihenfolge der Prüfungen in beiden Routen.
+* 167: Tabelle aller Arten mit „nochmal erlaubt“ bzw. „nie“, Abweichungen von der Beschreibung.
+* „Für dich zu tun“:
+   * Abnahmen in der Vorschau (ohne Mail-Versand; `RESEND_API_KEY` fehlt dort)
+   * Admin-Bilder 161/162/167
+   * Webhook bei Resend anlegen und `RESEND_WEBHOOK_SECRET` setzen (160)
+   * `LINK_SECRET` setzen (166)
+   * Resend Pro buchen, dann `TARIFE.resend` umschalten lassen (162)
+   * Merge per Merge-Commit. Danach in der Produktion: Admin › Betrieb › E-Mails ansehen, eine Testbestellung mit Stripe im Testmodus und ihre Bestellnummer in der Suche → Mails gesendet und zugestellt.
