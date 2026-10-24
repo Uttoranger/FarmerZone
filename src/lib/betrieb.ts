@@ -145,11 +145,35 @@ export const BETRIEB_ARTEN = [
   // Vercel-Ausgaben (Nr. 113): was Spend Management zuletzt gemeldet hat, in ganzen Cent (aus Dollar) — Ausgaben und Limit.
   'vercelAusgaben',
   'vercelLimit',
+  // Hofliste (Nr. 163, Register N19, Ergänzung 24.10.2026): Größe des Zwischenspeichers in Bytes und die Zahl der Höfe darin.
+  'hoflisteBytes',
+  'hoflisteHoefe',
 ] as const
 export type BetriebArt = (typeof BETRIEB_ARTEN)[number]
 
 /** Was nur `messeBetrieb` schreibt — daraus „Gemessen heute, hh:mm“ (der Mail-Zähler ist keine Messung). */
-export const MESS_ARTEN = ['bilderBytes', 'bilderDateien', 'bilderUploadsMonat', 'bildVorgaengeMonat', 'datenbankBytes'] as const satisfies readonly BetriebArt[]
+export const MESS_ARTEN = [
+  'bilderBytes',
+  'bilderDateien',
+  'bilderUploadsMonat',
+  'bildVorgaengeMonat',
+  'datenbankBytes',
+  'hoflisteBytes',
+  'hoflisteHoefe',
+] as const satisfies readonly BetriebArt[]
+
+/**
+ * Ab dieser Größe speichert Vercel einen Eintrag des Daten-Zwischenspeichers
+ * nicht mehr (Next prüft „items over 2MB“ in
+ * node_modules/next/dist/server/lib/incremental-cache/index.js) — für die
+ * Hofliste (`ladeOeffentlicheHoefe`) hieße das: jeder Aufruf von /hoefe und der
+ * Startseite liest alle Höfe aus der Datenbank. Dezimal wie die anderen
+ * Grenzen (2 · 10⁶ statt 2 · 2²⁰): warnt früher, nie später. Kein Tarif ändert
+ * sie (Nr. 163, Register N19, Ergänzung 24.10.2026).
+ */
+export const HOFLISTE_GRENZE_BYTES = 2_000_000
+/** „2 MB“ — die Grenze als Text, ohne Nachkommastelle (speicherText schriebe „2,0 MB“). */
+const HOFLISTE_GRENZE_TEXT = `${HOFLISTE_GRENZE_BYTES / 1e6} MB`
 
 /**
  * Der Merker „eine Messung hat begonnen“ (Nr. 113): eine Zeile je UTC-Tag in
@@ -521,7 +545,7 @@ export function wannText(ablauf: Pick<Ablauf, 'zeitplan' | 'rhythmus'>, jetzt: D
 // ─── Warnungen ───────────────────────────────────────────────────────────────
 
 /** Die Werte mit Grenze, je mit ihrer Regel: Speicher mit Entwarnung, Monatswerte ohne, E-Mails je Tag als Hinweis am Morgen. */
-export const GRENZ_WERTE = ['bilder', 'datenbank', 'mailsMonat', 'bildVorgaenge', 'mailsTag'] as const
+export const GRENZ_WERTE = ['bilder', 'datenbank', 'mailsMonat', 'bildVorgaenge', 'mailsTag', 'hofliste'] as const
 export type GrenzWert = (typeof GRENZ_WERTE)[number]
 export type GrenzRegel = 'speicher' | 'monat' | 'tag'
 
@@ -531,6 +555,7 @@ export const GRENZ_REGEL: Record<GrenzWert, GrenzRegel> = {
   mailsMonat: 'monat',
   bildVorgaenge: 'monat',
   mailsTag: 'tag',
+  hofliste: 'speicher',
 }
 
 /** Die Grenze eines Werts im Tarif von heute — null = keine feste Grenze (Vercel Pro: Bilder, Bild-Vorgänge), dann gibt es keine Warnstufe. */
@@ -539,6 +564,7 @@ export function grenzeVon(wert: GrenzWert): number | null {
   if (wert === 'bildVorgaenge') return GRENZE.bildVorgaengeMonat
   if (wert === 'datenbank') return GRENZE.datenbankBytes
   if (wert === 'mailsMonat') return GRENZE.mailsMonat
+  if (wert === 'hofliste') return HOFLISTE_GRENZE_BYTES
   return GRENZE.mailsTag
 }
 
@@ -735,6 +761,13 @@ export function grenzTexte(tarife: Tarife = TARIFE): Record<GrenzWert, GrenzText
       name: 'E-Mails gestern',
       kurz: 'E-Mails',
       voll: grenze.mailsTag === null ? OHNE_TAGESGRENZE : `Bei ${formatZahl(grenze.mailsTag)} am Tag gehen weitere E-Mails erst nach 0 Uhr UTC hinaus.`,
+      hilft: null,
+    },
+    // Nr. 163: Satz aus der Freigabe, wörtlich. Was hilft, entscheidet die Projektleitung („Hofliste aufteilen“, N19).
+    hofliste: {
+      name: 'Hofliste',
+      kurz: 'Hofliste',
+      voll: `Ab ${HOFLISTE_GRENZE_TEXT} speichert Vercel die Hofliste nicht mehr – jeder Aufruf von /hoefe und der Startseite lädt dann alle Höfe aus der Datenbank.`,
       hilft: null,
     },
   }
@@ -1229,7 +1262,7 @@ export function hilftSatz(wert: GrenzWert, ohneVerwendungBytes: number | null): 
 /** Eine Messung, wie die Abfrage sie liefert: Tag als JJJJ-MM-TT (UTC), Wert als Zahl (Werte < 2^53). */
 export type Messung = { tag: string; art: BetriebArt; wert: number; gemessenAm: Date }
 
-export type KachelId = 'bilder' | 'datenbank' | 'mailsHeute' | 'bildVorgaenge'
+export type KachelId = 'bilder' | 'datenbank' | 'mailsHeute' | 'bildVorgaenge' | 'hofliste'
 
 export type Kachel = {
   id: KachelId
@@ -1296,12 +1329,13 @@ function trendZeile(verlauf: readonly VerlaufPunkt[], grenze: number | null, heu
 }
 
 /**
- * Die vier Kacheln (Mockup admin-betrieb): Bilder, Datenbank, E-Mails heute,
- * Bild-Vorgänge. Ohne feste Grenze (Vercel Pro, Nr. 113) zeigen Bilder und
- * Bild-Vorgänge den Wert ohne Prozent und Balken, dafür den Satz `ohneGrenze`;
- * ebenso E-Mails heute ohne Tagesgrenze (Resend Pro). Der Monat der E-Mails
- * ist der Abrechnungszeitraum von Resend, die Kachel nennt Beginn und Ende
- * (Nr. 162). `tarife` nur für Tests anderer Tarife.
+ * Die Kacheln (Mockup admin-betrieb): Bilder, Datenbank, E-Mails heute,
+ * Bild-Vorgänge, seit Nr. 163 die Hofliste (Größe gegen 2 MB). Ohne feste
+ * Grenze (Vercel Pro, Nr. 113) zeigen Bilder und Bild-Vorgänge den Wert ohne
+ * Prozent und Balken, dafür den Satz `ohneGrenze`; ebenso E-Mails heute ohne
+ * Tagesgrenze (Resend Pro). Der Monat der E-Mails ist der Abrechnungszeitraum
+ * von Resend, die Kachel nennt Beginn und Ende (Nr. 162). `tarife` nur für
+ * Tests anderer Tarife.
  */
 export function betriebKacheln(messungen: readonly Messung[], jetzt: Date, tarife: Tarife = TARIFE): Kachel[] {
   const grenze = grenzeFuer(tarife)
@@ -1337,6 +1371,13 @@ export function betriebKacheln(messungen: readonly Messung[], jetzt: Date, tarif
   const vorgaengeGrenze = grenze.bildVorgaengeMonat
   const vorgaengeAnteil = vorgaengeHeute && vorgaengeGrenze !== null ? anteil(vorgaengeHeute.wert, vorgaengeGrenze) : null
   const bilderSperre = bilderGrenze === null ? null : `Bei ${speicherText(bilderGrenze)} sperrt Vercel alle Bilder für 30 Tage.`
+
+  // Nr. 163: Größe des Zwischenspeichers der Hofliste gegen 2 MB, mit der Zahl der Höfe darin.
+  const liste = letzter(messungen, 'hoflisteBytes')
+  const listeHoefe = letzter(messungen, 'hoflisteHoefe')
+  const listeAnteil = liste ? anteil(liste.wert, HOFLISTE_GRENZE_BYTES) : null
+  const listeTrend = trendZeile(reihe(messungen, 'hoflisteBytes'), HOFLISTE_GRENZE_BYTES, heute)
+  const listeZeile = listeHoefe ? `${formatZahl(listeHoefe.wert)} ${listeHoefe.wert === 1 ? 'Hof' : 'Höfe'} · ${listeTrend}` : listeTrend
 
   return [
     {
@@ -1405,6 +1446,22 @@ export function betriebKacheln(messungen: readonly Messung[], jetzt: Date, tarif
           : `Ein Blick in den Speicher im Vercel-Dashboard zählt auch. Bei ${formatZahl(vorgaengeGrenze)}: Bilder 30 Tage gesperrt.`,
       kurz: 'Jedes Foto zählt doppelt; das Vercel-Dashboard auch.',
       hinweis: vorgaengeHeute ? hinweisFuer(vorgaengeHeute, BETRIEB_TEXT.bilderOhneZugang) : BETRIEB_TEXT.bilderOhneZugang,
+    },
+    {
+      id: 'hofliste',
+      titel: 'Hofliste',
+      untertitel: null,
+      tarif: `Vercel ${TARIF_NAME[TARIFE.vercel]}`,
+      wert: liste ? speicherText(liste.wert) : null,
+      von: `von ${HOFLISTE_GRENZE_TEXT}`,
+      anteil: listeAnteil,
+      prozent: listeAnteil === null ? null : prozentText(listeAnteil),
+      ohneGrenze: null,
+      warnt: listeAnteil !== null && stufe(listeAnteil) > 0,
+      zeile: listeZeile,
+      satz: GRENZ_TEXT.hofliste.voll,
+      kurz: `${listeZeile}.`,
+      hinweis: hinweisFuer(liste, BETRIEB_TEXT.nochNichtGemessen),
     },
   ]
 }
@@ -1552,6 +1609,7 @@ export function warnEintraege(
     if (wert === 'bilder') return kacheln.find((k) => k.id === 'bilder')?.anteil ?? null
     if (wert === 'datenbank') return kacheln.find((k) => k.id === 'datenbank')?.anteil ?? null
     if (wert === 'bildVorgaenge') return kacheln.find((k) => k.id === 'bildVorgaenge')?.anteil ?? null
+    if (wert === 'hofliste') return kacheln.find((k) => k.id === 'hofliste')?.anteil ?? null
     if (wert === 'mailsMonat') return anteil(mailsImMonatBis(messungen, utcTag(jetzt)), GRENZE.mailsMonat)
     const gestern = utcTagVersetzt(utcTag(jetzt), -1)
     const tagGrenze = GRENZE.mailsTag
@@ -1706,6 +1764,7 @@ export function grenzStandText(wert: GrenzWert, zahl: number): string {
   const vorgaenge = GRENZE.bildVorgaengeMonat
   if (wert === 'bilder') return bilder === null ? `${speicherText(zahl)} sind belegt` : `${speicherText(zahl)} von ${speicherText(bilder)} sind belegt`
   if (wert === 'datenbank') return `${speicherText(zahl)} von ${speicherText(GRENZE.datenbankBytes)} sind belegt`
+  if (wert === 'hofliste') return `${speicherText(zahl)} von ${HOFLISTE_GRENZE_TEXT} sind belegt`
   if (wert === 'mailsMonat') return `${formatZahl(zahl)} von ${formatZahl(GRENZE.mailsMonat)} E-Mails in diesem Monat`
   if (wert === 'bildVorgaenge')
     return vorgaenge === null ? `≈ ${formatZahl(zahl)} Bild-Vorgänge in diesem Monat` : `≈ ${formatZahl(zahl)} von ${formatZahl(vorgaenge)} Bild-Vorgängen in diesem Monat`

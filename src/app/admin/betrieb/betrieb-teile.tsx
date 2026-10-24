@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ChevronRight, Database, Download, ExternalLink, Image as BildSymbol, ImageOff, LineChart, Mail, TriangleAlert, Upload, type LucideIcon } from 'lucide-react'
+import { ChevronRight, Database, Download, ExternalLink, Image as BildSymbol, ImageOff, LineChart, List, Mail, TriangleAlert, Upload, type LucideIcon } from 'lucide-react'
 import {
   BETRIEB_TEXT,
   BILDER_EXPORT_HREF,
@@ -46,7 +46,7 @@ import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellunge
 
 const H2 = 'font-heading text-[17px] font-semibold text-foreground'
 
-const KACHEL_SYMBOL: Record<KachelId, LucideIcon> = { bilder: BildSymbol, datenbank: Database, mailsHeute: Mail, bildVorgaenge: Upload }
+const KACHEL_SYMBOL: Record<KachelId, LucideIcon> = { bilder: BildSymbol, datenbank: Database, mailsHeute: Mail, bildVorgaenge: Upload, hofliste: List }
 
 /** Orange ab 80 %, sonst Grün — der Ton kommt aus der Fachregel (`warnt`), die Farbe aus den Status-Tokens. */
 function tonText(warnt: boolean): string {

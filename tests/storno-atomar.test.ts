@@ -35,14 +35,15 @@ vi.mock('@/lib/email', () => ({
   sendErstattungOffen: vi.fn(),
 }))
 vi.mock('@/lib/prisma', () => {
-  const order = { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() }
+  // findUnique: Nach dem Storno liest das Erneuern der Hofliste den Termin (Nr. 163) — hier keiner.
+  const order = { findFirst: vi.fn(), findUnique: vi.fn(async () => null), update: vi.fn(), updateMany: vi.fn() }
   const product = { update: vi.fn() }
   return {
     prisma: {
       farm: { findUnique: vi.fn() },
       order,
       product,
-      // Nach dem Storno fragt das Erneuern der Hofliste nach einer Höchstzahl (Nr. 131) — hier keine.
+      // Nach dem Storno fragt das Erneuern der Hofliste nach einer Höchstzahl (Nr. 131, seit Nr. 163 erst nach dem Termin) — hier keine.
       pickupSlot: { findFirst: vi.fn(async () => null) },
       // Standard: der Rückruf bekommt dieselben Fakes. Der Test, der die
       // Transaktion selbst beweist, ersetzt das durch EIGENE tx-Fakes.

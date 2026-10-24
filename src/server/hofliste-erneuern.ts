@@ -1,7 +1,8 @@
 /**
- * Hofliste nach dem Anlegen und nach jedem Storno einer Bestellung erneuern,
- * wenn ihr Hof eine aktive Abholzeit mit Höchstzahl hat (Register N19,
- * Ergänzung 21.10.2026). Warum über `nachDerAntwort`: Kommentar an `erneuere`.
+ * Hofliste nach dem Anlegen und nach einem Storno einer Bestellung erneuern,
+ * wenn dadurch ein Abholfenster voll wird bzw. wieder frei (Register N19,
+ * Ergänzungen 21.10.2026 und 24.10.2026). Warum über `nachDerAntwort`:
+ * Kommentar an `erneuere`.
  */
 import * as Sentry from '@sentry/nextjs'
 import { revalidateTag } from 'next/cache'
@@ -9,6 +10,29 @@ import { prisma } from '@/lib/prisma'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { fehlerKlasse } from '@/lib/betrieb'
+import { istFensterBestellbar, istVoll } from '@/lib/abholfenster'
+import { wochentagVon } from '@/lib/kalender'
+import { kalendertagInWien } from '@/lib/wiener-tag'
+import { belegung, type HofFenster } from '@/server/abholfenster'
+
+/** Was den Platz im Fenster geändert hat. */
+export type FensterWechsel = 'bestellung' | 'storno'
+
+/**
+ * Die Entscheidung, rein (Register N19, Ergänzung 24.10.2026, Nr. 163): Hat
+ * dieser Wechsel das Fenster voll gemacht bzw. ein volles wieder frei? Nur
+ * dann ändern sich die vollen Tage (`ausgebuchtAm`) im Zwischenspeicher der
+ * Hofliste. `belegtNachher` ist die Zählung NACH dem Wechsel (`belegung`, wie
+ * in der Kasse); vorher war es ein Platz weniger (Bestellung) bzw. mehr
+ * (Storno). „Voll“ heißt dieselbe Regel wie beim Anlegen (`istVoll`) — ohne
+ * Höchstzahl nie. Ein Fenster, das schon vorher voll war (Höchstzahl
+ * nachträglich gesenkt), erneuert nicht noch einmal.
+ */
+export function wechseltFensterStand(wechsel: FensterWechsel, belegtNachher: number, maxOrders: number | null): boolean {
+  if (maxOrders === null) return false
+  const vorher = wechsel === 'bestellung' ? belegtNachher - 1 : belegtNachher + 1
+  return istVoll(vorher, maxOrders) !== istVoll(belegtNachher, maxOrders)
+}
 
 /**
  * Die Hofliste sofort erneuern, wenn eine Bestellung ein volles Abholfenster
@@ -19,8 +43,9 @@ import { fehlerKlasse } from '@/lib/betrieb'
  * erneuert, gewollt. Ohne Erneuern altert die Liste wie bisher höchstens
  * 300 s; verbindlich bleibt die Kasse (`imAbholfenster` mit `FOR UPDATE`).
  *
- * Erneuert wird nur, wenn der Hof eine aktive Abholzeit mit Höchstzahl hat —
- * nur dann kann eine Bestellung ein Fenster füllen oder freigeben.
+ * Erneuert wird seit Nr. 163 nur, wenn der Wechsel das Fenster voll macht oder
+ * wieder frei (`wechseltFensterStand`) — sonst ändert sich an der Liste nichts,
+ * und jede Bestellung ließe sonst den ganzen Eintrag (alle Höfe) neu bauen.
  *
  * WARUM `revalidateTag(…, { expire: 0 })` ÜBER `nachDerAntwort`, nicht
  * `updateTag`: Der Helfer läuft in Route (api/checkout, Stripe-Webhook), Cron,
@@ -44,10 +69,10 @@ import { fehlerKlasse } from '@/lib/betrieb'
  * Fehlerklasse, ohne Bestell- oder Personendaten. Wirkt das Erneuern nach dem
  * Rendern nicht, altert die Liste höchstens 300 s, ohne Meldung.
  */
-function erneuere(hatHoechstzahl: () => Promise<boolean>): void {
+function erneuere(wechseltStand: () => Promise<boolean>): void {
   nachDerAntwort(async () => {
     try {
-      if (!(await hatHoechstzahl())) return
+      if (!(await wechseltStand())) return
       revalidateTag(HOEFE_CACHE_TAG, { expire: 0 })
     } catch (err) {
       const meldung = new Error('Hofliste nicht erneuert')
@@ -59,27 +84,47 @@ function erneuere(hatHoechstzahl: () => Promise<boolean>): void {
 
 /**
  * Nach dem Anlegen einer Bestellung (api/checkout, nach `imAbholfenster`): Die
- * Route kennt die Höchstzahl ihres Fensters schon (`abholung.fenster.slot.maxOrders`)
- * — keine Zusatzabfrage. Ohne Höchstzahl kann das Fenster nicht voll werden.
+ * Route übergibt Hof und Fenster samt Tag (`abholung.fenster`) — die Höchstzahl
+ * steckt im Slot, ohne Höchstzahl kann das Fenster nicht voll werden, dann
+ * auch keine Zählung. Gezählt wird erst im Nachlauf, nach dem Commit.
  */
-export function erneuereHoflisteNachBestellung(maxOrders: number | null): void {
+export function erneuereHoflisteNachBestellung(farmId: string, fenster: HofFenster): void {
+  const { maxOrders } = fenster.slot
   if (maxOrders === null) return
-  erneuere(async () => true)
+  erneuere(async () => wechseltFensterStand('bestellung', await belegung(prisma, farmId, fenster), maxOrders))
 }
 
 /**
  * Nach jedem Wechsel einer Bestellung auf CANCELLED (Storno des Hofs,
- * `storniereUnbezahlteBestellung`), nach dem Commit: Ob der Hof der Bestellung
- * eine aktive Abholzeit mit Höchstzahl hat, fragt erst der Nachlauf — die
- * Antwort an den Browser wartet nicht darauf. Wache:
+ * `storniereUnbezahlteBestellung`), nach dem Commit: Termin der Bestellung,
+ * die aktive Abholzeit mit Höchstzahl dazu und die Zählung fragt erst der
+ * Nachlauf — die Antwort an den Browser wartet nicht darauf. Ein Termin, den
+ * man nicht mehr bestellen kann, steht in keiner Liste (dieselbe Regel wie die
+ * Liste, `istFensterBestellbar`): kein Erneuern. Wache:
  * tests/hofliste-erneuern-wache.test.ts.
  */
 export function erneuereHoflisteNachStorno(orderId: string): void {
   erneuere(async () => {
-    const begrenzt = await prisma.pickupSlot.findFirst({
-      where: { isActive: true, maxOrders: { not: null }, farm: { orders: { some: { id: orderId } } } },
-      select: { farmId: true },
+    const bestellung = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { farmId: true, pickupDate: true, pickupTimeStart: true, pickupTimeEnd: true },
     })
-    return begrenzt !== null
+    if (!bestellung) return false
+    const datum = kalendertagInWien(bestellung.pickupDate)
+    if (!istFensterBestellbar(datum, bestellung.pickupTimeStart, new Date())) return false
+    const slot = await prisma.pickupSlot.findFirst({
+      where: {
+        farmId: bestellung.farmId,
+        isActive: true,
+        maxOrders: { not: null },
+        dayOfWeek: wochentagVon(datum),
+        startTime: bestellung.pickupTimeStart,
+        endTime: bestellung.pickupTimeEnd,
+      },
+      select: { maxOrders: true },
+    })
+    if (!slot) return false
+    const wahl = { datum, start: bestellung.pickupTimeStart, ende: bestellung.pickupTimeEnd }
+    return wechseltFensterStand('storno', await belegung(prisma, bestellung.farmId, wahl), slot.maxOrders)
   })
 }

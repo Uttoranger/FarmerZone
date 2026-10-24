@@ -726,10 +726,10 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 9b. Die Bestellung steht (Transaktion vorbei): Füllt sie ein Fenster mit
-  //     Höchstzahl, die Hofliste nach der Antwort erneuern (Register N19,
-  //     Ergänzung 21.10.2026) — ein Fehler dabei berührt die Bestellung nie.
-  erneuereHoflisteNachBestellung(abholung.fenster.slot.maxOrders)
+  // 9b. Die Bestellung steht (Transaktion vorbei): Macht sie ihr Fenster voll,
+  //     die Hofliste nach der Antwort erneuern (Register N19, Ergänzungen
+  //     21.10. und 24.10.2026) — ein Fehler dabei berührt die Bestellung nie.
+  erneuereHoflisteNachBestellung(farm.id, abholung.fenster)
 
   // 10. Die Halte der Sitzung werden erst frei, wenn die Bestellung steht —
   //     online also NACH dem PaymentIntent (11a). Scheitert Stripe, wird die
