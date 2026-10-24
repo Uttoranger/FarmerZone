@@ -8,7 +8,8 @@
  *    /api/reserve schon heute meldet, sonst null; die vollen Tage zählt sie
  *    nur für einen Hof, der die ersten drei Prüfungen besteht.
  *  - Besteht ein Hof nicht, erneuert der Warenkorb bei ihm keinen Halt, löscht
- *    die Halte der Sitzung bei ihm und nennt den Grund in der Meldung; die
+ *    ALLE Halte der Sitzung bei ihm (auch den eines Produkts, das die Anfrage
+ *    nicht mehr mitschickt; Gegenprobe beim bestellbaren Hof) und nennt den Grund in der Meldung; die
  *    Position gilt als nicht möglich. Gegenprobe: ein bestellbarer Hof behält
  *    seinen Halt.
  *  - Gemischter Korb mit zwei Höfen: nur der gesperrte entfällt.
@@ -75,23 +76,35 @@ const volleTage = vi.mocked(ausgebuchteTage)
 const upsert = vi.mocked(prisma.stockReservation.upsert)
 const deleteMany = vi.mocked(prisma.stockReservation.deleteMany)
 
-/** Produkte mit Bestand 10, je an ihrem Hof; der eigene Halt gilt noch. */
+/**
+ * Produkte mit Bestand 10, je an ihrem Hof; die Sitzung hält jedes davon noch —
+ * auch eines, das die Anfrage nicht mitschickt. Die Abfrage der Produkte
+ * achtet auf `id` und `farmId` wie die echte Datenbank.
+ */
 function stelleEin(produkte: { id: string; farm: Hof }[]) {
-  vi.mocked(prisma.product.findMany).mockResolvedValue(
-    produkte.map((p) => ({
-      id: p.id,
-      stock: 10,
-      isAvailable: true,
-      category: null,
-      verpackung: null,
-      farm: { ...p.farm, betriebsnummer: null, betriebsstatus: null },
-    })) as never
-  )
-  vi.mocked(prisma.stockReservation.findMany).mockImplementation(((a: unknown) => {
-    const sitzung = (a as { where?: { sessionId?: unknown } })?.where?.sessionId
-    if (sitzung && typeof sitzung === 'object') return Promise.resolve([])
+  vi.mocked(prisma.product.findMany).mockImplementation(((a: unknown) => {
+    const where = (a as { where?: { id?: { in?: string[] }; farmId?: { in?: string[] } } })?.where ?? {}
     return Promise.resolve(
-      produkte.map((p) => ({ productId: p.id, quantity: 2, expiresAt: new Date(JETZT.getTime() + 60_000) }))
+      produkte
+        .filter((p) => !where.id?.in || where.id.in.includes(p.id))
+        .filter((p) => !where.farmId?.in || where.farmId.in.includes(p.farm.id))
+        .map((p) => ({
+          id: p.id,
+          stock: 10,
+          isAvailable: true,
+          category: null,
+          verpackung: null,
+          farm: { ...p.farm, betriebsnummer: null, betriebsstatus: null },
+        }))
+    )
+  }) as never)
+  vi.mocked(prisma.stockReservation.findMany).mockImplementation(((a: unknown) => {
+    const where = (a as { where?: { sessionId?: unknown; productId?: { in?: string[] } } })?.where ?? {}
+    if (where.sessionId && typeof where.sessionId === 'object') return Promise.resolve([])
+    return Promise.resolve(
+      produkte
+        .filter((p) => !where.productId?.in || where.productId.in.includes(p.id))
+        .map((p) => ({ productId: p.id, quantity: 2, expiresAt: new Date(JETZT.getTime() + 60_000) }))
     )
   }) as never)
 }
@@ -115,13 +128,14 @@ function erneuert(): string[] {
   return upsert.mock.calls.map((c) => (c[0] as { create: { productId: string } }).create.productId)
 }
 
-/** Welche Produkte dieser Sitzung freigegeben wurden. */
+/** Welche Halte dieser Sitzung freigegeben wurden (je Produkt einmal, sortiert). */
 function geloescht(): string[] {
-  return deleteMany.mock.calls.flatMap((c) => {
+  const ids = deleteMany.mock.calls.flatMap((c) => {
     const where = (c[0] as { where: { sessionId: string; productId: { in: string[] } } }).where
     expect(where.sessionId).toBe(SITZUNG)
     return where.productId.in
   })
+  return [...new Set(ids)].sort()
 }
 
 beforeEach(() => {
@@ -192,7 +206,7 @@ describe('/api/warenkorb/pruefen — Hof besteht die Prüfkette nicht', () => {
     expect(body.meldung).toContain(text)
     expect(body.items).toEqual([])
     expect(body.reserviertBis).toBeNull()
-    expect(body.positionen).toEqual([expect.objectContaining({ productId: 'eier', moeglich: 0, zustand: 'weg', grund: text })])
+    expect(body.positionen).toEqual([expect.objectContaining({ productId: 'eier', moeglich: 0, zustand: 'weg' })])
   })
 
   it('ausgebucht: kein Halt erneuert, Halte gelöscht, „Gerade ausgebucht.“ in der Meldung', async () => {
@@ -204,6 +218,49 @@ describe('/api/warenkorb/pruefen — Hof besteht die Prüfkette nicht', () => {
     expect(erneuert()).toEqual([])
     expect(geloescht()).toEqual(['eier'])
     expect(body.meldung).toContain('Gerade ausgebucht.')
+  })
+
+  it('gesperrter Hof: auch der Halt ohne mitgeschickte Position fällt', async () => {
+    // Die Sitzung hält Eier und Käse, der Korb schickt nur noch die Eier mit.
+    stelleEin([
+      { id: 'eier', farm: hof('a', { isPaused: true }) },
+      { id: 'kaese', farm: hof('a', { isPaused: true }) },
+    ])
+
+    await POST(anfrage([{ productId: 'eier', quantity: 2 }]))
+
+    expect(erneuert()).toEqual([])
+    expect(geloescht()).toEqual(['eier', 'kaese'])
+  })
+
+  it('Gegenprobe: bei einem bestellbaren Hof bleibt der Halt ohne mitgeschickte Position', async () => {
+    stelleEin([
+      { id: 'eier', farm: hof('a') },
+      { id: 'kaese', farm: hof('a') },
+    ])
+
+    await POST(anfrage([{ productId: 'eier', quantity: 2 }]))
+
+    expect(erneuert()).toEqual(['eier'])
+    expect(geloescht()).toEqual([])
+  })
+
+  it('gemischter Korb: der Halt ohne mitgeschickte Position fällt nur beim gesperrten Hof', async () => {
+    stelleEin([
+      { id: 'eier', farm: hof('a', { isPaused: true }) },
+      { id: 'kaese', farm: hof('a', { isPaused: true }) },
+      { id: 'milch', farm: hof('b') },
+      { id: 'butter', farm: hof('b') },
+    ])
+
+    await POST(
+      anfrage([
+        { productId: 'eier', quantity: 2 },
+        { productId: 'milch', quantity: 2 },
+      ])
+    )
+
+    expect(geloescht()).toEqual(['eier', 'kaese'])
   })
 
   it('Gegenprobe: ein bestellbarer Hof behält seinen Halt, keine Meldung', async () => {

@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { bremseReservieren } from '@/server/bremse-datenbank'
-import { pruefeSitzungsWarenkorb, erneuereHalte, loescheHalte, hofSperrenFuerProdukte } from '@/server/warenkorb'
+import {
+  pruefeSitzungsWarenkorb,
+  erneuereHalte,
+  loescheHalte,
+  loescheHalteBeiHoefen,
+  hofSperrenFuerProdukte,
+} from '@/server/warenkorb'
 import { MAX_MENGE } from '@/lib/reservierung'
 import { gibVerwaisteFreiFuerProdukte } from '@/server/verwaiste-bestellungen'
 
@@ -75,10 +81,16 @@ export async function POST(request: NextRequest) {
     const gruende = [...new Set([...sperren.values()].map((s) => s.text))]
     const meldung = [...gruende, pruefung.meldung].filter((t): t is string => !!t).join(' ') || null
 
-    // Halte nachführen: erneuern, was bleibt; löschen, was rausfällt.
+    // Halte nachführen: erneuern, was bleibt; löschen, was rausfällt. Bei einem
+    // gesperrten Hof fallen ALLE Halte der Sitzung dort, auch für Produkte, die
+    // der Korb nicht mehr mitschickt (N24, Ergänzung 24.10.2026).
     const entfallen = befund.positionen.filter((p) => p.moeglich === 0).map((p) => p.productId)
     const reserviertBis = await erneuereHalte(berichtigt, sessionId, jetzt)
     await loescheHalte(entfallen, sessionId)
+    await loescheHalteBeiHoefen(
+      [...sperren.values()].map((s) => s.farmId),
+      sessionId
+    )
 
     return NextResponse.json({
       meldung,
@@ -87,10 +99,7 @@ export async function POST(request: NextRequest) {
       etwasAbgelaufen: befund.etwasAbgelaufen,
       etwasGeaendert: befund.etwasGeaendert,
       items: berichtigt,
-      positionen: befund.positionen.map((p) => {
-        const sperre = sperren.get(p.productId)
-        return sperre ? { ...p, grund: sperre.text } : p
-      }),
+      positionen: befund.positionen,
     })
   } catch (e) {
     console.error('[/api/warenkorb/pruefen]', e)

@@ -84,8 +84,10 @@ export async function pruefeKaufbarkeitHoefe(
 ): Promise<Map<string, HofSperre>> {
   const sperren = new Map<string, HofSperre>()
   const offen: HofZurKaufbarkeit[] = []
+  const gesehen = new Set<string>()
   for (const hof of hoefe) {
-    if (sperren.has(hof.id) || offen.some((h) => h.id === hof.id)) continue
+    if (gesehen.has(hof.id)) continue
+    gesehen.add(hof.id)
     if (hof.archivedAt) sperren.set(hof.id, { grund: 'stillgelegt', text: FARM_ARCHIVED_MESSAGE })
     else if (!hof.approvedAt) sperren.set(hof.id, { grund: 'nicht-freigeschaltet', text: FARM_NOT_APPROVED_MESSAGE })
     else if (hof.isPaused) sperren.set(hof.id, { grund: 'pause', text: SHOP_PAUSED_MESSAGE })
@@ -114,14 +116,19 @@ export async function pruefeKaufbarkeitHof(hof: HofZurKaufbarkeit, jetzt: Date):
   return (await pruefeKaufbarkeitHoefe([hof], jetzt)).get(hof.id) ?? null
 }
 
+/** Die Sperre eines Produkts samt dem Hof, an dem sie hängt. */
+export type ProduktHofSperre = HofSperre & { farmId: string }
+
 /**
  * Die Sperren der Höfe hinter diesen Produkten, je Produkt (für den Warenkorb).
  * Unbekannte Produkte fehlen — sie fallen im Abgleich ohnehin als „weg“.
+ * Die Hof-ID reist mit, damit der Warenkorb ALLE Halte der Sitzung bei einem
+ * gesperrten Hof freigeben kann, nicht nur die der mitgeschickten Positionen.
  */
 export async function hofSperrenFuerProdukte(
   productIds: readonly string[],
   jetzt: Date
-): Promise<Map<string, HofSperre>> {
+): Promise<Map<string, ProduktHofSperre>> {
   const ids = [...new Set(productIds)]
   if (ids.length === 0) return new Map()
   const produkte = await prisma.product.findMany({
@@ -132,10 +139,10 @@ export async function hofSperrenFuerProdukte(
     produkte.map((p) => p.farm),
     jetzt
   )
-  const jeProdukt = new Map<string, HofSperre>()
+  const jeProdukt = new Map<string, ProduktHofSperre>()
   for (const p of produkte) {
     const sperre = jeHof.get(p.farm.id)
-    if (sperre) jeProdukt.set(p.id, sperre)
+    if (sperre) jeProdukt.set(p.id, { ...sperre, farmId: p.farm.id })
   }
   return jeProdukt
 }
@@ -241,4 +248,28 @@ export async function loescheHalte(productIds: readonly string[], sessionId: str
   await prisma.stockReservation.deleteMany({
     where: { sessionId, productId: { in: [...productIds] } },
   })
+}
+
+/**
+ * Gibt ALLE Halte dieser Sitzung bei diesen Höfen frei (Register N24,
+ * Ergänzung 24.10.2026: „die Halte der Sitzung bei diesem Hof“) — auch für
+ * Produkte, die nicht mehr im mitgeschickten Korb stehen. Sonst hielte ein
+ * gesperrter Hof Ware bis zum Ablauf der Frist fest. Fremde Sitzungen bleiben.
+ *
+ * `StockReservation` hat keine Relation zum Produkt (nur `productId`), darum in
+ * zwei Schritten: erst die Halte der Sitzung (wenige), dann die davon, deren
+ * Produkt an einem dieser Höfe hängt.
+ */
+export async function loescheHalteBeiHoefen(farmIds: readonly string[], sessionId: string): Promise<void> {
+  if (farmIds.length === 0) return
+  const halte = await prisma.stockReservation.findMany({ where: { sessionId }, select: { productId: true } })
+  if (halte.length === 0) return
+  const betroffen = await prisma.product.findMany({
+    where: { id: { in: [...new Set(halte.map((h) => h.productId))] }, farmId: { in: [...new Set(farmIds)] } },
+    select: { id: true },
+  })
+  await loescheHalte(
+    betroffen.map((p) => p.id),
+    sessionId
+  )
 }

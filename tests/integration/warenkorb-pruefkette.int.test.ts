@@ -10,6 +10,10 @@
  *    seinen Halt mit neuer Frist.
  *  - Gemischter Korb: Der Halt beim bestellbaren Hof bleibt und wird erneuert,
  *    nur der beim stillgelegten Hof fällt; fremde Sitzungen bleiben unberührt.
+ *  - Halt bei einem gesperrten Hof ohne mitgeschickte Position: Hält die Sitzung
+ *    dort noch ein Produkt, das der Korb nicht mehr mitschickt, fällt auch
+ *    dieser Halt (N24: „die Halte der Sitzung bei diesem Hof“). Gegenprobe: ein
+ *    solcher Halt bei einem bestellbaren Hof bleibt.
  *
  * Alles trägt das Präfix int- (raeumeAuf). Die Uhr bleibt echt (geteilte
  * Test-DB); jeder Hof bietet an jedem Tag ein Fenster an (erstelleHof).
@@ -93,5 +97,37 @@ describe('/api/warenkorb/pruefen — Prüfkette der Höfe gegen echte Halte', ()
     expect(eigene[0].expiresAt.getTime()).toBe(new Date(body.reserviertBis).getTime())
     // Die Route fasst keine fremde Sitzung an — auch nicht beim gesperrten Hof.
     expect(await halteVon(fremd)).toHaveLength(1)
+  })
+
+  it('gesperrter Hof: auch der Halt ohne mitgeschickte Position fällt', async () => {
+    const { farm } = await erstelleHof({ isPaused: true })
+    const eier = await erstelleProdukt(farm.id, { stock: 10 })
+    const kaese = await erstelleProdukt(farm.id, { stock: 10 })
+    const sitzung = intKennung('sitzung')
+    const fremd = intKennung('sitzung')
+    await setzeHalt(eier.id, sitzung, 2)
+    // Käse steht nicht mehr im mitgeschickten Korb, der Halt der Sitzung hält ihn aber noch.
+    await setzeHalt(kaese.id, sitzung, 1)
+    await setzeHalt(kaese.id, fremd, 1)
+
+    const body = await (await pruefen(sitzung, [{ productId: eier.id, quantity: 2 }])).json()
+
+    expect(body.meldung).toContain(SHOP_PAUSED_MESSAGE)
+    expect(await halteVon(sitzung)).toEqual([])
+    expect(await halteVon(fremd)).toHaveLength(1)
+  })
+
+  it('Gegenprobe: bei einem bestellbaren Hof bleibt der Halt ohne mitgeschickte Position', async () => {
+    const { farm } = await erstelleHof()
+    const eier = await erstelleProdukt(farm.id, { stock: 10 })
+    const kaese = await erstelleProdukt(farm.id, { stock: 10 })
+    const sitzung = intKennung('sitzung')
+    await setzeHalt(eier.id, sitzung, 2)
+    await setzeHalt(kaese.id, sitzung, 1)
+
+    const body = await (await pruefen(sitzung, [{ productId: eier.id, quantity: 2 }])).json()
+
+    expect(body.meldung).toBeNull()
+    expect((await halteVon(sitzung)).map((h) => h.productId).sort()).toEqual([eier.id, kaese.id].sort())
   })
 })
