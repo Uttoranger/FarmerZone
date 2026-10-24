@@ -69,6 +69,13 @@ export type EinstellAuftrag = {
   bezug: Record<string, string>
   bestellungId?: string
   farmId?: string
+  /**
+   * „Nochmal schicken“ (Register N27, Nr. 167): `support` und die Kennung der
+   * ursprünglichen Mail — der Vermerk „vom Support“ im Protokoll. Sonst
+   * bleibt der Standard der Spalte (`system`).
+   */
+  ausloeser?: 'support'
+  nochmalVon?: string
 }
 
 /**
@@ -88,6 +95,8 @@ export async function stelleMailEin(auftraege: EinstellAuftrag | readonly Einste
       bezug: bezugSchemaFuer(a.art).parse(a.bezug),
       bestellungId: a.bestellungId ?? null,
       farmId: a.farmId ?? null,
+      ...(a.ausloeser ? { ausloeser: a.ausloeser } : {}),
+      ...(a.nochmalVon ? { nochmalVon: a.nochmalVon } : {}),
     })),
     skipDuplicates: true,
   })
@@ -108,6 +117,9 @@ export async function stelleMailEin(auftraege: EinstellAuftrag | readonly Einste
 export async function protokolliereSofortMail(zeile: {
   art: MailArt
   bestellungId?: string
+  /** Nr. 167: der Hof der Bestellung (Filter „Hof“) und der Vermerk „vom Support“ beim Nochmal-Schicken. */
+  farmId?: string
+  nochmalVon?: string
   empfaengerHash: string
   status: Extract<MailStatus, 'gesendet' | 'gescheitert' | 'gesperrt' | 'ohne_schluessel'>
   resendId?: string
@@ -121,6 +133,8 @@ export async function protokolliereSofortMail(zeile: {
       // Sofort-Mails haben keinen fachlichen Schlüssel — jede Zeile ist ein Versuch.
       schluessel: `sofort:${randomUUID()}`,
       bestellungId: zeile.bestellungId ?? null,
+      ...(zeile.farmId ? { farmId: zeile.farmId } : {}),
+      ...(zeile.nochmalVon ? { ausloeser: 'support', nochmalVon: zeile.nochmalVon } : {}),
       status: zeile.status,
       resendId: zeile.resendId ?? null,
       fehlerCode: zeile.fehlerCode ?? null,

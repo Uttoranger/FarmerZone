@@ -16,6 +16,7 @@
  * Rein, ohne Datenbank (tests/bar-bestaetigung.test.ts).
  */
 import { createHash } from 'crypto'
+import { nanoid } from 'nanoid'
 import type { OrderStatus } from '@prisma/client'
 import { GRUND_NICHT_BESTAETIGT, istVerwaist, type FristBestellung } from '@/lib/fristen'
 
@@ -74,6 +75,20 @@ const HASH_ZWECK = 'bar-bestaetigung:'
 /** Der gespeicherte Wert zu einem Token aus der Mail. */
 export function barTokenHash(token: string): string {
   return BAR_HASH_PRAEFIX + createHash('sha256').update(HASH_ZWECK + token).digest('hex')
+}
+
+/** Länge des Tokens aus der Mail — dieselbe in Kasse, „Erneut senden“ und beim Support (Nr. 167). */
+export const BAR_TOKEN_LAENGE = 32
+
+/**
+ * Ein neuer Token für den Bestätigungslink und sein gespeicherter Wert (S17):
+ * Der Token geht nur in die Mail, `hash` in `Order.confirmationToken`.
+ * Dieselbe Erzeugung wie in der Kasse (`nanoid(32)`, src/app/api/checkout)
+ * — seit Nr. 167 als eigene Funktion für „Nochmal schicken“ im Admin.
+ */
+export function neuerBarToken(): { token: string; hash: string } {
+  const token = nanoid(BAR_TOKEN_LAENGE)
+  return { token, hash: barTokenHash(token) }
 }
 
 /**

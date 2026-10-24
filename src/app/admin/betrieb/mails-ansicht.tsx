@@ -2,8 +2,11 @@ import * as Sentry from '@sentry/nextjs'
 import { CircleAlert, CircleCheck, Clock, Info } from 'lucide-react'
 import { ADMIN_BETRIEB_HREF, ADMIN_BETRIEB_MAILS_HREF, BETRIEB_TEXT, TARIFE } from '@/lib/betrieb'
 import {
+  ADMIN_BETRIEB_ALLE_MAILS_HREF,
   ADMIN_BETRIEB_MAILS_ALLE_ARTEN_HREF,
+  ALLE_MAILS_TEXT,
   MAIL_TEXT,
+  alleMailsHref,
   brauchtDich,
   jeArt,
   mailKacheln,
@@ -37,6 +40,7 @@ import { ADMIN_RAHMEN } from '@/components/admin/admin-teile'
 import { Seitenkopf } from '@/components/admin/seitenkopf'
 import { BetriebUnterreiter, GrenzBalken, Karte, Klappkarte, Warnkarte } from './betrieb-teile'
 import { MailKnoepfe, type MailKnoepfeTexte } from './mails-aktionen'
+import { NochmalAlleKnopf } from './mails-nochmal'
 import { MinutenNachladen } from './minuten-nachladen'
 
 /*
@@ -76,6 +80,8 @@ function TeilFehler(): React.JSX.Element {
     </Hinweiskarte>
   )
 }
+
+const LINK = cn('inline-flex min-h-11 items-center rounded-md font-semibold text-status-fertig underline-offset-2 hover:underline', FOKUS_RAHMEN)
 
 const KNOPF_TEXTE: MailKnoepfeTexte = { jetztSchicken: MAIL_TEXT.jetztSchicken, verwerfen: MAIL_TEXT.verwerfen, fehler: MAIL_TEXT.aktionFehler }
 
@@ -151,7 +157,12 @@ function SuchFeld({ id, wert, mitHilfe }: { id: string; wert: string; mitHilfe: 
   )
 }
 
-function SuchTreffer({ ergebnis }: { ergebnis: SuchErgebnis | null }): React.JSX.Element | null {
+/**
+ * Die Treffer der Suche — dieselbe Darstellung in der Übersicht und in „Alle
+ * Mails“ (Nr. 167): Jede Zeile führt zum Detail (`mail=`), jede Bestellung
+ * zu „Alle Mails zu dieser Bestellung“; `gewaehlt` markiert die offene Zeile.
+ */
+export function SuchTreffer({ ergebnis, gewaehlt = null, detail }: { ergebnis: SuchErgebnis | null; gewaehlt?: string | null; detail: (id: string) => string }): React.JSX.Element | null {
   if (ergebnis === null) return <TeilFehler />
   if (ergebnis.art === 'leer') return null
   if (ergebnis.art === 'hinweis') {
@@ -170,20 +181,43 @@ function SuchTreffer({ ergebnis }: { ergebnis: SuchErgebnis | null }): React.JSX
           {g.an && <p className={cn('text-[12.5px] leading-snug break-words', LEISE)}>{g.an}</p>}
           {g.zeilen.length > 0 && (
             <ul className="flex flex-col divide-y divide-border">
-              {g.zeilen.map((z, i) => (
-                <li key={`${z.name}-${i}`} className="flex min-w-0 items-center gap-2 py-2">
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="text-[13px] font-semibold text-foreground">{z.name}</span>
-                    <span className={cn('text-[12.5px] leading-snug', LEISE)}>
-                      {z.weg} · {z.stand}
+              {g.zeilen.map((z, i) => {
+                const inhalt = (
+                  <>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="text-[13px] font-semibold text-foreground">{z.name}</span>
+                      <span className={cn('text-[12.5px] leading-snug', LEISE)}>
+                        {z.weg} · {z.stand}
+                      </span>
+                      {z.hinweis && <span className={cn('text-[12px] leading-snug', LEISE)}>{z.hinweis}</span>}
                     </span>
-                  </span>
-                  {z.marke && <Marke art={z.marke.art}>{z.marke.text}</Marke>}
-                </li>
-              ))}
+                    {z.marke && <Marke art={z.marke.art}>{z.marke.text}</Marke>}
+                  </>
+                )
+                return (
+                  <li key={z.id ?? `${z.name}-${i}`}>
+                    {z.id ? (
+                      <a
+                        href={detail(z.id)}
+                        aria-current={gewaehlt === z.id ? 'true' : undefined}
+                        className={cn('flex min-h-11 min-w-0 items-center gap-2 rounded-md py-2 hover:bg-muted/60 aria-[current=true]:bg-muted', FOKUS_RAHMEN)}
+                      >
+                        {inhalt}
+                      </a>
+                    ) : (
+                      <div className="flex min-w-0 items-center gap-2 py-2">{inhalt}</div>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
           )}
           {g.leer && <p className={cn('text-[12.5px] leading-snug', LEISE)}>{g.leer}</p>}
+          {g.nummer && (
+            <a href={alleMailsHref({}, { suche: g.nummer })} className={cn(LINK, 'self-start text-[12.5px]')}>
+              {ALLE_MAILS_TEXT.zuDieserBestellung}
+            </a>
+          )}
         </section>
       ))}
       {ergebnis.zugestellt && (
@@ -221,6 +255,7 @@ function BrauchtDichListe({ zeilen, gruppen, anker }: { zeilen: readonly Braucht
                 verwerfen={g.verwerfen > 1 ? MAIL_TEXT.alleVerwerfen(g.verwerfen) : undefined}
                 texte={KNOPF_TEXTE}
               />
+              {g.nochmal > 1 && <NochmalAlleKnopf art={g.art} text={ALLE_MAILS_TEXT.alleNochmal(g.nochmal)} fehlerText={MAIL_TEXT.aktionFehler} />}
             </div>
           ))}
           <ul className="flex flex-col gap-2.5">
@@ -234,6 +269,9 @@ function BrauchtDichListe({ zeilen, gruppen, anker }: { zeilen: readonly Braucht
                 <p className="text-[13px] leading-snug break-words text-foreground">{z.grund}</p>
                 <p className={cn('text-[12.5px] leading-snug', LEISE)}>{z.zeile}</p>
                 <p className="text-[12.5px] leading-snug text-foreground">{z.tun}</p>
+                <a href={alleMailsHref({}, { mail: z.id })} className={cn(LINK, 'self-start text-[12.5px]')}>
+                  {ALLE_MAILS_TEXT.detail}
+                </a>
                 {(z.jetztSchicken || z.verwerfen) && (
                   <MailKnoepfe
                     auswahl={{ id: z.id }}
@@ -438,22 +476,19 @@ export async function MailsAnsicht({ jetzt, suche, sucheRoh, alle }: { jetzt: Da
   const sucheKarte = (id: string, mitHilfe: boolean): React.JSX.Element => (
     <div className="flex flex-col gap-3">
       <SuchFeld id={id} wert={sucheRoh} mitHilfe={mitHilfe} />
-      <SuchTreffer ergebnis={ergebnis} />
+      <SuchTreffer ergebnis={ergebnis} detail={(id) => alleMailsHref({}, { suche: sucheRoh, mail: id })} />
     </div>
   )
   const brauchtTeil = (anker: string): React.JSX.Element => (braucht ? <BrauchtDichListe zeilen={braucht.zeilen} gruppen={braucht.gruppen} anker={anker} /> : <TeilFehler />)
   const jeArtFuss = artenListe && (
     <p className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] leading-snug', LEISE)}>
       {alle ? (
-        <a href={ADMIN_BETRIEB_MAILS_HREF} className={cn('inline-flex min-h-11 items-center rounded-md font-semibold text-status-fertig underline-offset-2 hover:underline', FOKUS_RAHMEN)}>
+        <a href={ADMIN_BETRIEB_MAILS_HREF} className={LINK}>
           {MAIL_TEXT.wenigerArten}
         </a>
       ) : (
         artenListe.zeilen.length > artenListe.gezeigt.length && (
-          <a
-            href={ADMIN_BETRIEB_MAILS_ALLE_ARTEN_HREF}
-            className={cn('inline-flex min-h-11 items-center rounded-md font-semibold text-status-fertig underline-offset-2 hover:underline', FOKUS_RAHMEN)}
-          >
+          <a href={ADMIN_BETRIEB_MAILS_ALLE_ARTEN_HREF} className={LINK}>
             {MAIL_TEXT.alleArten(artenListe.zeilen.length)}
           </a>
         )
@@ -470,10 +505,16 @@ export async function MailsAnsicht({ jetzt, suche, sucheRoh, alle }: { jetzt: Da
         titel={BETRIEB_TEXT.titel}
         satz={MAIL_TEXT.satz}
         rechts={
-          <span className={cn('inline-flex items-center gap-1.5 text-[13px]', LEISE)}>
-            <Clock className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
-            {MAIL_TEXT.stand(uhrzeitInWien(jetzt))}
-          </span>
+          <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 md:w-auto md:justify-end">
+            <span className={cn('inline-flex items-center gap-1.5 text-[13px]', LEISE)}>
+              <Clock className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+              {MAIL_TEXT.stand(uhrzeitInWien(jetzt))}
+            </span>
+            <a href={ADMIN_BETRIEB_ALLE_MAILS_HREF} className={cn(LINK, 'text-[13px]')}>
+              <span className="hidden lg:inline">{ALLE_MAILS_TEXT.link}</span>
+              <span className="lg:hidden">{ALLE_MAILS_TEXT.linkKurz}</span>
+            </a>
+          </div>
         }
       />
       <BetriebUnterreiter aktiv="mails" offen={braucht ? braucht.zeilen.length : null}>
