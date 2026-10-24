@@ -16,6 +16,7 @@ import { beitragIdImLink } from '@/lib/teilen-fenster'
 import { NEUIGKEITEN_CACHE_TAG } from '@/lib/startseite-gestalten'
 import { beitragLaeuftBis, mailSperreWo } from '@/lib/beitrag-mailabstand'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import { setzeVorname, vornameFuer, vornamenAusBestellungen } from '@/server/beitrag-vorname'
 import {
   BEITRAG_FELDER_MIT_SATZ,
   BEITRAG_PRODUKT_FREMD,
@@ -191,26 +192,21 @@ async function versendeBeitragsMails(auftrag: {
     if (!farmFull) return
 
     // Vornamen für {Vorname} im Text
-    const nameRows = await prisma.order.findMany({
-      where: { farmId, customerEmail: { in: empfaenger } },
-      select: { customerEmail: true, customerName: true },
-      distinct: ['customerEmail'],
-      orderBy: { createdAt: 'desc' },
-    })
-    const nameMap = new Map(nameRows.map((r) => [r.customerEmail.toLowerCase(), r.customerName.split(' ')[0]]))
+    // Dieselbe Hilfe wie der Renderer „beitrag“ der Warteschlange (Nr. 158).
+    const vornamen = await vornamenAusBestellungen(farmId, empfaenger)
 
     const { sendStatusUpdateEmail } = await import('@/lib/email')
     let angenommen = 0
     // Nacheinander: Resend begrenzt die Anfragen je Sekunde.
     for (const an of empfaenger) {
       try {
-        const firstName = nameMap.get(an.toLowerCase()) ?? ''
+        const firstName = vornameFuer(vornamen, an)
         const ergebnis = await sendStatusUpdateEmail({
           to: an,
           farmName: farmFull.name,
           farmSlug: farmFull.slug,
           title: data.title,
-          body: data.body.replace(/\{Vorname\}/gi, firstName),
+          body: setzeVorname(data.body, firstName),
           anlass: data.anlass,
           photoUrl: data.photoUrl,
           // Der Knopf führt zu genau diesem Beitrag (T5) — nur, wenn er auf der

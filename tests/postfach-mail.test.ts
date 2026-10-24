@@ -31,6 +31,8 @@ const { sendMock, captureException, db, nachDerAntwort } = vi.hoisted(() => ({
 }))
 
 vi.mock('server-only', () => ({}))
+// Das Mail-Protokoll (Nr. 158) bindet Prisma; hier geht es nur um die Mail selbst.
+vi.mock('@/server/mail-warteschlange', () => ({ protokolliereSofortMail: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureMessage: vi.fn(), captureException }))
 // Nur für antworteAlsTeam: die Grenzen der Action als Attrappen.
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))

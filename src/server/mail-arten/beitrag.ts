@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { beitragIdImLink } from '@/lib/teilen-fenster'
 import { generateUnsubscribeToken } from '@/lib/unsubscribe'
 import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
+import { setzeVorname, vornameFuer, vornamenAusBestellungen } from '@/server/beitrag-vorname'
 import type { BeitragBezug } from '@/schemas/mail-auftrag'
 import type { StapelMail } from '@/lib/email'
 import type { Verworfen } from '@/server/mail-arten'
@@ -26,19 +27,15 @@ export async function rendereBeitrag(bezug: Record<string, string>): Promise<Sta
     select: { title: true, body: true, anlass: true, photoUrl: true, showOnFarmPage: true, farm: { select: { name: true, slug: true } } },
   })
   if (!post) return { verworfen: 'beitrag_fehlt' }
-  const bestellung = await prisma.order.findFirst({
-    where: { farmId: abo.farmId, customerEmail: abo.customerEmail },
-    select: { customerName: true },
-    orderBy: { createdAt: 'desc' },
-  })
-  const vorname = bestellung?.customerName.split(' ')[0] ?? ''
+  // Dieselbe Hilfe wie der direkte Versand: gleicher Adressabgleich, gleicher Text.
+  const vorname = vornameFuer(await vornamenAusBestellungen(abo.farmId, [abo.customerEmail]), abo.customerEmail)
   const { baueBeitragMail } = await import('@/lib/email')
   return baueBeitragMail({
     to: abo.customerEmail,
     farmName: post.farm.name,
     farmSlug: post.farm.slug,
     title: post.title,
-    body: post.body.replace(/\{Vorname\}/gi, vorname),
+    body: setzeVorname(post.body, vorname),
     anlass: post.anlass,
     photoUrl: post.photoUrl ?? undefined,
     beitragId: beitragIdImLink({ id: postId, showOnFarmPage: post.showOnFarmPage }),

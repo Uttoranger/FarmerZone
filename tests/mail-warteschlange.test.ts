@@ -12,7 +12,7 @@ const db = vi.hoisted(() => ({
   mailAuftrag: { createMany: vi.fn() },
   customerFarmSubscription: { findFirst: vi.fn() },
   statusPost: { findFirst: vi.fn() },
-  order: { findFirst: vi.fn() },
+  order: { findMany: vi.fn() },
 }))
 const { nachDerAntwort, arbeite, mitHerzschlag } = vi.hoisted(() => ({
   nachDerAntwort: vi.fn(),
@@ -28,6 +28,7 @@ vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi
 import { kannWartenPausiert, laesstSichWiederholen, naechsterVersuch, stelleMailEin } from '@/server/mail-warteschlange'
 import { bezugSchemaFuer, VORRANG } from '@/schemas/mail-auftrag'
 import { rendereBeitrag } from '@/server/mail-arten/beitrag'
+import { setzeVorname, vornameFuer, vornamenAusBestellungen } from '@/server/beitrag-vorname'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -144,7 +145,7 @@ describe('Renderer „beitrag“ lädt frisch', () => {
       showOnFarmPage: true,
       farm: { name: 'Hof Muster', slug: 'hof-muster' },
     })
-    db.order.findFirst.mockResolvedValue({ customerName: 'Erika Musterfrau' })
+    db.order.findMany.mockResolvedValue([{ customerEmail: 'Kundin@example.com', customerName: 'Erika Musterfrau' }])
     const mail = await rendereBeitrag({ postId: 'p1', aboId: 'a1' })
     expect('verworfen' in mail).toBe(false)
     if ('verworfen' in mail) return
@@ -153,6 +154,25 @@ describe('Renderer „beitrag“ lädt frisch', () => {
     expect(mail.html).toContain('Hallo Erika')
     expect(Object.keys(mail.headers ?? {})).toEqual(expect.arrayContaining(['List-Unsubscribe', 'List-Unsubscribe-Post']))
   }, 30_000)
+})
+
+describe('Vorname: eine Hilfe für direkten Versand und Renderer', () => {
+  it('Adresse ohne Rücksicht auf Groß-/Kleinschreibung, neueste Bestellung gewinnt, ohne Bestellung leer', async () => {
+    db.order.findMany.mockResolvedValue([
+      { customerEmail: 'KUNDIN@example.com', customerName: 'Erika Musterfrau' },
+      { customerEmail: 'kundin@example.com', customerName: 'Alt Name' },
+    ])
+    const vornamen = await vornamenAusBestellungen('hof1', ['kundin@example.com', 'neu@example.com'])
+    expect(db.order.findMany.mock.calls[0][0].where).toEqual({ farmId: 'hof1', customerEmail: { in: ['kundin@example.com', 'neu@example.com'] } })
+    expect(vornameFuer(vornamen, 'Kundin@Example.com')).toBe('Erika')
+    expect(vornameFuer(vornamen, 'neu@example.com')).toBe('')
+    expect(setzeVorname('Hallo {Vorname} und {vorname}!', 'Erika')).toBe('Hallo Erika und Erika!')
+  })
+
+  it('ohne Adressen keine Abfrage', async () => {
+    expect((await vornamenAusBestellungen('hof1', [])).size).toBe(0)
+    expect(db.order.findMany).not.toHaveBeenCalled()
+  })
 })
 
 describe('Cron /api/cron/mails', () => {
