@@ -53,3 +53,84 @@ export function mailSucheAus(wert: string | string[] | undefined): MailSuche {
  */
 export const mailAuswahlSchema = z.union([z.object({ id: z.string().regex(/^[a-z0-9]{20,40}$/) }).strict(), z.object({ art: mailArtSchema }).strict()])
 export type MailAuswahl = z.infer<typeof mailAuswahlSchema>
+
+// ─── Alle Mails (Register N27, Nr. 167) ──────────────────────────────────────
+
+/** Die Stände, nach denen „Alle Mails“ filtert — Wörter der Seite, nicht die Spalte `status`. */
+export const MAIL_STAENDE = ['gesendet', 'zugestellt', 'offen', 'gescheitert', 'gesperrt', 'verworfen', 'abgelehnt'] as const
+export type MailStandFilter = (typeof MAIL_STAENDE)[number]
+
+/** Die Wege als Filter (Wortliste N8: Sofort, Wichtig, Kann warten). */
+export const MAIL_WEGE = ['sofort', 'wichtig', 'kannWarten'] as const
+export type MailWegFilter = (typeof MAIL_WEGE)[number]
+
+/** Der Zeitraum: höchstens 90 Tage — länger hält das Protokoll nicht. */
+export const MAIL_ZEITRAEUME = ['24h', '7t', '30t', '90t'] as const
+export type MailZeitraum = (typeof MAIL_ZEITRAEUME)[number]
+
+export type AlleMailsFilter = {
+  art: z.infer<typeof mailArtSchema> | null
+  weg: MailWegFilter | null
+  stand: MailStandFilter | null
+  zeitraum: MailZeitraum
+  hof: string | null
+  support: boolean
+}
+
+/** Eine Kennung (cuid u. ä.) — nie eine Adresse, nie Text. */
+const kennungSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)
+/** Die Kennung eines Auftrags — dasselbe Muster wie `mailAuswahlSchema`. */
+export const mailKennungSchema = z.string().regex(/^[a-z0-9]{20,40}$/)
+
+/** Seite weiter: `<Millisekunden>.<Kennung>` des letzten Eintrags (Cursor über `erstelltAm`, `id`). */
+const cursorSchema = z
+  .string()
+  .regex(/^[0-9]{1,15}\.[A-Za-z0-9_-]{1,64}$/)
+  .transform((w) => {
+    const [ms, id] = w.split('.')
+    return { am: new Date(Number.parseInt(ms, 10)), id }
+  })
+
+/** Ein Parameter nur, wenn er genau einmal und als Text kommt — sonst der Standard. */
+function einmal(wert: string | string[] | undefined): string | undefined {
+  return typeof wert === 'string' ? wert : undefined
+}
+
+export type AlleMailsParameter = {
+  /** `?liste=alle` — sonst die Übersicht E-Mails aus Nr. 161. */
+  liste: boolean
+  filter: AlleMailsFilter
+  nach: { am: Date; id: string } | null
+  /** Die gewählte Mail (Detail rechts bzw. Blatt am Handy). */
+  mail: string | null
+}
+
+/**
+ * Die Adresse von „Alle Mails“ (`?reiter=mails&liste=alle`), alles mit Zod:
+ * Ein unbekannter oder doppelter Wert ist nie ein Fehler, sondern der
+ * Standard (alle, 90 Tage) — ein alter Link zeigt die Liste.
+ */
+export function alleMailsAus(p: Record<string, string | string[] | undefined>): AlleMailsParameter {
+  const nimm = <T>(schema: z.ZodType<T>, wert: string | string[] | undefined): T | null => {
+    const r = schema.safeParse(einmal(wert))
+    return r.success ? r.data : null
+  }
+  return {
+    liste: einmal(p.liste) === 'alle',
+    filter: {
+      art: nimm(mailArtSchema, p.art),
+      weg: nimm(z.enum(MAIL_WEGE), p.weg),
+      stand: nimm(z.enum(MAIL_STAENDE), p.stand),
+      zeitraum: nimm(z.enum(MAIL_ZEITRAEUME), p.zeitraum) ?? '90t',
+      hof: nimm(kennungSchema, p.hof),
+      support: einmal(p.support) === '1',
+    },
+    nach: nimm(cursorSchema, p.nach),
+    mail: nimm(mailKennungSchema, p.mail),
+  }
+}
+
+/** „Nochmal schicken“ und „Vorschau“ meinen genau einen Auftrag. */
+export const mailEinzelnSchema = z.object({ id: mailKennungSchema }).strict()
+/** „Alle nochmal schicken“ in „Braucht dich“: alle gescheiterten einer Art. */
+export const mailArtEingabeSchema = z.object({ art: mailArtSchema }).strict()

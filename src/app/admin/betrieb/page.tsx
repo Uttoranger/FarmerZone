@@ -4,7 +4,7 @@ import { Clock, Download, Info } from 'lucide-react'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { ladeGroessteTabellen, ladeLaeufe, ladeMessungenFuerSeite, ladeWarnungen, letzteMessungAm } from '@/server/queries/betrieb'
 import { zaehleProbleme } from '@/server/queries/mails'
-import { alleArtenAus, betriebReiterAus, mailSucheAus } from '@/schemas/betrieb-mails'
+import { alleArtenAus, alleMailsAus, betriebReiterAus, mailSucheAus } from '@/schemas/betrieb-mails'
 import { STRIPE_MARKE, UMGEBUNG } from '@/lib/umgebung-server'
 import {
   ABLAEUFE,
@@ -35,6 +35,7 @@ import { ADMIN_RAHMEN, AdminFehler } from '@/components/admin/admin-teile'
 import { Seitenkopf } from '@/components/admin/seitenkopf'
 import { JetztMessen } from './jetzt-messen'
 import { MailsAnsicht } from './mails-ansicht'
+import { MailsAlle } from './mails-alle'
 import {
   AblaeufeListe,
   BetriebUnterreiter,
@@ -144,7 +145,8 @@ async function ladeDaten(jetzt: Date) {
  * Bild-Vorgänge keine Prozente mehr, und die Karte „Vercel-Ausgaben“ steht
  * rechts nach „Tarife und Grenzen“, am Handy als Klappkarte danach.
  * Seit Nr. 161 zwei Unterreiter: „Überblick“ (diese Seite) und „E-Mails“
- * (`?reiter=mails`, MailsAnsicht in mails-ansicht.tsx).
+ * (`?reiter=mails`, MailsAnsicht in mails-ansicht.tsx). Seit Nr. 167 darin
+ * „Alle Mails“ (`?reiter=mails&liste=alle`, MailsAlle in mails-alle.tsx).
  */
 export default async function AdminBetriebPage({
   searchParams,
@@ -157,6 +159,9 @@ export default async function AdminBetriebPage({
   const parameter = await searchParams
   if (betriebReiterAus(parameter.reiter) === 'mails') {
     const suche = typeof parameter.suche === 'string' ? parameter.suche : ''
+    // Seit Nr. 167: „Alle Mails“ (`&liste=alle`) mit Filter, Detail und Nochmal schicken.
+    const alle = alleMailsAus(parameter)
+    if (alle.liste) return <MailsAlle jetzt={jetzt} p={alle} suche={mailSucheAus(parameter.suche)} sucheRoh={suche.slice(0, 254)} />
     return <MailsAnsicht jetzt={jetzt} suche={mailSucheAus(parameter.suche)} sucheRoh={suche.slice(0, 254)} alle={alleArtenAus(parameter.alle)} />
   }
 

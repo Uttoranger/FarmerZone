@@ -349,7 +349,18 @@ describe('Braucht dich', () => {
 
   it('alle einer Art: Knöpfe erst ab zwei Mails derselben Art', () => {
     const { gruppen } = brauchtDich([problem({ id: 'a' }), problem({ id: 'b' })], JETZT)
-    expect(gruppen).toEqual([{ art: 'bestellung-bestaetigung', name: 'Bestellbestätigung', jetztSchicken: 2, verwerfen: 2 }])
+    expect(gruppen).toEqual([{ art: 'bestellung-bestaetigung', name: 'Bestellbestätigung', jetztSchicken: 2, verwerfen: 2, nochmal: 0 }])
+  })
+
+  it('Nr. 167: „Alle nochmal schicken“ zählt nur gescheiterte wichtige Mails einer erlaubten Art — Gegenprobe Beitrag und Anmeldecode', () => {
+    const gescheitert = (id: string, art: string, vorrang = 1) => problem({ id, art, vorrang, status: 'gescheitert', fehlerCode: 'validation_error', naechsterVersuchAm: minuten(30) })
+    const { gruppen } = brauchtDich(
+      [gescheitert('a', 'abholbereit'), gescheitert('b', 'abholbereit'), gescheitert('c', 'beitrag', 2), gescheitert('d', 'beitrag', 2), gescheitert('e', 'anmeldecode', 0), gescheitert('f', 'anmeldecode', 0)],
+      JETZT
+    )
+    expect(gruppen.find((g) => g.art === 'abholbereit')?.nochmal).toBe(2)
+    expect(gruppen.find((g) => g.art === 'beitrag')?.nochmal).toBe(0)
+    expect(gruppen.find((g) => g.art === 'anmeldecode')?.nochmal).toBe(0)
   })
 })
 
@@ -444,9 +455,10 @@ describe('Suche: Ergebnis', () => {
           unterzeile: 'Online bezahlt · Zum Packen',
           an: 'an k•••@example.at · aus der Bestellung',
           leer: null,
+          nummer: 'HM-2611-A4F2',
           zeilen: [
-            { name: 'Bestellbestätigung', weg: 'Wichtig', stand: 'gesendet 09:12', marke: { text: 'zugestellt', art: 'laeuft' } },
-            { name: 'Bezahlt (an den Hof)', weg: 'Wichtig', stand: 'gesendet 09:12', marke: { text: 'zugestellt', art: 'laeuft' } },
+            { id: 'm1', name: 'Bestellbestätigung', weg: 'Wichtig', stand: 'gesendet 09:12', marke: { text: 'zugestellt', art: 'laeuft' } },
+            { id: 'm2', name: 'Bezahlt (an den Hof)', weg: 'Wichtig', stand: 'gesendet 09:12', marke: { text: 'zugestellt', art: 'laeuft' } },
             { name: 'Abholbereit', weg: 'Wichtig', stand: 'noch nicht fällig · kommt, wenn der Hof packt', marke: null },
           ],
         },
