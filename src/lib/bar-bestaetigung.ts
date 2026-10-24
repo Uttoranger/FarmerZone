@@ -69,12 +69,11 @@ export function barBestaetigungsAnsicht(bestellung: BarBestellung | null, jetzt:
  */
 /** Das Präfix jedes gespeicherten Hashs — das Aufräumen leert alle Werte ohne es (Nr. 164). */
 export const BAR_HASH_PRAEFIX = 'h1:'
-const HASH_FASSUNG = BAR_HASH_PRAEFIX
 const HASH_ZWECK = 'bar-bestaetigung:'
 
 /** Der gespeicherte Wert zu einem Token aus der Mail. */
 export function barTokenHash(token: string): string {
-  return HASH_FASSUNG + createHash('sha256').update(HASH_ZWECK + token).digest('hex')
+  return BAR_HASH_PRAEFIX + createHash('sha256').update(HASH_ZWECK + token).digest('hex')
 }
 
 /**

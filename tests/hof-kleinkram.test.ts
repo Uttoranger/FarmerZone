@@ -29,11 +29,16 @@ const m = vi.hoisted(() => ({
   deletePickupSlot: vi.fn(),
   togglePickupSlotActive: vi.fn(),
   refresh: vi.fn(),
+  /** Erzwingt den Anfangszustand von useState der Karte (der Test rendert nur, ohne Klick). */
+  kartenStand: undefined as unknown,
 }))
 
 vi.mock('react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react')>()),
-  useState: <T,>(anfang: T | (() => T)): [T, () => void] => [typeof anfang === 'function' ? (anfang as () => T)() : anfang, () => {}],
+  useState: <T,>(anfang: T | (() => T)): [T, () => void] => [
+    m.kartenStand !== undefined && anfang === 'offen' ? (m.kartenStand as T) : typeof anfang === 'function' ? (anfang as () => T)() : anfang,
+    () => {},
+  ],
   useTransition: (): [boolean, (lauf: () => void) => void] => [false, (lauf) => void lauf()],
 }))
 vi.mock('next/link', () => ({
@@ -61,7 +66,7 @@ vi.mock('@/server/actions/email-bestaetigung', () => ({ bestaetigeEmail: vi.fn()
 
 import PrintPacklistPage from '@/app/(farmer)/orders/today/print/page'
 import { PickupSlotsClient } from '@/components/settings/pickup-slots-client'
-import { NachBestaetigung, NeuerLinkWeg } from '@/components/email-bestaetigung/bestaetigen-karte'
+import { BestaetigenKarte, NachBestaetigung, NeuerLinkWeg } from '@/components/email-bestaetigung/bestaetigen-karte'
 import { ABHOLZEIT_GELOESCHT } from '@/lib/pickup-slot-rules'
 
 function quelle(pfad: string): string {
@@ -76,6 +81,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   m.freigegeben = false
   m.reihenfolge = []
+  m.kartenStand = undefined
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -240,7 +246,33 @@ describe('Bestätigen ohne Umweg (P8)', () => {
     expect(html).not.toContain('hof-anmeldung')
   })
 
-  it('„schon bestätigt", abgemeldet: nach dem Fehler dasselbe Formular mit Ziel /verify, kein Link auf /login', () => {
+  it('Fehlerzustand der Karte, abgemeldet: zeigt NeuerLinkWeg mit dem Satz und dem Formular (Ziel /verify), kein Link auf /login', () => {
+    m.kartenStand = { fehler: 'Der Link ist abgelaufen.' }
+    const html = renderToStaticMarkup(createElement(BestaetigenKarte, { token: 't', angemeldet: false }))
+
+    expect(html).toContain('Der Link ist abgelaufen.')
+    expect(html).toContain('Melde dich an, dann schicken wir dir einen neuen Link.')
+    expect(html).toContain('data-ziel="/verify"')
+    expect(html).not.toContain('/login')
+  })
+
+  it('Gegenprobe: Fehlerzustand angemeldet zeigt den Link auf /verify, ohne den Satz und ohne Formular', () => {
+    m.kartenStand = { fehler: 'Der Link ist abgelaufen.' }
+    const html = renderToStaticMarkup(createElement(BestaetigenKarte, { token: 't', angemeldet: true }))
+
+    expect(html).toContain('href="/verify"')
+    expect(html).not.toContain('Melde dich an, dann schicken wir dir einen neuen Link.')
+    expect(html).not.toContain('hof-anmeldung')
+  })
+
+  it('ohne Fehler (Anfangszustand) steht kein Weg zu einem neuen Link da', () => {
+    const html = renderToStaticMarkup(createElement(BestaetigenKarte, { token: 't', angemeldet: false }))
+
+    expect(html).not.toContain('data-ziel="/verify"')
+    expect(html).not.toContain('Melde dich an, dann schicken wir dir einen neuen Link.')
+  })
+
+  it('NeuerLinkWeg abgemeldet: dasselbe Formular mit Ziel /verify, kein Link auf /login', () => {
     const html = renderToStaticMarkup(createElement(NeuerLinkWeg, { angemeldet: false }))
 
     expect(html).toContain('data-merkmal="hof-anmeldung"')

@@ -55,8 +55,8 @@ type HofFuerJsonLd = {
   bannerType: string
   bannerUrl: string | null
   logoUrl: string | null
-  /** "AT" oder "DE" (Farm.country); fehlt es oder ist es unbekannt, gilt AT. */
-  country?: string | null
+  /** "AT" oder "DE" (Farm.country); ist es unbekannt, gilt AT. */
+  country: string
 }
 
 /**

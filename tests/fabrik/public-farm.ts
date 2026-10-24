@@ -19,6 +19,7 @@ export function publicFarm(teil: Partial<PublicFarm> = {}): PublicFarm {
     address: 'Musterweg 1',
     postalCode: '4900',
     city: 'Musterdorf',
+    country: 'AT',
     phone: '+43 660 0000000',
     email: 'hof@example.com',
     logoUrl: null,
