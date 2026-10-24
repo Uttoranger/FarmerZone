@@ -5754,6 +5754,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Abholzeit rückgängig (P10):** Löschen ist endgültig (`Order` hängt nicht an `PickupSlot`), `farm.ts` bleibt unverändert. Der Toast „Abholzeit gelöscht“ trägt für eine AKTIVE Zeit „Rückgängig“ (sechs Sekunden), auch in Mein Hof (dort statt „Gespeichert · Ansehen“); der Klick legt die Zeit über `addPickupSlot` mit Tag, Beginn, Ende und `maxOrders` neu an. Eine pausierte Zeit behält den bisherigen Toast, sie käme sonst aktiv zurück. Die Texte stehen in `ABHOLZEIT_GELOESCHT` (`src/lib/pickup-slot-rules.ts`).
 - **Bestätigen ohne Umweg (P8):** Abgemeldet zeigt die Karte nach dem Bestätigen gleich das Formular der Hof-Anmeldung (`NachBestaetigung`); `HofAnmeldung` bekommt die optionale Prop `ziel` (nur `/onboarding`, fest im Code, nie aus der Adresse). Keine Adresse in der URL, nichts vorausgefüllt.
 
+## Hofliste: Größe messen, warnen, seltener erneuern (Register N19, Ergänzung 24.10.2026; Nr. 163, Lauf 24)
+
+- **Warum:** `ladeOeffentlicheHoefe` legt ALLE sichtbaren Höfe mit ALLEN verfügbaren Produkten als EINEN Eintrag ab; über 2 MB speichert Vercel ihn nicht, dann liest jeder Aufruf von /hoefe und der Startseite die ganze Liste aus der Datenbank. Und seit Nr. 131 ließ jede Bestellung bei einem Hof mit Höchstzahl den ganzen Eintrag neu bauen.
+- **Messen:** `messeHofliste` (`src/server/betrieb.ts`) misst `getOeffentlicheHoefe` ohne Cache (Bytes des JSON in UTF-8, Zahl der Höfe) im Mess-Lauf und bei „Jetzt messen“; Kachel „Hofliste“ und Warnung nach der Regel `speicher` (80/95/100 %, Entwarnung unter 75 %) in `src/lib/betrieb.ts`. Grenze dezimal 2 000 000 B; Next selbst prüft `JSON.stringify(eintrag).length > 2 · 1024 · 1024` am verpackten Eintrag (der Inhalt steckt dort noch einmal als Text, mit maskierten Anführungszeichen) — die Warnung ab 80 % lässt dafür Luft.
+- **Messwerte (Integrationstest `hofliste-groesse.int.test.ts`, üppig gefüllte erfundene Höfe, je 20 Produkte mit Foto):** 50 Höfe ≈ 0,60 MB, 200 ≈ 2,39 MB, 500 ≈ 5,99 MB, gleichmäßig ≈ 12 KB je Hof; 2 MB ab etwa 167 Höfen. Die Entscheidung „Hofliste aufteilen“ trifft die Projektleitung nach diesen Zahlen.
+- **Seltener erneuern:** `wechseltFensterStand` (rein) entscheidet, ob eine Bestellung ihr Fenster voll macht bzw. ein Storno ein volles frei; gezählt wird im Nachlauf mit `belegung` (`src/server/abholfenster.ts`, dieselbe Zählung wie `imAbholfenster`). Ein Storno für einen Termin, der nicht mehr bestellbar ist (`istFensterBestellbar`), erneuert nie. Sonst altert die Liste wie bisher höchstens 300 s.
+
 ## Nützliche Befehle
 
 ```bash

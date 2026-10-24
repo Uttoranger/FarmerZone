@@ -46,6 +46,7 @@ import {
 import { ladeLaeufe, ladeMessungenFuerPruefung, ladeWarnungen, summeImMonat } from '@/server/queries/betrieb'
 import { ladeBetreiberEmpfaenger } from '@/server/queries/postfach'
 import { ohneVerwendungMesswerte } from '@/server/betrieb-bilder'
+import { getOeffentlicheHoefe } from '@/server/queries/farm'
 
 /*
  * Admin › Betrieb im Hintergrund (Register N18, Nr. 103): messen, Herzschlag,
@@ -115,7 +116,19 @@ export async function listeBilder(): Promise<{ dateien: BildDatei[]; auflistunge
 
 // ─── Messen ──────────────────────────────────────────────────────────────────
 
-export type MessErgebnis = { gemessen: BetriebArt[]; fehler: Array<'bilder' | 'datenbank'> }
+export type MessErgebnis = { gemessen: BetriebArt[]; fehler: Array<'bilder' | 'datenbank' | 'hofliste'> }
+
+/**
+ * Die Hofliste, wie sie im Zwischenspeicher steht (Nr. 163, Register N19,
+ * Ergänzung 24.10.2026): `getOeffentlicheHoefe` OHNE Cache — gemessen wird,
+ * was `ladeOeffentlicheHoefe` speichern müsste, auch wenn Vercel den Eintrag
+ * schon nicht mehr nimmt. Bytes des JSON in UTF-8 (Umlaute zählen doppelt) und
+ * die Zahl der Höfe. Nur lesen.
+ */
+export async function messeHofliste(): Promise<{ bytes: number; hoefe: number }> {
+  const liste = await getOeffentlicheHoefe()
+  return { bytes: Buffer.byteLength(JSON.stringify(liste)), hoefe: liste.length }
+}
 
 /** Schreibt die Werte eines UTC-Tags in EINER Anweisung (upsert auf tag+art: ein zweiter Lauf am selben Tag überschreibt). */
 async function schreibeMessungen(tag: string, werte: ReadonlyArray<readonly [BetriebArt, number]>, jetzt: Date): Promise<void> {
@@ -161,7 +174,7 @@ export async function beginneMessung(jetzt: Date): Promise<boolean> {
 }
 
 /**
- * Misst Datenbank und Bild-Speicher und schreibt je Wert eine Zeile
+ * Misst Datenbank, Bild-Speicher und (seit Nr. 163) die Hofliste und schreibt je Wert eine Zeile
  * BetriebMessung für den UTC-Tag. Wirft nicht wegen einer Quelle: Deren
  * Fehlerklasse geht nach Sentry (ohne Inhalt), die anderen laufen weiter.
  * Nur in der Produktion zählt sie aus DERSELBEN Auflistung die Bilder ohne
@@ -205,6 +218,14 @@ export async function messeBetrieb(jetzt: Date = new Date(), { produktion = UMGE
   } catch (err) {
     fehler.push('bilder')
     meldeFehler('Betrieb: Bild-Speicher nicht gemessen', err, { quelle: 'bilder' })
+  }
+
+  try {
+    const { bytes, hoefe } = await messeHofliste()
+    werte.push(['hoflisteBytes', bytes], ['hoflisteHoefe', hoefe])
+  } catch (err) {
+    fehler.push('hofliste')
+    meldeFehler('Betrieb: Hofliste nicht gemessen', err, { quelle: 'hofliste' })
   }
 
   if (werte.length > 0) await schreibeMessungen(tag, werte, jetzt)
@@ -297,13 +318,14 @@ function grenzStand(wert: GrenzWert, messungen: readonly Messung[], mailsImMonat
   if (wert === 'bilder') return mitAnteil(vonHeute('bilderBytes'))
   if (wert === 'datenbank') return mitAnteil(vonHeute('datenbankBytes'))
   if (wert === 'bildVorgaenge') return mitAnteil(vonHeute('bildVorgaengeMonat'))
+  if (wert === 'hofliste') return mitAnteil(vonHeute('hoflisteBytes'))
   if (wert === 'mailsMonat') return mitAnteil(mailsImMonat)
   const gestern = utcTagVersetzt(heute, -1)
   return mitAnteil(messungen.find((m) => m.art === 'mails' && m.tag === gestern)?.wert ?? 0)
 }
 
 function trendFuer(wert: GrenzWert, messungen: readonly Messung[], jetzt: Date): string | null {
-  const art: BetriebArt | null = wert === 'bilder' ? 'bilderBytes' : wert === 'datenbank' ? 'datenbankBytes' : null
+  const art: BetriebArt | null = wert === 'bilder' ? 'bilderBytes' : wert === 'datenbank' ? 'datenbankBytes' : wert === 'hofliste' ? 'hoflisteBytes' : null
   const grenze = grenzeVon(wert)
   if (!art || grenze === null) return null
   const t = vollIn(

@@ -112,7 +112,10 @@ describe('messeBetrieb', () => {
     // 2 × 1 Upload + 3 eigene Auflistungen im Monat.
     expect(werte.bildVorgaengeMonat).toBe(5)
     expect(werte.datenbankBytes).toBeGreaterThan(0)
-    expect(zeilen).toHaveLength(6)
+    // Seit Nr. 163 auch die Hofliste aus der echten Abfrage: Bytes und Höfe.
+    expect(werte.hoflisteBytes).toBeGreaterThan(0)
+    expect(werte.hoflisteHoefe).toBeGreaterThanOrEqual(0)
+    expect(zeilen).toHaveLength(8)
   })
 })
 

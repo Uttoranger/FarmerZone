@@ -6,6 +6,9 @@
  *    Dateien und Uploads des Monats, schreibt je Art eine Zeile für den
  *    UTC-Tag; scheitert eine Quelle, läuft die andere weiter, und nach Sentry
  *    geht nur die Klasse unter einem festen Satz.
+ *  - seit Nr. 163 misst sie die Hofliste (`getOeffentlicheHoefe` ohne Cache):
+ *    Bytes des JSON (UTF-8) und Zahl der Höfe; scheitert das, laufen die
+ *    anderen Werte weiter. Ab 80 % von 2 MB warnt die Prüfung (Regel speicher).
  *  - mitHerzschlag gibt das Ergebnis unverändert zurück bzw. wirft den Fehler
  *    des Laufs weiter, schreibt Start und Ende (ok, Fehlerklasse) und hält den
  *    Lauf nicht auf, wenn der Herzschlag selbst scheitert.
@@ -29,6 +32,7 @@ vi.mock('@vercel/blob', () => ({ list: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendBetriebWarnung: vi.fn(async () => ({ gesendet: 1, gescheitert: 0 })) }))
 vi.mock('@/server/queries/postfach', () => ({ ladeBetreiberEmpfaenger: vi.fn(async () => ['team@example.com']) }))
+vi.mock('@/server/queries/farm', () => ({ getOeffentlicheHoefe: vi.fn() }))
 const nachlauf = vi.hoisted(() => ({ aufgaben: [] as Array<() => Promise<void>> }))
 vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn((aufgabe: () => Promise<void>) => nachlauf.aufgaben.push(aufgabe)) }))
 
@@ -36,9 +40,14 @@ import { list } from '@vercel/blob'
 import * as Sentry from '@sentry/nextjs'
 import { sendBetriebWarnung } from '@/lib/email'
 import { ladeBetreiberEmpfaenger } from '@/server/queries/postfach'
+import { getOeffentlicheHoefe } from '@/server/queries/farm'
 import { beginneMessung, messeBetrieb, mitHerzschlag, pruefeAblaeufe, pruefeGrenzen } from '@/server/betrieb'
 
 const JETZT = new Date('2026-10-16T04:05:00.000Z')
+
+/** Zwei erfundene Höfe; „ü“ zählt in UTF-8 zwei Bytes — gemessen werden Bytes, nicht Zeichen. */
+const LISTE = [{ name: 'Hof Grünwiese' }, { name: 'Hof Test' }]
+const LISTE_BYTES = JSON.stringify(LISTE).length + 1
 
 /** Die Werte einer Rohabfrage, flach — so, wie Postgres sie als Parameter bekommt. */
 function werteVon(aufruf: unknown[]): unknown[] {
@@ -57,6 +66,7 @@ beforeEach(() => {
   db.$queryRaw.mockResolvedValue([{ bytes: BigInt(46_000_000) }])
   db.$executeRaw.mockResolvedValue(1)
   db.betriebMessung.aggregate.mockResolvedValue({ _sum: { wert: BigInt(3) } })
+  vi.mocked(getOeffentlicheHoefe).mockResolvedValue(LISTE as never)
   vi.mocked(list)
     .mockResolvedValue({ blobs: [], hasMore: false } as never)
     .mockResolvedValueOnce({ blobs: [blob('hoefe/a/1.webp', 400_000, '2026-10-02T10:00:00Z'), blob('hoefe/a/2.webp', 600_000, '2026-09-20T10:00:00Z')], hasMore: true, cursor: 'seite-2' } as never)
@@ -75,7 +85,10 @@ describe('messeBetrieb', () => {
       [1000, undefined],
       [1000, 'seite-2'],
     ])
-    expect(ergebnis).toEqual({ gemessen: ['datenbankBytes', 'bilderBytes', 'bilderDateien', 'bilderUploadsMonat', 'bildVorgaengeMonat'], fehler: [] })
+    expect(ergebnis).toEqual({
+      gemessen: ['datenbankBytes', 'bilderBytes', 'bilderDateien', 'bilderUploadsMonat', 'bildVorgaengeMonat', 'hoflisteBytes', 'hoflisteHoefe'],
+      fehler: [],
+    })
     // Erst die eigenen Auflistungen (2 Seiten), dann alle Werte in EINER Anweisung.
     expect(werteVon(db.$executeRaw.mock.calls[0])).toEqual(['2026-10-16', 2, JETZT])
     expect(werteVon(db.$executeRaw.mock.calls[1])).toEqual([
@@ -85,7 +98,21 @@ describe('messeBetrieb', () => {
       ...['2026-10-16', 'bilderUploadsMonat', BigInt(2), JETZT],
       // 2 × 2 Uploads + 3 eigene Auflistungen im Monat (Summe aus der Datenbank).
       ...['2026-10-16', 'bildVorgaengeMonat', BigInt(7), JETZT],
+      // Die Hofliste ohne Cache (Nr. 163): Bytes des JSON und die Zahl der Höfe.
+      ...['2026-10-16', 'hoflisteBytes', BigInt(LISTE_BYTES), JETZT],
+      ...['2026-10-16', 'hoflisteHoefe', BigInt(2), JETZT],
     ])
+    expect(getOeffentlicheHoefe).toHaveBeenCalledTimes(1)
+  })
+
+  it('scheitert die Hofliste, laufen die anderen Werte weiter — nach Sentry nur Klasse und fester Satz', async () => {
+    vi.mocked(getOeffentlicheHoefe).mockRejectedValueOnce(Object.assign(new Error('Hof Grünwiese kaputt'), { name: 'PrismaClientKnownRequestError' }))
+    const ergebnis = await messeBetrieb(JETZT)
+    expect(ergebnis.fehler).toEqual(['hofliste'])
+    expect(ergebnis.gemessen).toEqual(['datenbankBytes', 'bilderBytes', 'bilderDateien', 'bilderUploadsMonat', 'bildVorgaengeMonat'])
+    const [fehler, kontext] = vi.mocked(Sentry.captureException).mock.calls[0] as [Error, { tags: Record<string, string> }]
+    expect([fehler.name, fehler.message]).toEqual(['PrismaClientKnownRequestError', 'Betrieb: Hofliste nicht gemessen'])
+    expect(kontext.tags).toEqual({ bereich: 'betrieb', quelle: 'hofliste' })
   })
 
   it('zwischen 0 und 2 Uhr Wiener Zeit gilt der UTC-Tag — nie der Vortag', async () => {
@@ -103,7 +130,7 @@ describe('messeBetrieb', () => {
   it('ohne Schlüssel zum Bild-Speicher (lokal): Datenbank gemessen, Bilder als Fehlerklasse ohne Inhalt', async () => {
     vi.stubEnv('BLOB_READ_WRITE_TOKEN', '')
     const ergebnis = await messeBetrieb(JETZT)
-    expect(ergebnis).toEqual({ gemessen: ['datenbankBytes'], fehler: ['bilder'] })
+    expect(ergebnis).toEqual({ gemessen: ['datenbankBytes', 'hoflisteBytes', 'hoflisteHoefe'], fehler: ['bilder'] })
     expect(list).not.toHaveBeenCalled()
     const [fehler, kontext] = vi.mocked(Sentry.captureException).mock.calls[0] as [Error, { tags: Record<string, string> }]
     expect([fehler.name, fehler.message]).toEqual(['BildSpeicherOhneZugang', 'Betrieb: Bild-Speicher nicht gemessen'])
@@ -216,7 +243,7 @@ describe('„Jetzt messen“ belegt den Beginn in EINER Anweisung (Nr. 113)', ()
       '2026-10-16',
       'messBeginn',
       JETZT,
-      ...['bilderBytes', 'bilderDateien', 'bilderUploadsMonat', 'bildVorgaengeMonat', 'datenbankBytes', 'messBeginn'],
+      ...['bilderBytes', 'bilderDateien', 'bilderUploadsMonat', 'bildVorgaengeMonat', 'datenbankBytes', 'hoflisteBytes', 'hoflisteHoefe', 'messBeginn'],
       vor10,
       vor10,
     ])
@@ -245,6 +272,18 @@ describe('Grenzen: Vercel Pro und Mail nach der Antwort (Nr. 113)', () => {
     expect(anweisungen.filter((a) => a.sql.includes('SET "stufe" = 0')).map((a) => a.werte)).toEqual([['bilder']])
     expect(sendBetriebWarnung).toHaveBeenCalledTimes(1)
     expect(vi.mocked(sendBetriebWarnung).mock.calls[0][0]).toMatchObject({ art: 'grenze', wert: 'datenbank', ohneVerwendungBytes: null })
+  })
+
+  it('Hofliste ab 80 % von 2 MB: Stufe 1 und eine Mail mit Stand und Trend; darunter keine (Nr. 163)', async () => {
+    db.betriebMessung.findMany.mockResolvedValue([zeile('hoflisteBytes', 1_700_000)])
+    db.betriebWarnung.findMany.mockResolvedValue([])
+    expect(await pruefeGrenzen(JETZT, { produktion: true })).toBe(1)
+    expect(vi.mocked(sendBetriebWarnung).mock.calls[0][0]).toMatchObject({ art: 'grenze', wert: 'hofliste', anteil: 85, stand: '1,7 MB von 2 MB sind belegt' })
+
+    vi.mocked(sendBetriebWarnung).mockClear()
+    db.betriebMessung.findMany.mockResolvedValue([zeile('hoflisteBytes', 1_500_000)])
+    expect(await pruefeGrenzen(JETZT, { produktion: true })).toBe(0)
+    expect(sendBetriebWarnung).not.toHaveBeenCalled()
   })
 
   it('mit `nachher` („Jetzt messen“): Stufe sofort gesetzt, die Mail erst im Nachlauf', async () => {
