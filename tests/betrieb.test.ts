@@ -185,6 +185,17 @@ describe('ablaufStand — pünktlich, überfällig, Fehler, noch kein Lauf', () 
     expect(wannText(aufraeumen, T('2026-11-16T12:00:00Z'))).toBe('täglich ab 04:00')
     expect(wannText(ABLAEUFE[3], T('2026-10-16T12:00:00Z'))).toBe('montags ab 07:00')
   })
+
+  it('die Mail-Warteschlange (N26, Nr. 158): „jede Minute“, überfällig nach 10 Minuten — Gegenprobe täglich', () => {
+    const mails = ABLAEUFE.find((a) => a.name === 'mails')
+    expect(mails).toMatchObject({ pfad: '/api/cron/mails', zeitplan: '* * * * *', rhythmus: 'minuetlich' })
+    if (!mails) return
+    expect(wannText(mails, T('2026-10-16T12:00:00Z'))).toBe('jede Minute')
+    const l = lauf('2026-10-16T12:00:00Z')
+    expect(ablaufStand(mails, l, T('2026-10-16T12:10:00Z'))).toBe('puenktlich')
+    expect(ablaufStand(mails, l, T('2026-10-16T12:10:00.001Z'))).toBe('ueberfaellig')
+    expect(ablaufStand(ABLAEUFE[0], l, T('2026-10-16T12:10:00.001Z'))).toBe('puenktlich')
+  })
 })
 
 describe('grenzSchritt — Speicher (Bilder, Datenbank)', () => {
@@ -257,7 +268,8 @@ describe('ablaufSchritt', () => {
 
 describe('Hinweis der Shell (Punkt und Betriebsleiste, Register N15)', () => {
   const jetzt = T('2026-10-16T08:00:00Z')
-  const gut = new Map(ABLAEUFE.map((a) => [a.name, lauf('2026-10-16T03:00:00Z')]))
+  // Die Mail-Warteschlange läuft jede Minute (Nr. 158) — pünktlich heißt hier: vor 2 Minuten.
+  const gut = new Map(ABLAEUFE.map((a) => [a.name, lauf(a.rhythmus === 'minuetlich' ? '2026-10-16T07:58:00Z' : '2026-10-16T03:00:00Z')]))
 
   it('nichts offen → null (kein Punkt)', () => {
     expect(betriebHinweis([{ art: 'bilder', stufe: 0 }], gut, jetzt)).toBeNull()

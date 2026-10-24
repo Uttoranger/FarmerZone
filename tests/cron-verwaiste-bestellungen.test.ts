@@ -87,12 +87,12 @@ describe('Alle Cron-Routen — Secret nur über cronBerechtigt', () => {
 
   it('findet die Cron-Routen — Gegenprobe, sonst bewiese ein leerer Fund nichts', () => {
     expect(routen.map((r) => r.name)).toEqual(
-      expect.arrayContaining(['betrieb', 'briefkasten', 'cleanup-reservations', 'verwaiste-bestellungen'])
+      expect.arrayContaining(['betrieb', 'briefkasten', 'cleanup-reservations', 'mails', 'verwaiste-bestellungen'])
     )
     expect(EIGENER_VERGLEICH.test('if (!cronSecret || authHeader !== `Bearer ${cronSecret}`)')).toBe(true)
   })
 
-  it.each(['betrieb', 'briefkasten', 'cleanup-reservations', 'verwaiste-bestellungen'])(
+  it.each(['betrieb', 'briefkasten', 'cleanup-reservations', 'mails', 'verwaiste-bestellungen'])(
     '%s prüft mit cronBerechtigt und vergleicht nicht selbst',
     (name) => {
       const quelle = routen.find((r) => r.name === name)?.quelle ?? ''
@@ -216,6 +216,7 @@ describe('/api/cron/cleanup-reservations', () => {
       '/api/cron/betrieb',
       '/api/cron/briefkasten',
       '/api/cron/cleanup-reservations',
+      '/api/cron/mails',
       '/api/cron/verwaiste-bestellungen',
     ])
   })

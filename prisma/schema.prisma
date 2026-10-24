@@ -1527,3 +1527,46 @@ model BetriebWarnung {
   seit       DateTime
   gemeldetAm DateTime
 }
+
+// Mail-Warteschlange und Protokoll (Register N26, Nachtlauf Nr. 158). Eine
+// Zeile je Mail: „Wichtig“ (vorrang 1) und „Kann warten“ (2) verschickt der
+// Worker (src/server/mail-warteschlange.ts), „Sofort“ (0) geht direkt über
+// sendRaw und steht hier nur als Protokoll. KEINE ADRESSE, KEIN NAME, KEIN
+// INHALT, KEIN TOKEN, KEIN CODE: Adresse und Inhalt lädt der Renderer je Art
+// frisch beim Versand; `bezug` trägt nur Kennungen (je Art mit Zod geprüft,
+// src/schemas/mail-auftrag.ts). `empfaengerHash` ist ein HMAC der Adresse
+// (empfaengerFingerabdruck, src/lib/mail-empfaenger.ts) nur für die
+// Support-Suche. `fehlerCode` ist der kurze Code von Resend, nie dessen Text.
+// Keine Fremdschlüssel: Ein gelöschter Bezug reißt das Protokoll nicht mit
+// und umgekehrt. Nach 90 Tagen löscht das Aufräumen die Zeile.
+model MailAuftrag {
+  id                 String    @id @default(cuid())
+  art                String
+  vorrang            Int
+  schluessel         String    @unique
+  bestellungId       String?
+  bezug              Json?
+  status             String    @default("offen")
+  versuche           Int       @default(0)
+  naechsterVersuchAm DateTime  @default(now())
+  belegtBis          DateTime?
+  erstelltAm         DateTime  @default(now())
+  gesendetAm         DateTime?
+  resendId           String?   @unique
+  fehlerCode         String?
+  zugestelltAm       DateTime?
+  bounceAm           DateTime?
+  beschwerdeAm       DateTime?
+  farmId             String?
+  ausloeser          String    @default("system")
+  nochmalVon         String?
+  empfaengerHash     String?
+
+  @@index([status, vorrang, naechsterVersuchAm])
+  @@index([art, erstelltAm])
+  @@index([erstelltAm])
+  @@index([bestellungId])
+  @@index([farmId, erstelltAm])
+  @@index([nochmalVon])
+  @@index([empfaengerHash, erstelltAm])
+}

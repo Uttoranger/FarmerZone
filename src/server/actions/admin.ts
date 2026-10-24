@@ -678,7 +678,7 @@ async function schreibeKundinnen(adressen: readonly string[], antwort: string): 
     const html = bescheidMailHtml(antwort, MARKE_TEAM)
     let gescheitert = 0
     for (const an of adressen) {
-      const ergebnis = await sendRaw(an, WUENSCHE_TEXT.bescheidTitel, html)
+      const ergebnis = await sendRaw(an, WUENSCHE_TEXT.bescheidTitel, html, { art: 'bescheid' })
       if (ergebnis.error) gescheitert += 1
     }
     if (gescheitert > 0) meldeBescheid(new Error('gescheitert'), gescheitert)

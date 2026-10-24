@@ -57,6 +57,7 @@ afterEach(async () => {
   await prisma.verification.deleteMany({ where: { identifier: { startsWith: 'int-' } } })
   await prisma.webhookEvent.deleteMany({ where: { stripeEventId: { startsWith: 'int-' } } })
   await prisma.betriebMessung.deleteMany({ where: { art: { startsWith: 'int-' } } })
+  await prisma.mailAuftrag.deleteMany({ where: { schluessel: { startsWith: 'int-' } } })
 })
 
 afterAll(async () => {
@@ -113,5 +114,33 @@ describe('Aufräumen im Ablauf cleanup-reservations', () => {
     expect((await prisma.betriebMessung.findMany({ where: { art: { startsWith: 'int-' } }, select: { art: true } })).map((m) => m.art)).toEqual(['int-jung'])
     expect(await zaehle()).toEqual(vorher)
     expect(await prisma.user.findUnique({ where: { id: konto.id }, select: { id: true } })).toEqual({ id: konto.id })
+  })
+
+  it('Mail-Warteschlange (N26, Nr. 158): nach 90 Tagen weg, mit 89 bleibt sie; abgelaufene Belegung wird wieder offen, laufende nicht', async () => {
+    const kennung = intKennung('mails')
+    const zeile = (was: string, erstelltAm: Date, teil: { status?: string; belegtBis?: Date } = {}) => ({
+      art: 'rundschreiben',
+      vorrang: 2,
+      schluessel: `${kennung}-${was}`,
+      bezug: { fadenId: kennung },
+      erstelltAm,
+      ...teil,
+    })
+    await prisma.mailAuftrag.createMany({
+      data: [
+        zeile('alt', vor(91 * TAG), { status: 'gesendet' }),
+        zeile('jung', vor(89 * TAG), { status: 'gesendet' }),
+        zeile('haengt', vor(TAG), { status: 'in_arbeit', belegtBis: vor(60_000) }),
+        zeile('laeuft', vor(TAG), { status: 'in_arbeit', belegtBis: new Date(Date.now() + 60_000) }),
+      ],
+    })
+    const { aufgeraeumt } = await rufeAblauf()
+    expect(aufgeraeumt).toMatchObject({ mailAuftraege: expect.any(Number), mailAuftraegeFrei: expect.any(Number) })
+    const stand = await prisma.mailAuftrag.findMany({ where: { schluessel: { startsWith: kennung } }, select: { schluessel: true, status: true, belegtBis: true }, orderBy: { schluessel: 'asc' } })
+    expect(stand).toEqual([
+      { schluessel: `${kennung}-haengt`, status: 'offen', belegtBis: null },
+      { schluessel: `${kennung}-jung`, status: 'gesendet', belegtBis: null },
+      { schluessel: `${kennung}-laeuft`, status: 'in_arbeit', belegtBis: expect.any(Date) },
+    ])
   })
 })

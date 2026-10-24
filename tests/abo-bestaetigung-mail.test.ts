@@ -175,6 +175,7 @@ describe('Transaktionsmails tragen keine Abmelde-Kopfzeilen', () => {
     const quelle = readFileSync(join(process.cwd(), 'src/lib/email.ts'), 'utf8')
     const stellen = [...quelle.matchAll(/listUnsubscribeKoepfe\(/g)].map((t) => quelle.lastIndexOf('export async function', t.index))
     expect(stellen).toHaveLength(1)
-    expect(quelle.slice(stellen[0], stellen[0] + 60)).toContain('export async function sendStatusUpdateEmail(')
+    // Gebaut wird die werbliche Mail in baueBeitragMail (Nr. 158) — für sendStatusUpdateEmail und den Renderer „beitrag“.
+    expect(quelle.slice(stellen[0], stellen[0] + 60)).toContain('export async function baueBeitragMail(')
   })
 })
