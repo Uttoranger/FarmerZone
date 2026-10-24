@@ -37,6 +37,7 @@ vi.mock('@vercel/blob', () => ({ list: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendBetriebWarnung: vi.fn() }))
 vi.mock('@/server/queries/postfach', () => ({ ladeBetreiberEmpfaenger: vi.fn(async () => []) }))
+vi.mock('@/server/queries/farm', () => ({ getOeffentlicheHoefe: vi.fn(async () => []) }))
 vi.mock('@/server/admin-wache', () => wache)
 vi.mock('@/lib/umgebung-server', async (importOriginal) => {
   const echt = await importOriginal<typeof import('@/lib/umgebung-server')>()
