@@ -57,6 +57,11 @@ const serverEnvSchema = z.object({
   // ist (x-vercel-signature, HMAC-SHA1 des Rohtexts). Fehlt es, antwortet die
   // Route 500 und speichert nichts (fail-closed).
   VERCEL_AUSGABEN_SECRET: optional(),
+  // OPTIONAL (Register N26, Nr. 160): Das Signatur-Geheimnis des Webhooks
+  // POST /api/webhooks/resend (Resend › Webhooks, Form `whsec_<Base64>`, Svix).
+  // Nur in Production. Fehlt es oder ist der Base64-Teil leer, antwortet die
+  // Route 503 und vermerkt nichts (fail-closed).
+  RESEND_WEBHOOK_SECRET: optional(),
   // OPTIONAL: Die öffentliche Adresse der App — in Produktion und, seit Nr. 43
   // (Register Z3), beim Branch staging (Testumgebung, nur https). Andere
   // Previews und lokal leiten ihre Adresse aus den Vercel-Systemvariablen

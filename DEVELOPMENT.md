@@ -5794,6 +5794,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Kontingent:** Kann warten bleibt liegen ab 70 % der Tagesgrenze oder 90 % des Monats; der Monat ist bis Nr. 162 noch der Kalendermonat (Stelle „Abrechnungszeitraum aus 162“).
 - **Keine Adresse in der Tabelle:** Der Renderer lädt Adresse und Inhalt frisch; gespeichert werden nur Kennungen und ein Fingerabdruck (`empfaengerFingerabdruck`, HMAC mit Zweck `mail-empfaenger:`) für die Support-Suche. Nach 90 Tagen löscht das Aufräumen die Zeile; es gibt auch hängengebliebene Aufträge wieder frei.
 
+## Zustellmeldungen von Resend (Register N26; Nr. 160, Lauf 24, 24.10.2026)
+
+- **Warum:** Bisher wusste die Plattform nur, dass Resend eine Mail angenommen hat. Ob sie ankam, abgelehnt wurde oder als Spam gemeldet, stand nur im Dashboard von Resend; ein Abo mit toter Adresse bekam weiter jeden Beitrag.
+- **Weg:** Resend meldet `email.delivered`, `email.bounced` und `email.complained` an `POST /api/webhooks/resend` (Svix-Signatur, ohne Paket nachgebaut). Vermerkt wird am Auftrag mit derselben `resendId` (`zugestelltAm`, `bounceAm`, `beschwerdeAm`); die `resendId` schreiben `protokolliereSofortMail` (direkte Mails) und der Worker.
+- **Abmelden:** Ein Bounce oder eine Spam-Meldung zu einem Auftrag mit Abo im Bezug (Beitrag) meldet das Abo ab, über `meldeAboAb` — dieselbe Funktion wie der Abmeldelink, darum auch WhatsApp aus. Mails zu Bestellungen werden nur vermerkt. Erst abmelden, dann vermerken: Scheitert das Abmelden, findet die Wiederholung von Resend die Spalte noch leer.
+- **Annahme:** `email.bounced` gilt als harter Bounce. Resend schickt das Ereignis bei einer endgültigen Ablehnung; `data.bounce.type` liest der Webhook nicht, weil die Freigabe nur `type`, `created_at` und `data.email_id` erlaubt.
+- **Für die Projektleitung:** Webhook bei Resend anlegen (`https://agrilo.at/api/webhooks/resend`, die drei Ereignisse) und `RESEND_WEBHOOK_SECRET` in Vercel nur für Production setzen (`docs/betrieb/stripe-live.md`, Anhang). Bis dahin antwortet der Endpunkt 503.
+
 ## Nützliche Befehle
 
 ```bash

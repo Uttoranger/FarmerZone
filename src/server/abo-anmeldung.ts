@@ -149,7 +149,21 @@ export function loeseOffeneAnfrageAuf(
 export async function meldeAboMitTokenAb(token: string): Promise<{ gueltig: boolean }> {
   const daten = verifyUnsubscribeToken(token)
   if (!daten) return { gueltig: false }
-  const wo = { customerEmail: daten.email.toLowerCase(), farmId: daten.farmId }
+  await meldeAboAb({ customerEmail: daten.email.toLowerCase(), farmId: daten.farmId })
+  return { gueltig: true }
+}
+
+/**
+ * Die eine Abmeldung eines Abos — für den Abmeldelink (`meldeAboMitTokenAb`)
+ * und, ohne Token, für eine Zustellmeldung von Resend (harter Bounce oder
+ * Spam gemeldet zu einem Beitrag, Register N26, Nr. 160, über die Kennung des
+ * Abos aus dem Bezug des Auftrags). Erst die offene Anfrage auflösen, dann
+ * E-Mail und WhatsApp aus, in einer Transaktion. Idempotent.
+ *
+ * Bewusst nur diese zwei Formen: Eine freie Bedingung könnte leer sein und
+ * träfe dann jedes Abo.
+ */
+export async function meldeAboAb(wo: { customerEmail: string; farmId: string } | { id: string }): Promise<void> {
   await prisma.$transaction([
     loeseOffeneAnfrageAuf(wo),
     prisma.customerFarmSubscription.updateMany({
@@ -157,7 +171,6 @@ export async function meldeAboMitTokenAb(token: string): Promise<{ gueltig: bool
       data: { optInEmail: false, optInWhatsApp: false },
     }),
   ])
-  return { gueltig: true }
 }
 
 export type AboBestaetigungsStand =
