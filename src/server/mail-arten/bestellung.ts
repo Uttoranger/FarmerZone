@@ -202,6 +202,16 @@ function alsMailBestellung(b: BestellungFuerMail): OrderForEmail {
   }
 }
 
+/**
+ * Die Bestellung in der Form der Mail-Vorlagen, frisch geladen — für den
+ * Bar-Bestätigungslink beim Nochmal-Schicken und in der Vorschau (Nr. 167),
+ * dieselbe Abfrage wie die Renderer.
+ */
+export async function ladeBestellungFuerMail(orderId: string): Promise<OrderForEmail | null> {
+  const b = await ladeBestellung(orderId)
+  return b ? alsMailBestellung(b) : null
+}
+
 const GELOESCHT: Verworfen = { verworfen: 'bestellung_fehlt' }
 
 /** Ein Renderer, der nur die Bestellung braucht. */

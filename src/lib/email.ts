@@ -121,7 +121,12 @@ export type VersandErgebnis = { id?: string; error?: string; gesperrt?: true }
  * gehört, und zusätzliche Kopfzeilen — heute nur die Abmelde-Kopfzeilen
  * werblicher Mails (List-Unsubscribe, RFC 8058, Nr. 47).
  */
-export type MailOptionen = { art: MailArt; bestellungId?: string; headers?: Record<string, string> }
+/**
+ * `farmId` und `nochmalVon` nur für das Protokoll (Nr. 167): der Hof für den
+ * Filter in „Alle Mails“, die ursprüngliche Mail beim Nochmal-Schicken durch
+ * den Support (dann steht die Zeile als „vom Support“).
+ */
+export type MailOptionen = { art: MailArt; bestellungId?: string; farmId?: string; nochmalVon?: string; headers?: Record<string, string> }
 
 /**
  * Zählt eine verschickte Mail für Admin › Betrieb (Register N18, Nr. 103) —
@@ -193,6 +198,8 @@ async function protokolliere(
     await protokolliereSofortMail({
       art: optionen.art,
       bestellungId: optionen.bestellungId,
+      farmId: optionen.farmId,
+      nochmalVon: optionen.nochmalVon,
       empfaengerHash: empfaengerFingerabdruck(to),
       ...ergebnis,
     })
@@ -765,11 +772,15 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
   return { an: order.customerEmail, betreff: `Deine Bestellung bei ${order.farm.name} – Abholung ${formatPickupDate(order.pickupDate)}`, html }
 }
 
-/** Vor-Ort-Zahlung: Bestätigungslink → Kunde */
-export async function sendOnsiteConfirmation(
+/**
+ * Die Mail mit dem Bestätigungslink — nur gebaut. `sendOnsiteConfirmation`
+ * verschickt sie; die Vorschau in Admin › Betrieb (Nr. 167) baut sie mit
+ * einem Platzhalter statt Token und macht den Link unkenntlich.
+ */
+export async function onsiteConfirmationInhalt(
   order: OrderForEmail,
   confirmationToken: string
-): Promise<void> {
+): Promise<StapelMail> {
   // Zur Seite mit dem Knopf (H3) — der Link selbst bestätigt nichts, damit
   // Link-Scanner der Mailprogramme keine Bestellung auslösen.
   const confirmationUrl = `${APP_URL}${barBestaetigungsPfad(order.farm.slug, confirmationToken)}`
@@ -802,12 +813,26 @@ export async function sendOnsiteConfirmation(
     bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
   }))
 
-  await send(
-    order.customerEmail,
-    `Bitte bestätige deine Bestellung bei ${order.farm.name}`,
-    html,
-    { art: 'bar-bestaetigungslink', bestellungId: order.id }
-  )
+  return { an: order.customerEmail, betreff: `Bitte bestätige deine Bestellung bei ${order.farm.name}`, html }
+}
+
+/**
+ * Vor-Ort-Zahlung: Bestätigungslink → Kunde (Sofort). `protokoll.nochmalVon`
+ * nur beim Nochmal-Schicken durch den Support (Nr. 167) — die Zeile steht dann
+ * als „vom Support“ mit Verweis auf die ursprüngliche Mail.
+ */
+export async function sendOnsiteConfirmation(
+  order: OrderForEmail,
+  confirmationToken: string,
+  protokoll: { nochmalVon?: string } = {}
+): Promise<void> {
+  const mail = await onsiteConfirmationInhalt(order, confirmationToken)
+  await send(mail.an, mail.betreff, mail.html, {
+    art: 'bar-bestaetigungslink',
+    bestellungId: order.id,
+    farmId: order.farm.id,
+    ...(protokoll.nochmalVon ? { nochmalVon: protokoll.nochmalVon } : {}),
+  })
 }
 
 /** Online-Zahlung → Bauer */

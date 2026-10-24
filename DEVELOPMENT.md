@@ -5822,6 +5822,15 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **„n per E-Mail":** zählt die gesendeten Aufträge eines Beitrags (`gesendeteBeitragsMails`, Mein Hof, Heute, Teilen-Bild); `emailRecipientCount` ist die Zahl der Aufträge und hält die 7-Tage-Sperre, sobald der Beitrag Aufträge hat. Beiträge von vor der Warteschlange behalten ihre alte Zahl.
 - **Was blieb direkt:** die Warn-Mail des Betriebs (N18-Ergänzung) — deshalb gibt es `sendeAnListe` noch, mit ihr als einzigem Aufrufer.
 
+## Mails nochmal schicken für den Support (Register N27; Nr. 167, Lauf 24, 24.10.2026)
+
+- **Warum:** Der häufigste Anruf ist „Ich habe keine Mail bekommen“. Seit Nr. 161 sieht der Support die Mails einer Bestellung; jetzt sieht er alle Mails der letzten 90 Tage (Admin › Betrieb › E-Mails › Alle Mails) und kann eine Mail zu einer Bestellung oder an einen Hof nochmal schicken — immer an die heute hinterlegte Adresse, mit dem heutigen Stand, höchstens 3-mal je Mail in 24 Stunden.
+- **Kein neues Schema:** Der Vermerk steht in `MailAuftrag` (`ausloeser`, `nochmalVon` aus Nr. 158); eine Tabelle für Admin-Protokolle gibt es nicht. Jedes Nochmal ist eine neue Zeile, die ursprüngliche bleibt unverändert.
+- **Was nie geht:** Codes und Links (die Person fordert sie selbst neu an; ein Code steht ohnehin nirgends, E7), Mails an den Betreiber, Beiträge, Rundschreiben und Bescheide (Einwilligung, S11). „Erstattung offen“ geht an den Betreiber und steht deshalb in `NOCHMAL_NIE`, obwohl die Freigabe bei der Kundin „Erstattung“ nannte — eine Erstattungs-Mail an die Kundin ist die Storno-Mail.
+- **Bar-Bestätigungslink:** Der Token steht nur als Hash an der Bestellung (S17), ein Renderer kann den Link nie neu bauen. Nochmal heißt deshalb: neuer Token, bedingter Wechsel des Hashs (der alte Link gilt nicht mehr), Versand direkt. Die Frist hängt an `createdAt` und bleibt.
+- **Stände:** Auch „gesperrt“ und „ohne Schlüssel“ lassen sich nochmal schicken — in der Vorschau steht jede Mail so, und die Abnahme braucht den Knopf; die neue Zeile entscheidet dort wieder dasselbe. Nur eine Mail, die noch unterwegs ist, hat stattdessen „Jetzt schicken“.
+- **Kann warten nur als Summe:** Eine Liste aller Beitragsmails wäre eine Liste der Abonnentinnen eines Hofs. Einzeln erscheinen sie nur in der Suche per Adresse, ohne Knopf.
+
 ## Nützliche Befehle
 
 ```bash

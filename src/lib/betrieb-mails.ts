@@ -45,12 +45,15 @@ import {
   type WarnStand,
 } from '@/lib/betrieb'
 import { MONAT_KURZ, formatDezimal, formatTagKurz, formatZahl } from '@/lib/format'
-import { uhrzeitInWien } from '@/lib/fristen'
+import { uhrzeitInWien, zeitpunktFuerMail } from '@/lib/fristen'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { bestellMarke, zahlartText } from '@/lib/hof-bestellungen'
 import { MARKE } from '@/lib/marke'
 import type { MarkeArt } from '@/lib/marke-art'
-import { MAIL_ARTEN, VORRANG, type MailArt } from '@/schemas/mail-auftrag'
+import { barLinkErneutMoeglich, type BarBestellung } from '@/lib/bar-bestaetigung'
+import { fristVon, istVerwaist } from '@/lib/fristen'
+import { MAIL_ARTEN, MAIL_WEG, VORRANG, type MailArt } from '@/schemas/mail-auftrag'
+import type { AlleMailsFilter, MailStandFilter, MailWegFilter, MailZeitraum } from '@/schemas/betrieb-mails'
 
 // ─── Namen ───────────────────────────────────────────────────────────────────
 
@@ -368,7 +371,7 @@ export const MAIL_TEXT = {
   brauchtTitel: 'Braucht dich',
   brauchtLeer: 'Alles hinaus – keine Mail ist gescheitert oder hängt.',
   brauchtLeerSatz: 'Gescheiterte und hängende Mails erscheinen hier, sobald es welche gibt.',
-  brauchtFuss: 'Jetzt schicken und Verwerfen fragen nach deinem Passkey. Verworfene Mails bleiben im Protokoll.',
+  brauchtFuss: 'Jetzt schicken und Verwerfen fragen nach deinem Passkey. Verworfene Mails stehen weiter in „Alle Mails“ und lassen sich von dort schicken, wenn die Art es erlaubt.',
   jetztSchicken: 'Jetzt schicken',
   verwerfen: 'Verwerfen',
   alleJetztSchicken: (n: number): string => `Alle ${formatZahl(n)} jetzt schicken`,
@@ -686,7 +689,14 @@ export type BrauchtDichZeile = {
 }
 
 /** Alle Aufträge einer Art auf einmal — nur für Arten, die die Liste kennt (die Action nimmt nur sie an). */
-export type BrauchtDichGruppe = { art: MailArt; name: string; jetztSchicken: number; verwerfen: number }
+export type BrauchtDichGruppe = {
+  art: MailArt
+  name: string
+  jetztSchicken: number
+  verwerfen: number
+  /** Nr. 167: gescheiterte Mails dieser Art, die „Alle nochmal schicken“ nimmt (Weg Wichtig, Art aus NOCHMAL_ERLAUBT). */
+  nochmal: number
+}
 
 /**
  * „Braucht dich“: gescheiterte, sich wiederholende und hängende Aufträge,
@@ -729,15 +739,20 @@ export function brauchtDich(probleme: readonly ProblemAuftrag[], jetzt: Date): {
       }
     })
   const gruppen: BrauchtDichGruppe[] = []
+  const nochmalJe = (id: string): number => {
+    const p = probleme.find((x) => x.id === id)
+    return p && p.status === 'gescheitert' && p.vorrang === VORRANG.wichtig && nochmalErlaubt(p.art) ? 1 : 0
+  }
   for (const z of zeilen) {
     if (!istMailArt(z.art)) continue
     const g = gruppen.find((x) => x.art === z.art)
     if (g) {
       g.jetztSchicken += z.jetztSchicken ? 1 : 0
       g.verwerfen += z.verwerfen ? 1 : 0
-    } else gruppen.push({ art: z.art, name: z.name, jetztSchicken: z.jetztSchicken ? 1 : 0, verwerfen: z.verwerfen ? 1 : 0 })
+      g.nochmal += nochmalJe(z.id)
+    } else gruppen.push({ art: z.art, name: z.name, jetztSchicken: z.jetztSchicken ? 1 : 0, verwerfen: z.verwerfen ? 1 : 0, nochmal: nochmalJe(z.id) })
   }
-  return { zeilen, gruppen: gruppen.filter((g) => g.jetztSchicken > 1 || g.verwerfen > 1) }
+  return { zeilen, gruppen: gruppen.filter((g) => g.jetztSchicken > 1 || g.verwerfen > 1 || g.nochmal > 1) }
 }
 
 // ─── Je Art ──────────────────────────────────────────────────────────────────
@@ -878,6 +893,9 @@ export type SuchMail = {
   zugestelltAm: Date | null
   bounceAm: Date | null
   beschwerdeAm: Date | null
+  /** Nr. 167: `support`, wenn der Support sie nochmal geschickt hat, und die ursprüngliche Mail. */
+  ausloeser?: string
+  nochmalVon?: string | null
 }
 
 export type SuchBestellung = {
@@ -891,8 +909,10 @@ export type SuchBestellung = {
   customerEmail: string
 }
 
-export type TrefferZeile = { name: string; weg: string; stand: string; marke: { text: string; art: MarkeArt } | null }
-export type TrefferGruppe = { kopf: string; unterzeile: string | null; an: string | null; zeilen: TrefferZeile[]; leer: string | null }
+/** `id` führt zum Detail (Nr. 167); `hinweis` steht unter der Zeile (Codes: der Support schickt sie nie). */
+export type TrefferZeile = { name: string; weg: string; stand: string; marke: { text: string; art: MarkeArt } | null; id?: string; hinweis?: string }
+/** `nummer`: die Bestellnummer der Gruppe (Nr. 167: „Alle Mails zu dieser Bestellung“). */
+export type TrefferGruppe = { kopf: string; unterzeile: string | null; an: string | null; zeilen: TrefferZeile[]; leer: string | null; nummer?: string }
 export type SuchErgebnis =
   | { art: 'leer' }
   | { art: 'hinweis'; satz: string }
@@ -900,8 +920,9 @@ export type SuchErgebnis =
 
 /** Der Stand einer Mail in der Suche: wann, und als Marke, was Resend gemeldet hat. */
 function trefferZeile(m: SuchMail, jetzt: Date): TrefferZeile {
-  const name = artName(m.art)
-  const weg = wegName(m.vorrang)
+  const name = m.nochmalVon ? ALLE_MAILS_TEXT.nochmalName(artName(m.art)) : artName(m.art)
+  const weg = m.ausloeser === 'support' ? `${wegName(m.vorrang)} · ${ALLE_MAILS_TEXT.vomSupport}` : wegName(m.vorrang)
+  const dazu = { id: m.id, ...(istCodeOderLink(m.art) ? { hinweis: ALLE_MAILS_TEXT.codeNie } : {}) }
   if (m.status === 'gesendet' && m.gesendetAm) {
     const marke: TrefferZeile['marke'] =
       m.beschwerdeAm !== null
@@ -911,7 +932,7 @@ function trefferZeile(m: SuchMail, jetzt: Date): TrefferZeile {
           : m.zugestelltAm !== null
             ? { text: 'zugestellt', art: 'laeuft' }
             : null
-    return { name, weg, stand: `gesendet ${zeitText(m.gesendetAm, jetzt)}`, marke }
+    return { name, weg, stand: `gesendet ${zeitText(m.gesendetAm, jetzt)}`, marke, ...dazu }
   }
   const stand: Record<string, string> = {
     offen: 'wartet',
@@ -926,6 +947,7 @@ function trefferZeile(m: SuchMail, jetzt: Date): TrefferZeile {
     weg,
     stand: `${stand[m.status] ?? m.status} · ${zeitText(m.erstelltAm, jetzt)}`,
     marke: m.status === 'gescheitert' ? { text: MAIL_TEXT.aufgegeben, art: 'tun' } : null,
+    ...dazu,
   }
 }
 
@@ -975,6 +997,7 @@ export function suchErgebnis(
       an: `an ${maskiereAdresse(e.adresse ?? b.customerEmail)} · ${vonKundin ? MAIL_TEXT.ausDerBestellung : MAIL_TEXT.ausDemHof}`,
       zeilen,
       leer: zeilen.length === 0 ? MAIL_TEXT.keineMail : null,
+      nummer: b.orderNumber,
     })
   }
   const ohne = ordne(e.mails.filter((m) => m.bestellungId === null || !e.bestellungen.some((b) => b.id === m.bestellungId)))
@@ -988,4 +1011,577 @@ export function suchErgebnis(
     })
   }
   return { art: 'treffer', gruppen, zugestellt: e.mails.some((m) => m.zugestelltAm !== null) }
+}
+
+// ─── Alle Mails und Nochmal schicken (Register N27, Nr. 167) ─────────────────
+
+/**
+ * Die Arten, die der Support nochmal schicken darf (N27): Mails zu
+ * Bestellungen an die Kundin, Mails an Höfe und der Bar-Bestätigungslink
+ * (Sonderfall: neuer Token, Weg Sofort). Jede Art steht in GENAU einer der
+ * beiden Listen — tests/mails-nochmal-wache.test.ts wacht, auch über neue
+ * Arten. „Barbestellung bestätigt“ an die Kundin ist die Bestellbestätigung
+ * (dieselbe Art wie bei Online-Zahlung).
+ */
+export const NOCHMAL_ERLAUBT = [
+  // Kundin
+  'bestellung-bestaetigung',
+  'abholbereit',
+  'nicht-abholbereit',
+  'storniert',
+  'artikel-fehlt',
+  'verfallen',
+  'zahlung-zu-spaet',
+  // Hof
+  'bestellung-bezahlt-hof',
+  'bar-bestaetigt-hof',
+  'freischaltung',
+  // Sonderfall: neuer Token, der alte Link gilt dann nicht mehr (S17)
+  'bar-bestaetigungslink',
+] as const satisfies readonly MailArt[]
+
+/**
+ * Nie nochmal: Codes und Links (die Person fordert sie selbst neu an; E7 —
+ * ein Code steht nirgends, er ließe sich gar nicht nochmal schicken), Mails an
+ * den Betreiber und Admin-Mails, Beiträge, Rundschreiben und Bescheide
+ * (Einwilligung, S11). „Erstattung offen“ geht an den Betreiber, nicht an die
+ * Kundin — darum hier, auch wenn sie eine Bestellung kennt.
+ */
+export const NOCHMAL_NIE = [
+  'anmeldecode',
+  'bestellcode',
+  'login-link',
+  'passwort-link',
+  'email-bestaetigung',
+  'abo-bestaetigung',
+  'registrierungs-hinweis',
+  'admin-sicherheit',
+  'neue-anmeldung',
+  'zu-viele-versuche',
+  'betrieb-warnung',
+  'betreiber-bestaetigung',
+  'testmail',
+  'betreiber-testmail',
+  'erstattung-offen',
+  'neuer-hof',
+  'meldung',
+  'wochenbericht',
+  'postfach',
+  'antwort-an-team',
+  'beitrag',
+  'rundschreiben',
+  'bescheid',
+] as const satisfies readonly MailArt[]
+
+export type NochmalArt = (typeof NOCHMAL_ERLAUBT)[number]
+
+/** Höchstens so oft je ursprünglicher Mail in 24 Stunden (gezählt über `nochmalVon`). */
+export const NOCHMAL_JE_TAG = 3
+/** „Alle nochmal schicken“ nimmt höchstens so viele je Klick. */
+export const NOCHMAL_AUF_EINMAL = 100
+/**
+ * Nochmal geht jede Mail, die nicht mehr unterwegs ist — eine wartende schickt
+ * „Jetzt schicken“. Auch „gesperrt“ und „ohne Schlüssel“: In der Vorschau
+ * (ohne Schlüssel für Resend) steht jede Mail so, und die Abnahme braucht
+ * den Knopf; die neue Zeile entscheidet dort wieder Post-Sperre bzw. Schlüssel.
+ */
+export const NOCHMAL_STAENDE = ['gesendet', 'gescheitert', 'gesperrt', 'ohne_schluessel', 'verworfen'] as const
+
+export function nochmalErlaubt(art: string): art is NochmalArt {
+  return (NOCHMAL_ERLAUBT as readonly string[]).includes(art)
+}
+
+/** Codes und Links: in der Liste mit dem Satz „Codes schickt der Support nie …“. */
+const CODE_ODER_LINK: readonly string[] = ['anmeldecode', 'bestellcode', 'login-link', 'passwort-link', 'email-bestaetigung', 'abo-bestaetigung']
+
+export function istCodeOderLink(art: string): boolean {
+  return CODE_ODER_LINK.includes(art)
+}
+
+export const ADMIN_BETRIEB_ALLE_MAILS_HREF = `${ADMIN_BETRIEB_MAILS_HREF}&liste=alle`
+
+/** Alle Sätze von „Alle Mails“ und „Nochmal schicken“ — EINE Quelle (Mockups admin-betrieb-mails-alle, mobil-…-alle, mobil-…-nochmal). */
+export const ALLE_MAILS_TEXT = {
+  titel: 'Alle Mails',
+  satz: 'Für den Support: suchen, nachsehen, ob eine Mail ankam, und wenn nötig nochmal schicken.',
+  satzKurz: 'Suchen, nachsehen, nochmal schicken',
+  pfad: 'Pfad',
+  pfadBetrieb: 'Betrieb',
+  pfadMails: 'E-Mails',
+  zurueck: 'E-Mails',
+  link: `Alle Mails · ${MAIL_PROTOKOLL_AUFBEWAHREN_TAGE} Tage`,
+  linkKurz: 'Alle Mails',
+  zuDieserBestellung: 'Alle Mails zu dieser Bestellung',
+  // Filter
+  filter: 'Filter',
+  filterAnwenden: 'Filter anwenden',
+  filterZuruecksetzen: 'Zurücksetzen',
+  filterArt: 'Art',
+  filterWeg: 'Weg',
+  filterStand: 'Stand',
+  filterZeitraum: 'Zeitraum',
+  filterHof: 'Hof',
+  alle: 'alle',
+  nurSupport: 'nur vom Support',
+  treffer: (n: number): string => `${formatZahl(n)} ${n === 1 ? 'Mail' : 'Mails'}`,
+  trefferZu: (was: string): string => `Treffer zu ${was}`,
+  trefferSuche: (mails: number, bestellungen: number): string =>
+    `${formatZahl(mails)} ${mails === 1 ? 'Mail' : 'Mails'} · ${formatZahl(bestellungen)} ${bestellungen === 1 ? 'Bestellung' : 'Bestellungen'}`,
+  // Liste
+  listeTitel: 'Einzelne Mails',
+  listeZusatz: 'neueste zuerst · Sofort und Wichtig',
+  listeCaption: 'Alle Mails der Auswahl, neueste zuerst',
+  spalten: { zeit: 'Zeit', art: 'Art', weg: 'Weg', bezug: 'Bestellung bzw. Hof', stand: 'Stand', versuche: 'Versuche', support: 'Support' },
+  weiter: 'Ältere Mails',
+  vonVorn: 'Zu den neuesten',
+  leer: 'Keine Mail passt zu diesem Filter.',
+  leerSatz: 'Ändere den Filter oder setze ihn zurück.',
+  leerKannWarten: 'Beiträge, Rundschreiben und Bescheide stehen nur als Summe unten – einzeln nie.',
+  summenTitel: 'Beiträge, Rundschreiben und Bescheide',
+  summenZusatz: 'nur als Summe – nie mit Empfänger',
+  summenLeer: 'In diesem Zeitraum ging kein Beitrag, kein Rundschreiben und kein Bescheid hinaus.',
+  vomSupport: 'vom Support',
+  nochmalName: (name: string): string => `Nochmal: ${name}`,
+  codeNie: 'Codes schickt der Support nie – die Person fordert einen neuen an',
+  keinTrefferAnruf: `Kein Treffer? „${MAIL_TEXT.keinTreffer}“ – dann nach der Bestellnummer auf dem Beleg fragen.`,
+  // Detail
+  detail: 'Mail im Detail',
+  schliessen: 'Detail schließen',
+  an: 'An',
+  bestellung: 'Bestellung',
+  hof: 'Hof',
+  nochmal: 'Nochmal',
+  nochNie: 'noch nie',
+  nochmalAnzahl: (n: number): string => (n === 1 ? 'einmal' : `${formatZahl(n)}-mal`),
+  adresseUnbekannt: 'nicht gespeichert – nur über die Suche per Adresse zu finden',
+  adresseFehlt: 'nicht mehr hinterlegt',
+  verlauf: 'Verlauf',
+  zugestelltHinweis: `${MAIL_TEXT.zugestelltHinweis} Erst dann nochmal schicken.`,
+  abgelehntHinweis: 'Diese Adresse hat die Mail abgelehnt. Nochmal schicken hilft meist nicht – frag nach der richtigen Adresse.',
+  detailFehlt: 'Diese Mail steht nicht mehr im Protokoll.',
+  // Vorschau
+  vorschauTitelKurz: 'Vorschau',
+  vorschauZusatz: 'so ginge sie heute hinaus · Links unkenntlich',
+  vorschauKnopf: 'Vorschau zeigen',
+  vorschauTitel: (name: string): string => `Vorschau der Mail ${name} mit heutigem Stand, Links unkenntlich`,
+  vorschauVerworfen: 'So ginge die Mail heute nicht hinaus – sie passt nicht mehr zum Stand.',
+  vorschauNie: 'Für diese Art gibt es keine Vorschau.',
+  // Nochmal schicken
+  nochmalKnopf: 'Nochmal schicken',
+  alleNochmal: (n: number): string => `Alle ${formatZahl(n)} nochmal schicken`,
+  heute: (n: number): string => `Heute ${formatZahl(n)} von ${formatZahl(NOCHMAL_JE_TAG)}`,
+  heuteKnopf: (n: number): string => `Heute ${formatZahl(n)} von ${formatZahl(NOCHMAL_JE_TAG)} · fragt nach deinem Passkey`,
+  grenze: `Diese Mail wurde heute schon ${formatZahl(NOCHMAL_JE_TAG)}-mal nochmal geschickt.`,
+  nieCode: 'Codes und Links schickt der Support nie – die Person fordert sie selbst neu an.',
+  nieEinwilligung: 'Beiträge, Rundschreiben und Bescheide gehen nie ein zweites Mal hinaus – sie brauchen die Einwilligung.',
+  nieSonst: 'Diese Mail schickt der Support nie nochmal.',
+  standPasstNicht: 'Diese Mail ist noch unterwegs – eine wartende schickt „Jetzt schicken“.',
+  dialogTitel: 'Mail nochmal schicken?',
+  dialogTitelLink: 'Bestätigungslink nochmal schicken?',
+  dialogAn: (an: string, quelle: string): string => `Geht an ${an} (${quelle}).`,
+  dialogAnLink: (an: string, quelle: string): string => `Neuer Link an ${an} (${quelle}).`,
+  dialogAlterLink: 'Der alte Link in der ersten Mail gilt dann nicht mehr.',
+  dialogFrist: (frist: string): string => `Die Frist bleibt ${frist}.`,
+  dialogStand: 'Mit dem heutigen Stand der Bestellung.',
+  dialogVermerk: 'Im Protokoll steht die Mail als „vom Support“.',
+  dialogSpam: 'Laut Resend angekommen – hast du schon nach dem Spam-Ordner gefragt?',
+  dialogKnopf: 'Mit Passkey bestätigen und schicken',
+  unterwegs: 'Ist unterwegs – in 1–2 Minuten siehst du hier, ob sie angekommen ist.',
+  unterwegsViele: (n: number): string => `${formatZahl(n)} Mails sind unterwegs – in 1–2 Minuten siehst du hier, ob sie angekommen sind.`,
+  nichtsNochmal: 'Keine dieser Mails lässt sich gerade nochmal schicken.',
+  regel:
+    'Nochmal schicken geht für Mails zu Bestellungen und an Höfe, immer an die hinterlegte Adresse und mit dem heutigen Stand – höchstens 3-mal je Mail am Tag. Codes und Passwort-Links fordert die Person selbst neu an; Beiträge und Rundschreiben gehen nie ein zweites Mal hinaus. Eine andere Adresse gibt es hier bewusst nicht.',
+} as const
+
+/** Warum eine Art nie nochmal geht — ein Satz je Gruppe. */
+export function nochmalNieGrund(art: string): string {
+  if (istCodeOderLink(art)) return ALLE_MAILS_TEXT.nieCode
+  if (istMailArt(art) && MAIL_WEG[art] === 'kannWarten') return ALLE_MAILS_TEXT.nieEinwilligung
+  return ALLE_MAILS_TEXT.nieSonst
+}
+
+/** Was `passtNochmal` von der Bestellung braucht — der heutige Stand, frisch geladen. */
+export type NochmalBestellung = BarBestellung & { paymentStatus: string; farm: { archivedAt: Date | null } }
+export type NochmalHof = { approvedAt: Date | null; archivedAt: Date | null }
+export type NochmalStand = { bestellung: NochmalBestellung | null; hof: NochmalHof | null }
+export type NochmalPruefung = { ok: true } | { ok: false; grund: string }
+
+const NICHT_MEHR = (status: string): string => `Passt nicht mehr: Die Bestellung steht jetzt auf „${bestellMarke(status).text}“.`
+
+/**
+ * Ob eine Mail heute noch passt (N27) — EINE reine Entscheidung für den
+ * Knopf (aus, mit Grund) und die Action (abgelehnt). Fehlt der Bezug (Bestellung
+ * oder Hof gelöscht) oder passt die Mail nicht mehr zum Stand („abholbereit“
+ * für eine stornierte Bestellung), geht sie nicht. Der Bar-Bestätigungslink
+ * nur, solange die Barbestellung unbestätigt und in der Frist ist (dieselbe
+ * Regel wie „Erneut senden“ auf der Bestätigungsseite, `barLinkErneutMoeglich`).
+ */
+export function passtNochmal(art: string, stand: NochmalStand, jetzt: Date): NochmalPruefung {
+  if (!nochmalErlaubt(art)) return { ok: false, grund: nochmalNieGrund(art) }
+  if (art === 'freischaltung') {
+    if (!stand.hof) return { ok: false, grund: 'Den Hof gibt es nicht mehr.' }
+    if (stand.hof.archivedAt) return { ok: false, grund: 'Der Hof ist stillgelegt.' }
+    return stand.hof.approvedAt ? { ok: true } : { ok: false, grund: 'Der Hof ist nicht mehr freigeschaltet.' }
+  }
+  const b = stand.bestellung
+  if (!b) return { ok: false, grund: 'Die Bestellung gibt es nicht mehr.' }
+  const s = b.status
+  const nein = { ok: false, grund: NICHT_MEHR(s) } as const
+  switch (art) {
+    case 'bar-bestaetigungslink':
+      if (barLinkErneutMoeglich(b, jetzt)) return { ok: true }
+      if (s === 'PENDING_CONFIRMATION' && istVerwaist(b, jetzt)) return { ok: false, grund: 'Die Frist zum Bestätigen ist vorbei.' }
+      if (s === 'PENDING_CONFIRMATION' && b.farm.archivedAt) return { ok: false, grund: 'Der Hof ist stillgelegt.' }
+      return { ok: false, grund: 'Die Bestellung ist schon bestätigt oder storniert – der Link passt nicht mehr.' }
+    case 'bestellung-bestaetigung':
+      return ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY', 'PICKED_UP'].includes(s) ? { ok: true } : nein
+    case 'bestellung-bezahlt-hof':
+      return b.paymentMethod === 'ONLINE' && ['PAID', 'IN_PREPARATION', 'READY', 'PICKED_UP'].includes(s) ? { ok: true } : nein
+    case 'bar-bestaetigt-hof':
+      return b.paymentMethod !== 'ONLINE' && ['CONFIRMED', 'IN_PREPARATION', 'READY', 'PICKED_UP'].includes(s) ? { ok: true } : nein
+    case 'abholbereit':
+      return s === 'READY' ? { ok: true } : nein
+    case 'nicht-abholbereit':
+      return ['PAID', 'CONFIRMED', 'IN_PREPARATION'].includes(s) ? { ok: true } : nein
+    case 'artikel-fehlt':
+      return s === 'CANCELLED' ? nein : { ok: true }
+    case 'storniert':
+    case 'verfallen':
+    case 'zahlung-zu-spaet':
+      return s === 'CANCELLED' ? { ok: true } : nein
+  }
+}
+
+/** Woher die Adresse einer Art kommt — frisch geladen, nie aus dem Protokoll. `null`: nirgends gespeichert. */
+export function adresseQuelle(art: string): 'bestellung' | 'hof' | 'hofInhaber' | null {
+  if (art === 'bestellung-bezahlt-hof' || art === 'bar-bestaetigt-hof') return 'hof'
+  if (art === 'freischaltung') return 'hofInhaber'
+  if (nochmalErlaubt(art)) return 'bestellung'
+  return null
+}
+
+const LINK_PLATZHALTER = '[Link]'
+
+/** Ein Link, der eine Signatur, einen Token oder eine Kennung tragen kann: mit Abfrage/Anker oder einem langen Stück im Pfad. */
+function traegtGeheimnis(url: string): boolean {
+  const ohneHost = url.replace(/^[a-z]+:\/\/[^/]*/i, '')
+  return /[?#]/.test(url) || /[A-Za-z0-9_-]{16,}/.test(ohneHost) || /^mailto:/i.test(url)
+}
+
+const ADRESSE_IM_TEXT = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
+const URL_IM_TEXT = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi
+
+/**
+ * Macht eine Mail für die Vorschau unschädlich (N27): Jeder Link verliert sein
+ * Ziel — einer, der eine Signatur, einen Token oder eine Kennung tragen kann
+ * (Abfrage, langer Pfad, mailto), wird zu „[Link]“, die anderen bleiben nur
+ * als Text. Adressen im Fließtext und in Links erscheinen nur gekürzt
+ * (`maskiereAdresse`), Links im Fließtext mit Geheimnis ebenfalls als „[Link]“.
+ * Rein; die Vorschau wird nicht gespeichert und nicht protokolliert.
+ */
+export function entschaerfeLinks(html: string): string {
+  const ohneAnker = html.replace(/<a\b([^>]*)>([\s\S]*?)<\/a\s*>/gi, (_ganz, attribute: string, inhalt: string) => {
+    const ziel = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attribute)
+    const url = ziel ? (ziel[1] ?? ziel[2] ?? ziel[3] ?? '') : ''
+    const text = inhalt.replace(/<[^>]*>/g, '').trim()
+    if (url === '' && text === '') return ''
+    if (traegtGeheimnis(url) || URL_IM_TEXT.test(text) || text.includes('@')) {
+      URL_IM_TEXT.lastIndex = 0
+      return `<span>${LINK_PLATZHALTER}</span>`
+    }
+    URL_IM_TEXT.lastIndex = 0
+    return `<span>${inhalt}</span>`
+  })
+  // Nur Text zwischen den Tags: Attribute (Bilder, Stile) bleiben unberührt.
+  return ohneAnker
+    .split(/(<[^>]*>)/)
+    .map((teil) =>
+      teil.startsWith('<')
+        ? teil
+        : teil.replace(URL_IM_TEXT, (url) => (traegtGeheimnis(url) ? LINK_PLATZHALTER : url)).replace(ADRESSE_IM_TEXT, (a) => maskiereAdresse(a))
+    )
+    .join('')
+}
+
+/** Eine Zeile aus MailAuftrag für „Alle Mails“ und das Detail — ohne Bezug, ohne Fingerabdruck. */
+export type AlleMailRoh = {
+  id: string
+  art: string
+  vorrang: number
+  status: string
+  versuche: number
+  fehlerCode: string | null
+  erstelltAm: Date
+  gesendetAm: Date | null
+  naechsterVersuchAm: Date
+  zugestelltAm: Date | null
+  bounceAm: Date | null
+  beschwerdeAm: Date | null
+  bestellungId: string | null
+  farmId: string | null
+  ausloeser: string
+  nochmalVon: string | null
+}
+
+export type StandWort = { wort: string; art: Extract<MarkeArt, 'tun' | 'laeuft'> }
+
+/** Der Stand in einem Wort (Filter-Wörter): Spam gemeldet, abgelehnt, zugestellt, gesendet, offen, gescheitert, gesperrt, verworfen. */
+export function standWort(m: Pick<AlleMailRoh, 'status' | 'zugestelltAm' | 'bounceAm' | 'beschwerdeAm'>): StandWort {
+  if (m.beschwerdeAm !== null) return { wort: 'Spam gemeldet', art: 'tun' }
+  if (m.bounceAm !== null) return { wort: 'abgelehnt', art: 'tun' }
+  if (m.zugestelltAm !== null) return { wort: 'zugestellt', art: 'laeuft' }
+  const w: Record<string, StandWort> = {
+    gesendet: { wort: 'gesendet', art: 'laeuft' },
+    offen: { wort: 'offen', art: 'laeuft' },
+    in_arbeit: { wort: 'offen', art: 'laeuft' },
+    gescheitert: { wort: 'gescheitert', art: 'tun' },
+    gesperrt: { wort: 'gesperrt', art: 'laeuft' },
+    ohne_schluessel: { wort: 'gesperrt', art: 'laeuft' },
+    verworfen: { wort: 'verworfen', art: 'laeuft' },
+  }
+  return w[m.status] ?? { wort: m.status, art: 'laeuft' }
+}
+
+export type AlleMailZeile = {
+  id: string
+  zeit: string
+  name: string
+  weg: string
+  bezug: string
+  stand: StandWort
+  versuche: string
+  vomSupport: boolean
+  hinweis: string | null
+}
+
+/** Eine Zeile der Liste: Zeit, Art (deutsch), Weg, Bestellnummer bzw. Hof, Stand, Versuche, „vom Support“ — nie eine Adresse. */
+export function alleMailZeile(m: AlleMailRoh, namen: { bestellnummern: ReadonlyMap<string, string>; hoefe: ReadonlyMap<string, string> }, jetzt: Date): AlleMailZeile {
+  const nummer = m.bestellungId ? namen.bestellnummern.get(m.bestellungId) : undefined
+  const hof = m.farmId ? namen.hoefe.get(m.farmId) : undefined
+  return {
+    id: m.id,
+    zeit: zeitText(m.erstelltAm, jetzt),
+    name: m.nochmalVon ? ALLE_MAILS_TEXT.nochmalName(artName(m.art)) : artName(m.art),
+    weg: wegName(m.vorrang),
+    bezug: nummer ?? hof ?? '–',
+    stand: standWort(m),
+    versuche: formatZahl(m.versuche),
+    vomSupport: m.ausloeser === 'support',
+    hinweis: istCodeOderLink(m.art) ? ALLE_MAILS_TEXT.codeNie : null,
+  }
+}
+
+/** Eine Summe je Beitrag, Rundschreiben oder Bescheid — Kann warten steht nie einzeln (N27). */
+export type KannWartenSumme = {
+  art: string
+  gruppe: string | null
+  titel: string | null
+  erstelltAm: Date
+  gesendet: number
+  offen: number
+  gescheitert: number
+  abgelehnt: number
+  spam: number
+}
+
+/** „Beitrag ‚Kürbisse sind da‘ · 412 gesendet · 3 abgelehnt“ — ohne Empfänger. */
+export function kannWartenZeile(s: KannWartenSumme, jetzt: Date): { titel: string; zahlen: string; zeit: string } {
+  const titel = s.titel ? `‚${s.titel.length > 60 ? `${s.titel.slice(0, 59)}…` : s.titel}‘` : null
+  const name = s.art === 'beitrag' ? 'Beitrag' : s.art === 'rundschreiben' ? 'Rundschreiben' : s.art === 'bescheid' ? 'Bescheid zu einer Meldung' : artName(s.art)
+  const zahlen = [
+    `${formatZahl(s.gesendet)} gesendet`,
+    ...(s.offen > 0 ? [`${formatZahl(s.offen)} offen`] : []),
+    ...(s.gescheitert > 0 ? [`${formatZahl(s.gescheitert)} gescheitert`] : []),
+    ...(s.abgelehnt > 0 ? [`${formatZahl(s.abgelehnt)} abgelehnt`] : []),
+    ...(s.spam > 0 ? [`${formatZahl(s.spam)} Spam gemeldet`] : []),
+  ].join(' · ')
+  return { titel: titel ? `${name} ${titel}` : name, zahlen, zeit: zeitText(s.erstelltAm, jetzt) }
+}
+
+// ─── Filter ──────────────────────────────────────────────────────────────────
+
+export const STAND_NAME: Record<MailStandFilter, string> = {
+  gesendet: 'gesendet',
+  zugestellt: 'zugestellt',
+  offen: 'offen',
+  gescheitert: 'gescheitert',
+  gesperrt: 'gesperrt',
+  verworfen: 'verworfen',
+  abgelehnt: 'abgelehnt',
+}
+export const WEG_FILTER_NAME: Record<MailWegFilter, string> = { sofort: WEG_NAME[0], wichtig: WEG_NAME[1], kannWarten: WEG_NAME[2] }
+export const ZEITRAUM_NAME: Record<MailZeitraum, string> = { '24h': '24 Stunden', '7t': '7 Tage', '30t': '30 Tage', '90t': `${MAIL_PROTOKOLL_AUFBEWAHREN_TAGE} Tage` }
+const ZEITRAUM_MS: Record<MailZeitraum, number> = { '24h': 86_400_000, '7t': 7 * 86_400_000, '30t': 30 * 86_400_000, '90t': MAIL_PROTOKOLL_AUFBEWAHREN_TAGE * 86_400_000 }
+
+/** Ab wann der Zeitraum zählt. */
+export function zeitraumAb(z: MailZeitraum, jetzt: Date): Date {
+  return new Date(jetzt.getTime() - ZEITRAUM_MS[z])
+}
+
+/** Die Arten für den Filter, nach ihrem deutschen Namen. */
+export function artAuswahl(): Array<{ wert: MailArt; name: string }> {
+  return MAIL_ARTEN.map((a) => ({ wert: a, name: MAIL_ART_NAME[a] })).sort((x, y) => x.name.localeCompare(y.name, 'de'))
+}
+
+/** Die Zeile der Klappkarte „Filter“ am Handy: „Alle Arten · alle Stände · 90 Tage · alle Höfe“. */
+export function filterZeile(f: AlleMailsFilter, hofName: string | null): string {
+  return [
+    f.art ? artName(f.art) : 'Alle Arten',
+    ...(f.weg ? [WEG_FILTER_NAME[f.weg]] : []),
+    f.stand ? STAND_NAME[f.stand] : 'alle Stände',
+    ZEITRAUM_NAME[f.zeitraum],
+    hofName ?? 'alle Höfe',
+    ...(f.support ? [ALLE_MAILS_TEXT.nurSupport] : []),
+  ].join(' · ')
+}
+
+/** Die Adresse von „Alle Mails“ mit Filter, Suche, Seite und gewählter Mail — nur Werte, die das Schema kennt. */
+export function alleMailsHref(f: Partial<AlleMailsFilter>, extra: { suche?: string; nach?: string; mail?: string } = {}): string {
+  const q = new URLSearchParams({ reiter: 'mails', liste: 'alle' })
+  if (f.art) q.set('art', f.art)
+  if (f.weg) q.set('weg', f.weg)
+  if (f.stand) q.set('stand', f.stand)
+  if (f.zeitraum && f.zeitraum !== '90t') q.set('zeitraum', f.zeitraum)
+  if (f.hof) q.set('hof', f.hof)
+  if (f.support) q.set('support', '1')
+  if (extra.suche) q.set('suche', extra.suche)
+  if (extra.nach) q.set('nach', extra.nach)
+  if (extra.mail) q.set('mail', extra.mail)
+  return `/admin/betrieb?${q.toString()}`
+}
+
+/** Der Cursor für „Ältere Mails“ aus dem letzten Eintrag einer Seite. */
+export function cursorVon(m: Pick<AlleMailRoh, 'erstelltAm' | 'id'>): string {
+  return `${m.erstelltAm.getTime()}.${m.id}`
+}
+
+// ─── Detail ──────────────────────────────────────────────────────────────────
+
+export type MailDetailEingabe = {
+  mail: AlleMailRoh
+  /** Alle Mails mit `nochmalVon` auf die ursprüngliche (die gewählte, oder ihre Vorgängerin). */
+  nochmal: readonly AlleMailRoh[]
+  /** Davon in den letzten 24 Stunden. */
+  heute: number
+  stand: NochmalStand
+  /** Die Adresse, frisch aus Bestellung bzw. Hof — wird hier gekürzt und nie weitergegeben. */
+  adresse: string | null
+  bestellung: { id: string; nummer: string; hof: string } | null
+  hofName: string | null
+}
+
+export type VerlaufEintrag = { titel: string; zeit: string; zusatz: string | null; id: string | null; am: number }
+
+export type NochmalKnopf =
+  | { darf: true; heute: string; dialogTitel: string; punkte: string[]; spam: boolean }
+  | { darf: false; grund: string; heute: string | null }
+
+export type MailDetail = {
+  id: string
+  name: string
+  weg: string
+  stand: StandWort
+  an: string
+  bestellung: { id: string; nummer: string; hof: string } | null
+  hofName: string | null
+  nochmalText: string
+  verlauf: VerlaufEintrag[]
+  zugestellt: boolean
+  abgelehnt: boolean
+  knopf: NochmalKnopf
+  zeigtVorschau: boolean
+  hinweis: string | null
+}
+
+const QUELLE_TEXT: Record<'bestellung' | 'hof' | 'hofInhaber', string> = {
+  bestellung: MAIL_TEXT.ausDerBestellung,
+  hof: MAIL_TEXT.ausDemHof,
+  hofInhaber: MAIL_TEXT.ausDemHof,
+}
+
+/** Der Verlauf einer Mail: eingestellt, Versuche mit Grund und Code, übergeben, zugestellt bzw. abgelehnt oder Spam gemeldet, und jedes Nochmal. */
+export function mailVerlaufListe(m: AlleMailRoh, nochmal: readonly AlleMailRoh[], jetzt: Date): VerlaufEintrag[] {
+  const e = (titel: string, am: Date, zusatz: string | null = null, id: string | null = null): VerlaufEintrag => ({ titel, zeit: zeitText(am, jetzt), zusatz, id, am: am.getTime() })
+  const liste: VerlaufEintrag[] = [
+    e(m.vorrang === VORRANG.sofort ? 'Direkt verschickt' : 'Eingestellt', m.erstelltAm, m.ausloeser === 'support' ? ALLE_MAILS_TEXT.vomSupport : null),
+  ]
+  if (m.versuche > 0 && m.fehlerCode !== null) {
+    const f = fehlerText(m.fehlerCode)
+    liste.push(e(`${formatZahl(m.versuche)} ${m.versuche === 1 ? 'Versuch' : 'Versuche'} gescheitert`, m.naechsterVersuchAm, `${f.grund} · ${codeText(m.fehlerCode)}`))
+  }
+  if (m.gesendetAm) liste.push(e('An Resend übergeben', m.gesendetAm))
+  if (m.zugestelltAm) liste.push(e('Zugestellt', m.zugestelltAm, 'Meldung von Resend'))
+  if (m.bounceAm) liste.push(e('Abgelehnt', m.bounceAm, 'Meldung von Resend'))
+  if (m.beschwerdeAm) liste.push(e('Spam gemeldet', m.beschwerdeAm, 'Meldung von Resend'))
+  const ende: Record<string, string> = {
+    gescheitert: 'Aufgegeben',
+    verworfen: 'Verworfen',
+    gesperrt: 'Nicht verschickt – nur Test-Adressen erlaubt',
+    ohne_schluessel: 'Nicht verschickt – ohne Schlüssel für Resend',
+    offen: 'Wartet auf den nächsten Versuch',
+    in_arbeit: 'Wird gerade geschickt',
+  }
+  if (ende[m.status]) {
+    const grund = m.status === 'verworfen' && m.fehlerCode ? fehlerText(m.fehlerCode).grund : null
+    liste.push(e(ende[m.status], m.status === 'offen' || m.status === 'gescheitert' ? m.naechsterVersuchAm : m.erstelltAm, grund))
+  }
+  for (const n of nochmal) liste.push(e(`Nochmal geschickt · ${ALLE_MAILS_TEXT.vomSupport}`, n.erstelltAm, standWort(n).wort, n.id))
+  return liste.sort((x, y) => x.am - y.am)
+}
+
+/**
+ * Das Detail einer Mail (N27): Kopf, An (nur gekürzt, mit Herkunft),
+ * Bestellung, wie oft schon nochmal, Verlauf, Hinweise und der Knopf mit
+ * allem, was der Bestätigungsschritt sagt — oder sein Grund, wenn er aus ist.
+ */
+export function mailDetail(e: MailDetailEingabe, jetzt: Date): MailDetail {
+  const m = e.mail
+  const quelle = adresseQuelle(m.art)
+  const gekuerzt = e.adresse ? maskiereAdresse(e.adresse) : null
+  const an = quelle === null ? ALLE_MAILS_TEXT.adresseUnbekannt : gekuerzt ? `${gekuerzt} · ${QUELLE_TEXT[quelle]}` : ALLE_MAILS_TEXT.adresseFehlt
+  const zugestellt = m.zugestelltAm !== null && m.bounceAm === null
+  const abgelehnt = m.bounceAm !== null
+  const heute = ALLE_MAILS_TEXT.heuteKnopf(e.heute)
+
+  let knopf: NochmalKnopf
+  const pruefung = passtNochmal(m.art, e.stand, jetzt)
+  if (!nochmalErlaubt(m.art)) knopf = { darf: false, grund: nochmalNieGrund(m.art), heute: null }
+  else if (!(NOCHMAL_STAENDE as readonly string[]).includes(m.status)) knopf = { darf: false, grund: ALLE_MAILS_TEXT.standPasstNicht, heute }
+  else if (e.heute >= NOCHMAL_JE_TAG) knopf = { darf: false, grund: ALLE_MAILS_TEXT.grenze, heute }
+  else if (!pruefung.ok) knopf = { darf: false, grund: pruefung.grund, heute }
+  else if (!gekuerzt || quelle === null) knopf = { darf: false, grund: ALLE_MAILS_TEXT.adresseFehlt, heute }
+  else {
+    const link = m.art === 'bar-bestaetigungslink'
+    const b = e.stand.bestellung
+    const frist = link && b ? zeitpunktFuerMail(fristVon(b)) : null
+    knopf = {
+      darf: true,
+      heute,
+      dialogTitel: link ? ALLE_MAILS_TEXT.dialogTitelLink : ALLE_MAILS_TEXT.dialogTitel,
+      punkte: [
+        link ? ALLE_MAILS_TEXT.dialogAnLink(gekuerzt, QUELLE_TEXT[quelle]) : ALLE_MAILS_TEXT.dialogAn(gekuerzt, QUELLE_TEXT[quelle]),
+        ...(link ? [ALLE_MAILS_TEXT.dialogAlterLink] : quelle === 'bestellung' || quelle === 'hof' ? [ALLE_MAILS_TEXT.dialogStand] : []),
+        ...(frist ? [ALLE_MAILS_TEXT.dialogFrist(frist)] : []),
+        ALLE_MAILS_TEXT.dialogVermerk,
+      ],
+      spam: zugestellt,
+    }
+  }
+
+  return {
+    id: m.id,
+    name: m.nochmalVon ? ALLE_MAILS_TEXT.nochmalName(artName(m.art)) : artName(m.art),
+    weg: wegName(m.vorrang),
+    stand: standWort(m),
+    an,
+    bestellung: e.bestellung,
+    hofName: e.hofName,
+    nochmalText: e.nochmal.length === 0 ? ALLE_MAILS_TEXT.nochNie : ALLE_MAILS_TEXT.nochmalAnzahl(e.nochmal.length),
+    verlauf: mailVerlaufListe(m, e.nochmal, jetzt),
+    zugestellt,
+    abgelehnt,
+    knopf,
+    zeigtVorschau: nochmalErlaubt(m.art),
+    hinweis: istCodeOderLink(m.art) ? ALLE_MAILS_TEXT.codeNie : null,
+  }
 }

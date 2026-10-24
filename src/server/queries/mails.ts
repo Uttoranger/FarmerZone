@@ -1,10 +1,24 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { GRENZE, MAIL_HAENGT_MINUTEN, MAIL_PROTOKOLL_AUFBEWAHREN_TAGE, QUOTE_TAGE, utcTag, utcTagesbeginn, utcTagVersetzt } from '@/lib/betrieb'
-import { MAIL_VERLAUF_TAGE, type ArtZahlen, type LetzterDurchlauf, type ProblemAuftrag, type SuchBestellung, type SuchMail, type VerlaufTag, type WarteschlangeDaten } from '@/lib/betrieb-mails'
+import {
+  MAIL_VERLAUF_TAGE,
+  NOCHMAL_AUF_EINMAL,
+  zeitraumAb,
+  type AlleMailRoh,
+  type ArtZahlen,
+  type KannWartenSumme,
+  type LetzterDurchlauf,
+  type NochmalStand,
+  type ProblemAuftrag,
+  type SuchBestellung,
+  type SuchMail,
+  type VerlaufTag,
+  type WarteschlangeDaten,
+} from '@/lib/betrieb-mails'
 import { empfaengerFingerabdruck } from '@/lib/mail-empfaenger'
-import { VORRANG } from '@/schemas/mail-auftrag'
-import type { MailSuche } from '@/schemas/betrieb-mails'
+import { MAIL_WEG, VORRANG, type MailArt } from '@/schemas/mail-auftrag'
+import type { AlleMailsFilter, MailStandFilter, MailSuche } from '@/schemas/betrieb-mails'
 import { kannWartenPausiert } from '@/server/mail-warteschlange'
 import { summeImMonat } from '@/server/queries/betrieb'
 
@@ -12,7 +26,10 @@ import { summeImMonat } from '@/server/queries/betrieb'
  * Lesen für Admin › Betrieb › E-Mails (Register N26, N18-Ergänzung; Nr. 161).
  * Gerechnet wird in src/lib/betrieb-mails.ts; hier nur Abfragen. Gelesen
  * werden nur Art, Weg, Stand, Zeiten, Fehlercode und Kennungen — nie
- * `bezug`, nie `empfaengerHash` (der dient nur als Bedingung der Suche).
+ * `empfaengerHash` (der dient nur als Bedingung der Suche). `bezug` lesen nur
+ * zwei Stellen aus Nr. 167, und keine zeigt ihn: die Summen „Kann warten“
+ * (nur die Kennung des Beitrags bzw. der Meldung zum Gruppieren) und
+ * `ladeGescheiterteDerArt` (für die Action, die ihn in den neuen Auftrag kopiert).
  *
  * Die Adresse einer Bestellung (`customerEmail`) liest nur die Suche, und
  * nur für die gekürzte Anzeige; die Suche per Adresse ist exakt: gleich der
@@ -206,6 +223,8 @@ const SUCH_MAIL_FELDER = {
   zugestelltAm: true,
   bounceAm: true,
   beschwerdeAm: true,
+  ausloeser: true,
+  nochmalVon: true,
 } as const satisfies Prisma.MailAuftragSelect
 
 const SUCH_BESTELLUNG_FELDER = {
@@ -263,4 +282,233 @@ export async function sucheMails(suche: Extract<MailSuche, { art: 'bestellung' |
   const fehlend = [...new Set(mails.flatMap((m) => (m.bestellungId !== null && !bekannt.has(m.bestellungId) ? [m.bestellungId] : [])))]
   const dazu = fehlend.length === 0 ? [] : await prisma.order.findMany({ where: { id: { in: fehlend } }, select: SUCH_BESTELLUNG_FELDER })
   return { bestellungen: [...vonAdresse, ...dazu].map(alsBestellung), mails }
+}
+
+// ─── Alle Mails (Register N27, Nr. 167) ──────────────────────────────────────
+
+/** Was „Alle Mails“ und das Detail aus einer Zeile lesen — nie `bezug`, nie `empfaengerHash`. */
+const ALLE_FELDER = {
+  id: true,
+  art: true,
+  vorrang: true,
+  status: true,
+  versuche: true,
+  fehlerCode: true,
+  erstelltAm: true,
+  gesendetAm: true,
+  naechsterVersuchAm: true,
+  zugestelltAm: true,
+  bounceAm: true,
+  beschwerdeAm: true,
+  bestellungId: true,
+  farmId: true,
+  ausloeser: true,
+  nochmalVon: true,
+} as const satisfies Prisma.MailAuftragSelect
+
+/** Je Seite so viele Mails. */
+export const ALLE_SEITE = 50
+
+/** Die Bedingung eines Stands — dieselben Wörter wie `standWort`. */
+function standBedingung(stand: MailStandFilter): Prisma.MailAuftragWhereInput {
+  switch (stand) {
+    case 'gesendet':
+      return { status: 'gesendet' }
+    case 'zugestellt':
+      return { zugestelltAm: { not: null } }
+    case 'offen':
+      return { status: { in: ['offen', 'in_arbeit'] } }
+    case 'gescheitert':
+      return { status: 'gescheitert' }
+    case 'gesperrt':
+      return { status: { in: ['gesperrt', 'ohne_schluessel'] } }
+    case 'verworfen':
+      return { status: 'verworfen' }
+    case 'abgelehnt':
+      return { OR: [{ bounceAm: { not: null } }, { beschwerdeAm: { not: null } }] }
+  }
+}
+
+/**
+ * Die Bedingung der einzelnen Mails: Zeitraum (höchstens 90 Tage), Art, Weg,
+ * Stand, Hof, nur vom Support. „Kann warten“ steht NIE einzeln (N27) — die
+ * Bedingung schließt den Weg immer aus; ein Filter auf ihn trifft nichts.
+ */
+export function alleMailsBedingung(f: AlleMailsFilter, jetzt: Date): Prisma.MailAuftragWhereInput {
+  const und: Prisma.MailAuftragWhereInput[] = [{ erstelltAm: { gte: zeitraumAb(f.zeitraum, jetzt) } }, { vorrang: { not: VORRANG.kannWarten } }]
+  if (f.weg) und.push({ vorrang: VORRANG[f.weg] })
+  if (f.art) und.push({ art: f.art })
+  if (f.stand) und.push(standBedingung(f.stand))
+  if (f.hof) und.push({ farmId: f.hof })
+  if (f.support) und.push({ ausloeser: 'support' })
+  return { AND: und }
+}
+
+/**
+ * Eine Seite „Alle Mails“: neueste zuerst, 50 je Seite, Cursor über
+ * (`erstelltAm`, `id`). Dazu die Trefferzahl (dieselbe Bedingung) und die
+ * Namen für die Spalte „Bestellung bzw. Hof“ — die Bestellnummer (keine
+ * Personenangabe, §2 der Freigabe), nie eine Adresse.
+ */
+export async function ladeAlleMails(
+  f: AlleMailsFilter,
+  nach: { am: Date; id: string } | null,
+  jetzt: Date
+): Promise<{ zeilen: AlleMailRoh[]; weiter: AlleMailRoh | null; anzahl: number; bestellnummern: Map<string, string>; hoefe: Map<string, string> }> {
+  const bedingung = alleMailsBedingung(f, jetzt)
+  const seite = nach ? { AND: [bedingung, { OR: [{ erstelltAm: { lt: nach.am } }, { erstelltAm: nach.am, id: { lt: nach.id } }] }] } : bedingung
+  const [roh, anzahl] = await Promise.all([
+    prisma.mailAuftrag.findMany({ where: seite, orderBy: [{ erstelltAm: 'desc' }, { id: 'desc' }], take: ALLE_SEITE + 1, select: ALLE_FELDER }),
+    prisma.mailAuftrag.count({ where: bedingung }),
+  ])
+  const zeilen = roh.slice(0, ALLE_SEITE)
+  const bestellIds = [...new Set(zeilen.flatMap((z) => (z.bestellungId ? [z.bestellungId] : [])))]
+  const hofIds = [...new Set(zeilen.flatMap((z) => (z.farmId ? [z.farmId] : [])))]
+  const [bestellungen, hoefe] = await Promise.all([
+    bestellIds.length === 0 ? [] : prisma.order.findMany({ where: { id: { in: bestellIds } }, select: { id: true, orderNumber: true } }),
+    hofIds.length === 0 ? [] : prisma.farm.findMany({ where: { id: { in: hofIds } }, select: { id: true, name: true } }),
+  ])
+  return {
+    zeilen,
+    weiter: roh.length > ALLE_SEITE ? (zeilen.at(-1) ?? null) : null,
+    anzahl,
+    bestellnummern: new Map(bestellungen.map((b) => [b.id, b.orderNumber])),
+    hoefe: new Map(hoefe.map((h) => [h.id, h.name])),
+  }
+}
+
+/** Die Arten, die nur als Summe erscheinen. */
+const KANN_WARTEN_ARTEN = (Object.keys(MAIL_WEG) as MailArt[]).filter((a) => MAIL_WEG[a] === 'kannWarten')
+
+/**
+ * Kann warten als Summe je Beitrag, Rundschreiben oder Bescheid (N27) — nie
+ * eine Zeile mit Empfänger. Gruppiert wird über die Kennung im Bezug (Beitrag,
+ * Meldung) bzw. über das Rundschreiben des Fadens; gelesen wird aus `bezug`
+ * nur diese Kennung. Höchstens 20 Summen, neueste zuerst. Mit Filter auf
+ * Stand oder „nur vom Support“ gibt es keine Summen (die Summe zeigt alle
+ * Stände; Kann warten schickt der Support nie nochmal).
+ */
+export async function ladeKannWartenSummen(f: AlleMailsFilter, jetzt: Date): Promise<KannWartenSumme[]> {
+  if (f.support || f.stand) return []
+  if (f.weg && f.weg !== 'kannWarten') return []
+  if (f.art && !KANN_WARTEN_ARTEN.includes(f.art)) return []
+  const arten = f.art ? [f.art] : KANN_WARTEN_ARTEN
+  const ab = zeitraumAb(f.zeitraum, jetzt)
+  const hof = f.hof ? Prisma.sql`AND m."farmId" = ${f.hof}` : Prisma.empty
+  const zeilen = await prisma.$queryRaw<
+    Array<{ art: string; gruppe: string | null; erstelltAm: Date; gesendet: bigint; offen: bigint; gescheitert: bigint; abgelehnt: bigint; spam: bigint }>
+  >`
+    SELECT m."art",
+      CASE m."art" WHEN 'beitrag' THEN m."bezug"->>'postId' WHEN 'rundschreiben' THEN u."rundschreibenId" ELSE m."bezug"->>'meldungId' END AS "gruppe",
+      MIN(m."erstelltAm") AS "erstelltAm",
+      COUNT(*) FILTER (WHERE m."status" = 'gesendet') AS "gesendet",
+      COUNT(*) FILTER (WHERE m."status" IN ('offen', 'in_arbeit')) AS "offen",
+      COUNT(*) FILTER (WHERE m."status" = 'gescheitert') AS "gescheitert",
+      COUNT(*) FILTER (WHERE m."bounceAm" IS NOT NULL) AS "abgelehnt",
+      COUNT(*) FILTER (WHERE m."beschwerdeAm" IS NOT NULL) AS "spam"
+    FROM "MailAuftrag" m
+    LEFT JOIN "Unterhaltung" u ON m."art" = 'rundschreiben' AND u."id" = m."bezug"->>'unterhaltungId'
+    WHERE m."vorrang" = ${VORRANG.kannWarten} AND m."erstelltAm" >= ${ab} AND m."art" = ANY(${arten}::text[]) ${hof}
+    GROUP BY 1, 2
+    ORDER BY MIN(m."erstelltAm") DESC
+    LIMIT 20`
+  const postIds = zeilen.flatMap((z) => (z.art === 'beitrag' && z.gruppe ? [z.gruppe] : []))
+  const rundIds = zeilen.flatMap((z) => (z.art === 'rundschreiben' && z.gruppe ? [z.gruppe] : []))
+  const [posts, rund] = await Promise.all([
+    postIds.length === 0 ? [] : prisma.statusPost.findMany({ where: { id: { in: postIds } }, select: { id: true, title: true } }),
+    rundIds.length === 0 ? [] : prisma.rundschreiben.findMany({ where: { id: { in: rundIds } }, select: { id: true, titel: true } }),
+  ])
+  const titel = new Map<string, string>([...posts.map((p): [string, string] => [p.id, p.title]), ...rund.map((r): [string, string] => [r.id, r.titel])])
+  return zeilen.map((z) => ({
+    art: z.art,
+    gruppe: z.gruppe,
+    // Ein Bescheid trägt keinen Titel — der Text der Meldung ist Fremdtext einer Kundin.
+    titel: z.art !== 'bescheid' && z.gruppe ? (titel.get(z.gruppe) ?? null) : null,
+    erstelltAm: z.erstelltAm,
+    gesendet: zahl(z.gesendet),
+    offen: zahl(z.offen),
+    gescheitert: zahl(z.gescheitert),
+    abgelehnt: zahl(z.abgelehnt),
+    spam: zahl(z.spam),
+  }))
+}
+
+/** Die Höfe für den Filter, nach Namen. */
+export async function ladeHofAuswahl(): Promise<Array<{ id: string; name: string }>> {
+  return prisma.farm.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' }, take: 500 })
+}
+
+/** Was `passtNochmal` und der Bestätigungsschritt von der Bestellung brauchen — dazu die Adresse für die gekürzte Anzeige. */
+const NOCHMAL_BESTELLUNG_FELDER = {
+  id: true,
+  orderNumber: true,
+  status: true,
+  paymentMethod: true,
+  paymentStatus: true,
+  cancelReason: true,
+  createdAt: true,
+  pickupDate: true,
+  pickupTimeStart: true,
+  customerEmail: true,
+  farm: { select: { name: true, email: true, archivedAt: true } },
+} as const satisfies Prisma.OrderSelect
+
+export type NochmalBezugStand = NochmalStand & {
+  /** Die heute hinterlegte Adresse — nur für die gekürzte Anzeige, nie gespeichert. */
+  adresse: string | null
+  bestellung: (NochmalStand['bestellung'] & { id: string; orderNumber: string; farm: { name: string } }) | null
+  hofName: string | null
+}
+
+/**
+ * Der heutige Stand für „Nochmal schicken“ (N27): Bestellung bzw. Hof frisch
+ * aus der Datenbank, dazu die Adresse, an die die Mail HEUTE ginge —
+ * Kundin aus der Bestellung, Hof aus dem Hof, Freischaltung an die Inhaberin.
+ */
+export async function ladeNochmalStand(m: { art: string; bestellungId: string | null; farmId: string | null }, quelle: 'bestellung' | 'hof' | 'hofInhaber' | null): Promise<NochmalBezugStand> {
+  if (quelle === 'hofInhaber') {
+    const hof = m.farmId
+      ? await prisma.farm.findUnique({ where: { id: m.farmId }, select: { name: true, approvedAt: true, archivedAt: true, owner: { select: { email: true } } } })
+      : null
+    return { bestellung: null, hof: hof ? { approvedAt: hof.approvedAt, archivedAt: hof.archivedAt } : null, adresse: hof?.owner.email ?? null, hofName: hof?.name ?? null }
+  }
+  const b = m.bestellungId ? await prisma.order.findUnique({ where: { id: m.bestellungId }, select: NOCHMAL_BESTELLUNG_FELDER }) : null
+  const adresse = !b || quelle === null ? null : quelle === 'hof' ? b.farm.email : b.customerEmail
+  return { bestellung: b, hof: null, adresse, hofName: b?.farm.name ?? null }
+}
+
+/** Wie oft eine Mail in den letzten 24 Stunden nochmal ging — gezählt über `nochmalVon` (N27). */
+export async function zaehleNochmalHeute(wurzel: string, jetzt: Date): Promise<number> {
+  return prisma.mailAuftrag.count({ where: { nochmalVon: wurzel, erstelltAm: { gte: new Date(jetzt.getTime() - TAG_MS) } } })
+}
+
+/**
+ * Das Detail einer Mail: die Zeile, alle Mails mit `nochmalVon` auf ihre
+ * ursprüngliche, wie oft davon in 24 Stunden, und der heutige Stand samt
+ * Adresse (nur für die gekürzte Anzeige). `null`: steht nicht (mehr) im Protokoll.
+ */
+export async function ladeMailDetail(
+  id: string,
+  quelleVon: (art: string) => 'bestellung' | 'hof' | 'hofInhaber' | null,
+  jetzt: Date
+): Promise<{ mail: AlleMailRoh; nochmal: AlleMailRoh[]; heute: number; stand: NochmalBezugStand } | null> {
+  const mail = await prisma.mailAuftrag.findUnique({ where: { id }, select: ALLE_FELDER })
+  if (!mail) return null
+  const wurzel = mail.nochmalVon ?? mail.id
+  const [nochmal, heute, stand] = await Promise.all([
+    prisma.mailAuftrag.findMany({ where: { nochmalVon: wurzel }, orderBy: { erstelltAm: 'asc' }, take: 50, select: ALLE_FELDER }),
+    zaehleNochmalHeute(wurzel, jetzt),
+    ladeNochmalStand(mail, quelleVon(mail.art)),
+  ])
+  return { mail, nochmal, heute, stand }
+}
+
+/** Die gescheiterten Mails einer Art aus „Braucht dich“ — für „Alle nochmal schicken“, höchstens 100. */
+export async function ladeGescheiterteDerArt(art: MailArt, jetzt: Date): Promise<Array<{ id: string; art: string; status: string; bestellungId: string | null; farmId: string | null; nochmalVon: string | null; bezug: Prisma.JsonValue }>> {
+  return prisma.mailAuftrag.findMany({
+    where: { AND: [{ art, status: 'gescheitert', vorrang: VORRANG.wichtig }, problemBedingung(jetzt)] },
+    orderBy: { naechsterVersuchAm: 'desc' },
+    take: NOCHMAL_AUF_EINMAL,
+    select: { id: true, art: true, status: true, bestellungId: true, farmId: true, nochmalVon: true, bezug: true },
+  })
 }
