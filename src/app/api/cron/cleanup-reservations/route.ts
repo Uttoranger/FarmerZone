@@ -6,8 +6,8 @@ import { raeumeBremsZaehlerAuf } from '@/server/bremse-datenbank'
 import { mitHerzschlag } from '@/server/betrieb'
 import { raeumeAltesAuf, type AufraeumErgebnis } from '@/server/aufraeumen'
 
-// Aufruf durch Vercel Cron einmal täglich (vercel.json: `0 3 * * *`, UTC —
-// mehr erlaubt der Hobby-Tarif nicht). Er räumt nur auf: Die
+// Aufruf durch Vercel Cron einmal täglich (vercel.json: `0 3 * * *`, UTC;
+// täglich reicht, seit Vercel Pro wäre auch öfter möglich). Er räumt nur auf: Die
 // Reservierungsfrist gilt beim Lesen (src/lib/reservierung.ts), ein Zähler
 // der Bremse gilt nur in seinem Fenster (src/lib/bremse-datenbank.ts).
 // Seit Nr. 103 im Herzschlag-Rahmen (Register N18): Admin › Betrieb sieht

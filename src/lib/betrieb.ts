@@ -205,12 +205,14 @@ export const CODES_NACH_ABLAUF_TAGE = 1
  * bleiben immer — sie verhindern eine zweite Mail „Erstattung gescheitert“.
  */
 export const WEBHOOK_EREIGNISSE_AUFBEWAHREN_TAGE = 30
+/** Zeilen der Mail-Warteschlange und des Protokolls (MailAuftrag) bleiben so lange; dann löscht sie der Ablauf „Aufräumen“ (N26). */
+export const MAIL_PROTOKOLL_AUFBEWAHREN_TAGE = 90
 /** Ein Bild ohne Verwendung kommt erst ab diesem Alter in die Liste — ein jüngeres kann noch in einem offenen Formular hängen. */
 export const BILDER_OHNE_VERWENDUNG_AB_TAGE = 7
 
 const TAG_MS = 24 * 60 * 60 * 1000
 
-export type AufraeumGrenzen = { sitzungen: Date; codes: Date; webhookEreignisse: Date; messungen: Date }
+export type AufraeumGrenzen = { sitzungen: Date; codes: Date; webhookEreignisse: Date; messungen: Date; mailAuftraege: Date }
 
 /**
  * Die festen Grenzen des Aufräumens: gelöscht wird, was VOR der Grenze liegt
@@ -224,6 +226,7 @@ export function aufraeumGrenzen(jetzt: Date): AufraeumGrenzen {
     codes: vor(CODES_NACH_ABLAUF_TAGE),
     webhookEreignisse: vor(WEBHOOK_EREIGNISSE_AUFBEWAHREN_TAGE),
     messungen: new Date(`${utcTagVersetzt(utcTag(jetzt), -MESSUNGEN_AUFBEWAHREN_TAGE)}T00:00:00.000Z`),
+    mailAuftraege: vor(MAIL_PROTOKOLL_AUFBEWAHREN_TAGE),
   }
 }
 
@@ -418,8 +421,8 @@ export function zuletztText(zeitpunkt: Date, jetzt: Date): string {
 
 // ─── Abläufe ─────────────────────────────────────────────────────────────────
 
-export type AblaufName = 'aufraeumen' | 'verwaisteBestellungen' | 'betrieb' | 'briefkasten'
-export type Rhythmus = 'taeglich' | 'woechentlich'
+export type AblaufName = 'aufraeumen' | 'verwaisteBestellungen' | 'betrieb' | 'briefkasten' | 'mails'
+export type Rhythmus = 'minuetlich' | 'taeglich' | 'woechentlich'
 
 export type Ablauf = {
   name: AblaufName
@@ -435,15 +438,17 @@ export type Ablauf = {
 
 /**
  * Die Abläufe aus vercel.json (Vercel Pro seit 19.10.2026: Start in der
- * genannten Minute; unter Hobby waren es höchstens täglich und irgendwann in
- * der Stunde). Der Wochenlauf heißt nach der Wortliste „Wochenbericht
- * (Postfach)“ — das alte Wort steht in keinem Nutzertext mehr (Register N12).
+ * genannten Minute, auch jede Minute; unter Hobby waren es höchstens täglich
+ * und irgendwann in der Stunde). Der Wochenlauf heißt nach der Wortliste
+ * „Wochenbericht (Postfach)“ — das alte Wort steht in keinem Nutzertext mehr
+ * (Register N12). Die Mail-Warteschlange (Register N26, Nr. 158) läuft jede
+ * Minute.
  */
 export const ABLAEUFE: readonly Ablauf[] = [
   {
     name: 'aufraeumen',
     text: 'Aufräumen',
-    zweck: 'Er räumt abgelaufene Reservierungen, alte Zähler der Bremse, abgelaufene Sitzungen und Codes, alte Webhook-Ereignisse und alte Messungen weg.',
+    zweck: 'Er räumt abgelaufene Reservierungen, alte Zähler der Bremse, abgelaufene Sitzungen und Codes, alte Webhook-Ereignisse, alte Messungen und alte Zeilen der Mail-Warteschlange weg.',
     pfad: '/api/cron/cleanup-reservations',
     zeitplan: '0 3 * * *',
     rhythmus: 'taeglich',
@@ -472,15 +477,25 @@ export const ABLAEUFE: readonly Ablauf[] = [
     zeitplan: '0 5 * * 1',
     rhythmus: 'woechentlich',
   },
+  {
+    name: 'mails',
+    text: 'Mail-Warteschlange',
+    zweck: 'Er verschickt jede Minute die wartenden E-Mails zu Bestellungen, an Höfe und an Abos.',
+    pfad: '/api/cron/mails',
+    zeitplan: '* * * * *',
+    rhythmus: 'minuetlich',
+  },
 ]
 
 /**
  * Ab wann ein Ablauf überfällig ist, gemessen vom letzten Start: täglich
- * 26 h, wöchentlich 8 Tage. Vercel Pro startet in der genannten Minute; die
- * zwei Stunden Spielraum (aus der Hobby-Zeit, als ein Lauf irgendwann in der
- * Stunde begann) fangen einen verzögerten Start ab, ohne Fehlalarm.
+ * 26 h, wöchentlich 8 Tage, die Mail-Warteschlange (jede Minute) nach 10
+ * Minuten (N26). Vercel Pro startet in der genannten Minute; die zwei Stunden
+ * Spielraum (aus der Hobby-Zeit, als ein Lauf irgendwann in der Stunde begann)
+ * fangen einen verzögerten Start ab, ohne Fehlalarm.
  */
 export const UEBERFAELLIG_NACH_MS: Record<Rhythmus, number> = {
+  minuetlich: 10 * 60 * 1000,
   taeglich: 26 * 60 * 60 * 1000,
   woechentlich: 8 * 24 * 60 * 60 * 1000,
 }
@@ -513,16 +528,17 @@ export function ablaufStand(ablauf: Pick<Ablauf, 'rhythmus'>, lauf: AblaufLaufDa
 
 /**
  * Was das Lebenszeichen vermisst (Nr. 113): die Namen der Abläufe, die
- * überfällig oder gescheitert sind — gleiche Regel wie `ablaufStand` (täglich
- * 26 Stunden, wöchentlich 8 Tage). Fail-closed, strenger als die Seite: Ein
- * TÄGLICHER Ablauf ohne Zeile fehlt (er lief nie — genau der Ausfall, den
- * das Lebenszeichen melden soll); nur der wöchentliche hat ohne Zeile
- * Schonfrist, weil er nach dem Deploy bis Montag keine haben kann.
+ * überfällig oder gescheitert sind — gleiche Regel wie `ablaufStand` (jede
+ * Minute 10 Minuten, täglich 26 Stunden, wöchentlich 8 Tage). Fail-closed,
+ * strenger als die Seite: Ein TÄGLICHER oder MINÜTLICHER Ablauf ohne Zeile
+ * fehlt (er lief nie — genau der Ausfall, den das Lebenszeichen melden soll);
+ * nur der wöchentliche hat ohne Zeile Schonfrist, weil er nach dem Deploy bis
+ * Montag keine haben kann.
  */
 export function fehlendeAblaeufe(laeufe: ReadonlyMap<string, AblaufLaufDaten>, jetzt: Date): AblaufName[] {
   return ABLAEUFE.filter((a) => {
     const stand = ablaufStand(a, laeufe.get(a.name) ?? null, jetzt)
-    return stand === 'ueberfaellig' || stand === 'fehler' || (stand === 'nochKeinLauf' && a.rhythmus === 'taeglich')
+    return stand === 'ueberfaellig' || stand === 'fehler' || (stand === 'nochKeinLauf' && a.rhythmus !== 'woechentlich')
   }).map((a) => a.name)
 }
 
@@ -533,8 +549,9 @@ export function fehlerKlasse(err: unknown): string {
 
 const WOCHENTAG_PLURAL = ['sonntags', 'montags', 'dienstags', 'mittwochs', 'donnerstags', 'freitags', 'samstags'] as const
 
-/** „täglich ab 05:00“ bzw. „montags ab 07:00“ — die UTC-Zeit aus dem Zeitplan in Wiener Zeit von heute. */
+/** „jede Minute“, „täglich ab 05:00“ bzw. „montags ab 07:00“ — die UTC-Zeit aus dem Zeitplan in Wiener Zeit von heute. */
 export function wannText(ablauf: Pick<Ablauf, 'zeitplan' | 'rhythmus'>, jetzt: Date): string {
+  if (ablauf.rhythmus === 'minuetlich') return 'jede Minute'
   const [minute, stunde, , , wochentag] = ablauf.zeitplan.split(' ')
   const start = new Date(`${utcTag(jetzt)}T${stunde.padStart(2, '0')}:${minute.padStart(2, '0')}:00.000Z`)
   const uhr = uhrzeitInWien(start)

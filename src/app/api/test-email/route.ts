@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     <p>Wenn du diese Mail siehst, funktioniert der E-Mail-Versand korrekt.</p>
   `
 
-  const result = await sendRaw(to, `${MARKE} Test-E-Mail ${new Date().toISOString()}`, html)
+  const result = await sendRaw(to, `${MARKE} Test-E-Mail ${new Date().toISOString()}`, html, { art: 'testmail' })
 
   // Gesperrt (Register Z3): Lokal geht Post nur an TEST_EMPFAENGER und
   // @example.com — dann ist nichts verschickt, und die Antwort sagt das.

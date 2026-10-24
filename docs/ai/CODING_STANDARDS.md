@@ -142,6 +142,7 @@ NextResponse.json({ ok: true, …daten })
 - **Eine Zeile als Sperre braucht ein echtes UPDATE.** Mit leerem `data` setzt Prisma kein UPDATE ab (geprüft mit Prisma 7.8: `updatedAt` bleibt stehen), die Zeile bleibt ungesperrt. Wer Felder nur bedingt schreibt (`...(x !== undefined && { x })`) und sich in derselben Transaktion auf die Sperre verlässt — etwa Kindzeilen löschen und neu anlegen —, schreibt `updatedAt: new Date()` immer mit (Vorbild `saveAppearanceAction`).
 - Geht das nicht (externer Dienst dazwischen): Kompensation schreiben, wie beim Bestandsabzug.
 - Nichts Langsames im Antwortpfad → `nachDerAntwort()`.
+- **Keine Schleife über Mails in Actions oder Routen** (Register N26, Regelvorschlag 149): Massenversand nur über `stelleMailEin` (`src/server/mail-warteschlange.ts`) — EIN Aufruf für alle Empfänger, der Worker verschickt. Jede Mail nennt ihre Art (`sendRaw(…, { art })`, der Typ erzwingt sie).
 - **Wiederholt wird nur ein öffentlicher Lesepfad**, nur bei einem Verbindungsabbruch (08006/`EAUTHTIMEOUT`) und genau einmal: `leseOeffentlichMitWiederholung` (`src/server/oeffentlich-lesen.ts`). Nie ein Schreibweg, nie in einer Transaktion — ein wiederholtes Schreiben könnte doppelt buchen. Eine neue Stelle braucht einen Eintrag in der Liste von `tests/oeffentlich-lesen.test.ts`.
 
 ---
