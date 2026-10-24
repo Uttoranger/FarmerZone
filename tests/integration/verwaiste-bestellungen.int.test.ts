@@ -27,6 +27,7 @@ vi.mock('@/lib/email', () => ({
 
 import { NextRequest } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
+import { barTokenHash } from '@/lib/bar-bestaetigung'
 import { gibVerwaisteBestellungenFrei, gibVerwaisteFreiFuerSlug } from '@/server/verwaiste-bestellungen'
 import { POST as reservieren } from '@/app/api/reserve/route'
 import { bestaetigeBarBestellung, storniereBarBestellung } from '@/server/actions/bar-bestaetigung'
@@ -71,6 +72,9 @@ async function offeneBestellung(eingabe: {
   const produkt = await erstelleProdukt(farm.id, { stock: eingabe.bestand ?? BESTAND_NACH_CHECKOUT })
   const paymentIntentId = eingabe.zahlart === 'ONLINE' && eingabe.mitIntent !== false ? intKennung('pi') : null
 
+  // Wie im Checkout: Der Klartext steht nur im Knopf-Link, die Datenbank hält den Hash.
+  const token = eingabe.zahlart === 'ONLINE' ? null : intKennung('token')
+
   const bestellung = await prisma.order.create({
     data: {
       orderNumber: intKennung('bestellung').toUpperCase(),
@@ -87,7 +91,7 @@ async function offeneBestellung(eingabe: {
       paymentMethod: eingabe.zahlart,
       paymentStatus: 'PENDING',
       stripePaymentIntentId: paymentIntentId,
-      confirmationToken: eingabe.zahlart === 'ONLINE' ? null : intKennung('token'),
+      confirmationToken: token === null ? null : barTokenHash(token),
       platformFeeAmount: 0,
       serviceFeeCents: 100,
       serviceFeePercentApplied: 4.9,
@@ -107,7 +111,7 @@ async function offeneBestellung(eingabe: {
     },
   })
 
-  return { farm, produkt, bestellung, paymentIntentId }
+  return { farm, produkt, bestellung, paymentIntentId, token }
 }
 
 async function bestand(produktId: string) {
@@ -367,9 +371,9 @@ describe('Frist gilt beim Lesen — Bestätigung per Knopf (H3)', () => {
   }
 
   it('nach der Frist: verfällt statt zu bestätigen, Ware zurück', async () => {
-    const { produkt, bestellung } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 121 })
+    const { produkt, bestellung, token } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 121 })
 
-    const { ziel } = await knopf(bestaetigeBarBestellung, bestellung.confirmationToken!)
+    const { ziel } = await knopf(bestaetigeBarBestellung, token!)
 
     expect(ziel).toContain('/bestaetigen/')
     expect((await zustand(bestellung.id)).status).toBe('CANCELLED')
@@ -377,9 +381,9 @@ describe('Frist gilt beim Lesen — Bestätigung per Knopf (H3)', () => {
   })
 
   it('in der Frist: bestätigt, Token verbraucht, Bestand bleibt gebucht', async () => {
-    const { produkt, bestellung } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 30 })
+    const { produkt, bestellung, token } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 30 })
 
-    const { ziel } = await knopf(bestaetigeBarBestellung, bestellung.confirmationToken!)
+    const { ziel } = await knopf(bestaetigeBarBestellung, token!)
 
     // Weiter zur signierten Bestätigungsseite, die den Stand aus der
     // Datenbank liest (tests/bestaetigung-zugang.test.ts).
@@ -391,8 +395,8 @@ describe('Frist gilt beim Lesen — Bestätigung per Knopf (H3)', () => {
   })
 
   it('zwei Klicks gleichzeitig: einmal bestätigt, der Token gilt danach nicht mehr', async () => {
-    const { bestellung } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 30 })
-    const token = bestellung.confirmationToken!
+    const { bestellung, token: klartext } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 30 })
+    const token = klartext!
 
     await Promise.all([knopf(bestaetigeBarBestellung, token), knopf(bestaetigeBarBestellung, token)])
 
@@ -401,8 +405,8 @@ describe('Frist gilt beim Lesen — Bestätigung per Knopf (H3)', () => {
   })
 
   it('„Doch nicht": storniert, Ware zurück, bestätigen geht danach nicht mehr', async () => {
-    const { produkt, bestellung } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 30 })
-    const token = bestellung.confirmationToken!
+    const { produkt, bestellung, token: klartext } = await offeneBestellung({ zahlart: 'ONSITE_CASH', bestelltVorMinuten: 30 })
+    const token = klartext!
 
     await knopf(storniereBarBestellung, token)
     await knopf(bestaetigeBarBestellung, token)
