@@ -769,7 +769,8 @@ describe('Rest-Storno mit Stripes bezahltem Betrag (Nr. 19c)', () => {
     // Erst den ganzen Nachlauf abwarten: „genau einmal" und „keine Storno-Mail" gelten erst danach.
     await nachlaufFertig()
     expect(await offenAnSupport(order.id)).toEqual([expect.objectContaining({ bezug: { empfaengerId: 'support', fall: 'storno_rest_ohne_betraege', orderId: order.id } })])
-    expect(await auftraegeVon(order.id, 'storniert')).toEqual([])
+    // Der Storno-Auftrag steht seit der Transaktion; „offen" heißt: der Renderer verwirft ihn, keine Storno-Mail.
+    expect(await auftraegeVon(order.id, 'storniert')).toEqual([expect.objectContaining({ bezug: { orderId: order.id, erstattung: 'offen' } })])
   })
 
   it('Rest-Erstattung scheitert: die Anweisung nennt eine TEILerstattung mit den Beträgen aus dem Rest', async () => {
@@ -780,7 +781,11 @@ describe('Rest-Storno mit Stripes bezahltem Betrag (Nr. 19c)', () => {
     const storno = await cancelOrder(order.id)
 
     expect(storno.erstattungOffen).toBe(true)
-    const [, kontext] = vi.mocked(Sentry.captureException).mock.calls.at(-1) as [unknown, { tags: Record<string, string>; extra: Record<string, unknown> }]
+    // Nur die Meldungen des Stornos (der Worker kann dazwischen warnen, Nr. 159).
+    const [, kontext] = vi
+      .mocked(Sentry.captureException)
+      .mock.calls.filter(([, k]) => (k as { tags?: { aktion?: string } } | undefined)?.tags?.aktion === 'cancelOrder')
+      .at(-1) as [unknown, { tags: Record<string, string>; extra: Record<string, unknown> }]
     expect(kontext.tags.grund).toBe('erstattung_offen')
     expect(kontext.extra).toMatchObject({ orderId: order.id, erstattungCents: 500, vomHofCents: 450 })
     expect(String(kontext.extra.handerstattung)).toContain('Teilerstattung')
@@ -805,7 +810,12 @@ describe('Rest-Storno mit Stripes bezahltem Betrag (Nr. 19c)', () => {
     const storno = await cancelOrder(order.id)
 
     expect(storno.erstattungOffen).toBe(true)
-    const [, kontext] = vi.mocked(Sentry.captureException).mock.calls.at(-1) as [unknown, { extra: Record<string, unknown> }]
+    // Die Meldung des Stornos — der Worker, der im Test sofort nach dem
+    // Einstellen läuft, kann davor eine Warnung „Erstattung ausstehend" melden (Nr. 159).
+    const [, kontext] = vi
+      .mocked(Sentry.captureException)
+      .mock.calls.filter(([, k]) => (k as { tags?: { aktion?: string } } | undefined)?.tags?.aktion === 'cancelOrder')
+      .at(-1) as [unknown, { extra: Record<string, unknown> }]
     expect(kontext.extra).toMatchObject({ orderId: order.id, erstattungCents: 500, vomHofCents: 1030 })
     expect(String(kontext.extra.handerstattung)).toContain('Teilerstattung')
     expect(String(kontext.extra.handerstattung)).not.toContain('Plattformgebühr erstatten')

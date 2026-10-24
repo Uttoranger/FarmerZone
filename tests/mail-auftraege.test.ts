@@ -24,6 +24,7 @@ const db = vi.hoisted(() => ({
   customerFarmSubscription: { findUnique: vi.fn(), findFirst: vi.fn() },
   statusPost: { findFirst: vi.fn() },
   betreiberEmpfaenger: { findMany: vi.fn(), findFirst: vi.fn() },
+  mailAuftrag: { updateMany: vi.fn() },
   $queryRaw: vi.fn(),
 }))
 
@@ -37,7 +38,14 @@ import { SUPPORT_EMAIL } from '@/lib/support'
 import { MAIL_WEG, VORRANG, bezugSchemaFuer, type MailArt } from '@/schemas/mail-auftrag'
 import type { EinstellAuftrag } from '@/server/mail-warteschlange'
 import { RENDERER } from '@/server/mail-arten'
-import { artikelFehltMailAuftrag, bestellMailAuftrag, stornoMailAuftrag, zahlungZuSpaetMailAuftrag } from '@/server/mail-arten/bestellung'
+import {
+  StornoErstattungAusstehend,
+  artikelFehltMailAuftrag,
+  bestellMailAuftrag,
+  stornoMailAuftrag,
+  trageStornoErstattungEin,
+  zahlungZuSpaetMailAuftrag,
+} from '@/server/mail-arten/bestellung'
 import { betreiberAuftraege, betreiberKennungen, empfaengerKennungen, erstattungOffenBezug } from '@/server/mail-arten/betreiber'
 import { freischaltungAuftrag, postfachAntwortAuftrag, rundschreibenAuftraege } from '@/server/mail-arten/hof'
 import { aboBestaetigungAuftrag, bescheidAuftraege } from '@/server/mail-arten/kundin'
@@ -57,8 +65,8 @@ const AUFTRAEGE: EinstellAuftrag[] = [
   bestellMailAuftrag('abholbereit', BESTELLUNG, JETZT),
   bestellMailAuftrag('nicht-abholbereit', BESTELLUNG, JETZT),
   bestellMailAuftrag('verfallen', BESTELLUNG),
-  stornoMailAuftrag(BESTELLUNG, 2098),
-  stornoMailAuftrag(BESTELLUNG, null),
+  stornoMailAuftrag(BESTELLUNG, true),
+  stornoMailAuftrag(BESTELLUNG, false),
   artikelFehltMailAuftrag(BESTELLUNG, { itemId: 'cposition000000000000001', bisherCents: 1082, neuCents: 632, erstattetCents: 450 }),
   zahlungZuSpaetMailAuftrag(BESTELLUNG, 2137),
   ...betreiberAuftraege(
@@ -112,6 +120,9 @@ describe('Aufträge: Weg, Schlüssel, Bestellung, Bezug', () => {
 
   it('Gegenprobe: eine Adresse, ein Text, ein Token oder ein fremdes Feld im Bezug werden abgelehnt', () => {
     expect(bezugSchemaFuer('storniert').safeParse({ orderId: BESTELLUNG.id, erstattetCents: '20,98' }).success).toBe(false)
+    expect(bezugSchemaFuer('storniert').safeParse({ orderId: BESTELLUNG.id, erstattung: 'irgendwas' }).success).toBe(false)
+    // Betrag und Stand zugleich wären widersprüchlich.
+    expect(bezugSchemaFuer('storniert').safeParse({ orderId: BESTELLUNG.id, erstattetCents: '1', erstattung: 'ausstehend' }).success).toBe(false)
     expect(bezugSchemaFuer('artikel-fehlt').safeParse({ orderId: BESTELLUNG.id, itemId: 'kundin@example.com', bisherCents: '1', neuCents: '1' }).success).toBe(false)
     expect(bezugSchemaFuer('abo-bestaetigung').safeParse({ aboId: 'cabo1', token: 'x' }).success).toBe(false)
     expect(bezugSchemaFuer('erstattung-offen').safeParse({ empfaengerId: 'support', fall: 'Das Geld fehlt' }).success).toBe(false)
@@ -121,7 +132,7 @@ describe('Aufträge: Weg, Schlüssel, Bestellung, Bezug', () => {
   it('wiederholbare Statusmails tragen den Zeitpunkt, einmalige nicht — zweimal eingestellt heißt einmal verschickt', () => {
     expect(bestellMailAuftrag('abholbereit', BESTELLUNG, JETZT).schluessel).toBe(`abholbereit:${BESTELLUNG.id}:${JETZT.getTime()}`)
     expect(bestellMailAuftrag('bestellung-bestaetigung', BESTELLUNG).schluessel).toBe(`bestellung-bestaetigung:${BESTELLUNG.id}`)
-    expect(stornoMailAuftrag(BESTELLUNG, 1).schluessel).toBe(stornoMailAuftrag(BESTELLUNG, 2).schluessel)
+    expect(stornoMailAuftrag(BESTELLUNG, true).schluessel).toBe(stornoMailAuftrag(BESTELLUNG, false).schluessel)
   })
 })
 
@@ -199,6 +210,26 @@ describe('Renderer: frisch geladen, Vorlage aus email.ts, heutige Adresse', () =
     const mail = alsMail(await rendere('storniert', { orderId: ORDER.id, erstattetCents: '2098' }))
     expect(mail.html).toContain('20,98')
     expect(mail.html).toContain('Hof krank')
+  })
+
+  it('Storno online: eingestellt mit „ausstehend", bis Stripe geantwortet hat; „offen" → keine Mail', async () => {
+    expect(stornoMailAuftrag(BESTELLUNG, true).bezug).toEqual({ orderId: BESTELLUNG.id, erstattung: 'ausstehend' })
+    expect(stornoMailAuftrag(BESTELLUNG, false).bezug).toEqual({ orderId: BESTELLUNG.id })
+    db.order.findUnique.mockResolvedValue(ORDER)
+    // Der Worker versucht es nach seinem Plan wieder (Renderer wirft).
+    await expect(rendere('storniert', { orderId: ORDER.id, erstattung: 'ausstehend' })).rejects.toThrow(StornoErstattungAusstehend)
+    expect(await rendere('storniert', { orderId: ORDER.id, erstattung: 'offen' })).toEqual({ verworfen: 'erstattung_offen' })
+    db.order.findUnique.mockResolvedValue(null)
+    expect(await rendere('storniert', { orderId: ORDER.id, erstattung: 'ausstehend' })).toEqual({ verworfen: 'bestellung_fehlt' })
+  })
+
+  it('Storno nachgetragen: Betrag von Stripe oder „offen", nur in einen nicht fertigen Auftrag', async () => {
+    await trageStornoErstattungEin(ORDER.id, { erstattetCents: 2098 })
+    await trageStornoErstattungEin(ORDER.id, 'offen')
+    expect(db.mailAuftrag.updateMany.mock.calls).toEqual([
+      [{ where: { schluessel: `storniert:${ORDER.id}`, status: { in: ['offen', 'in_arbeit'] } }, data: { bezug: { orderId: ORDER.id, erstattetCents: '2098' } } }],
+      [{ where: { schluessel: `storniert:${ORDER.id}`, status: { in: ['offen', 'in_arbeit'] } }, data: { bezug: { orderId: ORDER.id, erstattung: 'offen' } } }],
+    ])
   })
 
   it('„Artikel fehlt": Position und Beträge; ohne Erstattung gilt vor Ort', async () => {

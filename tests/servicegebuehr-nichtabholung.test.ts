@@ -29,6 +29,8 @@ vi.mock('@/lib/prisma', () => {
       farm: { findUnique: vi.fn() },
       order,
       product,
+      // Nach Stripe trägt der Storno die Erstattung in seinen Auftrag nach (Nr. 159).
+      mailAuftrag: { updateMany: vi.fn(async () => ({ count: 1 })) },
       // Storno läuft seit fix/storno-atomar durch eine interaktive
       // Transaktion — der Rückruf bekommt dieselben Fakes.
       $transaction: vi.fn(async (arg: unknown) =>
@@ -304,9 +306,14 @@ describe('cancelOrder — Gebühren-Vermerk bei Storno', () => {
     expect(stornoDaten().at(-1)).toEqual(
       expect.objectContaining({ status: 'CANCELLED', serviceFeeRefundedAt: expect.any(Date) })
     )
-    // Die Storno-Mail ist ein Auftrag mit dem Betrag, den Stripe erstattet hat (Cent, nie neu gerechnet).
+    // Die Storno-Mail ist ein Auftrag aus der Storno-Transaktion; der Betrag,
+    // den Stripe erstattet hat, kommt danach hinein (Cent, nie neu gerechnet).
     expect(stelleMailEin).toHaveBeenCalledWith(
-      expect.objectContaining({ art: 'storniert', vorrang: 1, schluessel: 'storniert:order_online', bezug: { orderId: 'order_online', erstattetCents: '2098' } })
+      expect.objectContaining({ art: 'storniert', vorrang: 1, schluessel: 'storniert:order_online', bezug: { orderId: 'order_online', erstattung: 'ausstehend' } }),
+      expect.anything()
+    )
+    expect(prisma.mailAuftrag.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { bezug: { orderId: 'order_online', erstattetCents: '2098' } } })
     )
   })
 })

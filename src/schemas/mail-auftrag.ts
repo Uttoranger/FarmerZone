@@ -168,8 +168,21 @@ export type BeitragBezug = z.infer<typeof beitragBezugSchema>
 
 /** Eine Mail zu einer Bestellung: nur ihre Kennung. */
 export const bestellungBezugSchema = z.object({ orderId: kennung }).strict()
-/** Storno: dazu die Erstattung in Cent, wenn online erstattet wurde (fehlt = keine Erstattung). */
-export const stornoBezugSchema = z.object({ orderId: kennung, erstattetCents: ganzzahl.optional() }).strict()
+/**
+ * Wie es um die Erstattung eines Online-Stornos steht: `ausstehend`, solange
+ * Stripe noch nicht geantwortet hat (der Auftrag steht schon in der
+ * Storno-Transaktion), `offen`, wenn die Erstattung gescheitert ist.
+ */
+export const STORNO_ERSTATTUNG = ['ausstehend', 'offen'] as const
+/**
+ * Storno: dazu die Erstattung in Cent, sobald Stripe online erstattet hat,
+ * oder ihr Stand (`erstattung`), solange kein Betrag feststeht. Beides fehlt =
+ * nichts zu erstatten (vor Ort, online nie bezahlt).
+ */
+export const stornoBezugSchema = z
+  .object({ orderId: kennung, erstattetCents: ganzzahl.optional(), erstattung: z.enum(STORNO_ERSTATTUNG).optional() })
+  .strict()
+  .refine((b) => b.erstattetCents === undefined || b.erstattung === undefined)
 /** „Artikel fehlt": Position und die Beträge aus der Rechnung beim Speichern; Erstattung nur online. */
 export const artikelFehltBezugSchema = z
   .object({ orderId: kennung, itemId: kennung, bisherCents: ganzzahl, neuCents: ganzzahl, erstattetCents: ganzzahl.optional() })

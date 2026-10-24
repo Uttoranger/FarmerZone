@@ -56,13 +56,16 @@ vi.mock('@/lib/email', () => ({
 vi.mock('@/lib/prisma', () => {
   const order = { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() }
   const product = { update: vi.fn() }
+  // Der Storno-Auftrag steht in der Storno-Transaktion (Nr. 159).
+  const mailAuftrag = { createMany: vi.fn(async () => ({ count: 1 })), updateMany: vi.fn(async () => ({ count: 1 })) }
   return {
     prisma: {
       farm: { findUnique: vi.fn() },
       order,
       product,
+      mailAuftrag,
       webhookEvent: { createMany: vi.fn(async () => ({ count: 1 })) },
-      $transaction: vi.fn(async (rueckruf: (tx: unknown) => Promise<unknown>) => rueckruf({ order, product })),
+      $transaction: vi.fn(async (rueckruf: (tx: unknown) => Promise<unknown>) => rueckruf({ order, product, mailAuftrag })),
     },
   }
 })

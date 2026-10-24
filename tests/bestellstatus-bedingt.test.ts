@@ -69,6 +69,8 @@ beforeEach(() => {
   } as never)
   // Lesen findet die Bestellung im Ausgangsstatus …
   vi.mocked(prisma.order.findFirst).mockImplementation((async () => bestellung()) as never)
+  // Statuswechsel und Mail-Auftrag laufen in einer Transaktion (Nr. 159) — hier durchgereicht.
+  vi.mocked(prisma.$transaction).mockImplementation((async (rueckruf: (tx: unknown) => Promise<unknown>) => rueckruf(prisma)) as never)
   // … dann storniert jemand, BEVOR geschrieben wird.
   vi.mocked(prisma.order.updateMany).mockImplementation((async (arg: { where: { status?: unknown } }) => {
     const filter = arg.where.status
@@ -89,6 +91,11 @@ describe('ein Storno zwischen Lesen und Schreiben gewinnt', () => {
     expect(ergebnis.error).toContain('inzwischen geändert')
     expect(prisma.order.update).not.toHaveBeenCalled()
     expect(stelleMailEin).not.toHaveBeenCalled()
+  })
+
+  it('scheitert das Einstellen, ist auch der Statuswechsel nicht gespeichert — der Hof bekommt einen Hinweis', async () => {
+    vi.mocked(stelleMailEin).mockRejectedValueOnce(new Error('DB weg'))
+    expect(await markAsReady('order_1')).toEqual({ error: 'Wir konnten die Änderung nicht speichern. Versuch es bitte gleich noch einmal.' })
   })
 
   it('markAsPickedUp und markAsPickedUpAndPaid schreiben nur aus READY', async () => {
@@ -114,7 +121,9 @@ describe('ein Storno zwischen Lesen und Schreiben gewinnt', () => {
       expect.objectContaining({ where: expect.objectContaining({ status: { in: ['PAID', 'CONFIRMED', 'IN_PREPARATION'] } }) })
     )
     expect(stelleMailEin).toHaveBeenCalledWith(
-      expect.objectContaining({ art: 'abholbereit', vorrang: 1, bestellungId: 'order_1', farmId: 'farm_1', bezug: { orderId: 'order_1' } })
+      expect.objectContaining({ art: 'abholbereit', vorrang: 1, bestellungId: 'order_1', farmId: 'farm_1', bezug: { orderId: 'order_1' } }),
+      // In der Transaktion des Statuswechsels eingestellt.
+      prisma
     )
   })
 })

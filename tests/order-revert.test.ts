@@ -28,6 +28,8 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findUnique: vi.fn() },
     order: { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    // Rückweg und Auftrag in einer Transaktion (Nr. 159) — hier durchgereicht.
+    $transaction: vi.fn(),
   },
 }))
 
@@ -70,6 +72,7 @@ beforeEach(() => {
   farmFindUnique.mockResolvedValue({ id: 'farm_1', name: 'Testhof', slug: 'testhof', email: 'hof@test.local', ownerName: 'Franz', address: 'Weg 1', postalCode: '4020', city: 'Linz', phone: '' } as never)
   orderUpdate.mockResolvedValue({} as never)
   orderUpdateMany.mockResolvedValue({ count: 1 } as never)
+  vi.mocked(prisma.$transaction).mockImplementation((async (rueckruf: (tx: unknown) => Promise<unknown>) => rueckruf(prisma)) as never)
 })
 
 describe('revertReady', () => {
@@ -126,8 +129,9 @@ describe('revertReady', () => {
     expect(auftrag).toMatchObject({ art: 'nicht-abholbereit', vorrang: 1, bestellungId: 'order_1', farmId: 'farm_1', bezug: { orderId: 'order_1' } })
     // Zurück und wieder bereit darf wieder schreiben: der Zeitpunkt macht den Schlüssel eindeutig.
     expect(auftrag.schluessel).toMatch(/^nicht-abholbereit:order_1:\d+$/)
-    // Erst nach dem Statuswechsel.
+    // Nach dem Statuswechsel, in derselben Transaktion.
     expect(orderUpdateMany.mock.invocationCallOrder[0]).toBeLessThan(einstellen.mock.invocationCallOrder[0]!)
+    expect(einstellen.mock.calls[0]![1]).toBe(prisma)
     expect(nachlauf).toHaveLength(0)
   })
 
@@ -144,20 +148,18 @@ describe('revertReady', () => {
     expect(einstellen).not.toHaveBeenCalled()
   })
 
-  it('Fehler beim Einstellen: Statuswechsel bleibt, Antwort ohne Fehler, Sentry ohne Adresse', async () => {
+  it('Fehler beim Einstellen: die Transaktion scheitert, nichts gespeichert, Hinweis an den Hof, Sentry ohne Adresse', async () => {
     orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PENDING' } as never)
     einstellen.mockRejectedValueOnce(new Error('DB weg'))
 
     const result = await revertReady('order_1')
-    expect(result).toEqual({})
-    expect(orderUpdateMany).toHaveBeenCalledTimes(1)
+    // Rückweg und Auftrag sind eine Transaktion (Nr. 159): beides oder keins.
+    expect(result).toEqual({ error: 'Wir konnten die Änderung nicht speichern. Versuch es bitte gleich noch einmal.' })
     expect(Sentry.captureException).toHaveBeenCalledTimes(1)
     const gemeldet = JSON.stringify(vi.mocked(Sentry.captureException).mock.calls[0]?.[1])
     expect(gemeldet).toContain('order_1')
     expect(gemeldet).not.toContain('kundin@test.local')
     expect(gemeldet).not.toContain('Anna')
-    // Kein Rückweg in die Datenbank: nichts zurückgerollt, nichts erneut geschrieben.
-    expect(orderUpdateMany).toHaveBeenCalledTimes(1)
     expect(orderUpdate).not.toHaveBeenCalled()
   })
 })

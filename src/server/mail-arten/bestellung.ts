@@ -79,15 +79,58 @@ export function bestellMailAuftrag(
   }
 }
 
-/** Storno → Kundin; `erstattetCents` nur bei einer Online-Erstattung (sonst null). */
-export function stornoMailAuftrag(bestellung: { id: string; farmId: string }, erstattetCents: number | null): EinstellAuftrag {
+/**
+ * Storno → Kundin, eingestellt IN der Storno-Transaktion (Nr. 159, Punkt 1).
+ * Online bezahlt steht der Betrag dann noch nicht fest — Stripe erstattet erst
+ * nach dem Commit (cancelOrder). Der Auftrag trägt deshalb `ausstehend`, und
+ * `trageStornoErstattungEin` setzt nach Stripe den Betrag, den Stripe
+ * gebucht hat (nie neu gerechnet), oder `offen`. Vor Ort bezahlt (oder online
+ * nie bezahlt) gibt es nichts zu erstatten: nur die Kennung.
+ */
+export function stornoMailAuftrag(bestellung: { id: string; farmId: string }, onlineErstattung: boolean): EinstellAuftrag {
   return {
     art: 'storniert',
     vorrang: VORRANG.wichtig,
-    schluessel: `storniert:${bestellung.id}`,
-    bezug: { orderId: bestellung.id, ...(erstattetCents === null ? {} : { erstattetCents: String(erstattetCents) }) },
+    schluessel: stornoSchluessel(bestellung.id),
+    bezug: { orderId: bestellung.id, ...(onlineErstattung ? { erstattung: 'ausstehend' } : {}) },
     bestellungId: bestellung.id,
     farmId: bestellung.farmId,
+  }
+}
+
+function stornoSchluessel(orderId: string): string {
+  return `storniert:${orderId}`
+}
+
+/**
+ * Trägt nach Stripe in den Storno-Auftrag ein, was aus der Erstattung wurde:
+ * der gebuchte Betrag in Cent, oder `offen` (gescheitert — dann geht keine
+ * Storno-Mail, der Betreiber meldet sich mit der Erstattung). Nur solange der
+ * Auftrag nicht fertig ist; hat der Worker ihn gerade belegt, nimmt der
+ * nächste Versuch den neuen Bezug (der Worker schreibt `bezug` nie zurück).
+ * Wirft bei einem Datenbankfehler — der Aufrufer meldet ihn; der Auftrag
+ * bleibt dann `ausstehend` und endet nach den Wiederholungen sichtbar als
+ * gescheitert im Protokoll, statt still zu fehlen.
+ */
+export async function trageStornoErstattungEin(orderId: string, ausgang: { erstattetCents: number } | 'offen'): Promise<void> {
+  const bezug = stornoBezugSchema.parse(
+    ausgang === 'offen' ? { orderId, erstattung: 'offen' } : { orderId, erstattetCents: String(ausgang.erstattetCents) }
+  )
+  await prisma.mailAuftrag.updateMany({
+    where: { schluessel: stornoSchluessel(orderId), status: { in: ['offen', 'in_arbeit'] } },
+    data: { bezug },
+  })
+}
+
+/**
+ * Der Storno-Auftrag wartet noch auf Stripe. Der Renderer wirft, der Worker
+ * versucht es nach seinem Plan wieder (1, 5, 15 … Minuten) — ein eigener
+ * Name, damit Sentry es vom echten Renderer-Fehler unterscheidet.
+ */
+export class StornoErstattungAusstehend extends Error {
+  constructor() {
+    super('Storno-Mail: Erstattung noch nicht eingetragen')
+    this.name = 'StornoErstattungAusstehend'
   }
 }
 
@@ -179,9 +222,14 @@ export const rendereNichtAbholbereit: MailRenderer = einfach((e, o) => e.baueOrd
 export const rendereVerfallen: MailRenderer = einfach((e, o) => e.baueBestellungVerfallen(o))
 
 export async function rendereStorniert(bezug: Record<string, string>): Promise<StapelMail | Verworfen> {
-  const { orderId, erstattetCents } = stornoBezugSchema.parse(bezug)
+  const { orderId, erstattetCents, erstattung } = stornoBezugSchema.parse(bezug)
+  // Gescheiterte Erstattung: keine Storno-Mail. Die Vorlage läse „keine
+  // Erstattung" als Vor-Ort-Zahlung („entstehen dir keine Kosten") — an eine
+  // Kundin, die online bezahlt hat und noch nichts zurückbekam.
+  if (erstattung === 'offen') return { verworfen: 'erstattung_offen' }
   const b = await ladeBestellung(orderId)
   if (!b) return GELOESCHT
+  if (erstattung === 'ausstehend') throw new StornoErstattungAusstehend()
   const { baueOrderCancelled } = await import('@/lib/email')
   // Der Grund steht seit dem Storno an der Bestellung (cancelReason).
   return baueOrderCancelled(alsMailBestellung(b), erstattetCents === undefined ? null : cents(erstattetCents), b.cancelReason)
