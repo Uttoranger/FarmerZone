@@ -102,6 +102,14 @@ describe('Aufräumen und Bilder ohne Verwendung löschen nur, was sie dürfen', 
   })
 })
 
+describe('Der eine Schritt auf Bestellungen schreibt nur (Nr. 164)', () => {
+  it('aufraeumen.ts: genau ein order.updateMany, der nur confirmationToken auf null setzt; kein order.update*, kein order.delete*', () => {
+    const quelle = lies('src/server/aufraeumen.ts')
+    expect(quelle.match(/prisma\.order\.\w+\(/g)).toEqual(['prisma.order.updateMany('])
+    expect(quelle).toMatch(/data:\s*\{\s*confirmationToken:\s*null\s*\}/)
+  })
+})
+
 describe('Gegenproben — die Suche schlägt an', () => {
   it('erkennt das Löschen von Bestellungen, auch über einen Transaktions-Client', () => {
     expect(pruefe('await prisma.order.deleteMany({ where: {} })', ['prisma.order']).maengel).toHaveLength(1)

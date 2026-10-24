@@ -5776,6 +5776,15 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Messwerte (Integrationstest `hofliste-groesse.int.test.ts`, üppig gefüllte erfundene Höfe, je 20 Produkte mit Foto):** 50 Höfe ≈ 0,60 MB, 200 ≈ 2,39 MB, 500 ≈ 5,99 MB, gleichmäßig ≈ 12 KB je Hof; 2 MB ab etwa 167 Höfen. Die Entscheidung „Hofliste aufteilen“ trifft die Projektleitung nach diesen Zahlen.
 - **Seltener erneuern:** `wechseltFensterStand` (rein) entscheidet, ob eine Bestellung ihr Fenster voll macht bzw. ein Storno ein volles frei; gezählt wird im Nachlauf mit `belegung` (`src/server/abholfenster.ts`, dieselbe Zählung wie `imAbholfenster`). Ein Storno für einen Termin, der nicht mehr bestellbar ist (`istFensterBestellbar`), erneuert nie. Sonst altert die Liste wie bisher höchstens 300 s.
 
+## Nacharbeit aus Lauf 23: Fehler beim Zurückholen, Land im Stripe-Satz, Bar-Token nur als Hash (Nr. 164, Lauf 24, 24.10.2026)
+
+- **Abholzeit zurückholen:** Wirft `addPickupSlot` (etwa ohne Netz), zeigt `holeZurueck` jetzt `ABHOLZEIT_GELOESCHT.zurueckFehler`, statt still zu bleiben.
+- **/verify, Fehler beim Bestätigen, abgemeldet:** statt des Links auf `/login?von=/verify` steht dasselbe Anmeldeformular wie nach dem Bestätigen (`HofAnmeldung` mit festem Ziel `/verify`), `NeuerLinkWeg` in der Karte. Angemeldet bleibt der Link „Neuen Link anfordern".
+- **JSON-LD:** `addressCountry` kommt aus dem Land des Hofs (`alsLand`), fehlt es, gilt AT. **Bremse-Kommentar** in `rate-limit.ts` nennt die Wege mit zweiter Stufe (Checkout, Reservieren, Warenkorb-Prüfung).
+- **Zahlung:** Solange es kein Stripe-Konto gibt, steht über dem Knopf der Satz `stripeLandSatz(land)` mit Link zu den Hofdaten — Stripe stellt das Land danach nicht mehr um (Z1). Auch im Zustand „neu einrichten" mit gespeicherter Kennung steht er nicht (Annahme: der Auftrag sagt „solange noch kein Konto da ist").
+- **Bar-Token nur als Hash (S17-Ergänzung):** `tokenKandidaten` liefert nur noch den Hash. Das tägliche Aufräumen setzt `confirmationToken` auf null für alle Werte ohne das Präfix `h1:` (`BAR_HASH_PRAEFIX`) — ein `updateMany`, kein Löschen; das Ergebnis trägt die Zahl (`klartextTokens`). Ein noch offener Klartext-Link gilt ab dem Deploy nicht mehr; die Barfrist war längst um (höchstens zwei Stunden).
+- **Wache** `tests/actions-in-actions-wache.test.ts`: Keine Datei unter `src/server/actions/` lädt eine andere Action (Import, Re-Export, `import()`, relativ). Bestandsliste heute leer, sie nimmt nur ab.
+
 ## Nützliche Befehle
 
 ```bash

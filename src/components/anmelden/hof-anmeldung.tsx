@@ -25,9 +25,9 @@ const DEV_ACCOUNTS = [
  * Rückkehr nur geprüft über zielNachHofAnmeldung (/teilen, /verify, seit Nr. 156
  * Pfade des Hofbereichs aus ?von=), der Schnellzugang nur in
  * der Entwicklungsumgebung. Neu ist nur die Gestalt. Die optionale Prop `ziel`
- * (Nr. 157) legt das Ziel nach der Anmeldung fest; ohne sie gilt `?von=`.
+ * (Nr. 157, /verify seit Nr. 164) legt das Ziel nach der Anmeldung fest; ohne sie gilt `?von=`.
  */
-export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' } = {}): React.JSX.Element {
+export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}): React.JSX.Element {
   const router = useRouter()
   const emailId = useId()
   const passwortId = useId()

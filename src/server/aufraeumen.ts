@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { aufraeumGrenzen } from '@/lib/betrieb'
 import { einmalLinkAufraeumGrenze } from '@/lib/geraete'
+import { BAR_HASH_PRAEFIX } from '@/lib/bar-bestaetigung'
 import { MELDE_VERMERK_TYP } from '@/server/erstattung-gescheitert'
 
 /*
@@ -18,11 +19,16 @@ import { MELDE_VERMERK_TYP } from '@/server/erstattung-gescheitert'
  *  - EinmalLink (E7, Ergänzung; Nr. 114): abgelaufen, oder seit 7 Tagen
  *    benutzt. Ein offener, gültiger Link bleibt immer.
  *
- * Nie Bestellungen, Konten oder Höfe, nie eine Datei im Bild-Speicher
+ * Dazu EIN updateMany, kein Löschen (Nr. 164, Register S17): Bestellungen, deren
+ * `confirmationToken` noch im Klartext steht (ohne das Präfix des Hashs),
+ * bekommen null. Der Link taugt dann nicht mehr; die Bestellung selbst und
+ * jeder andere Wert bleiben. Ein Hash und null bleiben, wie sie sind.
+ *
+ * Nie Bestellungen löschen, nie Konten oder Höfe, nie eine Datei im Bild-Speicher
  * (Quelltext-Wache tests/aufraeumen.test.ts). Ins Ergebnis kommen nur Zahlen.
  */
 
-export type AufraeumErgebnis = { sitzungen: number; codes: number; webhookEreignisse: number; messungen: number; einmalLinks: number }
+export type AufraeumErgebnis = { sitzungen: number; codes: number; webhookEreignisse: number; messungen: number; einmalLinks: number; klartextTokens: number }
 
 export async function raeumeAltesAuf(jetzt: Date = new Date()): Promise<AufraeumErgebnis> {
   const grenze = aufraeumGrenzen(jetzt)
@@ -35,11 +41,18 @@ export async function raeumeAltesAuf(jetzt: Date = new Date()): Promise<Aufraeum
   const einmalLinks = await prisma.einmalLink.deleteMany({
     where: { OR: [{ ablaufAm: { lt: jetzt } }, { benutztAm: { lt: einmalLinkAufraeumGrenze(jetzt) } }] },
   })
+  // Nur ein Wert, kein Löschen. Die Bedingung `not: null` steht ausdrücklich da: In SQL ist
+  // NOT (null LIKE 'h1:%') nicht wahr, ohne sie fiele die Absicht nicht auf.
+  const klartextTokens = await prisma.order.updateMany({
+    where: { confirmationToken: { not: null }, NOT: { confirmationToken: { startsWith: BAR_HASH_PRAEFIX } } },
+    data: { confirmationToken: null },
+  })
   return {
     sitzungen: sitzungen.count,
     codes: codes.count,
     webhookEreignisse: webhookEreignisse.count,
     messungen: messungen.count,
     einmalLinks: einmalLinks.count,
+    klartextTokens: klartextTokens.count,
   }
 }

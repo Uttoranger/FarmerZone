@@ -8,6 +8,7 @@ import {
   BAR_LINK_JE_BESTELLUNG_UND_TAG,
   barBestaetigungsAnsicht,
   barLinkErneutMoeglich,
+  BAR_HASH_PRAEFIX,
   barTokenHash,
   GRUND_KUNDIN_STORNIERT,
   tokenKandidaten,
@@ -129,8 +130,14 @@ describe('barTokenHash — nur der Hash in der Datenbank (S17 Punkt 2, Nr. 151)'
     expect(barBestaetigungsTokenSchema.safeParse(barTokenHash(TOKEN)).success).toBe(false)
   })
 
-  it('tokenKandidaten: zuerst der Hash, dann der Klartext älterer Bestellungen', () => {
-    expect(tokenKandidaten(TOKEN)).toEqual([barTokenHash(TOKEN), TOKEN])
+  it('tokenKandidaten: nur der Hash, nie der Klartext (Nr. 164)', () => {
+    expect(tokenKandidaten(TOKEN)).toEqual([barTokenHash(TOKEN)])
+    expect(tokenKandidaten(TOKEN)).not.toContain(TOKEN)
+  })
+
+  it('jeder Hash trägt das Präfix, nach dem das Aufräumen Klartext erkennt', () => {
+    expect(barTokenHash(TOKEN).startsWith(BAR_HASH_PRAEFIX)).toBe(true)
+    expect(TOKEN.startsWith(BAR_HASH_PRAEFIX)).toBe(false)
   })
 })
 

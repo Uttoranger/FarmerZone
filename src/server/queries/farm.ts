@@ -147,6 +147,8 @@ export type PublicFarm = {
   address: string
   postalCode: string
   city: string
+  /** "AT" oder "DE" (Farm.country) — für addressCountry im JSON-LD (Nr. 164). */
+  country: string
   phone: string
   email: string
   logoUrl: string | null
@@ -373,6 +375,7 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       address: true,
       postalCode: true,
       city: true,
+      country: true,
       phone: true,
       email: true,
       logoUrl: true,
@@ -472,6 +475,7 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       address: true,
       postalCode: true,
       city: true,
+      country: true,
       phone: true,
       email: true,
       logoUrl: true,
