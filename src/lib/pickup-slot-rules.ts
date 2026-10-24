@@ -123,6 +123,8 @@ export const ABHOLZEIT_GELOESCHT = {
   text: 'Abholzeit gelöscht',
   rueckgaengig: 'Rückgängig',
   zurueck: 'Abholzeit wiederhergestellt',
+  /** Wirft das Zurückholen (etwa ohne Netz): sonst sähe der Hof gar nichts. */
+  zurueckFehler: 'Die Abholzeit konnten wir nicht wiederherstellen. Leg sie bitte neu an.',
   /** Wie die Bestell-Aktionen: sechs Sekunden Zeit zum Zurücknehmen. */
   dauerMs: 6000,
 } as const

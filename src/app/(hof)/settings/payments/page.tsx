@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { CircleAlert, CircleCheck, Clock } from 'lucide-react'
@@ -14,6 +15,7 @@ import { ONLINE_AUS_SATZ, ONLINE_AUS_TITEL, zahlungHinweis } from '@/lib/hof-ein
 import { NEU_EINRICHTEN_MARKE, NEU_EINRICHTEN_TITEL, neuEinrichtenSatz } from '@/lib/stripe-konto'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import { TESTBETRIEB } from '@/lib/umgebung-server'
+import { alsLand, stripeLandSatz } from '@/lib/laender'
 import { PaymentsActions } from './payments-actions'
 import { MARKE } from '@/lib/marke'
 
@@ -28,6 +30,8 @@ async function getFarmPaymentData(userId: string) {
       acceptsOnline: true,
       // Nur für den Satz „neu einrichten": Barzahlung versprechen, wo es sie gibt.
       acceptsOnsite: true,
+      // Nur für den Satz vor „Mit Stripe einrichten".
+      country: true,
     },
   })
 }
@@ -128,6 +132,15 @@ export default async function PaymentsPage({
             <p className="mt-3 flex items-start gap-1.5 text-[13px] leading-snug font-medium text-status-offen">
               <CircleAlert className="mt-px size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
               <span>{TESTBETRIEB_TEXT.zahlung}</span>
+            </p>
+          )}
+          {/* Solange es kein Konto gibt: Das Land lässt sich bei Stripe danach nicht mehr ändern. */}
+          {!farm.stripeAccountId && (
+            <p className="mt-4 text-[13px] leading-snug text-muted-foreground">
+              {stripeLandSatz(alsLand(farm.country))}{' '}
+              <Link href="/settings/profile" className="font-semibold text-status-fertig hover:underline">
+                Hofdaten öffnen
+              </Link>
             </p>
           )}
           <div className="mt-4">

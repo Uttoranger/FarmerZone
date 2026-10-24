@@ -167,12 +167,20 @@ export function PickupSlotsClient({
   }
 
   async function holeZurueck(slot: Slot) {
-    const res = await addPickupSlot({
-      dayOfWeek: slot.dayOfWeek,
-      startTime: slot.startTime,
-      endTime: slot.endTime,
-      maxOrders: slot.maxOrders,
-    })
+    // Ein Klick im Toast hat keinen Aufrufer, der einen Fehler auffinge: Wirft die
+    // Action (etwa ohne Netz), bliebe der Hof ohne jede Rückmeldung.
+    let res: Awaited<ReturnType<typeof addPickupSlot>>
+    try {
+      res = await addPickupSlot({
+        dayOfWeek: slot.dayOfWeek,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        maxOrders: slot.maxOrders,
+      })
+    } catch {
+      toast.error(ABHOLZEIT_GELOESCHT.zurueckFehler)
+      return
+    }
     if (res.error) {
       toast.error(res.error)
       return

@@ -74,9 +74,10 @@ const limiters = new Map<string, ReturnType<typeof createRateLimiter>>()
 // viele echte Kundinnen eine IP. Erst beide Grenzen zusammen sind brauchbar.
 //
 // SERVERLESS-KAVEAT wie oben: Die Zähler leben im Prozess, das Limit gilt je
-// Instanz. Für den Checkout folgt die zweite Stufe über alle Instanzen
-// (`bremseCheckout`, src/server/bremse-datenbank.ts); die übrigen Routen
-// bleiben bei dieser einen Stufe.
+// Instanz. Für den Checkout, das Reservieren und die Warenkorb-Prüfung
+// folgt die zweite Stufe über alle Instanzen (`bremseCheckout`,
+// `bremseReservieren`, src/server/bremse-datenbank.ts); die CSP-Berichte haben
+// eine eigene Datenbank-Bremse. Die übrigen Routen bleiben bei dieser einen Stufe.
 //
 // EIGENE GRENZE (`max`, seit Nr. 47): nur, wo der Aufrufer kein Mensch ist und
 // die Vorgabe echte Aufrufe abwiese — die Ein-Klick-Abmeldung kommt von den

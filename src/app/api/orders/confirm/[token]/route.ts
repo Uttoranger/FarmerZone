@@ -21,7 +21,7 @@ export async function GET(
   const eingabe = barBestaetigungsTokenSchema.safeParse((await params).token)
   if (!eingabe.success) return NextResponse.redirect(new URL('/', request.url))
 
-  // Hash oder (ältere Bestellungen) Klartext — wie Seite und Knöpfe (Nr. 151).
+  // Nur der Hash — wie Seite und Knöpfe (Nr. 151, ohne Klartext seit Nr. 164).
   const order = await prisma.order.findFirst({
     where: { confirmationToken: { in: tokenKandidaten(eingabe.data) } },
     select: { farm: { select: { slug: true } } },

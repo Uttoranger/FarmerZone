@@ -398,11 +398,11 @@ describe('Knopf „Ja, ich hole verbindlich ab" — bestaetigeBarBestellung', ()
 
     expect(updateMany).toHaveBeenCalledTimes(1)
     const aufruf = updateMany.mock.calls[0][0] as { where: Record<string, unknown>; data: Record<string, unknown> }
-    // Hash oder (ältere Bestellung) Klartext — beides aus tokenKandidaten (Nr. 151).
+    // Nur der Hash — aus tokenKandidaten (Nr. 151, Klartext entfällt seit Nr. 164).
     expect(aufruf.where).toMatchObject({
       id: 'order-1',
       status: 'PENDING_CONFIRMATION',
-      confirmationToken: { in: [barTokenHash(TOKEN), TOKEN] },
+      confirmationToken: { in: [barTokenHash(TOKEN)] },
     })
     expect(aufruf.data).toMatchObject({ status: 'CONFIRMED', confirmationToken: null })
     expect(aufruf.data.confirmedAt).toEqual(IN_DER_FRIST)
@@ -568,10 +568,10 @@ describe('Knopf „Doch nicht – Bestellung stornieren" — storniereBarBestell
   })
 })
 
-describe('Nur der Hash in der Datenbank (Nr. 151) — alle Leser suchen Hash und Klartext', () => {
-  const GESUCHT = { confirmationToken: { in: [barTokenHash(TOKEN), TOKEN] } }
+describe('Nur der Hash in der Datenbank (Nr. 151) — alle Leser suchen nur den Hash', () => {
+  const GESUCHT = { confirmationToken: { in: [barTokenHash(TOKEN)] } }
 
-  it('Seite, Knöpfe und alter Mail-Link fragen nach Hash ODER Klartext — nie nur nach dem Klartext', async () => {
+  it('Seite, Knöpfe und alter Mail-Link fragen nach dem Hash — nie nach dem Klartext', async () => {
     await seite()
     await weiterleitungVon(bestaetigeBarBestellung({}, formular()))
     await weiterleitungVon(storniereBarBestellung({}, formular()))

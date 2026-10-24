@@ -32,8 +32,8 @@ import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
  *
  * BERECHTIGUNG: Es gibt kein Konto — der Token aus der Mail IST die
  * Berechtigung (nanoid(32), nicht ratbar). Gespeichert ist seit Nr. 151 nur
- * sein Hash (`barTokenHash`); gesucht wird über `tokenKandidaten`, das auch
- * den Klartext älterer Bestellungen findet. Der Filter steht in der
+ * sein Hash (`barTokenHash`); gesucht wird über `tokenKandidaten` (nur der
+ * Hash; Klartext-Werte leert das Aufräumen, Nr. 164). Der Filter steht in der
  * WHERE-Klausel des Schreibens, nicht nur in der Abfrage davor. Nach dem
  * Bestätigen ist der Wert gelöscht; ein zweiter Klick findet nichts mehr.
  *
