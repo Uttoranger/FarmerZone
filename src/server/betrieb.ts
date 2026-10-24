@@ -22,6 +22,7 @@ import {
   grenzeVon,
   neuMessenAb,
   ohneVerwendungKarte,
+  monatsBeginn,
   utcMonatsbeginn,
   utcTag,
   utcTagesbeginn,
@@ -213,14 +214,23 @@ export async function messeBetrieb(jetzt: Date = new Date(), { produktion = UMGE
 
 // ─── Warnen ──────────────────────────────────────────────────────────────────
 
+/** Wo der Monat einer Warnart beginnt — nur E-Mails im Monat zählen im Abrechnungszeitraum von Resend (Nr. 162). */
+function monatsBeginnVon(art: WarnArt, jetzt: Date): Date {
+  return monatsBeginn(art === 'mailsMonat' ? 'mailsMonat' : 'bildVorgaenge', jetzt)
+}
+
 /** Die Regel einer Warnart: Grenzwert, Ablauf oder Vercel-Ausgaben (je Abrechnungszeitraum, Nr. 113). */
 type WarnRegel = GrenzRegel | 'ablauf' | 'abrechnung'
 
-/** Die Bedingung, unter der eine Warnung (neu) gesetzt wird — als SQL in derselben Anweisung wie das Setzen. */
-function warnBedingung(regel: WarnRegel, jetzt: Date): Prisma.Sql {
+/**
+ * Die Bedingung, unter der eine Warnung (neu) gesetzt wird — als SQL in
+ * derselben Anweisung wie das Setzen. Der Monat beginnt je Art: E-Mails im
+ * Abrechnungszeitraum von Resend, Bild-Vorgänge im Kalendermonat (Nr. 162).
+ */
+function warnBedingung(regel: WarnRegel, jetzt: Date, art: WarnArt): Prisma.Sql {
   if (regel === 'abrechnung') return Prisma.sql`("BetriebWarnung"."stufe" < EXCLUDED."stufe" OR "BetriebWarnung"."gemeldetAm" < ${abrechnungsBeginn(jetzt)})`
   if (regel === 'speicher') return Prisma.sql`"BetriebWarnung"."stufe" < EXCLUDED."stufe"`
-  if (regel === 'monat') return Prisma.sql`("BetriebWarnung"."stufe" < EXCLUDED."stufe" OR "BetriebWarnung"."gemeldetAm" < ${utcMonatsbeginn(jetzt)})`
+  if (regel === 'monat') return Prisma.sql`("BetriebWarnung"."stufe" < EXCLUDED."stufe" OR "BetriebWarnung"."gemeldetAm" < ${monatsBeginnVon(art, jetzt)})`
   if (regel === 'tag') return Prisma.sql`"BetriebWarnung"."gemeldetAm" < ${utcTagesbeginn(jetzt)}`
   return Prisma.sql`("BetriebWarnung"."stufe" = 0 OR "BetriebWarnung"."gemeldetAm" < ${utcTagesbeginn(jetzt)})`
 }
@@ -238,7 +248,7 @@ async function setzeStufe(art: WarnArt, neu: Exclude<Stufe, 0>, regel: WarnRegel
       "stufe" = EXCLUDED."stufe",
       "gemeldetAm" = EXCLUDED."gemeldetAm",
       "seit" = CASE WHEN "BetriebWarnung"."stufe" = 0 THEN EXCLUDED."seit" ELSE "BetriebWarnung"."seit" END
-    WHERE ${warnBedingung(regel, jetzt)}
+    WHERE ${warnBedingung(regel, jetzt, art)}
     RETURNING "art"`
   return getroffen.length > 0
 }
@@ -338,7 +348,7 @@ export async function pruefeGrenzen(
     const stand = grenzStand(wert, messungen, mailsImMonat, jetzt)
     if (stand === null) continue
     const regel = GRENZ_REGEL[wert]
-    const schritt = grenzSchritt(regel, warnStandVon(warnungen, wert), stand.anteil, jetzt)
+    const schritt = grenzSchritt(regel, warnStandVon(warnungen, wert), stand.anteil, jetzt, monatsBeginnVon(wert, jetzt))
     // grenzSchritt warnt und entwarnt nur mit Anteil; ohne Grenze kommt höchstens „still“.
     const anteilHeute = stand.anteil ?? 0
     if (schritt.tun === 'warnen' && (await setzeStufe(wert, schritt.stufe, regel, jetzt))) {

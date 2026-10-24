@@ -396,7 +396,8 @@ export function TarifeInhalt({ stripeMarke }: { stripeMarke: StripeMarke | null 
 
 /**
  * Die Karte „Vercel-Ausgaben“ (Nr. 113; nach dem Muster „Tarife und
- * Grenzen“): die letzte Meldung von Spend Management bzw. „Unter 50 % …“,
+ * Grenzen“): die letzte Meldung von Spend Management, „Unter 50 % (letzte
+ * Meldung …)“ oder „Noch keine Meldung …“ (Nr. 162),
  * dazu der Link nach Vercel › Usage. Ab 1024 px in einer Karte, am Handy in
  * einer Klappkarte.
  */

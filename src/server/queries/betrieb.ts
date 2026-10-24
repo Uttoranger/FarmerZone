@@ -5,6 +5,7 @@ import {
   VERLAUF_TAGE,
   TREND_TAGE,
   betriebHinweis,
+  monatsBeginn,
   utcMonatsbeginn,
   utcTag,
   utcTagVersetzt,
@@ -72,10 +73,10 @@ export async function letzteMessungAm(mitBeginn = false): Promise<Date | null> {
   return zeile?.gemessenAm ?? null
 }
 
-/** Die E-Mail-Zahl eines Monats bis heute und die eigenen Auflistungen des Bild-Speichers im Monat. */
+/** Die E-Mails im Abrechnungszeitraum von Resend bis heute (ab dem 17., Nr. 162) und die eigenen Auflistungen des Bild-Speichers im Kalendermonat. */
 export async function summeImMonat(art: 'mails' | 'bilderAuflistungen', jetzt: Date): Promise<number> {
   const summe = await prisma.betriebMessung.aggregate({
-    where: { art, tag: { gte: utcMonatsbeginn(jetzt) } },
+    where: { art, tag: { gte: monatsBeginn(art, jetzt) } },
     _sum: { wert: true },
   })
   return summe._sum.wert === null ? 0 : alsZahl(summe._sum.wert)
