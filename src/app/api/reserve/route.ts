@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { bremseReservieren } from '@/server/bremse-datenbank'
-import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
-import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
-import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { gibVerwaisteFreiFuerProdukte } from '@/server/verwaiste-bestellungen'
-import { alsAbholFenster, ausgebuchteTage } from '@/server/abholfenster'
-import { kaufSperre, kaufSperreHinweis } from '@/lib/bereiche-anzeige'
-
-const MAX_MENGE = 10_000
+import { HOF_KAUFBARKEIT_AUSWAHL, pruefeKaufbarkeitHof } from '@/server/warenkorb'
+import { MAX_MENGE } from '@/lib/reservierung'
 
 const bodySchema = z.object({
   productId: z.string().min(1),
@@ -76,58 +71,25 @@ export async function POST(request: NextRequest) {
     // 2. Verify product exists and is available
     // Pausen- und Stilllegungs-Zustand kommen über den Hof-Join: der Request
     // kennt nur die productId, und ein zweiter Query wäre unnötig. Die aktiven
-    // Abholzeiten braucht die Kaufsperre (2d), wie in der Kasse.
+    // Abholzeiten braucht die Kaufsperre, wie in der Kasse.
     const product = await prisma.product.findUnique({
       where: { id: productId },
-      select: {
-        stock: true,
-        isAvailable: true,
-        farm: {
-          select: {
-            id: true,
-            name: true,
-            isPaused: true,
-            archivedAt: true,
-            approvedAt: true,
-            pickupSlots: { where: { isActive: true }, select: { dayOfWeek: true, startTime: true, endTime: true } },
-          },
-        },
-      },
+      select: { stock: true, isAvailable: true, farm: { select: HOF_KAUFBARKEIT_AUSWAHL } },
     })
 
     if (!product || !product.isAvailable) {
       return NextResponse.json({ error: 'Produkt nicht verfügbar' }, { status: 409 })
     }
 
-    // 2b. Stilllegung — fail-closed und VOR der Pause geprüft: der dauerhafte
-    // Zustand sticht den vorübergehenden (siehe src/lib/farm-archive.ts).
-    if (product.farm.archivedAt) {
-      return NextResponse.json({ error: FARM_ARCHIVED_MESSAGE }, { status: 409 })
-    }
-
-    // 2b². Freischaltung — nach der Stilllegung, vor der Pause
-    // (Begründung der Reihenfolge: src/lib/farm-approval.ts).
-    if (!product.farm.approvedAt) {
-      return NextResponse.json({ error: FARM_NOT_APPROVED_MESSAGE }, { status: 409 })
-    }
-
-    // 2c. Shop-Pause — fail-closed VOR jeder Reservierungslogik: vor der
-    // Bestandsrechnung und vor dem upsert, das die Reservierung anlegt.
-    if (product.farm.isPaused) {
-      return NextResponse.json({ error: SHOP_PAUSED_MESSAGE }, { status: 409 })
-    }
-
-    // 2d. Kaufsperre (Register N24) — nach der Pause, vor dem Bestand: Ohne
-    // buchbaren Abholtermin nimmt die Kasse nichts an, also wird auch keine Ware
-    // blockiert. Dieselbe Regel und Zählung wie die Kasse (checkout/page.tsx);
-    // die verwaisten Bestellungen des Hofs hat Schritt 0 schon freigegeben.
-    const { farm } = product
-    const voll = (await ausgebuchteTage([farm.id], now)).get(farm.id)
-    // Die Pause ist oben schon beantwortet; die Sperre kann hier nur „keine
-    // Abholzeit" oder „ausgebucht" sein.
-    const sperre = kaufSperre({ isPaused: false, pickupSlots: farm.pickupSlots.map((s) => alsAbholFenster(s, voll)) }, now)
-    if (sperre === 'keine-abholzeit' || sperre === 'ausgebucht') {
-      return NextResponse.json({ error: kaufSperreHinweis(sperre, farm.name).titel }, { status: 409 })
+    // 2b. Prüfkette des Hofs (src/server/warenkorb.ts, Nr. 165): Stilllegung →
+    // Freischaltung → Pause → Kaufsperre, fail-closed VOR jeder
+    // Reservierungslogik — vor der Bestandsrechnung und vor dem upsert. Dieselbe
+    // Kette nutzt /api/warenkorb/pruefen. Die Kaufsperre (Register N24) zählt die
+    // vollen Tage wie die Kasse; die verwaisten Bestellungen des Hofs hat
+    // Schritt 0 schon freigegeben.
+    const sperre = await pruefeKaufbarkeitHof(product.farm, now)
+    if (sperre) {
+      return NextResponse.json({ error: sperre.text }, { status: 409 })
     }
 
     // 3. Count stock reserved by OTHER sessions (excluding this session)
