@@ -277,14 +277,14 @@ describe('Hinweis der Shell (Punkt und Betriebsleiste, Register N15)', () => {
   })
 
   it('eine Warnung → „1 Warnung“ mit dem Wert; die höhere Stufe steht vorn', () => {
-    expect(betriebHinweis([{ art: 'bilder', stufe: 1 }], gut, jetzt)).toEqual({ anzahl: 1, text: 'Bilder-Speicher über 80 %', kurz: 'Bilder über 80 %' })
+    expect(betriebHinweis([{ art: 'bilder', stufe: 1 }], gut, jetzt)).toEqual({ anzahl: 1, text: 'Bilder-Speicher über 80 %', kurz: 'Bilder über 80 %', href: '/admin/betrieb' })
     expect(betriebHinweis([{ art: 'bilder', stufe: 1 }, { art: 'datenbank', stufe: 2 }], gut, jetzt)).toMatchObject({ anzahl: 2, text: 'Datenbank über 95 %' })
   })
 
   it('ein überfälliger Ablauf ohne Warnzeile zählt mit — so fällt auch ein ganz ausgefallener Lauf auf', () => {
     const alt = new Map(gut)
     alt.set('betrieb', lauf('2026-10-14T04:00:00Z'))
-    expect(betriebHinweis([], alt, jetzt)).toEqual({ anzahl: 1, text: 'Ablauf „Messung (Betrieb)“ ausgefallen', kurz: 'Ablauf ausgefallen' })
+    expect(betriebHinweis([], alt, jetzt)).toEqual({ anzahl: 1, text: 'Ablauf „Messung (Betrieb)“ ausgefallen', kurz: 'Ablauf ausgefallen', href: '/admin/betrieb' })
   })
 })
 
