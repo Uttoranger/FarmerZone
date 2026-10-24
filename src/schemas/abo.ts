@@ -28,13 +28,14 @@ export const aboBestaetigenSchema = z.object({ token: aboTokenSchema })
 /**
  * Neuigkeiten auf der Bestätigungsseite anmelden (Register N2, Nr. 46). Der
  * Browser schickt nur, was ohnehin in der Adresse der Seite steht: die
- * Bestell-Kennung und die Signatur (`sig`, HMAC in Hex, bestell-link.ts) —
+ * Bestell-Kennung und die Signatur (`sig`, HMAC in Hex, mit LINK_SECRET mit
+ * Kennung `2.` davor, bestell-link.ts / link-signatur.ts) —
  * nie eine E-Mail-Adresse. Ein zusätzliches Feld (etwa eine Adresse) fällt
  * still weg. Ob die Signatur gilt, prüft `bestellLinkGilt` in der Action.
  */
 export const neuigkeitenAnmeldenSchema = z.object({
   orderId: z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/),
-  sig: z.string().regex(/^[0-9a-f]{64}$/),
+  sig: z.string().regex(/^(?:2\.)?[0-9a-f]{64}$/),
 })
 
 export type NeuigkeitenAnmelden = z.infer<typeof neuigkeitenAnmeldenSchema>

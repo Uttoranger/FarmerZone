@@ -104,6 +104,12 @@ Vercel erlaubt je Variable und Umgebung nur einen Wert. Deshalb kommt **zuerst S
   - Liegt der Wert **mehr als 24 Stunden in der Zukunft** (etwa ein falsches Jahr), gilt er trotzdem – bis dahin zählen alle Online-Bestellungen als Testzahlungen. Sentry meldet dann „Umgebung widersprüchlich: STRIPE_LIVE_AB liegt mehr als 24 Stunden in der Zukunft …“ (höchstens einmal je Instanz, ohne den Wert). Dann den Wert berichtigen und neu deployen.
   - **Bau-Fenster:** Online-Bestellungen zwischen dem Beginn des Redeploys und dem fertigen Deployment laufen noch über den Test-Schlüssel, liegen aber nach dem Stichtag – sie würden mitgezählt. Darum die ruhige Stunde (Schritt 0) und danach Admin → Finanzen prüfen (Schritt 8).
 
+**Unabhängig von Stripe: `LINK_SECRET` (Register S17, Nr. 166)**
+
+- [ ] `LINK_SECRET` signiert die Links in Mails (Bestellung ansehen, Nachbestellen, Abmelden). Je einen **eigenen** Wert für **Preview** und für **Production** anlegen, „Sensitive“, mindestens 32 Zeichen (`openssl rand -base64 32`), nie derselbe Wert wie `BETTER_AUTH_SECRET`. Kürzer als 32 Zeichen bricht der Start ab.
+- [ ] Reihenfolge: zuerst Preview setzen, neu deployen, in der Vorschau eine Bestellung durchspielen (Bestätigungsseite, Bestellseite aus der Mail bzw. dem Protokoll, Kalender), dann Production.
+- Ohne die Variable bleibt alles wie bisher. Mit ihr tragen neue Links `2.` vor der Signatur; alte Links aus Mails gelten weiter.
+
 ## 6. Zahlungsarten live aktivieren
 
 - [ ] Einstellungen → Zahlungsmethoden (Live-Modus): **EPS**, **Apple Pay** und **Google Pay** aktivieren, Karten sind an. Welche Wege die Kasse anbietet, entscheidet allein diese Einstellung. Stripes Zahlungsfeld zeigt nur, was hier aktiv ist und was das Gerät kann.
