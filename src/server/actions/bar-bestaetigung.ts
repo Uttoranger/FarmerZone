@@ -26,6 +26,8 @@ import { neuigkeitenAnmeldenSchema as bestellLinkSchema } from '@/schemas/abo'
 import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
+import { stelleMailEin } from '@/server/mail-warteschlange'
+import { bestellMailAuftrag } from '@/server/mail-arten/bestellung'
 
 /**
  * Die zwei Knöpfe der Bar-Bestätigung (/{hof}/bestaetigen/{token}, H3).
@@ -44,8 +46,9 @@ import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
 export type BarAktionStand = { error?: string }
 
 /**
- * Die Daten für die Mails an Kundin und Hof — dieselben Felder wie beim
- * Checkout. Bestätigen und „Erneut senden" nehmen beide diese eine Hilfe.
+ * Die Daten für den Bestätigungslink (Sofort, „Erneut senden") — dieselben
+ * Felder wie beim Checkout. Die Mails nach dem Bestätigen lädt seit Nr. 159
+ * der Renderer der Warteschlange selbst.
  */
 function barMailBestellung(order: NonNullable<Awaited<ReturnType<typeof leseBestellung>>>): OrderForEmail {
   return {
@@ -130,40 +133,31 @@ export async function bestaetigeBarBestellung(_vorher: BarAktionStand, formular:
   // aus PENDING_CONFIRMATION, nur mit genau diesem Token, und der Token
   // verfällt im selben Schreiben. count 0: zweiter Klick, parallel storniert
   // oder eben verfallen — die signierte Seite zeigt den echten Stand.
-  const { count } = await prisma.order.updateMany({
-    where: {
-      id: order.id,
-      status: 'PENDING_CONFIRMATION',
-      confirmationToken: { in: tokenKandidaten(token) },
-      paymentMethod: { not: 'ONLINE' },
-    },
-    data: { status: 'CONFIRMED', confirmedAt: jetzt, confirmationToken: null },
+  //
+  // Die Mails an Kundin und Hof sind seit Nr. 159 Aufträge der Warteschlange
+  // — in DERSELBEN Transaktion, erst der Status, dann die Aufträge: Eine
+  // bestätigte Bestellung hat immer ihre Mails. Verschickt wird nach der
+  // Antwort (Worker); ein hakender Mailserver nimmt die Bestätigung nie zurück.
+  const count = await prisma.$transaction(async (tx) => {
+    const { count: bestaetigt } = await tx.order.updateMany({
+      where: {
+        id: order.id,
+        status: 'PENDING_CONFIRMATION',
+        confirmationToken: { in: tokenKandidaten(token) },
+        paymentMethod: { not: 'ONLINE' },
+      },
+      data: { status: 'CONFIRMED', confirmedAt: jetzt, confirmationToken: null },
+    })
+    if (bestaetigt === 1) {
+      await stelleMailEin([bestellMailAuftrag('bestellung-bestaetigung', order), bestellMailAuftrag('bar-bestaetigt-hof', order)], tx)
+    }
+    return bestaetigt
   })
   if (count === 0) redirect(bestaetigungsPfad(order.farm.slug, order.id))
 
   // Wie cancelOrder: Die Bestellliste des Hofs zeigt den neuen Stand sofort.
   revalidatePath('/orders')
   revalidatePath(`/orders/${order.id}`)
-
-  const mailBestellung = barMailBestellung(order)
-
-  // Mails NACH der Antwort und jede für sich: Die Bestellung ist bestätigt,
-  // ein hakender Mailserver nimmt das nie zurück (CLAUDE.md, Geld und
-  // Bestellungen). Nur die Bestell-ID geht nach Sentry.
-  nachDerAntwort(async () => {
-    for (const [mail, senden] of [
-      // Der Versand erst hier geladen (Nr. 31) — im try: Scheitert schon das
-      // Laden, ist es ein Mailfehler wie jeder andere.
-      ['bestaetigung_kundin', async () => (await import('@/lib/email')).sendOrderConfirmation(mailBestellung)],
-      ['bestaetigung_hof', async () => (await import('@/lib/email')).sendOrderConfirmedToFarmer(mailBestellung)],
-    ] as const) {
-      try {
-        await senden()
-      } catch (err) {
-        Sentry.captureException(err, { tags: { aufgabe: 'bar-bestaetigung', mail }, extra: { orderId: order.id } })
-      }
-    }
-  })
 
   redirect(bestaetigungsPfad(order.farm.slug, order.id))
 }

@@ -40,12 +40,6 @@ vi.mock('@/lib/stripe', async () => {
     },
   }
 })
-vi.mock('@/lib/email', () => ({
-  sendOrderConfirmation: vi.fn(),
-  sendOrderPaidToFarmer: vi.fn(),
-  sendZahlungZuSpaet: vi.fn(),
-  sendErstattungOffen: vi.fn(),
-}))
 /**
  * Die Mails laufen nach der Antwort (`nachDerAntwort`). Seit Nr. 95 liest der
  * Nachlauf vorher die Empfänger aus der Datenbank — eine feste Pause reicht
@@ -66,9 +60,24 @@ import * as Sentry from '@sentry/nextjs'
 import { POST } from '@/app/api/stripe/webhook/route'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import { sendErstattungOffen } from '@/lib/email'
+import { erstattungOffenInhalt } from '@/lib/erstattung-offen'
 import { INTEGRATIONS_ENV } from './setup/integrations-umgebung'
-import { erstelleHof, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
+import { auftraege, erstelleHof, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
+
+/*
+ * Die Meldung an den Betreiber ist seit Nr. 159 je Empfänger ein Auftrag der
+ * Warteschlange (Wichtig), Schlüssel `erstattung-offen:<refundId>:<empfänger>`.
+ * Gezählt wird der Auftrag an die feste Adresse (`support`) aus diesem Test —
+ * weitere bestätigte Adressen der geteilten Test-Datenbank zählen nicht.
+ */
+let testBeginn = new Date()
+
+async function offeneMeldungen(): Promise<Array<{ bestellungId: string | null; bezug: Record<string, string> }>> {
+  const zeilen = await auftraege({ art: 'erstattung-offen', erstelltAm: { gte: testBeginn } })
+  return zeilen
+    .map((z) => ({ bestellungId: z.bestellungId, bezug: z.bezug as Record<string, string> }))
+    .filter((z) => z.bezug.empfaengerId === 'support')
+}
 
 type Erstattung = { id: string; amount: number; status: string; metadata: Record<string, string> }
 
@@ -78,6 +87,7 @@ let rueckbuchungen: Array<{ amount: number; metadata: Record<string, string> }> 
 
 beforeEach(() => {
   vi.clearAllMocks()
+  testBeginn = new Date(Date.now() - 1000)
   erstattungen = []
   rueckbuchungen = []
   vi.mocked(stripe.paymentIntents.retrieve).mockResolvedValue({ latest_charge: { id: 'ch_test', transfer: 'tr_test', amount: 1082 } } as never)
@@ -214,9 +224,9 @@ describe('refund.failed — Teilerstattung nach „Artikel fehlt" gescheitert', 
     expect(danach.serviceFeeCents).toBe(50)
     expect(meldungen('erstattung_gescheitert_zurueckgenommen')).toBe(1)
     await nachlaufFertig()
-    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
-    const meldung = vi.mocked(sendErstattungOffen).mock.calls[0]![0]
-    expect(meldung).toMatchObject({ bestellId: order.id, betraege: [expect.objectContaining({ cents: 582 })] })
+    const [meldung, ...weitere] = await offeneMeldungen()
+    expect(weitere).toEqual([])
+    expect(meldung).toMatchObject({ bestellungId: order.id, bezug: { fall: 'zurueckgenommen', orderId: order.id, kundinCents: '582' } })
     const sentryText = JSON.stringify(vi.mocked(Sentry.captureMessage).mock.calls)
     for (const text of [JSON.stringify(meldung), sentryText]) {
       expect(text).not.toContain('Anna')
@@ -239,7 +249,7 @@ describe('refund.failed — Teilerstattung nach „Artikel fehlt" gescheitert', 
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(0)
     expect(meldungen('erstattung_gescheitert_zurueckgenommen')).toBe(1)
     await nachlaufFertig()
-    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
+    expect(await offeneMeldungen()).toHaveLength(1)
   })
 
   it('zwei gleichzeitige Zustellungen (beide Ereignisse): nie doppelt zurückgenommen', async () => {
@@ -260,7 +270,7 @@ describe('refund.failed — Teilerstattung nach „Artikel fehlt" gescheitert', 
     await nachlaufFertig()
     expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
     expect(meldungen('erstattung_gescheitert_zurueckgenommen')).toBe(1)
-    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
+    expect(await offeneMeldungen()).toHaveLength(1)
   })
 
   it('stimmt die Datenbank weder vorher noch nachher mit Stripe überein: nichts geändert, als unklar gemeldet', async () => {
@@ -274,7 +284,7 @@ describe('refund.failed — Teilerstattung nach „Artikel fehlt" gescheitert', 
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(900)
     expect(meldungen('erstattung_gescheitert_unklar')).toBe(1)
     await nachlaufFertig()
-    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
+    expect(await offeneMeldungen()).toHaveLength(1)
   })
 })
 
@@ -307,9 +317,9 @@ describe('Erstattungen, die nicht nachweislich zu einer unserer Buchungen gehör
     expect(danach.paymentStatus).toBe('REFUNDED')
     expect(meldungen('erstattung_gescheitert_fremd')).toBe(1)
     await nachlaufFertig()
-    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
+    expect(await offeneMeldungen()).toHaveLength(1)
     // Die Bestellung zur Zahlung wird zum Wiederfinden genannt, nicht geändert.
-    expect(vi.mocked(sendErstattungOffen).mock.calls[0]![0]).toMatchObject({ bestellId: order.id })
+    expect((await offeneMeldungen())[0]).toMatchObject({ bestellungId: order.id, bezug: expect.objectContaining({ fall: 'fremd', orderId: order.id }) })
     expect(stripe.refunds.list).not.toHaveBeenCalled()
   })
 
@@ -334,7 +344,7 @@ describe('Erstattungen, die nicht nachweislich zu einer unserer Buchungen gehör
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(582)
     await nachlaufFertig()
     expect(Sentry.captureMessage).not.toHaveBeenCalled()
-    expect(sendErstattungOffen).not.toHaveBeenCalled()
+    expect(await offeneMeldungen()).toHaveLength(0)
   })
 })
 
@@ -351,7 +361,7 @@ describe('Nachbesserung Runde 1', () => {
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(0)
     expect(meldungen('erstattung_gescheitert_zurueckgenommen')).toBe(1)
     await nachlaufFertig()
-    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
+    expect(await offeneMeldungen()).toHaveLength(1)
   })
 
   it('nie gezählt (Datenbank = Stripe ohne die gescheiterte): nichts geändert, genau eine Meldung, auch beim zweiten Ereignis', async () => {
@@ -369,7 +379,7 @@ describe('Nachbesserung Runde 1', () => {
     expect(Sentry.captureMessage).not.toHaveBeenCalled()
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(0)
     await nachlaufFertig()
-    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
+    expect(await offeneMeldungen()).toHaveLength(1)
   })
 
   it('nie gezählt, beide Ereignisse gleichzeitig: genau eine Meldung und eine Mail', async () => {
@@ -385,7 +395,7 @@ describe('Nachbesserung Runde 1', () => {
     expect(antworten.map((a) => a.status)).toEqual([200, 200])
     await nachlaufFertig()
     expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
-    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
+    expect(await offeneMeldungen()).toHaveLength(1)
   })
 
   it('zurückgenommen, danach das zweite Ereignis: es findet den Vermerk der Zurücknahme und meldet nichts', async () => {
@@ -399,7 +409,7 @@ describe('Nachbesserung Runde 1', () => {
 
     expect(Sentry.captureMessage).not.toHaveBeenCalled()
     await nachlaufFertig()
-    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
+    expect(await offeneMeldungen()).toHaveLength(1)
   })
 
   it('Zahlung ohne Überweisung: 200, nichts geändert, als unklar gemeldet (keine stumme Neuzustellung)', async () => {
@@ -424,7 +434,7 @@ describe('Nachbesserung Runde 1', () => {
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).erstattetCents).toBe(582)
     await nachlaufFertig()
     expect(Sentry.captureMessage).not.toHaveBeenCalled()
-    expect(sendErstattungOffen).not.toHaveBeenCalled()
+    expect(await offeneMeldungen()).toHaveLength(0)
   })
 
   it('refund.failed eines verbundenen Hof-Kontos (event.account gesetzt): ignoriert', async () => {
@@ -438,7 +448,7 @@ describe('Nachbesserung Runde 1', () => {
     expect(stripe.refunds.list).not.toHaveBeenCalled()
     await nachlaufFertig()
     expect(Sentry.captureMessage).not.toHaveBeenCalled()
-    expect(sendErstattungOffen).not.toHaveBeenCalled()
+    expect(await offeneMeldungen()).toHaveLength(0)
   })
 })
 
@@ -495,10 +505,11 @@ describe('refund.failed — Vollerstattung mit Merkmalen gescheitert (Nr. 27)', 
     expect(danach.erstattetCents).toBe(0)
     expect(meldungen('erstattung_gescheitert_zurueckgenommen')).toBe(1)
     await nachlaufFertig()
-    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
-    const meldung = vi.mocked(sendErstattungOffen).mock.calls[0]![0]
-    expect(meldung).toMatchObject({ bestellId: order.id, betraege: [expect.objectContaining({ cents: 1082 })] })
-    expect(meldung.handanweisung).toContain('Vollerstattung')
+    const [meldung, ...weitere] = await offeneMeldungen()
+    expect(weitere).toEqual([])
+    expect(meldung).toMatchObject({ bestellungId: order.id, bezug: { fall: 'vollstorno_zurueckgenommen', orderId: order.id, kundinCents: '1082' } })
+    // Die Anweisung, die der Renderer aus dem Fall nimmt.
+    expect(erstattungOffenInhalt('vollstorno_zurueckgenommen', { kundinCents: 1082 }).handanweisung).toContain('Vollerstattung')
     const sentryText = JSON.stringify(vi.mocked(Sentry.captureMessage).mock.calls)
     for (const text of [JSON.stringify(meldung), sentryText]) {
       expect(text).not.toContain('Anna')
@@ -517,7 +528,7 @@ describe('refund.failed — Vollerstattung mit Merkmalen gescheitert (Nr. 27)', 
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).paymentStatus).toBe('PAID')
     await nachlaufFertig()
     expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
-    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
+    expect(await offeneMeldungen()).toHaveLength(1)
   })
 
   it('beide Ereignisse gleichzeitig: nie doppelt, genau eine Meldung', async () => {
@@ -534,7 +545,7 @@ describe('refund.failed — Vollerstattung mit Merkmalen gescheitert (Nr. 27)', 
     await nachlaufFertig()
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).paymentStatus).toBe('PAID')
     expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
-    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
+    expect(await offeneMeldungen()).toHaveLength(1)
   })
 
   it('Stripe kennt daneben eine weitere zählende Erstattung (von Hand nachgeholt): nichts geändert, als unklar gemeldet', async () => {
@@ -603,6 +614,6 @@ describe('Nachbesserung Runde 1 (Nr. 27) — sofort gescheiterter Storno schon g
     expect(danach.paymentStatus).toBe('PAID')
     await nachlaufFertig()
     expect(Sentry.captureMessage).not.toHaveBeenCalled()
-    expect(sendErstattungOffen).not.toHaveBeenCalled()
+    expect(await offeneMeldungen()).toHaveLength(0)
   })
 })

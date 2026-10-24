@@ -1,7 +1,6 @@
 import * as Sentry from '@sentry/nextjs'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { APP_URL } from '@/lib/umgebung-server'
 import { emailAnmeldungSchritt, werbemailErlaubt, type EmailAboStand, type EmailAnmeldeSchritt } from '@/lib/abo-bestaetigung'
 import { aboBestaetigungsPfad, erzeugeAboBestaetigungsToken, pruefeAboBestaetigungsToken } from '@/lib/abo-bestaetigung-token'
@@ -65,46 +64,39 @@ export async function meldeEmailAboAn(
   // Eine gleichzeitige Anmeldung war schneller und hat den Link verschickt.
   if (count === 0) return 'gebremst'
 
-  schickeBestaetigungNachDerAntwort(abo.id, jetzt)
+  await stelleBestaetigungEin(abo.id, jetzt)
   return schritt
 }
 
-function meldeVersandFehler(grund: 'resend_fehler' | 'nachlauf_fehler', err?: unknown): void {
+function meldeEinstellFehler(err: unknown): void {
   // Fester Text und Art, nie Adresse oder Hofname (sentry-hygiene).
-  const kontext = { tags: { aufgabe: 'abo_bestaetigung', grund } }
-  if (err === undefined) {
-    Sentry.captureMessage('Abo-Bestätigung nicht verschickt', { level: 'error', ...kontext })
-    return
-  }
-  const meldung = new Error('Abo-Bestätigung nicht verschickt')
+  const meldung = new Error('Abo-Bestätigung nicht eingestellt')
   meldung.name = err instanceof Error ? err.name : 'Unbekannt'
-  Sentry.captureException(meldung, kontext)
+  Sentry.captureException(meldung, { tags: { aufgabe: 'abo_bestaetigung', grund: 'einstellen_fehler' } })
 }
 
-function schickeBestaetigungNachDerAntwort(aboId: string, angefragtAm: Date): void {
-  nachDerAntwort(async () => {
-    try {
-      const abo = await prisma.customerFarmSubscription.findUnique({
-        where: { id: aboId },
-        select: { customerEmail: true, farm: { select: { name: true } } },
-      })
-      if (!abo) return
-      const url = `${APP_URL}${aboBestaetigungsPfad(erzeugeAboBestaetigungsToken(aboId, angefragtAm))}`
-      const { sendAboBestaetigung } = await import('@/lib/email')
-      const ergebnis = await sendAboBestaetigung(abo.customerEmail, { hofName: abo.farm.name, url })
-      // sendRaw wirft nie, ein Resend-Fehler kommt als { error } zurück.
-      if (ergebnis.error) meldeVersandFehler('resend_fehler')
-      // Ohne Versand (lokal ohne RESEND_API_KEY) steht der Link im Terminal —
-      // nie in Produktion, auch nicht bei einem Resend-Fehler.
-      if (!ergebnis.id && process.env.NODE_ENV !== 'production') {
-        // Ohne Adresse — die Abo-ID reicht, um den Link zuzuordnen.
-        console.log(`[DEV] Bestätigungslink Neuigkeiten (Abo ${aboId}): ${url}`)
-      }
-    } catch (err) {
-      console.error('[Abo-Bestätigung] E-Mail-Fehler:', err instanceof Error ? err.name : 'unbekannt')
-      meldeVersandFehler('nachlauf_fehler', err)
+/**
+ * Die Bestätigungsmail ist ein Auftrag der Warteschlange (Wichtig, Nr. 159):
+ * Im Auftrag steht nur das Abo, den Link signiert der Renderer beim Versand
+ * frisch aus Abo und Anfragezeitpunkt (src/server/mail-arten/kundin.ts). Ein
+ * Fehler beim Einstellen ändert am Abo nichts.
+ */
+async function stelleBestaetigungEin(aboId: string, angefragtAm: Date): Promise<void> {
+  try {
+    const abo = await prisma.customerFarmSubscription.findUnique({ where: { id: aboId }, select: { farmId: true } })
+    if (!abo) return
+    // Erst hier geladen: Seiten unter /account binden diese Datei ein, die Warteschlange samt Renderern brauchen sie nicht.
+    const [{ stelleMailEin }, { aboBestaetigungAuftrag }] = await Promise.all([import('@/server/mail-warteschlange'), import('@/server/mail-arten/kundin')])
+    await stelleMailEin(aboBestaetigungAuftrag({ id: aboId, farmId: abo.farmId }, angefragtAm))
+    // Ohne Versand (lokal ohne RESEND_API_KEY) steht der Link im Terminal —
+    // nie in Produktion. Ohne Adresse: Die Abo-ID reicht, um ihn zuzuordnen.
+    if (process.env.NODE_ENV !== 'production' && !process.env.RESEND_API_KEY) {
+      console.log(`[DEV] Bestätigungslink Neuigkeiten (Abo ${aboId}): ${APP_URL}${aboBestaetigungsPfad(erzeugeAboBestaetigungsToken(aboId, angefragtAm))}`)
     }
-  })
+  } catch (err) {
+    console.error('[Abo-Bestätigung] Einstellen gescheitert:', err instanceof Error ? err.name : 'unbekannt')
+    meldeEinstellFehler(err)
+  }
 }
 
 /**

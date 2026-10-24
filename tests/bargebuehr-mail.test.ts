@@ -24,6 +24,17 @@ vi.mock('resend', () => ({
 const IMPORT_TIMEOUT = 30_000
 
 let email: typeof import('@/lib/email')
+
+/**
+ * Seit Nr. 159 baut email.ts diese Mail nur (Renderer der Warteschlange);
+ * `gebaut` legt das Ergebnis dorthin, wo der Test den Aufruf an Resend liest.
+ */
+function gebaut<A extends unknown[]>(baue: (...a: A) => Promise<import('@/lib/email').StapelMail>): (...a: A) => Promise<void> {
+  return async (...a) => {
+    const mail = await baue(...a)
+    sendMock({ from: 'test', to: mail.an, subject: mail.betreff, html: mail.html, ...(mail.headers ? { headers: mail.headers } : {}) })
+  }
+}
 let konditionen: typeof import('@/lib/konditionen')
 
 beforeAll(async () => {
@@ -81,9 +92,9 @@ function gesendeterText(): string {
 
 const normal = (text: string): string => text.replace(/ /g, ' ')
 
-describe('sendOrderConfirmedToFarmer — Bar-Ausnahme nach dem Bestellzeitpunkt', () => {
+describe('baueOrderConfirmedToFarmer — Bar-Ausnahme nach dem Bestellzeitpunkt', () => {
   it('bar vor dem Stichtag bestellt, Gebühr 0: der ganze Betrag bleibt dem Hof', async () => {
-    await email.sendOrderConfirmedToFarmer(bestellung({ serviceFeeCents: 0, createdAt: new Date('2026-10-06T10:00:00.000Z') }))
+    await gebaut(email.baueOrderConfirmedToFarmer)(bestellung({ serviceFeeCents: 0, createdAt: new Date('2026-10-06T10:00:00.000Z') }))
     const text = gesendeterText()
     expect(text).toContain('Bar zu kassieren: € 10,30')
     expect(text).toContain(`${normal(konditionen.BAR_OHNE_GEBUEHR_SATZ)} Der ganze Betrag bleibt dir.`)
@@ -92,7 +103,7 @@ describe('sendOrderConfirmedToFarmer — Bar-Ausnahme nach dem Bestellzeitpunkt'
 
   it('bar ab dem Stichtag bestellt, mit Gebühr: wie bisher mit der Monatsabrechnung', async () => {
     const danach = new Date(konditionen.BAR_SERVICEGEBUEHR_AB.getTime() + 60_000)
-    await email.sendOrderConfirmedToFarmer(bestellung({ serviceFeeCents: 52, createdAt: danach }))
+    await gebaut(email.baueOrderConfirmedToFarmer)(bestellung({ serviceFeeCents: 52, createdAt: danach }))
     const text = gesendeterText()
     expect(text).toContain('Bar zu kassieren: € 10,82')
     expect(text).toContain('die schuldest du der Monatsabrechnung')
@@ -100,7 +111,7 @@ describe('sendOrderConfirmedToFarmer — Bar-Ausnahme nach dem Bestellzeitpunkt'
   })
 
   it('ohne Bestellzeitpunkt kein Hinweis — lieber keiner als ein falscher', async () => {
-    await email.sendOrderConfirmedToFarmer(bestellung({ serviceFeeCents: 0 }))
+    await gebaut(email.baueOrderConfirmedToFarmer)(bestellung({ serviceFeeCents: 0 }))
     expect(gesendeterText()).not.toContain(normal(konditionen.BAR_OHNE_GEBUEHR_SATZ))
   })
 })

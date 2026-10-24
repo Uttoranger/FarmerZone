@@ -21,6 +21,8 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+// Der echte Teil von email.ts (Renderer, Worker) bindet 'server-only'.
+vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
@@ -31,14 +33,9 @@ vi.mock('@/lib/stripe', () => ({
     transfers: { createReversal: vi.fn(), listReversals: vi.fn() },
   },
 }))
-vi.mock('@/lib/email', () => ({
-  sendOrderReady: vi.fn(),
-  sendOrderCancelled: vi.fn(),
-  sendOrderNotReady: vi.fn(),
-  sendArtikelFehlt: vi.fn(),
-  sendOnsiteConfirmation: vi.fn(),
-  sendErstattungOffen: vi.fn(),
-}))
+// Die Bestellmails sind seit Nr. 159 Aufträge der Warteschlange (echt in der
+// Datenbank); der Checkout schickt den Bar-Bestätigungslink weiter direkt.
+vi.mock('@/lib/email', async (original) => ({ ...(await original<typeof import('@/lib/email')>()), sendOnsiteConfirmation: vi.fn() }))
 
 /**
  * Die Mails laufen nach der Antwort (`nachDerAntwort`). Seit Nr. 95 liest der
@@ -55,6 +52,16 @@ vi.mock('@/lib/nach-der-antwort', () => ({
   },
 }))
 
+/** Die Aufträge einer Art zu einer Bestellung (echt in der Datenbank). */
+async function auftraegeVon(orderId: string, art: string) {
+  return auftraege({ bestellungId: orderId, art })
+}
+
+/** „Erstattung offen" an die feste Adresse — weitere bestätigte Adressen der geteilten Test-Datenbank zählen nicht. */
+async function offenAnSupport(orderId: string) {
+  return (await auftraegeVon(orderId, 'erstattung-offen')).filter((a) => (a.bezug as { empfaengerId?: string }).empfaengerId === 'support')
+}
+
 async function nachlaufFertig(): Promise<void> {
   while (nachlauf.laufend.length > 0) await Promise.all(nachlauf.laufend.splice(0))
 }
@@ -69,7 +76,6 @@ import { getMeistverkaufteProduktIds } from '@/server/queries/manual-sales'
 import { POST as checkout } from '@/app/api/checkout/route'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import { sendArtikelFehlt, sendErstattungOffen, sendOrderCancelled } from '@/lib/email'
 import {
   checkoutAnfrage,
   erstelleHof,
@@ -77,6 +83,7 @@ import {
   erstelleProdukt,
   intKennung,
   raeumeAuf,
+  auftraege,
   setzeHalt,
 } from './setup/basis'
 
@@ -252,13 +259,14 @@ describe('Artikel fehlt — Rechenbeispiele der Freigabe in der Datenbank', () =
     expect(refundCreate).not.toHaveBeenCalled()
     // Der fehlende Artikel geht nicht zurück in den Vorrat — er ist nicht da.
     expect((await prisma.product.findUniqueOrThrow({ where: { id: produkte[1]!.id } })).stock).toBe(5)
-    await vi.waitFor(() => expect(sendArtikelFehlt).toHaveBeenCalledTimes(1))
-    expect(vi.mocked(sendArtikelFehlt).mock.calls[0]![1]).toMatchObject({
-      zahlung: 'vor_ort',
-      bisherCents: 1082,
-      neuCents: 500,
-      erstattetCents: null,
-    })
+    // Der Auftrag trägt die Beträge der Rechnung; ohne Erstattung gilt vor Ort.
+    expect(await auftraegeVon(order.id, 'artikel-fehlt')).toEqual([
+      expect.objectContaining({
+        vorrang: 1,
+        schluessel: `artikel-fehlt:${order.id}:${position('Brot').id}`,
+        bezug: { orderId: order.id, itemId: position('Brot').id, bisherCents: '1082', neuCents: '500' },
+      }),
+    ])
   })
 
   it('online: Kundin bekommt € 5,82, vom Hof genau € 5,80 per Rückbuchung mit festem Betrag', async () => {
@@ -288,8 +296,9 @@ describe('Artikel fehlt — Rechenbeispiele der Freigabe in der Datenbank', () =
       erstattetCents: 582,
       fehlend: ['Brot'],
     })
-    await vi.waitFor(() => expect(sendArtikelFehlt).toHaveBeenCalledTimes(1))
-    expect(vi.mocked(sendArtikelFehlt).mock.calls[0]![1]).toMatchObject({ zahlung: 'online', erstattetCents: 582, neuCents: 500 })
+    expect(await auftraegeVon(order.id, 'artikel-fehlt')).toEqual([
+      expect.objectContaining({ bezug: { orderId: order.id, itemId: brot.id, bisherCents: '1082', neuCents: '500', erstattetCents: '582' } }),
+    ])
   })
 })
 
@@ -308,7 +317,7 @@ describe('Artikel fehlt — Doppeltipp, Fehler, Wiederholung', () => {
     expect(erstattungen).toHaveLength(1)
     expect(rueckbuchungen).toHaveLength(1)
     expect(await stand(order.id)).toMatchObject({ erstattetCents: 582, warenCents: 450, gebuehrCents: 50 })
-    await vi.waitFor(() => expect(sendArtikelFehlt).toHaveBeenCalledTimes(1))
+    expect(await auftraegeVon(order.id, 'artikel-fehlt')).toHaveLength(1)
   })
 
   it('zwei verschiedene Artikel gleichzeitig: beide vom jeweils aktuellen Stand, Summe nie über dem bezahlten Betrag', async () => {
@@ -360,7 +369,7 @@ describe('Artikel fehlt — Doppeltipp, Fehler, Wiederholung', () => {
 
     expect(zweiter).toEqual({ erstattetCents: 582, vomHofCents: 580, neuGesamtCents: 500 })
     expect(erstattungen).toHaveLength(1)
-    await vi.waitFor(() => expect(sendArtikelFehlt).toHaveBeenCalledTimes(1))
+    expect(await auftraegeVon(order.id, 'artikel-fehlt')).toHaveLength(1)
   })
 
   it('Stripe hat erstattet, die Antwort kam nicht an: der zweite Versuch bekommt DIESELBE Erstattung', async () => {
@@ -497,7 +506,8 @@ describe('Artikel fehlt — fehlt alles, ist es ein Storno', () => {
     // Eier zurück in den Vorrat (5 + 1), das fehlende Brot nicht.
     expect((await prisma.product.findUniqueOrThrow({ where: { id: produkte[0]!.id } })).stock).toBe(6)
     expect((await prisma.product.findUniqueOrThrow({ where: { id: produkte[1]!.id } })).stock).toBe(5)
-    await vi.waitFor(() => expect(sendOrderCancelled).toHaveBeenCalledTimes(1))
+    // Die Storno-Mail mit dem Rest, den Stripe eben erstattet hat (500 Cent).
+    expect(await auftraegeVon(order.id, 'storniert')).toEqual([expect.objectContaining({ bezug: { orderId: order.id, erstattetCents: '500' } })])
   })
 
   it('Storno nach Teilerstattung doppelt geklickt: genau eine Erstattung des Rests', async () => {
@@ -513,8 +523,9 @@ describe('Artikel fehlt — fehlt alles, ist es ein Storno', () => {
     ])
     const danach = await prisma.order.findUniqueOrThrow({ where: { id: order.id } })
     expect(danach.erstattetCents).toBe(1082)
-    await vi.waitFor(() => expect(sendOrderCancelled).toHaveBeenCalledTimes(1))
-    expect(vi.mocked(sendOrderCancelled).mock.calls[0]![2]).toBe('Hof verhindert')
+    // Doppelt geklickt: ein Auftrag; den Grund liest der Renderer an der Bestellung.
+    expect(await auftraegeVon(order.id, 'storniert')).toHaveLength(1)
+    expect(danach.cancelReason).toBe('Hof verhindert')
   })
 
   it('Storno ohne Teilerstattung doppelt geklickt: eine Vollerstattung mit reverse_transfer', async () => {
@@ -622,9 +633,7 @@ describe('Im Zweifel nicht buchen (Nachbesserung 2)', () => {
     expect(await stand(orderId)).toMatchObject({ warenCents: 1030, gebuehrCents: 52, erstattetCents: 0, fehlend: [] })
     expect(refundCreate).not.toHaveBeenCalled()
     expect(reversalCreate).not.toHaveBeenCalled()
-    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
-    await vi.dynamicImportSettled()
-    expect(sendArtikelFehlt).not.toHaveBeenCalled()
+    expect(await auftraegeVon(orderId, 'artikel-fehlt')).toEqual([])
   }
 
   it('eine Erstattung ohne Zuordnung (von Hand im Dashboard): nichts gebucht, Hof soll sich melden, Sentry', async () => {
@@ -728,8 +737,9 @@ describe('Im Zweifel nicht buchen (Nachbesserung 2)', () => {
       expect.objectContaining({ tags: expect.objectContaining({ grund: 'stripe_unklar_ohne_zuordnung' }) })
     )
     await nachlaufFertig()
-    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(sendErstattungOffen).mock.calls[0]![0]).toMatchObject({ bestellId: order.id })
+    expect(await offenAnSupport(order.id)).toEqual([
+      expect.objectContaining({ schluessel: `erstattung-offen:storno-${order.id}:support`, bezug: { empfaengerId: 'support', fall: 'storno_rest_ohne_betraege', orderId: order.id } }),
+    ])
   })
 })
 
@@ -758,9 +768,9 @@ describe('Rest-Storno mit Stripes bezahltem Betrag (Nr. 19c)', () => {
     )
     // Erst den ganzen Nachlauf abwarten: „genau einmal" und „keine Storno-Mail" gelten erst danach.
     await nachlaufFertig()
-    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(sendErstattungOffen).mock.calls[0]![0]).toMatchObject({ bestellId: order.id })
-    expect(sendOrderCancelled).not.toHaveBeenCalled()
+    expect(await offenAnSupport(order.id)).toEqual([expect.objectContaining({ bezug: { empfaengerId: 'support', fall: 'storno_rest_ohne_betraege', orderId: order.id } })])
+    // Der Storno-Auftrag steht seit der Transaktion; „offen" heißt: der Renderer verwirft ihn, keine Storno-Mail.
+    expect(await auftraegeVon(order.id, 'storniert')).toEqual([expect.objectContaining({ bezug: { orderId: order.id, erstattung: 'offen' } })])
   })
 
   it('Rest-Erstattung scheitert: die Anweisung nennt eine TEILerstattung mit den Beträgen aus dem Rest', async () => {
@@ -771,20 +781,20 @@ describe('Rest-Storno mit Stripes bezahltem Betrag (Nr. 19c)', () => {
     const storno = await cancelOrder(order.id)
 
     expect(storno.erstattungOffen).toBe(true)
-    const [, kontext] = vi.mocked(Sentry.captureException).mock.calls.at(-1) as [unknown, { tags: Record<string, string>; extra: Record<string, unknown> }]
+    // Nur die Meldungen des Stornos (der Worker kann dazwischen warnen, Nr. 159).
+    const [, kontext] = vi
+      .mocked(Sentry.captureException)
+      .mock.calls.filter(([, k]) => (k as { tags?: { aktion?: string } } | undefined)?.tags?.aktion === 'cancelOrder')
+      .at(-1) as [unknown, { tags: Record<string, string>; extra: Record<string, unknown> }]
     expect(kontext.tags.grund).toBe('erstattung_offen')
     expect(kontext.extra).toMatchObject({ orderId: order.id, erstattungCents: 500, vomHofCents: 450 })
     expect(String(kontext.extra.handerstattung)).toContain('Teilerstattung')
     expect(String(kontext.extra.handerstattung)).not.toContain('Plattformgebühr erstatten')
     await nachlaufFertig()
-    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(sendErstattungOffen).mock.calls[0]![0]).toMatchObject({
-      bestellId: order.id,
-      betraege: [
-        { label: expect.stringContaining('Kundin'), cents: 500 },
-        { label: expect.stringContaining('Hof'), cents: 450 },
-      ],
-    })
+    // Der Fall mit den Beträgen aus dem Rest — Satz und Anweisung wählt der Renderer (src/lib/erstattung-offen.ts).
+    expect(await offenAnSupport(order.id)).toEqual([
+      expect.objectContaining({ bezug: { empfaengerId: 'support', fall: 'storno_rest', orderId: order.id, kundinCents: '500', hofCents: '450' } }),
+    ])
   })
 
   it('Rest nach verlorener Teilstorno-Antwort scheitert: ebenfalls Teilerstattung, nicht „Plattformgebühr erstatten"', async () => {
@@ -800,7 +810,12 @@ describe('Rest-Storno mit Stripes bezahltem Betrag (Nr. 19c)', () => {
     const storno = await cancelOrder(order.id)
 
     expect(storno.erstattungOffen).toBe(true)
-    const [, kontext] = vi.mocked(Sentry.captureException).mock.calls.at(-1) as [unknown, { extra: Record<string, unknown> }]
+    // Die Meldung des Stornos — der Worker, der im Test sofort nach dem
+    // Einstellen läuft, kann davor eine Warnung „Erstattung ausstehend" melden (Nr. 159).
+    const [, kontext] = vi
+      .mocked(Sentry.captureException)
+      .mock.calls.filter(([, k]) => (k as { tags?: { aktion?: string } } | undefined)?.tags?.aktion === 'cancelOrder')
+      .at(-1) as [unknown, { extra: Record<string, unknown> }]
     expect(kontext.extra).toMatchObject({ orderId: order.id, erstattungCents: 500, vomHofCents: 1030 })
     expect(String(kontext.extra.handerstattung)).toContain('Teilerstattung')
     expect(String(kontext.extra.handerstattung)).not.toContain('Plattformgebühr erstatten')

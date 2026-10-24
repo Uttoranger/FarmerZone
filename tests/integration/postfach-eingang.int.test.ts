@@ -23,6 +23,8 @@
  */
 import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from 'vitest'
 
+// Der echte Teil von email.ts (Renderer, Worker) bindet 'server-only'.
+vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
@@ -33,15 +35,11 @@ vi.mock('@/lib/nach-der-antwort', () => ({
     nachlauf.aufgaben.push(aufgabe)
   },
 }))
-vi.mock('@/lib/email', () => ({
-  sendPostfachMail: vi.fn(async () => ({ id: 'int-mail' })),
-  sendHofAntwortAnTeam: vi.fn(async () => ({ gesendet: 1, gescheitert: 0 })),
+// Die Bestätigung einer weiteren Adresse geht direkt (Sofort, Bestätigungslink);
+// alle anderen Betreiber-Mails sind seit Nr. 159 je Adresse ein Auftrag der Warteschlange.
+vi.mock('@/lib/email', async (original) => ({
+  ...(await original<typeof import('@/lib/email')>()),
   sendBetreiberBestaetigung: vi.fn(async () => ({ id: 'int-mail' })),
-  sendBetreiberTestmail: vi.fn(async () => ({ gesendet: 1, gescheitert: 0 })),
-  sendErstattungOffen: vi.fn(),
-  sendOrderConfirmation: vi.fn(),
-  sendOrderPaidToFarmer: vi.fn(),
-  sendZahlungZuSpaet: vi.fn(),
 }))
 vi.mock('@/lib/stripe', async () => {
   // Die echten Webhook-Helfer des SDK — Signatur prüfen und im Test erzeugen —, aber keine Buchung.
@@ -64,7 +62,7 @@ import { Prisma } from '@prisma/client'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import { sendBetreiberBestaetigung, sendErstattungOffen, sendHofAntwortAnTeam } from '@/lib/email'
+import { sendBetreiberBestaetigung } from '@/lib/email'
 import { POSTFACH_FEHLER, eingangEintraege } from '@/lib/postfach'
 import { SUPPORT_EMAIL } from '@/lib/support'
 import { PLATTFORM_EINSTELLUNG_ID } from '@/lib/plattform-einstellung'
@@ -73,7 +71,7 @@ import { antworteAlsHof, fuegeEmpfaengerHinzu, sendeRundschreiben, speichereZust
 import { bestaetigeEmpfaenger } from '@/server/zustellung-bestaetigen'
 import { empfaengerTokenHash, ladeBetreiberEmpfaenger, ladeEingang, zaehleOffenImEingang } from '@/server/queries/postfach'
 import { INTEGRATIONS_ENV } from './setup/integrations-umgebung'
-import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf, machePasskeyAdmin } from './setup/basis'
+import { auftraege, erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf, machePasskeyAdmin } from './setup/basis'
 
 const MIGRATION = readFileSync(join(process.cwd(), 'prisma', 'migrations', '20261015130000_postfach_stufe2', 'migration.sql'), 'utf8')
 const SUPPORT = SUPPORT_EMAIL.toLowerCase()
@@ -109,6 +107,22 @@ async function erstelleAdmin(): Promise<{ cookie: string }> {
   const { ownerId, cookie } = await erstelleHofMitAnmeldung()
   await machePasskeyAdmin(ownerId)
   return { cookie }
+}
+
+/** Die Adressen hinter den Aufträgen (Kennung `support` = die feste Adresse), sortiert. */
+async function adressenDer(zeilen: Array<{ bezug: unknown }>): Promise<string[]> {
+  const adressen: string[] = []
+  for (const { bezug } of zeilen) {
+    const kennung = (bezug as { empfaengerId: string }).empfaengerId
+    adressen.push(kennung === 'support' ? SUPPORT : (await prisma.betreiberEmpfaenger.findUniqueOrThrow({ where: { id: kennung } })).email)
+  }
+  return adressen.sort()
+}
+
+/** An wen die Mail „Ein Hof hat geantwortet" zu einer Nachricht dieses Fadens geht. */
+async function empfaengerDerAntwort(unterhaltungId: string): Promise<string[]> {
+  const nachrichten = await prisma.nachricht.findMany({ where: { unterhaltungId }, select: { id: true } })
+  return adressenDer(await auftraege({ art: 'antwort-an-team', OR: nachrichten.map((n) => ({ bezug: { path: ['nachrichtId'], equals: n.id } })) }))
 }
 
 async function arbeiteNachlaufAb(): Promise<void> {
@@ -235,7 +249,7 @@ describe('Zustellung: Double-Opt-in', () => {
     await alsSitzung(hofCookie)
     await antworteAlsHof({ unterhaltungId: faden, text: 'Erste Antwort.' })
     await arbeiteNachlaufAb()
-    expect(vi.mocked(sendHofAntwortAnTeam).mock.calls[0]![0]).toEqual([SUPPORT])
+    expect(await empfaengerDerAntwort(faden)).toEqual([SUPPORT])
 
     // Einlösen — einmal.
     expect(await bestaetigeEmpfaenger(token)).toEqual({ ok: true })
@@ -250,7 +264,7 @@ describe('Zustellung: Double-Opt-in', () => {
     await alsSitzung(hofCookie)
     await antworteAlsHof({ unterhaltungId: zweiterFaden.id, text: 'Zweite Antwort.' })
     await arbeiteNachlaufAb()
-    expect(vi.mocked(sendHofAntwortAnTeam).mock.calls[1]![0]).toEqual([SUPPORT, 'int-team@example.com'])
+    expect(await empfaengerDerAntwort(zweiterFaden.id)).toEqual([SUPPORT, 'int-team@example.com'].sort())
 
     // Eine bestätigte Adresse ein zweites Mal: kein neuer Link.
     await alsSitzung(adminCookie)
@@ -310,11 +324,10 @@ describe('Zustellung: Erstattung offen', () => {
 
     const nachher = await prisma.order.findUniqueOrThrow({ where: { id: bestellung.id }, select: { erstattungOffenSeit: true } })
     expect(nachher.erstattungOffenSeit).not.toBeNull()
-    // Die Mail läuft nach der Antwort an Stripe (gesammelter Nachlauf).
-    expect(sendErstattungOffen).not.toHaveBeenCalled()
+    // Die Aufträge entstehen nach der Antwort an Stripe (gesammelter Nachlauf), je bestätigter Adresse einer.
+    expect(await auftraege({ art: 'erstattung-offen', bestellungId: bestellung.id })).toEqual([])
     await arbeiteNachlaufAb()
-    expect(sendErstattungOffen).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(sendErstattungOffen).mock.calls[0]![1]).toEqual([SUPPORT, 'int-bestaetigt@example.com'])
+    expect(await adressenDer(await auftraege({ art: 'erstattung-offen', bestellungId: bestellung.id }))).toEqual([SUPPORT, 'int-bestaetigt@example.com'].sort())
     expect(eingangEintraege(await ladeEingang('aufgabe', new Date()), 'aufgabe').map((e) => e.auswahl.id)).toContain(bestellung.id)
 
     // Eine ältere erfolgreiche Erstattung derselben Zahlung erledigt nichts …

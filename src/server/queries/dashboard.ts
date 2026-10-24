@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { ANSTOSS_NACH_TAGEN, type DeinBeitrag } from '@/lib/heute'
 import { AKTIVER_BEITRAG, NEUESTER_BEITRAG_ZUERST } from '@/server/queries/status-posts'
 import { leseAusschnitt } from '@/schemas/bild-ausschnitt'
+import { gesendeteBeitragsMails } from '@/server/mail-arten/beitrag'
 
 export async function getFarmForUser(userId: string) {
   return prisma.farm.findUnique({
@@ -27,9 +28,11 @@ export async function ladeLaufendenBeitrag(farmId: string, jetzt: Date): Promise
   const aktiv = await prisma.statusPost.findFirst({
     where: { AND: [{ farmId }, AKTIVER_BEITRAG(jetzt)] },
     orderBy: NEUESTER_BEITRAG_ZUERST,
-    select: { id: true, title: true, anlass: true, photoUrl: true, fotoAusschnitt: true, publishedAt: true, expiresAt: true, emailRecipientCount: true, whatsappGetippt: true },
+    select: { id: true, title: true, anlass: true, photoUrl: true, fotoAusschnitt: true, publishedAt: true, expiresAt: true, createdAt: true, emailRecipientCount: true, whatsappGetippt: true },
   })
   if (!aktiv) return null
+  // „n per E-Mail" aus der Warteschlange — eine Quelle (Nr. 159).
+  const gesendet = await gesendeteBeitragsMails([aktiv])
   return {
     id: aktiv.id,
     titel: aktiv.title,
@@ -39,7 +42,7 @@ export async function ladeLaufendenBeitrag(farmId: string, jetzt: Date): Promise
     // Sicher: AKTIVER_BEITRAG verlangt `publishedAt: { lte: jetzt }` und schließt Entwürfe (null) aus.
     veroeffentlicht: aktiv.publishedAt!.toISOString(),
     endet: aktiv.expiresAt?.toISOString() ?? null,
-    emailAnzahl: aktiv.emailRecipientCount,
+    emailAnzahl: gesendet.get(aktiv.id) ?? aktiv.emailRecipientCount,
     whatsappAnzahl: aktiv.whatsappGetippt.length,
   }
 }

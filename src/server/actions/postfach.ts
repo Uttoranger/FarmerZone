@@ -17,7 +17,6 @@ import {
   POSTFACH_DB_BREMSE,
   POSTFACH_FEHLER,
   POSTFACH_HREF,
-  POSTFACH_TEXT,
   TAG_MS,
   fadenHref,
 } from '@/lib/postfach'
@@ -46,13 +45,10 @@ import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { verschickeRundschreiben, type RundschreibenErgebnis } from '@/server/rundschreiben'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import {
-  empfaengerTokenHash,
-  ladeAntwortFuerTeam,
-  ladeBetreiberEmpfaenger,
-  ladeMailEmpfaenger,
-  ladeZustellung,
-} from '@/server/queries/postfach'
+import { empfaengerTokenHash, ladeZustellung } from '@/server/queries/postfach'
+import { stelleMailEin } from '@/server/mail-warteschlange'
+import { betreiberAuftraege, betreiberKennungen, empfaengerKennungen } from '@/server/mail-arten/betreiber'
+import { postfachAntwortAuftrag } from '@/server/mail-arten/hof'
 
 /*
  * Das Postfach, Stufe 1 (Register N12, Nachtlauf Nr. 87) — die schreibenden
@@ -65,9 +61,10 @@ import {
  *
  * Nachrichtentexte sind Fremdtext: Sie gehen nie nach Sentry, auch nicht über
  * einen Fehlertext — gemeldet wird ein fester Satz mit Klasse und Kennungen.
- * Die E-Mails laufen nach der Antwort (nachDerAntwort) über sendRaw mit der
- * Post-Sperre; ein gescheiterter Versand nimmt nie eine gespeicherte
- * Nachricht zurück.
+ * Die E-Mails sind Aufträge der Warteschlange (Register N26, Nr. 159; der
+ * Worker verschickt mit der Post-Sperre); ein gescheitertes Einstellen oder
+ * ein gescheiterter Versand nimmt nie eine gespeicherte Nachricht zurück.
+ * Nur die Bestätigung einer weiteren Adresse geht direkt (Bestätigungslink).
  */
 
 type Ergebnis = { ok: true } | { error: string }
@@ -177,10 +174,10 @@ export async function antworteAlsHof(eingabe: unknown): Promise<Ergebnis> {
       where: { id: unterhaltungId, farmId: hof.id, OR: [{ rundschreibenId: null }, { rundschreiben: { antwortMoeglich: true } }] },
       data: { letzteNachrichtAm: jetzt },
     })
-    if (count === 0) return false
-    await tx.nachricht.create({ data: { unterhaltungId, vonFarmId: hof.id, text, createdAt: jetzt } })
+    if (count === 0) return null
+    const nachricht = await tx.nachricht.create({ data: { unterhaltungId, vonFarmId: hof.id, text, createdAt: jetzt }, select: { id: true } })
     await setzeLesestand(tx, unterhaltungId, 'HOF', jetzt)
-    return true
+    return nachricht
   })
   if (!angelegt) {
     // Nur für den richtigen Satz, nach dem Schreiben: Gehört der Faden dem
@@ -189,16 +186,13 @@ export async function antworteAlsHof(eingabe: unknown): Promise<Ergebnis> {
     return { error: eigener > 0 ? POSTFACH_FEHLER.antwortNichtMoeglich : POSTFACH_FEHLER.nichtGefunden }
   }
 
+  // Je Empfänger ein Auftrag (Wichtig); Hofname, Titel und Text lädt der Renderer aus der Nachricht.
   nachDerAntwort(async () => {
     try {
-      const an = await ladeBetreiberEmpfaenger('antwortHof')
-      if (an.length === 0) return
+      const kennungen = await betreiberKennungen('antwortHof')
+      if (kennungen.length === 0) return
       if (!(await antwortMailFrei(unterhaltungId, jetzt))) return
-      const faden = await ladeAntwortFuerTeam(unterhaltungId)
-      if (!faden) return
-      const { sendHofAntwortAnTeam } = await import('@/lib/email')
-      const ergebnis = await sendHofAntwortAnTeam(an, { hofName: faden.hofName, titel: faden.titel ?? POSTFACH_TEXT.ohneTitel, text, unterhaltungId })
-      if (ergebnis.gescheitert > 0) meldeNachlauf(new Error('Versand'), 'antwort-team-mail', unterhaltungId)
+      await stelleMailEin(betreiberAuftraege('antwort-an-team', angelegt.id, kennungen, { nachrichtId: angelegt.id }, { farmId: hof.id }))
     } catch (err) {
       meldeNachlauf(err, 'antwort-team-mail', unterhaltungId)
     }
@@ -267,48 +261,35 @@ export async function antworteAlsTeam(eingabe: unknown): Promise<TeamAntwortErge
   const jetzt = new Date()
   const angelegt = await prisma.$transaction(async (tx) => {
     const { count } = await tx.unterhaltung.updateMany({ where: { id: unterhaltungId }, data: { letzteNachrichtAm: jetzt } })
-    if (count === 0) return false
-    await tx.nachricht.create({
+    if (count === 0) return null
+    const nachricht = await tx.nachricht.create({
       data: { unterhaltungId, vonFarmId: null, text, linkUrl: link, art: wichtig ? 'WICHTIG' : 'NORMAL', createdAt: jetzt },
+      select: { id: true, unterhaltung: { select: { farmId: true } } },
     })
     await setzeLesestand(tx, unterhaltungId, 'TEAM', jetzt)
-    return true
+    return nachricht
   })
   if (!angelegt) return { error: POSTFACH_FEHLER.nichtGefunden }
 
   let mail: 'unterwegs' | 'gedrosselt' | 'aus' = 'aus'
   if (perMail) {
-    // Nachlauf: Die Antwort ist gespeichert. Scheitert das Belegen der Stunde,
-    // geht keine Mail ('aus') — aber kein Fehler an den Admin, sonst schickte
-    // er dieselbe Antwort ein zweites Mal. Gemeldet wird nur die Fehlerklasse.
+    // Nachlauf: Die Antwort ist gespeichert. Die Stunde belegen und den
+    // Auftrag der Mail einstellen (Wichtig, Nr. 159) in EINER Transaktion —
+    // scheitert eins, ist die Stunde frei und keine Mail unterwegs ('aus');
+    // aber kein Fehler an den Admin, sonst schickte er dieselbe Antwort ein
+    // zweites Mal. Gemeldet wird nur die Fehlerklasse.
     try {
-      const { count } = await prisma.unterhaltung.updateMany({
-        where: { id: unterhaltungId, OR: [{ letzteMailAm: null }, { letzteMailAm: { lte: new Date(jetzt.getTime() - MAIL_ABSTAND_MS) } }] },
-        data: { letzteMailAm: jetzt },
+      mail = await prisma.$transaction(async (tx) => {
+        const { count } = await tx.unterhaltung.updateMany({
+          where: { id: unterhaltungId, OR: [{ letzteMailAm: null }, { letzteMailAm: { lte: new Date(jetzt.getTime() - MAIL_ABSTAND_MS) } }] },
+          data: { letzteMailAm: jetzt },
+        })
+        if (count !== 1) return 'gedrosselt'
+        await stelleMailEin(postfachAntwortAuftrag(angelegt.id, angelegt.unterhaltung.farmId), tx)
+        return 'unterwegs'
       })
-      mail = count === 1 ? 'unterwegs' : 'gedrosselt'
     } catch (err) {
       meldeNachlauf(err, 'antwort-mail-stunde', unterhaltungId)
-    }
-    if (mail === 'unterwegs') {
-      nachDerAntwort(async () => {
-        try {
-          const [empfaenger] = await ladeMailEmpfaenger([unterhaltungId])
-          if (!empfaenger) return
-          const { sendPostfachMail } = await import('@/lib/email')
-          const ergebnis = await sendPostfachMail({
-            art: 'antwort',
-            an: empfaenger.email,
-            titel: empfaenger.titel ?? POSTFACH_TEXT.ohneTitel,
-            text,
-            link,
-            unterhaltungId,
-          })
-          if (ergebnis.error) meldeNachlauf(new Error('Versand'), 'antwort-mail', unterhaltungId)
-        } catch (err) {
-          meldeNachlauf(err, 'antwort-mail', unterhaltungId)
-        }
-      })
     }
   }
 
@@ -481,14 +462,11 @@ export async function sendeTestmail(): Promise<TestmailErgebnis> {
   if (process.env.NODE_ENV === 'production' && !testmailDrossel.check('alle')) return { error: ZUSTELLUNG_FEHLER.testZuOft }
 
   const an = empfaengerliste((await ladeZustellung()).bestaetigte)
-  nachDerAntwort(async () => {
-    try {
-      const { sendBetreiberTestmail } = await import('@/lib/email')
-      const ergebnis = await sendBetreiberTestmail(an)
-      if (ergebnis.gescheitert > 0) meldeZustellung(new Error(`${ergebnis.gescheitert} gescheitert`), 'testmail')
-    } catch (err) {
-      meldeZustellung(err, 'testmail')
-    }
-  })
+  // Je Adresse ein Auftrag (Wichtig, Nr. 159); der Zeitpunkt macht den Schlüssel eindeutig.
+  try {
+    await stelleMailEin(betreiberAuftraege('betreiber-testmail', String(Date.now()), await empfaengerKennungen(an), {}))
+  } catch (err) {
+    meldeZustellung(err, 'testmail')
+  }
   return { ok: true, empfaenger: an.length }
 }

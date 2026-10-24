@@ -29,13 +29,12 @@ vi.mock('@/lib/nach-der-antwort', () => ({
 }))
 vi.mock('@/lib/email', () => ({
   sendRaw: vi.fn(async () => ({ id: 'int-mail' })),
-  sendPostfachMail: vi.fn(async () => ({ id: 'int-mail' })),
   sendBetreiberBestaetigung: vi.fn(async () => ({ id: 'int-mail' })),
 }))
 
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
-import { sendBetreiberBestaetigung, sendPostfachMail } from '@/lib/email'
+import { sendBetreiberBestaetigung } from '@/lib/email'
 import { FRISCH_FEHLER } from '@/lib/admin-anmeldung'
 import { WUENSCHE_TEXT } from '@/lib/meldung'
 import { setzeBuendelStandAction } from '@/server/actions/admin'
@@ -105,7 +104,8 @@ describe('Bescheid an die Höfe ohne frische Bestätigung (N20, Ergänzung 23.10
       expect(f.rundschreiben).toMatchObject({ titel: WUENSCHE_TEXT.bescheidTitel, perMail: false, antwortMoeglich: false, erstelltVonUserId: admin.userId })
     }
     await Promise.all(nachlauf.aufgaben.splice(0).map((a) => a()))
-    expect(sendPostfachMail).not.toHaveBeenCalled()
+    // Ohne Haken „Betriebsmitteilung" kein Auftrag an die Höfe (Nr. 159).
+    expect(await prisma.mailAuftrag.count({ where: { art: 'rundschreiben', farmId: { in: [hofA.id, hofB.id] } } })).toBe(0)
   })
 
   it('Gegenprobe, dieselbe Sitzung: Rundschreiben und Empfänger antworten „frisch“ — nichts geschrieben, keine Mail', async () => {
@@ -119,7 +119,7 @@ describe('Bescheid an die Höfe ohne frische Bestätigung (N20, Ergänzung 23.10
     expect(await prisma.unterhaltung.count({ where: { farmId: farm.id } })).toBe(0)
     expect(await prisma.betreiberEmpfaenger.count({ where: { email: EMPFAENGER } })).toBe(0)
     expect(nachlauf.aufgaben).toHaveLength(0)
-    expect(sendPostfachMail).not.toHaveBeenCalled()
+    expect(await prisma.mailAuftrag.count({ where: { farmId: farm.id } })).toBe(0)
     expect(sendBetreiberBestaetigung).not.toHaveBeenCalled()
   })
 

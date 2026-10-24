@@ -8,7 +8,8 @@
  * samt Screenshot; ein scheiternder Blob-Aufruf hält die Löschung nicht auf.
  * Seit Nr. 95 (Register N14): Die Mail geht an die Empfängerliste der
  * Zustellung (empfaengerFuer('wochenbericht')); Regel aus (leere Liste) heißt
- * keine Mail, auch wenn etwas offen ist. Ob der Bericht geht, entscheidet
+ * keine Mail, auch wenn etwas offen ist. Seit Nr. 159 je Adresse ein Auftrag
+ * der Warteschlange (Wichtig); die Zahlen zählt der Renderer beim Versand. Ob der Bericht geht, entscheidet
  * „etwas offen im Eingang" (zaehleOffenImEingang — dieselbe Zählung wie
  * „Offen" und der Reiter): Auch eine wartende Aufgabe allein löst ihn aus.
  */
@@ -18,7 +19,9 @@ import { NextRequest } from 'next/server'
 vi.mock('@vercel/blob', () => ({ del: vi.fn() }))
 // Der Herzschlag-Rahmen (Nr. 103) reicht den Wochenlauf unverändert durch (tests/betrieb-herzschlag.test.ts).
 vi.mock('@/server/betrieb', () => ({ mitHerzschlag: vi.fn(async (_name: string, lauf: () => Promise<unknown>) => lauf()) }))
-vi.mock('@/lib/email', () => ({ sendBriefkastenZusammenfassung: vi.fn() }))
+vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn() }))
+// Die Kennung der weiteren Adresse aus der Zustellung (empfaengerKennungen).
+vi.mock('@/lib/prisma', () => ({ prisma: { betreiberEmpfaenger: { findMany: vi.fn(async () => [{ id: 'cteamaaaaaaaaaaaaaaaaaaa1', email: 'team@example.com' }]) } } }))
 vi.mock('@/server/queries/postfach', () => ({ ladeBetreiberEmpfaenger: vi.fn(), zaehleOffenImEingang: vi.fn() }))
 vi.mock('@/server/queries/meldung', () => ({
   findeHauptmeldungen: vi.fn(),
@@ -29,20 +32,34 @@ vi.mock('@/server/queries/meldung', () => ({
 
 import { GET } from '@/app/api/cron/briefkasten/route'
 import { del } from '@vercel/blob'
-import { sendBriefkastenZusammenfassung } from '@/lib/email'
+import { stelleMailEin } from '@/server/mail-warteschlange'
+import { SUPPORT_EMAIL } from '@/lib/support'
 import { findeHauptmeldungen, findeLoeschKandidaten, loescheMeldungen, zaehleFuerWochenlauf } from '@/server/queries/meldung'
 import { ladeBetreiberEmpfaenger, zaehleOffenImEingang } from '@/server/queries/postfach'
 import { AUFBEWAHRUNG_TAGE } from '@/lib/meldung'
 
 const blobDel = vi.mocked(del)
-const mail = vi.mocked(sendBriefkastenZusammenfassung)
+const mail = vi.mocked(stelleMailEin)
 const kandidaten = vi.mocked(findeLoeschKandidaten)
 const hauptmeldungen = vi.mocked(findeHauptmeldungen)
 const loeschen = vi.mocked(loescheMeldungen)
 const zaehlen = vi.mocked(zaehleFuerWochenlauf)
 const liste = vi.mocked(ladeBetreiberEmpfaenger)
 const eingang = vi.mocked(zaehleOffenImEingang)
-const LISTE = ['support@example.com', 'team@example.com']
+const LISTE = [SUPPORT_EMAIL.toLowerCase(), 'team@example.com']
+
+/** Je Adresse ein Auftrag „wochenbericht" mit der Zahl der eben gelöschten Meldungen; der Tag macht den Schlüssel eindeutig. */
+function erwarteBericht(geloescht = 0): void {
+  expect(mail).toHaveBeenCalledTimes(1)
+  expect(mail.mock.calls[0]![0]).toEqual([
+    expect.objectContaining({ art: 'wochenbericht', vorrang: 1, schluessel: 'wochenbericht:2026-09-14:support', bezug: { empfaengerId: 'support', geloeschtAnzahl: String(geloescht) } }),
+    expect.objectContaining({
+      art: 'wochenbericht',
+      schluessel: 'wochenbericht:2026-09-14:cteamaaaaaaaaaaaaaaaaaaa1',
+      bezug: { empfaengerId: 'cteamaaaaaaaaaaaaaaaaaaa1', geloeschtAnzahl: String(geloescht) },
+    }),
+  ])
+}
 
 const JETZT = new Date('2026-09-14T05:00:00.000Z')
 const TAG = 24 * 60 * 60 * 1000
@@ -70,7 +87,7 @@ beforeEach(() => {
   hauptmeldungen.mockResolvedValue(new Map())
   loeschen.mockResolvedValue(0)
   zaehlen.mockResolvedValue(RUHIG)
-  mail.mockResolvedValue(undefined)
+  mail.mockResolvedValue(2)
   liste.mockResolvedValue(LISTE)
   eingang.mockResolvedValue(NICHTS_OFFEN)
   blobDel.mockResolvedValue(undefined)
@@ -120,8 +137,7 @@ describe('Wochenlauf — Zusammenfassung', () => {
     zaehlen.mockResolvedValue({ neu: 2, liegenGeblieben: 0, offen: 2, neueste: [] })
     eingang.mockResolvedValue(offenImEingang({ meldungen: 2 }))
     const res = await GET(anfrage('Bearer geheim-123'))
-    expect(mail).toHaveBeenCalledTimes(1)
-    expect(mail).toHaveBeenCalledWith(expect.objectContaining({ neu: 2, geloescht: 0, eingang: offenImEingang({ meldungen: 2 }) }), LISTE)
+    erwarteBericht()
     expect(liste).toHaveBeenCalledWith('wochenbericht')
     expect(await res.json()).toMatchObject({ zusammenfassung: true, neu: 2 })
   })
@@ -144,8 +160,7 @@ describe('Wochenlauf — Zusammenfassung', () => {
     eingang.mockResolvedValue(offenImEingang({ hoefe: 1 }))
     const res = await GET(anfrage('Bearer geheim-123'))
     expect(liste).toHaveBeenCalledWith('wochenbericht')
-    expect(mail).toHaveBeenCalledTimes(1)
-    expect(mail).toHaveBeenCalledWith(expect.objectContaining({ neu: 0, liegenGeblieben: 0, eingang: offenImEingang({ hoefe: 1 }) }), LISTE)
+    erwarteBericht()
     expect(await res.json()).toMatchObject({ zusammenfassung: true, offenImEingang: 1 })
   })
 
@@ -177,8 +192,7 @@ describe('Wochenlauf — Zusammenfassung', () => {
     zaehlen.mockResolvedValue({ neu: 0, liegenGeblieben: 1, offen: 3, neueste: [] })
     eingang.mockResolvedValue(offenImEingang({ meldungen: 3 }))
     await GET(anfrage('Bearer geheim-123'))
-    expect(mail).toHaveBeenCalledTimes(1)
-    expect(mail).toHaveBeenCalledWith(expect.objectContaining({ liegenGeblieben: 1 }), LISTE)
+    erwarteBericht()
   })
 
   it('übergibt den Stichtag „jetzt" an die Zählung', async () => {

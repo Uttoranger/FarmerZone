@@ -167,23 +167,17 @@ export async function meldungAbsenden(data: MeldungFormularDaten): Promise<Meldu
   //    Meldung nicht scheitern lassen — sie ist gespeichert.
   if (eingabe.art === 'FEHLER') {
     try {
-      // Erst hier geladen (Nr. 31): Die Meldeseiten binden diese Action ein.
-      const { sendMeldungNotification } = await import('@/lib/email')
-      // Empfänger und Regel aus der Zustellung (Register N14, Nr. 95).
-      const { ladeBetreiberEmpfaenger } = await import('@/server/queries/postfach')
-      const an = await ladeBetreiberEmpfaenger('fehlermeldung')
-      await sendMeldungNotification({
-        kurznummer: kurznummer(meldung.id),
-        id: meldung.id,
-        text: eingabe.text,
-        seiteUrl: eingabe.seiteUrl,
-        userAgent: eingabe.userAgent,
-        viewport: eingabe.viewport,
-        diagKennung: eingabe.diagKennung ?? null,
-        farmName: hof?.name ?? null,
-        screenshotUrl,
-        createdAt: meldung.createdAt,
-      }, an)
+      // Je Empfänger ein Auftrag der Warteschlange (Wichtig, Nr. 159); Text
+      // und Hof lädt der Renderer aus der Meldung. Empfänger und Regel aus der
+      // Zustellung (Register N14, Nr. 95). Erst hier geladen: Die Meldeseiten
+      // binden diese Action ein.
+      const [{ stelleMailEin }, { betreiberAuftraege, betreiberKennungen }] = await Promise.all([
+        import('@/server/mail-warteschlange'),
+        import('@/server/mail-arten/betreiber'),
+      ])
+      await stelleMailEin(
+        betreiberAuftraege('meldung', meldung.id, await betreiberKennungen('fehlermeldung'), { meldungId: meldung.id }, hof ? { farmId: hof.id } : {})
+      )
     } catch (e) {
       if (process.env.NODE_ENV !== 'production') {
         console.log(`[DEV] Meldungs-Mail fehlgeschlagen: ${e instanceof Error ? e.message : e}`)

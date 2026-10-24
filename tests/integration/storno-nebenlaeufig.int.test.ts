@@ -23,18 +23,15 @@ vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 vi.mock('@/lib/stripe', () => ({ stripe: { refunds: { create: vi.fn() } } }))
-vi.mock('@/lib/email', () => ({
-  sendOrderReady: vi.fn(),
-  sendOrderCancelled: vi.fn(),
-  sendOrderNotReady: vi.fn(),
-}))
+// Die Storno-Mail ist seit Nr. 159 ein Auftrag der Warteschlange (echt in der
+// Datenbank); den Worker danach braucht dieser Test nicht.
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
 
 import { headers } from 'next/headers'
 import { cancelOrder } from '@/server/actions/orders'
 import { prisma } from '@/lib/prisma'
-import { sendOrderCancelled } from '@/lib/email'
 import { stripe } from '@/lib/stripe'
-import { erstelleHofMitAnmeldung, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
+import { artenZu, erstelleHofMitAnmeldung, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -118,7 +115,7 @@ describe('cancelOrder — Nebenläufigkeit in der echten Datenbank', () => {
     })
 
     // Prüfstelle: Die Kundin bekommt EINE Storno-Mail, nicht zwei.
-    await vi.waitFor(() => expect(sendOrderCancelled).toHaveBeenCalledTimes(1))
+    expect(await artenZu(bestellung.id)).toEqual(['storniert'])
     // Vor-Ort-Zahlung ohne PaymentIntent: keine Erstattung über Stripe.
     expect(stripe.refunds.create).not.toHaveBeenCalled()
   })
@@ -156,8 +153,6 @@ describe('cancelOrder — Nebenläufigkeit in der echten Datenbank', () => {
     expect(await prisma.product.findUniqueOrThrow({ where: { id: produkt.id } })).toMatchObject({
       stock: 5,
     })
-    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
-    await vi.dynamicImportSettled()
-    expect(sendOrderCancelled).not.toHaveBeenCalled()
+    expect(await artenZu(bestellung.id)).toEqual([])
   })
 })

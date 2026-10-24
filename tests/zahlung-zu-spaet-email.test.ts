@@ -24,6 +24,17 @@ const IMPORT_TIMEOUT = 30_000
 
 let email: typeof import('@/lib/email')
 
+/**
+ * Seit Nr. 159 baut email.ts diese Mail nur (Renderer der Warteschlange);
+ * `gebaut` legt das Ergebnis dorthin, wo der Test den Aufruf an Resend liest.
+ */
+function gebaut<A extends unknown[]>(baue: (...a: A) => Promise<import('@/lib/email').StapelMail>): (...a: A) => Promise<void> {
+  return async (...a) => {
+    const mail = await baue(...a)
+    sendMock({ from: 'test', to: mail.an, subject: mail.betreff, html: mail.html, ...(mail.headers ? { headers: mail.headers } : {}) })
+  }
+}
+
 beforeAll(async () => {
   vi.stubEnv('RESEND_API_KEY', 're_test_dummy')
   email = await import('@/lib/email')
@@ -33,11 +44,11 @@ afterAll(() => {
   vi.unstubAllEnvs()
 })
 
-describe('sendZahlungZuSpaet', () => {
+describe('baueZahlungZuSpaet', () => {
   it('sagt der Kundin, dass die Zahlung zu spät kam und wie viel zurückgeht', async () => {
     sendMock.mockResolvedValue({ data: { id: 'email_1' }, error: null })
 
-    await email.sendZahlungZuSpaet(
+    await gebaut(email.baueZahlungZuSpaet)(
       {
         customerName: 'Erika Mustermann',
         customerEmail: 'kundin@example.com',

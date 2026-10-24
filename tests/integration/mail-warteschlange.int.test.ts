@@ -59,7 +59,7 @@ const OHNE_GRENZE = { mailsTag: null, mailsMonat: null }
 /** Adressen aus dem Bezug — die Attrappe zeigt, welche Mail hinausging. */
 const FAKE: RendererTabelle = {
   abholbereit: async (b) => ({ an: `${b.orderId}@example.com`, betreff: 'Abholbereit', html: '<p>abholbereit</p>' }),
-  rundschreiben: async (b) => ({ an: b.fadenId.startsWith('int-gesperrt') ? `${b.fadenId}@example.org` : `${b.fadenId}@example.com`, betreff: 'Rundschreiben', html: '<p>rundschreiben</p>' }),
+  rundschreiben: async (b) => ({ an: b.unterhaltungId.startsWith('int-gesperrt') ? `${b.unterhaltungId}@example.org` : `${b.unterhaltungId}@example.com`, betreff: 'Rundschreiben', html: '<p>rundschreiben</p>' }),
 }
 
 let zaehlerVorher: bigint | null = null
@@ -74,7 +74,7 @@ function wichtig(kennung: string): EinstellAuftrag {
 }
 
 function kannWarten(kennung: string): EinstellAuftrag {
-  return { art: 'rundschreiben', vorrang: VORRANG.kannWarten, schluessel: `${kennung}:k`, bezug: { fadenId: kennung } }
+  return { art: 'rundschreiben', vorrang: VORRANG.kannWarten, schluessel: `${kennung}:k`, bezug: { unterhaltungId: kennung } }
 }
 
 async function zeile(schluessel: string) {

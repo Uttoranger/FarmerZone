@@ -25,18 +25,22 @@ vi.mock('@/lib/nach-der-antwort', () => ({
     nachlauf.aufgaben.push(aufgabe)
   },
 }))
-vi.mock('@/lib/email', () => ({
-  sendHofAntwortAnTeam: vi.fn(async () => ({ gesendet: 1, gescheitert: 0 })),
-}))
+// Die Mail an das Team ist seit Nr. 159 je Adresse ein Auftrag der Warteschlange (echt in der Datenbank).
 
 import { headers } from 'next/headers'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { sendHofAntwortAnTeam } from '@/lib/email'
 import { DB_BREMSEN, fensterBeginn } from '@/lib/bremse-datenbank'
 import { antworteAlsHof, markiereErstattungErledigt } from '@/server/actions/postfach'
 import { zaehleOffenImEingang } from '@/server/queries/postfach'
-import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf, machePasskeyAdmin } from './setup/basis'
+import { auftraege, erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf, machePasskeyAdmin } from './setup/basis'
+
+/** Die Aufträge „Ein Hof hat geantwortet" an die feste Adresse zu Nachrichten dieses Fadens — einer je Versand. */
+async function versandZu(unterhaltungId: string): Promise<Array<{ nachrichtId: string }>> {
+  const nachrichten = await prisma.nachricht.findMany({ where: { unterhaltungId }, select: { id: true } })
+  const zeilen = await auftraege({ art: 'antwort-an-team', OR: nachrichten.map((n) => ({ bezug: { path: ['nachrichtId'], equals: n.id } })) })
+  return zeilen.map((z) => z.bezug as { nachrichtId: string; empfaengerId: string }).filter((b) => b.empfaengerId === 'support')
+}
 
 afterEach(async () => {
   vi.mocked(headers).mockResolvedValue(new Headers() as never)
@@ -140,14 +144,15 @@ describe('Drossel der Mail „Ein Hof hat geantwortet" (echte Bremse)', () => {
 
     // Die Systemuhr läuft (Integrationsschicht): Liegt zufällig eine volle Stunde dazwischen, sind es zwei Fenster.
     const einFenster = fensterBeginn(new Date(beginn), DB_BREMSEN.antwortHofMail.fensterMs).getTime() === fensterBeginn(new Date(ende), DB_BREMSEN.antwortHofMail.fensterMs).getTime()
-    expect(sendHofAntwortAnTeam).toHaveBeenCalledTimes(einFenster ? 1 : 2)
-    expect(vi.mocked(sendHofAntwortAnTeam).mock.calls[0]![1]).toMatchObject({ unterhaltungId: faden, text: 'Erfundene erste Antwort.' })
+    const versand = await versandZu(faden)
+    expect(versand).toHaveLength(einFenster ? 1 : 2)
+    // Der Auftrag trägt nur die Nachricht; ihren Text lädt der Renderer — hier die erste Antwort.
+    expect(await prisma.nachricht.findUniqueOrThrow({ where: { id: versand[0]!.nachrichtId } })).toMatchObject({ unterhaltungId: faden, text: 'Erfundene erste Antwort.' })
     // Beide Antworten stehen im Faden — gedrosselt wird nur die Mail.
     expect(await prisma.nachricht.count({ where: { unterhaltungId: faden, vonFarmId: farm.id } })).toBe(2)
 
-    vi.mocked(sendHofAntwortAnTeam).mockClear()
     expect(await antworteAlsHof({ unterhaltungId: andererFaden, text: 'Erfundene Antwort im anderen Faden.' })).toEqual({ ok: true })
     await arbeiteNachlaufAb()
-    expect(sendHofAntwortAnTeam).toHaveBeenCalledTimes(1)
+    expect(await versandZu(andererFaden)).toHaveLength(1)
   })
 })
