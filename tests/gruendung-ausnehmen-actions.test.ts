@@ -19,7 +19,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn(), unstable_cache: (fn: unknown) => fn }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
-vi.mock('@/lib/email', () => ({ sendFreischaltungEmail: vi.fn(async () => ({})) }))
+vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn(async () => 1) }))
 vi.mock('@/lib/prisma', async () => {
   const prisma: Record<string, unknown> = {
     farm: { findUnique: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
@@ -39,7 +39,7 @@ vi.mock('@/lib/prisma', async () => {
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { sendFreischaltungEmail } from '@/lib/email'
+import { stelleMailEin } from '@/server/mail-warteschlange'
 import { GRUENDUNGSPLAETZE_SPERRE, gruendungAlleVergeben } from '@/lib/gruendungshof'
 import {
   GRUENDUNG_AUSNEHMEN_GEAENDERT,
@@ -139,7 +139,7 @@ describe('nimmAusGruendung', () => {
     for (const pfad of PFADE) expect(revalidatePath).toHaveBeenCalledWith(pfad)
     // Keine Nachricht, keine Mail (K2).
     expect(db.unterhaltung.create).not.toHaveBeenCalled()
-    expect(sendFreischaltungEmail).not.toHaveBeenCalled()
+    expect(stelleMailEin).not.toHaveBeenCalled()
   })
 
   it('ein Hof ohne Platz (Plätze aus der Einstellung) braucht keinen Haken', async () => {

@@ -17,7 +17,8 @@ vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
-vi.mock('@/lib/email', () => ({ sendRaw: vi.fn(async () => ({ id: 'mail' })), sendFreischaltungEmail: vi.fn() }))
+// Der Bescheid an Kundinnen ist seit Nr. 159 ein Auftrag der Warteschlange (Kann warten).
+vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn(async () => 1) }))
 // Der Bescheid läuft über den Versand ohne eigene Wache (Register N20, Ergänzung 23.10.2026; Nr. 154).
 vi.mock('@/server/rundschreiben', () => ({ verschickeRundschreiben: vi.fn() }))
 const nachlauf = vi.hoisted(() => ({ aufgaben: [] as (() => Promise<void>)[] }))
@@ -43,7 +44,7 @@ import * as Sentry from '@sentry/nextjs'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { sendRaw } from '@/lib/email'
+import { stelleMailEin } from '@/server/mail-warteschlange'
 import { verschickeRundschreiben } from '@/server/rundschreiben'
 import { MELDUNG_KLICK_TEXT, WUENSCHE_TEXT } from '@/lib/meldung'
 import { legeMeldungAbAction, setzeBuendelStandAction } from '@/server/actions/admin'
@@ -78,9 +79,10 @@ describe('Stand für alle — das Rundschreiben scheitert nach dem Speichern', (
     expect(ergebnis).toEqual({ error: WUENSCHE_TEXT.bescheidNichtGesendet })
     expect(revalidatePath).toHaveBeenCalledWith('/admin/postfach')
     expect(revalidatePath).toHaveBeenCalledWith('/meldungen')
-    await Promise.all(nachlauf.aufgaben.splice(0).map((a) => a()))
-    expect(sendRaw).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(sendRaw).mock.calls[0]?.[0]).toBe('kundin@example.com')
+    // Je Kundin ein Auftrag mit der Kennung ihrer Meldung — keine Adresse in der Warteschlange.
+    expect(stelleMailEin).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(stelleMailEin).mock.calls[0]![0]).toEqual([expect.objectContaining({ art: 'bescheid', vorrang: 2, bezug: { meldungId: 'm2' } })])
+    expect(JSON.stringify(vi.mocked(stelleMailEin).mock.calls)).not.toContain('kundin@example.com')
     const [fehler, kontext] = vi.mocked(Sentry.captureException).mock.calls[0] ?? []
     expect((fehler as Error).name).toBe('RangeError')
     expect(JSON.stringify([String((fehler as Error).message), kontext])).not.toContain('Erfundene')
@@ -92,7 +94,8 @@ describe('Stand für alle — das Rundschreiben scheitert nach dem Speichern', (
 
     expect(ergebnis).toEqual({ error: WUENSCHE_TEXT.bescheidNichtGesendet })
     expect(revalidatePath).toHaveBeenCalledWith('/admin/postfach')
-    expect(nachlauf.aufgaben).toHaveLength(1)
+    expect(stelleMailEin).toHaveBeenCalledTimes(1)
+    expect(nachlauf.aufgaben).toHaveLength(0)
     // Die Kennung des Admins kommt aus der Wache dieser Aktion; die Optionen des Bescheids bleiben (nur Postfach, ohne Antwort).
     expect(vi.mocked(verschickeRundschreiben)).toHaveBeenCalledWith(
       expect.objectContaining({ perMail: false, antwortMoeglich: false, empfaenger: { art: 'ausgewaehlt', hofIds: ['hof-a'] } }),

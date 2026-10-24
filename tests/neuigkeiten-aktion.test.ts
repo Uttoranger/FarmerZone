@@ -23,7 +23,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers({ 'x-forwarded-for': '203.0.113.7' })) }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
-vi.mock('@/lib/email', () => ({ sendAboBestaetigung: vi.fn(async () => ({ id: 'mail-1' })) }))
+// Die Bestätigungsmail ist seit Nr. 159 ein Auftrag der Warteschlange.
+vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn(async () => 1) }))
 // Die Datenbank-Bremse je Bestellung: im Unit-Test eine Attrappe, echt in
 // tests/integration/checkout-abo-fehler.int.test.ts.
 vi.mock('@/server/bremse-datenbank', () => ({ neuigkeitenGebremst: vi.fn(async () => false) }))
@@ -36,7 +37,7 @@ vi.mock('@/lib/prisma', () => ({
 
 import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
-import { sendAboBestaetigung } from '@/lib/email'
+import { stelleMailEin } from '@/server/mail-warteschlange'
 import { bestellSignatur } from '@/lib/bestell-link'
 import { NEUIGKEITEN_JE_BESTELLUNG_UND_TAG, NEUIGKEITEN_PRO_MINUTE, NEUIGKEITEN_TEXT } from '@/lib/abo-bestaetigung'
 import { GRUND_NICHT_BESTAETIGT } from '@/lib/fristen'
@@ -69,7 +70,7 @@ beforeEach(() => {
   findeBestellung.mockResolvedValue(BESTELLUNG as never)
   upsert.mockResolvedValue(NEU as never)
   updateMany.mockResolvedValue({ count: 1 } as never)
-  vi.mocked(sendAboBestaetigung).mockResolvedValue({ id: 'mail-1' } as never)
+  vi.mocked(stelleMailEin).mockResolvedValue(1)
   // Die Mail-Lieferung schreibt im Test den Bestätigungslink ins Log — hier nicht von Belang.
   vi.spyOn(console, 'log').mockImplementation(() => {})
 })
@@ -124,15 +125,18 @@ describe('Die Adresse kommt aus der Bestellung', () => {
     expect(JSON.stringify(upsert.mock.calls)).not.toContain('fremd@example.com')
   })
 
-  it('die Bestätigungsmail geht an die Adresse der Bestellung — mit Link, nach der Antwort', async () => {
-    vi.mocked(prisma.customerFarmSubscription.findUnique).mockResolvedValue({ customerEmail: 'erika@example.org', farm: { name: 'Hof Test' } } as never)
+  it('die Bestätigungsmail ist ein Auftrag (Wichtig) nur mit dem Abo — Adresse und Link baut der Renderer', async () => {
+    vi.mocked(prisma.customerFarmSubscription.findUnique).mockResolvedValue({ farmId: 'farm-1' } as never)
 
     await meldeNeuigkeitenAn({ orderId: ORDER_ID, sig: SIG })
 
-    await vi.waitFor(() => expect(sendAboBestaetigung).toHaveBeenCalledOnce())
-    const [an, inhalt] = vi.mocked(sendAboBestaetigung).mock.calls[0]!
-    expect(an).toBe('erika@example.org')
-    expect(inhalt).toMatchObject({ hofName: 'Hof Test', url: expect.stringContaining('/account/neuigkeiten-bestaetigen?token=') })
+    expect(stelleMailEin).toHaveBeenCalledOnce()
+    const auftrag = vi.mocked(stelleMailEin).mock.calls[0]![0]
+    expect(auftrag).toMatchObject({ art: 'abo-bestaetigung', vorrang: 1, bezug: { aboId: 'abo-1' }, farmId: 'farm-1' })
+    // Je Anfrage (Zeitpunkt) ein Auftrag; kein Token, keine Adresse.
+    expect((auftrag as { schluessel: string }).schluessel).toMatch(/^abo-bestaetigung:abo-1:\d+$/)
+    expect(JSON.stringify(auftrag)).not.toContain('erika@example.org')
+    expect(JSON.stringify(auftrag)).not.toContain('token')
     // Angefragt, nicht angemeldet: optInEmail bleibt false bis zum Klick.
     expect(updateMany.mock.calls[0]![0]).toMatchObject({ data: { optInEmail: false, emailOptInAngefragtAm: expect.any(Date) } })
   })
@@ -156,17 +160,15 @@ describe('Keine Auskunft, ob die Adresse schon angemeldet ist', () => {
       upsert.mockResolvedValueOnce(abo as never)
       await meldeNeuigkeitenAn({ orderId: ORDER_ID, sig: SIG })
     }
-    await vi.dynamicImportSettled()
     expect(updateMany).not.toHaveBeenCalled()
-    expect(sendAboBestaetigung).not.toHaveBeenCalled()
+    expect(stelleMailEin).not.toHaveBeenCalled()
   })
 
   it('die Bremse des Abos: eine offene Anfrage von vor fünf Minuten bekommt keinen zweiten Link', async () => {
     upsert.mockResolvedValueOnce({ ...NEU, emailOptInAngefragtAm: new Date(Date.now() - 5 * 60 * 1000) } as never)
     expect(await meldeNeuigkeitenAn({ orderId: ORDER_ID, sig: SIG })).toEqual({ ok: true })
-    await vi.dynamicImportSettled()
     expect(updateMany).not.toHaveBeenCalled()
-    expect(sendAboBestaetigung).not.toHaveBeenCalled()
+    expect(stelleMailEin).not.toHaveBeenCalled()
   })
 })
 
@@ -213,7 +215,7 @@ describe('Nur für eine laufende Bestellung — dieselbe Regel wie die Karte (Ru
     expect(upsert).not.toHaveBeenCalled()
     expect(neuigkeitenGebremst).not.toHaveBeenCalled()
     await vi.dynamicImportSettled()
-    expect(sendAboBestaetigung).not.toHaveBeenCalled()
+    expect(stelleMailEin).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -243,7 +245,7 @@ describe('Bremse je Bestellung über die Datenbank (Runde 1)', () => {
 
     expect(upsert).not.toHaveBeenCalled()
     await vi.dynamicImportSettled()
-    expect(sendAboBestaetigung).not.toHaveBeenCalled()
+    expect(stelleMailEin).not.toHaveBeenCalled()
   })
 
   it('gezählt wird je Bestellung (die Kennung, nie die Adresse) — auch außerhalb der Produktion', async () => {

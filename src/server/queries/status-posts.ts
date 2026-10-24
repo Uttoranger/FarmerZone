@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma'
 import { Prisma, type StatusPostAnlass } from '@prisma/client'
 import type { Abonnentin } from '@/lib/whatsapp-versand'
 import { leseAusschnitt, type BildAusschnitt } from '@/schemas/bild-ausschnitt'
+import { gesendeteBeitragsMails } from '@/server/mail-arten/beitrag'
 
 export type StatusPostSummary = {
   id: string
@@ -50,6 +51,8 @@ export async function getStatusPostsForFarm(farmId: string): Promise<StatusPostS
     where: { farmId },
     orderBy: { createdAt: 'desc' },
   })
+  // „n per E-Mail" aus der Warteschlange — eine Quelle (Nr. 159).
+  const gesendet = await gesendeteBeitragsMails(posts)
   const now = new Date()
   return posts.map((p) => ({
     id: p.id,
@@ -63,7 +66,7 @@ export async function getStatusPostsForFarm(farmId: string): Promise<StatusPostS
     showOnFarmPage: p.showOnFarmPage,
     sentViaEmail: p.sentViaEmail,
     sentViaWhatsApp: p.sentViaWhatsApp,
-    emailRecipientCount: p.emailRecipientCount,
+    emailRecipientCount: gesendet.get(p.id) ?? p.emailRecipientCount,
     whatsappRecipientCount: p.whatsappRecipientCount,
     whatsappSentCount: p.whatsappSentCount,
     whatsappGetippt: p.whatsappGetippt,

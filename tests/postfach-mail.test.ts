@@ -1,5 +1,5 @@
 /**
- * Postfach per E-Mail (Register N12, Nr. 87): sendPostfachMail aus
+ * Postfach per E-Mail (Register N12, Nr. 87): bauePostfachMail aus
  * src/lib/email.ts mit den Vorlagen postfach-rundschreiben.tsx und
  * postfach-antwort.tsx — echt gerendert, nur das Resend-SDK ist eine Attrappe.
  *
@@ -12,27 +12,29 @@
  *    Auftrag eines Hofes" — Gegenprobe: ohne `fusszeile` schreibt das Layout
  *    weiter den Satz der Mails im Namen eines Hofs.
  *  - Fremdtext bleibt Text: Markup im Text kommt maskiert an.
- *  - Die Post-Sperre (Z3) greift: außerhalb der Produktion geht nichts an eine
- *    Adresse, die nicht freigegeben ist (Gegenprobe mit @example.com).
+ *  - Seit Nr. 159 baut email.ts die Mail nur; verschickt (mit Post-Sperre Z3)
+ *    der Worker der Warteschlange (tests/mail-warteschlange.test.ts).
  *  - Antwort des Teams (antworteAlsTeam): Die Stunde zu belegen
- *    (Unterhaltung.letzteMailAm) ist Nachlauf — scheitert es, bleibt die
- *    gespeicherte Antwort ein Erfolg ohne Mail, gemeldet nur mit Fehlerklasse;
- *    Gegenprobe: belegt es die Stunde, geht die Mail in den Nachlauf.
+ *    (Unterhaltung.letzteMailAm) und den Auftrag einzustellen ist Nachlauf —
+ *    scheitert es, bleibt die gespeicherte Antwort ein Erfolg ohne Mail,
+ *    gemeldet nur mit Fehlerklasse; Gegenprobe: belegt es die Stunde, steht
+ *    ein Auftrag „postfach“ in derselben Transaktion.
  *    Datenbank, Sitzung und Admin-Prüfung sind dafür Attrappen; die echte
  *    Drossel prüft tests/integration/postfach.int.test.ts.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { sendMock, captureException, db, nachDerAntwort } = vi.hoisted(() => ({
+const { sendMock, captureException, db, nachDerAntwort, stelleMailEin } = vi.hoisted(() => ({
   sendMock: vi.fn(),
   captureException: vi.fn(),
   db: { transaction: vi.fn(), updateMany: vi.fn() },
   nachDerAntwort: vi.fn(),
+  stelleMailEin: vi.fn(),
 }))
 
 vi.mock('server-only', () => ({}))
 // Das Mail-Protokoll (Nr. 158) bindet Prisma; hier geht es nur um die Mail selbst.
-vi.mock('@/server/mail-warteschlange', () => ({ protokolliereSofortMail: vi.fn() }))
+vi.mock('@/server/mail-warteschlange', () => ({ protokolliereSofortMail: vi.fn(), stelleMailEin }))
 vi.mock('@sentry/nextjs', () => ({ captureMessage: vi.fn(), captureException }))
 // Nur für antworteAlsTeam: die Grenzen der Action als Attrappen.
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
@@ -42,7 +44,7 @@ vi.mock('@/lib/prisma', () => ({ prisma: { $transaction: db.transaction, unterha
 vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort }))
 vi.mock('@/server/admin-wache', () => ({ verlangeAdminAktion: vi.fn(async () => ({ ok: true, userId: 'cadminaaaaaaaaaaaaaaaaaa1' })), verlangeFrischeBestaetigung: vi.fn(async () => ({ ok: true, userId: 'admin_1', sitzungId: 'sitzung-admin_1' })), frischOderBestaetigen: vi.fn(async () => null), adminPflichtOffen: vi.fn(async () => false) }))
 vi.mock('@/server/bremse-datenbank', () => ({ bremseUeberAlleInstanzen: vi.fn() }))
-vi.mock('@/server/queries/postfach', () => ({ ladeEmpfaengerHoefe: vi.fn(), ladeMailEmpfaenger: vi.fn() }))
+vi.mock('@/server/queries/postfach', () => ({ ladeEmpfaengerHoefe: vi.fn(), ladeZustellung: vi.fn() }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: vi.fn() }))
 vi.mock('resend', () => ({
   Resend: class {
@@ -84,14 +86,9 @@ beforeEach(() => {
   vi.spyOn(console, 'log').mockImplementation(() => undefined)
 })
 
-function gesendet(): { to: string; subject: string; html: string } {
-  expect(sendMock).toHaveBeenCalledTimes(1)
-  return sendMock.mock.calls[0][0] as { to: string; subject: string; html: string }
-}
-
-describe('sendPostfachMail', () => {
+describe('bauePostfachMail', () => {
   it('Rundschreiben: Titel als Betreff, Text, Link in die App, Weg in den Faden, Absender aus MARKE_TEAM', async () => {
-    const ergebnis = await email.sendPostfachMail({
+    const gebaut = await email.bauePostfachMail({
       art: 'rundschreiben',
       an: 'hof@example.com',
       titel: 'Bitte die Abholzeiten prüfen',
@@ -99,8 +96,7 @@ describe('sendPostfachMail', () => {
       link: '/products?bereich=futter',
       unterhaltungId: FADEN,
     })
-    expect(ergebnis).toEqual({ id: 'email_1' })
-    const mail = gesendet()
+    const mail = { to: gebaut.an, subject: gebaut.betreff, html: gebaut.html }
     expect(mail.to).toBe('hof@example.com')
     expect(mail.subject).toBe('Bitte die Abholzeiten prüfen')
     expect(mail.html).toContain('Bitte die Abholzeiten prüfen')
@@ -115,8 +111,8 @@ describe('sendPostfachMail', () => {
   })
 
   it('Antwort des Teams: eigener Betreff, der Text steht in der Mail; ohne Link kein Link-Knopf', async () => {
-    await email.sendPostfachMail({ art: 'antwort', an: 'hof@example.com', titel: 'Neue Abholzeiten', text: 'Passt, danke dir!', link: null, unterhaltungId: FADEN })
-    const mail = gesendet()
+    const gebaut = await email.bauePostfachMail({ art: 'antwort', an: 'hof@example.com', titel: 'Neue Abholzeiten', text: 'Passt, danke dir!', link: null, unterhaltungId: FADEN })
+    const mail = { to: gebaut.an, subject: gebaut.betreff, html: gebaut.html }
     expect(mail.subject).toBe(`Antwort vom ${MARKE_TEAM}: Neue Abholzeiten`)
     expect(mail.html).toContain('Passt, danke dir!')
     expect(mail.html).not.toContain('>Ansehen<')
@@ -132,24 +128,28 @@ describe('sendPostfachMail', () => {
     expect(html).not.toContain(POSTFACH_MAIL_TEXT.fuss)
   })
 
-  it('die Post-Sperre greift: außerhalb der Produktion nichts an eine nicht freigegebene Adresse', async () => {
-    const ergebnis = await email.sendPostfachMail({ art: 'antwort', an: 'hof@example.org', titel: 'Erfunden', text: 'Erfunden.', link: null, unterhaltungId: FADEN })
-    expect(ergebnis).toEqual({ gesperrt: true })
+  it('baut nur und verschickt nie selbst — die Post-Sperre (Z3) prüft der Worker vor dem Versand', async () => {
+    const gebaut = await email.bauePostfachMail({ art: 'antwort', an: 'hof@example.org', titel: 'Erfunden', text: 'Erfunden.', link: null, unterhaltungId: FADEN })
+    expect(gebaut.an).toBe('hof@example.org')
     expect(sendMock).not.toHaveBeenCalled()
   })
 })
 
-describe('antworteAlsTeam — die Stunde zu belegen ist Nachlauf', () => {
+describe('antworteAlsTeam — die Stunde zu belegen und einzustellen ist Nachlauf', () => {
   const eingabe = { unterhaltungId: FADEN, text: 'Erfundene Antwort vom Team.', wichtig: false, link: null, perMail: true }
 
   beforeEach(() => {
     captureException.mockReset()
     nachDerAntwort.mockReset()
     db.updateMany.mockReset()
-    // Die Transaktion findet den Faden und speichert die Antwort.
+    stelleMailEin.mockReset()
+    // Die erste Transaktion findet den Faden und speichert die Antwort; die
+    // zweite belegt die Stunde (letzteMailAm → db.updateMany) und stellt ein.
     const tx = {
-      unterhaltung: { updateMany: async () => ({ count: 1 }) },
-      nachricht: { create: async () => ({}) },
+      unterhaltung: {
+        updateMany: async (arg: { data: { letzteMailAm?: Date } }) => (arg.data.letzteMailAm ? db.updateMany(arg) : { count: 1 }),
+      },
+      nachricht: { create: async () => ({ id: 'cnachrichtaaaaaaaaaaaaaa1', unterhaltung: { farmId: 'chofaaaaaaaaaaaaaaaaaaaa1' } }) },
       unterhaltungStand: { createMany: async () => ({ count: 1 }), updateMany: async () => ({ count: 0 }) },
     }
     db.transaction.mockReset()
@@ -165,6 +165,7 @@ describe('antworteAlsTeam — die Stunde zu belegen ist Nachlauf', () => {
     const ergebnis = await aktionen.antworteAlsTeam(eingabe)
 
     expect(ergebnis).toEqual({ ok: true, mail: 'aus' })
+    expect(stelleMailEin).not.toHaveBeenCalled()
     expect(nachDerAntwort).not.toHaveBeenCalled()
     expect(captureException).toHaveBeenCalledTimes(1)
     const [fehler, kontext] = captureException.mock.calls[0] as [Error, unknown]
@@ -173,11 +174,26 @@ describe('antworteAlsTeam — die Stunde zu belegen ist Nachlauf', () => {
     expect(JSON.stringify(kontext)).not.toContain(eingabe.text)
   })
 
-  it('Gegenprobe: belegt es die Stunde, geht die Mail in den Nachlauf — ohne Meldung', async () => {
+  it('Gegenprobe: belegt es die Stunde, steht ein Auftrag „postfach“ (Wichtig) in derselben Transaktion — ohne Meldung', async () => {
     db.updateMany.mockResolvedValue({ count: 1 })
 
     expect(await aktionen.antworteAlsTeam(eingabe)).toEqual({ ok: true, mail: 'unterwegs' })
-    expect(nachDerAntwort).toHaveBeenCalledTimes(1)
+    expect(stelleMailEin).toHaveBeenCalledTimes(1)
+    expect(stelleMailEin.mock.calls[0]![0]).toMatchObject({
+      art: 'postfach',
+      vorrang: 1,
+      schluessel: 'postfach:cnachrichtaaaaaaaaaaaaaa1',
+      bezug: { nachrichtId: 'cnachrichtaaaaaaaaaaaaaa1' },
+      farmId: 'chofaaaaaaaaaaaaaaaaaaaa1',
+    })
+    // Mit dem Transaktions-Client: Ohne Stunde kein Auftrag und umgekehrt.
+    expect(stelleMailEin.mock.calls[0]![1]).toBeDefined()
     expect(captureException).not.toHaveBeenCalled()
+  })
+
+  it('belegt ein anderer die Stunde schon: gedrosselt, kein Auftrag', async () => {
+    db.updateMany.mockResolvedValue({ count: 0 })
+    expect(await aktionen.antworteAlsTeam(eingabe)).toEqual({ ok: true, mail: 'gedrosselt' })
+    expect(stelleMailEin).not.toHaveBeenCalled()
   })
 })

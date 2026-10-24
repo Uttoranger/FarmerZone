@@ -20,11 +20,7 @@ vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/stripe', () => ({
   stripe: { refunds: { create: vi.fn(), list: vi.fn(async () => ({ data: [], has_more: false })) } },
 }))
-vi.mock('@/lib/email', () => ({
-  sendOrderReady: vi.fn(),
-  sendOrderCancelled: vi.fn(),
-  sendOrderNotReady: vi.fn(),
-}))
+vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn() }))
 vi.mock('@/lib/prisma', () => {
   const order = { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() }
   const product = { update: vi.fn() }
@@ -48,7 +44,7 @@ import { markAsNotPickedUp, cancelOrder } from '@/server/actions/orders'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import { sendOrderCancelled } from '@/lib/email'
+import { stelleMailEin } from '@/server/mail-warteschlange'
 
 const getSession = vi.mocked(auth.api.getSession)
 const farmFindUnique = vi.mocked(prisma.farm.findUnique)
@@ -155,9 +151,7 @@ describe('markAsNotPickedUp — bar', () => {
     expect(daten[0]).toEqual({ status: 'NOT_PICKED_UP' })
     expect(daten[1]).toEqual({ serviceFeeRefundedAt: expect.any(Date) })
     expect(refundCreate).not.toHaveBeenCalled()
-    // Mails laden den Versand erst im Aufruf (Nr. 31): erst alle Importe abwarten, sonst wäre „nicht gesendet“ nur zu früh geprüft.
-    await vi.dynamicImportSettled()
-    expect(sendOrderCancelled).not.toHaveBeenCalled()
+    expect(stelleMailEin).not.toHaveBeenCalled()
   })
 
   it('WARENPREIS unangetastet: kein paymentStatus, kein Bestand, kein paidAt im Update', async () => {
@@ -310,9 +304,9 @@ describe('cancelOrder — Gebühren-Vermerk bei Storno', () => {
     expect(stornoDaten().at(-1)).toEqual(
       expect.objectContaining({ status: 'CANCELLED', serviceFeeRefundedAt: expect.any(Date) })
     )
-    // Die Mail läuft nach der Antwort und lädt den Versand erst dann (Nr. 31) — also abwarten.
-    await vi.waitFor(() =>
-      expect(sendOrderCancelled).toHaveBeenCalledWith(expect.objectContaining({ serviceFeeCents: 98 }), 20.98, undefined)
+    // Die Storno-Mail ist ein Auftrag mit dem Betrag, den Stripe erstattet hat (Cent, nie neu gerechnet).
+    expect(stelleMailEin).toHaveBeenCalledWith(
+      expect.objectContaining({ art: 'storniert', vorrang: 1, schluessel: 'storniert:order_online', bezug: { orderId: 'order_online', erstattetCents: '2098' } })
     )
   })
 })

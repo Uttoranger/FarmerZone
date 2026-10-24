@@ -122,7 +122,7 @@ describe('Aufräumen im Ablauf cleanup-reservations', () => {
       art: 'rundschreiben',
       vorrang: 2,
       schluessel: `${kennung}-${was}`,
-      bezug: { fadenId: kennung },
+      bezug: { unterhaltungId: kennung },
       erstelltAm,
       ...teil,
     })

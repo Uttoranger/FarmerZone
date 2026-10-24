@@ -28,7 +28,9 @@ vi.mock('@sentry/nextjs', async (original) => ({
   captureException: sentry.captureException,
 }))
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
-vi.mock('@/lib/email', () => ({ sendOnsiteConfirmation: vi.fn(), sendAboBestaetigung: vi.fn(async () => ({ id: 'mail-1' })) }))
+vi.mock('@/lib/email', () => ({ sendOnsiteConfirmation: vi.fn() }))
+// Die Bestätigungsmail ist seit Nr. 159 ein Auftrag der Warteschlange (echt in der Datenbank); den Worker danach braucht dieser Test nicht.
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
 vi.mock('@/lib/stripe', () => ({
   stripe: { paymentIntents: { create: vi.fn(), retrieve: vi.fn() } },
 }))
@@ -40,13 +42,17 @@ vi.mock('@/server/abo-anmeldung', async (original) => {
 import { POST as checkout } from '@/app/api/checkout/route'
 import { prisma } from '@/lib/prisma'
 import { env } from '@/lib/env'
-import { sendAboBestaetigung } from '@/lib/email'
 import { bestellSignatur } from '@/lib/bestell-link'
 import { NEUIGKEITEN_JE_BESTELLUNG_UND_TAG, NEUIGKEITEN_TEXT } from '@/lib/abo-bestaetigung'
 import { DB_BREMSEN, bremsSchluessel } from '@/lib/bremse-datenbank'
 import { meldeEmailAboAn } from '@/server/abo-anmeldung'
 import { meldeNeuigkeitenAn } from '@/server/actions/neuigkeiten'
-import { checkoutAnfrage, erstelleHof, erstelleProdukt, intKennung, raeumeAuf, setzeHalt } from './setup/basis'
+import { auftraege, checkoutAnfrage, erstelleHof, erstelleProdukt, intKennung, raeumeAuf, setzeHalt } from './setup/basis'
+
+/** Die Aufträge „abo-bestaetigung" eines Hofs — eine je verschickter Bestätigung. */
+async function bestaetigungen(farmId: string) {
+  return auftraege({ art: 'abo-bestaetigung', farmId })
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -103,8 +109,7 @@ describe('Checkout ohne Abo (Register N2)', () => {
     expect(bestellung.totalAmount.toString()).toBe('10')
     expect((await prisma.product.findUniqueOrThrow({ where: { id: produktId } })).stock).toBe(4)
     expect(await prisma.customerFarmSubscription.count({ where: { farmId } })).toBe(0)
-    await vi.dynamicImportSettled()
-    expect(sendAboBestaetigung).not.toHaveBeenCalled()
+    expect(await bestaetigungen(farmId)).toEqual([])
     expect(meldeEmailAboAn).not.toHaveBeenCalled()
   })
 })
@@ -120,8 +125,8 @@ describe('Anmeldung auf der Bestätigungsseite', () => {
     expect(abos).toHaveLength(1)
     expect(abos[0]).toMatchObject({ customerEmail: email, optInEmail: false, optInWhatsApp: false, emailOptInBestaetigtAm: null })
     expect(abos[0]!.emailOptInAngefragtAm).toBeInstanceOf(Date)
-    await vi.waitFor(() => expect(sendAboBestaetigung).toHaveBeenCalledOnce())
-    expect(vi.mocked(sendAboBestaetigung).mock.calls[0]![0]).toBe(email)
+    // Ein Auftrag nur mit dem Abo — die Adresse lädt der Renderer aus dem Abo (das der Bestellung).
+    expect(await bestaetigungen(farmId)).toEqual([expect.objectContaining({ bezug: { aboId: abos[0]!.id } })])
   })
 
   it('falsche Signatur oder die einer anderen Bestellung: nichts geschrieben, keine Mail', async () => {
@@ -132,8 +137,7 @@ describe('Anmeldung auf der Bestätigungsseite', () => {
     expect(await meldeNeuigkeitenAn({ orderId, sig: bestellSignatur(`${orderId}x`) })).toEqual({ error: NEUIGKEITEN_TEXT.linkUngueltig })
 
     expect(await prisma.customerFarmSubscription.count({ where: { farmId } })).toBe(0)
-    await vi.dynamicImportSettled()
-    expect(sendAboBestaetigung).not.toHaveBeenCalled()
+    expect(await bestaetigungen(farmId)).toEqual([])
   })
 })
 
@@ -151,13 +155,12 @@ describe('Nur für eine laufende Bestellung, höchstens drei Anfragen am Tag (Ru
 
     expect(await prisma.customerFarmSubscription.count({ where: { farmId } })).toBe(0)
     expect(await prisma.rateLimitZaehler.count({ where: { schluessel: zaehlerSchluessel(orderId) } })).toBe(0)
-    await vi.dynamicImportSettled()
-    expect(sendAboBestaetigung).not.toHaveBeenCalled()
+    expect(await bestaetigungen(farmId)).toEqual([])
   })
 
   it(`je Bestellung ${NEUIGKEITEN_JE_BESTELLUNG_UND_TAG} Anfragen am Tag: die vierte schickt keine Mail, die Antwort bleibt dieselbe`, async () => {
     const email = `${intKennung('kundin')}@example.com`
-    const { orderId, sig } = await bestelle(email)
+    const { farmId, orderId, sig } = await bestelle(email)
     const schluessel = zaehlerSchluessel(orderId)
     try {
       for (let anfrage = 1; anfrage <= NEUIGKEITEN_JE_BESTELLUNG_UND_TAG + 1; anfrage++) {
@@ -168,10 +171,9 @@ describe('Nur für eine laufende Bestellung, höchstens drei Anfragen am Tag (Ru
           data: { emailOptInAngefragtAm: new Date(Date.now() - 20 * 60 * 1000) },
         })
         expect(await meldeNeuigkeitenAn({ orderId, sig })).toEqual({ ok: true })
-        await vi.waitFor(() => expect(sendAboBestaetigung).toHaveBeenCalledTimes(Math.min(anfrage, NEUIGKEITEN_JE_BESTELLUNG_UND_TAG)))
+        expect(await bestaetigungen(farmId)).toHaveLength(Math.min(anfrage, NEUIGKEITEN_JE_BESTELLUNG_UND_TAG))
       }
-      await vi.dynamicImportSettled()
-      expect(sendAboBestaetigung).toHaveBeenCalledTimes(NEUIGKEITEN_JE_BESTELLUNG_UND_TAG)
+      expect(await bestaetigungen(farmId)).toHaveLength(NEUIGKEITEN_JE_BESTELLUNG_UND_TAG)
 
       const zeilen = await prisma.rateLimitZaehler.findMany({ where: { schluessel } })
       expect(zeilen.map((z) => z.zaehler)).toEqual([NEUIGKEITEN_JE_BESTELLUNG_UND_TAG + 1])

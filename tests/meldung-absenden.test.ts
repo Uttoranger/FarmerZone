@@ -19,11 +19,17 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     meldung: { count: vi.fn(), create: vi.fn() },
     farm: { findUnique: vi.fn() },
+    // Die Kennung der weiteren Adresse (empfaengerKennungen, Nr. 159).
+    betreiberEmpfaenger: { findMany: vi.fn(async () => [{ id: 'cteamaaaaaaaaaaaaaaaaaaa1', email: 'team@example.com' }]) },
   },
 }))
-vi.mock('@/lib/email', () => ({ sendMeldungNotification: vi.fn() }))
+// Die Betreiber-Mail ist seit Nr. 159 je Adresse ein Auftrag der Warteschlange.
+vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn() }))
 // Empfänger und Regel aus der Zustellung (Register N14, Nr. 95) — hier die Liste fest.
-vi.mock('@/server/queries/postfach', () => ({ ladeBetreiberEmpfaenger: vi.fn(async () => ['support@example.com', 'team@example.com']) }))
+vi.mock('@/server/queries/postfach', async () => {
+  const { SUPPORT_EMAIL } = await import('@/lib/support')
+  return { ladeBetreiberEmpfaenger: vi.fn(async () => [SUPPORT_EMAIL.toLowerCase(), 'team@example.com']) }
+})
 // Zweite Stufe der Bremse (Register R1): hier nur, ob und wann sie gefragt
 // wird — die Zählung prüfen tests/bremse-datenbank*.test.ts.
 vi.mock('@/server/bremse-datenbank', () => ({ bremseUeberAlleInstanzen: vi.fn(async () => true) }))
@@ -34,7 +40,7 @@ import { generateFormToken, FORM_EXPIRED_MESSAGE, MIN_FORM_AGE_MS, MAX_FORM_AGE_
 import { MELDUNGEN_PRO_STUNDE, MELDUNG_TEXT_MAX, ZU_VIELE_MELDUNGEN } from '@/lib/meldung'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { sendMeldungNotification } from '@/lib/email'
+import { stelleMailEin } from '@/server/mail-warteschlange'
 import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 import { DB_BREMSEN } from '@/lib/bremse-datenbank'
 
@@ -42,7 +48,7 @@ const getSession = vi.mocked(auth.api.getSession)
 const meldungCount = vi.mocked(prisma.meldung.count)
 const meldungCreate = vi.mocked(prisma.meldung.create)
 const farmFindUnique = vi.mocked(prisma.farm.findUnique)
-const mail = vi.mocked(sendMeldungNotification)
+const mail = vi.mocked(stelleMailEin)
 
 const AUSGESTELLT = new Date('2026-09-01T10:00:00.000Z')
 const NEUE_ID = 'cmfabcdefgh123456789xyz'
@@ -89,7 +95,7 @@ beforeEach(() => {
   alsHof()
   meldungCount.mockResolvedValue(0)
   meldungCreate.mockResolvedValue({ id: NEUE_ID, createdAt: new Date('2026-09-01T10:00:10.000Z') } as never)
-  mail.mockResolvedValue(undefined)
+  mail.mockResolvedValue(2)
 })
 
 afterEach(() => {
@@ -312,21 +318,19 @@ describe('meldungAbsenden — Stundenzähler', () => {
 // ── Betreiber-Mail nur bei FEHLER ───────────────────────────────────────────
 
 describe('meldungAbsenden — Betreiber-Mail', () => {
-  it('schickt bei FEHLER genau eine Mail mit Kurznummer, Hof und Kontext', async () => {
+  it('stellt bei FEHLER je Adresse der Liste genau einen Auftrag ein — nur mit der Kennung der Meldung', async () => {
     await meldungAbsenden(meldung({ art: 'FEHLER', diagKennung: 'S71' }))
     expect(mail).toHaveBeenCalledTimes(1)
-    expect(mail).toHaveBeenCalledWith(
+    // An die ganze Empfängerliste der Zustellung (Regel „Fehlermeldung: sofort"); Text und Hof lädt der Renderer.
+    expect(mail.mock.calls[0]![0]).toEqual([
+      expect.objectContaining({ art: 'meldung', vorrang: 1, schluessel: `meldung:${NEUE_ID}:support`, bezug: { meldungId: NEUE_ID, empfaengerId: 'support' } }),
       expect.objectContaining({
-        id: NEUE_ID,
-        kurznummer: NEUE_ID.slice(0, 8),
-        farmName: 'Biohof Sonnleitner',
-        diagKennung: 'S71',
-        seiteUrl: 'https://agrilo.at/settings',
-        viewport: '375x667',
+        art: 'meldung',
+        schluessel: `meldung:${NEUE_ID}:cteamaaaaaaaaaaaaaaaaaaa1`,
+        bezug: { meldungId: NEUE_ID, empfaengerId: 'cteamaaaaaaaaaaaaaaaaaaa1' },
       }),
-      // An die ganze Empfängerliste der Zustellung (Regel „Fehlermeldung: sofort").
-      ['support@example.com', 'team@example.com']
-    )
+    ])
+    expect(JSON.stringify(mail.mock.calls[0])).not.toContain('S71')
   })
 
   it('schickt bei WUNSCH und FRAGE keine Mail — die werden gesammelt, nicht gemeldet', async () => {

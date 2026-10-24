@@ -3,9 +3,47 @@ import { beitragIdImLink } from '@/lib/teilen-fenster'
 import { generateUnsubscribeToken } from '@/lib/unsubscribe'
 import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
 import { setzeVorname, vornameFuer, vornamenAusBestellungen } from '@/server/beitrag-vorname'
-import type { BeitragBezug } from '@/schemas/mail-auftrag'
+import { VORRANG, type BeitragBezug } from '@/schemas/mail-auftrag'
 import type { StapelMail } from '@/lib/email'
+import type { EinstellAuftrag } from '@/server/mail-warteschlange'
 import type { Verworfen } from '@/server/mail-arten'
+
+/** Ein Beitrag an jedes Abo: je Abo ein Auftrag (Kann warten), Schlüssel `beitrag:<postId>:<aboId>`. */
+export function beitragAuftraege(post: { id: string; farmId: string }, aboIds: readonly string[]): EinstellAuftrag[] {
+  return aboIds.map((aboId) => ({
+    art: 'beitrag',
+    vorrang: VORRANG.kannWarten,
+    schluessel: `beitrag:${post.id}:${aboId}`,
+    bezug: { postId: post.id, aboId },
+    farmId: post.farmId,
+  }))
+}
+
+/**
+ * Wie viele Mails eines Beitrags hinausgingen — die EINE Quelle für „n per
+ * E-Mail" in Mein Hof, Heute und im Teilen-Bild (Nr. 159): die gesendeten
+ * Aufträge der Warteschlange. Ein Beitrag ganz ohne Aufträge stammt von vor
+ * der Warteschlange; für ihn gilt die Zahl, die damals am Beitrag stand
+ * (`emailRecipientCount`). Die Aufträge eines Beitrags entstehen frühestens
+ * mit ihm — `ab` (der früheste Zeitpunkt) hält die Abfrage auf dem Index
+ * (`art`, `erstelltAm`).
+ */
+export async function gesendeteBeitragsMails(
+  beitraege: readonly { id: string; publishedAt: Date | null; createdAt: Date; emailRecipientCount: number }[]
+): Promise<Map<string, number>> {
+  const ergebnis = new Map(beitraege.map((b) => [b.id, b.emailRecipientCount]))
+  if (beitraege.length === 0) return ergebnis
+  // Eine Minute Spielraum: Beitrag und Aufträge entstehen in derselben Transaktion, aber mit je eigener Uhrzeit.
+  const ab = new Date(Math.min(...beitraege.map((b) => Math.min(b.createdAt.getTime(), b.publishedAt?.getTime() ?? Infinity))) - 60_000)
+  const zeilen = await prisma.$queryRaw<{ postId: string; gesendet: number }[]>`
+    SELECT "bezug"->>'postId' AS "postId", (COUNT(*) FILTER (WHERE "status" = 'gesendet'))::int AS "gesendet"
+    FROM "MailAuftrag"
+    WHERE "art" = 'beitrag' AND "vorrang" = ${VORRANG.kannWarten} AND "erstelltAm" >= ${ab}
+      AND "bezug"->>'postId' = ANY(${beitraege.map((b) => b.id)}::text[])
+    GROUP BY 1`
+  for (const z of zeilen) ergebnis.set(z.postId, z.gesendet)
+  return ergebnis
+}
 
 /**
  * Renderer „beitrag“ (Kann warten): ein Beitrag an EIN Abo. Lädt beim Versand

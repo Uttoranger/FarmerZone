@@ -55,15 +55,15 @@ vi.mock('@/lib/prisma', async () => {
 vi.mock('@/lib/stripe', () => ({ stripe: { paymentIntents: { create: vi.fn() } } }))
 vi.mock('@/lib/email', () => ({
   sendOnsiteConfirmation: vi.fn(),
-  sendNewFarmNotification: vi.fn(),
-  sendFreischaltungEmail: vi.fn(),
 }))
+// Neuer Hof und Freischaltung sind seit Nr. 159 Aufträge der Warteschlange.
+vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn() }))
 
 import { POST as checkoutPOST } from '@/app/api/checkout/route'
 import { POST as reservePOST } from '@/app/api/reserve/route'
 import { getPublicFarm } from '@/server/queries/farm'
 import { approveFarmAction, revokeFarmApprovalAction } from '@/server/actions/admin'
-import { sendFreischaltungEmail } from '@/lib/email'
+import { stelleMailEin } from '@/server/mail-warteschlange'
 import { registerFarmer } from '@/server/actions/register'
 import { generateFormToken, MIN_FORM_AGE_MS } from '@/lib/form-token'
 import { createFarm } from '@/server/actions/onboarding'
@@ -117,7 +117,11 @@ const reservationAggregate = vi.mocked(prisma.stockReservation.aggregate)
 const reservationDeleteMany = vi.mocked(prisma.stockReservation.deleteMany)
 const reservationUpsert = vi.mocked(prisma.stockReservation.upsert)
 const userFindUnique = vi.mocked(prisma.user.findUnique)
-const freischaltMail = vi.mocked(sendFreischaltungEmail)
+const freischaltMail = vi.mocked(stelleMailEin)
+/** Die eingestellten Aufträge „freischaltung". */
+function freischaltAuftraege(): unknown[] {
+  return freischaltMail.mock.calls.flatMap(([a]) => (Array.isArray(a) ? a : [a])).filter((a) => (a as { art: string }).art === 'freischaltung')
+}
 const userUpdate = vi.mocked(prisma.user.update)
 const orderCreate = vi.mocked(prisma.order.create)
 const paymentIntentCreate = vi.mocked(stripe.paymentIntents.create)
@@ -393,12 +397,10 @@ describe('Freigabe-Actions', () => {
 
     await approveFarmAction('farm_1')
 
-    expect(freischaltMail).toHaveBeenCalledTimes(1)
-    expect(freischaltMail).toHaveBeenCalledWith({
-      name: 'Testhof',
-      slug: 'testhof',
-      ownerEmail: 'bauer@testhof.at',
-    })
+    // Ein Auftrag (Wichtig) nur mit der Kennung des Hofs — Adresse und Name lädt der Renderer.
+    expect(freischaltAuftraege()).toEqual([
+      expect.objectContaining({ art: 'freischaltung', vorrang: 1, bezug: { farmId: 'farm_1' }, farmId: 'farm_1', schluessel: expect.stringMatching(/^freischaltung:farm_1:\d+$/) }),
+    ])
   })
 
   it('lässt die Freischaltung gelingen, auch wenn die Mail scheitert', async () => {
@@ -440,7 +442,7 @@ describe('Freigabe-Actions', () => {
 
     expect(result.error).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
     expect(farmUpdateMany).not.toHaveBeenCalled()
-    expect(freischaltMail).not.toHaveBeenCalled()
+    expect(freischaltAuftraege()).toEqual([])
   })
 
   it('Gegenprobe: ein neues Konto MIT bestätigter E-Mail wird freigeschaltet', async () => {
@@ -478,7 +480,7 @@ describe('Freigabe-Actions', () => {
 
     expect(result.error).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
     expect(farmUpdateMany).not.toHaveBeenCalled()
-    expect(freischaltMail).not.toHaveBeenCalled()
+    expect(freischaltAuftraege()).toEqual([])
   })
 
   it('schaltet auch einen Bar-Hof (acceptsOnline false) ohne Stripe NICHT frei — die Wahl „nur bar" gibt es nicht mehr (Z1)', async () => {
@@ -499,7 +501,7 @@ describe('Freigabe-Actions', () => {
 
     expect(result.error).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
     expect(farmUpdateMany).not.toHaveBeenCalled()
-    expect(freischaltMail).not.toHaveBeenCalled()
+    expect(freischaltAuftraege()).toEqual([])
   })
 
   it('schaltet einen Hof mit fertigem Stripe frei', async () => {
@@ -587,7 +589,7 @@ describe('Freigabe-Actions', () => {
     const result = await approveFarmAction('farm_1')
 
     expect(result.error).toBe(FREISCHALTUNG_GEAENDERT_TEXT)
-    expect(freischaltMail).not.toHaveBeenCalled()
+    expect(freischaltAuftraege()).toEqual([])
   })
 
   it('prüft den Admin zuerst — ohne Admin wird nichts gelesen und nichts geschrieben', async () => {
@@ -627,7 +629,7 @@ describe('Freigabe-Actions', () => {
     expect(arg.data.approvedAt).toBeNull()
     // Bewusst KEINE Mail bei der Zurücknahme — heikle Kommunikation gehört
     // dem Betreiber persönlich (Kommentar an revokeFarmApprovalAction).
-    expect(freischaltMail).not.toHaveBeenCalled()
+    expect(freischaltAuftraege()).toEqual([])
   })
 
   it('lehnt ohne isAdmin ab, obwohl eine gültige Session besteht — und ändert nichts', async () => {
@@ -656,7 +658,7 @@ describe('Freigabe-Actions', () => {
 
     expect(farmFindUnique).not.toHaveBeenCalled()
     expect(farmUpdateMany).not.toHaveBeenCalled()
-    expect(freischaltMail).not.toHaveBeenCalled()
+    expect(freischaltAuftraege()).toEqual([])
   })
 
   it('lehnt ohne Session ab', async () => {

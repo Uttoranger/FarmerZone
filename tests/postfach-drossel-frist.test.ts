@@ -22,7 +22,8 @@ vi.mock('@/server/queries/postfach', () => ({
   ladeBetreiberEmpfaenger: vi.fn(async () => ['team@example.com']),
   ladeAntwortFuerTeam: vi.fn(async () => ({ hofName: 'Testhof A', titel: 'Erfundener Titel' })),
 }))
-vi.mock('@/lib/email', () => ({ sendHofAntwortAnTeam: vi.fn(async () => ({ gesendet: 1, gescheitert: 0 })) }))
+// Die Mail an das Team ist seit Nr. 159 je Adresse ein Auftrag der Warteschlange.
+vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn(async () => 1) }))
 const nachlauf = vi.hoisted(() => ({ aufgaben: [] as (() => Promise<void>)[] }))
 vi.mock('@/lib/nach-der-antwort', () => ({
   nachDerAntwort: (aufgabe: () => Promise<void>) => {
@@ -32,7 +33,7 @@ vi.mock('@/lib/nach-der-antwort', () => ({
 vi.mock('@/lib/prisma', async () => {
   const tx = {
     unterhaltung: { updateMany: vi.fn(async () => ({ count: 1 })) },
-    nachricht: { create: vi.fn(async () => ({})) },
+    nachricht: { create: vi.fn(async () => ({ id: 'cmfnachricht000000000001' })) },
     unterhaltungStand: { createMany: vi.fn(async () => ({ count: 1 })), updateMany: vi.fn(async () => ({ count: 1 })) },
   }
   return {
@@ -41,6 +42,8 @@ vi.mock('@/lib/prisma', async () => {
       user: { findUnique: vi.fn() },
       // Der Zähler der Bremse (INSERT … ON CONFLICT … RETURNING).
       $queryRaw: vi.fn(),
+      // Die Kennung der weiteren Adresse aus der Zustellung (empfaengerKennungen).
+      betreiberEmpfaenger: { findMany: vi.fn(async () => [{ id: 'cmfteam00000000000000001', email: 'team@example.com' }]) },
       $transaction: vi.fn(async (arbeit: (t: typeof tx) => Promise<unknown>) => arbeit(tx)),
     },
   }
@@ -49,7 +52,7 @@ vi.mock('@/lib/prisma', async () => {
 import * as Sentry from '@sentry/nextjs'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { sendHofAntwortAnTeam } from '@/lib/email'
+import { stelleMailEin } from '@/server/mail-warteschlange'
 import { DB_BREMSE_ZEITLIMIT_MS, DB_BREMSEN, bremsSchluessel } from '@/lib/bremse-datenbank'
 import { env } from '@/lib/env'
 import { antworteAlsHof } from '@/server/actions/postfach'
@@ -85,12 +88,22 @@ describe('Drossel „Ein Hof hat geantwortet": der Zähler hängt', () => {
 
     // Innerhalb der Frist wartet die Drossel noch.
     await vi.advanceTimersByTimeAsync(DB_BREMSE_ZEITLIMIT_MS - 1)
-    expect(sendHofAntwortAnTeam).not.toHaveBeenCalled()
+    expect(stelleMailEin).not.toHaveBeenCalled()
 
     // Mit der Frist gilt sie als „frei": fail-open.
     await vi.advanceTimersByTimeAsync(1)
     await fertig
-    expect(sendHofAntwortAnTeam).toHaveBeenCalledTimes(1)
+    expect(stelleMailEin).toHaveBeenCalledTimes(1)
+    // Je Adresse ein Auftrag „antwort-an-team" — nur Kennungen, kein Text der Antwort.
+    expect(vi.mocked(stelleMailEin).mock.calls[0]![0]).toEqual([
+      expect.objectContaining({
+        art: 'antwort-an-team',
+        vorrang: 1,
+        schluessel: 'antwort-an-team:cmfnachricht000000000001:cmfteam00000000000000001',
+        bezug: { nachrichtId: 'cmfnachricht000000000001', empfaengerId: 'cmfteam00000000000000001' },
+      }),
+    ])
+    expect(JSON.stringify(vi.mocked(stelleMailEin).mock.calls)).not.toContain('Erfundene Antwort')
 
     // Nach Sentry geht nur die Klasse und der Grund — kein Text der Antwort, keine Kennung des Fadens.
     // (In EINEM Fall: Die Bremse meldet höchstens einmal je Instanz und Abstand.)
@@ -109,7 +122,7 @@ describe('Drossel „Ein Hof hat geantwortet": der Zähler hängt', () => {
     await antworteAlsHof({ unterhaltungId: FADEN, text: GEHEIMER_TEXT })
     await arbeiteNachlaufAb()
 
-    expect(sendHofAntwortAnTeam).not.toHaveBeenCalled()
+    expect(stelleMailEin).not.toHaveBeenCalled()
     expect(Sentry.captureException).not.toHaveBeenCalled()
   })
 })

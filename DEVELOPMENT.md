@@ -5794,6 +5794,15 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Kontingent:** Kann warten bleibt liegen ab 70 % der Tagesgrenze oder 90 % des Monats; der Monat ist bis Nr. 162 noch der Kalendermonat (Stelle „Abrechnungszeitraum aus 162“).
 - **Keine Adresse in der Tabelle:** Der Renderer lädt Adresse und Inhalt frisch; gespeichert werden nur Kennungen und ein Fingerabdruck (`empfaengerFingerabdruck`, HMAC mit Zweck `mail-empfaenger:`) für die Support-Suche. Nach 90 Tagen löscht das Aufräumen die Zeile; es gibt auch hängengebliebene Aufträge wieder frei.
 
+## Alle Mail-Wege auf die Warteschlange (Register N26; Nr. 159, Lauf 24, 24.10.2026)
+
+- **Warum:** Nr. 158 brachte Tabelle, Worker und Protokoll; die Mails selbst gingen weiter aus den Actions — Beiträge und Rundschreiben in einer Schleife im Nachlauf, Betreiber-Mails nacheinander an jede Adresse (`sendeAnListe`). Seit Nr. 159 stellt jede Action nur noch Aufträge ein; verschickt wird allein vom Worker, mit Wiederholung, Vorrang und Kontingent.
+- **Welche Art welchen Weg hat**, steht an einer Stelle (`MAIL_WEG`). Sofort bleiben die Mails mit Code, Einmal-Link oder Bestätigungslink — dazu die Bestätigung einer weiteren Betreiber-Adresse: Ihr Token liegt nur als Hash in `BetreiberEmpfaenger`, ein Renderer könnte den Link nie neu bauen (N26 nimmt Bestätigungslinks aus). Die Abo-Bestätigung dagegen ist Wichtig: Ihr Link ist aus Abo und Anfragezeitpunkt signiert und entsteht beim Versand frisch; ist die Anfrage inzwischen erledigt, wird der Auftrag verworfen.
+- **Beträge:** Storno, „Artikel fehlt" und „Zahlung zu spät" zeigen Beträge, die beim Ereignis feststanden (was Stripe eben erstattet hat). Neu rechnen verbietet die Freigabe (§2 Geld), speichern verbietet N26 nur für Adresse, Text und Token — deshalb stehen genau diese Cent-Beträge als Ziffern im Bezug, je Art mit striktem Schema. „Erstattung offen" trägt statt Text einen festen Fall; Satz und Anweisung für Sentry und Mail stehen einmal in `src/lib/erstattung-offen.ts`.
+- **Transaktion:** Webhook bezahlt, Bar-Bestätigung, Beitrag, Rundschreiben und der Vermerk „Zahlung zu spät" stellen in derselben Transaktion ein wie ihr Statuswechsel — scheitert das Einstellen, rollt der Wechsel mit zurück (Webhook: 500, Stripe stellt erneut zu). Beim Storno steht erst nach Stripe fest, ob eine Mail geht und mit welchem Betrag; dort wird danach eingestellt, ein Fehler kippt den Storno nie.
+- **„n per E-Mail":** zählt die gesendeten Aufträge eines Beitrags (`gesendeteBeitragsMails`, Mein Hof, Heute, Teilen-Bild); `emailRecipientCount` ist die Zahl der Aufträge und hält die 7-Tage-Sperre, sobald der Beitrag Aufträge hat. Beiträge von vor der Warteschlange behalten ihre alte Zahl.
+- **Was blieb direkt:** die Warn-Mail des Betriebs (N18-Ergänzung) — deshalb gibt es `sendeAnListe` noch, mit ihr als einzigem Aufrufer.
+
 ## Nützliche Befehle
 
 ```bash

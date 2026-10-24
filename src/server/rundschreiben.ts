@@ -1,10 +1,10 @@
 import { revalidatePath } from 'next/cache'
-import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
-import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { ADMIN_POSTFACH_HREF, POSTFACH_FEHLER, POSTFACH_HREF, empfaengerFuer, nachrichtArtVon, type EmpfaengerRegel } from '@/lib/postfach'
 import { rundschreibenSchema } from '@/schemas/postfach'
-import { ladeEmpfaengerHoefe, ladeMailEmpfaenger } from '@/server/queries/postfach'
+import { ladeEmpfaengerHoefe } from '@/server/queries/postfach'
+import { stelleMailEin } from '@/server/mail-warteschlange'
+import { rundschreibenAuftraege } from '@/server/mail-arten/hof'
 
 /*
  * Der Versand eines Rundschreibens (Register N12, N14) ohne Wache — bewusst
@@ -29,19 +29,13 @@ function satzAus(satz: string | undefined): string {
   return satz !== undefined && EIGENE_SAETZE.has(satz) ? satz : POSTFACH_FEHLER.eingabe
 }
 
-/** Ein Fehler im Nachlauf geht ohne Text nach Sentry: nur ein fester Satz, die Klasse und Kennungen. */
-function meldeNachlauf(err: unknown, kennung: string): void {
-  const meldung = new Error('Postfach: E-Mail nicht verschickt')
-  meldung.name = err instanceof Error ? err.name : 'Unbekannt'
-  Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'postfach', aufgabe: 'rundschreiben-mail' }, extra: { kennung } })
-}
-
 /**
  * Ein Rundschreiben senden: Die Empfänger rechnet der Server aus der Regel
  * (empfaengerFuer über die nicht stillgelegten Höfe) — nie eine Liste aus dem
  * Browser übernehmen. In EINER Transaktion: das Rundschreiben, je Empfänger
  * genau ein Faden (Unique farmId + rundschreibenId) mit der ersten Nachricht
- * vom Team. Mit Haken gehen danach die E-Mails raus; letzteMailAm belegt die
+ * vom Team, und mit Haken je Faden ein Auftrag der Warteschlange (Kann
+ * warten, Nr. 159) — kein Versand in der Anfrage; letzteMailAm belegt die
  * Stunde schon in der Transaktion. Die Eingabe prüft das Schema auch hier —
  * auch der Bescheid läuft durch dieselben Grenzen.
  */
@@ -63,31 +57,14 @@ export async function verschickeRundschreiben(eingabe: unknown, userId: string):
     })
     const angelegt = await tx.unterhaltung.createManyAndReturn({
       data: hofIds.map((farmId) => ({ farmId, rundschreibenId: rundschreiben.id, letzteNachrichtAm: jetzt, letzteMailAm: perMail ? jetzt : null })),
-      select: { id: true },
+      select: { id: true, farmId: true },
     })
     await tx.nachricht.createMany({
       data: angelegt.map((f) => ({ unterhaltungId: f.id, vonFarmId: null, text, linkUrl: link, art: nachrichtArtVon(art), createdAt: jetzt })),
     })
-    return angelegt.map((f) => f.id)
+    if (perMail) await stelleMailEin(rundschreibenAuftraege(angelegt), tx)
+    return angelegt
   })
-
-  if (perMail) {
-    nachDerAntwort(async () => {
-      try {
-        const empfaengerListe = await ladeMailEmpfaenger(faeden)
-        const { sendPostfachMail } = await import('@/lib/email')
-        let gescheitert = 0
-        // Nacheinander: Resend begrenzt die Anfragen je Sekunde, und ein Fehler bei einem Hof hält die übrigen nicht auf.
-        for (const e of empfaengerListe) {
-          const ergebnis = await sendPostfachMail({ art: 'rundschreiben', an: e.email, titel, text, link, unterhaltungId: e.unterhaltungId })
-          if (ergebnis.error) gescheitert += 1
-        }
-        if (gescheitert > 0) meldeNachlauf(new Error(`${gescheitert} gescheitert`), String(faeden.length))
-      } catch (err) {
-        meldeNachlauf(err, String(faeden.length))
-      }
-    })
-  }
 
   revalidatePath(ADMIN_POSTFACH_HREF)
   revalidatePath(POSTFACH_HREF)

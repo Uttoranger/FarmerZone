@@ -20,8 +20,10 @@
  *
  * Echt sind Datenbank, Transaktion, Anmeldung des Hofes und die
  * Signaturprüfung von Stripe (das Ereignis wird mit dem Platzhalter-Secret der
- * Integrationsschicht signiert). Gemockt sind Erstattung, Mail, Sentry und der
- * Request-Kontext — kein Netz, kein Geld.
+ * Integrationsschicht signiert). Gemockt sind Erstattung, Sentry und der
+ * Request-Kontext — kein Netz, kein Geld. Die Mails sind seit Nr. 159
+ * Aufträge der Warteschlange und stehen echt in der Datenbank: Statuswechsel
+ * und Aufträge in einer Transaktion, zweimal zugestellt heißt ein Auftrag.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
@@ -35,14 +37,28 @@ vi.mock('@/lib/stripe', async () => {
   const echt = new Stripe('sk_test_integration_dummy')
   return { stripe: { webhooks: echt.webhooks, refunds: { create: vi.fn(), list: vi.fn(async () => ({ data: [], has_more: false })) } } }
 })
-vi.mock('@/lib/email', () => ({
-  sendOrderConfirmation: vi.fn(),
-  sendOrderPaidToFarmer: vi.fn(),
-  sendZahlungZuSpaet: vi.fn(),
-  sendOrderCancelled: vi.fn(),
-  sendOrderReady: vi.fn(),
-  sendOrderNotReady: vi.fn(),
+/**
+ * Der Nachlauf (Worker nach dem Einstellen) startet sofort, sein Ende wird
+ * gemerkt: `nachlaufFertig()` wartet darauf, `afterEach` ebenso. Der Worker
+ * schickt hier nichts hinaus — die Post-Sperre (Z3) sperrt außerhalb der
+ * Produktion jede Adresse.
+ */
+const nachlauf = vi.hoisted(() => ({ laufend: [] as Array<Promise<void>> }))
+vi.mock('@/lib/nach-der-antwort', () => ({
+  nachDerAntwort: (aufgabe: () => Promise<void>) => {
+    nachlauf.laufend.push(aufgabe().catch(() => {}))
+  },
 }))
+
+// Echt eingestellt; nur für den Rollback-Fall lässt sich ein Fehler einspeisen.
+vi.mock('@/server/mail-warteschlange', async (original) => {
+  const echt = await original<typeof import('@/server/mail-warteschlange')>()
+  return { ...echt, stelleMailEin: vi.fn(echt.stelleMailEin) }
+})
+
+async function nachlaufFertig(): Promise<void> {
+  while (nachlauf.laufend.length > 0) await Promise.all(nachlauf.laufend.splice(0))
+}
 
 import { NextRequest } from 'next/server'
 import { headers } from 'next/headers'
@@ -51,9 +67,9 @@ import { POST } from '@/app/api/stripe/webhook/route'
 import { cancelOrder } from '@/server/actions/orders'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import { sendOrderConfirmation, sendOrderPaidToFarmer, sendZahlungZuSpaet } from '@/lib/email'
+import { stelleMailEin } from '@/server/mail-warteschlange'
 import { INTEGRATIONS_ENV } from './setup/integrations-umgebung'
-import { erstelleHofMitAnmeldung, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
+import { artenZu, auftraege, erstelleHofMitAnmeldung, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
 
 const erstatten = vi.mocked(stripe.refunds.create)
 
@@ -63,6 +79,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
+  await nachlaufFertig()
   await raeumeAuf()
 })
 
@@ -193,8 +210,7 @@ describe('payment_intent.payment_failed — nur vermerken', () => {
     // Der Fehler lieferte 7 — zurückgebucht und trotzdem bezahlt.
     expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT)
     expect(erstatten).not.toHaveBeenCalled()
-    await vi.waitFor(() => expect(sendOrderConfirmation).toHaveBeenCalledTimes(1))
-    expect(sendOrderPaidToFarmer).toHaveBeenCalledTimes(1)
+    expect(await artenZu(bestellung.id)).toEqual(['bestellung-bestaetigung', 'bestellung-bezahlt-hof'])
   })
 })
 
@@ -259,11 +275,12 @@ describe('payment_intent.succeeded — nur aus „wartet auf Zahlung"', () => {
     // Der Bestand bleibt, wie der Storno ihn hinterließ.
     expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT + MENGE)
     expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
-    // Der Betrag aus der Erstattung, in Cent.
-    await vi.waitFor(() => expect(sendZahlungZuSpaet).toHaveBeenCalledWith(expect.anything(), 2100))
-    expect(sendZahlungZuSpaet).toHaveBeenCalledTimes(1)
-    expect(sendOrderConfirmation).not.toHaveBeenCalled()
-    expect(sendOrderPaidToFarmer).not.toHaveBeenCalled()
+    // Der Betrag aus der Erstattung, in Cent — im Auftrag, nie neu gerechnet. Dazu die Storno-Mail (bar, unbezahlt: ohne Erstattung).
+    const zuSpaet = (await auftraege({ bestellungId: bestellung.id })).filter((a) => a.art === 'zahlung-zu-spaet')
+    expect(zuSpaet).toEqual([
+      expect.objectContaining({ vorrang: 1, schluessel: `zahlung-zu-spaet:${bestellung.id}`, bezug: { orderId: bestellung.id, erstattetCents: '2100' } }),
+    ])
+    expect(await artenZu(bestellung.id)).toEqual(['storniert', 'zahlung-zu-spaet'])
   })
 
   it('dieselbe späte Zahlung zweimal gleichzeitig zugestellt: ein Schlüssel, eine Mail', async () => {
@@ -278,9 +295,7 @@ describe('payment_intent.succeeded — nur aus „wartet auf Zahlung"', () => {
     for (const aufruf of erstatten.mock.calls) {
       expect(aufruf[1]).toEqual({ idempotencyKey: `spaet-bezahlt-${bestellung.id}` })
     }
-    await vi.waitFor(() => expect(sendZahlungZuSpaet).toHaveBeenCalledTimes(1))
-    await new Promise((r) => setTimeout(r, 50))
-    expect(sendZahlungZuSpaet).toHaveBeenCalledTimes(1)
+    expect((await artenZu(bestellung.id)).filter((a) => a === 'zahlung-zu-spaet')).toHaveLength(1)
     expect(await zustand(bestellung.id)).toMatchObject({ status: 'CANCELLED', paymentStatus: 'REFUNDED' })
   })
 
@@ -318,36 +333,41 @@ describe('payment_intent.succeeded — nur aus „wartet auf Zahlung"', () => {
 
     expect(antwort.status).toBe(200)
     expect(erstatten).not.toHaveBeenCalled()
-    expect(sendZahlungZuSpaet).not.toHaveBeenCalled()
+    expect(await artenZu(bestellung.id)).not.toContain('zahlung-zu-spaet')
     expect(await zustand(bestellung.id)).toMatchObject({ status: 'CANCELLED', paymentStatus: 'REFUNDED' })
   })
 
-  it('zweimal succeeded: einmal PAID, einmal Mails', async () => {
+  it('zweimal succeeded (auch dasselbe Ereignis gleichzeitig): einmal PAID, je Art ein Auftrag mit Bestellung und Hof', async () => {
     const { bestellung, paymentIntentId } = await offeneOnlineBestellung()
+    const einmal = ereignis('payment_intent.succeeded', paymentIntentId)
 
-    await zustellen(ereignis('payment_intent.succeeded', paymentIntentId))
+    await Promise.all([zustellen(einmal), zustellen(einmal)])
     await zustellen(ereignis('payment_intent.succeeded', paymentIntentId))
 
     expect(await zustand(bestellung.id)).toMatchObject({ status: 'PAID' })
-    await vi.waitFor(() => expect(sendOrderConfirmation).toHaveBeenCalledTimes(1))
-    expect(sendOrderPaidToFarmer).toHaveBeenCalledTimes(1)
+    expect(await auftraege({ bestellungId: bestellung.id })).toEqual([
+      { art: 'bestellung-bestaetigung', vorrang: 1, schluessel: `bestellung-bestaetigung:${bestellung.id}`, bestellungId: bestellung.id, farmId: bestellung.farmId, bezug: { orderId: bestellung.id } },
+      { art: 'bestellung-bezahlt-hof', vorrang: 1, schluessel: `bestellung-bezahlt-hof:${bestellung.id}`, bestellungId: bestellung.id, farmId: bestellung.farmId, bezug: { orderId: bestellung.id } },
+    ])
     expect(erstatten).not.toHaveBeenCalled()
   })
 })
 
-describe('Mailfehler', () => {
-  it('antwortet trotzdem 200 und vermerkt das Ereignis — kein Stripe-Retry, keine doppelten Mails', async () => {
+describe('Statuswechsel und Auftrag in einer Transaktion', () => {
+  it('scheitert das Einstellen: 500, die Bestellung bleibt offen (Rollback), kein Auftrag; die Wiederholung bezahlt und stellt ein', async () => {
     const { bestellung, paymentIntentId } = await offeneOnlineBestellung()
-    vi.mocked(sendOrderConfirmation).mockRejectedValue(new Error('Mailversand gescheitert'))
-    vi.mocked(sendOrderPaidToFarmer).mockRejectedValue(new Error('Mailversand gescheitert'))
+    vi.mocked(stelleMailEin).mockRejectedValueOnce(new Error('Warteschlange weg'))
     const ev = ereignis('payment_intent.succeeded', paymentIntentId)
 
-    const antwort = await zustellen(ev)
+    expect((await zustellen(ev)).status).toBe(500)
+    // Der Statuswechsel rollt mit zurück — Stripe stellt erneut zu.
+    expect(await zustand(bestellung.id)).toMatchObject({ status: 'PENDING_CONFIRMATION', paymentStatus: 'PENDING', paidAt: null })
+    expect(await artenZu(bestellung.id)).toEqual([])
+    expect(await prisma.webhookEvent.findUnique({ where: { stripeEventId: ev.id } })).toBeNull()
 
-    expect(antwort.status).toBe(200)
-    expect(await zustand(bestellung.id)).toMatchObject({ status: 'PAID', paymentStatus: 'PAID' })
-    expect(await prisma.webhookEvent.findUnique({ where: { stripeEventId: ev.id } })).not.toBeNull()
-    // Der Hof bekommt seine Mail, auch wenn die der Kundin scheitert.
-    await vi.waitFor(() => expect(sendOrderPaidToFarmer).toHaveBeenCalledTimes(1))
+    // Gegenprobe: dieselbe Zustellung noch einmal — jetzt bezahlt, mit beiden Aufträgen.
+    expect((await zustellen(ev)).status).toBe(200)
+    expect(await zustand(bestellung.id)).toMatchObject({ status: 'PAID' })
+    expect(await artenZu(bestellung.id)).toEqual(['bestellung-bestaetigung', 'bestellung-bezahlt-hof'])
   })
 })
