@@ -157,6 +157,16 @@ Online-Bestellungen von vor der Umstellung sind Testzahlungen. **Barbestellungen
 - **Ohne Variable bleibt alles wie vorher.** Lässt eine gezeigte Zahl eine Testzahlung aus, steht in Auswertung, Verkäufe und Admin-Finanzen leise „Testzahlungen vor dem … sind nicht mitgezählt.“
 - **Vorschlag B – Merkmal an der Bestellung (Expand-Migration)** bleibt eine Option für später: eine Spalte wie `Order.stripeLivemode`, gesetzt aus `livemode` des PaymentIntents. Sie hielte auch für die Testumgebung und weitere Umstellungen, braucht aber eine freigegebene Migration und einen eigenen Auftrag.
 
+## Anhang: Zustellmeldungen von Resend (Nr. 160)
+
+Unabhängig von der Live-Schaltung, einmal einzurichten. Ohne diesen Schritt antwortet `/api/webhooks/resend` mit 503, und Admin › Betrieb kennt keine Zustellung, keine Ablehnung und keine Spam-Meldung.
+
+- [ ] Resend → Webhooks → Endpunkt hinzufügen: **`https://agrilo.at/api/webhooks/resend`** (nie farmerzone.at – die Adresse leitet weiter, und eine Weiterleitung kommt beim Webhook nicht an).
+- [ ] Ereignisse: **`email.delivered`**, **`email.bounced`**, **`email.complained`** – keine weiteren.
+- [ ] Das Signatur-Geheimnis des Endpunkts (beginnt mit `whsec_`) in Vercel als **`RESEND_WEBHOOK_SECRET`** anlegen, **nur Production**, „Sensitive“. Danach neu deployen.
+- [ ] Prüfen: Nach der nächsten Mail zeigt Resend beim Endpunkt eine Zustellung mit 200. Ein 401 heißt: Geheimnis falsch kopiert; 503: Variable fehlt oder Deploy noch nicht durch.
+- Ein Bounce oder eine Spam-Meldung zu einem Beitrag meldet das Abo ab (E-Mail und WhatsApp aus, wie der Abmeldelink). Mails zu Bestellungen werden nur vermerkt.
+
 ## Zurück, falls nötig
 
 - [ ] Für Production wieder die Test-Werte eintragen und neu deployen (Schritt 8). Die drei Hinweise erscheinen wieder von selbst.

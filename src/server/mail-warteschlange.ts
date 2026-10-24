@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/nextjs'
 import { createHash, randomUUID } from 'crypto'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { GRENZE, fehlerKlasse, utcTagesbeginn } from '@/lib/betrieb'
@@ -8,6 +9,8 @@ import { summeImMonat } from '@/server/queries/betrieb'
 import { RENDERER, type RendererTabelle } from '@/server/mail-arten'
 import { bezugSchemaFuer, mailArtSchema, VORRANG, type MailArt, type MailStatus } from '@/schemas/mail-auftrag'
 import type { StapelMail } from '@/lib/email'
+import { meldeAboAb } from '@/server/abo-anmeldung'
+import type { Zustellung } from '@/schemas/resend-ereignis'
 
 /*
  * Die Mail-Warteschlange (Register N26, Nr. 158).
@@ -22,6 +25,8 @@ import type { StapelMail } from '@/lib/email'
  *    `versendeStapel` (src/lib/email.ts), zwischen zwei Anfragen an Resend
  *    mindestens 200 ms.
  *  - protokolliereSofortMail: die Zeile jeder direkten Mail aus `sendRaw`.
+ *  - vermerkeZustellung: Zustellung, Bounce oder Spam-Meldung aus dem
+ *    Webhook von Resend (Nr. 160), über die `resendId`.
  *
  * In der Tabelle steht nie eine Adresse, ein Name, ein Inhalt oder ein Token:
  * Adresse und Inhalt lädt der Renderer je Art frisch (src/server/mail-arten/),
@@ -124,6 +129,65 @@ export async function protokolliereSofortMail(zeile: {
       naechsterVersuchAm: jetzt,
     },
   })
+}
+
+/** Welche Spalte eine Zustellmeldung setzt. */
+const ZUSTELL_SPALTE = { zugestellt: 'zugestelltAm', bounce: 'bounceAm', beschwerde: 'beschwerdeAm' } as const
+
+export type ZustellVermerk = 'unbekannt' | 'schon_vermerkt' | 'vermerkt' | 'abgemeldet'
+
+/**
+ * Vermerkt eine Zustellmeldung von Resend am Auftrag mit dieser `resendId`
+ * (Register N26, Nr. 160). Die `resendId` schreiben genau zwei Wege:
+ * `protokolliereSofortMail` (direkte Mails) und `schreibeAusgaenge` (Worker).
+ *
+ *  - Unbekannte `resendId` → nichts (`unbekannt`).
+ *  - Spalte schon gesetzt → nichts (`schon_vermerkt`): Resend stellt
+ *    mindestens einmal zu, dieselbe Meldung kommt womöglich zweimal.
+ *  - Bounce oder Spam-Meldung zu einem Auftrag mit Abo im Bezug (Beitrag) →
+ *    erst das Abo abmelden (`meldeAboAb`, dieselbe Funktion wie der
+ *    Abmeldelink), DANN vermerken. Scheitert das Abmelden, ist auch nichts
+ *    vermerkt, und die Wiederholung von Resend findet die Spalte noch leer.
+ *    Mails zu Bestellungen werden nur vermerkt.
+ *
+ * Vermerkt wird per `updateMany` mit leerer Spalte als Bedingung: Von zwei
+ * gleichzeitigen Meldungen schreibt nur eine, der Zeitpunkt der ersten bleibt.
+ */
+export async function vermerkeZustellung(resendId: string, zustellung: Zustellung, am: Date): Promise<ZustellVermerk> {
+  const auftrag = await prisma.mailAuftrag.findUnique({
+    where: { resendId },
+    select: { art: true, bezug: true, zugestelltAm: true, bounceAm: true, beschwerdeAm: true },
+  })
+  if (!auftrag) return 'unbekannt'
+  const spalte = ZUSTELL_SPALTE[zustellung]
+  if (auftrag[spalte] !== null) return 'schon_vermerkt'
+
+  const aboId = zustellung === 'zugestellt' ? null : aboIdAusBezug(auftrag.art, auftrag.bezug)
+  if (aboId) await meldeAboAb({ id: aboId })
+
+  const { count } = await prisma.mailAuftrag.updateMany(zustellVermerk(resendId, spalte, am))
+  if (count === 0) return 'schon_vermerkt'
+  return aboId ? 'abgemeldet' : 'vermerkt'
+}
+
+/** Die Anweisung „Spalte setzen, nur wenn sie noch leer ist“ — je Spalte ausgeschrieben, damit Prisma die Typen kennt. */
+function zustellVermerk(resendId: string, spalte: (typeof ZUSTELL_SPALTE)[Zustellung], am: Date): Prisma.MailAuftragUpdateManyArgs {
+  switch (spalte) {
+    case 'zugestelltAm':
+      return { where: { resendId, zugestelltAm: null }, data: { zugestelltAm: am } }
+    case 'bounceAm':
+      return { where: { resendId, bounceAm: null }, data: { bounceAm: am } }
+    case 'beschwerdeAm':
+      return { where: { resendId, beschwerdeAm: null }, data: { beschwerdeAm: am } }
+  }
+}
+
+/** Die Kennung des Abos aus dem Bezug — geprüft mit demselben Schema wie beim Einstellen. */
+function aboIdAusBezug(art: string, bezug: unknown): string | null {
+  const geprueft = mailArtSchema.safeParse(art)
+  if (!geprueft.success) return null
+  const daten = bezugSchemaFuer(geprueft.data).safeParse(bezug)
+  return daten.success ? (daten.data.aboId ?? null) : null
 }
 
 // ─── Regeln ──────────────────────────────────────────────────────────────────
