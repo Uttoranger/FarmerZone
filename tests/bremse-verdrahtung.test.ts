@@ -15,6 +15,9 @@
  *    Speicher-Bremsen und dem Parsen, VOR Fristfreigabe, Aufräumen und den
  *    Hof-Prüfungen; in /api/warenkorb/pruefen NACH Speicher-Bremse und
  *    Parsen, VOR Fristfreigabe und Erneuern.
+ *  - Prüfkette der Höfe (Nr. 165): eine Funktion in src/server/warenkorb.ts
+ *    (Stilllegung → Freischaltung → Pause → Kaufsperre), in beiden Routen
+ *    nach der Fristfreigabe und vor Bestand bzw. Abgleich.
  *  - Gegenprobe: Die Muster schlagen an einer vertauschten Reihenfolge an.
  */
 import { readFileSync } from 'node:fs'
@@ -118,10 +121,7 @@ describe('Reservieren — zweite Stufe in /api/reserve (Nr. 150)', () => {
         'if (ueberAlleInstanzen) return ueberAlleInstanzen',
         'gibVerwaisteFreiFuerProdukte([productId], now)',
         'prisma.stockReservation.deleteMany',
-        'product.farm.archivedAt',
-        'product.farm.approvedAt',
-        'product.farm.isPaused',
-        'kaufSperre(',
+        'pruefeKaufbarkeitHof(product.farm, now)',
         'prisma.stockReservation.aggregate',
         'prisma.stockReservation.upsert',
       ])
@@ -133,11 +133,33 @@ describe('Reservieren — zweite Stufe in /api/reserve (Nr. 150)', () => {
   })
 })
 
+describe('Prüfkette des Hofs — EINE Funktion für beide Routen (Nr. 165)', () => {
+  const server = quelle('src', 'server', 'warenkorb.ts')
+  const kette = server.slice(server.indexOf('export async function pruefeKaufbarkeitHoefe'))
+
+  it('Stilllegung → Freischaltung → Pause → Zählung der vollen Tage → Kaufsperre', () => {
+    expect(
+      inReihenfolge(kette, ['hof.archivedAt', '!hof.approvedAt', 'hof.isPaused', 'await ausgebuchteTage(', 'kaufSperre('])
+    ).toBe(true)
+  })
+
+  it('Gegenprobe: Pause vor Stilllegung stünde falsch', () => {
+    expect(inReihenfolge(kette, ['hof.isPaused', 'hof.archivedAt'])).toBe(false)
+  })
+
+  it('/api/reserve prüft den Hof nicht mehr selbst, nur über die gemeinsame Kette', () => {
+    const route = quelle('src', 'app', 'api', 'reserve', 'route.ts')
+    for (const eigen of ['farm.archivedAt', 'farm.approvedAt', 'farm.isPaused', 'kaufSperre(']) {
+      expect(route).not.toContain(eigen)
+    }
+  })
+})
+
 describe('Reservieren — zweite Stufe in /api/warenkorb/pruefen (Nr. 150)', () => {
   const route = quelle('src', 'app', 'api', 'warenkorb', 'pruefen', 'route.ts')
   const post = route.slice(route.indexOf('export async function POST'))
 
-  it('Speicher-Bremse → Parsen → Datenbank → Fristfreigabe → Abgleich → Erneuern', () => {
+  it('Speicher-Bremse → Parsen → Datenbank → Fristfreigabe → Prüfkette der Höfe → Abgleich → Erneuern', () => {
     expect(
       inReihenfolge(post, [
         "enforceRateLimit('warenkorb-pruefen', request)",
@@ -145,6 +167,7 @@ describe('Reservieren — zweite Stufe in /api/warenkorb/pruefen (Nr. 150)', () 
         'await bremseReservieren(request)',
         'if (ueberAlleInstanzen) return ueberAlleInstanzen',
         'gibVerwaisteFreiFuerProdukte(',
+        'hofSperrenFuerProdukte(',
         'pruefeSitzungsWarenkorb(',
         'erneuereHalte(',
       ])

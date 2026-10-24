@@ -24,6 +24,13 @@
 
 export const RESERVIERUNG_TTL_MS = 15 * 60 * 1000
 
+/**
+ * Höchstmenge je Position beim Reservieren und im Warenkorb — EINE Quelle für
+ * /api/reserve und /api/warenkorb/pruefen (Nr. 165): gegen Bestand blockieren
+ * mit einer Riesenmenge. So viel führt kein Hof, und der Bestand ist ein Int.
+ */
+export const MAX_MENGE = 10_000
+
 /** Die eine Meldung, die die Kundin bei verfallener Reservierung liest. */
 export const RESERVIERUNG_ABGELAUFEN =
   'Deine Reservierung ist abgelaufen. Wir haben die Verfügbarkeit neu geprüft.'

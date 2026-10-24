@@ -5754,6 +5754,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Abholzeit rückgängig (P10):** Löschen ist endgültig (`Order` hängt nicht an `PickupSlot`), `farm.ts` bleibt unverändert. Der Toast „Abholzeit gelöscht“ trägt für eine AKTIVE Zeit „Rückgängig“ (sechs Sekunden), auch in Mein Hof (dort statt „Gespeichert · Ansehen“); der Klick legt die Zeit über `addPickupSlot` mit Tag, Beginn, Ende und `maxOrders` neu an. Eine pausierte Zeit behält den bisherigen Toast, sie käme sonst aktiv zurück. Die Texte stehen in `ABHOLZEIT_GELOESCHT` (`src/lib/pickup-slot-rules.ts`).
 - **Bestätigen ohne Umweg (P8):** Abgemeldet zeigt die Karte nach dem Bestätigen gleich das Formular der Hof-Anmeldung (`NachBestaetigung`); `HofAnmeldung` bekommt die optionale Prop `ziel` (nur `/onboarding`, fest im Code, nie aus der Adresse). Keine Adresse in der URL, nichts vorausgefüllt.
 
+## Warenkorb prüfen mit derselben Prüfkette wie Reservieren (Register N24, Ergänzung 24.10.2026; Nr. 165, Lauf 24)
+
+- **Lücke (Bericht 150):** `/api/warenkorb/pruefen` erneuerte Halte nur nach Bestand und Frist. Ein Korb aus der Zeit vor einer Pause oder Stilllegung hielt die Ware bis zu 15 Minuten je Aufruf weiter fest; `quantity` hatte keine Obergrenze. Geld war nie betroffen, die Kasse prüft selbst.
+- **Fix:** Die Prüfkette (Stilllegung → Freischaltung → Pause → Kaufsperre) steht in `pruefeKaufbarkeitHoefe`/`pruefeKaufbarkeitHof` (src/server/warenkorb.ts), mit denselben Texten wie bisher; `/api/reserve` ruft sie statt der eigenen Abfragen (Verhalten gleich). Der Warenkorb ruft sie über `hofSperrenFuerProdukte` je Hof der Positionen: Positionen eines gesperrten Hofs gelten im Abgleich als nicht möglich, alle Halte der Sitzung bei diesem Hof werden gelöscht (`loescheHalteBeiHoefen`, auch für Produkte, die der Korb nicht mehr mitschickt — Nachbesserung Runde 1), der Grund steht vorn in der Meldung. `MAX_MENGE` kommt für beide Routen aus src/lib/reservierung.ts.
+- **Reihenfolge:** /api/reserve: Speicher je IP → Parsen → Speicher je Sitzung → Datenbank → Fristfreigabe → Aufräumen → Produkt → Prüfkette → Bestand → `upsert`. /api/warenkorb/pruefen: Speicher je IP → Parsen (mit `MAX_MENGE`) → Datenbank → Fristfreigabe → Prüfkette → Abgleich → Erneuern/Löschen.
+- **Offen:** Obergrenze je Sitzung (Entscheidung offen, Futter in großen Mengen).
+
 ## Nützliche Befehle
 
 ```bash
