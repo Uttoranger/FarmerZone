@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Handy-Sterne · Barrierefreiheit und Formulare: 44 px, 16 px, Kontraste, Feldfehler</title>
+<meta name="viewport" content="width=1320">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button,a,input,select,textarea{font:inherit}
+a{color:#1C241D}a:hover{color:#2E6B45}
+</style>
+</head>
+<body>
+<div style="position: relative; width: 1320px; height: 1120px; box-sizing: border-box; padding: 28px; display: flex; flex-direction: column; gap: 24px; background: #F4F1E7; color: #1C241D; font-family: 'Instrument Sans', sans-serif; font-size: 14px;">
+
+  <div>
+    <span style="display: inline-block; padding: 4px 10px; border-radius: 999px; background: #2E6B45; color: #F6F4EA; font-size: 12px; font-weight: 600; letter-spacing: 0.02em;">BARRIEREFREIHEIT 3½ → 5 · FORMULARE &amp; EINGABE 3½ → 5</span>
+    <h1 style="margin: 10px 0 4px; font-family: Fraunces, serif; font-weight: 600; font-size: 28px; line-height: 1.1;">Das Produktformular: dort tippen Höfe am meisten – und dort ist alles 32–36 px</h1>
+    <p style="margin: 0; color: #5D6A5C; line-height: 1.45; max-width: 1050px;">Die neuen Bausteine halten 44 px, der Fokusrahmen ist zentral, Kontraste der Texte sind getestet. Die Lücken sitzen in den shadcn-Grundbausteinen (Button 32 px, Input 36 px, Select 32 px, Auge im Passwortfeld 16 px), in Platzhaltern (2,45:1), Feldrändern (1,29:1) und Schaltern (1,51:1) – und in älteren Hof-Formularen ohne Feldfehler. Behebt man die Grundbausteine, heilt das 30 Stellen auf einmal.</p>
+  </div>
+
+  <div style="display: flex; gap: 40px; align-items: flex-start;">
+
+    <!-- Handy: Produktformular -->
+    <div style="position: relative; width: 390px; height: 844px; flex-shrink: 0; overflow: hidden; border-radius: 28px; background: #0B100C; color: #F1EEE3; box-shadow: 0 18px 50px rgba(28,36,29,0.28);">
+      <header style="position: absolute; top: 0; left: 0; right: 0; height: 56px; display: grid; grid-template-columns: 1fr auto; align-items: center; padding: 0 8px 0 16px; background: #131B14; border-bottom: 1px solid #223125;">
+        <h1 style="margin: 0; font-family: Fraunces, serif; font-weight: 600; font-size: 18px;">Neues Produkt</h1>
+        <button type="button" aria-label="Schließen" style="width: 44px; height: 44px; border: 0; background: transparent; color: #F1EEE3; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center;"><span style="width: 28px; height: 28px; border-radius: 50%; background: #223125; display: flex; align-items: center; justify-content: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></span></button>
+      </header>
+      <main style="position: absolute; top: 57px; left: 0; right: 0; bottom: 84px; padding: 16px 16px 0; display: flex; flex-direction: column; gap: 14px; overflow: hidden;">
+        <label for="pname" style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 500;">Name<input id="pname" type="text" value="Heumilch" enterkeyhint="next" style="height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid #4B5B4E; background: #131B14; color: #F1EEE3; font-size: 16px;"></label>
+        <div style="display: flex; gap: 10px;">
+          <label for="preis" style="flex: 1; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 500;">Preis in €<input id="preis" type="text" inputmode="decimal" value="1,60" enterkeyhint="next" style="height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid #4B5B4E; background: #131B14; color: #F1EEE3; font-size: 16px;"></label>
+          <label for="einheit" style="flex: 1; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 500;">je<select id="einheit" style="height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #4B5B4E; background: #131B14; color: #F1EEE3; font-size: 16px;"><option>Liter</option><option>kg</option><option>Stück</option></select></label>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label for="vorrat" style="font-size: 13px; font-weight: 500;">Vorrat</label>
+          <input id="vorrat" type="text" inputmode="numeric" value="" placeholder="Wie viel hast du gerade?" aria-invalid="true" aria-describedby="vorrat-fehler" enterkeyhint="next" style="height: 44px; padding: 0 14px; border-radius: 12px; border: 2px solid #FF7E7D; background: #131B14; color: #F1EEE3; font-size: 16px;">
+          <span id="vorrat-fehler" role="alert" style="font-size: 13px; color: #FF7E7D; line-height: 1.35;">Gib an, wie viel du hast – sonst zeigen wir das Produkt als ausverkauft.</span>
+        </div>
+        <label for="beschr" style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 500;"><span>Beschreibung <span style="font-weight: 400; color: #9AA899;">(freiwillig)</span></span><textarea id="beschr" rows="2" placeholder="Zum Beispiel: silofrei, von Kühen auf der Alm" style="padding: 12px 14px; border-radius: 12px; border: 1px solid #4B5B4E; background: #131B14; color: #F1EEE3; font-size: 16px; line-height: 1.4; resize: none;"></textarea></label>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <span style="font-size: 13px; font-weight: 500;">Enthält <span style="font-weight: 400; color: #9AA899;">(freiwillig)</span></span>
+          <div role="group" aria-label="Allergene" style="display: flex; flex-wrap: wrap; gap: 8px;">
+            
+              <button type="button" aria-pressed="true" style="height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #9FD0AF; background: #1B3324; color: #F1EEE3; font-size: 14px; font-weight: 500; cursor: pointer;">Milch</button>
+            
+              <button type="button" aria-pressed="false" style="height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #4B5B4E; background: transparent; color: #F1EEE3; font-size: 14px; font-weight: 500; cursor: pointer;">Eier</button>
+            
+              <button type="button" aria-pressed="false" style="height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #4B5B4E; background: transparent; color: #F1EEE3; font-size: 14px; font-weight: 500; cursor: pointer;">Gluten</button>
+            
+              <button type="button" aria-pressed="false" style="height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #4B5B4E; background: transparent; color: #F1EEE3; font-size: 14px; font-weight: 500; cursor: pointer;">Nüsse</button>
+            
+          </div>
+        </div>
+        <label style="display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 50px; padding: 0 14px; border-radius: 14px; background: #131B14; border: 1px solid #223125; cursor: pointer;">
+          <span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-weight: 600; font-size: 14px;">Im Shop zeigen</span><span style="font-size: 12px; color: #9AA899;">Kundinnen sehen es sofort nach dem Speichern</span></span>
+          <span role="switch" aria-checked="true" aria-label="Im Shop zeigen" style="position: relative; width: 48px; height: 28px; border-radius: 999px; background: #2E6B45; display: inline-block; flex-shrink: 0;"><span style="position: absolute; top: 3px; left: 23px; width: 22px; height: 22px; border-radius: 50%; background: #F6F4EA;"></span></span>
+        </label>
+      </main>
+      <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 16px 28px; background: #131B14; border-top: 1px solid #223125; display: flex; gap: 10px;">
+        <button type="button" style="flex: 1; height: 48px; border: 1px solid #4B5B4E; border-radius: 12px; background: transparent; color: #F1EEE3; font-weight: 600; font-size: 15px; cursor: pointer;">Abbrechen</button>
+        <button type="button" style="flex: 2; height: 48px; border: 0; border-radius: 12px; background: #E07A4A; color: #231208; font-weight: 600; font-size: 15px; cursor: pointer;">Speichern</button>
+      </div>
+      <span aria-hidden="true" style="position: absolute; left: 352px; top: 100px; width: 26px; height: 26px; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px #0B100C; z-index: 9;">1</span>
+      <span aria-hidden="true" style="position: absolute; left: 352px; top: 262px; width: 26px; height: 26px; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px #0B100C; z-index: 9;">2</span>
+      <span aria-hidden="true" style="position: absolute; left: 352px; top: 322px; width: 26px; height: 26px; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px #0B100C; z-index: 9;">3</span>
+      <span aria-hidden="true" style="position: absolute; left: 352px; top: 536px; width: 26px; height: 26px; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px #0B100C; z-index: 9;">4</span>
+      <span aria-hidden="true" style="position: absolute; left: 352px; top: 772px; width: 26px; height: 26px; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px #0B100C; z-index: 9;">5</span>
+    </div>
+
+    <!-- Kontrast-Proben -->
+    <div style="width: 330px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px;">
+      <h2 style="margin: 0; font-family: Fraunces, serif; font-weight: 600; font-size: 18px;">Proben: heute → Ziel</h2>
+      
+        <div style="padding: 12px; border-radius: 14px; background: #0B100C; color: #F1EEE3; display: flex; flex-direction: column; gap: 8px;">
+          <span style="font-size: 12px; color: #9AA899; letter-spacing: 0.04em; font-weight: 600;">PLATZHALTER AUF FELD</span>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <span style="height: 36px; border-radius: 10px; background: #131B14; border: 1px solid #223125; color: #4E5A4F; display: flex; align-items: center; padding: 0 10px; font-size: 14px;">Wie viel hast du?</span>
+              <span style="font-size: 12px; color: #E59A6F;">heute 3,37:1 (hell 2,45)</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <span style="height: 36px; border-radius: 10px; background: #131B14; border: 1px solid #223125; color: #9AA899; display: flex; align-items: center; padding: 0 10px; font-size: 14px;">Wie viel hast du?</span>
+              <span style="font-size: 12px; color: #9FD0AF;">Ziel 7,06:1 (hell 5,05)</span>
+            </div>
+          </div>
+        </div>
+      
+        <div style="padding: 12px; border-radius: 14px; background: #0B100C; color: #F1EEE3; display: flex; flex-direction: column; gap: 8px;">
+          <span style="font-size: 12px; color: #9AA899; letter-spacing: 0.04em; font-weight: 600;">FELDRAND AUF FLÄCHE</span>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <span style="height: 36px; border-radius: 10px; background: #131B14; border: 1px solid #223125; color: #F1EEE3; display: flex; align-items: center; padding: 0 10px; font-size: 14px;">Name</span>
+              <span style="font-size: 12px; color: #E59A6F;">heute 1,28:1</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <span style="height: 36px; border-radius: 10px; background: #131B14; border: 1px solid #4B5B4E; color: #F1EEE3; display: flex; align-items: center; padding: 0 10px; font-size: 14px;">Name</span>
+              <span style="font-size: 12px; color: #9FD0AF;">Ziel ≥ 3:1</span>
+            </div>
+          </div>
+        </div>
+      
+        <div style="padding: 12px; border-radius: 14px; background: #0B100C; color: #F1EEE3; display: flex; flex-direction: column; gap: 8px;">
+          <span style="font-size: 12px; color: #9AA899; letter-spacing: 0.04em; font-weight: 600;">SCHALTER AUS</span>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <span style="height: 36px; border-radius: 10px; background: #131B14; border: 1px solid #2A332B; color: #F1EEE3; display: flex; align-items: center; padding: 0 10px; font-size: 14px;">Schalter</span>
+              <span style="font-size: 12px; color: #E59A6F;">heute 1,77:1</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <span style="height: 36px; border-radius: 10px; background: #131B14; border: 1px solid #6B7A6E; color: #F1EEE3; display: flex; align-items: center; padding: 0 10px; font-size: 14px;">Schalter</span>
+              <span style="font-size: 12px; color: #9FD0AF;">Ziel ≥ 3:1</span>
+            </div>
+          </div>
+        </div>
+      
+        <div style="padding: 12px; border-radius: 14px; background: #0B100C; color: #F1EEE3; display: flex; flex-direction: column; gap: 8px;">
+          <span style="font-size: 12px; color: #9AA899; letter-spacing: 0.04em; font-weight: 600;">FOKUS-HALO (RING/30)</span>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <span style="height: 36px; border-radius: 10px; background: #131B14; border: 1px solid #2F5A3E; color: #F1EEE3; display: flex; align-items: center; padding: 0 10px; font-size: 14px;">Knopf</span>
+              <span style="font-size: 12px; color: #E59A6F;">heute 3,53:1 (hell 2,14)</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <span style="height: 36px; border-radius: 10px; background: #131B14; border: 1px solid #9FD0AF; color: #F1EEE3; display: flex; align-items: center; padding: 0 10px; font-size: 14px;">Knopf</span>
+              <span style="font-size: 12px; color: #9FD0AF;">Ziel voller Ring, 2 px</span>
+            </div>
+          </div>
+        </div>
+      
+      <div style="padding: 12px; border-radius: 14px; background: #FBF9F2; border: 1px solid #E2DDC9; display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-size: 12px; color: #5D6A5C; letter-spacing: 0.04em; font-weight: 600;">PASSWORT-AUGE (HOF-LOGIN)</span>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <span style="flex: 1; height: 44px; border-radius: 12px; border: 1px solid #E2DDC9; background: #FFFFFF; display: flex; align-items: center; justify-content: space-between; padding: 0 4px 0 12px;"><span style="letter-spacing: 0.2em;">••••••••</span><button type="button" aria-label="Passwort anzeigen" aria-pressed="false" style="width: 44px; height: 40px; border: 0; background: transparent; border-radius: 10px; color: #1C241D; cursor: pointer; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle></svg></button></span>
+        </div>
+        <span style="font-size: 12px; color: #5D6A5C; line-height: 1.4;">Heute 16 × 16 px und tabIndex −1 (nicht per Tastatur erreichbar). Ziel: 44 px, aria-pressed, eine Umsetzung statt drei.</span>
+      </div>
+    </div>
+
+    <!-- Legende -->
+    <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0;">
+      
+        <li style="display: flex; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #FBF9F2; border: 1px solid #E2DDC9;">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;">1</span>
+          <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 600;">Grundbausteine auf 44 px</span>
+            <span style="color: #5D6A5C; line-height: 1.4; font-size: 13px;">Input h-11, Select h-11, Button-Standard h-11, icon size-11, Schließen-Kreuz 44 px mit sichtbarem Kreis als Span. Eine Änderung in src/components/ui heilt rund 30 Stellen – darunter das ganze Produktformular.</span>
+            <span style="font-size: 12px; color: #2E6B45; font-weight: 600;">button.tsx:26-36, input.tsx:12, select.tsx:44, dialog.tsx:69, sheet.tsx:69</span>
+          </div>
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #FBF9F2; border: 1px solid #E2DDC9;">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;">2</span>
+          <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 600;">Richtige Tastatur, kein Zoom</span>
+            <span style="color: #5D6A5C; line-height: 1.4; font-size: 13px;">inputmode decimal für den Preis (schon da), numeric für den Vorrat, enterkeyhint „weiter“/„fertig“, überall 16 px – heute zoomt iOS bei 7 Handy-Feldern (Beitrag, Bildunterschrift, Auswahlfelder, Startseiten-Suche).</span>
+            <span style="font-size: 12px; color: #2E6B45; font-weight: 600;">product-dialog.tsx:1376 · status-new-client.tsx:262 · profile-form.tsx:282</span>
+          </div>
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #FBF9F2; border: 1px solid #E2DDC9;">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;">3</span>
+          <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 600;">Fehler am Feld, verknüpft</span>
+            <span style="color: #5D6A5C; line-height: 1.4; font-size: 13px;">aria-invalid und aria-describedby, ein Satz mit Grund. Heute: Futter, Brennmaterial, Profil, Beitrag und Abholzeiten melden nur per Toast oder ohne Verknüpfung – der Toast ist nach 4 s weg.</span>
+            <span style="font-size: 12px; color: #2E6B45; font-weight: 600;">futter-formular.tsx:279, profile-form.tsx:237, pickup-slots-client.tsx:105</span>
+          </div>
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #FBF9F2; border: 1px solid #E2DDC9;">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;">4</span>
+          <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 600;">„(freiwillig)“ statt „*“</span>
+            <span style="color: #5D6A5C; line-height: 1.4; font-size: 13px;">Pflicht ist der Normalfall, Freiwilliges wird benannt – wie in der Kasse. Chips 40 px, Zustand als aria-pressed, Schalter mit sichtbarem Aus-Zustand (≥ 3:1).</span>
+            <span style="font-size: 12px; color: #2E6B45; font-weight: 600;">product-dialog.tsx:1570 Allergen-Chips 36 px · switch.tsx:13</span>
+          </div>
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #FBF9F2; border: 1px solid #E2DDC9;">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;">5</span>
+          <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 600;">Fuß 48 px, Hauptaktion rechts</span>
+            <span style="color: #5D6A5C; line-height: 1.4; font-size: 13px;">Löschen gehört nicht neben Speichern, sondern ins Menü oben oder ans Ende des Formulars mit Rückfrage.</span>
+            <span style="font-size: 12px; color: #2E6B45; font-weight: 600;">product-dialog.tsx:1997-2014</span>
+          </div>
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #FBF9F2; border: 1px solid #E2DDC9;">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;">6</span>
+          <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 600;">Fokus und Bewegung</span>
+            <span style="color: #5D6A5C; line-height: 1.4; font-size: 13px;">Code-Login: nach „Code schicken“ Fokus ins Codefeld, Statusregion dauerhaft im DOM. Startvideo mit Pause-Knopf (2.2.2). Sortieren im Hofseiten-Editor zusätzlich mit ↑/↓ (2.5.7). scroll-padding für Shells mit klebendem Kopf und Unterleiste (2.4.11).</span>
+            <span style="font-size: 12px; color: #2E6B45; font-weight: 600;">kunde-code-formular.tsx:270 · startseite-kopf.tsx:78 · use-reorder-sensors.ts</span>
+          </div>
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #FBF9F2; border: 1px solid #E2DDC9;">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;">7</span>
+          <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 600;">Prüfen lassen, nicht hoffen</span>
+            <span style="color: #5D6A5C; line-height: 1.4; font-size: 13px;">axe auf 6 Kernrouten in beiden Modi bei 390 px in der CI; Wachen für Platzhalter-Transparenz, 16-px-Felder und Mindestgrößen der Grundbausteine. Heute läuft axe nur von Hand.</span>
+            <span style="font-size: 12px; color: #2E6B45; font-weight: 600;">umsetzungsprompt.md:139 · tests/</span>
+          </div>
+        </li>
+      
+    </ol>
+  </div>
+</div>
+</body>
+</html>

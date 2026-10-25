@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Handy-Sterne · Kasse: Fehlertexte mit Grund, Tastatur, Rücktritt, inkl. USt, Datenschutz-Link, Zeitlimit</title>
+<meta name="viewport" content="width=980">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button,a,input{font:inherit}
+a{color:#1C241D}a:hover{color:#2E6B45}
+</style>
+</head>
+<body>
+<div style="position: relative; width: 980px; height: 960px; box-sizing: border-box; padding: 28px; display: flex; gap: 40px; background: #F4F1E7; color: #1C241D; font-family: 'Instrument Sans', sans-serif; font-size: 14px;">
+
+  <!-- Handy -->
+  <div style="position: relative; width: 390px; height: 844px; flex-shrink: 0; overflow: hidden; border-radius: 28px; background: #0B100C; color: #F1EEE3; box-shadow: 0 18px 50px rgba(28,36,29,0.28);">
+
+    <header style="position: absolute; top: 0; left: 0; right: 0; height: 56px; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; padding: 0 8px; background: #131B14; border-bottom: 1px solid #223125; z-index: 5;">
+      <a href="#hof" aria-label="Zurück zum Hof Sonnleiten" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; color: #F1EEE3; text-decoration: none;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>
+      </a>
+      <h1 style="margin: 0; text-align: center; font-family: Fraunces, serif; font-weight: 600; font-size: 18px;">Kasse</h1>
+      <span></span>
+    </header>
+
+    <main style="position: absolute; top: 57px; left: 0; right: 0; bottom: 118px; overflow: hidden; padding: 14px 16px 0; display: flex; flex-direction: column; gap: 14px;">
+
+      <section aria-labelledby="daten" style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between;">
+          <h2 id="daten" style="margin: 0; font-family: Fraunces, serif; font-weight: 600; font-size: 18px;">Deine Daten</h2>
+          <a href="#datenschutz" style="font-size: 12px; color: #9FD0AF; font-weight: 600; text-decoration: none; height: 32px; display: flex; align-items: center;">Was passiert damit?</a>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label for="name" style="font-size: 13px; font-weight: 500;">Name</label>
+          <input id="name" type="text" autocomplete="name" enterkeyhint="next" aria-invalid="true" aria-describedby="name-fehler" value="" placeholder="Vor- und Nachname" style="height: 48px; padding: 0 14px; border-radius: 12px; border: 2px solid #FF7E7D; background: #131B14; color: #F1EEE3; font-size: 16px;">
+          <span id="name-fehler" role="alert" style="font-size: 13px; color: #FF7E7D; line-height: 1.35;">Bitte gib deinen Namen an – so weiß der Hof, wer abholt.</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label for="tel" style="font-size: 13px; font-weight: 500;">Telefon <span style="font-weight: 400; color: #9AA899;">(falls der Hof rückfragen muss)</span></label>
+          <input id="tel" type="tel" inputmode="tel" autocomplete="tel" enterkeyhint="next" value="+43 660 000 0000" style="height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid #223125; background: #131B14; color: #F1EEE3; font-size: 16px;">
+        </div>
+      </section>
+
+      <section aria-labelledby="abholung" style="padding: 12px 14px; border-radius: 16px; background: #131B14; border: 1px solid #223125; display: flex; gap: 12px; align-items: center;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9FD0AF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M3 11h18"></path></svg>
+        <div style="display: flex; flex-direction: column; gap: 2px; flex: 1;">
+          <h2 id="abholung" style="margin: 0; font-size: 14px; font-weight: 600;">Abholung Sa, 31. Okt · 9–12 Uhr</h2>
+          <span style="font-size: 12px; color: #9AA899;">Hof Sonnleiten, Dorfstraße 12, 4910 Musterort</span>
+        </div>
+        <a href="#termin" style="font-size: 13px; color: #9FD0AF; font-weight: 600; text-decoration: none; height: 44px; display: flex; align-items: center;">Ändern</a>
+      </section>
+
+      <section aria-labelledby="summe" style="padding: 12px 14px; border-radius: 16px; background: #131B14; border: 1px solid #223125; display: flex; flex-direction: column; gap: 8px;">
+        <h2 id="summe" style="margin: 0 0 2px; font-family: Fraunces, serif; font-weight: 600; font-size: 18px;">Zusammenfassung</h2>
+        <div style="display: flex; justify-content: space-between; font-size: 14px;"><span>3 Artikel</span><span>€ 11,40</span></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px;">
+          <span style="display: flex; align-items: center; gap: 6px;">Servicegebühr 4,9 %, mind. € 0,50 <button type="button" aria-label="Was ist die Servicegebühr?" style="width: 32px; height: 32px; border: 1px solid #223125; border-radius: 999px; background: transparent; color: #9AA899; font-size: 12px; font-weight: 700; cursor: pointer;">i</button></span>
+          <span>€ 0,56</span>
+        </div>
+        <div style="height: 1px; background: #223125;"></div>
+        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+          <span style="font-weight: 600; font-size: 16px;">Gesamt</span>
+          <span style="display: flex; flex-direction: column; align-items: flex-end;"><span style="font-family: Fraunces, serif; font-weight: 600; font-size: 22px;">€ 11,96</span><span style="font-size: 12px; color: #9AA899;">Preise inkl. USt · online bezahlt</span></span>
+        </div>
+      </section>
+
+      <p style="margin: 0; font-size: 12px; color: #9AA899; line-height: 1.45;">Du kaufst direkt beim Hof Sonnleiten. Frische Lebensmittel sind vom Rücktritt ausgenommen; bei Futter und Brennmaterial kannst du 14 Tage zurücktreten. <a href="#ruecktritt" style="color: #9FD0AF; font-weight: 600;">Rücktrittsrecht</a> · <a href="#agb" style="color: #9FD0AF; font-weight: 600;">AGB</a></p>
+    </main>
+
+    <!-- Aktionsleiste -->
+    <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 16px 28px; background: #131B14; border-top: 1px solid #223125; z-index: 6; display: flex; flex-direction: column; gap: 8px;">
+      <button type="button" style="height: 52px; border: 0; border-radius: 14px; background: #2E6B45; color: #F6F4EA; font-weight: 600; font-size: 16px; cursor: pointer;">Zahlungspflichtig bestellen · € 11,96</button>
+      <div role="status" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: #E59A6F;">
+        <span>Dauert länger als sonst – nichts wird doppelt bestellt.</span>
+        <button type="button" style="height: 32px; padding: 0 10px; border: 1px solid #3A2519; border-radius: 999px; background: transparent; color: #E59A6F; font-weight: 600; cursor: pointer;">Nochmal versuchen</button>
+      </div>
+    </div>
+    <span aria-hidden="true" style="position: absolute; left: 128px; right: 128px; bottom: 7px; height: 5px; border-radius: 999px; background: #9AA899; z-index: 8;"></span>
+
+    <!-- Marker -->
+    <span aria-hidden="true" style="position: absolute; left: 352px; top: 66px; width: 26px; height: 26px; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px #0B100C; z-index: 9;">5</span>
+    <span aria-hidden="true" style="position: absolute; left: 352px; top: 176px; width: 26px; height: 26px; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px #0B100C; z-index: 9;">1</span>
+    <span aria-hidden="true" style="position: absolute; left: 352px; top: 254px; width: 26px; height: 26px; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px #0B100C; z-index: 9;">2</span>
+    <span aria-hidden="true" style="position: absolute; left: 352px; top: 528px; width: 26px; height: 26px; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px #0B100C; z-index: 9;">4</span>
+    <span aria-hidden="true" style="position: absolute; left: 352px; top: 640px; width: 26px; height: 26px; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px #0B100C; z-index: 9;">3</span>
+    <span aria-hidden="true" style="position: absolute; left: 352px; top: 790px; width: 26px; height: 26px; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px #0B100C; z-index: 9;">6</span>
+  </div>
+
+  <!-- Legende -->
+  <div style="display: flex; flex-direction: column; gap: 14px; flex: 1; min-width: 0;">
+    <div>
+      <span style="display: inline-block; padding: 4px 10px; border-radius: 999px; background: #2E6B45; color: #F6F4EA; font-size: 12px; font-weight: 600; letter-spacing: 0.02em;">VERTRAUEN 3½ → 5 · UX-WRITING 4 → 5 · FORMULARE → 5</span>
+      <h1 style="margin: 10px 0 4px; font-family: Fraunces, serif; font-weight: 600; font-size: 28px; line-height: 1.1;">Kasse: alles gesagt, bevor man zahlt</h1>
+      <p style="margin: 0; color: #5D6A5C; line-height: 1.45;">Die Kasse ist heute schon ehrlich (Gebührenzeile, Gesamtsumme am Knopf, Verkäufer sichtbar, Frist). Es fehlen der Rücktritt, der Datenschutz-Link, „inkl. USt“, hilfreiche Pflichtfeld-Texte und ein Ausweg, wenn das Netz hängt.</p>
+    </div>
+    <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px;">
+      
+        <li style="display: flex; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #FBF9F2; border: 1px solid #E2DDC9;">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;">1</span>
+          <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 600;">Fehlertexte helfen weiter</span>
+            <span style="color: #5D6A5C; line-height: 1.4; font-size: 13px;">Statt „Pflichtfeld“ und „Ungültige E-Mail-Adresse“: Was fehlt und wozu der Hof es braucht. Rot nur als Rand und Satz, mit aria-invalid und aria-describedby.</span>
+            <span style="font-size: 12px; color: #2E6B45; font-weight: 600;">schemas/checkout.ts:38-43 nach dem Muster hofAnlegenFormularSchema</span>
+          </div>
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #FBF9F2; border: 1px solid #E2DDC9;">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;">2</span>
+          <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 600;">Die richtige Tastatur</span>
+            <span style="color: #5D6A5C; line-height: 1.4; font-size: 13px;">type=tel/email, inputmode, autocomplete name/email/tel, enterkeyhint „weiter“; Felder 16 px, damit iOS nicht zoomt. Freiwillige Felder sagen, wofür sie sind.</span>
+            <span style="font-size: 12px; color: #2E6B45; font-weight: 600;">checkout-form.tsx:672-707 (teils schon da – prüfen und ergänzen)</span>
+          </div>
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #FBF9F2; border: 1px solid #E2DDC9;">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;">3</span>
+          <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 600;">Rücktritt in einem Satz</span>
+            <span style="color: #5D6A5C; line-height: 1.4; font-size: 13px;">Vor dem Knopf steht, was vom Rücktritt ausgenommen ist und wo die Belehrung steht. Dieselbe Belehrung in die Bestellmail (die AGB versprechen sie dem Hof).</span>
+            <span style="font-size: 12px; color: #2E6B45; font-weight: 600;">FAGG § 4 Abs. 1 Z 8 · Text erst nach anwaltlicher Prüfung</span>
+          </div>
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #FBF9F2; border: 1px solid #E2DDC9;">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;">4</span>
+          <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 600;">„inkl. USt“ und Gebühr mit (i)</span>
+            <span style="color: #5D6A5C; line-height: 1.4; font-size: 13px;">Die Gebühr bleibt eine eigene Zeile mit Prozent und Mindestbetrag; an der Gesamtsumme steht „Preise inkl. USt“ und die gewählte Zahlart.</span>
+            <span style="font-size: 12px; color: #2E6B45; font-weight: 600;">kasse-teile.tsx:295-335</span>
+          </div>
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #FBF9F2; border: 1px solid #E2DDC9;">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;">5</span>
+          <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 600;">Datenschutz dort, wo Daten eingegeben werden</span>
+            <span style="color: #5D6A5C; line-height: 1.4; font-size: 13px;">Ein Link „Was passiert damit?“ bei „Deine Daten“ – die Kasse hat keinen Seitenfuß, also fehlt er heute ganz.</span>
+            <span style="font-size: 12px; color: #2E6B45; font-weight: 600;">kunde-shell.tsx:310-353 (KundeFokusShell)</span>
+          </div>
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #FBF9F2; border: 1px solid #E2DDC9;">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;">6</span>
+          <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 600;">Wenn das Netz hängt</span>
+            <span style="color: #5D6A5C; line-height: 1.4; font-size: 13px;">Nach 15 s ohne Antwort: Hinweis und „Nochmal versuchen“. Der Idempotenz-Schlüssel sorgt dafür, dass nichts doppelt bestellt wird – das steht auch da.</span>
+            <span style="font-size: 12px; color: #2E6B45; font-weight: 600;">checkout-form.tsx:483 fetch(/api/checkout) ohne Zeitlimit</span>
+          </div>
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #FBF9F2; border: 1px solid #E2DDC9;">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #E07A4A; color: #231208; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;">7</span>
+          <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 600;">Hof pausiert: kein 404</span>
+            <span style="color: #5D6A5C; line-height: 1.4; font-size: 13px;">Macht der Hof während des Einkaufs Pause, sieht die Kundin die Pausen-Karte mit „Zurück zu den Höfen“, nicht „Diesen Hof gibt es hier nicht (mehr)“.</span>
+            <span style="font-size: 12px; color: #2E6B45; font-weight: 600;">checkout/page.tsx:61 notFound() → KaufSperreHinweis</span>
+          </div>
+        </li>
+      
+    </ol>
+    <p style="margin: 4px 0 0; font-size: 12px; color: #5D6A5C; line-height: 1.4;">Vorbilder (Mobbin): Grubhub – ein Satz mit Links zu Bedingungen und Datenschutz direkt unter dem Zahlknopf; Swiggy – Storno-Regel als eigener Block vor dem Zahlen. Der Rücktrittstext ist ein Platzhalter bis zur Prüfung durch die Anwältin (Go-Live-Checkliste A).</p>
+  </div>
+</div>
+</body>
+</html>

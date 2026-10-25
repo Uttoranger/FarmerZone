@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Handy-Sterne · Leistung und Plattform: messen, Ziele, Stufen</title>
+<meta name="viewport" content="width=1440">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1C241D}a:hover{color:#2E6B45}
+</style>
+</head>
+<body>
+<div style="position: relative; width: 1440px; height: 1040px; box-sizing: border-box; padding: 28px; display: flex; flex-direction: column; gap: 20px; background: #F4F1E7; color: #1C241D; font-family: 'Instrument Sans', sans-serif; font-size: 14px;">
+
+  <div>
+    <span style="display: inline-block; padding: 4px 10px; border-radius: 999px; background: #2E6B45; color: #F6F4EA; font-size: 12px; font-weight: 600; letter-spacing: 0.02em;">PERFORMANCE 3 → 5 · PLATTFORM / PWA 3 → 5</span>
+    <h1 style="margin: 10px 0 4px; font-family: Fraunces, serif; font-weight: 600; font-size: 28px; line-height: 1.1;">Was man nicht zeichnen kann: schneller laden, als App bestehen</h1>
+    <p style="margin: 0; color: #5D6A5C; line-height: 1.45; max-width: 1100px;">Nichts davon ist gemessen – seit 5.10.2026 steht „Lighthouse vom Menschen messen“ offen. Die Zahlen zum Bundle stammen aus Berichten 07 und 31. Deshalb zuerst messen, dann in zwei Stufen arbeiten; der fünfte Stern ist erst vergeben, wenn die Ziele unten auf einem Mittelklasse-Handy im 4G-Profil erreicht sind.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 20px; flex: 1; min-height: 0;">
+
+    <!-- Spalte 1: Messen und Ziele -->
+    <section style="display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: 18px; background: #1C241D; color: #F1EEE3;">
+      <h2 style="margin: 0; font-family: Fraunces, serif; font-weight: 600; font-size: 20px;">Zuerst messen, dann Ziele</h2>
+      <p style="margin: 0; font-size: 13px; color: #9AA899; line-height: 1.4;">Vier Seiten, Handy-Profil, 4G gedrosselt: `/`, `/hoefe`, `/&lt;hof&gt;`, `/&lt;hof&gt;/checkout`. Dazu Web Vitals aus dem Feld (Sentry hat sie bei 10 % Tracing schon, niemand liest sie).</p>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px;"><span>JavaScript Startseite (gzip)</span><span style="color: #9AA899;">427 KiB → Ziel ≤ 200 KiB</span></div>
+            <div style="position: relative; height: 10px; border-radius: 999px; background: #223125; overflow: hidden;">
+              <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 82%; background: #E59A6F; border-radius: 999px;"></span>
+              <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 38%; background: #9FD0AF; border-radius: 999px;"></span>
+            </div>
+          </div>
+        
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px;"><span>JavaScript /products Hof (gzip)</span><span style="color: #9AA899;">520 KB → Ziel ≤ 300 KB</span></div>
+            <div style="position: relative; height: 10px; border-radius: 999px; background: #223125; overflow: hidden;">
+              <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: #E59A6F; border-radius: 999px;"></span>
+              <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 58%; background: #9FD0AF; border-radius: 999px;"></span>
+            </div>
+          </div>
+        
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px;"><span>Hero-Video Startseite</span><span style="color: #9AA899;">972 KB → Ziel 0 bei saveData / ≤ 400 KB</span></div>
+            <div style="position: relative; height: 10px; border-radius: 999px; background: #223125; overflow: hidden;">
+              <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: #E59A6F; border-radius: 999px;"></span>
+              <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 41%; background: #9FD0AF; border-radius: 999px;"></span>
+            </div>
+          </div>
+        
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px;"><span>SQL je Hofseiten-Aufruf</span><span style="color: #9AA899;">14–16, 5–6 Stufen → Ziel ≤ 8, 2 Stufen</span></div>
+            <div style="position: relative; height: 10px; border-radius: 999px; background: #223125; overflow: hidden;">
+              <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: #E59A6F; border-radius: 999px;"></span>
+              <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 50%; background: #9FD0AF; border-radius: 999px;"></span>
+            </div>
+          </div>
+        
+        <span style="font-size: 11px; color: #9AA899;">Orange = heute (Berichte 07/31, nicht frisch gemessen) · Grün = Ziel</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px;">
+        
+          <div style="padding: 10px; border-radius: 12px; background: #131B14; border: 1px solid #223125; display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 11px; color: #9AA899; letter-spacing: 0.04em;">LCP</span>
+            <span style="font-family: Fraunces, serif; font-weight: 600; font-size: 20px;">&lt; 2,5 s</span>
+            <span style="font-size: 11px; color: #9AA899;">Hofseite, 4G, Moto-G-Klasse</span>
+          </div>
+        
+          <div style="padding: 10px; border-radius: 12px; background: #131B14; border: 1px solid #223125; display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 11px; color: #9AA899; letter-spacing: 0.04em;">INP</span>
+            <span style="font-family: Fraunces, serif; font-weight: 600; font-size: 20px;">&lt; 200 ms</span>
+            <span style="font-size: 11px; color: #9AA899;">„+“ in den Korb, Filter</span>
+          </div>
+        
+          <div style="padding: 10px; border-radius: 12px; background: #131B14; border: 1px solid #223125; display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 11px; color: #9AA899; letter-spacing: 0.04em;">CLS</span>
+            <span style="font-family: Fraunces, serif; font-weight: 600; font-size: 20px;">&lt; 0,1</span>
+            <span style="font-size: 11px; color: #9AA899;">Schriftwechsel, Skelette</span>
+          </div>
+        
+      </div>
+      <div style="margin-top: auto; padding: 12px; border-radius: 12px; background: #131B14; border: 1px solid #223125; font-size: 13px; line-height: 1.4;">
+        <b>Qualitätstor:</b> ein Größenbudget je Route in der CI (Skript nach Bericht 31), Lighthouse-Lauf vor jedem Sammel-PR, Web Vitals im Admin › Betrieb als Karte. Ohne Messung kein fünfter Stern.
+      </div>
+    </section>
+
+    <!-- Spalte 2: Performance -->
+    <section style="display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 18px; background: #FBF9F2; border: 1px solid #E2DDC9;">
+      <h2 style="margin: 0; font-family: Fraunces, serif; font-weight: 600; font-size: 20px;">Performance</h2>
+      <span style="font-size: 12px; color: #2E6B45; font-weight: 600; letter-spacing: 0.04em;">STUFE 1 · KLEIN, SOFORT (→ 4 Sterne)</span>
+      <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px;">
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #2E6B45; flex-shrink: 0;"></span><span><b>Instrument Sans vorladen,</b> Geist nicht mehr. Der Kommentar („bis die erste Route umzieht“) ist veraltet – die Schrift ist überall aktiv. Behebt sichtbaren Schriftwechsel. <span style="color: #5D6A5C;">layout.tsx:38-42</span></span></li>
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #2E6B45; flex-shrink: 0;"></span><span><b>Zod raus aus jeder Seite:</b> RueckwegMerker und KundeShell importieren Schemas → einfache Prüfung oder zod/mini. <span style="color: #5D6A5C;">rueckweg-merker.tsx:6, kunde-shell.tsx:9</span></span></li>
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #2E6B45; flex-shrink: 0;"></span><span><b>Stripe erst beim Zahlen laden,</b> nicht beim Öffnen der Kasse (bar zahlt die Hälfte). <span style="color: #5D6A5C;">stripe-payment.tsx:29 loadStripe</span></span></li>
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #2E6B45; flex-shrink: 0;"></span><span><b>Rohe &lt;img&gt; im Korb-Blatt und in der Produktliste</b> auf next/image mit sizes 56/44 px – heute lädt ein 56-px-Bild das 2.400-px-Original. <span style="color: #5D6A5C;">cart-sheet.tsx:83, produkte-ansicht.tsx:713</span></span></li>
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #2E6B45; flex-shrink: 0;"></span><span><b>Hero-Video:</b> kein Autoplay bei saveData oder &lt; 768 px, oder eine 400-KB-Fassung. <span style="color: #5D6A5C;">startseite-kopf.tsx:80-88</span></span></li>
+        
+      </ul>
+      <span style="font-size: 12px; color: #9C4D20; font-weight: 600; letter-spacing: 0.04em; margin-top: 6px;">STUFE 2 · EIGENE AUFTRÄGE (→ 5 Sterne)</span>
+      <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px;">
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #E07A4A; flex-shrink: 0;"></span><span><b>Hofseite entlasten:</b> Hof und Produkte nicht zweimal laden (Metadaten), Beiträge und ausgebuchte Tage parallel, relationJoins prüfen; später statische Hülle mit dynamischem Bestand. <span style="color: #5D6A5C;">teilen-bild.ts:58 vs. farm.ts:367 · hofseite-vorschau.ts</span></span></li>
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #E07A4A; flex-shrink: 0;"></span><span><b>Größenbudget in der CI</b> je Route, rot ab Grenze. <span style="color: #5D6A5C;">neues Skript, Vorlage Bericht 31</span></span></li>
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #E07A4A; flex-shrink: 0;"></span><span><b>Hofliste aufteilen</b> ab ~100 Höfen (heute 12 KB je Hof, 2 MB ab 167). <span style="color: #5D6A5C;">Vorschlag aus Nr. 163</span></span></li>
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #E07A4A; flex-shrink: 0;"></span><span><b>AVIF zusätzlich zu WebP</b> mit Blick auf Vercel-Kosten. <span style="color: #5D6A5C;">next.config.ts:119-126</span></span></li>
+        
+      </ul>
+    </section>
+
+    <!-- Spalte 3: Plattform -->
+    <section style="display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 18px; background: #FBF9F2; border: 1px solid #E2DDC9;">
+      <h2 style="margin: 0; font-family: Fraunces, serif; font-weight: 600; font-size: 20px;">Plattform und PWA</h2>
+      <span style="font-size: 12px; color: #2E6B45; font-weight: 600; letter-spacing: 0.04em;">STUFE 1 · KLEIN, SOFORT (→ 4 Sterne)</span>
+      <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px;">
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #2E6B45; flex-shrink: 0;"></span><span><b>viewport-fit=cover</b> setzen, sonst sind alle safe-area-Polster 0. Danach am iPhone prüfen, installiert und im Browser. <span style="color: #5D6A5C;">layout.tsx:77 generateViewport</span></span></li>
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #2E6B45; flex-shrink: 0;"></span><span><b>Manifest:</b> background_color dunkel (Standard ist dunkel), id, scope, lang de-AT, screenshots, shortcuts „Heute“ und „Neuer Beitrag“. <span style="color: #5D6A5C;">manifest.ts:31-53</span></span></li>
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #2E6B45; flex-shrink: 0;"></span><span><b>Startadresse je Welt:</b> Kundinnen landen heute auf /dashboard (Hof-Login). Manifest nur in Hof-Routen oder start_url „/“. <span style="color: #5D6A5C;">manifest.ts:37</span></span></li>
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #2E6B45; flex-shrink: 0;"></span><span><b>appleWebApp-Metas</b> (Titel, Statusleiste) ergänzen. <span style="color: #5D6A5C;">layout.tsx metadata</span></span></li>
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #2E6B45; flex-shrink: 0;"></span><span><b>Netz-Zeile + Zeitlimit</b> siehe Board „Kein Netz“; overscroll-behavior contain in der Kasse. <span style="color: #5D6A5C;">Shells, checkout-form.tsx:483</span></span></li>
+        
+      </ul>
+      <span style="font-size: 12px; color: #9C4D20; font-weight: 600; letter-spacing: 0.04em; margin-top: 6px;">STUFE 2 · ENTSCHEIDUNG + AUFTRAG (→ 5 Sterne)</span>
+      <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px;">
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #E07A4A; flex-shrink: 0;"></span><span><b>Offline-Grundsatz ins Register:</b> kleinste sichere Stufe = Offline-Seite für Navigationen, Netz zuerst, nie HTML oder Kasse zwischenspeichern, Versionsnummer, skipWaiting. <span style="color: #5D6A5C;">public/sw.js:13-14 verlangt eigenen Sprint</span></span></li>
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #E07A4A; flex-shrink: 0;"></span><span><b>Karten im Hofbereich:</b> Ziehen nur mit zwei Fingern, scrollWheelZoom aus – heute fängt eine 60-vh-Karte das Scrollen. <span style="color: #5D6A5C;">futter-karte-ansicht.tsx:43, umfeld-karte.tsx:42</span></span></li>
+        
+          <li style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4;"><span style="width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: #E07A4A; flex-shrink: 0;"></span><span><b>Web Push für neue Bestellungen</b> (Paket, Schlüssel, Migration → Freigabe). <span style="color: #5D6A5C;">Morgenbericht 12 §366</span></span></li>
+        
+      </ul>
+      <div style="margin-top: auto; display: flex; gap: 10px; align-items: center; padding: 12px; border-radius: 12px; background: #E8F0E2; border: 1px solid #E2DDC9;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2D5F3F" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"></rect><path d="M12 18h.01"></path></svg>
+        <span style="font-size: 13px; line-height: 1.4; color: #1C241D;"><b>Was heute schon gut ist:</b> Teilen mit Dateien, App als Teilen-Ziel für Fotos, drei Fotowege, Standort nur auf /hoefe, Kalenderdatei, robuste Uploads. Das bleibt.</span>
+      </div>
+    </section>
+  </div>
+</div>
+</body>
+</html>
