@@ -6514,3 +6514,1219 @@ Wie Lauf 23, dazu:
    * `LINK_SECRET` setzen (166)
    * Resend Pro buchen, dann `TARIFE.resend` umschalten lassen (162)
    * Merge per Merge-Commit. Danach in der Produktion: Admin › Betrieb › E-Mails ansehen, eine Testbestellung mit Stripe im Testmodus und ihre Bestellnummer in der Suche → Mails gesendet und zugestellt.
+
+## 29. Lauf 25 (uttoranger, im Chat erteilt, 25.10.2026)
+
+Nachtlauf 25 – Freigabe (uttoranger, im Chat 25.10.2026) · Nacharbeit Lauf 24, Startseite gestalten und „Handy auf fünf Sterne"
+
+Geschrieben auf main 6b55d67 (25.10.2026 00:19, #384 Sammel-PR Lauf 24). Zusammengeführt am 25.10.2026, 16:40. Dieser Lauf ersetzt die Entwürfe claude/lauf25-prompt.md (Nr. 168–171), claude/lauf26-prompt.md (Nr. 172–181) und die beiden /fix-Aufträge zur Startseite (claude/fix-startseiten-vorschau-route-prompt.md, claude/fix-startseite-editor-prompt.md). Keiner davon ist gelaufen; auf GitHub gibt es keinen Branch dazu.
+
+Nachgeprüft am 25.10.2026 um 00:33, nur lesend:
+- Production READY.
+- Migration `20261024100000_mail_auftrag` angewandt.
+- Der Ablauf `mails` läuft jede Minute (Herzschlag ok).
+- Der erste Mail-Auftrag ist gesendet.
+
+Grundlage:
+- Morgenbericht 24: die Entscheidungen 1–4, die Regelvorschläge, die Nacharbeit „Sollte".
+- Die Prüfung des Warenkorbs vom 24.10.2026 (Vormerkung 24.10.) und der Fund aus Bericht 165.
+- Die Prüfung von Admin › Startseite vom 25.10.2026 (Vorschau zeigt in Produktion immer live; Editor bleibt im Fehler hängen).
+- Die Bewertung der Handyansicht vom 25.10.2026 (Projekt-Doc claude/handy-bewertung-2026-10-25.md) mit den Boards auf dem Canvas https://claude.ai/artifact/9SAisAoBLrFCkhxLuxo5Ln, Zeile „VORSCHLAG 25.10.2026 · HANDYANSICHT MIT STERNEN":
+  - SterneBogen
+  - SterneHofseiteOrientierung, SterneKasseVertrauen, SterneOfflineZustaende
+  - SterneHofStart, SterneSicherheit, SterneBarrierefreiheitFormular, SterneLeistungPlattform
+- Offenes aus Vormerkung 24.10. und Go-Live-Checkliste 23.10.:
+  - toter Code
+  - Betriebsdoku auf agrilo.at
+  - Sentry JAVASCRIPT-NEXTJS-C (`fokusX` auf /hoefe) und -8 (`toLowerCase` auf /)
+  - Meldung cmua8bofv000004jr4r6v6o80 (Sprungmarken am Handy, Status GEPLANT)
+  - Nacharbeit aus 143: Filter-Chips /products mit 36 px
+
+Jede Ausgangslage unten ist vor dem Bau am Code zu bestätigen. Bei gestapelten Nummern gilt der Zwischenstand, von dem sie starten. Weicht sie ab: STOPP für die Nummer bzw. den Punkt, Bericht, die übrigen laufen weiter.
+
+Stand der Produktion:
+- Stripe im Testmodus, CSP nur beobachtend (G8).
+- Resend Free, Supabase Pro, Vercel Pro.
+- Testhöfe markiert nur die Projektleitung (N21).
+- PR #329 (Nr. 124) läuft getrennt; berühren sich beide, dann nur in Doku-Dateien.
+
+Arbeite als Dirigent nach docs/nachtlauf.md: §2 Regeln, §4 Ablauf je Gate, 4a Tempo, §5 Stoppen, §6 Morgenbericht. Dieser Text ist die Freigabe.
+- Die Nummern 168–183 sind neu. 102 bleibt für die Sammelbestellung reserviert.
+- Es gelten G10, die G10-Ergänzung und §0 wie in Lauf 22 (freigabe.md §26), mit der Zuordnung unten. Der Dirigent führt ein Zeitbuch (docs/nachtlauf/berichte/zeitbuch-lauf25.md).
+- **Tests** folgen docs/ai/TESTING_GUIDELINES.md:
+  - Umgebung `node`, kein DOM, kein Klicken.
+  - Hooks über den Prüfstand wie tests/use-cart.test.ts.
+  - Seiten mit `renderToStaticMarkup`, mit Merkmalen und Gegenprobe.
+  - Fachregeln als reine Funktionen in src/lib/.
+- **Keine Migration, kein neues Paket, keine neue Variable.**
+  - Braucht eine Nummer eines davon: STOPP für die Nummer, Vorschlag in den Bericht.
+  - Das gilt ausdrücklich für axe-core, @vercel/speed-insights und einen Service Worker mit Cache.
+  - Das Entfernen eines Pakets ist auch eine Paketänderung: nur als Vorschlag in den Bericht.
+- **Mockups:** Die Boards „Sterne…" sind das Zielbild für 172–181. Was dort nicht steht, folgt docs/ai/DESIGN_SYSTEM.md. Jede Abweichung gehört mit Grund in den PR.
+- **Umfang:** 16 Nummern. Reicht das Budget nicht, gilt die Priorität unten; was nicht fertig wird, ist im Morgenbericht „nicht begonnen" und läuft im nächsten Lauf mit demselben Text.
+
+## Zuerst der Doku-PR (Branch docs/lauf25 von main, model: sonnet)
+
+**Freigabe:**
+- diesen Text wörtlich als „## 29. Lauf 25 (uttoranger, im Chat erteilt, 25.10.2026)" in docs/nachtlauf/freigabe.md
+- in docs/nachtlauf.md §3 die Zeilen 168–183 und „Sammel 25"
+- den Absatz „Reihenfolge in Lauf 25": keine Migration, kein Paket, keine Variable; Wellen und Priorität wie unten
+
+**docs/nachtlauf/status.md:**
+- die Zeilen 158–167 und „Sammel 24" tragen „gemergt (#384)"
+- neu die Zeilen 168–183 und „Sammel 25", Status „offen"
+
+**docs/entscheidungen.md:** die Einträge unter „Entscheidungen" (unten) wörtlich, dazu die Zeile „Stand Lauf 25".
+- Vorher prüfen, ob die Kennungen N28–N31 und S18 frei sind. Sonst die nächste freie nehmen und im PR nennen.
+
+**Regelvorschläge aus Morgenbericht 24, hiermit freigegeben** (je mit Herkunft „Regelvorschlag …, Morgenbericht 24, freigegeben 25.10.2026"):
+- docs/nachtlauf.md 4a Punkt 2: Den bestehenden Satz „Eine Nummer, die eine Annahme für alle ändert …" ergänzen um „… oder einen gemeinsamen Schutz (Bar-Token, Aufräumen, Prüfkette) …". Kein zweiter Satz in Punkt 3.
+- 4a Punkt 9, am Ende: „Den PR einer gestapelten Nummer öffnet der Dirigent vor dem Push des Zwischenstands; sonst braucht er einen eigenen Basis-Branch."
+- 4a Punkt 1, am Ende, zwei Sätze. Der erste erweitert den Vorschlag 161 bewusst von „Admin-Seite" auf „Seite"; das steht im PR:
+  - „Erweitert eine Nummer eine Seite um Parameter in der Adresse, gehört deren loading.tsx in die Grenze."
+  - „Ändert eine Nummer das Format eines Werts in der Adresse, gehören die Zod-Schemas dieses Parameters in die Grenze."
+- docs/ai/CODING_STANDARDS.md §2: „Kein `updateMany` mit berechnetem Spaltenschlüssel (`{ [spalte]: wert }`) – je Spalte ausschreiben; sonst läuft tsc an den Speicher."
+- docs/ai/CODING_STANDARDS.md §4, nach dem Punkt „Keine Schleife über Mails", zwei Sätze:
+  - „Ein Betrag, der beim Ereignis feststand, geht als Cent-Ziffern unter `…Cents` in den Bezug eines Mail-Auftrags (nie neu gerechnet)."
+  - „Eine neue Mail-Art steht im selben Commit in genau einer der Listen `NOCHMAL_ERLAUBT` oder `NOCHMAL_NIE`."
+
+**docs/mockups/:**
+- die 8 Boards „Sterne…" als HTML-Export (`system-sterne-*.html`; liefert die Projektleitung als Zip). Fehlt das Zip, die Zeilen trotzdem anlegen, mit dem Vermerk „Board auf dem Canvas".
+- je eine README-Zeile im neuen Abschnitt „SYSTEM · Handy auf fünf Sterne (25.10.2026)"
+
+**Betriebsdoku auf agrilo.at** (Go-Live B):
+- docs/betrieb/stripe-live.md und docs/betrieb/testumgebung.md: `farmerzone.at` bzw. `test.farmerzone.at` bei Webhooks, Apple Pay und Prüfschritten → `agrilo.at` bzw. `test.agrilo.at`
+- Satz dazu: „Stripe folgt keiner Weiterleitung; der Webhook muss direkt auf agrilo.at zeigen."
+
+**Veraltete Doku-Stellen (nur Doku, kein Code):**
+- docs/ai/ARCHITECTURE.md ~203: Datenschutz zieht mit Nr. 181 um.
+- docs/ai/ARCHITECTURE.md ~233: /status/new und send-whatsapp tragen den Kopf.
+- docs/ai/DESIGN_SYSTEM.md Typografie: Fließschrift im neuen Design ist Instrument Sans, Geist nur im Bestand.
+
+**Commit- und PR-Texte** immer über eine Datei (Write, dann `git commit -F` bzw. `gh pr create --body-file`), Präfixe nach CLAUDE.md §5. Das gilt für den ganzen Lauf.
+
+## Stand – vor dem Start prüfen, sonst STOPP und melden
+
+- main enthält #384 (6b55d67 oder später).
+- `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint` (0 Fehler) und `pnpm test` sind grün.
+- Die Tabelle `MailAuftrag` gibt es (Migration aus 158).
+- Vorschau und Produktion laufen mit Stripe im Testmodus.
+- CSP ist weiter Report-Only. G8 „CSP scharf" läuft getrennt.
+
+**Priorität, falls das Budget nicht reicht:**
+168 → 169 → 182 → 170 → 171 → 183 → 172 → 173 → 175 → 176 → 174 → 177 → 178 → 181 → 180 → 179
+
+## Nicht in diesem Lauf
+
+- **Servicegebühr bei Barzahlung ab 1.2.2027** (B1): Entscheidung der Projektleitung, eigener Auftrag bis spätestens Dezember 2026.
+- **Tarifwahl, SEPA und Grenzen im Hoftor** (Vorschlag `tarif-uebergang` bei der Projektleitung).
+- **Rücktrittshinweis in Kasse und Bestellmail, Widerrufsfunktion (§ 13a FAGG), AGB 1.0:** erst nach der Anwältin (Go-Live A).
+- **Servicegebühr und Rolle bei der Zahlung:** Go-Live A.
+- **Datenschutzerklärung über Fakten hinaus** (O4). 181 berichtigt nur, was nachweislich falsch ist; die Freigabe des Texts liegt bei der Projektleitung.
+- **CSP scharf (G8, ab 28.10.):** eigener Auftrag.
+- **Service Worker mit Offline-Seite:** braucht einen eigenen Sprint (public/sw.js ~13).
+- **Pakete:** axe in der CI, Speed Insights, das Entfernen von recharts, @tanstack/react-query und date-fns. Nur als Vorschlag.
+- **Obergrenze der reservierten Menge je Warenkorb-Sitzung:** offen.
+- **Hofliste aufteilen:** nach den Messwerten aus 163, ab etwa 100 Höfen.
+- **Rückruf als Hilfeweg:** braucht einen Ablauf im Team.
+- **Eine gemeinsame Checkliste** für /onboarding und „Zu tun" auf Heute: eigener Vorschlag mit Board.
+- **`BETTER_AUTH_SECRET` mit `min(32)`:** erst, wenn die Projektleitung die Länge in Vercel geprüft hat. Eine Schema-Grenze, die der heutige Wert nicht erfüllt, legt die Produktion lahm.
+- **Abmelde-Token ohne E-Mail:** eigener Auftrag mit Kennung `2.`; alte Links müssen gelten.
+- **Web Push:** braucht Paket, Schlüssel und Migration.
+- `erneuereHalte` per `upsert` ohne Bestandsbedingung (Altlast; die Kasse prüft verbindlich).
+- Die seltenen Doppelversand-Fälle aus Bericht 158 (bräuchten eine Schema-Änderung).
+- Resend Pro (Projektleitung).
+- Nur ein harter Bounce meldet ein Abo ab: Heute meldet nach N26 jeder Bounce ab; eine Änderung braucht eine Entscheidung.
+- Der Preissatz der Kasse aus derselben Quelle wie der Hofseite (Nacharbeit nach 169).
+- Startseite gestalten: ein Knopf „Entfernen" für Zusatz-Abschnitte (Entscheidung offen); die doppelte Stunde beim Wechsel auf Winterzeit (`zeitpunktAusEingabe`) und das Liveschalten geplanter Fassungen per Cron – nur als Notiz in den Bericht von 183.
+
+## Entscheidungen (uttoranger, im Chat 25.10.2026 – mit diesem Start freigegeben; wörtlich ins Register)
+
+- „N26 · Ergänzung (25.10.2026): Ein Mail-Auftrag hält nie eine Zahlung, eine Barbestätigung, einen Storno, ‚Artikel fehlt' oder einen Statuswechsel einer Bestellung auf.
+  - Das gilt auch für den Vermerk einer zu spät eingegangenen Zahlung.
+  - Der Bezug wird vor dem Einstellen geprüft. Ist er ungültig, gilt der Wechsel ohne Auftrag, und Sentry bekommt Art und Bestellung.
+  - Scheitert das Einstellen in der Transaktion, gilt der Wechsel trotzdem. Der Auftrag wird nach dem Commit noch einmal eingestellt; scheitert auch das, geht es an Sentry.
+  - Der Bezug trägt Kennungen und Beträge, die beim Ereignis feststanden, als Cent-Ziffern unter `…Cents` (Storno, Artikel fehlt, Zahlung zu spät); nie Adresse, Name, Text oder Token.
+  - Die Bestätigung eines Empfängers der Zustellung (`betreiber-bestaetigung`) trägt einen Bestätigungslink und geht deshalb Sofort."
+- „N27 · Ergänzung (25.10.2026): Nochmal schicken geht nur für diese Stände:
+  - `gesendet`, auch zugestellt, abgelehnt oder Spam gemeldet
+  - `gescheitert`
+  - `ohne_schluessel` (kommt nur in der Vorschau vor)
+  Nicht für `gesperrt` (nur Test-Adressen erlaubt) oder `verworfen` (abgemeldet oder ohne Einwilligung); dort nennt die Seite den Grund."
+- „N28 · Warenkorb ehrlich (25.10.2026): Die Hofseite gleicht einen gespeicherten Warenkorb beim Laden mit ihrem eigenen Stand ab, ohne Halte zu setzen oder zu erneuern.
+  - Was es nicht mehr gibt, fällt heraus.
+  - Mengen über dem Bestand werden gekürzt.
+  - Geänderte Preise werden übernommen, mit einem Satz im Korb-Blatt bzw. im Mini-Warenkorb.
+  - Bei einer Kaufsperre bleibt der Korb; Blatt und Mini-Warenkorb zeigen die Sperre wie heute.
+  - Die Produktseite gleicht nicht ab.
+  - Wer ein Produkt aus dem Korb nimmt, gibt seinen Halt sofort frei.
+  - Die Kasse nennt den Grund auch dann, wenn nach der Prüfung nichts mehr im Korb liegt.
+  - Verbindlich prüft weiter nur die Kasse."
+- „N16 · Ergänzung (25.10.2026): Die Vorschau von Admin › Startseite läuft über eine eigene dynamische Route `/startseite-vorschau` mit signiertem Link und Admin-Sitzung, ohne Draft Mode. Die Startseite `/` bleibt statisch und liest nie die Anfrage."
+- „N29 · Kein Netz ist ein Zustand (25.10.2026): Neben gefüllt, leer, laden und Fehler hat jeder Screen den Zustand ‚kein Netz'.
+  - Scheitert ein Aufruf am Netz, bleibt die Eingabe stehen. Am Formular bzw. an der Aktion steht ein Satz aus einer Quelle (‚Keine Verbindung – nichts gespeichert. Versuch es gleich noch einmal.'), dazu ein Knopf ‚Nochmal'. Nie die ganze Fehlerseite, nie nur ein Toast.
+  - Geht das Netz im Browser verloren, zeigen die Shells unter dem Kopf eine Zeile, bis es zurück ist.
+  - Ein Service Worker mit Cache gehört nicht dazu (eigener Sprint). Kasse und HTML werden nie zwischengespeichert."
+- „N30 · Korb ohne Blatt-Pingpong (25.10.2026): Auf der Hofseite öffnet nur das erste ‚In den Korb' einer Sitzung das Korb-Blatt. Jedes weitere bestätigt mit einer kurzen Zeile (‚… ist im Korb', ‚Rückgängig'), und die Korb-Leiste zählt hoch. Weicht bewusst von mobil-k2-produkte ab; Board SterneHofseiteOrientierung."
+- „N31 · App-Start nach Sitzung (25.10.2026): Die installierte App startet auf /app. Die Route leitet nach der Sitzung weiter:
+  - Hof → /dashboard
+  - Admin ohne Hof → /admin
+  - sonst → /
+  Das Manifest bleibt eines für beide Welten."
+- „E7 · Ergänzung (25.10.2026): Höfe können zusätzlich zum Passwort einen Passkey einrichten (Fingerabdruck, Gesicht, Sicherheitsschlüssel). Freiwillig; das Passwort bleibt als Ersatz. Für Admins gilt N20 unverändert."
+- „S18 · Sitzungsdauer (25.10.2026): Eine Sitzung von Hof oder Kundin endet spätestens 30 Tage nach der Anmeldung, auch wenn sie benutzt wird. Admins bleiben bei 12 Stunden (N20).
+  - Die Seite ‚Konto und Sicherheit' sagt das in einem Satz.
+  - Kundinnen sehen unter /account ihre angemeldeten Geräte und können ‚Überall abmelden'."
+- Stand-Zeile: „Stand Lauf 25 (uttoranger, 25.10.2026): Die Ergänzungen zu N26 (Mail-Auftrag hält keine Bestellung auf, Beträge in Cent, betreiber-bestaetigung Sofort), N27 (Nochmal schicken nicht bei gesperrt oder verworfen) und N16 (eigene Vorschau-Route) sowie N28 (Warenkorb ehrlich), N29 (kein Netz als Zustand), N30 (Korb ohne Blatt-Pingpong), N31 (App-Start nach Sitzung), die E7-Ergänzung (Passkey für Höfe) und S18 (Sitzungsdauer) sind entschieden und in Nr. 168–183 eingeplant (freigabe.md §29); dazu die Regelvorschläge aus Morgenbericht 24. Lauf 25 hat keine Migration, kein neues Paket und keine neue Variable. Nicht in diesem Lauf: Servicegebühr bei Barzahlung ab 1.2.2027 (Entscheidung offen, bis Dezember), Tarifwahl und SEPA, Rücktritt und Widerruf, Datenschutzerklärung über Fakten hinaus, CSP scharf, Service Worker, Paketänderungen, Obergrenze je Warenkorb-Sitzung, Hofliste aufteilen, Rückruf, eine gemeinsame Checkliste."
+
+## §0 Zuordnung für diesen Lauf
+
+**Modell:**
+- Doku-PR mit Sonnet.
+- 168, 169, 170, 171, 173, 175, 177, 178, 179, 182 und 183 mit Opus.
+- 172, 174, 176, 180 und 181 mit Sonnet.
+- tester und sichter mit Sonnet, pruefer immer mit Opus, höchstens 22 Schritte je Aufruf.
+
+**Prüfdurchgänge:**
+- ein voller Durchgang für 168, 169, 173, 175, 177, 178, 179, 182 und 183
+- gezielt für 170, 171, 172, 174, 176, 180 und 181: jede Änderung an Verhalten oder Text hat einen Test mit Gegenprobe
+
+**pnpm test:integration:**
+- GANZ: 168, 169 und 170 (Kaufweg, Bar-Token, Aufräumen: gemeinsamer Schutz nach 4a Punkt 2), 175 und 178 (Kaufweg, Anmeldung, Sitzungen)
+- 171: tests/integration/double-opt-in.int.test.ts und jede Integrationsdatei, die sich ändert
+- 179: alle Integrationsdateien zu Passkey und Admin-Anmeldung
+- 182 und 183: alle startseite-*
+- sonst jede Datei, die sich ändert
+- im Sammel-PR ganz
+
+**Bilder** (390 hell UND dunkel, wo nicht anders genannt):
+
+| Nummer | Bilder |
+|---|---|
+| 169 | Korb-Blatt 390 hell mit dem Satz nach geändertem Preis; Mini-Warenkorb 1440 hell mit dem Satz; Kasse 390 hell, leer, mit Grund |
+| 170 | macht die Projektleitung in der Vorschau (Admin); kein Blocker |
+| 173 | /products mit offenem Produktformular; Hof-Login mit Passwort-Auge; Abholzeiten |
+| 174 | Hofprofil mit Feldfehler; Beitrag schreiben |
+| 175 | Hofseite mit Netz-Zeile und gescheitertem „In den Korb"; Abholzeiten mit Netzfehler; (hof)/error |
+| 176 | Kasse mit Feldfehlern und Hinweisen; Kasse eines pausierten Hofs |
+| 177 | Hofseite gescrollt mit klebender Hofzeile und Chips; Bestätigungszeile nach dem zweiten „+" |
+| 178 | /account mit Geräten; Konto und Sicherheit |
+| 179 | Konto und Sicherheit mit Passkey-Karte |
+| 181 | /datenschutz in der KundeShell; Druckansicht |
+| 182 | Startseiten-Vorschau 1440 und 390, je hell und dunkel, mit ausgeblendetem Abschnitt und Band in der Seite |
+| 183 | Editor 1440 und 390 (hell und dunkel): Fehlerzeile nach Verwerfen ist weg; Satz zum nicht mehr sichtbaren Hof |
+
+**Lesemappe** je Nummer wie 4a Punkt 1, mit den Einträgen, die etwas ausschließen:
+- 168: CLAUDE.md §2 „Geld und Bestellungen", N26, ARCHITECTURE §5 (bedingt schreiben) und Abschnitt „Mails"
+- 169: N24, N28, R1, S17 Punkt 1; ARCHITECTURE §4 „State-Regeln", Zeile Warenkorb; produktdetail-kunde.tsx (rendert das Korb-Blatt)
+- 170: N26, N27, N18, S11, Z3
+- 171: S17, S11, N18, Z1
+- 172–181: DESIGN_SYSTEM „Qualität", „Zustände", „Navigation (AppShells)" und das Board der Nummer
+- 175 zusätzlich N24, N28, CLAUDE.md §2 „Geld und Bestellungen"
+- 178 und 179 zusätzlich E7, N20, S17, R1 und auth.ts ganz
+- 182 und 183: N16, ARCHITECTURE §3 und Abschnitt automatisches Speichern, Admin-Seitenmuster N15
+
+## §1 Warteschlange (fest)
+
+- Doku-PR
+- **Welle 1**, alle von docs/lauf25: 168 ∥ 169 ∥ 171 ∥ 172 ∥ 173 ∥ 178 ∥ 181 ∥ 182
+- **Welle 2**, je vom Zwischenstand integration/lauf25, sobald die Vorgängerin hineingemergt und der volle lokale Lauf grün ist:
+  - 170 nach 168
+  - 175 und 180 nach 169
+  - 179 nach 178
+  - 183 nach 182
+- **Welle 3**, vom Zwischenstand:
+  - 176 und 177 nach 169 und 175
+  - 174 nach 173 und 175
+- Dann der Sammel-PR (Haltepunkt). 181 als letzter Merge (Text der Datenschutzerklärung wartet auf Freigabe). Branches nacht/<datum>/<nr>-<kurz>.
+- Ist eine Vorgängerin Entwurf oder entfallen, startet die Nachfolgerin von docs/lauf25 und nennt das im Bericht; Punkte, die die Vorgängerin brauchen (z. B. src/lib/netz.ts aus 175), entfallen dann mit Bericht.
+
+**Dateigrenzen.** Jede Nummer nennt unten ihre Dateien. Nie zwei Nummern an derselben Datei außerhalb dieser Grenzen; Erweiterungen nur nach 4a, mit Nennung im Morgenbericht.
+
+Gestapelt (die spätere Nummer startet vom Zwischenstand mit der früheren):
+- 168 → 170: src/server/mail-warteschlange.ts und src/server/actions/bar-bestaetigung.ts (168 die Bestätigung, 170 die Token-Zeilen)
+- 169 → 175, 176, 177, 180: src/lib/use-cart.ts (169, dann 175), src/components/farm/cart-sheet.tsx (169 Satz und 15 Minuten, dann 175 leerer Zustand, 180 Bild – getrennte Zeilen), src/components/farm/product-grid.tsx (169 Abgleich, dann 177), src/components/checkout/checkout-form.tsx (169 leerer Zustand `KasseLeer`, dann 176)
+- 175 → 174, 176, 177: src/lib/netz.ts wird genutzt, nicht geändert
+- 173 → 174: src/components/ui/* gehört 173; 174 nutzt die Bausteine nur
+- 178 → 179: src/lib/auth.ts, src/app/(hof)/settings/account/*
+- 182 → 183: src/server/actions/startseite.ts, src/components/admin/startseite-*.tsx, src/lib/startseite-fassung.ts
+
+Geteilt in getrennten Zeilen (Konflikt nur dort, der Dirigent löst ihn beim Hineinmergen):
+- src/components/shells/kunde-shell.tsx: 175 die Netz-Zeile; 177 aktiv, Kopfhöhe Fokus, scroll-padding; 180 nur der Import
+- next.config.ts: 172 nur der Kommentar zur Bestätigungsseite; 182 die Header und `KEINE_HOFSEITE`
+- src/app/(public)/[farmSlug]/checkout/page.tsx: 176 nur die Pause; 170 fasst sie nicht an (170 ändert src/app/api/checkout/route.ts)
+- src/components/ui/bottom-nav.tsx gehört 177 (Beschriftung 12 px), nicht 173
+- src/app/layout.tsx gehört allein 172 (auch `<Analytics beforeSend>`)
+- src/lib/bauern-navigation.ts gehört allein 181 (alter Teil samt Kommentar)
+
+Allein:
+- 168: src/app/api/stripe/webhook/route.ts, src/server/actions/orders.ts
+- 169: src/app/api/reserve/route.ts, src/lib/reservierung.ts, src/components/hofseite/hofseite-seitenspalte.tsx, src/server/warenkorb.ts (Kommentare), tests/bremse-verdrahtung.test.ts, tests/use-cart.test.ts, tests/reservations.test.ts
+- 170: src/app/api/checkout/route.ts (NUR die Token-Stellen aus Punkt 7), src/lib/betrieb-mails.ts, src/app/api/cron/mails/route.ts, src/server/aufraeumen.ts, src/server/betrieb-zaehler.ts, src/lib/email.ts (Zählen), src/server/queries/mails.ts, src/server/actions/betrieb.ts, src/server/mail-arten/*
+- 171: src/lib/betrieb.ts, src/lib/link-signatur.ts, src/lib/abo-bestaetigung-token.ts, src/app/(hof)/settings/payments/page.tsx, .env.example
+- die übrigen wie bei der Nummer angegeben
+
+Parallel:
+- DEVELOPMENT.md je ein Eintrag
+- docs/ai/ARCHITECTURE.md je eigener Abschnitt: 168 „Mails", 169 Reservierung/Halte, 170 Betrieb, 171 signierte Links, 178 Sitzungen, 179 Anmeldung, 181 Gruppen und Datenschutz, 182 §3 und statische Startseite, 183 automatisches Speichern
+- docs/ai/DESIGN_SYSTEM.md je eigener Abschnitt: 169 Korb-Blatt/Kasse, 173 „Farbtokens", „Qualität" und „Komponenten", 175 „Zustände", 176 der Satz in „Symbole, Zeiger, Texte", 177 „Navigation" und „Hofseite", 178 „Angemeldete Geräte", 179 Konto und Sicherheit
+- docs/ai/BAUSTEINE.md nur über `pnpm bausteine`
+
+## Die Nummern
+
+### 168 Ein Mail-Auftrag hält nie eine Bestellung auf (N26-Ergänzung, Entscheidung 1 aus Morgenbericht 24) – Opus, ein voller Durchgang, von docs/lauf25
+
+Ausgangslage (main 6b55d67, suchen, nicht raten):
+- `stelleMailEin(auftraege, db)` (src/server/mail-warteschlange.ts ~87) prüft den Bezug mit `bezugSchemaFuer(a.art).parse` mitten im `createMany` (~95); ein falscher Bezug wirft. Danach startet sie den Worker über `nachDerAntwort` (~106–112).
+- In DERSELBEN Transaktion wie der fachliche Wechsel stellen sechs Stellen mit Bestellbezug ein:
+  1. Bezahlt: `handlePaymentSucceeded` (src/app/api/stripe/webhook/route.ts ~148–161). Die Bestellung wird erst in der Transaktion über die PaymentIntent-ID gelesen (~155).
+  2. Zahlung zu spät: Vermerk `REFUNDED` (webhook ~290–296). Der catch-Zweig ~297–305 stellt danach nur die Mail ohne Vermerk ein (`mailOhneRisiko`, ~437–444).
+  3. Barbestätigung (src/server/actions/bar-bestaetigung.ts ~141–155). Ohne try: Ein Fehler wirft.
+  4. Abholbereit (src/server/actions/orders.ts ~174).
+  5. Nicht abholbereit (orders.ts ~268).
+  6. Storno `storniere` (orders.ts ~430, Auftrag ~497). Der Bezug hängt an `onlineBezahlt(stand)`; `stand` wird erst unter der Sperre gelesen (~481). Nach dem Commit folgen Stripe (~540–651) und `trageStornoErstattungEin` (~725–732, schreibt nur in einen schon vorhandenen Auftrag mit Stand `offen`/`in_arbeit`).
+- Scheitert das Einstellen, rollt der Wechsel mit zurück:
+  - Webhook: 500, und Stripe wiederholt. Bei einem festen Fehler bleibt eine bezahlte Bestellung auf PENDING_CONFIRMATION (Widerspruch zu CLAUDE.md §2), bzw. der Stand der Erstattung bleibt falsch.
+  - Storno: Er käme nie zustande, also auch keine Erstattung.
+- docs/ai/ARCHITECTURE.md (~346) sagt heute: „scheitert das Einstellen, ist auch der Wechsel nicht gespeichert".
+- Bleiben, wie sie sind (nicht anfassen):
+  - Postfach (postfach.ts ~288), Beitrag (status-posts.ts ~157) und Rundschreiben (rundschreiben.ts ~65): Dort ist „alles oder nichts" gewollt.
+  - „Artikel fehlt" (orders.ts ~837–847, `stelleEinOhneRisiko` nach dem Commit, fail-open; die Geld-Transaktion in src/server/artikel-fehlt.ts mit Stripe unter der Sperre wird nicht angefasst).
+  - „Erstattung offen" (webhook ~354–361, nach der Antwort, fail-open).
+  - Verfallen (verwaiste-bestellungen.ts ~124, nach dem Commit).
+
+1. **Prüfen:** `pruefeMailAuftraege(auftraege)` in src/server/mail-warteschlange.ts.
+   - Reine Funktion, wirft nie.
+   - Gibt die gültigen Aufträge und die Arten mit ungültigem Bezug zurück.
+   - `stelleMailEin` nutzt sie (eine Quelle für die Prüfung) und **wirft bei einem ungültigen Bezug weiter wie heute**: Postfach, Beitrag und Rundschreiben ändern sich nicht (tests/mail-warteschlange.test.ts ~139 bleibt grün).
+   - Steht der Bezug vor der Transaktion fest (Barbestätigung, abholbereit, nicht abholbereit), prüft der Aufrufer davor. Sonst prüft die Hilfe aus Punkt 2 vor dem Einstellen; Lesevorgänge wandern dafür nie vor die Sperre.
+2. **Einstellen in der Transaktion, ohne den Wechsel zu kippen:** `stelleMailEinInTransaktion(auftraege, tx)` in derselben Datei. Rückgabe `'eingestellt' | 'nachholen' | 'ungueltig'`; sie wirft nie.
+   - Ungültige Aufträge fallen weg, gültige werden eingestellt. Gemeldet wird EINMAL je Aufruf, mit festem Satz und den Arten, `bestellungId` in `extra`. `meldeFehler` (~577–585) bekommt dafür die Bestellung.
+   - Ist kein gültiger Auftrag übrig, ist die Rückgabe `'ungueltig'`.
+   - **Weg A (zuerst):** eine verschachtelte Transaktion `tx.$transaction(async (t) => …createMany…)` in try/catch. Prisma 7 legt dafür über den Adapter einen Savepoint an (`@prisma/adapter-pg`: `createSavepoint`/`rollbackToSavepoint`). Ein Datenbankfehler setzt nur diesen Teil zurück → `'nachholen'`.
+   - **Weg A2:** Trägt Weg A nicht (Integrationstest unten), dann roh `SAVEPOINT mail_auftrag` / `ROLLBACK TO SAVEPOINT` / `RELEASE` über `tx.$executeRaw`.
+   - **Weg B:** Trägt auch A2 nicht: STOPP für den Weg, Bericht. Dann gilt Weg B:
+     - prüfen wie Punkt 1
+     - scheitert die Transaktion, den Wechsel in einer zweiten Transaktion ohne Auftrag mit derselben Bedingung wiederholen (bedingtes `updateMany`, ARCHITECTURE §5)
+     - danach nachholen
+     - Vorbild „Zahlung zu spät"
+   - Die Hilfe startet den Worker wie `stelleMailEin`.
+3. **Nachholen:** Bei `'nachholen'` stellt der Aufrufer NACH dem Commit mit **demselben Auftragsobjekt** noch einmal ein: über `stelleEinOhneRisiko` (zieht von orders.ts ~138 als exportierte Hilfe nach mail-warteschlange.ts), fail-open mit Sentry.
+   - Derselbe Schlüssel verhindert einen zweiten Auftrag. Die Schlüssel von abholbereit und nicht abholbereit enthalten den Zeitpunkt; das Objekt wird darum einmal gebaut.
+   - Der Webhook gibt die gelesene Bestellung aus der Transaktion zurück.
+   - **Storno:** Nachgeholt wird direkt nach dem Commit, VOR `erneuereHoflisteNachStorno`, vor Stripe und vor `trageStornoErstattungEin`. Sonst bliebe der Auftrag ohne Betrag stehen, und die Kundin bekäme keine Storno-Mail.
+   - `mailOhneRisiko` im Webhook geht in `stelleEinOhneRisiko` auf. Eine Hilfe, die Sentry-Tags werden vereinheitlicht und im Bericht genannt.
+4. **Anwenden an den sechs Stellen.** Bei „Zahlung zu spät" bleibt der catch-Zweig für einen Fehler des Vermerks selbst. Reihenfolge und Bedingungen der Wechsel bleiben: erst der Status, dann der Auftrag. Kein Betrag wird neu gerechnet.
+5. docs/ai/ARCHITECTURE.md, Abschnitt „Mails" (~346): wann ein Auftrag in die Transaktion gehört und dass er sie nie kippt.
+
+Dateien:
+- src/server/mail-warteschlange.ts (NUR `pruefeMailAuftraege`, `stelleMailEinInTransaktion`, `stelleEinOhneRisiko`, `meldeFehler`, `stelleMailEin` für die gemeinsame Prüfung, der Typ `Db`)
+- src/app/api/stripe/webhook/route.ts (NUR die Stellen 1 und 2 und `mailOhneRisiko`)
+- src/server/actions/bar-bestaetigung.ts (NUR die Bestätigung)
+- src/server/actions/orders.ts (NUR die Stellen 4–6 und das Herausziehen von `stelleEinOhneRisiko`)
+- die Tests unten
+- docs/ai/ARCHITECTURE.md (NUR der Abschnitt „Mails")
+- DEVELOPMENT.md
+
+Tests (mit Gegenprobe; Resend und Sentry als Attrappe):
+- Je Stelle bei ungültigem Bezug (Schema per Attrappe zum Werfen gebracht) gilt der Wechsel:
+  - Webhook: PAID, Antwort 200, Sentry einmal, kein Auftrag. Gegenprobe gültig → PAID und zwei Aufträge, Rückgabe ausdrücklich `'eingestellt'`. „Wirft nie" darf Lücken in Attrappen nicht verdecken.
+  - Dasselbe für „Zahlung zu spät" (REFUNDED), Barbestätigung, abholbereit, nicht abholbereit.
+  - Storno: storniert, Bestand zurück, Erstattung angestoßen, Mail nachgeholt vor Stripe.
+- Diese Tests prüfen heute das Gegenteil und werden nach der Entscheidung umgedreht (keine Lockerung):
+  - Unit: tests/webhook.test.ts ~182–190, tests/bestellstatus-bedingt.test.ts ~96–99, tests/order-revert.test.ts ~151–160, tests/storno-atomar.test.ts ~398–403, tests/bar-bestaetigung-zugang.test.ts ~439–443.
+  - Integration: tests/integration/webhook-zahlung.int.test.ts ~356–373, tests/integration/mail-wege.int.test.ts ~166–175. Der Beitrag (~108–117) bleibt.
+- Die Modul-Attrappen von `@/server/mail-warteschlange` brauchen die neuen Exporte: webhook, bestellstatus-bedingt, order-revert, storno-atomar, bar-bestaetigung-zugang, servicegebuehr-nichtabholung.
+- **Integration (echtes Postgres):**
+  - Eine Trigger-Funktion mit festem Namen lässt jedes INSERT in `MailAuftrag` scheitern. Angelegt im Test, `DROP … IF EXISTS` in `beforeAll` und im `finally`, nie in einer Migration.
+  - Ergebnis: Webhook bezahlt → PAID, kein Auftrag, Sentry. Storno → storniert, Bestand zurück.
+  - Ohne Trigger: die Aufträge da.
+  - Ein zweiter Webhook desselben Ereignisses legt nichts doppelt an.
+  - Belegt, welcher Weg (A, A2, B) trägt.
+- **Quelltext-Wache:** In webhook/route.ts, bar-bestaetigung.ts und orders.ts kein `stelleMailEin(…, tx)` mehr, nur `stelleMailEinInTransaktion`. Gegenprobe mit dem alten Stand rot. tests/schwere-module.test.ts (~190–197, kein `import(` in `$transaction(`) bleibt grün.
+
+`pnpm test:integration` ganz.
+
+Fertig, wenn: grün. Der Bericht enthält:
+- eine Tabelle aller Aufrufer von `stelleMailEin` (in der Transaktion, nach dem Commit, mit Hilfe)
+- welcher Weg trägt
+- die vereinheitlichten Sentry-Tags
+
+### 169 Warenkorb ehrlich (N28) – Opus, ein voller Durchgang, von docs/lauf25
+
+Ausgangslage:
+- Der Warenkorb liegt im localStorage und läuft nie ab (src/lib/warenkorb-speicher.ts, Hook src/lib/use-cart.ts).
+- Die Hofseite (src/components/farm/product-grid.tsx, `useCart` ~585) zeigt ihn ungeprüft:
+  - am Handy das Korb-Blatt (src/components/farm/cart-sheet.tsx)
+  - ab 1024 px den Mini-Warenkorb (src/components/hofseite/hofseite-seitenspalte.tsx ~203; die Korb-Leiste ist dort versteckt, product-grid.tsx ~877)
+  - beide und die Zahl in der Kopfzeile mit gespeicherten Preisen, Mengen und Produkten, auch wenn es sie nicht mehr gibt
+- Abgeglichen wird nur in der Kasse:
+  - Bestand und Halte über `pruefeKorb` → /api/warenkorb/pruefen (checkout-form.tsx ~234–262)
+  - Preise erst beim POST /api/checkout (`uebernehmePreise`, ~126)
+- `ProductGrid` bekommt nur verfügbare Produkte (src/components/hofseite/hofseite-kunde.tsx ~158, Filter `isAvailable`), mit Preis und Bestand als Zahl (`PublicProduct`, src/server/queries/farm.ts ~40–53), den Bestand ohne fremde Halte. Die Kaufsperre kennt sie als `sperre`.
+- Ohne verfügbare Produkte und ohne Abholzeit wird `ProductGrid` gar nicht gerendert (hofseite-kunde.tsx ~263).
+- Die Produktseite (src/components/produktdetail/produktdetail-kunde.tsx ~114, ~437) nutzt denselben `useCart` und rendert dasselbe Korb-Blatt.
+- `removeItem` und `updateQuantity(…, 0)` (use-cart.ts ~144–168) nehmen das Produkt nur im Browser heraus; der Halt bleibt bis zu 15 Minuten („Reservation expires naturally after 15 min"). /api/reserve kennt nur POST.
+- Zwei Konstanten für 15 Minuten: `RESERVATION_TTL_MS` (src/app/api/reserve/route.ts ~18) und `RESERVIERUNG_TTL_MS` mit `neueFrist` (src/lib/reservierung.ts ~25, ~150). cart-sheet.tsx (~166) schreibt „Reservierung gilt 15 Minuten." fest in den Text.
+- Kasse: Fällt durch die Prüfung alles aus dem Korb, zeigt der leere Zustand (checkout-form.tsx ~510) nur „Dein Korb ist leer". `korbHinweis` steht nur im vollen Zweig (~588–594). Fund aus Bericht 165.
+- Kommentare und Doku nennen „beim Laden des Warenkorbs" als Prüfmoment; gebaut ist das nicht:
+  - DEVELOPMENT.md ~1190
+  - src/server/warenkorb.ts ~21, ~222
+  - src/lib/reservierung.ts ~92
+- ARCHITECTURE §4 „State-Regeln", Zeile Warenkorb (~168): Jeder Schreibweg geht über `persist((vorher) => …)`, nie über `items` des Renders.
+
+1. **Abgleich:** reine Funktion `gleicheKorbMitHofseite(positionen, produkte, sperre)` in src/lib/reservierung.ts (vorher BAUSTEINE.md nach Abgleich und Warenkorb durchsuchen).
+   - Produkt fehlt in der Liste (gelöscht, nicht im Shop) → raus.
+   - Menge größer als `stock` → auf `stock`; 0 → raus.
+   - Preis anders → neuer Preis. Verglichen wird über `preisAbweichungen` (src/lib/order-totals.ts ~67, auf den Cent über Decimal), nie selbst gerundet (CODING_STANDARDS §2).
+   - Name, Einheit, Größe und Bild kommen frisch aus dem Produkt.
+   - Bei einer Kaufsperre bleibt alles, wie es ist.
+   - Rückgabe: der neue Korb und EIN Satz, oder null ohne Änderung:
+     - für entfernt und gekürzt `befundMeldung({ positionen, etwasAbgelaufen: false, etwasGeaendert })`, ohne `pruefeWarenkorb` (sonst stünde „Reservierung abgelaufen" da)
+     - dahinter der Preissatz als Konstante in reservierung.ts, z. B. „Ein Preis hat sich geändert – der Korb zeigt den neuen."
+     - Die Kasse behält ihren eigenen Preissatz (api/checkout gehört 170 nur an den Token-Stellen; Nacharbeit).
+2. **Anwenden:**
+   - Einmal nach dem Hydrieren in product-grid.tsx, nur mit `mitKorb` (nie `kaufen`, tests/hofseite-vorschau.test.ts ~232–251 bleibt grün), nie in der Vorschau des Hofs.
+   - Geschrieben wird über `ersetzeKorb(aendern: (vorher: CartItem[]) => CartItem[])` in useCart, über `persist` (ARCHITECTURE §4); ohne Änderung wird nicht geschrieben (tests/use-cart.test.ts ~317 bleibt grün).
+   - Der Satz steht wie `korbHinweis` in der Kasse: `<div role="status">` mit `Hinweiskarte ton="orange"`.
+     - oben im Korb-Blatt (neuer, optionaler Prop; die Produktseite rendert das Blatt ohne ihn)
+     - im Mini-Warenkorb der Hofseite
+     - bis sich der Korb ändert; kein Toast
+   - **Kein** Aufruf von /api/warenkorb/pruefen und kein Halt: Wer nur schaut, blockiert nichts. Die Halte anderer zählen auf der Hofseite wie dort üblich nicht.
+   - Die Produktseite gleicht nicht ab (sie kennt nur ein Produkt); den Halt gibt sie beim Entfernen über `useCart` frei.
+   - Der Satz „Reservierung gilt 15 Minuten." kommt aus `RESERVIERUNG_MINUTEN` (src/lib/kasse.ts ~292).
+3. **Entfernen gibt den Halt frei:**
+   - Neu `DELETE /api/reserve` mit `{ productId, sessionId }` (Zod).
+   - Davor wie bei POST: Speicher-Bremse je IP vor dem Parsen, je Sitzung danach, dann `bremseReservieren`.
+   - Kein `gibVerwaisteFreiFuerProdukte`, keine Prüfkette.
+   - Löscht nur den Halt dieser Sitzung für dieses Produkt (`loescheHalte`).
+   - Antwort immer `200 { ok: true }`, ob es einen Halt gab oder nicht; Datenbankfehler 500 wie bei POST (CODING_STANDARDS §4).
+   - **Ort:** DELETE steht in route.ts VOR POST. tests/bremse-verdrahtung.test.ts (~112: schneidet ab `export async function POST` bis zum Dateiende; Gegenprobe ~131–132) bekommt einen eigenen Abschnitt für DELETE mit Gegenprobe.
+   - `removeItem` und `updateQuantity(…, 0)` rufen es, ohne zu warten; ein Fehler wird verschluckt, der Halt läuft dann wie bisher ab.
+   - Im Bericht: Der gemeinsame Zähler `reserveIp` (S17 Punkt 1, 20 je Minute und Adresse) zählt jetzt drei Wege.
+4. **Eine Konstante:** /api/reserve nutzt `neueFrist`; `RESERVATION_TTL_MS` entfällt.
+5. **Kasse leer mit Grund:**
+   - Der leere Zustand wird eine exportierte Komponente in checkout-form.tsx, z. B. `KasseLeer({ hof, hinweis })`.
+   - Die Hinweiskarte steht wie im vollen Zweig ÜBER dem `EmptyState`, nicht in dessen Satz.
+   - Der Test rendert die Komponente direkt: Der Hinweis entsteht in der Kasse erst nach einem `await` und fehlte im Server-Render.
+6. **Doku:**
+   - die veralteten Stellen aus der Ausgangslage (DEVELOPMENT.md, Kommentare in warenkorb.ts und reservierung.ts)
+   - docs/ai/DESIGN_SYSTEM.md, NUR die Absätze Korb-Blatt/Mini-Warenkorb und „Kasse" (~374–388, leerer Zustand)
+   - docs/ai/ARCHITECTURE.md, NUR der Absatz zu Reservierung und Halten
+
+Dateien:
+- src/lib/reservierung.ts, src/lib/use-cart.ts
+- src/components/farm/product-grid.tsx, src/components/farm/cart-sheet.tsx
+- src/components/hofseite/hofseite-seitenspalte.tsx (NUR der Satz im Mini-Warenkorb)
+- src/app/api/reserve/route.ts
+- src/components/checkout/checkout-form.tsx (NUR der leere Zustand)
+- src/server/warenkorb.ts (NUR Kommentare)
+- Tests: tests/reservations.test.ts, tests/bremse-verdrahtung.test.ts, tests/use-cart.test.ts, tests/hofseite-vorschau.test.ts (falls nötig), neue Tests, eine neue Integrationsdatei
+- die Doku aus Punkt 6, DEVELOPMENT.md
+
+Tests (mit Gegenprobe):
+- `gleicheKorbMitHofseite`: Produkt weg, Bestand kleiner, Bestand 0, Preis anders (auch krumme Cent), nichts anders, Kaufsperre lässt alles stehen, Satz ohne „Reservierung abgelaufen"
+- useCart im Prüfstand: `removeItem` und `updateQuantity(…, 0)` rufen `DELETE /api/reserve` mit Produkt und Sitzung; `ersetzeKorb` schreibt Speicher und Zustand, ohne Änderung nichts. Die Fetch-Attrappe unterscheidet nach `init.method`; `reservierungen()` zählt nur POST.
+- Route, Unit: `DELETE` ruft `loescheHalte([productId], sessionId)`, 200 auch ohne Halt, 400 bei kaputtem Körper, Verdrahtung der Bremse
+- Route, Integration (neue Datei): Der Halt einer fremden Sitzung bleibt.
+- `KasseLeer` mit und ohne Hinweis per `renderToStaticMarkup`
+- Quelltext-Wache: product-grid.tsx, cart-sheet.tsx, use-cart.ts und reservierung.ts rufen /api/warenkorb/pruefen nicht auf
+
+`pnpm test:integration` ganz.
+
+Fertig, wenn: grün; Bilder nach §0. Der Bericht nennt den Randfall „Hofseite ohne `ProductGrid`".
+
+Vorschau (prüft der Mensch):
+- Produkt in den Korb, im Hofbereich den Preis ändern, Hofseite neu laden → Satz im Korb-Blatt bzw. Mini-Warenkorb, neuer Preis.
+- Produkt aus dem Korb nehmen → im zweiten Browser sofort die volle Menge reservierbar.
+
+### 170 Nacharbeit Mails aus Lauf 24 (Morgenbericht 24, „Sollte"; N27-Ergänzung) – Opus, gezielt, vom Zwischenstand nach 168
+
+Jeder Punkt ist klein und für sich. Ist einer größer als beschrieben: STOPP für den Punkt, Bericht, die anderen laufen weiter.
+
+1. **Aufräumen löscht das Abbruch-Kennzeichen:**
+   - Problem: `raeumeAltesAuf` (src/server/aufraeumen.ts ~64–67) setzt Aufträge `in_arbeit` mit abgelaufener Belegung auf `offen` und `belegtBis = null`. Der Worker holt solche Aufträge selbst (`"status" = 'in_arbeit' AND "belegtBis" < jetzt`, mail-warteschlange.ts ~435) und schickt einen abgebrochenen Lauf mit seinem alten Idempotenz-Schlüssel (~432, ~455–462). Nach dem Zurücksetzen ist `vorherBelegtBis` null, und der Schlüssel greift nicht mehr.
+   - Fix: Der Schritt entfällt, mit dem Feld `mailAuftraegeFrei` (~43, ~76) und dem Kommentar (~21–24).
+   - tests/integration/aufraeumen.int.test.ts (~119–146) wird umgedreht: Die abgelaufene Belegung bleibt `in_arbeit` mit altem `belegtBis`, und der nächste Lauf schickt sie als eigene Anfrage.
+2. **Zählen in einem Schritt:**
+   - `zaehleMail` (src/server/betrieb-zaehler.ts ~24) und `zaehleVersand` (src/lib/email.ts ~139–152) bekommen `menge` (Standard 1).
+   - Der Stapelversand zählt einmal mit der Zahl der angenommenen Mails statt in einer Schleife (email.ts ~284). Der Kommentar in betrieb-zaehler.ts zieht mit.
+   - docs/ai/ARCHITECTURE.md, Abschnitt Betrieb (~328: „`sendRaw` genau ein Empfänger", „+ 1"): Den Satz zieht 170 nach. Im selben Absatz ergänzt 170 auch den Abrechnungszeitraum der Mails (ab dem 17., 0 Uhr UTC; Bild-Vorgänge im Kalendermonat), damit nur eine Nummer den Absatz anfasst.
+3. **Ungenutztes:**
+   - `ladeAntwortFuerTeam` und `ladeMailEmpfaenger` (src/server/queries/postfach.ts ~345, ~354) haben keinen Aufrufer → entfernen.
+   - Mit ihnen die veralteten Attrappen in tests/postfach-drossel-frist.test.ts (~23) und tests/postfach-erstattung-drossel.test.ts (~25) und den Kommentar in src/server/mail-arten/hof.ts (~13).
+4. **„n per E-Mail" nach 90 Tagen:**
+   - Problem: Ohne Zeilen gibt `gesendeteBeitragsMails` (src/server/mail-arten/beitrag.ts ~34–46) `emailRecipientCount` zurück, die Zahl der eingestellten Aufträge (status-posts.ts ~153). Nach dem Aufräumen springt die Anzeige von „gesendet" auf „eingestellt".
+   - Fix: Das Aufräumen setzt VOR dem Löschen (aufraeumen.ts ~63) für jeden Beitrag, dessen Aufträge es löscht, `emailRecipientCount` auf die gesendete Zahl. Gezählt wird über eine Hilfe in mail-arten/beitrag.ts; keine Rohabfrage in aufraeumen.ts (Wache tests/aufraeumen.test.ts ~48–59).
+   - Nie im Worker: `emailRecipientCount > 0` ist die 7-Tage-Sperre (`mailSperreWo`, beitrag-mailabstand.ts ~42–48), und nach 90 Tagen ist sie längst vorbei.
+5. **Resend-Webhook:** `leseBegrenzt` steht zweimal (src/app/api/csp-bericht/route.ts ~46, src/app/api/webhooks/resend/route.ts ~98) → eine Hilfe, Ort im Bericht. Abmelden bei Bounce oder Spam-Meldung bleibt wie in N26.
+6. **Cron und Warnkarte (161):**
+   - In /api/cron/mails laufen `pruefeAblaeufe` und `pruefeMailWarnungen` je in eigenem try. Ein Fehler hält den anderen nicht auf; beide gehen mit festem Satz an Sentry.
+   - „Jetzt schicken" in der Warnkarte steht nicht bei einem Auftrag `in_arbeit`.
+7. **Bar-Token aus einer Quelle (167):**
+   - Die Kasse und `sendeBarLinkErneut` erzeugen den Token über `neuerBarToken()` (src/lib/bar-bestaetigung.ts ~89).
+   - Kasse: src/app/api/checkout/route.ts ~10 (`nanoid`-Import, einzige Verwendung), ~42, ~814, ~817 (`hash`), NUR diese Stellen.
+   - `sendeBarLinkErneut`: src/server/actions/bar-bestaetigung.ts ~6, ~244, ~252.
+   - Wache über den Syntaxbaum (nur Aufrufe, Kommentare zählen nicht): kein `nanoid(32)` bzw. `nanoid(BAR_TOKEN_LAENGE)` außerhalb von src/lib/bar-bestaetigung.ts. `nanoid()` in src/lib/use-cart.ts und in Tests ist erlaubt.
+8. **„Alle nochmal schicken" (167)** lädt die Daten gebündelt: höchstens eine Abfrage je Art und Bezugstabelle statt bis zu 300 (src/server/actions/betrieb.ts ~281–301, src/server/queries/mails.ts ~507–515). `AlleMailsFilter` kommt aus `z.infer` des Schemas (src/schemas/betrieb-mails.ts ~71).
+9. **Nochmal-Stände (N27-Ergänzung):**
+   - `NOCHMAL_STAENDE` (src/lib/betrieb-mails.ts ~1088) wird `gesendet`, `gescheitert`, `ohne_schluessel`; `gesperrt` und `verworfen` fallen weg.
+   - Genutzt in `mailDetail` (~1549) und `pruefeNochmal` (src/server/actions/betrieb.ts ~177, einzeln und für alle). Kommentar (~1084) und Texte ziehen mit.
+   - Je Stand ein eigener Grund statt `standPasstNicht` (~1178, sagt heute „noch unterwegs"): gesperrt → „nur Test-Adressen erlaubt", verworfen → „abgemeldet oder ohne Einwilligung", aus einer Quelle.
+   - tests/mails-nochmal-aktion.test.ts zieht mit, Gegenprobe je Stand.
+
+Dateien:
+- src/server/aufraeumen.ts, src/server/betrieb-zaehler.ts, src/lib/email.ts (NUR Zählen)
+- src/server/queries/postfach.ts, src/server/mail-arten/beitrag.ts, src/server/mail-arten/hof.ts (NUR der Kommentar)
+- src/app/api/csp-bericht/route.ts, src/app/api/webhooks/resend/route.ts, Ort der neuen Hilfe
+- src/app/api/cron/mails/route.ts
+- src/app/admin/betrieb/mails-ansicht.tsx bzw. die Teile der Warnkarte
+- src/app/api/checkout/route.ts und src/server/actions/bar-bestaetigung.ts (NUR die Stellen aus Punkt 7)
+- src/server/actions/betrieb.ts, src/server/queries/mails.ts, src/schemas/betrieb-mails.ts, src/lib/betrieb-mails.ts
+- die Tests
+- docs/ai/ARCHITECTURE.md (NUR Abschnitt Betrieb und, falls ein Satz nicht mehr stimmt, Abschnitt „Mails")
+- DEVELOPMENT.md
+- **Nicht:** tests/betrieb.test.ts (gehört 171)
+
+Tests: je Punkt mit Gegenprobe; Punkt 3 hat keinen.
+
+Fertig, wenn: grün. Für die Projektleitung: Warnkarte und „Alle Mails" in der Vorschau ansehen (Admin-Bilder).
+
+### 171 Nacharbeit Betrieb, Links und Kleines aus Lauf 24 (Morgenbericht 24, „Sollte"; S17) – Opus, gezielt, von docs/lauf25
+
+Jeder Punkt ist klein und für sich. Ist einer größer als beschrieben: STOPP für den Punkt, Bericht, die anderen laufen weiter.
+
+1. **Abrechnungszeitraum im Text (162):**
+   - `grenzStandText` (src/lib/betrieb.ts ~1899) sagt bei `mailsMonat` noch „in diesem Monat" → „im Abrechnungszeitraum (ab dem 17.)". NUR in betrieb.ts.
+   - `tarifZeilen` (~1072, „im Monat (ab dem 17.)", festgehalten in tests/betrieb-plausibel.test.ts ~131–132) bleibt.
+   - src/lib/betrieb-mails.ts gehört 170 und bleibt.
+   - Tests in tests/betrieb-plausibel.test.ts:
+     - für die Monats-Mail über `betriebMail(…).fuss` (`FUSS_MAILS_MONAT`, ~1776, nicht exportiert)
+     - für den Satz zur Ablaufregel (~977, „zwei Stunden Spielraum …")
+   - ARCHITECTURE Abschnitt Betrieb ändert 170.
+2. **Land vor dem Einrichten (164):** In src/app/(hof)/settings/payments/page.tsx (~139) wird `{!farm.stripeAccountId && …}` zu `{(!farm.stripeAccountId || neuEinrichten) && …}`: Auch bei „Online-Zahlung neu einrichten" legt Stripe ein neues Konto an.
+   - payments-actions.tsx bleibt.
+   - Test in tests/stripe-land-satz.test.ts mit `stripe: 'neu'`; die Gegenprobe dort (~64–68) bleibt grün.
+3. **Double-Opt-in-Link mit eigenem Geheimnis (166, S17):**
+   - Ausgangslage: src/lib/abo-bestaetigung-token.ts (~27) signiert mit `env.BETTER_AUTH_SECRET`.
+     - Payload `abo-optin:<aboId>:<ms>` (~40), Token `<base64url>.<hex>`, getrennt am letzten Punkt (~53).
+     - Prüfung in src/server/abo-anmeldung.ts (~182, ~203), Parsen auf src/app/(public)/neuigkeiten-bestaetigen/page.tsx (~40) und in src/server/actions/subscriptions.ts (~98).
+   - Neu: über `signiereLink`/`pruefeLink` (src/lib/link-signatur.ts) mit neuem Zweck `abo-optin`, `ALTES_PRAEFIX` wahr.
+     - Der Base64-Teil bleibt `abo-optin:<aboId>:<ms>`.
+     - Signiert wird `signiereLink('abo-optin', '<aboId>:<ms>')`, geprüft der Inhalt nach dem Präfix. Die alte Signatur bleibt damit bitgleich (`alteSignatur` ~41–43 = HMAC über genau den heutigen Payload; Test mit festem Altwert).
+     - Getrennt wird am ERSTEN Punkt. base64url enthält keinen (Alphabet A–Z, a–z, 0–9, `-`, `_`, ohne Auffüllung; wie reorder-token.ts ~6–7). Der Rest ist die Signatur, mit oder ohne Kennung `2.`.
+   - Unverändert bleiben:
+     - die Signaturen von `erzeugeAboBestaetigungsToken` und `pruefeAboBestaetigungsToken`
+     - die Aufrufer (abo-anmeldung.ts, src/server/mail-arten/kundin.ts ~51)
+     - Zweck, Ablauf, die Bindung an `emailOptInAngefragtAm`
+     - `aboTokenSchema` (src/schemas/abo.ts ~24, prüft nur die Länge)
+   - **Vertauschter Zweck:**
+     - Nachbestell- und Abmelde-Token gelten nicht als Abo-Token, in beiden Formaten.
+     - Mit Kennung `2.` gilt das auch umgekehrt.
+     - Ohne Kennung bleibt die Gegenrichtung, wie sie ist. Ein alter Abo-Token besteht die Prüfung des Nachbestell-Tokens, weil `nachbestellen` ohne Präfix signiert. Harmlos, weil die Hofseite `farmId` prüft (src/app/(public)/[farmSlug]/page.tsx ~127). Kommt mit Ursache, Auswirkung und Fix in den Bericht.
+     - **`ALTES_PRAEFIX` für `nachbestellen` und `abmelden` NICHT ändern:** Das machte verschickte Links ungültig.
+   - Testlücke aus 166: Nachbestell-Token ohne `LINK_SECRET`.
+   - tests/abo-bestaetigung.test.ts (~175–177 erwartet den Import von `env` in der Token-Datei): Die Gegenprobe prüft danach den Import aus `@/lib/link-signatur`.
+   - Doku:
+     - docs/ai/ARCHITECTURE.md ~283 („keiner dieser drei Links" → vier) und ~287 (Geheimnis nur in abo-bestaetigung-token.ts)
+     - der Kopf von link-signatur.ts (~7)
+     - Den Kommentar in src/server/startseite-vorschau.ts fasst 171 NICHT an; die Datei gehört 182.
+4. **.env.example:**
+   - `LINK_SECRET` neben `BETTER_AUTH_SECRET` (~10): optional, mindestens 32 Zeichen, nie gleich `BETTER_AUTH_SECRET`, eigener Wert je Umgebung.
+   - `RESEND_WEBHOOK_SECRET` in den Block „E-Mail (Resend)" (~29–38): optional, nur Production.
+   - Stil `VAR=""  # …` wie `VERCEL_AUSGABEN_SECRET` (~85–87), Texte nach src/lib/env.ts (~61–74).
+   - Kein echter Wert.
+
+Dateien:
+- src/lib/betrieb.ts (NUR der Text)
+- src/app/(hof)/settings/payments/page.tsx (NUR die Bedingung)
+- src/lib/abo-bestaetigung-token.ts, src/lib/link-signatur.ts (NUR der neue Zweck und der Kopf)
+- .env.example
+- die Tests: tests/betrieb-plausibel.test.ts, tests/stripe-land-satz.test.ts, tests/abo-bestaetigung.test.ts, Tests zu Link-Signatur und Nachbestell-Token
+- docs/ai/ARCHITECTURE.md (NUR die Stellen aus Punkt 3), DEVELOPMENT.md
+- **Nicht:** src/lib/betrieb-mails.ts, src/server/mail-arten/*, Tests `betrieb-mails-*` (gehören 170)
+
+Tests (mit Gegenprobe):
+- alter Double-Opt-in-Link (fester Altwert) gilt mit und ohne `LINK_SECRET`
+- neuer mit Kennung nur mit `LINK_SECRET`
+- vertauschter Zweck wie oben
+- abgelaufen bleibt „abgelaufen"
+- die Texte aus 1 und 2
+
+`pnpm test:integration`: tests/integration/double-opt-in.int.test.ts muss laufen.
+
+Fertig, wenn: grün.
+
+### 172 Plattform und Schrift – Sonnet, gezielt, von docs/lauf25
+
+Ausgangslage:
+- src/app/layout.tsx:
+  - `generateViewport` (~77–90) ohne `viewportFit`, obwohl über 20 Stellen `env(safe-area-inset-*)` nutzen
+  - `Instrument_Sans` mit `preload: false` (~38–42), Kommentar veraltet; Geist wird vorgeladen (~15–19)
+  - keine `appleWebApp`-Metadaten
+- src/app/manifest.ts (~31–53):
+  - `start_url: '/dashboard'`
+  - `background_color` hell
+  - ohne `id`, `scope`, `lang`, `shortcuts`
+- Kommentar „noch keine Route nutzt die HofShell": hof-shell.tsx ~82–85 (den in bauern-navigation.ts ~325–329 nimmt 181 mit dem alten Teil heraus)
+- src/app/layout.tsx ~124: `<Analytics />` ohne `beforeSend`. Bar-Token im Pfad und `?token=`, `?sig=`, `?t=` werden nicht gefiltert. `NIE_MELDEN_PFADE`/`NIE_MELDEN_PARAMETER` gibt es in src/lib/csp.ts.
+- Kommentar zur Bestätigungsseite: next.config.ts ~168–170 (seit Nr. 153 ohne Personendaten)
+
+1. `viewportFit: 'cover'` in `generateViewport`, Werte sonst gleich. Im Bericht für die Projektleitung als Prüfschritt: iPhone, installiert und in Safari – Unterleiste über dem Home-Indikator, Blätter, Kasse.
+2. Schriften: `Instrument_Sans` mit `preload: true`, Geist mit `preload: false`. Kommentare wahr machen. Fraunces kursiv nur behalten, wenn es Fundstellen gibt (zählen und nennen).
+3. Manifest:
+   - `id: '/'`, `scope: '/'`, `lang: 'de-AT'`, `start_url: '/app'` (N31)
+   - `background_color` = sRGB von `--fz-bg` dunkel; der Grund steht im Kommentar wie bei theme-color
+   - `shortcuts`: „Heute" → /dashboard, „Neuer Beitrag" → /status/new, „Bestellungen" → /orders, jeweils mit icon-192
+4. Neue Route src/app/app/route.ts (GET):
+   - liest die Sitzung, leitet mit 307 nach N31 weiter
+   - kein Cache, `robots` noindex
+   - Wache: tests/app-start.test.ts mit allen drei Fällen und Gegenprobe
+5. `appleWebApp: { capable: true, title: MARKE, statusBarStyle: 'black-translucent' }` in den Metadaten.
+6. Die Kommentare aus der Ausgangslage berichtigen.
+7. **Analytics (Sicherheit):**
+   - `beforeSend` als reine Funktion in src/lib/ entfernt Ereignisse auf Pfaden aus `NIE_MELDEN_PFADE` und streicht Parameter aus `NIE_MELDEN_PARAMETER`; eine Quelle in csp.ts (dort nur exportieren)
+   - Test der reinen Funktion mit Gegenprobe
+   - Im Bericht: was Vercel Analytics laut Doku an Adressen speichert (nur lesen, Quelle nennen)
+
+Dateien:
+- src/app/layout.tsx (NUR Viewport, Schriften, Metadaten, `<Analytics beforeSend>`), src/lib/csp.ts (NUR Export), die neue Filterfunktion in src/lib/
+- src/app/manifest.ts, src/app/app/route.ts
+- src/components/shells/hof-shell.tsx (NUR Kommentar ~82–85)
+- next.config.ts (NUR Kommentar)
+- tests/theme-schalter.test.ts bzw. die Manifest-Tests, neue Tests, DEVELOPMENT.md
+
+Fertig, wenn: grün; im Vorschau-HTML enthält das Viewport-Meta `viewport-fit=cover`, und `/manifest.webmanifest` zeigt die neuen Felder.
+
+### 173 Grundbausteine 44 px und Kontrast (Qualität, WCAG 2.5.8 / 1.4.3 / 1.4.11) – Opus, voller Durchgang, von docs/lauf25
+
+Ausgangslage:
+
+| Datei | heute |
+|---|---|
+| src/components/ui/button.tsx ~26–36 | Größen xs 24, sm 28, default 32, lg 36, icon 24–36 px |
+| src/components/ui/input.tsx ~12 | `h-9`; Platzhalter `muted-foreground/60` = 2,45:1 hell, 3,37:1 dunkel |
+| src/components/ui/select.tsx ~44 | `SelectTrigger` `h-8` |
+| src/components/ui/dialog.tsx ~69–73, src/components/ui/sheet.tsx ~69–73 | Schließen-Kreuz `icon-sm` 28 px |
+| src/components/ui/password-input.tsx ~19–27 | Auge 16 × 16 px, `tabIndex={-1}`; Kopien in register-form.tsx und neues-passwort-formular.tsx ~28–33 |
+| src/components/ui/switch.tsx ~13 | Aus-Zustand `muted-foreground/30` = 1,51:1 hell, 1,77:1 dunkel |
+
+- Feldrand `--fz-border` auf `--fz-surface` = 1,29:1 hell, 1,28:1 dunkel.
+- Fokus-Halo `ring/50` bzw. `/30` = 2,14:1 hell.
+- Nacharbeit aus 143: Filter-Chips auf /products mit 36 px ohne 44-px-Fläche. Die Fundstelle suchen, nicht raten.
+
+1. **Größen:**
+   - `button.tsx`: Standard `h-11`, `lg` `h-12`, `icon` `size-11`. `xs` und `sm` bleiben nur für Stellen mit 44-px-Fläche über `before:` (wie Chip) und bekommen dafür eine Klasse.
+   - Neue Wache tests/grundbausteine-groesse.test.ts:
+     - rendert jede Größe
+     - prüft ≥ 44 px Höhe oder eine Trefferfläche über `before:`
+     - Gegenprobe mit dem alten Wert
+   - Jede Stelle, die `size="xs"` oder `size="sm"` OHNE Fläche nutzt, steht in einer Bestandsliste, die nur schrumpft. Im Bericht die Zahl.
+2. `input.tsx` und `select.tsx` mit `h-11`. `DezimalFeld` (src/components/shared/dezimal-feld.tsx ~51) folgt dem Input.
+3. **Kreuz in Dialog und Blatt:** 44-px-Knopf, der sichtbare Kreis von 28 px als Span (Muster DESIGN_SYSTEM „Qualität", zweiter Punkt), `aria-label` „Schließen" bleibt.
+4. **`PasswordInput`:**
+   - Knopf 44 px, per Tastatur erreichbar, `aria-pressed`, `aria-label` „Passwort anzeigen"/„Passwort verbergen"
+   - danach register-form.tsx und neues-passwort-formular.tsx auf `PasswordInput` umstellen. Eine Umsetzung statt drei.
+5. **Kontrast:**
+   - Platzhalter mit vollem `text-muted-foreground` (5,05:1 hell).
+   - Neues Token für Feldränder und den Aus-Zustand des Schalters, ≥ 3:1 auf `--fz-surface` UND `--fz-bg` in beiden Modi:
+     - Vorschlag `--fz-feldrand`, abgeleitet aus `--fz-text-muted`, Werte ausrechnen
+     - gilt nur für Feldränder (`--input`) und den Schalter; Kartenränder bleiben `--fz-border`
+     - Tabelle in DESIGN_SYSTEM „Farbtokens", Abgleich in tests/design-tokens.test.ts
+   - Fokus-Halo: Button und Input ohne Transparenz (`ring-ring`, 2 px), oder der Ring hat ≥ 3:1 – rechnen und nennen.
+6. **Wache gegen Transparenz** an `placeholder:` und an Feldrändern unter src/components/ui, mit Gegenprobe.
+7. Filter-Chips /products: auf `FilterChip` bzw. die 44-px-Fläche umstellen.
+
+Dateien:
+- src/components/ui/button.tsx, input.tsx, select.tsx, dialog.tsx, sheet.tsx, password-input.tsx, switch.tsx
+- src/components/shared/dezimal-feld.tsx
+- src/app/(auth)/register/register-form.tsx und src/app/(auth)/reset-password/neues-passwort-formular.tsx (NUR das Passwort-Auge)
+- die Fundstelle der Filter-Chips /products
+- src/app/globals.css (NUR das neue Token und die Zuordnung von `--input`)
+- tests/design-tokens.test.ts, neue Wachen
+- docs/ai/DESIGN_SYSTEM.md („Farbtokens", „Komponenten", „Qualität"), DEVELOPMENT.md
+
+Risiko, im Bericht: Größere Knöpfe verschieben Layouts. Der sichter prüft dafür
+- /dashboard, /products, Produktformular, /orders/[id], /settings/*
+- Kasse, Hofseite, /hoefe
+
+jeweils 390 und 1440, und nennt jede Stelle, die umbricht.
+
+Fertig, wenn: grün; Bilder nach §0; keine Stelle bricht um.
+
+### 174 Hof-Formulare: speicherbar, Feldfehler, Tastatur (Formulare 3½ → 5, Funktionalität) – Sonnet, gezielt, vom Zwischenstand nach 173 und 175
+
+Ausgangslage:
+- src/schemas/hofprofil.ts `profilSchemaFuer`:
+  - `description` mit `min(10)` (~33), `email` Pflicht (~45)
+  - beim Anlegen sind beide freiwillig (src/components/einrichten/hof-anlegen-formular.tsx ~135, ~160)
+  - Folge: Ein Hof ohne Beschreibung kann das Profil nicht speichern (Widerspruch zu CODING_STANDARDS „Bestand bleibt speicherbar")
+- Fehlermeldungen in hofprofil.ts: „Pflichtfeld", „Ungültige E-Mail-Adresse", „Telefonnummer ist zu kurz" ohne Grund. Das gute Muster ist `hofAnlegenFormularSchema` (~125–134).
+- src/components/settings/profile-form.tsx:
+  - Telefon, E-Mail und PLZ ohne `type`/`inputMode`/`autoComplete` (~322, ~373–374)
+  - Fehler nicht verknüpft (~237–244)
+  - `select` mit 14 px (~282, ~391); Fehler beim Speichern als `toast.error` (~186)
+  - Mein Hof zeichnet dieselben Felder richtig (src/components/mein-hof/abschnitt-formulare.tsx ~232–272)
+- src/components/settings/pickup-slots-client.tsx:
+  - kein `<form>`, `type="number"` ohne `inputMode` (~296–303)
+  - `select` mit 14 px (~257); Fehler nur als Toast (~105, ~134)
+- futter-formular.tsx und brennmaterial-formular.tsx (src/components/produkte/): kein `aria-describedby`, `aria-invalid` nur am Namen (~279)
+- src/app/(hof)/status/new/status-new-client.tsx: Felder mit 14 px (~262, ~291), Fehler unverknüpft (~262–280)
+- Weitere Felder unter 16 px: src/components/mein-hof/bild-bausteine.tsx ~646, src/app/(hof)/postfach/[id]/antwort-formular.tsx ~47
+- Pflichtfelder mit „*" ohne Erklärung (product-dialog.tsx)
+
+1. **Profil-Schema** wie beim Anlegen:
+   - Beschreibung freiwillig (leer oder bis zur Grenze)
+   - Hof-E-Mail freiwillig; leer heißt Anmelde-Adresse. Wo die Hof-E-Mail gelesen wird, alle Leser auflisten und prüfen.
+   - Test mit Bestandsdaten (leere Beschreibung, leere Hof-E-Mail) → speicherbar, mit Gegenprobe
+2. **Meldungen** von `profilSchemaFuer` nach dem Muster `hofAnlegenFormularSchema`: Was fehlt, wozu der Hof es braucht. Texte als Konstanten in src/lib/.
+3. **Feldfehler am Feld** mit `aria-invalid`, `aria-describedby` und `role="alert"` am Satz:
+   - Profil, Abholzeiten, Futter, Brennmaterial, Beitrag
+   - Speicherfehler, die kein Feld betreffen: Hinweiskarte am Formular statt Toast
+   - Der Toast für den Erfolg bleibt.
+4. **Abholzeiten** als `<form>`: Enter speichert, `inputMode="numeric"`. Speichern, Löschen und Umschalten laufen über `speichernOhneWurf` mit dem Netzsatz aus 175 (N29); die Datei gehört allein 174.
+5. **Feldtypen im Profil:** `type`, `inputMode`, `autoComplete` wie in abschnitt-formulare.tsx (eine Quelle für die Attribute, z. B. `FELD_ATTRIBUTE` in src/lib/).
+6. **16 px** an allen Feldern aus der Ausgangslage.
+   - Wache: kein `text-sm`/`text-[1[0-5]px]` an `input`, `textarea`, `select` unter src/components und src/app
+   - Ausnahmen mit Grund, Gegenprobe
+7. **`enterKeyHint`:** „next" in mehrteiligen Formularen, „done"/„send" am letzten Feld (Profil, Abholzeiten, Beitrag, Produkt).
+8. **Pflicht und freiwillig:** „(freiwillig)" an freiwilligen Feldern statt „*" an Pflichtfeldern, wie in der Kasse (Produktformular, Futter, Brennmaterial).
+
+Dateien:
+- src/schemas/hofprofil.ts
+- src/components/settings/profile-form.tsx, src/components/settings/pickup-slots-client.tsx
+- src/components/produkte/futter-formular.tsx, src/components/produkte/brennmaterial-formular.tsx
+- src/components/products/product-dialog.tsx (NUR Kennzeichnung, enterKeyHint, Fehlerverknüpfung)
+- src/app/(hof)/status/new/status-new-client.tsx, src/components/mein-hof/bild-bausteine.tsx (NUR Schriftgröße), src/app/(hof)/postfach/[id]/antwort-formular.tsx (NUR Schriftgröße)
+- die neue Konstante in src/lib/, Tests, DEVELOPMENT.md
+
+Fertig, wenn: grün; Bilder nach §0.
+
+### 175 Kein Netz als Zustand (N29) – Opus, voller Durchgang, vom Zwischenstand nach 169 (Warenkorb ehrlich ändert use-cart.ts und cart-sheet.tsx)
+
+Ausgangslage:
+- src/lib/use-cart.ts `addItem` (~121–130): `fetch('/api/reserve')` ohne try/finally. Ohne Netz kommt keine Antwort, der Knopf in product-grid.tsx bleibt im Ladezustand (`setAddingId(null)` läuft nie, ~644–656, ~713).
+- Rohe Servertexte („Serverfehler bei der Reservierung", „Ungültige Parameter", src/app/api/reserve/route.ts ~37, ~125) landen im Toast. Gefiltert wird nur beim Ändern der Menge (`mengeAbgelehntText`, product-grid.tsx ~703).
+- Kein `online`/`offline`-Ereignis im Code.
+- Netzfehler werden schon zentral erkannt (src/lib/upload-diagnose.ts ~116–118).
+- `speichernOhneWurf` (src/components/mein-hof/abschnitt-speichern.ts ~94–108) nutzen nur 4 Dateien.
+- Server-Aufrufe ohne catch fallen auf src/app/error.tsx:
+  - Text „Das liegt an uns"
+  - einziger Weg nach /
+  - ohne `data-design`
+  - „Problem melden" mit `text-xs` (src/components/shared/fehler-ansicht.tsx ~39, ~59, ~75–76)
+  - Im Hofbereich gibt es keine eigene error.tsx.
+- Der leere Korb im Blatt (src/components/farm/cart-sheet.tsx ~71–75) ist nur ein Satz, ohne Ausweg.
+
+1. **src/lib/netz.ts:**
+   - `istNetzFehler(e)` (aus upload-diagnose.ts dorthin ziehen, eine Quelle)
+   - `NETZ_SATZ` und `NETZ_KNOPF` (Wortlaut N29)
+   - `mitNetzSchutz(aufruf, { zeitlimitMs })` liefert `{ ok, daten } | { ok: false, art: 'netz' | 'zeit' | 'server', fehler }`; wirft nie, Zeitlimit über `AbortSignal.timeout`
+   - Reine Tests mit Gegenprobe.
+2. **Baustein `NetzHinweis`** (src/components/ui/netz-hinweis.tsx):
+   - hört auf `online`/`offline`, zeigt unter dem Kopf eine Zeile mit `role="status"`
+   - Farben `zustand-tun`, Symbol `WifiOff`
+   - eingebunden in KundeShell, KundeFokusShell und HofShell, nur die Einbindung (nicht der Kopf)
+   - Render-Test für beide Zustände.
+3. **use-cart.ts:** `addItem`, `updateQuantity` und `removeItem` über `mitNetzSchutz`. Bei `netz`/`zeit` die Rückgabe `{ ok: false, error: NETZ_SATZ, nochmal: true }`.
+   - Den Fehlerzweig mit „Nochmal" in product-grid.tsx baut 177 (Dateigrenze); bis dahin zeigt product-grid.tsx den Satz im bestehenden Toast.
+   - Test im Prüfstand: Fetch wirft → Rückgabe `ok: false`, Zustand unverändert; Gegenprobe mit Erfolg.
+4. **Hof-Formulare:** `speichernOhneWurf` nutzt `istNetzFehler` und gibt den Netzsatz am Formular aus.
+   - Alle Server-Actions im Hofbereich, die heute ohne catch aufgerufen werden, auflisten (Bericht).
+   - Umstellen: mindestens Pause, Im-Shop-Schalter, Vorrat-Blatt, Bestellung abholbereit/storniert.
+   - Wache: Aufruf einer Server-Action aus einem Client-Bauteil unter src/components/(settings|produkte|products|mein-hof|hof-bestellungen) nur über `speichernOhneWurf` oder in try. Bestandsliste, die nur schrumpft; Gegenprobe.
+   - pickup-slots-client.tsx gehört 174 (läuft nach 175 und stellt die Abholzeiten auf den Helfer um); 175 fasst die Datei nicht an.
+5. **src/app/(hof)/error.tsx:**
+   - Fehlernummer, „Nochmal versuchen" (reset), „Zu Heute", „Problem melden" (44 px)
+   - die Unterleiste bleibt (Grenze unter dem Layout)
+   - Texte aus src/lib/fehlerseite.ts; Sentry wie error.tsx.
+   - src/components/shared/fehler-ansicht.tsx: `data-design="neu"`, „Problem melden" 44 px, Ziel als Prop.
+   - Render-Test beider Ziele.
+6. **Leerer Korb im Blatt** als `EmptyState` mit Ausweg „Höfe entdecken" bzw. zurück zur Hofseite; Text aus einer Konstante (Leerzustands-Wache).
+7. **Regel:** docs/ai/DESIGN_SYSTEM.md „Zustände" um „Kein Netz" (Wortlaut N29, Baustein, Helfer, Wache).
+
+Dateien:
+- src/lib/netz.ts, src/lib/upload-diagnose.ts (NUR Umzug von `istNetzFehler`)
+- src/components/ui/netz-hinweis.tsx
+- src/components/shells/kunde-shell.tsx und hof-shell.tsx (NUR die Einbindung von `NetzHinweis`)
+- src/lib/use-cart.ts
+- src/components/mein-hof/abschnitt-speichern.ts, die umgestellten Hof-Bauteile (NUR der Aufruf)
+- src/app/(hof)/error.tsx, src/components/shared/fehler-ansicht.tsx, src/lib/fehlerseite.ts
+- src/components/farm/cart-sheet.tsx (NUR der leere Zustand)
+- Tests, docs/ai/DESIGN_SYSTEM.md „Zustände", DEVELOPMENT.md
+
+`pnpm test:integration` ganz.
+
+Fertig, wenn: grün; Bilder nach §0.
+
+Vorschau (prüft der Mensch): Hofseite am Handy, Flugmodus an, „+" → Satz und „Nochmal", nichts hängt; Flugmodus aus → Zeile verschwindet.
+
+### 176 Kasse und Texte: Vertrauen, Grund, Ausweg (Vertrauen, UX-Writing, Onboarding) – Sonnet, gezielt, vom Zwischenstand nach 169 und 175
+
+Ausgangslage:
+- src/schemas/checkout.ts ~38–43: „Name muss mindestens 2 Zeichen haben", „Ungültige E-Mail-Adresse", „Telefonnummer ist zu kurz"
+- src/components/checkout/checkout-form.tsx:
+  - kein Link zur Datenschutzerklärung (die KundeFokusShell hat keinen Seitenfuß)
+  - `fetch('/api/checkout')` ohne Zeitlimit (~483)
+  - `enterKeyHint` fehlt
+- Kein „inkl. USt" bei der Kundin (nur in den AGB, src/lib/rechtstexte/agb.ts ~331).
+- Pausierter Hof in der Kasse → `notFound()` (src/app/(public)/[farmSlug]/checkout/page.tsx ~61) → „Diesen Hof gibt es hier nicht (mehr)".
+- src/components/cookie-banner.tsx ~101: „Session".
+- Wortliste: „Korb"/„Warenkorb" gemischt (cart-sheet.tsx ~65, ~74 gegen kasse-teile.tsx ~147); „+ Gebühr" statt „Servicegebühr" (product-grid.tsx ~883).
+  - product-grid.tsx gehört 177: Der Text kommt aus einer Konstante, die 176 in src/lib/ anlegt; 177 übernimmt den Import.
+- Fachwörter im Hofbereich: „im Checkout" (product-dialog.tsx ~1933, futter-formular.tsx ~428); „bitte den Betreiber informieren" ohne Weg (bestell-detail.tsx ~108).
+- Startseite „Höfe in deiner Nähe" ohne Standort, sortiert nach Freischaltung (src/components/startseite/hoefe-in-der-naehe.tsx ~35, src/lib/startseite.ts ~193–199).
+- src/components/einrichten/einrichten-seite.tsx ~115: Satz zur Sichtbarkeit `hidden md:block`.
+- src/lib/produkte-hof.ts ~56 `PRODUKTE_LEER` verspricht „sehen es sofort" auch vor der Freischaltung.
+- Code-Login:
+  - Nach „Code schicken" geht der Fokus verloren (src/components/anmelden/kunde-code-formular.tsx ~270–272).
+  - `role="status"` wird erst mit Text eingefügt (~197–201).
+- Startvideo: läuft endlos ohne Pause-Knopf (WCAG 2.2.2) und ohne Prüfung auf Datensparmodus (src/components/startseite/startseite-kopf.tsx ~78–88, 972 KB).
+- Suche der Startseite mit 15,5 px (~130).
+
+1. **Kasse:**
+   - Meldungen in checkout.ts mit Grund (Board SterneKasseVertrauen, Punkt 1)
+   - „Was passiert damit?" → /datenschutz (neuer Tab) bei „Deine Daten"
+   - „Preise inkl. USt" unter der Gesamtsumme, aus einer Konstante in src/lib/kasse.ts
+   - `enterKeyHint`
+   - **Zeitlimit:** `mitNetzSchutz` aus 175 mit 15 s. Bei `zeit`/`netz` der Satz „Dauert länger als sonst – nichts wird doppelt bestellt." und „Nochmal versuchen" mit demselben Idempotenz-Schlüssel. Test: zweiter Versuch schickt denselben Schlüssel, Gegenprobe.
+2. **Pausierter Hof in der Kasse:** `KaufSperreHinweis` mit „Zurück zum Hof" und „Höfe entdecken" statt `notFound()`. Ein wirklich unbekannter Hof bleibt 404. Test beider Fälle.
+3. **Texte:**
+   - Cookie-Hinweis ohne „Session", sachlich richtig: Anmeldung und Sicherheit; der Warenkorb liegt nur auf dem Gerät.
+   - Wortliste: „Warenkorb" überall (oder der Eintrag der Wortliste, falls dort anders, dann diesen); „Servicegebühr" als Konstante für 177.
+   - „im Checkout" → „in der Kasse".
+   - „bitte den Betreiber informieren" → Link „Problem melden".
+   - Startseite: ohne Standort „Höfe aus der Region" statt „… in deiner Nähe". Mit Standort bleibt es.
+4. **Onboarding:**
+   - Satz zur Sichtbarkeit auch unter md
+   - `PRODUKTE_LEER` mit Zweig vor/nach Freischaltung (Board SterneHofStart, Punkt 5)
+5. **Code-Login:** Fokus ins Codefeld nach dem Schrittwechsel; die Status-Region dauerhaft im DOM, leer.
+6. **Startvideo:**
+   - Pause-Knopf 44 px, `aria-pressed`, Wahl im localStorage (try/catch)
+   - kein Autoplay bei `navigator.connection?.saveData` oder `prefers-reduced-motion` (bleibt)
+   - Suche 16 px
+7. **Fehlertext-Regel** in docs/ai/DESIGN_SYSTEM.md, Abschnitt „Symbole, Zeiger, Texte": „Ein Fehlertext sagt, was passiert ist und was die Person tun kann; ‚Pflichtfeld' und ‚Ungültig' allein sind nicht erlaubt." Plus eine Wache über src/schemas (die Wörter allein als Meldung), mit Bestandsliste.
+
+Dateien:
+- src/schemas/checkout.ts, src/components/checkout/checkout-form.tsx, src/lib/kasse.ts
+- src/app/(public)/[farmSlug]/checkout/page.tsx (NUR die Pause)
+- src/components/cookie-banner.tsx
+- die Textstellen aus Punkt 3 (je NUR der Text)
+- src/components/startseite/hoefe-in-der-naehe.tsx bzw. src/lib/startseite.ts (NUR die Überschrift)
+- src/components/einrichten/einrichten-seite.tsx, src/lib/produkte-hof.ts
+- src/components/anmelden/kunde-code-formular.tsx, src/components/startseite/startseite-kopf.tsx
+- Tests, DESIGN_SYSTEM.md (NUR der Satz), DEVELOPMENT.md
+
+Fertig, wenn: grün; Bilder nach §0.
+
+### 177 Hofseite und Navigation: immer wissen, wo man ist (Menüführung Kundin und Hof, N30) – Opus, voller Durchgang, vom Zwischenstand nach 169 und 175
+
+Ausgangslage:
+- src/lib/kunden-navigation.ts ~164–167: Auf /, Hofseite und Produktseite ist in der Unterleiste kein Eintrag aktiv (laut Kommentar Absicht).
+- Hofseite:
+  - „‹ Alle Höfe" (src/components/hofseite/hofseite-kunde.tsx ~250–260) und der Hofname scrollen weg
+  - die Reiter kleben (`top-14`, ~479–507)
+  - die Kategorie-Chips kleben nicht (src/components/hofseite/produkt-abschnitte.tsx ~137; Scroll-Spy ~97–127)
+  - Meldung cmua8bofv000004jr4r6v6o80 (Sprungmarken am Handy, GEPLANT) betrifft genau das
+- product-grid.tsx ~658–661: Jedes „In den Korb" öffnet das Korb-Blatt.
+- Kopf der KundeFokusShell 52 px (kunde-shell.tsx ~315), sonst 56 px.
+- Beschriftung der Unterleiste 10,5 px (src/components/ui/bottom-nav.tsx ~58, ~122).
+- `scroll-padding` nur für die Kasse (globals.css ~536–541); der Fokus kann unter klebende Köpfe und Unterleiste rutschen (WCAG 2.4.11).
+- Hofbereich, Rückweg:
+  - `UnterseitenKopf` nutzt nur feste Links; die Liste steht danach wieder oben
+  - kunden-detail.tsx ~52 reicht `suche` nicht durch, Filter und Suche der Kundenliste gehen verloren
+  - Muster für den Rückweg mit Verlauf: src/lib/kunden-kopf.ts ~76–120 und src/components/shared/rueckweg-merker.tsx
+
+1. **Aktiver Eintrag:**
+   - `KundeShellMitSitzung` bekommt `aktiv?: KundenNavId`
+   - Hofseite und Produktseite setzen `entdecken`
+   - `aria-current="true"` (nicht `page`)
+   - Test mit Gegenprobe; der Kommentar in kunden-navigation.ts zieht mit
+2. **Klebende Hofzeile** (Board SterneHofseiteOrientierung, Punkt 2):
+   - Unter dem Kopf eine 48-px-Zeile: Zurück zu den Höfen (44 px, Name für den Screenreader), Hofname (`truncate` mit `title`), Ort und Zustand aus derselben Quelle wie das Schild der Hofseite, „Teilen"
+   - Darunter die Reiter, darunter die Chips – alles im selben klebenden Block
+   - Am Computer bleibt die Hofseite, wie sie ist (nur unter md).
+   - Die Hofseite gibt es genau einmal (ARCHITECTURE §4): Die Vorschau in Mein Hof zeigt die Zeile ebenfalls, ohne Klick-Ziele, wie heute die übrigen Links. tests/hofseite-vorschau.test.ts bleibt grün.
+3. **Chips kleben**; der Scroll-Spy zeigt die Kategorie. Im PR-Body „Behebt Meldung: cmua8bofv000004jr4r6v6o80" und `pnpm briefkasten geplant` nach CLAUDE.md, falls die Meldung Art FEHLER ist; sonst nur der Satz im Bericht.
+4. **N30 Korb:**
+   - Das erste „In den Korb" einer Sitzung öffnet das Blatt (Merker in sessionStorage, try/catch).
+   - Danach eine Bestätigungszeile über der Korb-Leiste: `role="status"`, „… ist im Korb", „Rückgängig" setzt die Menge zurück über `useCart`, 6 s, beim Tippen auf die Korb-Leiste weg.
+   - Bei einem Fehler (175) der Satz mit „Nochmal".
+   - Die Produktseite bleibt, wie sie ist.
+   - „+ Gebühr" → Konstante aus 176 (falls 176 nicht fertig: Text unverändert, Bericht).
+   - Prüfstand-Test: erstes und zweites „+", Rückgängig, Netzfehler.
+5. **Maße:**
+   - Kopf der KundeFokusShell 56 px
+   - Beschriftung der Unterleiste 12 px. tests/kunde-shell-masse.test.ts koppelt die Höhen; Höhe 68 px bleibt, nur die Schrift wächst. Prüfen, dass „Bestellungen" bei 320 px Breite nicht abschneidet, sonst `truncate` belassen und nennen.
+6. **`scroll-padding`:** `scroll-padding-top` und `-bottom` aus `--kunde-kopf`, Höhe des klebenden Blocks und `--kunde-unterleiste` in KundeShell und HofShell; Muster der Kasse. Test am Quelltext mit Gegenprobe.
+7. **Rückweg im Hofbereich:**
+   - `UnterseitenKopf` nimmt das Verfahren der Kundschaft: `router.back()`, wenn die Elternseite direkt davor stand, sonst Link. Eine Quelle: Die Regel aus kunden-kopf.ts wird allgemein und von beiden genutzt.
+   - kunden-detail.tsx reicht `suche` durch.
+   - Test der Regel als reine Funktion.
+
+Dateien:
+- src/lib/kunden-navigation.ts
+- src/components/shells/kunde-shell.tsx (NUR aktiv, Kopfhöhe Fokus, scroll-padding)
+- src/components/shells/hof-shell.tsx (NUR scroll-padding)
+- src/components/ui/bottom-nav.tsx (NUR Schriftgröße)
+- src/components/hofseite/hofseite-kunde.tsx, src/components/hofseite/produkt-abschnitte.tsx
+- src/components/farm/product-grid.tsx
+- src/components/hofbereich/unterseiten-kopf.tsx, src/lib/kunden-kopf.ts (bzw. die allgemeine Regel), src/components/hof-kunden/kunden-detail.tsx
+- src/app/globals.css (NUR scroll-padding)
+- Tests, docs/ai/DESIGN_SYSTEM.md („Navigation", „Hofseite"), DEVELOPMENT.md
+
+Fertig, wenn: grün; Bilder nach §0.
+
+Vorschau (prüft der Mensch): Hofseite am Handy bis „Honig" scrollen → Hofzeile, Reiter und Chips stehen, „Honig" ist gewählt; zwei Produkte in den Korb → Blatt nur beim ersten.
+
+### 178 Sicherheit am Handy (S18, Sicherheit 4 → 5 ohne CSP) – Opus, voller Durchgang, von docs/lauf25
+
+Ausgangslage:
+- src/lib/auth.ts:
+  - ~893–894: `expiresIn` 7 Tage, `updateAge` 1 Tag, keine Höchstdauer
+  - ~603–611: „Passwort vergessen" nur je IP gebremst
+  - ~613–622: Passwortregeln bei Reset und Änderung nur im Browser; der Server prüft nur die Länge
+  - ~811: Magic-Link-Plugin aktiv, obwohl die Kundschaft mit Code anmeldet (Kommentar ~809–810)
+- Kundschaft: nur „Abmelden" für das eigene Gerät (src/app/account/profile/profile-client.tsx ~126–129). Der Baustein „Angemeldete Geräte" steht im Hofbereich (src/server/actions/geraete.ts ~34–55, ~75–113; src/app/(hof)/settings/account/page.tsx ~42, ~103).
+- src/app/api/status-image/[id]/route.tsx ~19–28: öffentlich, ohne Prüfung der Sichtbarkeit, im Code nirgends verlinkt.
+- Keine Wache für `farmId` in Schreib-WHERE und keine für Zod bei Actions mit Parametern. Beispiele ohne Schema: `markAsReady(orderId: string)` (src/server/actions/orders.ts ~151), `deleteFarmPhotoAction` (src/server/actions/farm-photos.ts ~84).
+
+1. **S18 Höchstdauer:**
+   - Eine Sitzung gilt höchstens 30 Tage ab `createdAt`.
+   - Geprüft in der einen Stelle, die Sitzungen liest (`cookieCache` ist aus, also frisch). Reine Funktion `sitzungAbgelaufen(createdAt, jetzt, rolle)` in src/lib/; Admin bleibt bei 12 h.
+   - Abgelaufene Sitzungen werden gelöscht, Weiterleitung zur passenden Anmeldung mit Rücksprung (Nr. 156).
+   - Der Satz unter „Angemeldete Geräte" (Board SterneSicherheit).
+   - Integrationstest: 31 Tage alte Sitzung → abgemeldet; 29 Tage → gilt; Gegenprobe.
+2. **Geräte für Kundinnen:**
+   - Baustein „Angemeldete Geräte" unter /account (Board SterneSicherheit, rechtes Handy): je Gerät abmelden, „Überall abmelden"
+   - Die Actions in geraete.ts prüfen die Rolle; eine Kundin sieht und beendet nur eigene Sitzungen.
+   - Test mit fremder Sitzung als Gegenprobe.
+3. **„Passwort vergessen" je Adresse:** wie `codeAnforderungen`, 5 in 15 Minuten, Datenbank-Stufe, fail-closed, gleiche Antwort für unbekannte Adressen. Wache tests/auth-bremse.test.ts erweitern.
+4. **Passwortregeln auf dem Server:** `hooks.before` für /reset-password und /change-password mit `passwordSchema` (src/schemas/register.ts); Meldung wie in der Registrierung. Test mit schwachem Passwort, Gegenprobe.
+5. **Analytics:** liegt bei 172 (layout.tsx gehört 172).
+6. **status-image:** dieselbe Sichtbarkeitsprüfung wie die Hofseite (freigegeben, nicht Testhof für Fremde, Beitrag sichtbar und nicht abgelaufen), sonst 404. NICHT löschen (Ankündigung nötig): Vorschlag zum Entfernen in den Bericht.
+7. **Magic-Link-Plugin:** Wenn der Nachweis gelingt, dass kein Weg es nutzt (grep plus Test, dass /magic-link/* 404 bzw. abgelehnt ist), aus auth.ts entfernen, samt customer-magic-link.tsx. Gelingt der Nachweis nicht: STOPP für den Punkt, Bericht.
+8. **Wachen:**
+   - jede exportierte Server-Action mit Parametern ruft ein Zod-Schema auf
+   - jedes `update`/`updateMany`/`delete`/`deleteMany` in Hof-Actions hat `farmId` in der WHERE oder steht mit Grund in einer Ausnahmeliste
+   - beide mit Bestandsliste, die nur schrumpft, und Gegenprobe
+   - `markAsReady` und `deleteFarmPhotoAction` bekommen ihr Schema
+
+Dateien:
+- src/lib/auth.ts (Punkte 1, 3, 4, 7), die neue reine Funktion
+- src/server/actions/geraete.ts, src/app/account/profile/*, src/app/(hof)/settings/account/page.tsx (NUR der Satz)
+- src/app/api/status-image/[id]/route.tsx
+- src/server/actions/orders.ts und farm-photos.ts (NUR die Schemas)
+- customer-magic-link.tsx
+- Tests, docs/ai/DESIGN_SYSTEM.md „Angemeldete Geräte", docs/ai/ARCHITECTURE.md (Sitzungen), DEVELOPMENT.md
+
+`pnpm test:integration` ganz.
+
+Fertig, wenn: grün; Bilder nach §0.
+
+### 179 Passkey für Höfe (E7-Ergänzung) – Opus, voller Durchgang, vom Zwischenstand nach 178
+
+Ausgangslage:
+- Passkeys gibt es nur für Admins: src/lib/auth.ts ~832–866, `registrierungsFall` in src/lib/admin-anmeldung.ts.
+- Fälle: erster Passkey, Ersatzcode, weiterer nur ≤ 5 min nach Passkey-Login.
+- `userVerification: 'required'`, `residentKey: 'required'`.
+- `/passkey/update-passkey` und `/passkey/delete-passkey` gesperrt (disabledPaths).
+- Namen der Passkeys aus `geraetName`, nicht unterscheidbar.
+
+1. Höfe (Rolle FARMER) dürfen einen Passkey einrichten:
+   - in „Konto und Sicherheit", frisch angemeldet (Passwort in den letzten 5 Minuten oder Passkey)
+   - Board SterneSicherheit, linkes Handy: Karte „Anmelden mit Fingerabdruck oder Gesicht"
+2. **Anmelden:** Auf /login bietet die Hof-Karte „Mit Passkey anmelden" zusätzlich zum Passwort. Das Passwort bleibt.
+3. **Verwalten:**
+   - Liste der Passkeys mit Namen „Gerät · Datum, Uhrzeit"
+   - Entfernen mit Rückfrage und frischer Bestätigung über einen eigenen, geprüften Weg (nicht `/passkey/delete-passkey` freischalten)
+   - Umbenennen nur, wenn ohne Freischalten von `/passkey/update-passkey` machbar; sonst Bericht
+4. **Admin bleibt bei N20:** Ein Admin mit Hof nutzt für den Admin-Bereich weiter die Admin-Regeln. Test, dass ein Hof-Passkey keine Admin-Sitzung ohne die Admin-Bedingungen ergibt.
+5. **Keine Migration:** Die Tabelle `Passkey` gibt es. Braucht es eine Spalte: STOPP, Bericht.
+
+Dateien:
+- src/lib/auth.ts (NUR Passkey-Teile), src/lib/admin-anmeldung.ts bzw. eine allgemeine `registrierungsFall`-Regel
+- src/app/(hof)/settings/account/*, src/components/anmelden/hof-anmeldung.tsx
+- Tests, docs/ai/DESIGN_SYSTEM.md (Konto und Sicherheit), docs/ai/ARCHITECTURE.md (Anmeldung), DEVELOPMENT.md
+
+Fertig, wenn: grün; im Bericht ein Prüfschritt für die Projektleitung mit YubiKey 5C NFC und Handy-Biometrie in der Vorschau.
+
+### 180 Leistung ohne Paket (Performance 3 → 4½) – Sonnet, gezielt, vom Zwischenstand nach 169
+
+Ausgangslage:
+- Zod im Bündel jeder Seite: `RueckwegMerker` importiert `@/schemas/rueckweg` (src/components/shared/rueckweg-merker.tsx ~6), KundeShell `@/schemas/hoefe-filter` (kunde-shell.tsx ~9).
+- `loadStripe` läuft beim Laden des Moduls (src/components/checkout/stripe-payment.tsx ~29), also auch bei Barzahlung.
+- Rohe `<img>`:
+  - im Korb-Blatt, 56 px aus dem Original bis 2.400 px (src/components/farm/cart-sheet.tsx ~83)
+  - in der Produktliste der Höfe (src/components/produkte/produkte-ansicht.tsx ~713, ~716)
+- Hofseite:
+  - `ladeTeilenBildQuelle` lädt Hof, Produkte und Abholzeiten für die Metadaten ein zweites Mal (src/server/queries/teilen-bild.ts ~58 gegen src/server/queries/farm.ts ~367)
+  - Beiträge und `ausgebuchteTage` laufen nacheinander (src/server/hofseite-vorschau.ts ~21–50)
+- Sentry JAVASCRIPT-NEXTJS-C: `fokusX` auf undefined auf /hoefe (3×, 8 Tage alt). JAVASCRIPT-NEXTJS-8: `toLowerCase` auf undefined auf / (1×).
+
+1. **Zod raus:** `RueckwegMerker` und `KundeShell` prüfen ihre Werte mit einer kleinen reinen Funktion. Die Schemas bleiben für den Server.
+   - Wache: kein Import aus src/schemas in 'use client'-Dateien unter src/components/shells und src/components/shared/rueckweg-merker.tsx; Gegenprobe.
+2. **Stripe:** `loadStripe` erst, wenn die Zahlart „online" gewählt ist; ein Promise je Seite (Memo). Test am Quelltext.
+3. **Bilder:** Korb-Blatt (cart-sheet.tsx NUR das Bild; 175 hat dort den leeren Zustand – getrennte Zeilen) und Produktliste auf `next/image` mit `sizes` 56 bzw. 44 px. Die Hex-/Alt-Wachen bleiben grün.
+4. **Hofseite:**
+   - Metadaten und Seite teilen die Daten über `cache()` von React (eine Abfrage je Anfrage)
+   - Beiträge und `ausgebuchteTage` parallel über `Promise.all`
+   - Im Bericht: Zahl der SQL vorher und nachher (Prisma-Log in der Vorschau oder ein Integrationstest mit Zähler)
+5. **Sentry C und 8:**
+   - Ursache am Quelltext finden (Sentry-Event lesen, Quelltextkarten gibt es seit #144)
+   - Fix mit Test, der den Fall nachbaut
+   - im PR „Sentry: JAVASCRIPT-NEXTJS-C" bzw. „-8"
+   - Ist die Ursache nicht belegbar: Bericht, nicht raten.
+6. **Messen:** ein Lighthouse-Lauf (Handy-Profil, gedrosselt) auf der Vorschau für /, /hoefe, eine Hofseite, die Kasse – vorher und nachher, Werte in docs/nachtlauf/berichte/180.md.
+   - Kein Paket: Chrome im Container (agent-browser bzw. Playwright-Chromium) über `npx lighthouse` nur, wenn ohne Installation in package.json möglich.
+   - Sonst entfällt der Punkt; Bericht mit dem Vorschlag Speed Insights oder Web Vitals aus Sentry.
+
+Dateien:
+- src/components/shared/rueckweg-merker.tsx
+- src/components/shells/kunde-shell.tsx (NUR der Import; 175/177 haben dort andere Zeilen)
+- src/components/checkout/stripe-payment.tsx
+- src/components/farm/cart-sheet.tsx (NUR das Bild), src/components/produkte/produkte-ansicht.tsx (NUR das Bild)
+- src/server/queries/teilen-bild.ts, src/server/hofseite-vorschau.ts, src/app/(public)/[farmSlug]/page.tsx (NUR die Datenwege)
+- die Fundstellen von Sentry C und 8
+- Tests, DEVELOPMENT.md
+
+Fertig, wenn: grün; Messwerte oder ein begründeter Verzicht im Bericht.
+
+### 181 Letzte Altrouten und Fakten der Datenschutzerklärung – Sonnet, gezielt, von docs/lauf25
+
+Ausgangslage:
+- Druckseiten `/orders/[orderId]/print` und `/orders/today/print` in der Gruppe `(farmer)` mit der alten FarmerNav (src/app/(farmer)/layout.tsx ~29–44) und Palette-Klassen (`text-slate-800`).
+- `/datenschutz` noch mit dem alten `KundenKopf` (src/app/(public)/datenschutz/page.tsx ~22, ~276).
+- Datenschutzerklärung, nachweislich falsch oder unvollständig:
+  - nennt Vercel Web Analytics (~100–103) und sagt in Abschnitt 8 „keine … Analyse-Tools" (~149–151)
+  - Abschnitt 10 beschreibt den Magic-Link (~182–187); gebaut ist die Anmeldung mit Code
+  - es fehlen: das Geräte-Cookie `agrilo_geraet` (400 Tage, src/lib/geraete.ts ~28–49), die IP-Adresse je Sitzung (Better Auth `Session.ipAddress`), das Cookie „Bestellungen finden" (30 min, Pfad /bestellungen), Cloudflare (DNS und Mail-Empfang)
+- `/teilen` ohne Shell und ohne `data-design` (src/app/teilen).
+- Toter Code laut Vormerkung 24.10.: newsletter.tsx, ungenutzte Onboarding-Actions. Fundstellen suchen.
+
+1. **Druckseiten:**
+   - eigenes schlankes Layout ohne Navigation, hell (Papier), nur Tokens
+   - Sitzungsprüfung wie bisher (`verlangeHofDerSitzung`)
+   - Umzug in die Gruppe `(hof)` mit eigenem Druck-Layout ODER eigene Gruppe `(druck)` – das Muster wählen, das die Hof-Seiten-Wache (tests/hof-seiten-wache…) ohne Ausnahme erfüllt
+   - danach src/components/farmer/farmer-nav.tsx und der alte Teil von bauern-navigation.ts entfernen (samt dem veralteten Kommentar ~325–329), mit Nachweis, dass nichts sie mehr nutzt
+2. **/datenschutz in die KundeShell** (mit Unterleiste und Seitenfuß, Register N22). Danach `KundenKopf` und sein Menü-Blatt entfernen, wenn nichts sie mehr nutzt (Nachweis).
+3. **Fakten der Datenschutzerklärung:**
+   - nur die Punkte aus der Ausgangslage, im Ton des bestehenden Texts
+   - jede Änderung im PR-Body als Tabelle „alt → neu → Beleg im Code"
+   - **Merge erst nach Freigabe des Texts durch die Projektleitung** (Haltepunkt im Sammel-PR; der Dirigent setzt 181 als letzten Merge und vermerkt „Text wartet auf Freigabe")
+   - Keine neue Rechtsaussage.
+4. **/teilen:** in die passende Shell (Hof) bzw. `data-design="neu"`, wenn es nur Anzeige ist. Das Verhalten des Service Workers (POST /teilen) bleibt unverändert; Test.
+5. **Toter Code:** newsletter.tsx und ungenutzte Onboarding-Actions entfernen, je mit Nachweis (kein Import, kein Aufruf, keine Route). Ungenutzte Pakete nur als Vorschlag.
+
+Dateien:
+- src/app/(farmer)/** bzw. die neue Gruppe, src/components/farmer/farmer-nav.tsx, src/lib/bauern-navigation.ts (NUR der alte Teil)
+- src/app/(public)/datenschutz/page.tsx, src/components/shared/kunden-kopf.tsx (NUR Entfernen)
+- src/app/teilen/*
+- die Fundstellen des toten Codes
+- Tests, docs/ai/ARCHITECTURE.md (Gruppen, Datenschutz), DEVELOPMENT.md
+
+Fertig, wenn: grün; Bilder nach §0; Text der Datenschutzerklärung als Tabelle im PR.
+
+
+### 182 Startseiten-Vorschau über eine eigene dynamische Route (N16-Ergänzung) – Opus, ein voller Durchgang, von docs/lauf25
+
+Anlass (Projektleitung, 25.10.2026): „Wenn ich etwas ausblende, sieht man es in der Vorschau noch." Dasselbe Symptom wurde schon am 16.10. (Nr. 106) und am 23.10. (Fix „Vorschau reagiert nicht") gemeldet; beide Male wurde lokal gesucht und nichts gefunden.
+
+Ausgangslage (main 6b55d67, im Chat frisch geprüft):
+- Speichern funktioniert. Produktion, Statistik der Tabelle StartseiteAbschnitt: 120 geänderte Zeilen = 15 Speicherungen × 8 Zeilen, alle Zeilen aus einer Transaktion.
+- Ursache: `/` ist ISR (`revalidate = 300`). Für eine nicht dynamische Route schreibt der Build `allowQuery: []` (node_modules/next/dist/build/adapter/build-complete.js ~718–726; ebenso @vercel/next). Vercel gibt dann KEINEN Query-Parameter an die Funktion weiter, auch nicht im Draft Mode (Build Output API: „passQuery … The allowQuery filter still applies").
+  - `vorschauDieserAnfrage` (src/server/startseite-vorschau.ts ~100–107) findet `vorschau` und `sig` nicht und gibt null.
+  - `src/app/page.tsx` rendert dann `ladeStartseite()`, also die Live-Fassung, je Anfrage frisch (Draft Mode ist an).
+  - Lokal (`next dev`, `next start`) kommen die Parameter an. Darum fanden Bericht 106 und der Fix vom 23.10. nichts. Passt zu vercel/next.js#92562 (offen).
+- Folge in Produktion: Entwurf, „Live" an einem anderen Tag, „Stand am" (Woche, Block, Termin), Zeitplan „Vorschau"/„Ansehen" einer geplanten Fassung und „Vorschau öffnen" zeigen alle die Live-Seite von heute. Das Band in der Seite (`VorschauBand`) erscheint nie; das Band über dem Rahmen sagt trotzdem „Entwurf". „Veröffentlichen" selbst liest den Entwurf richtig aus der Datenbank.
+
+Weg: eine eigene dynamische Vorschau-Route, KEIN Draft Mode mehr. Gründe: Jeder Rahmen hat seine eigene Adresse (Editor, Zeitplan-Dialog und neuer Tab gleichzeitig), kein Zustand im Browser, `/` bleibt rein statisch, lokal und auf Vercel gleich prüfbar. Verworfen: Inhalt im Cookie statt in der Adresse (ein Cookie je Browser, Rahmen überschreiben sich gegenseitig); Umschreiben im Proxy (liefe bei jedem Besuch der Startseite).
+
+1. **Ein Baustein für den Inhalt:** `src/components/startseite/startseiten-inhalt.tsx` (Server-Komponente). Hinein wandern aus src/app/page.tsx: `ladeStartseitenHoefe` (mit `cache`), `HofKartenGeladen`, `RegionsKarteGeladen`, `BlockGeladen`, `Eintrag`, `VorschauBand` und das JSON-LD.
+   - Props: `eintraege`, `jetzt`, optional `vorschau` (Quelle und Tag für das Band).
+   - `src/app/page.tsx` und die neue Route rendern nur diesen Baustein. Keine zweite Kopie (vorher in docs/ai/BAUSTEINE.md suchen).
+2. **`src/app/page.tsx`:** ohne `searchParams`, ohne `vorschauDieserAnfrage`, ohne Draft Mode. `revalidate = 300` bleibt; die Seite liest nichts aus der Anfrage. Kommentar oben anpassen.
+3. **Neue Route `src/app/startseite-vorschau/page.tsx`** (`/startseite-vorschau?vorschau=…&sig=…`):
+   - `export const dynamic = 'force-dynamic'`. Metadata: robots noindex/nofollow, canonical `/`, Titel wie die Startseite.
+   - Liest `searchParams` und prüft wie bisher: erst Signatur und Ablauf, erst danach die Admin-Sitzung (frisch aus der Datenbank, wie `vorschauFuerAdmin`). Dann `ladeVorschauZeilen` → `zuRendern` mit `blockEntwurfId` → Baustein mit Band.
+   - Ungültig, abgelaufen, ohne Sitzung oder ohne Admin-Recht: KEIN Inhalt der Startseite und keine Weiterleitung auf `/` (die ist nicht einbettbar, der Rahmen bliebe leer). Stattdessen ein kurzer Fehlerzustand nach DESIGN_SYSTEM „Zustände" mit einem bestehenden Baustein: „Diese Vorschau gilt nicht mehr. Öffne Admin › Startseite und lade sie neu." und ein Link auf `/admin/startseite`.
+   - Der neue Ordner kommt in `KEINE_HOFSEITE` (next.config.ts) und `RESERVED_SLUGS` (src/lib/slug.ts). In Produktion trägt kein Hof den Slug `startseite-vorschau` (geprüft 25.10.).
+   - Header in next.config.ts für `/startseite-vorschau`: `X-Frame-Options: SAMEORIGIN`, `Content-Security-Policy: frame-ancestors 'self'`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`.
+   - Die Regel `source: '/'` mit `has: [{ type: 'query', key: 'vorschau' }]` (~280–292) fällt weg; `/` ist damit wieder überall DENY.
+   - `/startseite-vorschau` in `gesperrtePfade` (src/lib/robots.ts), nicht in der Sitemap. `NIE_MELDEN_PARAMETER` und die Sentry-Hygiene für `vorschau`/`sig` bleiben. Dieselbe Liste filtert ab 172 auch Analytics.
+4. **src/server/startseite-vorschau.ts:** Signatur, Prüfung, eine Stunde, Quelle im signierten Teil bleiben unverändert. `vorschauDieserAnfrage` (Draft Mode) und `oeffneVorschau` entfallen; dafür eine Lese-Funktion für die neue Seite (Parameter → Inhalt oder null). Kopf-Kommentar anpassen.
+5. **`erzeugeStartseitenVorschau`** (src/server/actions/startseite.ts ~374–408): kein `draftMode().enable()` mehr. `pfad` und `link` sind beide `/startseite-vorschau?…`, aus einer Konstante `STARTSEITE_VORSCHAU_HREF` neben `ADMIN_STARTSEITE_HREF` in src/lib/startseite-gestalten.ts.
+6. **Entfernen (Code, hiermit angekündigt):**
+   - `beendeStartseitenVorschau` samt dem Aufruf beim Aushängen in src/components/admin/startseite-vorschau.tsx (~222–230) und ihr Eintrag in tests/actions-sitzung-wache.test.ts.
+   - Die Route src/app/admin/startseite/vorschau/route.ts und `ADMIN_STARTSEITE_VORSCHAU_HREF`.
+   - „Vorschau öffnen" zeigt direkt auf die neue Route. Sie wirkt auf jedem Gerät mit Admin-Sitzung, auch am Handy.
+   - Ein altes Draft-Mode-Cookie im Browser des Admins ist ein Sitzungs-Cookie mit dem Schlüssel des alten Builds und verfällt von selbst; nichts zu tun.
+7. **Scroll beim Neuladen:** `scrollNachNeuladen` (src/lib/startseite-fassung.ts ~605) vergleicht mit `STARTSEITE_VORSCHAU_HREF` statt mit `/`. Sonst springt der Rahmen nach jeder Speicherung nach oben (Nr. 106). Kommentare in startseite-vorschau.tsx (~20–43) nachziehen.
+
+Dateien:
+- src/components/startseite/startseiten-inhalt.tsx (neu), src/app/page.tsx, src/app/startseite-vorschau/page.tsx (neu)
+- src/server/startseite-vorschau.ts, src/server/actions/startseite.ts (NUR `erzeugeStartseitenVorschau` und `beendeStartseitenVorschau`)
+- src/components/admin/startseite-vorschau.tsx, src/lib/startseite-gestalten.ts, src/lib/startseite-fassung.ts (NUR `scrollNachNeuladen`)
+- src/app/admin/startseite/vorschau/route.ts (entfernen)
+- next.config.ts (NUR Header und `KEINE_HOFSEITE`), src/lib/slug.ts, src/lib/robots.ts
+- die Tests unten, docs/ai/ARCHITECTURE.md (NUR die Stellen unten), DEVELOPMENT.md
+
+Tests (zuerst rot, dann grün):
+- **Nachstellen:** tests/startseite-vorschau.test.ts. Die Lese-Funktion der neuen Seite liefert mit gültigem Link und Admin-Sitzung den Entwurf, OHNE Draft Mode. Gegenproben: abgelaufen, fremde Signatur, Unsinn, keine Sitzung, Hof-Sitzung → null; bei ungültiger Signatur wird die Sitzung gar nicht gelesen.
+- **Neue Wache** `tests/isr-liest-keine-anfrage-wache.test.ts`: Jede Datei unter src/app mit `export const revalidate` liest weder `searchParams` noch `draftMode`, `cookies` oder `headers`. Heute rot für src/app/page.tsx. Begründung im Kopf: Vercel gibt einer statischen Route keine Query weiter.
+- **Wache:** src/app/page.tsx und src/app/startseite-vorschau/page.tsx importieren beide `startseiten-inhalt`; `Eintrag`/`BlockGeladen` gibt es nur dort.
+- tests/sicherheits-header.test.ts:
+  - `/` mit `?vorschau` → DENY.
+  - `/startseite-vorschau` → SAMEORIGIN, frame-ancestors 'self', no-referrer, no-store.
+  - Der KEINE_HOFSEITE-Abgleich deckt den neuen Ordner.
+- tests/startseite-aktion.test.ts: Ergebnis beginnt mit `/startseite-vorschau?`, `pfad` = `link`, `draftMode` wird nicht aufgerufen.
+- tests/startseite-vorschau-neuladen.test.ts: Folge ohne `beende`; die Scroll-Position bleibt mit dem neuen Pfad (Gegenprobe: anderer Pfad → 0).
+- tests/robots.test.ts: der neue Pfad ist gesperrt.
+- tests/ladeansichten.test.ts (~415–428): `HomePage` wartet nur noch auf `ladeStartseite()`; die Vorschau-Seite hat ihre eigene Erwartung.
+- tests/admin-seiten-wache.test.ts (~253–256): Der Eintrag für `startseite/vorschau/route.ts` fällt mit der Route weg.
+- Alle übrigen Startseite-Tests bleiben grün: startseite-bearbeiten-vorschau, startseite-zusatz-menue, ladeansichten, admin-seiten-wache, admin-heikel-eine-wache, reservierte-slugs, test:integration startseite-*.
+
+Prüfung am echten Ort (Pflicht, der Fehler zeigt sich nur auf Vercel):
+- `pnpm build`: In der Routen-Tabelle steht `/` weiter als ISR (5 m) und `/startseite-vorschau` als dynamisch (ƒ). Den Auszug in den Bericht.
+- Bilder lokal (Seed-Admin, wie bisher) nach §0.
+- Im Bericht eine Prüfliste für die Projektleitung am Vorschau-Deployment (Entwicklungsdatenbank):
+  - Abschnitt ausblenden → nach 1–2 s fehlt er im Rahmen, das Band steht in der Seite.
+  - „Live" → der Abschnitt ist wieder da.
+  - „Stand am: in einer Woche" → das Datum im Band wechselt.
+  - „Vorschau öffnen" im neuen Tab und am Handy → dasselbe.
+  - Privates Fenster mit dem Link → Fehlerzustand, kein Inhalt.
+
+Doku:
+- docs/ai/ARCHITECTURE.md:
+  - Die Tabelle in §3 (~65): Die Ausnahme „Draft-Mode-Cookie" streichen.
+  - „Einbetten nur mit Parameter" (~243): statt „die Startseite mit `?vorschau`" nun „`/startseite-vorschau`".
+  - Bei der statischen Startseite: Die Vorschau läuft über die eigene dynamische Route.
+  - Neue Regel: „Eine Seite mit `revalidate` liest nie die Anfrage. Was je Anfrage gelten muss, bekommt eine eigene dynamische Route."
+- DEVELOPMENT.md: ein Eintrag mit Ursache (Vercel, `allowQuery: []` bei statischen Routen, lokal nicht nachstellbar), Folge und Fix; mit dem Hinweis, dass die Meldungen vom 16.10. und 23.10. sehr wahrscheinlich dieselbe Ursache hatten.
+- docs/ai/BAUSTEINE.md neu erzeugen (`pnpm bausteine`). Mockups unverändert: Die Vorschau sieht gleich aus.
+
+Fertig, wenn: grün; Build-Auszug, Bilder und Prüfliste im Bericht.
+
+### 183 Admin › Startseite: Editor bleibt nicht mehr im Fehler hängen, keine Rennen beim Verwerfen und Einfügen (N16) – Opus, ein voller Durchgang, vom Zwischenstand nach 182
+
+Anlass (Projektleitung, 25.10.2026): „Prüfe sämtliche Funktionalitäten von Admin › Startseite." Die Funde stammen aus der Code-Prüfung im Chat (Stand main 6b55d67), jeder am Code belegt. Zuerst nachstellen, dann beheben; Hook über den Prüfstand wie tests/startseite-entwurf.test.ts.
+
+1. **Fehlerzustand lässt sich nur über eine andere Änderung verlassen (Hoch).** Stellen: src/components/admin/startseite-entwurf.tsx ~299, ~309, ~358–379 und src/components/admin/startseite-gestalten.tsx ~417–421, ~476–479.
+   - Ursache: Nur eine neue Speicherung setzt `fehlerFrei` und `stand` zurück. `speichereSofort` ohne laufende Uhr gibt nur den alten Wert zurück. `oeffneBlock(null)` beim Verwerfen eines nie gespeicherten Blocks, `blockGeloescht` und `setzeZurueck` setzen nichts zurück.
+   - Szenario: „Block einfügen" → Vorlage wählen (ohne Titel) → nach 800 ms rot „Bitte gib einen Titel ein." → „Verwerfen". Die rote Zeile bleibt. „Block einfügen" und das Öffnen eines Blocks tun nichts (`nachSpeichern` ruft `weiter` nicht). „Veröffentlichen …" zeigt denselben Satz. Ebenso nach einem Netzfehler.
+   - Fix:
+     - Ist `fehlerFrei` falsch, speichert `speichereSofort` den jetzigen Stand neu.
+     - Verwerfen eines neuen Blocks, `blockGeloescht` und `setzeZurueck` setzen `fehlerFrei` auf wahr und `stand` auf „ruhe", wenn danach kein ungültiger Block offen ist.
+   - Test: das Szenario im Prüfstand. Danach öffnet `nachSpeichern` wieder. Gegenprobe ohne Fix: `weiter` wird nicht gerufen.
+2. **Ein verworfener neuer Block bleibt im Entwurf (Mittel).** Stellen: startseite-gestalten.tsx ~476–479, startseite-entwurf.tsx ~303.
+   - Ursache: „Verwerfen" wartet nicht auf eine laufende Speicherung. Legt diese den Block am Server an, findet `mitNeuerKennung` keine Zeile `NEUER_BLOCK` mehr.
+   - Szenario: Titel tippen, warten, bis „Speichert …" läuft, dann „Verwerfen".
+   - Folge: Der Block steht in der Datenbank, aber nicht in der Liste; „Veröffentlichen …" brächte ihn live; jede weitere Speicherung scheitert mit „Die Startseite wurde inzwischen geändert …".
+   - Fix: Vor dem Verwerfen `speichereSofort` abwarten. Hat der Block danach eine Kennung, `loescheStartseitenBlock` wie beim gespeicherten Block.
+   - Test: Speicherung im Prüfstand verzögert; „Verwerfen" während sie läuft → Löschen wird mit der neuen Kennung gerufen.
+3. **Veraltete Liste nach „Neu bei den Höfen" und gleich danach „Block einfügen" (Mittel).** Stelle: startseite-gestalten.tsx ~455–463 (`fuegeEin`).
+   - Ursache: Die Rückruffunktion nach `nachSpeichern` nimmt `entwurf.zeilen` aus dem Render VOR der Speicherung. Dort steht noch die vorläufige Kennung `neu-neuigkeiten` (NEUER_ABSCHNITT).
+   - Folge: Die nächste Speicherung schickt sie noch einmal, der Server meldet „inzwischen geändert", und nach dem Neuladen fehlt der neue Block.
+   - Fix: `oeffneBlock` bekommt nur die Einfügestelle und baut die Liste aus `aktuell.current`, also aus dem Stand nach der Speicherung.
+   - Test im Prüfstand: Abschnitt einfügen, sofort Block einfügen → die zweite Eingabe hat die Kennung vom Server, kein `neu-neuigkeiten`.
+4. **„Entwurf verwerfen" bzw. „Als Entwurf übernehmen" lässt „Neu bei den Höfen" stehen (Mittel).** Stelle: src/server/actions/startseite.ts ~320–358.
+   - Ursache: Übernehmen schreibt nur die Zeilen der Fassung. Ein Zusatz-Abschnitt, den die Fassung nicht kennt, behält seine alte Position.
+   - Folgen: Der Entwurf wird nie „wie live". Steht der Abschnitt danach hinter dem Fuß, scheitert jede Speicherung („Der Fuß bleibt immer ganz unten."). Die Vorschau zeigt dann die Standard-Reihenfolge, und Veröffentlichen geht nicht.
+   - Fix: In derselben Transaktion nur Zeilen einer Zusatz-Art (`ZUSATZ_ARTEN`) löschen, die die Fassung nicht hat. Feste und Standard-Abschnitte nie löschen.
+   - Test im Integrationstest (startseite-fassung.int.test.ts): Entwurf mit NEUIGKEITEN, Fassung ohne → nach Übernehmen keine Zeile NEUIGKEITEN, `pruefeReihenfolge` gibt null. Gegenprobe: Fassung mit NEUIGKEITEN → die Zeile bleibt.
+   - NICHT bauen: einen Knopf „Entfernen" für Zusatz-Abschnitte (Entscheidung offen).
+5. **Höfe-Auswahl mit einem nicht mehr sichtbaren Hof (Mittel).** Stellen: src/components/admin/startseite-block-formular.tsx ~189–195 und actions/startseite.ts ~131–134.
+   - Ursache: Das Formular zeigt nur sichtbare Höfe. Ein gewählter Hof, der inzwischen pausiert, gesperrt oder zum Testhof wurde, bleibt in `farmIds`, lässt sich aber nicht abwählen. Der Server lehnt dann die GANZE Speicherung ab, auch Pfeile und Auge.
+   - Fix im Browser: Beim Öffnen des Blocks fallen Kennungen, die nicht in `daten.hoefe` stehen, aus der Auswahl. Darunter steht einmal der Satz „Ein Hof ist nicht mehr sichtbar und wurde aus der Auswahl genommen." bzw. für mehrere Höfe „… Höfe …" (Texte bei ADMIN_STARTSEITE_TEXT).
+   - Die Prüfung am Server bleibt, wie sie ist.
+   - Test: `blockWerteAus` bzw. die neue Hilfe mit einem unbekannten Hof.
+6. **Letzte Änderung geht beim Verlassen still verloren (Niedrig).** Stelle: startseite-entwurf.tsx ~275–280.
+   - Fix: Läuft beim Aushängen noch die Uhr, sofort speichern statt nur löschen (`reiheEin`). Solange „Speichert …" steht oder ein nie gültiger neuer Block offen ist, warnt `beforeunload`.
+   - Test im Prüfstand: Aushängen mit laufender Uhr → `speichere` wird einmal gerufen.
+7. **„Entwurf verwerfen" und „Als Entwurf übernehmen" warten nicht auf die Uhr (Niedrig).** Stelle: startseite-gestalten.tsx ~515–523.
+   - Fix: Vorher die Uhr löschen und eine laufende Speicherung abwarten, dann erst die Action. So überschreibt danach nichts den übernommenen Stand.
+8. **Fehlertext im Veröffentlichen-Dialog (Niedrig).** Stelle: startseite-gestalten.tsx ~500–501.
+   - Ursache: Der Text kommt aus dem Stand vor dem Klick.
+   - Fix: `speichereSofort` gibt `{ ok, fehler }` zurück; der Dialog zeigt diesen Grund.
+9. **Netzfehler (N29):** Scheitert eine Speicherung am Netz, zeigt die Fehlerzeile den Netzsatz aus src/lib/netz.ts, sofern 175 schon im Zwischenstand ist; sonst bleibt der heutige Text, Bericht.
+
+Grenzen:
+- Keine Änderung an Vorschau, Route oder `src/app/page.tsx` (182).
+- Mockups unverändert; die neue Zeile aus Punkt 5 folgt DESIGN_SYSTEM „Zustände".
+- Nicht anfassen: die doppelte Stunde beim Wechsel auf Winterzeit (`zeitpunktAusEingabe`, heute nimmt sie still die zweite 02:xx) und das Liveschalten geplanter Fassungen per Cron. Beide nur als Notiz in den Bericht.
+
+Dateien:
+- src/components/admin/startseite-entwurf.tsx, src/components/admin/startseite-gestalten.tsx, src/components/admin/startseite-block-formular.tsx
+- src/server/actions/startseite.ts (NUR Übernehmen/Verwerfen der Fassung)
+- src/lib/startseite-gestalten.ts (NUR Texte), die Tests
+- docs/ai/ARCHITECTURE.md (~181, automatisches Speichern: Ein Fehlerzustand wird durch jede Aktion verlassen, die den Entwurf wieder gültig macht, und vor jeder Action, die den Entwurf ersetzt, wird gewartet), DEVELOPMENT.md
+
+Fertig, wenn: grün (test:integration startseite-*); Bilder nach §0.
+
+## §2 Regeln für alle Nummern
+
+- Es gelten die Regeln aus Lauf 22 (freigabe.md §26, §2), Lauf 23 (§27, §2) und Lauf 24 (§28, §2), mit diesen Abweichungen: keine Migration, kein Paket, keine Variable.
+- **Geld und Bestellungen:**
+  - Kein Betrag wird neu gerechnet.
+  - 168 ändert nur, was geschieht, wenn ein Mail-Auftrag scheitert; Bedingungen und Reihenfolge der Wechsel bleiben.
+  - 175 und 176 ändern nur, wie ein Fehler angezeigt wird; Reservierung, Kasse und Idempotenz bleiben.
+  - Ändert sich durch eine Nummer ein Betrag: Geld-Fund, STOPP, Bericht zuerst.
+- **Sicherheit:**
+  - Keine Nummer lockert eine Prüfung.
+  - `DELETE /api/reserve` (169) löscht nur Halte der mitgeschickten Sitzung, gebremst wie Reservieren, und verrät nie, ob es einen Halt gab.
+  - 171 lässt jeden heute verschickten Link gültig.
+  - 178 und 179 verlängern keine Sitzung und schalten keinen gesperrten Better-Auth-Pfad frei.
+  - 182 zeigt ohne gültige Signatur UND Admin-Sitzung keinen Entwurf; `/` bleibt überall DENY.
+  - 181 ändert keine Rechtsaussage.
+  - Berichte beschreiben Funde als Ursache, Auswirkung und Fix, ohne Anleitung zum Ausnutzen.
+- **Design:**
+  - Jede UI-Änderung in beiden Modi und bei 390 und 1440 px.
+  - Touch-Ziele ≥ 44 px, Texte ≥ 4,5:1, UI-Grenzen ≥ 3:1, Felder 16 px.
+  - Keine Hexwerte in Komponenten.
+- **Mails:** Kein Test und keine Abnahme verschickt eine echte Mail an eine echte Adresse. Die Post-Sperre Z3 bleibt die eine Stelle, die über den Versand entscheidet.
+- **Personendaten:** nie Adressen, Namen, Codes, Token oder IPs in Code, Logs, Tests, Berichten oder Bildern. Beispieldaten erfunden.
+
+## §3 Checkliste je PR
+
+Wie Lauf 22 (§26, §3), mit „Migration: nein · Paket: nein · neue Variable: nein". „Alle Einstiege geprüft" gilt für:
+
+| Nummer | alle Einstiege |
+|---|---|
+| 168 | alle Aufrufer von `stelleMailEin` |
+| 169 | alle Wege, die Halte anlegen, erneuern oder freigeben, und alle Stellen, die den Korb schreiben |
+| 170 | alle Aufrufer von `zaehleMail`/`zaehleVersand`, jede Erzeugung eines Bar-Tokens, alle Nutzer von `NOCHMAL_STAENDE` |
+| 171 | alle Aufrufer der Double-Opt-in-Funktionen |
+| 173 | alle Nutzer der geänderten Grundbausteine (Zahl im Bericht) |
+| 175 | alle Aufrufe von Server-Actions aus Client-Bauteilen im Hofbereich, alle Fetches in use-cart.ts |
+| 177 | alle Seiten mit KundeShell und alle Nutzer von `UnterseitenKopf` |
+| 178 | alle Wege, die Sitzungen anlegen oder lesen |
+| 179 | alle Passkey-Pfade |
+| 181 | alle Importe der entfernten Dateien |
+| 182 | alle Nutzer von `vorschauDieserAnfrage`, `oeffneVorschau`, `beendeStartseitenVorschau`, `ADMIN_STARTSEITE_VORSCHAU_HREF` |
+| 183 | alle Wege, die den Entwurf speichern, ersetzen oder verwerfen |
+
+## §4 Morgenbericht (morgenbericht-<datum>-lauf25.md)
+
+Wie Lauf 24, dazu:
+- **Ganz oben:** je Nummer, ob die Ausgangslage am Code bestätigt war, und welche Nummern nicht begonnen wurden.
+- **168:** Tabelle aller Aufrufer von `stelleMailEin` mit Ort (in der Transaktion, nach dem Commit, mit Hilfe); welcher Weg trägt (A, A2, B); die vereinheitlichten Sentry-Tags.
+- **169:** die Prüfmomente des Warenkorbs (Hofseite ohne Halt, Kasse mit Halt, Kauf verbindlich); dass `reserveIp` jetzt drei Wege zählt; der Randfall „Hofseite ohne `ProductGrid`".
+- **170 und 171:** je Punkt erledigt bzw. nicht und warum; für 171 die Gegenrichtung beim vertauschten Zweck (Ursache, Auswirkung, Fix).
+- **Die Sterne-Tabelle** aus claude/handy-bewertung-2026-10-25.md (13 Kategorien, heute Ø 3,7) mit einer Spalte „nach Lauf 25": je Kategorie die erreichten Sterne mit Beleg (PR, Test, Bild). Ehrlich: Was nicht gebaut ist, zählt nicht.
+- **172:** was Vercel Analytics speichert (mit Quelle).
+- **173:** Zahl der Stellen in der Bestandsliste „xs/sm ohne Fläche" und die umgebrochenen Stellen.
+- **175:** Liste der Aufrufe ohne Schutz vorher und nachher.
+- **178:** Vorschlag zu status-image; Ergebnis Magic-Link.
+- **180:** Messwerte oder Verzicht; SQL je Hofseite vorher und nachher; Ursache von Sentry C und 8.
+- **181:** Text der Datenschutzerklärung wartet auf Freigabe.
+- **182:** Build-Auszug (`/` ISR, `/startseite-vorschau` ƒ) und die Prüfliste.
+- **183:** die Notizen zu Winterzeit und Cron.
+- **„Für dich zu tun":**
+  - Abnahmen aus „Fertig, wenn" und „Vorschau"; Admin-Bilder 170
+  - Prüfliste 182 am Vorschau-Deployment
+  - iPhone-Prüfung (172), Passkey mit YubiKey (179)
+  - Freigabe des Texts (181), danach Merge des Sammel-PR per Merge-Commit; danach in der Produktion eine Testbestellung mit Stripe im Testmodus → in Admin › Betrieb › E-Mails gesendet
+  - Zip der 8 Boards für docs/mockups/, falls noch nicht geliefert
+  - Länge von `BETTER_AUTH_SECRET` in Vercel prüfen (für den späteren min(32))
+  - Stufe 3 der Sterne: drei Höfe, drei Aufgaben (Vorrat ändern, Woche pausieren, Logo finden) – Zeit und Fehltipps notieren
+  - Erinnerung: die Entscheidung zur Servicegebühr bei Barzahlung ab 1.2.2027 bis Dezember

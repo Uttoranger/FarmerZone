@@ -272,6 +272,21 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 | `system-k2-gruendung-abzeichen.html` | Aktion 100 · Abzeichen „Gründungshof“: drei Wege verglichen (A Etikett empfohlen), Lagen des Etiketts (dunkel, hell, auf Foto, Fokus), Hofseite am Handy mit Etikett und Erklär-Blatt, Höfe-Liste am Handy und am Computer, Hofseite am Computer mit Sprechblase, Heute-Karte und Schalter „Abzeichen zeigen“ für den Hof, Teilen-Bild mit Etikett; Regeln | `/<slug>`, `/hoefe`, `/settings/konditionen`, Teilen-Bild der Hofseite | neu (Nr. 116, K2 ergänzt) | 2500×3060 |
 | `system-k2-gruendung-bausteine.html` | Gründungshöfe · Bausteine: Satz (dunkel/hell), Pill/Knopf/Fußnote, Preiszeile + Hofladen-Preis, Registrieren-Satz, einmaliger Hinweis, Zustände (letzter Platz, alle vergeben, Datum vorbei), Regeln · Baustein 5 (Heute-Karte) entfällt (19.10.2026) | Bausteine (`components/gruendung/*`) | neu | 1760×860 |
 
+## SYSTEM · Handy auf fünf Sterne (25.10.2026)
+
+Zielbild für Nr. 172–181 (`docs/nachtlauf/freigabe.md` §29). Was ein Board nicht zeigt, folgt `docs/ai/DESIGN_SYSTEM.md`; jede Abweichung gehört mit Grund in den PR. Auf dem Canvas liegen die Boards in der Zeile „VORSCHLAG 25.10.2026 · HANDYANSICHT MIT STERNEN".
+
+| Datei | Bildschirm | Route im Code | Arbeit | Größe |
+|---|---|---|---|---|
+| `system-sterne-bogen.html` | Handy auf fünf Sterne · Bewertung 25.10.2026: 13 Kategorien, heute → Stufe 1 → 2 → 3 (Board SterneBogen) | Übersicht, keine Route | Bezugsrahmen für Nr. 172–181; der Bericht führt die Spalte „nach Lauf 25" | 1440×1160 |
+| `system-sterne-hofseite-orientierung.html` | Hofseite: aktiver Reiter, klebende Hofzeile, Chips kleben, Korb ohne Blatt-Pingpong (Board SterneHofseiteOrientierung) | `/[farmSlug]` (Handy) | neu (Nr. 177, N30; weicht bewusst von `mobil-k2-produkte` ab) | 980×900 |
+| `system-sterne-kasse-vertrauen.html` | Kasse: Fehlertexte mit Grund, Tastatur, Rücktritt, inkl. USt, Datenschutz-Link, Zeitlimit (Board SterneKasseVertrauen) | `/[farmSlug]/checkout` | Umbau (Nr. 176); Rücktritt und Widerruf erst nach der Anwältin | 980×960 |
+| `system-sterne-kein-netz.html` | Kein Netz als Zustand: Netz-Zeile, Korb, Speichern inline, Fehlerseite Hofbereich (Board SterneOfflineZustaende) | alle Shells, Hofseite, `(hof)/error` | neu (Nr. 175, N29) | 1320×1180 |
+| `system-sterne-hof-start.html` | Hof startet: Profil speicherbar, Feldfehler, Zustand im Kopf, eine Checkliste (Board SterneHofStart) | `/settings/profile`, `/products` (leer), Hofkopf | Umbau (Nr. 174 Profil und Feldfehler, Nr. 176 Punkt 5 `PRODUKTE_LEER`); die gemeinsame Checkliste ist nicht beauftragt | 1320×1100 |
+| `system-sterne-sicherheit.html` | Sicherheit: Passkey für Höfe (E7), Sitzung mit Ende (S18), Geräte für Kundinnen (Board SterneSicherheit) | `/settings/account` (Hof), `/account` (Kundin) | neu (Nr. 178 Sitzung und Geräte, Nr. 179 Passkey) | 1320×1180 |
+| `system-sterne-barrierefreiheit-formular.html` | Barrierefreiheit und Formulare: 44 px, 16 px, Kontraste, Feldfehler (Board SterneBarrierefreiheitFormular) | `src/components/ui/*`, Hof-Formulare | Umbau (Nr. 173 Bausteine und Kontrast, Nr. 174 Formulare) | 1320×1120 |
+| `system-sterne-leistung-plattform.html` | Leistung und Plattform: messen, Ziele, Stufen (Board SterneLeistungPlattform) | `layout.tsx`, Manifest, Hofseite | Zustand (Nr. 172 Plattform und Schrift, Nr. 180 Leistung ohne Paket) | 1440×1040 |
+
 ## ADMIN · Betreiber
 
 Ein Seitenmuster für alle Admin-Seiten: Seitenkopf (Titel + ein Satz + rechts die Hauptaktion oder der Monat) · Kennzahlen-Zeile · Unterreiter (zweite Ebene als Pillen) · Inhalt · Regel-Zeile in leiser Schrift. Reiter in der Kopfzeile: Höfe · Postfach · Startseite · Finanzen · Betrieb (neu, Nr. 103; Punkt bei offener Warnung) · Einstellungen. Die älteren Admin-Mockups zeigen noch fünf Reiter; maßgeblich für Reiter und Betriebsleiste ist `admin-betrieb.html`. Unter den Reitern die Betriebsleiste mit „Stripe Test" (Register Z2) – ohne Link „Zur Testumgebung", weil es keine gibt (Z3, Korrektur 15.10.). Betriebsleiste: rechts ein Hinweis bei offener Warnung („Bilder-Speicher bei 82 % – ansehen“, Link auf `/admin/betrieb`), sonst nichts. Einstellungen sind Gruppen (Gründungshöfe · Plattform), jede mit eigenem Speichern und Protokollzeile; der Stripe-Modus steht in Admin › Betrieb.

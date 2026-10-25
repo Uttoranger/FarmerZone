@@ -59,7 +59,7 @@ Alle Farben kommen aus CSS-Custom-Properties auf `:root`, umgeschaltet über `da
 
 ## Typografie und Form
 
-- Fraunces (600) für H1–H3 und Kennzahlen; Instrument Sans für allen anderen UI-Text. Utilities: `font-heading` (Fraunces) und `font-sans` (im neuen Design Instrument Sans, im Bestand noch Geist).
+- Fraunces (600) für H1–H3 und Kennzahlen; Instrument Sans für allen anderen UI-Text. Utilities: `font-heading` (Fraunces) und `font-sans` (die Fließschrift im neuen Design ist Instrument Sans, gesetzt unter `data-design="neu"`; Geist gilt nur im Bestand, bis die letzte Route umgezogen ist).
 - Karten: Radius 14–16 px, `--surface` mit `--border`. Buttons: Pills (Radius 999).
 - Pills nur für Buttons in Inhaltsbreite; Buttons über volle Containerbreite nutzen Radius 12–14 px.
 

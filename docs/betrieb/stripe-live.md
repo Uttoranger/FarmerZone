@@ -57,7 +57,7 @@ Mit dem Live-Schlüssel verschwinden alle drei von selbst. Den Modus liest die A
 
 ## 3. Zwei Live-Webhooks
 
-Beide Endpunkte zeigen auf **`https://agrilo.at/api/stripe/webhook`**. Die Route prüft jede Zustellung gegen beide Secrets. Die alte Adresse farmerzone.at leitet auf agrilo.at um; Stripe folgt keiner Weiterleitung – Endpunkte immer auf agrilo.at.
+Beide Endpunkte zeigen auf **`https://agrilo.at/api/stripe/webhook`**. Die Route prüft jede Zustellung gegen beide Secrets. Die alte Adresse farmerzone.at leitet auf agrilo.at um; Stripe folgt keiner Weiterleitung; der Webhook muss direkt auf agrilo.at zeigen.
 
 - [ ] **Endpunkt A – Plattform** („Ereignisse in deinem Konto“), alle Ereignisse, die `src/app/api/stripe/webhook/route.ts` verarbeitet:
 
