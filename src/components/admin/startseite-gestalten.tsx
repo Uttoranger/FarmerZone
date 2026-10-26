@@ -712,10 +712,14 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
         fehler={dialogFehler}
         onVeroeffentlichen={veroeffentlichen}
       >
+        {/* Nur Veröffentlichen läuft im offenen Dialog — sein Passkey-Dialog darf darin hängen. */}
         {frischVeroeffentlichen.dialog}
-        {frischZurueckziehen.dialog}
-        {frischLoeschen.dialog}
       </VeroeffentlichenDialog>
+
+      {/* Zurückziehen und Löschen laufen bei geschlossenem Veröffentlichen-Dialog: Darin wäre ihr
+          Passkey-Dialog nicht eingehängt, und die Aktion hinge nach 5 Minuten ohne Meldung (Nr. 188, Runde 2). */}
+      {frischZurueckziehen.dialog}
+      {frischLoeschen.dialog}
 
       <VorschauFenster
         offen={fassungVorschau !== null}

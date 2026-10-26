@@ -120,6 +120,38 @@ function oberflaechenMaengel(quelltext: string, aktion: string): string[] {
   return maengel
 }
 
+/**
+ * Wie viele der genannten Passkey-Dialoge (`<name>.dialog`) stehen im Inhalt eines JSX-Elements `<huelle>`?
+ * Ein Dialog, der nur in einem anderen, gerade geschlossenen Dialog eingehängt ist, erscheint nie —
+ * die Aktion wartete dann ohne Meldung (Nr. 188, Runde 2).
+ */
+function dialogeInHuelle(quelltext: string, huelle: string, namen: string[]): string[] {
+  const funde: string[] = []
+  const besuche = (knoten: ts.Node, drin: boolean): void => {
+    const istHuelle = ts.isJsxElement(knoten) && knoten.openingElement.tagName.getText() === huelle
+    if (drin && ts.isPropertyAccessExpression(knoten) && knoten.name.text === 'dialog' && ts.isIdentifier(knoten.expression) && namen.includes(knoten.expression.text)) {
+      funde.push(knoten.expression.text)
+    }
+    ts.forEachChild(knoten, (kind) => besuche(kind, drin || istHuelle))
+  }
+  besuche(datei(quelltext), false)
+  return funde
+}
+
+describe('Passkey-Dialoge hängen dort, wo ihre Aktion ausgelöst wird', () => {
+  it('Zurückziehen und Block löschen stehen nicht im Veröffentlichen-Dialog (Nr. 188, Runde 2)', () => {
+    const quelltext = lies('src/components/admin/startseite-gestalten.tsx')
+    expect(dialogeInHuelle(quelltext, 'VeroeffentlichenDialog', ['frischZurueckziehen', 'frischLoeschen'])).toEqual([])
+    expect(quelltext).toMatch(/\{frischZurueckziehen\.dialog\}/)
+    expect(quelltext).toMatch(/\{frischLoeschen\.dialog\}/)
+  })
+
+  it('Gegenprobe: ein Dialog in der Hülle schlägt an', () => {
+    const schnipsel = '<div><VeroeffentlichenDialog offen={x}>{frischVeroeffentlichen.dialog}{frischLoeschen.dialog}</VeroeffentlichenDialog>{frischZurueckziehen.dialog}</div>'
+    expect(dialogeInHuelle(schnipsel, 'VeroeffentlichenDialog', ['frischZurueckziehen', 'frischLoeschen'])).toEqual(['frischLoeschen'])
+  })
+})
+
 describe('heikle Aktionen verlangen die frische Bestätigung (N20)', () => {
   it('jede heikle Action ruft als erste Anweisung await verlangeFrischeBestaetigung()', () => {
     const maengel = HEIKLE_AKTIONEN.flatMap(({ datei: pfad, namen }) => namen.flatMap((n) => aktionsMaengel(lies(pfad), n).map((m) => `${pfad} ${m}`)))
