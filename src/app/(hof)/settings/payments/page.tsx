@@ -134,8 +134,9 @@ export default async function PaymentsPage({
               <span>{TESTBETRIEB_TEXT.zahlung}</span>
             </p>
           )}
-          {/* Solange es kein Konto gibt: Das Land lässt sich bei Stripe danach nicht mehr ändern. */}
-          {!farm.stripeAccountId && (
+          {/* Solange es kein Konto gibt oder es neu eingerichtet wird (Stripe legt dann ein neues an):
+              Das Land lässt sich bei Stripe danach nicht mehr ändern. */}
+          {(!farm.stripeAccountId || neuEinrichten) && (
             <p className="mt-4 text-[13px] leading-snug text-muted-foreground">
               {stripeLandSatz(alsLand(farm.country))}{' '}
               <Link href="/settings/profile" className="font-semibold text-status-fertig hover:underline">

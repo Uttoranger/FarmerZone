@@ -1,7 +1,8 @@
 /**
  * Eigenes Geheimnis für Links mit Schlüsselkennung (Register S17, Ergänzung
  * 24.10.2026, Nr. 166) — src/lib/link-signatur.ts und die drei Dateien, die
- * damit signieren (bestell-link.ts, reorder-token.ts, unsubscribe.ts).
+ * damit signieren (bestell-link.ts, reorder-token.ts, unsubscribe.ts). Den
+ * vierten, den Double-Opt-in-Link (Nr. 171), prüft tests/abo-bestaetigung.test.ts.
  *
  * Die ALTEN Werte unten sind fest erzeugt (HMAC mit dem Test-Geheimnis aus
  * vitest.config.ts, so wie die Dateien bis Nr. 166 signiert haben). Sie stehen
@@ -10,6 +11,8 @@
  * Buchstaben.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { pruefeLink, signiereLink } from '@/lib/link-signatur'
 import { bestellLinkGilt, bestellSignatur, bestellungPfad } from '@/lib/bestell-link'
 import { generateReorderToken, verifyReorderToken } from '@/lib/reorder-token'
@@ -70,6 +73,14 @@ describe('Ohne LINK_SECRET bleibt alles wie heute', () => {
     expect(bestellSignatur('bestellung-alt')).toBe(ALTE_BESTELL_SIGNATUR)
     expect(signiereLink('bestellung-ansehen', 'bestellung-alt')).toBe(ALTE_BESTELL_SIGNATUR)
     expect(generateUnsubscribeToken('kundin@example.com', 'hof-alt')).toBe(ALTER_ABMELDE_TOKEN)
+  })
+
+  it('auch der Nachbestell-Token ist ohne LINK_SECRET bitgleich mit dem alten (Testlücke aus Nr. 166, Nr. 171)', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(ALTER_NACHBESTELL_ZEITPUNKT))
+    const token = generateReorderToken('bestellung-alt', 'hof-alt')
+    expect(token).toBe(ALTER_NACHBESTELL_TOKEN)
+    expect(token).not.toMatch(/\.2\./)
   })
 })
 
@@ -156,5 +167,22 @@ describe('Die Formprüfung der Adresse lässt die Kennung durch', () => {
       expect(bestaetigungsParameterSchema.parse({ sig }).sig).toBeUndefined()
       expect(neuigkeitenAnmeldenSchema.safeParse({ orderId: 'bestellung-neu', sig }).success).toBe(false)
     }
+  })
+})
+
+describe('.env.example nennt die optionalen Geheimnisse (Nr. 171, Punkt 4)', () => {
+  const zeilen = readFileSync(join(process.cwd(), '.env.example'), 'utf8').split('\n')
+  const zuweisung = (name: string): string[] => zeilen.filter((zeile) => zeile.startsWith(`${name}=`))
+
+  it('LINK_SECRET und RESEND_WEBHOOK_SECRET stehen genau einmal da, leer (kein echter Wert)', () => {
+    for (const name of ['LINK_SECRET', 'RESEND_WEBHOOK_SECRET']) {
+      const treffer = zuweisung(name)
+      expect(treffer, name).toHaveLength(1)
+      expect(treffer[0], name).toMatch(new RegExp(`^${name}=""(\\s+#.*)?$`))
+    }
+  })
+
+  it('Gegenprobe: die Suche findet keine Zuweisung eines Namens, den es nicht gibt', () => {
+    expect(zuweisung('LINK_SECRE')).toEqual([])
   })
 })

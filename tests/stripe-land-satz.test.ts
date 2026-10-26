@@ -1,8 +1,8 @@
 /**
  * Der Satz vor „Mit Stripe einrichten" (Nachtlauf 24, Nr. 164, Punkt 5):
  * In welchem Land das Konto angelegt wird — Stripe lässt es danach nicht mehr
- * ändern. Er steht nur, solange es noch kein Konto gibt, und führt zu den
- * Hofdaten.
+ * ändern. Er steht, solange es noch kein Konto gibt oder das Konto neu
+ * eingerichtet wird (Nr. 171), und führt zu den Hofdaten.
  */
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -32,9 +32,9 @@ import { stripeLandSatz } from '@/lib/laender'
 
 const findUnique = vi.mocked(prisma.farm.findUnique)
 
-async function seite(hof: { stripeAccountId: string | null; country: string }): Promise<string> {
+async function seite(hof: { stripeAccountId: string | null; country: string }, stripe?: string): Promise<string> {
   findUnique.mockResolvedValue({ stripeAccountReady: false, acceptsOnline: false, acceptsOnsite: true, ...hof } as never)
-  const baum = await PaymentsPage({ searchParams: Promise.resolve({}) })
+  const baum = await PaymentsPage({ searchParams: Promise.resolve(stripe ? { stripe } : {}) })
   return renderToStaticMarkup(baum)
 }
 
@@ -59,6 +59,12 @@ describe('/settings/payments: Land vor „Mit Stripe einrichten"', () => {
 
   it('ohne Konto und mit Österreich: Österreich', async () => {
     expect(await seite({ stripeAccountId: null, country: 'AT' })).toContain(stripeLandSatz('AT'))
+  })
+
+  it('„Online-Zahlung neu einrichten“ (Konto da, ?stripe=neu): Stripe legt ein neues Konto an, also steht der Satz (Nr. 171)', async () => {
+    const html = await seite({ stripeAccountId: 'acct_test', country: 'AT' }, 'neu')
+    expect(html).toContain(stripeLandSatz('AT'))
+    expect(html).toContain('href="/settings/profile"')
   })
 
   it('Gegenprobe: mit Konto steht der Satz nicht da', async () => {

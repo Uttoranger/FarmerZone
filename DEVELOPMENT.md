@@ -5786,6 +5786,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Bar-Token nur als Hash (S17-Ergänzung):** `tokenKandidaten` liefert nur noch den Hash. Das tägliche Aufräumen setzt `confirmationToken` auf null für alle Werte ohne das Präfix `h1:` (`BAR_HASH_PRAEFIX`) — ein `updateMany`, kein Löschen; das Ergebnis trägt die Zahl (`klartextTokens`). Ein noch offener Klartext-Link gilt ab dem Deploy nicht mehr; die Barfrist war längst um (höchstens zwei Stunden).
 - **Wache** `tests/actions-in-actions-wache.test.ts`: Keine Datei unter `src/server/actions/` lädt eine andere Action (Import, Re-Export, `import()`, relativ). Bestandsliste heute leer, sie nimmt nur ab.
 
+## Nacharbeit Betrieb, Links und Kleines aus Lauf 24 (Register S17; Nr. 171, Lauf 25, 25.10.2026)
+
+- **Betrieb:** Der Stand der Monats-Mail sagt „… E-Mails im Abrechnungszeitraum (ab dem 17.)“ statt „in diesem Monat“ (`grenzStandText`); Bild-Vorgänge bleiben beim Kalendermonat, `tarifZeilen` unverändert.
+- **Zahlung:** Der Satz zum Land des Stripe-Kontos steht jetzt auch bei „Online-Zahlung neu einrichten“ — Stripe legt dann ein neues Konto an, das Land lässt sich danach nicht mehr ändern (Z1). Damit ist die Annahme aus Nr. 164 aufgehoben.
+- **Double-Opt-in-Link mit eigenem Geheimnis (S17):** `abo-bestaetigung-token.ts` signiert über `signiereLink`/`pruefeLink` (Zweck `abo-optin`, altes Präfix). Ohne `LINK_SECRET` ist der Token bitgleich mit dem bisherigen; mit trägt er `2.`. Verschickte Links gelten weiter (7 Tage), getrennt wird am ersten Punkt. Ohne Kennung besteht ein alter Abo-Token weiter die Signaturprüfung des Nachbestell- und des Abmelde-Tokens (beide ohne Präfix, wie seit jeher); das trifft keine Bestellung und kein Abo (Hofseite prüft `farmId`, die Abmeldung findet kein Abo zu diesem Inhalt) und verschwindet mit `LINK_SECRET` für neue Links.
+- **.env.example:** nennt `LINK_SECRET` und `RESEND_WEBHOOK_SECRET` (beide optional, leer).
+
 ## Mail-Warteschlange und Protokoll (Register N26; Nr. 158, Lauf 24, 24.10.2026)
 
 - **Warum:** Jede Mail ging einzeln über `resend.emails.send` und hing an der Anfrage; ein Beitrag an viele Abos lief als Schleife im Nachlauf, ohne Wiederholung bei 429 und ohne Vorrang. Jetzt gibt es die Tabelle `MailAuftrag` (eine Migration, Expand) als Warteschlange und als Protokoll.
