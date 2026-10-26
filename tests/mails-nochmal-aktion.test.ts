@@ -260,8 +260,8 @@ describe('Alle nochmal schicken', () => {
       zeile({ id: b, art: 'freischaltung', status: 'gescheitert', bestellungId: null, farmId: 'hof_2', bezug: { farmId: 'hof_2' } }),
     ])
     db.farm.findMany.mockResolvedValue([
-      { id: 'hof_1', name: 'Testhof A', approvedAt: new Date(), archivedAt: null, owner: { email: 'hof1@example.at' } },
-      { id: 'hof_2', name: 'Testhof B', approvedAt: new Date(), archivedAt: new Date(), owner: { email: 'hof2@example.at' } },
+      { id: 'hof_1', name: 'Testhof A', approvedAt: new Date(), archivedAt: null, owner: { email: 'hof1@example.com' } },
+      { id: 'hof_2', name: 'Testhof B', approvedAt: new Date(), archivedAt: new Date(), owner: { email: 'hof2@example.com' } },
     ])
     expect(await schickeArtNochmalAction({ art: 'freischaltung' })).toEqual({ ok: true, satz: ALLE_MAILS_TEXT.unterwegs })
     expect(db.farm.findMany).toHaveBeenCalledTimes(1)
