@@ -61,7 +61,7 @@ describe('Mein Hof (früher Mein Auftritt) — Felder mindestens 44 px', () => {
     expect(feldKlassen('<input\n  onChange={(e) => x(e)}\n  className="w-full h-8 px-2"\n/>')).toEqual(['w-full h-8 px-2'])
   })
 
-  it('die Basiskomponente Input bleibt unverändert bei 36 px (nur additiv gehoben)', () => {
-    expect(INPUT).toContain('"h-9 w-full min-w-0')
+  it('die Basiskomponente Input ist seit Nr. 173 selbst 44 px hoch (tests/grundbausteine-groesse.test.ts)', () => {
+    expect(INPUT).toContain('"h-11 w-full min-w-0')
   })
 })

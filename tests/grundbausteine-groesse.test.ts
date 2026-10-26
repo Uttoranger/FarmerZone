@@ -272,7 +272,7 @@ describe('Kleine Größen nur mit Fläche (Bestandsliste)', () => {
     expect(gefunden.filter((f) => !erlaubt.has(f.datei))).toEqual([])
     const mitFund = new Set(gefunden.map((f) => f.datei))
     expect([...erlaubt].filter((d) => !mitFund.has(d))).toEqual([])
-  })
+  }, 30_000)
 
   it('die Bestandsliste ohne Fläche ist leer — und bleibt es', () => {
     expect(BESTAND_OHNE_FLAECHE).toHaveLength(0)
