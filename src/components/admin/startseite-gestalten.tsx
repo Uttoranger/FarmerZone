@@ -59,6 +59,7 @@ import {
   entwurfInhalt,
   mitOffenemBlock,
   neueBlockWerte,
+  nurSichtbareHoefe,
   speicherEingabe,
   useStartseitenEntwurf,
   type SpeicherStand,
@@ -75,8 +76,7 @@ import {
  * Ab 1024 px steht bei offenem Block sein Formular links an Stelle der Liste,
  * die Vorschau bleibt rechts stehen (Register N16, Ergänzung 23.10.2026;
  * Nr. 155) — an GENAU einer Stelle im Baum, unabhängig vom offenen Block:
- * Sonst hängte React sie beim Öffnen aus (beendeStartseitenVorschau) und der
- * Rahmen begänne leer. Unter 1024 px steht das Formular unter der Liste, die
+ * Sonst hängte React sie beim Öffnen aus und der Rahmen begänne leer. Unter 1024 px steht das Formular unter der Liste, die
  * Vorschau im Blatt. Am Handy die
  * Statuskarte oben und unten eine feste Leiste Vorschau · Veröffentlichen …,
  * Vorschau und Dialog als Blatt.
@@ -413,9 +413,9 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
   }
   const termin = daten.geplant[0]?.liveAb ?? null
 
-  /** Was gerade wartet, erst in den Entwurf — dann `weiter` (Block wechseln, schließen, veröffentlichen). */
+  /** Was gerade wartet, erst in den Entwurf — dann `weiter`; nach einem Fehler speichert speichereSofort neu (Nr. 183). */
   function nachSpeichern(weiter: () => void): void {
-    void entwurf.speichereSofort().then((ok) => {
+    void entwurf.speichereSofort().then(({ ok }) => {
       if (ok) weiter()
     })
   }
@@ -423,7 +423,10 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
   function oeffne(zeile: Zeile) {
     if (zeile.id === NEUER_BLOCK || zeile.id === entwurf.block?.zeilenId) return
     setNachFertig(null)
-    nachSpeichern(() => entwurf.oeffneBlock(blockWerteAus(zeile)))
+    const werte = blockWerteAus(zeile)
+    // Gewählte Höfe, die nicht mehr sichtbar sind, fallen beim Öffnen aus der Auswahl (Nr. 183, Fund 5).
+    const sichtbar = daten.hoefe.map((h) => h.id)
+    void entwurf.wechsleBlock(werte && nurSichtbareHoefe(werte, sichtbar))
   }
 
   /** „Fertig“: erst speichern, dann zu — der Block behält für die Zeile unter der Vorschau Titel und Zeitraum. */
@@ -455,11 +458,8 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
   function fuegeEin(nachIndex: number, vorlage: StartseiteVorlage = 'SAISONKARTE') {
     if (entwurf.zeilen.some((z) => z.id === NEUER_BLOCK)) return
     setNachFertig(null)
-    nachSpeichern(() => {
-      const neu: Zeile = { id: NEUER_BLOCK, art: 'BLOCK', sichtbar: true, block: null }
-      const zeilen = entwurf.zeilen
-      entwurf.oeffneBlock(neueBlockWerte(vorlage, jetzt), [...zeilen.slice(0, nachIndex + 1), neu, ...zeilen.slice(nachIndex + 1)])
-    })
+    // Nur die Einfügestelle: Die Liste baut der Entwurf aus dem Stand NACH der Speicherung (Nr. 183, Fund 3).
+    void entwurf.wechsleBlock(neueBlockWerte(vorlage, jetzt), nachIndex)
   }
 
   function waehleVorlage(vorlage: StartseiteVorlage) {
@@ -470,24 +470,13 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
     fuegeEin(entwurf.zeilen.findIndex((z) => z.art === 'HOEFE'), vorlage)
   }
 
+  /** „Block löschen“ bzw. „Verwerfen“ (neuer Block): wartet eine laufende Speicherung ab — legt sie den Block an, wird er gelöscht (Nr. 183). */
   function loeschen() {
-    const offen = entwurf.block
-    if (!offen) return
-    if (!offen.id) {
-      // Ein neuer Block, der noch nie gespeichert war: nur die Zeile weg.
-      entwurf.oeffneBlock(null, entwurf.zeilen.filter((z) => z.id !== NEUER_BLOCK))
-      return
-    }
-    const blockId = offen.id
+    if (!entwurf.block) return
     startTransition(async () => {
-      await entwurf.speichereSofort()
-      const ergebnis = await loescheStartseitenBlock({ blockId })
-      if ('error' in ergebnis) {
-        toast.error(ergebnis.error)
-        return
-      }
-      entwurf.blockGeloescht(blockId)
-      toast.success(T.geloescht)
+      const ergebnis = await entwurf.entferneBlock((blockId) => loescheStartseitenBlock({ blockId }))
+      if (ergebnis?.art === 'fehler') toast.error(ergebnis.text)
+      if (ergebnis?.art === 'geloescht') toast.success(T.geloescht)
     })
   }
 
@@ -497,8 +486,10 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
   function veroeffentlichen(eingabe: VeroeffentlichenEingabe) {
     setDialogFehler(null)
     startTransition(async () => {
-      if (!(await entwurf.speichereSofort())) {
-        setDialogFehler(entwurf.stand.art === 'fehler' ? entwurf.stand.text : E.nichtGespeichert)
+      // Der Grund aus DIESEM Klick, nicht aus dem Render davor (Nr. 183, Fund 8).
+      const gespeichert = await entwurf.speichereSofort()
+      if (!gespeichert.ok) {
+        setDialogFehler(gespeichert.fehler ?? E.nichtGespeichert)
         return
       }
       const ergebnis = await frischVeroeffentlichen.ausfuehren(eingabe)
@@ -515,6 +506,8 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
   function uebernimm(id: string | null, satz: string) {
     setAktionFehler(null)
     startTransition(async () => {
+      // Erst die Uhr weg und eine laufende Speicherung abwarten — sonst überschriebe sie danach den übernommenen Stand (Nr. 183, Fund 7).
+      await entwurf.halteAn()
       const ergebnis = await uebernehmeFassungAlsEntwurf({ id })
       if ('error' in ergebnis) {
         setAktionFehler(ergebnis.error)

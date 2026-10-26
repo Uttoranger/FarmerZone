@@ -5847,6 +5847,17 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Fix:** Eigene Route `/startseite-vorschau` (`force-dynamic`, signierter Link wie bisher, erst Signatur und Ablauf, dann die Admin-Sitzung; ungültig → Fehlerzustand, keine Weiterleitung). Kein Draft Mode mehr: `vorschauDieserAnfrage`, `oeffneVorschau`, `beendeStartseitenVorschau` und die Route `/admin/startseite/vorschau` sind entfernt; Rahmen und „Vorschau öffnen" nehmen dieselbe Adresse (`STARTSEITE_VORSCHAU_HREF`). Der Inhalt steht in einem Baustein (`StartseitenInhalt`) für beide Seiten. `/` ist wieder überall `X-Frame-Options: DENY`; die neue Route darf sich nur mit `vorschau` und `sig` selbst einbetten. `scrollNachNeuladen` vergleicht mit der neuen Route. Wache: `tests/isr-liest-keine-anfrage-wache.test.ts`.
 - **Prüfbar nur auf Vercel:** Der Fehler zeigte sich nur dort; die Abnahme läuft am Vorschau-Deployment (Bericht 182).
 
+## Admin › Startseite: Editor bleibt nicht im Fehler hängen (Register N16; Nr. 183, Lauf 25, 26.10.2026)
+
+- **Anlass:** Prüfung aller Funktionen von Admin › Startseite durch die Projektleitung (25.10.2026); neun Funde, jeder zuerst im Prüfstand bzw. im Integrationstest nachgestellt.
+- **Fehlerzustand:** Nur eine neue Speicherung setzte ihn zurück. Nach „Bitte gib einen Titel ein.“ und „Verwerfen“ blieb die rote Zeile, „Block einfügen“ und das Öffnen eines Blocks taten nichts. Jetzt speichert `speichereSofort` nach einem Fehler neu; Verwerfen, Löschen und Übernehmen beenden einen Fehler des Blocks (ein Fehler der Speicherung selbst bleibt bis zur nächsten gelungenen).
+- **Rennen:** „Verwerfen“ wartet eine laufende Speicherung ab und löscht einen Block, den sie eben angelegt hat (`entferneBlock`); „Block einfügen“ direkt nach „Neu bei den Höfen“ baut die Liste aus dem Stand nach der Speicherung (`wechsleBlock` mit Einfügestelle); „Entwurf verwerfen“/„Als Entwurf übernehmen“ löschen erst die Uhr und warten (`halteAn`).
+- **Übernehmen am Server:** Ein Zusatz-Abschnitt (`ZUSATZ_ARTEN`), den die Fassung nicht hat, fällt in derselben Transaktion weg — vorher blieb er mit alter Position stehen, der Entwurf wurde nie „wie live“, und hinter dem Fuß scheiterte jede Speicherung. Feste und Standard-Abschnitte werden nie gelöscht; einen Knopf „Entfernen“ gibt es weiterhin nicht (offen).
+- **Höfe-Auswahl:** Gewählte Höfe, die nicht mehr sichtbar sind, fallen beim Öffnen aus der Auswahl (`nurSichtbareHoefe`), mit einem Satz darunter; die Bereinigung zählt als Änderung und speichert sich nach der Ruhe. Die Prüfung am Server bleibt.
+- **Verlassen:** Beim Aushängen geht eine wartende Änderung sofort hinaus; `beforeunload` fragt nach, solange „Speichert …“ steht oder ein nie gespeicherter Block offen ist. Der Veröffentlichen-Dialog zeigt den Grund aus dem Klick.
+- **Netz (N29):** `src/lib/netz.ts` (Nr. 175) ist noch nicht im Zwischenstand — der heutige Satz bleibt.
+- **Offen, nur notiert:** die doppelte Stunde beim Wechsel auf Winterzeit in `zeitpunktAusEingabe` (nimmt still die zweite 02:xx) und das Liveschalten geplanter Fassungen per Cron.
+
 ## Nützliche Befehle
 
 ```bash

@@ -180,6 +180,8 @@ Client-Komponente → Server Action → Zod → Fachregel (lib) → Prisma → r
 
 **Ein Client mit automatischem Speichern (Admin › Startseite, `useStartseitenEntwurf`) übernimmt neue Props nach dem ersten Rendern nie still in seinen Zustand**, nur die Antwort der eigenen Action — ein `revalidatePath` auf die eigene Seite setzte sonst offene Eingaben mitten im Speichern zurück; der Prüfstand-Test „neue Props → Liste bleibt“ in `tests/startseite-entwurf.test.ts` hält es fest.
 
+**Ein Fehlerzustand beim automatischen Speichern wird durch jede Aktion verlassen, die den Entwurf wieder gültig macht** (Verwerfen eines neuen Blocks, Löschen, Übernehmen einer Fassung, eine neue Speicherung): „Speichern vor dem nächsten Schritt“ (`speichereSofort`) speichert nach einem Fehler neu, statt den alten Fehler zurückzugeben, und gibt den Grund dieses Laufs zurück (`{ ok, fehler }`), nie den Stand aus dem Render davor. **Vor jeder Action, die den Entwurf ersetzt oder einen Block entfernt, wird gewartet:** Uhr löschen bzw. das Wartende speichern und eine laufende Speicherung abwarten (`halteAn`, `entferneBlock`) — sonst legt sie danach einen verworfenen Block an oder überschreibt den übernommenen Stand. Listen, in die nach einer Speicherung etwas eingefügt wird, baut der Hook aus seiner Ref (nur die Einfügestelle kommt von außen). Beim Aushängen geht eine wartende Änderung sofort hinaus; solange „Speichert …“ steht oder ein nie gespeicherter neuer Block offen ist, fragt `beforeunload` nach (Nr. 183, Prüfstand `tests/startseite-entwurf.test.ts`).
+
 ---
 
 ### Schwere Module nur dynamisch (seit Nr. 31)

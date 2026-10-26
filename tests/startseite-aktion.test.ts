@@ -40,7 +40,7 @@ vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', async () => {
   const tx = {
-    startseiteAbschnitt: { findMany: vi.fn(), update: vi.fn(), create: vi.fn() },
+    startseiteAbschnitt: { findMany: vi.fn(), update: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
     startseiteBlock: { create: vi.fn(), update: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },
     startseiteFassung: { create: vi.fn() },
   }
@@ -87,7 +87,7 @@ import { FRISCH_FEHLER } from '@/lib/admin-anmeldung'
 
 type Fn = ReturnType<typeof vi.fn>
 type TxMock = {
-  startseiteAbschnitt: { findMany: Fn; update: Fn; create: Fn }
+  startseiteAbschnitt: { findMany: Fn; update: Fn; create: Fn; deleteMany: Fn }
   startseiteBlock: { create: Fn; update: Fn; deleteMany: Fn; findMany: Fn }
   startseiteFassung: { create: Fn }
 }

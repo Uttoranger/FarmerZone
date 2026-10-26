@@ -390,6 +390,11 @@ export const ADMIN_STARTSEITE_TEXT = {
   geloescht: 'Der Block ist aus dem Entwurf gelöscht.',
   bildHinweis: 'Quadratisch, mindestens 320 × 320 Pixel.',
   hoefeHinweis: 'Nur freigeschaltete Höfe, höchstens drei.',
+  /** Unter der Höfe-Auswahl, wenn beim Öffnen gewählte Höfe nicht mehr sichtbar waren (Nr. 183). */
+  hoefeEntfernt: (anzahl: number) =>
+    anzahl === 1
+      ? 'Ein Hof ist nicht mehr sichtbar und wurde aus der Auswahl genommen.'
+      : `${anzahl} Höfe sind nicht mehr sichtbar und wurden aus der Auswahl genommen.`,
   vorschauKachel: 'Vorschau',
   vorschauSatz:
     'Die echte Startseite – dein Entwurf oder die Live-Fassung – mit den Blöcken, die am gewählten Tag live wären. Höfe und Produkte sind der Stand von jetzt.',
