@@ -35,7 +35,7 @@ vi.mock('next/navigation', () => ({ redirect: vi.fn(), notFound: vi.fn(), unstab
 
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
-import { NEUER_BLOCK, STANDARD_REIHENFOLGE } from '@/lib/startseite-gestalten'
+import { NEUER_BLOCK, STANDARD_REIHENFOLGE, pruefeReihenfolge } from '@/lib/startseite-gestalten'
 import { standardFassung } from '@/lib/startseite-fassung'
 import type { FassungInhalt } from '@/schemas/startseite-fassung'
 import { speichereEntwurf, uebernehmeFassungAlsEntwurf, veroeffentlicheStartseite, zieheFassungZurueck } from '@/server/actions/startseite'
@@ -60,6 +60,8 @@ afterEach(async () => {
   const ids = [INT_ADMIN, ...testPersonen.map((p) => p.id)]
   await prisma.startseiteFassung.deleteMany({ where: { erstelltVonUserId: { in: ids } } })
   await prisma.startseiteBlock.deleteMany({ where: { OR: [{ erstelltVonUserId: { in: ids } }, { titel: { startsWith: 'int-' } }] } })
+  // Der Zusatz-Abschnitt (Nr. 129) gehört nicht zum Seed — ein Test, der ihn anlegt, lässt ihn nicht stehen.
+  await prisma.startseiteAbschnitt.deleteMany({ where: { art: 'NEUIGKEITEN' } })
   for (const [position, id] of SEED_IDS.entries()) {
     await prisma.startseiteAbschnitt.update({ where: { id }, data: { position, sichtbar: true } })
   }
@@ -250,5 +252,50 @@ describe('Als Entwurf übernehmen', () => {
     expect(zeilen[2].block).toMatchObject({ titel: 'int-Erntedank am Hof', vorlage: 'HINWEISBAND' })
     // Live ändert sich dadurch nicht.
     expect(await ladeStartseite(JETZT)).toEqual(liveVorher)
+  })
+
+  // Nr. 183, Fund 4: Ein Zusatz-Abschnitt, den die Fassung nicht kennt, blieb mit seiner alten Position stehen —
+  // der Entwurf wurde nie „wie live“, und hinter dem Fuß scheiterte danach jede Speicherung.
+  async function mitNeuigkeitenImEntwurf(): Promise<void> {
+    // Hinter dem Fuß: der schlimmste Fall — ohne Fix bliebe er dort, und pruefeReihenfolge meldete den Fuß.
+    await prisma.startseiteAbschnitt.create({ data: { art: 'NEUIGKEITEN', position: SEED_IDS.length, sichtbar: true } })
+  }
+
+  it('nimmt einen Zusatz-Abschnitt aus dem Entwurf, den die Fassung nicht hat — Entwurf wie live, Reihenfolge gültig', async () => {
+    await alsAdmin()
+    await mitNeuigkeitenImEntwurf()
+    const id = await fassung(new Date(JETZT.getTime() - 10 * TAG_MS), mitFragen(false))
+
+    expect(await uebernehmeFassungAlsEntwurf({ id })).toMatchObject({ ok: true })
+
+    const zeilen = await prisma.startseiteAbschnitt.findMany({ orderBy: [{ position: 'asc' }, { id: 'asc' }] })
+    expect(zeilen.some((z) => z.art === 'NEUIGKEITEN')).toBe(false)
+    expect(pruefeReihenfolge(zeilen)).toBeNull()
+    expect(zeilen.map((z) => z.art)).toEqual(STANDARD_REIHENFOLGE)
+  })
+
+  it('„Entwurf verwerfen“ ohne Fassung (Standard-Reihenfolge) nimmt ihn ebenso heraus', async () => {
+    await alsAdmin()
+    await mitNeuigkeitenImEntwurf()
+
+    expect(await uebernehmeFassungAlsEntwurf({ id: null })).toMatchObject({ ok: true })
+
+    expect(await prisma.startseiteAbschnitt.count({ where: { art: 'NEUIGKEITEN' } })).toBe(0)
+    expect(await prisma.startseiteAbschnitt.count()).toBe(SEED_IDS.length)
+  })
+
+  it('Gegenprobe: kennt die Fassung den Zusatz-Abschnitt, bleibt seine Zeile — an der Stelle der Fassung', async () => {
+    await alsAdmin()
+    await mitNeuigkeitenImEntwurf()
+    const vorher = await prisma.startseiteAbschnitt.findFirstOrThrow({ where: { art: 'NEUIGKEITEN' }, select: { id: true } })
+    const [kopf, hoefe, ...rest] = standardFassung().zeilen
+    const mitNeuigkeiten: FassungInhalt = { v: 1, zeilen: [kopf, hoefe, { art: 'NEUIGKEITEN', sichtbar: false }, ...rest] }
+    const id = await fassung(new Date(JETZT.getTime() - 10 * TAG_MS), mitNeuigkeiten)
+
+    expect(await uebernehmeFassungAlsEntwurf({ id })).toMatchObject({ ok: true })
+
+    const zeilen = await prisma.startseiteAbschnitt.findMany({ orderBy: [{ position: 'asc' }, { id: 'asc' }] })
+    expect(zeilen[2]).toMatchObject({ id: vorher.id, art: 'NEUIGKEITEN', sichtbar: false })
+    expect(pruefeReihenfolge(zeilen)).toBeNull()
   })
 })

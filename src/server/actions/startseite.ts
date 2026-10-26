@@ -14,6 +14,7 @@ import {
   REIHENFOLGE_FEHLER_TEXT,
   STARTSEITE_CACHE_TAG,
   STARTSEITE_VORSCHAU_HREF,
+  ZUSATZ_ARTEN,
   felderDerVorlage,
   neueZusatzArt,
   pruefeReihenfolge,
@@ -300,8 +301,9 @@ export async function zieheFassungZurueck(eingabe: unknown): Promise<{ ok: true 
  * „Als Entwurf übernehmen" (und „Entwurf verwerfen" = die Live-Fassung bzw.
  * ohne Fassung `id: null`, die Standard-Reihenfolge): schreibt die Tabellen des
  * Entwurfs aus der Fassung in EINER Transaktion. Blöcke behalten ihre
- * Kennung (gleicher Block = keine Änderung gegenüber live); Blöcke des
- * Entwurfs, die die Fassung nicht kennt, fallen weg (ihre Bilder bleiben).
+ * Kennung (gleicher Block = keine Änderung gegenüber live); Blöcke und
+ * Zusatz-Abschnitte des Entwurfs, die die Fassung nicht kennt, fallen weg
+ * (die Bilder der Blöcke bleiben).
  * Live ändert sich nichts.
  */
 export async function uebernehmeFassungAlsEntwurf(eingabe: unknown): Promise<{ ok: true; zeilen: AdminStartseitenZeile[] } | { error: string }> {
@@ -323,6 +325,12 @@ export async function uebernehmeFassungAlsEntwurf(eingabe: unknown): Promise<{ o
     const behalten = new Set(inhalt.zeilen.flatMap((z) => (z.art === 'BLOCK' && z.block.id ? [z.block.id] : [])))
     // Erst die Blöcke, die die Fassung nicht kennt (Cascade nimmt ihre Zeile mit).
     await tx.startseiteBlock.deleteMany({ where: { id: { notIn: [...behalten] } } })
+    // Ein Zusatz-Abschnitt (Nr. 129), den die Fassung nicht hat, fällt ebenso weg (Nr. 183) — sonst behielte er
+    // seine alte Position, der Entwurf würde nie „wie live“, und hinter dem Fuß scheiterte jede Speicherung.
+    // Nur Zusatz-Arten: feste und Standard-Abschnitte schreibt die Schleife unten, gelöscht werden sie nie.
+    const artenDerFassung = new Set(inhalt.zeilen.map((z) => z.art))
+    const fremdeZusatz = ZUSATZ_ARTEN.filter((art) => !artenDerFassung.has(art))
+    if (fremdeZusatz.length > 0) await tx.startseiteAbschnitt.deleteMany({ where: { art: { in: fremdeZusatz } } })
     const vorhanden = new Set((await tx.startseiteBlock.findMany({ select: { id: true } })).map((b) => b.id))
 
     // Nacheinander, nie Promise.all im Transaktions-Client (CODING_STANDARDS §4).

@@ -5868,6 +5868,17 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Fix:** `src/lib/netz.ts` ist die eine Quelle: `istNetzFehler` (aus upload-diagnose.ts gezogen, dort unter dem alten Namen weitergereicht), `NETZ_SATZ`/`NETZ_KNOPF`, `mitNetzSchutz` mit `AbortSignal.timeout` (15 s). use-cart.ts schickt Reservieren, Mengenänderung und Freigabe darüber; bei `netz`/`zeit` kommt `{ ok: false, error: NETZ_SATZ, nochmal: true }`, der Korb bleibt. Was der Server prüft und hält, ist unverändert — ein Zeitablauf kann einen Halt hinterlassen, der nach 15 Minuten abläuft. Hof-Aktionen laufen über `aktionOhneWurf` (neu, gibt die ganze Antwort durch) bzw. `speichernOhneWurf` (gibt am Netz jetzt `NETZ_SATZ`); eine Wache hält es. `NetzHinweis` in den Shells; eigene Fehlergrenze `(hof)/error.tsx` mit „Zu Heute", die Unterleiste bleibt; der leere Korb im Blatt ist ein `EmptyState`.
 - **Offen:** Den Knopf „Nochmal" an der Aktion bauen 177 (Hofseite) und 174 (Hof-Formulare, Abholzeiten); bis dahin steht der Netzsatz im bestehenden Toast bzw. in der bestehenden Fehlerzeile.
 
+## Admin › Startseite: Editor bleibt nicht im Fehler hängen (Register N16; Nr. 183, Lauf 25, 26.10.2026)
+
+- **Anlass:** Prüfung aller Funktionen von Admin › Startseite durch die Projektleitung (25.10.2026); neun Funde, jeder zuerst im Prüfstand bzw. im Integrationstest nachgestellt.
+- **Fehlerzustand:** Nur eine neue Speicherung setzte ihn zurück. Nach „Bitte gib einen Titel ein.“ und „Verwerfen“ blieb die rote Zeile, „Block einfügen“ und das Öffnen eines Blocks taten nichts. Jetzt speichert `speichereSofort` nach einem Fehler neu; Verwerfen, Löschen und Übernehmen beenden einen Fehler des Blocks (ein Fehler der Speicherung selbst bleibt bis zur nächsten gelungenen).
+- **Rennen:** „Verwerfen“ wartet eine laufende Speicherung ab und löscht einen Block, den sie eben angelegt hat (`entferneBlock`); „Block einfügen“ direkt nach „Neu bei den Höfen“ baut die Liste aus dem Stand nach der Speicherung (`wechsleBlock` mit Einfügestelle); „Entwurf verwerfen“/„Als Entwurf übernehmen“ löschen erst die Uhr und warten (`halteAn`); scheitert die Action, reiht `fahreFort` die angehaltene Änderung wieder ein (Nachbesserung Runde 1). Verwerfen eines neuen Blocks und Löschen setzen auch nach einem Speicher-Fehler auf Ruhe (Wortlaut der Freigabe).
+- **Übernehmen am Server:** Ein Zusatz-Abschnitt (`ZUSATZ_ARTEN`), den die Fassung nicht hat, fällt in derselben Transaktion weg — vorher blieb er mit alter Position stehen, der Entwurf wurde nie „wie live“, und hinter dem Fuß scheiterte jede Speicherung. Feste und Standard-Abschnitte werden nie gelöscht; einen Knopf „Entfernen“ gibt es weiterhin nicht (offen).
+- **Höfe-Auswahl:** Gewählte Höfe, die nicht mehr sichtbar sind, fallen beim Öffnen aus der Auswahl (`nurSichtbareHoefe`), mit einem Satz darunter; die Bereinigung zählt als Änderung und speichert sich nach der Ruhe. Die Prüfung am Server bleibt.
+- **Verlassen:** Beim Aushängen geht eine wartende Änderung sofort hinaus; `beforeunload` fragt nach, solange „Speichert …“ steht oder ein nie gültiger neuer Block offen ist. Der Veröffentlichen-Dialog zeigt den Grund aus dem Klick.
+- **Netz (N29):** `src/lib/netz.ts` (Nr. 175) ist noch nicht im Zwischenstand — der heutige Satz bleibt.
+- **Offen, nur notiert:** die doppelte Stunde beim Wechsel auf Winterzeit in `zeitpunktAusEingabe` (nimmt still die zweite 02:xx) und das Liveschalten geplanter Fassungen per Cron.
+
 ## Nützliche Befehle
 
 ```bash

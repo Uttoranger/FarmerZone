@@ -57,6 +57,8 @@ export type BlockWerte = {
   liveAbUhrzeit: string
   liveBisTag: string
   liveBisUhrzeit: string
+  /** So viele gewählte Höfe waren beim Öffnen nicht mehr sichtbar und fielen aus der Auswahl (Nr. 183) — für den Satz darunter. */
+  hoefeEntfernt?: number
 }
 
 export function neueBlockWerte(vorlage: StartseiteVorlage, jetzt: Date): BlockWerte {
@@ -101,6 +103,18 @@ export function blockWerteAus(zeile: Zeile): BlockWerte | null {
     liveBisTag: bis?.tag ?? '',
     liveBisUhrzeit: bis?.uhrzeit ?? '',
   }
+}
+
+/**
+ * Beim Öffnen: Gewählte Höfe, die nicht mehr sichtbar sind (pausiert, gesperrt,
+ * Testhof), fallen aus der Auswahl (Nr. 183). Das Formular zeigt nur sichtbare
+ * Höfe — ein unsichtbarer ließe sich nicht abwählen, und der Server wiese
+ * jede Speicherung ab, auch Pfeile und Auge. Seine Prüfung bleibt.
+ */
+export function nurSichtbareHoefe(werte: BlockWerte, sichtbar: readonly string[]): BlockWerte {
+  const farmIds = werte.farmIds.filter((id) => sichtbar.includes(id))
+  const entfernt = werte.farmIds.length - farmIds.length
+  return entfernt === 0 ? werte : { ...werte, farmIds, hoefeEntfernt: entfernt }
 }
 
 /** Der Block als Eingabe des Schemas — leere Felder als null (CODING_STANDARDS §8). */
@@ -202,6 +216,21 @@ export type SpeicherStand =
 
 type Speichern = (eingabe: StartseiteSpeichernEingabe) => Promise<EntwurfGespeichert | { error: string }>
 
+/** Was „Speichern vor dem nächsten Schritt“ ergab — der Grund kommt aus DIESEM Lauf, nicht aus einem alten Render (Nr. 183). */
+export type SofortGespeichert = { ok: boolean; fehler: string | null }
+
+/** „Block löschen“ bzw. „Verwerfen“ — die Action wird übergeben, damit der Prüfstand sie ersetzen kann. */
+type Loeschen = (blockId: string) => Promise<{ ok: true } | { error: string }>
+
+export type BlockEntfernt = { art: 'verworfen' } | { art: 'geloescht' } | { art: 'fehler'; text: string }
+
+/**
+ * Woran die letzte Speicherung scheiterte: am offenen Block (Schema) oder an
+ * der Speicherung selbst (Server, Netz). Ein Block-Fehler endet, sobald der
+ * Block weg ist; ein Speicher-Fehler erst mit der nächsten gelungenen Speicherung.
+ */
+type Fehler = { art: 'block' | 'speichern'; text: string }
+
 /** Ein gefangener Wurf geht trotzdem nach Sentry (CODING_STANDARDS §4) — fester Text, Klasse als Name, nie Formularwerte. */
 function meldeGescheitert(fehler: unknown): void {
   try {
@@ -253,12 +282,29 @@ export function useStartseitenEntwurf({
   aenderungen: Aenderung[]
   aendereZeilen: (neu: Zeile[]) => void
   aendereBlock: (neu: BlockWerte) => void
-  /** Öffnet bzw. schließt das Formular (und setzt die Liste, etwa mit einem neuen, noch leeren Block) — ohne zu speichern. */
-  oeffneBlock: (neu: BlockWerte | null, zeilen?: Zeile[]) => void
+  /**
+   * Öffnet bzw. schließt das Formular — ohne zu speichern. Ein neuer Block
+   * bekommt seine leere Zeile nach `nachIndex`, eingefügt in den Stand der Ref
+   * (nie in eine Liste aus einem alten Render, Nr. 183).
+   */
+  oeffneBlock: (neu: BlockWerte | null, nachIndex?: number) => void
+  /** Erst speichern, was wartet, dann `oeffneBlock` — false (und nichts geöffnet), wenn danach nicht alles im Entwurf steht. */
+  wechsleBlock: (neu: BlockWerte | null, nachIndex?: number) => Promise<boolean>
+  /**
+   * „Block löschen“ bzw. „Verwerfen“: erst eine laufende Speicherung abwarten;
+   * hat der Block danach eine Kennung, löscht ihn `loesche` — sonst fällt nur
+   * seine Zeile weg (Nr. 183, Fund 2).
+   */
+  entferneBlock: (loesche: Loeschen) => Promise<BlockEntfernt | null>
+  /**
+   * Vor einer Action, die den Entwurf ersetzt: Uhr löschen, laufende Speicherung abwarten (Nr. 183, Fund 7).
+   * Gibt `fahreFort` zurück: Scheitert die Action, reiht es die angehaltene Änderung wieder ein.
+   */
+  halteAn: () => Promise<() => void>
   setzeZurueck: (zeilen: readonly Zeile[]) => void
   /** Nach „Block löschen“: Die Action hat den Entwurf schon geändert — Formular zu, Zeile weg, Vorschau lädt neu. */
   blockGeloescht: (blockId: string) => void
-  speichereSofort: () => Promise<boolean>
+  speichereSofort: () => Promise<SofortGespeichert>
 } {
   const [zeilen, setZeilen] = useState<Zeile[]>(() => [...start])
   const [block, setBlock] = useState<BlockWerte | null>(null)
@@ -269,15 +315,36 @@ export function useStartseitenEntwurf({
   const kette = useRef<Promise<void>>(Promise.resolve())
   const eingereiht = useRef(false)
   const version = useRef(0)
-  const fehlerFrei = useRef(true)
+  const fehler = useRef<Fehler | null>(null)
 
-  // Beim Verlassen keine Uhr stehen lassen.
+  // Beim Verlassen keine Uhr stehen lassen — läuft sie noch, geht die letzte Änderung sofort hinaus (Nr. 183, Fund 6).
   useEffect(
     () => () => {
-      if (uhr.current) clearTimeout(uhr.current)
+      if (!uhr.current) return
+      clearTimeout(uhr.current)
+      uhr.current = null
+      void reiheEin()
     },
+    // Absichtlich nur beim Aushängen: reiheEin liest alles aus Refs, `speichere` ist eine feste Server Action.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   )
+
+  // Schließen oder Neuladen des Tabs hängt nichts aus: Der Browser fragt nach, solange etwas noch nicht im Entwurf steht —
+  // „Speichert …“ oder ein nie gültiger neuer Block. Ein gültiger neuer Block ohne Kennung wartet auf seine Speicherung
+  // und ist damit schon über „Speichert …“ abgedeckt; ohne Kennung bleibt also nur der, den der Server nie annehmen konnte.
+  const nieGueltigerNeuerBlock = block !== null && !block.id
+  const warnen = stand.art === 'speichert' || nieGueltigerNeuerBlock
+  useEffect(() => {
+    if (!warnen) return
+    const halte = (ereignis: BeforeUnloadEvent): void => {
+      ereignis.preventDefault()
+      // Ältere Browser fragen nur nach, wenn returnValue gesetzt ist.
+      ereignis.returnValue = ''
+    }
+    window.addEventListener('beforeunload', halte)
+    return () => window.removeEventListener('beforeunload', halte)
+  }, [warnen])
 
   function uebernimm(neu: { zeilen?: Zeile[]; block?: BlockWerte | null }): void {
     aktuell.current = { ...aktuell.current, ...neu }
@@ -296,7 +363,7 @@ export function useStartseitenEntwurf({
       antwort = { error: ABSCHNITT_SPEICHERN_TEXT.gingNicht }
     }
     if ('error' in antwort) {
-      fehlerFrei.current = false
+      fehler.current = { art: 'speichern', text: antwort.error }
       setStand({ art: 'fehler', text: antwort.error })
       return
     }
@@ -306,7 +373,7 @@ export function useStartseitenEntwurf({
       uebernimm({ zeilen: aktuell.current.zeilen.map((z) => ({ ...z, id: antwort.neueAbschnitte[z.id] ?? z.id })) })
     }
     setSpeicherungen((n) => n + 1)
-    fehlerFrei.current = blockFehler === null
+    fehler.current = blockFehler === null ? null : { art: 'block', text: blockFehler }
     if (blockFehler) setStand({ art: 'fehler', text: blockFehler })
     // Kam während der Speicherung etwas dazu, ist es schon eingereiht — bis dahin „Speichert …".
     else if (version.current === gestartet && !uhr.current) setStand({ art: 'gespeichert', um: uhrzeitInWien(new Date(antwort.gespeichertAm)) })
@@ -322,6 +389,53 @@ export function useStartseitenEntwurf({
       })
     }
     return kette.current
+  }
+
+  /** Vor „Veröffentlichen …", einem Blockwechsel, Löschen: was noch wartet, sofort speichern. */
+  async function speichereSofort(): Promise<SofortGespeichert> {
+    if (uhr.current) {
+      clearTimeout(uhr.current)
+      uhr.current = null
+      await reiheEin()
+    } else if (fehler.current) {
+      // Nach einem Fehler ist der Stand nicht sicher im Entwurf: neu speichern statt den alten Fehler zurückzugeben (Nr. 183, Fund 1).
+      await reiheEin()
+    } else {
+      await kette.current
+    }
+    return { ok: fehler.current === null, fehler: fehler.current?.text ?? null }
+  }
+
+  /**
+   * Der offene Block ist weg (verworfen, gelöscht), danach ist kein ungültiger Block mehr offen: Der Editor ist wieder frei,
+   * gleich welcher Fehler vorher stand (Wortlaut Freigabe Nr. 183, Fund 1). Nach einem Speicher-Fehler (Server, Netz)
+   * hat `speichereSofort` es gerade noch einmal versucht; jede weitere Änderung schickt den ganzen Stand neu.
+   */
+  function nachBlockWeg(): void {
+    fehler.current = null
+    // Läuft noch eine Uhr, wartet eine Änderung: „Speichert …“ ist dann wahrer als „Ruhe“ (über entferneBlock nie der Fall).
+    if (!uhr.current) setStand({ art: 'ruhe' })
+  }
+
+  function oeffneBlock(neu: BlockWerte | null, nachIndex?: number): void {
+    // Wer einen nie gespeicherten neuen Block verlässt, lässt seine leere Zeile nicht stehen.
+    // Der Block, der zugeht, bleibt mit seinem Stand in der Liste (Nr. 106): Sonst zeigte sie nach „Fertig“
+    // seine alten Daten (ein neuer: keine) und zählte ihn nicht als Änderung, bis die Seite neu lädt.
+    const liste = mitOffenemBlock(aktuell.current.zeilen, aktuell.current.block).filter((z) => z.id !== NEUER_BLOCK)
+    if (neu?.zeilenId === NEUER_BLOCK && nachIndex !== undefined) {
+      liste.splice(nachIndex + 1, 0, { id: NEUER_BLOCK, art: 'BLOCK', sichtbar: true, block: null })
+    }
+    uebernimm({ block: neu, zeilen: liste })
+    // Fielen beim Öffnen unsichtbare Höfe aus der Auswahl (Nr. 183, Fund 5), ist das eine Änderung am Entwurf.
+    if (neu?.hoefeEntfernt) geaendert()
+  }
+
+  function blockGeloescht(blockId: string): void {
+    // Auch über die Zeile des offenen Blocks: Ein in dieser Sitzung angelegter Block steht in `zeilen` ohne Daten (block: null).
+    const zeilenId = aktuell.current.block?.zeilenId
+    uebernimm({ block: null, zeilen: aktuell.current.zeilen.filter((z) => z.id !== zeilenId && z.block?.id !== blockId) })
+    setSpeicherungen((n) => n + 1)
+    nachBlockWeg()
   }
 
   function geaendert(): void {
@@ -348,34 +462,49 @@ export function useStartseitenEntwurf({
       uebernimm({ block: neu })
       geaendert()
     },
-    oeffneBlock(neu, zeilen) {
-      // Wer einen nie gespeicherten neuen Block verlässt, lässt seine leere Zeile nicht stehen.
-      // Der Block, der zugeht, bleibt mit seinem Stand in der Liste (Nr. 106): Sonst zeigte sie nach „Fertig“
-      // seine alten Daten (ein neuer: keine) und zählte ihn nicht als Änderung, bis die Seite neu lädt.
-      const liste = mitOffenemBlock(zeilen ?? aktuell.current.zeilen, aktuell.current.block)
-      uebernimm({ block: neu, zeilen: neu?.zeilenId === NEUER_BLOCK ? liste : liste.filter((z) => z.id !== NEUER_BLOCK) })
+    oeffneBlock,
+    async wechsleBlock(neu, nachIndex) {
+      const { ok } = await speichereSofort()
+      if (ok) oeffneBlock(neu, nachIndex)
+      return ok
     },
-    setzeZurueck(neu) {
-      uebernimm({ zeilen: [...neu], block: null })
-      setStand({ art: 'ruhe' })
-      setSpeicherungen((n) => n + 1)
+    async entferneBlock(loesche) {
+      if (!aktuell.current.block) return null
+      // Erst abwarten: Legt eine laufende Speicherung den Block gerade an, hat er danach seine Kennung (Fund 2).
+      await speichereSofort()
+      const offen = aktuell.current.block
+      if (!offen) return null
+      if (!offen.id) {
+        // Ein neuer Block, der nie gespeichert wurde: nur die Zeile weg.
+        oeffneBlock(null)
+        nachBlockWeg()
+        return { art: 'verworfen' }
+      }
+      const ergebnis = await loesche(offen.id)
+      if ('error' in ergebnis) return { art: 'fehler', text: ergebnis.error }
+      blockGeloescht(offen.id)
+      return { art: 'geloescht' }
     },
-    blockGeloescht(blockId) {
-      // Auch über die Zeile des offenen Blocks: Ein in dieser Sitzung angelegter Block steht in `zeilen` ohne Daten (block: null).
-      const zeilenId = aktuell.current.block?.zeilenId
-      uebernimm({ block: null, zeilen: aktuell.current.zeilen.filter((z) => z.id !== zeilenId && z.block?.id !== blockId) })
-      setSpeicherungen((n) => n + 1)
-    },
-    /** Vor „Veröffentlichen …": was noch wartet, sofort speichern — true, wenn danach alles im Entwurf steht. */
-    async speichereSofort() {
+    async halteAn() {
+      const angehalten = uhr.current !== null
       if (uhr.current) {
         clearTimeout(uhr.current)
         uhr.current = null
-        await reiheEin()
-      } else {
-        await kette.current
       }
-      return fehlerFrei.current
+      await kette.current
+      // Scheitert die Action danach, geht die angehaltene Änderung wieder hinaus — sonst stünde „Speichert …“ ohne Speicherung.
+      return () => {
+        if (angehalten) void reiheEin()
+      }
     },
+    setzeZurueck(neu) {
+      // Der Entwurf kommt ganz vom Server: kein offener Block, kein alter Fehler.
+      uebernimm({ zeilen: [...neu], block: null })
+      fehler.current = null
+      setStand({ art: 'ruhe' })
+      setSpeicherungen((n) => n + 1)
+    },
+    blockGeloescht,
+    speichereSofort,
   }
 }

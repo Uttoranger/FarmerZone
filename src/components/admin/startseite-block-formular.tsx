@@ -2,7 +2,7 @@
 
 import { useId } from 'react'
 import Image from 'next/image'
-import { Check, ImagePlus, LayoutGrid, Megaphone, Plus, Sprout, Tag, Trash2, type LucideIcon } from 'lucide-react'
+import { Check, ImagePlus, Info, LayoutGrid, Megaphone, Plus, Sprout, Tag, Trash2, type LucideIcon } from 'lucide-react'
 import type { StartseiteVorlage } from '@prisma/client'
 import {
   ABSCHNITT_TEXT,
@@ -211,6 +211,13 @@ export function BlockFormular({
             })}
           </ul>
           <p className={cn('text-[12px]', LEISE)}>{T.hoefeHinweis}</p>
+          {werte.hoefeEntfernt ? (
+            // Ein Hinweis, kein Fehler: Die Auswahl ist schon bereinigt, gespeichert wird sie mit der nächsten Speicherung (Nr. 183).
+            <p role="status" className="flex items-start gap-1.5 text-[12.5px] text-foreground">
+              <Info className="mt-0.5 size-3.5 shrink-0 text-status-fertig" strokeWidth={1.8} aria-hidden="true" />
+              {T.hoefeEntfernt(werte.hoefeEntfernt)}
+            </p>
+          ) : null}
         </fieldset>
       )}
 
