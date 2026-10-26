@@ -23,7 +23,9 @@ import {
   EINRICHTUNGSCODE_GUELTIG_MINUTEN,
   EINRICHTUNGSCODE_STELLEN,
   REGISTRIERUNG_GESPERRT,
+  adminPasskeyWo,
   einrichtenOffen,
+  istAdminPasskey,
   type AdminSicherheitAnlass,
 } from '@/lib/admin-anmeldung'
 import { ersatzcodeHash, erzeugeErsatzcodes } from '@/lib/ersatzcodes'
@@ -105,11 +107,11 @@ export async function schickeEinrichtungscode(): Promise<AktionsAntwort> {
   const sitzung = await eigeneSitzung()
   if (!sitzung) return { error: 'Nicht angemeldet.' }
   const jetzt = new Date()
-  const [konto, passkeys] = await Promise.all([
-    prisma.user.findUnique({ where: { id: sitzung.userId }, select: { adminSeit: true } }),
-    prisma.passkey.count({ where: { userId: sitzung.userId } }),
-  ])
-  if (!einrichtenMitCodeErlaubt(sitzung, konto?.adminSeit ?? null, passkeys, jetzt)) return { error: REGISTRIERUNG_GESPERRT }
+  const konto = await prisma.user.findUnique({ where: { id: sitzung.userId }, select: { adminSeit: true } })
+  const adminSeit = konto?.adminSeit ?? null
+  // Nur Passkeys aus der Admin-Einrichtung zählen (Nr. 179): Ein Hof-Passkey von vorher ersetzt den ersten nicht.
+  const passkeys = await prisma.passkey.count({ where: { userId: sitzung.userId, ...adminPasskeyWo(adminSeit) } })
+  if (!einrichtenMitCodeErlaubt(sitzung, adminSeit, passkeys, jetzt)) return { error: REGISTRIERUNG_GESPERRT }
   if (process.env.NODE_ENV === 'production' && !codeVersandJeKonto.check(sitzung.userId)) return { error: ADMIN_ANMELDEN_FEHLER.zuViele }
 
   const zweck = einmalLinkZweck(EINRICHTUNGSCODE_ART, sitzung.sitzungId)
@@ -164,7 +166,8 @@ export type ErsatzcodesAntwort = { ok: true; codes: string[] } | { error: string
 export async function erstelleErsatzcodes(): Promise<ErsatzcodesAntwort> {
   const frisch = await verlangeFrischeBestaetigung({ ohnePasskey: true })
   if ('error' in frisch) return frisch
-  const passkeys = await prisma.passkey.count({ where: { userId: frisch.userId } })
+  const konto = await prisma.user.findUnique({ where: { id: frisch.userId }, select: { adminSeit: true } })
+  const passkeys = await prisma.passkey.count({ where: { userId: frisch.userId, ...adminPasskeyWo(konto?.adminSeit ?? null) } })
   if (passkeys === 0) return { error: ADMIN_AKTION_FEHLER.pflicht }
 
   const codes = erzeugeErsatzcodes()
@@ -180,10 +183,12 @@ export async function erstelleErsatzcodes(): Promise<ErsatzcodesAntwort> {
 const passkeyEntfernenSchema = z.object({ id: z.string().min(1).max(200) })
 
 /**
- * Entfernt einen eigenen Passkey (frisch bestätigt), nie den letzten. Zwei
- * Tabs, die gleichzeitig je einen der letzten zwei entfernen, dürfen nicht
- * beide durchkommen: Die Kontozeile wird in der Transaktion per echtem UPDATE
- * gesperrt, erst dann gezählt und gelöscht (CODING_STANDARDS §4).
+ * Entfernt einen eigenen Passkey (frisch bestätigt), nie den letzten aus der
+ * Admin-Einrichtung (Nr. 179: ein Hof-Passkey von vor dem Recht zählt nicht
+ * mit und darf immer gehen). Zwei Tabs, die gleichzeitig je einen der letzten
+ * zwei entfernen, dürfen nicht beide durchkommen: Die Kontozeile wird in der
+ * Transaktion per echtem UPDATE gesperrt, erst dann gezählt und gelöscht
+ * (CODING_STANDARDS §4).
  */
 export async function entfernePasskey(eingabe: unknown): Promise<AktionsAntwort> {
   const frisch = await verlangeFrischeBestaetigung()
@@ -193,9 +198,11 @@ export async function entfernePasskey(eingabe: unknown): Promise<AktionsAntwort>
 
   const userId = frisch.userId
   const ergebnis = await prisma.$transaction(async (tx) => {
-    await tx.user.update({ where: { id: userId }, data: { updatedAt: new Date() } })
-    const anzahl = await tx.passkey.count({ where: { userId } })
-    if (anzahl <= 1) return 'letzter' as const
+    const { adminSeit } = await tx.user.update({ where: { id: userId }, data: { updatedAt: new Date() }, select: { adminSeit: true } })
+    const ziel = await tx.passkey.findFirst({ where: { id: v.data.id, userId }, select: { createdAt: true } })
+    if (!ziel) return 'fehlt' as const
+    const anzahl = await tx.passkey.count({ where: { userId, ...adminPasskeyWo(adminSeit) } })
+    if (istAdminPasskey(ziel.createdAt, adminSeit) && anzahl <= 1) return 'letzter' as const
     const { count } = await tx.passkey.deleteMany({ where: { id: v.data.id, userId } })
     return count === 1 ? ('entfernt' as const) : ('fehlt' as const)
   })

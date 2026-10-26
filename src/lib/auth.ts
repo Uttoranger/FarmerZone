@@ -41,11 +41,14 @@ import {
   EINRICHTUNGSCODE_ART,
   ERSATZCODE_ANMELDEN_PFAD,
   REGISTRIERUNG_GESPERRT,
+  adminPasskeyWo,
   anmeldeartFuerPfad,
+  istAdminPasskey,
   lokaleHerkunft,
   passkeyAdresse,
   registrierungsFall,
   type AdminSicherheitAnlass,
+  type RegistrierungsFall,
 } from '@/lib/admin-anmeldung'
 import { ersatzcodeAnmeldenSchema, ersatzcodeHash, normalisiereErsatzcode } from '@/lib/ersatzcodes'
 import { erkenneGeraet } from '@/server/geraete'
@@ -249,16 +252,19 @@ function falschesPasswortFehler(): APIError {
 }
 
 /**
- * Hat die Adresse ein Konto mit Admin-Recht UND mindestens einem Passkey? Dann
- * sind Passwort und „Passwort vergessen" gesperrt (N20) — auch für seinen Hof.
- * Genau diese Adresse, alle Treffer (wie rolleZurAdresse).
+ * Hat die Adresse ein Konto mit Admin-Recht UND mindestens einem Passkey aus
+ * der Admin-Einrichtung? Dann sind Passwort und „Passwort vergessen" gesperrt
+ * (N20) — auch für seinen Hof. Ein Hof-Passkey von vor dem Admin-Recht zählt
+ * nicht (istAdminPasskey, Nr. 179): Sonst wäre ein Hof, der Admin wird, ohne
+ * Passwort und ohne gültigen Passkey ausgesperrt. Genau diese Adresse, alle
+ * Treffer (wie rolleZurAdresse).
  */
 async function adminMitPasskey(email: string): Promise<boolean> {
-  const treffer = await prisma.user.findFirst({
+  const treffer = await prisma.user.findMany({
     where: { email: { equals: genauesIlikeMuster(email), mode: 'insensitive' }, isAdmin: true, passkeys: { some: {} } },
-    select: { id: true },
+    select: { adminSeit: true, passkeys: { select: { createdAt: true } } },
   })
-  return treffer !== null
+  return treffer.some((konto) => konto.passkeys.some((p) => istAdminPasskey(p.createdAt, konto.adminSeit)))
 }
 
 /**
@@ -290,8 +296,8 @@ async function meldeAdminSicherheit(userId: string, anlass: AdminSicherheitAnlas
  */
 const sitzungVorPasskey = new WeakMap<object, { userId: string; sitzungId: string }>()
 
-/** Die Sitzung, die gerade einen Passkey anlegt — hooks.after setzt danach `passkeyAm`. */
-const sitzungBeimEinrichten = new WeakMap<object, { userId: string; sitzungId: string }>()
+/** Die Sitzung, die gerade einen Passkey anlegt — hooks.after setzt danach `passkeyAm` (und schickt Admins die Mail). */
+const sitzungBeimEinrichten = new WeakMap<object, { userId: string; sitzungId: string; fall: RegistrierungsFall }>()
 
 type HookKontext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0]
 
@@ -349,28 +355,31 @@ function pruefePasswortRegeln(ctx: HookKontext): void {
 }
 
 /**
- * Darf diese Sitzung einen Passkey anlegen (Fälle a–c, registrierungsFall)?
- * Auf BEIDEN Registrierungs-Pfaden, alles frisch aus der Datenbank: Recht und
- * `adminSeit`, Zahl der Passkeys, Alter, Anmeldeart und `passkeyAm` der
- * Sitzung, der E-Mail-Code der Einrichtung in dieser Sitzung. Sonst 403 mit
- * neutralem Text. Das Plugin prüft danach seine eigene Frische (1 Tag).
+ * Darf diese Sitzung einen Passkey anlegen (Fälle a–c für Admins, `hof` für
+ * Höfe ohne Admin-Recht; registrierungsFall)? Auf BEIDEN Registrierungs-
+ * Pfaden, alles frisch aus der Datenbank: Recht, Rolle und `adminSeit`, Zahl
+ * der Passkeys (bei Admins nur die aus der Admin-Einrichtung), Alter,
+ * Anmeldeart und `passkeyAm` der Sitzung, der E-Mail-Code der Einrichtung in
+ * dieser Sitzung. Sonst 403 mit neutralem Text. Das Plugin prüft danach seine
+ * eigene Frische (1 Tag).
  */
 async function pruefeRegistrierung(ctx: HookKontext): Promise<void> {
   const angemeldet = await getSessionFromCtx(ctx, { disableRefresh: true })
   if (!angemeldet) throw APIError.from('UNAUTHORIZED', { code: 'UNAUTHORIZED', message: 'Unauthorized' })
   const userId = angemeldet.user.id
   const sitzungId = angemeldet.session.id
-  const [konto, sitzung, passkeys, codes] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true, adminSeit: true } }),
+  const [konto, sitzung, codes] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true, role: true, adminSeit: true } }),
     prisma.session.findFirst({ where: { id: sitzungId, userId }, select: { createdAt: true, anmeldeart: true, passkeyAm: true } }),
-    prisma.passkey.count({ where: { userId } }),
     prisma.einmalLink.count({ where: { userId, zweck: einmalLinkZweck(EINRICHTUNGSCODE_ART, sitzungId), benutztAm: { not: null } } }),
   ])
+  const passkeys = konto ? await prisma.passkey.count({ where: { userId, ...(konto.isAdmin ? adminPasskeyWo(konto.adminSeit) : {}) } }) : 0
   const fall =
     konto && sitzung
       ? registrierungsFall(
           {
             isAdmin: konto.isAdmin,
+            rolle: konto.role,
             adminSeit: konto.adminSeit,
             passkeys,
             sitzung: { angemeldetAm: sitzung.createdAt, anmeldeart: sitzung.anmeldeart, passkeyAm: sitzung.passkeyAm },
@@ -380,7 +389,7 @@ async function pruefeRegistrierung(ctx: HookKontext): Promise<void> {
         )
       : null
   if (fall === null) throw APIError.from('FORBIDDEN', { code: 'PASSKEY_NICHT_ERLAUBT', message: REGISTRIERUNG_GESPERRT })
-  sitzungBeimEinrichten.set(ctx.context, { userId, sitzungId })
+  sitzungBeimEinrichten.set(ctx.context, { userId, sitzungId, fall })
 }
 
 /**
@@ -586,8 +595,9 @@ export const auth = betterAuth({
   // bestaetigung.ts) — die ruft nur der Server über auth.api.
   // Registrieren mit Passwort nur über registerFarmer (auth.api).
   // Passkeys entfernen und umbenennen nur über src/server/actions/admin-
-  // anmeldung.ts (frisch bestätigt, nie der letzte; N20, Nr. 115) — die beiden
-  // Wege des Plugins prüften nur den Besitz.
+  // anmeldung.ts (frisch bestätigt, nie der letzte; N20, Nr. 115) bzw. für
+  // Höfe über src/server/actions/hof-passkey.ts (Nr. 179) — die beiden Wege
+  // des Plugins prüften nur den Besitz.
   disabledPaths: [
     ...GESPERRTE_AUTH_PFADE,
     ...BESTAETIGUNG_GESPERRTE_AUTH_PFADE,
@@ -805,13 +815,15 @@ export const auth = betterAuth({
           return
         }
         // Passkey angelegt: Die Sitzung gilt als frisch bestätigt (so gehen
-        // Ersatzcodes und zweiter Passkey direkt nach der Einrichtung), und das
-        // Konto bekommt eine Mail.
+        // Ersatzcodes und zweiter Passkey direkt nach der Einrichtung), und ein
+        // Admin-Konto bekommt eine Mail. Höfe bekommen keine: Die Mail spricht
+        // vom Admin-Konto (Vorschlag im Bericht Nr. 179).
         case '/passkey/verify-registration': {
           const einrichtend = sitzungBeimEinrichten.get(ctx.context)
           if (isAPIError(ctx.context.returned) || !einrichtend) return
           const jetzt = new Date()
           await prisma.session.updateMany({ where: { id: einrichtend.sitzungId, userId: einrichtend.userId }, data: { passkeyAm: jetzt } })
+          if (einrichtend.fall === 'hof') return
           const userAgent = ctx.headers?.get('user-agent') ?? null
           nachDerAntwort(() => meldeAdminSicherheit(einrichtend.userId, 'passkey-hinzugefuegt', userAgent, jetzt))
           return
@@ -900,7 +912,8 @@ export const auth = betterAuth({
     // Kein Magic-Link-Plugin mehr (Nr. 178): Anfordern und Prüfen waren
     // seit Nr. 19b gesperrt, kein Weg erzeugte Links. Die beiden Pfade bleiben
     // zusätzlich in GESPERRTE_AUTH_PFADE (404, tests/integration/anmeldecode).
-    // Admin nur mit Passkey (N20; Nr. 115). Nutzerprüfung (Fingerabdruck,
+    // Admin nur mit Passkey (N20; Nr. 115), Höfe freiwillig zusätzlich zum
+    // Passwort (E7-Ergänzung, Nr. 179). Nutzerprüfung (Fingerabdruck,
     // Gesicht oder PIN) beim Einrichten und bei jeder Anmeldung: Das Plugin
     // prüft beides mit requireUserVerification: false und fragt beim Anmelden
     // fest „preferred" — die beiden afterVerification sind die Sperre. Wirft
@@ -933,9 +946,20 @@ export const auth = betterAuth({
         },
       },
       authentication: {
-        afterVerification: async ({ verification }) => {
+        afterVerification: async ({ verification, clientData }) => {
           if (verification.authenticationInfo.userVerified !== true) {
             throw APIError.from('UNAUTHORIZED', { code: 'NUTZERPRUEFUNG_FEHLT', message: ADMIN_ANMELDEN_FEHLER.nutzerpruefung })
+          }
+          // N20 bleibt bei einem Hof mit Admin-Recht (Nr. 179): Ein Hof-Passkey
+          // von vor dem Recht ergibt keine Sitzung — sonst trüge sie passkeyAm
+          // und öffnete den Admin-Bereich ohne die Admin-Bedingungen. Erst
+          // hier, nach der Signatur: Der Satz geht nur an den Besitzer des Geräts.
+          const passkey = await prisma.passkey.findUnique({
+            where: { credentialID: clientData.id },
+            select: { createdAt: true, user: { select: { isAdmin: true, adminSeit: true } } },
+          })
+          if (passkey?.user.isAdmin && !istAdminPasskey(passkey.createdAt, passkey.user.adminSeit)) {
+            throw APIError.from('UNAUTHORIZED', { code: 'PASSKEY_NICHT_FUER_ADMIN', message: ADMIN_ANMELDEN_FEHLER.nichtFuerAdmin })
           }
         },
       },

@@ -142,11 +142,13 @@ describe('verlangeAdminAktion', () => {
   it('fragt das Recht frisch aus der Datenbank ab — genau einmal je Aufruf', async () => {
     melde('user_admin', true)
     await verlangeAdminAktion()
-    expect(userFindUnique).toHaveBeenCalledTimes(1)
+    // Das Recht genau einmal; dazu liest die Pflicht `adminSeit` (Nr. 179: nur Passkeys ab dem Recht zählen).
+    expect(userFindUnique.mock.calls.filter(([frage]) => frage?.select && 'isAdmin' in frage.select)).toHaveLength(1)
     expect(userFindUnique).toHaveBeenCalledWith({
       where: { id: 'user_admin' },
       select: { isAdmin: true },
     })
+    expect(userFindUnique).toHaveBeenCalledWith({ where: { id: 'user_admin' }, select: { adminSeit: true } })
   })
 })
 

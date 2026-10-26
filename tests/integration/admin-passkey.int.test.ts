@@ -20,6 +20,11 @@
  *  - Sperren: Passwort wie falsches Passwort, „Passwort vergessen" ohne Mail;
  *    delete-/update-passkey per HTTP zu; /update-session setzt passkeyAm nicht.
  *  - Wache: 12 Stunden, Pflicht in jeder Admin-Seite, frische Bestätigung.
+ *  - Passkey für Höfe (E7-Ergänzung, Nr. 179): frisch angemeldet einrichten
+ *    (ohne Admin-Mail), auf /login anmelden, das Passwort bleibt; Entfernen
+ *    und Umbenennen nur eigene Zeilen über die Hof-Actions, Entfernen frisch;
+ *    ein Hof-Passkey ergibt nach dem Admin-Recht keine Sitzung, sperrt das
+ *    Passwort nicht und erfüllt die Pflicht nicht (N20 bleibt).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createHash, generateKeyPairSync, randomBytes, sign } from 'node:crypto'
@@ -81,6 +86,8 @@ import { adminPflichtOffen, verlangeAdminAktion, verlangeAdminSeite, verlangeFri
 import { ladeAdminbereich } from '@/server/adminbereich'
 import { entfernePasskey, erstelleErsatzcodes, pruefeEinrichtungscode, schickeEinrichtungscode } from '@/server/actions/admin-anmeldung'
 import { meldeAllesAbNichtIch } from '@/server/actions/geraete'
+import { benenneHofPasskeyUm, entferneHofPasskey, pruefeFrischFuerHofPasskey } from '@/server/actions/hof-passkey'
+import { HOF_PASSKEY_TEXT, PASSKEY_NAME_MAX } from '@/lib/hof-passkey'
 import { erzeugeEinmalLink } from '@/server/geraete'
 import { intKennung, raeumeAuf } from './setup/basis'
 
@@ -734,5 +741,137 @@ describe('Passkey entfernen', () => {
     expect(await prisma.passkey.count({ where: { userId: admin.id } })).toBe(1)
     await arbeiteNachlaufAb()
     expect(post.sicherheit.filter((m) => m.anlass === 'passkey-entfernt')).toHaveLength(1)
+  })
+})
+
+describe('Passkey für Höfe (E7-Ergänzung, Nr. 179)', () => {
+  /** Ein Hof ohne Admin-Recht (Rolle FARMER), Passwort wie die übrigen Konten. */
+  async function erstelleHof(): Promise<{ id: string; email: string }> {
+    const konto = await erstelleKonto(null)
+    await prisma.user.update({ where: { id: konto.id }, data: { role: 'FARMER' } })
+    return konto
+  }
+
+  /** Ein Hof mit einem Passkey, angelegt in der Passwort-Sitzung `dose`. */
+  async function hofMitPasskey(): Promise<{ id: string; email: string; geraet: Testgeraet; dose: Dose }> {
+    const konto = await erstelleHof()
+    const dose = await mitPasswort(konto.email)
+    const geraet = new Testgeraet()
+    expect((await registriere(dose, geraet)).status).toBe(200)
+    return { ...konto, geraet, dose }
+  }
+
+  it('frisch mit Passwort: Passkey angelegt, ohne Admin-Mail; danach Anmeldung mit Passkey — und das Passwort gilt weiter', async () => {
+    const hof = await hofMitPasskey()
+    expect(await prisma.passkey.count({ where: { userId: hof.id } })).toBe(1)
+    expect((await sitzungsZeile(hof.dose))?.passkeyAm).toBeInstanceOf(Date)
+    await arbeiteNachlaufAb()
+    expect(post.sicherheit).toEqual([])
+
+    const neu: Dose = new Map()
+    expect((await meldeMitPasskeyAn(neu, hof.geraet)).status).toBe(200)
+    expect((await sitzungsZeile(neu))?.anmeldeart).toBe('passkey')
+    expect((await sitzungVon(neu))?.userId).toBe(hof.id)
+    await mitPasswort(hof.email)
+  })
+
+  it('nicht frisch (6 Minuten nach dem Passwort) oder als Kundin: 403, kein Passkey; mit Passkey bestätigt wieder frisch', async () => {
+    const hof = await erstelleHof()
+    const dose = await mitPasswort(hof.email)
+    const sitzung = await sitzungVon(dose)
+    await prisma.session.update({ where: { id: String(sitzung?.id) }, data: { createdAt: new Date(Date.now() - 6 * MINUTE) } })
+    const antwort = await http(dose, '/passkey/generate-register-options')
+    expect(antwort.status).toBe(403)
+    expect(antwort.daten?.code).toBe('PASSKEY_NICHT_ERLAUBT')
+
+    const kundin = await erstelleKonto(null)
+    expect((await http(await mitPasswort(kundin.email), '/passkey/generate-register-options')).status).toBe(403)
+    expect(await prisma.passkey.count({ where: { userId: { in: [hof.id, kundin.id] } } })).toBe(0)
+
+    const mitKey = await hofMitPasskey()
+    await prisma.session.update({ where: { id: String((await sitzungVon(mitKey.dose))?.id) }, data: { createdAt: new Date(Date.now() - 6 * MINUTE), passkeyAm: null } })
+    expect((await http(mitKey.dose, '/passkey/generate-register-options')).status).toBe(403)
+    expect((await meldeMitPasskeyAn(mitKey.dose, mitKey.geraet)).status).toBe(200)
+    expect((await registriere(mitKey.dose, new Testgeraet())).status).toBe(200)
+  })
+
+  it('Entfernen nur frisch und nur eigene Zeilen — auch der letzte (das Passwort bleibt); Umbenennen ohne update-passkey', async () => {
+    const hof = await hofMitPasskey()
+    const fremd = await hofMitPasskey()
+    const eigener = await prisma.passkey.findFirstOrThrow({ where: { userId: hof.id } })
+    const fremder = await prisma.passkey.findFirstOrThrow({ where: { userId: fremd.id } })
+    alsBrowser(hof.dose)
+
+    expect(await pruefeFrischFuerHofPasskey()).toEqual({ ok: true })
+    expect(await benenneHofPasskeyUm({ id: eigener.id, name: '  Schlüssel am Bund  ' })).toEqual({ ok: true })
+    expect((await prisma.passkey.findUniqueOrThrow({ where: { id: eigener.id } })).name).toBe('Schlüssel am Bund')
+    expect(await benenneHofPasskeyUm({ id: eigener.id, name: 'x'.repeat(PASSKEY_NAME_MAX + 1) })).toEqual({ error: HOF_PASSKEY_TEXT.nameZuLang })
+    expect(await benenneHofPasskeyUm({ id: fremder.id, name: 'int-fremd' })).toEqual({ error: HOF_PASSKEY_TEXT.fehlt })
+    expect(await entferneHofPasskey({ id: fremder.id })).toEqual({ error: HOF_PASSKEY_TEXT.fehlt })
+    expect(await prisma.passkey.findUniqueOrThrow({ where: { id: fremder.id } })).toMatchObject({ name: fremder.name })
+
+    await prisma.session.update({ where: { id: String((await sitzungVon(hof.dose))?.id) }, data: { createdAt: new Date(Date.now() - 6 * MINUTE), passkeyAm: null } })
+    expect(await entferneHofPasskey({ id: eigener.id })).toEqual({ error: FRISCH_FEHLER })
+    expect(await pruefeFrischFuerHofPasskey()).toEqual({ error: FRISCH_FEHLER })
+    await prisma.session.update({ where: { id: String((await sitzungVon(hof.dose))?.id) }, data: { passkeyAm: new Date() } })
+    expect(await entferneHofPasskey({ id: eigener.id })).toEqual({ ok: true })
+    expect(await prisma.passkey.count({ where: { userId: hof.id } })).toBe(0)
+    await mitPasswort(hof.email)
+  })
+
+  it('ein Hof mit Admin-Recht nimmt die Hof-Actions nicht (N20: Verwalten im Admin-Bereich)', async () => {
+    const admin = await adminMitPasskey()
+    await prisma.user.update({ where: { id: admin.id }, data: { role: 'FARMER' } })
+    const passkey = await prisma.passkey.findFirstOrThrow({ where: { userId: admin.id } })
+    alsBrowser(admin.dose)
+    expect(await entferneHofPasskey({ id: passkey.id })).toEqual({ error: HOF_PASSKEY_TEXT.nichtErlaubt })
+    expect(await benenneHofPasskeyUm({ id: passkey.id, name: 'int-neu' })).toEqual({ error: HOF_PASSKEY_TEXT.nichtErlaubt })
+    expect(await prisma.passkey.count({ where: { userId: admin.id } })).toBe(1)
+  })
+
+  it('Hof-Passkey ergibt keine Admin-Sitzung ohne die Admin-Bedingungen: Recht danach vergeben → Anmeldung 401, Passwort offen, Pflicht offen, erster Admin-Passkey nur mit E-Mail-Code', async () => {
+    const hof = await hofMitPasskey()
+    // Der Hof-Passkey entstand vor dem Recht.
+    await prisma.passkey.updateMany({ where: { userId: hof.id }, data: { createdAt: new Date(Date.now() - 10 * MINUTE) } })
+    await prisma.user.update({ where: { id: hof.id }, data: { isAdmin: true, adminSeit: new Date(Date.now() - MINUTE) } })
+
+    const dose: Dose = new Map()
+    const antwort = await meldeMitPasskeyAn(dose, hof.geraet)
+    expect(antwort.status).toBe(401)
+    expect(antwort.daten?.code).toBe('PASSKEY_NICHT_FUER_ADMIN')
+    expect(sitzungsKeks(dose)).toBeUndefined()
+    // Auch nicht als frische Bestätigung in einer bestehenden Sitzung.
+    expect((await meldeMitPasskeyAn(hof.dose, hof.geraet)).status).toBe(401)
+
+    expect(await adminPflichtOffen(hof.id)).toBe(true)
+    const mitPw = await mitPasswort(hof.email)
+    alsBrowser(mitPw)
+    await expect(verlangeAdminSeite()).rejects.toThrow('REDIRECT:/admin/einrichten')
+    expect((await http(mitPw, '/passkey/generate-register-options')).status).toBe(403)
+
+    await codeBestaetigt(hof.id, String((await sitzungVon(mitPw))?.id))
+    expect((await registriere(mitPw, new Testgeraet())).status).toBe(200)
+    expect(await adminPflichtOffen(hof.id)).toBe(false)
+    // Ab jetzt gilt N20: kein Passwort mehr.
+    expect((await http(new Map(), '/sign-in/email', { email: hof.email, password: PASSWORT })).status).toBe(401)
+  })
+
+  it('Admin mit Hof-Passkey von vorher: den kann er entfernen, den letzten Admin-Passkey nicht', async () => {
+    const hof = await hofMitPasskey()
+    await prisma.passkey.updateMany({ where: { userId: hof.id }, data: { createdAt: new Date(Date.now() - 10 * MINUTE) } })
+    await prisma.user.update({ where: { id: hof.id }, data: { isAdmin: true, adminSeit: new Date(Date.now() - MINUTE) } })
+    const hofKey = await prisma.passkey.findFirstOrThrow({ where: { userId: hof.id } })
+    const mitPw = await mitPasswort(hof.email)
+    await codeBestaetigt(hof.id, String((await sitzungVon(mitPw))?.id))
+    const adminGeraet = new Testgeraet()
+    expect((await registriere(mitPw, adminGeraet)).status).toBe(200)
+    const adminKey = await prisma.passkey.findFirstOrThrow({ where: { userId: hof.id, id: { not: hofKey.id } } })
+    const frisch: Dose = new Map()
+    expect((await meldeMitPasskeyAn(frisch, adminGeraet)).status).toBe(200)
+    alsBrowser(frisch)
+
+    expect(await entfernePasskey({ id: adminKey.id })).toEqual({ error: ADMIN_AKTION_FEHLER.letzterPasskey })
+    expect(await entfernePasskey({ id: hofKey.id })).toEqual({ ok: true })
+    expect(await prisma.passkey.findMany({ where: { userId: hof.id }, select: { id: true } })).toEqual([{ id: adminKey.id }])
   })
 })

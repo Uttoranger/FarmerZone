@@ -3,9 +3,11 @@ import { passkeyClient } from '@better-auth/passkey/client'
 import { ERSATZCODE_ANMELDEN_PFAD } from '@/lib/admin-anmeldung'
 
 /*
- * Der Passkey-Client NUR für die Admin-Seiten (Register N20; Nr. 115):
+ * Der Passkey-Client für die Admin-Seiten (Register N20; Nr. 115):
  * /login/admin, /admin/einrichten, /admin/einstellungen/anmeldung,
- * /admin/bestaetigen und den Dialog „Mit Passkey bestätigen". Getrennt von
+ * /admin/bestaetigen und den Dialog „Mit Passkey bestätigen" — seit Nr. 179
+ * auch für die Hof-Karte auf /login und Konto und Sicherheit, dort erst beim
+ * Klick geladen (`await import`). Getrennt von
  * src/lib/auth-client.ts, damit @simplewebauthn/browser nicht in jede Seite
  * der Kundschaft und der Höfe geladen wird. Ohne baseURL wie dort: Der Client
  * nimmt die Adresse, unter der die Seite läuft — Passkeys gelten genau unter
