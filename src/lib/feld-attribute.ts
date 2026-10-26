@@ -1,7 +1,8 @@
 /**
- * Die Eingabe-Attribute der Hof-Felder — eine Quelle für Mein Hof
- * (components/mein-hof/abschnitt-formulare.tsx) und das Hofprofil
- * (components/settings/profile-form.tsx). Sie wählen die Tastatur am Handy
+ * Die Eingabe-Attribute der Hof-Felder — die Quelle für das Hofprofil
+ * (components/settings/profile-form.tsx). Mein Hof
+ * (components/mein-hof/abschnitt-formulare.tsx) schreibt sie von Hand und
+ * spiegelt sie; ein Test hält beide gleich. Sie wählen die Tastatur am Handy
  * (type, inputMode) und das, was der Browser vorschlägt (autoComplete).
  *
  * `enterKeyHint` steht NICHT hier: Er hängt davon ab, ob ein Feld das letzte

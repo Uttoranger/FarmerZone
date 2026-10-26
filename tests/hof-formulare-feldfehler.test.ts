@@ -108,6 +108,9 @@ describe('Beitrag schreiben', () => {
     const titel = m.match(/<input[^>]*id="status-title"[^>]*>/)?.[0] ?? ''
     const text = m.match(/<textarea[^>]*id="status-body"[^>]*>/)?.[0] ?? ''
     expect(titel).toContain('enterKeyHint="next"')
+    // Die Nachricht ist das letzte Feld: „Senden" statt „Weiter".
+    expect(text).toContain('enterKeyHint="send"')
+    expect(text).not.toContain('enterKeyHint="next"')
     for (const feld of [titel, text]) {
       expect(feld).toContain('text-base')
       expect(feld).not.toMatch(/(^|[\s"])text-sm/)

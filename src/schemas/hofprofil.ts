@@ -19,7 +19,7 @@ import { PROFIL_MELDUNG } from '@/lib/profil-meldungen'
  */
 // Bewusst ausgeschrieben statt Pick<ProfileFormData, …>: Das Schema nimmt den
 // Bestand als Parameter, ein abgeleiteter Typ wäre ein Zirkelbezug (TS2456).
-export type ProfilBestand = { name: string; ownerName: string; phone: string }
+export type ProfilBestand = { name: string; ownerName: string; phone: string; email?: string }
 
 /** Die Hof-E-Mail: freiwillig, klein, ohne Ränder; leer ist erlaubt (Profil und Anlegen). */
 const hofEmailSchema = z
@@ -28,6 +28,18 @@ const hofEmailSchema = z
   .toLowerCase()
   .max(EMAIL_MAX, ZU_LANG.email)
   .refine((v) => v === '' || emailSchema().safeParse(v).success, PROFIL_MELDUNG.email)
+
+/**
+ * Im Profil: Hat der Hof schon eine Hof-E-Mail gespeichert, darf er sie nicht
+ * leeren. Die Bestellmails an den Hof (src/lib/email.ts) lesen Farm.email ohne
+ * Rückfall auf die Anmelde-Adresse; ein leeres Feld ließe sie ins Leere gehen.
+ * Ein Hof ohne gespeicherte Adresse (beim Anlegen frei gelassen) bleibt
+ * speicherbar.
+ */
+function hofEmailFuer(bestandEmail?: string) {
+  if (!bestandEmail) return hofEmailSchema
+  return hofEmailSchema.refine((v) => v !== '', PROFIL_MELDUNG.emailPflicht)
+}
 
 function profilSchemaFuer(bestand?: ProfilBestand) {
   return z.object({
@@ -57,8 +69,9 @@ function profilSchemaFuer(bestand?: ProfilBestand) {
       .refine((v) => passtInGrenze(v, TELEFON_MAX, bestand?.phone), ZU_LANG.telefon),
     // Freiwillig wie beim Anlegen: leer bleibt leer, sonst gilt emailSchema
     // (klein, ohne Ränder, gültiges Format). Die Spalte ist NOT NULL — leer
-    // heißt Leerstring, wie ihn das Anlegen schon speichert.
-    email: hofEmailSchema,
+    // heißt Leerstring, wie ihn das Anlegen schon speichert. Ein Hof mit
+    // gespeicherter Adresse darf sie nicht leeren (hofEmailFuer).
+    email: hofEmailFuer(bestand?.email),
     // Der Kartenpunkt wird MIT dem Profil gespeichert — es gibt keinen eigenen
     // Bestätigen-Schritt mehr. null heißt: (noch) kein Punkt gesetzt; ein
     // gespeicherter Punkt wird dann NICHT angerührt (siehe updateProfile).

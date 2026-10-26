@@ -38,8 +38,17 @@ describe('Bestandsdaten sind speicherbar', () => {
   it('leere Beschreibung und leere Hof-E-Mail gehen durch (Anlegen und Bearbeiten)', () => {
     const leer = { ...BASIS, description: '', email: '' }
     expect(profileSchema.safeParse(leer).success).toBe(true)
+    // BESTAND ohne gespeicherte Hof-E-Mail: leer bleibt erlaubt.
     expect(profilBearbeitenSchema(BESTAND).safeParse(leer).success).toBe(true)
     expect(profileSchema.parse(leer).email).toBe('')
+  })
+
+  it('Gegenprobe: mit gespeicherter Hof-E-Mail ist leer nicht erlaubt (Leser ohne Rückfall), die Beschreibung schon', () => {
+    const mitMail = { ...BESTAND, email: BASIS.email }
+    expect(meldungen({ ...BASIS, email: '' }, profilBearbeitenSchema(mitMail))).toEqual([PROFIL_MELDUNG.emailPflicht])
+    expect(meldungen({ ...BASIS, email: '   ' }, profilBearbeitenSchema(mitMail))).toEqual([PROFIL_MELDUNG.emailPflicht])
+    expect(profilBearbeitenSchema(mitMail).safeParse({ ...BASIS, description: '' }).success).toBe(true)
+    expect(profilBearbeitenSchema(mitMail).safeParse({ ...BASIS, email: 'neu@beispiel.at' }).success).toBe(true)
   })
 
   it('eine kurze Beschreibung geht ebenfalls durch (früher mindestens 10 Zeichen)', () => {

@@ -15,7 +15,7 @@ import {
   sucheHofStandort,
   type ProfileFormData,
 } from '@/server/actions/farm'
-import { aktionOhneWurf, speichereProfil, speichernOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
+import { aktionOhneWurf, meldeGescheitertesSpeichern, speichereProfil, speichernOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
 import { FeldFehlerSatz, SpeicherFehler, feldFehlerAttribute, hilfeKennung } from '@/components/shared/formular-meldungen'
 import { FELD_ATTRIBUTE, enterTaste, weiterMitEnter } from '@/lib/feld-attribute'
 import { FREIWILLIG, HOF_EMAIL_HILFE } from '@/lib/profil-meldungen'
@@ -101,8 +101,8 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
   // gespeichert wurde, sperrt das Speichern nicht — am Feld steht dann
   // „Bitte kürzen", geprüft wird beim Speichern (src/schemas/hofprofil.ts).
   const schema = useMemo(
-    () => profilBearbeitenSchema({ name: farm.name, ownerName: farm.ownerName, phone: farm.phone }),
-    [farm.name, farm.ownerName, farm.phone]
+    () => profilBearbeitenSchema({ name: farm.name, ownerName: farm.ownerName, phone: farm.phone, email: farm.email }),
+    [farm.name, farm.ownerName, farm.phone, farm.email]
   )
   // Der Stand beim Laden: Startwerte des Formulars und Maßstab dafür, was
   // dieses Formular ändert (geaendertSeitLaden, siehe onSubmit).
@@ -227,7 +227,9 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
     let punkt: Awaited<ReturnType<typeof holeAdresseZumPunkt>>
     try {
       punkt = await holeAdresseZumPunkt(lat, lon)
-    } catch {
+    } catch (fehler) {
+      // Stumm für den Hof, nicht für uns: Sentry bekommt die gescheiterte Anfrage.
+      meldeGescheitertesSpeichern(fehler)
       return
     }
     if (!punkt || anfrageFolge.current !== meineFolge) return
@@ -246,6 +248,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
     setHinweis(HINWEIS_ADRESSE_UEBERNOMMEN)
   }
 
+  const istAttributFeld = (id: FeldId): id is FeldId & keyof typeof FELD_ATTRIBUTE => id in FELD_ATTRIBUTE
   type FeldId = 'name' | 'ownerName' | 'address' | 'phone' | 'email' | 'betriebsnummer'
   /**
    * Ein Textfeld mit Fehlersatz am Feld (aria-invalid, aria-describedby, role="alert"),
@@ -258,7 +261,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
     { placeholder, hilfe, letztes }: { placeholder?: string; hilfe?: string; letztes?: boolean } = {}
   ) {
     const max = GRENZE[id]
-    const attribute: Record<string, string> = id in FELD_ATTRIBUTE ? FELD_ATTRIBUTE[id as keyof typeof FELD_ATTRIBUTE] : {}
+    const attribute = istAttributFeld(id) ? FELD_ATTRIBUTE[id] : undefined
     return (
       <div>
         <Label htmlFor={id} className="text-sm text-muted-foreground mb-1 block">{label}</Label>

@@ -316,6 +316,7 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                 }}
                 placeholder="Schreibe hier deinen Beitrag…"
                 rows={5}
+                enterKeyHint={enterTaste(true, 'send')}
                 {...feldFehlerAttribute('status-body', Boolean(fieldErrors.body))}
                 className={cn(
                   'w-full px-3 py-2.5 rounded-xl border bg-card text-base focus:outline-none focus:ring-2 resize-none transition-colors',

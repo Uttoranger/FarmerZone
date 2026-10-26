@@ -169,10 +169,16 @@ describe('Hof-Profil: Bestand ohne Beschreibung und ohne Hof-E-Mail (Nr. 174)', 
     expect(navigation.push).toHaveBeenCalledWith('/settings')
   })
 
-  it('Beschreibung und Hof-E-Mail leeren geht ebenfalls (freiwillig)', async () => {
-    await sendeAb({ description: '', email: '' })
+  it('die Beschreibung leeren geht (freiwillig)', async () => {
+    await sendeAb({ description: '' })
 
-    expect(speicherweg.speichereProfil).toHaveBeenCalledWith({ description: '', email: '' })
+    expect(speicherweg.speichereProfil).toHaveBeenCalledWith({ description: '' })
+  })
+
+  it('Gegenprobe: ein Hof mit gespeicherter Hof-E-Mail kann sie nicht leeren – die Bestellmails gehen dorthin', async () => {
+    await sendeAb({ email: '' })
+
+    expect(speicherweg.speichereProfil).not.toHaveBeenCalled()
   })
 
   it('Gegenprobe: eine kaputte Hof-E-Mail wird nicht gespeichert', async () => {

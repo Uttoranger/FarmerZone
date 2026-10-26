@@ -13,10 +13,12 @@ export const PROFIL_MELDUNG = {
   phoneKurz: 'Die Telefonnummer ist zu kurz – bitte mit Vorwahl, damit Kundinnen dich erreichen.',
   /** Die Hof-E-Mail ist freiwillig: ungültig heißt „korrigieren oder leer lassen". Derselbe Satz beim Anlegen. */
   email: 'Bitte gib eine gültige Hof-E-Mail an — oder lass das Feld leer.',
+  /** Ein Hof mit gespeicherter Hof-E-Mail darf sie nicht leeren: Bestellmails gehen dorthin. */
+  emailPflicht: 'Bitte lass die Hof-E-Mail stehen – an sie gehen deine Bestellmeldungen.',
 } as const
 
 /** Die Hilfe unter der freiwilligen Hof-E-Mail: wo sie steht. */
-export const HOF_EMAIL_HILFE = 'Freiwillig. Sie steht für Kundinnen auf der Bestellseite, damit sie dich erreichen.'
+export const HOF_EMAIL_HILFE = 'Sie steht für Kundinnen auf der Bestellseite, damit sie dich erreichen. Ohne Eintrag gilt deine Anmelde-Adresse.'
 
 /** Der Zusatz an einem freiwilligen Feld – statt „*" an jedem Pflichtfeld (wie in der Kasse). */
 export const FREIWILLIG = '(freiwillig)'
