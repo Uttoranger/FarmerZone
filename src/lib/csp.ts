@@ -124,20 +124,9 @@ export function baueCsp({ melden, berichtAdresse = null, toolbar: mitToolbar = f
   return anweisungen.map(([name, quellen]) => `${name} ${quellen.join(' ')}`).join('; ')
 }
 
-/**
- * Seiten, die NIE melden (neben den Seiten mit `Referrer-Policy: no-referrer`,
- * die next.config.ts selbst einsammelt): Ihre Adresse trägt eine Kennung, eine
- * Signatur oder einen Token, und eine Meldung schickt die ganze Adresse mit.
- */
-export const NIE_MELDEN_PFADE = [
-  '/:farmSlug/bestellung/:orderId',
-  '/:farmSlug/bestellung/:orderId/kalender',
-  '/admin/postfach/zustellung/bestaetigen',
-  '/api/:pfad*',
-] as const
-
-/** Jede Adresse mit einem dieser Query-Werte meldet nie. `?beitrag=` ist eine öffentliche Kennung (Nr. 128) und fehlt bewusst. */
-export const NIE_MELDEN_PARAMETER = ['s', 'sig', 'token', 't', 'code', 'vorschau', 'reorder'] as const
+/** Seiten und Query-Werte, die nie melden — zod-frei in src/lib/nie-melden.ts (Nr. 196). */
+// Relativ, nicht über @/: next.config.ts lädt diese Datei ohne den Pfad-Alias.
+export { NIE_MELDEN_PARAMETER, NIE_MELDEN_PFADE } from './nie-melden'
 
 // ─── Die Meldungen (/api/csp-bericht) ─────────────────────────────────────────
 

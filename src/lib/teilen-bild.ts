@@ -279,7 +279,7 @@ export function teilenBildDaten(eingabe: {
  * Zwischenspeicher liegen und ist trotzdem nie veraltet (S9 „Cache je Hof mit
  * Invalidierung"). `fotos` sind die Adressen der eigenen Fotos im Bild (ein
  * neues Foto hat eine neue Adresse); ohne Fotos ist die Summe dieselbe wie
- * die der Metadaten (`ladeTeilenVorschau`).
+ * die der Metadaten (`teilenVorschauAus`).
  */
 export function teilenBildVersion(daten: TeilenBildDaten, fotos: readonly string[] = []): string {
   const text = JSON.stringify(fotos.length > 0 ? [daten, fotos] : daten)

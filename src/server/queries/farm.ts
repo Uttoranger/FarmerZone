@@ -5,6 +5,8 @@ import { hofAdresse, hofZustand, titelbildFoto, type HofZustand } from '@/lib/me
 import { APP_URL } from '@/lib/umgebung-server'
 import { categoryImagePath } from '@/lib/product-image'
 import { zuProduktDto } from '@/lib/produkt-dto'
+import { alsCents } from '@/lib/order-totals'
+import type { VerpackungValue } from '@/lib/futter-registrierung'
 import type { AbholhinweisValue } from '@/lib/abholhinweise'
 import { DEFAULT_SECTIONS, type SectionConfig } from './appearance'
 import { leseAusschnitt, type BildAusschnitt } from '@/schemas/bild-ausschnitt'
@@ -360,12 +362,31 @@ function alsOeffentlichesProdukt(
   }
 }
 
-export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
+/**
+ * Was nur der Server vom öffentlichen Hof braucht: die Rohwerte des
+ * Teilen-Bilds (Nr. 196). Die Betriebsnummer entscheidet die Sperre je
+ * Gebinde, der Preis kommt als Cent aus dem Decimal derselben Zeile (kein
+ * Umweg über `price: number`). Geht nie an den Browser.
+ */
+export type TeilenRoh = {
+  betriebsnummer: string | null
+  produkte: ReadonlyMap<string, { preisCents: number; verpackung: VerpackungValue | null }>
+}
+
+/** Der öffentliche Hof und seine Rohwerte fürs Teilen-Bild — aus EINER Abfrage. */
+export type OeffentlicherHof = { farm: PublicFarm; teilen: TeilenRoh }
+
+/**
+ * Der öffentliche Hof samt Rohwerten des Teilen-Bilds (Nr. 196): Hofseite
+ * (Metadaten), Teilen-Bild-Route und Teilen-Fenster bauen das Bild aus
+ * derselben Abfrage wie die Seite (getPublicFarm), statt eine eigene zu stellen.
+ */
+export async function getPublicFarmMitTeilen(wo: { slug: string } | { id: string }): Promise<OeffentlicherHof | null> {
   // Die Filterung sitzt bewusst hier in der Query und nicht in den Seiten:
   // jede öffentliche Unterseite, die über getPublicFarm lädt, ist damit
   // automatisch mitgesperrt und läuft in ihren bestehenden notFound-Pfad.
   const farm = await prisma.farm.findUnique({
-    where: { slug, ...OEFFENTLICH_SICHTBAR },
+    where: { ...wo, ...OEFFENTLICH_SICHTBAR },
     select: {
       id: true,
       slug: true,
@@ -413,7 +434,8 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       istTesthof: true,
       products: {
         orderBy: PRODUCT_ORDER_BY,
-        select: OEFFENTLICHES_PRODUKT_SELECT,
+        // Seit Nr. 196 mit der Verpackung — nur für das Teilen-Bild (Sperre je Gebinde), nie an den Browser.
+        select: { ...OEFFENTLICHES_PRODUKT_SELECT, verpackung: true },
       },
       pickupSlots: {
         where: { isActive: true },
@@ -433,7 +455,13 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
 
   // Die Felder des Abzeichens (auch die Nummer des Platzes) fallen hier heraus — nur das Ja/Nein geht weiter.
   const { betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, ...rest } = farm
-  return {
+  // Die Verpackung bleibt auf dem Server: Sie geht nur in die Rohwerte des Teilen-Bilds.
+  const produkte = farm.products.map(({ verpackung, ...p }) => ({ verpackung, p }))
+  const teilen: TeilenRoh = {
+    betriebsnummer,
+    produkte: new Map(produkte.map(({ verpackung, p }) => [p.id, { preisCents: alsCents(p.price), verpackung }])),
+  }
+  const oeffentlich: PublicFarm = {
     ...rest,
     ...abzeichenDaten({ approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen }),
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
@@ -444,8 +472,13 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
     farmPhotos: farm.farmPhotos.map(alsOeffentlichesFoto),
     serviceFeePercent: Number(farm.serviceFeePercent),
     serviceFeeActiveFrom: farm.serviceFeeActiveFrom?.toISOString() ?? null,
-    products: farm.products.map((p) => alsOeffentlichesProdukt(p, { betriebsnummer })),
+    products: produkte.map(({ p }) => alsOeffentlichesProdukt(p, { betriebsnummer })),
   }
+  return { farm: oeffentlich, teilen }
+}
+
+export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
+  return (await getPublicFarmMitTeilen({ slug }))?.farm ?? null
 }
 
 /**

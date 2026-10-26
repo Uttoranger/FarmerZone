@@ -24,20 +24,20 @@ import {
   scrollVerhalten,
   springeZuAktuell,
 } from '@/lib/hofseite-kunde'
-import { ALTER_REITER_BEITRAEGE, BEITRAG_PARAMETER, beitragKennungSchema } from '@/schemas/hofseite-reiter'
+import { ALTER_REITER_BEITRAEGE, BEITRAG_PARAMETER, leseBeitragKennung } from '@/schemas/hofseite-reiter'
 import { beitragLink, linkMitKanal } from '@/lib/teilen-fenster'
 import { teilenBesuchAusAdresse } from '@/lib/teilen-besuch'
 
 describe('?beitrag= — die Adresse ist eine Systemgrenze (Zod)', () => {
   it('nimmt eine Kennung aus Kleinbuchstaben und Ziffern bis 40 Zeichen', () => {
-    expect(beitragKennungSchema.parse('cbeitragaaaaaaaaaaaaaaaaa')).toBe('cbeitragaaaaaaaaaaaaaaaaa')
-    expect(beitragKennungSchema.parse('a'.repeat(40))).toBe('a'.repeat(40))
-    expect(beitragKennungSchema.parse('b7')).toBe('b7')
+    expect(leseBeitragKennung('cbeitragaaaaaaaaaaaaaaaaa')).toBe('cbeitragaaaaaaaaaaaaaaaaa')
+    expect(leseBeitragKennung('a'.repeat(40))).toBe('a'.repeat(40))
+    expect(leseBeitragKennung('b7')).toBe('b7')
   })
 
   it('verwirft alles andere still — Großbuchstaben, Zeichen, zu lang, leer, Liste, fehlend', () => {
     for (const wert of ['Cbeitrag', 'beitrag-1', 'beitrag 1', '<script>', 'a'.repeat(41), '', ['abc', 'def'], undefined, null, 7]) {
-      expect(beitragKennungSchema.parse(wert), String(wert)).toBeNull()
+      expect(leseBeitragKennung(wert), String(wert)).toBeNull()
     }
   })
 
@@ -183,6 +183,6 @@ describe('Links eines Beitrags (Register T5, Ergänzung Nr. 128)', () => {
     expect(geteilt).toBe('https://example.com/hof-test?beitrag=cbeitragaaaa&k=wa')
     expect(teilenBesuchAusAdresse(geteilt)).toEqual({ kanal: 'wa', ohne: '/hof-test?beitrag=cbeitragaaaa' })
     // Gegenprobe: die Kennung kommt durch die Prüfung der Hofseite.
-    expect(beitragKennungSchema.parse(new URL(geteilt).searchParams.get(BEITRAG_PARAMETER))).toBe('cbeitragaaaa')
+    expect(leseBeitragKennung(new URL(geteilt).searchParams.get(BEITRAG_PARAMETER))).toBe('cbeitragaaaa')
   })
 })

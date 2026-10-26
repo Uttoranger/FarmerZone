@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import { MELDUNG_KENNUNG_MAX } from '@/lib/meldung'
 
 /**
@@ -6,8 +5,8 @@ import { MELDUNG_KENNUNG_MAX } from '@/lib/meldung'
  *
  * Die URL ist eine Systemgrenze (CODING_STANDARDS §3), und der Wert reist
  * weit: von hier in ein Formularfeld, von dort in den Briefkasten und damit in
- * den Export, der in einen Agentenkontext geht. Deshalb ein Zod-Schema an
- * derselben Stelle wie die übrigen URL-Schemas (`hoefe-filter`,
+ * den Export, der in einen Agentenkontext geht. Deshalb eine Prüfung an
+ * derselben Stelle wie die übrigen URL-Prüfungen (`hoefe-filter`,
  * `umfeld-filter`), und dieselbe Haltung: Was nicht passt, wird VERWORFEN,
  * nie ein Fehler — ein verstümmelter Link zeigt das Formular mit leerem Feld
  * statt einer Fehlerseite.
@@ -21,10 +20,12 @@ import { MELDUNG_KENNUNG_MAX } from '@/lib/meldung'
  * ZU LANG HEISST LEER, nicht abgeschnitten: Eine abgeschnittene Fehlernummer
  * zeigt auf den falschen Fehler. Die vollständige steht auf der Fehlerseite
  * und lässt sich von dort kopieren.
+ *
+ * OHNE ZOD (Nr. 196): Die Fehlerseite hängt an der Navigation, die jede
+ * Kundenseite im Browser lädt (tests/leistung-196.test.ts). Kein Wert wirft.
  */
-export const kennungAusUrlSchema = z
-  .string()
-  .trim()
-  .transform((wert) => wert.replace(/[^A-Za-z0-9_-]/g, ''))
-  .pipe(z.string().min(1).max(MELDUNG_KENNUNG_MAX))
-  .catch('')
+export function kennungAusUrl(roh: unknown): string {
+  if (typeof roh !== 'string') return ''
+  const wert = roh.trim().replace(/[^A-Za-z0-9_-]/g, '')
+  return wert.length >= 1 && wert.length <= MELDUNG_KENNUNG_MAX ? wert : ''
+}

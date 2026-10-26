@@ -9,28 +9,21 @@ import {
 import { emailSchema } from '@/schemas/email'
 import { NEUE_BESTELLUNG_ZAHLARTEN } from '@/lib/kasse'
 
-/**
- * Die Reihenfolge der Felder auf der Seite — maßgeblich dafür, zu welchem
- * Feld nach einer fehlgeschlagenen Prüfung gesprungen wird (Bug-Report
- * Befund 6: es sprang an den Seitenanfang statt zum ersten Fehler).
- */
-export const CHECKOUT_FELD_REIHENFOLGE = [
-  'pickupSlotKey',
-  'customerName',
-  'customerEmail',
-  'customerPhone',
-  'customerNote',
-  'kaeuferArt',
-  'betriebsnummer',
-  'paymentMethod',
-] as const
+/** Die Reihenfolge der Felder auf der Seite — zod-frei in src/lib/kasse-pruefung.ts (Nr. 196). */
+export { CHECKOUT_FELD_REIHENFOLGE } from '@/lib/kasse-pruefung'
 
 /** JJJJ-MM-TT — der Wiener Kalendertag des Abholfensters. */
 const KALENDERTAG = /^\d{4}-\d{2}-\d{2}$/
 /** HH:MM — Wiener Ortszeit, wie PickupSlot.startTime/endTime. */
 const UHRZEIT = /^\d{2}:\d{2}$/
 
-// Client-side form schema (no items/sessionId/farmId — those are added on submit)
+/**
+ * Die Form des Kassenformulars. Der Browser prüft sie seit Nr. 196 ohne Zod
+ * (pruefeKasseFormular in src/lib/kasse-pruefung.ts, dieselben Regeln und
+ * Sätze); dieses Schema bleibt die Beschreibung, gegen die
+ * tests/leistung-196.test.ts die reine Prüfung abgleicht. Ohne items,
+ * sessionId und farmId — die kommen beim Absenden dazu.
+ */
 export const checkoutFormSchema = z
   .object({
     customerName: z
@@ -145,7 +138,8 @@ export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>
  * Der Betrag, den /api/checkout beim Anlegen an Stripe gegeben hat — kommt mit
  * jeder Antwort, die ein Client-Secret trägt. Der Zahlungsschritt zeigt nur
  * diesen Wert (src/lib/kasse.ts, zahlungsBetraege); die Antwort ist für den
- * Browser eine Systemgrenze und wird deshalb geprüft.
+ * Browser eine Systemgrenze. Im Browser prüft sie seit Nr. 196
+ * leseZahlungsBetrag (src/lib/kasse-pruefung.ts) mit derselben Regel.
  */
 export const checkoutZahlungsBetragSchema = z
   .object({

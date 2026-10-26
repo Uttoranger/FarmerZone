@@ -33,12 +33,13 @@ import type { KennzahlDaten, UnterreiterDaten } from '@/lib/admin-seiten'
 import type { DbBremse } from '@/lib/bremse-datenbank'
 // Nur Typen (zur Laufzeit nichts): Die Zod-Schemas sind die Quelle der Werte (CODING_STANDARDS §2).
 import type { z } from 'zod'
+import { POSTFACH_HREF } from '@/lib/bauern-navigation'
 import type { empfaengerRegelSchema, nachrichtArtSchema, unterhaltungSeiteSchema } from '@/schemas/postfach'
 
 // ─── Ziele ───────────────────────────────────────────────────────────────────
 
-/** Das Postfach des Hofs — Hauptpunkt nach „Bestellungen" (bauern-navigation.ts). */
-export const POSTFACH_HREF = '/postfach'
+/** Das Postfach des Hofs — Hauptpunkt nach „Bestellungen"; die Adresse steht in bauern-navigation.ts. */
+export { POSTFACH_HREF }
 
 /** Ein Faden im Postfach des Hofs. */
 export function fadenHref(unterhaltungId: string): string {

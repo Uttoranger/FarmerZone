@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import { SUCHTEXT_PARAMETER } from '@/lib/suchtext-parameter'
 import {
   ANZEIGE_BEREICHE,
@@ -18,8 +17,8 @@ import {
 /**
  * Der Filterzustand von /hoefe in der URL (Sprint Bereiche 2, Konzept 6.2).
  *
- * Die URL ist eine Systemgrenze: Jeder kann einen Link bauen. Deshalb läuft
- * jeder Wert einzeln durch Zod — und was nicht passt, wird VERWORFEN, nie ein
+ * Die URL ist eine Systemgrenze: Jeder kann einen Link bauen. Deshalb wird
+ * jeder Wert einzeln geprüft — und was nicht passt, wird VERWORFEN, nie ein
  * Fehler: Ein alter oder verstümmelter Link zeigt die Übersicht mit dem, was
  * sich retten lässt, statt einer Fehlerseite.
  *
@@ -40,6 +39,11 @@ import {
  * Darum trägt jede Adresse, die die Seite selbst schreibt, die Kennung `t=1`
  * beim Suchtext; ohne sie kam er von außen (abgesendeterSuchtext). Die
  * Formulare brauchen von der Kennung nichts zu wissen.
+ *
+ * OHNE ZOD (Nr. 196): /hoefe, Startseite, Hofseite und Kasse lesen diese Datei
+ * im Browser (tests/leistung-196.test.ts). Jede Prüfung ist eine kleine reine
+ * Funktion mit derselben Wirkung wie das frühere Zod-Schema (Liste der Werte,
+ * Ränder weg, Länge).
  */
 
 export const GEBINDE_VALUES = ['KLEIN', 'GROSS'] as const
@@ -85,17 +89,16 @@ export const LEERER_HOEFE_FILTER: HoefeFilter = {
 export const SUCHTEXT_MAX = 100
 export const SUCHMARKEN_MAX = 10
 
-const kategorieSchema = z.enum(PRODUCT_CATEGORY_VALUES)
-const sorteSchema = z.enum(PRODUCT_SUBCATEGORY_VALUES)
-const siegelSchema = z.enum(PRODUCT_LABEL_VALUES)
-const tierSchema = z.enum(TIERART_VALUES)
-const suchSchema = z.string().trim().min(1).max(SUCHTEXT_MAX)
-// Einzelwerte: Was nicht passt, fällt per .catch auf die Voreinstellung.
-const bereichSchema = z.enum(['futter']).nullable().catch(null)
-const gebindeSchema = z.enum(['klein', 'gross']).nullable().catch(null)
-const sortSchema = z.enum(['grundpreis']).nullable().catch(null)
-const ansichtSchema = z.enum(['liste', 'karte']).catch('liste')
-const abholungSchema = z.enum(ABHOLUNG_VALUES).nullable().catch(null)
+/** Der Wert, wenn er in der Liste steht, sonst null. */
+function ausListe<T extends string>(werte: readonly T[], roh: unknown): T | null {
+  return werte.find((wert) => wert === roh) ?? null
+}
+
+/** Ein Suchtext ohne Ränder, 1 bis SUCHTEXT_MAX Zeichen — sonst null. */
+function suchwort(roh: string): string | null {
+  const wert = roh.trim()
+  return wert.length >= 1 && wert.length <= SUCHTEXT_MAX ? wert : null
+}
 
 /**
  * Der Name des Suchparameters, auch für Seiten, die nur AUF die Suche zeigen
@@ -129,7 +132,7 @@ export type SuchParameter = {
 
 /** URL-Wert des Bereichs: `bereich=futter`; alles andere ist Hofladen. */
 export function bereichAusParameter(wert: string | null | undefined): AnzeigeBereich {
-  return bereichSchema.parse(wert ?? null) === 'futter' ? 'FUTTERMITTEL' : 'LEBENSMITTEL'
+  return wert === 'futter' ? 'FUTTERMITTEL' : 'LEBENSMITTEL'
 }
 
 export function bereichParameter(bereich: AnzeigeBereich): string | null {
@@ -137,12 +140,12 @@ export function bereichParameter(bereich: AnzeigeBereich): string | null {
 }
 
 /** Kommaliste → gültige, entdoppelte Werte in Eingabereihenfolge. */
-function liste<T>(roh: string | null, schema: z.ZodType<T>): T[] {
+function liste<T extends string>(roh: string | null, erlaubt: readonly T[]): T[] {
   if (!roh) return []
   const werte: T[] = []
   for (const teil of roh.split(',')) {
-    const ergebnis = schema.safeParse(teil.trim())
-    if (ergebnis.success && !werte.includes(ergebnis.data)) werte.push(ergebnis.data)
+    const wert = ausListe(erlaubt, teil.trim())
+    if (wert !== null && !werte.includes(wert)) werte.push(wert)
   }
   return werte
 }
@@ -155,18 +158,18 @@ function liste<T>(roh: string | null, schema: z.ZodType<T>): T[] {
 export function leseHoefeFilter(params: SuchParameter): HoefeFilter {
   const bereich = bereichAusParameter(params.get(P.bereich))
   const imBereich = ANZEIGE_BEREICHE[bereich].kategorien as readonly ProductCategoryValue[]
-  const kategorien = liste(params.get(P.kategorien), kategorieSchema).filter((k) => imBereich.includes(k))
-  const sorten = liste(params.get(P.sorten), sorteSchema).filter(
+  const kategorien = liste(params.get(P.kategorien), PRODUCT_CATEGORY_VALUES).filter((k) => imBereich.includes(k))
+  const sorten = liste(params.get(P.sorten), PRODUCT_SUBCATEGORY_VALUES).filter(
     (s) => !istAltlastUnterkategorie(s) && kategorien.some((k) => gehoertZu(k, s))
   )
   const futter = bereich === 'FUTTERMITTEL'
-  const gebinde = gebindeSchema.parse(params.get(P.gebinde))
-  const suchtext = suchSchema.safeParse(params.get(P.suchtext) ?? '')
+  const gebinde = ausListe(['klein', 'gross'] as const, params.get(P.gebinde))
+  const suchtextGueltig = suchwort(params.get(P.suchtext) ?? '') !== null
   const suchMarken: string[] = []
   for (const roh of params.getAll(P.suchMarken)) {
-    const marke = suchSchema.safeParse(roh)
-    if (marke.success && !suchMarken.includes(marke.data) && suchMarken.length < SUCHMARKEN_MAX) {
-      suchMarken.push(marke.data)
+    const marke = suchwort(roh)
+    if (marke !== null && !suchMarken.includes(marke) && suchMarken.length < SUCHMARKEN_MAX) {
+      suchMarken.push(marke)
     }
   }
 
@@ -174,16 +177,16 @@ export function leseHoefeFilter(params: SuchParameter): HoefeFilter {
     bereich,
     kategorien,
     sorten,
-    siegel: liste(params.get(P.siegel), siegelSchema),
-    tiere: futter ? liste(params.get(P.tiere), tierSchema) : [],
+    siegel: liste(params.get(P.siegel), PRODUCT_LABEL_VALUES),
+    tiere: futter ? liste(params.get(P.tiere), TIERART_VALUES) : [],
     gebinde: !futter || gebinde === null ? null : gebinde === 'klein' ? 'KLEIN' : 'GROSS',
-    sortierung: futter && sortSchema.parse(params.get(P.sortierung)) === 'grundpreis' ? 'GRUNDPREIS' : null,
+    sortierung: futter && params.get(P.sortierung) === 'grundpreis' ? 'GRUNDPREIS' : null,
     // Der getippte Text bleibt, wie er ist (auch mit Leerzeichen am Ende —
     // sonst spränge der Cursor beim Tippen); nur zu lang wird verworfen.
-    suchtext: suchtext.success ? (params.get(P.suchtext) ?? '') : '',
+    suchtext: suchtextGueltig ? (params.get(P.suchtext) ?? '') : '',
     suchMarken,
-    abholung: abholungSchema.parse(params.get(P.abholung)),
-    ansicht: ansichtSchema.parse(params.get(P.ansicht)),
+    abholung: ausListe(ABHOLUNG_VALUES, params.get(P.abholung)),
+    ansicht: params.get(P.ansicht) === 'karte' ? 'karte' : 'liste',
   }
 }
 

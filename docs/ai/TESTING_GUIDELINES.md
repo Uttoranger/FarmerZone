@@ -22,7 +22,7 @@ Wie viele Testdateien es gibt, zählt `pnpm vitest list --filesOnly | wc -l` (Un
 | `tests/fabrik/` | Fabriken für nachgebaute Typen (keine Tests, §5) | `<typ>.ts` |
 | `tests/fixtures/` | Beispieldateien, die ein Test liest (keine Tests) | beliebig |
 
-Keine weiteren Unterordner, kein `.spec.ts`. Innerhalb eines Ordners bleibt es flach; `tests/integration/setup/`, `tests/fabrik/` und `tests/fixtures/` enthalten nur Hilfsmittel, keine Tests. **Lose Hilfsdateien** in `tests/` (`*.ts` ohne `.test`) sind erlaubt und stehen mit Namen da: `admin-sitzung.ts`, `element-suche.ts`, `finanzen-jahr-daten.ts`, `geld-namen.ts`, `hydrieren-hilfe.ts`, `yaml-lader.ts`; eine neue kommt in diese Liste. Nach `tests/fabrik/` gehören nur Fabriken nachgebauter Typen (Inventur 14, Morgenbericht 20 §3, freigegeben 21.10.2026).
+Keine weiteren Unterordner, kein `.spec.ts`. Innerhalb eines Ordners bleibt es flach; `tests/integration/setup/`, `tests/fabrik/` und `tests/fixtures/` enthalten nur Hilfsmittel, keine Tests. **Lose Hilfsdateien** in `tests/` (`*.ts` ohne `.test`) sind erlaubt und stehen mit Namen da: `admin-sitzung.ts`, `element-suche.ts`, `finanzen-jahr-daten.ts`, `geld-namen.ts`, `hofseiten-zeile.ts` (eine Datenbankzeile der Hofseite für die Tests des Teilen-Bilds, Nr. 196), `hydrieren-hilfe.ts`, `yaml-lader.ts`; eine neue kommt in diese Liste. Nach `tests/fabrik/` gehören nur Fabriken nachgebauter Typen (Inventur 14, Morgenbericht 20 §3, freigegeben 21.10.2026).
 
 **Der `exclude` in `vitest.config.ts` ist Pflicht, keine Geschmacksfrage:**
 `tests/**/*.test.ts` passt auch auf `tests/integration/*.int.test.ts`. Ohne

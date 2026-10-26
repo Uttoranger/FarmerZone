@@ -154,10 +154,10 @@ function erlaubt(fund: Fund, text: string): boolean {
   if (fund.pfad === 'src/server/startseite-vorschau.ts') {
     return fund.art === 'Adresse im Text' && imRumpf(code, 'function alsAbfrage(', fund.stelle)
   }
-  // Die CSP zum Beobachten (Register G8, Nr. 125): `vorschau` steht in der Liste der Query-Werte, bei denen keine
+  // Die CSP zum Beobachten (Register G8, Nr. 125; Liste seit Nr. 196 in src/lib/nie-melden.ts): `vorschau` steht in der Liste der Query-Werte, bei denen keine
   // Meldung hinausgeht (der signierte Inhalt stünde sonst darin). Die Header-Regel liest den Wert nie — erlaubt nur
   // als Eintrag von NIE_MELDEN_PARAMETER.
-  if (fund.pfad === 'src/lib/csp.ts' && fund.art === 'Literal') {
+  if (fund.pfad === 'src/lib/nie-melden.ts' && fund.art === 'Literal') {
     return /^export const NIE_MELDEN_PARAMETER = \[[^\]]*\] as const$/.test(zeileVon(code, fund.stelle))
   }
   // Die eine Ausnahme: die Breite der Vorschau-Spalte heißt `vorschau` (Ergebnis von editorSpalten, Nr. 73) —

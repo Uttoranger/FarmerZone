@@ -48,7 +48,7 @@ import {
 } from '@/lib/laender'
 import { MARKE } from '@/lib/marke'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
-import { ORTSSUCHE_MAX_ZEICHEN } from '@/schemas/ortssuche'
+import { ORTSSUCHE_MAX_ZEICHEN } from '@/lib/eingabegrenzen'
 
 export type StandortKandidat = {
   lat: number

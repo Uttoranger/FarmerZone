@@ -22,9 +22,18 @@ import type { Prisma } from '@prisma/client'
 import { tagVersetzt, wienKalendertag, wienWochenMontag } from '@/lib/kalender'
 import { wienerMitternacht, centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
-import { CHANNEL_LABELS } from '@/schemas/manual-sale'
 import { ohneTestzahlungenWhere, testzahlungWhere } from '@/lib/testzahlung'
 import { MARKE } from '@/lib/marke'
+
+/** Die Namen der Verkaufskanäle (früher in src/schemas/manual-sale.ts; dort weiter exportiert, Nr. 196). */
+export const CHANNEL_LABELS: Record<string, string> = {
+  PLATFORM: 'Plattform',
+  WHATSAPP: 'WhatsApp',
+  HOFLADEN: 'Hofladen',
+  MARKT: 'Markt',
+  BUSINESS: 'Geschäftskunde',
+  OTHER: 'Sonstiges',
+}
 
 export type Periode = 'woche' | 'monat' | 'jahr'
 
