@@ -64,13 +64,14 @@ async function wochenlauf(): Promise<Record<string, unknown>> {
   }
   const geloescht = await loescheMeldungen(zuLoeschen.map((m) => m.id))
 
-  // (a) Zusammenfassung nur, wenn im Eingang etwas offen ist — je Empfänger
+  // (a) Wochenlage jede Woche, auch wenn im Eingang nichts offen ist (Nr. 192:
+  // die Zahlen der Woche zählen auch in einer ruhigen Woche) — je Empfänger
   // ein Auftrag der Warteschlange (Wichtig, Nr. 159). Die Zahlen zählt der
   // Renderer beim Versand frisch; nur „gelöscht" kennt allein dieser Lauf.
   // Der Tag macht den Schlüssel eindeutig: ein zweiter Lauf am selben Tag
   // schreibt nicht noch einmal.
   const [zaehler, eingang] = await Promise.all([zaehleFuerWochenlauf(jetzt), zaehleOffenImEingang()])
-  const an = eingang.gesamt > 0 ? await betreiberKennungen('wochenbericht') : []
+  const an = await betreiberKennungen('wochenbericht')
   if (an.length > 0) {
     await stelleMailEin(betreiberAuftraege('wochenbericht', jetzt.toISOString().slice(0, 10), an, { geloeschtAnzahl: String(geloescht) }))
   }
