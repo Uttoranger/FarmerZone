@@ -2,8 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
-import { eigenerVorgaenger, merkeVorgaenger, ordneWechsel } from '@/lib/kunden-kopf'
-import { hinaufEintraegeSchema } from '@/schemas/rueckweg'
+import { eigenerVorgaenger, hinaufEintraegeAus, merkeVorgaenger, ordneWechsel } from '@/lib/kunden-kopf'
 
 /**
  * Merkt sich je Dokument, welche eigene Seite vor der aktuellen steht — für
@@ -59,7 +58,7 @@ const HINAUF_SPEICHER = 'farmerzone:hinauf'
 function hinaufEintraege(): string[] {
   try {
     const roh = sessionStorage.getItem(HINAUF_SPEICHER)
-    return roh ? hinaufEintraegeSchema.parse(JSON.parse(roh)) : []
+    return roh ? hinaufEintraegeAus(JSON.parse(roh)) : []
   } catch {
     // Kein Zugriff oder kein JSON: keine bekannten Einträge — dann gilt die
     // Navigation API allein, im schlimmsten Fall ein Schritt zurück hinunter.

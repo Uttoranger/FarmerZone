@@ -2,6 +2,7 @@
 
 import type { ComponentProps } from 'react'
 import { Info, Minus, Plus, Trash2, ShoppingBasket } from 'lucide-react'
+import Image from 'next/image'
 import Link from 'next/link'
 import {
   Sheet,
@@ -110,10 +111,10 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
             items.map((item) => (
               <div key={item.productId} className="flex gap-3 items-center">
                 {/* Image */}
-                <div className="shrink-0 w-14 h-14 rounded-lg bg-muted overflow-hidden flex items-center justify-center">
+                <div className="relative shrink-0 w-14 h-14 rounded-lg bg-muted overflow-hidden flex items-center justify-center">
                   {item.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                    // 56 px breit: der Browser holt eine kleine Fassung, nicht das Original (bis 2.400 px).
+                    <Image src={item.imageUrl} alt={item.name} fill sizes="56px" className="object-cover" />
                   ) : (
                     <ShoppingBasket className="size-5 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
                   )}
