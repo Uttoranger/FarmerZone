@@ -396,7 +396,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/alert.tsx · Alert, AlertAction, AlertDescription, AlertTitle · kein Zweck vermerkt · unbenutzt
 - src/components/ui/badge.tsx · Badge, badgeVariants · kein Zweck vermerkt · unbenutzt
 - src/components/ui/bottom-nav.tsx · BottomNav, BottomNavLink, BottomNavMitte, bottomNavEintragKlassen, mittelknopfKlassen, mittelknopfMitWortKlassen, mittelkreisKlassen · BottomNav: die Unterleiste am Handy (unter 768 px) mit erhobenem Mittelknopf — Kunde: Warenkorb (grün), Hof: „+ Neu" (orange) (docs/ai/DESIGN_SYSTEM.md, „Navigation"). · genutzt
-- src/components/ui/button.tsx · Button, buttonVariants · kein Zweck vermerkt · genutzt
+- src/components/ui/button.tsx · Button, TREFFER_44, buttonVariants · Trefferfläche von mindestens 44 × 44 px für Knöpfe, die sichtbar kleiner sind (WCAG 2.5.8, DESIGN_SYSTEM „Qualität"): ein unsichtbares ::before, mittig, so groß wie der Knopf, aber nie unter 44 px — … · genutzt
 - src/components/ui/card.tsx · Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle · kein Zweck vermerkt · genutzt
 - src/components/ui/chip.tsx · Chip, FilterChip, FilterChipReihe · Chip: ein kurzes Merkmal ohne Handlung („Eier", „Gemüse", „Frontlader vor Ort"). · genutzt
 - src/components/ui/dialog.tsx · Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogPortal, DialogTitle, DialogTrigger · kein Zweck vermerkt · genutzt
@@ -412,7 +412,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/list-row.tsx · ListGruppe, ListRow · ListGruppe: Zeilen auf einer Karte, durch feine Linien getrennt — wie das Mehr-Blatt und die Bestellliste in den Mockups. · genutzt
 - src/components/ui/marke.tsx · Marke · Die Marke: ein Zustand als kurzes Wort auf seiner Bedeutungsfarbe (Register G5) — tun (die Kundin oder der Hof muss etwas tun), läuft, erledigt, abgebrochen. · genutzt
 - src/components/ui/menue-ziel.tsx · MenueZielAnbieter, useMenueZiel, type MenueZiel · Der Zielort für das Portal der Menüs (Regelvorschlag 132 aus Morgenbericht 20, freigegeben 21.10.2026). · genutzt
-- src/components/ui/password-input.tsx · PasswordInput · kein Zweck vermerkt · genutzt
+- src/components/ui/password-input.tsx · PasswordInput · Passwortfeld mit Auge-Knopf — die EINE Umsetzung für alle Formulare (Nr. 173; vorher je eine Kopie in Registrierung und neuem Passwort). · genutzt
 - src/components/ui/progress-bar.tsx · ProgressBar · ProgressBar: Fortschritt als Balken, z. B. „Deine Hofseite · 64 %". · genutzt
 - src/components/ui/segment.tsx · Segment, type SegmentOption · Segment: ein Umschalter mit genau einer Wahl („Handy | Web", „10 km | 25 km | 50 km"). · genutzt
 - src/components/ui/select.tsx · Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectScrollDownButton, SelectScrollUpButton, SelectSeparator, SelectTrigger, SelectValue · kein Zweck vermerkt · genutzt

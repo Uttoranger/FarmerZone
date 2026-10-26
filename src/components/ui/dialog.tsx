@@ -66,15 +66,23 @@ function DialogContent({
             <DialogPrimitive.Close
               data-slot="dialog-close"
               render={
+                // 44-px-Knopf, der sichtbare Kreis von 28 px als Span darin
+                // (DESIGN_SYSTEM „Qualität"): Die Mitte bleibt, wo das alte
+                // Kreuz saß, die Trefferfläche wächst.
                 <Button
                   variant="ghost"
-                  className="absolute top-2 right-2"
-                  size="icon-sm"
+                  className="absolute top-0 right-0 rounded-full hover:bg-transparent dark:hover:bg-transparent"
+                  size="icon"
                 />
               }
             >
-              <XIcon
-              />
+              <span
+                data-slot="schliessen-kreis"
+                aria-hidden="true"
+                className="flex size-7 items-center justify-center rounded-full transition-colors group-hover/button:bg-muted"
+              >
+                <XIcon />
+              </span>
               <span className="sr-only">Schließen</span>
             </DialogPrimitive.Close>
           )}

@@ -3,7 +3,7 @@
 import { useId, useState } from 'react'
 import { useForm, useWatch, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Eye, EyeOff, Loader2, Mail } from 'lucide-react'
+import { Loader2, Mail } from 'lucide-react'
 import { registerFarmer } from '@/server/actions/register'
 import { passwortStaerke } from '@/lib/password-rules'
 import { schreibeHofnameEntwurf, sitzungsSpeicher } from '@/lib/hofname-entwurf'
@@ -16,6 +16,7 @@ import { registrierenFormularSchema, type RegistrierenFormular } from '@/schemas
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { PasswordInput } from '@/components/ui/password-input'
 import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
 import { HofAdresseVorschau } from '@/components/shared/hof-adresse-vorschau'
 import { SchonDabei } from '@/components/shared/schon-dabei'
@@ -69,7 +70,6 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
   // er keine Regel und keinen Fehler bekommt.
   const [website, setWebsite] = useState('')
   const [fehler, setFehler] = useState('')
-  const [zeigePasswort, setZeigePasswort] = useState(false)
   // Gesetzt nach dem Absenden: die Adresse, an die die Mail ging (bzw. bei
   // einer vergebenen Adresse: der Hinweis an das bestehende Konto).
   const [gesendetAn, setGesendetAn] = useState<string | null>(null)
@@ -199,33 +199,14 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
                 <label htmlFor={feldId('password')} className={FELD_LABEL}>
                   Passwort
                 </label>
-                <div className="relative">
-                  <input
-                    id={feldId('password')}
-                    type={zeigePasswort ? 'text' : 'password'}
-                    autoComplete="new-password"
-                    aria-invalid={errors.password ? true : undefined}
-                    aria-describedby={beschreibung(`${id}-staerke`, !!errors.password && fehlerId('password'))}
-                    className={cn(FELD, 'pr-12')}
-                    {...form.register('password')}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setZeigePasswort((z) => !z)}
-                    aria-label={zeigePasswort ? 'Passwort verbergen' : 'Passwort anzeigen'}
-                    aria-pressed={zeigePasswort}
-                    className={cn(
-                      'absolute top-0.5 right-0.5 flex size-11 items-center justify-center rounded-[10px] text-muted-foreground hover:text-foreground',
-                      FOKUS_RAHMEN
-                    )}
-                  >
-                    {zeigePasswort ? (
-                      <EyeOff className="size-[18px]" strokeWidth={1.7} aria-hidden="true" />
-                    ) : (
-                      <Eye className="size-[18px]" strokeWidth={1.7} aria-hidden="true" />
-                    )}
-                  </button>
-                </div>
+                <PasswordInput
+                  id={feldId('password')}
+                  autoComplete="new-password"
+                  aria-invalid={errors.password ? true : undefined}
+                  aria-describedby={beschreibung(`${id}-staerke`, !!errors.password && fehlerId('password'))}
+                  feld={FELD}
+                  {...form.register('password')}
+                />
                 {/* Vier Balken: orange, solange das Passwort nicht reicht, grün, sobald der Server es nimmt. */}
                 <div className="mt-2 grid grid-cols-4 gap-1.5" aria-hidden="true">
                   {[1, 2, 3, 4].map((stufe) => (

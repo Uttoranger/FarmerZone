@@ -284,6 +284,11 @@
   /* Abzeichen „Gründungshof“ (Nr. 116): hell Creme auf Markengrün (6,4:1). */
   --fz-abzeichen: oklch(0.9473 0.0184 86.1); /* #F3EDE0 */
   --fz-abzeichen-grund: oklch(0.4411 0.0761 153.8); /* #2D5F3F */
+  /* Feldrand (Nr. 173): Ränder von Eingabefeldern und Aus-Zustand des
+     Schalters, abgeleitet aus --fz-text-muted (75 % zum Rahmen hin) —
+     ≥ 3:1 auf Fläche (3,63) und Grund (3,38), WCAG 1.4.11. Kartenränder
+     bleiben --fz-border. */
+  --fz-feldrand: oklch(0.6052 0.0258 143.3); /* #798678 */
 }
 
 [data-theme="dark"] {
@@ -409,6 +414,9 @@
   /* Abzeichen bei Nacht: Tannengrün auf Creme (9,6:1). */
   --fz-abzeichen: oklch(0.3464 0.0474 155.7); /* #24412F */
   --fz-abzeichen-grund: oklch(0.9473 0.0184 86.1); /* #F3EDE0 */
+  /* Feldrand nachts (Nr. 173): 60 % --fz-text-muted zum Rahmen hin —
+     3,62:1 auf Fläche, 3,96:1 auf Grund. */
+  --fz-feldrand: oklch(0.5472 0.0264 143.2); /* #687567 */
 }
 
 /* ── Neues Design im Geltungsbereich ─────────────────────────────────
@@ -447,7 +455,8 @@
   --secondary: color-mix(in oklch, var(--fz-surface) 60%, var(--fz-border));
   --secondary-foreground: var(--fz-text);
   --border: var(--fz-border);
-  --input: var(--fz-border);
+  /* Feldränder eigen (Nr. 173): --fz-border hätte nur 1,3:1 auf der Fläche. */
+  --input: var(--fz-feldrand);
   --sidebar: var(--fz-surface);
   --sidebar-foreground: var(--fz-text);
   --sidebar-primary: var(--fz-primary);
