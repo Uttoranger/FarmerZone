@@ -43,8 +43,6 @@ const ZOD_BESTAND: readonly Eintrag[] = [
   { datei: 'farm.ts', name: 'holeAdresseZumPunkt', grund: 'Altbestand vor Nr. 178: Number.isFinite prüft beide Zahlen, sie gehen nur an die Geokodierung; Schema nachziehen' },
   { datei: 'farm.ts', name: 'deletePickupSlot', grund: ALTBESTAND },
   { datei: 'farm.ts', name: 'togglePickupSlotActive', grund: ALTBESTAND },
-  { datei: 'onboarding.ts', name: 'createOnboardingProducts', grund: 'Altbestand vor Nr. 178: Einrichten des eigenen Hofs, Hof aus der Sitzung geprüft; Schema nachziehen' },
-  { datei: 'onboarding.ts', name: 'createOnboardingSlots', grund: 'Altbestand vor Nr. 178: Einrichten des eigenen Hofs, Hof aus der Sitzung geprüft; Schema nachziehen' },
   { datei: 'orders.ts', name: 'markAsPickedUp', grund: ALTBESTAND },
   { datei: 'orders.ts', name: 'markAsPickedUpAndPaid', grund: ALTBESTAND },
   { datei: 'orders.ts', name: 'revertReady', grund: ALTBESTAND },
