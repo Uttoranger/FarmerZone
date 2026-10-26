@@ -5886,6 +5886,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Folge:** Mit dem dunkleren `--input` wären die `dark:bg-input/30`-Tönungen von Input, Textarea, Select und Umriss-Knopf hell geworden; sie sind entfallen, Felder stehen auf `bg-card` wie im Board. Das Passwort-Auge gibt es nur noch einmal (`PasswordInput`, Feldform über `feld`).
 - **Filter-Chips /products:** `FilterChip` selbst hat die Fläche (36 + 2 × 5 px, die Reihe schneidet mit `py-1` auf genau 44 px). Ohne Fläche waren die Hinweis-Knöpfe in den Produktzeilen („… übernehmen", „Kategorie ergänzen") — sie tragen jetzt `TREFFER_44`.
 
+## Hof-Formulare: speicherbar, Feldfehler, Tastatur (Nr. 174, Lauf 25, 26.10.2026)
+
+- **Warum:** Ein Hof, der beim Anlegen Beschreibung und Hof-E-Mail leer ließ (das Anlegen erlaubt es), konnte sein Profil nicht mehr speichern (`min(10)`, E-Mail Pflicht) — gegen „Bestand bleibt speicherbar". Dazu Meldungen wie „Pflichtfeld", Fehler nur im Toast oder unverknüpft, Felder mit 14 px (iOS zoomt), Abholzeiten ohne `<form>` und ohne Netz auf der Fehlerseite.
+- **Schema:** `profilSchemaFuer` — Beschreibung und Hof-E-Mail freiwillig (leer = Leerstring, die Spalte ist NOT NULL), Meldungen aus `PROFIL_MELDUNG`. Die Hof-E-Mail-Prüfung ist dieselbe wie beim Anlegen (`hofEmailSchema`). Eine Obergrenze für die Beschreibung gab es nie und kommt nicht dazu.
+- **Leser der Hof-E-Mail** (`Farm.email`, leer möglich seit dem Anlegen): Bestellseite und Bestätigung (`HofErreichen`) und `AngabenZumHof` blenden eine leere Adresse aus; `hofseite-fortschritt` zählt „Kontakt" nur mit Telefon UND E-Mail; **Offen:** `baueOrderPaidToFarmer`/`baueOrderConfirmedToFarmer` (`src/lib/email.ts`) schreiben `an: farm.email`, `ladeNochmalStand` (`queries/mails.ts`) und Stripe-Connect (`email: farm.email`) lesen sie ebenfalls — bei einem Hof ohne Hof-E-Mail geht die Bestellmail an eine leere Adresse. Der Rückfall auf die Anmelde-Adresse gehört in diese Leser (Nacharbeit, außerhalb der Dateien von Nr. 174). Die Anmelde-Adresse wird nie in `Farm.email` kopiert: Sie stünde sonst öffentlich auf der Bestellseite.
+- **Felder:** `FeldFehlerSatz`/`SpeicherFehler`/`feldFehlerAttribute` in `src/components/shared/formular-meldungen.tsx`; `Feld` in `familien-teile.tsx` verbindet Futter- und Brennmaterial-Felder selbst. Abholzeiten: `<form>`, Enter legt an, `aktionOhneWurf` um alle drei Aufrufe, Fehler als Karte (Ende vor Beginn am Feld „Bis"). Beitrag: Fehler am Feld, Veröffentlichen über `aktionOhneWurf`. Produktdialog: nur Kennzeichnung („(freiwillig)" statt „*"), `enterKeyHint`, `role="alert"` am Unterkategorie-Satz.
+- **Wache:** `tests/feld-schriftgroesse-wache.test.ts` (kein Feld unter 16 px ohne Breakpoint); `hof-aktionen-netz-wache` ist um Abholzeiten und `holeAdresseZumPunkt` kürzer.
+
 ## Nützliche Befehle
 
 ```bash

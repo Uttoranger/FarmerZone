@@ -114,8 +114,8 @@ const HOF: FarmSettings = {
 }
 
 /** Rendert das echte Formular, ändert Felder wie beim Tippen und schickt es ab. */
-async function sendeAb(felder: Record<string, unknown>): Promise<void> {
-  renderToStaticMarkup(createElement(ProfileForm, { farm: HOF }))
+async function sendeAb(felder: Record<string, unknown>, farm: FarmSettings = HOF): Promise<void> {
+  renderToStaticMarkup(createElement(ProfileForm, { farm }))
   const { form, absenden } = formular
   if (!form || !absenden) throw new Error('Das Formular hat keinen Absende-Griff gebaut')
   for (const [name, wert] of Object.entries(felder)) form.setValue(name, wert, { shouldDirty: true })
@@ -155,5 +155,69 @@ describe('Hof-Profil absenden', () => {
 
     expect(speicherweg.speichereProfil).toHaveBeenCalledTimes(1)
     expect(navigation.push).not.toHaveBeenCalled()
+  })
+})
+
+describe('Hof-Profil: Bestand ohne Beschreibung und ohne Hof-E-Mail (Nr. 174)', () => {
+  /** Ein Hof, der beim Anlegen beides leer gelassen hat – das Anlegen erlaubt es. */
+  const OHNE: FarmSettings = { ...HOF, description: '', email: '' }
+
+  it('ist speicherbar: nur das Telefon geändert → speichereProfil bekommt { phone }', async () => {
+    await sendeAb({ phone: '+43 676 0000000' }, OHNE)
+
+    expect(speicherweg.speichereProfil).toHaveBeenCalledWith({ phone: '+43 676 0000000' })
+    expect(navigation.push).toHaveBeenCalledWith('/settings')
+  })
+
+  it('Beschreibung und Hof-E-Mail leeren geht ebenfalls (freiwillig)', async () => {
+    await sendeAb({ description: '', email: '' })
+
+    expect(speicherweg.speichereProfil).toHaveBeenCalledWith({ description: '', email: '' })
+  })
+
+  it('Gegenprobe: eine kaputte Hof-E-Mail wird nicht gespeichert', async () => {
+    await sendeAb({ email: 'kein-at-zeichen' }, OHNE)
+
+    expect(speicherweg.speichereProfil).not.toHaveBeenCalled()
+  })
+})
+
+describe('Hof-Profil: Felder (Nr. 174)', () => {
+  const html = () => renderToStaticMarkup(createElement(ProfileForm, { farm: HOF }))
+  const feld = (id: string): string => html().match(new RegExp(`<(?:input|textarea|select)[^>]*id="${id}"[^>]*>`))?.[0] ?? ''
+
+  it('Telefon, E-Mail und PLZ wählen die passende Tastatur und das Autofill', () => {
+    expect(feld('phone')).toMatch(/type="tel"/)
+    expect(feld('phone')).toMatch(/autoComplete="tel"/)
+    expect(feld('email')).toMatch(/type="email"/)
+    expect(feld('email')).toMatch(/autoComplete="email"/)
+    expect(feld('postalCode')).toMatch(/inputMode="numeric"/)
+    expect(feld('postalCode')).toMatch(/autoComplete="postal-code"/)
+  })
+
+  it('„Weiter" in den Feldern, „Fertig" am letzten (Betriebsnummer)', () => {
+    for (const id of ['name', 'ownerName', 'address', 'postalCode', 'city', 'phone', 'email']) expect(feld(id), id).toMatch(/enterKeyHint="next"/)
+    expect(feld('betriebsnummer')).toMatch(/enterKeyHint="done"/)
+  })
+
+  it('freiwillig steht am Feld, kein „*" an Pflichtfeldern; die Hof-E-Mail erklärt sich', () => {
+    const markup = html()
+    expect(markup).toContain('Beschreibung (freiwillig)')
+    expect(markup).toContain('Hof-E-Mail (freiwillig)')
+    expect(markup).not.toMatch(/ \*<\/label>/)
+    expect(markup).toMatch(/aria-describedby="email-hilfe"/)
+  })
+
+  it('das Formular ist noValidate: Die Sätze am Feld gelten, nicht die Blase des Browsers (type="email")', () => {
+    expect(html().match(/<form[^>]*>/)?.[0]).toContain('noValidate')
+  })
+
+  it('die Auswahlfelder haben 16 px (text-base), kein text-sm', () => {
+    const select = html().match(/<select[^>]*>/g) ?? []
+    expect(select.length).toBeGreaterThanOrEqual(2)
+    for (const s of select) {
+      expect(s).toContain('text-base')
+      expect(s).not.toMatch(/(^|\s)text-sm/)
+    }
   })
 })

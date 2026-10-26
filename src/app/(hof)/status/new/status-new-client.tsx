@@ -16,6 +16,11 @@ import { BEITRAG_RAHMEN, BILD_RAHMEN_TEXT, alsFotoAusschnitt, ausschnittOderNull
 import type { BildAusschnitt as BildAusschnittWert } from '@/schemas/bild-ausschnitt'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { toast } from 'sonner'
+import { aktionOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
+import { FeldFehlerSatz, SpeicherFehler, feldFehlerAttribute } from '@/components/shared/formular-meldungen'
+import { enterTaste } from '@/lib/feld-attribute'
+import { FREIWILLIG } from '@/lib/profil-meldungen'
+import { NETZ_SATZ } from '@/lib/netz'
 import { cn } from '@/lib/utils'
 import { BEITRAG_ANLAESSE, BEITRAG_ANLASS, type BeitragAnlass } from '@/lib/beitrag-anlass'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -137,6 +142,8 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
 
   // A3: field validation errors
   const [fieldErrors, setFieldErrors] = useState<{ title?: boolean; body?: boolean }>({})
+  // Ein Fehler beim Veröffentlichen, der kein Feld betrifft: Karte über dem Knopf statt Toast; am Netz mit „Nochmal".
+  const [publishFehler, setPublishFehler] = useState<string | null>(null)
 
   // Channel state
   const [showOnFarmPage, setShowOnFarmPage] = useState(true)
@@ -158,8 +165,10 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs)
       const firstId = errs.title ? 'status-title' : 'status-body'
-      document.getElementById(firstId)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      toast.error('Bitte alle Pflichtfelder ausfüllen.')
+      // Der Satz steht am Feld (role="alert"), kein zweiter im Toast; der Fokus geht dorthin.
+      const erstes = document.getElementById(firstId)
+      erstes?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      erstes?.focus({ preventScroll: true })
       return
     }
 
@@ -168,18 +177,22 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
   }
 
   function handlePublish() {
+    setPublishFehler(null)
     startTransition(async () => {
-      const res = await publishStatusPost({
-        title: title.trim(),
-        body: body.trim(),
-        anlass,
-        photoUrl: photoUrl ?? undefined,
-        linkedProductIds,
-        showOnFarmPage,
-        sendEmail: sendEmail && !emailBlocked,
-      })
+      // aktionOhneWurf: Ohne Netz würfe die Aktion und ginge an die Fehlerseite – der Beitrag wäre weg.
+      const res = await aktionOhneWurf(() =>
+        publishStatusPost({
+          title: title.trim(),
+          body: body.trim(),
+          anlass,
+          photoUrl: photoUrl ?? undefined,
+          linkedProductIds,
+          showOnFarmPage,
+          sendEmail: sendEmail && !emailBlocked,
+        })
+      )
       if (res.error) {
-        toast.error(res.error)
+        setPublishFehler(res.error)
         return
       }
       // Der Beitrag steht — ein gescheiterter Ausschnitt nimmt ihn nicht zurück, er sagt es nur.
@@ -255,7 +268,7 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
             <div className="mb-4">
               <div className="flex items-center justify-between mb-1.5">
                 <label htmlFor="status-title" className="text-sm font-medium text-foreground">
-                  Titel *
+                  Titel
                 </label>
                 <span className="text-xs text-muted-foreground">{title.length}/80</span>
               </div>
@@ -267,24 +280,30 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                   setTitle(e.target.value.slice(0, 80))
                   if (fieldErrors.title) setFieldErrors((p) => ({ ...p, title: false }))
                 }}
+                // Kein <form>: Enter springt von Hand in die Nachricht, wie es die „Weiter"-Taste verspricht.
+                enterKeyHint={enterTaste(false)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' || e.nativeEvent.isComposing) return
+                  e.preventDefault()
+                  document.getElementById('status-body')?.focus()
+                }}
                 placeholder="z.B. Frisches Rindfleisch ab Samstag"
+                {...feldFehlerAttribute('status-title', Boolean(fieldErrors.title))}
                 className={cn(
-                  'w-full h-11 px-3 rounded-xl border bg-card text-sm focus:outline-none focus:ring-2 transition-colors',
+                  'w-full h-11 px-3 rounded-xl border bg-card text-base focus:outline-none focus:ring-2 transition-colors',
                   fieldErrors.title
                     ? 'border-status-offen focus:ring-status-offen/30'
                     : 'border-border focus:ring-ring/50',
                 )}
               />
-              {fieldErrors.title && (
-                <p className="text-xs font-medium text-status-offen mt-1">Bitte einen Titel eingeben.</p>
-              )}
+              <FeldFehlerSatz feldId="status-title" text={fieldErrors.title ? 'Bitte gib einen Titel ein – er steht über deinem Beitrag.' : null} />
             </div>
 
             {/* Body */}
             <div className="mb-4">
               <div className="flex items-center justify-between mb-1.5">
                 <label htmlFor="status-body" className="text-sm font-medium text-foreground">
-                  Nachricht *
+                  Nachricht
                 </label>
                 <span className="text-xs text-muted-foreground">{body.length}/500</span>
               </div>
@@ -297,16 +316,15 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                 }}
                 placeholder="Schreibe hier deinen Beitrag…"
                 rows={5}
+                {...feldFehlerAttribute('status-body', Boolean(fieldErrors.body))}
                 className={cn(
-                  'w-full px-3 py-2.5 rounded-xl border bg-card text-sm focus:outline-none focus:ring-2 resize-none transition-colors',
+                  'w-full px-3 py-2.5 rounded-xl border bg-card text-base focus:outline-none focus:ring-2 resize-none transition-colors',
                   fieldErrors.body
                     ? 'border-status-offen focus:ring-status-offen/30'
                     : 'border-border focus:ring-ring/50',
                 )}
               />
-              {fieldErrors.body && (
-                <p className="text-xs font-medium text-status-offen mt-1">Bitte eine Nachricht eingeben.</p>
-              )}
+              <FeldFehlerSatz feldId="status-body" text={fieldErrors.body ? 'Bitte schreib eine Nachricht – sie ist der Inhalt deines Beitrags.' : null} />
               <p className="text-xs text-muted-foreground mt-1">
                 Tipp:{' '}
                 <code className="bg-muted px-1 rounded">{'{Vorname}'}</code> wird automatisch
@@ -398,7 +416,7 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
               <div className="mb-5">
                 <label className="block text-sm font-medium text-foreground mb-2">
                   Produkte verlinken{' '}
-                  <span className="text-muted-foreground font-normal">(optional)</span>
+                  <span className="text-muted-foreground font-normal">{FREIWILLIG}</span>
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {products.map((p) => (
@@ -556,6 +574,8 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                 </div>
               )}
             </div>
+
+            <SpeicherFehler text={publishFehler} nochmal={publishFehler === NETZ_SATZ} onNochmal={handlePublish} laeuft={pending} className="mb-3" />
 
             {/* A2: orange CTA */}
             <button

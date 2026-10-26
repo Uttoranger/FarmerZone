@@ -16,7 +16,7 @@
  * weitergegeben wird, ist kein Aufruf — sie zählt dort, wo sie aufgerufen wird.
  *
  * Bestand (BESTAND): Stellen, die es vor Nr. 175 gab — die Liste schrumpft nur.
- * Die Abholzeiten (pickup-slots-client.tsx) stellt Nr. 174 um.
+ * Nr. 174 hat die Abholzeiten (pickup-slots-client.tsx) und das Profil (profile-form.tsx) umgestellt und aus dem Bestand gestrichen.
  *
  * Gegenprobe: Text-Attrappen — ein nackter Aufruf, einer in `startTransition`
  * und einer im `catch` schlagen an; im `try`, im Helfer, als Wert und mit
@@ -46,10 +46,6 @@ const BESTAND = [
   'src/components/mein-hof/bild-bausteine.tsx: updateFarmLogoAction',
   'src/components/mein-hof/bild-bausteine.tsx: updateFarmLogoAction',
   'src/components/mein-hof/bild-bausteine.tsx: updateFarmPhotoCaptionAction',
-  'src/components/settings/pickup-slots-client.tsx: addPickupSlot',
-  'src/components/settings/pickup-slots-client.tsx: deletePickupSlot',
-  'src/components/settings/pickup-slots-client.tsx: togglePickupSlotActive',
-  'src/components/settings/profile-form.tsx: holeAdresseZumPunkt',
 ]
 
 function* quelldateien(ordner: string): Generator<string> {
@@ -110,7 +106,7 @@ describe('Hofbereich: Server-Actions ohne Wurf (Register N29)', () => {
     expect(funde.sort()).toEqual([...BESTAND].sort())
   })
 
-  it('die umgestellten Aufrufe (Pause, Im-Shop-Schalter, Bestellung, Storno, Artikel fehlt) laufen über den Helfer', () => {
+  it('die umgestellten Aufrufe (Pause, Im-Shop-Schalter, Bestellung, Storno, Artikel fehlt, Abholzeiten, Profil, Beitrag) laufen über den Helfer', () => {
     for (const datei of [
       'src/components/settings/pause-client.tsx',
       'src/components/mein-hof/pausieren-blatt.tsx',
@@ -118,6 +114,9 @@ describe('Hofbereich: Server-Actions ohne Wurf (Register N29)', () => {
       'src/components/hof-bestellungen/bestell-detail.tsx',
       'src/components/hof-bestellungen/storno-dialog.tsx',
       'src/components/hof-bestellungen/artikel-fehlt-dialog.tsx',
+      'src/components/settings/pickup-slots-client.tsx',
+      'src/components/settings/profile-form.tsx',
+      'src/app/(hof)/status/new/status-new-client.tsx',
     ]) {
       expect(readFileSync(join(WURZEL, datei), 'utf8'), datei).toContain('aktionOhneWurf(() =>')
     }

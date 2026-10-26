@@ -650,7 +650,7 @@ function GalleryPhotoItem({
           onBlur={handleCaptionBlur}
           placeholder="Bildunterschrift (freiwillig)"
           aria-label={`Bildunterschrift zu Foto ${index + 1}`}
-          className="h-11 w-full rounded-lg border border-input bg-card px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
+          className="h-11 w-full rounded-lg border border-input bg-card px-2 text-base focus:outline-none focus:ring-2 focus:ring-ring/40"
         />
         {isSavingCaption && <span className="text-xs text-muted-foreground">Speichert…</span>}
       </div>

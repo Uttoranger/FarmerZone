@@ -262,7 +262,8 @@ describe('profilWieImSchema — der Stand beim Laden, Feld für Feld durch das S
   })
 
   it('ein Altwert scheitert am Schema: nur er bleibt, wie geladen — E-Mail und Betriebsnummer zählen nicht als geändert', () => {
-    const geladen = { ...GELADEN, description: 'Kurz' }
+    // Seit Nr. 174 ist die Beschreibung freiwillig; ein zu kurzer Altwert bleibt der Name der Inhaberin.
+    const geladen = { ...GELADEN, ownerName: 'M' }
     const schema = schemaFuer(geladen)
     // Voraussetzung: Als Ganzes hält der Stand das Schema nicht ein.
     expect(schema.safeParse(geladen).success).toBe(false)
@@ -270,12 +271,12 @@ describe('profilWieImSchema — der Stand beim Laden, Feld für Feld durch das S
     const anfang = profilWieImSchema(schema, geladen)
     expect(anfang).toEqual({ ...geladen, email: 'hof@example.com', betriebsnummer: null })
 
-    // Der Bauer verlängert nur die Beschreibung; zodResolver gibt die Ausgabe des Schemas weiter.
-    const gespeichert = schema.parse({ ...geladen, description: 'Gemüse und Eier vom Hof' })
-    expect(geaendertSeitLaden(anfang, gespeichert)).toEqual({ description: 'Gemüse und Eier vom Hof' })
+    // Der Bauer korrigiert nur den Namen; zodResolver gibt die Ausgabe des Schemas weiter.
+    const gespeichert = schema.parse({ ...geladen, ownerName: 'Maria Muster' })
+    expect(geaendertSeitLaden(anfang, gespeichert)).toEqual({ ownerName: 'Maria Muster' })
     // Gegenprobe: Mit dem ungeprüften Stand zählten E-Mail und Betriebsnummer als geändert.
     expect(geaendertSeitLaden(geladen, gespeichert)).toEqual({
-      description: 'Gemüse und Eier vom Hof',
+      ownerName: 'Maria Muster',
       email: 'hof@example.com',
       betriebsnummer: null,
     })
