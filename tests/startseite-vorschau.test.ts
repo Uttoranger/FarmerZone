@@ -1,39 +1,51 @@
 /**
- * Der Vorschau-Link der Startseite (Register N16, Nr. 96) —
- * src/server/startseite-vorschau.ts mit gemockter Sitzung, Datenbank und
- * Draft Mode.
+ * Der Vorschau-Link der Startseite (Register N16, Nr. 96; seit Nr. 182 über die
+ * eigene dynamische Route /startseite-vorschau) — src/server/startseite-vorschau.ts
+ * mit gemockter Sitzung und Datenbank, dazu die Seite selbst.
  *
  * Beweist:
  *  - Signatur, Zweck und Ablauf: gültig bis knapp unter einer Stunde,
  *    abgelaufen ab genau einer Stunde, ein veränderter Inhalt oder eine fremde
  *    Signatur ist ungültig (nie „abgelaufen").
- *  - Die Seite bekommt eine Vorschau nur im Draft Mode, mit gültigem Link UND
- *    Admin-Sitzung — ohne Sitzung, mit fremder (Hof-)Sitzung, mit
- *    abgelaufenem Link: null, also die normale Startseite.
- *  - Ohne Draft Mode liest die Funktion weder die Parameter noch die Sitzung —
- *    der Weg jedes Besuchs bleibt statisch.
+ *  - Die Vorschau-Seite bekommt den Entwurf mit gültigem Link UND
+ *    Admin-Sitzung — OHNE Draft Mode (Nr. 182: Vercel gibt einer statischen
+ *    Route keine Query weiter, darum die eigene Route). Ohne Sitzung, mit
+ *    fremder (Hof-)Sitzung, mit abgelaufenem, fremd signiertem oder unsinnigem
+ *    Link: null. Bei ungültiger Signatur wird die Sitzung gar nicht gelesen.
+ *  - Die Seite zeigt ohne gültige Vorschau keinen Inhalt der Startseite und
+ *    leitet nicht um, sondern sagt, was zu tun ist (Link auf Admin › Startseite).
  *  - Die Signatur steht im Parameter `sig`, den die Sentry-Hygiene nach dem
  *    Namen entfernt; der Inhalt trägt kein Geheimnis.
  *  - Seit Nr. 99 trägt der signierte Inhalt die Quelle (Entwurf, Live oder eine
  *    Fassung): Eine andere Quelle ändert die Signatur, eine unbekannte ist
  *    ungültig.
- *  - „Vorschau öffnen" wirkt auf jedem Gerät mit Admin-Sitzung (Runde 2): Die
- *    Route /admin/startseite/vorschau schaltet dort den Draft Mode ein und
- *    leitet mit demselben Link auf die Startseite; ohne Admin-Sitzung, mit
- *    abgelaufenem oder falschem Link kein Draft Mode, normale Startseite.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { NextRequest } from 'next/server'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createElement, type ReactNode } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 
-const draft = vi.hoisted(() => ({ an: false, enable: vi.fn() }))
+// draftMode ist eine Attrappe, die nie „an" ist: Die Vorschau darf ihn nicht brauchen.
 vi.mock('next/headers', () => ({
   headers: vi.fn(async () => new Headers()),
-  draftMode: vi.fn(async () => ({ isEnabled: draft.an, enable: draft.enable })),
+  draftMode: vi.fn(async () => ({ isEnabled: false, enable: vi.fn() })),
 }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', () => ({ prisma: { user: { findUnique: vi.fn() } } }))
+// Für die Seite: Shell und Inhalt als Marken, die Zeilen als Attrappe.
+vi.mock('next/link', () => ({
+  default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
+}))
+vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
+  KundeShellMitSitzung: ({ children }: { children?: ReactNode }) => createElement('div', { 'data-shell': 'kunde' }, children),
+}))
+vi.mock('@/components/startseite/startseiten-inhalt', () => ({
+  STARTSEITE_TITEL: 'Titel der Startseite',
+  StartseitenInhalt: ({ band }: { band?: { quelle: string } }) =>
+    createElement('div', { 'data-inhalt': 'startseite', 'data-quelle': band?.quelle ?? 'keine' }),
+}))
+vi.mock('@/server/queries/startseite', () => ({ ladeVorschauZeilen: vi.fn(async () => []) }))
 
-import { headers } from 'next/headers'
+import { draftMode, headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { bereinigeEreignis } from '@/lib/sentry-hygiene'
@@ -41,9 +53,11 @@ import {
   VORSCHAU_GUELTIG_MS,
   erzeugeVorschauAbfrage,
   pruefeVorschau,
-  vorschauDieserAnfrage,
+  leseStartseitenVorschau,
 } from '@/server/startseite-vorschau'
-import { GET as oeffneVorschauRoute } from '@/app/admin/startseite/vorschau/route'
+import { ladeVorschauZeilen } from '@/server/queries/startseite'
+import VorschauSeite, { dynamic, metadata } from '@/app/startseite-vorschau/page'
+import { ADMIN_STARTSEITE_HREF, STARTSEITE_VORSCHAU_HREF, STARTSEITE_VORSCHAU_UNGUELTIG } from '@/lib/startseite-gestalten'
 import type { VorschauQuelle } from '@/schemas/startseite'
 import { createHmac } from 'crypto'
 
@@ -54,9 +68,9 @@ function parameterAus(pfad: string): Record<string, string> {
   return Object.fromEntries(new URL(pfad, 'http://localhost').searchParams)
 }
 
-/** Der Pfad der Startseite mit Vorschau-Link — wie ihn die Action baut (`/?${abfrage}`). */
+/** Der Pfad der Vorschau-Seite mit Link — wie ihn die Action baut (`${STARTSEITE_VORSCHAU_HREF}?${abfrage}`). */
 function erzeugeVorschauPfad(inhalt: Parameters<typeof erzeugeVorschauAbfrage>[0], jetzt: Date): string {
-  return `/?${erzeugeVorschauAbfrage(inhalt, jetzt)}`
+  return `${STARTSEITE_VORSCHAU_HREF}?${erzeugeVorschauAbfrage(inhalt, jetzt)}`
 }
 
 function link(blockEntwurfId: string | null = 'block-1', quelle: VorschauQuelle = 'entwurf'): Record<string, string> {
@@ -124,95 +138,88 @@ describe('Quelle im signierten Inhalt (Nr. 99)', () => {
   })
 })
 
-describe('vorschauDieserAnfrage', () => {
+describe('leseStartseitenVorschau — die Lese-Funktion der Vorschau-Seite (Nr. 182)', () => {
   const JETZT = new Date(AUSGESTELLT.getTime() + 60_000)
 
   beforeEach(() => {
     vi.clearAllMocks()
-    draft.an = true
     vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'admin-1' } } as never)
     vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true } as never)
   })
 
-  it('zeigt die Vorschau mit Draft Mode, gültigem Link und Admin-Sitzung', async () => {
-    expect(await vorschauDieserAnfrage(Promise.resolve(link()), JETZT)).toEqual({ datum: DATUM, blockEntwurfId: 'block-1', quelle: 'entwurf' })
+  it('liefert mit gültigem Link und Admin-Sitzung den Inhalt — ohne Draft Mode', async () => {
+    expect(await leseStartseitenVorschau(link(), JETZT)).toEqual({ datum: DATUM, blockEntwurfId: 'block-1', quelle: 'entwurf' })
+    expect(draftMode).not.toHaveBeenCalled()
+    // Die Sitzung kommt aus den Headern dieser Anfrage, frisch geprüft.
+    expect(headers).toHaveBeenCalledTimes(1)
+    expect(prisma.user.findUnique).toHaveBeenCalledTimes(1)
   })
 
-  it('liest ohne Draft Mode weder die Adresse noch die Sitzung — die Seite bleibt statisch', async () => {
-    draft.an = false
-    const parameter = { then: vi.fn() } as unknown as Promise<Record<string, string>>
-    expect(await vorschauDieserAnfrage(parameter, JETZT)).toBeNull()
-    expect((parameter as unknown as { then: ReturnType<typeof vi.fn> }).then).not.toHaveBeenCalled()
-    expect(headers).not.toHaveBeenCalled()
-    expect(auth.api.getSession).not.toHaveBeenCalled()
-  })
-
-  it('gibt ohne Sitzung die normale Startseite', async () => {
+  it('gibt ohne Sitzung null', async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(null as never)
-    expect(await vorschauDieserAnfrage(Promise.resolve(link()), JETZT)).toBeNull()
+    expect(await leseStartseitenVorschau(link(), JETZT)).toBeNull()
   })
 
-  it('gibt mit fremder Sitzung (kein Admin) die normale Startseite', async () => {
+  it('gibt mit Hof-Sitzung (kein Admin) null', async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'hof-1', role: 'FARMER' } } as never)
     vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: false } as never)
-    expect(await vorschauDieserAnfrage(Promise.resolve(link()), JETZT)).toBeNull()
+    expect(await leseStartseitenVorschau(link(), JETZT)).toBeNull()
   })
 
-  it('gibt mit abgelaufenem oder falsch signiertem Link die normale Startseite — und fragt die Sitzung gar nicht erst', async () => {
+  it('gibt mit abgelaufenem, fremd signiertem oder unsinnigem Link null — und liest die Sitzung gar nicht erst', async () => {
     const spaet = new Date(AUSGESTELLT.getTime() + VORSCHAU_GUELTIG_MS)
-    expect(await vorschauDieserAnfrage(Promise.resolve(link()), spaet)).toBeNull()
-    expect(await vorschauDieserAnfrage(Promise.resolve({ ...link(), sig: 'c'.repeat(64) }), JETZT)).toBeNull()
-    expect(await vorschauDieserAnfrage(Promise.resolve({ vorschau: '<script>', sig: 'x' }), JETZT)).toBeNull()
+    expect(await leseStartseitenVorschau(link(), spaet)).toBeNull()
+    expect(await leseStartseitenVorschau({ ...link(), sig: 'c'.repeat(64) }, JETZT)).toBeNull()
+    expect(await leseStartseitenVorschau({ vorschau: '<script>', sig: 'x' }, JETZT)).toBeNull()
+    expect(await leseStartseitenVorschau({ vorschau: ['a', 'b'], sig: undefined }, JETZT)).toBeNull()
+    expect(await leseStartseitenVorschau({}, JETZT)).toBeNull()
+    expect(headers).not.toHaveBeenCalled()
     expect(auth.api.getSession).not.toHaveBeenCalled()
   })
 })
 
-describe('Route /admin/startseite/vorschau — „Vorschau öffnen" auf jedem Gerät', () => {
+describe('Seite /startseite-vorschau (Nr. 182)', () => {
   const JETZT = new Date(AUSGESTELLT.getTime() + 60_000)
 
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(JETZT)
-    // Ein anderes Gerät: Dort hat noch keine Action den Draft Mode eingeschaltet.
-    draft.an = false
     vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'admin-1' } } as never)
     vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true } as never)
+    return () => vi.useRealTimers()
   })
 
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  function oeffne(parameter: Record<string, string>): Promise<Response> {
-    return oeffneVorschauRoute(new NextRequest(`http://localhost/admin/startseite/vorschau?${new URLSearchParams(parameter)}`))
+  async function seite(parameter: Record<string, string | string[] | undefined>): Promise<string> {
+    return renderToStaticMarkup(await VorschauSeite({ searchParams: Promise.resolve(parameter) }))
   }
 
-  it('schaltet mit Admin-Sitzung den Draft Mode ein und leitet mit demselben Link auf die Startseite', async () => {
-    const parameter = link()
-    const antwort = await oeffne(parameter)
-    expect(draft.enable).toHaveBeenCalledTimes(1)
-    expect(antwort.status).toBe(303)
-    expect(antwort.headers.get('location')).toBe(`http://localhost/?vorschau=${parameter.vorschau}&sig=${parameter.sig}`)
-    expect(antwort.headers.get('cache-control')).toContain('no-store')
+  it('ist dynamisch, nie im Index, mit der Startseite als Canonical', () => {
+    expect(dynamic).toBe('force-dynamic')
+    expect(metadata.robots).toEqual({ index: false, follow: false })
+    expect(metadata.alternates).toEqual({ canonical: '/' })
+    expect(metadata.title).toBe('Titel der Startseite')
   })
 
-  it('zeigt ohne Sitzung oder mit Hof-Sitzung die normale Startseite — ohne Draft Mode', async () => {
+  it('zeigt mit gültigem Link und Admin-Sitzung die Quelle aus dem Link — mit Band', async () => {
+    const html = await seite(link('block-1', 'live'))
+    expect(html).toContain('data-inhalt="startseite"')
+    expect(html).toContain('data-quelle="live"')
+    expect(ladeVorschauZeilen).toHaveBeenCalledWith({ datum: DATUM, blockEntwurfId: 'block-1', quelle: 'live' })
+    expect(html).not.toContain(STARTSEITE_VORSCHAU_UNGUELTIG)
+  })
+
+  it('zeigt ohne Admin-Sitzung, abgelaufen oder ungültig keinen Inhalt, sondern den Fehlerzustand mit Weg zurück', async () => {
     vi.mocked(auth.api.getSession).mockResolvedValueOnce(null as never)
-    expect((await oeffne(link())).headers.get('location')).toBe('http://localhost/')
-    vi.mocked(auth.api.getSession).mockResolvedValueOnce({ user: { id: 'hof-1', role: 'FARMER' } } as never)
-    vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({ isAdmin: false } as never)
-    expect((await oeffne(link())).headers.get('location')).toBe('http://localhost/')
-    expect(draft.enable).not.toHaveBeenCalled()
-  })
-
-  it('zeigt mit abgelaufenem, falsch signiertem oder unsinnigem Link die normale Startseite — ohne nach der Sitzung zu fragen', async () => {
+    const faelle = [link(), { ...link(), sig: 'c'.repeat(64) }, {}]
+    for (const parameter of faelle) {
+      const html = await seite(parameter)
+      expect(html).not.toContain('data-inhalt')
+      expect(html).toContain(STARTSEITE_VORSCHAU_UNGUELTIG)
+      expect(html).toContain(`href="${ADMIN_STARTSEITE_HREF}"`)
+    }
     vi.setSystemTime(new Date(AUSGESTELLT.getTime() + VORSCHAU_GUELTIG_MS))
-    expect((await oeffne(link())).headers.get('location')).toBe('http://localhost/')
-    vi.setSystemTime(JETZT)
-    expect((await oeffne({ ...link(), sig: 'c'.repeat(64) })).headers.get('location')).toBe('http://localhost/')
-    expect((await oeffne({ vorschau: '<script>', sig: 'x' })).headers.get('location')).toBe('http://localhost/')
-    expect(draft.enable).not.toHaveBeenCalled()
-    expect(auth.api.getSession).not.toHaveBeenCalled()
+    expect(await seite(link())).toContain(STARTSEITE_VORSCHAU_UNGUELTIG)
+    expect(ladeVorschauZeilen).not.toHaveBeenCalled()
   })
 })

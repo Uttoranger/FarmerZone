@@ -16,15 +16,24 @@
  *
  * Dazu (Register N24): Mit Kaufsperre legt der Nachbestell-Link nichts in den
  * Korb — dieselbe Regel wie der Kaufknopf.
+ *
+ * Warenkorb ehrlich (Register N28, Nr. 169): Entfernen (`removeItem`,
+ * `updateQuantity(…, 0)`) gibt den Halt über DELETE /api/reserve frei, ohne zu
+ * warten; ein Fehler wird verschluckt. `ersetzeKorb` schreibt Speicher und
+ * Zustand, ohne Änderung nichts. Das Produktraster gleicht den gespeicherten
+ * Korb nach dem Hydrieren einmal mit seinen Produkten ab — ohne Reservierung,
+ * nie mit Kaufsperre, nie in der Vorschau des Hofs — und zeigt den Satz, bis
+ * sich der Korb ändert.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PublicProduct } from '@/server/queries/farm'
 import { publicProduct } from './fabrik/public-product'
 import type { CartItem, Warenkorb } from '@/lib/use-cart'
-import { useCart } from '@/lib/use-cart'
+import { useCart, useKorbHinweis } from '@/lib/use-cart'
 import { ProductGrid } from '@/components/farm/product-grid'
 import type { KaufSperre } from '@/lib/bereiche-anzeige'
-import { WARENKORB_SCHLUESSEL, leseWarenkorb } from '@/lib/warenkorb-speicher'
+import { SITZUNG_SCHLUESSEL, WARENKORB_SCHLUESSEL, leseWarenkorb } from '@/lib/warenkorb-speicher'
+import { NETZ_SATZ } from '@/lib/netz'
 
 const pruefstand = vi.hoisted(() => {
   type Setzer<T> = (wert: T | ((vorher: T) => T)) => void
@@ -178,8 +187,16 @@ function position(p: PublicProduct): Omit<CartItem, 'quantity'> {
 
 let speicher = new Map<string, string>()
 let abgelehnt = new Set<string>()
+let freigabeScheitert = false
+/** Ein Wurf beim Reservieren (POST) — Funkloch oder Programmierfehler (Register N29, Nr. 175). */
+let reservierenWirft: Error | null = null
 const reserviere = vi.fn(async (_adresse: string, init?: RequestInit): Promise<Response> => {
   const { productId } = JSON.parse(String(init?.body)) as { productId: string }
+  if (init?.method === 'DELETE') {
+    if (freigabeScheitert) throw new TypeError('Kein Netz')
+    return { ok: true, json: async () => ({ ok: true }) } as Response
+  }
+  if (reservierenWirft) throw reservierenWirft
   return (
     abgelehnt.has(productId)
       ? { ok: false, json: async () => ({ error: 'Davon ist nicht mehr genug da.' }) }
@@ -190,6 +207,8 @@ const reserviere = vi.fn(async (_adresse: string, init?: RequestInit): Promise<R
 beforeEach(() => {
   speicher = new Map()
   abgelehnt = new Set()
+  freigabeScheitert = false
+  reservierenWirft = null
   geliefert.korb = null
   reserviere.mockClear()
   vi.stubGlobal('localStorage', {
@@ -225,11 +244,21 @@ function gespeichert(): { farmId: string; inhalt: Array<[string, number]> } | nu
   return stand && { farmId: stand.farmId, inhalt: inhalt(stand.items) }
 }
 
+/** Nur die Reservierungen (POST) — Freigaben zählt `freigaben()`. */
 function reservierungen(): Array<[string, number]> {
-  return reserviere.mock.calls.map(([adresse, init]) => {
+  return reserviere.mock.calls.filter(([, init]) => init?.method === 'POST').map(([adresse, init]) => {
     expect(adresse).toBe('/api/reserve')
     const { productId, quantity } = JSON.parse(String(init?.body)) as { productId: string; quantity: number }
     return [productId, quantity]
+  })
+}
+
+/** Die Freigaben (DELETE /api/reserve): Produkt und Sitzung. */
+function freigaben(): Array<[string, string]> {
+  return reserviere.mock.calls.filter(([, init]) => init?.method === 'DELETE').map(([adresse, init]) => {
+    expect(adresse).toBe('/api/reserve')
+    const { productId, sessionId } = JSON.parse(String(init?.body)) as { productId: string; sessionId: string }
+    return [productId, sessionId]
   })
 }
 
@@ -374,5 +403,224 @@ describe('useCart: Summe in ganzen Cent (Nr. 139)', () => {
   it('Gegenprobe: Die alte Rechnung in Fließkomma ergibt 3.3000000000000003', () => {
     const alt = [{ price: 1.1, quantity: 3 }].reduce((s, i) => s + i.price * i.quantity, 0)
     expect(alt).toBe(3.3000000000000003)
+  })
+})
+
+describe('useCart: Entfernen gibt den Halt frei (Register N28)', () => {
+  it('removeItem ruft DELETE /api/reserve mit Produkt und Sitzung', async () => {
+    pruefstand.starte(NurKorb)
+    await korb().addItem(position(EIER), 2)
+    await pruefstand.zuRuhe()
+
+    korb().removeItem(EIER.id)
+    await pruefstand.zuRuhe()
+
+    const sitzung = speicher.get(SITZUNG_SCHLUESSEL)
+    expect(sitzung).toBeTruthy()
+    expect(freigaben()).toEqual([[EIER.id, sitzung]])
+    expect(korb().items).toEqual([])
+  })
+
+  it('updateQuantity(…, 0) gibt ebenso frei — ohne Reservierung', async () => {
+    pruefstand.starte(NurKorb)
+    await korb().addItem(position(MEHL), 1)
+    await pruefstand.zuRuhe()
+
+    expect(await korb().updateQuantity(MEHL.id, 0)).toEqual({ ok: true })
+    await pruefstand.zuRuhe()
+
+    expect(freigaben().map(([id]) => id)).toEqual([MEHL.id])
+    expect(reservierungen()).toEqual([[MEHL.id, 1]])
+    expect(gespeichert()).toEqual({ farmId: HOF_ID, inhalt: [] })
+  })
+
+  it('Gegenprobe: eine geänderte Menge über 0 gibt nichts frei', async () => {
+    pruefstand.starte(NurKorb)
+    await korb().addItem(position(MEHL), 1)
+    await korb().updateQuantity(MEHL.id, 3)
+    await pruefstand.zuRuhe()
+
+    expect(freigaben()).toEqual([])
+  })
+
+  it('scheitert die Freigabe (kein Netz), bleibt das Produkt trotzdem draußen — der Halt läuft dann ab', async () => {
+    freigabeScheitert = true
+    pruefstand.starte(NurKorb)
+    await korb().addItem(position(HONIG), 1)
+    await pruefstand.zuRuhe()
+
+    korb().removeItem(HONIG.id)
+    await pruefstand.zuRuhe()
+
+    expect(freigaben().map(([id]) => id)).toEqual([HONIG.id])
+    expect(korb().items).toEqual([])
+    expect(gespeichert()).toEqual({ farmId: HOF_ID, inhalt: [] })
+  })
+})
+
+describe('useCart: kein Netz (Register N29, Nr. 175)', () => {
+  it('addItem ohne Netz wirft nicht: ok false mit dem Netzsatz und „nochmal", der Korb bleibt, wie er war', async () => {
+    pruefstand.starte(NurKorb)
+    await korb().addItem(position(EIER), 1)
+    await pruefstand.zuRuhe()
+
+    reservierenWirft = new TypeError('Failed to fetch')
+    expect(await korb().addItem(position(MEHL), 2)).toEqual({ ok: false, error: NETZ_SATZ, nochmal: true })
+    await pruefstand.zuRuhe()
+
+    expect(inhalt(korb().items)).toEqual([[EIER.id, 1]])
+    expect(gespeichert()).toEqual({ farmId: HOF_ID, inhalt: [[EIER.id, 1]] })
+  })
+
+  it('updateQuantity ohne Netz: ok false mit dem Netzsatz, die alte Menge bleibt', async () => {
+    pruefstand.starte(NurKorb)
+    await korb().addItem(position(EIER), 1)
+    await pruefstand.zuRuhe()
+
+    reservierenWirft = new TypeError('Load failed')
+    expect(await korb().updateQuantity(EIER.id, 3)).toEqual({ ok: false, error: NETZ_SATZ, nochmal: true })
+    await pruefstand.zuRuhe()
+
+    expect(inhalt(korb().items)).toEqual([[EIER.id, 1]])
+  })
+
+  it('ein anderer Wurf ist kein Funkloch: ok false ohne Netzsatz und ohne „nochmal", der Korb bleibt', async () => {
+    pruefstand.starte(NurKorb)
+    reservierenWirft = new TypeError("Cannot read properties of undefined (reading 'x')")
+    const ergebnis = await korb().addItem(position(HONIG), 1)
+    await pruefstand.zuRuhe()
+
+    expect(ergebnis.ok).toBe(false)
+    expect(ergebnis.error).not.toBe(NETZ_SATZ)
+    expect(ergebnis.nochmal).toBeUndefined()
+    expect(korb().items).toEqual([])
+  })
+
+  it('Gegenprobe: mit Netz landet dasselbe Produkt im Korb', async () => {
+    pruefstand.starte(NurKorb)
+    expect(await korb().addItem(position(MEHL), 2)).toEqual({ ok: true })
+    await pruefstand.zuRuhe()
+
+    expect(inhalt(korb().items)).toEqual([[MEHL.id, 2]])
+  })
+
+  it('jeder Aufruf von /api/reserve trägt ein Zeitlimit (Signal)', async () => {
+    pruefstand.starte(NurKorb)
+    await korb().addItem(position(EIER), 1)
+    await korb().updateQuantity(EIER.id, 2)
+    korb().removeItem(EIER.id)
+    await pruefstand.zuRuhe()
+
+    expect(reserviere.mock.calls.map(([, init]) => init?.signal instanceof AbortSignal)).toEqual([true, true, true])
+  })
+})
+
+describe('useCart: ersetzeKorb (Register N28)', () => {
+  it('schreibt Speicher und Zustand', async () => {
+    pruefstand.starte(NurKorb)
+    await korb().addItem(position(EIER), 2)
+    await pruefstand.zuRuhe()
+
+    korb().ersetzeKorb((vorher) => vorher.map((i) => ({ ...i, price: 4.2 })))
+    await pruefstand.zuRuhe()
+
+    expect(korb().items.map((i) => i.price)).toEqual([4.2])
+    expect(leseWarenkorb(speicher.get(WARENKORB_SCHLUESSEL) ?? null)?.items.map((i) => i.price)).toEqual([4.2])
+  })
+
+  it('ohne Änderung schreibt er nichts', async () => {
+    pruefstand.starte(NurKorb)
+    await pruefstand.zuRuhe()
+
+    korb().ersetzeKorb((vorher) => vorher)
+    await pruefstand.zuRuhe()
+
+    expect(speicher.has(WARENKORB_SCHLUESSEL)).toBe(false)
+    expect(reserviere).not.toHaveBeenCalled()
+  })
+})
+
+describe('Produktraster: Abgleich beim Laden (Register N28)', () => {
+  const EIER_TEURER: PublicProduct = { ...EIER, price: 3.9 }
+
+  function gespeicherterKorb(...positionen: CartItem[]): void {
+    speicher.set(WARENKORB_SCHLUESSEL, JSON.stringify({ farmId: HOF_ID, farmSlug: HOF_SLUG, items: positionen }))
+  }
+
+  function raster(neu: { products?: PublicProduct[]; sperre?: KaufSperre; kaufen?: boolean } = {}): void {
+    const props = {
+      products: neu.products ?? [EIER_TEURER, MEHL],
+      farmId: HOF_ID,
+      farmSlug: HOF_SLUG,
+      sperre: neu.sperre ?? null,
+      kaufen: neu.kaufen ?? true,
+      hofName: 'Testhof A',
+      pauseMessage: null,
+    }
+    pruefstand.starte(() => {
+      ProductGrid(props)
+      // Wie Korb-Blatt und Mini-Warenkorb: der Satz zum Korb dieses Hofs.
+      hinweis.text = useKorbHinweis(HOF_ID)
+    })
+  }
+  const hinweis = { text: null as string | null }
+
+  afterEach(async () => {
+    // Der Satz lebt im Modul — der nächste Fall beginnt ohne (und das Rendern danach noch mit Speicher).
+    korb().clearCart()
+    await pruefstand.zuRuhe()
+  })
+
+  it('übernimmt den neuen Preis, nimmt Fehlendes heraus und sagt es — ohne Reservierung, ohne Freigabe', async () => {
+    gespeicherterKorb({ ...position(EIER), quantity: 2 }, { ...position(HONIG), quantity: 1 })
+    raster()
+    await pruefstand.zuRuhe()
+
+    expect(korb().items.map((i) => [i.productId, i.price])).toEqual([[EIER.id, 3.9]])
+    expect(leseWarenkorb(speicher.get(WARENKORB_SCHLUESSEL) ?? null)?.items.map((i) => i.price)).toEqual([3.9])
+    expect(hinweis.text).toBe('Eine Position ist nicht mehr verfügbar und wurde entfernt. Ein Preis hat sich geändert – der Korb zeigt den neuen.')
+    // Wer nur schaut, hält nichts: kein Aufruf von /api/reserve und keiner der Kasse.
+    expect(reserviere).not.toHaveBeenCalled()
+  })
+
+  it('der Satz bleibt, bis sich der Korb ändert', async () => {
+    gespeicherterKorb({ ...position(EIER), quantity: 2 })
+    raster()
+    await pruefstand.zuRuhe()
+    expect(hinweis.text).not.toBeNull()
+
+    await korb().addItem(position(MEHL), 1)
+    await pruefstand.zuRuhe()
+    expect(hinweis.text).toBeNull()
+  })
+
+  it('ohne Änderung: nichts geschrieben, kein Satz', async () => {
+    const roh = JSON.stringify({ farmId: HOF_ID, farmSlug: HOF_SLUG, items: [{ ...position(MEHL), quantity: 1 }] })
+    speicher.set(WARENKORB_SCHLUESSEL, roh)
+    raster()
+    await pruefstand.zuRuhe()
+
+    expect(speicher.get(WARENKORB_SCHLUESSEL)).toBe(roh)
+    expect(hinweis.text).toBeNull()
+  })
+
+  it('mit Kaufsperre bleibt der Korb, wie er ist', async () => {
+    const roh = JSON.stringify({ farmId: HOF_ID, farmSlug: HOF_SLUG, items: [{ ...position(EIER), quantity: 2 }, { ...position(HONIG), quantity: 1 }] })
+    speicher.set(WARENKORB_SCHLUESSEL, roh)
+    raster({ sperre: 'pause' })
+    await pruefstand.zuRuhe()
+
+    expect(speicher.get(WARENKORB_SCHLUESSEL)).toBe(roh)
+    expect(hinweis.text).toBeNull()
+  })
+
+  it('in der Vorschau des Hofs (kaufen=false) gleicht es nicht ab', async () => {
+    const roh = JSON.stringify({ farmId: HOF_ID, farmSlug: HOF_SLUG, items: [{ ...position(EIER), quantity: 2 }] })
+    speicher.set(WARENKORB_SCHLUESSEL, roh)
+    raster({ kaufen: false })
+    await pruefstand.zuRuhe()
+
+    expect(speicher.get(WARENKORB_SCHLUESSEL)).toBe(roh)
+    expect(hinweis.text).toBeNull()
   })
 })

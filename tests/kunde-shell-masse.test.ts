@@ -58,7 +58,7 @@ describe('Maße der KundeShell', () => {
   it('die Shell setzt die Variablen an ihren Rahmen und baut die Kopfzeile aus derselben Konstante', () => {
     const shell = quelle('src/components/shells/kunde-shell.tsx')
     const kundeShell = shell.slice(shell.indexOf('export function KundeShell('), shell.indexOf('export type KundeFokusShellProps'))
-    expect(kundeShell).toMatch(/<div data-design="neu" className=\{cn\('min-h-dvh bg-background text-foreground', KUNDE_SHELL_MASSE\)\}>/)
+    expect(kundeShell).toMatch(/<div data-design="neu" data-scroll-rand=\{[^}]*\} className=\{cn\('min-h-dvh bg-background text-foreground', KUNDE_SHELL_MASSE\)\}>/)
     expect(kundeShell).toMatch(/<header className="sticky top-0 z-40 border-b border-border/)
     expect(kundeShell).toContain('KUNDE_KOPF_ZEILE')
     // Keine zweite Höhe daneben: Die Kopfzeile nennt ihre Höhe nur über die Konstante.

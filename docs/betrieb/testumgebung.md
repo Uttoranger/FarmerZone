@@ -63,6 +63,7 @@ Vercel → Settings → Environment Variables → „Add". Umgebung **Preview**,
 
 - [ ] Stripe-Dashboard, **Testmodus** → Entwickler → Webhooks → Endpunkt hinzufügen: **`https://test.agrilo.at/api/stripe/webhook`**.
   - **Zusätzlich, nicht statt des bestehenden** Endpunkts `https://agrilo.at/api/stripe/webhook`: Die Produktion läuft bis zur Live-Schaltung selbst im Testmodus und braucht ihren Test-Endpunkt weiter.
+  - Stripe folgt keiner Weiterleitung; der Webhook muss direkt auf agrilo.at zeigen.
   - Ereignisse: dieselben wie Endpunkt A in `docs/betrieb/stripe-live.md`, Schritt 3.
 - [ ] **Vercel-Sperre für Stripe öffnen:** Stripe kann sich nicht bei Vercel anmelden und bekäme sonst 401.
   - Vercel → Settings → Deployment Protection → „Protection Bypass for Automation": ein Geheimnis erzeugen.

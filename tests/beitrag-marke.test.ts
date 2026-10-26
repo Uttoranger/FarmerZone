@@ -200,7 +200,8 @@ describe('Hofkarten der Startseite mit Marke („Höfe in deiner Nähe“)', () 
   })
 
   it('die Startseite reicht ihren Zeitpunkt an die Hofkarten weiter', () => {
-    const seite = readFileSync(join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    // Seit Nr. 182 steht der Inhalt der Startseite im Baustein, den auch die Vorschau rendert.
+    const seite = readFileSync(join(process.cwd(), 'src/components/startseite/startseiten-inhalt.tsx'), 'utf8')
     expect(seite).toMatch(/<HofKarten hoefe=\{daten\.hoefe\} jetzt=\{jetzt\.toISOString\(\)\} \/>/)
     expect(seite).toMatch(/<HofKartenGeladen jetzt=\{jetzt\} \/>/)
   })

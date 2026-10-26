@@ -10,7 +10,7 @@ import { VORRANG, fadenBezugSchema, hofBezugSchema, nachrichtBezugSchema } from 
  * die Antwort des Teams im Faden (Wichtig), das Rundschreiben mit dem Haken
  * „Betriebsmitteilung" (Kann warten). Adresse ist die des Inhaberkontos —
  * wie bisher; ein stillgelegter Hof bekommt keine Postfach-Mail mehr
- * (dieselbe Bedingung wie `ladeMailEmpfaenger`).
+ * (die Renderer unten verwerfen bei `archivedAt`).
  */
 
 /** Freischaltung → Hof. Der Zeitpunkt macht den Schlüssel eindeutig: Nach einer Rücknahme darf eine neue Freischaltung wieder schreiben. */

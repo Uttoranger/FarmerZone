@@ -1,16 +1,26 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { KundenKopf } from '@/components/shared/kunden-kopf'
-import { KundeFuss } from '@/components/shells/kunde-fuss'
+import { INFOSEITE_ABSCHNITT, INFOSEITE_LINK, INFOSEITE_SPALTE, INFOSEITE_TITEL } from '@/components/shared/infoseite-stil'
+import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
+import { ANMELDECODE_GUELTIG_SEKUNDEN, ANMELDECODE_LAENGE } from '@/lib/anmeldecode'
+import { BESTELLUNGEN_ANSICHT_SEKUNDEN, BESTELLUNGEN_COOKIE, BESTELLUNGEN_PFAD } from '@/lib/bestellungen-finden'
+import { SITZUNGEN_NACH_ABLAUF_TAGE } from '@/lib/betrieb'
+import { GERAETE_COOKIE, GERAETE_COOKIE_MAX_ALTER_SEKUNDEN } from '@/lib/geraete'
 import { DATENSCHUTZ_EMAIL } from '@/lib/support'
 import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = { title: `Datenschutz — ${MARKE}`, alternates: { canonical: '/datenschutz' } }
 
+// Zahlen und Namen, die der Text nennt, kommen aus dem Code, der sie auch setzt —
+// ändert sich dort etwas, ändert sich der Text mit (tests/altrouten-datenschutz.test.ts).
+const GERAETE_COOKIE_TAGE = GERAETE_COOKIE_MAX_ALTER_SEKUNDEN / 86_400
+const BESTELLUNGEN_MINUTEN = BESTELLUNGEN_ANSICHT_SEKUNDEN / 60
+const ANMELDECODE_MINUTEN = ANMELDECODE_GUELTIG_SEKUNDEN / 60
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="font-semibold text-foreground text-base mb-3">{title}</h2>
+      <h2 className={INFOSEITE_ABSCHNITT}>{title}</h2>
       <div className="space-y-2 text-muted-foreground">{children}</div>
     </section>
   )
@@ -18,22 +28,21 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function DatenschutzPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <KundenKopf seite={{ art: 'info' }} />
-      <div className="max-w-2xl mx-auto px-4 py-10">
-        <h1 className="text-2xl font-semibold text-foreground mb-2">Datenschutzerklärung</h1>
+    <KundeShellMitSitzung>
+      <div className={INFOSEITE_SPALTE}>
+        <h1 className={`${INFOSEITE_TITEL} mb-2`}>Datenschutzerklärung</h1>
         <p className="text-sm text-muted-foreground mb-8">Gemäß DSGVO / DSG Österreich</p>
 
         <div className="space-y-8 text-sm leading-relaxed">
 
           <Section title="1. Verantwortliche Stelle">
             <p>
-              Verantwortlich für die Datenverarbeitung auf dieser Plattform ist der Betreiber von
+              Verantwortlich für die Datenverarbeitung auf dieser Plattform ist der Betreiber von{' '}
               {MARKE} (Kontaktdaten siehe Impressum).
             </p>
             <p>
               Kontakt für Datenschutzanfragen:{' '}
-              <a href={`mailto:${DATENSCHUTZ_EMAIL}`} className="text-primary hover:underline break-words">
+              <a href={`mailto:${DATENSCHUTZ_EMAIL}`} className={INFOSEITE_LINK}>
                 {DATENSCHUTZ_EMAIL}
               </a>
             </p>
@@ -49,7 +58,7 @@ export default function DatenschutzPage() {
             </ul>
             <p className="mt-3"><strong className="text-foreground">Zahlungsdaten:</strong></p>
             <p>
-              Kreditkarten- und Bankdaten werden ausschließlich von Stripe verarbeitet und gespeichert.
+              Kreditkarten- und Bankdaten werden ausschließlich von Stripe verarbeitet und gespeichert.{' '}
               {MARKE} speichert keine vollständigen Zahlungsdaten — nur eine anonymisierte
               Bestätigungs-ID.
             </p>
@@ -57,6 +66,24 @@ export default function DatenschutzPage() {
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li>Session-Cookies (für Warenkorbfunktion, technisch notwendig)</li>
               <li>Server-Logs (IP-Adresse, Zeitstempel) für Betrieb und Sicherheit</li>
+              <li>
+                Meldest du dich an, speichern wir zur Sitzung deine IP-Adresse. Sie gehört zur
+                Sitzung: Abgelaufene Sitzungen löschen wir {SITZUNGEN_NACH_ABLAUF_TAGE} Tage nach ihrem
+                Ablauf.
+              </li>
+            </ul>
+            <p className="mt-3"><strong className="text-foreground">Weitere Cookies:</strong></p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li>
+                Cookie zur Wiedererkennung des Geräts (<span className="whitespace-nowrap">{GERAETE_COOKIE}</span>, {GERAETE_COOKIE_TAGE} Tage):
+                nur bei Hof- und Betreiber-Konten. Es enthält eine zufällige Kennung und dient dazu,
+                dir eine E-Mail zu schicken, wenn sich jemand auf einem neuen Gerät anmeldet.
+              </li>
+              <li>
+                Cookie für „Bestellungen finden“ (<span className="whitespace-nowrap">{BESTELLUNGEN_COOKIE}</span>, {BESTELLUNGEN_MINUTEN} Minuten,
+                nur für die Seite {BESTELLUNGEN_PFAD}): Es merkt sich, dass du deine E-Mail-Adresse mit
+                dem Code bestätigt hast, solange die Liste deiner Bestellungen offen ist.
+              </li>
             </ul>
           </Section>
 
@@ -97,6 +124,11 @@ export default function DatenschutzPage() {
                 übermittelt wird, was technisch schiefging, nicht wer betroffen war.</p>
               </div>
               <div>
+                <p className="font-medium text-foreground">Cloudflare (DNS und E-Mail-Empfang)</p>
+                <p>Cloudflare, Inc., USA — DNS der Domain und Empfang der E-Mails an unsere
+                Kontaktadressen (Weiterleitung an den Betreiber).</p>
+              </div>
+              <div>
                 <p className="font-medium text-foreground">Vercel Web Analytics (Reichweitenmessung)</p>
                 <p>Vercel Inc., USA — cookielose Zählung von Seitenaufrufen ohne Wiedererkennung:
                 Es werden keine Cookies gesetzt, keine Kennungen auf dem Gerät gespeichert und
@@ -124,7 +156,7 @@ export default function DatenschutzPage() {
             </ul>
             <p className="mt-3">
               Anfragen richten an:{' '}
-              <a href={`mailto:${DATENSCHUTZ_EMAIL}`} className="text-primary hover:underline break-words">
+              <a href={`mailto:${DATENSCHUTZ_EMAIL}`} className={INFOSEITE_LINK}>
                 {DATENSCHUTZ_EMAIL}
               </a>
             </p>
@@ -137,7 +169,7 @@ export default function DatenschutzPage() {
                 href="https://www.dsb.gv.at"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary hover:underline"
+                className={INFOSEITE_LINK}
               >
                 www.dsb.gv.at
               </a>
@@ -146,9 +178,10 @@ export default function DatenschutzPage() {
 
           <Section title="8. Cookies">
             <p>
-              Wir verwenden ausschließlich technisch notwendige Cookies und localStorage-Einträge
-              (für Warenkorbfunktion und Session-Verwaltung). Es werden keine Tracking-Cookies,
-              Werbe-Cookies oder Analyse-Tools eingesetzt.
+              Für Warenkorbfunktion und Session-Verwaltung verwenden wir technisch notwendige
+              Cookies und localStorage-Einträge. Es werden keine Tracking-Cookies oder
+              Werbe-Cookies eingesetzt. Die weiteren Cookies stehen mit Zweck und Dauer in
+              Abschnitt 2.
             </p>
           </Section>
 
@@ -166,7 +199,7 @@ export default function DatenschutzPage() {
               <li>Über den Abmelde-Link in jeder Nachricht</li>
               <li>
                 In deinem{' '}
-                <Link href="/account/profile" className="text-primary hover:underline">
+                <Link href="/account/profile" className={INFOSEITE_LINK}>
                   Kunden-Profil
                 </Link>{' '}
                 unter „Mein Konto&ldquo;
@@ -179,15 +212,16 @@ export default function DatenschutzPage() {
             </p>
           </Section>
 
-          <Section title="10. Kunden-Konto (Magic-Link-Login)">
+          <Section title="10. Kunden-Konto (Anmeldung mit Code)">
             <p>
-              Du kannst dich per einmaligem Login-Link (Magic Link) in dein Kunden-Konto einloggen,
-              um deine Benachrichtigungs-Einstellungen zu verwalten. Dabei wird deine E-Mail-Adresse
-              gespeichert sowie ein temporärer Sitzungs-Cookie gesetzt (gültig 7 Tage).
+              Du kannst dich mit einem Code, den wir dir per E-Mail schicken, in dein Kunden-Konto
+              einloggen, um deine Benachrichtigungs-Einstellungen zu verwalten. Der Code hat{' '}
+              {ANMELDECODE_LAENGE} Stellen und gilt {ANMELDECODE_MINUTEN} Minuten. Dabei wird deine
+              E-Mail-Adresse gespeichert sowie ein temporärer Sitzungs-Cookie gesetzt (gültig 7 Tage).
             </p>
             <p>
               Du kannst dein Konto und alle gespeicherten Einwilligungen jederzeit unter{' '}
-              <Link href="/account/profile" className="text-primary hover:underline">
+              <Link href="/account/profile" className={INFOSEITE_LINK}>
                 Mein Konto → Konto löschen
               </Link>{' '}
               vollständig löschen. Bestelldaten werden aus steuerrechtlichen Gründen weiterhin
@@ -272,8 +306,6 @@ export default function DatenschutzPage() {
           </p>
         </div>
       </div>
-      {/* Der Seitenfuß wie auf jeder Seite der Kundschaft (Register N22) — nur das Gerüst, der Text bleibt (O4). */}
-      <KundeFuss />
-    </div>
+    </KundeShellMitSitzung>
   )
 }

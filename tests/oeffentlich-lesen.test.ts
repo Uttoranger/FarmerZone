@@ -350,7 +350,8 @@ describe('Wache: Wiederholen nur auf öffentlichen Lesepfaden', () => {
   })
 
   it('Startseite und /hoefe melden einen schon gemeldeten Abbruch nicht ein zweites Mal', () => {
-    for (const seite of ['app/page.tsx', 'app/(public)/hoefe/page.tsx']) {
+    // Die Startseite lädt ihre Höfe seit Nr. 182 im Baustein startseiten-inhalt (auch für die Vorschau).
+    for (const seite of ['components/startseite/startseiten-inhalt.tsx', 'app/(public)/hoefe/page.tsx']) {
       const text = readFileSync(join(SRC, seite), 'utf8')
       expect(text, seite).toMatch(/if \(!schonGemeldet\(err\)\) Sentry\.captureException\(err/)
     }

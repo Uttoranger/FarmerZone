@@ -104,7 +104,8 @@ describe('robots.txt', () => {
 
   it('sperrt die übrigen privaten Bereiche', () => {
     // /sicherheit seit Nr. 117: „Das warst nicht du?" (Nr. 114) kommt mit einem Token aus der Mail.
-    for (const pfad of ['/admin', '/account', '/intern', '/onboarding', '/verify', '/reset-password', '/bestellungen', '/teilen', '/sicherheit']) {
+    // /startseite-vorschau seit Nr. 182: die Vorschau aus Admin › Startseite, nur mit signiertem Link und Admin-Sitzung.
+    for (const pfad of ['/admin', '/account', '/intern', '/onboarding', '/verify', '/reset-password', '/bestellungen', '/teilen', '/sicherheit', '/startseite-vorschau']) {
       expect(PRIVATE_BEREICHE, pfad).toContain(pfad)
       expect(darf(regeln, pfad), pfad).toBe(false)
       expect(darf(regeln, `${pfad}?x=1`), pfad).toBe(false)
@@ -114,6 +115,9 @@ describe('robots.txt', () => {
     expect(darf(regeln, '/api/upload/token')).toBe(false)
     expect(darf(regeln, '/teilen/abc?t=signiert')).toBe(false)
     expect(darf(regeln, '/sicherheit/nicht-ich?t=signiert')).toBe(false)
+    expect(darf(regeln, '/startseite-vorschau?vorschau=abc&sig=def')).toBe(false)
+    // Gegenprobe: die Startseite selbst bleibt erlaubt.
+    expect(darf(regeln, '/')).toBe(true)
   })
 
   it('der Admin-Zugang steht nicht in robots.txt — die Datei nennte ihn sonst jedem', () => {

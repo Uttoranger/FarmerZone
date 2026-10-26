@@ -8,6 +8,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
 import { EINMAL_LINK_ART, NICHT_ICH_JE_MINUTE, einmalTokenSchema } from '@/lib/geraete'
+import { istAdminPasskey } from '@/lib/admin-anmeldung'
 import { loeseEinmalLinkEin } from '@/server/geraete'
 
 /*
@@ -19,8 +20,18 @@ import { loeseEinmalLinkEin } from '@/server/geraete'
  * nichts mehr tun.
  */
 
-const KONTO_HREF = '/settings/account'
 const NEU_ANMELDEN = 'Bitte melde dich neu an.'
+const NUR_KUNDINNEN = 'Das geht nur unter „Mein Konto".'
+
+/**
+ * Die Seite, die die Liste zeigt — nach der Rolle aus der Sitzung (Nr. 178):
+ * Höfe „Konto und Sicherheit", Kundinnen „Mein Konto". Admin › Einstellungen
+ * › Anmeldung lädt selbst neu (router.refresh im Baustein). Die Rolle wählt
+ * nur die Seite; was gelöscht wird, bestimmt allein das Konto der Sitzung.
+ */
+function kontoSeite(rolle: unknown): string {
+  return rolle === 'CUSTOMER' ? '/account/profile' : '/settings/account'
+}
 
 export type AbmeldenAntwort = { ok: true; abgemeldet: number } | { error: string }
 
@@ -38,7 +49,7 @@ export async function meldeGeraetAb(eingabe: unknown): Promise<AbmeldenAntwort> 
   if (!sitzung?.user) return { error: NEU_ANMELDEN }
 
   const { count } = await prisma.session.deleteMany({ where: { id: v.data.sitzungId, userId: sitzung.user.id } })
-  revalidatePath(KONTO_HREF)
+  revalidatePath(kontoSeite(sitzung.user.role))
   return { ok: true, abgemeldet: count }
 }
 
@@ -50,7 +61,23 @@ export async function meldeAlleAnderenAb(): Promise<AbmeldenAntwort> {
   const { count } = await prisma.session.deleteMany({
     where: { userId: sitzung.user.id, id: { not: sitzung.session.id } },
   })
-  revalidatePath(KONTO_HREF)
+  revalidatePath(kontoSeite(sitzung.user.role))
+  return { ok: true, abgemeldet: count }
+}
+
+/**
+ * „Überall abmelden" unter /account (Register S18; Nr. 178): ALLE Sitzungen
+ * des eigenen Kontos, auch diese — danach ist die Kundin auch hier
+ * abgemeldet und landet auf der Anmeldung (der Baustein führt hin). Nur für
+ * Kundinnen: Ein Hof behält „Alle anderen abmelden", damit er am Gerät, an
+ * dem er gerade arbeitet, angemeldet bleibt.
+ */
+export async function meldeUeberallAb(): Promise<AbmeldenAntwort> {
+  const sitzung = await auth.api.getSession({ headers: await headers() })
+  if (!sitzung?.user) return { error: NEU_ANMELDEN }
+  if (sitzung.user.role !== 'CUSTOMER') return { error: NUR_KUNDINNEN }
+
+  const { count } = await prisma.session.deleteMany({ where: { userId: sitzung.user.id } })
   return { ok: true, abgemeldet: count }
 }
 
@@ -93,12 +120,14 @@ export async function meldeAllesAbNichtIch(eingabe: unknown): Promise<NichtIchAn
   // Die Adresse frisch aus der Datenbank, nie aus der Anfrage.
   const konto = await prisma.user.findUnique({
     where: { id: link.userId },
-    select: { email: true, isAdmin: true, _count: { select: { passkeys: true } } },
+    select: { email: true, isAdmin: true, adminSeit: true, passkeys: { select: { createdAt: true } } },
   })
   if (!konto) return { ok: true, passwortMail: false }
   // Admin mit Passkey (N20, Nr. 115): „Passwort vergessen" schickt ihm nichts
   // — also gar nicht erst anstoßen; er meldet sich mit dem Passkey wieder an.
-  if (konto.isAdmin && konto._count.passkeys > 0) return { ok: true, passwortMail: false, passkey: true }
+  // Nur Passkeys aus der Admin-Einrichtung zählen, wie bei der Sperre in
+  // src/lib/auth.ts (Nr. 179).
+  if (konto.isAdmin && konto.passkeys.some((p) => istAdminPasskey(p.createdAt, konto.adminSeit))) return { ok: true, passwortMail: false, passkey: true }
   try {
     await auth.api.requestPasswordReset({ body: { email: konto.email, redirectTo: '/reset-password' } })
     return { ok: true, passwortMail: true }

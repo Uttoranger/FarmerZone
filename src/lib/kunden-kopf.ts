@@ -1,8 +1,8 @@
 /**
- * Kopfzeile der Kundenseiten — welche Form sie hat und wohin „Zurück" führt.
- * Rein, ohne Browser prüfbar (tests/kunden-kopf.test.ts); die Komponente
- * src/components/shared/kunden-kopf.tsx zeigt nur an, was hier entschieden
- * wird.
+ * Rückwege der Kundenseiten — wohin „Zurück" führt. Rein, ohne Browser
+ * prüfbar (tests/kunden-kopf.test.ts); useRueckwegKlick in
+ * src/components/shared/kunden-kopf.tsx führt aus, was hier entschieden
+ * wird. Die Kopfzeile selbst (KundenKopf) ist seit Nr. 181 entfernt.
  *
  * Anlass: Außer der Startseite hatte keine Kundenseite eine Navigation. Wer
  * über einen geteilten Link auf einer Hofseite landete, kam nur über den
@@ -12,7 +12,7 @@ import { hoefeLink } from '@/lib/bereiche-anzeige'
 import { REITER_PARAMETER } from '@/schemas/hofseite-reiter'
 import type { AnzeigeBereich } from '@/lib/taxonomie'
 
-/** Die Kundenseiten mit Kopfzeile. Die Startseite trägt die KundeShell (Nr. 07). */
+/** Die Kundenseiten mit Rückweg. */
 export type KundenSeite =
   /** `bereich` ist der tatsächlich angezeigte (teileHofseite), nicht der URL-Parameter:
    *  Ein reiner Futterhof zeigt Futter auch ohne `?bereich`, und geteilte Links tragen keinen. */
@@ -21,40 +21,6 @@ export type KundenSeite =
   /** Produktseite /[hof]/produkt/[id] (Nr. 11) — zurück zu allen Produkten des Hofs. */
   | { art: 'produkt'; hofSlug: string }
   | { art: 'hofuebersicht' }
-  /** Seit Nr. 54 nur noch der Datenschutz (zieht mit Nr. 57 in die KundeShell). */
-  | { art: 'info' }
-
-export type KopfForm = {
-  /**
-   * Handy: der Zurück-Knopf in der Leiste. Nur, wo „Zurück" woanders hinführt
-   * als die Bildmarke daneben — auf der Hofübersicht ginge er zur Startseite:
-   * zwei Knöpfe mit demselben Ziel nebeneinander.
-   */
-  zurueck: boolean
-  /**
-   * Das Warenkorb-Symbol (Handy-Leiste und Browser-Kopfzeile). Auf der
-   * Hofseite nicht — dort sitzt der Warenkorb-Knopf unten, wie bei den
-   * Vorbildern. Im Checkout nicht — dort ist der Warenkorb gerade der Inhalt
-   * der Seite.
-   */
-  warenkorb: boolean
-  /** Browser: unter der Kopfzeile ein Rückweg-Link, wo die Kopfzeile selbst keinen hat. */
-  rueckwegZeile: boolean
-}
-
-export function kopfForm(seite: KundenSeite): KopfForm {
-  const zurueck = rueckweg(seite, false).href !== '/'
-  switch (seite.art) {
-    case 'hofseite':
-    case 'produkt':
-    case 'checkout':
-      return { zurueck, warenkorb: false, rueckwegZeile: true }
-    case 'hofuebersicht':
-    case 'info':
-      // Im Browser führen der Name und „Höfe entdecken" schon zurück.
-      return { zurueck, warenkorb: true, rueckwegZeile: false }
-  }
-}
 
 export type Rueckweg = {
   /** Wohin der Link führt — immer ein echter Link, auch ohne JavaScript und im neuen Tab. */
@@ -88,8 +54,6 @@ export function rueckweg(seite: KundenSeite, vorgaengerEigen: boolean): Rueckweg
       return { href: `/${seite.hofSlug}`, verlauf: vorgaengerEigen }
     case 'hofuebersicht':
       return { href: '/', verlauf: vorgaengerEigen }
-    case 'info':
-      return { href: '/hoefe', verlauf: vorgaengerEigen }
   }
 }
 
@@ -105,8 +69,24 @@ function pfadVon(href: string): string {
  * Startseite, führte ein Schritt zurück nicht zu „Alle Höfe".
  */
 export function zeileNimmtVerlauf(seite: KundenSeite, vorgaengerPfad: string | null): boolean {
-  const weg = rueckweg(seite, vorgaengerPfad !== null)
-  return weg.verlauf && vorgaengerPfad === pfadVon(weg.href)
+  return nimmtVerlaufZu(rueckweg(seite, false).href, vorgaengerPfad)
+}
+
+/**
+ * Die allgemeine Regel für jeden Rückweg, der nach seinem Ziel benannt ist
+ * (Nr. 177) — die Browser-Zeile der Kundenseiten („‹ Alle Höfe") und der
+ * Unterseiten-Kopf des Hofbereichs („← Kunden"): ein Schritt im Verlauf genau
+ * dann, wenn die eigene Seite direkt davor dieses Ziel war — dann mit
+ * Filtern, Suche und Scrollstelle. Sonst der Link: Ein Schritt zurück führte
+ * woandershin als der Name verspricht.
+ */
+export function nimmtVerlaufZu(ziel: string, vorgaengerPfad: string | null): boolean {
+  return vorgaengerPfad !== null && vorgaengerPfad === pfadVon(ziel)
+}
+
+/** Der Tipp auf einen nach seinem Ziel benannten Rückweg (`nimmtVerlaufZu`): Verlauf oder hinauf zum Ziel. */
+export function tippAufZiel(ziel: string, vorgaengerPfad: string | null): RueckwegTipp {
+  return nimmtVerlaufZu(ziel, vorgaengerPfad) ? { aktion: 'verlauf' } : { aktion: 'hinauf', ziel: pfadVon(ziel) }
 }
 
 /** Was ein Tipp auf einen Rückweg tut: ein Schritt im Verlauf — oder dem Link folgen und damit hinaufsteigen. */
@@ -120,8 +100,8 @@ export type RueckwegTipp = { aktion: 'verlauf' } | { aktion: 'hinauf'; ziel: str
  */
 export function tippAufRueckweg(seite: KundenSeite, vorgaengerPfad: string | null, form: 'knopf' | 'zeile'): RueckwegTipp {
   const weg = rueckweg(seite, vorgaengerPfad !== null)
-  const verlauf = form === 'zeile' ? zeileNimmtVerlauf(seite, vorgaengerPfad) : weg.verlauf
-  return verlauf ? { aktion: 'verlauf' } : { aktion: 'hinauf', ziel: pfadVon(weg.href) }
+  if (form === 'zeile') return tippAufZiel(weg.href, vorgaengerPfad)
+  return weg.verlauf ? { aktion: 'verlauf' } : { aktion: 'hinauf', ziel: pfadVon(weg.href) }
 }
 
 /**
@@ -202,4 +182,18 @@ export function eigenerVorgaenger(
 ): string | null {
   if (!navigation) return merker
   return hinaufErreicht ? null : navigation.vorherigerPfad
+}
+
+/**
+ * Die Verlaufseinträge aus dem sessionStorage (Schlüssel der Navigation API,
+ * rueckweg-merker.tsx): eine Liste von höchstens 50 Texten mit 1 bis 100
+ * Zeichen — alles andere gilt als leer. Browser-Speicher ist Fremddaten; die
+ * Prüfung ist klein und rein, damit Zod nicht ins Bündel jeder Seite kommt.
+ * Dieselbe Regel wie `hinaufEintraegeSchema` (src/schemas/rueckweg.ts), die
+ * tests/leistung-180.test.ts danebenhält.
+ */
+export function hinaufEintraegeAus(roh: unknown): string[] {
+  if (!Array.isArray(roh) || roh.length > 50) return []
+  const istGueltig = (s: unknown): s is string => typeof s === 'string' && s.length >= 1 && s.length <= 100
+  return roh.every(istGueltig) ? roh : []
 }

@@ -214,8 +214,8 @@ describe('Blatt „Bestellungen pausieren?"', () => {
   })
 
   it('Pausieren schreibt die Nachricht mit, Fortsetzen die gespeicherte; Meldungen aus EINER Quelle', () => {
-    expect(blatt).toContain('await setPause(true, nachricht)')
-    expect(blatt).toContain("await setPause(false, gespeicherteNachricht ?? '')")
+    expect(blatt).toContain('await aktionOhneWurf(() => setPause(true, nachricht))')
+    expect(blatt).toContain("await aktionOhneWurf(() => setPause(false, gespeicherteNachricht ?? ''))")
     expect(blatt).toContain('toast.success(PAUSE_MELDUNG.pausiert)')
     expect(blatt).toContain('toast.success(PAUSE_MELDUNG.fortgesetzt)')
     // Ein Fehler steht im Blatt, das Blatt bleibt offen.

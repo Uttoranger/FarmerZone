@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { useKundenSitzung } from '@/lib/use-kunden-sitzung'
+import type { KundenNavId } from '@/lib/kunden-navigation'
 import { KundeShell } from '@/components/shells/kunde-shell'
 
 /**
@@ -18,15 +19,18 @@ import { KundeShell } from '@/components/shells/kunde-shell'
  */
 export function KundeShellMitSitzung({
   unterleiste,
+  aktiv,
   children,
 }: {
   /** Durchgereicht an die KundeShell — `false` für Fokus-Seiten mit Kopf (Produktseite). */
   unterleiste?: boolean
+  /** Durchgereicht an die KundeShell — Hof- und Produktseite setzen `entdecken` (Nr. 177). */
+  aktiv?: KundenNavId
   children: ReactNode
 }): React.JSX.Element {
   const sitzung = useKundenSitzung()
   return (
-    <KundeShell sitzung={sitzung} unterleiste={unterleiste}>
+    <KundeShell sitzung={sitzung} unterleiste={unterleiste} aktiv={aktiv}>
       {children}
     </KundeShell>
   )

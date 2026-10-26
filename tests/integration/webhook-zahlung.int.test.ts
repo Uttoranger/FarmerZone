@@ -24,8 +24,11 @@
  * Request-Kontext — kein Netz, kein Geld. Die Mails sind seit Nr. 159
  * Aufträge der Warteschlange und stehen echt in der Datenbank: Statuswechsel
  * und Aufträge in einer Transaktion, zweimal zugestellt heißt ein Auftrag.
+ * Ein Auftrag hält den Wechsel nie auf (Nr. 168, Register N26, Ergänzung
+ * 25.10.2026): Eine Trigger-Funktion (setup/mail-sperre.ts) lässt das
+ * Anlegen scheitern; der Wechsel committet trotzdem (Savepoint, Weg A).
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
@@ -50,10 +53,10 @@ vi.mock('@/lib/nach-der-antwort', () => ({
   },
 }))
 
-// Echt eingestellt; nur für den Rollback-Fall lässt sich ein Fehler einspeisen.
+// Echt eingestellt; beobachtet wird nur, was die Hilfe zurückgibt (Nr. 168).
 vi.mock('@/server/mail-warteschlange', async (original) => {
   const echt = await original<typeof import('@/server/mail-warteschlange')>()
-  return { ...echt, stelleMailEin: vi.fn(echt.stelleMailEin) }
+  return { ...echt, stelleMailEinInTransaktion: vi.fn(echt.stelleMailEinInTransaktion) }
 })
 
 async function nachlaufFertig(): Promise<void> {
@@ -67,8 +70,10 @@ import { POST } from '@/app/api/stripe/webhook/route'
 import { cancelOrder } from '@/server/actions/orders'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import { stelleMailEin } from '@/server/mail-warteschlange'
+import { stelleMailEinInTransaktion } from '@/server/mail-warteschlange'
+import { bestellMailAuftrag } from '@/server/mail-arten/bestellung'
 import { INTEGRATIONS_ENV } from './setup/integrations-umgebung'
+import { gibMailAuftraegeFrei, sperreMailAuftraege } from './setup/mail-sperre'
 import { artenZu, auftraege, erstelleHofMitAnmeldung, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
 
 const erstatten = vi.mocked(stripe.refunds.create)
@@ -353,21 +358,122 @@ describe('payment_intent.succeeded — nur aus „wartet auf Zahlung"', () => {
   })
 })
 
-describe('Statuswechsel und Auftrag in einer Transaktion', () => {
-  it('scheitert das Einstellen: 500, die Bestellung bleibt offen (Rollback), kein Auftrag; die Wiederholung bezahlt und stellt ein', async () => {
-    const { bestellung, paymentIntentId } = await offeneOnlineBestellung()
-    vi.mocked(stelleMailEin).mockRejectedValueOnce(new Error('Warteschlange weg'))
-    const ev = ereignis('payment_intent.succeeded', paymentIntentId)
+describe('Ein Mail-Auftrag hält nie auf (Nr. 168): Savepoint in der Transaktion, nachholen nach dem Commit', () => {
+  const einstellen = vi.mocked(stelleMailEinInTransaktion)
+  /** Was an Sentry ging, je Grund — nur aus der Warteschlange. */
+  const mailMeldungen = () =>
+    vi.mocked(Sentry.captureException).mock.calls
+      .map(([, k]) => (k as { tags?: Record<string, string> } | undefined)?.tags)
+      // Nur die Meldungen der Einstell-Wege (mit Grund) — der Worker im Nachlauf meldet eigene.
+      .filter((t) => t?.bereich === 'mail-warteschlange' && t.grund)
+      .map((t) => t!.grund)
 
-    expect((await zustellen(ev)).status).toBe(500)
-    // Der Statuswechsel rollt mit zurück — Stripe stellt erneut zu.
-    expect(await zustand(bestellung.id)).toMatchObject({ status: 'PENDING_CONFIRMATION', paymentStatus: 'PENDING', paidAt: null })
+  beforeAll(async () => {
+    await gibMailAuftraegeFrei()
+  })
+
+  it('Weg A trägt: ein gescheitertes INSERT setzt nur den Savepoint zurück — dieselbe Transaktion liest und schreibt weiter und committet', async () => {
+    const { bestellung } = await offeneOnlineBestellung()
+    try {
+      await sperreMailAuftraege('immer')
+      const ergebnis = await prisma.$transaction(async (tx) => {
+        await tx.order.updateMany({ where: { id: bestellung.id }, data: { cancelReason: 'vor dem Auftrag' } })
+        const mail = await stelleMailEinInTransaktion(bestellMailAuftrag('abholbereit', bestellung, new Date()), tx)
+        // Ohne Savepoint wäre die Transaktion hier abgebrochen („current transaction is aborted").
+        await tx.order.updateMany({ where: { id: bestellung.id }, data: { cancelledAt: new Date(0) } })
+        return mail
+      })
+      expect(ergebnis).toBe('nachholen')
+    } finally {
+      await gibMailAuftraegeFrei()
+    }
+    expect(await zustand(bestellung.id)).toMatchObject({ cancelReason: 'vor dem Auftrag', cancelledAt: new Date(0) })
     expect(await artenZu(bestellung.id)).toEqual([])
-    expect(await prisma.webhookEvent.findUnique({ where: { stripeEventId: ev.id } })).toBeNull()
+  })
 
-    // Gegenprobe: dieselbe Zustellung noch einmal — jetzt bezahlt, mit beiden Aufträgen.
+  it('Trigger lässt jedes INSERT scheitern: bezahlt → PAID und 200, kein Auftrag, Sentry; ein zweites Ereignis legt nichts doppelt an', async () => {
+    const { bestellung, paymentIntentId } = await offeneOnlineBestellung()
+    const ev = ereignis('payment_intent.succeeded', paymentIntentId)
+    try {
+      await sperreMailAuftraege('immer')
+      expect((await zustellen(ev)).status).toBe(200)
+      await nachlaufFertig()
+    } finally {
+      await gibMailAuftraegeFrei()
+    }
+    expect(await zustand(bestellung.id)).toMatchObject({ status: 'PAID', paymentStatus: 'PAID' })
+    expect(await einstellen.mock.results[0]!.value).toBe('nachholen')
+    expect(await artenZu(bestellung.id)).toEqual([])
+    // In der Transaktion gescheitert (Warnung), nachgeholt gescheitert (Fehler).
+    expect(mailMeldungen()).toEqual(['in_transaktion_gescheitert', 'einstellen_gescheitert'])
+    expect(await prisma.webhookEvent.findUnique({ where: { stripeEventId: ev.id } })).not.toBeNull()
+
+    // Dasselbe Ereignis und ein neues desselben PaymentIntents: nichts doppelt, nichts neu.
     expect((await zustellen(ev)).status).toBe(200)
+    expect((await zustellen(ereignis('payment_intent.succeeded', paymentIntentId))).status).toBe(200)
+    expect(await artenZu(bestellung.id)).toEqual([])
+  })
+
+  it('nur das INSERT in der Transaktion scheitert: PAID, die Aufträge werden nach dem Commit nachgeholt — je Art genau einer', async () => {
+    const { bestellung, paymentIntentId } = await offeneOnlineBestellung()
+    try {
+      await sperreMailAuftraege('einmal')
+      expect((await zustellen(ereignis('payment_intent.succeeded', paymentIntentId))).status).toBe(200)
+      await nachlaufFertig()
+    } finally {
+      await gibMailAuftraegeFrei()
+    }
     expect(await zustand(bestellung.id)).toMatchObject({ status: 'PAID' })
+    expect(await einstellen.mock.results[0]!.value).toBe('nachholen')
     expect(await artenZu(bestellung.id)).toEqual(['bestellung-bestaetigung', 'bestellung-bezahlt-hof'])
+    expect(mailMeldungen()).toEqual(['in_transaktion_gescheitert'])
+
+    // Ein zweites Ereignis legt nichts doppelt an.
+    await zustellen(ereignis('payment_intent.succeeded', paymentIntentId))
+    expect(await prisma.mailAuftrag.count({ where: { bestellungId: bestellung.id } })).toBe(2)
+  })
+
+  it('Storno mit gesperrtem INSERT: storniert, Bestand zurück, erstattet — kein Auftrag, Sentry', async () => {
+    const { produkt, bestellung, paymentIntentId } = await offeneOnlineBestellung()
+    await zustellen(ereignis('payment_intent.succeeded', paymentIntentId))
+    await nachlaufFertig()
+    vi.mocked(Sentry.captureException).mockClear()
+    try {
+      await sperreMailAuftraege('immer')
+      expect(await cancelOrder(bestellung.id)).not.toHaveProperty('error')
+      await nachlaufFertig()
+    } finally {
+      await gibMailAuftraegeFrei()
+    }
+    expect(await zustand(bestellung.id)).toMatchObject({ status: 'CANCELLED', paymentStatus: 'REFUNDED' })
+    expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT + MENGE)
+    expect(erstatten).toHaveBeenCalledTimes(1)
+    expect(await artenZu(bestellung.id)).not.toContain('storniert')
+    expect(mailMeldungen()).toEqual(['in_transaktion_gescheitert', 'einstellen_gescheitert'])
+  })
+
+  it('Storno, nur das INSERT in der Transaktion scheitert: der Auftrag wird vor Stripe nachgeholt und trägt danach den erstatteten Betrag', async () => {
+    const { produkt, bestellung, paymentIntentId } = await offeneOnlineBestellung()
+    await zustellen(ereignis('payment_intent.succeeded', paymentIntentId))
+    await nachlaufFertig()
+    try {
+      await sperreMailAuftraege('einmal')
+      expect(await cancelOrder(bestellung.id)).toEqual({ erstattetCents: 2100, vomHofCents: 2000 })
+      await nachlaufFertig()
+    } finally {
+      await gibMailAuftraegeFrei()
+    }
+    expect(await zustand(bestellung.id)).toMatchObject({ status: 'CANCELLED' })
+    expect(await bestand(produkt.id)).toBe(BESTAND_NACH_CHECKOUT + MENGE)
+    const [storno] = await auftraege({ bestellungId: bestellung.id, art: 'storniert' })
+    expect(storno?.bezug).toEqual({ orderId: bestellung.id, erstattetCents: '2100' })
+  })
+
+  it('Gegenprobe ohne Trigger: Statuswechsel und Aufträge in derselben Transaktion, Rückgabe „eingestellt"', async () => {
+    const { bestellung, paymentIntentId } = await offeneOnlineBestellung()
+    expect((await zustellen(ereignis('payment_intent.succeeded', paymentIntentId))).status).toBe(200)
+    expect(await einstellen.mock.results[0]!.value).toBe('eingestellt')
+    expect(await artenZu(bestellung.id)).toEqual(['bestellung-bestaetigung', 'bestellung-bezahlt-hof'])
+    expect(mailMeldungen()).toEqual([])
   })
 })

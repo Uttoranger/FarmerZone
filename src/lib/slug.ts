@@ -7,10 +7,10 @@ import { HOFNAME_MAX } from '@/lib/eingabegrenzen'
 // beide mit den echten Ordnern ab; ein neuer Ordner fällt dort auf.
 // Bestehende Höfe bleiben unberührt: Die Liste wirkt nur beim Anlegen.
 export const RESERVED_SLUGS = new Set([
-  'account', 'admin', 'agb', 'analytics', 'api', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
+  'account', 'admin', 'agb', 'analytics', 'api', 'app', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
   'farm-page', 'fehler-melden', 'forgot-password', 'fuer-hoefe', 'hoefe', 'impressum', 'intern', 'konditionen',
   'login', 'meldungen', 'onboarding', 'orders', 'postfach', 'problem-melden', 'products', 'region', 'register',
-  'reset-password', 'sales', 'settings', 'sicherheit', 'status', 'teilen', 'verify',
+  'reset-password', 'sales', 'settings', 'sicherheit', 'startseite-vorschau', 'status', 'teilen', 'verify',
 ])
 
 export function generateSlug(name: string): string {

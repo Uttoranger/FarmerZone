@@ -1,10 +1,12 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ArrowLeft, ChevronLeft } from 'lucide-react'
 import { RUECKWEG_PRAEFIX, elternseite, type Elternseite } from '@/lib/bauern-navigation'
+import { tippAufZiel } from '@/lib/kunden-kopf'
+import { eigenerVorgaengerJetzt, merkeHinauf } from '@/components/shared/rueckweg-merker'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { LEISTE_HANDY, ZEILE_BROWSER } from '@/components/hofbereich/unterseiten-kopf-stil'
 import { cn } from '@/lib/utils'
@@ -14,6 +16,29 @@ function zielMitSuche(eltern: Elternseite, suche: string | undefined): string {
   if (!suche) return eltern.href
   const teil = suche.replace(/^\?/, '')
   return eltern.href + (eltern.href.includes('?') ? '&' : '?') + teil
+}
+
+/**
+ * Der Tipp auf den Rückweg (Nr. 177): Stand die Elternseite direkt davor, ein
+ * Schritt im Verlauf — die Liste steht dann mit Filter, Suche und Scrollstelle
+ * da, wo man sie verlassen hat. Sonst folgt der Tipp dem Link und steigt
+ * hinauf (der RueckwegMerker merkt es sich). Dieselbe Regel wie die
+ * Browser-Zeile der Kundenseiten (`tippAufZiel`, lib/kunden-kopf.ts).
+ *
+ * `history.back()` statt `useRouter().back()`: Der App-Router tut dort nichts
+ * anderes, und der Kopf bleibt ohne Router renderbar (Ladeansichten, Tests).
+ */
+function beimTipp(ziel: string) {
+  return (e: MouseEvent<HTMLAnchorElement>) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+    const tipp = tippAufZiel(ziel, eigenerVorgaengerJetzt())
+    if (tipp.aktion === 'verlauf') {
+      e.preventDefault()
+      window.history.back()
+      return
+    }
+    merkeHinauf(tipp.ziel)
+  }
 }
 
 /**
@@ -63,9 +88,11 @@ export function UnterseitenKopf({
   return (
     <>
       {eltern && ziel && (
-        <div className={LEISTE_HANDY}>
+        // data-unterseiten-leiste: Der Fokus scrollt nie unter diese Leiste (scroll-padding in globals.css).
+        <div className={LEISTE_HANDY} data-unterseiten-leiste="">
           <Link
             href={ziel}
+            onClick={beimTipp(ziel)}
             className={cn(
               'flex min-h-11 max-w-full min-w-0 items-center gap-2 rounded-xl pr-3 pl-2 text-[15px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted',
               FOKUS_RAHMEN
@@ -82,6 +109,7 @@ export function UnterseitenKopf({
         <div className={cn(ZEILE_BROWSER, titel ? 'md:mb-1' : 'md:mb-2', listeDaneben && 'lg:hidden')}>
           <Link
             href={ziel}
+            onClick={beimTipp(ziel)}
             className={cn(
               '-ml-1.5 inline-flex min-h-11 w-fit items-center gap-1 rounded-full pr-3 pl-1 text-sm font-medium text-muted-foreground transition-colors duration-[250ms] hover:text-foreground',
               FOKUS_RAHMEN

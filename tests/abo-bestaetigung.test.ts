@@ -1,9 +1,15 @@
 /**
  * Double-Opt-in (Register S11, Nachtlauf Nr. 38): Regeln und signierter Link
  * ohne Datenbank — src/lib/abo-bestaetigung.ts und abo-bestaetigung-token.ts.
+ *
+ * Seit Nr. 171 (Register S17) signiert der Link über src/lib/link-signatur.ts
+ * (Zweck `abo-optin`). Der ALTE Wert unten ist fest erzeugt (HMAC mit dem
+ * Test-Geheimnis aus vitest.config.ts über `abo-optin:<aboId>:<ms>`, so wie
+ * bis Nr. 171 signiert wurde) und steht für Links, die schon im Postfach
+ * liegen. Die erfundenen Geheimnisse bestehen nur aus Buchstaben.
  */
 import { createHmac } from 'crypto'
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
@@ -15,8 +21,9 @@ import {
   type EmailAboStand,
 } from '@/lib/abo-bestaetigung'
 import { aboBestaetigungsPfad, erzeugeAboBestaetigungsToken, pruefeAboBestaetigungsToken } from '@/lib/abo-bestaetigung-token'
-import { generateUnsubscribeToken } from '@/lib/unsubscribe'
-import { generateReorderToken } from '@/lib/reorder-token'
+import { generateUnsubscribeToken, verifyUnsubscribeToken } from '@/lib/unsubscribe'
+import { generateReorderToken, verifyReorderToken } from '@/lib/reorder-token'
+import { signiereLink } from '@/lib/link-signatur'
 
 const JETZT = new Date('2026-10-07T12:00:00Z')
 const vor = (ms: number): Date => new Date(JETZT.getTime() - ms)
@@ -172,8 +179,125 @@ describe('Regeln und Texte sind im Browser ladbar', () => {
     expect(importe.filter((zeile) => /@\/lib\/env|['"](node:)?crypto['"]|geheimnis/.test(zeile))).toEqual([])
   })
 
-  it('Gegenprobe: die Suche erkennt den Import des Token-Moduls', () => {
+  it('abo-bestaetigung.ts importiert auch die Link-Signatur nicht (sie zieht env mit)', () => {
+    expect(importe.filter((zeile) => /@\/lib\/link-signatur/.test(zeile))).toEqual([])
+  })
+
+  it('Gegenprobe: die Suche erkennt den Import des Token-Moduls (seit Nr. 171 die Link-Signatur)', () => {
     const token = readFileSync(join(process.cwd(), 'src/lib/abo-bestaetigung-token.ts'), 'utf8')
-    expect(token).toMatch(/import \{ env \} from '@\/lib\/env'/)
+    const tokenImporte = token.split('\n').filter((zeile) => /^\s*import\b/.test(zeile))
+    expect(tokenImporte.filter((zeile) => /@\/lib\/link-signatur/.test(zeile))).toEqual([
+      "import { pruefeLink, signiereLink } from '@/lib/link-signatur'",
+    ])
+  })
+})
+
+// ── Eigenes Geheimnis (Register S17, Nr. 171) ─────────────────────────────────
+
+const LINK_GEHEIMNIS = 'abcdefghijklmnopqrstuvwxyzabcdefgh'
+const ANDERES_LINK_GEHEIMNIS = 'zyxwvutsrqponmlkjihgfedcbazyxwvuts'
+const ALT_ANGEFRAGT = new Date(1792800000000)
+// Fest erzeugt mit dem bisherigen Verfahren (BETTER_AUTH_SECRET, ohne Kennung).
+const ALTER_ABO_TOKEN =
+  'YWJvLW9wdGluOmFiby1hbHQ6MTc5MjgwMDAwMDAwMA.6fe54775480ed2da4cac1ce033d9fe45b13255011bb6ab0b7638536371547452'
+const IM_ZEITRAUM = new Date(ALT_ANGEFRAGT.getTime() + 60 * 60 * 1000)
+const ALT_ENDE = new Date(ALT_ANGEFRAGT.getTime() + ABO_BESTAETIGUNG_GUELTIG_MS)
+const NEUE_FORM = /^[A-Za-z0-9_-]+\.2\.[0-9a-f]{64}$/
+
+describe('Double-Opt-in-Link mit eigenem Geheimnis (Nr. 171)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.useRealTimers()
+  })
+  const mitLinkGeheimnis = (wert = LINK_GEHEIMNIS): void => {
+    vi.stubEnv('LINK_SECRET', wert)
+  }
+  const altGilt = { ok: true, aboId: 'abo-alt', angefragtAm: ALT_ANGEFRAGT }
+
+  it('ein heute verschickter Link (fester Altwert) gilt ohne LINK_SECRET', () => {
+    expect(pruefeAboBestaetigungsToken(ALTER_ABO_TOKEN, IM_ZEITRAUM)).toEqual(altGilt)
+  })
+
+  it('ein heute verschickter Link gilt auch mit LINK_SECRET', () => {
+    mitLinkGeheimnis()
+    expect(pruefeAboBestaetigungsToken(ALTER_ABO_TOKEN, IM_ZEITRAUM)).toEqual(altGilt)
+  })
+
+  it('Gegenprobe: eine veränderte alte Signatur gilt nicht', () => {
+    mitLinkGeheimnis()
+    const gedreht = ALTER_ABO_TOKEN.slice(0, -1) + (ALTER_ABO_TOKEN.endsWith('a') ? 'b' : 'a')
+    expect(pruefeAboBestaetigungsToken(gedreht, IM_ZEITRAUM)).toEqual({ ok: false, grund: 'ungueltig' })
+  })
+
+  it('ohne LINK_SECRET ist der neue Link bitgleich mit dem alten', () => {
+    expect(erzeugeAboBestaetigungsToken('abo-alt', ALT_ANGEFRAGT)).toBe(ALTER_ABO_TOKEN)
+  })
+
+  it('mit LINK_SECRET trägt der neue Link die Kennung 2, behält den Inhalt und gilt', () => {
+    mitLinkGeheimnis()
+    const token = erzeugeAboBestaetigungsToken('abo-neu', JETZT)
+    expect(token).toMatch(NEUE_FORM)
+    expect(Buffer.from(token.slice(0, token.indexOf('.')), 'base64url').toString()).toBe(`abo-optin:abo-neu:${JETZT.getTime()}`)
+    expect(pruefeAboBestaetigungsToken(token, JETZT)).toEqual({ ok: true, aboId: 'abo-neu', angefragtAm: JETZT })
+  })
+
+  it('Gegenprobe: der Link mit Kennung gilt nicht ohne LINK_SECRET und nicht mit einem anderen', () => {
+    mitLinkGeheimnis()
+    const token = erzeugeAboBestaetigungsToken('abo-neu', JETZT)
+    mitLinkGeheimnis(ANDERES_LINK_GEHEIMNIS)
+    expect(pruefeAboBestaetigungsToken(token, JETZT)).toEqual({ ok: false, grund: 'ungueltig' })
+    vi.unstubAllEnvs()
+    expect(pruefeAboBestaetigungsToken(token, JETZT)).toEqual({ ok: false, grund: 'ungueltig' })
+  })
+
+  it('abgelaufen bleibt „abgelaufen“ — alt und neu, mit LINK_SECRET', () => {
+    mitLinkGeheimnis()
+    expect(pruefeAboBestaetigungsToken(ALTER_ABO_TOKEN, new Date(ALT_ENDE.getTime() - 1))).toEqual(altGilt)
+    expect(pruefeAboBestaetigungsToken(ALTER_ABO_TOKEN, ALT_ENDE)).toEqual({ ok: false, grund: 'abgelaufen' })
+    const neu = erzeugeAboBestaetigungsToken('abo-neu', JETZT)
+    expect(pruefeAboBestaetigungsToken(neu, new Date(JETZT.getTime() + ABO_BESTAETIGUNG_GUELTIG_MS))).toEqual({ ok: false, grund: 'abgelaufen' })
+  })
+
+  it('ein verschobener Zeitpunkt unter der Kennung 2 ist „ungültig“, nie „abgelaufen“', () => {
+    mitLinkGeheimnis()
+    const token = erzeugeAboBestaetigungsToken('abo-neu', JETZT)
+    const punkt = token.indexOf('.')
+    const payload = Buffer.from(token.slice(0, punkt), 'base64url').toString().replace(/:\d+$/, ':1000')
+    expect(pruefeAboBestaetigungsToken(`${Buffer.from(payload).toString('base64url')}${token.slice(punkt)}`, JETZT)).toEqual({
+      ok: false,
+      grund: 'ungueltig',
+    })
+  })
+
+  describe('vertauschter Zweck', () => {
+    it('Nachbestell- und Abmelde-Token gelten nicht als Abo-Token — mit LINK_SECRET (Kennung 2)', () => {
+      mitLinkGeheimnis()
+      expect(pruefeAboBestaetigungsToken(generateUnsubscribeToken('kundin@example.com', 'abo123'), JETZT).ok).toBe(false)
+      expect(pruefeAboBestaetigungsToken(generateReorderToken('abo123', 'hof1'), JETZT).ok).toBe(false)
+    })
+
+    it('mit Kennung 2 gilt eine Nachbestell- oder Abmelde-Signatur über genau den Abo-Inhalt nicht', () => {
+      mitLinkGeheimnis()
+      const payload = `abo-optin:abo123:${JETZT.getTime()}`
+      const b64 = Buffer.from(payload).toString('base64url')
+      expect(pruefeAboBestaetigungsToken(`${b64}.${signiereLink('nachbestellen', payload)}`, JETZT).ok).toBe(false)
+      expect(pruefeAboBestaetigungsToken(`${b64}.${signiereLink('abmelden', payload)}`, JETZT).ok).toBe(false)
+      // Gegenprobe: mit dem eigenen Zweck gilt derselbe Inhalt.
+      expect(pruefeAboBestaetigungsToken(`${b64}.${signiereLink('abo-optin', `abo123:${JETZT.getTime()}`)}`, JETZT).ok).toBe(true)
+    })
+
+    it('mit Kennung 2 gilt ein Abo-Token weder als Nachbestell- noch als Abmelde-Token', () => {
+      mitLinkGeheimnis()
+      const token = erzeugeAboBestaetigungsToken('abo123', new Date())
+      expect(verifyReorderToken(token)).toBeNull()
+      expect(verifyUnsubscribeToken(token)).toBeNull()
+    })
+
+    it('ohne Kennung bleibt die Gegenrichtung wie bisher: ein alter Abo-Token besteht die Signatur des Nachbestell-Tokens (harmlos, die Hofseite prüft farmId)', () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(IM_ZEITRAUM)
+      // `nachbestellen` signiert ohne Präfix (ALTES_PRAEFIX bleibt, sonst gälten verschickte Links nicht mehr).
+      expect(verifyReorderToken(ALTER_ABO_TOKEN)).toEqual({ orderId: 'abo-optin', farmId: 'abo-alt' })
+    })
   })
 })

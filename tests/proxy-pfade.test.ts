@@ -1,5 +1,5 @@
 /**
- * Die geschützten Pfade sind vollständig: Jeder Ordner unter src/app/(farmer)
+ * Die geschützten Pfade sind vollständig: Jeder Ordner unter src/app/(druck)
  * und src/app/(hof) steht in FARMER_PATHS (src/lib/hof-pfade.ts, seit Nr. 156
  * die eine Liste für Proxy, robots.txt und Rücksprung) UND im matcher von
  * src/proxy.ts. Fehlt er im matcher, läuft der Proxy dort gar nicht erst — die
@@ -14,8 +14,8 @@ import { join } from 'node:path'
 import { FARMER_PATHS } from '@/lib/hof-pfade'
 
 const proxy = readFileSync(join(process.cwd(), 'src/proxy.ts'), 'utf8')
-// Beide Routengruppen des Hofbereichs: Bestand (farmer) und HofShell (hof, seit Nr. 16).
-const ordner = ['src/app/(farmer)', 'src/app/(hof)'].flatMap((gruppe) => {
+// Beide Routengruppen des Hofbereichs: HofShell (hof, seit Nr. 16) und Druckseiten (druck, seit Nr. 181; vorher (farmer)).
+const ordner = ['src/app/(druck)', 'src/app/(hof)'].flatMap((gruppe) => {
   const wurzel = join(process.cwd(), gruppe)
   return readdirSync(wurzel).filter((n) => statSync(join(wurzel, n)).isDirectory())
 })
@@ -30,7 +30,7 @@ describe('FARMER_PATHS und der matcher von src/proxy.ts', () => {
   const pfade: readonly string[] = FARMER_PATHS
   const matcher = liste(/matcher: \[([\s\S]*?)\]/)
 
-  it('kennt jeden Ordner unter (farmer) und (hof) — auch /status und /farm-page', () => {
+  it('kennt jeden Ordner unter (druck) und (hof) — auch /status und /farm-page', () => {
     expect(ordner).toContain('status')
     expect(ordner).toContain('farm-page')
     for (const name of ordner) expect(pfade, name).toContain(`/${name}`)

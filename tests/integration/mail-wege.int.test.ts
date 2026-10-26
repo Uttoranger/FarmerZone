@@ -8,14 +8,15 @@
  *    7-Tage-Sperre greift, sobald der Beitrag Aufträge hat.
  *  - Rollback: Scheitert das Einstellen, gibt es auch den Beitrag nicht.
  *  - Bar-Bestätigung: Statuswechsel und beide Aufträge in einer Transaktion;
- *    ein zweiter Klick stellt nichts ein.
+ *    ein zweiter Klick stellt nichts ein. Scheitert das Anlegen der Aufträge
+ *    (Trigger, setup/mail-sperre.ts), gilt die Bestätigung trotzdem (Nr. 168).
  *  - Der Worker mit den echten Renderern: Er lädt Bestellung und Adressen
  *    frisch, die Post-Sperre (Z3) entscheidet je Adresse — die Testdomäne
  *    geht an die Attrappe, jede andere ist außerhalb der Produktion
  *    „gesperrt"; beide mit Fingerabdruck der Adresse, nie die Adresse selbst.
  * Resend ist eine Attrappe; nichts geht an eine echte Adresse.
  */
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeAll } from 'vitest'
 
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
@@ -57,6 +58,8 @@ import { bestaetigeBarBestellung } from '@/server/actions/bar-bestaetigung'
 import { arbeiteWarteschlange, stelleMailEin } from '@/server/mail-warteschlange'
 import { gesendeteBeitragsMails } from '@/server/mail-arten/beitrag'
 import { auftraege, erstelleHof, erstelleHofMitAnmeldung, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
+import { gibMailAuftraegeFrei, sperreMailAuftraege } from './setup/mail-sperre'
+import * as Sentry from '@sentry/nextjs'
 
 afterEach(async () => {
   vi.mocked(headers).mockResolvedValue(new Headers() as never)
@@ -151,6 +154,10 @@ function formular(token: string): FormData {
 }
 
 describe('Bar-Bestätigung', () => {
+  beforeAll(async () => {
+    await gibMailAuftraegeFrei()
+  })
+
   it('bestätigt und stellt beide Aufträge in derselben Transaktion ein; der zweite Klick stellt nichts ein', async () => {
     const { farm, bestellung, token } = await offeneBarBestellung()
 
@@ -165,14 +172,20 @@ describe('Bar-Bestätigung', () => {
     ].sort((a, b) => a.schluessel.localeCompare(b.schluessel)))
   })
 
-  it('scheitert das Einstellen: die Bestellung bleibt offen (Rollback), der Token gilt weiter', async () => {
+  it('scheitert das Anlegen der Aufträge (Trigger): die Bestätigung gilt, der Token ist verbraucht, kein Auftrag, Sentry (Nr. 168)', async () => {
     const { bestellung, token } = await offeneBarBestellung()
-    vi.mocked(stelleMailEin).mockRejectedValueOnce(new Error('Warteschlange weg'))
+    vi.mocked(Sentry.captureException).mockClear()
+    try {
+      await sperreMailAuftraege('immer')
+      await expect(bestaetigeBarBestellung({}, formular(token))).rejects.toThrow('REDIRECT')
+    } finally {
+      await gibMailAuftraegeFrei()
+    }
 
-    await expect(bestaetigeBarBestellung({}, formular(token))).rejects.toThrow('Warteschlange weg')
-
-    expect(await prisma.order.findUniqueOrThrow({ where: { id: bestellung.id } })).toMatchObject({ status: 'PENDING_CONFIRMATION', confirmationToken: barTokenHash(token) })
+    expect(await prisma.order.findUniqueOrThrow({ where: { id: bestellung.id } })).toMatchObject({ status: 'CONFIRMED', confirmationToken: null })
     expect(await auftraege({ bestellungId: bestellung.id })).toEqual([])
+    const gruende = vi.mocked(Sentry.captureException).mock.calls.map(([, k]) => (k as { tags?: Record<string, string> }).tags?.grund)
+    expect(gruende).toEqual(['in_transaktion_gescheitert', 'einstellen_gescheitert'])
   })
 })
 

@@ -249,11 +249,6 @@ const ROUTEN_OHNE_WACHE: { datei: string; beleg: RegExp; grund: string }[] = [
     beleg: /OHNE Anmeldung/,
     grund: 'Der Link aus der Bestätigungsmail geht an Adressen ohne Konto: GET liest nur und zeigt den Knopf, POST löst einen einmaligen Token ein',
   },
-  {
-    datei: 'startseite/vorschau/route.ts',
-    beleg: /await oeffneVorschau\(/,
-    grund: 'Prüft Signatur, Ablauf und die Admin-Sitzung im Aufruf von oeffneVorschau und leitet sonst auf die normale Startseite',
-  },
 ]
 
 const ROUTEN = [...dateienUnter(ADMIN)].filter((p) => p.endsWith(`${sep}route.ts`)).map((p) => relative(ADMIN, p).split(sep).join('/'))
@@ -267,7 +262,6 @@ describe('jede Route unter /admin (route.ts)', () => {
       'meldungen/[id]/route.ts',
       'meldungen/route.ts',
       'postfach/zustellung/bestaetigen/route.ts',
-      'startseite/vorschau/route.ts',
     ])
   })
 
@@ -401,6 +395,8 @@ describe('ladeAdminbereich — Verhalten', () => {
     getSession.mockResolvedValue(adminSitzung('u1') as never)
     userFindUnique
       .mockResolvedValueOnce({ isAdmin: true } as never)
+      // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
+      .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
     // Meldungen 3 + ungelesene Antworten 4 + wartende Höfe 2 + offene Erstattung 1.
     // betrieb: null — Punkt und Hinweis von Admin › Betrieb nur in der Produktion (N15/N18, Nr. 103; tests/betrieb-seite.test.ts).
@@ -416,6 +412,8 @@ describe('ladeAdminbereich — Verhalten', () => {
     passkeyAggregate.mockResolvedValue({ _count: { _all: 0 }, _max: { createdAt: null } } as never)
     userFindUnique
       .mockResolvedValueOnce({ isAdmin: true } as never)
+      // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
+      .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
     expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, betrieb: null })
     expect(farmCount).not.toHaveBeenCalled()
@@ -428,6 +426,8 @@ describe('ladeAdminbereich — Verhalten', () => {
     getSession.mockResolvedValue({ user: { id: 'u1' }, session: { id: 'sitzung-u1', createdAt: new Date(), passkeyAm: null } } as never)
     userFindUnique
       .mockResolvedValueOnce({ isAdmin: true } as never)
+      // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
+      .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
     expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, betrieb: null })
     expect(farmCount).not.toHaveBeenCalled()
@@ -441,6 +441,8 @@ describe('ladeAdminbereich — Verhalten', () => {
     getSession.mockResolvedValue(adminSitzung('u1') as never)
     userFindUnique
       .mockResolvedValueOnce({ isAdmin: true } as never)
+      // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
+      .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'FARMER', farm: { id: 'f1' } } as never)
     expect(await ladeAdminbereich()).toMatchObject({ personName: 'Max Mustermann', hatHof: true })
     expect(userFindUnique).toHaveBeenLastCalledWith({
@@ -453,6 +455,8 @@ describe('ladeAdminbereich — Verhalten', () => {
     getSession.mockResolvedValue(adminSitzung('u1') as never)
     userFindUnique
       .mockResolvedValueOnce({ isAdmin: true } as never)
+      // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
+      .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'FARMER', farm: null } as never)
     expect(await ladeAdminbereich()).toMatchObject({ hatHof: false })
   })

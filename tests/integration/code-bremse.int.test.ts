@@ -372,9 +372,9 @@ describe('falsche Passwörter je Adresse', () => {
     await expect(auth.api.resetPassword({ body: { newPassword: 'kurz', token: token! } })).rejects.toThrow()
     expect(await stand(DB_BREMSEN.passwortFehler.zweck, email)).toBe(10)
 
-    await auth.api.resetPassword({ body: { newPassword: 'neues-passwort-5678', token: token! } })
+    await auth.api.resetPassword({ body: { newPassword: 'Neues-Passwort-5678', token: token! } })
     expect(await stand(DB_BREMSEN.passwortFehler.zweck, email)).toBe(0)
-    expect(await mitPasswort(email, 'neues-passwort-5678')).toEqual({ ok: true })
+    expect(await mitPasswort(email, 'Neues-Passwort-5678')).toEqual({ ok: true })
   })
 
   it('gleichzeitig: von 20 falschen Passwörtern werden genau 10 geprüft (gezählt wird vor dem Prüfen)', async () => {

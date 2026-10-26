@@ -8,13 +8,13 @@ import { KasseSkelett } from '@/components/checkout/kasse-skelett'
  * kasse-skelett.tsx).
  *
  * Seit Nr. 12 steht die Kasse in der Fokus-Shell: deren Kopf (Zurück, Titel,
- * Hofname) ist 52 px hoch, ab md 64 px — der Platzhalter hat genau diese Maße
+ * Hofname) ist 56 px hoch (seit Nr. 177), ab md 64 px — der Platzhalter hat genau diese Maße
  * und den Marker des neuen Designs, damit die Tokens dieselben sind.
  */
 export default function CheckoutLaden() {
   return (
     <div data-design="neu" className="min-h-dvh bg-background">
-      <div className="h-[52px] border-b border-border bg-background md:h-16" aria-hidden="true">
+      <div className="h-14 border-b border-border bg-background md:h-16" aria-hidden="true">
         <div className="mx-auto flex h-full max-w-[1200px] animate-pulse items-center gap-3 px-3.5 md:px-8">
           <div className="size-6 rounded-full bg-app-chip" />
           <div className="h-5 w-28 rounded bg-border" />

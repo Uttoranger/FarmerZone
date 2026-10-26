@@ -184,11 +184,15 @@ export function CodeEingabeSchritt({
           {fehler}
         </p>
       )}
-      {!fehler && hinweis && (
-        <p id={meldungId} role="status" className="text-[13.5px] leading-normal text-status-fertig">
-          {hinweis}
-        </p>
-      )}
+      {/* Die Status-Region steht immer da (leer, solange nichts zu sagen ist): Screenreader sagen eine Region nur an,
+          wenn sie schon im DOM war, bevor der Text hineinkommt (WCAG 4.1.3). Leer ist sie sr-only und nimmt keinen Platz. */}
+      <p
+        id={!fehler && hinweis ? meldungId : undefined}
+        role="status"
+        className={!fehler && hinweis ? 'text-[13.5px] leading-normal text-status-fertig' : 'sr-only'}
+      >
+        {!fehler && hinweis ? hinweis : ''}
+      </p>
       <button type="submit" disabled={laedt} className={KNOPF_GRUEN}>
         {laedt ? (
           <>
@@ -233,6 +237,11 @@ function LadeStatus({ laedt }: { laedt: boolean }): React.JSX.Element {
 
 type Schritt = 'email' | 'code'
 
+/** Der Fokus geht ins Codefeld, sobald der Schritt „Code" steht — im Schritt „E-Mail" bleibt er, wo er ist. */
+export function fokusiereCodeFeld(schritt: Schritt, feld: { current: { focus(): void } | null }): void {
+  if (schritt === 'code') feld.current?.focus()
+}
+
 export function KundeCodeFormular({ ziel }: { ziel: string }): React.JSX.Element {
   const router = useRouter()
   const [schritt, setSchritt] = useState<Schritt>('email')
@@ -246,6 +255,12 @@ export function KundeCodeFormular({ ziel }: { ziel: string }): React.JSX.Element
   const codeFeldRef = useRef<HTMLInputElement>(null)
 
   const wartezeit = restWartezeitSekunden(gesendetUm, jetzt)
+
+  // Nach „Code schicken" steht das Codefeld da, der Knopf davor ist weg — der Fokus ginge verloren. Er geht ins Feld
+  // (nicht beim ersten Anzeigen der Seite: dort steht das Formular für die E-Mail).
+  useEffect(() => {
+    fokusiereCodeFeld(schritt, codeFeldRef)
+  }, [schritt])
 
   // Der Zähler für „Code erneut senden" läuft nur, solange gewartet wird.
   useEffect(() => {

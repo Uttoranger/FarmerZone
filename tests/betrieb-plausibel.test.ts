@@ -18,11 +18,13 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import ts from 'typescript'
 import {
+  BETRIEB_TEXT,
   GRENZE,
   GRENZEN,
   NUR_IM_DASHBOARD,
   RESEND_ABRECHNUNG_TAG,
   TARIFE,
+  UEBERFAELLIG_NACH_MS,
   betriebKacheln,
   betriebMail,
   grenzSchritt,
@@ -250,5 +252,42 @@ describe('Wache: keine feste Grenzzahl in den Texten von src/lib/betrieb.ts (Nr.
   it('src/lib/betrieb.ts: kein Text mit fester Grenzzahl', () => {
     const quelle = readFileSync(join(process.cwd(), 'src/lib/betrieb.ts'), 'utf8')
     expect(texte(quelle).filter(festeZahl)).toEqual([])
+  })
+})
+
+describe('Texte zum Abrechnungszeitraum und zur Ablaufregel (Nr. 171, Punkt 1)', () => {
+  const STUNDE = 60 * 60 * 1000
+
+  it('Stand der Monats-Mail: „im Abrechnungszeitraum (ab dem 17.)“ statt „in diesem Monat“', () => {
+    const stand = grenzStandText('mailsMonat', 412)
+    expect(stand).toMatch(/^412 von 3\s000 E-Mails im Abrechnungszeitraum \(ab dem 17\.\)$/)
+    expect(stand).not.toContain('in diesem Monat')
+  })
+
+  it('Gegenprobe: Bild-Vorgänge zählen weiter im Kalendermonat', () => {
+    expect(grenzStandText('bildVorgaenge', 12)).toMatch(/in diesem Monat$/)
+  })
+
+  it('Monats-Mail: Satz und Fuß nennen den Abrechnungszeitraum von Resend', () => {
+    const mail = betriebMail({ art: 'grenze', wert: 'mailsMonat', anteil: 82, stand: grenzStandText('mailsMonat', 2_460), trend: null, ohneVerwendungBytes: null })
+    expect(mail.absaetze[0]).toMatch(/^2\s460 von 3\s000 E-Mails im Abrechnungszeitraum \(ab dem 17\.\)\./)
+    expect(mail.fuss).toBe(
+      'Diese Mail kommt einmal je Stufe (80 %, 95 %, voll) und Abrechnungszeitraum von Resend; der neue Zeitraum beginnt am 17. still bei 0. Abschalten lässt sie sich nicht – es geht um den Betrieb der Plattform.'
+    )
+  })
+
+  it('Gegenprobe: die Mail zu Bild-Vorgängen behält den Kalendermonat im Fuß', () => {
+    const mail = betriebMail({ art: 'grenze', wert: 'bildVorgaenge', anteil: 82, stand: grenzStandText('bildVorgaenge', 12), trend: null, ohneVerwendungBytes: null })
+    expect(mail.fuss).toMatch(/und Monat; der neue Monat beginnt still bei 0\./)
+    expect(mail.fuss).not.toContain('Resend')
+  })
+
+  it('Ablaufregel: Stunden, Tage und Spielraum stimmen mit UEBERFAELLIG_NACH_MS', () => {
+    const stunden = UEBERFAELLIG_NACH_MS.taeglich / STUNDE
+    const tage = UEBERFAELLIG_NACH_MS.woechentlich / (24 * STUNDE)
+    expect(stunden - 24).toBe(2)
+    expect(BETRIEB_TEXT.ablaeufeRegel).toBe(
+      `= mehr als ${stunden} Stunden (täglich) bzw. ${tage} Tage (wöchentlich) ohne Lauf – zwei Stunden Spielraum, falls Vercel einen Lauf verzögert.`
+    )
   })
 })

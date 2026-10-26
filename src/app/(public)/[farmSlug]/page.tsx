@@ -2,8 +2,8 @@ import { Suspense } from 'react'
 import { notFound, unstable_rethrow } from 'next/navigation'
 import type { Metadata } from 'next'
 import * as Sentry from '@sentry/nextjs'
-import { getActiveStatusPosts, ladeAktivenBeitrag, type ActiveStatusPost } from '@/server/queries/status-posts'
-import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
+import { beitragKennungAus, ladeBeitraege } from '@/server/hofseite-beitraege'
+import { ladeHofseiteGeteilt, type Vorab } from '@/server/hofseite-vorschau'
 import { pruefeHofseiteGeteilt, type HofSeo } from '@/server/queries/seo'
 import { verifyReorderToken } from '@/lib/reorder-token'
 import { prisma } from '@/lib/prisma'
@@ -14,12 +14,11 @@ import { sammleKategorien } from '@/lib/hofuebersicht'
 import { kaufSperre } from '@/lib/bereiche-anzeige'
 import { KATEGORIE_LABEL, PRODUCT_CATEGORY_VALUES } from '@/lib/taxonomie'
 import { teilenVorschauText } from '@/lib/teilen-bild'
-import { HOFSEITE_BEITRAEGE_MAX, entferneKontaktdaten, ueberUnsText } from '@/lib/hofseite-kunde'
+import { entferneKontaktdaten, ueberUnsText } from '@/lib/hofseite-kunde'
 import { ladeTeilenVorschau } from '@/server/queries/teilen-bild'
 import type { Suchparameter } from '@/lib/ansichts-modus'
 import type { PublicFarm } from '@/server/queries/farm'
 import { nachbestellToken } from '@/schemas/nachbestellung'
-import { BEITRAG_PARAMETER, beitragKennungSchema } from '@/schemas/hofseite-reiter'
 import { FarmPageView } from '@/components/farm/farm-page-view'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { StartseiteFuss } from '@/components/startseite/startseite-abschnitte'
@@ -77,7 +76,12 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   // Seite und fragten sonst für jede Adresse die Datenbank.
   const seo = await pruefeHofseiteGeteilt(farmSlug, suche)
   if (!seo) return HOF_NICHT_GEFUNDEN
-  const { farm, ansicht } = await ladeHofseiteGeteilt(farmSlug, suche)
+  // Hof und Teilen-Bild hängen nicht voneinander ab (das Bild fragt nur den Slug): gleichzeitig,
+  // nicht nacheinander (Nr. 180). Das Bild scheitert nie laut (ladeTeilenVorschauOhneRisiko).
+  const [{ farm, ansicht }, vorschau] = await Promise.all([
+    ladeHofseiteGeteilt(farmSlug, suche, vorab(suche)),
+    ladeTeilenVorschauOhneRisiko(farmSlug),
+  ])
   if (!farm) return HOF_NICHT_GEFUNDEN
   // Die Vorschau-Adresse bleibt ganz fern; ein Hof ohne Produkt im Shop und ein
   // Testhof (Register N21) nur aus dem Index — seinen Links folgen Suchmaschinen weiter.
@@ -86,9 +90,8 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   // Dieselbe Regel wie „Über uns“ auf der Seite: Ein geleerter eigener Text
   // ('' aus dem Formular „Auftritt“) fällt auf die Kurzbeschreibung zurück.
   const desc = (ueberUnsText(farm) ?? '').slice(0, 155)
-  // Das Teilen-Bild (Gate 7) — ist es nicht ladbar, bleibt die Seite und
+  // Das Teilen-Bild (Gate 7, oben geladen) — ist es nicht ladbar, bleibt die Seite und
   // nimmt das Bild der Startseite; der Fehler geht nur nach Sentry.
-  const vorschau = await ladeTeilenVorschauOhneRisiko(farm.slug)
 
   return {
     title: hofTitel(farm),
@@ -120,6 +123,15 @@ async function ladeTeilenVorschauOhneRisiko(slug: string): Promise<Awaited<Retur
   }
 }
 
+/**
+ * Was der Lader der Hofseite gleichzeitig mit den vollen Tagen startet, sobald der Hof bekannt ist
+ * (Nr. 180): die Beiträge. Metadaten und Seite geben dasselbe mit — wer zuerst lädt, startet sie.
+ */
+function vorab(suche: Suchparameter): Vorab {
+  const kennung = beitragKennungAus(suche)
+  return (hofId) => ladeBeitraege(hofId, kennung)
+}
+
 type ReorderItem = { productId: string; productName: string; quantity: number }
 
 async function loadReorderItems(token: string, farmId: string): Promise<ReorderItem[]> {
@@ -136,31 +148,6 @@ async function loadReorderItems(token: string, farmId: string): Promise<ReorderI
   })
 
   return order?.items ?? []
-}
-
-/**
- * Die aktiven Beiträge des Hofs für „Aktuell vom Hof“ (Register F8: höchstens
- * fünf, der neueste zuerst). Trägt die Adresse `?beitrag=<id>` (geprüft) und
- * ist der Beitrag nicht unter den fünf, kommt er — nur wenn er aktiv ist und
- * GENAU diesem Hof gehört (ladeAktivenBeitrag) — hinten dazu; die Seite stellt
- * ihn oben hin (ordneBeitraege). Scheitert das Laden, fehlt nur der Abschnitt —
- * die Seite mit Produkten und Korb bleibt (Fehler inline statt der 500 für
- * alles); der Fehler geht nach Sentry, und `fehler` sagt der Seite, dass sie zu
- * `?beitrag=` nichts sagen kann („nicht mehr aktuell“ stimmte nicht: Der
- * Beitrag kann aktiv sein, Nr. 134). Die Vorschau im Bauern-Bereich ist
- * dieselbe Route (?vorschau=1) und bekommt deshalb dieselbe Liste.
- */
-async function ladeBeitraege(farmId: string, kennung: string | null): Promise<{ beitraege: ActiveStatusPost[]; fehler: boolean }> {
-  try {
-    const neueste = await getActiveStatusPosts(farmId, HOFSEITE_BEITRAEGE_MAX)
-    if (kennung === null || neueste.some((beitrag) => beitrag.id === kennung)) return { beitraege: neueste, fehler: false }
-    const geteilt = await ladeAktivenBeitrag(farmId, kennung)
-    return { beitraege: geteilt ? [...neueste, geteilt] : neueste, fehler: false }
-  } catch (err) {
-    unstable_rethrow(err)
-    Sentry.captureException(err, { tags: { bereich: 'hofseite-beitrag' } })
-    return { beitraege: [], fehler: true }
-  }
 }
 
 export default async function FarmPage({ params, searchParams }: Props) {
@@ -180,18 +167,22 @@ export default async function FarmPage({ params, searchParams }: Props) {
 
 /** Der Inhalt hinter dem Skelett — erst nach der Prüfung in FarmPage. */
 async function Hofseite({ farmSlug, suche, geo }: { farmSlug: string; suche: Suchparameter; geo: HofSeo['geo'] }) {
-  const { farm, ansicht } = await ladeHofseiteGeteilt(farmSlug, suche)
+  const { farm, ansicht } = await ladeHofseiteGeteilt(farmSlug, suche, vorab(suche))
 
   // Nur noch ein Wettlauf (Hof zwischen Prüfung und Laden stillgelegt): Die
   // 404-Ansicht kommt dann hinter dem Skelett, mit Status 200 und noindex.
   if (!farm) notFound()
 
   // `?beitrag=` ist eine Systemgrenze: Was nicht passt, wird verworfen (Zod).
-  const { beitraege, fehler: beitraegeFehler } = await ladeBeitraege(farm.id, beitragKennungSchema.parse(suche[BEITRAG_PARAMETER]))
   // Wo Kaufen nicht wirkt (Vorschau), gibt es keinen Korb — also auch nichts,
   // was ein Nachbestell-Link hineinlegen dürfte (korbErlaubt, src/lib/hofseite-vorschau.ts).
   const reorder = nachbestellToken(suche.reorder)
-  const reorderItems = reorder && ansicht.kaufen ? await loadReorderItems(reorder, farm.id) : []
+  // Die Beiträge hat der Lader schon gestartet, als der Hof bekannt war (vorab, Nr. 180); hier kommt dieselbe Antwort
+  // (React `cache`). Mit den Nachbestell-Artikeln gleichzeitig: Die Beiträge fangen ihre Fehler selbst, der Nachbestell-Link wie bisher nicht.
+  const [{ beitraege, fehler: beitraegeFehler }, reorderItems] = await Promise.all([
+    ladeBeitraege(farm.id, beitragKennungAus(suche)),
+    (async (): Promise<ReorderItem[]> => (reorder && ansicht.kaufen ? await loadReorderItems(reorder, farm.id) : []))(),
+  ])
   // Einmal hier, auf dem Server: Gebührensatz und „vor 2 Tagen" rechnen in
   // Server und Browser vom selben Zeitpunkt (sonst Hydration-Abweichung).
   const jetzt = new Date()
@@ -200,7 +191,8 @@ async function Hofseite({ farmSlug, suche, geo }: { farmSlug: string; suche: Suc
   const sperre = kaufSperre(farm, jetzt)
 
   return (
-    <KundeShellMitSitzung>
+    // In der Unterleiste ist „Entdecken" aktiv — die Kundin steckt mitten im Entdecken (Nr. 177).
+    <KundeShellMitSitzung aktiv="entdecken">
       <FarmPageView
         // Telefon und E-Mail erst nach dem Kauf (Nr. 60): Sie bleiben hier auf
         // dem Server und stehen so nicht in den Seitendaten der Client-Komponente.

@@ -15,6 +15,9 @@ import {
   anmeldeartFuerPfad,
   einrichtenZustand,
   frischBestaetigt,
+  hofFrisch,
+  istAdminPasskey,
+  adminPasskeyWo,
   passkeyAdresse,
   passkeyFehlerText,
   passkeyPflicht,
@@ -34,6 +37,7 @@ function lage(abweichend: Omit<Partial<RegistrierungsLage>, 'sitzung'> & { sitzu
   const { sitzung, ...rest } = abweichend
   return {
     isAdmin: true,
+    rolle: 'CUSTOMER',
     adminSeit: vor(STUNDE),
     passkeys: 0,
     codeBestaetigt: true,
@@ -76,6 +80,53 @@ describe('registrierungsFall — wer einen Passkey anlegen darf', () => {
     expect(registrierungsFall(lage({ passkeys: 1, sitzung: { anmeldeart: 'passkey', passkeyAm: vor(5 * MINUTE) } }), JETZT)).toBe('weiterer')
     expect(registrierungsFall(lage({ passkeys: 1, sitzung: { anmeldeart: 'passkey', passkeyAm: vor(5 * MINUTE + 1) } }), JETZT)).toBeNull()
     expect(registrierungsFall(lage({ passkeys: 0, codeBestaetigt: false, sitzung: { anmeldeart: 'passkey', passkeyAm: JETZT } }), JETZT)).toBeNull()
+  })
+})
+
+describe('Passkey für Höfe (E7-Ergänzung, Nr. 179)', () => {
+  const hof = (sitzung: Partial<RegistrierungsLage['sitzung']>, mehr: Omit<Partial<RegistrierungsLage>, 'sitzung'> = {}): RegistrierungsLage =>
+    lage({ isAdmin: false, rolle: 'FARMER', adminSeit: null, codeBestaetigt: false, ...mehr, sitzung })
+
+  it('Hof frisch mit Passwort: genau 5 Minuten noch, eine Millisekunde älter nicht — erster wie weiterer', () => {
+    expect(registrierungsFall(hof({ anmeldeart: 'passwort', angemeldetAm: vor(5 * MINUTE) }), JETZT)).toBe('hof')
+    expect(registrierungsFall(hof({ anmeldeart: 'passwort', angemeldetAm: vor(5 * MINUTE) }, { passkeys: 3 }), JETZT)).toBe('hof')
+    expect(registrierungsFall(hof({ anmeldeart: 'passwort', angemeldetAm: vor(5 * MINUTE + 1) }), JETZT)).toBeNull()
+  })
+
+  it('Hof frisch mit Passkey: passkeyAm genau 5 Minuten alt noch, älter nicht — auch in einer alten Sitzung', () => {
+    expect(registrierungsFall(hof({ anmeldeart: 'passkey', angemeldetAm: vor(20 * 24 * STUNDE), passkeyAm: vor(5 * MINUTE) }), JETZT)).toBe('hof')
+    expect(registrierungsFall(hof({ anmeldeart: 'passkey', angemeldetAm: vor(STUNDE), passkeyAm: vor(5 * MINUTE + 1) }), JETZT)).toBeNull()
+  })
+
+  it('nein: Sitzung ohne Anmeldeart (Code, Bestätigung), aus der Zukunft, Kundin', () => {
+    expect(registrierungsFall(hof({ anmeldeart: null, angemeldetAm: vor(MINUTE) }), JETZT)).toBeNull()
+    expect(registrierungsFall(hof({ anmeldeart: 'passwort', angemeldetAm: new Date(JETZT.getTime() + 1) }), JETZT)).toBeNull()
+    expect(registrierungsFall(hof({ anmeldeart: 'passwort', angemeldetAm: vor(MINUTE) }, { rolle: 'CUSTOMER' }), JETZT)).toBeNull()
+    expect(hofFrisch({ anmeldeart: 'passwort', angemeldetAm: vor(MINUTE), passkeyAm: null }, JETZT)).toBe(true)
+    expect(hofFrisch({ anmeldeart: 'ersatzcode', angemeldetAm: vor(MINUTE), passkeyAm: null }, JETZT)).toBe(false)
+  })
+
+  it('Admin mit Hof bleibt bei N20: frisch mit Passwort genügt nicht, ohne E-Mail-Code kein erster Passkey', () => {
+    const adminHof = lage({ rolle: 'FARMER', codeBestaetigt: false, sitzung: { anmeldeart: 'passwort', angemeldetAm: vor(MINUTE) } })
+    expect(registrierungsFall(adminHof, JETZT)).toBeNull()
+    expect(registrierungsFall({ ...adminHof, codeBestaetigt: true }, JETZT)).toBe('erster')
+    // Ein vorhandener Hof-Passkey zählt für den Admin nicht mit (passkeys = Admin-Passkeys): wieder Fall a, nicht c.
+    expect(registrierungsFall({ ...adminHof, passkeys: 0, sitzung: { ...adminHof.sitzung, anmeldeart: 'passkey', passkeyAm: JETZT } }, JETZT)).toBeNull()
+  })
+
+  it('Admin-Passkey = ab adminSeit eingerichtet; davor ein Hof-Passkey; ohne adminSeit (Altbestand) alle', () => {
+    const seit = vor(STUNDE)
+    expect(istAdminPasskey(seit, seit)).toBe(true)
+    expect(istAdminPasskey(vor(STUNDE - 1), seit)).toBe(true)
+    expect(istAdminPasskey(vor(STUNDE + 1), seit)).toBe(false)
+    expect(istAdminPasskey(null, seit)).toBe(false)
+    expect(istAdminPasskey(vor(STUNDE + 1), null)).toBe(true)
+    expect(adminPasskeyWo(seit)).toEqual({ createdAt: { gte: seit } })
+    expect(adminPasskeyWo(null)).toEqual({})
+  })
+
+  it('Fehlersatz für einen Hof-Passkey an einem Admin-Konto', () => {
+    expect(passkeyFehlerText({ code: 'PASSKEY_NICHT_FUER_ADMIN' })).toBe(ADMIN_ANMELDEN_FEHLER.nichtFuerAdmin)
   })
 })
 

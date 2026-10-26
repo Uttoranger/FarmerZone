@@ -20,22 +20,29 @@ vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/stripe', () => ({
   stripe: { refunds: { create: vi.fn(), list: vi.fn(async () => ({ data: [], has_more: false })) } },
 }))
-vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn() }))
+// Die Hilfen der Warteschlange bleiben echt (Nr. 168, tests/mail-attrappe.ts).
+vi.mock('@/server/mail-warteschlange', async (o) => (await import('./mail-attrappe')).warteschlangeEcht(await o()))
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
 vi.mock('@/lib/prisma', () => {
   const order = { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() }
   const product = { update: vi.fn() }
+  // Einstellen (createMany) und Nachtragen nach Stripe (updateMany, Nr. 159).
+  const mailAuftrag = { createMany: vi.fn(async () => ({ count: 1 })), updateMany: vi.fn(async () => ({ count: 1 })) }
+  // Die verschachtelte Transaktion (Savepoint, Nr. 168) bekommt dieselben Fakes.
+  const tx: Record<string, unknown> = { order, product, mailAuftrag }
+  tx.$transaction = (arbeit: (t: unknown) => Promise<unknown>) => arbeit(tx)
   return {
     prisma: {
       farm: { findUnique: vi.fn() },
       order,
       product,
       // Nach Stripe trägt der Storno die Erstattung in seinen Auftrag nach (Nr. 159).
-      mailAuftrag: { updateMany: vi.fn(async () => ({ count: 1 })) },
+      mailAuftrag,
       // Storno läuft seit fix/storno-atomar durch eine interaktive
       // Transaktion — der Rückruf bekommt dieselben Fakes.
       $transaction: vi.fn(async (arg: unknown) =>
         typeof arg === 'function'
-          ? (arg as (tx: unknown) => Promise<unknown>)({ order, product })
+          ? (arg as (tx: unknown) => Promise<unknown>)(tx)
           : Promise.all(arg as Array<Promise<unknown>>)
       ),
     },
@@ -46,7 +53,10 @@ import { markAsNotPickedUp, cancelOrder } from '@/server/actions/orders'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import { stelleMailEin } from '@/server/mail-warteschlange'
+import { stelleMailEinInTransaktion } from '@/server/mail-warteschlange'
+import { ergebnis } from './mail-attrappe'
+
+const stelleMailEin = vi.mocked(stelleMailEinInTransaktion)
 
 const getSession = vi.mocked(auth.api.getSession)
 const farmFindUnique = vi.mocked(prisma.farm.findUnique)
@@ -312,6 +322,7 @@ describe('cancelOrder — Gebühren-Vermerk bei Storno', () => {
       expect.objectContaining({ art: 'storniert', vorrang: 1, schluessel: 'storniert:order_online', bezug: { orderId: 'order_online', erstattung: 'ausstehend' } }),
       expect.anything()
     )
+    expect(await ergebnis(stelleMailEin)).toBe('eingestellt')
     expect(prisma.mailAuftrag.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: { bezug: { orderId: 'order_online', erstattetCents: '2098' } } })
     )

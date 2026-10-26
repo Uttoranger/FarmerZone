@@ -110,7 +110,8 @@ async function Produktseite({ farmSlug, id, suche }: { farmSlug: string; id: str
   const sperre = kaufSperre(farm, jetzt)
 
   return (
-    <KundeShellMitSitzung unterleiste={false}>
+    // „Entdecken" aktiv wie auf der Hofseite (Nr. 177) — hier im Kopf, eine Unterleiste hat die Fokus-Seite nicht.
+    <KundeShellMitSitzung unterleiste={false} aktiv="entdecken">
       <ProduktdetailKunde
         // Telefon und E-Mail erst nach dem Kauf (Nr. 60, hier seit Nr. 70): Sie bleiben auf
         // dem Server und stehen so nicht in den Seitendaten der Client-Komponente.

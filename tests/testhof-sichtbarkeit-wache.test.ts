@@ -29,6 +29,7 @@ const DIREKTER_LINK: Record<string, string> = {
   'src/server/queries/teilen-bild.ts:ladeTeilenBildQuelle': 'Teilen-Bild',
   'src/server/queries/teilen-bild.ts:getPlakatDaten': 'Plakat',
   'src/server/teilen-zaehlung.ts:zaehleBesuchFuerSlug': 'Teilen-Zählung (Besuch über einen geteilten Link)',
+  'src/app/api/status-image/[id]/route.tsx:GET': 'Beitragsbild über einen direkten Link (Nr. 178); einen Testhof sieht nur sein eigenes Konto',
 }
 
 /** Die Listen, Karten, Zählungen und Auswahlen der Freigabe (Nr. 119, Punkt 2) — jede nennt IN_LISTEN_SICHTBAR. */

@@ -42,7 +42,6 @@ vi.mock('@/server/actions/startseite', () => ({
   veroeffentlicheStartseite: vi.fn(),
   zieheFassungZurueck: vi.fn(),
   erzeugeStartseitenVorschau: vi.fn(),
-  beendeStartseitenVorschau: vi.fn(),
 }))
 // Ab 1024 px: Auf dem Server gilt sonst immer „schmal“.
 vi.mock('@/lib/use-mindestbreite', () => ({ useMindestbreite: () => true, useSchmalerAls: () => false }))

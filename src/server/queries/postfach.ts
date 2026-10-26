@@ -341,24 +341,6 @@ export async function ladeEmpfaengerHoefe(): Promise<EmpfaengerHof[]> {
   }))
 }
 
-/** Für den Mailversand nach der Antwort: die Adresse des Kontos hinter dem Hof eines Fadens. */
-export async function ladeMailEmpfaenger(unterhaltungIds: readonly string[]): Promise<{ unterhaltungId: string; email: string; titel: string | null }[]> {
-  const faeden = await prisma.unterhaltung.findMany({
-    where: { id: { in: [...unterhaltungIds] }, farm: { archivedAt: null } },
-    select: { id: true, rundschreiben: { select: { titel: true } }, farm: { select: { owner: { select: { email: true } } } } },
-  })
-  return faeden.map((f) => ({ unterhaltungId: f.id, email: f.farm.owner.email, titel: f.rundschreiben?.titel ?? null }))
-}
-
-/** Für die Mail an das Team nach einer Antwort des Hofs: Hofname und Titel des Fadens. */
-export async function ladeAntwortFuerTeam(unterhaltungId: string): Promise<{ hofName: string; titel: string | null } | null> {
-  const faden = await prisma.unterhaltung.findUnique({
-    where: { id: unterhaltungId },
-    select: { farm: { select: { name: true } }, rundschreiben: { select: { titel: true } } },
-  })
-  return faden ? { hofName: faden.farm.name, titel: faden.rundschreiben?.titel ?? null } : null
-}
-
 // ─── Eingang (Register N12-Änderung, N14; Nr. 95) ────────────────────────────
 
 /**

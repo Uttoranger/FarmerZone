@@ -46,6 +46,29 @@ export async function gesendeteBeitragsMails(
 }
 
 /**
+ * Für das Aufräumen (Nr. 170), VOR dem Löschen der Aufträge älter als `grenze`:
+ * Jeder Beitrag mit solchen Aufträgen bekommt als `emailRecipientCount` die
+ * Zahl der gesendeten. Ohne Aufträge liest `gesendeteBeitragsMails` dieses
+ * Feld — so bleibt „n per E-Mail“ nach 90 Tagen die gesendete Zahl statt der
+ * eingestellten. EINE Anweisung, dieselbe Grenze wie das Löschen.
+ *
+ * Nur hier, nie im Worker: `emailRecipientCount > 0` ist zugleich die
+ * 7-Tage-Sperre (`mailSperreWo`) — nach 90 Tagen ist sie längst vorbei.
+ * Gibt zurück, wie viele Beiträge die Zahl bekamen.
+ */
+export async function sichereGesendeteBeitragsMails(grenze: Date): Promise<number> {
+  return prisma.$executeRaw`
+    UPDATE "StatusPost" AS p SET "emailRecipientCount" = z."gesendet"
+    FROM (
+      SELECT "bezug"->>'postId' AS "postId", (COUNT(*) FILTER (WHERE "status" = 'gesendet'))::int AS "gesendet"
+      FROM "MailAuftrag"
+      WHERE "art" = 'beitrag' AND "vorrang" = ${VORRANG.kannWarten} AND "erstelltAm" < ${grenze}
+      GROUP BY 1
+    ) AS z
+    WHERE p."id" = z."postId"`
+}
+
+/**
  * Renderer „beitrag“ (Kann warten): ein Beitrag an EIN Abo. Lädt beim Versand
  * frisch — wer sich inzwischen abgemeldet hat oder die Anmeldung nie bestätigt
  * hat, bekommt nichts (`WERBEMAIL_EMPFAENGER`, Double-Opt-in S11). Der Text

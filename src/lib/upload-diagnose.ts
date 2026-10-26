@@ -19,6 +19,7 @@
  * Rein, ohne DOM und ohne Netz.
  */
 import type { LeseUrteil, TransferUrteil } from './upload-fehler'
+import { istNetzFehler } from './netz'
 
 /** Der Schritt, an dem ein Upload endgültig scheiterte. */
 export type UploadSchritt = 'kennung' | 'uebertragung' | 'abschluss'
@@ -102,38 +103,11 @@ export function blobFehlerKlasse(fehler: unknown): string | null {
 }
 
 /**
- * Wortlaute, mit denen ein abgerissener Request scheitert — immer als
- * TypeError, je Browser anders. Grundlage ist die Liste in @vercel/blob
- * (is-network-error), ergänzt um den Zeitablauf seines XHR-Wegs und Safaris
- * ältere Texte.
- *
- * Bewusst eine Liste statt „jeder TypeError": Auch ein Programmierfehler ist
- * ein TypeError („Cannot read properties of undefined"). Den als
- * Verbindungsabbruch zu melden, wäre genau die falsche Auskunft, die dieser
- * Fix beseitigt.
+ * Ein abgerissener Request. Die Erkennung lebt seit Nr. 175 in src/lib/netz.ts
+ * (eine Quelle, Register N29); der alte Name bleibt für die bestehenden
+ * Aufrufer (Upload, Mein Hof, Ortssuche, Admin) stehen.
  */
-const NETZFEHLER_TEXTE = new Set([
-  'Failed to fetch', // Chrome
-  'NetworkError when attempting to fetch resource.', // Firefox
-  'Load failed', // Safari 17+
-  'The Internet connection appears to be offline.', // Safari
-  'The network connection was lost.', // Safari
-  'The request timed out.', // Safari
-  'network error',
-  'Network request failed', // XHR-Weg des SDK
-  'Network request timed out', // XHR-Weg des SDK
-  'fetch failed', // Node (undici)
-  'terminated', // Node (undici)
-])
-
-/**
- * Ein abgerissener Request — nach den Wortlauten oben. Auch die Formulare von
- * Mein Hof fragen das (abschnitt-speichern.ts): Ein Funkloch beim Speichern
- * ist dort nur eine Brotkrume für Sentry, kein Befund.
- */
-export function istNetzfehler(fehler: unknown): boolean {
-  return fehler instanceof Error && fehler.name === 'TypeError' && NETZFEHLER_TEXTE.has(fehler.message)
-}
+export { istNetzFehler as istNetzfehler } from './netz'
 
 /**
  * Der Name, den ein Fehler trägt — auch von einer DOMException, die kein Error
@@ -238,7 +212,7 @@ export function ordneTransferFehler(fehler: unknown, abgebrochen: boolean): Tran
   // das Gerät die Freigabe zurückgezogen (#135). Vor der Netzfehler-Prüfung,
   // weil das SDK dieselbe Ablehnung auch beim Lesen eines Teilstücks bekommt.
   if (istLeseVerlust(fehler)) return 'lesen'
-  if (istNetzfehler(fehler)) return 'netz'
+  if (istNetzFehler(fehler)) return 'netz'
   const klasse = blobFehlerKlasse(fehler)
   // Den Abbruch meldet das SDK nur, wenn das Signal am Request feuert — und
   // das einzige Signal dort ist das unserer Wächter.

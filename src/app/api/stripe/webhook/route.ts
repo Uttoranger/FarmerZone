@@ -6,7 +6,7 @@ import { stripe } from '@/lib/stripe'
 import { env } from '@/lib/env'
 import { prisma } from '@/lib/prisma'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
-import { stelleMailEin } from '@/server/mail-warteschlange'
+import { stelleEinOhneRisiko, stelleMailEinInTransaktion, type EinstellAuftrag } from '@/server/mail-warteschlange'
 import { bestellMailAuftrag, zahlungZuSpaetMailAuftrag } from '@/server/mail-arten/bestellung'
 import { betreiberAuftraege, betreiberKennungen, erstattungOffenBezug } from '@/server/mail-arten/betreiber'
 import { erstattungOffenInhalt } from '@/lib/erstattung-offen'
@@ -140,25 +140,29 @@ type BestellungStand = Prisma.OrderGetPayload<{ select: typeof BESTELLUNG_STAND 
  *
  * Die beiden Mails (Kundin, Hof) sind seit Nr. 159 Aufträge der
  * Warteschlange — in DERSELBEN Transaktion wie der Statuswechsel, erst der
- * Status, dann die Aufträge: Eine bezahlte Bestellung hat immer ihre Mails,
- * und scheitert das Einstellen, rollt der Wechsel mit zurück (500, Stripe
- * stellt das Ereignis erneut zu). Ein zweites Ereignis trifft count 0 und
- * stellt nichts ein; der Schlüssel `<art>:<orderId>` hielte es ohnehin auf.
+ * Status, dann die Aufträge. Ein Auftrag hält die Zahlung nie auf (Register
+ * N26, Ergänzung 25.10.2026): Ein ungültiger Bezug fällt mit Meldung weg,
+ * ein Datenbankfehler beim Einstellen setzt nur den Savepoint zurück — PAID
+ * bleibt, und die Aufträge werden nach dem Commit nachgeholt. Ein zweites
+ * Ereignis trifft count 0 und stellt nichts ein; der Schlüssel
+ * `<art>:<orderId>` hielte es ohnehin auf.
  */
 async function handlePaymentSucceeded(pi: Stripe.PaymentIntent) {
-  const count = await prisma.$transaction(async (tx) => {
+  const { count, nachholen } = await prisma.$transaction(async (tx) => {
     const { count: bezahlt } = await tx.order.updateMany({
       where: { stripePaymentIntentId: pi.id, status: 'PENDING_CONFIRMATION' },
       data: { status: 'PAID', paymentStatus: 'PAID', paidAt: new Date() },
     })
-    if (bezahlt === 1) {
-      const bestellung = await tx.order.findUnique({ where: { stripePaymentIntentId: pi.id }, select: { id: true, farmId: true } })
-      if (bestellung) {
-        await stelleMailEin([bestellMailAuftrag('bestellung-bestaetigung', bestellung), bestellMailAuftrag('bestellung-bezahlt-hof', bestellung)], tx)
-      }
-    }
-    return bezahlt
+    if (bezahlt !== 1) return { count: bezahlt, nachholen: null }
+    // Die Bestellung steht erst unter der Sperre fest — gelesen wird nach dem Wechsel, nie davor.
+    const bestellung = await tx.order.findUnique({ where: { stripePaymentIntentId: pi.id }, select: { id: true, farmId: true } })
+    if (!bestellung) return { count: bezahlt, nachholen: null }
+    const auftraege: EinstellAuftrag[] = [bestellMailAuftrag('bestellung-bestaetigung', bestellung), bestellMailAuftrag('bestellung-bezahlt-hof', bestellung)]
+    const ergebnis = await stelleMailEinInTransaktion(auftraege, tx)
+    return { count: bezahlt, nachholen: ergebnis === 'nachholen' ? { bestellungId: bestellung.id, auftraege } : null }
   })
+  // Nach dem Commit, mit demselben Auftragsobjekt (derselbe Schlüssel).
+  if (nachholen) await stelleEinOhneRisiko('bestellung-bestaetigung', nachholen.bestellungId, nachholen.auftraege)
   if (count === 1) return
 
   const order = await prisma.order.findUnique({
@@ -280,29 +284,31 @@ async function erstatteSpaeteZahlung(pi: Stripe.PaymentIntent, order: Bestellung
   // desselben Ereignisses erstatten beide (Stripe liefert über den Schlüssel
   // dieselbe Erstattung), aber nur wer den Vermerk setzt, schreibt der Kundin.
   // Vermerk und Auftrag der Mail in EINER Transaktion (Nr. 159), erst der
-  // Vermerk. Getrennt abgefangen: Scheitert sie, ist das Geld trotzdem
-  // zurück — dann wie bisher die Mail ohne Vermerk (der Schlüssel
+  // Vermerk. Der Auftrag kippt den Vermerk nie (Register N26, Ergänzung
+  // 25.10.2026): Scheitert nur er, wird er nach dem Commit nachgeholt.
+  // Getrennt abgefangen bleibt ein Fehler des Vermerks selbst: Das Geld ist
+  // trotzdem zurück — dann wie bisher die Mail ohne Vermerk (der Schlüssel
   // `zahlung-zu-spaet:<orderId>` hält eine zweite auf). Ein Wurf hier hieße
   // 500 und eine Wiederholung, die nach Ablauf des Idempotenz-Schlüssels an
   // „schon erstattet" scheiterte.
   const auftrag = zahlungZuSpaetMailAuftrag(order, erstattetCents)
+  let nachholen = false
   try {
-    await prisma.$transaction(async (tx) => {
+    nachholen = await prisma.$transaction(async (tx) => {
       const { count } = await tx.order.updateMany({
         where: { id: order.id, status: 'CANCELLED', paymentStatus: { in: ['PENDING', 'FAILED'] } },
         data: { paymentStatus: 'REFUNDED' },
       })
-      if (count === 1) await stelleMailEin(auftrag, tx)
+      return count === 1 && (await stelleMailEinInTransaktion(auftrag, tx)) === 'nachholen'
     })
   } catch (err) {
     Sentry.captureException(err, {
       tags: { webhook: 'payment_intent.succeeded', grund: 'vermerk_fehlgeschlagen' },
       extra: { orderId: order.id },
     })
-    await mailOhneRisiko('zahlung_zu_spaet', order.id, async () => {
-      await stelleMailEin(auftrag)
-    })
+    nachholen = true
   }
+  if (nachholen) await stelleEinOhneRisiko('zahlung-zu-spaet', order.id, auftrag)
 }
 
 /**
@@ -352,11 +358,9 @@ async function handleErstattungGescheitert(refund: Stripe.Refund, typ: 'refund.f
   // (Register N14): „Erstattung offen" geht immer, auch bei Regel „aus".
   // Nach der Antwort und abgesichert wie bisher: ein Fehler kippt das Ereignis nicht.
   nachDerAntwort(async () => {
-    await mailOhneRisiko('erstattung_offen', orderId ?? refund.id, async () => {
+    await stelleEinOhneRisiko('erstattung-offen', orderId, async () => {
       const bezug = erstattungOffenBezug({ fall: meldung.fall, orderId, refundId: refund.id, kundinCents: refund.amount })
-      await stelleMailEin(
-        betreiberAuftraege('erstattung-offen', refund.id, await betreiberKennungen('erstattungOffen'), bezug, orderId ? { bestellungId: orderId } : {})
-      )
+      return betreiberAuftraege('erstattung-offen', refund.id, await betreiberKennungen('erstattungOffen'), bezug, orderId ? { bestellungId: orderId } : {})
     })
   })
 }
@@ -431,14 +435,4 @@ function gescheitertMeldung(ausgang: Exclude<GescheitertAusgang, { art: 'nicht_g
     return { titel: 'Erstattung gescheitert — Stand unklar, nichts geändert', grund: 'erstattung_gescheitert_unklar', fall: 'unklar' }
   }
   return { titel: 'Erstattung gescheitert — keiner Buchung der App zuzuordnen', grund: 'erstattung_gescheitert_fremd', fall: 'fremd' }
-}
-
-/** Ein Mailfehler wird gemeldet, nie weitergeworfen. Nur die Bestell-ID, keine Adresse. */
-async function mailOhneRisiko(mail: string, orderId: string, senden: () => Promise<void>) {
-  try {
-    await senden()
-  } catch (err) {
-    console.error(`[Webhook] Mail ${mail} fehlgeschlagen für Bestellung ${orderId}`)
-    Sentry.captureException(err, { tags: { webhook: 'mail', mail }, extra: { orderId } })
-  }
 }

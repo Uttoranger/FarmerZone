@@ -13,10 +13,11 @@ import { TeilenClient } from './teilen-client'
  * Seite. Sie liest die Ablage, lässt das Ziel wählen (Titelbild oder
  * Hofgalerie) und lädt über den BESTEHENDEN Upload-Weg hoch.
  *
- * Bewusst AUSSERHALB der (farmer)-Gruppe: Deren Layout leitet nackt auf
- * /login — hier braucht der Login-Umweg aber ein Rückkehr-Ziel, sonst
- * stranden die geteilten Fotos in der Ablage, während der Bauer auf der
- * Übersicht landet. Die Prüfung selbst ist dieselbe wie im Farmer-Layout.
+ * Bewusst AUSSERHALB der Gruppe (hof): Der Login-Umweg braucht hier ein
+ * Rückkehr-Ziel (`von=/teilen`), sonst stranden die geteilten Fotos in der
+ * Ablage, während der Bauer auf der Übersicht landet. Der Service Worker
+ * fängt den POST ab (public/sw.js); die Adresse steht deshalb auch nicht in
+ * der Liste des Proxys.
  */
 export default async function TeilenSeite() {
   const session = await auth.api.getSession({ headers: await headers() })

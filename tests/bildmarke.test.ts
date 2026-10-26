@@ -9,7 +9,7 @@
  *    MARKE; kein Inline-SVG, kein Farbwert.
  *  - Die Bildmarke nimmt Fassung, Größe und Rundung aus den Props (Gegenprobe).
  *  - Vorab geladen wird nur in der Kopfzeile: Der Fuß der Startseite gibt priority={false}.
- *  - Kein App-Icon als Marke in einer Komponente — die Handy-Leiste des KundenKopf zeigt die Bildmarke klein.
+ *  - Kein App-Icon als Marke in einer Komponente — die Handy-Leiste der KundeShell zeigt die Bildmarke klein.
  *  - Quelltext-Wache: Die alten Zeichnungen (Blatt im Kreis der Wortmarke und
  *    des Teilen-Bilds) stehen nirgends mehr unter src/ — mit Gegenprobe, dass
  *    die Suche einen eingepflanzten Pfad fände.
@@ -108,10 +108,10 @@ describe('Wache: nur EINE Zeichnung der Marke', () => {
   }, 30_000)
 
   it('keine Komponente nimmt ein App-Icon als Marke — die Kopfzeile am Handy zeigt die Bildmarke klein', () => {
-    // Bis Nr. 92 stand in der Handy-Leiste des KundenKopf `/icons/icon-192.png` (das F-Icon); mit der vollen Fassung
+    // Bis Nr. 92 stand in der Handy-Leiste (damals KundenKopf) `/icons/icon-192.png` (das F-Icon); mit der vollen Fassung
     // darin stünde dort die große Marke bei 32 px. Die Ziele des Skripts nennt nur src/lib/marke-bild.ts.
     expect(funde(join(process.cwd(), 'src/components'), ['/icons/icon-'])).toEqual([])
-    const kopf = readFileSync(join(process.cwd(), 'src/components/shared/kunden-kopf.tsx'), 'utf8')
+    const kopf = readFileSync(join(process.cwd(), 'src/components/shared/wortmarke.tsx'), 'utf8')
     expect(kopf).toContain('<Bildmarke groesse={MARKE_KOPF_PX} fassung="klein"')
   })
 

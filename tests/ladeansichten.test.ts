@@ -2,7 +2,7 @@
  * Ladeansichten und Fehlerseiten der öffentlichen Seiten.
  *
  * Befund vor diesem Fix: Von 48 Seiten hatte genau EINE eine Ladeansicht
- * (`src/app/(farmer)/loading.tsx`). Eine `global-error.tsx` gab es nicht —
+ * (`src/app/(farmer)/loading.tsx`, seit Nr. 181 gibt es die Gruppe nicht mehr). Eine `global-error.tsx` gab es nicht —
  * scheitert das Root-Layout selbst, zeigte Next.js seine eigene, englische
  * Seite. Und die beiden vorhandenen Fehlerseiten trugen ein Emoji als
  * einzige Illustration, standen also außerhalb des Design-Systems.
@@ -163,23 +163,19 @@ describe('Ladeansichten — jede öffentliche Route, die auf Daten wartet, zeigt
   it('bringt die Kopfleiste in ihrer echten Höhe mit — die Gruppe hat kein Layout', () => {
     // Die Kundenseiten rendern ihre Kopfleiste selbst (56 px, ab md 64).
     // Fehlt sie im Skeleton, springt die Seite beim Umschalten um ihre Höhe.
-    // Die Kasse steht seit Nr. 12 in der Fokus-Shell, die Bar-Bestätigung
-    // seit Nr. 54: deren Kopf ist 52 px hoch (ab md 64) — der Platzhalter hat
-    // genau diese Maße.
-    const FOKUS_SHELL = new Set([
-      'src/app/(public)/[farmSlug]/checkout/loading.tsx',
-      'src/app/(public)/[farmSlug]/bestaetigen/[token]/loading.tsx',
-    ])
+    // Seit Nr. 177 hat auch die Fokus-Shell (Kasse, Bar-Bestätigung) 56 px —
+    // vorher 52 px mit eigener Ausnahme hier.
     for (const ansicht of LADEANSICHTEN) {
-      expect(liesDatei(ansicht.datei), `${ansicht.zweck} ohne Kopfleisten-Platzhalter`).toMatch(
-        FOKUS_SHELL.has(ansicht.datei) ? /h-\[52px\][^"]*md:h-16/ : /h-14[^"]*md:h-16/
-      )
+      expect(liesDatei(ansicht.datei), `${ansicht.zweck} ohne Kopfleisten-Platzhalter`).toMatch(/h-14[^"]*md:h-16/)
     }
   })
 
   it('die Kasse: Kopf-Platzhalter in den Maßen der Fokus-Shell', () => {
-    // Gegenprobe zur Ausnahme oben: Die Shell hat wirklich 52 px / ab md 64 px.
-    expect(liesDatei('src/components/shells/kunde-shell.tsx')).toMatch(/h-\[52px\][^"]*md:h-16/)
+    // Die Fokus-Shell hat wirklich 56 px / ab md 64 px (Nr. 177) — und keine 52 px mehr (Gegenprobe zum alten Stand).
+    const fokusShell = liesDatei('src/components/shells/kunde-shell.tsx').split('export function KundeFokusShell(')[1]
+    expect(fokusShell).toMatch(/flex h-14 max-w-\[1200px\][^"]*md:h-16/)
+    expect(fokusShell).not.toMatch(/h-\[52px\]/)
+    expect(liesDatei('src/app/(public)/[farmSlug]/checkout/loading.tsx')).not.toMatch(/h-\[52px\]/)
     expect(liesDatei('src/app/(public)/[farmSlug]/checkout/loading.tsx')).toContain('data-design="neu"')
   })
 
@@ -214,15 +210,13 @@ describe('Ladeansichten — jede öffentliche Route, die auf Daten wartet, zeigt
  * nur Routen, die neu dazukommen. Der Admin bekommt seine Ladeansichten mit
  * der AdminShell (Nr. 24, #203), samt Prüfung im Layout davor.
  */
-const BEREICHE = ['src/app/(hof)', 'src/app/(farmer)'] as const
+const BEREICHE = ['src/app/(hof)', 'src/app/(druck)'] as const
 
 /**
- * Noch ohne eigene Ladeansicht, mit Grund: Die Auswertung zieht mit Nr. 22c
- * (#200) nach (hof); dort zeigt sie seit Nr. 121 einen Ladepunkt statt eines Skeletts;
- * bis dahin greift der Rückfall (farmer)/loading.tsx. Nach dem Merge gibt es
- * diese Ordner nicht mehr — die Ausnahme greift dann ins Leere.
+ * Noch ohne eigene Ladeansicht, mit Grund: keine (die Auswertung zog mit Nr. 22c
+ * nach (hof), die Gruppe (farmer) fiel mit Nr. 181 weg). Ein Eintrag braucht einen Grund.
  */
-const OHNE_EIGENE = new Set(['src/app/(farmer)/analytics', 'src/app/(farmer)/analytics/umfeld'])
+const OHNE_EIGENE = new Set<string>()
 
 /**
  * Statt eines Skeletts bei jedem Klick zeigen diese Seiten einen Ladepunkt
@@ -279,7 +273,7 @@ describe('Ladeansichten — jede Route im Hofbereich und im Bestand hat eine eig
   it('findet die Routen überhaupt (Gegenprobe)', () => {
     expect(routen).toContain('src/app/(hof)/orders')
     expect(routen).toContain('src/app/(hof)/status/new')
-    expect(routen).toContain('src/app/(farmer)/orders/today/print')
+    expect(routen).toContain('src/app/(druck)/orders/today/print')
     expect(routen.length).toBeGreaterThanOrEqual(25)
   })
 
@@ -300,9 +294,9 @@ describe('Ladeansichten — jede Route im Hofbereich und im Bestand hat eine eig
     })
   }
 
-  it('die Gruppen haben einen Rückfall für neue Routen', () => {
+  it('(hof) hat einen Rückfall für neue Routen; (druck) braucht keinen — jede ihrer Routen hat die eigene Ladeansicht', () => {
     expect(existiert('src/app/(hof)/loading.tsx')).toBe(true)
-    expect(existiert('src/app/(farmer)/loading.tsx')).toBe(true)
+    expect(existiert('src/app/(farmer)')).toBe(false)
   })
 
   it('alle zeigen Platzhalter in Kartenform mit aria-busy, ohne Spinner, Farbliteral oder Emoji', () => {
@@ -311,7 +305,6 @@ describe('Ladeansichten — jede Route im Hofbereich und im Bestand hat eine eig
         .filter((r) => !OHNE_EIGENE.has(r) && !LADEPUNKT_STATT_SKELETT.has(r))
         .map((r) => `${r}/loading.tsx`),
       'src/app/(hof)/loading.tsx',
-      'src/app/(farmer)/loading.tsx',
     ]
     for (const datei of dateien) {
       const text = ladeansichtMitTeilen(datei)
@@ -353,10 +346,9 @@ describe('Ladeansichten — jede Route im Hofbereich und im Bestand hat eine eig
     expect('<Link href={href}><span>Zeile</span></Link>').not.toMatch(/<LadePunkt\b/)
   })
 
-  it('Hof und Bestand: Zugang prüft das Layout der Gruppe, vor jeder Ladeansicht', () => {
-    for (const gruppe of ['src/app/(hof)/layout.tsx', 'src/app/(farmer)/layout.tsx']) {
-      expect(liesDatei(gruppe), gruppe).toContain('await ladeHofbereich()')
-    }
+  it('Hof und Druck: Zugang prüft das Layout der Gruppe, vor jeder Ladeansicht', () => {
+    expect(liesDatei('src/app/(hof)/layout.tsx')).toContain('await ladeHofbereich()')
+    expect(liesDatei('src/app/(druck)/layout.tsx')).toContain('await verlangeHofDerSitzung()')
   })
 })
 
@@ -412,20 +404,30 @@ describe('Startseite — bewusst OHNE src/app/loading.tsx', () => {
     // Kartenform), nicht eine Datei im Wurzelsegment. Wer auf der Seite ein
     // await einführt, sieht hier, dass sie dafür nicht gebaut ist.
     //
-    // Seit Nr. 96 (Register N16) wartet die Seite auf genau zwei Dinge, die
-    // beide nichts aus der Anfrage lesen: die Vorschau (ohne Draft Mode sofort
-    // null, src/server/startseite-vorschau.ts) und die Liste der Abschnitte
-    // aus dem Datencache (ladeStartseite, wirft nie). Seit Nr. 99 liest nur
-    // die Vorschau ihre Quelle selbst (ladeVorschauZeilen, Draft Mode) — auf
-    // derselben Zeile, statt der Live-Liste. Jedes weitere await fällt hier auf.
+    // Seit Nr. 182 (Register N16, Ergänzung 25.10.2026) wartet die Seite auf
+    // genau eins: die Liste der Abschnitte aus dem Datencache (ladeStartseite,
+    // wirft nie). Die Vorschau aus Admin › Startseite hat ihre eigene,
+    // dynamische Route (/startseite-vorschau); die Startseite liest nichts aus
+    // der Anfrage. Jedes weitere await fällt hier auf.
     const seite = liesDatei('src/app/page.tsx')
     const komponente = seite.slice(seite.indexOf('export default async function HomePage('))
     expect(komponente.length).toBeLessThan(seite.length)
+    expect(komponente.match(/\bawait\b[^\n]*/g)).toEqual(['await ladeStartseite(), jetzt, {'])
+    // Die Höfe hinter Suspense stehen im gemeinsamen Baustein (src/components/startseite/startseiten-inhalt.tsx).
+    expect(seite).toContain("from '@/components/startseite/startseiten-inhalt'")
+    expect(liesDatei('src/components/startseite/startseiten-inhalt.tsx')).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>/)
+  })
+
+  it('die Vorschau-Seite wartet auf die Prüfung von Link und Sitzung und erst danach auf ihre Quelle (Nr. 182)', () => {
+    // Dynamisch (force-dynamic): Sie liest die Anfrage. Ohne gültige Vorschau lädt sie keine Zeilen.
+    const seite = liesDatei('src/app/startseite-vorschau/page.tsx')
+    const komponente = seite.slice(seite.indexOf('export default async function StartseitenVorschauSeite('))
+    expect(komponente.length).toBeLessThan(seite.length)
     expect(komponente.match(/\bawait\b[^\n]*/g)).toEqual([
-      'await vorschauDieserAnfrage(searchParams, new Date())',
-      'await ladeVorschauZeilen(vorschau) : await ladeStartseite(), jetzt, {',
+      'await leseStartseitenVorschau(await searchParams, jetzt)',
+      'await ladeVorschauZeilen(vorschau), vorschau.datum, {',
     ])
-    expect(seite).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>/)
+    expect(seite).toContain("from '@/components/startseite/startseiten-inhalt'")
   })
 })
 
@@ -552,7 +554,7 @@ describe('500 — dieselbe Ansicht an beiden Grenzen', () => {
   })
 
   it('führt zum Briefkasten, mit der Fehlernummer vorausgefüllt', () => {
-    expect(liesDatei(ansicht)).toContain('meldungLinkMitKennung(fehlernummer)')
+    expect(liesDatei(ansicht)).toContain('meldungLinkMitKennung(fehlernummer')
   })
 
   it('bleibt in beiden Fehlerseiten ohne Emoji', () => {

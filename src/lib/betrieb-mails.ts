@@ -250,7 +250,7 @@ export type WarteschlangeDaten = {
   kannWarten: number
   aeltesteWichtigeAm: Date | null
   /** Die älteste wartende wichtige Mail — für Warnkarte, Leiste und „Jetzt schicken“. */
-  aeltesteWichtige: { id: string; art: string; versuche: number; fehlerCode: string | null; naechsterVersuchAm: Date; zuBestellung: boolean } | null
+  aeltesteWichtige: { id: string; art: string; status: string; versuche: number; fehlerCode: string | null; naechsterVersuchAm: Date; zuBestellung: boolean } | null
   /** Seit wann der älteste fällige Auftrag ungeholt liegt (offen und fällig bzw. Belegung abgelaufen) — für „hängt“. */
   faelligSeit: Date | null
   /** „Kann warten“ pausiert gerade (Kontingent, N26). */
@@ -585,7 +585,7 @@ export function mailKacheln(e: KachelEingabe, jetzt: Date, grenze: Pick<Grenze, 
 export type MailWarnkarte = {
   eintraege: WarnEintrag[]
   gruen: string
-  /** Die wartende wichtige Mail, die „Jetzt schicken“ schickt — nur, wenn der Code es erlaubt. */
+  /** Die wartende wichtige Mail, die „Jetzt schicken“ schickt — nur, wenn der Code es erlaubt und sie nicht „in Arbeit“ ist. */
   jetztSchicken: string | null
 }
 
@@ -623,7 +623,8 @@ export function mailWarnkarte(
       ],
     })
     merkeMail('mail:wartet')
-    if (f === null || f.jetztSchicken) jetztSchicken = a.id
+    // Nicht bei „in Arbeit“ (Nr. 170): Ein Worker hält die Mail gerade; „Jetzt schicken“ träfe sie nicht.
+    if (a.status !== 'in_arbeit' && (f === null || f.jetztSchicken)) jetztSchicken = a.id
   }
   if (e.lage['mail:haengt'].gilt) {
     eintraege.push({
@@ -1080,12 +1081,15 @@ export const NOCHMAL_JE_TAG = 3
 /** „Alle nochmal schicken“ nimmt höchstens so viele je Klick. */
 export const NOCHMAL_AUF_EINMAL = 100
 /**
- * Nochmal geht jede Mail, die nicht mehr unterwegs ist — eine wartende schickt
- * „Jetzt schicken“. Auch „gesperrt“ und „ohne Schlüssel“: In der Vorschau
- * (ohne Schlüssel für Resend) steht jede Mail so, und die Abnahme braucht
- * den Knopf; die neue Zeile entscheidet dort wieder Post-Sperre bzw. Schlüssel.
+ * Nochmal geht nur für diese Stände (Register N27, Ergänzung 25.10.2026):
+ * gesendet (auch zugestellt, abgelehnt oder Spam gemeldet), gescheitert und
+ * „ohne Schlüssel“ — der kommt nur in der Vorschau vor (ohne Schlüssel für
+ * Resend), und die Abnahme braucht dort den Knopf. Nicht „gesperrt“ (nur
+ * Test-Adressen erlaubt) und nicht „verworfen“ (abgemeldet oder ohne
+ * Einwilligung); eine wartende schickt „Jetzt schicken“. Den Grund je Stand
+ * gibt `nochmalStandGrund`.
  */
-export const NOCHMAL_STAENDE = ['gesendet', 'gescheitert', 'gesperrt', 'ohne_schluessel', 'verworfen'] as const
+export const NOCHMAL_STAENDE = ['gesendet', 'gescheitert', 'ohne_schluessel'] as const
 
 export function nochmalErlaubt(art: string): art is NochmalArt {
   return (NOCHMAL_ERLAUBT as readonly string[]).includes(art)
@@ -1175,7 +1179,9 @@ export const ALLE_MAILS_TEXT = {
   nieCode: 'Codes und Links schickt der Support nie – die Person fordert sie selbst neu an.',
   nieEinwilligung: 'Beiträge, Rundschreiben und Bescheide gehen nie ein zweites Mal hinaus – sie brauchen die Einwilligung.',
   nieSonst: 'Diese Mail schickt der Support nie nochmal.',
-  standPasstNicht: 'Diese Mail ist noch unterwegs – eine wartende schickt „Jetzt schicken“.',
+  standUnterwegs: 'Diese Mail ist noch unterwegs – eine wartende schickt „Jetzt schicken“.',
+  standGesperrt: 'Nur Test-Adressen erlaubt – diese Mail geht nicht nochmal.',
+  standVerworfen: 'Abgemeldet oder ohne Einwilligung – diese Mail geht nicht nochmal.',
   dialogTitel: 'Mail nochmal schicken?',
   dialogTitelLink: 'Bestätigungslink nochmal schicken?',
   dialogAn: (an: string, quelle: string): string => `Geht an ${an} (${quelle}).`,
@@ -1192,6 +1198,17 @@ export const ALLE_MAILS_TEXT = {
   regel:
     'Nochmal schicken geht für Mails zu Bestellungen und an Höfe, immer an die hinterlegte Adresse und mit dem heutigen Stand – höchstens 3-mal je Mail am Tag. Codes und Passwort-Links fordert die Person selbst neu an; Beiträge und Rundschreiben gehen nie ein zweites Mal hinaus. Eine andere Adresse gibt es hier bewusst nicht.',
 } as const
+
+/**
+ * Warum eine Mail in ihrem Stand nicht nochmal geht — null, wenn der Stand
+ * passt (`NOCHMAL_STAENDE`). Die EINE Quelle für das Detail und die Action.
+ */
+export function nochmalStandGrund(status: string): string | null {
+  if ((NOCHMAL_STAENDE as readonly string[]).includes(status)) return null
+  if (status === 'gesperrt') return ALLE_MAILS_TEXT.standGesperrt
+  if (status === 'verworfen') return ALLE_MAILS_TEXT.standVerworfen
+  return ALLE_MAILS_TEXT.standUnterwegs
+}
 
 /** Warum eine Art nie nochmal geht — ein Satz je Gruppe. */
 export function nochmalNieGrund(art: string): string {
@@ -1545,8 +1562,9 @@ export function mailDetail(e: MailDetailEingabe, jetzt: Date): MailDetail {
 
   let knopf: NochmalKnopf
   const pruefung = passtNochmal(m.art, e.stand, jetzt)
+  const standGrund = nochmalStandGrund(m.status)
   if (!nochmalErlaubt(m.art)) knopf = { darf: false, grund: nochmalNieGrund(m.art), heute: null }
-  else if (!(NOCHMAL_STAENDE as readonly string[]).includes(m.status)) knopf = { darf: false, grund: ALLE_MAILS_TEXT.standPasstNicht, heute }
+  else if (standGrund !== null) knopf = { darf: false, grund: standGrund, heute }
   else if (e.heute >= NOCHMAL_JE_TAG) knopf = { darf: false, grund: ALLE_MAILS_TEXT.grenze, heute }
   else if (!pruefung.ok) knopf = { darf: false, grund: pruefung.grund, heute }
   else if (!gekuerzt || quelle === null) knopf = { darf: false, grund: ALLE_MAILS_TEXT.adresseFehlt, heute }

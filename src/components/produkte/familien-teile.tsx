@@ -1,10 +1,12 @@
 'use client'
 
+import { cloneElement, isValidElement } from 'react'
 import { Check, Lock, Plus, X } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { ABHOLHINWEIS_SYMBOL, ABHOLHINWEIS_TEXT, ABHOLHINWEIS_VALUES, ABHOLUNG_ABSCHNITT, schalteAbholhinweis, type AbholhinweisValue } from '@/lib/abholhinweise'
+import { feldFehlerAttribute, fehlerKennung, hilfeKennung } from '@/components/shared/formular-meldungen'
 import { cn } from '@/lib/utils'
 
 /*
@@ -138,21 +140,31 @@ export function Feld({
   labelKlasse?: string
 }): React.JSX.Element {
   const id = feldId(feld)
+  // Fehler bzw. Hilfe gehören zum Eingabefeld, nicht nur daneben: aria-invalid und aria-describedby
+  // setzt der Rahmen selbst, so tragen alle Felder beider Formulare sie (WCAG 3.3.1).
+  const verbindung = feldFehlerAttribute(id, Boolean(fehler), !fehler && Boolean(hilfe))
+  const eingabe = isValidElement<Record<string, unknown>>(children) && Object.keys(verbindung).length > 0 ? cloneElement(children, verbindung) : children
   return (
     <div className="flex min-w-0 flex-col gap-1.5" data-feld={feld}>
       <label htmlFor={id} className={cn('text-[13px] font-medium text-foreground', labelKlasse)}>
         {label}
         {labelZusatz && <span className="sr-only"> {labelZusatz}</span>}
       </label>
-      {children}
-      {fehler ? <FeldFehler id={`${id}-fehler`}>{fehler}</FeldFehler> : hilfe ? <p className="text-xs text-muted-foreground">{hilfe}</p> : null}
+      {eingabe}
+      {fehler ? (
+        <FeldFehler id={fehlerKennung(id)}>{fehler}</FeldFehler>
+      ) : hilfe ? (
+        <p id={hilfeKennung(id)} className="text-xs text-muted-foreground">
+          {hilfe}
+        </p>
+      ) : null}
     </div>
   )
 }
 
 export function FeldFehler({ id, children }: { id?: string; children: React.ReactNode }): React.JSX.Element {
   return (
-    <p id={id} className="text-xs font-medium text-status-offen">
+    <p id={id} role="alert" className="text-xs font-medium text-status-offen">
       {children}
     </p>
   )

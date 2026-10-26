@@ -1,6 +1,9 @@
 import { ImageResponse } from 'next/og'
 import { prisma } from '@/lib/prisma'
 import { NextRequest } from 'next/server'
+import { auth } from '@/lib/auth'
+import { OEFFENTLICH_SICHTBAR } from '@/server/queries/farm'
+import { AKTIVER_BEITRAG } from '@/server/queries/status-posts'
 import { stripStatusVariables } from '@/lib/status-body'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { MARKE } from '@/lib/marke'
@@ -9,21 +12,36 @@ import { BEITRAG_ANLASS } from '@/lib/beitrag-anlass'
 
 export const runtime = 'nodejs'
 
+/** Schaut das Konto des Hofs selbst? Nur dann zeigt sich ein Testhof (N21). */
+async function istEigenerHof(req: NextRequest, ownerId: string): Promise<boolean> {
+  const sitzung = await auth.api.getSession({ headers: req.headers })
+  return sitzung?.user.id === ownerId
+}
+
 /** Die Bildmarke im Fuß: 64 px, über der Grenze von 48 px, also die volle Fassung. */
 const MARKE_KANTE = 64
 
+/*
+ * Bild eines Beitrags im Story-Format. Im Code nirgends verlinkt (Vorschlag
+ * zum Entfernen: Bericht Nr. 178); bis dahin dieselbe Sichtbarkeit wie die
+ * Hofseite: Hof freigeschaltet, aktiv und nicht stillgelegt
+ * (OEFFENTLICH_SICHTBAR), Beitrag veröffentlicht, nicht abgelaufen und „Auf
+ * der Hofseite zeigen" (AKTIVER_BEITRAG) — sonst 404, gleich ob es den
+ * Beitrag gibt. Ein Testhof (N21) nur für sein eigenes Konto: Ein Fremder
+ * bekommt über eine geratene Kennung kein Bild aus einem Testhof.
+ */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
 
-  const post = await prisma.statusPost.findUnique({
-    where: { id },
-    select: { title: true, body: true, anlass: true, farm: { select: { name: true } } },
+  const post = await prisma.statusPost.findFirst({
+    where: { id, AND: [AKTIVER_BEITRAG(new Date())], farm: OEFFENTLICH_SICHTBAR },
+    select: { title: true, body: true, anlass: true, farm: { select: { name: true, istTesthof: true, ownerId: true } } },
   })
 
-  if (!post) {
+  if (!post || (post.farm.istTesthof && !(await istEigenerHof(req, post.farm.ownerId)))) {
     return new Response('Not found', { status: 404 })
   }
 

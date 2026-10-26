@@ -69,6 +69,8 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Begründung:** Der Code funktioniert auch, wenn die Mail am Handy ankommt und am Laptop eingekauft wird.
 - **Dateien:** `src/lib/auth.ts`, `src/lib/auth-client.ts`, `src/lib/anmeldecode.ts`, `src/components/anmelden/` (#172).
 - **Ergänzung Geräte, Code- und Passwort-Raten (uttoranger, im Chat, 19.10.2026; Nr. 112 und 114):** „Falsche Codes zählen je Adresse über alle Codes hinweg: höchstens 10 je Stunde und 30 je Tag; darüber pausiert die Anmeldung mit Code für diese Adresse bis zum Ende des Zeitfensters, und es geht eine Mail an die Adresse (eine je Pause). Falsche Passwörter zählen je Konto: höchstens 10 je Stunde, danach Pause bis zum Ende der Stunde und eine Mail; „Passwort vergessen“ bleibt möglich. Alles gilt gleich für Adressen, die es nicht gibt. Ein erfolgreiches Zurücksetzen des Passworts setzt diesen Zähler zurück; Warn-Mails dazu höchstens eine am Tag. Höfe sehen unter Einstellungen › Konto und Sicherheit ihre angemeldeten Geräte (Gerät und Browser, nie Ort oder IP-Adresse) und melden einzelne oder alle anderen sofort ab, ohne Code. Meldet sich ein Hof- oder Admin-Konto auf einem Gerät an, das wir bei diesem Konto noch nicht kannten, geht eine Mail „Neue Anmeldung“ mit Gerät und Uhrzeit hinaus; ihr Knopf „Das war ich nicht“ öffnet eine Seite mit Knopf (der Link gilt 7 Tage und einmal), die alle Geräte abmeldet und einen Link für ein neues Passwort schickt. Jede Sitzung wird frisch aus der Datenbank gelesen (kein Zwischenspeicher im Cookie mehr), sodass Abmelden sofort wirkt. Bis zur SMS (Lauf 18) geht der Hinweis an die E-Mail-Adresse, danach über den jeweils anderen Weg.“
+- **Ergänzung (uttoranger, im Chat, 25.10.2026):** „Höfe können zusätzlich zum Passwort einen Passkey einrichten (Fingerabdruck, Gesicht, Sicherheitsschlüssel). Freiwillig; das Passwort bleibt als Ersatz. Für Admins gilt N20 unverändert.“
+- **Umsetzung (Ergänzung 25.10.2026):** Nr. 179 (Passkey für Höfe) (freigabe.md §29); keine Migration.
 
 ### E8 · Vorläufig kein Kundenkonto (02.10.2026)
 - **Entscheidung:** Kundinnen bestellen als Gast.
@@ -484,6 +486,12 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Ergänzung (uttoranger, im Chat, 24.10.2026):** „Links in Mails werden mit einem eigenen Geheimnis signiert (`LINK_SECRET`) und tragen eine Schlüsselkennung; Links ohne Kennung gelten weiter mit dem bisherigen Geheimnis. Der Bestätigungslink einer Barbestellung gilt nur noch als Hash; Klartext-Werte alter Bestellungen setzt das Aufräumen auf leer.“
 - **Umsetzung (Ergänzung 24.10.2026):** Nr. 166 (eigenes Geheimnis, `LINK_SECRET`) und Nr. 164 (Bar-Token nur als Hash, Aufräumen) (freigabe.md §28); keine Migration.
 
+### S18 · Sitzungsdauer (25.10.2026)
+- **Entscheidung (uttoranger, im Chat, 25.10.2026):** „Eine Sitzung von Hof oder Kundin endet spätestens 30 Tage nach der Anmeldung, auch wenn sie benutzt wird. Admins bleiben bei 12 Stunden (N20).
+  - Die Seite ‚Konto und Sicherheit‘ sagt das in einem Satz.
+  - Kundinnen sehen unter /account ihre angemeldeten Geräte und können ‚Überall abmelden‘.“
+- **Umsetzung:** Nr. 178 (freigabe.md §29); keine Migration.
+
 ---
 
 ## D – Direktverkauf
@@ -653,6 +661,8 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Ergänzung (uttoranger, im Chat, 20.10.2026; Nr. 129):** „Neuer Abschnitt der Startseite ‚Neu bei den Höfen‘ (Art `NEUIGKEITEN`, Migration `20261021110000_startseite_neuigkeiten`): die neuesten aktiven Beiträge sichtbarer, nicht pausierter Höfe aus den letzten 14 Tagen, höchstens einer je Hof und sechs insgesamt, nach Zeit. Er ist ein zusätzlicher Abschnitt: Admin fügt ihn in Admin › Startseite hinzu (Entwurf, Vorschau, Veröffentlichen); bestehende Fassungen bleiben ohne ihn gültig.“
 - **Ergänzung (uttoranger, im Chat, 23.10.2026):** „Ab 1024 px steht bei offenem Block das Formular mit den Vorlagen links an Stelle der Abschnittsliste; die Vorschau ‚So sieht’s die Kundin‘ bleibt rechts sichtbar und zeigt den Block in Bearbeitung unabhängig von seinem Zeitraum. Abweichung vom Mockup admin-startseite-entwurf freigegeben. Grund: Meldung der Projektleitung, die Vorschau reagiere beim Bearbeiten nicht.“
 - **Ergänzung (uttoranger, im Chat, 24.10.2026):** „Ist ein eben geschlossener Block am gezeigten Tag schon vorbei, sagt die Zeile unter der Vorschau ‚… ist an diesem Tag nicht zu sehen – live bis <Tag, Uhrzeit>.‘ (bestätigt aus Bericht 155).“
+- **Ergänzung (uttoranger, im Chat, 25.10.2026):** „Die Vorschau von Admin › Startseite läuft über eine eigene dynamische Route `/startseite-vorschau` mit signiertem Link und Admin-Sitzung, ohne Draft Mode. Die Startseite `/` bleibt statisch und liest nie die Anfrage.“
+- **Umsetzung (Ergänzung 25.10.2026):** Nr. 182 (eigene Vorschau-Route) und Nr. 183 (Editor) (freigabe.md §29); keine Migration.
 
 ### N17 · Bild-Baustein für alle Fotos (15.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 15):** „Wo ein Hof ein Foto hochlädt (Titelbild, Logo, Produktfoto, Galerie, Beitragsfoto), kann er danach Ausschnitt (Fokus + Zoom) und Filter wählen und sieht vorher live, wie das Foto in jeder Größe aussieht – am Handy und am Computer gleichwertig: am Computer in der Zeile, am Handy im Blatt, mit Vorschau ‚So sieht es im Browser aus‘ und ‚So sieht es am Handy aus‘. Sechs feste Filter nur als CSS (Natürlich, Klar, Warm, Kräftig, Sanft, Schwarzweiß); gespeichert wird nur der Name. Das Logo bekommt keinen Filter. Kein Ausschnitt und kein Filter beim Screenshot unter ‚Problem melden‘. Keine zweite Bilddatei, keine Verarbeitung am Server; Teilen-Vorschaubild, Warenkorb, Kasse und E-Mails zeigen das Rohfoto. Umsetzung Nr. 97 (Baustein, Titelbild, Schema) und Nr. 98 (Logo, Produktfoto, Galerie, Beitragsfoto).“
@@ -718,10 +728,54 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 ### N26 · Mails über die Warteschlange (24.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 24):** „Jede Mail außer den Mails mit Code, Einmal-Link oder Bestätigungslink (Anmeldecode, Bestellcode, Passwort-Link, E-Mail bestätigen, Bar-Bestätigungslink, Admin-Sicherheit, Neue Anmeldung) geht über eine Warteschlange in der Datenbank. Kein Massenversand mehr innerhalb einer Anfrage. ‚Wichtig‘ sind Mails zu Bestellungen und an Höfe und Betreiber, ‚Kann warten‘ Beiträge, Rundschreiben und Bescheide; ‚Sofort‘ heißen die Mails mit Code oder Link, die direkt gehen. ‚Kann warten‘ pausiert, wenn das Tageskontingent zu 70 % oder das Kontingent des Abrechnungszeitraums zu 90 % verbraucht ist. Die Warteschlange speichert keine Adressen und keine Inhalte, nur Art, Bezug (Kennungen, darunter die Bestellung), Stand, Fehlercode und für die Support-Suche einen Fingerabdruck der Adresse (HMAC mit eigenem Zweck, nicht umkehrbar). Die Adresse lädt der Versand; ein abgemeldetes Abo bekommt nichts mehr. Jeder Versand, auch der direkte, steht als Zeile im Protokoll; Zeilen älter als 90 Tage löscht das Aufräumen. Resend meldet Zustellung, Bounce und Beschwerde an einen signierten Endpunkt; ein Bounce oder eine Beschwerde zu einem Abo meldet es ab. Admin › Betrieb › E-Mails zeigt Kontingent, Warteschlange, Fehler, Zustellquoten und auf Eingabe der Bestellnummer alle Mails zu dieser Bestellung (Mockup admin-betrieb-mails).“
 - **Umsetzung:** Nr. 158 (Warteschlange und Protokoll; eine Migration, Expand: Tabelle `MailAuftrag`), 159 (alle Mail-Wege), 160 (Zustellmeldungen von Resend, Variable `RESEND_WEBHOOK_SECRET`) und 161 (Admin › Betrieb › E-Mails) (freigabe.md §28). Mockups `admin-betrieb-mails`, `mobil-admin-betrieb-mails` (docs/mockups/README.md).
+- **Ergänzung (uttoranger, im Chat, 25.10.2026):** „Ein Mail-Auftrag hält nie eine Zahlung, eine Barbestätigung, einen Storno, ‚Artikel fehlt‘ oder einen Statuswechsel einer Bestellung auf.
+  - Das gilt auch für den Vermerk einer zu spät eingegangenen Zahlung.
+  - Der Bezug wird vor dem Einstellen geprüft. Ist er ungültig, gilt der Wechsel ohne Auftrag, und Sentry bekommt Art und Bestellung.
+  - Scheitert das Einstellen in der Transaktion, gilt der Wechsel trotzdem. Der Auftrag wird nach dem Commit noch einmal eingestellt; scheitert auch das, geht es an Sentry.
+  - Der Bezug trägt Kennungen und Beträge, die beim Ereignis feststanden, als Cent-Ziffern unter `…Cents` (Storno, Artikel fehlt, Zahlung zu spät); nie Adresse, Name, Text oder Token.
+  - Die Bestätigung eines Empfängers der Zustellung (`betreiber-bestaetigung`) trägt einen Bestätigungslink und geht deshalb Sofort.“
+- **Umsetzung (Ergänzung 25.10.2026):** Nr. 168 (Mail-Auftrag hält nie eine Bestellung auf) (freigabe.md §29); keine Migration.
 
 ### N27 · Mails nochmal schicken (Support, 24.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 24):** „Admin › Betrieb › E-Mails zeigt alle Mails der letzten 90 Tage mit Filter (Art, Stand, Zeitraum, Hof) und Suche nach Bestellnummer oder exakter E-Mail-Adresse; die Suche per Adresse findet auch Mails ohne Bestellung (z. B. Anmeldecodes) über den Fingerabdruck der Adresse. Die Adresse erscheint nur gekürzt (m•••@gmail.com) und wird bei jeder Anzeige frisch aus der Bestellung bzw. dem Hof geladen, nie im Protokoll gespeichert. Nochmal schicken geht nur für Mails zu Bestellungen und an Höfe (Weg ‚Wichtig‘) und für den Bar-Bestätigungslink, immer an die heute hinterlegte Adresse, mit dem heutigen Stand der Bestellung, mit frischer Bestätigung und höchstens 3-mal je Mail in 24 Stunden. Der Bar-Bestätigungslink bekommt dabei einen neuen Token; der alte Link gilt dann nicht mehr. Anmeldecodes, Bestellcodes, Passwort-Links und Admin-Mails schickt der Support nie; die Person fordert sie selbst neu an. Beiträge, Rundschreiben und Bescheide werden nicht nochmal geschickt (Einwilligung). Jedes Nochmal-Schicken ist eine neue Zeile im Protokoll mit Verweis auf die ursprüngliche Mail und dem Vermerk ‚vom Support‘. Eine Vorschau zeigt die Mail, wie sie heute verschickt würde, mit unkenntlich gemachten Links.“
 - **Umsetzung:** Nr. 167 (freigabe.md §28; keine Migration, Felder aus Nr. 158). Mockups `admin-betrieb-mails-alle`, `mobil-admin-betrieb-mails-alle`, `mobil-admin-betrieb-mails-nochmal` (docs/mockups/README.md).
+- **Ergänzung (uttoranger, im Chat, 25.10.2026):** „Nochmal schicken geht nur für diese Stände:
+  - `gesendet`, auch zugestellt, abgelehnt oder Spam gemeldet
+  - `gescheitert`
+  - `ohne_schluessel` (kommt nur in der Vorschau vor)
+  Nicht für `gesperrt` (nur Test-Adressen erlaubt) oder `verworfen` (abgemeldet oder ohne Einwilligung); dort nennt die Seite den Grund.“
+- **Umsetzung (Ergänzung 25.10.2026):** Nr. 170 Punkt 9 (freigabe.md §29); keine Migration.
+
+### N28 · Warenkorb ehrlich (25.10.2026)
+- **Entscheidung (uttoranger, im Chat, 25.10.2026):** „Die Hofseite gleicht einen gespeicherten Warenkorb beim Laden mit ihrem eigenen Stand ab, ohne Halte zu setzen oder zu erneuern.
+  - Was es nicht mehr gibt, fällt heraus.
+  - Mengen über dem Bestand werden gekürzt.
+  - Geänderte Preise werden übernommen, mit einem Satz im Korb-Blatt bzw. im Mini-Warenkorb.
+  - Bei einer Kaufsperre bleibt der Korb; Blatt und Mini-Warenkorb zeigen die Sperre wie heute.
+  - Die Produktseite gleicht nicht ab.
+  - Wer ein Produkt aus dem Korb nimmt, gibt seinen Halt sofort frei.
+  - Die Kasse nennt den Grund auch dann, wenn nach der Prüfung nichts mehr im Korb liegt.
+  - Verbindlich prüft weiter nur die Kasse.“
+- **Umsetzung:** Nr. 169 (Abgleich, Halt beim Entfernen, Kasse leer mit Grund), Nr. 175 (liest den Stand) (freigabe.md §29); keine Migration.
+
+### N29 · Kein Netz ist ein Zustand (25.10.2026)
+- **Entscheidung (uttoranger, im Chat, 25.10.2026):** „Neben gefüllt, leer, laden und Fehler hat jeder Screen den Zustand ‚kein Netz‘.
+  - Scheitert ein Aufruf am Netz, bleibt die Eingabe stehen. Am Formular bzw. an der Aktion steht ein Satz aus einer Quelle (‚Keine Verbindung – nichts gespeichert. Versuch es gleich noch einmal.‘), dazu ein Knopf ‚Nochmal‘. Nie die ganze Fehlerseite, nie nur ein Toast.
+  - Geht das Netz im Browser verloren, zeigen die Shells unter dem Kopf eine Zeile, bis es zurück ist.
+  - Ein Service Worker mit Cache gehört nicht dazu (eigener Sprint). Kasse und HTML werden nie zwischengespeichert.“
+- **Umsetzung:** Nr. 175 (Zustand und Zeile in den Shells), Nr. 174 (Hof-Formulare) und Nr. 183 (Editor) (freigabe.md §29); keine Migration, kein Paket.
+
+### N30 · Korb ohne Blatt-Pingpong (25.10.2026)
+- **Entscheidung (uttoranger, im Chat, 25.10.2026):** „Auf der Hofseite öffnet nur das erste ‚In den Korb‘ einer Sitzung das Korb-Blatt. Jedes weitere bestätigt mit einer kurzen Zeile (‚… ist im Korb‘, ‚Rückgängig‘), und die Korb-Leiste zählt hoch. Weicht bewusst von mobil-k2-produkte ab; Board SterneHofseiteOrientierung.“
+- **Umsetzung:** Nr. 177 (freigabe.md §29); keine Migration.
+
+### N31 · App-Start nach Sitzung (25.10.2026)
+- **Entscheidung (uttoranger, im Chat, 25.10.2026):** „Die installierte App startet auf /app. Die Route leitet nach der Sitzung weiter:
+  - Hof → /dashboard
+  - Admin ohne Hof → /admin
+  - sonst → /
+  Das Manifest bleibt eines für beide Welten.“
+- **Umsetzung:** Nr. 172 (freigabe.md §29); keine Migration.
 
 ---
 
@@ -788,3 +842,5 @@ Stand Lauf 22 (uttoranger, 22.10.2026): F12 (Bestätigungen aus Lauf 21) und die
 Stand Lauf 23 (uttoranger, 23.10.2026): S17 (Härtung aus der Seitenkarte) und die Ergänzungen zu N20 (frische Bestätigung), Z1 (Land des Stripe-Kontos), N16 (Vorschau beim Bearbeiten) und G8 (eigene Rahmen) sind entschieden und in Nr. 149–157 eingeplant (freigabe.md §27). Lauf 23 hat keine Migration, kein neues Paket und keine neue Variable. Nicht in diesem Lauf: Widerrufsfunktion und Rücktritt nach Abholung (eigener Auftrag nach anwaltlicher Klärung), Datenschutzerklärung Abschnitt 10 (O4), CSP scharf (ab 28.10.), eigenes Geheimnis für Links (eigener Auftrag), Obergrenze je Warenkorb-Sitzung (Entscheidung nach Bericht 150), Servicegebühr und Rolle bei der Zahlung, Aufräumen toter Code.
 
 Stand Lauf 24 (uttoranger, 24.10.2026): N26 (Mails über die Warteschlange) und die Ergänzungen zu N18 (Abrechnungszeitraum, Warnungen, Supabase Pro), N19 (seltener erneuern, Größe messen), N24 (Prüfkette im Warenkorb), S17 (Link-Geheimnis, Bar-Token nur als Hash) und N16 (‚live bis‘) sowie N27 (Mails nochmal schicken) sind entschieden und in Nr. 158–167 eingeplant (freigabe.md §28). Lauf 24 hat eine Migration (158, Expand), kein neues Paket und zwei optionale Variablen (`RESEND_WEBHOOK_SECRET`, `LINK_SECRET`). Nicht in diesem Lauf: Resend Pro (Projektleitung), Hofliste aufteilen (Entscheidung nach 163), Obergrenze je Warenkorb-Sitzung, Widerrufsfunktion, Datenschutzerklärung, CSP scharf, Servicegebühr, toter Code, Nochmal schicken an eine andere Adresse.
+
+Stand Lauf 25 (uttoranger, 25.10.2026): Die Ergänzungen zu N26 (Mail-Auftrag hält keine Bestellung auf, Beträge in Cent, betreiber-bestaetigung Sofort), N27 (Nochmal schicken nicht bei gesperrt oder verworfen) und N16 (eigene Vorschau-Route) sowie N28 (Warenkorb ehrlich), N29 (kein Netz als Zustand), N30 (Korb ohne Blatt-Pingpong), N31 (App-Start nach Sitzung), die E7-Ergänzung (Passkey für Höfe) und S18 (Sitzungsdauer) sind entschieden und in Nr. 168–183 eingeplant (freigabe.md §29); dazu die Regelvorschläge aus Morgenbericht 24. Lauf 25 hat keine Migration, kein neues Paket und keine neue Variable. Nicht in diesem Lauf: Servicegebühr bei Barzahlung ab 1.2.2027 (Entscheidung offen, bis Dezember), Tarifwahl und SEPA, Rücktritt und Widerruf, Datenschutzerklärung über Fakten hinaus, CSP scharf, Service Worker, Paketänderungen, Obergrenze je Warenkorb-Sitzung, Hofliste aufteilen, Rückruf, eine gemeinsame Checkliste.

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { setzeVorrat, type VorratErgebnis } from '@/server/actions/products'
+import { NETZ_SATZ, istNetzFehler } from '@/lib/netz'
 
 export const SPEICHERN_GING_NICHT = 'Wir konnten den Vorrat nicht speichern. Bitte versuch es noch einmal.'
 
@@ -66,8 +67,9 @@ export function erzeugeVorratSchleife(optionen: {
         let ergebnis: VorratErgebnis
         try {
           ergebnis = await setze({ productId, vorher, neu })
-        } catch {
-          ergebnis = { error: SPEICHERN_GING_NICHT }
+        } catch (fehler) {
+          // Am Netz gescheitert: der eine Satz dafür (Register N29), sonst wie bisher.
+          ergebnis = { error: istNetzFehler(fehler) ? NETZ_SATZ : SPEICHERN_GING_NICHT }
         }
         if ('ok' in ergebnis) {
           bestaetigt = ergebnis.vorrat

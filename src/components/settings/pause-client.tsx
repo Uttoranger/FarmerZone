@@ -10,6 +10,7 @@ import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
 import { PAUSENACHRICHT_MAX } from '@/lib/eingabegrenzen'
 import { PAUSE_MELDUNG } from '@/lib/shop-pause'
 import { setPause } from '@/server/actions/farm'
+import { aktionOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
 import { KNOPF_GRUEN, KNOPF_ORANGE_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speichern'
 import { cn } from '@/lib/utils'
@@ -44,7 +45,8 @@ export function PauseClient({
   function handleToggle() {
     const newPaused = !isPaused
     startTransition(async () => {
-      const res = await setPause(newPaused, message)
+      // Ohne Wurf (Register N29): Ohne Netz kommt der Netzsatz, die Nachricht bleibt stehen.
+      const res = await aktionOhneWurf(() => setPause(newPaused, message))
       if (res.error) {
         toast.error(res.error)
       } else {
@@ -58,7 +60,7 @@ export function PauseClient({
 
   function handleSaveMessage() {
     startTransition(async () => {
-      const res = await setPause(isPaused, message)
+      const res = await aktionOhneWurf(() => setPause(isPaused, message))
       if (res.error) {
         toast.error(res.error)
       } else {

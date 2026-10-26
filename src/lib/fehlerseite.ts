@@ -46,7 +46,21 @@ export const PRODUKT_NICHT_GEFUNDEN_TEXT =
 export const FEHLER_TITEL = 'Da ist etwas schiefgelaufen'
 export const FEHLER_TEXT = 'Das liegt an uns, nicht an dir. Deine Bestellungen und Daten sind sicher.'
 
+/**
+ * 500 im Hofbereich (Nr. 175, Board system-sterne-kein-netz, Punkt 4): Die
+ * Seite steht unter dem Layout der Gruppe, die Unterleiste bleibt — darum
+ * führt der Weg zurück zu Heute, nicht zur Startseite der Kundinnen.
+ */
+export const HOF_FEHLER_TEXT = 'Deine Bestellungen und Produkte sind sicher. Probier es gleich noch einmal – oder geh zu Heute.'
+
+/** Der Kicker über der Überschrift beider 500 — mit Fehlernummer, wenn es eine gibt. */
+export function fehlerKicker(fehlernummer?: string): string {
+  const kennung = bereinigeKennung(fehlernummer)
+  return kennung === '' ? 'Fehler 500' : `Fehler 500 · Nr. ${kennung}`
+}
+
 /** Die Knopfbeschriftungen — auch sie gibt es mehrfach. */
+export const ZU_HEUTE = 'Zu Heute'
 export const ZUR_STARTSEITE = 'Zur Startseite'
 export const HOEFE_ENTDECKEN = 'Höfe entdecken'
 export const NOCHMAL_VERSUCHEN = 'Nochmal versuchen'
@@ -66,14 +80,18 @@ export function bereinigeKennung(roh: unknown): string {
   return kennungAusUrlSchema.parse(roh)
 }
 
+/** Der Weg für den Hofbereich zu „Problem melden" (dessen eigener Briefkasten, Nr. 175/176). */
+export const PROBLEM_MELDEN_HOF = '/fehler-melden'
+
 /**
  * Der Link auf „Problem melden", mit der Fehlernummer vorausgefüllt.
  *
  * Ohne brauchbare Nummer der nackte Link — ein leerer Parameter in der URL
- * sagt nichts und sieht aus wie ein Fehler.
+ * sagt nichts und sieht aus wie ein Fehler. Im Hofbereich geht es in dessen
+ * eigenen Briefkasten (`/fehler-melden`, liest dieselbe Kennung).
  */
-export function meldungLinkMitKennung(roh?: unknown): string {
+export function meldungLinkMitKennung(roh?: unknown, pfad: '/problem-melden' | '/fehler-melden' = '/problem-melden'): string {
   const kennung = bereinigeKennung(roh)
-  if (kennung === '') return '/problem-melden'
-  return `/problem-melden?${KENNUNG_PARAMETER}=${encodeURIComponent(kennung)}`
+  if (kennung === '') return pfad
+  return `${pfad}?${KENNUNG_PARAMETER}=${encodeURIComponent(kennung)}`
 }

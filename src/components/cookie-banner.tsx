@@ -98,7 +98,7 @@ export function CookieBanner(): React.JSX.Element | null {
       >
         <div className="flex items-center gap-3 rounded-2xl bg-card p-3 text-[13px] shadow-lg dark:ring-1 dark:ring-border sm:block sm:p-4 sm:text-sm">
           <p className="min-w-0 flex-1 leading-snug text-muted-foreground sm:mb-3 sm:leading-relaxed">
-            Wir verwenden nur technisch notwendige Cookies für Warenkorb und Session.{' '}
+            Wir verwenden nur technisch notwendige Cookies für Anmeldung und Sicherheit. Dein Warenkorb bleibt auf deinem Gerät.{' '}
             {/* Markengrün als Text (brand-text), nicht die Knopffläche: Im neuen
                 Design ist --primary Orange und hätte als Schrift zu wenig Kontrast;
                 im Bestand ist brand-text am Tag derselbe Ton wie primary. */}

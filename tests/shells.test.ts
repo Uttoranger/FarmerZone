@@ -488,8 +488,10 @@ describe('kein Big Bang', () => {
     '(auth)/reset-password/page.tsx',
     // Nr. 114: „Das war ich nicht" (neu, KundeShell ohne Unterleiste wie die Bestätigungsseite).
     'sicherheit/nicht-ich/page.tsx',
-    // Nr. 120: nur der Seitenfuß (KundeFuss, Register N22) — die Seite selbst bleibt bei KundenKopf.
+    // Nr. 120: erst nur der Seitenfuß (KundeFuss, Register N22); seit Nr. 181 trägt die Seite die KundeShell (KundeShellMitSitzung).
     '(public)/datenschutz/page.tsx',
+    // Nr. 182: die Vorschau der Startseite (eigene dynamische Route) — dieselbe KundeShell wie die Startseite.
+    'startseite-vorschau/page.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {
@@ -501,13 +503,15 @@ describe('kein Big Bang', () => {
   })
 
   // Nr. 120 (Register N22): Der Seitenfuß hängt an der KundeShell — jede Route, die sie trägt, hat ihn.
-  // „Fertig, wenn": /hoefe, Hofseite, /bestellungen, /fuer-hoefe und die Startseite; /datenschutz bindet ihn selbst ein.
-  it('Seitenfuß auf jeder Seite der Kundschaft: über die KundeShell, /datenschutz selbst', () => {
+  // „Fertig, wenn": /hoefe, Hofseite, /bestellungen, /fuer-hoefe, die Startseite und (seit Nr. 181) /datenschutz.
+  it('Seitenfuß auf jeder Seite der Kundschaft: über die KundeShell — auch /datenschutz', () => {
     const mitKundeShell = UMGESTELLT.filter((p) => /\bKundeShell(MitSitzung)?\b/.test(readFileSync(join(wurzel, p), 'utf8')))
     for (const p of ['page.tsx', '(public)/hoefe/page.tsx', '(public)/[farmSlug]/page.tsx', '(public)/bestellungen/page.tsx', '(public)/fuer-hoefe/page.tsx']) {
       expect(mitKundeShell, p).toContain(p)
     }
-    expect(readFileSync(join(wurzel, '(public)/datenschutz/page.tsx'), 'utf8')).toMatch(/<KundeFuss \/>/)
+    // Der Fuß steht einmal, in der Shell: Die Seite bindet ihn nicht selbst ein (sonst stünde er doppelt).
+    expect(mitKundeShell).toContain('(public)/datenschutz/page.tsx')
+    expect(readFileSync(join(wurzel, '(public)/datenschutz/page.tsx'), 'utf8')).not.toMatch(/<KundeFuss\b/)
     expect(readFileSync(join(process.cwd(), 'src/components/shells/kunde-shell.tsx'), 'utf8')).toMatch(/<KundeFuss\b/)
     // Gegenprobe: Eine Seite nur mit der Fokus-Shell zählt nicht.
     expect(/\bKundeShell(MitSitzung)?\b/.test("import { KundeFokusShell } from '@/components/shells/kunde-shell'")).toBe(false)
@@ -559,8 +563,9 @@ describe('kein Big Bang', () => {
     for (const shell of ['hof-shell', 'kunde-shell', 'admin-shell']) expect(text).toContain(`@/components/shells/${shell}'`)
   })
 
-  it('die Bestandslayouts bleiben bei ihrer Navigation', () => {
-    expect(readFileSync(join(wurzel, '(farmer)/layout.tsx'), 'utf8')).toContain('<FarmerNav')
-    expect(readFileSync(join(wurzel, '(farmer)/layout.tsx'), 'utf8')).not.toContain('data-design')
+  it('die Druckseiten (Papier) tragen keine Shell und keine Navigation', () => {
+    const druck = readFileSync(join(wurzel, '(druck)/layout.tsx'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+    expect(druck).not.toMatch(/FarmerNav|HofShell|KundeShell/)
+    expect(druck).toContain('data-design="neu"')
   })
 })

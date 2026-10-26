@@ -28,6 +28,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, createElement, type ComponentProps, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BROWSER_OBJEKTE, hydriere, pruefeHydrieren, raeumeHydrierenAuf } from './hydrieren-hilfe'
+import { NetzHinweis } from '@/components/ui/netz-hinweis'
+import { NETZ_ZEILE } from '@/lib/netz'
 
 // Attrappen wie in tests/mein-hof-umschalter.test.ts: Die Adresse liest useSearchParams aus `adresse`.
 const adresse = { suche: '' }
@@ -68,13 +70,13 @@ import { Abholzeile } from '@/components/hoefe/abholzeile'
 import { BeitragMarke } from '@/components/hoefe/beitrag-marke'
 import { ThemeUmschalter, ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
 import { CookieBanner } from '@/components/cookie-banner'
-import { KundenKopf } from '@/components/shared/kunden-kopf'
+import { useWarenkorbKopf } from '@/lib/use-warenkorb-kopf'
 import { MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
 import { StartbildschirmKarte } from '@/components/heute/startbildschirm-karte'
 import { STARTBILDSCHIRM_KARTE } from '@/lib/startbildschirm'
 import { MEIN_HOF_ANSICHT_TEXT } from '@/lib/mein-hof-ansicht'
 import { WARENKORB_SCHLUESSEL } from '@/lib/warenkorb-speicher'
-import { useCart } from '@/lib/use-cart'
+import { useCart, useKorbHinweis, zeigeKorbHinweis } from '@/lib/use-cart'
 import { useHoefeAdresse } from '@/components/hoefe/use-hoefe-adresse'
 import { useMindestbreite, useSchmalerAls } from '@/lib/use-mindestbreite'
 import { DarstellungKarte } from '@/app/(hof)/settings/account/darstellung-karte'
@@ -195,6 +197,21 @@ describe('Hydrieren – Teile mit dem Darstellungsmodus des Browsers', () => {
   })
 })
 
+describe('Hydrieren – die Netz-Zeile (Register N29, Nr. 175)', () => {
+  it('NetzHinweis: im Server-HTML keine Zeile, offline erscheint sie erst nach dem Hydrieren', async () => {
+    const ergebnis = await pruefeHydrieren(createElement(NetzHinweis), {
+      imBrowser: () => Object.defineProperty(navigator, 'onLine', { value: false, configurable: true }),
+    })
+    try {
+      expect(ergebnis.serverHtml).not.toContain(NETZ_ZEILE)
+      expect(ergebnis.meldungen).toEqual([])
+      expect(ergebnis.container.textContent).toBe(NETZ_ZEILE)
+    } finally {
+      Reflect.deleteProperty(navigator, 'onLine')
+    }
+  })
+})
+
 describe('Hydrieren – Teile mit dem Browser-Speicher', () => {
   /** Die Messung des Cookie-Hinweises läuft über Bildaufbau und Beobachter — fürs Hydrieren ohne Belang. */
   function ohneMessung(): void {
@@ -218,7 +235,12 @@ describe('Hydrieren – Teile mit dem Browser-Speicher', () => {
   it('Kopfzeile: die Zahl im Warenkorb kommt aus dem Speicher des Browsers, nicht aus dem Server-HTML', async () => {
     const position = { productId: 'p-eier', name: 'Eier', price: 3.2, unit: 'piece', unitSize: null, imageUrl: null }
     const korb = { farmId: 'hof-a', farmSlug: 'testhof-a', items: [{ ...position, quantity: 2 }, { ...position, productId: 'p-brot', quantity: 3 }] }
-    const ergebnis = await pruefeHydrieren(createElement(KundenKopf, { seite: { art: 'hofuebersicht' } }), {
+    // Das Symbol der Kopfzeile (KundeShell) liest den Korb über useWarenkorbKopf — hier nur dessen Anzeige.
+    function KorbSymbol(): React.JSX.Element | null {
+      const korb = useWarenkorbKopf()
+      return korb ? createElement('a', { href: korb.href, 'aria-label': `Warenkorb: ${korb.anzahl} Artikel — zum Hof` }) : null
+    }
+    const ergebnis = await pruefeHydrieren(createElement(KorbSymbol), {
       imBrowser: () => localStorage.setItem(WARENKORB_SCHLUESSEL, JSON.stringify(korb)),
     })
     expect(ergebnis.serverHtml).not.toContain('Warenkorb:')
@@ -236,6 +258,15 @@ describe('Hydrieren – Teile mit dem Browser-Speicher', () => {
     })
     expect(ergebnis.serverHtml).toContain('Korb: 0 (noch nicht gelesen)')
     expect(ergebnis.container.textContent).toBe('Korb: 4 (gelesen)')
+  })
+
+  it('useKorbHinweis (Nr. 169): der Satz des Abgleichs steht nie im Server-HTML, nach dem Hydrieren der des Browsers', async () => {
+    function Satz(): React.JSX.Element {
+      return createElement('p', null, `Satz: ${useKorbHinweis('hof-hinweis') ?? 'keiner'}`)
+    }
+    const ergebnis = await pruefeHydrieren(createElement(Satz), { imBrowser: () => zeigeKorbHinweis('hof-hinweis', 'Ein Preis hat sich geändert.') })
+    expect(ergebnis.serverHtml).toContain('Satz: keiner')
+    expect(ergebnis.container.textContent).toBe('Satz: Ein Preis hat sich geändert.')
   })
 })
 
@@ -407,7 +438,7 @@ describe('Hydrieren – die Hofübersicht /hoefe', () => {
  * Datei → die Teile, die ihren Hydrier-Fall tragen (Komponente oder Hook, wie sie oben im Test stehen). Ein Hook, den nur
  * Bauteile aus anderen Dateien benutzen (`use-uhr.ts`), steht mit den Bauteilen, die ihn im Fall zeigen. Hat eine Datei
  * mehrere Aufrufe von useSyncExternalStore, nennt sie mindestens ebenso viele Teile (`use-warenkorb-kopf.ts`: das Symbol
- * der Kopfzeile über `KundenKopf`, der Mini-Warenkorb über `useWarenkorbVomHof`).
+ * der Kopfzeile über `useWarenkorbKopf`, der Mini-Warenkorb über `useWarenkorbVomHof`).
  */
 const GEPRUEFT: Record<string, string[]> = {
   'src/app/(hof)/settings/account/darstellung-karte.tsx': ['DarstellungKarte'],
@@ -419,9 +450,10 @@ const GEPRUEFT: Record<string, string[]> = {
   'src/components/hoefe/use-uhr.ts': ['Abholzeile', 'BeitragMarke'],
   'src/components/shared/theme-umschalter.tsx': ['ThemeUmschalter', 'ThemeUmschalterZeile'],
   'src/components/shared/use-meldung-formular.ts': ['useMeldungFormular'],
-  'src/lib/use-cart.ts': ['useCart'],
+  'src/components/ui/netz-hinweis.tsx': ['NetzHinweis'],
+  'src/lib/use-cart.ts': ['useCart', 'useKorbHinweis'],
   'src/lib/use-mindestbreite.ts': ['useMindestbreite', 'useSchmalerAls'],
-  'src/lib/use-warenkorb-kopf.ts': ['KundenKopf', 'useWarenkorbVomHof'],
+  'src/lib/use-warenkorb-kopf.ts': ['useWarenkorbKopf', 'useWarenkorbVomHof'],
 }
 
 /** Datei → Grund, warum es für sie keinen Hydrier-Fall gibt. Heute keine; ein Eintrag braucht einen Satz und kommt in den Bericht. */

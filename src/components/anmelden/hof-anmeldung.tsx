@@ -3,16 +3,24 @@
 import { useId, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { FlaskConical, Loader2 } from 'lucide-react'
+import { FlaskConical, KeyRound, Loader2 } from 'lucide-react'
 import { signIn } from '@/lib/auth-client'
 import { anmeldeFehlerVon, passwortZuVieleText, zielNachHofAnmeldung } from '@/lib/anmeldecode'
 import { ADMIN_ANMELDEN_TEXT, ADMIN_PFAD } from '@/lib/admin-anmeldung'
+import { HOF_PASSKEY_ANMELDEN, hofPasskeyFehlerText } from '@/lib/hof-passkey'
+import { NETZ_SATZ, istNetzFehler } from '@/lib/netz'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { PasswordInput } from '@/components/ui/password-input'
 import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_ORANGE, TEXTKNOPF } from '@/components/anmelden/stil'
 
 const IS_DEV = process.env.NODE_ENV === 'development'
+
+/** „Mit Passkey anmelden" neben dem Passwort: Umriss, damit „Anmelden" die eine Hauptaktion bleibt. */
+const KNOPF_PASSKEY = cn(
+  'inline-flex h-12 w-full items-center justify-center gap-2 rounded-full border border-border bg-card px-[18px] text-sm font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted disabled:opacity-60',
+  FOKUS_RAHMEN
+)
 
 const DEV_ACCOUNTS = [
   { label: 'Bauer Franz (Hof Müller)', email: 'bauer@example.com', password: 'test1234' },
@@ -26,6 +34,8 @@ const DEV_ACCOUNTS = [
  * Pfade des Hofbereichs aus ?von=), der Schnellzugang nur in
  * der Entwicklungsumgebung. Neu ist nur die Gestalt. Die optionale Prop `ziel`
  * (Nr. 157, /verify seit Nr. 164) legt das Ziel nach der Anmeldung fest; ohne sie gilt `?von=`.
+ * Seit Nr. 179 (E7, Ergänzung) darunter „Mit Passkey anmelden" für Höfe mit
+ * Passkey — ohne E-Mail-Feld, den Rest fragt der Browser; das Passwort bleibt.
  */
 export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}): React.JSX.Element {
   const router = useRouter()
@@ -37,6 +47,9 @@ export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}
   const [password, setPassword] = useState('')
   const [fehler, setFehler] = useState('')
   const [laedt, setLaedt] = useState(false)
+  const [passkeyLaeuft, setPasskeyLaeuft] = useState(false)
+  // Eigener Satz unter dem Passkey-Knopf: E-Mail und Passwort sind dabei nicht falsch.
+  const [passkeyFehler, setPasskeyFehler] = useState('')
 
   function weiter(): void {
     // `ziel` ist fest im Code gesetzt (Karte nach dem Bestätigen), nie aus der Adresse.
@@ -54,6 +67,26 @@ export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}
       return
     }
     weiter()
+  }
+
+  async function mitPasskey(): Promise<void> {
+    setPasskeyLaeuft(true)
+    setFehler('')
+    setPasskeyFehler('')
+    try {
+      // Der Passkey-Client erst beim Klick: @simplewebauthn/browser gehört nicht in die Anmeldeseite jeder Kundin.
+      const { passkeySignIn } = await import('@/lib/auth-client-passkey')
+      const { error } = await passkeySignIn.passkey()
+      if (error) {
+        setPasskeyFehler(hofPasskeyFehlerText(error))
+        return
+      }
+      weiter()
+    } catch (err) {
+      setPasskeyFehler(istNetzFehler(err) ? NETZ_SATZ : hofPasskeyFehlerText(null))
+    } finally {
+      setPasskeyLaeuft(false)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent): Promise<void> {
@@ -106,7 +139,7 @@ export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}
             required
             aria-invalid={fehler ? true : undefined}
             aria-describedby={fehler ? fehlerId : undefined}
-            className={cn(FELD, 'pr-10')}
+            feld={FELD}
           />
         </div>
 
@@ -116,7 +149,7 @@ export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}
           </p>
         )}
 
-        <button type="submit" disabled={laedt} className={KNOPF_ORANGE}>
+        <button type="submit" disabled={laedt || passkeyLaeuft} className={KNOPF_ORANGE}>
           {laedt ? (
             <>
               <Loader2 className="size-4 animate-spin" strokeWidth={1.7} aria-hidden="true" />
@@ -127,6 +160,25 @@ export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}
           )}
         </button>
       </form>
+
+      <div className="flex items-center gap-3 text-[12.5px] text-muted-foreground" aria-hidden="true">
+        <span className="h-px flex-1 bg-border" />
+        {HOF_PASSKEY_ANMELDEN.oder}
+        <span className="h-px flex-1 bg-border" />
+      </div>
+      <button type="button" onClick={() => void mitPasskey()} disabled={laedt || passkeyLaeuft} aria-busy={passkeyLaeuft || undefined} className={KNOPF_PASSKEY}>
+        {passkeyLaeuft ? (
+          <Loader2 className="size-4 animate-spin" strokeWidth={1.7} aria-hidden="true" />
+        ) : (
+          <KeyRound className="size-4" strokeWidth={1.7} aria-hidden="true" />
+        )}
+        {passkeyLaeuft ? HOF_PASSKEY_ANMELDEN.laeuft : HOF_PASSKEY_ANMELDEN.knopf}
+      </button>
+      {passkeyFehler && (
+        <p role="alert" aria-live="polite" className={FEHLER_TEXT}>
+          {passkeyFehler}
+        </p>
+      )}
 
       <div className="flex flex-wrap justify-between gap-x-2">
         <Link href="/forgot-password" className={TEXTKNOPF}>

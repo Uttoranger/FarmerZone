@@ -5,7 +5,6 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,8 +15,11 @@ import {
   sucheHofStandort,
   type ProfileFormData,
 } from '@/server/actions/farm'
-import { speichereProfil, speichernOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
-import { DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
+import { aktionOhneWurf, meldeGescheitertesSpeichern, speichereProfil, speichernOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
+import { FeldFehlerSatz, SpeicherFehler, feldFehlerAttribute, hilfeKennung } from '@/components/shared/formular-meldungen'
+import { FELD_ATTRIBUTE, enterTaste, weiterMitEnter } from '@/lib/feld-attribute'
+import { FREIWILLIG, HOF_EMAIL_HILFE } from '@/lib/profil-meldungen'
+import { NETZ_SATZ } from '@/lib/netz'
 import { geaendertSeitLaden, profilWieImSchema } from '@/lib/abschnitt-stand'
 import type { FarmSettings } from '@/server/queries/farm'
 import {
@@ -69,6 +71,8 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
   // Ein Fehler beim Speichern steht im Formular über dem Knopf, die Eingabe
   // bleibt — wie in den Formularen von Mein Hof (DESIGN_SYSTEM).
   const [speicherFehler, setSpeicherFehler] = useState<string | null>(null)
+  // Die Ortssuche ist kein Speichern, aber derselbe Fall: ein Fehler ohne Feld – Karte am Formular, kein Toast.
+  const [sucheFehler, setSucheFehler] = useState<string | null>(null)
   // Die ruhige Zeile über der Karte: anfangs der Start-Hinweis (solange kein
   // Punkt gespeichert ist), danach das Vorwärts-Ergebnis oder die
   // Übernahme-Zeile der Rückwärtssuche.
@@ -97,8 +101,8 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
   // gespeichert wurde, sperrt das Speichern nicht — am Feld steht dann
   // „Bitte kürzen", geprüft wird beim Speichern (src/schemas/hofprofil.ts).
   const schema = useMemo(
-    () => profilBearbeitenSchema({ name: farm.name, ownerName: farm.ownerName, phone: farm.phone }),
-    [farm.name, farm.ownerName, farm.phone]
+    () => profilBearbeitenSchema({ name: farm.name, ownerName: farm.ownerName, phone: farm.phone, email: farm.email }),
+    [farm.name, farm.ownerName, farm.phone, farm.email]
   )
   // Der Stand beim Laden: Startwerte des Formulars und Maßstab dafür, was
   // dieses Formular ändert (geaendertSeitLaden, siehe onSubmit).
@@ -162,6 +166,9 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
     })
   }
 
+  // „Nochmal" am Netzsatz (Register N29): dasselbe Speichern noch einmal, die Eingabe stand die ganze Zeit.
+  const nochmalSpeichern = () => void handleSubmit(onSubmit)()
+
   /** Jede vom Bauern gewählte Kartenmitte wird zum Formularwert — erkennbar
    *  ungespeichert wie jedes andere geänderte Feld, bis „Profil speichern". */
   function punktGewaehlt(lat: number, lon: number) {
@@ -172,18 +179,22 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
   async function aufKarteSuchen() {
     if (sucheLaeuft) return
     setSucheLaeuft(true)
+    setSucheFehler(null)
     try {
       const werte = getValues()
-      const res = await sucheHofStandort({
-        address: werte.address,
-        postalCode: werte.postalCode,
-        city: werte.city,
-        // Das gerade GEWÄHLTE Land, nicht das gespeicherte: Wer eben auf
-        // Deutschland umgestellt hat, sucht sofort dort.
-        country: land,
-      })
+      // aktionOhneWurf: Ohne Netz würfe der Aufruf, und die Suche bliebe ohne Antwort.
+      const res = await aktionOhneWurf(() =>
+        sucheHofStandort({
+          address: werte.address,
+          postalCode: werte.postalCode,
+          city: werte.city,
+          // Das gerade GEWÄHLTE Land, nicht das gespeicherte: Wer eben auf
+          // Deutschland umgestellt hat, sucht sofort dort.
+          country: land,
+        })
+      )
       if ('error' in res) {
-        toast.error(res.error)
+        setSucheFehler(res.error)
         return
       }
       const ergebnis = res.ergebnis
@@ -212,7 +223,15 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
   async function adresseVomPunkt(lat: number, lon: number) {
     anfrageFolge.current += 1
     const meineFolge = anfrageFolge.current
-    const punkt = await holeAdresseZumPunkt(lat, lon)
+    // Scheitern bleibt stumm (der Hof tippt die Adresse selbst) – aber ohne Wurf, auch ohne Netz.
+    let punkt: Awaited<ReturnType<typeof holeAdresseZumPunkt>>
+    try {
+      punkt = await holeAdresseZumPunkt(lat, lon)
+    } catch (fehler) {
+      // Stumm für den Hof, nicht für uns: Sentry bekommt die gescheiterte Anfrage.
+      meldeGescheitertesSpeichern(fehler)
+      return
+    }
     if (!punkt || anfrageFolge.current !== meineFolge) return
 
     const bisher = {
@@ -229,39 +248,61 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
     setHinweis(HINWEIS_ADRESSE_UEBERNOMMEN)
   }
 
-  function field(id: 'name' | 'ownerName' | 'address' | 'phone' | 'email' | 'betriebsnummer', label: string, placeholder?: string) {
+  const istAttributFeld = (id: FeldId): id is FeldId & keyof typeof FELD_ATTRIBUTE => id in FELD_ATTRIBUTE
+  type FeldId = 'name' | 'ownerName' | 'address' | 'phone' | 'email' | 'betriebsnummer'
+  /**
+   * Ein Textfeld mit Fehlersatz am Feld (aria-invalid, aria-describedby, role="alert"),
+   * den Attributen aus FELD_ATTRIBUTE und der Taste unten rechts am Handy. Pflicht ist
+   * der Normalfall; was freiwillig ist, sagt „(freiwillig)" am Namen.
+   */
+  function field(
+    id: FeldId,
+    label: string,
+    { placeholder, hilfe, letztes }: { placeholder?: string; hilfe?: string; letztes?: boolean } = {}
+  ) {
     const max = GRENZE[id]
+    const attribute = istAttributFeld(id) ? FELD_ATTRIBUTE[id] : undefined
     return (
       <div>
         <Label htmlFor={id} className="text-sm text-muted-foreground mb-1 block">{label}</Label>
         <Input
           id={id}
           {...register(id)}
+          {...attribute}
+          enterKeyHint={enterTaste(letztes === true)}
           placeholder={placeholder}
+          {...feldFehlerAttribute(id, Boolean(errors[id]), Boolean(hilfe))}
           className={errors[id] ? 'min-h-11 border-status-offen' : 'min-h-11'}
         />
         {max !== undefined && <FeldZaehler control={control} name={id} max={max} />}
-        {errors[id] && <p className="mt-1 text-xs text-status-offen">{errors[id]?.message}</p>}
+        {hilfe && (
+          <p id={hilfeKennung(id)} className="mt-1 text-xs text-muted-foreground">
+            {hilfe}
+          </p>
+        )}
+        <FeldFehlerSatz feldId={id} text={errors[id]?.message} />
       </div>
     )
   }
 
+  // noValidate: Mit type="email" prüfte sonst der Browser zuerst – mit englischer Blase und ohne unsere Sätze am Feld.
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form noValidate onSubmit={handleSubmit(onSubmit)} onKeyDown={weiterMitEnter} className="space-y-6">
       <div className="bg-card rounded-xl border border-border p-4 space-y-4">
         <h2 className="font-medium text-foreground">Hof-Informationen</h2>
-        {field('name', 'Hof-Name *', 'Hof Müller')}
-        {field('ownerName', 'Name des Inhabers *', 'Klaus Müller')}
+        {field('name', 'Hof-Name', { placeholder: 'Hof Müller' })}
+        {field('ownerName', 'Name des Inhabers', { placeholder: 'Klaus Müller' })}
         <div>
-          <Label htmlFor="description" className="text-sm text-muted-foreground mb-1 block">Beschreibung *</Label>
+          <Label htmlFor="description" className="text-sm text-muted-foreground mb-1 block">Beschreibung {FREIWILLIG}</Label>
           <Textarea
             id="description"
             {...register('description')}
             rows={4}
             placeholder="Beschreibe deinen Hof für Kunden..."
+            {...feldFehlerAttribute('description', Boolean(errors.description))}
             className={errors.description ? 'border-status-offen' : ''}
           />
-          {errors.description && <p className="mt-1 text-xs text-status-offen">{errors.description.message}</p>}
+          <FeldFehlerSatz feldId="description" text={errors.description?.message} />
         </div>
       </div>
 
@@ -272,7 +313,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
             gelesen werden (vier- oder fünfstellig, Nominatim-Anker) — es
             danach zu fragen, wäre die falsche Reihenfolge. */}
         <div>
-          <Label htmlFor="country" className="text-sm text-muted-foreground mb-1 block">Land *</Label>
+          <Label htmlFor="country" className="text-sm text-muted-foreground mb-1 block">Land</Label>
           {/* Der eigene onChange DARF den von react-hook-form nicht
               ersetzen: `register` gibt beide Handler unter demselben Namen
               zurück, das spätere JSX-Prop gewänne — der Formularwert käme
@@ -287,7 +328,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
               landFeld.onChange(e)
               setLand(alsLand(e.target.value))
             }}
-            className="min-h-11 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground"
+            className="min-h-11 w-full rounded-lg border border-border bg-card px-3 text-base text-foreground"
           >
             {LAENDER.map((wert) => (
               <option key={wert} value={wert}>
@@ -310,32 +351,38 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
           </p>
         )}
 
-        {field('address', 'Straße und Hausnummer *', 'Dorfstraße 12')}
+        {field('address', 'Straße und Hausnummer', { placeholder: 'Dorfstraße 12' })}
         <div className="grid grid-cols-2 gap-3">
           <div>
             {/* Neutral beschriftet und ohne länderfestes Beispiel: „3400" wäre
                 für einen deutschen Hof eine falsche Vorgabe. */}
-            <Label htmlFor="postalCode" className="text-sm text-muted-foreground mb-1 block">Postleitzahl *</Label>
+            <Label htmlFor="postalCode" className="text-sm text-muted-foreground mb-1 block">Postleitzahl</Label>
             {/* Das Beispiel folgt dem Land — „3400" wäre für einen
                 deutschen Hof eine falsche Vorgabe, gar keines wäre für
                 beide eine verlorene Ausfüllhilfe. */}
             <Input
               id="postalCode"
               {...register('postalCode')}
+              {...FELD_ATTRIBUTE.postalCode}
+              enterKeyHint={enterTaste(false)}
               placeholder={land === 'DE' ? '84359' : '3400'}
+              {...feldFehlerAttribute('postalCode', Boolean(errors.postalCode))}
               className={errors.postalCode ? 'min-h-11 border-status-offen' : 'min-h-11'}
             />
-            {errors.postalCode && <p className="mt-1 text-xs text-status-offen">{errors.postalCode.message}</p>}
+            <FeldFehlerSatz feldId="postalCode" text={errors.postalCode?.message} />
           </div>
           <div>
-            <Label htmlFor="city" className="text-sm text-muted-foreground mb-1 block">Ort *</Label>
+            <Label htmlFor="city" className="text-sm text-muted-foreground mb-1 block">Ort</Label>
             <Input
               id="city"
               {...register('city')}
+              {...FELD_ATTRIBUTE.city}
+              enterKeyHint={enterTaste(false)}
               placeholder={land === 'DE' ? 'Simbach am Inn' : 'Klosterneuburg'}
+              {...feldFehlerAttribute('city', Boolean(errors.city))}
               className={errors.city ? 'min-h-11 border-status-offen' : 'min-h-11'}
             />
-            {errors.city && <p className="mt-1 text-xs text-status-offen">{errors.city.message}</p>}
+            <FeldFehlerSatz feldId="city" text={errors.city?.message} />
           </div>
         </div>
         {/* Der EINZIGE Auslöser der Vorwärts-Suche — bewusst eine Schaltfläche,
@@ -350,6 +397,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
           {sucheLaeuft && <Loader2 className="size-4 animate-spin" />}
           Auf der Karte suchen
         </button>
+        <SpeicherFehler text={sucheFehler} nochmal={sucheFehler === NETZ_SATZ} onNochmal={() => void aufKarteSuchen()} laeuft={sucheLaeuft} />
 
         {/* Die Karte dauerhaft unter den Adressfeldern — beide Richtungen:
             Die Suche fährt die Karte, das Schieben füllt die Adresse. Die
@@ -370,8 +418,8 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
 
       <div className="bg-card rounded-xl border border-border p-4 space-y-4">
         <h2 className="font-medium text-foreground">Kontakt</h2>
-        {field('phone', 'Telefon *', '+43 660 000 0000')}
-        {field('email', 'E-Mail *', 'hof@beispiel.at')}
+        {field('phone', 'Telefon', { placeholder: '+43 660 000 0000' })}
+        {field('email', farm.email ? 'Hof-E-Mail' : `Hof-E-Mail ${FREIWILLIG}`, { placeholder: 'hof@beispiel.at', hilfe: HOF_EMAIL_HILFE })}
       </div>
 
       {/* Betriebsnummer (Sprint Bereiche 1): gehört dem Hof, nicht einem
@@ -395,7 +443,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
               statusFeld.onChange(e)
               setStatus(e.target.value === '' ? null : (e.target.value as BetriebsstatusValue))
             }}
-            className="min-h-11 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground"
+            className="min-h-11 w-full rounded-lg border border-border bg-card px-3 text-base text-foreground"
           >
             <option value="">Keine Angabe</option>
             {BETRIEBSSTATUS_VALUES.map((s) => (
@@ -410,7 +458,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
               : 'LFBIS-Nummer, BAES- bzw. BVL-Registrierung oder α-Nummer — je nachdem, was du mit Futter machst.'}
           </p>
         </div>
-        {field('betriebsnummer', 'Betriebsnummer', 'z. B. AT 1234567')}
+        {field('betriebsnummer', 'Betriebsnummer', { placeholder: 'z. B. AT 1234567', letztes: true })}
       </div>
 
       <p className="text-sm text-muted-foreground">
@@ -427,7 +475,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         — dort lädst du Bilder direkt vom Gerät hoch.
       </p>
 
-      <DialogFehler text={speicherFehler} />
+      <SpeicherFehler text={speicherFehler} nochmal={speicherFehler === NETZ_SATZ} onNochmal={nochmalSpeichern} laeuft={isPending} />
 
       {/* Wartet, solange „Auf der Karte suchen" läuft — sonst ginge der neue Standort verloren (siehe onSubmit). */}
       <Button

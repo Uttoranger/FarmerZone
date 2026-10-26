@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Pause } from 'lucide-react'
 import { setPause } from '@/server/actions/farm'
+import { aktionOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
 import { PAUSENACHRICHT_MAX } from '@/lib/eingabegrenzen'
 import { PAUSE_MELDUNG } from '@/lib/shop-pause'
 import { Sheet, SheetBlatt, SheetClose, SheetTitle } from '@/components/ui/sheet'
@@ -66,7 +67,8 @@ export function PausierenBlatt({
   function fortsetzen() {
     startTransition(async () => {
       // Mit der gespeicherten Nachricht: Sie bleibt für die nächste Pause stehen (setPause).
-      const res = await setPause(false, gespeicherteNachricht ?? '')
+      // Ohne Wurf (Register N29): Ohne Netz kommt der Netzsatz statt der Fehlerseite.
+      const res = await aktionOhneWurf(() => setPause(false, gespeicherteNachricht ?? ''))
       if (res.error) {
         toast.error(res.error)
         return
@@ -78,7 +80,7 @@ export function PausierenBlatt({
 
   function pausieren() {
     startTransition(async () => {
-      const res = await setPause(true, nachricht)
+      const res = await aktionOhneWurf(() => setPause(true, nachricht))
       if (res.error) {
         // Im Blatt, die Eingabe bleibt; der Zustand ist unverändert.
         setFehler(res.error)

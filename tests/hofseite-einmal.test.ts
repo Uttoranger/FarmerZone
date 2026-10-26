@@ -149,7 +149,7 @@ function erlaubt(fund: Fund, text: string): boolean {
     return imImport || imRumpf(code, 'export async function ansichtsModus(', fund.stelle)
   }
   // Die Vorschau der STARTSEITE (Register N16, Nr. 96) ist ein eigener, signierter Parameter derselben
-  // Schreibweise (/?vorschau=…&sig=…, Freigabe §18): geschrieben nur in alsAbfrage (aus geprüften Werten),
+  // Schreibweise (/startseite-vorschau?vorschau=…&sig=…, Freigabe §18, Route seit Nr. 182): geschrieben nur in alsAbfrage (aus geprüften Werten),
   // gelesen nur über vorschauParameterSchema — die Hofseite und ansichtsModus berührt er nicht.
   if (fund.pfad === 'src/server/startseite-vorschau.ts') {
     return fund.art === 'Adresse im Text' && imRumpf(code, 'function alsAbfrage(', fund.stelle)
@@ -224,11 +224,13 @@ describe('der Parameter „vorschau" wird nur in ansichtsModus() gelesen', () =>
   }, 30_000)
 
   it('außerhalb von src/ nur die Header-Regeln in next.config.ts — sie geben das Einbetten frei, sonst nichts', () => {
-    const konfiguration = ohneKommentare(quelle('next.config.ts'))
-    // Zwei Regeln: die Hofseite mit ?vorschau=1 und die Startseite mit ihrem signierten ?vorschau (N16, Nr. 96).
+    // Der Pfad der Vorschau-Route der Startseite (Nr. 182) ist kein Parameter — er zählt hier nicht.
+    const konfiguration = ohneKommentare(quelle('next.config.ts')).replaceAll('startseite-vorschau', 'PFAD')
+    // Zwei Regeln: die Hofseite mit ?vorschau=1 und die Vorschau-Route der Startseite mit ihrem signierten
+    // ?vorschau UND ?sig (N16, Nr. 96; eigene Route seit Nr. 182).
     expect([...konfiguration.matchAll(/vorschau/g)]).toHaveLength(2)
     expect(konfiguration).toContain("has: [{ type: 'query', key: 'vorschau', value: '1' }]")
-    expect(konfiguration).toContain("has: [{ type: 'query', key: 'vorschau' }]")
+    expect(konfiguration).toMatch(/source: '\/PFAD',\s*has: \[\s*\{ type: 'query', key: 'vorschau' \},\s*\{ type: 'query', key: 'sig' \},?\s*\]/)
   })
 
   it('ansichtsModus läuft nur auf dem Server: aufgerufen im Lader und in der Prüfung davor, von keinem Client-Modul eingebunden', () => {

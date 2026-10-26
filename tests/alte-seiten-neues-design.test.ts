@@ -7,7 +7,7 @@
  *    Impressum, Konditionen, Problem melden und die beiden 404; die
  *    Fokus-Shell für die Bar-Bestätigung und die Passwort-Seiten. Mit
  *    Gegenprobe, dass die Suche anschlägt.
- *  - Der alte Kopf (KundenKopf) steht nur noch auf /datenschutz (Nr. 57).
+ *  - Der alte Kopf (KundenKopf) ist entfernt (Nr. 181; /datenschutz war die letzte Seite).
  *  - Die Seiten mit Token in der Adresse bleiben aus dem Suchindex
  *    (Metadaten); die Header prüft tests/sicherheits-header.test.ts. Der
  *    Token von /reset-password steht im Formular nur an den erwarteten
@@ -100,7 +100,7 @@ describe('Shell je Seite (Nr. 54)', () => {
   })
 })
 
-describe('Der alte Kopf — nur noch auf /datenschutz (zieht mit Nr. 57 um)', () => {
+describe('Der alte Kopf — nirgends mehr (zog mit Nr. 181 als Letzter um)', () => {
   /** Alle Dateien unter src/app, die KundenKopf rendern. */
   function kopfNutzer(): string[] {
     const ergebnis: string[] = []
@@ -117,8 +117,9 @@ describe('Der alte Kopf — nur noch auf /datenschutz (zieht mit Nr. 57 um)', ()
     return ergebnis.sort()
   }
 
-  it('rendert KundenKopf nirgends sonst — die Suche findet den Datenschutz (Gegenprobe)', () => {
-    expect(kopfNutzer()).toEqual(['src/app/(public)/datenschutz/page.tsx'])
+  it('rendert KundenKopf nirgends — die Suche findet ihn aber, wo er stünde (Gegenprobe)', () => {
+    expect(kopfNutzer()).toEqual([])
+    expect(/<KundenKopf\b/.test('<KundenKopf seite={{ art: \'x\' }} />')).toBe(true)
   })
 })
 
@@ -292,12 +293,12 @@ describe('Kontrast und Touch-Ziele (Befunde der Axe-Prüfung)', () => {
 
   it('der Auge-Knopf der Passwortseite ist 44 px groß, benannt und meldet seinen Zustand', () => {
     const text = lies('src/app/(auth)/reset-password/neues-passwort-formular.tsx')
-    // Nicht das gemeinsame PasswordInput (Knopf 16 px).
-    expect(text).not.toMatch(/from '@\/components\/ui\/password-input'/)
-    expect(text).toMatch(/flex size-11 items-center justify-center/)
-    expect(text).toMatch(/aria-pressed=\{sichtbar\}/)
-    expect(text).toMatch(/aria-label=\{sichtbar \? 'Passwort verbergen' : 'Passwort anzeigen'\}/)
-    expect(anzahl(text, /<PasswortFeld\b/)).toBe(2)
+    // Seit Nr. 173 das gemeinsame PasswordInput (44 px, aria-pressed; tests/grundbausteine-groesse.test.ts)
+    // in der Feldform der Anmeldung — keine eigene Kopie mehr.
+    expect(text).toMatch(/from '@\/components\/ui\/password-input'/)
+    expect(anzahl(text, /<PasswordInput\b/)).toBe(2)
+    expect(anzahl(text, /feld=\{FELD\}/)).toBe(2)
+    expect(text).not.toMatch(/PasswortFeld/)
   })
 })
 

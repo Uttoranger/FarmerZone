@@ -3,6 +3,7 @@ import { aufraeumGrenzen } from '@/lib/betrieb'
 import { einmalLinkAufraeumGrenze } from '@/lib/geraete'
 import { BAR_HASH_PRAEFIX } from '@/lib/bar-bestaetigung'
 import { MELDE_VERMERK_TYP } from '@/server/erstattung-gescheitert'
+import { sichereGesendeteBeitragsMails } from '@/server/mail-arten/beitrag'
 
 /*
  * Das tägliche Aufräumen (Register N18, Nr. 104) — im bestehenden Ablauf
@@ -19,9 +20,16 @@ import { MELDE_VERMERK_TYP } from '@/server/erstattung-gescheitert'
  *  - EinmalLink (E7, Ergänzung; Nr. 114): abgelaufen, oder seit 7 Tagen
  *    benutzt. Ein offener, gültiger Link bleibt immer.
  *  - MailAuftrag (N26, Nr. 158): Zeilen der Warteschlange und des Protokolls
- *    nach 90 Tagen, gleich welcher Stand. Dazu gibt es Aufträge frei, die ein
- *    abgebrochener Worker „in Arbeit“ hinterließ (Belegung abgelaufen) — sie
- *    gehen beim nächsten Lauf wieder hinaus.
+ *    nach 90 Tagen, gleich welcher Stand. VOR dem Löschen schreibt
+ *    `sichereGesendeteBeitragsMails` (Nr. 170) an jeden betroffenen Beitrag die
+ *    Zahl der gesendeten Mails — sonst zeigte „n per E-Mail“ danach die Zahl
+ *    der eingestellten Aufträge.
+ *
+ * Aufträge, die ein abgebrochener Worker „in Arbeit“ hinterließ, fasst das
+ * Aufräumen NICHT an (Nr. 170): Der Worker holt sie selbst und erkennt sie an
+ * ihrer alten Belegung (`vorherBelegtBis`) — nur so gehen sie mit dem
+ * Idempotenz-Schlüssel des abgebrochenen Laufs hinaus, und Resend verschickt
+ * sie nicht ein zweites Mal.
  *
  * Dazu EIN updateMany, kein Löschen (Nr. 164, Register S17): Bestellungen, deren
  * `confirmationToken` noch im Klartext steht (ohne das Präfix des Hashs),
@@ -40,7 +48,6 @@ export type AufraeumErgebnis = {
   einmalLinks: number
   klartextTokens: number
   mailAuftraege: number
-  mailAuftraegeFrei: number
 }
 
 export async function raeumeAltesAuf(jetzt: Date = new Date()): Promise<AufraeumErgebnis> {
@@ -60,11 +67,9 @@ export async function raeumeAltesAuf(jetzt: Date = new Date()): Promise<Aufraeum
     where: { confirmationToken: { not: null }, NOT: { confirmationToken: { startsWith: BAR_HASH_PRAEFIX } } },
     data: { confirmationToken: null },
   })
+  // Erst die Zahl sichern, dann löschen: Scheitert das Sichern, wirft der Lauf und löscht nichts.
+  await sichereGesendeteBeitragsMails(grenze.mailAuftraege)
   const mailAuftraege = await prisma.mailAuftrag.deleteMany({ where: { erstelltAm: { lt: grenze.mailAuftraege } } })
-  const mailAuftraegeFrei = await prisma.mailAuftrag.updateMany({
-    where: { status: 'in_arbeit', belegtBis: { lt: jetzt } },
-    data: { status: 'offen', belegtBis: null },
-  })
   return {
     sitzungen: sitzungen.count,
     codes: codes.count,
@@ -73,6 +78,5 @@ export async function raeumeAltesAuf(jetzt: Date = new Date()): Promise<Aufraeum
     einmalLinks: einmalLinks.count,
     klartextTokens: klartextTokens.count,
     mailAuftraege: mailAuftraege.count,
-    mailAuftraegeFrei: mailAuftraegeFrei.count,
   }
 }

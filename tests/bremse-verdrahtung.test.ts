@@ -133,6 +133,39 @@ describe('Reservieren — zweite Stufe in /api/reserve (Nr. 150)', () => {
   })
 })
 
+describe('Halt freigeben — DELETE /api/reserve, gebremst wie Reservieren (Nr. 169)', () => {
+  const route = quelle('src', 'app', 'api', 'reserve', 'route.ts')
+  const loeschen = route.slice(route.indexOf('export async function DELETE'), route.indexOf('export async function POST'))
+
+  it('steht vor POST — der Abschnitt von POST reicht bis zum Dateiende', () => {
+    expect(route.indexOf('export async function DELETE')).toBeGreaterThan(-1)
+    expect(route.indexOf('export async function DELETE')).toBeLessThan(route.indexOf('export async function POST'))
+  })
+
+  it('Speicher-Bremse je IP → Parsen → je Sitzung → Datenbank-Bremse → nur die Halte dieser Sitzung löschen', () => {
+    expect(
+      inReihenfolge(loeschen, [
+        "enforceRateLimit('reserve', request)",
+        'freigabeSchema.safeParse(body)',
+        "enforceRateLimit('reserve', request, sessionId)",
+        'await bremseReservieren(request)',
+        'if (ueberAlleInstanzen) return ueberAlleInstanzen',
+        'await loescheHalte([productId], sessionId)',
+      ])
+    ).toBe(true)
+  })
+
+  it('keine Fristfreigabe und keine Prüfkette beim Freigeben', () => {
+    for (const fremd of ['gibVerwaisteFreiFuerProdukte', 'pruefeKaufbarkeitHof', 'stockReservation.']) {
+      expect(loeschen).not.toContain(fremd)
+    }
+  })
+
+  it('Gegenprobe: nach dem Löschen stünde die Bremse falsch', () => {
+    expect(inReihenfolge(loeschen, ['loescheHalte(', 'await bremseReservieren('])).toBe(false)
+  })
+})
+
 describe('Prüfkette des Hofs — EINE Funktion für beide Routen (Nr. 165)', () => {
   const server = quelle('src', 'server', 'warenkorb.ts')
   const kette = server.slice(server.indexOf('export async function pruefeKaufbarkeitHoefe'))

@@ -20,11 +20,15 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/stripe', () => ({ stripe: { refunds: { create: vi.fn() } } }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
-vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn() }))
+// Die Hilfen der Warteschlange bleiben echt (Nr. 168, tests/mail-attrappe.ts).
+vi.mock('@/server/mail-warteschlange', async (o) => (await import('./mail-attrappe')).warteschlangeEcht(await o()))
+vi.mock('@/schemas/mail-auftrag', async (o) => (await import('./mail-attrappe')).schemaEcht(await o()))
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findUnique: vi.fn() },
     order: { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    mailAuftrag: { createMany: vi.fn() },
     $transaction: vi.fn(),
   },
 }))
@@ -33,7 +37,12 @@ import { markAsReady, markAsPickedUp, markAsPickedUpAndPaid, markAsNotPickedUp, 
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import { stelleMailEin } from '@/server/mail-warteschlange'
+import * as Sentry from '@sentry/nextjs'
+import { stelleEinOhneRisiko, stelleMailEinInTransaktion } from '@/server/mail-warteschlange'
+import { bezugSchemaFuer } from '@/schemas/mail-auftrag'
+import { bezugWirft, ergebnis } from './mail-attrappe'
+
+const stelleMailEin = vi.mocked(stelleMailEinInTransaktion)
 
 const satz = { status: 'CONFIRMED' }
 
@@ -61,6 +70,8 @@ function bestellung() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(bezugSchemaFuer).mockReset()
+  vi.mocked(prisma.mailAuftrag.createMany).mockResolvedValue({ count: 1 })
   satz.status = 'CONFIRMED'
   vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'user_1' } } as never)
   vi.mocked(prisma.farm.findUnique).mockResolvedValue({
@@ -93,9 +104,29 @@ describe('ein Storno zwischen Lesen und Schreiben gewinnt', () => {
     expect(stelleMailEin).not.toHaveBeenCalled()
   })
 
-  it('scheitert das Einstellen, ist auch der Statuswechsel nicht gespeichert — der Hof bekommt einen Hinweis', async () => {
-    vi.mocked(stelleMailEin).mockRejectedValueOnce(new Error('DB weg'))
-    expect(await markAsReady('order_1')).toEqual({ error: 'Wir konnten die Änderung nicht speichern. Versuch es bitte gleich noch einmal.' })
+  it('ungültiger Bezug (Register N26, 25.10.2026): abholbereit gilt trotzdem, Sentry einmal, kein Auftrag', async () => {
+    bezugWirft(bezugSchemaFuer)
+    expect(await markAsReady('order_1')).toEqual({})
+    expect(prisma.order.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { status: 'READY' } }))
+    // Rein geprüft vor dem Schreiben: der ungültige fällt weg, EINE Meldung, nichts nachzuholen.
+    expect(await ergebnis(stelleMailEin)).toBe('ungueltig')
+    expect(stelleEinOhneRisiko).not.toHaveBeenCalled()
+    expect(prisma.mailAuftrag.createMany).not.toHaveBeenCalled()
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1)
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ tags: { bereich: 'mail-warteschlange', art: 'abholbereit', grund: 'bezug_ungueltig' }, extra: { bestellungId: 'order_1' } })
+    )
+  })
+
+  it('scheitert das Einstellen (Datenbank): abholbereit gilt, der Auftrag wird mit demselben Objekt nachgeholt', async () => {
+    vi.mocked(prisma.mailAuftrag.createMany).mockRejectedValueOnce(new Error('DB weg'))
+    expect(await markAsReady('order_1')).toEqual({})
+    expect(await ergebnis(stelleMailEin)).toBe('nachholen')
+    // Derselbe Zeitpunkt im Schlüssel: kein zweiter Auftrag, falls der erste doch stand.
+    const inDerTransaktion = (stelleMailEin.mock.calls[0]![0] as unknown as Array<{ schluessel: string }>)[0]!.schluessel
+    expect(vi.mocked(stelleEinOhneRisiko).mock.calls[0]![2]).toMatchObject({ schluessel: inDerTransaktion })
+    expect(prisma.mailAuftrag.createMany).toHaveBeenCalledTimes(2)
   })
 
   it('markAsPickedUp und markAsPickedUpAndPaid schreiben nur aus READY', async () => {
@@ -121,10 +152,13 @@ describe('ein Storno zwischen Lesen und Schreiben gewinnt', () => {
       expect.objectContaining({ where: expect.objectContaining({ status: { in: ['PAID', 'CONFIRMED', 'IN_PREPARATION'] } }) })
     )
     expect(stelleMailEin).toHaveBeenCalledWith(
-      expect.objectContaining({ art: 'abholbereit', vorrang: 1, bestellungId: 'order_1', farmId: 'farm_1', bezug: { orderId: 'order_1' } }),
+      [expect.objectContaining({ art: 'abholbereit', vorrang: 1, bestellungId: 'order_1', farmId: 'farm_1', bezug: { orderId: 'order_1' } })],
       // In der Transaktion des Statuswechsels eingestellt.
       prisma
     )
+    expect(await ergebnis(stelleMailEin)).toBe('eingestellt')
+    expect(prisma.mailAuftrag.createMany).toHaveBeenCalledTimes(1)
+    expect(stelleEinOhneRisiko).not.toHaveBeenCalled()
   })
 })
 

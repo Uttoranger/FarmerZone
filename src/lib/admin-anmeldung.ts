@@ -7,9 +7,9 @@ import { anmeldeZeitpunkt } from '@/lib/geraete'
  * Regeln rein und ohne Datenbank, dazu die Texte der Seiten /login/admin,
  * /admin/einrichten, /admin/einstellungen/anmeldung, /admin/bestaetigen und
  * des Dialogs „Mit Passkey bestätigen". Wer etwas entscheidet:
- *  - src/lib/auth.ts (Hooks): Registrierung nur in den Fällen a–c
- *    (registrierungsFall), Anmeldeart der Sitzung (anmeldeartFuerPfad),
- *    Passkey-Adresse (passkeyAdresse).
+ *  - src/lib/auth.ts (Hooks): Registrierung nur in den Fällen a–c bzw. für
+ *    Höfe frisch angemeldet (registrierungsFall, Nr. 179), Anmeldeart der
+ *    Sitzung (anmeldeartFuerPfad), Passkey-Adresse (passkeyAdresse).
  *  - src/server/admin-wache.ts: 12 Stunden (adminSitzungAbgelaufen), Pflicht
  *    (passkeyPflicht), frische Bestätigung (frischBestaetigt).
  * Ersatzcodes selbst (Form, Zufall, Hash) stehen in src/lib/ersatzcodes.ts.
@@ -128,15 +128,48 @@ function sitzungJungGenug(angemeldetAm: Date, jetzt: Date): boolean {
 
 export type RegistrierungsLage = {
   isAdmin: boolean
+  /** Rolle des Kontos (Better Auth `user.role`) — nur ein Hof (FARMER) ohne Admin-Recht hat den Fall `hof`. */
+  rolle: string | null
   adminSeit: Date | null
+  /** Bei Admins nur die Passkeys aus der Admin-Einrichtung (adminPasskeyWo), sonst alle. */
   passkeys: number
   sitzung: { angemeldetAm: Date; anmeldeart: string | null; passkeyAm: Date | null }
   /** Ein E-Mail-Code der Einrichtung wurde in DIESER Sitzung bestätigt. */
   codeBestaetigt: boolean
 }
 
-/** a: erster Passkey · b: nach Ersatzcode genau einer · c: weiterer, frisch bestätigt. */
-export type RegistrierungsFall = 'erster' | 'ersatzcode' | 'weiterer'
+/** a: erster Passkey · b: nach Ersatzcode genau einer · c: weiterer, frisch bestätigt · hof: Hof ohne Admin-Recht, frisch angemeldet (E7-Ergänzung). */
+export type RegistrierungsFall = 'erster' | 'ersatzcode' | 'weiterer' | 'hof'
+
+/**
+ * Frisch angemeldet für einen Hof (E7-Ergänzung, Nr. 179): Die Sitzung ist
+ * höchstens 5 Minuten alt und mit Passwort entstanden, oder die letzte
+ * Bestätigung mit Passkey liegt höchstens 5 Minuten zurück. Gilt für
+ * Einrichten und Entfernen der Hof-Passkeys; Admins bleiben bei N20.
+ */
+export function hofFrisch(sitzung: { angemeldetAm: Date; anmeldeart: string | null; passkeyAm: Date | null }, jetzt: Date): boolean {
+  const alter = jetzt.getTime() - sitzung.angemeldetAm.getTime()
+  const mitPasswort = sitzung.anmeldeart === ANMELDEART.passwort && alter >= 0 && alter <= FRISCH_MINUTEN * MINUTE_MS
+  return mitPasswort || frischBestaetigt(sitzung.passkeyAm, jetzt)
+}
+
+/**
+ * Welche Passkeys für den Admin-Bereich zählen (N20 bleibt bei einem Hof mit
+ * Admin-Recht, Nr. 179): nur die, die ab dem Vergeben des Rechts (`adminSeit`)
+ * entstanden — also unter den Admin-Bedingungen. Ein Hof-Passkey von davor
+ * öffnet den Admin-Bereich nie, sperrt das Passwort nicht und ersetzt nicht
+ * den ersten Passkey mit E-Mail-Code. Ohne `adminSeit` (Admins von vor Nr. 115)
+ * zählen alle — Hof-Passkeys gab es damals nicht.
+ */
+export function istAdminPasskey(erstelltAm: Date | null, adminSeit: Date | null): boolean {
+  if (adminSeit === null) return true
+  return erstelltAm !== null && erstelltAm.getTime() >= adminSeit.getTime()
+}
+
+/** Dieselbe Regel als Bedingung für Prisma (`passkey.count`, `aggregate`): ohne `adminSeit` keine Einschränkung. */
+export function adminPasskeyWo(adminSeit: Date | null): { createdAt?: { gte: Date } } {
+  return adminSeit === null ? {} : { createdAt: { gte: adminSeit } }
+}
 
 /**
  * Darf diese Sitzung einen Passkey anlegen, und in welchem Fall (Freigabe
@@ -147,11 +180,14 @@ export type RegistrierungsFall = 'erster' | 'ersatzcode' | 'weiterer'
  *  (b) Ersatzcode: Sitzung höchstens 15 Minuten alt mit Anmeldeart
  *      `ersatzcode` — genau einer (den Anspruch verbraucht afterVerification);
  *  (c) weiterer Passkey: schon einer da und `passkeyAm` höchstens 5 Minuten
- *      alt — nie in einer Sitzung aus einem Ersatzcode (sonst wären es zwei).
+ *      alt — nie in einer Sitzung aus einem Ersatzcode (sonst wären es zwei);
+ *  (hof) Hof ohne Admin-Recht (E7-Ergänzung, Nr. 179): frisch angemeldet
+ *      (hofFrisch) — erster und jeder weitere gleich.
  */
 export function registrierungsFall(lage: RegistrierungsLage, jetzt: Date): RegistrierungsFall | null {
-  if (!lage.isAdmin) return null
   const { sitzung } = lage
+  // Ein Hof mit Admin-Recht geht den Admin-Weg unten (N20 unverändert).
+  if (!lage.isAdmin) return lage.rolle === 'FARMER' && hofFrisch(sitzung, jetzt) ? 'hof' : null
   if (sitzung.anmeldeart === ANMELDEART.ersatzcode) return sitzungJungGenug(sitzung.angemeldetAm, jetzt) ? 'ersatzcode' : null
   if (sitzung.anmeldeart === ANMELDEART.ersatzcodeEingeloest) return null
   if (lage.passkeys === 0) {
@@ -165,7 +201,7 @@ export function registrierungsFall(lage: RegistrierungsLage, jetzt: Date): Regis
   return frischBestaetigt(sitzung.passkeyAm, jetzt) ? 'weiterer' : null
 }
 
-export type EinrichtenLage = Omit<RegistrierungsLage, 'isAdmin' | 'codeBestaetigt'> & {
+export type EinrichtenLage = Omit<RegistrierungsLage, 'isAdmin' | 'rolle' | 'codeBestaetigt'> & {
   /** Gilt die Pflicht (passkeyPflicht)? */
   pflicht: boolean
   codeBestaetigtAm: Date | null
@@ -270,7 +306,8 @@ export const ADMIN_ANMELDEN_TEXT = {
   ersatzcodeKnopf: 'Anmelden',
   hinweis:
     'Kein Passwort, kein Code per SMS oder E-Mail für Admin-Konten. Für das Handy braucht der PC Bluetooth; ohne Bluetooth: Passkey am PC (Windows Hello mit PIN) oder ein Sicherheitsschlüssel.',
-  linkAufLogin: 'Mit Passkey anmelden',
+  /** Der kleine Link unter der Hof-Karte auf /login — seit Nr. 179 nicht mehr „Mit Passkey anmelden“: So heißt dort jetzt der Knopf der Höfe. */
+  linkAufLogin: 'Admin-Anmeldung',
   zumAdminBereich: 'Zum Admin-Bereich',
 } as const
 
@@ -285,6 +322,8 @@ export const ADMIN_ANMELDEN_FEHLER = {
   nichtVerfuegbar: 'Die Anmeldung mit Passkey ist gerade nicht verfügbar. Versuch es später noch einmal.',
   /** Zweiter Einrichtversuch auf demselben Gerät (Nr. 126): Der Browser kennt den Passkey des Kontos schon. */
   schonRegistriert: 'Dieses Gerät hat schon einen Passkey für dein Konto. Nimm ein anderes Gerät oder melde dich mit dem Passkey an.',
+  /** Ein Hof-Passkey von vor dem Admin-Recht (istAdminPasskey) — erst nach der Prüfung des Geräts gesagt. */
+  nichtFuerAdmin: 'Dein Konto hat Admin-Rechte. Melde dich mit dem Passkey aus der Admin-Einrichtung an.',
   allgemein: 'Das hat nicht geklappt. Versuch es noch einmal.',
 } as const
 
@@ -314,6 +353,8 @@ export function passkeyFehlerText(fehler: { status?: number; code?: unknown } | 
       return ADMIN_ANMELDEN_FEHLER.nichtVerfuegbar
     case 'PASSKEY_NICHT_ERLAUBT':
       return REGISTRIERUNG_GESPERRT
+    case 'PASSKEY_NICHT_FUER_ADMIN':
+      return ADMIN_ANMELDEN_FEHLER.nichtFuerAdmin
     // InvalidStateError des Browsers: @simplewebauthn/browser nennt ihn so, der Passkey-Client reicht den Code durch.
     case 'ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED':
       return ADMIN_ANMELDEN_FEHLER.schonRegistriert

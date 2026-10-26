@@ -2,7 +2,8 @@ import * as Sentry from '@sentry/nextjs'
 import { saveAppearanceAction } from '@/server/actions/appearance'
 import { ladeProfilStand, updateProfile } from '@/server/actions/farm'
 import { ABSCHNITT_SPEICHERN_TEXT, bereiteAuftrittVor, profilMitTeil, type AuftrittTeil, type ProfilTeil } from '@/lib/abschnitt-stand'
-import { BEZEICHNER, befundVon, istNetzfehler } from '@/lib/upload-diagnose'
+import { BEZEICHNER, befundVon } from '@/lib/upload-diagnose'
+import { NETZ_SATZ, istNetzFehler } from '@/lib/netz'
 
 /*
  * Der EINE Speicherweg der Abschnitte von Mein Hof (Nachtlauf Nr. 50,
@@ -77,11 +78,11 @@ function nacheinander(arbeit: () => Promise<{ error?: string }>): Promise<{ erro
  * mit, falls danach etwas Echtes gemeldet wird. Wirft nie — der Bauer bekommt
  * seinen Satz auch, wenn Sentry selbst scheitert.
  */
-function meldeGescheitertesSpeichern(fehler: unknown): void {
+export function meldeGescheitertesSpeichern(fehler: unknown): void {
   try {
     const { klasse, meldung } = befundVon(fehler)
     const name = BEZEICHNER.test(klasse) ? klasse : 'Unbekannt'
-    if (istNetzfehler(fehler)) {
+    if (istNetzFehler(fehler)) {
       Sentry.addBreadcrumb({ category: 'mein-hof', level: 'warning', message: 'Speichern: Verbindung abgebrochen', data: { klasse: name } })
       return
     }
@@ -94,21 +95,43 @@ function meldeGescheitertesSpeichern(fehler: unknown): void {
 }
 
 /**
- * Ein Speichern, das nie wirft — für die Formulare der Abschnitte und das
- * Hof-Profil: Der Satz der Aktion bzw. bei einer gescheiterten Anfrage (Netz
- * weg, Aktion nach einem Deploy unbekannt) `ABSCHNITT_SPEICHERN_TEXT.gingNicht`,
- * sonst null.
+ * Eine gescheiterte Anfrage in der Form der Antwort: `error` gesetzt, alle
+ * übrigen Felder der Aktion fehlen — so liest der Aufrufer `ergebnis.error`
+ * und z. B. `ergebnis.erstattungOffen` wie bei einer Antwort der Aktion.
+ */
+export type AktionGescheitert<T> = Partial<T> & { error: string; netz?: true }
+
+/**
+ * Ein Aufruf einer Server-Action, der nie wirft — für jede Aktion im
+ * Hofbereich, deren Antwort mehr trägt als einen Satz (Register N29, Nr. 175):
+ * die Antwort der Aktion unverändert, bei einer gescheiterten Anfrage
+ * `{ error }` — am Netz gescheitert `NETZ_SATZ` mit `netz: true` (die Anzeige
+ * bietet „Nochmal" an), sonst `ABSCHNITT_SPEICHERN_TEXT.gingNicht`.
  * Geworfen ginge es an die Fehlergrenze, und die Eingabe wäre weg. Sentry
  * bekommt die gescheiterte Anfrage trotzdem (meldeGescheitertesSpeichern).
+ * Die Wache tests/hof-aktionen-netz-wache.test.ts verlangt diesen Weg (oder try).
  */
-export async function speichernOhneWurf(speichern: () => Promise<{ error?: string }>): Promise<string | null> {
+export async function aktionOhneWurf<T extends object>(aufruf: () => Promise<T>): Promise<T | AktionGescheitert<T>> {
   try {
-    const antwort = await speichern()
-    return antwort.error ?? null
+    return await aufruf()
   } catch (fehler) {
     meldeGescheitertesSpeichern(fehler)
-    return ABSCHNITT_SPEICHERN_TEXT.gingNicht
+    const gescheitert: AktionGescheitert<T> = istNetzFehler(fehler)
+      ? ({ error: NETZ_SATZ, netz: true } as AktionGescheitert<T>)
+      : ({ error: ABSCHNITT_SPEICHERN_TEXT.gingNicht } as AktionGescheitert<T>)
+    return gescheitert
   }
+}
+
+/**
+ * Ein Speichern, das nie wirft — für die Formulare der Abschnitte, das
+ * Hof-Profil und jede Aktion, deren Antwort nur `{ error? }` ist: der Satz der
+ * Aktion bzw. bei einer gescheiterten Anfrage der Satz aus aktionOhneWurf
+ * (am Netz `NETZ_SATZ`, Register N29), sonst null.
+ */
+export async function speichernOhneWurf(speichern: () => Promise<{ error?: string }>): Promise<string | null> {
+  const antwort = await aktionOhneWurf(speichern)
+  return antwort.error ?? null
 }
 
 /** Speichert einen Teil des Auftritts (Leitspruch und Gründungsjahr, Über uns, Werte, Abschnitte) — nur diesen Teil. */

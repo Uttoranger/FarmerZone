@@ -16,6 +16,10 @@ import { PasswordForm } from './password-form'
 import { ArchiveFarmCard } from './archive-farm-card'
 import { DarstellungKarte } from './darstellung-karte'
 import { MARKE } from '@/lib/marke'
+import { SITZUNG_DAUER_SATZ } from '@/lib/sitzung-dauer'
+import { prisma } from '@/lib/prisma'
+import { passkeyAnzeigeName } from '@/lib/hof-passkey'
+import { PasskeyKarte, type HofPasskeyZeile } from './passkey-karte'
 
 export const metadata: Metadata = { title: `${EINSTELLUNG_KONTO.label} — ${MARKE}` }
 
@@ -29,6 +33,9 @@ const TEXTLINK = 'font-medium text-brand-text underline underline-offset-2 break
  * Hof stilllegen/reaktivieren über die bestehenden Actions mit Sperre bei
  * offenen Bestellungen. Neu sind nur Kopf, Rahmen und Farben (Tokens).
  * Seit Nr. 114 (E7, Ergänzung) nach dem Passwort die angemeldeten Geräte.
+ * Seit Nr. 179 (E7, Ergänzung 25.10.2026) oben die Karte „Anmelden mit
+ * Fingerabdruck oder Gesicht" (Passkey für Höfe; ein Admin mit Hof sieht nur
+ * den Weg in den Admin-Bereich, N20).
  */
 export default async function AccountPage(): Promise<React.JSX.Element> {
   const { userId } = await verlangeHofDerSitzung()
@@ -37,10 +44,19 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return zurHofAnmeldung()
 
-  const [farm, geraete] = await Promise.all([
+  const [farm, geraete, konto] = await Promise.all([
     getFarmArchiveState(userId),
     ladeAngemeldeteGeraete(userId, session.session.id, new Date()),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { isAdmin: true, passkeys: { select: { id: true, name: true, createdAt: true }, orderBy: { createdAt: 'asc' } } },
+    }),
   ])
+  const fuerAdmin = konto?.isAdmin === true
+  // Ein Admin verwaltet seine Passkeys im Admin-Bereich — hier keine Liste.
+  const passkeys: HofPasskeyZeile[] = fuerAdmin
+    ? []
+    : (konto?.passkeys ?? []).map((p) => ({ id: p.id, name: p.name ?? '', anzeige: passkeyAnzeigeName(p.name, p.createdAt) }))
 
   // Vorausgefüllte Support-Anfragen: Anliegen, Hof-Slug und Login-Adresse
   // stehen im Textkörper, damit nichts nachgefragt werden muss.
@@ -62,6 +78,8 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
       <UnterseitenKopf titel={EINSTELLUNG_KONTO.label} satz="Anmeldung, Passwort, Geräte, Darstellung und dein Hof." />
 
       <div data-app-palette="neu" className="space-y-4">
+        <PasskeyKarte passkeys={passkeys} fuerAdmin={fuerAdmin} />
+
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -100,7 +118,8 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
           </CardContent>
         </Card>
 
-        <AngemeldeteGeraete zeilen={geraete} />
+        {/* Höchstdauer der Sitzung in einem Satz (S18, Nr. 178). */}
+        <AngemeldeteGeraete zeilen={geraete} satz={SITZUNG_DAUER_SATZ} />
 
         <DarstellungKarte />
 

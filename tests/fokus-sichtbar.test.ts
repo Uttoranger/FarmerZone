@@ -66,8 +66,7 @@ describe('Fokusrahmen mit Rahmenart', () => {
   })
 
   it('Gegenprobe: die Kette des Bestands fällt auf', () => {
-    const bestand = readFileSync(join(process.cwd(), 'src/components/farmer/farmer-nav.tsx'), 'utf8')
-    expect(rahmenOhneArt(bestand).length).toBeGreaterThan(0)
+    // Die Hofleiste mit dieser Kette (farmer-nav.tsx) gibt es seit Nr. 181 nicht mehr; die Prüfung bleibt an einem Beispiel.
     expect(rahmenOhneArt("'outline-none focus-visible:outline-2 focus-visible:outline-ring'")).toHaveLength(1)
   })
 })

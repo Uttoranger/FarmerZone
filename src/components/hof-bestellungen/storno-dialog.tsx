@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { cancelOrder } from '@/server/actions/orders'
+import { aktionOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
 import type { HofBestellDetail } from '@/server/queries/orders'
 import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
 import { STORNO_GRUND_MAX } from '@/lib/eingabegrenzen'
@@ -41,7 +42,8 @@ export function StornoDialog({
   function stornieren() {
     setFehler(null)
     starte(async () => {
-      const ergebnis = await cancelOrder(bestellung.id, grund.trim() || undefined)
+      // Ohne Wurf (Register N29): Ohne Netz steht der Netzsatz im Dialog, der Grund bleibt stehen.
+      const ergebnis = await aktionOhneWurf(() => cancelOrder(bestellung.id, grund.trim() || undefined))
       if (ergebnis.erstattungOffen) {
         // Storniert ist sie trotzdem — nur das Geld steht aus (Sentry hat es).
         onOffenChange(false)

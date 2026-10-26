@@ -9,7 +9,7 @@ import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin
 import { beginneMessung, messeUndPruefe } from '@/server/betrieb'
 import { arbeiteWarteschlange, stelleMailEin, type EinstellAuftrag } from '@/server/mail-warteschlange'
 import { letzteMessungAm } from '@/server/queries/betrieb'
-import { ladeGescheiterteDerArt, ladeNochmalStand, problemBedingung, zaehleNochmalHeute } from '@/server/queries/mails'
+import { ladeGescheiterteDerArt, ladeNochmalStaende, ladeNochmalStand, problemBedingung, zaehleNochmalHeute, zaehleNochmalHeuteJe, type NochmalBezugStand } from '@/server/queries/mails'
 import { ladeBestellungFuerMail } from '@/server/mail-arten/bestellung'
 import { baueMailVorschau } from '@/server/mail-arten/vorschau'
 import { ADMIN_BETRIEB_HREF, BETRIEB_TEXT, fehlerKlasse } from '@/lib/betrieb'
@@ -18,11 +18,11 @@ import {
   CODES_OHNE_JETZT_SCHICKEN,
   MAIL_TEXT,
   NOCHMAL_JE_TAG,
-  NOCHMAL_STAENDE,
   adresseQuelle,
   artName,
   nochmalErlaubt,
   nochmalNieGrund,
+  nochmalStandGrund,
   passtNochmal,
 } from '@/lib/betrieb-mails'
 import { neuerBarToken } from '@/lib/bar-bestaetigung'
@@ -160,29 +160,40 @@ function meldeNochmal(satz: string, err: unknown): void {
   }
 }
 
+type Pruefung = { ok: true; wurzel: string; n: number; stand: NochmalBezugStand } | { error: string }
+
+/** Was ohne Datenbank feststeht: Art in `NOCHMAL_ERLAUBT` und Stand in `NOCHMAL_STAENDE` (je Stand ein eigener Grund). */
+function nochmalVorab(m: NochmalQuelle): string | null {
+  if (!nochmalErlaubt(m.art)) return nochmalNieGrund(m.art)
+  return nochmalStandGrund(m.status)
+}
+
 /**
  * Die Regeln für EINE Mail (N27), in dieser Reihenfolge: Art in
- * `NOCHMAL_ERLAUBT`, Stand gesendet oder gescheitert, höchstens 3-mal je
- * ursprünglicher Mail in 24 Stunden (`nochmalVon`), und der heutige Stand der
- * Bestellung bzw. des Hofs passt (`passtNochmal`). Gibt den fertigen Auftrag
- * (Weg Wichtig, `ausloeser: 'support'`, Schlüssel `nochmal:<id>:<n>`) oder den
- * Grund zurück. Der Empfänger ist nie ein Feld: Der Renderer lädt die heute
- * hinterlegte Adresse.
+ * `NOCHMAL_ERLAUBT`, Stand in `NOCHMAL_STAENDE`, höchstens 3-mal je
+ * ursprünglicher Mail in 24 Stunden (`nochmalVon`, hier als `heute`), und der
+ * heutige Stand der Bestellung bzw. des Hofs passt (`passtNochmal`). Gibt
+ * Wurzel und n des Schlüssels `nochmal:<id>:<n>` oder den Grund zurück. Der
+ * Empfänger ist nie ein Feld: Der Renderer lädt die heute hinterlegte Adresse.
+ * Liest nichts — die Zahlen laden `pruefeNochmal` (eine Mail) bzw.
+ * `schickeArtNochmalAction` (gebündelt, Nr. 170).
  */
-async function pruefeNochmal(
-  m: NochmalQuelle,
-  jetzt: Date
-): Promise<{ ok: true; wurzel: string; n: number; stand: Awaited<ReturnType<typeof ladeNochmalStand>> } | { error: string }> {
-  if (!nochmalErlaubt(m.art)) return { error: nochmalNieGrund(m.art) }
-  if (!(NOCHMAL_STAENDE as readonly string[]).includes(m.status)) return { error: ALLE_MAILS_TEXT.standPasstNicht }
-  const wurzel = m.nochmalVon ?? m.id
-  const heute = await zaehleNochmalHeute(wurzel, jetzt)
+function pruefeNochmalMit(m: NochmalQuelle, heute: number, stand: NochmalBezugStand, jetzt: Date): Pruefung {
+  const vorab = nochmalVorab(m)
+  if (vorab !== null) return { error: vorab }
   if (heute >= NOCHMAL_JE_TAG) return { error: ALLE_MAILS_TEXT.grenze }
-  const stand = await ladeNochmalStand(m, adresseQuelle(m.art))
   const passt = passtNochmal(m.art, stand, jetzt)
   if (!passt.ok) return { error: passt.grund }
   if (!stand.adresse) return { error: ALLE_MAILS_TEXT.adresseFehlt }
-  return { ok: true, wurzel, n: heute + 1, stand }
+  return { ok: true, wurzel: m.nochmalVon ?? m.id, n: heute + 1, stand }
+}
+
+/** Eine Mail: erst was ohne Datenbank feststeht, dann Zahl und Stand frisch. */
+async function pruefeNochmal(m: NochmalQuelle, jetzt: Date): Promise<Pruefung> {
+  const vorab = nochmalVorab(m)
+  if (vorab !== null) return { error: vorab }
+  const [heute, stand] = await Promise.all([zaehleNochmalHeute(m.nochmalVon ?? m.id, jetzt), ladeNochmalStand(m, adresseQuelle(m.art))])
+  return pruefeNochmalMit(m, heute, stand, jetzt)
 }
 
 /** Der neue Auftrag: dieselbe Art, derselbe Bezug, Weg Wichtig, Vermerk „vom Support“. */
@@ -273,7 +284,7 @@ export async function schickeMailNochmalAction(eingabe: unknown): Promise<Antwor
 /**
  * „Alle nochmal schicken“ in „Braucht dich“: die gescheiterten Mails EINER
  * Art (Weg Wichtig, `problemBedingung`), höchstens 100 je Klick, mit denselben
- * Regeln je Mail wie einzeln. Der Bar-Bestätigungslink ist nicht dabei (Sofort,
+ * Regeln je Mail wie einzeln, die Daten dazu gebündelt geladen (Nr. 170). Der Bar-Bestätigungslink ist nicht dabei (Sofort,
  * je Mail ein neuer Token — nur einzeln). Alle Aufträge in EINEM Einstellen.
  */
 export async function schickeArtNochmalAction(eingabe: unknown): Promise<Antwort> {
@@ -284,11 +295,18 @@ export async function schickeArtNochmalAction(eingabe: unknown): Promise<Antwort
   if (!nochmalErlaubt(gelesen.data.art) || gelesen.data.art === 'bar-bestaetigungslink') return { error: nochmalNieGrund(gelesen.data.art) }
 
   const jetzt = new Date()
-  const kandidaten = await ladeGescheiterteDerArt(gelesen.data.art, jetzt)
+  const kandidaten = (await ladeGescheiterteDerArt(gelesen.data.art, jetzt)).filter((m) => nochmalVorab(m) === null)
+  // Gebündelt (Nr. 170): eine Zählung und höchstens eine Abfrage je Bezugstabelle statt zwei je Mail.
+  const [heuteJe, staende] = await Promise.all([
+    zaehleNochmalHeuteJe([...new Set(kandidaten.map((m) => m.nochmalVon ?? m.id))], jetzt),
+    ladeNochmalStaende(kandidaten, adresseQuelle),
+  ])
   const auftraege: EinstellAuftrag[] = []
   const schonDabei = new Set<string>()
   for (const m of kandidaten) {
-    const pruefung = await pruefeNochmal(m, jetzt)
+    const stand = staende.get(m.id)
+    if (!stand) continue
+    const pruefung = pruefeNochmalMit(m, heuteJe.get(m.nochmalVon ?? m.id) ?? 0, stand, jetzt)
     if ('error' in pruefung || schonDabei.has(pruefung.wurzel)) continue
     const auftrag = nochmalAuftrag(m, pruefung.wurzel, pruefung.n)
     if (!auftrag) continue

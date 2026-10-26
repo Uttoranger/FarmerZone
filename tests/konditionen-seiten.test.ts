@@ -22,8 +22,6 @@ vi.mock('next/link', () => ({
 vi.mock('next/image', () => ({
   default: ({ alt }: { alt: string }) => createElement('img', { alt }),
 }))
-// Die Kopfzeilen lesen Sitzung und Pfad im Browser — hier zählt nur der Inhalt.
-vi.mock('@/components/shared/kunden-kopf', () => ({ KundenKopf: () => null }))
 // Seit Nr. 93 lädt die Seite die Zahlen der Gründungshöfe — ohne Zahlen rendert sie wie vorher.
 vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null }))
 vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({

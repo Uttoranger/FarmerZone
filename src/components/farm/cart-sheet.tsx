@@ -1,7 +1,8 @@
 ﻿'use client'
 
 import type { ComponentProps } from 'react'
-import { Minus, Plus, Trash2, ShoppingBasket } from 'lucide-react'
+import { Info, Minus, Plus, Trash2, ShoppingBasket } from 'lucide-react'
+import Image from 'next/image'
 import Link from 'next/link'
 import {
   Sheet,
@@ -11,13 +12,17 @@ import {
   SheetFooter,
 } from '@/components/ui/sheet'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { cn } from '@/lib/utils'
 import { centsAlsEuro, formatEuro, formatGrundpreis } from '@/lib/format'
 import { korbBetraege } from '@/lib/hofseite-kunde'
+import { RESERVIERUNG_MINUTEN } from '@/lib/kasse'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
-import type { CartItem } from '@/lib/use-cart'
+import { KORB_LEER, type CartItem } from '@/lib/use-cart'
+import { EmptyState } from '@/components/ui/empty-state'
+import { HOEFE_ENTDECKEN } from '@/lib/fehlerseite'
 
 type Props = {
   open: boolean
@@ -39,6 +44,11 @@ type Props = {
    * 1024 px der einzige Weg zur Kasse ist — der Mini-Warenkorb steht dort nicht.
    */
   kaufSperre: ComponentProps<typeof KaufSperreHinweis>
+  /**
+   * Der Satz nach dem Abgleich der Hofseite (Register N28: entfernt, gekürzt, neuer Preis) — oben im Blatt, bis
+   * sich der Korb ändert. Die Produktseite gleicht nicht ab und gibt ihn nicht mit.
+   */
+  hinweis?: string | null
 }
 
 /** Ein runder Mengen-Knopf: sichtbar 28 px, Trefferfläche 44 px. */
@@ -47,12 +57,15 @@ const MENGEN_KNOPF = cn(
   FOKUS_RAHMEN
 )
 
+/** Die Wege aus dem leeren Korb: Pillen mit 44 px. */
+const LEER_WEG = cn('inline-flex min-h-11 items-center justify-center rounded-full px-4 text-sm transition-opacity', FOKUS_RAHMEN)
+
 /*
  * Der Warenkorb der Hofseite als Blatt von rechts. Seit Nr. 10 steht er nur
  * noch in der Kundenansicht im neuen Design (KundeShell, data-design="neu"):
  * Kaufen ist Grün (accent), Text und Symbole aus den Tokens.
  */
-export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHref, onUpdateQuantity, onRemoveItem, gebuehrKorb = null, futterHinweis = [], kaufSperre }: Props) {
+export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHref, onUpdateQuantity, onRemoveItem, gebuehrKorb = null, futterHinweis = [], kaufSperre, hinweis = null }: Props) {
   // Zeilensummen in ganzen Cent auf dem Weg des Checkouts (korbBetraege, wie im Mini-Warenkorb),
   // nie price × Menge in Fließkomma — verbindlich rechnet der Checkout mit den Preisen aus der Datenbank.
   const { zeilenCents } = korbBetraege(items)
@@ -68,19 +81,40 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
 
         {/* Items */}
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4">
-          {items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
-              <ShoppingBasket className="mb-2 size-10" strokeWidth={1.5} aria-hidden="true" />
-              <p className="text-sm">Dein Warenkorb ist leer.</p>
+          {/* Wie korbHinweis in der Kasse: orange Karte, als Status vorgelesen, kein Toast. */}
+          {hinweis && (
+            <div role="status">
+              <Hinweiskarte ton="orange" symbol={Info}>
+                {hinweis}
+              </Hinweiskarte>
             </div>
+          )}
+          {items.length === 0 ? (
+            // Leer mit Weg weiter (Register N9, Nr. 175): zurück zum Angebot schließt das Blatt, sonst zu den Höfen.
+            <EmptyState
+              symbol={ShoppingBasket}
+              titel={KORB_LEER.titel}
+              satz={KORB_LEER.satz}
+              className="border-0 bg-transparent py-8"
+              ausweg={
+                <>
+                  <Link href={`/${farmSlug}`} onClick={() => onOpenChange(false)} className={cn(LEER_WEG, 'bg-accent font-semibold text-accent-foreground hover:opacity-90')}>
+                    {KORB_LEER.zumHof}
+                  </Link>
+                  <Link href="/hoefe" className={cn(LEER_WEG, 'border border-border font-medium text-foreground hover:bg-muted')}>
+                    {HOEFE_ENTDECKEN}
+                  </Link>
+                </>
+              }
+            />
           ) : (
             items.map((item) => (
               <div key={item.productId} className="flex gap-3 items-center">
                 {/* Image */}
-                <div className="shrink-0 w-14 h-14 rounded-lg bg-muted overflow-hidden flex items-center justify-center">
+                <div className="relative shrink-0 w-14 h-14 rounded-lg bg-muted overflow-hidden flex items-center justify-center">
                   {item.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                    // 56 px breit: der Browser holt eine kleine Fassung, nicht das Original (bis 2.400 px).
+                    <Image src={item.imageUrl} alt={item.name} fill sizes="56px" className="object-cover" />
                   ) : (
                     <ShoppingBasket className="size-5 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
                   )}
@@ -144,7 +178,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
                   <button
                     type="button"
                     onClick={() => onRemoveItem(item.productId)}
-                    aria-label={`${item.name} aus dem Korb nehmen`}
+                    aria-label={`${item.name} aus dem Warenkorb nehmen`}
                     className={cn('-mr-3 flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground', FOKUS_RAHMEN)}
                   >
                     <Trash2 className="size-4" strokeWidth={1.7} aria-hidden="true" />
@@ -163,7 +197,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
               <span className="tabular-nums">{formatEuro(total)}</span>
             </div>
             <p className="text-xs text-muted-foreground -mt-1">
-              {gebuehrKorb ? `${gebuehrKorb[0].toUpperCase()}${gebuehrKorb.slice(1)} · ` : ''}Reservierung gilt 15 Minuten.
+              {gebuehrKorb ? `${gebuehrKorb[0].toUpperCase()}${gebuehrKorb.slice(1)} · ` : ''}Reservierung gilt {RESERVIERUNG_MINUTEN} Minuten.
             </p>
             <FutterVerantwortung saetze={futterHinweis} />
             {/* Mit Kaufsperre nimmt die Kasse nichts an — der Grund steht hier, nicht erst dort. */}

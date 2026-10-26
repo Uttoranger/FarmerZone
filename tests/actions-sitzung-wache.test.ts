@@ -51,7 +51,6 @@ const OEFFENTLICH: Ausnahme[] = [
   { datei: 'neuigkeiten.ts', name: 'meldeNeuigkeitenAn', grund: 'Die Anmeldung zu Neuigkeiten eines Hofs ist ohne Konto gedacht; Double-Opt-in per Mail, Eingabe mit Zod geprüft, dazu Bremse' },
   { datei: 'onboarding.ts', name: 'checkSlugAvailability', grund: 'Die Vorschau der Hofadresse läuft beim Registrieren vor dem Konto; Eingabe mit Zod geprüft, dazu Bremse, bei Fehlern neutral' },
   { datei: 'register.ts', name: 'registerFarmer', grund: 'Die Registrierung eines Hofs legt erst das Konto an und hat deshalb keine Sitzung; Eingabe mit Zod geprüft, dazu Bremse' },
-  { datei: 'startseite.ts', name: 'beendeStartseitenVorschau', grund: 'Schaltet nur den Vorschau-Modus im eigenen Browser aus; ohne Sitzung gibt es nichts zu beenden und nichts zu schützen' },
   { datei: 'subscriptions.ts', name: 'bestaetigeNeuigkeiten', grund: 'Der Link in der Bestätigungsmail trägt ein signiertes Token; die Abonnentin ist nicht angemeldet' },
   { datei: 'subscriptions.ts', name: 'unsubscribeWithToken', grund: 'Der Abmeldelink in der Mail trägt ein signiertes Token; die Abonnentin ist nicht angemeldet' },
 ]

@@ -35,6 +35,7 @@ Bei **jeder** Codeänderung lesen.
 - Keine nicht-null-Assertion `!`, außer mit der Begründung als Kommentar in derselben Zeile (Inventur 7, Morgenbericht 20 §3, freigegeben 21.10.2026).
 - Typen aus Prisma ableiten, nicht abschreiben: `Prisma.OrderGetPayload<…>`.
 - Keine Typduplikate: Zod-Schema ist die Quelle → `type X = z.infer<typeof xSchema>`.
+- Kein `updateMany` mit berechnetem Spaltenschlüssel (`{ [spalte]: wert }`) – je Spalte ausschreiben; sonst läuft tsc an den Speicher. (Regelvorschlag Dirigent, Morgenbericht 24, freigegeben 25.10.2026)
 
 ### Geld
 - Prisma speichert Preise als `Decimal(10,2)`.
@@ -143,6 +144,7 @@ NextResponse.json({ ok: true, …daten })
 - Geht das nicht (externer Dienst dazwischen): Kompensation schreiben, wie beim Bestandsabzug.
 - Nichts Langsames im Antwortpfad → `nachDerAntwort()`.
 - **Keine Schleife über Mails in Actions oder Routen** (Register N26, Regelvorschlag 149): Massenversand nur über `stelleMailEin` (`src/server/mail-warteschlange.ts`) — EIN Aufruf für alle Empfänger, der Worker verschickt. Jede Mail nennt ihre Art (`sendRaw(…, { art })`, der Typ erzwingt sie). Eine neue Mail-Art bekommt einen Eintrag in `MAIL_ARTEN` und `MAIL_WEG`; Sofort (Code, Einmal-Link, Bestätigungslink) heißt `send…` und geht über `sendRaw`, Wichtig und Kann warten heißen `baue…`, bauen nur und haben einen Renderer in `RENDERER` (Wache `tests/mail-wege-wache.test.ts`, Nr. 159).
+- Ein Betrag, der beim Ereignis feststand, geht als Cent-Ziffern unter `…Cents` in den Bezug eines Mail-Auftrags (nie neu gerechnet). Eine neue Mail-Art steht im selben Commit in genau einer der Listen `NOCHMAL_ERLAUBT` oder `NOCHMAL_NIE`. (Regelvorschlag Dirigent, Morgenbericht 24, freigegeben 25.10.2026)
 - **Wiederholt wird nur ein öffentlicher Lesepfad**, nur bei einem Verbindungsabbruch (08006/`EAUTHTIMEOUT`) und genau einmal: `leseOeffentlichMitWiederholung` (`src/server/oeffentlich-lesen.ts`). Nie ein Schreibweg, nie in einer Transaktion — ein wiederholtes Schreiben könnte doppelt buchen. Eine neue Stelle braucht einen Eintrag in der Liste von `tests/oeffentlich-lesen.test.ts`.
 
 ---

@@ -28,12 +28,14 @@ import { NextRequest } from 'next/server'
 const { nachlauf } = vi.hoisted(() => ({ nachlauf: [] as Array<() => Promise<void>> }))
 
 vi.mock('@/lib/prisma', () => {
-  const prisma = { order: { findFirst: vi.fn(), updateMany: vi.fn() }, $transaction: vi.fn() }
+  const prisma = { order: { findFirst: vi.fn(), updateMany: vi.fn() }, mailAuftrag: { createMany: vi.fn() }, $transaction: vi.fn() }
   return { prisma }
 })
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: vi.fn() }))
 vi.mock('@/server/unbezahlte-bestellung', () => ({ storniereUnbezahlteBestellung: vi.fn() }))
-vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn() }))
+// Die Hilfen der Warteschlange bleiben echt (Nr. 168, tests/mail-attrappe.ts).
+vi.mock('@/server/mail-warteschlange', async (o) => (await import('./mail-attrappe')).warteschlangeEcht(await o()))
+vi.mock('@/schemas/mail-auftrag', async (o) => (await import('./mail-attrappe')).schemaEcht(await o()))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 // Der Nachlauf wird gesammelt statt sofort gestartet — so ist prüfbar, dass
@@ -68,13 +70,16 @@ import { bestellLinkGilt } from '@/lib/bestell-link'
 import { prisma } from '@/lib/prisma'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
-import { stelleMailEin } from '@/server/mail-warteschlange'
+import { stelleEinOhneRisiko, stelleMailEinInTransaktion } from '@/server/mail-warteschlange'
+import { bezugSchemaFuer } from '@/schemas/mail-auftrag'
+import { bezugWirft, ergebnis } from './mail-attrappe'
 
 const findFirst = vi.mocked(prisma.order.findFirst)
 const updateMany = vi.mocked(prisma.order.updateMany)
 const freigabe = vi.mocked(gibVerwaisteFreiOhneRisiko)
 const stornieren = vi.mocked(storniereUnbezahlteBestellung)
-const einstellen = vi.mocked(stelleMailEin)
+const einstellen = vi.mocked(stelleMailEinInTransaktion)
+const createMany = vi.mocked(prisma.mailAuftrag.createMany)
 
 const TOKEN = 'V1StGXR8_Z5jdHi6BmyT9pqLnv2wYc4k'
 /** Bestellt am 02.10.2026 um 10:00 Wiener Zeit — Frist 12:00 (zwei Stunden). */
@@ -219,6 +224,8 @@ beforeEach(() => {
   findFirst.mockResolvedValue(bestellung() as never)
   updateMany.mockResolvedValue({ count: 1 } as never)
   stornieren.mockResolvedValue(true)
+  createMany.mockResolvedValue({ count: 2 })
+  vi.mocked(bezugSchemaFuer).mockReset()
   // Die Transaktion arbeitet auf denselben Attrappen.
   vi.mocked(prisma.$transaction).mockImplementation((async (arbeit: (tx: typeof prisma) => Promise<unknown>) => arbeit(prisma)) as never)
 })
@@ -433,13 +440,39 @@ describe('Knopf „Ja, ich hole verbindlich ab" — bestaetigeBarBestellung', ()
     ])
     expect(tx).toBe(prisma)
     expect(updateMany.mock.invocationCallOrder[0]).toBeLessThan(einstellen.mock.invocationCallOrder[0]!)
-    expect(nachlauf).toHaveLength(0)
+    expect(await ergebnis(einstellen)).toBe('eingestellt')
+    expect(createMany).toHaveBeenCalledTimes(1)
+    // Nur der Worker, den die Hilfe nach dem Einstellen startet — nichts lief im Antwortpfad.
+    expect(nachlauf).toHaveLength(1)
   })
 
-  it('scheitert das Einstellen, wirft die Transaktion — die Bestätigung ist nicht gespeichert, kein Weiterleiten', async () => {
-    einstellen.mockRejectedValueOnce(new Error('DB weg'))
-    await expect(bestaetigeBarBestellung({}, formular())).rejects.toThrow('DB weg')
-    expect(Sentry.captureException).not.toHaveBeenCalled()
+  it('scheitert das Einstellen (Datenbank): die Bestätigung gilt, weiter auf die Bestätigungsseite, Auftrag nach dem Commit nachgeholt', async () => {
+    createMany.mockRejectedValueOnce(new Error('DB weg'))
+    erwarteSignierteBestaetigungsseite(await weiterleitungVon(bestaetigeBarBestellung({}, formular())))
+    expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'CONFIRMED', confirmationToken: null }) }))
+    expect(await ergebnis(einstellen)).toBe('nachholen')
+    expect(stelleEinOhneRisiko).toHaveBeenCalledWith('bestellung-bestaetigung', 'order-1', [
+      expect.objectContaining({ schluessel: 'bestellung-bestaetigung:order-1' }),
+      expect.objectContaining({ schluessel: 'bar-bestaetigt-hof:order-1' }),
+    ])
+    expect(createMany).toHaveBeenCalledTimes(2)
+  })
+
+  it('ungültiger Bezug (Register N26, 25.10.2026): die Bestätigung gilt, Sentry einmal mit Art und Bestellung, kein Auftrag', async () => {
+    bezugWirft(bezugSchemaFuer)
+    erwarteSignierteBestaetigungsseite(await weiterleitungVon(bestaetigeBarBestellung({}, formular())))
+    expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'CONFIRMED' }) }))
+    // Rein geprüft vor dem Schreiben: beide fallen weg, EINE Meldung.
+    expect(await ergebnis(einstellen)).toBe('ungueltig')
+    expect(createMany).not.toHaveBeenCalled()
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1)
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: { bereich: 'mail-warteschlange', art: 'bestellung-bestaetigung,bar-bestaetigt-hof', grund: 'bezug_ungueltig' },
+        extra: { bestellungId: 'order-1' },
+      })
+    )
   })
 
   it('nach der Frist: bestätigt NICHT, keine Mail — die Seite zeigt „verfallen"', async () => {

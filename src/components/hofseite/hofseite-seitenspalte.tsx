@@ -3,13 +3,15 @@
 import type { ReactNode } from 'react'
 import { useMemo } from 'react'
 import Link from 'next/link'
-import { Banknote, CalendarDays, CreditCard, MapPin, Phone, ShoppingBasket } from 'lucide-react'
+import { Banknote, CalendarDays, CreditCard, Info, MapPin, Phone, ShoppingBasket } from 'lucide-react'
 import type { PublicPickupSlot } from '@/server/queries/farm'
 import { abholtagZeile, abholzeitenJeWochentag, nextPickupDays } from '@/lib/pickup-days'
 import { buildMapsUrl } from '@/lib/customer-links'
 import { formatEuro, mitAnzahl } from '@/lib/format'
 import { warenkorbAnzahl } from '@/lib/warenkorb-speicher'
 import { useWarenkorbVomHof } from '@/lib/use-warenkorb-kopf'
+import { useKorbHinweis } from '@/lib/use-cart'
+import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { KONTAKT_NACH_DEM_KAUF, korbBetraege, type Zahlungsart } from '@/lib/hofseite-kunde'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { cn } from '@/lib/utils'
@@ -215,7 +217,10 @@ function MiniWarenkorb({
 }): ReactNode {
   const { id: farmId, slug } = hof
   const positionen = useWarenkorbVomHof(farmId)
-  if (positionen.length === 0) return null
+  // Der Satz nach dem Abgleich der Hofseite (Register N28) — auch wenn danach nichts mehr im Korb liegt:
+  // Dann steht er allein unter dem Titel, damit die Kundin erfährt, wohin ihr Korb ist.
+  const hinweis = useKorbHinweis(farmId)
+  if (positionen.length === 0 && !hinweis) return null
   const anzahl = warenkorbAnzahl(positionen)
   // In ganzen Cent auf dem Weg des Checkouts (korbBetraege), nie price × Menge
   // in Fließkomma — verbindlich rechnet der Checkout mit den Preisen aus der Datenbank.
@@ -228,10 +233,19 @@ function MiniWarenkorb({
     >
       <h2 id="mini-warenkorb" className="flex items-center gap-2 text-[15px] font-semibold text-foreground">
         <ShoppingBasket className="size-4 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
-        Dein Korb
+        Dein Warenkorb
         <span className="flex-1" />
         <span className="text-[13px] font-normal text-muted-foreground">{mitAnzahl(anzahl, 'Artikel', 'Artikel')}</span>
       </h2>
+      {hinweis && (
+        <div role="status">
+          <Hinweiskarte ton="orange" symbol={Info}>
+            {hinweis}
+          </Hinweiskarte>
+        </div>
+      )}
+      {positionen.length > 0 && (
+      <>
       <ul className="flex flex-col gap-1.5">
         {positionen.map((p) => (
           <li key={p.productId} className="flex items-baseline gap-2 text-[13.5px]">
@@ -260,6 +274,8 @@ function MiniWarenkorb({
         >
           Zur Kasse
         </Link>
+      )}
+      </>
       )}
     </section>
   )

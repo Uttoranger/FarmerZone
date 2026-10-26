@@ -119,7 +119,6 @@ describe('Wache: jede feste Leiste am unteren Rand trägt das Merkmal', () => {
         'components/produktdetail/produktdetail-kunde.tsx',
         'components/farm/product-grid.tsx',
         'components/shells/kunde-shell.tsx',
-        'components/farmer/farmer-nav.tsx',
       ])
     )
     for (const f of funde) expect(f.merkmale, f.pfad).toBeGreaterThanOrEqual(f.leisten)

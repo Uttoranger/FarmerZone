@@ -70,7 +70,7 @@ export async function ladeWarteschlange(jetzt: Date, zaehler: { heute: number; i
     prisma.mailAuftrag.findFirst({
       where: { status: { in: WARTEND }, vorrang: VORRANG.wichtig },
       orderBy: { erstelltAm: 'asc' },
-      select: { id: true, art: true, versuche: true, fehlerCode: true, naechsterVersuchAm: true, erstelltAm: true, bestellungId: true },
+      select: { id: true, art: true, status: true, versuche: true, fehlerCode: true, naechsterVersuchAm: true, erstelltAm: true, bestellungId: true },
     }),
     prisma.$queryRaw<Array<{ seit: Date | null }>>`
       SELECT MIN(CASE WHEN "status" = 'in_arbeit' THEN "belegtBis" ELSE "naechsterVersuchAm" END) AS "seit"
@@ -87,6 +87,7 @@ export async function ladeWarteschlange(jetzt: Date, zaehler: { heute: number; i
       ? {
           id: aeltesteWichtige.id,
           art: aeltesteWichtige.art,
+          status: aeltesteWichtige.status,
           versuche: aeltesteWichtige.versuche,
           fehlerCode: aeltesteWichtige.fehlerCode,
           naechsterVersuchAm: aeltesteWichtige.naechsterVersuchAm,
@@ -460,26 +461,73 @@ export type NochmalBezugStand = NochmalStand & {
   hofName: string | null
 }
 
+type NochmalQuelle = 'bestellung' | 'hof' | 'hofInhaber' | null
+type NochmalBestellung = Prisma.OrderGetPayload<{ select: typeof NOCHMAL_BESTELLUNG_FELDER }>
+const NOCHMAL_HOF_FELDER = { id: true, name: true, approvedAt: true, archivedAt: true, owner: { select: { email: true } } } as const satisfies Prisma.FarmSelect
+type NochmalHof = Prisma.FarmGetPayload<{ select: typeof NOCHMAL_HOF_FELDER }>
+
+/** Der Stand aus dem Hof — Freischaltung an die Inhaberin. */
+function standAusHof(hof: NochmalHof | null): NochmalBezugStand {
+  return { bestellung: null, hof: hof ? { approvedAt: hof.approvedAt, archivedAt: hof.archivedAt } : null, adresse: hof?.owner.email ?? null, hofName: hof?.name ?? null }
+}
+
+/** Der Stand aus der Bestellung — Kundin aus der Bestellung, Hof aus dem Hof der Bestellung. */
+function standAusBestellung(b: NochmalBestellung | null, quelle: NochmalQuelle): NochmalBezugStand {
+  const adresse = !b || quelle === null ? null : quelle === 'hof' ? b.farm.email : b.customerEmail
+  return { bestellung: b, hof: null, adresse, hofName: b?.farm.name ?? null }
+}
+
 /**
  * Der heutige Stand für „Nochmal schicken“ (N27): Bestellung bzw. Hof frisch
  * aus der Datenbank, dazu die Adresse, an die die Mail HEUTE ginge —
  * Kundin aus der Bestellung, Hof aus dem Hof, Freischaltung an die Inhaberin.
  */
-export async function ladeNochmalStand(m: { art: string; bestellungId: string | null; farmId: string | null }, quelle: 'bestellung' | 'hof' | 'hofInhaber' | null): Promise<NochmalBezugStand> {
+export async function ladeNochmalStand(m: { art: string; bestellungId: string | null; farmId: string | null }, quelle: NochmalQuelle): Promise<NochmalBezugStand> {
   if (quelle === 'hofInhaber') {
-    const hof = m.farmId
-      ? await prisma.farm.findUnique({ where: { id: m.farmId }, select: { name: true, approvedAt: true, archivedAt: true, owner: { select: { email: true } } } })
-      : null
-    return { bestellung: null, hof: hof ? { approvedAt: hof.approvedAt, archivedAt: hof.archivedAt } : null, adresse: hof?.owner.email ?? null, hofName: hof?.name ?? null }
+    return standAusHof(m.farmId ? await prisma.farm.findUnique({ where: { id: m.farmId }, select: NOCHMAL_HOF_FELDER }) : null)
   }
-  const b = m.bestellungId ? await prisma.order.findUnique({ where: { id: m.bestellungId }, select: NOCHMAL_BESTELLUNG_FELDER }) : null
-  const adresse = !b || quelle === null ? null : quelle === 'hof' ? b.farm.email : b.customerEmail
-  return { bestellung: b, hof: null, adresse, hofName: b?.farm.name ?? null }
+  return standAusBestellung(m.bestellungId ? await prisma.order.findUnique({ where: { id: m.bestellungId }, select: NOCHMAL_BESTELLUNG_FELDER }) : null, quelle)
+}
+
+/**
+ * Derselbe Stand für viele Mails auf einmal („Alle nochmal schicken“, Nr. 170):
+ * höchstens EINE Abfrage je Bezugstabelle (Bestellungen, Höfe) statt einer je
+ * Mail. Ergebnis je Kennung der Mail.
+ */
+export async function ladeNochmalStaende(
+  mails: ReadonlyArray<{ id: string; art: string; bestellungId: string | null; farmId: string | null }>,
+  quelleVon: (art: string) => NochmalQuelle
+): Promise<Map<string, NochmalBezugStand>> {
+  const zuHof = mails.filter((m) => quelleVon(m.art) === 'hofInhaber')
+  const zuBestellung = mails.filter((m) => quelleVon(m.art) !== 'hofInhaber')
+  const hofIds = [...new Set(zuHof.flatMap((m) => (m.farmId ? [m.farmId] : [])))]
+  const bestellIds = [...new Set(zuBestellung.flatMap((m) => (m.bestellungId ? [m.bestellungId] : [])))]
+  const [hoefe, bestellungen] = await Promise.all([
+    hofIds.length === 0 ? [] : prisma.farm.findMany({ where: { id: { in: hofIds } }, select: NOCHMAL_HOF_FELDER }),
+    bestellIds.length === 0 ? [] : prisma.order.findMany({ where: { id: { in: bestellIds } }, select: NOCHMAL_BESTELLUNG_FELDER }),
+  ])
+  const hofJe = new Map(hoefe.map((h) => [h.id, h]))
+  const bestellungJe = new Map(bestellungen.map((b) => [b.id, b]))
+  const ergebnis = new Map<string, NochmalBezugStand>()
+  for (const m of zuHof) ergebnis.set(m.id, standAusHof(m.farmId ? (hofJe.get(m.farmId) ?? null) : null))
+  for (const m of zuBestellung) ergebnis.set(m.id, standAusBestellung(m.bestellungId ? (bestellungJe.get(m.bestellungId) ?? null) : null, quelleVon(m.art)))
+  return ergebnis
 }
 
 /** Wie oft eine Mail in den letzten 24 Stunden nochmal ging — gezählt über `nochmalVon` (N27). */
 export async function zaehleNochmalHeute(wurzel: string, jetzt: Date): Promise<number> {
   return prisma.mailAuftrag.count({ where: { nochmalVon: wurzel, erstelltAm: { gte: new Date(jetzt.getTime() - TAG_MS) } } })
+}
+
+/** Dasselbe für viele ursprüngliche Mails in EINER Abfrage (Nr. 170) — eine fehlende Kennung heißt 0. */
+export async function zaehleNochmalHeuteJe(wurzeln: readonly string[], jetzt: Date): Promise<Map<string, number>> {
+  if (wurzeln.length === 0) return new Map()
+  const gruppen = await prisma.mailAuftrag.groupBy({
+    by: ['nochmalVon'],
+    where: { nochmalVon: { in: [...wurzeln] }, erstelltAm: { gte: new Date(jetzt.getTime() - TAG_MS) } },
+    _count: { _all: true },
+  })
+  return new Map(gruppen.flatMap((g) => (g.nochmalVon ? [[g.nochmalVon, g._count._all] as [string, number]] : [])))
 }
 
 /**

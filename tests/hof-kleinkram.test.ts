@@ -49,7 +49,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: m.refresh, push: vi.fn() }),
 }))
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }))
-vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: async () => ({ user: { id: 'u1' } }) } } }))
+vi.mock('@/server/hofbereich', () => ({ verlangeHofDerSitzung: async () => ({ userId: 'u1', farmId: 'farm_1' }) }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: async () => ({ id: 'farm_1', name: 'Testhof' }) }))
 vi.mock('@/lib/prisma', () => ({ prisma: { order: { findMany: m.findMany } } }))
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: m.gibFrei }))
@@ -64,7 +64,7 @@ vi.mock('@/components/anmelden/hof-anmeldung', () => ({
 }))
 vi.mock('@/server/actions/email-bestaetigung', () => ({ bestaetigeEmail: vi.fn() }))
 
-import PrintPacklistPage from '@/app/(farmer)/orders/today/print/page'
+import PrintPacklistPage from '@/app/(druck)/orders/today/print/page'
 import { PickupSlotsClient } from '@/components/settings/pickup-slots-client'
 import { BestaetigenKarte, NachBestaetigung, NeuerLinkWeg } from '@/components/email-bestaetigung/bestaetigen-karte'
 import { ABHOLZEIT_GELOESCHT } from '@/lib/pickup-slot-rules'
@@ -126,7 +126,7 @@ describe('Packliste gibt verwaiste Bestellungen frei (P6)', () => {
   })
 
   it('derselbe `jetzt` fürs Freigeben und für die Tagesgrenze', () => {
-    const seite = quelle('src/app/(farmer)/orders/today/print/page.tsx')
+    const seite = quelle('src/app/(druck)/orders/today/print/page.tsx')
     expect(seite).toContain('await gibVerwaisteFreiOhneRisiko(farm.id, jetzt)')
     expect(seite.indexOf('gibVerwaisteFreiOhneRisiko(farm.id, jetzt)')).toBeLessThan(seite.indexOf('prisma.order.findMany'))
     expect(seite.match(/new Date\(\)/g)).toHaveLength(1)

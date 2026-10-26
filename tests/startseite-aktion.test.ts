@@ -23,16 +23,16 @@
  *    dem Admin aus der Sitzung und dem Termin in UTC.
  *  - Zurückziehen nur, solange die Zeit nicht erreicht ist (Bedingung in der
  *    WHERE-Klausel); eine laufende Fassung wird abgewiesen.
- *  - Der Vorschau-Link schaltet den Draft Mode nur für den Admin ein; „Vorschau
- *    öffnen" führt über die Route, die ihn auf jedem Gerät einschaltet;
- *    zurück auf „Bearbeiten" schaltet ihn wieder aus.
+ *  - Der Vorschau-Link führt auf die eigene dynamische Route
+ *    /startseite-vorschau (Nr. 182): Rahmen und „Vorschau öffnen" nehmen
+ *    dieselbe Adresse, und die Action fasst den Draft Mode nie an.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const h = vi.hoisted(() => ({ draftEnable: vi.fn(), draftDisable: vi.fn() }))
+const h = vi.hoisted(() => ({ draftMode: vi.fn() }))
 vi.mock('next/headers', () => ({
   headers: vi.fn(async () => new Headers()),
-  draftMode: vi.fn(async () => ({ isEnabled: false, enable: h.draftEnable, disable: h.draftDisable })),
+  draftMode: h.draftMode,
 }))
 vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidatePath: vi.fn(), unstable_cache: (fn: unknown) => fn }))
 vi.mock('next/navigation', () => ({ unstable_rethrow: vi.fn() }))
@@ -40,7 +40,7 @@ vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', async () => {
   const tx = {
-    startseiteAbschnitt: { findMany: vi.fn(), update: vi.fn(), create: vi.fn() },
+    startseiteAbschnitt: { findMany: vi.fn(), update: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
     startseiteBlock: { create: vi.fn(), update: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },
     startseiteFassung: { create: vi.fn() },
   }
@@ -66,7 +66,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
   ADMIN_STARTSEITE_HREF,
-  ADMIN_STARTSEITE_VORSCHAU_HREF,
+  STARTSEITE_VORSCHAU_HREF,
   REIHENFOLGE_FEHLER_TEXT,
   STANDARD_REIHENFOLGE,
   STARTSEITE_CACHE_TAG,
@@ -74,7 +74,6 @@ import {
   standText,
 } from '@/lib/startseite-gestalten'
 import {
-  beendeStartseitenVorschau,
   erzeugeStartseitenVorschau,
   loescheStartseitenBlock,
   speichereEntwurf,
@@ -88,7 +87,7 @@ import { FRISCH_FEHLER } from '@/lib/admin-anmeldung'
 
 type Fn = ReturnType<typeof vi.fn>
 type TxMock = {
-  startseiteAbschnitt: { findMany: Fn; update: Fn; create: Fn }
+  startseiteAbschnitt: { findMany: Fn; update: Fn; create: Fn; deleteMany: Fn }
   startseiteBlock: { create: Fn; update: Fn; deleteMany: Fn; findMany: Fn }
   startseiteFassung: { create: Fn }
 }
@@ -146,7 +145,7 @@ describe('nur der Admin', () => {
     expect(await erzeugeStartseitenVorschau({ stand: 'heute', quelle: 'entwurf', blockEntwurfId: null })).toEqual({ error: 'Kein Zugriff.' })
     expect(prisma.$transaction).not.toHaveBeenCalled()
     expect(prisma.startseiteBlock.deleteMany).not.toHaveBeenCalled()
-    expect(h.draftEnable).not.toHaveBeenCalled()
+    expect(h.draftMode).not.toHaveBeenCalled()
   })
 
   it('lehnt ohne Sitzung ab', async () => {
@@ -265,35 +264,31 @@ describe('gültig speichern', () => {
 })
 
 describe('Vorschau-Link', () => {
-  it('schaltet für den Admin den Draft Mode ein und gibt einen signierten Pfad', async () => {
+  it('gibt dem Admin einen signierten Pfad auf die Vorschau-Route — ohne Draft Mode', async () => {
     const ergebnis = await erzeugeStartseitenVorschau({ stand: 'heute', quelle: 'entwurf', blockEntwurfId: 'b1' })
-    expect(h.draftEnable).toHaveBeenCalledTimes(1)
     expect(ergebnis).toMatchObject({ ok: true })
-    expect('pfad' in ergebnis && ergebnis.pfad).toMatch(/^\/\?vorschau=[A-Za-z0-9_-]+&sig=[a-f0-9]{64}$/)
+    expect('pfad' in ergebnis && ergebnis.pfad).toMatch(/^\/startseite-vorschau\?vorschau=[A-Za-z0-9_-]+&sig=[a-f0-9]{64}$/)
+    expect(h.draftMode).not.toHaveBeenCalled()
   })
 
-  it('führt „Vorschau öffnen" über die Route, die den Draft Mode auf jedem Gerät einschaltet — mit demselben Link', async () => {
+  it('„Vorschau öffnen" nimmt dieselbe Adresse wie der Rahmen — sie wirkt auf jedem Gerät mit Admin-Sitzung', async () => {
     const ergebnis = await erzeugeStartseitenVorschau({ stand: 'heute', quelle: 'entwurf', blockEntwurfId: 'b1' })
     if (!('link' in ergebnis)) throw new Error('kein Link')
-    expect(ergebnis.link.startsWith(`${ADMIN_STARTSEITE_VORSCHAU_HREF}?`)).toBe(true)
-    expect(ergebnis.link.slice(ADMIN_STARTSEITE_VORSCHAU_HREF.length)).toBe(ergebnis.pfad.slice(1))
+    expect(STARTSEITE_VORSCHAU_HREF).toBe('/startseite-vorschau')
+    expect(ergebnis.link.startsWith(`${STARTSEITE_VORSCHAU_HREF}?`)).toBe(true)
+    expect(ergebnis.link).toBe(ergebnis.pfad)
   })
 
-  it('schaltet den Draft Mode beim Zurückschalten auf „Bearbeiten" wieder aus', async () => {
-    expect(await beendeStartseitenVorschau()).toEqual({ ok: true })
-    expect(h.draftDisable).toHaveBeenCalledTimes(1)
-  })
-
-  it('sagt ohne geplanten Block, dass keiner kommt — ohne Draft Mode', async () => {
+  it('sagt ohne geplanten Block, dass keiner kommt — ohne Link', async () => {
     vi.mocked(prisma.startseiteAbschnitt.findMany).mockResolvedValue(ZEILEN as never)
     expect(await erzeugeStartseitenVorschau({ stand: 'block', quelle: 'entwurf', blockEntwurfId: null })).toEqual({ error: 'Es ist gerade kein Block geplant.' })
-    expect(h.draftEnable).not.toHaveBeenCalled()
+    expect(h.draftMode).not.toHaveBeenCalled()
   })
 
   it('sagt ohne Planung, dass nichts geplant ist — und nimmt sonst den Termin der nächsten Fassung', async () => {
     vi.mocked(prisma.startseiteFassung.findFirst).mockResolvedValue(null as never)
     expect(await erzeugeStartseitenVorschau({ stand: 'termin', quelle: 'live', blockEntwurfId: null })).toEqual({ error: 'Es ist gerade nichts geplant.' })
-    expect(h.draftEnable).not.toHaveBeenCalled()
+    expect(h.draftMode).not.toHaveBeenCalled()
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-10-15T18:44:00.000Z'))
     try {
@@ -305,11 +300,11 @@ describe('Vorschau-Link', () => {
     }
   })
 
-  it('weist eine unbekannte Quelle ab, ohne den Draft Mode einzuschalten', async () => {
+  it('weist eine unbekannte Quelle ab, ohne Link', async () => {
     expect(await erzeugeStartseitenVorschau({ stand: 'heute', quelle: 'fassung:../x', blockEntwurfId: null })).toEqual({
       error: 'Bitte prüf die Angaben und speichere noch einmal.',
     })
-    expect(h.draftEnable).not.toHaveBeenCalled()
+    expect(h.draftMode).not.toHaveBeenCalled()
   })
 })
 

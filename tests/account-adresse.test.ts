@@ -45,6 +45,8 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
 vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({ KundeShellMitSitzung: () => null }))
 vi.mock('@/app/account/profile/profile-client', () => ({ ProfileClient: () => null }))
+// Die Geräteliste (Nr. 178) prüfen tests/kundin-geraete.test.ts und die Integrationsschicht.
+vi.mock('@/server/geraete', () => ({ ladeAngemeldeteGeraete: vi.fn(async () => []) }))
 
 import AccountProfilePage from '@/app/account/profile/page'
 import { updateSubscription, deleteCustomerAccount } from '@/server/actions/subscriptions'
@@ -91,6 +93,7 @@ function sitzung(
       role: 'CUSTOMER',
       phone: '+43 664 0000000',
     },
+    session: { id: 'sitzung_1' },
   } as never)
   userFindUnique.mockResolvedValue({ email: 'erika.mustermann@example.org', emailVerified: inDb, ...konto } as never)
 }

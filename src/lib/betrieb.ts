@@ -1896,7 +1896,7 @@ export function grenzStandText(wert: GrenzWert, zahl: number): string {
   if (wert === 'bilder') return bilder === null ? `${speicherText(zahl)} sind belegt` : `${speicherText(zahl)} von ${speicherText(bilder)} sind belegt`
   if (wert === 'datenbank') return `${speicherText(zahl)} von ${speicherText(GRENZE.datenbankBytes)} sind belegt`
   if (wert === 'hofliste') return `${speicherText(zahl)} von ${HOFLISTE_GRENZE_TEXT} sind belegt`
-  if (wert === 'mailsMonat') return `${formatZahl(zahl)} von ${formatZahl(GRENZE.mailsMonat)} E-Mails in diesem Monat`
+  if (wert === 'mailsMonat') return `${formatZahl(zahl)} von ${formatZahl(GRENZE.mailsMonat)} E-Mails im Abrechnungszeitraum (ab dem ${RESEND_ABRECHNUNG_TAG}.)`
   if (wert === 'bildVorgaenge')
     return vorgaenge === null ? `≈ ${formatZahl(zahl)} Bild-Vorgänge in diesem Monat` : `≈ ${formatZahl(zahl)} von ${formatZahl(vorgaenge)} Bild-Vorgängen in diesem Monat`
   return GRENZE.mailsTag === null ? `${formatZahl(zahl)} E-Mails gestern` : `${formatZahl(zahl)} von ${formatZahl(GRENZE.mailsTag)} E-Mails gestern`

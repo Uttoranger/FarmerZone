@@ -9,10 +9,10 @@ import { CSP_BERICHT_GRUPPE, CSP_HEADER, NIE_MELDEN_PARAMETER, NIE_MELDEN_PFADE,
 // Dieselbe Menge steht als RESERVED_SLUGS in src/lib/slug.ts, damit kein Hof
 // einen dieser Slugs bekommt (tests/reservierte-slugs.test.ts).
 const KEINE_HOFSEITE = [
-  'account', 'admin', 'agb', 'analytics', 'api', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
+  'account', 'admin', 'agb', 'analytics', 'api', 'app', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
   'farm-page', 'fehler-melden', 'forgot-password', 'fuer-hoefe', 'hoefe', 'impressum', 'intern', 'konditionen',
   'login', 'meldungen', 'onboarding', 'orders', 'postfach', 'problem-melden', 'products', 'region', 'register',
-  'reset-password', 'sales', 'settings', 'sicherheit', 'status', 'teilen', 'verify',
+  'reset-password', 'sales', 'settings', 'sicherheit', 'startseite-vorschau', 'status', 'teilen', 'verify',
 ];
 // Genau EIN Pfadstück aus Slug-Zeichen (src/lib/slug.ts), das keine Route ist.
 const HOFSEITEN_QUELLE = `/:farmSlug((?!(?:${KEINE_HOFSEITE.join('|')})$)[a-z0-9-]+)`;
@@ -165,9 +165,10 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Die Bestätigungsseite trägt die signierte Adresse (?sig=) und zeigt
-        // Name und E-Mail der Kundin: Beim Klick auf einen Link (Hofseite,
-        // Stripe) geht sie NICHT als Referrer mit, und in keinen Suchindex.
+        // Die Bestätigungsseite trägt die signierte Adresse (?sig=): Beim Klick
+        // auf einen Link (Hofseite, Stripe) geht sie NICHT als Referrer mit,
+        // und in keinen Suchindex. Seit Nr. 153 zeigt sie keine Personendaten
+        // mehr; die Sperre bleibt, weil die Adresse selbst das Zugangsmittel ist.
         // Steht nach der allgemeinen Regel, damit sie dort gewinnt.
         source: '/:farmSlug/confirm/:orderId',
         headers: [
@@ -277,14 +278,27 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Dasselbe für die STARTSEITE mit ihrem Vorschau-Link (Register N16,
-        // Nr. 96): Admin › Startseite zeigt sie im Rahmen „So sieht’s die
-        // Kundin". Der Wert ist der signierte Inhalt, keine feste Zahl — darum
-        // nur der Name. Die Freigabe betrifft allein das Einbetten von uns
-        // selbst; was die Seite zeigt, entscheidet weiter vorschauDieserAnfrage
-        // (Draft Mode, Signatur, Admin-Sitzung). Ohne den Parameter bleibt DENY.
-        source: '/',
-        has: [{ type: 'query', key: 'vorschau' }],
+        // Die Vorschau der Startseite (Register N16, Ergänzung 25.10.2026;
+        // Nr. 182) hat ihre eigene dynamische Route — die Startseite `/` ist
+        // damit überall DENY. Die Adresse trägt den signierten Link (?sig=):
+        // kein Referrer beim Klick hinaus, nie zwischengespeichert (die Seite
+        // zeigt einen Entwurf nur mit Admin-Sitzung). Was sie zeigt,
+        // entscheidet leseStartseitenVorschau (Signatur, Ablauf, Sitzung).
+        source: '/startseite-vorschau',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'Cache-Control', value: 'no-store' },
+        ],
+      },
+      {
+        // Einbetten von uns selbst NUR mit Link (vorschau UND sig — der Wert
+        // ist der signierte Inhalt, keine feste Zahl): Admin › Startseite
+        // zeigt sie im Rahmen „So sieht’s die Kundin". Ohne Link bleibt DENY.
+        source: '/startseite-vorschau',
+        has: [
+          { type: 'query', key: 'vorschau' },
+          { type: 'query', key: 'sig' },
+        ],
         headers: [
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },

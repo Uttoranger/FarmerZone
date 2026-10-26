@@ -14,6 +14,11 @@
  * bekommt 429 mit Retry-After bis zum Fensterende, und nichts wird gehalten;
  * die Bremse sitzt nach dem Parsen und vor jeder Hof-Prüfung.
  *
+ * Nr. 169 (Register N28): DELETE /api/reserve gibt den Halt DIESER Sitzung für
+ * DIESES Produkt frei (`loescheHalte`), antwortet immer 200 { ok: true } — ob es
+ * einen Halt gab oder nicht —, 400 bei kaputtem Körper, 500 bei Datenbankfehler;
+ * es zählt im selben Zähler `reserveIp` wie Reservieren und Prüfen.
+ *
  * Prisma ist gemockt — keine DB-Zugriffe. Die Zählung der zweiten Stufe
  * stellt eine Attrappe von `$queryRaw` (ein Zähler je Schlüssel); echt prüft
  * sie tests/integration/bremse-datenbank.int.test.ts.
@@ -62,10 +67,10 @@ vi.mock('@/server/abholfenster', async (original) => ({
   ausgebuchteTage: vi.fn(async () => new Map()),
 }))
 
-import { POST } from '@/app/api/reserve/route'
+import { DELETE, POST } from '@/app/api/reserve/route'
 import { POST as pruefenPOST } from '@/app/api/warenkorb/pruefen/route'
 import { prisma } from '@/lib/prisma'
-import { erneuereHalte } from '@/server/warenkorb'
+import { erneuereHalte, loescheHalte } from '@/server/warenkorb'
 import { gibVerwaisteFreiFuerProdukte } from '@/server/verwaiste-bestellungen'
 import { DB_BREMSEN, ZU_VIELE_ANFRAGEN, bremsSchluessel } from '@/lib/bremse-datenbank'
 import { ausgebuchteTage, fensterSchluessel } from '@/server/abholfenster'
@@ -482,5 +487,92 @@ describe('Bremse über alle Instanzen (Nr. 150, Register S17 Punkt 1)', () => {
     expect((await POST(reservieren())).status).toBe(200)
     expect((await pruefenPOST(pruefen())).status).toBe(200)
     expect(queryRaw).not.toHaveBeenCalled()
+  })
+})
+
+describe('DELETE /api/reserve — Entfernen gibt den Halt frei (Nr. 169, Register N28)', () => {
+  function freigeben(body: unknown, ip = '198.51.100.7') {
+    return new NextRequest('http://localhost/api/reserve', {
+      method: 'DELETE',
+      body: typeof body === 'string' ? body : JSON.stringify(body),
+      headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
+    })
+  }
+
+  it('löscht nur den Halt dieser Sitzung für dieses Produkt und antwortet 200 { ok: true }', async () => {
+    const res = await DELETE(freigeben({ productId: 'prod_1', sessionId: 'sess_a' }))
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ ok: true })
+    expect(vi.mocked(loescheHalte)).toHaveBeenCalledWith(['prod_1'], 'sess_a')
+    // Kein Aufräumen fremder Halte, keine Fristfreigabe, keine Prüfkette.
+    expect(deleteMany).not.toHaveBeenCalled()
+    expect(gibVerwaisteFreiFuerProdukte).not.toHaveBeenCalled()
+    expect(productFindUnique).not.toHaveBeenCalled()
+  })
+
+  it('ohne Halt dieselbe Antwort — sie verrät nicht, ob es einen gab', async () => {
+    vi.mocked(loescheHalte).mockResolvedValueOnce(undefined)
+    const res = await DELETE(freigeben({ productId: 'prod_ohne_halt', sessionId: 'sess_b' }))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ ok: true })
+  })
+
+  it('kaputter Körper: 400, nichts gelöscht', async () => {
+    for (const body of ['{kein json', { productId: 'prod_1' }, { productId: '', sessionId: 'sess_a' }, { sessionId: 'sess_a' }]) {
+      expect((await DELETE(freigeben(body))).status).toBe(400)
+    }
+    expect(vi.mocked(loescheHalte)).not.toHaveBeenCalled()
+  })
+
+  it('Datenbankfehler: 500 wie bei POST', async () => {
+    vi.mocked(loescheHalte).mockRejectedValueOnce(new Error('DB weg'))
+    const fehler = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await DELETE(freigeben({ productId: 'prod_1', sessionId: 'sess_a' }))
+    expect(res.status).toBe(500)
+    fehler.mockRestore()
+  })
+
+  describe('im selben Zähler reserveIp (Register S17 Punkt 1)', () => {
+    const queryRaw = vi.mocked(prisma.$queryRaw)
+    beforeEach(() => {
+      vi.useFakeTimers({ now: new Date('2026-10-14T09:00:30.000Z'), toFake: ['Date'] })
+      vi.stubEnv('NODE_ENV', 'production')
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+      vi.unstubAllEnvs()
+    })
+
+    it('volle Bremse: 429, nichts gelöscht', async () => {
+      queryRaw.mockImplementation((async (...args: unknown[]) => {
+        const werte = (args[1] as { values: unknown[] }).values
+        return werte.filter((w): w is string => typeof w === 'string').map((s) => ({ schluessel: s, zaehler: 21 }))
+      }) as never)
+
+      const res = await DELETE(freigeben({ productId: 'prod_1', sessionId: 'sess_a' }))
+
+      expect(res.status).toBe(429)
+      expect(await res.json()).toEqual({ error: ZU_VIELE_ANFRAGEN })
+      expect(vi.mocked(loescheHalte)).not.toHaveBeenCalled()
+      // Derselbe Zweck wie Reservieren und Prüfen.
+      const werte = (queryRaw.mock.calls[0][1] as unknown as { values: unknown[] }).values
+      expect(werte.some((w) => typeof w === 'string' && w.startsWith(`${DB_BREMSEN.reserveIp.zweck}:`))).toBe(true)
+    })
+
+    it('Gegenprobe: freie Bremse — gelöscht', async () => {
+      queryRaw.mockImplementation((async (...args: unknown[]) => {
+        const werte = (args[1] as { values: unknown[] }).values
+        return werte.filter((w): w is string => typeof w === 'string').map((s) => ({ schluessel: s, zaehler: 1 }))
+      }) as never)
+
+      expect((await DELETE(freigeben({ productId: 'prod_1', sessionId: 'sess_a' }))).status).toBe(200)
+      expect(vi.mocked(loescheHalte)).toHaveBeenCalledTimes(1)
+    })
+
+    it('kaputter Körper zählt nicht: erst parsen, dann bremsen', async () => {
+      expect((await DELETE(freigeben({ sessionId: 'sess_a' }))).status).toBe(400)
+      expect(queryRaw).not.toHaveBeenCalled()
+    })
   })
 })

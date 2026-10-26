@@ -25,6 +25,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { hofInitialen } from '@/lib/hof-initialen'
+import { NetzHinweis } from '@/components/ui/netz-hinweis'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
 import {
   EINSTELLUNG_KONTO,
@@ -80,8 +81,8 @@ import { TarifZeile } from '@/components/hofbereich/tarif-zeile'
  * Tarif-Zeile (TarifZeile; Zustand und Texte als Prop vom Server).
  *
  * Die Shell setzt data-design="neu" und damit die Tokens des Design-Systems
- * für das ganze Dokument. Noch nutzt sie keine Route (kein Big Bang): Der
- * Bauern-Bereich läuft weiter über (farmer)/layout.tsx mit farmer-nav.tsx.
+ * für das ganze Dokument. Der Hofbereich unter (hof) läuft über diese Shell;
+ * nur die Druckansichten und Reste unter (farmer) nutzen noch farmer-nav.tsx.
  */
 
 const SYMBOL: Record<HofNavId, LucideIcon> = {
@@ -307,7 +308,8 @@ export function HofShell({
   const untenImMehr = nav.mehr.filter((p) => nav.unten.some((u) => u.id === p.id))
 
   return (
-    <div data-design="neu" className="min-h-dvh bg-background text-foreground">
+    // data-scroll-rand: Der Fokus scrollt nie unter Unterleiste und Unterseiten-Kopf (WCAG 2.4.11, scroll-padding in globals.css, Nr. 177).
+    <div data-design="neu" data-scroll-rand="hof" className="min-h-dvh bg-background text-foreground">
       <SprungLink />
 
       {/* ===== Browser: Seitenleiste ===== */}
@@ -417,6 +419,8 @@ export function HofShell({
       </MenueZielAnbieter>
 
       <main id={INHALT_ID} tabIndex={-1} className="min-w-0 pb-28 outline-none md:pb-0 md:pl-[264px] print:pb-0 print:pl-0">
+        {/* Kein Netz (Register N29): Die HofShell hat keinen eigenen Kopf, die Zeile steht über dem Inhalt — bis das Netz zurück ist. */}
+        <NetzHinweis />
         {children}
       </main>
 

@@ -8,6 +8,8 @@ import { toast } from 'sonner'
 import { Camera, Crop, X, Leaf, Thermometer, Snowflake, ChevronRight, Info, Sparkles, Plus } from 'lucide-react'
 import { ladeFotoHoch, pruefeLesbarkeit, stufenText, type UploadStufe } from '@/components/shared/image-upload'
 import { useFotoQuellen, type FotoAuswahl } from '@/components/shared/foto-quellen'
+import { enterTaste, weiterMitEnter } from '@/lib/feld-attribute'
+import { FREIWILLIG } from '@/lib/profil-meldungen'
 import { ordneLeseFehler, type LeseDiagnose, type UploadDiagnose } from '@/lib/upload-diagnose'
 import { bildFehlerArtVon, bildFehlerMeldung, karteText } from '@/lib/upload-fehler'
 import { IM_SHOP, NICHT_IM_SHOP, NICHT_IM_SHOP_IM_SATZ } from '@/lib/produkt-sichtbarkeit'
@@ -952,6 +954,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
           <form
             ref={formRef}
             onSubmit={form.handleSubmit(onSubmit, onInvalid)}
+            onKeyDown={weiterMitEnter}
             className="flex flex-col flex-1 min-h-0"
           >
             {/* Scrollbarer Inhalt — pb-8, damit die letzte Karte nie unter dem Fuß liegt */}
@@ -1058,9 +1061,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                         name="name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Was verkaufst du? *</FormLabel>
+                            <FormLabel>Was verkaufst du?</FormLabel>
                             <FormControl>
-                              <Input placeholder="z. B. Lammfleisch oder Wiesenheu" {...field} />
+                              <Input placeholder="z. B. Lammfleisch oder Wiesenheu" enterKeyHint={enterTaste(false)} {...field} />
                             </FormControl>
                             <FormMessage />
                             {/* Vorschlag aus dem Namen (Vorbild Shopee „Recommend
@@ -1104,7 +1107,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                         name="category"
                         render={() => (
                           <FormItem data-feld="category">
-                            <FormLabel>Kategorie{(!isEdit || futterBereich) && ' *'}</FormLabel>
+                            <FormLabel>Kategorie</FormLabel>
                             <button
                               type="button"
                               data-feld="subcategory"
@@ -1122,7 +1125,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                             </button>
                             <FormMessage />
                             {form.formState.errors.subcategory?.message && (
-                              <p className="text-sm text-destructive">{form.formState.errors.subcategory.message}</p>
+                              <p role="alert" className="text-sm text-destructive">{form.formState.errors.subcategory.message}</p>
                             )}
                             {category && hatUnterkategorien(category) && !werte.subcategory && !futterBereich && (
                               <FormDescription className="text-xs">
@@ -1138,7 +1141,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                         name="description"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Kurzbeschreibung</FormLabel>
+                            <FormLabel>Kurzbeschreibung {FREIWILLIG}</FormLabel>
                             <FormControl>
                               <Textarea
                                 placeholder="Kurze Produktbeschreibung für den Shop…"
@@ -1168,7 +1171,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                         name="unit"
                         render={({ field }) => (
                           <FormItem data-feld="unit">
-                            <FormLabel>Einheit *</FormLabel>
+                            <FormLabel>Einheit</FormLabel>
                             <Select
                               onValueChange={(v) => einheitSetzen(v as ProductFormData['unit'])}
                               value={field.value}
@@ -1206,13 +1209,14 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                             name="futter.nettoMenge"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>{gewichtGefragt} *</FormLabel>
+                                <FormLabel>{gewichtGefragt}</FormLabel>
                                 <div className="flex gap-2">
                                   <FormControl>
                                     <DezimalFeld
                                       name={field.name}
                                       value={field.value}
                                       placeholder="z. B. 300"
+                                      enterKeyHint={enterTaste(false)}
                                       onBlur={field.onBlur}
                                       onChange={(neu) => field.onChange(neu ?? Number.NaN)}
                                     />
@@ -1276,12 +1280,13 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                                   oder Pakete aus mehreren? Stell bitte die Einheit um — dann stimmt der Kilopreis.
                                 </p>
                               )}
-                              <FormLabel>Gebindegröße{!altesGebinde && ' *'}</FormLabel>
+                              <FormLabel>Gebindegröße</FormLabel>
                               <FormControl>
                                 <DezimalFeld
                                   name={field.name}
                                   value={field.value}
                                   placeholder="z. B. 2"
+                                  enterKeyHint={enterTaste(false)}
                                   suffix={einheitLabel(werte.unit)}
                                   onBlur={field.onBlur}
                                   onChange={(neu) => {
@@ -1310,12 +1315,13 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                         name="price"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{preisFeldLabel(werte.unit, werte.unitSize)} *</FormLabel>
+                            <FormLabel>{preisFeldLabel(werte.unit, werte.unitSize)}</FormLabel>
                             <FormControl>
                               <DezimalFeld
                                 name={field.name}
                                 value={field.value}
                                 placeholder="0,00"
+                                enterKeyHint={enterTaste(false)}
                                 praefix="€"
                                 stellen={2}
                                 onBlur={field.onBlur}
@@ -1378,6 +1384,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                                 inputMode="numeric"
                                 step="1"
                                 min="0"
+                                enterKeyHint={enterTaste(true)}
                                 {...field}
                                 onChange={(e) => field.onChange(e.target.valueAsNumber)}
                               />
@@ -1409,7 +1416,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                           name="unavailableReason"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Grund (optional, für dich)</FormLabel>
+                              <FormLabel>Grund {FREIWILLIG}, nur für dich</FormLabel>
                               <FormControl>
                                 <Input placeholder="z. B. Saison vorbei, wieder ab November" {...field} />
                               </FormControl>
@@ -1516,7 +1523,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                         name="labels"
                         render={({ field }) => (
                           <FormItem data-feld="labels" tabIndex={-1} className="outline-none">
-                            <FormLabel>Siegel</FormLabel>
+                            <FormLabel>Siegel {FREIWILLIG}</FormLabel>
                             <div className="space-y-1">
                               {PRODUCT_LABEL_VALUES.map((l) => {
                                 const siegel = SIEGEL[l]
@@ -1562,7 +1569,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                         name="allergens"
                         render={({ field }) => (
                           <FormItem data-feld="allergens">
-                            <FormLabel>Allergene (EU 14)</FormLabel>
+                            <FormLabel>Allergene (EU 14) {FREIWILLIG}</FormLabel>
                             <div className="flex flex-wrap gap-1.5">
                               {ALLERGENS.map(({ id, label }) => {
                                 const active = field.value.includes(id)
@@ -1686,7 +1693,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                           name="futter.futtermittelart"
                           render={({ field }) => (
                             <FormItem data-feld="futter.futtermittelart" tabIndex={-1} className="outline-none">
-                              <FormLabel>Futtermittelart *</FormLabel>
+                              <FormLabel>Futtermittelart</FormLabel>
                               {erlaubteArten.length === 1 ? (
                                 <div className="rounded-lg border border-border bg-muted/30 p-3">
                                   <p className="text-sm font-medium text-foreground">
@@ -1736,7 +1743,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                           name="futter.zielTierarten"
                           render={({ field }) => (
                             <FormItem data-feld="futter.zielTierarten" tabIndex={-1} className="outline-none">
-                              <FormLabel>Für welche Tiere? *</FormLabel>
+                              <FormLabel>Für welche Tiere?</FormLabel>
                               <div className="flex flex-wrap gap-2" role="group" aria-label="Tierarten">
                                 {TIERART_VALUES.map((t) => {
                                   const aktiv = (field.value ?? []).includes(t)
@@ -1772,7 +1779,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                           name="futter.zusammensetzung"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Zusammensetzung *</FormLabel>
+                              <FormLabel>Zusammensetzung</FormLabel>
                               <FormControl>
                                 <Textarea
                                   rows={3}
@@ -1794,7 +1801,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                           name="futter.analytischeBestandteile"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Analytische Bestandteile *</FormLabel>
+                              <FormLabel>Analytische Bestandteile</FormLabel>
                               <FormControl>
                                 <Textarea
                                   rows={3}
@@ -1856,7 +1863,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                           name="futter.zusatzstoffe"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Zusatzstoffe</FormLabel>
+                              <FormLabel>Zusatzstoffe {FREIWILLIG}</FormLabel>
                               <FormControl>
                                 <Textarea
                                   rows={2}
@@ -1895,7 +1902,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                           name="futter.gebrauchshinweis"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Gebrauchshinweis</FormLabel>
+                              <FormLabel>Gebrauchshinweis {FREIWILLIG}</FormLabel>
                               <FormControl>
                                 <Textarea
                                   rows={2}
@@ -1930,7 +1937,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
                               <SchalterZeile
                                 id="nur-betriebe"
                                 titel="Nur an landwirtschaftliche Betriebe"
-                                untertitel="Wer bestellt, muss im Checkout eine Betriebsnummer angeben."
+                                untertitel="Wer bestellt, muss in der Kasse eine Betriebsnummer angeben."
                                 checked={field.value === 'NUR_BETRIEBE'}
                                 onCheckedChange={(an) => field.onChange(an ? 'NUR_BETRIEBE' : 'ALLE')}
                               />

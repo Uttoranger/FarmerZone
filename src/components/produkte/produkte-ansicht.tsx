@@ -2,11 +2,12 @@
 
 import { useCallback, useId, useOptimistic, useRef, useState, useTransition } from 'react'
 import { flushSync } from 'react-dom'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { ChevronRight, Lock, Package, Plus, Search, Sparkles } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button, TREFFER_44 } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
@@ -33,6 +34,7 @@ import {
   produktStatus,
   produkteAbschnitte,
   PRODUKTE_LEER,
+  produkteLeerSatz,
   produkteKopfzeile,
   sichtbareProdukteFilter,
   wiederDaMomentMoeglich,
@@ -245,7 +247,7 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
         <EmptyState
           symbol={Package}
           titel={PRODUKTE_LEER.titel}
-          satz={PRODUKTE_LEER.satz}
+          satz={produkteLeerSatz(hof.sichtbar)}
           ausweg={neuKnopf()}
         />
       ) : (
@@ -656,6 +658,8 @@ function Hinweise({ product, onOeffnen }: { product: ProductData; onOeffnen: () 
     })
   }
 
+  // Sichtbar 36 px wie die Filter-Chips; die Knöpfe darunter tragen die
+  // 44-px-Fläche über ::before (TREFFER_44, Nacharbeit aus Nr. 143).
   const chip = 'inline-flex min-h-9 items-center gap-1 rounded-full border border-dashed px-2.5 text-xs font-medium transition-colors disabled:opacity-50'
   return (
     <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -674,7 +678,7 @@ function Hinweise({ product, onOeffnen }: { product: ProductData; onOeffnen: () 
               type="button"
               disabled={uebernimmt}
               onClick={() => uebernehmen(h.vorschlag)}
-              className={cn(chip, 'border-primary/60 bg-primary/5 text-foreground hover:bg-primary/10', FOKUS_RAHMEN)}
+              className={cn(chip, TREFFER_44, 'border-primary/60 bg-primary/5 text-foreground hover:bg-primary/10', FOKUS_RAHMEN)}
             >
               <Sparkles className="size-3.5 shrink-0 text-status-offen" strokeWidth={1.7} aria-hidden="true" />
               {formatKategorie(h.vorschlag.category, h.vorschlag.subcategory)} übernehmen
@@ -694,7 +698,7 @@ function Hinweise({ product, onOeffnen }: { product: ProductData; onOeffnen: () 
             key={h.art}
             type="button"
             onClick={onOeffnen}
-            className={cn(chip, 'border-status-offen/60 bg-primary/10 text-status-offen hover:bg-primary/15', FOKUS_RAHMEN)}
+            className={cn(chip, TREFFER_44, 'border-status-offen/60 bg-primary/10 text-status-offen hover:bg-primary/15', FOKUS_RAHMEN)}
           >
             {h.art === 'kategorie-ergaenzen' ? 'Kategorie ergänzen' : 'Einheit prüfen'}
           </button>
@@ -704,16 +708,19 @@ function Hinweise({ product, onOeffnen }: { product: ProductData; onOeffnen: () 
   )
 }
 
+// 44 px, wie freigegeben (Nr. 180): Next wählt daraus dieselbe Breite (48 bzw. 96 px) wie für den 48-px-Rahmen,
+// scharf bleibt das Bild trotzdem — die kleinste Stufe über 44 px ist 48.
+const PRODUKT_BILD_SIZES = '44px'
+
 /** Foto des Hofs, sonst die Kategorie-Illustration (im Dunkeln gedämpft), sonst ein Symbol. */
 function ProduktBild({ product, className }: { product: ProductData; className?: string }): React.JSX.Element {
   return (
-    <div className={cn('flex shrink-0 items-center justify-center overflow-hidden border border-border bg-muted', className)}>
+    <div className={cn('relative flex shrink-0 items-center justify-center overflow-hidden border border-border bg-muted', className)}>
       {product.imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={product.imageUrl} alt="" className="h-full w-full object-cover" style={bildStil(product.bildAusschnitt)} />
+        // Die Rahmen sind 44 bis 48 px breit — `sizes` sagt das dem Browser.
+        <Image src={product.imageUrl} alt="" fill sizes={PRODUKT_BILD_SIZES} className="object-cover" style={bildStil(product.bildAusschnitt)} />
       ) : product.categoryImageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={product.categoryImageUrl} alt="" className="h-full w-full object-contain dark:brightness-[0.85] dark:saturate-[0.9]" />
+        <Image src={product.categoryImageUrl} alt="" fill sizes={PRODUKT_BILD_SIZES} className="object-contain dark:brightness-[0.85] dark:saturate-[0.9]" />
       ) : (
         <Package className="size-5 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
       )}

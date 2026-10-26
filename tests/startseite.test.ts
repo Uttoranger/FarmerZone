@@ -74,6 +74,7 @@ import { STARTSEITE_VORSCHAUBILD } from '@/lib/vorschaubild'
 import { KATEGORIE_LABEL } from '@/lib/taxonomie'
 import type { ProductCategoryValue } from '@/schemas/product'
 import { leseHoefeFilter, type HoefeFilter } from '@/schemas/hoefe-filter'
+import { HeroVideo } from '@/components/startseite/hero-video'
 import { RegionsKarte, StartseiteKopf } from '@/components/startseite/startseite-kopf'
 import { HoefeInDerNaehe, HofKarten, HofKartenFehler, HofKartenSkelett } from '@/components/startseite/hoefe-in-der-naehe'
 import {
@@ -340,7 +341,9 @@ describe('beispielRechnung', () => {
 
 describe('Kopf — Video, Standbild und Suche', () => {
   const kopf = html(createElement(StartseiteKopf, {}))
-  const video = kopf.slice(kopf.indexOf('<video'), kopf.indexOf('</video>'))
+  // Das Video entscheidet erst der Browser (Datensparmodus, Wahl der Person): `anfang` stellt den Zustand „läuft" fest.
+  const kopfMitVideo = html(createElement(HeroVideo, { anfang: true }))
+  const video = kopfMitVideo.slice(kopfMitVideo.indexOf('<video'), kopfMitVideo.indexOf('</video>'))
 
   it('das Video läuft stumm, in Schleife, im Bild (playsInline), ohne Ton und Bedienung', () => {
     expect(video).toMatch(/<video [^>]*autoPlay=""/)
@@ -363,7 +366,8 @@ describe('Kopf — Video, Standbild und Suche', () => {
     // Das Standbild steht außerhalb des Videos und damit immer da.
     const standbild = kopf.indexOf('src="/landing/hero-poster.jpg"')
     expect(standbild).toBeGreaterThanOrEqual(0)
-    expect(standbild).toBeLessThan(kopf.indexOf('<video'))
+    // Ohne Entscheidung des Browsers (Server-Render) steht gar kein Video da — das Standbild trägt den Kopf.
+    expect(kopf).not.toContain('<video')
   })
 
   it('genau eine Überschrift erster Ordnung', () => {
@@ -736,7 +740,8 @@ describe('Abschnitte', () => {
         expect(text, datei).toMatch(/<KundeShellMitSitzung\b/)
       }
       // Die Startseite baut ihn als Abschnitt FUSS (STARTSEITE_ABSCHNITTE) in derselben Shell.
-      expect(code('src/app/page.tsx')).toContain('STARTSEITE_ABSCHNITTE[eintrag.art]')
+      expect(code('src/app/page.tsx')).toContain('<StartseitenInhalt ')
+      expect(code('src/components/startseite/startseiten-inhalt.tsx')).toContain('STARTSEITE_ABSCHNITTE[eintrag.art]')
       expect(code('src/components/startseite/startseite-abschnitte.tsx').match(/<StartseiteFuss\b/g)).toHaveLength(1)
       expect(code('src/components/shells/kunde-shell.tsx')).toMatch(/<KundeFuss\b/)
     })
@@ -784,6 +789,8 @@ describe('Themes: Farben nur über Tokens', () => {
 
 describe('Aufbau der Seite', () => {
   const seite = quelle('src/app/page.tsx')
+  // Der Inhalt steht seit Nr. 182 im Baustein, den Startseite und Vorschau rendern (keine zweite Kopie).
+  const inhalt = quelle('src/components/startseite/startseiten-inhalt.tsx')
 
   it('in der KundeShell (Sitzung aus dem Browser), ohne die alte LandingNav', () => {
     expect(seite).toMatch(/<KundeShellMitSitzung>/)
@@ -806,15 +813,16 @@ describe('Aufbau der Seite', () => {
   })
 
   it('die Höfe hinter Suspense mit Skelett — Kopf und Suche warten nicht auf die Datenbank', () => {
-    expect(seite).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>\s*<HofKartenGeladen jetzt=\{jetzt\} \/>/)
+    expect(inhalt).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>\s*<HofKartenGeladen jetzt=\{jetzt\} \/>/)
   })
 
   it('die Karte hinter Suspense: bis die Höfe da sind, das Land ohne Pins (Nr. 59)', () => {
-    expect(seite).toMatch(/<Suspense fallback=\{<RegionsKarte form=\{form\} karte=\{null\} \/>\}>\s*<RegionsKarteGeladen form=\{form\} \/>/)
+    expect(inhalt).toMatch(/<Suspense fallback=\{<RegionsKarte form=\{form\} karte=\{null\} \/>\}>\s*<RegionsKarteGeladen form=\{form\} \/>/)
   })
 
   it('Liste und Karte aus EINER Abfrage — keine zweite für die Koordinaten', () => {
-    expect(code('src/app/page.tsx').match(/ladeOeffentlicheHoefe\(/g)).toHaveLength(1)
+    expect(code('src/components/startseite/startseiten-inhalt.tsx').match(/ladeOeffentlicheHoefe\(/g)).toHaveLength(1)
+    expect(code('src/app/page.tsx')).not.toMatch(/ladeOeffentlicheHoefe\(/)
   })
 
   // Seit Nr. 96 (Register N16) kommt die Reihenfolge aus Admin › Startseite;
@@ -832,8 +840,8 @@ describe('Aufbau der Seite', () => {
     expect(reihe.every((stelle) => stelle > 0)).toBe(true)
     expect([...reihe].sort((a, b) => a - b)).toEqual(reihe)
     // Kopf und Höfe rendert die Seite selbst, die übrigen Abschnitte kommen aus ihrer Tabelle.
-    expect(seite).toMatch(/case 'KOPF':\s*return \(\s*<StartseiteKopf/)
-    expect(seite).toMatch(/case 'HOEFE':\s*return \(\s*<HoefeInDerNaehe/)
-    expect(seite).toMatch(/STARTSEITE_ABSCHNITTE\[eintrag\.art\]/)
+    expect(inhalt).toMatch(/case 'KOPF':\s*return \(\s*<StartseiteKopf/)
+    expect(inhalt).toMatch(/case 'HOEFE':\s*return \(\s*<HoefeInDerNaehe/)
+    expect(inhalt).toMatch(/STARTSEITE_ABSCHNITTE\[eintrag\.art\]/)
   })
 })

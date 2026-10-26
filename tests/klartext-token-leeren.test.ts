@@ -26,9 +26,11 @@ vi.mock('@/lib/prisma', () => ({
     order: { updateMany: m.updateMany },
     // Seit Nr. 158 räumt raeumeAltesAuf auch das Mail-Protokoll auf; eigene Attrappe, damit
     // m.updateMany nur das Leeren der Klartext-Token zählt.
-    mailAuftrag: { deleteMany: vi.fn(async () => m.nichts), updateMany: vi.fn(async () => m.nichts) },
+    mailAuftrag: { deleteMany: vi.fn(async () => m.nichts) },
   },
 }))
+// Seit Nr. 170 sichert das Aufräumen vorher die Zahl der gesendeten Beitrags-Mails.
+vi.mock('@/server/mail-arten/beitrag', () => ({ sichereGesendeteBeitragsMails: vi.fn(async () => 0) }))
 
 import { raeumeAltesAuf } from '@/server/aufraeumen'
 import { BAR_HASH_PRAEFIX, barTokenHash } from '@/lib/bar-bestaetigung'

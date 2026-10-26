@@ -37,7 +37,8 @@ describe('ladeOeffentlicheHoefe', () => {
   })
 
   it('Startseite und /hoefe nutzen dieselbe Funktion und keinen eigenen Cache', () => {
-    for (const seite of ['src/app/page.tsx', 'src/app/(public)/hoefe/page.tsx']) {
+    // Die Startseite lädt ihre Höfe seit Nr. 182 im Baustein startseiten-inhalt (auch für die Vorschau).
+    for (const seite of ['src/components/startseite/startseiten-inhalt.tsx', 'src/app/(public)/hoefe/page.tsx']) {
       const text = quelle(seite)
       expect(text, seite).toContain("from '@/server/queries/oeffentliche-hoefe'")
       expect(text, seite).toMatch(/\bladeOeffentlicheHoefe\(\)/)

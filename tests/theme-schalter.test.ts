@@ -6,8 +6,8 @@
  *  - Das Layout lässt next-themes data-theme setzen — per Inline-Skript vor der
  *    Hydration, Erstbesuch nach der Systemeinstellung, Wahl gespeichert.
  *  - Fraunces und Instrument Sans kommen über next/font; nirgends im Produkt
- *    wird eine Schrift von Google geladen; Instrument Sans wird nicht
- *    vorgeladen, solange keine Route sie nutzt.
+ *    wird eine Schrift von Google geladen; Instrument Sans wird vorgeladen,
+ *    Geist nicht (Nr. 172).
  *  - ESLint weist Farbliterale (Hex, rgb, hsl, oklch) in allem Neuen unter src/
  *    ab und lässt Tokens durch; nur der gelistete Bestand ist ausgenommen.
  */
@@ -52,11 +52,30 @@ describe('Schriften über next/font', () => {
     expect(layout).toMatch(/className=\{`[^`]*\$\{fraunces\.variable\}[^`]*\$\{instrumentSans\.variable\}/)
   })
 
-  it('Instrument Sans wird noch nicht vorgeladen — keine Route nutzt sie', () => {
-    const anfang = layout.indexOf('Instrument_Sans({')
-    const aufruf = layout.slice(anfang, layout.indexOf('})', anfang))
-    expect(aufruf).toContain('preload: false')
+  it('Instrument Sans wird vorgeladen, Geist nicht — die Shells nutzen die erste (Nr. 172)', () => {
+    const aufruf = (name: string) => {
+      const anfang = layout.indexOf(`${name}({`)
+      return layout.slice(anfang, layout.indexOf('})', anfang))
+    }
+    expect(aufruf('Instrument_Sans')).toContain('preload: true')
+    expect(aufruf('Instrument_Sans')).not.toContain('preload: false')
+    expect(aufruf('Geist')).toContain('preload: false')
+    // Gegenprobe: Der alte Kommentar ist weg.
+    expect(layout).not.toContain('Noch nicht vorladen')
   })
+
+  it('Fraunces kursiv bleibt nur, solange es eine Fundstelle gibt', () => {
+    const fundstellen: string[] = []
+    const suche = (ordner: string) => {
+      for (const e of readdirSync(ordner, { withFileTypes: true })) {
+        const pfad = join(ordner, e.name)
+        if (e.isDirectory()) suche(pfad)
+        else if (/\.tsx$/.test(e.name) && /font-heading[^'"`]*\bitalic\b|\bitalic\b[^'"`]*font-heading/.test(readFileSync(pfad, 'utf8'))) fundstellen.push(pfad)
+      }
+    }
+    suche(join(process.cwd(), 'src'))
+    expect(fundstellen.length > 0).toBe(layout.includes("style: ['normal', 'italic']"))
+  }, 30_000)
 
   it('kein Google-CDN im Produkt', () => {
     const dateien = readdirSync(join(process.cwd(), 'src'), { recursive: true, withFileTypes: true })

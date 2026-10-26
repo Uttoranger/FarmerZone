@@ -22,7 +22,6 @@ vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: vi.fn(async () => ({ id: 'cmfhof00000000000000test' })) }))
 vi.mock('@/server/queries/postfach', () => ({
   ladeBetreiberEmpfaenger: vi.fn(async () => ['team@example.com']),
-  ladeAntwortFuerTeam: vi.fn(async () => ({ hofName: 'Testhof A', titel: 'Erfundener Titel' })),
 }))
 vi.mock('@/server/bremse-datenbank', () => ({ bremseUeberAlleInstanzen: vi.fn(async () => true) }))
 // Die Mail an das Team ist seit Nr. 159 je Adresse ein Auftrag der Warteschlange.

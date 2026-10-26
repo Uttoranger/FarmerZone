@@ -9,6 +9,7 @@ import { SERVICEGEBUEHR_HINWEIS, centsAlsEuro } from '@/lib/servicegebuehr'
 import {
   GEBUEHR_ENTFAELLT,
   KONTAKT_HINWEIS,
+  PREISE_INKL_UST,
   RESERVIERUNG_MINUTEN,
   zahlungAbgelehntText,
   type AbholKachel,
@@ -144,11 +145,11 @@ export function KorbKarte({
     <section aria-labelledby="kasse-korb" className={KARTE}>
       <div className="flex items-baseline gap-3">
         <h2 id="kasse-korb" className={cn(KARTEN_TITEL, 'min-w-0 flex-1 text-[19px] break-words')}>
-          Dein Korb bei <span title={hofName}>{hofName}</span>
+          Dein Warenkorb bei <span title={hofName}>{hofName}</span>
         </h2>
         {aendernHref && (
           <Link href={aendernHref} className={cn(TEXTLINK, 'shrink-0')}>
-            Korb ändern
+            Warenkorb ändern
           </Link>
         )}
       </div>
@@ -338,6 +339,7 @@ export function UebersichtKarte({
         <span>Gesamt</span>
         <span className="ml-auto tabular-nums">{formatEuro(centsAlsEuro(betraege.gesamtCents))}</span>
       </p>
+      <p className={cn(HINWEIS, '-mt-1.5')}>{PREISE_INKL_UST}</p>
       {fehler}
       {children}
     </section>

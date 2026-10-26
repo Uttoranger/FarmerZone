@@ -1,6 +1,7 @@
 /**
- * Kopfzeile der Kundenseiten (src/lib/kunden-kopf.ts): welche Seite welche
- * Form bekommt und wohin „Zurück" führt — rein, ohne Browser.
+ * Rückwege der Kundenseiten (src/lib/kunden-kopf.ts): wohin „Zurück" führt —
+ * rein, ohne Browser. Die Kopfzeile (KundenKopf) und ihre Form (kopfForm) sind
+ * seit Nr. 181 entfernt; hier steht, dass keine Seite sie mehr trägt.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -9,7 +10,6 @@ import { angezeigterBereich, hoefeLink } from '@/lib/bereiche-anzeige'
 import { bereichAusParameter } from '@/schemas/hoefe-filter'
 import {
   eigenerVorgaenger,
-  kopfForm,
   merkeVorgaenger,
   ordneWechsel,
   rueckweg,
@@ -23,12 +23,11 @@ const HOFSEITE: KundenSeite = { art: 'hofseite', hofSlug: 'testhof', bereich: 'L
 const FUTTER_HOFSEITE: KundenSeite = { art: 'hofseite', hofSlug: 'testhof', bereich: 'FUTTERMITTEL' }
 const CHECKOUT: KundenSeite = { art: 'checkout', hofSlug: 'testhof' }
 const HOFUEBERSICHT: KundenSeite = { art: 'hofuebersicht' }
-const INFO: KundenSeite = { art: 'info' }
 const PRODUKT: KundenSeite = { art: 'produkt', hofSlug: 'testhof' }
 // Bestätigung, Bestellseite und Bar-Bestätigung tragen seit Nr. 13 bzw. 54 die
 // KundeShell bzw. die Fokus-Shell; ihre Wege hinaus prüfen die Tests der Seiten
 // (tests/bestellverfolgung-zugang.test.ts, tests/alte-seiten-neues-design.test.ts).
-const ALLE = [HOFSEITE, FUTTER_HOFSEITE, CHECKOUT, HOFUEBERSICHT, INFO, PRODUKT]
+const ALLE = [HOFSEITE, FUTTER_HOFSEITE, CHECKOUT, HOFUEBERSICHT, PRODUKT]
 
 describe('rueckweg — Hofseite', () => {
   it('vom eigenen Verlauf: einen Schritt zurück, dorthin, wo der Kunde herkam', () => {
@@ -70,10 +69,6 @@ describe('rueckweg — Produktseite (Nr. 11)', () => {
     expect(zeileNimmtVerlauf(PRODUKT, '/hoefe')).toBe(false)
     expect(zeileNimmtVerlauf(PRODUKT, null)).toBe(false)
   })
-
-  it('Form wie im Bestellweg: Zurück und Rückweg-Zeile', () => {
-    expect(kopfForm(PRODUKT)).toEqual({ zurueck: true, warenkorb: false, rueckwegZeile: true })
-  })
 })
 
 describe('rueckweg — übrige Seiten', () => {
@@ -82,39 +77,12 @@ describe('rueckweg — übrige Seiten', () => {
     expect(rueckweg(HOFUEBERSICHT, false)).toEqual({ href: '/', verlauf: false })
   })
 
-  it('Impressum und Co.: vom eigenen Verlauf zurück, sonst zur Hofübersicht', () => {
-    expect(rueckweg(INFO, true)).toEqual({ href: '/hoefe', verlauf: true })
-    expect(rueckweg(INFO, false)).toEqual({ href: '/hoefe', verlauf: false })
-  })
-
   it('jeder Rückweg ist ein eigener Pfad — nie eine fremde Adresse', () => {
     for (const seite of ALLE) {
       for (const eigen of [true, false]) {
         expect(rueckweg(seite, eigen).href, seite.art).toMatch(/^\/(?!\/)/)
       }
     }
-  })
-})
-
-describe('kopfForm — welche Seite welche Form bekommt', () => {
-  it('Zurück in der Handy-Leiste überall, wo es woanders hinführt als das Bildmarke', () => {
-    for (const seite of [HOFSEITE, FUTTER_HOFSEITE, CHECKOUT, INFO]) {
-      expect(kopfForm(seite).zurueck, seite.art).toBe(true)
-    }
-    // Die Hofübersicht führt hinauf zur Startseite — das tut das Bildmarke schon.
-    expect(kopfForm(HOFUEBERSICHT).zurueck).toBe(false)
-  })
-  it('Warenkorb-Symbol weder auf der Hofseite noch im Checkout — sonst ja', () => {
-    expect(kopfForm(HOFSEITE).warenkorb).toBe(false)
-    expect(kopfForm(CHECKOUT).warenkorb).toBe(false)
-    for (const seite of [HOFUEBERSICHT, INFO]) expect(kopfForm(seite).warenkorb, seite.art).toBe(true)
-  })
-
-  it('im Browser eine Rückweg-Zeile nur dort, wo die Kopfzeile selbst nicht zurückführt', () => {
-    for (const seite of [HOFSEITE, CHECKOUT]) {
-      expect(kopfForm(seite).rueckwegZeile, seite.art).toBe(true)
-    }
-    for (const seite of [HOFUEBERSICHT, INFO]) expect(kopfForm(seite).rueckwegZeile, seite.art).toBe(false)
   })
 })
 
@@ -300,8 +268,8 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     'src/app/(public)/impressum/page.tsx': [],
     // Die AGB (Nr. 90, Register O4) sind gleich in der KundeShell entstanden.
     'src/app/(public)/agb/page.tsx': [],
-    // Der Datenschutz zieht erst mit Nr. 57 um — bis dahin der letzte KundenKopf.
-    'src/app/(public)/datenschutz/page.tsx': ['info'],
+    // Der Datenschutz steht seit Nr. 181 in der KundeShell — der letzte KundenKopf ist entfernt.
+    'src/app/(public)/datenschutz/page.tsx': [],
     'src/app/(public)/konditionen/page.tsx': [],
     'src/app/(public)/problem-melden/page.tsx': [],
     // Die Hofseite trägt seit Nr. 10 die KundeShell (siehe unten).
@@ -328,7 +296,8 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     expect(seiten.sort()).toEqual(Object.keys(ARTEN).sort())
   })
 
-  it('jede Seite rendert KundenKopf mit ihrer Art', () => {
+  it('keine Seite rendert noch KundenKopf (Gegenprobe: die Suche würde ihn finden)', () => {
+    expect([..."<KundenKopf seite={{ art: 'info' }} />".matchAll(/<KundenKopf\s+seite=\{\{\s*art:\s*'([a-z-]+)'/g)].map((m) => m[1])).toEqual(['info'])
     for (const [datei, arten] of Object.entries(ARTEN)) {
       const text = lies(datei)
       const gefunden = [...text.matchAll(/<KundenKopf\s+seite=\{\{\s*art:\s*'([a-z-]+)'/g)].map((m) => m[1])
@@ -337,7 +306,7 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
   })
 
   it('die Hofseite trägt die KundeShell des neuen Designs und keine zweite Kopfzeile (Nr. 10)', () => {
-    expect(lies('src/app/(public)/[farmSlug]/page.tsx')).toMatch(/<KundeShellMitSitzung>/)
+    expect(lies('src/app/(public)/[farmSlug]/page.tsx')).toMatch(/<KundeShellMitSitzung aktiv="entdecken">/)
     for (const datei of ['src/components/farm/farm-page-view.tsx', 'src/components/hofseite/hofseite-kunde.tsx']) {
       expect(lies(datei), datei).not.toMatch(/<KundenKopf\b|TitelbildTeilen/)
     }
@@ -361,7 +330,8 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     expect(text).toMatch(/setBestellungAngelegt\(true\)\s*setZahlung\(/)
     // Laden, leerer Korb, Zahlung und Formular — alle in derselben Fokus-Shell.
     expect(text.match(/fokusShell\(/g)?.length).toBeGreaterThanOrEqual(4)
-    expect(text.match(/<KundeFokusShell\b/g)).toHaveLength(1)
+    // Zwei Stellen: die Kasse selbst und die Kasse eines pausierten Hofs (KassePausiert, Nr. 176).
+    expect(text.match(/<KundeFokusShell\b/g)).toHaveLength(2)
   })
 
   it('die Bestätigungsseite trägt die KundeShell ohne Unterleiste, nie den Verlauf als Rückweg (Nr. 13)', () => {
@@ -370,7 +340,7 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     expect(text.match(/<KundeShellMitSitzung unterleiste=\{false\}>/g)).toHaveLength(2)
     expect(text).not.toMatch(/<KundenKopf\b|router\.back|history\.back/)
     // Gegenprobe: Die Suche findet die Hülle ohne Unterleiste auf der Produktseite.
-    expect(lies('src/app/(public)/[farmSlug]/produkt/[id]/page.tsx')).toMatch(/<KundeShellMitSitzung unterleiste=\{false\}>/)
+    expect(lies('src/app/(public)/[farmSlug]/produkt/[id]/page.tsx')).toMatch(/<KundeShellMitSitzung unterleiste=\{false\} aktiv="entdecken">/)
   })
 
   it('die Startseite trägt die KundeShell des neuen Designs und keine zweite Kopfzeile', () => {
@@ -387,7 +357,8 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     // Über die Hülle, die die Sitzung im Browser liest — keine Sitzungsabfrage je Aufruf.
     expect(text).toMatch(/<KundeShellMitSitzung>/)
     expect(text).not.toMatch(/KundenKopf|headers\(\)|auth\.api/)
-    // Gegenprobe: Die Suche findet KundenKopf, wo er noch steht (Datenschutz, bis Nr. 57).
-    expect(lies('src/app/(public)/datenschutz/page.tsx')).toMatch(/KundenKopf/)
+    // Der Datenschutz trägt die KundeShell (Nr. 181), nicht mehr den alten Kopf.
+    expect(lies('src/app/(public)/datenschutz/page.tsx')).toMatch(/<KundeShellMitSitzung>/)
+    expect(lies('src/app/(public)/datenschutz/page.tsx')).not.toMatch(/KundenKopf/)
   })
 })
