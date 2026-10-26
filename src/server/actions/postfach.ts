@@ -43,6 +43,8 @@ import { PLATTFORM_EINSTELLUNG_ID, PLATTFORM_EINSTELLUNG_TAG } from '@/lib/platt
 import { DB_BREMSEN } from '@/lib/bremse-datenbank'
 import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
+import { protokolliere } from '@/server/admin-protokoll'
+import { PLATTFORM_BEZUG } from '@/schemas/admin-aktion'
 import { verschickeRundschreiben, type RundschreibenErgebnis } from '@/server/rundschreiben'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { empfaengerTokenHash, ladeZustellung } from '@/server/queries/postfach'
@@ -255,7 +257,7 @@ export async function antworteAlsTeam(eingabe: unknown): Promise<TeamAntwortErge
   if (!geprueft.success) return { error: satzAus(geprueft.error) }
   const { unterhaltungId, text, wichtig, link, perMail } = geprueft.data
 
-  const guard = await verlangeAdminAktion()
+  const guard = await verlangeAdminAktion({ recht: 'ansehen' })
   if ('error' in guard) return { error: guard.error }
 
   const jetzt = new Date()
@@ -270,6 +272,8 @@ export async function antworteAlsTeam(eingabe: unknown): Promise<TeamAntwortErge
     return nachricht
   })
   if (!angelegt) return { error: POSTFACH_FEHLER.nichtGefunden }
+  // Bezug ist der Hof des Fadens — nie der Text der Antwort (N33).
+  await protokolliere({ wer: guard.userId, art: 'team_antwort', bezugArt: 'hof', bezugId: angelegt.unterhaltung.farmId, mitPasskey: guard.mitPasskey })
 
   let mail: 'unterwegs' | 'gedrosselt' | 'aus' = 'aus'
   if (perMail) {
@@ -305,7 +309,7 @@ export async function markiereGelesenTeam(eingabe: unknown): Promise<Ergebnis> {
   if (!geprueft.success) return { error: satzAus(geprueft.error) }
   const { unterhaltungId, nachrichtId } = geprueft.data
 
-  const guard = await verlangeAdminAktion()
+  const guard = await verlangeAdminAktion({ recht: 'ansehen' })
   if ('error' in guard) return { error: guard.error }
 
   const nachricht = await prisma.nachricht.findFirst({ where: { id: nachrichtId, unterhaltungId }, select: { createdAt: true } })
@@ -326,15 +330,16 @@ export async function markiereGelesenTeam(eingabe: unknown): Promise<Ergebnis> {
  */
 export async function markiereErstattungErledigt(eingabe: unknown): Promise<Ergebnis> {
   // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
-  const frisch = await verlangeFrischeBestaetigung()
+  const frisch = await verlangeFrischeBestaetigung({ recht: 'geld' })
   if ('error' in frisch) return { error: frisch.error }
   const geprueft = erstattungErledigtSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: satzAus(geprueft.error) }
 
-  await prisma.order.updateMany({
+  const { count } = await prisma.order.updateMany({
     where: { id: geprueft.data.orderId, erstattungOffenSeit: { not: null } },
     data: { erstattungOffenSeit: null },
   })
+  if (count > 0) await protokolliere({ wer: frisch.userId, art: 'erstattung_erledigt', bezugArt: 'bestellung', bezugId: geprueft.data.orderId, mitPasskey: frisch.mitPasskey })
   revalidatePath(ADMIN_POSTFACH_HREF)
   return { ok: true }
 }
@@ -347,9 +352,12 @@ export async function markiereErstattungErledigt(eingabe: unknown): Promise<Erge
  * ruft den Versand direkt, mit der Wache seiner eigenen Aktion.
  */
 export async function sendeRundschreiben(eingabe: unknown): Promise<RundschreibenErgebnis> {
-  const frisch = await verlangeFrischeBestaetigung()
+  // Recht „Höfe“ (N35): Ein Rundschreiben spricht für die Plattform zu den Höfen (Annahme Nr. 188, s. ARCHITECTURE).
+  const frisch = await verlangeFrischeBestaetigung({ recht: 'hoefe_freischalten' })
   if ('error' in frisch) return { error: frisch.error }
-  return verschickeRundschreiben(eingabe, frisch.userId)
+  const ergebnis = await verschickeRundschreiben(eingabe, frisch.userId)
+  if ('ok' in ergebnis) await protokolliere({ wer: frisch.userId, art: 'rundschreiben_gesendet', bezugArt: 'plattform', bezugId: PLATTFORM_BEZUG, mitPasskey: frisch.mitPasskey })
+  return ergebnis
 }
 
 // ─── Zustellung (Register N14, Nr. 95) ───────────────────────────────────────
@@ -367,7 +375,7 @@ export type HinzufuegenErgebnis = { ok: true; email: string } | { error: string 
  */
 export async function fuegeEmpfaengerHinzu(eingabe: unknown): Promise<HinzufuegenErgebnis> {
   // Heikle Aktion (Register N20, Ergänzung 23.10.2026): nur frisch mit Passkey bestätigt, vor der Prüfung der Eingabe.
-  const guard = await verlangeFrischeBestaetigung()
+  const guard = await verlangeFrischeBestaetigung({ recht: 'benachrichtigungen' })
   if ('error' in guard) return { error: guard.error }
   const geprueft = empfaengerHinzufuegenSchema.safeParse(eingabe)
   if (!geprueft.success) {
@@ -392,6 +400,8 @@ export async function fuegeEmpfaengerHinzu(eingabe: unknown): Promise<Hinzufuege
       throw err
     }
   }
+  // Bezug ist die Plattform — die Adresse steht nie im Protokoll (N33).
+  await protokolliere({ wer: guard.userId, art: 'empfaenger_hinzugefuegt', bezugArt: 'plattform', bezugId: PLATTFORM_BEZUG, mitPasskey: guard.mitPasskey })
 
   nachDerAntwort(async () => {
     try {
@@ -416,14 +426,15 @@ function meldeZustellung(err: unknown, aufgabe: string): void {
 
 /** Eine weitere Adresse entfernen — sofort; ab dann bekommt sie nichts mehr. */
 export async function entferneEmpfaenger(eingabe: unknown): Promise<Ergebnis> {
+  // Heikel (Audit D10; Nr. 188): ab sofort bekommt die Adresse nichts mehr — frisch mit Passkey bestätigt, vor der Prüfung der Eingabe.
+  const guard = await verlangeFrischeBestaetigung({ recht: 'benachrichtigungen' })
+  if ('error' in guard) return { error: guard.error }
   const geprueft = empfaengerEntfernenSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: ZUSTELLUNG_FEHLER.eingabe }
 
-  const guard = await verlangeAdminAktion()
-  if ('error' in guard) return { error: guard.error }
-
   const { count } = await prisma.betreiberEmpfaenger.deleteMany({ where: { id: geprueft.data.id } })
   if (count === 0) return { error: ZUSTELLUNG_FEHLER.nichtGefunden }
+  await protokolliere({ wer: guard.userId, art: 'empfaenger_entfernt', bezugArt: 'plattform', bezugId: PLATTFORM_BEZUG, mitPasskey: guard.mitPasskey })
   revalidatePath(ADMIN_POSTFACH_HREF)
   return { ok: true }
 }
@@ -435,11 +446,11 @@ export async function entferneEmpfaenger(eingabe: unknown): Promise<Ergebnis> {
  * (Nr. 93). Danach das Etikett der gecachten Einstellung leeren.
  */
 export async function speichereZustellRegeln(eingabe: unknown): Promise<Ergebnis> {
+  // Heikel (Audit D10; Nr. 188): die Regeln wirken sofort auf die Zustellung — frisch mit Passkey bestätigt, vor der Prüfung der Eingabe.
+  const guard = await verlangeFrischeBestaetigung({ recht: 'benachrichtigungen' })
+  if ('error' in guard) return { error: guard.error }
   const geprueft = zustellRegelnSpeichernSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: ZUSTELLUNG_FEHLER.eingabe }
-
-  const guard = await verlangeAdminAktion()
-  if ('error' in guard) return { error: guard.error }
 
   const zustellRegeln = geprueft.data
   await prisma.plattformEinstellung.upsert({
@@ -447,6 +458,7 @@ export async function speichereZustellRegeln(eingabe: unknown): Promise<Ergebnis
     create: { id: PLATTFORM_EINSTELLUNG_ID, zustellRegeln },
     update: { zustellRegeln },
   })
+  await protokolliere({ wer: guard.userId, art: 'zustellregeln_geaendert', bezugArt: 'plattform', bezugId: PLATTFORM_BEZUG, mitPasskey: guard.mitPasskey })
   // updateTag statt revalidateTag: In Next 16 verlangt revalidateTag ein Profil (wie Nr. 93).
   updateTag(PLATTFORM_EINSTELLUNG_TAG)
   revalidatePath(ADMIN_POSTFACH_HREF)
@@ -457,7 +469,7 @@ export type TestmailErgebnis = { ok: true; empfaenger: number } | { error: strin
 
 /** „Testmail an alle senden": an die ganze Liste (SUPPORT_EMAIL und jede bestätigte Adresse), höchstens eine je Minute. */
 export async function sendeTestmail(): Promise<TestmailErgebnis> {
-  const guard = await verlangeAdminAktion()
+  const guard = await verlangeAdminAktion({ recht: 'benachrichtigungen' })
   if ('error' in guard) return { error: guard.error }
   if (process.env.NODE_ENV === 'production' && !testmailDrossel.check('alle')) return { error: ZUSTELLUNG_FEHLER.testZuOft }
 
@@ -468,5 +480,6 @@ export async function sendeTestmail(): Promise<TestmailErgebnis> {
   } catch (err) {
     meldeZustellung(err, 'testmail')
   }
+  await protokolliere({ wer: guard.userId, art: 'testmail_gesendet', bezugArt: 'plattform', bezugId: PLATTFORM_BEZUG, mitPasskey: guard.mitPasskey })
   return { ok: true, empfaenger: an.length }
 }

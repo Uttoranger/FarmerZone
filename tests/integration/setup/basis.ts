@@ -150,7 +150,8 @@ export async function erstelleHofMitAnmeldung(
  * Die Zeilen gehen mit dem Konto per Cascade.
  */
 export async function machePasskeyAdmin(userId: string): Promise<void> {
-  await prisma.user.update({ where: { id: userId }, data: { isAdmin: true } })
+  // Bestehende Admins sind seit Nr. 188 Inhaber (N35, Migration 20261026100000_regelbetrieb).
+  await prisma.user.update({ where: { id: userId }, data: { isAdmin: true, adminInhaber: true } })
   await prisma.passkey.create({
     data: { id: intKennung('passkey'), userId, publicKey: 'int-schluessel', credentialID: intKennung('credential'), counter: 0, deviceType: 'singleDevice', backedUp: false },
   })

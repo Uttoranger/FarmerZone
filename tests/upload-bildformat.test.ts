@@ -25,6 +25,7 @@
  * HEIC besteht hier nur die Byte-Prüfung: Das vorgebaute sharp dekodiert HEIC
  * nicht, ein echtes HEIC-Original endet an sharp mit 415.
  */
+import { adminSitzung } from './admin-sitzung'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const s = vi.hoisted(() => {
@@ -48,7 +49,10 @@ const s = vi.hoisted(() => {
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
-vi.mock('@/lib/prisma', () => ({ prisma: { farm: { findUnique: vi.fn() }, user: { findUnique: vi.fn() } } }))
+// Seit Nr. 188 prüft der Startseiten-Weg über die echte Admin-Wache (Passkey der Sitzung, Recht „Startseite“) — Sitzung aus tests/admin-sitzung.ts.
+vi.mock('@/lib/prisma', async () => ({
+  prisma: { farm: { findUnique: vi.fn() }, user: { findUnique: vi.fn() }, session: { deleteMany: vi.fn() }, ...(await import('./admin-sitzung')).passkeyAttrappen() },
+}))
 vi.mock('@vercel/blob', () => ({ put: vi.fn(async (pfad: string) => ({ url: `https://speicher.public.blob.vercel-storage.com/${pfad}` })), del: vi.fn() }))
 vi.mock('sharp', () => ({ default: s.sharp }))
 vi.mock('@vercel/blob/client', () => ({
@@ -121,9 +125,9 @@ function alsHof(): void {
 }
 
 function alsAdminOhneHof(): void {
-  vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'admin-1', role: 'CUSTOMER' } } as never)
+  vi.mocked(auth.api.getSession).mockResolvedValue(adminSitzung('admin-1', { role: 'CUSTOMER' }) as never)
   vi.mocked(prisma.farm.findUnique).mockResolvedValue(null as never)
-  vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true, createdAt: new Date('2020-01-01'), emailVerified: true } as never)
+  vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true, adminInhaber: true, createdAt: new Date('2020-01-01'), emailVerified: true } as never)
 }
 
 beforeEach(() => {

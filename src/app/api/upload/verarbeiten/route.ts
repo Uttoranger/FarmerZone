@@ -17,7 +17,7 @@ import {
 import { BILD_PIXEL_GRENZE, formatFuerSharp, istPixelGrenzeFehler, sperreFremdeLader } from '@/lib/bild-format'
 import { UPLOAD_GESPERRT_TEXT } from '@/lib/email-bestaetigung'
 import { emailBestaetigungOffen } from '@/server/email-bestaetigung'
-import { isAdminUser } from '@/server/queries/admin'
+import { verlangeAdminAktion } from '@/server/admin-wache'
 
 /**
  * Verkleinert ein hochgeladenes Original und legt das Ergebnis ab.
@@ -143,14 +143,16 @@ async function verarbeiteUndLege(
 
 /**
  * Ein Bild für einen Block der Startseite (Register N16, Nr. 96): nur mit
- * Admin-Sitzung (frisch aus der Datenbank), nur aus dem Ordner der Startseite,
+ * Admin-Sitzung über die Admin-Wache (Nr. 188, Audit A2/B1: Recht frisch aus
+ * der Datenbank, 12 Stunden, Passkey der Sitzung, Recht „Startseite
+ * veröffentlichen“), nur aus dem Ordner der Startseite,
  * quadratisch (1:1) mit der langen Kante höchstens 1600 px — und nicht unter
  * STARTSEITE_MIN_KANTE, sonst wird es auf großen Schirmen unscharf. Ein altes
  * Bild löscht diese Route NICHT: Es kann noch an einem gespeicherten Block
  * hängen, solange das Formular nicht gespeichert ist.
  */
-async function verarbeiteStartseitenBild(userId: string, url: string): Promise<NextResponse> {
-  if (!(await isAdminUser(userId))) {
+async function verarbeiteStartseitenBild(url: string): Promise<NextResponse> {
+  if (!('ok' in (await verlangeAdminAktion({ recht: 'startseite_veroeffentlichen' })))) {
     return NextResponse.json({ error: 'Kein Zugriff', art: 'server' }, { status: 403 })
   }
   if (!darfStartseitenBildVerarbeitetWerden(url)) {
@@ -198,7 +200,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // Zweck 'startseite' prüft die Admin-Sitzung statt der Hof-Sitzung — alle
   // anderen Zwecke laufen unverändert weiter unten.
   if (gelesen?.zweck === 'startseite') {
-    return verarbeiteStartseitenBild(session.user.id, typeof gelesen.url === 'string' ? gelesen.url : '')
+    return verarbeiteStartseitenBild(typeof gelesen.url === 'string' ? gelesen.url : '')
   }
 
   const rolle = (session.user as typeof session.user & { role?: string }).role

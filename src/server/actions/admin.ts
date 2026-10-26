@@ -5,6 +5,8 @@ import * as Sentry from '@sentry/nextjs'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
+import { protokolliere } from '@/server/admin-protokoll'
+import { plattformBezug } from '@/schemas/admin-aktion'
 import {
   FARM_REJECT_APPROVED_MESSAGE,
   FARM_REJECT_HAS_DATA_MESSAGE,
@@ -108,8 +110,8 @@ async function legeGruendungsNachrichtAn(farmId: string, zusage: { platz: number
  * die Zusage-Mail) läuft automatisch.
  */
 export async function approveFarmAction(farmId: string): Promise<{ error?: string }> {
-  // Heikle Aktion (Register N20, Ergänzung 23.10.2026): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion.
-  const guard = await verlangeFrischeBestaetigung()
+  // Heikle Aktion (Register N20, Ergänzung 23.10.2026): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion; Recht nach N35.
+  const guard = await verlangeFrischeBestaetigung({ recht: 'hoefe_freischalten' })
   if ('error' in guard) return { error: guard.error }
 
   const farm = await prisma.farm.findUnique({
@@ -204,6 +206,8 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
     throw err
   }
   if (freigabe === null) return { error: FREISCHALTUNG_GEAENDERT_TEXT }
+  // Protokoll nach der Wirkung (N33) — wirft nie.
+  await protokolliere({ wer: guard.userId, art: 'hof_freigeschaltet', bezugArt: 'hof', bezugId: farmId, mitPasskey: guard.mitPasskey })
   revalidateAll(farm.slug)
   // Höfe-Liste und Startseite lesen über den Fünf-Minuten-Cache: Der frische Hof und sein Abzeichen
   // erscheinen sofort, ebenso die Zahlen des Erklär-Blatts. /konditionen zeigt den Abschnitt Aktion
@@ -244,13 +248,14 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
  */
 export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?: string }> {
   // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
-  const frisch = await verlangeFrischeBestaetigung()
+  const frisch = await verlangeFrischeBestaetigung({ recht: 'hoefe_freischalten' })
   if ('error' in frisch) return { error: frisch.error }
 
   const farm = await prisma.farm.findUnique({ where: { id: farmId }, select: { slug: true } })
   if (!farm) return { error: 'Hof nicht gefunden.' }
 
   await prisma.farm.update({ where: { id: farmId }, data: { approvedAt: null } })
+  await protokolliere({ wer: frisch.userId, art: 'hof_freigabe_entzogen', bezugArt: 'hof', bezugId: farmId, mitPasskey: frisch.mitPasskey })
   revalidateAll(farm.slug)
   // Höfe-Liste und Startseite lesen über den Fünf-Minuten-Cache: Der Hof verschwindet dort sofort.
   updateTag(HOEFE_CACHE_TAG)
@@ -283,7 +288,7 @@ export async function revokeFarmApprovalAction(farmId: string): Promise<{ error?
  */
 export async function rejectFarmAction(farmId: string): Promise<{ error?: string }> {
   // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
-  const frisch = await verlangeFrischeBestaetigung()
+  const frisch = await verlangeFrischeBestaetigung({ recht: 'hoefe_freischalten' })
   if ('error' in frisch) return { error: frisch.error }
 
   const farm = await prisma.farm.findUnique({
@@ -333,6 +338,8 @@ export async function rejectFarmAction(farmId: string): Promise<{ error?: string
     prisma.farm.delete({ where: { id: farmId } }),
     prisma.user.delete({ where: { id: farm.ownerId } }),
   ])
+  // Nur die Kennungen — Hof und Konto gibt es danach nicht mehr, der Eintrag bleibt (kein Fremdschlüssel).
+  await protokolliere({ wer: frisch.userId, art: 'hof_abgelehnt', bezugArt: 'hof', bezugId: farmId, mitPasskey: frisch.mitPasskey })
 
   revalidateAll(farm.slug)
   return {}
@@ -355,7 +362,7 @@ export async function setServiceFeeAction(
   eingabe: { percent: unknown; minCents: unknown; activeFrom: unknown }
 ): Promise<{ error?: string }> {
   // Heikle Aktion (Register N20, Ergänzung 23.10.2026): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion.
-  const guard = await verlangeFrischeBestaetigung()
+  const guard = await verlangeFrischeBestaetigung({ recht: 'hoefe_freischalten' })
   if ('error' in guard) return { error: guard.error }
 
   const parsed = servicegebuehrEinstellungSchema.safeParse(eingabe)
@@ -386,6 +393,7 @@ export async function setServiceFeeAction(
       serviceFeeActiveFrom: giltAb,
     },
   })
+  await protokolliere({ wer: guard.userId, art: 'servicegebuehr_geaendert', bezugArt: 'hof', bezugId: farmId, mitPasskey: guard.mitPasskey })
 
   if (process.env.NODE_ENV !== 'production') {
     console.log(
@@ -423,7 +431,7 @@ export async function setzeGruendungBisAction(
   eingabe: { gruendungBis: unknown; bestaetigt: unknown }
 ): Promise<{ error?: string }> {
   // Heikle Aktion (Register N20, Ergänzung 23.10.2026): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion.
-  const guard = await verlangeFrischeBestaetigung()
+  const guard = await verlangeFrischeBestaetigung({ recht: 'hoefe_freischalten' })
   if ('error' in guard) return { error: guard.error }
 
   const jetzt = new Date()
@@ -460,6 +468,7 @@ export async function setzeGruendungBisAction(
     data: { gruendungBis: neu },
   })
   if (count === 0) return { error: GRUENDUNG_BIS_GEAENDERT }
+  await protokolliere({ wer: guard.userId, art: 'gruendung_bis_geaendert', bezugArt: 'hof', bezugId: farmId, mitPasskey: guard.mitPasskey })
 
   if (process.env.NODE_ENV !== 'production') {
     console.log(
@@ -530,7 +539,7 @@ export async function triageMeldungAction(
     vorherNotiz?: unknown
   }
 ): Promise<{ error?: string }> {
-  const guard = await verlangeAdminAktion()
+  const guard = await verlangeAdminAktion({ recht: 'ansehen' })
   if ('error' in guard) return { error: guard.error }
 
   const parsed = triageEingabeSchema.safeParse(eingabe)
@@ -585,6 +594,8 @@ export async function triageMeldungAction(
   if (count === 0) {
     return { error: duplikatVonId === null ? MELDUNG_GEAENDERT : MELDUNG_VERWEIS_GEAENDERT }
   }
+  // „Ansehen“ genügt (N35), aber mit Protokoll; Zusammenfassen und Trennen schreiben über diesen Weg.
+  await protokolliere({ wer: guard.userId, art: 'meldung_triagiert', bezugArt: 'plattform', bezugId: plattformBezug('meldung', meldungId), mitPasskey: guard.mitPasskey })
 
   if (process.env.NODE_ENV !== 'production') {
     console.log(`[DEV] Meldung triagiert: ${new Date().toISOString()} admin=${guard.userId} meldung=${meldungId} status=${triage.status}`)
@@ -617,7 +628,7 @@ const MELDUNG_FEHLT = 'Meldung nicht gefunden.'
  * Bedingung derselben Anweisung). Kein Mail an den Hof.
  */
 export async function fasseZusammenAction(eingabe: unknown): Promise<{ error?: string }> {
-  const guard = await verlangeAdminAktion()
+  const guard = await verlangeAdminAktion({ recht: 'ansehen' })
   if ('error' in guard) return { error: guard.error }
   const parsed = zusammenfassenSchema.safeParse(eingabe)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe.' }
@@ -638,7 +649,7 @@ export async function fasseZusammenAction(eingabe: unknown): Promise<{ error?: s
 
 /** Trennen in „Woraus": Das Duplikat wird wieder eine eigene, angesehene Meldung (GEPRUEFT, ohne Verweis). */
 export async function trenneDuplikatAction(eingabe: unknown): Promise<{ error?: string }> {
-  const guard = await verlangeAdminAktion()
+  const guard = await verlangeAdminAktion({ recht: 'ansehen' })
   if ('error' in guard) return { error: guard.error }
   const parsed = trennenSchema.safeParse(eingabe)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe.' }
@@ -696,7 +707,7 @@ async function schreibeKundinnen(meldungIds: readonly string[], gespeichertAm: D
  * leert „Geplant in".
  */
 export async function setzeBuendelStandAction(eingabe: unknown): Promise<BuendelStandErgebnis> {
-  const guard = await verlangeAdminAktion()
+  const guard = await verlangeAdminAktion({ recht: 'ansehen' })
   if ('error' in guard) return { error: guard.error }
   const parsed = buendelStandSchema.safeParse(eingabe)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe.' }
@@ -726,6 +737,8 @@ export async function setzeBuendelStandAction(eingabe: unknown): Promise<Buendel
     return [...eigene, ...duplikate]
   })
   if (!betroffen) return { error: 'Dieses Bündel gibt es nicht mehr – lade die Seite neu.' }
+  // Bezug ist die erste Meldung des Bündels (eine Kennung) — das Stichwort ist Freitext und bleibt draußen.
+  await protokolliere({ wer: guard.userId, art: 'meldung_buendel_stand', bezugArt: 'plattform', bezugId: plattformBezug('meldung', betroffen[0].id), mitPasskey: guard.mitPasskey })
 
   const hofIds = [...new Set(betroffen.flatMap((m) => (m.farmId ? [m.farmId] : [])))]
   // Je Adresse eine Meldung — eine Kundin bekommt den Bescheid einmal.
@@ -777,7 +790,8 @@ export async function setzeBuendelStandAction(eingabe: unknown): Promise<Buendel
  * Karte zeigte. Schon Abgelegtes und Duplikate legt sie nie ab.
  */
 export async function legeMeldungAbAction(eingabe: unknown): Promise<{ error?: string }> {
-  const guard = await verlangeAdminAktion()
+  // Heikel (Audit D10; Nr. 188): Ablegen schließt die Meldung und schreibt dem Hof — frisch mit Passkey bestätigt, „ansehen“ genügt.
+  const guard = await verlangeFrischeBestaetigung({ recht: 'ansehen' })
   if ('error' in guard) return { error: guard.error }
   const parsed = ablegenSchema.safeParse(eingabe)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe.' }
@@ -788,6 +802,7 @@ export async function legeMeldungAbAction(eingabe: unknown): Promise<{ error?: s
     data: { status: 'KEIN_FEHLER', antwortAnMelder: antwort, triagedAt: new Date() },
   })
   if (count === 0) return { error: MELDUNG_GEAENDERT }
+  await protokolliere({ wer: guard.userId, art: 'meldung_abgelegt', bezugArt: 'plattform', bezugId: plattformBezug('meldung', meldungId), mitPasskey: guard.mitPasskey })
 
   revalidatePath('/admin')
   revalidatePath('/admin/postfach')

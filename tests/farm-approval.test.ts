@@ -358,7 +358,7 @@ describe('öffentliche Hof-Query', () => {
 
 describe('Freigabe-Actions', () => {
   it('schaltet mit isAdmin frei und setzt approvedAt auf einen Zeitstempel', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
@@ -382,7 +382,7 @@ describe('Freigabe-Actions', () => {
   it('verschickt nach der Freischaltung die Zusage-Mail an den Inhaber', async () => {
     // Das automatische Glied der Aufnahme: Alle Wartetexte versprechen diese
     // Mail — hier steht fest, dass sie beim EINEN Admin-Klick wirklich fällt.
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
@@ -406,7 +406,7 @@ describe('Freigabe-Actions', () => {
   it('lässt die Freischaltung gelingen, auch wenn die Mail scheitert', async () => {
     // Der Hof ist ab dem Update öffentlich — eine kaputte Mail-Infrastruktur
     // darf das nicht rückgängig erscheinen lassen.
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
@@ -427,7 +427,7 @@ describe('Freigabe-Actions', () => {
   })
 
   it('schaltet ein neues Konto ohne bestätigte E-Mail NICHT frei — „Hof online stellen" ist gesperrt (S3, 17b)', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
@@ -446,7 +446,7 @@ describe('Freigabe-Actions', () => {
   })
 
   it('Gegenprobe: ein neues Konto MIT bestätigter E-Mail wird freigeschaltet', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
@@ -463,7 +463,7 @@ describe('Freigabe-Actions', () => {
   })
 
   it('schaltet einen Hof ohne fertiges Stripe-Konto NICHT frei (Register Z1) — keine Mail, nichts geschrieben', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
@@ -484,7 +484,7 @@ describe('Freigabe-Actions', () => {
   })
 
   it('schaltet auch einen Bar-Hof (acceptsOnline false) ohne Stripe NICHT frei — die Wahl „nur bar" gibt es nicht mehr (Z1)', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
@@ -505,7 +505,7 @@ describe('Freigabe-Actions', () => {
   })
 
   it('schaltet einen Hof mit fertigem Stripe frei', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
@@ -522,7 +522,7 @@ describe('Freigabe-Actions', () => {
   })
 
   it('fragt Stripe frisch aus der Datenbank ab', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     farmFindUnique.mockResolvedValue(null as never)
 
     await approveFarmAction('farm_1')
@@ -532,7 +532,7 @@ describe('Freigabe-Actions', () => {
   })
 
   it('schreibt die Freischaltung bedingt: nur mit fertigem Stripe und noch nicht freigeschaltet (dicht gegen Wettläufe)', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
@@ -555,7 +555,7 @@ describe('Freigabe-Actions', () => {
   })
 
   it('schaltet einen Hof ohne aktive Abholzeit NICHT frei (Z1-Ergänzung) — der Satz der Freigabe, nichts geschrieben', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
@@ -573,7 +573,7 @@ describe('Freigabe-Actions', () => {
   })
 
   it('trifft das bedingte Schreiben nichts (Stripe inzwischen weg oder schon frei), kommt eine Meldung — keine Mail', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
@@ -603,7 +603,7 @@ describe('Freigabe-Actions', () => {
   })
 
   it('ohne bestätigte E-Mail UND ohne Stripe nennt die Sperre zuerst die E-Mail — wie die Liste', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     farmFindUnique.mockResolvedValue({
       name: 'Testhof',
       slug: 'testhof',
@@ -619,7 +619,7 @@ describe('Freigabe-Actions', () => {
   })
 
   it('nimmt mit isAdmin die Freigabe zurück (approvedAt = null) — und schweigt dabei', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     farmFindUnique.mockResolvedValue({ slug: 'testhof' } as never)
 
     const result = await revokeFarmApprovalAction('farm_1')
@@ -652,7 +652,7 @@ describe('Freigabe-Actions', () => {
 
   it('Freischalten ohne frische Bestätigung (N20, Ergänzung 23.10.2026): { error: frisch }, nichts gelesen, geschrieben oder gemailt', async () => {
     getSession.mockResolvedValue(alteAdminSitzung('user_1') as never)
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
 
     expect(await approveFarmAction('farm_1')).toEqual({ error: FRISCH_FEHLER })
 

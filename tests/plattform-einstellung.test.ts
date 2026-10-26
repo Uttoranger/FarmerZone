@@ -221,7 +221,7 @@ describe('speichereGruendungEinstellung — die Wache, die Sperre und was geschr
 
   function angemeldet(isAdmin: boolean) {
     getSession.mockResolvedValue(adminSitzung('konto-1') as never)
-    p.user.findUnique.mockResolvedValue({ isAdmin } as never)
+    p.user.findUnique.mockResolvedValue({ isAdmin, adminInhaber: isAdmin } as never)
   }
 
   it('ohne Anmeldung bzw. ohne Admin-Recht: abgelehnt, nichts gelesen, nichts geschrieben', async () => {

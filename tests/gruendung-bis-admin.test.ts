@@ -79,7 +79,7 @@ beforeEach(() => {
   vi.useFakeTimers()
   vi.setSystemTime(JETZT)
   getSession.mockResolvedValue(adminSitzung('admin_1') as never)
-  userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+  userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
   farmUpdateMany.mockResolvedValue({ count: 1 } as never)
   stand(null)
 })

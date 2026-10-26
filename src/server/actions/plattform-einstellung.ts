@@ -2,7 +2,9 @@
 
 import { revalidatePath, updateTag } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { verlangeAdminAktion } from '@/server/admin-wache'
+import { verlangeFrischeBestaetigung } from '@/server/admin-wache'
+import { protokolliere } from '@/server/admin-protokoll'
+import { PLATTFORM_BEZUG } from '@/schemas/admin-aktion'
 import { GRUENDUNGSPLAETZE_SPERRE, bildeGruendungBis, vergebeneGruendungsplaetze } from '@/lib/gruendungshof'
 import {
   ADMIN_EINSTELLUNGEN_HREF,
@@ -30,7 +32,7 @@ const EIGENE_SAETZE: ReadonlySet<string> = new Set([
  * Die Gruppe Gründungshöfe in Admin › Einstellungen speichern (Register
  * K2-Ergänzung, Nr. 93; Aktion seit Nr. 116): Plätze gesamt, Monate, „Aktion
  * bis“, Anzeige an/aus. Nur der Admin (frisch aus der Datenbank,
- * verlangeAdminAktion).
+ * verlangeFrischeBestaetigung, Recht hoefe_freischalten).
  *
  * SPERRE (Nr. 116): in EINER Transaktion unter GRUENDUNGSPLAETZE_SPERRE —
  * dieselbe wie Freischalten, Ausnehmen, Wiederaufnahme, Festschreiben und
@@ -46,7 +48,8 @@ const EIGENE_SAETZE: ReadonlySet<string> = new Set([
  * der Höfe-Liste leeren und die Seiten neu bauen, die die Zahlen zeigen.
  */
 export async function speichereGruendungEinstellung(eingabe: unknown): Promise<{ ok: true } | { error: string }> {
-  const guard = await verlangeAdminAktion()
+  // Heikel (Audit D10; Nr. 188): wirkt sofort auf Startseite und Plätze — frisch mit Passkey bestätigt.
+  const guard = await verlangeFrischeBestaetigung({ recht: 'hoefe_freischalten' })
   if ('error' in guard) return { error: guard.error }
 
   const geprueft = gruendungEinstellungSchema.safeParse(eingabe)
@@ -80,6 +83,7 @@ export async function speichereGruendungEinstellung(eingabe: unknown): Promise<{
     return { ok: true }
   })
   if ('error' in ergebnis) return ergebnis
+  await protokolliere({ wer: guard.userId, art: 'gruendung_einstellung_geaendert', bezugArt: 'plattform', bezugId: PLATTFORM_BEZUG, mitPasskey: guard.mitPasskey })
 
   // updateTag statt revalidateTag: In Next 16 verlangt revalidateTag ein
   // Profil; updateTag gilt für Server Actions (wie revalidiereProdukte).

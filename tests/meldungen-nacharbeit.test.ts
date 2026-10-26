@@ -35,6 +35,7 @@ vi.mock('@/lib/prisma', async () => {
       ...(await import('./admin-sitzung')).passkeyAttrappen(),
       user: { findUnique: vi.fn() },
       meldung,
+      adminAktion: { create: vi.fn(async () => ({ id: 'a1' })) },
       $transaction: vi.fn(async (arbeit: (t: { meldung: typeof meldung }) => Promise<unknown>) => arbeit({ meldung })),
     },
   }
@@ -58,7 +59,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   nachlauf.aufgaben.length = 0
   getSession.mockResolvedValue(adminSitzung('admin_1') as never)
-  userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+  userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
   meldungUpdateMany.mockResolvedValue({ count: 1 })
 })
 

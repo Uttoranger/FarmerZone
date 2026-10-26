@@ -113,7 +113,7 @@ beforeEach(() => {
   vi.stubEnv('BLOB_READ_WRITE_TOKEN', SCHLUESSEL)
   // Eine Sitzung für beide Seiten: Inhaber von Testhof A und frisch bestätigter Admin.
   vi.mocked(auth.api.getSession).mockResolvedValue(adminSitzung('nutzer_a') as never)
-  db.user.findUnique.mockResolvedValue({ isAdmin: true })
+  db.user.findUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true })
   db.farm.findUnique.mockResolvedValue({ id: HOF, slug: 'testhof-a', ...PROFIL, pauseMessage: null, archivedAt: null, bannerUrl: null, logoUrl: null })
   db.farm.update.mockResolvedValue({})
   db.pickupSlot.findMany.mockResolvedValue([])

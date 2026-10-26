@@ -113,6 +113,8 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
   const [festFehler, setFestFehler] = useState<string | null>(null)
   // „Zusagen festschreiben" ist heikel (Register N20): frisch mit Passkey bestätigt.
   const frischFest = useFrischBestaetigt(schreibeZusagenFest)
+  // Die Einstellungen wirken sofort auf Startseite und Plätze (Audit D10; Nr. 188): ebenso frisch bestätigt.
+  const frischSpeichern = useFrischBestaetigt(speichereGruendungEinstellung)
   const plaetzeId = useId()
   const monateId = useId()
   const aktionBisId = useId()
@@ -154,7 +156,7 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
     }
     setFehler(null)
     startTransition(async () => {
-      const ergebnis = await speichereGruendungEinstellung(eingabe)
+      const ergebnis = await frischSpeichern.ausfuehren(eingabe)
       if ('error' in ergebnis) {
         setFehler(ergebnis.error)
         return
@@ -396,6 +398,7 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
       </div>
       {frischFest.dialog}
     </BestellDialog>
+    {frischSpeichern.dialog}
     </>
   )
 }

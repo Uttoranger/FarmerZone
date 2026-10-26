@@ -4,10 +4,11 @@ import { einmalLinkAufraeumGrenze } from '@/lib/geraete'
 import { BAR_HASH_PRAEFIX } from '@/lib/bar-bestaetigung'
 import { MELDE_VERMERK_TYP } from '@/server/erstattung-gescheitert'
 import { sichereGesendeteBeitragsMails } from '@/server/mail-arten/beitrag'
+import { adminProtokollGrenze } from '@/server/admin-protokoll'
 
 /*
  * Das tägliche Aufräumen (Register N18, Nr. 104) — im bestehenden Ablauf
- * „Aufräumen“ (api/cron/cleanup-reservations). Genau sechs Tabellen, je EIN
+ * „Aufräumen“ (api/cron/cleanup-reservations). Genau sieben Tabellen, je EIN
  * deleteMany mit fester Grenze aus src/lib/betrieb.ts (`aufraeumGrenzen`) bzw.
  * src/lib/geraete.ts:
  *
@@ -24,6 +25,8 @@ import { sichereGesendeteBeitragsMails } from '@/server/mail-arten/beitrag'
  *    `sichereGesendeteBeitragsMails` (Nr. 170) an jeden betroffenen Beitrag die
  *    Zahl der gesendeten Mails — sonst zeigte „n per E-Mail“ danach die Zahl
  *    der eingestellten Aufträge.
+ *  - AdminAktion (N33, Nr. 188): Einträge des Admin-Protokolls nach 5 Jahren
+ *    (adminProtokollGrenze, src/server/admin-protokoll.ts).
  *
  * Aufträge, die ein abgebrochener Worker „in Arbeit“ hinterließ, fasst das
  * Aufräumen NICHT an (Nr. 170): Der Worker holt sie selbst und erkennt sie an
@@ -48,6 +51,7 @@ export type AufraeumErgebnis = {
   einmalLinks: number
   klartextTokens: number
   mailAuftraege: number
+  adminAktionen: number
 }
 
 export async function raeumeAltesAuf(jetzt: Date = new Date()): Promise<AufraeumErgebnis> {
@@ -70,6 +74,7 @@ export async function raeumeAltesAuf(jetzt: Date = new Date()): Promise<Aufraeum
   // Erst die Zahl sichern, dann löschen: Scheitert das Sichern, wirft der Lauf und löscht nichts.
   await sichereGesendeteBeitragsMails(grenze.mailAuftraege)
   const mailAuftraege = await prisma.mailAuftrag.deleteMany({ where: { erstelltAm: { lt: grenze.mailAuftraege } } })
+  const adminAktionen = await prisma.adminAktion.deleteMany({ where: { wann: { lt: adminProtokollGrenze(jetzt) } } })
   return {
     sitzungen: sitzungen.count,
     codes: codes.count,
@@ -78,5 +83,6 @@ export async function raeumeAltesAuf(jetzt: Date = new Date()): Promise<Aufraeum
     einmalLinks: einmalLinks.count,
     klartextTokens: klartextTokens.count,
     mailAuftraege: mailAuftraege.count,
+    adminAktionen: adminAktionen.count,
   }
 }

@@ -25,6 +25,7 @@ import {
 import type { KostenpostenZeile } from '@/server/queries/finanzen'
 import { cn } from '@/lib/utils'
 import { MonatWahl } from './monat-wahl'
+import { useFrischBestaetigt } from '@/components/admin/frisch-bestaetigen'
 
 /**
  * Ein Kostenposten anlegen oder ändern — und beim Ändern auch beenden oder
@@ -102,6 +103,11 @@ function SheetInhalt({
   })
   const [endeMonat, setEndeMonat] = useState<Monatsschluessel>(vorhanden?.bis ?? monat)
   const [loeschenGefragt, setLoeschenGefragt] = useState(false)
+  // Kosten ändern ist heikel (Register N20, Audit D10; Nr. 188): frisch mit Passkey bestätigt.
+  const frischAnlegen = useFrischBestaetigt(kostenpostenAnlegen)
+  const frischAendern = useFrischBestaetigt(kostenpostenAendern)
+  const frischBeenden = useFrischBestaetigt(kostenpostenBeenden)
+  const frischLoeschen = useFrischBestaetigt(kostenpostenLoeschen)
 
   function setze<K extends keyof Entwurf>(feld: K, wert: Entwurf[K]) {
     setEntwurf((e) => ({ ...e, [feld]: wert }))
@@ -135,15 +141,16 @@ function SheetInhalt({
       notiz: entwurf.notiz,
     }
     if (vorhanden) {
-      fuehreAus(() => kostenpostenAendern({ ...eingabe, id: vorhanden.id }), 'Posten geändert.')
+      fuehreAus(() => frischAendern.ausfuehren({ ...eingabe, id: vorhanden.id }), 'Posten geändert.')
     } else {
-      fuehreAus(() => kostenpostenAnlegen(eingabe), 'Posten eingetragen.')
+      fuehreAus(() => frischAnlegen.ausfuehren(eingabe), 'Posten eingetragen.')
     }
   }
 
   const beschriftung = 'mb-1 block text-xs font-medium text-muted-foreground'
 
   return (
+    <>
     <form onSubmit={speichern}>
       <SheetHeader className="border-b border-border">
         <SheetTitle>{vorhanden ? 'Posten bearbeiten' : 'Kosten eintragen'}</SheetTitle>
@@ -265,7 +272,7 @@ function SheetInhalt({
               disabled={laeuft}
               onClick={() =>
                 fuehreAus(
-                  () => kostenpostenBeenden({ id: vorhanden.id, monat: endeMonat }),
+                  () => frischBeenden.ausfuehren({ id: vorhanden.id, monat: endeMonat }),
                   'Posten beendet.'
                 )
               }
@@ -289,7 +296,7 @@ function SheetInhalt({
                   variant="destructive"
                   disabled={laeuft}
                   onClick={() =>
-                    fuehreAus(() => kostenpostenLoeschen({ id: vorhanden.id }), 'Posten gelöscht.')
+                    fuehreAus(() => frischLoeschen.ausfuehren({ id: vorhanden.id }), 'Posten gelöscht.')
                   }
                   className="min-h-11 flex-1"
                 >
@@ -318,6 +325,11 @@ function SheetInhalt({
         </div>
       )}
     </form>
+    {frischAnlegen.dialog}
+    {frischAendern.dialog}
+    {frischBeenden.dialog}
+    {frischLoeschen.dialog}
+    </>
   )
 }
 

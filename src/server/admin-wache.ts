@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { isAdminUser } from '@/server/queries/admin'
+import { ADMIN_RECHT_FEHLER, darf, type AdminRecht } from '@/lib/admin-rechte'
 import { einmalLinkZweck } from '@/lib/geraete'
 import {
   ADMIN_AKTION_FEHLER,
@@ -47,8 +47,22 @@ import {
  *    /login/admin, ohne sie zu löschen (der Hof bleibt erreichbar). Sonst
  *    öffnete eine Passwort-Sitzung von vor dem ersten Passkey (anderes Gerät,
  *    oder von vor dem Deploy) den Bereich bis zum Ende ihrer 12 Stunden.
- *  - Frische Bestätigung (verlangeFrischeBestaetigung): heikle Aktionen nur,
- *    wenn die letzte Bestätigung mit Passkey höchstens 5 Minuten zurückliegt.
+ *  - Frische Bestätigung (`verlangeAdminAktion({ frisch: true })` bzw.
+ *    verlangeFrischeBestaetigung): heikle Aktionen nur, wenn die letzte
+ *    Bestätigung mit Passkey höchstens 5 Minuten zurückliegt.
+ *
+ * Rechte je Person (Register N35, Nr. 188) — zuletzt, nach Passkey und
+ * Sitzung: `recht` nennt, was die Aktion bzw. Seite braucht; ohne `recht`
+ * gilt nur „ansehen“ (das hat jede Person mit Admin-Recht). Was eine Person
+ * darf, entscheidet `darf` (src/lib/admin-rechte.ts), gelesen frisch aus der
+ * Datenbank in DERSELBEN Abfrage wie `isAdmin`. Ohne Recht: die Aktion
+ * antwortet mit ADMIN_RECHT_FEHLER, die Seite leitet nach /admin.
+ *
+ * Für jede neue Admin-Aktion (Freigabe Lauf 26, §2):
+ *   const wache = await verlangeAdminAktion({ frisch: true, recht: 'geld' })
+ *   if ('error' in wache) return { error: wache.error }
+ *   … Wirkung …
+ *   await protokolliere({ wer: wache.userId, art, bezugArt, bezugId, grund, mitPasskey: wache.mitPasskey })
  *
  * Zwei Ausgänge, weil eine Seite und eine Aktion verschieden scheitern:
  * Die Seite wirft (`redirect`/`notFound`), die Aktion gibt einen Satz zurück.
@@ -62,7 +76,17 @@ import {
 export type AdminWacheOptionen = {
   /** Nur die Actions der Pflichtseite (/admin/einrichten): kein Passkey nötig. Die Seite selbst prüft mit verlangeEinrichtenSeite. */
   ohnePasskey?: true
+  /** Was die Aktion bzw. Seite braucht (N35); ohne = nur „ansehen“. */
+  recht?: AdminRecht
 }
+
+export type AdminAktionOptionen = AdminWacheOptionen & {
+  /** Heikel (N20): nur frisch mit Passkey bestätigt (höchstens 5 Minuten), sonst `{ error: 'frisch' }`. */
+  frisch?: true
+}
+
+/** Was eine Admin-Aktion von der Wache bekommt — `mitPasskey` geht so ins Protokoll (N33). */
+export type AdminAktionErlaubt = { ok: true; userId: string; sitzungId: string; mitPasskey: boolean }
 
 type Geprueft =
   | { art: 'abgemeldet' }
@@ -70,6 +94,7 @@ type Geprueft =
   | { art: 'abgelaufen' }
   | { art: 'pflicht' }
   | { art: 'ohne-passkey' }
+  | { art: 'ohne-recht' }
   | { art: 'ok'; userId: string; sitzungId: string; passkeyAm: Date | null }
 
 /**
@@ -109,7 +134,9 @@ async function pruefe(optionen: AdminWacheOptionen): Promise<Geprueft> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { art: 'abgemeldet' }
   const userId = session.user.id
-  if (!(await isAdminUser(userId))) return { art: 'kein-recht' }
+  // Frisch aus der Datenbank, nie aus der Sitzung — Admin-Recht und Rechte je Person in EINER Abfrage.
+  const konto = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true, adminInhaber: true, adminRechte: true } })
+  if (konto?.isAdmin !== true) return { art: 'kein-recht' }
   if (adminSitzungAbgelaufen(session.session.createdAt, new Date())) {
     // „Danach Abmelden" (N20): die eigene Sitzung, Besitz in der WHERE-Klausel.
     await prisma.session.deleteMany({ where: { id: session.session.id, userId } })
@@ -120,6 +147,7 @@ async function pruefe(optionen: AdminWacheOptionen): Promise<Geprueft> {
     const sperre = await passkeySperre(userId, passkeyAm)
     if (sperre) return { art: sperre }
   }
+  if (!darf({ adminInhaber: konto.adminInhaber === true, adminRechte: konto.adminRechte ?? [] }, optionen.recht ?? 'ansehen')) return { art: 'ohne-recht' }
   return { art: 'ok', userId, sitzungId: session.session.id, passkeyAm }
 }
 
@@ -135,6 +163,9 @@ function seiteScheitert(art: Exclude<Geprueft['art'], 'ok'>): never {
       redirect(ADMIN_PFAD.anmelden)
     case 'pflicht':
       redirect(ADMIN_PFAD.einrichten)
+    case 'ohne-recht':
+      // Den Bereich kennt die Person — nur diese Seite nicht (N35): zurück zu „Heute“.
+      redirect(ADMIN_PFAD.bereich)
   }
 }
 
@@ -148,8 +179,8 @@ function seiteScheitert(art: Exclude<Geprueft['art'], 'ok'>): never {
  * `notFound()` statt `redirect` oder 403: Der Bereich soll sich Unbefugten
  * nicht einmal zu erkennen geben — für sie existiert /admin schlicht nicht.
  */
-export async function verlangeAdminSeite(): Promise<string> {
-  const geprueft = await pruefe({})
+export async function verlangeAdminSeite(optionen: { recht?: AdminRecht } = {}): Promise<string> {
+  const geprueft = await pruefe({ recht: optionen.recht })
   if (geprueft.art !== 'ok') return seiteScheitert(geprueft.art)
   return geprueft.userId
 }
@@ -198,6 +229,8 @@ function alsAktionsFehler(art: Exclude<Geprueft['art'], 'ok'>): { error: string 
       return { error: ADMIN_AKTION_FEHLER.pflicht }
     case 'ohne-passkey':
       return { error: ADMIN_AKTION_FEHLER.ohnePasskey }
+    case 'ohne-recht':
+      return { error: ADMIN_RECHT_FEHLER }
   }
 }
 
@@ -205,11 +238,17 @@ function alsAktionsFehler(art: Exclude<Geprueft['art'], 'ok'>): { error: string 
  * Die Wache einer Admin-AKTION. Kein Wurf, sondern die Antwortform der
  * Server Actions ({ ok } | { error }) — der Aufrufer gibt den Satz an die
  * Oberfläche weiter, statt eine Navigation auszulösen.
+ *
+ * `recht` (N35): was die Aktion braucht; `frisch` (N20): heikel, nur frisch
+ * mit Passkey bestätigt. `mitPasskey` sagt, ob die letzte Bestätigung mit
+ * Passkey in diesem Moment frisch war — so steht es im Protokoll (N33).
  */
-export async function verlangeAdminAktion(optionen: AdminWacheOptionen = {}): Promise<{ ok: true; userId: string } | { error: string }> {
+export async function verlangeAdminAktion(optionen: AdminAktionOptionen = {}): Promise<AdminAktionErlaubt | { error: string }> {
   const geprueft = await pruefe(optionen)
   if (geprueft.art !== 'ok') return alsAktionsFehler(geprueft.art)
-  return { ok: true, userId: geprueft.userId }
+  const mitPasskey = frischBestaetigt(geprueft.passkeyAm, new Date())
+  if (optionen.frisch && !mitPasskey) return { error: FRISCH_FEHLER }
+  return { ok: true, userId: geprueft.userId, sitzungId: geprueft.sitzungId, mitPasskey }
 }
 
 /**
@@ -225,13 +264,9 @@ export async function verlangeAdminAktion(optionen: AdminWacheOptionen = {}): Pr
  * eine zweite Wache dahinter läse dieselbe Datenbank noch einmal und könnte
  * nichts Neues sagen (tests/admin-heikel-eine-wache.test.ts).
  */
-export async function verlangeFrischeBestaetigung(
-  optionen: AdminWacheOptionen = {}
-): Promise<{ ok: true; userId: string; sitzungId: string } | { error: string }> {
-  const geprueft = await pruefe(optionen)
-  if (geprueft.art !== 'ok') return alsAktionsFehler(geprueft.art)
-  if (!frischBestaetigt(geprueft.passkeyAm, new Date())) return { error: FRISCH_FEHLER }
-  return { ok: true, userId: geprueft.userId, sitzungId: geprueft.sitzungId }
+export async function verlangeFrischeBestaetigung(optionen: AdminWacheOptionen = {}): Promise<AdminAktionErlaubt | { error: string }> {
+  // Dasselbe wie verlangeAdminAktion({ frisch: true, … }) — der Name bleibt für die Quelltext-Wachen der heiklen Aktionen.
+  return verlangeAdminAktion({ ...optionen, frisch: true })
 }
 
 /**
@@ -239,8 +274,8 @@ export async function verlangeFrischeBestaetigung(
  * ohne frische Bestätigung 303 auf /admin/bestaetigen?weiter=<Pfad> — nur ein
  * relativer Pfad unter /admin (sichererWeiterPfad). null = weiter im Export.
  */
-export async function frischOderBestaetigen(weiter: string): Promise<NextResponse | null> {
-  const frisch = await verlangeFrischeBestaetigung()
+export async function frischOderBestaetigen(weiter: string, optionen: { recht?: AdminRecht } = {}): Promise<NextResponse | null> {
+  const frisch = await verlangeFrischeBestaetigung({ recht: optionen.recht })
   if ('ok' in frisch) return null
   if (frisch.error === FRISCH_FEHLER) return new NextResponse(null, { status: 303, headers: { Location: bestaetigenAdresse(weiter) } })
   return new NextResponse('Kein Zugriff.', { status: 403, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })

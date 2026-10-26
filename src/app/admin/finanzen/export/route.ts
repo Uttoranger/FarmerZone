@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { frischOderBestaetigen, verlangeAdminAktion } from '@/server/admin-wache'
+import { protokolliere } from '@/server/admin-protokoll'
 import { aktuellerFinanzMonat, getFinanzenJahr } from '@/server/queries/finanzen'
 import { jahrAlsCsv } from '@/lib/finanzen'
 import { finanzenJahrAus } from '@/schemas/admin-reiter'
@@ -10,7 +11,8 @@ import { finanzenJahrAus } from '@/schemas/admin-reiter'
  * keine Seite — er hängt unter keinem Layout und damit nicht unter der
  * Admin-Prüfung der Seiten (src/app/admin/layout.tsx); darum prüft er selbst,
  * und zwar mit derselben Wache wie jede Admin-Aktion (`verlangeAdminAktion`,
- * Recht frisch aus der Datenbank): ohne Anmeldung oder ohne Admin-Recht
+ * Recht frisch aus der Datenbank, seit Nr. 188 mit dem Recht „Geld“ und
+ * einem Eintrag im Protokoll): ohne Anmeldung oder ohne Recht
  * 403 ohne Inhalt, nie eine Umleitung auf eine Seite mit Zahlen.
  *
  * Die Zahlen sind die der Jahresansicht (`getFinanzenJahr` → `jahrAlsCsv`), keine
@@ -21,16 +23,17 @@ import { finanzenJahrAus } from '@/schemas/admin-reiter'
 const KOPF = { 'Cache-Control': 'no-store' } as const
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const wache = await verlangeAdminAktion()
+  const wache = await verlangeAdminAktion({ recht: 'geld' })
   if ('error' in wache) return new NextResponse('Kein Zugriff.', { status: 403, headers: { ...KOPF, 'Content-Type': 'text/plain; charset=utf-8' } })
   // Heikler Download (Register N20, Nr. 115): ohne frische Bestätigung 303 auf /admin/bestaetigen.
-  const bestaetigen = await frischOderBestaetigen(`${request.nextUrl.pathname}${request.nextUrl.search}`)
+  const bestaetigen = await frischOderBestaetigen(`${request.nextUrl.pathname}${request.nextUrl.search}`, { recht: 'geld' })
   if (bestaetigen) return bestaetigen
 
   const jetzt = new Date()
   const laufendesJahr = Number(aktuellerFinanzMonat(jetzt).slice(0, 4))
   // Das Jahr aus der Adresse ist Fremdtext: Ungültiges ist das laufende, ein Jahr vor den ersten Daten zeigt `getFinanzenJahr` ebenso.
   const daten = await getFinanzenJahr(finanzenJahrAus(request.nextUrl.searchParams.get('jahr') ?? undefined, laufendesJahr), jetzt)
+  await protokolliere({ wer: wache.userId, art: 'finanzen_export', bezugArt: 'monat', bezugId: String(daten.jahr), mitPasskey: true })
 
   return new NextResponse(jahrAlsCsv(daten.rechnung), {
     status: 200,

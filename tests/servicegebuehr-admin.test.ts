@@ -52,7 +52,7 @@ const GUELTIG = { percent: 4.9, minCents: 50, activeFrom: '2026-10-01' }
 beforeEach(() => {
   vi.clearAllMocks()
   getSession.mockResolvedValue(adminSitzung('admin_1') as never)
-  userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+  userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
   farmFindUnique.mockResolvedValue({ slug: 'welszucht' } as never)
   farmUpdate.mockResolvedValue({} as never)
 })

@@ -74,7 +74,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   nachlauf.aufgaben.length = 0
   getSession.mockResolvedValue(adminSitzung('admin_1') as never)
-  userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+  userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
   orderUpdateMany.mockResolvedValue({ count: 1 })
 })
 
