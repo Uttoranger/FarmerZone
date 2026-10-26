@@ -5839,6 +5839,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Formprüfung:** Die beiden Schemas mit `sig` (`src/schemas/bestaetigung.ts`, `src/schemas/abo.ts`) ließen nur 64 Hex durch; sie nehmen jetzt auch `2.` davor, sonst zeigte die Bestätigungsseite mit `LINK_SECRET` nur „eingegangen“.
 - **Bleibt:** `bremsSchluessel` (Bremsen) und der Hash des Bar-Tokens hängen nicht an Links in Mails und bleiben, wie sie sind. Der Double-Opt-in-Link (`abo-bestaetigung-token.ts`, 7 Tage) gehört nicht zu den drei Dateien und signiert weiter mit `BETTER_AUTH_SECRET`.
 
+## Startseiten-Vorschau über eine eigene dynamische Route (Register N16, Ergänzung 25.10.2026; Nr. 182, Lauf 25)
+
+- **Meldung:** „Wenn ich etwas ausblende, sieht man es in der Vorschau noch." Speichern funktionierte (die Zeilen der Tabelle kamen je Speicherung aus einer Transaktion); nur die Vorschau zeigte in Produktion immer die Live-Seite.
+- **Ursache:** `/` ist ISR (`revalidate = 300`). Für eine nicht dynamische Route schreibt der Build `allowQuery: []`, und Vercel gibt der Funktion dann keinen Query-Parameter weiter — auch nicht im Draft Mode (Build Output API: „The allowQuery filter still applies"). `vorschauDieserAnfrage` fand `vorschau` und `sig` nie und gab null; die Seite renderte die Live-Fassung, das Band in der Seite erschien nie. Lokal (`next dev`, `next start`) kommen die Parameter an — darum fanden Bericht 106 und der Fix vom 23.10. nichts. Die Meldungen vom 16.10. und 23.10. hatten sehr wahrscheinlich dieselbe Ursache (vgl. vercel/next.js#92562).
+- **Folge:** Entwurf, „Live" an einem anderen Tag, „Stand am", die Vorschau einer geplanten Fassung und „Vorschau öffnen" zeigten alle die Live-Seite von heute; „Veröffentlichen" las den Entwurf trotzdem richtig.
+- **Fix:** Eigene Route `/startseite-vorschau` (`force-dynamic`, signierter Link wie bisher, erst Signatur und Ablauf, dann die Admin-Sitzung; ungültig → Fehlerzustand, keine Weiterleitung). Kein Draft Mode mehr: `vorschauDieserAnfrage`, `oeffneVorschau`, `beendeStartseitenVorschau` und die Route `/admin/startseite/vorschau` sind entfernt; Rahmen und „Vorschau öffnen" nehmen dieselbe Adresse (`STARTSEITE_VORSCHAU_HREF`). Der Inhalt steht in einem Baustein (`StartseitenInhalt`) für beide Seiten. `/` ist wieder überall `X-Frame-Options: DENY`; die neue Route darf sich nur mit `vorschau` und `sig` selbst einbetten. `scrollNachNeuladen` vergleicht mit der neuen Route. Wache: `tests/isr-liest-keine-anfrage-wache.test.ts`.
+- **Prüfbar nur auf Vercel:** Der Fehler zeigte sich nur dort; die Abnahme läuft am Vorschau-Deployment (Bericht 182).
+
 ## Nützliche Befehle
 
 ```bash

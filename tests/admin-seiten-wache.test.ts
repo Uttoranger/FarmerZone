@@ -249,11 +249,6 @@ const ROUTEN_OHNE_WACHE: { datei: string; beleg: RegExp; grund: string }[] = [
     beleg: /OHNE Anmeldung/,
     grund: 'Der Link aus der Bestätigungsmail geht an Adressen ohne Konto: GET liest nur und zeigt den Knopf, POST löst einen einmaligen Token ein',
   },
-  {
-    datei: 'startseite/vorschau/route.ts',
-    beleg: /await oeffneVorschau\(/,
-    grund: 'Prüft Signatur, Ablauf und die Admin-Sitzung im Aufruf von oeffneVorschau und leitet sonst auf die normale Startseite',
-  },
 ]
 
 const ROUTEN = [...dateienUnter(ADMIN)].filter((p) => p.endsWith(`${sep}route.ts`)).map((p) => relative(ADMIN, p).split(sep).join('/'))
@@ -267,7 +262,6 @@ describe('jede Route unter /admin (route.ts)', () => {
       'meldungen/[id]/route.ts',
       'meldungen/route.ts',
       'postfach/zustellung/bestaetigen/route.ts',
-      'startseite/vorschau/route.ts',
     ])
   })
 

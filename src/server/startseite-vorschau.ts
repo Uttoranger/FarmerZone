@@ -1,13 +1,14 @@
 import { createHmac } from 'crypto'
-import { draftMode, headers } from 'next/headers'
+import { headers } from 'next/headers'
 import { env } from '@/lib/env'
 import { geheimnisGleich } from '@/lib/geheimnis'
 import { vorschauParameterSchema, vorschauQuelleSchema, type VorschauParameter, type VorschauQuelle } from '@/schemas/startseite'
 
 /*
- * Der Vorschau-Link der Startseite (Register N16, Nr. 96): `/?vorschau=…&sig=…`
- * zeigt die Startseite mit dem „Stand am" eines Tages und dem Block in
- * Bearbeitung — nur mit gültiger Admin-Sitzung, eine Stunde lang. Seit Nr. 99
+ * Der Vorschau-Link der Startseite (Register N16, Nr. 96; Route seit Nr. 182):
+ * `/startseite-vorschau?vorschau=…&sig=…` zeigt die Startseite mit dem „Stand
+ * am" eines Tages und dem Block in Bearbeitung — nur mit gültiger
+ * Admin-Sitzung, eine Stunde lang. Seit Nr. 99
  * trägt der Inhalt auch die Quelle (`entwurf`, `live` oder `fassung:<id>`):
  * Sie steht im signierten Teil, ein geänderter Link zeigt also nie eine
  * andere Quelle.
@@ -23,11 +24,16 @@ import { vorschauParameterSchema, vorschauQuelleSchema, type VorschauParameter, 
  * hier nie.
  *
  * Der Link allein öffnet nichts: Die Seite verlangt zusätzlich die Admin-
- * Sitzung (frisch aus der Datenbank, wie verlangeAdminSeite) und den Draft
- * Mode. Den schalten nur zwei Wege ein, beide nach derselben Prüfung: die
- * Admin-Action (Rahmen „So sieht's die Kundin") und die Route hinter
- * „Vorschau öffnen" (oeffneVorschau) — die macht den Link auf jedem Gerät
- * wirksam, auf dem der Admin angemeldet ist.
+ * Sitzung (frisch aus der Datenbank, wie verlangeAdminSeite). Damit wirkt er
+ * auf jedem Gerät, auf dem der Admin angemeldet ist.
+ *
+ * EIGENE DYNAMISCHE ROUTE, KEIN DRAFT MODE (Register N16, Ergänzung
+ * 25.10.2026; Nr. 182): Bis dahin las die statische Startseite `/` den Link im
+ * Draft Mode. Für eine Route mit `revalidate` gibt Vercel aber keinen
+ * Query-Parameter an die Funktion weiter (`allowQuery: []`, auch im Draft
+ * Mode) — in Produktion zeigte die Vorschau darum immer die Live-Seite, lokal
+ * nie nachstellbar. Jetzt liest nur src/app/startseite-vorschau/page.tsx
+ * (force-dynamic) den Link, über leseStartseitenVorschau.
  */
 
 const ZWECK = 'startseite-vorschau'
@@ -80,8 +86,8 @@ export function pruefeVorschau(vorschau: string, sig: string, jetzt: Date): Vors
 async function vorschauFuerAdmin({ vorschau, sig }: VorschauParameter, jetzt: Date): Promise<VorschauInhalt | null> {
   const ergebnis = pruefeVorschau(vorschau, sig, jetzt)
   if (!ergebnis.ok) return null
-  // Sitzung und Admin-Recht erst hier und dynamisch geladen: Der statische
-  // Weg der Startseite braucht Better Auth nie (ARCHITECTURE §4).
+  // Sitzung und Admin-Recht erst hier und dynamisch geladen: Better Auth
+  // gehört nicht in den statischen Import-Graphen einer Seite (ARCHITECTURE §4).
   const [{ auth }, { isAdminUser }] = await Promise.all([import('@/lib/auth'), import('@/server/queries/admin')])
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user || !(await isAdminUser(session.user.id))) return null
@@ -89,35 +95,16 @@ async function vorschauFuerAdmin({ vorschau, sig }: VorschauParameter, jetzt: Da
 }
 
 /**
- * Die Vorschau dieser Anfrage — oder null (dann die normale Startseite).
- *
- * ZUERST der Draft Mode: Nur wenn ihn „Vorschau öffnen" für diesen Browser
- * eingeschaltet hat, rendert Next die Seite je Anfrage; dann erst werden die
- * Parameter der Adresse und die Sitzung gelesen. Ohne Draft Mode (jeder Besuch
- * und jeder Bau) liest diese Funktion nichts aus der Anfrage — die Startseite
- * bleibt statisch (revalidate 300). Danach: gültiger, nicht abgelaufener
- * Link und Admin-Sitzung, sonst null.
+ * Die Vorschau der Seite /startseite-vorschau aus den Parametern ihrer
+ * Adresse — oder null (dann zeigt die Seite ihren Fehlerzustand, nie die
+ * Startseite). Unsinnige Parameter sind Fremddaten: null, nie ein Fehler.
+ * Gültiger, nicht abgelaufener Link UND Admin-Sitzung, die Sitzung erst nach
+ * einer gültigen Signatur gelesen.
  */
-export async function vorschauDieserAnfrage(
-  parameter: Promise<Record<string, string | string[] | undefined>>,
+export async function leseStartseitenVorschau(
+  parameter: Record<string, string | string[] | undefined>,
   jetzt: Date
 ): Promise<VorschauInhalt | null> {
-  if (!(await draftMode()).isEnabled) return null
-  const gelesen = vorschauParameterSchema.safeParse(await parameter)
-  return gelesen.success ? vorschauFuerAdmin(gelesen.data, jetzt) : null
-}
-
-/**
- * Der Weg hinter „Vorschau öffnen" (Route /admin/startseite/vorschau): Link
- * und Admin-Sitzung gültig → Draft Mode für DIESEN Browser an und das Ziel
- * `/?vorschau=…&sig=…` (aus den geprüften Werten neu gebaut, nie die rohe
- * Adresse); sonst `/`, die normale Startseite. Geändert wird dabei nur das
- * Draft-Mode-Cookie des eigenen Browsers, kein Datensatz — darum darf es ein
- * GET sein (ARCHITECTURE §3, Aufruf per Link).
- */
-export async function oeffneVorschau(parameter: Record<string, string>, jetzt: Date): Promise<string> {
   const gelesen = vorschauParameterSchema.safeParse(parameter)
-  if (!gelesen.success || !(await vorschauFuerAdmin(gelesen.data, jetzt))) return '/'
-  ;(await draftMode()).enable()
-  return `/?${alsAbfrage(gelesen.data)}`
+  return gelesen.success ? vorschauFuerAdmin(gelesen.data, jetzt) : null
 }

@@ -22,7 +22,6 @@ vi.mock('@/server/actions/startseite', () => ({
   veroeffentlicheStartseite: vi.fn(),
   zieheFassungZurueck: vi.fn(),
   erzeugeStartseitenVorschau: vi.fn(),
-  beendeStartseitenVorschau: vi.fn(),
 }))
 vi.mock('@/components/admin/startseite-vorschau', () => ({ StartseiteVorschau: () => null, VorschauFenster: () => null }))
 
