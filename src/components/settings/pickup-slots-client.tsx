@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -10,7 +10,11 @@ import { Label } from '@/components/ui/label'
 import { EmptyState } from '@/components/ui/empty-state'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { addPickupSlot, deletePickupSlot, togglePickupSlotActive } from '@/server/actions/farm'
-import { findSlotError, DAY_NAMES, ABHOLZEITEN_FEHLEN, ABHOLZEITEN_FORMULAR_ID, ABHOLZEIT_GELOESCHT } from '@/lib/pickup-slot-rules'
+import { aktionOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
+import { FeldFehlerSatz, SpeicherFehler, feldFehlerAttribute } from '@/components/shared/formular-meldungen'
+import { enterTaste, weiterMitEnter } from '@/lib/feld-attribute'
+import { NETZ_SATZ } from '@/lib/netz'
+import { findSlotError, isInvertedSlot, INVERTED_SLOT_MESSAGE, DAY_NAMES, ABHOLZEITEN_FEHLEN, ABHOLZEITEN_FORMULAR_ID, ABHOLZEIT_GELOESCHT } from '@/lib/pickup-slot-rules'
 import type { FarmSettings } from '@/server/queries/farm'
 
 type Slot = FarmSettings['pickupSlots'][number]
@@ -82,6 +86,12 @@ export function PickupSlotsClient({
   const [slots, setSlots] = useState(initialSlots)
   const [isPending, startTransition] = useTransition()
   const [form, setForm] = useState({ dayOfWeek: 1, startTime: '14:00', endTime: '16:00', maxOrders: '' })
+  // Fehler stehen am Formular, nicht im Toast (DESIGN_SYSTEM, Zustände): „Ende vor Beginn" am Feld „Bis",
+  // alles andere (Dublette, Überschneidung, Speichern gescheitert) als Karte über dem Knopf bzw. über der Liste.
+  // Am Netz gescheitert (`netz`) steht „Nochmal" daneben (Register N29) – die Eingabe bleibt stehen.
+  const [endeFehler, setEndeFehler] = useState<string | null>(null)
+  const [formFehler, setFormFehler] = useState<{ text: string; netz: boolean } | null>(null)
+  const [listenFehler, setListenFehler] = useState<{ text: string; netz: boolean; nochmal: () => void } | null>(null)
 
   // Haus-Muster (nachlese-4 Punkt 14): alle drei Wege optimistisch, nach
   // Erfolg router.refresh(). Der Refresh liefert neue initialSlots — dieser
@@ -95,14 +105,18 @@ export function PickupSlotsClient({
   }
 
   function handleAdd() {
+    setEndeFehler(null)
+    setFormFehler(null)
     // Clientseitig dieselben Regeln wie der Server (Zeitlogik, Dublette,
     // Überschneidung) — spart den Roundtrip und zeigt die Meldung sofort
-    const clientError = findSlotError(
-      { dayOfWeek: form.dayOfWeek, startTime: form.startTime, endTime: form.endTime },
-      { all: slots, active: slots.filter((s) => s.isActive) }
-    )
+    const kandidat = { dayOfWeek: form.dayOfWeek, startTime: form.startTime, endTime: form.endTime }
+    if (isInvertedSlot(kandidat)) {
+      setEndeFehler(INVERTED_SLOT_MESSAGE)
+      return
+    }
+    const clientError = findSlotError(kandidat, { all: slots, active: slots.filter((s) => s.isActive) })
     if (clientError) {
-      toast.error(clientError)
+      setFormFehler({ text: clientError, netz: false })
       return
     }
     // Optimistisch: sofort einsortiert anzeigen; die Temp-Id wird nach dem
@@ -121,17 +135,20 @@ export function PickupSlotsClient({
     setSlots((s) => sortSlots([...s, optimistic]))
     setForm({ dayOfWeek: 1, startTime: '14:00', endTime: '16:00', maxOrders: '' })
     startTransition(async () => {
-      const res = await addPickupSlot({
-        dayOfWeek: optimistic.dayOfWeek,
-        startTime: optimistic.startTime,
-        endTime: optimistic.endTime,
-        maxOrders,
-      })
+      // aktionOhneWurf: Ohne Netz würfe die Aktion und ginge an die Fehlerseite – die Eingabe wäre weg.
+      const res = await aktionOhneWurf(() =>
+        addPickupSlot({
+          dayOfWeek: optimistic.dayOfWeek,
+          startTime: optimistic.startTime,
+          endTime: optimistic.endTime,
+          maxOrders,
+        })
+      )
       if (res.error) {
-        // Revert: Eintrag raus, Eingaben zurück, Meldung zeigen
+        // Revert: Eintrag raus, Eingaben zurück, Meldung am Formular zeigen
         setSlots((s) => s.filter((x) => x.id !== tempId))
         setForm(prevForm)
-        toast.error(res.error)
+        setFormFehler({ text: res.error, netz: res.error === NETZ_SATZ })
       } else {
         if (meldeErfolg) meldeErfolg()
         else toast.success('Abholzeit hinzugefügt')
@@ -144,12 +161,13 @@ export function PickupSlotsClient({
   function handleDelete(slot: Slot) {
     // Optimistisch: sofort ausblenden, bei Server-Fehler zurückrollen
     const prev = slots
+    setListenFehler(null)
     setSlots((s) => s.filter((x) => x.id !== slot.id))
     startTransition(async () => {
-      const res = await deletePickupSlot(slot.id)
+      const res = await aktionOhneWurf(() => deletePickupSlot(slot.id))
       if (res.error) {
         setSlots(prev)
-        toast.error(res.error)
+        setListenFehler({ text: res.error, netz: res.error === NETZ_SATZ, nochmal: () => handleDelete(slot) })
       } else {
         if (slot.isActive) {
           // „Rückgängig" legt die Zeit neu an — aktiv. Eine pausierte käme
@@ -193,12 +211,13 @@ export function PickupSlotsClient({
   function handleToggle(slot: Slot) {
     // Optimistisch: sofort umschalten, bei Server-Fehler zurückrollen
     const next = !slot.isActive
+    setListenFehler(null)
     setSlots((s) => s.map((x) => (x.id === slot.id ? { ...x, isActive: next } : x)))
     startTransition(async () => {
-      const res = await togglePickupSlotActive(slot.id, next)
+      const res = await aktionOhneWurf(() => togglePickupSlotActive(slot.id, next))
       if (res.error) {
         setSlots((s) => s.map((x) => (x.id === slot.id ? { ...x, isActive: slot.isActive } : x)))
-        toast.error(res.error)
+        setListenFehler({ text: res.error, netz: res.error === NETZ_SATZ, nochmal: () => handleToggle(slot) })
       } else {
         router.refresh()
         onGespeichert?.()
@@ -219,6 +238,13 @@ export function PickupSlotsClient({
       {/* Existing slots */}
       <div className="bg-card rounded-xl border border-border p-4">
         <h2 className="font-medium text-foreground mb-3">Aktuelle Abholzeiten</h2>
+        <SpeicherFehler
+          text={listenFehler?.text}
+          nochmal={listenFehler?.netz}
+          onNochmal={listenFehler?.nochmal}
+          laeuft={isPending}
+          className="mb-3"
+        />
         {slots.length === 0 ? (
           <EmptyState
             symbol={CalendarClock}
@@ -248,8 +274,16 @@ export function PickupSlotsClient({
         </p>
       </div>
 
-      {/* Add new slot */}
-      <div className="bg-card rounded-xl border border-border p-4 space-y-4">
+      {/* Add new slot – ein Formular: Enter in einem Feld geht weiter bzw. speichert am letzten. */}
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault()
+          handleAdd()
+        }}
+        onKeyDown={weiterMitEnter}
+        className="bg-card rounded-xl border border-border p-4 space-y-4"
+      >
         <h2 className="font-medium text-foreground">Abholzeit hinzufügen</h2>
 
         <div>
@@ -258,7 +292,7 @@ export function PickupSlotsClient({
             value={form.dayOfWeek}
             onChange={(e) => setForm({ ...form, dayOfWeek: parseInt(e.target.value) })}
             id={ABHOLZEITEN_FORMULAR_ID}
-            className="min-h-11 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground"
+            className="min-h-11 w-full rounded-md border border-border bg-card px-3 text-base text-foreground"
           >
             {DAY_NAMES.map((name, i) => (
               <option key={i} value={i}>{name}</option>
@@ -272,6 +306,7 @@ export function PickupSlotsClient({
             <Input
               id="startTime"
               type="time"
+              enterKeyHint={enterTaste(false)}
               className="min-h-11"
               value={form.startTime}
               onChange={(e) => setForm({ ...form, startTime: e.target.value })}
@@ -282,20 +317,25 @@ export function PickupSlotsClient({
             <Input
               id="endTime"
               type="time"
-              className="min-h-11"
+              enterKeyHint={enterTaste(false)}
+              className={endeFehler ? 'min-h-11 border-status-offen' : 'min-h-11'}
               value={form.endTime}
               onChange={(e) => setForm({ ...form, endTime: e.target.value })}
+              {...feldFehlerAttribute('endTime', Boolean(endeFehler))}
             />
           </div>
         </div>
+        <FeldFehlerSatz feldId="endTime" text={endeFehler} className="-mt-2" />
 
         <div>
           <Label htmlFor="maxOrders" className="text-sm text-muted-foreground mb-1 block">
-            Max. Bestellungen (optional, leer = unbegrenzt)
+            Max. Bestellungen (freiwillig, leer = unbegrenzt)
           </Label>
           <Input
             id="maxOrders"
             type="number"
+            inputMode="numeric"
+            enterKeyHint={enterTaste(true)}
             className="min-h-11"
             min="1"
             value={form.maxOrders}
@@ -304,8 +344,15 @@ export function PickupSlotsClient({
           />
         </div>
 
+        <SpeicherFehler
+          text={formFehler?.text}
+          nochmal={formFehler?.netz}
+          onNochmal={handleAdd}
+          laeuft={isPending}
+        />
+
         <Button
-          onClick={handleAdd}
+          type="submit"
           disabled={isPending}
           className="min-h-11 w-full bg-primary text-primary-foreground hover:opacity-90"
         >
@@ -320,7 +367,7 @@ export function PickupSlotsClient({
             </>
           )}
         </Button>
-      </div>
+      </form>
     </div>
   )
 }

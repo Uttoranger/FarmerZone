@@ -10,6 +10,7 @@ import {
 } from '@/lib/eingabegrenzen'
 import { hofBetriebsnummerSchema, betriebsstatusSchema } from '@/schemas/betrieb'
 import { emailSchema } from '@/schemas/email'
+import { PROFIL_MELDUNG } from '@/lib/profil-meldungen'
 
 /**
  * Was gespeichert ist — für die Felder, die erst nachträglich eine Obergrenze
@@ -18,31 +19,59 @@ import { emailSchema } from '@/schemas/email'
  */
 // Bewusst ausgeschrieben statt Pick<ProfileFormData, …>: Das Schema nimmt den
 // Bestand als Parameter, ein abgeleiteter Typ wäre ein Zirkelbezug (TS2456).
-export type ProfilBestand = { name: string; ownerName: string; phone: string }
+export type ProfilBestand = { name: string; ownerName: string; phone: string; email?: string }
+
+/** Die Hof-E-Mail: freiwillig, klein, ohne Ränder; leer ist erlaubt (Profil und Anlegen). */
+const hofEmailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(EMAIL_MAX, ZU_LANG.email)
+  .refine((v) => v === '' || emailSchema().safeParse(v).success, PROFIL_MELDUNG.email)
+
+/**
+ * Im Profil: Hat der Hof schon eine Hof-E-Mail gespeichert, darf er sie nicht
+ * leeren. Die Bestellmails an den Hof (src/lib/email.ts) lesen Farm.email ohne
+ * Rückfall auf die Anmelde-Adresse; ein leeres Feld ließe sie ins Leere gehen.
+ * Ein Hof ohne gespeicherte Adresse (beim Anlegen frei gelassen) bleibt
+ * speicherbar.
+ */
+function hofEmailFuer(bestandEmail?: string) {
+  if (!bestandEmail) return hofEmailSchema
+  return hofEmailSchema.refine((v) => v !== '', PROFIL_MELDUNG.emailPflicht)
+}
 
 function profilSchemaFuer(bestand?: ProfilBestand) {
   return z.object({
     name: z
       .string()
-      .min(2, 'Name muss mindestens 2 Zeichen haben')
+      .min(2, PROFIL_MELDUNG.name)
       .refine((v) => passtInGrenze(v, HOFNAME_MAX, bestand?.name), ZU_LANG.hofname),
     ownerName: z
       .string()
-      .min(2, 'Name muss mindestens 2 Zeichen haben')
+      .min(2, PROFIL_MELDUNG.ownerName)
       .refine((v) => passtInGrenze(v, PERSONENNAME_MAX, bestand?.ownerName), ZU_LANG.personenname),
-    description: z.string().min(10, 'Beschreibung muss mindestens 10 Zeichen haben'),
-    address: z.string().min(3, 'Pflichtfeld'),
-    postalCode: z.string().min(4, 'Pflichtfeld'),
-    city: z.string().min(2, 'Pflichtfeld'),
+    // Freiwillig, wie beim Anlegen (hofAnlegenSchema): Ein Hof, der sie dort leer
+    // gelassen hat, muss sein Profil trotzdem speichern können (CODING_STANDARDS,
+    // „Bestand bleibt speicherbar"). Eine Obergrenze gab es nie; sie kommt nicht dazu.
+    description: z.string(),
+    address: z.string().min(3, PROFIL_MELDUNG.address),
+    postalCode: z.string().min(4, PROFIL_MELDUNG.postalCode),
+    city: z.string().min(2, PROFIL_MELDUNG.city),
     // Die Spalte ist ein String mit Default (prisma/schema.prisma) — ERLAUBT
     // sind aber nur AT und DE, und das erzwingt genau diese Zeile. Ein drittes
     // Land kostet damit einen Eintrag in src/lib/laender.ts, keine Migration.
     country: z.enum(LAENDER, { message: 'Bitte Österreich oder Deutschland wählen' }),
     phone: z
       .string()
-      .min(4, 'Pflichtfeld')
+      .min(1, PROFIL_MELDUNG.phoneFehlt)
+      .min(4, PROFIL_MELDUNG.phoneKurz)
       .refine((v) => passtInGrenze(v, TELEFON_MAX, bestand?.phone), ZU_LANG.telefon),
-    email: emailSchema('Ungültige E-Mail-Adresse'),
+    // Freiwillig wie beim Anlegen: leer bleibt leer, sonst gilt emailSchema
+    // (klein, ohne Ränder, gültiges Format). Die Spalte ist NOT NULL — leer
+    // heißt Leerstring, wie ihn das Anlegen schon speichert. Ein Hof mit
+    // gespeicherter Adresse darf sie nicht leeren (hofEmailFuer).
+    email: hofEmailFuer(bestand?.email),
     // Der Kartenpunkt wird MIT dem Profil gespeichert — es gibt keinen eigenen
     // Bestätigen-Schritt mehr. null heißt: (noch) kein Punkt gesetzt; ein
     // gespeicherter Punkt wird dann NICHT angerührt (siehe updateProfile).
@@ -103,15 +132,7 @@ export const hofAnlegenSchema = z.object({
   phone: z.string().trim().max(TELEFON_MAX, ZU_LANG.telefon),
   // Die Hof-E-Mail ist im Onboarding freiwillig: leer bleibt leer. Sonst gilt
   // emailSchema (src/schemas/email.ts) — klein, ohne Ränder, gültiges Format.
-  email: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .max(EMAIL_MAX, ZU_LANG.email)
-    .refine(
-      (v) => v === '' || emailSchema().safeParse(v).success,
-      'Bitte gib eine gültige Hof-E-Mail an — oder lass das Feld leer.'
-    ),
+  email: hofEmailSchema,
 })
 
 /**

@@ -53,7 +53,7 @@ export function AntwortFormular({ unterhaltungId }: { unterhaltungId: string }):
           aria-invalid={fehler !== null}
           aria-describedby={fehler !== null ? 'postfach-antwort-fehler' : 'postfach-antwort-hinweis'}
           className={cn(
-            'min-h-[46px] flex-1 resize-y rounded-[14px] border border-input bg-card px-3.5 py-3 text-[15px] text-foreground placeholder:text-muted-foreground',
+            'min-h-[46px] flex-1 resize-y rounded-[14px] border border-input bg-card px-3.5 py-3 text-base text-foreground placeholder:text-muted-foreground',
             FOKUS_RAHMEN
           )}
         />

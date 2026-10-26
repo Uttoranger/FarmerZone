@@ -272,7 +272,8 @@ describe('Speichern auf den Einstellungs-Unterseiten (Quelltext)', () => {
     expect(profil).not.toContain('toast.error(')
     // Ein neuer Versuch räumt den alten Satz weg.
     expect(profil).toMatch(/if \(sucheLaeuft\) return\s*setSpeicherFehler\(null\)/)
-    expect(text).toMatch(/<DialogFehler text=\{speicherFehler\} \/>\s*\{\/\*[^*]*\*\/\}\s*<Button\s*type="submit"/)
+    // Seit Nr. 174 die Hinweiskarte mit „Nochmal" am Netz (SpeicherFehler) statt DialogFehler.
+    expect(text).toMatch(/<SpeicherFehler text=\{speicherFehler\}[^>]*\/>\s*\{\/\*[^*]*\*\/\}\s*<Button\s*type="submit"/)
     // Ohne Fehler steht nichts da.
     expect(renderToStaticMarkup(createElement(ProfileForm, { farm: HOF }))).not.toContain('role="alert"')
   })

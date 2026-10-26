@@ -71,6 +71,7 @@ export async function updateProfile(data: ProfileFormData): Promise<ProfileResul
     name: farm.name,
     ownerName: farm.ownerName,
     phone: farm.phone,
+    email: farm.email,
   }).safeParse(data)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Ungültige Daten' }
 

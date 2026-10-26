@@ -78,7 +78,7 @@ function nacheinander(arbeit: () => Promise<{ error?: string }>): Promise<{ erro
  * mit, falls danach etwas Echtes gemeldet wird. Wirft nie — der Bauer bekommt
  * seinen Satz auch, wenn Sentry selbst scheitert.
  */
-function meldeGescheitertesSpeichern(fehler: unknown): void {
+export function meldeGescheitertesSpeichern(fehler: unknown): void {
   try {
     const { klasse, meldung } = befundVon(fehler)
     const name = BEZEICHNER.test(klasse) ? klasse : 'Unbekannt'
