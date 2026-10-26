@@ -4,7 +4,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
-import { stelleMailEin, type EinstellAuftrag } from '@/server/mail-warteschlange'
+import { stelleEinOhneRisiko, stelleMailEinInTransaktion, type EinstellAuftrag, type EinstellErgebnis } from '@/server/mail-warteschlange'
 import { artikelFehltMailAuftrag, bestellMailAuftrag, stornoMailAuftrag, trageStornoErstattungEin } from '@/server/mail-arten/bestellung'
 import { betreiberAuftraege, betreiberKennungen, erstattungOffenBezug } from '@/server/mail-arten/betreiber'
 import { erstattungOffenInhalt } from '@/lib/erstattung-offen'
@@ -67,8 +67,8 @@ export type ArtikelFehltErgebnis = StornoErgebnis & {
 const BESTELLUNG_INZWISCHEN_GEAENDERT =
   'Die Bestellung wurde inzwischen geändert, zum Beispiel storniert. Lade die Seite neu.'
 
-// Statuswechsel und Mail-Auftrag sind eine Transaktion — scheitert sie, ist
-// nichts gespeichert und der Hof tippt einfach noch einmal.
+// Scheitert der Statuswechsel selbst, ist nichts gespeichert und der Hof
+// tippt einfach noch einmal. Ein Mail-Auftrag kippt ihn nie (Nr. 168).
 const STATUS_NICHT_GESPEICHERT = 'Wir konnten die Änderung nicht speichern. Versuch es bitte gleich noch einmal.'
 
 async function getAuthFarm() {
@@ -135,19 +135,6 @@ const LAUFEND: OrderStatus[] = ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY']
  * in die Warteschlange (Register N26, Nr. 159), der Worker verschickt.
  */
 
-/**
- * Stellt die Mail(s) eines schon gespeicherten Statuswechsels ein. Ein Fehler
- * dabei kippt den Wechsel nicht (CLAUDE.md §2) — nur gemeldet, ohne
- * Kundendaten. Kein eigener Versand, deshalb im Antwortpfad: ein Insert.
- */
-async function stelleEinOhneRisiko(art: string, orderId: string, auftraege: () => Promise<EinstellAuftrag | EinstellAuftrag[]>): Promise<void> {
-  try {
-    await stelleMailEin(await auftraege())
-  } catch (err) {
-    Sentry.captureException(err, { tags: { aktion: 'bestellmail', art }, extra: { orderId } })
-  }
-}
-
 export async function markAsReady(orderId: string): Promise<ActionResult> {
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
@@ -161,23 +148,29 @@ export async function markAsReady(orderId: string): Promise<ActionResult> {
   // Bedingt (S2, ARCHITECTURE §6 Altlast): Ein Storno zwischen Lesen und
   // Schreiben darf nicht überschrieben werden — sonst stünde eine stornierte
   // Bestellung als abholbereit da.
-  // Statuswechsel und Mail-Auftrag in EINER Transaktion: Ein gespeichertes
-  // „abholbereit" hat immer seinen Auftrag. Abholbereit kann sich wiederholen
-  // (zurück und wieder bereit): der Zeitpunkt macht den Schlüssel eindeutig.
+  // Statuswechsel und Mail-Auftrag in EINER Transaktion; der Auftrag hält den
+  // Wechsel nie auf (Register N26, Ergänzung 25.10.2026) — scheitert er, wird
+  // er nach dem Commit nachgeholt. Abholbereit kann sich wiederholen (zurück
+  // und wieder bereit): der Zeitpunkt macht den Schlüssel eindeutig, darum
+  // wird das Objekt EINMAL gebaut, vor der Transaktion; geprüft wird es rein,
+  // vor dem Schreiben (ungültig fällt weg, einmal gemeldet).
+  const auftrag = bestellMailAuftrag('abholbereit', { id: orderId, farmId: farm.id }, new Date())
   let count: number
+  let mail: EinstellErgebnis | null = null
   try {
     count = await prisma.$transaction(async (tx) => {
       const { count: geaendert } = await tx.order.updateMany({
         where: { id: orderId, farmId: farm.id, status: { in: PACKBAR } },
         data: { status: 'READY' },
       })
-      if (geaendert > 0) await stelleMailEin(bestellMailAuftrag('abholbereit', { id: orderId, farmId: farm.id }, new Date()), tx)
+      if (geaendert > 0) mail = await stelleMailEinInTransaktion([auftrag], tx)
       return geaendert
     })
   } catch (err) {
     Sentry.captureException(err, { tags: { aktion: 'markAsReady' }, extra: { orderId } })
     return { error: STATUS_NICHT_GESPEICHERT }
   }
+  if (mail === 'nachholen') await stelleEinOhneRisiko('abholbereit', orderId, auftrag)
   if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
   revalidatePath('/orders')
@@ -255,24 +248,27 @@ export async function revertReady(
   // zurück ins Leben — und ein zweiter Storno buchte den Bestand erneut zurück.
   // Kunden-Info nur auf Wunsch (Haken im Dialog, Standard AN): neutrales
   // "Kurzes Update" — relativiert die bereits verschickte Abholbereit-Mail.
-  // Der Auftrag in derselben Transaktion wie der Rückweg (Nr. 159): beides
-  // oder keins. Verschickt wird nach der Antwort.
+  // Der Auftrag in derselben Transaktion wie der Rückweg (Nr. 159); er hält
+  // den Rückweg nie auf (Register N26, Ergänzung 25.10.2026) — scheitert er,
+  // wird er nach dem Commit mit demselben Objekt nachgeholt (der Zeitpunkt
+  // steckt im Schlüssel). Verschickt wird nach der Antwort.
+  const auftrag = notifyCustomer ? bestellMailAuftrag('nicht-abholbereit', { id: orderId, farmId: farm.id }, new Date()) : null
   let count: number
+  let mail: EinstellErgebnis | null = null
   try {
     count = await prisma.$transaction(async (tx) => {
       const { count: geaendert } = await tx.order.updateMany({
         where: { id: orderId, farmId: farm.id, status: 'READY' },
         data: { status: previous },
       })
-      if (geaendert > 0 && notifyCustomer) {
-        await stelleMailEin(bestellMailAuftrag('nicht-abholbereit', { id: orderId, farmId: farm.id }, new Date()), tx)
-      }
+      if (geaendert > 0 && auftrag) mail = await stelleMailEinInTransaktion([auftrag], tx)
       return geaendert
     })
   } catch (err) {
     Sentry.captureException(err, { tags: { aktion: 'revertReady' }, extra: { orderId } })
     return { error: STATUS_NICHT_GESPEICHERT }
   }
+  if (mail === 'nachholen' && auftrag) await stelleEinOhneRisiko('nicht-abholbereit', orderId, auftrag)
   if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
   revalidatePath('/orders')
@@ -447,7 +443,7 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
   // Warenpreis beim Hof (markAsNotPickedUp); ein Storno danach erstattete ihn
   // voll und buchte Ware zurück, die nie zurückkam. Die Oberfläche bietet es
   // dort schon nicht an — der Server muss es genauso sehen.
-  let storno: Prisma.OrderGetPayload<{ select: typeof STORNO_STAND }> | null
+  let storno: (Prisma.OrderGetPayload<{ select: typeof STORNO_STAND }> & { nachholen: EinstellAuftrag | null }) | null
   try {
     storno = await prisma.$transaction(async (tx) => {
       const { count } = await tx.order.updateMany({
@@ -490,12 +486,15 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
         })
       }
       // Die Storno-Mail als Auftrag in DERSELBEN Transaktion (Nr. 159, Punkt
-      // 1): gespeicherte Stornierung ⇔ Auftrag. Online bezahlt steht der Betrag
-      // erst nach Stripe fest — dann trägt der Auftrag `ausstehend`, der Betrag
-      // kommt unten nach (trageStornoErstattungEin). Scheitert das Einstellen,
-      // rollt der Storno zurück und der Hof versucht es noch einmal.
-      await stelleMailEin(stornoMailAuftrag({ id: orderId, farmId: farm.id }, onlineBezahlt(stand)), tx)
-      return stand
+      // 1). Online bezahlt steht der Betrag erst nach Stripe fest — dann
+      // trägt der Auftrag `ausstehend`, der Betrag kommt unten nach
+      // (trageStornoErstattungEin). Der Bezug hängt am Stand unter der Sperre,
+      // geprüft wird darum erst hier. Der Auftrag kippt den Storno nie
+      // (Register N26, Ergänzung 25.10.2026): Scheitert er, wird er direkt
+      // nach dem Commit nachgeholt.
+      const auftrag = stornoMailAuftrag({ id: orderId, farmId: farm.id }, onlineBezahlt(stand))
+      const mail = await stelleMailEinInTransaktion(auftrag, tx)
+      return { ...stand, nachholen: mail === 'nachholen' ? auftrag : null }
     })
   } catch (err) {
     // Zurückgerollt: nichts storniert, nichts zurückgebucht, kein Auftrag.
@@ -504,6 +503,10 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
   }
 
   if (!storno) return { error: 'Diese Bestellung ist schon storniert oder abgeholt.' }
+  // Direkt nach dem Commit, VOR Hofliste, Stripe und trageStornoErstattungEin:
+  // Das Nachtragen schreibt nur in einen schon vorhandenen Auftrag — fehlte
+  // er dann noch, bekäme die Kundin keine Storno-Mail.
+  if (storno.nachholen) await stelleEinOhneRisiko('storniert', orderId, storno.nachholen)
   // Nach dem Commit: ein volles Abholfenster kann frei werden (Register N19, Ergänzung 21.10.2026).
   erneuereHoflisteNachStorno(orderId)
 
@@ -738,7 +741,7 @@ async function storniere(farm: FarmInfo, orderId: string, reason?: string): Prom
   if (handbuchungOffen) {
     const hand = handbuchungOffen
     // Empfänger aus der Zustellung (Register N14): „Erstattung offen" geht immer, auch bei Regel „aus".
-    await stelleEinOhneRisiko('erstattung_offen', orderId, async () =>
+    await stelleEinOhneRisiko('erstattung-offen', orderId, async () =>
       betreiberAuftraege(
         'erstattung-offen',
         `storno-${orderId}`,
@@ -834,7 +837,7 @@ export async function meldeArtikelFehlt(input: unknown): Promise<ArtikelFehltErg
   // Der Auftrag trägt die Beträge der Rechnung beim Speichern — nie neu
   // gerechnet; Bestellung und Position lädt der Renderer nach dem Schreiben
   // frisch, Mail und Datenbank zeigen denselben Stand.
-  await stelleEinOhneRisiko('artikel_fehlt', orderId, async () =>
+  await stelleEinOhneRisiko('artikel-fehlt', orderId, async () =>
     artikelFehltMailAuftrag(
       { id: orderId, farmId: farm.id },
       {

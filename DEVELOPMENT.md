@@ -5856,6 +5856,12 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Randfall:** Ohne verfügbare Produkte und ohne Abholzeit rendert die Hofseite kein `ProductGrid` (und keine rechte Spalte) — dann gleicht sie nicht ab; nur die Zahl am Korb-Symbol der Kopfzeile zeigt den gespeicherten Korb, die Kasse prüft ihn beim Öffnen.
 - **Zähler:** `reserveIp` (S17 Punkt 1, 20 je Minute und Adresse) zählt jetzt drei Wege: Reservieren, Prüfen, Freigeben.
 
+## Ein Mail-Auftrag hält nie eine Bestellung auf (Register N26, Ergänzung 25.10.2026; Nr. 168, Lauf 25)
+
+- **Warum:** Seit Nr. 159 stellten Webhook bezahlt, „Zahlung zu spät", Barbestätigung, Storno, abholbereit und nicht abholbereit ihre Mail-Aufträge mit `stelleMailEin(…, tx)` in ihrer Transaktion ein. Ein falscher Bezug (`parse` mitten im `createMany`) oder ein Datenbankfehler beim Einstellen rollte den Wechsel mit zurück: Der Webhook antwortete 500 und Stripe wiederholte, bei einem festen Fehler blieb eine bezahlte Bestellung auf PENDING_CONFIRMATION (Widerspruch zu CLAUDE.md §2); ein Storno kam nie zustande, also auch keine Erstattung.
+- **Jetzt:** `stelleMailEinInTransaktion` (src/server/mail-warteschlange.ts) wirft nie. Ungültige Aufträge fallen mit einer Meldung weg; die gültigen schreibt eine verschachtelte Transaktion, die Prisma 7 über `@prisma/adapter-pg` als Savepoint anlegt (Weg A der Freigabe — trägt, belegt im Integrationstest mit einer Trigger-Funktion, die jedes INSERT in `MailAuftrag` scheitern lässt: Die Transaktion liest und schreibt danach weiter und committet). Scheitert das Einstellen, holt der Aufrufer nach dem Commit mit demselben Auftragsobjekt nach (`stelleEinOhneRisiko`, aus orders.ts nach mail-warteschlange.ts gezogen; `mailOhneRisiko` im Webhook ging darin auf). Der Storno holt direkt nach dem Commit nach, vor Stripe — sonst fände `trageStornoErstattungEin` keinen Auftrag.
+- **Bleibt:** Postfach, Beitrag und Rundschreiben mit „alles oder nichts" (`stelleMailEin(…, tx)`); „Artikel fehlt", „Erstattung offen" und Verfallen stellen weiter nach dem Commit ein. Bedingungen und Reihenfolge der Wechsel sind unverändert, kein Betrag wird neu gerechnet.
+
 ## Nützliche Befehle
 
 ```bash

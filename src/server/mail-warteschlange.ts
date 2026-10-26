@@ -17,9 +17,11 @@ import type { Zustellung } from '@/schemas/resend-ereignis'
  *
  *  - stelleMailEin: Aufträge anlegen (ein Aufruf auch für 5.000), doppelte
  *    fachliche Schlüssel fallen still weg; danach arbeitet der Worker nach
- *    der Antwort. Liegt eine fachliche Änderung vor, gehört das Einstellen in
- *    dieselbe Transaktion (Parameter `db`) — dann fehlt nie eine Mail zu einer
- *    gespeicherten Bestellung.
+ *    der Antwort. Postfach, Beitrag und Rundschreiben stellen in ihrer
+ *    Transaktion ein (Parameter `db`) — dort ist „alles oder nichts" gewollt.
+ *  - stelleMailEinInTransaktion: Bestellwechsel stellen in ihrer Transaktion
+ *    ein, ohne dass ein Auftrag den Wechsel je kippt (Savepoint); was dort
+ *    scheitert, holt `stelleEinOhneRisiko` nach dem Commit nach (Nr. 168).
  *  - arbeiteWarteschlange: der Worker — nur einer zur Zeit (Advisory-Lock),
  *    Seiten zu 100, Wichtig vor Kann warten, Versand als Stapel über
  *    `versendeStapel` (src/lib/email.ts), zwischen zwei Anfragen an Resend
@@ -59,6 +61,8 @@ const PUFFER_MS = 5_000
 
 type Grenzen = { mailsTag: number | null; mailsMonat: number | null }
 type Db = { mailAuftrag: Pick<typeof prisma.mailAuftrag, 'createMany'> }
+/** Der Client einer offenen Transaktion: schreibt Aufträge und öffnet darin eine verschachtelte (Savepoint). */
+type TxDb = Db & { $transaction<R>(arbeit: (t: Db) => Promise<R>): Promise<R> }
 
 export type EinstellAuftrag = {
   art: MailArt
@@ -78,21 +82,50 @@ export type EinstellAuftrag = {
   nochmalVon?: string
 }
 
+/** Ein Auftrag oder mehrere — so nehmen ihn alle Wege zum Einstellen. */
+export type Einstellbar = EinstellAuftrag | readonly EinstellAuftrag[]
+
+/** Das Ergebnis der Prüfung: die Aufträge mit gültigem Bezug (geprüfter Bezug) und die Arten mit ungültigem. */
+export type MailPruefung = { gueltig: EinstellAuftrag[]; ungueltigeArten: MailArt[] }
+
+/** Was beim Einstellen in der Transaktion herauskam (Register N26, Ergänzung 25.10.2026). */
+export type EinstellErgebnis = 'eingestellt' | 'nachholen' | 'ungueltig'
+
+function alsListe(auftraege: Einstellbar): readonly EinstellAuftrag[] {
+  return 'art' in auftraege ? [auftraege] : auftraege
+}
+
 /**
- * Stellt einen oder viele Aufträge ein — EIN `createMany` mit
- * `skipDuplicates` über `schluessel`, auch für 5.000 Abos. Gibt die Zahl der
- * neu angelegten zurück. Der Bezug wird je Art geprüft; ein falscher wirft
- * (Programmierfehler, nie Nutzereingabe).
+ * Prüft den Bezug jedes Auftrags gegen das Schema seiner Art — die eine
+ * Quelle der Prüfung für alle Wege. Rein, wirft nie: Auch ein Schema, das
+ * selbst scheitert (unbekannte Art aus schwach typisiertem Aufruf), zählt als
+ * ungültig. Gültige Aufträge tragen den geprüften Bezug.
  */
-export async function stelleMailEin(auftraege: EinstellAuftrag | readonly EinstellAuftrag[], db: Db = prisma): Promise<number> {
-  const liste: readonly EinstellAuftrag[] = 'art' in auftraege ? [auftraege] : auftraege
-  if (liste.length === 0) return 0
+export function pruefeMailAuftraege(auftraege: Einstellbar): MailPruefung {
+  const gueltig: EinstellAuftrag[] = []
+  const ungueltigeArten: MailArt[] = []
+  for (const a of alsListe(auftraege)) {
+    let bezug: Record<string, string> | null = null
+    try {
+      const geprueft = bezugSchemaFuer(a.art).safeParse(a.bezug)
+      if (geprueft.success) bezug = geprueft.data
+    } catch {
+      bezug = null
+    }
+    if (bezug) gueltig.push({ ...a, bezug })
+    else if (!ungueltigeArten.includes(a.art)) ungueltigeArten.push(a.art)
+  }
+  return { gueltig, ungueltigeArten }
+}
+
+/** EIN createMany mit skipDuplicates über den fachlichen Schlüssel — nur mit schon geprüften Aufträgen. */
+async function schreibeAuftraege(db: Db, liste: readonly EinstellAuftrag[]): Promise<number> {
   const { count } = await db.mailAuftrag.createMany({
     data: liste.map((a) => ({
       art: a.art,
       vorrang: a.vorrang,
       schluessel: a.schluessel,
-      bezug: bezugSchemaFuer(a.art).parse(a.bezug),
+      bezug: a.bezug,
       bestellungId: a.bestellungId ?? null,
       farmId: a.farmId ?? null,
       ...(a.ausloeser ? { ausloeser: a.ausloeser } : {}),
@@ -100,9 +133,16 @@ export async function stelleMailEin(auftraege: EinstellAuftrag | readonly Einste
     })),
     skipDuplicates: true,
   })
-  // Mit `db = tx` läuft der Worker unter Umständen vor dem Commit und sieht
-  // diese Aufträge noch nicht — dann nimmt sie der nächste Lauf (Cron jede
-  // Minute) mit. Verloren geht keiner, er kommt nur bis zu einer Minute später.
+  return count
+}
+
+/**
+ * Startet den Worker nach der Antwort. Mit dem Client einer Transaktion läuft
+ * er unter Umständen vor dem Commit und sieht die Aufträge noch nicht — dann
+ * nimmt sie der nächste Lauf (Cron jede Minute) mit. Verloren geht keiner,
+ * er kommt nur bis zu einer Minute später.
+ */
+function starteWorker(): void {
   nachDerAntwort(async () => {
     try {
       await arbeiteWarteschlange({ biszeitMs: 45_000 })
@@ -110,7 +150,103 @@ export async function stelleMailEin(auftraege: EinstellAuftrag | readonly Einste
       meldeFehler('Mail-Warteschlange: Worker nach dem Einstellen gescheitert', err)
     }
   })
+}
+
+/** Fester Satz für Sentry, wenn Aufträge wegen ihres Bezugs wegfallen (Programmierfehler, nie Nutzereingabe). */
+const SATZ_BEZUG_UNGUELTIG = 'Mail-Auftrag: Bezug ungültig — ohne diesen Auftrag weiter'
+
+/** Meldet die Arten mit ungültigem Bezug EINMAL, mit der Bestellung in `extra`. */
+function meldeUngueltig(pruefung: MailPruefung, bestellungId: string | null): void {
+  if (pruefung.ungueltigeArten.length === 0) return
+  meldeFehler(SATZ_BEZUG_UNGUELTIG, new Error('bezug_ungueltig'), pruefung.ungueltigeArten, {
+    bestellungId,
+    grund: 'bezug_ungueltig',
+    stufe: 'error',
+  })
+}
+
+/** Die Bestellung der Aufträge für Sentry — sie tragen alle dieselbe. */
+function bestellungDer(liste: readonly EinstellAuftrag[]): string | null {
+  return liste.find((a) => a.bestellungId)?.bestellungId ?? null
+}
+
+/**
+ * Stellt einen oder viele Aufträge ein — EIN `createMany` mit
+ * `skipDuplicates` über `schluessel`, auch für 5.000 Abos. Gibt die Zahl der
+ * neu angelegten zurück. Der Bezug wird je Art geprüft (`pruefeMailAuftraege`);
+ * ein falscher wirft, bevor etwas geschrieben wird. So bleibt „alles oder
+ * nichts" für Postfach, Beitrag und Rundschreiben, die mit `db = tx` in ihrer
+ * Transaktion einstellen. Bestellungen nehmen `stelleMailEinInTransaktion`.
+ */
+export async function stelleMailEin(auftraege: Einstellbar, db: Db = prisma): Promise<number> {
+  const liste = alsListe(auftraege)
+  if (liste.length === 0) return 0
+  const { gueltig, ungueltigeArten } = pruefeMailAuftraege(liste)
+  if (ungueltigeArten.length > 0) throw new Error(`Mail-Auftrag: Bezug ungültig (${ungueltigeArten.join(', ')})`)
+  const count = await schreibeAuftraege(db, gueltig)
+  starteWorker()
   return count
+}
+
+/**
+ * Stellt die Aufträge eines Bestellwechsels in SEINER Transaktion ein, ohne
+ * ihn je zu kippen (Register N26, Ergänzung 25.10.2026, Nr. 168). Wirft nie.
+ *
+ *  - Aufträge mit ungültigem Bezug fallen weg, EINE Meldung je Aufruf mit
+ *    den Arten und der Bestellung. Bleibt keiner übrig: `'ungueltig'`.
+ *  - Die gültigen schreibt eine verschachtelte Transaktion: Prisma legt dafür
+ *    über den Adapter einen Savepoint an (`createSavepoint`/
+ *    `rollbackToSavepoint` in @prisma/adapter-pg). Ein Datenbankfehler setzt
+ *    nur diesen Teil zurück, der Wechsel bleibt und committet — `'nachholen'`:
+ *    Der Aufrufer stellt NACH dem Commit mit demselben Auftragsobjekt über
+ *    `stelleEinOhneRisiko` noch einmal ein (derselbe Schlüssel hält einen
+ *    zweiten Auftrag auf). Belegt in tests/integration/webhook-zahlung.int.test.ts (Weg A).
+ */
+export async function stelleMailEinInTransaktion(auftraege: Einstellbar, tx: TxDb): Promise<EinstellErgebnis> {
+  const liste = alsListe(auftraege)
+  const pruefung = pruefeMailAuftraege(liste)
+  const bestellungId = bestellungDer(liste)
+  meldeUngueltig(pruefung, bestellungId)
+  if (pruefung.gueltig.length === 0) return pruefung.ungueltigeArten.length > 0 ? 'ungueltig' : 'eingestellt'
+  try {
+    await tx.$transaction((t) => schreibeAuftraege(t, pruefung.gueltig))
+  } catch (err) {
+    meldeFehler('Mail-Auftrag in der Transaktion gescheitert — wird nach dem Commit nachgeholt', err, artenDer(pruefung.gueltig), {
+      bestellungId,
+      grund: 'in_transaktion_gescheitert',
+      stufe: 'warning',
+    })
+    return 'nachholen'
+  }
+  starteWorker()
+  return 'eingestellt'
+}
+
+/**
+ * Stellt die Mail(s) eines schon gespeicherten Wechsels ein — nach dem
+ * Commit, fail-open: Ein Fehler kippt den Wechsel nicht (CLAUDE.md §2), er
+ * geht nur an Sentry, ohne Kundendaten. Für das Nachholen nach
+ * `'nachholen'` (dasselbe Auftragsobjekt) und für Wege, deren Wechsel ohne
+ * Auftrag committet („Artikel fehlt", „Erstattung offen"). Ein Bauer der
+ * Aufträge (`() => …`) läuft mit unter dem Schutz.
+ */
+export async function stelleEinOhneRisiko(
+  art: MailArt,
+  bestellungId: string | null,
+  auftraege: Einstellbar | (() => Promise<Einstellbar>)
+): Promise<void> {
+  try {
+    const liste = alsListe(typeof auftraege === 'function' ? await auftraege() : auftraege)
+    const pruefung = pruefeMailAuftraege(liste)
+    meldeUngueltig(pruefung, bestellungId)
+    if (pruefung.gueltig.length > 0) await stelleMailEin(pruefung.gueltig)
+  } catch (err) {
+    meldeFehler('Mail-Auftrag nach dem Commit gescheitert — die Mail fehlt', err, art, { bestellungId, grund: 'einstellen_gescheitert', stufe: 'error' })
+  }
+}
+
+function artenDer(liste: readonly EinstellAuftrag[]): MailArt[] {
+  return [...new Set(liste.map((a) => a.art))]
 }
 
 /** Die Zeile einer direkten Mail (vorrang 0) — aus `sendRaw`, fail-open beim Aufrufer. */
@@ -573,12 +709,26 @@ function zaehle(e: WorkerErgebnis, a: Ausgang): void {
   else if (a.status === 'ohne_schluessel') e.ohneSchluessel += 1
 }
 
-/** Nach Sentry nur die Fehlerklasse unter festem Satz, dazu höchstens die Art — nie Adresse, Bezug oder Text. */
-function meldeFehler(satz: string, err: unknown, art?: MailArt): void {
+/**
+ * Nach Sentry nur die Fehlerklasse unter festem Satz, dazu höchstens die
+ * Art(en), der Grund und die Bestellung — nie Adresse, Bezug oder Text.
+ * Einheitliche Tags aller Meldungen der Warteschlange: `bereich`
+ * (`mail-warteschlange`), `art`, `grund`; die Bestellung in `extra`.
+ */
+function meldeFehler(
+  satz: string,
+  err: unknown,
+  art?: MailArt | readonly MailArt[],
+  kontext: { bestellungId?: string | null; grund?: string; stufe?: 'warning' | 'error' } = {}
+): void {
   try {
     const meldung = new Error(satz)
     meldung.name = fehlerKlasse(err)
-    Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'mail-warteschlange', ...(art ? { art } : {}) } })
+    Sentry.captureException(meldung, {
+      level: kontext.stufe ?? 'warning',
+      tags: { bereich: 'mail-warteschlange', ...(art && art.length > 0 ? { art: typeof art === 'string' ? art : art.join(',') } : {}), ...(kontext.grund ? { grund: kontext.grund } : {}) },
+      ...(kontext.bestellungId ? { extra: { bestellungId: kontext.bestellungId } } : {}),
+    })
   } catch {
     // Telemetrie scheitert leise.
   }
