@@ -23,6 +23,12 @@ type Ziel = 'banner' | 'gallery'
 type Ergebnis = { name: string; ok: boolean; meldung?: string }
 
 /**
+ * Seit Nr. 181 im neuen Design (`data-design="neu"` am <main>): nur Tokens, in
+ * beiden Themes lesbar — Links und das Häkchen grün (`text-brand-text`), nie
+ * `text-primary` (orange Text taugt im Dunkeln nicht). Eine Shell trägt die
+ * Seite bewusst nicht: Sie ist das Ziel des Teilens-Menüs, keine Seite zum
+ * Stöbern; der Weg zurück sind die Links darin.
+ *
  * Nimmt die geteilten Fotos aus der Ablage entgegen und lädt sie über den
  * bestehenden Upload-Weg hoch — zweck 'banner' (Titelbild, nur bei genau
  * einem Foto) oder 'gallery' (Hofgalerie, bei mehreren immer). Die Serie
@@ -142,7 +148,7 @@ export function TeilenClient({
   const fertigOhneFehler = ergebnisse !== null && ergebnisse.every((e) => e.ok)
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8">
+    <main data-design="neu" className="min-h-screen bg-background px-4 py-8">
       <div className="mx-auto max-w-md">
         <h1 className="font-heading text-2xl font-semibold text-foreground mb-1">
           Geteilte Fotos
@@ -166,7 +172,7 @@ export function TeilenClient({
             </p>
             <Link
               href="/dashboard"
-              className="mt-4 inline-flex min-h-11 items-center text-sm font-medium text-primary underline underline-offset-4"
+              className="mt-4 inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline underline-offset-4"
             >
               Zur Übersicht
             </Link>
@@ -257,7 +263,7 @@ export function TeilenClient({
         {/* Alles angekommen */}
         {fertigOhneFehler && (
           <div className="rounded-2xl bg-card p-6 shadow-sm">
-            <CheckCircle2 className="size-6 text-primary mb-3" aria-hidden="true" />
+            <CheckCircle2 className="size-6 text-brand-text mb-3" aria-hidden="true" />
             <p className="text-sm leading-relaxed text-foreground mb-4">
               {ergebnisse.length === 1
                 ? wirksamesZiel === 'banner'
@@ -268,13 +274,13 @@ export function TeilenClient({
             <div className="flex flex-col gap-1">
               <Link
                 href={`/${hofSlug}`}
-                className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline underline-offset-4"
+                className="inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline underline-offset-4"
               >
                 Zur Hofseite
               </Link>
               <Link
                 href={EINSTELLUNG_MEIN_AUFTRITT.href}
-                className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline underline-offset-4"
+                className="inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline underline-offset-4"
               >
                 Zu „{EINSTELLUNG_MEIN_AUFTRITT.label}“
               </Link>

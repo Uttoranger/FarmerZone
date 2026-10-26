@@ -5839,6 +5839,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Formprüfung:** Die beiden Schemas mit `sig` (`src/schemas/bestaetigung.ts`, `src/schemas/abo.ts`) ließen nur 64 Hex durch; sie nehmen jetzt auch `2.` davor, sonst zeigte die Bestätigungsseite mit `LINK_SECRET` nur „eingegangen“.
 - **Bleibt:** `bremsSchluessel` (Bremsen) und der Hash des Bar-Tokens hängen nicht an Links in Mails und bleiben, wie sie sind. Der Double-Opt-in-Link (`abo-bestaetigung-token.ts`, 7 Tage) gehört nicht zu den drei Dateien und signiert weiter mit `BETTER_AUTH_SECRET`.
 
+## Letzte Altrouten und Fakten der Datenschutzerklärung (Nr. 181, Lauf 25, 25.10.2026)
+
+- **Druckseiten:** Abholzettel und Packliste stehen in der neuen Gruppe `(druck)` mit eigenem Papier-Layout (Crème und fast Schwarz aus den Tokens, die in beiden Themes gleich sind, keine Navigation), Wache `verlangeHofDerSitzung` statt eigener Sitzungsprüfung; `tests/hof-seiten-wache.test.ts` liest beide Gruppen ohne Ausnahme. Warum nicht `(hof)`: Dessen Layout setzt jede Seite in die HofShell. Mit dem Umzug fielen die Gruppe `(farmer)`, `farmer-nav.tsx` und der alte Teil von `bauern-navigation.ts` (`NEU`, `NEU_BROWSER`, `NUR_IM_MEHR`, `aktiverPunkt` …) weg.
+- **/datenschutz** steht in der KundeShell; `KundenKopf` mit Menü-Blatt (`kunden-menue.ts`) ist entfernt, geblieben sind `useRueckwegKlick` und die Rückwege in `kunden-kopf.ts`.
+- **Datenschutzerklärung (Text wartet auf Freigabe der Projektleitung):** Anmeldung mit Code statt Magic-Link, Geräte-Cookie, IP-Adresse je Sitzung, Cookie „Bestellungen finden“, Cloudflare, und Abschnitt 8 widerspricht der Reichweitenmessung nicht mehr. Zahlen und Namen kommen aus den Konstanten im Code. Keine neue Rechtsaussage; die Tabelle „alt → neu → Beleg“ steht im PR.
+- **/teilen** trägt `data-design="neu"`, keine Shell; der Service Worker ist unverändert.
+- **Toter Code entfernt:** `src/emails/newsletter.tsx`, `createOnboardingProducts`, `createOnboardingSlots` (jeweils ohne Import und Aufruf).
+
 ## Nützliche Befehle
 
 ```bash

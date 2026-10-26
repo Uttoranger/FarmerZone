@@ -180,13 +180,6 @@ describe('/farm-page in der HofShell', () => {
     }
   })
 
-  it('das Bauern-Layout nimmt denselben Lader und bleibt bei der Bestandsnavigation', () => {
-    const bestand = quelle('src/app/(farmer)/layout.tsx')
-    expect(bestand).toContain('ladeHofbereich()')
-    expect(bestand).toContain('<FarmerNav')
-    expect(bestand).not.toContain('@/components/shells/')
-  })
-
   it('/farm-page gibt es nur noch in (hof)', () => {
     expect(existsSync(join(process.cwd(), 'src/app/(farmer)/farm-page'))).toBe(false)
   })

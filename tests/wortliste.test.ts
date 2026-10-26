@@ -196,12 +196,6 @@ const AUSNAHMEN: Ausnahme[] = [
     text: '9. Newsletter und Neuigkeiten von Höfen',
     grund: 'Anmeldung bei einem Hof (Neuigkeiten), Entscheidung offen (Freigabe Lauf 13: keine Änderung)',
   },
-  {
-    datei: 'src/emails/newsletter.tsx',
-    wort: 'Newsletter',
-    text: 'Du erhältst diese Nachricht, weil du den Newsletter von',
-    grund: 'Anmeldung bei einem Hof (Neuigkeiten), Entscheidung offen (Freigabe Lauf 13: keine Änderung)',
-  },
   // Lager
   {
     datei: 'src/lib/taxonomie.ts',

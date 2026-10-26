@@ -1,17 +1,14 @@
 /**
  * Hof-Anmeldung am Handy und „Mein Hof" (Nachtlauf Nr. 41, Register N1) —
- * die Seiten, die noch KundenKopf tragen, und die Wege „Schon dabei?
- * Anmelden". Die KundeShell prüft tests/shells.test.ts, die Sitzung im
+ * und die Wege „Schon dabei? Anmelden". Die KundeShell (Kopf mit „Anmelden",
+ * „Mein Hof", „Mein Konto") prüft tests/shells.test.ts, die Sitzung im
  * Browser tests/kunde-shell-mit-sitzung.test.ts, die Quellen
- * tests/kunden-navigation.test.ts und tests/kunden-menue.test.ts; /login mit
- * vorgewählter Hofkarte tests/anmelden-seite.test.ts.
+ * tests/kunden-navigation.test.ts; /login mit vorgewählter Hofkarte
+ * tests/anmelden-seite.test.ts. Der alte Kopf (KundenKopf) ist seit Nr. 181
+ * entfernt.
  *
  * Beweist:
- *  - KundenKopf: ohne Sitzung oben rechts „Anmelden" auf /login — am Handy
- *    (44 px) und im Browser, nirgends mehr „Hofbetreiber-Login"; mit
- *    Hof-Sitzung „Mein Hof" auf /dashboard an beiden Stellen; mit
- *    Kundensitzung wie bisher die Anmeldung.
- *  - Hell/Dunkel steht im Menü-Blatt von KundenKopf, nicht im Kopf.
+ *  - Der Name im Kopf der KundeShell tritt nie bei 390 px oder breiter zurück.
  *  - „Schon dabei? Anmelden" (→ /login) im Band „Für Höfe" der Startseite,
  *    auf /fuer-hoefe oben und unten und auf /register.
  *  - Die Sitzung liest weiter der Browser: Die statischen Seiten mit dem
@@ -26,7 +23,6 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { MARKE } from '@/lib/marke'
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/impressum',
@@ -50,7 +46,6 @@ vi.mock('@/server/actions/register', () => ({ registerFarmer: vi.fn() }))
 // Seit Nr. 93 lädt die Seite die Zahlen der Gründungshöfe — ohne Zahlen rendert sie wie vorher.
 vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null }))
 
-import { KundenKopf } from '@/components/shared/kunden-kopf'
 import { FuerHoefeBandInhalt } from '@/components/startseite/startseite-abschnitte'
 import { FuerHoefeEinstieg, FuerHoefeSchluss } from '@/components/fuer-hoefe/fuer-hoefe-abschnitte'
 import FuerHoefePage from '@/app/(public)/fuer-hoefe/page'
@@ -62,88 +57,17 @@ const quelle = (pfad: string): string => readFileSync(join(process.cwd(), pfad),
 /** Nur der Code zählt — Kommentare dürfen erklären, was hier gesucht wird. */
 const ohneKommentare = (text: string): string => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
-function kopf(stand: Sitzung): { handy: string; browser: string } {
-  sitzung.aktuell = stand
-  const html = renderToStaticMarkup(createElement(KundenKopf, { seite: { art: 'info' } }))
-  // Zwei Kopfzeilen, je eine für Handy und Browser; die des Browsers steht als zweite im HTML.
-  expect(html.match(/<header\b/g)).toHaveLength(2)
-  const browserAb = html.lastIndexOf('<header')
-  return { handy: html.slice(0, browserAb), browser: html.slice(browserAb) }
-}
-
-/** Das öffnende Tag des ersten Links auf `href`. */
-function linkTag(html: string, href: string): string {
-  return html.match(new RegExp(`<a [^>]*href="${href.replace(/\//g, '\\/')}"[^>]*>`))?.[0] ?? ''
-}
-
-const OHNE: Sitzung = { data: null, isPending: false }
-const HOF: Sitzung = { data: { user: { id: 'h1', role: 'FARMER' } }, isPending: false }
-const KUNDIN: Sitzung = { data: { user: { id: 'k1', role: 'CUSTOMER' } }, isPending: false }
-
-describe('KundenKopf — Seiten, die noch nicht in der KundeShell stehen', () => {
-  it('ohne Sitzung: am Handy oben rechts „Anmelden" auf /login, 44 px, nicht ausgeblendet', () => {
-    const { handy } = kopf(OHNE)
-    expect(handy).toMatch(/<a [^>]*href="\/login"[^>]*>Anmelden<\/a>/)
-    const tag = linkTag(handy, '/login')
-    expect(tag).toMatch(/\b(min-)?h-11\b/)
-    expect(tag).not.toMatch(/\bhidden\b/)
-    // Rechts vom Logo, vor dem Menü.
-    expect(handy.indexOf('href="/login"')).toBeGreaterThan(handy.indexOf(MARKE))
-    expect(handy.indexOf('href="/login"')).toBeLessThan(handy.indexOf('Menü öffnen'))
-  })
-
-  it('ohne Sitzung: im Browser heißt der Knopf ebenfalls „Anmelden" — nirgends mehr „Hofbetreiber-Login"', () => {
-    const { handy, browser } = kopf(OHNE)
-    expect(browser).toMatch(/<a [^>]*href="\/login"[^>]*>Anmelden<\/a>/)
-    expect(linkTag(browser, '/login')).toMatch(/\b(min-)?h-11\b/)
-    expect(handy + browser).not.toContain('Hofbetreiber-Login')
-    expect(quelle('src/components/shared/kunden-kopf.tsx')).not.toContain('Hofbetreiber-Login')
-  })
-
-  it('Hof-Sitzung: „Mein Hof" auf /dashboard am Handy und im Browser, kein „Anmelden"', () => {
-    const { handy, browser } = kopf(HOF)
-    expect(handy).toMatch(/<a [^>]*href="\/dashboard"[^>]*>Mein Hof<\/a>/)
-    expect(browser).toMatch(/<a [^>]*href="\/dashboard"[^>]*>Mein Hof<\/a>/)
-    expect(handy + browser).not.toContain('>Anmelden<')
-    expect(handy + browser).not.toContain('href="/login"')
-  })
-
-  // Nachbesserung 1: dieselbe Variante wie in der KundeShell — „Mein Konto" als Konto-Symbol.
-  it('Kundensitzung: „Mein Konto" auf /account/profile am Handy und im Browser, 44 px, kein „Anmelden"', () => {
-    const { handy, browser } = kopf(KUNDIN)
-    for (const teil of [handy, browser]) {
-      const tag = linkTag(teil, '/account/profile')
-      expect(tag).toContain('aria-label="Mein Konto"')
-      expect(tag).toMatch(/\bsize-11\b/)
-      expect(teil).toContain('lucide-user-round')
-    }
-    expect(handy + browser).not.toContain('>Anmelden<')
-    expect(handy + browser).not.toContain('Mein Hof')
-  })
-
+describe('Kopf der KundeShell — Platz für „Anmelden"', () => {
   // Nachbesserung 1: Bei 390 px steht der Name in jedem Kopf; zurück tritt er nur auf schmaleren Handys.
   it('der Name tritt nie bei 390 px oder breiter zurück', () => {
-    const schwellen = ['src/components/shared/kunden-kopf.tsx', 'src/components/shells/kunde-shell.tsx'].flatMap((datei) =>
-      [...ohneKommentare(quelle(datei)).matchAll(/max-\[(\d+)px\]:hidden/g)].map((t) => Number(t[1]))
-    )
-    // KundenKopf ohne und mit Warenkorb, KundeShell mit Warenkorb im Kopf.
-    expect(schwellen).toHaveLength(3)
+    const schwellen = [...ohneKommentare(quelle('src/components/shells/kunde-shell.tsx')).matchAll(/max-\[(\d+)px\]:hidden/g)].map((t) => Number(t[1]))
+    // KundeShell mit Warenkorb im Kopf (der alte KundenKopf ist seit Nr. 181 entfernt).
+    expect(schwellen.length).toBeGreaterThan(0)
     for (const schwelle of schwellen) expect(schwelle).toBeLessThanOrEqual(390)
   })
 
-  it('solange die Sitzung lädt: „Anmelden" — dasselbe HTML wie vom Server', () => {
-    expect(kopf({ data: null, isPending: true }).handy).toContain('>Anmelden<')
-  })
-
-  // Am Handy braucht „Anmelden" den Platz oben rechts — Hell/Dunkel wandert ins Menü-Blatt.
-  it('Hell/Dunkel steht im Menü-Blatt, nicht in der Kopfzeile', () => {
-    const text = quelle('src/components/shared/kunden-kopf.tsx')
-    const menue = text.slice(text.indexOf('function MenueBlatt('), text.indexOf('\n}\n', text.indexOf('function MenueBlatt(')))
-    expect(menue).toContain('<ThemeUmschalterZeile')
-    const kopfFunktion = text.slice(text.indexOf('export function KundenKopf('), text.indexOf('\n}\n', text.indexOf('export function KundenKopf(')))
-    expect(kopfFunktion).not.toMatch(/<ThemeUmschalter\b/)
-    // Gegenprobe: Die Suche findet den Schalter, wo er steht.
-    expect(text).toMatch(/import \{[^}]*\bThemeUmschalterZeile\b[^}]*\} from '@\/components\/shared\/theme-umschalter'/)
+  it('der alte Kopf ist weg: keine Seite und keine Datei nennt KundenKopf als Bauteil', () => {
+    expect(ohneKommentare(quelle('src/components/shared/kunden-kopf.tsx'))).not.toMatch(/export function KundenKopf\b/)
   })
 })
 
@@ -200,7 +124,6 @@ describe('die Sitzung liest der Browser — statische Seiten bleiben statisch', 
     'src/app/(public)/agb/page.tsx',
     'src/app/(public)/datenschutz/page.tsx',
     'src/components/shells/kunde-shell-mit-sitzung.tsx',
-    'src/components/shared/kunden-kopf.tsx',
     'src/lib/use-kunden-sitzung.ts',
   ])('%s liest weder Kopfzeilen noch Cookies noch die Sitzung auf dem Server', (datei) => {
     expect(ohneKommentare(quelle(datei))).not.toMatch(LIEST_ANFRAGE)
@@ -208,7 +131,6 @@ describe('die Sitzung liest der Browser — statische Seiten bleiben statisch', 
 
   it('der Knopf kommt aus der Sitzung im Browser (useSession)', () => {
     expect(quelle('src/lib/use-kunden-sitzung.ts')).toMatch(/useSession\(\)/)
-    expect(quelle('src/components/shared/kunden-kopf.tsx')).toMatch(/useKundenSitzung\(\)/)
     expect(quelle('src/components/shells/kunde-shell-mit-sitzung.tsx')).toMatch(/useKundenSitzung\(\)/)
   })
 

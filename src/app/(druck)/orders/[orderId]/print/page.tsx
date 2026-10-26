@@ -1,8 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
-import { headers } from 'next/headers'
 import Link from 'next/link'
-import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getOrderDetail } from '@/server/queries/orders'
 import { statusLabel, paymentLabel } from '@/components/orders/order-status'
 import { PrintButton } from '@/components/orders/print-button'
@@ -20,14 +19,14 @@ export default async function OrderPrintPage({
 }) {
   const { orderId } = await params
 
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  // Dieselbe Wache wie jede Hof-Seite (Anmeldung mit Rücksprung, sonst Einrichten).
+  const { farmId } = await verlangeHofDerSitzung()
 
   const farm = await prisma.farm.findUnique({
-    where: { ownerId: session.user.id },
+    where: { id: farmId },
     select: { id: true, name: true, address: true, postalCode: true, city: true, phone: true },
   })
-  if (!farm) redirect('/login')
+  if (!farm) redirect('/onboarding')
 
   const order = await getOrderDetail(farm.id, orderId)
   if (!order) notFound()
@@ -39,30 +38,30 @@ export default async function OrderPrintPage({
   const summen = bestellSummen(order)
   const kassieren = barZuKassierenCents(order)
 
-  // Navigation und Seitenleiste blenden sich seit dem Druck-Sprint selbst aus
-  // (print:hidden in farmer-nav.tsx, print:ml-0 am <main> im Layout) — ein
-  // eigener @media-print-Block hier wäre eine zweite Wahrheit.
+  // Das Layout der Gruppe (druck) trägt keine Navigation: Papier aus Tokens, die
+  // in beiden Themes gleich sind. Nur der Knopf und der Rückweg sind
+  // `print:hidden` — ein eigener @media-print-Block wäre eine zweite Wahrheit.
   return (
     <>
-      <div className="p-8 max-w-md mx-auto font-sans text-slate-800">
+      <div className="p-8 max-w-md mx-auto font-sans">
         {/* Browser-only controls */}
-        <div className="flex gap-4 mb-6 print:hidden">
+        <div className="flex items-center gap-4 mb-6 print:hidden">
           <PrintButton />
           <Link
             href={`/orders/${orderId}`}
-            className="text-sm text-slate-500 hover:underline self-center"
+            className="inline-flex min-h-11 items-center rounded-sm text-sm text-primary-foreground/70 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground"
           >
             Zurück
           </Link>
         </div>
 
         {/* Farm header */}
-        <div className="border-b-2 border-slate-800 pb-4 mb-5">
+        <div className="border-b-2 border-primary-foreground pb-4 mb-5">
           <div className="text-xl font-bold">{farm.name}</div>
-          <div className="text-sm text-slate-500">
+          <div className="text-sm text-primary-foreground/70">
             {farm.address} · {farm.postalCode} {farm.city}
           </div>
-          {farm.phone && <div className="text-sm text-slate-500">{formatiereTelefon(farm.phone)}</div>}
+          {farm.phone && <div className="text-sm text-primary-foreground/70">{formatiereTelefon(farm.phone)}</div>}
         </div>
 
         {/* Order header */}
@@ -71,39 +70,39 @@ export default async function OrderPrintPage({
             <div className="text-lg font-bold">{order.orderNumber}</div>
             <div className="text-sm">{statusLabel(order.status)}</div>
           </div>
-          <div className="text-xs text-slate-400 mt-0.5">
+          <div className="text-xs text-primary-foreground/70 mt-0.5">
             Eingang: {formatDatumLang(order.createdAt)}
           </div>
         </div>
 
         {/* Pickup */}
         <div className="mb-5">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">
+          <div className="text-xs font-semibold uppercase tracking-wide text-primary-foreground/70 mb-1">
             Abholung
           </div>
           <div className="font-medium">{pickupDate}</div>
-          <div className="text-sm text-slate-600">
+          <div className="text-sm text-primary-foreground/80">
             {order.pickupTimeStart} – {order.pickupTimeEnd} Uhr
           </div>
         </div>
 
         {/* Customer */}
         <div className="mb-5">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">
+          <div className="text-xs font-semibold uppercase tracking-wide text-primary-foreground/70 mb-1">
             Kunde
           </div>
           <div className="font-medium">{order.customerName}</div>
-          <div className="text-sm text-slate-600">{formatiereTelefon(order.customerPhone)}</div>
-          <div className="text-sm text-slate-600">{order.customerEmail}</div>
+          <div className="text-sm text-primary-foreground/80">{formatiereTelefon(order.customerPhone)}</div>
+          <div className="text-sm text-primary-foreground/80">{order.customerEmail}</div>
           {order.customerNote && (
-            <div className="text-sm text-slate-500 mt-1 italic">{order.customerNote}</div>
+            <div className="text-sm text-primary-foreground/70 mt-1 italic">{order.customerNote}</div>
           )}
         </div>
 
         {/* Items */}
         <table className="w-full text-sm mb-4 border-collapse">
           <thead>
-            <tr className="border-b-2 border-slate-300">
+            <tr className="border-b-2 border-primary-foreground/30">
               <th className="text-left py-1 font-semibold">Produkt</th>
               <th className="text-center py-1 font-semibold w-12">Menge</th>
               <th className="text-right py-1 font-semibold w-20">Preis</th>
@@ -111,7 +110,7 @@ export default async function OrderPrintPage({
           </thead>
           <tbody>
             {order.items.map((item) => (
-              <tr key={item.id} className="border-b border-slate-100">
+              <tr key={item.id} className="border-b border-primary-foreground/10">
                 <td className={`py-1.5 ${item.fehltSeit ? 'line-through' : ''}`}>
                   {item.productName}
                   {item.fehltSeit && <span className="no-underline"> (fehlt)</span>}
@@ -124,7 +123,7 @@ export default async function OrderPrintPage({
           <tfoot>
             {summen.gebuehrCents > 0 && (
               <>
-                <tr className="border-t-2 border-slate-300">
+                <tr className="border-t-2 border-primary-foreground/30">
                   <td colSpan={2} className="py-1.5">Zwischensumme (Warenpreis)</td>
                   <td className="text-right py-1.5">{formatEuro(centsAlsEuro(summen.warenpreisCents))}</td>
                 </tr>
@@ -134,7 +133,7 @@ export default async function OrderPrintPage({
                 </tr>
               </>
             )}
-            <tr className={summen.gebuehrCents > 0 ? 'border-t border-slate-300' : 'border-t-2 border-slate-300'}>
+            <tr className={summen.gebuehrCents > 0 ? 'border-t border-primary-foreground/30' : 'border-t-2 border-primary-foreground/30'}>
               <td colSpan={2} className="py-2 font-bold">
                 Gesamt
               </td>
@@ -145,14 +144,14 @@ export default async function OrderPrintPage({
           </tfoot>
         </table>
 
-        <div className="text-sm text-slate-600">
+        <div className="text-sm text-primary-foreground/80">
           Zahlung: {paymentLabel(order.paymentMethod)}
         </div>
         {kassieren !== null && (
-          <div className="mt-1 text-sm font-semibold text-slate-800">
+          <div className="mt-1 text-sm font-semibold">
             Bar zu kassieren: {formatEuro(centsAlsEuro(kassieren))}
             {summen.gebuehrCents > 0 && (
-              <span className="font-normal text-slate-500">
+              <span className="font-normal text-primary-foreground/70">
                 {' '}(davon Servicegebühr {formatEuro(centsAlsEuro(summen.gebuehrCents))})
               </span>
             )}

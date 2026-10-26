@@ -354,7 +354,7 @@ describe('an den Seiten — Heute und Packliste teilen die Abfrage', () => {
   })
 
   it('die Packliste nimmt dieselbe Bedingung, keine eigene Tagesgrenze mehr', () => {
-    const packliste = quelle('src/app/(farmer)/orders/today/print/page.tsx')
+    const packliste = quelle('src/app/(druck)/orders/today/print/page.tsx')
     expect(packliste).toContain('where: abholWhere(farm.id, abholtage(jetzt).heute)')
     expect(packliste).not.toContain('setHours')
     expect(packliste).toContain('datumLang(jetzt)')

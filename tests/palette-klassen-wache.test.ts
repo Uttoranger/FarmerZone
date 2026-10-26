@@ -35,14 +35,10 @@ type Ausnahme = { datei: string; grund: string }
 const BESTAND: Ausnahme[] = [
   { datei: 'src/components/shared/umgebungs-banner.tsx', grund: 'Das Absperrband der Testumgebung: feste Warnfarben, in beiden Modi gleich gewollt (Kontrast im Kommentar der Datei)' },
   { datei: 'src/components/shared/zeichen-zaehler.tsx', grund: 'Bestand: Hinweis über der Grenze in Bernstein mit eigener dark-Kopie, zieht mit den Formularen auf Tokens um' },
-  { datei: 'src/components/orders/print-button.tsx', grund: 'Bestand: Druckknopf der alten Bestellansicht, zieht mit dem Umbau der Druckseiten auf Tokens um' },
   { datei: 'src/components/farmer/archived-farm-banner.tsx', grund: 'Bestand: Hinweiskasten für stillgelegte Höfe in Bernstein mit dark-Kopien, zieht mit dem Hofbereich auf die Hinweis-Tokens um' },
   { datei: 'src/components/farmer/pending-approval-banner.tsx', grund: 'Bestand: Hinweiskasten für Höfe vor der Freischaltung in Himmelblau mit dark-Kopien, zieht auf die Hinweis-Tokens um' },
-  { datei: 'src/components/farmer/farmer-nav.tsx', grund: 'Bestand: Abmelden-Zeile der alten Hofleiste in Rot, zieht mit der Leiste auf destructive um' },
   { datei: 'src/components/products/product-dialog.tsx', grund: 'Bestand: Hinweise und Symbole im Produktdialog in Bernstein und Grün, ziehen auf die Hinweis-Tokens und die Marke um' },
   { datei: 'src/components/farm/product-grid.tsx', grund: 'Bestand: Kühl- und Tiefkühl-Symbole auf dem Produktfoto in Blau, Fotos folgen dem Modus nicht (Abschnitt „Was dem Modus NICHT folgt“)' },
-  { datei: 'src/app/(farmer)/orders/[orderId]/print/page.tsx', grund: 'Bestand: Druckseite der Bestellung, Papier ist weiß und hat kein dunkles Thema, zieht mit den Druckseiten um' },
-  { datei: 'src/app/(farmer)/orders/today/print/page.tsx', grund: 'Bestand: Druckseite der Packliste, Papier ist weiß und hat kein dunkles Thema, zieht mit den Druckseiten um' },
 ]
 
 function* dateien(ordner: string): Generator<string> {

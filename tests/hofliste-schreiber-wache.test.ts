@@ -67,7 +67,6 @@ const LISTEN_FELDER = new Set([
 
 /** Ausnahmen je Funktion (`Datei#Name`), jede mit Grund. */
 const AUSNAHMEN: Record<string, string> = {
-  'src/server/actions/onboarding.ts#createOnboardingSlots': 'ohne Aufrufer in src/ (Stand 22.10.2026)',
   'src/server/actions/farm-photos.ts#updateFarmPhotoCaptionAction': 'schreibt nur `caption`, die die Hofliste nicht liest',
   'src/server/actions/gruendung.ts#markiereAlsTesthof': '`updateTag(HOEFE_CACHE_TAG)` über `revalidiereTesthof` → `revalidiereGruendung`',
   'src/server/actions/gruendung.ts#nimmTesthofZurueck': '`updateTag(HOEFE_CACHE_TAG)` über `revalidiereTesthof` → `revalidiereGruendung`',

@@ -68,7 +68,7 @@ import { Abholzeile } from '@/components/hoefe/abholzeile'
 import { BeitragMarke } from '@/components/hoefe/beitrag-marke'
 import { ThemeUmschalter, ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
 import { CookieBanner } from '@/components/cookie-banner'
-import { KundenKopf } from '@/components/shared/kunden-kopf'
+import { useWarenkorbKopf } from '@/lib/use-warenkorb-kopf'
 import { MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
 import { StartbildschirmKarte } from '@/components/heute/startbildschirm-karte'
 import { STARTBILDSCHIRM_KARTE } from '@/lib/startbildschirm'
@@ -218,7 +218,12 @@ describe('Hydrieren – Teile mit dem Browser-Speicher', () => {
   it('Kopfzeile: die Zahl im Warenkorb kommt aus dem Speicher des Browsers, nicht aus dem Server-HTML', async () => {
     const position = { productId: 'p-eier', name: 'Eier', price: 3.2, unit: 'piece', unitSize: null, imageUrl: null }
     const korb = { farmId: 'hof-a', farmSlug: 'testhof-a', items: [{ ...position, quantity: 2 }, { ...position, productId: 'p-brot', quantity: 3 }] }
-    const ergebnis = await pruefeHydrieren(createElement(KundenKopf, { seite: { art: 'hofuebersicht' } }), {
+    // Das Symbol der Kopfzeile (KundeShell) liest den Korb über useWarenkorbKopf — hier nur dessen Anzeige.
+    function KorbSymbol(): React.JSX.Element | null {
+      const korb = useWarenkorbKopf()
+      return korb ? createElement('a', { href: korb.href, 'aria-label': `Warenkorb: ${korb.anzahl} Artikel — zum Hof` }) : null
+    }
+    const ergebnis = await pruefeHydrieren(createElement(KorbSymbol), {
       imBrowser: () => localStorage.setItem(WARENKORB_SCHLUESSEL, JSON.stringify(korb)),
     })
     expect(ergebnis.serverHtml).not.toContain('Warenkorb:')
@@ -407,7 +412,7 @@ describe('Hydrieren – die Hofübersicht /hoefe', () => {
  * Datei → die Teile, die ihren Hydrier-Fall tragen (Komponente oder Hook, wie sie oben im Test stehen). Ein Hook, den nur
  * Bauteile aus anderen Dateien benutzen (`use-uhr.ts`), steht mit den Bauteilen, die ihn im Fall zeigen. Hat eine Datei
  * mehrere Aufrufe von useSyncExternalStore, nennt sie mindestens ebenso viele Teile (`use-warenkorb-kopf.ts`: das Symbol
- * der Kopfzeile über `KundenKopf`, der Mini-Warenkorb über `useWarenkorbVomHof`).
+ * der Kopfzeile über `useWarenkorbKopf`, der Mini-Warenkorb über `useWarenkorbVomHof`).
  */
 const GEPRUEFT: Record<string, string[]> = {
   'src/app/(hof)/settings/account/darstellung-karte.tsx': ['DarstellungKarte'],
@@ -421,7 +426,7 @@ const GEPRUEFT: Record<string, string[]> = {
   'src/components/shared/use-meldung-formular.ts': ['useMeldungFormular'],
   'src/lib/use-cart.ts': ['useCart'],
   'src/lib/use-mindestbreite.ts': ['useMindestbreite', 'useSchmalerAls'],
-  'src/lib/use-warenkorb-kopf.ts': ['KundenKopf', 'useWarenkorbVomHof'],
+  'src/lib/use-warenkorb-kopf.ts': ['useWarenkorbKopf', 'useWarenkorbVomHof'],
 }
 
 /** Datei → Grund, warum es für sie keinen Hydrier-Fall gibt. Heute keine; ein Eintrag braucht einen Satz und kommt in den Bericht. */

@@ -340,7 +340,6 @@ const MENUE_DATEIEN: Record<string, { unter: 'AdminShell' | 'HofShell' } | { gru
   'src/components/admin/meldungen-werkzeug.tsx': { unter: 'AdminShell' },
   'src/components/shells/admin-konto.tsx': { unter: 'AdminShell' },
   'src/components/shells/hof-shell.tsx': { unter: 'HofShell' },
-  'src/components/farmer/farmer-nav.tsx': { grund: 'Gruppe (farmer), Befund im Bericht' },
 }
 
 /** Hat die Datei ein `<DropdownMenuContent` als Element (Kommentare und Zeichenketten zählen nicht)? */
@@ -381,8 +380,8 @@ describe('Quelltext: jede Datei mit einem Menü steht in der Liste', () => {
       .map((pfad) => ({ name: relative(process.cwd(), pfad).split(sep).join('/'), pfad }))
       .filter(({ name, pfad }) => name !== 'src/components/ui/dropdown-menu.tsx' && hatMenue(readFileSync(pfad, 'utf8'), name))
       .map(({ name }) => name)
-    // Nicht blind: Die Wache sah die fünf Dateien.
-    expect(dateien.length).toBeGreaterThanOrEqual(5)
+    // Nicht blind: Die Wache sah die vier Dateien (farmer-nav.tsx entfiel mit Nr. 181).
+    expect(dateien.length).toBeGreaterThanOrEqual(4)
     expect(menueProbleme(dateien, MENUE_DATEIEN)).toEqual([])
   }, 30_000)
 

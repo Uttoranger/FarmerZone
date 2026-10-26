@@ -2,10 +2,8 @@
  * Tests für die Bauern-Navigation (src/lib/bauern-navigation.ts).
  *
  * Beweist:
- *  - Handy: fünf Plätze in fester Reihenfolge — Heute · Bestellungen · ➕ ·
- *    Mein Hof · Mehr; Produkte liegt dort oben im Mehr-Blatt.
- *  - Browser: dieselbe Ordnung als Leiste, mit „Produkte" zwischen
- *    Bestellungen und Mein Hof; „Neu" dort mit genau zwei Einträgen.
+ *  - Browser: die Ordnung der Seitenleiste, mit „Produkte" zwischen
+ *    Bestellungen und Mein Hof.
  *  - „Mein Hof" ist auf Hofseite, Beiträge und den /status-Unterseiten aktiv;
  *    Hofseite und Beiträge liegen auf /farm-page; Produkte trägt den Kopf
  *    nicht, ist aber seit Nr. 49 (Register N3) unter md der erste Reiter —
@@ -20,7 +18,7 @@
  *    /fehler-melden; „Meine Meldungen" trägt den Knopf „+ Neue Meldung",
  *    „Meldung abgeben" die Überschrift „Problem melden" (Nr. 22e).
  *  - „Admin" nur für den Betreiber.
- *  - Jede Seite unter src/app/(farmer) ist über die Navigation erreichbar.
+ *  - Jede Seite unter src/app/(hof) ist über die Navigation erreichbar.
  *  - Rückweg (Nr. 44, Register N1): elternseite() kennt jede Unterseite mit
  *    Name und Ziel aus Leiste und Mehr-Blatt; deren Seiten haben keinen.
  *    zielNachSpeichern(): Einstellungs-Unterseiten zurück zur Übersicht,
@@ -30,20 +28,13 @@ import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  HANDY_LEISTE,
   HAUPT,
   BEITRAEGE_HREF,
   MEIN_HOF_HINWEIS,
   MEIN_HOF_REITER_HOFBEREICH,
-  NEU,
-  NEU_BROWSER,
-  NUR_IM_MEHR,
   UNTEN,
   VERKAUF_UND_KUNDEN,
   VERKAUF_UND_KUNDEN_TITEL,
-  aktiverPunkt,
-  ariaAktuell,
-  fuerNutzer,
   hofAktiverPunkt,
   hofAriaAktuell,
   hofHandyAktiverPunkt,
@@ -52,7 +43,6 @@ import {
   hofNavigation,
   PRODUKTE_HREF,
   HOF_NEU_TITEL,
-  mehrAktiv,
   elternseite,
   zielNachSpeichern,
   EINSTELLUNG_KONTO,
@@ -64,10 +54,10 @@ import {
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
-/** Die Routengruppen des Hofbereichs: Bestand (FarmerNav) und HofShell (seit Nr. 16). */
-const HOF_GRUPPEN = ['src/app/(farmer)', 'src/app/(hof)'] as const
+/** Die Routengruppe des Hofbereichs: die HofShell (seit Nr. 16; die Bestandsgruppe (farmer) gibt es seit Nr. 181 nicht mehr). */
+const HOF_GRUPPEN = ['src/app/(hof)'] as const
 
-/** Die page.tsx einer Hof-Route — in welcher der beiden Gruppen sie gerade liegt. */
+/** Die page.tsx einer Hof-Route. */
 function hofSeite(href: string): string {
   const treffer = HOF_GRUPPEN.map((g) => `${g}${href}/page.tsx`).filter((p) => existsSync(join(process.cwd(), p)))
   expect(treffer, href).toHaveLength(1)
@@ -75,16 +65,6 @@ function hofSeite(href: string): string {
 }
 
 describe('Reihenfolge', () => {
-  it('Handy: Heute · Bestellungen · Plus · Mein Hof · Mehr', () => {
-    expect(HANDY_LEISTE.map((p) => (p.art === 'punkt' ? p.punkt.label : p.art))).toEqual([
-      'Heute',
-      'Bestellungen',
-      'neu',
-      'Mein Hof',
-      'mehr',
-    ])
-  })
-
   it('Browser: Postfach direkt nach Bestellungen (N12), Produkte vor Mein Hof; Zahlen an Bestellungen und Postfach', () => {
     expect(HAUPT.map((p) => [p.label, p.href, p.zahl])).toEqual([
       ['Heute', '/dashboard', undefined],
@@ -93,28 +73,6 @@ describe('Reihenfolge', () => {
       ['Produkte', '/products', undefined],
       ['Mein Hof', '/farm-page', undefined],
     ])
-  })
-
-  it('am Handy haben Postfach und Produkte keinen Platz in der Leiste — Postfach steht ganz oben im Mehr-Blatt', () => {
-    expect(NUR_IM_MEHR.map((p) => p.id)).toEqual(['postfach', 'produkte'])
-    expect(fuerNutzer({ isAdmin: false }).nurImMehr.map((p) => p.href)).toEqual(['/postfach', '/products'])
-  })
-
-  it('Plus am Handy: Verkauf eintragen, Neuer Beitrag, Produkt anlegen — jeweils mit einem Satz', () => {
-    expect(NEU.map((p) => [p.label, p.href])).toEqual([
-      ['Verkauf eintragen', '/sales?neu=1'],
-      ['Neuer Beitrag', '/status/new'],
-      ['Produkt anlegen', '/products?neu=1'],
-    ])
-    for (const p of NEU) expect(p.satz).toMatch(/^\S.*\.$/)
-  })
-
-  it('„Neu" im Browser: Neues Produkt und Neuer Beitrag, mit Untertitel, auf dieselben Ziele wie das Plus', () => {
-    expect(NEU_BROWSER.map((p) => [p.label, p.satz, p.href])).toEqual([
-      ['Neues Produkt', 'Foto, Preis, Vorrat', '/products?neu=1'],
-      ['Neuer Beitrag', 'Beitrag auf deiner Hofseite', '/status/new'],
-    ])
-    for (const p of NEU_BROWSER) expect(NEU.map((n) => n.href)).toContain(p.href)
   })
 
   it('Verkauf und Kunden: Kunden, Verkäufe, Auswertung — ohne Hofseite und Beiträge', () => {
@@ -133,13 +91,6 @@ describe('Reihenfolge', () => {
       ['Admin', '/admin'],
     ])
     expect(UNTEN.map((p) => p.href)).not.toContain('/fehler-melden')
-  })
-
-  it('das Mehr-Blatt kennt Produkte, aber weder Hofseite noch Beiträge', () => {
-    const imBlatt = [...NUR_IM_MEHR, ...VERKAUF_UND_KUNDEN, ...UNTEN].map((p) => p.href)
-    expect(imBlatt).toContain('/products')
-    expect(imBlatt).not.toContain('/farm-page')
-    expect(imBlatt).not.toContain('/status')
   })
 })
 
@@ -227,10 +178,10 @@ describe('Problem melden', () => {
   const hilfe = UNTEN.find((p) => p.id === 'hilfe')!
 
   it('leuchtet auf /meldungen und auf /fehler-melden', () => {
-    expect(aktiverPunkt('/meldungen')).toBe('hilfe')
-    expect(aktiverPunkt('/fehler-melden')).toBe('hilfe')
-    expect(ariaAktuell('/meldungen', hilfe)).toBe('page')
-    expect(ariaAktuell('/fehler-melden', hilfe)).toBe('true')
+    expect(hofAktiverPunkt('/meldungen')).toBe('hilfe')
+    expect(hofAktiverPunkt('/fehler-melden')).toBe('hilfe')
+    expect(hofAriaAktuell('/meldungen', hilfe)).toBe('page')
+    expect(hofAriaAktuell('/fehler-melden', hilfe)).toBe('true')
   })
 
   it('Meine Meldungen trägt „+ Neue Meldung", Meldung abgeben die Überschrift des Punkts', () => {
@@ -249,33 +200,31 @@ describe('aria-current', () => {
   const bestellungen = HAUPT.find((p) => p.id === 'bestellungen')!
 
   it("'page' nur auf genau der Zielseite, sonst 'true' — nie zwei Links als dieselbe Seite", () => {
-    expect(ariaAktuell('/farm-page', meinHof)).toBe('page')
-    expect(ariaAktuell('/status', meinHof)).toBe('true')
-    expect(ariaAktuell('/status/new', meinHof)).toBe('true')
-    expect(ariaAktuell('/products', produkte)).toBe('page')
-    expect(ariaAktuell('/orders', bestellungen)).toBe('page')
-    expect(ariaAktuell('/orders/abc', bestellungen)).toBe('true')
+    expect(hofAriaAktuell('/farm-page', meinHof)).toBe('page')
+    expect(hofAriaAktuell('/status', meinHof)).toBe('true')
+    expect(hofAriaAktuell('/status/new', meinHof)).toBe('true')
+    expect(hofAriaAktuell('/products', produkte)).toBe('page')
+    expect(hofAriaAktuell('/orders', bestellungen)).toBe('page')
+    expect(hofAriaAktuell('/orders/abc', bestellungen)).toBe('true')
   })
 
   it('kein aria-current für andere Punkte', () => {
-    expect(ariaAktuell('/products', meinHof)).toBeUndefined()
-    expect(ariaAktuell('/farm-page', produkte)).toBeUndefined()
-    expect(ariaAktuell('/orders', meinHof)).toBeUndefined()
-    expect(ariaAktuell('/dashboard', bestellungen)).toBeUndefined()
+    expect(hofAriaAktuell('/products', meinHof)).toBeUndefined()
+    expect(hofAriaAktuell('/farm-page', produkte)).toBeUndefined()
+    expect(hofAriaAktuell('/orders', meinHof)).toBeUndefined()
+    expect(hofAriaAktuell('/dashboard', bestellungen)).toBeUndefined()
   })
 })
 
 describe('Admin nur für Admins', () => {
   it('ohne Betreiberrechte fehlt Admin, sonst ist alles gleich', () => {
-    const bauer = fuerNutzer({ isAdmin: false })
-    const betreiber = fuerNutzer({ isAdmin: true })
+    const bauer = hofNavigation({ isAdmin: false })
+    const betreiber = hofNavigation({ isAdmin: true })
     expect(bauer.unten.map((p) => p.id)).toEqual(['einstellungen', 'hilfe'])
     expect(betreiber.unten.map((p) => p.id)).toEqual(['einstellungen', 'hilfe', 'admin'])
     expect(bauer.haupt).toEqual(betreiber.haupt)
-    expect(bauer.nurImMehr).toEqual(betreiber.nurImMehr)
     expect(bauer.verkaufUndKunden).toEqual(betreiber.verkaufUndKunden)
     expect(bauer.neu).toEqual(betreiber.neu)
-    expect(bauer.neuBrowser).toEqual(betreiber.neuBrowser)
   })
 
   it('Admin trägt die Zahl der Meldungen', () => {
@@ -302,55 +251,34 @@ describe('aktive Pfade', () => {
     ['/meldungen', 'hilfe'],
     ['/admin/meldungen', 'admin'],
   ])('%s → %s', (pfad, id) => {
-    expect(aktiverPunkt(pfad)).toBe(id)
+    expect(hofAktiverPunkt(pfad)).toBe(id)
   })
 
   it('kein Treffer über ein Namenspräfix hinweg', () => {
-    expect(aktiverPunkt('/ordersxyz')).toBeNull()
-    expect(aktiverPunkt('/statusmeldung')).toBeNull()
-    expect(aktiverPunkt('/onboarding')).toBeNull()
-    expect(aktiverPunkt('/')).toBeNull()
-  })
-
-  it('Mehr ist aktiv für alles, was im Mehr-Blatt liegt — auch Produkte —, nicht für die Leiste', () => {
-    for (const pfad of ['/products', '/customers', '/sales', '/analytics/umfeld', '/settings', '/fehler-melden', '/meldungen', '/admin']) {
-      expect(mehrAktiv(pfad), pfad).toBe(true)
-    }
-    for (const pfad of ['/dashboard', '/orders', '/orders/today/print', '/farm-page', '/status', '/status/new', '/onboarding']) {
-      expect(mehrAktiv(pfad), pfad).toBe(false)
-    }
+    expect(hofAktiverPunkt('/ordersxyz')).toBeNull()
+    expect(hofAktiverPunkt('/statusmeldung')).toBeNull()
+    expect(hofAktiverPunkt('/onboarding')).toBeNull()
+    expect(hofAktiverPunkt('/')).toBeNull()
   })
 })
 
 describe('Vollständigkeit', () => {
-  it('jede Seite unter src/app/(farmer) und src/app/(hof) hat ihren Punkt in der Navigation', () => {
-    const ordner = HOF_GRUPPEN.flatMap((gruppe) => {
-      const wurzel = join(process.cwd(), gruppe)
-      return readdirSync(wurzel)
-        .filter((n) => statSync(join(wurzel, n)).isDirectory())
-        .map((name) => ({ gruppe, name }))
-    })
+  it('jede Seite unter src/app/(hof) hat ihren Punkt in der Navigation', () => {
+    const wurzel = join(process.cwd(), 'src/app/(hof)')
+    const ordner = readdirSync(wurzel).filter((n) => statSync(join(wurzel, n)).isDirectory())
     expect(ordner.length).toBeGreaterThan(5)
-    // Gegenprobe: Die Suche erreicht beide Gruppen.
-    expect(ordner.map((o) => o.name)).toContain('farm-page')
-    expect(ordner.map((o) => o.name)).toContain('status')
-    for (const { gruppe, name } of ordner) {
-      expect(hofAktiverPunkt(`/${name}`), name).not.toBeNull()
-      // Die Bestandsleiste (farmer-nav.tsx) zeichnet nur das Layout von
-      // (farmer). Routen, die es dort nie gab (seit Nr. 22c /region), braucht
-      // sie nicht zu kennen — alle früheren (farmer)-Routen kennt sie weiter.
-      if (gruppe.includes('(farmer)') || name !== 'region') expect(aktiverPunkt(`/${name}`), name).not.toBeNull()
-    }
+    // Gegenprobe: Die Suche erreicht die Gruppe.
+    expect(ordner).toContain('farm-page')
+    expect(ordner).toContain('status')
+    for (const name of ordner) expect(hofAktiverPunkt(`/${name}`), name).not.toBeNull()
   })
 })
 
 // ─── Neue HofShell (Gate 2, Redesign) ────────────────────────────────────────
 // Die Ordnung nach docs/ai/DESIGN_SYSTEM.md, „Shells und Navigation – feste
-// Einträge". Sie steht in derselben Datei wie die Bestandsnavigation und baut
-// aus denselben Punkten; die Bestandsnavigation oben bleibt unverändert, bis
-// die erste Route in die HofShell umzieht.
+// Einträge". Seit Nr. 181 ist es die einzige Ordnung des Hofbereichs.
 describe('HofShell: Seitenleiste', () => {
-  it('Hauptpunkte: Heute · Bestellungen · Postfach · Produkte · Mein Hof — dieselben Punkte wie im Bestand', () => {
+  it('Hauptpunkte: Heute · Bestellungen · Postfach · Produkte · Mein Hof — dieselben Punkte wie die Hauptpunkte', () => {
     const nav = hofNavigation({ isAdmin: false })
     expect(nav.haupt.map((p) => p.label)).toEqual(['Heute', 'Bestellungen', 'Postfach', 'Produkte', 'Mein Hof'])
     expect(nav.haupt).toEqual(HAUPT)
@@ -393,7 +321,7 @@ describe('HofShell: Seitenleiste', () => {
     // Jeder Eintrag führt in einen vorhandenen Dialog — der Bereich ist nur ein Zusatz zum Auftrag.
     for (const p of hofNavigation({ isAdmin: false }).neu) {
       const ohneBereich = p.href.replace(/&bereich=[a-z]+$/, '')
-      expect(NEU.map((n) => n.href)).toContain(ohneBereich)
+      expect(['/sales?neu=1', '/status/new', '/products?neu=1']).toContain(ohneBereich)
     }
   })
 })
@@ -582,9 +510,6 @@ describe('HofShell: aktive Punkte', () => {
     expect(auswertung && hofAriaAktuell('/analytics', auswertung)).toBe('page')
   })
 
-  it('die Bestandsnavigation bleibt, wie sie ist: /analytics/umfeld gehört dort weiter zur Auswertung', () => {
-    expect(aktiverPunkt('/analytics/umfeld')).toBe('auswertung')
-  })
 })
 
 // ─── Rückweg auf Unterseiten (Nachtlauf Nr. 44, Register N1) ────────────────

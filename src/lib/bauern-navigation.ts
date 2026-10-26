@@ -1,23 +1,18 @@
 /**
  * Die Navigation des Bauern-Bereichs — EINE Ordnung für Handy und Browser.
  *
- * Am Handy: Heute · Bestellungen · ➕ · Mein Hof · Mehr. Im Browser dieselbe
- * Ordnung als Seitenleiste: Hof-Visitenkarte, „Neu", die Hauptpunkte
- * (dort zusätzlich „Produkte" zwischen Bestellungen und Mein Hof), die Gruppe
- * „Verkauf und Kunden", unten der Rest. Die Komponente
- * (components/farmer/farmer-nav.tsx) ordnet nur Symbole zu und zeichnet —
- * welcher Punkt wohin gehört und wann er aktiv ist, steht hier und ist
- * getestet (tests/bauern-navigation.test.ts).
+ * Die Ordnung der HofShell (components/shells/hof-shell.tsx) — EINE Quelle für
+ * Handy und Browser: Welcher Punkt wohin gehört und wann er aktiv ist, steht
+ * hier und ist getestet (tests/bauern-navigation.test.ts); die Shell ordnet
+ * nur Symbole zu und zeichnet. Die Bestandsleiste (FarmerNav) und ihre
+ * Ordnung gibt es seit Nr. 181 nicht mehr.
  *
  * „Produkte" ist Tagesgeschäft und deshalb ein eigener Punkt (Mockup
  * hof-sidebar-komponente.html). Am Handy hat die Leiste nur fünf Plätze —
- * dort liegt Produkte oben im Mehr-Blatt (NUR_IM_MEHR).
+ * dort öffnet „Mein Hof" Produkte (HOF_HANDY_LEISTE, Register N3).
  *
- * Das Plus in der Mitte ist eine bewusste Entscheidung für die drei
- * häufigsten Handlungen; es öffnet die vorhandenen Dialoge über die
- * URL-Parameter ?neu=1 (lib/url-auftrag.ts), keine neuen. Der „Neu"-Knopf
- * der Seitenleiste zeigt nach dem Mockup nur die beiden Dinge, die auf der
- * Hofseite landen (NEU_BROWSER).
+ * Das Plus (Neu-Menü, HOF_NEU) öffnet die vorhandenen Dialoge über die
+ * URL-Parameter ?neu=1 (lib/url-auftrag.ts), keine neuen.
  *
  * „Mein Hof" bündelt Hofseite und Beiträge unter einem Kopf mit Reitern —
  * beide auf /farm-page (?reiter=beitraege, E12,
@@ -29,8 +24,8 @@
  *
  * „Postfach" (Register N12, seit Nr. 87) ist tägliche Arbeit wie Bestellungen
  * und steht als Hauptpunkt direkt danach, mit dem Zähler ungelesener Fäden.
- * Die Handy-Leiste bleibt (Heute · Bestellungen · Neu · Mein Hof · Mehr);
- * dort steht Postfach ganz oben im Mehr-Blatt, und „Mehr" trägt den Zähler.
+ * Die Handy-Leiste ist Heute · Bestellungen · Neu · Mein Hof · Mehr; dort
+ * steht Postfach ganz oben im Mehr-Blatt, und „Mehr" trägt den Zähler.
  */
 
 import { MEIN_HOF_REITER_PARAMETER, MEIN_HOF_REITER_VALUES, meinHofReiterSchema } from '@/schemas/mein-hof-reiter'
@@ -64,16 +59,6 @@ export type NavPunkt = {
   zahl?: 'bestellungen' | 'postfach' | 'admin'
   /** Nur für das Betreiber-Konto (frisch aus der DB, nie aus der Sitzung). */
   nurAdmin?: boolean
-}
-
-export type NeuId = 'verkauf-eintragen' | 'status-posten' | 'produkt-anlegen'
-
-/** Ein Eintrag im Plus-Blatt bzw. im „Neu"-Menü: Symbol, Titel, ein Satz. */
-export type NeuPunkt = {
-  id: NeuId
-  label: string
-  satz: string
-  href: string
 }
 
 /** Die Reiter auf /farm-page (der Reiter steht in der Adresse) — Hofseite ist der Standard. */
@@ -154,8 +139,8 @@ export function meinHofReiterAus(wert: string | string[] | undefined): MeinHofRe
 export const MEIN_HOF_HINWEIS = `${meinHofReiter('produkte').label} verwaltest du links unter „${meinHofReiter('produkte').label}“.`
 
 /**
- * Die Hauptpunkte — im Browser alle fünf in der Leiste, am Handy drei davon
- * direkt; Postfach und Produkte stehen dort oben im Mehr-Blatt (NUR_IM_MEHR).
+ * Die Hauptpunkte — im Browser alle fünf in der Seitenleiste; am Handy deckt
+ * „Mein Hof" der Leiste Produkte und Mein Hof ab, Postfach steht oben im Mehr-Blatt.
  */
 export const HAUPT: readonly NavPunkt[] = [
   { id: 'heute', label: 'Heute', href: '/dashboard' },
@@ -176,34 +161,6 @@ function hauptPunkt(id: NavPunktId): NavPunkt {
   if (!punkt) throw new Error(`Kein Hauptpunkt „${id}"`)
   return punkt
 }
-
-/** Plus am Handy: die drei häufigsten Handlungen. */
-export const NEU: readonly NeuPunkt[] = [
-  {
-    id: 'verkauf-eintragen',
-    label: 'Verkauf eintragen',
-    satz: 'Was du am Hof oder am Markt verkauft hast.',
-    href: '/sales?neu=1',
-  },
-  {
-    id: 'status-posten',
-    label: 'Neuer Beitrag',
-    satz: 'Sag deinen Kundinnen, was es gerade gibt.',
-    href: '/status/new',
-  },
-  {
-    id: 'produkt-anlegen',
-    label: 'Produkt anlegen',
-    satz: 'Etwas Neues für deinen Hofladen.',
-    href: '/products?neu=1',
-  },
-]
-
-/** „Neu" in der Seitenleiste: was auf der Hofseite landet (Mockup hof-mein-hof-v2-desktop.html). */
-export const NEU_BROWSER: readonly NeuPunkt[] = [
-  { id: 'produkt-anlegen', label: 'Neues Produkt', satz: 'Foto, Preis, Vorrat', href: '/products?neu=1' },
-  { id: 'status-posten', label: 'Neuer Beitrag', satz: 'Beitrag auf deiner Hofseite', href: '/status/new' },
-]
 
 /** „Verkauf und Kunden" — am Handy im Mehr-Blatt, im Browser als eigene Gruppe. */
 export const VERKAUF_UND_KUNDEN: readonly NavPunkt[] = [
@@ -230,44 +187,6 @@ export const UNTEN: readonly NavPunkt[] = [
 
 export const ABMELDEN_LABEL = 'Abmelden'
 
-/** Die fünf Plätze der Handy-Leiste, von links nach rechts. */
-export type LeistenPlatz = { art: 'punkt'; punkt: NavPunkt } | { art: 'neu' } | { art: 'mehr' }
-
-export const HANDY_LEISTE: readonly LeistenPlatz[] = [
-  { art: 'punkt', punkt: hauptPunkt('heute') },
-  { art: 'punkt', punkt: hauptPunkt('bestellungen') },
-  { art: 'neu' },
-  { art: 'punkt', punkt: hauptPunkt('mein-hof') },
-  { art: 'mehr' },
-]
-
-/** Hauptpunkte ohne Platz in der Handy-Leiste — sie stehen oben im Mehr-Blatt. */
-export const NUR_IM_MEHR: readonly NavPunkt[] = HAUPT.filter(
-  (p) => !HANDY_LEISTE.some((platz) => platz.art === 'punkt' && platz.punkt.id === p.id)
-)
-
-export type Navigation = {
-  haupt: readonly NavPunkt[]
-  neu: readonly NeuPunkt[]
-  neuBrowser: readonly NeuPunkt[]
-  nurImMehr: readonly NavPunkt[]
-  verkaufUndKunden: readonly NavPunkt[]
-  unten: readonly NavPunkt[]
-}
-
-/** Die Navigation für dieses Konto — „Admin" nur für den Betreiber. */
-export function fuerNutzer({ isAdmin }: { isAdmin: boolean }): Navigation {
-  const sichtbar = (p: NavPunkt) => isAdmin || !p.nurAdmin
-  return {
-    haupt: HAUPT.filter(sichtbar),
-    neu: NEU,
-    neuBrowser: NEU_BROWSER,
-    nurImMehr: NUR_IM_MEHR.filter(sichtbar),
-    verkaufUndKunden: VERKAUF_UND_KUNDEN.filter(sichtbar),
-    unten: UNTEN.filter(sichtbar),
-  }
-}
-
 const ALLE: readonly NavPunkt[] = [...HAUPT, ...VERKAUF_UND_KUNDEN, ...UNTEN]
 
 /** Wie weit `pfad` unter `ziel` liegt — die Länge des passenden Ziels, sonst -1. */
@@ -276,7 +195,7 @@ function treffer(pfad: string, ziel: string): number {
   return pfad === ohneSuche || pfad.startsWith(ohneSuche + '/') ? ohneSuche.length : -1
 }
 
-/** Der längste passende Punkt einer Liste — gemeinsam für Bestand und HofShell. */
+/** Der längste passende Punkt einer Liste. */
 function aktivIn<Id extends string>(
   liste: readonly { id: Id; href: string; auchAktivAuf?: readonly string[] }[],
   pfad: string
@@ -291,44 +210,15 @@ function aktivIn<Id extends string>(
   return bester?.id ?? null
 }
 
-/**
- * Der aktive Punkt zu einem Pfad — der längste passende, damit ein
- * Unterpfad nie zwei Punkte zugleich hervorhebt. null = kein Punkt
- * (z. B. /onboarding).
- */
-export function aktiverPunkt(pfad: string): NavPunktId | null {
-  return aktivIn(ALLE, pfad)
-}
-
-/** „Mehr" gilt als aktiv für jeden Pfad, dessen Ziel im Mehr-Blatt liegt. */
-export function mehrAktiv(pfad: string): boolean {
-  const id = aktiverPunkt(pfad)
-  return id !== null && [...NUR_IM_MEHR, ...VERKAUF_UND_KUNDEN, ...UNTEN].some((p) => p.id === id)
-}
-
-/**
- * aria-current für einen Punkt: 'page' nur, wenn der Link genau auf diese
- * Seite führt; 'true', wenn er nur für sie steht (Unterseite, oder „Mein Hof"
- * auf /status/new) — sonst hörte der Screenreader zwei Links mit
- * verschiedenen Zielen als „aktuelle Seite".
- */
-export function ariaAktuell(pfad: string, punkt: NavPunkt): 'page' | 'true' | undefined {
-  if (aktiverPunkt(pfad) !== punkt.id) return undefined
-  return pfad === punkt.href.split('?')[0] ? 'page' : 'true'
-}
-
-// ─── Neue HofShell (Redesign, Gate 2) ───────────────────────────────────────
+// ─── Die Ordnung der HofShell ───────────────────────────────────────────────
 //
 // Die Ordnung der HofShell (components/shells/hof-shell.tsx) nach
-// docs/ai/DESIGN_SYSTEM.md, „Shells und Navigation – feste Einträge". Sie baut
-// aus denselben Punkten wie die Bestandsnavigation oben und steht deshalb in
-// derselben Datei — EINE Quelle für die Welt des Hofs. Getrennt bleibt sie,
-// solange noch keine Route in die HofShell umgezogen ist: Die Bestandsleiste
-// (farmer-nav.tsx) behält ihre Ordnung (Mein Hof in der Handy-Leiste, kein
-// „Region"), damit nichts auf einmal umspringt (kein Big Bang). Zieht die
-// letzte Seite um, fällt der Bestandsteil weg.
+// docs/ai/DESIGN_SYSTEM.md, „Shells und Navigation – feste Einträge". Seit
+// Nr. 181 gibt es keine zweite Ordnung mehr: Die Bestandsleiste (FarmerNav)
+// und ihr Teil dieser Datei sind entfernt, nachdem die letzte Route umgezogen
+// ist (die Druckseiten haben als Papier gar keine Navigation).
 //
-// Unterschiede zum Bestand:
+// Besonderheiten der HofShell:
 //  - Handy (seit Nr. 49, Register N3; vorher nach Mockup Produkte in der
 //    Leiste und Mein Hof in „Mehr"): „Mein Hof" in der Leiste öffnet
 //    Produkte — der Vorrat bleibt ein Tipp — und steht für alle drei Reiter
@@ -350,7 +240,7 @@ export function ariaAktuell(pfad: string, punkt: NavPunkt): 'page' | 'true' | un
  */
 export const REGION_HREF = '/region'
 
-/** Punkte der HofShell: die des Bestands plus „Region". */
+/** Punkte der HofShell: die Hauptpunkte plus „Region". */
 export type HofNavId = NavPunktId | 'region'
 
 export type HofNavPunkt = Omit<NavPunkt, 'id'> & { id: HofNavId }
