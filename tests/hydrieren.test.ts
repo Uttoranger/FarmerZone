@@ -31,6 +31,7 @@ import { BROWSER_OBJEKTE, hydriere, pruefeHydrieren, raeumeHydrierenAuf } from '
 import { NetzHinweis } from '@/components/ui/netz-hinweis'
 import { useHofzeileKlebt } from '@/components/hofseite/use-hofzeile-klebt'
 import { NETZ_ZEILE } from '@/lib/netz'
+import { HeuteRoutine } from '@/components/admin/heute-routine'
 
 // Attrappen wie in tests/mein-hof-umschalter.test.ts: Die Adresse liest useSearchParams aus `adresse`.
 const adresse = { suche: '' }
@@ -294,6 +295,18 @@ describe('Hydrieren – Teile mit dem Browser-Speicher', () => {
 })
 
 describe('Hydrieren – weitere Teile mit dem Browser-Speicher und -Kontext', () => {
+  it('HeuteRoutine (Nr. 185): im Server-HTML kein Haken, nach dem Hydrieren die Haken der Woche aus dem Speicher', async () => {
+    const schluessel = 'fz_admin_montag_2026-10-26'
+    const ergebnis = await pruefeHydrieren(createElement(HeuteRoutine, { schluessel, kopf: true }), {
+      imBrowser: () => localStorage.setItem(schluessel, JSON.stringify(['sentry'])),
+    })
+    expect(ergebnis.serverHtml).not.toContain('checked')
+    expect(ergebnis.serverHtml).toContain('0 von 5 erledigt')
+    const haken = [...ergebnis.container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
+    expect(haken.map((h) => h.checked)).toEqual([false, false, true, false, false])
+    expect(ergebnis.container.textContent).toContain('1 von 5 erledigt')
+  })
+
   it('DarstellungKarte: Platzhalter im Server-HTML, die drei Knöpfe mit der Wahl des Browsers erst danach', async () => {
     const ergebnis = await pruefeHydrieren(createElement(DarstellungKarte), { imBrowser: () => localStorage.setItem('theme', 'dark') })
     expect(ergebnis.serverHtml).not.toContain('<button')
@@ -465,6 +478,7 @@ describe('Hydrieren – die Hofübersicht /hoefe', () => {
  */
 const GEPRUEFT: Record<string, string[]> = {
   'src/app/(hof)/settings/account/darstellung-karte.tsx': ['DarstellungKarte'],
+  'src/components/admin/heute-routine.tsx': ['HeuteRoutine'],
   'src/components/cookie-banner.tsx': ['CookieBanner'],
   'src/components/farm/vorschau-im-rahmen.tsx': ['useImVorschauRahmen'],
   'src/components/heute/startbildschirm-karte.tsx': ['StartbildschirmKarte'],

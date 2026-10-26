@@ -49,6 +49,7 @@ const AUSNAHMEN: Record<string, { art: Art; grund: string }> = {
   'src/app/(public)/[farmSlug]/confirm/[orderId]': { art: 'kein-filter', grund: 'Signatur und Zustand der Rückkehr von Stripe, keine Auswahl.' },
   'src/app/(public)/problem-melden': { art: 'kein-filter', grund: 'Die Adresse trägt die Kennung des Fehlers aus einem Link.' },
   'src/app/account/neuigkeiten-bestaetigen': { art: 'kein-filter', grund: 'Die Adresse trägt den Token aus der Bestätigungs-Mail.' },
+  'src/app/admin': { art: 'kein-filter', grund: 'Heute (Nr. 185) liest die Adresse nur, um alte Höfe-Adressen (/admin?…) mit 308 nach /admin/hoefe zu leiten; die Seite filtert nichts.' },
   'src/app/sicherheit/nicht-ich': { art: 'kein-filter', grund: 'Die Adresse trägt den Token aus der Mail „Neue Anmeldung“.' },
 }
 
