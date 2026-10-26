@@ -25,6 +25,7 @@ import {
   type PlattformEinstellung,
 } from '@/lib/plattform-einstellung'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
+import { bestellstoppAus, type BestellstoppStand } from '@/lib/notbremse'
 import { ladeHoefeFuerFestschreiben, ladeHoefeFuerGruendung } from '@/server/queries/admin'
 
 /*
@@ -53,6 +54,31 @@ export async function lesePlattformEinstellung(): Promise<PlattformEinstellung> 
  */
 export function ladePlattformEinstellung(): Promise<PlattformEinstellung> {
   return unstable_cache(lesePlattformEinstellung, [PLATTFORM_EINSTELLUNG_TAG], { tags: [PLATTFORM_EINSTELLUNG_TAG] })()
+}
+
+/**
+ * Die Notbremse (Register N34, Nr. 189) — nur die vier Felder `bestellstopp*`,
+ * FRISCH aus der Datenbank: für die Prüfkette (src/server/warenkorb.ts), die
+ * nie einen alten Stand nehmen darf. Eine Abfrage über den Primärschlüssel.
+ * Ohne Zeile: keine Notbremse. Ob sie JETZT gilt, entscheidet der Leser mit
+ * `bestellstoppAktiv` (Frist beim Lesen).
+ */
+export async function leseBestellstopp(): Promise<BestellstoppStand | null> {
+  const zeile = await prisma.plattformEinstellung.findUnique({
+    where: { id: PLATTFORM_EINSTELLUNG_ID },
+    select: { bestellstoppAb: true, bestellstoppBis: true, bestellstoppGrund: true, bestellstoppSatz: true },
+  })
+  return zeile ? bestellstoppAus(zeile) : null
+}
+
+/**
+ * Dieselben Felder gecacht unter dem Etikett der Einstellung — für das Band
+ * der Kundenseiten. Setzen und Aufheben leeren das Etikett (`updateTag` in
+ * src/server/actions/notbremse.ts); das Ende prüft der Leser selbst, darum
+ * braucht der Eintrag keine Ablaufzeit.
+ */
+export function ladeBestellstopp(): Promise<BestellstoppStand | null> {
+  return unstable_cache(leseBestellstopp, ['bestellstopp'], { tags: [PLATTFORM_EINSTELLUNG_TAG] })()
 }
 
 /**

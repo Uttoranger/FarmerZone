@@ -29,6 +29,7 @@ import { act, createElement, useState, type ComponentProps, type ReactNode } fro
 import { createRoot } from 'react-dom/client'
 import { BROWSER_OBJEKTE, hydriere, pruefeHydrieren, raeumeHydrierenAuf } from './hydrieren-hilfe'
 import { NetzHinweis } from '@/components/ui/netz-hinweis'
+import { NotbremseBand } from '@/components/notbremse-band'
 import { useHofzeileKlebt } from '@/components/hofseite/use-hofzeile-klebt'
 import { NETZ_ZEILE } from '@/lib/netz'
 
@@ -210,6 +211,25 @@ describe('Hydrieren – die Netz-Zeile (Register N29, Nr. 175)', () => {
     } finally {
       Reflect.deleteProperty(navigator, 'onLine')
     }
+  })
+})
+
+describe('Hydrieren – das Band der Notbremse (Register N34, Nr. 189)', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('NotbremseBand: im Server-HTML kein Satz, nach dem Hydrieren holt der Browser ihn nach', async () => {
+    const satz = 'Bestellen ist gerade kurz nicht möglich.'
+    const bis = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    const holen = vi.fn(async () => new Response(JSON.stringify({ stopp: { satz, bis } }), { status: 200 }))
+    const ergebnis = await pruefeHydrieren(createElement(NotbremseBand), { imBrowser: () => vi.stubGlobal('fetch', holen) })
+    expect(ergebnis.serverHtml).not.toContain(satz)
+    expect(ergebnis.meldungen).toEqual([])
+    await act(async () => {
+      await new Promise((fertig) => setTimeout(fertig, 0))
+    })
+    expect(holen).toHaveBeenCalledWith('/api/notbremse', { cache: 'no-store' })
+    expect(ergebnis.container.textContent).toContain(satz)
+    expect(ergebnis.container.querySelector('[role="status"]')).not.toBeNull()
   })
 })
 
@@ -475,6 +495,7 @@ const GEPRUEFT: Record<string, string[]> = {
   'src/components/shared/theme-umschalter.tsx': ['ThemeUmschalter', 'ThemeUmschalterZeile'],
   'src/components/shared/use-meldung-formular.ts': ['useMeldungFormular'],
   'src/components/ui/netz-hinweis.tsx': ['NetzHinweis'],
+  'src/components/notbremse-band.tsx': ['NotbremseBand'],
   'src/lib/use-cart.ts': ['useCart', 'useKorbHinweis'],
   'src/lib/use-mindestbreite.ts': ['useMindestbreite', 'useSchmalerAls'],
   'src/lib/use-warenkorb-kopf.ts': ['useWarenkorbKopf', 'useWarenkorbVomHof'],

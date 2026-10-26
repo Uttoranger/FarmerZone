@@ -19,7 +19,7 @@ import {
   preisAbweichungen,
 } from '@/lib/order-totals'
 import { berechneServicegebuehr } from '@/lib/servicegebuehr'
-import { pruefeSitzungsWarenkorb } from '@/server/warenkorb'
+import { BESTELLSTOPP_CODE, pruefeBestellstopp, pruefeSitzungsWarenkorb } from '@/server/warenkorb'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { bestellPositionsName } from '@/lib/eingabegrenzen'
@@ -417,6 +417,16 @@ export async function POST(request: NextRequest) {
   //    Zweites entsteht, kein Bestand wird ein zweites Mal gebucht.
   const wiederholung = await antwortFuerBestehendeBestellung(data.idempotencyKey, data.sessionId)
   if (wiederholung) return wiederholung
+
+  // 0b. NOTBREMSE (Register N34, Nr. 189) — vor dem Hof und vor allem, was
+  //     schreibt: Der Admin hat neue Bestellungen auf allen Höfen angehalten.
+  //     Dieselbe Prüfung wie die Kette von /api/reserve (pruefeBestellstopp),
+  //     frisch gelesen, Ende beim Lesen. Nach Schritt 0: Eine schon angelegte
+  //     Bestellung (gleicher Schlüssel) bekommt weiter ihre Antwort.
+  const stopp = await pruefeBestellstopp(new Date())
+  if (stopp) {
+    return konflikt(data.idempotencyKey, data.sessionId, { error: stopp.text, code: BESTELLSTOPP_CODE })
+  }
 
   // 1. Load farm
   const farm = await prisma.farm.findUnique({

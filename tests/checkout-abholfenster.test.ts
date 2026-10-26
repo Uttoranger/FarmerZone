@@ -23,6 +23,8 @@ vi.mock('@/lib/email', () => ({ sendOnsiteConfirmation: vi.fn() }))
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: vi.fn() }))
 vi.mock('@/lib/prisma', () => {
   const prisma = {
+    // Keine Notbremse (Nr. 189): die Zeile der Einstellung fehlt.
+    plattformEinstellung: { findUnique: vi.fn(async () => null) },
     farm: { findUnique: vi.fn() },
     product: { findUnique: vi.fn(), update: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     stockReservation: { aggregate: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },

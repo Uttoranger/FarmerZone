@@ -52,7 +52,7 @@ const OHNE_PROTOKOLL: Record<string, string> = {
 }
 
 /** So viele exportierte Actions rufen die Admin-Wache (Bericht 188: „alle Einstiege geprüft“). */
-const ANZAHL_ADMIN_ACTIONS = 45
+const ANZAHL_ADMIN_ACTIONS = 47
 
 type Aktion = { datei: string; name: string; rechte: Array<string | null>; protokoll: boolean }
 
