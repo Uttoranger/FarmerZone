@@ -4,7 +4,8 @@ import { geheimnisGleich } from '@/lib/geheimnis'
 
 /**
  * Die Signatur der Links in Mails (Register S17, Ergänzung 24.10.2026, Nr. 166)
- * — EINE Stelle für Bestell-Link, Nachbestell-Token und Abmeldelink.
+ * — EINE Stelle für Bestell-Link, Nachbestell-Token, Abmeldelink und, seit
+ * Nr. 171, den Double-Opt-in-Link (abo-bestaetigung-token.ts).
  *
  * Zwei Geheimnisse, unterschieden an einer Schlüsselkennung vor dem Hex:
  *  - ohne Kennung (`<hex>`): BETTER_AUTH_SECRET, so wie bis Nr. 166 signiert
@@ -18,20 +19,23 @@ import { geheimnisGleich } from '@/lib/geheimnis'
  * die 2, wenn LINK_SECRET fehlt. Tausch mit Kennung 3: docs/ai/ARCHITECTURE.md
  * §5, „Signierte Links".
  */
-export type LinkZweck = 'bestellung-ansehen' | 'nachbestellen' | 'abmelden'
+export type LinkZweck = 'bestellung-ansehen' | 'nachbestellen' | 'abmelden' | 'abo-optin'
 
 /** Die Kennung, die neue Signaturen mit LINK_SECRET tragen. */
 export const LINK_KENNUNG = '2'
 
-// Das alte Verfahren hatte nur beim Bestell-Link ein Zweck-Präfix; Nachbestell-
-// und Abmelde-Token signierten den nackten Inhalt (ihre Inhalte haben
-// verschiedene Formen). Damit alte Links gelten, bleibt das ohne Kennung genau
-// so. Mit Kennung trägt jeder Zweck sein Präfix — dort gilt eine Signatur nur
-// für genau einen Zweck.
+// Das alte Verfahren hatte nur beim Bestell-Link und beim Double-Opt-in-Link
+// ein Zweck-Präfix; Nachbestell- und Abmelde-Token signierten den nackten
+// Inhalt (ihre Inhalte haben verschiedene Formen). Damit alte Links gelten,
+// bleibt das ohne Kennung genau so — auch für `nachbestellen` und `abmelden`
+// nie ändern, sonst gälten verschickte Links nicht mehr. Mit Kennung trägt
+// jeder Zweck sein Präfix — dort gilt eine Signatur nur für genau einen Zweck.
 const ALTES_PRAEFIX: Record<LinkZweck, boolean> = {
   'bestellung-ansehen': true,
   nachbestellen: false,
   abmelden: false,
+  // Bis Nr. 171 HMAC über `abo-optin:<aboId>:<ms>` — mit Präfix bitgleich.
+  'abo-optin': true,
 }
 
 function hmac(geheimnis: string, text: string): string {
