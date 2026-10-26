@@ -412,20 +412,30 @@ describe('Startseite — bewusst OHNE src/app/loading.tsx', () => {
     // Kartenform), nicht eine Datei im Wurzelsegment. Wer auf der Seite ein
     // await einführt, sieht hier, dass sie dafür nicht gebaut ist.
     //
-    // Seit Nr. 96 (Register N16) wartet die Seite auf genau zwei Dinge, die
-    // beide nichts aus der Anfrage lesen: die Vorschau (ohne Draft Mode sofort
-    // null, src/server/startseite-vorschau.ts) und die Liste der Abschnitte
-    // aus dem Datencache (ladeStartseite, wirft nie). Seit Nr. 99 liest nur
-    // die Vorschau ihre Quelle selbst (ladeVorschauZeilen, Draft Mode) — auf
-    // derselben Zeile, statt der Live-Liste. Jedes weitere await fällt hier auf.
+    // Seit Nr. 182 (Register N16, Ergänzung 25.10.2026) wartet die Seite auf
+    // genau eins: die Liste der Abschnitte aus dem Datencache (ladeStartseite,
+    // wirft nie). Die Vorschau aus Admin › Startseite hat ihre eigene,
+    // dynamische Route (/startseite-vorschau); die Startseite liest nichts aus
+    // der Anfrage. Jedes weitere await fällt hier auf.
     const seite = liesDatei('src/app/page.tsx')
     const komponente = seite.slice(seite.indexOf('export default async function HomePage('))
     expect(komponente.length).toBeLessThan(seite.length)
+    expect(komponente.match(/\bawait\b[^\n]*/g)).toEqual(['await ladeStartseite(), jetzt, {'])
+    // Die Höfe hinter Suspense stehen im gemeinsamen Baustein (src/components/startseite/startseiten-inhalt.tsx).
+    expect(seite).toContain("from '@/components/startseite/startseiten-inhalt'")
+    expect(liesDatei('src/components/startseite/startseiten-inhalt.tsx')).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>/)
+  })
+
+  it('die Vorschau-Seite wartet auf die Prüfung von Link und Sitzung und erst danach auf ihre Quelle (Nr. 182)', () => {
+    // Dynamisch (force-dynamic): Sie liest die Anfrage. Ohne gültige Vorschau lädt sie keine Zeilen.
+    const seite = liesDatei('src/app/startseite-vorschau/page.tsx')
+    const komponente = seite.slice(seite.indexOf('export default async function StartseitenVorschauSeite('))
+    expect(komponente.length).toBeLessThan(seite.length)
     expect(komponente.match(/\bawait\b[^\n]*/g)).toEqual([
-      'await vorschauDieserAnfrage(searchParams, new Date())',
-      'await ladeVorschauZeilen(vorschau) : await ladeStartseite(), jetzt, {',
+      'await leseStartseitenVorschau(await searchParams, jetzt)',
+      'await ladeVorschauZeilen(vorschau), vorschau.datum, {',
     ])
-    expect(seite).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>/)
+    expect(seite).toContain("from '@/components/startseite/startseiten-inhalt'")
   })
 })
 

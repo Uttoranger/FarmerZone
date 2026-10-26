@@ -8,9 +8,11 @@
  *  - Kein „X-Powered-By" (poweredByHeader: false, Sicherheitsupdate 20.10.2026).
  *  - Nur die Hofseite MIT ?vorschau=1 darf sich selbst einbetten
  *    (SAMEORIGIN, frame-ancestors 'self'): der Editor zeigt sie im iframe.
- *  - Ebenso die Startseite MIT ?vorschau (Register N16, Nr. 96): Admin ›
- *    Startseite zeigt sie im Rahmen „So sieht’s die Kundin". Ohne den
- *    Parameter bleibt sie gesperrt.
+ *  - Die Startseite ist überall gesperrt, auch mit ?vorschau (seit Nr. 182).
+ *    Den Rahmen „So sieht’s die Kundin" in Admin › Startseite füllt die eigene
+ *    Route /startseite-vorschau (Register N16, Ergänzung 25.10.2026): Nur sie
+ *    darf sich mit ihrem Link selbst einbetten, schickt keinen Referrer und
+ *    wird nie zwischengespeichert.
  *  - Die Ausschlussliste der Nicht-Hofseiten deckt jeden Routenordner unter
  *    src/app ab — ein neuer Ordner fällt hier auf.
  *  - Die Liste „einbettbar mit Parameter" (EINBETTBAR_MIT_PARAMETER, Nr. 110) ist vollständig und
@@ -123,21 +125,41 @@ describe('Einbetten', () => {
     }
   })
 
-  it('die Startseite mit ?vorschau darf sich selbst einbetten — der Rahmen in Admin › Startseite (N16)', () => {
-    // Der Wert ist der signierte Inhalt (src/server/startseite-vorschau.ts), keine feste Zahl.
-    const h = headerFuer('/', { vorschau: 'aW5oYWx0', sig: 'ab12' })
-    expect(h['X-Frame-Options']).toBe('SAMEORIGIN')
-    expect(h['Content-Security-Policy']).toBe("frame-ancestors 'self'")
-    expect(h['X-Content-Type-Options']).toBe('nosniff')
+  it('die Startseite bleibt gesperrt, auch mit ?vorschau und sig (Nr. 182)', () => {
+    const faelle: Record<string, string>[] = [{}, { vorschau: 'aW5oYWx0', sig: 'ab12' }, { vorschau: '1' }, { sig: 'ab12' }]
+    for (const query of faelle) {
+      const h = headerFuer('/', query)
+      expect(h['X-Frame-Options'], JSON.stringify(query)).toBe('DENY')
+      expect(h['Content-Security-Policy'], JSON.stringify(query)).toBeUndefined()
+    }
   })
 
-  it('ohne ?vorschau bleibt die Startseite gesperrt, und die Regel trifft nur „/"', () => {
-    expect(headerFuer('/')['X-Frame-Options']).toBe('DENY')
-    expect(headerFuer('/')['Content-Security-Policy']).toBeUndefined()
-    expect(headerFuer('/', { sig: 'ab12' })['X-Frame-Options']).toBe('DENY')
-    for (const pfad of ['/admin/startseite', '/hoefe', '/hof-test/bestellung/abc']) {
+  it('die Vorschau-Route /startseite-vorschau darf sich mit ihrem Link selbst einbetten — ohne Referrer, ohne Zwischenspeicher', () => {
+    // Der Wert ist der signierte Inhalt (src/server/startseite-vorschau.ts), keine feste Zahl.
+    const h = headerFuer('/startseite-vorschau', { vorschau: 'aW5oYWx0', sig: 'ab12' })
+    expect(h['X-Frame-Options']).toBe('SAMEORIGIN')
+    expect(h['Content-Security-Policy']).toBe("frame-ancestors 'self'")
+    expect(h['Referrer-Policy']).toBe('no-referrer')
+    expect(h['Cache-Control']).toBe('no-store')
+    expect(h['X-Content-Type-Options']).toBe('nosniff')
+    // Ohne Link zeigt die Seite nur den Fehlerzustand — eingebettet wird sie dann nicht, Referrer und Cache bleiben aus.
+    const ohne = headerFuer('/startseite-vorschau')
+    expect(ohne['X-Frame-Options']).toBe('DENY')
+    expect(ohne['Referrer-Policy']).toBe('no-referrer')
+    expect(ohne['Cache-Control']).toBe('no-store')
+    // Nur mit beiden Parametern: `vorschau` allein (wie bei der Hofseite) öffnet nichts.
+    expect(headerFuer('/startseite-vorschau', { vorschau: 'aW5oYWx0' })['X-Frame-Options']).toBe('DENY')
+    for (const pfad of ['/admin/startseite', '/hoefe', '/startseite-vorschau/abc']) {
       expect(headerFuer(pfad, { vorschau: 'aW5oYWx0', sig: 'ab12' })['X-Frame-Options'], pfad).toBe('DENY')
     }
+  })
+
+  it('der Ordner der Vorschau-Route steht in der Ausschlussliste — mit ?vorschau=1 ist sie keine Hofseite', () => {
+    // Die Hofseiten-Regel öffnet /<slug>?vorschau=1; ohne Eintrag in KEINE_HOFSEITE träfe sie auch diese Route.
+    expect(routenOrdner()).toContain('startseite-vorschau')
+    expect(headerFuer('/startseite-vorschau', { vorschau: '1' })['X-Frame-Options']).toBe('DENY')
+    // Gegenprobe: ein Slug, der nur so anfängt, bleibt eine Hofseite.
+    expect(headerFuer('/startseite-vorschau-hof', { vorschau: '1' })['X-Frame-Options']).toBe('SAMEORIGIN')
   })
 
   it('jede andere Route bleibt gesperrt, auch mit ?vorschau=1 — die Liste deckt jeden Ordner unter src/app', () => {
@@ -281,7 +303,7 @@ function oeffnetEinbetten(regel: Regel): boolean {
  */
 const EINBETTBAR_MIT_PARAMETER: { beispiel: string; query: Record<string, string>; schluessel: string; grund: string }[] = [
   { beispiel: '/hof-test', query: { vorschau: '1' }, schluessel: 'vorschau', grund: 'Der Editor zeigt die Hofseite als Handy-Vorschau im Rahmen' },
-  { beispiel: '/', query: { vorschau: 'aW5oYWx0', sig: 'ab12' }, schluessel: 'vorschau', grund: 'Admin › Startseite zeigt die Startseite im Rahmen „So sieht’s die Kundin“' },
+  { beispiel: '/startseite-vorschau', query: { vorschau: 'aW5oYWx0', sig: 'ab12' }, schluessel: 'vorschau', grund: 'Admin › Startseite zeigt die Vorschau der Startseite im Rahmen „So sieht’s die Kundin“' },
 ]
 
 describe('Einbetten — die Liste „einbettbar mit Parameter"', () => {
@@ -381,6 +403,8 @@ const OHNE_REFERRER_BEISPIELE = [
   '/account/unsubscribe',
   '/api/abmelden',
   '/api/orders/confirm/TokenAbcDef',
+  // Nr. 182: die Vorschau der Startseite trägt den signierten Link.
+  '/startseite-vorschau',
 ]
 const WEITERE_NIE_MELDEN = ['/hof-test/bestellung/bestellungA', '/hof-test/bestellung/bestellungA/kalender', '/admin/postfach/zustellung/bestaetigen', '/api/csp-bericht', '/api/checkout']
 const HEIKLE_WERTE = ['s', 'sig', 'token', 't', 'code', 'vorschau', 'reorder']
@@ -417,7 +441,7 @@ describe('CSP zum Beobachten (G8)', () => {
     }
   })
 
-  it('genau zehn Seiten mit no-referrer — und jede davon meldet nie', () => {
+  it('genau elf Seiten mit no-referrer — und jede davon meldet nie', () => {
     const ohneReferrer = produktion.filter((r) => r.headers.some((h) => h.key === 'Referrer-Policy' && h.value === 'no-referrer'))
     expect(ohneReferrer).toHaveLength(OHNE_REFERRER_BEISPIELE.length)
     for (const regel of ohneReferrer) {
@@ -467,7 +491,7 @@ describe('CSP zum Beobachten (G8)', () => {
     const faelle: [string, Record<string, string>][] = [
       ...[...MIT_MELDUNG, ...OHNE_REFERRER_BEISPIELE, ...WEITERE_NIE_MELDEN].map((p): [string, Record<string, string>] => [p, {}]),
       ['/hof-test', { vorschau: '1' }],
-      ['/', { vorschau: 'aW5oYWx0', sig: 'ab12' }],
+      ['/startseite-vorschau', { vorschau: 'aW5oYWx0', sig: 'ab12' }],
       ['/sicherheit/nicht-ich', { t: 'abc' }],
     ]
     for (const [pfad, query] of faelle) {

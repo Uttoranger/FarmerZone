@@ -34,6 +34,8 @@ export const PRIVATE_BEREICHE = [
   '/teilen',
   // „Das warst nicht du?" (Nr. 114): Links aus Mails, mit Token.
   '/sicherheit',
+  // Die Vorschau aus Admin › Startseite (Nr. 182): signierter Link und Admin-Sitzung, nie in der Sitemap.
+  '/startseite-vorschau',
 ] as const
 
 /**

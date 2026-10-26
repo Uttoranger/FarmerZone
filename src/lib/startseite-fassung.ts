@@ -18,6 +18,7 @@ import type { FassungBlock, FassungInhalt, FassungZeile } from '@/schemas/starts
 import {
   ABSCHNITT_TEXT,
   STANDARD_REIHENFOLGE,
+  STARTSEITE_VORSCHAU_HREF,
   type AbschnittArt,
   type StartseitenBlockDaten,
   type StartseitenZeile,
@@ -597,13 +598,15 @@ export function vorschauRahmen(sichtbar: string | null, gewuenscht: string | nul
 
 /**
  * Wohin der neue Rahmen nach dem Laden scrollt: dorthin, wo der alte stand —
- * solange der alte noch die Startseite zeigt. Hat jemand im Rahmen eine
- * andere Seite geöffnet (oder lässt der Browser keinen Blick hinein), beginnt
- * der neue oben. Eine Markierung, die selbst scrollt (VorschauImRahmen),
- * gibt es nur auf der Hofseite; die Startseite im Rahmen scrollt nie selbst.
+ * solange der alte noch die Vorschau-Route zeigt (STARTSEITE_VORSCHAU_HREF,
+ * seit Nr. 182; vorher `/`). Hat jemand im Rahmen eine andere Seite geöffnet
+ * (auch die echte Startseite) oder lässt der Browser keinen Blick hinein,
+ * beginnt der neue oben. Eine Markierung, die selbst scrollt
+ * (VorschauImRahmen), gibt es nur auf der Hofseite; die Startseite im Rahmen
+ * scrollt nie selbst.
  */
 export function scrollNachNeuladen(alt: { pfadname: string; scrollY: number } | null): number {
-  return alt !== null && alt.pfadname === '/' ? Math.max(0, Math.round(alt.scrollY)) : 0
+  return alt !== null && alt.pfadname === STARTSEITE_VORSCHAU_HREF ? Math.max(0, Math.round(alt.scrollY)) : 0
 }
 
 // ─── Hinweis unter der Vorschau beim Bearbeiten (Register N16, Ergänzung 23.10.2026; Nr. 155) ─

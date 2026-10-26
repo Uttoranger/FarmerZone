@@ -736,7 +736,8 @@ describe('Abschnitte', () => {
         expect(text, datei).toMatch(/<KundeShellMitSitzung\b/)
       }
       // Die Startseite baut ihn als Abschnitt FUSS (STARTSEITE_ABSCHNITTE) in derselben Shell.
-      expect(code('src/app/page.tsx')).toContain('STARTSEITE_ABSCHNITTE[eintrag.art]')
+      expect(code('src/app/page.tsx')).toContain('<StartseitenInhalt ')
+      expect(code('src/components/startseite/startseiten-inhalt.tsx')).toContain('STARTSEITE_ABSCHNITTE[eintrag.art]')
       expect(code('src/components/startseite/startseite-abschnitte.tsx').match(/<StartseiteFuss\b/g)).toHaveLength(1)
       expect(code('src/components/shells/kunde-shell.tsx')).toMatch(/<KundeFuss\b/)
     })
@@ -784,6 +785,8 @@ describe('Themes: Farben nur über Tokens', () => {
 
 describe('Aufbau der Seite', () => {
   const seite = quelle('src/app/page.tsx')
+  // Der Inhalt steht seit Nr. 182 im Baustein, den Startseite und Vorschau rendern (keine zweite Kopie).
+  const inhalt = quelle('src/components/startseite/startseiten-inhalt.tsx')
 
   it('in der KundeShell (Sitzung aus dem Browser), ohne die alte LandingNav', () => {
     expect(seite).toMatch(/<KundeShellMitSitzung>/)
@@ -806,15 +809,16 @@ describe('Aufbau der Seite', () => {
   })
 
   it('die Höfe hinter Suspense mit Skelett — Kopf und Suche warten nicht auf die Datenbank', () => {
-    expect(seite).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>\s*<HofKartenGeladen jetzt=\{jetzt\} \/>/)
+    expect(inhalt).toMatch(/<Suspense fallback=\{<HofKartenSkelett \/>\}>\s*<HofKartenGeladen jetzt=\{jetzt\} \/>/)
   })
 
   it('die Karte hinter Suspense: bis die Höfe da sind, das Land ohne Pins (Nr. 59)', () => {
-    expect(seite).toMatch(/<Suspense fallback=\{<RegionsKarte form=\{form\} karte=\{null\} \/>\}>\s*<RegionsKarteGeladen form=\{form\} \/>/)
+    expect(inhalt).toMatch(/<Suspense fallback=\{<RegionsKarte form=\{form\} karte=\{null\} \/>\}>\s*<RegionsKarteGeladen form=\{form\} \/>/)
   })
 
   it('Liste und Karte aus EINER Abfrage — keine zweite für die Koordinaten', () => {
-    expect(code('src/app/page.tsx').match(/ladeOeffentlicheHoefe\(/g)).toHaveLength(1)
+    expect(code('src/components/startseite/startseiten-inhalt.tsx').match(/ladeOeffentlicheHoefe\(/g)).toHaveLength(1)
+    expect(code('src/app/page.tsx')).not.toMatch(/ladeOeffentlicheHoefe\(/)
   })
 
   // Seit Nr. 96 (Register N16) kommt die Reihenfolge aus Admin › Startseite;
@@ -832,8 +836,8 @@ describe('Aufbau der Seite', () => {
     expect(reihe.every((stelle) => stelle > 0)).toBe(true)
     expect([...reihe].sort((a, b) => a - b)).toEqual(reihe)
     // Kopf und Höfe rendert die Seite selbst, die übrigen Abschnitte kommen aus ihrer Tabelle.
-    expect(seite).toMatch(/case 'KOPF':\s*return \(\s*<StartseiteKopf/)
-    expect(seite).toMatch(/case 'HOEFE':\s*return \(\s*<HoefeInDerNaehe/)
-    expect(seite).toMatch(/STARTSEITE_ABSCHNITTE\[eintrag\.art\]/)
+    expect(inhalt).toMatch(/case 'KOPF':\s*return \(\s*<StartseiteKopf/)
+    expect(inhalt).toMatch(/case 'HOEFE':\s*return \(\s*<HoefeInDerNaehe/)
+    expect(inhalt).toMatch(/STARTSEITE_ABSCHNITTE\[eintrag\.art\]/)
   })
 })

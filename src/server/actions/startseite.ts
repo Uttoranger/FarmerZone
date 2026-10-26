@@ -1,7 +1,6 @@
 'use server'
 
 import { revalidatePath, updateTag } from 'next/cache'
-import { draftMode } from 'next/headers'
 import type { Prisma, StartseiteArt } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
@@ -11,10 +10,10 @@ import { erzeugeVorschauAbfrage } from '@/server/startseite-vorschau'
 import { blobSpeicherAusSchluessel, istEigeneStartseitenBildUrl } from '@/lib/upload-pfade'
 import {
   ADMIN_STARTSEITE_HREF,
-  ADMIN_STARTSEITE_VORSCHAU_HREF,
   NEUER_BLOCK,
   REIHENFOLGE_FEHLER_TEXT,
   STARTSEITE_CACHE_TAG,
+  STARTSEITE_VORSCHAU_HREF,
   felderDerVorlage,
   neueZusatzArt,
   pruefeReihenfolge,
@@ -366,11 +365,11 @@ export async function uebernehmeFassungAlsEntwurf(eingabe: unknown): Promise<{ o
 /**
  * „So sieht's die Kundin" und „Vorschau öffnen": der signierte Link für den
  * gewählten Stand (heute, +1 Woche, nächster Block, geplanter Termin) und die
- * Quelle (Entwurf, Live oder eine Fassung des Zeitplans). Schaltet für den
- * Browser des Admins den Draft Mode ein — nur dann rendert die sonst
- * statische Startseite je Anfrage und liest den Link (src/app/page.tsx).
- * `pfad` lädt der Rahmen in diesem Browser; `link` führt über die Route, die
- * den Draft Mode auf jedem Gerät mit Admin-Sitzung einschaltet (am Handy).
+ * Quelle (Entwurf, Live oder eine Fassung des Zeitplans). Er führt auf die
+ * eigene dynamische Route /startseite-vorschau (Register N16, Ergänzung
+ * 25.10.2026; Nr. 182) — kein Draft Mode, kein Zustand im Browser. `pfad`
+ * (Rahmen) und `link` (neuer Tab, Handy) sind dieselbe Adresse; sie wirkt
+ * auf jedem Gerät mit Admin-Sitzung.
  */
 export async function erzeugeStartseitenVorschau(
   eingabe: unknown
@@ -402,19 +401,6 @@ export async function erzeugeStartseitenVorschau(
   }
   if (!datum) return { error: STARTSEITE_SAETZE.ungueltig }
 
-  ;(await draftMode()).enable()
-  const abfrage = erzeugeVorschauAbfrage({ datum, blockEntwurfId, quelle }, jetzt)
-  return { ok: true, pfad: `/?${abfrage}`, link: `${ADMIN_STARTSEITE_VORSCHAU_HREF}?${abfrage}`, stand: standText(datum) }
-}
-
-/**
- * Zurück auf „Bearbeiten" oder weg von Admin › Startseite: Draft Mode aus —
- * sonst rendert dieser Browser jede statische Seite bis zum Ende der Sitzung
- * ohne Cache. Ohne Admin-Prüfung mit Absicht: Die Action löscht nur das
- * Draft-Mode-Cookie des Aufrufers selbst und liest oder schreibt sonst nichts;
- * auch ein abgelaufener Admin soll es loswerden.
- */
-export async function beendeStartseitenVorschau(): Promise<{ ok: true }> {
-  ;(await draftMode()).disable()
-  return { ok: true }
+  const adresse = `${STARTSEITE_VORSCHAU_HREF}?${erzeugeVorschauAbfrage({ datum, blockEntwurfId, quelle }, jetzt)}`
+  return { ok: true, pfad: adresse, link: adresse, stand: standText(datum) }
 }

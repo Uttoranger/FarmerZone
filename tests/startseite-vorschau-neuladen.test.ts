@@ -11,11 +11,12 @@
  * Baum. Die Actions sind Attrappen, die Uhr ist gestellt.
  *
  * Beweist (die drei Prüfpunkte der Freigabe als Wache):
- *  - Jede neue Speicherung (neuLaden) holt eine neue Adresse — und dazwischen
- *    schaltet nichts den Draft Mode aus; das tut nur das Aushängen, und zwar
- *    nach der letzten Adresse.
+ *  - Jede neue Speicherung (neuLaden) holt eine neue Adresse; seit Nr. 182
+ *    (eigene Route /startseite-vorschau, kein Draft Mode) ruft auch das
+ *    Aushängen keine weitere Action.
  *  - Während die neue Adresse lädt, bleibt der alte Rahmen sichtbar; ist sie
- *    fertig, scrollt sie an die Stelle des alten und erst dann tauschen sie.
+ *    fertig, scrollt sie an die Stelle des alten (solange der alte noch die
+ *    Vorschau-Route zeigt) und erst dann tauschen sie.
  *    Darunter steht „Vorschau aktualisiert · hh:mm“ in Wiener Zeit.
  *  - Ein Laden des sichtbaren Rahmens selbst oder einer überholten Adresse
  *    tauscht nichts.
@@ -117,14 +118,14 @@ vi.mock('react', async (importOriginal) => ({
   useEffect: pruefstand.useEffect,
 }))
 
-const aktionen = vi.hoisted(() => ({ erzeuge: vi.fn(), beende: vi.fn(), folge: [] as string[] }))
+const aktionen = vi.hoisted(() => ({ erzeuge: vi.fn(), folge: [] as string[] }))
+// Nur diese eine Action gibt es für die Vorschau; jede weitere wäre hier undefined und fiele auf.
 vi.mock('@/server/actions/startseite', () => ({
   erzeugeStartseitenVorschau: aktionen.erzeuge,
-  beendeStartseitenVorschau: aktionen.beende,
 }))
 
-import { ADMIN_STARTSEITE_TEXT } from '@/lib/startseite-gestalten'
-import { ENTWURF_TEXT } from '@/lib/startseite-fassung'
+import { ADMIN_STARTSEITE_TEXT, STARTSEITE_VORSCHAU_HREF } from '@/lib/startseite-gestalten'
+import { ENTWURF_TEXT, scrollNachNeuladen } from '@/lib/startseite-fassung'
 import { StartseiteVorschau } from '@/components/admin/startseite-vorschau'
 
 /** Freitag, 16. Oktober 2026, 21:04 in Wien. */
@@ -183,7 +184,7 @@ function vorschau(neuLaden: number, blockEntwurfId: string | null = null): () =>
 }
 
 /** Ein Rahmen für den Rückruf: liest Pfad und Scroll-Lage, merkt sich, wohin gescrollt wurde. */
-function fenster(lage: { pfadname: string; scrollY: number } | 'fremd' = { pfadname: '/', scrollY: 0 }) {
+function fenster(lage: { pfadname: string; scrollY: number } | 'fremd' = { pfadname: STARTSEITE_VORSCHAU_HREF, scrollY: 0 }) {
   const scrollTo = vi.fn()
   const contentWindow = {
     scrollTo,
@@ -213,12 +214,7 @@ beforeEach(() => {
   aktionen.erzeuge.mockImplementation(async () => {
     aktionen.folge.push('erzeuge')
     ausgegeben += 1
-    return { ok: true, pfad: `/?vorschau=v${ausgegeben}&sig=s`, link: `/admin/startseite/vorschau?vorschau=v${ausgegeben}&sig=s`, stand: 'Fr, 16. Okt 2026' }
-  })
-  aktionen.beende.mockReset()
-  aktionen.beende.mockImplementation(async () => {
-    aktionen.folge.push('beende')
-    return { ok: true }
+    return { ok: true, pfad: `${STARTSEITE_VORSCHAU_HREF}?vorschau=v${ausgegeben}&sig=s`, link: `${STARTSEITE_VORSCHAU_HREF}?vorschau=v${ausgegeben}&sig=s`, stand: 'Fr, 16. Okt 2026' }
   })
 })
 
@@ -226,11 +222,11 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('StartseiteVorschau — neue Adresse je Speicherung, Draft Mode bleibt an', () => {
-  it('holt nach jeder Speicherung eine neue Adresse und schaltet den Draft Mode nur beim Aushängen aus', async () => {
+describe('StartseiteVorschau — neue Adresse je Speicherung', () => {
+  it('holt nach jeder Speicherung eine neue Adresse — und ruft beim Aushängen nichts mehr auf', async () => {
     pruefstand.starte(vorschau(0))
     await erledigt()
-    expect(rahmen().rahmen).toEqual(['/?vorschau=v1&sig=s'])
+    expect(rahmen().rahmen).toEqual(['/startseite-vorschau?vorschau=v1&sig=s'])
 
     // Pfeil, Auge, Block-Formular, Löschen: jede Speicherung zählt neuLaden hoch (tests/startseite-entwurf.test.ts).
     for (const n of [1, 2, 3]) {
@@ -243,11 +239,10 @@ describe('StartseiteVorschau — neue Adresse je Speicherung, Draft Mode bleibt 
 
     expect(aktionen.erzeuge).toHaveBeenCalledTimes(5)
     expect(aktionen.erzeuge.mock.calls[4]?.[0]).toEqual({ stand: 'heute', quelle: 'entwurf', blockEntwurfId: 'block-1' })
-    expect(aktionen.beende).not.toHaveBeenCalled()
 
     pruefstand.entferne()
     await erledigt()
-    expect(aktionen.folge).toEqual(['erzeuge', 'erzeuge', 'erzeuge', 'erzeuge', 'erzeuge', 'beende'])
+    expect(aktionen.folge).toEqual(['erzeuge', 'erzeuge', 'erzeuge', 'erzeuge', 'erzeuge'])
   })
 })
 
@@ -273,54 +268,54 @@ describe('StartseiteVorschau — neu laden ohne leeren Rahmen, an derselben Stel
     expect(rahmen()).toMatchObject({ sichtbar: null, laedt: true })
     expect(statusZeile()).toBeFalsy()
     const erster = fenster()
-    rahmen().onGeladen('/?vorschau=v1&sig=s', erster.element, undefined)
+    rahmen().onGeladen('/startseite-vorschau?vorschau=v1&sig=s', erster.element, undefined)
     pruefstand.rendere()
     expect(erster.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'instant' })
-    expect(rahmen()).toMatchObject({ rahmen: ['/?vorschau=v1&sig=s'], sichtbar: '/?vorschau=v1&sig=s', laedt: false, titel: 'Vorschau der Startseite · Entwurf' })
+    expect(rahmen()).toMatchObject({ rahmen: ['/startseite-vorschau?vorschau=v1&sig=s'], sichtbar: '/startseite-vorschau?vorschau=v1&sig=s', laedt: false, titel: 'Vorschau der Startseite · Entwurf' })
     expect(statusZeile()).toBe(ADMIN_STARTSEITE_TEXT.vorschauAktualisiert('21:04'))
 
     // Auge aus, gespeichert: die neue Adresse lädt neben der alten — die alte bleibt sichtbar.
     vi.setSystemTime(new Date('2026-10-16T19:06:00.000Z'))
     pruefstand.setzeKomponente(vorschau(1))
     await erledigt()
-    expect(rahmen()).toMatchObject({ rahmen: ['/?vorschau=v1&sig=s', '/?vorschau=v2&sig=s'], sichtbar: '/?vorschau=v1&sig=s', laedt: true })
+    expect(rahmen()).toMatchObject({ rahmen: ['/startseite-vorschau?vorschau=v1&sig=s', '/startseite-vorschau?vorschau=v2&sig=s'], sichtbar: '/startseite-vorschau?vorschau=v1&sig=s', laedt: true })
     expect(statusZeile()).toBe(ADMIN_STARTSEITE_TEXT.vorschauAktualisiert('21:04'))
 
     // Fertig geladen: dorthin, wo der alte stand (900 px), dann tauschen.
     const zweiter = fenster()
-    rahmen().onGeladen('/?vorschau=v2&sig=s', zweiter.element, fenster({ pfadname: '/', scrollY: 900.4 }).element)
+    rahmen().onGeladen('/startseite-vorschau?vorschau=v2&sig=s', zweiter.element, fenster({ pfadname: STARTSEITE_VORSCHAU_HREF, scrollY: 900.4 }).element)
     pruefstand.rendere()
     expect(zweiter.scrollTo).toHaveBeenCalledWith({ top: 900, behavior: 'instant' })
-    expect(rahmen()).toMatchObject({ rahmen: ['/?vorschau=v2&sig=s'], sichtbar: '/?vorschau=v2&sig=s', laedt: false })
+    expect(rahmen()).toMatchObject({ rahmen: ['/startseite-vorschau?vorschau=v2&sig=s'], sichtbar: '/startseite-vorschau?vorschau=v2&sig=s', laedt: false })
     expect(statusZeile()).toBe(ADMIN_STARTSEITE_TEXT.vorschauAktualisiert('21:06'))
   })
 
   it('beginnt oben, wenn im alten Rahmen eine andere Seite offen ist oder der Browser nicht hineinsehen lässt', async () => {
     pruefstand.starte(vorschau(0))
     await erledigt()
-    rahmen().onGeladen('/?vorschau=v1&sig=s', fenster().element, undefined)
+    rahmen().onGeladen('/startseite-vorschau?vorschau=v1&sig=s', fenster().element, undefined)
     pruefstand.rendere()
 
     pruefstand.setzeKomponente(vorschau(1))
     await erledigt()
     const nachHof = fenster()
-    rahmen().onGeladen('/?vorschau=v2&sig=s', nachHof.element, fenster({ pfadname: '/hof/testhof-a', scrollY: 600 }).element)
+    rahmen().onGeladen('/startseite-vorschau?vorschau=v2&sig=s', nachHof.element, fenster({ pfadname: '/hof/testhof-a', scrollY: 600 }).element)
     pruefstand.rendere()
     expect(nachHof.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'instant' })
 
     pruefstand.setzeKomponente(vorschau(2))
     await erledigt()
     const nachFremd = fenster()
-    rahmen().onGeladen('/?vorschau=v3&sig=s', nachFremd.element, fenster('fremd').element)
+    rahmen().onGeladen('/startseite-vorschau?vorschau=v3&sig=s', nachFremd.element, fenster('fremd').element)
     pruefstand.rendere()
     expect(nachFremd.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'instant' })
-    expect(rahmen().sichtbar).toBe('/?vorschau=v3&sig=s')
+    expect(rahmen().sichtbar).toBe('/startseite-vorschau?vorschau=v3&sig=s')
   })
 
   it('tauscht nichts, wenn der sichtbare Rahmen selbst neu lädt oder eine überholte Adresse fertig wird', async () => {
     pruefstand.starte(vorschau(0))
     await erledigt()
-    rahmen().onGeladen('/?vorschau=v1&sig=s', fenster().element, undefined)
+    rahmen().onGeladen('/startseite-vorschau?vorschau=v1&sig=s', fenster().element, undefined)
     pruefstand.rendere()
 
     // Zwei Speicherungen schnell hintereinander: v3 ersetzt das ladende v2.
@@ -328,17 +323,17 @@ describe('StartseiteVorschau — neu laden ohne leeren Rahmen, an derselben Stel
     await erledigt()
     pruefstand.setzeKomponente(vorschau(2))
     await erledigt()
-    expect(rahmen().rahmen).toEqual(['/?vorschau=v1&sig=s', '/?vorschau=v3&sig=s'])
+    expect(rahmen().rahmen).toEqual(['/startseite-vorschau?vorschau=v1&sig=s', '/startseite-vorschau?vorschau=v3&sig=s'])
 
     const sichtbar = fenster()
-    rahmen().onGeladen('/?vorschau=v1&sig=s', sichtbar.element, undefined)
+    rahmen().onGeladen('/startseite-vorschau?vorschau=v1&sig=s', sichtbar.element, undefined)
     const ueberholt = fenster()
-    rahmen().onGeladen('/?vorschau=v2&sig=s', ueberholt.element, undefined)
+    rahmen().onGeladen('/startseite-vorschau?vorschau=v2&sig=s', ueberholt.element, undefined)
     pruefstand.rendere()
 
     expect(sichtbar.scrollTo).not.toHaveBeenCalled()
     expect(ueberholt.scrollTo).not.toHaveBeenCalled()
-    expect(rahmen()).toMatchObject({ sichtbar: '/?vorschau=v1&sig=s', laedt: true })
+    expect(rahmen()).toMatchObject({ sichtbar: '/startseite-vorschau?vorschau=v1&sig=s', laedt: true })
   })
 })
 
@@ -346,7 +341,7 @@ describe('StartseiteVorschau — Titel und Band des Rahmens wechseln mit dem neu
   it('bleiben „Entwurf“, solange der Entwurf noch sichtbar ist, und werden „Live“ erst beim Tausch nach dem Laden', async () => {
     pruefstand.starte(vorschau(0))
     await erledigt()
-    rahmen().onGeladen('/?vorschau=v1&sig=s', fenster().element, undefined)
+    rahmen().onGeladen('/startseite-vorschau?vorschau=v1&sig=s', fenster().element, undefined)
     pruefstand.rendere()
     expect(rahmen().titel).toBe(`Vorschau der Startseite · ${ENTWURF_TEXT.entwurf}`)
     expect(rahmen().band).toBe('entwurf')
@@ -355,15 +350,25 @@ describe('StartseiteVorschau — Titel und Band des Rahmens wechseln mit dem neu
     findeSegment(pruefstand.baum(), ENTWURF_TEXT.quelleBeschriftung)?.onWertChange('live')
     pruefstand.rendere()
     await erledigt()
-    expect(rahmen()).toMatchObject({ rahmen: ['/?vorschau=v1&sig=s', '/?vorschau=v2&sig=s'], sichtbar: '/?vorschau=v1&sig=s', laedt: true })
+    expect(rahmen()).toMatchObject({ rahmen: ['/startseite-vorschau?vorschau=v1&sig=s', '/startseite-vorschau?vorschau=v2&sig=s'], sichtbar: '/startseite-vorschau?vorschau=v1&sig=s', laedt: true })
     expect(rahmen().titel).toBe(`Vorschau der Startseite · ${ENTWURF_TEXT.entwurf}`)
     // Das Band „Entwurf/Live“ über dem Rahmen sagt dasselbe wie der Titel: Es zeigt noch den Entwurf, also steht dort „Entwurf“.
     expect(rahmen().band).toBe('entwurf')
     expect(aktionen.erzeuge.mock.calls.at(-1)?.[0]).toMatchObject({ quelle: 'live' })
 
     // Fertig geladen und getauscht: jetzt steht der Rahmen für Live.
-    rahmen().onGeladen('/?vorschau=v2&sig=s', fenster().element, fenster().element)
+    rahmen().onGeladen('/startseite-vorschau?vorschau=v2&sig=s', fenster().element, fenster().element)
     pruefstand.rendere()
-    expect(rahmen()).toMatchObject({ sichtbar: '/?vorschau=v2&sig=s', titel: `Vorschau der Startseite · ${ENTWURF_TEXT.live}`, band: 'live' })
+    expect(rahmen()).toMatchObject({ sichtbar: '/startseite-vorschau?vorschau=v2&sig=s', titel: `Vorschau der Startseite · ${ENTWURF_TEXT.live}`, band: 'live' })
+  })
+})
+
+describe('scrollNachNeuladen — nur solange der alte Rahmen die Vorschau-Route zeigt (Nr. 182)', () => {
+  it('behält die Lage auf /startseite-vorschau, beginnt sonst oben — auch auf der Startseite selbst', () => {
+    expect(scrollNachNeuladen({ pfadname: STARTSEITE_VORSCHAU_HREF, scrollY: 412.6 })).toBe(413)
+    // Gegenprobe: Die Startseite „/" ist nicht mehr die Vorschau — wer im Rahmen dorthin geklickt hat, beginnt oben.
+    expect(scrollNachNeuladen({ pfadname: '/', scrollY: 412 })).toBe(0)
+    expect(scrollNachNeuladen({ pfadname: '/hoefe', scrollY: 412 })).toBe(0)
+    expect(scrollNachNeuladen(null)).toBe(0)
   })
 })

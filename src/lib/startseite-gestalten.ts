@@ -353,11 +353,17 @@ export function zuRendern(
 export const ADMIN_STARTSEITE_HREF = '/admin/startseite'
 
 /**
- * Die Route hinter „Vorschau öffnen": prüft Link und Admin-Sitzung, schaltet
- * den Draft Mode für DIESEN Browser ein und leitet auf die Startseite weiter —
- * so wirkt der Link auf jedem Gerät, auf dem der Admin angemeldet ist.
+ * Die Vorschau der Startseite (Register N16, Ergänzung 25.10.2026; Nr. 182):
+ * eine eigene dynamische Route mit signiertem Link und Admin-Sitzung, ohne
+ * Draft Mode. Rahmen „So sieht's die Kundin" und „Vorschau öffnen" nehmen
+ * dieselbe Adresse — sie wirkt auf jedem Gerät mit Admin-Sitzung. Die
+ * Startseite `/` bleibt statisch und liest nie die Anfrage.
  */
-export const ADMIN_STARTSEITE_VORSCHAU_HREF = `${ADMIN_STARTSEITE_HREF}/vorschau`
+export const STARTSEITE_VORSCHAU_HREF = '/startseite-vorschau'
+
+/** Der Fehlerzustand der Vorschau-Seite: Link abgelaufen, ungültig oder ohne Admin-Sitzung. */
+export const STARTSEITE_VORSCHAU_UNGUELTIG = 'Diese Vorschau gilt nicht mehr. Öffne Admin › Startseite und lade sie neu.'
+export const STARTSEITE_VORSCHAU_ZURUECK = 'Admin › Startseite öffnen'
 
 /**
  * Die Texte von Admin › Startseite (Mockups admin-startseite-gestalten,

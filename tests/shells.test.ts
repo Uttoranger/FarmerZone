@@ -490,6 +490,8 @@ describe('kein Big Bang', () => {
     'sicherheit/nicht-ich/page.tsx',
     // Nr. 120: nur der Seitenfuß (KundeFuss, Register N22) — die Seite selbst bleibt bei KundenKopf.
     '(public)/datenschutz/page.tsx',
+    // Nr. 182: die Vorschau der Startseite (eigene dynamische Route) — dieselbe KundeShell wie die Startseite.
+    'startseite-vorschau/page.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {

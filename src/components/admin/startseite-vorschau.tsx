@@ -9,7 +9,7 @@ import { VORSCHAU_HANDY_HOEHE, VORSCHAU_SEITENBREITE, vorschauMassstab, type Vor
 import { useElementGroesse } from '@/lib/use-element-groesse'
 import { cn } from '@/lib/utils'
 import type { VorschauQuelle } from '@/schemas/startseite'
-import { beendeStartseitenVorschau, erzeugeStartseitenVorschau } from '@/server/actions/startseite'
+import { erzeugeStartseitenVorschau } from '@/server/actions/startseite'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Segment } from '@/components/ui/segment'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -27,18 +27,19 @@ import { LEISE } from '@/components/hof-bestellungen/stil'
  * Entwurf | Live wählt die Quelle (Standard Entwurf), „Stand am" den Tag:
  * heute, in einer Woche, der Beginn des nächsten Blocks oder der Termin der
  * nächsten Planung. Die Adresse holt die Action (erzeugeStartseitenVorschau):
- * signiert, mit der Quelle im signierten Teil, eine Stunde gültig, und sie
- * schaltet für diesen Browser den Draft Mode ein. Oben im Rahmen ein Band,
- * damit niemand den Entwurf für die echte Seite hält. „Vorschau öffnen" führt
- * über die Route /admin/startseite/vorschau (anderes Gerät mit
- * Admin-Sitzung), mit derselben Quelle. Verschwindet die Vorschau, schaltet
- * beendeStartseitenVorschau den Draft Mode wieder aus.
+ * signiert, mit der Quelle im signierten Teil, eine Stunde gültig, auf der
+ * eigenen dynamischen Route /startseite-vorschau (Register N16, Ergänzung
+ * 25.10.2026; Nr. 182 — kein Draft Mode, nichts zu beenden). Oben im Rahmen
+ * ein Band, damit niemand den Entwurf für die echte Seite hält. „Vorschau
+ * öffnen" öffnet dieselbe Adresse im neuen Tab; sie wirkt auf jedem Gerät
+ * mit Admin-Sitzung, auch am Handy.
  *
  * Neu laden ohne leeren Rahmen (Register N16, Ergänzung Nr. 106): Nach jeder
  * Speicherung kommt eine neue Adresse. Der sichtbare Rahmen bleibt stehen, die
  * neue lädt unsichtbar daneben (vorschauRahmen); ist sie fertig, scrollt sie
  * dorthin, wo der alte stand (scrollNachNeuladen — gleicher Ursprung, also
- * lesbar), und erst dann tauschen die beiden. Darunter „Vorschau aktualisiert
+ * lesbar; nur solange der alte noch /startseite-vorschau zeigt), und erst
+ * dann tauschen die beiden. Darunter „Vorschau aktualisiert
  * · hh:mm" (Wiener Zeit), während des Ladens ein Punkt über dem Rahmen.
  */
 
@@ -218,16 +219,6 @@ export function StartseiteVorschau({
       gueltig = false
     }
   }, [standGilt, quelle, blockEntwurfId, neuLaden])
-
-  // Nur beim Aushängen: Sonst rendert dieser Browser jede statische Seite bis
-  // zum Ende der Sitzung ohne Cache. Actions laufen nacheinander — ein
-  // späteres Einschalten (wieder „So sieht's die Kundin") gewinnt.
-  useEffect(
-    () => () => {
-      void beendeStartseitenVorschau()
-    },
-    []
-  )
 
   const hinweisText = quelle === 'entwurf' ? (hinweis?.(standGilt) ?? null) : null
   const oeffnen = link && 'link' in link ? link.link : null
