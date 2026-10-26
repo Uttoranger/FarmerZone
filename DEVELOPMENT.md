@@ -6024,6 +6024,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Montags-Routine:** fünf Punkte als Konstante (`MONTAGS_ROUTINE`), Haken nur im Browser je Wiener Woche (`routineSchluessel`), gelesen über `useSyncExternalStore` (tests/hydrieren.test.ts).
 - **Gestapelt:** 189 (Notbremse aktiv, Knopf „Bestellungen anhalten …“), 191 (Abweichung beim Geld, Abgleich in der Kachel Geld) und 198 tragen ihre Quellen in `ADMIN_AUFGABEN` ein; 187 baut `/admin/hoefe` aus; 193 stellt die Reiter um (bis dahin zeigt „Höfe“ noch auf `/admin`).
 
+## Admin › Bestellungen und Notfall-Storno (Register N32, N34; Nr. 186, Lauf 26, 26.10.2026)
+
+- **Warum:** Fragen von Kundinnen („keine Mail“, „wo ist mein Geld“) liefen bisher über Admin › Betrieb › E-Mails und das Postfach; eine Bestellung selbst war im Admin nicht zu sehen, und ein Hof, der nicht erreichbar ist, ließ eine Bestellung offen.
+- **Jetzt:** `/admin/bestellungen` mit derselben Suche wie die Mails (`sucheMails`), Filtern und einem Detail mit Fall und „Was tun“, Verlauf, Mails und „In Stripe ansehen“. Aktionen: „Außerhalb erstattet …“ (aus dem Postfach hierher, jetzt mit Grund), „Kundin schreiben …“ (volle Adresse nach Grund, Protokoll), „Hof schreiben“ (neuester Faden des Hofs), „Notfall-Storno …“.
+- **Ein Storno:** Die innere Funktion `storniere` zog aus `src/server/actions/orders.ts` nach `src/server/stornieren.ts`, Verhalten gleich (die Sperrliste ist jetzt `ABHOLUNG_ERLEDIGT`, dieselben drei Stände). Der Notfall-Storno nimmt den Hof aus der Bestellung und schickt der Kundin die normale Storno-Mail ohne Grund; der Grund steht in der Nachricht an den Hof und im Protokoll.
+- **Bewusst nicht:** WebhookEvent im Verlauf (kein Bezug zur Bestellung ohne Schema-Änderung); ein neuer Faden für „Hof schreiben“ ohne bestehenden Faden (der Knopf ist dann gesperrt, mit Satz). Navigation und das Entfernen des Postfach-Knopfs folgen in Nr. 193.
+
 ## Nützliche Befehle
 
 ```bash

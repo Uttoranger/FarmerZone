@@ -3,7 +3,7 @@
  * Postgres — mit echter Anmeldung über Better Auth und der echten Bremse.
  *
  * Beweist (Zustand danach):
- *  - „Erstattung erledigt" löscht nur Order.erstattungOffenSeit (die übrigen
+ *  - „Erstattung erledigt" (seit Nr. 186 aus Admin › Bestellungen, mit Grund) löscht nur Order.erstattungOffenSeit (die übrigen
  *    Felder bleiben, außer dem automatischen updatedAt); ein zweiter Aufruf
  *    schreibt 0 Zeilen und ist kein Fehler; ohne Admin bleibt alles stehen.
  *    Danach zählt der Eingang die Erstattung nicht mehr („Davon Geld").
@@ -31,7 +31,8 @@ import { headers } from 'next/headers'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { DB_BREMSEN, fensterBeginn } from '@/lib/bremse-datenbank'
-import { antworteAlsHof, markiereErstattungErledigt } from '@/server/actions/postfach'
+import { antworteAlsHof } from '@/server/actions/postfach'
+import { markiereErstattungErledigt } from '@/server/actions/admin-bestellung'
 import { zaehleOffenImEingang } from '@/server/queries/postfach'
 import { auftraege, erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf, machePasskeyAdmin } from './setup/basis'
 
@@ -96,7 +97,7 @@ describe('Erstattung erledigt', () => {
     const offenVorher = (await zaehleOffenImEingang()).erstattungen
 
     await alsSitzung(cookie)
-    expect(await markiereErstattungErledigt({ orderId: id })).toEqual({ ok: true })
+    expect(await markiereErstattungErledigt({ orderId: id, grund: 'Selbst überwiesen' })).toEqual({ ok: true })
 
     const nachher = await prisma.order.findUniqueOrThrow({ where: { id } })
     expect(nachher.erstattungOffenSeit).toBeNull()
@@ -106,7 +107,7 @@ describe('Erstattung erledigt', () => {
     expect((await zaehleOffenImEingang()).erstattungen).toBe(offenVorher - 1)
 
     const zweitesMal = await prisma.order.findUniqueOrThrow({ where: { id }, select: { updatedAt: true } })
-    expect(await markiereErstattungErledigt({ orderId: id })).toEqual({ ok: true })
+    expect(await markiereErstattungErledigt({ orderId: id, grund: 'Selbst überwiesen' })).toEqual({ ok: true })
     // 0 Zeilen: nicht einmal updatedAt rückt.
     expect((await prisma.order.findUniqueOrThrow({ where: { id }, select: { updatedAt: true } })).updatedAt).toEqual(zweitesMal.updatedAt)
   })
@@ -116,9 +117,9 @@ describe('Erstattung erledigt', () => {
     const id = await bestellungMitOffenerErstattung(farm.id)
 
     await alsSitzung(cookie)
-    expect(await markiereErstattungErledigt({ orderId: id })).toEqual({ error: 'Kein Zugriff.' })
+    expect(await markiereErstattungErledigt({ orderId: id, grund: 'Selbst überwiesen' })).toEqual({ error: 'Kein Zugriff.' })
     await alsSitzung('')
-    expect(await markiereErstattungErledigt({ orderId: id })).toEqual({ error: 'Nicht angemeldet.' })
+    expect(await markiereErstattungErledigt({ orderId: id, grund: 'Selbst überwiesen' })).toEqual({ error: 'Nicht angemeldet.' })
     expect((await prisma.order.findUniqueOrThrow({ where: { id } })).erstattungOffenSeit).not.toBeNull()
   })
 })

@@ -168,9 +168,10 @@ const SEITEN = [...seiten(ADMIN)]
 const PFLICHTSEITE = join(ADMIN, 'einrichten', 'page.tsx')
 
 describe('jede Seite unter /admin', () => {
-  it('es gibt die zehn Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 93 die Einstellungen, seit Nr. 94 die Startseite, seit Nr. 103 Betrieb, seit Nr. 115 Bestätigen, Einrichten und Einstellungen › Anmeldung, seit Nr. 185 Höfe unter /admin/hoefe und Heute unter /admin; /admin/meldungen leitet seit Nr. 101 als Route Handler um und prüft trotzdem)', () => {
+  it('es gibt die elf Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 93 die Einstellungen, seit Nr. 94 die Startseite, seit Nr. 103 Betrieb, seit Nr. 115 Bestätigen, Einrichten und Einstellungen › Anmeldung, seit Nr. 185 Höfe unter /admin/hoefe und Heute unter /admin, seit Nr. 186 Bestellungen; /admin/meldungen leitet seit Nr. 101 als Route Handler um und prüft trotzdem)', () => {
     expect(SEITEN.map((p) => relative(ADMIN, p).split(sep).join('/')).sort()).toEqual([
       'bestaetigen/page.tsx',
+      'bestellungen/page.tsx',
       'betrieb/page.tsx',
       'einrichten/page.tsx',
       'einstellungen/anmeldung/page.tsx',
