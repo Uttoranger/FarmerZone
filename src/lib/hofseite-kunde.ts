@@ -325,6 +325,7 @@ const VERSTAENDLICH = new Set<string>([
   SHOP_PAUSED_MESSAGE,
   FARM_ARCHIVED_MESSAGE,
   FARM_NOT_APPROVED_MESSAGE,
+  kaufSperreHinweis('gesperrt', '').titel,
   kaufSperreHinweis('keine-abholzeit', '').titel,
   kaufSperreHinweis('ausgebucht', '').titel,
 ])

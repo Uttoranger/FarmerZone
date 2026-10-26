@@ -7,6 +7,7 @@ import { bremseCheckout } from '@/server/bremse-datenbank'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
+import { HOF_GESPERRT_SATZ } from '@/lib/bereiche-anzeige'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendOnsiteConfirmation } from '@/lib/email'
@@ -439,6 +440,13 @@ export async function POST(request: NextRequest) {
   // war nie offen (siehe src/lib/farm-approval.ts).
   if (!farm.approvedAt) {
     return konflikt(data.idempotencyKey, data.sessionId, { error: FARM_NOT_APPROVED_MESSAGE })
+  }
+
+  // 1b³. Sperre durch das Team (Register N34, Nr. 187) — dieselbe Stelle der
+  // Prüfkette wie in pruefeKaufbarkeitHoefe (nach der Freischaltung, vor der
+  // Pause), mit dem neutralen Satz; der Grund bleibt im Admin.
+  if (farm.adminGesperrtAm) {
+    return konflikt(data.idempotencyKey, data.sessionId, { error: HOF_GESPERRT_SATZ })
   }
 
   // 1c. Shop-Pause — fail-closed VOR jeder Bestell- und Zahlungslogik:

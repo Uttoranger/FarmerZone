@@ -42,6 +42,7 @@ import { formatMenge, formatZahl, kilopreisNetto } from '@/lib/format'
 import { produktZustand } from '@/lib/produkt-sichtbarkeit'
 import { ABHOL_VORLAUF_TAGE } from '@/lib/pickup-days'
 import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
+import { HOF_GESPERRT_SATZ } from '@/lib/farm-approval'
 // Nur zur Laufzeit einer Funktion gebraucht: hofuebersicht.ts bindet dieses Modul selbst ein, der Kreis
 // ist harmlos, solange keine Konstante auf Modulebene von dort liest (naechsteAbholung, wienJetzt sind Funktionen).
 import { naechsteAbholung, wienJetzt, type AbholFenster } from '@/lib/hofuebersicht'
@@ -253,9 +254,19 @@ export function istBestellbar(hof: { angebot: AngebotVorhanden; abholfenster?: r
  * Server (`/api/checkout`, `imAbholfenster`); die Sperre erspart der Kundin nur
  * einen Korb, den sie nicht abholen kann.
  */
-export type KaufSperre = null | 'pause' | 'keine-abholzeit' | 'ausgebucht'
+export type KaufSperre = null | 'gesperrt' | 'pause' | 'keine-abholzeit' | 'ausgebucht'
 
-export function kaufSperre(hof: { isPaused: boolean; pickupSlots: readonly AbholFenster[] }, jetzt: Date): KaufSperre {
+// Der neutrale Satz der Sperre (N34, Nr. 187) wohnt in farm-approval.ts: Diese Datei hängt in einem
+// Importkreis mit hofseite-kunde.ts, eine eigene Konstante hier wäre dort beim Laden noch nicht belegt.
+export { HOF_GESPERRT_SATZ }
+
+/**
+ * `adminGesperrt` (N34, Nr. 187): Die Sperre des Teams sticht die Pause — wie
+ * in der Prüfkette (`pruefeKaufbarkeitHoefe`: Freischaltung, Sperre, Pause).
+ * Fehlt das Feld, gilt der Hof als nicht gesperrt; verbindlich prüft der Server.
+ */
+export function kaufSperre(hof: { isPaused: boolean; adminGesperrt?: boolean; pickupSlots: readonly AbholFenster[] }, jetzt: Date): KaufSperre {
+  if (hof.adminGesperrt === true) return 'gesperrt'
   if (hof.isPaused) return 'pause'
   if (hof.pickupSlots.length === 0) return 'keine-abholzeit'
   return naechsteAbholung(hof.pickupSlots, wienJetzt(jetzt)) === null ? 'ausgebucht' : null
@@ -275,11 +286,12 @@ export function vorlaufInWochen(): string {
 }
 
 /**
- * Titel und Satz der Hinweiskarte bei 'keine-abholzeit' und 'ausgebucht' — EINE
+ * Titel und Satz der Hinweiskarte bei 'gesperrt' (Team, N34), 'keine-abholzeit' und 'ausgebucht' — EINE
  * Quelle für Hofseite, Produktseite, Mini-Warenkorb und Kasse. Die Pause hat
  * ihre eigenen Texte (shop-pause.ts).
  */
-export function kaufSperreHinweis(sperre: 'keine-abholzeit' | 'ausgebucht', hofName: string): { titel: string; satz: string } {
+export function kaufSperreHinweis(sperre: 'gesperrt' | 'keine-abholzeit' | 'ausgebucht', hofName: string): { titel: string; satz: string } {
+  if (sperre === 'gesperrt') return { titel: HOF_GESPERRT_SATZ, satz: 'Schau bald wieder vorbei.' }
   if (sperre === 'keine-abholzeit') {
     return { titel: 'Noch nicht bestellbar.', satz: `${hofName} hat gerade keine Abholzeit eingetragen. Schau bald wieder vorbei.` }
   }

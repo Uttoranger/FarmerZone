@@ -164,7 +164,7 @@ const SEITEN = [...seiten(ADMIN)]
 const PFLICHTSEITE = join(ADMIN, 'einrichten', 'page.tsx')
 
 describe('jede Seite unter /admin', () => {
-  it('es gibt die neun Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 93 die Einstellungen, seit Nr. 94 die Startseite, seit Nr. 103 Betrieb, seit Nr. 115 Bestätigen, Einrichten und Einstellungen › Anmeldung; /admin/meldungen leitet seit Nr. 101 als Route Handler um und prüft trotzdem)', () => {
+  it('es gibt die neun Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 93 die Einstellungen, seit Nr. 94 die Startseite, seit Nr. 103 Betrieb, seit Nr. 115 Bestätigen, Einrichten und Einstellungen › Anmeldung, seit Nr. 187 Höfe und Akte; /admin/meldungen leitet seit Nr. 101 als Route Handler um und prüft trotzdem)', () => {
     expect(SEITEN.map((p) => relative(ADMIN, p).split(sep).join('/')).sort()).toEqual([
       'bestaetigen/page.tsx',
       'betrieb/page.tsx',
@@ -172,6 +172,8 @@ describe('jede Seite unter /admin', () => {
       'einstellungen/anmeldung/page.tsx',
       'einstellungen/page.tsx',
       'finanzen/page.tsx',
+      'hoefe/[id]/page.tsx',
+      'hoefe/page.tsx',
       'page.tsx',
       'postfach/page.tsx',
       'startseite/page.tsx',

@@ -48,7 +48,7 @@ function dbZeile(overrides: Record<string, unknown> = {}) {
     serviceFeeMinCents: 50,
     serviceFeeActiveFrom: null,
     // Altes Konto ohne Bestätigung — vor dem Stichtag keine Pflicht (S3, 17b).
-    owner: { email: 'franz@test.local', emailVerified: false, createdAt: ANGELEGT },
+    owner: { email: 'franz@test.local', emailVerified: false, createdAt: ANGELEGT, sessions: [] },
     _count: { products: 3, farmPhotos: 2, pickupSlots: 1 },
     // Seit Nr. 116: ob ein Produkt im Shop ist (Freischalten).
     products: [{ id: 'p_1' }],
@@ -154,8 +154,8 @@ describe('getAdminFarms — eine einzige Abfrage', () => {
     expect(arg.select._count).toEqual({
       select: { products: true, farmPhotos: true, pickupSlots: true },
     })
-    // Die Monatsspalten: EINE Aggregat-Abfrage für alle Höfe, kein N+1
-    expect(queryRaw).toHaveBeenCalledTimes(1)
+    // Die Monatsspalten und seit Nr. 187 die Bestellungen der letzten 30 Tage: je EINE Aggregat-Abfrage für alle Höfe, kein N+1
+    expect(queryRaw).toHaveBeenCalledTimes(2)
   })
 
   it('Monatsspalten: Höfe ohne Bestellung bekommen die Nullzeile, andere ihre Werte', async () => {
@@ -343,13 +343,13 @@ describe('getAdminFarms — E-Mail bestätigt (S3, Nr. 17b)', () => {
   })
 
   it('neues Konto unbestätigt: nein, Freischalten gesperrt', async () => {
-    farmFindMany.mockResolvedValue([dbZeile({ owner: { email: 'neu@example.com', emailVerified: false, createdAt: NEU } })] as never)
+    farmFindMany.mockResolvedValue([dbZeile({ owner: { email: 'neu@example.com', emailVerified: false, createdAt: NEU, sessions: [] } })] as never)
     const [hof] = await getAdminFarms()
     expect(hof).toMatchObject({ emailBestaetigt: false, emailBestaetigungOffen: true })
   })
 
   it('neues Konto bestätigt: ja, nichts gesperrt', async () => {
-    farmFindMany.mockResolvedValue([dbZeile({ owner: { email: 'neu@example.com', emailVerified: true, createdAt: NEU } })] as never)
+    farmFindMany.mockResolvedValue([dbZeile({ owner: { email: 'neu@example.com', emailVerified: true, createdAt: NEU, sessions: [] } })] as never)
     const [hof] = await getAdminFarms()
     expect(hof).toMatchObject({ emailBestaetigt: true, emailBestaetigungOffen: false })
   })
