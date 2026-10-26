@@ -30,7 +30,7 @@ const AUSNAHMEN: Record<string, string> = {
 }
 
 /** Felder unter 16 px, die es vor Nr. 174 gab und die nicht zu den Dateien von 174 gehören. */
-const BESTAND = ['src/components/startseite/startseite-kopf.tsx: input']
+const BESTAND: string[] = []
 
 function* quelldateien(ordner: string): Generator<string> {
   for (const name of readdirSync(ordner)) {

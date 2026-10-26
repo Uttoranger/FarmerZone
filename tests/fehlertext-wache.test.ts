@@ -34,8 +34,6 @@ export function zuKnappeMeldungen(quelltext: string): string[] {
 
 /** Altbestand — nur zur Verkleinerung. Jeder Eintrag nennt, warum er (noch) so steht. */
 const BESTAND: { datei: string; text: string; grund: string }[] = [
-  { datei: 'hofprofil.ts', text: 'Pflichtfeld', grund: 'Hofprofil bearbeiten: Board SterneHofStart (Nr. 174) macht die Felder freiwillig oder gibt ihnen einen Grund.' },
-  { datei: 'hofprofil.ts', text: 'Ungültige E-Mail-Adresse', grund: 'Hofprofil bearbeiten: kommt mit Nr. 174 in die Form der Meldungen von hofAnlegenFormularSchema.' },
   { datei: 'register.ts', text: 'Ungültige E-Mail-Adresse.', grund: 'Registrierung gehört zur Anmeldung; die Meldung folgt dem Muster der Kasse, sobald das Formular umgebaut wird.' },
   { datei: 'meldung.ts', text: 'Ungültige E-Mail-Adresse', grund: 'Prüfung auf dem Server für „Problem melden"; das Formular zeigt eigene Sätze an den Feldern.' },
   { datei: 'checkout.ts', text: 'Ungültiges Abholdatum', grund: 'Anfrage an den Server (checkoutRequestSchema): Der Browser schickt nur geprüfte Werte, die Kundin sieht diese Meldung nie.' },
