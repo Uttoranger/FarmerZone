@@ -17,6 +17,7 @@ import {
   type WarteschlangeDaten,
 } from '@/lib/betrieb-mails'
 import { empfaengerFingerabdruck } from '@/lib/mail-empfaenger'
+import { hofKontaktEmail, HOF_KONTAKT_FELDER } from '@/lib/hof-kontakt'
 import { MAIL_WEG, VORRANG, type MailArt } from '@/schemas/mail-auftrag'
 import type { AlleMailsFilter, MailStandFilter, MailSuche } from '@/schemas/betrieb-mails'
 import { kannWartenPausiert } from '@/server/mail-warteschlange'
@@ -451,7 +452,8 @@ const NOCHMAL_BESTELLUNG_FELDER = {
   pickupDate: true,
   pickupTimeStart: true,
   customerEmail: true,
-  farm: { select: { name: true, email: true, archivedAt: true } },
+  // Mit der Anmelde-Adresse: ohne Hof-E-Mail ginge die Hof-Mail dorthin (hofKontaktEmail, Nr. 194).
+  farm: { select: { name: true, archivedAt: true, ...HOF_KONTAKT_FELDER } },
 } as const satisfies Prisma.OrderSelect
 
 export type NochmalBezugStand = NochmalStand & {
@@ -473,7 +475,7 @@ function standAusHof(hof: NochmalHof | null): NochmalBezugStand {
 
 /** Der Stand aus der Bestellung — Kundin aus der Bestellung, Hof aus dem Hof der Bestellung. */
 function standAusBestellung(b: NochmalBestellung | null, quelle: NochmalQuelle): NochmalBezugStand {
-  const adresse = !b || quelle === null ? null : quelle === 'hof' ? b.farm.email : b.customerEmail
+  const adresse = !b || quelle === null ? null : quelle === 'hof' ? hofKontaktEmail(b.farm) : b.customerEmail
   return { bestellung: b, hof: null, adresse, hofName: b?.farm.name ?? null }
 }
 

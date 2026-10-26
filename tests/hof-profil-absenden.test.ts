@@ -175,10 +175,10 @@ describe('Hof-Profil: Bestand ohne Beschreibung und ohne Hof-E-Mail (Nr. 174)', 
     expect(speicherweg.speichereProfil).toHaveBeenCalledWith({ description: '' })
   })
 
-  it('Gegenprobe: ein Hof mit gespeicherter Hof-E-Mail kann sie nicht leeren – die Bestellmails gehen dorthin', async () => {
+  it('ein Hof mit gespeicherter Hof-E-Mail kann sie leeren – dann gilt die Anmelde-Adresse (Nr. 194)', async () => {
     await sendeAb({ email: '' })
 
-    expect(speicherweg.speichereProfil).not.toHaveBeenCalled()
+    expect(speicherweg.speichereProfil).toHaveBeenCalledWith({ email: '' })
   })
 
   it('Gegenprobe: eine kaputte Hof-E-Mail wird nicht gespeichert', async () => {
@@ -209,16 +209,16 @@ describe('Hof-Profil: Felder (Nr. 174)', () => {
   it('freiwillig steht am Feld, kein „*" an Pflichtfeldern; die Hof-E-Mail erklärt sich', () => {
     const markup = html()
     expect(markup).toContain('Beschreibung (freiwillig)')
-    // Mit gespeicherter Adresse ist das Feld Pflicht – dann steht kein „(freiwillig)" daran.
-    expect(markup).not.toContain('Hof-E-Mail (freiwillig)')
+    // Auch mit gespeicherter Adresse freiwillig (Nr. 194): leer heißt Anmelde-Adresse.
+    expect(markup).toContain('Hof-E-Mail (freiwillig)')
     expect(markup).not.toMatch(/ \*<\/label>/)
     expect(markup).toMatch(/aria-describedby="email-hilfe"/)
   })
 
-  it('ohne gespeicherte Hof-E-Mail ist das Feld freiwillig; die Hilfe sagt keinen Rückfall zu', () => {
+  it('ohne gespeicherte Hof-E-Mail ist das Feld freiwillig; die Hilfe nennt den Rückfall auf die Anmelde-Adresse', () => {
     const markup = renderToStaticMarkup(createElement(ProfileForm, { farm: { ...HOF, email: '' } }))
     expect(markup).toContain('Hof-E-Mail (freiwillig)')
-    expect(markup).not.toContain('Anmelde-Adresse')
+    expect(markup).toMatch(/id="email-hilfe"[^>]*>[^<]*Anmelde-Adresse/)
   })
 
   it('das Formular ist noValidate: Die Sätze am Feld gelten, nicht die Blase des Browsers (type="email")', () => {

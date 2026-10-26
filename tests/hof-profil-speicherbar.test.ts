@@ -5,9 +5,11 @@
  * nicht speichern. Die Meldungen sagen, was fehlt und wozu (Muster
  * hofAnlegenFormularSchema), keine „Pflichtfeld"-Sätze.
  *
- * Leser der Hof-E-Mail (geprüft, siehe Bericht 174): Bestellseite und
+ * Leser der Hof-E-Mail (geprüft, siehe Bericht 174 und 194): Bestellseite und
  * Bestätigung (HofErreichen) und die Angaben zum Hof (AngabenZumHof) blenden
  * eine leere Adresse aus; hofseite-fortschritt zählt Kontakt nur mit beiden.
+ * Wer den Hof anschreibt, fällt auf die Anmelde-Adresse zurück
+ * (hofKontaktEmail, tests/hof-kontakt.test.ts).
  */
 import { describe, expect, it } from 'vitest'
 import { hofAnlegenFormularSchema, profilBearbeitenSchema, profileSchema } from '@/schemas/hofprofil'
@@ -43,12 +45,12 @@ describe('Bestandsdaten sind speicherbar', () => {
     expect(profileSchema.parse(leer).email).toBe('')
   })
 
-  it('Gegenprobe: mit gespeicherter Hof-E-Mail ist leer nicht erlaubt (Leser ohne Rückfall), die Beschreibung schon', () => {
-    const mitMail = { ...BESTAND, email: BASIS.email }
-    expect(meldungen({ ...BASIS, email: '' }, profilBearbeitenSchema(mitMail))).toEqual([PROFIL_MELDUNG.emailPflicht])
-    expect(meldungen({ ...BASIS, email: '   ' }, profilBearbeitenSchema(mitMail))).toEqual([PROFIL_MELDUNG.emailPflicht])
-    expect(profilBearbeitenSchema(mitMail).safeParse({ ...BASIS, description: '' }).success).toBe(true)
-    expect(profilBearbeitenSchema(mitMail).safeParse({ ...BASIS, email: 'neu@beispiel.at' }).success).toBe(true)
+  it('auch eine gespeicherte Hof-E-Mail darf geleert werden – dann gilt die Anmelde-Adresse (Nr. 194)', () => {
+    // Das Bestand-Schema kennt die Hof-E-Mail nicht mehr: leer ist für jeden Hof erlaubt.
+    expect(profilBearbeitenSchema(BESTAND).safeParse({ ...BASIS, email: '' }).success).toBe(true)
+    expect(profilBearbeitenSchema(BESTAND).parse({ ...BASIS, email: '   ' }).email).toBe('')
+    expect(profilBearbeitenSchema(BESTAND).safeParse({ ...BASIS, email: 'neu@beispiel.at' }).success).toBe(true)
+    expect(Object.keys(PROFIL_MELDUNG)).not.toContain('emailPflicht')
   })
 
   it('eine kurze Beschreibung geht ebenfalls durch (früher mindestens 10 Zeichen)', () => {

@@ -56,7 +56,7 @@ afterEach(() => {
 })
 
 /** Eine Bestellung mit erfundenen Daten — Eier € 4,50, Brot € 5,80, Gebühr € 0,52. */
-function bestellung(teil: Partial<import('@/lib/email').OrderForEmail> = {}): import('@/lib/email').OrderForEmail {
+function bestellung(teil: Partial<import('@/lib/email').OrderForHofMail> = {}): import('@/lib/email').OrderForHofMail {
   return {
     id: 'order-1',
     orderNumber: 'HT-0210-A4F2',
@@ -80,6 +80,7 @@ function bestellung(teil: Partial<import('@/lib/email').OrderForEmail> = {}): im
       postalCode: '4910',
       phone: '+43 664 0000000',
       slug: 'hof-beispiel',
+      owner: { email: 'inhaber@example.org' },
     },
     items: [
       { productName: 'Freilandeier', quantity: 1, unitPrice: '4.50', totalPrice: '4.50', product: { unit: 'STUECK', unitSize: null } },
