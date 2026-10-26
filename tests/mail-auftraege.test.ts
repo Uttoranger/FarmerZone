@@ -14,11 +14,13 @@
  * prüft tests/integration/mail-wege.int.test.ts.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { Prisma } from '@prisma/client'
 
 const db = vi.hoisted(() => ({
-  order: { findUnique: vi.fn() },
-  farm: { findUnique: vi.fn() },
-  meldung: { findUnique: vi.fn() },
+  order: { findUnique: vi.fn(), findMany: vi.fn(), aggregate: vi.fn() },
+  farm: { findUnique: vi.fn(), count: vi.fn() },
+  meldung: { findUnique: vi.fn(), count: vi.fn() },
+  kostenposten: { findMany: vi.fn() },
   nachricht: { findUnique: vi.fn() },
   unterhaltung: { findUnique: vi.fn() },
   customerFarmSubscription: { findUnique: vi.fn(), findFirst: vi.fn() },
@@ -279,12 +281,30 @@ describe('Renderer: frisch geladen, Vorlage aus email.ts, heutige Adresse', () =
     expect(await rendere('meldung', { meldungId: 'cweg', empfaengerId: 'support' })).toEqual({ verworfen: 'meldung_fehlt' })
   })
 
-  it('Wochenbericht: zählt beim Versand frisch; ist nichts mehr offen, keine Mail', async () => {
-    vi.mocked(zaehleFuerWochenlauf).mockResolvedValue({ neu: 1, liegenGeblieben: 0, offen: 1, neueste: [] })
+  it('Wochenlage: zählt beim Versand frisch, nennt nur Zahlen; auch bei leerem Eingang', async () => {
+    vi.mocked(zaehleFuerWochenlauf).mockResolvedValue({ neu: 1, liegenGeblieben: 2, offen: 1, neueste: [{ kurznummer: 'M-1', art: 'FEHLER', ersteZeile: 'Knopf geht nicht bei Frau Muster', hofName: 'Hof Beispiel' }] })
     vi.mocked(zaehleOffenImEingang).mockResolvedValue({ antworten: 0, meldungen: 1, hoefe: 0, erstattungen: 0, gesamt: 1 })
-    expect(alsMail(await rendere('wochenbericht', { empfaengerId: 'support', geloeschtAnzahl: '3' })).html).toContain('3 erledigte Meldungen')
+    db.order.aggregate.mockResolvedValue({ _count: { _all: 5 }, _sum: { totalAmount: new Prisma.Decimal('123.40') } })
+    db.order.findMany.mockResolvedValue([
+      { createdAt: JETZT, status: 'CONFIRMED', paymentMethod: 'ONLINE', paymentStatus: 'PAID', serviceFeeCents: 150, serviceFeeRefundedAt: null },
+    ])
+    db.farm.count.mockResolvedValue(2)
+    db.meldung.count.mockResolvedValue(3)
+    db.kostenposten.findMany.mockResolvedValue([{ betrag: new Prisma.Decimal('49.00'), rhythmus: 'MONATLICH', ab: new Date('2026-01-01T00:00:00.000Z'), bis: null }])
+    const mail = alsMail(await rendere('wochenbericht', { empfaengerId: 'support', geloeschtAnzahl: '3' }))
+    expect(mail.html).toContain('Wochenlage')
+    expect(mail.html).toContain('3 erledigte Meldungen')
+    expect(mail.html).toContain('€ 123,40')
+    expect(mail.html).toContain('€ 1,50')
+    expect(mail.html).toContain('€ 49,00')
+    expect(mail.html).toContain('überfällig: 2')
+    // Gegenprobe: Der Text einer Meldung und der Hofname verlassen die Mail nicht.
+    expect(mail.html).not.toContain('Frau Muster')
+    expect(mail.html).not.toContain('Hof Beispiel')
+    // Testhöfe zählen nirgends (N21).
+    expect(db.farm.count).toHaveBeenCalledWith({ where: expect.objectContaining({ istTesthof: false }) })
     vi.mocked(zaehleOffenImEingang).mockResolvedValue({ antworten: 0, meldungen: 0, hoefe: 0, erstattungen: 0, gesamt: 0 })
-    expect(await rendere('wochenbericht', { empfaengerId: 'support', geloeschtAnzahl: '3' })).toEqual({ verworfen: 'nichts_offen' })
+    expect(alsMail(await rendere('wochenbericht', { empfaengerId: 'support', geloeschtAnzahl: '0' })).html).toContain('Wochenlage')
   })
 
   it('Freischaltung: nur solange der Hof freigeschaltet ist', async () => {

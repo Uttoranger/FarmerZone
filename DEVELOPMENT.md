@@ -5967,6 +5967,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **/teilen** trägt `data-design="neu"`, keine Shell; der Service Worker ist unverändert.
 - **Toter Code entfernt:** `src/emails/newsletter.tsx`, `createOnboardingProducts`, `createOnboardingSlots` (jeweils ohne Import und Aufruf).
 
+## Betriebshandbuch und Wochenlage (Register N32, Nr. 192, Lauf 26, 26.10.2026)
+
+- **Handbuch:** `docs/betrieb/handbuch.md` ist gefüllt: drei Routinen (täglich 2 Minuten in Heute, montags die fünf Punkte des Boards, Monatsende Geld), zehn Notfälle je mit Erkennen · Sofort · Danach und Verweis auf die Alarm-Matrix, Restore-Probe (immer in ein neues Projekt, nie über das laufende) und Uptime-Dienst einrichten. Keine Kontodaten; `tests/handbuch.test.ts` hält das Gerüst, die Gliederung der Notfälle und die Gegenprobe (keine Adresse, IBAN, kein Schlüssel, kein lokaler Pfad) fest.
+- **Wochenlage statt Wochenbericht:** Die Mail-Art `wochenbericht` bleibt (Bezug, Schlüssel und Zustellregel unverändert); der Renderer (`rendereWochenbericht`, `src/server/mail-arten/betreiber.ts`; Regeln in `src/lib/wochenlage.ts`, Lader in `src/server/queries/wochenlage.ts`, weil die Testzahlungs-Regel nur dort stehen darf) setzt über der Postfach-Zusammenfassung die Zahlen der letzten 7 Tage: Bestellungen und Umsatz (ohne Storno, Testhöfe, Testzahlungen), Servicegebühr aus derselben Zuordnung wie Admin › Geld (`topfVonBestellung`), neue Höfe, offene und überfällige Aufgaben, Fehlermeldungen der Woche und die Kosten des Monats. Nur Zahlen: Die jüngsten Meldungen (Fremdtext) stehen nicht mehr in der Mail.
+- **Stripe-Gebühren fehlen bewusst**, bis Admin › Geld sie zeigt (Nr. 191); die Zeile kommt dann in `wochenlageZeilen` dazu.
+- **„Überfällig"** heißt hier: Meldungen, die länger als 14 Tage offen liegen (`liegenGeblieben`). Verfeinert Nr. 185 die Fristen der Aufgaben, folgt die Wochenlage ihnen.
+- **Nichts mehr offen heißt nicht mehr „keine Mail"** im Renderer; ob der Lauf die Mail dann einstellt, entscheidet weiter `api/cron/briefkasten` (Nacharbeit, siehe Bericht 192).
+
 ## Nützliche Befehle
 
 ```bash
