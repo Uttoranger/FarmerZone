@@ -53,10 +53,14 @@ export function BottomNav({
   )
 }
 
-/** Gestalt eines Eintrags — aktiv heißt Textfarbe und fett, sonst die leise Farbe. */
+/**
+ * Gestalt eines Eintrags — aktiv heißt Textfarbe und fett, sonst die leise Farbe.
+ * Schrift 12 px (Nr. 177, vorher 10,5): gelesen wird draußen, oft mit Handschuhen
+ * und in der Sonne. Die Leiste bleibt 68 px hoch, nur die Schrift wächst.
+ */
 export function bottomNavEintragKlassen(aktiv: boolean): string {
   return cn(
-    'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-[3px] rounded-xl text-[10.5px] leading-none transition-colors duration-[250ms]',
+    'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-[3px] rounded-xl text-[12px] leading-none transition-colors duration-[250ms]',
     aktiv ? 'font-semibold text-foreground' : 'text-muted-foreground hover:text-foreground',
     FOKUS_RAHMEN
   )
@@ -119,7 +123,7 @@ export function mittelknopfKlassen(ton: 'gruen' | 'orange'): string {
  */
 export function mittelknopfMitWortKlassen(): string {
   return cn(
-    'group relative -mt-5 flex shrink-0 flex-col items-center gap-[7px] rounded-2xl text-[10.5px] leading-none text-muted-foreground transition-colors duration-[250ms] hover:text-foreground',
+    'group relative -mt-5 flex shrink-0 flex-col items-center gap-[7px] rounded-2xl text-[12px] leading-none text-muted-foreground transition-colors duration-[250ms] hover:text-foreground',
     FOKUS_RAHMEN
   )
 }

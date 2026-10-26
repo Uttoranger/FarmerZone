@@ -337,7 +337,7 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
   })
 
   it('die Hofseite trägt die KundeShell des neuen Designs und keine zweite Kopfzeile (Nr. 10)', () => {
-    expect(lies('src/app/(public)/[farmSlug]/page.tsx')).toMatch(/<KundeShellMitSitzung>/)
+    expect(lies('src/app/(public)/[farmSlug]/page.tsx')).toMatch(/<KundeShellMitSitzung aktiv="entdecken">/)
     for (const datei of ['src/components/farm/farm-page-view.tsx', 'src/components/hofseite/hofseite-kunde.tsx']) {
       expect(lies(datei), datei).not.toMatch(/<KundenKopf\b|TitelbildTeilen/)
     }
@@ -370,7 +370,7 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     expect(text.match(/<KundeShellMitSitzung unterleiste=\{false\}>/g)).toHaveLength(2)
     expect(text).not.toMatch(/<KundenKopf\b|router\.back|history\.back/)
     // Gegenprobe: Die Suche findet die Hülle ohne Unterleiste auf der Produktseite.
-    expect(lies('src/app/(public)/[farmSlug]/produkt/[id]/page.tsx')).toMatch(/<KundeShellMitSitzung unterleiste=\{false\}>/)
+    expect(lies('src/app/(public)/[farmSlug]/produkt/[id]/page.tsx')).toMatch(/<KundeShellMitSitzung unterleiste=\{false\} aktiv="entdecken">/)
   })
 
   it('die Startseite trägt die KundeShell des neuen Designs und keine zweite Kopfzeile', () => {

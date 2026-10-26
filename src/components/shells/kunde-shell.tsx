@@ -131,10 +131,15 @@ export type KundeShellProps = {
    * unerreichbar. Ohne Angabe: mit Unterleiste.
    */
   unterleiste?: boolean
+  /**
+   * Der Punkt, der auf dieser Seite aktiv ist, wo der Pfad es nicht sagt (Nr. 177):
+   * Hof- und Produktseite setzen `entdecken` (kundenAriaAktuell).
+   */
+  aktiv?: KundenNavId
   children: ReactNode
 }
 
-export function KundeShell({ sitzung, unterleiste = true, children }: KundeShellProps): React.JSX.Element {
+export function KundeShell({ sitzung, unterleiste = true, aktiv, children }: KundeShellProps): React.JSX.Element {
   const pathname = usePathname()
   const nav = kundenNavigation({ sitzung })
   const korb = useWarenkorbKopf()
@@ -147,7 +152,8 @@ export function KundeShell({ sitzung, unterleiste = true, children }: KundeShell
   return (
     // Die Maße als CSS-Variablen (src/lib/kunde-shell-masse.ts): Der Kartenmodus auf
     // /hoefe füllt damit genau den Platz zwischen Kopfzeile und Unterleiste.
-    <div data-design="neu" className={cn('min-h-dvh bg-background text-foreground', KUNDE_SHELL_MASSE)}>
+    // data-scroll-rand: Der Fokus scrollt nie unter Kopf und Unterleiste (WCAG 2.4.11, scroll-padding in globals.css, Nr. 177).
+    <div data-design="neu" data-scroll-rand={unterleiste ? 'kunde' : 'kunde-ohne-leiste'} className={cn('min-h-dvh bg-background text-foreground', KUNDE_SHELL_MASSE)}>
       <SprungLink />
       <header className="sticky top-0 z-40 border-b border-border bg-background print:hidden">
         <div className={cn(KUNDE_KOPF_ZEILE, 'mx-auto flex max-w-[1200px] items-center gap-3 px-4 md:gap-3 md:px-6 lg:gap-[22px]')}>
@@ -184,7 +190,7 @@ export function KundeShell({ sitzung, unterleiste = true, children }: KundeShell
             <ul className="flex items-center gap-4 lg:gap-[22px]">
               {nav.web.map((punkt) => (
                 <li key={punkt.id}>
-                  <Link href={punkt.href} aria-current={kundenAriaAktuell(pathname, punkt)} className={TEXTLINK}>
+                  <Link href={punkt.href} aria-current={kundenAriaAktuell(pathname, punkt, aktiv)} className={TEXTLINK}>
                     {/* Zwischen 768 und 1024 px der kurze Name („Entdecken",
                         „Bestellungen"): Seit Nr. 14 stehen abgemeldet vier
                         Links im Kopf, mit den langen Namen bräche er um. */}
@@ -211,7 +217,7 @@ export function KundeShell({ sitzung, unterleiste = true, children }: KundeShell
             {/* Am Handy steht Hell/Dunkel am Seitenfuß — oben rechts gehört der Platz dem Knopf. */}
             <ThemeUmschalter className={cn('hidden rounded-full text-foreground hover:bg-muted md:inline-flex', FOKUS_RAHMEN)} />
             {nav.knopf && (
-              <Link href={nav.knopf.href} aria-current={kundenAriaAktuell(pathname, nav.knopf)} className={KOPF_KNOPF}>
+              <Link href={nav.knopf.href} aria-current={kundenAriaAktuell(pathname, nav.knopf, aktiv)} className={KOPF_KNOPF}>
                 {nav.knopf.label}
               </Link>
             )}
@@ -220,7 +226,7 @@ export function KundeShell({ sitzung, unterleiste = true, children }: KundeShell
                 href={nav.konto.href}
                 aria-label={nav.konto.label}
                 title={nav.konto.label}
-                aria-current={kundenAriaAktuell(pathname, nav.konto)}
+                aria-current={kundenAriaAktuell(pathname, nav.konto, aktiv)}
                 className={cn('flex size-11 items-center justify-center rounded-full', FOKUS_RAHMEN)}
               >
                 <span className="flex size-8 items-center justify-center rounded-full bg-border text-foreground">
@@ -277,7 +283,7 @@ export function KundeShell({ sitzung, unterleiste = true, children }: KundeShell
                   href={punkt.href}
                   label={punkt.kurz ?? punkt.label}
                   symbol={Symbol}
-                  aktuell={kundenAriaAktuell(pathname, punkt)}
+                  aktuell={kundenAriaAktuell(pathname, punkt, aktiv)}
                 />
               )
             })}
@@ -315,7 +321,8 @@ export function KundeFokusShell({ titel, zurueck, rechts, aktion, children }: Ku
     <div data-design="neu" className="min-h-dvh bg-background text-foreground">
       <SprungLink />
       <header className="sticky top-0 z-40 border-b border-border bg-background print:hidden">
-        <div className="mx-auto flex h-[52px] max-w-[1200px] items-center gap-1.5 px-2 md:h-16 md:px-6">
+        {/* 56 px wie die KundeShell (Nr. 177; vorher 52) — die Ladeansichten der Fokus-Seiten haben dieselbe Höhe. */}
+        <div className="mx-auto flex h-14 max-w-[1200px] items-center gap-1.5 px-2 md:h-16 md:px-6">
           {'href' in zurueck ? (
             <Link
               href={zurueck.href}

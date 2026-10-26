@@ -200,7 +200,8 @@ async function Hofseite({ farmSlug, suche, geo }: { farmSlug: string; suche: Suc
   const sperre = kaufSperre(farm, jetzt)
 
   return (
-    <KundeShellMitSitzung>
+    // In der Unterleiste ist „Entdecken" aktiv — die Kundin steckt mitten im Entdecken (Nr. 177).
+    <KundeShellMitSitzung aktiv="entdecken">
       <FarmPageView
         // Telefon und E-Mail erst nach dem Kauf (Nr. 60): Sie bleiben hier auf
         // dem Server und stehen so nicht in den Seitendaten der Client-Komponente.

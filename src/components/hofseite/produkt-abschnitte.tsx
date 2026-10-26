@@ -5,6 +5,7 @@ import { Info } from 'lucide-react'
 import type { KategorieAbschnitt } from '@/lib/bereiche-anzeige'
 import { mitAnzahl } from '@/lib/format'
 import { naechsterAktiverReiter } from '@/lib/hofseite-sektionen'
+import { CHIPS_KLEBEN } from '@/lib/hofseite-orientierung'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
@@ -13,10 +14,12 @@ import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 const ALLE_ANKER = 'produkte-alle'
 
 /**
- * Wie weit ein Sprungziel unter dem oberen Rand stehen bleibt: unter der
- * Kopfzeile der Shell (56 px, ab md 64 px) und der klebenden Reiterleiste.
+ * Wie weit ein Sprungziel unter dem oberen Rand stehen bleibt: am Handy unter
+ * Kopf, Hofzeile, Reitern und Chips (57 + 48 + 49 + 45 = 199 px, Nr. 177;
+ * src/lib/hofseite-orientierung.ts), ab md unter der Kopfzeile (64 px) und der
+ * klebenden Reiterleiste.
  */
-export const SPRUNGZIEL_UNTER_LEISTE = 'scroll-mt-28 md:scroll-mt-32'
+export const SPRUNGZIEL_UNTER_LEISTE = 'scroll-mt-[13rem] md:scroll-mt-32'
 
 /** Erkennungsstreifen des Beobachters: zwischen 30 % und 40 % der Fensterhöhe (wie bisher auf der Hofseite). */
 const SPY_STREIFEN = '-30% 0px -60% 0px'
@@ -65,6 +68,7 @@ export function ProduktAbschnitte<P extends { id: string }>({
   const [aktiv, setAktiv] = useState(() => springeZu ?? ALLE_ANKER)
   const sprungZiel = useRef<string | null>(null)
   const sprungTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const chipReihe = useRef<HTMLUListElement>(null)
 
   function sperreAuf(anker: string) {
     sprungZiel.current = anker
@@ -117,6 +121,19 @@ export function ProduktAbschnitte<P extends { id: string }>({
     return () => beobachter.disconnect()
   }, [reihenfolgeText])
 
+  // Die Chip-Reihe klebt am Handy und scrollt seitlich: Der markierte Chip
+  // rückt in den sichtbaren Teil, sonst stünde „Honig" gewählt, aber außer
+  // Sicht. Nur die Reihe scrollt (scrollTo), nie das Fenster.
+  useEffect(() => {
+    const reihe = chipReihe.current
+    const chip = reihe?.querySelector<HTMLElement>(`[data-chip="${aktiv}"]`)
+    if (!reihe || !chip) return
+    const links = chip.offsetLeft - reihe.offsetLeft
+    if (links < reihe.scrollLeft || links + chip.offsetWidth > reihe.scrollLeft + reihe.clientWidth) {
+      reihe.scrollTo({ left: Math.max(0, links - 16) })
+    }
+  }, [aktiv])
+
   function beimChip(e: MouseEvent<HTMLAnchorElement>, anker: string) {
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
     e.preventDefault()
@@ -134,14 +151,19 @@ export function ProduktAbschnitte<P extends { id: string }>({
   return (
     <div id={ALLE_ANKER} className={cn('flex flex-col gap-5', SPRUNGZIEL_UNTER_LEISTE)}>
       {abschnitte.length > 1 && (
-        <nav aria-label="Zu einer Kategorie springen" className="-mx-4 overflow-x-auto px-4 py-1 md:mx-0 md:px-0">
-          <ul className="flex gap-2 md:flex-wrap">
+        // Klebt am Handy unter den Reitern (CHIPS_KLEBEN, Nr. 177; Meldung „Sprungmarken am Handy"), ab md im Fluss.
+        <nav
+          aria-label="Zu einer Kategorie springen"
+          className={cn(CHIPS_KLEBEN, 'z-20 -mx-4 border-b border-border bg-background md:mx-0 md:border-0 md:bg-transparent')}
+        >
+          <ul ref={chipReihe} className="flex gap-2 overflow-x-auto px-4 py-1 md:flex-wrap md:overflow-visible md:px-0">
             {chips.map((chip) => {
               const gewaehlt = aktiv === chip.anker
               return (
                 <li key={chip.anker}>
                   <a
                     href={`#${chip.anker}`}
+                    data-chip={chip.anker}
                     onClick={(e) => beimChip(e, chip.anker)}
                     aria-current={gewaehlt ? 'true' : undefined}
                     className={cn(

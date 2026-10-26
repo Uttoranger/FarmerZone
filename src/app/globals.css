@@ -548,4 +548,40 @@
       scroll-padding-bottom: 9.5rem;
     }
   }
+  /* Dasselbe in KundeShell und HofShell (Nr. 177, Muster der Kasse): Der
+     Browser scrollt ein fokussiertes Element nie unter den klebenden Kopf und
+     nie unter die Unterleiste samt Mittelknopf. Die Shells markieren ihren
+     Rahmen (data-scroll-rand); die Zahlen sind die Maße der KundeShell
+     (--kunde-kopf 57/65 px, --kunde-unterleiste 69 px plus Home-Indicator,
+     --kunde-ueberstand 20 px, src/lib/kunde-shell-masse.ts) und des klebenden
+     Blocks der Hofseite (Hofzeile 48, Reiter 49, Chips 45 px,
+     src/lib/hofseite-orientierung.ts) — die Wurzel sieht die Variablen am
+     Rahmen der Shell nicht, tests/hofseite-orientierung.test.ts koppelt sie. */
+  html:has([data-scroll-rand^='kunde']) {
+    scroll-padding-top: 57px;
+  }
+  @media (max-width: 767px) {
+    html:has([data-scroll-rand='kunde']),
+    html:has([data-scroll-rand='hof']) {
+      scroll-padding-bottom: calc(89px + env(safe-area-inset-bottom));
+    }
+    /* Im Hofbereich klebt oben nur der Unterseiten-Kopf (56 px samt Linie 57). */
+    html:has([data-scroll-rand='hof']):has([data-unterseiten-leiste]) {
+      scroll-padding-top: 57px;
+    }
+    /* Hofseite: Kopf, Hofzeile, Reiter und Chips kleben; unten zusätzlich Korb-Leiste und Bestätigungszeile. */
+    html:has([data-scroll-rand='kunde']):has([data-hofzeile]) {
+      scroll-padding-top: 199px;
+      scroll-padding-bottom: calc(9.5rem + 3.75rem + env(safe-area-inset-bottom));
+    }
+  }
+  @media (min-width: 768px) {
+    html:has([data-scroll-rand^='kunde']) {
+      scroll-padding-top: 65px;
+    }
+    /* Ab md klebt auf der Hofseite nur die Reiterleiste unter dem Kopf. */
+    html:has([data-scroll-rand='kunde']):has([data-hofzeile]) {
+      scroll-padding-top: 114px;
+    }
+  }
 }

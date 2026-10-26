@@ -5886,6 +5886,15 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Folge:** Mit dem dunkleren `--input` wären die `dark:bg-input/30`-Tönungen von Input, Textarea, Select und Umriss-Knopf hell geworden; sie sind entfallen, Felder stehen auf `bg-card` wie im Board. Das Passwort-Auge gibt es nur noch einmal (`PasswordInput`, Feldform über `feld`).
 - **Filter-Chips /products:** `FilterChip` selbst hat die Fläche (36 + 2 × 5 px, die Reihe schneidet mit `py-1` auf genau 44 px). Ohne Fläche waren die Hinweis-Knöpfe in den Produktzeilen („… übernehmen", „Kategorie ergänzen") — sie tragen jetzt `TREFFER_44`.
 
+## Hofseite und Navigation: immer wissen, wo man ist (Register N30; Nr. 177, Lauf 25, 26.10.2026)
+
+- **Warum:** Auf der Hofseite am Handy scrollten Rückweg und Hofname weg, die Kategorie-Chips klebten nicht (Meldung „Sprungmarken am Handy"), in der Unterleiste war nichts aktiv, und jedes „+" öffnete das Korb-Blatt — wer fünf Dinge kaufte, schloss es fünfmal (Blatt-Pingpong). Board system-sterne-hofseite-orientierung.
+- **Klebender Block:** Hofzeile (48 px), Reiter (49) und Chips (45) kleben am Handy als drei `sticky`-Teile übereinander statt in einem Element — die Chips stehen tief im Produktraster, ihr klebender Bereich ist der Abschnitt der Produkte. Die Abstände stehen als ganze Klassen in `src/lib/hofseite-orientierung.ts`.
+- **scroll-padding:** gehört an `html`, die Wurzel sieht die CSS-Variablen am Rahmen der Shell nicht. Darum markieren die Shells ihren Rahmen und `globals.css` nennt die Zahlen; ein Test koppelt sie an `KUNDE_SHELL_MASSE`.
+- **N30:** Der Merker liegt im sessionStorage (eine Sitzung = ein Tab). Er wird erst nach einem gelungenen Griff gesetzt — scheitert das erste „+" am Netz, öffnet das wiederholte das Blatt. Fehler stehen nicht mehr im Toast, sondern in derselben Zeile an der Aktion (N29), geglättet über `korbFehlerText` (Übergabe aus Nr. 175: rohe Servertexte, Netzsatz bei der Menge).
+- **Rückweg Hofbereich:** `UnterseitenKopf` nimmt mit `tippAufZiel` dieselbe Regel wie „‹ Alle Höfe"; Schritt zurück per `history.back()` (dasselbe wie `router.back()` im App-Router, aber ohne Router-Hook beim Rendern).
+- **Offen:** „+ Gebühr" an der Korb-Leiste bleibt bis zur Konstante aus Nr. 176; Filter und Suche der Kundenliste reist nur über den Verlauf mit, nicht über den Link (die Liste gibt sie den Detail-Links nicht mit).
+
 ## Nützliche Befehle
 
 ```bash

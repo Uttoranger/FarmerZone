@@ -308,7 +308,8 @@ export function HofShell({
   const untenImMehr = nav.mehr.filter((p) => nav.unten.some((u) => u.id === p.id))
 
   return (
-    <div data-design="neu" className="min-h-dvh bg-background text-foreground">
+    // data-scroll-rand: Der Fokus scrollt nie unter Unterleiste und Unterseiten-Kopf (WCAG 2.4.11, scroll-padding in globals.css, Nr. 177).
+    <div data-design="neu" data-scroll-rand="hof" className="min-h-dvh bg-background text-foreground">
       <SprungLink />
 
       {/* ===== Browser: Seitenleiste ===== */}

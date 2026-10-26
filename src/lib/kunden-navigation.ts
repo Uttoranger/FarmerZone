@@ -163,7 +163,11 @@ export function kopfKnopf(sitzung: KundenSitzung): KundenNavPunkt {
 // Jeder Punkt mit eigener Seite. Anker (#…) sind nie eine eigene Seite.
 const AKTIVIERBAR: readonly KundenNavPunkt[] = [ENTDECKEN, FUER_HOEFE, BESTELLUNGEN, ANMELDEN, MEIN_HOF, KONTO]
 
-/** Der aktive Punkt zu einem Pfad — der längste passende; null auf Startseite, Hofseite und allem anderen. */
+/**
+ * Der aktive Punkt zu einem Pfad — der längste passende; null auf Startseite,
+ * Hofseite und allem anderen. Hof- und Produktseite setzen ihren Punkt selbst
+ * (`aktiv` in kundenAriaAktuell, Nr. 177); die Startseite bleibt ohne.
+ */
 export function kundenAktiverPunkt(pfad: string): KundenNavId | null {
   let bester: { id: KundenNavId; laenge: number } | null = null
   for (const punkt of AKTIVIERBAR) {
@@ -177,8 +181,15 @@ export function kundenAktiverPunkt(pfad: string): KundenNavId | null {
 /**
  * aria-current: 'page' auf genau der Zielseite, 'true' auf Unterseiten, sonst
  * nichts. Der Punkt muss selbst dorthin führen.
+ *
+ * `aktiv` (Nr. 177, Board system-sterne-hofseite-orientierung Punkt 1): Hof-
+ * und Produktseite liegen unter /[hof] — kein Pfad eines Punkts, darum sagt
+ * die Seite selbst, wo sie steht (`entdecken`, über KundeShellMitSitzung).
+ * Dann ist genau dieser Punkt aktiv, als 'true' (ein Ort darin, nicht die
+ * Zielseite selbst), und kein anderer. Die Startseite setzt nichts.
  */
-export function kundenAriaAktuell(pfad: string, punkt: KundenNavPunkt): 'page' | 'true' | undefined {
+export function kundenAriaAktuell(pfad: string, punkt: KundenNavPunkt, aktiv?: KundenNavId): 'page' | 'true' | undefined {
+  if (aktiv) return aktiv === punkt.id ? 'true' : undefined
   if (kundenAktiverPunkt(pfad) !== punkt.id) return undefined
   if (pfad !== punkt.href && !pfad.startsWith(punkt.href + '/')) return undefined
   return pfad === punkt.href ? 'page' : 'true'

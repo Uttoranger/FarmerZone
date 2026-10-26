@@ -105,8 +105,24 @@ function pfadVon(href: string): string {
  * Startseite, führte ein Schritt zurück nicht zu „Alle Höfe".
  */
 export function zeileNimmtVerlauf(seite: KundenSeite, vorgaengerPfad: string | null): boolean {
-  const weg = rueckweg(seite, vorgaengerPfad !== null)
-  return weg.verlauf && vorgaengerPfad === pfadVon(weg.href)
+  return nimmtVerlaufZu(rueckweg(seite, false).href, vorgaengerPfad)
+}
+
+/**
+ * Die allgemeine Regel für jeden Rückweg, der nach seinem Ziel benannt ist
+ * (Nr. 177) — die Browser-Zeile der Kundenseiten („‹ Alle Höfe") und der
+ * Unterseiten-Kopf des Hofbereichs („← Kunden"): ein Schritt im Verlauf genau
+ * dann, wenn die eigene Seite direkt davor dieses Ziel war — dann mit
+ * Filtern, Suche und Scrollstelle. Sonst der Link: Ein Schritt zurück führte
+ * woandershin als der Name verspricht.
+ */
+export function nimmtVerlaufZu(ziel: string, vorgaengerPfad: string | null): boolean {
+  return vorgaengerPfad !== null && vorgaengerPfad === pfadVon(ziel)
+}
+
+/** Der Tipp auf einen nach seinem Ziel benannten Rückweg (`nimmtVerlaufZu`): Verlauf oder hinauf zum Ziel. */
+export function tippAufZiel(ziel: string, vorgaengerPfad: string | null): RueckwegTipp {
+  return nimmtVerlaufZu(ziel, vorgaengerPfad) ? { aktion: 'verlauf' } : { aktion: 'hinauf', ziel: pfadVon(ziel) }
 }
 
 /** Was ein Tipp auf einen Rückweg tut: ein Schritt im Verlauf — oder dem Link folgen und damit hinaufsteigen. */
@@ -120,8 +136,8 @@ export type RueckwegTipp = { aktion: 'verlauf' } | { aktion: 'hinauf'; ziel: str
  */
 export function tippAufRueckweg(seite: KundenSeite, vorgaengerPfad: string | null, form: 'knopf' | 'zeile'): RueckwegTipp {
   const weg = rueckweg(seite, vorgaengerPfad !== null)
-  const verlauf = form === 'zeile' ? zeileNimmtVerlauf(seite, vorgaengerPfad) : weg.verlauf
-  return verlauf ? { aktion: 'verlauf' } : { aktion: 'hinauf', ziel: pfadVon(weg.href) }
+  if (form === 'zeile') return tippAufZiel(weg.href, vorgaengerPfad)
+  return weg.verlauf ? { aktion: 'verlauf' } : { aktion: 'hinauf', ziel: pfadVon(weg.href) }
 }
 
 /**

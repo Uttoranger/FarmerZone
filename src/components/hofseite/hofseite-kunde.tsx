@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Check, ChevronRight, Clock, FlaskConical, MapPin, Navigation, Share2, ShoppingBasket, Sprout } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Clock, FlaskConical, MapPin, Navigation, Share2, ShoppingBasket, Sprout } from 'lucide-react'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
@@ -30,6 +30,7 @@ import {
   type HofReiterId,
 } from '@/lib/hofseite-kunde'
 import { korbErlaubt } from '@/lib/hofseite-vorschau'
+import { HOFZEILE_ZURUECK, REITER_KLEBT, hofZeileUnterzeile } from '@/lib/hofseite-orientierung'
 import { produktLink } from '@/lib/produktdetail'
 import { rueckweg, type KundenSeite } from '@/lib/kunden-kopf'
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
@@ -66,7 +67,7 @@ import { TESTHOF_HINWEIS } from '@/lib/gruendungshof'
  * KundeShell legt die Seite herum (page.tsx), damit auch die Vorschau die
  * echte Navigation zeigt.
  *
- * Aufbau: Rückweg, Titelbild mit Name und Aktionen, Hinweis zur Kaufsperre
+ * Aufbau: Rückweg (am Handy die klebende Hofzeile, Nr. 177), Titelbild mit Name und Aktionen, Hinweis zur Kaufsperre
  * (Pause, keine Abholzeit, ausgebucht — kaufSperre, Register N24), Reiter
  * Übersicht · Produkte (in der Adresse, ?reiter=, geschrieben per
  * replaceState), darunter zweispaltig ab 1024 px: der Inhalt des Reiters und
@@ -226,7 +227,10 @@ export function HofseiteKunde({
       window.history.replaceState(null, '', reiterAdresse(pfad, window.location.search, id))
       const anker = reiterAnker.current
       if (anker) {
-        const kopf = document.querySelector('header')?.getBoundingClientRect().height ?? 0
+        // Am Handy klebt die Hofzeile unter dem Kopf mit (ab md versteckt: Höhe 0).
+        const kopf =
+          (document.querySelector('header')?.getBoundingClientRect().height ?? 0) +
+          (document.querySelector('[data-hofzeile]')?.getBoundingClientRect().height ?? 0)
         const ziel = anker.getBoundingClientRect().top + window.scrollY - kopf
         if (window.scrollY > ziel) window.scrollTo({ top: ziel })
       }
@@ -247,8 +251,44 @@ export function HofseiteKunde({
     document.getElementById('aktuell-titel')?.focus({ preventScroll: true })
   }
 
+  /*
+   * Am Handy die klebende Hofzeile (Nr. 177, Board system-sterne-hofseite-
+   * orientierung Punkt 2): Zurück zu den Höfen, Hofname, Ort und Zustand und
+   * „Teilen" bleiben beim Scrollen oben — dieselbe Form wie der Unterseiten-
+   * Kopf im Hofbereich. Darunter kleben die Reiter (REITER_KLEBT) und im Reiter
+   * Produkte die Chips. Ab md bleibt die Seite, wie sie war: die Zeile
+   * „‹ Alle Höfe" darunter. In der Vorschau steht die Zeile ebenso; ihre Links
+   * behandelt VorschauImRahmen wie alle übrigen.
+   */
+  const hofZeile = (
+    <div data-hofzeile="" className="sticky top-14 z-30 flex h-12 items-center gap-1 bg-background px-2 md:hidden print:hidden">
+      <Link
+        href={zurueck.href}
+        onClick={beimZurueck}
+        aria-label={HOFZEILE_ZURUECK}
+        className={cn('flex size-11 shrink-0 items-center justify-center rounded-xl text-foreground hover:bg-muted', FOKUS_RAHMEN)}
+      >
+        <ChevronLeft className="size-[22px]" strokeWidth={1.9} aria-hidden="true" />
+      </Link>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate font-heading text-[17px] leading-[1.15] font-semibold text-foreground" title={farm.name}>
+          {farm.name}
+        </span>
+        <span className="truncate text-[12px] text-muted-foreground">{hofZeileUnterzeile(farm.city, sperre)}</span>
+      </div>
+      <button
+        type="button"
+        onClick={() => void teileHof(farm)}
+        aria-label="Hofseite teilen"
+        className={cn('flex size-11 shrink-0 items-center justify-center rounded-xl text-foreground hover:bg-muted', FOKUS_RAHMEN)}
+      >
+        <Share2 className="size-5" strokeWidth={1.7} aria-hidden="true" />
+      </button>
+    </div>
+  )
+
   const rueckwegZeile = (
-    <div className="mx-auto max-w-[1200px] px-4 pt-1 md:px-6 md:pt-3">
+    <div className="mx-auto hidden max-w-[1200px] px-6 pt-3 md:block">
       <Link
         href={zurueck.href}
         onClick={beimZurueck}
@@ -264,6 +304,7 @@ export function HofseiteKunde({
     return (
       <>
         {ansicht.art === 'vorschau' && <VorschauImRahmen />}
+        {hofZeile}
         {rueckwegZeile}
         <div className="mx-auto flex max-w-xl flex-col gap-5 px-4 pt-6 pb-16">
           <h1 className="font-heading text-[28px] leading-tight font-semibold break-words text-foreground">{farm.name}</h1>
@@ -372,11 +413,12 @@ export function HofseiteKunde({
       {/* Das JSON-LD des Hofs baut seit Nr. 117 die Seite auf dem Server (src/app/(public)/[farmSlug]/page.tsx). */}
       {ansicht.art === 'vorschau' && <VorschauImRahmen />}
 
+      {hofZeile}
       {rueckwegZeile}
 
       {/* Testhof (Register N21, Nr. 119): oben ein ruhiger Hinweis im neutralen Ton, nie orange — Bestellen bleibt möglich (Testbestellungen sind der Zweck). */}
       {farm.istTesthof && (
-        <div className="mx-auto max-w-[1200px] px-4 pb-3 md:px-6">
+        <div className="mx-auto max-w-[1200px] px-4 pt-1 pb-3 md:px-6 md:pt-0">
           <Hinweiskarte ton="neutral" symbol={FlaskConical}>{TESTHOF_HINWEIS}</Hinweiskarte>
         </div>
       )}
@@ -384,19 +426,8 @@ export function HofseiteKunde({
       {/* ── Titelbild, Name, Aktionen ── */}
       <div className="relative">
         {/* Hochformat ab md ganz statt beschnitten (Register N6, Nr. 72): entscheidet titelbild.tsx. */}
-        <Titelbild foto={foto} verlauf={titelbildVerlauf(farm.bannerValue)} ausschnitt={titelbildAusschnitt(farm.bannerAusschnitt, farm.bannerFocusY)} hofName={farm.name}>
-          <button
-            type="button"
-            onClick={() => void teileHof(farm)}
-            aria-label="Hofseite teilen"
-            className={cn(
-              'absolute top-3 right-3 flex size-11 items-center justify-center rounded-full bg-primary-foreground/55 text-accent-foreground transition-colors hover:bg-primary-foreground/70 md:hidden',
-              FOKUS_RAHMEN
-            )}
-          >
-            <Share2 className="size-5" strokeWidth={1.7} aria-hidden="true" />
-          </button>
-        </Titelbild>
+        {/* „Teilen" steht am Handy fest in der Hofzeile (Nr. 177), nicht mehr auf dem Titelbild. */}
+        <Titelbild foto={foto} verlauf={titelbildVerlauf(farm.bannerValue)} ausschnitt={titelbildAusschnitt(farm.bannerAusschnitt, farm.bannerFocusY)} hofName={farm.name} />
 
         <div className="relative mx-auto max-w-[1200px] px-4 md:flex md:items-end md:gap-6 md:px-6">
           {/* Am Handy über dem unteren Rand des Titelbilds, ab 768 px darunter neben dem Hofzeichen. */}
@@ -479,7 +510,8 @@ export function HofseiteKunde({
       <nav
         aria-label="Bereiche der Hofseite"
         data-abschnitt="abschnitte"
-        className="sticky top-14 z-30 mt-5 border-b border-border bg-background md:top-16 md:mt-7"
+        // Klebt am Handy unter der Hofzeile, ab md unter dem Kopf (REITER_KLEBT, Nr. 177).
+        className={cn(REITER_KLEBT, 'z-30 mt-5 border-b border-border bg-background md:mt-7')}
       >
         <ul className="mx-auto flex max-w-[1200px] gap-7 overflow-x-auto px-4 md:px-6">
           {reiter.map((r) => (
