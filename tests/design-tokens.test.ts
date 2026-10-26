@@ -83,12 +83,13 @@ const ZUSTAND_PAARE: [string, string][] = MARKE_ARTEN.map((art) => [`zustand-${a
 const ABZEICHEN_PAAR: [string, string] = ['abzeichen', 'abzeichen-grund']
 
 describe('Tabelle und CSS decken sich', () => {
-  it('die Tabelle im Design-System hat einundzwanzig Tokens — elf Grundfarben, acht Bedeutungsfarben, das Abzeichen', () => {
+  it('die Tabelle im Design-System hat zweiundzwanzig Tokens — elf Grundfarben, acht Bedeutungsfarben, das Abzeichen, der Feldrand', () => {
     expect([...soll.keys()].toSorted()).toEqual(
       [
         'accent', 'bg', 'border', 'on-accent', 'on-primary', 'primary', 'status-fertig', 'status-offen', 'surface', 'text', 'text-muted',
         ...ZUSTAND_PAARE.flat(),
         ...ABZEICHEN_PAAR,
+        'feldrand',
       ].toSorted()
     )
   })
@@ -211,7 +212,7 @@ describe('Geltungsbereich data-design="neu"', () => {
       'accent-foreground': 'on-accent',
       'muted-foreground': 'text-muted',
       border: 'border',
-      input: 'border',
+      input: 'feldrand',
     }
     for (const [variable, token] of Object.entries(zuordnung)) {
       expect(neu, variable).toContain(`--${variable}: var(--fz-${token});`)
@@ -259,6 +260,41 @@ describe('Geltungsbereich data-design="neu"', () => {
 
   it('der Geltungsbereich steht nach beiden Modusblöcken — er gewinnt ohnehin über die Spezifität (0,2,0), soll aber als Überlagerung lesbar bleiben', () => {
     expect(css.indexOf(`${NEU} {`)).toBeGreaterThan(css.indexOf(`${DUNKEL} {`))
+  })
+})
+
+describe('Feldrand und Fokus (WCAG 1.4.11, ≥ 3:1; Nr. 173)', () => {
+  /** Eine Farbe mit Deckkraft über einem Grund — so sieht das Auge eine `/50`-Klasse. */
+  function ueber(vorne: string, hinten: string, deckkraft: number): string {
+    const kanal = (hex: string, i: number): number => parseInt(hex.slice(1 + 2 * i, 3 + 2 * i), 16)
+    return `#${[0, 1, 2].map((i) => Math.round(kanal(vorne, i) * deckkraft + kanal(hinten, i) * (1 - deckkraft)).toString(16).padStart(2, '0')).join('').toUpperCase()}`
+  }
+
+  it.each(['surface', 'bg'])('der Feldrand erreicht 3:1 auf --%s, hell und dunkel', (grund) => {
+    expect(kontrast(wert('feldrand', 'hell'), wert(grund, 'hell')), 'hell').toBeGreaterThanOrEqual(3)
+    expect(kontrast(wert('feldrand', 'dunkel'), wert(grund, 'dunkel')), 'dunkel').toBeGreaterThanOrEqual(3)
+  })
+
+  it('Gegenprobe: der Kartenrand als Feldrand fiele durch — deshalb ein eigenes Token', () => {
+    expect(kontrast(wert('border', 'hell'), wert('surface', 'hell'))).toBeLessThan(3)
+    expect(kontrast(wert('border', 'dunkel'), wert('surface', 'dunkel'))).toBeLessThan(3)
+  })
+
+  it('Feldränder zeigen auf den Feldrand, Kartenränder bleiben beim Rahmen', () => {
+    const neu = block(NEU)
+    expect(neu).toContain('--input: var(--fz-feldrand);')
+    expect(neu).toContain('--border: var(--fz-border);')
+    expect(neu).toContain('--sidebar-border: var(--fz-border);')
+  })
+
+  it('der volle Fokusring (--ring = --fz-status-fertig) erreicht 3:1 auf Grund und Fläche, der alte Halo ring/50 nicht', () => {
+    for (const modus of ['hell', 'dunkel'] as const) {
+      for (const grund of ['bg', 'surface']) {
+        expect(kontrast(wert('status-fertig', modus), wert(grund, modus)), `${modus} ${grund}`).toBeGreaterThanOrEqual(3)
+      }
+    }
+    const halo = ueber(wert('status-fertig', 'hell'), wert('surface', 'hell'), 0.5)
+    expect(kontrast(halo, wert('surface', 'hell'))).toBeLessThan(3)
   })
 })
 

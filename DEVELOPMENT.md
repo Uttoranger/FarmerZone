@@ -5879,6 +5879,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Netz (N29):** `src/lib/netz.ts` (Nr. 175) ist noch nicht im Zwischenstand — der heutige Satz bleibt.
 - **Offen, nur notiert:** die doppelte Stunde beim Wechsel auf Winterzeit in `zeitpunktAusEingabe` (nimmt still die zweite 02:xx) und das Liveschalten geplanter Fassungen per Cron.
 
+## Grundbausteine 44 px und Kontrast (Nr. 173, Lauf 25, 26.10.2026)
+
+- **Warum:** Die shadcn-Grundbausteine kamen mit Desktop-Maßen (Button 32, Input 36, Select 32, Kreuz 28, Passwort-Auge 16 px ohne Tastatur) und mit Deckkraft an Textfarben und Rändern (Platzhalter 2,45:1, Feldrand 1,29:1, Schalter aus 1,51:1, Fokus-Halo 2,14:1). Eine Änderung in `src/components/ui` heilt alle 45 Nutzer zugleich — das Produktformular ganz.
+- **Feldrand:** eigenes Token `--fz-feldrand` statt `--fz-border` für `--input`, abgeleitet aus `--fz-text-muted` (hell 75 %, dunkel 60 % zum Rahmen hin). Das Board schlug für dunkel `#4B5B4E` vor; nachgerechnet sind das nur 2,43:1 auf der Fläche — deshalb `#687567` (3,62:1). Kartenränder bleiben `--fz-border`, sonst würde jede Karte so laut wie ein Feld.
+- **Folge:** Mit dem dunkleren `--input` wären die `dark:bg-input/30`-Tönungen von Input, Textarea, Select und Umriss-Knopf hell geworden; sie sind entfallen, Felder stehen auf `bg-card` wie im Board. Das Passwort-Auge gibt es nur noch einmal (`PasswordInput`, Feldform über `feld`).
+- **Filter-Chips /products:** `FilterChip` selbst hat die Fläche (36 + 2 × 5 px, die Reihe schneidet mit `py-1` auf genau 44 px). Ohne Fläche waren die Hinweis-Knöpfe in den Produktzeilen („… übernehmen", „Kategorie ergänzen") — sie tragen jetzt `TREFFER_44`.
+
 ## Nützliche Befehle
 
 ```bash

@@ -292,12 +292,12 @@ describe('Kontrast und Touch-Ziele (Befunde der Axe-Prüfung)', () => {
 
   it('der Auge-Knopf der Passwortseite ist 44 px groß, benannt und meldet seinen Zustand', () => {
     const text = lies('src/app/(auth)/reset-password/neues-passwort-formular.tsx')
-    // Nicht das gemeinsame PasswordInput (Knopf 16 px).
-    expect(text).not.toMatch(/from '@\/components\/ui\/password-input'/)
-    expect(text).toMatch(/flex size-11 items-center justify-center/)
-    expect(text).toMatch(/aria-pressed=\{sichtbar\}/)
-    expect(text).toMatch(/aria-label=\{sichtbar \? 'Passwort verbergen' : 'Passwort anzeigen'\}/)
-    expect(anzahl(text, /<PasswortFeld\b/)).toBe(2)
+    // Seit Nr. 173 das gemeinsame PasswordInput (44 px, aria-pressed; tests/grundbausteine-groesse.test.ts)
+    // in der Feldform der Anmeldung — keine eigene Kopie mehr.
+    expect(text).toMatch(/from '@\/components\/ui\/password-input'/)
+    expect(anzahl(text, /<PasswordInput\b/)).toBe(2)
+    expect(anzahl(text, /feld=\{FELD\}/)).toBe(2)
+    expect(text).not.toMatch(/PasswortFeld/)
   })
 })
 

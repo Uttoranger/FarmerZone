@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { ChevronRight, Lock, Package, Plus, Search, Sparkles } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button, TREFFER_44 } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
@@ -656,6 +656,8 @@ function Hinweise({ product, onOeffnen }: { product: ProductData; onOeffnen: () 
     })
   }
 
+  // Sichtbar 36 px wie die Filter-Chips; die Knöpfe darunter tragen die
+  // 44-px-Fläche über ::before (TREFFER_44, Nacharbeit aus Nr. 143).
   const chip = 'inline-flex min-h-9 items-center gap-1 rounded-full border border-dashed px-2.5 text-xs font-medium transition-colors disabled:opacity-50'
   return (
     <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -674,7 +676,7 @@ function Hinweise({ product, onOeffnen }: { product: ProductData; onOeffnen: () 
               type="button"
               disabled={uebernimmt}
               onClick={() => uebernehmen(h.vorschlag)}
-              className={cn(chip, 'border-primary/60 bg-primary/5 text-foreground hover:bg-primary/10', FOKUS_RAHMEN)}
+              className={cn(chip, TREFFER_44, 'border-primary/60 bg-primary/5 text-foreground hover:bg-primary/10', FOKUS_RAHMEN)}
             >
               <Sparkles className="size-3.5 shrink-0 text-status-offen" strokeWidth={1.7} aria-hidden="true" />
               {formatKategorie(h.vorschlag.category, h.vorschlag.subcategory)} übernehmen
@@ -694,7 +696,7 @@ function Hinweise({ product, onOeffnen }: { product: ProductData; onOeffnen: () 
             key={h.art}
             type="button"
             onClick={onOeffnen}
-            className={cn(chip, 'border-status-offen/60 bg-primary/10 text-status-offen hover:bg-primary/15', FOKUS_RAHMEN)}
+            className={cn(chip, TREFFER_44, 'border-status-offen/60 bg-primary/10 text-status-offen hover:bg-primary/15', FOKUS_RAHMEN)}
           >
             {h.art === 'kategorie-ergaenzen' ? 'Kategorie ergänzen' : 'Einheit prüfen'}
           </button>
