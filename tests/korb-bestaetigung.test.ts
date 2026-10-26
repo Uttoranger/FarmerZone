@@ -317,6 +317,44 @@ describe('N30: nur das erste „In den Korb“ öffnet das Blatt', () => {
     await vi.waitFor(() => expect(inhalt()).toEqual([['prod_eier', 1]]))
   })
 
+  it('scheitert Rückgängig am Netz, sagt es die Zeile mit „Nochmal“ — die Menge bleibt sichtbar erhöht, „Nochmal“ setzt sie zurück', async () => {
+    sitzung.set(BLATT_MERKER, '1')
+    raster()
+    await tippe(EIER)
+    reserve.mockClear()
+    await tippe(EIER)
+    expect(inhalt()).toEqual([['prod_eier', 2]])
+    antwort = { art: 'netz' }
+    reserve.mockClear()
+    knopfInZeile('Rückgängig')()
+    await vi.waitFor(() => expect(reserve).toHaveBeenCalled())
+    await pruefstand.zuRuhe()
+    expect(zeile()?.props['data-korb-zeile']).toBe('fehler')
+    expect(text(zeile()?.props.children as ReactNode)).toContain(NETZ_SATZ)
+    expect(inhalt()).toEqual([['prod_eier', 2]])
+
+    antwort = { art: 'ok' }
+    knopfInZeile(NETZ_KNOPF)()
+    await vi.waitFor(() => expect(inhalt()).toEqual([['prod_eier', 1]]))
+  })
+
+  it('Gegenprobe: lehnt der Server das Zurücksetzen ab, steht der geglättete Satz ohne „Nochmal“', async () => {
+    sitzung.set(BLATT_MERKER, '1')
+    raster()
+    await tippe(EIER)
+    reserve.mockClear()
+    await tippe(EIER)
+    antwort = { art: 'text', text: 'Ungültige Parameter' }
+    reserve.mockClear()
+    knopfInZeile('Rückgängig')()
+    await vi.waitFor(() => expect(reserve).toHaveBeenCalled())
+    await pruefstand.zuRuhe()
+    const satz = text(zeile()?.props.children as ReactNode)
+    expect(satz).not.toContain('Ungültige Parameter')
+    expect(satz).toContain('Wir konnten die Menge nicht ändern.')
+    expect(() => knopfInZeile(NETZ_KNOPF)).toThrow()
+  })
+
   it('der Tipp auf die Korb-Leiste nimmt die Zeile weg und öffnet den Korb', async () => {
     sitzung.set(BLATT_MERKER, '1')
     raster()

@@ -8,7 +8,7 @@ import { Check, ChevronLeft, ChevronRight, Clock, FlaskConical, MapPin, Navigati
 import type { PublicFarm } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
-import { FUTTER_ABSCHNITT_ANKER, angezeigterBereich, type KaufSperre } from '@/lib/bereiche-anzeige'
+import { FUTTER_ABSCHNITT_ANKER, angezeigterBereich, kategorieAbschnitte, type KaufSperre } from '@/lib/bereiche-anzeige'
 import { buildMapsUrl } from '@/lib/customer-links'
 import { hofInitialen } from '@/lib/hof-initialen'
 import {
@@ -30,7 +30,7 @@ import {
   type HofReiterId,
 } from '@/lib/hofseite-kunde'
 import { korbErlaubt } from '@/lib/hofseite-vorschau'
-import { HOFZEILE_ZURUECK, REITER_KLEBT, hofZeileUnterzeile } from '@/lib/hofseite-orientierung'
+import { HOFZEILE_ZURUECK, KLEBE_BLOCK, KLEBE_BLOCK_VAR, hofZeileUnterzeile } from '@/lib/hofseite-orientierung'
 import { produktLink } from '@/lib/produktdetail'
 import { rueckweg, type KundenSeite } from '@/lib/kunden-kopf'
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
@@ -216,6 +216,31 @@ export function HofseiteKunde({
   // die Seite schon darunter gescrollt war.
   const reiterAnker = useRef<HTMLDivElement>(null)
 
+  // Der klebende Block (Hofzeile, Reiter, Chips — Nr. 177) und der Platz der
+  // Chips darin: als Zustand, damit das Produktraster seine Chips per Portal
+  // dorthin legt, sobald der Platz im Dokument steht.
+  const [klebeBlock, setKlebeBlock] = useState<HTMLDivElement | null>(null)
+  const [chipPlatz, setChipPlatz] = useState<HTMLDivElement | null>(null)
+  // Im Reiter Produkte mit mehr als einer Kategorie kleben die Chips mit
+  // (dieselbe Bedingung wie in ProduktAbschnitte). Ihr Platz steht schon im
+  // Server-HTML in voller Höhe — das Portal kommt erst nach dem Laden, und
+  // der Inhalt darunter soll dann nicht springen.
+  const chipsKleben = offen === 'produkte' && kategorieAbschnitte(produkte).length > 1
+
+  // Die echte Höhe des Blocks an der Wurzel: scroll-padding in globals.css
+  // rechnet damit, auch wenn größere Schrift die Reiter umbricht. Die festen
+  // Zahlen dort gelten nur bis zur ersten Messung.
+  useEffect(() => {
+    if (!klebeBlock || typeof ResizeObserver === 'undefined') return
+    const wurzel = document.documentElement
+    const beobachter = new ResizeObserver(() => wurzel.style.setProperty(KLEBE_BLOCK_VAR, `${klebeBlock.offsetHeight}px`))
+    beobachter.observe(klebeBlock)
+    return () => {
+      beobachter.disconnect()
+      wurzel.style.removeProperty(KLEBE_BLOCK_VAR)
+    }
+  }, [klebeBlock])
+
   function zeigeReiter(id: HofReiterId, { fokusAufReiter = false }: { fokusAufReiter?: boolean } = {}) {
     return (e: { preventDefault: () => void }) => {
       // Wie die Filter auf /hoefe: Die Adresse wird geschrieben, Next gleicht
@@ -227,10 +252,8 @@ export function HofseiteKunde({
       window.history.replaceState(null, '', reiterAdresse(pfad, window.location.search, id))
       const anker = reiterAnker.current
       if (anker) {
-        // Am Handy klebt die Hofzeile unter dem Kopf mit (ab md versteckt: Höhe 0).
-        const kopf =
-          (document.querySelector('header')?.getBoundingClientRect().height ?? 0) +
-          (document.querySelector('[data-hofzeile]')?.getBoundingClientRect().height ?? 0)
+        // Der Anker steht vor dem klebenden Block: Unter dem Kopf beginnt dann der Block.
+        const kopf = document.querySelector('header')?.getBoundingClientRect().height ?? 0
         const ziel = anker.getBoundingClientRect().top + window.scrollY - kopf
         if (window.scrollY > ziel) window.scrollTo({ top: ziel })
       }
@@ -252,16 +275,17 @@ export function HofseiteKunde({
   }
 
   /*
-   * Am Handy die klebende Hofzeile (Nr. 177, Board system-sterne-hofseite-
-   * orientierung Punkt 2): Zurück zu den Höfen, Hofname, Ort und Zustand und
-   * „Teilen" bleiben beim Scrollen oben — dieselbe Form wie der Unterseiten-
-   * Kopf im Hofbereich. Darunter kleben die Reiter (REITER_KLEBT) und im Reiter
-   * Produkte die Chips. Ab md bleibt die Seite, wie sie war: die Zeile
-   * „‹ Alle Höfe" darunter. In der Vorschau steht die Zeile ebenso; ihre Links
-   * behandelt VorschauImRahmen wie alle übrigen.
+   * Am Handy die Hofzeile (Nr. 177, Board system-sterne-hofseite-orientierung
+   * Punkt 2): Zurück zu den Höfen, Hofname, Ort und Zustand und „Teilen"
+   * bleiben beim Scrollen oben. Sie ist der erste Teil des EINEN klebenden
+   * Blocks (KLEBE_BLOCK), darunter die Reiter und im Reiter Produkte die
+   * Chips — ein `sticky` für alle drei, Freigabe 177 Punkt 2. Ab md bleibt die
+   * Seite, wie sie war: die Zeile „‹ Alle Höfe" oben, die Reiter kleben allein.
+   * In der Vorschau steht die Zeile ebenso; ihre Links behandelt
+   * VorschauImRahmen wie alle übrigen.
    */
   const hofZeile = (
-    <div data-hofzeile="" className="sticky top-14 z-30 flex h-12 items-center gap-1 bg-background px-2 md:hidden print:hidden">
+    <div data-hofzeile="" className="flex h-12 items-center gap-1 px-2 md:hidden print:hidden">
       <Link
         href={zurueck.href}
         onClick={beimZurueck}
@@ -304,7 +328,10 @@ export function HofseiteKunde({
     return (
       <>
         {ansicht.art === 'vorschau' && <VorschauImRahmen />}
-        {hofZeile}
+        {/* Ohne Reiter besteht der Block nur aus der Hofzeile (ab md leer). */}
+        <div ref={setKlebeBlock} data-klebe-block="" className={KLEBE_BLOCK}>
+          {hofZeile}
+        </div>
         {rueckwegZeile}
         <div className="mx-auto flex max-w-xl flex-col gap-5 px-4 pt-6 pb-16">
           <h1 className="font-heading text-[28px] leading-tight font-semibold break-words text-foreground">{farm.name}</h1>
@@ -413,7 +440,6 @@ export function HofseiteKunde({
       {/* Das JSON-LD des Hofs baut seit Nr. 117 die Seite auf dem Server (src/app/(public)/[farmSlug]/page.tsx). */}
       {ansicht.art === 'vorschau' && <VorschauImRahmen />}
 
-      {hofZeile}
       {rueckwegZeile}
 
       {/* Testhof (Register N21, Nr. 119): oben ein ruhiger Hinweis im neutralen Ton, nie orange — Bestellen bleibt möglich (Testbestellungen sind der Zweck). */}
@@ -505,38 +531,38 @@ export function HofseiteKunde({
         </div>
       )}
 
-      {/* ── Reiter ── */}
+      {/* ── Der klebende Block: Hofzeile (nur am Handy), Reiter, Chips (nur am Handy, Reiter Produkte) ── */}
       <div ref={reiterAnker} />
-      <nav
-        aria-label="Bereiche der Hofseite"
-        data-abschnitt="abschnitte"
-        // Klebt am Handy unter der Hofzeile, ab md unter dem Kopf (REITER_KLEBT, Nr. 177).
-        className={cn(REITER_KLEBT, 'z-30 mt-5 border-b border-border bg-background md:mt-7')}
-      >
-        <ul className="mx-auto flex max-w-[1200px] gap-7 overflow-x-auto px-4 md:px-6">
-          {reiter.map((r) => (
-            <li key={r.id}>
-              <Link
-                href={reiterAdresse(pfad, suche.toString(), r.id)}
-                onNavigate={zeigeReiter(r.id)}
-                prefetch={false}
-                data-reiter={r.id}
-                aria-current={offen === r.id ? 'page' : undefined}
-                className={cn(
-                  'inline-flex min-h-12 items-center border-b-2 px-0.5 text-[15px] whitespace-nowrap transition-colors duration-[250ms]',
-                  offen === r.id
-                    ? 'border-foreground font-semibold text-foreground'
-                    : 'border-transparent font-medium text-muted-foreground hover:text-foreground',
-                  FOKUS_RAHMEN,
-                  'focus-visible:-outline-offset-2'
-                )}
-              >
-                {r.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <div ref={setKlebeBlock} data-klebe-block="" className={cn(KLEBE_BLOCK, 'mt-5 md:mt-7')}>
+        {hofZeile}
+        <nav aria-label="Bereiche der Hofseite" data-abschnitt="abschnitte" className="border-b border-border">
+          <ul className="mx-auto flex max-w-[1200px] gap-7 overflow-x-auto px-4 md:px-6">
+            {reiter.map((r) => (
+              <li key={r.id}>
+                <Link
+                  href={reiterAdresse(pfad, suche.toString(), r.id)}
+                  onNavigate={zeigeReiter(r.id)}
+                  prefetch={false}
+                  data-reiter={r.id}
+                  aria-current={offen === r.id ? 'page' : undefined}
+                  className={cn(
+                    'inline-flex min-h-12 items-center border-b-2 px-0.5 text-[15px] whitespace-nowrap transition-colors duration-[250ms]',
+                    offen === r.id
+                      ? 'border-foreground font-semibold text-foreground'
+                      : 'border-transparent font-medium text-muted-foreground hover:text-foreground',
+                    FOKUS_RAHMEN,
+                    'focus-visible:-outline-offset-2'
+                  )}
+                >
+                  {r.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        {/* Der Platz der Chip-Reihe: ProduktAbschnitte legt sie per Portal hinein (CHIPS_PX hoch, wächst mit). */}
+        {chipsKleben && <div ref={setChipPlatz} data-chips-kleben="" className="min-h-[45px] md:hidden print:hidden" />}
+      </div>
 
       {/* ── Inhalt und rechte Spalte ──
           In der Übersicht zuerst „Aktuell vom Hof“ (Register F8/N5, Nr. 128),
@@ -605,6 +631,7 @@ export function HofseiteKunde({
               produktLink={(id) => produktLink(farm.slug, id, ansicht.art === 'vorschau')}
               platzUnten={!schaufenster}
               inDenKorb={korbWeg}
+              chipBlock={chipsKleben ? { platz: chipPlatz } : undefined}
             />
           </div>
 

@@ -101,6 +101,12 @@ type Props = {
    * Kein zweiter Warenkorb: Ein zweiter useCart führte seinen eigenen Korb.
    */
   inDenKorb?: Ref<InDenKorb>
+  /**
+   * Die Hofseite hält im klebenden Block einen Platz für die Kategorie-Chips
+   * bereit (Nr. 177): Am Handy kommen sie dorthin, ab md bleiben sie im Fluss.
+   * `platz` ist null, bis der Platz im Dokument steht. Ohne: wie bisher.
+   */
+  chipBlock?: { platz: HTMLElement | null }
 }
 
 
@@ -534,6 +540,7 @@ export function ProductGrid({
   produktLink = (id) => produktPfad(farmSlug, id),
   platzUnten = true,
   inDenKorb,
+  chipBlock,
 }: Props) {
   const isEditMode = ownerMode && mode !== 'preview'
   // EINE Regel für jeden Weg in den Korb (Kaufknopf, Nachbestell-Link,
@@ -714,11 +721,22 @@ export function ProductGrid({
     else setKorbZeile({ art: 'im-korb', nr: Date.now(), name: product.name, produktId: product.id, vorher })
   }
 
-  /** „Rückgängig": die Menge von vorher, über denselben Korb (useCart) — 0 nimmt das Produkt heraus und gibt den Halt frei. */
+  /**
+   * „Rückgängig": die Menge von vorher, über denselben Korb (useCart) — 0 nimmt
+   * das Produkt heraus und gibt den Halt frei (ohne Server, scheitert nicht).
+   * Scheitert das Zurücksetzen, sagt es die Zeile an der Aktion (N29), am Netz
+   * mit „Nochmal" — sonst stünde die Menge still erhöht.
+   */
   function rueckgaengig(zeile: Extract<KorbZeile, { art: 'im-korb' }>) {
     setKorbZeile(null)
-    if (zeile.vorher === 0) removeItem(zeile.produktId)
-    else void updateQuantity(zeile.produktId, zeile.vorher)
+    if (zeile.vorher === 0) {
+      removeItem(zeile.produktId)
+      return
+    }
+    void updateQuantity(zeile.produktId, zeile.vorher).then((ergebnis) => {
+      if (ergebnis.ok) return
+      setKorbZeile({ art: 'fehler', nr: Date.now(), text: korbFehlerText(ergebnis, 'menge'), nochmal: ergebnis.nochmal ? () => rueckgaengig(zeile) : null })
+    })
   }
 
   // Ohne Abhängigkeiten nach jedem Rendern: Die Funktion schließt den Korb
@@ -834,6 +852,7 @@ export function ProductGrid({
             gebuehrHinweis={gebuehrHinweis}
             springeZu={springeZu}
             onGesprungen={onGesprungen}
+            chipBlock={chipBlock}
             renderKarte={karte}
           />
         )

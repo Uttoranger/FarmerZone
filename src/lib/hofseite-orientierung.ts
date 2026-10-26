@@ -12,23 +12,28 @@ import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
 // ─── Der klebende Block unter dem Kopf (nur unter md) ───────────────────────
 
 /*
- * Hofzeile, Reiter und Kategorie-Chips kleben übereinander unter dem Kopf der
- * KundeShell (56 px Zeile, `top-14`). Tailwind liest nur ganze Wörter — darum
- * stehen die Klassen fertig hier, die Zahlen daneben; tests/hofseite-
- * orientierung.test.ts koppelt beide und den scroll-padding in globals.css.
+ * Hofzeile, Reiter und Kategorie-Chips kleben als EIN Block unter dem Kopf der
+ * KundeShell (Freigabe 177 Punkt 2): ein Element mit `sticky`, die drei Teile
+ * darin im Fluss. Wächst ein Teil (größere Schrift, umbrechende Reiter), wächst
+ * der Block mit — nichts überlappt, keine Lücke. Die Chips stecken im
+ * Produktraster und kommen über ein Portal in ihren Platz im Block
+ * (produkt-abschnitte.tsx). Die Zahlen unten sind nur der Ausgangswert des
+ * scroll-padding in globals.css, bis die Hofseite die echte Höhe gemessen hat
+ * (KLEBE_BLOCK_VAR); tests/hofseite-orientierung.test.ts koppelt sie.
  */
 
-/** Die Hofzeile: 48 px, klebt direkt unter dem Kopf. */
+/** Die Hofzeile: 48 px (nur unter md). */
 export const HOFZEILE_PX = 48
 /** Die Reiterleiste: 48 px Reiter plus 1 px Linie. */
 export const REITER_PX = 49
-/** Die Chip-Zeile: 36 px Chips, 4 px Luft oben und unten, 1 px Linie. */
+/** Die Chip-Zeile: 36 px Chips, 4 px Luft oben und unten, 1 px Linie (nur unter md, nur im Reiter Produkte). */
 export const CHIPS_PX = 45
 
-/** Die Reiterleiste klebt am Handy unter der Hofzeile (56 + 48 = 104 px), ab md wie bisher unter dem Kopf. */
-export const REITER_KLEBT = 'sticky top-[104px] md:top-16'
-/** Die Chips kleben am Handy unter den Reitern (104 + 49 = 153 px); ab md stehen sie im Fluss, wie bisher. */
-export const CHIPS_KLEBEN = 'sticky top-[153px] md:static'
+/** Der klebende Block: am Handy unter dem 56-px-Kopf (`top-14`), ab md unter dem 64-px-Kopf (`top-16`), wie bisher die Reiter. */
+export const KLEBE_BLOCK = 'sticky top-14 z-30 bg-background md:top-16'
+
+/** Die gemessene Höhe des Blocks am Wurzelelement — globals.css rechnet scroll-padding damit. */
+export const KLEBE_BLOCK_VAR = '--hof-klebeblock'
 
 // ─── Hofzeile ───────────────────────────────────────────────────────────────
 
