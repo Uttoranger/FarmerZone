@@ -203,3 +203,17 @@ export function eigenerVorgaenger(
   if (!navigation) return merker
   return hinaufErreicht ? null : navigation.vorherigerPfad
 }
+
+/**
+ * Die Verlaufseinträge aus dem sessionStorage (Schlüssel der Navigation API,
+ * rueckweg-merker.tsx): eine Liste von höchstens 50 Texten mit 1 bis 100
+ * Zeichen — alles andere gilt als leer. Browser-Speicher ist Fremddaten; die
+ * Prüfung ist klein und rein, damit Zod nicht ins Bündel jeder Seite kommt.
+ * Dieselbe Regel wie `hinaufEintraegeSchema` (src/schemas/rueckweg.ts), die
+ * tests/leistung-180.test.ts danebenhält.
+ */
+export function hinaufEintraegeAus(roh: unknown): string[] {
+  if (!Array.isArray(roh) || roh.length > 50) return []
+  const alleGueltig = roh.every((s) => typeof s === 'string' && s.length >= 1 && s.length <= 100)
+  return alleGueltig ? (roh as string[]) : []
+}

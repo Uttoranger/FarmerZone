@@ -40,13 +40,18 @@ export async function ladeHofseite(
   // 21.10.2026): gezählt wie in der Kasse, NACH der Freigabe verwaister
   // Bestellungen oben — getPublicFarm/getOwnerFarm zählen selbst nicht (Mein
   // Hof liest getOwnerFarm auch). Die zweite Abfrage läuft nur bei einer Höchstzahl.
-  const voll = (await ausgebuchteTage([hof.id], new Date())).get(hof.id)
+  // Volle Tage und Abzeichen-Blatt hängen nicht voneinander ab: gleichzeitig (Nr. 180).
+  const [volleTage, abzeichenBlatt] = await Promise.all([
+    ausgebuchteTage([hof.id], new Date()),
+    hof.gruendungshof ? ladeAbzeichenBlatt() : null,
+  ])
+  const voll = volleTage.get(hof.id)
   const geladen = voll ? { ...hof, pickupSlots: hof.pickupSlots.map((s) => alsAbholFenster(s, voll)) } : hof
   // Abzeichen (Register K2, Nr. 116): Das Erklär-Blatt nennt die Plätze und —
   // solange der Zähler läuft — die freien. Nur für Gründungshöfe, aus dem Cache
   // (ladeAbzeichenBlatt); ohne Zahlen (Ladefehler) zeigt die Seite das Etikett ohne Blatt.
   if (!geladen.gruendungshof) return { farm: geladen, ansicht }
-  return { farm: { ...geladen, abzeichenBlatt: await ladeAbzeichenBlatt() }, ansicht }
+  return { farm: { ...geladen, abzeichenBlatt }, ansicht }
 }
 
 // React `cache` vergleicht Argumente nach Identität: Metadaten und Seite

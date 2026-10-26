@@ -80,7 +80,9 @@ export type BildStil = {
  * unter dem Fokus an derselben Stelle des Rahmens, in jeder Rahmengröße.
  */
 export function bildStil(ausschnitt: BildAusschnitt | null, optionen: { filter?: boolean } = {}): BildStil {
-  if (ausschnitt === null) return {}
+  // `!ausschnitt` statt `=== null`: Daten aus einem älteren Zwischenspeicher tragen das Feld noch nicht
+  // (undefined) — das stürzte /hoefe ab (Sentry JAVASCRIPT-NEXTJS-C).
+  if (!ausschnitt) return {}
   const punkt = `${ausschnitt.fokusX}% ${ausschnitt.fokusY}%`
   const stil: BildStil = { objectPosition: punkt, transform: `scale(${ausschnitt.zoom / 100})`, transformOrigin: punkt }
   const filter = BILD_FILTER[ausschnitt.filter]
@@ -90,7 +92,7 @@ export function bildStil(ausschnitt: BildAusschnitt | null, optionen: { filter?:
 
 /** Nur der Filter, ohne Fokus und Zoom — für ein Foto, das ganz steht (`object-contain`). */
 export function nurFilterStil(ausschnitt: BildAusschnitt | null): BildStil {
-  const filter = ausschnitt === null ? '' : BILD_FILTER[ausschnitt.filter]
+  const filter = !ausschnitt ? '' : BILD_FILTER[ausschnitt.filter]
   return filter === '' ? {} : { filter }
 }
 
@@ -100,7 +102,7 @@ export function nurFilterStil(ausschnitt: BildAusschnitt | null): BildStil {
  * (eine Klasse `blur-[28px]` neben einem Inline-Filter wäre wirkungslos).
  */
 export function filterMit(vorweg: string, ausschnitt: BildAusschnitt | null): string {
-  const filter = ausschnitt === null ? '' : BILD_FILTER[ausschnitt.filter]
+  const filter = !ausschnitt ? '' : BILD_FILTER[ausschnitt.filter]
   return filter === '' ? vorweg : `${vorweg} ${filter}`
 }
 

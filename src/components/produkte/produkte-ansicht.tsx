@@ -2,6 +2,7 @@
 
 import { useCallback, useId, useOptimistic, useRef, useState, useTransition } from 'react'
 import { flushSync } from 'react-dom'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
@@ -704,16 +705,17 @@ function Hinweise({ product, onOeffnen }: { product: ProductData; onOeffnen: () 
   )
 }
 
+const PRODUKT_BILD_SIZES = '48px'
+
 /** Foto des Hofs, sonst die Kategorie-Illustration (im Dunkeln gedämpft), sonst ein Symbol. */
 function ProduktBild({ product, className }: { product: ProductData; className?: string }): React.JSX.Element {
   return (
-    <div className={cn('flex shrink-0 items-center justify-center overflow-hidden border border-border bg-muted', className)}>
+    <div className={cn('relative flex shrink-0 items-center justify-center overflow-hidden border border-border bg-muted', className)}>
       {product.imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={product.imageUrl} alt="" className="h-full w-full object-cover" style={bildStil(product.bildAusschnitt)} />
+        // Die Rahmen sind 44 bis 48 px breit — `sizes` sagt das dem Browser.
+        <Image src={product.imageUrl} alt="" fill sizes={PRODUKT_BILD_SIZES} className="object-cover" style={bildStil(product.bildAusschnitt)} />
       ) : product.categoryImageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={product.categoryImageUrl} alt="" className="h-full w-full object-contain dark:brightness-[0.85] dark:saturate-[0.9]" />
+        <Image src={product.categoryImageUrl} alt="" fill sizes={PRODUKT_BILD_SIZES} className="object-contain dark:brightness-[0.85] dark:saturate-[0.9]" />
       ) : (
         <Package className="size-5 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
       )}

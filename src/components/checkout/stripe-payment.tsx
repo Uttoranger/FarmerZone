@@ -26,8 +26,6 @@ import {
   ZahlungAbgelehnt,
 } from './kasse-teile'
 
-const stripePromise = getStripePromise()
-
 /*
  * Der Zahlungsschritt der Kasse (Nachtlauf Nr. 12; Mockups
  * web-k3-zahlung-abgelehnt, mobil-k3-zahlung-abgelehnt). Er erscheint, wenn
@@ -63,7 +61,9 @@ export type StripeZahlungProps = {
 export function StripeZahlung(props: StripeZahlungProps): React.JSX.Element {
   return (
     <Elements
-      stripe={stripePromise}
+      // Erst hier, wenn die Zahlung online gewählt ist (diese Komponente erscheint erst nach /api/checkout):
+      // Bar-Bestellungen und die Kasse davor laden Stripe.js nie. Ein Promise je Seite (Memo in stripe-client).
+      stripe={getStripePromise()}
       options={{
         clientSecret: props.clientSecret,
         // Stripes Zahlungsfeld läuft in einem eigenen iframe und kennt unsere

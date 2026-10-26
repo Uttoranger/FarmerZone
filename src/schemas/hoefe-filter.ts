@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SUCHTEXT_PARAMETER } from '@/lib/suchtext-parameter'
 import {
   ANZEIGE_BEREICHE,
   PRODUCT_CATEGORY_VALUES,
@@ -101,7 +102,7 @@ const abholungSchema = z.enum(ABHOLUNG_VALUES).nullable().catch(null)
  * (die 404 schickt ihr Suchfeld als GET-Formular auf /hoefe). Gelesen wird er
  * unten über P.suchtext — es ist derselbe Wert, nur einmal geschrieben.
  */
-export const SUCHTEXT_PARAMETER = 'q'
+export { SUCHTEXT_PARAMETER }
 
 /** Die Namen der Parameter — eine Stelle, damit Lesen und Schreiben nicht auseinanderlaufen. */
 const P = {

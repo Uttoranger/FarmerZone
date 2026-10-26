@@ -28,6 +28,7 @@ import {
   bildLage,
   bildStil,
   filterMit,
+  nurFilterStil,
 } from '@/lib/bild-ausschnitt'
 import { BILD_FILTER_NAMEN, bildAusschnittSchema, bildAusschnittSpeichernSchema, leseAusschnitt, type BildAusschnitt } from '@/schemas/bild-ausschnitt'
 
@@ -268,5 +269,13 @@ describe('bildAusschnittSpeichernSchema (was „Speichern“ schickt)', () => {
   it('Produkt, Foto und Beitrag brauchen ihre Kennung', () => {
     expect(bildAusschnittSpeichernSchema.safeParse({ ziel: 'produkt', wert: GUELTIG }).success).toBe(false)
     expect(bildAusschnittSpeichernSchema.safeParse({ ziel: 'produkt', productId: 'p1', wert: GUELTIG }).success).toBe(true)
+  })
+})
+
+describe('fehlender Ausschnitt (Sentry JAVASCRIPT-NEXTJS-C, Nr. 180)', () => {
+  it('undefined (Feld fehlt in alten Zwischenspeicher-Daten) ist wie null, kein Absturz', () => {
+    expect(bildStil(undefined as never)).toEqual({})
+    expect(nurFilterStil(undefined as never)).toEqual({})
+    expect(filterMit('blur', undefined as never)).toBe('blur')
   })
 })

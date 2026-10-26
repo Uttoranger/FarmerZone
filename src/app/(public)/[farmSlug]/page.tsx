@@ -77,7 +77,12 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   // Seite und fragten sonst für jede Adresse die Datenbank.
   const seo = await pruefeHofseiteGeteilt(farmSlug, suche)
   if (!seo) return HOF_NICHT_GEFUNDEN
-  const { farm, ansicht } = await ladeHofseiteGeteilt(farmSlug, suche)
+  // Hof und Teilen-Bild hängen nicht voneinander ab (das Bild fragt nur den Slug): gleichzeitig,
+  // nicht nacheinander (Nr. 180). Das Bild scheitert nie laut (ladeTeilenVorschauOhneRisiko).
+  const [{ farm, ansicht }, vorschau] = await Promise.all([
+    ladeHofseiteGeteilt(farmSlug, suche),
+    ladeTeilenVorschauOhneRisiko(farmSlug),
+  ])
   if (!farm) return HOF_NICHT_GEFUNDEN
   // Die Vorschau-Adresse bleibt ganz fern; ein Hof ohne Produkt im Shop und ein
   // Testhof (Register N21) nur aus dem Index — seinen Links folgen Suchmaschinen weiter.
@@ -86,9 +91,8 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   // Dieselbe Regel wie „Über uns“ auf der Seite: Ein geleerter eigener Text
   // ('' aus dem Formular „Auftritt“) fällt auf die Kurzbeschreibung zurück.
   const desc = (ueberUnsText(farm) ?? '').slice(0, 155)
-  // Das Teilen-Bild (Gate 7) — ist es nicht ladbar, bleibt die Seite und
+  // Das Teilen-Bild (Gate 7, oben geladen) — ist es nicht ladbar, bleibt die Seite und
   // nimmt das Bild der Startseite; der Fehler geht nur nach Sentry.
-  const vorschau = await ladeTeilenVorschauOhneRisiko(farm.slug)
 
   return {
     title: hofTitel(farm),
@@ -187,11 +191,14 @@ async function Hofseite({ farmSlug, suche, geo }: { farmSlug: string; suche: Suc
   if (!farm) notFound()
 
   // `?beitrag=` ist eine Systemgrenze: Was nicht passt, wird verworfen (Zod).
-  const { beitraege, fehler: beitraegeFehler } = await ladeBeitraege(farm.id, beitragKennungSchema.parse(suche[BEITRAG_PARAMETER]))
   // Wo Kaufen nicht wirkt (Vorschau), gibt es keinen Korb — also auch nichts,
   // was ein Nachbestell-Link hineinlegen dürfte (korbErlaubt, src/lib/hofseite-vorschau.ts).
   const reorder = nachbestellToken(suche.reorder)
-  const reorderItems = reorder && ansicht.kaufen ? await loadReorderItems(reorder, farm.id) : []
+  // Beiträge und Nachbestell-Artikel hängen nicht voneinander ab: gleichzeitig (Nr. 180). Die Beiträge fangen ihre Fehler selbst, der Nachbestell-Link wie bisher nicht.
+  const [{ beitraege, fehler: beitraegeFehler }, reorderItems] = await Promise.all([
+    ladeBeitraege(farm.id, beitragKennungSchema.parse(suche[BEITRAG_PARAMETER])),
+    (async (): Promise<ReorderItem[]> => (reorder && ansicht.kaufen ? await loadReorderItems(reorder, farm.id) : []))(),
+  ])
   // Einmal hier, auf dem Server: Gebührensatz und „vor 2 Tagen" rechnen in
   // Server und Browser vom selben Zeitpunkt (sonst Hydration-Abweichung).
   const jetzt = new Date()
