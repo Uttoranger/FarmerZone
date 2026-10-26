@@ -108,9 +108,9 @@ describe('ein Storno zwischen Lesen und Schreiben gewinnt', () => {
     bezugWirft(bezugSchemaFuer)
     expect(await markAsReady('order_1')).toEqual({})
     expect(prisma.order.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { status: 'READY' } }))
-    // Geprüft VOR der Transaktion: darin wird nichts eingestellt, gemeldet wird nach dem Commit.
-    expect(stelleMailEin).not.toHaveBeenCalled()
-    expect(stelleEinOhneRisiko).toHaveBeenCalledWith('abholbereit', 'order_1', expect.objectContaining({ art: 'abholbereit' }))
+    // Rein geprüft vor dem Schreiben: der ungültige fällt weg, EINE Meldung, nichts nachzuholen.
+    expect(await ergebnis(stelleMailEin)).toBe('ungueltig')
+    expect(stelleEinOhneRisiko).not.toHaveBeenCalled()
     expect(prisma.mailAuftrag.createMany).not.toHaveBeenCalled()
     expect(Sentry.captureException).toHaveBeenCalledTimes(1)
     expect(Sentry.captureException).toHaveBeenCalledWith(

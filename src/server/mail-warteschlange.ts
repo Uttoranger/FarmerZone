@@ -158,7 +158,7 @@ const SATZ_BEZUG_UNGUELTIG = 'Mail-Auftrag: Bezug ungültig — ohne diesen Auft
 /** Meldet die Arten mit ungültigem Bezug EINMAL, mit der Bestellung in `extra`. */
 function meldeUngueltig(pruefung: MailPruefung, bestellungId: string | null): void {
   if (pruefung.ungueltigeArten.length === 0) return
-  meldeFehler(SATZ_BEZUG_UNGUELTIG, new Error('bezug_ungueltig'), pruefung.ungueltigeArten.join(','), {
+  meldeFehler(SATZ_BEZUG_UNGUELTIG, new Error('bezug_ungueltig'), pruefung.ungueltigeArten, {
     bestellungId,
     grund: 'bezug_ungueltig',
     stufe: 'error',
@@ -245,8 +245,8 @@ export async function stelleEinOhneRisiko(
   }
 }
 
-function artenDer(liste: readonly EinstellAuftrag[]): string {
-  return [...new Set(liste.map((a) => a.art))].join(',')
+function artenDer(liste: readonly EinstellAuftrag[]): MailArt[] {
+  return [...new Set(liste.map((a) => a.art))]
 }
 
 /** Die Zeile einer direkten Mail (vorrang 0) — aus `sendRaw`, fail-open beim Aufrufer. */
@@ -718,7 +718,7 @@ function zaehle(e: WorkerErgebnis, a: Ausgang): void {
 function meldeFehler(
   satz: string,
   err: unknown,
-  art?: string,
+  art?: MailArt | readonly MailArt[],
   kontext: { bestellungId?: string | null; grund?: string; stufe?: 'warning' | 'error' } = {}
 ): void {
   try {
@@ -726,7 +726,7 @@ function meldeFehler(
     meldung.name = fehlerKlasse(err)
     Sentry.captureException(meldung, {
       level: kontext.stufe ?? 'warning',
-      tags: { bereich: 'mail-warteschlange', ...(art ? { art } : {}), ...(kontext.grund ? { grund: kontext.grund } : {}) },
+      tags: { bereich: 'mail-warteschlange', ...(art && art.length > 0 ? { art: typeof art === 'string' ? art : art.join(',') } : {}), ...(kontext.grund ? { grund: kontext.grund } : {}) },
       ...(kontext.bestellungId ? { extra: { bestellungId: kontext.bestellungId } } : {}),
     })
   } catch {

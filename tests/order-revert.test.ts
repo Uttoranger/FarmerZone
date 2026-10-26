@@ -184,7 +184,7 @@ describe('revertReady', () => {
 
     expect(await revertReady('order_1')).toEqual({})
     expect(orderUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { status: 'CONFIRMED' } }))
-    expect(einstellen).not.toHaveBeenCalled()
+    expect(await ergebnis(einstellen)).toBe('ungueltig')
     expect(createMany).not.toHaveBeenCalled()
     expect(Sentry.captureException).toHaveBeenCalledTimes(1)
     expect(Sentry.captureException).toHaveBeenCalledWith(

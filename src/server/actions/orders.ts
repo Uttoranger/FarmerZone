@@ -4,7 +4,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
-import { pruefeMailAuftraege, stelleEinOhneRisiko, stelleMailEinInTransaktion, type EinstellAuftrag, type EinstellErgebnis } from '@/server/mail-warteschlange'
+import { stelleEinOhneRisiko, stelleMailEinInTransaktion, type EinstellAuftrag, type EinstellErgebnis } from '@/server/mail-warteschlange'
 import { artikelFehltMailAuftrag, bestellMailAuftrag, stornoMailAuftrag, trageStornoErstattungEin } from '@/server/mail-arten/bestellung'
 import { betreiberAuftraege, betreiberKennungen, erstattungOffenBezug } from '@/server/mail-arten/betreiber'
 import { erstattungOffenInhalt } from '@/lib/erstattung-offen'
@@ -135,17 +135,6 @@ const LAUFEND: OrderStatus[] = ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY']
  * in die Warteschlange (Register N26, Nr. 159), der Worker verschickt.
  */
 
-/**
- * Stellt die Aufträge eines Statuswechsels in seiner Transaktion ein, deren
- * Bezug schon VOR der Transaktion feststeht und davor geprüft ist (Register
- * N26, Ergänzung 25.10.2026). Ein ungültiger Bezug schreibt in der
- * Transaktion nichts und heißt „nachholen": `stelleEinOhneRisiko` meldet ihn
- * nach dem Commit einmal an Sentry.
- */
-async function einstellenGeprueft(pruefung: ReturnType<typeof pruefeMailAuftraege>, tx: Prisma.TransactionClient): Promise<EinstellErgebnis> {
-  return pruefung.ungueltigeArten.length === 0 ? stelleMailEinInTransaktion(pruefung.gueltig, tx) : 'nachholen'
-}
-
 export async function markAsReady(orderId: string): Promise<ActionResult> {
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
@@ -163,9 +152,9 @@ export async function markAsReady(orderId: string): Promise<ActionResult> {
   // Wechsel nie auf (Register N26, Ergänzung 25.10.2026) — scheitert er, wird
   // er nach dem Commit nachgeholt. Abholbereit kann sich wiederholen (zurück
   // und wieder bereit): der Zeitpunkt macht den Schlüssel eindeutig, darum
-  // wird das Objekt EINMAL gebaut, vor der Transaktion, und geprüft.
+  // wird das Objekt EINMAL gebaut, vor der Transaktion; geprüft wird es rein,
+  // vor dem Schreiben (ungültig fällt weg, einmal gemeldet).
   const auftrag = bestellMailAuftrag('abholbereit', { id: orderId, farmId: farm.id }, new Date())
-  const pruefung = pruefeMailAuftraege(auftrag)
   let count: number
   let mail: EinstellErgebnis | null = null
   try {
@@ -174,7 +163,7 @@ export async function markAsReady(orderId: string): Promise<ActionResult> {
         where: { id: orderId, farmId: farm.id, status: { in: PACKBAR } },
         data: { status: 'READY' },
       })
-      if (geaendert > 0) mail = await einstellenGeprueft(pruefung, tx)
+      if (geaendert > 0) mail = await stelleMailEinInTransaktion([auftrag], tx)
       return geaendert
     })
   } catch (err) {
@@ -264,7 +253,6 @@ export async function revertReady(
   // wird er nach dem Commit mit demselben Objekt nachgeholt (der Zeitpunkt
   // steckt im Schlüssel). Verschickt wird nach der Antwort.
   const auftrag = notifyCustomer ? bestellMailAuftrag('nicht-abholbereit', { id: orderId, farmId: farm.id }, new Date()) : null
-  const pruefung = auftrag ? pruefeMailAuftraege(auftrag) : null
   let count: number
   let mail: EinstellErgebnis | null = null
   try {
@@ -273,7 +261,7 @@ export async function revertReady(
         where: { id: orderId, farmId: farm.id, status: 'READY' },
         data: { status: previous },
       })
-      if (geaendert > 0 && pruefung) mail = await einstellenGeprueft(pruefung, tx)
+      if (geaendert > 0 && auftrag) mail = await stelleMailEinInTransaktion([auftrag], tx)
       return geaendert
     })
   } catch (err) {

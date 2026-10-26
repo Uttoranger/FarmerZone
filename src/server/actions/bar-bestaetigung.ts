@@ -26,7 +26,7 @@ import { neuigkeitenAnmeldenSchema as bestellLinkSchema } from '@/schemas/abo'
 import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
-import { pruefeMailAuftraege, stelleEinOhneRisiko, stelleMailEinInTransaktion, type EinstellErgebnis } from '@/server/mail-warteschlange'
+import { stelleEinOhneRisiko, stelleMailEinInTransaktion, type EinstellErgebnis } from '@/server/mail-warteschlange'
 import { bestellMailAuftrag } from '@/server/mail-arten/bestellung'
 
 /**
@@ -137,13 +137,13 @@ export async function bestaetigeBarBestellung(_vorher: BarAktionStand, formular:
   // Die Mails an Kundin und Hof sind seit Nr. 159 Aufträge der Warteschlange
   // — in DERSELBEN Transaktion, erst der Status, dann die Aufträge. Ein
   // Auftrag hält die Bestätigung nie auf (Register N26, Ergänzung
-  // 25.10.2026): Der Bezug steht vor der Transaktion fest und wird davor
-  // geprüft; ist er ungültig oder scheitert das Einstellen (Savepoint), gilt
-  // die Bestätigung trotzdem, und die Aufträge werden nach dem Commit mit
-  // demselben Objekt nachgeholt bzw. gemeldet. Verschickt wird nach der
-  // Antwort (Worker); ein hakender Mailserver nimmt die Bestätigung nie zurück.
+  // 25.10.2026): Das Objekt steht vor der Transaktion fest und wird rein
+  // geprüft, bevor geschrieben wird; ungültige fallen weg (einmal gemeldet),
+  // gültige werden eingestellt. Scheitert das Einstellen (Savepoint), gilt die
+  // Bestätigung trotzdem, und die Aufträge werden nach dem Commit mit
+  // demselben Objekt nachgeholt. Verschickt wird nach der Antwort (Worker);
+  // ein hakender Mailserver nimmt die Bestätigung nie zurück.
   const auftraege = [bestellMailAuftrag('bestellung-bestaetigung', order), bestellMailAuftrag('bar-bestaetigt-hof', order)]
-  const pruefung = pruefeMailAuftraege(auftraege)
   const { count, mail } = await prisma.$transaction(async (tx) => {
     const { count: bestaetigt } = await tx.order.updateMany({
       where: {
@@ -155,7 +155,7 @@ export async function bestaetigeBarBestellung(_vorher: BarAktionStand, formular:
       data: { status: 'CONFIRMED', confirmedAt: jetzt, confirmationToken: null },
     })
     if (bestaetigt !== 1) return { count: bestaetigt, mail: null }
-    const mail: EinstellErgebnis = pruefung.ungueltigeArten.length === 0 ? await stelleMailEinInTransaktion(pruefung.gueltig, tx) : 'nachholen'
+    const mail: EinstellErgebnis = await stelleMailEinInTransaktion(auftraege, tx)
     return { count: bestaetigt, mail }
   })
   if (mail === 'nachholen') await stelleEinOhneRisiko('bestellung-bestaetigung', order.id, auftraege)

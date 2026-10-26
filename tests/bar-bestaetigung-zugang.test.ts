@@ -462,8 +462,8 @@ describe('Knopf „Ja, ich hole verbindlich ab" — bestaetigeBarBestellung', ()
     bezugWirft(bezugSchemaFuer)
     erwarteSignierteBestaetigungsseite(await weiterleitungVon(bestaetigeBarBestellung({}, formular())))
     expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'CONFIRMED' }) }))
-    // Geprüft VOR der Transaktion: darin wird nichts eingestellt.
-    expect(einstellen).not.toHaveBeenCalled()
+    // Rein geprüft vor dem Schreiben: beide fallen weg, EINE Meldung.
+    expect(await ergebnis(einstellen)).toBe('ungueltig')
     expect(createMany).not.toHaveBeenCalled()
     expect(Sentry.captureException).toHaveBeenCalledTimes(1)
     expect(Sentry.captureException).toHaveBeenCalledWith(
