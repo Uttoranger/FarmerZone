@@ -36,6 +36,7 @@ Bei **jeder** Codeänderung lesen.
 - Typen aus Prisma ableiten, nicht abschreiben: `Prisma.OrderGetPayload<…>`.
 - Keine Typduplikate: Zod-Schema ist die Quelle → `type X = z.infer<typeof xSchema>`.
 - Kein `updateMany` mit berechnetem Spaltenschlüssel (`{ [spalte]: wert }`) – je Spalte ausschreiben; sonst läuft tsc an den Speicher. (Regelvorschlag Dirigent, Morgenbericht 24, freigegeben 25.10.2026)
+- Stripe.js nur über `@stripe/stripe-js/pure` (Wache in Nr. 196). (Regelvorschlag Dirigent, Morgenbericht 25, freigegeben 26.10.2026)
 
 ### Geld
 - Prisma speichert Preise als `Decimal(10,2)`.
