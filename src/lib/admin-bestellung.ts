@@ -204,6 +204,20 @@ export function zeitpunktText(zeitpunkt: Date): string {
 
 // ─── Sätze ───────────────────────────────────────────────────────────────────
 
+export type HofNachrichtGeld = 'erstattet' | 'offen' | 'vor_ort'
+
+const HOF_NACHRICHT_GELD: Record<HofNachrichtGeld, string> = {
+  erstattet: 'Die Kundin bekommt ihr Geld zurück.',
+  offen: 'Die Erstattung hat noch nicht geklappt – das Team kümmert sich darum.',
+  vor_ort: 'Bezahlt wird vor Ort, es gibt nichts zu erstatten.',
+}
+
+/** Welcher Geld-Satz in die Nachricht an den Hof gehört. */
+export function hofNachrichtGeld(onlineBezahlt: boolean, erstattungOffen: boolean): HofNachrichtGeld {
+  if (!onlineBezahlt) return 'vor_ort'
+  return erstattungOffen ? 'offen' : 'erstattet'
+}
+
 export const ADMIN_BESTELLUNG_TEXT = {
   titel: 'Bestellungen',
   satz: 'Für Fragen von Kundinnen und Höfen: finden, verstehen, abschließen.',
@@ -272,6 +286,8 @@ export const ADMIN_BESTELLUNG_TEXT = {
   grundHilfe: 'Ohne E-Mail-Adresse und ohne Telefonnummer.',
   abbrechen: 'Abbrechen',
   // Die Nachricht an den Hof (Postfach, Faden ohne Rundschreiben)
-  hofNachricht: (nummer: string, grund: string): string =>
-    `Bestellung ${nummer} vom Team storniert. Grund: „${grund}“. Die Kundin bekommt ihr Geld zurück und eine Mail, die Ware ist wieder in deinem Vorrat. Fragen? Antworte hier.`,
+  // Der Geld-Satz folgt dem echten Ausgang: online erstattet, Erstattung offen
+  // oder vor Ort bezahlt — nie ein Versprechen, das nicht stimmt.
+  hofNachricht: (nummer: string, grund: string, geld: HofNachrichtGeld): string =>
+    `Bestellung ${nummer} vom Team storniert. Grund: „${grund}“. ${HOF_NACHRICHT_GELD[geld]} Die Kundin bekommt eine Mail, die Ware ist wieder in deinem Vorrat. Fragen? Antworte hier.`,
 } as const

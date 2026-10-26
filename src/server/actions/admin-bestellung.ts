@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
-import { ADMIN_BESTELLUNGEN_HREF, ADMIN_BESTELLUNG_TEXT, notfallStornoStand } from '@/lib/admin-bestellung'
+import { ADMIN_BESTELLUNGEN_HREF, ADMIN_BESTELLUNG_TEXT, hofNachrichtGeld, notfallStornoStand, type HofNachrichtGeld } from '@/lib/admin-bestellung'
+import { onlineBezahlt } from '@/lib/storno'
 import { ADMIN_POSTFACH_HREF, POSTFACH_HREF } from '@/lib/postfach'
 import { adminBestellAktionSchema, adminBestellFehler } from '@/schemas/admin-bestellung'
 import { verlangeFrischeBestaetigung } from '@/server/admin-wache'
@@ -50,7 +51,7 @@ export async function markiereErstattungErledigt(eingabe: unknown): Promise<Erge
  * „Kundin schreiben …“ (N33, N35): die volle Adresse der Kundin — nur nach
  * Grund, mit Recht `adresse_anzeigen`, und mit Eintrag im Protokoll (Art
  * `adresse_angezeigt`, ohne die Adresse). Eine unbekannte Bestellung ergibt
- * denselben Satz wie eine falsche Eingabe und keinen Eintrag.
+ * den Satz „nicht gefunden“ und keinen Eintrag.
  */
 export async function zeigeKundinAdresse(eingabe: unknown): Promise<{ ok: true; adresse: string } | { error: string }> {
   const wache = await verlangeFrischeBestaetigung({ recht: 'adresse_anzeigen' })
@@ -73,7 +74,7 @@ export async function zeigeKundinAdresse(eingabe: unknown): Promise<{ ok: true; 
  * NACHLAUF: Ein Fehler hier rollt den Storno nie zurück (CLAUDE.md, Geld und
  * Bestellungen); er geht mit festem Text und nur den Kennungen nach Sentry.
  */
-async function schreibeHofNachricht(farmId: string, orderId: string, nummer: string, grund: string): Promise<void> {
+async function schreibeHofNachricht(farmId: string, orderId: string, nummer: string, grund: string, geld: HofNachrichtGeld): Promise<void> {
   try {
     const jetzt = new Date()
     await prisma.unterhaltung.create({
@@ -82,7 +83,7 @@ async function schreibeHofNachricht(farmId: string, orderId: string, nummer: str
         rundschreibenId: null,
         letzteNachrichtAm: jetzt,
         nachrichten: {
-          create: { vonFarmId: null, text: ADMIN_BESTELLUNG_TEXT.hofNachricht(nummer, grund), linkUrl: `/orders/${orderId}`, art: 'SYSTEM', createdAt: jetzt },
+          create: { vonFarmId: null, text: ADMIN_BESTELLUNG_TEXT.hofNachricht(nummer, grund, geld), linkUrl: `/orders/${orderId}`, art: 'SYSTEM', createdAt: jetzt },
         },
       },
       select: { id: true },
@@ -115,7 +116,7 @@ export async function notfallStorno(eingabe: unknown): Promise<StornoErgebnis> {
   if (!geprueft.success) return { error: adminBestellFehler(geprueft.error) }
   const { orderId, grund } = geprueft.data
 
-  const bestellung = await prisma.order.findUnique({ where: { id: orderId }, select: { farmId: true, orderNumber: true, status: true } })
+  const bestellung = await prisma.order.findUnique({ where: { id: orderId }, select: { farmId: true, orderNumber: true, status: true, stripePaymentIntentId: true, paymentStatus: true } })
   if (!bestellung) return { error: ADMIN_BESTELLUNG_TEXT.nichtGefunden }
   const stand = notfallStornoStand(bestellung)
   if (!stand.moeglich) return { error: stand.grund }
@@ -123,7 +124,8 @@ export async function notfallStorno(eingabe: unknown): Promise<StornoErgebnis> {
   const ergebnis = await storniere({ id: bestellung.farmId }, orderId)
   if (ergebnis.error && !ergebnis.erstattungOffen) return ergebnis
 
-  await schreibeHofNachricht(bestellung.farmId, orderId, bestellung.orderNumber, grund)
+  const geld = hofNachrichtGeld(onlineBezahlt(bestellung), Boolean(ergebnis.erstattungOffen))
+  await schreibeHofNachricht(bestellung.farmId, orderId, bestellung.orderNumber, grund, geld)
   await protokolliere({ wer: wache.userId, art: 'notfall_storno', bezugArt: 'bestellung', bezugId: orderId, grund, mitPasskey: wache.mitPasskey })
   await protokolliere({ wer: wache.userId, art: 'notfall_storno', bezugArt: 'hof', bezugId: bestellung.farmId, grund, mitPasskey: wache.mitPasskey })
   revalidatePath(ADMIN_BESTELLUNGEN_HREF)

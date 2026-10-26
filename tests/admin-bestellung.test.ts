@@ -245,6 +245,26 @@ describe('Notfall-Storno — derselbe Storno wie beim Hof', () => {
     expect(eintraege()).toHaveLength(2)
   })
 
+  it('der Geld-Satz an den Hof folgt dem echten Ausgang: online erstattet, Erstattung offen, vor Ort bezahlt', async () => {
+    const text = (i: number): string => (db.unterhaltung.create.mock.calls[i]?.[0] as { data: { nachrichten: { create: { text: string } } } }).data.nachrichten.create.text
+    const online = { farmId: HOF, orderNumber: 'HM-2610-B7C2', status: 'PAID', stripePaymentIntentId: 'pi_test_1', paymentStatus: 'PAID' }
+    db.order.findUnique.mockResolvedValue(online)
+    await notfallStorno({ orderId: BESTELLUNG, grund: 'Hof nicht erreichbar' })
+    expect(text(0)).toContain('Die Kundin bekommt ihr Geld zurück.')
+
+    stornieren.mockResolvedValue({ error: 'Rückerstattung fehlgeschlagen.', erstattungOffen: true })
+    await notfallStorno({ orderId: BESTELLUNG, grund: 'Hof nicht erreichbar' })
+    expect(text(1)).toContain('Die Erstattung hat noch nicht geklappt')
+    expect(text(1)).not.toContain('bekommt ihr Geld zurück')
+
+    // Gegenprobe: Barzahlung verspricht keine Erstattung.
+    stornieren.mockResolvedValue({ erstattetCents: 0, vomHofCents: 0 })
+    db.order.findUnique.mockResolvedValue({ ...online, stripePaymentIntentId: null, paymentStatus: 'PENDING' })
+    await notfallStorno({ orderId: BESTELLUNG, grund: 'Hof nicht erreichbar' })
+    expect(text(2)).toContain('nichts zu erstatten')
+    expect(text(2)).not.toContain('bekommt ihr Geld zurück')
+  })
+
   it('scheitert die Nachricht an den Hof, bleibt der Storno gültig (Nachlauf)', async () => {
     db.unterhaltung.create.mockRejectedValueOnce(new Error('Verbindung weg'))
     expect(await notfallStorno({ orderId: BESTELLUNG, grund: 'Hof nicht erreichbar' })).toEqual({ erstattetCents: 2100, vomHofCents: 2000 })
