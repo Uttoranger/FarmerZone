@@ -296,8 +296,11 @@ export function useStartseitenEntwurf({
    * seine Zeile weg (Nr. 183, Fund 2).
    */
   entferneBlock: (loesche: Loeschen) => Promise<BlockEntfernt | null>
-  /** Vor einer Action, die den Entwurf ersetzt: Uhr löschen, laufende Speicherung abwarten (Nr. 183, Fund 7). */
-  halteAn: () => Promise<void>
+  /**
+   * Vor einer Action, die den Entwurf ersetzt: Uhr löschen, laufende Speicherung abwarten (Nr. 183, Fund 7).
+   * Gibt `fahreFort` zurück: Scheitert die Action, reiht es die angehaltene Änderung wieder ein.
+   */
+  halteAn: () => Promise<() => void>
   setzeZurueck: (zeilen: readonly Zeile[]) => void
   /** Nach „Block löschen“: Die Action hat den Entwurf schon geändert — Formular zu, Zeile weg, Vorschau lädt neu. */
   blockGeloescht: (blockId: string) => void
@@ -327,11 +330,18 @@ export function useStartseitenEntwurf({
     []
   )
 
-  // Schließen oder Neuladen des Tabs hängt nichts aus: Der Browser fragt nach, solange etwas noch nicht im Entwurf steht.
-  const warnen = stand.art === 'speichert' || (block !== null && !block.id)
+  // Schließen oder Neuladen des Tabs hängt nichts aus: Der Browser fragt nach, solange etwas noch nicht im Entwurf steht —
+  // „Speichert …“ oder ein nie gültiger neuer Block. Ein gültiger neuer Block ohne Kennung wartet auf seine Speicherung
+  // und ist damit schon über „Speichert …“ abgedeckt; ohne Kennung bleibt also nur der, den der Server nie annehmen konnte.
+  const nieGueltigerNeuerBlock = block !== null && !block.id
+  const warnen = stand.art === 'speichert' || nieGueltigerNeuerBlock
   useEffect(() => {
     if (!warnen) return
-    const halte = (ereignis: BeforeUnloadEvent): void => ereignis.preventDefault()
+    const halte = (ereignis: BeforeUnloadEvent): void => {
+      ereignis.preventDefault()
+      // Ältere Browser fragen nur nach, wenn returnValue gesetzt ist.
+      ereignis.returnValue = ''
+    }
     window.addEventListener('beforeunload', halte)
     return () => window.removeEventListener('beforeunload', halte)
   }, [warnen])
@@ -396,11 +406,15 @@ export function useStartseitenEntwurf({
     return { ok: fehler.current === null, fehler: fehler.current?.text ?? null }
   }
 
-  /** Der offene Block ist weg (verworfen, gelöscht): Sein Fehler gilt nicht mehr — ein Speicher-Fehler bleibt bis zur nächsten Speicherung. */
-  function ohneBlockFehler(): void {
-    if (fehler.current?.art !== 'block') return
+  /**
+   * Der offene Block ist weg (verworfen, gelöscht), danach ist kein ungültiger Block mehr offen: Der Editor ist wieder frei,
+   * gleich welcher Fehler vorher stand (Wortlaut Freigabe Nr. 183, Fund 1). Nach einem Speicher-Fehler (Server, Netz)
+   * hat `speichereSofort` es gerade noch einmal versucht; jede weitere Änderung schickt den ganzen Stand neu.
+   */
+  function nachBlockWeg(): void {
     fehler.current = null
-    setStand({ art: 'ruhe' })
+    // Läuft noch eine Uhr, wartet eine Änderung: „Speichert …“ ist dann wahrer als „Ruhe“ (über entferneBlock nie der Fall).
+    if (!uhr.current) setStand({ art: 'ruhe' })
   }
 
   function oeffneBlock(neu: BlockWerte | null, nachIndex?: number): void {
@@ -421,7 +435,7 @@ export function useStartseitenEntwurf({
     const zeilenId = aktuell.current.block?.zeilenId
     uebernimm({ block: null, zeilen: aktuell.current.zeilen.filter((z) => z.id !== zeilenId && z.block?.id !== blockId) })
     setSpeicherungen((n) => n + 1)
-    ohneBlockFehler()
+    nachBlockWeg()
   }
 
   function geaendert(): void {
@@ -463,7 +477,7 @@ export function useStartseitenEntwurf({
       if (!offen.id) {
         // Ein neuer Block, der nie gespeichert wurde: nur die Zeile weg.
         oeffneBlock(null)
-        ohneBlockFehler()
+        nachBlockWeg()
         return { art: 'verworfen' }
       }
       const ergebnis = await loesche(offen.id)
@@ -472,11 +486,16 @@ export function useStartseitenEntwurf({
       return { art: 'geloescht' }
     },
     async halteAn() {
+      const angehalten = uhr.current !== null
       if (uhr.current) {
         clearTimeout(uhr.current)
         uhr.current = null
       }
       await kette.current
+      // Scheitert die Action danach, geht die angehaltene Änderung wieder hinaus — sonst stünde „Speichert …“ ohne Speicherung.
+      return () => {
+        if (angehalten) void reiheEin()
+      }
     },
     setzeZurueck(neu) {
       // Der Entwurf kommt ganz vom Server: kein offener Block, kein alter Fehler.

@@ -119,7 +119,7 @@ import { NEUER_ABSCHNITT, STANDARD_REIHENFOLGE, verschiebe } from '@/lib/startse
 import { aenderungenText, standardFassung } from '@/lib/startseite-fassung'
 import type { StartseiteSpeichernEingabe } from '@/schemas/startseite'
 import { ADMIN_STARTSEITE_TEXT, NEUER_BLOCK } from '@/lib/startseite-gestalten'
-import { blockWerteAus, neueBlockWerte, nurSichtbareHoefe, useStartseitenEntwurf, type Zeile } from '@/components/admin/startseite-entwurf'
+import { blockWerteAus, neueBlockWerte, nurSichtbareHoefe, useStartseitenEntwurf, type BlockWerte, type Zeile } from '@/components/admin/startseite-entwurf'
 
 const JETZT = new Date('2026-10-15T18:30:00.000Z')
 const ZEILEN: Zeile[] = STANDARD_REIHENFOLGE.map((art) => ({ id: `z-${art.toLowerCase()}`, art, sichtbar: true, block: null }))
@@ -148,13 +148,16 @@ async function warte(ms: number): Promise<void> {
 /** Die Seite im Browser — nur, was der Entwurf braucht: die Warnung beim Verlassen (Nr. 183, Fund 6). */
 const fenster = { addEventListener: vi.fn(), removeEventListener: vi.fn() }
 
-/** Was `beforeunload` jetzt täte: true, wenn der Browser vor dem Verlassen warnt. */
+/** Was `beforeunload` jetzt täte: true, wenn der Browser vor dem Verlassen warnt — auch ein älterer (returnValue gesetzt). */
 function warntBeimVerlassen(): boolean {
   const angemeldet = fenster.addEventListener.mock.calls.filter(([art]) => art === 'beforeunload').map(([, f]) => f as (e: Event) => void)
   const abgemeldet = new Set(fenster.removeEventListener.mock.calls.map(([, f]) => f))
-  const ereignis = { preventDefault: vi.fn() } as unknown as Event
-  for (const f of angemeldet.filter((f) => !abgemeldet.has(f))) f(ereignis)
-  return vi.mocked(ereignis.preventDefault).mock.calls.length > 0
+  const preventDefault = vi.fn()
+  const ereignis: { preventDefault: () => void; returnValue?: string } = { preventDefault }
+  for (const f of angemeldet.filter((f) => !abgemeldet.has(f))) f(ereignis as unknown as Event)
+  const warnt = preventDefault.mock.calls.length > 0
+  if (warnt) expect(ereignis.returnValue).toBe('')
+  return warnt
 }
 
 beforeEach(() => {
@@ -495,6 +498,54 @@ describe('useStartseitenEntwurf — Fund 1: der Fehlerzustand bleibt nicht häng
     expect(zuletzt.stand).toEqual({ art: 'ruhe' })
     expect(await tueUndWarte((e) => e.speichereSofort())).toEqual({ ok: true, fehler: null })
   })
+
+  it('auch nach einem Speicher-Fehler: „Verwerfen“ eines neuen Blocks setzt auf Ruhe (Nachbesserung Runde 1)', async () => {
+    speichere.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    speichere.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    tue((e) => e.oeffneBlock(neueBlockWerte('HINWEISBAND', JETZT), 1))
+    tue((e) => e.block && e.aendereBlock({ ...e.block, titel: 'Winterpause' }))
+    await warte(800)
+    expect(zuletzt.stand.art).toBe('fehler')
+
+    // `speichereSofort` versucht es noch einmal und scheitert wieder — der Block hat keine Kennung, nur die Zeile fällt weg.
+    expect(await tueUndWarte((e) => e.entferneBlock(geloescht))).toEqual({ art: 'verworfen' })
+    expect(speichere).toHaveBeenCalledTimes(2)
+    expect(geloescht).not.toHaveBeenCalled()
+    expect(zuletzt.stand).toEqual({ art: 'ruhe' })
+    expect(await tueUndWarte((e) => e.speichereSofort())).toEqual({ ok: true, fehler: null })
+  })
+
+  it('auch nach einem Speicher-Fehler: „Block löschen“ setzt auf Ruhe (Nachbesserung Runde 1)', async () => {
+    speichere.mockResolvedValueOnce(gespeichert({ blockId: 'block-neu', zeilenId: 'zeile-neu' }))
+    tue((e) => e.oeffneBlock(neueBlockWerte('HINWEISBAND', JETZT), 1))
+    tue((e) => e.block && e.aendereBlock({ ...e.block, titel: 'Winterpause' }))
+    await warte(800)
+    speichere.mockResolvedValueOnce({ error: 'Wir konnten den Entwurf nicht speichern.' })
+    speichere.mockResolvedValueOnce({ error: 'Wir konnten den Entwurf nicht speichern.' })
+    tue((e) => e.block && e.aendereBlock({ ...e.block, titel: 'Winterpause bis März' }))
+    await warte(800)
+    expect(zuletzt.stand).toEqual({ art: 'fehler', text: 'Wir konnten den Entwurf nicht speichern.' })
+
+    expect(await tueUndWarte((e) => e.entferneBlock(geloescht))).toEqual({ art: 'geloescht' })
+    expect(geloescht).toHaveBeenCalledWith('block-neu')
+    expect(zuletzt.stand).toEqual({ art: 'ruhe' })
+  })
+
+  it('Gegenprobe: scheitert das Löschen, bleibt der Fehler stehen und der Block offen', async () => {
+    speichere.mockResolvedValueOnce(gespeichert({ blockId: 'block-neu', zeilenId: 'zeile-neu' }))
+    tue((e) => e.oeffneBlock(neueBlockWerte('HINWEISBAND', JETZT), 1))
+    tue((e) => e.block && e.aendereBlock({ ...e.block, titel: 'Winterpause' }))
+    await warte(800)
+    speichere.mockResolvedValueOnce({ error: 'Wir konnten den Entwurf nicht speichern.' })
+    speichere.mockResolvedValueOnce({ error: 'Wir konnten den Entwurf nicht speichern.' })
+    tue((e) => e.block && e.aendereBlock({ ...e.block, titel: 'Winterpause bis März' }))
+    await warte(800)
+    geloescht.mockResolvedValueOnce({ error: 'Wir konnten den Block nicht löschen.' })
+
+    expect(await tueUndWarte((e) => e.entferneBlock(geloescht))).toEqual({ art: 'fehler', text: 'Wir konnten den Block nicht löschen.' })
+    expect(zuletzt.block).toMatchObject({ id: 'block-neu' })
+    expect(zuletzt.stand).toEqual({ art: 'fehler', text: 'Wir konnten den Entwurf nicht speichern.' })
+  })
 })
 
 describe('useStartseitenEntwurf — Fund 2: „Verwerfen“ während der Speicherung', () => {
@@ -568,10 +619,15 @@ describe('useStartseitenEntwurf — Fund 5: ein gewählter Hof, der nicht mehr s
     },
   }
 
-  it('nimmt ihn beim Öffnen aus der Auswahl und sagt es in einem Satz', () => {
+  /** Die Formularwerte des Blocks — ohne Werte ist der Test falsch aufgebaut. */
+  function werteMitHoefen(): BlockWerte {
     const werte = blockWerteAus(MIT_HOEFEN)
-    expect(werte).not.toBeNull()
-    const offen = nurSichtbareHoefe(werte!, ['hof-a', 'hof-b', 'hof-c'])
+    if (!werte) throw new Error('MIT_HOEFEN ergibt keine Formularwerte')
+    return werte
+  }
+
+  it('nimmt ihn beim Öffnen aus der Auswahl und sagt es in einem Satz', () => {
+    const offen = nurSichtbareHoefe(werteMitHoefen(), ['hof-a', 'hof-b', 'hof-c'])
     expect(offen.farmIds).toEqual(['hof-a', 'hof-b'])
     expect(offen.hoefeEntfernt).toBe(1)
     expect(ADMIN_STARTSEITE_TEXT.hoefeEntfernt(1)).toBe('Ein Hof ist nicht mehr sichtbar und wurde aus der Auswahl genommen.')
@@ -579,7 +635,7 @@ describe('useStartseitenEntwurf — Fund 5: ein gewählter Hof, der nicht mehr s
   })
 
   it('Gegenprobe: lauter sichtbare Höfe — Auswahl wie gespeichert, kein Satz', () => {
-    const offen = nurSichtbareHoefe(blockWerteAus(MIT_HOEFEN)!, ['hof-a', 'hof-pausiert', 'hof-b'])
+    const offen = nurSichtbareHoefe(werteMitHoefen(), ['hof-a', 'hof-pausiert', 'hof-b'])
     expect(offen.farmIds).toEqual(['hof-a', 'hof-pausiert', 'hof-b'])
     expect(offen.hoefeEntfernt).toBeUndefined()
   })
@@ -588,7 +644,7 @@ describe('useStartseitenEntwurf — Fund 5: ein gewählter Hof, der nicht mehr s
     pruefstand.starte(() => {
       zuletzt = useStartseitenEntwurf({ start: [ZEILEN[0], ZEILEN[1], MIT_HOEFEN, ...ZEILEN.slice(2)], live: standardFassung(), speichere })
     })
-    expect(await tueUndWarte((e) => e.wechsleBlock(nurSichtbareHoefe(blockWerteAus(MIT_HOEFEN)!, ['hof-a', 'hof-b'])))).toBe(true)
+    expect(await tueUndWarte((e) => e.wechsleBlock(nurSichtbareHoefe(werteMitHoefen(), ['hof-a', 'hof-b'])))).toBe(true)
     await warte(800)
     expect(speichere).toHaveBeenCalledTimes(1)
     expect(speichere.mock.calls[0]?.[0].block).toMatchObject({ id: 'block-auswahl', farmIds: ['hof-a', 'hof-b'] })
@@ -633,6 +689,26 @@ describe('useStartseitenEntwurf — Fund 7 und 8: vor einer Action warten, Grund
     await warte(5_000)
     expect(speichere).not.toHaveBeenCalled()
     expect(zuletzt.zeilen).toEqual(ZEILEN)
+  })
+
+  it('scheitert die Action nach halteAn, geht die angehaltene Änderung mit fahreFort wieder hinaus', async () => {
+    tue((e) => e.aendereZeilen(augeAn('FRAGEN', e)))
+    const fahreFort = await tueUndWarte((e) => e.halteAn())
+    expect(zuletzt.stand).toEqual({ art: 'speichert' })
+    fahreFort()
+    await warte(0)
+    expect(speichere).toHaveBeenCalledTimes(1)
+    expect(speichere.mock.calls[0]?.[0].reihenfolge.find((r) => r.id === 'z-fragen')).toEqual({ id: 'z-fragen', sichtbar: false })
+    expect(zuletzt.stand).toEqual({ art: 'gespeichert', um: '20:41' })
+    expect(warntBeimVerlassen()).toBe(false)
+  })
+
+  it('Gegenprobe: ohne angehaltene Änderung speichert fahreFort nichts', async () => {
+    const fahreFort = await tueUndWarte((e) => e.halteAn())
+    fahreFort()
+    await warte(5_000)
+    expect(speichere).not.toHaveBeenCalled()
+    expect(zuletzt.stand).toEqual({ art: 'ruhe' })
   })
 
   it('halteAn wartet eine laufende Speicherung ab', async () => {

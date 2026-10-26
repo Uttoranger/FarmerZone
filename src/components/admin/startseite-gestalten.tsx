@@ -507,9 +507,11 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
     setAktionFehler(null)
     startTransition(async () => {
       // Erst die Uhr weg und eine laufende Speicherung abwarten — sonst überschriebe sie danach den übernommenen Stand (Nr. 183, Fund 7).
-      await entwurf.halteAn()
+      const fahreFort = await entwurf.halteAn()
       const ergebnis = await uebernehmeFassungAlsEntwurf({ id })
       if ('error' in ergebnis) {
+        // Die angehaltene Änderung geht wieder hinaus — sonst bliebe „Speichert …“ ohne Speicherung stehen.
+        fahreFort()
         setAktionFehler(ergebnis.error)
         return
       }
