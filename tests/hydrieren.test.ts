@@ -28,6 +28,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, createElement, type ComponentProps, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BROWSER_OBJEKTE, hydriere, pruefeHydrieren, raeumeHydrierenAuf } from './hydrieren-hilfe'
+import { NetzHinweis } from '@/components/ui/netz-hinweis'
+import { NETZ_ZEILE } from '@/lib/netz'
 
 // Attrappen wie in tests/mein-hof-umschalter.test.ts: Die Adresse liest useSearchParams aus `adresse`.
 const adresse = { suche: '' }
@@ -192,6 +194,21 @@ describe('Hydrieren – Teile mit dem Darstellungsmodus des Browsers', () => {
     const knopf = ergebnis.container.querySelector('button')
     expect(knopf?.getAttribute('aria-label')).toBe('Hellen Modus einschalten')
     expect(knopf?.getAttribute('title')).toBe('Hellen Modus einschalten')
+  })
+})
+
+describe('Hydrieren – die Netz-Zeile (Register N29, Nr. 175)', () => {
+  it('NetzHinweis: im Server-HTML keine Zeile, offline erscheint sie erst nach dem Hydrieren', async () => {
+    const ergebnis = await pruefeHydrieren(createElement(NetzHinweis), {
+      imBrowser: () => Object.defineProperty(navigator, 'onLine', { value: false, configurable: true }),
+    })
+    try {
+      expect(ergebnis.serverHtml).not.toContain(NETZ_ZEILE)
+      expect(ergebnis.meldungen).toEqual([])
+      expect(ergebnis.container.textContent).toBe(NETZ_ZEILE)
+    } finally {
+      Reflect.deleteProperty(navigator, 'onLine')
+    }
   })
 })
 
@@ -428,6 +445,7 @@ const GEPRUEFT: Record<string, string[]> = {
   'src/components/hoefe/use-uhr.ts': ['Abholzeile', 'BeitragMarke'],
   'src/components/shared/theme-umschalter.tsx': ['ThemeUmschalter', 'ThemeUmschalterZeile'],
   'src/components/shared/use-meldung-formular.ts': ['useMeldungFormular'],
+  'src/components/ui/netz-hinweis.tsx': ['NetzHinweis'],
   'src/lib/use-cart.ts': ['useCart', 'useKorbHinweis'],
   'src/lib/use-mindestbreite.ts': ['useMindestbreite', 'useSchmalerAls'],
   'src/lib/use-warenkorb-kopf.ts': ['KundenKopf', 'useWarenkorbVomHof'],

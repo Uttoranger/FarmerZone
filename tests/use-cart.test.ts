@@ -33,6 +33,7 @@ import { useCart, useKorbHinweis } from '@/lib/use-cart'
 import { ProductGrid } from '@/components/farm/product-grid'
 import type { KaufSperre } from '@/lib/bereiche-anzeige'
 import { SITZUNG_SCHLUESSEL, WARENKORB_SCHLUESSEL, leseWarenkorb } from '@/lib/warenkorb-speicher'
+import { NETZ_SATZ } from '@/lib/netz'
 
 const pruefstand = vi.hoisted(() => {
   type Setzer<T> = (wert: T | ((vorher: T) => T)) => void
@@ -187,12 +188,15 @@ function position(p: PublicProduct): Omit<CartItem, 'quantity'> {
 let speicher = new Map<string, string>()
 let abgelehnt = new Set<string>()
 let freigabeScheitert = false
+/** Ein Wurf beim Reservieren (POST) — Funkloch oder Programmierfehler (Register N29, Nr. 175). */
+let reservierenWirft: Error | null = null
 const reserviere = vi.fn(async (_adresse: string, init?: RequestInit): Promise<Response> => {
   const { productId } = JSON.parse(String(init?.body)) as { productId: string }
   if (init?.method === 'DELETE') {
     if (freigabeScheitert) throw new TypeError('Kein Netz')
     return { ok: true, json: async () => ({ ok: true }) } as Response
   }
+  if (reservierenWirft) throw reservierenWirft
   return (
     abgelehnt.has(productId)
       ? { ok: false, json: async () => ({ error: 'Davon ist nicht mehr genug da.' }) }
@@ -204,6 +208,7 @@ beforeEach(() => {
   speicher = new Map()
   abgelehnt = new Set()
   freigabeScheitert = false
+  reservierenWirft = null
   geliefert.korb = null
   reserviere.mockClear()
   vi.stubGlobal('localStorage', {
@@ -450,6 +455,63 @@ describe('useCart: Entfernen gibt den Halt frei (Register N28)', () => {
     expect(freigaben().map(([id]) => id)).toEqual([HONIG.id])
     expect(korb().items).toEqual([])
     expect(gespeichert()).toEqual({ farmId: HOF_ID, inhalt: [] })
+  })
+})
+
+describe('useCart: kein Netz (Register N29, Nr. 175)', () => {
+  it('addItem ohne Netz wirft nicht: ok false mit dem Netzsatz und „nochmal", der Korb bleibt, wie er war', async () => {
+    pruefstand.starte(NurKorb)
+    await korb().addItem(position(EIER), 1)
+    await pruefstand.zuRuhe()
+
+    reservierenWirft = new TypeError('Failed to fetch')
+    expect(await korb().addItem(position(MEHL), 2)).toEqual({ ok: false, error: NETZ_SATZ, nochmal: true })
+    await pruefstand.zuRuhe()
+
+    expect(inhalt(korb().items)).toEqual([[EIER.id, 1]])
+    expect(gespeichert()).toEqual({ farmId: HOF_ID, inhalt: [[EIER.id, 1]] })
+  })
+
+  it('updateQuantity ohne Netz: ok false mit dem Netzsatz, die alte Menge bleibt', async () => {
+    pruefstand.starte(NurKorb)
+    await korb().addItem(position(EIER), 1)
+    await pruefstand.zuRuhe()
+
+    reservierenWirft = new TypeError('Load failed')
+    expect(await korb().updateQuantity(EIER.id, 3)).toEqual({ ok: false, error: NETZ_SATZ, nochmal: true })
+    await pruefstand.zuRuhe()
+
+    expect(inhalt(korb().items)).toEqual([[EIER.id, 1]])
+  })
+
+  it('ein anderer Wurf ist kein Funkloch: ok false ohne Netzsatz und ohne „nochmal", der Korb bleibt', async () => {
+    pruefstand.starte(NurKorb)
+    reservierenWirft = new TypeError("Cannot read properties of undefined (reading 'x')")
+    const ergebnis = await korb().addItem(position(HONIG), 1)
+    await pruefstand.zuRuhe()
+
+    expect(ergebnis.ok).toBe(false)
+    expect(ergebnis.error).not.toBe(NETZ_SATZ)
+    expect(ergebnis.nochmal).toBeUndefined()
+    expect(korb().items).toEqual([])
+  })
+
+  it('Gegenprobe: mit Netz landet dasselbe Produkt im Korb', async () => {
+    pruefstand.starte(NurKorb)
+    expect(await korb().addItem(position(MEHL), 2)).toEqual({ ok: true })
+    await pruefstand.zuRuhe()
+
+    expect(inhalt(korb().items)).toEqual([[MEHL.id, 2]])
+  })
+
+  it('jeder Aufruf von /api/reserve trägt ein Zeitlimit (Signal)', async () => {
+    pruefstand.starte(NurKorb)
+    await korb().addItem(position(EIER), 1)
+    await korb().updateQuantity(EIER.id, 2)
+    korb().removeItem(EIER.id)
+    await pruefstand.zuRuhe()
+
+    expect(reserviere.mock.calls.map(([, init]) => init?.signal instanceof AbortSignal)).toEqual([true, true, true])
   })
 })
 

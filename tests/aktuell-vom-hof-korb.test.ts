@@ -52,6 +52,8 @@ vi.mock('@/lib/use-cart', () => ({
   }),
   // Der Satz des Abgleichs (Nr. 169) — hier keiner.
   useKorbHinweis: () => null,
+  // Der leere Korb im Blatt (Nr. 175).
+  KORB_LEER: { titel: 'leer', satz: 'leer', zumHof: 'zum Hof' },
   zeigeKorbHinweis: vi.fn(),
 }))
 vi.mock('@/components/hofseite/aktuell-vom-hof', () => ({

@@ -13,6 +13,7 @@ import {
   revertPickedUp,
   revertReady,
 } from '@/server/actions/orders'
+import { aktionOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
 import type { HofBestellDetail } from '@/server/queries/orders'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Marke } from '@/components/ui/marke'
@@ -75,7 +76,8 @@ export function BestellDetail({
     setFehler(null)
     const vorher = bestellung.status
     starte(async () => {
-      const ergebnis = await aktion(bestellung.id)
+      // Ohne Wurf (Register N29): Ohne Netz steht der Netzsatz am Knopf, nicht die Fehlerseite.
+      const ergebnis = await aktionOhneWurf(() => aktion(bestellung.id))
       if (ergebnis.error) {
         setFehler(ergebnis.error)
         return
@@ -85,7 +87,7 @@ export function BestellDetail({
         action: {
           label: 'Rückgängig',
           onClick: () => {
-            void revertOrderStatus(bestellung.id, vorher).then((r) => {
+            void aktionOhneWurf(() => revertOrderStatus(bestellung.id, vorher)).then((r) => {
               if (r.error) toast.error(r.error)
               else toast.success('Zurückgesetzt')
             })
@@ -98,7 +100,7 @@ export function BestellDetail({
   function nichtAbgeholt() {
     setFehler(null)
     starte(async () => {
-      const ergebnis = await markAsNotPickedUp(bestellung.id)
+      const ergebnis = await aktionOhneWurf(() => markAsNotPickedUp(bestellung.id))
       if (ergebnis.error) {
         setFehler(ergebnis.error)
         return
@@ -115,7 +117,7 @@ export function BestellDetail({
   function rueckweg(art: 'dochNicht' | 'abholungZurueck') {
     setFehler(null)
     starte(async () => {
-      const ergebnis = art === 'dochNicht' ? await revertReady(bestellung.id, kundinInformieren) : await revertPickedUp(bestellung.id)
+      const ergebnis = await aktionOhneWurf(() => (art === 'dochNicht' ? revertReady(bestellung.id, kundinInformieren) : revertPickedUp(bestellung.id)))
       if (ergebnis.error) {
         setFehler(ergebnis.error)
         return

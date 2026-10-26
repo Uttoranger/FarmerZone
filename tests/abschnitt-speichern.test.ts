@@ -24,6 +24,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ABSCHNITT_SPEICHERN_TEXT } from '@/lib/abschnitt-stand'
+import { NETZ_SATZ } from '@/lib/netz'
 
 const aktion = vi.hoisted(() => ({
   saveAppearanceAction: vi.fn(),
@@ -183,10 +184,22 @@ describe('ein hängendes Speichern', () => {
 })
 
 describe('Fehler im Formular statt Fehlerseite (speichernOhneWurf)', () => {
-  it('eine gescheiterte Anfrage wird zum Satz mit Ausweg', async () => {
+  it('eine am Netz gescheiterte Anfrage wird zum Netzsatz (Register N29, Nr. 175)', async () => {
     const { speichernOhneWurf } = await speicherweg()
-    await expect(speichernOhneWurf(() => Promise.reject(new TypeError('Failed to fetch')))).resolves.toBe(ABSCHNITT_SPEICHERN_TEXT.gingNicht)
+    await expect(speichernOhneWurf(() => Promise.reject(new TypeError('Failed to fetch')))).resolves.toBe(NETZ_SATZ)
+  })
+
+  it('Gegenprobe: eine aus anderem Grund gescheiterte Anfrage bleibt beim Satz mit Ausweg', async () => {
+    const { speichernOhneWurf } = await speicherweg()
+    await expect(speichernOhneWurf(() => Promise.reject(new Error('kaputt')))).resolves.toBe(ABSCHNITT_SPEICHERN_TEXT.gingNicht)
     expect(ABSCHNITT_SPEICHERN_TEXT.gingNicht).toBe('Wir konnten das gerade nicht speichern. Versuch es noch einmal.')
+  })
+
+  it('aktionOhneWurf gibt die ganze Antwort durch und macht aus einem Wurf { error }', async () => {
+    const { aktionOhneWurf } = await speicherweg()
+    await expect(aktionOhneWurf(async () => ({ ok: true as const, zahl: 3 }))).resolves.toEqual({ ok: true, zahl: 3 })
+    await expect(aktionOhneWurf(() => Promise.reject(new TypeError('Load failed')))).resolves.toEqual({ error: NETZ_SATZ, netz: true })
+    await expect(aktionOhneWurf(() => Promise.reject(new Error('kaputt')))).resolves.toEqual({ error: ABSCHNITT_SPEICHERN_TEXT.gingNicht })
   })
 
   it('der Satz der Aktion bleibt, wie er ist; ohne Fehler null', async () => {
@@ -254,7 +267,7 @@ describe('Sentry sieht die gescheiterte Anfrage (speichernOhneWurf)', () => {
 
   it('ein Netzabbruch ist nur eine Brotkrume, kein Befund', async () => {
     const { speichernOhneWurf } = await speicherweg()
-    await expect(speichernOhneWurf(() => Promise.reject(new TypeError('Failed to fetch')))).resolves.toBe(ABSCHNITT_SPEICHERN_TEXT.gingNicht)
+    await expect(speichernOhneWurf(() => Promise.reject(new TypeError('Failed to fetch')))).resolves.toBe(NETZ_SATZ)
 
     expect(sentry.captureException).not.toHaveBeenCalled()
     expect(sentry.addBreadcrumb).toHaveBeenCalledTimes(1)

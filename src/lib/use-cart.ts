@@ -14,16 +14,37 @@ import {
 } from '@/lib/warenkorb-speicher'
 import { centsAlsEuro } from '@/lib/format'
 import { korbBetraege } from '@/lib/hofseite-kunde'
+import { NETZ_SATZ, mitNetzSchutz } from '@/lib/netz'
 
 export type CartItem = WarenkorbPosition
+
+/**
+ * Wie ein Griff in den Korb ausging. `nochmal`: Er scheiterte am Netz (Register
+ * N29) — `error` ist dann `NETZ_SATZ`, und die Anzeige bietet „Nochmal" an.
+ */
+export type KorbErgebnis = { ok: boolean; error?: string; nochmal?: true }
+
+/**
+ * Der leere Korb im Korb-Blatt (Nr. 175, Register N9): Symbol, ein Satz, ein
+ * Weg weiter — zurück zum Angebot des Hofs oder zu den Höfen. Eine Quelle für
+ * Hofseite und Produktseite, die beide das Blatt zeigen.
+ */
+export const KORB_LEER = {
+  titel: 'Dein Warenkorb ist leer.',
+  satz: 'Leg etwas aus dem Angebot des Hofs hinein.',
+  zumHof: 'Zum Angebot',
+} as const
+
+/** Der Satz, wenn der Aufruf aus einem anderen Grund als dem Netz warf — wie bisher bei einer Ablehnung ohne Grund. */
+const NICHT_VERFUEGBAR = 'Produkt nicht mehr verfügbar'
 
 export type Warenkorb = {
   items: CartItem[]
   count: number
   total: number
   isHydrated: boolean
-  addItem: (product: Omit<CartItem, 'quantity'>, qty?: number) => Promise<{ ok: boolean; error?: string }>
-  updateQuantity: (productId: string, qty: number) => Promise<{ ok: boolean; error?: string }>
+  addItem: (product: Omit<CartItem, 'quantity'>, qty?: number) => Promise<KorbErgebnis>
+  updateQuantity: (productId: string, qty: number) => Promise<KorbErgebnis>
   removeItem: (productId: string) => void
   clearCart: () => void
   /** Den ganzen Korb auf einmal neu setzen (Abgleich der Hofseite, Register N28) — gibt die gleiche Liste zurück, wird nichts geschrieben. */
@@ -83,6 +104,31 @@ export function zeigeKorbHinweis(farmId: string, text: string): void {
 /** Der Satz zum Korb dieses Hofs nach dem Abgleich — null ohne. Liest nur; schreiben tut useCart. */
 export function useKorbHinweis(farmId: string): string | null {
   return useSyncExternalStore(abonniereHinweis, () => korbHinweise.get(farmId) ?? null, keinHinweis)
+}
+
+/**
+ * Reserviert die Menge über /api/reserve — mit Zeitlimit, ohne Wurf (Register
+ * N29). Ohne Netz kam früher keine Antwort, und der Knopf blieb im
+ * Ladezustand; jetzt gibt es `nochmal` mit dem Netzsatz. Was der Server
+ * prüft und hält, bleibt, wie es war: Hier ändert sich nur, wie ein
+ * gescheiterter Aufruf zurückkommt.
+ */
+async function reserviere(
+  productId: string,
+  quantity: number,
+  sessionId: string
+): Promise<{ antwort: Response } | { gescheitert: KorbErgebnis }> {
+  const antwort = await mitNetzSchutz((signal) =>
+    fetch('/api/reserve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ productId, quantity, sessionId }),
+      signal,
+    })
+  )
+  if (antwort.ok) return { antwort: antwort.daten }
+  if (antwort.art === 'server') return { gescheitert: { ok: false, error: NICHT_VERFUEGBAR } }
+  return { gescheitert: { ok: false, error: NETZ_SATZ, nochmal: true } }
 }
 
 /** Die Kennung, an der die Reservierungen hängen — beim ersten Mal angelegt, bleibt über Seitenaufrufe. */
@@ -161,29 +207,33 @@ export function useCart(farmId: string, farmSlug: string): Warenkorb {
    * früher nach 15 Minuten ab; die Kundin muss davon nichts wissen.
    */
   function gibHaltFrei(productId: string) {
-    fetch('/api/reserve', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ productId, sessionId: sitzungsKennung() }),
-    }).catch(() => {})
+    const sessionId = sitzungsKennung()
+    // mitNetzSchutz wirft nie; ohne Netz bleibt nur der Ablauf nach 15 Minuten.
+    void mitNetzSchutz((signal) =>
+      fetch('/api/reserve', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId, sessionId }),
+        signal,
+      })
+    )
   }
 
   async function addItem(
     product: Omit<CartItem, 'quantity'>,
     qty = 1
-  ): Promise<{ ok: boolean; error?: string }> {
+  ): Promise<KorbErgebnis> {
     const existingQty = aktuellePositionen().find((i) => i.productId === product.productId)?.quantity ?? 0
     const totalQty = existingQty + qty
 
-    const res = await fetch('/api/reserve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ productId: product.productId, quantity: totalQty, sessionId: sitzungsKennung() }),
-    })
+    const reserviert = await reserviere(product.productId, totalQty, sitzungsKennung())
+    // Ohne Antwort des Servers gescheitert (Netz, Zeitlimit): Der Korb bleibt, wie er war.
+    if ('gescheitert' in reserviert) return reserviert.gescheitert
+    const res = reserviert.antwort
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      return { ok: false, error: err.error ?? 'Produkt nicht mehr verfügbar' }
+      return { ok: false, error: err.error ?? NICHT_VERFUEGBAR }
     }
 
     // /api/reserve setzt die Menge auf totalQty, es zählt nicht dazu — genau
@@ -197,17 +247,15 @@ export function useCart(farmId: string, farmSlug: string): Warenkorb {
     return { ok: true }
   }
 
-  async function updateQuantity(productId: string, qty: number): Promise<{ ok: boolean; error?: string }> {
+  async function updateQuantity(productId: string, qty: number): Promise<KorbErgebnis> {
     if (qty <= 0) {
       removeItem(productId)
       return { ok: true }
     }
 
-    const res = await fetch('/api/reserve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ productId, quantity: qty, sessionId: sitzungsKennung() }),
-    })
+    const reserviert = await reserviere(productId, qty, sitzungsKennung())
+    if ('gescheitert' in reserviert) return reserviert.gescheitert
+    const res = reserviert.antwort
 
     if (res.ok) {
       persist((vorher) => vorher.map((i) => (i.productId === productId ? { ...i, quantity: qty } : i)))
