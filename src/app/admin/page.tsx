@@ -104,7 +104,7 @@ export default async function AdminHeutePage({
   const kacheln = lageKacheln(
     {
       bestellungen: roh.bestellungen,
-      umsatzWocheCents: roh.umsatzWocheCents,
+      woche: roh.woche,
       dienste: { laufen: dienste.filter((d) => d.art === 'laeuft').length, von: dienste.length, ansehen: dienste.filter((d) => d.art === 'tun').map((d) => d.dienst), testbetrieb: TESTBETRIEB },
       hoefe: roh.hoefe,
     },

@@ -22,7 +22,7 @@ const JETZT = new Date('2026-10-26T08:42:00.000Z')
 
 const db = vi.hoisted(() => ({
   farm: { findMany: vi.fn(), count: vi.fn() },
-  order: { groupBy: vi.fn(), aggregate: vi.fn() },
+  order: { groupBy: vi.fn(), aggregate: vi.fn(), count: vi.fn() },
   adminAktion: { findMany: vi.fn() },
   user: { findUnique: vi.fn() },
   $queryRaw: vi.fn(),
@@ -117,7 +117,11 @@ beforeEach(() => {
     { status: 'READY', _count: { _all: 2 } },
     { status: 'CANCELLED', _count: { _all: 1 } },
   ])
-  db.order.aggregate.mockResolvedValue({ _sum: { totalAmount: new Prisma.Decimal('1840.00') } })
+  // Woche: Warenwert und Zahl in einem Aufruf, die Servicegebühr (ohne entfallene) im zweiten; die Vorwoche über count.
+  db.order.aggregate.mockImplementation(async (a: { _sum: { serviceFeeCents?: true } }) =>
+    a._sum.serviceFeeCents ? { _sum: { serviceFeeCents: 9200 } } : { _sum: { totalAmount: new Prisma.Decimal('1840.00') }, _count: { _all: 118 } }
+  )
+  db.order.count.mockResolvedValue(108)
   db.adminAktion.findMany.mockResolvedValue([{ wann: new Date(JETZT.getTime() - STUNDE), wer: 'ich', art: 'hof_freigeschaltet' }])
   db.user.findUnique.mockResolvedValue({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null })
   db.$queryRaw.mockResolvedValue([])
@@ -140,7 +144,16 @@ describe('Admin › Heute', () => {
     // Lage aus den Attrappen: 6 offen (4 bezahlt + 2 bereit), davon 4 nicht gepackt, 1 Storno; € 1.840 Umsatz.
     expect(html).toContain('4 noch nicht gepackt · 1 Storno')
     expect(html).toMatch(/€ 1\D840</)
+    // Zwei leise Zeilen und das Zustandswort wie im Mockup; Servicegebühr der Woche in Euro.
+    expect(html).toContain('Im Rahmen')
+    expect(html).toContain('Woche: 118 (+9 % zur Vorwoche)')
+    expect(html).toMatch(/Servicegebühr € 92,00/)
+    expect(db.order.aggregate).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ serviceFeeRefundedAt: null, status: 'PICKED_UP' }) }))
     expect(html).toContain('Hof freigeschaltet')
+    // Signal „ohne Bestellung“: Storno und Testzahlung zählen nicht als letzte Bestellung.
+    const hofAbfrage = db.farm.findMany.mock.calls[0]?.[0] as { select: { orders: { where: { status: unknown; AND: unknown[] } } } }
+    expect(hofAbfrage.select.orders.where.status).toEqual({ not: 'CANCELLED' })
+    expect(hofAbfrage.select.orders.where.AND).toHaveLength(1)
   })
 
   it('keine Adresse und keine E-Mail-Adresse im HTML (Gegenprobe: beide stehen im Bestand)', async () => {

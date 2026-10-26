@@ -23,7 +23,8 @@ import { VORRANG } from '@/schemas/mail-auftrag'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { uhrzeitInWien } from '@/lib/fristen'
 import type { MarkeArt } from '@/lib/marke-art'
-import { ohnePersonendaten, type AdminAktionArt } from '@/schemas/admin-aktion'
+import { adminAktionSchema, ohnePersonendaten, type AdminAktionArt } from '@/schemas/admin-aktion'
+import { SERVICEGEBUEHR_BEZEICHNUNG } from '@/lib/servicegebuehr'
 
 /*
  * Admin › Heute (Register N32, Nr. 185): die EINE Liste „Braucht dich“ aus
@@ -501,10 +502,27 @@ export const HEUTE_TEXT = {
 
 // ─── Lage ────────────────────────────────────────────────────────────────────
 
+/** Die Woche aller Höfe nach der Umsatzregel (abgeholt seit Montag, ohne Testzahlungen); Beträge in Cent. */
+export type HeuteWoche = {
+  umsatzCents: number
+  /** Servicegebühr dieser Bestellungen, ohne entfallene. */
+  gebuehrCents: number
+  anzahl: number
+  /** Dieselbe Zahl in der Vorwoche bis zum selben Zeitpunkt. */
+  anzahlVorwoche: number
+}
+
+/** „Woche: 118 (+9 % zur Vorwoche)“ — ohne Bestellung in der Vorwoche kein Prozent. */
+export function wochenZeile(w: Pick<HeuteWoche, 'anzahl' | 'anzahlVorwoche'>): string {
+  // Dieselbe Rundung wie `wochenvergleich` (src/lib/heute.ts) — nicht importiert, weil diese Datei auch im Browser der Betriebsleiste landet.
+  const prozent = w.anzahlVorwoche > 0 ? Math.round(((w.anzahl - w.anzahlVorwoche) / w.anzahlVorwoche) * 100) : null
+  const vergleich = prozent === null ? 'Vorwoche: keine' : `${prozent > 0 ? '+' : prozent < 0 ? '−' : '±'}${formatZahl(Math.abs(prozent))} % zur Vorwoche`
+  return `Woche: ${formatZahl(w.anzahl)} (${vergleich})`
+}
+
 export type HeuteLage = {
   bestellungen: { zurAbholung: number; nichtGepackt: number; storniert: number }
-  /** Warenwert der diese Woche abgeholten Bestellungen in Cent (Umsatzregel, ohne Testzahlungen). */
-  umsatzWocheCents: number
+  woche: HeuteWoche
   dienste: { laufen: number; von: number; ansehen: readonly string[]; testbetrieb: boolean }
   hoefe: { verkaufen: number; warten: number }
 }
@@ -531,16 +549,18 @@ export function lageKacheln(lage: HeuteLage, aufgaben: readonly Aufgabe[]): Lage
       titel: 'Bestellungen heute',
       wert: formatZahl(b.zurAbholung),
       einheit: 'zur Abholung',
-      marke: b.zurAbholung === 0 ? { wort: 'ruhig', art: 'erledigt' } : { wort: 'läuft', art: 'laeuft' },
-      zeilen: [`${formatZahl(b.nichtGepackt)} noch nicht gepackt · ${mitAnzahlWort(b.storniert, 'Storno', 'Stornos')}`],
+      // Wort aus dem Mockup; einen Rahmen, der „zu viel“ meldet, gibt es (noch) nicht — darum kein `tun`.
+      marke: { wort: 'Im Rahmen', art: 'laeuft' },
+      zeilen: [`${formatZahl(b.nichtGepackt)} noch nicht gepackt · ${mitAnzahlWort(b.storniert, 'Storno', 'Stornos')}`, wochenZeile(lage.woche)],
     },
     {
       id: 'geld',
       titel: 'Geld · Woche',
-      wert: formatEuro(centsAlsEuro(lage.umsatzWocheCents), 0),
+      wert: formatEuro(centsAlsEuro(lage.woche.umsatzCents), 0),
       einheit: 'Umsatz der Höfe',
+      // „stimmt“, „Auszahlung Do“ und die Abgleich-Zeile liefert erst der Geld-Abgleich (Nr. 191).
       marke: null,
-      zeilen: ['Warenwert abgeholter Bestellungen seit Montag'],
+      zeilen: [`${SERVICEGEBUEHR_BEZEICHNUNG} ${formatEuro(centsAlsEuro(lage.woche.gebuehrCents))}`],
     },
     {
       id: 'dienste',
@@ -695,11 +715,19 @@ export const PROTOKOLL_TEXT: Partial<Record<AdminAktionArt, string>> = {
 export type ProtokollRoh = { wann: Date; wer: string | null; art: string }
 export type ProtokollZeile = { wer: string; text: string; wann: string }
 
+const artSchema = adminAktionSchema.shape.art
+
+/** Die Art steht als Text in der Datenbank — erst geprüft, eine unbekannte heißt „Admin-Aktion“. */
+function protokollText(art: string): string {
+  const geprueft = artSchema.safeParse(art)
+  return (geprueft.success ? PROTOKOLL_TEXT[geprueft.data] : undefined) ?? 'Admin-Aktion'
+}
+
 /** „Du“, „Team“ oder „System“ — nie ein Name (Register N33). */
 export function protokollZeilen(zeilen: readonly ProtokollRoh[], ichId: string, jetzt: Date): ProtokollZeile[] {
   return zeilen.map((z) => ({
     wer: z.wer === null ? 'System' : z.wer === ichId ? 'Du' : 'Team',
-    text: PROTOKOLL_TEXT[z.art as AdminAktionArt] ?? 'Admin-Aktion',
+    text: protokollText(z.art),
     wann: zuletztText(z.wann, jetzt),
   }))
 }

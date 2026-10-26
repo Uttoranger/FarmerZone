@@ -13,7 +13,7 @@ import { umsatzBestellungWhere, umsatzfenster } from '@/lib/umsatz'
 import { ohneTestzahlungenWhere } from '@/lib/testzahlung'
 import { gruendungEinstellungAus } from '@/lib/plattform-einstellung'
 import type { AblaufLaufDaten } from '@/lib/betrieb'
-import { sammleAufgaben, LEERER_STAND, type Aufgabe, type AufgabeHof, type AufgabenStand, type ProtokollRoh } from '@/lib/admin-aufgaben'
+import { sammleAufgaben, LEERER_STAND, type Aufgabe, type AufgabeHof, type AufgabenStand, type HeuteWoche, type ProtokollRoh } from '@/lib/admin-aufgaben'
 
 /*
  * Die Daten von Admin › Heute (Register N32, Nr. 185). Die Aufgaben kommen
@@ -41,7 +41,8 @@ async function ladeHoefeAktiv(): Promise<AufgabeHof[]> {
       name: true,
       approvedAt: true,
       pickupSlots: { where: { isActive: true }, select: { id: true }, take: 1 },
-      orders: { orderBy: { createdAt: 'desc' }, select: { createdAt: true }, take: 1 },
+      // Storno und Testzahlung sind keine Bestellung im Sinn des Signals.
+      orders: { where: { status: { not: 'CANCELLED' }, AND: [ohneTestzahlungenWhere(STRIPE_LIVE_AB)] }, orderBy: { createdAt: 'desc' }, select: { createdAt: true }, take: 1 },
     },
   })
   return hoefe.flatMap((h) =>
@@ -90,7 +91,8 @@ export async function ladeAdminAufgaben(jetzt: Date, optionen: { mitBetrieb: boo
 export type HeuteRoh = {
   stand: AufgabenStand
   bestellungen: { zurAbholung: number; nichtGepackt: number; storniert: number }
-  umsatzWocheCents: number
+  /** Die Woche aller Höfe (Umsatzregel), Beträge in Cent. */
+  woche: HeuteWoche
   hoefe: { verkaufen: number; warten: number }
   naechsteFassung: Date | null
   gruendung: { aktionBisTag: string | null; fest: boolean }
@@ -128,20 +130,39 @@ async function ladeBestellungenHeute(jetzt: Date, stripeLiveAb: Date | null): Pr
   }
 }
 
-/** Warenwert der seit Montag (Wien) abgeholten Bestellungen aller Höfe — die Umsatzregel (`umsatzBestellungWhere`) ohne den Hof. */
-async function ladeUmsatzWoche(jetzt: Date, stripeLiveAb: Date | null): Promise<number> {
-  const alleHoefe = umsatzBestellungWhere('', umsatzfenster('woche', jetzt).aktuell, stripeLiveAb)
-  delete alleHoefe.farmId
-  const summe = await prisma.order.aggregate({ where: alleHoefe, _sum: { totalAmount: true } })
-  return centAusDecimal(summe._sum.totalAmount)
+/**
+ * Die Woche aller Höfe nach der Umsatzregel (`umsatzBestellungWhere` ohne den
+ * Hof): abgeholte Bestellungen seit Montag (Wien) ohne Testzahlungen — ihr
+ * Warenwert, ihre Servicegebühr (ohne entfallene, wie die Monatsabrechnung)
+ * und ihre Zahl gegen die Vorwoche bis zum selben Zeitpunkt (`umsatzfenster`).
+ */
+async function ladeWoche(jetzt: Date, stripeLiveAb: Date | null): Promise<HeuteRoh['woche']> {
+  const fenster = umsatzfenster('woche', jetzt)
+  const alleHoefe = (f: typeof fenster.aktuell) => {
+    const where = umsatzBestellungWhere('', f, stripeLiveAb)
+    delete where.farmId
+    return where
+  }
+  const aktuell = alleHoefe(fenster.aktuell)
+  const [summe, gebuehr, anzahlVorwoche] = await Promise.all([
+    prisma.order.aggregate({ where: aktuell, _sum: { totalAmount: true }, _count: { _all: true } }),
+    prisma.order.aggregate({ where: { ...aktuell, serviceFeeRefundedAt: null }, _sum: { serviceFeeCents: true } }),
+    prisma.order.count({ where: alleHoefe(fenster.vergleich) }),
+  ])
+  return {
+    umsatzCents: centAusDecimal(summe._sum.totalAmount),
+    gebuehrCents: gebuehr._sum.serviceFeeCents ?? 0,
+    anzahl: summe._count._all,
+    anzahlVorwoche,
+  }
 }
 
 /** Alles für die Seite Heute: Aufgaben-Stand, Lage, Kommt und die letzten drei Einträge im Protokoll. */
 export async function ladeHeute(jetzt: Date, optionen: { mitBetrieb: boolean }, stripeLiveAb: Date | null = STRIPE_LIVE_AB): Promise<HeuteRoh> {
-  const [stand, bestellungen, umsatzWocheCents, verkaufen, naechsteFassung, einstellung, protokoll, antwortMs, laeufe] = await Promise.all([
+  const [stand, bestellungen, woche, verkaufen, naechsteFassung, einstellung, protokoll, antwortMs, laeufe] = await Promise.all([
     ladeAufgabenStand(jetzt, optionen),
     ladeBestellungenHeute(jetzt, stripeLiveAb),
-    ladeUmsatzWoche(jetzt, stripeLiveAb),
+    ladeWoche(jetzt, stripeLiveAb),
     prisma.farm.count({ where: { approvedAt: { not: null }, archivedAt: null, isPaused: false, istTesthof: false } }),
     naechsterTermin(jetzt),
     lesePlattformEinstellung(),
@@ -154,7 +175,7 @@ export async function ladeHeute(jetzt: Date, optionen: { mitBetrieb: boolean }, 
   return {
     stand,
     bestellungen,
-    umsatzWocheCents,
+    woche,
     hoefe: { verkaufen, warten: stand.hoefeWartend.length },
     naechsteFassung,
     gruendung: { aktionBisTag: gruendung.aktionBisTag, fest: gruendung.festAm !== null },

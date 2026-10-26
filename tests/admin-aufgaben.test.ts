@@ -22,6 +22,8 @@ import {
   aufgabenZahl,
   fristText,
   kommtEintraege,
+  lageKacheln,
+  wochenZeile,
   leseRoutine,
   protokollZeilen,
   routineSchluessel,
@@ -285,5 +287,29 @@ describe('Alte Adresse der Höfe, Routine, Kommt, Protokoll', () => {
       ['Team', 'Mail nochmal geschickt'],
       ['System', 'Admin-Aktion'],
     ])
+  })
+
+  it('Lage: „Bestellungen heute“ mit „Im Rahmen“ und zwei Zeilen, „Geld · Woche“ mit der Servicegebühr (Mockup admin-heute)', () => {
+    const k = lageKacheln(
+      {
+        bestellungen: { zurAbholung: 23, nichtGepackt: 4, storniert: 1 },
+        woche: { umsatzCents: 184_000, gebuehrCents: 9_200, anzahl: 118, anzahlVorwoche: 108 },
+        dienste: { laufen: 5, von: 5, ansehen: [], testbetrieb: false },
+        hoefe: { verkaufen: 31, warten: 0 },
+      },
+      []
+    )
+    const bestellungen = k.find((x) => x.id === 'bestellungen')!
+    expect(bestellungen.marke).toEqual({ wort: 'Im Rahmen', art: 'laeuft' })
+    expect(bestellungen.zeilen).toEqual(['4 noch nicht gepackt · 1 Storno', 'Woche: 118 (+9 % zur Vorwoche)'])
+    const geld = k.find((x) => x.id === 'geld')!
+    expect(geld.wert).toMatch(/^€ 1\D840$/)
+    expect(geld.zeilen).toEqual([expect.stringMatching(/^Servicegebühr € 92,00$/)])
+  })
+
+  it('Wochenzeile: weniger mit echtem Minus, gleich mit ±, ohne Vorwoche kein Prozent', () => {
+    expect(wochenZeile({ anzahl: 90, anzahlVorwoche: 100 })).toBe('Woche: 90 (−10 % zur Vorwoche)')
+    expect(wochenZeile({ anzahl: 100, anzahlVorwoche: 100 })).toBe('Woche: 100 (±0 % zur Vorwoche)')
+    expect(wochenZeile({ anzahl: 3, anzahlVorwoche: 0 })).toBe('Woche: 3 (Vorwoche: keine)')
   })
 })
