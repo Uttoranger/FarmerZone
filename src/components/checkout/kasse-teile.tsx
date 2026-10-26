@@ -47,7 +47,7 @@ export const FELD_LABEL = 'mb-1 block text-[12.5px] font-semibold text-muted-for
 
 /** Eingabefeld: 46 px hoch, Radius 11 px, Grund etwas tiefer als die Karte; 16 px am Handy (kein Zoom). */
 export const FELD = cn(
-  'h-[46px] w-full min-w-0 rounded-[11px] border border-input bg-background px-3.5 text-base text-foreground placeholder:text-muted-foreground aria-[invalid=true]:border-status-offen md:text-[14.5px]',
+  'h-[46px] w-full min-w-0 rounded-[11px] border border-border bg-background px-3.5 text-base text-foreground placeholder:text-muted-foreground aria-[invalid=true]:border-status-offen md:text-[14.5px]',
   FOKUS_RAHMEN
 )
 

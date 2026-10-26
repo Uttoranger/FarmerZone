@@ -394,7 +394,7 @@ export function CheckoutForm({
 
       // Keine Antwort: kein Fehlertext über die Bestellung, sondern der Ausweg. Der Schlüssel bleibt derselbe.
       if (!senden.ok) {
-        if (senden.art === 'server') setFehler('Wir konnten die Bestellung nicht senden. Prüf deine Verbindung und versuch es noch einmal.')
+        if (senden.art === 'server') setFehler('Wir konnten die Bestellung nicht senden. Lade die Seite neu und versuch es noch einmal.')
         else setOhneAntwort(true)
         return
       }

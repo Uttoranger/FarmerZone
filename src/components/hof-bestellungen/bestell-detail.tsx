@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Check, MessageCircle, Phone, Printer } from 'lucide-react'
 import {
@@ -55,6 +56,7 @@ export function BestellDetail({
   const [offen, setOffen] = useState<Offen>(null)
   const [fehler, setFehler] = useState<string | null>(null)
   const [kundinInformieren, setKundinInformieren] = useState(true)
+  const router = useRouter()
   const [laeuft, starte] = useTransition()
   const { aktionen, betrag, kunde } = bestellung
   const anrufen = telefonLink(kunde.telefon)
@@ -111,7 +113,7 @@ export function BestellDetail({
         // Der Weg steht am Toast: „bitte den Betreiber informieren" sagte nicht, wie.
         toast.warning('Als nicht abgeholt gespeichert. Die Servicegebühr-Erstattung hat nicht geklappt.', {
           duration: 10000,
-          action: { label: PROBLEM_MELDEN, onClick: () => window.location.assign(PROBLEM_MELDEN_HOF) },
+          action: { label: PROBLEM_MELDEN, onClick: () => router.push(PROBLEM_MELDEN_HOF) },
         })
       } else {
         toast.success('Als nicht abgeholt gespeichert')

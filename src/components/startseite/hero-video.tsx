@@ -73,6 +73,8 @@ export function HeroVideo({ anfang = null }: { anfang?: boolean | null }): React
         </video>
       )}
       {/* 44 px, Wahl in aria-pressed (Beschriftung bleibt gleich). Bei „Bewegung reduzieren" gibt es nichts anzuhalten. */}
+      {/* Erst nach der Prüfung: Vorher läuft kein Video, ein Knopf meldete sonst ein laufendes. */}
+      {spielt !== null && (
       <button
         type="button"
         onClick={umschalten}
@@ -85,6 +87,7 @@ export function HeroVideo({ anfang = null }: { anfang?: boolean | null }): React
       >
         <Symbol className="size-5" strokeWidth={1.7} aria-hidden="true" />
       </button>
+      )}
     </>
   )
 }

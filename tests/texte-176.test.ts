@@ -114,6 +114,8 @@ describe('Startvideo', () => {
 
   it('bevor der Browser entschieden hat (Server): kein Video — im Datensparmodus lädt nie etwas', () => {
     expect(renderToStaticMarkup(createElement(HeroVideo, {}))).not.toContain('<video')
+    // Auch kein Knopf: Er meldete sonst ein laufendes Video, das es nicht gibt.
+    expect(renderToStaticMarkup(createElement(HeroVideo, {}))).not.toContain('<button')
   })
 
   it('der Knopf erscheint nur bei erlaubter Bewegung; die Wahl liegt im localStorage mit try/catch', () => {

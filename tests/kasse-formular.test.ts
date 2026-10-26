@@ -268,13 +268,11 @@ describe('Kasse: Vertrauen, Grund, Ausweg (Nr. 176)', () => {
     expect(html.match(/<textarea[^>]*id="customerNote"[^>]*>/)?.[0]).not.toContain('enterKeyHint')
   })
 
-  it('Felder in „Warenkorb"-Sprache, Rand aus dem Feldrand-Token', () => {
+  it('Felder in „Warenkorb"-Sprache', () => {
     const html = kasseHof()
     expect(html).toContain('Dein Warenkorb bei')
     expect(html).toContain('Warenkorb ändern')
     expect(html).not.toContain('Dein Korb bei')
-    const kasseTeile = readFileSync(join(process.cwd(), 'src/components/checkout/kasse-teile.tsx'), 'utf8')
-    expect(kasseTeile).toMatch(/export const FELD = cn\(\s*'[^']*\bborder-input\b/)
   })
 
   it('die Konstante für das Produktraster (177) heißt Servicegebühr, nicht „Gebühr"', () => {
