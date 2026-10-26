@@ -115,10 +115,10 @@ describe('Register T1 und Manifest', () => {
     expect(quelle('src/lib/warenkorb-speicher.ts')).toMatch(/localStorage/)
   })
 
-  it('das Manifest bleibt: installierbar als eigenständige App, Start auf Heute', () => {
+  it('das Manifest bleibt: installierbar als eigenständige App, Start über /app (N31, leitet den Hof auf Heute)', () => {
     const m = manifest()
     expect(m.display).toBe('standalone')
-    expect(m.start_url).toBe('/dashboard')
+    expect(m.start_url).toBe('/app')
   })
 })
 

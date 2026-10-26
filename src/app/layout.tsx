@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist, Fraunces, Instrument_Sans } from 'next/font/google'
 import { ThemeProvider } from 'next-themes'
-import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
+import { AnalyticsGefiltert } from '@/components/shared/analytics-gefiltert'
 import { CookieBanner } from '@/components/cookie-banner'
 import { UmgebungsBanner, UmgebungsBannerLink } from '@/components/shared/umgebungs-banner'
 import { RueckwegMerker } from '@/components/shared/rueckweg-merker'
@@ -12,10 +12,14 @@ import { OG_LOCALE } from '@/lib/json-ld'
 import './globals.css'
 import { MARKE } from '@/lib/marke'
 
+// Geist ist die Schrift der Bestandsseiten und wird nur noch geladen, wenn
+// eine davon sie braucht — vorgeladen wird die Schrift des neuen Designs
+// (Instrument Sans, unten), die jede Shell nutzt.
 const geist = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
   display: 'swap',
+  preload: false,
 })
 
 // Beide Schriften des Design-Systems (docs/ai/DESIGN_SYSTEM.md) kommen über
@@ -23,7 +27,9 @@ const geist = Geist({
 // Browser spricht nie mit Google. Die <link>-Schriften in docs/mockups/ sind
 // nur Referenz. Fraunces für Überschriften und Kennzahlen, Instrument Sans
 // für den übrigen Text im neuen Design (globals.css, --font-sans-aktiv);
-// Geist bleibt, bis die letzte Route umgestellt ist.
+// Geist bleibt, bis die letzte Route umgestellt ist. Fraunces kursiv hat
+// Fundstellen (Hofseite: Leitspruch im Kopf; Startseite: Schriftzug in der
+// Karte) und bleibt deshalb geladen; fällt die letzte weg, entfällt 'italic'.
 const fraunces = Fraunces({
   variable: '--font-fraunces',
   subsets: ['latin'],
@@ -35,11 +41,9 @@ const instrumentSans = Instrument_Sans({
   variable: '--font-instrument-sans',
   subsets: ['latin'],
   display: 'swap',
-  // Noch nicht vorladen: Bis die erste Route in eine Shell des neuen Designs
-  // umzieht (data-design="neu"), nutzt nur die interne Vorschau die Schrift —
-  // jede Bestandsseite lüde sonst eine woff2 umsonst. Das Gate, das die erste
-  // Route umstellt, setzt preload auf true.
-  preload: false,
+  // Vorladen: Die Shells des neuen Designs (data-design="neu") setzen sie auf
+  // jeder umgestellten Route als Fließtext — die woff2 liegt im ersten Wurf.
+  preload: true,
 })
 
 // In der Testumgebung trägt JEDER Browser-Tab das Präfix „[TEST] " — auch
@@ -61,6 +65,9 @@ export function generateMetadata(): Metadata {
     description: 'Regionale Lebensmittel direkt vom Bauern',
     // Gilt nur für Seiten ohne eigenes openGraph — eines ersetzt dieses ganz (Next mischt flach).
     openGraph: { locale: OG_LOCALE },
+    // Installiert auf dem iPhone: eigene Vollbild-Oberfläche, die Statusleiste
+    // liegt durchsichtig über der Seite (dazu viewportFit 'cover').
+    appleWebApp: { capable: true, title: MARKE, statusBarStyle: 'black-translucent' },
   }
 }
 
@@ -78,6 +85,10 @@ export function generateViewport(): Viewport {
   return {
     width: 'device-width',
     initialScale: 1,
+    // Die Seite reicht bis unter Kerbe und Home-Indikator; die Stellen mit
+    // env(safe-area-inset-*) halten den Inhalt davon frei. Ohne 'cover' liefert
+    // der Browser dort immer 0.
+    viewportFit: 'cover',
     // In der Testumgebung ist die Browserleiste die Warnfarbe des Banners —
     // Bernstein, bei Widersprüchen Rot —, damit das Handy es auch dann zeigt,
     // wenn das Banner längst weggescrollt ist. Feste Werte, unabhängig vom Modus.
@@ -120,8 +131,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
         </ThemeProvider>
         {/* Vercel Web Analytics: cookielose Reichweitenmessung ohne
             Wiedererkennung — rendert nichts Sichtbares und setzt nichts
-            auf dem Gerät (deshalb auch nicht Teil des Cookie-Banners). */}
-        <Analytics />
+            auf dem Gerät (deshalb auch nicht Teil des Cookie-Banners).
+            Gefiltert: Seiten mit Token in der Adresse und heikle Parameter
+            gehen nie raus (src/lib/analytics-filter.ts). */}
+        <AnalyticsGefiltert />
         {/* „Zur echten Seite" (Testumgebung, Register Z3): sichtbar im Balken
             oben, im DOM bewusst zuletzt — „Zum Inhalt springen" der Shells
             bleibt so der erste Link der Seite. */}

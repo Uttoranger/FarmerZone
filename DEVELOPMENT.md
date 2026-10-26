@@ -5839,6 +5839,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Formprüfung:** Die beiden Schemas mit `sig` (`src/schemas/bestaetigung.ts`, `src/schemas/abo.ts`) ließen nur 64 Hex durch; sie nehmen jetzt auch `2.` davor, sonst zeigte die Bestätigungsseite mit `LINK_SECRET` nur „eingegangen“.
 - **Bleibt:** `bremsSchluessel` (Bremsen) und der Hash des Bar-Tokens hängen nicht an Links in Mails und bleiben, wie sie sind. Der Double-Opt-in-Link (`abo-bestaetigung-token.ts`, 7 Tage) gehört nicht zu den drei Dateien und signiert weiter mit `BETTER_AUTH_SECRET`.
 
+## Plattform und Schrift: Viewport, iPhone-App, App-Start, Analytics-Filter (Register N31; Nr. 172, Lauf 25)
+
+- **Viewport:** `viewportFit: 'cover'`, sonst unverändert. Ohne das liefert der Browser für `env(safe-area-inset-*)` immer 0, obwohl über 20 Stellen es nutzen. Prüfschritt auf dem iPhone steht im Bericht 172.
+- **Schriften:** Instrument Sans wird vorgeladen (jede Shell nutzt sie), Geist nicht mehr. Fraunces kursiv bleibt: zwei Fundstellen (Leitspruch im Hofseiten-Kopf, Schriftzug in der Karte des Startseiten-Kopfes).
+- **Manifest:** `id`/`scope` `/`, `lang` `de-AT`, `start_url` `/app`, `background_color` = `--fz-bg` dunkel, drei `shortcuts`. `/app` (`src/app/app/route.ts`) leitet nach der Sitzung weiter (Hof `/dashboard`, Admin ohne Hof `/admin`, sonst `/`), 307, nie zwischengespeichert, noindex. `app` steht deshalb in `RESERVED_SLUGS` und `KEINE_HOFSEITE`.
+- **iPhone:** `appleWebApp` mit Marke und `black-translucent`.
+- **Analytics:** `AnalyticsGefiltert` (Client-Hülle, weil `beforeSend` eine Funktion ist) ruft `filtereAnalyticsEreignis` (`src/lib/analytics-filter.ts`): Seiten aus `NIE_MELDEN_PFADE` und die übrigen `no-referrer`-Seiten (u. a. Bar-Bestätigung) gehen nie raus, `NIE_MELDEN_PARAMETER` werden aus der Adresse gestrichen. Die Zusatzliste wird in `tests/analytics-filter.test.ts` gegen `next.config.ts` abgeglichen.
+
 ## Nützliche Befehle
 
 ```bash
