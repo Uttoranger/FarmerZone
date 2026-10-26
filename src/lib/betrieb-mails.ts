@@ -163,6 +163,10 @@ export const FEHLER_TEXTE: Record<string, FehlerText> = {
   bezug_ungueltig: { grund: 'Der Bezug der Mail war ungültig', kurz: 'Bezug ungültig', tun: UNS_MELDEN, jetztSchicken: false, http: null },
   abo_abgemeldet: { grund: 'Das Abo ist abgemeldet', kurz: 'Abo abgemeldet', tun: 'Nichts zu tun – wer sich abmeldet, bekommt nichts mehr.', jetztSchicken: false, http: null },
   beitrag_fehlt: { grund: 'Den Beitrag gibt es nicht mehr', kurz: 'Beitrag gelöscht', tun: 'Nichts zu tun – der Hof hat den Beitrag gelöscht.', jetztSchicken: false, http: null },
+  // Nr. 195 (Audit A4): Ein Rückweg nimmt „abholbereit“ zurück bzw. die Bestellung ist nicht mehr bereit – nie nachschicken.
+  zurueckgenommen: { grund: 'Der Hof hat „Gepackt“ zurückgenommen', kurz: 'Zurückgenommen', tun: 'Nichts zu tun – die Bestellung ist nicht mehr abholbereit.', jetztSchicken: false, http: null },
+  nicht_mehr_bereit: { grund: 'Die Bestellung ist nicht mehr abholbereit', kurz: 'Nicht mehr bereit', tun: 'Nichts zu tun – die Mail passt nicht mehr zur Bestellung.', jetztSchicken: false, http: null },
+  bestellung_fehlt: { grund: 'Die Bestellung gibt es nicht mehr', kurz: 'Bestellung fehlt', tun: 'Nichts zu tun – die Mail hat keinen Bezug mehr.', jetztSchicken: false, http: null },
 }
 
 /** Grund, Kurzform und „Was tun“ zu einem Code — ein unbekannter mit Ersatztext, „Jetzt schicken“ bleibt dann erlaubt. */
