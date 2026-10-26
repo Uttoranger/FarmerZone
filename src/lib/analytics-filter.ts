@@ -19,6 +19,8 @@ export const ANALYTICS_ZUSATZ_PFADE = [
   '/account/unsubscribe',
   '/api/abmelden',
   '/api/orders/confirm/:token',
+  // Nr. 182: die Vorschau der Startseite trägt Signatur und Ablauf in der Adresse.
+  '/startseite-vorschau',
 ] as const
 
 /** Nexts einfache Pfadmuster (`:name`, `:name*`) als Ausdruck; mehr kommt in den Listen nicht vor. */
