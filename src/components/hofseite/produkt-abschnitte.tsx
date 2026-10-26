@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Info } from 'lucide-react'
 import type { KategorieAbschnitt } from '@/lib/bereiche-anzeige'
 import { mitAnzahl } from '@/lib/format'
@@ -13,10 +14,13 @@ import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 const ALLE_ANKER = 'produkte-alle'
 
 /**
- * Wie weit ein Sprungziel unter dem oberen Rand stehen bleibt: unter der
- * Kopfzeile der Shell (56 px, ab md 64 px) und der klebenden Reiterleiste.
+ * Wie weit ein Sprungziel unter dem klebenden Block stehen bleibt. Kopf und
+ * Block (Hofzeile, Reiter, Chips — Nr. 177) hält schon das scroll-padding der
+ * Hofseite frei (globals.css, gemessene Blockhöhe); der Browser zählt
+ * scroll-margin dazu. Hier nur noch etwas Luft, sonst stünde der Abschnitt
+ * nach einem Chip einen halben Bildschirm tief.
  */
-export const SPRUNGZIEL_UNTER_LEISTE = 'scroll-mt-28 md:scroll-mt-32'
+export const SPRUNGZIEL_UNTER_LEISTE = 'scroll-mt-3'
 
 /** Erkennungsstreifen des Beobachters: zwischen 30 % und 40 % der Fensterhöhe (wie bisher auf der Hofseite). */
 const SPY_STREIFEN = '-30% 0px -60% 0px'
@@ -42,6 +46,12 @@ const CHIP = cn(
  * sonst der unterste sichtbare Abschnitt — der Beobachter überschreibt nie
  * unterwegs den Chip, den jemand gedrückt hat (Meldung cmua8bof).
  *
+ * `chipBlock` (Nr. 177): Die Hofseite hält im klebenden Block unter dem Kopf
+ * einen Platz bereit — am Handy kommen die Chips per Portal dorthin und
+ * kleben mit Hofzeile und Reitern in EINEM Element; ab md bleiben sie im
+ * Fluss. Bis der Platz steht (`platz` null, Server-HTML), hält die Hofseite
+ * seine Höhe frei. Ohne `chipBlock` stehen die Chips überall im Fluss.
+ *
  * `springeZu`: ein Abschnitt, zu dem die Seite beim Öffnen springt — der
  * Futter-Abschnitt für `?bereich=futter`. Einmal; danach meldet
  * `onGesprungen`, damit ein späterer Reiterwechsel nicht wieder springt.
@@ -51,12 +61,14 @@ export function ProduktAbschnitte<P extends { id: string }>({
   gebuehrHinweis,
   springeZu,
   onGesprungen,
+  chipBlock,
   renderKarte,
 }: {
   abschnitte: readonly KategorieAbschnitt<P>[]
   gebuehrHinweis: string | null
   springeZu?: string | null
   onGesprungen?: () => void
+  chipBlock?: { platz: HTMLElement | null }
   renderKarte: (p: P) => ReactNode
 }): React.JSX.Element {
   const gesamt = abschnitte.reduce((n, a) => n + a.produkte.length, 0)
@@ -65,6 +77,8 @@ export function ProduktAbschnitte<P extends { id: string }>({
   const [aktiv, setAktiv] = useState(() => springeZu ?? ALLE_ANKER)
   const sprungZiel = useRef<string | null>(null)
   const sprungTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const chipReihe = useRef<HTMLUListElement>(null)
+  const chipPlatz = chipBlock?.platz ?? null
 
   function sperreAuf(anker: string) {
     sprungZiel.current = anker
@@ -117,6 +131,20 @@ export function ProduktAbschnitte<P extends { id: string }>({
     return () => beobachter.disconnect()
   }, [reihenfolgeText])
 
+  // Die Chip-Reihe im Block klebt am Handy und scrollt seitlich: Der markierte Chip
+  // rückt in den sichtbaren Teil, sonst stünde „Honig" gewählt, aber außer
+  // Sicht. Nur die Reihe scrollt (scrollTo), nie das Fenster.
+  useEffect(() => {
+    const reihe = chipReihe.current
+    const chip = reihe?.querySelector<HTMLElement>(`[data-chip="${aktiv}"]`)
+    if (!reihe || !chip) return
+    const links = chip.offsetLeft - reihe.offsetLeft
+    if (links < reihe.scrollLeft || links + chip.offsetWidth > reihe.scrollLeft + reihe.clientWidth) {
+      reihe.scrollTo({ left: Math.max(0, links - 16) })
+    }
+  // chipPlatz: Erst mit dem Platz im Block gibt es die Reihe, die scrollt.
+  }, [aktiv, chipPlatz])
+
   function beimChip(e: MouseEvent<HTMLAnchorElement>, anker: string) {
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
     e.preventDefault()
@@ -131,37 +159,56 @@ export function ProduktAbschnitte<P extends { id: string }>({
     ...abschnitte.map((a) => ({ anker: a.anker, titel: a.titel, anzahl: a.produkte.length })),
   ]
 
+  // Dieselbe Reihe im Fluss und im Block — eine Quelle für Chips und Markierung.
+  function chipReiheInhalt(ref: typeof chipReihe | null, klassen: string) {
+    return (
+      <ul ref={ref ?? undefined} className={klassen}>
+        {chips.map((chip) => {
+          const gewaehlt = aktiv === chip.anker
+          return (
+            <li key={chip.anker}>
+              <a
+                href={`#${chip.anker}`}
+                data-chip={chip.anker}
+                onClick={(e) => beimChip(e, chip.anker)}
+                aria-current={gewaehlt ? 'true' : undefined}
+                className={cn(
+                  CHIP,
+                  gewaehlt
+                    ? 'border-foreground bg-foreground font-semibold text-background'
+                    : 'border-border bg-card font-medium text-foreground hover:bg-muted'
+                )}
+              >
+                {chip.titel}
+                <span className={cn('tabular-nums', gewaehlt ? 'text-background' : 'text-muted-foreground')}>· {chip.anzahl}</span>
+              </a>
+            </li>
+          )
+        })}
+      </ul>
+    )
+  }
+
   return (
     <div id={ALLE_ANKER} className={cn('flex flex-col gap-5', SPRUNGZIEL_UNTER_LEISTE)}>
       {abschnitte.length > 1 && (
-        <nav aria-label="Zu einer Kategorie springen" className="-mx-4 overflow-x-auto px-4 py-1 md:mx-0 md:px-0">
-          <ul className="flex gap-2 md:flex-wrap">
-            {chips.map((chip) => {
-              const gewaehlt = aktiv === chip.anker
-              return (
-                <li key={chip.anker}>
-                  <a
-                    href={`#${chip.anker}`}
-                    onClick={(e) => beimChip(e, chip.anker)}
-                    aria-current={gewaehlt ? 'true' : undefined}
-                    className={cn(
-                      CHIP,
-                      gewaehlt
-                        ? 'border-foreground bg-foreground font-semibold text-background'
-                        : 'border-border bg-card font-medium text-foreground hover:bg-muted'
-                    )}
-                  >
-                    {chip.titel}
-                    <span className={cn('tabular-nums', gewaehlt ? 'text-background' : 'text-muted-foreground')}>
-                      · {chip.anzahl}
-                    </span>
-                  </a>
-                </li>
-              )
-            })}
-          </ul>
+        // Im klebenden Block nur ab md sichtbar; am Handy steht die Reihe im Block (Portal unten).
+        <nav
+          aria-label="Zu einer Kategorie springen"
+          className={cn('-mx-4 overflow-x-auto px-4 py-1 md:mx-0 md:px-0', chipBlock && 'hidden md:block')}
+        >
+          {chipReiheInhalt(null, 'flex gap-2 md:flex-wrap')}
         </nav>
       )}
+      {abschnitte.length > 1 &&
+        chipPlatz &&
+        createPortal(
+          // Am Handy im klebenden Block der Hofseite unter den Reitern (Meldung „Sprungmarken am Handy"); eigene Fläche mit Linie.
+          <nav aria-label="Zu einer Kategorie springen" className="border-b border-border bg-background">
+            {chipReiheInhalt(chipReihe, 'flex gap-2 overflow-x-auto px-4 py-1')}
+          </nav>,
+          chipPlatz
+        )}
 
       {gebuehrHinweis && (
         <Hinweiskarte symbol={Info} className="py-3">

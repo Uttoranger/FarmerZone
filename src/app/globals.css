@@ -548,4 +548,47 @@
       scroll-padding-bottom: 9.5rem;
     }
   }
+  /* Dasselbe in KundeShell und HofShell (Nr. 177, Muster der Kasse): Der
+     Browser scrollt ein fokussiertes Element nie unter den klebenden Kopf und
+     nie unter die Unterleiste samt Mittelknopf. Die Shells markieren ihren
+     Rahmen (data-scroll-rand); die Zahlen sind die Maße der KundeShell
+     (--kunde-kopf 57/65 px, --kunde-unterleiste 69 px plus Home-Indicator,
+     --kunde-ueberstand 20 px, src/lib/kunde-shell-masse.ts) — die Wurzel sieht
+     die Variablen am Rahmen der Shell nicht, tests/hofseite-orientierung.test.ts
+     koppelt sie. Auf der Hofseite kommt der klebende Block dazu (Hofzeile,
+     Reiter, Chips — EIN Element, data-klebe-block): seine gemessene Höhe
+     (--hof-klebeblock, hofseite-kunde.tsx), bis zur ersten Messung die Maße aus
+     src/lib/hofseite-orientierung.ts (Hofzeile 48, Reiter 49, Chips 45 px —
+     die Chips nur, wo ihr Platz im Block steht, data-chips-kleben). */
+  html:has([data-scroll-rand^='kunde']) {
+    scroll-padding-top: 57px;
+  }
+  @media (max-width: 767px) {
+    html:has([data-scroll-rand='kunde']),
+    html:has([data-scroll-rand='hof']) {
+      scroll-padding-bottom: calc(89px + env(safe-area-inset-bottom));
+    }
+    /* Im Hofbereich klebt oben nur der Unterseiten-Kopf (56 px samt Linie 57). */
+    html:has([data-scroll-rand='hof']):has([data-unterseiten-leiste]) {
+      scroll-padding-top: 57px;
+    }
+    /* Hofseite: Kopf und Block kleben; unten zusätzlich Korb-Leiste und Bestätigungszeile. */
+    html:has([data-scroll-rand='kunde']):has([data-klebe-block]) {
+      scroll-padding-top: calc(57px + var(--hof-klebeblock, 97px));
+      scroll-padding-bottom: calc(9.5rem + 3.75rem + env(safe-area-inset-bottom));
+    }
+    /* Im Reiter Produkte gehört die Chip-Reihe zum Block. */
+    html:has([data-scroll-rand='kunde']):has([data-chips-kleben]) {
+      scroll-padding-top: calc(57px + var(--hof-klebeblock, 142px));
+    }
+  }
+  @media (min-width: 768px) {
+    html:has([data-scroll-rand^='kunde']) {
+      scroll-padding-top: 65px;
+    }
+    /* Ab md besteht der Block der Hofseite nur aus der Reiterleiste. */
+    html:has([data-scroll-rand='kunde']):has([data-klebe-block]) {
+      scroll-padding-top: calc(65px + var(--hof-klebeblock, 49px));
+    }
+  }
 }

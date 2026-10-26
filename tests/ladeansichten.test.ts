@@ -163,23 +163,19 @@ describe('Ladeansichten — jede öffentliche Route, die auf Daten wartet, zeigt
   it('bringt die Kopfleiste in ihrer echten Höhe mit — die Gruppe hat kein Layout', () => {
     // Die Kundenseiten rendern ihre Kopfleiste selbst (56 px, ab md 64).
     // Fehlt sie im Skeleton, springt die Seite beim Umschalten um ihre Höhe.
-    // Die Kasse steht seit Nr. 12 in der Fokus-Shell, die Bar-Bestätigung
-    // seit Nr. 54: deren Kopf ist 52 px hoch (ab md 64) — der Platzhalter hat
-    // genau diese Maße.
-    const FOKUS_SHELL = new Set([
-      'src/app/(public)/[farmSlug]/checkout/loading.tsx',
-      'src/app/(public)/[farmSlug]/bestaetigen/[token]/loading.tsx',
-    ])
+    // Seit Nr. 177 hat auch die Fokus-Shell (Kasse, Bar-Bestätigung) 56 px —
+    // vorher 52 px mit eigener Ausnahme hier.
     for (const ansicht of LADEANSICHTEN) {
-      expect(liesDatei(ansicht.datei), `${ansicht.zweck} ohne Kopfleisten-Platzhalter`).toMatch(
-        FOKUS_SHELL.has(ansicht.datei) ? /h-\[52px\][^"]*md:h-16/ : /h-14[^"]*md:h-16/
-      )
+      expect(liesDatei(ansicht.datei), `${ansicht.zweck} ohne Kopfleisten-Platzhalter`).toMatch(/h-14[^"]*md:h-16/)
     }
   })
 
   it('die Kasse: Kopf-Platzhalter in den Maßen der Fokus-Shell', () => {
-    // Gegenprobe zur Ausnahme oben: Die Shell hat wirklich 52 px / ab md 64 px.
-    expect(liesDatei('src/components/shells/kunde-shell.tsx')).toMatch(/h-\[52px\][^"]*md:h-16/)
+    // Die Fokus-Shell hat wirklich 56 px / ab md 64 px (Nr. 177) — und keine 52 px mehr (Gegenprobe zum alten Stand).
+    const fokusShell = liesDatei('src/components/shells/kunde-shell.tsx').split('export function KundeFokusShell(')[1]
+    expect(fokusShell).toMatch(/flex h-14 max-w-\[1200px\][^"]*md:h-16/)
+    expect(fokusShell).not.toMatch(/h-\[52px\]/)
+    expect(liesDatei('src/app/(public)/[farmSlug]/checkout/loading.tsx')).not.toMatch(/h-\[52px\]/)
     expect(liesDatei('src/app/(public)/[farmSlug]/checkout/loading.tsx')).toContain('data-design="neu"')
   })
 

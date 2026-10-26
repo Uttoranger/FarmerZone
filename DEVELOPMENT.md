@@ -5928,6 +5928,15 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Startvideo:** Pause-Knopf (44 px, `aria-pressed`, Wahl im localStorage), kein Video im Datensparmodus; es steht erst nach der Prüfung im Browser da.
 - **Fehlertext-Regel:** `docs/ai/DESIGN_SYSTEM.md` und `tests/fehlertext-wache.test.ts` (Bestandsliste, schrumpft nur).
 
+## Hofseite und Navigation: immer wissen, wo man ist (Register N30; Nr. 177, Lauf 25, 26.10.2026)
+
+- **Warum:** Auf der Hofseite am Handy scrollten Rückweg und Hofname weg, die Kategorie-Chips klebten nicht (Meldung „Sprungmarken am Handy"), in der Unterleiste war nichts aktiv, und jedes „+" öffnete das Korb-Blatt — wer fünf Dinge kaufte, schloss es fünfmal (Blatt-Pingpong). Board system-sterne-hofseite-orientierung.
+- **Klebender Block (Nachbesserung Runde 1):** Hofzeile (48 px), Reiter (49) und Chips (45) kleben am Handy als EIN `sticky`-Element (`KLEBE_BLOCK`). Erst waren es drei klebende Teile mit gerechneten Abständen (`top-[104px]`, `top-[153px]`) — bei größerer Schrift oder umbrechenden Reitern überlappten sie oder ließen eine Lücke. Die Chips stecken im Produktraster; sie kommen per Portal in ihren Platz im Block, dessen Höhe schon im Server-HTML frei bleibt (sonst spränge der Inhalt nach dem Laden). Weil der Block jetzt unter dem Titelbild direkt über den Reitern steht, beginnt die Hofzeile am Handy dort und klebt ab dann; ganz oben stehen Titelbild und Name. Die Hofseite misst die Blockhöhe (ResizeObserver) und schreibt sie als `--hof-klebeblock` an die Wurzel; `scroll-padding-top` rechnet damit. Sprungziele der Chips hatten zusätzlich 13 rem scroll-margin — der Browser zählt beides zusammen, jetzt nur noch Luft.
+- **scroll-padding:** gehört an `html`, die Wurzel sieht die CSS-Variablen am Rahmen der Shell nicht. Darum markieren die Shells ihren Rahmen und `globals.css` nennt die Zahlen; ein Test koppelt sie an `KUNDE_SHELL_MASSE`.
+- **N30:** Der Merker liegt im sessionStorage (eine Sitzung = ein Tab). Er wird erst nach einem gelungenen Griff gesetzt — scheitert das erste „+" am Netz, öffnet das wiederholte das Blatt. Fehler stehen nicht mehr im Toast, sondern in derselben Zeile an der Aktion (N29), geglättet über `korbFehlerText` (Übergabe aus Nr. 175: rohe Servertexte, Netzsatz bei der Menge).
+- **Rückweg Hofbereich:** `UnterseitenKopf` nimmt mit `tippAufZiel` dieselbe Regel wie „‹ Alle Höfe"; Schritt zurück per `history.back()` (dasselbe wie `router.back()` im App-Router, aber ohne Router-Hook beim Rendern).
+- **Offen:** „+ Gebühr" an der Korb-Leiste bleibt bis zur Konstante aus Nr. 176; Filter und Suche der Kundenliste reist nur über den Verlauf mit, nicht über den Link (die Liste gibt sie den Detail-Links nicht mit).
+
 ## Nützliche Befehle
 
 ```bash

@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ShoppingCart, ShoppingBasket, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, Camera, Loader2, GripVertical, ChevronRight, Sprout } from 'lucide-react'
+import { ShoppingCart, ShoppingBasket, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, Camera, Loader2, GripVertical, ChevronRight, Sprout, Check, WifiOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart, useKorbHinweis, zeigeKorbHinweis } from '@/lib/use-cart'
 import { gleicheKorbMitHofseite } from '@/lib/reservierung'
@@ -19,7 +19,9 @@ import { VORSCHAU_KAUF_HINWEIS, korbErlaubt } from '@/lib/hofseite-vorschau'
 import { produktZustand, streifenText, type ProduktZustand } from '@/lib/produkt-sichtbarkeit'
 import { ImShopSchalter } from '@/components/products/im-shop-schalter'
 import { kartenZustand, kategorieAbschnitte, ruhenderKnopfText, zeigeKaufknopf, type KaufSperre } from '@/lib/bereiche-anzeige'
-import { SCHAUFENSTER_PRODUKTE, mengeAbgelehntText, oeffnetKorbHier, stehtNurAmHandy, uebersichtProdukte } from '@/lib/hofseite-kunde'
+import { SCHAUFENSTER_PRODUKTE, oeffnetKorbHier, stehtNurAmHandy, uebersichtProdukte } from '@/lib/hofseite-kunde'
+import { BESTAETIGUNG_MS, RUECKGAENGIG, blattBeimErstenMal, imKorbText, korbFehlerText } from '@/lib/hofseite-orientierung'
+import { NETZ_KNOPF } from '@/lib/netz'
 import { bereichAusParameter } from '@/schemas/hoefe-filter'
 import type { AnzeigeBereich } from '@/lib/taxonomie'
 import type { PublicProduct } from '@/server/queries/farm'
@@ -99,6 +101,12 @@ type Props = {
    * Kein zweiter Warenkorb: Ein zweiter useCart führte seinen eigenen Korb.
    */
   inDenKorb?: Ref<InDenKorb>
+  /**
+   * Die Hofseite hält im klebenden Block einen Platz für die Kategorie-Chips
+   * bereit (Nr. 177): Am Handy kommen sie dorthin, ab md bleiben sie im Fluss.
+   * `platz` ist null, bis der Platz im Dokument steht. Ohne: wie bisher.
+   */
+  chipBlock?: { platz: HTMLElement | null }
 }
 
 
@@ -499,6 +507,19 @@ export function useBereichWunsch(): AnzeigeBereich | null {
 /** Ein Produkt in den Korb legen — so, wie es der Kaufknopf der Produktkarte tut (Nr. 128, `inDenKorb`). */
 export type InDenKorb = (produkt: PublicProduct) => void
 
+/**
+ * Die kurze Zeile über der Korb-Leiste (Register N30, Nr. 177): nach jedem
+ * „In den Korb" außer dem ersten einer Sitzung „… ist im Korb" mit
+ * „Rückgängig" — oder, wenn der Griff in den Korb scheiterte, der Grund, am
+ * Netz mit „Nochmal" (Register N29).
+ */
+type KorbZeile =
+  | { art: 'im-korb'; nr: number; name: string; produktId: string; vorher: number }
+  | { art: 'fehler'; nr: number; text: string; nochmal: (() => void) | null }
+
+/** Der sessionStorage des Browsers — Zugriff kann werfen (gesperrter Speicher); blattBeimErstenMal fängt das. */
+const sitzungsSpeicher = () => window.sessionStorage
+
 export function ProductGrid({
   products,
   farmId,
@@ -519,6 +540,7 @@ export function ProductGrid({
   produktLink = (id) => produktPfad(farmSlug, id),
   platzUnten = true,
   inDenKorb,
+  chipBlock,
 }: Props) {
   const isEditMode = ownerMode && mode !== 'preview'
   // EINE Regel für jeden Weg in den Korb (Kaufknopf, Nachbestell-Link,
@@ -582,6 +604,16 @@ export function ProductGrid({
   const [cartOpen, setCartOpen] = useState(false)
   const [addingId, setAddingId] = useState<string | null>(null)
   const [showWelcomeBack, setShowWelcomeBack] = useState(false)
+  const [korbZeile, setKorbZeile] = useState<KorbZeile | null>(null)
+
+  // „… ist im Korb" steht 6 s (BESTAETIGUNG_MS); ein Fehler bleibt, bis die
+  // Kundin wieder etwas tut — sein „Nochmal" soll nicht unter dem Finger verschwinden.
+  const zeileNr = korbZeile?.art === 'im-korb' ? korbZeile.nr : null
+  useEffect(() => {
+    if (zeileNr === null) return
+    const weg = setTimeout(() => setKorbZeile((z) => (z?.nr === zeileNr ? null : z)), BESTAETIGUNG_MS)
+    return () => clearTimeout(weg)
+  }, [zeileNr])
 
   const { items, count, total, isHydrated, addItem, updateQuantity, removeItem, ersetzeKorb } = useCart(farmId, farmSlug)
   const korbHinweis = useKorbHinweis(farmId)
@@ -662,6 +694,9 @@ export function ProductGrid({
       return
     }
     setAddingId(product.id)
+    setKorbZeile(null)
+    // Die Menge davor — „Rückgängig" setzt genau sie wieder (0: heraus, Halt frei).
+    const vorher = imKorb(product.id)
     const result = await addItem(
       {
         productId: product.id,
@@ -675,12 +710,33 @@ export function ProductGrid({
     )
     setAddingId(null)
 
-    if (result.ok) {
-      toast.success(`${product.name} hinzugefügt`, { duration: 2000 })
-      setCartOpen(true)
-    } else {
-      toast.error(result.error ?? 'Produkt nicht verfügbar')
+    if (!result.ok) {
+      // Nie der rohe Text des Servers (korbFehlerText); am Netz mit „Nochmal" (N29).
+      setKorbZeile({ art: 'fehler', nr: Date.now(), text: korbFehlerText(result, 'legen'), nochmal: result.nochmal ? () => void handleAddToCart(product) : null })
+      return
     }
+    // Register N30: Nur das erste „In den Korb" einer Sitzung öffnet das Blatt,
+    // danach bestätigt die Zeile, und die Korb-Leiste zählt hoch.
+    if (blattBeimErstenMal(sitzungsSpeicher)) setCartOpen(true)
+    else setKorbZeile({ art: 'im-korb', nr: Date.now(), name: product.name, produktId: product.id, vorher })
+  }
+
+  /**
+   * „Rückgängig": die Menge von vorher, über denselben Korb (useCart) — 0 nimmt
+   * das Produkt heraus und gibt den Halt frei (ohne Server, scheitert nicht).
+   * Scheitert das Zurücksetzen, sagt es die Zeile an der Aktion (N29), am Netz
+   * mit „Nochmal" — sonst stünde die Menge still erhöht.
+   */
+  function rueckgaengig(zeile: Extract<KorbZeile, { art: 'im-korb' }>) {
+    setKorbZeile(null)
+    if (zeile.vorher === 0) {
+      removeItem(zeile.produktId)
+      return
+    }
+    void updateQuantity(zeile.produktId, zeile.vorher).then((ergebnis) => {
+      if (ergebnis.ok) return
+      setKorbZeile({ art: 'fehler', nr: Date.now(), text: korbFehlerText(ergebnis, 'menge'), nochmal: ergebnis.nochmal ? () => rueckgaengig(zeile) : null })
+    })
   }
 
   // Ohne Abhängigkeiten nach jedem Rendern: Die Funktion schließt den Korb
@@ -717,10 +773,12 @@ export function ProductGrid({
       toast.info(VORSCHAU_KAUF_HINWEIS)
       return
     }
-    // Lehnt die Reservierung ab (jemand war schneller), sagt die Karte es —
-    // die Menge bleibt dann, wie sie war.
+    // Lehnt die Reservierung ab (jemand war schneller), sagt die Zeile es —
+    // die Menge bleibt dann, wie sie war. Am Netz der Satz aus N29 mit „Nochmal".
+    setKorbZeile(null)
     void updateQuantity(produkt.id, menge).then((ergebnis) => {
-      if (!ergebnis.ok) toast.error(mengeAbgelehntText(ergebnis.error))
+      if (ergebnis.ok) return
+      setKorbZeile({ art: 'fehler', nr: Date.now(), text: korbFehlerText(ergebnis, 'menge'), nochmal: ergebnis.nochmal ? () => mengeAendern(produkt, menge) : null })
     })
   }
 
@@ -794,6 +852,7 @@ export function ProductGrid({
             gebuehrHinweis={gebuehrHinweis}
             springeZu={springeZu}
             onGesprungen={onGesprungen}
+            chipBlock={chipBlock}
             renderKarte={karte}
           />
         )
@@ -886,10 +945,68 @@ export function ProductGrid({
           Am Handy über der Unterleiste der Shell (68 px + Home-Balken), bis
           1024 px unten rechts; ab 1024 px trägt der Mini-Warenkorb der
           rechten Spalte den Korb (hofseite-seitenspalte.tsx). */}
+      {/* Die Bestätigungszeile über der Korb-Leiste (Register N30) — role="status", damit
+          Screenreader sie hören, ohne dass der Fokus springt. */}
+      {mitKorb && korbZeile && (
+        <div
+          role="status"
+          data-korb-zeile={korbZeile.art}
+          // Der Cookie-Hinweis steht darüber, nie darauf (src/lib/cookie-hinweis.ts).
+          data-unten-fest=""
+          className={cn(
+            'fixed inset-x-4 bottom-[calc(68px+env(safe-area-inset-bottom,0px)+5.5rem)] z-40 flex min-h-12 items-center gap-2.5 rounded-2xl border py-1 pr-1 pl-3.5 text-[13.5px] text-foreground shadow-lg md:inset-x-auto md:right-6 md:bottom-[5.25rem] md:w-[360px] lg:bottom-6',
+            korbZeile.art === 'im-korb' ? 'border-zustand-erledigt bg-zustand-erledigt-grund' : 'border-zustand-tun bg-zustand-tun-grund'
+          )}
+        >
+          {korbZeile.art === 'im-korb' ? (
+            <>
+              <Check className="size-[18px] shrink-0 text-zustand-erledigt" strokeWidth={2} aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate" title={korbZeile.name}>
+                {imKorbText(korbZeile.name)}
+              </span>
+              <button
+                type="button"
+                onClick={() => rueckgaengig(korbZeile)}
+                className={cn('inline-flex min-h-11 shrink-0 items-center rounded-full px-3 font-semibold text-brand-text hover:bg-muted', FOKUS_RAHMEN)}
+              >
+                {RUECKGAENGIG}
+              </button>
+            </>
+          ) : (
+            <>
+              {korbZeile.nochmal && <WifiOff className="size-[18px] shrink-0 text-zustand-tun" strokeWidth={1.7} aria-hidden="true" />}
+              <span className="min-w-0 flex-1 py-2">{korbZeile.text}</span>
+              {korbZeile.nochmal ? (
+                <button
+                  type="button"
+                  onClick={korbZeile.nochmal}
+                  className={cn('inline-flex min-h-11 shrink-0 items-center rounded-full px-3 font-semibold text-foreground hover:bg-muted', FOKUS_RAHMEN)}
+                >
+                  {NETZ_KNOPF}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setKorbZeile(null)}
+                  aria-label="Hinweis schließen"
+                  className={cn('flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)}
+                >
+                  <X className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {mitKorb && isHydrated && count > 0 && (
         <button
           type="button"
-          onClick={() => setCartOpen(true)}
+          onClick={() => {
+            // Wer zum Korb tippt, braucht die Bestätigung nicht mehr (N30).
+            setKorbZeile(null)
+            setCartOpen(true)
+          }}
           // Der Cookie-Hinweis steht über der Korb-Leiste, nie darauf (src/lib/cookie-hinweis.ts).
           data-unten-fest=""
           className={cn(

@@ -145,7 +145,7 @@ describe('die Hofseite steht in der KundeShell', () => {
 
   it('die Seite legt die Shell herum, über die Hülle mit der Sitzung im Browser', () => {
     const text = quelle('src/app/(public)/[farmSlug]/page.tsx')
-    expect(text).toMatch(/<KundeShellMitSitzung>\s*<FarmPageView/)
+    expect(text).toMatch(/<KundeShellMitSitzung aktiv="entdecken">\s*<FarmPageView/)
     expect(text).not.toMatch(/KundenKopf|auth\.api|headers\(\)/)
   })
 })
