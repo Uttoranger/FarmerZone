@@ -4,8 +4,8 @@ import { bremseReservieren } from '@/server/bremse-datenbank'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { gibVerwaisteFreiFuerProdukte } from '@/server/verwaiste-bestellungen'
-import { HOF_KAUFBARKEIT_AUSWAHL, pruefeKaufbarkeitHof } from '@/server/warenkorb'
-import { MAX_MENGE } from '@/lib/reservierung'
+import { HOF_KAUFBARKEIT_AUSWAHL, loescheHalte, pruefeKaufbarkeitHof } from '@/server/warenkorb'
+import { MAX_MENGE, neueFrist } from '@/lib/reservierung'
 
 const bodySchema = z.object({
   productId: z.string().min(1),
@@ -15,7 +15,52 @@ const bodySchema = z.object({
   sessionId: z.string().min(1),
 })
 
-const RESERVATION_TTL_MS = 15 * 60 * 1000 // 15 minutes
+const freigabeSchema = z.object({
+  productId: z.string().min(1),
+  sessionId: z.string().min(1),
+})
+
+/**
+ * Wer ein Produkt aus dem Korb nimmt, gibt seinen Halt sofort frei (Register
+ * N28) — sonst hielte er die Ware bis zu 15 Minuten vor anderen fest. Gebremst
+ * wie Reservieren (dieselben Bremsen, derselbe Zähler `reserveIp`), sonst nichts:
+ * keine Fristfreigabe, keine Prüfkette des Hofs — Freigeben ist auch bei
+ * gesperrtem Hof richtig. Gelöscht wird nur der Halt DIESER Sitzung für DIESES
+ * Produkt; die Antwort ist immer dieselbe und verrät nicht, ob es einen gab.
+ * Steht vor POST: Die Verdrahtungs-Wache liest POST bis zum Dateiende.
+ */
+export async function DELETE(request: NextRequest) {
+  const limited = enforceRateLimit('reserve', request)
+  if (limited) return limited
+
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Ungültige Anfrage' }, { status: 400 })
+  }
+
+  const parsed = freigabeSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Ungültige Parameter' }, { status: 400 })
+  }
+
+  const { productId, sessionId } = parsed.data
+
+  const sitzungsLimit = enforceRateLimit('reserve', request, sessionId)
+  if (sitzungsLimit) return sitzungsLimit
+
+  const ueberAlleInstanzen = await bremseReservieren(request)
+  if (ueberAlleInstanzen) return ueberAlleInstanzen
+
+  try {
+    await loescheHalte([productId], sessionId)
+    return NextResponse.json({ ok: true })
+  } catch (e) {
+    console.error('[/api/reserve DELETE]', e)
+    return NextResponse.json({ error: 'Serverfehler bei der Reservierung' }, { status: 500 })
+  }
+}
 
 export async function POST(request: NextRequest) {
   const limited = enforceRateLimit('reserve', request)
@@ -55,7 +100,7 @@ export async function POST(request: NextRequest) {
   if (ueberAlleInstanzen) return ueberAlleInstanzen
 
   const now = new Date()
-  const expiresAt = new Date(now.getTime() + RESERVATION_TTL_MS)
+  const expiresAt = neueFrist(now)
 
   try {
     // 0. Frist gilt beim Lesen: Verwaiste Bestellungen dieses Hofs geben ihre

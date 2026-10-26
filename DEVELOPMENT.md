@@ -1185,11 +1185,12 @@ Tabelle echte Policies.
 
 **Die Frist wird beim Lesen durchgesetzt**, nicht vom Cron. Jede Abfrage fremder Halte filtert auf `expiresAt > jetzt`; damit gilt die 15-Minuten-Frist auf die Sekunde genau. `/api/cron/cleanup-reservations` löscht nur noch verfallene Zeilen und ist Aufräumer, nicht die Wahrheit — deshalb schadet es nicht, dass er im Hobby-Tarif einmal täglich läuft.
 
-Die Entscheidung trifft an EINER Stelle `pruefeWarenkorb` (`src/lib/reservierung.ts`, rein und getestet); angewendet wird sie über `src/server/warenkorb.ts` an drei Momenten:
+Die Entscheidung trifft an EINER Stelle `pruefeWarenkorb` (`src/lib/reservierung.ts`, rein und getestet); angewendet wird sie über `src/server/warenkorb.ts` an zwei Momenten:
 
-1. beim Laden des Warenkorbs,
-2. beim Öffnen des Checkouts (`POST /api/warenkorb/pruefen`),
-3. im `POST /api/checkout`, bevor irgendetwas geschrieben wird.
+1. beim Öffnen des Checkouts (`POST /api/warenkorb/pruefen`, mit Erneuern der Halte),
+2. im `POST /api/checkout`, bevor irgendetwas geschrieben wird (verbindlich).
+
+Davor gleicht die Hofseite beim Laden ab, im Browser und ohne Halt (`gleicheKorbMitHofseite`, Register N28, seit Nr. 169) — „beim Laden des Warenkorbs" stand hier bis dahin als dritter Moment, gebaut war er nie.
 
 Eine abgelaufene Position wird im Checkout **nie** durchgewunken: Die Antwort trägt `code: RESERVIERUNG_ABGELAUFEN`, den Grund im Klartext und den berichtigten Warenkorb, damit die Kundin sieht, was noch gilt.
 
@@ -5838,6 +5839,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Altes Format genau erhalten:** Nur der Bestell-Link hatte ein Zweck-Präfix (`bestellung-ansehen:`); Nachbestell- und Abmelde-Token signierten den nackten Inhalt. Ohne Kennung bleibt das so, mit Kennung trägt jeder Zweck sein Präfix (`nachbestellen:`, `abmelden:`). Die Tokens werden am ersten Punkt getrennt (Base64url hat keinen Punkt), damit `<inhalt>.2.<hex>` geht.
 - **Formprüfung:** Die beiden Schemas mit `sig` (`src/schemas/bestaetigung.ts`, `src/schemas/abo.ts`) ließen nur 64 Hex durch; sie nehmen jetzt auch `2.` davor, sonst zeigte die Bestätigungsseite mit `LINK_SECRET` nur „eingegangen“.
 - **Bleibt:** `bremsSchluessel` (Bremsen) und der Hash des Bar-Tokens hängen nicht an Links in Mails und bleiben, wie sie sind. Der Double-Opt-in-Link (`abo-bestaetigung-token.ts`, 7 Tage) gehört nicht zu den drei Dateien und signiert weiter mit `BETTER_AUTH_SECRET`.
+
+## Warenkorb ehrlich (Register N28; Nr. 169, Lauf 25, 25.10.2026)
+
+- **Lücke:** Der Korb im localStorage läuft nie ab. Die Hofseite zeigte ihn ungeprüft — gelöschte Produkte, alte Preise, Mengen über dem Bestand —, abgeglichen wurde erst in der Kasse. Entfernen nahm das Produkt nur im Browser heraus, der Halt blieb bis zu 15 Minuten. Fiel in der Kasse alles aus dem Korb, stand nur „Dein Korb ist leer" da (Fund aus Bericht 165).
+- **Fix:** `gleicheKorbMitHofseite` (src/lib/reservierung.ts) gleicht einmal nach dem Hydrieren im Produktraster ab, gegen die Produkte der Seite (Preisvergleich auf den Cent über `preisAbweichungen`), geschrieben über `ersetzeKorb` (= `persist`, ohne Änderung kein Schreiben). Der Satz steht im Korb-Blatt und im Mini-Warenkorb (`useKorbHinweis`, ein kleiner Speicher im Modul use-cart.ts, weil beide keinen gemeinsamen Zustand haben), bis sich der Korb ändert. Mit Kaufsperre bleibt der Korb. `DELETE /api/reserve` gibt den Halt beim Entfernen frei. `/api/reserve` nimmt die Frist aus `neueFrist`; das Korb-Blatt die Minuten aus `RESERVIERUNG_MINUTEN`. `KasseLeer` zeigt den Grund über dem leeren Zustand.
+- **Prüfmomente:** Hofseite beim Laden ohne Halt (nur `ProductGrid`, nur mit Korb); Kasse beim Öffnen mit Halt (`/api/warenkorb/pruefen`); Kauf verbindlich (`/api/checkout`). Die Produktseite gleicht nicht ab.
+- **Randfall:** Ohne verfügbare Produkte und ohne Abholzeit rendert die Hofseite kein `ProductGrid` (und keine rechte Spalte) — dann gleicht sie nicht ab; nur die Zahl am Korb-Symbol der Kopfzeile zeigt den gespeicherten Korb, die Kasse prüft ihn beim Öffnen.
+- **Zähler:** `reserveIp` (S17 Punkt 1, 20 je Minute und Adresse) zählt jetzt drei Wege: Reservieren, Prüfen, Freigeben.
 
 ## Nützliche Befehle
 

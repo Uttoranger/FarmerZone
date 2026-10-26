@@ -9,7 +9,8 @@ import { arrayMove, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ShoppingCart, ShoppingBasket, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, Camera, Loader2, GripVertical, ChevronRight, Sprout } from 'lucide-react'
 import { toast } from 'sonner'
-import { useCart } from '@/lib/use-cart'
+import { useCart, useKorbHinweis, zeigeKorbHinweis } from '@/lib/use-cart'
+import { gleicheKorbMitHofseite } from '@/lib/reservierung'
 import { WARENKORB_ANKER } from '@/lib/warenkorb-speicher'
 import { MONTH_SHORT, seasonLabel } from '@/schemas/product'
 import { formatEuro, formatGrundpreis, formatGrundpreisNetto, mitAnzahl } from '@/lib/format'
@@ -582,7 +583,26 @@ export function ProductGrid({
   const [addingId, setAddingId] = useState<string | null>(null)
   const [showWelcomeBack, setShowWelcomeBack] = useState(false)
 
-  const { items, count, total, isHydrated, addItem, updateQuantity, removeItem } = useCart(farmId, farmSlug)
+  const { items, count, total, isHydrated, addItem, updateQuantity, removeItem, ersetzeKorb } = useCart(farmId, farmSlug)
+  const korbHinweis = useKorbHinweis(farmId)
+
+  // Warenkorb ehrlich (Register N28): Einmal nach dem Hydrieren gleicht die
+  // Hofseite den gespeicherten Korb mit ihren Produkten ab — Fehlendes raus,
+  // Mengen auf den Bestand, neue Preise mit einem Satz. Ohne Halt und ohne
+  // Prüfung am Server: Wer nur schaut, blockiert nichts; verbindlich prüft die
+  // Kasse. Nur wo es einen Korb gibt (nie in der Vorschau des Hofs); mit
+  // Kaufsperre bleibt der Korb (gleicheKorbMitHofseite gibt dann null).
+  useEffect(() => {
+    if (!mitKorb || !isHydrated) return
+    let satz = null as string | null
+    ersetzeKorb((vorher) => {
+      const abgleich = gleicheKorbMitHofseite(vorher, products, sperre)
+      satz = abgleich?.satz ?? null
+      return abgleich?.positionen ?? vorher
+    })
+    if (satz) zeigeKorbHinweis(farmId, satz)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHydrated])
 
   // Das Warenkorb-Symbol der Kopfzeile führt mit #warenkorb hierher: den
   // Korb gleich öffnen. Der Anker ist ein einmaliger Auftrag — weg damit,
@@ -904,6 +924,7 @@ export function ProductGrid({
           gebuehrKorb={gebuehrKorb}
           futterHinweis={futterVerantwortungImKorb(items, products)}
           kaufSperre={{ sperre, hofName, pauseMessage }}
+          hinweis={korbHinweis}
         />
       )}
     </>

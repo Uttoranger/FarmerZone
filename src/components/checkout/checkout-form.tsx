@@ -506,24 +506,8 @@ export function CheckoutForm({
   // loading.tsx dieser Route, damit zwischen den beiden Wartezeiten nichts springt.
   if (!isHydrated) return fokusShell('Bestellen', <KasseSkelett />)
 
-  // Leerer Korb — mit Ausweg.
-  if (cart.length === 0) {
-    return fokusShell(
-      'Bestellen',
-      <div className="mx-auto max-w-lg px-4 py-12">
-        <EmptyState
-          symbol={ShoppingBasket}
-          titel="Dein Korb ist leer"
-          satz={`Leg bei ${farm.name} etwas in den Korb, dann kannst du hier bestellen.`}
-          ausweg={
-            <Link href={`/${farm.slug}`} className={cn(KNOPF_GRUEN, 'w-auto')}>
-              Zurück zum Hof
-            </Link>
-          }
-        />
-      </div>
-    )
-  }
+  // Leerer Korb — mit Ausweg und, wenn die Prüfung alles herausgenommen hat, mit dem Grund (Register N28).
+  if (cart.length === 0) return fokusShell('Bestellen', <KasseLeer hof={farm} hinweis={korbHinweis} />)
 
   const korbPositionen = cart.map((i) => ({
     productId: i.productId,
@@ -813,6 +797,36 @@ export function CheckoutForm({
  * ist der Knopf die feste Leiste unten; im Quelltext steht er nach den
  * Angaben, ab 768 px auch sichtbar darunter. Die Knopftexte sind die von Nr. 12.
  */
+/**
+ * Der leere Zustand der Kasse, mit Ausweg zum Hof. Hat die Prüfung beim Öffnen
+ * alles aus dem Korb genommen, steht der Grund wie im vollen Zweig als orange
+ * Karte darüber (Register N28, Fund aus Bericht 165) — nicht im Satz des
+ * leeren Zustands, der bleibt für jeden leeren Korb derselbe.
+ */
+export function KasseLeer({ hof, hinweis }: { hof: Pick<PublicFarm, 'name' | 'slug'>; hinweis: string | null }): React.JSX.Element {
+  return (
+    <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-12">
+      {hinweis && (
+        <div role="status">
+          <Hinweiskarte ton="orange" symbol={Info}>
+            {hinweis}
+          </Hinweiskarte>
+        </div>
+      )}
+      <EmptyState
+        symbol={ShoppingBasket}
+        titel="Dein Korb ist leer"
+        satz={`Leg bei ${hof.name} etwas in den Korb, dann kannst du hier bestellen.`}
+        ausweg={
+          <Link href={`/${hof.slug}`} className={cn(KNOPF_GRUEN, 'w-auto')}>
+            Zurück zum Hof
+          </Link>
+        }
+      />
+    </div>
+  )
+}
+
 export function KassenAbschluss({
   hof,
   uebersicht,
