@@ -687,6 +687,8 @@ export async function baueBriefkastenZusammenfassung(
     neueste: Array<{ kurznummer: string; art: string; ersteZeile: string; hofName: string | null }>
     geloescht: number
     eingang: EingangZahlen
+    /** Die Zahlen der Wochenlage (Nr. 192), fertig formuliert; ohne sie bleibt die Mail wie vor Nr. 192. */
+    lage?: Array<{ label: string; wert: string }>
   },
   an: string
 ): Promise<StapelMail> {

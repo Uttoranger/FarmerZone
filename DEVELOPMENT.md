@@ -6007,6 +6007,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Stripe.js:** Wache über ganz `src/` gegen den Haupteingang `@stripe/stripe-js` (nur `/pure`, Typ-Importe erlaubt).
 - **Bündel (Client-Chunks laut client-reference-manifest, `next build` lokal):** / 658 660 → 514 267 B, /hoefe 719 868 → 569 692 B, Hofseite 950 022 → 804 582 B, Kasse 581 245 → 422 426 B; Zod in keinem Chunk der vier Routen mehr (vorher je einer). Messung im Bericht 196.
 
+## Betriebshandbuch und Wochenlage (Register N32, Nr. 192, Lauf 26, 26.10.2026)
+
+- **Handbuch:** `docs/betrieb/handbuch.md` ist gefüllt: drei Routinen (täglich 2 Minuten in Heute, montags die fünf Punkte des Boards, Monatsende Geld), zehn Notfälle je mit Erkennen · Sofort · Danach und Verweis auf die Alarm-Matrix, Restore-Probe (immer in ein neues Projekt, nie über das laufende) und Uptime-Dienst einrichten. Keine Kontodaten; `tests/handbuch.test.ts` hält das Gerüst, die Gliederung der Notfälle und die Gegenprobe (keine Adresse, IBAN, kein Schlüssel, kein lokaler Pfad) fest.
+- **Wochenlage statt Wochenbericht:** Die Mail-Art `wochenbericht` bleibt (Bezug, Schlüssel und Zustellregel unverändert); der Renderer (`rendereWochenbericht`, `src/server/mail-arten/betreiber.ts`; Regeln in `src/lib/wochenlage.ts`, Lader in `src/server/queries/wochenlage.ts`, weil die Testzahlungs-Regel nur dort stehen darf) setzt über der Postfach-Zusammenfassung die Zahlen der letzten 7 Tage: Bestellungen und Umsatz (ohne Storno, Testhöfe, Testzahlungen), Servicegebühr aus derselben Zuordnung wie Admin › Geld (`topfVonBestellung`), neue Höfe, offene und überfällige Aufgaben, Fehlermeldungen der Woche und die Kosten des Monats. Nur Zahlen: Die jüngsten Meldungen (Fremdtext) stehen nicht mehr in der Mail.
+- **Stripe-Gebühren fehlen bewusst**, bis Admin › Geld sie zeigt (Nr. 191); die Zeile kommt dann in `wochenlageZeilen` dazu.
+- **„Überfällig"** heißt hier: Meldungen, die länger als 14 Tage offen liegen (`liegenGeblieben`). Verfeinert Nr. 185 die Fristen der Aufgaben, folgt die Wochenlage ihnen.
+- **Nichts mehr offen heißt nicht mehr „keine Mail"** im Renderer; ob der Lauf die Mail dann einstellt, entscheidet weiter `api/cron/briefkasten` (Nacharbeit, siehe Bericht 192).
+
 ## Nützliche Befehle
 
 ```bash

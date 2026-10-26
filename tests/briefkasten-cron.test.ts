@@ -9,9 +9,9 @@
  * Seit Nr. 95 (Register N14): Die Mail geht an die Empfängerliste der
  * Zustellung (empfaengerFuer('wochenbericht')); Regel aus (leere Liste) heißt
  * keine Mail, auch wenn etwas offen ist. Seit Nr. 159 je Adresse ein Auftrag
- * der Warteschlange (Wichtig); die Zahlen zählt der Renderer beim Versand. Ob der Bericht geht, entscheidet
- * „etwas offen im Eingang" (zaehleOffenImEingang — dieselbe Zählung wie
- * „Offen" und der Reiter): Auch eine wartende Aufgabe allein löst ihn aus.
+ * der Warteschlange (Wichtig); die Zahlen zählt der Renderer beim Versand.
+ * Seit Nr. 192 geht die Wochenlage jede Woche, auch wenn im Eingang nichts
+ * offen ist; nur die Regel der Zustellung entscheidet.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
@@ -123,14 +123,16 @@ describe('Wochenlauf — Zugriff', () => {
   it('mit richtigem Bearer: 200 und Bericht', async () => {
     const res = await GET(anfrage('Bearer geheim-123'))
     expect(res.status).toBe(200)
-    expect(await res.json()).toMatchObject({ zusammenfassung: false, neu: 0, liegenGeblieben: 0, geloescht: 0 })
+    expect(await res.json()).toMatchObject({ zusammenfassung: true, neu: 0, liegenGeblieben: 0, geloescht: 0 })
   })
 })
 
 describe('Wochenlauf — Zusammenfassung', () => {
-  it('schickt KEINE Mail, wenn nichts neu ist und nichts liegt', async () => {
-    await GET(anfrage('Bearer geheim-123'))
-    expect(mail).not.toHaveBeenCalled()
+  it('schickt die Wochenlage auch in einer ruhigen Woche (nichts neu, nichts offen)', async () => {
+    const res = await GET(anfrage('Bearer geheim-123'))
+    expect(liste).toHaveBeenCalledWith('wochenbericht')
+    erwarteBericht()
+    expect(await res.json()).toMatchObject({ zusammenfassung: true, offenImEingang: 0 })
   })
 
   it('schickt eine Mail bei neuen Meldungen', async () => {
@@ -151,9 +153,11 @@ describe('Wochenlauf — Zusammenfassung', () => {
     expect(await res.json()).toMatchObject({ zusammenfassung: false, neu: 2 })
   })
 
-  it('ohne Offenes fragt der Lauf die Liste gar nicht erst', async () => {
-    await GET(anfrage('Bearer geheim-123'))
-    expect(liste).not.toHaveBeenCalled()
+  it('Regel aus in einer ruhigen Woche: keine Mail (Gegenprobe)', async () => {
+    liste.mockResolvedValue([])
+    const res = await GET(anfrage('Bearer geheim-123'))
+    expect(mail).not.toHaveBeenCalled()
+    expect(await res.json()).toMatchObject({ zusammenfassung: false })
   })
 
   it('nur eine Aufgabe offen (Hof wartet), keine Meldung: der Bericht geht trotzdem', async () => {
@@ -179,13 +183,12 @@ describe('Wochenlauf — Zusammenfassung', () => {
     expect(mail).not.toHaveBeenCalled()
   })
 
-  it('nichts im Eingang offen: kein Bericht, auch wenn die alte Meldungszählung etwas meldet', async () => {
-    // Eine liegen gebliebene Meldung außerhalb von NEU/GEPRUEFT zählt im Eingang nicht als offen.
+  it('nichts im Eingang offen: die Wochenlage geht trotzdem, offenImEingang bleibt 0', async () => {
     zaehlen.mockResolvedValue({ neu: 0, liegenGeblieben: 1, offen: 1, neueste: [] })
     const res = await GET(anfrage('Bearer geheim-123'))
-    expect(liste).not.toHaveBeenCalled()
-    expect(mail).not.toHaveBeenCalled()
-    expect(await res.json()).toMatchObject({ zusammenfassung: false, offenImEingang: 0 })
+    expect(liste).toHaveBeenCalledWith('wochenbericht')
+    erwarteBericht()
+    expect(await res.json()).toMatchObject({ zusammenfassung: true, offenImEingang: 0 })
   })
 
   it('schickt eine Mail, wenn Meldungen länger als 14 Tage in NEU/GEPRUEFT stehen', async () => {
