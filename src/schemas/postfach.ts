@@ -154,14 +154,6 @@ export function fadenKennungAus(wert: string | string[] | undefined): string | u
   return faden.success ? faden.data : undefined
 }
 
-/**
- * „Erstattung erledigt" (Register N14, Ergänzung; Nr. 105): nur die Kennung
- * der Bestellung — was gesetzt wird, entscheidet der Server allein.
- */
-export const erstattungErledigtSchema = z.strictObject({
-  orderId: z.cuid(POSTFACH_FEHLER.eingabe),
-})
-
 // ─── Zustellung (Register N14, Nr. 95) ───────────────────────────────────────
 
 /** Eine weitere Adresse: klein, ohne Ränder, höchstens 254 Zeichen (emailSchema). */

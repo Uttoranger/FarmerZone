@@ -6000,6 +6000,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Jetzt:** `hofKontaktEmail(farm)` (src/lib/hof-kontakt.ts) — Hof-E-Mail, sonst `owner.email`. Leser: `baueOrderPaidToFarmer`/`baueOrderConfirmedToFarmer` (Typ `OrderForHofMail`, Select der Renderer mit Inhaber), `ladeNochmalStand`/`ladeNochmalStaende`, `createConnectAccount`. Die Pflicht im Profil entfällt (`hofEmailFuer`, `PROFIL_MELDUNG.emailPflicht` und `ProfilBestand.email` gestrichen); das Feld heißt immer „Hof-E-Mail (freiwillig)“, die Hilfe nennt den Rückfall.
 - **Bewusst ohne Rückfall:** Bestellseite, Bestätigung, Angaben zum Hof (öffentlich), Hofseiten-Fortschritt und der Startwert des Profils. Wache `tests/hof-kontakt-wache.test.ts`.
 
+## Admin › Bestellungen und Notfall-Storno (Register N32, N34; Nr. 186, Lauf 26, 26.10.2026)
+
+- **Warum:** Fragen von Kundinnen („keine Mail“, „wo ist mein Geld“) liefen bisher über Admin › Betrieb › E-Mails und das Postfach; eine Bestellung selbst war im Admin nicht zu sehen, und ein Hof, der nicht erreichbar ist, ließ eine Bestellung offen.
+- **Jetzt:** `/admin/bestellungen` mit derselben Suche wie die Mails (`sucheMails`), Filtern und einem Detail mit Fall und „Was tun“, Verlauf, Mails und „In Stripe ansehen“. Aktionen: „Außerhalb erstattet …“ (aus dem Postfach hierher, jetzt mit Grund), „Kundin schreiben …“ (volle Adresse nach Grund, Protokoll), „Hof schreiben“ (neuester Faden des Hofs), „Notfall-Storno …“.
+- **Ein Storno:** Die innere Funktion `storniere` zog aus `src/server/actions/orders.ts` nach `src/server/stornieren.ts`, Verhalten gleich (die Sperrliste ist jetzt `ABHOLUNG_ERLEDIGT`, dieselben drei Stände). Der Notfall-Storno nimmt den Hof aus der Bestellung und schickt der Kundin die normale Storno-Mail ohne Grund; der Grund steht in der Nachricht an den Hof und im Protokoll.
+- **Bewusst nicht:** WebhookEvent im Verlauf (kein Bezug zur Bestellung ohne Schema-Änderung); ein neuer Faden für „Hof schreiben“ ohne bestehenden Faden (der Knopf ist dann gesperrt, mit Satz). Navigation und das Entfernen des Postfach-Knopfs folgen in Nr. 193.
+
 ## Nützliche Befehle
 
 ```bash

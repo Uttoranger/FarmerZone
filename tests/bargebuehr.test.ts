@@ -383,7 +383,8 @@ describe('Storno und „nicht abgeholt" mit 0 Cent', () => {
 
   it('Storno und „nicht abgeholt" setzen den Vermerk nur bei einer Gebühr über 0 — keine negative Rechnung', () => {
     const orders = lies('src/server/actions/orders.ts')
-    expect(orders).toMatch(/order\.serviceFeeCents > 0 && !order\.serviceFeeRefundedAt/)
+    // Der Storno liegt seit Nr. 186 in src/server/stornieren.ts (dieselbe innere Funktion für Hof und Team).
+    expect(lies('src/server/stornieren.ts')).toMatch(/order\.serviceFeeCents > 0 && !order\.serviceFeeRefundedAt/)
     expect(orders).toMatch(/if \(order\.serviceFeeCents <= 0 \|\| order\.serviceFeeRefundedAt\) return \{ offen: false \}/)
   })
 })
