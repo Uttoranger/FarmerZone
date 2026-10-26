@@ -425,7 +425,7 @@ export function HofShell({
       </main>
 
       {/* ===== Handy: Unterleiste ===== */}
-      <BottomNav ueberSchleier={offen !== null}>
+      <BottomNav ueberSchleier={offen !== null} engUnter360>
         {nav.handyLeiste.map((platz) => {
           if (platz.art === 'punkt') {
             const { punkt } = platz

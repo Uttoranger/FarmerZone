@@ -13,6 +13,14 @@
 /** Der Satz am Formular bzw. an der Aktion, wenn ein Aufruf am Netz scheitert (Wortlaut N29). */
 export const NETZ_SATZ = 'Keine Verbindung – nichts gespeichert. Versuch es gleich noch einmal.'
 
+/**
+ * Der Satz bei Aktionen, die der Server schon ausgeführt haben kann (Storno,
+ * Statuswechsel einer Bestellung, Bezahlen; Ergänzung 26.10.2026 zu N29).
+ * Hier gibt es bewusst keinen „Nochmal"-Knopf: Ein zweiter Versuch ohne Blick
+ * auf den Stand könnte eine Erstattung oder einen Statuswechsel doppelt auslösen.
+ */
+export const NETZ_SATZ_UNSICHER = 'Wir wissen nicht, ob es geklappt hat – lade die Seite neu, bevor du es nochmal tust.'
+
 /** Der Knopf daneben (Wortlaut N29). */
 export const NETZ_KNOPF = 'Nochmal'
 

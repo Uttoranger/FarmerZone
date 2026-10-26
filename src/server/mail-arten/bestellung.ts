@@ -36,6 +36,8 @@ const BESTELLUNG_FUER_MAIL = {
   paymentMethod: true,
   stripePaymentIntentId: true,
   cancelReason: true,
+  // Nur der Renderer „abholbereit“ liest ihn: Die Mail geht nur, solange die Bestellung bereit ist.
+  status: true,
   farm: {
     select: { id: true, name: true, slug: true, email: true, ownerName: true, address: true, postalCode: true, city: true, phone: true },
   },
@@ -77,6 +79,21 @@ export function bestellMailAuftrag(
     bestellungId: bestellung.id,
     farmId: bestellung.farmId,
   }
+}
+
+/**
+ * Nimmt der Hof „Gepackt“ zurück, wird ein noch offener Auftrag `abholbereit`
+ * verworfen (Nr. 195, Audit A4) — sonst ginge er später doch hinaus, und nach
+ * einem erneuten „Gepackt“ bekäme die Kundin die Mail zweimal. Ein Auftrag, den
+ * der Worker gerade verschickt (`in_arbeit`), bleibt: dort schützt die
+ * Statusprüfung im Renderer. Wirft bei einem Datenbankfehler; der Aufrufer
+ * meldet ihn, der Rückweg gilt trotzdem.
+ */
+export async function verwirfOffenenAbholbereitAuftrag(orderId: string): Promise<void> {
+  await prisma.mailAuftrag.updateMany({
+    where: { bestellungId: orderId, art: 'abholbereit', status: 'offen' },
+    data: { status: 'verworfen', fehlerCode: 'zurueckgenommen' },
+  })
 }
 
 /**
@@ -227,7 +244,20 @@ function einfach(baue: (email: typeof import('@/lib/email'), order: OrderForEmai
 export const rendereBestellungBestaetigung: MailRenderer = einfach((e, o) => e.baueOrderConfirmation(o))
 export const rendereBestellungBezahltHof: MailRenderer = einfach((e, o) => e.baueOrderPaidToFarmer(o))
 export const rendereBarBestaetigtHof: MailRenderer = einfach((e, o) => e.baueOrderConfirmedToFarmer(o))
-export const rendereAbholbereit: MailRenderer = einfach((e, o) => e.baueOrderReady(o))
+/**
+ * „Abholbereit“ nur, solange die Bestellung bereit ist (Nr. 195, Audit A4):
+ * Nimmt der Hof „Gepackt“ zurück, bevor der Worker die Mail schickt, wäre sie
+ * falsch — die Kundin führe umsonst los. Dieselbe Regel wie `passtNochmal`
+ * (src/lib/betrieb-mails.ts). Eine andere Lage (zurück, storniert, schon
+ * abgeholt) verwirft den Auftrag, einmal gezählt im Protokoll.
+ */
+export const rendereAbholbereit: MailRenderer = async (bezug) => {
+  const { orderId } = bestellungBezugSchema.parse(bezug)
+  const b = await ladeBestellung(orderId)
+  if (!b) return GELOESCHT
+  if (b.status !== 'READY') return { verworfen: 'nicht_mehr_bereit' }
+  return (await import('@/lib/email')).baueOrderReady(alsMailBestellung(b))
+}
 export const rendereNichtAbholbereit: MailRenderer = einfach((e, o) => e.baueOrderNotReady(o))
 export const rendereVerfallen: MailRenderer = einfach((e, o) => e.baueBestellungVerfallen(o))
 

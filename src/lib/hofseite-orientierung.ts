@@ -40,6 +40,26 @@ export const KLEBE_BLOCK_VAR = '--hof-klebeblock'
 /** Der Name des Rückwegs für den Screenreader — sichtbar ist nur der Pfeil. */
 export const HOFZEILE_ZURUECK = 'Zurück zu allen Höfen'
 
+/**
+ * Der Name des Zurück-Knopfs im Titelbild für den Screenreader (Entscheidung 5,
+ * Morgenbericht 25) — sichtbar ist nur der Pfeil. Er ersetzt am Handy die Hofzeile,
+ * solange diese noch nicht klebt (am Seitenanfang steht sie noch im Fluss unter
+ * dem Titelbild); danach übernimmt sie (HOFZEILE_ZURUECK).
+ */
+export const TITELBILD_ZURUECK = 'Zu allen Höfen'
+
+/**
+ * Steht der klebende Block schon oben? Dann ist die Hofzeile mit ihrem eigenen
+ * Zurück da, und der Knopf im Titelbild geht weg (wer weiter oben scrollt, hat
+ * ihn gleich wieder; die Hofzeile klebt oben, der Knopf bliebe ohnehin zurück).
+ * `blockOben` ist die Oberkante des Blocks im Fenster, `kopfHoehe` die Höhe des
+ * Seitenkopfs, unter dem er klebt (0, wenn es keinen gibt). Eine halbe Pixelzeile
+ * Luft, weil die Messung beim Kleben auf Bruchteile rundet.
+ */
+export function hofzeileSteht(blockOben: number, kopfHoehe: number): boolean {
+  return blockOben <= kopfHoehe + 0.5
+}
+
 /** Der Zustand des Hofs, wenn er Bestellungen annimmt (Wortlaut des Boards). */
 export const NIMMT_BESTELLUNGEN_AN = 'Nimmt Bestellungen an'
 
@@ -69,9 +89,9 @@ export const BESTAETIGUNG_MS = 6000
 /** Der Merker im sessionStorage: In dieser Sitzung hat das Korb-Blatt sich schon einmal geöffnet. */
 export const BLATT_MERKER = 'korb-blatt-gezeigt'
 
-/** „Heumilch ist im Korb". */
+/** „Heumilch ist im Warenkorb". */
 export function imKorbText(name: string): string {
-  return `${name} ist im Korb`
+  return `${name} ist im Warenkorb`
 }
 
 export const RUECKGAENGIG = 'Rückgängig'
@@ -110,7 +130,7 @@ export function vergissBlattMerker(): void {
 /** Wie ein Griff in den Korb ausging (KorbErgebnis aus use-cart.ts, ohne den Hook zu laden). */
 type Ergebnis = { ok: boolean; error?: string; nochmal?: true }
 
-const NICHT_IN_DEN_KORB = 'Wir konnten das Produkt nicht in den Korb legen. Versuch es gleich noch einmal.'
+const NICHT_IN_DEN_KORB = 'Wir konnten das Produkt nicht in den Warenkorb legen. Versuch es gleich noch einmal.'
 /** Sätze von /api/reserve bzw. use-cart.ts beim Legen, die eine Kundin versteht und die bleiben. */
 const VERSTAENDLICH_BEIM_LEGEN = new Set(['Produkt nicht verfügbar', 'Produkt nicht mehr verfügbar', 'Bitte eine Menge bis 10.000.'])
 

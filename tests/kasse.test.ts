@@ -308,6 +308,13 @@ describe('reservierungsStand', () => {
 })
 
 describe('zahlungsFehlerArt — „nichts abgebucht" nur, wenn es stimmt', () => {
+  it('abgerissene Verbindung beim Bezahlen: netz (ob es ankam, ist offen); Gegenprobe: andere Typen nicht', () => {
+    expect(zahlungsFehlerArt({ fehlerTyp: 'api_connection_error', intentStatus: undefined, fristUm: false })).toBe('netz')
+    expect(zahlungsFehlerArt({ fehlerTyp: 'api_error', intentStatus: undefined, fristUm: false })).toBe('sonstig')
+    // Steht der Zahlungsvorgang schon auf bezahlt, gewinnt das.
+    expect(zahlungsFehlerArt({ fehlerTyp: 'api_connection_error', intentStatus: 'succeeded', fristUm: false })).toBe('bezahlt')
+  })
+
   it('schon bezahlt oder in Bearbeitung: zur Bestellung, nie „abgelehnt"', () => {
     expect(zahlungsFehlerArt({ fehlerTyp: 'card_error', intentStatus: 'succeeded', fristUm: false })).toBe('bezahlt')
     expect(zahlungsFehlerArt({ fehlerTyp: 'invalid_request_error', intentStatus: 'processing', fristUm: true })).toBe('bezahlt')
@@ -323,9 +330,9 @@ describe('zahlungsFehlerArt — „nichts abgebucht" nur, wenn es stimmt', () =>
     expect(zahlungsFehlerArt({ fehlerTyp: 'card_error', intentStatus: undefined, fristUm: false })).toBe('abgelehnt')
   })
 
-  it('unvollständige Eingabe, Netzfehler und Unbekanntes: kein Zusatz', () => {
+  it('unvollständige Eingabe und Unbekanntes: kein Zusatz', () => {
     expect(zahlungsFehlerArt({ fehlerTyp: 'validation_error', intentStatus: undefined, fristUm: false })).toBe('sonstig')
-    expect(zahlungsFehlerArt({ fehlerTyp: 'api_connection_error', intentStatus: undefined, fristUm: false })).toBe('sonstig')
+    expect(zahlungsFehlerArt({ fehlerTyp: undefined, intentStatus: undefined, fristUm: false })).toBe('sonstig')
   })
 })
 

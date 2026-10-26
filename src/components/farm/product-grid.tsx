@@ -321,7 +321,6 @@ function ProductCard({
   onAddToCart,
   onDetails,
   isAddingId,
-  ownerMode = false,
   isEditMode = false,
   sperre = null,
   setzeSichtbarkeit,
@@ -803,7 +802,7 @@ export function ProductGrid({
       {/* Willkommen-zurück-Hinweis — nur, wo es einen Korb gibt (der Nachbestell-Effekt setzt ihn ohnehin nur dann). */}
       {mitKorb && showWelcomeBack && (
         <div className="relative mb-4 rounded-2xl border border-accent/45 bg-accent/12 py-2 pr-12 pl-4 text-[13.5px] font-medium text-foreground">
-          <p className="flex min-h-9 items-center">Willkommen zurück! Dein letzter Einkauf liegt wieder im Korb.</p>
+          <p className="flex min-h-9 items-center">Willkommen zurück! Dein letzter Einkauf liegt wieder im Warenkorb.</p>
           <button
             type="button"
             onClick={() => setShowWelcomeBack(false)}

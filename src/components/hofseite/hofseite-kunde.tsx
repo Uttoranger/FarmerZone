@@ -30,7 +30,7 @@ import {
   type HofReiterId,
 } from '@/lib/hofseite-kunde'
 import { korbErlaubt } from '@/lib/hofseite-vorschau'
-import { HOFZEILE_ZURUECK, KLEBE_BLOCK, KLEBE_BLOCK_VAR, hofZeileUnterzeile } from '@/lib/hofseite-orientierung'
+import { HOFZEILE_ZURUECK, KLEBE_BLOCK, KLEBE_BLOCK_VAR, TITELBILD_ZURUECK, hofZeileUnterzeile } from '@/lib/hofseite-orientierung'
 import { produktLink } from '@/lib/produktdetail'
 import { rueckweg, type KundenSeite } from '@/lib/kunden-kopf'
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
@@ -52,6 +52,7 @@ import { HofseiteSeitenspalte } from '@/components/hofseite/hofseite-seitenspalt
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
 import { Titelbild } from '@/components/hofseite/titelbild'
+import { useHofzeileKlebt } from '@/components/hofseite/use-hofzeile-klebt'
 import { Abzeichen, AbzeichenKnopf } from '@/components/ui/abzeichen'
 import { TESTHOF_HINWEIS } from '@/lib/gruendungshof'
 
@@ -226,6 +227,11 @@ export function HofseiteKunde({
   // Server-HTML in voller Höhe — das Portal kommt erst nach dem Laden, und
   // der Inhalt darunter soll dann nicht springen.
   const chipsKleben = offen === 'produkte' && kategorieAbschnitte(produkte).length > 1
+
+  // Klebt der Block schon, hat die Hofzeile ihr eigenes Zurück — dann geht der
+  // Knopf im Titelbild weg (Entscheidung 5). Gelesen wird die Lage im Fenster;
+  // auf dem Server und vor der Messung gilt „klebt noch nicht", der Knopf steht da.
+  const klebt = useHofzeileKlebt(klebeBlock)
 
   // Die echte Höhe des Blocks an der Wurzel: scroll-padding in globals.css
   // rechnet damit, auch wenn größere Schrift die Reiter umbricht. Die festen
@@ -451,6 +457,18 @@ export function HofseiteKunde({
 
       {/* ── Titelbild, Name, Aktionen ── */}
       <div className="relative">
+        {/* Am Handy: Zurück oben links im Titelbild, solange die klebende Hofzeile (mit ihrem eigenen Zurück) nicht steht. Theme-fest dunkel wie jedes Bild-Overlay. */}
+        {!klebt && (
+          <Link
+            href={zurueck.href}
+            onClick={beimZurueck}
+            aria-label={TITELBILD_ZURUECK}
+            data-titelbild-zurueck=""
+            className={cn('absolute top-2 left-2 z-10 flex size-11 items-center justify-center rounded-full bg-primary-foreground/65 text-accent-foreground md:hidden print:hidden', FOKUS_RAHMEN)}
+          >
+            <ChevronLeft className="size-[22px]" strokeWidth={1.9} aria-hidden="true" />
+          </Link>
+        )}
         {/* Hochformat ab md ganz statt beschnitten (Register N6, Nr. 72): entscheidet titelbild.tsx. */}
         {/* „Teilen" steht am Handy fest in der Hofzeile (Nr. 177), nicht mehr auf dem Titelbild. */}
         <Titelbild foto={foto} verlauf={titelbildVerlauf(farm.bannerValue)} ausschnitt={titelbildAusschnitt(farm.bannerAusschnitt, farm.bannerFocusY)} hofName={farm.name} />

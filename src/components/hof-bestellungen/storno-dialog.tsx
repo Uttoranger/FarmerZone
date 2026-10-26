@@ -43,7 +43,7 @@ export function StornoDialog({
     setFehler(null)
     starte(async () => {
       // Ohne Wurf (Register N29): Ohne Netz steht der Netzsatz im Dialog, der Grund bleibt stehen.
-      const ergebnis = await aktionOhneWurf(() => cancelOrder(bestellung.id, grund.trim() || undefined))
+      const ergebnis = await aktionOhneWurf(() => cancelOrder(bestellung.id, grund.trim() || undefined), { unsicher: true })
       if (ergebnis.erstattungOffen) {
         // Storniert ist sie trotzdem — nur das Geld steht aus (Sentry hat es).
         onOffenChange(false)

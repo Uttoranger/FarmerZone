@@ -6,6 +6,7 @@ import { Loader2, Lock } from 'lucide-react'
 import { getStripePromise } from '@/lib/stripe-client'
 import { formatEuro } from '@/lib/format'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
+import { NETZ_SATZ_UNSICHER } from '@/lib/netz'
 import {
   bestaetigungMitStatus,
   reservierungsStand,
@@ -139,6 +140,9 @@ function ZahlungsInhalt({
     }
     if (art === 'abgelaufen') setAbgebrochen(true)
     else if (art === 'abgelehnt') setAbgelehnt(true)
+    // Kein Netz mitten im Bezahlen: Der Betrag kann schon abgebucht sein. Der Satz sagt das ehrlich
+    // und schickt zum Neuladen statt zum zweiten Versuch (Register N29, Ergänzung 26.10.2026).
+    else if (art === 'netz') setFehler(NETZ_SATZ_UNSICHER)
     // Unvollständige Eingaben zeigt Stripe selbst am Feld; alles andere
     // (Netz, Dienst) steht als Stripes eigener Satz an der Übersicht.
     else if (error.type !== 'validation_error') {

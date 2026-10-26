@@ -216,7 +216,7 @@ describe('Hofseite, Produktseite, Mini-Warenkorb: der Gebührenhinweis vor dem B
   it('online und bar vor dem Stichtag: Satz wie bisher plus Bar-Ausnahme, im Korb „bei Online-Zahlung"', () => {
     const h = gebuehrHinweisFuerHof(ALLES, LANGE_VORHER)
     expect(h?.kurz).toBe(`${GRUND} – im Warenkorb einzeln ausgewiesen. Der Hof bekommt den vollen Preis. ${BAR_OHNE_GEBUEHR_HINWEIS}`)
-    expect(h?.produkte).toBe(`${GRUND} – einmal pro Bestellung, egal wie viel du in den Korb legst. ${BAR_OHNE_GEBUEHR_HINWEIS}`)
+    expect(h?.produkte).toBe(`${GRUND} – einmal pro Bestellung, egal wie viel du in den Warenkorb legst. ${BAR_OHNE_GEBUEHR_HINWEIS}`)
     expect(h?.korb).toBe(GEBUEHR_KORB_NUR_ONLINE)
   })
 

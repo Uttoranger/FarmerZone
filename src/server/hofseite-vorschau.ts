@@ -69,7 +69,7 @@ export async function ladeHofseite(
 // in einem Fach derselben Anfrage, das der Lader erst liest, wenn der Hof da ist (nach mehreren
 // Abfragen): Wer vorher `vorab` mitgibt, dessen Wunsch läuft mit; wer zu spät kommt, lädt danach
 // wie bisher.
-const vorabFach = cache((_farmSlug: string, _sucheAlsText: string): { vorab: Vorab | null } => ({ vorab: null }))
+const vorabFach = cache<(farmSlug: string, sucheAlsText: string) => { vorab: Vorab | null }>(() => ({ vorab: null }))
 
 const geteilt = cache((farmSlug: string, sucheAlsText: string) =>
   // Der Text stammt aus JSON.stringify in ladeHofseiteGeteilt darunter, nie von

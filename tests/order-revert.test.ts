@@ -30,14 +30,14 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findUnique: vi.fn() },
     order: { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
-    mailAuftrag: { createMany: vi.fn() },
+    mailAuftrag: { createMany: vi.fn(), updateMany: vi.fn() },
     // Rückweg und Auftrag in einer Transaktion (Nr. 159) — hier durchgereicht.
     $transaction: vi.fn(),
   },
 }))
 
 import * as Sentry from '@sentry/nextjs'
-import { revertReady, revertPickedUp } from '@/server/actions/orders'
+import { revertReady, revertPickedUp, revertOrderStatus } from '@/server/actions/orders'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stelleEinOhneRisiko, stelleMailEinInTransaktion } from '@/server/mail-warteschlange'
@@ -54,6 +54,7 @@ const orderUpdate = vi.mocked(prisma.order.update)
 const orderUpdateMany = vi.mocked(prisma.order.updateMany)
 const einstellen = vi.mocked(stelleMailEinInTransaktion)
 const createMany = vi.mocked(prisma.mailAuftrag.createMany)
+const auftragUpdateMany = vi.mocked(prisma.mailAuftrag.updateMany)
 
 const EMAIL_ORDER = {
   id: 'order_1',
@@ -76,6 +77,7 @@ beforeEach(() => {
   nachlauf.length = 0
   vi.mocked(bezugSchemaFuer).mockReset()
   createMany.mockResolvedValue({ count: 1 })
+  auftragUpdateMany.mockResolvedValue({ count: 0 } as never)
   getSession.mockResolvedValue({ user: { id: 'user_1' } } as never)
   farmFindUnique.mockResolvedValue({ id: 'farm_1', name: 'Testhof', slug: 'testhof', email: 'hof@test.local', ownerName: 'Franz', address: 'Weg 1', postalCode: '4020', city: 'Linz', phone: '' } as never)
   orderUpdate.mockResolvedValue({} as never)
@@ -191,6 +193,52 @@ describe('revertReady', () => {
       expect.any(Error),
       expect.objectContaining({ tags: { bereich: 'mail-warteschlange', art: 'nicht-abholbereit', grund: 'bezug_ungueltig' }, extra: { bestellungId: 'order_1' } })
     )
+  })
+})
+
+describe('A4: „Rückgängig“ nach „Gepackt“ verwirft den offenen Auftrag abholbereit (Nr. 195)', () => {
+  const VERWERFEN = {
+    where: { bestellungId: 'order_1', art: 'abholbereit', status: 'offen' },
+    data: { status: 'verworfen', fehlerCode: 'zurueckgenommen' },
+  }
+
+  it('revertReady: nach dem Rückweg wird der offene Auftrag verworfen — nur dieser, nur offen', async () => {
+    orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PAID' } as never)
+    expect(await revertReady('order_1')).toEqual({})
+    expect(auftragUpdateMany).toHaveBeenCalledTimes(1)
+    expect(auftragUpdateMany).toHaveBeenCalledWith(VERWERFEN)
+    expect(orderUpdateMany.mock.invocationCallOrder[0]).toBeLessThan(auftragUpdateMany.mock.invocationCallOrder[0]!)
+  })
+
+  it('revertOrderStatus aus READY (Rückgängig im Hinweis): ebenfalls verworfen', async () => {
+    orderFindFirst.mockResolvedValue({ paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', paidAt: null, pickedUpAt: null } as never)
+    expect(await revertOrderStatus('order_1', 'CONFIRMED')).toEqual({})
+    expect(auftragUpdateMany).toHaveBeenCalledWith(VERWERFEN)
+  })
+
+  it('Gegenprobe: der Rückweg aus „Abgeholt“ nach READY lässt die Mail in Ruhe (sie ist längst hinaus)', async () => {
+    orderFindFirst.mockResolvedValue({ paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', paidAt: null, pickedUpAt: new Date() } as never)
+    expect(await revertOrderStatus('order_1', 'READY')).toEqual({})
+    expect(auftragUpdateMany).not.toHaveBeenCalled()
+    await revertPickedUp('order_1')
+    expect(auftragUpdateMany).not.toHaveBeenCalled()
+  })
+
+  it('Gegenprobe: traf der Rückweg nichts (inzwischen geändert), wird auch nichts verworfen', async () => {
+    orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PAID' } as never)
+    orderUpdateMany.mockResolvedValue({ count: 0 } as never)
+    expect((await revertReady('order_1')).error).toMatch(/inzwischen geändert/)
+    expect(auftragUpdateMany).not.toHaveBeenCalled()
+  })
+
+  it('scheitert das Verwerfen, gilt der Rückweg trotzdem; Sentry bekommt nur die Kennung', async () => {
+    orderFindFirst.mockResolvedValue({ ...EMAIL_ORDER, paymentStatus: 'PAID' } as never)
+    auftragUpdateMany.mockRejectedValue(new Error('DB weg'))
+    expect(await revertReady('order_1', false)).toEqual({})
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1)
+    const gemeldet = JSON.stringify(vi.mocked(Sentry.captureException).mock.calls)
+    expect(gemeldet).toContain('abholbereit-verwerfen')
+    expect(gemeldet).not.toContain('kundin@test.local')
   })
 })
 

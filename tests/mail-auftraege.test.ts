@@ -173,6 +173,7 @@ const ORDER = {
   paymentMethod: 'ONLINE',
   stripePaymentIntentId: 'pi_1',
   cancelReason: 'Hof krank',
+  status: 'READY',
   farm: { id: BESTELLUNG.farmId, name: 'Hof Beispiel', slug: 'hof-beispiel', email: 'hof@example.org', ownerName: 'Max', address: 'Weg 1', postalCode: '4910', city: 'Ried', phone: '+43 664 0000000' },
   items: [{ id: 'cposition000000000000001', productName: 'Freilandeier', quantity: 1, unitPrice: '4.50', totalPrice: '4.50', product: null }],
 }
@@ -245,6 +246,15 @@ describe('Renderer: frisch geladen, Vorlage aus email.ts, heutige Adresse', () =
   it('Zahlung zu spät: der erstattete Betrag aus dem Auftrag', async () => {
     db.order.findUnique.mockResolvedValue(ORDER)
     expect(alsMail(await rendere('zahlung-zu-spaet', { orderId: ORDER.id, erstattetCents: '2137' })).html).toContain('21,37')
+  })
+
+  it('abholbereit nur, solange die Bestellung bereit ist (Nr. 195, A4); Gegenprobe: bereit geht hinaus', async () => {
+    for (const status of ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'PICKED_UP', 'CANCELLED']) {
+      db.order.findUnique.mockResolvedValue({ ...ORDER, status })
+      expect(await rendere('abholbereit', { orderId: ORDER.id }), status).toEqual({ verworfen: 'nicht_mehr_bereit' })
+    }
+    db.order.findUnique.mockResolvedValue({ ...ORDER, status: 'READY' })
+    expect(alsMail(await rendere('abholbereit', { orderId: ORDER.id })).an).toBe('erika@example.org')
   })
 
   it('gelöschte Bestellung → verworfen, nie eine Mail', async () => {

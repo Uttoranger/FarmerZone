@@ -162,7 +162,7 @@ export function ProduktdetailKunde({
     )
     setWirdHinzugefuegt(null)
     if (ergebnis.ok) {
-      toast.success(`${p.name} liegt im Korb`, { duration: 2000 })
+      toast.success(`${p.name} liegt im Warenkorb`, { duration: 2000 })
       setMenge(1)
       setKorbOffen(true)
     } else {
@@ -396,7 +396,7 @@ export function ProduktdetailKunde({
             </div>
 
             {kaufbar && nochMoeglich === 0 && (
-              <p className="text-[13px] text-muted-foreground">Alles, was der Hof davon hat, liegt schon in deinem Korb.</p>
+              <p className="text-[13px] text-muted-foreground">Alles, was der Hof davon hat, liegt schon in deinem Warenkorb.</p>
             )}
 
             {fehler && (

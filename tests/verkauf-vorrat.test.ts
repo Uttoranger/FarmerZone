@@ -142,6 +142,26 @@ describe('createManualSale mit „Vorrat abziehen"', () => {
     expect(revalidatePath).toHaveBeenCalledWith('/sales')
   })
 
+  it('A7 (Nr. 195): ohne Abzug ändert sich kein Vorrat — Produkte und Hofseite werden nicht neu geladen; mit Abzug ruft die Action revalidiereProdukte (inkl. Hofübersicht)', async () => {
+    const { updateTag } = await import('next/cache')
+    await createManualSale(eingabe({ vorratAbziehen: false }))
+    expect(revalidatePath).toHaveBeenCalledWith('/sales')
+    expect(revalidatePath).not.toHaveBeenCalledWith('/products')
+    expect(revalidatePath).not.toHaveBeenCalledWith('/hof-eins')
+    expect(updateTag).not.toHaveBeenCalled()
+
+    vi.clearAllMocks()
+    db.$transaction.mockImplementation(async (fn: (tx: typeof db) => unknown) => fn(db))
+    db.manualSale.create.mockImplementation(async ({ data }: { data: { quantity: number; unit: string | null } }) => ({ quantity: new Prisma.Decimal(data.quantity), unit: data.unit }))
+    db.product.findFirst.mockResolvedValueOnce(PRODUKT).mockResolvedValueOnce({ stock: 4 })
+    db.product.updateMany.mockResolvedValue({ count: 1 })
+    await createManualSale(eingabe())
+    // revalidiereProdukte: Produkte, Hofseite, Hofübersicht (eigener Cache) zugleich.
+    expect(revalidatePath).toHaveBeenCalledWith('/products')
+    expect(revalidatePath).toHaveBeenCalledWith('/hof-eins')
+    expect(updateTag).toHaveBeenCalledTimes(1)
+  })
+
   it('zu wenig Vorrat: Verkauf gebucht, Vorrat bedingt auf 0, Hinweis', async () => {
     db.product.updateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 })
 

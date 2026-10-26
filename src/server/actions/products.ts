@@ -2,6 +2,7 @@
 
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import {
   productAnlegenSchema,
@@ -477,17 +478,46 @@ export async function setzeVorrat(input: unknown): Promise<VorratErgebnis> {
   return { ok: true, vorrat: neu, wiederDa: istWiederDa(vorher, neu) }
 }
 
-export async function deleteProduct(productId: string) {
+/**
+ * `archiviert`: Das Produkt hat Bestellungen und blieb deshalb erhalten — es ist
+ * ausgeblendet (`isAvailable = false`), nicht gelöscht (Nr. 195, Audit A5).
+ */
+export type ProduktLoeschErgebnis = { archiviert: boolean }
+
+/**
+ * Löscht ein Produkt ohne Bestellungen. Hat es welche, wird es ausgeblendet
+ * statt gelöscht: Die Positionen vergangener Bestellungen verweisen auf das
+ * Produkt (Fremdschlüssel ohne Kaskade), und Zahlen, Mails und Belege der
+ * Kundin hängen daran. Vorher scheiterte das Löschen mit einem Datenbankfehler
+ * und dem allgemeinen Satz. Ohne Migration: `isAvailable` gibt es schon.
+ * Kommt zwischen Zählen und Löschen eine Bestellung dazu, hält der
+ * Fremdschlüssel (P2003) das Löschen auf — dann ebenfalls ausblenden.
+ */
+export async function deleteProduct(productId: string): Promise<ProduktLoeschErgebnis> {
   const farm = await getAuthenticatedFarm()
 
   const existing = await prisma.product.findFirst({
     where: { id: productId, farmId: farm.id },
+    select: { id: true },
   })
   if (!existing) throw new Error('Produkt nicht gefunden')
 
-  await prisma.product.delete({ where: { id: productId } })
+  const bestellungen = await prisma.orderItem.count({ where: { productId: existing.id } })
+  let archiviert = bestellungen > 0
+  if (!archiviert) {
+    try {
+      await prisma.product.deleteMany({ where: { id: existing.id, farmId: farm.id } })
+    } catch (err) {
+      if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003')) throw err
+      archiviert = true
+    }
+  }
+  if (archiviert) {
+    await prisma.product.updateMany({ where: { id: existing.id, farmId: farm.id }, data: { isAvailable: false } })
+  }
 
   revalidate(farm.slug)
+  return { archiviert }
 }
 
 // Sprint 18: manuelle Reihenfolge per Drag & Drop.
