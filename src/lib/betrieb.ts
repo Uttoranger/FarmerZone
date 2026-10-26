@@ -432,8 +432,9 @@ export function zuletztText(zeitpunkt: Date, jetzt: Date): string {
 
 // ─── Abläufe ─────────────────────────────────────────────────────────────────
 
-export type AblaufName = 'aufraeumen' | 'verwaisteBestellungen' | 'betrieb' | 'briefkasten' | 'mails'
-export type Rhythmus = 'minuetlich' | 'taeglich' | 'woechentlich'
+export type AblaufName = 'aufraeumen' | 'verwaisteBestellungen' | 'betrieb' | 'briefkasten' | 'mails' | 'von-aussen'
+/** `vonAussen` (Nr. 184): kein Cron bei Vercel — der Uptime-Dienst ruft /api/gesund etwa alle 5 Minuten, jeder Aufruf ist ein Herzschlag. */
+export type Rhythmus = 'minuetlich' | 'taeglich' | 'woechentlich' | 'vonAussen'
 
 export type Ablauf = {
   name: AblaufName
@@ -442,7 +443,7 @@ export type Ablauf = {
   /** Was er tut — ein Satz für die Warn-Mail. */
   zweck: string
   pfad: string
-  /** Wie in vercel.json (UTC); tests/betrieb.test.ts hält beide gleich. */
+  /** Wie in vercel.json (UTC); tests/betrieb.test.ts hält beide gleich. Beim Rhythmus `vonAussen` der erwartete Takt des Uptime-Dienstes, nicht in vercel.json. */
   zeitplan: string
   rhythmus: Rhythmus
 }
@@ -496,6 +497,18 @@ export const ABLAEUFE: readonly Ablauf[] = [
     zeitplan: '* * * * *',
     rhythmus: 'minuetlich',
   },
+  // Nr. 184 (Register N18, Ergänzung 26.10.2026): der Herzschlag „von außen“ —
+  // jeder Aufruf von /api/gesund durch den Uptime-Dienst, höchstens einmal je
+  // Minute (`schlageVonAussen`). Überfällig nach 30 Minuten; ohne Zeile „noch
+  // nicht eingerichtet“, ohne Warnung.
+  {
+    name: 'von-aussen',
+    text: 'Uptime-Dienst (von außen)',
+    zweck: 'Der Uptime-Dienst ruft etwa alle 5 Minuten /api/gesund auf und meldet dir per Push, wenn die Seite nicht antwortet. Bleibt er still, merkt niemand mehr, wenn die Seite ausfällt.',
+    pfad: '/api/gesund',
+    zeitplan: '*/5 * * * *',
+    rhythmus: 'vonAussen',
+  },
 ]
 
 /**
@@ -507,6 +520,7 @@ export const ABLAEUFE: readonly Ablauf[] = [
  */
 export const UEBERFAELLIG_NACH_MS: Record<Rhythmus, number> = {
   minuetlich: 10 * 60 * 1000,
+  vonAussen: 30 * 60 * 1000,
   taeglich: 26 * 60 * 60 * 1000,
   woechentlich: 8 * 24 * 60 * 60 * 1000,
 }
@@ -549,6 +563,9 @@ export function ablaufStand(ablauf: Pick<Ablauf, 'rhythmus'>, lauf: AblaufLaufDa
 export function fehlendeAblaeufe(laeufe: ReadonlyMap<string, AblaufLaufDaten>, jetzt: Date): AblaufName[] {
   return ABLAEUFE.filter((a) => {
     const stand = ablaufStand(a, laeufe.get(a.name) ?? null, jetzt)
+    // Der Uptime-Dienst ist nicht Sache des Lebenszeichens (Alarm-Matrix: „still > 30 Min.“ → Aufgabe in Heute);
+    // sonst scheiterte der Workflow alle 15 Minuten, solange er nicht eingerichtet ist.
+    if (a.rhythmus === 'vonAussen') return false
     return stand === 'ueberfaellig' || stand === 'fehler' || (stand === 'nochKeinLauf' && a.rhythmus !== 'woechentlich')
   }).map((a) => a.name)
 }
@@ -563,6 +580,7 @@ const WOCHENTAG_PLURAL = ['sonntags', 'montags', 'dienstags', 'mittwochs', 'donn
 /** „jede Minute“, „täglich ab 05:00“ bzw. „montags ab 07:00“ — die UTC-Zeit aus dem Zeitplan in Wiener Zeit von heute. */
 export function wannText(ablauf: Pick<Ablauf, 'zeitplan' | 'rhythmus'>, jetzt: Date): string {
   if (ablauf.rhythmus === 'minuetlich') return 'jede Minute'
+  if (ablauf.rhythmus === 'vonAussen') return 'alle 5 Minuten, von außen'
   const [minute, stunde, , , wochentag] = ablauf.zeitplan.split(' ')
   const start = new Date(`${utcTag(jetzt)}T${stunde.padStart(2, '0')}:${minute.padStart(2, '0')}:00.000Z`)
   const uhr = uhrzeitInWien(start)
@@ -921,6 +939,26 @@ export function betriebHinweis(
   offen.sort((a, b) => warnRang(a.art, a.stufe) - warnRang(b.art, b.stufe))
   return { anzahl: offen.length, ...warnHinweis(offen[0].art, offen[0].stufe), href: istMailWarnArt(offen[0].art) ? ADMIN_BETRIEB_MAILS_HREF : ADMIN_BETRIEB_HREF }
 }
+
+// ─── Alarm-Matrix (Register N18, Ergänzung 26.10.2026; Nr. 184) ──────────────
+
+export type AlarmZeile = { signal: string; weg: string; reaktion: string }
+
+/**
+ * Welches Signal wie kommt — EINE Quelle für Admin › Betrieb (Karte
+ * „Alarm-Matrix“) und docs/ai/ARCHITECTURE.md (Tabelle „Alarm-Matrix“;
+ * tests/betrieb.test.ts hält beide gleich). Zeilen wie im Board
+ * admin-betrieb-neu. „Aufgabe in Heute“ zeigt Admin › Heute (Nr. 185).
+ */
+export const ALARM_MATRIX: readonly AlarmZeile[] = [
+  { signal: 'Seite nicht erreichbar', weg: 'Uptime-Dienst: Push aufs Handy (unabhängig von Vercel und Resend)', reaktion: 'sofort, Handbuch Notfall 1' },
+  { signal: 'Abläufe stehen', weg: 'GitHub-Mail (Lebenszeichen)', reaktion: 'innerhalb 1 Stunde' },
+  { signal: 'Uptime-Dienst selbst still > 30 Min.', weg: 'Aufgabe in Heute', reaktion: 'am selben Tag' },
+  { signal: 'Fehler in der App', weg: 'Sentry-Mail und App, nur neue Fehler', reaktion: 'am selben Tag' },
+  { signal: 'Wichtige Mail hängt > 5 Min.', weg: 'Aufgabe in Heute + Warn-Mail', reaktion: 'innerhalb 1 Stunde' },
+  { signal: 'Geld weicht ab', weg: 'Aufgabe in Heute', reaktion: 'am selben Tag' },
+  { signal: 'Grenze bei 80 %', weg: 'Aufgabe in Heute + Warn-Mail', reaktion: 'diese Woche' },
+]
 
 // ─── Texte: Seite ────────────────────────────────────────────────────────────
 
@@ -1864,6 +1902,8 @@ export function betriebMail(anlass: BetriebMailAnlass): BetriebMail {
     }
   }
   const ablauf = ablaufVon(anlass.name)
+  // Der Uptime-Dienst ist schon nach 30 Minuten überfällig (Nr. 184) — „seit 0 Stunden“ wäre falsch.
+  const seitText = (stunden: number | null): string => (stunden === null ? 'über 26 Stunden' : stunden < 1 ? 'über 30 Minuten' : `${stunden} Stunden`)
   if (anlass.art === 'ablaufWieder') {
     return {
       betreff: `Betrieb: Ablauf „${ablauf.text}“ läuft wieder`,
@@ -1877,7 +1917,7 @@ export function betriebMail(anlass: BetriebMailAnlass): BetriebMail {
   const zuletzt = anlass.zuletzt ? ` (zuletzt ${anlass.zuletzt})` : ''
   const satz =
     anlass.stand === 'ueberfaellig'
-      ? `„${ablauf.text}“ läuft ${anlass.wann} und hat sich seit ${anlass.stundenSeit ?? 'über 26'} Stunden nicht gemeldet${zuletzt}.`
+      ? `„${ablauf.text}“ läuft ${anlass.wann} und hat sich seit ${seitText(anlass.stundenSeit)} nicht gemeldet${zuletzt}.`
       : `„${ablauf.text}“ läuft ${anlass.wann} und ist beim letzten Lauf gescheitert${zuletzt}. Die Fehlerklasse steht in Sentry, ohne Inhalt.`
   return {
     betreff: `Betrieb: Ablauf „${ablauf.text}“ ist ${anlass.stand === 'ueberfaellig' ? 'überfällig' : 'gescheitert'}`,

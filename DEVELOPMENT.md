@@ -5976,6 +5976,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **/teilen** trägt `data-design="neu"`, keine Shell; der Service Worker ist unverändert.
 - **Toter Code entfernt:** `src/emails/newsletter.tsx`, `createOnboardingProducts`, `createOnboardingSlots` (jeweils ohne Import und Aufruf).
 
+## Signal statt Lärm, /api/gesund, Lebenszeichen alle 15 Minuten (Register N18, Ergänzung 26.10.2026; Nr. 184, Lauf 26, 26.10.2026)
+
+- **JAVASCRIPT-NEXTJS-7** („Umgebung widersprüchlich: Stripe TEST in Produktion … Kein STRIPE_CONNECT_WEBHOOK_SECRET …“, 1 553 Ereignisse vom 2. bis 26.10.2026, rund 65 am Tag): `meldeUmgebungsWarnungen` (`src/lib/umgebung-server.ts`) läuft aus `UmgebungsBanner` im Root-Layout bei JEDEM Seitenaufbau. Der Merker „einmal je Instanz“ war ein Modul-Wert — jede neue Vercel-Instanz (Kaltstart, Deploy, Skalierung) meldete denselben, bekannten Zustand von vorn. Jetzt höchstens einmal je UTC-Tag und Deploy: je Instanz ein Tag-Merker im Speicher, über alle Instanzen eine Zeile `sentry:<zustand>:<deploy>` in `BetriebMessung` (ON CONFLICT DO NOTHING; nur wer anlegt, meldet), gemeldet nach der Antwort. Scheitert die Datenbank, wird nicht gemeldet. Der Deploy ist der Commit von Vercel (`VERCEL_GIT_COMMIT_SHA`, Systemvariable, neu in `env.ts`). Banner, Betriebsleiste und Admin › Betrieb zeigen den Zustand weiter.
+- **/api/gesund** für einen Uptime-Dienst: nur `ok`/`gestoert`, Datenbank und Mail-Herzschlag (≤ 10 Minuten) in 1 Sekunde, 30 Sekunden je Instanz gemerkt, Bremse je IP. Jeder Aufruf ist der Herzschlag `von-aussen` (höchstens einmal je Minute, bedingte Anweisung). Warum ein Eintrag in `ABLAEUFE` statt einer eigenen Prüfung: `pruefeAblaeufe` läuft nach jedem Lauf der Mail-Warteschlange (jede Minute), warnt einmal am Tag und entwarnt beim nächsten Aufruf — genau das gewünschte Verhalten, ohne zweite Logik. Der neue Rhythmus `vonAussen` hält ihn aus `vercel.json` und aus dem Lebenszeichen heraus (sonst scheiterte der Workflow, solange der Dienst nicht eingerichtet ist).
+- **Lebenszeichen** alle 15 Minuten statt täglich um 7:17 UTC.
+- **Admin › Betrieb › Überblick:** Karten „Dienste“ (je mit Prüfweg), „Version“ (Commit, letzte Migration aus `_prisma_migrations`, Instant Rollback) und „Alarm-Matrix“ (`ALARM_MATRIX`, dieselbe Tabelle in ARCHITECTURE). Die Build-Zeit fehlt: Ohne Eintrag in `next.config.ts` gibt es sie zur Laufzeit nicht (Bericht 184).
+
 ## Nützliche Befehle
 
 ```bash

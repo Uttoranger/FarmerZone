@@ -159,6 +159,8 @@ const ohneDateien = (funde: Fund[], dateien: AusnahmeDatei[]): Fund[] => funde.f
  */
 type Ausnahme = { datei: string; wort: string; text: string | RegExp; grund: string }
 const AUSNAHMEN: Ausnahme[] = [
+  // Version
+  { datei: 'src/app/admin/betrieb/dienste.ts', wort: 'Version', text: 'Version', grund: 'Karte „Version“ in Admin › Betrieb meint den Deploy, der live ist (Board admin-betrieb-neu, Nr. 184) — keine Fassung der Startseite' },
   // Status
   { datei: 'src/app/(hof)/settings/payments/payments-actions.tsx', wort: 'Status', text: 'Status prüfen', grund: 'Knopf fragt bei Stripe, wie weit die Freischaltung des Hofs ist — kein Beitrag' },
   { datei: 'src/components/admin/meldungen-triage-form.tsx', wort: 'Status', text: 'Status', grund: 'Feld „Status“ der Meldung im Admin — kein Beitrag' },

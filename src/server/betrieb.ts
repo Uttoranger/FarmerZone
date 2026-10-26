@@ -579,6 +579,37 @@ export async function mitHerzschlag<T>(
   return ergebnis
 }
 
+// ─── Herzschlag von außen (Register N18, Ergänzung 26.10.2026; Nr. 184) ─────
+
+/** Höchstens ein Herzschlag „von außen“ je Minute — auch wenn der Uptime-Dienst öfter oder von mehreren Orten ruft. */
+export const VON_AUSSEN_ABSTAND_MS = 60 * 1000
+
+/**
+ * Der Herzschlag des Uptime-Dienstes (Ablauf `von-aussen` in ABLAEUFE): Jeder
+ * Aufruf von /api/gesund schreibt die Zeile in AblaufLauf — in EINER
+ * Anweisung (Muster `beginneMailPruefung`) und nur, wenn der letzte
+ * Herzschlag mindestens eine Minute zurückliegt. Zwei gleichzeitige Aufrufe
+ * schreiben so nur einmal. Ein Herzschlag ist immer „ok“: Er sagt nur, dass
+ * der Dienst gerufen hat; ob die Seite gesund war, sagt ihm die Antwort.
+ *
+ * Die Warnung kommt aus der bestehenden Prüfung `pruefeAblaeufe` (nach jedem
+ * Lauf der Mail-Warteschlange, also jede Minute): überfällig nach 30 Minuten
+ * → BetriebWarnung `ablauf:von-aussen` und eine Warn-Mail am Tag; ohne Zeile
+ * (nie gerufen) keine Warnung. true = diese Anfrage hat geschrieben.
+ */
+export async function schlageVonAussen(jetzt: Date = new Date()): Promise<boolean> {
+  const ab = new Date(jetzt.getTime() - VON_AUSSEN_ABSTAND_MS)
+  const name: AblaufName = 'von-aussen'
+  const getroffen = await prisma.$queryRaw<Array<{ name: string }>>`
+    INSERT INTO "AblaufLauf" ("name", "gestartetAm", "beendetAm", "ok", "fehlerKlasse", "dauerMs")
+    VALUES (${name}, ${jetzt}::timestamp(3), ${jetzt}::timestamp(3), true, NULL, 0)
+    ON CONFLICT ("name") DO UPDATE SET
+      "gestartetAm" = EXCLUDED."gestartetAm", "beendetAm" = EXCLUDED."beendetAm", "ok" = true, "fehlerKlasse" = NULL, "dauerMs" = 0
+    WHERE "AblaufLauf"."gestartetAm" <= ${ab}::timestamp(3)
+    RETURNING "name"`
+  return getroffen.length > 0
+}
+
 /** „Jetzt messen“ und der Mess-Lauf: messen, dann die Grenzen prüfen. `nachher`: die Warn-Mails nach der Antwort („Jetzt messen“). */
 export async function messeUndPruefe(jetzt: Date = new Date(), { nachher = false }: Pick<Optionen, 'nachher'> = {}): Promise<MessErgebnis> {
   const ergebnis = await messeBetrieb(jetzt)

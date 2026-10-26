@@ -17,6 +17,8 @@ import { join } from 'node:path'
 import ts from 'typescript'
 import {
   ABLAEUFE,
+  ALARM_MATRIX,
+  fehlendeAblaeufe,
   GRENZE,
   GRENZEN,
   TARIF_ZEILEN,
@@ -266,10 +268,42 @@ describe('ablaufSchritt', () => {
   })
 })
 
+describe('Herzschlag von außen (Nr. 184, N18-Ergänzung)', () => {
+  const vonAussen = ABLAEUFE.find((a) => a.name === 'von-aussen')!
+  const jetzt = T('2026-10-26T09:40:00Z')
+
+  it('überfällig erst nach 30 Minuten ohne Aufruf; ohne Zeile „noch kein Lauf“ — keine Warnung', () => {
+    expect(ablaufStand(vonAussen, lauf('2026-10-26T09:10:00Z'), jetzt)).toBe('puenktlich')
+    expect(ablaufStand(vonAussen, lauf('2026-10-26T09:09:59Z'), jetzt)).toBe('ueberfaellig')
+    expect(ablaufStand(vonAussen, null, jetzt)).toBe('nochKeinLauf')
+    expect(ablaufSchritt('nochKeinLauf', null, jetzt)).toEqual({ tun: 'nichts' })
+    expect(ablaufSchritt('ueberfaellig', null, jetzt)).toEqual({ tun: 'warnen', stufe: 1 })
+    expect(wannText(vonAussen, jetzt)).toBe('alle 5 Minuten, von außen')
+  })
+
+  it('die Warn-Mail sagt „seit über 30 Minuten“, nicht „seit 0 Stunden“; ein täglicher Ablauf weiter in Stunden (Gegenprobe)', () => {
+    const mail = betriebMail({ art: 'ablauf', name: 'von-aussen', stand: 'ueberfaellig', zuletzt: 'heute 09:05', stundenSeit: 0, wann: 'alle 5 Minuten, von außen' })
+    expect(mail.betreff).toBe('Betrieb: Ablauf „Uptime-Dienst (von außen)“ ist überfällig')
+    expect(mail.absaetze[0]).toContain('läuft alle 5 Minuten, von außen und hat sich seit über 30 Minuten nicht gemeldet (zuletzt heute 09:05).')
+    expect(betriebMail({ art: 'ablauf', name: 'betrieb', stand: 'ueberfaellig', zuletzt: null, stundenSeit: 48, wann: 'täglich ab 05:00' }).absaetze[0]).toContain('seit 48 Stunden')
+  })
+
+  it('das Lebenszeichen vermisst ihn nie — weder ohne Zeile noch überfällig (Alarm-Matrix: Aufgabe in Heute)', () => {
+    const laeufe = new Map(ABLAEUFE.filter((a) => a.rhythmus !== 'vonAussen').map((a) => [a.name, lauf(a.rhythmus === 'minuetlich' ? '2026-10-26T09:38:00Z' : '2026-10-26T03:00:00Z')]))
+    expect(fehlendeAblaeufe(laeufe, jetzt)).toEqual([])
+    laeufe.set('von-aussen', lauf('2026-10-25T09:00:00Z'))
+    expect(fehlendeAblaeufe(laeufe, jetzt)).toEqual([])
+    // Gegenprobe: ein ausgefallener Cron fehlt weiter.
+    laeufe.set('mails', lauf('2026-10-26T09:00:00Z'))
+    expect(fehlendeAblaeufe(laeufe, jetzt)).toEqual(['mails'])
+  })
+})
+
 describe('Hinweis der Shell (Punkt und Betriebsleiste, Register N15)', () => {
   const jetzt = T('2026-10-16T08:00:00Z')
   // Die Mail-Warteschlange läuft jede Minute (Nr. 158) — pünktlich heißt hier: vor 2 Minuten.
-  const gut = new Map(ABLAEUFE.map((a) => [a.name, lauf(a.rhythmus === 'minuetlich' ? '2026-10-16T07:58:00Z' : '2026-10-16T03:00:00Z')]))
+  // Der Uptime-Dienst (Nr. 184) ruft alle 5 Minuten — pünktlich heißt hier ebenfalls: vor 2 Minuten.
+  const gut = new Map(ABLAEUFE.map((a) => [a.name, lauf(a.rhythmus === 'minuetlich' || a.rhythmus === 'vonAussen' ? '2026-10-16T07:58:00Z' : '2026-10-16T03:00:00Z')]))
 
   it('nichts offen → null (kein Punkt)', () => {
     expect(betriebHinweis([{ art: 'bilder', stufe: 0 }], gut, jetzt)).toBeNull()
@@ -481,18 +515,32 @@ describe('Warn-Mail: Bilder ohne Verwendung (Nacharbeit 104, Nr. 113)', () => {
 })
 
 describe('Wachen', () => {
-  it('ABLAEUFE und vercel.json nennen dieselben Abläufe mit demselben Zeitplan', () => {
+  it('ABLAEUFE und vercel.json nennen dieselben Abläufe mit demselben Zeitplan — außer dem Herzschlag von außen (kein Cron, Nr. 184)', () => {
     const konfig = JSON.parse(readFileSync(join(WURZEL, 'vercel.json'), 'utf8')) as { crons: Array<{ path: string; schedule: string }> }
     const ausKonfig = konfig.crons.map((c) => `${c.path} ${c.schedule}`).sort()
-    expect(ABLAEUFE.map((a) => `${a.pfad} ${a.zeitplan}`).sort()).toEqual(ausKonfig)
+    expect(ABLAEUFE.filter((a) => a.rhythmus !== 'vonAussen').map((a) => `${a.pfad} ${a.zeitplan}`).sort()).toEqual(ausKonfig)
+    expect(ABLAEUFE.filter((a) => a.rhythmus === 'vonAussen').map((a) => a.name)).toEqual(['von-aussen'])
     expect(ausKonfig).toContain('/api/cron/betrieb 0 4 * * *')
   })
 
-  it('jeder Ablauf hat seine Route — und ruft mitHerzschlag mit seinem Namen', () => {
+  it('jeder Ablauf hat seine Route — und ruft mitHerzschlag mit seinem Namen; der von außen schlageVonAussen', () => {
     for (const a of ABLAEUFE) {
       const quelle = readFileSync(join(WURZEL, 'src/app', a.pfad, 'route.ts'), 'utf8')
-      expect(quelle, a.pfad).toContain(`mitHerzschlag('${a.name}'`)
+      expect(quelle, a.pfad).toContain(a.rhythmus === 'vonAussen' ? 'schlageVonAussen(' : `mitHerzschlag('${a.name}'`)
     }
+  })
+
+  it('die Alarm-Matrix steht in ARCHITECTURE genau wie in ALARM_MATRIX (eine Quelle, Nr. 184)', () => {
+    const doku = readFileSync(join(WURZEL, 'docs/ai/ARCHITECTURE.md'), 'utf8')
+    const abschnitt = doku.slice(doku.indexOf('### Betrieb: Alarm-Matrix'))
+    // Die erste zusammenhängende Tabelle des Abschnitts, ohne Kopf und Trennzeile.
+    const ab = abschnitt.split('\n').slice(1)
+    const beginn = ab.findIndex((z) => z.startsWith('|'))
+    const ende = ab.findIndex((z, i) => i > beginn && !z.startsWith('|'))
+    const tabelle = ab.slice(beginn, ende).slice(2)
+    expect(tabelle.length).toBeGreaterThan(0)
+    const gelesen = tabelle.map((z) => z.split('|').slice(1, -1).map((t) => t.trim()))
+    expect(gelesen).toEqual(ALARM_MATRIX.map((a) => [a.signal, a.weg, a.reaktion]))
   })
 
   it('die drei Tabellen von Betrieb haben keine Textspalte außer Namen, Arten und fehlerKlasse (keine Inhalte)', () => {

@@ -18,6 +18,11 @@
  *    („Vercel Pro — Bilder ohne feste Grenze") und tests/betrieb-server.test.ts
  *    („Bilder ohne feste Grenze").
  *  - mitHerzschlag schreibt AblaufLauf (ok, Dauer, nur die Fehlerklasse).
+ *  - Seit Nr. 184: schlageVonAussen schreibt den Herzschlag „von-aussen“
+ *    höchstens einmal je Minute (zehn gleichzeitige Aufrufe → einer schreibt;
+ *    nach 59 s keiner, nach 60 s wieder); erstmalsHeute (umgebung-server.ts)
+ *    legt die Zeile eines bekannten Zustands je Tag und Deploy genau einmal
+ *    an — am nächsten Tag wieder (Gegenprobe).
  *
  * Daten: Messungen an Tagen im Jahr 2001 (fern von jedem echten Tag),
  * Abläufe mit `int-`-Namen. Die Arten der Warnungen sind fest (keine
@@ -35,7 +40,8 @@ vi.mock('@vercel/blob', () => ({ list: vi.fn() }))
 
 import { list } from '@vercel/blob'
 import { sendBetriebWarnung } from '@/lib/email'
-import { messeBetrieb, mitHerzschlag, pruefeGrenzen } from '@/server/betrieb'
+import { messeBetrieb, mitHerzschlag, pruefeGrenzen, schlageVonAussen } from '@/server/betrieb'
+import { erstmalsHeute } from '@/lib/umgebung-server'
 import { zaehleMail } from '@/server/betrieb-zaehler'
 import { intKennung } from './setup/basis'
 
@@ -221,5 +227,47 @@ describe('mitHerzschlag', () => {
 
     await mitHerzschlag(n, async () => null, nichtsDanach)
     expect(await prisma.ablaufLauf.findMany({ where: { name: n } })).toEqual([expect.objectContaining({ ok: true, fehlerKlasse: null })])
+  })
+})
+
+describe('schlageVonAussen (Nr. 184)', () => {
+  // Der Name ist fest („von-aussen“, keine int-Kennung möglich): Stand vorher merken, danach wiederherstellen.
+  let vorher: Awaited<ReturnType<typeof prisma.ablaufLauf.findUnique>> = null
+  beforeAll(async () => {
+    vorher = await prisma.ablaufLauf.findUnique({ where: { name: 'von-aussen' } })
+    await prisma.ablaufLauf.deleteMany({ where: { name: 'von-aussen' } })
+  })
+  afterAll(async () => {
+    await prisma.ablaufLauf.deleteMany({ where: { name: 'von-aussen' } })
+    if (vorher) await prisma.ablaufLauf.create({ data: vorher })
+  })
+
+  it('zehn gleichzeitige Aufrufe → genau einer schreibt; nach 59 s keiner, nach 60 s wieder', async () => {
+    const t0 = new Date('2001-03-01T10:00:00.000Z')
+    const ergebnisse = await Promise.all(Array.from({ length: 10 }, () => schlageVonAussen(t0)))
+    expect(ergebnisse.filter(Boolean)).toHaveLength(1)
+    expect(await prisma.ablaufLauf.findUnique({ where: { name: 'von-aussen' } })).toMatchObject({ gestartetAm: t0, beendetAm: t0, ok: true, fehlerKlasse: null, dauerMs: 0 })
+
+    expect(await schlageVonAussen(new Date(t0.getTime() + 59_000))).toBe(false)
+    expect((await prisma.ablaufLauf.findUnique({ where: { name: 'von-aussen' } }))?.gestartetAm).toEqual(t0)
+
+    const t1 = new Date(t0.getTime() + 60_000)
+    expect(await schlageVonAussen(t1)).toBe(true)
+    expect((await prisma.ablaufLauf.findUnique({ where: { name: 'von-aussen' } }))?.gestartetAm).toEqual(t1)
+  })
+})
+
+describe('erstmalsHeute — bekannte Zustände einmal je Tag und Deploy (Nr. 184)', () => {
+  it('fünf gleichzeitige Anfragen → eine legt an; am selben Tag keine mehr, am nächsten Tag wieder', async () => {
+    const tag1 = new Date('2001-04-02T08:00:00.000Z')
+    const ergebnisse = await Promise.all(Array.from({ length: 5 }, () => erstmalsHeute('umgebung', tag1)))
+    expect(ergebnisse.filter(Boolean)).toHaveLength(1)
+    expect(await erstmalsHeute('umgebung', new Date('2001-04-02T23:59:00.000Z'))).toBe(false)
+    // Ein anderer Zustand hat seine eigene Zeile.
+    expect(await erstmalsHeute('stichtag', tag1)).toBe(true)
+    // Gegenprobe zweiter Tag.
+    expect(await erstmalsHeute('umgebung', new Date('2001-04-03T00:01:00.000Z'))).toBe(true)
+    const zeilen = await prisma.betriebMessung.findMany({ where: { art: { startsWith: 'sentry:' }, tag: { lt: TEST_JAHR_BIS } }, select: { art: true } })
+    expect(zeilen.map((z) => z.art).sort()).toEqual(['sentry:stichtag:lokal', 'sentry:umgebung:lokal', 'sentry:umgebung:lokal'])
   })
 })
