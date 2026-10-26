@@ -247,7 +247,7 @@ describe('ein öffentlicher Hof: erst geprüft, dann das Skelett, dahinter der I
     expect(baum.props.fallback.type).toBe(HofseiteSkelett)
     expect(lade).not.toHaveBeenCalled()
     expect(findeElement(await inhaltHinterSuspense(baum), FarmPageView)).not.toBeNull()
-    expect(lade).toHaveBeenCalledWith('hof-test', {})
+    expect(lade).toHaveBeenCalledWith('hof-test', {}, expect.any(Function))
   })
 
   it('die Produktseite ebenso, mit ihrem eigenen Skelett', async () => {

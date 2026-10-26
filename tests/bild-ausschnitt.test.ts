@@ -274,8 +274,8 @@ describe('bildAusschnittSpeichernSchema (was „Speichern“ schickt)', () => {
 
 describe('fehlender Ausschnitt (Sentry JAVASCRIPT-NEXTJS-C, Nr. 180)', () => {
   it('undefined (Feld fehlt in alten Zwischenspeicher-Daten) ist wie null, kein Absturz', () => {
-    expect(bildStil(undefined as never)).toEqual({})
-    expect(nurFilterStil(undefined as never)).toEqual({})
-    expect(filterMit('blur', undefined as never)).toBe('blur')
+    expect(bildStil(undefined)).toEqual({})
+    expect(nurFilterStil(undefined)).toEqual({})
+    expect(filterMit('blur', undefined)).toBe('blur')
   })
 })

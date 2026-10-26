@@ -79,7 +79,7 @@ export type BildStil = {
  * Gezoomt wird um den Fokuspunkt (`transform-origin`): So bleibt der Bildpunkt
  * unter dem Fokus an derselben Stelle des Rahmens, in jeder Rahmengröße.
  */
-export function bildStil(ausschnitt: BildAusschnitt | null, optionen: { filter?: boolean } = {}): BildStil {
+export function bildStil(ausschnitt: BildAusschnitt | null | undefined, optionen: { filter?: boolean } = {}): BildStil {
   // `!ausschnitt` statt `=== null`: Daten aus einem älteren Zwischenspeicher tragen das Feld noch nicht
   // (undefined) — das stürzte /hoefe ab (Sentry JAVASCRIPT-NEXTJS-C).
   if (!ausschnitt) return {}
@@ -91,7 +91,7 @@ export function bildStil(ausschnitt: BildAusschnitt | null, optionen: { filter?:
 }
 
 /** Nur der Filter, ohne Fokus und Zoom — für ein Foto, das ganz steht (`object-contain`). */
-export function nurFilterStil(ausschnitt: BildAusschnitt | null): BildStil {
+export function nurFilterStil(ausschnitt: BildAusschnitt | null | undefined): BildStil {
   const filter = !ausschnitt ? '' : BILD_FILTER[ausschnitt.filter]
   return filter === '' ? {} : { filter }
 }
@@ -101,7 +101,7 @@ export function nurFilterStil(ausschnitt: BildAusschnitt | null): BildStil {
  * `blur(28px)` der unscharfen Titelbild-Kopie. Zwei Angaben überschrieben sich
  * (eine Klasse `blur-[28px]` neben einem Inline-Filter wäre wirkungslos).
  */
-export function filterMit(vorweg: string, ausschnitt: BildAusschnitt | null): string {
+export function filterMit(vorweg: string, ausschnitt: BildAusschnitt | null | undefined): string {
   const filter = !ausschnitt ? '' : BILD_FILTER[ausschnitt.filter]
   return filter === '' ? vorweg : `${vorweg} ${filter}`
 }

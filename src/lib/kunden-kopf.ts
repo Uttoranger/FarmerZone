@@ -214,6 +214,6 @@ export function eigenerVorgaenger(
  */
 export function hinaufEintraegeAus(roh: unknown): string[] {
   if (!Array.isArray(roh) || roh.length > 50) return []
-  const alleGueltig = roh.every((s) => typeof s === 'string' && s.length >= 1 && s.length <= 100)
-  return alleGueltig ? (roh as string[]) : []
+  const istGueltig = (s: unknown): s is string => typeof s === 'string' && s.length >= 1 && s.length <= 100
+  return roh.every(istGueltig) ? roh : []
 }

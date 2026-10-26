@@ -10,7 +10,7 @@
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { hinaufEintraegeAus } from '@/lib/kunden-kopf'
 import { hinaufEintraegeSchema } from '@/schemas/rueckweg'
 import { SUCHTEXT_PARAMETER } from '@/lib/suchtext-parameter'
@@ -82,36 +82,69 @@ describe('Stripe.js lädt erst bei Online-Zahlung', () => {
 })
 
 describe('Bilder über next/image', () => {
+  /** Rohes img oder ein `<Image>` ohne `sizes` — der alte Stand. */
+  const altesBild = /<img\b|<Image (?![^>]*\bsizes=)[^>]*>/
+
+  it('die Spürprobe erkennt den alten Stand (Gegenprobe)', () => {
+    expect('<img src={x} alt="" className="size-14" />').toMatch(altesBild)
+    expect('<Image src={x} alt="" fill />').toMatch(altesBild)
+    expect('<Image src={x} alt="" fill sizes="56px" />').not.toMatch(altesBild)
+  })
+
   it('Korb-Blatt: 56 px, kein rohes img', () => {
     const t = lies('src/components/farm/cart-sheet.tsx')
     expect(t).toMatch(/import Image from 'next\/image'/)
-    expect(t).not.toMatch(/<img\b/)
+    expect(t).not.toMatch(altesBild)
     expect(t).toMatch(/<Image [^>]*sizes="56px"/)
   })
 
-  it('Produktliste: kleine Rahmen, kein rohes img', () => {
+  it('Produktliste: kleine Rahmen (44 px), kein rohes img', () => {
     const t = lies('src/components/produkte/produkte-ansicht.tsx')
     expect(t).toMatch(/import Image from 'next\/image'/)
-    expect(t).not.toMatch(/<img\b/)
+    expect(t).not.toMatch(altesBild)
     expect(t.match(/<Image [^>]*sizes=\{PRODUKT_BILD_SIZES\}/g)).toHaveLength(2)
-    expect(t).toMatch(/PRODUKT_BILD_SIZES = '48px'/)
+    expect(t).toMatch(/PRODUKT_BILD_SIZES = '44px'/)
   })
 })
 
 describe('Hofseite: Unabhängiges läuft gleichzeitig', () => {
-  it('Seite: Beiträge und Nachbestell-Artikel über Promise.all', () => {
-    const t = lies('src/app/(public)/[farmSlug]/page.tsx')
-    expect(t).toMatch(/Promise\.all\(\[\s*ladeBeitraege\(/)
+  const seite = lies('src/app/(public)/[farmSlug]/page.tsx')
+  const nacheinander = /await ladeBeitraege\(|await ladeTeilenVorschauOhneRisiko\(/
+
+  it('die Spürprobe erkennt das Nacheinander (Gegenprobe)', () => {
+    expect('const b = await ladeBeitraege(farm.id, k)').toMatch(nacheinander)
+    expect('const v = await ladeTeilenVorschauOhneRisiko(slug)').toMatch(nacheinander)
+  })
+
+  it('Seite: Beiträge und Nachbestell-Artikel über Promise.all, Beiträge vom Lader vorab gestartet', () => {
+    expect(seite).toMatch(/Promise\.all\(\[\s*ladeBeitraege\(/)
+    expect(seite).not.toMatch(nacheinander)
+    expect(seite.match(/ladeHofseiteGeteilt\(farmSlug, suche, vorab\(suche\)\)/g)).toHaveLength(2)
   })
 
   it('Metadaten: Hof und Teilen-Vorschau über Promise.all', () => {
-    const t = lies('src/app/(public)/[farmSlug]/page.tsx')
-    expect(t).toMatch(/Promise\.all\(\[\s*ladeHofseiteGeteilt\(/)
+    expect(seite).toMatch(/Promise\.all\(\[\s*ladeHofseiteGeteilt\(/)
   })
 })
 
-describe('ladeHofseite: volle Tage und Abzeichen-Blatt gleichzeitig', () => {
-  it('beide Abfragen sind gestartet, bevor eine antwortet', async () => {
+describe('ladeHofseite: volle Tage, Abzeichen-Blatt und Beiträge gleichzeitig', () => {
+  const MODULE = [
+    'next/headers',
+    '@/lib/auth',
+    '@/lib/prisma',
+    '@/server/verwaiste-bestellungen',
+    '@/server/queries/farm',
+    '@/server/abholfenster',
+    '@/server/queries/plattform-einstellung',
+    'react',
+  ]
+  afterEach(() => {
+    for (const m of MODULE) vi.doUnmock(m)
+    vi.resetModules()
+  })
+
+  /** Hof mit offenen Abfragen: `gestartet` füllt sich, bis `ende()` sie alle beantwortet. */
+  async function lader(optionen: { memo?: boolean } = {}) {
     vi.resetModules()
     const gestartet: string[] = []
     let ende: () => void = () => {}
@@ -142,13 +175,64 @@ describe('ladeHofseite: volle Tage und Abzeichen-Blatt gleichzeitig', () => {
         return null
       }),
     }))
-    const { ladeHofseite } = await import('@/server/hofseite-vorschau')
-    const ergebnis = ladeHofseite('hof-a', {})
-    await vi.waitFor(() => expect(gestartet.sort()).toEqual(['blatt', 'tage']))
+    if (optionen.memo) {
+      // Ohne Anfrage merkt sich React `cache` nichts; hier merkt es sich die Aufrufe wie auf dem Server.
+      vi.doMock('react', async (original) => ({
+        ...(await original<typeof import('react')>()),
+        cache: <A extends unknown[], R>(fn: (...a: A) => R) => {
+          const gemerkt = new Map<string, R>()
+          return (...a: A): R => {
+            const schluessel = JSON.stringify(a)
+            if (!gemerkt.has(schluessel)) gemerkt.set(schluessel, fn(...a))
+            return gemerkt.get(schluessel) as R
+          }
+        },
+      }))
+    }
+    const modul = await import('@/server/hofseite-vorschau')
+    return { modul, gestartet, ende }
+  }
+
+  it('Tage und Blatt sind gestartet, bevor eine antwortet', async () => {
+    const { modul, gestartet, ende } = await lader()
+    const ergebnis = modul.ladeHofseite('hof-a', {})
+    await vi.waitFor(() => expect([...gestartet].sort()).toEqual(['blatt', 'tage']))
     ende()
     expect((await ergebnis).farm?.id).toBe('f1')
-    vi.doUnmock('@/server/abholfenster')
-    vi.doUnmock('@/server/queries/plattform-einstellung')
-    vi.resetModules()
+  })
+
+  it('die Beiträge starten mit der Hof-ID, ohne auf die vollen Tage zu warten', async () => {
+    const { modul, gestartet, ende } = await lader()
+    const vorab = vi.fn(async (hofId: string) => {
+      gestartet.push(`beitraege:${hofId}`)
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    const ergebnis = modul.ladeHofseite('hof-a', {}, vorab)
+    // Die vollen Tage antworten noch nicht — und die Beiträge laufen schon.
+    await vi.waitFor(() => expect([...gestartet].sort()).toEqual(['beitraege:f1', 'blatt', 'tage']))
+    ende()
+    expect((await ergebnis).farm?.id).toBe('f1')
+    expect(vorab).toHaveBeenCalledTimes(1)
+  })
+
+  it('ohne Hof (404) starten die Beiträge nicht', async () => {
+    const { modul } = await lader()
+    const farm = await import('@/server/queries/farm')
+    vi.mocked(farm.getPublicFarm).mockResolvedValueOnce(null)
+    const vorab = vi.fn(async () => {})
+    expect((await modul.ladeHofseite('hof-a', {}, vorab)).farm).toBeNull()
+    expect(vorab).not.toHaveBeenCalled()
+  })
+
+  it('ladeHofseiteGeteilt: Metadaten und Seite geben dasselbe mit, geladen wird einmal, die Beiträge starten einmal', async () => {
+    const { modul, ende } = await lader({ memo: true })
+    ende()
+    const farm = await import('@/server/queries/farm')
+    const vorab = vi.fn(async () => {})
+    const [a, b] = await Promise.all([modul.ladeHofseiteGeteilt('hof-a', {}, vorab), modul.ladeHofseiteGeteilt('hof-a', {}, vorab)])
+    expect(a).toBe(b)
+    expect(farm.getPublicFarm).toHaveBeenCalledTimes(1)
+    expect(vorab).toHaveBeenCalledTimes(1)
+    expect(vorab).toHaveBeenCalledWith('f1')
   })
 })

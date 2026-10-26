@@ -19,7 +19,7 @@ import { getActiveStatusPosts } from '@/server/queries/status-posts'
 
 describe('Beiträge der Hofseite: höchstens fünf (F8)', () => {
   it('die Hofseite fragt mit der Grenze, und die Abfrage reicht fünf als take an die Datenbank', async () => {
-    const seite = readFileSync(join(process.cwd(), 'src', 'app', '(public)', '[farmSlug]', 'page.tsx'), 'utf8')
+    const seite = readFileSync(join(process.cwd(), 'src', 'server', 'hofseite-beitraege.ts'), 'utf8')
     expect(seite).toContain('getActiveStatusPosts(farmId, HOFSEITE_BEITRAEGE_MAX)')
 
     await getActiveStatusPosts('farm_test', HOFSEITE_BEITRAEGE_MAX)

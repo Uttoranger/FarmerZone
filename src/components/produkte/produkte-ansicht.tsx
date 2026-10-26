@@ -705,7 +705,9 @@ function Hinweise({ product, onOeffnen }: { product: ProductData; onOeffnen: () 
   )
 }
 
-const PRODUKT_BILD_SIZES = '48px'
+// 44 px, wie freigegeben (Nr. 180): Next wählt daraus dieselbe Breite (48 bzw. 96 px) wie für den 48-px-Rahmen,
+// scharf bleibt das Bild trotzdem — die kleinste Stufe über 44 px ist 48.
+const PRODUKT_BILD_SIZES = '44px'
 
 /** Foto des Hofs, sonst die Kategorie-Illustration (im Dunkeln gedämpft), sonst ein Symbol. */
 function ProduktBild({ product, className }: { product: ProductData; className?: string }): React.JSX.Element {
