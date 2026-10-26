@@ -23,9 +23,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const db = vi.hoisted(() => ({
-  mailAuftrag: { findUnique: vi.fn(), count: vi.fn(), updateMany: vi.fn(), findMany: vi.fn() },
-  order: { findUnique: vi.fn(), updateMany: vi.fn() },
-  farm: { findUnique: vi.fn() },
+  mailAuftrag: { findUnique: vi.fn(), count: vi.fn(), updateMany: vi.fn(), findMany: vi.fn(), groupBy: vi.fn() },
+  order: { findUnique: vi.fn(), updateMany: vi.fn(), findMany: vi.fn() },
+  farm: { findUnique: vi.fn(), findMany: vi.fn() },
 }))
 const wache = vi.hoisted(() => ({ verlangeAdminAktion: vi.fn(), verlangeFrischeBestaetigung: vi.fn() }))
 const schlange = vi.hoisted(() => ({ stelleMailEin: vi.fn(async () => 1), arbeiteWarteschlange: vi.fn() }))
@@ -84,6 +84,8 @@ beforeEach(() => {
   db.mailAuftrag.findUnique.mockResolvedValue(zeile())
   db.mailAuftrag.count.mockResolvedValue(0)
   db.order.findUnique.mockResolvedValue(bestellung())
+  db.order.findMany.mockResolvedValue([bestellung()])
+  db.mailAuftrag.groupBy.mockResolvedValue([])
   db.order.updateMany.mockResolvedValue({ count: 1 })
   schlange.stelleMailEin.mockResolvedValue(1)
 })
@@ -149,8 +151,26 @@ describe('Nochmal schicken', () => {
     expect(await schickeMailNochmalAction({ id: ID })).toEqual({ error: 'Die Bestellung gibt es nicht mehr.' })
     db.order.findUnique.mockResolvedValue(bestellung())
     db.mailAuftrag.findUnique.mockResolvedValue(zeile({ status: 'offen' }))
-    expect(await schickeMailNochmalAction({ id: ID })).toEqual({ error: ALLE_MAILS_TEXT.standPasstNicht })
+    expect(await schickeMailNochmalAction({ id: ID })).toEqual({ error: ALLE_MAILS_TEXT.standUnterwegs })
     expect(schlange.stelleMailEin).not.toHaveBeenCalled()
+  })
+
+  it('Nochmal-Stände (N27, Ergänzung 25.10.2026): gesperrt und verworfen abgelehnt, je mit eigenem Grund, ohne Abfrage — Gegenprobe: gesendet, gescheitert, ohne Schlüssel gehen', async () => {
+    for (const [status, satz] of [
+      ['gesperrt', ALLE_MAILS_TEXT.standGesperrt],
+      ['verworfen', ALLE_MAILS_TEXT.standVerworfen],
+      ['in_arbeit', ALLE_MAILS_TEXT.standUnterwegs],
+    ] as const) {
+      db.mailAuftrag.findUnique.mockResolvedValue(zeile({ status }))
+      expect(await schickeMailNochmalAction({ id: ID })).toEqual({ error: satz })
+    }
+    expect(db.mailAuftrag.count).not.toHaveBeenCalled()
+    expect(schlange.stelleMailEin).not.toHaveBeenCalled()
+    for (const status of ['gesendet', 'gescheitert', 'ohne_schluessel']) {
+      db.mailAuftrag.findUnique.mockResolvedValue(zeile({ status }))
+      expect(await schickeMailNochmalAction({ id: ID })).toEqual({ ok: true, satz: ALLE_MAILS_TEXT.unterwegs })
+    }
+    expect(schlange.stelleMailEin).toHaveBeenCalledTimes(3)
   })
 
   it('keine andere Adresse: eine Eingabe mit Adresse oder Zusatzfeld ist ungültig', async () => {
@@ -205,13 +225,49 @@ describe('Bar-Link nochmal (S17, E7)', () => {
 describe('Alle nochmal schicken', () => {
   it('je Mail dieselben Regeln, EIN Einstellen; gesperrte (Grenze) fallen weg', async () => {
     db.mailAuftrag.findMany.mockResolvedValue([zeile({ status: 'gescheitert' }), zeile({ id: 'cmfauftrag0000000000003c', status: 'gescheitert' })])
-    db.mailAuftrag.count.mockResolvedValueOnce(0).mockResolvedValueOnce(3)
+    db.mailAuftrag.groupBy.mockResolvedValue([{ nochmalVon: 'cmfauftrag0000000000003c', _count: { _all: 3 } }])
     expect(await schickeArtNochmalAction({ art: 'abholbereit' })).toEqual({ ok: true, satz: ALLE_MAILS_TEXT.unterwegs })
     expect(schlange.stelleMailEin).toHaveBeenCalledTimes(1)
     const auftraege = (schlange.stelleMailEin.mock.calls[0] as unknown as [Array<{ nochmalVon: string }>])[0]
     expect(auftraege.map((a) => a.nochmalVon)).toEqual([ID])
     // Nur gescheiterte, wichtige Mails dieser Art aus „Braucht dich“.
     expect(JSON.stringify(db.mailAuftrag.findMany.mock.calls[0][0].where)).toContain('"status":"gescheitert"')
+  })
+
+  it('Nr. 170: gebündelt — EINE Zählung und EINE Abfrage der Bestellungen für alle Mails, keine je Mail; Gegenprobe: die Grenze gilt trotzdem je Mail', async () => {
+    const ids = Array.from({ length: 5 }, (_, i) => `cmfauftrag000000000000${i}x${i}`)
+    db.mailAuftrag.findMany.mockResolvedValue(ids.map((id, i) => zeile({ id, status: 'gescheitert', bestellungId: `bestellung_${i % 2}` })))
+    db.order.findMany.mockResolvedValue([bestellung({ id: 'bestellung_0' }), bestellung({ id: 'bestellung_1' })])
+    db.mailAuftrag.groupBy.mockResolvedValue([{ nochmalVon: ids[4], _count: { _all: 3 } }])
+    schlange.stelleMailEin.mockResolvedValue(4)
+    expect(await schickeArtNochmalAction({ art: 'abholbereit' })).toEqual({ ok: true, satz: ALLE_MAILS_TEXT.unterwegsViele(4) })
+    expect(db.mailAuftrag.groupBy).toHaveBeenCalledTimes(1)
+    expect(db.mailAuftrag.groupBy.mock.calls[0][0].where.nochmalVon).toEqual({ in: ids })
+    expect(db.order.findMany).toHaveBeenCalledTimes(1)
+    expect(db.order.findMany.mock.calls[0][0].where).toEqual({ id: { in: ['bestellung_0', 'bestellung_1'] } })
+    expect(db.mailAuftrag.count).not.toHaveBeenCalled()
+    expect(db.order.findUnique).not.toHaveBeenCalled()
+    const auftraege = (schlange.stelleMailEin.mock.calls[0] as unknown as [Array<{ nochmalVon: string; bestellungId: string }>])[0]
+    expect(auftraege.map((a) => a.nochmalVon)).toEqual(ids.slice(0, 4))
+    expect(auftraege.map((a) => a.bestellungId)).toEqual(['bestellung_0', 'bestellung_1', 'bestellung_0', 'bestellung_1'])
+  })
+
+  it('Freischaltung (an die Inhaberin): EINE Abfrage der Höfe für alle — Gegenprobe: ein stillgelegter Hof fällt weg', async () => {
+    const a = 'cmfauftrag0000000000004d'
+    const b = 'cmfauftrag0000000000005e'
+    db.mailAuftrag.findMany.mockResolvedValue([
+      zeile({ id: a, art: 'freischaltung', status: 'gescheitert', bestellungId: null, farmId: 'hof_1', bezug: { farmId: 'hof_1' } }),
+      zeile({ id: b, art: 'freischaltung', status: 'gescheitert', bestellungId: null, farmId: 'hof_2', bezug: { farmId: 'hof_2' } }),
+    ])
+    db.farm.findMany.mockResolvedValue([
+      { id: 'hof_1', name: 'Testhof A', approvedAt: new Date(), archivedAt: null, owner: { email: 'hof1@example.at' } },
+      { id: 'hof_2', name: 'Testhof B', approvedAt: new Date(), archivedAt: new Date(), owner: { email: 'hof2@example.at' } },
+    ])
+    expect(await schickeArtNochmalAction({ art: 'freischaltung' })).toEqual({ ok: true, satz: ALLE_MAILS_TEXT.unterwegs })
+    expect(db.farm.findMany).toHaveBeenCalledTimes(1)
+    expect(db.farm.findUnique).not.toHaveBeenCalled()
+    const auftraege = (schlange.stelleMailEin.mock.calls[0] as unknown as [Array<{ nochmalVon: string }>])[0]
+    expect(auftraege.map((x) => x.nochmalVon)).toEqual([a])
   })
 
   it('Gegenprobe: Codes, Beiträge und der Bar-Link gehen nie auf einmal', async () => {

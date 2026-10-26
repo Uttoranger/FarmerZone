@@ -3,7 +3,6 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import * as Sentry from '@sentry/nextjs'
-import { nanoid } from 'nanoid'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
@@ -14,8 +13,8 @@ import {
   LINK_UNGUELTIG_TITEL,
   barBestaetigungsAnsicht,
   barLinkErneutMoeglich,
-  barTokenHash,
   GRUND_KUNDIN_STORNIERT,
+  neuerBarToken,
   tokenKandidaten,
 } from '@/lib/bar-bestaetigung'
 import { DB_BREMSEN } from '@/lib/bremse-datenbank'
@@ -247,7 +246,7 @@ export async function sendeBarLinkErneut(
     const frei = await bremseUeberAlleInstanzen([{ bremse: DB_BREMSEN.barLinkBestellung, merkmal: orderId }], jetzt)
     if (!frei) return antwort
 
-    const token = nanoid(32)
+    const { token, hash } = neuerBarToken()
     const { count } = await prisma.order.updateMany({
       where: {
         id: order.id,
@@ -255,7 +254,7 @@ export async function sendeBarLinkErneut(
         paymentMethod: { not: 'ONLINE' },
         confirmationToken: order.confirmationToken,
       },
-      data: { confirmationToken: barTokenHash(token) },
+      data: { confirmationToken: hash },
     })
     // 0: parallel bestätigt, storniert oder schon neu angefordert — keine Mail.
     if (count !== 1) return antwort

@@ -7,7 +7,6 @@ import { bremseCheckout } from '@/server/bremse-datenbank'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
-import { nanoid } from 'nanoid'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendOnsiteConfirmation } from '@/lib/email'
@@ -39,7 +38,7 @@ import {
 } from '@/lib/stripe-konto'
 import { vermerkeUnbekanntesHofKonto } from '@/server/hofkonto-unbekannt'
 import { CODE_ZAHLART_NICHT_ANGEBOTEN, ZAHLART_NICHT_ANGEBOTEN, zahlartFuerNeueBestellung } from '@/lib/kasse'
-import { barTokenHash } from '@/lib/bar-bestaetigung'
+import { neuerBarToken } from '@/lib/bar-bestaetigung'
 import {
   pruefeBetriebsnachweis,
   betriebsnummerFuerBestellung,
@@ -811,10 +810,10 @@ export async function POST(request: NextRequest) {
   await gibHalteFrei()
   // Gespeichert wird nur der Hash (Register S17 Punkt 2, Nr. 151) — der
   // Token selbst steht allein in der Mail.
-  const confirmationToken = nanoid(32)
+  const { token: confirmationToken, hash: confirmationHash } = neuerBarToken()
   await prisma.order.update({
     where: { id: order.id },
-    data: { confirmationToken: barTokenHash(confirmationToken) },
+    data: { confirmationToken: confirmationHash },
   })
 
   // Der Versand hängt an Resend und dauert Sekunden. Er gehört nicht in die

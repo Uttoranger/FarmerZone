@@ -5862,6 +5862,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Jetzt:** `stelleMailEinInTransaktion` (src/server/mail-warteschlange.ts) wirft nie. Ungültige Aufträge fallen mit einer Meldung weg; die gültigen schreibt eine verschachtelte Transaktion, die Prisma 7 über `@prisma/adapter-pg` als Savepoint anlegt (Weg A der Freigabe — trägt, belegt im Integrationstest mit einer Trigger-Funktion, die jedes INSERT in `MailAuftrag` scheitern lässt: Die Transaktion liest und schreibt danach weiter und committet). Scheitert das Einstellen, holt der Aufrufer nach dem Commit mit demselben Auftragsobjekt nach (`stelleEinOhneRisiko`, aus orders.ts nach mail-warteschlange.ts gezogen; `mailOhneRisiko` im Webhook ging darin auf). Der Storno holt direkt nach dem Commit nach, vor Stripe — sonst fände `trageStornoErstattungEin` keinen Auftrag.
 - **Bleibt:** Postfach, Beitrag und Rundschreiben mit „alles oder nichts" (`stelleMailEin(…, tx)`); „Artikel fehlt", „Erstattung offen" und Verfallen stellen weiter nach dem Commit ein. Bedingungen und Reihenfolge der Wechsel sind unverändert, kein Betrag wird neu gerechnet.
 
+## Nacharbeit Mails aus Lauf 24 (Register N27, Ergänzung 25.10.2026; Nr. 170, Lauf 25)
+
+- **Aufräumen und abgebrochene Läufe:** Das Aufräumen setzte Aufträge „in Arbeit“ mit abgelaufener Belegung auf offen und `belegtBis` auf null. Damit verlor der Worker die Kennung des abgebrochenen Laufs, schickte die Mails gemischt mit neuen unter einem anderen Idempotenz-Schlüssel, und Resend konnte sie ein zweites Mal verschicken. Der Schritt entfiel; der Worker holt solche Aufträge ohnehin selbst.
+- **„n per E-Mail“ nach 90 Tagen:** Ohne Aufträge liest die Anzeige `emailRecipientCount`, und das war die Zahl der eingestellten Aufträge. Das Aufräumen schreibt jetzt vor dem Löschen die gesendete Zahl hinein (`sichereGesendeteBeitragsMails`). Im Worker geht das nicht, weil dasselbe Feld die 7-Tage-Sperre trägt.
+- **Nochmal-Stände:** `gesperrt` (nur Test-Adressen erlaubt) und `verworfen` (abgemeldet oder ohne Einwilligung) gehen nicht mehr nochmal, und jeder Stand nennt seinen eigenen Grund. Bis dahin hieß es überall „noch unterwegs“.
+- **Kleines:** Der Stapelversand zählt in einem Schritt, „Alle nochmal schicken“ lädt gebündelt (statt bis zu 300 Abfragen), und der Bar-Token entsteht nur noch in `neuerBarToken` (Wache `tests/bar-token-wache.test.ts`). Im Cron „E-Mails“ hält eine gescheiterte Prüfung die andere nicht mehr auf, und die Warnkarte zeigt „Jetzt schicken“ nicht bei einem Auftrag „in Arbeit“. `leseBegrenzt` ist eine Hilfe (src/lib/lese-begrenzt.ts), zwei ungenutzte Postfach-Abfragen sind weg.
+
 ## Nützliche Befehle
 
 ```bash

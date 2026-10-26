@@ -68,17 +68,19 @@ export type MailWegFilter = (typeof MAIL_WEGE)[number]
 export const MAIL_ZEITRAEUME = ['24h', '7t', '30t', '90t'] as const
 export type MailZeitraum = (typeof MAIL_ZEITRAEUME)[number]
 
-export type AlleMailsFilter = {
-  art: z.infer<typeof mailArtSchema> | null
-  weg: MailWegFilter | null
-  stand: MailStandFilter | null
-  zeitraum: MailZeitraum
-  hof: string | null
-  support: boolean
-}
-
 /** Eine Kennung (cuid u. ä.) — nie eine Adresse, nie Text. */
 const kennungSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)
+
+/** Der Filter von „Alle Mails“ — EINE Quelle für Typ und Lesen der Adresse (`alleMailsAus`, Nr. 170). */
+export const alleMailsFilterSchema = z.object({
+  art: mailArtSchema.nullable(),
+  weg: z.enum(MAIL_WEGE).nullable(),
+  stand: z.enum(MAIL_STAENDE).nullable(),
+  zeitraum: z.enum(MAIL_ZEITRAEUME),
+  hof: kennungSchema.nullable(),
+  support: z.boolean(),
+})
+export type AlleMailsFilter = z.infer<typeof alleMailsFilterSchema>
 /** Die Kennung eines Auftrags — dasselbe Muster wie `mailAuswahlSchema`. */
 export const mailKennungSchema = z.string().regex(/^[a-z0-9]{20,40}$/)
 
@@ -111,6 +113,7 @@ export type AlleMailsParameter = {
  * Standard (alle, 90 Tage) — ein alter Link zeigt die Liste.
  */
 export function alleMailsAus(p: Record<string, string | string[] | undefined>): AlleMailsParameter {
+  const F = alleMailsFilterSchema.shape
   const nimm = <T>(schema: z.ZodType<T>, wert: string | string[] | undefined): T | null => {
     const r = schema.safeParse(einmal(wert))
     return r.success ? r.data : null
@@ -118,11 +121,11 @@ export function alleMailsAus(p: Record<string, string | string[] | undefined>): 
   return {
     liste: einmal(p.liste) === 'alle',
     filter: {
-      art: nimm(mailArtSchema, p.art),
-      weg: nimm(z.enum(MAIL_WEGE), p.weg),
-      stand: nimm(z.enum(MAIL_STAENDE), p.stand),
-      zeitraum: nimm(z.enum(MAIL_ZEITRAEUME), p.zeitraum) ?? '90t',
-      hof: nimm(kennungSchema, p.hof),
+      art: nimm(F.art.unwrap(), p.art),
+      weg: nimm(F.weg.unwrap(), p.weg),
+      stand: nimm(F.stand.unwrap(), p.stand),
+      zeitraum: nimm(F.zeitraum, p.zeitraum) ?? '90t',
+      hof: nimm(F.hof.unwrap(), p.hof),
       support: einmal(p.support) === '1',
     },
     nach: nimm(cursorSchema, p.nach),

@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
 
-const { sendMock, zaehleMail } = vi.hoisted(() => ({ sendMock: vi.fn(), zaehleMail: vi.fn() }))
+const { sendMock, batchMock, zaehleMail } = vi.hoisted(() => ({ sendMock: vi.fn(), batchMock: vi.fn(), zaehleMail: vi.fn() }))
 
 vi.mock('server-only', () => ({}))
 // Das Mail-Protokoll (Nr. 158) bindet Prisma; hier geht es nur um die Mail selbst.
@@ -20,6 +20,7 @@ vi.mock('@/server/mail-warteschlange', () => ({ protokolliereSofortMail: vi.fn()
 vi.mock('resend', () => ({
   Resend: class {
     emails = { send: sendMock }
+    batch = { send: batchMock }
   },
 }))
 vi.mock('@/server/betrieb-zaehler', () => ({ zaehleMail }))
@@ -92,5 +93,24 @@ describe('sendRaw zählt verschickte Mails', () => {
     await mitKey.sendRaw('kunde@example.com', 'Betreff', '<p>Hallo</p>', { art: 'testmail' })
     await vi.dynamicImportSettled()
     expect(zaehleMail).not.toHaveBeenCalled()
+  })
+})
+
+describe('Stapelversand zählt in einem Schritt (Nr. 170)', () => {
+  const mails = [1, 2, 3].map((i) => ({ an: `kunde${i}@example.com`, betreff: 'Betreff', html: '<p>Hallo</p>' }))
+
+  it('drei angenommene Mails: EIN Aufruf des Zählers mit 3', async () => {
+    batchMock.mockResolvedValue({ data: { data: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] }, error: null })
+    expect(await mitKey.versendeStapel(mails, 'mail-stapel-test')).toEqual({ ok: true, ids: ['a', 'b', 'c'] })
+    expect(zaehleMail).toHaveBeenCalledTimes(1)
+    expect(zaehleMail).toHaveBeenCalledWith(expect.any(Date), 3)
+  })
+
+  it('Gegenprobe: ein abgelehnter Stapel zählt nicht; sendRaw zählt weiter 1', async () => {
+    batchMock.mockResolvedValue({ data: null, error: { name: 'rate_limit_exceeded', statusCode: 429 } })
+    expect(await mitKey.versendeStapel(mails, 'mail-stapel-test')).toMatchObject({ ok: false, statusCode: 429 })
+    expect(zaehleMail).not.toHaveBeenCalled()
+    await mitKey.sendRaw('kunde@example.com', 'Betreff', '<p>Hallo</p>', { art: 'testmail' })
+    expect(zaehleMail).toHaveBeenCalledWith(expect.any(Date), 1)
   })
 })

@@ -12,6 +12,7 @@ import {
   type CspMeldung,
 } from '@/lib/csp'
 import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
+import { leseBegrenzt } from '@/lib/lese-begrenzt'
 import { ohneAnfrage } from '@/lib/sentry-hygiene'
 import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 
@@ -41,25 +42,6 @@ const OHNE_INHALT = (): NextResponse => new NextResponse(null, { status: 204 })
 const GESEHEN = new Map<string, number>()
 /** Erste Stufe, wie bei den anderen Bremsen: je Instanz im Speicher, dieselbe Grenze wie die zweite. */
 const ERSTE_STUFE = createRateLimiter({ max: DB_BREMSEN.cspBerichtIp.max, windowMs: DB_BREMSEN.cspBerichtIp.fensterMs })
-
-/** Liest höchstens `max` Bytes; null = mehr geschickt (dann wird nicht weitergelesen). */
-async function leseBegrenzt(request: NextRequest, max: number): Promise<string | null> {
-  if (!request.body) return ''
-  const leser = request.body.getReader()
-  const teile: Uint8Array[] = []
-  let laenge = 0
-  for (;;) {
-    const { done, value } = await leser.read()
-    if (done) break
-    laenge += value.byteLength
-    if (laenge > max) {
-      await leser.cancel()
-      return null
-    }
-    teile.push(value)
-  }
-  return Buffer.concat(teile).toString('utf8')
-}
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // 1. Größe — die Angabe des Absenders; gelesen wird unten trotzdem begrenzt.

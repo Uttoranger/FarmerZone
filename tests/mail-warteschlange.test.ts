@@ -245,6 +245,35 @@ describe('Cron /api/cron/mails', () => {
     expect(pruefeAblaeufe.mock.invocationCallOrder[0]).toBeLessThan(pruefeMailWarnungen.mock.invocationCallOrder[0])
     vi.unstubAllEnvs()
   })
+
+  it('Nr. 170: je Prüfung ein eigenes try — scheitert die eine, läuft die andere; Sentry bekommt je einen festen Satz mit der Klasse, nie den Text', async () => {
+    vi.stubEnv('CRON_SECRET', 'cron-test-geheim')
+    arbeite.mockResolvedValue({ gelaufen: true, seiten: 0, gesendet: 0 })
+    await rufe('Bearer cron-test-geheim')
+    const danach = mitHerzschlag.mock.calls.at(-1)?.[2] as (jetzt: Date) => Promise<unknown>
+    const jetzt = new Date('2026-10-24T08:00:00.000Z')
+    vi.mocked(Sentry.captureException).mockClear()
+
+    pruefeAblaeufe.mockRejectedValueOnce(Object.assign(new Error('kunde@example.com weg'), { name: 'PrismaClientKnownRequestError' }))
+    await expect(danach(jetzt)).resolves.toBeUndefined()
+    expect(pruefeMailWarnungen).toHaveBeenLastCalledWith(jetzt)
+    const [erste] = vi.mocked(Sentry.captureException).mock.calls[0] as [Error]
+    expect([erste.name, erste.message]).toEqual(['PrismaClientKnownRequestError', 'Betrieb: Abläufe nach dem Mail-Lauf nicht geprüft'])
+
+    pruefeAblaeufe.mockClear()
+    pruefeMailWarnungen.mockRejectedValueOnce(new TypeError('kaputt'))
+    await expect(danach(jetzt)).resolves.toBeUndefined()
+    expect(pruefeAblaeufe).toHaveBeenCalledWith(jetzt)
+    const [zweite] = vi.mocked(Sentry.captureException).mock.calls[1] as [Error]
+    expect([zweite.name, zweite.message]).toEqual(['TypeError', 'Betrieb: Mail-Warnungen nicht geprüft'])
+    expect(JSON.stringify(vi.mocked(Sentry.captureException).mock.calls)).not.toContain('example.com')
+
+    // Gegenprobe: ohne Fehler keine Meldung.
+    vi.mocked(Sentry.captureException).mockClear()
+    await danach(jetzt)
+    expect(Sentry.captureException).not.toHaveBeenCalled()
+    vi.unstubAllEnvs()
+  })
 })
 
 describe('Bestellwechsel: ein Auftrag hält nie auf (Register N26, Ergänzung 25.10.2026, Nr. 168)', () => {

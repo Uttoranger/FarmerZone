@@ -234,8 +234,17 @@ describe('mailDetail', () => {
   it('aus mit Grund: 3-mal heute, wartende Mail, unpassender Stand — Gegenprobe 2-mal geht', () => {
     expect(mailDetail(detailEingabe({ heute: 3 }), JETZT).knopf).toEqual({ darf: false, grund: ALLE_MAILS_TEXT.grenze, heute: 'Heute 3 von 3 · fragt nach deinem Passkey' })
     expect(mailDetail(detailEingabe({ heute: 2 }), JETZT).knopf.darf).toBe(true)
-    expect(mailDetail(detailEingabe({ mail: roh({ status: 'offen' }) }), JETZT).knopf).toMatchObject({ darf: false, grund: ALLE_MAILS_TEXT.standPasstNicht })
+    expect(mailDetail(detailEingabe({ mail: roh({ status: 'offen' }) }), JETZT).knopf).toMatchObject({ darf: false, grund: ALLE_MAILS_TEXT.standUnterwegs })
     expect(mailDetail(detailEingabe({ stand: { bestellung: bestellung({ status: 'CANCELLED' }), hof: null } }), JETZT).knopf.darf).toBe(false)
+  })
+
+  it('Nochmal-Stände (N27, Ergänzung 25.10.2026): gesperrt und verworfen mit eigenem Grund — Gegenprobe: gesendet, gescheitert, ohne Schlüssel haben den Knopf', () => {
+    expect(mailDetail(detailEingabe({ mail: roh({ status: 'gesperrt' }) }), JETZT).knopf).toMatchObject({ darf: false, grund: ALLE_MAILS_TEXT.standGesperrt })
+    expect(mailDetail(detailEingabe({ mail: roh({ status: 'verworfen' }) }), JETZT).knopf).toMatchObject({ darf: false, grund: ALLE_MAILS_TEXT.standVerworfen })
+    expect(mailDetail(detailEingabe({ mail: roh({ status: 'in_arbeit' }) }), JETZT).knopf).toMatchObject({ darf: false, grund: ALLE_MAILS_TEXT.standUnterwegs })
+    for (const status of ['gesendet', 'gescheitert', 'ohne_schluessel']) expect(mailDetail(detailEingabe({ mail: roh({ status }) }), JETZT).knopf.darf).toBe(true)
+    expect(ALLE_MAILS_TEXT.standGesperrt).toContain('Test-Adressen')
+    expect(ALLE_MAILS_TEXT.standVerworfen).toContain('Einwilligung')
   })
 
   it('Codes: kein Knopf, nur der Satz; die Adresse ist nicht gespeichert', () => {
