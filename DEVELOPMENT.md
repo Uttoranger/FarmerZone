@@ -6000,6 +6000,15 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Jetzt:** `hofKontaktEmail(farm)` (src/lib/hof-kontakt.ts) — Hof-E-Mail, sonst `owner.email`. Leser: `baueOrderPaidToFarmer`/`baueOrderConfirmedToFarmer` (Typ `OrderForHofMail`, Select der Renderer mit Inhaber), `ladeNochmalStand`/`ladeNochmalStaende`, `createConnectAccount`. Die Pflicht im Profil entfällt (`hofEmailFuer`, `PROFIL_MELDUNG.emailPflicht` und `ProfilBestand.email` gestrichen); das Feld heißt immer „Hof-E-Mail (freiwillig)“, die Hilfe nennt den Rückfall.
 - **Bewusst ohne Rückfall:** Bestellseite, Bestätigung, Angaben zum Hof (öffentlich), Hofseiten-Fortschritt und der Startwert des Profils. Wache `tests/hof-kontakt-wache.test.ts`.
 
+## Admin › Heute (Register N32; Nr. 185, Lauf 26, 26.10.2026)
+
+- **Warum:** Im Regelbetrieb soll der Admin an EINER Stelle sehen, was ihn braucht — bisher verteilt auf Höfe, Postfach, Betrieb und die Betriebsleiste mit nur der ersten Warnung.
+- **Jetzt:** `/admin` ist Heute (Mockups admin-heute, mobil-admin-heute), die Höfe stehen unter `/admin/hoefe` (Inhalt unverändert; `/admin?…` → 308 dorthin, `alteHoefeAdresse`). „Braucht dich“ kommt aus dem Register `ADMIN_AUFGABEN` (src/lib/admin-aufgaben.ts): je Quelle eine reine Funktion `(stand, jetzt) → Aufgabe[]` mit Frist (Ziel und „überfällig“), „Was tun“ aus `WAS_TUN` und Ziel. Quellen und Ziele: Hof wartet 48 h, Erstattung offen 24 h, Mail gescheitert (je Art eine Aufgabe, Grund aus `FEHLER_TEXTE`) 1 h, wichtige Mail hängt (`ladeAeltesteWichtige`, ab 5 Min.) 1 h, neue Meldung 7 Tage, Warnung des Betriebs 1 h (Mail, Abläufe) bzw. 7 Tage (Grenzen), Uptime-Dienst still 12 h, Hof ohne Abholzeit nächste Woche (Ziel Beginn der nächsten Woche) und seit 14 Tagen ohne Bestellung (7 Tage). Sortiert nach Frist; kein eigener Zustand.
+- **Daten:** src/server/queries/admin-heute.ts nimmt die bestehenden Abfragen (Postfach-Eingang, Mail-Probleme, Betrieb); neu sind nur die Signale (verkaufende Höfe mit Abholzeit und letzter Bestellung), die Lage (Bestellungen heute über `abholtage`, Umsatz der Woche über `umsatzBestellungWhere` ohne Hof, beide ohne Testzahlungen) und die letzten drei Einträge im Protokoll („Du“/„Team“/„System“, nie ein Name). Warnungen, Abläufe und wartende Mail nur in der Produktion (wie bisher der Punkt am Reiter).
+- **Betriebsleiste:** rechts „n offen · m überfällig – ansehen“ mit Link auf Heute statt der einzelnen Warnung; dieselbe Quelle (`ladeAdminAufgaben` in `ladeAdminbereich`), scheitert sie, fehlt nur die Zeile. Der Punkt am Reiter Betrieb bleibt.
+- **Montags-Routine:** fünf Punkte als Konstante (`MONTAGS_ROUTINE`), Haken nur im Browser je Wiener Woche (`routineSchluessel`), gelesen über `useSyncExternalStore` (tests/hydrieren.test.ts).
+- **Gestapelt:** 189 (Notbremse aktiv, Knopf „Bestellungen anhalten …“), 191 (Abweichung beim Geld, Abgleich in der Kachel Geld) und 198 tragen ihre Quellen in `ADMIN_AUFGABEN` ein; 187 baut `/admin/hoefe` aus; 193 stellt die Reiter um (bis dahin zeigt „Höfe“ noch auf `/admin`).
+
 ## Nützliche Befehle
 
 ```bash
