@@ -5893,6 +5893,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Nochmal-Stände:** `gesperrt` (nur Test-Adressen erlaubt) und `verworfen` (abgemeldet oder ohne Einwilligung) gehen nicht mehr nochmal, und jeder Stand nennt seinen eigenen Grund. Bis dahin hieß es überall „noch unterwegs“.
 - **Kleines:** Der Stapelversand zählt in einem Schritt, „Alle nochmal schicken“ lädt gebündelt (statt bis zu 300 Abfragen), und der Bar-Token entsteht nur noch in `neuerBarToken` (Wache `tests/bar-token-wache.test.ts`). Im Cron „E-Mails“ hält eine gescheiterte Prüfung die andere nicht mehr auf, und die Warnkarte zeigt „Jetzt schicken“ nicht bei einem Auftrag „in Arbeit“. `leseBegrenzt` ist eine Hilfe (src/lib/lese-begrenzt.ts), zwei ungenutzte Postfach-Abfragen sind weg.
 
+## Sicherheit am Handy (Register S18; Nr. 178, Lauf 25, 26.10.2026)
+
+- **Warum eine Höchstdauer:** Better Auth verlängert eine benutzte Sitzung täglich um 7 Tage. Ein Handy, das einmal die Woche geöffnet wird, blieb damit für immer angemeldet — auch ein verlorenes. Seit S18 endet jede Sitzung von Hof und Kundin spätestens 30 Tage nach der Anmeldung; Konten mit der Rolle ADMIN bleiben bei 12 Stunden. Geprüft wird beim Lesen (`/get-session` in hooks.after, jeder andere Weg in hooks.before), nicht durch einen Cron — wie bei der Reservierung gilt die Frist beim Lesen.
+- **Kundinnen** bekommen die Geräteliste aus dem Hofbereich unter /account, mit „Überall abmelden" (auch dieses Gerät). Ein Hof behält „Alle anderen abmelden", damit er am Gerät, an dem er arbeitet, angemeldet bleibt.
+- **Passwort:** Die Regeln (Groß-, Kleinbuchstabe, Zahl) prüfte vorher nur der Browser; jetzt auch der Server beim Ändern und Zurücksetzen. „Passwort vergessen" bremst zusätzlich je Adresse (5 in 15 Minuten, fail-closed), nicht mehr nur je IP.
+- **Aufgeräumt:** Das Magic-Link-Plugin samt Mailvorlage ist weg (seit Nr. 19b ohne Weg). `/api/status-image/[id]` prüft die Sichtbarkeit wie die Hofseite; sie ist im Code nirgends verlinkt und soll nach einer Ankündigung entfallen (Bericht 178).
+- **Zwei Wachen** halten Altbestand fest, der nur schrumpft: Server Actions mit Parametern ohne Zod-Schema (`tests/actions-zod-wache.test.ts`) und Schreiben auf Hof-Daten ohne `farmId` in der WHERE (`tests/hof-schreiben-farmid-wache.test.ts`).
+
 ## Nützliche Befehle
 
 ```bash

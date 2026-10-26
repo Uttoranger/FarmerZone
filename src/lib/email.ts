@@ -430,13 +430,6 @@ function betraege(order: OrderForEmail): { warenpreis: number; gebuehr: number; 
 
 // ─── Send-Funktionen ──────────────────────────────────────────────────────────
 
-/** Magic-Link → Kunde */
-export async function sendMagicLinkEmail(email: string, url: string, firstName?: string): Promise<void> {
-  const { CustomerMagicLinkEmail } = await import('@/emails/customer-magic-link')
-  const html = await toHtml(React.createElement(CustomerMagicLinkEmail, { firstName, magicUrl: url }))
-  await send(email, `Dein Login-Link für ${MARKE}`, html, { art: 'login-link' })
-}
-
 /**
  * Anmeldecode → Kundin (E7). Der Betreff trägt den Code NICHT: sendRaw
  * schreibt den Betreff auch in Produktion ins Log, und der Sperrbildschirm

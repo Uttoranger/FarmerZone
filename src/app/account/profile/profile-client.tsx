@@ -12,6 +12,8 @@ import { ABO_TEXT } from '@/lib/abo-bestaetigung'
 import { ADMIN_ANMELDEN_TEXT, ADMIN_PFAD } from '@/lib/admin-anmeldung'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { EmptyState } from '@/components/ui/empty-state'
+import { AngemeldeteGeraete } from '@/components/konto/angemeldete-geraete'
+import type { GeraeteZeile } from '@/lib/geraete'
 import { Button } from '@/components/ui/button'
 import { KARTE, KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/bestaetigung/bestaetigung-teile'
 import {
@@ -26,6 +28,8 @@ import {
  * „Mein Konto" der freiwilligen Kunden-Anmeldung — seit Nr. 14 im neuen Design
  * (KundeShell, Tokens), inhaltlich unverändert (E8: keine neuen
  * Konto-Funktionen): Abonnements je Hof, Abmelden, Konto löschen.
+ * Seit Nr. 178 (Register S18) dazu die angemeldeten Geräte mit „Überall
+ * abmelden" (Baustein AngemeldeteGeraete, `fuerKundin`).
  * Zerstörendes steht orange umrandet, nie grün (DESIGN_SYSTEM, „Dialoge").
  */
 
@@ -45,6 +49,8 @@ interface Props {
   subscriptions: SubscriptionRow[]
   /** Konto mit Admin-Recht (frisch aus der Datenbank, Register N20): der Link „Zum Admin-Bereich". */
   adminBereich?: boolean
+  /** Die Sitzungen des eigenen Kontos (ladeAngemeldeteGeraete), dieses Gerät eingeschlossen. */
+  geraete?: readonly GeraeteZeile[]
 }
 
 const ETIKETT = 'text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase'
@@ -55,7 +61,7 @@ const KNOPF_ZERSTOEREND = cn(
   FOKUS_RAHMEN
 )
 
-export function ProfileClient({ user, subscriptions: initialSubs, adminBereich = false }: Props): React.JSX.Element {
+export function ProfileClient({ user, subscriptions: initialSubs, adminBereich = false, geraete = [] }: Props): React.JSX.Element {
   const [subs, setSubs] = useState(initialSubs)
   const [isPending, startTransition] = useTransition()
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -211,6 +217,13 @@ export function ProfileClient({ user, subscriptions: initialSubs, adminBereich =
           </ul>
         )}
       </section>
+
+      {/* Angemeldete Geräte (S18): je Gerät abmelden, „Überall abmelden" */}
+      {geraete.length > 0 && (
+        <section aria-label="Angemeldete Geräte" className="flex flex-col gap-3">
+          <AngemeldeteGeraete zeilen={geraete} fuerKundin />
+        </section>
+      )}
 
       {/* Konto löschen */}
       <section aria-labelledby="konto-titel" className="flex flex-col gap-3">

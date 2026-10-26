@@ -81,7 +81,11 @@ export async function updateFarmPhotoCaptionAction(
   return {}
 }
 
+/** Eine Foto-Kennung an der Grenze (Nr. 178): dieselbe Form wie beim Ändern der Unterschrift. */
+const fotoKennungSchema = farmFotoUnterschriftSchema.shape.id
+
 export async function deleteFarmPhotoAction(id: string): Promise<{ error?: string }> {
+  if (!fotoKennungSchema.safeParse(id).success) return { error: 'Kein Zugriff' }
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { error: 'Nicht angemeldet' }
 

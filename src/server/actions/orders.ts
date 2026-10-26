@@ -135,7 +135,11 @@ const LAUFEND: OrderStatus[] = ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY']
  * in die Warteschlange (Register N26, Nr. 159), der Worker verschickt.
  */
 
+/** Eine Bestell-Kennung an der Grenze (Nr. 178): dieselbe Form wie bei Storno und „Artikel fehlt". */
+const bestellKennungSchema = stornoEingabeSchema.shape.orderId
+
 export async function markAsReady(orderId: string): Promise<ActionResult> {
+  if (!bestellKennungSchema.safeParse(orderId).success) return { error: 'Bestellung nicht gefunden' }
   const farm = await getAuthFarm()
   if (!farm) return { error: 'Nicht angemeldet' }
 

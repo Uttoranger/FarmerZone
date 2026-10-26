@@ -45,7 +45,6 @@ const EMAIL_TS = join(WURZEL, 'src', 'lib', 'email.ts')
 
 /** Sofort: direkt über sendRaw, nur Protokoll — ein Token oder Code wird nie gespeichert. */
 const SOFORT: Record<string, MailArt> = {
-  sendMagicLinkEmail: 'login-link',
   sendAnmeldeCodeEmail: 'anmeldecode',
   sendBestellCodeEmail: 'bestellcode',
   sendEmailBestaetigung: 'email-bestaetigung',
@@ -91,6 +90,7 @@ const KANN_WARTEN: Record<string, MailArt> = {
 const OHNE_EIGENE_FUNKTION: Record<string, string> = {
   testmail: 'Die Testmail (/api/test-email) ruft sendRaw selbst mit ihrer Art.',
   rundschreiben: 'bauePostfachMail baut Rundschreiben und Antwort; die Art wählt der Renderer.',
+  'login-link': 'Magic Links gibt es seit Nr. 178 nicht mehr (Plugin und Vorlage entfernt); die Art bleibt für alte Zeilen im Protokoll.',
 }
 
 const LISTEN = { sofort: SOFORT, wichtig: WICHTIG, kannWarten: KANN_WARTEN } as const
