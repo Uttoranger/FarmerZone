@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { protokolliere } from '@/server/admin-protokoll'
+import { plattformBezug } from '@/schemas/admin-aktion'
 import { monatAlsUtcDatum } from '@/lib/finanzen'
 import {
   kostenpostenAendernSchema,
@@ -67,7 +68,7 @@ export async function kostenpostenAnlegen(input: unknown): Promise<Ergebnis> {
       notiz,
     },
   })
-  await protokolliere({ wer: wache.userId, art: 'kostenposten_angelegt', bezugArt: 'kostenposten', bezugId: neu.id, mitPasskey: wache.mitPasskey })
+  await protokolliere({ wer: wache.userId, art: 'kostenposten_angelegt', bezugArt: 'plattform', bezugId: plattformBezug('kostenposten', neu.id), mitPasskey: wache.mitPasskey })
 
   revalidate()
   return { ok: true }
@@ -110,7 +111,7 @@ export async function kostenpostenAendern(input: unknown): Promise<Ergebnis> {
           : 'Der erste Monat liegt nach dem letzten. Wähle einen früheren Monat.',
     }
   }
-  await protokolliere({ wer: wache.userId, art: 'kostenposten_geaendert', bezugArt: 'kostenposten', bezugId: id, mitPasskey: wache.mitPasskey })
+  await protokolliere({ wer: wache.userId, art: 'kostenposten_geaendert', bezugArt: 'plattform', bezugId: plattformBezug('kostenposten', id), mitPasskey: wache.mitPasskey })
 
   revalidate()
   return { ok: true }
@@ -145,7 +146,7 @@ export async function kostenpostenBeenden(input: unknown): Promise<Ergebnis> {
           : 'Dieser Monat liegt vor dem Beginn des Postens. Wähle den Beginn oder einen späteren Monat.',
     }
   }
-  await protokolliere({ wer: wache.userId, art: 'kostenposten_beendet', bezugArt: 'kostenposten', bezugId: geprueft.data.id, mitPasskey: wache.mitPasskey })
+  await protokolliere({ wer: wache.userId, art: 'kostenposten_beendet', bezugArt: 'plattform', bezugId: plattformBezug('kostenposten', geprueft.data.id), mitPasskey: wache.mitPasskey })
 
   revalidate()
   return { ok: true }
@@ -163,7 +164,7 @@ export async function kostenpostenLoeschen(input: unknown): Promise<Ergebnis> {
 
   const { count } = await prisma.kostenposten.deleteMany({ where: { id: geprueft.data.id } })
   if (count === 0) return { error: NICHT_GEFUNDEN }
-  await protokolliere({ wer: wache.userId, art: 'kostenposten_geloescht', bezugArt: 'kostenposten', bezugId: geprueft.data.id, mitPasskey: wache.mitPasskey })
+  await protokolliere({ wer: wache.userId, art: 'kostenposten_geloescht', bezugArt: 'plattform', bezugId: plattformBezug('kostenposten', geprueft.data.id), mitPasskey: wache.mitPasskey })
 
   revalidate()
   return { ok: true }

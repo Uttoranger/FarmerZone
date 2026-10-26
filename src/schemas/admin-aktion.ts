@@ -63,13 +63,29 @@ export const ADMIN_AKTIONEN = [
 
 export type AdminAktionArt = (typeof ADMIN_AKTIONEN)[number]
 
-/** Worauf sich ein Eintrag bezieht — immer mit einer Kennung, nie mit einem Namen. */
-export const ADMIN_BEZUG_ARTEN = ['hof', 'bestellung', 'mail', 'person', 'plattform', 'monat', 'meldung', 'kostenposten'] as const
+/** Worauf sich ein Eintrag bezieht — immer mit einer Kennung, nie mit einem Namen. Genau die sechs Arten der Freigabe (188). */
+export const ADMIN_BEZUG_ARTEN = ['hof', 'bestellung', 'mail', 'person', 'plattform', 'monat'] as const
 
 export type AdminBezugArt = (typeof ADMIN_BEZUG_ARTEN)[number]
 
-/** Kennung der Plattform als Bezug (Einstellungen, Startseite, Zustellung). */
+/** Kennung der Plattform als Bezug, wenn es nichts Genaueres gibt (Einstellungen, Zustellung, Rundschreiben). */
 export const PLATTFORM_BEZUG = 'plattform'
+
+/** Was unter `bezugArt: 'plattform'` eine eigene Kennung hat — sie steht mit Vorsatz in `bezugId`. */
+export const PLATTFORM_TEILE = ['meldung', 'kostenposten', 'fassung', 'block'] as const
+
+export type PlattformTeil = (typeof PLATTFORM_TEILE)[number]
+
+/**
+ * `bezugId` für `bezugArt: 'plattform'` mit eigener Kennung: `<teil>:<kennung>`
+ * (etwa `meldung:cm…`, `fassung:cm…`). So bleibt die Kennung im Protokoll,
+ * und eine Abfrage nach `plattform` trennt die Teile über den Vorsatz
+ * (`bezugId` beginnt mit `meldung:`) — nie eine nackte fremde Kennung neben
+ * PLATTFORM_BEZUG.
+ */
+export function plattformBezug(teil: PlattformTeil, kennung: string): string {
+  return `${teil}:${kennung}`
+}
 
 export const ADMIN_GRUND_MAX = 300
 

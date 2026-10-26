@@ -470,11 +470,14 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
     fuegeEin(entwurf.zeilen.findIndex((z) => z.art === 'HOEFE'), vorlage)
   }
 
+  // Löschen ist heikel wie alles, was löscht (Freigabe 188 Punkt 4): frisch mit Passkey bestätigt.
+  const frischLoeschen = useFrischBestaetigt(loescheStartseitenBlock)
+
   /** „Block löschen“ bzw. „Verwerfen“ (neuer Block): wartet eine laufende Speicherung ab — legt sie den Block an, wird er gelöscht (Nr. 183). */
   function loeschen() {
     if (!entwurf.block) return
     startTransition(async () => {
-      const ergebnis = await entwurf.entferneBlock((blockId) => loescheStartseitenBlock({ blockId }))
+      const ergebnis = await entwurf.entferneBlock((blockId) => frischLoeschen.ausfuehren({ blockId }))
       if (ergebnis?.art === 'fehler') toast.error(ergebnis.text)
       if (ergebnis?.art === 'geloescht') toast.success(T.geloescht)
     })
@@ -711,6 +714,7 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
       >
         {frischVeroeffentlichen.dialog}
         {frischZurueckziehen.dialog}
+        {frischLoeschen.dialog}
       </VeroeffentlichenDialog>
 
       <VorschauFenster

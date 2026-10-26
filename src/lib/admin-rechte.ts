@@ -16,7 +16,7 @@
 export const ADMIN_RECHTE = [
   'mails_nochmal',
   'adresse_anzeigen',
-  'hof_sperren',
+  'hof_sperren_storno',
   'hoefe_freischalten',
   'geld',
   'notbremse',
@@ -36,7 +36,7 @@ export const ADMIN_RECHT_TEXT: Record<AdminRecht, string> = {
   ansehen: 'Ansehen',
   mails_nochmal: 'Mails nochmal schicken',
   adresse_anzeigen: 'Volle Adresse anzeigen',
-  hof_sperren: 'Hof sperren und Notfall-Storno',
+  hof_sperren_storno: 'Hof sperren und Notfall-Storno',
   hoefe_freischalten: 'Höfe freischalten, Gründung, Testhof und Servicegebühr',
   geld: 'Geld und Monatsabschluss',
   notbremse: 'Notbremse',

@@ -366,6 +366,9 @@ describe('veroeffentlicheStartseite', () => {
   it('schreibt ohne frische Bestätigung nichts (N20, Ergänzung 23.10.2026): { error: frisch }', async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(alteAdminSitzung('admin-1') as never)
     expect(await veroeffentlicheStartseite({ wann: 'jetzt' })).toEqual({ error: FRISCH_FEHLER })
+    // Block löschen löscht (Freigabe 188 Punkt 4): ebenso nur frisch.
+    expect(await loescheStartseitenBlock({ blockId: 'b1' })).toEqual({ error: FRISCH_FEHLER })
+    expect(prisma.startseiteBlock.deleteMany).not.toHaveBeenCalled()
     expect(prisma.$transaction).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
     expect(revalidatePath).not.toHaveBeenCalled()

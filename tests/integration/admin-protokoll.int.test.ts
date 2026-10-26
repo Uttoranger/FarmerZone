@@ -93,7 +93,7 @@ describe('Recht und Protokoll an einer echten Action (kostenpostenAnlegen, Recht
     expect(await kostenpostenAnlegen(eingabe(name))).toEqual({ ok: true })
     const zeile = await prisma.kostenposten.findFirstOrThrow({ where: { name }, select: { id: true } })
     const eintraege = await prisma.adminAktion.findMany({ where: { wer: mit }, select: { art: true, bezugArt: true, bezugId: true, mitPasskey: true, grund: true } })
-    expect(eintraege).toEqual([{ art: 'kostenposten_angelegt', bezugArt: 'kostenposten', bezugId: zeile.id, mitPasskey: true, grund: null }])
+    expect(eintraege).toEqual([{ art: 'kostenposten_angelegt', bezugArt: 'plattform', bezugId: `kostenposten:${zeile.id}`, mitPasskey: true, grund: null }])
   })
 })
 

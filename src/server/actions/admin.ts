@@ -6,6 +6,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { protokolliere } from '@/server/admin-protokoll'
+import { plattformBezug } from '@/schemas/admin-aktion'
 import {
   FARM_REJECT_APPROVED_MESSAGE,
   FARM_REJECT_HAS_DATA_MESSAGE,
@@ -594,7 +595,7 @@ export async function triageMeldungAction(
     return { error: duplikatVonId === null ? MELDUNG_GEAENDERT : MELDUNG_VERWEIS_GEAENDERT }
   }
   // „Ansehen“ genügt (N35), aber mit Protokoll; Zusammenfassen und Trennen schreiben über diesen Weg.
-  await protokolliere({ wer: guard.userId, art: 'meldung_triagiert', bezugArt: 'meldung', bezugId: meldungId, mitPasskey: guard.mitPasskey })
+  await protokolliere({ wer: guard.userId, art: 'meldung_triagiert', bezugArt: 'plattform', bezugId: plattformBezug('meldung', meldungId), mitPasskey: guard.mitPasskey })
 
   if (process.env.NODE_ENV !== 'production') {
     console.log(`[DEV] Meldung triagiert: ${new Date().toISOString()} admin=${guard.userId} meldung=${meldungId} status=${triage.status}`)
@@ -737,7 +738,7 @@ export async function setzeBuendelStandAction(eingabe: unknown): Promise<Buendel
   })
   if (!betroffen) return { error: 'Dieses Bündel gibt es nicht mehr – lade die Seite neu.' }
   // Bezug ist die erste Meldung des Bündels (eine Kennung) — das Stichwort ist Freitext und bleibt draußen.
-  await protokolliere({ wer: guard.userId, art: 'meldung_buendel_stand', bezugArt: 'meldung', bezugId: betroffen[0].id, mitPasskey: guard.mitPasskey })
+  await protokolliere({ wer: guard.userId, art: 'meldung_buendel_stand', bezugArt: 'plattform', bezugId: plattformBezug('meldung', betroffen[0].id), mitPasskey: guard.mitPasskey })
 
   const hofIds = [...new Set(betroffen.flatMap((m) => (m.farmId ? [m.farmId] : [])))]
   // Je Adresse eine Meldung — eine Kundin bekommt den Bescheid einmal.
@@ -801,7 +802,7 @@ export async function legeMeldungAbAction(eingabe: unknown): Promise<{ error?: s
     data: { status: 'KEIN_FEHLER', antwortAnMelder: antwort, triagedAt: new Date() },
   })
   if (count === 0) return { error: MELDUNG_GEAENDERT }
-  await protokolliere({ wer: guard.userId, art: 'meldung_abgelegt', bezugArt: 'meldung', bezugId: meldungId, mitPasskey: guard.mitPasskey })
+  await protokolliere({ wer: guard.userId, art: 'meldung_abgelegt', bezugArt: 'plattform', bezugId: plattformBezug('meldung', meldungId), mitPasskey: guard.mitPasskey })
 
   revalidatePath('/admin')
   revalidatePath('/admin/postfach')

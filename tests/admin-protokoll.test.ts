@@ -34,7 +34,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ADMIN_RECHT_FEHLER } from '@/lib/admin-rechte'
 import { FRISCH_FEHLER } from '@/lib/admin-anmeldung'
-import { ADMIN_GRUND_FEHLER, adminGrundSchema, ohnePersonendaten } from '@/schemas/admin-aktion'
+import { ADMIN_BEZUG_ARTEN, ADMIN_GRUND_FEHLER, adminAktionSchema, adminGrundSchema, ohnePersonendaten, plattformBezug } from '@/schemas/admin-aktion'
 import { ADMIN_PROTOKOLL_JAHRE, adminProtokollGrenze, protokolliere } from '@/server/admin-protokoll'
 import { kostenpostenLoeschen } from '@/server/actions/finanzen'
 import { adminSitzung, alteAdminSitzung } from './admin-sitzung'
@@ -45,11 +45,23 @@ const adminAktionCreate = vi.mocked(prisma.adminAktion.create)
 const kostenLoeschen = vi.mocked(prisma.kostenposten.deleteMany)
 const sentry = vi.mocked(Sentry.captureException)
 
-const EINTRAG = { wer: 'user_admin', art: 'kostenposten_geloescht', bezugArt: 'kostenposten', bezugId: 'cmfkosten0000000000000001', mitPasskey: true } as const
+const EINTRAG = { wer: 'user_admin', art: 'kostenposten_geloescht', bezugArt: 'plattform', bezugId: 'kostenposten:cmfkosten0000000000000001', mitPasskey: true } as const
 
 beforeEach(() => {
   vi.clearAllMocks()
   adminAktionCreate.mockResolvedValue({ id: 'eintrag-1' } as never)
+})
+
+describe('Bezug eines Eintrags (Freigabe 188: genau sechs Arten)', () => {
+  it('kennt nur hof, bestellung, mail, person, plattform, monat — keine weitere Art', () => {
+    expect([...ADMIN_BEZUG_ARTEN]).toEqual(['hof', 'bestellung', 'mail', 'person', 'plattform', 'monat'])
+    expect(adminAktionSchema.safeParse({ ...EINTRAG, bezugArt: 'meldung' }).success).toBe(false)
+  })
+
+  it('plattformBezug setzt den Teil vor die Kennung — eine gültige bezugId', () => {
+    expect(plattformBezug('meldung', 'cmeldung0000000000000001')).toBe('meldung:cmeldung0000000000000001')
+    expect(adminAktionSchema.safeParse({ ...EINTRAG, bezugId: plattformBezug('fassung', 'cfassung01') }).success).toBe(true)
+  })
 })
 
 describe('protokolliere (N33)', () => {
@@ -131,7 +143,7 @@ describe('Rechte und Protokoll an einer Action (kostenpostenLoeschen, Recht geld
     expect(await kostenpostenLoeschen(EINGABE)).toEqual({ ok: true })
     expect(kostenLoeschen).toHaveBeenCalledTimes(1)
     expect(adminAktionCreate).toHaveBeenCalledWith({
-      data: { wer: 'user_team', art: 'kostenposten_geloescht', bezugArt: 'kostenposten', bezugId: EINGABE.id, grund: null, mitPasskey: true },
+      data: { wer: 'user_team', art: 'kostenposten_geloescht', bezugArt: 'plattform', bezugId: `kostenposten:${EINGABE.id}`, grund: null, mitPasskey: true },
       select: { id: true },
     })
   })
