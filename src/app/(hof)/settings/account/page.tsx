@@ -16,6 +16,7 @@ import { PasswordForm } from './password-form'
 import { ArchiveFarmCard } from './archive-farm-card'
 import { DarstellungKarte } from './darstellung-karte'
 import { MARKE } from '@/lib/marke'
+import { SITZUNG_DAUER_SATZ } from '@/lib/sitzung-dauer'
 
 export const metadata: Metadata = { title: `${EINSTELLUNG_KONTO.label} — ${MARKE}` }
 
@@ -100,7 +101,8 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
           </CardContent>
         </Card>
 
-        <AngemeldeteGeraete zeilen={geraete} />
+        {/* Höchstdauer der Sitzung in einem Satz (S18, Nr. 178). */}
+        <AngemeldeteGeraete zeilen={geraete} satz={SITZUNG_DAUER_SATZ} />
 
         <DarstellungKarte />
 

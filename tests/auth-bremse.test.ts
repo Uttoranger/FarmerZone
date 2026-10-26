@@ -13,6 +13,10 @@
  *    und Instanz — nie Schlüssel, IP oder Pfad; ohne Client-IP einmal je Instanz eine Warnung.
  *  - Der Ersatz hält höchstens 10 000 Schlüssel, Abgelaufenes geht zuerst.
  *  - auth.ts setzt den Speicher im Block `rateLimit`, der Rest des Blocks bleibt.
+ *  - „Passwort vergessen" je Adresse (Nr. 178): 5 in 15 Minuten wie `codeAnforderungen`, gezählt in der Tabelle
+ *    (`adminBremseVoll`, fail-closed: Fehler → gebremst), VOR der Frage nach dem Konto und für jede Adresse gleich
+ *    (Merkmal `adressMerkmal`); Gegenprobe mit vertauschter Reihenfolge. Gegen ein echtes Postgres (6. Anfrage 429,
+ *    unbekannte Adresse genauso): tests/integration/sitzung-dauer.int.test.ts.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -186,5 +190,44 @@ describe('Verdrahtung', () => {
     expect(block).toContain('max: AUTH_RATE_LIMIT_MAX,')
     expect(block).toContain("'/get-session': false,")
     expect(quelle).toContain("import { AUTH_BREMSE_SPEICHER } from '@/server/auth-bremse'")
+  })
+})
+
+describe('„Passwort vergessen" je Adresse (Nr. 178)', () => {
+  const quelle = readFileSync(join(process.cwd(), 'src', 'lib', 'auth.ts'), 'utf8')
+
+  /** Der Zweig für /request-password-reset: erst die Bremse je Adresse, dann die Frage nach dem Konto. */
+  const bremstVorDemKonto = (text: string): boolean => {
+    const start = text.indexOf("if (ctx.path === '/request-password-reset') {")
+    const zweig = text.slice(start, text.indexOf("if (ctx.path === '/change-password') {", start))
+    const bremse = zweig.indexOf('await adminBremseVoll(PASSWORT_VERGESSEN_JE_ADRESSE, adressMerkmal(email))')
+    const konto = zweig.indexOf('await adminMitPasskey(email)')
+    return start >= 0 && bremse >= 0 && konto > bremse && /throw new APIError\('TOO_MANY_REQUESTS'/.test(zweig.slice(bremse, konto))
+  }
+
+  it('5 in 15 Minuten wie codeAnforderungen, ein eigener Zweck', async () => {
+    const { PASSWORT_VERGESSEN_JE_ADRESSE } = await import('@/lib/auth')
+    const { CODE_ANFORDERUNGEN_JE_ADRESSE } = await import('@/lib/anmeldecode')
+    expect(PASSWORT_VERGESSEN_JE_ADRESSE).toEqual({ zweck: 'passwort-vergessen-adresse', max: 5, fensterMs: 15 * 60_000 })
+    expect(PASSWORT_VERGESSEN_JE_ADRESSE.max).toBe(CODE_ANFORDERUNGEN_JE_ADRESSE.max)
+    expect(PASSWORT_VERGESSEN_JE_ADRESSE.fensterMs).toBe(CODE_ANFORDERUNGEN_JE_ADRESSE.fensterMs)
+  }, 30_000)
+
+  it('fail-closed: bis 5 frei, die 6. gebremst, ein Datenbankfehler bremst', async () => {
+    const { PASSWORT_VERGESSEN_JE_ADRESSE } = await import('@/lib/auth')
+    const { adminBremseVoll } = await import('@/server/admin-bremse')
+    db.zaehleVersuche.mockResolvedValueOnce([5]).mockResolvedValueOnce([6]).mockRejectedValueOnce(new Error('weg'))
+    expect(await adminBremseVoll(PASSWORT_VERGESSEN_JE_ADRESSE, 'erika@example.com')).toBe(false)
+    expect(await adminBremseVoll(PASSWORT_VERGESSEN_JE_ADRESSE, 'erika@example.com')).toBe(true)
+    expect(await adminBremseVoll(PASSWORT_VERGESSEN_JE_ADRESSE, 'erika@example.com')).toBe(true)
+  }, 30_000)
+
+  it('auth.ts bremst vor der Frage nach dem Konto — Gegenprobe: vertauscht schlägt die Erkennung an', () => {
+    expect(bremstVorDemKonto(quelle)).toBe(true)
+    const vertauscht = quelle
+      .replace('await adminBremseVoll(PASSWORT_VERGESSEN_JE_ADRESSE, adressMerkmal(email))', '__BREMSE__')
+      .replace('await adminMitPasskey(email)', 'await adminBremseVoll(PASSWORT_VERGESSEN_JE_ADRESSE, adressMerkmal(email))')
+      .replace('__BREMSE__', 'await adminMitPasskey(email)')
+    expect(bremstVorDemKonto(vertauscht)).toBe(false)
   })
 })

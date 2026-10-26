@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { bestaetigteAdresse } from '@/server/kunden-adresse'
+import { ladeAngemeldeteGeraete } from '@/server/geraete'
 import { isAdminUser } from '@/server/queries/admin'
 import { wartetAufBestaetigung, werbemailErlaubt } from '@/lib/abo-bestaetigung'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
@@ -11,6 +12,8 @@ import { ProfileClient } from './profile-client'
 export const dynamic = 'force-dynamic'
 
 // Seit Nr. 14 im neuen Design (KundeShell); Inhalt und Zugang unverändert (E8).
+// Seit Nr. 178 (Register S18) mit dem Baustein „Angemeldete Geräte": nur die
+// Sitzungen des eigenen Kontos, Zeilen und Texte rechnet der Server.
 
 export default async function AccountProfilePage() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -32,11 +35,13 @@ export default async function AccountProfilePage() {
       })
     : []
   const jetzt = new Date()
+  const geraete = await ladeAngemeldeteGeraete(session.user.id, session.session.id, jetzt)
 
   return (
     <KundeShellMitSitzung>
       <ProfileClient
         adminBereich={adminBereich}
+        geraete={geraete}
         // Ohne Namen: Er kann aus einer Registrierung mit Passwort stammen, die
         // die Adresse nie bewiesen hat (Better Auth behält ihn beim ersten Code).
         user={{

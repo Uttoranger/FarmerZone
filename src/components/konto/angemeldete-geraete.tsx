@@ -1,13 +1,16 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Loader2, LogOut, Monitor, MonitorSmartphone, Smartphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GERAETE_TEXT, alleAnderenSatz, geraeteHinweise, type GeraeteZeile } from '@/lib/geraete'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
-import { meldeAlleAnderenAb, meldeGeraetAb, type AbmeldenAntwort } from '@/server/actions/geraete'
+import { KUNDIN_GERAETE_TEXT } from '@/lib/sitzung-dauer'
+import { meldeAlleAnderenAb, meldeGeraetAb, meldeUeberallAb, type AbmeldenAntwort } from '@/server/actions/geraete'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Marke } from '@/components/ui/marke'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/components/ui/dialog'
 import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetTitle } from '@/components/ui/sheet'
@@ -26,11 +29,26 @@ import { KNOPF_ORANGE, KNOPF_ORANGE_RAHMEN, KNOPF_RAHMEN } from '@/components/ho
  * Auch für Admin › Einstellungen › Anmeldung (Nr. 115): ohne Bezug auf
  * den Hofbereich, die Liste lädt nach dem Abmelden über router.refresh neu;
  * dort mit `fuerAdmin` (Nr. 126): Hinweis und Zusatz nennen auch die Passkeys.
+ * Unter /account mit `fuerKundin` (Register S18; Nr. 178, Board
+ * SterneSicherheit, rechtes Handy): „Überall abmelden" statt „Alle anderen
+ * abmelden" — meldet auch dieses Gerät ab und führt zur Anmeldung —, dazu
+ * der Satz zum Abmelden und der Weg zu „Was wir speichern". `satz` (Konto und
+ * Sicherheit der Höfe) steht als letzte Zeile der Karte: die Höchstdauer.
  */
 
 const KNOPF_KLEIN = cn(KNOPF_RAHMEN, 'min-h-11 shrink-0 px-4 text-[13px] font-semibold')
 
-export function AngemeldeteGeraete({ zeilen, fuerAdmin = false }: { zeilen: readonly GeraeteZeile[]; fuerAdmin?: boolean }): React.JSX.Element {
+export function AngemeldeteGeraete({
+  zeilen,
+  fuerAdmin = false,
+  fuerKundin = false,
+  satz,
+}: {
+  zeilen: readonly GeraeteZeile[]
+  fuerAdmin?: boolean
+  fuerKundin?: boolean
+  satz?: string
+}): React.JSX.Element {
   const router = useRouter()
   // Im Admin-Bereich kommt der Blick auf die Passkeys dazu (N20); für Höfe bleibt der Text, wie er war.
   const hinweise = geraeteHinweise(fuerAdmin)
@@ -59,18 +77,38 @@ export function AngemeldeteGeraete({ zeilen, fuerAdmin = false }: { zeilen: read
     })
   }
 
+  /** „Überall abmelden": danach ist auch dieses Gerät abgemeldet — weiter zur Anmeldung. */
+  function meldeUeberallAbUndWeiter(): void {
+    setFehler(null)
+    starte(async () => {
+      try {
+        const antwort = await meldeUeberallAb()
+        if ('error' in antwort) {
+          setFehler(antwort.error)
+          return
+        }
+        setFrageOffen(false)
+        router.replace('/account/login')
+      } catch {
+        setFehler(GERAETE_TEXT.fehler)
+      }
+    })
+  }
+
+  const knopfText = fuerKundin ? KUNDIN_GERAETE_TEXT.ueberallAbmelden : GERAETE_TEXT.alleAnderenAbmelden
   const frage = {
-    titel: GERAETE_TEXT.blattTitel,
-    satz: alleAnderenSatz(zeilen),
+    titel: fuerKundin ? KUNDIN_GERAETE_TEXT.blattTitel : GERAETE_TEXT.blattTitel,
+    satz: fuerKundin ? KUNDIN_GERAETE_TEXT.blattSatz : alleAnderenSatz(zeilen),
+    zusatz: fuerKundin ? null : hinweise.blattZusatz,
     knopf: (
       <button
         type="button"
-        onClick={() => fuehreAus(meldeAlleAnderenAb, null)}
+        onClick={() => (fuerKundin ? meldeUeberallAbUndWeiter() : fuehreAus(meldeAlleAnderenAb, null))}
         disabled={laeuft}
         className={cn(KNOPF_ORANGE, 'w-full disabled:opacity-60', breit && 'w-auto')}
       >
         {laeuft ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <LogOut className="size-4" strokeWidth={1.7} aria-hidden="true" />}
-        {laeuft ? GERAETE_TEXT.einenMoment : GERAETE_TEXT.alleAnderenAbmelden}
+        {laeuft ? GERAETE_TEXT.einenMoment : knopfText}
       </button>
     ),
   }
@@ -121,14 +159,21 @@ export function AngemeldeteGeraete({ zeilen, fuerAdmin = false }: { zeilen: read
           </p>
         )}
 
-        {andere > 0 && (
+        {/* Kundin: „Überall" schließt dieses Gerät ein — der Knopf steht immer da. */}
+        {(fuerKundin || andere > 0) && (
           <button type="button" onClick={() => setFrageOffen(true)} disabled={laeuft} className={cn(KNOPF_ORANGE_RAHMEN, 'w-full disabled:opacity-60')}>
             <LogOut className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            {GERAETE_TEXT.alleAnderenAbmelden}
+            {knopfText}
           </button>
         )}
 
-        <p className="text-xs leading-relaxed text-muted-foreground">{hinweise.hinweis}</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">{fuerKundin ? KUNDIN_GERAETE_TEXT.hinweis : hinweise.hinweis}</p>
+        {fuerKundin && (
+          <Link href="/datenschutz" className={cn('inline-flex min-h-11 items-center rounded-md text-sm font-medium text-brand-text underline underline-offset-2', FOKUS_RAHMEN)}>
+            {KUNDIN_GERAETE_TEXT.wasWirSpeichern}
+          </Link>
+        )}
+        {satz && <p className="text-xs leading-relaxed text-muted-foreground">{satz}</p>}
       </CardContent>
 
       {breit ? (
@@ -136,7 +181,7 @@ export function AngemeldeteGeraete({ zeilen, fuerAdmin = false }: { zeilen: read
           <DialogContent className="sm:max-w-[480px]">
             <DialogTitle className="font-heading text-xl leading-tight font-semibold">{frage.titel}</DialogTitle>
             <DialogDescription className="text-sm leading-relaxed text-foreground">{frage.satz}</DialogDescription>
-            <p className="text-[13px] leading-relaxed text-muted-foreground">{hinweise.blattZusatz}</p>
+            {frage.zusatz && <p className="text-[13px] leading-relaxed text-muted-foreground">{frage.zusatz}</p>}
             <DialogFooter>
               <button type="button" onClick={() => setFrageOffen(false)} disabled={laeuft} className={KNOPF_RAHMEN}>
                 {GERAETE_TEXT.abbrechen}
@@ -150,7 +195,7 @@ export function AngemeldeteGeraete({ zeilen, fuerAdmin = false }: { zeilen: read
           <SheetBlatt>
             <SheetTitle className="font-heading text-xl leading-tight font-semibold">{frage.titel}</SheetTitle>
             <SheetDescription className="text-sm leading-relaxed text-foreground">{frage.satz}</SheetDescription>
-            <p className="text-[13px] leading-relaxed text-muted-foreground">{hinweise.blattZusatz}</p>
+            {frage.zusatz && <p className="text-[13px] leading-relaxed text-muted-foreground">{frage.zusatz}</p>}
             {frage.knopf}
             <SheetClose disabled={laeuft} className={cn(KNOPF_RAHMEN, 'w-full')}>
               {GERAETE_TEXT.abbrechen}

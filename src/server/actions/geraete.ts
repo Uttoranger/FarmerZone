@@ -19,8 +19,18 @@ import { loeseEinmalLinkEin } from '@/server/geraete'
  * nichts mehr tun.
  */
 
-const KONTO_HREF = '/settings/account'
 const NEU_ANMELDEN = 'Bitte melde dich neu an.'
+const NUR_KUNDINNEN = 'Das geht nur unter „Mein Konto".'
+
+/**
+ * Die Seite, die die Liste zeigt — nach der Rolle aus der Sitzung (Nr. 178):
+ * Höfe „Konto und Sicherheit", Kundinnen „Mein Konto". Admin › Einstellungen
+ * › Anmeldung lädt selbst neu (router.refresh im Baustein). Die Rolle wählt
+ * nur die Seite; was gelöscht wird, bestimmt allein das Konto der Sitzung.
+ */
+function kontoSeite(rolle: unknown): string {
+  return rolle === 'CUSTOMER' ? '/account/profile' : '/settings/account'
+}
 
 export type AbmeldenAntwort = { ok: true; abgemeldet: number } | { error: string }
 
@@ -38,7 +48,7 @@ export async function meldeGeraetAb(eingabe: unknown): Promise<AbmeldenAntwort> 
   if (!sitzung?.user) return { error: NEU_ANMELDEN }
 
   const { count } = await prisma.session.deleteMany({ where: { id: v.data.sitzungId, userId: sitzung.user.id } })
-  revalidatePath(KONTO_HREF)
+  revalidatePath(kontoSeite(sitzung.user.role))
   return { ok: true, abgemeldet: count }
 }
 
@@ -50,7 +60,23 @@ export async function meldeAlleAnderenAb(): Promise<AbmeldenAntwort> {
   const { count } = await prisma.session.deleteMany({
     where: { userId: sitzung.user.id, id: { not: sitzung.session.id } },
   })
-  revalidatePath(KONTO_HREF)
+  revalidatePath(kontoSeite(sitzung.user.role))
+  return { ok: true, abgemeldet: count }
+}
+
+/**
+ * „Überall abmelden" unter /account (Register S18; Nr. 178): ALLE Sitzungen
+ * des eigenen Kontos, auch diese — danach ist die Kundin auch hier
+ * abgemeldet und landet auf der Anmeldung (der Baustein führt hin). Nur für
+ * Kundinnen: Ein Hof behält „Alle anderen abmelden", damit er am Gerät, an
+ * dem er gerade arbeitet, angemeldet bleibt.
+ */
+export async function meldeUeberallAb(): Promise<AbmeldenAntwort> {
+  const sitzung = await auth.api.getSession({ headers: await headers() })
+  if (!sitzung?.user) return { error: NEU_ANMELDEN }
+  if (sitzung.user.role !== 'CUSTOMER') return { error: NUR_KUNDINNEN }
+
+  const { count } = await prisma.session.deleteMany({ where: { userId: sitzung.user.id } })
   return { ok: true, abgemeldet: count }
 }
 

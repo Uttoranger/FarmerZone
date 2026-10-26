@@ -1,14 +1,15 @@
 import * as Sentry from '@sentry/nextjs'
 import { betterAuth, type BetterAuthPlugin } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
-import { emailOTP, magicLink } from 'better-auth/plugins'
+import { emailOTP } from 'better-auth/plugins'
 import { APIError, createAuthEndpoint, createAuthMiddleware, getSessionFromCtx, isAPIError } from 'better-auth/api'
-import { setSessionCookie } from 'better-auth/cookies'
+import { deleteSessionCookie, setSessionCookie } from 'better-auth/cookies'
 import { passkey } from '@better-auth/passkey'
 import { prisma } from '@/lib/prisma'
 import { APP_URL, UMGEBUNG } from '@/lib/umgebung-server'
 import {
   ANMELDECODE_PLUGIN_OPTIONEN,
+  CODE_ANFORDERUNGEN_JE_ADRESSE,
   GESPERRTE_AUTH_PFADE,
   PASSWORT_LINK_SEKUNDEN,
   codeVersandErlaubt,
@@ -31,7 +32,7 @@ import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { GERAETE_COOKIE, GERAETE_COOKIE_OPTIONEN, einmalLinkZweck, geraetName } from '@/lib/geraete'
 import { env } from '@/lib/env'
 import { MARKE } from '@/lib/marke'
-import { DB_BREMSEN, adressMerkmal } from '@/lib/bremse-datenbank'
+import { DB_BREMSEN, adressMerkmal, type DbBremse } from '@/lib/bremse-datenbank'
 import { adminBremseVoll } from '@/server/admin-bremse'
 import { AUTH_BREMSE_SPEICHER } from '@/server/auth-bremse'
 import {
@@ -57,6 +58,8 @@ import {
   bestaetigungPerLinkErlaubt,
   bestaetigungsPfad,
 } from '@/lib/email-bestaetigung'
+import { passwordSchema } from '@/schemas/register'
+import { sitzungAbgelaufen, sitzungRolle } from '@/lib/sitzung-dauer'
 
 // Franz-tauglich: 10 Login-Versuche pro Minute pro IP sperren keinen echten
 // Nutzer aus (auch nicht bei Tippfehlern), bremsen aber Passwort-Rater.
@@ -67,6 +70,17 @@ const AUTH_RATE_LIMIT_MAX = 10
 // Höchstens 5 Anmeldecodes je Adresse in 15 Minuten (src/lib/anmeldecode.ts),
 // je Instanz — gegen ein Postfach, das von vielen IPs aus zugeschüttet wird.
 const codeAnforderungen = erzeugeAnforderungsSperre()
+
+/**
+ * „Passwort vergessen" je Adresse (Nr. 178): dieselben 5 in 15 Minuten wie
+ * `codeAnforderungen`, aber über alle Instanzen in der Tabelle und
+ * FAIL-CLOSED — antwortet die Datenbank nicht (Fehler oder 1,5 s), ist die
+ * Adresse gebremst (adminBremseVoll). Gezählt wird jede Anfrage VOR jeder
+ * Frage nach dem Konto: Eine unbekannte Adresse zählt und antwortet genauso
+ * wie eine bekannte. Vorher bremste nur die IP — ein Postfach ließ sich von
+ * vielen IPs aus mit Links zuschütten.
+ */
+export const PASSWORT_VERGESSEN_JE_ADRESSE: DbBremse = { zweck: 'passwort-vergessen-adresse', ...CODE_ANFORDERUNGEN_JE_ADRESSE }
 
 /**
  * Die Rolle hinter einer Adresse, ohne Rücksicht auf Groß-/Kleinschreibung.
@@ -280,6 +294,59 @@ const sitzungVorPasskey = new WeakMap<object, { userId: string; sitzungId: strin
 const sitzungBeimEinrichten = new WeakMap<object, { userId: string; sitzungId: string }>()
 
 type HookKontext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0]
+
+// ── Höchstdauer der Sitzung (Register S18; Nr. 178) ─────────────────────────
+
+/** Was Better Auth beim Lesen einer Sitzung liefert — nur die Felder, die die Höchstdauer braucht. */
+type GeleseneSitzung = { session: { id: string; userId: string; createdAt: Date | string }; user: { role?: unknown } }
+
+function istGeleseneSitzung(wert: unknown): wert is GeleseneSitzung {
+  if (typeof wert !== 'object' || wert === null || !('session' in wert) || !('user' in wert)) return false
+  const sitzung = (wert as { session: unknown }).session
+  return typeof sitzung === 'object' && sitzung !== null && 'createdAt' in sitzung && 'id' in sitzung && 'userId' in sitzung
+}
+
+/** Älter als erlaubt (30 Tage ab der Anmeldung, Konten mit der Rolle ADMIN 12 Stunden)? */
+function sitzungZuAlt(gelesen: GeleseneSitzung, jetzt: Date): boolean {
+  return sitzungAbgelaufen(new Date(gelesen.session.createdAt), jetzt, sitzungRolle(gelesen.user.role))
+}
+
+/** Löscht die Sitzung (Besitz in der WHERE) und das Sitzungs-Cookie der Antwort. */
+async function beendeSitzung(ctx: HookKontext, gelesen: GeleseneSitzung): Promise<void> {
+  await prisma.session.deleteMany({ where: { id: gelesen.session.id, userId: gelesen.session.userId } })
+  deleteSessionCookie(ctx)
+}
+
+/**
+ * Jeder Better-Auth-Weg außer `/get-session` (den prüft hooks.after, ohne
+ * zweite Abfrage): Trägt die Anfrage ein Sitzungs-Cookie und ist die Sitzung
+ * zu alt, fällt sie weg, bevor der Endpunkt sie liest — Passwort ändern,
+ * Passkeys, Abmelden anderer Geräte sehen dann keine Sitzung (401), eine
+ * Anmeldung läuft normal weiter. Ohne Cookie keine Abfrage.
+ */
+async function beendeZuAlteSitzung(ctx: HookKontext): Promise<void> {
+  if (!ctx.getCookie(ctx.context.authCookies.sessionToken.name)) return
+  const angemeldet = await getSessionFromCtx(ctx, { disableRefresh: true })
+  if (!istGeleseneSitzung(angemeldet) || !sitzungZuAlt(angemeldet, new Date())) return
+  await beendeSitzung(ctx, angemeldet)
+  ctx.context.session = null
+}
+
+/**
+ * Passwortregeln auf dem Server (Nr. 178): Zurücksetzen und Ändern prüfen
+ * das neue Passwort mit derselben Regel wie die Registrierung
+ * (`passwordSchema`, src/schemas/register.ts) — vorher prüfte der Server nur
+ * die Länge, die übrigen Regeln standen nur im Browser. Meldung wie in der
+ * Registrierung (die erste des Schemas). Vor dem Endpunkt: Ein schwaches
+ * Passwort ändert nichts und verbraucht keinen Link.
+ */
+function pruefePasswortRegeln(ctx: HookKontext): void {
+  const neu = (ctx.body as { newPassword?: unknown } | undefined)?.newPassword
+  // Fehlt das Feld, lehnt Better Auth die Anfrage selbst ab (Body-Schema).
+  if (typeof neu !== 'string') return
+  const ergebnis = passwordSchema.safeParse(neu)
+  if (!ergebnis.success) throw APIError.from('BAD_REQUEST', { code: 'PASSWORT_ZU_SCHWACH', message: ergebnis.error.issues[0].message })
+}
 
 /**
  * Darf diese Sitzung einen Passkey anlegen (Fälle a–c, registrierungsFall)?
@@ -537,6 +604,9 @@ export const auth = betterAuth({
   // nähme Better Auth dabei das Passwort (revokeUnprovenAccountAccess).
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      // Höchstdauer der Sitzung (S18) vor allem anderen: Ein Endpunkt, der die
+      // Sitzung liest, sieht eine zu alte nie.
+      if (ctx.path !== '/get-session') await beendeZuAlteSitzung(ctx)
       // Admin nur mit Passkey (N20; Nr. 115): ohne lesbare App-Adresse keine
       // Passkeys und keine Ersatzcodes (503), alle anderen Anmeldungen laufen.
       if ((ctx.path.startsWith('/passkey/') || ctx.path === ERSATZCODE_ANMELDEN_PFAD) && PASSKEY_ADRESSE === null) {
@@ -601,16 +671,28 @@ export const auth = betterAuth({
       }
 
       if (ctx.path === '/request-password-reset') {
+        const email = (ctx.body as { email?: unknown } | undefined)?.email
+        if (typeof email !== 'string') return
+        // Je Adresse über alle Instanzen, fail-closed (Nr. 178) — vor der
+        // Frage nach dem Konto, gleich für jede Adresse.
+        if (await adminBremseVoll(PASSWORT_VERGESSEN_JE_ADRESSE, adressMerkmal(email))) {
+          throw new APIError('TOO_MANY_REQUESTS', { message: 'Zu viele Anfragen.' })
+        }
         // „Passwort vergessen" für einen Admin mit Passkey (N20): dieselbe
         // Antwort wie immer, aber kein Link — wie bei einer unbekannten
         // Adresse (Better Auth liest dort einmal ins Leere, hier auch).
-        const email = (ctx.body as { email?: unknown } | undefined)?.email
-        if (typeof email !== 'string' || !(await adminMitPasskey(email))) return
+        if (!(await adminMitPasskey(email))) return
         await ctx.context.internalAdapter.findVerificationValue('dummy-verification-token')
         return ctx.json({ status: true, message: 'If this email exists in our system, check your email for the reset link' })
       }
 
+      if (ctx.path === '/change-password') {
+        pruefePasswortRegeln(ctx)
+        return
+      }
+
       if (ctx.path === '/reset-password') {
+        pruefePasswortRegeln(ctx)
         // Nur lesen, wessen Passwort es ist (adresseBeimZuruecksetzen); ob
         // der Token gilt, entscheidet Better Auth im Endpunkt.
         const token = (ctx.body as { token?: unknown } | undefined)?.token ?? ctx.query?.token
@@ -670,6 +752,16 @@ export const auth = betterAuth({
         if (kennung !== null) ctx.setCookie(GERAETE_COOKIE, kennung, { ...GERAETE_COOKIE_OPTIONEN, secure })
       }
       switch (ctx.path) {
+        // Höchstdauer (S18): Die Sitzung, die Better Auth eben gelesen hat,
+        // ist zu alt → gelöscht samt Cookie, die Antwort ist „nicht
+        // angemeldet". Seiten und Actions leiten wie bei jeder fehlenden
+        // Sitzung zur passenden Anmeldung (Hof mit Rücksprung, Nr. 156).
+        case '/get-session': {
+          const gelesen = ctx.context.returned
+          if (!istGeleseneSitzung(gelesen) || !sitzungZuAlt(gelesen, new Date())) return
+          await beendeSitzung(ctx, gelesen)
+          return ctx.json(null)
+        }
         case '/sign-in/email-otp':
         case '/sign-in/email': {
           const versuch = vorabGezaehlt.get(ctx.context)
@@ -805,25 +897,9 @@ export const auth = betterAuth({
         })
       },
     }),
-    // Ohne Wirkung: Anfordern UND Prüfen sind über disabledPaths zu (seit
-    // Nr. 19b auch /magic-link/verify), der Server erzeugt keine Links. Kann
-    // in einem Aufräum-PR samt customer-magic-link.tsx entfallen.
-    magicLink({
-      expiresIn: 900, // 15 Minuten
-      sendMagicLink: async ({ email, url }) => {
-        try {
-          const { sendMagicLinkEmail } = await import('@/lib/email')
-          await sendMagicLinkEmail(email, url)
-        } catch (err) {
-          console.error('[Magic Link] E-Mail-Fehler:', err)
-          // Der Fallback-Log enthält einen GÜLTIGEN Login-Link samt Adresse —
-          // er darf niemals in die Produktions-Logs (Vercel) gelangen.
-          if (process.env.NODE_ENV !== 'production') {
-            console.log(`[DEV] Magic Link für ${email}: ${url}`)
-          }
-        }
-      },
-    }),
+    // Kein Magic-Link-Plugin mehr (Nr. 178): Anfordern und Prüfen waren
+    // seit Nr. 19b gesperrt, kein Weg erzeugte Links. Die beiden Pfade bleiben
+    // zusätzlich in GESPERRTE_AUTH_PFADE (404, tests/integration/anmeldecode).
     // Admin nur mit Passkey (N20; Nr. 115). Nutzerprüfung (Fingerabdruck,
     // Gesicht oder PIN) beim Einrichten und bei jeder Anmeldung: Das Plugin
     // prüft beides mit requireUserVerification: false und fragt beim Anmelden
@@ -892,6 +968,8 @@ export const auth = betterAuth({
     },
     expiresIn: 60 * 60 * 24 * 7, // 7 Tage
     updateAge: 60 * 60 * 24,      // täglich auffrischen
+    // … aber höchstens 30 Tage ab der Anmeldung (S18, Nr. 178): geprüft in
+    // hooks.before/after über sitzungAbgelaufen (src/lib/sitzung-dauer.ts).
     // Kein Zwischenspeicher im Cookie (E7, Ergänzung; Nr. 114): Jede Prüfung
     // (auth.api.getSession, /get-session) liest Sitzung und Rolle frisch aus
     // der Datenbank — eine abgemeldete Sitzung gilt ab dem nächsten Klick

@@ -5839,6 +5839,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Formprüfung:** Die beiden Schemas mit `sig` (`src/schemas/bestaetigung.ts`, `src/schemas/abo.ts`) ließen nur 64 Hex durch; sie nehmen jetzt auch `2.` davor, sonst zeigte die Bestätigungsseite mit `LINK_SECRET` nur „eingegangen“.
 - **Bleibt:** `bremsSchluessel` (Bremsen) und der Hash des Bar-Tokens hängen nicht an Links in Mails und bleiben, wie sie sind. Der Double-Opt-in-Link (`abo-bestaetigung-token.ts`, 7 Tage) gehört nicht zu den drei Dateien und signiert weiter mit `BETTER_AUTH_SECRET`.
 
+## Sicherheit am Handy (Register S18; Nr. 178, Lauf 25, 26.10.2026)
+
+- **Warum eine Höchstdauer:** Better Auth verlängert eine benutzte Sitzung täglich um 7 Tage. Ein Handy, das einmal die Woche geöffnet wird, blieb damit für immer angemeldet — auch ein verlorenes. Seit S18 endet jede Sitzung von Hof und Kundin spätestens 30 Tage nach der Anmeldung; Konten mit der Rolle ADMIN bleiben bei 12 Stunden. Geprüft wird beim Lesen (`/get-session` in hooks.after, jeder andere Weg in hooks.before), nicht durch einen Cron — wie bei der Reservierung gilt die Frist beim Lesen.
+- **Kundinnen** bekommen die Geräteliste aus dem Hofbereich unter /account, mit „Überall abmelden" (auch dieses Gerät). Ein Hof behält „Alle anderen abmelden", damit er am Gerät, an dem er arbeitet, angemeldet bleibt.
+- **Passwort:** Die Regeln (Groß-, Kleinbuchstabe, Zahl) prüfte vorher nur der Browser; jetzt auch der Server beim Ändern und Zurücksetzen. „Passwort vergessen" bremst zusätzlich je Adresse (5 in 15 Minuten, fail-closed), nicht mehr nur je IP.
+- **Aufgeräumt:** Das Magic-Link-Plugin samt Mailvorlage ist weg (seit Nr. 19b ohne Weg). `/api/status-image/[id]` prüft die Sichtbarkeit wie die Hofseite; sie ist im Code nirgends verlinkt und soll nach einer Ankündigung entfallen (Bericht 178).
+- **Zwei Wachen** halten Altbestand fest, der nur schrumpft: Server Actions mit Parametern ohne Zod-Schema (`tests/actions-zod-wache.test.ts`) und Schreiben auf Hof-Daten ohne `farmId` in der WHERE (`tests/hof-schreiben-farmid-wache.test.ts`).
+
 ## Nützliche Befehle
 
 ```bash
