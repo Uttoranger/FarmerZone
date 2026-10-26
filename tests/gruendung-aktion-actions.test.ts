@@ -90,7 +90,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers({ now: new Date('2026-10-19T10:00:00+02:00'), toFake: ['Date'] })
   getSession.mockResolvedValue(adminSitzung('admin_1') as never)
-  db.user.findUnique.mockResolvedValue({ isAdmin: true })
+  db.user.findUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true })
   db.farm.updateMany.mockResolvedValue({ count: 1 })
   db.plattformEinstellung.updateMany.mockResolvedValue({ count: 1 })
   einstellung()

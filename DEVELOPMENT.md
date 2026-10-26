@@ -5916,6 +5916,15 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **iPhone:** `appleWebApp` mit Marke und `black-translucent`.
 - **Analytics:** `AnalyticsGefiltert` (Client-Hülle, weil `beforeSend` eine Funktion ist) ruft `filtereAnalyticsEreignis` (`src/lib/analytics-filter.ts`): Seiten aus `NIE_MELDEN_PFADE` und die übrigen `no-referrer`-Seiten (u. a. Bar-Bestätigung) gehen nie raus, `NIE_MELDEN_PARAMETER` werden aus der Adresse gestrichen. Die Zusatzliste wird in `tests/analytics-filter.test.ts` gegen `next.config.ts` abgeglichen.
 
+## Schema für den Regelbetrieb und Admin-Protokoll (Register N33–N36, N38; Nr. 188, Lauf 26, 26.10.2026)
+
+- **Eine Migration** `20261026100000_regelbetrieb`, nur Expand: Tabelle `AdminAktion` (ohne Fremdschlüssel, RLS an), `User.adminInhaber`/`adminRechte`, auf `Farm` Sperre und Schließen (für 187/190) und die Felder der Plattformgebühr im Hofpreis (für 197/198), auf `PlattformEinstellung` Notbremse (189) und Stichtag des Hofpreis-Modells, `Order.gebuehrModell`/`gebuehrEinzug`, `OrderItem.gebuehrCents`, `Monatsabrechnung.stand` und die Rechnungs-Kennungen. Einziger Datenschritt: bestehende Admins werden Inhaber. `Farm.sepaMandatAm` gab es schon (Schema-Expand Redesign) und wurde nicht doppelt angelegt.
+- **Warum fail-open beim Protokoll:** Ein Protokoll, das eine gültige Freischaltung oder Erstattung zurückrollt, wäre schlimmer als ein fehlender Eintrag (CLAUDE.md §2). Darum schreibt `protokolliere` in einer eigenen Anweisung nach der Wirkung — ein gescheitertes INSERT in einer interaktiven Transaktion bräche sonst die ganze Transaktion ab.
+- **Warum das Recht zuletzt:** Eine Person ohne Passkey soll zuerst zur Einrichtung bzw. Anmeldung, nicht einen Satz über fehlende Rechte lesen.
+- **Upload-Wege der Startseite** (Audit A2/B1) prüften nur `isAdmin` — auch in einer Sitzung ohne Passkey. Jetzt über die Admin-Wache mit Recht `startseite_veroeffentlichen`; ebenso die Vorschau-Seite.
+- **Frisch bestätigt** (Audit D10) jetzt auch: Fassung zurückziehen, Meldung ablegen, Kostenposten, Gründungs-Einstellungen, Empfänger entfernen, Zustell-Regeln; die Oberflächen gehen über `useFrischBestaetigt`.
+- **Annahmen:** Rundschreiben → `hoefe_freischalten` (spricht für die Plattform zu den Höfen); Passkey entfernen, Ersatzcodes und „frisch für Passkey“ → `notfallzugang` (Inhaber) wie in der Freigabe; die eigene Einrichtung (Code schicken/prüfen) bleibt für jede Person offen.
+
 ## Kasse und Texte: Vertrauen, Grund, Ausweg (Nr. 176, Lauf 25, 26.10.2026)
 
 - **Kasse:** Die Meldungen des Schemas sagen, was fehlt und wozu der Hof es braucht („Bitte gib deinen Namen an – so weiß der Hof, wer abholt."); leere und falsche E-Mail-Adresse sind zwei Meldungen. Bei „Deine Daten" führt „Was passiert damit?" in neuem Tab zu /datenschutz, unter der Gesamtsumme steht „Preise inkl. USt" (Konstanten in `src/lib/kasse.ts`), die Felder tragen `enterKeyHint`.

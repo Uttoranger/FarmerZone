@@ -27,6 +27,7 @@ vi.mock('@/lib/prisma', () => ({
     // Seit Nr. 158 räumt raeumeAltesAuf auch das Mail-Protokoll auf; eigene Attrappe, damit
     // m.updateMany nur das Leeren der Klartext-Token zählt.
     mailAuftrag: { deleteMany: vi.fn(async () => m.nichts) },
+    adminAktion: { deleteMany: vi.fn(async () => m.nichts) },
   },
 }))
 // Seit Nr. 170 sichert das Aufräumen vorher die Zahl der gesendeten Beitrags-Mails.

@@ -32,6 +32,7 @@ import { ersatzcodeHash, erzeugeErsatzcodes } from '@/lib/ersatzcodes'
 import { einmalTokenHash, loeseEinmalLinkEin } from '@/server/geraete'
 import { adminBremseVoll } from '@/server/admin-bremse'
 import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
+import { protokolliere } from '@/server/admin-protokoll'
 
 /*
  * Die Actions der Admin-Anmeldung (Register N20, Ergänzung Lauf 18; Nr. 115):
@@ -102,7 +103,7 @@ export type AktionsAntwort = { ok: true } | { error: string }
  * Sitzung); frühere Codes dieser Sitzung laufen sofort ab.
  */
 export async function schickeEinrichtungscode(): Promise<AktionsAntwort> {
-  const wache = await verlangeAdminAktion({ ohnePasskey: true })
+  const wache = await verlangeAdminAktion({ ohnePasskey: true, recht: 'ansehen' })
   if ('error' in wache) return wache
   const sitzung = await eigeneSitzung()
   if (!sitzung) return { error: 'Nicht angemeldet.' }
@@ -142,7 +143,7 @@ const einrichtungscodeSchema = z.object({ code: z.string().trim().regex(/^\d{6}$
 export async function pruefeEinrichtungscode(eingabe: unknown): Promise<AktionsAntwort> {
   const v = einrichtungscodeSchema.safeParse(eingabe)
   if (!v.success) return { error: EINRICHTEN_TEXT.codeFalsch }
-  const wache = await verlangeAdminAktion({ ohnePasskey: true })
+  const wache = await verlangeAdminAktion({ ohnePasskey: true, recht: 'ansehen' })
   if ('error' in wache) return wache
   const sitzung = await eigeneSitzung()
   if (!sitzung) return { error: 'Nicht angemeldet.' }
@@ -164,7 +165,7 @@ export type ErsatzcodesAntwort = { ok: true; codes: string[] } | { error: string
  * die Oberfläche; in der Datenbank steht nur ihr HMAC.
  */
 export async function erstelleErsatzcodes(): Promise<ErsatzcodesAntwort> {
-  const frisch = await verlangeFrischeBestaetigung({ ohnePasskey: true })
+  const frisch = await verlangeFrischeBestaetigung({ ohnePasskey: true, recht: 'notfallzugang' })
   if ('error' in frisch) return frisch
   const konto = await prisma.user.findUnique({ where: { id: frisch.userId }, select: { adminSeit: true } })
   const passkeys = await prisma.passkey.count({ where: { userId: frisch.userId, ...adminPasskeyWo(konto?.adminSeit ?? null) } })
@@ -176,6 +177,7 @@ export async function erstelleErsatzcodes(): Promise<ErsatzcodesAntwort> {
     prisma.adminErsatzcode.deleteMany({ where: { userId: frisch.userId, benutztAm: null } }),
     prisma.adminErsatzcode.createMany({ data: hashes.map((codeHash) => ({ userId: frisch.userId, codeHash })) }),
   ])
+  await protokolliere({ wer: frisch.userId, art: 'ersatzcodes_erstellt', bezugArt: 'person', bezugId: frisch.userId, mitPasskey: frisch.mitPasskey })
   neuLaden()
   return { ok: true, codes }
 }
@@ -191,7 +193,7 @@ const passkeyEntfernenSchema = z.object({ id: z.string().min(1).max(200) })
  * (CODING_STANDARDS §4).
  */
 export async function entfernePasskey(eingabe: unknown): Promise<AktionsAntwort> {
-  const frisch = await verlangeFrischeBestaetigung()
+  const frisch = await verlangeFrischeBestaetigung({ recht: 'notfallzugang' })
   if ('error' in frisch) return frisch
   const v = passkeyEntfernenSchema.safeParse(eingabe)
   if (!v.success) return { error: ADMIN_AKTION_FEHLER.passkeyFehlt }
@@ -208,6 +210,7 @@ export async function entfernePasskey(eingabe: unknown): Promise<AktionsAntwort>
   })
   if (ergebnis === 'letzter') return { error: ADMIN_AKTION_FEHLER.letzterPasskey }
   if (ergebnis === 'fehlt') return { error: ADMIN_AKTION_FEHLER.passkeyFehlt }
+  await protokolliere({ wer: userId, art: 'passkey_entfernt', bezugArt: 'person', bezugId: userId, mitPasskey: frisch.mitPasskey })
   schickeSicherheitsMail(userId, 'passkey-entfernt', (await headers()).get('user-agent'), new Date())
   neuLaden()
   return { ok: true }
@@ -219,7 +222,7 @@ export async function entfernePasskey(eingabe: unknown): Promise<AktionsAntwort>
  * der Browser den Passkey an (Fall c in src/lib/auth.ts).
  */
 export async function pruefeFrischFuerPasskey(): Promise<AktionsAntwort> {
-  const frisch = await verlangeFrischeBestaetigung()
+  const frisch = await verlangeFrischeBestaetigung({ recht: 'notfallzugang' })
   if ('error' in frisch) return frisch
   return { ok: true }
 }

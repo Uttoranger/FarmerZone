@@ -97,7 +97,7 @@ const PFADE = ['/admin', '/admin/einstellungen', '/fuer-hoefe', '/register', '/'
 beforeEach(() => {
   vi.clearAllMocks()
   getSession.mockResolvedValue(adminSitzung('admin_1') as never)
-  db.user.findUnique.mockResolvedValue({ isAdmin: true })
+  db.user.findUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true })
   db.farm.updateMany.mockResolvedValue({ count: 1 })
   einstellung(12)
 })

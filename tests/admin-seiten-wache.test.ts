@@ -112,7 +112,20 @@ function importiertAls(datei: ts.SourceFile, modul: string, exportName: string):
   return null
 }
 
-/** Ob die erste Anweisung `await <name>()` ohne Argument ist — allein oder als Initialisierer. */
+/**
+ * Erlaubt ist als einziges Argument `{ recht: '<recht>' }` (Rechte je Person,
+ * Register N35, Nr. 188) — es verschärft nur. Alles andere (etwa
+ * `ohnePasskey`) lockert die Wache und fällt auf.
+ */
+function nurRecht(argumente: ts.NodeArray<ts.Expression>): boolean {
+  if (argumente.length === 0) return true
+  if (argumente.length !== 1 || !ts.isObjectLiteralExpression(argumente[0])) return false
+  return argumente[0].properties.every(
+    (e) => ts.isPropertyAssignment(e) && ts.isIdentifier(e.name) && e.name.text === 'recht' && ts.isStringLiteral(e.initializer)
+  )
+}
+
+/** Ob die erste Anweisung `await <name>()` ohne Argument (oder nur mit `{ recht }`) ist — allein oder als Initialisierer. */
 function ersteIstAwait(fn: ts.FunctionDeclaration, name: string): boolean {
   const erste = fn.body?.statements[0]
   if (!erste) return false
@@ -124,7 +137,7 @@ function ersteIstAwait(fn: ts.FunctionDeclaration, name: string): boolean {
   if (!ausdruck || !ts.isAwaitExpression(ausdruck)) return false
   const aufruf = ausdruck.expression
   if (!ts.isCallExpression(aufruf) || !ts.isIdentifier(aufruf.expression) || aufruf.expression.text !== name) return false
-  return aufruf.arguments.length === 0
+  return nurRecht(aufruf.arguments)
 }
 
 /** Was an der Wache fehlt — leer heißt gedeckt. */
@@ -184,6 +197,9 @@ describe('jede Seite unter /admin', () => {
     expect(wachenMaengel(`${kopf}export default async function S() { await verlangeEinrichtenSeite({ ohnePasskey: true })\n return null }`, EINRICHTEN)).toHaveLength(1)
     expect(wachenMaengel(`${kopf}export default async function S() { const j = new Date()\n await verlangeEinrichtenSeite()\n return j }`, EINRICHTEN)).toHaveLength(1)
     expect(wachenMaengel(`${kopf}export default async function S() { const { pflicht } = await verlangeEinrichtenSeite()\n return pflicht }`, EINRICHTEN)).toEqual([])
+    // Nr. 188: nur `{ recht }` verschärft und geht durch; zusammen mit ohnePasskey fällt es auf.
+    expect(wachenMaengel(`${kopf}export default async function S() { await verlangeAdminSeite({ recht: 'geld' })\n return null }`, SEITE)).toEqual([])
+    expect(wachenMaengel(`${kopf}export default async function S() { await verlangeAdminSeite({ recht: 'geld', ohnePasskey: true })\n return null }`, SEITE)).toHaveLength(1)
   })
 
   it('die Umleitungen /admin/meldungen und /admin/meldungen/[id] (Route Handler, Nr. 101) prüfen als erste Anweisung im GET', () => {
@@ -394,7 +410,7 @@ describe('ladeAdminbereich — Verhalten', () => {
   it('Admin ohne Hof: Name und Zähler — wartende Höfe; am Postfach „Offen" im Eingang (N14), kein Weg zum Hof', async () => {
     getSession.mockResolvedValue(adminSitzung('u1') as never)
     userFindUnique
-      .mockResolvedValueOnce({ isAdmin: true } as never)
+      .mockResolvedValueOnce({ isAdmin: true, adminInhaber: true } as never)
       // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
       .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
@@ -411,7 +427,7 @@ describe('ladeAdminbereich — Verhalten', () => {
     getSession.mockResolvedValue(adminSitzung('u1') as never)
     passkeyAggregate.mockResolvedValue({ _count: { _all: 0 }, _max: { createdAt: null } } as never)
     userFindUnique
-      .mockResolvedValueOnce({ isAdmin: true } as never)
+      .mockResolvedValueOnce({ isAdmin: true, adminInhaber: true } as never)
       // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
       .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
@@ -425,7 +441,7 @@ describe('ladeAdminbereich — Verhalten', () => {
   it('Sitzung ohne Passkey (das Konto hat einen, N20): die Shell ohne Zähler — die Seite leitet zur Admin-Anmeldung um', async () => {
     getSession.mockResolvedValue({ user: { id: 'u1' }, session: { id: 'sitzung-u1', createdAt: new Date(), passkeyAm: null } } as never)
     userFindUnique
-      .mockResolvedValueOnce({ isAdmin: true } as never)
+      .mockResolvedValueOnce({ isAdmin: true, adminInhaber: true } as never)
       // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
       .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
@@ -440,7 +456,7 @@ describe('ladeAdminbereich — Verhalten', () => {
   it('Admin mit eigenem Hof (Rolle FARMER): hatHof — gelesen werden nur Name, Rolle und die Hof-Kennung', async () => {
     getSession.mockResolvedValue(adminSitzung('u1') as never)
     userFindUnique
-      .mockResolvedValueOnce({ isAdmin: true } as never)
+      .mockResolvedValueOnce({ isAdmin: true, adminInhaber: true } as never)
       // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
       .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'FARMER', farm: { id: 'f1' } } as never)
@@ -454,7 +470,7 @@ describe('ladeAdminbereich — Verhalten', () => {
   it('Rolle FARMER ohne Hof: kein Weg zum Hof (der Hofbereich führte erst nach /onboarding)', async () => {
     getSession.mockResolvedValue(adminSitzung('u1') as never)
     userFindUnique
-      .mockResolvedValueOnce({ isAdmin: true } as never)
+      .mockResolvedValueOnce({ isAdmin: true, adminInhaber: true } as never)
       // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
       .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'FARMER', farm: null } as never)
@@ -474,7 +490,7 @@ describe('/admin/meldungen — Umleitung in den Reiter „Meldungen" (echter 308
   })
 
   it('Admin: 308 auf den Reiter — die alten Filter gibt es dort nicht', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     for (const antwort of [await umleiten('?status=NEU&art=FEHLER'), await umleiten()]) {
       expect(antwort.status).toBe(308)
       expect(antwort.headers.get('location')).toBe('http://localhost/admin/postfach?reiter=meldungen')
@@ -499,7 +515,7 @@ describe('/admin/meldungen/[id] — Umleitung in die Spalte „Meldung entscheid
   })
 
   it('Admin: 308 auf /admin/postfach?art=meldung&meldung=<id> — auch mit der Kurznummer', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     const voll = await umleiten('ckmeldung00000000000000000')
     expect(voll.status).toBe(308)
     expect(voll.headers.get('location')).toBe('http://localhost/admin/postfach?art=meldung&meldung=ckmeldung00000000000000000')

@@ -58,7 +58,7 @@ const GUELTIG = {
 
 function alsAdmin() {
   getSession.mockResolvedValue(adminSitzung('user_admin') as never)
-  userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+  userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
 }
 
 beforeEach(() => {

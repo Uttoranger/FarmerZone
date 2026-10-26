@@ -69,7 +69,7 @@ const WARTENDER_HOF = {
 beforeEach(() => {
   vi.clearAllMocks()
   getSession.mockResolvedValue(adminSitzung('admin_1') as never)
-  userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+  userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
   farmFindUnique.mockResolvedValue(WARTENDER_HOF as never)
   orderCount.mockResolvedValue(0 as never)
   orderItemCount.mockResolvedValue(0 as never)

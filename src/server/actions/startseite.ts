@@ -4,6 +4,8 @@ import { revalidatePath, updateTag } from 'next/cache'
 import type { Prisma, StartseiteArt } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
+import { protokolliere } from '@/server/admin-protokoll'
+import { PLATTFORM_BEZUG } from '@/schemas/admin-aktion'
 import { IN_LISTEN_SICHTBAR } from '@/server/queries/farm'
 import { ladeEntwurfAdmin, leseEntwurf, leseFassung, leseQuelle, naechsterTermin, type AdminStartseitenZeile } from '@/server/queries/startseite'
 import { erzeugeVorschauAbfrage } from '@/server/startseite-vorschau'
@@ -114,7 +116,7 @@ export type EntwurfGespeichert = {
  * nichts. Die öffentliche Startseite bleibt, wie sie ist.
  */
 export async function speichereEntwurf(eingabe: unknown): Promise<EntwurfGespeichert | { error: string }> {
-  const guard = await verlangeAdminAktion()
+  const guard = await verlangeAdminAktion({ recht: 'startseite_veroeffentlichen' })
   if ('error' in guard) return { error: guard.error }
 
   const geprueft = startseiteSpeichernSchema.safeParse(eingabe)
@@ -214,13 +216,14 @@ export async function speichereEntwurf(eingabe: unknown): Promise<EntwurfGespeic
  * steht der Block in einer Fassung, bleibt er dort samt Bild.
  */
 export async function loescheStartseitenBlock(eingabe: unknown): Promise<{ ok: true } | { error: string }> {
-  const guard = await verlangeAdminAktion()
+  const guard = await verlangeAdminAktion({ recht: 'startseite_veroeffentlichen' })
   if ('error' in guard) return { error: guard.error }
   const geprueft = blockLoeschenSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: STARTSEITE_SAETZE.ungueltig }
 
   const { count } = await prisma.startseiteBlock.deleteMany({ where: { id: geprueft.data.blockId } })
   if (count === 0) return { error: SATZ.veraltet }
+  await protokolliere({ wer: guard.userId, art: 'startseite_block_geloescht', bezugArt: 'plattform', bezugId: PLATTFORM_BEZUG, mitPasskey: guard.mitPasskey })
   erneuereAdmin()
   return { ok: true }
 }
@@ -241,7 +244,7 @@ export async function veroeffentlicheStartseite(
   eingabe: unknown
 ): Promise<{ ok: true; id: string; liveAb: string; text: string } | { error: string }> {
   // Heikle Aktion (Register N20, Ergänzung 23.10.2026): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion.
-  const guard = await verlangeFrischeBestaetigung()
+  const guard = await verlangeFrischeBestaetigung({ recht: 'startseite_veroeffentlichen' })
   if ('error' in guard) return { error: guard.error }
   const geprueft = veroeffentlichenSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: STARTSEITE_SAETZE.ungueltig }
@@ -265,6 +268,7 @@ export async function veroeffentlicheStartseite(
     })
   })
   if (!fassung) return { error: SATZ.entwurfKaputt }
+  await protokolliere({ wer: guard.userId, art: 'startseite_veroeffentlicht', bezugArt: 'plattform', bezugId: fassung.id, mitPasskey: guard.mitPasskey })
 
   // updateTag statt revalidateTag: In Next 16 verlangt revalidateTag ein Profil (wie Nr. 93/95).
   updateTag(STARTSEITE_CACHE_TAG)
@@ -281,7 +285,8 @@ export async function veroeffentlicheStartseite(
  * Der Datencache vergisst damit den Termin; live ändert sich nichts.
  */
 export async function zieheFassungZurueck(eingabe: unknown): Promise<{ ok: true } | { error: string }> {
-  const guard = await verlangeAdminAktion()
+  // Heikel (Audit D10; Nr. 188): nimmt eine geplante Fassung vom Zeitplan — frisch mit Passkey bestätigt.
+  const guard = await verlangeFrischeBestaetigung({ recht: 'startseite_veroeffentlichen' })
   if ('error' in guard) return { error: guard.error }
   const geprueft = fassungWahlSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: STARTSEITE_SAETZE.ungueltig }
@@ -292,6 +297,7 @@ export async function zieheFassungZurueck(eingabe: unknown): Promise<{ ok: true 
     data: { zurueckgezogenAm: jetzt },
   })
   if (count === 0) return { error: SATZ.schonLive }
+  await protokolliere({ wer: guard.userId, art: 'startseite_zurueckgezogen', bezugArt: 'plattform', bezugId: geprueft.data.id, mitPasskey: guard.mitPasskey })
   updateTag(STARTSEITE_CACHE_TAG)
   erneuereAdmin()
   return { ok: true }
@@ -307,7 +313,7 @@ export async function zieheFassungZurueck(eingabe: unknown): Promise<{ ok: true 
  * Live ändert sich nichts.
  */
 export async function uebernehmeFassungAlsEntwurf(eingabe: unknown): Promise<{ ok: true; zeilen: AdminStartseitenZeile[] } | { error: string }> {
-  const guard = await verlangeAdminAktion()
+  const guard = await verlangeAdminAktion({ recht: 'startseite_veroeffentlichen' })
   if ('error' in guard) return { error: guard.error }
   const geprueft = entwurfUebernehmenSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: STARTSEITE_SAETZE.ungueltig }
@@ -365,6 +371,7 @@ export async function uebernehmeFassungAlsEntwurf(eingabe: unknown): Promise<{ o
     }
   })
 
+  await protokolliere({ wer: guard.userId, art: 'startseite_uebernommen', bezugArt: 'plattform', bezugId: geprueft.data.id ?? PLATTFORM_BEZUG, mitPasskey: guard.mitPasskey })
   erneuereAdmin()
   // Die neue Liste gleich mit: Der Browser ersetzt damit seinen Entwurf (Admin › Startseite übernimmt Props sonst nicht).
   return { ok: true, zeilen: await ladeEntwurfAdmin() }
@@ -382,7 +389,7 @@ export async function uebernehmeFassungAlsEntwurf(eingabe: unknown): Promise<{ o
 export async function erzeugeStartseitenVorschau(
   eingabe: unknown
 ): Promise<{ ok: true; pfad: string; link: string; stand: string } | { error: string }> {
-  const guard = await verlangeAdminAktion()
+  const guard = await verlangeAdminAktion({ recht: 'startseite_veroeffentlichen' })
   if ('error' in guard) return { error: guard.error }
   const geprueft = vorschauAnfrageSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: STARTSEITE_SAETZE.ungueltig }

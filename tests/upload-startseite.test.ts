@@ -14,6 +14,7 @@
  *    nicht gelöscht.
  *  - Die übrigen Zwecke laufen unverändert (Gegenprobe: Hof mit Produktbild).
  */
+import { adminSitzung } from './admin-sitzung'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const s = vi.hoisted(() => {
@@ -33,7 +34,10 @@ const s = vi.hoisted(() => {
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
-vi.mock('@/lib/prisma', () => ({ prisma: { farm: { findUnique: vi.fn() }, user: { findUnique: vi.fn() } } }))
+// Seit Nr. 188 prüft der Startseiten-Weg über die echte Admin-Wache (Passkey der Sitzung, Recht „Startseite“) — Sitzung aus tests/admin-sitzung.ts.
+vi.mock('@/lib/prisma', async () => ({
+  prisma: { farm: { findUnique: vi.fn() }, user: { findUnique: vi.fn() }, session: { deleteMany: vi.fn() }, ...(await import('./admin-sitzung')).passkeyAttrappen() },
+}))
 vi.mock('@vercel/blob', () => ({ put: vi.fn(async (pfad: string) => ({ url: `https://speicher.public.blob.vercel-storage.com/${pfad}` })), del: vi.fn() }))
 // block/unblock: Die Route sperrt beim Laden die fremden Lader (Sicherheitsupdate 20.10.2026).
 vi.mock('sharp', () => ({ default: Object.assign(vi.fn(() => s.kette), { block: vi.fn(), unblock: vi.fn() }) }))
@@ -66,9 +70,9 @@ function verarbeitenAnfrage(daten: object): NextRequest {
 }
 
 function alsAdminOhneHof(): void {
-  vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'admin-1', role: 'CUSTOMER' } } as never)
+  vi.mocked(auth.api.getSession).mockResolvedValue(adminSitzung('admin-1', { role: 'CUSTOMER' }) as never)
   vi.mocked(prisma.farm.findUnique).mockResolvedValue(null as never)
-  vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true, createdAt: new Date('2020-01-01'), emailVerified: true } as never)
+  vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true, adminInhaber: true, createdAt: new Date('2020-01-01'), emailVerified: true } as never)
 }
 
 function alsHof(): void {
@@ -131,6 +135,22 @@ describe('ein Admin ohne Hof', () => {
     s.pfad.wert = `originals/${STARTSEITE_UPLOAD_KENNUNG}/product/foto.jpg`
     const hofPfad = await tokenPOST(tokenAnfrage())
     expect(hofPfad.status).toBe(400)
+  })
+
+  it('Nr. 188 (Audit A2/B1): ohne Passkey-Sitzung oder ohne das Recht „Startseite veröffentlichen“ 403 — kein Token, nichts verarbeitet', async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'admin-1', role: 'CUSTOMER' }, session: { id: 's', createdAt: new Date(), passkeyAm: null } } as never)
+    expect((await kennungGET()).status).toBe(403)
+    expect((await tokenPOST(tokenAnfrage())).status).toBe(400)
+    expect((await verarbeitenPOST(verarbeitenAnfrage({ url: ORIGINAL, zweck: 'startseite' }))).status).toBe(403)
+    vi.mocked(auth.api.getSession).mockResolvedValue(adminSitzung('admin-1', { role: 'CUSTOMER' }) as never)
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true, adminInhaber: false, adminRechte: ['geld'], createdAt: new Date('2020-01-01'), emailVerified: true } as never)
+    expect((await kennungGET()).status).toBe(403)
+    expect((await verarbeitenPOST(verarbeitenAnfrage({ url: ORIGINAL, zweck: 'startseite' }))).status).toBe(403)
+    expect(fetch).not.toHaveBeenCalled()
+    expect(put).not.toHaveBeenCalled()
+    // Gegenprobe: mit dem Recht geht es wieder.
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true, adminInhaber: false, adminRechte: ['startseite_veroeffentlichen'], createdAt: new Date('2020-01-01'), emailVerified: true } as never)
+    expect((await kennungGET()).status).toBe(200)
   })
 
   it('bekommt kein Produktbild verarbeitet', async () => {

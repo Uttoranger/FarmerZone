@@ -25,6 +25,12 @@ const HEIKLE_AKTIONEN: Array<{ datei: string; namen: string[] }> = [
   { datei: 'src/server/actions/postfach.ts', namen: ['markiereErstattungErledigt', 'sendeRundschreiben', 'fuegeEmpfaengerHinzu'] },
   { datei: 'src/server/actions/startseite.ts', namen: ['veroeffentlicheStartseite'] },
   { datei: 'src/server/actions/admin-anmeldung.ts', namen: ['erstelleErsatzcodes', 'entfernePasskey', 'pruefeFrischFuerPasskey'] },
+  // Nr. 188 (Audit D10): was live wirkt oder löscht — Zurückziehen, Ablegen, Kostenposten, Gründungs-Einstellungen.
+  { datei: 'src/server/actions/startseite.ts', namen: ['zieheFassungZurueck'] },
+  { datei: 'src/server/actions/admin.ts', namen: ['legeMeldungAbAction'] },
+  { datei: 'src/server/actions/finanzen.ts', namen: ['kostenpostenAnlegen', 'kostenpostenAendern', 'kostenpostenBeenden', 'kostenpostenLoeschen'] },
+  { datei: 'src/server/actions/plattform-einstellung.ts', namen: ['speichereGruendungEinstellung'] },
+  { datei: 'src/server/actions/postfach.ts', namen: ['entferneEmpfaenger', 'speichereZustellRegeln'] },
 ]
 
 const EXPORTE = ['src/app/admin/finanzen/export/route.ts', 'src/app/admin/betrieb/export/route.ts', 'src/app/admin/betrieb/bilder-export/route.ts']
@@ -41,6 +47,12 @@ const OBERFLAECHEN: Array<{ datei: string; aktionen: string[] }> = [
   { datei: 'src/components/admin/einstellungen-gruendung.tsx', aktionen: ['schreibeZusagenFest'] },
   { datei: 'src/app/admin/postfach/erstattung-erledigt.tsx', aktionen: ['markiereErstattungErledigt'] },
   { datei: 'src/app/admin/einstellungen/anmeldung/anmeldung-verwalten.tsx', aktionen: ['entfernePasskey', 'erstelleErsatzcodes', 'pruefeFrischFuerPasskey'] },
+  // Nr. 188 (Audit D10)
+  { datei: 'src/components/admin/startseite-gestalten.tsx', aktionen: ['zieheFassungZurueck'] },
+  { datei: 'src/components/admin/meldungen-werkzeug.tsx', aktionen: ['legeMeldungAbAction'] },
+  { datei: 'src/app/admin/finanzen/kosten-sheet.tsx', aktionen: ['kostenpostenAnlegen', 'kostenpostenAendern', 'kostenpostenBeenden', 'kostenpostenLoeschen'] },
+  { datei: 'src/components/admin/einstellungen-gruendung.tsx', aktionen: ['speichereGruendungEinstellung'] },
+  { datei: 'src/components/admin/postfach-zustellung.tsx', aktionen: ['entferneEmpfaenger', 'speichereZustellRegeln'] },
 ]
 
 function datei(quelltext: string): ts.SourceFile {

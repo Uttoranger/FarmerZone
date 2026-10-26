@@ -67,7 +67,7 @@ export default async function AdminFinanzenPage({
 }: {
   searchParams: Promise<{ monat?: string; reiter?: string; zeitraum?: string; jahr?: string }>
 }): Promise<React.JSX.Element> {
-  await verlangeAdminSeite()
+  await verlangeAdminSeite({ recht: 'geld' })
 
   const { monat: gewuenscht, reiter: gewaehlterReiter, zeitraum: gewaehlterZeitraum, jahr: gewuenschtesJahr } = await searchParams
   // Auch der Reiter ist Fremdtext aus der Adresse: Unbekanntes ist der Monat (Zod, src/schemas/admin-reiter.ts).

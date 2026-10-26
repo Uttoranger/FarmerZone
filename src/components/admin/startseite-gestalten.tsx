@@ -482,6 +482,8 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
 
   // Veröffentlichen ist heikel (Register N20, Ergänzung 23.10.2026): frisch mit Passkey bestätigt.
   const frischVeroeffentlichen = useFrischBestaetigt(veroeffentlicheStartseite)
+  // Zurückziehen nimmt eine geplante oder laufende Fassung von der Startseite (Audit D10; Nr. 188): frisch mit Passkey bestätigt.
+  const frischZurueckziehen = useFrischBestaetigt(zieheFassungZurueck)
 
   function veroeffentlichen(eingabe: VeroeffentlichenEingabe) {
     setDialogFehler(null)
@@ -535,7 +537,7 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
     }
     setAktionFehler(null)
     startTransition(async () => {
-      const ergebnis = await zieheFassungZurueck({ id: aktion.id })
+      const ergebnis = await frischZurueckziehen.ausfuehren({ id: aktion.id })
       if ('error' in ergebnis) {
         setAktionFehler(ergebnis.error)
         return
@@ -708,6 +710,7 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
         onVeroeffentlichen={veroeffentlichen}
       >
         {frischVeroeffentlichen.dialog}
+        {frischZurueckziehen.dialog}
       </VeroeffentlichenDialog>
 
       <VorschauFenster

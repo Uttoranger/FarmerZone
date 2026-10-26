@@ -6,6 +6,8 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
+import { protokolliere } from '@/server/admin-protokoll'
+import { PLATTFORM_BEZUG } from '@/schemas/admin-aktion'
 import { beginneMessung, messeUndPruefe } from '@/server/betrieb'
 import { arbeiteWarteschlange, stelleMailEin, type EinstellAuftrag } from '@/server/mail-warteschlange'
 import { letzteMessungAm } from '@/server/queries/betrieb'
@@ -47,7 +49,7 @@ import { mailArtEingabeSchema, mailAuswahlSchema, mailEinzelnSchema, type MailAu
  * ohne Schlüssel), hält die anderen nicht auf — das sagt die Kachel.
  */
 export async function messeJetztAction(): Promise<{ ok: true; satz: string } | { error: string }> {
-  const wache = await verlangeAdminAktion()
+  const wache = await verlangeAdminAktion({ recht: 'ansehen' })
   if ('error' in wache) return { error: wache.error }
 
   const jetzt = new Date()
@@ -58,6 +60,7 @@ export async function messeJetztAction(): Promise<{ ok: true; satz: string } | {
   }
 
   await messeUndPruefe(jetzt, { nachher: true })
+  await protokolliere({ wer: wache.userId, art: 'betrieb_gemessen', bezugArt: 'plattform', bezugId: PLATTFORM_BEZUG, mitPasskey: wache.mitPasskey })
   revalidatePath(ADMIN_BETRIEB_HREF)
   return { ok: true, satz: BETRIEB_TEXT.gemessen }
 }
@@ -71,6 +74,11 @@ export async function messeJetztAction(): Promise<{ ok: true; satz: string } | {
  * gescheitert ist. Das n auf dem Knopf und die Zahl der geänderten Zeilen
  * kommen so aus derselben Bedingung.
  */
+/** Der Bezug im Protokoll: die Kennung der Mail oder ihre Art — nie Adresse oder Inhalt. */
+function auswahlBezug(auswahl: MailAuswahl): string {
+  return 'id' in auswahl ? auswahl.id : auswahl.art
+}
+
 function auswahlBedingung(auswahl: MailAuswahl, jetzt: Date): Prisma.MailAuftragWhereInput {
   return 'id' in auswahl ? { id: auswahl.id } : { AND: [{ art: auswahl.art }, problemBedingung(jetzt)] }
 }
@@ -101,7 +109,7 @@ function arbeiteNachher(): void {
  * Heikel (N20): frische Bestätigung mit Passkey; sonst ändert sich nichts.
  */
 export async function schickeMailJetztAction(eingabe: unknown): Promise<{ ok: true; satz: string } | { error: string }> {
-  const frisch = await verlangeFrischeBestaetigung()
+  const frisch = await verlangeFrischeBestaetigung({ recht: 'mails_nochmal' })
   if ('error' in frisch) return frisch
   const auswahl = mailAuswahlSchema.safeParse(eingabe)
   if (!auswahl.success) return { error: MAIL_TEXT.eingabeUngueltig }
@@ -118,6 +126,7 @@ export async function schickeMailJetztAction(eingabe: unknown): Promise<{ ok: tr
   })
   revalidatePath(ADMIN_BETRIEB_HREF)
   if (count === 0) return { ok: true, satz: MAIL_TEXT.nichtsGeaendert }
+  await protokolliere({ wer: frisch.userId, art: 'mail_jetzt_geschickt', bezugArt: 'mail', bezugId: auswahlBezug(auswahl.data), mitPasskey: frisch.mitPasskey })
   arbeiteNachher()
   return { ok: true, satz: MAIL_TEXT.geschickt(count) }
 }
@@ -129,7 +138,7 @@ export async function schickeMailJetztAction(eingabe: unknown): Promise<{ ok: tr
  * 90 Tagen löscht. Heikel (N20): frische Bestätigung mit Passkey.
  */
 export async function verwirfMailAction(eingabe: unknown): Promise<{ ok: true; satz: string } | { error: string }> {
-  const frisch = await verlangeFrischeBestaetigung()
+  const frisch = await verlangeFrischeBestaetigung({ recht: 'mails_nochmal' })
   if ('error' in frisch) return frisch
   const auswahl = mailAuswahlSchema.safeParse(eingabe)
   if (!auswahl.success) return { error: MAIL_TEXT.eingabeUngueltig }
@@ -138,6 +147,7 @@ export async function verwirfMailAction(eingabe: unknown): Promise<{ ok: true; s
     where: { ...auswahlBedingung(auswahl.data, new Date()), status: { in: ['offen', 'gescheitert'] } },
     data: { status: 'verworfen', belegtBis: null },
   })
+  if (count > 0) await protokolliere({ wer: frisch.userId, art: 'mail_verworfen', bezugArt: 'mail', bezugId: auswahlBezug(auswahl.data), mitPasskey: frisch.mitPasskey })
   revalidatePath(ADMIN_BETRIEB_HREF)
   return { ok: true, satz: count === 0 ? MAIL_TEXT.nichtsGeaendert : MAIL_TEXT.verworfen(count) }
 }
@@ -255,7 +265,7 @@ const NOCHMAL_FELDER = { id: true, art: true, status: true, bestellungId: true, 
  * nur die Kennung.
  */
 export async function schickeMailNochmalAction(eingabe: unknown): Promise<Antwort> {
-  const frisch = await verlangeFrischeBestaetigung()
+  const frisch = await verlangeFrischeBestaetigung({ recht: 'mails_nochmal' })
   if ('error' in frisch) return frisch
   const gelesen = mailEinzelnSchema.safeParse(eingabe)
   if (!gelesen.success) return { error: MAIL_TEXT.eingabeUngueltig }
@@ -277,6 +287,7 @@ export async function schickeMailNochmalAction(eingabe: unknown): Promise<Antwor
     const neu = await stelleMailEin(auftrag)
     antwort = neu === 0 ? { ok: true, satz: MAIL_TEXT.nichtsGeaendert } : { ok: true, satz: ALLE_MAILS_TEXT.unterwegs }
   }
+  if ('ok' in antwort) await protokolliere({ wer: frisch.userId, art: 'mail_nochmal', bezugArt: 'mail', bezugId: m.id, mitPasskey: frisch.mitPasskey })
   revalidatePath(ADMIN_BETRIEB_HREF)
   return antwort
 }
@@ -288,7 +299,7 @@ export async function schickeMailNochmalAction(eingabe: unknown): Promise<Antwor
  * je Mail ein neuer Token — nur einzeln). Alle Aufträge in EINEM Einstellen.
  */
 export async function schickeArtNochmalAction(eingabe: unknown): Promise<Antwort> {
-  const frisch = await verlangeFrischeBestaetigung()
+  const frisch = await verlangeFrischeBestaetigung({ recht: 'mails_nochmal' })
   if ('error' in frisch) return frisch
   const gelesen = mailArtEingabeSchema.safeParse(eingabe)
   if (!gelesen.success) return { error: MAIL_TEXT.eingabeUngueltig }
@@ -316,6 +327,7 @@ export async function schickeArtNochmalAction(eingabe: unknown): Promise<Antwort
   const neu = await stelleMailEin(auftraege)
   revalidatePath(ADMIN_BETRIEB_HREF)
   if (neu === 0) return { ok: true, satz: ALLE_MAILS_TEXT.nichtsNochmal }
+  await protokolliere({ wer: frisch.userId, art: 'mail_art_nochmal', bezugArt: 'mail', bezugId: gelesen.data.art, mitPasskey: frisch.mitPasskey })
   return { ok: true, satz: neu === 1 ? ALLE_MAILS_TEXT.unterwegs : ALLE_MAILS_TEXT.unterwegsViele(neu) }
 }
 
@@ -326,7 +338,7 @@ export async function schickeArtNochmalAction(eingabe: unknown): Promise<Antwort
  * `NOCHMAL_ERLAUBT`.
  */
 export async function zeigeMailVorschauAction(eingabe: unknown): Promise<{ ok: true; titel: string; betreff: string; html: string } | { error: string }> {
-  const wache = await verlangeAdminAktion()
+  const wache = await verlangeAdminAktion({ recht: 'ansehen' })
   if ('error' in wache) return { error: wache.error }
   const gelesen = mailEinzelnSchema.safeParse(eingabe)
   if (!gelesen.success) return { error: MAIL_TEXT.eingabeUngueltig }

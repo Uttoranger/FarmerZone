@@ -68,6 +68,9 @@ export function PostfachZustellung({
   const [laeuft, starte] = useTransition()
   // Einen Empfänger hinzufügen ist heikel (Register N20, Ergänzung 23.10.2026): frisch mit Passkey bestätigt.
   const frischHinzufuegen = useFrischBestaetigt(fuegeEmpfaengerHinzu)
+  // Entfernen und Regeln wirken sofort darauf, wer Betreiber-Mails bekommt (Audit D10; Nr. 188): ebenso frisch bestätigt.
+  const frischEntfernen = useFrischBestaetigt(entferneEmpfaenger)
+  const frischRegeln = useFrischBestaetigt(speichereZustellRegeln)
   const geaendert = SCHALTBARE_ARTEN.some((art) => entwurf[art] !== regeln[art])
 
   function hinzufuegen(ereignis: FormEvent<HTMLFormElement>): void {
@@ -88,7 +91,7 @@ export function PostfachZustellung({
   function entfernen(empfaengerId: string): void {
     if (laeuft) return
     starte(async () => {
-      const ergebnis = await entferneEmpfaenger({ id: empfaengerId })
+      const ergebnis = await frischEntfernen.ausfuehren({ id: empfaengerId })
       setListenSatz('error' in ergebnis ? { art: 'fehler', text: ergebnis.error } : null)
       router.refresh()
     })
@@ -97,7 +100,7 @@ export function PostfachZustellung({
   function speichern(): void {
     if (laeuft) return
     starte(async () => {
-      const ergebnis = await speichereZustellRegeln(Object.fromEntries(SCHALTBARE_ARTEN.map((art) => [art, entwurf[art]])))
+      const ergebnis = await frischRegeln.ausfuehren(Object.fromEntries(SCHALTBARE_ARTEN.map((art) => [art, entwurf[art]])))
       setRegelSatz('error' in ergebnis ? { art: 'fehler', text: ergebnis.error } : { art: 'ok', text: ZUSTELLUNG_TEXT.gespeichert })
       if (!('error' in ergebnis)) router.refresh()
     })
@@ -115,6 +118,8 @@ export function PostfachZustellung({
     <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-[18px]">
       <section aria-labelledby={`${id}-empfaenger`} className={cn(KARTE, 'flex min-w-0 flex-col gap-3 px-4 py-4 md:px-5 dark:ring-1 dark:ring-border')}>
         {frischHinzufuegen.dialog}
+        {frischEntfernen.dialog}
+        {frischRegeln.dialog}
         <div>
           <h2 id={`${id}-empfaenger`} className={UEBERSCHRIFT}>
             {ZUSTELLUNG_TEXT.empfaengerTitel}

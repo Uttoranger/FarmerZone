@@ -3,7 +3,8 @@
 import { Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { verlangeAdminAktion } from '@/server/admin-wache'
+import { verlangeFrischeBestaetigung } from '@/server/admin-wache'
+import { protokolliere } from '@/server/admin-protokoll'
 import { monatAlsUtcDatum } from '@/lib/finanzen'
 import {
   kostenpostenAendernSchema,
@@ -15,7 +16,7 @@ import {
 /**
  * Die Kostenposten der Plattform — anlegen, ändern, beenden, löschen.
  *
- * Nur für den Betreiber: jede Aktion durch `verlangeAdminAktion`
+ * Nur für den Betreiber: jede Aktion durch `verlangeFrischeBestaetigung` (Recht geld, Nr. 188)
  * (src/server/admin-wache.ts). Es gibt hier keinen Hofbezug und damit keine
  * Besitzprüfung — die Tabelle gehört der Plattform. Das Admin-Recht IST die
  * Besitzprüfung, deshalb steht es in jeder einzelnen Aktion und nicht nur in
@@ -45,7 +46,8 @@ function revalidate(): void {
 }
 
 export async function kostenpostenAnlegen(input: unknown): Promise<Ergebnis> {
-  const wache = await verlangeAdminAktion()
+  // Heikel (Audit D10; Nr. 188): Kosten ändern die Zahlen in Geld — frisch mit Passkey bestätigt.
+  const wache = await verlangeFrischeBestaetigung({ recht: 'geld' })
   if ('error' in wache) return { error: wache.error }
 
   const geprueft = kostenpostenSchema.safeParse(input)
@@ -54,7 +56,8 @@ export async function kostenpostenAnlegen(input: unknown): Promise<Ergebnis> {
   }
   const { name, kategorie, betrag, rhythmus, ab, notiz } = geprueft.data
 
-  await prisma.kostenposten.create({
+  const neu = await prisma.kostenposten.create({
+    select: { id: true },
     data: {
       name,
       kategorie,
@@ -64,13 +67,15 @@ export async function kostenpostenAnlegen(input: unknown): Promise<Ergebnis> {
       notiz,
     },
   })
+  await protokolliere({ wer: wache.userId, art: 'kostenposten_angelegt', bezugArt: 'kostenposten', bezugId: neu.id, mitPasskey: wache.mitPasskey })
 
   revalidate()
   return { ok: true }
 }
 
 export async function kostenpostenAendern(input: unknown): Promise<Ergebnis> {
-  const wache = await verlangeAdminAktion()
+  // Heikel (Audit D10; Nr. 188): Kosten ändern die Zahlen in Geld — frisch mit Passkey bestätigt.
+  const wache = await verlangeFrischeBestaetigung({ recht: 'geld' })
   if ('error' in wache) return { error: wache.error }
 
   const geprueft = kostenpostenAendernSchema.safeParse(input)
@@ -105,6 +110,7 @@ export async function kostenpostenAendern(input: unknown): Promise<Ergebnis> {
           : 'Der erste Monat liegt nach dem letzten. Wähle einen früheren Monat.',
     }
   }
+  await protokolliere({ wer: wache.userId, art: 'kostenposten_geaendert', bezugArt: 'kostenposten', bezugId: id, mitPasskey: wache.mitPasskey })
 
   revalidate()
   return { ok: true }
@@ -115,7 +121,8 @@ export async function kostenpostenAendern(input: unknown): Promise<Ergebnis> {
  * (einschließlich) — die Monate davor bleiben unverändert richtig.
  */
 export async function kostenpostenBeenden(input: unknown): Promise<Ergebnis> {
-  const wache = await verlangeAdminAktion()
+  // Heikel (Audit D10; Nr. 188): Kosten ändern die Zahlen in Geld — frisch mit Passkey bestätigt.
+  const wache = await verlangeFrischeBestaetigung({ recht: 'geld' })
   if ('error' in wache) return { error: wache.error }
 
   const geprueft = kostenpostenBeendenSchema.safeParse(input)
@@ -138,13 +145,15 @@ export async function kostenpostenBeenden(input: unknown): Promise<Ergebnis> {
           : 'Dieser Monat liegt vor dem Beginn des Postens. Wähle den Beginn oder einen späteren Monat.',
     }
   }
+  await protokolliere({ wer: wache.userId, art: 'kostenposten_beendet', bezugArt: 'kostenposten', bezugId: geprueft.data.id, mitPasskey: wache.mitPasskey })
 
   revalidate()
   return { ok: true }
 }
 
 export async function kostenpostenLoeschen(input: unknown): Promise<Ergebnis> {
-  const wache = await verlangeAdminAktion()
+  // Heikel (Audit D10; Nr. 188): Kosten ändern die Zahlen in Geld — frisch mit Passkey bestätigt.
+  const wache = await verlangeFrischeBestaetigung({ recht: 'geld' })
   if ('error' in wache) return { error: wache.error }
 
   const geprueft = kostenpostenLoeschenSchema.safeParse(input)
@@ -154,6 +163,7 @@ export async function kostenpostenLoeschen(input: unknown): Promise<Ergebnis> {
 
   const { count } = await prisma.kostenposten.deleteMany({ where: { id: geprueft.data.id } })
   if (count === 0) return { error: NICHT_GEFUNDEN }
+  await protokolliere({ wer: wache.userId, art: 'kostenposten_geloescht', bezugArt: 'kostenposten', bezugId: geprueft.data.id, mitPasskey: wache.mitPasskey })
 
   revalidate()
   return { ok: true }

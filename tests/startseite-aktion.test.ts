@@ -121,7 +121,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.stubEnv('BLOB_READ_WRITE_TOKEN', `vercel_blob_rw_${SPEICHER}_geheim`)
   vi.mocked(auth.api.getSession).mockResolvedValue(adminSitzung('admin-1') as never)
-  vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true } as never)
+  vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
   tx.startseiteAbschnitt.findMany.mockResolvedValue(ZEILEN)
   tx.startseiteBlock.create.mockResolvedValue({ id: 'block-neu' })
   tx.startseiteAbschnitt.create.mockResolvedValue({ id: 'zeile-neu' })

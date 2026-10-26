@@ -30,7 +30,7 @@ vi.mock('@/lib/prisma', async () => ({
     ...(await import('./admin-sitzung')).passkeyAttrappen(),
     user: { findUnique: vi.fn() },
     session: { deleteMany: vi.fn() },
-    order: { updateMany: vi.fn() },
+    order: { updateMany: vi.fn(async () => ({ count: 0 })) },
     mailAuftrag: { updateMany: vi.fn() },
     $transaction: vi.fn(),
     $executeRaw: vi.fn(),
@@ -136,7 +136,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.setSystemTime(JETZT)
   getSession.mockResolvedValue(adminSitzung('admin_1') as never)
-  db.user.findUnique.mockResolvedValue({ isAdmin: true })
+  db.user.findUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true })
   // Ein Passkey, kein Ersatzcode benutzt — die Szenarien überschreiben es; clearAllMocks setzt nur die Aufrufe zurück.
   db.passkey.aggregate.mockResolvedValue({ _count: { _all: 1 }, _max: { createdAt: new Date(0) } })
   db.farm.findUnique.mockResolvedValue(null)
