@@ -81,8 +81,8 @@ import { TarifZeile } from '@/components/hofbereich/tarif-zeile'
  * Tarif-Zeile (TarifZeile; Zustand und Texte als Prop vom Server).
  *
  * Die Shell setzt data-design="neu" und damit die Tokens des Design-Systems
- * für das ganze Dokument. Noch nutzt sie keine Route (kein Big Bang): Der
- * Bauern-Bereich läuft weiter über (farmer)/layout.tsx mit farmer-nav.tsx.
+ * für das ganze Dokument. Der Hofbereich unter (hof) läuft über diese Shell;
+ * nur die Druckansichten und Reste unter (farmer) nutzen noch farmer-nav.tsx.
  */
 
 const SYMBOL: Record<HofNavId, LucideIcon> = {

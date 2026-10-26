@@ -14,6 +14,7 @@ import { describe, it, expect } from 'vitest'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import manifest from '@/app/manifest'
+import { istHofPfad } from '@/lib/hof-pfade'
 
 const wurzel = process.cwd()
 
@@ -41,6 +42,59 @@ describe('Manifest-Icons', () => {
       expect(existsSync(datei), icon.src).toBe(true)
       expect(pngGroesse(datei), icon.src).toBe(icon.sizes)
     }
+  })
+})
+
+describe('Manifest-Felder (Nr. 172, Register N31)', () => {
+  const m = manifest()
+
+  it('id, scope, Sprache und Start über /app', () => {
+    expect(m.id).toBe('/')
+    expect(m.scope).toBe('/')
+    expect(m.lang).toBe('de-AT')
+    expect(m.start_url).toBe('/app')
+    expect(m.start_url).not.toBe('/dashboard')
+  })
+
+  it('background_color ist --fz-bg des dunklen Themes aus globals.css', () => {
+    const css = readFileSync(join(wurzel, 'src/app/globals.css'), 'utf8')
+    const dunkel = css.slice(css.indexOf('Design-System bei Nacht'))
+    const hex = dunkel.match(/--fz-bg: [^;]*; \/\* (#[0-9A-Fa-f]{6}) \*\//)?.[1]
+    expect(hex).toBeDefined()
+    expect(m.background_color?.toLowerCase()).toBe(hex?.toLowerCase())
+    expect(m.background_color).not.toBe('#F8F2E5')
+  })
+
+  it('drei Kürzel mit icon-192, jedes Ziel ist ein Pfad des Hofbereichs', () => {
+    expect((m.shortcuts ?? []).map((s) => [s.name, s.url])).toEqual([
+      ['Heute', '/dashboard'],
+      ['Neuer Beitrag', '/status/new'],
+      ['Bestellungen', '/orders'],
+    ])
+    for (const s of m.shortcuts ?? []) {
+      expect(s.icons?.[0]?.src).toBe('/icons/icon-192.png')
+      expect(istHofPfad(s.url)).toBe(true)
+    }
+  })
+})
+
+describe('Layout: Viewport und iPhone-App (Nr. 172)', () => {
+  const layout = readFileSync(join(wurzel, 'src/app/layout.tsx'), 'utf8')
+
+  it('viewportFit cover, die übrigen Werte gleich', () => {
+    expect(layout).toContain("viewportFit: 'cover'")
+    expect(layout).toContain("width: 'device-width'")
+    expect(layout).toContain('initialScale: 1,')
+  })
+
+  it('appleWebApp mit Marke und durchsichtiger Statusleiste', () => {
+    expect(layout).toContain("appleWebApp: { capable: true, title: MARKE, statusBarStyle: 'black-translucent' }")
+  })
+
+  it('Analytics läuft nur gefiltert', () => {
+    expect(layout).toContain('<AnalyticsGefiltert />')
+    expect(layout).not.toContain("from '@vercel/analytics/next'")
+    expect(readFileSync(join(wurzel, 'src/components/shared/analytics-gefiltert.tsx'), 'utf8')).toContain('beforeSend={filtereAnalyticsEreignis}')
   })
 })
 

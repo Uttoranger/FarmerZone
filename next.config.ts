@@ -9,7 +9,7 @@ import { CSP_BERICHT_GRUPPE, CSP_HEADER, NIE_MELDEN_PARAMETER, NIE_MELDEN_PFADE,
 // Dieselbe Menge steht als RESERVED_SLUGS in src/lib/slug.ts, damit kein Hof
 // einen dieser Slugs bekommt (tests/reservierte-slugs.test.ts).
 const KEINE_HOFSEITE = [
-  'account', 'admin', 'agb', 'analytics', 'api', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
+  'account', 'admin', 'agb', 'analytics', 'api', 'app', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
   'farm-page', 'fehler-melden', 'forgot-password', 'fuer-hoefe', 'hoefe', 'impressum', 'intern', 'konditionen',
   'login', 'meldungen', 'onboarding', 'orders', 'postfach', 'problem-melden', 'products', 'region', 'register',
   'reset-password', 'sales', 'settings', 'sicherheit', 'startseite-vorschau', 'status', 'teilen', 'verify',
@@ -165,9 +165,10 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Die Bestätigungsseite trägt die signierte Adresse (?sig=) und zeigt
-        // Name und E-Mail der Kundin: Beim Klick auf einen Link (Hofseite,
-        // Stripe) geht sie NICHT als Referrer mit, und in keinen Suchindex.
+        // Die Bestätigungsseite trägt die signierte Adresse (?sig=): Beim Klick
+        // auf einen Link (Hofseite, Stripe) geht sie NICHT als Referrer mit,
+        // und in keinen Suchindex. Seit Nr. 153 zeigt sie keine Personendaten
+        // mehr; die Sperre bleibt, weil die Adresse selbst das Zugangsmittel ist.
         // Steht nach der allgemeinen Regel, damit sie dort gewinnt.
         source: '/:farmSlug/confirm/:orderId',
         headers: [
