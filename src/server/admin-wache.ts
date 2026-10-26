@@ -10,6 +10,7 @@ import {
   ADMIN_PFAD,
   EINRICHTUNGSCODE_ART,
   FRISCH_FEHLER,
+  adminPasskeyWo,
   adminSitzungAbgelaufen,
   bestaetigenAdresse,
   frischBestaetigt,
@@ -74,10 +75,14 @@ type Geprueft =
 /**
  * Ob für dieses Konto die Pflicht „erst Passkey" gilt — gelesen werden nur
  * die Zahl der Passkeys, der jüngste und der zuletzt benutzte Ersatzcode.
+ * Es zählen nur Passkeys aus der Admin-Einrichtung (ab `adminSeit`,
+ * adminPasskeyWo; Nr. 179): Ein Hof-Passkey von vor dem Recht erfüllt die
+ * Pflicht nicht.
  */
 export async function adminPflichtOffen(userId: string): Promise<boolean> {
+  const konto = await prisma.user.findUnique({ where: { id: userId }, select: { adminSeit: true } })
   const [passkeys, ersatzcode] = await Promise.all([
-    prisma.passkey.aggregate({ where: { userId }, _count: { _all: true }, _max: { createdAt: true } }),
+    prisma.passkey.aggregate({ where: { userId, ...adminPasskeyWo(konto?.adminSeit ?? null) }, _count: { _all: true }, _max: { createdAt: true } }),
     prisma.adminErsatzcode.aggregate({ where: { userId, benutztAm: { not: null } }, _max: { benutztAm: true } }),
   ])
   return passkeyPflicht({
@@ -245,6 +250,7 @@ export type EinrichtenStand = {
   userId: string
   /** Wann das Admin-Recht vergeben wurde; null = leer (Einrichtung gesperrt). */
   adminSeit: Date | null
+  /** Passkeys aus der Admin-Einrichtung (adminPasskeyWo). */
   passkeys: number
   ersatzcodes: number
   sitzung: { id: string; angemeldetAm: Date; anmeldeart: string | null; passkeyAm: Date | null }
@@ -263,9 +269,10 @@ export async function ladeEinrichtenStand(jetzt: Date): Promise<EinrichtenStand>
   if (!session?.user) redirect('/login')
   const userId = session.user.id
   const zweck = einmalLinkZweck(EINRICHTUNGSCODE_ART, session.session.id)
-  const [konto, passkeys, ersatzcodes, bestaetigt, offen] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId }, select: { adminSeit: true } }),
-    prisma.passkey.count({ where: { userId } }),
+  const konto = await prisma.user.findUnique({ where: { id: userId }, select: { adminSeit: true } })
+  const [passkeys, ersatzcodes, bestaetigt, offen] = await Promise.all([
+    // Nur Passkeys aus der Admin-Einrichtung (Nr. 179) — ein Hof-Passkey ersetzt den ersten nicht.
+    prisma.passkey.count({ where: { userId, ...adminPasskeyWo(konto?.adminSeit ?? null) } }),
     prisma.adminErsatzcode.count({ where: { userId, benutztAm: null } }),
     prisma.einmalLink.findFirst({ where: { userId, zweck, benutztAm: { not: null } }, select: { benutztAm: true }, orderBy: { benutztAm: 'desc' } }),
     prisma.einmalLink.count({ where: { userId, zweck, benutztAm: null, ablaufAm: { gt: jetzt } } }),

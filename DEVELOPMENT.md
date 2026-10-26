@@ -5901,6 +5901,12 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Aufgeräumt:** Das Magic-Link-Plugin samt Mailvorlage ist weg (seit Nr. 19b ohne Weg). `/api/status-image/[id]` prüft die Sichtbarkeit wie die Hofseite; sie ist im Code nirgends verlinkt und soll nach einer Ankündigung entfallen (Bericht 178).
 - **Zwei Wachen** halten Altbestand fest, der nur schrumpft: Server Actions mit Parametern ohne Zod-Schema (`tests/actions-zod-wache.test.ts`) und Schreiben auf Hof-Daten ohne `farmId` in der WHERE (`tests/hof-schreiben-farmid-wache.test.ts`).
 
+## Passkey für Höfe (Register E7, Ergänzung 25.10.2026; Nr. 179, Lauf 25, 26.10.2026)
+
+- **Was:** Höfe können auf Konto und Sicherheit zusätzlich zum Passwort einen Passkey einrichten (Fingerabdruck, Gesicht, Sicherheitsschlüssel) und sich auf /login damit anmelden. Freiwillig; das Passwort bleibt als Ersatz, auch nach dem Entfernen des letzten Passkeys. Einrichten und Entfernen nur frisch angemeldet (Passwort oder Passkey in den letzten 5 Minuten) — ohne Passkey heißt das: kurz neu mit Passwort anmelden, die Anmeldung führt zurück.
+- **Warum „Admin-Passkey ab adminSeit":** N20 bleibt für einen Hof mit Admin-Recht unverändert. Hätte ein Hof-Passkey von vor dem Recht gezählt, wäre der Admin-Bereich ohne E-Mail-Code und 24-Stunden-Fenster aufgegangen, und das Passwort wäre gesperrt gewesen. Deshalb zählen für alles, was N20 regelt, nur Passkeys, die ab `adminSeit` entstanden; ein älterer Hof-Passkey meldet ein Admin-Konto nicht an (Satz nach der Signaturprüfung). Ohne Spalte: Kriterium ist `Passkey.createdAt` gegen `User.adminSeit`. Wer `adminSeit` neu setzt, ohne die Passkeys zu löschen, macht die alten damit zu Hof-Passkeys — der Admin richtet dann wie beim ersten Mal ein (Passwort ist dann wieder offen).
+- **Umbenennen** ging ohne `/passkey/update-passkey`: eine eigene Action mit `userId` in der WHERE. Höfe bekommen beim Einrichten keine Mail (die Mail „Admin-Sicherheit" spricht vom Admin-Konto); Vorschlag im Bericht 179.
+
 ## Nützliche Befehle
 
 ```bash

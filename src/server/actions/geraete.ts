@@ -8,6 +8,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
 import { EINMAL_LINK_ART, NICHT_ICH_JE_MINUTE, einmalTokenSchema } from '@/lib/geraete'
+import { istAdminPasskey } from '@/lib/admin-anmeldung'
 import { loeseEinmalLinkEin } from '@/server/geraete'
 
 /*
@@ -119,12 +120,14 @@ export async function meldeAllesAbNichtIch(eingabe: unknown): Promise<NichtIchAn
   // Die Adresse frisch aus der Datenbank, nie aus der Anfrage.
   const konto = await prisma.user.findUnique({
     where: { id: link.userId },
-    select: { email: true, isAdmin: true, _count: { select: { passkeys: true } } },
+    select: { email: true, isAdmin: true, adminSeit: true, passkeys: { select: { createdAt: true } } },
   })
   if (!konto) return { ok: true, passwortMail: false }
   // Admin mit Passkey (N20, Nr. 115): „Passwort vergessen" schickt ihm nichts
   // — also gar nicht erst anstoßen; er meldet sich mit dem Passkey wieder an.
-  if (konto.isAdmin && konto._count.passkeys > 0) return { ok: true, passwortMail: false, passkey: true }
+  // Nur Passkeys aus der Admin-Einrichtung zählen, wie bei der Sperre in
+  // src/lib/auth.ts (Nr. 179).
+  if (konto.isAdmin && konto.passkeys.some((p) => istAdminPasskey(p.createdAt, konto.adminSeit))) return { ok: true, passwortMail: false, passkey: true }
   try {
     await auth.api.requestPasswordReset({ body: { email: konto.email, redirectTo: '/reset-password' } })
     return { ok: true, passwortMail: true }
