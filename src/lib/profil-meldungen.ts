@@ -17,8 +17,12 @@ export const PROFIL_MELDUNG = {
   emailPflicht: 'Bitte lass die Hof-E-Mail stehen – an sie gehen deine Bestellmeldungen.',
 } as const
 
-/** Die Hilfe unter der freiwilligen Hof-E-Mail: wo sie steht. */
-export const HOF_EMAIL_HILFE = 'Sie steht für Kundinnen auf der Bestellseite, damit sie dich erreichen. Ohne Eintrag gilt deine Anmelde-Adresse.'
+/**
+ * Die Hilfe unter der Hof-E-Mail: nur, wo sie steht. Keine Zusage zu einem
+ * Rückfall auf die Anmelde-Adresse – die Leser der Bestellmails haben keinen
+ * (src/lib/email.ts liest Farm.email allein).
+ */
+export const HOF_EMAIL_HILFE = 'Sie steht für Kundinnen auf der Bestellseite, damit sie dich erreichen.'
 
 /** Der Zusatz an einem freiwilligen Feld – statt „*" an jedem Pflichtfeld (wie in der Kasse). */
 export const FREIWILLIG = '(freiwillig)'
