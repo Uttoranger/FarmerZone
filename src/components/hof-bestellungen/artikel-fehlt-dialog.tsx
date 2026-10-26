@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { meldeArtikelFehlt } from '@/server/actions/orders'
+import { aktionOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
 import type { HofBestellDetail } from '@/server/queries/orders'
 import { artikelFehltZeilen } from '@/lib/artikel-fehlt'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
@@ -59,7 +60,8 @@ export function ArtikelFehltDialog({
     if (!gewaehlt) return
     setFehler(null)
     starte(async () => {
-      const ergebnis = await meldeArtikelFehlt({ orderId: bestellung.id, itemId: gewaehlt })
+      // Ohne Wurf (Register N29): Ohne Netz steht der Netzsatz im Dialog.
+      const ergebnis = await aktionOhneWurf(() => meldeArtikelFehlt({ orderId: bestellung.id, itemId: gewaehlt }))
       if (ergebnis.error) {
         setFehler(ergebnis.error)
         return

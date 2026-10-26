@@ -25,6 +25,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { hofInitialen } from '@/lib/hof-initialen'
+import { NetzHinweis } from '@/components/ui/netz-hinweis'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
 import {
   EINSTELLUNG_KONTO,
@@ -417,6 +418,8 @@ export function HofShell({
       </MenueZielAnbieter>
 
       <main id={INHALT_ID} tabIndex={-1} className="min-w-0 pb-28 outline-none md:pb-0 md:pl-[264px] print:pb-0 print:pl-0">
+        {/* Kein Netz (Register N29): Die HofShell hat keinen eigenen Kopf, die Zeile steht über dem Inhalt — bis das Netz zurück ist. */}
+        <NetzHinweis />
         {children}
       </main>
 

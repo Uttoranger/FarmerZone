@@ -19,6 +19,7 @@ import { KUNDE_KOPF_ZEILE, KUNDE_SHELL_MASSE } from '@/lib/kunde-shell-masse'
 import { MARKE } from '@/lib/marke'
 import { VORSCHAU_LEISTE_HINWEIS, VORSCHAU_LEISTE_HINWEIS_MS } from '@/lib/hofseite-vorschau'
 import { useImVorschauRahmen } from '@/components/farm/vorschau-im-rahmen'
+import { NetzHinweis } from '@/components/ui/netz-hinweis'
 
 /*
  * Die Shell der Kundenseiten im neuen Design (Gate 2): Kopfzeile im Browser,
@@ -230,6 +231,8 @@ export function KundeShell({ sitzung, unterleiste = true, children }: KundeShell
           </div>
         </div>
       </header>
+      {/* Kein Netz (Register N29): die Zeile unter dem Kopf, bis das Netz zurück ist. */}
+      <NetzHinweis />
 
       <main id={INHALT_ID} tabIndex={-1} className="outline-none">
         {children}
@@ -338,6 +341,8 @@ export function KundeFokusShell({ titel, zurueck, rechts, aktion, children }: Ku
           {rechts && <div className="min-w-0 truncate pr-2.5 text-[12.5px] text-muted-foreground">{rechts}</div>}
         </div>
       </header>
+      {/* Kein Netz (Register N29): die Zeile unter dem Kopf, bis das Netz zurück ist. */}
+      <NetzHinweis />
 
       <main id={INHALT_ID} tabIndex={-1} className={cn('outline-none', aktion && 'pb-28 md:pb-0')}>
         {children}

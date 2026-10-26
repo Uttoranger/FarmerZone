@@ -5856,6 +5856,12 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Randfall:** Ohne verfügbare Produkte und ohne Abholzeit rendert die Hofseite kein `ProductGrid` (und keine rechte Spalte) — dann gleicht sie nicht ab; nur die Zahl am Korb-Symbol der Kopfzeile zeigt den gespeicherten Korb, die Kasse prüft ihn beim Öffnen.
 - **Zähler:** `reserveIp` (S17 Punkt 1, 20 je Minute und Adresse) zählt jetzt drei Wege: Reservieren, Prüfen, Freigeben.
 
+## Kein Netz als Zustand (Register N29; Nr. 175, Lauf 25, 25.10.2026)
+
+- **Lücke:** Ohne Netz bekam `fetch('/api/reserve')` in `addItem` keine Antwort und warf; der Knopf „In den Korb" blieb im Ladezustand. Hof-Aktionen ohne catch (Pause, Im-Shop-Schalter, Statuswechsel, Storno) warfen auf die Fehlerseite „Das liegt an uns" mit dem einzigen Weg zur Startseite — die Eingabe war weg. Kein `online`/`offline` im Code.
+- **Fix:** `src/lib/netz.ts` ist die eine Quelle: `istNetzFehler` (aus upload-diagnose.ts gezogen, dort unter dem alten Namen weitergereicht), `NETZ_SATZ`/`NETZ_KNOPF`, `mitNetzSchutz` mit `AbortSignal.timeout` (15 s). use-cart.ts schickt Reservieren, Mengenänderung und Freigabe darüber; bei `netz`/`zeit` kommt `{ ok: false, error: NETZ_SATZ, nochmal: true }`, der Korb bleibt. Was der Server prüft und hält, ist unverändert — ein Zeitablauf kann einen Halt hinterlassen, der nach 15 Minuten abläuft. Hof-Aktionen laufen über `aktionOhneWurf` (neu, gibt die ganze Antwort durch) bzw. `speichernOhneWurf` (gibt am Netz jetzt `NETZ_SATZ`); eine Wache hält es. `NetzHinweis` in den Shells; eigene Fehlergrenze `(hof)/error.tsx` mit „Zu Heute", die Unterleiste bleibt; der leere Korb im Blatt ist ein `EmptyState`.
+- **Offen:** Den Knopf „Nochmal" an der Aktion bauen 177 (Hofseite) und 174 (Hof-Formulare, Abholzeiten); bis dahin steht der Netzsatz im bestehenden Toast bzw. in der bestehenden Fehlerzeile.
+
 ## Nützliche Befehle
 
 ```bash

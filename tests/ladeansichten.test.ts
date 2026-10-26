@@ -562,7 +562,7 @@ describe('500 — dieselbe Ansicht an beiden Grenzen', () => {
   })
 
   it('führt zum Briefkasten, mit der Fehlernummer vorausgefüllt', () => {
-    expect(liesDatei(ansicht)).toContain('meldungLinkMitKennung(fehlernummer)')
+    expect(liesDatei(ansicht)).toContain('meldungLinkMitKennung(fehlernummer')
   })
 
   it('bleibt in beiden Fehlerseiten ohne Emoji', () => {

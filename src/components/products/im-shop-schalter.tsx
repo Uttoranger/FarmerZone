@@ -3,6 +3,7 @@
 import { useTransition } from 'react'
 import { toast } from 'sonner'
 import { produktSichtbarkeitSetzen } from '@/server/actions/products'
+import { aktionOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
 import { IM_SHOP, umschaltMeldung } from '@/lib/produkt-sichtbarkeit'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -62,7 +63,8 @@ export function ImShopSchalter({
   function umschalten(nach: boolean) {
     startTransition(async () => {
       setzeOptimistisch(nach)
-      const ergebnis = await produktSichtbarkeitSetzen({ productId, imShop: nach })
+      // Ohne Wurf (Register N29): Ohne Netz fällt der Schalter zurück, der Netzsatz kommt.
+      const ergebnis = await aktionOhneWurf(() => produktSichtbarkeitSetzen({ productId, imShop: nach }))
 
       if ('error' in ergebnis) {
         // KEIN Zurückschalten von Hand: `useOptimistic` fällt beim Ende der
@@ -70,7 +72,7 @@ export function ImShopSchalter({
         // unverändert, weil nichts geschrieben wurde — genau das ist der
         // Rückweg. Ein eigenes Zurücksetzen wäre eine zweite Wahrheit.
         // Gesperrte Größe (S7, Nr. 20): der Grund statt „nochmal" — nochmal hülfe nicht.
-        toast.error('code' in ergebnis && ergebnis.code === 'GESPERRT' ? ergebnis.error : 'Das hat nicht geklappt. Bitte nochmal.')
+        toast.error(('code' in ergebnis && ergebnis.code === 'GESPERRT') || 'netz' in ergebnis ? ergebnis.error : 'Das hat nicht geklappt. Bitte nochmal.')
         return
       }
 

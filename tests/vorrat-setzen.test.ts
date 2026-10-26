@@ -128,6 +128,7 @@ const setzeVorrat = vi.hoisted(() => vi.fn())
 vi.mock('@/server/actions/products', () => ({ setzeVorrat }))
 
 import { SPEICHERN_GING_NICHT, erzeugeVorratSchleife, type VorratMeldungen } from '@/components/produkte/use-vorrat-setzen'
+import { NETZ_SATZ } from '@/lib/netz'
 import { VorratBlatt } from '@/components/produkte/vorrat-blatt'
 import { VorratFeld } from '@/components/produkte/vorrat-feld'
 import { Stepper } from '@/components/ui/stepper'
@@ -201,6 +202,13 @@ describe('Schleife des Sendens — rein, mit nachgebautem setzeVorrat', () => {
     expect(await s.senden(7)).toEqual({ art: 'abgewiesen', stand: 3, fehler: SPEICHERN_GING_NICHT })
     await s.senden(7)
     expect(setze).toHaveBeenLastCalledWith({ productId: 'p1', vorher: 3, neu: 7 })
+  })
+
+  it('am Netz gescheitert: der Netzsatz (Register N29, Nr. 175), der bestätigte Stand bleibt', async () => {
+    const setze = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const s = erzeugeVorratSchleife({ productId: 'p1', bestaetigt: 3, setze, melde: meldungen() })
+
+    expect(await s.senden(7)).toEqual({ art: 'abgewiesen', stand: 3, fehler: NETZ_SATZ })
   })
 
   it('gleicher Wert → keine Anfrage; ein Stand vom Server gilt nur, solange nichts läuft', async () => {

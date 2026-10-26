@@ -19,7 +19,9 @@ import { RESERVIERUNG_MINUTEN } from '@/lib/kasse'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
-import type { CartItem } from '@/lib/use-cart'
+import { KORB_LEER, type CartItem } from '@/lib/use-cart'
+import { EmptyState } from '@/components/ui/empty-state'
+import { HOEFE_ENTDECKEN } from '@/lib/fehlerseite'
 
 type Props = {
   open: boolean
@@ -54,6 +56,9 @@ const MENGEN_KNOPF = cn(
   FOKUS_RAHMEN
 )
 
+/** Die Wege aus dem leeren Korb: Pillen mit 44 px. */
+const LEER_WEG = cn('inline-flex min-h-11 items-center justify-center rounded-full px-4 text-sm transition-opacity', FOKUS_RAHMEN)
+
 /*
  * Der Warenkorb der Hofseite als Blatt von rechts. Seit Nr. 10 steht er nur
  * noch in der Kundenansicht im neuen Design (KundeShell, data-design="neu"):
@@ -84,10 +89,23 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
             </div>
           )}
           {items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
-              <ShoppingBasket className="mb-2 size-10" strokeWidth={1.5} aria-hidden="true" />
-              <p className="text-sm">Dein Warenkorb ist leer.</p>
-            </div>
+            // Leer mit Weg weiter (Register N9, Nr. 175): zurück zum Angebot schließt das Blatt, sonst zu den Höfen.
+            <EmptyState
+              symbol={ShoppingBasket}
+              titel={KORB_LEER.titel}
+              satz={KORB_LEER.satz}
+              className="border-0 bg-transparent py-8"
+              ausweg={
+                <>
+                  <Link href={`/${farmSlug}`} onClick={() => onOpenChange(false)} className={cn(LEER_WEG, 'bg-accent font-semibold text-accent-foreground hover:opacity-90')}>
+                    {KORB_LEER.zumHof}
+                  </Link>
+                  <Link href="/hoefe" className={cn(LEER_WEG, 'border border-border font-medium text-foreground hover:bg-muted')}>
+                    {HOEFE_ENTDECKEN}
+                  </Link>
+                </>
+              }
+            />
           ) : (
             items.map((item) => (
               <div key={item.productId} className="flex gap-3 items-center">

@@ -203,12 +203,13 @@ Vorschau im Hofbereich: Der Umschalter bedeutet Gerät (Handy/Web, inline — di
 
 ## Zustände
 
-Jeder Screen liefert vier Zustände:
+Jeder Screen liefert fünf Zustände:
 
 - **Gefüllt** — nach Mockup.
 - **Leer** — Symbol, ein Satz, nächste Aktion („Noch keine Produkte — Lege dein erstes an"); ohne sinnvolle Aktion steht der Grund dafür in der Wache (Abschnitt „Leerzustände").
 - **Laden** — Skeleton in Kartenform, kein Spinner.
 - **Fehler** — inline am Feld bzw. an der Karte, kein Modal.
+- **Kein Netz** (Register N29, seit Nr. 175; Board system-sterne-kein-netz) — scheitert ein Aufruf am Netz, bleibt die Eingabe stehen, und an Formular bzw. Aktion steht der eine Satz `NETZ_SATZ` („Keine Verbindung – nichts gespeichert. Versuch es gleich noch einmal.") mit dem Knopf `NETZ_KNOPF` („Nochmal"); nie die ganze Fehlerseite, nie nur ein Toast. Quelle ist `src/lib/netz.ts`: `istNetzFehler` (die eine Erkennung), `mitNetzSchutz(aufruf, { zeitlimitMs })` für fetch (wirft nie, Art `netz`/`zeit`/`server`). Server-Actions aus Client-Bauteilen des Hofbereichs laufen über `aktionOhneWurf` bzw. `speichernOhneWurf` (`src/components/mein-hof/abschnitt-speichern.ts`) oder in `try`; die Wache `tests/hof-aktionen-netz-wache.test.ts` (Bestandsliste, die nur schrumpft) prüft das in den Ordnern settings, produkte, products, mein-hof und hof-bestellungen unter `src/components/`. Geht das Netz im Browser verloren, zeigen KundeShell, KundeFokusShell und HofShell unter dem Kopf die Zeile `NetzHinweis` (`src/components/ui/netz-hinweis.tsx`: `role="status"`, `zustand-tun` auf `zustand-tun-grund`, Symbol `WifiOff`), bis es zurück ist. Kein Service Worker mit Cache; Kasse und HTML werden nie zwischengespeichert.
 - **Neu laden ohne leeren Rahmen:** Ein iframe, das nach Speicherungen neu lädt (Vorschau), bekommt nie ein `key` aus seiner Adresse – der neue Rahmen lädt unsichtbar daneben und tauscht erst nach `load` (`vorschauRahmen`, Wache `tests/vorschau-rahmen-wache.test.ts`; Regelvorschlag 106, Nr. 118).
 
 ### Leerzustände (Register N9)
@@ -240,6 +241,7 @@ Jeder Screen liefert vier Zustände:
 - **Kein Emoji als Illustration**, in keinem Zustand.
 - Die 500 zeigt die **Fehlernummer** (`error.digest`) und sonst nichts Technisches: keine Fehlermeldung, kein Stapel, kein Dateiname.
 - Die 500 trägt **keine Kopfleiste**: War sie selbst die Ursache, risse sie die Fehlerseite mit. Der Weg nach Hause steht als Knopf, als gewöhnlicher Link (Vollaufbau) statt `<Link>`.
+- **Die 500 (seit Nr. 175)** zeichnet wie die 404 (`FehlerAnsicht`, `data-design="neu"`): Kreis 76 px mit Warnzeichen, Kicker „Fehler 500 · Nr. …" (`fehlerKicker`), h1, Satz, „Nochmal versuchen" und der Weg zurück als Pillen 48 px, „Problem melden" mit 44 px. Der Weg zurück ist eine Prop (`ziel`). Der Hofbereich hat eine eigene Grenze `src/app/(hof)/error.tsx` unter dem Layout der Gruppe: Die Unterleiste bleibt, der Weg führt „Zu Heute", „Problem melden" in `/fehler-melden`.
 - `global-error.tsx` bringt `<html>`, `<body>` und den Import des Stylesheets selbst mit und meldet nach Sentry — sie ist die einzige Grenze, die ein Fehler im Root-Layout erreicht.
 
 ## Qualität
