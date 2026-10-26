@@ -31,26 +31,37 @@ vi.mock('@/server/queries/postfach', async () => {
   const { SUPPORT_EMAIL } = await import('@/lib/support')
   return { ladeBetreiberEmpfaenger: vi.fn(async () => [SUPPORT_EMAIL.toLowerCase()]) }
 })
-// Die Mails sind seit Nr. 159 Aufträge der Warteschlange.
-vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn() }))
+// Die Mails sind seit Nr. 159 Aufträge der Warteschlange; die Hilfen bleiben
+// echt und schreiben in die Fakes (Nr. 168, tests/mail-attrappe.ts).
+vi.mock('@/server/mail-warteschlange', async (o) => (await import('./mail-attrappe')).warteschlangeEcht(await o()))
+vi.mock('@/schemas/mail-auftrag', async (o) => (await import('./mail-attrappe')).schemaEcht(await o()))
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
+/** Ein tx-Fake mit verschachtelter Transaktion (Savepoint, Nr. 168): Sie bekommt dieselben Fakes. */
+const { txMit } = vi.hoisted(() => ({
+  txMit: <T extends object>(fakes: T): T & { $transaction: (arbeit: (t: unknown) => Promise<unknown>) => Promise<unknown> } => {
+    const tx = { ...fakes, $transaction: (arbeit: (t: unknown) => Promise<unknown>) => arbeit(tx) }
+    return tx
+  },
+}))
 vi.mock('@/lib/prisma', () => {
   // findUnique: Nach dem Storno liest das Erneuern der Hofliste den Termin (Nr. 163) — hier keiner.
   const order = { findFirst: vi.fn(), findUnique: vi.fn(async () => null), update: vi.fn(), updateMany: vi.fn() }
   const product = { update: vi.fn() }
+  // Einstellen (createMany) und Nachtragen nach Stripe (updateMany, Nr. 159).
+  const mailAuftrag = { createMany: vi.fn(async () => ({ count: 1 })), updateMany: vi.fn(async () => ({ count: 1 })) }
   return {
     prisma: {
       farm: { findUnique: vi.fn() },
       order,
       product,
-      // Nach Stripe trägt der Storno die Erstattung in seinen Auftrag nach (Nr. 159).
-      mailAuftrag: { updateMany: vi.fn(async () => ({ count: 1 })) },
+      mailAuftrag,
       // Nach dem Storno fragt das Erneuern der Hofliste nach einer Höchstzahl (Nr. 131, seit Nr. 163 erst nach dem Termin) — hier keine.
       pickupSlot: { findFirst: vi.fn(async () => null) },
       // Standard: der Rückruf bekommt dieselben Fakes. Der Test, der die
       // Transaktion selbst beweist, ersetzt das durch EIGENE tx-Fakes.
       $transaction: vi.fn(async (arg: unknown) => {
         if (typeof arg === 'function') {
-          return (arg as (tx: unknown) => Promise<unknown>)({ order, product })
+          return (arg as (tx: unknown) => Promise<unknown>)(txMit({ order, product, mailAuftrag }))
         }
         return Promise.all(arg as Array<Promise<unknown>>)
       }),
@@ -67,7 +78,9 @@ import {
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import { stelleMailEin } from '@/server/mail-warteschlange'
+import { stelleEinOhneRisiko, stelleMailEinInTransaktion } from '@/server/mail-warteschlange'
+import { bezugSchemaFuer } from '@/schemas/mail-auftrag'
+import { bezugWirft, ergebnis } from './mail-attrappe'
 import * as Sentry from '@sentry/nextjs'
 
 const getSession = vi.mocked(auth.api.getSession)
@@ -78,7 +91,9 @@ const orderUpdateMany = vi.mocked(prisma.order.updateMany)
 const productUpdate = vi.mocked(prisma.product.update)
 const transaktion = vi.mocked(prisma.$transaction)
 const refundCreate = vi.mocked(stripe.refunds.create)
-const einstellen = vi.mocked(stelleMailEin)
+const einstellen = vi.mocked(stelleMailEinInTransaktion)
+const nachholen = vi.mocked(stelleEinOhneRisiko)
+const createMany = vi.mocked(prisma.mailAuftrag.createMany)
 const nachtragen = vi.mocked(prisma.mailAuftrag.updateMany)
 
 /** Was der Storno nach Stripe in seinen Auftrag nachgetragen hat (Bezug je Aufruf). */
@@ -86,9 +101,9 @@ function nachgetragen(): unknown[] {
   return nachtragen.mock.calls.map(([arg]) => (arg as { data: { bezug: unknown } }).data.bezug)
 }
 
-/** Alle eingestellten Aufträge, flach. */
+/** Alle wirklich geschriebenen Aufträge (createMany in der Transaktion und danach), flach. */
 function auftraege(): Array<{ art: string; bezug: Record<string, string>; bestellungId?: string; schluessel: string }> {
-  return einstellen.mock.calls.flatMap(([a]) => (Array.isArray(a) ? a : [a])) as never
+  return createMany.mock.calls.flatMap(([arg]) => (arg as { data: unknown[] }).data) as never
 }
 const sentryMeldung = vi.mocked(Sentry.captureException)
 
@@ -172,7 +187,7 @@ beforeEach(() => {
   // Mal zurück auf die Durchreichung an die globalen Fakes.
   transaktion.mockImplementation((async (arg: unknown) =>
     typeof arg === 'function'
-      ? (arg as (tx: unknown) => Promise<unknown>)({ order: prisma.order, product: prisma.product })
+      ? (arg as (tx: unknown) => Promise<unknown>)(txMit({ order: prisma.order, product: prisma.product, mailAuftrag: prisma.mailAuftrag }))
       : Promise.all(arg as Array<Promise<unknown>>)) as never)
   getSession.mockResolvedValue({ user: { id: 'user_1' } } as never)
   farmFindUnique.mockResolvedValue({
@@ -181,7 +196,8 @@ beforeEach(() => {
   } as never)
   productUpdate.mockResolvedValue({} as never)
   refundCreate.mockResolvedValue({ id: 're_1', amount: 2000 } as never)
-  einstellen.mockResolvedValue(1)
+  createMany.mockResolvedValue({ count: 1 })
+  vi.mocked(bezugSchemaFuer).mockReset()
 })
 
 afterEach(() => {
@@ -249,19 +265,24 @@ describe('cancelOrder — Doppelausführung', () => {
     // Seit Nr. 19 liest der Storno Beträge und Positionen frisch UNTER der
     // Sperre — auch das gehört in die Transaktion.
     const txFindFirst = vi.fn(async () => { ablauf.push('lesen'); return satz })
+    // Der Mail-Auftrag ebenfalls über `tx` (Savepoint, Nr. 168).
+    const txCreateMany = vi.fn(async () => { ablauf.push('auftrag'); return { count: 1 } })
     transaktion.mockImplementation((async (arg: unknown) => {
       ablauf.push('start')
-      const ergebnis = await (arg as (tx: unknown) => Promise<unknown>)({
+      const ergebnis = await (arg as (tx: unknown) => Promise<unknown>)(txMit({
         order: { updateMany: txUpdateMany, findFirst: txFindFirst },
         product: { update: txProduktUpdate },
-      })
+        mailAuftrag: { createMany: txCreateMany },
+      }))
       ablauf.push('ende')
       return ergebnis
     }) as never)
 
     await cancelOrder('order_1')
 
-    expect(ablauf).toEqual(['start', 'sperre', 'lesen', 'buchung', 'buchung', 'ende'])
+    expect(ablauf).toEqual(['start', 'sperre', 'lesen', 'buchung', 'buchung', 'auftrag', 'ende'])
+    expect(await ergebnis(einstellen)).toBe('eingestellt')
+    expect(createMany).not.toHaveBeenCalled()
     expect(productUpdate).not.toHaveBeenCalled()
     expect(orderUpdateMany).not.toHaveBeenCalled()
   })
@@ -326,6 +347,7 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
       expect.objectContaining({ art: 'storniert', schluessel: 'storniert:order_1', bezug: { orderId: 'order_1', erstattung: 'ausstehend' }, bestellungId: 'order_1' }),
     ])
     expect(einstellen.mock.calls[0]![1]).toBeDefined()
+    expect(await ergebnis(einstellen)).toBe('eingestellt')
     expect(einstellen.mock.invocationCallOrder[0]).toBeLessThan(refundCreate.mock.invocationCallOrder[0]!)
     expect(nachgetragen()).toEqual([{ orderId: 'order_1', erstattetCents: '2000' }])
     expect(nachtragen.mock.calls[0]![0]).toMatchObject({ where: { schluessel: 'storniert:order_1', status: { in: ['offen', 'in_arbeit'] } } })
@@ -395,12 +417,39 @@ describe('cancelOrder — Erstattung erst nach der Sperre', () => {
     expect(auftraege()).toEqual([expect.objectContaining({ art: 'storniert', bezug: { orderId: 'order_1' } })])
     expect(nachtragen).not.toHaveBeenCalled()
 
-    // Gegenprobe: Scheitert das Einstellen, scheitert die Transaktion — der Hof
-    // bekommt eine Fehlermeldung statt einer Stornierung ohne Mail.
-    datenbankMit({ ...barBestellung(), status: 'READY' })
-    einstellen.mockRejectedValueOnce(new Error('DB weg'))
-    expect(await cancelOrder('order_1')).toEqual({ error: 'Wir konnten die Bestellung nicht stornieren. Versuch es bitte gleich noch einmal.' })
-    expect(sentryMeldung).toHaveBeenCalledWith(expect.any(Error), expect.objectContaining({ tags: { aktion: 'cancelOrder', grund: 'nicht_gespeichert' } }))
+  })
+
+  it('scheitert das Einstellen (Datenbank): storniert, Bestand zurück, Erstattung angestoßen — die Mail direkt nach dem Commit nachgeholt, vor Stripe', async () => {
+    const satz = onlineBezahlt()
+    createMany.mockRejectedValueOnce(new Error('DB weg'))
+
+    expect(await cancelOrder('order_1')).toEqual({ erstattetCents: 2000, vomHofCents: 2000 })
+    expect(satz.status).toBe('CANCELLED')
+    expect(rueckbuchungen()).toBe(2)
+    expect(await ergebnis(einstellen)).toBe('nachholen')
+    expect(nachholen).toHaveBeenCalledWith('storniert', 'order_1', expect.objectContaining({ schluessel: 'storniert:order_1', bezug: { orderId: 'order_1', erstattung: 'ausstehend' } }))
+    // Nachgeholt VOR Stripe und vor dem Nachtragen: sonst fände das Nachtragen keinen Auftrag.
+    expect(nachholen.mock.invocationCallOrder[0]).toBeLessThan(refundCreate.mock.invocationCallOrder[0]!)
+    expect(createMany.mock.invocationCallOrder[1]).toBeLessThan(refundCreate.mock.invocationCallOrder[0]!)
+    expect(createMany.mock.invocationCallOrder[1]).toBeLessThan(nachtragen.mock.invocationCallOrder[0]!)
+    expect(nachgetragen()).toEqual([{ orderId: 'order_1', erstattetCents: '2000' }])
+  })
+
+  it('ungültiger Bezug (Register N26, 25.10.2026): storniert, Bestand zurück, Sentry einmal mit Art und Bestellung, kein Auftrag', async () => {
+    const satz = datenbankMit({ ...barBestellung(), status: 'READY' })
+    bezugWirft(bezugSchemaFuer)
+
+    expect(await cancelOrder('order_1')).toEqual({ erstattetCents: 0, vomHofCents: 0 })
+    expect(satz.status).toBe('CANCELLED')
+    expect(rueckbuchungen()).toBe(2)
+    expect(await ergebnis(einstellen)).toBe('ungueltig')
+    expect(createMany).not.toHaveBeenCalled()
+    expect(nachholen).not.toHaveBeenCalled()
+    expect(sentryMeldung).toHaveBeenCalledTimes(1)
+    expect(sentryMeldung).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ tags: { bereich: 'mail-warteschlange', art: 'storniert', grund: 'bezug_ungueltig' }, extra: { bestellungId: 'order_1' } })
+    )
   })
 
   it('scheitert nur das Nachtragen der Erstattung: Storno und Erstattung bleiben, Sentry meldet es', async () => {

@@ -29,6 +29,7 @@ vi.mock('@/lib/prisma', () => {
     webhookEvent: { findUnique: vi.fn(), create: vi.fn() },
     order: { findUnique: vi.fn(), updateMany: vi.fn() },
     farm: { findFirst: vi.fn(), update: vi.fn() },
+    mailAuftrag: { createMany: vi.fn() },
     // Die Transaktion arbeitet auf denselben Attrappen — geprüft wird, WAS darin geschieht.
     $transaction: vi.fn(),
   }
@@ -36,8 +37,11 @@ vi.mock('@/lib/prisma', () => {
   return { prisma }
 })
 
-// Die Mails sind seit Nr. 159 Aufträge der Warteschlange.
-vi.mock('@/server/mail-warteschlange', () => ({ stelleMailEin: vi.fn() }))
+// Die Mails sind seit Nr. 159 Aufträge der Warteschlange; die Hilfen bleiben echt
+// und schreiben in die Prisma-Attrappe (Nr. 168, tests/mail-attrappe.ts).
+vi.mock('@/server/mail-warteschlange', async (o) => (await import('./mail-attrappe')).warteschlangeEcht(await o()))
+vi.mock('@/schemas/mail-auftrag', async (o) => (await import('./mail-attrappe')).schemaEcht(await o()))
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
 
 vi.mock('@/server/unbezahlte-bestellung', () => ({
   storniereUnbezahlteBestellung: vi.fn(),
@@ -49,7 +53,9 @@ import * as Sentry from '@sentry/nextjs'
 import { POST } from '@/app/api/stripe/webhook/route'
 import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
-import { stelleMailEin } from '@/server/mail-warteschlange'
+import { stelleEinOhneRisiko, stelleMailEinInTransaktion } from '@/server/mail-warteschlange'
+import { bezugSchemaFuer } from '@/schemas/mail-auftrag'
+import { bezugWirft, ergebnis, geschriebeneArten } from './mail-attrappe'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
 
 const constructEvent = vi.mocked(stripe.webhooks.constructEvent)
@@ -59,11 +65,13 @@ const webhookEventCreate = vi.mocked(prisma.webhookEvent.create)
 const orderFindUnique = vi.mocked(prisma.order.findUnique)
 const orderUpdateMany = vi.mocked(prisma.order.updateMany)
 const stornieren = vi.mocked(storniereUnbezahlteBestellung)
-const einstellen = vi.mocked(stelleMailEin)
+const einstellen = vi.mocked(stelleMailEinInTransaktion)
+const nachholen = vi.mocked(stelleEinOhneRisiko)
+const createMany = vi.mocked(prisma.mailAuftrag.createMany)
 
-/** Die Arten aller eingestellten Aufträge, in Reihenfolge. */
+/** Die Arten aller wirklich geschriebenen Aufträge, in Reihenfolge. */
 function eingestellteArten(): string[] {
-  return einstellen.mock.calls.flatMap(([a]) => (Array.isArray(a) ? a : [a]).map((x) => (x as { art: string }).art))
+  return geschriebeneArten(createMany)
 }
 
 function makeRequest(body = '{}', headers: Record<string, string> = { 'stripe-signature': 'sig_test' }) {
@@ -121,7 +129,9 @@ beforeEach(() => {
   orderUpdateMany.mockResolvedValue({ count: 1 })
   stornieren.mockResolvedValue(true)
   erstatten.mockResolvedValue({ id: 're_test_1', amount: 3400 } as never)
-  einstellen.mockResolvedValue(1)
+  createMany.mockResolvedValue({ count: 1 })
+  // Zurück auf das echte Schema (mockReset stellt die Funktion aus vi.fn(echt) wieder her).
+  vi.mocked(bezugSchemaFuer).mockReset()
   vi.mocked(prisma.$transaction).mockImplementation((async (arbeit: (tx: typeof prisma) => Promise<unknown>) => arbeit(prisma)) as never)
 })
 
@@ -150,6 +160,10 @@ describe('payment_intent.succeeded', () => {
     // Mit dem Transaktions-Client, nach dem Statuswechsel.
     expect(tx).toBe(prisma)
     expect(orderUpdateMany.mock.invocationCallOrder[0]).toBeLessThan(einstellen.mock.invocationCallOrder[0]!)
+    // Ausdrücklich eingestellt — „wirft nie" verdeckt keine Lücke der Attrappe.
+    expect(await ergebnis(einstellen)).toBe('eingestellt')
+    expect(eingestellteArten()).toEqual(['bestellung-bestaetigung', 'bestellung-bezahlt-hof'])
+    expect(nachholen).not.toHaveBeenCalled()
     expect(webhookEventCreate).toHaveBeenCalledWith({
       data: { stripeEventId: 'evt_success_1', type: 'payment_intent.succeeded' },
     })
@@ -179,14 +193,44 @@ describe('payment_intent.succeeded', () => {
     expect(webhookEventCreate).not.toHaveBeenCalled()
   })
 
-  it('scheitert das Einstellen: 500, Event NICHT persistiert — der Statuswechsel rollt mit zurück, Stripe stellt erneut zu', async () => {
+  it('ungültiger Bezug (Register N26, 25.10.2026): trotzdem PAID und 200, Sentry einmal mit Art und Bestellung, kein Auftrag', async () => {
     constructEvent.mockReturnValue(succeededEvent())
-    einstellen.mockRejectedValue(new Error('DB weg'))
+    bezugWirft(bezugSchemaFuer)
 
     const res = await POST(makeRequest())
 
-    expect(res.status).toBe(500)
-    expect(webhookEventCreate).not.toHaveBeenCalled()
+    expect(res.status).toBe(200)
+    expect(orderUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'PAID' }) }))
+    expect(webhookEventCreate).toHaveBeenCalledTimes(1)
+    expect(await ergebnis(einstellen)).toBe('ungueltig')
+    expect(createMany).not.toHaveBeenCalled()
+    expect(nachholen).not.toHaveBeenCalled()
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1)
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: { bereich: 'mail-warteschlange', art: 'bestellung-bestaetigung,bestellung-bezahlt-hof', grund: 'bezug_ungueltig' },
+        extra: { bestellungId: 'order_1' },
+      })
+    )
+  })
+
+  it('scheitert das Einstellen (Datenbank): PAID bleibt, 200 — die Aufträge werden nach dem Commit mit demselben Objekt nachgeholt', async () => {
+    constructEvent.mockReturnValue(succeededEvent())
+    createMany.mockRejectedValueOnce(new Error('DB weg'))
+
+    const res = await POST(makeRequest())
+
+    expect(res.status).toBe(200)
+    expect(webhookEventCreate).toHaveBeenCalledTimes(1)
+    expect(await ergebnis(einstellen)).toBe('nachholen')
+    expect(nachholen).toHaveBeenCalledTimes(1)
+    // Dasselbe Objekt wie in der Transaktion: derselbe Schlüssel hält einen zweiten Auftrag auf.
+    expect(nachholen.mock.calls[0]![2]).toBe(einstellen.mock.calls[0]![0])
+    // Erst der gescheiterte Versuch im Savepoint, dann der nachgeholte nach dem Commit.
+    expect(createMany).toHaveBeenCalledTimes(2)
+    expect(createMany.mock.invocationCallOrder[1]).toBeGreaterThan(vi.mocked(prisma.$transaction).mock.invocationCallOrder[0]!)
+    expect(eingestellteArten().slice(2)).toEqual(['bestellung-bestaetigung', 'bestellung-bezahlt-hof'])
   })
 
   it('behandelt parallele Zustellung (Unique-Verletzung beim Persistieren) als skipped, nicht als Fehler', async () => {
@@ -254,7 +298,23 @@ describe('payment_intent.succeeded', () => {
         }),
         prisma,
       ])
+      expect(await ergebnis(einstellen)).toBe('eingestellt')
       expect(eingestellteArten()).toEqual(['zahlung-zu-spaet'])
+    })
+
+    it('ungültiger Bezug: der Vermerk REFUNDED gilt trotzdem, 200, Sentry einmal, kein Auftrag', async () => {
+      constructEvent.mockReturnValue(succeededEvent())
+      bezugWirft(bezugSchemaFuer)
+
+      const res = await POST(makeRequest())
+
+      expect(res.status).toBe(200)
+      expect(orderUpdateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: { paymentStatus: 'REFUNDED' } }))
+      expect(await ergebnis(einstellen)).toBe('ungueltig')
+      expect(createMany).not.toHaveBeenCalled()
+      expect(nachholen).not.toHaveBeenCalled()
+      expect(vi.mocked(Sentry.captureException).mock.calls.filter(([, k]) => (k as { tags?: { grund?: string } }).tags?.grund === 'bezug_ungueltig')).toHaveLength(1)
+      expect(Sentry.captureException).toHaveBeenCalledTimes(1)
     })
 
     it('ohne Gebühr auf der Zahlung kein refund_application_fee', async () => {
@@ -309,6 +369,7 @@ describe('payment_intent.succeeded', () => {
       expect(res.status).toBe(200)
       expect(webhookEventCreate).toHaveBeenCalledTimes(1)
       expect(eingestellteArten()).toEqual(['zahlung-zu-spaet'])
+      expect(nachholen).toHaveBeenCalledWith('zahlung-zu-spaet', 'order_1', expect.objectContaining({ schluessel: 'zahlung-zu-spaet:order_1' }))
     })
   })
 

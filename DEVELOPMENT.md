@@ -5839,6 +5839,12 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Formprüfung:** Die beiden Schemas mit `sig` (`src/schemas/bestaetigung.ts`, `src/schemas/abo.ts`) ließen nur 64 Hex durch; sie nehmen jetzt auch `2.` davor, sonst zeigte die Bestätigungsseite mit `LINK_SECRET` nur „eingegangen“.
 - **Bleibt:** `bremsSchluessel` (Bremsen) und der Hash des Bar-Tokens hängen nicht an Links in Mails und bleiben, wie sie sind. Der Double-Opt-in-Link (`abo-bestaetigung-token.ts`, 7 Tage) gehört nicht zu den drei Dateien und signiert weiter mit `BETTER_AUTH_SECRET`.
 
+## Ein Mail-Auftrag hält nie eine Bestellung auf (Register N26, Ergänzung 25.10.2026; Nr. 168, Lauf 25)
+
+- **Warum:** Seit Nr. 159 stellten Webhook bezahlt, „Zahlung zu spät", Barbestätigung, Storno, abholbereit und nicht abholbereit ihre Mail-Aufträge mit `stelleMailEin(…, tx)` in ihrer Transaktion ein. Ein falscher Bezug (`parse` mitten im `createMany`) oder ein Datenbankfehler beim Einstellen rollte den Wechsel mit zurück: Der Webhook antwortete 500 und Stripe wiederholte, bei einem festen Fehler blieb eine bezahlte Bestellung auf PENDING_CONFIRMATION (Widerspruch zu CLAUDE.md §2); ein Storno kam nie zustande, also auch keine Erstattung.
+- **Jetzt:** `stelleMailEinInTransaktion` (src/server/mail-warteschlange.ts) wirft nie. Ungültige Aufträge fallen mit einer Meldung weg; die gültigen schreibt eine verschachtelte Transaktion, die Prisma 7 über `@prisma/adapter-pg` als Savepoint anlegt (Weg A der Freigabe — trägt, belegt im Integrationstest mit einer Trigger-Funktion, die jedes INSERT in `MailAuftrag` scheitern lässt: Die Transaktion liest und schreibt danach weiter und committet). Scheitert das Einstellen, holt der Aufrufer nach dem Commit mit demselben Auftragsobjekt nach (`stelleEinOhneRisiko`, aus orders.ts nach mail-warteschlange.ts gezogen; `mailOhneRisiko` im Webhook ging darin auf). Der Storno holt direkt nach dem Commit nach, vor Stripe — sonst fände `trageStornoErstattungEin` keinen Auftrag.
+- **Bleibt:** Postfach, Beitrag und Rundschreiben mit „alles oder nichts" (`stelleMailEin(…, tx)`); „Artikel fehlt", „Erstattung offen" und Verfallen stellen weiter nach dem Commit ein. Bedingungen und Reihenfolge der Wechsel sind unverändert, kein Betrag wird neu gerechnet.
+
 ## Nützliche Befehle
 
 ```bash

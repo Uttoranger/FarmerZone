@@ -31,9 +31,13 @@ import {
   kannWartenPausiert,
   laesstSichWiederholen,
   naechsterVersuch,
+  pruefeMailAuftraege,
   stapelSchluessel,
+  stelleEinOhneRisiko,
   stelleMailEin,
+  stelleMailEinInTransaktion,
 } from '@/server/mail-warteschlange'
+import * as Sentry from '@sentry/nextjs'
 import { bezugSchemaFuer, VORRANG } from '@/schemas/mail-auftrag'
 import { rendereBeitrag } from '@/server/mail-arten/beitrag'
 import { setzeVorname, vornameFuer, vornamenAusBestellungen } from '@/server/beitrag-vorname'
@@ -240,5 +244,77 @@ describe('Cron /api/cron/mails', () => {
     expect(pruefeMailWarnungen).toHaveBeenCalledWith(jetzt)
     expect(pruefeAblaeufe.mock.invocationCallOrder[0]).toBeLessThan(pruefeMailWarnungen.mock.invocationCallOrder[0])
     vi.unstubAllEnvs()
+  })
+})
+
+describe('Bestellwechsel: ein Auftrag hält nie auf (Register N26, Ergänzung 25.10.2026, Nr. 168)', () => {
+  const abholbereit = (orderId: string) => ({ art: 'abholbereit' as const, vorrang: VORRANG.wichtig, schluessel: `abholbereit:${orderId}:1`, bezug: { orderId }, bestellungId: 'o1', farmId: 'hof1' })
+  /** Ein tx-Client mit verschachtelter Transaktion — sie bekommt denselben Client (wie der Savepoint). */
+  function txMit(createMany = vi.fn().mockResolvedValue({ count: 1 })) {
+    const tx = { mailAuftrag: { createMany }, $transaction: vi.fn(async <R>(arbeit: (t: typeof tx) => Promise<R>) => arbeit(tx)) }
+    return tx
+  }
+
+  it('pruefeMailAuftraege: trennt gültige und ungültige Arten, wirft nie — auch nicht, wenn das Schema selbst wirft', () => {
+    const ergebnis = pruefeMailAuftraege([abholbereit('o1'), { ...abholbereit('kundin@example.com'), art: 'storniert' as const }])
+    expect(ergebnis.gueltig).toEqual([abholbereit('o1')])
+    expect(ergebnis.ungueltigeArten).toEqual(['storniert'])
+    // Eine Art ohne Schema aus schwach typisiertem Aufruf: ungültig statt Wurf.
+    expect(pruefeMailAuftraege({ ...abholbereit('o1'), bezug: null as never }).ungueltigeArten).toEqual(['abholbereit'])
+  })
+
+  it('gültig: EIN createMany in der verschachtelten Transaktion, Rückgabe „eingestellt", der Worker nach der Antwort', async () => {
+    const tx = txMit()
+    expect(await stelleMailEinInTransaktion([abholbereit('o1')], tx as never)).toBe('eingestellt')
+    expect(tx.$transaction).toHaveBeenCalledTimes(1)
+    expect(tx.mailAuftrag.createMany).toHaveBeenCalledTimes(1)
+    expect(nachDerAntwort).toHaveBeenCalledTimes(1)
+    expect(Sentry.captureException).not.toHaveBeenCalled()
+  })
+
+  it('ungültiger Bezug: nichts geschrieben, „ungueltig", EINE Meldung mit Arten und Bestellung — ohne Bezug', async () => {
+    const tx = txMit()
+    expect(await stelleMailEinInTransaktion([abholbereit('kundin@example.com'), abholbereit('a b')], tx as never)).toBe('ungueltig')
+    expect(tx.mailAuftrag.createMany).not.toHaveBeenCalled()
+    expect(nachDerAntwort).not.toHaveBeenCalled()
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1)
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'error',
+      tags: { bereich: 'mail-warteschlange', art: 'abholbereit', grund: 'bezug_ungueltig' },
+      extra: { bestellungId: 'o1' },
+    })
+    expect(JSON.stringify(vi.mocked(Sentry.captureException).mock.calls)).not.toContain('kundin@example.com')
+  })
+
+  it('teils ungültig: die gültigen werden eingestellt, die ungültigen gemeldet', async () => {
+    const tx = txMit()
+    expect(await stelleMailEinInTransaktion([abholbereit('o1'), { ...abholbereit('x y'), art: 'storniert' as const, schluessel: 'storniert:o1' }], tx as never)).toBe('eingestellt')
+    expect(tx.mailAuftrag.createMany.mock.calls[0]![0].data.map((z: { art: string }) => z.art)).toEqual(['abholbereit'])
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1)
+  })
+
+  it('Datenbankfehler im Savepoint: wirft nicht, „nachholen", Warnung an Sentry; Gegenprobe ohne $transaction ebenso — „wirft nie" ist kein Beweis für „eingestellt"', async () => {
+    const tx = txMit(vi.fn().mockRejectedValue(new Error('DB weg')))
+    expect(await stelleMailEinInTransaktion(abholbereit('o1'), tx as never)).toBe('nachholen')
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), expect.objectContaining({ level: 'warning', tags: expect.objectContaining({ grund: 'in_transaktion_gescheitert' }) }))
+    expect(nachDerAntwort).not.toHaveBeenCalled()
+    expect(await stelleMailEinInTransaktion(abholbereit('o1'), { mailAuftrag: { createMany: vi.fn() } } as never)).toBe('nachholen')
+  })
+
+  it('stelleEinOhneRisiko: stellt außerhalb der Transaktion ein; ein Fehler geht an Sentry und wird nie geworfen', async () => {
+    db.mailAuftrag.createMany.mockResolvedValueOnce({ count: 1 })
+    await stelleEinOhneRisiko('abholbereit', 'o1', abholbereit('o1'))
+    expect(db.mailAuftrag.createMany).toHaveBeenCalledTimes(1)
+
+    db.mailAuftrag.createMany.mockRejectedValueOnce(new Error('DB weg'))
+    await expect(stelleEinOhneRisiko('abholbereit', 'o1', async () => abholbereit('o1'))).resolves.toBeUndefined()
+    expect(Sentry.captureException).toHaveBeenLastCalledWith(expect.any(Error), {
+      level: 'error',
+      tags: { bereich: 'mail-warteschlange', art: 'abholbereit', grund: 'einstellen_gescheitert' },
+      extra: { bestellungId: 'o1' },
+    })
+
+    // Ein Bauer der Aufträge, der selbst wirft, ist ebenso geschützt.
+    await expect(stelleEinOhneRisiko('erstattung-offen', null, async () => { throw new Error('Empfänger weg') })).resolves.toBeUndefined()
   })
 })
