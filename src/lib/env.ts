@@ -99,13 +99,16 @@ const serverEnvSchema = z.object({
   // Liste baut leseTestEmpfaenger (src/lib/testumgebung.ts).
   TEST_EMPFAENGER: optional(),
   // OPTIONAL, von Vercel selbst gesetzt („Automatically expose System
-  // Environment Variables"): Umgebung, Deploy-Adresse, Branch-Adresse, Branch.
+  // Environment Variables"): Umgebung, Deploy-Adresse, Branch-Adresse, Branch
+  // und (seit Nr. 184) der Commit des Deploys — für die Karte „Version“ und
+  // „einmal je Tag und Deploy“ bei bekannten Zuständen (umgebung-server.ts).
   // Lokal fehlen sie alle — dann gilt die Umgebung als lokal oder Produktion,
   // nie als Preview.
   VERCEL_ENV: optional(),
   VERCEL_URL: optional(),
   VERCEL_BRANCH_URL: optional(),
   VERCEL_GIT_COMMIT_REF: optional(),
+  VERCEL_GIT_COMMIT_SHA: optional(),
 })
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>

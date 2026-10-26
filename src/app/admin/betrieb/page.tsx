@@ -5,7 +5,8 @@ import { verlangeAdminSeite } from '@/server/admin-wache'
 import { ladeGroessteTabellen, ladeLaeufe, ladeMessungenFuerSeite, ladeWarnungen, letzteMessungAm } from '@/server/queries/betrieb'
 import { zaehleProbleme } from '@/server/queries/mails'
 import { alleArtenAus, alleMailsAus, betriebReiterAus, mailSucheAus } from '@/schemas/betrieb-mails'
-import { STRIPE_MARKE, UMGEBUNG } from '@/lib/umgebung-server'
+import { STRIPE_MARKE, TESTBETRIEB, UMGEBUNG } from '@/lib/umgebung-server'
+import { env } from '@/lib/env'
 import {
   ABLAEUFE,
   ADMIN_BETRIEB_HREF,
@@ -16,6 +17,7 @@ import {
   betriebKacheln,
   betriebVerlauf,
   gemessenText,
+  istMailWarnArt,
   ohneVerwendungKarte,
   OHNE_VERWENDUNG_ANKER,
   speicherText,
@@ -34,11 +36,17 @@ import { LEISE } from '@/components/hof-bestellungen/stil'
 import { ADMIN_RAHMEN, AdminFehler } from '@/components/admin/admin-teile'
 import { Seitenkopf } from '@/components/admin/seitenkopf'
 import { JetztMessen } from './jetzt-messen'
+import { DIENSTE_TEXT, dienstZeilen, versionZeilen } from './dienste'
+import { ladeLetzteMigration, messeAntwort } from './version'
 import { MailsAnsicht } from './mails-ansicht'
 import { MailsAlle } from './mails-alle'
 import {
   AblaeufeListe,
+  AlarmMatrixListe,
+  AlarmMatrixTabelle,
   BetriebUnterreiter,
+  DiensteInhalt,
+  VersionInhalt,
   AblaeufeRegel,
   AblaeufeTabelle,
   BilderOhneVerwendung,
@@ -90,13 +98,15 @@ async function zaehleProblemeSicher(jetzt: Date): Promise<number | null> {
 }
 
 async function ladeDaten(jetzt: Date) {
-  const [messungen, warnungen, laeufe, letzte, tabellen, mailsOffen] = await Promise.all([
+  const [messungen, warnungen, laeufe, letzte, tabellen, mailsOffen, antwortMs, migration] = await Promise.all([
     ladeMessungenFuerSeite(jetzt),
     ladeWarnungen(),
     ladeLaeufe(),
     letzteMessungAm(),
     ladeTabellenSicher(),
     zaehleProblemeSicher(jetzt),
+    messeAntwort(),
+    ladeLetzteMigration(),
   ])
   const produktion = UMGEBUNG.vercelProduktion
   const kacheln = betriebKacheln(messungen, jetzt)
@@ -107,6 +117,23 @@ async function ladeDaten(jetzt: Date) {
   const ohneVerwendungBytes = ohneVerwendung && ohneVerwendung.bytes > 0 ? ohneVerwendung.bytes : null
   const eintraege = warnEintraege(warnungen, kacheln, zeilen, messungen, jetzt, produktion, ohneVerwendungBytes)
   const puenktlich = zeilen.filter((z) => z.stand === 'puenktlich').length
+  // Karten „Dienste“ und „Version“ (Nr. 184): der Uptime-Dienst hat seine eigene Zeile, „Abläufe“ zählt nur die Crons.
+  const crons = zeilen.filter((z) => z.name !== 'von-aussen')
+  const datenbank = kacheln.find((k) => k.id === 'datenbank')
+  const vonAussen = laeufe.get('von-aussen') ?? null
+  const dienste = dienstZeilen(
+    {
+      stripe: STRIPE_MARKE,
+      testbetrieb: TESTBETRIEB,
+      mailWarnungOffen: warnungen.some((w) => w.stufe > 0 && istMailWarnArt(w.art)),
+      datenbank: datenbank?.wert ? `${datenbank.wert} ${datenbank.von}` : null,
+      antwortMs,
+      ablaeufe: { puenktlich: crons.filter((z) => z.stand === 'puenktlich').length, von: crons.length, ausgefallen: crons.some((z) => z.stand === 'ueberfaellig' || z.stand === 'fehler') },
+      vonAussen: { stand: zeilen.find((z) => z.name === 'von-aussen')?.stand ?? 'nochKeinLauf', gestartetAm: vonAussen?.gestartetAm ?? null },
+    },
+    jetzt
+  )
+  const version = versionZeilen(env.VERCEL_GIT_COMMIT_SHA ?? null, UMGEBUNG.branch, migration, jetzt)
   const sonstGruen = kacheln.filter((k) => k.warnt).length <= eintraege.length && zeilen.every((z) => z.stand === 'puenktlich' || z.stand === 'nochKeinLauf')
   return {
     produktion,
@@ -124,6 +151,8 @@ async function ladeDaten(jetzt: Date) {
     tabellen: tabellen?.zeilen ?? null,
     tabellenZusammen: tabellen === null ? null : BETRIEB_TEXT.tabellenZusammen(speicherText(tabellen.bytes)),
     mailsOffen,
+    dienste,
+    version,
   }
 }
 
@@ -147,6 +176,8 @@ async function ladeDaten(jetzt: Date) {
  * Seit Nr. 161 zwei Unterreiter: „Überblick“ (diese Seite) und „E-Mails“
  * (`?reiter=mails`, MailsAnsicht in mails-ansicht.tsx). Seit Nr. 167 darin
  * „Alle Mails“ (`?reiter=mails&liste=alle`, MailsAlle in mails-alle.tsx).
+ * Seit Nr. 184 im Überblick die Karten „Dienste“ (je mit Prüfweg),
+ * „Version“ und „Alarm-Matrix“ (Board admin-betrieb-neu; dienste.ts).
  */
 export default async function AdminBetriebPage({
   searchParams,
@@ -215,6 +246,21 @@ export default async function AdminBetriebPage({
 
         <Kacheln kacheln={daten.kacheln} ohneVerwendung={daten.davonOhneVerwendung} />
 
+        {/* Nr. 184 (Board admin-betrieb-neu): ab 1024 px links Dienste und Version, rechts die Alarm-Matrix. */}
+        <div className="hidden gap-[18px] lg:grid lg:grid-cols-2 lg:items-start">
+          <div className="flex min-w-0 flex-col gap-[18px]">
+            <Karte titel={DIENSTE_TEXT.titel} zusatz={DIENSTE_TEXT.zusatz}>
+              <DiensteInhalt zeilen={daten.dienste} />
+            </Karte>
+            <Karte titel={DIENSTE_TEXT.versionTitel} zusatz={DIENSTE_TEXT.versionZusatz}>
+              <VersionInhalt zeilen={daten.version} />
+            </Karte>
+          </div>
+          <Karte titel={DIENSTE_TEXT.matrixTitel} zusatz={DIENSTE_TEXT.matrixZusatz}>
+            <AlarmMatrixTabelle />
+          </Karte>
+        </div>
+
         {/* Ab 1024 px: links Verlauf, Abläufe, Tabellen; rechts Tarife und Dashboard (Mockup admin-betrieb). */}
         <div className="hidden gap-[18px] lg:grid lg:grid-cols-[minmax(0,1fr)_468px] lg:items-start">
           <div className="flex min-w-0 flex-col gap-[18px]">
@@ -251,6 +297,15 @@ export default async function AdminBetriebPage({
         {/* Am Handy (Mockup mobil-admin-betrieb): Abläufe offen, der Rest zugeklappt. */}
         <div className="flex flex-col gap-3 lg:hidden">
           <AblaeufeListe zeilen={daten.zeilen} puenktlich={daten.puenktlich} />
+          <Klappkarte titel={DIENSTE_TEXT.titel} zeile={DIENSTE_TEXT.zusatz}>
+            <DiensteInhalt zeilen={daten.dienste} />
+          </Klappkarte>
+          <Klappkarte titel={DIENSTE_TEXT.versionTitel} zeile={daten.version[0].wert}>
+            <VersionInhalt zeilen={daten.version} />
+          </Klappkarte>
+          <Klappkarte titel={DIENSTE_TEXT.matrixTitel} zeile={DIENSTE_TEXT.matrixZusatz}>
+            <AlarmMatrixListe />
+          </Klappkarte>
           <BilderOhneVerwendung karte={daten.ohneVerwendung} produktion={daten.produktion} anker={OHNE_VERWENDUNG_ANKER.handy} />
           <Klappkarte titel={BETRIEB_TEXT.verlaufTitel} zeile={verlaufKurz(daten.verlauf.linien)}>
             <VerlaufLegende linien={daten.verlauf.linien} />

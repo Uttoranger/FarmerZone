@@ -3,6 +3,7 @@ import { env } from '@/lib/env'
 import { STICHTAG_ZUKUNFT_WARNUNG, bestimmeUmgebung, stichtagWeitInDerZukunft, type Umgebung } from '@/lib/umgebung'
 import { istTestbetrieb } from '@/lib/stripe-modus'
 import { stripeMarke, type StripeMarke } from '@/lib/testumgebung'
+import { nachDerAntwort } from '@/lib/nach-der-antwort'
 
 /**
  * Die Umgebung, einmal je Prozess berechnet — der Serverzweig zu umgebung.ts.
@@ -69,43 +70,97 @@ export const TESTUMGEBUNG_URL: string | null = UMGEBUNG.testumgebungUrl
  */
 export const STRIPE_LIVE_AB: Date | null = UMGEBUNG.stripeLiveAb
 
-// Einmal je Kaltstart — mehr wäre bei jedem Seitenaufruf dieselbe Meldung.
-// Serverlos heißt: je Instanz einmal; das ist gewollt, nicht zu viel.
-let warnungenGemeldet = false
-let stichtagZukunftGemeldet = false
+/**
+ * Der Deploy, an dem „einmal je Tag und Deploy“ hängt (Nr. 184): die ersten
+ * zwölf Zeichen des Commits, den Vercel mitgibt; lokal und in Tests „lokal“.
+ */
+export const DEPLOY_KENNUNG: string = env.VERCEL_GIT_COMMIT_SHA?.trim().slice(0, 12) || 'lokal'
+
+/** Die bekannten Zustände, die Sentry je Tag und Deploy höchstens einmal hört. */
+export type BekannterZustand = 'umgebung' | 'stichtag'
 
 /**
- * Widersprüche in Produktion (Dev-Datenbank, Stripe test, seit Register S16
- * auch ein fremder Host oder ein Muster in NEXT_PUBLIC_APP_URL) gehen nicht ins
- * Banner — Kundinnen sehen nie eines — sondern als Warnung an Sentry, ohne den
- * Wert.
- * Ohne DSN ist Sentry nicht initialisiert und der Aufruf ein No-op; schlägt
- * er dennoch fehl, bleibt es folgenlos.
+ * Bekannte Zustände (Register N18, Ergänzung 26.10.2026; Nr. 184): Testmodus
+ * in Produktion, fehlendes Connect-Secret, ein Stichtag weit in der Zukunft.
+ * Bis Nr. 184 ging die Meldung „einmal je Instanz“ — aber das Umgebungsbanner
+ * im Root-Layout ruft bei jedem Seitenaufbau, und jede neue Instanz (Kaltstart,
+ * Deploy, Skalierung) meldete von vorn: JAVASCRIPT-NEXTJS-7 kam so in 24
+ * Tagen auf über 1 500 Ereignisse, ohne dass sich etwas änderte.
  *
- * Dazu, zur Laufzeit gemessen (`jetzt`), ein Stichtag mehr als 24 Stunden in
- * der Zukunft (Register Z4, `stichtagWeitInDerZukunft`): Er gilt, nähme aber
- * still alle Online-Umsätze heraus. In jeder Umgebung, weil ihn kein Banner
- * zeigt; ebenso höchstens einmal je Instanz und ohne den Wert. Die Seiten
- * rufen diese Funktion über das Umgebungsbanner bei jedem Aufbau.
+ * Jetzt zwei Stufen: Je Instanz merkt sich der Speicher den UTC-Tag (kein
+ * zweiter Versuch am selben Tag); über alle Instanzen entscheidet EINE
+ * Anweisung auf BetriebMessung (Art `sentry:<zustand>:<deploy>`, Zeile je
+ * Tag) — nur wer sie anlegt, meldet. Die Betriebsleiste und Admin › Betrieb
+ * zeigen den Zustand weiter bei jedem Aufbau, sie hängen nicht an Sentry.
  */
-export function meldeUmgebungsWarnungen(jetzt: Date = new Date()): void {
-  meldeStichtagInDerZukunft(jetzt)
-  if (UMGEBUNG.art !== 'produktion' || UMGEBUNG.warnungen.length === 0) return
-  if (warnungenGemeldet) return
-  warnungenGemeldet = true
+const gemerktAm = new Map<BekannterZustand, string>()
+
+/** Der UTC-Tag als JJJJ-MM-TT — wie BetriebMessung zählt. */
+function utcTagVon(jetzt: Date): string {
+  return jetzt.toISOString().slice(0, 10)
+}
+
+/** Ob diese Instanz den Zustand heute schon angefragt hat; merkt ihn sonst. */
+function heuteNeu(zustand: BekannterZustand, jetzt: Date): boolean {
+  const tag = utcTagVon(jetzt)
+  if (gemerktAm.get(zustand) === tag) return false
+  gemerktAm.set(zustand, tag)
+  return true
+}
+
+/**
+ * Legt die Zeile des Tages für Zustand und Deploy an — true nur für die
+ * Anfrage, die sie anlegt (ON CONFLICT DO NOTHING). Prisma kommt dynamisch:
+ * Dieses Modul laden auch Seed und E-Mail-Tests, die keine Datenbank wollen.
+ * Scheitert die Datenbank, wird nicht gemeldet — der Zustand steht weiter in
+ * der Betriebsleiste, und eine fehlende Datenbank meldet sich selbst.
+ */
+export async function erstmalsHeute(zustand: BekannterZustand, jetzt: Date): Promise<boolean> {
   try {
-    Sentry.captureMessage(`Umgebung widersprüchlich: ${UMGEBUNG.warnungen.join(' ')}`, 'warning')
+    const { prisma } = await import('@/lib/prisma')
+    const art = `sentry:${zustand}:${DEPLOY_KENNUNG}`
+    const angelegt = await prisma.$queryRaw<Array<{ art: string }>>`
+      INSERT INTO "BetriebMessung" ("tag", "art", "wert", "gemessenAm")
+      VALUES (${utcTagVon(jetzt)}::date, ${art}, 1, ${jetzt}::timestamp(3))
+      ON CONFLICT ("tag", "art") DO NOTHING
+      RETURNING "art"`
+    return angelegt.length > 0
+  } catch {
+    return false
+  }
+}
+
+async function meldeEinmal(zustand: BekannterZustand, satz: string, jetzt: Date): Promise<void> {
+  if (!(await erstmalsHeute(zustand, jetzt))) return
+  try {
+    Sentry.captureMessage(`Umgebung widersprüchlich: ${satz}`, 'warning')
   } catch {
     // Telemetrie scheitert leise.
   }
 }
 
-function meldeStichtagInDerZukunft(jetzt: Date): void {
-  if (stichtagZukunftGemeldet || !stichtagWeitInDerZukunft(STRIPE_LIVE_AB, jetzt)) return
-  stichtagZukunftGemeldet = true
-  try {
-    Sentry.captureMessage(`Umgebung widersprüchlich: ${STICHTAG_ZUKUNFT_WARNUNG}`, 'warning')
-  } catch {
-    // Telemetrie scheitert leise.
-  }
+/**
+ * Widersprüche in Produktion (Dev-Datenbank, Stripe test, seit Register S16
+ * auch ein fremder Host oder ein Muster in NEXT_PUBLIC_APP_URL) gehen nicht ins
+ * Banner — Kundinnen sehen nie eines — sondern als Warnung an Sentry, ohne den
+ * Wert. Dazu, zur Laufzeit gemessen (`jetzt`), ein Stichtag mehr als 24
+ * Stunden in der Zukunft (Register Z4, `stichtagWeitInDerZukunft`): Er gilt,
+ * nähme aber still alle Online-Umsätze heraus — in jeder Umgebung, weil ihn
+ * kein Banner zeigt.
+ *
+ * Beides höchstens einmal je Tag und Deploy (siehe oben); gemeldet wird nach
+ * der Antwort (`nachDerAntwort`), damit kein Seitenaufbau auf die Datenbank
+ * wartet. Ohne DSN ist Sentry nicht initialisiert und der Aufruf ein No-op.
+ * Die Seiten rufen diese Funktion über das Umgebungsbanner bei jedem Aufbau;
+ * nach dem ersten Aufruf des Tages kostet sie je Instanz nur einen Blick in
+ * den Speicher.
+ */
+export function meldeUmgebungsWarnungen(jetzt: Date = new Date()): void {
+  const offen: Array<[BekannterZustand, string]> = []
+  if (stichtagWeitInDerZukunft(STRIPE_LIVE_AB, jetzt) && heuteNeu('stichtag', jetzt)) offen.push(['stichtag', STICHTAG_ZUKUNFT_WARNUNG])
+  if (UMGEBUNG.art === 'produktion' && UMGEBUNG.warnungen.length > 0 && heuteNeu('umgebung', jetzt)) offen.push(['umgebung', UMGEBUNG.warnungen.join(' ')])
+  if (offen.length === 0) return
+  nachDerAntwort(async () => {
+    for (const [zustand, satz] of offen) await meldeEinmal(zustand, satz, jetzt)
+  })
 }

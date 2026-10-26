@@ -41,7 +41,7 @@ import * as Sentry from '@sentry/nextjs'
 import { sendBetriebWarnung } from '@/lib/email'
 import { ladeBetreiberEmpfaenger } from '@/server/queries/postfach'
 import { getOeffentlicheHoefe } from '@/server/queries/farm'
-import { beginneMessung, messeBetrieb, mitHerzschlag, pruefeAblaeufe, pruefeGrenzen } from '@/server/betrieb'
+import { beginneMessung, messeBetrieb, mitHerzschlag, pruefeAblaeufe, pruefeGrenzen, schlageVonAussen } from '@/server/betrieb'
 
 const JETZT = new Date('2026-10-16T04:05:00.000Z')
 
@@ -227,6 +227,34 @@ describe('Warnen — nur in der Produktion, nur nach getroffener Zeile', () => {
     db.betriebWarnung.findMany.mockResolvedValue([])
     expect(await pruefeAblaeufe(JETZT, { produktion: true })).toBe(0)
     expect(db.$queryRaw).not.toHaveBeenCalled()
+  })
+})
+
+describe('Herzschlag von außen (Nr. 184)', () => {
+  it('EINE Anweisung: anlegen oder überschreiben nur, wenn der letzte Herzschlag mindestens eine Minute alt ist', async () => {
+    db.$queryRaw.mockResolvedValueOnce([{ name: 'von-aussen' }])
+    expect(await schlageVonAussen(JETZT)).toBe(true)
+    const [teile] = db.$queryRaw.mock.calls[0] as [TemplateStringsArray]
+    expect(teile.join('?')).toMatch(/INSERT INTO "AblaufLauf"[\s\S]*ON CONFLICT \("name"\) DO UPDATE[\s\S]*WHERE "AblaufLauf"\."gestartetAm" <= [\s\S]*RETURNING/)
+    expect(werteVon(db.$queryRaw.mock.calls[0])).toEqual(['von-aussen', JETZT, JETZT, new Date(JETZT.getTime() - 60_000)])
+  })
+
+  it('keine Zeile zurück (vor weniger als einer Minute schon geschrieben): false', async () => {
+    db.$queryRaw.mockResolvedValueOnce([])
+    expect(await schlageVonAussen(JETZT)).toBe(false)
+  })
+
+  it('still länger als 30 Minuten → Warnung „ablauf:von-aussen“ und eine Mail; nie gerufen → nichts', async () => {
+    db.betriebWarnung.findMany.mockResolvedValue([])
+    db.ablaufLauf.findMany.mockResolvedValue([])
+    expect(await pruefeAblaeufe(JETZT, { produktion: true })).toBe(0)
+    expect(db.$queryRaw).not.toHaveBeenCalled()
+
+    db.ablaufLauf.findMany.mockResolvedValue([{ name: 'von-aussen', gestartetAm: new Date(JETZT.getTime() - 31 * 60_000), beendetAm: new Date(JETZT.getTime() - 31 * 60_000), ok: true, fehlerKlasse: null, dauerMs: 0 }])
+    db.$queryRaw.mockResolvedValueOnce([{ art: 'ablauf:von-aussen' }])
+    expect(await pruefeAblaeufe(JETZT, { produktion: true })).toBe(1)
+    expect(werteVon(db.$queryRaw.mock.calls[0]).slice(0, 2)).toEqual(['ablauf:von-aussen', 1])
+    expect(sendBetriebWarnung).toHaveBeenCalledWith(expect.objectContaining({ art: 'ablauf', name: 'von-aussen', stand: 'ueberfaellig', wann: 'alle 5 Minuten, von außen' }), ['team@example.com'])
   })
 })
 

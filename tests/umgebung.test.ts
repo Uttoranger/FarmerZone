@@ -829,10 +829,12 @@ describe('bestimmeUmgebung — Produktion nimmt NEXT_PUBLIC_APP_URL als bereinig
 })
 
 describe('Produktion: die Warnung zu NEXT_PUBLIC_APP_URL geht an Sentry (Nr. 56)', () => {
-  it('höchstens einmal je Instanz und ohne den Wert; APP_URL behält den Rohwert', async () => {
+  it('höchstens einmal am Tag (seit Nr. 184) und ohne den Wert; APP_URL behält den Rohwert', async () => {
     // Frisch geladen: Umgebung und „schon gemeldet" leben auf Modulebene (umgebung-server.ts).
     vi.resetModules()
     vi.doMock('@sentry/nextjs', () => ({ captureMessage: vi.fn() }))
+    // Seit Nr. 184 entscheidet eine Zeile je Tag und Deploy (BetriebMessung) — hier: die erste Anfrage legt an.
+    vi.doMock('@/lib/prisma', () => ({ prisma: { $queryRaw: vi.fn(async () => [{ art: 'sentry:umgebung:lokal' }]) } }))
     vi.doMock('@/lib/env', () => ({
       env: {
         VERCEL_ENV: 'production',
@@ -849,6 +851,9 @@ describe('Produktion: die Warnung zu NEXT_PUBLIC_APP_URL geht an Sentry (Nr. 56)
     expect(server.APP_URL).toBe('http://plattform.example/geheim-123')
     server.meldeUmgebungsWarnungen()
     server.meldeUmgebungsWarnungen()
+    // Gemeldet wird nach der Antwort (im Test sofort, aber asynchron).
+    await vi.dynamicImportSettled()
+    await vi.waitFor(() => expect(sentry.captureMessage).toHaveBeenCalled())
     expect(sentry.captureMessage).toHaveBeenCalledTimes(1)
     const [satz, stufe] = vi.mocked(sentry.captureMessage).mock.calls[0]
     expect(satz).toContain(WARNUNG_APP_URL_UNGUELTIG)
@@ -948,10 +953,12 @@ describe('S16 — NEXT_PUBLIC_APP_URL in der Produktion: kein Muster, fremder Ho
     expect(bestimmeUmgebung({ ...LOKAL, NEXT_PUBLIC_APP_URL: 'https://farmer-zone-beispiel.vercel.app' }).warnungen).toEqual([])
   })
 
-  it('in der Produktion geht der fremde Host einmal je Instanz an Sentry, ohne den Wert', async () => {
+  it('in der Produktion geht der fremde Host einmal am Tag an Sentry (seit Nr. 184), ohne den Wert', async () => {
     // Frisch geladen: Umgebung und „schon gemeldet" leben auf Modulebene (umgebung-server.ts).
     vi.resetModules()
     vi.doMock('@sentry/nextjs', () => ({ captureMessage: vi.fn() }))
+    // Seit Nr. 184 entscheidet eine Zeile je Tag und Deploy (BetriebMessung) — hier: die erste Anfrage legt an.
+    vi.doMock('@/lib/prisma', () => ({ prisma: { $queryRaw: vi.fn(async () => [{ art: 'sentry:umgebung:lokal' }]) } }))
     vi.doMock('@/lib/env', () => ({
       env: {
         VERCEL_ENV: 'production',
@@ -967,6 +974,9 @@ describe('S16 — NEXT_PUBLIC_APP_URL in der Produktion: kein Muster, fremder Ho
     expect(server.APP_URL).toBe('https://farmer-zone-beispiel.vercel.app')
     server.meldeUmgebungsWarnungen()
     server.meldeUmgebungsWarnungen()
+    // Gemeldet wird nach der Antwort (im Test sofort, aber asynchron).
+    await vi.dynamicImportSettled()
+    await vi.waitFor(() => expect(sentry.captureMessage).toHaveBeenCalled())
     expect(sentry.captureMessage).toHaveBeenCalledTimes(1)
     const [satz, stufe] = vi.mocked(sentry.captureMessage).mock.calls[0]
     expect(satz).toContain(WARNUNG_APP_URL_FREMDER_HOST)
