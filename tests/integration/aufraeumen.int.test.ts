@@ -4,6 +4,10 @@
  * der Tabellen danach ist die Aussage.
  *
  * Beweist:
+ *  - Mail-Warteschlange (Nr. 170): eine abgelaufene Belegung bleibt „in Arbeit“
+ *    mit alter Belegung, der nächste Lauf schickt sie als eigene Anfrage mit
+ *    dem Schlüssel ihres Laufs; ein Beitrag bekommt vor dem Löschen seiner
+ *    Aufträge die gesendete Zahl.
  *  - Sitzung: vor 6 Tagen abgelaufen bleibt, vor 8 Tagen ist sie weg, eine
  *    gültige (laufender Login) bleibt.
  *  - Code: 2 Tage nach Ablauf weg, 12 Stunden nach Ablauf bleibt er.
@@ -20,16 +24,38 @@
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
+import { randomUUID } from 'node:crypto'
 import { prisma } from '@/lib/prisma'
-import { utcTag, utcTagVersetzt } from '@/lib/betrieb'
+import { utcTag, utcTagVersetzt, utcTagesbeginn } from '@/lib/betrieb'
 import { MELDE_VERMERK_TYP, meldeVermerk } from '@/server/erstattung-gescheitert'
-import { intKennung } from './setup/basis'
+import { gesendeteBeitragsMails } from '@/server/mail-arten/beitrag'
+import { arbeiteWarteschlange, stapelSchluessel } from '@/server/mail-warteschlange'
+import type { RendererTabelle } from '@/server/mail-arten'
+import { erstelleHof, intKennung, raeumeAuf } from './setup/basis'
 
-vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
+type StapelPayload = Array<{ to: string }>
+const { batchMock } = vi.hoisted(() => ({ batchMock: vi.fn() }))
+
+vi.mock('server-only', () => ({}))
+vi.mock('resend', () => ({
+  Resend: class {
+    emails = { send: vi.fn() }
+    batch = { send: batchMock }
+  },
+}))
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
+vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn(), addBreadcrumb: vi.fn() }))
+
+/** Adresse aus dem Bezug — die Attrappe zeigt, welche Mail hinausging (erfunden, example.com). */
+const FAKE: RendererTabelle = {
+  rundschreiben: async (b) => ({ an: `${b.unterhaltungId}@example.com`, betreff: 'Rundschreiben', html: '<p>rundschreiben</p>' }),
+}
 
 const TAG = 24 * 60 * 60 * 1000
 type Lauf = Awaited<ReturnType<typeof prisma.ablaufLauf.findUnique>>
 let laufVorher: Lauf = null
+let zaehlerVorher: bigint | null = null
+const heute = () => utcTagesbeginn(new Date())
 
 function vor(ms: number): Date {
   return new Date(Date.now() - ms)
@@ -49,15 +75,21 @@ async function rufeAblauf(): Promise<{ aufgeraeumt: { sitzungen: number; codes: 
 
 beforeAll(async () => {
   laufVorher = await prisma.ablaufLauf.findUnique({ where: { name: 'aufraeumen' } })
+  zaehlerVorher = (await prisma.betriebMessung.findUnique({ where: { tag_art: { tag: heute(), art: 'mails' } } }))?.wert ?? null
 })
 
 afterEach(async () => {
   vi.unstubAllEnvs()
+  // Testhöfe (Nr. 170) zuerst — ihre Inhaber hängen am Hof.
+  await raeumeAuf()
   await prisma.user.deleteMany({ where: { email: { startsWith: 'int-' } } })
   await prisma.verification.deleteMany({ where: { identifier: { startsWith: 'int-' } } })
   await prisma.webhookEvent.deleteMany({ where: { stripeEventId: { startsWith: 'int-' } } })
   await prisma.betriebMessung.deleteMany({ where: { art: { startsWith: 'int-' } } })
   await prisma.mailAuftrag.deleteMany({ where: { schluessel: { startsWith: 'int-' } } })
+  // Der Worker im Test zählt in den heutigen Mail-Zähler — danach der Stand von vorher.
+  if (zaehlerVorher === null) await prisma.betriebMessung.deleteMany({ where: { tag: heute(), art: 'mails' } })
+  else await prisma.betriebMessung.update({ where: { tag_art: { tag: heute(), art: 'mails' } }, data: { wert: zaehlerVorher } })
 })
 
 afterAll(async () => {
@@ -116,13 +148,14 @@ describe('Aufräumen im Ablauf cleanup-reservations', () => {
     expect(await prisma.user.findUnique({ where: { id: konto.id }, select: { id: true } })).toEqual({ id: konto.id })
   })
 
-  it('Mail-Warteschlange (N26, Nr. 158): nach 90 Tagen weg, mit 89 bleibt sie; abgelaufene Belegung wird wieder offen, laufende nicht', async () => {
+  it('Mail-Warteschlange (N26, Nr. 158/170): nach 90 Tagen weg, mit 89 bleibt sie; eine abgelaufene Belegung bleibt „in Arbeit“ mit alter Belegung, und der nächste Lauf schickt sie als eigene Anfrage', async () => {
     const kennung = intKennung('mails')
-    const zeile = (was: string, erstelltAm: Date, teil: { status?: string; belegtBis?: Date } = {}) => ({
+    const alteBelegung = vor(60_000)
+    const zeile = (was: string, erstelltAm: Date, teil: { status?: string; belegtBis?: Date; naechsterVersuchAm?: Date } = {}) => ({
       art: 'rundschreiben',
       vorrang: 2,
       schluessel: `${kennung}-${was}`,
-      bezug: { unterhaltungId: kennung },
+      bezug: { unterhaltungId: `${kennung}-${was}` },
       erstelltAm,
       ...teil,
     })
@@ -130,17 +163,65 @@ describe('Aufräumen im Ablauf cleanup-reservations', () => {
       data: [
         zeile('alt', vor(91 * TAG), { status: 'gesendet' }),
         zeile('jung', vor(89 * TAG), { status: 'gesendet' }),
-        zeile('haengt', vor(TAG), { status: 'in_arbeit', belegtBis: vor(60_000) }),
+        zeile('haengt', vor(TAG), { status: 'in_arbeit', belegtBis: alteBelegung }),
         zeile('laeuft', vor(TAG), { status: 'in_arbeit', belegtBis: new Date(Date.now() + 60_000) }),
+        zeile('neu', vor(TAG), { status: 'offen', naechsterVersuchAm: vor(1_000) }),
       ],
     })
     const { aufgeraeumt } = await rufeAblauf()
-    expect(aufgeraeumt).toMatchObject({ mailAuftraege: expect.any(Number), mailAuftraegeFrei: expect.any(Number) })
+    expect(aufgeraeumt).toMatchObject({ mailAuftraege: expect.any(Number) })
+    expect(aufgeraeumt).not.toHaveProperty('mailAuftraegeFrei')
     const stand = await prisma.mailAuftrag.findMany({ where: { schluessel: { startsWith: kennung } }, select: { schluessel: true, status: true, belegtBis: true }, orderBy: { schluessel: 'asc' } })
     expect(stand).toEqual([
-      { schluessel: `${kennung}-haengt`, status: 'offen', belegtBis: null },
+      { schluessel: `${kennung}-haengt`, status: 'in_arbeit', belegtBis: alteBelegung },
       { schluessel: `${kennung}-jung`, status: 'gesendet', belegtBis: null },
       { schluessel: `${kennung}-laeuft`, status: 'in_arbeit', belegtBis: expect.any(Date) },
+      { schluessel: `${kennung}-neu`, status: 'offen', belegtBis: null },
     ])
+
+    // Der nächste Lauf: der abgebrochene Auftrag geht allein, mit dem Schlüssel seines Laufs; der neue getrennt.
+    batchMock.mockImplementation(async (payload: StapelPayload) => ({ data: { data: payload.map(() => ({ id: `int-re-${randomUUID()}` })) }, error: null, headers: null }))
+    await arbeiteWarteschlange({ biszeitMs: 20_000, renderer: FAKE, grenze: { mailsTag: null, mailsMonat: null }, abstandMs: 0 })
+    const haengt = await prisma.mailAuftrag.findUniqueOrThrow({ where: { schluessel: `${kennung}-haengt` }, select: { id: true, versuche: true, status: true } })
+    const anfragen = batchMock.mock.calls.map(([payload, optionen]) => ({ an: (payload as StapelPayload).map((m) => m.to).sort(), schluessel: (optionen as { idempotencyKey: string }).idempotencyKey }))
+    expect(anfragen).toContainEqual({ an: [`${kennung}-haengt@example.com`], schluessel: stapelSchluessel([{ id: haengt.id, versuche: 0 }]) })
+    const neu = anfragen.find((x) => x.an.includes(`${kennung}-neu@example.com`))
+    expect(neu?.an).not.toContain(`${kennung}-haengt@example.com`)
+    expect(haengt.status).toBe('gesendet')
+    // Der laufende Auftrag gehört einem anderen Worker und bleibt unberührt.
+    expect(anfragen.flatMap((x) => x.an)).not.toContain(`${kennung}-laeuft@example.com`)
+  })
+
+  it('Beiträge (Nr. 170): vor dem Löschen bekommt der Beitrag die gesendete Zahl — „n per E-Mail“ bleibt danach 2 statt 3; Gegenprobe: ein junger Beitrag behält seine Zahl und seine Aufträge', async () => {
+    const { farm } = await erstelleHof()
+    const alt = await prisma.statusPost.create({ data: { farmId: farm.id, title: 'Alter Beitrag', body: 'Erfunden', publishedAt: vor(91 * TAG), sentViaEmail: true, emailRecipientCount: 3 } })
+    const jung = await prisma.statusPost.create({ data: { farmId: farm.id, title: 'Junger Beitrag', body: 'Erfunden', publishedAt: vor(TAG), sentViaEmail: true, emailRecipientCount: 3 } })
+    const auftrag = (post: string, abo: string, status: string, erstelltAm: Date) => ({
+      art: 'beitrag',
+      vorrang: 2,
+      schluessel: `int-beitrag:${post}:${abo}`,
+      bezug: { postId: post, aboId: abo },
+      farmId: farm.id,
+      status,
+      erstelltAm,
+    })
+    await prisma.mailAuftrag.createMany({
+      data: [
+        auftrag(alt.id, 'a1', 'gesendet', vor(91 * TAG)),
+        auftrag(alt.id, 'a2', 'gesendet', vor(91 * TAG)),
+        auftrag(alt.id, 'a3', 'verworfen', vor(91 * TAG)),
+        auftrag(jung.id, 'a1', 'gesendet', vor(TAG)),
+        auftrag(jung.id, 'a2', 'offen', vor(TAG)),
+        auftrag(jung.id, 'a3', 'offen', vor(TAG)),
+      ],
+    })
+    await rufeAblauf()
+    expect(await prisma.mailAuftrag.count({ where: { bezug: { path: ['postId'], equals: alt.id } } })).toBe(0)
+    expect(await prisma.mailAuftrag.count({ where: { bezug: { path: ['postId'], equals: jung.id } } })).toBe(3)
+    const nachher = await prisma.statusPost.findMany({ where: { id: { in: [alt.id, jung.id] } }, select: { id: true, publishedAt: true, createdAt: true, emailRecipientCount: true } })
+    expect(Object.fromEntries(nachher.map((p) => [p.id, p.emailRecipientCount]))).toEqual({ [alt.id]: 2, [jung.id]: 3 })
+    const anzeige = await gesendeteBeitragsMails(nachher)
+    expect(anzeige.get(alt.id)).toBe(2)
+    expect(anzeige.get(jung.id)).toBe(1)
   })
 })

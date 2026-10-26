@@ -5886,6 +5886,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Folge:** Mit dem dunkleren `--input` wären die `dark:bg-input/30`-Tönungen von Input, Textarea, Select und Umriss-Knopf hell geworden; sie sind entfallen, Felder stehen auf `bg-card` wie im Board. Das Passwort-Auge gibt es nur noch einmal (`PasswordInput`, Feldform über `feld`).
 - **Filter-Chips /products:** `FilterChip` selbst hat die Fläche (36 + 2 × 5 px, die Reihe schneidet mit `py-1` auf genau 44 px). Ohne Fläche waren die Hinweis-Knöpfe in den Produktzeilen („… übernehmen", „Kategorie ergänzen") — sie tragen jetzt `TREFFER_44`.
 
+## Nacharbeit Mails aus Lauf 24 (Register N27, Ergänzung 25.10.2026; Nr. 170, Lauf 25)
+
+- **Aufräumen und abgebrochene Läufe:** Das Aufräumen setzte Aufträge „in Arbeit“ mit abgelaufener Belegung auf offen und `belegtBis` auf null. Damit verlor der Worker die Kennung des abgebrochenen Laufs, schickte die Mails gemischt mit neuen unter einem anderen Idempotenz-Schlüssel, und Resend konnte sie ein zweites Mal verschicken. Der Schritt entfiel; der Worker holt solche Aufträge ohnehin selbst.
+- **„n per E-Mail“ nach 90 Tagen:** Ohne Aufträge liest die Anzeige `emailRecipientCount`, und das war die Zahl der eingestellten Aufträge. Das Aufräumen schreibt jetzt vor dem Löschen die gesendete Zahl hinein (`sichereGesendeteBeitragsMails`). Im Worker geht das nicht, weil dasselbe Feld die 7-Tage-Sperre trägt.
+- **Nochmal-Stände:** `gesperrt` (nur Test-Adressen erlaubt) und `verworfen` (abgemeldet oder ohne Einwilligung) gehen nicht mehr nochmal, und jeder Stand nennt seinen eigenen Grund. Bis dahin hieß es überall „noch unterwegs“.
+- **Kleines:** Der Stapelversand zählt in einem Schritt, „Alle nochmal schicken“ lädt gebündelt (statt bis zu 300 Abfragen), und der Bar-Token entsteht nur noch in `neuerBarToken` (Wache `tests/bar-token-wache.test.ts`). Im Cron „E-Mails“ hält eine gescheiterte Prüfung die andere nicht mehr auf, und die Warnkarte zeigt „Jetzt schicken“ nicht bei einem Auftrag „in Arbeit“. `leseBegrenzt` ist eine Hilfe (src/lib/lese-begrenzt.ts), zwei ungenutzte Postfach-Abfragen sind weg.
+
 ## Nützliche Befehle
 
 ```bash

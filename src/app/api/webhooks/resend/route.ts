@@ -2,6 +2,7 @@ import { createHmac } from 'crypto'
 import { NextResponse, type NextRequest } from 'next/server'
 import { env } from '@/lib/env'
 import { geheimnisGleich } from '@/lib/geheimnis'
+import { leseBegrenzt } from '@/lib/lese-begrenzt'
 import { RESEND_EREIGNIS_MAX_BYTES, RESEND_ZUSTELL_EREIGNISSE, resendEreignisArtSchema, resendZustellSchema } from '@/schemas/resend-ereignis'
 import { vermerkeZustellung } from '@/server/mail-warteschlange'
 
@@ -92,25 +93,6 @@ function signaturGilt(kopf: Headers, roh: string, schluessel: Buffer, jetztS: nu
     const komma = eintrag.indexOf(',')
     return komma > 0 && eintrag.slice(0, komma) === 'v1' && geheimnisGleich(eintrag.slice(komma + 1), erwartet)
   })
-}
-
-/** Liest höchstens `max` Bytes; null = mehr geschickt (dann wird nicht weitergelesen). Wie in /api/csp-bericht. */
-async function leseBegrenzt(request: NextRequest, max: number): Promise<string | null> {
-  if (!request.body) return ''
-  const leser = request.body.getReader()
-  const teile: Uint8Array[] = []
-  let laenge = 0
-  for (;;) {
-    const { done, value } = await leser.read()
-    if (done) break
-    laenge += value.byteLength
-    if (laenge > max) {
-      await leser.cancel()
-      return null
-    }
-    teile.push(value)
-  }
-  return Buffer.concat(teile).toString('utf8')
 }
 
 function zuGross(): NextResponse {

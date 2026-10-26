@@ -8,7 +8,8 @@
  *  - messeBetrieb schreibt je Art EINE Zeile für den UTC-Tag; ein zweiter Lauf
  *    am selben Tag überschreibt (upsert), nur die eigenen Auflistungen zählen
  *    weiter hoch.
- *  - zaehleMail zählt atomar: zweimal → 2, zwanzig gleichzeitig → 22.
+ *  - zaehleMail zählt atomar: zweimal → 2, zwanzig gleichzeitig → 22; seit
+ *    Nr. 170 mit `menge` in einem Schritt (5, dann 1 und 3 → 9).
  *  - Die Warnstufe wird bedingt gesetzt: zwei gleichzeitige Prüfungen → EINE
  *    Mail; 85 % danach keine, 95 % eine, 74 % die Entwarnung — `stufe = 0`,
  *    die Zeile bleibt (gelöscht wird nichts). Geführt an der Datenbank
@@ -130,6 +131,17 @@ describe('zaehleMail', () => {
 
     await Promise.all(Array.from({ length: 20 }, () => zaehleMail(jetzt)))
     expect(await zaehlerstand()).toBe(22)
+  })
+
+  it('Nr. 170: menge zählt in einem Schritt — 5 auf leeren Tag gibt 5, danach 1 und 3 gibt 9', async () => {
+    const jetzt = new Date('2001-04-10T12:00:00.000Z')
+    await zaehleMail(jetzt, 5)
+    const zaehlerstand = async (): Promise<number> =>
+      Number((await prisma.betriebMessung.findUnique({ where: { tag_art: { tag: tagDatum('2001-04-10'), art: 'mails' } } }))?.wert)
+    expect(await zaehlerstand()).toBe(5)
+    await zaehleMail(jetzt)
+    await zaehleMail(jetzt, 3)
+    expect(await zaehlerstand()).toBe(9)
   })
 
   it('zählt in den UTC-Tag: 23:30 Uhr UTC ist noch derselbe Tag, 0:30 Uhr UTC der nächste', async () => {

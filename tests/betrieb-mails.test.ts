@@ -279,7 +279,7 @@ describe('Warnkarte der Ansicht E-Mails', () => {
     wichtig: 1,
     kannWarten: 13,
     aeltesteWichtigeAm: minuten(7),
-    aeltesteWichtige: { id: 'auftrag_1', art: 'bestellung-bestaetigung', versuche: 2, fehlerCode: 'rate_limit_exceeded', naechsterVersuchAm: new Date('2026-10-24T07:43:00.000Z'), zuBestellung: true },
+    aeltesteWichtige: { id: 'auftrag_1', art: 'bestellung-bestaetigung', status: 'offen', versuche: 2, fehlerCode: 'rate_limit_exceeded', naechsterVersuchAm: new Date('2026-10-24T07:43:00.000Z'), zuBestellung: true },
   }
   const arten = [art({ art: 'abholbereit', gesendet: 1_102, zugestellt: 1_095, abgelehnt: 7 })]
   const lage = mailWarnLage(schlange, { gesendet: 1_102, abgelehnt: 7, spam: 0 }, JETZT)
@@ -295,6 +295,15 @@ describe('Warnkarte der Ansicht E-Mails', () => {
     ])
     expect(karte.gruen).toBe('Sonst im grünen Bereich · Zustellung 99,4 % · Kontingent 42 % · Warn-Mail ging um 09:41 an dich')
     expect(karte.jetztSchicken).toBe('auftrag_1')
+  })
+
+  it('Nr. 170: kein „Jetzt schicken“ bei einem Auftrag „in Arbeit“ — Gegenprobe: derselbe Auftrag offen bekommt den Knopf', () => {
+    const inArbeit = { ...schlange, aeltesteWichtige: { ...schlange.aeltesteWichtige!, status: 'in_arbeit' } }
+    const karte = mailWarnkarte({ lage, schlange: inArbeit, zaehler: { heute: 1, imZeitraum: 1 }, arten }, [], JETZT, GRENZE_FREE)
+    expect(karte.jetztSchicken).toBeNull()
+    // Die Warnung selbst bleibt stehen — nur der Knopf fehlt.
+    expect(karte.eintraege.map((e) => e.art)).toEqual(['mail:wartet'])
+    expect(mailWarnkarte({ lage, schlange, zaehler: { heute: 1, imZeitraum: 1 }, arten }, [], JETZT, GRENZE_FREE).jetztSchicken).toBe('auftrag_1')
   })
 
   it('Gegenprobe: bei 422 kein „Jetzt schicken“; ohne Warnung leer und „Alles im grünen Bereich“', () => {

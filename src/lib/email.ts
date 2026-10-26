@@ -129,17 +129,17 @@ export type VersandErgebnis = { id?: string; error?: string; gesperrt?: true }
 export type MailOptionen = { art: MailArt; bestellungId?: string; farmId?: string; nochmalVon?: string; headers?: Record<string, string> }
 
 /**
- * Zählt eine verschickte Mail für Admin › Betrieb (Register N18, Nr. 103) —
+ * Zählt `menge` verschickte Mails für Admin › Betrieb (Register N18, Nr. 103) —
  * die EINE Ausnahme von „email.ts liest nie Prisma" (ARCHITECTURE §4): Der
  * Zähler kommt per `await import()` erst nach dem Versand, email.ts selbst
  * bindet ihn nicht statisch ein. Fail-open: Ein Fehler beim Zählen stoppt nie
  * eine Mail und wirft nie — nach Sentry geht nur die Fehlerklasse unter einem
  * festen Satz, nie Adresse oder Betreff.
  */
-async function zaehleVersand(): Promise<void> {
+async function zaehleVersand(menge = 1): Promise<void> {
   try {
     const { zaehleMail } = await import('@/server/betrieb-zaehler')
-    await zaehleMail()
+    await zaehleMail(new Date(), menge)
   } catch (err) {
     try {
       const meldung = new Error('Betrieb: Mail nicht gezählt')
@@ -264,8 +264,8 @@ export type StapelErgebnis = { ok: true; ids: string[] } | { ok: false; statusCo
  * `postSperreLaesstDurch` geprüft hat. `batch.send` nimmt je Mail dieselben
  * Felder wie `emails.send` ohne Anhänge und ohne Termin, also auch `headers`;
  * der Idempotenz-Schlüssel gilt für die ganze Anfrage. Strikte Prüfung (alles
- * oder nichts): So gehört die n-te ID sicher zur n-ten Mail. Gezählt wird
- * jede angenommene Mail wie bei sendRaw. Wirft nie.
+ * oder nichts): So gehört die n-te ID sicher zur n-ten Mail. Gezählt werden
+ * die angenommenen Mails in EINEM Schritt. Wirft nie.
  */
 export async function versendeStapel(mails: readonly StapelMail[], idempotenzSchluessel: string): Promise<StapelErgebnis> {
   if (!apiKey) return { ok: false, statusCode: null, code: 'ohne_schluessel' }
@@ -281,7 +281,8 @@ export async function versendeStapel(mails: readonly StapelMail[], idempotenzSch
     }
     const ids = result.data.data.map((d) => d.id)
     console.log(`[E-Mail] ✓ Stapel gesendet: ${ids.length} Mails`)
-    for (let i = 0; i < ids.length; i += 1) await zaehleVersand()
+    // Ein Schritt für den ganzen Stapel (Nr. 170) statt einer Anweisung je Mail.
+    if (ids.length > 0) await zaehleVersand(ids.length)
     return { ok: true, ids }
   } catch (err) {
     console.error(`[E-Mail] Exception im Stapel: ${fehlerKlasse(err)}`)
