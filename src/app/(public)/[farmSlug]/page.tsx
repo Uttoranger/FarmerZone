@@ -3,7 +3,7 @@ import { notFound, unstable_rethrow } from 'next/navigation'
 import type { Metadata } from 'next'
 import * as Sentry from '@sentry/nextjs'
 import { beitragKennungAus, ladeBeitraege } from '@/server/hofseite-beitraege'
-import { ladeHofseiteGeteilt } from '@/server/hofseite-vorschau'
+import { ladeHofseiteGeteilt, type Vorab } from '@/server/hofseite-vorschau'
 import { pruefeHofseiteGeteilt, type HofSeo } from '@/server/queries/seo'
 import { verifyReorderToken } from '@/lib/reorder-token'
 import { prisma } from '@/lib/prisma'
@@ -127,7 +127,7 @@ async function ladeTeilenVorschauOhneRisiko(slug: string): Promise<Awaited<Retur
  * Was der Lader der Hofseite gleichzeitig mit den vollen Tagen startet, sobald der Hof bekannt ist
  * (Nr. 180): die Beiträge. Metadaten und Seite geben dasselbe mit — wer zuerst lädt, startet sie.
  */
-function vorab(suche: Suchparameter): (hofId: string) => Promise<unknown> {
+function vorab(suche: Suchparameter): Vorab {
   const kennung = beitragKennungAus(suche)
   return (hofId) => ladeBeitraege(hofId, kennung)
 }

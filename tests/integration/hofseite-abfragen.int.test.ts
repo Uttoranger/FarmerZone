@@ -17,7 +17,7 @@ vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi
 import pg from 'pg'
 import { ladeHofseite } from '@/server/hofseite-vorschau'
 import { ladeTeilenVorschau } from '@/server/queries/teilen-bild'
-import { getActiveStatusPosts } from '@/server/queries/status-posts'
+import { ladeBeitraege } from '@/server/hofseite-beitraege'
 import { erstelleHof, erstelleProdukt, raeumeAuf } from './setup/basis'
 
 let abfragen: string[] = []
@@ -25,12 +25,11 @@ const original = pg.Client.prototype.query
 
 beforeEach(() => {
   abfragen = []
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  pg.Client.prototype.query = function (this: unknown, ...args: any[]) {
-    const text = typeof args[0] === 'string' ? args[0] : (args[0]?.text as string | undefined)
+  pg.Client.prototype.query = function (this: unknown, ...args: unknown[]) {
+    const erstes = args[0]
+    const text = typeof erstes === 'string' ? erstes : (erstes as { text?: string } | undefined)?.text
     if (text) abfragen.push(text.trim().split(/\s+/).slice(0, 2).join(' '))
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (original as any).apply(this, args)
+    return Reflect.apply(original, this, args)
   } as typeof original
 })
 
@@ -49,11 +48,12 @@ describe('SQL je Hofseiten-Anfrage', () => {
 
     abfragen = []
     await Promise.all([
-      // Metadaten: Hof (geteilt mit der Seite, einmal) und Teilen-Bild
-      ladeHofseite(farm.slug, {}).then((e) => e.farm && getActiveStatusPosts(e.farm.id, 5)),
+      // Der Weg der Seite: Hof (geteilt mit den Metadaten, einmal) und die Beiträge; dazu das Teilen-Bild der Metadaten.
+      ladeHofseite(farm.slug, {}).then((e) => e.farm && ladeBeitraege(e.farm.id, null)),
       ladeTeilenVorschau(farm.slug, new Date()),
     ])
-    // Der Messwert steht im Bericht (docs/nachtlauf/berichte/180.md). Ein Test, der ihn nur ausgibt,
+    // Vorher-Wert (14, e1f89496): derselbe Test gegen den Lader von e1f89496 (Beiträge dort nacheinander
+    // geladen, gleiche Abfragen). Der Messwert steht im Bericht (docs/nachtlauf/berichte/180.md). Ein Test, der ihn nur ausgibt,
     // wäre keiner: Eine Abfrage mehr oder weniger soll auffallen.
     expect(selects()).toBe(GEZAEHLT)
   })
