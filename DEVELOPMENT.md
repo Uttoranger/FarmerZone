@@ -5983,6 +5983,17 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Lebenszeichen** alle 15 Minuten statt täglich um 7:17 UTC.
 - **Admin › Betrieb › Überblick:** Karten „Dienste“ (je mit Prüfweg), „Version“ (Commit, letzte Migration aus `_prisma_migrations`, Instant Rollback) und „Alarm-Matrix“ (`ALARM_MATRIX`, dieselbe Tabelle in ARCHITECTURE). Die Build-Zeit fehlt: Ohne Eintrag in `next.config.ts` gibt es sie zur Laufzeit nicht (Bericht 184).
 
+## Nacharbeit Lauf 25 (Nr. 195, Lauf 26, 26.10.2026)
+
+- **Netzsatz bei nicht wiederholbaren Aktionen** (Register N29, Ergänzung 26.10.2026): `NETZ_SATZ_UNSICHER` in `src/lib/netz.ts`; `aktionOhneWurf(aufruf, { unsicher: true })` für Storno, Statuswechsel, Rückwege und „Artikel fehlt“ im Hofbereich (kein „Nochmal“), in der Kasse beim Verbindungsfehler von `stripe.confirmPayment` (`zahlungsFehlerArt` → `netz`). Das Abschicken der Bestellung bleibt bei „Nochmal versuchen“ (gleicher Idempotenz-Schlüssel).
+- **Enter in der Kasse** springt weiter (Entscheidung 4): unverändert, Kommentar an `weiterBeiEnter`.
+- **Hofseite am Handy:** Zurück-Knopf oben links im Titelbild, solange die klebende Hofzeile nicht steht (Entscheidung 5, `TITELBILD_ZURUECK`, `hofzeileSteht`). **Hof-Unterleiste:** 11 px unter 360 px (Entscheidung 6, `engUnter360`). **Kicker „Aus der Region“** entfällt (Entscheidung 10).
+- **Wortliste:** „Warenkorb“, nur am Knopf „In den Korb“ (N8-Ergänzung); Wache `tests/warenkorb-wort-wache.test.ts` mit Bestand der Knöpfe. Die Bestätigung „… ist im Warenkorb“ (N30) folgt der Ergänzung.
+- **Lint:** 10 der 12 Warnungen behoben (ungenutzte Namen, überflüssige Ausnahme). Geblieben: zwei Hinweise des React Compilers zu `form.watch()` in `checkout-form.tsx` und `product-dialog.tsx` — `useWatch` ließ den Compiler beide Dateien prüfen und brachte Fehler zu `set-state-in-effect`, ein eigener Auftrag.
+- **Audit:** A4 „Rückgängig“ nach „Gepackt“ verwirft den offenen Auftrag `abholbereit` (`verwirfOffenenAbholbereitAuftrag`), und der Renderer sendet nur bei `READY`. A5 Produkt mit Bestellungen wird ausgeblendet (`isAvailable = false`) statt gelöscht (der Fremdschlüssel hätte das Löschen ohnehin abgelehnt); ohne Migration. A7 war schon so (`revalidiereProdukte` in `createManualSale`), jetzt mit Gegenprobe getestet. D11/D12 `env.CRON_SECRET` in cleanup-reservations; vier Variablen optional im Schema.
+
+---
+
 ## Nützliche Befehle
 
 ```bash

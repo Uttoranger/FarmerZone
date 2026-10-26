@@ -31,8 +31,6 @@ import { checkoutFormSchema } from '@/schemas/checkout'
 import {
   KASSE_NOCHMAL,
   KASSE_ZEITLIMIT_SATZ,
-  PREISE_INKL_UST,
-  SERVICEGEBUEHR_ZUSATZ,
   bestellungSenden,
   weiterBeiEnter,
 } from '@/lib/kasse'

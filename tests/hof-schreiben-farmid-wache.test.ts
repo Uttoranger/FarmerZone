@@ -56,7 +56,6 @@ const FARMID_BESTAND: readonly Eintrag[] = [
   { datei: 'postfach.ts', funktion: 'antworteAlsTeam', aufruf: 'unterhaltung.updateMany', anzahl: 2, grund: ADMIN },
   { datei: 'postfach.ts', funktion: 'markiereErstattungErledigt', aufruf: 'order.updateMany', anzahl: 1, grund: ADMIN },
   { datei: 'products.ts', funktion: 'updateProductImageAction', aufruf: 'product.update', anzahl: 1, grund: VORAB },
-  { datei: 'products.ts', funktion: 'deleteProduct', aufruf: 'product.delete', anzahl: 1, grund: VORAB },
   { datei: 'products.ts', funktion: 'reorderProductsAction', aufruf: 'product.update', anzahl: 1, grund: 'Die Liste ist vorher als genau die Produkte des eigenen Hofs geprüft; farmId in die WHERE nachziehen' },
   { datei: 'subscriptions.ts', funktion: 'deleteCustomerAccount', aufruf: 'customerFarmSubscription.deleteMany', anzahl: 1, grund: 'Kundin löscht ihr Konto: alle Abos ihrer bestätigten Adresse, über alle Höfe' },
 ]

@@ -756,7 +756,7 @@ export function CheckoutForm({
                   Betrieb
                 </h2>
                 <p className={cn(HINWEIS, 'mt-1')}>
-                  Ein Futtermittel in deinem Korb gibt der Hof nur an landwirtschaftliche Betriebe ab.
+                  Ein Futtermittel in deinem Warenkorb gibt der Hof nur an landwirtschaftliche Betriebe ab.
                 </p>
               </div>
               <label className="flex min-h-11 cursor-pointer items-start gap-3">

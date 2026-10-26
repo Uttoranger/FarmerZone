@@ -254,7 +254,7 @@ export function gebuehrHinweis(
   const zusatz = barAusnahme ? ` ${BAR_OHNE_GEBUEHR_HINWEIS}` : ''
   return {
     kurz: `${grund} – im Warenkorb einzeln ausgewiesen. Der Hof bekommt den vollen Preis.${zusatz}`,
-    produkte: `${grund} – einmal pro Bestellung, egal wie viel du in den Korb legst.${zusatz}`,
+    produkte: `${grund} – einmal pro Bestellung, egal wie viel du in den Warenkorb legst.${zusatz}`,
     korb: barAusnahme ? GEBUEHR_KORB_NUR_ONLINE : 'zzgl. Servicegebühr',
   }
 }

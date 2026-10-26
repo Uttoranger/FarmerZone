@@ -9,7 +9,6 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FilterChip } from '@/components/ui/chip'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { Kicker } from '@/components/startseite/kicker'
 import { Abzeichen } from '@/components/ui/abzeichen'
 import { BeitragMarke } from '@/components/hoefe/beitrag-marke'
 
@@ -22,6 +21,9 @@ import { BeitragMarke } from '@/components/hoefe/beitrag-marke'
  * Einen Standort kennt die Startseite nicht: Die Entfernung („4 km") des
  * Mockups gibt es erst auf /hoefe, wo die Umkreissuche im Browser rechnet.
  * Statt der Kilometer steht PLZ und Ort.
+ *
+ * Kein Kicker „Aus der Region" über dem Titel (Entscheidung 10, Morgenbericht 25):
+ * „Höfe aus der Region" sagt es schon, der Kicker wiederholte es.
  */
 
 export function HoefeInDerNaehe({ children }: { children: ReactNode }): React.JSX.Element {
@@ -30,7 +32,6 @@ export function HoefeInDerNaehe({ children }: { children: ReactNode }): React.JS
       <div className="mx-auto flex max-w-[1200px] flex-col gap-[22px] px-4 md:gap-[26px] md:px-6">
         <div className="flex flex-wrap items-end gap-3">
           <div>
-            <Kicker>Aus der Region</Kicker>
             <h2 id="hoefe-titel" className="font-heading text-[22px] font-semibold md:text-[32px]">
               {STARTSEITE_HOEFE_TITEL}
             </h2>

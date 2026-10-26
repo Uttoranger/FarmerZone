@@ -578,7 +578,7 @@ describe('Produktraster: Abgleich beim Laden (Register N28)', () => {
 
     expect(korb().items.map((i) => [i.productId, i.price])).toEqual([[EIER.id, 3.9]])
     expect(leseWarenkorb(speicher.get(WARENKORB_SCHLUESSEL) ?? null)?.items.map((i) => i.price)).toEqual([3.9])
-    expect(hinweis.text).toBe('Eine Position ist nicht mehr verfügbar und wurde entfernt. Ein Preis hat sich geändert – der Korb zeigt den neuen.')
+    expect(hinweis.text).toBe('Eine Position ist nicht mehr verfügbar und wurde entfernt. Ein Preis hat sich geändert – der Warenkorb zeigt den neuen.')
     // Wer nur schaut, hält nichts: kein Aufruf von /api/reserve und keiner der Kasse.
     expect(reserviere).not.toHaveBeenCalled()
   })

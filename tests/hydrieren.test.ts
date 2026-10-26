@@ -25,10 +25,11 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import ts from 'typescript'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, createElement, type ComponentProps, type ReactNode } from 'react'
+import { act, createElement, useState, type ComponentProps, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BROWSER_OBJEKTE, hydriere, pruefeHydrieren, raeumeHydrierenAuf } from './hydrieren-hilfe'
 import { NetzHinweis } from '@/components/ui/netz-hinweis'
+import { useHofzeileKlebt } from '@/components/hofseite/use-hofzeile-klebt'
 import { NETZ_ZEILE } from '@/lib/netz'
 
 // Attrappen wie in tests/mein-hof-umschalter.test.ts: Die Adresse liest useSearchParams aus `adresse`.
@@ -209,6 +210,28 @@ describe('Hydrieren – die Netz-Zeile (Register N29, Nr. 175)', () => {
     } finally {
       Reflect.deleteProperty(navigator, 'onLine')
     }
+  })
+})
+
+describe('Hydrieren – klebt die Hofzeile (Nr. 195)', () => {
+  function Probe(): React.JSX.Element {
+    const [block, setzeBlock] = useState<HTMLDivElement | null>(null)
+    return createElement('div', { ref: setzeBlock }, `klebt: ${useHofzeileKlebt(block)}`)
+  }
+  afterEach(() => vi.restoreAllMocks())
+  const lageDesBlocks = (oben: number) => () =>
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ top: oben, height: 0 } as DOMRect)
+
+  it('im Server-HTML „klebt nicht“; oben angekommen nach dem Hydrieren „klebt“', async () => {
+    const ergebnis = await pruefeHydrieren(createElement(Probe), { imBrowser: lageDesBlocks(0) })
+    expect(ergebnis.serverHtml).toContain('klebt: false')
+    expect(ergebnis.meldungen).toEqual([])
+    expect(ergebnis.container.textContent).toBe('klebt: true')
+  })
+
+  it('Gegenprobe: weit unten im Fluss bleibt es bei „klebt nicht“', async () => {
+    const ergebnis = await pruefeHydrieren(createElement(Probe), { imBrowser: lageDesBlocks(420) })
+    expect(ergebnis.container.textContent).toBe('klebt: false')
   })
 })
 
@@ -445,6 +468,7 @@ const GEPRUEFT: Record<string, string[]> = {
   'src/components/cookie-banner.tsx': ['CookieBanner'],
   'src/components/farm/vorschau-im-rahmen.tsx': ['useImVorschauRahmen'],
   'src/components/heute/startbildschirm-karte.tsx': ['StartbildschirmKarte'],
+  'src/components/hofseite/use-hofzeile-klebt.ts': ['useHofzeileKlebt'],
   'src/components/hoefe/hoefe-client.tsx': ['HoefeClient'],
   'src/components/hoefe/use-hoefe-adresse.ts': ['useHoefeAdresse'],
   'src/components/hoefe/use-uhr.ts': ['Abholzeile', 'BeitragMarke'],

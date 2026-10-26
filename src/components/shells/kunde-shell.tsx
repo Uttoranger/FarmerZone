@@ -72,7 +72,7 @@ function WarenkorbKopf({ anzahl, href }: { anzahl: number; href: string }) {
       className={cn('relative flex size-11 items-center justify-center rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN)}
     >
       <ShoppingBasket className="size-5" strokeWidth={1.7} aria-hidden="true" />
-      <Zaehler anzahl={anzahl} wofuer="Artikel im Korb" ton="gruen" className="absolute top-0.5 right-0 h-4 min-w-4 px-1 text-[9.5px]" />
+      <Zaehler anzahl={anzahl} wofuer="Artikel im Warenkorb" ton="gruen" className="absolute top-0.5 right-0 h-4 min-w-4 px-1 text-[9.5px]" />
     </Link>
   )
 }
@@ -266,7 +266,7 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, children }: Kun
                       {korb && (
                         <Zaehler
                           anzahl={korb.anzahl}
-                          wofuer="Artikel im Korb"
+                          wofuer="Artikel im Warenkorb"
                           ton="orange"
                           className="absolute -top-1 -right-1 ring-2 ring-card"
                         />

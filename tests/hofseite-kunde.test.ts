@@ -275,7 +275,7 @@ describe('Servicegebühr — Satz und Hinweis aus der Hofeinstellung (E4)', () =
   it('der Hinweis nennt Satz und Mindestgebühr, einmal je Bestellung — ohne Satz kein Hinweis', () => {
     expect(gebuehrHinweis({ prozent: 5, mindestCents: 50 })).toEqual({
       kurz: 'Preise zzgl. 5 % Servicegebühr (mind. € 0,50) – im Warenkorb einzeln ausgewiesen. Der Hof bekommt den vollen Preis.',
-      produkte: 'Preise zzgl. 5 % Servicegebühr (mind. € 0,50) – einmal pro Bestellung, egal wie viel du in den Korb legst.',
+      produkte: 'Preise zzgl. 5 % Servicegebühr (mind. € 0,50) – einmal pro Bestellung, egal wie viel du in den Warenkorb legst.',
       korb: 'zzgl. Servicegebühr',
     })
     expect(gebuehrHinweis({ prozent: 4.9, mindestCents: 50 })?.kurz).toContain('4,9 %')

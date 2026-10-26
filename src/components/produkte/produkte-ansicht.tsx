@@ -29,6 +29,8 @@ import {
   PRODUKTE_FILTER_LABEL,
   VORRAT_HINWEIS,
   VORRAT_HINWEIS_ZEILEN,
+  PRODUKT_LOESCHEN_TEXT,
+  produktLoeschenHinweis,
   filterAdresse,
   filtereProdukte,
   produktStatus,
@@ -184,8 +186,8 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
     if (!loeschen) return
     setLoeschtGerade(true)
     try {
-      await deleteProduct(loeschen.id)
-      toast.success('Produkt gelöscht')
+      const ergebnis = await deleteProduct(loeschen.id)
+      toast.success(produktLoeschenHinweis(ergebnis), ergebnis.archiviert ? { duration: 8000 } : undefined)
       setLoeschen(null)
     } catch {
       toast.error('Wir konnten das Produkt nicht löschen. Bitte versuch es noch einmal.')
@@ -377,10 +379,9 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
 
       <Dialog open={loeschen !== null} onOpenChange={(o) => !o && setLoeschen(null)}>
         <DialogContent className="sm:max-w-[480px]">
-          <DialogTitle className="font-heading text-xl font-semibold">Produkt löschen?</DialogTitle>
+          <DialogTitle className="font-heading text-xl font-semibold">{PRODUKT_LOESCHEN_TEXT.titel}</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            <span className="font-medium break-words text-foreground">{loeschen?.name}</span> wird dauerhaft gelöscht. Vergangene
-            Bestellungen bleiben erhalten. Nur ausblenden geht mit dem Schalter „Sichtbar“.
+            <span className="font-medium break-words text-foreground">{loeschen?.name}</span> {PRODUKT_LOESCHEN_TEXT.dialogSatz}
           </DialogDescription>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setLoeschen(null)} disabled={loeschtGerade}>

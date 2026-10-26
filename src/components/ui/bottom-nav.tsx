@@ -27,12 +27,15 @@ import { Zaehler } from '@/components/ui/zaehler'
 export function BottomNav({
   beschriftung = 'Hauptnavigation',
   ueberSchleier = false,
+  engUnter360 = false,
   children,
   className,
 }: {
   beschriftung?: string
   /** Solange ein Blatt der Leiste offen ist, liegt sie über dessen Schleier (Ebene 60), sonst auf 50. */
   ueberSchleier?: boolean
+  /** Hofbereich (Entscheidung 6, Nr. 195): unter 360 px Breite 11 statt 12 px Schrift, damit „Bestellungen" nicht abgeschnitten wird. */
+  engUnter360?: boolean
   children: ReactNode
   className?: string
 }): React.JSX.Element {
@@ -42,9 +45,11 @@ export function BottomNav({
       data-slot="bottom-nav"
       // Feste Leiste unten: Der Cookie-Hinweis steht darüber, nie darauf (src/lib/cookie-hinweis.ts).
       data-unten-fest=""
+      data-eng={engUnter360 ? '' : undefined}
       className={cn(
         'fixed inset-x-0 bottom-0 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] md:hidden print:hidden',
         ueberSchleier ? 'z-[60]' : 'z-50',
+        'group/leiste',
         className
       )}
     >
@@ -57,10 +62,12 @@ export function BottomNav({
  * Gestalt eines Eintrags — aktiv heißt Textfarbe und fett, sonst die leise Farbe.
  * Schrift 12 px (Nr. 177, vorher 10,5): gelesen wird draußen, oft mit Handschuhen
  * und in der Sonne. Die Leiste bleibt 68 px hoch, nur die Schrift wächst.
+ * Nur im Hofbereich (`engUnter360` an der Leiste) und nur unter 360 px Breite 11 px
+ * (Entscheidung 6, Nr. 195): fünf Einträge ohne abgeschnittene Wörter.
  */
 export function bottomNavEintragKlassen(aktiv: boolean): string {
   return cn(
-    'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-[3px] rounded-xl text-[12px] leading-none transition-colors duration-[250ms]',
+    'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-[3px] rounded-xl text-[12px] leading-none group-data-[eng]/leiste:max-[359px]:text-[11px] transition-colors duration-[250ms]',
     aktiv ? 'font-semibold text-foreground' : 'text-muted-foreground hover:text-foreground',
     FOKUS_RAHMEN
   )
@@ -123,7 +130,7 @@ export function mittelknopfKlassen(ton: 'gruen' | 'orange'): string {
  */
 export function mittelknopfMitWortKlassen(): string {
   return cn(
-    'group relative -mt-5 flex shrink-0 flex-col items-center gap-[7px] rounded-2xl text-[12px] leading-none text-muted-foreground transition-colors duration-[250ms] hover:text-foreground',
+    'group relative -mt-5 flex shrink-0 flex-col items-center gap-[7px] rounded-2xl text-[12px] leading-none group-data-[eng]/leiste:max-[359px]:text-[11px] text-muted-foreground transition-colors duration-[250ms] hover:text-foreground',
     FOKUS_RAHMEN
   )
 }

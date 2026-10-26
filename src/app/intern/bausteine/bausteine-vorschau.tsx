@@ -216,7 +216,7 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
                 {LANGER_NAME}
               </StatusBadge>
               <Zaehler anzahl={3} wofuer="offene Bestellungen" />
-              <Zaehler anzahl={128} wofuer="Artikel im Korb" ton="gruen" />
+              <Zaehler anzahl={128} wofuer="Artikel im Warenkorb" ton="gruen" />
             </div>
             <ProgressBar beschriftung="Deine Hofseite" wert={64} />
             <ProgressBar beschriftung="Gepackt" wert={3} max={8} ton="orange" />

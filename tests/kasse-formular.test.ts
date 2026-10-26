@@ -60,8 +60,6 @@ vi.mock('@/lib/stripe-client', () => ({ getStripePromise: () => null }))
 
 import { CheckoutForm } from '@/components/checkout/checkout-form'
 import { barGuenstiger, PREISE_INKL_UST, SERVICEGEBUEHR_ZUSATZ } from '@/lib/kasse'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { BAR_OHNE_GEBUEHR_HINWEIS, BAR_OHNE_GEBUEHR_ZAHLART } from '@/lib/konditionen'
 import { ANGABEN_ZUM_HOF_TITEL } from '@/lib/stripe-konto'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'

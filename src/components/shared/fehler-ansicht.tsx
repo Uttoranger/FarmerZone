@@ -76,7 +76,7 @@ export function FehlerAnsicht({
           <button type="button" onClick={nochmal} className={cn(PILLE, 'bg-primary text-primary-foreground hover:opacity-90')}>
             {NOCHMAL_VERSUCHEN}
           </button>
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Hier ist der
+          {/* Absichtlich ein <a>, kein <Link>: Hier ist der
               Vollaufbau das Ziel, nicht der Umweg: <Link> navigiert im selben,
               gerade zerbrochenen Baum weiter, und in global-error gibt es den
               Router-Kontext ohnehin nicht verlässlich. */}

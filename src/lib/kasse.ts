@@ -321,7 +321,7 @@ export function reservierungsStand(bisIso: string | null, jetzt: Date): Reservie
 
 // ─── Zahlung ────────────────────────────────────────────────────────────────
 
-export type ZahlungsFehler = 'bezahlt' | 'abgelaufen' | 'abgelehnt' | 'sonstig'
+export type ZahlungsFehler = 'bezahlt' | 'abgelaufen' | 'abgelehnt' | 'netz' | 'sonstig'
 
 /**
  * Was ein Fehler aus `stripe.confirmPayment` für die Kundin heißt.
@@ -333,7 +333,8 @@ export type ZahlungsFehler = 'bezahlt' | 'abgelaufen' | 'abgelehnt' | 'sonstig'
  * - Nur eine abgelehnte Karte (`card_error`) heißt sicher: Der Zahlungsvorgang
  *   steht wieder auf „Zahlungsart fehlt", es wurde nichts abgebucht, ein neuer
  *   Versuch geht. Unvollständige Eingaben zeigt Stripe selbst am Feld,
- *   Netzfehler bleiben ohne Zusatz.
+ *   Netzfehler (`api_connection_error`) heißen `netz`: Ob die Zahlung ankam, ist
+ *   offen — die Kasse zeigt `NETZ_SATZ_UNSICHER` (Register N29, Ergänzung 26.10.2026).
  */
 export function zahlungsFehlerArt(f: {
   fehlerTyp: string | undefined
@@ -343,6 +344,7 @@ export function zahlungsFehlerArt(f: {
   if (f.intentStatus === 'succeeded' || f.intentStatus === 'processing') return 'bezahlt'
   if (f.intentStatus === 'canceled' || f.fristUm) return 'abgelaufen'
   if (f.fehlerTyp === 'card_error') return 'abgelehnt'
+  if (f.fehlerTyp === 'api_connection_error') return 'netz'
   return 'sonstig'
 }
 
@@ -542,6 +544,9 @@ type EnterEreignis = {
  * abzuschicken. Die Tastatur zeigt dort „Weiter" (enterKeyHint) — und der
  * Abschluss dieses Formulars ist zahlungspflichtig: Eine Taste, die „Weiter"
  * heißt, darf nie bestellen. Notizfeld, Haken und Knöpfe behalten ihr Verhalten.
+ *
+ * Bleibt so (Entscheidung 4, Morgenbericht 25, am 26.10.2026 bestätigt): Enter
+ * springt in der Kasse weiter, bestellt wird nur mit dem Kaufknopf.
  */
 export function weiterBeiEnter(e: EnterEreignis): void {
   const ziel = e.target as { tagName?: string; type?: string; focus?: () => void }

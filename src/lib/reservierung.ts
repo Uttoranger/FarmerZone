@@ -159,7 +159,7 @@ export function neueFrist(jetzt: Date): Date {
 }
 
 /** Der Satz, wenn die Hofseite einen geänderten Preis in den Korb übernimmt (Register N28). Die Kasse hat ihren eigenen. */
-export const KORB_PREIS_GEAENDERT = 'Ein Preis hat sich geändert – der Korb zeigt den neuen.'
+export const KORB_PREIS_GEAENDERT = 'Ein Preis hat sich geändert – der Warenkorb zeigt den neuen.'
 
 /** Was die Hofseite über ein Produkt weiß (PublicProduct): ohne fremde Halte, nur verfügbare Produkte. */
 export type HofseitenProdukt = {

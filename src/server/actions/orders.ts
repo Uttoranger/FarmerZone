@@ -5,7 +5,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { stelleEinOhneRisiko, stelleMailEinInTransaktion, type EinstellAuftrag, type EinstellErgebnis } from '@/server/mail-warteschlange'
-import { artikelFehltMailAuftrag, bestellMailAuftrag, stornoMailAuftrag, trageStornoErstattungEin } from '@/server/mail-arten/bestellung'
+import { artikelFehltMailAuftrag, bestellMailAuftrag, stornoMailAuftrag, trageStornoErstattungEin, verwirfOffenenAbholbereitAuftrag } from '@/server/mail-arten/bestellung'
 import { betreiberAuftraege, betreiberKennungen, erstattungOffenBezug } from '@/server/mail-arten/betreiber'
 import { erstattungOffenInhalt } from '@/lib/erstattung-offen'
 import type { ErstattungOffenFall } from '@/schemas/mail-auftrag'
@@ -137,6 +137,19 @@ const LAUFEND: OrderStatus[] = ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY']
 
 /** Eine Bestell-Kennung an der Grenze (Nr. 178): dieselbe Form wie bei Storno und „Artikel fehlt". */
 const bestellKennungSchema = stornoEingabeSchema.shape.orderId
+
+/**
+ * Nach einem Rückweg aus „Gepackt“: der noch offene Auftrag `abholbereit` fällt
+ * weg (Audit A4). Nachlauf — scheitert er, gilt der Rückweg trotzdem (der
+ * Renderer prüft vor dem Senden ohnehin `READY`); Sentry bekommt nur die Kennung.
+ */
+async function verwerfeAbholbereitOhneRisiko(orderId: string): Promise<void> {
+  try {
+    await verwirfOffenenAbholbereitAuftrag(orderId)
+  } catch (err) {
+    Sentry.captureException(err, { tags: { aktion: 'abholbereit-verwerfen' }, extra: { orderId } })
+  }
+}
 
 export async function markAsReady(orderId: string): Promise<ActionResult> {
   if (!bestellKennungSchema.safeParse(orderId).success) return { error: 'Bestellung nicht gefunden' }
@@ -274,6 +287,7 @@ export async function revertReady(
   }
   if (mail === 'nachholen' && auftrag) await stelleEinOhneRisiko('nicht-abholbereit', orderId, auftrag)
   if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
+  await verwerfeAbholbereitOhneRisiko(orderId)
 
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)
@@ -362,6 +376,8 @@ export async function revertOrderStatus(orderId: string, previousStatus: string)
     data: { status: previousStatus as OrderStatus, pickedUpAt: null, ...(zahlung ?? {}) },
   })
   if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
+  // „Rückgängig“ nach „Gepackt“: die Abholbereit-Mail, die noch wartet, geht nicht mehr hinaus (A4).
+  if (ausStatus === 'READY') await verwerfeAbholbereitOhneRisiko(orderId)
 
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)
