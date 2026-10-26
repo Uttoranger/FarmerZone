@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Check, MessageCircle, Phone, Printer } from 'lucide-react'
 import {
@@ -20,6 +21,7 @@ import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS, centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
+import { PROBLEM_MELDEN, PROBLEM_MELDEN_HOF } from '@/lib/fehlerseite'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 import { cn } from '@/lib/utils'
 import { BestellDialog, DialogFehler } from './bestell-dialog'
@@ -54,6 +56,7 @@ export function BestellDetail({
   const [offen, setOffen] = useState<Offen>(null)
   const [fehler, setFehler] = useState<string | null>(null)
   const [kundinInformieren, setKundinInformieren] = useState(true)
+  const router = useRouter()
   const [laeuft, starte] = useTransition()
   const { aktionen, betrag, kunde } = bestellung
   const anrufen = telefonLink(kunde.telefon)
@@ -107,7 +110,11 @@ export function BestellDetail({
       }
       setOffen(null)
       if (ergebnis.gebuehrErstattungOffen) {
-        toast.warning('Als nicht abgeholt gespeichert. Die Servicegebühr-Erstattung hat nicht geklappt – bitte den Betreiber informieren.', { duration: 10000 })
+        // Der Weg steht am Toast: „bitte den Betreiber informieren" sagte nicht, wie.
+        toast.warning('Als nicht abgeholt gespeichert. Die Servicegebühr-Erstattung hat nicht geklappt.', {
+          duration: 10000,
+          action: { label: PROBLEM_MELDEN, onClick: () => router.push(PROBLEM_MELDEN_HOF) },
+        })
       } else {
         toast.success('Als nicht abgeholt gespeichert')
       }
@@ -346,7 +353,14 @@ function Betrag({ bestellung }: { bestellung: HofBestellDetail }): React.JSX.Ele
         </p>
         {betrag.erstattetCents > 0 && <p className={cn('mt-1 text-[12.5px]', LEISE)}>Erstattet: {euro(betrag.erstattetCents)}</p>}
         {bestellung.stornoGrund && <p className="mt-1 text-[12.5px] break-words">Grund: {bestellung.stornoGrund}</p>}
-        {betrag.gebuehrErstattungOffen && <p className="mt-1.5 text-[12.5px] font-medium text-status-offen">{GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS}</p>}
+        {betrag.gebuehrErstattungOffen && (
+          <p className="mt-1.5 text-[12.5px] font-medium text-status-offen">
+            {GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS}{' '}
+            <Link href={PROBLEM_MELDEN_HOF} className={cn('inline-flex min-h-11 items-center underline underline-offset-2', FOKUS_RAHMEN)}>
+              {PROBLEM_MELDEN}
+            </Link>
+          </p>
+        )}
       </div>
     )
   }

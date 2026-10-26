@@ -112,7 +112,7 @@ function Fortschritt({ stand, freigeschaltet }: { stand: EinrichtenStand; freige
         <div className="h-full rounded-full bg-accent" style={{ width: `${prozent}%` }} />
       </div>
       {!freigeschaltet && (
-        <p className="mt-3 hidden text-[13px] text-muted-foreground md:block">
+        <p className="mt-3 text-[13px] text-muted-foreground">
           Profil und Produkte kannst du in Ruhe vorbereiten. Kunden sehen deinen Hof erst nach der Freischaltung.
         </p>
       )}

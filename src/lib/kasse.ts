@@ -27,6 +27,7 @@ import {
   type ServicegebuehrEinstellung,
   type Zahlungsart,
 } from '@/lib/servicegebuehr'
+import { mitNetzSchutz, type NetzErgebnis } from '@/lib/netz'
 import { mitKaeuferVorbelegung, type KaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 
 // ─── Zahlarten (E5) ─────────────────────────────────────────────────────────
@@ -487,4 +488,67 @@ export function abholSatz(k: Pick<AbholKachel, 'datum' | 'relativ' | 'zeit'>): s
  */
 export function bestellschlussHeute(kacheln: readonly AbholKachel[]): string | null {
   return kacheln.filter((k) => k.heute && !k.ausgebucht).at(-1)?.start ?? null
+}
+
+// ─── Vertrauen, Grund, Ausweg (Nr. 176; Board system-sterne-kasse-vertrauen) ─
+
+/** Unter der Gesamtsumme: Die Preise der Hofseite und der Kasse enthalten die Umsatzsteuer. */
+export const PREISE_INKL_UST = 'Preise inkl. USt'
+
+/** Der Link bei „Deine Daten" zur Datenschutzerklärung — die Kasse hat keinen Seitenfuß. */
+export const KASSE_DATENSCHUTZ_LINK = 'Was passiert damit?'
+
+/** Nach dem Zeitlimit: kein Vorwurf, und die Zusage, die der Idempotenz-Schlüssel hält. */
+export const KASSE_ZEITLIMIT_SATZ = 'Dauert länger als sonst – nichts wird doppelt bestellt.'
+
+/** Der Knopf dazu. */
+export const KASSE_NOCHMAL = 'Nochmal versuchen'
+
+/**
+ * Der Zusatz an der Korb-Leiste der Hofseite (product-grid.tsx, Nr. 177 übernimmt
+ * den Import): „Servicegebühr" ist das Wort der Wortliste, „Gebühr" allein nicht.
+ */
+export const SERVICEGEBUEHR_ZUSATZ = '+ Servicegebühr'
+
+/** So lange wartet die Kasse auf /api/checkout, bevor sie „Nochmal versuchen" anbietet. */
+export const KASSE_ZEITLIMIT_MS = 15_000
+
+/**
+ * Schickt die Bestellung an /api/checkout — wirft nie. `netz`/`zeit` heißt: Die
+ * Antwort fehlt, ob der Server die Bestellung angelegt hat, ist offen. Der
+ * zweite Versuch schickt deshalb den SELBEN Idempotenz-Schlüssel (er steht im
+ * `body`, den die Kasse unverändert wieder übergibt): Der Server liefert dann
+ * die bestehende Bestellung statt einer zweiten. Die Antwort mit Fehlerstatus
+ * ist kein Wurf; die bewertet die Kasse selbst.
+ */
+export function bestellungSenden(body: unknown, { zeitlimitMs = KASSE_ZEITLIMIT_MS }: { zeitlimitMs?: number } = {}): Promise<NetzErgebnis<Response>> {
+  const text = JSON.stringify(body)
+  return mitNetzSchutz(
+    (signal) => fetch('/api/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: text, signal }),
+    { zeitlimitMs }
+  )
+}
+
+/** Das Stück des Tastaturereignisses, das `weiterBeiEnter` braucht (ohne DOM-Typen testbar). */
+type EnterEreignis = {
+  key: string
+  target: unknown
+  currentTarget: { querySelectorAll(auswahl: string): ArrayLike<{ focus(): void }> }
+  preventDefault(): void
+}
+
+/**
+ * Enter in einem einzeiligen Feld geht zum nächsten Feld, statt das Formular
+ * abzuschicken. Die Tastatur zeigt dort „Weiter" (enterKeyHint) — und der
+ * Abschluss dieses Formulars ist zahlungspflichtig: Eine Taste, die „Weiter"
+ * heißt, darf nie bestellen. Notizfeld, Haken und Knöpfe behalten ihr Verhalten.
+ */
+export function weiterBeiEnter(e: EnterEreignis): void {
+  const ziel = e.target as { tagName?: string; type?: string; focus?: () => void }
+  if (e.key !== 'Enter' || ziel.tagName !== 'INPUT') return
+  if (ziel.type === 'checkbox' || ziel.type === 'radio' || ziel.type === 'submit' || ziel.type === 'button') return
+  e.preventDefault()
+  const felder = Array.from(e.currentTarget.querySelectorAll('input:not([type=radio]):not([type=checkbox]):not([type=submit]):not([type=button]):not([disabled]), textarea:not([disabled])'))
+  const i = felder.indexOf(ziel as (typeof felder)[number])
+  felder[i + 1]?.focus()
 }

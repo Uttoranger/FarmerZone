@@ -101,7 +101,7 @@ export function ShellVorschau({ variante }: { variante: ShellVariante }): React.
             </button>
           }
         >
-          <Beispielinhalt titel="Dein Korb bei Hof Beispiel" welt="kunde" unter />
+          <Beispielinhalt titel="Dein Warenkorb bei Hof Beispiel" welt="kunde" unter />
         </KundeFokusShell>
       )
     case 'hof':

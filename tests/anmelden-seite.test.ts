@@ -44,7 +44,7 @@ vi.mock('@/lib/auth-client', () => ({
 }))
 
 import { AnmeldenSeite } from '@/components/anmelden/anmelden-seite'
-import { CodeEmailSchritt, CodeEingabeSchritt } from '@/components/anmelden/kunde-code-formular'
+import { CodeEmailSchritt, CodeEingabeSchritt, fokusiereCodeFeld } from '@/components/anmelden/kunde-code-formular'
 import { HofAnmeldung } from '@/components/anmelden/hof-anmeldung'
 import KundenLoginSeite from '@/app/account/login/page'
 
@@ -229,14 +229,15 @@ describe('Kundenkarte — Code-Schritt', () => {
   })
 
   it('laden: „Einen Moment …" steht in einer Live-Region (role="status"), die immer da ist', () => {
-    const status = (html: string) => html.match(/<p[^>]*role="status"[^>]*>([^<]*)<\/p>/)
-    expect(status(codeSchritt({ laedt: true, code: '481234' }))?.[1]).toContain('Einen Moment')
-    // Die Region steht auch ohne Laden schon da (leer) — sonst sagt der
+    // Seit Nr. 176 gibt es zwei Regeln: die für den Hinweis (nach „Code erneut senden") und die fürs Laden.
+    const status = (html: string) => [...html.matchAll(/<p[^>]*role="status"[^>]*>([^<]*)<\/p>/g)].map((m) => m[1])
+    expect(status(codeSchritt({ laedt: true, code: '481234' }))).toContain('Einen Moment …')
+    // Die Regionen stehen auch ohne Laden schon da (leer) — sonst sagt der
     // Screenreader die erste Meldung nicht an.
     const ohne = status(codeSchritt({ code: '481' }))
-    expect(ohne).not.toBeNull()
-    expect(ohne?.[1]).toBe('')
-    expect(status(emailSchritt({ laedt: true, email: 'kundin@example.com' }))?.[1]).toContain('Einen Moment')
+    expect(ohne).toHaveLength(2)
+    expect(ohne.every((text) => text === '')).toBe(true)
+    expect(status(emailSchritt({ laedt: true, email: 'kundin@example.com' }))).toContain('Einen Moment …')
   })
 
   it('320 px: sechs Kästchen teilen sich die Breite (flexibel), bleiben aber ≥ 44 px hoch', () => {
@@ -304,3 +305,38 @@ describe('Routen', () => {
     expect(quellen).toContain('signIn.emailOtp')
   })
 })
+
+describe('Code-Login (Nr. 176)', () => {
+  const props = { email: 'kundin@example.com', code: '', onCode: () => {}, onAbsenden: () => {}, onErneut: () => {}, onAndereEmail: () => {}, laedt: false, fehler: null, wartezeit: 0 }
+
+  it('die Status-Region steht immer im DOM — leer, solange nichts zu sagen ist', () => {
+    const leer = renderToStaticMarkup(createElement(CodeEingabeSchritt, { ...props, hinweis: null }))
+    expect(leer.match(/role="status"/g)?.length).toBeGreaterThanOrEqual(2) // Hinweis-Region und Lade-Region
+    expect(leer).toMatch(/<p role="status" class="sr-only"><\/p>/)
+  })
+
+  it('Gegenprobe: mit Hinweis steht der Text in derselben Region, sichtbar und mit der Verbindung zum Feld', () => {
+    const html = renderToStaticMarkup(createElement(CodeEingabeSchritt, { ...props, hinweis: 'Wir haben dir einen neuen Code geschickt.' }))
+    expect(html).toMatch(/<p id="[^"]+" role="status" class="[^"]*text-status-fertig[^"]*">Wir haben dir einen neuen Code geschickt\.<\/p>/)
+  })
+
+  it('mit Fehler gewinnt der Fehler (role="alert"), die Region bleibt leer', () => {
+    const html = renderToStaticMarkup(createElement(CodeEingabeSchritt, { ...props, fehler: 'Der Code stimmt nicht.', hinweis: 'alt' }))
+    expect(html).toContain('role="alert"')
+    expect(html).not.toContain('>alt<')
+  })
+
+  it('nach dem Schrittwechsel geht der Fokus ins Codefeld — nur im Schritt „Code"', () => {
+    const focus = vi.fn()
+    fokusiereCodeFeld('email', { current: { focus } })
+    expect(focus).not.toHaveBeenCalled()
+    fokusiereCodeFeld('code', { current: { focus } })
+    expect(focus).toHaveBeenCalledTimes(1)
+    expect(() => fokusiereCodeFeld('code', { current: null })).not.toThrow()
+  })
+
+  it('der Effekt in der Seite ruft ihn bei jedem Schrittwechsel', () => {
+    expect(readFileSync(join(process.cwd(), 'src/components/anmelden/kunde-code-formular.tsx'), 'utf8')).toMatch(/useEffect\(\(\) => \{\s*fokusiereCodeFeld\(schritt, codeFeldRef\)\s*\}, \[schritt\]\)/)
+  })
+})
+

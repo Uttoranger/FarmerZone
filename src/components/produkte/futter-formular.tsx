@@ -425,7 +425,7 @@ export function FutterFormular({
             Nur an landwirtschaftliche Betriebe
           </Wahl>
         </div>
-        {nurBetriebe && <p className="text-xs text-muted-foreground">Wer bestellt, muss im Checkout eine Betriebsnummer angeben.</p>}
+        {nurBetriebe && <p className="text-xs text-muted-foreground">Wer bestellt, muss in der Kasse eine Betriebsnummer angeben.</p>}
       </Abschnitt>
 
       <AbholhinweisWahl wert={abholhinweise} onWert={setAbholhinweise} />

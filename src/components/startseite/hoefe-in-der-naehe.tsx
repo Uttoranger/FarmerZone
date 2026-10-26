@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { ChevronRight, Store } from 'lucide-react'
-import { KARTE_ADRESSE, STARTSEITE_CHIPS, STARTSEITE_HOEFE_DECKEL, hoefeAdresse, type StartseitenHof } from '@/lib/startseite'
+import { KARTE_ADRESSE, STARTSEITE_CHIPS, STARTSEITE_HOEFE_DECKEL, STARTSEITE_HOEFE_TITEL, hoefeAdresse, type StartseitenHof } from '@/lib/startseite'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -32,7 +32,7 @@ export function HoefeInDerNaehe({ children }: { children: ReactNode }): React.JS
           <div>
             <Kicker>Aus der Region</Kicker>
             <h2 id="hoefe-titel" className="font-heading text-[22px] font-semibold md:text-[32px]">
-              Höfe in deiner Nähe
+              {STARTSEITE_HOEFE_TITEL}
             </h2>
           </div>
           <span className="flex-1" />

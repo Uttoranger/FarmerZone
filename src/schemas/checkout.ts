@@ -35,21 +35,26 @@ export const checkoutFormSchema = z
   .object({
     customerName: z
       .string()
-      .min(2, 'Name muss mindestens 2 Zeichen haben')
+      .min(2, 'Bitte gib deinen Namen an – so weiß der Hof, wer abholt.')
       .max(PERSONENNAME_MAX, ZU_LANG.personenname),
-    customerEmail: emailSchema('Ungültige E-Mail-Adresse'),
+    // Leer und falsch sind zwei Meldungen: Erst fehlt die Adresse, dann stimmt sie nicht.
+    customerEmail: z
+      .string()
+      .trim()
+      .min(1, 'Bitte gib deine E-Mail-Adresse an – dorthin schicken wir dir die Bestätigung.')
+      .pipe(emailSchema('Diese E-Mail-Adresse stimmt nicht ganz – bitte prüf sie, zum Beispiel du@beispiel.at.')),
     customerPhone: z
       .string()
-      .min(4, 'Telefonnummer ist zu kurz')
+      .min(4, 'Bitte gib eine Telefonnummer an – der Hof ruft nur an, falls bei der Abholung etwas ist.')
       .max(TELEFON_MAX, ZU_LANG.telefon),
     customerNote: z.string().max(NOTIZ_MAX, ZU_LANG.notiz).optional(),
     // "YYYY-MM-DD|HH:MM|HH:MM" — encoded slot key
-    pickupSlotKey: z.string().min(1, 'Bitte wähle einen Abholtermin'),
+    pickupSlotKey: z.string().min(1, 'Bitte wähle einen Abholtermin – so weiß der Hof, wann du kommst.'),
     // E5: Das Formular bietet nur noch online und bar an
     // (NEUE_BESTELLUNG_ZAHLARTEN, src/lib/kasse.ts). Die Anfrage an den
     // Server (unten) kennt ONSITE_CARD weiter — dort entscheidet die Route
     // NACH der Idempotenz, ob es eine neue Bestellung wäre.
-    paymentMethod: z.enum(NEUE_BESTELLUNG_ZAHLARTEN, 'Bitte wähle, wie du bezahlen möchtest'),
+    paymentMethod: z.enum(NEUE_BESTELLUNG_ZAHLARTEN, 'Bitte wähle, wie du bezahlen möchtest – online jetzt oder bar bei der Abholung.'),
     // Kein Haken „Ich hole ab und zahle bar" mehr (Register N2, Nr. 46): Der
     // verbindliche Abschluss ist der Knopf „Zahlungspflichtig bestellen".
     // Keine Neuigkeiten-Haken mehr — die Anmeldung steht auf der

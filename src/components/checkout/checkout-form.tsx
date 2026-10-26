@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Info, Loader2, ShoppingBasket } from 'lucide-react'
+import { hoefeAdresse } from '@/lib/startseite'
 import { KasseSkelett } from '@/components/checkout/kasse-skelett'
 import {
   checkoutFormSchema,
@@ -38,6 +39,11 @@ import {
   barGuenstiger,
   bestellschlussHeute,
   gebuehrZeile,
+  bestellungSenden,
+  KASSE_DATENSCHUTZ_LINK,
+  KASSE_NOCHMAL,
+  KASSE_ZEITLIMIT_SATZ,
+  weiterBeiEnter,
   kassenBetraege,
   kassenZahlarten,
   kassenZahlweg,
@@ -72,6 +78,7 @@ import {
   KARTEN_TITEL,
   KNOPF_GRUEN,
   KassenRaster,
+  TEXTLINK,
   KontaktHinweis,
   KorbKarte,
   ReservierungsHinweis,
@@ -197,6 +204,8 @@ export function CheckoutForm({
   // geändert hat; an der Übersicht, was beim Abschicken schiefging.
   const [korbHinweis, setKorbHinweis] = useState<string | null>(null)
   const [fehler, setFehler] = useState<string | null>(null)
+  // Keine Antwort in 15 s oder kein Netz: Ob die Bestellung steht, ist offen — „Nochmal versuchen" schickt denselben Schlüssel.
+  const [ohneAntwort, setOhneAntwort] = useState(false)
   // Register Z2: Stripe kennt den Zahlungszugang des Hofs nicht (Antwort `onlineAus`).
   // Bis zum Neuladen bietet die Kasse dann nur bar an; danach sagt es der
   // Server selbst, denn der Hof ist als nicht bereit vermerkt.
@@ -349,6 +358,7 @@ export function CheckoutForm({
 
   async function onSubmit(data: CheckoutFormData) {
     setFehler(null)
+    setOhneAntwort(false)
     if (cart.length === 0) {
       setFehler('Dein Warenkorb ist leer.')
       return
@@ -357,34 +367,38 @@ export function CheckoutForm({
     const [pickupDate, pickupTimeStart, pickupTimeEnd] = data.pickupSlotKey.split('|')
 
     try {
-      const res = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          farmId: farm.id,
-          farmSlug: farm.slug,
-          sessionId,
-          idempotencyKey: idempotencyKeyRef.current || undefined,
-          customerName: data.customerName,
-          customerEmail: data.customerEmail,
-          customerPhone: data.customerPhone,
-          customerNote: data.customerNote ?? '',
-          pickupDate,
-          pickupTimeStart,
-          pickupTimeEnd,
-          paymentMethod: data.paymentMethod,
-          // Ohne sichtbaren Abschnitt ist jede Bestellung privat — eine
-          // Vorbelegung als Betrieb darf nicht unbemerkt mitlaufen.
-          kaeuferArt: betriebAbschnitt ? data.kaeuferArt : 'PRIVAT',
-          betriebsnummer: betriebAbschnitt && data.kaeuferArt === 'BETRIEB' ? data.betriebsnummer : undefined,
-          items: cart.map((i) => ({
-            productId: i.productId,
-            name: i.name,
-            quantity: i.quantity,
-            unitPrice: i.price,
-          })),
-        }),
+      const senden = await bestellungSenden({
+        farmId: farm.id,
+        farmSlug: farm.slug,
+        sessionId,
+        idempotencyKey: idempotencyKeyRef.current || undefined,
+        customerName: data.customerName,
+        customerEmail: data.customerEmail,
+        customerPhone: data.customerPhone,
+        customerNote: data.customerNote ?? '',
+        pickupDate,
+        pickupTimeStart,
+        pickupTimeEnd,
+        paymentMethod: data.paymentMethod,
+        // Ohne sichtbaren Abschnitt ist jede Bestellung privat — eine
+        // Vorbelegung als Betrieb darf nicht unbemerkt mitlaufen.
+        kaeuferArt: betriebAbschnitt ? data.kaeuferArt : 'PRIVAT',
+        betriebsnummer: betriebAbschnitt && data.kaeuferArt === 'BETRIEB' ? data.betriebsnummer : undefined,
+        items: cart.map((i) => ({
+          productId: i.productId,
+          name: i.name,
+          quantity: i.quantity,
+          unitPrice: i.price,
+        })),
       })
+
+      // Keine Antwort: kein Fehlertext über die Bestellung, sondern der Ausweg. Der Schlüssel bleibt derselbe.
+      if (!senden.ok) {
+        if (senden.art === 'server') setFehler('Wir konnten die Bestellung nicht senden. Lade die Seite neu und versuch es noch einmal.')
+        else setOhneAntwort(true)
+        return
+      }
+      const res = senden.daten
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -555,6 +569,8 @@ export function CheckoutForm({
             }
           : form.handleSubmit((daten) => startTransition(async () => { await onSubmit(daten) }), onInvalid)
       }
+      // „Weiter" auf der Tastatur bestellt nie (weiterBeiEnter) — bestellt wird mit dem Kaufknopf.
+      onKeyDown={weiterBeiEnter}
       noValidate
     >
       <KassenRaster
@@ -598,10 +614,14 @@ export function CheckoutForm({
                   )
                 }
                 fehler={
-                  fehler && (
-                    <div role="alert">
-                      <Hinweiskarte ton="orange">{fehler}</Hinweiskarte>
-                    </div>
+                  ohneAntwort ? (
+                    <KasseNetzFehler onNochmal={() => formRef.current?.requestSubmit()} wirdGesendet={isPending} />
+                  ) : (
+                    fehler && (
+                      <div role="alert">
+                        <Hinweiskarte ton="orange">{fehler}</Hinweiskarte>
+                      </div>
+                    )
                   )
                 }
               />
@@ -645,9 +665,17 @@ export function CheckoutForm({
           </section>
 
           <section aria-labelledby="kasse-daten" className={cn(KARTE, 'flex min-w-0 flex-col gap-3')}>
-            <h2 id="kasse-daten" className={KARTEN_TITEL}>
-              Deine Daten
-            </h2>
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 id="kasse-daten" className={KARTEN_TITEL}>
+                Deine Daten
+              </h2>
+              {/* Die Kasse hat keinen Seitenfuß: Der Weg zur Datenschutzerklärung steht dort, wo Daten eingegeben werden.
+                  Neuer Tab, damit die Eingaben stehen bleiben. */}
+              <Link href="/datenschutz" target="_blank" rel="noopener noreferrer" className={cn(TEXTLINK, 'shrink-0')}>
+                {KASSE_DATENSCHUTZ_LINK}
+                <span className="sr-only"> (öffnet in neuem Tab)</span>
+              </Link>
+            </div>
             {/* Ab 768 px zwei Spalten in Lesereihenfolge: E-Mail · Name / Telefon · Notiz. */}
             <div className="grid gap-3.5 md:grid-cols-2 md:items-start md:gap-x-5">
               <Feld id="customerEmail" label="E-Mail" fehler={fehlerAm.customerEmail?.message}>
@@ -658,6 +686,7 @@ export function CheckoutForm({
                   required
                   autoComplete="email"
                   inputMode="email"
+                  enterKeyHint="next"
                   aria-invalid={fehlerAm.customerEmail ? true : undefined}
                   aria-describedby={fehlerAm.customerEmail ? 'customerEmail-fehler' : 'customerEmail-hinweis'}
                   placeholder="du@beispiel.at"
@@ -674,6 +703,7 @@ export function CheckoutForm({
                   {...form.register('customerName')}
                   required
                   autoComplete="name"
+                  enterKeyHint="next"
                   aria-invalid={fehlerAm.customerName ? true : undefined}
                   aria-describedby={fehlerAm.customerName ? 'customerName-fehler' : undefined}
                   placeholder="Vor- und Nachname"
@@ -689,6 +719,7 @@ export function CheckoutForm({
                   required
                   autoComplete="tel"
                   inputMode="tel"
+                  enterKeyHint="next"
                   aria-invalid={fehlerAm.customerPhone ? true : undefined}
                   aria-describedby={fehlerAm.customerPhone ? 'customerPhone-fehler' : 'customerPhone-hinweis'}
                   placeholder="+43 …"
@@ -749,6 +780,7 @@ export function CheckoutForm({
                   id="betriebsnummer"
                   {...form.register('betriebsnummer')}
                   autoComplete="off"
+                  enterKeyHint="done"
                   aria-invalid={fehlerAm.betriebsnummer ? true : undefined}
                   aria-describedby={fehlerAm.betriebsnummer ? 'betriebsnummer-fehler' : 'betriebsnummer-hilfe'}
                   placeholder="z. B. LFBIS-Nummer"
@@ -815,8 +847,8 @@ export function KasseLeer({ hof, hinweis }: { hof: Pick<PublicFarm, 'name' | 'sl
       )}
       <EmptyState
         symbol={ShoppingBasket}
-        titel="Dein Korb ist leer"
-        satz={`Leg bei ${hof.name} etwas in den Korb, dann kannst du hier bestellen.`}
+        titel="Dein Warenkorb ist leer"
+        satz={`Leg bei ${hof.name} etwas in den Warenkorb, dann kannst du hier bestellen.`}
         ausweg={
           <Link href={`/${hof.slug}`} className={cn(KNOPF_GRUEN, 'w-auto')}>
             Zurück zum Hof
@@ -824,6 +856,57 @@ export function KasseLeer({ hof, hinweis }: { hof: Pick<PublicFarm, 'name' | 'sl
         }
       />
     </div>
+  )
+}
+
+/**
+ * Keine Antwort in 15 s oder kein Netz (Nr. 176): Ob die Bestellung schon steht, ist offen — der Satz sagt, dass
+ * nichts doppelt bestellt wird (derselbe Idempotenz-Schlüssel), „Nochmal versuchen" schickt sie noch einmal ab.
+ */
+export function KasseNetzFehler({ onNochmal, wirdGesendet }: { onNochmal: () => void; wirdGesendet: boolean }): React.JSX.Element {
+  return (
+    <div role="alert">
+      <Hinweiskarte
+        ton="orange"
+        aktion={
+          <button
+            type="button"
+            onClick={onNochmal}
+            disabled={wirdGesendet}
+            className={cn('inline-flex min-h-11 items-center rounded-full border border-border px-4 text-sm font-semibold hover:bg-muted disabled:opacity-60', FOKUS_RAHMEN)}
+          >
+            {KASSE_NOCHMAL}
+          </button>
+        }
+      >
+        {KASSE_ZEITLIMIT_SATZ}
+      </Hinweiskarte>
+    </div>
+  )
+}
+
+/**
+ * Die Kasse eines Hofs, der gerade pausiert (Nr. 176; vorher `notFound()` — „Diesen Hof gibt es hier nicht (mehr)"):
+ * die Pausen-Karte mit dem Text des Hofs und zwei Wegen. Ein wirklich unbekannter Hof bleibt ein 404 (die Seite).
+ */
+export function KassePausiert({ farm }: { farm: Pick<PublicFarm, 'name' | 'slug' | 'pauseMessage'> }): React.JSX.Element {
+  return (
+    <KundeFokusShell titel="Bestellen" rechts={<span title={farm.name}>{farm.name}</span>} zurueck={{ href: `/${farm.slug}`, label: 'Zurück zum Hof' }}>
+      <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-12">
+        <KaufSperreHinweis sperre="pause" hofName={farm.name} pauseMessage={farm.pauseMessage} />
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Link href={`/${farm.slug}`} className={cn(KNOPF_GRUEN, 'sm:w-auto')}>
+            Zurück zum Hof
+          </Link>
+          <Link
+            href={hoefeAdresse()}
+            className={cn('inline-flex h-[50px] items-center justify-center rounded-full border border-border px-[18px] text-[15px] font-semibold hover:bg-muted', FOKUS_RAHMEN)}
+          >
+            Höfe entdecken
+          </Link>
+        </div>
+      </div>
+    </KundeFokusShell>
   )
 }
 

@@ -54,7 +54,14 @@ export function produktStatus(p: { isAvailable: boolean; stock: number; unit: st
 export const PRODUKTE_LEER = {
   titel: 'Noch keine Produkte',
   satz: 'Leg dein erstes Produkt an – deine Kundinnen sehen es sofort auf deiner Hofseite.',
+  // Vor der Freischaltung sieht niemand die Hofseite: „sofort" wäre ein falsches Versprechen (Nr. 176, Board SterneHofStart 5).
+  satzVorFreischaltung: 'Leg dein erstes Produkt an – deine Kundinnen sehen es, sobald dein Hof freigeschaltet ist.',
 } as const
+
+/** Der Satz des Leerzustands: nach der Freischaltung „sofort", davor erst mit der Freischaltung. */
+export function produkteLeerSatz(hofSichtbar: boolean): string {
+  return hofSichtbar ? PRODUKTE_LEER.satz : PRODUKTE_LEER.satzVorFreischaltung
+}
 
 /**
  * „6 Produkte · 5 sichtbar" — ohne Produkt null (dann steht nur der Leerzustand). Gezählt wird isAvailable, NICHT der Bestand: Ein

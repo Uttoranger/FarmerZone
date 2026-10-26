@@ -27,11 +27,12 @@ import {
 import type { StrassenArt } from '@/lib/regionskarte-daten'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { HeroVideo } from '@/components/startseite/hero-video'
 
 /*
  * Der Kopf der Startseite (Mockups web-k0-startseite, mobil-k0-startseite;
  * die Karte seit Nr. 59 nach web-/mobil-k0-startseite-karte-region):
- * Kornfeld-Video als Hintergrund, links Satz und Suche, rechts die Karte der
+ * Kornfeld-Video als Hintergrund (mit Pause-Knopf), links Satz und Suche, rechts die Karte der
  * Region. Am Handy endet der Kopf vor der Karte; sie folgt in einem eigenen
  * Abschnitt mit Überschrift auf dem Seitengrund, mit dem Knopf darunter.
  *
@@ -65,27 +66,8 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
             (2) darüber das Video, rein per CSS eingeblendet; (3) der Schleier. */}
         <Image src="/landing/hero-poster.jpg" alt="" fill priority sizes="100vw" className="-z-10 object-cover" />
 
-        {/* Stumm, in Schleife, ohne Bedienelemente — reiner Hintergrund
-            (aria-hidden). Zweimal dieselbe Bedingung: Die Klasse blendet das
-            Element nur bei erlaubter Bewegung ein, die media-Bedingung an der
-            Quelle entscheidet, ob das Video überhaupt geladen wird.
-            preload="none" hält das Laden NICHT auf: autoPlay geht vor, das
-            Video lädt sofort an. Es bleibt nur für Browser stehen, die die
-            automatische Wiedergabe sperren (etwa im Datensparmodus) — dort lädt
-            dann gar nichts. Kein poster: Das Standbild darunter (next/image,
-            verkleinert) zeigt sich durch, solange das Video noch kein Bild hat;
-            ein poster lud dasselbe Foto ein zweites Mal im Original. */}
-        <video
-          className="absolute inset-0 -z-10 hidden h-full w-full object-cover motion-safe:block"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="none"
-          aria-hidden="true"
-        >
-          <source media="(prefers-reduced-motion: no-preference)" src="/landing/hero-loop.mp4" type="video/mp4" />
-        </video>
+        {/* Das Video samt Pause-Knopf (Nr. 176): hero-video.tsx. */}
+        <HeroVideo />
 
         <div aria-hidden="true" className="absolute inset-0 -z-10 bg-linear-to-tr from-black/65 via-black/30 via-45% to-black/5" />
         <div aria-hidden="true" className="absolute inset-x-0 bottom-0 -z-10 h-12 bg-linear-to-b from-transparent to-background md:h-20" />
@@ -133,7 +115,7 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
                   maxLength={SUCHTEXT_MAX}
                   placeholder="Hof oder Produkt, z. B. Eier oder Heu"
                   className={cn(
-                    'h-11 min-w-0 flex-1 rounded-md bg-transparent text-[15.5px] text-foreground placeholder:text-muted-foreground',
+                    'h-11 min-w-0 flex-1 rounded-md bg-transparent text-base text-foreground placeholder:text-muted-foreground',
                     FOKUS_RAHMEN
                   )}
                 />

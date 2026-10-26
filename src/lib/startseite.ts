@@ -190,6 +190,25 @@ function bereiteStartseitenHof(hof: StartseitenHofEingabe): StartseitenHof {
   }
 }
 
+/** Wo der Browser merkt, dass die Person das Startvideo angehalten hat (nur „pause" wird gespeichert). */
+export const HERO_VIDEO_SCHLUESSEL = 'fz-startvideo'
+
+/**
+ * Läuft das Startvideo? Nicht, wenn die Person es angehalten hat oder der
+ * Datensparmodus an ist (`navigator.connection.saveData`) — dort lädt es nie.
+ * „Bewegung reduzieren" regelt die Seite selbst (Quelle mit media-Bedingung).
+ */
+export function heroVideoSpielt({ gespeichert, sparmodus }: { gespeichert: string | null; sparmodus: boolean }): boolean {
+  return !sparmodus && gespeichert !== 'pause'
+}
+
+/**
+ * Die Überschrift der Hofkarten auf der Startseite. Die Seite kennt keinen
+ * Standort (er bleibt im Browser, erst /hoefe fragt danach) — „in deiner Nähe"
+ * wäre ein Versprechen ohne Grundlage. Mit Standort bleibt es auf /hoefe.
+ */
+export const STARTSEITE_HOEFE_TITEL = 'Höfe aus der Region'
+
 /**
  * Die Höfe der Startseite. Einen Standort kennt die Seite nicht (er bleibt im
  * Browser, und erst /hoefe fragt danach) — deshalb die Reihenfolge der

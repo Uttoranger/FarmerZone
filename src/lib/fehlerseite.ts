@@ -80,6 +80,9 @@ export function bereinigeKennung(roh: unknown): string {
   return kennungAusUrlSchema.parse(roh)
 }
 
+/** Der Weg für den Hofbereich zu „Problem melden" (dessen eigener Briefkasten, Nr. 175/176). */
+export const PROBLEM_MELDEN_HOF = '/fehler-melden'
+
 /**
  * Der Link auf „Problem melden", mit der Fehlernummer vorausgefüllt.
  *

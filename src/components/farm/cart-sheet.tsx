@@ -177,7 +177,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
                   <button
                     type="button"
                     onClick={() => onRemoveItem(item.productId)}
-                    aria-label={`${item.name} aus dem Korb nehmen`}
+                    aria-label={`${item.name} aus dem Warenkorb nehmen`}
                     className={cn('-mr-3 flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground', FOKUS_RAHMEN)}
                   >
                     <Trash2 className="size-4" strokeWidth={1.7} aria-hidden="true" />

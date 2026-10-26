@@ -74,6 +74,7 @@ import { STARTSEITE_VORSCHAUBILD } from '@/lib/vorschaubild'
 import { KATEGORIE_LABEL } from '@/lib/taxonomie'
 import type { ProductCategoryValue } from '@/schemas/product'
 import { leseHoefeFilter, type HoefeFilter } from '@/schemas/hoefe-filter'
+import { HeroVideo } from '@/components/startseite/hero-video'
 import { RegionsKarte, StartseiteKopf } from '@/components/startseite/startseite-kopf'
 import { HoefeInDerNaehe, HofKarten, HofKartenFehler, HofKartenSkelett } from '@/components/startseite/hoefe-in-der-naehe'
 import {
@@ -340,7 +341,9 @@ describe('beispielRechnung', () => {
 
 describe('Kopf — Video, Standbild und Suche', () => {
   const kopf = html(createElement(StartseiteKopf, {}))
-  const video = kopf.slice(kopf.indexOf('<video'), kopf.indexOf('</video>'))
+  // Das Video entscheidet erst der Browser (Datensparmodus, Wahl der Person): `anfang` stellt den Zustand „läuft" fest.
+  const kopfMitVideo = html(createElement(HeroVideo, { anfang: true }))
+  const video = kopfMitVideo.slice(kopfMitVideo.indexOf('<video'), kopfMitVideo.indexOf('</video>'))
 
   it('das Video läuft stumm, in Schleife, im Bild (playsInline), ohne Ton und Bedienung', () => {
     expect(video).toMatch(/<video [^>]*autoPlay=""/)
@@ -363,7 +366,8 @@ describe('Kopf — Video, Standbild und Suche', () => {
     // Das Standbild steht außerhalb des Videos und damit immer da.
     const standbild = kopf.indexOf('src="/landing/hero-poster.jpg"')
     expect(standbild).toBeGreaterThanOrEqual(0)
-    expect(standbild).toBeLessThan(kopf.indexOf('<video'))
+    // Ohne Entscheidung des Browsers (Server-Render) steht gar kein Video da — das Standbild trägt den Kopf.
+    expect(kopf).not.toContain('<video')
   })
 
   it('genau eine Überschrift erster Ordnung', () => {

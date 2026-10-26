@@ -5916,6 +5916,18 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **iPhone:** `appleWebApp` mit Marke und `black-translucent`.
 - **Analytics:** `AnalyticsGefiltert` (Client-Hülle, weil `beforeSend` eine Funktion ist) ruft `filtereAnalyticsEreignis` (`src/lib/analytics-filter.ts`): Seiten aus `NIE_MELDEN_PFADE` und die übrigen `no-referrer`-Seiten (u. a. Bar-Bestätigung) gehen nie raus, `NIE_MELDEN_PARAMETER` werden aus der Adresse gestrichen. Die Zusatzliste wird in `tests/analytics-filter.test.ts` gegen `next.config.ts` abgeglichen.
 
+## Kasse und Texte: Vertrauen, Grund, Ausweg (Nr. 176, Lauf 25, 26.10.2026)
+
+- **Kasse:** Die Meldungen des Schemas sagen, was fehlt und wozu der Hof es braucht („Bitte gib deinen Namen an – so weiß der Hof, wer abholt."); leere und falsche E-Mail-Adresse sind zwei Meldungen. Bei „Deine Daten" führt „Was passiert damit?" in neuem Tab zu /datenschutz, unter der Gesamtsumme steht „Preise inkl. USt" (Konstanten in `src/lib/kasse.ts`), die Felder tragen `enterKeyHint`.
+- **Zeitlimit:** `bestellungSenden` (kasse.ts) schickt über `mitNetzSchutz` mit 15 s. Bei `zeit`/`netz` steht „Dauert länger als sonst – nichts wird doppelt bestellt." mit „Nochmal versuchen"; der zweite Versuch geht durch dieselbe Absendefunktion mit demselben Idempotenz-Schlüssel (er wird nur nach „Zahlung nicht möglich" erneuert). `/api/checkout` und alle Beträge blieben unberührt.
+- **Enter:** Weil die Tastatur „Weiter" zeigt, geht Enter in einem einzeiligen Feld zum nächsten Feld (`weiterBeiEnter`) und schickt nie ab — der Abschluss ist zahlungspflichtig.
+- **Pause:** Die Kasse eines pausierten Hofs zeigt die Pausen-Karte mit „Zurück zum Hof" und „Höfe entdecken" (`KassePausiert`); ein unbekannter Hof bleibt ein 404.
+- **Texte:** Cookie-Hinweis ohne „Session"; „in der Kasse" statt „im Checkout"; „Problem melden" als Weg bei der offenen Erstattung der Servicegebühr; Startseite „Höfe aus der Region" (sie kennt keinen Standort, /hoefe behält „in deiner Nähe"); Warenkorb statt Korb in Kasse und Warenkorb-Blatt. `SERVICEGEBUEHR_ZUSATZ` („+ Servicegebühr") liegt für Nr. 177 bereit.
+- **Onboarding:** Der Satz zur Freischaltung steht auch am Handy; der leere Produkte-Zustand verspricht „sofort" nur nach der Freischaltung (`produkteLeerSatz`).
+- **Code-Login:** Der Fokus geht nach „Code schicken" ins Codefeld; die Status-Region steht immer im DOM.
+- **Startvideo:** Pause-Knopf (44 px, `aria-pressed`, Wahl im localStorage), kein Video im Datensparmodus; es steht erst nach der Prüfung im Browser da.
+- **Fehlertext-Regel:** `docs/ai/DESIGN_SYSTEM.md` und `tests/fehlertext-wache.test.ts` (Bestandsliste, schrumpft nur).
+
 ## Nützliche Befehle
 
 ```bash

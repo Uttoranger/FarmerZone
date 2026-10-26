@@ -71,7 +71,7 @@ export const SERVICEGEBUEHR_ADMIN_ERKLAERUNG =
 /** Der Vermerk im Bauern-Bereich, wenn die Stripe-Erstattung der Gebühr
  *  fehlgeschlagen ist — der Statuswechsel ist trotzdem durch. */
 export const GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS =
-  'Servicegebühr-Erstattung ausstehend — bitte den Betreiber informieren.'
+  'Servicegebühr-Erstattung ausstehend.'
 
 function alsZahl(wert: number | string | { toString(): string }): number {
   const n = typeof wert === 'number' ? wert : Number(wert.toString())

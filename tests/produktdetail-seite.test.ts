@@ -288,7 +288,7 @@ describe('Vorschau des Hofs', () => {
     const html = await seite('p_5kg', {}, HOF, { art: 'vorschau', noindex: true, kaufen: false })
     expect(html).toContain('href="/hof-test?vorschau=1&amp;reiter=produkte"')
     expect(html).toContain('href="/hof-test/produkt/p_eier?vorschau=1"')
-    expect(html).not.toContain('Dein Korb')
+    expect(html).not.toContain('Dein Warenkorb')
   })
 })
 
