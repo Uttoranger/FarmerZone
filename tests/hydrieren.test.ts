@@ -74,7 +74,7 @@ import { StartbildschirmKarte } from '@/components/heute/startbildschirm-karte'
 import { STARTBILDSCHIRM_KARTE } from '@/lib/startbildschirm'
 import { MEIN_HOF_ANSICHT_TEXT } from '@/lib/mein-hof-ansicht'
 import { WARENKORB_SCHLUESSEL } from '@/lib/warenkorb-speicher'
-import { useCart } from '@/lib/use-cart'
+import { useCart, useKorbHinweis, zeigeKorbHinweis } from '@/lib/use-cart'
 import { useHoefeAdresse } from '@/components/hoefe/use-hoefe-adresse'
 import { useMindestbreite, useSchmalerAls } from '@/lib/use-mindestbreite'
 import { DarstellungKarte } from '@/app/(hof)/settings/account/darstellung-karte'
@@ -236,6 +236,15 @@ describe('Hydrieren – Teile mit dem Browser-Speicher', () => {
     })
     expect(ergebnis.serverHtml).toContain('Korb: 0 (noch nicht gelesen)')
     expect(ergebnis.container.textContent).toBe('Korb: 4 (gelesen)')
+  })
+
+  it('useKorbHinweis (Nr. 169): der Satz des Abgleichs steht nie im Server-HTML, nach dem Hydrieren der des Browsers', async () => {
+    function Satz(): React.JSX.Element {
+      return createElement('p', null, `Satz: ${useKorbHinweis('hof-hinweis') ?? 'keiner'}`)
+    }
+    const ergebnis = await pruefeHydrieren(createElement(Satz), { imBrowser: () => zeigeKorbHinweis('hof-hinweis', 'Ein Preis hat sich geändert.') })
+    expect(ergebnis.serverHtml).toContain('Satz: keiner')
+    expect(ergebnis.container.textContent).toBe('Satz: Ein Preis hat sich geändert.')
   })
 })
 
@@ -419,7 +428,7 @@ const GEPRUEFT: Record<string, string[]> = {
   'src/components/hoefe/use-uhr.ts': ['Abholzeile', 'BeitragMarke'],
   'src/components/shared/theme-umschalter.tsx': ['ThemeUmschalter', 'ThemeUmschalterZeile'],
   'src/components/shared/use-meldung-formular.ts': ['useMeldungFormular'],
-  'src/lib/use-cart.ts': ['useCart'],
+  'src/lib/use-cart.ts': ['useCart', 'useKorbHinweis'],
   'src/lib/use-mindestbreite.ts': ['useMindestbreite', 'useSchmalerAls'],
   'src/lib/use-warenkorb-kopf.ts': ['KundenKopf', 'useWarenkorbVomHof'],
 }

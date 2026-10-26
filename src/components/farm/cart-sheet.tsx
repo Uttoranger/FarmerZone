@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import type { ComponentProps } from 'react'
-import { Minus, Plus, Trash2, ShoppingBasket } from 'lucide-react'
+import { Info, Minus, Plus, Trash2, ShoppingBasket } from 'lucide-react'
 import Link from 'next/link'
 import {
   Sheet,
@@ -11,9 +11,11 @@ import {
   SheetFooter,
 } from '@/components/ui/sheet'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { cn } from '@/lib/utils'
 import { centsAlsEuro, formatEuro, formatGrundpreis } from '@/lib/format'
 import { korbBetraege } from '@/lib/hofseite-kunde'
+import { RESERVIERUNG_MINUTEN } from '@/lib/kasse'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
@@ -39,6 +41,11 @@ type Props = {
    * 1024 px der einzige Weg zur Kasse ist — der Mini-Warenkorb steht dort nicht.
    */
   kaufSperre: ComponentProps<typeof KaufSperreHinweis>
+  /**
+   * Der Satz nach dem Abgleich der Hofseite (Register N28: entfernt, gekürzt, neuer Preis) — oben im Blatt, bis
+   * sich der Korb ändert. Die Produktseite gleicht nicht ab und gibt ihn nicht mit.
+   */
+  hinweis?: string | null
 }
 
 /** Ein runder Mengen-Knopf: sichtbar 28 px, Trefferfläche 44 px. */
@@ -52,7 +59,7 @@ const MENGEN_KNOPF = cn(
  * noch in der Kundenansicht im neuen Design (KundeShell, data-design="neu"):
  * Kaufen ist Grün (accent), Text und Symbole aus den Tokens.
  */
-export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHref, onUpdateQuantity, onRemoveItem, gebuehrKorb = null, futterHinweis = [], kaufSperre }: Props) {
+export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHref, onUpdateQuantity, onRemoveItem, gebuehrKorb = null, futterHinweis = [], kaufSperre, hinweis = null }: Props) {
   // Zeilensummen in ganzen Cent auf dem Weg des Checkouts (korbBetraege, wie im Mini-Warenkorb),
   // nie price × Menge in Fließkomma — verbindlich rechnet der Checkout mit den Preisen aus der Datenbank.
   const { zeilenCents } = korbBetraege(items)
@@ -68,6 +75,14 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
 
         {/* Items */}
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4">
+          {/* Wie korbHinweis in der Kasse: orange Karte, als Status vorgelesen, kein Toast. */}
+          {hinweis && (
+            <div role="status">
+              <Hinweiskarte ton="orange" symbol={Info}>
+                {hinweis}
+              </Hinweiskarte>
+            </div>
+          )}
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
               <ShoppingBasket className="mb-2 size-10" strokeWidth={1.5} aria-hidden="true" />
@@ -163,7 +178,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
               <span className="tabular-nums">{formatEuro(total)}</span>
             </div>
             <p className="text-xs text-muted-foreground -mt-1">
-              {gebuehrKorb ? `${gebuehrKorb[0].toUpperCase()}${gebuehrKorb.slice(1)} · ` : ''}Reservierung gilt 15 Minuten.
+              {gebuehrKorb ? `${gebuehrKorb[0].toUpperCase()}${gebuehrKorb.slice(1)} · ` : ''}Reservierung gilt {RESERVIERUNG_MINUTEN} Minuten.
             </p>
             <FutterVerantwortung saetze={futterHinweis} />
             {/* Mit Kaufsperre nimmt die Kasse nichts an — der Grund steht hier, nicht erst dort. */}

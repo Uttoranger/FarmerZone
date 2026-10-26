@@ -22,11 +22,16 @@
  * ist weg — und war die eigene Reservierung daran schuld.
  */
 
+import { preisAbweichungen } from '@/lib/order-totals'
+import type { KaufSperre } from '@/lib/bereiche-anzeige'
+import type { WarenkorbPosition as GespeichertePosition } from '@/schemas/warenkorb-speicher'
+
+/** Die EINE Frist eines Halts — /api/reserve und erneuereHalte nehmen sie über `neueFrist`, die Texte über RESERVIERUNG_MINUTEN (kasse.ts). */
 export const RESERVIERUNG_TTL_MS = 15 * 60 * 1000
 
 /**
  * Höchstmenge je Position beim Reservieren und im Warenkorb — EINE Quelle für
- * /api/reserve und /api/warenkorb/pruefen (Nr. 165): gegen Bestand blockieren
+ * /api/reserve und die Prüfroute der Kasse (Nr. 165): gegen Bestand blockieren
  * mit einer Riesenmenge. So viel führt kein Hof, und der Bestand ist ein Int.
  */
 export const MAX_MENGE = 10_000
@@ -89,8 +94,10 @@ export function istGueltig(reservierung: EigeneReservierung | undefined, jetzt: 
 
 /**
  * Der Abgleich: Warenkorb gegen eigene Reservierungen und echte Verfügbarkeit.
- * Rein — dieselbe Funktion entscheidet beim Laden des Warenkorbs, beim Öffnen
- * des Checkouts und im POST /api/checkout, damit alle drei dasselbe sagen.
+ * Rein — dieselbe Funktion entscheidet beim Öffnen der Kasse und im POST
+ * /api/checkout, damit beide dasselbe sagen. Die Hofseite gleicht beim Laden
+ * ohne Halte ab (`gleicheKorbMitHofseite`, Register N28): Wer nur schaut,
+ * hat keinen Halt, den eine Frist prüfen könnte.
  */
 export function pruefeWarenkorb(
   positionen: readonly WarenkorbPosition[],
@@ -149,4 +156,96 @@ export function befundMeldung(befund: WarenkorbBefund): string | null {
 /** Der neue Zeitpunkt, bis zu dem ein frisch gesetzter Halt gilt. */
 export function neueFrist(jetzt: Date): Date {
   return new Date(jetzt.getTime() + RESERVIERUNG_TTL_MS)
+}
+
+/** Der Satz, wenn die Hofseite einen geänderten Preis in den Korb übernimmt (Register N28). Die Kasse hat ihren eigenen. */
+export const KORB_PREIS_GEAENDERT = 'Ein Preis hat sich geändert – der Korb zeigt den neuen.'
+
+/** Was die Hofseite über ein Produkt weiß (PublicProduct): ohne fremde Halte, nur verfügbare Produkte. */
+export type HofseitenProdukt = {
+  id: string
+  name: string
+  price: number
+  unit: string
+  unitSize: number | null
+  imageUrl: string | null
+  stock: number
+}
+
+export type HofseitenAbgleich = {
+  /** Der neue Korb in derselben Reihenfolge. */
+  positionen: GespeichertePosition[]
+  /** EIN Satz für Korb-Blatt und Mini-Warenkorb — null, wenn sich nur Name, Einheit oder Bild geändert haben. */
+  satz: string | null
+}
+
+/**
+ * Der Abgleich der Hofseite beim Laden (Register N28): der gespeicherte Korb
+ * gegen die Produkte, die die Seite gerade zeigt. Rein und ohne Halt — die
+ * Halte anderer zählen hier wie überall auf der Hofseite nicht; verbindlich
+ * prüft weiter nur die Kasse.
+ *
+ * - Produkt nicht in der Liste (gelöscht, nicht im Shop) → raus.
+ * - Menge über dem Bestand → auf den Bestand; 0 → raus.
+ * - Preis anders (auf den Cent über `preisAbweichungen`, nie selbst gerundet) → neuer Preis.
+ * - Name, Einheit, Größe und Bild frisch aus dem Produkt.
+ * - Mit Kaufsperre bleibt alles, wie es ist: Der Korb wartet auf die Öffnung.
+ *
+ * null = nichts geändert, nichts zu schreiben.
+ */
+export function gleicheKorbMitHofseite(
+  positionen: readonly GespeichertePosition[],
+  produkte: readonly HofseitenProdukt[],
+  sperre: KaufSperre
+): HofseitenAbgleich | null {
+  if (sperre !== null) return null
+  const nachId = new Map(produkte.map((p) => [p.id, p]))
+  const befunde: PositionsBefund[] = []
+  const neu: GespeichertePosition[] = []
+  let geaendert = false
+  let preisGeaendert = false
+
+  for (const alt of positionen) {
+    const p = nachId.get(alt.productId)
+    const moeglich = p ? Math.max(0, Math.min(alt.quantity, p.stock)) : 0
+    const zustand: PositionsZustand = moeglich === 0 ? 'weg' : moeglich < alt.quantity ? 'gekuerzt' : 'ok'
+    befunde.push({ productId: alt.productId, gewuenscht: alt.quantity, moeglich, abgelaufen: false, zustand })
+    if (!p || moeglich === 0) {
+      geaendert = true
+      continue
+    }
+    const anderer = preisAbweichungen([{ productId: alt.productId, name: alt.name, unitPrice: alt.price }], new Map([[p.id, p.price]]))
+    if (anderer.length > 0) preisGeaendert = true
+    const position: GespeichertePosition = {
+      productId: alt.productId,
+      name: p.name,
+      // Nur bei einer Abweichung auf den Cent der neue Preis — ein Float-Rest ist keine Änderung.
+      price: anderer.length > 0 ? p.price : alt.price,
+      unit: p.unit,
+      unitSize: p.unitSize,
+      imageUrl: p.imageUrl,
+      quantity: moeglich,
+    }
+    if (
+      position.name !== alt.name ||
+      position.price !== alt.price ||
+      position.unit !== alt.unit ||
+      position.unitSize !== alt.unitSize ||
+      position.imageUrl !== alt.imageUrl ||
+      position.quantity !== alt.quantity
+    ) {
+      geaendert = true
+    }
+    neu.push(position)
+  }
+
+  if (!geaendert) return null
+  // Ohne pruefeWarenkorb und mit etwasAbgelaufen: false — sonst stünde „Reservierung abgelaufen" da.
+  const folge = befundMeldung({
+    positionen: befunde,
+    etwasAbgelaufen: false,
+    etwasGeaendert: befunde.some((b) => b.zustand !== 'ok'),
+  })
+  const teile = [folge, preisGeaendert ? KORB_PREIS_GEAENDERT : null].filter((t): t is string => t !== null)
+  return { positionen: neu, satz: teile.length > 0 ? teile.join(' ') : null }
 }

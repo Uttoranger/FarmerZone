@@ -16,11 +16,12 @@ import {
 } from '@/lib/reservierung'
 
 /**
- * Der Abgleich eines Warenkorbs mit der Wirklichkeit — EINE Stelle für alle
- * drei Momente, in denen er gebraucht wird (Bug-Report Befund 3):
- *   1. beim Laden des Warenkorbs,
- *   2. beim Öffnen des Checkouts,
- *   3. im POST /api/checkout, bevor irgendetwas geschrieben wird.
+ * Der Abgleich eines Warenkorbs mit der Wirklichkeit — EINE Stelle für die
+ * beiden Momente am Server (Bug-Report Befund 3):
+ *   1. beim Öffnen des Checkouts (mit Erneuern der Halte),
+ *   2. im POST /api/checkout, bevor irgendetwas geschrieben wird (verbindlich).
+ * Die Hofseite gleicht beim Laden im Browser ab, gegen ihre eigenen Produkte
+ * und ohne Halte (`gleicheKorbMitHofseite`, Register N28) — nicht hier.
  *
  * Die Entscheidung trifft die reine Funktion in src/lib/reservierung.ts; hier
  * wird nur gelesen und angewendet.
@@ -219,8 +220,8 @@ export async function pruefeSitzungsWarenkorb(
 
 /**
  * Setzt die Halte dieser Sitzung neu — für die Positionen, die es noch gibt.
- * Wird nach der Prüfung beim Laden des Warenkorbs und beim Öffnen des
- * Checkouts gerufen: Wer weiterhin am Einkauf sitzt, soll seinen Halt behalten,
+ * Wird nach der Prüfung beim Öffnen des Checkouts gerufen (die Hofseite setzt
+ * und erneuert keine Halte, Register N28): Wer weiterhin am Einkauf sitzt, soll seinen Halt behalten,
  * statt ihn stillschweigend zu verlieren. Der Checkout selbst erneuert NICHT —
  * dort wird geprüft und gekauft, nicht verlängert.
  */
@@ -242,7 +243,7 @@ export async function erneuereHalte(
   return positionen.length > 0 ? bis : null
 }
 
-/** Halte dieser Sitzung für Produkte, die aus dem Warenkorb geflogen sind, aufräumen. */
+/** Halte dieser Sitzung für diese Produkte freigeben — nach der Prüfung der Kasse und beim Entfernen aus dem Korb (DELETE /api/reserve, Register N28). */
 export async function loescheHalte(productIds: readonly string[], sessionId: string): Promise<void> {
   if (productIds.length === 0) return
   await prisma.stockReservation.deleteMany({
