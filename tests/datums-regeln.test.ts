@@ -23,8 +23,8 @@ const WURZEL = process.cwd()
 const PROBE = 'src/lib/datums-probe.ts'
 const DATUM = /Wiener/
 const DATEIEN_NACH_NR_118 = [
-  'src/app/(farmer)/orders/[orderId]/print/page.tsx',
-  'src/app/(farmer)/orders/today/print/page.tsx',
+  'src/app/(druck)/orders/[orderId]/print/page.tsx',
+  'src/app/(druck)/orders/today/print/page.tsx',
   'src/lib/order-groups.ts',
   'src/lib/whatsapp.ts',
   'src/lib/email.ts',

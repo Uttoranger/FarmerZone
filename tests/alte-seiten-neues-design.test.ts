@@ -7,7 +7,7 @@
  *    Impressum, Konditionen, Problem melden und die beiden 404; die
  *    Fokus-Shell für die Bar-Bestätigung und die Passwort-Seiten. Mit
  *    Gegenprobe, dass die Suche anschlägt.
- *  - Der alte Kopf (KundenKopf) steht nur noch auf /datenschutz (Nr. 57).
+ *  - Der alte Kopf (KundenKopf) ist entfernt (Nr. 181; /datenschutz war die letzte Seite).
  *  - Die Seiten mit Token in der Adresse bleiben aus dem Suchindex
  *    (Metadaten); die Header prüft tests/sicherheits-header.test.ts. Der
  *    Token von /reset-password steht im Formular nur an den erwarteten
@@ -100,7 +100,7 @@ describe('Shell je Seite (Nr. 54)', () => {
   })
 })
 
-describe('Der alte Kopf — nur noch auf /datenschutz (zieht mit Nr. 57 um)', () => {
+describe('Der alte Kopf — nirgends mehr (zog mit Nr. 181 als Letzter um)', () => {
   /** Alle Dateien unter src/app, die KundenKopf rendern. */
   function kopfNutzer(): string[] {
     const ergebnis: string[] = []
@@ -117,8 +117,9 @@ describe('Der alte Kopf — nur noch auf /datenschutz (zieht mit Nr. 57 um)', ()
     return ergebnis.sort()
   }
 
-  it('rendert KundenKopf nirgends sonst — die Suche findet den Datenschutz (Gegenprobe)', () => {
-    expect(kopfNutzer()).toEqual(['src/app/(public)/datenschutz/page.tsx'])
+  it('rendert KundenKopf nirgends — die Suche findet ihn aber, wo er stünde (Gegenprobe)', () => {
+    expect(kopfNutzer()).toEqual([])
+    expect(/<KundenKopf\b/.test('<KundenKopf seite={{ art: \'x\' }} />')).toBe(true)
   })
 })
 

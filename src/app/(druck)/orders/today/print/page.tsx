@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
-import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -25,18 +24,18 @@ function PacklistenBetrag({
   const kassieren = barZuKassierenCents(order)
   if (kassieren === null) {
     return (
-      <span className="text-right text-sm font-semibold text-gray-800">
+      <span className="text-right text-sm font-semibold text-primary-foreground">
         {formatEuro(centsAlsEuro(summen.warenpreisCents))}
       </span>
     )
   }
   return (
     <span className="text-right">
-      <span className="block text-sm font-semibold text-gray-800">
+      <span className="block text-sm font-semibold text-primary-foreground">
         Bar zu kassieren: {formatEuro(centsAlsEuro(kassieren))}
       </span>
       {summen.gebuehrCents > 0 && (
-        <span className="block text-xs text-gray-500">
+        <span className="block text-xs text-primary-foreground/70">
           inkl. {formatEuro(centsAlsEuro(summen.gebuehrCents))} Servicegebühr
         </span>
       )}
@@ -45,11 +44,11 @@ function PacklistenBetrag({
 }
 
 export default async function PrintPacklistPage() {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect('/login')
+  // Dieselbe Wache wie jede Hof-Seite (Anmeldung mit Rücksprung, sonst Einrichten).
+  const { userId } = await verlangeHofDerSitzung()
 
-  const farm = await getFarmForUser(session.user.id)
-  if (!farm) redirect('/login')
+  const farm = await getFarmForUser(userId)
+  if (!farm) redirect('/onboarding')
 
   // Dieselbe Bedingung wie „Heute abholen" auf /dashboard, mit Wiener
   // Tagesgrenze: Bildschirm und Papier zeigen dieselben Bestellungen.
@@ -90,22 +89,14 @@ export default async function PrintPacklistPage() {
   const packListEntries = Array.from(packList.entries()).sort((a, b) => a[0].localeCompare(b[0]))
 
   return (
-    <div className="min-h-screen bg-white">
-      <style>{`
-        @media print {
-          .no-print { display: none !important; }
-          body { font-size: 14px; }
-          .page-break { page-break-before: always; }
-        }
-      `}</style>
-
-      {/* Back button — hidden on print */}
-      <div className="no-print px-6 py-4 border-b border-gray-200">
+    <div className="min-h-screen print:text-sm">
+      {/* Zurück und Drucken — nicht auf dem Papier */}
+      <div className="print:hidden flex items-center gap-4 px-6 py-4 border-b border-primary-foreground/20">
         <Link
           href="/orders"
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-sm text-sm text-primary-foreground/70 hover:text-primary-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" />
           Zurück
         </Link>
         <PrintButton />
@@ -113,36 +104,36 @@ export default async function PrintPacklistPage() {
 
       <div className="px-8 py-6 max-w-2xl mx-auto">
         {/* Header */}
-        <div className="mb-8 border-b border-gray-200 pb-4">
-          <div className="text-xs text-gray-400 uppercase tracking-widest mb-1">{farm.name}</div>
-          <h1 className="text-2xl font-bold text-gray-900">Packliste</h1>
-          <p className="text-gray-500 mt-0.5 capitalize">{today}</p>
+        <div className="mb-8 border-b border-primary-foreground/20 pb-4">
+          <div className="text-xs text-primary-foreground/70 uppercase tracking-widest mb-1">{farm.name}</div>
+          <h1 className="text-2xl font-bold text-primary-foreground">Packliste</h1>
+          <p className="text-primary-foreground/70 mt-0.5 capitalize">{today}</p>
         </div>
 
         {orders.length === 0 ? (
-          <p className="text-gray-400 text-center py-12">Heute keine Bestellungen zur Abholung.</p>
+          <p className="text-primary-foreground/70 text-center py-12">Heute keine Bestellungen zur Abholung.</p>
         ) : (
           <>
             {/* Aggregated pack list */}
             <section className="mb-10">
-              <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+              <h2 className="text-xs font-bold text-primary-foreground/70 uppercase tracking-widest mb-3">
                 Gesamt vorbereiten
               </h2>
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="border border-primary-foreground/20 rounded-lg overflow-hidden">
                 {packListEntries.map(([name, entry], i) => (
                   <div
                     key={name}
                     className={`flex items-center justify-between gap-3 px-4 py-3 ${
-                      i !== packListEntries.length - 1 ? 'border-b border-gray-100' : ''
+                      i !== packListEntries.length - 1 ? 'border-b border-primary-foreground/10' : ''
                     }`}
                   >
-                    <span className="font-medium text-gray-800 min-w-0">
+                    <span className="font-medium text-primary-foreground min-w-0">
                       {name}
                       {unitSuffix(entry.product) ? (
-                        <span className="text-gray-500 font-normal"> ({unitSuffix(entry.product)})</span>
+                        <span className="text-primary-foreground/70 font-normal"> ({unitSuffix(entry.product)})</span>
                       ) : null}
                     </span>
-                    <span className="font-bold text-gray-900 text-lg shrink-0">{entry.qty}×</span>
+                    <span className="font-bold text-primary-foreground text-lg shrink-0">{entry.qty}×</span>
                   </div>
                 ))}
               </div>
@@ -150,38 +141,38 @@ export default async function PrintPacklistPage() {
 
             {/* Per-customer breakdown */}
             <section>
-              <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+              <h2 className="text-xs font-bold text-primary-foreground/70 uppercase tracking-widest mb-3">
                 Pro Kunde ({orders.length})
               </h2>
               <div className="space-y-4">
                 {orders.map((order) => (
-                  <div key={order.id} className="border border-gray-200 rounded-lg px-4 py-3 break-inside-avoid">
+                  <div key={order.id} className="border border-primary-foreground/20 rounded-lg px-4 py-3 break-inside-avoid">
                     <div className="flex items-baseline justify-between mb-2">
                       <div>
-                        <span className="font-semibold text-gray-900">{order.customerName}</span>
-                        <span className="text-xs text-gray-400 ml-2 font-mono">
+                        <span className="font-semibold text-primary-foreground">{order.customerName}</span>
+                        <span className="text-xs text-primary-foreground/70 ml-2 font-mono">
                           {order.orderNumber}
                         </span>
                       </div>
-                      <span className="text-sm text-gray-500">
+                      <span className="text-sm text-primary-foreground/70">
                         {order.pickupTimeStart}–{order.pickupTimeEnd} Uhr
                       </span>
                     </div>
                     <div className="space-y-0.5">
                       {order.items.map((item, i) => (
-                        <div key={i} className="flex items-center gap-2 text-sm text-gray-700">
+                        <div key={i} className="flex items-center gap-2 text-sm text-primary-foreground/90">
                           <span className="font-bold w-6 text-right shrink-0">{item.quantity}×</span>
                           <span className="min-w-0">
                             {item.productName}
                             {unitSuffix(item.product) ? (
-                              <span className="text-gray-400"> ({unitSuffix(item.product)})</span>
+                              <span className="text-primary-foreground/70"> ({unitSuffix(item.product)})</span>
                             ) : null}
                           </span>
                         </div>
                       ))}
                     </div>
-                    <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between gap-3">
-                      <span className="text-xs text-gray-400">
+                    <div className="mt-2 pt-2 border-t border-primary-foreground/10 flex items-center justify-between gap-3">
+                      <span className="text-xs text-primary-foreground/70">
                         {order.paymentMethod === 'ONLINE'
                           ? 'Online bezahlt'
                           : order.paymentMethod === 'ONSITE_CASH'
@@ -200,7 +191,7 @@ export default async function PrintPacklistPage() {
         )}
 
         {/* Print footer */}
-        <div className="mt-10 pt-4 border-t border-gray-200 text-xs text-gray-300 text-center">
+        <div className="mt-10 pt-4 border-t border-primary-foreground/20 text-xs text-primary-foreground/70 text-center">
           Gedruckt am {formatDatumLang(jetzt)}, {uhrzeitInWien(jetzt)} Uhr · {MARKE}
         </div>
       </div>

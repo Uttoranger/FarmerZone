@@ -1,8 +1,8 @@
 /**
- * Kopfzeile der Kundenseiten — welche Form sie hat und wohin „Zurück" führt.
- * Rein, ohne Browser prüfbar (tests/kunden-kopf.test.ts); die Komponente
- * src/components/shared/kunden-kopf.tsx zeigt nur an, was hier entschieden
- * wird.
+ * Rückwege der Kundenseiten — wohin „Zurück" führt. Rein, ohne Browser
+ * prüfbar (tests/kunden-kopf.test.ts); useRueckwegKlick in
+ * src/components/shared/kunden-kopf.tsx führt aus, was hier entschieden
+ * wird. Die Kopfzeile selbst (KundenKopf) ist seit Nr. 181 entfernt.
  *
  * Anlass: Außer der Startseite hatte keine Kundenseite eine Navigation. Wer
  * über einen geteilten Link auf einer Hofseite landete, kam nur über den
@@ -12,7 +12,7 @@ import { hoefeLink } from '@/lib/bereiche-anzeige'
 import { REITER_PARAMETER } from '@/schemas/hofseite-reiter'
 import type { AnzeigeBereich } from '@/lib/taxonomie'
 
-/** Die Kundenseiten mit Kopfzeile. Die Startseite trägt die KundeShell (Nr. 07). */
+/** Die Kundenseiten mit Rückweg. */
 export type KundenSeite =
   /** `bereich` ist der tatsächlich angezeigte (teileHofseite), nicht der URL-Parameter:
    *  Ein reiner Futterhof zeigt Futter auch ohne `?bereich`, und geteilte Links tragen keinen. */
@@ -21,40 +21,6 @@ export type KundenSeite =
   /** Produktseite /[hof]/produkt/[id] (Nr. 11) — zurück zu allen Produkten des Hofs. */
   | { art: 'produkt'; hofSlug: string }
   | { art: 'hofuebersicht' }
-  /** Seit Nr. 54 nur noch der Datenschutz (zieht mit Nr. 57 in die KundeShell). */
-  | { art: 'info' }
-
-export type KopfForm = {
-  /**
-   * Handy: der Zurück-Knopf in der Leiste. Nur, wo „Zurück" woanders hinführt
-   * als die Bildmarke daneben — auf der Hofübersicht ginge er zur Startseite:
-   * zwei Knöpfe mit demselben Ziel nebeneinander.
-   */
-  zurueck: boolean
-  /**
-   * Das Warenkorb-Symbol (Handy-Leiste und Browser-Kopfzeile). Auf der
-   * Hofseite nicht — dort sitzt der Warenkorb-Knopf unten, wie bei den
-   * Vorbildern. Im Checkout nicht — dort ist der Warenkorb gerade der Inhalt
-   * der Seite.
-   */
-  warenkorb: boolean
-  /** Browser: unter der Kopfzeile ein Rückweg-Link, wo die Kopfzeile selbst keinen hat. */
-  rueckwegZeile: boolean
-}
-
-export function kopfForm(seite: KundenSeite): KopfForm {
-  const zurueck = rueckweg(seite, false).href !== '/'
-  switch (seite.art) {
-    case 'hofseite':
-    case 'produkt':
-    case 'checkout':
-      return { zurueck, warenkorb: false, rueckwegZeile: true }
-    case 'hofuebersicht':
-    case 'info':
-      // Im Browser führen der Name und „Höfe entdecken" schon zurück.
-      return { zurueck, warenkorb: true, rueckwegZeile: false }
-  }
-}
 
 export type Rueckweg = {
   /** Wohin der Link führt — immer ein echter Link, auch ohne JavaScript und im neuen Tab. */
@@ -88,8 +54,6 @@ export function rueckweg(seite: KundenSeite, vorgaengerEigen: boolean): Rueckweg
       return { href: `/${seite.hofSlug}`, verlauf: vorgaengerEigen }
     case 'hofuebersicht':
       return { href: '/', verlauf: vorgaengerEigen }
-    case 'info':
-      return { href: '/hoefe', verlauf: vorgaengerEigen }
   }
 }
 

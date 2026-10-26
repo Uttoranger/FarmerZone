@@ -5959,6 +5959,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Warum „Admin-Passkey ab adminSeit":** N20 bleibt für einen Hof mit Admin-Recht unverändert. Hätte ein Hof-Passkey von vor dem Recht gezählt, wäre der Admin-Bereich ohne E-Mail-Code und 24-Stunden-Fenster aufgegangen, und das Passwort wäre gesperrt gewesen. Deshalb zählen für alles, was N20 regelt, nur Passkeys, die ab `adminSeit` entstanden; ein älterer Hof-Passkey meldet ein Admin-Konto nicht an (Satz nach der Signaturprüfung). Ohne Spalte: Kriterium ist `Passkey.createdAt` gegen `User.adminSeit`. Wer `adminSeit` neu setzt, ohne die Passkeys zu löschen, macht die alten damit zu Hof-Passkeys — der Admin richtet dann wie beim ersten Mal ein (Passwort ist dann wieder offen).
 - **Umbenennen** ging ohne `/passkey/update-passkey`: eine eigene Action mit `userId` in der WHERE. Höfe bekommen beim Einrichten keine Mail (die Mail „Admin-Sicherheit" spricht vom Admin-Konto); Vorschlag im Bericht 179.
 
+## Letzte Altrouten und Fakten der Datenschutzerklärung (Nr. 181, Lauf 25, 25.10.2026)
+
+- **Druckseiten:** Abholzettel und Packliste stehen in der neuen Gruppe `(druck)` mit eigenem Papier-Layout (Crème und fast Schwarz aus den Tokens, die in beiden Themes gleich sind, keine Navigation), Wache `verlangeHofDerSitzung` statt eigener Sitzungsprüfung; `tests/hof-seiten-wache.test.ts` liest beide Gruppen ohne Ausnahme. Warum nicht `(hof)`: Dessen Layout setzt jede Seite in die HofShell. Mit dem Umzug fielen die Gruppe `(farmer)`, `farmer-nav.tsx` und der alte Teil von `bauern-navigation.ts` (`NEU`, `NEU_BROWSER`, `NUR_IM_MEHR`, `aktiverPunkt` …) weg.
+- **/datenschutz** steht in der KundeShell; `KundenKopf` mit Menü-Blatt (`kunden-menue.ts`) ist entfernt, geblieben sind `useRueckwegKlick` und die Rückwege in `kunden-kopf.ts`.
+- **Datenschutzerklärung (Text wartet auf Freigabe der Projektleitung):** Anmeldung mit Code statt Magic-Link, Geräte-Cookie, IP-Adresse je Sitzung, Cookie „Bestellungen finden“, Cloudflare, und Abschnitt 8 widerspricht der Reichweitenmessung nicht mehr. Zahlen und Namen kommen aus den Konstanten im Code. Keine neue Rechtsaussage; die Tabelle „alt → neu → Beleg“ steht im PR.
+- **/teilen** trägt `data-design="neu"`, keine Shell; der Service Worker ist unverändert.
+- **Toter Code entfernt:** `src/emails/newsletter.tsx`, `createOnboardingProducts`, `createOnboardingSlots` (jeweils ohne Import und Aufruf).
+
 ## Nützliche Befehle
 
 ```bash

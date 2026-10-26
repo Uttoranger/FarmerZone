@@ -188,7 +188,7 @@ describe('kundenSitzung — wie eine öffentliche Seite die Sitzung sieht', () =
   })
 })
 
-describe('kopfKnopf — der Knopf der Kopfzeile auf Seiten, die noch KundenKopf tragen', () => {
+describe('kopfKnopf — der Knopf der Kopfzeile (Quelle für den Knopf der KundeShell)', () => {
   it('dieselben drei Varianten wie in der KundeShell: „Anmelden", „Mein Hof", „Mein Konto"', () => {
     expect(kopfKnopf('gast')).toEqual(kundenNavigation({ sitzung: 'gast' }).knopf)
     expect(kopfKnopf('hof')).toEqual(kundenNavigation({ sitzung: 'hof' }).knopf)

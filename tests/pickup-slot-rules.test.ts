@@ -1,6 +1,6 @@
 /**
  * Tests für die Abholzeiten-Regeln (src/lib/pickup-slot-rules.ts +
- * addPickupSlot / createOnboardingSlots).
+ * addPickupSlot; die Onboarding-Variante entfiel mit Nr. 181).
  *
  * Beweist: exaktes Duplikat → abgelehnt mit deutscher Meldung; invertiertes
  * Fenster (Bis <= Von) → abgelehnt; Überschneidung mit aktivem Fenster
@@ -35,7 +35,6 @@ import {
   INVERTED_SLOT_MESSAGE,
 } from '@/lib/pickup-slot-rules'
 import { addPickupSlot, togglePickupSlotActive } from '@/server/actions/farm'
-import { createOnboardingSlots } from '@/server/actions/onboarding'
 import { getPublicFarm, getOwnerFarm } from '@/server/queries/farm'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -225,71 +224,6 @@ describe('addPickupSlot (Einstellungen)', () => {
     const result = await addPickupSlot({ ...SA_NACHMITTAG, maxOrders: null })
     expect(result.error).toBe('Nicht angemeldet')
     expect(slotCreate).not.toHaveBeenCalled()
-  })
-})
-
-describe('createOnboardingSlots (Onboarding, dieselbe Prüfung)', () => {
-  it('lehnt Duplikate gegen den Bestand ab', async () => {
-    const result = await createOnboardingSlots('farm_1', [SA_VORMITTAG])
-    expect('error' in result && result.error).toBe(DUPLICATE_SLOT_MESSAGE)
-    expect(slotCreateMany).not.toHaveBeenCalled()
-  })
-
-  it('lehnt Duplikate innerhalb des Aufrufs ab', async () => {
-    slotFindMany.mockResolvedValue([] as never)
-    const result = await createOnboardingSlots('farm_1', [SA_NACHMITTAG, SA_NACHMITTAG])
-    expect('error' in result && result.error).toBe(DUPLICATE_SLOT_MESSAGE)
-    expect(slotCreateMany).not.toHaveBeenCalled()
-  })
-
-  it('erlaubt verschiedene Fenster am selben Tag', async () => {
-    slotFindMany.mockResolvedValue([] as never)
-    const result = await createOnboardingSlots('farm_1', [SA_VORMITTAG, SA_NACHMITTAG])
-    expect(result).toEqual({ ok: true })
-    expect(slotCreateMany).toHaveBeenCalledTimes(1)
-  })
-
-  it('lehnt invertierte Fenster ab', async () => {
-    slotFindMany.mockResolvedValue([] as never)
-    const result = await createOnboardingSlots('farm_1', [
-      { dayOfWeek: 1, startTime: '17:00', endTime: '14:00' },
-    ])
-    expect('error' in result && result.error).toBe(INVERTED_SLOT_MESSAGE)
-    expect(slotCreateMany).not.toHaveBeenCalled()
-  })
-
-  it('lehnt Überschneidungen mit dem Bestand ab (komplett umschließend)', async () => {
-    const result = await createOnboardingSlots('farm_1', [
-      { dayOfWeek: 6, startTime: '08:00', endTime: '13:00' },
-    ])
-    expect('error' in result && result.error).toBe('Überschneidet sich mit Samstag 09:00–12:00.')
-    expect(slotCreateMany).not.toHaveBeenCalled()
-  })
-
-  it('lehnt Überschneidungen innerhalb des Aufrufs ab', async () => {
-    slotFindMany.mockResolvedValue([] as never)
-    const result = await createOnboardingSlots('farm_1', [
-      { dayOfWeek: 2, startTime: '09:00', endTime: '12:00' },
-      { dayOfWeek: 2, startTime: '11:00', endTime: '13:00' },
-    ])
-    expect('error' in result && result.error).toBe('Überschneidet sich mit Dienstag 09:00–12:00.')
-    expect(slotCreateMany).not.toHaveBeenCalled()
-  })
-
-  it('erlaubt angrenzende Fenster und gleiche Zeiten an anderen Wochentagen', async () => {
-    const result = await createOnboardingSlots('farm_1', [
-      { dayOfWeek: 6, startTime: '12:00', endTime: '14:00' },
-      { dayOfWeek: 3, startTime: '09:00', endTime: '12:00' },
-    ])
-    expect(result).toEqual({ ok: true })
-    expect(slotCreateMany).toHaveBeenCalledTimes(1)
-  })
-
-  it('Ownership unverändert: fremde Farm wird verweigert', async () => {
-    farmFindUnique.mockResolvedValue(null)
-    const result = await createOnboardingSlots('fremde_farm', [SA_NACHMITTAG])
-    expect('error' in result && result.error).toBe('Hof nicht gefunden.')
-    expect(slotCreateMany).not.toHaveBeenCalled()
   })
 })
 

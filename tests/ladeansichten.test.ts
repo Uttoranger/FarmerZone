@@ -2,7 +2,7 @@
  * Ladeansichten und Fehlerseiten der öffentlichen Seiten.
  *
  * Befund vor diesem Fix: Von 48 Seiten hatte genau EINE eine Ladeansicht
- * (`src/app/(farmer)/loading.tsx`). Eine `global-error.tsx` gab es nicht —
+ * (`src/app/(farmer)/loading.tsx`, seit Nr. 181 gibt es die Gruppe nicht mehr). Eine `global-error.tsx` gab es nicht —
  * scheitert das Root-Layout selbst, zeigte Next.js seine eigene, englische
  * Seite. Und die beiden vorhandenen Fehlerseiten trugen ein Emoji als
  * einzige Illustration, standen also außerhalb des Design-Systems.
@@ -210,15 +210,13 @@ describe('Ladeansichten — jede öffentliche Route, die auf Daten wartet, zeigt
  * nur Routen, die neu dazukommen. Der Admin bekommt seine Ladeansichten mit
  * der AdminShell (Nr. 24, #203), samt Prüfung im Layout davor.
  */
-const BEREICHE = ['src/app/(hof)', 'src/app/(farmer)'] as const
+const BEREICHE = ['src/app/(hof)', 'src/app/(druck)'] as const
 
 /**
- * Noch ohne eigene Ladeansicht, mit Grund: Die Auswertung zieht mit Nr. 22c
- * (#200) nach (hof); dort zeigt sie seit Nr. 121 einen Ladepunkt statt eines Skeletts;
- * bis dahin greift der Rückfall (farmer)/loading.tsx. Nach dem Merge gibt es
- * diese Ordner nicht mehr — die Ausnahme greift dann ins Leere.
+ * Noch ohne eigene Ladeansicht, mit Grund: keine (die Auswertung zog mit Nr. 22c
+ * nach (hof), die Gruppe (farmer) fiel mit Nr. 181 weg). Ein Eintrag braucht einen Grund.
  */
-const OHNE_EIGENE = new Set(['src/app/(farmer)/analytics', 'src/app/(farmer)/analytics/umfeld'])
+const OHNE_EIGENE = new Set<string>()
 
 /**
  * Statt eines Skeletts bei jedem Klick zeigen diese Seiten einen Ladepunkt
@@ -275,7 +273,7 @@ describe('Ladeansichten — jede Route im Hofbereich und im Bestand hat eine eig
   it('findet die Routen überhaupt (Gegenprobe)', () => {
     expect(routen).toContain('src/app/(hof)/orders')
     expect(routen).toContain('src/app/(hof)/status/new')
-    expect(routen).toContain('src/app/(farmer)/orders/today/print')
+    expect(routen).toContain('src/app/(druck)/orders/today/print')
     expect(routen.length).toBeGreaterThanOrEqual(25)
   })
 
@@ -296,9 +294,9 @@ describe('Ladeansichten — jede Route im Hofbereich und im Bestand hat eine eig
     })
   }
 
-  it('die Gruppen haben einen Rückfall für neue Routen', () => {
+  it('(hof) hat einen Rückfall für neue Routen; (druck) braucht keinen — jede ihrer Routen hat die eigene Ladeansicht', () => {
     expect(existiert('src/app/(hof)/loading.tsx')).toBe(true)
-    expect(existiert('src/app/(farmer)/loading.tsx')).toBe(true)
+    expect(existiert('src/app/(farmer)')).toBe(false)
   })
 
   it('alle zeigen Platzhalter in Kartenform mit aria-busy, ohne Spinner, Farbliteral oder Emoji', () => {
@@ -307,7 +305,6 @@ describe('Ladeansichten — jede Route im Hofbereich und im Bestand hat eine eig
         .filter((r) => !OHNE_EIGENE.has(r) && !LADEPUNKT_STATT_SKELETT.has(r))
         .map((r) => `${r}/loading.tsx`),
       'src/app/(hof)/loading.tsx',
-      'src/app/(farmer)/loading.tsx',
     ]
     for (const datei of dateien) {
       const text = ladeansichtMitTeilen(datei)
@@ -349,10 +346,9 @@ describe('Ladeansichten — jede Route im Hofbereich und im Bestand hat eine eig
     expect('<Link href={href}><span>Zeile</span></Link>').not.toMatch(/<LadePunkt\b/)
   })
 
-  it('Hof und Bestand: Zugang prüft das Layout der Gruppe, vor jeder Ladeansicht', () => {
-    for (const gruppe of ['src/app/(hof)/layout.tsx', 'src/app/(farmer)/layout.tsx']) {
-      expect(liesDatei(gruppe), gruppe).toContain('await ladeHofbereich()')
-    }
+  it('Hof und Druck: Zugang prüft das Layout der Gruppe, vor jeder Ladeansicht', () => {
+    expect(liesDatei('src/app/(hof)/layout.tsx')).toContain('await ladeHofbereich()')
+    expect(liesDatei('src/app/(druck)/layout.tsx')).toContain('await verlangeHofDerSitzung()')
   })
 })
 
