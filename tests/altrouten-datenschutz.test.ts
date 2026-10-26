@@ -16,12 +16,17 @@ import { describe, expect, it, vi } from 'vitest'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join } from 'node:path'
 
 vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
   KundeShellMitSitzung: ({ children }: { children: ReactNode }) => createElement('div', { 'data-shell': 'kunde' }, children),
 }))
 
+vi.mock('@/server/hofbereich', () => ({ verlangeHofDerSitzung: vi.fn(async () => ({ farmId: 'hof-1' })) }))
+vi.mock('@/components/farmer/sentry-nutzer', () => ({ SentryNutzer: () => null }))
+
+import { verlangeHofDerSitzung } from '@/server/hofbereich'
+import DruckLayout from '@/app/(druck)/layout'
 import DatenschutzPage from '@/app/(public)/datenschutz/page'
 import { GERAETE_COOKIE } from '@/lib/geraete'
 import { BESTELLUNGEN_COOKIE, BESTELLUNGEN_PFAD } from '@/lib/bestellungen-finden'
@@ -58,6 +63,16 @@ describe('Druckseiten — eigene Gruppe (druck), Papier ohne Navigation', () => 
     expect(layout).toContain('text-primary-foreground')
     expect(layout).toMatch(/await verlangeHofDerSitzung\(\)/)
     for (const verboten of ['FarmerNav', 'HofShell', 'KundeShell', 'ladeHofbereich', 'Banner']) expect(layout, verboten).not.toContain(verboten)
+  })
+
+  it('das Layout rendert Papier ohne Navigation; die Wache läuft vorher', async () => {
+    const html = renderToStaticMarkup(await DruckLayout({ children: createElement('p', null, 'Inhalt') }))
+    expect(html).toContain('data-design="neu"')
+    expect(html).toContain('Inhalt')
+    expect(html).not.toMatch(/<nav\b|<header\b|<footer\b/)
+    expect(verlangeHofDerSitzung).toHaveBeenCalled()
+    // Gegenprobe: Die Suche würde eine Navigation finden.
+    expect(renderToStaticMarkup(createElement('nav'))).toMatch(/<nav\b/)
   })
 
   it.each(DRUCKSEITEN)('%s prüft über die Wache und kennt keine Palette', (seite) => {
@@ -169,10 +184,29 @@ describe('/teilen — neues Design, Verhalten unverändert', () => {
     expect(lies('src/app/teilen/teilen-client.tsx')).toContain('data-design="neu"')
   })
 
-  it('der Service Worker ist unberührt: POST /teilen, 303 auf die Seite', () => {
-    const sw = lies('public/sw.js')
-    expect(sw).toMatch(/\/teilen/)
-    expect(sw).toMatch(/303/)
+  it('der Service Worker ist unberührt: nur der POST auf /teilen wird beantwortet, mit 303 auf die Seite', async () => {
+    const handler: Array<(e: unknown) => void> = []
+    const eigen = { addEventListener: (art: string, f: (e: unknown) => void) => { if (art === 'fetch') handler.push(f) }, skipWaiting: () => {}, clients: { claim: () => {} } }
+    new Function('self', 'caches', lies('public/sw.js'))(eigen, {
+      delete: async () => true,
+      open: async () => ({ put: async () => {} }),
+    })
+    expect(handler).toHaveLength(1)
+    const anfrage = (methode: string, pfad: string) => {
+      let antwort: Promise<Response> | null = null
+      const formular = new FormData()
+      handler[0]({
+        request: { method: methode, url: `https://example.com${pfad}`, formData: async () => formular },
+        respondWith: (p: Promise<Response>) => { antwort = p },
+      })
+      return antwort as Promise<Response> | null
+    }
+    const antwort = await anfrage('POST', '/teilen')
+    expect(antwort?.status).toBe(303)
+    expect(antwort?.headers.get('location')).toBe('/teilen')
+    // Gegenproben: GET auf /teilen und POST auf anderen Pfad laufen unangefasst zum Netz.
+    expect(anfrage('GET', '/teilen')).toBeNull()
+    expect(anfrage('POST', '/anderswo')).toBeNull()
   })
 
   it('die Anmeldung behält den Rücksprung auf /teilen', () => {
@@ -180,8 +214,10 @@ describe('/teilen — neues Design, Verhalten unverändert', () => {
     expect(seite).toContain("redirect('/login?von=/teilen')")
   })
 
-  it('keine Palette-Klasse, kein text-primary als Linkfarbe', () => {
+  it('keine Palette-Klasse, keine Hexfarbe, kein text-primary als Linkfarbe', () => {
     const code = ohneKommentare(lies('src/app/teilen/teilen-client.tsx'))
+    expect(code).not.toMatch(/\b(?:text|bg|border|divide)-(?:slate|gray|zinc|neutral|stone|white|black)\b/)
+    expect(code).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
     expect(code).not.toMatch(/\btext-primary\b(?!-)/)
   })
 })
@@ -203,7 +239,6 @@ describe('Toter Code — entfernt, mit Nachweis', () => {
 
 describe('Wache deckt (druck) mit ab', () => {
   it('die Hof-Seiten-Wache liest beide Gruppen', () => {
-    expect(relative(WURZEL, join(WURZEL, 'tests/hof-seiten-wache.test.ts'))).toBe('tests/hof-seiten-wache.test.ts')
     expect(lies('tests/hof-seiten-wache.test.ts')).toContain("'(druck)'")
   })
 })

@@ -71,6 +71,9 @@ export default function DatenschutzPage() {
                 Sitzung: Abgelaufene Sitzungen löschen wir {SITZUNGEN_NACH_ABLAUF_TAGE} Tage nach ihrem
                 Ablauf.
               </li>
+            </ul>
+            <p className="mt-3"><strong className="text-foreground">Weitere Cookies:</strong></p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
               <li>
                 Cookie zur Wiedererkennung des Geräts (<span className="whitespace-nowrap">{GERAETE_COOKIE}</span>, {GERAETE_COOKIE_TAGE} Tage):
                 nur bei Hof- und Betreiber-Konten. Es enthält eine zufällige Kennung und dient dazu,
@@ -176,9 +179,8 @@ export default function DatenschutzPage() {
           <Section title="8. Cookies">
             <p>
               Wir verwenden ausschließlich technisch notwendige Cookies und localStorage-Einträge
-              (für Warenkorbfunktion, Anmeldung und die Wiedererkennung deines Geräts, siehe
-              Abschnitt 2). Es werden keine Tracking-Cookies und keine Werbe-Cookies eingesetzt.
-              Die Reichweitenmessung (Vercel Web Analytics, Abschnitt 4) arbeitet ohne Cookies.
+              (für Warenkorbfunktion und Session-Verwaltung). Es werden keine Tracking-Cookies
+              oder Werbe-Cookies eingesetzt. Weitere Cookies stehen in Abschnitt 2.
             </p>
           </Section>
 

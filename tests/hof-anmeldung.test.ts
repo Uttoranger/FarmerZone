@@ -62,11 +62,11 @@ describe('Kopf der KundeShell — Platz für „Anmelden"', () => {
   it('der Name tritt nie bei 390 px oder breiter zurück', () => {
     const schwellen = [...ohneKommentare(quelle('src/components/shells/kunde-shell.tsx')).matchAll(/max-\[(\d+)px\]:hidden/g)].map((t) => Number(t[1]))
     // KundeShell mit Warenkorb im Kopf (der alte KundenKopf ist seit Nr. 181 entfernt).
-    expect(schwellen.length).toBeGreaterThan(0)
+    expect(schwellen).toHaveLength(1)
     for (const schwelle of schwellen) expect(schwelle).toBeLessThanOrEqual(390)
   })
 
-  it('der alte Kopf ist weg: keine Seite und keine Datei nennt KundenKopf als Bauteil', () => {
+  it('der alte Kopf ist weg: kunden-kopf.tsx exportiert kein KundenKopf mehr', () => {
     expect(ohneKommentare(quelle('src/components/shared/kunden-kopf.tsx'))).not.toMatch(/export function KundenKopf\b/)
   })
 })
