@@ -25,6 +25,7 @@ import { EINGANG_TEXT, POSTFACH_MAIL_TEXT, eingangAdresse, eingangMeldungAdresse
 import { ZUSTELLUNG_MAIL_TEXT, bestaetigenPfad } from '@/lib/zustellung'
 import { ADMIN_BETRIEB_HREF, betriebMail, fehlerKlasse, type BetriebMailAnlass } from '@/lib/betrieb'
 import { empfaengerFingerabdruck } from '@/lib/mail-empfaenger'
+import { hofKontaktEmail, type HofKontakt } from '@/lib/hof-kontakt'
 import type { MailArt, MailStatus } from '@/schemas/mail-auftrag'
 
 const apiKey = process.env.RESEND_API_KEY
@@ -363,6 +364,12 @@ export type OrderForEmail = {
     product?: OrderLineProduct
   }>
 }
+
+/**
+ * Eine Bestellung für die Mails AN DEN HOF: dazu die Anmelde-Adresse der
+ * Inhaberin — ohne Hof-E-Mail geht die Mail dorthin (hofKontaktEmail, Nr. 194).
+ */
+export type OrderForHofMail = OrderForEmail & { farm: OrderForEmail['farm'] & HofKontakt }
 
 /**
  * „Heumilch frisch · 2 × 1 L" — die Positionszeile in DERSELBEN Schreibweise
@@ -830,7 +837,7 @@ export async function sendOnsiteConfirmation(
 }
 
 /** Online-Zahlung → Bauer */
-export async function baueOrderPaidToFarmer(order: OrderForEmail): Promise<StapelMail> {
+export async function baueOrderPaidToFarmer(order: OrderForHofMail): Promise<StapelMail> {
   const { NewOrderNotificationEmail } = await import('@/emails/new-order-notification')
   const html = await toHtml(React.createElement(NewOrderNotificationEmail, {
     farmerName: order.farm.ownerName,
@@ -849,11 +856,11 @@ export async function baueOrderPaidToFarmer(order: OrderForEmail): Promise<Stape
     dashboardUrl: `${APP_URL}/orders`,
   }))
 
-  return { an: order.farm.email, betreff: `Neue Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber}`, html }
+  return { an: hofKontaktEmail(order.farm), betreff: `Neue Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber}`, html }
 }
 
 /** Vor-Ort bestätigt → Bauer */
-export async function baueOrderConfirmedToFarmer(order: OrderForEmail): Promise<StapelMail> {
+export async function baueOrderConfirmedToFarmer(order: OrderForHofMail): Promise<StapelMail> {
   const paymentLabel =
     order.paymentMethod === 'ONSITE_CASH' ? 'Bar bei Abholung' : 'Karte bei Abholung'
 
@@ -877,7 +884,7 @@ export async function baueOrderConfirmedToFarmer(order: OrderForEmail): Promise<
   }))
 
   return {
-    an: order.farm.email,
+    an: hofKontaktEmail(order.farm),
     betreff: `Neue Vor-Ort-Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber} (${paymentLabel})`,
     html,
   }

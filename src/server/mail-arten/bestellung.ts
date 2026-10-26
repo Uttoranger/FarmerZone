@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import type { OrderForEmail, StapelMail } from '@/lib/email'
+import { HOF_KONTAKT_FELDER } from '@/lib/hof-kontakt'
+import type { OrderForEmail, OrderForHofMail, StapelMail } from '@/lib/email'
 import type { EinstellAuftrag } from '@/server/mail-warteschlange'
 import type { MailRenderer, Verworfen } from '@/server/mail-arten'
 import {
@@ -37,7 +38,8 @@ const BESTELLUNG_FUER_MAIL = {
   stripePaymentIntentId: true,
   cancelReason: true,
   farm: {
-    select: { id: true, name: true, slug: true, email: true, ownerName: true, address: true, postalCode: true, city: true, phone: true },
+    // Mit der Anmelde-Adresse: ohne Hof-E-Mail gehen die Hof-Mails dorthin (hofKontaktEmail, Nr. 194).
+    select: { id: true, name: true, slug: true, ownerName: true, address: true, postalCode: true, city: true, phone: true, ...HOF_KONTAKT_FELDER },
   },
   items: {
     select: {
@@ -176,7 +178,7 @@ async function ladeBestellung(orderId: string): Promise<BestellungFuerMail | nul
   return prisma.order.findUnique({ where: { id: orderId }, select: BESTELLUNG_FUER_MAIL })
 }
 
-function alsMailBestellung(b: BestellungFuerMail): OrderForEmail {
+function alsMailBestellung(b: BestellungFuerMail): OrderForHofMail {
   return {
     id: b.id,
     orderNumber: b.orderNumber,
@@ -215,7 +217,7 @@ export async function ladeBestellungFuerMail(orderId: string): Promise<OrderForE
 const GELOESCHT: Verworfen = { verworfen: 'bestellung_fehlt' }
 
 /** Ein Renderer, der nur die Bestellung braucht. */
-function einfach(baue: (email: typeof import('@/lib/email'), order: OrderForEmail) => Promise<StapelMail>): MailRenderer {
+function einfach(baue: (email: typeof import('@/lib/email'), order: OrderForHofMail) => Promise<StapelMail>): MailRenderer {
   return async (bezug) => {
     const { orderId } = bestellungBezugSchema.parse(bezug)
     const b = await ladeBestellung(orderId)

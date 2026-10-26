@@ -76,6 +76,7 @@ function bestellung(felder: { serviceFeeCents: number; createdAt?: Date; payment
       postalCode: '1234',
       phone: '+43 664 0000000',
       slug: 'hof-test',
+      owner: { email: 'inhaber@example.com' },
     },
     items: [{ productName: 'Eier', quantity: 1, unitPrice: 10.3, totalPrice: 10.3, product: null }],
   }

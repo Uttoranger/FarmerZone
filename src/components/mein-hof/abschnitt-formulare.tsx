@@ -187,7 +187,7 @@ type ProfilFormularProps = AbschnittFormularProps & { einstellungen: FarmSetting
 // Altwert, der vor der Grenze länger gespeichert wurde, sperrt das Speichern
 // nicht. Der Server prüft noch einmal — mit dem Stand aus der Datenbank.
 function bestandVon(e: FarmSettings): ProfilBestand {
-  return { name: e.name, ownerName: e.ownerName, phone: e.phone, email: e.email }
+  return { name: e.name, ownerName: e.ownerName, phone: e.phone }
 }
 
 type NameDaten = Pick<ProfileFormData, 'name' | 'description'>
