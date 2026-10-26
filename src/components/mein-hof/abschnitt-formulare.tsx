@@ -45,6 +45,8 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
+import { FREIWILLIG, HOF_EMAIL_HILFE } from '@/lib/profil-meldungen'
+import { hilfeKennung } from '@/components/shared/formular-meldungen'
 
 /*
  * Die Formulare der Abschnitte von Mein Hof (Nachtlauf Nr. 50, Register N4):
@@ -268,12 +270,23 @@ export function KontaktForm({ einstellungen, ...rueckmeldung }: ProfilFormularPr
           <Input id="hofseite-telefon" className="h-11" type="tel" autoComplete="tel" {...register('phone')} />
           <FeldZaehler control={control} name="phone" max={TELEFON_MAX} leise="text-muted-foreground" />
         </Feld>
-        <Feld id="hofseite-email" label="E-Mail" fehler={formState.errors.email}>
-          <Input id="hofseite-email" className="h-11" type="email" autoComplete="email" {...register('email')} />
+        {/* Leer heißt Anmelde-Adresse (Nr. 194) — derselbe Hinweis wie im Profil, damit beide Wege dasselbe sagen. */}
+        <Feld id="hofseite-email" label={`E-Mail ${FREIWILLIG}`} fehler={formState.errors.email}>
+          <Input
+            id="hofseite-email"
+            className="h-11"
+            type="email"
+            autoComplete="email"
+            aria-describedby={hilfeKennung('hofseite-email')}
+            {...register('email')}
+          />
           <FeldZaehler control={control} name="email" max={EMAIL_MAX} leise="text-muted-foreground" />
+          <p id={hilfeKennung('hofseite-email')} className="mt-1 text-xs text-muted-foreground">
+            {HOF_EMAIL_HILFE}
+          </p>
         </Feld>
       </div>
-      <p className="text-xs text-muted-foreground">Beides steht für Kunden auf der Hofseite.</p>
+      <p className="text-xs text-muted-foreground">Die Telefonnummer steht für Kunden auf der Bestellseite.</p>
       <Aktionen pending={pending} fehler={fehler} onAbbrechen={rueckmeldung.onAbbrechen} />
     </form>
   )
