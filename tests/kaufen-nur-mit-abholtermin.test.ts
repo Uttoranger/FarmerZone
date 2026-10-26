@@ -16,7 +16,7 @@
  *    Satz auf Hof- und Produktseite einmal dasteht (ein Zustand, eine Fassung; gezählt mit vollem Korb).
  *    Im Korb-Blatt (`CartSheet`), das unter 1024 px der einzige Weg zur Kasse ist, die volle Karte.
  *  - Die Kasse (page.tsx) rechnet die Sperre einmal auf dem Server aus der einen Zählung der vollen Tage und
- *    gibt sie dem Formular; bei Pause bleibt sie eine 404.
+ *    gibt sie dem Formular; bei Pause zeigt sie die Pausen-Karte (Nr. 176), ein unbekannter Hof bleibt eine 404.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Fragment, createElement, type ReactElement, type ReactNode } from 'react'
@@ -87,7 +87,7 @@ vi.mock('@/components/ui/sheet', async (importOriginal) => {
 })
 // Die Kasse prüft hier nur, was ihre Seite dem Formular gibt (die Props); das Formular selbst rendert
 // tests/kasse-formular.test.ts. So bleibt Stripes Zahlungsfeld aus dem Spiel (Wache tests/paket-mock-wache.test.ts).
-vi.mock('@/components/checkout/checkout-form', () => ({ CheckoutForm: () => null }))
+vi.mock('@/components/checkout/checkout-form', () => ({ CheckoutForm: () => null, KassePausiert: () => null }))
 
 import FarmPage from '@/app/(public)/[farmSlug]/page'
 import ProduktSeite from '@/app/(public)/[farmSlug]/produkt/[id]/page'
@@ -366,7 +366,7 @@ describe('Mini-Warenkorb: statt „Zur Kasse“ der Hinweis', () => {
     }
     for (const sperre of ['keine-abholzeit', 'ausgebucht', 'pause'] as const) {
       const html = spalte(sperre)
-      expect(html, sperre).toContain('Dein Korb')
+      expect(html, sperre).toContain('Dein Warenkorb')
       expect(html, sperre).not.toContain('Zur Kasse')
     }
   })
@@ -388,7 +388,7 @@ describe('Mini-Warenkorb: statt „Zur Kasse“ der Hinweis', () => {
     expect(spalte(null)).toContain('Zur Kasse')
     korb.positionen = []
     const leer = spalte('keine-abholzeit')
-    expect(leer).not.toContain('Dein Korb')
+    expect(leer).not.toContain('Dein Warenkorb')
     expect(leer).not.toContain(TEXT.keineSatz)
   })
 })
@@ -412,7 +412,7 @@ describe('Ein Zustand, eine Fassung: mit vollem Korb steht der Satz einmal auf d
       korb.positionen = [POSITION]
       const seiten = { hofseite: await hofseite(farm), produkte: await hofseite(farm, { reiter: 'produkte' }), produktseite: await produktseite(farm) }
       for (const [seite, html] of Object.entries(seiten)) {
-        expect(html, seite).toContain('Dein Korb')
+        expect(html, seite).toContain('Dein Warenkorb')
         expect(vorkommen(html, satz), seite).toBe(1)
         expect(vorkommen(html, titel), seite).toBe(2)
       }
@@ -420,7 +420,7 @@ describe('Ein Zustand, eine Fassung: mit vollem Korb steht der Satz einmal auf d
 
     it(`${fall}: Gegenprobe — leerer Korb: kein Mini-Warenkorb, Titel und Satz je einmal`, async () => {
       for (const html of [await hofseite(farm), await produktseite(farm)]) {
-        expect(html).not.toContain('Dein Korb')
+        expect(html).not.toContain('Dein Warenkorb')
         expect(vorkommen(html, satz)).toBe(1)
         expect(vorkommen(html, titel)).toBe(1)
       }
@@ -480,7 +480,7 @@ describe('Korb-Blatt (unter 1024 px der einzige Weg zur Kasse): statt „Zur Kas
       expect(html, sperre).not.toContain('Karotten: eins mehr')
       expect(html, sperre).not.toContain('Karotten: eins weniger')
       expect(html, sperre).toContain('Menge: 2')
-      expect(html, sperre).toContain('Karotten aus dem Korb nehmen')
+      expect(html, sperre).toContain('Karotten aus dem Warenkorb nehmen')
     }
   })
 
@@ -488,7 +488,7 @@ describe('Korb-Blatt (unter 1024 px der einzige Weg zur Kasse): statt „Zur Kas
     const frei = blatt(null)
     expect(frei).toContain('Karotten: eins mehr')
     expect(frei).toContain('Karotten: eins weniger')
-    expect(frei).toContain('Karotten aus dem Korb nehmen')
+    expect(frei).toContain('Karotten aus dem Warenkorb nehmen')
   })
 })
 
@@ -516,7 +516,14 @@ describe('Kasse: die Sperre rechnet der Server, einmal, aus der einen Zählung',
     expect((await kasse(HOF_FREI)).props.sperre).toBeNull()
   })
 
-  it('Pause: wie bisher keine Kasse (404)', async () => {
-    await expect(kasse({ ...HOF_FREI, isPaused: true })).rejects.toBe(NICHT_GEFUNDEN)
+  it('Pause (Nr. 176): keine Kasse und kein 404, sondern die Pausen-Karte mit dem Hof', async () => {
+    const seite = await kasse({ ...HOF_FREI, isPaused: true })
+    expect(String(typeof seite.type === 'function' ? seite.type.name : seite.type)).toBe('KassePausiert')
+    expect((seite.props.farm as { slug: string }).slug).toBe(HOF_FREI.slug)
+  })
+
+  it('Gegenprobe (Nr. 176): ein unbekannter Hof bleibt ein 404', async () => {
+    ladeFuerKasse.mockResolvedValue(null)
+    await expect(CheckoutPage({ params: Promise.resolve({ farmSlug: 'gibt-es-nicht' }), searchParams: Promise.resolve({}) })).rejects.toBe(NICHT_GEFUNDEN)
   })
 })

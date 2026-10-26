@@ -233,7 +233,7 @@ function MiniWarenkorb({
     >
       <h2 id="mini-warenkorb" className="flex items-center gap-2 text-[15px] font-semibold text-foreground">
         <ShoppingBasket className="size-4 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
-        Dein Korb
+        Dein Warenkorb
         <span className="flex-1" />
         <span className="text-[13px] font-normal text-muted-foreground">{mitAnzahl(anzahl, 'Artikel', 'Artikel')}</span>
       </h2>

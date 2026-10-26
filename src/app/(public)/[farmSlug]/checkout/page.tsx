@@ -4,7 +4,7 @@ import type { Metadata } from 'next'
 import { auth } from '@/lib/auth'
 import { getPublicFarmGeteilt } from '@/server/queries/farm'
 import { getBetriebsVorbelegung, getNurBetriebeProduktIds } from '@/server/queries/products'
-import { CheckoutForm } from '@/components/checkout/checkout-form'
+import { CheckoutForm, KassePausiert } from '@/components/checkout/checkout-form'
 import { alsAbholFenster, ausgebuchteSchluessel, ausgebuchteTage } from '@/server/abholfenster'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { kassenVorbelegung } from '@/lib/kasse'
@@ -57,8 +57,9 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
   // Die Kaufsperre (Register N24) einmal hier, aus derselben Zählung wie die ausgegrauten Termine —
   // das Formular rechnet sie nicht selbst. Verbindlich bleibt /api/checkout.
   const sperre = kaufSperre({ isPaused: farm.isPaused, pickupSlots: farm.pickupSlots.map((s) => alsAbholFenster(s, voll)) }, jetzt)
-  // Pause: wie bisher keine Kasse — die Pause sticht in kaufSperre alles andere.
-  if (sperre === 'pause') notFound()
+  // Pause: keine Kasse, aber auch kein 404 — Macht der Hof während des Einkaufs Pause, sieht die Kundin die
+  // Pausen-Karte mit Wegen (Nr. 176). Ein unbekannter Hof ist oben schon beim 404 gelandet.
+  if (sperre === 'pause') return <KassePausiert farm={farm} />
 
   // Die Fokus-Shell (Nachtlauf Nr. 12) rendert CheckoutForm selbst: Ihr
   // „Zurück" hängt am Zustand im Browser — hinaus zum Hof nur, solange keine

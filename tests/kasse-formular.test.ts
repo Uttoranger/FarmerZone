@@ -59,7 +59,9 @@ vi.mock('@stripe/react-stripe-js', () => ({
 vi.mock('@/lib/stripe-client', () => ({ getStripePromise: () => null }))
 
 import { CheckoutForm } from '@/components/checkout/checkout-form'
-import { barGuenstiger } from '@/lib/kasse'
+import { barGuenstiger, PREISE_INKL_UST, SERVICEGEBUEHR_ZUSATZ } from '@/lib/kasse'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { BAR_OHNE_GEBUEHR_HINWEIS, BAR_OHNE_GEBUEHR_ZAHLART } from '@/lib/konditionen'
 import { ANGABEN_ZUM_HOF_TITEL } from '@/lib/stripe-konto'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
@@ -184,7 +186,7 @@ describe('Kasse glätten (N10): das ganze Formular', () => {
     // Gegenprobe: An diesem Tag ist bar günstiger — früher stand dann der lose Absatz da.
     expect(barGuenstiger(HOF, JETZT)).toBe(true)
     for (const html of [kasse(HOF), kasse({ ...HOF, stripeAccountReady: false })]) {
-      expect(html).toContain('Dein Korb bei')
+      expect(html).toContain('Dein Warenkorb bei')
       expect(html).not.toContain('Ein Korb pro Hof')
       expect(html).not.toContain(BAR_OHNE_GEBUEHR_HINWEIS)
     }
@@ -237,3 +239,46 @@ describe('Kaufsperre in der Kasse (Register N24)', () => {
     expect(kaufknopf(html)).not.toMatch(/\bdisabled=""/)
   })
 })
+
+describe('Kasse: Vertrauen, Grund, Ausweg (Nr. 176)', () => {
+  const kasseHof = () => kasse(HOF)
+
+  it('„Deine Daten" führt zur Datenschutzerklärung — neuer Tab, mit Hinweis für den Screenreader', () => {
+    const html = kasseHof()
+    const link = html.match(/<a [^>]*href="\/datenschutz"[^>]*>[\s\S]*?<\/a>/)?.[0] ?? ''
+    expect(link).toContain('Was passiert damit?')
+    expect(link).toContain('target="_blank"')
+    expect(link).toContain('rel="noopener noreferrer"')
+    expect(link).toContain('öffnet in neuem Tab')
+    expect(html.indexOf('Deine Daten')).toBeLessThan(html.indexOf('Was passiert damit?'))
+  })
+
+  it('unter der Gesamtsumme steht „Preise inkl. USt"', () => {
+    const html = kasseHof()
+    expect(PREISE_INKL_UST).toBe('Preise inkl. USt')
+    expect(html.indexOf(PREISE_INKL_UST)).toBeGreaterThan(html.indexOf('Gesamt'))
+  })
+
+  it('Tastaturhinweis „weiter" an E-Mail, Name und Telefon; Gegenprobe: nicht an der Notiz', () => {
+    const html = kasseHof()
+    for (const id of ['customerEmail', 'customerName', 'customerPhone']) {
+      const tag = html.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))?.[0] ?? ''
+      expect(tag, id).toContain('enterKeyHint="next"')
+    }
+    expect(html.match(/<textarea[^>]*id="customerNote"[^>]*>/)?.[0]).not.toContain('enterKeyHint')
+  })
+
+  it('Felder in „Warenkorb"-Sprache, Rand aus dem Feldrand-Token', () => {
+    const html = kasseHof()
+    expect(html).toContain('Dein Warenkorb bei')
+    expect(html).toContain('Warenkorb ändern')
+    expect(html).not.toContain('Dein Korb bei')
+    const kasseTeile = readFileSync(join(process.cwd(), 'src/components/checkout/kasse-teile.tsx'), 'utf8')
+    expect(kasseTeile).toMatch(/export const FELD = cn\(\s*'[^']*\bborder-input\b/)
+  })
+
+  it('die Konstante für das Produktraster (177) heißt Servicegebühr, nicht „Gebühr"', () => {
+    expect(SERVICEGEBUEHR_ZUSATZ).toBe('+ Servicegebühr')
+  })
+})
+

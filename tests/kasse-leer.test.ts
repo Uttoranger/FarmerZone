@@ -1,6 +1,6 @@
 /**
  * Kasse leer mit Grund (Register N28, Nr. 169; Fund aus Bericht 165): Fällt durch die Prüfung beim Öffnen alles aus
- * dem Korb, stand nur „Dein Korb ist leer" da — der Grund (`korbHinweis`) stand nur im vollen Zweig. Jetzt rendert der
+ * dem Korb, stand nur „Dein Warenkorb ist leer" da — der Grund (`korbHinweis`) stand nur im vollen Zweig. Jetzt rendert der
  * leere Zustand `KasseLeer` die orange Hinweiskarte ÜBER dem leeren Zustand, nicht in dessen Satz.
  *
  * Die Komponente wird direkt gerendert: Der Hinweis entsteht in der Kasse erst nach einem `await` (Prüfung beim
@@ -31,9 +31,9 @@ describe('KasseLeer (Register N28)', () => {
     expect(html).toContain('role="status"')
     expect(html).toContain('data-ton="orange"')
     expect(html).toContain(GRUND)
-    expect(html).toContain('Dein Korb ist leer')
+    expect(html).toContain('Dein Warenkorb ist leer')
     // Die Karte steht ÜBER dem leeren Zustand, nicht in dessen Satz.
-    expect(html.indexOf(GRUND)).toBeLessThan(html.indexOf('Dein Korb ist leer'))
+    expect(html.indexOf(GRUND)).toBeLessThan(html.indexOf('Dein Warenkorb ist leer'))
     expect(html).toContain('href="/hof-test"')
   })
 
@@ -42,8 +42,8 @@ describe('KasseLeer (Register N28)', () => {
 
     expect(html).not.toContain('role="status"')
     expect(html).not.toContain('data-ton="orange"')
-    expect(html).toContain('Dein Korb ist leer')
-    expect(html).toContain('Leg bei Testhof A etwas in den Korb, dann kannst du hier bestellen.')
+    expect(html).toContain('Dein Warenkorb ist leer')
+    expect(html).toContain('Leg bei Testhof A etwas in den Warenkorb, dann kannst du hier bestellen.')
     expect(html).toContain('Zurück zum Hof')
   })
 })

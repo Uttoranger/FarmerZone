@@ -361,7 +361,8 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     expect(text).toMatch(/setBestellungAngelegt\(true\)\s*setZahlung\(/)
     // Laden, leerer Korb, Zahlung und Formular — alle in derselben Fokus-Shell.
     expect(text.match(/fokusShell\(/g)?.length).toBeGreaterThanOrEqual(4)
-    expect(text.match(/<KundeFokusShell\b/g)).toHaveLength(1)
+    // Zwei Stellen: die Kasse selbst und die Kasse eines pausierten Hofs (KassePausiert, Nr. 176).
+    expect(text.match(/<KundeFokusShell\b/g)).toHaveLength(2)
   })
 
   it('die Bestätigungsseite trägt die KundeShell ohne Unterleiste, nie den Verlauf als Rückweg (Nr. 13)', () => {

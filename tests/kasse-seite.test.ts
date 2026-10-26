@@ -238,7 +238,7 @@ describe('Korb und Zahlarten (N10)', () => {
         zeilenCents: new Map([['eier', 980]]),
       })
     )
-    expect(html).toContain('Dein Korb bei')
+    expect(html).toContain('Dein Warenkorb bei')
     expect(html).toContain('Freilandeier 10er')
     expect(html).toContain('€ 9,80')
     expect(html).not.toContain('Ein Korb pro Hof')

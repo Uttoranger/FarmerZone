@@ -33,6 +33,7 @@ import {
   produktStatus,
   produkteAbschnitte,
   PRODUKTE_LEER,
+  produkteLeerSatz,
   produkteKopfzeile,
   sichtbareProdukteFilter,
   wiederDaMomentMoeglich,
@@ -245,7 +246,7 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
         <EmptyState
           symbol={Package}
           titel={PRODUKTE_LEER.titel}
-          satz={PRODUKTE_LEER.satz}
+          satz={produkteLeerSatz(hof.sichtbar)}
           ausweg={neuKnopf()}
         />
       ) : (

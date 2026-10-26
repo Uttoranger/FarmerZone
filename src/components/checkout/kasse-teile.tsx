@@ -9,6 +9,7 @@ import { SERVICEGEBUEHR_HINWEIS, centsAlsEuro } from '@/lib/servicegebuehr'
 import {
   GEBUEHR_ENTFAELLT,
   KONTAKT_HINWEIS,
+  PREISE_INKL_UST,
   RESERVIERUNG_MINUTEN,
   zahlungAbgelehntText,
   type AbholKachel,
@@ -46,7 +47,7 @@ export const FELD_LABEL = 'mb-1 block text-[12.5px] font-semibold text-muted-for
 
 /** Eingabefeld: 46 px hoch, Radius 11 px, Grund etwas tiefer als die Karte; 16 px am Handy (kein Zoom). */
 export const FELD = cn(
-  'h-[46px] w-full min-w-0 rounded-[11px] border border-border bg-background px-3.5 text-base text-foreground placeholder:text-muted-foreground aria-[invalid=true]:border-status-offen md:text-[14.5px]',
+  'h-[46px] w-full min-w-0 rounded-[11px] border border-input bg-background px-3.5 text-base text-foreground placeholder:text-muted-foreground aria-[invalid=true]:border-status-offen md:text-[14.5px]',
   FOKUS_RAHMEN
 )
 
@@ -144,11 +145,11 @@ export function KorbKarte({
     <section aria-labelledby="kasse-korb" className={KARTE}>
       <div className="flex items-baseline gap-3">
         <h2 id="kasse-korb" className={cn(KARTEN_TITEL, 'min-w-0 flex-1 text-[19px] break-words')}>
-          Dein Korb bei <span title={hofName}>{hofName}</span>
+          Dein Warenkorb bei <span title={hofName}>{hofName}</span>
         </h2>
         {aendernHref && (
           <Link href={aendernHref} className={cn(TEXTLINK, 'shrink-0')}>
-            Korb ändern
+            Warenkorb ändern
           </Link>
         )}
       </div>
@@ -338,6 +339,7 @@ export function UebersichtKarte({
         <span>Gesamt</span>
         <span className="ml-auto tabular-nums">{formatEuro(centsAlsEuro(betraege.gesamtCents))}</span>
       </p>
+      <p className={cn(HINWEIS, '-mt-1.5')}>{PREISE_INKL_UST}</p>
       {fehler}
       {children}
     </section>
