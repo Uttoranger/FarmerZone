@@ -52,7 +52,7 @@ export const TEILEN_KANAL_NAME: Record<TeilenKanal, string> = {
   LINK: 'Link kopiert',
 }
 
-function istKanalCode(wert: unknown): wert is TeilenKanalCode {
+export function istKanalCode(wert: unknown): wert is TeilenKanalCode {
   return typeof wert === 'string' && (TEILEN_KANAL_CODES as readonly string[]).includes(wert)
 }
 

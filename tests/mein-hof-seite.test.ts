@@ -41,7 +41,7 @@ vi.mock('next/image', () => ({
 }))
 
 import { BEITRAEGE_HREF, MEIN_HOF_REITER_HOFBEREICH, meinHofReiterAus } from '@/lib/bauern-navigation'
-import { meinHofReiterSchema } from '@/schemas/mein-hof-reiter'
+import { leseMeinHofReiter } from '@/schemas/mein-hof-reiter'
 import { beitraegeUebersicht, type BeitragQuelle } from '@/lib/mein-hof-beitraege'
 import { formatZahl } from '@/lib/format'
 import { EINSTELLUNG_FUER_ZEILE } from '@/lib/hofseite-fortschritt'
@@ -73,9 +73,9 @@ describe('Reiter in der Adresse (E12)', () => {
     expect(meinHofReiterAus(['x', 'beitraege'])).toBe('hofseite')
   })
 
-  it('das Schema wirft nie', () => {
-    expect(meinHofReiterSchema.parse(42)).toBe('hofseite')
-    expect(meinHofReiterSchema.parse(null)).toBe('hofseite')
+  it('die Prüfung wirft nie', () => {
+    expect(leseMeinHofReiter(42)).toBe('hofseite')
+    expect(leseMeinHofReiter(null)).toBe('hofseite')
   })
 })
 

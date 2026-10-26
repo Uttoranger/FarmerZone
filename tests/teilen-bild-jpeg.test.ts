@@ -21,7 +21,7 @@ import { Decimal } from '@prisma/client/runtime/index-browser'
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    farm: { findFirst: vi.fn() },
+    farm: { findUnique: vi.fn() },
     product: { findMany: vi.fn(async () => []) },
     statusPost: { findUnique: vi.fn(async () => null) },
   },
@@ -42,6 +42,8 @@ vi.mock('next/og', async (importOriginal) => {
   }
 })
 
+// Seit Nr. 196 liest das Teilen-Bild die Zeile der Hofseite (getPublicFarmMitTeilen); die Hilfe füllt den Rest.
+import { hofseitenZeile } from './hofseiten-zeile'
 import { prisma } from '@/lib/prisma'
 import * as Sentry from '@sentry/nextjs'
 import { ImageResponse } from 'next/og'
@@ -72,7 +74,7 @@ const aufruf = (suche = '') =>
 // 5 s der Vorgabe. Einmal je Datei vorwärmen, mit eigenem Zeitlimit (TESTING_GUIDELINES §4) — die Tests
 // selbst laufen dann im Standard-Limit.
 beforeAll(async () => {
-  vi.mocked(prisma.farm.findFirst).mockResolvedValue(HOF_ROH as never)
+  vi.mocked(prisma.farm.findUnique).mockResolvedValue(hofseitenZeile(HOF_ROH) as never)
   await aufruf('?format=quadrat')
   await aufruf('?format=story')
   await import('sharp')
@@ -80,7 +82,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(prisma.farm.findFirst).mockResolvedValue(HOF_ROH as never)
+  vi.mocked(prisma.farm.findUnique).mockResolvedValue(hofseitenZeile(HOF_ROH) as never)
 })
 
 describe('GET /[farmSlug]/opengraph-image — JPEG statt PNG (Register T7)', () => {

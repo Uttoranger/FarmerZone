@@ -96,27 +96,9 @@ export function unitOptionsFuer(
     : UNIT_OPTIONS.filter((u) => !istGrossgebindeEinheit(u.value) && raummass(u))
 }
 
-export const UNIT_LABELS: Record<string, string> = {
-  STUECK: 'Stück',
-  KG: 'kg',
-  G: 'g',
-  LITER: 'L',
-  ML: 'ml',
-  M3: 'm³',
-  PAKET: 'Paket',
-  BALLEN: 'Ballen',
-  BIGBAG: 'Big Bag',
-  RAUMMETER: 'rm',
-  SCHUETTRAUMMETER: 'srm',
-}
-
-// Kurznamen für kompakte Saison-Anzeigen (Badge auf der Hof-Seite,
-// Klartext-Zeile im Produkt-Dialog) — identischer Wortlaut an beiden Stellen
-export const MONTH_SHORT = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
-
-export function seasonLabel(start: number, end: number): string {
-  return `Saisonal verfügbar: ${MONTH_SHORT[start - 1]} bis ${MONTH_SHORT[end - 1]}`
-}
+// Einheiten-Namen, Monatskürzel und die Saison-Zeile stehen zod-frei in
+// src/lib/format.ts: Die Hofseite liest sie im Browser (Nr. 196).
+export { MONTH_SHORT, UNIT_LABELS, seasonLabel } from '@/lib/format'
 
 export const MONTH_OPTIONS = [
   { value: 1, label: 'Jänner' },

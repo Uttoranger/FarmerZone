@@ -1,11 +1,14 @@
 import { cache } from 'react'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
-import { getHofBesitzer, getOwnerFarm, getPublicFarm, type PublicFarm } from '@/server/queries/farm'
+import { getHofBesitzer, getOwnerFarm, getPublicFarmMitTeilen, type OeffentlicherHof, type PublicFarm } from '@/server/queries/farm'
 import { ansichtsModus, type SeitenAnsicht, type Suchparameter } from '@/lib/ansichts-modus'
 import { gibVerwaisteFreiFuerSlug } from '@/server/verwaiste-bestellungen'
 import { alsAbholFenster, ausgebuchteTage } from '@/server/abholfenster'
 import { ladeAbzeichenBlatt } from '@/server/queries/plattform-einstellung'
+
+/** Was die Hof- und die Produktseite laden: der Hof, wer ihn sieht, und (öffentlich) die Rohwerte des Teilen-Bilds. */
+export type Hofseite = { farm: PublicFarm | null; ansicht: SeitenAnsicht; teilen?: OeffentlicherHof | null }
 
 /** Etwas, das mit der Hof-ID gleichzeitig mit den vollen Tagen startet (Nr. 180); die Seite liest sein Ergebnis selbst (React `cache`). */
 export type Vorab = (hofId: string) => Promise<unknown>
@@ -15,7 +18,11 @@ export type Vorab = (hofId: string) => Promise<unknown>
  * von der Seite für Kundinnen unterscheidet, entscheidet `ansichtsModus`
  * (src/lib/ansichts-modus.ts) — hier, auf dem Server, mit Sitzung und Besitzer
  * als Quellen. Sieht der Besitzer seine Vorschau, lädt `getOwnerFarm` ohne die
- * Sichtbarkeitsregel (auch vor der Freigabe), sonst `getPublicFarm` mit ihr.
+ * Sichtbarkeitsregel (auch vor der Freigabe), sonst `getPublicFarmMitTeilen`
+ * (die Abfrage von `getPublicFarm`) mit ihr. `teilen` ist dann der
+ * öffentliche Hof samt Rohwerten des Teilen-Bilds: Die Metadaten bauen das
+ * Bild daraus, statt den Hof ein zweites Mal zu fragen (Nr. 196); in der
+ * Vorschau des Besitzers vor der Freigabe ist es null — dann gibt es kein Bild.
  *
  * Eigene Datei statt in der Seite: So lässt sich die Wahl zwischen den beiden
  * Abfragen mit nachgebildeter Sitzung prüfen (tests/hofseite-vorschau-laden.test.ts);
@@ -25,7 +32,7 @@ export async function ladeHofseite(
   farmSlug: string,
   suche: Suchparameter,
   vorab?: Vorab
-): Promise<{ farm: PublicFarm | null; ansicht: SeitenAnsicht }> {
+): Promise<Hofseite> {
   // Frist gilt beim Lesen (src/lib/fristen.ts): Verwaiste Bestellungen geben
   // ihre Ware frei, BEVOR die Hofseite den Bestand zeigt — sonst stünde ein
   // Produkt als „Ausverkauft" da, und niemand riefe /api/reserve auf, das
@@ -36,10 +43,11 @@ export async function ladeHofseite(
     angemeldeterNutzer: async () => (await auth.api.getSession({ headers: await headers() }))?.user.id ?? null,
     besitzer: () => getHofBesitzer(farmSlug),
   })
-  const hof = besitzerVorFreigabe ? await getOwnerFarm(besitzerVorFreigabe) : await getPublicFarm(farmSlug)
+  const oeffentlich = besitzerVorFreigabe ? null : await getPublicFarmMitTeilen({ slug: farmSlug })
+  const hof = besitzerVorFreigabe ? await getOwnerFarm(besitzerVorFreigabe) : (oeffentlich?.farm ?? null)
   // Der Besitzer hat genau einen Hof (ownerId ist eindeutig) — der Abgleich
   // ist eine Absicherung, keine Unterscheidung.
-  if (!hof || hof.slug !== farmSlug) return { farm: null, ansicht }
+  if (!hof || hof.slug !== farmSlug) return { farm: null, ansicht, teilen: null }
   // „Nächste Abholung" lässt volle Fenster weg (Register N19, Ergänzung
   // 21.10.2026): gezählt wie in der Kasse, NACH der Freigabe verwaister
   // Bestellungen oben — getPublicFarm/getOwnerFarm zählen selbst nicht (Mein
@@ -56,8 +64,8 @@ export async function ladeHofseite(
   // Abzeichen (Register K2, Nr. 116): Das Erklär-Blatt nennt die Plätze und —
   // solange der Zähler läuft — die freien. Nur für Gründungshöfe, aus dem Cache
   // (ladeAbzeichenBlatt); ohne Zahlen (Ladefehler) zeigt die Seite das Etikett ohne Blatt.
-  if (!geladen.gruendungshof) return { farm: geladen, ansicht }
-  return { farm: { ...geladen, abzeichenBlatt }, ansicht }
+  if (!geladen.gruendungshof) return { farm: geladen, ansicht, teilen: oeffentlich }
+  return { farm: { ...geladen, abzeichenBlatt }, ansicht, teilen: oeffentlich }
 }
 
 // React `cache` vergleicht Argumente nach Identität: Metadaten und Seite
@@ -83,7 +91,7 @@ export function ladeHofseiteGeteilt(
   farmSlug: string,
   suche: Suchparameter,
   vorab?: Vorab
-): Promise<{ farm: PublicFarm | null; ansicht: SeitenAnsicht }> {
+): Promise<Hofseite> {
   const sucheAlsText = JSON.stringify(suche)
   if (vorab) vorabFach(farmSlug, sucheAlsText).vorab = vorab
   return geteilt(farmSlug, sucheAlsText)

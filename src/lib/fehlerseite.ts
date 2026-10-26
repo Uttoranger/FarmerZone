@@ -11,7 +11,7 @@
  * Kundin, die auf einen alten Link getippt hat, braucht einen Weg zurück,
  * keinen Statuscode.
  */
-import { kennungAusUrlSchema } from '@/schemas/fehlerseite'
+import { kennungAusUrl } from '@/schemas/fehlerseite'
 
 /** 404 — irgendeine Adresse, die es nicht gibt. */
 export const NICHT_GEFUNDEN_TITEL = 'Diese Seite gibt es nicht (mehr)'
@@ -72,12 +72,12 @@ export const KENNUNG_PARAMETER = 'kennung'
 /**
  * Die Fehlernummer, geprüft — leer, wenn nichts Brauchbares übrig bleibt.
  *
- * Die Regel samt Begründung steht im Schema (`src/schemas/fehlerseite.ts`);
- * hier bleibt nur der bequeme Griff, den Seite und Link benutzen. `parse`
- * wirft nicht: Das Schema fällt über `.catch` auf den leeren Text zurück.
+ * Die Regel samt Begründung steht in `src/schemas/fehlerseite.ts`;
+ * hier bleibt nur der bequeme Griff, den Seite und Link benutzen. Die
+ * Prüfung wirft nicht, sie fällt auf den leeren Text zurück.
  */
 export function bereinigeKennung(roh: unknown): string {
-  return kennungAusUrlSchema.parse(roh)
+  return kennungAusUrl(roh)
 }
 
 /** Der Weg für den Hofbereich zu „Problem melden" (dessen eigener Briefkasten, Nr. 175/176). */

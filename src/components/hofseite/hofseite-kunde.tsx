@@ -37,7 +37,7 @@ import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
 import { titelbildAusschnitt } from '@/lib/titelbild'
 import { bildStil } from '@/lib/bild-ausschnitt'
 import { anzeigeBereichVon } from '@/lib/taxonomie'
-import { BEITRAG_PARAMETER, REITER_PARAMETER, beitragKennungSchema } from '@/schemas/hofseite-reiter'
+import { BEITRAG_PARAMETER, REITER_PARAMETER, leseBeitragKennung } from '@/schemas/hofseite-reiter'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -182,7 +182,7 @@ export function HofseiteKunde({
   // ist eine Systemgrenze — dieselbe Prüfung wie in page.tsx, die den Beitrag lädt.
   const { anordnung, nichtMehrAktuell } = ordneBeitraege(
     gezeigteBeitraege,
-    beitragKennungSchema.parse(suche.get(BEITRAG_PARAMETER)),
+    leseBeitragKennung(suche.get(BEITRAG_PARAMETER)),
     beitraegeFehler
   )
   const mitAktuell = offen === 'uebersicht' && anordnung !== null

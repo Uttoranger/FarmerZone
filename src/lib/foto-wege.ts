@@ -28,10 +28,9 @@
  * User-Agent, die Bytes, das Urteil der Lese-Stufe, der gemerkte Weg. Die
  * Komponenten (foto-quellen.tsx, image-upload.tsx) führen nur aus.
  */
-import type { z } from 'zod'
 import type { UploadZweck } from '@/lib/upload-pfade'
 import type { BildFehlerArt, LeseUrteil } from '@/lib/upload-fehler'
-import type { fotoWegSchema } from '@/schemas/foto-weg'
+import type { AUSWAHL_WEGE } from '@/schemas/foto-weg'
 
 /**
  * Über welchen Weg eine Datei kam.
@@ -46,8 +45,8 @@ import type { fotoWegSchema } from '@/schemas/foto-weg'
  */
 export type FotoWeg = 'galerie' | 'dateien' | 'kamera' | 'teilen'
 
-/** Die zwei Wege hinter „Foto wählen" — nur zwischen ihnen wird gewählt und gemerkt. Aus dem Schema des Speichers. */
-export type AuswahlWeg = z.infer<typeof fotoWegSchema>
+/** Die zwei Wege hinter „Foto wählen" — nur zwischen ihnen wird gewählt und gemerkt. Aus der Prüfung des Speichers. */
+export type AuswahlWeg = (typeof AUSWAHL_WEGE)[number]
 
 /**
  * Warum dieser Weg genommen wurde — für Sentry und für den Merker.

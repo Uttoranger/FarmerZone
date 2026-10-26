@@ -24,13 +24,15 @@ vi.mock('@/server/mail-arten/beitrag', () => ({
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    farm: { findFirst: vi.fn() },
+    farm: { findUnique: vi.fn() },
     statusPost: { findFirst: vi.fn() },
     customerFarmSubscription: { count: vi.fn() },
   },
 }))
 
 import { auth } from '@/lib/auth'
+// Seit Nr. 196 liest das Teilen-Bild die Zeile der Hofseite (getPublicFarmMitTeilen); die Hilfe füllt den Rest.
+import { hofseitenZeile } from './hofseiten-zeile'
 import { prisma } from '@/lib/prisma'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { ladeTeilenFensterBeitragAction } from '@/server/actions/teilen-fenster'
@@ -118,7 +120,7 @@ beforeEach(() => {
   vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_testspeicher_geheim')
   vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'user-1' } } as never)
   vi.mocked(getFarmForUser).mockResolvedValue({ id: 'farm-1' } as never)
-  vi.mocked(prisma.farm.findFirst).mockResolvedValue(HOF_ROH as never)
+  vi.mocked(prisma.farm.findUnique).mockResolvedValue(hofseitenZeile(HOF_ROH) as never)
   vi.mocked(prisma.customerFarmSubscription.count).mockResolvedValue(3 as never)
   stelleBeitrag(beitragRoh())
 })
@@ -178,7 +180,7 @@ describe('ladeTeilenFensterBeitragAction — Daten im Beitrag-Modus', () => {
     ['nicht auf der Hofseite', () => stelleBeitrag(beitragRoh({ showOnFarmPage: false }))],
     ['abgelaufen', () => stelleBeitrag(beitragRoh({ expiresAt: new Date('2026-10-12T09:59:59Z') }))],
     ['unbekannt', () => stelleBeitrag(null)],
-    ['Hof nicht öffentlich', () => vi.mocked(prisma.farm.findFirst).mockResolvedValue(null as never)],
+    ['Hof nicht öffentlich', () => vi.mocked(prisma.farm.findUnique).mockResolvedValue(null as never)],
   ])('%s → Satz, keine Daten', async (_fall, vorbereiten) => {
     vorbereiten()
     expect(await ladeTeilenFensterBeitragAction(BEITRAG_ID)).toEqual({ error: BEITRAG_TEILEN_TEXT.nichtTeilbar })

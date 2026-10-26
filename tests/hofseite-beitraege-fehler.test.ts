@@ -18,7 +18,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: new Proxy({}, { get: (_, modell: string) => new Proxy({}, { get: () => async () => (modell === 'farm' ? db.hof : null) }) }),
 }))
 vi.mock('@/server/hofseite-vorschau', () => ({ ladeHofseiteGeteilt: vi.fn() }))
-vi.mock('@/server/queries/teilen-bild', () => ({ ladeTeilenVorschau: vi.fn(async () => null) }))
+vi.mock('@/server/queries/teilen-bild', () => ({ teilenVorschauAus: vi.fn(() => null) }))
 vi.mock('@/server/queries/status-posts', () => ({ getActiveStatusPosts: vi.fn(), ladeAktivenBeitrag: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), addBreadcrumb: vi.fn() }))
 vi.mock('@/server/actions/appearance', () => ({ updateFarmBannerAction: vi.fn() }))

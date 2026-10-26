@@ -29,7 +29,7 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    farm: { findFirst: vi.fn() },
+    farm: { findUnique: vi.fn() },
     product: { findMany: vi.fn(async () => []) },
     statusPost: { findFirst: vi.fn(async () => null) },
   },
@@ -51,6 +51,8 @@ vi.mock('next/og', () => ({
   }),
 }))
 
+// Seit Nr. 196 liest das Teilen-Bild die Zeile der Hofseite (getPublicFarmMitTeilen); die Hilfe füllt den Rest.
+import { hofseitenZeile } from './hofseiten-zeile'
 import { prisma } from '@/lib/prisma'
 import * as Sentry from '@sentry/nextjs'
 import { ImageResponse } from 'next/og'
@@ -74,10 +76,17 @@ import { teilenBildSucheSchema } from '@/schemas/teilen'
 import { ladeTeilenBildBilder, type GeladeneBilder } from '@/lib/teilen-bild-quellen'
 import { TEILEN_BILD_FARBE, TeilenBildGrafik } from '@/components/teilen/teilen-bild-grafik'
 import { GET as bildRoute } from '@/app/(public)/[farmSlug]/opengraph-image/route'
-import { ladeTeilenBildQuelle, ladeTeilenVorschau } from '@/server/queries/teilen-bild'
+import { ladeTeilenBildQuelle, teilenVorschauAus } from '@/server/queries/teilen-bild'
+import { getPublicFarmMitTeilen } from '@/server/queries/farm'
+
+/** Der Weg der Metadaten der Hofseite (Nr. 196): der Hof des Laders (getPublicFarmMitTeilen), daraus teilenVorschauAus. */
+async function ladeTeilenVorschau(slug: string, jetzt: Date) {
+  const hof = await getPublicFarmMitTeilen({ slug })
+  return hof ? teilenVorschauAus(hof, jetzt) : null
+}
 import { ABZEICHEN_TEXT } from '@/lib/gruendungshof'
 
-const findFirst = vi.mocked(prisma.farm.findFirst)
+const hofLesen = vi.mocked(prisma.farm.findUnique)
 const beitragLesen = vi.mocked(prisma.statusPost.findFirst)
 const OHNE_BILDER: GeladeneBilder = { produkte: {}, held: null, ersatz: false }
 /** Die Bildmarke, wie die Route sie hereinreicht (hier eine Attrappe statt der Datei). */
@@ -322,17 +331,17 @@ describe('GET /[farmSlug]/opengraph-image', () => {
     bildRoute(new NextRequest(`http://localhost/${slug}/opengraph-image${suche}`), { params: Promise.resolve({ farmSlug: slug }) })
 
   it('kein öffentlicher Hof: 404, gefragt mit der Sichtbarkeits-Bedingung der Hofseite', async () => {
-    findFirst.mockResolvedValue(null)
+    hofLesen.mockResolvedValue(null)
     const res = await aufruf('hof-test')
     expect(res.status).toBe(404)
-    expect(findFirst.mock.calls[0][0]?.where).toMatchObject({ slug: 'hof-test', isActive: true, archivedAt: null, approvedAt: { not: null } })
+    expect(hofLesen.mock.calls[0][0]?.where).toMatchObject({ slug: 'hof-test', isActive: true, archivedAt: null, approvedAt: { not: null } })
   })
 
   it('ungültiger Slug: 404 ohne Datenbank und ohne Zwischenspeicher', async () => {
     const res = await aufruf('Hof%20Test')
     expect(res.status).toBe(404)
     expect(res.headers.get('cache-control')).toBe('no-store')
-    expect(findFirst).not.toHaveBeenCalled()
+    expect(hofLesen).not.toHaveBeenCalled()
   })
 })
 
@@ -359,7 +368,7 @@ describe('GET /[farmSlug]/opengraph-image — Zwischenspeicher, Bremse, Fehler (
     })
 
   beforeEach(() => {
-    findFirst.mockResolvedValue(ROH as never)
+    hofLesen.mockResolvedValue(hofseitenZeile(ROH) as never)
   })
 
   it('lang zwischengespeichert nur mit der Prüfsumme des aktuellen Inhalts', async () => {
@@ -428,7 +437,7 @@ describe('GET /[farmSlug]/opengraph-image — Zwischenspeicher, Bremse, Fehler (
     }
 
     beforeEach(() => {
-      findFirst.mockResolvedValue(VIELE as never)
+      hofLesen.mockResolvedValue(hofseitenZeile(VIELE) as never)
     })
 
     it('das vierte Produkt lässt sich wählen und steht im Bild', async () => {
@@ -665,7 +674,7 @@ describe('GET /[farmSlug]/opengraph-image — Beitrag-Modus (Register T6)', () =
   beforeEach(() => {
     // Die Route nimmt ihre eigene Uhr: Nur Date steht still, Zeitgeber laufen echt.
     vi.useFakeTimers({ toFake: ['Date'], now: JETZT })
-    findFirst.mockResolvedValue(HOF_ROH as never)
+    hofLesen.mockResolvedValue(hofseitenZeile(HOF_ROH) as never)
   })
   afterEach(() => {
     vi.useRealTimers()
@@ -688,7 +697,7 @@ describe('GET /[farmSlug]/opengraph-image — Beitrag-Modus (Register T6)', () =
   it('eine Kennung, die keine cuid sein kann: 404 ohne Datenbank', async () => {
     const res = await aufruf('?b=..%2Fx%20y')
     expect(res.status).toBe(404)
-    expect(findFirst).not.toHaveBeenCalled()
+    expect(hofLesen).not.toHaveBeenCalled()
   })
 
   it('gültiger Beitrag: Anlass, Titel, zwei Sätze und die verknüpften Produkte im Bild', async () => {
@@ -718,7 +727,7 @@ describe('GET /[farmSlug]/opengraph-image — Beitrag-Modus (Register T6)', () =
     vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_testspeicher_geheim')
     try {
       // Die Fotos kommen mit dem Hof aus EINER Abfrage (ladeTeilenBildQuelle, Nr. 75).
-      findFirst.mockResolvedValueOnce({
+      hofLesen.mockResolvedValueOnce(hofseitenZeile({
         ...HOF_ROH,
         products: [
           { ...roh('eier', 'Freilandeier'), imageUrl: 'https://testspeicher.public.blob.vercel-storage.com/farms/farm-1/product/1.webp' },
@@ -726,7 +735,7 @@ describe('GET /[farmSlug]/opengraph-image — Beitrag-Modus (Register T6)', () =
           roh('brot', 'Brot'),
           roh('heu', 'Heu'),
         ],
-      } as never)
+      }) as never)
       beitragLesen.mockResolvedValueOnce(
         beitrag({ linkedProductIds: ['eier', 'honig'], photoUrl: 'https://testspeicher.public.blob.vercel-storage.com/farms/farm-2/status/1.webp' }) as never
       )
@@ -770,17 +779,17 @@ describe('Abzeichen im Teilen-Bild (Register K2, Nr. 116)', () => {
   }
 
   it('der Lader liest den Platz, gibt aber nur Ja/Nein weiter — ausgeblendet und ausgenommen ohne Etikett', async () => {
-    findFirst.mockResolvedValue(ROH as never)
+    hofLesen.mockResolvedValue(hofseitenZeile(ROH) as never)
     const quelle = await ladeTeilenBildQuelle({ slug: 'hof-test' })
     expect(quelle?.hof.gruendungshof).toBe(true)
-    expect(findFirst.mock.calls[0][0]?.select).toMatchObject({ gruendungPlatz: true, gruendungAusgenommen: true, gruendungAbzeichenZeigen: true })
+    expect(hofLesen.mock.calls[0][0]?.select).toMatchObject({ gruendungPlatz: true, gruendungAusgenommen: true, gruendungAbzeichenZeigen: true })
     expect(JSON.stringify(quelle)).not.toContain('gruendungPlatz')
 
-    findFirst.mockResolvedValue({ ...ROH, gruendungAbzeichenZeigen: false } as never)
+    hofLesen.mockResolvedValue(hofseitenZeile({ ...ROH, gruendungAbzeichenZeigen: false }) as never)
     expect((await ladeTeilenBildQuelle({ slug: 'hof-test' }))?.hof.gruendungshof).toBe(false)
-    findFirst.mockResolvedValue({ ...ROH, gruendungAusgenommen: true } as never)
+    hofLesen.mockResolvedValue(hofseitenZeile({ ...ROH, gruendungAusgenommen: true }) as never)
     expect((await ladeTeilenBildQuelle({ slug: 'hof-test' }))?.hof.gruendungshof).toBe(false)
-    findFirst.mockResolvedValue({ ...ROH, gruendungPlatz: null } as never)
+    hofLesen.mockResolvedValue(hofseitenZeile({ ...ROH, gruendungPlatz: null }) as never)
     expect((await ladeTeilenBildQuelle({ slug: 'hof-test' }))?.hof.gruendungshof).toBe(false)
   })
 

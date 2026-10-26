@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   KAEUFER_PARAMETER,
-  kaeuferVorbelegungSchema,
+  kaeuferVorbelegungAus,
   leseKaeuferVorbelegung,
   mitKaeuferVorbelegung,
 } from '@/schemas/kaeufer-vorbelegung'
@@ -135,7 +135,7 @@ describe('Der Adressparameter: nur erlaubte Werte (Zod)', () => {
     expect(leseKaeuferVorbelegung(undefined)).toBeNull()
     expect(leseKaeuferVorbelegung([])).toBeNull()
     expect(leseKaeuferVorbelegung(['betrieb', 'privat'])).toBeNull()
-    expect(kaeuferVorbelegungSchema.parse(42)).toBeNull()
+    expect(kaeuferVorbelegungAus(42)).toBeNull()
   })
 
   it('mitKaeuferVorbelegung hängt an, behält andere Parameter und lässt ohne Wert alles, wie es ist', () => {

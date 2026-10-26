@@ -15,8 +15,8 @@
  * und leereWarenkorb berühren den Browser.
  */
 import {
-  warenkorbPositionSchema,
-  warenkorbSpeicherSchema,
+  leseWarenkorbHuelle,
+  leseWarenkorbPosition,
   type WarenkorbPosition,
   type WarenkorbSpeicher,
 } from '@/schemas/warenkorb-speicher'
@@ -47,13 +47,13 @@ export function leseWarenkorb(roh: string | null): WarenkorbSpeicher | null {
     // Stand ist kaputt. Wie ein leerer Korb behandeln — der Rückgabewert sagt es.
     return null
   }
-  const huelle = warenkorbSpeicherSchema.safeParse(daten)
-  if (!huelle.success) return null
-  const items = huelle.data.items.flatMap((p) => {
-    const position = warenkorbPositionSchema.safeParse(p)
-    return position.success ? [position.data] : []
+  const huelle = leseWarenkorbHuelle(daten)
+  if (!huelle) return null
+  const items = huelle.items.flatMap((p) => {
+    const position = leseWarenkorbPosition(p)
+    return position ? [position] : []
   })
-  return { farmId: huelle.data.farmId, farmSlug: huelle.data.farmSlug, items }
+  return { farmId: huelle.farmId, farmSlug: huelle.farmSlug, items }
 }
 
 /** Die Positionen für diesen Hof — der Korb eines anderen Hofs zählt hier nicht. */

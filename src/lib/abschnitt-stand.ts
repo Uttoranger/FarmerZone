@@ -16,9 +16,9 @@
  */
 import type { Betriebsstatus } from '@prisma/client'
 import { alsLand } from '@/lib/laender'
-import { ZU_LANG } from '@/lib/eingabegrenzen'
+import { GRUENDUNGSJAHR_FEHLER, WERTE_ZU_VIELE, ZU_LANG } from '@/lib/eingabegrenzen'
 import { EINSTELLUNG_FUER_ZEILE, ZEILE_TITEL } from '@/lib/hofseite-fortschritt'
-import { GRUENDUNGSJAHR_FEHLER, WERTE_ZU_VIELE, type AppearanceSaveInput } from '@/schemas/auftritt'
+import type { AppearanceSaveInput } from '@/schemas/auftritt'
 import type { ProfileFormData, profileSchema } from '@/schemas/hofprofil'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 

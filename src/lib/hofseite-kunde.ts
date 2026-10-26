@@ -28,7 +28,7 @@ import {
   ALTER_REITER_BEITRAEGE,
   BEITRAG_PARAMETER,
   REITER_PARAMETER,
-  reiterSchema,
+  leseHofReiter,
   type HofReiterAngebot,
   type HofReiterId,
 } from '@/schemas/hofseite-reiter'
@@ -68,7 +68,7 @@ export function aktiverReiter(
   suche: { reiter: string | null; bereich: string | null },
   angebot: readonly HofReiter[]
 ): HofReiterAngebot {
-  const gewaehlt = reiterSchema.parse(suche.reiter)
+  const gewaehlt = leseHofReiter(suche.reiter)
   if (gewaehlt && angebot.some((r) => r.id === gewaehlt)) return gewaehlt
   if (bereichAusParameter(suche.bereich) === 'FUTTERMITTEL' && angebot.some((r) => r.id === 'produkte')) return 'produkte'
   return 'uebersicht'
@@ -413,7 +413,7 @@ export type BeitragsAnordnung<B> = {
  * Ordnet die aktiven Beiträge für „Aktuell vom Hof“. `beitraege` kommt von
  * page.tsx: die fünf neuesten, der neueste zuerst, und — wenn `?beitrag=` einen
  * älteren aktiven Beitrag dieses Hofs trifft — dieser dahinter. `kennung` ist
- * der geprüfte Wert aus der Adresse (beitragKennungSchema).
+ * der geprüfte Wert aus der Adresse (leseBeitragKennung).
  *
  * Trifft die Kennung, steht dieser Beitrag oben, „Aktuell“ trägt trotzdem nur
  * der neueste, und darunter steht „Neuester: …“. Trifft sie nicht (abgelaufen,

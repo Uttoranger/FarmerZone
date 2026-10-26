@@ -32,7 +32,7 @@ vi.mock('@/server/queries/seo', () => ({
   pruefeHofseiteGeteilt: vi.fn(async () => ({ indexieren: true, geo: null })),
   pruefeProduktseiteGeteilt: vi.fn(async () => ({ indexieren: true })),
 }))
-vi.mock('@/server/queries/teilen-bild', () => ({ ladeTeilenVorschau: vi.fn(async () => null) }))
+vi.mock('@/server/queries/teilen-bild', () => ({ teilenVorschauAus: vi.fn(() => null) }))
 vi.mock('@/server/queries/status-posts', () => ({ getActiveStatusPosts: vi.fn(async () => []) }))
 vi.mock('@/server/queries/farm', () => ({ getPublicFarmGeteilt: vi.fn() }))
 vi.mock('@/server/queries/products', () => ({ getNurBetriebeProduktIds: vi.fn(async () => []), getBetriebsVorbelegung: vi.fn(async () => null) }))

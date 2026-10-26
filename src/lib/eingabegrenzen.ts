@@ -66,6 +66,21 @@ export const BEITRAG_WHATSAPP_MAX = 100_000
 export const VERKAUF_BETRAG_MAX = 1_000_000
 export const VERKAUF_MENGE_MAX = 999_999
 
+/*
+ * Werte und Gründungsjahr auf der Hofseite (früher in src/schemas/auftritt.ts,
+ * dort weiter exportiert) und die Länge einer Ortssuche (früher in
+ * src/schemas/ortssuche.ts). Hier, weil Hofseite und /hoefe sie im Browser
+ * lesen und die Schemas Zod mitbrächten (Nr. 196).
+ */
+/** Höchstens so viele Werte stehen auf der Hofseite (wie bisher in Mein Auftritt). */
+export const WERTE_MAX = 4
+export const GRUENDUNGSJAHR_MIN = 1800
+export const GRUENDUNGSJAHR_MAX = 2050
+export const GRUENDUNGSJAHR_FEHLER = `Bitte ein Jahr zwischen ${GRUENDUNGSJAHR_MIN} und ${GRUENDUNGSJAHR_MAX} eintragen — oder das Feld leer lassen.`
+export const WERTE_ZU_VIELE = `Höchstens ${WERTE_MAX} Werte.`
+/** Was länger ist als ein österreichischer Ortsname, ist keine Ortssuche. */
+export const ORTSSUCHE_MAX_ZEICHEN = 60
+
 /**
  * Der Name einer Bestellposition — immer der Name des Produkts aus der
  * Datenbank, nie, was der Browser schickt. GEKÜRZT statt abgelehnt: Ein

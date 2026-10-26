@@ -1,4 +1,3 @@
-import { UNIT_LABELS } from '@/schemas/product'
 import {
   KATEGORIE_LABEL,
   UNTERKATEGORIE_LABEL,
@@ -8,6 +7,29 @@ import {
   type ProductCategoryValue,
   type ProductSubcategoryValue,
 } from '@/lib/taxonomie'
+
+/** Die Einheiten-Namen (früher in src/schemas/product.ts; dort weiter exportiert, Nr. 196). */
+export const UNIT_LABELS: Record<string, string> = {
+  STUECK: 'Stück',
+  KG: 'kg',
+  G: 'g',
+  LITER: 'L',
+  ML: 'ml',
+  M3: 'm³',
+  PAKET: 'Paket',
+  BALLEN: 'Ballen',
+  BIGBAG: 'Big Bag',
+  RAUMMETER: 'rm',
+  SCHUETTRAUMMETER: 'srm',
+}
+
+// Kurznamen für kompakte Saison-Anzeigen (Badge auf der Hof-Seite,
+// Klartext-Zeile im Produkt-Dialog) — identischer Wortlaut an beiden Stellen
+export const MONTH_SHORT = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+
+export function seasonLabel(start: number, end: number): string {
+  return `Saisonal verfügbar: ${MONTH_SHORT[start - 1]} bis ${MONTH_SHORT[end - 1]}`
+}
 
 /**
  * EINE Darstellung für Geld, Mengen und Positionen — überall.

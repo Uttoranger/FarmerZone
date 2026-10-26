@@ -1,5 +1,3 @@
-import { z } from 'zod'
-
 /**
  * Die Käuferart als Vorbelegung in der Adresse (`?kaeufer=betrieb`, Nachtlauf
  * Nr. 29, Gate 8 „Region › Futter kaufen"). Ein Hof, der bei einem anderen
@@ -15,19 +13,25 @@ import { z } from 'zod'
  * Bewusst nur die Adresse — kein Cookie, kein Speicher im Browser: Der Wert
  * reist von „Futter kaufen" über die Produktseite bis zur Kasse und ist
  * danach vergessen (tests/kaeufer-vorbelegung.test.ts wacht darüber).
+ *
+ * Ohne Zod (Nr. 196): `mitKaeuferVorbelegung` läuft im Korb-Blatt und in der
+ * Kasse im Browser (tests/leistung-196.test.ts).
  */
 export const KAEUFER_PARAMETER = 'kaeufer'
 
 export const KAEUFER_VORBELEGUNG_VALUES = ['betrieb'] as const
 
-export const kaeuferVorbelegungSchema = z.enum(KAEUFER_VORBELEGUNG_VALUES).nullable().catch(null)
-
 export type KaeuferVorbelegung = (typeof KAEUFER_VORBELEGUNG_VALUES)[number]
+
+/** Die Vorbelegung aus einem beliebigen Wert; alles andere ist null (wie vorher `z.enum(…).nullable().catch(null)`). */
+export function kaeuferVorbelegungAus(roh: unknown): KaeuferVorbelegung | null {
+  return KAEUFER_VORBELEGUNG_VALUES.find((wert) => wert === roh) ?? null
+}
 
 /** Der Wert aus den Suchparametern der Seite; steht er mehrfach da, zählt der letzte (wie bei leseGroesse). */
 export function leseKaeuferVorbelegung(roh: string | string[] | undefined): KaeuferVorbelegung | null {
   const wert = Array.isArray(roh) ? roh.at(-1) : roh
-  return kaeuferVorbelegungSchema.parse(wert ?? null)
+  return kaeuferVorbelegungAus(wert)
 }
 
 /**

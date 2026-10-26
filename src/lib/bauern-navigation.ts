@@ -28,9 +28,8 @@
  * steht Postfach ganz oben im Mehr-Blatt, und „Mehr" trägt den Zähler.
  */
 
-import { MEIN_HOF_REITER_PARAMETER, MEIN_HOF_REITER_VALUES, meinHofReiterSchema } from '@/schemas/mein-hof-reiter'
+import { MEIN_HOF_REITER_PARAMETER, MEIN_HOF_REITER_VALUES, leseMeinHofReiter } from '@/schemas/mein-hof-reiter'
 import { HOFSEITE_HREF } from '@/lib/mein-hof'
-import { POSTFACH_HREF } from '@/lib/postfach'
 
 export type NavPunktId =
   | 'heute'
@@ -93,6 +92,13 @@ export const PRODUKTE_HREF = '/products'
 export { HOFSEITE_HREF }
 
 /**
+ * Das Postfach des Hofs — Hauptpunkt nach „Bestellungen". Die Adresse steht
+ * hier und nicht in lib/postfach.ts: Die Navigation lädt jede Kundenseite im
+ * Browser mit, und lib/postfach.ts zöge den Admin-Teil und Zod nach (Nr. 196).
+ */
+export const POSTFACH_HREF = '/postfach'
+
+/**
  * Die Adresse des Reiters „Beiträge" — EINE Quelle für den Reiter, die
  * Umleitung von /status und die Rückwege nach dem Schreiben (Nr. 22e).
  */
@@ -121,11 +127,11 @@ function meinHofReiter(id: MeinHofReiterAlleId): MeinHofReiter {
 
 /**
  * Der Reiter aus dem Suchparameter der Seite. Next liefert einen doppelten
- * Parameter als Liste — dann zählt der erste. Alles andere fällt über das
- * Schema still auf „hofseite".
+ * Parameter als Liste — dann zählt der erste. Alles andere fällt über
+ * leseMeinHofReiter still auf „hofseite".
  */
 export function meinHofReiterAus(wert: string | string[] | undefined): MeinHofReiterId {
-  return meinHofReiterSchema.parse(Array.isArray(wert) ? wert[0] : wert)
+  return leseMeinHofReiter(Array.isArray(wert) ? wert[0] : wert)
 }
 
 /**

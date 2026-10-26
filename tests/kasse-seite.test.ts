@@ -345,7 +345,8 @@ describe('Nachbesserung 1: der Zahlungsschritt zeigt den Betrag des Servers', ()
     expect(zahlung).toMatch(/zahlungsBetraege\(betrag\)/)
     const kasse = lies('src/components/checkout/checkout-form.tsx')
     expect(kasse).toMatch(/betrag=\{zahlung\.betrag\}/)
-    expect(kasse).toMatch(/checkoutZahlungsBetragSchema\.safeParse\(/)
+    // Seit Nr. 196 ohne Zod: dieselbe Prüfung als reine Funktion (tests/leistung-196.test.ts gleicht sie mit dem Schema ab).
+    expect(kasse).toMatch(/leseZahlungsBetrag\(result\)/)
     const alteUebergabe = /<StripeZahlung[^<]*betraege=\{betraege\}/
     // Gegenprobe: Das Muster findet die alte Übergabe (Stand vor der Nachbesserung).
     expect('<StripeZahlung\n        stand={stand}\n        betraege={betraege}\n        korb={<KorbKarte />}').toMatch(alteUebergabe)

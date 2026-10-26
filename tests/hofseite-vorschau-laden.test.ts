@@ -21,6 +21,7 @@ vi.mock('@/server/queries/farm', () => ({
   getHofBesitzer: vi.fn(),
   getOwnerFarm: vi.fn(),
   getPublicFarm: vi.fn(),
+  getPublicFarmMitTeilen: vi.fn(),
 }))
 // Volle Abholfenster (Nr. 131): gezählt wird in ausgebuchteTage (eigene Integrationstests), hier nur die Weitergabe.
 vi.mock('@/lib/prisma', () => ({ prisma: {} }))
@@ -33,7 +34,7 @@ import { ladeHofseite } from '@/server/hofseite-vorschau'
 import { ausgebuchteTage } from '@/server/abholfenster'
 import { gibVerwaisteFreiFuerSlug } from '@/server/verwaiste-bestellungen'
 import { auth } from '@/lib/auth'
-import { getHofBesitzer, getOwnerFarm, getPublicFarm } from '@/server/queries/farm'
+import { getHofBesitzer, getOwnerFarm, getPublicFarm, getPublicFarmMitTeilen } from '@/server/queries/farm'
 
 const getSession = vi.mocked(auth.api.getSession)
 const besitzer = vi.mocked(getHofBesitzer)
@@ -47,17 +48,25 @@ const VORSCHAU = { art: 'vorschau', noindex: true, kaufen: false }
 const KUNDIN = { art: 'kundin', noindex: false, kaufen: true }
 const KUNDIN_OHNE_INDEX = { ...KUNDIN, noindex: true }
 
+/** Die Rohwerte des Teilen-Bilds, die mit dem öffentlichen Hof kommen (Nr. 196). */
+const TEILEN_ROH = { betriebsnummer: null, produkte: new Map() }
+
 beforeEach(() => {
   vi.clearAllMocks()
   getSession.mockResolvedValue(null as never)
   besitzer.mockImplementation(async (slug) => (slug === HOF.slug ? HOF.ownerId : null))
   publicFarm.mockResolvedValue(null)
+  // Seit Nr. 196 lädt der Lader den öffentlichen Hof samt Rohwerten des Teilen-Bilds — aus derselben Abfrage wie getPublicFarm.
+  vi.mocked(getPublicFarmMitTeilen).mockImplementation(async (wo) => {
+    const farm = 'slug' in wo ? await publicFarm(wo.slug) : null
+    return farm ? { farm, teilen: TEILEN_ROH } : null
+  })
   ownerFarm.mockImplementation(async (ownerId) => (ownerId === HOF.ownerId ? (HOF as never) : null))
 })
 
 describe('nicht freigegebener Hof', () => {
   it('abgemeldet mit ?vorschau=1: nicht gefunden, keine Vorschau', async () => {
-    expect(await ladeHofseite('hof-neu', { vorschau: '1' })).toEqual({ farm: null, ansicht: KUNDIN_OHNE_INDEX })
+    expect(await ladeHofseite('hof-neu', { vorschau: '1' })).toEqual({ farm: null, ansicht: KUNDIN_OHNE_INDEX, teilen: null })
     expect(ownerFarm).not.toHaveBeenCalled()
     expect(publicFarm).toHaveBeenCalledWith('hof-neu')
     // Ohne Anmeldung interessiert der Besitzer nicht — keine zweite Abfrage.
@@ -66,22 +75,22 @@ describe('nicht freigegebener Hof', () => {
 
   it('ein fremder Bauer mit ?vorschau=1: nicht gefunden, keine Vorschau', async () => {
     getSession.mockResolvedValue({ user: { id: 'user_anderer' } } as never)
-    expect(await ladeHofseite('hof-neu', { vorschau: '1' })).toEqual({ farm: null, ansicht: KUNDIN_OHNE_INDEX })
+    expect(await ladeHofseite('hof-neu', { vorschau: '1' })).toEqual({ farm: null, ansicht: KUNDIN_OHNE_INDEX, teilen: null })
     expect(ownerFarm).not.toHaveBeenCalled()
   })
 
   it('der Besitzer mit ?vorschau=1 sieht seinen Hof — als Vorschau', async () => {
     getSession.mockResolvedValue({ user: { id: HOF.ownerId } } as never)
-    expect(await ladeHofseite('hof-neu', { vorschau: '1' })).toEqual({ farm: HOF, ansicht: VORSCHAU })
+    expect(await ladeHofseite('hof-neu', { vorschau: '1' })).toEqual({ farm: HOF, ansicht: VORSCHAU, teilen: null })
     expect(ownerFarm).toHaveBeenCalledWith(HOF.ownerId)
     expect(publicFarm).not.toHaveBeenCalled()
   })
 
   it('der Besitzer ohne Parameter sieht ihn nicht — und die Sitzung wird gar nicht gelesen', async () => {
     getSession.mockResolvedValue({ user: { id: HOF.ownerId } } as never)
-    expect(await ladeHofseite('hof-neu', {})).toEqual({ farm: null, ansicht: KUNDIN })
+    expect(await ladeHofseite('hof-neu', {})).toEqual({ farm: null, ansicht: KUNDIN, teilen: null })
     for (const wert of ['0', '']) {
-      expect(await ladeHofseite('hof-neu', { vorschau: wert }), wert).toEqual({ farm: null, ansicht: KUNDIN_OHNE_INDEX })
+      expect(await ladeHofseite('hof-neu', { vorschau: wert }), wert).toEqual({ farm: null, ansicht: KUNDIN_OHNE_INDEX, teilen: null })
     }
     expect(getSession).not.toHaveBeenCalled()
     expect(besitzer).not.toHaveBeenCalled()
@@ -91,7 +100,7 @@ describe('nicht freigegebener Hof', () => {
   it('der Besitzer mit dem Slug eines fremden Hofs: wie öffentlich', async () => {
     getSession.mockResolvedValue({ user: { id: HOF.ownerId } } as never)
     besitzer.mockResolvedValue('user_anderer')
-    expect(await ladeHofseite('hof-fremd', { vorschau: '1' })).toEqual({ farm: null, ansicht: KUNDIN_OHNE_INDEX })
+    expect(await ladeHofseite('hof-fremd', { vorschau: '1' })).toEqual({ farm: null, ansicht: KUNDIN_OHNE_INDEX, teilen: null })
     expect(ownerFarm).not.toHaveBeenCalled()
     expect(publicFarm).toHaveBeenCalledWith('hof-fremd')
   })
@@ -100,7 +109,7 @@ describe('nicht freigegebener Hof', () => {
 describe('freigegebener Hof', () => {
   it('ohne Parameter kommt er über die Sichtbarkeitsregel, keine Vorschau', async () => {
     publicFarm.mockResolvedValue(HOF as never)
-    expect(await ladeHofseite('hof-neu', {})).toEqual({ farm: HOF, ansicht: KUNDIN })
+    expect(await ladeHofseite('hof-neu', {})).toEqual({ farm: HOF, ansicht: KUNDIN, teilen: { farm: HOF, teilen: TEILEN_ROH } })
     expect(getSession).not.toHaveBeenCalled()
   })
 

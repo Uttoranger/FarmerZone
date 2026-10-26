@@ -70,7 +70,8 @@ const AUSNAHMEN: Record<string, Ausnahme> = {
   'src/lib/foto-weg-speicher.ts': { stellen: ["'farmerzone_foto_weg'"], grund: SPEICHER },
   'src/lib/gespeichert-moment.ts': { stellen: ['`farmerzone_gespeichert_gezeigt:'], grund: SPEICHER },
   'src/lib/warenkorb-speicher.ts': { stellen: ["'farmerzone:warenkorb'"], grund: NACHRICHT },
-  'src/schemas/hofseite-vorschau.ts': {
+  // Seit Nr. 196 in lib (zod-frei, die Hofseite liest sie im Browser).
+  'src/lib/hofseite-vorschau.ts': {
     stellen: ["'farmerzone:markiere-abschnitt'", "'farmerzone:vorschau-bereit'"],
     grund: NACHRICHT,
   },

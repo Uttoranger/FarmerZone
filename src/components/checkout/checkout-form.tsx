@@ -3,17 +3,17 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm, type FieldErrors } from 'react-hook-form'
 import { Info, Loader2, ShoppingBasket } from 'lucide-react'
 import { hoefeAdresse } from '@/lib/startseite'
 import { KasseSkelett } from '@/components/checkout/kasse-skelett'
+// Ohne Zod (Nr. 196): Die Kasse prüft mit reinen Funktionen, Zod bleibt auf dem Server.
 import {
-  checkoutFormSchema,
-  checkoutZahlungsBetragSchema,
   CHECKOUT_FELD_REIHENFOLGE,
-  type CheckoutFormData,
-} from '@/schemas/checkout'
+  kasseFormularResolver,
+  leseZahlungsBetrag,
+  type KasseFormularDaten as CheckoutFormData,
+} from '@/lib/kasse-pruefung'
 import { formatEuro } from '@/lib/format'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_UNGUELTIG, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
@@ -292,7 +292,7 @@ export function CheckoutForm({
   const defaultPayment = zahlarten[0]?.wert ?? 'ONSITE_CASH'
 
   const form = useForm<CheckoutFormData>({
-    resolver: zodResolver(checkoutFormSchema) as Resolver<CheckoutFormData>,
+    resolver: kasseFormularResolver,
     defaultValues: {
       customerName: '',
       customerEmail: '',
@@ -309,7 +309,7 @@ export function CheckoutForm({
 
   // Abschnitt „Betrieb" nur, wenn eine NUR_BETRIEBE-Position im Korb liegt.
   const betriebAbschnitt = nachweisVomServer || cart.some((i) => nurBetriebeIds.includes(i.productId))
-  // Der Wert fließt in die Komfortprüfung des Formulars (checkoutFormSchema);
+  // Der Wert fließt in die Komfortprüfung des Formulars (pruefeKasseFormular);
   // verbindlich prüft der Checkout-Handler mit seinen eigenen Daten.
   useEffect(() => {
     form.setValue('nurBetriebeImKorb', betriebAbschnitt)
@@ -471,8 +471,8 @@ export function CheckoutForm({
       if (typeof result.clientSecret === 'string') {
         // Ohne den Betrag des Servers keinen Zahlungsschritt: Eine eigene
         // Rechnung könnte von dem abweichen, was Stripe abbucht.
-        const betrag = checkoutZahlungsBetragSchema.safeParse(result)
-        if (!betrag.success) {
+        const betrag = leseZahlungsBetrag(result)
+        if (!betrag) {
           setFehler('Wir konnten die Zahlung nicht starten. Lade die Seite neu und versuch es noch einmal.')
           return
         }
@@ -481,8 +481,8 @@ export function CheckoutForm({
           clientSecret: result.clientSecret,
           bestaetigung,
           reserviertBis: typeof result.reserviertBis === 'string' ? result.reserviertBis : null,
-          betrag: betrag.data,
-          gebuehrText: zahlungsGebuehrText(farm, new Date(), betrag.data),
+          betrag,
+          gebuehrText: zahlungsGebuehrText(farm, new Date(), betrag),
           abholung: gewaehlt ? abholSatz(gewaehlt) : '',
           name: data.customerName,
           email: data.customerEmail,

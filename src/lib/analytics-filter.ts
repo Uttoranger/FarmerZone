@@ -1,5 +1,5 @@
 import type { BeforeSendEvent } from '@vercel/analytics/next'
-import { NIE_MELDEN_PARAMETER, NIE_MELDEN_PFADE } from '@/lib/csp'
+import { NIE_MELDEN_PARAMETER, NIE_MELDEN_PFADE } from '@/lib/nie-melden'
 
 /**
  * Seiten mit `Referrer-Policy: no-referrer` in next.config.ts (Token, Signatur

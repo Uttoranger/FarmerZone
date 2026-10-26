@@ -7,12 +7,12 @@
  * direkt den Ausweg. Scheitert der gemerkte Weg, wird er gelöscht. Wann was
  * geschieht, entscheidet merkerNachErgebnis; hier wird nur gespeichert.
  *
- * Gelesen wird mit Zod, und nichts hier wirft: Ein privates Fenster, ein
+ * Gelesen wird über leseAuswahlWeg, und nichts hier wirft: Ein privates Fenster, ein
  * voller Speicher oder ein Browser, der schon beim Zugriff eine SecurityError
  * wirft, darf die Fotoauswahl nie aufhalten — dann gilt eben der Standard.
  * Den Speicher bekommen die Funktionen hereingereicht (tests/foto-android.test.ts).
  */
-import { fotoWegSchema } from '@/schemas/foto-weg'
+import { leseAuswahlWeg } from '@/schemas/foto-weg'
 import type { AuswahlWeg } from '@/lib/foto-wege'
 
 export const FOTO_WEG_SCHLUESSEL = 'farmerzone_foto_weg'
@@ -33,8 +33,7 @@ export function browserSpeicher(): Speicher | null {
 export function leseFotoWeg(speicher: Speicher | null): AuswahlWeg | null {
   if (!speicher) return null
   try {
-    const gelesen = fotoWegSchema.safeParse(speicher.getItem(FOTO_WEG_SCHLUESSEL))
-    return gelesen.success ? gelesen.data : null
+    return leseAuswahlWeg(speicher.getItem(FOTO_WEG_SCHLUESSEL))
   } catch {
     // Kein Lesezugriff: Dann ist nichts gemerkt, und der Standard gilt.
     return null
