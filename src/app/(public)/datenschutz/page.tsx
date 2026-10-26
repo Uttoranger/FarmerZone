@@ -178,9 +178,10 @@ export default function DatenschutzPage() {
 
           <Section title="8. Cookies">
             <p>
-              Wir verwenden ausschließlich technisch notwendige Cookies und localStorage-Einträge
-              (für Warenkorbfunktion und Session-Verwaltung). Es werden keine Tracking-Cookies
-              oder Werbe-Cookies eingesetzt. Weitere Cookies stehen in Abschnitt 2.
+              Für Warenkorbfunktion und Session-Verwaltung verwenden wir technisch notwendige
+              Cookies und localStorage-Einträge. Es werden keine Tracking-Cookies oder
+              Werbe-Cookies eingesetzt. Die weiteren Cookies stehen mit Zweck und Dauer in
+              Abschnitt 2.
             </p>
           </Section>
 

@@ -147,6 +147,27 @@ describe('Datenschutzerklärung — Fakten wie gebaut', () => {
     expect(text()).toContain(BESTELLUNGEN_PFAD)
   })
 
+  it('Geräte-Cookie und „Bestellungen finden“ stehen erst unter „Weitere Cookies“, nicht unter „Technisch notwendige Daten“', () => {
+    const t = text()
+    const notwendig = t.indexOf('Technisch notwendige Daten')
+    const weitere = t.indexOf('Weitere Cookies')
+    expect(notwendig).toBeGreaterThan(-1)
+    expect(weitere).toBeGreaterThan(notwendig)
+    expect(t.indexOf(GERAETE_COOKIE)).toBeGreaterThan(weitere)
+    expect(t.indexOf(BESTELLUNGEN_COOKIE)).toBeGreaterThan(weitere)
+    // Gegenprobe: im Block dazwischen kommt keines von beiden vor
+    const zwischen = t.slice(notwendig, weitere)
+    expect(zwischen).not.toContain(GERAETE_COOKIE)
+    expect(zwischen).not.toContain(BESTELLUNGEN_COOKIE)
+  })
+
+  it('Abschnitt 8 stuft die weiteren Cookies nicht als technisch notwendig ein', () => {
+    const t = text()
+    const abschnitt = t.slice(t.indexOf('8. Cookies'), t.indexOf('9.', t.indexOf('8. Cookies')))
+    expect(abschnitt).toContain('Abschnitt 2')
+    expect(abschnitt).not.toMatch(/ausschließlich technisch notwendige/)
+  })
+
   it('die IP-Adresse je Sitzung steht da', () => {
     expect(text()).toMatch(/IP-Adresse[^.]*Sitzung|Sitzung[^.]*IP-Adresse/)
   })
