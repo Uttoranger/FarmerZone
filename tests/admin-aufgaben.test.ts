@@ -89,6 +89,7 @@ const VOLL: AufgabenStand = {
     { art: 'ablauf:von-aussen', stufe: 1, seit: vor(2 * STUNDE) },
   ],
   laeufe: new Map([['von-aussen', { gestartetAm: vor(3 * STUNDE), beendetAm: vor(3 * STUNDE), ok: true, fehlerKlasse: null, dauerMs: 10 }]]),
+  bestellstopp: { ab: vor(STUNDE).toISOString(), bis: new Date(JETZT.getTime() + 2 * STUNDE).toISOString(), grund: 'wartung', satz: 'Bestellen geht gleich wieder.' },
   hoefeAktiv: [
     { id: 'hof-ohne-zeit', name: 'Hof Ohne Zeit', approvedAt: vor(60 * TAG), abholzeitAktiv: false, letzteBestellungAm: vor(TAG) },
     { id: 'hof-still', name: 'Hof Still', approvedAt: vor(90 * TAG), abholzeitAktiv: true, letzteBestellungAm: vor(16 * TAG) },
@@ -97,6 +98,7 @@ const VOLL: AufgabenStand = {
 
 /** Was „erledigt“ je Quelle heißt: die Ursache fehlt im Stand. */
 const ERLEDIGT: Record<AufgabeQuelle, Partial<AufgabenStand>> = {
+  notbremse_aktiv: { bestellstopp: null },
   hof_wartet: { hoefeWartend: [] },
   erstattung_offen: { erstattungen: [] },
   mail_gescheitert: { mailProbleme: [] },
@@ -193,8 +195,9 @@ describe('Braucht dich: je Quelle da und wieder weg', () => {
 })
 
 describe('Braucht dich: Sortierung und Wörter', () => {
-  it('nach Frist sortiert — das nächste Ziel zuerst, überfällige oben', () => {
-    const aufgaben = sammleAufgaben(VOLL, JETZT)
+  it('nach Frist sortiert — das nächste Ziel zuerst, überfällige oben; die Notbremse steht davor', () => {
+    const [notbremse, ...aufgaben] = sammleAufgaben(VOLL, JETZT)
+    expect(notbremse.quelle).toBe('notbremse_aktiv')
     const ziele = aufgaben.map((a) => a.frist.ziel.getTime())
     expect(ziele).toEqual([...ziele].sort((x, y) => x - y))
     expect(aufgaben[0].frist.ueberfaellig).toBe(true)
@@ -225,6 +228,38 @@ describe('Braucht dich: Sortierung und Wörter', () => {
     const [a] = ADMIN_AUFGABEN.meldung_neu({ ...VOLL, meldungen: [{ ...VOLL.meldungen[0], ersteZeile: 'Bitte an max@example.com schreiben' }] }, JETZT)
     expect(a.titel).toBe('Neue Meldung: Fehler')
     expect(ADMIN_AUFGABEN.meldung_neu(VOLL, JETZT)[0].titel).toBe('Neue Meldung: „Foto lädt nicht“')
+  })
+})
+
+describe('Notbremse aktiv (Nr. 189 Punkt 4)', () => {
+  it('ganz oben, auch vor überfälligen Aufgaben; Frist = „bis“; Knopf „Freigeben“', () => {
+    const [a] = sammleAufgaben(VOLL, JETZT)
+    expect(a.quelle).toBe('notbremse_aktiv')
+    expect(a.frist.ziel.toISOString()).toBe(VOLL.bestellstopp?.bis)
+    expect(a.frist.ueberfaellig).toBe(false)
+    expect(WAS_TUN[a.wasTun]).toBe('Freigeben')
+    expect(fristText(a, JETZT)).toBe('bis Mo., 26.10., 11:42 Uhr')
+    expect(a.bezug.text).toBe('Wartung')
+    expect(a.satz).toBe('Bestellen geht gleich wieder.')
+  })
+
+  it('Gegenprobe: abgelaufen (Frist beim Lesen) oder aufgehoben → keine Aufgabe', () => {
+    const abgelaufen = { ...VOLL.bestellstopp!, bis: vor(60_000).toISOString() }
+    expect(ADMIN_AUFGABEN.notbremse_aktiv({ ...VOLL, bestellstopp: abgelaufen }, JETZT)).toEqual([])
+    expect(ADMIN_AUFGABEN.notbremse_aktiv({ ...VOLL, bestellstopp: null }, JETZT)).toEqual([])
+    expect(sammleAufgaben({ ...VOLL, bestellstopp: null }, JETZT)[0].quelle).not.toBe('notbremse_aktiv')
+  })
+
+  it('Protokoll nennt Anhalten und Freigeben beim Wort', () => {
+    const zeilen = protokollZeilen(
+      [
+        { wann: vor(STUNDE), wer: 'ich', art: 'bestellungen_angehalten' },
+        { wann: vor(STUNDE), wer: 'ich', art: 'bestellungen_freigegeben' },
+      ],
+      'ich',
+      JETZT
+    )
+    expect(zeilen.map((z) => z.text)).toEqual(['Bestellungen angehalten', 'Bestellungen freigegeben'])
   })
 })
 

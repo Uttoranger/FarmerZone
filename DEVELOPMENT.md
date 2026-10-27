@@ -6021,7 +6021,7 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Wie:** `halteBestellungenAn` (Grund aus der Liste, Satz für die Kundschaft, „bis“ Pflicht, höchstens 72 Stunden) und `gibBestellungenFrei` schreiben nur die vier Felder `bestellstopp*` der Plattform-Einstellung (Recht `notbremse`, frisch, Protokoll). Ob sie gilt, entscheidet die Uhr beim Lesen — nach „bis“ ist sie aus, ohne Cron.
 - **Durchgesetzt** in der Prüfkette als erste Bedingung (`pruefeBestellstopp`, frisch gelesen); die Kasse ruft dieselbe Funktion nach der Idempotenz-Antwort. Der Korb bleibt bei einer Notbremse, wie er ist (keine Halte gelöscht) — sie gilt nur kurz.
 - **Band:** Die Kundenseiten sind statisch bzw. gecacht; das Band holt sich den Stand nach dem Laden über `GET /api/notbremse` (eine Server Action ohne Sitzung ließe die Actions-Wache nicht zu). Durchgesetzt wird nie im Browser.
-- **Offen:** Ohne Nr. 185 (Heute) gibt es noch keinen Knopf im Admin; die Actions sind gebaut und getestet, Knopf und Blatt folgen mit Heute (Bericht 189).
+- **Nachbau (nach 185, 186, 187 im Zwischenstand):** Heute zeigt „Notbremse aktiv“ ganz oben mit „Freigeben“ (Quelle `notbremse_aktiv`, Frist = „bis“) und „Bestellungen anhalten …“ mit Dialog bzw. Blatt nach dem Mockup. Die Hofseite sagt während der Notbremse in der Hofzeile „Bestellen geht gerade nicht“ statt „Nimmt Bestellungen an“, „Bestellen“ fehlt. Das Band hat die Gestalt der Netz-Zeile; Freigeben ohne Änderung leert den Cache nicht mehr.
 
 ## Admin › Heute (Register N32; Nr. 185, Lauf 26, 26.10.2026)
 

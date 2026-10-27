@@ -26,6 +26,7 @@ import type { MarkeArt } from '@/lib/marke-art'
 import { adminAktionSchema, ohnePersonendaten, type AdminAktionArt } from '@/schemas/admin-aktion'
 import { SERVICEGEBUEHR_BEZEICHNUNG } from '@/lib/servicegebuehr'
 import { ADMIN_HOEFE_HREF, adminHofHref } from '@/lib/admin-hof-akte'
+import { NOTBREMSE_ADMIN_TEXT, bestellstoppAktiv, bestellstoppBisText, notbremseGrundLabel, type BestellstoppStand } from '@/lib/notbremse'
 
 /*
  * Admin › Heute (Register N32, Nr. 185): die EINE Liste „Braucht dich“ aus
@@ -50,6 +51,7 @@ const STUNDE_MS = 60 * MINUTE_MS
 const TAG_MS = 24 * STUNDE_MS
 
 export const AUFGABE_QUELLEN = [
+  'notbremse_aktiv',
   'hof_wartet',
   'erstattung_offen',
   'mail_gescheitert',
@@ -72,6 +74,8 @@ export const WAS_TUN = {
   ansehen: 'Ansehen',
   oeffnen: 'Öffnen',
   hofAnsehen: 'Hof ansehen',
+  /** Kein Link: hebt die Notbremse mit Passkey auf (gibBestellungenFrei, Nr. 189). */
+  freigeben: 'Freigeben',
 } as const
 
 export type WasTun = keyof typeof WAS_TUN
@@ -116,6 +120,8 @@ export type AufgabenStand = {
   warnungen: readonly { art: string; stufe: number; seit: Date }[]
   laeufe: ReadonlyMap<string, AblaufLaufDaten>
   hoefeAktiv: readonly AufgabeHof[]
+  /** Die Felder der Notbremse (Nr. 189), frisch gelesen; ob sie gilt, entscheidet die Quelle mit `jetzt`. */
+  bestellstopp: BestellstoppStand | null
 }
 
 /** Ein leerer Stand — Ausgangspunkt für Tests und für Bereiche, die außerhalb der Produktion nichts melden. */
@@ -128,6 +134,7 @@ export const LEERER_STAND: AufgabenStand = {
   warnungen: [],
   laeufe: new Map(),
   hoefeAktiv: [],
+  bestellstopp: null,
 }
 
 /** Ab wann ein verkaufender Hof ohne Bestellung auffällt (Register N32: „seit 14 Tagen ohne Bestellung“). */
@@ -140,6 +147,8 @@ export const OHNE_BESTELLUNG_TAGE = 14
  * Abläufe 1 h, Grenzen 7 Tage (`betriebZiel`).
  */
 export const AUFGABE_ZIEL_MS: Record<AufgabeQuelle, number> = {
+  // Nur der Rahmen — die Frist der Notbremse ist ihr „bis“ (höchstens 72 h, notbremseAktiv).
+  notbremse_aktiv: 72 * STUNDE_MS,
   hof_wartet: 48 * STUNDE_MS,
   erstattung_offen: 24 * STUNDE_MS,
   mail_gescheitert: STUNDE_MS,
@@ -152,6 +161,7 @@ export const AUFGABE_ZIEL_MS: Record<AufgabeQuelle, number> = {
 }
 
 const BEREICH: Record<AufgabeQuelle, AufgabeBereich> = {
+  notbremse_aktiv: 'Betrieb',
   hof_wartet: 'Höfe',
   erstattung_offen: 'Geld',
   mail_gescheitert: 'E-Mails',
@@ -406,8 +416,36 @@ function hofOhneBestellung(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
   })
 }
 
+/**
+ * Die Notbremse gilt (Nr. 189 Punkt 4): eine Aufgabe ganz oben mit
+ * „Freigeben“, Frist = „bis“. Nach „bis“ ist sie aus (Frist beim Lesen) und
+ * verschwindet von selbst. Der Grund ist nur für den Admin, der Satz der
+ * Kundschaft steht darunter.
+ */
+function notbremseAktiv(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
+  const stopp = bestellstoppAktiv(stand.bestellstopp, jetzt)
+  if (!stopp || !stand.bestellstopp) return []
+  const seit = new Date(stand.bestellstopp.ab)
+  return [
+    aufgabe(
+      'notbremse_aktiv',
+      {
+        titel: NOTBREMSE_ADMIN_TEXT.aufgabe,
+        bezug: { kennung: 'plattform', text: notbremseGrundLabel(stand.bestellstopp.grund) },
+        satz: stopp.satz,
+        seit,
+        wasTun: 'freigeben',
+        ziel: ADMIN_HEUTE_HREF,
+      },
+      jetzt,
+      Math.max(1, Date.parse(stopp.bis) - seit.getTime())
+    ),
+  ]
+}
+
 /** Das Register: je Quelle eine reine Funktion `(stand, jetzt) → Aufgabe[]`. */
 export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt: Date) => Aufgabe[]> = {
+  notbremse_aktiv: notbremseAktiv,
   hof_wartet: hofWartet,
   erstattung_offen: erstattungOffen,
   mail_gescheitert: mailGescheitert,
@@ -419,9 +457,13 @@ export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt:
   hof_ohne_bestellung: hofOhneBestellung,
 }
 
-/** Alle Aufgaben aus allen Quellen, nach Frist sortiert (das nächste Ziel zuerst — überfällige stehen damit oben). */
+/** Steht vor allem anderen, solange sie gilt — ihre Frist ist ein Ende, kein Ziel (Freigabe 189 Punkt 4: „ganz oben“). */
+const GANZ_OBEN: ReadonlySet<AufgabeQuelle> = new Set(['notbremse_aktiv'])
+
+/** Alle Aufgaben aus allen Quellen: die Notbremse ganz oben, sonst nach Frist (das nächste Ziel zuerst — überfällige stehen damit oben). */
 export function sammleAufgaben(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
-  return AUFGABE_QUELLEN.flatMap((q) => ADMIN_AUFGABEN[q](stand, jetzt)).sort((a, b) => a.frist.ziel.getTime() - b.frist.ziel.getTime())
+  const rang = (a: Aufgabe): number => (GANZ_OBEN.has(a.quelle) ? 0 : 1)
+  return AUFGABE_QUELLEN.flatMap((q) => ADMIN_AUFGABEN[q](stand, jetzt)).sort((a, b) => rang(a) - rang(b) || a.frist.ziel.getTime() - b.frist.ziel.getTime())
 }
 
 export type AufgabenZahl = { offen: number; ueberfaellig: number }
@@ -443,7 +485,9 @@ function dauerText(ms: number, dativ: boolean, stundenBis = 47): string {
 }
 
 /** „überfällig · seit 2 Tagen“ bzw. „Ziel 48 h · noch 21 h“ (Mockup admin-heute). „überfällig“ steht als Wort da, nie nur als Farbe. */
-export function fristText(a: Pick<Aufgabe, 'seit' | 'frist'>, jetzt: Date): string {
+export function fristText(a: Pick<Aufgabe, 'seit' | 'frist'> & Partial<Pick<Aufgabe, 'quelle'>>, jetzt: Date): string {
+  // Die Notbremse endet zu „bis“ von selbst — kein Ziel, sondern ein Ende (wie im Band der Kundschaft).
+  if (a.quelle === 'notbremse_aktiv') return bestellstoppBisText(a.frist.ziel.toISOString())
   if (a.frist.ueberfaellig) return `überfällig · seit ${dauerText(jetzt.getTime() - a.seit.getTime(), true)}`
   return `Ziel ${dauerText(a.frist.dauerMs, false, 48)} · noch ${dauerText(a.frist.ziel.getTime() - jetzt.getTime(), false)}`
 }
@@ -710,6 +754,8 @@ export const PROTOKOLL_TEXT: Partial<Record<AdminAktionArt, string>> = {
   startseite_uebernommen: 'Fassung als Entwurf übernommen',
   ersatzcodes_erstellt: 'Ersatzcodes erstellt',
   passkey_entfernt: 'Passkey entfernt',
+  bestellungen_angehalten: 'Bestellungen angehalten',
+  bestellungen_freigegeben: 'Bestellungen freigegeben',
 }
 
 export type ProtokollRoh = { wann: Date; wer: string | null; art: string }

@@ -49,7 +49,9 @@ vi.mock('next/navigation', () => ({
     throw new Error(`PERMANENT:${ziel}`)
   }),
   usePathname: () => '/admin',
+  useRouter: () => ({ refresh() {}, push() {}, replace() {} }),
 }))
+vi.mock('@/server/actions/notbremse', () => ({ halteBestellungenAn: vi.fn(), gibBestellungenFrei: vi.fn() }))
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))
@@ -60,6 +62,7 @@ vi.mock('@/server/queries/meldung', () => quellen)
 vi.mock('@/server/queries/admin', () => ({ zaehleWartendeHoefe: vi.fn(async () => 1) }))
 vi.mock('@/server/queries/startseite', () => ({ naechsterTermin: vi.fn(async () => null) }))
 vi.mock('@/server/queries/plattform-einstellung', () => ({
+  leseBestellstopp: vi.fn(async () => null),
   lesePlattformEinstellung: vi.fn(async () => ({
     gruendungPlaetze: 12,
     gruendungBisTag: '2027-12-31',
@@ -80,6 +83,7 @@ import * as Sentry from '@sentry/nextjs'
 import AdminHeutePage from '@/app/admin/page'
 import { ladeAdminbereich } from '@/server/adminbereich'
 import { verlangeAdminSeite } from '@/server/admin-wache'
+import { leseBestellstopp } from '@/server/queries/plattform-einstellung'
 
 const STUNDE = 60 * 60_000
 
@@ -176,6 +180,34 @@ describe('Admin › Heute', () => {
     const html = await seite()
     expect(html).toContain('Wir konnten Heute gerade nicht laden.')
     expect(vi.mocked(Sentry.captureException).mock.calls[0]?.[1]).toEqual({ tags: { bereich: 'admin', seite: 'heute' } })
+  })
+})
+
+describe('Notbremse in Heute (Nr. 189 Punkt 4)', () => {
+  it('aktiv: „Notbremse aktiv“ ganz oben mit „Freigeben“ (ein Knopf, kein Link) und „bis …“', async () => {
+    vi.mocked(leseBestellstopp).mockResolvedValueOnce({
+      ab: new Date(JETZT.getTime() - STUNDE).toISOString(),
+      bis: new Date(JETZT.getTime() + 2 * STUNDE).toISOString(),
+      grund: 'zahlungen',
+      satz: 'Bestellen geht gleich wieder.',
+    })
+    const html = await seite()
+    const liste = html.slice(html.indexOf('id="braucht-dich"'))
+    const eintraege = liste.split('<li').slice(1)
+    expect(eintraege[0]).toContain('Notbremse aktiv')
+    // Vor der überfälligen Erstattung — „ganz oben“ heißt vor jeder Frist.
+    expect(eintraege.slice(1).some((e) => e.includes('überfällig'))).toBe(true)
+    expect(html).toMatch(/<button[^>]*>Freigeben<\/button>/)
+    expect(html).toContain('bis Mo., 26.10., 11:42 Uhr')
+    expect(html).toContain('Zahlungen gestört (Stripe)')
+  })
+
+  it('Gegenprobe: ohne Notbremse keine Aufgabe und kein „Freigeben“; „Bestellungen anhalten …“ steht immer da', async () => {
+    const html = await seite()
+    expect(html).not.toContain('Notbremse aktiv')
+    expect(html).not.toContain('>Freigeben<')
+    expect(html).toMatch(/<button[^>]*>Bestellungen anhalten …<\/button>/)
+    expect(html).toContain('Stoppt neue Bestellungen auf allen Höfen. Laufende bleiben.')
   })
 })
 

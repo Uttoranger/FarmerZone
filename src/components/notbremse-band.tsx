@@ -99,8 +99,9 @@ export function BestellstoppZeile({ stopp }: { stopp: Bestellstopp | null }): Re
   return (
     <div role="status" data-notbremse-band="" className="print:hidden">
       {stopp && (
-        <p className="flex min-h-11 items-start gap-2.5 border-b border-primary/45 bg-zustand-tun-grund px-4 py-2.5 text-[13.5px] text-foreground md:items-center md:px-6">
-          <PauseCircle className="mt-0.5 size-[18px] shrink-0 text-zustand-tun md:mt-0" strokeWidth={1.8} aria-hidden="true" />
+        // Gestalt wie NetzZeile (13 px, Zustand „tun“), dazu ein Rand derselben Familie — das Band bleibt länger stehen.
+        <p className="flex min-h-10 items-start gap-2.5 border-b border-zustand-tun/40 bg-zustand-tun-grund px-4 py-2 text-[13px] text-foreground md:items-center md:px-6">
+          <PauseCircle className="mt-0.5 size-4 shrink-0 text-zustand-tun md:mt-0" strokeWidth={1.8} aria-hidden="true" />
           <span className="min-w-0 break-words">
             <span className="font-semibold">{stopp.satz}</span> <span className="whitespace-nowrap">{bestellstoppBisText(stopp.bis)}</span>
           </span>

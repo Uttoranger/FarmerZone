@@ -50,6 +50,7 @@ import { AktuellVomHof } from '@/components/hofseite/aktuell-vom-hof'
 import { VorschauImRahmen } from '@/components/farm/vorschau-im-rahmen'
 import { HofseiteSeitenspalte } from '@/components/hofseite/hofseite-seitenspalte'
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
+import { useBestellstopp } from '@/components/notbremse-band'
 import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
 import { Titelbild } from '@/components/hofseite/titelbild'
 import { useHofzeileKlebt } from '@/components/hofseite/use-hofzeile-klebt'
@@ -158,6 +159,9 @@ export function HofseiteKunde({
   const pfad = usePathname()
   const bereichWunsch = useBereichWunsch()
   const produkte = useMemo(() => farm.products.filter((p) => p.isAvailable), [farm.products])
+  // Notbremse (Register N34, Nr. 189): Zustand der Hofzeile, „Bestellen“ und „+“ lesen sie wie die
+  // Kaufknöpfe des Produktrasters; den Grund sagt das Band unter dem Kopf. Die Sperre bleibt die des Hofs.
+  const bestellstopp = useBestellstopp() !== null
 
   function sichtbar(key: string): boolean {
     const s = farm.sectionsConfig.find((x) => x.key === key)
@@ -304,7 +308,7 @@ export function HofseiteKunde({
         <span className="truncate font-heading text-[17px] leading-[1.15] font-semibold text-foreground" title={farm.name}>
           {farm.name}
         </span>
-        <span className="truncate text-[12px] text-muted-foreground">{hofZeileUnterzeile(farm.city, sperre)}</span>
+        <span className="truncate text-[12px] text-muted-foreground">{hofZeileUnterzeile(farm.city, sperre, bestellstopp)}</span>
       </div>
       <button
         type="button"
@@ -360,7 +364,7 @@ export function HofseiteKunde({
   const ueberUns = sichtbar('about') ? (ueberUnsText(farm) ?? '') : ''
   const werte = sichtbar('values') ? farm.farmValues.slice(0, 6) : []
   const verfuegbar = verfuegbarText(produkte, sperre)
-  const kannBestellen = produkte.length > 0 && sperre === null
+  const kannBestellen = produkte.length > 0 && sperre === null && !bestellstopp
 
   const zeigeUeberUns = offen === 'uebersicht' && Boolean(ueberUns || werte.length > 0 || farm.foundedYear)
   // Ab lg mit Schaufenster ein Raster aus zwei Zeilen: Über uns oben links,
@@ -431,7 +435,7 @@ export function HofseiteKunde({
           anordnung={anordnung}
           jetzt={jetzt}
           produkte={produkte}
-          mitPlus={mitKorb && sperre === null}
+          mitPlus={mitKorb && sperre === null && !bestellstopp}
           onInDenKorb={(p) => korbWeg.current?.(p)}
           produktLink={(id) => produktLink(farm.slug, id, ansicht.art === 'vorschau')}
           neuesterHref={adresseOhneBeitrag(pfad, suche.toString())}

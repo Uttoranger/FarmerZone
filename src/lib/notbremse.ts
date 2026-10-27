@@ -1,4 +1,6 @@
 import type { KaufSperre } from '@/lib/bereiche-anzeige'
+import { kalendertagInWien } from '@/lib/wiener-tag'
+import { uhrzeitInWien, wienerZeitpunkt } from '@/lib/fristen'
 
 /*
  * Die Notbremse „Bestellungen anhalten“ (Register N34, Nr. 189): Der Admin hält
@@ -145,4 +147,74 @@ export function bestellstoppAusAntwort(daten: unknown): Bestellstopp | null {
   const { satz, bis } = stopp as { satz?: unknown; bis?: unknown }
   if (typeof satz !== 'string' || satz.trim() === '' || typeof bis !== 'string' || Number.isNaN(Date.parse(bis))) return null
   return { satz, bis }
+}
+
+// ─── Admin › Heute: „Bestellungen anhalten …“ (Nr. 189 Punkt 4) ─────────────
+
+/** Die Wörter von Knopf, Blatt und Aufgabe — wörtlich aus den Mockups admin-heute und mobil-admin-notbremse. */
+export const NOTBREMSE_ADMIN_TEXT = {
+  knopf: 'Bestellungen anhalten …',
+  notfall: 'Notfall',
+  notfallSatz: 'Stoppt neue Bestellungen auf allen Höfen. Laufende bleiben.',
+  titel: 'Bestellungen auf allen Höfen anhalten?',
+  satz: 'Neue Bestellungen sind auf allen Höfen gestoppt, bis du sie freigibst oder die Zeit abläuft. Laufende Bestellungen und Abholungen bleiben.',
+  grund: 'Grund (nur für dich und das Protokoll)',
+  kundschaft: 'Satz für die Kundschaft',
+  soSiehtEs: 'So sieht es die Kundschaft',
+  soSiehtEsSatz: '– als Band über jeder Hofseite und in der Kasse, „In den Warenkorb“ ist aus.',
+  bis: 'Bis spätestens',
+  bisHinweis: 'Wiener Zeit, höchstens 72 Stunden ab jetzt.',
+  anhalten: 'Mit Passkey anhalten',
+  danach: 'Steht danach als Aufgabe ganz oben in Heute, bis es wieder läuft.',
+  angehalten: 'Neue Bestellungen sind angehalten.',
+  aufgabe: 'Notbremse aktiv',
+  freigegeben: 'Bestellungen gehen wieder.',
+} as const
+
+/**
+ * Ein Zeitpunkt als Wert für `<input type="datetime-local">` („2026-10-26T11:00“)
+ * — in Wiener Zeit wie Band und Protokoll, unabhängig von der Uhr des Geräts.
+ */
+export function zeitpunktLokal(d: Date): string {
+  return `${kalendertagInWien(d)}T${uhrzeitInWien(d)}`
+}
+
+/** Der Wert des Felds (Wiener Zeit) → Zeitpunkt; leer oder unlesbar → null. */
+export function zeitpunktAusLokal(text: string): Date | null {
+  const teile = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/.exec(text)
+  return teile ? wienerZeitpunkt(teile[1], teile[2]) : null
+}
+
+const STUNDE_MS = 60 * 60 * 1000
+
+/** Vorgabe für „bis“: die volle Stunde, die frühestens eine Stunde nach jetzt kommt (passt zum Satz „in einer Stunde“). */
+export function notbremseBisVorgabe(jetzt: Date): Date {
+  return new Date(Math.ceil((jetzt.getTime() + STUNDE_MS) / STUNDE_MS) * STUNDE_MS)
+}
+
+/** Grenzen des Felds: ab der nächsten Minute bis höchstens 72 Stunden ab jetzt (auf die Minute abgerundet). */
+export function notbremseBisGrenzen(jetzt: Date): { min: string; max: string } {
+  const minute = 60_000
+  return {
+    min: zeitpunktLokal(new Date(Math.ceil((jetzt.getTime() + 1) / minute) * minute)),
+    max: zeitpunktLokal(new Date(Math.floor((jetzt.getTime() + NOTBREMSE_HOECHSTENS_MS) / minute) * minute)),
+  }
+}
+
+/**
+ * Die Eingabe des Blatts → was `halteBestellungenAn` bekommt, oder der Satz,
+ * der fehlt. Die Oberfläche prüft nur vor, entschieden wird am Server mit
+ * denselben Regeln (`notbremseBisFehler`).
+ */
+export function notbremseEingabe(
+  roh: { grund: NotbremseGrund; satz: string; bisLokal: string },
+  jetzt: Date
+): { eingabe: { grund: NotbremseGrund; satz: string; bis: string } } | { fehler: string } {
+  const satz = roh.satz.trim()
+  if (satz === '' || satz.length > NOTBREMSE_SATZ_MAX) return { fehler: NOTBREMSE_FEHLER.satz }
+  const bis = zeitpunktAusLokal(roh.bisLokal)
+  if (!bis) return { fehler: NOTBREMSE_FEHLER.bis }
+  const bisFehler = notbremseBisFehler(bis, jetzt)
+  if (bisFehler) return { fehler: bisFehler }
+  return { eingabe: { grund: roh.grund, satz, bis: bis.toISOString() } }
 }

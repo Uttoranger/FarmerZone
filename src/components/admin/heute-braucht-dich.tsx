@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils'
 import { Marke } from '@/components/ui/marke'
 import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
 import { HEUTE_TEXT, WAS_TUN, type AufgabeBereich, type WasTun } from '@/lib/admin-aufgaben'
+import { NotbremseFreigeben } from '@/components/admin/heute-notbremse'
 
 /** Ein Eintrag fertig für die Anzeige — Frist schon als Text (die Seite rechnet mit ihrer Uhr). */
 export type BrauchtDichEintrag = {
@@ -21,7 +22,8 @@ export type BrauchtDichEintrag = {
  * „Braucht dich“ auf Admin › Heute (Register N32, Nr. 185; Mockups
  * admin-heute, mobil-admin-heute): eine Liste aus allen Quellen, nach Frist
  * sortiert. „überfällig“ steht als Wort in einer Marke (tun), nie nur als
- * Farbe; je Eintrag EIN Knopf aus WAS_TUN.
+ * Farbe; je Eintrag EIN Knopf aus WAS_TUN — ein Link, nur „Freigeben“ der
+ * Notbremse (Nr. 189) ist eine Aktion mit Passkey.
  */
 export function HeuteBrauchtDich({ eintraege, zahl }: { eintraege: readonly BrauchtDichEintrag[]; zahl: string }): React.JSX.Element {
   return (
@@ -51,9 +53,13 @@ export function HeuteBrauchtDich({ eintraege, zahl }: { eintraege: readonly Brau
                 <p className={cn('mt-0.5 text-[13px] break-words', LEISE)}>{e.bezug}</p>
                 <p className="mt-1 text-[13.5px] leading-snug text-foreground">{e.satz}</p>
               </div>
-              <Link href={e.ziel} className={cn(KNOPF_RAHMEN, 'self-start md:self-center')}>
-                {WAS_TUN[e.wasTun]}
-              </Link>
+              {e.wasTun === 'freigeben' ? (
+                <NotbremseFreigeben text={WAS_TUN.freigeben} className="self-start md:self-center" />
+              ) : (
+                <Link href={e.ziel} className={cn(KNOPF_RAHMEN, 'self-start md:self-center')}>
+                  {WAS_TUN[e.wasTun]}
+                </Link>
+              )}
             </li>
           ))}
         </ul>

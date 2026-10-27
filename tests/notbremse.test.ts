@@ -21,6 +21,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement } from 'react'
 import { NextRequest } from 'next/server'
+import { updateTag } from 'next/cache'
 
 vi.mock('next/cache', () => ({ updateTag: vi.fn(), unstable_cache: (f: () => unknown) => f }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
@@ -41,6 +42,7 @@ import { pruefeKaufbarkeitHof } from '@/server/warenkorb'
 import { gibBestellungenFrei, halteBestellungenAn } from '@/server/actions/notbremse'
 import { GET } from '@/app/api/notbremse/route'
 import { BestellstoppHinweis, BestellstoppZeile } from '@/components/notbremse-band'
+import { NotbremseFormular } from '@/components/admin/heute-notbremse'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import {
   NOTBREMSE_FEHLER,
@@ -51,6 +53,11 @@ import {
   bestellstoppAusAntwort,
   bestellstoppBisText,
   notbremseBisFehler,
+  notbremseBisGrenzen,
+  notbremseBisVorgabe,
+  notbremseEingabe,
+  zeitpunktAusLokal,
+  zeitpunktLokal,
   sperreMitBestellstopp,
 } from '@/lib/notbremse'
 
@@ -160,8 +167,49 @@ describe('Actions: Recht notbremse, frisch, Protokoll', () => {
     executeRaw.mockResolvedValueOnce(0 as never).mockResolvedValueOnce(1 as never)
     await gibBestellungenFrei()
     expect(protokolliere).not.toHaveBeenCalled()
+    expect(updateTag).not.toHaveBeenCalled()
     await gibBestellungenFrei()
     expect(vi.mocked(protokolliere).mock.calls[0]?.[0]).toMatchObject({ art: 'bestellungen_freigegeben', bezugArt: 'plattform', wer: 'admin-1' })
+    expect(updateTag).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Formular „Bestellungen anhalten …“ in Heute (Nr. 189 Punkt 4)', () => {
+  it('„bis“: Vorgabe auf die volle Stunde nach einer Stunde, Grenzen jetzt bis 72 h', () => {
+    expect(notbremseBisVorgabe(new Date('2026-10-26T08:42:00.000Z')).toISOString()).toBe('2026-10-26T10:00:00.000Z')
+    expect(notbremseBisVorgabe(new Date('2026-10-26T09:00:00.000Z')).toISOString()).toBe('2026-10-26T10:00:00.000Z')
+    const { min, max } = notbremseBisGrenzen(JETZT)
+    expect(zeitpunktAusLokal(min)?.getTime()).toBeGreaterThanOrEqual(JETZT.getTime())
+    expect(zeitpunktAusLokal(max)!.getTime() - JETZT.getTime()).toBeLessThanOrEqual(NOTBREMSE_HOECHSTENS_MS)
+    expect(zeitpunktAusLokal(zeitpunktLokal(BIS))?.toISOString()).toBe(BIS.toISOString())
+    expect(zeitpunktAusLokal('')).toBeNull()
+    expect(zeitpunktAusLokal('morgen')).toBeNull()
+  })
+
+  it('Eingabe: Grund, Satz und „bis“ als ISO-Zeit; „bis“ fehlt, vorbei oder über 72 h → eigener Satz', () => {
+    const lokal = zeitpunktLokal(BIS)
+    expect(notbremseEingabe({ grund: 'wartung', satz: ` ${SATZ} `, bisLokal: lokal }, JETZT)).toEqual({ eingabe: { grund: 'wartung', satz: SATZ, bis: BIS.toISOString() } })
+    expect(notbremseEingabe({ grund: 'wartung', satz: SATZ, bisLokal: '' }, JETZT)).toEqual({ fehler: NOTBREMSE_FEHLER.bis })
+    expect(notbremseEingabe({ grund: 'wartung', satz: SATZ, bisLokal: zeitpunktLokal(AB) }, JETZT)).toEqual({ fehler: NOTBREMSE_FEHLER.vorbei })
+    const zuSpaet = zeitpunktLokal(new Date(JETZT.getTime() + NOTBREMSE_HOECHSTENS_MS + 60 * 60_000))
+    expect(notbremseEingabe({ grund: 'wartung', satz: SATZ, bisLokal: zuSpaet }, JETZT)).toEqual({ fehler: NOTBREMSE_FEHLER.zuLang })
+    expect(notbremseEingabe({ grund: 'wartung', satz: '  ', bisLokal: lokal }, JETZT)).toEqual({ fehler: NOTBREMSE_FEHLER.satz })
+  })
+
+  it('Formular nach dem Mockup: Grund aus der Liste, Satz vorbelegt, „bis“ Pflicht mit Grenzen, Felder 16 px am Handy', () => {
+    const { min, max } = notbremseBisGrenzen(JETZT)
+    const html = renderToStaticMarkup(
+      createElement(NotbremseFormular, { grund: 'zahlungen', satz: SATZ, bis: zeitpunktLokal(BIS), min, max, setGrund: () => {}, setSatz: () => {}, setBis: () => {} })
+    )
+    expect(html).toContain('Grund (nur für dich und das Protokoll)')
+    for (const g of ['Zahlungen gestört (Stripe)', 'Fehler in der Kasse', 'Wartung', 'Sonstiges']) expect(html).toContain(`>${g}</option>`)
+    expect(html).toContain(`>${SATZ}</textarea>`)
+    expect(html).toContain('So sieht es die Kundschaft')
+    expect(html).toMatch(/<input[^>]*type="datetime-local"[^>]*required=""/)
+    expect(html).toContain(`min="${min}"`)
+    expect(html).toContain(`max="${max}"`)
+    expect(html).toContain('Bis spätestens')
+    expect(html).toContain('text-base')
   })
 })
 
