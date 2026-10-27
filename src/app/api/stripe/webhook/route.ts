@@ -21,6 +21,13 @@ import {
 } from '@/server/erstattung-gescheitert'
 import { stripeKontoBereit } from '@/lib/stripe-konto'
 import { istModusSperre } from '@/lib/stripe-modus'
+import {
+  behandleMandatEingerichtet,
+  behandleMandatGeaendert,
+  behandleRechnungBezahlt,
+  behandleRechnungGescheitert,
+  behandleRueckbuchung,
+} from '@/server/plattformgebuehr-abrechnung'
 
 // Next.js App Router does not pre-parse the body — raw text needed for Stripe sig verification
 export async function POST(request: NextRequest) {
@@ -104,6 +111,17 @@ export async function POST(request: NextRequest) {
       // Beide Ereignisse können für DIESELBE Erstattung kommen — die
       // Zurücknahme ist je Erstattung idempotent (src/server/erstattung-gescheitert.ts).
       await handleErstattungGescheitert(event.data.object as Stripe.Refund, event.type)
+    } else if (event.type === 'invoice.paid') {
+      // Monatsabrechnung der Plattformgebühr (N38, Nr. 198) — Rechnungen und Mandat des Hofs bei der Plattform.
+      await behandleRechnungBezahlt(event.data.object as Stripe.Invoice)
+    } else if (event.type === 'invoice.payment_failed') {
+      await behandleRechnungGescheitert(event.data.object as Stripe.Invoice)
+    } else if (event.type === 'charge.dispute.created') {
+      await behandleRueckbuchung(event.data.object as Stripe.Dispute)
+    } else if (event.type === 'setup_intent.succeeded') {
+      await behandleMandatEingerichtet(event.data.object as Stripe.SetupIntent)
+    } else if (event.type === 'mandate.updated') {
+      await behandleMandatGeaendert(event.data.object as Stripe.Mandate)
     }
   } catch (err) {
     // 500 → Stripe retried das Event; es wurde noch nicht persistiert und gilt als unverarbeitet

@@ -233,6 +233,55 @@ export const MINDESTBESTELLWERT_SATZ = `Mindestbestellwert ${formatZahl(centsAls
  */
 export const BAR_NICHT_MOEGLICH_SATZ = 'Bei diesem Hof geht gerade nur Online-Bezahlen. Bitte wähl „Online bezahlen“.'
 
+// ─── Lastschrift und Monatsabrechnung (N38, Nr. 198) ─────────────────────────
+
+/** Wohin „Lastschrift einrichten“ führt: der Abschnitt „Barzahlung“ in Deine Konditionen. */
+export const LASTSCHRIFT_HREF = '/settings/konditionen#barzahlung'
+
+/** Die Sätze rund um Lastschrift und Monatsabrechnung — Konditionen, Heute, Postfach und Mails nehmen sie von hier. */
+export const LASTSCHRIFT_TEXT = {
+  titel: 'Barzahlung',
+  einrichten: 'Lastschrift einrichten',
+  aendern: 'Lastschrift ändern',
+  mandatDa: (bank: string | null, letzte4: string | null): string =>
+    `Lastschrift eingerichtet${bank || letzte4 ? ` · ${[bank, letzte4 ? `IBAN endet auf ${letzte4}` : null].filter(Boolean).join(' · ')}` : ''}`,
+  mandatFehlt: 'Noch keine Lastschrift eingerichtet.',
+  mandatPflicht: 'Ohne Lastschrift bieten wir bei dir ab dem Einzug nur Online-Bezahlen an.',
+  mandatFrei: 'Eine Lastschrift ist bei dir nicht Pflicht – ohne sie schicken wir die Rechnung zur Überweisung.',
+  einzugAb: (datum: string): string => `Einzug ab ${datum}`,
+  erlassen: (datum: string): string => `Bis ${datum} behältst du die Plattformgebühr aus Barbestellungen – wir verzichten darauf.`,
+  satz: (satz: string): string => `Plattformgebühr ${satz} % vom Warenpreis`,
+  wartet: 'Die Bank bestätigt die Lastschrift – das dauert meist nur einen Moment. Lade die Seite gleich neu.',
+  fehler: 'Wir konnten die Lastschrift gerade nicht starten. Versuch es bitte gleich noch einmal.',
+  abrechnungen: 'Monatsabrechnungen',
+  abrechnungenLeer: 'Noch keine Monatsabrechnung. Die erste kommt nach dem ersten Monat mit Plattformgebühr.',
+  spalten: { monat: 'Monat', bar: 'bar', online: 'online', stand: 'Stand' },
+  rechnung: 'Rechnung (PDF)',
+  bezahlen: 'Jetzt bezahlen',
+  rechnungFehlt: 'Die Rechnung lässt sich gerade nicht öffnen. Versuch es bitte gleich noch einmal.',
+  heuteTitel: 'Barzahlung ist pausiert',
+  heuteSatz: (monat: string): string =>
+    `Die Plattformgebühr für ${monat} ist noch offen. Bis sie bezahlt ist, nehmen wir bei dir keine Barbestellungen an – laufende Bestellungen bleiben.`,
+} as const
+
+/** Die Postfach-Nachricht vier Wochen vor dem Einzugsbeginn (N38, „Start“). */
+export function ankuendigungText(d: { datum: string; satz: string; mandatNoetig: boolean }): string {
+  return (
+    `Ab ${d.datum} ziehen wir die Plattformgebühr (${d.satz} % vom Warenpreis) aus deinen Barbestellungen einmal im Monat ein. ` +
+    'Bei Online-Zahlungen behält Stripe sie schon beim Bezahlen ein. ' +
+    (d.mandatNoetig ? `Dafür brauchst du eine Lastschrift. ${LASTSCHRIFT_TEXT.mandatPflicht}` : LASTSCHRIFT_TEXT.mandatFrei)
+  )
+}
+
+/** Die Postfach-Nachricht nach einer gescheiterten Lastschrift (N38, „Einzug scheitert“). */
+export function lastschriftGescheitertText(d: { monat: string; tage: number }): string {
+  return (
+    `Die Lastschrift für ${d.monat} hat nicht geklappt. Stripe versucht es erneut. ` +
+    'Bitte sorg für Deckung auf deinem Konto oder bezahl die Rechnung direkt. ' +
+    `Bleibt der Betrag ${d.tage} Tage offen, nehmen wir bei dir keine Barbestellungen mehr an – laufende Bestellungen bleiben.`
+  )
+}
+
 // ─── Online-Zahlung gehört zum Start (Register Z1) ───────────────────────────
 
 /**

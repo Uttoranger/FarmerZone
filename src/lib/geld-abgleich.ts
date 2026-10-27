@@ -28,6 +28,12 @@
  *                 Datenbank gesenkt, die ursprüngliche ist bezahlt − Waren
  *                 aller Positionen (auch der fehlenden).
  *
+ * Im Modell `hofpreis` (N38, Nr. 197/198) eine eigene Zeile: bezahlt ist
+ * Ware + Summe der Gebühren je Position (`serviceFeeCents`), die Gebühr bei
+ * Stripe ist Provision + Summe ALLER `OrderItem.gebuehrCents` (der Snapshot je
+ * Position bleibt auch nach „Artikel fehlt“ stehen; `intentParameter` legte
+ * sie so an) — der Hof bekommt 100 % der Ware.
+ *
  * Unbezahlt (PENDING, FAILED) erwartet die Datenbank 0 € bezahlt und nichts
  * erstattet; die Gebühr wird dann nicht verglichen — der PaymentIntent trägt
  * sie schon vor der Zahlung.
@@ -92,6 +98,10 @@ export type BestellungFuerAbgleich = {
   erstattetCents: number
   /** serviceFeeRefundedAt gesetzt (Gebühr entfallen). */
   gebuehrEntfallen: boolean
+  /** Order.gebuehrModell — null = bisher, `hofpreis` = N38. */
+  gebuehrModell: string | null
+  /** Summe `OrderItem.gebuehrCents` aller Positionen, auch der fehlenden (im Modell bisher 0). */
+  gebuehrPositionenCents: number
 }
 
 export type ErwartetLautDatenbank = { bezahlt: boolean; betragCents: number; gebuehrCents: number; erstattetCents: number }
@@ -104,7 +114,11 @@ export function erwartetLautDatenbank(b: BestellungFuerAbgleich): ErwartetLautDa
   const betragCents = reststorno ? b.erstattetCents : b.warenCents + b.serviceFeeCents + b.erstattetCents
   const erstattetCents =
     b.paymentStatus === 'REFUNDED' ? betragCents : b.erstattetCents + (b.gebuehrEntfallen ? b.serviceFeeCents : 0)
-  // Ohne fehlende Position ist der Warenpreis noch der ursprüngliche — dann gilt die gespeicherte Gebühr.
+  // Modell hofpreis (N38): die application_fee ist Provision + Summe der Gebühren aller Positionen (Snapshot).
+  if (b.gebuehrModell === 'hofpreis') {
+    return { bezahlt, betragCents, gebuehrCents: b.provisionCents + b.gebuehrPositionenCents, erstattetCents }
+  }
+  // Modell bisher: ohne fehlende Position ist der Warenpreis noch der ursprüngliche — dann gilt die gespeicherte Gebühr.
   const gebuehrCents =
     b.warenOriginalCents === b.warenCents ? b.provisionCents + b.serviceFeeCents : b.provisionCents + betragCents - b.warenOriginalCents
   return { bezahlt, betragCents, gebuehrCents, erstattetCents }

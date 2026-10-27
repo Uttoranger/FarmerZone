@@ -670,6 +670,27 @@ export async function baueFreischaltungEmail(farm: {
 }
 
 /**
+ * Plattformgebühr: Ankündigung vier Wochen vor dem Einzugsbeginn → Hof
+ * (Register N38, Nr. 198). Der Text kommt fertig aus `ankuendigungText` —
+ * dieselben Worte wie die Postfach-Nachricht.
+ */
+export async function bauePlattformgebuehrAnkuendigung(d: { an: string; text: string; datum: string }): Promise<StapelMail> {
+  const { LASTSCHRIFT_HREF, LASTSCHRIFT_TEXT } = await import('@/lib/konditionen')
+  const { PlattformgebuehrAnkuendigungEmail } = await import('@/emails/plattformgebuehr-ankuendigung')
+  const html = await toHtml(
+    React.createElement(PlattformgebuehrAnkuendigungEmail, { text: d.text, datum: d.datum, lastschriftUrl: `${APP_URL}${LASTSCHRIFT_HREF}`, knopf: LASTSCHRIFT_TEXT.einrichten })
+  )
+  return { an: d.an, betreff: `Plattformgebühr ab ${d.datum}`, html }
+}
+
+/** Lastschrift der Monatsabrechnung gescheitert → Hof (Register N38, Nr. 198); Text aus `lastschriftGescheitertText`. */
+export async function baueLastschriftGescheitert(d: { an: string; text: string; monat: string }): Promise<StapelMail> {
+  const { LastschriftGescheitertEmail } = await import('@/emails/lastschrift-gescheitert')
+  const html = await toHtml(React.createElement(LastschriftGescheitertEmail, { text: d.text, monat: d.monat, konditionenUrl: `${APP_URL}/settings/konditionen` }))
+  return { an: d.an, betreff: `Lastschrift für ${d.monat} hat nicht geklappt`, html }
+}
+
+/**
  * Neue FEHLER-Meldung → EINE Betreiber-Adresse (Fehlerbriefkasten). NUR bei
  * art FEHLER — Wünsche und Fragen bleiben im Eingang (Register N14); die
  * Adressen aus empfaengerFuer('fehlermeldung'), je Adresse ein Auftrag.

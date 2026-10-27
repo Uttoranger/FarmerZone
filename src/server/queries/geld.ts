@@ -33,7 +33,8 @@ const BESTELLUNG_FUER_ABGLEICH = {
   platformFeeAmount: true,
   erstattetCents: true,
   serviceFeeRefundedAt: true,
-  items: { select: { totalPrice: true } },
+  gebuehrModell: true,
+  items: { select: { totalPrice: true, gebuehrCents: true } },
 } as const satisfies Prisma.OrderSelect
 
 type AbgleichZeile = Prisma.OrderGetPayload<{ select: typeof BESTELLUNG_FUER_ABGLEICH }>
@@ -51,6 +52,8 @@ function alsAbgleichBestellung(o: AbgleichZeile): BestellungFuerAbgleich {
     provisionCents: alsCents(o.platformFeeAmount),
     erstattetCents: o.erstattetCents,
     gebuehrEntfallen: o.serviceFeeRefundedAt !== null,
+    gebuehrModell: o.gebuehrModell,
+    gebuehrPositionenCents: o.items.reduce((s, i) => s + i.gebuehrCents, 0),
   }
 }
 

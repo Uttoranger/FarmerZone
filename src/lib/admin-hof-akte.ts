@@ -210,6 +210,14 @@ export const PROTOKOLL_ART_TEXT: Partial<Record<AdminAktionArt, string>> = {
   team_antwort: 'Antwort im Postfach',
   hof_gesperrt: 'Vorübergehend gesperrt',
   hof_sperre_aufgehoben: 'Sperre aufgehoben',
+  plattformgebuehr_geaendert: 'Plattformgebühr geändert',
+  plattformgebuehr_angekuendigt: 'Einzug angekündigt',
+  monatsabrechnung_erstellt: 'Monatsabrechnung erstellt',
+  lastschrift_mandat_gueltig: 'Lastschrift eingerichtet',
+  lastschrift_mandat_beendet: 'Lastschrift beendet',
+  lastschrift_bezahlt: 'Monatsabrechnung bezahlt',
+  lastschrift_gescheitert: 'Lastschrift gescheitert',
+  lastschrift_zurueckgebucht: 'Lastschrift zurückgebucht',
 }
 
 export function protokollArtText(art: string): string {

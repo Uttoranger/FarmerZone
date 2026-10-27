@@ -29,6 +29,7 @@ import { ADMIN_HOEFE_HREF, adminHofHref } from '@/lib/admin-hof-akte'
 import { NOTBREMSE_ADMIN_TEXT, bestellstoppAktiv, bestellstoppBisText, notbremseGrundLabel, type BestellstoppStand } from '@/lib/notbremse'
 import { ABWEICHUNG_FELD_TEXT, type OffeneAbweichung } from '@/lib/geld-abgleich'
 import { bestellungenHref } from '@/lib/admin-bestellung'
+import { nichtAbgeholtAuffaellig } from '@/lib/plattformgebuehr'
 
 /*
  * Admin › Heute (Register N32, Nr. 185): die EINE Liste „Braucht dich“ aus
@@ -64,6 +65,10 @@ export const AUFGABE_QUELLEN = [
   'hof_ohne_abholzeit',
   'hof_ohne_bestellung',
   'geld_abweichung',
+  'einzug_gescheitert',
+  'rueckbuchung',
+  'rechnungsangaben_fehlen',
+  'nicht_abgeholt_auffaellig',
 ] as const
 
 export type AufgabeQuelle = (typeof AUFGABE_QUELLEN)[number]
@@ -127,6 +132,20 @@ export type AufgabenStand = {
   bestellstopp: BestellstoppStand | null
   /** Offene Abweichungen aus dem Geld-Abgleich (Nr. 191) — nur Kennung, Feld und Cent. */
   geldAbweichungen: readonly OffeneAbweichung[]
+  /** Die Monatsabrechnung der Plattformgebühr (Nr. 198) — nur Kennungen, Hofname, Monat und Zahlen. */
+  plattformgebuehr: PlattformgebuehrStand
+}
+
+/** Eine Monatsabrechnung, die Aufmerksamkeit braucht (gescheitert oder zurückgebucht). */
+export type AbrechnungAufgabeRoh = { abrechnungId: string; farmId: string; hofName: string; monat: string; seit: Date }
+
+export type PlattformgebuehrStand = {
+  gescheitert: readonly AbrechnungAufgabeRoh[]
+  zurueckgebucht: readonly AbrechnungAufgabeRoh[]
+  /** Seit wann die Rechnungsangaben im Stripe-Dashboard fehlen (Ablauf `monatsabrechnung`), sonst null. */
+  rechnungsangabenFehlenSeit: Date | null
+  /** Barbestellungen der letzten 90 Tage je Hof: gesamt und nicht abgeholt (die Quelle prüft die Schwelle). */
+  nichtAbgeholt: readonly { farmId: string; hofName: string; bar: number; nicht: number; seit: Date }[]
 }
 
 /** Ein leerer Stand — Ausgangspunkt für Tests und für Bereiche, die außerhalb der Produktion nichts melden. */
@@ -141,6 +160,7 @@ export const LEERER_STAND: AufgabenStand = {
   hoefeAktiv: [],
   bestellstopp: null,
   geldAbweichungen: [],
+  plattformgebuehr: { gescheitert: [], zurueckgebucht: [], rechnungsangabenFehlenSeit: null, nichtAbgeholt: [] },
 }
 
 /** Ab wann ein verkaufender Hof ohne Bestellung auffällt (Register N32: „seit 14 Tagen ohne Bestellung“). */
@@ -165,6 +185,11 @@ export const AUFGABE_ZIEL_MS: Record<AufgabeQuelle, number> = {
   hof_ohne_abholzeit: 7 * TAG_MS,
   hof_ohne_bestellung: 7 * TAG_MS,
   geld_abweichung: 24 * STUNDE_MS,
+  // Nr. 198: Einzug gescheitert 3 Tage, Rückbuchung sofort (1 h), Rechnungsangaben vor der nächsten Abrechnung, Quote diese Woche.
+  einzug_gescheitert: 3 * TAG_MS,
+  rueckbuchung: STUNDE_MS,
+  rechnungsangaben_fehlen: 24 * STUNDE_MS,
+  nicht_abgeholt_auffaellig: 7 * TAG_MS,
 }
 
 const BEREICH: Record<AufgabeQuelle, AufgabeBereich> = {
@@ -179,6 +204,10 @@ const BEREICH: Record<AufgabeQuelle, AufgabeBereich> = {
   hof_ohne_abholzeit: 'Höfe',
   hof_ohne_bestellung: 'Höfe',
   geld_abweichung: 'Geld',
+  einzug_gescheitert: 'Geld',
+  rueckbuchung: 'Geld',
+  rechnungsangaben_fehlen: 'Geld',
+  nicht_abgeholt_auffaellig: 'Höfe',
 }
 
 // Die Höfe-Liste steht seit Nr. 185 unter /admin/hoefe; seit Nr. 187 hat jeder Hof eine Akte —
@@ -479,6 +508,84 @@ function geldAbweichung(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
   })
 }
 
+/**
+ * Plattformgebühr (Register N38, Nr. 198): gescheiterter Einzug, Rückbuchung,
+ * fehlende Rechnungsangaben und eine auffällige Quote „nicht abgeholt“ bei
+ * bar. Erledigt verschwindet von selbst: bezahlt (invoice.paid), Angaben
+ * nachgetragen (nächster Lauf), Quote wieder unter der Schwelle.
+ */
+function einzugGescheitert(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
+  return stand.plattformgebuehr.gescheitert.map((a) =>
+    aufgabe(
+      'einzug_gescheitert',
+      {
+        titel: 'Lastschrift gescheitert',
+        bezug: { kennung: a.farmId, text: `${a.hofName} · ${a.monat}` },
+        satz: 'Stripe versucht es erneut, der Hof hat eine Nachricht. Bleibt der Betrag offen, nimmt der Hof keine Barbestellungen mehr an.',
+        seit: a.seit,
+        wasTun: 'hofAnsehen',
+        ziel: adminHofHref(a.farmId),
+      },
+      jetzt
+    )
+  )
+}
+
+function rueckbuchung(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
+  return stand.plattformgebuehr.zurueckgebucht.map((a) =>
+    aufgabe(
+      'rueckbuchung',
+      {
+        titel: 'Lastschrift zurückgebucht',
+        bezug: { kennung: a.farmId, text: `${a.hofName} · ${a.monat}` },
+        satz: 'Der Hof nimmt keine Barbestellungen mehr an. Mit dem Hof sprechen und die Zahlung bei Stripe klären.',
+        seit: a.seit,
+        wasTun: 'hofAnsehen',
+        ziel: adminHofHref(a.farmId),
+      },
+      jetzt
+    )
+  )
+}
+
+function rechnungsangabenFehlen(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
+  const seit = stand.plattformgebuehr.rechnungsangabenFehlenSeit
+  if (!seit) return []
+  return [
+    aufgabe(
+      'rechnungsangaben_fehlen',
+      {
+        titel: 'Rechnungsangaben fehlen',
+        bezug: { kennung: 'stripe', text: 'Stripe-Dashboard · Rechnungen' },
+        satz: 'Firmenname oder Steuernummer fehlen im Stripe-Dashboard. Die Monatsrechnungen gehen trotzdem hinaus – bitte dort nachtragen.',
+        seit,
+        wasTun: 'ansehen',
+        ziel: '/admin/geld',
+      },
+      jetzt
+    ),
+  ]
+}
+
+function nichtAbgeholtAuffaelligQuelle(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
+  return stand.plattformgebuehr.nichtAbgeholt
+    .filter((h) => nichtAbgeholtAuffaellig(h.bar, h.nicht))
+    .map((h) =>
+      aufgabe(
+        'nicht_abgeholt_auffaellig',
+        {
+          titel: 'Viele Barbestellungen nicht abgeholt',
+          bezug: { kennung: h.farmId, text: `${h.hofName} · ${formatZahl(h.nicht)} von ${formatZahl(h.bar)} in 90 Tagen` },
+          satz: 'Mehr als jede fünfte Barbestellung wurde nicht abgeholt – bei „nicht abgeholt“ ist keine Plattformgebühr fällig. Mit dem Hof sprechen.',
+          seit: h.seit,
+          wasTun: 'hofAnsehen',
+          ziel: adminHofHref(h.farmId),
+        },
+        jetzt
+      )
+    )
+}
+
 /** Das Register: je Quelle eine reine Funktion `(stand, jetzt) → Aufgabe[]`. */
 export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt: Date) => Aufgabe[]> = {
   notbremse_aktiv: notbremseAktiv,
@@ -492,6 +599,10 @@ export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt:
   hof_ohne_abholzeit: hofOhneAbholzeit,
   hof_ohne_bestellung: hofOhneBestellung,
   geld_abweichung: geldAbweichung,
+  einzug_gescheitert: einzugGescheitert,
+  rueckbuchung,
+  rechnungsangaben_fehlen: rechnungsangabenFehlen,
+  nicht_abgeholt_auffaellig: nichtAbgeholtAuffaelligQuelle,
 }
 
 /** Steht vor allem anderen, solange sie gilt — ihre Frist ist ein Ende, kein Ziel (Freigabe 189 Punkt 4: „ganz oben“). */
@@ -787,6 +898,14 @@ export const PROTOKOLL_TEXT: Partial<Record<AdminAktionArt, string>> = {
   kostenposten_geloescht: 'Kosten gelöscht',
   finanzen_export: 'Geld als CSV geladen',
   monat_abgeschlossen: 'Monat abgeschlossen',
+  plattformgebuehr_geaendert: 'Plattformgebühr des Hofs geändert',
+  plattformgebuehr_angekuendigt: 'Einzug der Plattformgebühr angekündigt',
+  monatsabrechnung_erstellt: 'Monatsabrechnung erstellt',
+  lastschrift_mandat_gueltig: 'Lastschrift eingerichtet',
+  lastschrift_mandat_beendet: 'Lastschrift beendet',
+  lastschrift_bezahlt: 'Monatsabrechnung bezahlt',
+  lastschrift_gescheitert: 'Lastschrift gescheitert',
+  lastschrift_zurueckgebucht: 'Lastschrift zurückgebucht',
   erstattung_erledigt: 'Erstattung als erledigt markiert',
   empfaenger_hinzugefuegt: 'Empfänger hinzugefügt',
   empfaenger_entfernt: 'Empfänger entfernt',

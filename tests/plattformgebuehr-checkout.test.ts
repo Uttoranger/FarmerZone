@@ -45,6 +45,8 @@ vi.mock('@/lib/prisma', () => ({
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     customerFarmSubscription: { findUnique: vi.fn(), upsert: vi.fn() },
+    // Sperre nach offener Monatsabrechnung (Nr. 198) — ohne Zeile frei.
+    monatsabrechnung: { findMany: vi.fn(async () => []) },
   },
 }))
 
@@ -123,6 +125,7 @@ const HOF = {
   einzugAb: null,
   barMandatPflicht: true,
   sepaMandatAm: null,
+  barSperreNachTagen: 14,
 }
 
 function anfrage(overrides: Record<string, unknown> = {}) {

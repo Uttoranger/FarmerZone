@@ -112,6 +112,7 @@ describe('vercel.json', () => {
       { path: '/api/cron/betrieb', schedule: '0 4 * * *' },
       { path: '/api/cron/briefkasten', schedule: '0 5 * * 1' },
       { path: '/api/cron/mails', schedule: '* * * * *' },
+      { path: '/api/cron/monatsabrechnung', schedule: '30 5 * * *' },
       { path: '/api/cron/geld-abgleich', schedule: '30 6 * * *' },
     ])
   })

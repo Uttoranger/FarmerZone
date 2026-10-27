@@ -49,7 +49,7 @@ import {
   zahlungZuSpaetMailAuftrag,
 } from '@/server/mail-arten/bestellung'
 import { betreiberAuftraege, betreiberKennungen, empfaengerKennungen, erstattungOffenBezug } from '@/server/mail-arten/betreiber'
-import { freischaltungAuftrag, postfachAntwortAuftrag, rundschreibenAuftraege } from '@/server/mail-arten/hof'
+import { ankuendigungAuftrag, freischaltungAuftrag, lastschriftGescheitertAuftrag, postfachAntwortAuftrag, rundschreibenAuftraege } from '@/server/mail-arten/hof'
 import { aboBestaetigungAuftrag, bescheidAuftraege } from '@/server/mail-arten/kundin'
 import { beitragAuftraege, gesendeteBeitragsMails } from '@/server/mail-arten/beitrag'
 import { ladeBetreiberEmpfaenger, zaehleOffenImEingang } from '@/server/queries/postfach'
@@ -84,6 +84,8 @@ const AUFTRAEGE: EinstellAuftrag[] = [
   ...betreiberAuftraege('antwort-an-team', 'cnachricht00000000000001', ['support'], { nachrichtId: 'cnachricht00000000000001' }),
   ...betreiberAuftraege('betreiber-testmail', '1761292800000', ['support'], {}),
   freischaltungAuftrag(BESTELLUNG.farmId, JETZT),
+  ankuendigungAuftrag(BESTELLUNG.farmId),
+  lastschriftGescheitertAuftrag('cabrechnung0000000000001', BESTELLUNG.farmId, 1),
   postfachAntwortAuftrag('cnachricht00000000000001', BESTELLUNG.farmId),
   ...rundschreibenAuftraege([{ id: 'cfaden000000000000000001', farmId: BESTELLUNG.farmId }]),
   aboBestaetigungAuftrag({ id: 'cabo00000000000000000001', farmId: BESTELLUNG.farmId }, JETZT),

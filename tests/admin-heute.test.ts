@@ -60,6 +60,10 @@ vi.mock('@/server/queries/mails', () => quellen)
 vi.mock('@/server/queries/betrieb', () => quellen)
 vi.mock('@/server/queries/meldung', () => quellen)
 vi.mock('@/server/queries/admin', () => ({ zaehleWartendeHoefe: vi.fn(async () => 1) }))
+// Die Quellen der Plattformgebühr (Nr. 198) haben eigene Tests (tests/plattformgebuehr-abrechnung.test.ts).
+vi.mock('@/server/plattformgebuehr-abrechnung', () => ({
+  ladePlattformgebuehrAufgaben: vi.fn(async () => ({ gescheitert: [], zurueckgebucht: [], rechnungsangabenFehlenSeit: null, nichtAbgeholt: [] })),
+}))
 vi.mock('@/server/queries/startseite', () => ({ naechsterTermin: vi.fn(async () => null) }))
 vi.mock('@/server/queries/plattform-einstellung', () => ({
   leseBestellstopp: vi.fn(async () => null),
