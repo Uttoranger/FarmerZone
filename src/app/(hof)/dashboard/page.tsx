@@ -19,6 +19,7 @@ import {
   PostfachKarte,
   StripeEinrichtenHinweis,
   StripeHinweis,
+  TeamSperreKarte,
   TeilenKarte,
   WocheKarte,
   ZuTunKarte,
@@ -170,6 +171,8 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10">
       <div className="flex flex-col gap-4 md:gap-5">
+        {/* Die Sperre des Teams (N34, Nr. 187) steht über allem: Ohne sie kommt keine neue Bestellung. */}
+        {farm.adminGesperrtAm && <TeamSperreKarte grund={farm.adminSperrGrund} />}
         {zeige(aufbau.oben)}
         <HeuteKopf datum={datumLang(jetzt)} abholungHeute={heute.abholfensterHeute} />
         <Kennzahlen

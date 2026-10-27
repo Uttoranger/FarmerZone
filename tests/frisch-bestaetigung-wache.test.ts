@@ -33,6 +33,8 @@ const HEIKLE_AKTIONEN: Array<{ datei: string; namen: string[] }> = [
   { datei: 'src/server/actions/finanzen.ts', namen: ['kostenpostenAnlegen', 'kostenpostenAendern', 'kostenpostenBeenden', 'kostenpostenLoeschen'] },
   { datei: 'src/server/actions/plattform-einstellung.ts', namen: ['speichereGruendungEinstellung'] },
   { datei: 'src/server/actions/postfach.ts', namen: ['entferneEmpfaenger', 'speichereZustellRegeln'] },
+  // Nr. 187 (N34): Hof sperren und Sperre aufheben.
+  { datei: 'src/server/actions/admin-hof.ts', namen: ['sperreHof', 'hebeHofSperreAuf'] },
 ]
 
 const EXPORTE = ['src/app/admin/finanzen/export/route.ts', 'src/app/admin/betrieb/export/route.ts', 'src/app/admin/betrieb/bilder-export/route.ts']
@@ -57,6 +59,8 @@ const OBERFLAECHEN: Array<{ datei: string; aktionen: string[] }> = [
   { datei: 'src/components/admin/postfach-zustellung.tsx', aktionen: ['entferneEmpfaenger', 'speichereZustellRegeln'] },
   // Nr. 186
   { datei: 'src/app/admin/bestellungen/bestellung-aktionen.tsx', aktionen: ['markiereErstattungErledigt', 'zeigeKundinAdresse', 'notfallStorno'] },
+  // Nr. 187
+  { datei: 'src/components/admin/hof-akte-sperre-dialog.tsx', aktionen: ['sperreHof', 'hebeHofSperreAuf'] },
 ]
 
 function datei(quelltext: string): ts.SourceFile {

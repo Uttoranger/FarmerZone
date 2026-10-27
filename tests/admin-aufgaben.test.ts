@@ -181,6 +181,15 @@ describe('Braucht dich: je Quelle da und wieder weg', () => {
     const nie = ADMIN_AUFGABEN.hof_ohne_bestellung({ ...VOLL, hoefeAktiv: [{ ...VOLL.hoefeAktiv[1], approvedAt: vor(13 * TAG), letzteBestellungAm: null }] }, JETZT)
     expect(nie).toHaveLength(0)
   })
+
+  it('Aufgaben zu einem Hof führen in seine Akte (seit Nr. 187), nicht in einen Listenfilter', () => {
+    const [ohneZeit] = ADMIN_AUFGABEN.hof_ohne_abholzeit(VOLL, JETZT)
+    const [ohneBestellung] = ADMIN_AUFGABEN.hof_ohne_bestellung(VOLL, JETZT)
+    for (const a of [ohneZeit, ohneBestellung]) {
+      expect(a.ziel).toBe(`/admin/hoefe/${a.bezug.kennung}`)
+      expect(a.ziel).not.toContain('filter=')
+    }
+  })
 })
 
 describe('Braucht dich: Sortierung und Wörter', () => {

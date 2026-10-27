@@ -25,6 +25,7 @@ import { uhrzeitInWien } from '@/lib/fristen'
 import type { MarkeArt } from '@/lib/marke-art'
 import { adminAktionSchema, ohnePersonendaten, type AdminAktionArt } from '@/schemas/admin-aktion'
 import { SERVICEGEBUEHR_BEZEICHNUNG } from '@/lib/servicegebuehr'
+import { ADMIN_HOEFE_HREF, adminHofHref } from '@/lib/admin-hof-akte'
 
 /*
  * Admin › Heute (Register N32, Nr. 185): die EINE Liste „Braucht dich“ aus
@@ -162,10 +163,9 @@ const BEREICH: Record<AufgabeQuelle, AufgabeBereich> = {
   hof_ohne_bestellung: 'Höfe',
 }
 
-/** Die Höfe-Liste im Reiter „Alle Höfe“ (Nr. 185: die Höfe stehen unter /admin/hoefe). */
-export const ADMIN_HOEFE_HREF = '/admin/hoefe'
-const OHNE_ABHOLZEIT_HREF = `${ADMIN_HOEFE_HREF}?reiter=alle&filter=abholzeit-fehlt`
-const ALLE_HOEFE_HREF = `${ADMIN_HOEFE_HREF}?reiter=alle`
+// Die Höfe-Liste steht seit Nr. 185 unter /admin/hoefe; seit Nr. 187 hat jeder Hof eine Akte —
+// Aufgaben zu einem Hof führen dorthin (adminHofHref), nicht in einen Listenfilter.
+export { ADMIN_HOEFE_HREF }
 
 type AufgabeTeile = Omit<Aufgabe, 'quelle' | 'bereich' | 'frist'>
 
@@ -375,7 +375,7 @@ function hofOhneAbholzeit(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
           satz: 'Ohne Abholzeit kann niemand bestellen. Den Hof anschreiben und fragen, ob er pausieren will.',
           seit: new Date(Math.max(h.approvedAt.getTime(), wochenbeginn.getTime())),
           wasTun: 'hofAnsehen',
-          ziel: OHNE_ABHOLZEIT_HREF,
+          ziel: adminHofHref(h.id),
         },
         jetzt
       )
@@ -398,7 +398,7 @@ function hofOhneBestellung(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
           satz: 'Nachfragen, ob Angebot, Fotos und Abholzeit stimmen.',
           seit: new Date(letzte.getTime() + grenze),
           wasTun: 'hofAnsehen',
-          ziel: ALLE_HOEFE_HREF,
+          ziel: adminHofHref(h.id),
         },
         jetzt
       ),

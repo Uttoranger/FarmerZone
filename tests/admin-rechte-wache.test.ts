@@ -51,8 +51,8 @@ const OHNE_PROTOKOLL: Record<string, string> = {
   pruefeFrischFuerPasskey: 'nur die Prüfung „frisch“ vor dem Anlegen eines Passkeys, schreibt nichts',
 }
 
-/** So viele exportierte Actions rufen die Admin-Wache (Bericht 188: „alle Einstiege geprüft“; Nr. 186: +2 in admin-bestellung.ts). */
-const ANZAHL_ADMIN_ACTIONS = 47
+/** So viele exportierte Actions rufen die Admin-Wache (Bericht 188: „alle Einstiege geprüft“; Nr. 186: +2 in admin-bestellung.ts; Nr. 187: +2 Hof sperren/aufheben). */
+const ANZAHL_ADMIN_ACTIONS = 49
 
 type Aktion = { datei: string; name: string; rechte: Array<string | null>; protokoll: boolean }
 

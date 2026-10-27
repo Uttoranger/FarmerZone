@@ -27,6 +27,9 @@ export const ADMIN_AKTIONEN = [
   'testhof_markiert',
   'testhof_zurueckgenommen',
   'rundschreiben_gesendet',
+  // Eingriffe (Recht hof_sperren_storno, N34)
+  'hof_gesperrt',
+  'hof_sperre_aufgehoben',
   // Briefkasten und Postfach (ansehen)
   'meldung_triagiert',
   'meldung_buendel_stand',

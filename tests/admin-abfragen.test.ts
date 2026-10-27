@@ -52,7 +52,7 @@ function dbZeile(ueber: Record<string, unknown> = {}) {
     isPaused: false,
     betriebsnummer: '  ',
     sepaMandatAm: null,
-    owner: { email: 'max@example.com', emailVerified: true, createdAt: new Date('2026-01-01T00:00:00Z') },
+    owner: { email: 'max@example.com', emailVerified: true, createdAt: new Date('2026-01-01T00:00:00Z'), sessions: [] },
     _count: { products: 0, farmPhotos: 0, pickupSlots: 0 },
     // Seit Nr. 116: ob ein Produkt im Shop ist (Freischalten).
     products: [],

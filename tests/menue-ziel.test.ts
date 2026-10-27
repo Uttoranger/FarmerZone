@@ -332,11 +332,10 @@ describe('Quelltext: der Anbieter der Shells', () => {
 
 /**
  * Datei → die Shell, unter der ihr Menü rendert (`unter`), oder der Grund, warum es keinen Anbieter hat (`grund`).
- * `AdminShell`: admin-konto.tsx im Kopf, hoefe-ansicht.tsx (/admin) und meldungen-werkzeug.tsx (/admin/postfach)
+ * `AdminShell`: admin-konto.tsx im Kopf und meldungen-werkzeug.tsx (/admin/postfach)
  * im Inhalt — src/app/admin/layout.tsx stellt die Seiten in die AdminShell. `HofShell`: das Menü „Neu“ in der Seitenleiste.
  */
 const MENUE_DATEIEN: Record<string, { unter: 'AdminShell' | 'HofShell' } | { grund: string }> = {
-  'src/components/admin/hoefe-ansicht.tsx': { unter: 'AdminShell' },
   'src/components/admin/meldungen-werkzeug.tsx': { unter: 'AdminShell' },
   'src/components/shells/admin-konto.tsx': { unter: 'AdminShell' },
   'src/components/shells/hof-shell.tsx': { unter: 'HofShell' },
@@ -380,8 +379,9 @@ describe('Quelltext: jede Datei mit einem Menü steht in der Liste', () => {
       .map((pfad) => ({ name: relative(process.cwd(), pfad).split(sep).join('/'), pfad }))
       .filter(({ name, pfad }) => name !== 'src/components/ui/dropdown-menu.tsx' && hatMenue(readFileSync(pfad, 'utf8'), name))
       .map(({ name }) => name)
-    // Nicht blind: Die Wache sah die vier Dateien (farmer-nav.tsx entfiel mit Nr. 181).
-    expect(dateien.length).toBeGreaterThanOrEqual(4)
+    // Nicht blind: Die Wache sah die drei Dateien (farmer-nav.tsx entfiel mit Nr. 181).
+    // Seit Nr. 187 hat die Hofliste kein Menü ⋯ mehr (alles Eingreifen steht in der Akte).
+    expect(dateien.length).toBeGreaterThanOrEqual(3)
     expect(menueProbleme(dateien, MENUE_DATEIEN)).toEqual([])
   }, 30_000)
 
