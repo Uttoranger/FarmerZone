@@ -8,8 +8,9 @@
  *  - Jede solche Action ruft `protokolliere` — selbst oder über eine
  *    Funktion derselben Datei —, außer mit Grund in OHNE_PROTOKOLL (nur
  *    Lesen, eigener Lesestand, eigene Einrichtung, Autospeichern).
- *  - `adminRechte` wird nur in src/lib/admin-rechte.ts und
- *    src/server/admin-wache.ts gelesen.
+ *  - `adminRechte` wird nur in src/lib/admin-rechte.ts,
+ *    src/server/admin-wache.ts und dem Team (Nr. 190: Action und Abfrage von
+ *    Einstellungen › Team, nur Inhaber) gelesen.
  *  - Die Zahl der Admin-Actions steht fest: Eine neue fällt auf und bekommt
  *    ihr Recht, ihre Art (src/schemas/admin-aktion.ts) und ihren Eintrag hier.
  * Gegenproben: Schnipsel ohne Recht, mit „ansehen“ ohne Liste, ohne Protokoll.
@@ -51,8 +52,8 @@ const OHNE_PROTOKOLL: Record<string, string> = {
   pruefeFrischFuerPasskey: 'nur die Prüfung „frisch“ vor dem Anlegen eines Passkeys, schreibt nichts',
 }
 
-/** So viele exportierte Actions rufen die Admin-Wache (Bericht 188: „alle Einstiege geprüft“; Nr. 186: +2 in admin-bestellung.ts; Nr. 187: +2 Hof sperren/aufheben; Nr. 189: +2 Notbremse). */
-const ANZAHL_ADMIN_ACTIONS = 51
+/** So viele exportierte Actions rufen die Admin-Wache (Bericht 188: „alle Einstiege geprüft“; Nr. 186: +2 in admin-bestellung.ts; Nr. 187: +2 Hof sperren/aufheben; Nr. 189: +2 Notbremse; Nr. 190: +5 Konto-Anfragen, +4 Team). */
+const ANZAHL_ADMIN_ACTIONS = 60
 
 type Aktion = { datei: string; name: string; rechte: Array<string | null>; protokoll: boolean }
 
@@ -153,8 +154,8 @@ describe('Admin-Actions: Recht und Protokoll (N33, N35)', () => {
     expect(Object.keys(OHNE_PROTOKOLL).filter((n) => !namen.has(n) || ALLE.find((a) => a.name === n)?.protokoll === true)).toEqual([])
   })
 
-  it('adminRechte wird nur in src/lib/admin-rechte.ts und src/server/admin-wache.ts gelesen', () => {
-    const erlaubt = new Set(['src/lib/admin-rechte.ts', 'src/server/admin-wache.ts'])
+  it('adminRechte wird nur in src/lib/admin-rechte.ts, src/server/admin-wache.ts und im Team (Nr. 190) gelesen', () => {
+    const erlaubt = new Set(['src/lib/admin-rechte.ts', 'src/server/admin-wache.ts', 'src/server/actions/team.ts', 'src/server/queries/team.ts'])
     const funde = dateienUnter(join(WURZEL, 'src'))
       .filter((p) => /\.tsx?$/.test(p))
       .map((p) => relative(WURZEL, p).split(sep).join('/'))

@@ -40,6 +40,7 @@ import { monatsgrenzenWien } from '@/lib/servicegebuehr'
 import { DEFAULT_SECTIONS, type SectionConfig } from '@/server/queries/appearance'
 import { ladeHoefeFuerGruendung, leseGruendungEinstellung } from '@/server/queries/admin'
 import { getMeldungenFuerAdmin } from '@/server/queries/meldung'
+import { HOF_SICHTBAR_WO } from '@/lib/hof-sichtbar'
 
 /*
  * Lesen rund um das Postfach (Register N12, Nachtlauf Nr. 87). Regeln
@@ -318,7 +319,7 @@ export async function zaehleRundschreibenImMonat(jetzt: Date): Promise<number> {
  */
 export async function ladeEmpfaengerHoefe(): Promise<EmpfaengerHof[]> {
   const hoefe = await prisma.farm.findMany({
-    where: { archivedAt: null },
+    where: { ...HOF_SICHTBAR_WO },
     orderBy: { name: 'asc' },
     select: {
       id: true,
@@ -348,7 +349,7 @@ export async function ladeEmpfaengerHoefe(): Promise<EmpfaengerHof[]> {
  * Gründungsplätze auf den Seiten, gruendungFuerSeiten) — ein stillgelegter Hof
  * kommt nie dran und ist keine Aufgabe.
  */
-const WARTENDER_HOF = { approvedAt: null, archivedAt: null } as const
+const WARTENDER_HOF = { approvedAt: null, ...HOF_SICHTBAR_WO } as const
 
 /**
  * Was im Eingang offen ist, gezählt — die EINE Zählung für die Zahl am Reiter

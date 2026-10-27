@@ -268,6 +268,23 @@ async function adminMitPasskey(email: string): Promise<boolean> {
 }
 
 /**
+ * Konto schließen (Register N36, Nr. 190): Gehört zur Adresse ein Hof mit
+ * `geschlossenAm`, ist Anmelden gesperrt. Genau diese Adresse, alle Treffer
+ * (wie adminMitPasskey).
+ */
+async function hofkontoGeschlossen(email: string): Promise<boolean> {
+  const treffer = await prisma.user.count({
+    where: { email: { equals: genauesIlikeMuster(email), mode: 'insensitive' }, farm: { geschlossenAm: { not: null } } },
+  })
+  return treffer > 0
+}
+
+/** Dasselbe beim Anlegen einer Sitzung — für jeden Anmeldeweg. */
+async function sitzungGesperrt(userId: string): Promise<boolean> {
+  return (await prisma.farm.count({ where: { ownerId: userId, geschlossenAm: { not: null } } })) > 0
+}
+
+/**
  * Mail „Admin-Sicherheit" (Passkey hinzugefügt, Ersatzcode benutzt) nach der
  * Antwort — mit Gerät und Uhrzeit, ohne Link zum Anmelden. Wirft nie: Ein
  * Fehler geht ohne Adresse nach Sentry, die Anmeldung ist längst durch.
@@ -669,8 +686,9 @@ export const auth = betterAuth({
         if (vorab.gesperrt) throw zuVieleFehlversucheFehler('passwort', vorab.bis)
         // Admin mit Passkey (N20): antwortet wie ein falsches Passwort — und
         // zählt wie eines; das Hashen gleicht die Rechenzeit an. Der Hof
-        // dieses Kontos ist nur noch mit Passkey erreichbar.
-        if (await adminMitPasskey(body.email)) {
+        // dieses Kontos ist nur noch mit Passkey erreichbar. Ebenso ein
+        // geschlossenes Hofkonto (N36, Nr. 190): gleiche Antwort, gleiche Zählung.
+        if ((await adminMitPasskey(body.email)) || (await hofkontoGeschlossen(body.email))) {
           const passwort = (ctx.body as { password?: unknown }).password
           await ctx.context.password.hash(typeof passwort === 'string' ? passwort : '')
           zaehleAlsFehlversuch(vorab.versuch)
@@ -851,6 +869,11 @@ export const auth = betterAuth({
     session: {
       create: {
         before: async (sitzung, kontext) => {
+          // Geschlossenes Hofkonto (N36, Nr. 190): KEIN Weg legt eine Sitzung
+          // an — Passwort, Passkey, Ersatzcode, Bestätigungslink. Antwort wie
+          // ein falsches Passwort; der Weg mit Passwort scheitert schon in
+          // hooks.before (mit Zählung).
+          if (await sitzungGesperrt(sitzung.userId)) throw falschesPasswortFehler()
           const anmeldeart = anmeldeartFuerPfad(kontext?.path)
           if (anmeldeart === null) return
           return { data: { ...sitzung, anmeldeart, ...(anmeldeart === ANMELDEART.passkey ? { passkeyAm: new Date() } : {}) } }

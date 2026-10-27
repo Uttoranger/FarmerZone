@@ -585,6 +585,56 @@ export async function sendAdminSicherheitEmail(
   return sendRaw(email, `${ADMIN_SICHERHEIT_MAIL.betreff[anlass]} · ${MARKE}`, vorlage.html, { art: 'admin-sicherheit' })
 }
 
+/**
+ * „Bestätige deine neue Anmelde-Adresse" → die NEUE Adresse (Register N36,
+ * Nr. 190). `link` trägt einen Einmal-Token (24 Stunden) — nur in der Mail,
+ * nie im Betreff und nie im Log. Gibt das Versandergebnis zurück.
+ */
+export async function sendEmailAendernLink(email: string, daten: { hof: string | null; link: string }): Promise<VersandErgebnis> {
+  // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
+  const { EMAIL_AENDERN_MAIL } = await import('@/lib/konto-anfragen')
+  const vorlage = await htmlOderFehler(async () => {
+    const { EmailAendernEmail } = await import('@/emails/email-aendern')
+    return React.createElement(EmailAendernEmail, daten)
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, `${EMAIL_AENDERN_MAIL.betreff} · ${MARKE}`, vorlage.html, { art: 'email-aendern-link' })
+}
+
+/**
+ * „Deine Anmelde-Adresse wurde geändert" → die ALTE Adresse (Register N36,
+ * Nr. 190), mit „Das war ich nicht" (Einmal-Link, nur in der Mail).
+ */
+export async function sendEmailGeaendertHinweis(email: string, daten: { hof: string | null; zeitpunkt: Date; link: string }): Promise<VersandErgebnis> {
+  // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
+  const { EMAIL_GEAENDERT_MAIL } = await import('@/lib/konto-anfragen')
+  const { anmeldeZeitpunkt } = await import('@/lib/geraete')
+  const vorlage = await htmlOderFehler(async () => {
+    const { EmailGeaendertEmail } = await import('@/emails/email-aendern')
+    return React.createElement(EmailGeaendertEmail, { hof: daten.hof, wann: anmeldeZeitpunkt(daten.zeitpunkt), link: daten.link })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, `${EMAIL_GEAENDERT_MAIL.betreff} · ${MARKE}`, vorlage.html, { art: 'email-geaendert-hinweis' })
+}
+
+/**
+ * Sicherheitsmail an eine Person im Admin-Team (Register N35, Nr. 190):
+ * eingeladen, Rechte, Inhaber, entfernt — mit den Rechten danach als Wörter.
+ */
+export async function sendTeamRechtGeaendert(
+  email: string,
+  daten: { anlass: import('@/lib/admin-team').TeamAnlass; name: string | null; rechte: string[] }
+): Promise<VersandErgebnis> {
+  // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
+  const { TEAM_MAIL } = await import('@/lib/admin-team')
+  const vorlage = await htmlOderFehler(async () => {
+    const { TeamRechtGeaendertEmail } = await import('@/emails/team-recht-geaendert')
+    return React.createElement(TeamRechtGeaendertEmail, daten)
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, `${TEAM_MAIL.betreff[daten.anlass]} · ${MARKE}`, vorlage.html, { art: 'team-recht-geaendert' })
+}
+
 /** Neuer Hof registriert → EINE Betreiber-Adresse (Freischaltung nötig); die Adressen aus empfaengerFuer('hofWartet'), je Adresse ein Auftrag. */
 export async function baueNewFarmNotification(
   farm: {

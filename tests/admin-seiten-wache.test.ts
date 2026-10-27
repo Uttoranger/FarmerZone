@@ -425,7 +425,7 @@ describe('ladeAdminbereich — Verhalten', () => {
     // betrieb: null — Punkt und Hinweis von Admin › Betrieb nur in der Produktion (N15/N18, Nr. 103; tests/betrieb-seite.test.ts).
     expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, zahlen: { hoefe: 2, briefkasten: 3 + 4 + 2 + 1 }, betrieb: null, aufgaben: null })
     expect(farmCount).toHaveBeenCalledWith({ where: { approvedAt: null } })
-    expect(farmCount).toHaveBeenCalledWith({ where: { approvedAt: null, archivedAt: null } })
+    expect(farmCount).toHaveBeenCalledWith({ where: { approvedAt: null, archivedAt: null, geschlossenAm: null } })
     expect(meldungCount).toHaveBeenCalledWith({ where: { status: { in: ['NEU', 'GEPRUEFT'] } } })
     expect(orderCount).toHaveBeenCalledWith({ where: { erstattungOffenSeit: { not: null } } })
   })

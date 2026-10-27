@@ -145,7 +145,7 @@ describe('barLinkErneutMoeglich — „Erneut senden" nur bei einer offenen Barb
   const IN_DER_FRIST = new Date('2026-10-02T08:30:00Z')
   const offen = (teil: Partial<BarBestellung> = {}, archivedAt: Date | null = null) => ({
     ...bestellung(teil),
-    farm: { archivedAt },
+    farm: { archivedAt, geschlossenAm: null },
   })
 
   it('offen, bar oder Karte beim Hof: ja', () => {

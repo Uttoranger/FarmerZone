@@ -39,6 +39,7 @@ import { FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { LadeInhalt, LadePunkt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { FELD, FELD_LABEL, KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
 import { BestellungAktionen } from './bestellung-aktionen'
+import { AuskunftKundin } from '@/components/admin/auskunft-kundin'
 
 export const metadata: Metadata = { title: `${T.titel} — Admin — ${MARKE}` }
 
@@ -304,7 +305,7 @@ export default async function AdminBestellungenPage({ searchParams }: { searchPa
   return (
     <div className={cn(ADMIN_RAHMEN, 'flex flex-col gap-4 md:gap-5')}>
       <LadeRahmen>
-        <Seitenkopf titel={T.titel} satz={T.satz} />
+        <Seitenkopf titel={T.titel} satz={T.satz} rechts={<AuskunftKundin />} />
         <SuchUndFilter sucheRoh={sucheRoh} f={f} hoefe={hoefe} />
         <LadeInhalt className="flex flex-col gap-3.5">
           {suche.art === 'ungueltig' && <Hinweiskarte ton="orange">{MAIL_TEXT.sucheUngueltig}</Hinweiskarte>}

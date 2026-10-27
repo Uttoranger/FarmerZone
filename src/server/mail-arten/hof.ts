@@ -4,13 +4,15 @@ import type { StapelMail } from '@/lib/email'
 import type { EinstellAuftrag } from '@/server/mail-warteschlange'
 import type { Verworfen } from '@/server/mail-arten'
 import { VORRANG, fadenBezugSchema, hofBezugSchema, nachrichtBezugSchema } from '@/schemas/mail-auftrag'
+import { hofSichtbar } from '@/lib/hof-sichtbar'
 
 /*
  * Die Mails an einen Hof (Register N12, N26; Nr. 159): die Freischaltung und
  * die Antwort des Teams im Faden (Wichtig), das Rundschreiben mit dem Haken
  * „Betriebsmitteilung" (Kann warten). Adresse ist die des Inhaberkontos —
  * wie bisher; ein stillgelegter Hof bekommt keine Postfach-Mail mehr
- * (die Renderer unten verwerfen bei `archivedAt`).
+ * (die Renderer unten verwerfen, wenn der Hof offline ist — `hofSichtbar`:
+ * stillgelegt oder geschlossen).
  */
 
 /** Freischaltung → Hof. Der Zeitpunkt macht den Schlüssel eindeutig: Nach einer Rücknahme darf eine neue Freischaltung wieder schreiben. */
@@ -58,11 +60,11 @@ export async function renderePostfachAntwort(bezug: Record<string, string>): Pro
       text: true,
       linkUrl: true,
       unterhaltungId: true,
-      unterhaltung: { select: { rundschreiben: { select: { titel: true } }, farm: { select: { archivedAt: true, owner: { select: { email: true } } } } } },
+      unterhaltung: { select: { rundschreiben: { select: { titel: true } }, farm: { select: { archivedAt: true, geschlossenAm: true, owner: { select: { email: true } } } } } },
     },
   })
   if (!n) return { verworfen: 'nachricht_fehlt' }
-  if (n.unterhaltung.farm.archivedAt) return { verworfen: 'hof_stillgelegt' }
+  if (!hofSichtbar(n.unterhaltung.farm)) return { verworfen: 'hof_stillgelegt' }
   const { bauePostfachMail } = await import('@/lib/email')
   return bauePostfachMail({
     art: 'antwort',
@@ -78,10 +80,10 @@ export async function rendereRundschreiben(bezug: Record<string, string>): Promi
   const { unterhaltungId } = fadenBezugSchema.parse(bezug)
   const faden = await prisma.unterhaltung.findUnique({
     where: { id: unterhaltungId },
-    select: { rundschreiben: { select: { titel: true, text: true, linkUrl: true } }, farm: { select: { archivedAt: true, owner: { select: { email: true } } } } },
+    select: { rundschreiben: { select: { titel: true, text: true, linkUrl: true } }, farm: { select: { archivedAt: true, geschlossenAm: true, owner: { select: { email: true } } } } },
   })
   if (!faden?.rundschreiben) return { verworfen: 'rundschreiben_fehlt' }
-  if (faden.farm.archivedAt) return { verworfen: 'hof_stillgelegt' }
+  if (!hofSichtbar(faden.farm)) return { verworfen: 'hof_stillgelegt' }
   const { bauePostfachMail } = await import('@/lib/email')
   return bauePostfachMail({
     art: 'rundschreiben',

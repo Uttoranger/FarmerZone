@@ -1,3 +1,4 @@
+import { hofSichtbar } from '@/lib/hof-sichtbar'
 import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
 import * as Sentry from '@sentry/nextjs'
@@ -441,7 +442,8 @@ export async function POST(request: NextRequest) {
   // 1b. Stilllegung — fail-closed und VOR der Pause geprüft: der dauerhafte
   // Zustand sticht den vorübergehenden, damit ein stillgelegter Hof nie die
   // Pausen-Meldung ausgibt ("bald wieder da" wäre eine falsche Zusage).
-  if (farm.archivedAt) {
+  // Ein geschlossenes Konto (N36, Nr. 190) gilt hier wie stillgelegt (hofSichtbar).
+  if (!hofSichtbar(farm)) {
     return konflikt(data.idempotencyKey, data.sessionId, { error: FARM_ARCHIVED_MESSAGE })
   }
 

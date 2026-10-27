@@ -429,8 +429,8 @@ describe('getOeffentlicheHoefe — die Query', () => {
     // getPublicFarm, IN_LISTEN_SICHTBAR nimmt dazu jeden Testhof heraus
     // (Register N21, Nr. 119) — hier wird der Inhalt beider festgenagelt.
     expect(args.where).toBe(IN_LISTEN_SICHTBAR)
-    expect(IN_LISTEN_SICHTBAR).toEqual({ isActive: true, archivedAt: null, approvedAt: { not: null }, istTesthof: false })
-    expect(OEFFENTLICH_SICHTBAR).toEqual({ isActive: true, archivedAt: null, approvedAt: { not: null } })
+    expect(IN_LISTEN_SICHTBAR).toEqual({ isActive: true, archivedAt: null, geschlossenAm: null, approvedAt: { not: null }, istTesthof: false })
+    expect(OEFFENTLICH_SICHTBAR).toEqual({ isActive: true, archivedAt: null, geschlossenAm: null, approvedAt: { not: null } })
     // Nur VERFÜGBARE Produkte (Kategorien UND Produktfotos speisen sich
     // daraus), Termine nur aus aktiven Fenstern, höchstens vier
     // Galerie-Fotos in Sortierreihenfolge.

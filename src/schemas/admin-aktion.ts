@@ -66,6 +66,18 @@ export const ADMIN_AKTIONEN = [
   // Notbremse (Recht notbremse, Nr. 189)
   'bestellungen_angehalten',
   'bestellungen_freigegeben',
+  // Konto-Anfragen (Nr. 190, N36): E-Mail ändern (hoefe_freischalten), Auskunft (adresse_anzeigen), Schließen (hoefe_freischalten)
+  'anmelde_email_angefragt',
+  'anmelde_email_geaendert',
+  'auskunft_exportiert',
+  'konto_geschlossen',
+  'konto_wieder_geoeffnet',
+  // Team (Nr. 190, N35; nur Inhaber)
+  'team_eingeladen',
+  'team_rechte_geaendert',
+  'team_inhaber_gesetzt',
+  'team_inhaber_entzogen',
+  'team_entfernt',
   // Eigener Zugang (Inhaber: Notfallzugang)
   'ersatzcodes_erstellt',
   'passkey_entfernt',

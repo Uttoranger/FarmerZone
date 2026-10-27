@@ -210,6 +210,12 @@ export const PROTOKOLL_ART_TEXT: Partial<Record<AdminAktionArt, string>> = {
   team_antwort: 'Antwort im Postfach',
   hof_gesperrt: 'Vorübergehend gesperrt',
   hof_sperre_aufgehoben: 'Sperre aufgehoben',
+  // Konto-Anfragen (Nr. 190)
+  anmelde_email_angefragt: 'Anmelde-E-Mail ändern angefragt',
+  anmelde_email_geaendert: 'Anmelde-E-Mail geändert',
+  auskunft_exportiert: 'Auskunft exportiert',
+  konto_geschlossen: 'Konto geschlossen',
+  konto_wieder_geoeffnet: 'Konto wieder geöffnet',
 }
 
 export function protokollArtText(art: string): string {

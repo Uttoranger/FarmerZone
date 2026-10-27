@@ -11,12 +11,13 @@ import { EinstellungenGruppen, type EinstellungenDaten } from '@/components/admi
 import { MARKE } from '@/lib/marke'
 import { redirect } from 'next/navigation'
 import { ADMIN_BETRIEB_HREF } from '@/lib/betrieb'
+import { ladeTeam } from '@/server/queries/team'
 
 export const metadata: Metadata = { title: `Einstellungen — Admin — ${MARKE}` }
 // Zeigt den gespeicherten Stand und rechnet „frei" mit den Höfen von jetzt — nie aus einem Cache.
 export const dynamic = 'force-dynamic'
 
-async function ladeDaten(gewaehlt: EinstellungenDaten['gewaehlt'], jetzt: Date): Promise<EinstellungenDaten> {
+async function ladeDaten(gewaehlt: EinstellungenDaten['gewaehlt'], jetzt: Date, ich: string, inhaber: boolean): Promise<EinstellungenDaten> {
   const einstellung = await lesePlattformEinstellung()
   const stand = await ladeGruendungStandAdmin(einstellung)
   // Wer zuletzt gespeichert hat — nur der Name, für die Protokollzeile (N15).
@@ -42,14 +43,16 @@ async function ladeDaten(gewaehlt: EinstellungenDaten['gewaehlt'], jetzt: Date):
       festgeschrieben: festgeschriebenZeile(einstellung),
     },
     gruendungZeile: gruendungZeileKurz(zahlen),
+    // Team (N35, Nr. 190): nur für Inhaber — für alle anderen gibt es die Gruppe nicht.
+    team: inhaber ? await ladeTeam(ich) : null,
   }
 }
 
 /**
  * /admin/einstellungen — was die Plattform als Ganzes betrifft (Register N15
  * und K2-Ergänzung, Nr. 93; Mockups admin-einstellungen und
- * admin-mobil-einstellungen). Bearbeitbar ist in diesem Lauf nur die Gruppe
- * Gründungshöfe; Plattform steht nur zum Nachsehen da. Die Gruppe Betrieb
+ * admin-mobil-einstellungen). Bearbeitbar sind die Gruppen Gründungshöfe und
+ * — nur für Inhaber — Team und Rechte (Nr. 190); Plattform steht nur zum Nachsehen da. Die Gruppe Betrieb
  * entfiel mit Nr. 103 (Register N15 geändert): Ein alter Link
  * `?gruppe=betrieb` führt nach Admin › Betrieb, wo der Stripe-Modus jetzt steht.
  */
@@ -58,16 +61,19 @@ export default async function AdminEinstellungenPage({
 }: {
   searchParams: Promise<{ gruppe?: string | string[] }>
 }): Promise<React.JSX.Element> {
-  await verlangeAdminSeite()
+  const ich = await verlangeAdminSeite()
 
   const { gruppe } = await searchParams
   if (gruppe === 'betrieb') redirect(ADMIN_BETRIEB_HREF)
   const gewaehlt = einstellungenGruppeSchema.parse(gruppe)
+  // Team nur für Inhaber (N35): dieselbe Wache mit Recht „team“ — sonst zurück zu „Heute“.
+  if (gewaehlt === 'team') await verlangeAdminSeite({ recht: 'team' })
+  const inhaber = (await prisma.user.findUnique({ where: { id: ich }, select: { adminInhaber: true } }))?.adminInhaber === true
   const jetzt = new Date()
 
   let daten: EinstellungenDaten | null = null
   try {
-    daten = await ladeDaten(gewaehlt, jetzt)
+    daten = await ladeDaten(gewaehlt, jetzt, ich, inhaber)
   } catch (err) {
     Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'einstellungen' } })
   }

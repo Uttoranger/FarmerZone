@@ -16,6 +16,7 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { BarBestaetigenKnoepfe } from '@/components/checkout/bar-bestaetigen-knoepfe'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
+import { hofSichtbar } from '@/lib/hof-sichtbar'
 
 interface Props {
   params: Promise<{ farmSlug: string; token: string }>
@@ -72,7 +73,7 @@ export default async function BarBestaetigenSeite({ params }: Props) {
       pickupTimeEnd: true,
       totalAmount: true,
       serviceFeeCents: true,
-      farm: { select: { slug: true, name: true, address: true, postalCode: true, city: true, archivedAt: true } },
+      farm: { select: { slug: true, name: true, address: true, postalCode: true, city: true, archivedAt: true, geschlossenAm: true } },
       items: {
         select: {
           productName: true,
@@ -86,7 +87,7 @@ export default async function BarBestaetigenSeite({ params }: Props) {
   })
   // Fremde Hofadresse oder stillgelegter Hof: wie ein unbekannter Token —
   // die Seite verrät nicht, ob es die Bestellung gibt.
-  if (!order || order.farm.slug !== farmSlug || order.farm.archivedAt) return <LinkUngueltig />
+  if (!order || order.farm.slug !== farmSlug || !hofSichtbar(order.farm)) return <LinkUngueltig />
 
   const jetzt = new Date()
   const ansicht = barBestaetigungsAnsicht(order, jetzt)

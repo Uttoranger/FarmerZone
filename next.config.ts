@@ -10,7 +10,7 @@ import { CSP_BERICHT_GRUPPE, CSP_HEADER, NIE_MELDEN_PARAMETER, NIE_MELDEN_PFADE,
 // einen dieser Slugs bekommt (tests/reservierte-slugs.test.ts).
 const KEINE_HOFSEITE = [
   'account', 'admin', 'agb', 'analytics', 'api', 'app', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
-  'farm-page', 'fehler-melden', 'forgot-password', 'fuer-hoefe', 'hoefe', 'impressum', 'intern', 'konditionen',
+  'farm-page', 'fehler-melden', 'forgot-password', 'fuer-hoefe', 'hoefe', 'impressum', 'intern', 'konditionen', 'konto',
   'login', 'meldungen', 'onboarding', 'orders', 'postfach', 'problem-melden', 'products', 'region', 'register',
   'reset-password', 'sales', 'settings', 'sicherheit', 'startseite-vorschau', 'status', 'teilen', 'verify',
 ];
@@ -213,6 +213,16 @@ const nextConfig: NextConfig = {
         // „Neue Anmeldung" trägt einen Einmal-Token (?t=) — gleiche Regel wie
         // /verify: kein Referrer beim Klick hinaus, kein Suchindex.
         source: '/sicherheit/:pfad*',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
+        // „Neue Anmelde-Adresse bestätigen" (N36, Nr. 190): Der Link aus der
+        // Mail an die neue Adresse trägt einen Einmal-Token (?t=) — gleiche
+        // Regel wie /sicherheit: kein Referrer beim Klick hinaus, kein Suchindex.
+        source: '/konto/:pfad*',
         headers: [
           { key: 'Referrer-Policy', value: 'no-referrer' },
           { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
