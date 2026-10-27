@@ -40,6 +40,8 @@ import { RECHNUNGSANGABEN_FEHLEN_ART, monatsGrenzen } from '@/server/queries/pla
  *     („bezahlt außerhalb“) und Rechnung bar (Lastschrift oder Überweisung).
  *     0 € bekommt keine Rechnung. Idempotent: gespeicherte Rechnungs-Kennungen
  *     und Stripe-Idempotenzschlüssel `abr-<farmId>-<yyyy-mm>-bar|online`.
+ *     Ändert sich der Weg, während die Rechnung bar im Entwurf liegt (Mandat
+ *     entfernt, neu oder geändert), wird der Entwurf ersetzt (bereiteRechnungVor).
  *  3. Rechnungsangaben (Firma, UID) kommen aus dem Stripe-Dashboard; fehlen
  *     sie, steht eine Warnung an (Sentry und Heute), kein Abbruch.
  *  4. Jede Abrechnung, die noch im Entwurf steht (gleich welcher Monat), wird
@@ -224,7 +226,19 @@ async function vorhandenePositionen(rechnungId: string): Promise<Set<string>> {
   }
 }
 
-type RechnungBereit = { id: string; status: 'draft' | 'open' | 'paid' } | null
+type Einzug = NonNullable<Stripe.InvoiceCreateParams['collection_method']>
+
+/**
+ * `schluessel` ist die Basis der Idempotenzschlüssel für alles, was an DIESER
+ * Rechnung hängt (Positionen, Finalisieren, Senden, „bezahlt außerhalb“);
+ * `einzug` ist der Weg, mit dem die Rechnung wirklich angelegt ist.
+ */
+type RechnungBereit = { id: string; status: 'draft' | 'open' | 'paid'; schluessel: string; einzug: Einzug } | null
+
+/** Stripe kennt die Rechnung nicht (mehr) — etwa nach einem Abbruch zwischen Löschen und Speichern. */
+function fehltBeiStripe(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'resource_missing'
+}
 
 /**
  * Bringt EINE Stripe-Rechnung bis vor das Finalisieren. Ohne gespeicherte
@@ -232,7 +246,17 @@ type RechnungBereit = { id: string; status: 'draft' | 'open' | 'paid' } | null
  * mit Kennung macht der Lauf mit derselben Rechnung weiter. Im Entwurf werden
  * fehlende Positionen nachgezogen (je Schlüssel einmal) und der Betrag gegen
  * die Summe geprüft: weicht er ab, Warnung und null — nie eine Teilsumme
- * finalisieren. Schon finalisiert: Status zurück, nichts mehr angefasst.
+ * finalisieren. Schon finalisiert: Status und Weg zurück, nichts mehr angefasst.
+ *
+ * Wegwechsel: Passt der Weg eines Entwurfs (`collection_method`, bei
+ * Lastschrift auch das Zahlungsmittel) nicht mehr zum aktuellen (Mandat
+ * entfernt, neu oder geändert), wird der Entwurf gelöscht — nur
+ * ein Entwurf, nie eine finalisierte Rechnung — und neu angelegt, mit dem
+ * Zusatz `-ersetzt-<alte Kennung>` an jedem Schlüssel: Stripe kennt die alten
+ * Schlüssel 24 Stunden und gäbe sonst die gelöschte Rechnung und ihre Posten
+ * zurück. Lässt sich der Entwurf nicht löschen, Warnung und null; er bleibt.
+ * Fehlt die gespeicherte Rechnung bei Stripe (Abbruch nach dem Löschen), wird
+ * sie mit demselben Ersatz-Schlüssel neu angelegt.
  */
 async function bereiteRechnungVor(
   basis: string,
@@ -244,29 +268,61 @@ async function bereiteRechnungVor(
   speichere: (id: string) => Promise<void>,
   extra: Record<string, string>
 ): Promise<RechnungBereit> {
-  let id = gespeichert
-  let schonDa = new Set<string>()
-  if (!id) {
+  const einzug: Einzug = parameter.collection_method ?? 'charge_automatically'
+  const lege = async (schluessel: string): Promise<string> => {
     const rechnung = await stripe.invoices.create(
       { customer: kunde, currency: 'eur', pending_invoice_items_behavior: 'exclude', auto_advance: false, ...parameter },
-      { idempotencyKey: basis }
+      { idempotencyKey: schluessel }
     )
-    id = rechnung.id
-    await speichere(id)
+    await speichere(rechnung.id)
+    return rechnung.id
+  }
+  let id: string
+  let schluessel = basis
+  let schonDa = new Set<string>()
+  if (!gespeichert) {
+    id = await lege(basis)
   } else {
-    const vorhanden = await stripe.invoices.retrieve(id)
-    if (vorhanden.status === 'open' || vorhanden.status === 'paid') return { id, status: vorhanden.status }
-    if (vorhanden.status !== 'draft') {
+    let vorhanden: Stripe.Invoice | null
+    try {
+      vorhanden = await stripe.invoices.retrieve(gespeichert)
+    } catch (err) {
+      if (!fehltBeiStripe(err)) throw err
+      vorhanden = null
+    }
+    if (vorhanden && (vorhanden.status === 'open' || vorhanden.status === 'paid')) {
+      return { id: gespeichert, status: vorhanden.status, schluessel, einzug: vorhanden.collection_method }
+    }
+    if (vorhanden && vorhanden.status !== 'draft') {
       warnung('Monatsabrechnung: Rechnung weder Entwurf noch offen oder bezahlt — nicht weiter bearbeitet', 'rechnung-stand', { ...extra, status: vorhanden.status ?? 'unbekannt' })
       return null
     }
-    schonDa = await vorhandenePositionen(id)
+    // Gleicher Weg heißt auch: dasselbe SEPA-Zahlungsmittel — nach „Lastschrift ändern“ zöge Stripe sonst über das alte Mandat ein.
+    const gleicherWeg =
+      vorhanden !== null &&
+      vorhanden.collection_method === einzug &&
+      (parameter.default_payment_method === undefined || kennung(vorhanden.default_payment_method) === parameter.default_payment_method)
+    if (vorhanden && gleicherWeg) {
+      id = gespeichert
+      schonDa = await vorhandenePositionen(id)
+    } else {
+      if (vorhanden) {
+        try {
+          await stripe.invoices.del(gespeichert)
+        } catch (err) {
+          warnung('Monatsabrechnung: Einzugsweg geändert, Entwurf ließ sich nicht löschen — bleibt stehen', 'rechnung-wegwechsel', { ...extra, einzug }, err)
+          return null
+        }
+      }
+      schluessel = `${basis}-ersetzt-${gespeichert}`
+      id = await lege(schluessel)
+    }
   }
   for (const p of positionen) {
     if (schonDa.has(p.schluessel)) continue
     await stripe.invoiceItems.create(
       { customer: kunde, invoice: id, currency: 'eur', amount: p.cents, description: p.text, metadata: { schluessel: p.schluessel } },
-      { idempotencyKey: `${basis}-pos-${p.schluessel}` }
+      { idempotencyKey: `${schluessel}-pos-${p.schluessel}` }
     )
   }
   const geprueft = await stripe.invoices.retrieve(id)
@@ -274,7 +330,7 @@ async function bereiteRechnungVor(
     warnung('Monatsabrechnung: Rechnungsbetrag weicht von der Summe ab — nicht finalisiert', 'rechnung-betrag', { ...extra, rechnungCents: geprueft.total, sollCents })
     return null
   }
-  return { id, status: 'draft' }
+  return { id, status: 'draft', schluessel, einzug }
 }
 
 export type HofErgebnis = { farmId: string; monat: string; stand: string; neu: boolean }
@@ -327,14 +383,16 @@ export async function rechneHofAb(hof: HofFuerAbrechnung, monat: string, jetzt: 
       { farmId: hof.id, monat, art: 'online' }
     )
     if (!online) return imEntwurf
-    if (online.status === 'draft') await stripe.invoices.finalizeInvoice(online.id, { auto_advance: false }, { idempotencyKey: `${basis}-online-fertig` })
-    if (online.status !== 'paid') await stripe.invoices.pay(online.id, { paid_out_of_band: true }, { idempotencyKey: `${basis}-online-bezahlt` })
+    if (online.status === 'draft') await stripe.invoices.finalizeInvoice(online.id, { auto_advance: false }, { idempotencyKey: `${online.schluessel}-fertig` })
+    if (online.status !== 'paid') await stripe.invoices.pay(online.id, { paid_out_of_band: true }, { idempotencyKey: `${online.schluessel}-bezahlt` })
   }
 
   // Rechnung bar: 0 € → keine Rechnung.
   if (summen.barCents === 0) {
-    // Bedingt: ein paralleler Lauf oder Webhook hat den Stand vielleicht schon weitergesetzt.
-    await prisma.monatsabrechnung.updateMany({ where: { id, stand: 'entwurf' }, data: { stand: 'nichts' } })
+    // Bedingt: ein paralleler Lauf oder Webhook hat den Stand vielleicht schon weitergesetzt —
+    // dann kein Protokoll und der echte Stand zurück, nicht „neu“.
+    const { count } = await prisma.monatsabrechnung.updateMany({ where: { id, stand: 'entwurf' }, data: { stand: 'nichts' } })
+    if (count !== 1) return { farmId: hof.id, monat, stand: await standJetzt(id), neu: false }
     await protokolliere({ wer: null, art: 'monatsabrechnung_erstellt', bezugArt: 'hof', bezugId: hof.id, mitPasskey: false, grund: `Monatsabrechnung ${monat}: bar nichts fällig` })
     return { farmId: hof.id, monat, stand: 'nichts', neu: true }
   }
@@ -366,14 +424,25 @@ export async function rechneHofAb(hof: HofFuerAbrechnung, monat: string, jetzt: 
     { farmId: hof.id, monat, art: 'bar' }
   )
   if (!bar) return imEntwurf
+  // Es zählt der Weg, mit dem die Rechnung wirklich angelegt ist — bei einer schon finalisierten
+  // kann er vom aktuellen abweichen; senden lässt sich nur eine Rechnung zur Überweisung.
+  const lastschrift = bar.einzug === 'charge_automatically'
   // Lastschrift: Stripe zieht nach dem Finalisieren selbst ein (auto_advance). Überweisung: die Rechnung geht per Mail.
-  if (bar.status === 'draft') await stripe.invoices.finalizeInvoice(bar.id, { auto_advance: weg === 'lastschrift' }, { idempotencyKey: `${basis}-bar-fertig` })
-  if (weg === 'ueberweisung' && bar.status !== 'paid') await stripe.invoices.sendInvoice(bar.id, {}, { idempotencyKey: `${basis}-bar-senden` })
+  if (bar.status === 'draft') await stripe.invoices.finalizeInvoice(bar.id, { auto_advance: lastschrift }, { idempotencyKey: `${bar.schluessel}-fertig` })
+  if (!lastschrift && bar.status !== 'paid') await stripe.invoices.sendInvoice(bar.id, {}, { idempotencyKey: `${bar.schluessel}-senden` })
   // offenSeit zählt die Tage bis zur Sperre: bei Überweisung ab dem Senden, bei Lastschrift erst ab dem ersten Fehlschlag.
-  // Bedingt auf „entwurf“: ein schneller Webhook (bezahlt, gescheitert) wird nicht überschrieben.
-  await prisma.monatsabrechnung.updateMany({ where: { id, stand: 'entwurf' }, data: { stand: 'offen', offenSeit: weg === 'ueberweisung' ? jetzt : null } })
-  await protokolliere({ wer: null, art: 'monatsabrechnung_erstellt', bezugArt: 'hof', bezugId: hof.id, mitPasskey: false, grund: `Monatsabrechnung ${monat}: ${weg === 'lastschrift' ? 'Lastschrift' : 'Überweisung'}` })
+  // Bedingt auf „entwurf“: ein schneller Webhook (bezahlt, gescheitert) wird nicht überschrieben — dann
+  // kein Protokoll und der echte Stand zurück.
+  const { count } = await prisma.monatsabrechnung.updateMany({ where: { id, stand: 'entwurf' }, data: { stand: 'offen', offenSeit: lastschrift ? null : jetzt } })
+  if (count !== 1) return { farmId: hof.id, monat, stand: await standJetzt(id), neu: false }
+  await protokolliere({ wer: null, art: 'monatsabrechnung_erstellt', bezugArt: 'hof', bezugId: hof.id, mitPasskey: false, grund: `Monatsabrechnung ${monat}: ${lastschrift ? 'Lastschrift' : 'Überweisung'}` })
   return { farmId: hof.id, monat, stand: 'offen', neu: true }
+}
+
+/** Der Stand, wie er jetzt gespeichert ist — nach einem bedingten Schreiben, das nichts traf. */
+async function standJetzt(id: string): Promise<string> {
+  const jetzt = await prisma.monatsabrechnung.findUnique({ where: { id }, select: { stand: true } })
+  return jetzt?.stand ?? 'entwurf'
 }
 
 /**

@@ -263,6 +263,9 @@ export const LASTSCHRIFT_TEXT = {
   heuteTitel: 'Barzahlung ist pausiert',
   heuteSatz: (monat: string): string =>
     `Die Plattformgebühr für ${monat} ist noch offen. Bis sie bezahlt ist, nehmen wir bei dir keine Barbestellungen an – laufende Bestellungen bleiben.`,
+  /** Nach einer Rückbuchung ist die Rechnung bezahlt — es gibt nichts zu bezahlen, das Team klärt es. */
+  zurueckgebuchtSatz: (monat: string): string => `Die Lastschrift für ${monat} wurde zurückgebucht. Barzahlung ist pausiert – das Team meldet sich bei dir.`,
+  zumPostfach: 'Zum Postfach',
 } as const
 
 /** Die Postfach-Nachricht vier Wochen vor dem Einzugsbeginn (N38, „Start“). */

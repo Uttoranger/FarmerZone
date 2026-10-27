@@ -16,7 +16,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const stripeAttrappe = vi.hoisted(() => ({
   customers: { create: vi.fn() },
-  invoices: { create: vi.fn(), finalizeInvoice: vi.fn(), pay: vi.fn(), sendInvoice: vi.fn(), retrieve: vi.fn() },
+  invoices: { create: vi.fn(), finalizeInvoice: vi.fn(), pay: vi.fn(), sendInvoice: vi.fn(), retrieve: vi.fn(), del: vi.fn() },
   invoiceItems: { create: vi.fn(), list: vi.fn() },
 }))
 vi.mock('@/lib/stripe', () => ({ stripe: stripeAttrappe }))

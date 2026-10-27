@@ -131,15 +131,25 @@ export async function ladeBarzahlung(farmId: string, jetzt: Date): Promise<Barza
   }
 }
 
-/** Hof › Heute: die offene Abrechnung, die bar sperrt — für die Karte „Jetzt bezahlen“; sonst null. */
-export async function ladeSperrKarte(farmId: string, jetzt: Date): Promise<{ abrechnungId: string; monatText: string } | null> {
+export type SperrKarte = { abrechnungId: string; monatText: string; stand: 'offen' | 'gescheitert' | 'zurueckgebucht' }
+
+/**
+ * Hof › Heute: die Abrechnung, die bar sperrt — für die Karte „Barzahlung ist
+ * pausiert“; sonst null. Eine zurückgebuchte geht vor: Ihre Rechnung ist schon
+ * bezahlt, und solange sie steht, höbe das Bezahlen einer offenen die Pause
+ * nicht auf — die Karte zeigt dann keinen Knopf, sondern den Weg ins Postfach.
+ */
+export async function ladeSperrKarte(farmId: string, jetzt: Date): Promise<SperrKarte | null> {
   const [hof, abrechnungen] = await Promise.all([
     prisma.farm.findUnique({ where: { id: farmId }, select: { barSperreNachTagen: true } }),
     prisma.monatsabrechnung.findMany({ where: { farmId, stand: { in: ['offen', 'gescheitert', 'zurueckgebucht'] } }, orderBy: { monat: 'asc' }, select: { id: true, monat: true, stand: true, offenSeit: true, rechnungBarId: true } }),
   ])
   if (!hof) return null
-  const sperrend = abrechnungen.find((a) => a.rechnungBarId && abrechnungSperrtBar([a], hof.barSperreNachTagen, jetzt))
-  return sperrend ? { abrechnungId: sperrend.id, monatText: monatText(monatSchluessel(sperrend.monat)) } : null
+  const sperrende = abrechnungen.filter((a) => a.rechnungBarId && abrechnungSperrtBar([a], hof.barSperreNachTagen, jetzt))
+  const sperrend = sperrende.find((a) => a.stand === 'zurueckgebucht') ?? sperrende[0]
+  if (!sperrend) return null
+  const stand = sperrend.stand === 'zurueckgebucht' || sperrend.stand === 'gescheitert' ? sperrend.stand : 'offen'
+  return { abrechnungId: sperrend.id, monatText: monatText(monatSchluessel(sperrend.monat)), stand }
 }
 
 export type AkteDaten = {

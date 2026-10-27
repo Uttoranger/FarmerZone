@@ -2,10 +2,10 @@
 
 import { headers } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
-import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { LASTSCHRIFT_TEXT } from '@/lib/konditionen'
+import { rechnungSchema } from '@/schemas/plattformgebuehr'
 
 /*
  * Lastschrift und Monatsrechnungen des Hofs (Register N38, Nr. 198). Nur für
@@ -52,12 +52,6 @@ export async function starteLastschrift(): Promise<LastschriftStart> {
     return { error: LASTSCHRIFT_TEXT.fehler }
   }
 }
-
-const rechnungSchema = z.object({
-  abrechnungId: z.string().regex(/^[\w-]{1,64}$/),
-  art: z.enum(['bar', 'online']),
-  ziel: z.enum(['pdf', 'bezahlen']),
-})
 
 /**
  * Die Rechnung als PDF bzw. die gehostete Seite „Jetzt bezahlen“ — erst beim
