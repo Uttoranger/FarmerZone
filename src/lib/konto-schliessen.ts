@@ -29,10 +29,9 @@ export async function zaehleOffenesFuerSchliessen(
   farmId: string,
   db: Pick<Prisma.TransactionClient, 'order'> = prisma
 ): Promise<{ bestellungen: number; erstattungen: number }> {
-  const [bestellungen, erstattungen] = await Promise.all([
-    db.order.count({ where: { farmId, status: { in: [...OFFENE_BESTELL_STAENDE] } } }),
-    db.order.count({ where: { farmId, erstattungOffenSeit: { not: null } } }),
-  ])
+  // Nacheinander: `db` kann der Transaktions-Client sein (tests/transaktion-nacheinander.test.ts).
+  const bestellungen = await db.order.count({ where: { farmId, status: { in: [...OFFENE_BESTELL_STAENDE] } } })
+  const erstattungen = await db.order.count({ where: { farmId, erstattungOffenSeit: { not: null } } })
   return { bestellungen, erstattungen }
 }
 

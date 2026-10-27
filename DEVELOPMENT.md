@@ -6046,6 +6046,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Sperre durch das Team (N34):** `sperreHof`/`hebeHofSperreAuf` (Recht `hof_sperren_storno`, frisch mit Passkey, Protokoll `hof_gesperrt`/`hof_sperre_aufgehoben` mit Grund) setzen `Farm.adminGesperrtAm`, `adminSperrGrund`, `adminGesperrtVonUserId` bedingt. Die Prüfkette lehnt direkt nach der Freischaltung ab, mit dem neutralen Satz „Bestellen ist bei diesem Hof gerade nicht möglich.“; `/api/checkout` prüft an derselben Stelle selbst (es geht nicht durch `pruefeKaufbarkeitHof`). Hofseite, Produktseite und Kasse zeigen den Satz über `kaufSperre` → `gesperrt`, der Korb über die Meldung von `/api/warenkorb/pruefen`. Der Hof bekommt eine SYSTEM-Nachricht im Postfach und in Heute eine Karte; die Pause bleibt unabhängig, und kein Weg des Hofs schreibt die Sperre (Wache in tests/admin-hof-sperre.test.ts).
 - **Warum der Satz fest ist:** Das Schema aus Nr. 188 hat nur den Grund; ein eigener Satz je Hof bräuchte ein Feld. Der Grund bleibt im Admin und im Postfach des Hofs, die Kundschaft liest nur den neutralen Satz.
 
+## Konto-Anfragen und Team mit Rechten je Person (Register N35, N36; Nr. 190, Lauf 26, 27.10.2026)
+
+- **Team:** Einstellungen › Team und Rechte nur für Inhaber. Einladen, Rechte, Inhaber, Entfernen je mit Passkey, Mail an die Person und Protokoll; alles unter einer Datenbank-Sperre, damit sich zwei Inhaber nicht gleichzeitig gegenseitig das Recht nehmen. Der letzte Inhaber bleibt.
+- **Warum die neue Adresse nicht im Link steht:** Eine Adresse in der URL landet in Logs und Verläufen; die Datenbank kennt nur ihren HMAC im Zweck des Einmal-Links. Darum tippt die Person sie auf der Bestätigungsseite noch einmal.
+- **Schließen:** Stufe 1 nimmt die Hofseite offline wie die Stilllegung — die Leser fragen jetzt alle `hofSichtbar` statt `archivedAt` allein. Stufe 2 ist gebaut, läuft aber erst, wenn die Projektleitung die Liste nach Rückmeldung der Anwältin freigibt (`ENDGUELTIG_FREIGEGEBEN`).
+- **Notfallzugang:** nicht gebaut. Ersatzcodes für eine Vertrauensperson mit Zweck „notfall“ brauchen entweder ein Feld am Ersatzcode oder eine Änderung am Ersatzcode-Endpunkt in `src/lib/auth.ts` (Sicherheitsmail an alle Inhaber beim Einlösen); beides lag außerhalb der Freigabe (Bericht 190).
+
 ## Nützliche Befehle
 
 ```bash

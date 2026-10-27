@@ -488,6 +488,8 @@ describe('kein Big Bang', () => {
     '(auth)/reset-password/page.tsx',
     // Nr. 114: „Das war ich nicht" (neu, KundeShell ohne Unterleiste wie die Bestätigungsseite).
     'sicherheit/nicht-ich/page.tsx',
+    // Nr. 190: „Neue Anmelde-Adresse bestätigen“ (neu, wie „Das war ich nicht“).
+    'konto/email-bestaetigen/page.tsx',
     // Nr. 120: erst nur der Seitenfuß (KundeFuss, Register N22); seit Nr. 181 trägt die Seite die KundeShell (KundeShellMitSitzung).
     '(public)/datenschutz/page.tsx',
     // Nr. 182: die Vorschau der Startseite (eigene dynamische Route) — dieselbe KundeShell wie die Startseite.

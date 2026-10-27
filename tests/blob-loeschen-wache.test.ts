@@ -28,6 +28,10 @@ const WEGE: Record<string, { aufrufe: number; grund: string }> = {
     aufrufe: 1,
     grund: 'deleteFarmPhotoAction löscht erst die Zeile FarmPhoto (Besitz geprüft), dann den Blob dieses Fotos — danach zeigt nichts mehr auf ihn.',
   },
+  'src/lib/konto-schliessen.ts': {
+    aufrufe: 1,
+    grund: 'Stufe 2 von „Konto schließen“ (N36, Nr. 190, nur mit ENDGUELTIG_FREIGEGEBEN): erst sind in einer Transaktion alle Zeilen weg, die auf die Bilder des Hofs zeigen (Fotos, Logo, Titelbild, Produktbilder, Meldungen), dann leert sie die Ordner des Hofs.',
+  },
   'src/app/api/cron/briefkasten/route.ts': {
     aufrufe: 1,
     grund: 'Der Wochenlauf löscht die Screenshots der Meldungen, die er im selben Lauf löscht; auf einen Screenshot zeigt nur seine Meldung.',

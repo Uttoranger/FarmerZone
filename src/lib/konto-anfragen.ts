@@ -1,5 +1,6 @@
 import type { OrderStatus } from '@prisma/client'
 import { MARKE } from '@/lib/marke'
+import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 
 /*
  * Konto-Anfragen eines Hofs im Admin (Register N36, Nachtlauf Nr. 190; Mockups
@@ -183,5 +184,5 @@ export const EMAIL_GEAENDERT_MAIL = {
   satz: (wann: string): string => `am ${wann} wurde die Anmelde-Adresse deines Kontos geändert. Alle Geräte sind abgemeldet.`,
   warstDu: 'Hast du das beim Team angefragt? Dann musst du nichts tun.',
   knopf: 'Das war ich nicht',
-  fuss: `Der Knopf öffnet eine Seite bei ${MARKE} – erst dort meldest du alle Geräte ab. Schreib uns danach über „Problem melden“. Wir fragen dich nie per Mail nach deinem Passwort.`,
+  fuss: `Der Knopf öffnet eine Seite bei ${MARKE} – erst dort meldest du alle Geräte ab. Schreib uns danach über „${PROBLEM_MELDEN}“. Wir fragen dich nie per Mail nach deinem Passwort.`,
 } as const

@@ -18,5 +18,3 @@ export function hofSichtbar(hof: { archivedAt: Date | null; geschlossenAm: Date 
   return !hof.archivedAt && !hof.geschlossenAm
 }
 
-/** Was ein Leser dafür auswählen muss. */
-export const HOF_SICHTBAR_FELDER = { archivedAt: true, geschlossenAm: true } as const satisfies Prisma.FarmSelect
