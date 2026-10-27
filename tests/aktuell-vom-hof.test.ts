@@ -30,6 +30,8 @@ vi.mock('react', async (importOriginal) => {
       // Nur der Zustand „offen“ der Karten ist ein Wahrheitswert.
       return [(typeof wert === 'boolean' ? stand.offen : wert) as T, () => {}]
     },
+    // Direkt aufgerufene Komponenten haben keinen Rahmen: der Vorgabewert (Preisanzeige, N38: null).
+    useContext: <T,>(kontext: import('react').Context<T>): T => (kontext as unknown as { _currentValue: T })._currentValue,
   }
 })
 vi.mock('next/image', () => ({

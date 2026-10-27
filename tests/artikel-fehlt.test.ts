@@ -67,6 +67,7 @@ describe('artikelFehltRechnung — Beispiele aus der Freigabe (E14)', () => {
       erstattungCents: 0,
       vomHofCents: 0,
       monatsabrechnung: true,
+      gebuehrWort: 'Servicegebühr',
     })
   })
 

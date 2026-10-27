@@ -92,9 +92,12 @@ const STAND_AUSWAHL = {
   serviceFeeCents: true,
   serviceFeePercentApplied: true,
   serviceFeeMinCentsApplied: true,
+  // N38 (Nr. 197): im Hofpreis-Modell zieht „Artikel fehlt“ die Gebühr der Position ab.
+  gebuehrModell: true,
+  gebuehrEinzug: true,
   erstattetCents: true,
   createdAt: true,
-  items: { select: { id: true, totalPrice: true, fehltSeit: true } },
+  items: { select: { id: true, totalPrice: true, fehltSeit: true, gebuehrCents: true } },
 } satisfies Prisma.OrderSelect
 
 type Gebucht = { positionId: string; rechnung: ArtikelFehltTeil; erstattetCents: number; rueckbuchungOffen: boolean }
@@ -131,7 +134,9 @@ export async function meldeFehlendenArtikel(eingabe: {
         serviceFeeMinCentsApplied: stand.serviceFeeMinCentsApplied,
         erstattetCents: stand.erstattetCents,
         bestelltAm: stand.createdAt,
-        positionen: stand.items.map((i) => ({ id: i.id, betragCents: alsCents(i.totalPrice), fehlt: i.fehltSeit !== null })),
+        gebuehrModell: stand.gebuehrModell,
+        gebuehrEinzug: stand.gebuehrEinzug,
+        positionen: stand.items.map((i) => ({ id: i.id, betragCents: alsCents(i.totalPrice), fehlt: i.fehltSeit !== null, gebuehrCents: i.gebuehrCents })),
       }
 
       // Vorprüfung ohne Stripe: Fremde Position, falscher Status, nicht bezahlt

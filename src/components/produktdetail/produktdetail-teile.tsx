@@ -1,6 +1,9 @@
 'use client'
 
 import Link from 'next/link'
+import { usePreisAnzeige } from '@/components/shared/preis-anzeige'
+import { endpreisEuro } from '@/lib/plattformgebuehr'
+import { PREISE_INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
 import { ChevronDown, Plus } from 'lucide-react'
 import type { PublicProduct } from '@/server/queries/farm'
 import { formatGrundpreis } from '@/lib/format'
@@ -79,6 +82,7 @@ export function GleichMitAbholen({
   wirdHinzugefuegt: string | null
   onInDenKorb: (p: PublicProduct) => void
 }): React.JSX.Element | null {
+  const anzeige = usePreisAnzeige()
   if (produkte.length === 0) return null
   return (
     <section aria-labelledby="gleich-mit-abholen" className="flex flex-col gap-3">
@@ -86,7 +90,8 @@ export function GleichMitAbholen({
         <h2 id="gleich-mit-abholen" className="font-heading text-[19px] font-semibold text-foreground">
           Gleich mit abholen
         </h2>
-        <p className="text-[12.5px] text-muted-foreground">Eine Bestellung, eine Gebühr</p>
+        {/* Im Hofpreis-Modell (N38) steckt die Gebühr je Stück im Preis — „eine Gebühr“ stimmte dann nicht. */}
+        <p className="text-[12.5px] text-muted-foreground">{anzeige ? PREISE_INKL_PLATTFORMGEBUEHR : 'Eine Bestellung, eine Gebühr'}</p>
       </div>
       <ul className="grid gap-3 sm:grid-cols-3">
         {produkte.map((p) => {
@@ -104,7 +109,7 @@ export function GleichMitAbholen({
                   {p.name}
                 </Link>
                 <div className="mt-auto flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold text-foreground">{formatGrundpreis(p.price, p.unit, p.unitSize)}</span>
+                  <span className="text-sm font-semibold text-foreground">{formatGrundpreis(endpreisEuro(p.price, anzeige), p.unit, p.unitSize)}</span>
                   <span className="flex-1" />
                   {mitFamilie(p) ? (
                     <Link

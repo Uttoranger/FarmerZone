@@ -11,6 +11,8 @@ import { kassenVorbelegung } from '@/lib/kasse'
 import { kaufSperre } from '@/lib/bereiche-anzeige'
 import { KAEUFER_PARAMETER, leseKaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 import { TESTBETRIEB } from '@/lib/umgebung-server'
+import { prisma } from '@/lib/prisma'
+import { HOF_FUER_GEBUEHR_LAGE, ladeBarMoeglich } from '@/server/queries/plattform-einstellung'
 
 interface Props {
   params: Promise<{ farmSlug: string }>
@@ -54,6 +56,10 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
     ausgebuchteTage([farm.id], jetzt),
   ])
   const voll = volleTage.get(farm.id)
+  // N38 (Nr. 197): Bar nur, wenn die Plattformgebühr einen Weg zur Plattform hat (barMoeglich) —
+  // dieselbe Lage wie /api/checkout; sonst bietet die Kasse nur online an. Ohne Zeile: wie bisher.
+  const gebuehrHof = await prisma.farm.findUnique({ where: { id: farm.id }, select: HOF_FUER_GEBUEHR_LAGE })
+  const barMoeglich = gebuehrHof ? await ladeBarMoeglich(gebuehrHof, jetzt) : true
   // Die Kaufsperre (Register N24) einmal hier, aus derselben Zählung wie die ausgegrauten Termine —
   // das Formular rechnet sie nicht selbst. Verbindlich bleibt /api/checkout.
   const sperre = kaufSperre({ isPaused: farm.isPaused, pickupSlots: farm.pickupSlots.map((s) => alsAbholFenster(s, voll)) }, jetzt)
@@ -73,6 +79,7 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
       ausgebuchteAbholfenster={ausgebuchteSchluessel(voll)}
       sperre={sperre}
       testbetrieb={TESTBETRIEB}
+      barMoeglich={barMoeglich}
     />
   )
 }

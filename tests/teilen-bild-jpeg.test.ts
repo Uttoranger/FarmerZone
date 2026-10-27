@@ -116,7 +116,8 @@ describe('GET /[farmSlug]/opengraph-image — JPEG statt PNG (Register T7)', () 
     expect(res.status).toBe(503)
     expect(res.headers.get('cache-control')).toBe('no-store')
     expect(res.headers.get('content-type')).not.toBe('image/jpeg')
-    const [, kontext] = vi.mocked(Sentry.captureException).mock.calls[0]
+    // Nur die Meldung des Bilds zählt (ohne Cache im Test meldet auch die Preisanzeige, N38).
+    const kontext = vi.mocked(Sentry.captureException).mock.calls.map(([, k]) => k).find((k) => JSON.stringify(k).includes('teilen-bild'))
     expect(kontext).toEqual({ tags: { bereich: 'teilen-bild', farmId: 'farm-1', slug: 'hof-test' } })
   })
 })

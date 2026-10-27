@@ -25,7 +25,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 const korb = vi.hoisted(() => ({ positionen: [] as unknown[] }))
 const NICHT_GEFUNDEN = vi.hoisted(() => new Error('NEXT_NOT_FOUND'))
 
-vi.mock('@/lib/prisma', () => ({ prisma: {} }))
+// N38 (Nr. 197): Die Kasse liest die Gebührenlage des Hofs — ohne Zeile bleibt bar, wie es ist.
+vi.mock('@/lib/prisma', () => ({ prisma: { farm: { findUnique: vi.fn(async () => null) } } }))
 vi.mock('@/server/hofseite-vorschau', () => ({ ladeHofseiteGeteilt: vi.fn() }))
 // Die Prüfung vor dem Streamen (Nr. 117) prüft tests/hofseite-404.test.ts; hier ist der Hof öffentlich.
 vi.mock('@/server/queries/seo', () => ({

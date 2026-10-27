@@ -27,6 +27,7 @@ import {
   type GruendungZahlen,
 } from '@/lib/gruendungshof'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
+import type { HofpreisEinstellung } from '@/lib/plattformgebuehr'
 import { MARKE } from '@/lib/marke'
 import { PRODUKTION_HOST } from '@/lib/umgebung'
 
@@ -51,6 +52,12 @@ export type PlattformEinstellung = {
   gruendungAktionBisTag: string | null
   /** Wann die Zusagen festgeschrieben wurden (ISO-Text); null = noch nicht — alles wie vor Nr. 116. */
   gruendungFestAm: string | null
+  /**
+   * Stichtag „Hofpreis-Modell ab“ (Register N38, Nr. 197) als ISO-Zeitpunkt;
+   * null = Vorgabe `BAR_SERVICEGEBUEHR_AB` (konditionen.ts). Gelesen über
+   * `hofpreisEinstellungAus`, gerechnet nur in plattformgebuehr.ts.
+   */
+  hofpreisModellAb: string | null
   /** Wer zuletzt gespeichert hat; null = noch nie (Seed-Zeile der Migration). */
   geaendertVonUserId: string | null
   /** Zeitpunkt der letzten Änderung als ISO-Text; null ohne Zeile. */
@@ -65,6 +72,7 @@ export const PLATTFORM_EINSTELLUNG_STANDARD: PlattformEinstellung = {
   gruendungMonate: GRUENDUNG_MONATE_STANDARD,
   gruendungAktionBisTag: null,
   gruendungFestAm: null,
+  hofpreisModellAb: null,
   geaendertVonUserId: null,
   geaendertAm: null,
 }
@@ -77,6 +85,7 @@ export const PLATTFORM_EINSTELLUNG_SELECT = {
   gruendungMonate: true,
   gruendungAktionBis: true,
   gruendungFestAm: true,
+  hofpreisModellAb: true,
   geaendertVonUserId: true,
   updatedAt: true,
 } as const
@@ -89,6 +98,7 @@ export function plattformEinstellungAus(zeile: {
   gruendungMonate: number
   gruendungAktionBis: Date | null
   gruendungFestAm: Date | null
+  hofpreisModellAb: Date | null
   geaendertVonUserId: string | null
   updatedAt: Date
 }): PlattformEinstellung {
@@ -99,9 +109,15 @@ export function plattformEinstellungAus(zeile: {
     gruendungMonate: zeile.gruendungMonate,
     gruendungAktionBisTag: zeile.gruendungAktionBis ? kalendertagInWien(zeile.gruendungAktionBis) : null,
     gruendungFestAm: zeile.gruendungFestAm ? zeile.gruendungFestAm.toISOString() : null,
+    hofpreisModellAb: zeile.hofpreisModellAb ? zeile.hofpreisModellAb.toISOString() : null,
     geaendertVonUserId: zeile.geaendertVonUserId,
     geaendertAm: zeile.updatedAt.toISOString(),
   }
+}
+
+/** Was plattformgebuehr.ts braucht (N38): der Stichtag als Date oder null. */
+export function hofpreisEinstellungAus(einstellung: Pick<PlattformEinstellung, 'hofpreisModellAb'>): HofpreisEinstellung {
+  return { hofpreisModellAb: einstellung.hofpreisModellAb ? new Date(einstellung.hofpreisModellAb) : null }
 }
 
 /** Was die Fachregeln in gruendungshof.ts brauchen. */

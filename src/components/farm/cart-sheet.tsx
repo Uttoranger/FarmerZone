@@ -1,6 +1,8 @@
 ﻿'use client'
 
 import type { ComponentProps } from 'react'
+import { usePreisAnzeige } from '@/components/shared/preis-anzeige'
+import { mitEndpreis } from '@/lib/plattformgebuehr'
 import { Info, Minus, Plus, Trash2, ShoppingBasket } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -68,7 +70,12 @@ const LEER_WEG = cn('inline-flex min-h-11 items-center justify-center rounded-fu
 export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHref, onUpdateQuantity, onRemoveItem, gebuehrKorb = null, futterHinweis = [], kaufSperre, hinweis = null }: Props) {
   // Zeilensummen in ganzen Cent auf dem Weg des Checkouts (korbBetraege, wie im Mini-Warenkorb),
   // nie price × Menge in Fließkomma — verbindlich rechnet der Checkout mit den Preisen aus der Datenbank.
-  const { zeilenCents } = korbBetraege(items)
+  // Im Hofpreis-Modell (N38) Endpreise je Stück — die Summe ist dann genau das Gesamt der Kasse.
+  const anzeige = usePreisAnzeige()
+  const angezeigt = items.map((i) => mitEndpreis(i, anzeige))
+  const { zeilenCents, summeCents } = korbBetraege(angezeigt)
+  // Ohne Hofpreis-Modell bleibt die Summe aus dem Korb wie bisher.
+  const gesamt = anzeige ? centsAlsEuro(summeCents) : total
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
@@ -108,7 +115,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
               }
             />
           ) : (
-            items.map((item) => (
+            angezeigt.map((item) => (
               <div key={item.productId} className="flex gap-3 items-center">
                 {/* Image */}
                 <div className="relative shrink-0 w-14 h-14 rounded-lg bg-muted overflow-hidden flex items-center justify-center">
@@ -194,7 +201,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
           <SheetFooter className="px-5 py-4 border-t border-border/50 flex-col gap-3">
             <div className="flex justify-between text-base font-semibold text-foreground">
               <span>Gesamt</span>
-              <span className="tabular-nums">{formatEuro(total)}</span>
+              <span className="tabular-nums">{formatEuro(gesamt)}</span>
             </div>
             <p className="text-xs text-muted-foreground -mt-1">
               {gebuehrKorb ? `${gebuehrKorb[0].toUpperCase()}${gebuehrKorb.slice(1)} · ` : ''}Reservierung gilt {RESERVIERUNG_MINUTEN} Minuten.

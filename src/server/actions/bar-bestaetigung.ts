@@ -58,6 +58,9 @@ function barMailBestellung(order: NonNullable<Awaited<ReturnType<typeof leseBest
     customerPhone: order.customerPhone,
     totalAmount: order.totalAmount,
     serviceFeeCents: order.serviceFeeCents,
+    // N38: im Hofpreis-Modell zeigt der Bestätigungslink Endpreise inkl. Plattformgebühr.
+    gebuehrModell: order.gebuehrModell,
+    gebuehrEinzug: order.gebuehrEinzug,
     // Für die Frist in „Bitte bestätige" und für den Hinweis „bei Barzahlung
     // bis … keine Servicegebühr" in der Mail an den Hof (B1).
     createdAt: order.createdAt,

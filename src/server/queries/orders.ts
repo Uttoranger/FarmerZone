@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { gebuehrFuerMonatsabrechnungJeModell, istHofpreisBestellung } from '@/lib/plattformgebuehr'
 import { stornoBetraege, type StornoBetraege } from '@/lib/storno'
 import { alsCents } from '@/lib/order-totals'
 import { artikelFehltRechnung, type ArtikelFehltErgebnis } from '@/lib/artikel-fehlt'
@@ -17,7 +18,7 @@ import {
 } from '@/lib/hof-bestellungen'
 import { formatPosition } from '@/lib/format'
 import { zeitpunktFuerMail } from '@/lib/fristen'
-import { gebuehrEntfallen, gebuehrErstattungOffen, gebuehrFuerMonatsabrechnung, istVorOrtZahlung } from '@/lib/servicegebuehr'
+import { gebuehrEntfallen, gebuehrErstattungOffen, istVorOrtZahlung } from '@/lib/servicegebuehr'
 import { buildOrderReminderUrl } from '@/lib/whatsapp'
 import type { MarkeArt } from '@/lib/marke-art'
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
@@ -150,6 +151,9 @@ const DETAIL_AUSWAHL = {
   stripePaymentIntentId: true,
   serviceFeePercentApplied: true,
   serviceFeeMinCentsApplied: true,
+  // N38 (Nr. 197): im Hofpreis-Modell zieht „Artikel fehlt“ die Gebühr der Position ab.
+  gebuehrModell: true,
+  gebuehrEinzug: true,
   serviceFeeRefundedAt: true,
   erstattetCents: true,
   items: {
@@ -159,6 +163,7 @@ const DETAIL_AUSWAHL = {
       quantity: true,
       totalPrice: true,
       fehltSeit: true,
+      gebuehrCents: true,
       product: { select: { unit: true, unitSize: true } },
     },
     orderBy: { id: 'asc' },
@@ -205,6 +210,8 @@ export type HofBestellDetail = {
     gebuehrErstattungOffen: boolean
     /** Vor Ort: holt die Monatsabrechnung die Gebühr? (B1: bar vor dem SEPA-Start nicht.) */
     gebuehrFuerAbrechnung: boolean
+    /** N38: Bestellung im Hofpreis-Modell — „Du bekommst … · die Kundin zahlt …“. */
+    hofpreis: boolean
   }
   positionen: HofBestellPosition[]
   storno: StornoBetraege | null
@@ -270,7 +277,9 @@ export async function getHofBestellDetail(
     serviceFeeMinCentsApplied: o.serviceFeeMinCentsApplied,
     erstattetCents: o.erstattetCents,
     bestelltAm: o.createdAt,
-    positionen: o.items.map((i) => ({ id: i.id, betragCents: alsCents(i.totalPrice), fehlt: i.fehltSeit !== null })),
+    gebuehrModell: o.gebuehrModell,
+    gebuehrEinzug: o.gebuehrEinzug,
+    positionen: o.items.map((i) => ({ id: i.id, betragCents: alsCents(i.totalPrice), fehlt: i.fehltSeit !== null, gebuehrCents: i.gebuehrCents })),
   }
   const offenePositionen = o.items.filter((i) => i.fehltSeit === null).length
 
@@ -298,11 +307,15 @@ export async function getHofBestellDetail(
       erstattetCents: o.erstattetCents,
       gebuehrEntfallen: gebuehrEntfallen(o),
       gebuehrErstattungOffen: gebuehrErstattungOffen(o),
-      gebuehrFuerAbrechnung: gebuehrFuerMonatsabrechnung({
+      // Im Hofpreis-Modell (N38) nur, was per Lastschrift oder Überweisung kommt — „erlassen“ bleibt beim Hof.
+      gebuehrFuerAbrechnung: gebuehrFuerMonatsabrechnungJeModell({
         paymentMethod: o.paymentMethod,
         serviceFeeCents: o.serviceFeeCents,
         bestelltAm: o.createdAt,
+        gebuehrModell: o.gebuehrModell,
+        gebuehrEinzug: o.gebuehrEinzug,
       }),
+      hofpreis: istHofpreisBestellung(o),
     },
     positionen: o.items.map((i) => ({
       id: i.id,

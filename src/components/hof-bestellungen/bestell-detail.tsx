@@ -341,15 +341,20 @@ function Haken({ an }: { an: boolean }): React.JSX.Element {
 function Betrag({ bestellung }: { bestellung: HofBestellDetail }): React.JSX.Element {
   const { betrag, status, vorOrt } = bestellung
   const beendet = status === 'CANCELLED' || status === 'NOT_PICKED_UP'
-  const zusammensetzung =
-    betrag.gebuehrCents > 0 ? `Warenpreis ${euro(betrag.warenCents)} + Servicegebühr ${euro(betrag.gebuehrCents)}` : `Warenpreis ${euro(betrag.warenCents)}`
+  // Hofpreis-Modell (N38): Die Plattformgebühr ist Teil des Preises — der Hof sieht, was ihm bleibt und was die Kundin zahlt.
+  const zusammensetzung = betrag.hofpreis
+    ? `Du bekommst ${euro(betrag.warenCents)} · die Kundin zahlt ${euro(betrag.gesamtCents)}`
+    : betrag.gebuehrCents > 0
+      ? `Warenpreis ${euro(betrag.warenCents)} + Servicegebühr ${euro(betrag.gebuehrCents)}`
+      : `Warenpreis ${euro(betrag.warenCents)}`
+  const gebuehrWort = betrag.hofpreis ? 'Plattformgebühr' : 'Servicegebühr'
 
   if (beendet) {
     return (
       <div className="rounded-xl border border-border bg-muted px-3.5 py-3">
         <p className={cn('text-xs font-semibold tracking-wide uppercase', LEISE)}>{status === 'CANCELLED' ? 'Storniert' : 'Nicht abgeholt'}</p>
         <p className="mt-1 text-[13.5px]">
-          {betrag.gebuehrCents > 0 ? `Warenpreis ${euro(betrag.warenCents)} · Servicegebühr ${euro(betrag.gebuehrCents)} entfällt` : `Warenpreis ${euro(betrag.warenCents)}`}
+          {betrag.gebuehrCents > 0 ? `Warenpreis ${euro(betrag.warenCents)} · ${gebuehrWort} ${euro(betrag.gebuehrCents)} entfällt` : `Warenpreis ${euro(betrag.warenCents)}`}
         </p>
         {betrag.erstattetCents > 0 && <p className={cn('mt-1 text-[12.5px]', LEISE)}>Erstattet: {euro(betrag.erstattetCents)}</p>}
         {bestellung.stornoGrund && <p className="mt-1 text-[12.5px] break-words">Grund: {bestellung.stornoGrund}</p>}

@@ -14,6 +14,7 @@ import {
 } from './_layout'
 import { SERVICEGEBUEHR_BEZEICHNUNG, SERVICEGEBUEHR_HINWEIS } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
+import { inklPlattformgebuehrSatz } from '@/lib/konditionen'
 
 export interface OnsiteConfirmationProps {
   orderNumber: string
@@ -26,6 +27,8 @@ export interface OnsiteConfirmationProps {
   items: Array<{ name: string; betrag: number }>
   /** Servicegebühr in Euro aus dem Snapshot; 0 oder fehlend = keine Zeile. */
   serviceFee?: number
+  /** Hofpreis-Modell (N38): die Plattformgebühr in Euro, schon in den Zeilen enthalten; 0 oder fehlend = kein Satz. */
+  plattformgebuehr?: number
   /** Was die Kundin vor Ort bezahlt: Warenpreis + Servicegebühr. */
   total: number
   /** Zur Seite mit dem Knopf (/{hof}/bestaetigen/{token}) — der Link selbst bestätigt nichts. */
@@ -82,6 +85,9 @@ export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
         <Text style={{ ...kleinText, marginTop: '12px' }}>
           {SERVICEGEBUEHR_BEZEICHNUNG}: {SERVICEGEBUEHR_HINWEIS}
         </Text>
+      )}
+      {(p.plattformgebuehr ?? 0) > 0 && (
+        <Text style={{ ...kleinText, marginTop: '12px' }}>{inklPlattformgebuehrSatz(formatEuro(p.plattformgebuehr ?? 0))}</Text>
       )}
       <Text style={{ ...kleinText, marginTop: '12px' }}>
         Falls du diese Bestellung nicht aufgegeben hast, ignoriere diese E-Mail einfach.

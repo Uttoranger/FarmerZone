@@ -10,9 +10,10 @@
  * Gebührensatz in servicegebuehr.ts.
  */
 import { formatEuro, formatZahl, mitAnzahl } from '@/lib/format'
+import { BAR_OHNE_GEBUEHR_HINWEIS, INKL_PLATTFORMGEBUEHR, PLATTFORMGEBUEHR_SATZ } from '@/lib/konditionen'
+import { satzText, type PreisAnzeige } from '@/lib/plattformgebuehr'
 import { kaufSperreHinweis, zeigeKaufknopf, type KaufSperre } from '@/lib/bereiche-anzeige'
 import { calcLineTotal, decimalZuCents } from '@/lib/order-totals'
-import { BAR_OHNE_GEBUEHR_HINWEIS } from '@/lib/konditionen'
 import {
   barOhneServicegebuehr,
   centsAlsEuro,
@@ -259,6 +260,16 @@ export function gebuehrHinweis(
   }
 }
 
+/**
+ * Die drei Wortlaute im Hofpreis-Modell (N38): Die Preise SIND Endpreise
+ * „inkl. Plattformgebühr“; „Zahlung & Kontakt“ nennt dazu den Satz aus
+ * konditionen.ts. Online und bar gleich — keine Ausnahme mehr (B1-Ergänzung).
+ */
+export function plattformgebuehrHinweis(hundertstel: number): { kurz: string; produkte: string; korb: string } {
+  const grund = `Preise ${INKL_PLATTFORMGEBUEHR} (${satzText(hundertstel)} %)`
+  return { kurz: `${grund}. ${PLATTFORMGEBUEHR_SATZ}`, produkte: `${grund} – online und bar gleich.`, korb: INKL_PLATTFORMGEBUEHR }
+}
+
 /** Neben der Korbsumme, solange bar keine Gebühr kostet (B1) — kurz, weil der Platz dort knapp ist. */
 export const GEBUEHR_KORB_NUR_ONLINE = 'zzgl. Servicegebühr bei Online-Zahlung'
 
@@ -276,9 +287,11 @@ const OHNE_BAR_AUSNAHME: GebuehrZahlung = { online: true, bar: false, barOhneGeb
  * (Server-Uhr, als ISO-Text durchgereicht) — nie aus der Browser-Uhr beim Rendern.
  */
 export function gebuehrHinweisFuerHof(
-  hof: ServicegebuehrEinstellung & { acceptsOnline: boolean; stripeAccountReady: boolean; acceptsOnsite: boolean },
+  hof: ServicegebuehrEinstellung & { acceptsOnline: boolean; stripeAccountReady: boolean; acceptsOnsite: boolean; preisAnzeige?: PreisAnzeige },
   jetzt: Date
 ): { kurz: string; produkte: string; korb: string } | null {
+  // Hofpreis-Modell (N38, Nr. 197): Die Gebühr steckt im Endpreis — kein „zzgl.“, sondern „inkl.“.
+  if (hof.preisAnzeige) return plattformgebuehrHinweis(hof.preisAnzeige.hundertstel)
   const arten = zahlungsarten(hof)
   return gebuehrHinweis(servicegebuehrSatz(hof, jetzt), {
     online: arten.some((a) => a.art === 'online'),

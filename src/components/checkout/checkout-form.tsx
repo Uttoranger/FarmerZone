@@ -15,6 +15,7 @@ import {
   type KasseFormularDaten as CheckoutFormData,
 } from '@/lib/kasse-pruefung'
 import { formatEuro } from '@/lib/format'
+import { BAR_NICHT_MOEGLICH_SATZ } from '@/lib/konditionen'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_UNGUELTIG, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
 import { BETRIEBSNACHWEIS_FEHLER, CODE_BETRIEBSNACHWEIS_FEHLT } from '@/lib/betriebsnachweis'
@@ -46,6 +47,8 @@ import {
   weiterBeiEnter,
   kassenBetraege,
   kassenZahlarten,
+  mindestbestellwertGrund,
+  CODE_BAR_NICHT_MOEGLICH,
   kassenZahlweg,
   kassenZurueck,
   kaufknopfZeile,
@@ -164,8 +167,15 @@ export function CheckoutForm({
   ausgebuchteAbholfenster,
   sperre,
   testbetrieb = false,
+  barMoeglich = true,
 }: {
   farm: PublicFarm
+  /**
+   * N38 (Nr. 197): Darf bei diesem Hof jetzt bar bestellt werden? Auf dem
+   * Server aus der Gebührenlage gerechnet (checkout/page.tsx); ohne bietet die
+   * Kasse nur online an. Verbindlich prüft /api/checkout (409).
+   */
+  barMoeglich?: boolean
   /** Fenster mit erreichter Höchstzahl (abholSchluessel) — vom Server gezählt. */
   ausgebuchteAbholfenster: string[]
   /**
@@ -210,6 +220,8 @@ export function CheckoutForm({
   // Bis zum Neuladen bietet die Kasse dann nur bar an; danach sagt es der
   // Server selbst, denn der Hof ist als nicht bereit vermerkt.
   const [onlineAus, setOnlineAus] = useState(false)
+  // N38: Bar geht bei diesem Hof gerade nicht — vom Server beim Laden oder als 409 (CODE_BAR_NICHT_MOEGLICH).
+  const [barAus, setBarAus] = useState(!barMoeglich)
   // Die Uhr der Frist. Nur im Browser gelesen (Effekt) — die Kasse rendert auf
   // dem Server ohnehin nur das Skelett, der Korb liegt im localStorage.
   const [jetzt, setJetzt] = useState(() => new Date())
@@ -288,7 +300,7 @@ export function CheckoutForm({
   // im Testbetrieb mit Satz an „Online bezahlen", nach `onlineAus` nur bar.
   // B1: Solange bar keine Servicegebühr kostet, online aber schon, nennt
   // „Bar bei Abholung" den Vorteil an der Option selbst (N10).
-  const zahlarten = kassenZahlarten(farm, barGuenstiger(farm, jetzt), { testbetrieb, onlineAus })
+  const zahlarten = kassenZahlarten(farm, barGuenstiger(farm, jetzt), { testbetrieb, onlineAus, barAus })
   const defaultPayment = zahlarten[0]?.wert ?? 'ONSITE_CASH'
 
   const form = useForm<CheckoutFormData>({
@@ -331,6 +343,8 @@ export function CheckoutForm({
   // „entfällt" und „bar am Hof" nur bei angebotener Barzahlung (N10, kassenZahlweg).
   const zahlweg = kassenZahlweg(zahlarten, paymentMethod)
   const gebuehr = gebuehrZeile(farm, jetzt, zahlweg)
+  // N38: Unter dem Mindestbestellwert ruht der Knopf, der Grund steht darunter. Steht die Bestellung, zählt sie.
+  const mindestGrund = bestellungAngelegt ? null : mindestbestellwertGrund(farm, betraege.warenCents)
   const gesamt = formatEuro(centsAlsEuro(betraege.gesamtCents))
   const hof = { farmId: farm.id, farmSlug: farm.slug }
 
@@ -441,6 +455,13 @@ export function CheckoutForm({
           setFehler(err.error ?? 'Online-Zahlung ist gerade nicht möglich.')
           return
         }
+        // N38: Bar geht bei diesem Hof gerade nicht — nur noch online anbieten und gleich auswählen.
+        if (err.code === CODE_BAR_NICHT_MOEGLICH) {
+          setBarAus(true)
+          form.setValue('paymentMethod', 'ONLINE')
+          setFehler(err.error ?? BAR_NICHT_MOEGLICH_SATZ)
+          return
+        }
         // Betriebsnachweis fehlt (Sprint Bereiche 1): Fehler am Feld.
         if (err.code === CODE_BETRIEBSNACHWEIS_FEHLT) {
           setNachweisVomServer(true)
@@ -545,7 +566,8 @@ export function CheckoutForm({
         stand={reservierungsStand(zahlung.reserviertBis, jetzt)}
         betrag={zahlung.betrag}
         gebuehrText={zahlung.gebuehrText}
-        korb={<KorbKarte hofName={farm.name} positionen={korbPositionen} zeilenCents={betraege.zeilenCents} />}
+        hofpreis={farm.preisAnzeige !== null}
+        korb={<KorbKarte hofName={farm.name} positionen={korbPositionen} zeilenCents={betraege.zeilenCents} anzeige={farm.preisAnzeige} />}
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
         fussnote={`${zahlung.abholung ? `Abholung ${zahlung.abholung} · ` : ''}${ZAHLWEG_ONLINE}`}
       />
@@ -583,6 +605,7 @@ export function CheckoutForm({
               hofName={farm.name}
               positionen={korbPositionen}
               zeilenCents={betraege.zeilenCents}
+              anzeige={farm.preisAnzeige}
               aendernHref={bestellungAngelegt ? undefined : `/${farm.slug}#${WARENKORB_ANKER}`}
             />
             {korbHinweis && (
@@ -603,6 +626,7 @@ export function CheckoutForm({
                 gebuehrText={zahlung?.gebuehrText ?? gebuehr.titel}
                 gebuehrErklaerung={zahlung ? undefined : gebuehr.erklaerung}
                 gebuehrEntfaellt={gebuehr.entfaellt}
+                hofpreis={farm.preisAnzeige !== null}
                 reservierung={
                   bestellungAngelegt ? null : (
                     <ReservierungsHinweis
@@ -628,9 +652,12 @@ export function CheckoutForm({
             }
             online={online}
             wirdGesendet={isPending}
-            gesperrt={isPending || kacheln.length === 0 || zahlarten.length === 0 || sperre !== null}
+            gesperrt={isPending || kacheln.length === 0 || zahlarten.length === 0 || sperre !== null || mindestGrund !== null}
             gesamt={gesamt}
-            fussnote={kaufknopfZeile({ termin: gewaehlt ? abholSatz(gewaehlt) : null, online, bar: zahlweg === 'ONSITE_CASH', gesperrt: sperre !== null })}
+            fussnote={
+              mindestGrund ??
+              kaufknopfZeile({ termin: gewaehlt ? abholSatz(gewaehlt) : null, online, bar: zahlweg === 'ONSITE_CASH', gesperrt: sperre !== null })
+            }
           />
         }
       >

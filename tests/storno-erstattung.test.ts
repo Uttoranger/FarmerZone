@@ -387,11 +387,26 @@ describe('stornoGeldSaetze — was der Hof im Storno-Dialog liest', () => {
 describe('Ladungstyp-Wache: der Checkout legt die Zahlung so an, wie der Storno sie zurückholt', () => {
   const checkout = readFileSync(join(process.cwd(), 'src/app/api/checkout/route.ts'), 'utf8')
 
-  it('Destination Charge ohne transfer_data.amount und ohne on_behalf_of — der volle Betrag geht an den Hof', () => {
+  it('Destination Charge ohne transfer_data.amount — der volle Betrag geht an den Hof, in beiden Modellen', () => {
     // Seit dem Fix „Zahlungsstart" rechnet intentParameter die Parameter aus der gespeicherten Bestellung.
     expect(checkout).toContain('transfer_data: { destination: hofKonto }')
     expect(checkout).not.toMatch(/transfer_data:\s*\{[^}]*\bamount\b/)
-    expect(checkout).not.toMatch(/on_behalf_of\s*:/)
+  })
+
+  it('on_behalf_of nur im Modell hofpreis (N38, Nr. 197) — bisher bleibt die Plattform Händler', () => {
+    // Genau eine Stelle setzt on_behalf_of, und nur unter istHofpreisBestellung der gespeicherten Bestellung.
+    expect(checkout.match(/on_behalf_of\s*:/g)).toHaveLength(1)
+    expect(checkout).toContain('...(istHofpreisBestellung(bestellung) ? { on_behalf_of: hofKonto } : {})')
+    // Gegenprobe: ein unbedingtes on_behalf_of fiele auf.
+    expect('    on_behalf_of: hofKonto,').not.toContain('istHofpreisBestellung(bestellung) ?')
+  })
+
+  it('der Storno holt in beiden Modellen dasselbe zurück: reverse_transfer und refund_application_fee', () => {
+    const storno = readFileSync(join(process.cwd(), 'src/server/actions/orders.ts'), 'utf8')
+    expect(storno).toMatch(/reverse_transfer:\s*true/)
+    expect(storno).toMatch(/refund_application_fee:\s*true/)
+    // Der Storno fragt das Modell nicht ab — on_behalf_of ändert an der Rückbuchung nichts.
+    expect(storno).not.toContain('gebuehrModell')
   })
 
   it('application_fee = Provision + Servicegebühr, nur bei > 0 — dieselbe Summe, die der Storno zurückgibt', () => {

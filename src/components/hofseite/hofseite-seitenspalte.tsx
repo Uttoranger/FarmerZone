@@ -1,6 +1,8 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { usePreisAnzeige } from '@/components/shared/preis-anzeige'
+import { mitEndpreis } from '@/lib/plattformgebuehr'
 import { useMemo } from 'react'
 import Link from 'next/link'
 import { Banknote, CalendarDays, CreditCard, Info, MapPin, Phone, ShoppingBasket } from 'lucide-react'
@@ -216,7 +218,10 @@ function MiniWarenkorb({
   kasseHref?: string
 }): ReactNode {
   const { id: farmId, slug } = hof
-  const positionen = useWarenkorbVomHof(farmId)
+  const imKorb = useWarenkorbVomHof(farmId)
+  // Im Hofpreis-Modell (N38) Endpreise je Stück — Zeilen und Summe wie in der Kasse.
+  const anzeige = usePreisAnzeige()
+  const positionen = imKorb.map((p) => mitEndpreis(p, anzeige))
   // Der Satz nach dem Abgleich der Hofseite (Register N28) — auch wenn danach nichts mehr im Korb liegt:
   // Dann steht er allein unter dem Titel, damit die Kundin erfährt, wohin ihr Korb ist.
   const hinweis = useKorbHinweis(farmId)

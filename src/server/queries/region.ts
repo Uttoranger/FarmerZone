@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { wienJetzt } from '@/lib/hofuebersicht'
+import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
 import { ausgebuchteTage } from '@/server/abholfenster'
 import { PRODUCT_ORDER_BY } from './products'
 import {
@@ -34,5 +35,7 @@ export async function ladeEigenenListeneintrag(farmId: string): Promise<HofUeber
     ausgebuchteTage([farmId], jetzt),
   ])
   if (!hof) return null
-  return baueHofUebersicht([hof], zeilen, wienJetzt(jetzt), ausgebucht)[0] ?? null
+  // N38 (Nr. 197): derselbe Preis wie in der Liste der Kundschaft — im Hofpreis-Modell der Endpreis.
+  const einstellung = await ladeHofpreisEinstellung()
+  return baueHofUebersicht([hof], zeilen, wienJetzt(jetzt), ausgebucht, { einstellung, zeitpunkt: jetzt })[0] ?? null
 }

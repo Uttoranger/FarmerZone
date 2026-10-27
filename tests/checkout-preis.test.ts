@@ -28,6 +28,8 @@ vi.mock('@/server/abholfenster', async (original) => ({
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    // N38 (Nr. 197): ohne Zeile gilt der Stichtag aus konditionen.ts — Modell `bisher`.
+    plattformEinstellung: { findUnique: vi.fn().mockResolvedValue(null) },
     farm: { findUnique: vi.fn() },
     product: { findUnique: vi.fn(), update: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     stockReservation: { aggregate: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },

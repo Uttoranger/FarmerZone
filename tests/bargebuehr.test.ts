@@ -195,7 +195,7 @@ describe('Kasse (Client-Vorschau) — derselbe Weg, mit der Zahlungsart', () => 
     const formular = lies('src/components/checkout/checkout-form.tsx')
     expect(formular).toMatch(/kassenBetraege\(cart, farm, jetzt, paymentMethod\)/)
     // Seit Nr. 42 (Register Z2) kommen Testbetrieb und onlineAus als drittes Argument dazu.
-    expect(formular).toMatch(/kassenZahlarten\(farm, barGuenstiger\(farm, jetzt\)(, \{ testbetrieb, onlineAus \})?\)/)
+    expect(formular).toMatch(/kassenZahlarten\(farm, barGuenstiger\(farm, jetzt\)(, \{ testbetrieb, onlineAus(, barAus)? \})?\)/)
     // Gegenprobe: die alte Form ohne Zahlungsart fiele auf.
     expect('kassenBetraege(cart, farm, jetzt)').not.toMatch(/kassenBetraege\(cart, farm, jetzt, paymentMethod\)/)
   })
@@ -360,7 +360,7 @@ describe('gebuehrFuerMonatsabrechnung — die Frage hinter jedem Hof-Satz zur Mo
     expect(lies('src/components/hof-bestellungen/bestell-detail.tsx')).toMatch(
       /betrag\.gebuehrFuerAbrechnung \? ' – die Gebühr holt die Monatsabrechnung\.'/
     )
-    expect(lies('src/server/queries/orders.ts')).toMatch(/gebuehrFuerAbrechnung: gebuehrFuerMonatsabrechnung\(\{/)
+    expect(lies('src/server/queries/orders.ts')).toMatch(/gebuehrFuerAbrechnung: gebuehrFuerMonatsabrechnung(JeModell)?\(\{/)
     // Gegenprobe: die alte Bedingung (jede Gebühr > 0, auch bar vor dem Stichtag) ist weg.
     expect(lies('src/components/hof-bestellungen/bestell-detail.tsx')).not.toContain(
       "betrag.gebuehrCents > 0 ? ' – die Gebühr holt"

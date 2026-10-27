@@ -53,6 +53,8 @@ export type StripeZahlungProps = {
   betrag: ZahlungsBetrag
   /** Bezeichnung der Gebührenzeile, beim Anlegen festgehalten (zahlungsGebuehrText). */
   gebuehrText: string
+  /** N38: Hofpreis-Modell — „Ware · Plattformgebühr · Gesamt“ wie vor dem Anlegen. */
+  hofpreis?: boolean
   /** Korb (ohne „ändern") und die festen Angaben zur Abholung — vom Formular gebaut. */
   korb: ReactNode
   angaben: ReactNode
@@ -94,6 +96,7 @@ function ZahlungsInhalt({
   stand,
   betrag,
   gebuehrText,
+  hofpreis = false,
   korb,
   angaben,
   fussnote,
@@ -158,6 +161,7 @@ function ZahlungsInhalt({
         <UebersichtKarte
           betraege={betraege}
           gebuehrText={gebuehrText}
+          hofpreis={hofpreis}
           reservierung={
             <ReservierungsHinweis stand={abgelaufen ? { zustand: 'abgelaufen' } : stand} schritt="zahlung" farmSlug={farmSlug} />
           }

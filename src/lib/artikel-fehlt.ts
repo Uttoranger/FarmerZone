@@ -30,14 +30,16 @@
 import { formatEuro } from '@/lib/format'
 import { BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
 import {
+  SERVICEGEBUEHR_BEZEICHNUNG,
   SERVICEGEBUEHR_STANDARD_MIND_CENTS,
   berechneServicegebuehr,
   centsAlsEuro,
-  gebuehrFuerMonatsabrechnung,
   istVorOrtZahlung,
   type Zahlungsart,
 } from '@/lib/servicegebuehr'
 import { onlineBezahlt } from '@/lib/storno'
+import { gebuehrFuerMonatsabrechnungJeModell, istHofpreisBestellung } from '@/lib/plattformgebuehr'
+import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
 import type { OrderStatus } from '@prisma/client'
 import { MARKE } from '@/lib/marke'
 
@@ -67,7 +69,12 @@ export type ArtikelFehltBestellung = {
   erstattetCents: number
   /** Order.createdAt — ob die Monatsabrechnung die neue Gebühr nimmt, hängt daran (Register B1). */
   bestelltAm: Date | string
-  positionen: ReadonlyArray<{ id: string; betragCents: number; fehlt: boolean }>
+  /** Order.gebuehrModell (N38): 'hofpreis' — dann zieht die Rechnung die Gebühr der Position ab; null/fehlend = bisher. */
+  gebuehrModell?: string | null
+  /** Order.gebuehrEinzug (N38): ob die Monatsabrechnung die Bargebühr nimmt ('sepa', 'ueberweisung'). */
+  gebuehrEinzug?: string | null
+  /** `gebuehrCents` = OrderItem.gebuehrCents (N38), im Modell `bisher` 0. */
+  positionen: ReadonlyArray<{ id: string; betragCents: number; fehlt: boolean; gebuehrCents?: number }>
 }
 
 export type ArtikelFehltAblehnung = 'position_unbekannt' | 'schon_fehlend' | 'status' | 'nicht_bezahlt'
@@ -90,6 +97,8 @@ export type ArtikelFehltTeil = {
   vomHofCents: number
   /** Vor Ort: Schuldet der Hof die neue Gebühr der Monatsabrechnung? (B1: bar vor dem Stichtag nie.) */
   monatsabrechnung: boolean
+  /** „Servicegebühr“ bzw. im Hofpreis-Modell „Plattformgebühr“ (N8) — für die Sätze im Dialog. */
+  gebuehrWort: string
 }
 
 export type ArtikelFehltErgebnis =
@@ -167,7 +176,13 @@ export function artikelFehltRechnung(b: ArtikelFehltBestellung, positionId: stri
   // Beides ist gleich, solange niemand an den Snapshots dreht — der Warenpreis
   // ist aber der Betrag, den Stripe und die Monatsabrechnung kennen.
   const neuWarenCents = Math.max(0, b.warenpreisCents - artikelCents)
-  const neuGebuehrCents = neueServicegebuehrCents(neuWarenCents, b)
+  // Hofpreis-Modell (N38): Die Gebühr steckt je Stück im Preis — es fällt genau
+  // die Gebühr der Position weg (Snapshot OrderItem.gebuehrCents), nichts wird
+  // neu gerechnet. Bisher: neu auf den Rest mit der Regel der Bestellung (E14).
+  const hofpreis = istHofpreisBestellung({ gebuehrModell: b.gebuehrModell ?? null })
+  const neuGebuehrCents = hofpreis
+    ? Math.max(0, b.serviceFeeCents - (position.gebuehrCents ?? 0))
+    : neueServicegebuehrCents(neuWarenCents, b)
   const gebuehrDifferenzCents = b.serviceFeeCents - neuGebuehrCents
 
   return {
@@ -182,11 +197,14 @@ export function artikelFehltRechnung(b: ArtikelFehltBestellung, positionId: stri
     gebuehrDifferenzCents,
     erstattungCents: online ? artikelCents + gebuehrDifferenzCents : 0,
     vomHofCents: online ? artikelCents : 0,
-    monatsabrechnung: gebuehrFuerMonatsabrechnung({
+    monatsabrechnung: gebuehrFuerMonatsabrechnungJeModell({
       paymentMethod: b.paymentMethod,
       serviceFeeCents: neuGebuehrCents,
       bestelltAm: b.bestelltAm,
+      gebuehrModell: b.gebuehrModell,
+      gebuehrEinzug: b.gebuehrEinzug,
     }),
+    gebuehrWort: hofpreis ? PLATTFORMGEBUEHR_BEZEICHNUNG : SERVICEGEBUEHR_BEZEICHNUNG,
   }
 }
 
@@ -209,15 +227,15 @@ export function artikelFehltZeilen(r: ArtikelFehltErgebnis, kundenVorname: strin
     return {
       bisher: { text: 'Bar zu kassieren bisher', betrag: euro(r.bisherWarenCents + r.bisherGebuehrCents) },
       neu: {
-        text: `Neu: Warenpreis ${euro(r.neuWarenCents)} + Servicegebühr ${euro(r.neuGebuehrCents)}`,
+        text: `Neu: Warenpreis ${euro(r.neuWarenCents)} + ${r.gebuehrWort} ${euro(r.neuGebuehrCents)}`,
         betrag: euro(r.neuGesamtCents),
       },
-      saetze: r.monatsabrechnung ? ['Die Monatsabrechnung nimmt die neue Servicegebühr.'] : [],
+      saetze: r.monatsabrechnung ? [`Die Monatsabrechnung nimmt die neue ${r.gebuehrWort}.`] : [],
     }
   }
   const zusammensetzung =
     r.gebuehrDifferenzCents > 0
-      ? `Artikel ${euro(r.artikelCents)} + Servicegebühr ${euro(r.gebuehrDifferenzCents)} – die Gebühr gilt nur noch für ${euro(r.neuWarenCents)} Ware.`
+      ? `Artikel ${euro(r.artikelCents)} + ${r.gebuehrWort} ${euro(r.gebuehrDifferenzCents)} – die Gebühr gilt nur noch für ${euro(r.neuWarenCents)} Ware.`
       : `Genau der Preis des Artikels, ${euro(r.artikelCents)}.`
   return {
     bisher: { text: `${kundenVorname} bekommt zurück`, betrag: euro(r.erstattungCents) },
@@ -225,7 +243,7 @@ export function artikelFehltZeilen(r: ArtikelFehltErgebnis, kundenVorname: strin
     saetze: [
       zusammensetzung,
       r.gebuehrDifferenzCents > 0
-        ? `Das ist genau der Preis des fehlenden Artikels. Den Unterschied bei der Servicegebühr erstattet ${MARKE}.`
+        ? `Das ist genau der Preis des fehlenden Artikels. Den Unterschied bei der ${r.gebuehrWort} erstattet ${MARKE}.`
         : 'Das ist genau der Preis des fehlenden Artikels.',
     ],
   }

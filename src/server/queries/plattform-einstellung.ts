@@ -21,9 +21,12 @@ import {
   PLATTFORM_EINSTELLUNG_STANDARD,
   PLATTFORM_EINSTELLUNG_TAG,
   gruendungEinstellungAus,
+  hofpreisEinstellungAus,
   plattformEinstellungAus,
   type PlattformEinstellung,
 } from '@/lib/plattform-einstellung'
+import { bestimmeGruendungBis } from '@/lib/gruendungshof'
+import { barMoeglich, gebuehrLageFuer, gebuehrModellFuer, type GebuehrLage, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { ladeHoefeFuerFestschreiben, ladeHoefeFuerGruendung } from '@/server/queries/admin'
 
@@ -147,4 +150,61 @@ export async function ladeGruendungStandAdmin(einstellung: PlattformEinstellung)
 /** Die Zahlen der Seiten mit dem gespeicherten Stand — für die zugeklappte Gruppe am Handy. */
 export function gruendungZahlenAdmin(einstellung: PlattformEinstellung, vergeben: number, jetzt: Date): ReturnType<typeof seitenZahlen> {
   return seitenZahlen(gruendungEinstellungAus(einstellung), vergeben, jetzt)
+}
+
+/**
+ * Der Stichtag „Hofpreis-Modell ab“ für die ANZEIGE (Hofseite, Produktseite,
+ * Listen, Teilen-Bild; Register N38, Nr. 197) — aus der gecachten Zeile.
+ * Scheitert das Laden, zeigt die Seite die Preise nach der Vorgabe
+ * (`BAR_SERVICEGEBUEHR_AB`) statt einer Fehlerseite: Die Preisanzeige ist ein
+ * Zusatz zur Seite; verbindlich rechnet /api/checkout mit der frischen Zeile
+ * (`ladeGebuehrLage`), und die Kasse zeigt online den Betrag des Servers.
+ * Der Fehler geht nach Sentry — mit festem Bereich, ohne Text.
+ */
+export async function ladeHofpreisEinstellung(): Promise<HofpreisEinstellung> {
+  try {
+    return hofpreisEinstellungAus(await ladePlattformEinstellung())
+  } catch (err) {
+    // Kein unstable_rethrow: Darin läuft nur das Lesen einer Zeile, kein Steuersignal von Next.
+    Sentry.captureException(err, { tags: { bereich: 'hofpreis-anzeige' } })
+    return { hofpreisModellAb: null }
+  }
+}
+
+/** Was die Gebührenlage über einen Hof braucht (N38, Nr. 197) — die Spalten aus Nr. 188. */
+export type HofFuerGebuehrLage = {
+  id: string
+  gruendungBis: Date | null
+  plattformgebuehrProzent: { toString(): string } | null
+  einzugAb: Date | null
+  barMandatPflicht: boolean
+  sepaMandatAm: Date | null
+}
+
+/** Das Select dazu — EIN Satz Spalten für /api/checkout und die Kasse. */
+export const HOF_FUER_GEBUEHR_LAGE = {
+  id: true,
+  gruendungBis: true,
+  plattformgebuehrProzent: true,
+  einzugAb: true,
+  barMandatPflicht: true,
+  sepaMandatAm: true,
+} as const
+
+/**
+ * Die Gebührenlage eines Hofs JETZT (Register N38, Nr. 197) — frisch, nie aus
+ * dem Cache: /api/checkout entscheidet damit über Betrag und Barzahlung, die
+ * Kasse zeigt dasselbe. Das Gründungs-Ende (Platzvergabe aller Höfe) wird nur
+ * gelesen, wenn es zählt: im Modell `hofpreis` und ohne `Farm.einzugAb`.
+ */
+export async function ladeGebuehrLage(hof: HofFuerGebuehrLage, jetzt: Date): Promise<GebuehrLage> {
+  const einstellung = hofpreisEinstellungAus(await lesePlattformEinstellung())
+  if (gebuehrModellFuer(einstellung, jetzt) === 'bisher') return { modell: 'bisher' }
+  const gruendungBis = hof.einzugAb ? null : bestimmeGruendungBis(hof, await ladeHoefeFuerGruendung())
+  return gebuehrLageFuer(hof, einstellung, gruendungBis, jetzt)
+}
+
+/** Darf bei diesem Hof jetzt bar bestellt werden? Für die Kasse (Anzeige); verbindlich prüft /api/checkout. */
+export async function ladeBarMoeglich(hof: HofFuerGebuehrLage, jetzt: Date): Promise<boolean> {
+  return barMoeglich(await ladeGebuehrLage(hof, jetzt), jetzt)
 }
