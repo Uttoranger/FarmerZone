@@ -5,6 +5,8 @@ import * as Sentry from '@sentry/nextjs'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { genauesIlikeMuster } from '@/lib/ilike-muster'
+import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import { KONTO_ANFRAGE_TEXT } from '@/lib/konto-anfragen'
 import { verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { protokolliere } from '@/server/admin-protokoll'
 import { ADMIN_RECHTE, ADMIN_RECHT_TEXT, eingestellteRechte } from '@/lib/admin-rechte'
@@ -87,7 +89,7 @@ export async function ladePersonEin(eingabe: unknown): Promise<Ergebnis> {
   if ('error' in frisch) return { error: frisch.error }
 
   const parsed = teamEinladenSchema.safeParse(eingabe)
-  if (!parsed.success) return { error: 'Das ist keine gültige E-Mail-Adresse.' }
+  if (!parsed.success) return { error: KONTO_ANFRAGE_TEXT.email.ungueltig }
 
   const eingeladen = await prisma.$transaction(async (tx) => {
     await sperre(tx)
@@ -99,8 +101,12 @@ export async function ladePersonEin(eingabe: unknown): Promise<Ergebnis> {
     return konto
   })
   if (eingeladen) {
-    await protokolliere({ wer: frisch.userId, art: 'team_eingeladen', bezugArt: 'person', bezugId: eingeladen.id, mitPasskey: frisch.mitPasskey })
-    await sagEsDerPerson(eingeladen, 'eingeladen', [ADMIN_RECHT_TEXT.ansehen])
+    // Protokoll und Mail erst nach der Antwort: Sonst verriete die Antwortzeit,
+    // ob es zu der Adresse ein Konto gibt (Freigabe 190, Punkt 4).
+    nachDerAntwort(async () => {
+      await protokolliere({ wer: frisch.userId, art: 'team_eingeladen', bezugArt: 'person', bezugId: eingeladen.id, mitPasskey: frisch.mitPasskey })
+      await sagEsDerPerson(eingeladen, 'eingeladen', [ADMIN_RECHT_TEXT.ansehen])
+    })
     revalidiere()
   }
   return { ok: true }
@@ -126,7 +132,7 @@ export async function setzeTeamRechte(eingabe: unknown): Promise<Ergebnis> {
   if (!person) return { error: TEAM_TEXT.nichtImTeam }
 
   await protokolliere({ wer: frisch.userId, art: 'team_rechte_geaendert', bezugArt: 'person', bezugId: userId, mitPasskey: frisch.mitPasskey })
-  await sagEsDerPerson(person, 'rechte', rechteWoerter({ adminInhaber: person.adminInhaber, adminRechte: rechte }))
+  nachDerAntwort(() => sagEsDerPerson(person, 'rechte', rechteWoerter({ adminInhaber: person.adminInhaber, adminRechte: rechte })))
   revalidiere()
   return { ok: true }
 }
@@ -152,7 +158,8 @@ export async function setzeInhaber(eingabe: unknown): Promise<Ergebnis> {
 
   const art: AdminAktionArt = inhaber ? 'team_inhaber_gesetzt' : 'team_inhaber_entzogen'
   await protokolliere({ wer: frisch.userId, art, bezugArt: 'person', bezugId: userId, mitPasskey: frisch.mitPasskey })
-  await sagEsDerPerson(ergebnis.person, inhaber ? 'inhaber' : 'inhaber-entzogen', rechteWoerter({ adminInhaber: inhaber, adminRechte: ergebnis.person.adminRechte }))
+  const { person } = ergebnis
+  nachDerAntwort(() => sagEsDerPerson(person, inhaber ? 'inhaber' : 'inhaber-entzogen', rechteWoerter({ adminInhaber: inhaber, adminRechte: person.adminRechte })))
   revalidiere()
   return { ok: true }
 }
@@ -182,7 +189,8 @@ export async function entfernePerson(eingabe: unknown): Promise<Ergebnis> {
   if ('error' in ergebnis) return ergebnis
 
   await protokolliere({ wer: frisch.userId, art: 'team_entfernt', bezugArt: 'person', bezugId: userId, mitPasskey: frisch.mitPasskey })
-  await sagEsDerPerson(ergebnis.person, 'entfernt', [])
+  const { person } = ergebnis
+  nachDerAntwort(() => sagEsDerPerson(person, 'entfernt', []))
   revalidiere()
   return { ok: true }
 }

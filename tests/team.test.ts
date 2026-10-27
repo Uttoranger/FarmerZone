@@ -8,13 +8,21 @@
  *    Schreiben, kein Protokoll, keine Mail;
  *  - Einladen setzt isAdmin, adminSeit = jetzt, adminRechte = [] und schickt
  *    die Sicherheitsmail; eine unbekannte Adresse bekommt dieselbe Antwort
- *    (nichts geschrieben); jede Änderung läuft unter der Team-Sperre;
+ *    (nichts geschrieben); Protokoll der Einladung und jede Mail laufen erst
+ *    nach der Antwort (nachDerAntwort); jede Änderung läuft unter der Team-Sperre;
  *  - Rechte nur aus ADMIN_RECHTE, in fester Reihenfolge;
  *  - den letzten Inhaber kann niemand entfernen und niemand entziehen —
  *    Gegenprobe mit einem zweiten Inhaber.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+const nachlauf = vi.hoisted(() => ({ aufgaben: [] as Array<() => Promise<void>> }))
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: (a: () => Promise<void>) => void nachlauf.aufgaben.push(a) }))
+/** Was die Action nach der Antwort angestoßen hat, jetzt ausführen. */
+async function nachDerAntwortAusfuehren(): Promise<void> {
+  const aufgaben = nachlauf.aufgaben.splice(0)
+  for (const a of aufgaben) await a()
+}
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendTeamRechtGeaendert: vi.fn(async () => ({ id: 'm-1' })) }))
@@ -43,10 +51,12 @@ const person = (abweichung: Record<string, unknown> = {}) => ({ id: 'p1', email:
 
 beforeEach(() => {
   vi.clearAllMocks()
+  nachlauf.aufgaben.length = 0
   wache.mockResolvedValue({ ok: true, userId: 'inhaber-1', sitzungId: 's1', mitPasskey: true })
 })
 
-function nichtsGeaendert() {
+async function nichtsGeaendert() {
+  await nachDerAntwortAusfuehren()
   expect(update).not.toHaveBeenCalled()
   expect(protokoll).not.toHaveBeenCalled()
   expect(mail).not.toHaveBeenCalled()
@@ -72,7 +82,7 @@ describe('nur Inhaber, frisch mit Passkey', () => {
   it.each(ALLE)('%s: Nicht-Inhaber → Satz der Wache, nichts geändert', async (_n, aufruf) => {
     wache.mockResolvedValue({ error: ADMIN_RECHT_FEHLER })
     expect(await aufruf()).toEqual({ error: ADMIN_RECHT_FEHLER })
-    nichtsGeaendert()
+    await nichtsGeaendert()
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 })
@@ -86,6 +96,10 @@ describe('ladePersonEin', () => {
     const daten = update.mock.calls[0][0].data as { isAdmin: boolean; adminInhaber: boolean; adminRechte: string[]; adminSeit: Date }
     expect(daten).toMatchObject({ isAdmin: true, adminInhaber: false, adminRechte: [] })
     expect(daten.adminSeit.getTime()).toBeGreaterThanOrEqual(vorher)
+    // Protokoll und Mail erst nach der Antwort — sonst verriete die Antwortzeit das Konto.
+    expect(protokoll).not.toHaveBeenCalled()
+    expect(mail).not.toHaveBeenCalled()
+    await nachDerAntwortAusfuehren()
     expect(mail).toHaveBeenCalledWith('vertretung@example.com', expect.objectContaining({ anlass: 'eingeladen' }))
     expect(protokoll.mock.calls[0][0].data).toMatchObject({ art: 'team_eingeladen', bezugArt: 'person', bezugId: 'p1', wer: 'inhaber-1', mitPasskey: true })
   })
@@ -97,7 +111,7 @@ describe('ladePersonEin', () => {
     const schonDa = await ladePersonEin({ adresse: 'vertretung@example.com' })
     expect(unbekannt).toEqual({ ok: true })
     expect(schonDa).toEqual(unbekannt)
-    nichtsGeaendert()
+    await nichtsGeaendert()
   })
 })
 
@@ -106,11 +120,13 @@ describe('setzeTeamRechte', () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue(person() as never)
     expect(await setzeTeamRechte({ userId: 'p1', rechte: ['geld', 'mails_nochmal'] })).toEqual({ ok: true })
     expect(update).toHaveBeenCalledWith({ where: { id: 'p1' }, data: { adminRechte: ['mails_nochmal', 'geld'] } })
+    expect(mail).not.toHaveBeenCalled()
+    await nachDerAntwortAusfuehren()
     expect(mail).toHaveBeenCalledWith('vertretung@example.com', expect.objectContaining({ anlass: 'rechte' }))
     vi.clearAllMocks()
     wache.mockResolvedValue({ ok: true, userId: 'inhaber-1', sitzungId: 's1', mitPasskey: true })
     expect(await setzeTeamRechte({ userId: 'p1', rechte: ['team'] })).toEqual({ error: TEAM_TEXT.nichtImTeam })
-    nichtsGeaendert()
+    await nichtsGeaendert()
   })
 })
 
@@ -120,7 +136,7 @@ describe('letzter Inhaber', () => {
     vi.mocked(prisma.user.count).mockResolvedValue(0 as never)
     expect(await entfernePerson({ userId: 'inhaber-1' })).toEqual({ error: TEAM_TEXT.letzterInhaber })
     expect(await setzeInhaber({ userId: 'inhaber-1', inhaber: false })).toEqual({ error: TEAM_TEXT.letzterInhaber })
-    nichtsGeaendert()
+    await nichtsGeaendert()
     expect(prisma.user.count).toHaveBeenCalledWith({ where: { isAdmin: true, adminInhaber: true, id: { not: 'inhaber-1' } } })
   })
 
@@ -132,11 +148,14 @@ describe('letzter Inhaber', () => {
     expect(await entfernePerson({ userId: 'p1' })).toEqual({ ok: true })
     expect(update).toHaveBeenLastCalledWith({ where: { id: 'p1' }, data: { isAdmin: false, adminInhaber: false, adminRechte: [], adminSeit: null } })
     expect(protokoll.mock.calls.map((c) => c[0].data.art)).toEqual(['team_inhaber_entzogen', 'team_entfernt'])
+    expect(mail).not.toHaveBeenCalled()
+    await nachDerAntwortAusfuehren()
+    expect(mail.mock.calls.map((c) => c[1].anlass)).toEqual(['inhaber-entzogen', 'entfernt'])
   })
 
   it('eine Person außerhalb des Teams: abgelehnt', async () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue(person({ isAdmin: false }) as never)
     expect(await entfernePerson({ userId: 'p1' })).toEqual({ error: TEAM_TEXT.nichtImTeam })
-    nichtsGeaendert()
+    await nichtsGeaendert()
   })
 })

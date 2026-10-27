@@ -22,6 +22,13 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+// Was die Actions nach der Antwort anstoßen (Mails, Protokoll der Einladung), sammelt der Test und führt es selbst aus.
+const nachlauf = vi.hoisted(() => ({ aufgaben: [] as Array<() => Promise<void>> }))
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: (a: () => Promise<void>) => void nachlauf.aufgaben.push(a) }))
+async function nachDerAntwortAusfuehren(): Promise<void> {
+  const aufgaben = nachlauf.aufgaben.splice(0)
+  for (const a of aufgaben) await a()
+}
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn(), unstable_cache: (fn: unknown) => fn }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
@@ -55,6 +62,7 @@ const adressen: string[] = []
 const umbenannt: { farmIds: string[]; userIds: string[] } = { farmIds: [], userIds: [] }
 
 afterEach(async () => {
+  await nachDerAntwortAusfuehren()
   vi.mocked(headers).mockResolvedValue(new Headers() as never)
   await prisma.adminAktion.deleteMany({ where: { bezugId: { in: bezuege.splice(0) } } })
   await prisma.rateLimitZaehler.deleteMany({
@@ -125,6 +133,7 @@ describe('Anmelde-E-Mail ändern', () => {
     expect(await prisma.session.count({ where: { userId: ownerId } })).toBe(1)
 
     expect(await aendereAnmeldeEmail({ farmId: farm.id, neueAdresse: neu, grund: 'Anfrage im Postfach' })).toEqual({ ok: true })
+    await nachDerAntwortAusfuehren()
     expect(vi.mocked(sendEmailAendernLink).mock.calls.at(-1)?.[0]).toBe(neu)
     const token = linkAusMail(vi.mocked(sendEmailAendernLink).mock.calls.length - 1)
     const link = await prisma.einmalLink.findFirstOrThrow({ where: { userId: ownerId, zweck: { startsWith: 'email-aendern:' } } })
@@ -137,6 +146,7 @@ describe('Anmelde-E-Mail ändern', () => {
     expect(await bestaetigeEmailAenderung({ token, adresse: `${intKennung('anders')}@example.com` })).toEqual({ error: EMAIL_BESTAETIGEN_TEXT.falscheAdresse })
 
     expect(await bestaetigeEmailAenderung({ token, adresse: neu.toUpperCase() })).toEqual({ ok: true })
+    await nachDerAntwortAusfuehren()
     const konto = await prisma.user.findUniqueOrThrow({ where: { id: ownerId } })
     expect(konto.email).toBe(neu)
     expect(konto.emailVerified).toBe(true)
@@ -155,6 +165,7 @@ describe('Anmelde-E-Mail ändern', () => {
     bezuege.push(farm.id)
     const neu = `${intKennung('neu')}@example.com`
     await aendereAnmeldeEmail({ farmId: farm.id, neueAdresse: neu, grund: 'Anfrage im Postfach' })
+    await nachDerAntwortAusfuehren()
     const token = linkAusMail(vi.mocked(sendEmailAendernLink).mock.calls.length - 1)
     await prisma.einmalLink.updateMany({ where: { userId: ownerId, zweck: { startsWith: 'email-aendern:' } }, data: { ablaufAm: new Date(Date.now() - 1000) } })
     expect(await bestaetigeEmailAenderung({ token, adresse: neu })).toEqual({ error: EMAIL_BESTAETIGEN_TEXT.ungueltigTitel, ungueltig: true })
@@ -168,6 +179,7 @@ describe('Anmelde-E-Mail ändern', () => {
     bezuege.push(farm.id)
     const vorher = vi.mocked(sendEmailAendernLink).mock.calls.length
     expect(await aendereAnmeldeEmail({ farmId: farm.id, neueAdresse: anderes.email.toUpperCase(), grund: 'Anfrage im Postfach' })).toEqual({ ok: true })
+    await nachDerAntwortAusfuehren()
     expect(vi.mocked(sendEmailAendernLink).mock.calls.length).toBe(vorher)
     expect(await prisma.einmalLink.count({ where: { userId: ownerId, zweck: { startsWith: 'email-aendern:' } } })).toBe(0)
   })
@@ -253,6 +265,8 @@ describe('Team', () => {
     const helfer = await prisma.user.findUniqueOrThrow({ where: { id: helferId } })
     const vorher = Date.now()
     expect(await ladePersonEin({ adresse: helfer.email })).toEqual({ ok: true })
+    await nachDerAntwortAusfuehren()
+    expect(await prisma.adminAktion.count({ where: { bezugId: helferId, art: 'team_eingeladen' } })).toBe(1)
     const eingeladen = await prisma.user.findUniqueOrThrow({ where: { id: helferId } })
     expect(eingeladen).toMatchObject({ isAdmin: true, adminInhaber: false, adminRechte: [] })
     expect(eingeladen.adminSeit?.getTime()).toBeGreaterThanOrEqual(vorher - 1000)

@@ -103,7 +103,6 @@ export const KONTO_ANFRAGE_TEXT = {
     erledigt: 'Wenn die Adresse verwendet werden kann, ist der Bestätigungslink unterwegs.',
     ungueltig: 'Das ist keine gültige E-Mail-Adresse.',
     gleich: 'Das ist schon die Anmelde-Adresse des Hofs.',
-    mailFehler: 'Die Mail ging gerade nicht hinaus. Versuch es in ein paar Minuten noch einmal.',
   },
   auskunft: {
     titel: (hof: string): string => `Auskunft für ${hof} exportieren`,

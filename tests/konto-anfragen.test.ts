@@ -9,6 +9,8 @@
  *  - E-Mail ändern: Einmal-Link mit Zweck `email-aendern:<Hash>` (nie die
  *    Adresse), 24 Stunden, Mail an die NEUE Adresse; hat ein anderes Konto die
  *    Adresse, gibt es keinen Link und keine Mail — und dieselbe Antwort;
+ *    Prüfung, Link und Mail laufen erst nach der Antwort (nachDerAntwort), ein
+ *    Versandfehler geht nur an Sentry — auch er verrät nichts;
  *  - Schließen: offene Bestellung oder Erstattung sperrt mit Grund (nichts
  *    geschrieben); falscher Hofname sperrt; sonst geschlossenAm bedingt,
  *    Sitzungen weg, Abos aus (optInEmail false), Protokoll;
@@ -16,6 +18,13 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+const nachlauf = vi.hoisted(() => ({ aufgaben: [] as Array<() => Promise<void>> }))
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: (a: () => Promise<void>) => void nachlauf.aufgaben.push(a) }))
+/** Was die Action nach der Antwort angestoßen hat, jetzt ausführen. */
+async function nachDerAntwortAusfuehren(): Promise<void> {
+  const aufgaben = nachlauf.aufgaben.splice(0)
+  for (const a of aufgaben) await a()
+}
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendEmailAendernLink: vi.fn(async () => ({ id: 'm-1' })), sendEmailGeaendertHinweis: vi.fn(async () => ({ id: 'm-2' })) }))
@@ -37,6 +46,7 @@ import { prisma } from '@/lib/prisma'
 import { verlangeFrischeBestaetigung, verlangeAdminAktion } from '@/server/admin-wache'
 import { erzeugeEinmalLink } from '@/server/geraete'
 import { sendEmailAendernLink } from '@/lib/email'
+import * as Sentry from '@sentry/nextjs'
 import { aendereAnmeldeEmail, exportiereAuskunftHof, exportiereAuskunftKundin, oeffneKontoWieder, schliesseKonto } from '@/server/actions/konto-anfragen'
 import { ADMIN_RECHT_FEHLER } from '@/lib/admin-rechte'
 import { KONTO_ANFRAGE_TEXT } from '@/lib/konto-anfragen'
@@ -47,6 +57,7 @@ const HOF = { name: 'Hof am Bach', slug: 'hof-am-bach', ownerId: 'u1', geschloss
 
 beforeEach(() => {
   vi.clearAllMocks()
+  nachlauf.aufgaben.length = 0
   wache.mockResolvedValue({ ok: true, userId: 'admin-1', sitzungId: 's1', mitPasskey: true })
   vi.mocked(prisma.farm.findUnique).mockResolvedValue(HOF as never)
   vi.mocked(prisma.order.count).mockResolvedValue(0 as never)
@@ -84,6 +95,11 @@ describe('Wache je Action', () => {
 describe('aendereAnmeldeEmail', () => {
   it('Link 24 Stunden mit Hash der neuen Adresse, Mail an die neue Adresse, Protokoll ohne Adresse', async () => {
     expect(await aendereAnmeldeEmail({ farmId: 'f1', neueAdresse: 'Neu@Example.com', grund: 'Anfrage im Postfach' })).toEqual({ ok: true })
+    // Prüfung, Link und Mail erst nach der Antwort — die Antwortzeit verrät nichts.
+    expect(prisma.user.count).not.toHaveBeenCalled()
+    expect(erzeugeEinmalLink).not.toHaveBeenCalled()
+    expect(sendEmailAendernLink).not.toHaveBeenCalled()
+    await nachDerAntwortAusfuehren()
     const link = vi.mocked(erzeugeEinmalLink).mock.calls[0][0]
     expect(link.userId).toBe('u1')
     expect(link.tage).toBe(1)
@@ -97,14 +113,30 @@ describe('aendereAnmeldeEmail', () => {
 
   it('Adresse eines anderen Kontos: kein Link, keine Mail — dieselbe Antwort', async () => {
     const frei = await aendereAnmeldeEmail({ farmId: 'f1', neueAdresse: 'neu@example.com', grund: 'Anfrage im Postfach' })
+    nachlauf.aufgaben.length = 0
     vi.clearAllMocks()
     wache.mockResolvedValue({ ok: true, userId: 'admin-1', sitzungId: 's1', mitPasskey: true })
     vi.mocked(prisma.farm.findUnique).mockResolvedValue(HOF as never)
     vi.mocked(prisma.user.count).mockResolvedValue(1 as never)
     const vergeben = await aendereAnmeldeEmail({ farmId: 'f1', neueAdresse: 'vergeben@example.com', grund: 'Anfrage im Postfach' })
     expect(vergeben).toEqual(frei)
+    await nachDerAntwortAusfuehren()
     expect(erzeugeEinmalLink).not.toHaveBeenCalled()
     expect(sendEmailAendernLink).not.toHaveBeenCalled()
+  })
+
+  it('Versandfehler bei freier Adresse: dieselbe Antwort, nur Sentry erfährt davon', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test-schluessel')
+    try {
+      vi.mocked(sendEmailAendernLink).mockResolvedValueOnce({ error: 'kaputt' } as never)
+      expect(await aendereAnmeldeEmail({ farmId: 'f1', neueAdresse: 'neu@example.com', grund: 'Anfrage im Postfach' })).toEqual({ ok: true })
+      await nachDerAntwortAusfuehren()
+      expect(sendEmailAendernLink).toHaveBeenCalledTimes(1)
+      expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), expect.objectContaining({ tags: expect.objectContaining({ aufgabe: 'link_resend' }) }))
+      expect(JSON.stringify(vi.mocked(Sentry.captureException).mock.calls)).not.toContain('example.com')
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 
   it('ungültige Adresse und die alte Adresse: eigener Satz, nichts angelegt', async () => {

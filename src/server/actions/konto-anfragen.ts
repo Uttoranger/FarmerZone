@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { env } from '@/lib/env'
 import { APP_URL } from '@/lib/umgebung-server'
 import { genauesIlikeMuster } from '@/lib/ilike-muster'
+import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { protokolliere } from '@/server/admin-protokoll'
 import { einmalTokenHash, erzeugeEinmalLink, loeseEinmalLinkEin } from '@/server/geraete'
@@ -90,7 +91,8 @@ function revalidiere(farmId: string, slug: string | null): void {
  * „Anmelde-E-Mail ändern …“: legt einen Einmal-Link (24 Stunden, Zweck
  * `email-aendern:<Hash der neuen Adresse>`) an und schickt ihn an die NEUE
  * Adresse. Hat schon ein anderes Konto die Adresse, entsteht kein Link und
- * keine Mail — die Antwort ist dieselbe. Bis zum Klick bleibt alles, wie es ist.
+ * keine Mail — die Antwort ist dieselbe, auch in der Zeit: Prüfung, Link und
+ * Versand laufen erst nach der Antwort. Bis zum Klick bleibt alles, wie es ist.
  */
 export async function aendereAnmeldeEmail(eingabe: unknown): Promise<Ergebnis> {
   const frisch = await verlangeFrischeBestaetigung({ recht: 'hoefe_freischalten' })
@@ -107,23 +109,33 @@ export async function aendereAnmeldeEmail(eingabe: unknown): Promise<Ergebnis> {
   if (!hof) return { error: KONTO_ANFRAGE_TEXT.nichtGefunden }
   if (normalisiereAdresse(hof.owner.email) === neueAdresse) return { error: KONTO_ANFRAGE_TEXT.email.gleich }
 
-  if (!(await adresseVergeben(neueAdresse, hof.ownerId))) {
-    const jetzt = new Date()
-    const token = await erzeugeEinmalLink({
-      userId: hof.ownerId,
-      zweck: einmalLinkZweck(EMAIL_AENDERN_ART, adressHash(neueAdresse)),
-      jetzt,
-      tage: EMAIL_AENDERN_TAGE,
-    })
-    const { sendEmailAendernLink } = await import('@/lib/email')
-    // Ohne RESEND_API_KEY schreibt sendRaw nur Betreff und Empfänger (gekürzt) ins Log — nie den Link.
-    const versand = await sendEmailAendernLink(neueAdresse, { hof: hof.name, link: emailBestaetigenLink(APP_URL, token) })
-    if (versand.error && process.env.RESEND_API_KEY) return { error: KONTO_ANFRAGE_TEXT.email.mailFehler }
-  }
+  // Link und Mail erst nach der Antwort (nachDerAntwort): Weder ein Versandfehler
+  // noch die Antwortzeit darf verraten, ob die Adresse frei ist (Freigabe 190, Punkt 1).
+  const { ownerId, name } = hof
+  nachDerAntwort(() => schickeEmailAendernLink(ownerId, name, neueAdresse))
 
   await protokolliere({ wer: frisch.userId, art: 'anmelde_email_angefragt', bezugArt: 'hof', bezugId: farmId, grund, mitPasskey: frisch.mitPasskey })
   revalidatePath(adminHofHref(farmId))
   return { ok: true }
+}
+
+/** Nachlauf von „Anmelde-E-Mail ändern“: Link anlegen und an die neue Adresse schicken — nur, wenn kein anderes Konto sie hat. Fehler gehen nur an Sentry. */
+async function schickeEmailAendernLink(userId: string, hof: string, neueAdresse: string): Promise<void> {
+  try {
+    if (await adresseVergeben(neueAdresse, userId)) return
+    const token = await erzeugeEinmalLink({
+      userId,
+      zweck: einmalLinkZweck(EMAIL_AENDERN_ART, adressHash(neueAdresse)),
+      jetzt: new Date(),
+      tage: EMAIL_AENDERN_TAGE,
+    })
+    const { sendEmailAendernLink } = await import('@/lib/email')
+    // Ohne RESEND_API_KEY schreibt sendRaw nur Betreff und Empfänger (gekürzt) ins Log — nie den Link.
+    const versand = await sendEmailAendernLink(neueAdresse, { hof, link: emailBestaetigenLink(APP_URL, token) })
+    if (versand.error && process.env.RESEND_API_KEY) meldeNachlauf('link_resend', new Error('resend'))
+  } catch (err) {
+    meldeNachlauf('link', err)
+  }
 }
 
 export type EmailBestaetigenErgebnis = { ok: true } | { error: string; ungueltig?: true }
@@ -173,7 +185,8 @@ export async function bestaetigeEmailAenderung(eingabe: unknown): Promise<EmailB
   }
   if (ausgang.art === 'vergeben') return { error: EMAIL_BESTAETIGEN_TEXT.nichtVerwendbar }
 
-  await sagEsDerAltenAdresse(ausgang.userId, ausgang.alteAdresse, ausgang.hof?.name ?? null, jetzt)
+  const { userId, alteAdresse, hof } = ausgang
+  nachDerAntwort(() => sagEsDerAltenAdresse(userId, alteAdresse, hof?.name ?? null, jetzt))
   await protokolliere({ wer: null, art: 'anmelde_email_geaendert', bezugArt: ausgang.hof ? 'hof' : 'person', bezugId: ausgang.hof?.id ?? ausgang.userId, mitPasskey: false })
   return { ok: true }
 }
