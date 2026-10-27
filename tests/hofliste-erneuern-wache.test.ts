@@ -112,7 +112,7 @@ describe('Wache: jeder Storno erneuert die Hofliste', () => {
 
     // Die Suche findet die bekannten Wege (sonst bewiese „keine Lücke“ nichts).
     const dateien = new Set(alle.map((b) => b.stelle.split(':')[0]))
-    expect(dateien).toContain('src/server/actions/orders.ts')
+    expect(dateien).toContain('src/server/stornieren.ts')
     expect(dateien).toContain('src/server/unbezahlte-bestellung.ts')
     expect(alle.filter((b) => !b.ruft).map((b) => b.stelle)).toEqual([])
   }, 30_000)

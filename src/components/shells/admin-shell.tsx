@@ -21,7 +21,8 @@ import { AdminAbmeldenKnopf, AdminKontoMenue, PLAKETTEN_KREIS } from '@/componen
 import { MenueZielAnbieter } from '@/components/ui/menue-ziel'
 import { MARKE } from '@/lib/marke'
 import { ADMIN_POSTFACH_TEXT } from '@/lib/postfach'
-import { BETRIEB_TEXT, warnungenText, type BetriebHinweis } from '@/lib/betrieb'
+import { warnungenText, type BetriebHinweis } from '@/lib/betrieb'
+import type { AufgabenLeiste } from '@/lib/admin-aufgaben'
 
 /*
  * Die Shell des Betreiber-Bereichs im neuen Design (Gate 2): eigene
@@ -51,10 +52,13 @@ import { BETRIEB_TEXT, warnungenText, type BetriebHinweis } from '@/lib/betrieb'
  * Plakette, am Handy öffnet die Plakette ein Menü (components/shells/admin-konto.tsx)
  * — derselbe Weg wie in der HofShell, danach /login/admin.
  *
- * Seit Nr. 103 (Register N15/N18) der Reiter Betrieb: ein Punkt am Reiter und
- * rechts in der Betriebsleiste der Hinweis mit Link, solange eine Warnung
- * offen ist. Ob, entscheidet der Server (ladeAdminbereich, nur in der
- * Produktion); die Shell bekommt nur Zahl und Text.
+ * Seit Nr. 103 (Register N15/N18) der Reiter Betrieb: ein Punkt am Reiter,
+ * solange eine Warnung offen ist. Ob, entscheidet der Server (ladeAdminbereich,
+ * nur in der Produktion); die Shell bekommt nur Zahl und Text.
+ *
+ * Seit Nr. 185 (Register N32) steht rechts in der Betriebsleiste statt der
+ * einzelnen Warnung „n offen · m überfällig – ansehen“ mit Link auf Heute —
+ * die Zahl aus derselben Quelle wie „Braucht dich“ (ladeAdminAufgaben).
  */
 
 export type AdminShellProps = {
@@ -74,8 +78,10 @@ export type AdminShellProps = {
    * umgebung-server.ts) — nur Text und Ton, nie der Schlüssel.
    */
   stripeMarke?: StripeMarke | null
-  /** Register N15/N18: offene Warnungen von Admin › Betrieb — Punkt am Reiter und Hinweis in der Betriebsleiste. */
+  /** Register N15/N18: offene Warnungen von Admin › Betrieb — der Punkt am Reiter. */
   betrieb?: BetriebHinweis | null
+  /** Register N32 (Nr. 185): „n offen · m überfällig – ansehen“ aus „Braucht dich“ — rechts in der Betriebsleiste; null = nichts offen. */
+  aufgaben?: AufgabenLeiste | null
   /**
    * Nur für die Vorschau unter /intern: ersetzt das echte Abmelden, damit der
    * Admin vor der Vorschau nicht abgemeldet wird (wie bei der HofShell).
@@ -146,10 +152,12 @@ export function AdminShell({
   testbetrieb = false,
   stripeMarke = null,
   betrieb = null,
+  aufgaben = null,
   onAbmelden,
   children,
 }: AdminShellProps): React.JSX.Element {
   const pathname = usePathname()
+  const leiste = aufgaben
   const aktiv = adminAktiverReiter(pathname)
   const anzeige = personName.trim() || 'Dein Konto'
 
@@ -242,23 +250,23 @@ export function AdminShell({
           <div ref={menueZiel} data-menue-ziel="" />
           {/* Betriebsleiste (Register Z3): welcher Stripe-Modus gilt. Eine eigene Zeile
               unter dem Kopf statt in ihm: Die Kopfzeile ist am Handy und bis 1024 px
-              schon voll. Rechts seit Nr. 103 der Hinweis auf eine offene Warnung
-              (Register N15). Ohne Marke und ohne Warnung keine Leiste. Seit Nr. 161
-              nennt er eine wartende wichtige Mail und führt dann zu Betrieb › E-Mails. */}
-          {(stripeMarke || betrieb) && (
+              schon voll. Rechts seit Nr. 185 „n offen · m überfällig – ansehen“
+              (Register N32) statt der einzelnen Warnung von Nr. 103/161. Ohne Marke
+              und ohne offene Aufgabe keine Leiste. */}
+          {(stripeMarke || leiste) && (
             <div className="flex min-h-11 items-center gap-3 border-t border-border px-4 md:px-8">
               {stripeMarke && <StatusBadge status={stripeMarke.ton}>{stripeMarke.text}</StatusBadge>}
-              {betrieb && (
+              {leiste && (
                 <Link
-                  href={betrieb.href}
+                  href={leiste.href}
                   className={cn(
                     'ml-auto inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md text-[13px] font-semibold text-status-offen hover:underline',
                     FOKUS_RAHMEN
                   )}
                 >
                   <TriangleAlert className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
-                  <span className="truncate sm:hidden">{betrieb.kurz}</span>
-                  <span className="hidden truncate sm:inline">{BETRIEB_TEXT.leiste(betrieb.text)}</span>
+                  <span className="truncate sm:hidden">{leiste.kurz}</span>
+                  <span className="hidden truncate sm:inline">{leiste.text}</span>
                 </Link>
               )}
             </div>

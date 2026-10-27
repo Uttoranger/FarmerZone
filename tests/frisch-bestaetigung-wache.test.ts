@@ -22,7 +22,9 @@ const HEIKLE_AKTIONEN: Array<{ datei: string; namen: string[] }> = [
   // Ergänzung 23.10.2026 (Nr. 154): Freischalten, Servicegebühr, „Gründungshof bis", Rundschreiben, Empfänger, Startseite.
   { datei: 'src/server/actions/admin.ts', namen: ['revokeFarmApprovalAction', 'rejectFarmAction', 'approveFarmAction', 'setServiceFeeAction', 'setzeGruendungBisAction'] },
   { datei: 'src/server/actions/gruendung.ts', namen: ['nimmAusGruendung', 'nimmWiederAuf', 'schreibeZusagenFest', 'markiereAlsTesthof', 'nimmTesthofZurueck'] },
-  { datei: 'src/server/actions/postfach.ts', namen: ['markiereErstattungErledigt', 'sendeRundschreiben', 'fuegeEmpfaengerHinzu'] },
+  { datei: 'src/server/actions/postfach.ts', namen: ['sendeRundschreiben', 'fuegeEmpfaengerHinzu'] },
+  // Nr. 186: Admin › Bestellungen — „Außerhalb erstattet“ (aus dem Postfach hierher), volle Adresse, Notfall-Storno.
+  { datei: 'src/server/actions/admin-bestellung.ts', namen: ['markiereErstattungErledigt', 'zeigeKundinAdresse', 'notfallStorno'] },
   { datei: 'src/server/actions/startseite.ts', namen: ['veroeffentlicheStartseite'] },
   { datei: 'src/server/actions/admin-anmeldung.ts', namen: ['erstelleErsatzcodes', 'entfernePasskey', 'pruefeFrischFuerPasskey'] },
   // Nr. 188 (Audit D10): was live wirkt oder löscht — Zurückziehen, Block löschen, Ablegen, Kostenposten, Gründungs-Einstellungen.
@@ -31,6 +33,8 @@ const HEIKLE_AKTIONEN: Array<{ datei: string; namen: string[] }> = [
   { datei: 'src/server/actions/finanzen.ts', namen: ['kostenpostenAnlegen', 'kostenpostenAendern', 'kostenpostenBeenden', 'kostenpostenLoeschen'] },
   { datei: 'src/server/actions/plattform-einstellung.ts', namen: ['speichereGruendungEinstellung'] },
   { datei: 'src/server/actions/postfach.ts', namen: ['entferneEmpfaenger', 'speichereZustellRegeln'] },
+  // Nr. 187 (N34): Hof sperren und Sperre aufheben.
+  { datei: 'src/server/actions/admin-hof.ts', namen: ['sperreHof', 'hebeHofSperreAuf'] },
 ]
 
 const EXPORTE = ['src/app/admin/finanzen/export/route.ts', 'src/app/admin/betrieb/export/route.ts', 'src/app/admin/betrieb/bilder-export/route.ts']
@@ -53,6 +57,10 @@ const OBERFLAECHEN: Array<{ datei: string; aktionen: string[] }> = [
   { datei: 'src/app/admin/finanzen/kosten-sheet.tsx', aktionen: ['kostenpostenAnlegen', 'kostenpostenAendern', 'kostenpostenBeenden', 'kostenpostenLoeschen'] },
   { datei: 'src/components/admin/einstellungen-gruendung.tsx', aktionen: ['speichereGruendungEinstellung'] },
   { datei: 'src/components/admin/postfach-zustellung.tsx', aktionen: ['entferneEmpfaenger', 'speichereZustellRegeln'] },
+  // Nr. 186
+  { datei: 'src/app/admin/bestellungen/bestellung-aktionen.tsx', aktionen: ['markiereErstattungErledigt', 'zeigeKundinAdresse', 'notfallStorno'] },
+  // Nr. 187
+  { datei: 'src/components/admin/hof-akte-sperre-dialog.tsx', aktionen: ['sperreHof', 'hebeHofSperreAuf'] },
 ]
 
 function datei(quelltext: string): ts.SourceFile {

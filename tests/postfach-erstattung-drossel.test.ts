@@ -1,13 +1,11 @@
 /**
- * „Erstattung erledigt" und die Drossel der Mail „Ein Hof hat geantwortet"
- * (Register N14, Ergänzung; Nachtlauf Nr. 105) — die Actions mit gemockter
- * Datenbank. Den Zustand in Postgres und die echte Bremse prüft
- * tests/integration/postfach-ruhig.int.test.ts.
+ * Die Drossel der Mail „Ein Hof hat geantwortet" (Register N14, Ergänzung;
+ * Nachtlauf Nr. 105) — die Action mit gemockter Datenbank. Den Zustand in
+ * Postgres und die echte Bremse prüft tests/integration/postfach-ruhig.int.test.ts.
+ * „Erstattung erledigt" steht seit Nr. 186 in Admin › Bestellungen
+ * (tests/admin-bestellung.test.ts).
  *
  * Beweist:
- *  - markiereErstattungErledigt schreibt ohne Admin nichts; mit Admin genau
- *    EIN bedingtes Schreiben, das nur das Merkmal löscht; eine fremde oder
- *    schon erledigte Bestellung (0 Zeilen) ist kein Fehler.
  *  - Drossel mit fester Uhr: Antworten um 10:05 und 10:15 → eine Mail, um
  *    11:05 wieder eine (das Fenster ist die volle Stunde der Bremse). Die
  *    Frist der Drossel (1,5 s, danach geht die Mail, nach Sentry nur die Klasse)
@@ -56,14 +54,13 @@ import { prisma } from '@/lib/prisma'
 import { stelleMailEin } from '@/server/mail-warteschlange'
 import { bremseUeberAlleInstanzen, type Versuch } from '@/server/bremse-datenbank'
 import { DB_BREMSEN, fensterBeginn, innerhalbDerGrenze } from '@/lib/bremse-datenbank'
-import { antworteAlsHof, markiereErstattungErledigt } from '@/server/actions/postfach'
+import { antworteAlsHof } from '@/server/actions/postfach'
 import { adminSitzung } from './admin-sitzung'
 
 const getSession = vi.mocked(auth.api.getSession)
 const userFindUnique = vi.mocked(prisma.user.findUnique)
 const orderUpdateMany = vi.mocked(prisma.order.updateMany)
 
-const BESTELLUNG = 'cmfbestellung000000001ab'
 const FADEN = 'cmffaden0000000000001abc'
 
 async function arbeiteNachlaufAb(): Promise<void> {
@@ -76,37 +73,6 @@ beforeEach(() => {
   getSession.mockResolvedValue(adminSitzung('admin_1') as never)
   userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
   orderUpdateMany.mockResolvedValue({ count: 1 })
-})
-
-describe('markiereErstattungErledigt — nur Admin, nur das Merkmal', () => {
-  it('ohne Anmeldung wird nichts geschrieben', async () => {
-    getSession.mockResolvedValue(null as never)
-    expect(await markiereErstattungErledigt({ orderId: BESTELLUNG })).toEqual({ error: 'Nicht angemeldet.' })
-    expect(orderUpdateMany).not.toHaveBeenCalled()
-  })
-
-  it('angemeldet, aber kein Admin: wird nichts geschrieben', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: false } as never)
-    expect(await markiereErstattungErledigt({ orderId: BESTELLUNG })).toEqual({ error: 'Kein Zugriff.' })
-    expect(orderUpdateMany).not.toHaveBeenCalled()
-  })
-
-  it('löscht nur erstattungOffenSeit — bedingt auf eine offene Erstattung, sonst nichts', async () => {
-    expect(await markiereErstattungErledigt({ orderId: BESTELLUNG })).toEqual({ ok: true })
-    expect(orderUpdateMany).toHaveBeenCalledTimes(1)
-    expect(orderUpdateMany).toHaveBeenCalledWith({ where: { id: BESTELLUNG, erstattungOffenSeit: { not: null } }, data: { erstattungOffenSeit: null } })
-  })
-
-  it('fremde oder schon erledigte Bestellung: 0 Zeilen, kein Fehler', async () => {
-    orderUpdateMany.mockResolvedValue({ count: 0 })
-    expect(await markiereErstattungErledigt({ orderId: BESTELLUNG })).toEqual({ ok: true })
-  })
-
-  it('eine Kennung, die keine cuid ist, oder ein Feld mehr: fester Satz, nichts geschrieben', async () => {
-    expect(await markiereErstattungErledigt({ orderId: 'abc' })).toEqual({ error: 'Das hat nicht geklappt. Bitte lade die Seite neu.' })
-    expect(await markiereErstattungErledigt({ orderId: BESTELLUNG, betrag: 100 })).toEqual({ error: 'Das hat nicht geklappt. Bitte lade die Seite neu.' })
-    expect(orderUpdateMany).not.toHaveBeenCalled()
-  })
 })
 
 describe('Drossel: „Ein Hof hat geantwortet" höchstens einmal je Faden und voller Stunde', () => {

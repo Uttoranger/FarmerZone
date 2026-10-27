@@ -4,7 +4,7 @@ import { istGebindeGesperrt } from '@/lib/futter-registrierung'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
-import { kaufSperre, kaufSperreHinweis } from '@/lib/bereiche-anzeige'
+import { HOF_GESPERRT_SATZ, kaufSperre, kaufSperreHinweis } from '@/lib/bereiche-anzeige'
 import { alsAbholFenster, ausgebuchteTage } from '@/server/abholfenster'
 import { leseBestellstopp } from '@/server/queries/plattform-einstellung'
 import { bestellstoppAktiv } from '@/lib/notbremse'
@@ -55,12 +55,14 @@ export const HOF_KAUFBARKEIT_AUSWAHL = {
   isPaused: true,
   archivedAt: true,
   approvedAt: true,
+  // Sperre durch das Team (Register N34, Nr. 187) — nur ob, nie der Grund.
+  adminGesperrtAm: true,
   pickupSlots: { where: { isActive: true }, select: { dayOfWeek: true, startTime: true, endTime: true } },
 } satisfies Prisma.FarmSelect
 
 export type HofZurKaufbarkeit = Prisma.FarmGetPayload<{ select: typeof HOF_KAUFBARKEIT_AUSWAHL }>
 
-export type HofSperrGrund = 'notbremse' | 'stillgelegt' | 'nicht-freigeschaltet' | 'pause' | 'keine-abholzeit' | 'ausgebucht'
+export type HofSperrGrund = 'notbremse' | 'stillgelegt' | 'nicht-freigeschaltet' | 'admin-gesperrt' | 'pause' | 'keine-abholzeit' | 'ausgebucht'
 
 /** Der Code der 409-Antwort bei Notbremse — /api/warenkorb/pruefen und /api/checkout (Nr. 189). */
 export const BESTELLSTOPP_CODE = 'BESTELLSTOPP'
@@ -93,6 +95,9 @@ export async function pruefeBestellstopp(jetzt: Date): Promise<HofSperre | null>
  *  1. Stilllegung — der dauerhafte Zustand sticht den vorübergehenden
  *     (src/lib/farm-archive.ts),
  *  2. Freischaltung — nach der Stilllegung, vor der Pause (src/lib/farm-approval.ts),
+ *  2b. Sperre durch das Team (Register N34, Nr. 187) — direkt nach der
+ *     Freischaltung, mit dem neutralen Satz (HOF_GESPERRT_SATZ); der Hof kann
+ *     sie nicht selbst aufheben, die Pause bleibt davon unabhängig,
  *  3. Pause,
  *  4. Kaufsperre (keine Abholzeit, ausgebucht) — dieselbe Regel und Zählung
  *     wie die Kasse (`kaufSperre`, `ausgebuchteTage`).
@@ -119,6 +124,7 @@ export async function pruefeKaufbarkeitHoefe(
     gesehen.add(hof.id)
     if (hof.archivedAt) sperren.set(hof.id, { grund: 'stillgelegt', text: FARM_ARCHIVED_MESSAGE })
     else if (!hof.approvedAt) sperren.set(hof.id, { grund: 'nicht-freigeschaltet', text: FARM_NOT_APPROVED_MESSAGE })
+    else if (hof.adminGesperrtAm) sperren.set(hof.id, { grund: 'admin-gesperrt', text: HOF_GESPERRT_SATZ })
     else if (hof.isPaused) sperren.set(hof.id, { grund: 'pause', text: SHOP_PAUSED_MESSAGE })
     else offen.push(hof)
   }

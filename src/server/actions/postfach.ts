@@ -23,7 +23,6 @@ import {
 import {
   empfaengerEntfernenSchema,
   empfaengerHinzufuegenSchema,
-  erstattungErledigtSchema,
   gelesenSchema,
   hofAntwortSchema,
   teamAntwortSchema,
@@ -316,30 +315,6 @@ export async function markiereGelesenTeam(eingabe: unknown): Promise<Ergebnis> {
   if (!nachricht) return { error: POSTFACH_FEHLER.nichtGefunden }
 
   await prisma.$transaction(async (tx) => setzeLesestand(tx, unterhaltungId, 'TEAM', nachricht.createdAt))
-  revalidatePath(ADMIN_POSTFACH_HREF)
-  return { ok: true }
-}
-
-/**
- * „Erstattung erledigt" (Register N14, Ergänzung; Nr. 105): Der Admin hat im
- * Stripe-Dashboard erstattet und schließt die Aufgabe. Es ändert sich NUR das
- * Merkmal Order.erstattungOffenSeit — kein Geld, keine Mail, kein Aufruf bei
- * Stripe. Bedingt geschrieben: Eine unbekannte oder schon erledigte
- * Bestellung ergibt 0 Zeilen und keinen Fehler — der gewünschte Zustand
- * (keine offene Erstattung) gilt dann schon.
- */
-export async function markiereErstattungErledigt(eingabe: unknown): Promise<Ergebnis> {
-  // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
-  const frisch = await verlangeFrischeBestaetigung({ recht: 'geld' })
-  if ('error' in frisch) return { error: frisch.error }
-  const geprueft = erstattungErledigtSchema.safeParse(eingabe)
-  if (!geprueft.success) return { error: satzAus(geprueft.error) }
-
-  const { count } = await prisma.order.updateMany({
-    where: { id: geprueft.data.orderId, erstattungOffenSeit: { not: null } },
-    data: { erstattungOffenSeit: null },
-  })
-  if (count > 0) await protokolliere({ wer: frisch.userId, art: 'erstattung_erledigt', bezugArt: 'bestellung', bezugId: geprueft.data.orderId, mitPasskey: frisch.mitPasskey })
   revalidatePath(ADMIN_POSTFACH_HREF)
   return { ok: true }
 }

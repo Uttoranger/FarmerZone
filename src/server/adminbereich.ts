@@ -7,6 +7,8 @@ import * as Sentry from '@sentry/nextjs'
 import { UMGEBUNG } from '@/lib/umgebung-server'
 import { fehlerKlasse, type BetriebHinweis } from '@/lib/betrieb'
 import { ladeBetriebHinweis } from '@/server/queries/betrieb'
+import { ladeAdminAufgaben } from '@/server/queries/admin-heute'
+import { aufgabenLeiste, aufgabenZahl, type AufgabenLeiste } from '@/lib/admin-aufgaben'
 
 export type Adminbereich = {
   personName: string
@@ -26,6 +28,12 @@ export type Adminbereich = {
    * (Register N15/N18) — nur in der Produktion, sonst null.
    */
   betrieb: BetriebHinweis | null
+  /**
+   * „n offen · m überfällig – ansehen“ rechts in der Betriebsleiste (Register
+   * N32, Nr. 185) — dieselbe Quelle wie „Braucht dich“ auf Heute. null, wenn
+   * nichts offen ist, im Pflicht-Zustand und wenn das Laden scheitert.
+   */
+  aufgaben: AufgabenLeiste | null
 }
 
 /**
@@ -40,6 +48,18 @@ async function ladeBetriebHinweisSicher(): Promise<BetriebHinweis | null> {
     const meldung = new Error('Betrieb: Hinweis der Shell nicht gelesen')
     meldung.name = fehlerKlasse(err)
     Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'betrieb', grund: 'shell-hinweis' } })
+    return null
+  }
+}
+
+/** Wie der Punkt: Die Zahl darf den Admin nie aufhalten — scheitert eine Quelle, fehlt nur die Zeile (Sentry, nur die Klasse). */
+async function ladeAufgabenLeisteSicher(jetzt: Date): Promise<AufgabenLeiste | null> {
+  try {
+    return aufgabenLeiste(aufgabenZahl(await ladeAdminAufgaben(jetzt, { mitBetrieb: UMGEBUNG.vercelProduktion })))
+  } catch (err) {
+    const meldung = new Error('Heute: Zahl der Betriebsleiste nicht gelesen')
+    meldung.name = fehlerKlasse(err)
+    Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'admin', grund: 'shell-aufgaben' } })
     return null
   }
 }
@@ -65,13 +85,14 @@ export async function ladeAdminbereich(): Promise<Adminbereich> {
   const { userId, inhaltOffen } = await verlangeAdminShell()
   if (!inhaltOffen) {
     const nutzer = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true, farm: { select: { id: true } } } })
-    return { personName: nutzer?.name ?? '', hatHof: kontoHatHof({ rolle: nutzer?.role, hofVorhanden: nutzer?.farm != null }), betrieb: null }
+    return { personName: nutzer?.name ?? '', hatHof: kontoHatHof({ rolle: nutzer?.role, hofVorhanden: nutzer?.farm != null }), betrieb: null, aufgaben: null }
   }
-  const [nutzer, hoefe, offen, betrieb] = await Promise.all([
+  const [nutzer, hoefe, offen, betrieb, aufgaben] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true, farm: { select: { id: true } } } }),
     zaehleWartendeHoefe(),
     zaehleOffenImEingang(),
     ladeBetriebHinweisSicher(),
+    ladeAufgabenLeisteSicher(new Date()),
   ])
   // Ein Postfach, eine Zahl (Register N14): dieselbe Zählung wie „Offen" im Eingang —
   // ungelesene Antworten, Meldungen NEU/GEPRUEFT, wartende Höfe, offene Erstattungen.
@@ -81,5 +102,6 @@ export async function ladeAdminbereich(): Promise<Adminbereich> {
     hatHof: kontoHatHof({ rolle: nutzer?.role, hofVorhanden: nutzer?.farm != null }),
     zahlen: { hoefe, briefkasten },
     betrieb,
+    aufgaben,
   }
 }

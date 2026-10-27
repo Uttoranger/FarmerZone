@@ -92,8 +92,8 @@ describe('getPublicFarm — nur Ja/Nein, nie die Nummer', () => {
 
   it('Quelltext: Hofseite und Hofliste nehmen den Platz vor dem Rückgabewert heraus', () => {
     const quelle = readFileSync(join(process.cwd(), 'src/server/queries/farm.ts'), 'utf8')
-    // Hofseite und Vorschau des Besitzers: beide entpacken die Felder, bevor der Rest gespreizt wird.
-    expect(quelle.match(/const \{ betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, \.\.\.rest \} = farm/g)).toHaveLength(2)
+    // Hofseite und Vorschau des Besitzers: beide entpacken die Felder, bevor der Rest gespreizt wird (seit Nr. 187 auch die Sperre — nur das Ja/Nein geht weiter).
+    expect(quelle.match(/const \{ betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, adminGesperrtAm, \.\.\.rest \} = farm/g)).toHaveLength(2)
     // Hofliste: das Ergebnis nennt nur das Ja/Nein.
     const start = quelle.indexOf('return hoefe.map((hof) => {')
     const rueckgabe = quelle.slice(start, quelle.indexOf('\n  })\n', start))

@@ -62,7 +62,11 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
+// Die Zahl der Betriebsleiste (Nr. 185) prüft tests/admin-heute.test.ts; hier nur, dass sie ohne Passkey nicht geladen wird.
+vi.mock('@/server/queries/admin-heute', () => ({ ladeAdminAufgaben: vi.fn(async () => []) }))
+
 import { ladeAdminbereich } from '@/server/adminbereich'
+import { ladeAdminAufgaben } from '@/server/queries/admin-heute'
 import { NextRequest } from 'next/server'
 import { GET as meldungenUmleitung } from '@/app/admin/meldungen/route'
 import { GET as meldungUmleitung } from '@/app/admin/meldungen/[id]/route'
@@ -164,14 +168,17 @@ const SEITEN = [...seiten(ADMIN)]
 const PFLICHTSEITE = join(ADMIN, 'einrichten', 'page.tsx')
 
 describe('jede Seite unter /admin', () => {
-  it('es gibt die neun Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 93 die Einstellungen, seit Nr. 94 die Startseite, seit Nr. 103 Betrieb, seit Nr. 115 Bestätigen, Einrichten und Einstellungen › Anmeldung; /admin/meldungen leitet seit Nr. 101 als Route Handler um und prüft trotzdem)', () => {
+  it('es gibt die zwölf Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 93 die Einstellungen, seit Nr. 94 die Startseite, seit Nr. 103 Betrieb, seit Nr. 115 Bestätigen, Einrichten und Einstellungen › Anmeldung, seit Nr. 185 Höfe unter /admin/hoefe und Heute unter /admin, seit Nr. 186 Bestellungen, seit Nr. 187 die Akte unter /admin/hoefe/[id]; /admin/meldungen leitet seit Nr. 101 als Route Handler um und prüft trotzdem)', () => {
     expect(SEITEN.map((p) => relative(ADMIN, p).split(sep).join('/')).sort()).toEqual([
       'bestaetigen/page.tsx',
+      'bestellungen/page.tsx',
       'betrieb/page.tsx',
       'einrichten/page.tsx',
       'einstellungen/anmeldung/page.tsx',
       'einstellungen/page.tsx',
       'finanzen/page.tsx',
+      'hoefe/[id]/page.tsx',
+      'hoefe/page.tsx',
       'page.tsx',
       'postfach/page.tsx',
       'startseite/page.tsx',
@@ -416,7 +423,7 @@ describe('ladeAdminbereich — Verhalten', () => {
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
     // Meldungen 3 + ungelesene Antworten 4 + wartende Höfe 2 + offene Erstattung 1.
     // betrieb: null — Punkt und Hinweis von Admin › Betrieb nur in der Produktion (N15/N18, Nr. 103; tests/betrieb-seite.test.ts).
-    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, zahlen: { hoefe: 2, briefkasten: 3 + 4 + 2 + 1 }, betrieb: null })
+    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, zahlen: { hoefe: 2, briefkasten: 3 + 4 + 2 + 1 }, betrieb: null, aufgaben: null })
     expect(farmCount).toHaveBeenCalledWith({ where: { approvedAt: null } })
     expect(farmCount).toHaveBeenCalledWith({ where: { approvedAt: null, archivedAt: null } })
     expect(meldungCount).toHaveBeenCalledWith({ where: { status: { in: ['NEU', 'GEPRUEFT'] } } })
@@ -431,7 +438,8 @@ describe('ladeAdminbereich — Verhalten', () => {
       // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
       .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
-    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, betrieb: null })
+    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, betrieb: null, aufgaben: null })
+    expect(ladeAdminAufgaben).not.toHaveBeenCalled()
     expect(farmCount).not.toHaveBeenCalled()
     expect(meldungCount).not.toHaveBeenCalled()
     expect(orderCount).not.toHaveBeenCalled()
@@ -445,7 +453,8 @@ describe('ladeAdminbereich — Verhalten', () => {
       // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
       .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
-    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, betrieb: null })
+    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, betrieb: null, aufgaben: null })
+    expect(ladeAdminAufgaben).not.toHaveBeenCalled()
     expect(farmCount).not.toHaveBeenCalled()
     expect(meldungCount).not.toHaveBeenCalled()
     expect(ungelesenTeam).not.toHaveBeenCalled()

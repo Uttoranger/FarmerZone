@@ -174,6 +174,8 @@ export type PublicFarm = {
   stripeAccountReady: boolean
   isPaused: boolean
   pauseMessage: string | null
+  /** Vom Team gesperrt (Register N34, Nr. 187) — nur das Ja/Nein, nie der Grund; kaufSperre liest es. */
+  adminGesperrt?: boolean
   // Servicegebühr-Einstellung des Hofes (Sprint servicegebuehr): Der Checkout
   // zeigt die Gebühr VORAB mit derselben Rechnung wie der Server
   // (src/lib/servicegebuehr.ts). Prozent als Zahl (Decimal ist nicht über die
@@ -415,6 +417,8 @@ export async function getPublicFarmMitTeilen(wo: { slug: string } | { id: string
       stripeAccountReady: true,
       isPaused: true,
       pauseMessage: true,
+      // Sperre des Teams (N34, Nr. 187): geht nur als Ja/Nein weiter.
+      adminGesperrtAm: true,
       serviceFeePercent: true,
       serviceFeeMinCents: true,
       serviceFeeActiveFrom: true,
@@ -454,7 +458,7 @@ export async function getPublicFarmMitTeilen(wo: { slug: string } | { id: string
       : DEFAULT_SECTIONS
 
   // Die Felder des Abzeichens (auch die Nummer des Platzes) fallen hier heraus — nur das Ja/Nein geht weiter.
-  const { betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, ...rest } = farm
+  const { betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, adminGesperrtAm, ...rest } = farm
   // Die Verpackung bleibt auf dem Server: Sie geht nur in die Rohwerte des Teilen-Bilds.
   const produkte = farm.products.map(({ verpackung, ...p }) => ({ verpackung, p }))
   const teilen: TeilenRoh = {
@@ -463,6 +467,7 @@ export async function getPublicFarmMitTeilen(wo: { slug: string } | { id: string
   }
   const oeffentlich: PublicFarm = {
     ...rest,
+    adminGesperrt: adminGesperrtAm !== null,
     ...abzeichenDaten({ approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen }),
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
     // Json aus der Datenbank nur über leseAusschnitt: Ein ungültiger Wert ergibt null, nie einen Fehler auf der Hofseite.
@@ -527,6 +532,8 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       stripeAccountReady: true,
       isPaused: true,
       pauseMessage: true,
+      // Sperre des Teams (N34, Nr. 187): geht nur als Ja/Nein weiter.
+      adminGesperrtAm: true,
       serviceFeePercent: true,
       serviceFeeMinCents: true,
       serviceFeeActiveFrom: true,
@@ -565,9 +572,10 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       : DEFAULT_SECTIONS
 
   // Die Felder des Abzeichens (auch die Nummer des Platzes) fallen hier heraus — nur das Ja/Nein geht weiter.
-  const { betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, ...rest } = farm
+  const { betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, adminGesperrtAm, ...rest } = farm
   return {
     ...rest,
+    adminGesperrt: adminGesperrtAm !== null,
     ...abzeichenDaten({ approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen }),
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
     // Json aus der Datenbank nur über leseAusschnitt: Ein ungültiger Wert ergibt null, nie einen Fehler auf der Hofseite.

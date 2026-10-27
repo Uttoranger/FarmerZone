@@ -27,6 +27,9 @@ export const ADMIN_AKTIONEN = [
   'testhof_markiert',
   'testhof_zurueckgenommen',
   'rundschreiben_gesendet',
+  // Eingriffe (Recht hof_sperren_storno, N34)
+  'hof_gesperrt',
+  'hof_sperre_aufgehoben',
   // Briefkasten und Postfach (ansehen)
   'meldung_triagiert',
   'meldung_buendel_stand',
@@ -45,7 +48,11 @@ export const ADMIN_AKTIONEN = [
   'kostenposten_beendet',
   'kostenposten_geloescht',
   'finanzen_export',
+  // Bestellungen (Nr. 186): „Außerhalb erstattet“ (Recht geld)
   'erstattung_erledigt',
+  // Bestellungen (Nr. 186): volle Adresse nach Grund (Recht adresse_anzeigen), Notfall-Storno (Recht hof_sperren_storno)
+  'adresse_angezeigt',
+  'notfall_storno',
   // Benachrichtigungen (Recht benachrichtigungen)
   'empfaenger_hinzugefuegt',
   'empfaenger_entfernt',

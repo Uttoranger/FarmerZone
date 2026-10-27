@@ -21,13 +21,13 @@ export const metadata: Metadata = {
 }
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }): Promise<React.JSX.Element> {
-  const { personName, hatHof, zahlen, betrieb } = await ladeAdminbereich()
+  const { personName, hatHof, zahlen, betrieb, aufgaben } = await ladeAdminbereich()
 
   // Testbetrieb (Register Z2): Produktion mit Test-Schlüssel — nur der Wahrheitswert geht an die Shell.
   // Betriebsleiste (Register Z3, Korrektur Nr. 94): der Stripe-Modus, als Text und Ton;
-  // rechts seit Nr. 103 (N15/N18) der Hinweis auf eine offene Warnung — nur in der Produktion.
+  // rechts seit Nr. 185 (N32) „n offen · m überfällig“ aus Heute; der Punkt am Reiter Betrieb (N15/N18) nur in der Produktion.
   return (
-    <AdminShell personName={personName} hatHof={hatHof} zahlen={zahlen} testbetrieb={TESTBETRIEB} stripeMarke={STRIPE_MARKE} betrieb={betrieb}>
+    <AdminShell personName={personName} hatHof={hatHof} zahlen={zahlen} testbetrieb={TESTBETRIEB} stripeMarke={STRIPE_MARKE} betrieb={betrieb} aufgaben={aufgaben}>
       {children}
     </AdminShell>
   )

@@ -240,7 +240,8 @@ const AUSNAHMEN: Ausnahme[] = [
  * sich selbst belegt; der Grund steht im Aufruf, nicht hier (seit Nr. 85).
  */
 const BEKANNT_OHNE: Array<{ datei: string; titel: string }> = [
-  { datei: 'src/components/admin/hoefe-ansicht.tsx', titel: 'Noch kein Hof freigeschaltet' },
+  { datei: 'src/components/admin/hoefe-ansicht.tsx', titel: 'HOEFE_LISTE_TEXT.leerTitel' },
+  { datei: 'src/components/admin/hof-akte-ansicht.tsx', titel: 'AKTE_PROTOKOLL_LEER.titel' },
   { datei: 'src/components/admin/briefkasten-teile.tsx', titel: 'WUNSCHLISTE_LEER.titel' },
   { datei: 'src/components/admin/meldungen-teile.tsx', titel: 'WUENSCHE_LEER.titel' },
   { datei: 'src/components/analytics/umfeld-anzeige.tsx', titel: 'Noch keine Höfe zum Vergleichen' },
@@ -257,7 +258,6 @@ const BEKANNT_OHNE: Array<{ datei: string; titel: string }> = [
  */
 const ALTLAST_IM_AUFRUF: Array<{ datei: string; text: string }> = [
   { datei: 'src/app/account/profile/profile-client.tsx', text: 'Du hast noch keine Benachrichtigungen abonniert.' },
-  { datei: 'src/components/admin/hoefe-ansicht.tsx', text: 'Noch kein Hof freigeschaltet' },
   { datei: 'src/components/analytics/umfeld-anzeige.tsx', text: 'Noch keine Höfe zum Vergleichen' },
   { datei: 'src/components/hof-bestellungen/bestellungen-ansicht.tsx', text: 'Noch keine Bestellungen' },
   { datei: 'src/components/hof-hilfe/meine-meldungen.tsx', text: 'Noch keine Meldungen' },

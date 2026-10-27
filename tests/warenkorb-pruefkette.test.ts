@@ -4,7 +4,7 @@
  *
  * Beweist:
  *  - `pruefeKaufbarkeitHof` liefert in der Reihenfolge Stilllegung →
- *    Freischaltung → Pause → Kaufsperre den ersten Grund mit dem Text, den
+ *    Freischaltung → Sperre des Teams (Nr. 187) → Pause → Kaufsperre den ersten Grund mit dem Text, den
  *    /api/reserve schon heute meldet, sonst null; die vollen Tage zählt sie
  *    nur für einen Hof, der die ersten drei Prüfungen besteht.
  *  - Besteht ein Hof nicht, erneuert der Warenkorb bei ihm keinen Halt, löscht
@@ -44,7 +44,7 @@ import { MAX_MENGE } from '@/lib/reservierung'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
-import { kaufSperreHinweis } from '@/lib/bereiche-anzeige'
+import { HOF_GESPERRT_SATZ, kaufSperreHinweis } from '@/lib/bereiche-anzeige'
 
 // Montag, 19. Oktober 2026, 10:00 Uhr in Wien. Im Vorlauf liegen die Mittwoche 21. und 28. Oktober.
 const JETZT = new Date('2026-10-19T08:00:00.000Z')
@@ -57,6 +57,7 @@ type Hof = {
   isPaused: boolean
   archivedAt: Date | null
   approvedAt: Date | null
+  adminGesperrtAm: Date | null
   pickupSlots: (typeof MITTWOCH)[]
 }
 
@@ -69,6 +70,7 @@ function hof(id: string, abweichung: Abweichung = {}): Hof {
     isPaused: false,
     archivedAt: null,
     approvedAt: new Date('2026-01-01T00:00:00.000Z'),
+    adminGesperrtAm: null,
     ...abweichung,
     pickupSlots: [...(abweichung.pickupSlots ?? [MITTWOCH])],
   }
@@ -160,6 +162,7 @@ describe('pruefeKaufbarkeitHof — EINE Prüfkette für Reservieren und Warenkor
   it.each([
     ['stillgelegt', { archivedAt: new Date('2026-09-01T00:00:00.000Z') }, FARM_ARCHIVED_MESSAGE],
     ['nicht-freigeschaltet', { approvedAt: null }, FARM_NOT_APPROVED_MESSAGE],
+    ['admin-gesperrt', { adminGesperrtAm: new Date('2026-10-18T00:00:00.000Z') }, HOF_GESPERRT_SATZ],
     ['pause', { isPaused: true }, SHOP_PAUSED_MESSAGE],
     ['keine-abholzeit', { pickupSlots: [] }, 'Noch nicht bestellbar.'],
   ] as const)('%s: Grund und der Text von /api/reserve', async (grund, abweichung, text) => {
@@ -184,6 +187,17 @@ describe('pruefeKaufbarkeitHof — EINE Prüfkette für Reservieren und Warenkor
     ).toBe('pause')
   })
 
+  it('Sperre des Teams (N34, Nr. 187): nach der Freischaltung, vor der Pause — und ohne Zählung der vollen Tage', async () => {
+    const gesperrt = { adminGesperrtAm: new Date('2026-10-18T00:00:00.000Z'), isPaused: true, pickupSlots: [] }
+    expect(await pruefeKaufbarkeitHof(hof('a', gesperrt), JETZT)).toEqual({ grund: 'admin-gesperrt', text: HOF_GESPERRT_SATZ })
+    // Freischaltung sticht die Sperre: Ein wartender Hof war nie offen.
+    expect((await pruefeKaufbarkeitHof(hof('a', { ...gesperrt, approvedAt: null }), JETZT))?.grund).toBe('nicht-freigeschaltet')
+    expect(volleTage).not.toHaveBeenCalled()
+    // Gegenprobe: aufgehoben → wieder die Pause bzw. bestellbar.
+    expect((await pruefeKaufbarkeitHof(hof('a', { ...gesperrt, adminGesperrtAm: null }), JETZT))?.grund).toBe('pause')
+    expect(await pruefeKaufbarkeitHof(hof('a', { adminGesperrtAm: null }), JETZT)).toBeNull()
+  })
+
   it('ein pausierter Hof kostet keine Zählung der vollen Tage', async () => {
     await pruefeKaufbarkeitHof(hof('a', { isPaused: true }), JETZT)
     expect(volleTage).not.toHaveBeenCalled()
@@ -195,6 +209,7 @@ describe('/api/warenkorb/pruefen — Hof besteht die Prüfkette nicht', () => {
     ['pausiert', { isPaused: true }, SHOP_PAUSED_MESSAGE],
     ['stillgelegt', { archivedAt: new Date('2026-09-01T00:00:00.000Z') }, FARM_ARCHIVED_MESSAGE],
     ['nicht freigeschaltet', { approvedAt: null }, FARM_NOT_APPROVED_MESSAGE],
+    ['vom Team gesperrt', { adminGesperrtAm: new Date('2026-10-18T00:00:00.000Z') }, HOF_GESPERRT_SATZ],
     ['ohne Abholzeit', { pickupSlots: [] }, 'Noch nicht bestellbar.'],
   ] as const)('%s: kein Halt erneuert, Halte gelöscht, Grund in der Meldung', async (_name, abweichung, text) => {
     stelleEin([{ id: 'eier', farm: hof('a', abweichung) }])
