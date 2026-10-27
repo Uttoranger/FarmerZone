@@ -9,6 +9,10 @@
  *    Mitternacht, das wäre der Vormonat.
  *  - Ein Posten kann nicht so verbogen werden, dass er in keinem Monat zählt
  *    (Beginn nach Ende). Die Bedingung steht in der WHERE-Klausel.
+ *  - Nach dem Monatsabschluss (Nr. 191, N37) brauchen Änderungen, die einen
+ *    abgeschlossenen Monat berühren, einen Grund — er steht im Protokoll.
+ *  - „Monat abschließen“ geht nur mit erledigter Prüfliste, nach dem
+ *    Monatsende und einmal; der Abschluss ist der Protokoll-Eintrag.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -20,7 +24,10 @@ vi.mock('@/lib/prisma', async () => ({
     // Die Wache liest seit Nr. 115 die Pflicht „erst Passkey“ (tests/admin-sitzung.ts).
     ...(await import('./admin-sitzung')).passkeyAttrappen(),
     user: { findUnique: vi.fn() },
+    adminAktion: { create: vi.fn(async () => ({ id: 'a1' })) },
     kostenposten: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(async () => []),
       create: vi.fn(),
       updateMany: vi.fn(),
       deleteMany: vi.fn(),
@@ -29,7 +36,15 @@ vi.mock('@/lib/prisma', async () => ({
   },
 }))
 
+// Abgeschlossene Monate und der Stand des Monats kommen aus dem Geld-Abgleich (src/server/geld-abgleich.ts).
+const geld = vi.hoisted(() => ({ abgeschlossen: new Map<string, Date>(), monat: vi.fn() }))
+vi.mock('@/server/queries/geld', () => ({
+  ladeAbgeschlosseneMonate: vi.fn(async () => geld.abgeschlossen),
+  ladeGeldMonat: geld.monat,
+}))
+
 import {
+  monatAbschliessen,
   kostenpostenAendern,
   kostenpostenAnlegen,
   kostenpostenBeenden,
@@ -63,6 +78,7 @@ function alsAdmin() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  geld.abgeschlossen = new Map()
   alsAdmin()
   create.mockResolvedValue({ id: 'k1' } as never)
   updateMany.mockResolvedValue({ count: 1 } as never)
@@ -241,5 +257,99 @@ describe('kostenpostenLoeschen', () => {
     expect(await kostenpostenLoeschen({ id: 'weg' })).toEqual({
       error: 'Diesen Posten gibt es nicht mehr.',
     })
+  })
+})
+
+describe('nach dem Monatsabschluss (Nr. 191): Kosten nur mit Grund', () => {
+  const findUnique = vi.mocked(prisma.kostenposten.findUnique)
+  const protokoll = vi.mocked(prisma.adminAktion.create)
+  beforeEach(() => {
+    geld.abgeschlossen = new Map([['2026-09', new Date('2026-10-03T07:00:00Z')]])
+    findUnique.mockResolvedValue({ ab: new Date('2026-01-01T00:00:00Z'), bis: null } as never)
+  })
+
+  it('Anlegen ab einem abgeschlossenen Monat ohne Grund: Satz mit dem Monat, nichts geschrieben', async () => {
+    expect(await kostenpostenAnlegen(GUELTIG)).toEqual({ error: 'September 2026 ist abgeschlossen. Schreib dazu, warum du die Kosten änderst.' })
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('mit Grund: geschrieben, und der Grund steht im Protokoll', async () => {
+    expect(await kostenpostenAnlegen({ ...GUELTIG, grund: 'Rechnung kam spät' })).toEqual({ ok: true })
+    expect(create).toHaveBeenCalledTimes(1)
+    expect(protokoll.mock.calls[0]?.[0]).toMatchObject({ data: { art: 'kostenposten_angelegt', grund: 'Rechnung kam spät' } })
+  })
+
+  it('ein Grund mit E-Mail-Adresse wird abgelehnt — nichts geschrieben', async () => {
+    const r = await kostenpostenAnlegen({ ...GUELTIG, grund: 'laut jemand@example.com' })
+    expect(r).toEqual({ error: expect.stringContaining('ohne E-Mail-Adresse') })
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('Gegenprobe: ab dem Monat danach braucht es keinen Grund', async () => {
+    expect(await kostenpostenAnlegen({ ...GUELTIG, ab: '2026-10' })).toEqual({ ok: true })
+  })
+
+  it('Ändern, Beenden vor dem abgeschlossenen Monat und Löschen berühren ihn — ohne Grund nichts', async () => {
+    expect(await kostenpostenAendern({ ...GUELTIG, id: 'k1', ab: '2026-10' })).toEqual({ error: expect.stringContaining('abgeschlossen') })
+    expect(await kostenpostenBeenden({ id: 'k1', monat: '2026-08' })).toEqual({ error: expect.stringContaining('abgeschlossen') })
+    expect(await kostenpostenLoeschen({ id: 'k1' })).toEqual({ error: expect.stringContaining('abgeschlossen') })
+    expect(updateMany).not.toHaveBeenCalled()
+    expect(deleteMany).not.toHaveBeenCalled()
+  })
+
+  it('Gegenprobe: Beenden NACH dem abgeschlossenen Monat lässt ihn, wie er war — kein Grund nötig', async () => {
+    expect(await kostenpostenBeenden({ id: 'k1', monat: '2026-10' })).toEqual({ ok: true })
+  })
+})
+
+describe('monatAbschliessen (Nr. 191)', () => {
+  const protokoll = vi.mocked(prisma.adminAktion.create)
+  const STAND = {
+    umsatz: { cents: 0, anzahl: 0, bar: 0 },
+    erstattungen: { cents: 0, anzahl: 0, offen: 0 },
+    stripeGebuehrCents: 0,
+    abweichungen: [],
+    abweichungenGesamt: 0,
+    lauf: null,
+    abgeschlossenAm: null,
+    abgleichNachMonatsende: true,
+    csvGeladen: true,
+  }
+  beforeEach(() => {
+    vi.mocked(prisma.kostenposten.findMany).mockResolvedValue([
+      { betrag: '25.00', rhythmus: 'MONATLICH', ab: new Date('2026-01-01T00:00:00Z'), bis: null },
+    ] as never)
+    geld.monat.mockResolvedValue(STAND)
+  })
+
+  it('alles erledigt: Eintrag `monat_abgeschlossen` mit Bezug Monat', async () => {
+    expect(await monatAbschliessen({ monat: '2026-09' })).toEqual({ ok: true })
+    expect(protokoll.mock.calls[0]?.[0]).toMatchObject({ data: { art: 'monat_abgeschlossen', bezugArt: 'monat', bezugId: '2026-09', wer: 'user_admin' } })
+  })
+
+  it('gesperrt bei offenem Punkt — mit Grund, ohne Eintrag', async () => {
+    geld.monat.mockResolvedValueOnce({ ...STAND, erstattungen: { cents: 0, anzahl: 1, offen: 1 } })
+    expect(await monatAbschliessen({ monat: '2026-09' })).toEqual({ error: 'Geht erst, wenn alles erledigt ist: 1 Erstattung offen.' })
+    geld.monat.mockResolvedValueOnce({ ...STAND, abgleichNachMonatsende: false })
+    expect(await monatAbschliessen({ monat: '2026-09' })).toEqual({ error: expect.stringContaining('Abgleich ist nach dem Monatsende noch nicht gelaufen') })
+    vi.mocked(prisma.kostenposten.findMany).mockResolvedValueOnce([] as never)
+    expect(await monatAbschliessen({ monat: '2026-09' })).toEqual({ error: expect.stringContaining('noch keine Kosten eingetragen') })
+    expect(protokoll).not.toHaveBeenCalled()
+  })
+
+  it('der laufende Monat, ein Unsinn-Monat und ein schon abgeschlossener: abgelehnt', async () => {
+    const heute = new Date()
+    const laufend = `${heute.getUTCFullYear()}-${String(heute.getUTCMonth() + 1).padStart(2, '0')}`
+    expect(await monatAbschliessen({ monat: laufend })).toEqual({ error: 'Einen Monat kannst du erst nach seinem Ende abschließen.' })
+    expect(await monatAbschliessen({ monat: '2026-13' })).toEqual({ error: 'Bitte wähle einen Monat.' })
+    geld.abgeschlossen = new Map([['2026-09', new Date()]])
+    expect(await monatAbschliessen({ monat: '2026-09' })).toEqual({ error: 'Dieser Monat ist schon abgeschlossen.' })
+    expect(protokoll).not.toHaveBeenCalled()
+  })
+
+  it('ohne Admin-Recht wirkt nichts', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: false } as never)
+    expect(await monatAbschliessen({ monat: '2026-09' })).toEqual({ error: expect.any(String) })
+    expect(protokoll).not.toHaveBeenCalled()
   })
 })

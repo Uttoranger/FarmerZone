@@ -110,6 +110,7 @@ export default async function AdminHeutePage({
       woche: roh.woche,
       dienste: { laufen: dienste.filter((d) => d.art === 'laeuft').length, von: dienste.length, ansehen: dienste.filter((d) => d.art === 'tun').map((d) => d.dienst), testbetrieb: TESTBETRIEB },
       hoefe: roh.hoefe,
+      geldAbgleichOk: roh.laeufe.get('geld-abgleich')?.ok === true,
     },
     aufgaben
   )

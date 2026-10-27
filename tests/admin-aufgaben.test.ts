@@ -94,6 +94,11 @@ const VOLL: AufgabenStand = {
     { id: 'hof-ohne-zeit', name: 'Hof Ohne Zeit', approvedAt: vor(60 * TAG), abholzeitAktiv: false, letzteBestellungAm: vor(TAG) },
     { id: 'hof-still', name: 'Hof Still', approvedAt: vor(90 * TAG), abholzeitAktiv: true, letzteBestellungAm: vor(16 * TAG) },
   ],
+  // Zwei Felder derselben Bestellung sind EINE Aufgabe (Nr. 191).
+  geldAbweichungen: [
+    { orderId: 'bestellung-1', orderNumber: 'HM-2610-C3D4', feld: 'betrag', differenzCents: 120, seit: vor(30 * STUNDE) },
+    { orderId: 'bestellung-1', orderNumber: 'HM-2610-C3D4', feld: 'gebuehr', differenzCents: -50, seit: vor(2 * STUNDE) },
+  ],
 }
 
 /** Was „erledigt“ je Quelle heißt: die Ursache fehlt im Stand. */
@@ -111,6 +116,7 @@ const ERLEDIGT: Record<AufgabeQuelle, Partial<AufgabenStand>> = {
   },
   hof_ohne_abholzeit: { hoefeAktiv: VOLL.hoefeAktiv.map((h) => ({ ...h, abholzeitAktiv: true, letzteBestellungAm: vor(TAG) })) },
   hof_ohne_bestellung: { hoefeAktiv: VOLL.hoefeAktiv.map((h) => ({ ...h, letzteBestellungAm: vor(2 * TAG) })) },
+  geld_abweichung: { geldAbweichungen: [] },
 }
 
 describe('Braucht dich: je Quelle da und wieder weg', () => {
@@ -349,6 +355,35 @@ describe('Alte Adresse der Höfe, Routine, Kommt, Protokoll', () => {
     const geld = k.find((x) => x.id === 'geld')!
     expect(geld.wert).toMatch(/^€ 1\D840$/)
     expect(geld.zeilen).toEqual([expect.stringMatching(/^Servicegebühr € 92,00$/)])
+  })
+
+  it('Geld · Woche nach dem Abgleich (Nr. 191): „stimmt“ ohne Abweichung, sonst die Zahl als Wort mit Ton; ohne Lauf keine Marke', () => {
+    const lage = {
+      bestellungen: { zurAbholung: 0, nichtGepackt: 0, storniert: 0 },
+      woche: { umsatzCents: 0, gebuehrCents: 0, anzahl: 0, anzahlVorwoche: 0 },
+      dienste: { laufen: 5, von: 5, ansehen: [], testbetrieb: false },
+      hoefe: { verkaufen: 1, warten: 0 },
+    }
+    const ohneLauf = lageKacheln(lage, []).find((x) => x.id === 'geld')!
+    expect(ohneLauf.marke).toBeNull()
+    const gut = lageKacheln({ ...lage, geldAbgleichOk: true }, []).find((x) => x.id === 'geld')!
+    expect(gut.marke).toEqual({ wort: 'stimmt', art: 'laeuft' })
+    expect(gut.zeilen[1]).toBe('Abgleich mit Stripe ohne Abweichung')
+    const abw = sammleAufgaben(VOLL, JETZT).filter((a) => a.quelle === 'geld_abweichung')
+    const schlecht = lageKacheln({ ...lage, geldAbgleichOk: true }, abw).find((x) => x.id === 'geld')!
+    expect(schlecht.marke).toEqual({ wort: '1 Abweichung', art: 'tun' })
+  })
+
+  it('Abweichung beim Geld: je Bestellung eine Aufgabe, Nummer und Felder mit Unterschied in Euro, Frist 24 h ab der ältesten, Ziel die Suche nach der Nummer', () => {
+    const [a] = ADMIN_AUFGABEN.geld_abweichung(VOLL, JETZT)
+    expect(a.bereich).toBe('Geld')
+    expect(a.bezug.kennung).toBe('HM-2610-C3D4')
+    expect(a.bezug.text).toBe('HM-2610-C3D4 · Betrag +€ 1,20 · Servicegebühr −€ 0,50')
+    expect(a.frist.ueberfaellig).toBe(true)
+    expect(a.ziel).toBe('/admin/bestellungen?suche=HM-2610-C3D4')
+    // Gegenprobe: jünger als 24 h → nicht überfällig.
+    const [jung] = ADMIN_AUFGABEN.geld_abweichung({ ...VOLL, geldAbweichungen: [{ ...VOLL.geldAbweichungen[1] }] }, JETZT)
+    expect(jung.frist.ueberfaellig).toBe(false)
   })
 
   it('Wochenzeile: weniger mit echtem Minus, gleich mit ±, ohne Vorwoche kein Prozent', () => {

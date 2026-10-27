@@ -4,6 +4,7 @@ import { ladeErstattungAufgaben, ladeHofAufgaben } from '@/server/queries/postfa
 import { ladeProbleme } from '@/server/queries/mails'
 import { ladeAeltesteWichtige, ladeLaeufe } from '@/server/queries/betrieb'
 import { getMeldungenFuerAdmin } from '@/server/queries/meldung'
+import { ladeOffeneAbweichungen } from '@/server/queries/geld'
 import { leseBestellstopp, lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
 import { naechsterTermin } from '@/server/queries/startseite'
 import { centAusDecimal } from '@/server/queries/umsatz'
@@ -71,6 +72,8 @@ export async function ladeAufgabenStand(jetzt: Date, { mitBetrieb }: { mitBetrie
           ladeAeltesteWichtige(),
           prisma.betriebWarnung.findMany({ where: { stufe: { gt: 0 } }, select: { art: true, stufe: true, seit: true } }),
           ladeLaeufe(),
+          // Der Geld-Abgleich läuft nur in der Produktion (Nr. 191) — außerhalb gibt es keine Zeilen.
+          ladeOffeneAbweichungen(),
         ])
       : null,
   ])
@@ -82,7 +85,7 @@ export async function ladeAufgabenStand(jetzt: Date, { mitBetrieb }: { mitBetrie
     meldungen: meldungen.map((m) => ({ id: m.id, art: m.art, createdAt: m.createdAt, ersteZeile: m.ersteZeile, von: meldungVon(m) })),
     hoefeAktiv,
     bestellstopp,
-    ...(betrieb ? { wartendeMail: betrieb[0], warnungen: betrieb[1], laeufe: betrieb[2] } : {}),
+    ...(betrieb ? { wartendeMail: betrieb[0], warnungen: betrieb[1], laeufe: betrieb[2], geldAbweichungen: betrieb[3] } : {}),
   }
 }
 

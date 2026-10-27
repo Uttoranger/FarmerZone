@@ -25,7 +25,8 @@ vi.mock('@/lib/prisma', async () => ({
     user: { findUnique: vi.fn() },
     session: { deleteMany: vi.fn() },
     kostenposten: { create: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
-    adminAktion: { create: vi.fn(async () => ({ id: 'eintrag-1' })) },
+    // findMany: abgeschlossene Monate (Nr. 191) — hier keine.
+    adminAktion: { create: vi.fn(async () => ({ id: 'eintrag-1' })), findMany: vi.fn(async () => []) },
   },
 }))
 

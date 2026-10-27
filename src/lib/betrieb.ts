@@ -432,7 +432,7 @@ export function zuletztText(zeitpunkt: Date, jetzt: Date): string {
 
 // ─── Abläufe ─────────────────────────────────────────────────────────────────
 
-export type AblaufName = 'aufraeumen' | 'verwaisteBestellungen' | 'betrieb' | 'briefkasten' | 'mails' | 'von-aussen'
+export type AblaufName = 'aufraeumen' | 'verwaisteBestellungen' | 'betrieb' | 'briefkasten' | 'mails' | 'von-aussen' | 'geld-abgleich'
 /** `vonAussen` (Nr. 184): kein Cron bei Vercel — der Uptime-Dienst ruft /api/gesund etwa alle 5 Minuten, jeder Aufruf ist ein Herzschlag. */
 export type Rhythmus = 'minuetlich' | 'taeglich' | 'woechentlich' | 'vonAussen'
 
@@ -496,6 +496,15 @@ export const ABLAEUFE: readonly Ablauf[] = [
     pfad: '/api/cron/mails',
     zeitplan: '* * * * *',
     rhythmus: 'minuetlich',
+  },
+  // Nr. 191 (Register N37): der Geld-Abgleich mit Stripe — nur lesend, nach den Aufräum- und Mess-Läufen.
+  {
+    name: 'geld-abgleich',
+    text: 'Geld-Abgleich (Stripe)',
+    zweck: 'Er liest jeden Morgen Zahlungen, Erstattungen und Gebühren der letzten 48 Stunden bei Stripe, vergleicht sie mit den Bestellungen und meldet Abweichungen in Heute.',
+    pfad: '/api/cron/geld-abgleich',
+    zeitplan: '30 6 * * *',
+    rhythmus: 'taeglich',
   },
   // Nr. 184 (Register N18, Ergänzung 26.10.2026): der Herzschlag „von außen“ —
   // jeder Aufruf von /api/gesund durch den Uptime-Dienst, höchstens einmal je

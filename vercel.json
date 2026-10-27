@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/mails",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/geld-abgleich",
+      "schedule": "30 6 * * *"
     }
   ]
 }

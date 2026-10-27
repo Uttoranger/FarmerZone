@@ -48,6 +48,8 @@ export const ADMIN_AKTIONEN = [
   'kostenposten_beendet',
   'kostenposten_geloescht',
   'finanzen_export',
+  // Monatsabschluss (Nr. 191, N37): Bezug `monat`, Kennung `JJJJ-MM`
+  'monat_abgeschlossen',
   // Bestellungen (Nr. 186): „Außerhalb erstattet“ (Recht geld)
   'erstattung_erledigt',
   // Bestellungen (Nr. 186): volle Adresse nach Grund (Recht adresse_anzeigen), Notfall-Storno (Recht hof_sperren_storno)

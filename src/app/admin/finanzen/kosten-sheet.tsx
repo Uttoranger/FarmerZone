@@ -59,10 +59,13 @@ export function KostenSheet({
   onClose,
   /** Der angezeigte Monat — Vorgabe für „ab" und für „beenden". */
   monat,
+  /** Abgeschlossene Monate (Nr. 191): Berührt eine Änderung einen davon, verlangt der Server einen Grund. */
+  grundFuer = [],
 }: {
   zustand: SheetZustand
   onClose: () => void
   monat: Monatsschluessel
+  grundFuer?: readonly Monatsschluessel[]
 }) {
   return (
     <Sheet open={zustand !== null} onOpenChange={(offen) => !offen && onClose()}>
@@ -73,7 +76,7 @@ export function KostenSheet({
         {/* Bei jedem Öffnen neu aufgebaut: So startet der Entwurf immer beim
             gespeicherten Stand, ohne Effekt zum Zurücksetzen. */}
         {zustand !== null && (
-          <SheetInhalt zustand={zustand} onClose={onClose} monat={monat} />
+          <SheetInhalt zustand={zustand} onClose={onClose} monat={monat} grundFuer={grundFuer} />
         )}
       </SheetContent>
     </Sheet>
@@ -84,10 +87,12 @@ function SheetInhalt({
   zustand,
   onClose,
   monat,
+  grundFuer,
 }: {
   zustand: NonNullable<SheetZustand>
   onClose: () => void
   monat: Monatsschluessel
+  grundFuer: readonly Monatsschluessel[]
 }) {
   const router = useRouter()
   const [laeuft, startTransition] = useTransition()
@@ -103,6 +108,8 @@ function SheetInhalt({
   })
   const [endeMonat, setEndeMonat] = useState<Monatsschluessel>(vorhanden?.bis ?? monat)
   const [loeschenGefragt, setLoeschenGefragt] = useState(false)
+  // Nach dem Monatsabschluss (N37): der Grund für eine Änderung, die einen abgeschlossenen Monat berührt — geht an jede Action mit.
+  const [grund, setGrund] = useState('')
   // Kosten ändern ist heikel (Register N20, Audit D10; Nr. 188): frisch mit Passkey bestätigt.
   const frischAnlegen = useFrischBestaetigt(kostenpostenAnlegen)
   const frischAendern = useFrischBestaetigt(kostenpostenAendern)
@@ -139,6 +146,7 @@ function SheetInhalt({
       rhythmus: entwurf.rhythmus,
       ab: entwurf.ab,
       notiz: entwurf.notiz,
+      grund,
     }
     if (vorhanden) {
       fuehreAus(() => frischAendern.ausfuehren({ ...eingabe, id: vorhanden.id }), 'Posten geändert.')
@@ -247,6 +255,22 @@ function SheetInhalt({
           />
         </div>
 
+        {grundFuer.length > 0 && (
+          <div>
+            <label htmlFor="kosten-grund" className={beschriftung}>
+              Grund (nur nötig, wenn ein abgeschlossener Monat betroffen ist)
+            </label>
+            <Input
+              id="kosten-grund"
+              value={grund}
+              onChange={(e) => setGrund(e.target.value)}
+              maxLength={300}
+              autoComplete="off"
+              className="min-h-11 text-base"
+            />
+          </div>
+        )}
+
         <Button type="submit" disabled={laeuft} className="min-h-11 w-full">
           {vorhanden ? 'Änderungen speichern' : 'Posten eintragen'}
         </Button>
@@ -272,7 +296,7 @@ function SheetInhalt({
               disabled={laeuft}
               onClick={() =>
                 fuehreAus(
-                  () => frischBeenden.ausfuehren({ id: vorhanden.id, monat: endeMonat }),
+                  () => frischBeenden.ausfuehren({ id: vorhanden.id, monat: endeMonat, grund }),
                   'Posten beendet.'
                 )
               }
@@ -296,7 +320,7 @@ function SheetInhalt({
                   variant="destructive"
                   disabled={laeuft}
                   onClick={() =>
-                    fuehreAus(() => frischLoeschen.ausfuehren({ id: vorhanden.id }), 'Posten gelöscht.')
+                    fuehreAus(() => frischLoeschen.ausfuehren({ id: vorhanden.id, grund }), 'Posten gelöscht.')
                   }
                   className="min-h-11 flex-1"
                 >
