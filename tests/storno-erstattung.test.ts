@@ -1,6 +1,6 @@
 /**
  * Vollstorno einer Online-Bestellung: Wer gibt welches Geld zurück?
- * (cancelOrder, src/server/actions/orders.ts)
+ * (cancelOrder, src/server/actions/orders.ts → storniere in src/server/stornieren.ts)
  *
  * Der Fehler: cancelOrder rief stripe.refunds.create({ payment_intent }) ohne
  * reverse_transfer. Die Zahlung ist eine Destination Charge auf dem
@@ -428,7 +428,8 @@ describe('Ladungstyp-Wache: der Checkout legt die Zahlung so an, wie der Storno 
   })
 
   it('der Storno holt in beiden Modellen dasselbe zurück: reverse_transfer und refund_application_fee', () => {
-    const storno = readFileSync(join(process.cwd(), 'src/server/actions/orders.ts'), 'utf8')
+    // Seit Nr. 186 steht der Storno in src/server/stornieren.ts (Hof und Notfall-Storno des Teams rufen ihn).
+    const storno = readFileSync(join(process.cwd(), 'src/server/stornieren.ts'), 'utf8')
     expect(storno).toMatch(/reverse_transfer:\s*true/)
     expect(storno).toMatch(/refund_application_fee:\s*true/)
     // Der Storno fragt das Modell nicht ab — on_behalf_of ändert an der Rückbuchung nichts.
