@@ -103,7 +103,7 @@ vi.mock('@/app/admin/finanzen/finanzen-diagramm', () => ({ FinanzenDiagramm: () 
 vi.mock('@/app/admin/finanzen/kosten-liste', () => ({ KostenListe: () => null }))
 // Seit Nr. 191 heißt die Seite Geld (/admin/geld); der Abgleich ohne Bezug zur Zeile.
 vi.mock('@/app/admin/geld/monatsabschluss', () => ({ Monatsabschluss: () => null }))
-vi.mock('@/server/geld-abgleich', () => ({
+vi.mock('@/server/queries/geld', () => ({
   ladeAbgeschlosseneMonate: vi.fn(async () => new Map()),
   ladeGeldMonat: vi.fn(async () => ({
     umsatz: { cents: 0, anzahl: 0, bar: 0 },

@@ -6038,6 +6038,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Sperre durch das Team (N34):** `sperreHof`/`hebeHofSperreAuf` (Recht `hof_sperren_storno`, frisch mit Passkey, Protokoll `hof_gesperrt`/`hof_sperre_aufgehoben` mit Grund) setzen `Farm.adminGesperrtAm`, `adminSperrGrund`, `adminGesperrtVonUserId` bedingt. Die Prüfkette lehnt direkt nach der Freischaltung ab, mit dem neutralen Satz „Bestellen ist bei diesem Hof gerade nicht möglich.“; `/api/checkout` prüft an derselben Stelle selbst (es geht nicht durch `pruefeKaufbarkeitHof`). Hofseite, Produktseite und Kasse zeigen den Satz über `kaufSperre` → `gesperrt`, der Korb über die Meldung von `/api/warenkorb/pruefen`. Der Hof bekommt eine SYSTEM-Nachricht im Postfach und in Heute eine Karte; die Pause bleibt unabhängig, und kein Weg des Hofs schreibt die Sperre (Wache in tests/admin-hof-sperre.test.ts).
 - **Warum der Satz fest ist:** Das Schema aus Nr. 188 hat nur den Grund; ein eigener Satz je Hof bräuchte ein Feld. Der Grund bleibt im Admin und im Postfach des Hofs, die Kundschaft liest nur den neutralen Satz.
 
+## Geld: Abgleich mit Stripe, Stripe-Gebühren, Monatsabschluss (Register N37; Nr. 191, Lauf 26, 27.10.2026)
+
+- Täglich 06:30 UTC liest der Ablauf `geld-abgleich` Zahlungen, Erstattungen und Saldo-Buchungen der letzten 48 Stunden bei Stripe (nur lesend) und vergleicht sie je Bestellung in Cent mit der Datenbank. Warum eine eigene Erwartung je Weg: Die Datenbank schreibt eine Zahlung nach „Artikel fehlt“, Voll- und Reststorno und „Gebühr entfallen“ jeweils anders (Warenpreis und Gebühr gesenkt, `erstattetCents` mal alles, mal nur Teile, die entfallene Gebühr gar nicht) — ohne diese Regel stünde nach jedem Teilstorno ein Fehlalarm in Heute.
+- Abweichungen bleiben, bis beide übereinstimmen, auch wenn die Zahlung älter als 48 Stunden ist (einzeln nachgeladen); die Frist in Heute zählt ab dem ersten Fund. Speicherort ist `BetriebMessung` (Kennung und Cent) — keine Migration in diesem Lauf.
+- Stripe-Gebühren trägt die Plattform (Destination Charges); sie stehen je Tag aus den Balance Transactions in `BetriebMessung` und auf Geld als Kosten neben dem Betrieb. Der Monat zählt nach dem UTC-Tag der Buchung. Das Jahr und die CSV rechnen sie (noch) nicht mit.
+- Ein Monat lässt sich abschließen, wenn er vorbei ist, der Abgleich danach ohne offene Abweichung lief, keine Erstattung offen ist, Kosten eingetragen sind und die Jahres-CSV nach dem Monatsende geladen wurde. Der Abschluss ist ein Protokoll-Eintrag; danach brauchen Kostenänderungen, die den Monat berühren, einen Grund.
+- „Finanzen“ heißt „Geld“ (`/admin/geld`, alte Adresse 308); die Navigation zieht Nr. 193 nach.
+
 ## Nützliche Befehle
 
 ```bash

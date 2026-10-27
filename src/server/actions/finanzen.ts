@@ -1,6 +1,7 @@
 'use server'
 
 import { Prisma } from '@prisma/client'
+import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { verlangeFrischeBestaetigung } from '@/server/admin-wache'
@@ -17,7 +18,7 @@ import {
   utcDatumAlsMonat,
 } from '@/lib/finanzen'
 import { istMonatsschluessel, monatsAbstand, monatsschluesselInWien, type Monatsschluessel } from '@/lib/servicegebuehr'
-import { ladeAbgeschlosseneMonate, ladeGeldMonat } from '@/server/geld-abgleich'
+import { ladeAbgeschlosseneMonate, ladeGeldMonat } from '@/server/queries/geld'
 import {
   kostenpostenAendernSchema,
   kostenpostenBeendenSchema,
@@ -234,12 +235,15 @@ export async function kostenpostenLoeschen(input: unknown): Promise<Ergebnis> {
  * `JJJJ-MM`); danach verlangen die Kostenposten-Actions für diesen Monat
  * einen Grund (`grundNachAbschluss`).
  */
+const monatAbschliessenSchema = z.object({ monat: z.string().refine(istMonatsschluessel) })
+
 export async function monatAbschliessen(input: unknown): Promise<Ergebnis> {
   const wache = await verlangeFrischeBestaetigung({ recht: 'geld' })
   if ('error' in wache) return { error: wache.error }
 
-  const monat = typeof input === 'object' && input !== null && 'monat' in input ? (input as { monat: unknown }).monat : undefined
-  if (typeof monat !== 'string' || !istMonatsschluessel(monat)) return { error: 'Bitte wähle einen Monat.' }
+  const geprueft = monatAbschliessenSchema.safeParse(input)
+  if (!geprueft.success) return { error: 'Bitte wähle einen Monat.' }
+  const { monat } = geprueft.data
   if (monatsAbstand(monat, monatsschluesselInWien(new Date())) <= 0) return { error: 'Einen Monat kannst du erst nach seinem Ende abschließen.' }
 
   const [abgeschlossen, stand, posten] = await Promise.all([

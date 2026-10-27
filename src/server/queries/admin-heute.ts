@@ -4,7 +4,7 @@ import { ladeErstattungAufgaben, ladeHofAufgaben } from '@/server/queries/postfa
 import { ladeProbleme } from '@/server/queries/mails'
 import { ladeAeltesteWichtige, ladeLaeufe } from '@/server/queries/betrieb'
 import { getMeldungenFuerAdmin } from '@/server/queries/meldung'
-import { ladeOffeneAbweichungen } from '@/server/geld-abgleich'
+import { ladeOffeneAbweichungen } from '@/server/queries/geld'
 import { lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
 import { naechsterTermin } from '@/server/queries/startseite'
 import { centAusDecimal } from '@/server/queries/umsatz'

@@ -11,7 +11,6 @@
  */
 import { describe, it, expect, vi } from 'vitest'
 import { createElement, type ReactNode } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode } & Record<string, unknown>) => {
@@ -46,7 +45,7 @@ vi.mock('@/server/queries/finanzen', () => ({
 vi.mock('@/server/queries/admin', () => ({ ladeHoefeFuerGruendung: abfragen.ladeHoefeFuerGruendung }))
 
 import AdminFinanzenPage from '@/app/admin/finanzen/page'
-import { FINANZEN_REITER_IDS, FINANZEN_REITER_OHNE_INHALT, finanzenAdresse, grundgebuehrenKachel } from '@/lib/admin-finanzen-seite'
+import { FINANZEN_REITER_IDS, finanzenAdresse, grundgebuehrenKachel } from '@/lib/admin-finanzen-seite'
 import { TARIFE_AB, TARIF_ZEILE } from '@/lib/konditionen'
 import { finanzenReiterAus } from '@/schemas/admin-reiter'
 import { formatEuro } from '@/lib/format'

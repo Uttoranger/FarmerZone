@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import * as Sentry from '@sentry/nextjs'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { aktuellerFinanzMonat, getFinanzen, type FinanzenDaten } from '@/server/queries/finanzen'
-import { ladeAbgeschlosseneMonate, ladeGeldMonat, type GeldMonat } from '@/server/geld-abgleich'
+import { ladeAbgeschlosseneMonate, ladeGeldMonat, type GeldMonat } from '@/server/queries/geld'
 import { centsAlsEuro, istMonatsschluessel, monatsAbstand } from '@/lib/servicegebuehr'
 import { formatEuro, formatTagKurz, mitAnzahl } from '@/lib/format'
 import {
@@ -153,7 +153,7 @@ export default async function AdminGeldPage({
     },
     {
       titel: 'Stripe-Gebühren',
-      satz: `${formatEuro(centsAlsEuro(geld.stripeGebuehrCents))} · trägt Agrilo (Destination Charges)`,
+      satz: `${formatEuro(centsAlsEuro(geld.stripeGebuehrCents))} · ${GELD_TEXT.stripeGebuehrTraeger}`,
       wort: 'gebucht',
       ton: 'neutral',
     },

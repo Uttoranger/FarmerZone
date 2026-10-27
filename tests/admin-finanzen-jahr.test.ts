@@ -39,7 +39,7 @@ vi.mock('@/server/actions/finanzen', () => ({
   monatAbschliessen: vi.fn(),
 }))
 // Seit Nr. 191 trägt /admin/geld das Jahr; der Monat dort braucht den Abgleich — hier ohne Lauf.
-vi.mock('@/server/geld-abgleich', () => ({
+vi.mock('@/server/queries/geld', () => ({
   ladeAbgeschlosseneMonate: vi.fn(async () => new Map()),
   ladeGeldMonat: vi.fn(async () => ({
     umsatz: { cents: 0, anzahl: 0, bar: 0 },

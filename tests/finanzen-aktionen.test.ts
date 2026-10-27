@@ -38,7 +38,7 @@ vi.mock('@/lib/prisma', async () => ({
 
 // Abgeschlossene Monate und der Stand des Monats kommen aus dem Geld-Abgleich (src/server/geld-abgleich.ts).
 const geld = vi.hoisted(() => ({ abgeschlossen: new Map<string, Date>(), monat: vi.fn() }))
-vi.mock('@/server/geld-abgleich', () => ({
+vi.mock('@/server/queries/geld', () => ({
   ladeAbgeschlosseneMonate: vi.fn(async () => geld.abgeschlossen),
   ladeGeldMonat: geld.monat,
 }))

@@ -35,14 +35,15 @@ vi.mock('@/server/actions/finanzen', () => ({
 }))
 const abfragen = vi.hoisted(() => ({ getFinanzen: vi.fn(), ladeGeldMonat: vi.fn(), ladeAbgeschlosseneMonate: vi.fn() }))
 vi.mock('@/server/queries/finanzen', () => ({ getFinanzen: abfragen.getFinanzen, aktuellerFinanzMonat: () => '2026-10' }))
-vi.mock('@/server/geld-abgleich', () => ({ ladeGeldMonat: abfragen.ladeGeldMonat, ladeAbgeschlosseneMonate: abfragen.ladeAbgeschlosseneMonate }))
+vi.mock('@/server/queries/geld', () => ({ ladeGeldMonat: abfragen.ladeGeldMonat, ladeAbgeschlosseneMonate: abfragen.ladeAbgeschlosseneMonate }))
 
 import AdminGeldPage from '@/app/admin/geld/page'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { formatEuro } from '@/lib/format'
 import { ergebnisText } from '@/lib/finanzen'
+import { GELD_TEXT } from '@/app/admin/geld/texte'
 import type { FinanzenDaten } from '@/server/queries/finanzen'
-import type { GeldMonat } from '@/server/geld-abgleich'
+import type { GeldMonat } from '@/server/queries/geld'
 
 const JETZT = new Date('2026-10-15T10:00:00+02:00')
 const NACH_MONATSENDE = new Date('2026-10-02T06:30:00Z')
@@ -123,12 +124,12 @@ describe('Admin › Geld', () => {
     expect(html).toContain('noch nicht gedeckt')
   })
 
-  it('Abgleich ohne Abweichung: „stimmt“ und „ok“; Stripe-Gebühren „gebucht“, trägt Agrilo', async () => {
+  it('Abgleich ohne Abweichung: „stimmt“ und „ok“; Stripe-Gebühren „gebucht“, trägt die Plattform', async () => {
     const html = await seite()
     expect(html).toContain('Abgleich mit Stripe')
     expect(html).toContain('Betrag, Servicegebühr und Erstattung gleich')
     expect(html).toContain('>stimmt<')
-    expect(html).toContain('trägt Agrilo (Destination Charges)')
+    expect(html).toContain(GELD_TEXT.stripeGebuehrTraeger)
   })
 
   it('Gegenprobe: mit Abweichung kein „stimmt“, sondern die Zahl; ohne Lauf „noch kein Lauf“', async () => {

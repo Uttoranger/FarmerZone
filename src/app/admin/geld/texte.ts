@@ -1,4 +1,5 @@
 import type { Monatsschluessel } from '@/lib/servicegebuehr'
+import { MARKE } from '@/lib/marke'
 
 /*
  * Die Sätze von Admin › Geld (Register N32, N37; Nr. 191; Mockup admin-geld)
@@ -6,10 +7,11 @@ import type { Monatsschluessel } from '@/lib/servicegebuehr'
  */
 export const GELD_TEXT = {
   titel: 'Geld',
-  satz: 'Was durch Agrilo fließt, ob es mit Stripe übereinstimmt, und der Monatsabschluss.',
+  satz: `Was durch ${MARKE} fließt, ob es mit Stripe übereinstimmt, und der Monatsabschluss.`,
   kennzahlen: 'Geld in Zahlen',
   abgleich: 'Abgleich mit Stripe',
   abgleichZusatz: 'täglich, nur lesend',
+  stripeGebuehrTraeger: `trägt ${MARKE} (Destination Charges)`,
   abschluss: (bezeichnung: string): string => `Monatsabschluss ${bezeichnung}`,
   abschliessen: (monatName: string): string => `${monatName} abschließen …`,
   abgeschlossen: 'abgeschlossen',

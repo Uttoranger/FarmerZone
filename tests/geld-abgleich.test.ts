@@ -206,7 +206,7 @@ beforeEach(() => {
 
 describe('gleicheGeldAb', () => {
   it('liest nur (list/retrieve), 48 Stunden zurück, mit expand; schreibt die neue Abweichung mit dem Tag des Funds und die Gebühren je Tag', async () => {
-    const ergebnis = await gleicheGeldAb(JETZT, null)
+    const ergebnis = await gleicheGeldAb(JETZT)
     expect(ergebnis).toMatchObject({ verglichen: 2, abweichungen: 1, neu: 1, geklaert: 0, stripeGebuehrTage: 1 })
     const ab = Math.floor((JETZT.getTime() - 48 * 3_600_000) / 1000)
     expect(stripeAttrappe.paymentIntents.list).toHaveBeenCalledWith({ created: { gte: ab }, limit: 100, expand: ['data.latest_charge'] })
@@ -227,7 +227,7 @@ describe('gleicheGeldAb', () => {
       { tag: new Date('2026-10-20T00:00:00Z'), art: 'geldAbweichung:bestellung-aaaa:betrag', wert: BigInt(5) },
       { tag: new Date('2026-10-21T00:00:00Z'), art: 'geldAbweichung:bestellung-bbbb:gebuehr', wert: BigInt(23) },
     ] as never)
-    const ergebnis = await gleicheGeldAb(JETZT, null)
+    const ergebnis = await gleicheGeldAb(JETZT)
     expect(ergebnis).toMatchObject({ neu: 0, geklaert: 1 })
     expect(db.betriebMessung.deleteMany).toHaveBeenCalledWith({ where: { art: { in: ['geldAbweichung:bestellung-aaaa:betrag'] } } })
     expect(db.betriebMessung.createMany).not.toHaveBeenCalled()
@@ -241,14 +241,14 @@ describe('gleicheGeldAb', () => {
     stripeAttrappe.paymentIntents.list.mockReturnValue(liste([pi('pi_1', 2573, 123)]))
     db.order.findMany.mockResolvedValue([zeile('bestellung-aaaa', 'pi_1'), zeile('bestellung-cccc', 'pi_alt')] as never)
     stripeAttrappe.paymentIntents.retrieve.mockRejectedValue(Object.assign(new Error('No such payment_intent'), { code: 'resource_missing', statusCode: 404 }))
-    await gleicheGeldAb(JETZT, null)
+    await gleicheGeldAb(JETZT)
     expect(stripeAttrappe.paymentIntents.retrieve).toHaveBeenCalledWith('pi_alt', { expand: ['latest_charge'] })
     expect(db.betriebMessung.createMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ art: 'geldAbweichung:bestellung-cccc:zahlung', wert: BigInt(2573) })], skipDuplicates: true })
   })
 
   it('Stripe-Fehler: Warnung an Sentry ohne Betrag und Kennung, nichts geschrieben, Fehler für den Herzschlag', async () => {
     stripeAttrappe.refunds.list.mockReturnValue(kaputt())
-    await expect(gleicheGeldAb(JETZT, null)).rejects.toBeInstanceOf(GeldAbgleichStripeFehler)
+    await expect(gleicheGeldAb(JETZT)).rejects.toBeInstanceOf(GeldAbgleichStripeFehler)
     expect(Sentry.captureException).toHaveBeenCalledWith(expect.objectContaining({ name: 'StripeConnectionError' }), {
       level: 'warning',
       tags: { aufgabe: 'geld-abgleich', schritt: 'liste' },
@@ -260,7 +260,7 @@ describe('gleicheGeldAb', () => {
   it('Gegenprobe: ein anderer Fehler beim Nachladen als „nicht gefunden“ bricht ebenso ohne Schreiben ab', async () => {
     stripeAttrappe.paymentIntents.list.mockReturnValue(liste([]))
     stripeAttrappe.paymentIntents.retrieve.mockRejectedValue(Object.assign(new Error('rate'), { name: 'StripeRateLimitError', statusCode: 429 }))
-    await expect(gleicheGeldAb(JETZT, null)).rejects.toBeInstanceOf(GeldAbgleichStripeFehler)
+    await expect(gleicheGeldAb(JETZT)).rejects.toBeInstanceOf(GeldAbgleichStripeFehler)
     expect(db.betriebMessung.createMany).not.toHaveBeenCalled()
     expect(db.betriebMessung.deleteMany).not.toHaveBeenCalled()
   })
