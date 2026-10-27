@@ -64,12 +64,17 @@ export type GeldAbgleichErgebnis = {
 }
 
 async function alle<T>(liste: AsyncIterable<T>): Promise<T[]> {
-  const ergebnis: T[] = []
+  return (await alleMitRand(liste)).eintraege
+}
+
+/** Wie `alle`, sagt aber, ob die Liste an LISTE_HOECHSTENS abgeschnitten wurde. */
+async function alleMitRand<T>(liste: AsyncIterable<T>): Promise<{ eintraege: T[]; abgeschnitten: boolean }> {
+  const eintraege: T[] = []
   for await (const eintrag of liste) {
-    ergebnis.push(eintrag)
-    if (ergebnis.length >= LISTE_HOECHSTENS) break
+    if (eintraege.length >= LISTE_HOECHSTENS) return { eintraege, abgeschnitten: true }
+    eintraege.push(eintrag)
   }
-  return ergebnis
+  return { eintraege, abgeschnitten: false }
 }
 
 /** Ein PaymentIntent als Zahlung in Cent — die Erstattung aus der letzten Belastung (expand). */
@@ -107,12 +112,15 @@ export async function gleicheGeldAb(jetzt: Date): Promise<GeldAbgleichErgebnis> 
   const { stripe } = await import('@/lib/stripe')
   const zahlungen = new Map<string, StripeZahlung>()
   let buchungen: SaldoBuchung[] = []
+  let saldoAbgeschnitten = false
   try {
-    const [intents, erstattungen, saldo] = await Promise.all([
+    const [intents, erstattungen, saldoListe] = await Promise.all([
       alle(stripe.paymentIntents.list({ created: { gte: ab }, limit: 100, expand: ['data.latest_charge'] })),
       alle(stripe.refunds.list({ created: { gte: ab }, limit: 100, expand: ['data.payment_intent.latest_charge'] })),
-      alle(stripe.balanceTransactions.list({ created: { gte: gebuehrenAb }, limit: 100 })),
+      alleMitRand(stripe.balanceTransactions.list({ created: { gte: gebuehrenAb }, limit: 100 })),
     ])
+    const saldo = saldoListe.eintraege
+    saldoAbgeschnitten = saldoListe.abgeschnitten
     for (const pi of intents) zahlungen.set(pi.id, alsZahlung(pi))
     for (const r of erstattungen) {
       if (r.payment_intent !== null && typeof r.payment_intent === 'object') zahlungen.set(r.payment_intent.id, alsZahlung(r.payment_intent))
@@ -173,7 +181,10 @@ export async function gleicheGeldAb(jetzt: Date): Promise<GeldAbgleichErgebnis> 
     await prisma.betriebMessung.updateMany({ where: { tag: alt.tag, art: alt.art }, data: { wert: BigInt(abweichungCents(a)), gemessenAm: jetzt } })
   }
 
-  const gebuehren = stripeGebuehrenJeTag(buchungen)
+  // Abgeschnittene Saldo-Liste: Die Tagessummen wären zu klein und gälten danach als vollständig —
+  // dann lieber gar nicht schreiben (die alten Werte bleiben) und warnen.
+  const gebuehren = saldoAbgeschnitten ? new Map<string, number>() : stripeGebuehrenJeTag(buchungen)
+  if (saldoAbgeschnitten) meldeAbgeschnitten()
   for (const [tag, cents] of gebuehren) {
     const tagDatum = new Date(`${tag}T00:00:00.000Z`)
     await prisma.betriebMessung.upsert({
@@ -184,6 +195,11 @@ export async function gleicheGeldAb(jetzt: Date): Promise<GeldAbgleichErgebnis> 
   }
 
   return { zahlungen: zahlungen.size, verglichen: verglichen.length, abweichungen: abweichungen.length, neu: neu.length, geklaert: geklaert.length, stripeGebuehrTage: gebuehren.size }
+}
+
+/** Warnung an Sentry: Die Saldo-Liste war länger als LISTE_HOECHSTENS — ohne Betrag und Kennung. */
+function meldeAbgeschnitten(): void {
+  Sentry.captureMessage('Geld-Abgleich: Saldo-Liste abgeschnitten, Stripe-Gebühren nicht geschrieben', { level: 'warning', tags: { aufgabe: 'geld-abgleich', schritt: 'saldo' } })
 }
 
 /** Warnung an Sentry — nur Schritt und Fehlerklasse, nie Text, Betrag oder Kennung. */

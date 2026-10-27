@@ -34,7 +34,7 @@ vi.mock('@/server/betrieb', () => ({ mitHerzschlag: vi.fn(async (_name: string, 
 import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
 import { mitHerzschlag } from '@/server/betrieb'
-import { GeldAbgleichStripeFehler, gleicheGeldAb } from '@/server/geld-abgleich'
+import { GeldAbgleichStripeFehler, LISTE_HOECHSTENS, gleicheGeldAb } from '@/server/geld-abgleich'
 import { GET } from '@/app/api/cron/geld-abgleich/route'
 import {
   abweichungArt,
@@ -220,6 +220,25 @@ describe('gleicheGeldAb', () => {
       expect.objectContaining({ where: { tag_art: { tag: new Date('2026-10-26T00:00:00Z'), art: 'stripeGebuehrCents' } }, create: expect.objectContaining({ wert: BigInt(52) }) })
     )
     expect(db.betriebMessung.deleteMany).not.toHaveBeenCalled()
+  })
+
+  it('abgeschnittene Saldo-Liste: keine Tagesgebühr geschrieben (sie wäre zu klein), Warnung an Sentry; genau voll ist nicht abgeschnitten', async () => {
+    const buchung = { created: Math.floor(Date.parse('2026-10-26T09:00:00Z') / 1000), fee: 1, type: 'charge', amount: 100 }
+    stripeAttrappe.balanceTransactions.list.mockReturnValue(liste(Array.from({ length: LISTE_HOECHSTENS + 1 }, () => buchung)))
+    expect(await gleicheGeldAb(JETZT)).toMatchObject({ stripeGebuehrTage: 0 })
+    expect(db.betriebMessung.upsert).not.toHaveBeenCalled()
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(expect.stringContaining('abgeschnitten'), expect.objectContaining({ level: 'warning' }))
+
+    // Gegenprobe: genau LISTE_HOECHSTENS Buchungen sind vollständig gelesen und werden geschrieben.
+    vi.clearAllMocks()
+    stripeAttrappe.paymentIntents.list.mockReturnValue(liste([]))
+    stripeAttrappe.refunds.list.mockReturnValue(liste([]))
+    db.betriebMessung.findMany.mockResolvedValue([])
+    db.order.findMany.mockResolvedValue([] as never)
+    stripeAttrappe.balanceTransactions.list.mockReturnValue(liste(Array.from({ length: LISTE_HOECHSTENS }, () => buchung)))
+    expect(await gleicheGeldAb(JETZT)).toMatchObject({ stripeGebuehrTage: 1 })
+    expect(db.betriebMessung.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: expect.objectContaining({ wert: BigInt(LISTE_HOECHSTENS) }) }))
+    expect(Sentry.captureMessage).not.toHaveBeenCalled()
   })
 
   it('eine offene Abweichung, die jetzt stimmt, wird gelöscht; eine weiter offene behält ihren ersten Tag', async () => {

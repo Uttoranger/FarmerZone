@@ -1,5 +1,6 @@
 'use server'
 
+import { alsCents } from '@/lib/order-totals'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
@@ -254,7 +255,7 @@ export async function monatAbschliessen(input: unknown): Promise<Ergebnis> {
   if (abgeschlossen.has(monat)) return { error: 'Dieser Monat ist schon abgeschlossen.' }
   const kosten = kostenSummeImMonat(
     posten.map((p) => ({
-      betragCents: Math.round(p.betrag.mul(100).toNumber()),
+      betragCents: alsCents(p.betrag),
       rhythmus: p.rhythmus,
       ab: utcDatumAlsMonat(p.ab),
       bis: p.bis === null ? null : utcDatumAlsMonat(p.bis),

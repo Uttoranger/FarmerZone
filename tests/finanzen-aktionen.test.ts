@@ -317,7 +317,7 @@ describe('monatAbschliessen (Nr. 191)', () => {
   }
   beforeEach(() => {
     vi.mocked(prisma.kostenposten.findMany).mockResolvedValue([
-      { betrag: { mul: () => ({ toNumber: () => 2500 }) }, rhythmus: 'MONATLICH', ab: new Date('2026-01-01T00:00:00Z'), bis: null },
+      { betrag: '25.00', rhythmus: 'MONATLICH', ab: new Date('2026-01-01T00:00:00Z'), bis: null },
     ] as never)
     geld.monat.mockResolvedValue(STAND)
   })
