@@ -31,7 +31,8 @@ export type TeamAnlass = 'eingeladen' | 'rechte' | 'inhaber' | 'inhaber-entzogen
 export const TEAM_TEXT = {
   titel: 'Team',
   zeile: (inhaber: number, weitere: number): string =>
-    `${inhaber} ${inhaber === 1 ? 'Inhaber' : 'Inhaber'} · ${weitere} ${weitere === 1 ? 'weitere Person' : 'weitere Personen'}`,
+    // „Inhaber“ ist Einzahl und Mehrzahl zugleich.
+    `${inhaber} Inhaber · ${weitere} ${weitere === 1 ? 'weitere Person' : 'weitere Personen'}`,
   einladen: 'Person einladen …',
   einladenTitel: 'Person ins Team einladen',
   einladenSatz:
