@@ -19,7 +19,8 @@ import type { HofBestellDetail } from '@/server/queries/orders'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
-import { GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS, centsAlsEuro } from '@/lib/servicegebuehr'
+import { GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS, SERVICEGEBUEHR_BEZEICHNUNG, centsAlsEuro } from '@/lib/servicegebuehr'
+import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
 import { formatEuro } from '@/lib/format'
 import { PROBLEM_MELDEN, PROBLEM_MELDEN_HOF } from '@/lib/fehlerseite'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
@@ -111,7 +112,7 @@ export function BestellDetail({
       setOffen(null)
       if (ergebnis.gebuehrErstattungOffen) {
         // Der Weg steht am Toast: „bitte den Betreiber informieren" sagte nicht, wie.
-        toast.warning('Als nicht abgeholt gespeichert. Die Servicegebühr-Erstattung hat nicht geklappt.', {
+        toast.warning(`Als nicht abgeholt gespeichert. Die Erstattung der ${gebuehrWortFuer(bestellung.betrag)} hat nicht geklappt.`, {
           duration: 10000,
           action: { label: PROBLEM_MELDEN, onClick: () => router.push(PROBLEM_MELDEN_HOF) },
         })
@@ -288,8 +289,8 @@ export function BestellDetail({
             <p>
               {betrag.gebuehrCents > 0
                 ? bestellung.vorOrt
-                  ? `Die Servicegebühr von ${euro(betrag.gebuehrCents)} entfällt und wird nicht abgerechnet. Am Warenpreis ändert sich nichts.`
-                  : `Die Servicegebühr von ${euro(betrag.gebuehrCents)} bekommt ${kunde.vorname} zurück. Der Warenpreis bleibt bei dir.`
+                  ? `Die ${gebuehrWortFuer(betrag)} von ${euro(betrag.gebuehrCents)} entfällt und wird nicht abgerechnet. Am Warenpreis ändert sich nichts.`
+                  : `Die ${gebuehrWortFuer(betrag)} von ${euro(betrag.gebuehrCents)} bekommt ${kunde.vorname} zurück. Der Warenpreis bleibt bei dir.`
                 : 'Am Warenpreis ändert sich nichts.'}
             </p>
             <p className="rounded-xl border border-border bg-background px-3.5 py-2.5">Das lässt sich nicht rückgängig machen.</p>
@@ -337,6 +338,11 @@ function Haken({ an }: { an: boolean }): React.JSX.Element {
   )
 }
 
+/** Das Gebührenwort aus den Konstanten (Register N8) — im Hofpreis-Modell „Plattformgebühr“, sonst „Servicegebühr“. */
+function gebuehrWortFuer(betrag: { hofpreis: boolean }): string {
+  return betrag.hofpreis ? PLATTFORMGEBUEHR_BEZEICHNUNG : SERVICEGEBUEHR_BEZEICHNUNG
+}
+
 /** „Bar zu kassieren" groß (vor Ort) bzw. „Online bezahlt" — dazu, wie sich der Betrag zusammensetzt. */
 function Betrag({ bestellung }: { bestellung: HofBestellDetail }): React.JSX.Element {
   const { betrag, status, vorOrt } = bestellung
@@ -345,9 +351,9 @@ function Betrag({ bestellung }: { bestellung: HofBestellDetail }): React.JSX.Ele
   const zusammensetzung = betrag.hofpreis
     ? `Du bekommst ${euro(betrag.warenCents)} · die Kundin zahlt ${euro(betrag.gesamtCents)}`
     : betrag.gebuehrCents > 0
-      ? `Warenpreis ${euro(betrag.warenCents)} + Servicegebühr ${euro(betrag.gebuehrCents)}`
+      ? `Warenpreis ${euro(betrag.warenCents)} + ${SERVICEGEBUEHR_BEZEICHNUNG} ${euro(betrag.gebuehrCents)}`
       : `Warenpreis ${euro(betrag.warenCents)}`
-  const gebuehrWort = betrag.hofpreis ? 'Plattformgebühr' : 'Servicegebühr'
+  const gebuehrWort = gebuehrWortFuer(betrag)
 
   if (beendet) {
     return (

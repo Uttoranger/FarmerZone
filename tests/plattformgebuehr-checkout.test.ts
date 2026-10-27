@@ -381,8 +381,8 @@ describe('Teilstorno im Hofpreis-Modell: genau die Gebühr der Position', () => 
         erstattetCents: 0,
         bestelltAm: JETZT,
         positionen: [
-          { id: 'eier', betragCents: 900, fehlt: false },
-          { id: 'brot', betragCents: 580, fehlt: false },
+          { id: 'eier', betragCents: 900, fehlt: false, gebuehrCents: 0 },
+          { id: 'brot', betragCents: 580, fehlt: false, gebuehrCents: 0 },
         ],
       },
       'brot'

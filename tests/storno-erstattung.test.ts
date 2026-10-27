@@ -393,12 +393,38 @@ describe('Ladungstyp-Wache: der Checkout legt die Zahlung so an, wie der Storno 
     expect(checkout).not.toMatch(/transfer_data:\s*\{[^}]*\bamount\b/)
   })
 
+  /**
+   * Die Stellen, an denen on_behalf_of NICHT unter istHofpreisBestellung der
+   * gespeicherten Bestellung steht — leer heißt: nur im Modell hofpreis.
+   * Kommentare zählen nicht (dort steht der Name zur Erklärung).
+   */
+  function onBehalfOfOhneModell(quelle: string): string[] {
+    const code = quelle.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    return code
+      .split('\n')
+      .filter((zeile) => /\bon_behalf_of\s*:/.test(zeile))
+      .filter((zeile) => !/istHofpreisBestellung\(bestellung\)\s*\?\s*\{\s*on_behalf_of\s*:/.test(zeile))
+  }
+
   it('on_behalf_of nur im Modell hofpreis (N38, Nr. 197) — bisher bleibt die Plattform Händler', () => {
     // Genau eine Stelle setzt on_behalf_of, und nur unter istHofpreisBestellung der gespeicherten Bestellung.
     expect(checkout.match(/on_behalf_of\s*:/g)).toHaveLength(1)
-    expect(checkout).toContain('...(istHofpreisBestellung(bestellung) ? { on_behalf_of: hofKonto } : {})')
-    // Gegenprobe: ein unbedingtes on_behalf_of fiele auf.
-    expect('    on_behalf_of: hofKonto,').not.toContain('istHofpreisBestellung(bestellung) ?')
+    expect(onBehalfOfOhneModell(checkout)).toEqual([])
+  })
+
+  it('Gegenprobe: ein unbedingtes on_behalf_of in den Intent-Parametern fällt auf', () => {
+    const unbedingt = [
+      'const parameter = {',
+      '  amount: betragCents,',
+      '  transfer_data: { destination: hofKonto },',
+      '  on_behalf_of: hofKonto,',
+      '}',
+    ].join('\n')
+    expect(onBehalfOfOhneModell(unbedingt)).toEqual(['  on_behalf_of: hofKonto,'])
+    // Eine andere Bedingung als das Modell der Bestellung zählt auch nicht.
+    expect(onBehalfOfOhneModell('...(hofKonto ? { on_behalf_of: hofKonto } : {}),')).toHaveLength(1)
+    // Und der echte Ausdruck geht durch, auch im Kommentar genannt.
+    expect(onBehalfOfOhneModell('// on_behalf_of: nur hofpreis\n...(istHofpreisBestellung(bestellung) ? { on_behalf_of: hofKonto } : {}),')).toEqual([])
   })
 
   it('der Storno holt in beiden Modellen dasselbe zurück: reverse_transfer und refund_application_fee', () => {

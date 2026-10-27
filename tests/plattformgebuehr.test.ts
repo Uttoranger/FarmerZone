@@ -27,6 +27,8 @@ import {
 import { BAR_SERVICEGEBUEHR_AB, MINDESTBESTELLWERT_SATZ, PLATTFORMGEBUEHR_PROZENT } from '@/lib/konditionen'
 import { bildeGruendungBis } from '@/lib/gruendungshof'
 import { wienerMitternacht } from '@/lib/wiener-tag'
+import { kassenBetraege, type KassenHof } from '@/lib/kasse'
+import { alsCents } from '@/lib/order-totals'
 
 const tag = (t: string): Date => {
   const d = wienerMitternacht(t)
@@ -133,17 +135,44 @@ describe('Wache: derselbe Korb kostet online und bar dasselbe', () => {
     return saat % bis
   }
 
-  it('500 zufällige Körbe: Gesamt = Summe der Endpreise × Menge, für beide Zahlarten aus derselben Funktion', () => {
+  // Euro wie im Korb (CartItem.price): ganze Cent / 100 ist als Text genau der
+  // Dezimalwert, alsCents in kassenBetraege liest ihn verlustfrei zurück.
+  const zufallsKorb = () =>
+    Array.from({ length: 1 + zufall(6) }, (_, j) => ({ productId: `p${j}`, price: (1 + zufall(9999)) / 100, quantity: 1 + zufall(9) }))
+
+  /** Die Körbe, bei denen online und bar über den echten Kassenweg (kassenBetraege) verschieden kosten. */
+  function abweichendeKoerbe(hofFuer: () => KassenHof, jetzt: Date): number {
+    let abweichend = 0
     for (let i = 0; i < 500; i += 1) {
-      const hundertstel = 100 + zufall(1400)
-      const korb = Array.from({ length: 1 + zufall(6) }, () => ({ preisCents: 1 + zufall(9999), menge: 1 + zufall(9) }))
-      const online = bestellGebuehr(korb, hundertstel)
-      const bar = bestellGebuehr(korb, hundertstel)
-      expect(bar.gesamtCents).toBe(online.gesamtCents)
-      const ausEndpreisen = korb.reduce((s, p) => s + p.menge * endpreisJeStueckCents(p.preisCents, hundertstel), 0)
-      expect(online.gesamtCents).toBe(ausEndpreisen)
-      expect(Number.isInteger(online.gebuehrCents)).toBe(true)
+      const hof = hofFuer()
+      const korb = zufallsKorb()
+      const online = kassenBetraege(korb, hof, jetzt, 'ONLINE')
+      const bar = kassenBetraege(korb, hof, jetzt, 'ONSITE_CASH')
+      if (online.gesamtCents !== bar.gesamtCents || online.gebuehrCents !== bar.gebuehrCents) abweichend += 1
     }
+    return abweichend
+  }
+
+  const HOF_BISHER_MIT_GEBUEHR = { serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z' }
+  // Vor dem Stichtag für Bar (Register B1): bar ohne Servicegebühr, online mit — die Rechnung weicht ab.
+  const VOR_BAR_STICHTAG = new Date(BAR_SERVICEGEBUEHR_AB.getTime() - 24 * 60 * 60 * 1000)
+
+  it('500 zufällige Körbe im Hofpreis-Modell: kassenBetraege ONLINE = ONSITE_CASH, Gesamt = Summe der Endpreise × Menge', () => {
+    const hofpreisHof = (): KassenHof => ({ ...HOF_BISHER_MIT_GEBUEHR, preisAnzeige: { hundertstel: 100 + zufall(1400) } })
+    // Auch vor dem Bar-Stichtag: Im Hofpreis-Modell gibt es keinen Bar-Rabatt.
+    expect(abweichendeKoerbe(hofpreisHof, VOR_BAR_STICHTAG)).toBe(0)
+    for (let i = 0; i < 100; i += 1) {
+      const hundertstel = 100 + zufall(1400)
+      const korb = zufallsKorb()
+      const bar = kassenBetraege(korb, { ...HOF_BISHER_MIT_GEBUEHR, preisAnzeige: { hundertstel } }, VOR_BAR_STICHTAG, 'ONSITE_CASH')
+      const ausEndpreisen = korb.reduce((s, p) => s + p.quantity * endpreisJeStueckCents(alsCents(String(p.price)), hundertstel), 0)
+      expect(bar.gesamtCents).toBe(ausEndpreisen)
+      expect(Number.isInteger(bar.gebuehrCents)).toBe(true)
+    }
+  })
+
+  it('Gegenprobe: dieselbe Prüfung schlägt an, wenn bar anders rechnet (Modell bisher vor dem Bar-Stichtag)', () => {
+    expect(abweichendeKoerbe(() => HOF_BISHER_MIT_GEBUEHR, VOR_BAR_STICHTAG)).toBeGreaterThan(0)
   })
 
   it('Gegenprobe: Prozent auf die Summe weicht bei manchen Körben ab — deshalb je Stück', () => {
@@ -164,5 +193,26 @@ describe('Wache: kein Float in plattformgebuehr.ts', () => {
   it('Gegenprobe: das Muster findet eine Gleitkommarechnung', () => {
     expect('const x = preis * 0.06').toMatch(verboten[3])
     expect('Math.ceil(a)').toMatch(verboten[2])
+  })
+})
+
+describe('Register N8: Hof-Bestelldetail nimmt die Gebührenwörter aus den Konstanten', () => {
+  /** Die Stellen, an denen das Wort im Code selbst steht statt aus PLATTFORMGEBUEHR_BEZEICHNUNG/SERVICEGEBUEHR_BEZEICHNUNG. */
+  const woerterImCode = (quelle: string): string[] =>
+    quelle
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '')
+      .match(/Plattformgebühr|Servicegebühr/g) ?? []
+
+  it('bestell-detail.tsx schreibt „Plattformgebühr“/„Servicegebühr“ nirgends selbst', () => {
+    const quelle = readFileSync(join(process.cwd(), 'src/components/hof-bestellungen/bestell-detail.tsx'), 'utf8')
+    expect(woerterImCode(quelle)).toEqual([])
+    expect(quelle).toContain('PLATTFORMGEBUEHR_BEZEICHNUNG')
+    expect(quelle).toContain('SERVICEGEBUEHR_BEZEICHNUNG')
+  })
+
+  it('Gegenprobe: ein selbst geschriebenes Wort fällt auf, ein Kommentar nicht', () => {
+    expect(woerterImCode("const wort = betrag.hofpreis ? 'Plattformgebühr' : 'Servicegebühr'")).toHaveLength(2)
+    expect(woerterImCode('// Die Plattformgebühr ist Teil des Preises')).toEqual([])
   })
 })

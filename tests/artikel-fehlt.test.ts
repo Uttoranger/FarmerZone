@@ -37,8 +37,8 @@ function bestellung(abweichend: Partial<ArtikelFehltBestellung> = {}): ArtikelFe
     // (Register B1; bar davor: tests/bargebuehr.test.ts).
     bestelltAm: new Date('2027-02-15T10:00:00.000Z'),
     positionen: [
-      { id: 'eier', betragCents: 450, fehlt: false },
-      { id: 'brot', betragCents: 580, fehlt: false },
+      { id: 'eier', betragCents: 450, fehlt: false, gebuehrCents: 0 },
+      { id: 'brot', betragCents: 580, fehlt: false, gebuehrCents: 0 },
     ],
     ...abweichend,
   }
@@ -96,15 +96,15 @@ describe('artikelFehltRechnung — Sonderfälle', () => {
       warenpreisCents: 580,
       serviceFeeCents: 50,
       positionen: [
-        { id: 'eier', betragCents: 450, fehlt: true },
-        { id: 'brot', betragCents: 580, fehlt: false },
+        { id: 'eier', betragCents: 450, fehlt: true, gebuehrCents: 0 },
+        { id: 'brot', betragCents: 580, fehlt: false, gebuehrCents: 0 },
       ],
     })
     expect(artikelFehltRechnung(b, 'brot')).toEqual({ art: 'storno' })
   })
 
   it('eine Bestellung mit nur einem Artikel wird storniert', () => {
-    const b = bestellung({ warenpreisCents: 450, serviceFeeCents: 50, positionen: [{ id: 'eier', betragCents: 450, fehlt: false }] })
+    const b = bestellung({ warenpreisCents: 450, serviceFeeCents: 50, positionen: [{ id: 'eier', betragCents: 450, fehlt: false, gebuehrCents: 0 }] })
     expect(artikelFehltRechnung(b, 'eier')).toEqual({ art: 'storno' })
   })
 
@@ -115,9 +115,9 @@ describe('artikelFehltRechnung — Sonderfälle', () => {
       warenpreisCents: 3080,
       serviceFeeCents: 154,
       positionen: [
-        { id: 'a', betragCents: 2000, fehlt: false },
-        { id: 'b', betragCents: 1000, fehlt: false },
-        { id: 'c', betragCents: 80, fehlt: false },
+        { id: 'a', betragCents: 2000, fehlt: false, gebuehrCents: 0 },
+        { id: 'b', betragCents: 1000, fehlt: false, gebuehrCents: 0 },
+        { id: 'c', betragCents: 80, fehlt: false, gebuehrCents: 0 },
       ],
     })
     const erst = artikelFehltRechnung(start, 'a')
@@ -131,9 +131,9 @@ describe('artikelFehltRechnung — Sonderfälle', () => {
       serviceFeeCents: erst.neuGebuehrCents,
       erstattetCents: erst.erstattungCents,
       positionen: [
-        { id: 'a', betragCents: 2000, fehlt: true },
-        { id: 'b', betragCents: 1000, fehlt: false },
-        { id: 'c', betragCents: 80, fehlt: false },
+        { id: 'a', betragCents: 2000, fehlt: true, gebuehrCents: 0 },
+        { id: 'b', betragCents: 1000, fehlt: false, gebuehrCents: 0 },
+        { id: 'c', betragCents: 80, fehlt: false, gebuehrCents: 0 },
       ],
     })
     const zweit = artikelFehltRechnung(danach, 'b')
@@ -151,8 +151,8 @@ describe('artikelFehltRechnung — Sonderfälle', () => {
   it('lehnt eine schon fehlende Position ab (zweiter Tipp)', () => {
     const b = bestellung({
       positionen: [
-        { id: 'eier', betragCents: 450, fehlt: false },
-        { id: 'brot', betragCents: 580, fehlt: true },
+        { id: 'eier', betragCents: 450, fehlt: false, gebuehrCents: 0 },
+        { id: 'brot', betragCents: 580, fehlt: true, gebuehrCents: 0 },
       ],
     })
     expect(artikelFehltRechnung(b, 'brot')).toEqual({ art: 'abgelehnt', grund: 'schon_fehlend' })

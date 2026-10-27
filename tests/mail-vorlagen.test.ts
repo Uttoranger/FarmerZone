@@ -83,8 +83,8 @@ function bestellung(teil: Partial<import('@/lib/email').OrderForHofMail> = {}): 
       owner: { email: 'inhaber@example.org' },
     },
     items: [
-      { productName: 'Freilandeier', quantity: 1, unitPrice: '4.50', totalPrice: '4.50', product: { unit: 'STUECK', unitSize: null } },
-      { productName: 'Bauernbrot', quantity: 2, unitPrice: '2.90', totalPrice: '5.80', product: { unit: 'STUECK', unitSize: null } },
+      { productName: 'Freilandeier', quantity: 1, unitPrice: '4.50', totalPrice: '4.50', gebuehrCents: 0, product: { unit: 'STUECK', unitSize: null } },
+      { productName: 'Bauernbrot', quantity: 2, unitPrice: '2.90', totalPrice: '5.80', gebuehrCents: 0, product: { unit: 'STUECK', unitSize: null } },
     ],
     ...teil,
   }

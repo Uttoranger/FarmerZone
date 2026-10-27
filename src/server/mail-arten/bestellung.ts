@@ -296,6 +296,7 @@ export async function rendereArtikelFehlt(bezug: Record<string, string>): Promis
       quantity: position.quantity,
       unitPrice: position.unitPrice,
       totalPrice: position.totalPrice,
+      gebuehrCents: position.gebuehrCents,
       product: position.product,
     },
     // Eine Erstattung gibt es nur bei Online-Zahlung — wie beim Speichern entschieden.

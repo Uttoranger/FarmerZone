@@ -20,7 +20,8 @@ import {
   pruefeGruendungEingabe,
   pruefeHofpreisStichtag,
 } from '@/lib/plattform-einstellung'
-import { wienerMitternacht } from '@/lib/wiener-tag'
+import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
+import { hofpreisModellAb } from '@/lib/plattformgebuehr'
 import { gruendungEinstellungSchema, hofpreisStichtagSchema } from '@/schemas/plattform-einstellung'
 import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
 
@@ -130,7 +131,17 @@ export async function speichereHofpreisStichtag(eingabe: unknown): Promise<{ ok:
     create: { id: PLATTFORM_EINSTELLUNG_ID, ...werte },
     update: werte,
   })
-  await protokolliere({ wer: guard.userId, art: 'hofpreis_stichtag_geaendert', bezugArt: 'plattform', bezugId: PLATTFORM_BEZUG, mitPasskey: guard.mitPasskey })
+  // Alter und neuer Tag im Grund, damit das Protokoll die Änderung selbst zeigt
+  // (nur Kalendertage in Wien, keine Personendaten). War keiner gesetzt, galt die Vorgabe.
+  const alterTag = `${kalendertagInWien(hofpreisModellAb(bisher))}${bisher.hofpreisModellAb ? '' : ' (Vorgabe)'}`
+  await protokolliere({
+    wer: guard.userId,
+    art: 'hofpreis_stichtag_geaendert',
+    bezugArt: 'plattform',
+    bezugId: PLATTFORM_BEZUG,
+    mitPasskey: guard.mitPasskey,
+    grund: `Hofpreis-Modell ab: ${alterTag} → ${tag}`,
+  })
 
   updateTag(PLATTFORM_EINSTELLUNG_TAG)
   revalidatePath('/')

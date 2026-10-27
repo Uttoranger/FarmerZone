@@ -78,7 +78,7 @@ function bestellung(felder: { serviceFeeCents: number; createdAt?: Date; payment
       slug: 'hof-test',
       owner: { email: 'inhaber@example.com' },
     },
-    items: [{ productName: 'Eier', quantity: 1, unitPrice: 10.3, totalPrice: 10.3, product: null }],
+    items: [{ productName: 'Eier', quantity: 1, unitPrice: 10.3, totalPrice: 10.3, gebuehrCents: 0, product: null }],
   }
 }
 

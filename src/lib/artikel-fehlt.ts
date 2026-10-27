@@ -73,8 +73,8 @@ export type ArtikelFehltBestellung = {
   gebuehrModell?: string | null
   /** Order.gebuehrEinzug (N38): ob die Monatsabrechnung die Bargebühr nimmt ('sepa', 'ueberweisung'). */
   gebuehrEinzug?: string | null
-  /** `gebuehrCents` = OrderItem.gebuehrCents (N38), im Modell `bisher` 0. */
-  positionen: ReadonlyArray<{ id: string; betragCents: number; fehlt: boolean; gebuehrCents?: number }>
+  /** `gebuehrCents` = OrderItem.gebuehrCents (N38), im Modell `bisher` 0 — Pflicht, damit kein Lader es vergisst. */
+  positionen: ReadonlyArray<{ id: string; betragCents: number; fehlt: boolean; gebuehrCents: number }>
 }
 
 export type ArtikelFehltAblehnung = 'position_unbekannt' | 'schon_fehlend' | 'status' | 'nicht_bezahlt'
@@ -181,7 +181,7 @@ export function artikelFehltRechnung(b: ArtikelFehltBestellung, positionId: stri
   // neu gerechnet. Bisher: neu auf den Rest mit der Regel der Bestellung (E14).
   const hofpreis = istHofpreisBestellung({ gebuehrModell: b.gebuehrModell ?? null })
   const neuGebuehrCents = hofpreis
-    ? Math.max(0, b.serviceFeeCents - (position.gebuehrCents ?? 0))
+    ? Math.max(0, b.serviceFeeCents - position.gebuehrCents)
     : neueServicegebuehrCents(neuWarenCents, b)
   const gebuehrDifferenzCents = b.serviceFeeCents - neuGebuehrCents
 

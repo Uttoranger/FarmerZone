@@ -264,8 +264,8 @@ describe('„Artikel fehlt" (E14) bei Barzahlung', () => {
       erstattetCents: 0,
       bestelltAm: LANGE_VORHER,
       positionen: [
-        { id: 'eier', betragCents: 450, fehlt: false },
-        { id: 'brot', betragCents: 580, fehlt: false },
+        { id: 'eier', betragCents: 450, fehlt: false, gebuehrCents: 0 },
+        { id: 'brot', betragCents: 580, fehlt: false, gebuehrCents: 0 },
       ],
       ...abweichend,
     }
@@ -297,9 +297,9 @@ describe('„Artikel fehlt" (E14) bei Barzahlung', () => {
     const drei = barOhneGebuehr({
       warenpreisCents: 1530,
       positionen: [
-        { id: 'eier', betragCents: 450, fehlt: false },
-        { id: 'brot', betragCents: 580, fehlt: false },
-        { id: 'honig', betragCents: 500, fehlt: false },
+        { id: 'eier', betragCents: 450, fehlt: false, gebuehrCents: 0 },
+        { id: 'brot', betragCents: 580, fehlt: false, gebuehrCents: 0 },
+        { id: 'honig', betragCents: 500, fehlt: false, gebuehrCents: 0 },
       ],
     })
     const erst = artikelFehltRechnung(drei, 'brot')

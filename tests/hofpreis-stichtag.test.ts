@@ -23,6 +23,8 @@ import { speichereHofpreisStichtag } from '@/server/actions/plattform-einstellun
 import { HOFPREIS_STICHTAG_FEHLER, PLATTFORM_EINSTELLUNG_TAG, hofpreisStichtagTag, pruefeHofpreisStichtag } from '@/lib/plattform-einstellung'
 import { BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
 import { einstellungsZeile } from './fabrik/plattform-einstellung'
+import { kalendertagInWien } from '@/lib/wiener-tag'
+import { adminGrundSchema } from '@/schemas/admin-aktion'
 
 const JETZT = new Date('2026-10-27T10:00:00.000Z')
 const OHNE = { hofpreisModellAb: null }
@@ -73,7 +75,20 @@ describe('speichereHofpreisStichtag — Recht geld, frisch, Protokoll', () => {
     // 1. Jänner 2027 in Wien = 31.12.2026, 23:00 UTC.
     expect(aufruf.update.hofpreisModellAb.toISOString()).toBe('2026-12-31T23:00:00.000Z')
     expect(protokolliere).toHaveBeenCalledWith(expect.objectContaining({ art: 'hofpreis_stichtag_geaendert', bezugArt: 'plattform', mitPasskey: true }))
+    // Ohne gesetzten Stichtag galt die Vorgabe (BAR_SERVICEGEBUEHR_AB) — alter und neuer Tag im Grund.
+    expect(protokolliere).toHaveBeenCalledWith(expect.objectContaining({ grund: `Hofpreis-Modell ab: ${kalendertagInWien(BAR_SERVICEGEBUEHR_AB)} (Vorgabe) → 2027-01-01` }))
     expect(updateTag).toHaveBeenCalledWith(PLATTFORM_EINSTELLUNG_TAG)
+  })
+
+  it('Protokoll nennt den gesetzten alten Tag und den neuen, nur Datum ohne Personendaten', async () => {
+    // Gesetzt auf den 1. März 2027 (Wiener Mitternacht), noch nicht erreicht.
+    vi.mocked(prisma.plattformEinstellung.findUnique).mockResolvedValue(einstellungsZeile(new Date('2027-02-28T23:00:00.000Z')) as never)
+    expect(await speichereHofpreisStichtag({ tag: '2027-01-15' })).toEqual({ ok: true })
+    const eintrag = vi.mocked(protokolliere).mock.calls[0]?.[0]
+    expect(eintrag?.grund).toBe('Hofpreis-Modell ab: 2027-03-01 → 2027-01-15')
+    // Der Grund besteht die Personendaten-Prüfung des Protokolls (sonst verwürfe protokolliere ihn).
+    expect(adminGrundSchema.safeParse(eintrag?.grund).success).toBe(true)
+    expect(eintrag?.grund).not.toContain('admin_1')
   })
 
   it('Gegenprobe: ohne Recht oder nicht frisch — nichts geschrieben, nichts protokolliert', async () => {

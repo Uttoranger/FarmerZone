@@ -254,13 +254,18 @@ describe('sendeBarLinkErneut — Hofpreis-Modell (N38, Nr. 197 Nachbesserung)', 
     const echt = await vi.importActual<typeof import('@/lib/email')>('@/lib/email')
     const { html } = await echt.onsiteConfirmationInhalt(mailBestellung, token)
 
-    const cents = (euro: string) => Number(euro.replace(',', ''))
-    // Zeilen mit Endpreis (Ware + Gebühr der Zeile), dann das Gesamt.
-    expect(html).toContain('€ 4,82')
-    expect(html).toContain('€ 3,22')
-    expect(html).toContain('€ 8,04')
-    const zeilen = ['4,82', '3,22'].map(cents).reduce((a, b) => a + b, 0)
-    expect(zeilen).toBe(cents('8,04'))
+    // Erwartet in ganzen Cent (CODING_STANDARDS §2): Zeile = Ware + Gebühr der Zeile aus dem Snapshot.
+    const zeileEierCents = 450 + 32
+    const zeileMilchCents = 300 + 22
+    const gesamtCents = 750 + 54
+    expect(zeileEierCents + zeileMilchCents).toBe(gesamtCents)
+    // Nur zur Suche im HTML: ganze Cent als Euro-Text, ohne Fließkomma.
+    const euroText = (c: number) => `€ ${Math.floor(c / 100)},${String(c % 100).padStart(2, '0')}`
+    expect(euroText(zeileEierCents)).toBe('€ 4,82')
+    // Zeilen mit Endpreis, dann das Gesamt.
+    expect(html).toContain(euroText(zeileEierCents))
+    expect(html).toContain(euroText(zeileMilchCents))
+    expect(html).toContain(euroText(gesamtCents))
     // Keine eigene Gebührenzeile — die Gebühr steckt im Preis.
     expect(html).not.toContain('Servicegebühr')
   })

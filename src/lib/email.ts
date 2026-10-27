@@ -365,8 +365,12 @@ export type OrderForEmail = {
     quantity: number
     unitPrice: { toString(): string } | number
     totalPrice?: { toString(): string } | number
-    /** Gebühr dieser Position in Cent (OrderItem.gebuehrCents, N38) — nur im Hofpreis-Modell über 0. */
-    gebuehrCents?: number
+    /**
+     * Gebühr dieser Position in Cent (OrderItem.gebuehrCents, N38) — nur im Hofpreis-Modell über 0.
+     * Pflicht, damit der Typecheck jeden Lader meldet, der das Feld vergisst: Sonst zeigt die Mail
+     * Zeilen ohne Gebühr, aber ein Gesamt mit Gebühr.
+     */
+    gebuehrCents: number
     // Einheit optional zur Anzeige gejoint (formatOrderLine-Schreibweise);
     // fehlt sie, bleibt die Darstellung wie bisher
     product?: OrderLineProduct
@@ -412,7 +416,7 @@ function n(v: { toString(): string } | number): number {
 function zeilenBetrag(i: OrderForEmail['items'][number], mitGebuehr: boolean): number {
   const cents = i.totalPrice != null ? alsCents(i.totalPrice) : decimalZuCents(calcLineTotal(i.unitPrice, i.quantity))
   // Im Hofpreis-Modell (N38) zeigt die Kundin-Mail den Endpreis der Zeile: Ware + Gebühr der Zeile aus dem Snapshot.
-  return centsAlsEuro(mitGebuehr ? cents + (i.gebuehrCents ?? 0) : cents)
+  return centsAlsEuro(mitGebuehr ? cents + i.gebuehrCents : cents)
 }
 
 /** Ist die Bestellung im Hofpreis-Modell (N38)? Dann heißt die Gebühr „Plattformgebühr“ und steckt im Preis. */
