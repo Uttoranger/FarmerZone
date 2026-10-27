@@ -128,6 +128,8 @@ export const ZUSTANDSZEILE_TEXT = {
   ausgebucht: { titel: 'Gerade ausgebucht', satz: `Alle Abholzeiten ${vorlaufInWochen()} sind voll.`, knopf: 'Abholzeiten' },
   keinProdukt: { titel: ABHOLZEILE_TEXT.nichtBestellbar, satz: 'Kein Produkt ist gerade zu kaufen.', knopf: 'Produkte' },
   nimmtAn: { titel: 'Nimmt Bestellungen an', satz: 'Nächste Abholung: ', knopf: 'Pausieren' },
+  // N34: Die Sperre des Teams kann der Hof nicht selbst aufheben — darum ohne Knopf.
+  gesperrt: { titel: 'Vom Team gesperrt', satz: 'Bestellen kann gerade niemand. Antworte im Postfach.' },
 } as const
 
 /** Was der Knopf der Zeile tut — die Adresse bzw. die Handlung wählt der Kopf (mein-hof-kopf.tsx). */
@@ -147,6 +149,7 @@ export type ZustandsZeile = {
  *    kommt dafür mit der Bedingung des Balkens (ladeMeinHofZustand), nicht aus
  *    hofZustand allein.
  *  - aus (freigeschaltet, aber nicht aktiv) → grau, ohne Knopf.
+ *  - vom Team gesperrt (N34) → orange, ohne Knopf; sticht die Pause wie bei der Kundin.
  *  - pausiert → Fortsetzen; keine Abholzeit → Eintragen; ausgebucht → Abholzeiten;
  *    kein kaufbares Produkt → Produkte (dieselbe Regel wie `istBestellbar` auf /hoefe).
  *  - sonst → grün mit der nächsten Abholung im Hausformat und „Pausieren“.
@@ -167,6 +170,7 @@ export function zustandsZeile({
   const t = ZUSTANDSZEILE_TEXT
   if (zustand === 'stillgelegt' || zustand === 'wartet') return null
   if (zustand === 'aus') return { ton: 'grau', ...t.aus, knopf: null }
+  if (sperre === 'gesperrt') return { ton: 'orange', ...t.gesperrt, knopf: null }
   if (zustand === 'pausiert') return { ton: 'orange', titel: t.pausiert.titel, satz: t.pausiert.satz, knopf: { art: 'fortsetzen', text: t.pausiert.knopf } }
   if (sperre === 'keine-abholzeit') {
     return { ton: 'orange', titel: t.keineAbholzeit.titel, satz: t.keineAbholzeit.satz, knopf: { art: 'eintragen', text: t.keineAbholzeit.knopf } }

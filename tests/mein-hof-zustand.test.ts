@@ -56,6 +56,14 @@ describe('zustandsZeile', () => {
     })
   })
 
+  it('vom Team gesperrt (N34): orange, ohne Knopf, sticht die Pause — nie „Nimmt Bestellungen an“', () => {
+    const zeile = { ton: 'orange', titel: ZUSTANDSZEILE_TEXT.gesperrt.titel, satz: ZUSTANDSZEILE_TEXT.gesperrt.satz, knopf: null }
+    expect(zustandsZeile({ ...OFFEN, sperre: 'gesperrt' })).toEqual(zeile)
+    expect(zustandsZeile({ ...OFFEN, zustand: 'pausiert', sperre: 'gesperrt' })).toEqual(zeile)
+    // Gegenprobe: ohne Sperre nimmt der Hof wieder an.
+    expect(zustandsZeile(OFFEN)?.titel).toBe('Nimmt Bestellungen an')
+  })
+
   it('pausiert sticht alles andere: orange, „Fortsetzen“', () => {
     const zeile = zustandsZeile({ ...OFFEN, zustand: 'pausiert', sperre: 'pause', kaufbar: false })
     expect(zeile).toEqual({ ton: 'orange', titel: 'Pausiert', satz: 'Bestellen kann gerade niemand.', knopf: { art: 'fortsetzen', text: 'Fortsetzen' } })
@@ -104,6 +112,7 @@ function hof(teile: Record<string, unknown> = {}) {
   return {
     isActive: true,
     isPaused: false,
+    adminGesperrtAm: null,
     approvedAt: new Date('2026-09-01T10:00:00Z'),
     archivedAt: null,
     pauseMessage: null,
@@ -128,6 +137,11 @@ describe('ladeMeinHofZustand (feste Uhr: Donnerstag 10:00 in Wien)', () => {
     const zustand = await ladeMeinHofZustand('hof-1', JETZT)
     return zustand && zustandsZeile(zustand)
   }
+
+  it('vom Team gesperrt: der Lader liest die Sperre, die Zeile sagt es (nie „Nimmt Bestellungen an“)', async () => {
+    findUnique.mockResolvedValue(hof({ adminGesperrtAm: new Date('2026-10-21T08:00:00Z') }) as never)
+    expect(await zeile()).toMatchObject({ titel: ZUSTANDSZEILE_TEXT.gesperrt.titel, knopf: null })
+  })
 
   it('nimmt an: morgen ist Freitag', async () => {
     findUnique.mockResolvedValue(hof() as never)
