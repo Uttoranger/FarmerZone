@@ -26,6 +26,8 @@ import type { MarkeArt } from '@/lib/marke-art'
 import { adminAktionSchema, ohnePersonendaten, type AdminAktionArt } from '@/schemas/admin-aktion'
 import { SERVICEGEBUEHR_BEZEICHNUNG } from '@/lib/servicegebuehr'
 import { ADMIN_HOEFE_HREF, adminHofHref } from '@/lib/admin-hof-akte'
+import { ABWEICHUNG_FELD_TEXT, type OffeneAbweichung } from '@/lib/geld-abgleich'
+import { bestellungenHref } from '@/lib/admin-bestellung'
 
 /*
  * Admin › Heute (Register N32, Nr. 185): die EINE Liste „Braucht dich“ aus
@@ -59,6 +61,7 @@ export const AUFGABE_QUELLEN = [
   'uptime_still',
   'hof_ohne_abholzeit',
   'hof_ohne_bestellung',
+  'geld_abweichung',
 ] as const
 
 export type AufgabeQuelle = (typeof AUFGABE_QUELLEN)[number]
@@ -116,6 +119,8 @@ export type AufgabenStand = {
   warnungen: readonly { art: string; stufe: number; seit: Date }[]
   laeufe: ReadonlyMap<string, AblaufLaufDaten>
   hoefeAktiv: readonly AufgabeHof[]
+  /** Offene Abweichungen aus dem Geld-Abgleich (Nr. 191) — nur Kennung, Feld und Cent. */
+  geldAbweichungen: readonly OffeneAbweichung[]
 }
 
 /** Ein leerer Stand — Ausgangspunkt für Tests und für Bereiche, die außerhalb der Produktion nichts melden. */
@@ -128,6 +133,7 @@ export const LEERER_STAND: AufgabenStand = {
   warnungen: [],
   laeufe: new Map(),
   hoefeAktiv: [],
+  geldAbweichungen: [],
 }
 
 /** Ab wann ein verkaufender Hof ohne Bestellung auffällt (Register N32: „seit 14 Tagen ohne Bestellung“). */
@@ -149,6 +155,7 @@ export const AUFGABE_ZIEL_MS: Record<AufgabeQuelle, number> = {
   uptime_still: 12 * STUNDE_MS,
   hof_ohne_abholzeit: 7 * TAG_MS,
   hof_ohne_bestellung: 7 * TAG_MS,
+  geld_abweichung: 24 * STUNDE_MS,
 }
 
 const BEREICH: Record<AufgabeQuelle, AufgabeBereich> = {
@@ -161,6 +168,7 @@ const BEREICH: Record<AufgabeQuelle, AufgabeBereich> = {
   uptime_still: 'Betrieb',
   hof_ohne_abholzeit: 'Höfe',
   hof_ohne_bestellung: 'Höfe',
+  geld_abweichung: 'Geld',
 }
 
 // Die Höfe-Liste steht seit Nr. 185 unter /admin/hoefe; seit Nr. 187 hat jeder Hof eine Akte —
@@ -406,6 +414,34 @@ function hofOhneBestellung(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
   })
 }
 
+/**
+ * Abweichung beim Geld (Nr. 191, N37): Der Geld-Abgleich fand Datenbank und
+ * Stripe nicht gleich — je Bestellung eine Aufgabe mit Nummer, Feld und
+ * Unterschied in Cent. Die älteste Abweichung der Bestellung bestimmt die
+ * Frist (24 h, wie eine offene Erstattung). Stimmen beide wieder, löscht der
+ * nächste Lauf die Zeile, und die Aufgabe verschwindet von selbst.
+ */
+function geldAbweichung(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
+  const jeBestellung = new Map<string, OffeneAbweichung[]>()
+  for (const a of stand.geldAbweichungen) jeBestellung.set(a.orderId, [...(jeBestellung.get(a.orderId) ?? []), a])
+  return [...jeBestellung.values()].map((liste) => {
+    const erste = liste.reduce((a, b) => (b.seit.getTime() < a.seit.getTime() ? b : a))
+    const teile = liste.map((a) => `${ABWEICHUNG_FELD_TEXT[a.feld]} ${a.differenzCents > 0 ? '+' : '−'}${formatEuro(centsAlsEuro(Math.abs(a.differenzCents)))}`)
+    return aufgabe(
+      'geld_abweichung',
+      {
+        titel: 'Abweichung beim Geld',
+        bezug: { kennung: erste.orderNumber, text: [erste.orderNumber, ...teile].join(' · ') },
+        satz: 'Die Datenbank und Stripe sagen nicht dasselbe (Plus: die Datenbank hat mehr). Bei Stripe nachsehen und die Bestellung prüfen.',
+        seit: erste.seit,
+        wasTun: 'pruefen',
+        ziel: bestellungenHref({}, { suche: erste.orderNumber }),
+      },
+      jetzt
+    )
+  })
+}
+
 /** Das Register: je Quelle eine reine Funktion `(stand, jetzt) → Aufgabe[]`. */
 export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt: Date) => Aufgabe[]> = {
   hof_wartet: hofWartet,
@@ -417,6 +453,7 @@ export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt:
   uptime_still: uptimeStill,
   hof_ohne_abholzeit: hofOhneAbholzeit,
   hof_ohne_bestellung: hofOhneBestellung,
+  geld_abweichung: geldAbweichung,
 }
 
 /** Alle Aufgaben aus allen Quellen, nach Frist sortiert (das nächste Ziel zuerst — überfällige stehen damit oben). */
@@ -525,6 +562,8 @@ export type HeuteLage = {
   woche: HeuteWoche
   dienste: { laufen: number; von: number; ansehen: readonly string[]; testbetrieb: boolean }
   hoefe: { verkaufen: number; warten: number }
+  /** Der letzte erfolgreiche Geld-Abgleich (Nr. 191); null = noch keiner (außerhalb der Produktion immer). */
+  geldAbgleichOk?: boolean
 }
 
 export type LageKachel = {
@@ -543,6 +582,7 @@ export function lageKacheln(lage: HeuteLage, aufgaben: readonly Aufgabe[]): Lage
   const d = lage.dienste
   const ohneAbholzeit = aufgaben.filter((a) => a.quelle === 'hof_ohne_abholzeit').length
   const ohneBestellung = aufgaben.filter((a) => a.quelle === 'hof_ohne_bestellung').length
+  const abweichungen = aufgaben.filter((a) => a.quelle === 'geld_abweichung').length
   return [
     {
       id: 'bestellungen',
@@ -558,9 +598,12 @@ export function lageKacheln(lage: HeuteLage, aufgaben: readonly Aufgabe[]): Lage
       titel: 'Geld · Woche',
       wert: formatEuro(centsAlsEuro(lage.woche.umsatzCents), 0),
       einheit: 'Umsatz der Höfe',
-      // „stimmt“, „Auszahlung Do“ und die Abgleich-Zeile liefert erst der Geld-Abgleich (Nr. 191).
-      marke: null,
-      zeilen: [`${SERVICEGEBUEHR_BEZEICHNUNG} ${formatEuro(centsAlsEuro(lage.woche.gebuehrCents))}`],
+      // „stimmt“ nur nach einem erfolgreichen Abgleich (Nr. 191); „Auszahlung Do“ hat keine Quelle im Code und fehlt weiter.
+      marke: lage.geldAbgleichOk ? (abweichungen === 0 ? { wort: 'stimmt', art: 'laeuft' } : { wort: mitAnzahlWort(abweichungen, 'Abweichung', 'Abweichungen'), art: 'tun' }) : null,
+      zeilen: [
+        `${SERVICEGEBUEHR_BEZEICHNUNG} ${formatEuro(centsAlsEuro(lage.woche.gebuehrCents))}`,
+        ...(lage.geldAbgleichOk ? [abweichungen === 0 ? 'Abgleich mit Stripe ohne Abweichung' : 'Abgleich mit Stripe: Abweichung in Braucht dich'] : []),
+      ],
     },
     {
       id: 'dienste',
@@ -699,6 +742,7 @@ export const PROTOKOLL_TEXT: Partial<Record<AdminAktionArt, string>> = {
   kostenposten_beendet: 'Kosten beendet',
   kostenposten_geloescht: 'Kosten gelöscht',
   finanzen_export: 'Geld als CSV geladen',
+  monat_abgeschlossen: 'Monat abgeschlossen',
   erstattung_erledigt: 'Erstattung als erledigt markiert',
   empfaenger_hinzugefuegt: 'Empfänger hinzugefügt',
   empfaenger_entfernt: 'Empfänger entfernt',

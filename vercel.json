@@ -14,6 +14,10 @@
       "schedule": "0 4 * * *"
     },
     {
+      "path": "/api/cron/geld-abgleich",
+      "schedule": "30 6 * * *"
+    },
+    {
       "path": "/api/cron/briefkasten",
       "schedule": "0 5 * * 1"
     },
