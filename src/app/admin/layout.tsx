@@ -5,9 +5,11 @@ import { STRIPE_MARKE, TESTBETRIEB } from '@/lib/umgebung-server'
 
 /*
  * Alle Routen unter /admin in der AdminShell (Nachtlauf Nr. 22f, Gate 8):
- * eigene Kopfzeile mit den Reitern Höfe · Postfach · Startseite · Finanzen ·
- * Betrieb · Einstellungen und — nur mit eigenem Hof — „← Zu meinem Hof", keine Hof-Seitenleiste
- * (docs/ai/DESIGN_SYSTEM.md).
+ * eigene Kopfzeile mit den Reitern Heute · Höfe · Bestellungen · Postfach ·
+ * Startseite · Geld · Betrieb · Einstellungen (Register N32, Nr. 193; am Handy
+ * als Leiste unten mit „Mehr“) und — nur mit eigenem Hof — „← Zu meinem Hof",
+ * keine Hof-Seitenleiste (docs/ai/DESIGN_SYSTEM.md). Welche Reiter die Person
+ * sieht, sagt `reiter` (N35: ohne Recht kein Reiter).
  *
  * Zugang: ladeAdminbereich prüft zuerst mit verlangeAdminShell (frisch aus
  * der Datenbank), erst danach lädt es Name und Zähler. Jede Seite darunter
@@ -21,13 +23,13 @@ export const metadata: Metadata = {
 }
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }): Promise<React.JSX.Element> {
-  const { personName, hatHof, zahlen, betrieb, aufgaben } = await ladeAdminbereich()
+  const { personName, hatHof, zahlen, reiter, betrieb, aufgaben } = await ladeAdminbereich()
 
   // Testbetrieb (Register Z2): Produktion mit Test-Schlüssel — nur der Wahrheitswert geht an die Shell.
   // Betriebsleiste (Register Z3, Korrektur Nr. 94): der Stripe-Modus, als Text und Ton;
   // rechts seit Nr. 185 (N32) „n offen · m überfällig“ aus Heute; der Punkt am Reiter Betrieb (N15/N18) nur in der Produktion.
   return (
-    <AdminShell personName={personName} hatHof={hatHof} zahlen={zahlen} testbetrieb={TESTBETRIEB} stripeMarke={STRIPE_MARKE} betrieb={betrieb} aufgaben={aufgaben}>
+    <AdminShell personName={personName} hatHof={hatHof} zahlen={zahlen} reiter={reiter} testbetrieb={TESTBETRIEB} stripeMarke={STRIPE_MARKE} betrieb={betrieb} aufgaben={aufgaben}>
       {children}
     </AdminShell>
   )

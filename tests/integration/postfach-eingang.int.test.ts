@@ -63,13 +63,13 @@ import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendBetreiberBestaetigung } from '@/lib/email'
-import { POSTFACH_FEHLER, eingangEintraege } from '@/lib/postfach'
+import { POSTFACH_FEHLER, eingangEintraege, offenImGespraech } from '@/lib/postfach'
 import { SUPPORT_EMAIL } from '@/lib/support'
 import { PLATTFORM_EINSTELLUNG_ID } from '@/lib/plattform-einstellung'
 import { POST as webhook } from '@/app/api/stripe/webhook/route'
 import { antworteAlsHof, fuegeEmpfaengerHinzu, sendeRundschreiben, speichereZustellRegeln } from '@/server/actions/postfach'
 import { bestaetigeEmpfaenger } from '@/server/zustellung-bestaetigen'
-import { empfaengerTokenHash, ladeBetreiberEmpfaenger, ladeEingang, zaehleOffenImEingang } from '@/server/queries/postfach'
+import { empfaengerTokenHash, ladeBetreiberEmpfaenger, ladeEingang, ladeErstattungAufgaben, ladeHofAufgaben, zaehleOffenImEingang } from '@/server/queries/postfach'
 import { INTEGRATIONS_ENV } from './setup/integrations-umgebung'
 import { auftraege, erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf, machePasskeyAdmin } from './setup/basis'
 
@@ -186,17 +186,19 @@ describe('Eingang', () => {
     await alsSitzung(hofCookie)
     expect(await antworteAlsHof({ unterhaltungId: faden, text: 'Erfundene Antwort.' })).toEqual({ ok: true })
 
-    const offen = eingangEintraege(await ladeEingang('offen', new Date()), 'offen')
+    // Seit Nr. 193 (N32) nur Gespräche: der wartende Hof und die offene Erstattung stehen in Heute, nicht im Eingang.
+    const offen = eingangEintraege(await ladeEingang('offen'), 'offen')
     const meine = offen.filter((e) => [faden, meldung.id, wartend.id, erstattung.id].includes(e.auswahl.id)).map((e) => `${e.auswahl.art}-${e.auswahl.id}`)
-    expect(meine).toEqual([`antwort-${faden}`, `meldung-${meldung.id}`, `erstattung-${erstattung.id}`, `hof-${wartend.id}`])
+    expect(meine).toEqual([`antwort-${faden}`, `meldung-${meldung.id}`])
+    const alle = eingangEintraege(await ladeEingang('alle'), 'alle').map((e) => e.auswahl.id)
+    expect(alle).not.toContain(wartend.id)
+    expect(alle).not.toContain(erstattung.id)
+    // Gegenprobe: Heute liest sie weiter aus denselben Abfragen.
+    expect((await ladeHofAufgaben(new Date())).map((h) => h.id)).toContain(wartend.id)
+    expect((await ladeErstattungAufgaben()).map((e) => e.id)).toContain(erstattung.id)
 
-    const aufgaben = eingangEintraege(await ladeEingang('aufgabe', new Date()), 'aufgabe').map((e) => e.auswahl.id)
-    expect(aufgaben).toEqual(expect.arrayContaining([wartend.id, erstattung.id]))
-    expect(aufgaben).not.toContain(faden)
-    expect(aufgaben).not.toContain(meldung.id)
-
-    // Eine Zählung für Reiter und Eingang: die SQL-Zählungen gleich der Liste „Offen".
-    expect((await zaehleOffenImEingang()).gesamt).toBe(offen.length)
+    // Eine Zählung für Reiter und Eingang: die SQL-Zählungen der Gespräche gleich der Liste „Offen".
+    expect(offenImGespraech(await zaehleOffenImEingang())).toBe(offen.length)
   })
 })
 
@@ -328,7 +330,8 @@ describe('Zustellung: Erstattung offen', () => {
     expect(await auftraege({ art: 'erstattung-offen', bestellungId: bestellung.id })).toEqual([])
     await arbeiteNachlaufAb()
     expect(await adressenDer(await auftraege({ art: 'erstattung-offen', bestellungId: bestellung.id }))).toEqual([SUPPORT, 'int-bestaetigt@example.com'].sort())
-    expect(eingangEintraege(await ladeEingang('aufgabe', new Date()), 'aufgabe').map((e) => e.auswahl.id)).toContain(bestellung.id)
+    // Die Aufgabe steht seit Nr. 193 in Heute (dieselbe Abfrage), nicht mehr im Eingang.
+    expect((await ladeErstattungAufgaben()).map((e) => e.id)).toContain(bestellung.id)
 
     // Eine ältere erfolgreiche Erstattung derselben Zahlung erledigt nichts …
     const alt = { id: intKennung('re-alt'), amount: 100, status: 'succeeded', payment_intent: bestellung.paymentIntentId, metadata: {}, created: Math.floor(Date.now() / 1000) - 3600 }

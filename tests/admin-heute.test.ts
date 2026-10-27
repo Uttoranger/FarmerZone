@@ -42,7 +42,7 @@ vi.mock('@/lib/prisma', () => ({ prisma: db }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 vi.mock('@/server/admin-wache', () => ({
   verlangeAdminSeite: vi.fn(async () => 'ich'),
-  verlangeAdminShell: vi.fn(async () => ({ userId: 'ich', inhaltOffen: true })),
+  verlangeAdminShell: vi.fn(async () => ({ userId: 'ich', inhaltOffen: true, person: { adminInhaber: true, adminRechte: [] } })),
 }))
 vi.mock('next/navigation', () => ({
   permanentRedirect: vi.fn((ziel: string) => {
@@ -147,7 +147,7 @@ describe('Admin › Heute', () => {
     expect(html).toContain('Ziel 48 h · noch 21 h')
     expect(html).toContain('überfällig · seit 2 Tagen')
     expect(html).toContain('Hof ohne Abholzeit nächste Woche')
-    expect(html).toMatch(/<a href="\/admin\/postfach\?art=aufgabe&amp;id=hof-hof-1"[^>]*>Prüfen<\/a>/)
+    expect(html).toMatch(/<a href="\/admin\/hoefe\/hof-1"[^>]*>Prüfen<\/a>/)
     expect(html.indexOf('Braucht dich')).toBeLessThan(html.indexOf('Bestellungen heute'))
     // Lage aus den Attrappen: 6 offen (4 bezahlt + 2 bereit), davon 4 nicht gepackt, 1 Storno; € 1.840 Umsatz.
     expect(html).toContain('4 noch nicht gepackt · 1 Storno')

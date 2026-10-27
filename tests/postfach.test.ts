@@ -243,7 +243,7 @@ describe('Empfänger eines Rundschreibens', () => {
 describe('Adressen', () => {
   it('der Eingang braucht keinen Reiter-Parameter, die anderen Reiter schon', () => {
     expect(adminPostfachAdresse('eingang')).toBe('/admin/postfach')
-    expect(adminPostfachAdresse('zustellung')).toBe('/admin/postfach?reiter=zustellung')
+    expect(adminPostfachAdresse('rundschreiben')).toBe('/admin/postfach?reiter=rundschreiben')
     expect(eingangAdresse('offen')).toBe('/admin/postfach')
     expect(eingangAdresse('antwort', { art: 'antwort', id: ID_A })).toBe(`/admin/postfach?art=antwort&id=antwort-${ID_A}`)
     expect(postfachFilterAus('ungelesen')).toBe('ungelesen')

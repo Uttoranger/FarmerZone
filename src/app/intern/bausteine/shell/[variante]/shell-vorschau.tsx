@@ -121,8 +121,8 @@ export function ShellVorschau({ variante }: { variante: ShellVariante }): React.
     case 'admin':
       return (
         // Auch hier sitzt ein echter Admin vor der Vorschau — „Abmelden" darf ihn nicht abmelden (Nr. 126).
-        <AdminShell personName="Max Mustermann" hatHof zahlen={{ hoefe: 2, briefkasten: 3 }} onAbmelden={() => toast(ABMELDEN_IN_VORSCHAU)}>
-          <Beispielinhalt titel="Höfe" welt="admin" />
+        <AdminShell personName="Max Mustermann" hatHof zahlen={{ heute: 4, hoefe: 2, postfach: 3 }} onAbmelden={() => toast(ABMELDEN_IN_VORSCHAU)}>
+          <Beispielinhalt titel="Heute" welt="admin" />
         </AdminShell>
       )
   }

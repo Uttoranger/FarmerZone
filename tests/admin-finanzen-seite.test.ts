@@ -81,8 +81,8 @@ describe('Reiter-Zustand aus der Adresse', () => {
   })
 
   it('die Adressen: Monat immer, Reiter nur wenn er nicht der Standard ist', () => {
-    expect(finanzenAdresse({ monat: '2026-09', reiter: 'monat' })).toBe('/admin/finanzen?monat=2026-09')
-    expect(finanzenAdresse({ monat: '2026-09', reiter: 'kosten' })).toBe('/admin/finanzen?monat=2026-09&reiter=kosten')
+    expect(finanzenAdresse({ monat: '2026-09', reiter: 'monat' })).toBe('/admin/geld?monat=2026-09')
+    expect(finanzenAdresse({ monat: '2026-09', reiter: 'kosten' })).toBe('/admin/geld?monat=2026-09&reiter=kosten')
   })
 })
 

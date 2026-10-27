@@ -135,14 +135,15 @@ export const ZUSTELL_REGEL_TEXT: Record<ZustellArt, string> = {
   betrieb: 'Betrieb – Warnung ab 80 % oder bei einem ausgefallenen Ablauf; immer an (nicht abschaltbar)',
   // Die Drossel kam mit Nr. 105 (Register N14, Ergänzung): höchstens eine Mail je Faden und voller Stunde.
   antwortHof: 'Antwort eines Hofs – sofort, höchstens eine Mail je Faden und Stunde; aus heißt nur der Zähler im Eingang',
-  wunschFrage: 'Wünsche und Fragen – nur im Eingang, gesammelt im Wochenbericht',
-  wochenbericht: 'Wochenbericht – montags früh, nur wenn im Eingang etwas offen ist',
+  wunschFrage: 'Wünsche und Fragen – nur im Eingang, gesammelt in der Wochenlage',
+  // Seit Nr. 192 kommt die Wochenlage jede Woche (nur diese Regel entscheidet); der Schlüssel heißt weiter `wochenbericht`.
+  wochenbericht: 'Wochenlage – montags früh',
 }
 
 /** Die Reihenfolge im Formular (Mockup admin-postfach-zustellung). */
 export const ZUSTELL_REGEL_REIHENFOLGE: readonly ZustellArt[] = ['fehlermeldung', 'hofWartet', 'erstattungOffen', 'betrieb', 'antwortHof', 'wunschFrage', 'wochenbericht']
 
-/** Alle Sätze des Reiters „Zustellung". */
+/** Alle Sätze der Gruppe „Benachrichtigungen“ (bis Nr. 193 der Reiter „Zustellung“ im Postfach). */
 export const ZUSTELLUNG_TEXT = {
   empfaengerTitel: 'Empfänger',
   empfaengerSatz: 'Wer die E-Mails bekommt. Eine Liste für alle Arten.',
@@ -160,7 +161,7 @@ export const ZUSTELLUNG_TEXT = {
   hinweis:
     'Nur Adressen von Leuten, die Meldungen lesen dürfen – die Mails enthalten Hofnamen und Meldungstexte. Jede neue Adresse bestätigt zuerst über einen Link, erst dann bekommt sie Mails.',
   regelnTitel: 'Welche Einträge per E-Mail',
-  regelnSatz: 'Alles landet im Eingang; hier steht nur, was zusätzlich sofort hinausgeht und was der Wochenbericht sammelt.',
+  regelnSatz: 'Alles landet im Eingang bzw. in Heute; hier steht nur, was zusätzlich sofort hinausgeht und was die Wochenlage sammelt.',
   speichern: 'Speichern',
   verwerfen: 'Verwerfen',
   gespeichert: 'Regeln gespeichert.',
@@ -190,7 +191,7 @@ export const BESTAETIGEN_TEXT = {
   dankeTitel: 'Adresse bestätigt',
   dankeSatz: 'Ab jetzt bekommt diese Adresse die Betriebs-Mails. Austragen kann dich das Team, das dich eingetragen hat.',
   abgelaufenTitel: 'Der Link ist abgelaufen',
-  abgelaufenSatz: `Links gelten ${BESTAETIGUNG_GUELTIG_STUNDEN} Stunden. Bitte die Person, die dich eingetragen hat, die Adresse unter Postfach › Zustellung noch einmal hinzuzufügen – dann kommt ein neuer Link.`,
+  abgelaufenSatz: `Links gelten ${BESTAETIGUNG_GUELTIG_STUNDEN} Stunden. Bitte die Person, die dich eingetragen hat, die Adresse unter Einstellungen › Benachrichtigungen noch einmal hinzuzufügen – dann kommt ein neuer Link.`,
   ungueltigTitel: 'Dieser Link gilt nicht',
   ungueltigSatz: 'Vielleicht ist er schon benutzt oder die Adresse wurde entfernt. Bitte die Person, die dich eingetragen hat, um einen neuen Link.',
 } as const
@@ -207,9 +208,9 @@ export const ZUSTELLUNG_MAIL_TEXT = {
   antwortZu: 'Zu',
   antwortOeffnen: 'Im Eingang öffnen',
   /** Der Wochenbericht nennt im Betreff, was im Eingang offen ist (offenSatz aus src/lib/postfach.ts). */
-  wochenberichtBetreff: (offen: string) => `Postfach – Wochenstand: ${offen}`,
+  wochenberichtBetreff: (offen: string) => `Wochenlage: ${offen}`,
   testBetreff: `Testmail · ${MARKE}`,
   testTitel: 'Testmail aus dem Postfach',
-  testSatz: 'So kommen die Betriebs-Mails bei dir an. Diese Adresse steht auf der Liste unter Postfach › Zustellung.',
+  testSatz: 'So kommen die Betriebs-Mails bei dir an. Diese Adresse steht auf der Liste unter Einstellungen › Benachrichtigungen.',
   fuss: `Betriebs-Mail von ${MARKE}.`,
 } as const

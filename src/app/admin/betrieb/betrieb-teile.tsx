@@ -4,6 +4,8 @@ import {
   ALARM_MATRIX,
   ADMIN_BETRIEB_HREF,
   ADMIN_BETRIEB_MAILS_HREF,
+  ADMIN_BETRIEB_PROTOKOLL_HREF,
+  ADMIN_BETRIEB_VERSION_HREF,
   BETRIEB_TEXT,
   BILDER_EXPORT_HREF,
   NUR_IM_DASHBOARD,
@@ -28,6 +30,7 @@ import {
   type WarnEintrag,
 } from '@/lib/betrieb'
 import type { StripeMarke } from '@/lib/testumgebung'
+import type { BetriebReiter } from '@/schemas/betrieb-mails'
 import { DIENSTE_TEXT, NOCH_NICHT_EINGERICHTET, type DienstZeile, type VersionZeile } from './dienste'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -68,7 +71,7 @@ function tonText(warnt: boolean): string {
  * Ladepunkt (`LadeRahmen`, Muster Postfach) — darum hat /admin/betrieb seit
  * Nr. 161 keine loading.tsx mehr (tests/loading-filter-wache.test.ts).
  */
-export function BetriebUnterreiter({ aktiv, offen, children }: { aktiv: 'ueberblick' | 'mails'; offen: number | null; children: ReactNode }): React.JSX.Element {
+export function BetriebUnterreiter({ aktiv, offen, children }: { aktiv: BetriebReiter; offen: number | null; children: ReactNode }): React.JSX.Element {
   return (
     <LadeRahmen>
       <div className="flex flex-col gap-4 lg:gap-[18px]">
@@ -79,6 +82,9 @@ export function BetriebUnterreiter({ aktiv, offen, children }: { aktiv: 'ueberbl
           eintraege={[
             { id: 'ueberblick', label: BETRIEB_TEXT.reiterUeberblick, href: ADMIN_BETRIEB_HREF },
             { id: 'mails', label: BETRIEB_TEXT.reiterMails, href: ADMIN_BETRIEB_MAILS_HREF, ...(offen ? { zahl: String(offen) } : {}) },
+            // Seit Nr. 193 (N32/N33): wer hat was getan, und welcher Stand läuft.
+            { id: 'protokoll', label: BETRIEB_TEXT.reiterProtokoll, href: ADMIN_BETRIEB_PROTOKOLL_HREF },
+            { id: 'version', label: BETRIEB_TEXT.reiterVersion, href: ADMIN_BETRIEB_VERSION_HREF },
           ]}
         />
         <LadeInhalt>{children}</LadeInhalt>

@@ -14,6 +14,7 @@ import { MARKE } from '@/lib/marke'
 import { redirect } from 'next/navigation'
 import { ADMIN_BETRIEB_HREF } from '@/lib/betrieb'
 import { ladeTeam } from '@/server/queries/team'
+import { BenachrichtigungenGruppe, ladeBenachrichtigungen } from './benachrichtigungen'
 
 export const metadata: Metadata = { title: `Einstellungen — Admin — ${MARKE}` }
 // Zeigt den gespeicherten Stand und rechnet „frei" mit den Höfen von jetzt — nie aus einem Cache.
@@ -57,6 +58,8 @@ async function ladeDaten(gewaehlt: EinstellungenDaten['gewaehlt'], jetzt: Date, 
     gruendungZeile: gruendungZeileKurz(zahlen),
     // Team (N35, Nr. 190): nur für Inhaber — für alle anderen gibt es die Gruppe nicht.
     team: inhaber ? await ladeTeam(ich) : null,
+    // Benachrichtigungen (Nr. 193): Empfänger und Regeln, wenige Zeilen — immer geladen, weil am Handy alle Gruppen untereinander stehen.
+    benachrichtigungen: <BenachrichtigungenGruppe daten={await ladeBenachrichtigungen(jetzt)} />,
   }
   return { daten, stichtag }
 }
@@ -65,7 +68,9 @@ async function ladeDaten(gewaehlt: EinstellungenDaten['gewaehlt'], jetzt: Date, 
  * /admin/einstellungen — was die Plattform als Ganzes betrifft (Register N15
  * und K2-Ergänzung, Nr. 93; Mockups admin-einstellungen und
  * admin-mobil-einstellungen). Bearbeitbar sind die Gruppen Gründungshöfe und
- * — nur für Inhaber — Team und Rechte (Nr. 190); Plattform steht nur zum Nachsehen da. Die Gruppe Betrieb
+ * — nur für Inhaber — Team und Rechte (Nr. 190), seit Nr. 193 auch
+ * Benachrichtigungen (die Zustellung aus dem Postfach, N32; der alte Link
+ * /admin/postfach?reiter=zustellung leitet mit 308 hierher); Plattform steht nur zum Nachsehen da. Die Gruppe Betrieb
  * entfiel mit Nr. 103 (Register N15 geändert): Ein alter Link
  * `?gruppe=betrieb` führt nach Admin › Betrieb, wo der Stripe-Modus jetzt steht.
  */

@@ -20,7 +20,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createElement, type ComponentType } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-const wache = vi.hoisted(() => ({ verlangeAdminAktion: vi.fn(), verlangeAdminSeite: vi.fn(async () => 'admin_1'), verlangeAdminShell: vi.fn(async () => ({ userId: 'admin_1', inhaltOffen: true })), verlangeFrischeBestaetigung: vi.fn(async () => ({ ok: true, userId: 'admin_1', sitzungId: 'sitzung-admin_1' })), frischOderBestaetigen: vi.fn(async () => null), adminPflichtOffen: vi.fn(async () => false) }))
+const wache = vi.hoisted(() => ({ verlangeAdminAktion: vi.fn(), verlangeAdminSeite: vi.fn(async () => 'admin_1'), verlangeAdminShell: vi.fn(async () => ({ userId: 'admin_1', inhaltOffen: true, person: { adminInhaber: true, adminRechte: [] } })), verlangeFrischeBestaetigung: vi.fn(async () => ({ ok: true, userId: 'admin_1', sitzungId: 'sitzung-admin_1' })), frischOderBestaetigen: vi.fn(async () => null), adminPflichtOffen: vi.fn(async () => false) }))
 const umgebung = vi.hoisted(() => ({ vercelProduktion: false }))
 const db = vi.hoisted(() => ({
   user: { findUnique: vi.fn() },
@@ -174,7 +174,7 @@ describe('Punkt und Hinweis der Shell (ladeAdminbereich)', () => {
 describe('AdminShell: Punkt am Reiter und Zahl in der Betriebsleiste (seit Nr. 185)', () => {
   const Shell = AdminShell as unknown as ComponentType<Omit<AdminShellProps, 'children'>>
   const render = (betrieb: AdminShellProps['betrieb'], aufgaben: AdminShellProps['aufgaben'] = null): string =>
-    renderToStaticMarkup(createElement(Shell, { personName: 'Max Mustermann', hatHof: false, zahlen: { hoefe: 0, briefkasten: 0 }, betrieb, aufgaben }))
+    renderToStaticMarkup(createElement(Shell, { personName: 'Max Mustermann', hatHof: false, zahlen: { hoefe: 0, postfach: 0 }, betrieb, aufgaben }))
 
   it('mit Warnung: Punkt mit „1 Warnung“ am Reiter — die einzelne Warnung steht nicht mehr in der Leiste', () => {
     const html = render({ anzahl: 1, text: 'Bilder-Speicher über 80 %', kurz: 'Bilder über 80 %', href: '/admin/betrieb' })

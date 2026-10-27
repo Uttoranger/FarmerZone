@@ -1,55 +1,30 @@
 /**
  * Der Eingang des Admin-Postfachs (Register N12-Änderung, N14; Nr. 95) — rein,
- * ohne Mock: eine Liste aus Antworten, Meldungen und Aufgaben, neueste zuerst,
- * mit den Filtern Offen · Antwort · Meldung · Aufgabe · Alle; „Offen" zählt
- * ungelesene Antworten, Meldungen NEU/GEPRUEFT und jede Aufgabe. Dazu die
- * Prüfliste eines wartenden Hofs, die Kennzahlen, „Antwort möglich" nach Art
- * und die Adresse (Reiter, Filter, Auswahl) als Fremddaten.
+ * ohne Mock: seit Nr. 193 (N32) nur Gespräche — eine Liste aus Antworten und
+ * Meldungen, neueste zuerst, mit den Filtern Offen · Antwort · Meldung · Alle
+ * (kein „Aufgabe“ mehr, mit Gegenprobe); „Offen" zählt ungelesene Antworten
+ * und Meldungen NEU/GEPRUEFT. Dazu der Zähler, „Antwort möglich" nach Art und
+ * die Adresse (Reiter, Filter, Auswahl) als Fremddaten.
  */
 import { describe, it, expect } from 'vitest'
 import {
   alteReiterAdresse,
   antwortMoeglichStandard,
   antwortenText,
+  EINGANG_FILTER_IDS,
+  EINGANG_FILTER_LABEL,
+  EINGANG_LEER,
   eingangEintraege,
-  geldSatz,
-  hofAufgabeZeile,
-  hofPruefliste,
+  offenImGespraech,
   offenSatz,
-  postfachKennzahlen,
   postfachUnterreiter,
   stripeZahlungAdresse,
   type EingangRoh,
-  type ErstattungAufgabeRoh,
-  type HofAufgabeRoh,
 } from '@/lib/postfach'
+import { AKTE_OEFFNEN, akteHinweisText } from '@/app/admin/postfach/faden-spalte'
 import { adminPostfachReiterAus, eingangAuswahlAus, eingangFilterAus, fadenKennungAus } from '@/schemas/postfach'
 
 const um = (stunde: number) => new Date(`2026-10-15T${String(stunde).padStart(2, '0')}:00:00Z`)
-
-const HOF: HofAufgabeRoh = {
-  id: 'hofwartet1',
-  name: 'Hof Test',
-  createdAt: um(6),
-  hofseite: { erledigt: 9, gesamt: 11 },
-  stripeBereit: true,
-  sepaErteilt: true,
-  futter: false,
-  lfbis: false,
-  titelbild: true,
-  email: 'bestaetigt',
-  platz: 8,
-}
-
-const ERSTATTUNG: ErstattungAufgabeRoh = {
-  id: 'bestellung1',
-  bestellnummer: 'HM-2610-TEST',
-  hofName: 'Hof Test',
-  seit: um(9),
-  bezahltCents: 2340,
-  schonErstattetCents: 0,
-  zahlungKennung: 'pi_test123',
-}
 
 const ROH: EingangRoh = {
   antworten: [
@@ -62,15 +37,13 @@ const ROH: EingangRoh = {
     { id: 'meldung-erledigt', art: 'FRAGE', status: 'ERLEDIGT', createdAt: um(7), ersteZeile: 'Abholzeit ändern', wer: 'Anonym', zeile: 'Erledigt' },
     { id: 'meldung-ki', art: 'WUNSCH', status: 'VERMUTLICH_WUNSCH', createdAt: um(4), ersteZeile: 'Dunkles Logo', wer: 'Hof Test', zeile: '' },
   ],
-  hoefe: [HOF],
-  erstattungen: [ERSTATTUNG],
 }
 
 const kennungen = (filter: Parameters<typeof eingangEintraege>[1]) => eingangEintraege(ROH, filter).map((e) => `${e.auswahl.art}-${e.auswahl.id}`)
 
 describe('eingangEintraege', () => {
-  it('„Offen" mischt die drei Arten, neueste zuerst: ungelesene Antwort, Meldung NEU/GEPRUEFT, jede Aufgabe', () => {
-    expect(kennungen('offen')).toEqual(['meldung-meldung-neu', 'erstattung-bestellung1', 'antwort-faden-neu', 'hof-hofwartet1', 'meldung-meldung-geprueft'])
+  it('„Offen" mischt Antworten und Meldungen, neueste zuerst: ungelesene Antwort, Meldung NEU/GEPRUEFT', () => {
+    expect(kennungen('offen')).toEqual(['meldung-meldung-neu', 'antwort-faden-neu', 'meldung-meldung-geprueft'])
   })
 
   it('gelesene Antworten, erledigte und von der KI vorgeschlagene Meldungen sind nicht offen (Freigabe: NEU/GEPRUEFT)', () => {
@@ -79,50 +52,35 @@ describe('eingangEintraege', () => {
     expect(kennungen('offen')).not.toContain('meldung-meldung-ki')
   })
 
-  it('die Filter Antwort, Meldung, Aufgabe zeigen nur ihre Art — gelesen und erledigt eingeschlossen', () => {
+  it('die Filter Antwort und Meldung zeigen nur ihre Art — gelesen und erledigt eingeschlossen', () => {
     expect(kennungen('antwort')).toEqual(['antwort-faden-gelesen', 'antwort-faden-neu'])
     expect(kennungen('meldung')).toEqual(['meldung-meldung-neu', 'meldung-meldung-erledigt', 'meldung-meldung-geprueft', 'meldung-meldung-ki'])
-    expect(kennungen('aufgabe')).toEqual(['erstattung-bestellung1', 'hof-hofwartet1'])
+  })
+
+  it('Postfach ohne „Aufgabe“ (N32, Nr. 193): kein Filter, kein Leerzustand, kein Wort im Eingang — Aufgaben stehen in Heute', () => {
+    expect(EINGANG_FILTER_IDS).toEqual(['offen', 'antwort', 'meldung', 'alle'])
+    expect(Object.values(EINGANG_FILTER_LABEL)).not.toContain('Aufgabe')
+    expect(Object.keys(EINGANG_LEER)).not.toContain('aufgabe')
+    expect(eingangEintraege(ROH, 'alle').map((e) => e.marke)).not.toContain('Aufgabe')
+    // Gegenprobe: ein alter Link ?art=aufgabe zeigt „Offen“, nie eine Fehlerseite.
+    expect(eingangFilterAus('aufgabe')).toBe('offen')
   })
 
   it('„Alle" zeigt jeden Eintrag genau einmal', () => {
-    expect(kennungen('alle')).toHaveLength(2 + 4 + 1 + 1)
-    expect(new Set(kennungen('alle')).size).toBe(8)
+    expect(kennungen('alle')).toHaveLength(2 + 4)
+    expect(new Set(kennungen('alle')).size).toBe(6)
   })
 
   it('gleiche Zeit: feste Reihenfolge über die Kennung', () => {
-    const zweiGleich: EingangRoh = { ...ROH, antworten: [], meldungen: [], hoefe: [{ ...HOF, id: 'b', createdAt: um(6) }, { ...HOF, id: 'a', createdAt: um(6) }], erstattungen: [] }
+    const antwort = ROH.antworten[0]
+    const zweiGleich: EingangRoh = { antworten: [{ ...antwort, id: 'b' }, { ...antwort, id: 'a' }], meldungen: [] }
     expect(eingangEintraege(zweiGleich, 'alle').map((e) => e.auswahl.id)).toEqual(['a', 'b'])
   })
 
   it('Zeilen tragen Marke, Wer und Titel wie im Mockup', () => {
-    const [meldung, erstattung, antwort, hof] = eingangEintraege(ROH, 'offen')
+    const [meldung, antwort] = eingangEintraege(ROH, 'offen')
     expect(meldung).toMatchObject({ marke: 'Fehler', markeArt: 'tun', wer: 'Hof Test', titel: 'Upload hängt' })
-    expect(erstattung).toMatchObject({ marke: 'Aufgabe', markeArt: 'tun', wer: 'Bestellung HM-2610-TEST', titel: 'Erstattung offen' })
     expect(antwort).toMatchObject({ marke: 'Antwort', titel: 'Re: Nachricht vom Team', zeile: 'Eine Frage' })
-    expect(hof).toMatchObject({ titel: 'Wartet auf Freischaltung', zeile: 'Hofseite 9 von 11 · Stripe und SEPA da – bekäme Gründungsplatz Nr. 8' })
-  })
-})
-
-describe('Aufgabe Hof', () => {
-  it('ohne Stripe kein Platz-Versprechen, sondern der Hinweis; ohne freien Platz keine Zeile', () => {
-    expect(hofAufgabeZeile({ ...HOF, stripeBereit: false })).toBe('Hofseite 9 von 11 · Stripe fehlt – Gründungsplatz erst mit Freischaltung')
-    expect(hofAufgabeZeile({ ...HOF, sepaErteilt: false, platz: null })).toBe('Hofseite 9 von 11 · Stripe da, SEPA fehlt')
-  })
-
-  it('die Prüfliste nennt Hofseite, Stripe, SEPA, Titelbild und E-Mail; LFBIS nur bei Futtermitteln', () => {
-    expect(hofPruefliste(HOF).map((p) => p.schluessel)).toEqual(['hofseite', 'stripe', 'sepa', 'titelbild', 'email'])
-    expect(hofPruefliste({ ...HOF, futter: true }).map((p) => p.schluessel)).toContain('lfbis')
-    expect(hofPruefliste({ ...HOF, futter: true, lfbis: false }).find((p) => p.schluessel === 'lfbis')).toMatchObject({ erledigt: false })
-  })
-
-  it('erledigt nur, was wirklich da ist — die Hofseite erst ganz, die E-Mail auch bei Konten vor der Pflicht', () => {
-    const liste = hofPruefliste({ ...HOF, stripeBereit: false, email: 'offen' })
-    expect(liste.find((p) => p.schluessel === 'hofseite')).toMatchObject({ erledigt: false, text: 'Hofseite 9 von 11 ausgefüllt' })
-    expect(liste.find((p) => p.schluessel === 'stripe')).toMatchObject({ erledigt: false })
-    expect(liste.find((p) => p.schluessel === 'email')).toMatchObject({ erledigt: false })
-    expect(hofPruefliste({ ...HOF, email: 'vor-pflicht' }).find((p) => p.schluessel === 'email')).toMatchObject({ erledigt: true })
-    expect(hofPruefliste({ ...HOF, hofseite: { erledigt: 11, gesamt: 11 } })[0]).toMatchObject({ erledigt: true })
   })
 })
 
@@ -136,30 +94,21 @@ describe('Aufgabe Erstattung', () => {
   })
 })
 
-describe('Kennzahlen und Zähler', () => {
+describe('Zähler', () => {
   const zahlen = { antworten: 2, meldungen: 1, hoefe: 1, erstattungen: 1 }
 
-  it('„Offen im Eingang" zählt alles, was wartet, und sagt es in einer Zeile', () => {
-    const [offen, geld, rundschreiben] = postfachKennzahlen({ zahlen, erstattungen: [ERSTATTUNG], rundschreibenImMonat: 3 })
-    expect(offen).toMatchObject({ wert: '5', satz: '2 Antworten · 1 Meldung · 2 Aufgaben', ton: 'tun' })
-    expect(geld).toMatchObject({ wert: '1', satz: 'Erstattung offen, € 23,40', ton: 'tun' })
-    expect(rundschreiben).toMatchObject({ wert: '3', ton: 'neutral' })
+  it('offen im Postfach sind nur Gespräche (N32): Antworten und Meldungen — Höfe und Erstattungen zählt Heute', () => {
+    expect(offenImGespraech(zahlen)).toBe(3)
+    // Die Wochenlage nennt weiter alles in einer Zeile (offenSatz).
+    expect(offenSatz(zahlen)).toBe('2 Antworten · 1 Meldung · 2 Aufgaben')
+    expect(offenSatz({ antworten: 0, meldungen: 0, hoefe: 0, erstattungen: 0 })).toBe('nichts offen')
   })
 
-  it('nichts offen: kein Ton; mehrere Erstattungen werden nicht summiert', () => {
-    const leer = { antworten: 0, meldungen: 0, hoefe: 0, erstattungen: 0 }
-    expect(postfachKennzahlen({ zahlen: leer, erstattungen: [], rundschreibenImMonat: 0 })[0]).toMatchObject({ wert: '0', satz: 'nichts offen', ton: 'neutral' })
-    expect(offenSatz(leer)).toBe('nichts offen')
-    expect(geldSatz([ERSTATTUNG, { ...ERSTATTUNG, id: 'zwei' }])).toBe('2 Erstattungen offen')
-    expect(geldSatz([{ ...ERSTATTUNG, bezahltCents: null }])).toBe('1 Erstattung offen')
-  })
-
-  it('der Unterreiter „Eingang" trägt die Zahl „Offen", die anderen keine', () => {
+  it('der Unterreiter „Eingang" trägt die Zahl „Offen", die anderen keine — die Zustellung ist kein Reiter mehr', () => {
     expect(postfachUnterreiter(5).map((r) => [r.id, r.zahl, r.href])).toEqual([
       ['eingang', '5', '/admin/postfach'],
       ['meldungen', undefined, '/admin/postfach?reiter=meldungen'],
       ['rundschreiben', undefined, '/admin/postfach?reiter=rundschreiben'],
-      ['zustellung', undefined, '/admin/postfach?reiter=zustellung'],
     ])
     expect(postfachUnterreiter(null)[0]?.zahl).toBeUndefined()
   })
@@ -181,7 +130,8 @@ describe('Antwort möglich (N14)', () => {
 
 describe('Adresse als Fremddaten', () => {
   it('Reiter: unbekannt oder leer heißt Eingang, doppelt zählt der erste', () => {
-    expect(adminPostfachReiterAus('zustellung')).toBe('zustellung')
+    // Seit Nr. 193 kein Reiter mehr (die Seite leitet ?reiter=zustellung vorher um, alteReiterAdresse).
+    expect(adminPostfachReiterAus('zustellung')).toBe('eingang')
     expect(adminPostfachReiterAus(['rundschreiben', 'zustellung'])).toBe('rundschreiben')
     // Seit Nr. 101 ist „Meldungen" wieder ein eigener Reiter (Register N14, Ergänzung).
     expect(adminPostfachReiterAus('meldungen')).toBe('meldungen')
@@ -190,7 +140,7 @@ describe('Adresse als Fremddaten', () => {
   })
 
   it('Filter: unbekannt heißt Offen', () => {
-    expect(eingangFilterAus('aufgabe')).toBe('aufgabe')
+    expect(eingangFilterAus('meldung')).toBe('meldung')
     expect(eingangFilterAus('FEHLER')).toBe('offen')
     expect(eingangFilterAus(undefined)).toBe('offen')
   })
@@ -213,5 +163,13 @@ describe('Adresse als Fremddaten', () => {
     expect(fadenKennungAus(undefined)).toBeUndefined()
     expect(alteReiterAdresse('unterhaltungen', fadenKennungAus('böse/../'))).toBe(alteReiterAdresse('unterhaltungen', undefined))
     expect(alteReiterAdresse('unterhaltungen', fadenKennungAus('cfaden123'))).toContain('id=antwort-cfaden123')
+  })
+})
+
+describe('Hinweis aus der Akte im Faden (N32, Nr. 193)', () => {
+  it('nennt Hof und Signale in einem Satz — der Link heißt „Akte öffnen“', () => {
+    expect(akteHinweisText('Hof Test', ['ohne Abholzeit'])).toBe('Hinweis aus der Akte: Hof Test – ohne Abholzeit.')
+    expect(akteHinweisText('Hof Test', ['Stripe fehlt', 'ohne Abholzeit'])).toBe('Hinweis aus der Akte: Hof Test – Stripe fehlt, ohne Abholzeit.')
+    expect(AKTE_OEFFNEN).toBe('Akte öffnen')
   })
 })

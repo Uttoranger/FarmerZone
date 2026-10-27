@@ -172,7 +172,8 @@ describe('Braucht dich: je Quelle da und wieder weg', () => {
     expect(a.frist.ziel).toEqual(new Date(HOF_WARTET.createdAt.getTime() + 48 * STUNDE))
     expect(fristText(a, JETZT)).toBe('Ziel 48 h · noch 21 h')
     expect(a.satz).toBe('Hofseite 5 von 7 · Stripe eingerichtet.')
-    expect(a.ziel).toBe('/admin/postfach?art=aufgabe&id=hof-hof-wartet')
+    // Seit Nr. 193 (N32): Freischalten steht in der Akte, nicht mehr im Postfach.
+    expect(a.ziel).toBe('/admin/hoefe/hof-wartet')
   })
 
   it('Erstattung offen: Ziel 24 h, nach 2 Tagen „überfällig · seit 2 Tagen“, Bezug Nummer · Hof · Betrag', () => {
@@ -180,6 +181,8 @@ describe('Braucht dich: je Quelle da und wieder weg', () => {
     expect(a.frist.ueberfaellig).toBe(true)
     expect(fristText(a, JETZT)).toBe('überfällig · seit 2 Tagen')
     expect(a.bezug).toEqual({ kennung: 'HM-2610-B7C2', text: 'HM-2610-B7C2 · Hof am Bach · € 18,38' })
+    // Seit Nr. 193 (N32): „Außerhalb erstattet“ steht in Admin › Bestellungen, nicht mehr im Postfach.
+    expect(a.ziel).toBe('/admin/bestellungen?bestellung=bestellung-1')
   })
 
   it('Mail gescheitert: je Art EINE Aufgabe mit Zahl, Grund und „Was tun“ aus FEHLER_TEXTE', () => {

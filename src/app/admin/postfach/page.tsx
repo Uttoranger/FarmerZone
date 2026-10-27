@@ -4,19 +4,17 @@ import { permanentRedirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { PenLine } from 'lucide-react'
 import { verlangeAdminSeite } from '@/server/admin-wache'
-import { ladeErstattungAufgaben, zaehleOffenImEingang, zaehleRundschreibenImMonat } from '@/server/queries/postfach'
+import { zaehleOffenImEingang } from '@/server/queries/postfach'
 import {
   ADMIN_POSTFACH_TEXT,
   EINGANG_TEXT,
   adminPostfachAdresse,
   alteReiterAdresse,
-  offenGesamt,
-  postfachKennzahlen,
+  offenImGespraech,
   postfachUnterreiter,
   type AdminPostfachReiter,
-  type EingangZahlen,
 } from '@/lib/postfach'
-import type { KennzahlDaten } from '@/lib/admin-seiten'
+import { alteAufgabeAdresse } from './alte-wege'
 import { adminPostfachReiterAus, eingangAuswahlAus, eingangFilterAus, fadenKennungAus } from '@/schemas/postfach'
 import { meldungenAnsichtAus } from '@/schemas/meldung'
 import { cn } from '@/lib/utils'
@@ -29,7 +27,6 @@ import { LadeInhalt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { EingangReiter, ladeEingangReiter, type EingangDaten } from './eingang-reiter'
 import { MeldungenReiter, ladeMeldungenReiter, type MeldungenDaten } from './meldungen-reiter'
 import { RundschreibenReiter, ladeRundschreibenReiter, type RundschreibenDaten } from './rundschreiben-reiter'
-import { ZustellungReiter, ladeZustellungDaten, type ZustellungDaten } from './zustellung-reiter'
 
 export const metadata: Metadata = { title: `${ADMIN_POSTFACH_TEXT.titel} — Admin — ${MARKE}` }
 export const dynamic = 'force-dynamic'
@@ -59,25 +56,27 @@ type ReiterDaten =
   | { reiter: 'eingang'; daten: EingangDaten }
   | { reiter: 'meldungen'; daten: MeldungenDaten }
   | { reiter: 'rundschreiben'; daten: RundschreibenDaten }
-  | { reiter: 'zustellung'; daten: ZustellungDaten }
 
 /** Lädt nur den offenen Reiter; ein Datenbankfehler wirft. */
 async function ladeReiter(reiter: AdminPostfachReiter, roh: Suche, jetzt: Date): Promise<ReiterDaten> {
   if (reiter === 'eingang') return { reiter, daten: await ladeEingangReiter(eingangFilterAus(roh.art), eingangAuswahlAus(roh.id, roh.meldung), jetzt) }
   if (reiter === 'meldungen') return { reiter, daten: await ladeMeldungenReiter(meldungenAnsichtAus(roh)) }
-  if (reiter === 'rundschreiben') return { reiter, daten: await ladeRundschreibenReiter() }
-  return { reiter, daten: await ladeZustellungDaten(jetzt) }
+  return { reiter, daten: await ladeRundschreibenReiter() }
 }
+
 
 /*
  * /admin/postfach — der eine Ort, an dem beim Admin alles ankommt (Register
  * N12 mit der Änderung vom 15.10., N14, N15; Nachtlauf Nr. 95; Mockups
  * admin-postfach*, admin-rundschreiben). Seit Nr. 105 (N14-Ergänzung, Mockup
- * admin-postfach-ruhig) steht auf allen vier Reitern dasselbe oben: der
+ * admin-postfach-ruhig) steht auf allen Reitern dasselbe oben: der
  * Seitenkopf mit EINEM Satz und „Rundschreiben schreiben", sofort darunter die
- * Unterreiter Eingang · Meldungen · Rundschreiben · Zustellung (?reiter=, Zod
- * mit Standard) — sie bewegen sich beim Wechsel nicht. Erst dann der Inhalt
- * des Reiters; die Kennzahlen gehören zum Eingang und stehen dort oben.
+ * Unterreiter Eingang · Meldungen · Rundschreiben (?reiter=, Zod mit
+ * Standard) — sie bewegen sich beim Wechsel nicht. Erst dann der Inhalt des
+ * Reiters. Seit Nr. 193 (N32, Mockup admin-postfach-gespraeche) nur
+ * Gespräche: keine Aufgaben, keine Kennzahlen; die Zustellung steht unter
+ * Einstellungen › Benachrichtigungen (alter Link: 308), alte Links auf eine
+ * Aufgabe leiten in Akte bzw. Bestellungen (308).
  * Kein Ladebild beim Wechsel: Es gibt keine loading.tsx in diesem Segment
  * (sie hing an den Suchparametern und zeigte bei jedem Klick das Skelett des
  * Eingangs); der bisherige Inhalt bleibt stehen, der gewählte Reiter bzw.
@@ -92,24 +91,17 @@ export default async function AdminPostfachPage({ searchParams }: { searchParams
   await verlangeAdminSeite()
 
   const roh = await searchParams
-  const alt = alteReiterAdresse(einzeln(roh.reiter), fadenKennungAus(roh.faden))
+  const alt = alteReiterAdresse(einzeln(roh.reiter), fadenKennungAus(roh.faden)) ?? alteAufgabeAdresse(eingangAuswahlAus(roh.id, undefined))
   if (alt) permanentRedirect(alt)
   const reiter = adminPostfachReiterAus(roh.reiter)
   const jetzt = new Date()
 
-  // Die Zahl am Unterreiter „Eingang" braucht jeder Reiter, die Kennzahlen nur der Eingang.
-  let zahlen: EingangZahlen | null = null
-  let kennzahlen: KennzahlDaten[] | null = null
+  // Die Zahl am Unterreiter „Eingang“: ungelesene Antworten und Meldungen (N32) — dieselbe wie am Reiter „Postfach“.
+  let offen: number | null = null
   try {
-    if (reiter === 'eingang') {
-      const [offen, erstattungen, rundschreibenImMonat] = await Promise.all([zaehleOffenImEingang(), ladeErstattungAufgaben(), zaehleRundschreibenImMonat(jetzt)])
-      zahlen = offen
-      kennzahlen = postfachKennzahlen({ zahlen: offen, erstattungen, rundschreibenImMonat })
-    } else {
-      zahlen = await zaehleOffenImEingang()
-    }
+    offen = offenImGespraech(await zaehleOffenImEingang())
   } catch (err) {
-    // Ohne Zahlen geht es weiter — der Reiter lädt seinen Inhalt selbst.
+    // Ohne Zahl geht es weiter — der Reiter lädt seinen Inhalt selbst.
     Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'postfach' } })
   }
 
@@ -147,12 +139,11 @@ export default async function AdminPostfachPage({ searchParams }: { searchParams
             </Link>
           }
         />
-        <Unterreiter beschriftung={EINGANG_TEXT.unterreiterBeschriftung} eintraege={postfachUnterreiter(zahlen ? offenGesamt(zahlen) : null)} aktiv={reiter} ladePunkt />
+        <Unterreiter beschriftung={EINGANG_TEXT.unterreiterBeschriftung} eintraege={postfachUnterreiter(offen)} aktiv={reiter} ladePunkt />
         <LadeInhalt>
-          {geladen.reiter === 'eingang' && <EingangReiter daten={geladen.daten} kennzahlen={kennzahlen} jetzt={jetzt} />}
+          {geladen.reiter === 'eingang' && <EingangReiter daten={geladen.daten} jetzt={jetzt} />}
           {geladen.reiter === 'meldungen' && <MeldungenReiter daten={geladen.daten} jetzt={jetzt} />}
           {geladen.reiter === 'rundschreiben' && <RundschreibenReiter daten={geladen.daten} jetzt={jetzt} />}
-          {geladen.reiter === 'zustellung' && <ZustellungReiter daten={geladen.daten} />}
         </LadeInhalt>
       </LadeRahmen>
     </div>

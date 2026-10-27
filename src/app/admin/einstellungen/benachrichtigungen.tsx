@@ -7,14 +7,14 @@ import { cn } from '@/lib/utils'
 import { LEISE } from '@/components/hof-bestellungen/stil'
 import { PostfachZustellung, type EmpfaengerAnzeige } from '@/components/admin/postfach-zustellung'
 
-export type ZustellungDaten = { regeln: ZustellRegeln; empfaenger: EmpfaengerAnzeige[] }
+export type BenachrichtigungenDaten = { regeln: ZustellRegeln; empfaenger: EmpfaengerAnzeige[] }
 
 /**
  * Die Daten des Reiters — wirft bei einem Datenbankfehler; die Seite zeigt
  * dann AdminFehler. An die Client-Komponente gehen nur Text und Kennungen:
  * Datum fertig geschrieben (Wiener Kalendertag), kein Token, kein Ablauf.
  */
-export async function ladeZustellungDaten(jetzt: Date): Promise<ZustellungDaten> {
+export async function ladeBenachrichtigungen(jetzt: Date): Promise<BenachrichtigungenDaten> {
   const { regeln, empfaenger } = await ladeZustellungReiter(jetzt)
   return {
     regeln,
@@ -32,12 +32,13 @@ export async function ladeZustellungDaten(jetzt: Date): Promise<ZustellungDaten>
 }
 
 /*
- * Der Reiter „Zustellung" (Register N14, Nr. 95; Mockup
- * admin-postfach-zustellung): die Empfängerliste — SUPPORT_EMAIL fest, weitere
- * Adressen erst nach Bestätigung — und die Regel je Art. Alles landet im
- * Eingang; hier steht nur, was zusätzlich per E-Mail hinausgeht.
+ * Die Gruppe „Benachrichtigungen" in Admin › Einstellungen (seit Nr. 193,
+ * Register N32; bis dahin der Reiter „Zustellung" im Postfach, Register N14,
+ * Nr. 95; Mockup admin-postfach-zustellung): die Empfängerliste —
+ * SUPPORT_EMAIL fest, weitere Adressen erst nach Bestätigung — und die Regel
+ * je Art. Dieselben Teile wie vorher; nur der Ort ist neu.
  */
-export function ZustellungReiter({ daten }: { daten: ZustellungDaten }): React.JSX.Element {
+export function BenachrichtigungenGruppe({ daten }: { daten: BenachrichtigungenDaten }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-3">
       <PostfachZustellung supportEmail={SUPPORT_EMAIL} regeln={daten.regeln} empfaenger={daten.empfaenger} />

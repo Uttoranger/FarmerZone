@@ -850,7 +850,8 @@ export const FINANZEN_JAHR_TEXT = {
 export function finanzenJahrAdresse(ansicht: { jahr: number; reiter: FinanzenReiterId }): string {
   const parameter = new URLSearchParams({ zeitraum: 'jahr', jahr: String(ansicht.jahr) })
   if (ansicht.reiter !== FINANZEN_REITER_STANDARD) parameter.set('reiter', ansicht.reiter)
-  return `/admin/finanzen?${parameter.toString()}`
+  // Seit Nr. 193 direkt auf Geld (N32) — /admin/finanzen leitet nur noch um.
+  return `/admin/geld?${parameter.toString()}`
 }
 
 /** Die Adresse der CSV — eine Route, kein Seitenaufruf. */

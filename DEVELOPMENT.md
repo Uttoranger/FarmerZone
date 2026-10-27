@@ -6052,7 +6052,7 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - Abweichungen bleiben, bis beide übereinstimmen, auch wenn die Zahlung älter als 48 Stunden ist (einzeln nachgeladen); die Frist in Heute zählt ab dem ersten Fund. Speicherort ist `BetriebMessung` (Kennung und Cent) — keine Migration in diesem Lauf.
 - Stripe-Gebühren trägt die Plattform (Destination Charges); sie stehen je Tag aus den Balance Transactions in `BetriebMessung` und auf Geld als Kosten neben dem Betrieb. Der Monat zählt nach dem UTC-Tag der Buchung. Das Jahr und die CSV rechnen sie (noch) nicht mit.
 - Ein Monat lässt sich abschließen, wenn er vorbei ist, der Abgleich danach ohne offene Abweichung lief, keine Erstattung offen ist, Kosten eingetragen sind und die Jahres-CSV nach dem Monatsende geladen wurde. Der Abschluss ist ein Protokoll-Eintrag; danach brauchen Kostenänderungen, die den Monat berühren, einen Grund.
-- „Finanzen“ heißt „Geld“ (`/admin/geld`, alte Adresse 308); die Navigation zieht Nr. 193 nach.
+- „Finanzen“ heißt „Geld“ (`/admin/geld`, alte Adresse 308); die Navigation zieht Nr. 193 nach (erledigt).
 
 ## Plattformgebühr im Hofpreis: Preis, Anzeige, Zahlung (Register N38, Schritt 1; Nr. 197, Lauf 26, 26.10.2026)
 
@@ -6079,6 +6079,15 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Rückbuchung bleibt stehen:** Nach `zurueckgebucht` hebt nur ein Eingriff des Teams die Sperre (Nacharbeit, Bericht 198). Die Heute-Karte bietet dann kein „Jetzt bezahlen“ mehr an — die Rechnung ist ja bezahlt —, sondern sagt, dass das Team sich meldet, und führt ins Postfach.
 - **Warum ein Entwurf bei Wegwechsel ersetzt wird:** Ein Stripe-Entwurf behält den Weg, mit dem er angelegt wurde. Wurde das Mandat entfernt (oder neu eingerichtet), während die Rechnung bar noch im Entwurf lag, hätte der Lauf eine Lastschrift ohne Mandat finalisiert bzw. eine Überweisung geschickt, obwohl abgebucht werden könnte. Gelöscht wird nur ein Entwurf; der Ersatz bekommt neue Schlüssel (`-ersetzt-<alte Kennung>`), weil Stripe die alten 24 Stunden lang wiedererkennt (Nachbesserung Dirigent, Lauf 26).
 - **Geld-Abgleich:** `erwartetLautDatenbank` hat eine eigene Zeile für das Hofpreis-Modell (application_fee = Provision + Summe `OrderItem.gebuehrCents`).
+
+## Aufräumen: Navigation, Umzüge, Postfach nur Gespräche (Register N32, N33; Nr. 193, Lauf 26, 27.10.2026)
+
+- **Reiter:** Heute · Höfe · Bestellungen · Postfach · Startseite · Geld · Betrieb · Einstellungen (`ADMIN_REITER`, src/lib/admin-navigation.ts) mit Zahlen an Heute (offene Aufgaben), Höfe (wartend) und Postfach (ungelesene Antworten und Meldungen). Am Handy eine Leiste unten (Heute · Höfe · Bestellungen · Postfach · Mehr) nach dem Muster der HofShell; „Mehr“ hat Startseite, Geld, Betrieb, Einstellungen, Handbuch (Link ins öffentliche Repository), Zu meinem Hof, Konto und Sicherheit, Abmelden. Ein Reiter ohne Recht fehlt (`sichtbareReiter`; heute betrifft das nur „Geld“) — die Seiten prüfen weiter selbst. Dafür gibt `verlangeAdminShell` die Rechte der Person aus derselben Abfrage mit.
+- **Postfach nur Gespräche:** Filter „Aufgabe“, Kennzahlen und die Spalten „Hof wartet“/„Erstattung offen“ (mit dem Knopf „Erstattung erledigt“) sind weg; die Aufgaben stehen in Heute und führen in die Akte bzw. nach Admin › Bestellungen. Alte Links (`?id=hof-…`, `?id=erstattung-…`) leiten mit 308 dorthin. Im Faden steht ein Hinweis aus der Akte, wenn der Hof ein Signal hat (`hofSignale`, dieselbe Regel wie Höfe und Heute). Die Wochenlage zählt weiter alles (offenSatz), die Zahl am Reiter nur Gespräche (`offenImGespraech`).
+- **Zustellung → Einstellungen › Benachrichtigungen** (dieselben Teile; `?reiter=zustellung` → 308). Die Bestätigungsroute der Empfänger bleibt unter /admin/postfach/zustellung/bestaetigen, weil die Links in verschickten Mails darauf zeigen. Der Betreff der Wochenlage heißt jetzt „Wochenlage: …“ (Nacharbeit 192).
+- **Betrieb:** Unterreiter Überblick · E-Mails · Protokoll · Version. Das Protokoll liest `AdminAktion` mit Filter (Wer: alle/System/du/Team, Art, 7/30/90/365 Tage, nur mit Passkey, Bezug genau als Kennung oder Bestellnummer) und schlägt nur Hofname und Bestellnummer nach, nie eine Adresse; die CSV verlangt die frische Bestätigung. Die Karte „Version“ steht jetzt im eigenen Reiter. Die Warnkarte im Überblick verweist auf Heute.
+- **Startseite pünktlich:** Der Mail-Cron prüft jede Minute vor dem Worker, ob eine Fassung seit weniger als 2 Minuten live ist (`fassungFaelligSeit`), und ruft dann einmal `revalidatePath('/')`. Eine sofort veröffentlichte Fassung wird dabei ein zweites Mal neu gebaut — harmlos.
+- **Links:** Monats- und Jahresadressen von Geld zeigen direkt auf /admin/geld; /admin/finanzen bleibt die 308-Weiterleitung (die CSV-Route bleibt unter /admin/finanzen/export). `/admin/loading.tsx` zeigt nur den Kopf, das Höfe-Skelett liegt unter /admin/hoefe.
 
 ## Nützliche Befehle
 

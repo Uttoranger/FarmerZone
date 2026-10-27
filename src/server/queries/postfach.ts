@@ -514,19 +514,16 @@ async function ladeMeldungenEingang(filter: EingangFilter): Promise<EingangMeldu
 /**
  * Die Rohdaten des Eingangs je Filter — gemischt und sortiert wird rein in
  * src/lib/postfach.ts (eingangEintraege). Was ein Filter nicht zeigt, wird
- * nicht geladen.
+ * nicht geladen. Seit Nr. 193 (N32) nur Gespräche: Aufgaben lädt Heute.
  */
-export async function ladeEingang(filter: EingangFilter, jetzt: Date): Promise<EingangRoh> {
+export async function ladeEingang(filter: EingangFilter): Promise<EingangRoh> {
   const mitAntworten = filter === 'offen' || filter === 'antwort' || filter === 'alle'
   const mitMeldungen = filter === 'offen' || filter === 'meldung' || filter === 'alle'
-  const mitAufgaben = filter === 'offen' || filter === 'aufgabe' || filter === 'alle'
-  const [antworten, meldungen, hoefe, erstattungen] = await Promise.all([
+  const [antworten, meldungen] = await Promise.all([
     mitAntworten ? ladeUnterhaltungenAdmin() : Promise.resolve([]),
     mitMeldungen ? ladeMeldungenEingang(filter) : Promise.resolve([]),
-    mitAufgaben ? ladeHofAufgaben(jetzt) : Promise.resolve([]),
-    mitAufgaben ? ladeErstattungAufgaben() : Promise.resolve([]),
   ])
-  return { antworten, meldungen, hoefe, erstattungen }
+  return { antworten, meldungen }
 }
 
 // ─── Zustellung (Register N14, Nr. 95) ───────────────────────────────────────
