@@ -119,6 +119,15 @@ export function bestellGebuehr(positionen: readonly GebuehrPosition[], hundertst
   return { warenCents, gebuehrCents, gesamtCents: warenCents + gebuehrCents, jePosition }
 }
 
+/**
+ * Die Gebühr einer gespeicherten Bestellung als Summe ihrer Positionen
+ * (Snapshot `OrderItem.gebuehrCents`, ganze Cent) — für den Geld-Abgleich,
+ * damit keine Servergrenze die Summe selbst bildet.
+ */
+export function summeGebuehrPositionen(positionen: readonly { gebuehrCents: number }[]): number {
+  return positionen.reduce((summe, p) => summe + p.gebuehrCents, 0)
+}
+
 /** Erreicht der Warenwert den Mindestbestellwert (N38: 10 € Warenwert je Bestellung)? */
 export function mindestbestellwertErreicht(warenCents: number): boolean {
   return warenCents >= MINDESTBESTELLWERT_CENTS

@@ -8,6 +8,7 @@ import { monatVerschoben, monatsgrenzenWienFuer, type Monatsschluessel } from '@
 import { GELD_ABWEICHUNG_ART, STRIPE_GEBUEHR_ART, erwartetLautDatenbank, leseAbweichungArt, type BestellungFuerAbgleich, type OffeneAbweichung } from '@/lib/geld-abgleich'
 import { erstattungenImMonat, stripeGebuehrenImMonat, type ErstattungenMonat } from '@/lib/finanzen'
 import type { AblaufLaufDaten } from '@/lib/betrieb'
+import { summeGebuehrPositionen } from '@/lib/plattformgebuehr'
 
 /*
  * Die Abfragen des Geld-Abgleichs und der Seite Geld (Register N37, Nr. 191).
@@ -53,7 +54,7 @@ function alsAbgleichBestellung(o: AbgleichZeile): BestellungFuerAbgleich {
     erstattetCents: o.erstattetCents,
     gebuehrEntfallen: o.serviceFeeRefundedAt !== null,
     gebuehrModell: o.gebuehrModell,
-    gebuehrPositionenCents: o.items.reduce((s, i) => s + i.gebuehrCents, 0),
+    gebuehrPositionenCents: summeGebuehrPositionen(o.items),
   }
 }
 

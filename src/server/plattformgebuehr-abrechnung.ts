@@ -42,6 +42,9 @@ import { RECHNUNGSANGABEN_FEHLEN_ART, monatsGrenzen } from '@/server/queries/pla
  *     und Stripe-Idempotenzschlüssel `abr-<farmId>-<yyyy-mm>-bar|online`.
  *  3. Rechnungsangaben (Firma, UID) kommen aus dem Stripe-Dashboard; fehlen
  *     sie, steht eine Warnung an (Sentry und Heute), kein Abbruch.
+ *  4. Jede Abrechnung, die noch im Entwurf steht (gleich welcher Monat), wird
+ *     täglich nachgezogen; fehlende Positionen kommen dazu, finalisiert wird
+ *     nur, wenn der Rechnungsbetrag der Summe entspricht.
  * Fehler bei einem Hof → Warnung, die anderen laufen weiter.
  *
  * Webhooks (src/app/api/stripe/webhook/route.ts, nur die Verteilung):
@@ -187,39 +190,91 @@ export async function ladeBestellungenFuerAbrechnung(farmId: string, von: Date, 
   }))
 }
 
-/** Die Positionen einer Rechnung: je Bestellnummer eine, über ZEILEN_HOECHSTENS eine Sammelzeile. */
-function rechnungsPositionen(zeilen: readonly AbrechnungsZeile[], art: 'bar' | 'online'): Array<{ schluessel: string; cents: number; text: string }> {
+type Position = { schluessel: string; cents: number; text: string }
+
+/**
+ * Die Positionen einer Rechnung: je Bestellnummer eine, über ZEILEN_HOECHSTENS
+ * eine Sammelzeile. Deren Betrag ist die Summe aus `monatsSummen` (src/lib/plattformgebuehr.ts) —
+ * hier wird nichts neu addiert.
+ */
+function rechnungsPositionen(zeilen: readonly AbrechnungsZeile[], summeCents: number, art: 'bar' | 'online'): Position[] {
   const wort = art === 'bar' ? 'bar' : 'online'
   if (zeilen.length <= ZEILEN_HOECHSTENS) {
     return zeilen.map((z) => ({ schluessel: z.orderId, cents: z.cents, text: `Plattformgebühr ${wort} · Bestellung ${z.orderNumber}` }))
   }
-  return [{ schluessel: 'sammel', cents: zeilen.reduce((s, z) => s + z.cents, 0), text: `Plattformgebühr ${wort} · ${zeilen.length} Bestellungen` }]
+  return [{ schluessel: 'sammel', cents: summeCents, text: `Plattformgebühr ${wort} · ${zeilen.length} Bestellungen` }]
 }
 
 /**
- * Legt EINE Stripe-Rechnung an und füllt sie — ohne sie zu finalisieren.
- * Die Kennung wird sofort gespeichert (`speichere`): Scheitert ein späterer
- * Schritt, macht der nächste Lauf mit derselben Rechnung weiter.
+ * Die Schlüssel der Positionen, die schon an der Rechnung hängen
+ * (`metadata.schluessel`). Nötig, weil Stripe Idempotenzschlüssel nur 24
+ * Stunden kennt — der nächste tägliche Lauf legte sonst jede Position doppelt an.
  */
-async function legeRechnungAn(
+async function vorhandenePositionen(rechnungId: string): Promise<Set<string>> {
+  const da = new Set<string>()
+  let nach: string | undefined
+  for (;;) {
+    const seite = await stripe.invoiceItems.list({ invoice: rechnungId, limit: 100, ...(nach ? { starting_after: nach } : {}) })
+    for (const posten of seite.data) {
+      const schluessel = posten.metadata?.schluessel
+      if (schluessel) da.add(schluessel)
+    }
+    if (!seite.has_more || seite.data.length === 0) return da
+    nach = seite.data[seite.data.length - 1].id
+  }
+}
+
+type RechnungBereit = { id: string; status: 'draft' | 'open' | 'paid' } | null
+
+/**
+ * Bringt EINE Stripe-Rechnung bis vor das Finalisieren. Ohne gespeicherte
+ * Kennung wird sie angelegt und die Kennung sofort gespeichert (`speichere`);
+ * mit Kennung macht der Lauf mit derselben Rechnung weiter. Im Entwurf werden
+ * fehlende Positionen nachgezogen (je Schlüssel einmal) und der Betrag gegen
+ * die Summe geprüft: weicht er ab, Warnung und null — nie eine Teilsumme
+ * finalisieren. Schon finalisiert: Status zurück, nichts mehr angefasst.
+ */
+async function bereiteRechnungVor(
   basis: string,
   kunde: string,
+  gespeichert: string | null,
   parameter: Stripe.InvoiceCreateParams,
-  positionen: ReadonlyArray<{ schluessel: string; cents: number; text: string }>,
-  speichere: (id: string) => Promise<void>
-): Promise<string> {
-  const rechnung = await stripe.invoices.create(
-    { customer: kunde, currency: 'eur', pending_invoice_items_behavior: 'exclude', auto_advance: false, ...parameter },
-    { idempotencyKey: basis }
-  )
-  await speichere(rechnung.id)
+  positionen: readonly Position[],
+  sollCents: number,
+  speichere: (id: string) => Promise<void>,
+  extra: Record<string, string>
+): Promise<RechnungBereit> {
+  let id = gespeichert
+  let schonDa = new Set<string>()
+  if (!id) {
+    const rechnung = await stripe.invoices.create(
+      { customer: kunde, currency: 'eur', pending_invoice_items_behavior: 'exclude', auto_advance: false, ...parameter },
+      { idempotencyKey: basis }
+    )
+    id = rechnung.id
+    await speichere(id)
+  } else {
+    const vorhanden = await stripe.invoices.retrieve(id)
+    if (vorhanden.status === 'open' || vorhanden.status === 'paid') return { id, status: vorhanden.status }
+    if (vorhanden.status !== 'draft') {
+      warnung('Monatsabrechnung: Rechnung weder Entwurf noch offen oder bezahlt — nicht weiter bearbeitet', 'rechnung-stand', { ...extra, status: vorhanden.status ?? 'unbekannt' })
+      return null
+    }
+    schonDa = await vorhandenePositionen(id)
+  }
   for (const p of positionen) {
+    if (schonDa.has(p.schluessel)) continue
     await stripe.invoiceItems.create(
-      { customer: kunde, invoice: rechnung.id, currency: 'eur', amount: p.cents, description: p.text },
+      { customer: kunde, invoice: id, currency: 'eur', amount: p.cents, description: p.text, metadata: { schluessel: p.schluessel } },
       { idempotencyKey: `${basis}-pos-${p.schluessel}` }
     )
   }
-  return rechnung.id
+  const geprueft = await stripe.invoices.retrieve(id)
+  if (geprueft.total !== sollCents) {
+    warnung('Monatsabrechnung: Rechnungsbetrag weicht von der Summe ab — nicht finalisiert', 'rechnung-betrag', { ...extra, rechnungCents: geprueft.total, sollCents })
+    return null
+  }
+  return { id, status: 'draft' }
 }
 
 export type HofErgebnis = { farmId: string; monat: string; stand: string; neu: boolean }
@@ -227,7 +282,8 @@ export type HofErgebnis = { farmId: string; monat: string; stand: string; neu: b
 /**
  * Die Abrechnung EINES Hofs für EINEN Monat. Idempotent: Steht die
  * Abrechnung schon außerhalb von „entwurf“, passiert nichts; im Entwurf geht
- * es mit den gespeicherten Kennungen weiter.
+ * es mit den gespeicherten Kennungen weiter (fehlende Positionen, Finalisieren,
+ * „bezahlt außerhalb“ bzw. Senden — jeweils mit Idempotenzschlüssel).
  */
 export async function rechneHofAb(hof: HofFuerAbrechnung, monat: string, jetzt: Date): Promise<HofErgebnis> {
   const { von, bis, datum } = monatsGrenzen(monat)
@@ -252,26 +308,33 @@ export async function rechneHofAb(hof: HofFuerAbrechnung, monat: string, jetzt: 
   const id = abrechnung.id
   const basis = `abr-${hof.id}-${monat}`
   const beschreibung = `Plattformgebühr ${monatText(monat)}`
+  const imEntwurf = { farmId: hof.id, monat, stand: 'entwurf', neu: !vorher }
 
   // Rechnung online: schon von Stripe einbehalten — finalisiert und „bezahlt außerhalb“.
-  if (summen.onlineCents > 0 && !abrechnung.rechnungOnlineId) {
+  // Auch mit gespeicherter Kennung: ein Abbruch nach dem Speichern darf keinen Entwurf zurücklassen.
+  if (summen.onlineCents > 0 && abrechnung.stand === 'entwurf') {
     const kunde = await stelleStripeKundeSicher(hof.id)
-    const rechnungId = await legeRechnungAn(
+    const online = await bereiteRechnungVor(
       `${basis}-online`,
       kunde,
+      abrechnung.rechnungOnlineId,
       { collection_method: 'charge_automatically', description: `${beschreibung} · online, bereits einbehalten`, metadata: { farmId: hof.id, monat, art: 'online' } },
-      rechnungsPositionen(summen.onlineZeilen, 'online'),
+      rechnungsPositionen(summen.onlineZeilen, summen.onlineCents, 'online'),
+      summen.onlineCents,
       async (rid) => {
         await prisma.monatsabrechnung.update({ where: { id }, data: { rechnungOnlineId: rid } })
-      }
+      },
+      { farmId: hof.id, monat, art: 'online' }
     )
-    await stripe.invoices.finalizeInvoice(rechnungId, { auto_advance: false }, { idempotencyKey: `${basis}-online-fertig` })
-    await stripe.invoices.pay(rechnungId, { paid_out_of_band: true }, { idempotencyKey: `${basis}-online-bezahlt` })
+    if (!online) return imEntwurf
+    if (online.status === 'draft') await stripe.invoices.finalizeInvoice(online.id, { auto_advance: false }, { idempotencyKey: `${basis}-online-fertig` })
+    if (online.status !== 'paid') await stripe.invoices.pay(online.id, { paid_out_of_band: true }, { idempotencyKey: `${basis}-online-bezahlt` })
   }
 
   // Rechnung bar: 0 € → keine Rechnung.
   if (summen.barCents === 0) {
-    await prisma.monatsabrechnung.update({ where: { id }, data: { stand: 'nichts' } })
+    // Bedingt: ein paralleler Lauf oder Webhook hat den Stand vielleicht schon weitergesetzt.
+    await prisma.monatsabrechnung.updateMany({ where: { id, stand: 'entwurf' }, data: { stand: 'nichts' } })
     await protokolliere({ wer: null, art: 'monatsabrechnung_erstellt', bezugArt: 'hof', bezugId: hof.id, mitPasskey: false, grund: `Monatsabrechnung ${monat}: bar nichts fällig` })
     return { farmId: hof.id, monat, stand: 'nichts', neu: true }
   }
@@ -279,34 +342,36 @@ export async function rechneHofAb(hof: HofFuerAbrechnung, monat: string, jetzt: 
   if (weg === null) {
     // Mandat Pflicht, aber keins (mehr) da: keine Rechnung ohne Weg — die Abrechnung bleibt im Entwurf.
     warnung('Monatsabrechnung: Mandat Pflicht, aber keins da — Rechnung bar nicht angelegt', 'ohne-mandat', { farmId: hof.id, monat })
-    return { farmId: hof.id, monat, stand: 'entwurf', neu: !vorher }
+    return imEntwurf
   }
-  let rechnungBarId = abrechnung.rechnungBarId
-  if (!rechnungBarId) {
-    const kunde = await stelleStripeKundeSicher(hof.id)
-    const parameter: Stripe.InvoiceCreateParams =
-      weg === 'lastschrift'
-        ? {
-            collection_method: 'charge_automatically',
-            default_payment_method: hof.sepaZahlungsmittelId ?? undefined,
-            payment_settings: { payment_method_types: ['sepa_debit'] },
-          }
-        : { collection_method: 'send_invoice', days_until_due: Math.max(1, hof.barSperreNachTagen) }
-    rechnungBarId = await legeRechnungAn(
-      `${basis}-bar`,
-      kunde,
-      { ...parameter, description: `${beschreibung} · bar`, metadata: { farmId: hof.id, monat, art: 'bar' } },
-      rechnungsPositionen(summen.barZeilen, 'bar'),
-      async (rid) => {
-        await prisma.monatsabrechnung.update({ where: { id }, data: { rechnungBarId: rid } })
-      }
-    )
-  }
+  const kunde = await stelleStripeKundeSicher(hof.id)
+  const parameter: Stripe.InvoiceCreateParams =
+    weg === 'lastschrift'
+      ? {
+          collection_method: 'charge_automatically',
+          default_payment_method: hof.sepaZahlungsmittelId ?? undefined,
+          payment_settings: { payment_method_types: ['sepa_debit'] },
+        }
+      : { collection_method: 'send_invoice', days_until_due: Math.max(1, hof.barSperreNachTagen) }
+  const bar = await bereiteRechnungVor(
+    `${basis}-bar`,
+    kunde,
+    abrechnung.rechnungBarId,
+    { ...parameter, description: `${beschreibung} · bar`, metadata: { farmId: hof.id, monat, art: 'bar' } },
+    rechnungsPositionen(summen.barZeilen, summen.barCents, 'bar'),
+    summen.barCents,
+    async (rid) => {
+      await prisma.monatsabrechnung.update({ where: { id }, data: { rechnungBarId: rid } })
+    },
+    { farmId: hof.id, monat, art: 'bar' }
+  )
+  if (!bar) return imEntwurf
   // Lastschrift: Stripe zieht nach dem Finalisieren selbst ein (auto_advance). Überweisung: die Rechnung geht per Mail.
-  await stripe.invoices.finalizeInvoice(rechnungBarId, { auto_advance: weg === 'lastschrift' }, { idempotencyKey: `${basis}-bar-fertig` })
-  if (weg === 'ueberweisung') await stripe.invoices.sendInvoice(rechnungBarId, {}, { idempotencyKey: `${basis}-bar-senden` })
+  if (bar.status === 'draft') await stripe.invoices.finalizeInvoice(bar.id, { auto_advance: weg === 'lastschrift' }, { idempotencyKey: `${basis}-bar-fertig` })
+  if (weg === 'ueberweisung' && bar.status !== 'paid') await stripe.invoices.sendInvoice(bar.id, {}, { idempotencyKey: `${basis}-bar-senden` })
   // offenSeit zählt die Tage bis zur Sperre: bei Überweisung ab dem Senden, bei Lastschrift erst ab dem ersten Fehlschlag.
-  await prisma.monatsabrechnung.update({ where: { id }, data: { stand: 'offen', offenSeit: weg === 'ueberweisung' ? jetzt : null } })
+  // Bedingt auf „entwurf“: ein schneller Webhook (bezahlt, gescheitert) wird nicht überschrieben.
+  await prisma.monatsabrechnung.updateMany({ where: { id, stand: 'entwurf' }, data: { stand: 'offen', offenSeit: weg === 'ueberweisung' ? jetzt : null } })
   await protokolliere({ wer: null, art: 'monatsabrechnung_erstellt', bezugArt: 'hof', bezugId: hof.id, mitPasskey: false, grund: `Monatsabrechnung ${monat}: ${weg === 'lastschrift' ? 'Lastschrift' : 'Überweisung'}` })
   return { farmId: hof.id, monat, stand: 'offen', neu: true }
 }
@@ -336,9 +401,9 @@ async function pruefeRechnungsangaben(jetzt: Date): Promise<boolean | null> {
   return fehlen
 }
 
-export type AbrechnungsLauf = { monat: string; hoefe: number; neu: number; fehler: number; angekuendigt: number; rechnungsangabenFehlen: boolean | null }
+export type AbrechnungsLauf = { monat: string; hoefe: number; neu: number; fehler: number; angekuendigt: number; rechnungsangabenFehlen: boolean | null; nachgezogen: number }
 
-/** Der tägliche Ablauf `monatsabrechnung` (Kopf der Datei). */
+/** Der tägliche Ablauf `monatsabrechnung` (Kopf der Datei); dazu jede Abrechnung, die noch im Entwurf steht. */
 export async function rechneMonatsabrechnungen(jetzt: Date): Promise<AbrechnungsLauf> {
   let angekuendigt = 0
   try {
@@ -354,18 +419,32 @@ export async function rechneMonatsabrechnungen(jetzt: Date): Promise<Abrechnungs
     select: { id: true, tarif: true, barMandatPflicht: true, barSperreNachTagen: true, sepaMandatAm: true, sepaZahlungsmittelId: true },
   })
   const rechnungsangabenFehlen = hoefe.length > 0 ? await pruefeRechnungsangaben(jetzt) : null
+  // Liegengebliebene Entwürfe (Abbruch, Betrag wich ab, Mandat fehlte) zieht jeder Lauf nach —
+  // sonst bliebe das Geld still liegen, weil der Abrechnungstag erst im nächsten Monat wiederkommt.
+  const heuteDran = new Set(hoefe.map((h) => h.id))
+  const entwuerfe = await prisma.monatsabrechnung.findMany({
+    where: { stand: 'entwurf' },
+    select: { monat: true, farm: { select: { id: true, tarif: true, barMandatPflicht: true, barSperreNachTagen: true, sepaMandatAm: true, sepaZahlungsmittelId: true } } },
+    orderBy: { monat: 'asc' },
+  })
+  const auftraege = [
+    ...hoefe.map((hof) => ({ hof, monat })),
+    ...entwuerfe
+      .map((e) => ({ hof: e.farm, monat: e.monat.toISOString().slice(0, 7) }))
+      .filter((a) => !(a.monat === monat && heuteDran.has(a.hof.id))),
+  ]
   let neu = 0
   let fehler = 0
-  for (const hof of hoefe) {
+  for (const a of auftraege) {
     try {
-      const ergebnis = await rechneHofAb(hof, monat, jetzt)
+      const ergebnis = await rechneHofAb(a.hof, a.monat, jetzt)
       if (ergebnis.neu) neu += 1
     } catch (err) {
       fehler += 1
-      warnung('Monatsabrechnung: Hof nicht abgerechnet', 'hof', { farmId: hof.id, monat }, err)
+      warnung('Monatsabrechnung: Hof nicht abgerechnet', 'hof', { farmId: a.hof.id, monat: a.monat }, err)
     }
   }
-  return { monat, hoefe: hoefe.length, neu, fehler, angekuendigt, rechnungsangabenFehlen }
+  return { monat, hoefe: hoefe.length, neu, fehler, angekuendigt, rechnungsangabenFehlen, nachgezogen: auftraege.length - hoefe.length }
 }
 
 // ─── Webhooks ────────────────────────────────────────────────────────────────

@@ -16,8 +16,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const stripeAttrappe = vi.hoisted(() => ({
   customers: { create: vi.fn() },
-  invoices: { create: vi.fn(), finalizeInvoice: vi.fn(), pay: vi.fn(), sendInvoice: vi.fn() },
-  invoiceItems: { create: vi.fn() },
+  invoices: { create: vi.fn(), finalizeInvoice: vi.fn(), pay: vi.fn(), sendInvoice: vi.fn(), retrieve: vi.fn() },
+  invoiceItems: { create: vi.fn(), list: vi.fn() },
 }))
 vi.mock('@/lib/stripe', () => ({ stripe: stripeAttrappe }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
@@ -29,6 +29,7 @@ import { rechneHofAb } from '@/server/plattformgebuehr-abrechnung'
 import { ladeGebuehrLage } from '@/server/queries/plattform-einstellung'
 import { barMoeglich } from '@/lib/plattformgebuehr'
 import { erstelleHof, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
+import { richteRechnungenEin } from '../stripe-rechnungen-attrappe'
 
 // 3. März 2028, 06:30 in Wien: abgerechnet wird Februar 2028.
 const JETZT = new Date('2028-03-03T05:30:00.000Z')
@@ -42,10 +43,7 @@ afterEach(async () => {
 beforeEach(() => {
   vi.clearAllMocks()
   stripeAttrappe.customers.create.mockResolvedValue({ id: 'cus_int' })
-  stripeAttrappe.invoices.create.mockImplementation(async (p: { metadata: { art: string } }) => ({ id: `in_int_${p.metadata.art}` }))
-  stripeAttrappe.invoiceItems.create.mockResolvedValue({})
-  stripeAttrappe.invoices.finalizeInvoice.mockResolvedValue({})
-  stripeAttrappe.invoices.pay.mockResolvedValue({})
+  richteRechnungenEin(stripeAttrappe, (art) => `in_int_${art}`)
 })
 
 type Bestellung = {

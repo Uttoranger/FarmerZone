@@ -27,7 +27,7 @@ const stripeAttrappe = vi.hoisted(() => ({
   customers: { create: vi.fn() },
   setupIntents: { create: vi.fn() },
   invoices: { create: vi.fn(), finalizeInvoice: vi.fn(), pay: vi.fn(), sendInvoice: vi.fn(), retrieve: vi.fn() },
-  invoiceItems: { create: vi.fn() },
+  invoiceItems: { create: vi.fn(), list: vi.fn() },
   invoicePayments: { list: vi.fn() },
   accounts: { retrieveCurrent: vi.fn() },
   paymentMethods: { retrieve: vi.fn() },
@@ -73,6 +73,9 @@ import {
   type BestellungFuerAbrechnung,
 } from '@/lib/plattformgebuehr'
 import { LASTSCHRIFT_TEXT, lastschriftGescheitertText } from '@/lib/konditionen'
+import { summeGebuehrPositionen } from '@/lib/plattformgebuehr'
+import { captureException } from '@sentry/nextjs'
+import { richteRechnungenEin } from './stripe-rechnungen-attrappe'
 
 const TAG = 24 * 60 * 60 * 1000
 // Dienstag, 3. März 2027, 06:30 in Wien — der Abrechnungstag (Vorgabe der 3.) für Februar.
@@ -136,6 +139,11 @@ describe('Summen eines Monats (rein, ganze Cent)', () => {
     expect(monatsSummen(APRIL)).toEqual(expect.objectContaining({ barCents: 48, onlineCents: 0 }))
   })
 
+  it('Gebühr einer Bestellung aus ihren Positionen (Geld-Abgleich): Summe der Snapshots in ganzen Cent', () => {
+    expect(summeGebuehrPositionen([{ gebuehrCents: 36 }, { gebuehrCents: 72 }, { gebuehrCents: 0 }])).toBe(108)
+    expect(summeGebuehrPositionen([])).toBe(0)
+  })
+
   it('alle Werte ganze Cent', () => {
     for (const monat of [FEBRUAR, MAERZ, APRIL]) {
       const s = monatsSummen(monat)
@@ -185,19 +193,19 @@ function bestellZeilen(liste: BestellungFuerAbrechnung[]) {
   return liste.map((b) => ({ ...b, serviceFeeRefundedAt: b.gebuehrEntfallen ? new Date() : null }))
 }
 
+let rechnungen: ReturnType<typeof richteRechnungenEin>
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.stubEnv('STRIPE_WEBHOOK_SECRET', 'whsec_test_dummy')
   db.monatsabrechnung.findUnique.mockResolvedValue(null)
-  db.monatsabrechnung.upsert.mockImplementation(async () => ({ id: 'abr_1', rechnungBarId: null, rechnungOnlineId: null }))
+  db.monatsabrechnung.upsert.mockImplementation(async () => ({ id: 'abr_1', stand: 'entwurf', rechnungBarId: null, rechnungOnlineId: null }))
   db.monatsabrechnung.update.mockResolvedValue({})
   db.monatsabrechnung.updateMany.mockResolvedValue({ count: 1 })
+  db.monatsabrechnung.findMany.mockResolvedValue([])
   db.farm.findUnique.mockResolvedValue({ id: 'hof_1', name: 'Hof Probe', stripeKundeId: 'cus_1', owner: { email: 'hof@example.com' } })
   db.order.findMany.mockResolvedValue(bestellZeilen(FEBRUAR))
-  stripeAttrappe.invoices.create.mockImplementation(async (p: { metadata: { art: string } }) => ({ id: `in_${p.metadata.art}` }))
-  stripeAttrappe.invoiceItems.create.mockResolvedValue({})
-  stripeAttrappe.invoices.finalizeInvoice.mockResolvedValue({})
-  stripeAttrappe.invoices.pay.mockResolvedValue({})
+  rechnungen = richteRechnungenEin(stripeAttrappe, (art) => `in_${art}`)
   stripeAttrappe.webhooks.constructEvent.mockReset()
   db.webhookEvent.findUnique.mockResolvedValue(null)
   db.webhookEvent.create.mockResolvedValue({})
@@ -225,14 +233,14 @@ describe('rechneHofAb: Februar abrechnen', () => {
     expect(db.monatsabrechnung.upsert.mock.calls[0][0].create).toEqual(
       expect.objectContaining({ farmId: 'hof_1', tarif: 'HOFTOR', grundgebuehrCents: 0, servicegebuehrBarCents: 342, barBestellungen: 2, servicegebuehrOnlineCents: 120, nichtAbgeholtBestellungen: 1, summeCents: 342 })
     )
-    expect(db.monatsabrechnung.update).toHaveBeenLastCalledWith({ where: { id: 'abr_1' }, data: { stand: 'offen', offenSeit: null } })
+    expect(db.monatsabrechnung.updateMany).toHaveBeenLastCalledWith({ where: { id: 'abr_1', stand: 'entwurf' }, data: { stand: 'offen', offenSeit: null } })
   })
 
   it('ohne Mandat (Pflicht aus): Überweisung mit days_until_due = Tage bis zur Sperre, offen ab dem Senden', async () => {
     await rechneHofAb({ ...HOF, barMandatPflicht: false, sepaMandatAm: null, sepaZahlungsmittelId: null, barSperreNachTagen: 10 }, '2027-02', JETZT)
     expect(stripeAttrappe.invoices.create.mock.calls[1][0]).toEqual(expect.objectContaining({ collection_method: 'send_invoice', days_until_due: 10 }))
     expect(stripeAttrappe.invoices.sendInvoice).toHaveBeenCalledWith('in_bar', {}, { idempotencyKey: 'abr-hof_1-2027-02-bar-senden' })
-    expect(db.monatsabrechnung.update).toHaveBeenLastCalledWith({ where: { id: 'abr_1' }, data: { stand: 'offen', offenSeit: JETZT } })
+    expect(db.monatsabrechnung.updateMany).toHaveBeenLastCalledWith({ where: { id: 'abr_1', stand: 'entwurf' }, data: { stand: 'offen', offenSeit: JETZT } })
   })
 
   it('0 € bar → keine Rechnung bar, Stand „nichts“ (März: nur die Rechnung online)', async () => {
@@ -241,7 +249,7 @@ describe('rechneHofAb: Februar abrechnen', () => {
     expect(e.stand).toBe('nichts')
     expect(stripeAttrappe.invoices.create).toHaveBeenCalledTimes(1)
     expect(stripeAttrappe.invoices.create.mock.calls[0][0].metadata.art).toBe('online')
-    expect(db.monatsabrechnung.update).toHaveBeenLastCalledWith({ where: { id: 'abr_1' }, data: { stand: 'nichts' } })
+    expect(db.monatsabrechnung.updateMany).toHaveBeenLastCalledWith({ where: { id: 'abr_1', stand: 'entwurf' }, data: { stand: 'nichts' } })
   })
 
   it('zweiter Lauf am selben Tag: Abrechnung steht schon auf „offen“ → nichts Neues bei Stripe', async () => {
@@ -252,12 +260,67 @@ describe('rechneHofAb: Februar abrechnen', () => {
     expect(db.monatsabrechnung.upsert).not.toHaveBeenCalled()
   })
 
-  it('Entwurf mit gespeicherter Rechnung bar (Abbruch beim letzten Mal): keine zweite Rechnung, nur finalisieren', async () => {
+  it('Entwurf mit gespeicherter Rechnung bar, Abbruch mitten in den Positionen: fehlende Position nachgezogen (je Schlüssel einmal), erst dann finalisiert', async () => {
     db.monatsabrechnung.findUnique.mockResolvedValue({ id: 'abr_1', stand: 'entwurf' })
-    db.monatsabrechnung.upsert.mockResolvedValue({ id: 'abr_1', rechnungBarId: 'in_bar_alt', rechnungOnlineId: 'in_online_alt' })
-    await rechneHofAb(HOF, '2027-02', JETZT)
+    db.monatsabrechnung.upsert.mockResolvedValue({ id: 'abr_1', stand: 'entwurf', rechnungBarId: 'in_bar_alt', rechnungOnlineId: 'in_online_alt' })
+    rechnungen.set('in_online_alt', { status: 'paid', posten: [] })
+    rechnungen.set('in_bar_alt', { status: 'draft', posten: [{ id: 'ii_alt', schluessel: 'b1', amount: 72 }] })
+    const e = await rechneHofAb(HOF, '2027-02', JETZT)
+    expect(e.stand).toBe('offen')
     expect(stripeAttrappe.invoices.create).not.toHaveBeenCalled()
-    expect(stripeAttrappe.invoices.finalizeInvoice).toHaveBeenCalledWith('in_bar_alt', { auto_advance: true }, expect.anything())
+    // Nur b2 kommt dazu, mit demselben Schlüssel wie beim ersten Lauf.
+    expect(stripeAttrappe.invoiceItems.create.mock.calls.map(([p, o]) => [p.invoice, p.amount, o.idempotencyKey])).toEqual([['in_bar_alt', 270, 'abr-hof_1-2027-02-bar-pos-b2']])
+    expect(stripeAttrappe.invoices.finalizeInvoice).toHaveBeenCalledWith('in_bar_alt', { auto_advance: true }, { idempotencyKey: 'abr-hof_1-2027-02-bar-fertig' })
+    expect(rechnungen.get('in_bar_alt')?.posten.reduce((s, x) => s + x.amount, 0)).toBe(342)
+    // Die Rechnung online ist schon bezahlt: nichts mehr daran.
+    expect(stripeAttrappe.invoices.pay).not.toHaveBeenCalled()
+  })
+
+  it('Rechnungsbetrag weicht von der Summe ab: Warnung, nicht finalisiert, bleibt im Entwurf', async () => {
+    db.monatsabrechnung.findUnique.mockResolvedValue({ id: 'abr_1', stand: 'entwurf' })
+    db.monatsabrechnung.upsert.mockResolvedValue({ id: 'abr_1', stand: 'entwurf', rechnungBarId: 'in_bar_alt', rechnungOnlineId: 'in_online_alt' })
+    rechnungen.set('in_online_alt', { status: 'paid', posten: [] })
+    rechnungen.set('in_bar_alt', { status: 'draft', posten: [{ id: 'ii_fremd', schluessel: 'b9', amount: 999 }] })
+    const e = await rechneHofAb(HOF, '2027-02', JETZT)
+    expect(e).toEqual({ farmId: 'hof_1', monat: '2027-02', stand: 'entwurf', neu: false })
+    expect(stripeAttrappe.invoices.finalizeInvoice).not.toHaveBeenCalled()
+    expect(db.monatsabrechnung.updateMany).not.toHaveBeenCalled()
+    expect(vi.mocked(captureException)).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Monatsabrechnung: Rechnungsbetrag weicht von der Summe ab — nicht finalisiert' }),
+      expect.objectContaining({ extra: expect.objectContaining({ rechnungCents: 999 + 342, sollCents: 342, art: 'bar' }) })
+    )
+  })
+
+  it('Rechnung online gespeichert, aber nicht finalisiert (Abbruch nach dem Speichern): Positionen nachgezogen, finalisiert, „bezahlt außerhalb“', async () => {
+    db.monatsabrechnung.findUnique.mockResolvedValue({ id: 'abr_1', stand: 'entwurf' })
+    db.monatsabrechnung.upsert.mockResolvedValue({ id: 'abr_1', stand: 'entwurf', rechnungBarId: null, rechnungOnlineId: 'in_online_alt' })
+    rechnungen.set('in_online_alt', { status: 'draft', posten: [{ id: 'ii_alt', schluessel: 'o1', amount: 72 }] })
+    const e = await rechneHofAb(HOF, '2027-02', JETZT)
+    expect(e.stand).toBe('offen')
+    expect(stripeAttrappe.invoices.create.mock.calls.map(([p]) => p.metadata.art)).toEqual(['bar'])
+    const online = stripeAttrappe.invoiceItems.create.mock.calls.filter(([p]) => p.invoice === 'in_online_alt').map(([p, o]) => [p.amount, o.idempotencyKey])
+    expect(online).toEqual([[48, 'abr-hof_1-2027-02-online-pos-o2']])
+    expect(stripeAttrappe.invoices.finalizeInvoice).toHaveBeenCalledWith('in_online_alt', { auto_advance: false }, { idempotencyKey: 'abr-hof_1-2027-02-online-fertig' })
+    expect(stripeAttrappe.invoices.pay).toHaveBeenCalledWith('in_online_alt', { paid_out_of_band: true }, { idempotencyKey: 'abr-hof_1-2027-02-online-bezahlt' })
+    expect(rechnungen.get('in_online_alt')?.status).toBe('paid')
+  })
+
+  it('Rechnung online schon finalisiert, aber nicht bezahlt gesetzt: nur noch „bezahlt außerhalb“', async () => {
+    db.monatsabrechnung.findUnique.mockResolvedValue({ id: 'abr_1', stand: 'entwurf' })
+    db.monatsabrechnung.upsert.mockResolvedValue({ id: 'abr_1', stand: 'entwurf', rechnungBarId: null, rechnungOnlineId: 'in_online_alt' })
+    rechnungen.set('in_online_alt', { status: 'open', posten: [{ id: 'ii_1', schluessel: 'o1', amount: 72 }, { id: 'ii_2', schluessel: 'o2', amount: 48 }] })
+    await rechneHofAb(HOF, '2027-02', JETZT)
+    expect(stripeAttrappe.invoices.finalizeInvoice).not.toHaveBeenCalledWith('in_online_alt', expect.anything(), expect.anything())
+    expect(stripeAttrappe.invoices.pay).toHaveBeenCalledWith('in_online_alt', { paid_out_of_band: true }, { idempotencyKey: 'abr-hof_1-2027-02-online-bezahlt' })
+  })
+
+  it('über 200 Bestellungen: eine Sammelzeile mit der Summe aus monatsSummen', async () => {
+    const viele = Array.from({ length: 201 }, (_, i) => bestellung({ id: `v${i}`, orderNumber: `HM-0227-V${String(i).padStart(3, '0')}`, serviceFeeCents: 72 + (i % 3) }))
+    db.order.findMany.mockResolvedValue(bestellZeilen(viele))
+    const e = await rechneHofAb(HOF, '2027-02', JETZT)
+    expect(e.stand).toBe('offen')
+    const bar = stripeAttrappe.invoiceItems.create.mock.calls.filter(([p]) => p.invoice === 'in_bar').map(([p]) => [p.amount, p.description])
+    expect(bar).toEqual([[monatsSummen(viele).barCents, 'Plattformgebühr bar · 201 Bestellungen']])
   })
 
   it('Mandat Pflicht, aber keins da: keine Rechnung bar, bleibt im Entwurf', async () => {
@@ -285,6 +348,16 @@ describe('rechneMonatsabrechnungen: Abrechnungstag je Hof, ein Fehler hält die 
     expect(lauf).toEqual(expect.objectContaining({ monat: '2027-02', hoefe: 2, neu: 1, fehler: 1, rechnungsangabenFehlen: false }))
     const abfrage = db.farm.findMany.mock.calls.find(([a]) => 'abrechnungsTag' in a.where)?.[0]
     expect(abfrage.where).toEqual({ abrechnungsTag: 3, orders: { some: { gebuehrModell: 'hofpreis' } } })
+  })
+
+  it('ein liegengebliebener Entwurf eines älteren Monats wird im täglichen Lauf nachgezogen', async () => {
+    db.farm.findMany.mockResolvedValue([])
+    db.monatsabrechnung.findMany.mockResolvedValue([{ monat: new Date('2027-01-01T00:00:00.000Z'), farm: { ...HOF, id: 'hof_alt' } }])
+    db.monatsabrechnung.findUnique.mockResolvedValue({ id: 'abr_1', stand: 'entwurf' })
+    const lauf = await rechneMonatsabrechnungen(new Date('2027-03-10T05:30:00.000Z'))
+    expect(lauf).toEqual(expect.objectContaining({ hoefe: 0, nachgezogen: 1, fehler: 0 }))
+    expect(db.monatsabrechnung.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { stand: 'entwurf' } }))
+    expect(stripeAttrappe.invoices.create.mock.calls.map(([, o]) => o.idempotencyKey)).toEqual(['abr-hof_alt-2027-01-online', 'abr-hof_alt-2027-01-bar'])
   })
 
   it('am 4. März ist für Tag-3-Höfe nichts zu tun — die Abfrage fragt Tag 4', async () => {
