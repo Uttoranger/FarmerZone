@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { CheckCheck, Inbox } from 'lucide-react'
 import { z } from 'zod'
+import * as Sentry from '@sentry/nextjs'
 import { getAdminFarms } from '@/server/queries/admin'
 import { getDuplikateVon, getMeldungDetail, getWunschCluster, type AdminMeldungDetail } from '@/server/queries/meldung'
 import { ladeEingang, ladeFadenAdmin, type AdminFaden } from '@/server/queries/postfach'
@@ -51,10 +52,18 @@ export type EingangDaten = {
  * klein; sie ist dieselbe Abfrage wie Admin › Höfe.
  */
 async function ladeAkteHinweis(hofId: string, jetzt: Date): Promise<AkteHinweis | null> {
-  const hof = (await getAdminFarms(jetzt)).find((f) => f.id === hofId)
-  if (!hof) return null
-  const signale = hofSignale(hof, jetzt)
-  return signale.length === 0 ? null : { signale: signale.map((s) => s.text), href: adminHofHref(hof.id) }
+  // Der Hinweis ist Beiwerk: Scheitert das Laden, bleibt der Faden sichtbar, nur ohne Hinweis.
+  try {
+    const hof = (await getAdminFarms(jetzt)).find((f) => f.id === hofId)
+    if (!hof) return null
+    const signale = hofSignale(hof, jetzt)
+    return signale.length === 0 ? null : { signale: signale.map((s) => s.text), href: adminHofHref(hof.id) }
+  } catch (err) {
+    const meldung = new Error('Postfach: Hinweis aus der Akte nicht geladen')
+    meldung.name = err instanceof Error ? err.name : 'Unbekannt'
+    Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'admin', seite: 'postfach-akte-hinweis' } })
+    return null
+  }
 }
 
 /**
