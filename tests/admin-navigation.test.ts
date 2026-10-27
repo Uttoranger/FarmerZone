@@ -1,43 +1,68 @@
 /**
  * Tests für die Reiter der AdminShell (src/lib/admin-navigation.ts).
  *
- * Beweist: Höfe · Postfach · Startseite · Finanzen · Betrieb · Einstellungen
- * (Register N15, Nr. 94; Betrieb seit Nr. 103 mit Warnpunkt statt Zahl) auf
- * die Admin-Seiten, Höfe und Postfach mit Zähler; die
- * Einstellungen-Seite liefert Nr. 93, bis zum Merge zeigt der Reiter dorthin;
- * der Weg zurück zum eigenen Hof und die
- * Konto-Plakette nur mit eigenem Hof (Nr. 41, Register N1); aktiv ist der
- * längste passende Reiter. Seit Nr. 87 (Register N12) hat das Postfach drei
- * Reiter unter /admin/postfach; auf /admin/meldungen (Umleitung) und der
- * Detailseite einer Meldung bleibt es aktiv.
+ * Beweist (Register N32, Nr. 193): Heute · Höfe · Bestellungen · Postfach ·
+ * Startseite · Geld · Betrieb · Einstellungen auf bestehende Admin-Seiten;
+ * Zahlen an Heute (offen), Höfe (warten) und Postfach (ungelesen), der Punkt
+ * nur an Betrieb; am Handy die ersten vier in der Leiste, der Rest im Blatt
+ * „Mehr“; ein Reiter ohne Recht wird nicht gezeigt (N35) — mit Gegenprobe;
+ * der Weg zurück zum eigenen Hof und die Konto-Plakette nur mit eigenem Hof
+ * (Nr. 41, Register N1); aktiv ist der längste passende Reiter, Heute nur auf
+ * /admin selbst. Seit Nr. 87 (Register N12) bleibt das Postfach auf
+ * /admin/meldungen (Umleitung) und der Detailseite einer Meldung aktiv.
  */
 import { describe, it, expect } from 'vitest'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ADMIN_KONTO, ADMIN_REITER, ADMIN_ZURUECK, adminAktiverReiter, kontoHatHof } from '@/lib/admin-navigation'
+import {
+  ADMIN_HANDBUCH,
+  ADMIN_KONTO,
+  ADMIN_MEHR_ZEILE,
+  ADMIN_REITER,
+  ADMIN_ZURUECK,
+  adminAktiverReiter,
+  kontoHatHof,
+  sichtbareReiter,
+} from '@/lib/admin-navigation'
 
 describe('Admin-Reiter', () => {
-  it('Höfe · Postfach · Startseite · Finanzen · Betrieb · Einstellungen, Zähler an Höfe und Postfach, der Punkt nur an Betrieb', () => {
-    expect(ADMIN_REITER.map((r) => [r.id, r.label, r.href, r.zahl, r.warnpunkt])).toEqual([
-      ['hoefe', 'Höfe', '/admin', 'hoefe', undefined],
-      ['postfach', 'Postfach', '/admin/postfach', 'briefkasten', undefined],
-      ['startseite', 'Startseite', '/admin/startseite', undefined, undefined],
-      ['finanzen', 'Finanzen', '/admin/finanzen', undefined, undefined],
-      ['betrieb', 'Betrieb', '/admin/betrieb', undefined, true],
-      ['einstellungen', 'Einstellungen', '/admin/einstellungen', undefined, undefined],
+  it('Heute · Höfe · Bestellungen · Postfach · Startseite · Geld · Betrieb · Einstellungen, Zahlen an Heute, Höfe und Postfach, der Punkt nur an Betrieb', () => {
+    expect(ADMIN_REITER.map((r) => [r.id, r.label, r.href, r.zahl, r.warnpunkt, r.amHandy])).toEqual([
+      ['heute', 'Heute', '/admin', 'heute', undefined, 'leiste'],
+      ['hoefe', 'Höfe', '/admin/hoefe', 'hoefe', undefined, 'leiste'],
+      ['bestellungen', 'Bestellungen', '/admin/bestellungen', undefined, undefined, 'leiste'],
+      ['postfach', 'Postfach', '/admin/postfach', 'postfach', undefined, 'leiste'],
+      ['startseite', 'Startseite', '/admin/startseite', undefined, undefined, 'mehr'],
+      ['geld', 'Geld', '/admin/geld', undefined, undefined, 'mehr'],
+      ['betrieb', 'Betrieb', '/admin/betrieb', undefined, true, 'mehr'],
+      ['einstellungen', 'Einstellungen', '/admin/einstellungen', undefined, undefined, 'mehr'],
     ])
   })
 
-  it('jeder Reiter zeigt auf eine bestehende Admin-Seite — die Einstellungen liefert Nr. 93 (bis zum Merge zeigt der Reiter dorthin)', () => {
-    const ordner = readdirSync(join(process.cwd(), 'src/app/admin'))
-    const kommtSpaeter = new Set(['einstellungen'])
-    for (const r of ADMIN_REITER.slice(1)) {
-      const segment = r.href.split('/')[2]
-      if (kommtSpaeter.has(segment)) continue
-      expect(ordner).toContain(segment)
+  it('jeder Reiter zeigt auf eine bestehende Admin-Seite, und sein Recht ist das Recht der Seite', () => {
+    for (const r of ADMIN_REITER) {
+      const datei = join(process.cwd(), 'src/app', r.href, 'page.tsx')
+      expect(existsSync(datei), r.href).toBe(true)
+      const quelle = readFileSync(datei, 'utf8')
+      // Die ERSTE Wache der Seite zählt (Einstellungen prüft „team“ erst für die Gruppe Team).
+      const nach = quelle.slice(quelle.indexOf('verlangeAdminSeite(') + 'verlangeAdminSeite('.length)
+      const verlangt = /^\{ recht: '([a-z_]+)' \}\)/.exec(nach)?.[1] ?? 'ansehen'
+      expect(r.recht, r.href).toBe(verlangt)
     }
-    // Gegenprobe: Der Platzhalter der Startseite ist keine Ausnahme, die Seite steht da.
-    expect(existsSync(join(process.cwd(), 'src/app/admin/startseite/page.tsx'))).toBe(true)
+  })
+
+  it('ohne Recht kein Reiter (N35): ohne „Geld“ fehlt Geld, alles mit „ansehen“ bleibt; Inhaber sehen alle', () => {
+    expect(sichtbareReiter({ adminInhaber: false, adminRechte: [] })).toEqual(['heute', 'hoefe', 'bestellungen', 'postfach', 'startseite', 'betrieb', 'einstellungen'])
+    // Gegenprobe: mit dem Recht ist der Reiter da, Inhaber sehen ohnehin alles.
+    expect(sichtbareReiter({ adminInhaber: false, adminRechte: ['geld'] })).toContain('geld')
+    expect(sichtbareReiter({ adminInhaber: true, adminRechte: [] })).toEqual(ADMIN_REITER.map((r) => r.id))
+  })
+
+  it('am Handy stehen genau vier Reiter in der Leiste, dazu „Mehr“ — im Blatt je eine Zeile', () => {
+    expect(ADMIN_REITER.filter((r) => r.amHandy === 'leiste')).toHaveLength(4)
+    for (const r of ADMIN_REITER.filter((r) => r.amHandy === 'mehr')) expect(ADMIN_MEHR_ZEILE[r.id], r.id).toBeTruthy()
+    expect(ADMIN_HANDBUCH.href).toBe('https://github.com/Uttoranger/FarmerZone/blob/main/docs/betrieb/handbuch.md')
+    expect(existsSync(join(process.cwd(), 'docs/betrieb/handbuch.md'))).toBe(true)
   })
 
   it('die Betriebsleiste führt keinen Weg zur Testumgebung mehr (Z3-Korrektur)', async () => {
@@ -55,14 +80,19 @@ describe('Admin-Reiter', () => {
   })
 
   it.each([
-    ['/admin', 'hoefe'],
+    ['/admin', 'heute'],
+    ['/admin/einrichten', null],
+    ['/admin/hoefe', 'hoefe'],
+    ['/admin/hoefe/abc', 'hoefe'],
+    ['/admin/bestellungen', 'bestellungen'],
     ['/admin/postfach', 'postfach'],
     ['/admin/meldungen', 'postfach'],
     ['/admin/meldungen/abc', 'postfach'],
-    ['/admin/finanzen', 'finanzen'],
+    ['/admin/geld', 'geld'],
+    ['/admin/finanzen', 'geld'],
     ['/admin/startseite', 'startseite'],
     ['/admin/einstellungen', 'einstellungen'],
-    ['/admin/einstellungen/betrieb', 'einstellungen'],
+    ['/admin/einstellungen/anmeldung', 'einstellungen'],
     ['/admin/betrieb', 'betrieb'],
     ['/admin/betrieb/export', 'betrieb'],
     ['/dashboard', null],

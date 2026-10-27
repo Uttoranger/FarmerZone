@@ -14,7 +14,7 @@ import {
   type WartendeMail,
 } from '@/lib/betrieb'
 import { artName, fehlerText, wegName, type ProblemAuftrag } from '@/lib/betrieb-mails'
-import { eingangAdresse, eingangMeldungAdresse, type ErstattungAufgabeRoh, type HofAufgabeRoh } from '@/lib/postfach'
+import { eingangMeldungAdresse, type ErstattungAufgabeRoh, type HofAufgabeRoh } from '@/lib/postfach'
 import { MELDUNG_ART_LABEL, kurznummer } from '@/lib/meldung'
 import { centsAlsEuro, formatEuro, formatTagKurz, formatZahl } from '@/lib/format'
 import { TARIFE_AB_TAG } from '@/lib/konditionen'
@@ -243,7 +243,8 @@ function hofWartet(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
         satz: `${angaben.join(' · ')}.`,
         seit: h.createdAt,
         wasTun: 'pruefen',
-        ziel: eingangAdresse('aufgabe', { art: 'hof', id: h.id }),
+        // Seit Nr. 193 (N32): Freischalten steht in der Akte, nicht mehr im Postfach.
+        ziel: adminHofHref(h.id),
       },
       jetzt
     )
@@ -260,10 +261,11 @@ function erstattungOffen(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
           kennung: e.bestellnummer,
           text: [e.bestellnummer, e.hofName, ...(e.bezahltCents === null ? [] : [formatEuro(centsAlsEuro(e.bezahltCents))])].join(' · '),
         },
-        satz: 'Das Geld ist noch nicht bei der Kundin. Im Postfach steht, wie du die Erstattung abschließt.',
+        satz: 'Das Geld ist noch nicht bei der Kundin. In der Bestellung steht, wie du die Erstattung abschließt.',
         seit: e.seit,
         wasTun: 'oeffnen',
-        ziel: eingangAdresse('aufgabe', { art: 'erstattung', id: e.id }),
+        // Seit Nr. 193 (N32): „Außerhalb erstattet“ steht in Admin › Bestellungen (Nr. 186), nicht mehr im Postfach.
+        ziel: bestellungenHref({}, { bestellung: e.id }),
       },
       jetzt
     )

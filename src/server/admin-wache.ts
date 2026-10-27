@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { ADMIN_RECHT_FEHLER, darf, type AdminRecht } from '@/lib/admin-rechte'
+import { ADMIN_RECHT_FEHLER, darf, type AdminPerson, type AdminRecht } from '@/lib/admin-rechte'
 import { einmalLinkZweck } from '@/lib/geraete'
 import {
   ADMIN_AKTION_FEHLER,
@@ -95,7 +95,7 @@ type Geprueft =
   | { art: 'pflicht' }
   | { art: 'ohne-passkey' }
   | { art: 'ohne-recht' }
-  | { art: 'ok'; userId: string; sitzungId: string; passkeyAm: Date | null }
+  | { art: 'ok'; userId: string; sitzungId: string; passkeyAm: Date | null; person: AdminPerson }
 
 /**
  * Ob für dieses Konto die Pflicht „erst Passkey" gilt — gelesen werden nur
@@ -147,8 +147,9 @@ async function pruefe(optionen: AdminWacheOptionen): Promise<Geprueft> {
     const sperre = await passkeySperre(userId, passkeyAm)
     if (sperre) return { art: sperre }
   }
-  if (!darf({ adminInhaber: konto.adminInhaber === true, adminRechte: konto.adminRechte ?? [] }, optionen.recht ?? 'ansehen')) return { art: 'ohne-recht' }
-  return { art: 'ok', userId, sitzungId: session.session.id, passkeyAm }
+  const person: AdminPerson = { adminInhaber: konto.adminInhaber === true, adminRechte: konto.adminRechte ?? [] }
+  if (!darf(person, optionen.recht ?? 'ansehen')) return { art: 'ohne-recht' }
+  return { art: 'ok', userId, sitzungId: session.session.id, passkeyAm, person }
 }
 
 /** Wie eine Seite scheitert — kehrt nie zurück. */
@@ -211,10 +212,11 @@ export async function verlangeEinrichtenSeite(): Promise<{ userId: string; pflic
  * Pflicht und in einer Sitzung mit Passkey. Das Layout rendert parallel zur
  * Seite und wird vor ihrer Umleitung gestreamt; mit einer Abfrage der Sitzung.
  */
-export async function verlangeAdminShell(): Promise<{ userId: string; inhaltOffen: boolean }> {
+export async function verlangeAdminShell(): Promise<{ userId: string; inhaltOffen: boolean; person: AdminPerson }> {
   const geprueft = await pruefe({ ohnePasskey: true })
   if (geprueft.art !== 'ok') return seiteScheitert(geprueft.art)
-  return { userId: geprueft.userId, inhaltOffen: (await passkeySperre(geprueft.userId, geprueft.passkeyAm)) === null }
+  // `person` (N35, Nr. 193): welche Reiter die Shell zeigt — aus derselben Abfrage wie das Admin-Recht.
+  return { userId: geprueft.userId, inhaltOffen: (await passkeySperre(geprueft.userId, geprueft.passkeyAm)) === null, person: geprueft.person }
 }
 
 function alsAktionsFehler(art: Exclude<Geprueft['art'], 'ok'>): { error: string } {

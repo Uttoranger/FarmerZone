@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { ChevronDown, Globe, KeyRound, Star, Users, type LucideIcon } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Bell, ChevronDown, Globe, KeyRound, Star, Users, type LucideIcon } from 'lucide-react'
 import {
   EINSTELLUNGEN_GRUPPEN,
   EINSTELLUNGEN_TEXT,
@@ -15,7 +16,7 @@ import { EinstellungenGruendung, type GruendungFormularDaten } from '@/component
 import { EinstellungenTeam } from '@/components/admin/einstellungen-team'
 import type { TeamDaten } from '@/server/queries/team'
 
-const SYMBOL: Record<EinstellungenGruppe, LucideIcon> = { gruendung: Star, team: Users, plattform: Globe, anmeldung: KeyRound }
+const SYMBOL: Record<EinstellungenGruppe, LucideIcon> = { gruendung: Star, team: Users, benachrichtigungen: Bell, plattform: Globe, anmeldung: KeyRound }
 
 const H2 = 'font-heading text-lg font-semibold text-foreground'
 
@@ -27,6 +28,11 @@ export type EinstellungenDaten = {
   gruendungZeile: string
   /** Team und Rechte (Nr. 190) — nur für Inhaber geladen; null = Gruppe ausgeblendet. */
   team: TeamDaten | null
+  /**
+   * Benachrichtigungen (Nr. 193, N32): die Zustellung aus dem Postfach, fertig
+   * von der Seite gerendert (Empfänger und Regeln) — dieselben Teile wie vorher.
+   */
+  benachrichtigungen: ReactNode
 }
 
 /** Die Gruppen, die diese Person sieht — „Team“ nur für Inhaber (N35). */
@@ -100,8 +106,8 @@ function Plattform(): React.JSX.Element {
  * zum Aufklappen verschwindet, der Titel steht dann in der Karte.
  *
  * Plattform nur lesend (in diesem Lauf keine neuen Felder): Name und Adresse
- * aus MARKE und PRODUKTION_HOST. Die Gruppe „Benachrichtigungen" des Mockups
- * gibt es nicht — das ist Postfach › Zustellung (Nr. 95); die Gruppe „Betrieb"
+ * aus MARKE und PRODUKTION_HOST. Die Gruppe „Benachrichtigungen" ist seit
+ * Nr. 193 (N32) die frühere Zustellung aus dem Postfach; die Gruppe „Betrieb"
  * entfiel mit Nr. 103 (Register N15 geändert) — der Stripe-Modus steht in
  * Admin › Betrieb.
  */
@@ -109,6 +115,7 @@ export function EinstellungenGruppen({ daten }: { daten: EinstellungenDaten }): 
   const zeileHandy: Record<EinstellungenGruppe, string> = {
     gruendung: daten.gruendungZeile,
     team: EINSTELLUNGEN_TEXT.gruppe.team.zeile,
+    benachrichtigungen: EINSTELLUNGEN_TEXT.gruppe.benachrichtigungen.zeile,
     plattform: `${PLATTFORM_ANGABEN.name} · ${PLATTFORM_ANGABEN.adresse}`,
     anmeldung: EINSTELLUNGEN_TEXT.gruppe.anmeldung.zeile,
   }
@@ -154,6 +161,7 @@ export function EinstellungenGruppen({ daten }: { daten: EinstellungenDaten }): 
                     </>
                   )}
                   {gruppe === 'team' && daten.team && <EinstellungenTeam daten={daten.team} />}
+                  {gruppe === 'benachrichtigungen' && daten.benachrichtigungen}
                   {gruppe === 'plattform' && <Plattform />}
                   {/* Anmeldung (Register N20) hat eine eigene Seite — hier nur der Weg dorthin. */}
                   {gruppe === 'anmeldung' && (

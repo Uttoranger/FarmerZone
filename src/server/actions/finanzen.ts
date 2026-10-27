@@ -56,7 +56,7 @@ function alsDecimal(betragEuro: number): Prisma.Decimal {
 }
 
 function revalidate(): void {
-  revalidatePath('/admin/finanzen')
+  // /admin/finanzen leitet seit Nr. 191 nur noch um (308) — neu gebaut wird Geld.
   revalidatePath('/admin/geld')
 }
 

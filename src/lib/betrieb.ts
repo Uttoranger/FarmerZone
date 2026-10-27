@@ -983,6 +983,9 @@ export const ALARM_MATRIX: readonly AlarmZeile[] = [
 export const ADMIN_BETRIEB_HREF = '/admin/betrieb'
 /** Unterreiter „E-Mails“ (Nr. 161). */
 export const ADMIN_BETRIEB_MAILS_HREF = '/admin/betrieb?reiter=mails'
+/** Unterreiter „Protokoll“ und „Version“ (Nr. 193, N32/N33). */
+export const ADMIN_BETRIEB_PROTOKOLL_HREF = '/admin/betrieb?reiter=protokoll'
+export const ADMIN_BETRIEB_VERSION_HREF = '/admin/betrieb?reiter=version'
 export const BETRIEB_EXPORT_HREF = '/admin/betrieb/export'
 /** „Liste als CSV“ der Bilder ohne Verwendung (Nr. 104). */
 export const BILDER_EXPORT_HREF = '/admin/betrieb/bilder-export'
@@ -993,7 +996,6 @@ export const OHNE_VERWENDUNG_ANKER = { breit: 'ohne-verwendung', handy: 'ohne-ve
 export const BETRIEB_TEXT = {
   titel: 'Betrieb',
   /** Rechts in der Betriebsleiste der AdminShell, solange eine Warnung offen ist (Register N15). */
-  leiste: (hinweis: string): string => `${hinweis} – ansehen`,
   satz: `Was ${MARKE} im Hintergrund braucht – jeden Morgen gemessen. Ab 80 % kommt eine Warn-Mail.`,
   vorschauUmgebung: 'Vorschau: Bilder gemeinsam mit der Produktion gemessen; Abläufe laufen nur in der Produktion',
   jetztMessen: 'Jetzt messen',
@@ -1075,6 +1077,10 @@ export const BETRIEB_TEXT = {
   reiter: 'Ansicht von Betrieb',
   reiterUeberblick: 'Überblick',
   reiterMails: 'E-Mails',
+  reiterProtokoll: 'Protokoll',
+  reiterVersion: 'Version',
+  /** Die Warnkarte im Überblick verweist auf Heute (N32, Nr. 193): Dort steht jede Aufgabe mit Frist. */
+  warnungInHeute: 'In Heute ansehen',
   mailWarnungSiehe: 'Die Einzelheiten stehen unter E-Mails.',
 } as const
 

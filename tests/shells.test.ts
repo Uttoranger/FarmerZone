@@ -380,10 +380,26 @@ describe('KundeShell', () => {
 describe('AdminShell', () => {
   function admin(hatHof: boolean): string {
     pfad.aktuell = '/admin/meldungen/abc'
-    return renderToStaticMarkup(el(AdminShell, { personName: 'Max Mustermann', hatHof, zahlen: { hoefe: 2, briefkasten: 3 } }))
+    return renderToStaticMarkup(el(AdminShell, { personName: 'Max Mustermann', hatHof, zahlen: { heute: 4, hoefe: 2, postfach: 3 }, reiter: ADMIN_REITER.map((r) => r.id) }))
   }
 
-  it('Reiter Höfe · Postfach · Startseite · Finanzen · Einstellungen mit Zählern, „Zu meinem Hof", keine Hof-Seitenleiste', () => {
+  it('am Handy die Leiste unten: Heute · Höfe · Bestellungen · Postfach und „Mehr“ (N32, Nr. 193)', () => {
+    const html = admin(true)
+    const leiste = abschnitt(html, '<nav aria-label="Admin-Bereiche" data-slot="bottom-nav"', '</nav>')
+    expect([...leiste.matchAll(/<a href="([^"]+)"/g)].map((t) => t[1])).toEqual(['/admin', '/admin/hoefe', '/admin/bestellungen', '/admin/postfach'])
+    expect(leiste).toContain('>Mehr<')
+    expect(leiste).toContain('4 Aufgaben offen in Heute')
+  })
+
+  it('ein Reiter ohne Recht fehlt in Kopf und Leiste (N35) — Gegenprobe mit dem Recht', () => {
+    pfad.aktuell = '/admin'
+    const ohne = renderToStaticMarkup(el(AdminShell, { personName: 'Max Mustermann', hatHof: false, reiter: ['heute', 'hoefe', 'bestellungen', 'postfach', 'startseite', 'betrieb', 'einstellungen'] }))
+    expect(ohne).not.toContain('href="/admin/geld"')
+    const mit = renderToStaticMarkup(el(AdminShell, { personName: 'Max Mustermann', hatHof: false, reiter: ADMIN_REITER.map((r) => r.id) }))
+    expect(mit).toContain('href="/admin/geld"')
+  })
+
+  it('Reiter Heute · Höfe · Bestellungen · Postfach · Startseite · Geld · Betrieb · Einstellungen mit Zählern, „Zu meinem Hof", keine Hof-Seitenleiste (N32)', () => {
     const html = admin(true)
     const reiter = abschnitt(html, '<nav aria-label="Admin-Bereiche"', '</nav>')
     expect([...reiter.matchAll(/<a href="([^"]+)"/g)].map((t) => t[1])).toEqual(ADMIN_REITER.map((r) => r.href))

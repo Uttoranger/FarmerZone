@@ -39,7 +39,8 @@ const REITER_LABEL: Record<FinanzenReiterId, string> = {
 export function finanzenAdresse(ansicht: { monat: Monatsschluessel; reiter: FinanzenReiterId }): string {
   const parameter = new URLSearchParams({ monat: ansicht.monat })
   if (ansicht.reiter !== FINANZEN_REITER_STANDARD) parameter.set('reiter', ansicht.reiter)
-  return `/admin/finanzen?${parameter.toString()}`
+  // Seit Nr. 193 direkt auf Geld (N32) — /admin/finanzen leitet nur noch um.
+  return `/admin/geld?${parameter.toString()}`
 }
 
 /** Der Name eines Reiters — Titel des Leerzustands, wenn er keinen Inhalt hat. */

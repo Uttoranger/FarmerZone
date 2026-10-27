@@ -51,20 +51,23 @@ export const ADMIN_POSTFACH_HREF = '/admin/postfach'
 
 /**
  * Die Reiter des Admin-Postfachs (Register N12-Änderung, N14; Nr. 95, seit
- * Nr. 101 mit „Meldungen"): Eingang · Meldungen · Rundschreiben · Zustellung
- * — nur der Eingang trägt eine Zahl. Gewählt wird über ?reiter= — die
+ * Nr. 101 mit „Meldungen"): Eingang · Meldungen · Rundschreiben — nur der
+ * Eingang trägt eine Zahl. Die Zustellung steht seit Nr. 193 (N32) unter
+ * Einstellungen › Benachrichtigungen; der alte Link leitet um. Gewählt wird über ?reiter= — die
  * Adresse ist Fremddaten, gelesen mit Zod (`adminPostfachReiterAus` in
  * src/schemas/postfach.ts): Unbekanntes heißt „Eingang".
  */
-export const ADMIN_POSTFACH_REITER_IDS = ['eingang', 'meldungen', 'rundschreiben', 'zustellung'] as const
+export const ADMIN_POSTFACH_REITER_IDS = ['eingang', 'meldungen', 'rundschreiben'] as const
 export type AdminPostfachReiter = (typeof ADMIN_POSTFACH_REITER_IDS)[number]
 
 export const ADMIN_POSTFACH_REITER: readonly { id: AdminPostfachReiter; label: string }[] = [
   { id: 'eingang', label: 'Eingang' },
   { id: 'meldungen', label: 'Meldungen' },
   { id: 'rundschreiben', label: 'Rundschreiben' },
-  { id: 'zustellung', label: 'Zustellung' },
 ]
+
+/** Wohin die Zustellung gezogen ist (N32, Nr. 193): Einstellungen › Benachrichtigungen — dieselben Teile. */
+export const ADMIN_BENACHRICHTIGUNGEN_HREF = '/admin/einstellungen?gruppe=benachrichtigungen'
 
 /** Ein Link in das Admin-Postfach: Ort, Reiter (ohne Parameter für den Eingang) und weitere Parameter. */
 export function adminPostfachAdresse(reiter: AdminPostfachReiter, weitere: Record<string, string | undefined> = {}): string {
@@ -77,19 +80,26 @@ export function adminPostfachAdresse(reiter: AdminPostfachReiter, weitere: Recor
 
 // ─── Eingang: Filter und Auswahl ─────────────────────────────────────────────
 
-/** Die Filterchips des Eingangs (N12-Änderung): Offen · Antwort · Meldung · Aufgabe · Alle. */
-export const EINGANG_FILTER_IDS = ['offen', 'antwort', 'meldung', 'aufgabe', 'alle'] as const
+/**
+ * Die Filterchips des Eingangs (N12-Änderung): Offen · Antwort · Meldung · Alle.
+ * Der Filter „Aufgabe“ entfiel mit Nr. 193 (N32): Das Postfach enthält nur
+ * Gespräche, Aufgaben stehen in Heute. Ein alter Link `?art=aufgabe` zeigt „Offen“.
+ */
+export const EINGANG_FILTER_IDS = ['offen', 'antwort', 'meldung', 'alle'] as const
 export type EingangFilter = (typeof EINGANG_FILTER_IDS)[number]
 
 export const EINGANG_FILTER_LABEL: Record<EingangFilter, string> = {
   offen: 'Offen',
   antwort: 'Antwort',
   meldung: 'Meldung',
-  aufgabe: 'Aufgabe',
   alle: 'Alle',
 }
 
-/** Was ein Eintrag ist: eine Antwort, eine Meldung oder eine der zwei Aufgaben (Hof wartet, Erstattung offen). */
+/**
+ * Was in `?id=` stehen kann: eine Antwort oder eine Meldung — dazu die zwei
+ * Aufgaben von früher (Hof wartet, Erstattung offen), nur damit ein alter
+ * Link sie erkennt und umleitet (Nr. 193: Akte bzw. Bestellungen).
+ */
 export const EINGANG_ARTEN = ['antwort', 'meldung', 'hof', 'erstattung'] as const
 export type EingangArt = (typeof EINGANG_ARTEN)[number]
 
@@ -118,6 +128,8 @@ export function eingangMeldungAdresse(meldungId: string): string {
  */
 export function alteReiterAdresse(reiter: string | undefined, faden: string | undefined): string | null {
   if (reiter === 'unterhaltungen') return eingangAdresse('antwort', faden ? { art: 'antwort', id: faden } : null)
+  // Seit Nr. 193 (N32): Die Zustellung steht unter Einstellungen › Benachrichtigungen.
+  if (reiter === 'zustellung') return ADMIN_BENACHRICHTIGUNGEN_HREF
   return null
 }
 
@@ -698,8 +710,6 @@ export type ErstattungAufgabeRoh = {
 export type EingangRoh = {
   antworten: readonly EingangAntwortRoh[]
   meldungen: readonly EingangMeldungRoh[]
-  hoefe: readonly HofAufgabeRoh[]
-  erstattungen: readonly ErstattungAufgabeRoh[]
 }
 
 /** Eine Zeile der Liste — fertig für die Anzeige, ohne Datenbank-Typen. */
@@ -732,7 +742,8 @@ export const EINGANG_TEXT = {
   erstattungTitel: 'Erstattung offen',
   bestellung: (nummer: string) => `Bestellung ${nummer}`,
   offenSr: 'offen',
-  regel: 'Aufgaben sind keine eigenen Einträge: Sie verschwinden von selbst, sobald der Hof entschieden oder die Erstattung durch ist. Antworten gelten als erledigt, sobald du sie gelesen hast.',
+  /** Regel-Zeile (Mockup admin-postfach-gespraeche, Nr. 193). */
+  regel: 'Im Postfach stehen nur noch Gespräche. Aufgaben (Hof wartet, Erstattung offen) stehen in Heute; wer Mails des Betriebs bekommt, steht in Einstellungen › Benachrichtigungen. Antworten gelten als erledigt, sobald du sie gelesen hast.',
   offenTitel: 'Offen im Eingang',
   offenTitelKurz: 'Offen',
   geldTitel: 'Davon Geld',
@@ -774,11 +785,10 @@ export const EINGANG_TEXT = {
 
 /** Leerzustände je Filter (Register N9) — der Ausweg steht im Aufruf. */
 export const EINGANG_LEER: Record<EingangFilter, { titel: string; satz: string }> = {
-  offen: { titel: 'Nichts offen', satz: 'Neue Antworten der Höfe, neue Meldungen und Aufgaben erscheinen hier.' },
+  offen: { titel: 'Nichts offen', satz: 'Neue Antworten der Höfe und neue Meldungen erscheinen hier. Aufgaben stehen in Heute.' },
   antwort: { titel: 'Bisher keine Antwort von einem Hof', satz: 'Antwortet ein Hof auf ein Rundschreiben, steht die Unterhaltung hier.' },
   meldung: { titel: 'Bisher keine Meldung', satz: `Was Höfe und Kundinnen über „${PROBLEM_MELDEN}“ schicken, steht hier.` },
-  aufgabe: { titel: 'Keine Aufgabe offen', satz: 'Wartet ein Hof auf die Freischaltung oder steht eine Erstattung aus, steht es hier.' },
-  alle: { titel: 'Der Eingang ist leer', satz: 'Antworten, Meldungen und Aufgaben erscheinen hier, sobald es welche gibt.' },
+  alle: { titel: 'Der Eingang ist leer', satz: 'Antworten und Meldungen erscheinen hier, sobald es welche gibt.' },
 }
 
 function zahlWort(anzahl: number, eins: string, viele: string): string {
@@ -792,43 +802,22 @@ export function offenGesamt(z: EingangZahlen): number {
   return z.antworten + z.meldungen + z.hoefe + z.erstattungen
 }
 
+/**
+ * Was im Postfach offen ist (N32, Nr. 193): nur Gespräche — ungelesene
+ * Antworten und Meldungen NEU/GEPRUEFT. Die Zahl am Reiter „Postfach“ und am
+ * Unterreiter „Eingang“; Höfe und Erstattungen zählt Heute.
+ */
+export function offenImGespraech(z: Pick<EingangZahlen, 'antworten' | 'meldungen'>): number {
+  return z.antworten + z.meldungen
+}
+
 /** „2 Antworten · 1 Meldung · 2 Aufgaben" — die Zeile unter „Offen im Eingang". */
 export function offenSatz(z: EingangZahlen): string {
   if (offenGesamt(z) === 0) return 'nichts offen'
   return [zahlWort(z.antworten, 'Antwort', 'Antworten'), zahlWort(z.meldungen, 'Meldung', 'Meldungen'), zahlWort(z.hoefe + z.erstattungen, 'Aufgabe', 'Aufgaben')].join(' · ')
 }
 
-/** Die Zeile unter „Davon Geld": mit genau einer offenen Erstattung ihr Betrag — summiert wird nichts. */
-export function geldSatz(erstattungen: readonly ErstattungAufgabeRoh[]): string {
-  if (erstattungen.length === 0) return 'keine Erstattung offen'
-  const [einzige] = erstattungen
-  if (erstattungen.length === 1 && einzige.bezahltCents !== null) return `Erstattung offen, ${formatEuro(centsAlsEuro(einzige.bezahltCents))}`
-  return zahlWort(erstattungen.length, 'Erstattung offen', 'Erstattungen offen')
-}
-
-/**
- * Die Kennzahlen des Postfachs (Seitenmuster N15, Mockup admin-postfach):
- * Offen im Eingang · Davon Geld · Rundschreiben diesen Monat. Ein Ton nur bei
- * Handlungsbedarf. Ohne „Antwortzeit" — sie steht weder in der Freigabe noch
- * im Register (Bericht 95).
- */
-export function postfachKennzahlen(stand: { zahlen: EingangZahlen; erstattungen: readonly ErstattungAufgabeRoh[]; rundschreibenImMonat: number }): KennzahlDaten[] {
-  const offen = offenGesamt(stand.zahlen)
-  return [
-    { id: 'offen', titel: EINGANG_TEXT.offenTitel, titelKurz: EINGANG_TEXT.offenTitelKurz, wert: String(offen), satz: offenSatz(stand.zahlen), ton: offen > 0 ? 'tun' : 'neutral' },
-    {
-      id: 'geld',
-      titel: EINGANG_TEXT.geldTitel,
-      titelKurz: EINGANG_TEXT.geldTitelKurz,
-      wert: String(stand.zahlen.erstattungen),
-      satz: geldSatz(stand.erstattungen),
-      ton: stand.zahlen.erstattungen > 0 ? 'tun' : 'neutral',
-    },
-    { id: 'rundschreiben', titel: EINGANG_TEXT.rundschreibenTitel, wert: String(stand.rundschreibenImMonat), satz: EINGANG_TEXT.rundschreibenSatz, ton: 'neutral' },
-  ]
-}
-
-/** Die Unterreiter des Postfachs (Eingang mit der Zahl „Offen", Rundschreiben, Zustellung) — echte Links mit ?reiter=. */
+/** Die Unterreiter des Postfachs (Eingang mit der Zahl „Offen", Meldungen, Rundschreiben) — echte Links mit ?reiter=. */
 export function postfachUnterreiter(offen: number | null): UnterreiterDaten[] {
   return ADMIN_POSTFACH_REITER.map((r) => ({
     id: r.id,
@@ -836,42 +825,6 @@ export function postfachUnterreiter(offen: number | null): UnterreiterDaten[] {
     href: adminPostfachAdresse(r.id),
     zahl: r.id === 'eingang' && offen !== null ? String(offen) : undefined,
   }))
-}
-
-/** „Hofseite 9 von 11 · Stripe und SEPA da – bekäme Gründungsplatz Nr. 8" (Mockup admin-postfach). */
-export function hofAufgabeZeile(h: HofAufgabeRoh): string {
-  const zahlung = h.stripeBereit ? (h.sepaErteilt ? 'Stripe und SEPA da' : 'Stripe da, SEPA fehlt') : 'Stripe fehlt'
-  const platz = wartelistePlatzZeile(h, h.platz)
-  return `Hofseite ${h.hofseite.erledigt} von ${h.hofseite.gesamt} · ${zahlung}${platz ? ` – ${platz.text}` : ''}`
-}
-
-export type PruefPunkt = { schluessel: string; text: string; erledigt: boolean }
-
-/**
- * Die Prüfliste eines wartenden Hofs (Freigabe §18: Hofseite-Fortschritt,
- * Stripe, SEPA, LFBIS, Titelbild, E-Mail bestätigt) — nur aus vorhandenen
- * Feldern. Die LFBIS-Zeile steht nur bei Futtermitteln im Shop. Ein Konto von
- * vor der Bestätigungspflicht (S3) gilt beim Freischalten als frei.
- */
-export function hofPruefliste(h: HofAufgabeRoh): PruefPunkt[] {
-  const punkte: PruefPunkt[] = [
-    { schluessel: 'hofseite', text: `Hofseite ${h.hofseite.erledigt} von ${h.hofseite.gesamt} ausgefüllt`, erledigt: h.hofseite.erledigt >= h.hofseite.gesamt },
-    { schluessel: 'stripe', text: h.stripeBereit ? 'Stripe eingerichtet' : 'Stripe fehlt – ohne Stripe kein Freischalten', erledigt: h.stripeBereit },
-    { schluessel: 'sepa', text: h.sepaErteilt ? 'SEPA-Mandat erteilt' : 'SEPA-Mandat fehlt', erledigt: h.sepaErteilt },
-  ]
-  if (h.futter) punkte.push({ schluessel: 'lfbis', text: h.lfbis ? 'Futtermittel: LFBIS-Nummer angegeben' : 'Futtermittel ohne LFBIS-Nummer', erledigt: h.lfbis })
-  punkte.push({ schluessel: 'titelbild', text: h.titelbild ? 'Titelbild hochgeladen' : 'Kein eigenes Titelbild', erledigt: h.titelbild })
-  punkte.push({
-    schluessel: 'email',
-    text: h.email === 'bestaetigt' ? 'E-Mail bestätigt' : h.email === 'offen' ? 'E-Mail noch nicht bestätigt – ohne sie kein Freischalten' : 'E-Mail: Konto von vor der Bestätigungspflicht',
-    erledigt: h.email !== 'offen',
-  })
-  return punkte
-}
-
-/** „Hof Muster · online bezahlt € 23,40 – Erstattung steht aus". */
-export function erstattungZeile(e: ErstattungAufgabeRoh): string {
-  return e.bezahltCents === null ? `${e.hofName} · Erstattung steht aus` : `${e.hofName} · online bezahlt ${formatEuro(centsAlsEuro(e.bezahltCents))} – Erstattung steht aus`
 }
 
 /**
@@ -910,48 +863,22 @@ function meldungEintrag(m: EingangMeldungRoh): EingangEintrag {
   }
 }
 
-function hofEintrag(h: HofAufgabeRoh): EingangEintrag {
-  return {
-    auswahl: { art: 'hof', id: h.id },
-    marke: EINGANG_TEXT.aufgabe,
-    markeArt: 'tun',
-    wer: h.name,
-    zeit: h.createdAt,
-    titel: EINGANG_TEXT.hofWartetTitel,
-    zeile: hofAufgabeZeile(h),
-    offen: true,
-  }
-}
-
-function erstattungEintrag(e: ErstattungAufgabeRoh): EingangEintrag {
-  return {
-    auswahl: { art: 'erstattung', id: e.id },
-    marke: EINGANG_TEXT.aufgabe,
-    markeArt: 'tun',
-    wer: EINGANG_TEXT.bestellung(e.bestellnummer),
-    zeit: e.seit,
-    titel: EINGANG_TEXT.erstattungTitel,
-    zeile: erstattungZeile(e),
-    offen: true,
-  }
-}
-
 function passt(e: EingangEintrag, filter: EingangFilter): boolean {
   if (filter === 'offen') return e.offen
   if (filter === 'antwort') return e.auswahl.art === 'antwort'
   if (filter === 'meldung') return e.auswahl.art === 'meldung'
-  if (filter === 'aufgabe') return e.auswahl.art === 'hof' || e.auswahl.art === 'erstattung'
   return true
 }
 
 /**
- * Der Eingang als EINE Liste (N12-Änderung): Antworten, Meldungen und
- * Aufgaben gemischt, neueste zuerst, nach Filter. „Offen" = ungelesene
- * Antworten, Meldungen NEU/GEPRUEFT und jede Aufgabe (Aufgaben sind offen,
- * solange es sie gibt). Gleiche Zeit: feste Reihenfolge über die Kennung.
+ * Der Eingang als EINE Liste (N12-Änderung, seit Nr. 193 nur Gespräche):
+ * Antworten und Meldungen gemischt, neueste zuerst, nach Filter. „Offen" =
+ * ungelesene Antworten und Meldungen NEU/GEPRUEFT. Aufgaben (Hof wartet,
+ * Erstattung offen) stehen in Heute (N32). Gleiche Zeit: feste Reihenfolge
+ * über die Kennung.
  */
 export function eingangEintraege(roh: EingangRoh, filter: EingangFilter): EingangEintrag[] {
-  return [...roh.antworten.map(antwortEintrag), ...roh.meldungen.map(meldungEintrag), ...roh.hoefe.map(hofEintrag), ...roh.erstattungen.map(erstattungEintrag)]
+  return [...roh.antworten.map(antwortEintrag), ...roh.meldungen.map(meldungEintrag)]
     .filter((e) => passt(e, filter))
     .sort((a, b) => b.zeit.getTime() - a.zeit.getTime() || eingangKennung(a.auswahl).localeCompare(eingangKennung(b.auswahl)))
 }
@@ -959,8 +886,8 @@ export function eingangEintraege(roh: EingangRoh, filter: EingangFilter): Eingan
 /** Sätze des Admin-Postfachs — EINE Quelle für die drei Reiter und das Formular. */
 export const ADMIN_POSTFACH_TEXT = {
   titel: 'Postfach',
-  /** EIN Satz für alle vier Reiter (Register N14, Ergänzung; Nr. 105; Mockup admin-postfach-ruhig) — Kopf und Reiter stehen still. */
-  satz: 'Was dich braucht, der Weg jeder Meldung, Rundschreiben an die Höfe und wer welche Mails bekommt.',
+  /** EIN Satz für alle Reiter (Register N14, Ergänzung; Nr. 105; seit Nr. 193 nach dem Mockup admin-postfach-gespraeche) — Kopf und Reiter stehen still. */
+  satz: 'Gespräche mit Höfen, Meldungen und Rundschreiben.',
   neuesRundschreiben: 'Neues Rundschreiben',
   rundschreibenHinweis: 'Ein Rundschreiben landet bei jedem Empfänger als Nachricht vom Team im Postfach; Antworten kommen im Eingang zu dir.',
   antwortAuf: 'Antwort auf',
@@ -1010,7 +937,6 @@ export const ADMIN_POSTFACH_TEXT = {
     eingang: 'Wir konnten den Eingang gerade nicht laden.',
     meldungen: 'Wir konnten die Meldungen gerade nicht laden.',
     rundschreiben: 'Wir konnten die Rundschreiben gerade nicht laden.',
-    zustellung: 'Wir konnten die Zustellung gerade nicht laden.',
   } satisfies Record<AdminPostfachReiter, string>,
 } as const
 

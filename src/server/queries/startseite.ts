@@ -123,6 +123,17 @@ export async function naechsterTermin(jetzt: Date): Promise<Date | null> {
   return naechste?.liveAb ?? null
 }
 
+/**
+ * Ging in den letzten `fensterMs` eine Fassung live (Nr. 193)? Eine billige
+ * Zählung über den Index auf `liveAb` — der Mail-Cron fragt das jede Minute
+ * und baut die Startseite dann neu (revalidatePath), damit eine geplante
+ * Fassung pünktlich live ist und nicht erst nach bis zu 5 Minuten.
+ */
+export async function fassungFaelligSeit(jetzt: Date, fensterMs: number): Promise<boolean> {
+  const anzahl = await prisma.startseiteFassung.count({ where: { liveAb: { gt: new Date(jetzt.getTime() - fensterMs), lte: jetzt }, zurueckgezogenAm: null } })
+  return anzahl > 0
+}
+
 export type LiveStand = { zeilen: StartseitenZeile[]; naechsteAb: string | null }
 
 /** Live zu `jetzt`, frisch an der Datenbank — samt dem Termin der nächsten Planung für den Cache. */

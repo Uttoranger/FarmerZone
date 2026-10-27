@@ -150,7 +150,7 @@ describe('kostenpostenAnlegen', () => {
 
   it('räumt die Seite auf, damit die neue Zeile sofort steht', async () => {
     await kostenpostenAnlegen(GUELTIG)
-    expect(revalidatePath).toHaveBeenCalledWith('/admin/finanzen')
+    expect(revalidatePath).toHaveBeenCalledWith('/admin/geld')
   })
 
   it.each([
@@ -249,7 +249,7 @@ describe('kostenpostenLoeschen', () => {
   it('löscht den Posten', async () => {
     expect(await kostenpostenLoeschen({ id: 'k1' })).toEqual({ ok: true })
     expect(deleteMany).toHaveBeenCalledWith({ where: { id: 'k1' } })
-    expect(revalidatePath).toHaveBeenCalledWith('/admin/finanzen')
+    expect(revalidatePath).toHaveBeenCalledWith('/admin/geld')
   })
 
   it('meldet einen Posten, den es nicht mehr gibt', async () => {
