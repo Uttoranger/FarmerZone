@@ -73,7 +73,8 @@ export function bestellstoppAus(zeile: {
   bestellstoppSatz: string | null
 }): BestellstoppStand | null {
   const { bestellstoppAb: ab, bestellstoppBis: bis, bestellstoppGrund: grund, bestellstoppSatz: satz } = zeile
-  if (ab === null || bis === null || satz === null || satz.trim() === '') return null
+  // Fehlt ein Feld ganz (eine Zeile, die nur andere Einstellungen trägt), gilt das wie leer.
+  if (!ab || !bis || !satz || satz.trim() === '') return null
   return { ab: ab.toISOString(), bis: bis.toISOString(), grund: grund ?? 'sonstiges', satz }
 }
 
