@@ -6,6 +6,8 @@ import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
 import { HOF_GESPERRT_SATZ, kaufSperre, kaufSperreHinweis } from '@/lib/bereiche-anzeige'
 import { alsAbholFenster, ausgebuchteTage } from '@/server/abholfenster'
+import { leseBestellstopp } from '@/server/queries/plattform-einstellung'
+import { bestellstoppAktiv } from '@/lib/notbremse'
 import {
   pruefeWarenkorb,
   befundMeldung,
@@ -60,16 +62,36 @@ export const HOF_KAUFBARKEIT_AUSWAHL = {
 
 export type HofZurKaufbarkeit = Prisma.FarmGetPayload<{ select: typeof HOF_KAUFBARKEIT_AUSWAHL }>
 
-export type HofSperrGrund = 'stillgelegt' | 'nicht-freigeschaltet' | 'admin-gesperrt' | 'pause' | 'keine-abholzeit' | 'ausgebucht'
+export type HofSperrGrund = 'notbremse' | 'stillgelegt' | 'nicht-freigeschaltet' | 'admin-gesperrt' | 'pause' | 'keine-abholzeit' | 'ausgebucht'
+
+/** Der Code der 409-Antwort bei Notbremse — /api/warenkorb/pruefen und /api/checkout (Nr. 189). */
+export const BESTELLSTOPP_CODE = 'BESTELLSTOPP'
 
 /** Der Grund und der Satz, den die Kundin liest — dieselben Sätze wie bisher in /api/reserve. */
 export type HofSperre = { grund: HofSperrGrund; text: string }
+
+/**
+ * Die Notbremse (Register N34, Nr. 189) als Sperre: null, wenn sie gerade
+ * nicht gilt. Frisch gelesen (nie aus dem Cache) und mit `jetzt` entschieden —
+ * nach „bis“ ist sie aus, ohne dass jemand schreibt. Der Satz des Admins ist
+ * der Text an die Kundschaft. Ein Ladefehler wirft wie jede andere Abfrage
+ * der Kette (die Routen antworten dann mit ihrem Serverfehler).
+ *
+ * Die Kasse fragt sie selbst (/api/checkout prüft den Hof ohne diese Kette,
+ * eine Zeile vor der Stilllegung) — dieselbe Funktion, kein Nachbau.
+ */
+export async function pruefeBestellstopp(jetzt: Date): Promise<HofSperre | null> {
+  const stopp = bestellstoppAktiv(await leseBestellstopp(), jetzt)
+  return stopp ? { grund: 'notbremse', text: stopp.satz } : null
+}
 
 /**
  * Die Prüfkette für mehrere Höfe: je Hof der ERSTE Grund, aus dem man bei ihm
  * nicht kaufen kann; bestellbare Höfe fehlen in der Antwort.
  *
  * Reihenfolge (verbindlich, gleich für /api/reserve und /api/warenkorb/pruefen):
+ *  0. Notbremse — gilt für alle Höfe zugleich, darum vor allem anderen und
+ *     ohne weitere Abfrage (Nr. 189),
  *  1. Stilllegung — der dauerhafte Zustand sticht den vorübergehenden
  *     (src/lib/farm-archive.ts),
  *  2. Freischaltung — nach der Stilllegung, vor der Pause (src/lib/farm-approval.ts),
@@ -89,6 +111,12 @@ export async function pruefeKaufbarkeitHoefe(
   jetzt: Date
 ): Promise<Map<string, HofSperre>> {
   const sperren = new Map<string, HofSperre>()
+  if (hoefe.length === 0) return sperren
+  const stopp = await pruefeBestellstopp(jetzt)
+  if (stopp) {
+    for (const hof of hoefe) sperren.set(hof.id, stopp)
+    return sperren
+  }
   const offen: HofZurKaufbarkeit[] = []
   const gesehen = new Set<string>()
   for (const hof of hoefe) {

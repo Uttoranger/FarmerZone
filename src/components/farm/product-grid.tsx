@@ -18,6 +18,8 @@ import { VORSCHAU_KAUF_HINWEIS, korbErlaubt } from '@/lib/hofseite-vorschau'
 import { produktZustand, streifenText, type ProduktZustand } from '@/lib/produkt-sichtbarkeit'
 import { ImShopSchalter } from '@/components/products/im-shop-schalter'
 import { kartenZustand, kategorieAbschnitte, ruhenderKnopfText, zeigeKaufknopf, type KaufSperre } from '@/lib/bereiche-anzeige'
+import { sperreMitBestellstopp } from '@/lib/notbremse'
+import { useBestellstopp } from '@/components/notbremse-band'
 import { SCHAUFENSTER_PRODUKTE, oeffnetKorbHier, stehtNurAmHandy, uebersichtProdukte } from '@/lib/hofseite-kunde'
 import { BESTAETIGUNG_MS, RUECKGAENGIG, blattBeimErstenMal, imKorbText, korbFehlerText } from '@/lib/hofseite-orientierung'
 import { NETZ_KNOPF } from '@/lib/netz'
@@ -525,7 +527,7 @@ export function ProductGrid({
   initialReorderItems,
   ownerMode = false,
   mode = 'preview',
-  sperre = null,
+  sperre: sperreDesHofs = null,
   hofName,
   pauseMessage,
   onVorschau,
@@ -541,6 +543,9 @@ export function ProductGrid({
   chipBlock,
 }: Props) {
   const isEditMode = ownerMode && mode !== 'preview'
+  // Notbremse (Register N34, Nr. 189): Kaufknöpfe und Nachbestell-Link ruhen wie
+  // bei einer Kaufsperre, der Korb bleibt; den Grund sagt das Band unter dem Kopf.
+  const sperre = sperreMitBestellstopp(sperreDesHofs, useBestellstopp())
   // EINE Regel für jeden Weg in den Korb (Kaufknopf, Nachbestell-Link,
   // #warenkorb-Anker, Korb-Knopf, Sheet) — src/lib/hofseite-vorschau.ts.
   const mitKorb = korbErlaubt({ isEditMode, kaufen })
@@ -1038,7 +1043,7 @@ export function ProductGrid({
           onRemoveItem={removeItem}
           gebuehrKorb={gebuehrKorb}
           futterHinweis={futterVerantwortungImKorb(items, products)}
-          kaufSperre={{ sperre, hofName, pauseMessage }}
+          kaufSperre={{ sperre: sperreDesHofs, hofName, pauseMessage }}
           hinweis={korbHinweis}
         />
       )}

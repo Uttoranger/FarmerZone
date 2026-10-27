@@ -25,6 +25,8 @@ vi.mock('@/lib/rate-limit', () => ({ enforceRateLimit: vi.fn(() => null) }))
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiFuerProdukte: vi.fn() }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    // Keine Notbremse (Nr. 189): die Zeile der Einstellung fehlt.
+    plattformEinstellung: { findUnique: vi.fn(async () => null) },
     product: { findMany: vi.fn() },
     stockReservation: { findMany: vi.fn(), upsert: vi.fn(), deleteMany: vi.fn() },
   },

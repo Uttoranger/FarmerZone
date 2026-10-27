@@ -6015,6 +6015,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **„Überfällig"** heißt hier: Meldungen, die länger als 14 Tage offen liegen (`liegenGeblieben`). Verfeinert Nr. 185 die Fristen der Aufgaben, folgt die Wochenlage ihnen.
 - **Nichts mehr offen heißt nicht mehr „keine Mail"** im Renderer; ob der Lauf die Mail dann einstellt, entscheidet weiter `api/cron/briefkasten` (Nacharbeit, siehe Bericht 192).
 
+## Notbremse „Bestellungen anhalten“ (Register N34; Nr. 189, Lauf 26, 26.10.2026)
+
+- **Warum:** Bei gestörten Zahlungen oder einem Fehler in der Kasse soll der Betreiber neue Bestellungen auf allen Höfen sofort anhalten können, ohne Deploy und ohne laufende Bestellungen anzufassen.
+- **Wie:** `halteBestellungenAn` (Grund aus der Liste, Satz für die Kundschaft, „bis“ Pflicht, höchstens 72 Stunden) und `gibBestellungenFrei` schreiben nur die vier Felder `bestellstopp*` der Plattform-Einstellung (Recht `notbremse`, frisch, Protokoll). Ob sie gilt, entscheidet die Uhr beim Lesen — nach „bis“ ist sie aus, ohne Cron.
+- **Durchgesetzt** in der Prüfkette als erste Bedingung (`pruefeBestellstopp`, frisch gelesen); die Kasse ruft dieselbe Funktion nach der Idempotenz-Antwort. Der Korb bleibt bei einer Notbremse, wie er ist (keine Halte gelöscht) — sie gilt nur kurz.
+- **Band:** Die Kundenseiten sind statisch bzw. gecacht; das Band holt sich den Stand nach dem Laden über `GET /api/notbremse` (eine Server Action ohne Sitzung ließe die Actions-Wache nicht zu). Durchgesetzt wird nie im Browser.
+- **Nachbau (nach 185, 186, 187 im Zwischenstand):** Heute zeigt „Notbremse aktiv“ ganz oben mit „Freigeben“ (Quelle `notbremse_aktiv`, Frist = „bis“) und „Bestellungen anhalten …“ mit Dialog bzw. Blatt nach dem Mockup. Die Hofseite sagt während der Notbremse in der Hofzeile „Bestellen geht gerade nicht“ statt „Nimmt Bestellungen an“, „Bestellen“ fehlt. Das Band hat die Gestalt der Netz-Zeile; Freigeben ohne Änderung leert den Cache nicht mehr.
+
 ## Admin › Heute (Register N32; Nr. 185, Lauf 26, 26.10.2026)
 
 - **Warum:** Im Regelbetrieb soll der Admin an EINER Stelle sehen, was ihn braucht — bisher verteilt auf Höfe, Postfach, Betrieb und die Betriebsleiste mit nur der ersten Warnung.

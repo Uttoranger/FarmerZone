@@ -25,6 +25,7 @@ import { HeuteBrauchtDich, type BrauchtDichEintrag } from '@/components/admin/he
 import { HeuteLage } from '@/components/admin/heute-lage'
 import { HeuteKommt, HeuteLaeuft, HeuteProtokoll } from '@/components/admin/heute-karten'
 import { HeuteRoutine } from '@/components/admin/heute-routine'
+import { NotbremseAnhalten } from '@/components/admin/heute-notbremse'
 import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = { title: `Admin — ${MARKE}` }
@@ -41,7 +42,9 @@ export const dynamic = 'force-dynamic'
  * Reihenfolge: Im Dokument steht „Braucht dich“ zuerst (am Handy oben, für
  * Tastatur und Screenreader zuerst); ab 1024 px zieht die Lage darüber.
  * Die Kacheln enthalten nichts zum Anklicken, die Tab-Folge bleibt also
- * gleich. „Bestellungen anhalten …“ kommt mit Nr. 189 (Notbremse).
+ * gleich. „Bestellungen anhalten …“ (Nr. 189): ab 768 px im Kopf neben dem
+ * Stand, am Handy als Karte „Notfall“ ganz unten (Mockups admin-heute,
+ * mobil-admin-heute); die Aufgabe „Notbremse aktiv“ steht dann ganz oben.
  */
 export default async function AdminHeutePage({
   searchParams,
@@ -121,7 +124,16 @@ export default async function AdminHeutePage({
 
   return (
     <div className={`${ADMIN_RAHMEN} flex flex-col gap-4 md:gap-5`}>
-      <Seitenkopf titel={HEUTE_TEXT.titel} satz={HEUTE_TEXT.satz} rechts={<span className="text-[13px] text-muted-foreground">{HEUTE_TEXT.stand(jetzt)}</span>} />
+      <Seitenkopf
+        titel={HEUTE_TEXT.titel}
+        satz={HEUTE_TEXT.satz}
+        rechts={
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-[13px] text-muted-foreground">{HEUTE_TEXT.stand(jetzt)}</span>
+            <NotbremseAnhalten art="kopf" className="hidden md:inline-flex" />
+          </div>
+        }
+      />
 
       <div className="flex flex-col gap-4 md:gap-5">
         <div className="grid grid-cols-1 gap-4 md:gap-5 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
@@ -158,6 +170,7 @@ export default async function AdminHeutePage({
             {protokollInhalt}
           </Klappkarte>
         </div>
+        <NotbremseAnhalten art="karte" className="md:hidden" />
       </div>
     </div>
   )

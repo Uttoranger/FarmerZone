@@ -28,6 +28,8 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    // Keine Notbremse (Nr. 189): die Zeile der Einstellung fehlt.
+    plattformEinstellung: { findUnique: vi.fn(async () => null) },
     $queryRaw: vi.fn(),
     stockReservation: { deleteMany: vi.fn(), aggregate: vi.fn(), upsert: vi.fn() },
     product: { findUnique: vi.fn() },

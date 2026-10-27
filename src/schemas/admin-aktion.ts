@@ -63,6 +63,9 @@ export const ADMIN_AKTIONEN = [
   'startseite_veroeffentlicht',
   'startseite_zurueckgezogen',
   'startseite_uebernommen',
+  // Notbremse (Recht notbremse, Nr. 189)
+  'bestellungen_angehalten',
+  'bestellungen_freigegeben',
   // Eigener Zugang (Inhaber: Notfallzugang)
   'ersatzcodes_erstellt',
   'passkey_entfernt',

@@ -8,6 +8,7 @@ import {
   loescheHalte,
   loescheHalteBeiHoefen,
   hofSperrenFuerProdukte,
+  BESTELLSTOPP_CODE,
 } from '@/server/warenkorb'
 import { MAX_MENGE } from '@/lib/reservierung'
 import { gibVerwaisteFreiFuerProdukte } from '@/server/verwaiste-bestellungen'
@@ -21,7 +22,7 @@ import { gibVerwaisteFreiFuerProdukte } from '@/server/verwaiste-bestellungen'
  * keine Bestellung an, ändert keinen Bestand und fasst keine fremde Sitzung an.
  *
  * Die Höfe prüft sie mit derselben Kette wie /api/reserve (Nr. 165, Register
- * N24): Stilllegung → Freischaltung → Pause → Kaufsperre. Besteht ein Hof
+ * N24): Notbremse → Stilllegung → Freischaltung → Pause → Kaufsperre. Besteht ein Hof
  * nicht, hält der Warenkorb bei ihm nichts mehr fest — sonst hielte ein Korb
  * aus der Zeit vor einer Pause die Ware weiter.
  *
@@ -75,6 +76,11 @@ export async function POST(request: NextRequest) {
     // Die Prüfkette je Hof nach der Fristfreigabe (wie /api/reserve): Positionen
     // eines gesperrten Hofs gelten im Abgleich als nicht möglich.
     const sperren = await hofSperrenFuerProdukte(items.map((i) => i.productId), jetzt)
+    // Notbremse (Register N34, Nr. 189): 409 mit dem Satz des Admins, und der
+    // Korb bleibt, wie er ist — keine Halte gelöscht, nichts entfernt. Sie
+    // gilt nur kurz; danach geht es mit demselben Korb weiter.
+    const stopp = [...sperren.values()].find((s) => s.grund === 'notbremse')
+    if (stopp) return NextResponse.json({ error: stopp.text, code: BESTELLSTOPP_CODE }, { status: 409 })
     const pruefung = await pruefeSitzungsWarenkorb(items, sessionId, jetzt, new Set(sperren.keys()))
     const { befund, berichtigt } = pruefung
     // Der Grund steht vorn, die Folge (entfernt, abgelaufen) dahinter — je Grund einmal.

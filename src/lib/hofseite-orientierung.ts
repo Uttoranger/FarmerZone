@@ -8,6 +8,7 @@ import { kaufSperreHinweis, type KaufSperre } from '@/lib/bereiche-anzeige'
 import { mengeAbgelehntText } from '@/lib/hofseite-kunde'
 import { NETZ_SATZ } from '@/lib/netz'
 import { SHOP_PAUSED_BUTTON_LABEL } from '@/lib/shop-pause'
+import { BESTELLSTOPP_TEXT } from '@/lib/notbremse'
 
 // ─── Der klebende Block unter dem Kopf (nur unter md) ───────────────────────
 
@@ -68,16 +69,17 @@ export const NIMMT_BESTELLUNGEN_AN = 'Nimmt Bestellungen an'
  * Hofseite (die Kaufsperre, Register N24, und deren Wortlaut aus
  * `kaufSperreHinweis` bzw. „Pausiert"). Nie die Pause selbst lesen.
  */
-export function hofZeileZustand(sperre: KaufSperre): string {
-  if (sperre === null) return NIMMT_BESTELLUNGEN_AN
+export function hofZeileZustand(sperre: KaufSperre, bestellstopp = false): string {
+  // Notbremse (Register N34, Nr. 189): Bestellen geht nirgends — aber eine Sperre des Hofs geht vor, sie bleibt danach.
+  if (sperre === null) return bestellstopp ? BESTELLSTOPP_TEXT.titel.replace(/\.$/, '') : NIMMT_BESTELLUNGEN_AN
   if (sperre === 'pause') return SHOP_PAUSED_BUTTON_LABEL
   // „Noch nicht bestellbar." → ohne Schlusspunkt: Die Zeile ist kein Satz.
   return kaufSperreHinweis(sperre, '').titel.replace(/\.$/, '')
 }
 
 /** „Musterort · Nimmt Bestellungen an" — ohne Ort nur der Zustand. */
-export function hofZeileUnterzeile(ort: string, sperre: KaufSperre): string {
-  const zustand = hofZeileZustand(sperre)
+export function hofZeileUnterzeile(ort: string, sperre: KaufSperre, bestellstopp = false): string {
+  const zustand = hofZeileZustand(sperre, bestellstopp)
   return ort.trim() ? `${ort.trim()} · ${zustand}` : zustand
 }
 

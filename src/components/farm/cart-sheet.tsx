@@ -20,6 +20,7 @@ import { RESERVIERUNG_MINUTEN } from '@/lib/kasse'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
+import { BestellstoppHinweis, useBestellstopp } from '@/components/notbremse-band'
 import { KORB_LEER, type CartItem } from '@/lib/use-cart'
 import { EmptyState } from '@/components/ui/empty-state'
 import { HOEFE_ENTDECKEN } from '@/lib/fehlerseite'
@@ -66,6 +67,10 @@ const LEER_WEG = cn('inline-flex min-h-11 items-center justify-center rounded-fu
  * Kaufen ist Grün (accent), Text und Symbole aus den Tokens.
  */
 export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHref, onUpdateQuantity, onRemoveItem, gebuehrKorb = null, futterHinweis = [], kaufSperre, hinweis = null }: Props) {
+  // Notbremse (Register N34, Nr. 189): wie eine Kaufsperre — Mengen ruhen, statt
+  // „Zur Kasse“ steht der Satz. Die Sperre des Hofs geht vor.
+  const stopp = useBestellstopp()
+  const ruht = kaufSperre.sperre !== null || stopp !== null
   // Zeilensummen in ganzen Cent auf dem Weg des Checkouts (korbBetraege, wie im Mini-Warenkorb),
   // nie price × Menge in Fließkomma — verbindlich rechnet der Checkout mit den Preisen aus der Datenbank.
   const { zeilenCents } = korbBetraege(items)
@@ -135,7 +140,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
                   {/* Mit Kaufsperre lehnt /api/reserve jede neue Menge ab (Nr. 145): Dann steht die Menge nur als
                       Zahl da, Entfernen bleibt — sonst brächte jeder Tipp auf „+“ oder „−“ eine Ablehnung. */}
                   {/* Menge: sichtbar kleine Kreise, Trefferfläche 44 px */}
-                  {kaufSperre.sperre !== null ? (
+                  {ruht ? (
                     <div className="flex h-11 items-center">
                       <span className="text-sm font-medium tabular-nums" aria-label={`Menge: ${item.quantity}`}>
                         {item.quantity}
@@ -203,6 +208,8 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
             {/* Mit Kaufsperre nimmt die Kasse nichts an — der Grund steht hier, nicht erst dort. */}
             {kaufSperre.sperre !== null ? (
               <KaufSperreHinweis {...kaufSperre} />
+            ) : stopp !== null ? (
+              <BestellstoppHinweis stopp={stopp} />
             ) : (
               <Link
                 href={kasseHref ?? `/${farmSlug}/checkout`}
