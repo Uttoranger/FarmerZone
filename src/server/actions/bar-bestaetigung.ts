@@ -95,6 +95,9 @@ async function leseBestellung(where: Prisma.OrderWhereInput) {
       items: {
         select: {
           productName: true, quantity: true, unitPrice: true, totalPrice: true,
+          // N38: die Gebühr der Zeile — ohne sie zeigt die Mail im Hofpreis-Modell
+          // Zeilen ohne Gebühr, aber ein Gesamt mit Gebühr.
+          gebuehrCents: true,
           // Einheit nur für die Anzeige in der Mail gejoint
           product: { select: { unit: true, unitSize: true } },
         },

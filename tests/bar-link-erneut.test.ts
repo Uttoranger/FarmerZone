@@ -24,6 +24,8 @@ vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: 
 vi.mock('@/server/unbezahlte-bestellung', () => ({ storniereUnbezahlteBestellung: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendOnsiteConfirmation: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
+// Die echte Mail-Vorlage (Hofpreis-Test unten) bindet server-only ein.
+vi.mock('server-only', () => ({}))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/nach-der-antwort', () => ({
   nachDerAntwort: (aufgabe: () => Promise<void>) => {
@@ -220,5 +222,46 @@ describe('sendeBarLinkErneut — keine Mail, gleiche Antwort', () => {
       tags: { aufgabe: 'bar-link-erneut' },
       extra: { orderId: 'order-1' },
     })
+  })
+})
+
+describe('sendeBarLinkErneut — Hofpreis-Modell (N38, Nr. 197 Nachbesserung)', () => {
+  /** Zwei Zeilen mit Gebühr im Snapshot — erfundene Beträge. Ware 7,50 €, Gebühr 0,54 €. */
+  const hofpreis = {
+    gebuehrModell: 'hofpreis',
+    gebuehrEinzug: 'monatsabrechnung',
+    totalAmount: 7.5,
+    serviceFeeCents: 54,
+    items: [
+      { productName: 'Freilandeier', quantity: 1, unitPrice: 4.5, totalPrice: 4.5, gebuehrCents: 32, product: { unit: 'STUECK', unitSize: null } },
+      { productName: 'Heumilch', quantity: 2, unitPrice: 1.5, totalPrice: 3, gebuehrCents: 22, product: { unit: 'LITER', unitSize: 1 } },
+    ],
+  }
+
+  it('liest die Gebühr je Zeile mit', async () => {
+    findFirst.mockResolvedValue(bestellung(hofpreis) as never)
+    await senden()
+
+    const abfrage = findFirst.mock.calls[0]![0] as { include: { items: { select: Record<string, unknown> } } }
+    expect(abfrage.include.items.select).toMatchObject({ gebuehrCents: true })
+  })
+
+  it('die erneut gesendete Mail: Summe der Zeilen = Gesamt', async () => {
+    findFirst.mockResolvedValue(bestellung(hofpreis) as never)
+    await senden()
+
+    const [mailBestellung, token] = mail.mock.calls[0]!
+    const echt = await vi.importActual<typeof import('@/lib/email')>('@/lib/email')
+    const { html } = await echt.onsiteConfirmationInhalt(mailBestellung, token)
+
+    const cents = (euro: string) => Number(euro.replace(',', ''))
+    // Zeilen mit Endpreis (Ware + Gebühr der Zeile), dann das Gesamt.
+    expect(html).toContain('€ 4,82')
+    expect(html).toContain('€ 3,22')
+    expect(html).toContain('€ 8,04')
+    const zeilen = ['4,82', '3,22'].map(cents).reduce((a, b) => a + b, 0)
+    expect(zeilen).toBe(cents('8,04'))
+    // Keine eigene Gebührenzeile — die Gebühr steckt im Preis.
+    expect(html).not.toContain('Servicegebühr')
   })
 })
