@@ -181,6 +181,8 @@ describe('Braucht dich: je Quelle da und wieder weg', () => {
     expect(a.frist.ueberfaellig).toBe(true)
     expect(fristText(a, JETZT)).toBe('überfällig · seit 2 Tagen')
     expect(a.bezug).toEqual({ kennung: 'HM-2610-B7C2', text: 'HM-2610-B7C2 · Hof am Bach · € 18,38' })
+    // Seit Nr. 193 (N32): „Außerhalb erstattet“ steht in Admin › Bestellungen, nicht mehr im Postfach.
+    expect(a.ziel).toBe('/admin/bestellungen?bestellung=bestellung-1')
   })
 
   it('Mail gescheitert: je Art EINE Aufgabe mit Zahl, Grund und „Was tun“ aus FEHLER_TEXTE', () => {

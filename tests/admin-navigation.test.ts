@@ -24,6 +24,7 @@ import {
   kontoHatHof,
   sichtbareReiter,
 } from '@/lib/admin-navigation'
+import { PR_BASIS_URL } from '@/lib/meldung'
 
 describe('Admin-Reiter', () => {
   it('Heute · Höfe · Bestellungen · Postfach · Startseite · Geld · Betrieb · Einstellungen, Zahlen an Heute, Höfe und Postfach, der Punkt nur an Betrieb', () => {
@@ -61,7 +62,9 @@ describe('Admin-Reiter', () => {
   it('am Handy stehen genau vier Reiter in der Leiste, dazu „Mehr“ — im Blatt je eine Zeile', () => {
     expect(ADMIN_REITER.filter((r) => r.amHandy === 'leiste')).toHaveLength(4)
     for (const r of ADMIN_REITER.filter((r) => r.amHandy === 'mehr')) expect(ADMIN_MEHR_ZEILE[r.id], r.id).toBeTruthy()
-    expect(ADMIN_HANDBUCH.href).toBe('https://github.com/Uttoranger/FarmerZone/blob/main/docs/betrieb/handbuch.md')
+    // Das öffentliche Repository (dieselbe Quelle wie die PR-Links der Meldungen), Datei docs/betrieb/handbuch.md.
+    expect(ADMIN_HANDBUCH.href).toBe(`${PR_BASIS_URL.replace(/\/pull\/$/, '')}/blob/main/docs/betrieb/handbuch.md`)
+    expect(ADMIN_HANDBUCH.href).toMatch(/^https:\/\/github\.com\/[^/]+\/[^/]+\/blob\/main\/docs\/betrieb\/handbuch\.md$/)
     expect(existsSync(join(process.cwd(), 'docs/betrieb/handbuch.md'))).toBe(true)
   })
 

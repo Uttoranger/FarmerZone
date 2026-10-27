@@ -21,6 +21,7 @@ import {
   stripeZahlungAdresse,
   type EingangRoh,
 } from '@/lib/postfach'
+import { AKTE_OEFFNEN, akteHinweisText } from '@/app/admin/postfach/faden-spalte'
 import { adminPostfachReiterAus, eingangAuswahlAus, eingangFilterAus, fadenKennungAus } from '@/schemas/postfach'
 
 const um = (stunde: number) => new Date(`2026-10-15T${String(stunde).padStart(2, '0')}:00:00Z`)
@@ -162,5 +163,13 @@ describe('Adresse als Fremddaten', () => {
     expect(fadenKennungAus(undefined)).toBeUndefined()
     expect(alteReiterAdresse('unterhaltungen', fadenKennungAus('böse/../'))).toBe(alteReiterAdresse('unterhaltungen', undefined))
     expect(alteReiterAdresse('unterhaltungen', fadenKennungAus('cfaden123'))).toContain('id=antwort-cfaden123')
+  })
+})
+
+describe('Hinweis aus der Akte im Faden (N32, Nr. 193)', () => {
+  it('nennt Hof und Signale in einem Satz — der Link heißt „Akte öffnen“', () => {
+    expect(akteHinweisText('Hof Test', ['ohne Abholzeit'])).toBe('Hinweis aus der Akte: Hof Test – ohne Abholzeit.')
+    expect(akteHinweisText('Hof Test', ['Stripe fehlt', 'ohne Abholzeit'])).toBe('Hinweis aus der Akte: Hof Test – Stripe fehlt, ohne Abholzeit.')
+    expect(AKTE_OEFFNEN).toBe('Akte öffnen')
   })
 })

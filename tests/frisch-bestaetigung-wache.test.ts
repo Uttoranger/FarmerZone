@@ -37,7 +37,7 @@ const HEIKLE_AKTIONEN: Array<{ datei: string; namen: string[] }> = [
   { datei: 'src/server/actions/admin-hof.ts', namen: ['sperreHof', 'hebeHofSperreAuf'] },
 ]
 
-const EXPORTE = ['src/app/admin/finanzen/export/route.ts', 'src/app/admin/betrieb/export/route.ts', 'src/app/admin/betrieb/bilder-export/route.ts']
+const EXPORTE = ['src/app/admin/finanzen/export/route.ts', 'src/app/admin/betrieb/export/route.ts', 'src/app/admin/betrieb/bilder-export/route.ts', 'src/app/admin/betrieb/protokoll/export/route.ts']
 
 const OBERFLAECHEN: Array<{ datei: string; aktionen: string[] }> = [
   { datei: 'src/components/admin/hof-aktion-dialog.tsx', aktionen: ['revokeFarmApprovalAction', 'rejectFarmAction', 'approveFarmAction'] },
@@ -49,7 +49,6 @@ const OBERFLAECHEN: Array<{ datei: string; aktionen: string[] }> = [
   { datei: 'src/components/admin/gruendung-ausnehmen-dialog.tsx', aktionen: ['nimmAusGruendung', 'nimmWiederAuf'] },
   { datei: 'src/components/admin/testhof-dialog.tsx', aktionen: ['markiereAlsTesthof', 'nimmTesthofZurueck'] },
   { datei: 'src/components/admin/einstellungen-gruendung.tsx', aktionen: ['schreibeZusagenFest'] },
-  { datei: 'src/app/admin/postfach/erstattung-erledigt.tsx', aktionen: ['markiereErstattungErledigt'] },
   { datei: 'src/app/admin/einstellungen/anmeldung/anmeldung-verwalten.tsx', aktionen: ['entfernePasskey', 'erstelleErsatzcodes', 'pruefeFrischFuerPasskey'] },
   // Nr. 188 (Audit D10)
   { datei: 'src/components/admin/startseite-gestalten.tsx', aktionen: ['zieheFassungZurueck', 'loescheStartseitenBlock'] },

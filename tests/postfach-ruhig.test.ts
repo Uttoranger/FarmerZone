@@ -3,10 +3,11 @@
  * Mockup admin-postfach-ruhig) — gerendert ohne DOM (TESTING_GUIDELINES §1).
  *
  * Beweist:
- *  - Auf allen vier Reitern folgen auf den Kopf (EIN Satz) sofort die
+ *  - Auf allen Reitern folgen auf den Kopf (EIN Satz) sofort die
  *    Unterreiter, dann der Inhalt — nichts dazwischen, was die Reiter
- *    verschieben könnte. Die Kennzahlen bekommt nur der Eingang (unter den
- *    Reitern), Rundschreiben und Zustellung laden sie gar nicht erst.
+ *    verschieben könnte. Seit Nr. 193 (N32) nur Gespräche: keine Kennzahlen
+ *    und keine Aufgaben; die Zahl am Eingang zählt Antworten und Meldungen;
+ *    ?reiter=zustellung und alte Links auf eine Aufgabe leiten um (308).
  *  - `Unterreiter` setzt `scroll={false}` (abschaltbar), `FilterChip` reicht
  *    `scroll` nur weiter, wenn es jemand angibt (Standard wie bisher).
  *  - Der Ladepunkt steht nur im ladenden Link, `aria-hidden`.
@@ -28,7 +29,8 @@ vi.mock('next/link', () => ({
     ),
   useLinkStatus: () => ({ pending: link.pending }),
 }))
-vi.mock('next/navigation', () => ({ permanentRedirect: vi.fn() }))
+const navigation = vi.hoisted(() => ({ permanentRedirect: vi.fn() }))
+vi.mock('next/navigation', () => navigation)
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 vi.mock('@/server/admin-wache', () => ({ verlangeAdminSeite: vi.fn(async () => undefined), verlangeFrischeBestaetigung: vi.fn(async () => ({ ok: true, userId: 'admin_1', sitzungId: 'sitzung-admin_1' })), frischOderBestaetigen: vi.fn(async () => null), adminPflichtOffen: vi.fn(async () => false) }))
 vi.mock('@/server/queries/postfach', () => ({
@@ -38,7 +40,7 @@ vi.mock('@/server/queries/postfach', () => ({
 }))
 vi.mock('@/app/admin/postfach/eingang-reiter', () => ({
   ladeEingangReiter: vi.fn(async () => ({})),
-  EingangReiter: ({ kennzahlen }: { kennzahlen: unknown[] | null }) => createElement('div', { 'data-reiter': 'eingang', 'data-kennzahlen': kennzahlen ? kennzahlen.length : 'keine' }),
+  EingangReiter: (props: Record<string, unknown>) => createElement('div', { 'data-reiter': 'eingang', 'data-kennzahlen': 'kennzahlen' in props ? 'ja' : 'keine' }),
 }))
 vi.mock('@/app/admin/postfach/meldungen-reiter', () => ({
   ladeMeldungenReiter: vi.fn(async () => ({})),
@@ -48,10 +50,6 @@ vi.mock('@/app/admin/postfach/rundschreiben-reiter', () => ({
   ladeRundschreibenReiter: vi.fn(async () => ({})),
   RundschreibenReiter: () => createElement('div', { 'data-reiter': 'rundschreiben' }),
 }))
-vi.mock('@/app/admin/postfach/zustellung-reiter', () => ({
-  ladeZustellungDaten: vi.fn(async () => ({})),
-  ZustellungReiter: () => createElement('div', { 'data-reiter': 'zustellung' }),
-}))
 
 import AdminPostfachPage from '@/app/admin/postfach/page'
 import { ladeErstattungAufgaben } from '@/server/queries/postfach'
@@ -60,8 +58,8 @@ import { Unterreiter } from '@/components/admin/unterreiter'
 import { FilterChip } from '@/components/ui/chip'
 import type { UnterreiterDaten } from '@/lib/admin-seiten'
 
-async function rendereSeite(reiter: string): Promise<string> {
-  return renderToStaticMarkup(await AdminPostfachPage({ searchParams: Promise.resolve({ reiter }) }))
+async function rendereSeite(reiter: string, weitere: Record<string, string> = {}): Promise<string> {
+  return renderToStaticMarkup(await AdminPostfachPage({ searchParams: Promise.resolve({ reiter, ...weitere }) }))
 }
 
 const NAV = `<nav aria-label="${EINGANG_TEXT.unterreiterBeschriftung}"`
@@ -71,7 +69,7 @@ beforeEach(() => {
   link.pending = false
 })
 
-describe('Postfach: Kopf und Reiter stehen auf allen vier Reitern gleich', () => {
+describe('Postfach: Kopf und Reiter stehen auf allen Reitern gleich', () => {
   it.each(ADMIN_POSTFACH_REITER_IDS)('Reiter %s: Kopf mit dem einen Satz, sofort die Unterreiter, dann der Inhalt', async (reiter) => {
     const html = await rendereSeite(reiter)
 
@@ -83,18 +81,28 @@ describe('Postfach: Kopf und Reiter stehen auf allen vier Reitern gleich', () =>
     expect(html.match(/<h1/g)).toHaveLength(1)
   })
 
-  it('die Kennzahlen gehören zum Eingang — Rundschreiben und Zustellung laden sie nicht', async () => {
-    expect(await rendereSeite('eingang')).toContain('data-kennzahlen="3"')
-    expect(ladeErstattungAufgaben).toHaveBeenCalledTimes(1)
-
-    vi.clearAllMocks()
-    for (const reiter of ['meldungen', 'rundschreiben', 'zustellung']) {
-      const html = await rendereSeite(reiter)
-      expect(html).not.toContain(EINGANG_TEXT.kennzahlenBeschriftung)
-      // Die Zahl am Unterreiter „Eingang" steht trotzdem da.
-      expect(html).toMatch(/Eingang<span[^>]*>2<\/span>/)
-    }
+  it('nur Gespräche (N32): keine Kennzahlen, keine Aufgaben — die Zahl am Eingang zählt Antworten und Meldungen', async () => {
+    const html = await rendereSeite('eingang')
+    expect(html).toContain('data-kennzahlen="keine"')
     expect(ladeErstattungAufgaben).not.toHaveBeenCalled()
+    for (const reiter of ADMIN_POSTFACH_REITER_IDS) {
+      // 1 Antwort + 0 Meldungen; der wartende Hof aus der Zählung steht in Heute, nicht hier.
+      expect(await rendereSeite(reiter)).toMatch(/Eingang<span[^>]*>1<\/span>/)
+    }
+    expect(navigation.permanentRedirect).not.toHaveBeenCalled()
+  })
+
+  it('alte Wege: ?reiter=zustellung → Einstellungen › Benachrichtigungen, ?id=hof-… → Akte, ?id=erstattung-… → Bestellungen (308)', async () => {
+    await rendereSeite('zustellung')
+    expect(navigation.permanentRedirect).toHaveBeenLastCalledWith('/admin/einstellungen?gruppe=benachrichtigungen')
+    await rendereSeite('eingang', { art: 'aufgabe', id: 'hof-hofwartet1' })
+    expect(navigation.permanentRedirect).toHaveBeenLastCalledWith('/admin/hoefe/hofwartet1')
+    await rendereSeite('eingang', { id: 'erstattung-bestellung1' })
+    expect(navigation.permanentRedirect).toHaveBeenLastCalledWith('/admin/bestellungen?bestellung=bestellung1')
+    // Gegenprobe: ein Faden bleibt im Postfach.
+    vi.clearAllMocks()
+    await rendereSeite('eingang', { art: 'antwort', id: 'antwort-cfaden123' })
+    expect(navigation.permanentRedirect).not.toHaveBeenCalled()
   })
 
   it('ohne laufenden Wechsel trägt nichts aria-busy und kein Ladepunkt steht da', async () => {

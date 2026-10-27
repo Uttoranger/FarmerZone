@@ -19,9 +19,11 @@ const KOPF = { 'Cache-Control': 'no-store' } as const
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const wache = await verlangeAdminAktion()
   if ('error' in wache) return new NextResponse('Kein Zugriff.', { status: 403, headers: { ...KOPF, 'Content-Type': 'text/plain; charset=utf-8' } })
-  const filter = protokollFilterAus(Object.fromEntries(request.nextUrl.searchParams))
-  const bestaetigen = await frischOderBestaetigen(protokollExportAdresse(filter))
+  // Heikler Download (N20): ohne frische Bestätigung 303 auf /admin/bestaetigen — zurück mit demselben Filter.
+  const bestaetigen = await frischOderBestaetigen(protokollExportAdresse(protokollFilterAus(Object.fromEntries(request.nextUrl.searchParams))))
   if (bestaetigen) return bestaetigen
+
+  const filter = protokollFilterAus(Object.fromEntries(request.nextUrl.searchParams))
 
   const jetzt = new Date()
   const { zeilen, namen } = await ladeProtokoll(filter, wache.userId, jetzt, PROTOKOLL_EXPORT_HOECHSTENS)

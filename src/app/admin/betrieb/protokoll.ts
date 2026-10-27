@@ -146,7 +146,7 @@ export function protokollAlsCsv(zeilen: readonly ProtokollRoh[], namen: Protokol
     z.grund ?? '',
     z.mitPasskey ? 'ja' : 'nein',
   ])
-  return `﻿${[kopf, ...reihen].map((r) => r.map(csvFeld).join(';')).join('\r\n')}\r\n`
+  return `\uFEFF${[kopf, ...reihen].map((r) => r.map(csvFeld).join(';')).join('\r\n')}\r\n`
 }
 
 /** Die Adresse der CSV mit demselben Filter wie die Seite. */
