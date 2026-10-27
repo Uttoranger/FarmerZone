@@ -43,6 +43,7 @@ export function publicFarm(teil: Partial<PublicFarm> = {}): PublicFarm {
     serviceFeePercent: 5,
     serviceFeeMinCents: 50,
     serviceFeeActiveFrom: '2026-01-01T00:00:00.000Z',
+    preisAnzeige: null,
     betriebsstatus: null,
     products: [],
     pickupSlots: [{ dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }],

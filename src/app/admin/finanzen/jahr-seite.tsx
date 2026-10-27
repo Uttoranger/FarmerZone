@@ -53,7 +53,7 @@ export async function ladeJahrSeite({
   if (!daten) {
     return (
       <div className={ADMIN_RAHMEN}>
-        <AdminFehler titel="Finanzen" satz="Wir konnten die Finanzen gerade nicht laden." nochmal="/admin/finanzen?zeitraum=jahr" />
+        <AdminFehler titel="Geld" satz="Wir konnten die Zahlen gerade nicht laden." nochmal="/admin/geld?zeitraum=jahr" />
       </div>
     )
   }

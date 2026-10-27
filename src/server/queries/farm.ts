@@ -5,6 +5,10 @@ import { hofAdresse, hofZustand, titelbildFoto, type HofZustand } from '@/lib/me
 import { APP_URL } from '@/lib/umgebung-server'
 import { categoryImagePath } from '@/lib/product-image'
 import { zuProduktDto } from '@/lib/produkt-dto'
+import { alsCents } from '@/lib/order-totals'
+import { anzeigePreisCents, mitEndpreis, preisAnzeigeFuer, type HofpreisEinstellung, type PreisAnzeige } from '@/lib/plattformgebuehr'
+import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
+import type { VerpackungValue } from '@/lib/futter-registrierung'
 import type { AbholhinweisValue } from '@/lib/abholhinweise'
 import { DEFAULT_SECTIONS, type SectionConfig } from './appearance'
 import { leseAusschnitt, type BildAusschnitt } from '@/schemas/bild-ausschnitt'
@@ -36,6 +40,7 @@ import {
 } from '@/lib/hofuebersicht'
 import { AKTIVER_BEITRAG, NEUESTER_BEITRAG_ZUERST } from './status-posts'
 import { alsAbholFenster, ausgebuchteTage, type AusgebuchteTage } from '@/server/abholfenster'
+import { HOF_SICHTBAR_WO } from '@/lib/hof-sichtbar'
 
 export type PublicProduct = {
   id: string
@@ -172,6 +177,8 @@ export type PublicFarm = {
   stripeAccountReady: boolean
   isPaused: boolean
   pauseMessage: string | null
+  /** Vom Team gesperrt (Register N34, Nr. 187) — nur das Ja/Nein, nie der Grund; kaufSperre liest es. */
+  adminGesperrt?: boolean
   // Servicegebühr-Einstellung des Hofes (Sprint servicegebuehr): Der Checkout
   // zeigt die Gebühr VORAB mit derselben Rechnung wie der Server
   // (src/lib/servicegebuehr.ts). Prozent als Zahl (Decimal ist nicht über die
@@ -181,6 +188,14 @@ export type PublicFarm = {
   serviceFeePercent: number
   serviceFeeMinCents: number
   serviceFeeActiveFrom: string | null
+  /**
+   * Plattformgebühr im Hofpreis (Register N38, Nr. 197): ab dem Stichtag
+   * „Hofpreis-Modell ab“ der Satz des Hofs — dann zeigen Hofseite,
+   * Produktseite, Korb und Kasse den Endpreis „inkl. Plattformgebühr“
+   * (mitEndpreis, src/lib/plattformgebuehr.ts). null = Modell `bisher`.
+   * Die Produktpreise selbst bleiben der Warenpreis (Korb, /api/checkout).
+   */
+  preisAnzeige: PreisAnzeige
   /**
    * Welche Nummer in Farm.betriebsnummer steht (Nr. 11): Das Schild
    * „Futtermittelbetrieb · LFBIS …" (E9) braucht den Status Primärproduktion.
@@ -243,13 +258,14 @@ function alsOeffentlichesFoto({ ausschnitt, ...foto }: { id: string; url: string
 /**
  * DIE öffentliche Sichtbarkeits-Bedingung — eine Quelle für Einzelseite UND
  * Übersicht, damit die beiden nie auseinanderlaufen können:
- * archivedAt: null — ein stillgelegter Hof ist öffentlich nicht auffindbar;
+ * HOF_SICHTBAR_WO — ein stillgelegter (archivedAt) oder geschlossener Hof
+ * (geschlossenAm, Konto schließen N36) ist öffentlich nicht auffindbar;
  * approvedAt: { not: null } — dasselbe für einen noch nicht vom Betreiber
  * freigeschalteten Hof (src/lib/farm-approval.ts).
  */
 export const OEFFENTLICH_SICHTBAR = {
   isActive: true,
-  archivedAt: null,
+  ...HOF_SICHTBAR_WO,
   approvedAt: { not: null },
 } as const
 
@@ -360,12 +376,31 @@ function alsOeffentlichesProdukt(
   }
 }
 
-export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
+/**
+ * Was nur der Server vom öffentlichen Hof braucht: die Rohwerte des
+ * Teilen-Bilds (Nr. 196). Die Betriebsnummer entscheidet die Sperre je
+ * Gebinde, der Preis kommt als Cent aus dem Decimal derselben Zeile (kein
+ * Umweg über `price: number`). Geht nie an den Browser.
+ */
+export type TeilenRoh = {
+  betriebsnummer: string | null
+  produkte: ReadonlyMap<string, { preisCents: number; verpackung: VerpackungValue | null }>
+}
+
+/** Der öffentliche Hof und seine Rohwerte fürs Teilen-Bild — aus EINER Abfrage. */
+export type OeffentlicherHof = { farm: PublicFarm; teilen: TeilenRoh }
+
+/**
+ * Der öffentliche Hof samt Rohwerten des Teilen-Bilds (Nr. 196): Hofseite
+ * (Metadaten), Teilen-Bild-Route und Teilen-Fenster bauen das Bild aus
+ * derselben Abfrage wie die Seite (getPublicFarm), statt eine eigene zu stellen.
+ */
+export async function getPublicFarmMitTeilen(wo: { slug: string } | { id: string }): Promise<OeffentlicherHof | null> {
   // Die Filterung sitzt bewusst hier in der Query und nicht in den Seiten:
   // jede öffentliche Unterseite, die über getPublicFarm lädt, ist damit
   // automatisch mitgesperrt und läuft in ihren bestehenden notFound-Pfad.
   const farm = await prisma.farm.findUnique({
-    where: { slug, ...OEFFENTLICH_SICHTBAR },
+    where: { ...wo, ...OEFFENTLICH_SICHTBAR },
     select: {
       id: true,
       slug: true,
@@ -394,9 +429,12 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       stripeAccountReady: true,
       isPaused: true,
       pauseMessage: true,
+      // Sperre des Teams (N34, Nr. 187): geht nur als Ja/Nein weiter.
+      adminGesperrtAm: true,
       serviceFeePercent: true,
       serviceFeeMinCents: true,
       serviceFeeActiveFrom: true,
+      plattformgebuehrProzent: true,
       farmValues: {
         orderBy: { sortOrder: 'asc' },
         select: { id: true, icon: true, title: true, subtitle: true },
@@ -413,7 +451,8 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       istTesthof: true,
       products: {
         orderBy: PRODUCT_ORDER_BY,
-        select: OEFFENTLICHES_PRODUKT_SELECT,
+        // Seit Nr. 196 mit der Verpackung — nur für das Teilen-Bild (Sperre je Gebinde), nie an den Browser.
+        select: { ...OEFFENTLICHES_PRODUKT_SELECT, verpackung: true },
       },
       pickupSlots: {
         where: { isActive: true },
@@ -432,9 +471,19 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
       : DEFAULT_SECTIONS
 
   // Die Felder des Abzeichens (auch die Nummer des Platzes) fallen hier heraus — nur das Ja/Nein geht weiter.
-  const { betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, ...rest } = farm
-  return {
+  const { betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, adminGesperrtAm, plattformgebuehrProzent, ...rest } = farm
+  // N38 (Nr. 197): der Stichtag aus der gecachten Einstellung — nach der Hof-Abfrage, nie im selben Takt (Nr. 47).
+  const preisAnzeige = preisAnzeigeFuer({ plattformgebuehrProzent }, await ladeHofpreisEinstellung(), new Date())
+  // Die Verpackung bleibt auf dem Server: Sie geht nur in die Rohwerte des Teilen-Bilds.
+  const produkte = farm.products.map(({ verpackung, ...p }) => ({ verpackung, p }))
+  const teilen: TeilenRoh = {
+    betriebsnummer,
+    // Das Teilen-Bild zeigt im Hofpreis-Modell den Endpreis (N38) — in Cent aus dem Decimal, nie über `price: number`.
+    produkte: new Map(produkte.map(({ verpackung, p }) => [p.id, { preisCents: anzeigePreisCents(alsCents(p.price), preisAnzeige), verpackung }])),
+  }
+  const oeffentlich: PublicFarm = {
     ...rest,
+    adminGesperrt: adminGesperrtAm !== null,
     ...abzeichenDaten({ approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen }),
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
     // Json aus der Datenbank nur über leseAusschnitt: Ein ungültiger Wert ergibt null, nie einen Fehler auf der Hofseite.
@@ -444,8 +493,14 @@ export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
     farmPhotos: farm.farmPhotos.map(alsOeffentlichesFoto),
     serviceFeePercent: Number(farm.serviceFeePercent),
     serviceFeeActiveFrom: farm.serviceFeeActiveFrom?.toISOString() ?? null,
-    products: farm.products.map((p) => alsOeffentlichesProdukt(p, { betriebsnummer })),
+    preisAnzeige,
+    products: produkte.map(({ p }) => alsOeffentlichesProdukt(p, { betriebsnummer })),
   }
+  return { farm: oeffentlich, teilen }
+}
+
+export async function getPublicFarm(slug: string): Promise<PublicFarm | null> {
+  return (await getPublicFarmMitTeilen({ slug }))?.farm ?? null
 }
 
 /**
@@ -494,9 +549,12 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       stripeAccountReady: true,
       isPaused: true,
       pauseMessage: true,
+      // Sperre des Teams (N34, Nr. 187): geht nur als Ja/Nein weiter.
+      adminGesperrtAm: true,
       serviceFeePercent: true,
       serviceFeeMinCents: true,
       serviceFeeActiveFrom: true,
+      plattformgebuehrProzent: true,
       farmValues: {
         orderBy: { sortOrder: 'asc' },
         select: { id: true, icon: true, title: true, subtitle: true },
@@ -532,9 +590,12 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       : DEFAULT_SECTIONS
 
   // Die Felder des Abzeichens (auch die Nummer des Platzes) fallen hier heraus — nur das Ja/Nein geht weiter.
-  const { betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, ...rest } = farm
+  const { betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, adminGesperrtAm, plattformgebuehrProzent, ...rest } = farm
+  // N38 (Nr. 197): der Stichtag aus der gecachten Einstellung — nach der Hof-Abfrage, nie im selben Takt (Nr. 47).
+  const preisAnzeige = preisAnzeigeFuer({ plattformgebuehrProzent }, await ladeHofpreisEinstellung(), new Date())
   return {
     ...rest,
+    adminGesperrt: adminGesperrtAm !== null,
     ...abzeichenDaten({ approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen }),
     bannerType: farm.bannerType as 'GRADIENT' | 'PHOTO',
     // Json aus der Datenbank nur über leseAusschnitt: Ein ungültiger Wert ergibt null, nie einen Fehler auf der Hofseite.
@@ -544,6 +605,7 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
     farmPhotos: farm.farmPhotos.map(alsOeffentlichesFoto),
     serviceFeePercent: Number(farm.serviceFeePercent),
     serviceFeeActiveFrom: farm.serviceFeeActiveFrom?.toISOString() ?? null,
+    preisAnzeige,
     products: farm.products.map((p) => alsOeffentlichesProdukt(p, { betriebsnummer })),
   }
 }
@@ -809,6 +871,8 @@ export const UEBERSICHT_HOF_SELECT = {
   gruendungPlatz: true,
   gruendungAusgenommen: true,
   gruendungAbzeichenZeigen: true,
+  // N38 (Nr. 197): der Satz der Plattformgebühr — die Liste zeigt im Hofpreis-Modell Endpreise.
+  plattformgebuehrProzent: true,
   slug: true,
   name: true,
   postalCode: true,
@@ -877,8 +941,15 @@ export function baueHofUebersicht(
   hoefe: readonly (UebersichtHof & { statusPosts?: NeuerBeitragRoh[] })[],
   schmaleZeilen: readonly UebersichtZeile[],
   jetzt: OrtsZeit,
-  ausgebucht: AusgebuchteTage
+  ausgebucht: AusgebuchteTage,
+  /**
+   * N38 (Nr. 197): Stichtag und Zeitpunkt für die Preisanzeige — im
+   * Hofpreis-Modell stehen in Produktzeilen, Angebot und Kilopreis die
+   * Endpreise „inkl. Plattformgebühr“ (mitEndpreis), je Hof mit seinem Satz.
+   */
+  preise: { einstellung: HofpreisEinstellung | null; zeitpunkt: Date }
 ): HofUebersichtEintrag[] {
+  const anzeigeJeHof = new Map(hoefe.map((h) => [h.id, preisAnzeigeFuer(h, preise.einstellung, preise.zeitpunkt)]))
   // Was die Deckelung oben NICHT verlieren darf: Kategorien, Produktfotos
   // und Suchnamen hängen an ALLEN verfügbaren Produkten, nicht an den
   // ersten acht.
@@ -906,7 +977,8 @@ export function baueHofUebersicht(
     // Kategorien, Suche, Facetten und Karte hängen an EINER Regel
     // (istKaufbar in baueAngebotsZeile). Vorher zählten die Chips jedes
     // sichtbare Produkt, die Suche nur solche mit freiem Bestand.
-    const dto = zuProduktDto(zeile)
+    // Nur Anzeige: im Hofpreis-Modell der Endpreis — auch Kilopreis und Preisfilter rechnen damit.
+    const dto = mitEndpreis(zuProduktDto(zeile), anzeigeJeHof.get(zeile.farmId) ?? null)
     const angebot = baueAngebotsZeile({
       ...dto,
       isAvailable: true, // die Abfrage liest nur sichtbare Produkte
@@ -924,6 +996,8 @@ export function baueHofUebersicht(
         unitSize: dto.unitSize,
         imageUrl: zeile.imageUrl,
         bildAusschnitt: leseAusschnitt(zeile.bildAusschnitt),
+        // N38: der Zusatz „inkl. Plattformgebühr“ an der Zeile, wenn der Preis der Endpreis ist.
+        ...((anzeigeJeHof.get(zeile.farmId) ?? null) !== null ? { inklPlattformgebuehr: true } : {}),
       })
       angebotJeHof.set(zeile.farmId, bisher)
     }
@@ -959,7 +1033,7 @@ export function baueHofUebersicht(
       produkte: hof.products.map((p) => ({
         id: p.id,
         name: p.name,
-        ...zuProduktDto({ price: p.price, unitSize: p.unitSize }),
+        ...mitEndpreis(zuProduktDto({ price: p.price, unitSize: p.unitSize }), anzeigeJeHof.get(hof.id) ?? null),
         unit: p.unit,
         imageUrl: p.imageUrl,
         bildAusschnitt: leseAusschnitt(p.bildAusschnitt),
@@ -968,6 +1042,7 @@ export function baueHofUebersicht(
         // „Verfügbar" heißt: Es ist noch etwas da, das nicht schon reserviert
         // ist. Siehe VORSCHAU-VERFÜGBARKEIT im Kopf dieser Datei.
         verfuegbar: p.stock - p.reservedStock > 0,
+        ...((anzeigeJeHof.get(hof.id) ?? null) !== null ? { inklPlattformgebuehr: true } : {}),
       })),
       produkteGesamt: hof._count.products,
       produkteJeBereich: jeBereich.get(hof.id) ?? { LEBENSMITTEL: 0, FUTTERMITTEL: 0 },
@@ -1034,7 +1109,9 @@ export async function getOeffentlicheHoefe(
     zeitpunkt
   )
 
-  return baueHofUebersicht(hoefe, await zeilenJeHof, jetzt, ausgebucht)
+  // N38: der Stichtag aus der gecachten Einstellung, nach den Abfragen (kein zweiter Takt im Batch, Nr. 47).
+  const einstellung = await ladeHofpreisEinstellung()
+  return baueHofUebersicht(hoefe, await zeilenJeHof, jetzt, ausgebucht, { einstellung, zeitpunkt })
 }
 
 /** Was der Kopf von „Mein Hof" zeigt (components/mein-hof/seitenkopf.tsx). */

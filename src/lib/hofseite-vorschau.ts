@@ -7,7 +7,55 @@
  * (`editorSpalten`, Register N7). Rein und ohne Datenbank prüfbar
  * (tests/hofseite-vorschau.test.ts).
  */
-import { bereitSchema, markierungSchema, type HofseiteZeileId } from '@/schemas/hofseite-vorschau'
+
+/**
+ * Die Zeilen des Hofseiten-Editors (src/lib/hofseite-fortschritt.ts). Dieselben
+ * Kennungen gehen über eine Systemgrenze: Der Editor schickt die geöffnete Zeile
+ * per postMessage an die Vorschau im iframe, und die Hofseite liest sie als
+ * Fremddaten (CODING_STANDARDS §3). Ohne Zod geprüft, weil die Hofseite diese
+ * Datei im Browser lädt (Nr. 196, tests/leistung-196.test.ts); das Schema
+ * `hofseiteZeileIdSchema` in src/schemas/hofseite-vorschau.ts baut auf dieser Liste.
+ * Seit Nr. 50 auch `tagline` und `werte`, seit Nr. 129 `aktuell` (die Zeile
+ * „Aktuell vom Hof“ — ein Link, kein Baustein und kein Teil des Fortschritts).
+ */
+export const HOFSEITE_ZEILE_IDS = [
+  'titelbild',
+  'logo',
+  'name',
+  'tagline',
+  'ueber-uns',
+  'werte',
+  'fotos',
+  'adresse',
+  'abholzeiten',
+  'zahlung',
+  'kontakt',
+  'bestellungen',
+  'abschnitte',
+  'aktuell',
+] as const
+
+export type HofseiteZeileId = (typeof HOFSEITE_ZEILE_IDS)[number]
+
+/** Der `typ` jeder Markierungs-Nachricht — ein Präfix, damit fremde Nachrichten nie passen. */
+export const MARKIERUNG_TYP = 'farmerzone:markiere-abschnitt'
+
+/**
+ * Der `typ` der Bereit-Meldung: Die Hofseite im Rahmen sagt dem Editor, dass
+ * ihr Empfänger steht — erst dann schickt er die Markierung. Das `load`-
+ * Ereignis des iframes reicht nicht: Es kann vor der Hydration feuern, und
+ * die Nachricht verhallte.
+ */
+export const BEREIT_TYP = 'farmerzone:vorschau-bereit'
+
+/** Ein Objekt wie für Zods `z.object`: nicht null, kein Array. */
+function istObjekt(wert: unknown): wert is Record<string, unknown> {
+  return typeof wert === 'object' && wert !== null && !Array.isArray(wert)
+}
+
+function istZeileId(wert: unknown): wert is HofseiteZeileId {
+  return (HOFSEITE_ZEILE_IDS as readonly unknown[]).includes(wert)
+}
 
 /** Der Name des Parameters — zum Schreiben von Adressen. Gelesen wird er nur in ansichtsModus. */
 export const VORSCHAU_PARAMETER = 'vorschau'
@@ -42,8 +90,9 @@ export function korbErlaubt(lage: { isEditMode: boolean; kaufen: boolean }): boo
  */
 export function leseMarkierung(ereignis: { origin: string; data: unknown }, eigenerUrsprung: string): HofseiteZeileId | null {
   if (ereignis.origin !== eigenerUrsprung) return null
-  const gelesen = markierungSchema.safeParse(ereignis.data)
-  return gelesen.success ? gelesen.data.abschnitt : null
+  const daten = ereignis.data
+  if (!istObjekt(daten) || daten.typ !== MARKIERUNG_TYP) return null
+  return istZeileId(daten.abschnitt) ? daten.abschnitt : null
 }
 
 /**
@@ -53,7 +102,7 @@ export function leseMarkierung(ereignis: { origin: string; data: unknown }, eige
  */
 export function leseBereit(ereignis: { origin: string; data: unknown }, eigenerUrsprung: string): boolean {
   if (ereignis.origin !== eigenerUrsprung) return false
-  return bereitSchema.safeParse(ereignis.data).success
+  return istObjekt(ereignis.data) && ereignis.data.typ === BEREIT_TYP
 }
 
 /**

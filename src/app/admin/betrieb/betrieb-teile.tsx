@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react'
 import { ChevronRight, Database, Download, ExternalLink, Image as BildSymbol, ImageOff, LineChart, List, Mail, TriangleAlert, Upload, type LucideIcon } from 'lucide-react'
 import {
+  ALARM_MATRIX,
   ADMIN_BETRIEB_HREF,
   ADMIN_BETRIEB_MAILS_HREF,
+  ADMIN_BETRIEB_PROTOKOLL_HREF,
+  ADMIN_BETRIEB_VERSION_HREF,
   BETRIEB_TEXT,
   BILDER_EXPORT_HREF,
   NUR_IM_DASHBOARD,
@@ -27,6 +30,8 @@ import {
   type WarnEintrag,
 } from '@/lib/betrieb'
 import type { StripeMarke } from '@/lib/testumgebung'
+import type { BetriebReiter } from '@/schemas/betrieb-mails'
+import { DIENSTE_TEXT, NOCH_NICHT_EINGERICHTET, type DienstZeile, type VersionZeile } from './dienste'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Chip } from '@/components/ui/chip'
@@ -66,7 +71,7 @@ function tonText(warnt: boolean): string {
  * Ladepunkt (`LadeRahmen`, Muster Postfach) — darum hat /admin/betrieb seit
  * Nr. 161 keine loading.tsx mehr (tests/loading-filter-wache.test.ts).
  */
-export function BetriebUnterreiter({ aktiv, offen, children }: { aktiv: 'ueberblick' | 'mails'; offen: number | null; children: ReactNode }): React.JSX.Element {
+export function BetriebUnterreiter({ aktiv, offen, children }: { aktiv: BetriebReiter; offen: number | null; children: ReactNode }): React.JSX.Element {
   return (
     <LadeRahmen>
       <div className="flex flex-col gap-4 lg:gap-[18px]">
@@ -77,6 +82,9 @@ export function BetriebUnterreiter({ aktiv, offen, children }: { aktiv: 'ueberbl
           eintraege={[
             { id: 'ueberblick', label: BETRIEB_TEXT.reiterUeberblick, href: ADMIN_BETRIEB_HREF },
             { id: 'mails', label: BETRIEB_TEXT.reiterMails, href: ADMIN_BETRIEB_MAILS_HREF, ...(offen ? { zahl: String(offen) } : {}) },
+            // Seit Nr. 193 (N32/N33): wer hat was getan, und welcher Stand läuft.
+            { id: 'protokoll', label: BETRIEB_TEXT.reiterProtokoll, href: ADMIN_BETRIEB_PROTOKOLL_HREF },
+            { id: 'version', label: BETRIEB_TEXT.reiterVersion, href: ADMIN_BETRIEB_VERSION_HREF },
           ]}
         />
         <LadeInhalt>{children}</LadeInhalt>
@@ -351,8 +359,9 @@ export function VerlaufDiagramm({ von, bis, linien, beschreibung }: { von: strin
 
 // ─── Abläufe ─────────────────────────────────────────────────────────────────
 
-function StandMarke({ stand }: { stand: AblaufZeile['stand'] }): React.JSX.Element {
-  return <Marke art={STAND_MARKE[stand]}>{STAND_TEXT[stand]}</Marke>
+/** Der Uptime-Dienst ohne jeden Aufruf heißt „noch nicht eingerichtet“ statt „noch kein Lauf“ (Nr. 184). */
+function StandMarke({ stand, name }: { stand: AblaufZeile['stand']; name: AblaufZeile['name'] }): React.JSX.Element {
+  return <Marke art={STAND_MARKE[stand]}>{name === 'von-aussen' && stand === 'nochKeinLauf' ? NOCH_NICHT_EINGERICHTET : STAND_TEXT[stand]}</Marke>
 }
 
 /** Die Abläufe als Tabelle (ab 1024 px). */
@@ -380,7 +389,7 @@ export function AblaeufeTabelle({ zeilen }: { zeilen: readonly AblaufZeile[] }):
               <td className="px-4 py-3 text-foreground tabular-nums">{z.zuletzt}</td>
               <td className="px-4 py-3 text-foreground tabular-nums">{z.dauer}</td>
               <td className="px-4 py-3">
-                <StandMarke stand={z.stand} />
+                <StandMarke stand={z.stand} name={z.name} />
               </td>
             </tr>
           ))}
@@ -419,11 +428,89 @@ export function AblaeufeListe({ zeilen, puenktlich }: { zeilen: readonly AblaufZ
               <span className="text-[14px] font-semibold text-foreground">{z.text}</span>
               <span className={cn('text-[12.5px]', LEISE)}>{`${z.zuletzt} · ${z.wann}`}</span>
             </span>
-            <StandMarke stand={z.stand} />
+            <StandMarke stand={z.stand} name={z.name} />
           </li>
         ))}
       </ul>
     </section>
+  )
+}
+
+// ─── Dienste, Version, Alarm-Matrix (Nr. 184, Board admin-betrieb-neu) ───────
+
+/** Die Dienste je mit Prüfweg: Name, ein Satz, Marke (Bedeutung nie nur als Farbe — das Wort steht in der Marke). */
+export function DiensteInhalt({ zeilen }: { zeilen: readonly DienstZeile[] }): React.JSX.Element {
+  return (
+    <ul className="flex flex-col">
+      {zeilen.map((z) => (
+        <li key={z.dienst} className="flex items-center gap-3 border-t border-border py-2.5 first:border-t-0 first:pt-0">
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-[14px] font-semibold text-foreground">{z.dienst}</span>
+            <span className={cn('text-[12.5px] leading-snug break-words', LEISE)}>{z.satz}</span>
+          </span>
+          <Marke art={z.art}>{z.marke}</Marke>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Was gerade live ist: Commit, letzte Migration, der Weg zurück. */
+export function VersionInhalt({ zeilen }: { zeilen: readonly VersionZeile[] }): React.JSX.Element {
+  return (
+    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3.5 gap-y-2 text-[13.5px]">
+      {zeilen.map((z) => (
+        <div key={z.name} className="contents">
+          <dt className={LEISE}>{z.name}</dt>
+          <dd className="min-w-0 break-words text-foreground">{z.wert}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+/** Die Alarm-Matrix als Tabelle (ab 1024 px) — die Zeilen aus ALARM_MATRIX, derselben Quelle wie ARCHITECTURE. */
+export function AlarmMatrixTabelle(): React.JSX.Element {
+  const s = DIENSTE_TEXT.matrixSpalten
+  return (
+    <table className="w-full text-left text-[13px]">
+      <caption className="sr-only">{DIENSTE_TEXT.matrixZusatz}</caption>
+      <thead>
+        <tr className={KICKER}>
+          {[s.signal, s.weg, s.reaktion].map((t) => (
+            <th key={t} scope="col" className="px-2.5 py-2 font-semibold">
+              {t}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {ALARM_MATRIX.map((z) => (
+          <tr key={z.signal} className="border-t border-border align-top">
+            <th scope="row" className="px-2.5 py-2 font-semibold text-foreground">
+              {z.signal}
+            </th>
+            <td className="px-2.5 py-2 text-foreground">{z.weg}</td>
+            <td className={cn('px-2.5 py-2', LEISE)}>{z.reaktion}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+/** Die Alarm-Matrix am Handy: je Signal Weg und Reaktion untereinander. */
+export function AlarmMatrixListe(): React.JSX.Element {
+  return (
+    <ul className="flex flex-col">
+      {ALARM_MATRIX.map((z) => (
+        <li key={z.signal} className="flex flex-col gap-0.5 border-t border-border py-2.5 first:border-t-0 first:pt-0">
+          <span className="text-[14px] font-semibold text-foreground">{z.signal}</span>
+          <span className="text-[13px] leading-snug text-foreground">{z.weg}</span>
+          <span className={cn('text-[12.5px]', LEISE)}>{z.reaktion}</span>
+        </li>
+      ))}
+    </ul>
   )
 }
 

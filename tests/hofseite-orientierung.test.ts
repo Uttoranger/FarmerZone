@@ -58,8 +58,10 @@ import {
   KLEBE_BLOCK_VAR,
   REITER_PX,
   blattBeimErstenMal,
+  TITELBILD_ZURUECK,
   hofZeileUnterzeile,
   hofZeileZustand,
+  hofzeileSteht,
   korbFehlerText,
   vergissBlattMerker,
 } from '@/lib/hofseite-orientierung'
@@ -244,7 +246,7 @@ describe('3. Chips am Handy im Block', () => {
 describe('4. Korb: Fehlertexte und das erste Blatt einer Sitzung (Register N29, N30)', () => {
   it('rohe Servertexte werden geglättet — beim Legen und beim Ändern der Menge', () => {
     for (const roh of ['Serverfehler bei der Reservierung', 'Ungültige Parameter', 'Ungültige Anfrage', undefined]) {
-      expect(korbFehlerText({ ok: false, error: roh }, 'legen')).toBe('Wir konnten das Produkt nicht in den Korb legen. Versuch es gleich noch einmal.')
+      expect(korbFehlerText({ ok: false, error: roh }, 'legen')).toBe('Wir konnten das Produkt nicht in den Warenkorb legen. Versuch es gleich noch einmal.')
       expect(korbFehlerText({ ok: false, error: roh }, 'menge')).toBe('Wir konnten die Menge nicht ändern. Versuch es gleich noch einmal.')
     }
   })
@@ -394,5 +396,52 @@ describe('7. Rückweg im Hofbereich: dieselbe Regel wie auf den Kundenseiten', (
     expect(kopf).toContain('tippAufZiel(ziel, eigenerVorgaengerJetzt())')
     expect(kopf).toContain('window.history.back()')
     expect(kopf.match(/onClick=\{beimTipp\(ziel\)\}/g)).toHaveLength(2)
+  })
+})
+
+describe('Zurück im Titelbild am Handy (Entscheidung 5, Nr. 195)', () => {
+  it('oben links im Titelbild, 44 px, nur unter md, mit dem Namen „Zu allen Höfen" für den Screenreader', () => {
+    expect(TITELBILD_ZURUECK).toBe('Zu allen Höfen')
+    const html = seite()
+    const knopf = element(html, 'data-titelbild-zurueck', '</a>')
+    expect(knopf).toContain('aria-label="Zu allen Höfen"')
+    expect(knopf).toMatch(/href="\/hoefe[^"]*"/)
+    expect(knopf).toContain('size-11')
+    expect(knopf).toContain('top-2 left-2')
+    expect(knopf).toContain('md:hidden')
+    // Theme-fest dunkel wie jedes Bild-Overlay, kein Palette-Wert.
+    expect(knopf).toContain('bg-primary-foreground/65')
+  })
+
+  it('steht vor der klebenden Hofzeile, nicht in ihr — vor dem Kleben (Server und erste Messung) ist er da', () => {
+    const html = seite()
+    expect(html.indexOf('data-titelbild-zurueck')).toBeGreaterThan(-1)
+    expect(html.indexOf('data-titelbild-zurueck')).toBeLessThan(html.indexOf('data-klebe-block'))
+    // Gegenprobe: Im klebenden Block bleibt das Zurück der Hofzeile, das mit dem langen Namen.
+    const block = ganzesDiv(html, 'data-klebe-block')
+    expect(block).not.toContain('data-titelbild-zurueck')
+    expect(block).toContain('aria-label="Zurück zu allen Höfen"')
+  })
+
+  it('ab md bleibt es bei „‹ Alle Höfe": der Knopf im Titelbild ist dort verborgen, Teilen steht weiter nur einmal', () => {
+    const html = seite()
+    expect(html.match(/data-titelbild-zurueck/g)).toHaveLength(1)
+    expect(html.match(/aria-label="Hofseite teilen"/g)).toHaveLength(1)
+  })
+
+  it('hofzeileSteht: klebt, sobald die Oberkante des Blocks unter dem Kopf angekommen ist', () => {
+    expect(hofzeileSteht(56, 56)).toBe(true)
+    expect(hofzeileSteht(20, 56)).toBe(true)
+    // Gegenprobe: noch darunter im Fluss.
+    expect(hofzeileSteht(57, 56)).toBe(false)
+    expect(hofzeileSteht(420, 56)).toBe(false)
+    // Ohne Kopf zählt die Fensterkante.
+    expect(hofzeileSteht(0, 0)).toBe(true)
+    expect(hofzeileSteht(10, 0)).toBe(false)
+  })
+
+  it('der Knopf verschwindet, wenn der Block klebt (Quelltext: nur ohne `klebt` gerendert)', () => {
+    const q = quelle('src/components/hofseite/hofseite-kunde.tsx')
+    expect(q).toMatch(/\{!klebt && \(\s*<Link[^>]*\s+href=\{zurueck\.href\}[\s\S]*?data-titelbild-zurueck/)
   })
 })

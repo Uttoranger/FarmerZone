@@ -22,11 +22,10 @@ const WURZEL = process.cwd()
 
 /** Wege über einen direkten Link — nur hier darf OEFFENTLICH_SICHTBAR allein stehen. */
 const DIREKTER_LINK: Record<string, string> = {
-  'src/server/queries/farm.ts:getPublicFarm': 'Hofseite',
+  'src/server/queries/farm.ts:getPublicFarmMitTeilen': 'Hofseite und Teilen-Bild aus derselben Abfrage (Nr. 196)',
   'src/server/queries/farm.ts:IN_LISTEN_SICHTBAR': 'die zweite Stufe baut auf der ersten auf',
   'src/server/queries/seo.ts:hofIstOeffentlich': 'SEO und 404 der Hofseite',
   'src/server/queries/seo.ts:produktIstOeffentlich': 'SEO und 404 der Produktseite',
-  'src/server/queries/teilen-bild.ts:ladeTeilenBildQuelle': 'Teilen-Bild',
   'src/server/queries/teilen-bild.ts:getPlakatDaten': 'Plakat',
   'src/server/teilen-zaehlung.ts:zaehleBesuchFuerSlug': 'Teilen-Zählung (Besuch über einen geteilten Link)',
   'src/app/api/status-image/[id]/route.tsx:GET': 'Beitragsbild über einen direkten Link (Nr. 178); einen Testhof sieht nur sein eigenes Konto',

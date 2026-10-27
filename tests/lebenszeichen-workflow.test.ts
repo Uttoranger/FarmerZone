@@ -3,7 +3,7 @@
  * ohne GitHub (.github/workflows/lebenszeichen.yml).
  *
  * Beweist:
- *  - Auslöser nur Zeitplan (`17 7 * * *`, UTC) und Handstart — kein PR-Ereignis.
+ *  - Auslöser nur Zeitplan (seit Nr. 184 alle 15 Minuten, vorher täglich 17 7) und Handstart — kein PR-Ereignis.
  *  - `permissions: {}`, kein Checkout, keine Action von außen (`uses:`).
  *  - Ein Schritt: `curl -fsS --max-time 20` mit dem Bearer-Token aus der
  *    Umgebung gegen die Produktionsadresse; das Secret steht nur unter `env:`,
@@ -33,7 +33,7 @@ function ohneKommentare(text: string): string {
 function pruefeWorkflow(text: string): string[] {
   const code = ohneKommentare(text)
   const befunde: string[] = []
-  if (!/^on:\n {2}schedule:\n {4}- cron: '17 7 \* \* \*'\n {2}workflow_dispatch:\n/m.test(code)) befunde.push('Auslöser nicht Zeitplan 17 7 und Handstart')
+  if (!/^on:\n {2}schedule:\n {4}- cron: '\*\/15 \* \* \* \*'\n {2}workflow_dispatch:\n/m.test(code)) befunde.push('Auslöser nicht Zeitplan alle 15 Minuten und Handstart')
   if (/pull_request|push:|workflow_run|repository_dispatch|issue_comment/.test(code)) befunde.push('weiterer Auslöser')
   if (!/^permissions: \{\}$/m.test(code) || /^[ \t]+permissions:/m.test(code)) befunde.push('nicht permissions: {}')
   if (/uses:/.test(code)) befunde.push('Action von außen (Checkout o. ä.)')
@@ -56,6 +56,10 @@ describe('lebenszeichen.yml', () => {
 })
 
 describe('lebenszeichen.yml — Gegenproben', () => {
+  it('der alte tägliche Zeitplan schlägt an (Nr. 184: alle 15 Minuten)', () => {
+    expect(pruefeWorkflow(TEXT.replace("'*/15 * * * *'", "'17 7 * * *'"))).toContain('Auslöser nicht Zeitplan alle 15 Minuten und Handstart')
+  })
+
   it('ein PR-Auslöser schlägt an', () => {
     expect(pruefeWorkflow(TEXT.replace('  workflow_dispatch:\n', '  workflow_dispatch:\n  pull_request:\n'))).toContain('weiterer Auslöser')
   })

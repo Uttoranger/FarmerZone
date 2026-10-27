@@ -170,14 +170,15 @@ describe('Prüfkette des Hofs — EINE Funktion für beide Routen (Nr. 165)', ()
   const server = quelle('src', 'server', 'warenkorb.ts')
   const kette = server.slice(server.indexOf('export async function pruefeKaufbarkeitHoefe'))
 
+  // Stilllegung = offline (hofSichtbar: stillgelegt oder geschlossen, Nr. 190).
   it('Stilllegung → Freischaltung → Pause → Zählung der vollen Tage → Kaufsperre', () => {
     expect(
-      inReihenfolge(kette, ['hof.archivedAt', '!hof.approvedAt', 'hof.isPaused', 'await ausgebuchteTage(', 'kaufSperre('])
+      inReihenfolge(kette, ['!hofSichtbar(hof)', '!hof.approvedAt', 'hof.isPaused', 'await ausgebuchteTage(', 'kaufSperre('])
     ).toBe(true)
   })
 
   it('Gegenprobe: Pause vor Stilllegung stünde falsch', () => {
-    expect(inReihenfolge(kette, ['hof.isPaused', 'hof.archivedAt'])).toBe(false)
+    expect(inReihenfolge(kette, ['hof.isPaused', '!hofSichtbar(hof)'])).toBe(false)
   })
 
   it('/api/reserve prüft den Hof nicht mehr selbst, nur über die gemeinsame Kette', () => {

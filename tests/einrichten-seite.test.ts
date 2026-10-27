@@ -64,9 +64,10 @@ describe('EinrichtenSeite', () => {
     expect(seite(null)).toContain('<form')
   })
 
-  it('SEPA nur als Hinweis — kein Eingabefeld, kein Link', () => {
+  it('Lastschrift nur als Hinweis mit Link zu Deine Konditionen — kein Eingabefeld (Nr. 198)', () => {
     const html = seite(HOF)
-    expect(html).toContain('SEPA-Mandat für die Monatsabrechnung')
+    expect(html).toContain('Lastschrift für die Monatsabrechnung')
+    expect(html).toContain('href="/settings/konditionen#barzahlung"')
     expect(html).not.toMatch(/IBAN<\/label>|name="iban"/i)
   })
 

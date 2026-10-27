@@ -3,6 +3,7 @@ import { SUPPORT_EMAIL } from '@/lib/support'
 import { kurznummer } from '@/lib/meldung'
 import { erstattungOffenInhalt } from '@/lib/erstattung-offen'
 import { POSTFACH_TEXT } from '@/lib/postfach'
+import { wochenlageZeilen } from '@/lib/wochenlage'
 import type { StapelMail } from '@/lib/email'
 import type { ZustellArt } from '@/lib/zustellung'
 import type { EinstellAuftrag } from '@/server/mail-warteschlange'
@@ -176,20 +177,25 @@ export async function rendereMeldung(bezug: Record<string, string>): Promise<Sta
 }
 
 /**
- * Wochenbericht: Die Zahlen zählt der Renderer beim Versand frisch (dieselben
- * Zählungen wie der Wochenlauf); nur die Zahl der eben gelöschten Meldungen
- * kennt allein der Lauf. Ist im Eingang inzwischen nichts mehr offen, geht
- * keine Mail — dieselbe Regel wie im Lauf.
+ * Wochenlage (Register N32, Nr. 192; Mail-Art `wochenbericht` seit Nr. 95):
+ * Die Zahlen zählt der Renderer beim Versand frisch — die der letzten 7 Tage,
+ * dazu den Stand des Eingangs; nur die Zahl der eben gelöschten Meldungen
+ * kennt allein der Lauf. Die Mail trägt nur Zahlen: keine Meldungstexte,
+ * keine Namen. Sie geht auch bei leerem Eingang — die Zahlen der Woche sind
+ * der Inhalt; ob der Lauf sie dann einstellt, entscheidet api/cron/briefkasten.
  */
 export async function rendereWochenbericht(bezug: Record<string, string>): Promise<StapelMail | Verworfen> {
   const { empfaengerId, geloeschtAnzahl } = wochenberichtBezugSchema.parse(bezug)
   const an = await betreiberAdresse(empfaengerId)
   if (!an) return OHNE_EMPFAENGER
   const [{ zaehleFuerWochenlauf }, { zaehleOffenImEingang }] = await Promise.all([import('@/server/queries/meldung'), import('@/server/queries/postfach')])
-  const [zaehler, eingang] = await Promise.all([zaehleFuerWochenlauf(new Date()), zaehleOffenImEingang()])
-  if (eingang.gesamt === 0) return { verworfen: 'nichts_offen' }
+  const jetzt = new Date()
+  const [zaehler, eingang] = await Promise.all([zaehleFuerWochenlauf(jetzt), zaehleOffenImEingang()])
+  const { ladeWochenlage } = await import('@/server/queries/wochenlage')
+  const lage = wochenlageZeilen(await ladeWochenlage(jetzt, eingang.gesamt, zaehler.liegenGeblieben))
   const { baueBriefkastenZusammenfassung } = await import('@/lib/email')
-  return baueBriefkastenZusammenfassung({ ...zaehler, geloescht: Number.parseInt(geloeschtAnzahl, 10), eingang }, an)
+  // Die jüngsten Meldungen nennt die Wochenlage nicht: Ihr Text ist Fremdtext, die Mail trägt nur Zahlen.
+  return baueBriefkastenZusammenfassung({ ...zaehler, neueste: [], geloescht: Number.parseInt(geloeschtAnzahl, 10), eingang, lage }, an)
 }
 
 export async function rendereAntwortAnTeam(bezug: Record<string, string>): Promise<StapelMail | Verworfen> {

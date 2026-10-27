@@ -333,7 +333,7 @@ describe('Bestellung im Detail: die Nummer der Kundin', () => {
     zahlart: 'Bar bei Abholung',
     vorOrt: true,
     bezahltAm: null,
-    betrag: { warenCents: 1000, gebuehrCents: 0, gesamtCents: 1000, erstattetCents: 0, gebuehrEntfallen: false, gebuehrErstattungOffen: false, gebuehrFuerAbrechnung: false },
+    betrag: { warenCents: 1000, gebuehrCents: 0, gesamtCents: 1000, erstattetCents: 0, gebuehrEntfallen: false, gebuehrErstattungOffen: false, gebuehrFuerAbrechnung: false, hofpreis: false },
     positionen: [],
     storno: null,
     stornoGrund: null,

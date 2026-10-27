@@ -316,17 +316,39 @@ Ein Seitenmuster für alle Admin-Seiten: Seitenkopf (Titel + ein Satz + rechts d
 | `admin-betrieb.html` | Admin · Betrieb: Warnkarte, Kacheln Bilder · Datenbank · E-Mails heute · Bild-Vorgänge (Wert, Grenze, Balken mit Strich bei 80 %, Trend, was bei 100 % passiert), Verlauf 90 Tage, Tarife und Grenzen, Abläufe mit Herzschlag, Nur im Dashboard, Größte Tabellen, Bilder ohne Verwendung (nur Liste) | `/admin/betrieb` (neu) | neu (Nr. 103; Bilder ohne Verwendung und Aufräumen Nr. 104) | 1440×1812 |
 | `mobil-admin-betrieb.html` | Admin am Handy · Betrieb: Warnkarte, Kacheln untereinander, Abläufe, Bilder ohne Verwendung, Verlauf/Tarife/Tabellen/Dashboard aufklappbar | `/admin/betrieb` (Handy) | neu (Nr. 103/104) | 390×2000 |
 | `email-betrieb-warnung.html` | Betreiber · Warn-Mails: Grenze erreicht (80 %, 95 %, voll, Entwarnung) und Ablauf überfällig – und wann keine Mail kommt | Mail an die Empfänger aus Postfach › Zustellung | neu (Nr. 103) | 680×930 |
-| `admin-betrieb-mails.html` | Admin · Betrieb › E-Mails: Kontingent, Warteschlange, Fehler, Zustellquoten und Suche nach Bestellnummer oder Adresse (Fassung 3; Knopf „Jetzt schicken“ in der Warnkarte; die Zahlen sind erfunden) | `/admin/betrieb?reiter=mails` | neu (Nr. 161) | 1440×1750 |
-| `mobil-admin-betrieb-mails.html` | Admin am Handy · Betrieb › E-Mails: dieselbe Ansicht untereinander | `/admin/betrieb?reiter=mails` (Handy) | neu (Nr. 161) | 390×3000 |
-| `admin-betrieb-mails-alle.html` | Admin · Betrieb › E-Mails › Alle Mails: letzte 90 Tage mit Filter (Art, Stand, Zeitraum, Hof), Suche und „Nochmal schicken“ (die Zahlen und Namen sind erfunden) | `/admin/betrieb?reiter=mails&liste=alle` | neu (Nr. 167) | 1440×1310 |
-| `mobil-admin-betrieb-mails-alle.html` | Admin am Handy · Betrieb › E-Mails › Alle Mails: Liste mit Filtern am Handy | `/admin/betrieb?reiter=mails&liste=alle` (Handy) | neu (Nr. 167) | 390×1490 |
-| `mobil-admin-betrieb-mails-nochmal.html` | Admin am Handy · Betrieb › E-Mails: „Nochmal schicken“ mit Vorschau der Mail und frischer Bestätigung | `/admin/betrieb?reiter=mails&liste=alle` (Handy) | neu (Nr. 167) | 390×844 |
+| `admin-betrieb-mails.html` | Admin · Betrieb › E-Mails: Kontingent, Warteschlange, Fehler, Zustellquoten und Suche nach Bestellnummer oder Adresse (Fassung 3; Knopf „Jetzt schicken“ in der Warnkarte; die Zahlen sind erfunden) | `/admin/betrieb?reiter=mails` | neu (Nr. 161); Detail; das Dringende steht ab Nr. 185 in Heute | 1440×1750 |
+| `mobil-admin-betrieb-mails.html` | Admin am Handy · Betrieb › E-Mails: dieselbe Ansicht untereinander | `/admin/betrieb?reiter=mails` (Handy) | neu (Nr. 161); Detail; das Dringende steht ab Nr. 185 in Heute | 390×3000 |
+| `admin-betrieb-mails-alle.html` | Admin · Betrieb › E-Mails › Alle Mails: letzte 90 Tage mit Filter (Art, Stand, Zeitraum, Hof), Suche und „Nochmal schicken“ (die Zahlen und Namen sind erfunden) | `/admin/betrieb?reiter=mails&liste=alle` | neu (Nr. 167); Detail; das Dringende steht ab Nr. 185 in Heute | 1440×1310 |
+| `mobil-admin-betrieb-mails-alle.html` | Admin am Handy · Betrieb › E-Mails › Alle Mails: Liste mit Filtern am Handy | `/admin/betrieb?reiter=mails&liste=alle` (Handy) | neu (Nr. 167); Detail; das Dringende steht ab Nr. 185 in Heute | 390×1490 |
+| `mobil-admin-betrieb-mails-nochmal.html` | Admin am Handy · Betrieb › E-Mails: „Nochmal schicken“ mit Vorschau der Mail und frischer Bestätigung | `/admin/betrieb?reiter=mails&liste=alle` (Handy) | neu (Nr. 167); Detail; das Dringende steht ab Nr. 185 in Heute | 390×844 |
 | `admin-postfach-ruhig.html` | Admin · Postfach: Kopf und Reiter auf allen vier Reitern an derselben Stelle, ein Satz für alle, Kennzahlen unter den Reitern nur im Eingang; Regeln: kein Ladebild beim Wechsel, kein Sprung nach oben, Platz für den Rollbalken | `/admin/postfach` (alle Reiter) | Umbau (Nr. 105) – ändert die Reihenfolge in `admin-postfach.html` | 1440×900 |
 | `admin-hoefe-gruendung-ausnehmen.html` | Admin · Höfe › Alle: Spalte Gründungshof (Nr. · bis · „ausgenommen“), Menü ⋯ mit „Nicht als Gründungshof zählen …“, Bestätigung mit Folgen | `/admin?reiter=alle` | Umbau (Nr. 109, K2 ergänzt; Haken „Testhof oder Zustimmung“ bei Platz) | 1440×1180 |
 | `mobil-admin-hoefe-gruendung-ausnehmen.html` | Admin am Handy · Höfe: dieselbe Bestätigung als Blatt | `/admin` (Handy) | Umbau (Nr. 109) | 390×844 |
 | `system-admin-anmeldung-passkey.html` | Admin · Anmelden nur mit Passkey: Seite `/login/admin` mit Knopf „Mit Passkey anmelden“ (den QR-Code fürs Handy zeigt der Browser, nicht Agrilo), Bestätigung am Handy, frische Bestätigung bei heiklen Aktionen, Pflichtseite beim ersten Mal (nur mit Passwort und frischem E-Mail-Code, 24 Stunden nach Vergabe des Rechts), Ersatzcodes, Einstellungen › Anmeldung; Schritt 7 gehört zu Lauf 18 | `/login/admin` (neu), `/admin` (Pflichtseite), `/admin/einstellungen/anmeldung` (neu) | neu (Nr. 115) | 2380×2560 |
 
 Hinweis Nr. 101: „später“-Marken in den Postfach-Mockups zeigen das Zielbild (Folgeauftrag mit Feld für KI-Vorschläge) und werden in Nr. 101 nicht gebaut.
+
+## ADMIN · Regelbetrieb (26.10.2026)
+
+Zielbild für Nr. 184–198 (`docs/nachtlauf/freigabe.md` §30). Was ein Board nicht zeigt, folgt `docs/ai/DESIGN_SYSTEM.md` („Aufbau jeder Admin-Seite“); jede Abweichung gehört mit Grund in den PR. Die Zahlen, Namen und Adressen in den Boards sind erfunden. Spalte Größe: nur die Breite.
+
+| Datei | Bildschirm | Route im Code | Arbeit | Größe |
+|---|---|---|---|---|
+| `admin-umbau-karte.html` | Admin · Umbau: was bleibt, was umzieht, was wegfällt | Übersicht, keine Route | Bezugsrahmen für Nr. 185–193 (Reiter, Umzüge, alte Wege mit 308) | 1440 |
+| `admin-heute.html` | Admin · Heute: Braucht dich, Lage, läuft von selbst, Notbremse | `/admin` | neu (Nr. 185) | 1440 |
+| `mobil-admin-heute.html` | Admin am Handy · Heute | `/admin` (Handy) | neu (Nr. 185) | 390 |
+| `mobil-admin-mehr.html` | Admin am Handy · Mehr-Blatt unter der Leiste | alle Admin-Seiten (Handy) | neu (Nr. 193) | 390 |
+| `mobil-admin-notbremse.html` | Admin am Handy · Notbremse „Bestellungen anhalten“ | Blatt in `/admin` (Handy) | neu (Nr. 189) | 390 |
+| `admin-hoefe-neu.html` | Admin · Höfe: Braucht Blick, Liste, Akte | `/admin/hoefe` | neu (Nr. 187) | 1440 |
+| `admin-hof-akte.html` | Admin · Höfe › Akte: Kontakt, Aktivität, Eingreifen, Konto-Anfragen | `/admin/hoefe/[id]` | neu (Nr. 187; die Konto-Knöpfe füllt Nr. 190, der Abschnitt „Plattformgebühr“ Nr. 198) | 1440 |
+| `admin-konto-anfrage.html` | Admin · Höfe › Akte › Anmelde-E-Mail ändern | Dialog in `/admin/hoefe/[id]`, Bestätigungsseite `/konto/email-bestaetigen` | neu (Nr. 190) | 1440 |
+| `admin-konto-schliessen.html` | Admin · Höfe › Akte › Konto schließen: sofort offline, nach 30 Tagen endgültig | Dialog in `/admin/hoefe/[id]` | neu (Nr. 190; Stufe 2 erst nach Freigabe der Liste) | 1440 |
+| `admin-bestellungen.html` | Admin · Bestellungen: Suche, Detail, Erstattung abschließen, Notfall-Storno | `/admin/bestellungen` | neu (Nr. 186) | 1440 |
+| `admin-postfach-gespraeche.html` | Admin · Postfach: nur Gespräche | `/admin/postfach` | Umbau (Nr. 193) | 1440 |
+| `admin-geld.html` | Admin · Geld: Abgleich mit Stripe, Monatsabschluss, Kosten | `/admin/geld` (bisher `/admin/finanzen`) | neu (Nr. 191; Plattformgebühr-Zeilen Nr. 198) | 1440 |
+| `admin-betrieb-neu.html` | Admin · Betrieb: Dienste, Alarm-Matrix, Version | `/admin/betrieb` | Umbau (Nr. 184 Überblick; Reiter Version Nr. 193) | 1440 |
+| `admin-protokoll.html` | Admin · Betrieb › Protokoll: wer hat was getan | `/admin/betrieb` (Reiter Protokoll) | neu (Nr. 193; die Einträge schreibt Nr. 188) | 1440 |
+| `admin-einstellungen-team.html` | Admin · Einstellungen › Team und Rechte je Person, Notfallzugang | `/admin/einstellungen?gruppe=team` | neu (Nr. 190) | 1440 |
 
 ## Hinweise
 

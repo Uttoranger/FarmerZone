@@ -38,7 +38,11 @@ function lauf(name: string, stunden: number, ok = true) {
 
 /** Die Mail-Warteschlange läuft jede Minute (N26, Nr. 158): vor 3 Minuten ist pünktlich. */
 const MAILS = lauf('mails', 0.05)
-const ALLE_PUENKTLICH = [lauf('aufraeumen', 4), lauf('verwaisteBestellungen', 3.5), lauf('betrieb', 3), lauf('briefkasten', 24), MAILS]
+/** Der Geld-Abgleich (Nr. 191) läuft täglich um 06:30 UTC. */
+const GELD = lauf('geld-abgleich', 1)
+// Nr. 198: die Monatsabrechnung läuft täglich wie der Geld-Abgleich.
+const MONAT = lauf('monatsabrechnung', 2)
+const ALLE_PUENKTLICH = [lauf('aufraeumen', 4), lauf('verwaisteBestellungen', 3.5), lauf('betrieb', 3), lauf('briefkasten', 24), MAILS, GELD, MONAT]
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -85,14 +89,14 @@ describe('Lebenszeichen — Abläufe', () => {
   })
 
   it('ein täglicher Ablauf überfällig (27 Stunden): 503 mit seinem Namen — nichts sonst', async () => {
-    db.ablaufLauf.findMany.mockResolvedValue([lauf('aufraeumen', 4), lauf('verwaisteBestellungen', 3.5), lauf('betrieb', 27), lauf('briefkasten', 24), MAILS])
+    db.ablaufLauf.findMany.mockResolvedValue([lauf('aufraeumen', 4), lauf('verwaisteBestellungen', 3.5), lauf('betrieb', 27), lauf('briefkasten', 24), MAILS, GELD, MONAT])
     const antwort = await GET(anfrage(`Bearer ${TOKEN}`))
     expect(antwort.status).toBe(503)
     expect(await antwort.json()).toEqual({ fehlen: ['betrieb'] })
   })
 
   it('der Wochenlauf 7 Tage alt: 200; 8 Tage und eine Stunde: 503 mit seinem Namen', async () => {
-    const mitWoche = (stunden: number) => [...ALLE_PUENKTLICH.slice(0, 3), lauf('briefkasten', stunden), MAILS]
+    const mitWoche = (stunden: number) => [...ALLE_PUENKTLICH.slice(0, 3), lauf('briefkasten', stunden), MAILS, GELD, MONAT]
     db.ablaufLauf.findMany.mockResolvedValue(mitWoche(7 * 24))
     expect((await GET(anfrage(`Bearer ${TOKEN}`))).status).toBe(200)
     db.ablaufLauf.findMany.mockResolvedValue(mitWoche(8 * 24 + 1))
@@ -111,7 +115,7 @@ describe('Lebenszeichen — Abläufe', () => {
   })
 
   it('ein täglicher Ablauf ganz ohne Zeile fehlt (fail-closed): 503 mit seinem Namen', async () => {
-    db.ablaufLauf.findMany.mockResolvedValue([lauf('aufraeumen', 4), lauf('verwaisteBestellungen', 3.5), lauf('briefkasten', 24), MAILS])
+    db.ablaufLauf.findMany.mockResolvedValue([lauf('aufraeumen', 4), lauf('verwaisteBestellungen', 3.5), lauf('briefkasten', 24), MAILS, GELD, MONAT])
     const antwort = await GET(anfrage(`Bearer ${TOKEN}`))
     expect(antwort.status).toBe(503)
     expect(await antwort.json()).toEqual({ fehlen: ['betrieb'] })
@@ -121,11 +125,11 @@ describe('Lebenszeichen — Abläufe', () => {
     db.ablaufLauf.findMany.mockResolvedValue([])
     const antwort = await GET(anfrage(`Bearer ${TOKEN}`))
     expect(antwort.status).toBe(503)
-    expect(await antwort.json()).toEqual({ fehlen: ['aufraeumen', 'verwaisteBestellungen', 'betrieb', 'mails'] })
+    expect(await antwort.json()).toEqual({ fehlen: ['aufraeumen', 'verwaisteBestellungen', 'betrieb', 'mails', 'monatsabrechnung', 'geld-abgleich'] })
   })
 
   it('die Mail-Warteschlange vor 9 Minuten: 200; vor 11 Minuten oder ohne Zeile: 503 mit ihrem Namen (N26)', async () => {
-    const ohneMails = ALLE_PUENKTLICH.slice(0, 4)
+    const ohneMails = [...ALLE_PUENKTLICH.slice(0, 4), GELD, MONAT]
     db.ablaufLauf.findMany.mockResolvedValue([...ohneMails, lauf('mails', 9 / 60)])
     expect((await GET(anfrage(`Bearer ${TOKEN}`))).status).toBe(200)
     db.ablaufLauf.findMany.mockResolvedValue([...ohneMails, lauf('mails', 11 / 60)])
@@ -137,7 +141,7 @@ describe('Lebenszeichen — Abläufe', () => {
   })
 
   it('Gegenprobe: nur der wöchentliche Ablauf ohne Zeile fehlt nicht (nach dem Deploy bis Montag): 200', async () => {
-    db.ablaufLauf.findMany.mockResolvedValue([...ALLE_PUENKTLICH.slice(0, 3), MAILS])
+    db.ablaufLauf.findMany.mockResolvedValue([...ALLE_PUENKTLICH.slice(0, 3), MAILS, GELD, MONAT])
     expect((await GET(anfrage(`Bearer ${TOKEN}`))).status).toBe(200)
   })
 })
@@ -160,7 +164,7 @@ describe('Lebenszeichen — wartende wichtige Mail (Nr. 161)', () => {
     db.mailAuftrag.findFirst.mockResolvedValue(wartetSeit(15))
     expect((await GET(anfrage(`Bearer ${TOKEN}`))).status).toBe(200)
     db.mailAuftrag.findFirst.mockResolvedValue(wartetSeit(30))
-    db.ablaufLauf.findMany.mockResolvedValue(ALLE_PUENKTLICH.slice(0, 4))
+    db.ablaufLauf.findMany.mockResolvedValue([...ALLE_PUENKTLICH.slice(0, 4), GELD, MONAT])
     expect(await (await GET(anfrage(`Bearer ${TOKEN}`))).json()).toEqual({ fehlen: ['mails'], mailWartet: true })
   })
 })

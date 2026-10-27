@@ -17,6 +17,8 @@ export interface OrderConfirmedProps {
   total: number
   /** Servicegebühr in Euro; 0 = keine Zeile. */
   serviceFee?: number
+  /** Das Wort für die Gebühr (N8): „Servicegebühr“ (Vorgabe) oder im Hofpreis-Modell „Plattformgebühr“. */
+  gebuehrWort?: string
   /** Bar zu kassieren: Warenpreis + Servicegebühr. */
   barZuKassieren?: number
   /**
@@ -46,7 +48,7 @@ export function OrderConfirmedEmail(p: OrderConfirmedProps) {
         </Text>
         {mitGebuehr && (
           <Text style={{ ...mutedText, margin: '4px 0 0', color: MAIL_FARBE.orangeText }}>
-            davon Servicegebühr {formatEuro(p.serviceFee ?? 0)}
+            davon {p.gebuehrWort ?? 'Servicegebühr'} {formatEuro(p.serviceFee ?? 0)}
             {p.barOhneGebuehr ? '' : ' — die schuldest du der Monatsabrechnung'}; Warenpreis{' '}
             {formatEuro(p.total)} bleibt dir.
           </Text>

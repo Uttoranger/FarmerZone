@@ -27,7 +27,7 @@ vi.mock('@/lib/prisma', () => ({ prisma: {} }))
 vi.mock('@/server/hofseite-vorschau', () => ({ ladeHofseiteGeteilt: vi.fn() }))
 // Die Prüfung vor dem Streamen (Nr. 117) prüft tests/hofseite-404.test.ts; hier ist der Hof öffentlich.
 vi.mock('@/server/queries/seo', () => ({ pruefeHofseiteGeteilt: vi.fn(async () => ({ indexieren: true, geo: null })) }))
-vi.mock('@/server/queries/teilen-bild', () => ({ ladeTeilenVorschau: vi.fn(async () => null) }))
+vi.mock('@/server/queries/teilen-bild', () => ({ teilenVorschauAus: vi.fn(() => null) }))
 vi.mock('@/server/queries/status-posts', () => ({ getActiveStatusPosts: vi.fn(async () => []) }))
 vi.mock('@/server/actions/appearance', () => ({ updateFarmBannerAction: vi.fn() }))
 vi.mock('@/server/actions/farm-photos', () => ({ addFarmPhotoAction: vi.fn(), reorderPhotosAction: vi.fn() }))

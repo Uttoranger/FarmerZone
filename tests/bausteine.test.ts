@@ -217,8 +217,8 @@ const FAELLE: Fall[] = [
   {
     name: 'Zähler',
     datei: 'zaehler',
-    element: createElement(Zaehler, { anzahl: 120, wofuer: 'Artikel im Korb', ton: 'gruen' }),
-    merkmale: ['99+', '120 Artikel im Korb', 'bg-accent'],
+    element: createElement(Zaehler, { anzahl: 120, wofuer: 'Artikel im Warenkorb', ton: 'gruen' }),
+    merkmale: ['99+', '120 Artikel im Warenkorb', 'bg-accent'],
   },
 ]
 

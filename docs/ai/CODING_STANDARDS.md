@@ -36,6 +36,7 @@ Bei **jeder** Codeänderung lesen.
 - Typen aus Prisma ableiten, nicht abschreiben: `Prisma.OrderGetPayload<…>`.
 - Keine Typduplikate: Zod-Schema ist die Quelle → `type X = z.infer<typeof xSchema>`.
 - Kein `updateMany` mit berechnetem Spaltenschlüssel (`{ [spalte]: wert }`) – je Spalte ausschreiben; sonst läuft tsc an den Speicher. (Regelvorschlag Dirigent, Morgenbericht 24, freigegeben 25.10.2026)
+- Stripe.js nur über `@stripe/stripe-js/pure` (Wache in Nr. 196). (Regelvorschlag Dirigent, Morgenbericht 25, freigegeben 26.10.2026)
 
 ### Geld
 - Prisma speichert Preise als `Decimal(10,2)`.
@@ -79,8 +80,9 @@ Bei **jeder** Codeänderung lesen.
 
 Systemgrenze = API-Route, Server Action, Webhook, URL-Parameter, `localStorage`, externe Antwort.
 
-- **Jede** Systemgrenze validiert mit Zod. Ohne Ausnahme.
+- **Jede** Systemgrenze validiert mit Zod. Ohne Ausnahme — außer im Browser der Kundenseiten (nächster Punkt).
 - Schemas liegen in `src/schemas/` und werden von Client **und** Server benutzt.
+- **Kein Zod im Browser der Kundenseiten** (`/`, `/hoefe`, Hofseite, Kasse; Nr. 196): Was diese Seiten ab dem ersten `'use client'`-Modul laden, erreicht weder `zod` noch `@hookform/resolvers`. Dort prüft eine kleine reine Funktion mit derselben Wirkung (Liste der Werte, Ränder, Länge; z. B. `leseHoefeFilter`, `leseWarenkorb`, `pruefeKasseFormular`, `leseZahlungsBetrag`); ein Modul unter `src/schemas/`, das diese Seiten erreichen, bleibt zod-frei, Konstanten liegen zod-frei in `src/lib/` (`eingabegrenzen.ts`, `format.ts`) und das Schema exportiert sie weiter. Gibt es ein Schema für den Server, gleicht ein Test die reine Prüfung damit ab. Der Server prüft unverändert mit Zod. Wache: `tests/leistung-196.test.ts` (Importgraph der vier Routen; Server-Actions zählen als Grenze).
 - Clientseitige Validierung ist Komfort, nie Schutz. Serverseitig immer erneut prüfen.
 - In API-Routen `safeParse` (Antwort bauen), in Server Actions `parse` oder `safeParse` mit `{ error }`.
 - `localStorage`-Inhalte (Warenkorb!) sind Fremddaten: parsen, validieren, bei Bruch verwerfen. Der Warenkorb nur über `leseWarenkorb`/`schreibeWarenkorb` (`src/lib/warenkorb-speicher.ts`), nie mit eigenem Schlüssel oder nacktem `JSON.parse`.

@@ -1,5 +1,4 @@
 import { createHmac } from 'crypto'
-import { headers } from 'next/headers'
 import { env } from '@/lib/env'
 import { geheimnisGleich } from '@/lib/geheimnis'
 import { vorschauParameterSchema, vorschauQuelleSchema, type VorschauParameter, type VorschauQuelle } from '@/schemas/startseite'
@@ -24,8 +23,10 @@ import { vorschauParameterSchema, vorschauQuelleSchema, type VorschauParameter, 
  * hier nie.
  *
  * Der Link allein öffnet nichts: Die Seite verlangt zusätzlich die Admin-
- * Sitzung (frisch aus der Datenbank, wie verlangeAdminSeite). Damit wirkt er
- * auf jedem Gerät, auf dem der Admin angemeldet ist.
+ * Sitzung über die Admin-Wache (seit Nr. 188, Audit A2/B1: Recht frisch aus
+ * der Datenbank, 12 Stunden, Passkey der Sitzung, Recht „Startseite
+ * veröffentlichen“). Damit wirkt er auf jedem Gerät, auf dem der Admin mit
+ * Passkey angemeldet ist.
  *
  * EIGENE DYNAMISCHE ROUTE, KEIN DRAFT MODE (Register N16, Ergänzung
  * 25.10.2026; Nr. 182): Bis dahin las die statische Startseite `/` den Link im
@@ -86,11 +87,10 @@ export function pruefeVorschau(vorschau: string, sig: string, jetzt: Date): Vors
 async function vorschauFuerAdmin({ vorschau, sig }: VorschauParameter, jetzt: Date): Promise<VorschauInhalt | null> {
   const ergebnis = pruefeVorschau(vorschau, sig, jetzt)
   if (!ergebnis.ok) return null
-  // Sitzung und Admin-Recht erst hier und dynamisch geladen: Better Auth
-  // gehört nicht in den statischen Import-Graphen einer Seite (ARCHITECTURE §4).
-  const [{ auth }, { isAdminUser }] = await Promise.all([import('@/lib/auth'), import('@/server/queries/admin')])
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user || !(await isAdminUser(session.user.id))) return null
+  // Die Admin-Wache erst hier und dynamisch geladen: Better Auth gehört nicht
+  // in den statischen Import-Graphen einer Seite (ARCHITECTURE §4).
+  const { verlangeAdminAktion } = await import('@/server/admin-wache')
+  if (!('ok' in (await verlangeAdminAktion({ recht: 'startseite_veroeffentlichen' })))) return null
   return { datum: ergebnis.datum, blockEntwurfId: ergebnis.blockEntwurfId, quelle: ergebnis.quelle }
 }
 

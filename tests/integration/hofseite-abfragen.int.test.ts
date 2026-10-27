@@ -2,7 +2,8 @@
  * Zahl der SQL-Abfragen je Hofseiten-Anfrage (Nachtlauf 25, Nr. 180) — gegen ein
  * ECHTES Postgres. Eine Anfrage an `/[farmSlug]` lädt:
  *  - die Seite: ladeHofseite (über ladeHofseiteGeteilt auch für die Metadaten) und die Beiträge,
- *  - die Metadaten zusätzlich: das Teilen-Bild (ladeTeilenVorschau).
+ *  - die Metadaten zusätzlich: das Teilen-Bild — seit Nr. 196 aus dem Hof des Laders
+ *    (teilenVorschauAus), ohne eigene Abfrage.
  * Gezählt wird auf der Leitung (pg.Client.query), nicht im Code: So bleibt die Zahl
  * ehrlich, auch wenn jemand Abfragen umstellt. Die Zahl ändert sich durch das
  * Gleichzeitig-Laden nicht (nur die Wartezeit); der Test hält sie fest, damit eine
@@ -16,7 +17,7 @@ vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi
 
 import pg from 'pg'
 import { ladeHofseite } from '@/server/hofseite-vorschau'
-import { ladeTeilenVorschau } from '@/server/queries/teilen-bild'
+import { teilenVorschauAus } from '@/server/queries/teilen-bild'
 import { ladeBeitraege } from '@/server/hofseite-beitraege'
 import { erstelleHof, erstelleProdukt, raeumeAuf } from './setup/basis'
 
@@ -47,16 +48,17 @@ describe('SQL je Hofseiten-Anfrage', () => {
     await erstelleProdukt(farm.id, { stock: 5 })
 
     abfragen = []
-    await Promise.all([
-      // Der Weg der Seite: Hof (geteilt mit den Metadaten, einmal) und die Beiträge; dazu das Teilen-Bild der Metadaten.
-      ladeHofseite(farm.slug, {}).then((e) => e.farm && ladeBeitraege(e.farm.id, null)),
-      ladeTeilenVorschau(farm.slug, new Date()),
-    ])
-    // Vorher-Wert (14, e1f89496): derselbe Test gegen den Lader von e1f89496 (Beiträge dort nacheinander
-    // geladen, gleiche Abfragen). Der Messwert steht im Bericht (docs/nachtlauf/berichte/180.md). Ein Test, der ihn nur ausgibt,
-    // wäre keiner: Eine Abfrage mehr oder weniger soll auffallen.
+    // Der Weg der Seite: Hof (geteilt mit den Metadaten, einmal) und die Beiträge; das Teilen-Bild der
+    // Metadaten baut aus demselben Hof (Nr. 196).
+    const geladen = await ladeHofseite(farm.slug, {})
+    const vorschau = geladen.teilen ? teilenVorschauAus(geladen.teilen, new Date()) : null
+    if (geladen.farm) await ladeBeitraege(geladen.farm.id, null)
+    expect(vorschau?.version).toMatch(/^[0-9a-z]+$/)
+    // Vorher-Werte: 14 (e1f89496, vor Nr. 180, Beiträge nacheinander) und 14 (Nr. 180, Teilen-Bild mit eigener
+    // Abfrage: Hof, Produkte, Abholzeiten). Seit Nr. 196 fallen diese drei weg (docs/nachtlauf/berichte/196.md).
+    // Ein Test, der die Zahl nur ausgibt, wäre keiner: Eine Abfrage mehr oder weniger soll auffallen.
     expect(selects()).toBe(GEZAEHLT)
   })
 })
 
-const GEZAEHLT = 14
+const GEZAEHLT = 11

@@ -25,11 +25,14 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import ts from 'typescript'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, createElement, type ComponentProps, type ReactNode } from 'react'
+import { act, createElement, useState, type ComponentProps, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BROWSER_OBJEKTE, hydriere, pruefeHydrieren, raeumeHydrierenAuf } from './hydrieren-hilfe'
 import { NetzHinweis } from '@/components/ui/netz-hinweis'
+import { NotbremseBand } from '@/components/notbremse-band'
+import { useHofzeileKlebt } from '@/components/hofseite/use-hofzeile-klebt'
 import { NETZ_ZEILE } from '@/lib/netz'
+import { HeuteRoutine } from '@/components/admin/heute-routine'
 
 // Attrappen wie in tests/mein-hof-umschalter.test.ts: Die Adresse liest useSearchParams aus `adresse`.
 const adresse = { suche: '' }
@@ -212,6 +215,47 @@ describe('Hydrieren – die Netz-Zeile (Register N29, Nr. 175)', () => {
   })
 })
 
+describe('Hydrieren – das Band der Notbremse (Register N34, Nr. 189)', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('NotbremseBand: im Server-HTML kein Satz, nach dem Hydrieren holt der Browser ihn nach', async () => {
+    const satz = 'Bestellen ist gerade kurz nicht möglich.'
+    const bis = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    const holen = vi.fn(async () => new Response(JSON.stringify({ stopp: { satz, bis } }), { status: 200 }))
+    const ergebnis = await pruefeHydrieren(createElement(NotbremseBand), { imBrowser: () => vi.stubGlobal('fetch', holen) })
+    expect(ergebnis.serverHtml).not.toContain(satz)
+    expect(ergebnis.meldungen).toEqual([])
+    await act(async () => {
+      await new Promise((fertig) => setTimeout(fertig, 0))
+    })
+    expect(holen).toHaveBeenCalledWith('/api/notbremse', { cache: 'no-store' })
+    expect(ergebnis.container.textContent).toContain(satz)
+    expect(ergebnis.container.querySelector('[role="status"]')).not.toBeNull()
+  })
+})
+
+describe('Hydrieren – klebt die Hofzeile (Nr. 195)', () => {
+  function Probe(): React.JSX.Element {
+    const [block, setzeBlock] = useState<HTMLDivElement | null>(null)
+    return createElement('div', { ref: setzeBlock }, `klebt: ${useHofzeileKlebt(block)}`)
+  }
+  afterEach(() => vi.restoreAllMocks())
+  const lageDesBlocks = (oben: number) => () =>
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ top: oben, height: 0 } as DOMRect)
+
+  it('im Server-HTML „klebt nicht“; oben angekommen nach dem Hydrieren „klebt“', async () => {
+    const ergebnis = await pruefeHydrieren(createElement(Probe), { imBrowser: lageDesBlocks(0) })
+    expect(ergebnis.serverHtml).toContain('klebt: false')
+    expect(ergebnis.meldungen).toEqual([])
+    expect(ergebnis.container.textContent).toBe('klebt: true')
+  })
+
+  it('Gegenprobe: weit unten im Fluss bleibt es bei „klebt nicht“', async () => {
+    const ergebnis = await pruefeHydrieren(createElement(Probe), { imBrowser: lageDesBlocks(420) })
+    expect(ergebnis.container.textContent).toBe('klebt: false')
+  })
+})
+
 describe('Hydrieren – Teile mit dem Browser-Speicher', () => {
   /** Die Messung des Cookie-Hinweises läuft über Bildaufbau und Beobachter — fürs Hydrieren ohne Belang. */
   function ohneMessung(): void {
@@ -271,6 +315,18 @@ describe('Hydrieren – Teile mit dem Browser-Speicher', () => {
 })
 
 describe('Hydrieren – weitere Teile mit dem Browser-Speicher und -Kontext', () => {
+  it('HeuteRoutine (Nr. 185): im Server-HTML kein Haken, nach dem Hydrieren die Haken der Woche aus dem Speicher', async () => {
+    const schluessel = 'fz_admin_montag_2026-10-26'
+    const ergebnis = await pruefeHydrieren(createElement(HeuteRoutine, { schluessel, kopf: true }), {
+      imBrowser: () => localStorage.setItem(schluessel, JSON.stringify(['sentry'])),
+    })
+    expect(ergebnis.serverHtml).not.toContain('checked')
+    expect(ergebnis.serverHtml).toContain('0 von 5 erledigt')
+    const haken = [...ergebnis.container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
+    expect(haken.map((h) => h.checked)).toEqual([false, false, true, false, false])
+    expect(ergebnis.container.textContent).toContain('1 von 5 erledigt')
+  })
+
   it('DarstellungKarte: Platzhalter im Server-HTML, die drei Knöpfe mit der Wahl des Browsers erst danach', async () => {
     const ergebnis = await pruefeHydrieren(createElement(DarstellungKarte), { imBrowser: () => localStorage.setItem('theme', 'dark') })
     expect(ergebnis.serverHtml).not.toContain('<button')
@@ -442,15 +498,18 @@ describe('Hydrieren – die Hofübersicht /hoefe', () => {
  */
 const GEPRUEFT: Record<string, string[]> = {
   'src/app/(hof)/settings/account/darstellung-karte.tsx': ['DarstellungKarte'],
+  'src/components/admin/heute-routine.tsx': ['HeuteRoutine'],
   'src/components/cookie-banner.tsx': ['CookieBanner'],
   'src/components/farm/vorschau-im-rahmen.tsx': ['useImVorschauRahmen'],
   'src/components/heute/startbildschirm-karte.tsx': ['StartbildschirmKarte'],
+  'src/components/hofseite/use-hofzeile-klebt.ts': ['useHofzeileKlebt'],
   'src/components/hoefe/hoefe-client.tsx': ['HoefeClient'],
   'src/components/hoefe/use-hoefe-adresse.ts': ['useHoefeAdresse'],
   'src/components/hoefe/use-uhr.ts': ['Abholzeile', 'BeitragMarke'],
   'src/components/shared/theme-umschalter.tsx': ['ThemeUmschalter', 'ThemeUmschalterZeile'],
   'src/components/shared/use-meldung-formular.ts': ['useMeldungFormular'],
   'src/components/ui/netz-hinweis.tsx': ['NetzHinweis'],
+  'src/components/notbremse-band.tsx': ['NotbremseBand'],
   'src/lib/use-cart.ts': ['useCart', 'useKorbHinweis'],
   'src/lib/use-mindestbreite.ts': ['useMindestbreite', 'useSchmalerAls'],
   'src/lib/use-warenkorb-kopf.ts': ['useWarenkorbKopf', 'useWarenkorbVomHof'],

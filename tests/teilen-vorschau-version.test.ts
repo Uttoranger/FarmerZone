@@ -14,7 +14,7 @@ import { Decimal } from '@prisma/client/runtime/index-browser'
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    farm: { findFirst: vi.fn() },
+    farm: { findUnique: vi.fn() },
     product: { findMany: vi.fn(async () => []) },
     statusPost: { findUnique: vi.fn(async () => null) },
   },
@@ -34,9 +34,18 @@ vi.mock('next/og', () => ({
   }),
 }))
 
+// Seit Nr. 196 liest das Teilen-Bild die Zeile der Hofseite (getPublicFarmMitTeilen); die Hilfe füllt den Rest.
+import { hofseitenZeile } from './hofseiten-zeile'
 import { prisma } from '@/lib/prisma'
 import { teilenBildVersion } from '@/lib/teilen-bild'
-import { ladeTeilenVorschau } from '@/server/queries/teilen-bild'
+import { teilenVorschauAus } from '@/server/queries/teilen-bild'
+import { getPublicFarmMitTeilen } from '@/server/queries/farm'
+
+/** Der Weg der Metadaten der Hofseite (Nr. 196): der Hof des Laders (getPublicFarmMitTeilen), daraus teilenVorschauAus. */
+async function ladeTeilenVorschau(slug: string, jetzt: Date) {
+  const hof = await getPublicFarmMitTeilen({ slug })
+  return hof ? teilenVorschauAus(hof, jetzt) : null
+}
 import { GET as bildRoute } from '@/app/(public)/[farmSlug]/opengraph-image/route'
 
 const SPEICHER = 'https://testspeicher.public.blob.vercel-storage.com/farms/farm-1/product'
@@ -46,7 +55,7 @@ const KURZ = 'public, max-age=60, s-maxage=60'
 
 /** Ein öffentlicher Hof mit einem Produkt; `imageUrl` ist sein Foto (oder keins). */
 function stelleHof(imageUrl: string | null) {
-  vi.mocked(prisma.farm.findFirst).mockResolvedValue({
+  vi.mocked(prisma.farm.findUnique).mockResolvedValue(hofseitenZeile({
     id: 'farm-1',
     name: 'Hof Test',
     slug: 'hof-test',
@@ -59,7 +68,7 @@ function stelleHof(imageUrl: string | null) {
     ],
     // Ohne Abholfenster hängt der Inhalt nicht an der Uhr — Route (Systemuhr) und Seite (JETZT) rechnen gleich.
     pickupSlots: [],
-  } as never)
+  }) as never)
   // Die Route liest die Produktfotos selbst (ladeBildQuelle in route.tsx).
   vi.mocked(prisma.product.findMany).mockResolvedValue((imageUrl ? [{ id: 'eier', imageUrl }] : []) as never)
 }

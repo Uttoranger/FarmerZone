@@ -470,11 +470,14 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
     fuegeEin(entwurf.zeilen.findIndex((z) => z.art === 'HOEFE'), vorlage)
   }
 
+  // Löschen ist heikel wie alles, was löscht (Freigabe 188 Punkt 4): frisch mit Passkey bestätigt.
+  const frischLoeschen = useFrischBestaetigt(loescheStartseitenBlock)
+
   /** „Block löschen“ bzw. „Verwerfen“ (neuer Block): wartet eine laufende Speicherung ab — legt sie den Block an, wird er gelöscht (Nr. 183). */
   function loeschen() {
     if (!entwurf.block) return
     startTransition(async () => {
-      const ergebnis = await entwurf.entferneBlock((blockId) => loescheStartseitenBlock({ blockId }))
+      const ergebnis = await entwurf.entferneBlock((blockId) => frischLoeschen.ausfuehren({ blockId }))
       if (ergebnis?.art === 'fehler') toast.error(ergebnis.text)
       if (ergebnis?.art === 'geloescht') toast.success(T.geloescht)
     })
@@ -482,6 +485,8 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
 
   // Veröffentlichen ist heikel (Register N20, Ergänzung 23.10.2026): frisch mit Passkey bestätigt.
   const frischVeroeffentlichen = useFrischBestaetigt(veroeffentlicheStartseite)
+  // Zurückziehen nimmt eine geplante oder laufende Fassung von der Startseite (Audit D10; Nr. 188): frisch mit Passkey bestätigt.
+  const frischZurueckziehen = useFrischBestaetigt(zieheFassungZurueck)
 
   function veroeffentlichen(eingabe: VeroeffentlichenEingabe) {
     setDialogFehler(null)
@@ -535,7 +540,7 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
     }
     setAktionFehler(null)
     startTransition(async () => {
-      const ergebnis = await zieheFassungZurueck({ id: aktion.id })
+      const ergebnis = await frischZurueckziehen.ausfuehren({ id: aktion.id })
       if ('error' in ergebnis) {
         setAktionFehler(ergebnis.error)
         return
@@ -707,8 +712,14 @@ export function StartseiteGestalten({ daten, jetzt: jetztText }: { daten: AdminS
         fehler={dialogFehler}
         onVeroeffentlichen={veroeffentlichen}
       >
+        {/* Nur Veröffentlichen läuft im offenen Dialog — sein Passkey-Dialog darf darin hängen. */}
         {frischVeroeffentlichen.dialog}
       </VeroeffentlichenDialog>
+
+      {/* Zurückziehen und Löschen laufen bei geschlossenem Veröffentlichen-Dialog: Darin wäre ihr
+          Passkey-Dialog nicht eingehängt, und die Aktion hinge nach 5 Minuten ohne Meldung (Nr. 188, Runde 2). */}
+      {frischZurueckziehen.dialog}
+      {frischLoeschen.dialog}
 
       <VorschauFenster
         offen={fassungVorschau !== null}

@@ -284,3 +284,22 @@ export const VORRAT_HINWEIS = 'Vorrat direkt hier ändern. Bei 0 wird das Produk
 
 /** Derselbe Platz unter 1024 px: Dort ändert ein Tipp auf den Vorrat ihn im Blatt (N25). */
 export const VORRAT_HINWEIS_ZEILEN = 'Tipp auf den Vorrat, um ihn zu ändern. Bei 0 steht das Produkt als ausverkauft da – es wird nicht gelöscht.'
+
+/**
+ * Die Sätze zum Löschen eines Produkts (Nr. 195, Audit A5): Eines mit
+ * Bestellungen bleibt erhalten und wird ausgeblendet — der Dialog sagt das
+ * vorher, der Hinweis danach, was geschehen ist.
+ */
+export const PRODUKT_LOESCHEN_TEXT = {
+  titel: 'Produkt löschen?',
+  /** Der Satz nach dem Namen im Dialog. */
+  dialogSatz:
+    'wird dauerhaft gelöscht. Hat es schon Bestellungen, bleibt es erhalten und wird nur ausgeblendet. Vergangene Bestellungen bleiben immer erhalten. Nur ausblenden geht mit dem Schalter „Sichtbar“.',
+  geloescht: 'Produkt gelöscht',
+  ausgeblendet: 'Das Produkt hat schon Bestellungen und bleibt deshalb erhalten. Es ist jetzt ausgeblendet.',
+} as const
+
+/** Der Hinweis nach dem Löschen: gelöscht oder (mit Bestellungen) nur ausgeblendet. */
+export function produktLoeschenHinweis(ergebnis: { archiviert: boolean }): string {
+  return ergebnis.archiviert ? PRODUKT_LOESCHEN_TEXT.ausgeblendet : PRODUKT_LOESCHEN_TEXT.geloescht
+}

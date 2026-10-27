@@ -53,6 +53,9 @@ const SOFORT: Record<string, MailArt> = {
   sendZuVieleVersucheEmail: 'zu-viele-versuche',
   sendNeueAnmeldungEmail: 'neue-anmeldung',
   sendAdminSicherheitEmail: 'admin-sicherheit',
+  sendEmailAendernLink: 'email-aendern-link',
+  sendEmailGeaendertHinweis: 'email-geaendert-hinweis',
+  sendTeamRechtGeaendert: 'team-recht-geaendert',
   sendOnsiteConfirmation: 'bar-bestaetigungslink',
   sendBetreiberBestaetigung: 'betreiber-bestaetigung',
   sendBetriebWarnung: 'betrieb-warnung',
@@ -78,6 +81,8 @@ const WICHTIG: Record<string, MailArt> = {
   baueHofAntwortAnTeam: 'antwort-an-team',
   baueBetreiberTestmail: 'betreiber-testmail',
   baueAboBestaetigung: 'abo-bestaetigung',
+  bauePlattformgebuehrAnkuendigung: 'plattformgebuehr-ankuendigung',
+  baueLastschriftGescheitert: 'lastschrift-gescheitert',
 }
 
 /** Kann warten: Beiträge, Rundschreiben, Bescheide. `bauePostfachMail` baut auch das Rundschreiben (Art je Aufruf). */

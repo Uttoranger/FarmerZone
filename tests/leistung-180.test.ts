@@ -122,8 +122,10 @@ describe('Hofseite: Unabhängiges läuft gleichzeitig', () => {
     expect(seite.match(/ladeHofseiteGeteilt\(farmSlug, suche, vorab\(suche\)\)/g)).toHaveLength(2)
   })
 
-  it('Metadaten: Hof und Teilen-Vorschau über Promise.all', () => {
-    expect(seite).toMatch(/Promise\.all\(\[\s*ladeHofseiteGeteilt\(/)
+  it('Metadaten: das Teilen-Bild kommt seit Nr. 196 aus dem Hof des Laders, ohne eigene Abfrage', () => {
+    expect(seite).toMatch(/const \{ farm, ansicht, teilen \} = await ladeHofseiteGeteilt\(/)
+    expect(seite).toMatch(/teilenVorschauAus\(teilen, /)
+    expect(seite).not.toMatch(/ladeTeilenVorschau\b/)
   })
 })
 
@@ -158,7 +160,12 @@ describe('ladeHofseite: volle Tage, Abzeichen-Blatt und Beiträge gleichzeitig',
     vi.doMock('@/server/queries/farm', () => ({
       getHofBesitzer: vi.fn(),
       getOwnerFarm: vi.fn(),
-      getPublicFarm: vi.fn(async () => ({ id: 'f1', slug: 'hof-a', pickupSlots: [], gruendungshof: true })),
+      getPublicFarm: vi.fn(),
+      // Seit Nr. 196: der öffentliche Hof samt Rohwerten des Teilen-Bilds (dieselbe Abfrage wie getPublicFarm).
+      getPublicFarmMitTeilen: vi.fn(async () => ({
+        farm: { id: 'f1', slug: 'hof-a', pickupSlots: [], gruendungshof: true },
+        teilen: { betriebsnummer: null, produkte: new Map() },
+      })),
     }))
     vi.doMock('@/server/abholfenster', () => ({
       alsAbholFenster: vi.fn(),
@@ -218,7 +225,7 @@ describe('ladeHofseite: volle Tage, Abzeichen-Blatt und Beiträge gleichzeitig',
   it('ohne Hof (404) starten die Beiträge nicht', async () => {
     const { modul } = await lader()
     const farm = await import('@/server/queries/farm')
-    vi.mocked(farm.getPublicFarm).mockResolvedValueOnce(null)
+    vi.mocked(farm.getPublicFarmMitTeilen).mockResolvedValueOnce(null)
     const vorab = vi.fn(async () => {})
     expect((await modul.ladeHofseite('hof-a', {}, vorab)).farm).toBeNull()
     expect(vorab).not.toHaveBeenCalled()
@@ -231,7 +238,7 @@ describe('ladeHofseite: volle Tage, Abzeichen-Blatt und Beiträge gleichzeitig',
     const vorab = vi.fn(async () => {})
     const [a, b] = await Promise.all([modul.ladeHofseiteGeteilt('hof-a', {}, vorab), modul.ladeHofseiteGeteilt('hof-a', {}, vorab)])
     expect(a).toBe(b)
-    expect(farm.getPublicFarm).toHaveBeenCalledTimes(1)
+    expect(farm.getPublicFarmMitTeilen).toHaveBeenCalledTimes(1)
     expect(vorab).toHaveBeenCalledTimes(1)
     expect(vorab).toHaveBeenCalledWith('f1')
   })

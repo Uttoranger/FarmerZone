@@ -11,15 +11,16 @@
  *  - Der Punkt am Reiter und der Hinweis in der Betriebsleiste: nur in der
  *    Produktion, aus EINER schlanken Abfrage je Seitenaufbau; scheitert sie,
  *    fehlt nur der Punkt (Sentry ohne Inhalt).
- *  - Die AdminShell zeigt Punkt („1 Warnung“) und Hinweis mit Link — ohne
- *    Warnung keins von beiden (Gegenprobe).
+ *  - Die AdminShell zeigt den Punkt („1 Warnung“); rechts in der Leiste steht
+ *    seit Nr. 185 „n offen · m überfällig – ansehen“ statt der Warnung — ohne
+ *    beides keins von beiden (Gegenprobe).
  *  - Admin › Einstellungen: `?gruppe=betrieb` führt nach Admin › Betrieb.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createElement, type ComponentType } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-const wache = vi.hoisted(() => ({ verlangeAdminAktion: vi.fn(), verlangeAdminSeite: vi.fn(async () => 'admin_1'), verlangeAdminShell: vi.fn(async () => ({ userId: 'admin_1', inhaltOffen: true })), verlangeFrischeBestaetigung: vi.fn(async () => ({ ok: true, userId: 'admin_1', sitzungId: 'sitzung-admin_1' })), frischOderBestaetigen: vi.fn(async () => null), adminPflichtOffen: vi.fn(async () => false) }))
+const wache = vi.hoisted(() => ({ verlangeAdminAktion: vi.fn(), verlangeAdminSeite: vi.fn(async () => 'admin_1'), verlangeAdminShell: vi.fn(async () => ({ userId: 'admin_1', inhaltOffen: true, person: { adminInhaber: true, adminRechte: [] } })), verlangeFrischeBestaetigung: vi.fn(async () => ({ ok: true, userId: 'admin_1', sitzungId: 'sitzung-admin_1' })), frischOderBestaetigen: vi.fn(async () => null), adminPflichtOffen: vi.fn(async () => false) }))
 const umgebung = vi.hoisted(() => ({ vercelProduktion: false }))
 const db = vi.hoisted(() => ({
   user: { findUnique: vi.fn() },
@@ -37,6 +38,8 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 vi.mock('@/server/queries/admin', () => ({ zaehleWartendeHoefe: vi.fn(async () => 0) }))
 vi.mock('@/server/queries/postfach', () => ({ zaehleOffenImEingang: vi.fn(async () => ({ gesamt: 0 })) }))
+// Die Zahl „n offen“ der Betriebsleiste (Nr. 185) prüft tests/admin-heute.test.ts; hier geht es um den Punkt.
+vi.mock('@/server/queries/admin-heute', () => ({ ladeAdminAufgaben: vi.fn(async () => []) }))
 vi.mock('@/lib/umgebung-server', async (importOriginal) => {
   const echt = await importOriginal<typeof import('@/lib/umgebung-server')>()
   return {
@@ -168,25 +171,24 @@ describe('Punkt und Hinweis der Shell (ladeAdminbereich)', () => {
   })
 })
 
-describe('AdminShell: Punkt am Reiter und Hinweis in der Betriebsleiste', () => {
+describe('AdminShell: Punkt am Reiter und Zahl in der Betriebsleiste (seit Nr. 185)', () => {
   const Shell = AdminShell as unknown as ComponentType<Omit<AdminShellProps, 'children'>>
-  const render = (betrieb: AdminShellProps['betrieb']): string =>
-    renderToStaticMarkup(createElement(Shell, { personName: 'Max Mustermann', hatHof: false, zahlen: { hoefe: 0, briefkasten: 0 }, betrieb }))
+  const render = (betrieb: AdminShellProps['betrieb'], aufgaben: AdminShellProps['aufgaben'] = null): string =>
+    renderToStaticMarkup(createElement(Shell, { personName: 'Max Mustermann', hatHof: false, zahlen: { hoefe: 0, postfach: 0 }, betrieb, aufgaben }))
 
-  it('mit Warnung: Punkt mit „1 Warnung“ und der Hinweis als Link nach Admin › Betrieb', () => {
+  it('mit Warnung: Punkt mit „1 Warnung“ am Reiter — die einzelne Warnung steht nicht mehr in der Leiste', () => {
     const html = render({ anzahl: 1, text: 'Bilder-Speicher über 80 %', kurz: 'Bilder über 80 %', href: '/admin/betrieb' })
     expect(html).toContain('aria-label="1 Warnung"')
-    expect(html).toContain('Bilder-Speicher über 80 % – ansehen')
-    expect(html).toMatch(/<a [^>]*href="\/admin\/betrieb"[^>]*>(?:(?!<\/a>)[\s\S])*Bilder über 80 %/)
+    expect(html).not.toContain('Bilder-Speicher über 80 % – ansehen')
   })
 
-  it('eine wartende Mail führt zu Betrieb › E-Mails (Nr. 161)', () => {
-    const html = render({ anzahl: 1, text: 'Eine Bestellmail wartet seit 7 Min.', kurz: 'Mail wartet 7 Min.', href: '/admin/betrieb?reiter=mails' })
-    expect(html).toContain('Eine Bestellmail wartet seit 7 Min. – ansehen')
-    expect(html).toMatch(/<a [^>]*href="\/admin\/betrieb\?reiter=mails"[^>]*>(?:(?!<\/a>)[\s\S])*Mail wartet 7 Min\./)
+  it('offene Aufgaben: „4 offen · 1 überfällig – ansehen“ als Link nach Heute, am Handy kurz', () => {
+    const html = render(null, { text: '4 offen · 1 überfällig – ansehen', kurz: '4 offen – ansehen', href: '/admin' })
+    expect(html).toMatch(/<a [^>]*href="\/admin"[^>]*>(?:(?!<\/a>)[\s\S])*4 offen · 1 überfällig – ansehen/)
+    expect(html).toContain('4 offen – ansehen')
   })
 
-  it('Gegenprobe: ohne Warnung weder Punkt noch Hinweis — der Reiter Betrieb steht trotzdem da', () => {
+  it('Gegenprobe: ohne Warnung und ohne Aufgabe weder Punkt noch Zeile — der Reiter Betrieb steht trotzdem da', () => {
     const html = render(null)
     expect(html).not.toContain('Warnung')
     expect(html).not.toContain('ansehen')

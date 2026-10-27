@@ -146,8 +146,20 @@ describe('Checkout vor dem Stichtag — echte Datenbank', () => {
   })
 })
 
+/** Den Stichtag „Hofpreis-Modell ab“ (N38, Nr. 197) für einen Test setzen und danach zurücksetzen — die Dateien laufen nacheinander. */
+async function mitHofpreisStichtag(ab: Date, test: () => Promise<void>): Promise<void> {
+  const vorher = await prisma.plattformEinstellung.findUnique({ where: { id: 'plattform' }, select: { hofpreisModellAb: true } })
+  await prisma.plattformEinstellung.upsert({ where: { id: 'plattform' }, create: { id: 'plattform', hofpreisModellAb: ab }, update: { hofpreisModellAb: ab } })
+  try {
+    await test()
+  } finally {
+    await prisma.plattformEinstellung.update({ where: { id: 'plattform' }, data: { hofpreisModellAb: vorher?.hofpreisModellAb ?? null } })
+  }
+}
+
 describe('Checkout ab dem Stichtag — echte Datenbank', () => {
-  it('bar: die Gebühr gilt wieder, mit Prozent und Mindestgebühr im Snapshot', async () => {
+  // Modell `bisher` nach BAR_SERVICEGEBUEHR_AB: Der Admin hat das Hofpreis-Modell (N38) verschoben.
+  it('bar: die Gebühr gilt wieder, mit Prozent und Mindestgebühr im Snapshot', () => mitHofpreisStichtag(new Date('2099-01-01T00:00:00.000Z'), async () => {
     uhrAuf(new Date(BAR_SERVICEGEBUEHR_AB.getTime() + 2 * TAG_MS))
     const { farm, produkt } = await hofMitGebuehr()
     const sitzung = intKennung('sitzung')
@@ -167,7 +179,36 @@ describe('Checkout ab dem Stichtag — echte Datenbank', () => {
     expect(bestellt.serviceFeeCents).toBe(100)
     expect(bestellt.serviceFeePercentApplied?.toNumber()).toBe(5)
     expect(bestellt.serviceFeeMinCentsApplied).toBe(50)
-  })
+    expect(bestellt.gebuehrModell).toBeNull()
+  }))
+
+  it('Hofpreis-Modell (N38): bar mit Mandat — 6 % je Stück, Snapshot je Position, Einzug sepa', () => mitHofpreisStichtag(BAR_SERVICEGEBUEHR_AB, async () => {
+    uhrAuf(new Date(BAR_SERVICEGEBUEHR_AB.getTime() + 2 * TAG_MS))
+    const { farm, produkt } = await hofMitGebuehr()
+    await prisma.farm.update({ where: { id: farm.id }, data: { einzugAb: BAR_SERVICEGEBUEHR_AB, sepaMandatAm: BAR_SERVICEGEBUEHR_AB } })
+    const sitzung = intKennung('sitzung')
+    await setzeHalt(produkt.id, sitzung, 2)
+
+    const antwort = await checkout(
+      checkoutAnfrage({
+        farm,
+        sessionId: sitzung,
+        paymentMethod: 'ONSITE_CASH',
+        positionen: [{ productId: produkt.id, name: 'Testprodukt', quantity: 2, unitPrice: 10 }],
+      })
+    )
+
+    expect(antwort.status).toBe(200)
+    const bestellt = await prisma.order.findFirstOrThrow({ where: { farmId: farm.id }, include: { items: true } })
+    // 10 € × 6 % = 60 Cent je Stück, 2 Stück = 120 Cent; Warenpreis bleibt 20 €.
+    expect(bestellt.totalAmount.toNumber()).toBe(20)
+    expect(bestellt.serviceFeeCents).toBe(120)
+    expect(bestellt.serviceFeePercentApplied?.toNumber()).toBe(6)
+    expect(bestellt.serviceFeeMinCentsApplied).toBe(0)
+    expect(bestellt.gebuehrModell).toBe('hofpreis')
+    expect(bestellt.gebuehrEinzug).toBe('sepa')
+    expect(bestellt.items.map((i) => i.gebuehrCents)).toEqual([120])
+  }))
 })
 
 describe('Admin-Summen — Barbestellungen vor dem Stichtag zählen nicht als geschuldet', () => {

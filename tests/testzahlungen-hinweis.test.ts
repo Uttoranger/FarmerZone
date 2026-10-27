@@ -16,6 +16,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 const SATZ = 'Testzahlungen vor dem 2. November 2026, 21:00 Uhr sind nicht mitgezählt.'
 const zustand = vi.hoisted(() => ({ hinweis: null as string | null }))
 
+// Die Plattformgebühr auf Geld (Nr. 198) hat eigene Tests (tests/plattformgebuehr-abrechnung.test.ts).
+vi.mock('@/server/queries/plattformgebuehr', () => ({ ladePlattformgebuehrGeld: async () => null }))
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode; [k: string]: unknown }) => {
     const attribute = { ...rest }
@@ -101,9 +103,25 @@ vi.mock('@/server/queries/finanzen', () => ({
 // Diagramm und Kostenliste sind Client-Teile ohne Bezug zur Zeile.
 vi.mock('@/app/admin/finanzen/finanzen-diagramm', () => ({ FinanzenDiagramm: () => null, DiagrammLegende: () => null }))
 vi.mock('@/app/admin/finanzen/kosten-liste', () => ({ KostenListe: () => null }))
+// Seit Nr. 191 heißt die Seite Geld (/admin/geld); der Abgleich ohne Bezug zur Zeile.
+vi.mock('@/app/admin/geld/monatsabschluss', () => ({ Monatsabschluss: () => null }))
+vi.mock('@/server/queries/geld', () => ({
+  ladeAbgeschlosseneMonate: vi.fn(async () => new Map()),
+  ladeGeldMonat: vi.fn(async () => ({
+    umsatz: { cents: 0, anzahl: 0, bar: 0 },
+    erstattungen: { cents: 0, anzahl: 0, offen: 0 },
+    stripeGebuehrCents: 0,
+    abweichungen: [],
+    abweichungenGesamt: 0,
+    lauf: null,
+    abgeschlossenAm: null,
+    abgleichNachMonatsende: false,
+    csvGeladen: false,
+  })),
+}))
 
 import AnalyticsPage from '@/app/(hof)/analytics/page'
-import AdminFinanzenPage from '@/app/admin/finanzen/page'
+import AdminFinanzenPage from '@/app/admin/geld/page'
 import { testzahlungenHinweisFuerHof } from '@/server/queries/testzahlungen'
 
 async function auswertung(): Promise<string> {
@@ -144,7 +162,7 @@ describe('Auswertung — Hinweiszeile im Kopf', () => {
   })
 })
 
-describe('Admin-Finanzen — Hinweiszeile im Kopf', () => {
+describe('Admin › Geld (früher Finanzen) — Hinweiszeile im Kopf', () => {
   it('steht leise unter dem Titel, wenn der Server sie schickt', async () => {
     zustand.hinweis = SATZ
     const html = await finanzen()

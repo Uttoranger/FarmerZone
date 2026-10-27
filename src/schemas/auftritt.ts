@@ -1,5 +1,15 @@
 import { z } from 'zod'
-import { LEITSPRUCH_MAX, UEBER_UNS_MAX, WERT_UNTERTITEL_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
+import {
+  GRUENDUNGSJAHR_FEHLER,
+  GRUENDUNGSJAHR_MAX,
+  GRUENDUNGSJAHR_MIN,
+  LEITSPRUCH_MAX,
+  UEBER_UNS_MAX,
+  WERTE_MAX,
+  WERTE_ZU_VIELE,
+  WERT_UNTERTITEL_MAX,
+  ZU_LANG,
+} from '@/lib/eingabegrenzen'
 
 /**
  * Der Auftritt der Hofseite, wie saveAppearanceAction
@@ -14,12 +24,8 @@ import { LEITSPRUCH_MAX, UEBER_UNS_MAX, WERT_UNTERTITEL_MAX, ZU_LANG } from '@/l
  * geschickt hat, und setzte den Stand eines anderen Tabs zurück.
  */
 
-/** Höchstens so viele Werte stehen auf der Hofseite (wie bisher in Mein Auftritt). */
-export const WERTE_MAX = 4
-export const GRUENDUNGSJAHR_MIN = 1800
-export const GRUENDUNGSJAHR_MAX = 2050
-export const GRUENDUNGSJAHR_FEHLER = `Bitte ein Jahr zwischen ${GRUENDUNGSJAHR_MIN} und ${GRUENDUNGSJAHR_MAX} eintragen — oder das Feld leer lassen.`
-export const WERTE_ZU_VIELE = `Höchstens ${WERTE_MAX} Werte.`
+/** Grenzen und Sätze der Werte und des Gründungsjahrs — zod-frei in src/lib/eingabegrenzen.ts (Nr. 196). */
+export { GRUENDUNGSJAHR_FEHLER, GRUENDUNGSJAHR_MAX, GRUENDUNGSJAHR_MIN, WERTE_MAX, WERTE_ZU_VIELE }
 
 const farmValueSchema = z.object({
   icon: z.string().max(10),

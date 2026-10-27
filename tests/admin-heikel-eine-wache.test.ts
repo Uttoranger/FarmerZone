@@ -30,7 +30,7 @@ vi.mock('@/lib/prisma', async () => ({
     ...(await import('./admin-sitzung')).passkeyAttrappen(),
     user: { findUnique: vi.fn() },
     session: { deleteMany: vi.fn() },
-    order: { updateMany: vi.fn() },
+    order: { updateMany: vi.fn(async () => ({ count: 0 })) },
     mailAuftrag: { updateMany: vi.fn() },
     $transaction: vi.fn(),
     $executeRaw: vi.fn(),
@@ -53,7 +53,9 @@ import { GRUENDUNG_EINGABE_UNGUELTIG } from '@/schemas/gruendung'
 import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { approveFarmAction, revokeFarmApprovalAction, rejectFarmAction, setServiceFeeAction, setzeGruendungBisAction } from '@/server/actions/admin'
 import { markiereAlsTesthof, nimmAusGruendung, nimmTesthofZurueck, nimmWiederAuf, schreibeZusagenFest } from '@/server/actions/gruendung'
-import { fuegeEmpfaengerHinzu, markiereErstattungErledigt, sendeRundschreiben } from '@/server/actions/postfach'
+import { fuegeEmpfaengerHinzu, sendeRundschreiben } from '@/server/actions/postfach'
+import { markiereErstattungErledigt, notfallStorno, zeigeKundinAdresse } from '@/server/actions/admin-bestellung'
+import { ADMIN_BESTELLUNG_EINGABE_FEHLER } from '@/schemas/admin-bestellung'
 import { veroeffentlicheStartseite } from '@/server/actions/startseite'
 import { schickeMailJetztAction, verwirfMailAction } from '@/server/actions/betrieb'
 import { MAIL_TEXT } from '@/lib/betrieb-mails'
@@ -97,7 +99,10 @@ const AKTIONEN: Array<{ name: string; rufe: () => Promise<unknown>; danach: unkn
   { name: 'sendeRundschreiben', rufe: () => sendeRundschreiben(null), danach: { error: POSTFACH_FEHLER.eingabe } },
   { name: 'fuegeEmpfaengerHinzu', rufe: () => fuegeEmpfaengerHinzu(null), danach: { error: ZUSTELLUNG_FEHLER.email } },
   { name: 'veroeffentlicheStartseite', rufe: () => veroeffentlicheStartseite(null), danach: { error: STARTSEITE_SAETZE.ungueltig } },
-  { name: 'markiereErstattungErledigt', rufe: () => markiereErstattungErledigt({ orderId: BESTELLUNG }), danach: { ok: true }, schreibt: true },
+  { name: 'markiereErstattungErledigt', rufe: () => markiereErstattungErledigt({ orderId: BESTELLUNG, grund: 'Selbst überwiesen' }), danach: { ok: true }, schreibt: true },
+  // Nr. 186: volle Adresse und Notfall-Storno in Admin › Bestellungen.
+  { name: 'zeigeKundinAdresse', rufe: () => zeigeKundinAdresse(null), danach: { error: ADMIN_BESTELLUNG_EINGABE_FEHLER } },
+  { name: 'notfallStorno', rufe: () => notfallStorno(null), danach: { error: ADMIN_BESTELLUNG_EINGABE_FEHLER } },
   // Nr. 161: Jetzt schicken und Verwerfen in Admin › Betrieb › E-Mails.
   { name: 'schickeMailJetztAction', rufe: () => schickeMailJetztAction(null), danach: { error: MAIL_TEXT.eingabeUngueltig } },
   { name: 'verwirfMailAction', rufe: () => verwirfMailAction(null), danach: { error: MAIL_TEXT.eingabeUngueltig } },
@@ -136,7 +141,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.setSystemTime(JETZT)
   getSession.mockResolvedValue(adminSitzung('admin_1') as never)
-  db.user.findUnique.mockResolvedValue({ isAdmin: true })
+  db.user.findUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true })
   // Ein Passkey, kein Ersatzcode benutzt — die Szenarien überschreiben es; clearAllMocks setzt nur die Aufrufe zurück.
   db.passkey.aggregate.mockResolvedValue({ _count: { _all: 1 }, _max: { createdAt: new Date(0) } })
   db.farm.findUnique.mockResolvedValue(null)

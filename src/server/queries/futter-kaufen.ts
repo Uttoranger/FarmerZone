@@ -1,5 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
+import { mitEndpreis, preisAnzeigeFuer } from '@/lib/plattformgebuehr'
 import { umkreisBox, waehleHoefeImUmkreis, UMFELD_KM } from '@/lib/umfeld'
 import { PRODUCT_CATEGORY_VALUES, betriebsnummerFuerAnzeige, istFuttermittel } from '@/lib/taxonomie'
 import { wienJetzt } from '@/lib/hofuebersicht'
@@ -162,7 +164,10 @@ export async function getFutterKaufen(farmId: string, jetzt: Date): Promise<Futt
     ),
   ])
 
-  const uebersicht = new Map(baueHofUebersicht(nah, zeilen, wienJetzt(jetzt), ausgebucht).map((e) => [e.slug, e]))
+  // N38 (Nr. 197): Die Höfe der Liste zeigen ihre Preise wie der Kundschaft — im Hofpreis-Modell den Endpreis.
+  const einstellung = await ladeHofpreisEinstellung()
+  const uebersicht = new Map(baueHofUebersicht(nah, zeilen, wienJetzt(jetzt), ausgebucht, { einstellung, zeitpunkt: jetzt }).map((e) => [e.slug, e]))
+  const anzeigeJeHof = new Map(nah.map((h) => [h.id, preisAnzeigeFuer(h, einstellung, jetzt)]))
   const nummerJeHof = new Map([...nah, ...ohneStandort].map((h) => [h.id, h.betriebsnummer]))
 
   return {
@@ -187,7 +192,7 @@ export async function getFutterKaufen(farmId: string, jetzt: Date): Promise<Futt
       }
     }),
     ohneStandort: ohneStandort.map((h) => ({ id: h.id, betriebsnummer: h.betriebsnummer, betriebsstatus: h.betriebsstatus })),
-    produkte: produkte.map((p) => alsFutterProdukt(p, nummerJeHof.get(p.farmId) ?? null)),
+    produkte: produkte.map((p) => mitEndpreis(alsFutterProdukt(p, nummerJeHof.get(p.farmId) ?? null), anzeigeJeHof.get(p.farmId) ?? null)),
     abgeschnitten,
     eigen: {
       name: eigen.name,

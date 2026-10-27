@@ -4,6 +4,8 @@ import { revalidatePath, updateTag } from 'next/cache'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { verlangeFrischeBestaetigung } from '@/server/admin-wache'
+import { protokolliere } from '@/server/admin-protokoll'
+import { PLATTFORM_BEZUG } from '@/schemas/admin-aktion'
 import { ladeHoefeFuerFestschreiben, ladeHoefeFuerGruendung, leseGruendungEinstellung } from '@/server/queries/admin'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { STARTSEITE_CACHE_TAG } from '@/lib/startseite-gestalten'
@@ -78,7 +80,7 @@ function revalidiereGruendung(): void {
  */
 export async function nimmAusGruendung(eingabe: unknown): Promise<Ergebnis> {
   // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
-  const frisch = await verlangeFrischeBestaetigung()
+  const frisch = await verlangeFrischeBestaetigung({ recht: 'hoefe_freischalten' })
   if ('error' in frisch) return { error: frisch.error }
 
   const parsed = nimmAusGruendungSchema.safeParse(eingabe)
@@ -102,6 +104,7 @@ export async function nimmAusGruendung(eingabe: unknown): Promise<Ergebnis> {
   })
   if ('error' in ergebnis) return ergebnis
 
+  await protokolliere({ wer: frisch.userId, art: 'gruendung_ausgenommen', bezugArt: 'hof', bezugId: farmId, mitPasskey: frisch.mitPasskey })
   revalidiereGruendung()
   return { ok: true }
 }
@@ -116,7 +119,7 @@ export async function nimmAusGruendung(eingabe: unknown): Promise<Ergebnis> {
  */
 export async function nimmWiederAuf(eingabe: unknown): Promise<Ergebnis> {
   // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
-  const frisch = await verlangeFrischeBestaetigung()
+  const frisch = await verlangeFrischeBestaetigung({ recht: 'hoefe_freischalten' })
   if ('error' in frisch) return { error: frisch.error }
 
   const parsed = nimmWiederAufSchema.safeParse(eingabe)
@@ -164,6 +167,7 @@ export async function nimmWiederAuf(eingabe: unknown): Promise<Ergebnis> {
   }
   if ('error' in ergebnis) return ergebnis
 
+  await protokolliere({ wer: frisch.userId, art: 'gruendung_wieder_aufgenommen', bezugArt: 'hof', bezugId: farmId, mitPasskey: frisch.mitPasskey })
   revalidiereGruendung()
   return { ok: true }
 }
@@ -181,7 +185,7 @@ export async function nimmWiederAuf(eingabe: unknown): Promise<Ergebnis> {
  */
 export async function schreibeZusagenFest(eingabe: unknown): Promise<Ergebnis> {
   // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
-  const frisch = await verlangeFrischeBestaetigung()
+  const frisch = await verlangeFrischeBestaetigung({ recht: 'hoefe_freischalten' })
   if ('error' in frisch) return { error: frisch.error }
 
   const parsed = schreibeZusagenFestSchema.safeParse(eingabe)
@@ -221,6 +225,7 @@ export async function schreibeZusagenFest(eingabe: unknown): Promise<Ergebnis> {
   }
   if ('error' in ergebnis) return ergebnis
 
+  await protokolliere({ wer: frisch.userId, art: 'gruendung_festgeschrieben', bezugArt: 'plattform', bezugId: PLATTFORM_BEZUG, mitPasskey: frisch.mitPasskey })
   updateTag(PLATTFORM_EINSTELLUNG_TAG)
   revalidiereGruendung()
   // Tarif-Zeile und „Dein Stand“ aller Höfe lesen das neue Ende.
@@ -256,7 +261,7 @@ function revalidiereTesthof(slug: string): void {
  */
 export async function markiereAlsTesthof(eingabe: unknown): Promise<Ergebnis> {
   // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
-  const frisch = await verlangeFrischeBestaetigung()
+  const frisch = await verlangeFrischeBestaetigung({ recht: 'hoefe_freischalten' })
   if ('error' in frisch) return { error: frisch.error }
 
   const parsed = markiereAlsTesthofSchema.safeParse(eingabe)
@@ -291,6 +296,7 @@ export async function markiereAlsTesthof(eingabe: unknown): Promise<Ergebnis> {
   })
   if ('error' in ergebnis) return ergebnis
 
+  await protokolliere({ wer: frisch.userId, art: 'testhof_markiert', bezugArt: 'hof', bezugId: farmId, mitPasskey: frisch.mitPasskey })
   revalidiereTesthof(ergebnis.slug)
   return { ok: true }
 }
@@ -303,7 +309,7 @@ export async function markiereAlsTesthof(eingabe: unknown): Promise<Ergebnis> {
  */
 export async function nimmTesthofZurueck(eingabe: unknown): Promise<Ergebnis> {
   // Heikle Aktion (Register N20, Nr. 115): nur frisch mit Passkey bestätigt. Diese EINE Wache prüft schon alles von verlangeAdminAktion (Nr. 126).
-  const frisch = await verlangeFrischeBestaetigung()
+  const frisch = await verlangeFrischeBestaetigung({ recht: 'hoefe_freischalten' })
   if ('error' in frisch) return { error: frisch.error }
 
   const parsed = nimmTesthofZurueckSchema.safeParse(eingabe)
@@ -322,6 +328,7 @@ export async function nimmTesthofZurueck(eingabe: unknown): Promise<Ergebnis> {
   })
   if ('error' in ergebnis) return ergebnis
 
+  await protokolliere({ wer: frisch.userId, art: 'testhof_zurueckgenommen', bezugArt: 'hof', bezugId: farmId, mitPasskey: frisch.mitPasskey })
   revalidiereTesthof(ergebnis.slug)
   return { ok: true }
 }

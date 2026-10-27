@@ -54,6 +54,7 @@ import { barLinkErneutMoeglich, type BarBestellung } from '@/lib/bar-bestaetigun
 import { fristVon, istVerwaist } from '@/lib/fristen'
 import { MAIL_ARTEN, MAIL_WEG, VORRANG, type MailArt } from '@/schemas/mail-auftrag'
 import type { AlleMailsFilter, MailStandFilter, MailWegFilter, MailZeitraum } from '@/schemas/betrieb-mails'
+import { hofSichtbar } from '@/lib/hof-sichtbar'
 
 // ─── Namen ───────────────────────────────────────────────────────────────────
 
@@ -68,6 +69,9 @@ export const MAIL_ART_NAME: Record<MailArt, string> = {
   'bar-bestaetigungslink': 'Bar: Abholung bestätigen',
   'admin-sicherheit': 'Admin-Sicherheit',
   'neue-anmeldung': 'Neue Anmeldung',
+  'email-aendern-link': 'Anmelde-E-Mail ändern: Link',
+  'email-geaendert-hinweis': 'Anmelde-E-Mail geändert: Hinweis',
+  'team-recht-geaendert': 'Team: Recht geändert',
   'zu-viele-versuche': 'Zu viele Versuche',
   'betrieb-warnung': 'Betrieb-Warnung',
   testmail: 'Testmail',
@@ -90,6 +94,8 @@ export const MAIL_ART_NAME: Record<MailArt, string> = {
   'betreiber-bestaetigung': 'Betreiber-Bestätigung',
   'betreiber-testmail': 'Betreiber-Testmail',
   'abo-bestaetigung': 'Abo bestätigen',
+  'plattformgebuehr-ankuendigung': 'Plattformgebühr: Ankündigung',
+  'lastschrift-gescheitert': 'Lastschrift gescheitert',
   beitrag: 'Beitrag an Abos',
   rundschreiben: 'Rundschreiben',
   bescheid: 'Bescheid an Kundinnen',
@@ -163,6 +169,10 @@ export const FEHLER_TEXTE: Record<string, FehlerText> = {
   bezug_ungueltig: { grund: 'Der Bezug der Mail war ungültig', kurz: 'Bezug ungültig', tun: UNS_MELDEN, jetztSchicken: false, http: null },
   abo_abgemeldet: { grund: 'Das Abo ist abgemeldet', kurz: 'Abo abgemeldet', tun: 'Nichts zu tun – wer sich abmeldet, bekommt nichts mehr.', jetztSchicken: false, http: null },
   beitrag_fehlt: { grund: 'Den Beitrag gibt es nicht mehr', kurz: 'Beitrag gelöscht', tun: 'Nichts zu tun – der Hof hat den Beitrag gelöscht.', jetztSchicken: false, http: null },
+  // Nr. 195 (Audit A4): Ein Rückweg nimmt „abholbereit“ zurück bzw. die Bestellung ist nicht mehr bereit – nie nachschicken.
+  zurueckgenommen: { grund: 'Der Hof hat „Gepackt“ zurückgenommen', kurz: 'Zurückgenommen', tun: 'Nichts zu tun – die Bestellung ist nicht mehr abholbereit.', jetztSchicken: false, http: null },
+  nicht_mehr_bereit: { grund: 'Die Bestellung ist nicht mehr abholbereit', kurz: 'Nicht mehr bereit', tun: 'Nichts zu tun – die Mail passt nicht mehr zur Bestellung.', jetztSchicken: false, http: null },
+  bestellung_fehlt: { grund: 'Die Bestellung gibt es nicht mehr', kurz: 'Bestellung fehlt', tun: 'Nichts zu tun – die Mail hat keinen Bezug mehr.', jetztSchicken: false, http: null },
 }
 
 /** Grund, Kurzform und „Was tun“ zu einem Code — ein unbekannter mit Ersatztext, „Jetzt schicken“ bleibt dann erlaubt. */
@@ -1037,6 +1047,8 @@ export const NOCHMAL_ERLAUBT = [
   'bestellung-bezahlt-hof',
   'bar-bestaetigt-hof',
   'freischaltung',
+  'plattformgebuehr-ankuendigung',
+  'lastschrift-gescheitert',
   // Sonderfall: neuer Token, der alte Link gilt dann nicht mehr (S17)
   'bar-bestaetigungslink',
 ] as const satisfies readonly MailArt[]
@@ -1058,6 +1070,10 @@ export const NOCHMAL_NIE = [
   'registrierungs-hinweis',
   'admin-sicherheit',
   'neue-anmeldung',
+  // Nr. 190: Bestätigungslink und Sicherheitsmails — die Person bzw. das Team löst sie neu aus.
+  'email-aendern-link',
+  'email-geaendert-hinweis',
+  'team-recht-geaendert',
   'zu-viele-versuche',
   'betrieb-warnung',
   'betreiber-bestaetigung',
@@ -1218,8 +1234,8 @@ export function nochmalNieGrund(art: string): string {
 }
 
 /** Was `passtNochmal` von der Bestellung braucht — der heutige Stand, frisch geladen. */
-export type NochmalBestellung = BarBestellung & { paymentStatus: string; farm: { archivedAt: Date | null } }
-export type NochmalHof = { approvedAt: Date | null; archivedAt: Date | null }
+export type NochmalBestellung = BarBestellung & { paymentStatus: string; farm: { archivedAt: Date | null; geschlossenAm: Date | null } }
+export type NochmalHof = { approvedAt: Date | null; archivedAt: Date | null; geschlossenAm: Date | null }
 export type NochmalStand = { bestellung: NochmalBestellung | null; hof: NochmalHof | null }
 export type NochmalPruefung = { ok: true } | { ok: false; grund: string }
 
@@ -1237,8 +1253,13 @@ export function passtNochmal(art: string, stand: NochmalStand, jetzt: Date): Noc
   if (!nochmalErlaubt(art)) return { ok: false, grund: nochmalNieGrund(art) }
   if (art === 'freischaltung') {
     if (!stand.hof) return { ok: false, grund: 'Den Hof gibt es nicht mehr.' }
-    if (stand.hof.archivedAt) return { ok: false, grund: 'Der Hof ist stillgelegt.' }
+    if (!hofSichtbar(stand.hof)) return { ok: false, grund: 'Der Hof ist stillgelegt.' }
     return stand.hof.approvedAt ? { ok: true } : { ok: false, grund: 'Der Hof ist nicht mehr freigeschaltet.' }
+  }
+  // Plattformgebühr (Nr. 198): an den Hof, solange es ihn gibt und er nicht stillgelegt ist.
+  if (art === 'plattformgebuehr-ankuendigung' || art === 'lastschrift-gescheitert') {
+    if (!stand.hof) return { ok: false, grund: 'Den Hof gibt es nicht mehr.' }
+    return hofSichtbar(stand.hof) ? { ok: true } : { ok: false, grund: 'Der Hof ist stillgelegt.' }
   }
   const b = stand.bestellung
   if (!b) return { ok: false, grund: 'Die Bestellung gibt es nicht mehr.' }
@@ -1248,7 +1269,7 @@ export function passtNochmal(art: string, stand: NochmalStand, jetzt: Date): Noc
     case 'bar-bestaetigungslink':
       if (barLinkErneutMoeglich(b, jetzt)) return { ok: true }
       if (s === 'PENDING_CONFIRMATION' && istVerwaist(b, jetzt)) return { ok: false, grund: 'Die Frist zum Bestätigen ist vorbei.' }
-      if (s === 'PENDING_CONFIRMATION' && b.farm.archivedAt) return { ok: false, grund: 'Der Hof ist stillgelegt.' }
+      if (s === 'PENDING_CONFIRMATION' && !hofSichtbar(b.farm)) return { ok: false, grund: 'Der Hof ist stillgelegt.' }
       return { ok: false, grund: 'Die Bestellung ist schon bestätigt oder storniert – der Link passt nicht mehr.' }
     case 'bestellung-bestaetigung':
       return ['PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY', 'PICKED_UP'].includes(s) ? { ok: true } : nein
@@ -1272,7 +1293,7 @@ export function passtNochmal(art: string, stand: NochmalStand, jetzt: Date): Noc
 /** Woher die Adresse einer Art kommt — frisch geladen, nie aus dem Protokoll. `null`: nirgends gespeichert. */
 export function adresseQuelle(art: string): 'bestellung' | 'hof' | 'hofInhaber' | null {
   if (art === 'bestellung-bezahlt-hof' || art === 'bar-bestaetigt-hof') return 'hof'
-  if (art === 'freischaltung') return 'hofInhaber'
+  if (art === 'freischaltung' || art === 'plattformgebuehr-ankuendigung' || art === 'lastschrift-gescheitert') return 'hofInhaber'
   if (nochmalErlaubt(art)) return 'bestellung'
   return null
 }

@@ -93,3 +93,32 @@ describe('Unterleiste Hof: „Neu" unter dem Plus', () => {
     expect(kundenLeiste).not.toContain(`>${HOF_NEU_KNOPF}<`)
   })
 })
+
+describe('Unterleiste Hof: 11 px unter 360 px Breite (Entscheidung 6, Nr. 195)', () => {
+  const ELF = 'group-data-[eng]/leiste:max-[359px]:text-[11px]'
+
+  it('nur die Leiste des Hofbereichs trägt das Merkmal; Einträge und „Neu" wechseln dort auf 11 px', () => {
+    expect(leiste).toMatch(/<nav[^>]*data-eng=""/)
+    expect(leiste).toMatch(/<nav[^>]*class="[^"]*\bgroup\/leiste\b/)
+    // Jeder Eintrag (Link) und der Knopf mit Wort kennt die schmale Stufe; die Grundstufe bleibt 12 px.
+    const eintraege = leiste.match(/<(?:a|button)\b[^>]*class="[^"]*"/g) ?? []
+    expect(eintraege.length).toBeGreaterThanOrEqual(4)
+    for (const e of eintraege) {
+      expect(e).toContain(ELF)
+      expect(e).toContain('text-[12px]')
+    }
+  })
+
+  it('Gegenprobe: die Kunden-Unterleiste hat kein Merkmal und bleibt bei 12 px (auch bei 320 px)', () => {
+    const kunde = renderToStaticMarkup(el(KundeShell, { sitzung: 'gast' }))
+    const kundenLeiste = abschnitt(kunde, 'data-slot="bottom-nav"', '</nav>')
+    expect(kundenLeiste).not.toContain('data-eng')
+    expect(kundenLeiste).toContain('text-[12px]')
+  })
+
+  it('die Breitenstufe liegt unter 360, nicht darauf: max-[359px]', () => {
+    expect(ELF).toContain('max-[359px]')
+    expect(quelle('src/components/ui/bottom-nav.tsx')).toContain('engUnter360')
+    expect(quelle('src/components/shells/hof-shell.tsx')).toContain('<BottomNav ueberSchleier={offen !== null} engUnter360>')
+  })
+})

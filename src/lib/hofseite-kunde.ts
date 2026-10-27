@@ -10,9 +10,10 @@
  * Gebührensatz in servicegebuehr.ts.
  */
 import { formatEuro, formatZahl, mitAnzahl } from '@/lib/format'
+import { BAR_OHNE_GEBUEHR_HINWEIS, INKL_PLATTFORMGEBUEHR, PLATTFORMGEBUEHR_SATZ } from '@/lib/konditionen'
+import { satzText, type PreisAnzeige } from '@/lib/plattformgebuehr'
 import { kaufSperreHinweis, zeigeKaufknopf, type KaufSperre } from '@/lib/bereiche-anzeige'
 import { calcLineTotal, decimalZuCents } from '@/lib/order-totals'
-import { BAR_OHNE_GEBUEHR_HINWEIS } from '@/lib/konditionen'
 import {
   barOhneServicegebuehr,
   centsAlsEuro,
@@ -28,7 +29,7 @@ import {
   ALTER_REITER_BEITRAEGE,
   BEITRAG_PARAMETER,
   REITER_PARAMETER,
-  reiterSchema,
+  leseHofReiter,
   type HofReiterAngebot,
   type HofReiterId,
 } from '@/schemas/hofseite-reiter'
@@ -68,7 +69,7 @@ export function aktiverReiter(
   suche: { reiter: string | null; bereich: string | null },
   angebot: readonly HofReiter[]
 ): HofReiterAngebot {
-  const gewaehlt = reiterSchema.parse(suche.reiter)
+  const gewaehlt = leseHofReiter(suche.reiter)
   if (gewaehlt && angebot.some((r) => r.id === gewaehlt)) return gewaehlt
   if (bereichAusParameter(suche.bereich) === 'FUTTERMITTEL' && angebot.some((r) => r.id === 'produkte')) return 'produkte'
   return 'uebersicht'
@@ -254,9 +255,19 @@ export function gebuehrHinweis(
   const zusatz = barAusnahme ? ` ${BAR_OHNE_GEBUEHR_HINWEIS}` : ''
   return {
     kurz: `${grund} – im Warenkorb einzeln ausgewiesen. Der Hof bekommt den vollen Preis.${zusatz}`,
-    produkte: `${grund} – einmal pro Bestellung, egal wie viel du in den Korb legst.${zusatz}`,
+    produkte: `${grund} – einmal pro Bestellung, egal wie viel du in den Warenkorb legst.${zusatz}`,
     korb: barAusnahme ? GEBUEHR_KORB_NUR_ONLINE : 'zzgl. Servicegebühr',
   }
+}
+
+/**
+ * Die drei Wortlaute im Hofpreis-Modell (N38): Die Preise SIND Endpreise
+ * „inkl. Plattformgebühr“; „Zahlung & Kontakt“ nennt dazu den Satz aus
+ * konditionen.ts. Online und bar gleich — keine Ausnahme mehr (B1-Ergänzung).
+ */
+export function plattformgebuehrHinweis(hundertstel: number): { kurz: string; produkte: string; korb: string } {
+  const grund = `Preise ${INKL_PLATTFORMGEBUEHR} (${satzText(hundertstel)} %)`
+  return { kurz: `${grund}. ${PLATTFORMGEBUEHR_SATZ}`, produkte: `${grund} – online und bar gleich.`, korb: INKL_PLATTFORMGEBUEHR }
 }
 
 /** Neben der Korbsumme, solange bar keine Gebühr kostet (B1) — kurz, weil der Platz dort knapp ist. */
@@ -276,9 +287,11 @@ const OHNE_BAR_AUSNAHME: GebuehrZahlung = { online: true, bar: false, barOhneGeb
  * (Server-Uhr, als ISO-Text durchgereicht) — nie aus der Browser-Uhr beim Rendern.
  */
 export function gebuehrHinweisFuerHof(
-  hof: ServicegebuehrEinstellung & { acceptsOnline: boolean; stripeAccountReady: boolean; acceptsOnsite: boolean },
+  hof: ServicegebuehrEinstellung & { acceptsOnline: boolean; stripeAccountReady: boolean; acceptsOnsite: boolean; preisAnzeige?: PreisAnzeige },
   jetzt: Date
 ): { kurz: string; produkte: string; korb: string } | null {
+  // Hofpreis-Modell (N38, Nr. 197): Die Gebühr steckt im Endpreis — kein „zzgl.“, sondern „inkl.“.
+  if (hof.preisAnzeige) return plattformgebuehrHinweis(hof.preisAnzeige.hundertstel)
   const arten = zahlungsarten(hof)
   return gebuehrHinweis(servicegebuehrSatz(hof, jetzt), {
     online: arten.some((a) => a.art === 'online'),
@@ -325,6 +338,7 @@ const VERSTAENDLICH = new Set<string>([
   SHOP_PAUSED_MESSAGE,
   FARM_ARCHIVED_MESSAGE,
   FARM_NOT_APPROVED_MESSAGE,
+  kaufSperreHinweis('gesperrt', '').titel,
   kaufSperreHinweis('keine-abholzeit', '').titel,
   kaufSperreHinweis('ausgebucht', '').titel,
 ])
@@ -413,7 +427,7 @@ export type BeitragsAnordnung<B> = {
  * Ordnet die aktiven Beiträge für „Aktuell vom Hof“. `beitraege` kommt von
  * page.tsx: die fünf neuesten, der neueste zuerst, und — wenn `?beitrag=` einen
  * älteren aktiven Beitrag dieses Hofs trifft — dieser dahinter. `kennung` ist
- * der geprüfte Wert aus der Adresse (beitragKennungSchema).
+ * der geprüfte Wert aus der Adresse (leseBeitragKennung).
  *
  * Trifft die Kennung, steht dieser Beitrag oben, „Aktuell“ trägt trotzdem nur
  * der neueste, und darunter steht „Neuester: …“. Trifft sie nicht (abgelaufen,

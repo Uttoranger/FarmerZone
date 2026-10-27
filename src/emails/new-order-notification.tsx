@@ -16,6 +16,8 @@ export interface NewOrderNotificationProps {
   total: number
   /** Servicegebühr in Euro (von der Plattform einbehalten); 0 = keine Zeile. */
   serviceFee?: number
+  /** Das Wort für die Gebühr (N8): „Servicegebühr“ (Vorgabe) oder im Hofpreis-Modell „Plattformgebühr“. */
+  gebuehrWort?: string
   /** Was die Kundin bezahlt hat: Warenpreis + Servicegebühr. */
   customerTotal?: number
   paymentLabel: string
@@ -60,7 +62,7 @@ export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
       </Text>
       {mitGebuehr && (
         <Text style={{ ...mutedText, margin: '0 0 4px' }}>
-          <strong>Servicegebühr:</strong> {formatEuro(p.serviceFee ?? 0)} — von der Plattform
+          <strong>{p.gebuehrWort ?? 'Servicegebühr'}:</strong> {formatEuro(p.serviceFee ?? 0)} — von der Plattform
           einbehalten, dir wird der Warenpreis überwiesen. Die Kundin hat{' '}
           {formatEuro(p.customerTotal ?? p.total)} bezahlt.
         </Text>

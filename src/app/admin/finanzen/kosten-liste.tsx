@@ -22,17 +22,26 @@ import { KostenSheet, type SheetZustand } from './kosten-sheet'
  * und der Jahresbetrag klein darunter. Ohne den zweiten wäre „8,34 €
  * jährlich" nicht zu verstehen. Eintragen und Bearbeiten laufen unverändert
  * über das Blatt (KostenSheet) und seine Actions.
+ *
+ * Auf Admin › Geld (Nr. 191, N37) steht oben die Zeile „Stripe-Gebühren“ —
+ * sie kommt aus dem Abgleich, ist kein Posten und lässt sich nicht bearbeiten
+ * (`stripeGebuehrCents`); `grundFuer` nennt die abgeschlossenen Monate, für
+ * die das Blatt einen Grund verlangt.
  */
 export function KostenListe({
   monat,
   bezeichnung,
   posten,
   summeCents,
+  stripeGebuehrCents = null,
+  grundFuer = [],
 }: {
   monat: Monatsschluessel
   bezeichnung: string
   posten: KostenpostenZeile[]
   summeCents: number
+  stripeGebuehrCents?: number | null
+  grundFuer?: readonly Monatsschluessel[]
 }): React.JSX.Element {
   const [sheet, setSheet] = useState<SheetZustand>(null)
 
@@ -47,6 +56,16 @@ export function KostenListe({
           Kostenposten
         </button>
       </div>
+
+      {stripeGebuehrCents !== null && (
+        <div className="flex min-h-[52px] items-center gap-3 border-t border-border py-2.5">
+          <span className="min-w-0 flex-1">
+            <span className="block text-[14.5px] text-foreground">Stripe-Gebühren</span>
+            <span className={cn('block text-[12.5px]', LEISE)}>kommt automatisch aus dem Abgleich</span>
+          </span>
+          <span className="shrink-0 text-[14.5px] font-semibold text-foreground tabular-nums">{formatEuro(centsAlsEuro(stripeGebuehrCents))}</span>
+        </div>
+      )}
 
       {posten.length === 0 ? (
         <p className={cn('border-t border-border py-4 text-[14px]', LEISE)}>Für {bezeichnung} sind keine Kosten eingetragen.</p>
@@ -86,7 +105,14 @@ export function KostenListe({
         </ul>
       )}
 
-      <KostenSheet zustand={sheet} onClose={() => setSheet(null)} monat={monat} />
+      {posten.length === 0 && stripeGebuehrCents !== null && (
+        <p className="flex items-center justify-between gap-3 border-t border-border pt-3 text-[15px] font-semibold text-foreground">
+          <span>Summe im Monat</span>
+          <span className="tabular-nums">{formatEuro(centsAlsEuro(summeCents))}</span>
+        </p>
+      )}
+
+      <KostenSheet zustand={sheet} onClose={() => setSheet(null)} monat={monat} grundFuer={grundFuer} />
     </section>
   )
 }

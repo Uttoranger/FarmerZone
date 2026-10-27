@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useSyncExternalStore } from 'react'
-import { BEREIT_TYP } from '@/schemas/hofseite-vorschau'
-import { leseMarkierung, verlaesstRahmen } from '@/lib/hofseite-vorschau'
+import { BEREIT_TYP, leseMarkierung, verlaesstRahmen } from '@/lib/hofseite-vorschau'
 import { ZIEL_ABSCHNITT } from '@/lib/hofseite-fortschritt'
 
 /** So lange bleibt der Rahmen stehen — lang genug zum Hinsehen, kurz genug, um nicht zu stören. */

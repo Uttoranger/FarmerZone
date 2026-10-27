@@ -6,6 +6,7 @@ import { Loader2, Lock } from 'lucide-react'
 import { getStripePromise } from '@/lib/stripe-client'
 import { formatEuro } from '@/lib/format'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
+import { NETZ_SATZ_UNSICHER } from '@/lib/netz'
 import {
   bestaetigungMitStatus,
   reservierungsStand,
@@ -52,6 +53,8 @@ export type StripeZahlungProps = {
   betrag: ZahlungsBetrag
   /** Bezeichnung der Gebührenzeile, beim Anlegen festgehalten (zahlungsGebuehrText). */
   gebuehrText: string
+  /** N38: Hofpreis-Modell — „Ware · Plattformgebühr · Gesamt“ wie vor dem Anlegen. */
+  hofpreis?: boolean
   /** Korb (ohne „ändern") und die festen Angaben zur Abholung — vom Formular gebaut. */
   korb: ReactNode
   angaben: ReactNode
@@ -93,6 +96,7 @@ function ZahlungsInhalt({
   stand,
   betrag,
   gebuehrText,
+  hofpreis = false,
   korb,
   angaben,
   fussnote,
@@ -139,6 +143,9 @@ function ZahlungsInhalt({
     }
     if (art === 'abgelaufen') setAbgebrochen(true)
     else if (art === 'abgelehnt') setAbgelehnt(true)
+    // Kein Netz mitten im Bezahlen: Der Betrag kann schon abgebucht sein. Der Satz sagt das ehrlich
+    // und schickt zum Neuladen statt zum zweiten Versuch (Register N29, Ergänzung 26.10.2026).
+    else if (art === 'netz') setFehler(NETZ_SATZ_UNSICHER)
     // Unvollständige Eingaben zeigt Stripe selbst am Feld; alles andere
     // (Netz, Dienst) steht als Stripes eigener Satz an der Übersicht.
     else if (error.type !== 'validation_error') {
@@ -154,6 +161,7 @@ function ZahlungsInhalt({
         <UebersichtKarte
           betraege={betraege}
           gebuehrText={gebuehrText}
+          hofpreis={hofpreis}
           reservierung={
             <ReservierungsHinweis stand={abgelaufen ? { zustand: 'abgelaufen' } : stand} schritt="zahlung" farmSlug={farmSlug} />
           }

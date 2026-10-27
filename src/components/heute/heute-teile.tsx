@@ -41,6 +41,7 @@ import {
   type WochenBalken,
 } from '@/lib/heute'
 import { onlinePausiertHinweis } from '@/lib/stripe-konto'
+import { SPERRE_KARTE_TITEL, sperreKarteSatz } from '@/lib/admin-hof-akte'
 import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { ERSTE_SCHRITTE_WARTET, ZU_TUN_TEXT, type ZuTunAufgabe } from '@/lib/erste-schritte'
@@ -245,6 +246,28 @@ export function StripeHinweis({ barMoeglich }: { barMoeglich: boolean }): React.
       }
     >
       <p className="text-[12.5px]">{satz}</p>
+    </Hinweiskarte>
+  )
+}
+
+/**
+ * Die Sperre durch das Team (Register N34, Nr. 187): ganz oben in Heute, mit
+ * dem Grund des Teams und dem Weg ins Postfach. Der Hof kann sie nicht selbst
+ * aufheben — anders als die Pause gibt es hier keinen Schalter.
+ */
+export function TeamSperreKarte({ grund }: { grund: string | null }): React.JSX.Element {
+  return (
+    <Hinweiskarte
+      ton="orange"
+      symbol={MessageCircle}
+      titel={SPERRE_KARTE_TITEL}
+      aktion={
+        <Link href={POSTFACH_HREF} className={KNOPF_ORANGE}>
+          Zum Postfach
+        </Link>
+      }
+    >
+      <p className="text-[12.5px]">{sperreKarteSatz(grund)}</p>
     </Hinweiskarte>
   )
 }

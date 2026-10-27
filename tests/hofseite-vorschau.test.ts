@@ -221,7 +221,9 @@ describe('am Quelltext', () => {
     const lader = quelltext('src/server/hofseite-vorschau.ts')
     expect(lader).toContain('await ansichtsModus(suche, {')
     // Vor der Freigabe sichtbar nur, wenn ansichtsModus den Besitzer nennt.
-    expect(lader).toContain('besitzerVorFreigabe ? await getOwnerFarm(besitzerVorFreigabe) : await getPublicFarm(farmSlug)')
+    // Seit Nr. 196 über getPublicFarmMitTeilen (die Abfrage von getPublicFarm samt Rohwerten des Teilen-Bilds).
+    expect(lader).toContain('besitzerVorFreigabe ? null : await getPublicFarmMitTeilen({ slug: farmSlug })')
+    expect(lader).toContain('besitzerVorFreigabe ? await getOwnerFarm(besitzerVorFreigabe) : (oeffentlich?.farm ?? null)')
   })
 
   it('die Seite lädt den Nachbestell-Link nur, wo Kaufen wirkt', () => {

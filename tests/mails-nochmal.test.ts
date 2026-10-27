@@ -142,7 +142,7 @@ const bestellung = (teil: Partial<NochmalBestellung> = {}): NochmalBestellung =>
   createdAt: new Date('2026-10-24T07:00:00.000Z'),
   pickupDate: new Date('2026-10-25T10:00:00.000Z'),
   pickupTimeStart: '15:00',
-  farm: { archivedAt: null },
+  farm: { archivedAt: null, geschlossenAm: null },
   ...teil,
 })
 

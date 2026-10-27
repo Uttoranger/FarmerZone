@@ -105,7 +105,8 @@ describe('Wache: kein ungeprüfter Endpunkt in den Postfach-Actions', () => {
    * `verlangeFrischeBestaetigung` gilt wie `verlangeAdminAktion`: Sie prüft alles davon und dazu die frische Bestätigung (Nr. 126).
    */
   function geprueft(koerper: string): boolean {
-    if (/await (verlangeAdminAktion|verlangeFrischeBestaetigung|hofDerSitzung)\(\)/.test(koerper)) return true
+    // Seit Nr. 188 mit `{ recht: … }` (N35) — ein Argument, das nur verschärft.
+    if (/await (verlangeAdminAktion|verlangeFrischeBestaetigung|hofDerSitzung)\((\{ recht: '\w+' \})?\)/.test(koerper)) return true
     return [...koerper.matchAll(/await (\w+)\(/g)].some((t) => t[1] !== undefined && namen.has(t[1]) && geprueft(exporte.find((e) => e.name === t[1])!.koerper))
   }
 

@@ -1,6 +1,5 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { decimalZuCents } from '@/lib/order-totals'
 import type { HeuteFenster } from '@/lib/heute'
 import {
   beitragDarfInsBild,
@@ -30,9 +29,7 @@ import { abholzeitenKurz } from '@/lib/hofseite-fortschritt'
 import { einzeiligerFremdtext } from '@/lib/fremdtext'
 import { BEITRAG_TITEL_MAX, HOFNAME_MAX } from '@/lib/eingabegrenzen'
 import { istEigenesBild } from '@/server/bild-url'
-import { zeigtAbzeichen } from '@/lib/gruendungshof'
-import { ABZEICHEN_SELECT, OEFFENTLICH_SICHTBAR } from '@/server/queries/farm'
-import { PRODUCT_ORDER_BY } from '@/server/queries/products'
+import { OEFFENTLICH_SICHTBAR, getPublicFarmMitTeilen, type OeffentlicherHof } from '@/server/queries/farm'
 import { zaehleWhatsAppAbonnentinnen } from '@/server/queries/status-posts'
 import { gesendeteBeitragsMails } from '@/server/mail-arten/beitrag'
 
@@ -46,45 +43,18 @@ export type TeilenBildQuelle = {
 }
 
 /**
- * Die Rohdaten für Teilen-Bild, Teilen-Fenster und Plakat (Gate 7) — NUR
- * öffentlich sichtbare Höfe (dieselbe Bedingung wie die Hofseite,
- * OEFFENTLICH_SICHTBAR). Ein nicht freigeschalteter oder stillgelegter Hof
- * ergibt null: Für ihn gibt es kein Bild und nichts zu teilen (S9). Was davon
- * ins Bild darf, entscheidet `src/lib/teilen-bild.ts`.
+ * Die Rohdaten für Teilen-Bild und Teilen-Fenster (Gate 7) aus dem
+ * öffentlichen Hof der Hofseite (`getPublicFarmMitTeilen`, Nr. 196) — keine
+ * eigene Abfrage mehr: Seite, Metadaten und Bild-Route lesen dieselbe Zeile.
+ * NUR öffentlich sichtbare Höfe (OEFFENTLICH_SICHTBAR in der Abfrage): Für
+ * einen nicht freigeschalteten oder stillgelegten Hof gibt es kein Bild und
+ * nichts zu teilen (S9). Was davon ins Bild darf, entscheidet
+ * `src/lib/teilen-bild.ts`.
  *
- * Nur öffentliche Felder; Geld einmal an der Servergrenze in Cent.
+ * Nur öffentliche Felder; Geld als Cent aus dem Decimal derselben Zeile
+ * (TeilenRoh), nie aus `price: number`.
  */
-export async function ladeTeilenBildQuelle(wo: { slug: string } | { id: string }): Promise<TeilenBildQuelle | null> {
-  const farm = await prisma.farm.findFirst({
-    where: { ...wo, ...OEFFENTLICH_SICHTBAR },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      city: true,
-      isPaused: true,
-      betriebsnummer: true,
-      betriebsstatus: true,
-      // Abzeichen (Register K2, Nr. 116): gelesen für das Ja/Nein unten, die Nummer verlässt den Lader nicht.
-      ...ABZEICHEN_SELECT,
-      products: {
-        orderBy: PRODUCT_ORDER_BY,
-        select: {
-          id: true,
-          name: true,
-          price: true,
-          isAvailable: true,
-          stock: true,
-          familieId: true,
-          category: true,
-          verpackung: true,
-          imageUrl: true,
-        },
-      },
-      pickupSlots: { where: { isActive: true }, select: { dayOfWeek: true, startTime: true, endTime: true } },
-    },
-  })
-  if (!farm) return null
+export function teilenBildQuelleAus({ farm, teilen }: OeffentlicherHof): TeilenBildQuelle {
   return {
     farmId: farm.id,
     hof: {
@@ -92,23 +62,33 @@ export async function ladeTeilenBildQuelle(wo: { slug: string } | { id: string }
       slug: farm.slug,
       city: farm.city,
       isPaused: farm.isPaused,
-      betriebsnummer: farm.betriebsnummer,
+      betriebsnummer: teilen.betriebsnummer,
       betriebsstatus: farm.betriebsstatus,
-      gruendungshof: zeigtAbzeichen(farm),
+      gruendungshof: farm.gruendungshof,
     },
-    produkte: farm.products.map((p) => ({
-      id: p.id,
-      name: p.name,
-      preisCents: decimalZuCents(p.price),
-      isAvailable: p.isAvailable,
-      stock: p.stock,
-      familieId: p.familieId,
-      category: p.category,
-      verpackung: p.verpackung,
-    })),
+    produkte: farm.products.map((p) => {
+      const roh = teilen.produkte.get(p.id)
+      if (!roh) throw new Error('Teilen-Bild: Produkt ohne Rohwerte')
+      return {
+        id: p.id,
+        name: p.name,
+        preisCents: roh.preisCents,
+        isAvailable: p.isAvailable,
+        stock: p.stock,
+        familieId: p.familieId,
+        category: p.category,
+        verpackung: roh.verpackung,
+      }
+    }),
     fotos: new Map(farm.products.flatMap((p) => (p.imageUrl ? [[p.id, p.imageUrl] as const] : []))),
-    slots: farm.pickupSlots,
+    slots: farm.pickupSlots.map(({ dayOfWeek, startTime, endTime }) => ({ dayOfWeek, startTime, endTime })),
   }
+}
+
+/** Lädt den öffentlichen Hof und baut daraus die Rohdaten des Teilen-Bilds; null: kein öffentlicher Hof. */
+export async function ladeTeilenBildQuelle(wo: { slug: string } | { id: string }): Promise<TeilenBildQuelle | null> {
+  const hof = await getPublicFarmMitTeilen(wo)
+  return hof ? teilenBildQuelleAus(hof) : null
 }
 
 /** Was die Bild-Route von einem Beitrag braucht — ob er ins Bild darf, entscheidet `beitragDarfInsBild`. */
@@ -161,11 +141,11 @@ function bildQuellen(quelle: TeilenBildQuelle, ids: readonly string[]): BildQuel
  * Was das Teilen-Bild eines öffentlichen Hofs gerade zeigt, samt Prüfsumme
  * für die Bildadresse in den Metadaten der Hofseite (`?v=`). Dieselben Daten
  * und dieselbe Regel wie die Bild-Route — so ändert sich die Adresse genau
- * dann, wenn sich das Bild ändert (S9). null: kein öffentlicher Hof.
+ * dann, wenn sich das Bild ändert (S9). Die Hofseite gibt ihren schon
+ * geladenen Hof herein (Nr. 196), statt ihn ein zweites Mal zu fragen.
  */
-export async function ladeTeilenVorschau(slug: string, jetzt: Date): Promise<{ daten: TeilenBildDaten; version: string } | null> {
-  const quelle = await ladeTeilenBildQuelle({ slug })
-  if (!quelle) return null
+export function teilenVorschauAus(hof: OeffentlicherHof, jetzt: Date): { daten: TeilenBildDaten; version: string } {
+  const quelle = teilenBildQuelleAus(hof)
   const daten = teilenBildDaten({
     hof: quelle.hof,
     produkte: quelle.produkte,

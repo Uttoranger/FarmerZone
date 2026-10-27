@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const BESTELLWEGE = ['src/app/api/stripe/webhook/route.ts', 'src/server/actions/bar-bestaetigung.ts', 'src/server/actions/orders.ts']
+const BESTELLWEGE = ['src/app/api/stripe/webhook/route.ts', 'src/server/actions/bar-bestaetigung.ts', 'src/server/actions/orders.ts', 'src/server/stornieren.ts']
 
 /** Aufrufe von `stelleMailEin(` — nicht `stelleMailEinInTransaktion(`. */
 function direkteAufrufe(quelltext: string): string[] {

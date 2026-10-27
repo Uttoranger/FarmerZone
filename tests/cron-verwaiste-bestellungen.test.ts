@@ -216,7 +216,9 @@ describe('/api/cron/cleanup-reservations', () => {
       '/api/cron/betrieb',
       '/api/cron/briefkasten',
       '/api/cron/cleanup-reservations',
+      '/api/cron/geld-abgleich',
       '/api/cron/mails',
+      '/api/cron/monatsabrechnung',
       '/api/cron/verwaiste-bestellungen',
     ])
   })

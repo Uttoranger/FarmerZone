@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { ChevronDown, Globe, KeyRound, Star, type LucideIcon } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Bell, ChevronDown, Globe, KeyRound, Star, Users, type LucideIcon } from 'lucide-react'
 import {
   EINSTELLUNGEN_GRUPPEN,
   EINSTELLUNGEN_TEXT,
@@ -12,8 +13,10 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Chip } from '@/components/ui/chip'
 import { LadeInhalt, LadePunkt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { EinstellungenGruendung, type GruendungFormularDaten } from '@/components/admin/einstellungen-gruendung'
+import { EinstellungenTeam } from '@/components/admin/einstellungen-team'
+import type { TeamDaten } from '@/server/queries/team'
 
-const SYMBOL: Record<EinstellungenGruppe, LucideIcon> = { gruendung: Star, plattform: Globe, anmeldung: KeyRound }
+const SYMBOL: Record<EinstellungenGruppe, LucideIcon> = { gruendung: Star, team: Users, benachrichtigungen: Bell, plattform: Globe, anmeldung: KeyRound }
 
 const H2 = 'font-heading text-lg font-semibold text-foreground'
 
@@ -23,12 +26,24 @@ export type EinstellungenDaten = {
   gruendung: GruendungFormularDaten
   /** „12 Plätze · 5 frei · bis 31.12.2027" — Zeile der zugeklappten Gruppe am Handy. */
   gruendungZeile: string
+  /** Team und Rechte (Nr. 190) — nur für Inhaber geladen; null = Gruppe ausgeblendet. */
+  team: TeamDaten | null
+  /**
+   * Benachrichtigungen (Nr. 193, N32): die Zustellung aus dem Postfach, fertig
+   * von der Seite gerendert (Empfänger und Regeln) — dieselben Teile wie vorher.
+   */
+  benachrichtigungen: ReactNode
 }
 
-function Navigation({ gewaehlt }: { gewaehlt: EinstellungenGruppe }): React.JSX.Element {
+/** Die Gruppen, die diese Person sieht — „Team“ nur für Inhaber (N35). */
+function sichtbareGruppen(daten: { team: TeamDaten | null }): EinstellungenGruppe[] {
+  return EINSTELLUNGEN_GRUPPEN.filter((g) => g !== 'team' || daten.team !== null)
+}
+
+function Navigation({ gewaehlt, gruppen }: { gewaehlt: EinstellungenGruppe; gruppen: readonly EinstellungenGruppe[] }): React.JSX.Element {
   return (
     <nav aria-label={EINSTELLUNGEN_TEXT.navigation} className="hidden flex-col gap-0.5 self-start rounded-2xl border border-border bg-card p-2 lg:flex">
-      {EINSTELLUNGEN_GRUPPEN.map((gruppe) => {
+      {gruppen.map((gruppe) => {
         const aktiv = gruppe === gewaehlt
         const Symbol = SYMBOL[gruppe]
         return (
@@ -91,23 +106,26 @@ function Plattform(): React.JSX.Element {
  * zum Aufklappen verschwindet, der Titel steht dann in der Karte.
  *
  * Plattform nur lesend (in diesem Lauf keine neuen Felder): Name und Adresse
- * aus MARKE und PRODUKTION_HOST. Die Gruppe „Benachrichtigungen" des Mockups
- * gibt es nicht — das ist Postfach › Zustellung (Nr. 95); die Gruppe „Betrieb"
+ * aus MARKE und PRODUKTION_HOST. Die Gruppe „Benachrichtigungen" ist seit
+ * Nr. 193 (N32) die frühere Zustellung aus dem Postfach; die Gruppe „Betrieb"
  * entfiel mit Nr. 103 (Register N15 geändert) — der Stripe-Modus steht in
  * Admin › Betrieb.
  */
 export function EinstellungenGruppen({ daten }: { daten: EinstellungenDaten }): React.JSX.Element {
   const zeileHandy: Record<EinstellungenGruppe, string> = {
     gruendung: daten.gruendungZeile,
+    team: EINSTELLUNGEN_TEXT.gruppe.team.zeile,
+    benachrichtigungen: EINSTELLUNGEN_TEXT.gruppe.benachrichtigungen.zeile,
     plattform: `${PLATTFORM_ANGABEN.name} · ${PLATTFORM_ANGABEN.adresse}`,
     anmeldung: EINSTELLUNGEN_TEXT.gruppe.anmeldung.zeile,
   }
+  const gruppen = sichtbareGruppen(daten)
   return (
     <LadeRahmen>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start lg:gap-[18px]">
-        <Navigation gewaehlt={daten.gewaehlt} />
+        <Navigation gewaehlt={daten.gewaehlt} gruppen={gruppen} />
         <LadeInhalt className="flex min-w-0 flex-col gap-2.5">
-          {EINSTELLUNGEN_GRUPPEN.map((gruppe) => {
+          {gruppen.map((gruppe) => {
             const Symbol = SYMBOL[gruppe]
             const titel = EINSTELLUNGEN_TEXT.gruppe[gruppe].titel
             return (
@@ -142,6 +160,8 @@ export function EinstellungenGruppen({ daten }: { daten: EinstellungenDaten }): 
                       <EinstellungenGruendung daten={daten.gruendung} />
                     </>
                   )}
+                  {gruppe === 'team' && daten.team && <EinstellungenTeam daten={daten.team} />}
+                  {gruppe === 'benachrichtigungen' && daten.benachrichtigungen}
                   {gruppe === 'plattform' && <Plattform />}
                   {/* Anmeldung (Register N20) hat eine eigene Seite — hier nur der Weg dorthin. */}
                   {gruppe === 'anmeldung' && (

@@ -121,7 +121,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.stubEnv('BLOB_READ_WRITE_TOKEN', `vercel_blob_rw_${SPEICHER}_geheim`)
   vi.mocked(auth.api.getSession).mockResolvedValue(adminSitzung('admin-1') as never)
-  vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true } as never)
+  vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
   tx.startseiteAbschnitt.findMany.mockResolvedValue(ZEILEN)
   tx.startseiteBlock.create.mockResolvedValue({ id: 'block-neu' })
   tx.startseiteAbschnitt.create.mockResolvedValue({ id: 'zeile-neu' })
@@ -366,6 +366,9 @@ describe('veroeffentlicheStartseite', () => {
   it('schreibt ohne frische Bestätigung nichts (N20, Ergänzung 23.10.2026): { error: frisch }', async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(alteAdminSitzung('admin-1') as never)
     expect(await veroeffentlicheStartseite({ wann: 'jetzt' })).toEqual({ error: FRISCH_FEHLER })
+    // Block löschen löscht (Freigabe 188 Punkt 4): ebenso nur frisch.
+    expect(await loescheStartseitenBlock({ blockId: 'b1' })).toEqual({ error: FRISCH_FEHLER })
+    expect(prisma.startseiteBlock.deleteMany).not.toHaveBeenCalled()
     expect(prisma.$transaction).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
     expect(revalidatePath).not.toHaveBeenCalled()

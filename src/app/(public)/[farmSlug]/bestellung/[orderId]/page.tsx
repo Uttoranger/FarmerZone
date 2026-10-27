@@ -18,6 +18,7 @@ import {
 } from '@/components/bestaetigung/bestaetigung-teile'
 import { HofErreichen } from '@/components/bestaetigung/hof-erreichen'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
+import { hofSichtbar } from '@/lib/hof-sichtbar'
 
 /**
  * Die Bestellseite der Kundin — erreichbar NUR über den signierten Link aus
@@ -97,13 +98,15 @@ export default async function BestellungPage({ params, searchParams }: Props) {
       totalAmount: true,
       serviceFeeCents: true,
       serviceFeeRefundedAt: true,
+      // N38 (Nr. 197): im Hofpreis-Modell heißt die Zeile „Plattformgebühr“.
+      gebuehrModell: true,
       pickupDate: true,
       pickupTimeStart: true,
       pickupTimeEnd: true,
       farm: {
         // Telefon und E-Mail für „Hof erreichen" (Nr. 60) — gelesen erst
         // hinter der Signatur oben, nie über die Bestellnummer.
-        select: { slug: true, name: true, address: true, postalCode: true, city: true, phone: true, email: true, archivedAt: true },
+        select: { slug: true, name: true, address: true, postalCode: true, city: true, phone: true, email: true, archivedAt: true, geschlossenAm: true },
       },
       items: {
         select: {
@@ -123,7 +126,7 @@ export default async function BestellungPage({ params, searchParams }: Props) {
 
   // Dieselbe ruhige Seite wie bei falscher Signatur (siehe Kopfkommentar);
   // stillgelegte Höfe wie auf der Bestätigungsseite (confirm/[orderId]).
-  if (!order || order.farm.slug !== farmSlug || order.farm.archivedAt) return <LinkUngueltig />
+  if (!order || order.farm.slug !== farmSlug || !hofSichtbar(order.farm)) return <LinkUngueltig />
 
   const abholtermin = formatiereAbholtermin(
     order.pickupDate,

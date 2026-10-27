@@ -11,6 +11,7 @@
  * Darstellung der Produktdetails, das Blatt der Hofseite gibt es nicht mehr.
  */
 import {
+  MONTH_SHORT,
   einheitLabel,
   formatEuro,
   formatGrundpreis,
@@ -42,7 +43,6 @@ import {
   type ProductCategoryValue,
   type TrocknungValue,
 } from '@/lib/taxonomie'
-import { MONTH_SHORT } from '@/schemas/product'
 import { GROESSE_PARAMETER } from '@/schemas/produktdetail'
 
 // ─── Formen ─────────────────────────────────────────────────────────────────

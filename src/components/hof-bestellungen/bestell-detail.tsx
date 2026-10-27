@@ -19,7 +19,8 @@ import type { HofBestellDetail } from '@/server/queries/orders'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
-import { GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS, centsAlsEuro } from '@/lib/servicegebuehr'
+import { GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS, SERVICEGEBUEHR_BEZEICHNUNG, centsAlsEuro } from '@/lib/servicegebuehr'
+import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
 import { formatEuro } from '@/lib/format'
 import { PROBLEM_MELDEN, PROBLEM_MELDEN_HOF } from '@/lib/fehlerseite'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
@@ -80,7 +81,7 @@ export function BestellDetail({
     const vorher = bestellung.status
     starte(async () => {
       // Ohne Wurf (Register N29): Ohne Netz steht der Netzsatz am Knopf, nicht die Fehlerseite.
-      const ergebnis = await aktionOhneWurf(() => aktion(bestellung.id))
+      const ergebnis = await aktionOhneWurf(() => aktion(bestellung.id), { unsicher: true })
       if (ergebnis.error) {
         setFehler(ergebnis.error)
         return
@@ -90,7 +91,7 @@ export function BestellDetail({
         action: {
           label: 'Rückgängig',
           onClick: () => {
-            void aktionOhneWurf(() => revertOrderStatus(bestellung.id, vorher)).then((r) => {
+            void aktionOhneWurf(() => revertOrderStatus(bestellung.id, vorher), { unsicher: true }).then((r) => {
               if (r.error) toast.error(r.error)
               else toast.success('Zurückgesetzt')
             })
@@ -103,7 +104,7 @@ export function BestellDetail({
   function nichtAbgeholt() {
     setFehler(null)
     starte(async () => {
-      const ergebnis = await aktionOhneWurf(() => markAsNotPickedUp(bestellung.id))
+      const ergebnis = await aktionOhneWurf(() => markAsNotPickedUp(bestellung.id), { unsicher: true })
       if (ergebnis.error) {
         setFehler(ergebnis.error)
         return
@@ -111,7 +112,7 @@ export function BestellDetail({
       setOffen(null)
       if (ergebnis.gebuehrErstattungOffen) {
         // Der Weg steht am Toast: „bitte den Betreiber informieren" sagte nicht, wie.
-        toast.warning('Als nicht abgeholt gespeichert. Die Servicegebühr-Erstattung hat nicht geklappt.', {
+        toast.warning(`Als nicht abgeholt gespeichert. Die Erstattung der ${gebuehrWortFuer(bestellung.betrag)} hat nicht geklappt.`, {
           duration: 10000,
           action: { label: PROBLEM_MELDEN, onClick: () => router.push(PROBLEM_MELDEN_HOF) },
         })
@@ -124,7 +125,7 @@ export function BestellDetail({
   function rueckweg(art: 'dochNicht' | 'abholungZurueck') {
     setFehler(null)
     starte(async () => {
-      const ergebnis = await aktionOhneWurf(() => (art === 'dochNicht' ? revertReady(bestellung.id, kundinInformieren) : revertPickedUp(bestellung.id)))
+      const ergebnis = await aktionOhneWurf(() => (art === 'dochNicht' ? revertReady(bestellung.id, kundinInformieren) : revertPickedUp(bestellung.id)), { unsicher: true })
       if (ergebnis.error) {
         setFehler(ergebnis.error)
         return
@@ -288,8 +289,8 @@ export function BestellDetail({
             <p>
               {betrag.gebuehrCents > 0
                 ? bestellung.vorOrt
-                  ? `Die Servicegebühr von ${euro(betrag.gebuehrCents)} entfällt und wird nicht abgerechnet. Am Warenpreis ändert sich nichts.`
-                  : `Die Servicegebühr von ${euro(betrag.gebuehrCents)} bekommt ${kunde.vorname} zurück. Der Warenpreis bleibt bei dir.`
+                  ? `Die ${gebuehrWortFuer(betrag)} von ${euro(betrag.gebuehrCents)} entfällt und wird nicht abgerechnet. Am Warenpreis ändert sich nichts.`
+                  : `Die ${gebuehrWortFuer(betrag)} von ${euro(betrag.gebuehrCents)} bekommt ${kunde.vorname} zurück. Der Warenpreis bleibt bei dir.`
                 : 'Am Warenpreis ändert sich nichts.'}
             </p>
             <p className="rounded-xl border border-border bg-background px-3.5 py-2.5">Das lässt sich nicht rückgängig machen.</p>
@@ -337,19 +338,29 @@ function Haken({ an }: { an: boolean }): React.JSX.Element {
   )
 }
 
+/** Das Gebührenwort aus den Konstanten (Register N8) — im Hofpreis-Modell „Plattformgebühr“, sonst „Servicegebühr“. */
+function gebuehrWortFuer(betrag: { hofpreis: boolean }): string {
+  return betrag.hofpreis ? PLATTFORMGEBUEHR_BEZEICHNUNG : SERVICEGEBUEHR_BEZEICHNUNG
+}
+
 /** „Bar zu kassieren" groß (vor Ort) bzw. „Online bezahlt" — dazu, wie sich der Betrag zusammensetzt. */
 function Betrag({ bestellung }: { bestellung: HofBestellDetail }): React.JSX.Element {
   const { betrag, status, vorOrt } = bestellung
   const beendet = status === 'CANCELLED' || status === 'NOT_PICKED_UP'
-  const zusammensetzung =
-    betrag.gebuehrCents > 0 ? `Warenpreis ${euro(betrag.warenCents)} + Servicegebühr ${euro(betrag.gebuehrCents)}` : `Warenpreis ${euro(betrag.warenCents)}`
+  // Hofpreis-Modell (N38): Die Plattformgebühr ist Teil des Preises — der Hof sieht, was ihm bleibt und was die Kundin zahlt.
+  const zusammensetzung = betrag.hofpreis
+    ? `Du bekommst ${euro(betrag.warenCents)} · die Kundin zahlt ${euro(betrag.gesamtCents)}`
+    : betrag.gebuehrCents > 0
+      ? `Warenpreis ${euro(betrag.warenCents)} + ${SERVICEGEBUEHR_BEZEICHNUNG} ${euro(betrag.gebuehrCents)}`
+      : `Warenpreis ${euro(betrag.warenCents)}`
+  const gebuehrWort = gebuehrWortFuer(betrag)
 
   if (beendet) {
     return (
       <div className="rounded-xl border border-border bg-muted px-3.5 py-3">
         <p className={cn('text-xs font-semibold tracking-wide uppercase', LEISE)}>{status === 'CANCELLED' ? 'Storniert' : 'Nicht abgeholt'}</p>
         <p className="mt-1 text-[13.5px]">
-          {betrag.gebuehrCents > 0 ? `Warenpreis ${euro(betrag.warenCents)} · Servicegebühr ${euro(betrag.gebuehrCents)} entfällt` : `Warenpreis ${euro(betrag.warenCents)}`}
+          {betrag.gebuehrCents > 0 ? `Warenpreis ${euro(betrag.warenCents)} · ${gebuehrWort} ${euro(betrag.gebuehrCents)} entfällt` : `Warenpreis ${euro(betrag.warenCents)}`}
         </p>
         {betrag.erstattetCents > 0 && <p className={cn('mt-1 text-[12.5px]', LEISE)}>Erstattet: {euro(betrag.erstattetCents)}</p>}
         {bestellung.stornoGrund && <p className="mt-1 text-[12.5px] break-words">Grund: {bestellung.stornoGrund}</p>}

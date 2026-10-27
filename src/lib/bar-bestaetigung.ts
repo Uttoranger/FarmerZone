@@ -19,6 +19,7 @@ import { createHash } from 'crypto'
 import { nanoid } from 'nanoid'
 import type { OrderStatus } from '@prisma/client'
 import { GRUND_NICHT_BESTAETIGT, istVerwaist, type FristBestellung } from '@/lib/fristen'
+import { hofSichtbar } from '@/lib/hof-sichtbar'
 
 /** Storno-Grund, wenn die Kundin auf „Doch nicht" tippt (Order.cancelReason) — der Hof liest ihn. */
 export const GRUND_KUNDIN_STORNIERT = 'Von der Kundin vor der Bestätigung storniert'
@@ -115,10 +116,10 @@ export const BAR_LINK_JE_BESTELLUNG_UND_TAG = 3
  * und die Action `sendeBarLinkErneut`.
  */
 export function barLinkErneutMoeglich(
-  bestellung: BarBestellung & { farm: { archivedAt: Date | null } },
+  bestellung: BarBestellung & { farm: { archivedAt: Date | null; geschlossenAm: Date | null } },
   jetzt: Date
 ): boolean {
-  if (bestellung.farm.archivedAt) return false
+  if (!hofSichtbar(bestellung.farm)) return false
   if (bestellung.paymentMethod !== 'ONSITE_CASH' && bestellung.paymentMethod !== 'ONSITE_CARD') return false
   return barBestaetigungsAnsicht(bestellung, jetzt) === 'offen'
 }

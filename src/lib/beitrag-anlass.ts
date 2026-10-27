@@ -13,10 +13,14 @@
  * von hier; tests/anlass-woerter-wache.test.ts hält das fest.
  */
 import { CalendarDays, Leaf, MessageCircle, Tag, type LucideIcon } from 'lucide-react'
-import { STATUS_POST_ANLASS_VALUES } from '@/schemas/status-post'
 
-/** Alle Anlässe in der Reihenfolge des Assistenten — für Zod (`z.enum(BEITRAG_ANLAESSE)`) und Auswahllisten. */
-export const BEITRAG_ANLAESSE = STATUS_POST_ANLASS_VALUES
+/**
+ * Alle Anlässe in der Reihenfolge des Assistenten — für Zod (`z.enum(BEITRAG_ANLAESSE)`) und Auswahllisten.
+ * Wie im Enum `StatusPostAnlass` ausgeschrieben, weil die Liste auch im Browser läuft (kein Import aus
+ * `@prisma/client`); tests/status-posts.test.ts gleicht beide ab. Hier statt in src/schemas/status-post.ts,
+ * damit die Startseite sie ohne Zod lädt (Nr. 196); das Schema nimmt dieselbe Liste.
+ */
+export const BEITRAG_ANLAESSE = ['FRESH_PRODUCT', 'NEW_SEASON', 'PROMOTION', 'ANNOUNCEMENT'] as const
 
 export type BeitragAnlass = (typeof BEITRAG_ANLAESSE)[number]
 

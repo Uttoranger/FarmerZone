@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useImperativeHandle, useMemo, useOptimistic, useTransition, type Ref } from 'react'
+import { usePreisAnzeige } from '@/components/shared/preis-anzeige'
+import { mitEndpreis } from '@/lib/plattformgebuehr'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -12,14 +14,15 @@ import { toast } from 'sonner'
 import { useCart, useKorbHinweis, zeigeKorbHinweis } from '@/lib/use-cart'
 import { gleicheKorbMitHofseite } from '@/lib/reservierung'
 import { WARENKORB_ANKER } from '@/lib/warenkorb-speicher'
-import { MONTH_SHORT, seasonLabel } from '@/schemas/product'
-import { formatEuro, formatGrundpreis, formatGrundpreisNetto, mitAnzahl } from '@/lib/format'
+import { MONTH_SHORT, centsAlsEuro, formatEuro, formatGrundpreis, formatGrundpreisNetto, mitAnzahl, seasonLabel } from '@/lib/format'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { VORSCHAU_KAUF_HINWEIS, korbErlaubt } from '@/lib/hofseite-vorschau'
 import { produktZustand, streifenText, type ProduktZustand } from '@/lib/produkt-sichtbarkeit'
 import { ImShopSchalter } from '@/components/products/im-shop-schalter'
 import { kartenZustand, kategorieAbschnitte, ruhenderKnopfText, zeigeKaufknopf, type KaufSperre } from '@/lib/bereiche-anzeige'
-import { SCHAUFENSTER_PRODUKTE, oeffnetKorbHier, stehtNurAmHandy, uebersichtProdukte } from '@/lib/hofseite-kunde'
+import { sperreMitBestellstopp } from '@/lib/notbremse'
+import { useBestellstopp } from '@/components/notbremse-band'
+import { SCHAUFENSTER_PRODUKTE, korbBetraege, oeffnetKorbHier, stehtNurAmHandy, uebersichtProdukte } from '@/lib/hofseite-kunde'
 import { BESTAETIGUNG_MS, RUECKGAENGIG, blattBeimErstenMal, imKorbText, korbFehlerText } from '@/lib/hofseite-orientierung'
 import { NETZ_KNOPF } from '@/lib/netz'
 import { bereichAusParameter } from '@/schemas/hoefe-filter'
@@ -321,7 +324,6 @@ function ProductCard({
   onAddToCart,
   onDetails,
   isAddingId,
-  ownerMode = false,
   isEditMode = false,
   sperre = null,
   setzeSichtbarkeit,
@@ -343,8 +345,10 @@ function ProductCard({
   const dim = isEditMode && !product.isAvailable ? 0.55 : 1
   // Futter: Kilopreis aus der Nettomenge (Bereiche 2) — Ballen und Big Bags
   // haben keine Gebindegröße und bekämen sonst gar keinen Grundpreis.
+  // Im Hofpreis-Modell (N38) Endpreis je Stück, Grund- und Kilopreis aus dem Endpreis — nur Anzeige.
+  const preis = mitEndpreis(product, usePreisAnzeige())
   const kilopreis = product.futter
-    ? formatGrundpreisNetto(product.price, product.futter.nettoMenge, product.futter.nettoEinheit)
+    ? formatGrundpreisNetto(preis.price, product.futter.nettoMenge, product.futter.nettoEinheit)
     : null
 
   const kopf = (
@@ -361,13 +365,13 @@ function ProductCard({
           {product.name}
         </p>
         <p className="text-[17px] font-bold mt-[5px]" style={{ color: 'var(--app-ink)' }}>
-          {formatGrundpreis(product.price, product.unit, product.unitSize)}
+          {formatGrundpreis(preis.price, product.unit, product.unitSize)}
         </p>
         {kilopreis ? (
           <p className="mt-0.5 text-[12px]" style={{ color: 'var(--app-ink-soft)' }}>{kilopreis}</p>
         ) : (
           <GrundpreisZeile
-            price={product.price}
+            price={preis.price}
             unit={product.unit}
             unitSize={product.unitSize}
             className="mt-0.5 text-[12px]"
@@ -527,7 +531,7 @@ export function ProductGrid({
   initialReorderItems,
   ownerMode = false,
   mode = 'preview',
-  sperre = null,
+  sperre: sperreDesHofs = null,
   hofName,
   pauseMessage,
   onVorschau,
@@ -543,6 +547,9 @@ export function ProductGrid({
   chipBlock,
 }: Props) {
   const isEditMode = ownerMode && mode !== 'preview'
+  // Notbremse (Register N34, Nr. 189): Kaufknöpfe und Nachbestell-Link ruhen wie
+  // bei einer Kaufsperre, der Korb bleibt; den Grund sagt das Band unter dem Kopf.
+  const sperre = sperreMitBestellstopp(sperreDesHofs, useBestellstopp())
   // EINE Regel für jeden Weg in den Korb (Kaufknopf, Nachbestell-Link,
   // #warenkorb-Anker, Korb-Knopf, Sheet) — src/lib/hofseite-vorschau.ts.
   const mitKorb = korbErlaubt({ isEditMode, kaufen })
@@ -615,7 +622,10 @@ export function ProductGrid({
     return () => clearTimeout(weg)
   }, [zeileNr])
 
-  const { items, count, total, isHydrated, addItem, updateQuantity, removeItem, ersetzeKorb } = useCart(farmId, farmSlug)
+  const { items, count, total: warenSumme, isHydrated, addItem, updateQuantity, removeItem, ersetzeKorb } = useCart(farmId, farmSlug)
+  // Im Hofpreis-Modell (N38) die Summe der Endpreise — dieselbe Zahl wie Korb und Kasse.
+  const anzeige = usePreisAnzeige()
+  const total = anzeige ? centsAlsEuro(korbBetraege(items.map((i) => mitEndpreis(i, anzeige))).summeCents) : warenSumme
   const korbHinweis = useKorbHinweis(farmId)
 
   // Warenkorb ehrlich (Register N28): Einmal nach dem Hydrieren gleicht die
@@ -803,7 +813,7 @@ export function ProductGrid({
       {/* Willkommen-zurück-Hinweis — nur, wo es einen Korb gibt (der Nachbestell-Effekt setzt ihn ohnehin nur dann). */}
       {mitKorb && showWelcomeBack && (
         <div className="relative mb-4 rounded-2xl border border-accent/45 bg-accent/12 py-2 pr-12 pl-4 text-[13.5px] font-medium text-foreground">
-          <p className="flex min-h-9 items-center">Willkommen zurück! Dein letzter Einkauf liegt wieder im Korb.</p>
+          <p className="flex min-h-9 items-center">Willkommen zurück! Dein letzter Einkauf liegt wieder im Warenkorb.</p>
           <button
             type="button"
             onClick={() => setShowWelcomeBack(false)}
@@ -1017,7 +1027,7 @@ export function ProductGrid({
           <ShoppingBasket className="size-5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
           <span className="min-w-0 truncate text-[13px] font-semibold">
             {mitAnzahl(count, 'Artikel', 'Artikel')} · {formatEuro(total)}
-            {gebuehrKorb && <span className="font-normal"> + Gebühr</span>}
+            {gebuehrKorb && !anzeige && <span className="font-normal"> + Gebühr</span>}
           </span>
           <span className="ml-auto flex shrink-0 items-center gap-0.5 text-[13px] font-semibold">
             Zum Warenkorb
@@ -1040,7 +1050,7 @@ export function ProductGrid({
           onRemoveItem={removeItem}
           gebuehrKorb={gebuehrKorb}
           futterHinweis={futterVerantwortungImKorb(items, products)}
-          kaufSperre={{ sperre, hofName, pauseMessage }}
+          kaufSperre={{ sperre: sperreDesHofs, hofName, pauseMessage }}
           hinweis={korbHinweis}
         />
       )}

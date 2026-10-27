@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { formatEuro } from '@/lib/format'
-import { SERVICEGEBUEHR_BEZEICHNUNG, SERVICEGEBUEHR_HINWEIS, bestellSummen, centsAlsEuro, gebuehrEntfallen } from '@/lib/servicegebuehr'
+import { bestellSummen, centsAlsEuro, gebuehrEntfallen } from '@/lib/servicegebuehr'
+import { gebuehrBezeichnungFuer, gebuehrHinweisFuer } from '@/lib/plattformgebuehr'
 import type { BestaetigungsKopf, BestellSchritt } from '@/lib/bestaetigung'
 
 /*
@@ -192,6 +193,8 @@ export function BestellPositionen({
     serviceFeeCents: number
     serviceFeeRefundedAt: Date | string | null
     paymentMethod: string
+    /** N38: 'hofpreis' — dann heißt die Zeile „Plattformgebühr“ mit dem Satz aus konditionen.ts. */
+    gebuehrModell?: string | null
   }
   zahlung: string
   fuss?: ReactNode
@@ -217,7 +220,7 @@ export function BestellPositionen({
         {s.gebuehrCents > 0 && (
           <li className="flex items-baseline gap-2 text-[13.5px]">
             <span className="min-w-0 flex-1 text-muted-foreground">
-              {SERVICEGEBUEHR_BEZEICHNUNG}
+              {gebuehrBezeichnungFuer(summen)}
               {entfallen && <span className="text-[12px]"> ({summen.paymentMethod === 'ONLINE' ? 'erstattet' : 'entfällt'})</span>}
             </span>
             <span className={cn('shrink-0 tabular-nums', entfallen && 'text-muted-foreground line-through')}>
@@ -231,7 +234,7 @@ export function BestellPositionen({
         <span className="min-w-0 flex-1">{zahlung}</span>
         <span className="shrink-0 tabular-nums">{formatEuro(centsAlsEuro(s.gesamtCents))}</span>
       </p>
-      {s.gebuehrCents > 0 && <p className="text-[12px] leading-normal text-muted-foreground">{SERVICEGEBUEHR_HINWEIS}</p>}
+      {s.gebuehrCents > 0 && <p className="text-[12px] leading-normal text-muted-foreground">{gebuehrHinweisFuer(summen)}</p>}
       {fuss}
     </section>
   )

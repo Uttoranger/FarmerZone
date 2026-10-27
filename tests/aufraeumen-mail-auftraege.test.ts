@@ -38,6 +38,7 @@ vi.mock('@/lib/prisma', () => ({
     einmalLink: { deleteMany: vi.fn(async () => m.nichts) },
     order: { updateMany: vi.fn(async () => m.nichts) },
     mailAuftrag: { deleteMany: m.loeschen, updateMany: m.auftragUpdate },
+    adminAktion: { deleteMany: vi.fn(async () => m.nichts) },
   },
 }))
 vi.mock('@/server/mail-arten/beitrag', () => ({ sichereGesendeteBeitragsMails: m.sichere }))

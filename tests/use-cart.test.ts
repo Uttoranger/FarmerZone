@@ -152,6 +152,8 @@ vi.mock('react', async (importOriginal) => ({
   useTransition: pruefstand.useTransition,
   useOptimistic: pruefstand.useOptimistic,
   useImperativeHandle: pruefstand.useImperativeHandle,
+  // Ohne Rahmen liefert ein Kontext seinen Vorgabewert (Preisanzeige, N38: null = Warenpreis wie bisher).
+  useContext: <T,>(kontext: import('react').Context<T>): T => (kontext as unknown as { _currentValue: T })._currentValue,
 }))
 
 // Das echte useCart, nur umhüllt: was der Hook zuletzt geliefert hat — auch aus dem Produktraster heraus.
@@ -578,7 +580,7 @@ describe('Produktraster: Abgleich beim Laden (Register N28)', () => {
 
     expect(korb().items.map((i) => [i.productId, i.price])).toEqual([[EIER.id, 3.9]])
     expect(leseWarenkorb(speicher.get(WARENKORB_SCHLUESSEL) ?? null)?.items.map((i) => i.price)).toEqual([3.9])
-    expect(hinweis.text).toBe('Eine Position ist nicht mehr verfügbar und wurde entfernt. Ein Preis hat sich geändert – der Korb zeigt den neuen.')
+    expect(hinweis.text).toBe('Eine Position ist nicht mehr verfügbar und wurde entfernt. Ein Preis hat sich geändert – der Warenkorb zeigt den neuen.')
     // Wer nur schaut, hält nichts: kein Aufruf von /api/reserve und keiner der Kasse.
     expect(reserviere).not.toHaveBeenCalled()
   })

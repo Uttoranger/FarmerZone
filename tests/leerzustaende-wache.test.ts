@@ -208,6 +208,8 @@ const AUSNAHMEN: Ausnahme[] = [
   // B — eine einzelne Zeile in einer Karte oder Liste, ohne Aktion, mit nur einer Fassung
   { datei: 'src/lib/admin-hoefe.ts', text: /^Noch kein Produkt im Shop – Freischalten erst/, art: 'C', grund: 'Grund an der gesperrten Freischaltung (Warteliste in Admin › Höfe und Satz der Action), Wortlaut der Freigabe §21 (Nr. 116) — kein Leerzustand' },
   { datei: 'src/lib/betrieb.ts', text: /^Noch keine Meldung( von Vercel\. Vercel meldet erst ab 50 % des Limits)?/, art: 'C', grund: 'Stand der Karte „Vercel-Ausgaben“ ohne jede Meldung von Spend Management (Nr. 162, Wortlaut der Freigabe §28) — ein Wert neben dem Link nach Vercel, kein Leerzustand' },
+  { datei: 'src/app/admin/geld/page.tsx', text: /^noch kein(er| Lauf ·)$/, art: 'C', grund: 'Stand der Zeilen „Zahlungen“ und „Letzter Lauf“ in der Karte „Abgleich mit Stripe“ von Admin › Geld vor dem ersten Lauf (Nr. 191) — ein Wert in einer Zeile, kein Leerzustand' },
+  { datei: 'src/lib/finanzen.ts', text: 'noch keine Kosten eingetragen', art: 'C', grund: 'Grund eines offenen Punkts der Prüfliste des Monatsabschlusses (Nr. 191, N37) — Teil des Satzes am gesperrten Knopf, kein Leerzustand' },
   { datei: 'src/lib/betrieb.ts', text: 'noch kein Lauf', art: 'C', grund: 'Stand eines Ablaufs in der Tabelle „Abläufe“ von Admin › Betrieb (Register N18: ohne bisherigen Lauf nie überfällig) — ein Wert in einer Zeile, kein Leerzustand' },
   { datei: 'src/lib/heute.ts', text: 'Noch keine Bestellungen', art: 'B', grund: 'Zeile unter dem Abholfenster in der Karte „Nächste Abholung“; HEUTE_KEINE_BESTELLUNGEN ist ihre einzige Fassung' },
   { datei: 'src/lib/pickup-slot-rules.ts', text: 'Noch keine — erst dann können Kundinnen bestellen', art: 'B', grund: 'Wert der Zeile „Abholzeiten“ in Mein Hof und in den Einstellungen; die Zeile ist selbst der Link zu den Abholzeiten' },
@@ -240,7 +242,8 @@ const AUSNAHMEN: Ausnahme[] = [
  * sich selbst belegt; der Grund steht im Aufruf, nicht hier (seit Nr. 85).
  */
 const BEKANNT_OHNE: Array<{ datei: string; titel: string }> = [
-  { datei: 'src/components/admin/hoefe-ansicht.tsx', titel: 'Noch kein Hof freigeschaltet' },
+  { datei: 'src/components/admin/hoefe-ansicht.tsx', titel: 'HOEFE_LISTE_TEXT.leerTitel' },
+  { datei: 'src/components/admin/hof-akte-ansicht.tsx', titel: 'AKTE_PROTOKOLL_LEER.titel' },
   { datei: 'src/components/admin/briefkasten-teile.tsx', titel: 'WUNSCHLISTE_LEER.titel' },
   { datei: 'src/components/admin/meldungen-teile.tsx', titel: 'WUENSCHE_LEER.titel' },
   { datei: 'src/components/analytics/umfeld-anzeige.tsx', titel: 'Noch keine Höfe zum Vergleichen' },
@@ -257,7 +260,6 @@ const BEKANNT_OHNE: Array<{ datei: string; titel: string }> = [
  */
 const ALTLAST_IM_AUFRUF: Array<{ datei: string; text: string }> = [
   { datei: 'src/app/account/profile/profile-client.tsx', text: 'Du hast noch keine Benachrichtigungen abonniert.' },
-  { datei: 'src/components/admin/hoefe-ansicht.tsx', text: 'Noch kein Hof freigeschaltet' },
   { datei: 'src/components/analytics/umfeld-anzeige.tsx', text: 'Noch keine Höfe zum Vergleichen' },
   { datei: 'src/components/hof-bestellungen/bestellungen-ansicht.tsx', text: 'Noch keine Bestellungen' },
   { datei: 'src/components/hof-hilfe/meine-meldungen.tsx', text: 'Noch keine Meldungen' },

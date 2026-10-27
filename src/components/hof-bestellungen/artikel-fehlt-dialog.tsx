@@ -61,7 +61,7 @@ export function ArtikelFehltDialog({
     setFehler(null)
     starte(async () => {
       // Ohne Wurf (Register N29): Ohne Netz steht der Netzsatz im Dialog.
-      const ergebnis = await aktionOhneWurf(() => meldeArtikelFehlt({ orderId: bestellung.id, itemId: gewaehlt }))
+      const ergebnis = await aktionOhneWurf(() => meldeArtikelFehlt({ orderId: bestellung.id, itemId: gewaehlt }), { unsicher: true })
       if (ergebnis.error) {
         setFehler(ergebnis.error)
         return

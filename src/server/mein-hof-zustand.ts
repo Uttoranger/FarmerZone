@@ -39,6 +39,7 @@ export async function ladeMeinHofZustand(farmId: string, jetzt: Date): Promise<M
       select: {
         isActive: true,
         isPaused: true,
+        adminGesperrtAm: true,
         approvedAt: true,
         archivedAt: true,
         pauseMessage: true,
@@ -57,7 +58,7 @@ export async function ladeMeinHofZustand(farmId: string, jetzt: Date): Promise<M
   const zustand: HofZustandArt = hof.archivedAt ? 'stillgelegt' : !hof.approvedAt ? 'wartet' : hofZustand(hof).art
   return {
     zustand,
-    sperre: kaufSperre({ isPaused: hof.isPaused, pickupSlots: fenster }, jetzt),
+    sperre: kaufSperre({ isPaused: hof.isPaused, adminGesperrt: Boolean(hof.adminGesperrtAm), pickupSlots: fenster }, jetzt),
     naechste: naechsteAbholung(fenster, wienJetzt(jetzt)),
     pauseMessage: hof.pauseMessage,
     abholzeitAktiv: fenster.length > 0,

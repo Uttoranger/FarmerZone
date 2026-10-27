@@ -12,7 +12,7 @@
 //               einrichten — Produkte, Fotos, Abholzeiten, Profil.
 //
 // Prüfreihenfolge in /api/checkout und /api/reserve:
-//   archiviert → nicht freigeschaltet → pausiert.
+//   archiviert → nicht freigeschaltet → vom Team gesperrt (N34) → pausiert.
 // Begründung: Der dauerhafte Zustand sticht den administrativen, und beide
 // stechen den vorübergehenden. So bekommt niemand ein „bald wieder da", wo
 // gar nichts wiederkommt.
@@ -95,3 +95,11 @@ export function freischaltungsMailto(supportEmail: string, farmName: string, far
   })
   return `mailto:${supportEmail}?${params.toString().replace(/\+/g, '%20')}`
 }
+
+/**
+ * Der neutrale Satz für die Kundschaft, solange das Team einen Hof gesperrt hat
+ * (Register N34, Nr. 187). Bewusst ohne Grund: Der steht nur im Admin und im
+ * Postfach des Hofs. EINE Quelle für Prüfkette, Kasse, Hofseite und Korb
+ * (weitergereicht über bereiche-anzeige.ts).
+ */
+export const HOF_GESPERRT_SATZ = 'Bestellen ist bei diesem Hof gerade nicht möglich.'

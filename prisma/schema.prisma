@@ -363,6 +363,12 @@ model User {
   // SQL zusammen mit isAdmin. Den ersten Passkey richtet ein Admin nur in den
   // 24 Stunden danach ein; leer = Einrichtung gesperrt (src/lib/admin-anmeldung.ts).
   adminSeit     DateTime?
+  // Rechte je Person (Register N35, Nr. 188): Inhaber dürfen alles und
+  // vergeben Rechte; sonst gilt „ansehen“ plus die einzeln vergebenen Rechte
+  // aus ADMIN_RECHTE (src/lib/admin-rechte.ts). Gelesen nur über darf() bzw.
+  // die Admin-Wache. Die Migration macht bestehende Admins zu Inhabern.
+  adminInhaber  Boolean  @default(false)
+  adminRechte   String[] @default([])
   emailVerified Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -671,6 +677,30 @@ model Farm {
   testhofGeaendertAm        DateTime?
   testhofGeaendertVonUserId String?
 
+  // Eingriffe des Admins (Register N34/N36, Nr. 188; gebaut in 187 und 190):
+  // Sperre durch den Admin (anders als isPaused nicht vom Hof aufhebbar) und
+  // „Konto schließen“ in zwei Stufen. VonUserId ohne Fremdschlüssel wie
+  // testhofGeaendertVonUserId. null = nicht gesperrt bzw. offen (Expand).
+  adminGesperrtAm        DateTime?
+  adminSperrGrund        String?
+  adminGesperrtVonUserId String?
+  geschlossenAm          DateTime?
+  endgueltigAm           DateTime?
+
+  // Plattformgebühr im Hofpreis (Register N38, Nr. 188; benutzt ab 197/198).
+  // Nur Kennungen von Stripe, nie IBAN oder Mandatstext. Das Mandat selbst
+  // steht schon in sepaMandatAm (Schema-Expand Redesign, oben).
+  //   plattformgebuehrProzent  null = Vorgabe 6 %
+  //   einzugAb                 null = abgeleitet (Stichtag bzw. nach der Gründung)
+  plattformgebuehrProzent Decimal?  @db.Decimal(5, 2)
+  einzugAb                DateTime?
+  barMandatPflicht        Boolean   @default(true)
+  barSperreNachTagen      Int       @default(14)
+  abrechnungsTag          Int       @default(3)
+  stripeKundeId           String?   @unique
+  sepaZahlungsmittelId    String?
+  gebuehrHinweisAm        DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -904,6 +934,12 @@ model Order {
   serviceFeePercentApplied Decimal?  @db.Decimal(5, 2)
   serviceFeeRefundedAt     DateTime?
 
+  // Plattformgebühr im Hofpreis (Register N38, Nr. 188; benutzt ab 197/198):
+  //   gebuehrModell  null = bisher (Servicegebühr), "hofpreis" = N38
+  //   gebuehrEinzug  "stripe", "sepa", "ueberweisung" oder "erlassen"
+  gebuehrModell String?
+  gebuehrEinzug String?
+
   // Teilstorno „Artikel fehlt" (Schema-Expand Redesign, E14) — noch von
   // keinem Code benutzt.
   //   serviceFeeMinCentsApplied  SNAPSHOT der Mindestgebühr zur Bestellzeit.
@@ -977,6 +1013,9 @@ model OrderItem {
   // trägt keine Servicegebühr mehr. Die Snapshot-Spalten darüber bleiben
   // unverändert. null = Position wird übergeben (alle Bestandspositionen).
   fehltSeit   DateTime?
+  // Plattformgebühr der Position im Hofpreis-Modell (N38, Nr. 188) in Cent:
+  // Menge × Gebühr je Stück. 0 = Modell „bisher“ (alle Bestandspositionen).
+  gebuehrCents Int @default(0)
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
@@ -1237,6 +1276,14 @@ model Monatsabrechnung {
   nichtAbgeholtBestellungen Int
   summeCents                Int
   eingezogenAm              DateTime?
+  // Monatsabrechnung nach N38 (Nr. 188; benutzt ab 198): Stand der
+  // Abrechnung und die Kennungen der beiden Stripe-Rechnungen, nie Beträge
+  // von Stripe oder Mandatsdaten.
+  stand                     String    @default("entwurf")
+  rechnungBarId             String?
+  rechnungOnlineId          String?
+  offenSeit                 DateTime?
+  zurueckgebuchtAm          DateTime?
   createdAt                 DateTime  @default(now())
   updatedAt                 DateTime  @updatedAt
 
@@ -1244,6 +1291,7 @@ model Monatsabrechnung {
 
   // Eine Abrechnung je Hof und Monat; deckt auch Abfragen nach farmId.
   @@unique([farmId, monat])
+  @@index([stand])
 }
 
 // Die Bremse über alle Instanzen (Register R1, Nr. 40): je Schlüssel und
@@ -1380,6 +1428,15 @@ model PlattformEinstellung {
   gruendungMonate      Int       @default(24)
   gruendungAktionBis   DateTime? @db.Date
   gruendungFestAm      DateTime?
+  // Notbremse „Bestellungen anhalten“ (Register N34, Nr. 188; gebaut in 189):
+  // null = keine Notbremse. Satz = Text für die Kundschaft.
+  bestellstoppAb       DateTime?
+  bestellstoppBis      DateTime?
+  bestellstoppGrund    String?
+  bestellstoppSatz     String?
+  // Stichtag des Hofpreis-Modells (N38, Nr. 188; benutzt ab 197):
+  // null = BAR_SERVICEGEBUEHR_AB.
+  hofpreisModellAb     DateTime?
   zustellRegeln        Json?
   geaendertVonUserId   String?
   updatedAt            DateTime @updatedAt
@@ -1569,4 +1626,27 @@ model MailAuftrag {
   @@index([farmId, erstelltAm])
   @@index([nochmalVon])
   @@index([empfaengerHash, erstelltAm])
+}
+
+// Admin-Protokoll (Register N33, Nr. 188): jede Admin-Aktion, jedes Ansehen
+// einer vollen Kundenadresse und jedes Ereignis, das Geld oder den Zustand
+// eines Hofs ändert. Geschrieben nur über protokolliere()
+// (src/server/admin-protokoll.ts), nie geändert; das Aufräumen löscht nach
+// 5 Jahren. KEINE ADRESSE, KEIN NAME, KEIN INHALT, KEIN TOKEN: Bezug nur als
+// Kennung, `art` aus ADMIN_AKTIONEN (src/schemas/admin-aktion.ts). `wer` ohne
+// Fremdschlüssel (null = System): Ein gelöschtes Konto reißt das Protokoll
+// nicht mit.
+model AdminAktion {
+  id         String   @id @default(cuid())
+  wann       DateTime @default(now())
+  wer        String?
+  art        String
+  bezugArt   String
+  bezugId    String
+  grund      String?
+  mitPasskey Boolean
+
+  @@index([wann])
+  @@index([bezugArt, bezugId, wann])
+  @@index([wer, wann])
 }

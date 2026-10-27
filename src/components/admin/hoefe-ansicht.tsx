@@ -3,75 +3,36 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { CalendarDays, Check, ChevronRight, CircleMinus, CirclePlus, Ellipsis, Eye, FlaskConical, FlaskConicalOff, MapPinOff, Search, Star, Store, Undo2 } from 'lucide-react'
+import { Search, Store } from 'lucide-react'
 import {
-  HOF_FILTER_LABEL,
-  HOF_FILTER_WERTE,
-  NUMMER_HINWEIS,
-  NUR_MIT_TREFFERN,
-  ONLINE_AUS_TEXT,
-  SERVICEGEBUEHR_NUR_NEUE,
-  filtereHoefe,
-  passtZurSuche,
-  zaehleHofFilter,
-  type AdminHofZeile,
-} from '@/lib/admin-hoefe'
-import {
-  GRUENDUNG_AUSNEHMEN_TEXT,
-  GRUENDUNGSHOF_SPALTE,
-  HOEFE_SEITE,
-  gruendungshofZelle,
-  gruendungshoefeListe,
-  hoefeKennzahlen,
-  hoefeSeitenAdresse,
-  hoefeUnterreiter,
-  waehleHoefeReiter,
-  wartelistePlatzZeile,
-  type GruendungAenderung,
-  type TesthofAenderung,
-} from '@/lib/admin-hoefe-seite'
-import { hoefeAnsichtAus } from '@/schemas/admin-hoefe'
-import { hoefeReiterAus } from '@/schemas/admin-reiter'
-import { aktivitaetsTeile, istOhneInhalt, AKTIVITAET_LEER, type FarmAktivitaet } from '@/lib/farm-aktivitaet'
-import { DE_ADMIN_KLAERUNG, LAND_LABEL } from '@/lib/laender'
-import { GRUENDUNG_AUSGENOMMEN_MARKE, GRUENDUNG_BIS_MARKE, GRUENDUNG_BIS_TITEL, TESTHOF_MARKE, type GruendungAnzeige } from '@/lib/gruendungshof'
+  HOEFE_LISTE_FILTER,
+  HOEFE_LISTE_FILTER_LABEL,
+  HOEFE_LISTE_TEXT,
+  filtereHoefeListe,
+  hoefeListeAdresse,
+  zaehleHoefeListe,
+  type HoefeListenZeile,
+} from '@/lib/admin-hoefe-liste'
+import type { AdminHofZeile } from '@/lib/admin-hoefe'
+import type { GruendungAenderung, TesthofAenderung } from '@/lib/admin-hoefe-seite'
+import { adminHofHref } from '@/lib/admin-hof-akte'
+import { hoefeListeAus } from '@/schemas/admin-hoefe'
+import type { FarmAktivitaet } from '@/lib/farm-aktivitaet'
+import type { GruendungAnzeige } from '@/lib/gruendungshof'
 import { HOFNAME_MAX } from '@/lib/eingabegrenzen'
 import { mitAnzahl } from '@/lib/format'
-import type { MeldungTon } from '@/lib/meldung'
 import { cn } from '@/lib/utils'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { EmptyState } from '@/components/ui/empty-state'
-import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLinkItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { KARTE, KICKER, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
-import { HofKachel } from './admin-teile'
-import { Kennzahlen } from './kennzahlen'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { KARTE, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
 import { Seitenkopf } from './seitenkopf'
-import { Unterreiter } from './unterreiter'
-import { HofAktionDialog, type HofAktion } from './hof-aktion-dialog'
-import { ServicegebuehrDialog } from './servicegebuehr-dialog'
-import { GruendungBisDialog, type GruendungsHof } from './gruendung-bis-dialog'
-import { GruendungAusnehmenDialog, type GruendungAusnehmenHof } from './gruendung-ausnehmen-dialog'
-import { TesthofDialog, type TesthofHof } from './testhof-dialog'
 
 /**
- * `gruendung`: das wirksame Gründungs-Ende (Nr. 62), null ohne Gründungsplatz.
- * `platzBeiFreischaltung`: der Gründungsplatz, den ein wartender Hof bei
- * sofortiger Freischaltung bekäme (Nr. 94, Register N15) — null für alle
- * anderen und wenn alle Plätze vergeben sind.
- * `gruendungAenderung`: Menüeintrag und Bestätigung „Nicht als / Wieder als
- * Gründungshof zählen“ (Register K2, Nr. 109) — nur für freigeschaltete, nicht
- * stillgelegte Höfe, sonst null. `gruendungZuletzt`: „zuletzt geändert von … am …“.
- * `testhofAenderung`: Menüeintrag und Bestätigung „Als Testhof markieren“ bzw.
- * „Kein Testhof mehr“ (Register N21, Nr. 119) — null ohne Eintrag.
+ * Ein Hof mit allem, was die Dialoge der Akte brauchen (Freischalten,
+ * Servicegebühr, Gründung, Testhof) — gebaut in ladeAdminHoefe
+ * (src/server/queries/admin-hof.ts).
  */
 export type AdminHof = AdminHofZeile & {
   aktivitaet: FarmAktivitaet
@@ -82,99 +43,46 @@ export type AdminHof = AdminHofZeile & {
   testhofAenderung: TesthofAenderung | null
 }
 
-export type NeueMeldung = { id: string; art: string; artTon: MeldungTon; titel: string }
-
 /**
- * Höfe und Freischaltung (Nachtlauf Nr. 22f; seit Nr. 94 im Admin-Seitenmuster,
- * Register N15; Mockups admin-hoefe-und-freischaltung,
- * admin-mobil-unterwegs-freischalten): Seitenkopf mit Suche, Kennzahlen,
- * Unterreiter „Warten auf Freischaltung · Alle Höfe · Gründungshöfe“, darunter
- * der Inhalt des gewählten Reiters und die Regel-Zeile. Warten zeigt die
- * wartenden Höfe als Karten mit „Freischalten“, Alle Höfe die Liste mit
- * Filtern — ab 1024 px als Tabelle, darunter als Karten —, Gründungshöfe die
- * Höfe mit Platz. Am Handy steht unter der Warteliste „Neu im Postfach“.
- *
- * Reiter, Filter und Suche stehen in der Adresse und werden im Browser
- * angewandt (replaceState, kein Server-Aufruf je Tipp). Was eine Zeile sagt,
- * entscheidet src/lib/admin-hoefe.ts, was die Kennzahlen und die Warteliste
- * sagen src/lib/admin-hoefe-seite.ts; die Wirkung die bestehenden Actions.
+ * Admin › Höfe im Regelbetrieb (Register N32; Nachtlauf Nr. 187; Mockup
+ * admin-hoefe-neu): Seitenkopf mit Suche, Filter „Braucht Blick“ (Standard) ·
+ * Wartet · Verkauft · Pausiert · Gesperrt · Geschlossen · Testhöfe · Alle,
+ * darunter ab 1024 px eine echte Tabelle (Hof, Zustand, Signal, Bestellungen
+ * 30 Tage, zuletzt aktiv), darunter Karten. Je Zeile „Prüfen“ (wartend) bzw.
+ * „Akte“. Filter und Suche stehen in der Adresse und werden im Browser
+ * angewandt (replaceState). Was eine Zeile sagt, entscheidet
+ * src/lib/admin-hoefe-liste.ts; alles Eingreifen steht in der Akte.
  */
-export function HoefeAnsicht({
-  hoefe,
-  vergebenePlaetze,
-  maxPlaetze,
-  ausgenommen,
-  neueMeldungen,
-}: {
-  hoefe: AdminHof[]
-  vergebenePlaetze: number
-  /** Plätze gesamt aus der Einstellung (Register K2). */
-  maxPlaetze: number
-  /** Freigeschaltete Höfe, die nicht für die Gründungsplätze zählen (Nr. 109). */
-  ausgenommen: number
-  neueMeldungen: NeueMeldung[]
-}): React.JSX.Element {
+export function HoefeAnsicht({ zeilen }: { zeilen: HoefeListenZeile[] }): React.JSX.Element {
   const parameter = useSearchParams()
-  const ansicht = hoefeAnsichtAus(parameter)
-  // Die Suche tippt lokal; die Adresse bekommt sie bereinigt mit.
-  const [suche, setSuche] = useState(ansicht.suche)
-  const [aktion, setAktion] = useState<HofAktion | null>(null)
-  const [gebuehrHof, setGebuehrHof] = useState<AdminHof | null>(null)
-  const [gruendungHof, setGruendungHof] = useState<GruendungsHof | null>(null)
-  const [ausnehmenHof, setAusnehmenHof] = useState<GruendungAusnehmenHof | null>(null)
-  const [testhofHof, setTesthofHof] = useState<TesthofHof | null>(null)
+  const start = hoefeListeAus(parameter)
+  const [filter, setFilter] = useState(start.filter)
+  const [suche, setSuche] = useState(start.suche)
+  const zahlen = zaehleHoefeListe(zeilen)
+  const liste = filtereHoefeListe(zeilen, { filter, suche })
 
-  const wartende = hoefe.filter((h) => h.status.id === 'wartet')
-  const zahlen = zaehleHofFilter(hoefe)
-  const reiter = waehleHoefeReiter(hoefeReiterAus(parameter), wartende.length)
-  const gruendungshoefe = gruendungshoefeListe(hoefe)
-  const liste = reiter === 'gruendung' ? filtereHoefe(gruendungshoefe, { filter: 'alle', suche }) : filtereHoefe(hoefe, { filter: ansicht.filter, suche })
-  const wartendeGefunden = wartende.filter((h) => passtZurSuche(h, suche))
-  const adresse = (neu: { reiter?: typeof reiter; filter?: typeof ansicht.filter; suche?: string }): string =>
-    hoefeSeitenAdresse({ reiter: neu.reiter ?? reiter, filter: neu.filter ?? ansicht.filter, suche: neu.suche ?? suche })
-  // Alle Hofzeilen derselben Art zeigen dieselbe Lage: ohne Treffer ein Satz mit Ausweg.
-  const keinTreffer = (
-    <EmptyState
-      symbol={Search}
-      titel="Kein Hof passt"
-      satz="Mit diesem Filter oder dieser Suche gibt es keinen Hof."
-      ausweg={
-        <Link
-          href={hoefeSeitenAdresse({ reiter, filter: 'alle', suche: '' })}
-          className={KNOPF_RAHMEN}
-          onNavigate={(e) => {
-            e.preventDefault()
-            setSuche('')
-            schreibeAdresse(hoefeSeitenAdresse({ reiter, filter: 'alle', suche: '' }))
-          }}
-        >
-          Alle Höfe zeigen
-        </Link>
-      }
-    />
-  )
+  function waehle(neu: { filter?: typeof filter; suche?: string }) {
+    const f = neu.filter ?? filter
+    const s = neu.suche ?? suche
+    setFilter(f)
+    setSuche(s)
+    // null als Zustand: Next gleicht useSearchParams ab (ARCHITECTURE §4, State-Regeln).
+    window.history.replaceState(null, '', hoefeListeAdresse({ filter: f, suche: s }))
+  }
 
   return (
     <div className="flex flex-col gap-5">
       <Seitenkopf
-        titel={HOEFE_SEITE.titel}
-        satz={HOEFE_SEITE.satz}
+        titel={HOEFE_LISTE_TEXT.titel}
+        satz={HOEFE_LISTE_TEXT.satz}
         rechts={
           <label className="relative block w-full md:w-[288px]">
             <span className="sr-only">Hof suchen</span>
-            <Search
-              className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
-              strokeWidth={1.7}
-              aria-hidden="true"
-            />
+            <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
             <input
               type="search"
               value={suche}
-              onChange={(e) => {
-                const wert = e.target.value.slice(0, HOFNAME_MAX)
-                setSuche(wert)
-                schreibeAdresse(adresse({ suche: wert }))
-              }}
+              onChange={(e) => waehle({ suche: e.target.value.slice(0, HOFNAME_MAX) })}
               placeholder="Hof suchen …"
               className={cn(
                 'h-11 w-full rounded-full border border-border bg-card pr-4 pl-10 text-base text-foreground placeholder:text-muted-foreground md:text-[13.5px]',
@@ -185,368 +93,148 @@ export function HoefeAnsicht({
         }
       />
 
-      <Kennzahlen beschriftung={HOEFE_SEITE.kennzahlen} eintraege={hoefeKennzahlen(hoefe, { vergeben: vergebenePlaetze, max: maxPlaetze, ausgenommen })} />
+      <FilterChipReihe beschriftung="Höfe filtern">
+        {HOEFE_LISTE_FILTER.map((f) => (
+          <FilterChip
+            key={f}
+            href={hoefeListeAdresse({ filter: f, suche })}
+            aktiv={filter === f}
+            onNavigate={(e) => {
+              e.preventDefault()
+              waehle({ filter: f })
+            }}
+          >
+            {HOEFE_LISTE_FILTER_LABEL[f]}
+            <span className="ml-1 tabular-nums">· {zahlen[f]}</span>
+          </FilterChip>
+        ))}
+      </FilterChipReihe>
 
-      <Unterreiter
-        beschriftung={HOEFE_SEITE.reiter}
-        eintraege={hoefeUnterreiter({ wartende: wartende.length, alle: zahlen.alle, gruendungshoefe: gruendungshoefe.length, maxPlaetze, suche })}
-        aktiv={reiter}
-        onNavigate={(e, eintrag) => {
-          e.preventDefault()
-          schreibeAdresse(eintrag.href)
-        }}
-      />
-
-      {reiter === 'warten' && (
-        <section aria-labelledby="warten-titel" className="flex flex-col gap-3">
-          <h2 id="warten-titel" className="sr-only">
-            Warten auf Freischaltung
-          </h2>
-          {wartende.length === 0 ? (
-            <p className={cn('text-[14px]', LEISE)}>{HOEFE_SEITE.keineWartenden}</p>
-          ) : wartendeGefunden.length === 0 ? (
-            keinTreffer
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {wartendeGefunden.map((hof) => (
-                <li key={hof.id}>
-                  <WartenderHof hof={hof} onAktion={setAktion} />
-                </li>
-              ))}
-            </ul>
-          )}
-          {neueMeldungen.length > 0 && <NeuImBriefkasten meldungen={neueMeldungen} />}
-        </section>
-      )}
-
-      {reiter !== 'warten' && (
-        <section aria-labelledby="liste-titel" className="flex flex-col gap-3">
-          <h2 id="liste-titel" className="sr-only">
-            {reiter === 'alle' ? 'Alle Höfe' : 'Gründungshöfe'}
-          </h2>
-          {reiter === 'alle' && (
-            <FilterChipReihe beschriftung="Höfe filtern">
-              {HOF_FILTER_WERTE.filter((f) => !NUR_MIT_TREFFERN.has(f) || zahlen[f] > 0).map((f) => {
-                const ziel = adresse({ filter: f })
-                return (
-                  <FilterChip
-                    key={f}
-                    href={ziel}
-                    aktiv={ansicht.filter === f}
-                    onNavigate={(e) => {
-                      e.preventDefault()
-                      schreibeAdresse(ziel)
-                    }}
-                  >
-                    {HOF_FILTER_LABEL[f]}
-                    <span className="ml-1 tabular-nums">· {zahlen[f]}</span>
-                  </FilterChip>
-                )
-              })}
-            </FilterChipReihe>
-          )}
-
-          <p className={cn('text-[13px]', LEISE)} aria-live="polite">
-            {mitAnzahl(liste.length, 'Hof', 'Höfe')}
-          </p>
-
-          {zahlen.alle === 0 ? (
-            <EmptyState
-              symbol={Store}
-              titel="Noch kein Hof freigeschaltet"
-              satz="Sobald du einen wartenden Hof freischaltest, steht er hier mit Servicegebühr und Bestellungen."
-              ausweg={{ ohne: 'Freischalten steht im Reiter „Warten auf Freischaltung“ (der Satz sagt es); die Liste hier ist leer, weil noch kein Hof freigeschaltet ist' }}
-            />
-          ) : liste.length === 0 ? (
-            keinTreffer
-          ) : (
-            <>
-              <Tabelle
-                hoefe={liste}
-                onGebuehr={setGebuehrHof}
-                onGruendung={setGruendungHof}
-                onAusnehmen={setAusnehmenHof}
-                onTesthof={setTesthofHof}
-                onAktion={setAktion}
-              />
-              <Karten
-                hoefe={liste}
-                onGebuehr={setGebuehrHof}
-                onGruendung={setGruendungHof}
-                onAusnehmen={setAusnehmenHof}
-                onTesthof={setTesthofHof}
-                onAktion={setAktion}
-              />
-            </>
-          )}
-        </section>
-      )}
-
-      <p className={cn('text-[12.5px] leading-relaxed', LEISE)}>
-        {HOEFE_SEITE.regel} {SERVICEGEBUEHR_NUR_NEUE} {NUMMER_HINWEIS}
+      <p className={cn('text-[13px]', LEISE)} aria-live="polite">
+        {filter === 'braucht-blick'
+          ? `${liste.length} von ${mitAnzahl(zahlen.alle, 'Hof', 'Höfen')} brauchen Blick · Testhöfe nur unter „Testhöfe“`
+          : mitAnzahl(liste.length, 'Hof', 'Höfe')}
       </p>
 
-      <HofAktionDialog aktion={aktion} onClose={() => setAktion(null)} />
-      <ServicegebuehrDialog hof={gebuehrHof} onClose={() => setGebuehrHof(null)} />
-      <GruendungBisDialog hof={gruendungHof} onClose={() => setGruendungHof(null)} />
-      <GruendungAusnehmenDialog hof={ausnehmenHof} onClose={() => setAusnehmenHof(null)} />
-      <TesthofDialog hof={testhofHof} onClose={() => setTesthofHof(null)} />
+      {zahlen.alle === 0 ? (
+        <EmptyState
+          symbol={Store}
+          titel={HOEFE_LISTE_TEXT.leerTitel}
+          satz={HOEFE_LISTE_TEXT.leerSatz}
+          ausweg={{ ohne: 'Höfe melden sich selbst an; vorher gibt es hier nichts zu tun' }}
+        />
+      ) : liste.length === 0 ? (
+        <EmptyState
+          symbol={filter === 'braucht-blick' && suche.trim() === '' ? Store : Search}
+          titel={filter === 'braucht-blick' && suche.trim() === '' ? HOEFE_LISTE_TEXT.keinerBrauchtBlick : HOEFE_LISTE_TEXT.keinTreffer}
+          satz={filter === 'braucht-blick' && suche.trim() === '' ? HOEFE_LISTE_TEXT.keinerBrauchtBlickSatz : HOEFE_LISTE_TEXT.keinTrefferSatz}
+          ausweg={
+            <Link
+              href={hoefeListeAdresse({ filter: 'alle', suche: '' })}
+              className={KNOPF_RAHMEN}
+              onNavigate={(e) => {
+                e.preventDefault()
+                waehle({ filter: 'alle', suche: '' })
+              }}
+            >
+              Alle Höfe zeigen
+            </Link>
+          }
+        />
+      ) : (
+        <>
+          <Tabelle zeilen={liste} />
+          <Karten zeilen={liste} />
+        </>
+      )}
+
+      <p className={cn('text-[12.5px] leading-relaxed', LEISE)}>{HOEFE_LISTE_TEXT.regel}</p>
     </div>
   )
 }
 
-function schreibeAdresse(adresse: string) {
-  // null als Zustand: Next gleicht useSearchParams ab (ARCHITECTURE §4, State-Regeln).
-  window.history.replaceState(null, '', adresse)
-}
-
-/** Ein wartender Hof (Mockup: Karte mit „Ablehnen" und „Freischalten"). */
-function WartenderHof({ hof, onAktion }: { hof: AdminHof; onAktion: (a: HofAktion) => void }): React.JSX.Element {
-  // Was der Hof schon angelegt hat, dann Stripe und SEPA (Mockup: „4 Produkte · Stripe eingerichtet · SEPA erteilt").
-  const teile = istOhneInhalt(hof.aktivitaet) ? [AKTIVITAET_LEER] : aktivitaetsTeile(hof.aktivitaet)
-  // Ohne Stripe steht der Grund darunter orange (hof.sperre, Register Z1).
-  const zahlung = hof.stripeBereit ? ['Stripe eingerichtet', ...(hof.onlineAn ? [] : [ONLINE_AUS_TEXT])] : []
-  const angaben = [...teile, ...zahlung, ...(hof.sepaErteilt ? ['SEPA erteilt'] : [])]
-  // Der Gründungsplatz bei Freischaltung (Register N15): mit Stripe der Platz, sonst der Hinweis; keine Zeile, wenn alle Plätze vergeben sind.
-  const platzZeile = wartelistePlatzZeile(hof, hof.platzBeiFreischaltung)
+/** „Prüfen“ bei wartenden Höfen, sonst „Akte“ — der Hofname steht für Screenreader mit im Link. */
+function AkteLink({ zeile }: { zeile: HoefeListenZeile }): React.JSX.Element {
+  const wartet = zeile.zustand.id === 'wartet'
   return (
-    <article
-      aria-label={hof.name}
-      className={cn(KARTE, 'flex flex-col gap-3 p-4 md:flex-row md:items-center md:gap-4 md:px-[18px]', !hof.sperre && 'border-primary/45')}
-    >
-      <div className="flex min-w-0 flex-1 gap-3.5">
-        <HofKachel name={hof.name} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="line-clamp-2 min-w-0 text-[15.5px] font-semibold break-words text-foreground" title={hof.name}>
-              {hof.name}
-            </p>
-            {hof.istDeutsch && <StatusBadge status="neutral">{LAND_LABEL.DE}</StatusBadge>}
-          </div>
-          <p className={cn('mt-0.5 truncate text-[13px]', LEISE)} title={hof.ownerEmail}>
-            {hof.ownerEmail} · {hof.registriert}
-          </p>
-          <p className="mt-0.5 flex flex-wrap gap-x-1.5 text-[13px] text-foreground">
-            {angaben.map((t, i) => (
-              <span key={t} className="flex gap-1.5">
-                {t}
-                {i < angaben.length - 1 && (
-                  <span aria-hidden="true" className="text-muted-foreground">
-                    ·
-                  </span>
-                )}
-              </span>
-            ))}
-          </p>
-          {hof.sperre && <p className="mt-0.5 text-[13px] font-medium text-status-offen">{hof.sperre}</p>}
-          {platzZeile && (
-            <p className={cn('mt-1 flex items-center gap-1.5 text-[12.5px]', platzZeile.art === 'bekaeme' ? 'font-semibold text-status-offen' : 'font-medium text-muted-foreground')}>
-              {platzZeile.art === 'bekaeme' && <Star className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />}
-              {platzZeile.text}
-            </p>
-          )}
-          <KartenpunktZeile text={hof.kartenpunktZeile} />
-          <p className={cn('mt-0.5 flex flex-wrap gap-x-3 text-[12.5px]', LEISE)}>
-            <span>E-Mail bestätigt: {hof.emailBestaetigtText}</span>
-            {hof.nummer && <span>Betriebsnummer {hof.nummer}</span>}
-            <span className="break-all">Hof-ID {hof.id}</span>
-          </p>
-          {hof.istDeutsch && (
-            <p className={cn('mt-2 rounded-lg border border-dashed border-border px-3 py-2 text-[12.5px]', LEISE)}>
-              {DE_ADMIN_KLAERUNG}
-            </p>
-          )}
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-2.5 md:flex md:shrink-0">
-        <button type="button" onClick={() => onAktion({ hof, art: 'reject' })} className={KNOPF_RAHMEN}>
-          Ablehnen
-        </button>
-        <button
-          type="button"
-          onClick={() => onAktion({ hof, art: 'approve' })}
-          disabled={hof.sperre !== null}
-          title={hof.sperre ?? undefined}
-          className={KNOPF_GRUEN}
-        >
-          Freischalten
-        </button>
-      </div>
-    </article>
+    <Link href={adminHofHref(zeile.id)} className={wartet ? KNOPF_GRUEN : KNOPF_RAHMEN}>
+      {wartet ? HOEFE_LISTE_TEXT.pruefen : HOEFE_LISTE_TEXT.akte}
+      <span className="sr-only"> {zeile.name}</span>
+    </Link>
   )
 }
 
-/** Am Handy: was im Postfach auf eine Entscheidung wartet (Mockup admin-mobil-unterwegs-freischalten). */
-function NeuImBriefkasten({ meldungen }: { meldungen: NeueMeldung[] }): React.JSX.Element {
+function Zustand({ zeile }: { zeile: HoefeListenZeile }): React.JSX.Element {
   return (
-    <section aria-labelledby="neu-briefkasten-titel" className="flex flex-col gap-3 md:hidden">
-      <h2 id="neu-briefkasten-titel" className={KICKER}>
-        Neu im Postfach
-      </h2>
-      <ul className={cn(KARTE, 'overflow-hidden [&>li+li]:border-t [&>li+li]:border-border')}>
-        {meldungen.map((m) => (
-          <li key={m.id}>
-            <Link
-              href={`/admin/meldungen/${m.id}`}
-              className={cn('flex min-h-[52px] items-center gap-2.5 px-4 py-2.5 hover:bg-muted', FOKUS_RAHMEN_INNEN)}
-            >
-              <StatusBadge status={m.artTon}>{m.art}</StatusBadge>
-              <span className="min-w-0 flex-1 truncate text-[14px] text-foreground" title={m.titel}>
-                {m.titel}
-              </span>
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
-}
-
-type ZeilenProps = {
-  hoefe: AdminHof[]
-  onGebuehr: (hof: AdminHof) => void
-  onGruendung: (hof: GruendungsHof) => void
-  onAusnehmen: (hof: GruendungAusnehmenHof) => void
-  onTesthof: (hof: TesthofHof) => void
-  onAktion: (a: HofAktion) => void
-}
-
-/** Die Rückrufe des Menüs ⋯ einer Hofzeile. */
-type MenueProps = Pick<ZeilenProps, 'onGruendung' | 'onAusnehmen' | 'onTesthof' | 'onAktion'>
-
-/**
- * „Kein Kartenpunkt – …“ (Nr. 119): leise wie die Platz-Zeile der Warteliste,
- * nie orange — ein Hinweis, keine Sperre; Freischalten bleibt möglich.
- */
-function KartenpunktZeile({ text }: { text: string | null }): React.JSX.Element | null {
-  if (text === null) return null
-  return (
-    <p className="mt-1 flex items-center gap-1.5 text-[12.5px] font-medium text-muted-foreground">
-      <MapPinOff className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-      {text}
-    </p>
-  )
-}
-
-/** „Standard" oder „abweichend" neben dem wirksamen Ende. */
-function gruendungMarke(gruendung: GruendungAnzeige): string {
-  return gruendung.abweichend ? GRUENDUNG_BIS_MARKE.abweichend : GRUENDUNG_BIS_MARKE.standard
-}
-
-/**
- * Die Zelle „Gründungshof“ (Register N15, Mockup): „★ Nr. 3 · bis 30.06.2027“,
- * darunter leise die Marke „Standard“ bzw. „abweichend“, daneben „ändern“ —
- * ohne Platz „kein Gründungshof“, ausgenommen die Marke „ausgenommen“
- * (Register K2, Nr. 109), ein Testhof nur die Marke „Testhof“ (Register N21).
- */
-function GruendungZelle({ hof, onGruendung }: { hof: AdminHof; onGruendung: (hof: GruendungsHof) => void }): React.JSX.Element {
-  const zelle = gruendungshofZelle(hof)
-  const gruendung = hof.gruendung
-  if (hof.istTesthof) return <StatusBadge status="neutral">{TESTHOF_MARKE}</StatusBadge>
-  if (hof.gruendungAusgenommen) return <StatusBadge status="neutral">{GRUENDUNG_AUSGENOMMEN_MARKE}</StatusBadge>
-  if (!zelle) return <span className={LEISE}>{GRUENDUNGSHOF_SPALTE.kein}</span>
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      {/* Mindestbreite des längsten Textes („Nr. 12 · bis 31.12.2027“), damit „ändern“ in jeder Zeile gleich steht. */}
-      <span className="flex min-w-44 flex-col leading-tight">
-        <span className="inline-flex items-center gap-1 text-foreground">
-          <Star className="size-3.5 shrink-0 text-status-offen" strokeWidth={1.8} aria-hidden="true" />
-          {zelle.text}
-        </span>
-        {zelle.marke && <span className={cn('text-[12px]', LEISE)}>{zelle.marke}</span>}
-      </span>
-      {gruendung && (
-        <button
-          type="button"
-          onClick={() => onGruendung({ id: hof.id, name: hof.name, gruendung })}
-          className={cn('min-h-11 rounded-full px-2 text-[13px] font-medium text-status-fertig hover:bg-muted', FOKUS_RAHMEN)}
-        >
-          ändern<span className="sr-only"> ({GRUENDUNG_BIS_TITEL} {hof.name})</span>
-        </button>
-      )}
+    <span className="flex flex-col items-start gap-0.5">
+      <StatusBadge status={zeile.zustand.ton}>{zeile.zustand.text}</StatusBadge>
+      {zeile.seit && <span className={cn('text-[12px]', LEISE)}>{zeile.seit}</span>}
     </span>
   )
 }
 
+function Signale({ zeile }: { zeile: HoefeListenZeile }): React.JSX.Element {
+  if (zeile.signale.length === 0) {
+    return (
+      <>
+        <span aria-hidden="true" className={LEISE}>
+          –
+        </span>
+        <span className="sr-only">kein Signal</span>
+      </>
+    )
+  }
+  return <span className={zeile.zustand.id === 'wartet' ? 'text-foreground' : 'font-medium text-status-offen'}>{zeile.signale.join(' · ')}</span>
+}
+
 /** Ab 1024 px: die Tabelle aus dem Mockup. */
-function Tabelle({ hoefe, onGebuehr, onGruendung, onAusnehmen, onTesthof, onAktion }: ZeilenProps): React.JSX.Element {
+function Tabelle({ zeilen }: { zeilen: HoefeListenZeile[] }): React.JSX.Element {
   const kopf = 'px-3.5 py-2.5 text-left text-[11px] font-semibold tracking-[0.1em] whitespace-nowrap text-muted-foreground uppercase'
   return (
     <div className={cn(KARTE, 'hidden overflow-hidden lg:block')}>
       <table className="w-full text-[14px]">
+        <caption className="sr-only">{HOEFE_LISTE_TEXT.tabelle}</caption>
         <thead className="border-b border-border">
           <tr>
             <th scope="col" className={cn(kopf, 'w-full max-w-0')}>
               Hof
             </th>
             <th scope="col" className={kopf}>
-              Status
+              Zustand
             </th>
             <th scope="col" className={kopf}>
-              {GRUENDUNGSHOF_SPALTE.titel}
+              Signal
             </th>
             <th scope="col" className={kopf}>
-              Servicegebühr
+              Best. 30 T
             </th>
             <th scope="col" className={kopf}>
-              Best./Monat
+              Zuletzt aktiv
             </th>
             <th scope="col" className={kopf}>
-              Stripe
-            </th>
-            <th scope="col" className={kopf}>
-              Betriebsnr.
-            </th>
-            <th scope="col" className={kopf}>
-              <span className="sr-only">Weitere Aktionen</span>
+              <span className="sr-only">Akte öffnen</span>
             </th>
           </tr>
         </thead>
         <tbody className="[&>tr+tr]:border-t [&>tr+tr]:border-border">
-          {hoefe.map((hof) => (
-            <tr key={hof.id}>
-              <td className="w-full max-w-0 px-3.5 py-2.5">
-                <p className="truncate font-semibold text-foreground" title={hof.name}>
-                  {hof.name}
+          {zeilen.map((z) => (
+            <tr key={z.id}>
+              <th scope="row" className="w-full max-w-0 px-3.5 py-2.5 text-left font-normal">
+                <p className="truncate font-semibold text-foreground" title={z.name}>
+                  {z.name}
                 </p>
-                <p className={cn('truncate text-[12.5px]', LEISE)} title={`/${hof.slug}`}>
-                  /{hof.slug}
-                </p>
-                <KartenpunktZeile text={hof.kartenpunktZeile} />
-              </td>
-              <td className="px-3.5 py-2.5">
-                <StatusBadge status={hof.status.ton}>{hof.status.text}</StatusBadge>
-              </td>
-              <td className="px-3.5 py-1.5 whitespace-nowrap">
-                <GruendungZelle hof={hof} onGruendung={onGruendung} />
-              </td>
+                <p className={cn('truncate text-[12.5px]', LEISE)}>{z.ort}</p>
+              </th>
               <td className="px-3.5 py-2.5 whitespace-nowrap">
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="rounded-lg border border-border px-2 py-0.5 tabular-nums" title={hof.satzLang}>
-                    {hof.satz}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onGebuehr(hof)}
-                    className={cn('min-h-11 rounded-full px-2 text-[13px] font-medium text-status-fertig hover:bg-muted', FOKUS_RAHMEN)}
-                  >
-                    ändern<span className="sr-only"> (Servicegebühr {hof.name})</span>
-                  </button>
-                </span>
+                <Zustand zeile={z} />
               </td>
-              <td className="px-3.5 py-2.5 tabular-nums">{hof.monat.bestellungen}</td>
-              <td className="px-3.5 py-2.5">
-                <StripeZeichen bereit={hof.stripeBereit} />
+              <td className="px-3.5 py-2.5 text-[13.5px] whitespace-nowrap">
+                <Signale zeile={z} />
               </td>
-              <td className="px-3.5 py-2.5 whitespace-nowrap tabular-nums">{hof.nummer ?? (
-                  <>
-                    <span aria-hidden="true">–</span>
-                    <span className="sr-only">keine Angabe</span>
-                  </>
-                )}</td>
-              <td className="px-2 py-1.5 text-right">
-                <MehrMenue hof={hof} onGruendung={onGruendung} onAusnehmen={onAusnehmen} onTesthof={onTesthof} onAktion={onAktion} />
+              <td className="px-3.5 py-2.5 tabular-nums">{z.bestellungen30}</td>
+              <td className="px-3.5 py-2.5 whitespace-nowrap">{z.zuletztAktiv ?? <span className={LEISE}>–</span>}</td>
+              <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                <AkteLink zeile={z} />
               </td>
             </tr>
           ))}
@@ -557,181 +245,41 @@ function Tabelle({ hoefe, onGebuehr, onGruendung, onAusnehmen, onTesthof, onAkti
 }
 
 /** Unter 1024 px: je Hof eine Karte (nichts scrollt quer). */
-function Karten({ hoefe, onGebuehr, onGruendung, onAusnehmen, onTesthof, onAktion }: ZeilenProps): React.JSX.Element {
+function Karten({ zeilen }: { zeilen: HoefeListenZeile[] }): React.JSX.Element {
   return (
     <ul className="flex flex-col gap-3 lg:hidden">
-      {hoefe.map((hof) => (
-        <li key={hof.id} className={cn(KARTE, 'flex flex-col gap-2.5 p-4')}>
+      {zeilen.map((z) => (
+        <li key={z.id} className={cn(KARTE, 'flex flex-col gap-2.5 p-4')}>
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
-              <p className="line-clamp-2 font-semibold break-words text-foreground" title={hof.name}>
-                {hof.name}
+              <p className="line-clamp-2 font-semibold break-words text-foreground" title={z.name}>
+                {z.name}
               </p>
-              <p className={cn('truncate text-[12.5px]', LEISE)}>/{hof.slug}</p>
-              <KartenpunktZeile text={hof.kartenpunktZeile} />
+              <p className={cn('truncate text-[12.5px]', LEISE)}>{z.ort}</p>
             </div>
-            <StatusBadge status={hof.status.ton} className="shrink-0">
-              {hof.status.text}
-            </StatusBadge>
-            <MehrMenue hof={hof} onGruendung={onGruendung} onAusnehmen={onAusnehmen} onTesthof={onTesthof} onAktion={onAktion} />
+            <Zustand zeile={z} />
           </div>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[13px] sm:grid-cols-4">
-            <div>
-              <dt className={LEISE}>{GRUENDUNGSHOF_SPALTE.titel}</dt>
-              <dd className="text-foreground">
-                {hof.istTesthof ? (
-                  <StatusBadge status="neutral">{TESTHOF_MARKE}</StatusBadge>
-                ) : hof.gruendungAusgenommen ? (
-                  <StatusBadge status="neutral">{GRUENDUNG_AUSGENOMMEN_MARKE}</StatusBadge>
-                ) : hof.gruendungsplatz !== null ? (
-                  `Nr. ${hof.gruendungsplatz}`
-                ) : (
-                  GRUENDUNGSHOF_SPALTE.kein
-                )}
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[13px]">
+            <div className="col-span-2">
+              <dt className={LEISE}>Signal</dt>
+              <dd>
+                <Signale zeile={z} />
               </dd>
             </div>
             <div>
-              <dt className={LEISE}>Bestellungen im Monat</dt>
-              <dd className="text-foreground tabular-nums">{hof.monat.bestellungen}</dd>
+              <dt className={LEISE}>Bestellungen 30 Tage</dt>
+              <dd className="text-foreground tabular-nums">{z.bestellungen30}</dd>
             </div>
             <div>
-              <dt className={LEISE}>Stripe</dt>
-              <dd className={hof.stripeBereit ? 'text-foreground' : 'text-status-offen'}>{hof.stripeBereit ? 'eingerichtet' : 'fehlt'}</dd>
-            </div>
-            <div>
-              <dt className={LEISE}>Betriebsnummer</dt>
-              <dd className="break-all text-foreground">{hof.nummer ?? '–'}</dd>
+              <dt className={LEISE}>Zuletzt aktiv</dt>
+              <dd className="text-foreground">{z.zuletztAktiv ?? '–'}</dd>
             </div>
           </dl>
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2.5">
-            <p className="min-w-0 text-[13px] text-foreground">
-              <span className={LEISE}>Servicegebühr </span>
-              {hof.satz}
-            </p>
-            <button type="button" onClick={() => onGebuehr(hof)} className={KNOPF_RAHMEN}>
-              Gebühr ändern
-            </button>
+          <div className="flex justify-end border-t border-border pt-2.5">
+            <AkteLink zeile={z} />
           </div>
-          {hof.gruendung && <GruendungKartenZeile hof={hof} gruendung={hof.gruendung} onGruendung={onGruendung} />}
         </li>
       ))}
     </ul>
-  )
-}
-
-/** Karte am Handy: die Zeile „Gründungshof bis" mit Datum, Marke und „Ende ändern" (nur mit Platz). */
-function GruendungKartenZeile({
-  hof,
-  gruendung,
-  onGruendung,
-}: {
-  hof: AdminHof
-  gruendung: GruendungAnzeige
-  onGruendung: (hof: GruendungsHof) => void
-}): React.JSX.Element {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2.5">
-      {/* Beschriftung über dem Datum: In einer Zeile bräche „Ende ändern" bei 390 px unter den Text. */}
-      <p className="min-w-0 text-[13px] text-foreground">
-        <span className={cn('block', LEISE)}>{GRUENDUNG_BIS_TITEL}</span>
-        {gruendung.bisText} <span className={LEISE}>{`· ${gruendungMarke(gruendung)}`}</span>
-      </p>
-      <button type="button" onClick={() => onGruendung({ id: hof.id, name: hof.name, gruendung })} className={KNOPF_RAHMEN}>
-        Ende ändern<span className="sr-only"> ({GRUENDUNG_BIS_TITEL} {hof.name})</span>
-      </button>
-    </div>
-  )
-}
-
-function StripeZeichen({ bereit }: { bereit: boolean }): React.JSX.Element {
-  if (bereit) {
-    return (
-      <span className="inline-flex text-status-fertig">
-        <Check className="size-4" strokeWidth={1.7} aria-hidden="true" />
-        <span className="sr-only">eingerichtet</span>
-      </span>
-    )
-  }
-  // Jeder Hof braucht Stripe (Register Z1) — orange, nicht rot: Der Hof bleibt online.
-  return (
-    <span className="text-status-offen">
-      <span aria-hidden="true">–</span>
-      <span className="sr-only">fehlt</span>
-    </span>
-  )
-}
-
-/**
- * „⋯": Hofseite ansehen, „Gründungshof bis …“, „Nicht als / Wieder als
- * Gründungshof zählen …“ (Register K2, Nr. 109 — ausgegraut mit Grund, wenn
- * kein Platz frei ist oder der Hof ein Testhof ist), „Als Testhof markieren …“
- * bzw. „Kein Testhof mehr …“ (Register N21, Nr. 119) und Freigabe zurücknehmen
- * — selten, deshalb nicht als eigener Knopf. Darunter leise, wer zuletzt aus-
- * oder wieder aufgenommen hat.
- */
-function MehrMenue({ hof, onGruendung, onAusnehmen, onTesthof, onAktion }: { hof: AdminHof } & MenueProps): React.JSX.Element {
-  const oeffentlich = hof.status.id !== 'stillgelegt'
-  const gruendung = hof.gruendung
-  const aenderung = hof.gruendungAenderung
-  const testhof = hof.testhofAenderung
-  const symbol = 'size-4 shrink-0 text-muted-foreground'
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        aria-label={`Weitere Aktionen für ${hof.name}`}
-        className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN)}
-      >
-        <Ellipsis className="size-5" strokeWidth={1.7} aria-hidden="true" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72 max-w-[calc(100vw-2rem)]">
-        {oeffentlich && (
-          <DropdownMenuLinkItem render={<a href={`/${hof.slug}`} target="_blank" rel="noopener noreferrer" />}>
-            <Eye className={symbol} strokeWidth={1.7} aria-hidden="true" />
-            Hofseite ansehen
-          </DropdownMenuLinkItem>
-        )}
-        {gruendung && (
-          <DropdownMenuItem onClick={() => onGruendung({ id: hof.id, name: hof.name, gruendung })}>
-            <CalendarDays className={symbol} strokeWidth={1.7} aria-hidden="true" />
-            {GRUENDUNG_AUSNEHMEN_TEXT.menueBis}
-          </DropdownMenuItem>
-        )}
-        {aenderung && (
-          <DropdownMenuItem
-            disabled={aenderung.gesperrt !== null}
-            onClick={() => onAusnehmen({ id: hof.id, name: hof.name, aenderung })}
-          >
-            {aenderung.richtung === 'ausnehmen' ? (
-              <CircleMinus className="size-4 shrink-0 text-status-offen" strokeWidth={1.7} aria-hidden="true" />
-            ) : (
-              <CirclePlus className={symbol} strokeWidth={1.7} aria-hidden="true" />
-            )}
-            {aenderung.menue}
-          </DropdownMenuItem>
-        )}
-        {/* Der Grund in voller Schrift UNTER dem ausgegrauten Eintrag — im Eintrag selbst wäre er zu blass zum Lesen. */}
-        {aenderung?.gesperrt && <p className="px-2.5 pb-1.5 pl-9 text-[12px] leading-snug text-muted-foreground">{aenderung.gesperrt}</p>}
-        {testhof && (
-          <DropdownMenuItem onClick={() => onTesthof({ id: hof.id, name: hof.name, aenderung: testhof })}>
-            {testhof.richtung === 'markieren' ? (
-              <FlaskConical className={symbol} strokeWidth={1.7} aria-hidden="true" />
-            ) : (
-              <FlaskConicalOff className={symbol} strokeWidth={1.7} aria-hidden="true" />
-            )}
-            {testhof.menue}
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuItem onClick={() => onAktion({ hof, art: 'revoke' })}>
-          <Undo2 className={symbol} strokeWidth={1.7} aria-hidden="true" />
-          Freigabe zurücknehmen
-        </DropdownMenuItem>
-        {hof.gruendungZuletzt && (
-          <>
-            <DropdownMenuSeparator />
-            <p className="px-2.5 pt-0.5 pb-1 text-[11.5px] leading-snug text-muted-foreground">{hof.gruendungZuletzt}</p>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
   )
 }

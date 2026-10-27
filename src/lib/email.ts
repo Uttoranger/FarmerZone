@@ -7,7 +7,9 @@ import { generateReorderToken } from '@/lib/reorder-token'
 import { formatEuro, formatPosition } from '@/lib/format'
 import { barBestaetigungsPfad, bestellungPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
-import { barOhneServicegebuehr, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { SERVICEGEBUEHR_BEZEICHNUNG, barOhneServicegebuehr, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { istHofpreisBestellung } from '@/lib/plattformgebuehr'
+import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
 import { alsCents, calcLineTotal, decimalZuCents } from '@/lib/order-totals'
 import { fristVon, zeitpunktFuerMail } from '@/lib/fristen'
 import { buildMapsUrl } from '@/lib/customer-links'
@@ -25,6 +27,7 @@ import { EINGANG_TEXT, POSTFACH_MAIL_TEXT, eingangAdresse, eingangMeldungAdresse
 import { ZUSTELLUNG_MAIL_TEXT, bestaetigenPfad } from '@/lib/zustellung'
 import { ADMIN_BETRIEB_HREF, betriebMail, fehlerKlasse, type BetriebMailAnlass } from '@/lib/betrieb'
 import { empfaengerFingerabdruck } from '@/lib/mail-empfaenger'
+import { hofKontaktEmail, type HofKontakt } from '@/lib/hof-kontakt'
 import type { MailArt, MailStatus } from '@/schemas/mail-auftrag'
 
 const apiKey = process.env.RESEND_API_KEY
@@ -335,6 +338,10 @@ export type OrderForEmail = {
   totalAmount: { toString(): string } | number
   /** Servicegebühr in Cent aus dem Bestell-Snapshot; fehlt sie, gilt 0. */
   serviceFeeCents?: number
+  /** Gebührenmodell aus dem Snapshot (N38): 'hofpreis' oder null/fehlend = bisher. */
+  gebuehrModell?: string | null
+  /** Einzugsweg aus dem Snapshot (N38): 'erlassen' heißt, die Bargebühr bleibt beim Hof. */
+  gebuehrEinzug?: string | null
   /** Bestellzeitpunkt — für die Frist in „Bitte bestätige" (fristVon); fehlt er, bleibt der allgemeine Satz. */
   createdAt?: Date
   pickupDate: Date
@@ -358,11 +365,23 @@ export type OrderForEmail = {
     quantity: number
     unitPrice: { toString(): string } | number
     totalPrice?: { toString(): string } | number
+    /**
+     * Gebühr dieser Position in Cent (OrderItem.gebuehrCents, N38) — nur im Hofpreis-Modell über 0.
+     * Pflicht, damit der Typecheck jeden Lader meldet, der das Feld vergisst: Sonst zeigt die Mail
+     * Zeilen ohne Gebühr, aber ein Gesamt mit Gebühr.
+     */
+    gebuehrCents: number
     // Einheit optional zur Anzeige gejoint (formatOrderLine-Schreibweise);
     // fehlt sie, bleibt die Darstellung wie bisher
     product?: OrderLineProduct
   }>
 }
+
+/**
+ * Eine Bestellung für die Mails AN DEN HOF: dazu die Anmelde-Adresse der
+ * Inhaberin — ohne Hof-E-Mail geht die Mail dorthin (hofKontaktEmail, Nr. 194).
+ */
+export type OrderForHofMail = OrderForEmail & { farm: OrderForEmail['farm'] & HofKontakt }
 
 /**
  * „Heumilch frisch · 2 × 1 L" — die Positionszeile in DERSELBEN Schreibweise
@@ -394,14 +413,40 @@ function n(v: { toString(): string } | number): number {
  * gerechnet über Decimal und Cent (CODING_STANDARDS §2), nie `Preis × Menge`
  * in Fließkomma: Der Snapshot `totalPrice`, sonst `calcLineTotal`.
  */
-function zeilenBetrag(i: OrderForEmail['items'][number]): number {
+function zeilenBetrag(i: OrderForEmail['items'][number], mitGebuehr: boolean): number {
   const cents = i.totalPrice != null ? alsCents(i.totalPrice) : decimalZuCents(calcLineTotal(i.unitPrice, i.quantity))
-  return centsAlsEuro(cents)
+  // Im Hofpreis-Modell (N38) zeigt die Kundin-Mail den Endpreis der Zeile: Ware + Gebühr der Zeile aus dem Snapshot.
+  return centsAlsEuro(mitGebuehr ? cents + i.gebuehrCents : cents)
 }
 
-/** Positionen für die Kunden-Mails: Zeile in der gemeinsamen Schreibweise, Betrag fertig gerechnet. */
+/** Ist die Bestellung im Hofpreis-Modell (N38)? Dann heißt die Gebühr „Plattformgebühr“ und steckt im Preis. */
+function imHofpreis(order: OrderForEmail): boolean {
+  return istHofpreisBestellung({ gebuehrModell: order.gebuehrModell ?? null })
+}
+
+/**
+ * Positionen für die Kunden-Mails: Zeile in der gemeinsamen Schreibweise,
+ * Betrag fertig gerechnet — im Hofpreis-Modell der Endpreis inkl.
+ * Plattformgebühr (N38), sonst der Warenpreis.
+ */
 function mailPositionen(order: OrderForEmail): Array<{ name: string; betrag: number }> {
-  return order.items.map((i) => ({ name: positionsZeile(i), betrag: zeilenBetrag(i) }))
+  const hofpreis = imHofpreis(order)
+  return order.items.map((i) => ({ name: positionsZeile(i), betrag: zeilenBetrag(i, hofpreis) }))
+}
+
+/**
+ * Die Gebühr in den Kunden-Mails: im Modell `bisher` eine eigene Zeile
+ * „Servicegebühr“ (`serviceFee`), im Hofpreis-Modell keine Zeile — sie steckt
+ * in den Endpreisen, der Satz darunter nennt sie (`plattformgebuehr`).
+ */
+function kundenGebuehr(order: OrderForEmail): { serviceFee: number; plattformgebuehr: number } {
+  const { gebuehr } = betraege(order)
+  return imHofpreis(order) ? { serviceFee: 0, plattformgebuehr: gebuehr } : { serviceFee: gebuehr, plattformgebuehr: 0 }
+}
+
+/** Das Wort für die Gebühr in den Hof-Mails (N8): „Plattformgebühr“ im Hofpreis-Modell, sonst „Servicegebühr“. */
+function gebuehrWort(order: OrderForEmail): string {
+  return imHofpreis(order) ? PLATTFORMGEBUEHR_BEZEICHNUNG : SERVICEGEBUEHR_BEZEICHNUNG
 }
 
 /** Online, bar oder (alte Bestellungen, E5) Karte vor Ort — für Satz und Gesamtzeile der Mail. */
@@ -578,6 +623,56 @@ export async function sendAdminSicherheitEmail(
   return sendRaw(email, `${ADMIN_SICHERHEIT_MAIL.betreff[anlass]} · ${MARKE}`, vorlage.html, { art: 'admin-sicherheit' })
 }
 
+/**
+ * „Bestätige deine neue Anmelde-Adresse" → die NEUE Adresse (Register N36,
+ * Nr. 190). `link` trägt einen Einmal-Token (24 Stunden) — nur in der Mail,
+ * nie im Betreff und nie im Log. Gibt das Versandergebnis zurück.
+ */
+export async function sendEmailAendernLink(email: string, daten: { hof: string | null; link: string }): Promise<VersandErgebnis> {
+  // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
+  const { EMAIL_AENDERN_MAIL } = await import('@/lib/konto-anfragen')
+  const vorlage = await htmlOderFehler(async () => {
+    const { EmailAendernEmail } = await import('@/emails/email-aendern')
+    return React.createElement(EmailAendernEmail, daten)
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, `${EMAIL_AENDERN_MAIL.betreff} · ${MARKE}`, vorlage.html, { art: 'email-aendern-link' })
+}
+
+/**
+ * „Deine Anmelde-Adresse wurde geändert" → die ALTE Adresse (Register N36,
+ * Nr. 190), mit „Das war ich nicht" (Einmal-Link, nur in der Mail).
+ */
+export async function sendEmailGeaendertHinweis(email: string, daten: { hof: string | null; zeitpunkt: Date; link: string }): Promise<VersandErgebnis> {
+  // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
+  const { EMAIL_GEAENDERT_MAIL } = await import('@/lib/konto-anfragen')
+  const { anmeldeZeitpunkt } = await import('@/lib/geraete')
+  const vorlage = await htmlOderFehler(async () => {
+    const { EmailGeaendertEmail } = await import('@/emails/email-aendern')
+    return React.createElement(EmailGeaendertEmail, { hof: daten.hof, wann: anmeldeZeitpunkt(daten.zeitpunkt), link: daten.link })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, `${EMAIL_GEAENDERT_MAIL.betreff} · ${MARKE}`, vorlage.html, { art: 'email-geaendert-hinweis' })
+}
+
+/**
+ * Sicherheitsmail an eine Person im Admin-Team (Register N35, Nr. 190):
+ * eingeladen, Rechte, Inhaber, entfernt — mit den Rechten danach als Wörter.
+ */
+export async function sendTeamRechtGeaendert(
+  email: string,
+  daten: { anlass: import('@/lib/admin-team').TeamAnlass; name: string | null; rechte: string[] }
+): Promise<VersandErgebnis> {
+  // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
+  const { TEAM_MAIL } = await import('@/lib/admin-team')
+  const vorlage = await htmlOderFehler(async () => {
+    const { TeamRechtGeaendertEmail } = await import('@/emails/team-recht-geaendert')
+    return React.createElement(TeamRechtGeaendertEmail, daten)
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(email, `${TEAM_MAIL.betreff[daten.anlass]} · ${MARKE}`, vorlage.html, { art: 'team-recht-geaendert' })
+}
+
 /** Neuer Hof registriert → EINE Betreiber-Adresse (Freischaltung nötig); die Adressen aus empfaengerFuer('hofWartet'), je Adresse ein Auftrag. */
 export async function baueNewFarmNotification(
   farm: {
@@ -622,6 +717,27 @@ export async function baueFreischaltungEmail(farm: {
   const { FreischaltungEmail } = await import('@/emails/freischaltung')
   const html = await toHtml(React.createElement(FreischaltungEmail, { farmName: farm.name, farmUrl }))
   return { an: farm.ownerEmail, betreff: 'Dein Hof ist freigeschaltet', html }
+}
+
+/**
+ * Plattformgebühr: Ankündigung vier Wochen vor dem Einzugsbeginn → Hof
+ * (Register N38, Nr. 198). Der Text kommt fertig aus `ankuendigungText` —
+ * dieselben Worte wie die Postfach-Nachricht.
+ */
+export async function bauePlattformgebuehrAnkuendigung(d: { an: string; text: string; datum: string }): Promise<StapelMail> {
+  const { LASTSCHRIFT_HREF, LASTSCHRIFT_TEXT } = await import('@/lib/konditionen')
+  const { PlattformgebuehrAnkuendigungEmail } = await import('@/emails/plattformgebuehr-ankuendigung')
+  const html = await toHtml(
+    React.createElement(PlattformgebuehrAnkuendigungEmail, { text: d.text, datum: d.datum, lastschriftUrl: `${APP_URL}${LASTSCHRIFT_HREF}`, knopf: LASTSCHRIFT_TEXT.einrichten })
+  )
+  return { an: d.an, betreff: `Plattformgebühr ab ${d.datum}`, html }
+}
+
+/** Lastschrift der Monatsabrechnung gescheitert → Hof (Register N38, Nr. 198); Text aus `lastschriftGescheitertText`. */
+export async function baueLastschriftGescheitert(d: { an: string; text: string; monat: string }): Promise<StapelMail> {
+  const { LastschriftGescheitertEmail } = await import('@/emails/lastschrift-gescheitert')
+  const html = await toHtml(React.createElement(LastschriftGescheitertEmail, { text: d.text, monat: d.monat, konditionenUrl: `${APP_URL}/settings/konditionen` }))
+  return { an: d.an, betreff: `Lastschrift für ${d.monat} hat nicht geklappt`, html }
 }
 
 /**
@@ -680,6 +796,8 @@ export async function baueBriefkastenZusammenfassung(
     neueste: Array<{ kurznummer: string; art: string; ersteZeile: string; hofName: string | null }>
     geloescht: number
     eingang: EingangZahlen
+    /** Die Zahlen der Wochenlage (Nr. 192), fertig formuliert; ohne sie bleibt die Mail wie vor Nr. 192. */
+    lage?: Array<{ label: string; wert: string }>
   },
   an: string
 ): Promise<StapelMail> {
@@ -756,7 +874,7 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     zahlart: mailZahlart(order.paymentMethod),
     items: mailPositionen(order),
-    serviceFee: betraege(order).gebuehr,
+    ...kundenGebuehr(order),
     total: betraege(order).gesamt,
     routeUrl: routeUrl(order),
     manageUrl: `${APP_URL}/account/profile`,
@@ -801,7 +919,7 @@ export async function onsiteConfirmationInhalt(
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     items: mailPositionen(order),
-    serviceFee: betraege(order).gebuehr,
+    ...kundenGebuehr(order),
     total: betraege(order).gesamt,
     confirmationUrl,
     bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
@@ -830,7 +948,7 @@ export async function sendOnsiteConfirmation(
 }
 
 /** Online-Zahlung → Bauer */
-export async function baueOrderPaidToFarmer(order: OrderForEmail): Promise<StapelMail> {
+export async function baueOrderPaidToFarmer(order: OrderForHofMail): Promise<StapelMail> {
   const { NewOrderNotificationEmail } = await import('@/emails/new-order-notification')
   const html = await toHtml(React.createElement(NewOrderNotificationEmail, {
     farmerName: order.farm.ownerName,
@@ -843,17 +961,18 @@ export async function baueOrderPaidToFarmer(order: OrderForEmail): Promise<Stape
     // Für den Hof zählt der Warenpreis — das ist, was ihm überwiesen wird.
     total: betraege(order).warenpreis,
     serviceFee: betraege(order).gebuehr,
+    gebuehrWort: gebuehrWort(order),
     customerTotal: betraege(order).gesamt,
     paymentLabel: 'Online (bereits bezahlt)',
     isOnline: true,
     dashboardUrl: `${APP_URL}/orders`,
   }))
 
-  return { an: order.farm.email, betreff: `Neue Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber}`, html }
+  return { an: hofKontaktEmail(order.farm), betreff: `Neue Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber}`, html }
 }
 
 /** Vor-Ort bestätigt → Bauer */
-export async function baueOrderConfirmedToFarmer(order: OrderForEmail): Promise<StapelMail> {
+export async function baueOrderConfirmedToFarmer(order: OrderForHofMail): Promise<StapelMail> {
   const paymentLabel =
     order.paymentMethod === 'ONSITE_CASH' ? 'Bar bei Abholung' : 'Karte bei Abholung'
 
@@ -869,15 +988,21 @@ export async function baueOrderConfirmedToFarmer(order: OrderForEmail): Promise<
     // Warenpreis für den Hof; „Bar zu kassieren" ist Warenpreis + Gebühr.
     total: betraege(order).warenpreis,
     serviceFee: betraege(order).gebuehr,
+    gebuehrWort: gebuehrWort(order),
     barZuKassieren: betraege(order).gesamt,
     // B1 nach dem BESTELLzeitpunkt, nicht nach dem Versand. Ohne Zeitpunkt der
     // bisherige Satz — lieber kein Hinweis als ein falscher.
-    barOhneGebuehr: order.paymentMethod === 'ONSITE_CASH' && order.createdAt ? barOhneServicegebuehr('ONSITE_CASH', order.createdAt) : false,
+    // Hofpreis-Modell (N38): Erlassen heißt, die Bargebühr bleibt beim Hof — kein Satz zur Monatsabrechnung.
+    barOhneGebuehr: imHofpreis(order)
+      ? order.gebuehrEinzug === 'erlassen'
+      : order.paymentMethod === 'ONSITE_CASH' && order.createdAt
+        ? barOhneServicegebuehr('ONSITE_CASH', order.createdAt)
+        : false,
     dashboardUrl: `${APP_URL}/orders`,
   }))
 
   return {
-    an: order.farm.email,
+    an: hofKontaktEmail(order.farm),
     betreff: `Neue Vor-Ort-Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber} (${paymentLabel})`,
     html,
   }
@@ -1009,6 +1134,7 @@ export async function baueArtikelFehlt(
     farmName: order.farm.name,
     farmPhone: order.farm.phone,
     artikel: positionsZeile(fehlt.position),
+    gebuehrWort: gebuehrWort(order),
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     zahlung: fehlt.zahlung,

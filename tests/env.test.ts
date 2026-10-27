@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { validateEnv } from '@/lib/env'
 
@@ -16,7 +18,7 @@ describe('validateEnv', () => {
   })
 
   it('wirft bei fehlender Pflicht-Variable einen sprechenden Fehler mit dem Namen', () => {
-    const { BETTER_AUTH_SECRET: _weg, ...ohne } = complete
+    const ohne: Record<string, string | undefined> = { ...complete, BETTER_AUTH_SECRET: undefined }
     expect(() => validateEnv(ohne)).toThrowError(/BETTER_AUTH_SECRET/)
     expect(() => validateEnv(ohne)).toThrowError(/Umgebungsvariablen/)
   })
@@ -35,7 +37,7 @@ describe('validateEnv', () => {
 
   it('gibt in der Fehlermeldung niemals Werte aus', () => {
     // Vorhandene (gültige) Werte dürfen nicht in der Meldung anderer Fehler landen
-    const { STRIPE_WEBHOOK_SECRET: _weg, ...ohne } = complete
+    const ohne: Record<string, string | undefined> = { ...complete, STRIPE_WEBHOOK_SECRET: undefined }
     let message = ''
     try {
       validateEnv(ohne)
@@ -113,5 +115,28 @@ describe('validateEnv', () => {
     expect(() =>
       validateEnv({ ...complete, NEXT_PUBLIC_TESTUMGEBUNG_URL: 'http://falsch', TEST_EMPFAENGER: 'kein-at ;' })
     ).not.toThrow()
+  })
+  // Nr. 195 (Audit D11/D12): Die vier standen nur als process.env im Code. Im Schema, aber optional wie heute.
+  it('RESEND_API_KEY, EMAIL_FROM, BLOB_READ_WRITE_TOKEN und der öffentliche Stripe-Schlüssel sind optional', () => {
+    const namen = ['RESEND_API_KEY', 'EMAIL_FROM', 'BLOB_READ_WRITE_TOKEN', 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY'] as const
+    const ohne = validateEnv(complete)
+    for (const name of namen) {
+      // Fehlt oder leer: undefined, nie ein Startfehler.
+      expect(ohne[name]).toBeUndefined()
+      expect(validateEnv({ ...complete, [name]: '  ' })[name]).toBeUndefined()
+      // Gesetzt: der Wert bleibt erhalten.
+      expect(validateEnv({ ...complete, [name]: 'wert-1' })[name]).toBe('wert-1')
+    }
+  })
+
+  it('Gegenprobe: eine Pflicht-Variable bleibt Pflicht, auch wenn die optionalen fehlen', () => {
+    const ohne: Record<string, string | undefined> = { ...complete, DATABASE_URL: undefined, RESEND_API_KEY: 'wert-1' }
+    expect(() => validateEnv(ohne)).toThrowError(/DATABASE_URL/)
+  })
+
+  it('die Cron-Route cleanup-reservations liest CRON_SECRET aus dem Schema, nicht aus process.env', () => {
+    const route = readFileSync(join(process.cwd(), 'src/app/api/cron/cleanup-reservations/route.ts'), 'utf8')
+    expect(route).toContain('env.CRON_SECRET')
+    expect(route).not.toContain('process.env')
   })
 })

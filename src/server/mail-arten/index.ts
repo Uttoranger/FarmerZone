@@ -20,7 +20,7 @@ import {
   rendereNeuerHof,
   rendereWochenbericht,
 } from '@/server/mail-arten/betreiber'
-import { rendereFreischaltung, renderePostfachAntwort, rendereRundschreiben } from '@/server/mail-arten/hof'
+import { rendereFreischaltung, rendereLastschriftGescheitert, renderePlattformgebuehrAnkuendigung, renderePostfachAntwort, rendereRundschreiben } from '@/server/mail-arten/hof'
 import { rendereAboBestaetigung, rendereBescheid } from '@/server/mail-arten/kundin'
 
 /*
@@ -63,6 +63,8 @@ export const RENDERER: RendererTabelle = {
   'antwort-an-team': rendereAntwortAnTeam,
   'betreiber-testmail': rendereBetreiberTestmail,
   'abo-bestaetigung': rendereAboBestaetigung,
+  'plattformgebuehr-ankuendigung': renderePlattformgebuehrAnkuendigung,
+  'lastschrift-gescheitert': rendereLastschriftGescheitert,
   beitrag: rendereBeitrag,
   rundschreiben: rendereRundschreiben,
   bescheid: rendereBescheid,

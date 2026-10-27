@@ -17,6 +17,8 @@ import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 const wache = vi.hoisted(() => ({ verlangeAdminAktion: vi.fn(), verlangeAdminSeite: vi.fn(async () => 'admin_1'), verlangeFrischeBestaetigung: vi.fn(async () => ({ ok: true, userId: 'admin_1', sitzungId: 'sitzung-admin_1' })), frischOderBestaetigen: vi.fn(async () => null), adminPflichtOffen: vi.fn(async () => false) }))
+// Die Plattformgebühr auf Geld (Nr. 198) hat eigene Tests (tests/plattformgebuehr-abrechnung.test.ts).
+vi.mock('@/server/queries/plattformgebuehr', () => ({ ladePlattformgebuehrGeld: async () => null }))
 vi.mock('@/server/admin-wache', () => wache)
 vi.mock('@/lib/prisma', async () => ({ prisma: (await import('./finanzen-jahr-daten')).prismaAttrappe }))
 vi.mock('@/lib/umgebung-server', async (importOriginal) => ({
@@ -32,7 +34,7 @@ vi.mock('next/link', () => ({
   // Der Ladepunkt (Nr. 105/121) fragt den Zustand des Links — beim Rendern auf dem Server lädt nichts.
   useLinkStatus: () => ({ pending: false }),
 }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }), usePathname: () => '/admin/finanzen' }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }), usePathname: () => '/admin/geld' }))
 vi.mock('@/server/actions/finanzen', () => ({
   kostenpostenAnlegen: vi.fn(),
   kostenpostenAendern: vi.fn(),
@@ -42,7 +44,8 @@ vi.mock('@/server/actions/finanzen', () => ({
 vi.mock('@/server/queries/admin', () => ({ ladeHoefeFuerGruendung: vi.fn(async () => []) }))
 
 import * as route from '@/app/admin/finanzen/export/route'
-import AdminFinanzenPage from '@/app/admin/finanzen/page'
+// Seit Nr. 191 zeigt /admin/geld das Jahr (/admin/finanzen leitet dorthin weiter).
+import AdminFinanzenPage from '@/app/admin/geld/page'
 import { getFinanzenJahr } from '@/server/queries/finanzen'
 import { ergebnisText } from '@/lib/finanzen'
 import { centsAlsEuro, formatEuro } from '@/lib/format'

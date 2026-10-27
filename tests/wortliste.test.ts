@@ -159,11 +159,13 @@ const ohneDateien = (funde: Fund[], dateien: AusnahmeDatei[]): Fund[] => funde.f
  */
 type Ausnahme = { datei: string; wort: string; text: string | RegExp; grund: string }
 const AUSNAHMEN: Ausnahme[] = [
+  // Version
+  { datei: 'src/app/admin/betrieb/dienste.ts', wort: 'Version', text: 'Version', grund: 'Karte „Version“ in Admin › Betrieb meint den Deploy, der live ist (Board admin-betrieb-neu, Nr. 184) — keine Fassung der Startseite' },
+  { datei: 'src/lib/betrieb.ts', wort: 'Version', text: 'Version', grund: 'Unterreiter „Version“ in Admin › Betrieb (Nr. 193, Mockup admin-protokoll) — dieselbe Karte des Deploys, keine Fassung der Startseite' },
   // Status
   { datei: 'src/app/(hof)/settings/payments/payments-actions.tsx', wort: 'Status', text: 'Status prüfen', grund: 'Knopf fragt bei Stripe, wie weit die Freischaltung des Hofs ist — kein Beitrag' },
   { datei: 'src/components/admin/meldungen-triage-form.tsx', wort: 'Status', text: 'Status', grund: 'Feld „Status“ der Meldung im Admin — kein Beitrag' },
   { datei: 'src/lib/meldung.ts', wort: 'Status', text: /Status setzen und bauen tust du/, grund: 'Register N14 wörtlich: den Stand einer Meldung setzen tut der Mensch — kein Beitrag' },
-  { datei: 'src/components/admin/hoefe-ansicht.tsx', wort: 'Status', text: 'Status', grund: 'Spaltenkopf der Hofliste im Admin (Freischaltung des Hofs) — kein Beitrag' },
   { datei: 'src/components/hof-kunden/kunden-ansicht.tsx', wort: 'Status', text: 'Status', grund: 'Spaltenkopf der Kundenliste (Marke je Kundin) — kein Beitrag' },
   { datei: 'src/components/produkte/produkte-ansicht.tsx', wort: 'Status', text: 'Status', grund: 'Spaltenkopf der Produktliste (sichtbar, nicht im Shop, ausverkauft) — kein Beitrag' },
   { datei: 'src/components/teilen/teilen-fenster.tsx', wort: 'Status', text: 'Status 9:16', grund: 'Format der WhatsApp-Funktion „Status“ (Hochformat 9:16), nicht der Beitrag' },

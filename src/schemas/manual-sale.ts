@@ -4,14 +4,8 @@ import { verkaufskanalSchema } from '@/schemas/verkaufskanal'
 import { NOTIZ_MAX, PRODUKTNAME_MAX, VERKAUF_BETRAG_MAX, VERKAUF_MENGE_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
 import { tagVersetzt } from '@/lib/kalender'
 
-export const CHANNEL_LABELS: Record<string, string> = {
-  PLATFORM: 'Plattform',
-  WHATSAPP: 'WhatsApp',
-  HOFLADEN: 'Hofladen',
-  MARKT: 'Markt',
-  BUSINESS: 'Geschäftskunde',
-  OTHER: 'Sonstiges',
-}
+/** Die Namen der Verkaufskanäle — zod-frei in src/lib/umsatz.ts, weil die Startseite sie im Browser liest (Nr. 196). */
+export { CHANNEL_LABELS } from '@/lib/umsatz'
 
 const DATUM_FEHLT = 'Bitte wähl oben ein Datum aus.'
 

@@ -22,12 +22,22 @@ const HEIKLE_AKTIONEN: Array<{ datei: string; namen: string[] }> = [
   // Ergänzung 23.10.2026 (Nr. 154): Freischalten, Servicegebühr, „Gründungshof bis", Rundschreiben, Empfänger, Startseite.
   { datei: 'src/server/actions/admin.ts', namen: ['revokeFarmApprovalAction', 'rejectFarmAction', 'approveFarmAction', 'setServiceFeeAction', 'setzeGruendungBisAction'] },
   { datei: 'src/server/actions/gruendung.ts', namen: ['nimmAusGruendung', 'nimmWiederAuf', 'schreibeZusagenFest', 'markiereAlsTesthof', 'nimmTesthofZurueck'] },
-  { datei: 'src/server/actions/postfach.ts', namen: ['markiereErstattungErledigt', 'sendeRundschreiben', 'fuegeEmpfaengerHinzu'] },
+  { datei: 'src/server/actions/postfach.ts', namen: ['sendeRundschreiben', 'fuegeEmpfaengerHinzu'] },
+  // Nr. 186: Admin › Bestellungen — „Außerhalb erstattet“ (aus dem Postfach hierher), volle Adresse, Notfall-Storno.
+  { datei: 'src/server/actions/admin-bestellung.ts', namen: ['markiereErstattungErledigt', 'zeigeKundinAdresse', 'notfallStorno'] },
   { datei: 'src/server/actions/startseite.ts', namen: ['veroeffentlicheStartseite'] },
   { datei: 'src/server/actions/admin-anmeldung.ts', namen: ['erstelleErsatzcodes', 'entfernePasskey', 'pruefeFrischFuerPasskey'] },
+  // Nr. 188 (Audit D10): was live wirkt oder löscht — Zurückziehen, Block löschen, Ablegen, Kostenposten, Gründungs-Einstellungen.
+  { datei: 'src/server/actions/startseite.ts', namen: ['zieheFassungZurueck', 'loescheStartseitenBlock'] },
+  { datei: 'src/server/actions/admin.ts', namen: ['legeMeldungAbAction'] },
+  { datei: 'src/server/actions/finanzen.ts', namen: ['kostenpostenAnlegen', 'kostenpostenAendern', 'kostenpostenBeenden', 'kostenpostenLoeschen'] },
+  { datei: 'src/server/actions/plattform-einstellung.ts', namen: ['speichereGruendungEinstellung'] },
+  { datei: 'src/server/actions/postfach.ts', namen: ['entferneEmpfaenger', 'speichereZustellRegeln'] },
+  // Nr. 187 (N34): Hof sperren und Sperre aufheben.
+  { datei: 'src/server/actions/admin-hof.ts', namen: ['sperreHof', 'hebeHofSperreAuf'] },
 ]
 
-const EXPORTE = ['src/app/admin/finanzen/export/route.ts', 'src/app/admin/betrieb/export/route.ts', 'src/app/admin/betrieb/bilder-export/route.ts']
+const EXPORTE = ['src/app/admin/finanzen/export/route.ts', 'src/app/admin/betrieb/export/route.ts', 'src/app/admin/betrieb/bilder-export/route.ts', 'src/app/admin/betrieb/protokoll/export/route.ts']
 
 const OBERFLAECHEN: Array<{ datei: string; aktionen: string[] }> = [
   { datei: 'src/components/admin/hof-aktion-dialog.tsx', aktionen: ['revokeFarmApprovalAction', 'rejectFarmAction', 'approveFarmAction'] },
@@ -39,8 +49,17 @@ const OBERFLAECHEN: Array<{ datei: string; aktionen: string[] }> = [
   { datei: 'src/components/admin/gruendung-ausnehmen-dialog.tsx', aktionen: ['nimmAusGruendung', 'nimmWiederAuf'] },
   { datei: 'src/components/admin/testhof-dialog.tsx', aktionen: ['markiereAlsTesthof', 'nimmTesthofZurueck'] },
   { datei: 'src/components/admin/einstellungen-gruendung.tsx', aktionen: ['schreibeZusagenFest'] },
-  { datei: 'src/app/admin/postfach/erstattung-erledigt.tsx', aktionen: ['markiereErstattungErledigt'] },
   { datei: 'src/app/admin/einstellungen/anmeldung/anmeldung-verwalten.tsx', aktionen: ['entfernePasskey', 'erstelleErsatzcodes', 'pruefeFrischFuerPasskey'] },
+  // Nr. 188 (Audit D10)
+  { datei: 'src/components/admin/startseite-gestalten.tsx', aktionen: ['zieheFassungZurueck', 'loescheStartseitenBlock'] },
+  { datei: 'src/components/admin/meldungen-werkzeug.tsx', aktionen: ['legeMeldungAbAction'] },
+  { datei: 'src/app/admin/finanzen/kosten-sheet.tsx', aktionen: ['kostenpostenAnlegen', 'kostenpostenAendern', 'kostenpostenBeenden', 'kostenpostenLoeschen'] },
+  { datei: 'src/components/admin/einstellungen-gruendung.tsx', aktionen: ['speichereGruendungEinstellung'] },
+  { datei: 'src/components/admin/postfach-zustellung.tsx', aktionen: ['entferneEmpfaenger', 'speichereZustellRegeln'] },
+  // Nr. 186
+  { datei: 'src/app/admin/bestellungen/bestellung-aktionen.tsx', aktionen: ['markiereErstattungErledigt', 'zeigeKundinAdresse', 'notfallStorno'] },
+  // Nr. 187
+  { datei: 'src/components/admin/hof-akte-sperre-dialog.tsx', aktionen: ['sperreHof', 'hebeHofSperreAuf'] },
 ]
 
 function datei(quelltext: string): ts.SourceFile {
@@ -107,6 +126,38 @@ function oberflaechenMaengel(quelltext: string, aktion: string): string[] {
   if (new RegExp(`\\b${aktion}\\(`).test(quelltext)) maengel.push(`${aktion}: wird noch direkt aufgerufen`)
   return maengel
 }
+
+/**
+ * Wie viele der genannten Passkey-Dialoge (`<name>.dialog`) stehen im Inhalt eines JSX-Elements `<huelle>`?
+ * Ein Dialog, der nur in einem anderen, gerade geschlossenen Dialog eingehängt ist, erscheint nie —
+ * die Aktion wartete dann ohne Meldung (Nr. 188, Runde 2).
+ */
+function dialogeInHuelle(quelltext: string, huelle: string, namen: string[]): string[] {
+  const funde: string[] = []
+  const besuche = (knoten: ts.Node, drin: boolean): void => {
+    const istHuelle = ts.isJsxElement(knoten) && knoten.openingElement.tagName.getText() === huelle
+    if (drin && ts.isPropertyAccessExpression(knoten) && knoten.name.text === 'dialog' && ts.isIdentifier(knoten.expression) && namen.includes(knoten.expression.text)) {
+      funde.push(knoten.expression.text)
+    }
+    ts.forEachChild(knoten, (kind) => besuche(kind, drin || istHuelle))
+  }
+  besuche(datei(quelltext), false)
+  return funde
+}
+
+describe('Passkey-Dialoge hängen dort, wo ihre Aktion ausgelöst wird', () => {
+  it('Zurückziehen und Block löschen stehen nicht im Veröffentlichen-Dialog (Nr. 188, Runde 2)', () => {
+    const quelltext = lies('src/components/admin/startseite-gestalten.tsx')
+    expect(dialogeInHuelle(quelltext, 'VeroeffentlichenDialog', ['frischZurueckziehen', 'frischLoeschen'])).toEqual([])
+    expect(quelltext).toMatch(/\{frischZurueckziehen\.dialog\}/)
+    expect(quelltext).toMatch(/\{frischLoeschen\.dialog\}/)
+  })
+
+  it('Gegenprobe: ein Dialog in der Hülle schlägt an', () => {
+    const schnipsel = '<div><VeroeffentlichenDialog offen={x}>{frischVeroeffentlichen.dialog}{frischLoeschen.dialog}</VeroeffentlichenDialog>{frischZurueckziehen.dialog}</div>'
+    expect(dialogeInHuelle(schnipsel, 'VeroeffentlichenDialog', ['frischZurueckziehen', 'frischLoeschen'])).toEqual(['frischLoeschen'])
+  })
+})
 
 describe('heikle Aktionen verlangen die frische Bestätigung (N20)', () => {
   it('jede heikle Action ruft als erste Anweisung await verlangeFrischeBestaetigung()', () => {

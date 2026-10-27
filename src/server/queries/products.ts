@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { categoryImagePath } from '@/lib/product-image'
+import { preisAnzeigeFuer, type PreisAnzeige } from '@/lib/plattformgebuehr'
+import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
 import { zuProduktDto } from '@/lib/produkt-dto'
 import { heuteHofSichtbar, naechstesAbholfenster, type NaechstesFenster } from '@/lib/heute'
 import { gebindeSperre, type HofRegistrierung } from '@/lib/futter-registrierung'
@@ -166,6 +168,8 @@ export type ProdukteSeite = {
   naechstesFenster: NaechstesFenster | null
   /** Farm.teilenMomenteAus (Nr. 30): true = kein Teilen-Moment auf dieser Seite. */
   teilenMomenteAus: boolean
+  /** N38 (Nr. 197): im Hofpreis-Modell der Satz — das Formular zeigt „Du bekommst … · die Kundin zahlt …“. */
+  preisAnzeige: PreisAnzeige
 }
 
 /**
@@ -186,6 +190,7 @@ export async function getProdukteSeite(farmId: string, jetzt: Date): Promise<Pro
         approvedAt: true,
         archivedAt: true,
         teilenMomenteAus: true,
+        plattformgebuehrProzent: true,
         pickupSlots: {
           where: { isActive: true },
           orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
@@ -194,6 +199,7 @@ export async function getProdukteSeite(farmId: string, jetzt: Date): Promise<Pro
       },
     }),
   ])
+  const einstellung = await ladeHofpreisEinstellung()
   const registrierung: HofRegistrierung = {
     betriebsnummer: hof?.betriebsnummer ?? null,
     betriebsstatus: hof?.betriebsstatus ?? null,
@@ -207,6 +213,7 @@ export async function getProdukteSeite(farmId: string, jetzt: Date): Promise<Pro
     naechstesFenster: naechstesAbholfenster(hof?.pickupSlots ?? [], jetzt),
     // Ohne Hof keine Momente — „aus" ist die sichere Seite.
     teilenMomenteAus: hof?.teilenMomenteAus ?? true,
+    preisAnzeige: hof ? preisAnzeigeFuer(hof, einstellung, jetzt) : null,
   }
 }
 

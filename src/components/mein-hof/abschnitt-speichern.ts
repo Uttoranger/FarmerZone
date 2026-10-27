@@ -3,7 +3,7 @@ import { saveAppearanceAction } from '@/server/actions/appearance'
 import { ladeProfilStand, updateProfile } from '@/server/actions/farm'
 import { ABSCHNITT_SPEICHERN_TEXT, bereiteAuftrittVor, profilMitTeil, type AuftrittTeil, type ProfilTeil } from '@/lib/abschnitt-stand'
 import { BEZEICHNER, befundVon } from '@/lib/upload-diagnose'
-import { NETZ_SATZ, istNetzFehler } from '@/lib/netz'
+import { NETZ_SATZ, NETZ_SATZ_UNSICHER, istNetzFehler } from '@/lib/netz'
 
 /*
  * Der EINE Speicherweg der Abschnitte von Mein Hof (Nachtlauf Nr. 50,
@@ -99,7 +99,7 @@ export function meldeGescheitertesSpeichern(fehler: unknown): void {
  * übrigen Felder der Aktion fehlen — so liest der Aufrufer `ergebnis.error`
  * und z. B. `ergebnis.erstattungOffen` wie bei einer Antwort der Aktion.
  */
-export type AktionGescheitert<T> = Partial<T> & { error: string; netz?: true }
+export type AktionGescheitert<T> = Partial<T> & { error: string; netz?: true; unsicher?: true }
 
 /**
  * Ein Aufruf einer Server-Action, der nie wirft — für jede Aktion im
@@ -110,14 +110,24 @@ export type AktionGescheitert<T> = Partial<T> & { error: string; netz?: true }
  * Geworfen ginge es an die Fehlergrenze, und die Eingabe wäre weg. Sentry
  * bekommt die gescheiterte Anfrage trotzdem (meldeGescheitertesSpeichern).
  * Die Wache tests/hof-aktionen-netz-wache.test.ts verlangt diesen Weg (oder try).
+ *
+ * `unsicher: true` für Aktionen, die der Server schon ausgeführt haben kann
+ * (Storno, Statuswechsel einer Bestellung): Am Netz gescheitert kommt
+ * `NETZ_SATZ_UNSICHER` mit `unsicher: true` und ohne `netz` — die Anzeige
+ * bietet kein „Nochmal" an, die Hofseite soll erst neu geladen werden.
  */
-export async function aktionOhneWurf<T extends object>(aufruf: () => Promise<T>): Promise<T | AktionGescheitert<T>> {
+export async function aktionOhneWurf<T extends object>(
+  aufruf: () => Promise<T>,
+  { unsicher = false }: { unsicher?: boolean } = {}
+): Promise<T | AktionGescheitert<T>> {
   try {
     return await aufruf()
   } catch (fehler) {
     meldeGescheitertesSpeichern(fehler)
     const gescheitert: AktionGescheitert<T> = istNetzFehler(fehler)
-      ? ({ error: NETZ_SATZ, netz: true } as AktionGescheitert<T>)
+      ? unsicher
+        ? ({ error: NETZ_SATZ_UNSICHER, unsicher: true } as AktionGescheitert<T>)
+        : ({ error: NETZ_SATZ, netz: true } as AktionGescheitert<T>)
       : ({ error: ABSCHNITT_SPEICHERN_TEXT.gingNicht } as AktionGescheitert<T>)
     return gescheitert
   }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, type ReactNode } from 'react'
+import type { PreisAnzeige } from '@/lib/plattformgebuehr'
 import Link from 'next/link'
 import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -193,6 +194,8 @@ type Props = {
   onClose: () => void
   /** Betriebsnummer aus den Hof-Einstellungen — nur Anzeige in der Kennzeichnung (F6). */
   hofBetriebsnummer: string | null
+  /** N38 (Nr. 197): im Hofpreis-Modell der Satz — „Du bekommst … · die Kundin zahlt …“ unter dem Preis. */
+  preisAnzeige?: PreisAnzeige
   /**
    * Die Wahl aus „Was legst du an?" (Nachtlauf Nr. 18), nur beim Anlegen:
    * Brennmaterial setzt Brennholz, Futtermittel startet die Kategorie bei den
@@ -359,7 +362,7 @@ function chipKlasse(aktiv: boolean): string {
   )
 }
 
-export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwahl = null, onLoeschen, onAngelegt }: Props) {
+export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preisAnzeige = null, vorwahl = null, onLoeschen, onAngelegt }: Props) {
   const isEdit = product !== null
   const [isSubmitting, setIsSubmitting] = useState(false)
   // Nur während des Foto-Uploads gesetzt — danach zeigt der Knopf wieder
@@ -479,7 +482,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, vorwa
     werte.price,
     werte.unit,
     werte.unitSize,
-    werte.futter && !altesGebinde ? werte.futter : null
+    werte.futter && !altesGebinde ? werte.futter : null,
+    preisAnzeige
   )
   // Nur ein Vorschlag, nie eine Wahl — und nur, solange keine Kategorie gewählt ist.
   const vorschlag = category == null ? kategorieVorschlag(werte.name) : null

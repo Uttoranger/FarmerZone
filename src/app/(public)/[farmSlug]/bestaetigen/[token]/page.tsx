@@ -9,13 +9,15 @@ import { bestaetigungsPfad } from '@/lib/bestell-link'
 import { LINK_UNGUELTIG_SATZ, LINK_UNGUELTIG_TITEL, barBestaetigungsAnsicht, tokenKandidaten } from '@/lib/bar-bestaetigung'
 import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
 import { zahlungsAnzeige } from '@/lib/bestellstatus'
-import { SERVICEGEBUEHR_BEZEICHNUNG, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { gebuehrBezeichnungFuer } from '@/lib/plattformgebuehr'
 import { barBestaetigungsTokenSchema } from '@/schemas/bar-bestaetigung'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { BarBestaetigenKnoepfe } from '@/components/checkout/bar-bestaetigen-knoepfe'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
+import { hofSichtbar } from '@/lib/hof-sichtbar'
 
 interface Props {
   params: Promise<{ farmSlug: string; token: string }>
@@ -72,7 +74,9 @@ export default async function BarBestaetigenSeite({ params }: Props) {
       pickupTimeEnd: true,
       totalAmount: true,
       serviceFeeCents: true,
-      farm: { select: { slug: true, name: true, address: true, postalCode: true, city: true, archivedAt: true } },
+      // N38 (Nr. 197): im Hofpreis-Modell heißt die Zeile „Plattformgebühr“.
+      gebuehrModell: true,
+      farm: { select: { slug: true, name: true, address: true, postalCode: true, city: true, archivedAt: true, geschlossenAm: true } },
       items: {
         select: {
           productName: true,
@@ -86,7 +90,7 @@ export default async function BarBestaetigenSeite({ params }: Props) {
   })
   // Fremde Hofadresse oder stillgelegter Hof: wie ein unbekannter Token —
   // die Seite verrät nicht, ob es die Bestellung gibt.
-  if (!order || order.farm.slug !== farmSlug || order.farm.archivedAt) return <LinkUngueltig />
+  if (!order || order.farm.slug !== farmSlug || !hofSichtbar(order.farm)) return <LinkUngueltig />
 
   const jetzt = new Date()
   const ansicht = barBestaetigungsAnsicht(order, jetzt)
@@ -153,7 +157,7 @@ export default async function BarBestaetigenSeite({ params }: Props) {
           )
         })}
         {summen.gebuehrCents > 0 && (
-          <Zeile titel={SERVICEGEBUEHR_BEZEICHNUNG}>{formatEuro(centsAlsEuro(summen.gebuehrCents))}</Zeile>
+          <Zeile titel={gebuehrBezeichnungFuer(order)}>{formatEuro(centsAlsEuro(summen.gebuehrCents))}</Zeile>
         )}
         <div className="h-px bg-border" />
         <div className="flex items-baseline gap-2 text-[15px] font-semibold text-foreground">

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { BEITRAG_ANLAESSE } from '@/lib/beitrag-anlass'
 import {
   BEITRAG_PRODUKTE_MAX,
   BEITRAG_TEXT_MAX,
@@ -15,12 +16,8 @@ import {
 /** Die Kennung eines Beitrags. */
 export const beitragIdSchema = z.string().min(1).max(64)
 
-/**
- * Die Anlässe wie im Enum `StatusPostAnlass` — hier ausgeschrieben, weil
- * Schemas auch im Browser laufen (kein Import aus `@prisma/client`);
- * tests/status-posts.test.ts gleicht beide Listen ab.
- */
-export const STATUS_POST_ANLASS_VALUES = ['FRESH_PRODUCT', 'NEW_SEASON', 'PROMOTION', 'ANNOUNCEMENT'] as const
+/** Die Anlässe wie im Enum `StatusPostAnlass` — die Liste steht zod-frei in src/lib/beitrag-anlass.ts (Nr. 196). */
+export const STATUS_POST_ANLASS_VALUES = BEITRAG_ANLAESSE
 
 export const beitragVeroeffentlichenSchema = z.object({
   title: z

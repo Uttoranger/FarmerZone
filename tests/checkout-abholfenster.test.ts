@@ -23,6 +23,8 @@ vi.mock('@/lib/email', () => ({ sendOnsiteConfirmation: vi.fn() }))
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: vi.fn() }))
 vi.mock('@/lib/prisma', () => {
   const prisma = {
+    // Keine Notbremse (Nr. 189) und ohne Zeile gilt der Stichtag aus konditionen.ts — Modell `bisher` (N38, Nr. 197).
+    plattformEinstellung: { findUnique: vi.fn().mockResolvedValue(null) },
     farm: { findUnique: vi.fn() },
     product: { findUnique: vi.fn(), update: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     stockReservation: { aggregate: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },

@@ -12,9 +12,10 @@ import { formatEuro, formatTagKurz, formatZahl } from '@/lib/format'
 import { uhrzeitInWien } from '@/lib/fristen'
 import { tagVersetzt } from '@/lib/kalender'
 import { korbBetraege, zahlungsarten } from '@/lib/hofseite-kunde'
-import { BAR_OHNE_GEBUEHR_ZAHLART } from '@/lib/konditionen'
+import { BAR_OHNE_GEBUEHR_ZAHLART, MINDESTBESTELLWERT_SATZ, PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_SATZ } from '@/lib/konditionen'
+import { bestellGebuehr, endpreisJeStueckCents, mindestbestellwertErreicht, satzText, type PreisAnzeige } from '@/lib/plattformgebuehr'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
-import { calcTotalAmount, decimalZuCents } from '@/lib/order-totals'
+import { alsCents, calcTotalAmount, decimalZuCents } from '@/lib/order-totals'
 import { RESERVIERUNG_TTL_MS } from '@/lib/reservierung'
 import {
   SERVICEGEBUEHR_BEZEICHNUNG,
@@ -33,6 +34,14 @@ import { mitKaeuferVorbelegung, type KaeuferVorbelegung } from '@/schemas/kaeufe
 // ─── Zahlarten (E5) ─────────────────────────────────────────────────────────
 
 /**
+ * Was die Kasse über die Gebühr eines Hofs weiß: seine Servicegebühr (Modell
+ * `bisher`) und — ab dem Stichtag „Hofpreis-Modell ab“ — die Preisanzeige
+ * mit dem Satz der Plattformgebühr (N38, Nr. 197; `PublicFarm.preisAnzeige`).
+ * Fehlt sie (null), rechnet die Kasse wie vor Nr. 197.
+ */
+export type KassenHof = ServicegebuehrEinstellung & { preisAnzeige?: PreisAnzeige }
+
+/**
  * Womit eine NEUE Bestellung bezahlt werden kann. Seit E5 kennt das
  * Preismodell nur online und bar bei Abholung. ONSITE_CARD bleibt im Enum
  * (Expand/Contract), solange Bestellungen ihn tragen: Anzeige, Storno und
@@ -49,6 +58,12 @@ export function zahlartFuerNeueBestellung(paymentMethod: string): paymentMethod 
 
 /** Maschinenlesbar für den Browser: Die gewählte Zahlart gibt es nicht (mehr). */
 export const CODE_ZAHLART_NICHT_ANGEBOTEN = 'ZAHLART_NICHT_ANGEBOTEN'
+
+/** Maschinenlesbar (N38, Nr. 197): Bar geht bei diesem Hof gerade nicht — die Kasse bietet nur online an. */
+export const CODE_BAR_NICHT_MOEGLICH = 'BAR_NICHT_MOEGLICH'
+
+/** Maschinenlesbar (N38, Nr. 197): Der Warenwert liegt unter dem Mindestbestellwert. */
+export const CODE_MINDESTBESTELLWERT = 'MINDESTBESTELLWERT'
 
 /** Was die Kundin liest, wenn ein alter Tab noch „Karte bei Abholung" schickt. */
 export const ZAHLART_NICHT_ANGEBOTEN =
@@ -97,9 +112,12 @@ export function kassenZahlarten(
     testbetrieb?: boolean
     /** Register Z2: Stripe kennt den Zahlungszugang des Hofs nicht — online wie ohne Stripe-Anbindung. */
     onlineAus?: boolean
+    /** N38 (Nr. 197): Bar geht bei diesem Hof gerade nicht (`barMoeglich` falsch) — nur online. */
+    barAus?: boolean
   } = {}
 ): KassenZahlart[] {
-  const angebot = optionen.onlineAus ? { ...hof, stripeAccountReady: false } : hof
+  const ohneOnline = optionen.onlineAus ? { ...hof, stripeAccountReady: false } : hof
+  const angebot = optionen.barAus ? { ...ohneOnline, acceptsOnsite: false } : ohneOnline
   return zahlungsarten(angebot).map((z) =>
     z.art === 'online'
       ? {
@@ -127,7 +145,9 @@ export function kassenZahlarten(
  * Kasse aus der Uhr der Seite; verbindlich entscheidet /api/checkout mit der
  * Server-Uhr.
  */
-export function barGuenstiger(hof: ServicegebuehrEinstellung, jetzt: Date): boolean {
+export function barGuenstiger(hof: KassenHof, jetzt: Date): boolean {
+  // Im Hofpreis-Modell (N38) zahlt die Kundin online und bar immer dasselbe.
+  if (hof.preisAnzeige) return false
   return barOhneServicegebuehr('ONSITE_CASH', jetzt) && servicegebuehrSatz(hof, jetzt) !== null
 }
 
@@ -167,14 +187,41 @@ export type KassenBetraege = {
  */
 export function kassenBetraege(
   positionen: readonly { productId: string; price: number; quantity: number }[],
-  hof: ServicegebuehrEinstellung,
+  hof: KassenHof,
   jetzt: Date,
   zahlungsart: Zahlungsart
 ): KassenBetraege {
+  if (hof.preisAnzeige) return hofpreisBetraege(positionen, hof.preisAnzeige.hundertstel)
   const { zeilenCents } = korbBetraege(positionen)
   const warenCents = decimalZuCents(calcTotalAmount(positionen.map((p) => ({ unitPrice: p.price, quantity: p.quantity }))))
   const { gebuehrCents } = berechneServicegebuehr(warenCents, hof, jetzt, zahlungsart)
   return { zeilenCents, warenCents, gebuehrCents, gesamtCents: warenCents + gebuehrCents }
+}
+
+/**
+ * Die Beträge im Hofpreis-Modell (N38): Gebühr = Summe aus Menge × Gebühr je
+ * Stück (bestellGebuehr, dieselbe Funktion wie /api/checkout), für online und
+ * bar gleich. Die Zeilen zeigen den Endpreis × Menge — genau das, was die
+ * Kundin auf den Karten sah; ihre Summe ist das Gesamt.
+ */
+function hofpreisBetraege(positionen: readonly { productId: string; price: number; quantity: number }[], hundertstel: number): KassenBetraege {
+  const mitCents = positionen.map((p) => ({ productId: p.productId, preisCents: alsCents(String(p.price)), menge: p.quantity }))
+  const summe = bestellGebuehr(mitCents, hundertstel)
+  const zeilenCents = new Map<string, number>()
+  for (const p of mitCents) {
+    zeilenCents.set(p.productId, (zeilenCents.get(p.productId) ?? 0) + p.menge * endpreisJeStueckCents(p.preisCents, hundertstel))
+  }
+  return { zeilenCents, warenCents: summe.warenCents, gebuehrCents: summe.gebuehrCents, gesamtCents: summe.gesamtCents }
+}
+
+/**
+ * Der Grund am ausgeschalteten Bestellknopf (N38): im Hofpreis-Modell unter
+ * 10 € Warenwert der Satz zum Mindestbestellwert, sonst null. Verbindlich
+ * prüft /api/checkout (400 mit demselben Satz).
+ */
+export function mindestbestellwertGrund(hof: KassenHof, warenCents: number): string | null {
+  if (!hof.preisAnzeige) return null
+  return mindestbestellwertErreicht(warenCents) ? null : MINDESTBESTELLWERT_SATZ
 }
 
 /** Was /api/checkout an Stripe gab (checkoutZahlungsBetragSchema in src/schemas/checkout.ts). */
@@ -212,7 +259,9 @@ export function angezeigteBetraege(lokal: KassenBetraege, vomServer: ZahlungsBet
  * statt einen Satz zu nennen, der nicht zum Betrag gehört. Den Zahlungsschritt
  * gibt es nur online, deshalb die Regel für ONLINE.
  */
-export function zahlungsGebuehrText(hof: ServicegebuehrEinstellung, jetzt: Date, betrag: ZahlungsBetrag): string {
+export function zahlungsGebuehrText(hof: KassenHof, jetzt: Date, betrag: ZahlungsBetrag): string {
+  // Hofpreis-Modell: nur das Wort — den Satz zum Betrag des Servers prüfen geht ohne die Positionen nicht.
+  if (hof.preisAnzeige) return PLATTFORMGEBUEHR_BEZEICHNUNG
   const { warenCents, gebuehrCents } = zahlungsBetraege(betrag)
   if (berechneServicegebuehr(warenCents, hof, jetzt, 'ONLINE').gebuehrCents !== gebuehrCents) return SERVICEGEBUEHR_BEZEICHNUNG
   return gebuehrBezeichnung(hof, jetzt)
@@ -253,7 +302,11 @@ export const GEBUEHR_ENTFAELLT = 'entfällt'
  * angebotene gewählte Zahlweg (`kassenZahlweg`): Ohne angebotene Barzahlung
  * steht kein „entfällt".
  */
-export function gebuehrZeile(hof: ServicegebuehrEinstellung, jetzt: Date, zahlweg: Zahlungsart | null): GebuehrZeile {
+export function gebuehrZeile(hof: KassenHof, jetzt: Date, zahlweg: Zahlungsart | null): GebuehrZeile {
+  // Hofpreis-Modell (N38): „Plattformgebühr (6 %)“ und der Satz aus konditionen.ts; entfällt nie.
+  if (hof.preisAnzeige) {
+    return { titel: `${PLATTFORMGEBUEHR_BEZEICHNUNG} (${satzText(hof.preisAnzeige.hundertstel)} %)`, erklaerung: PLATTFORMGEBUEHR_SATZ, entfaellt: false }
+  }
   const satz = servicegebuehrSatz(hof, jetzt)
   if (!satz) return { titel: SERVICEGEBUEHR_BEZEICHNUNG, erklaerung: SERVICEGEBUEHR_HINWEIS, entfaellt: false }
   return {
@@ -321,7 +374,7 @@ export function reservierungsStand(bisIso: string | null, jetzt: Date): Reservie
 
 // ─── Zahlung ────────────────────────────────────────────────────────────────
 
-export type ZahlungsFehler = 'bezahlt' | 'abgelaufen' | 'abgelehnt' | 'sonstig'
+export type ZahlungsFehler = 'bezahlt' | 'abgelaufen' | 'abgelehnt' | 'netz' | 'sonstig'
 
 /**
  * Was ein Fehler aus `stripe.confirmPayment` für die Kundin heißt.
@@ -333,7 +386,8 @@ export type ZahlungsFehler = 'bezahlt' | 'abgelaufen' | 'abgelehnt' | 'sonstig'
  * - Nur eine abgelehnte Karte (`card_error`) heißt sicher: Der Zahlungsvorgang
  *   steht wieder auf „Zahlungsart fehlt", es wurde nichts abgebucht, ein neuer
  *   Versuch geht. Unvollständige Eingaben zeigt Stripe selbst am Feld,
- *   Netzfehler bleiben ohne Zusatz.
+ *   Netzfehler (`api_connection_error`) heißen `netz`: Ob die Zahlung ankam, ist
+ *   offen — die Kasse zeigt `NETZ_SATZ_UNSICHER` (Register N29, Ergänzung 26.10.2026).
  */
 export function zahlungsFehlerArt(f: {
   fehlerTyp: string | undefined
@@ -343,6 +397,7 @@ export function zahlungsFehlerArt(f: {
   if (f.intentStatus === 'succeeded' || f.intentStatus === 'processing') return 'bezahlt'
   if (f.intentStatus === 'canceled' || f.fristUm) return 'abgelaufen'
   if (f.fehlerTyp === 'card_error') return 'abgelehnt'
+  if (f.fehlerTyp === 'api_connection_error') return 'netz'
   return 'sonstig'
 }
 
@@ -542,6 +597,9 @@ type EnterEreignis = {
  * abzuschicken. Die Tastatur zeigt dort „Weiter" (enterKeyHint) — und der
  * Abschluss dieses Formulars ist zahlungspflichtig: Eine Taste, die „Weiter"
  * heißt, darf nie bestellen. Notizfeld, Haken und Knöpfe behalten ihr Verhalten.
+ *
+ * Bleibt so (Entscheidung 4, Morgenbericht 25, am 26.10.2026 bestätigt): Enter
+ * springt in der Kasse weiter, bestellt wird nur mit dem Kaufknopf.
  */
 export function weiterBeiEnter(e: EnterEreignis): void {
   const ziel = e.target as { tagName?: string; type?: string; focus?: () => void }

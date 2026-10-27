@@ -70,7 +70,7 @@ import { toast } from 'sonner'
 import { setzeWhatsAppGetippt } from '@/server/actions/status-posts'
 import { WHATSAPP_VERSAND_TEXT, type Abonnentin } from '@/lib/whatsapp-versand'
 import { teilenKanalAus } from '@/lib/teilen-kanal'
-import { beitragKennungSchema } from '@/schemas/hofseite-reiter'
+import { leseBeitragKennung } from '@/schemas/hofseite-reiter'
 import { WhatsAppTapClient } from '@/app/(hof)/status/[id]/send-whatsapp/whatsapp-tap-client'
 
 const ANNA: Abonnentin = { id: 'cabo00000000000000000001', name: 'Anna Muster', phone: '+43 660 0000000' }
@@ -175,7 +175,7 @@ describe('Tipp-Liste: der Link in der Nachricht (Register T5)', () => {
     const link = linkInDerNachricht()
     const adresse = new URL(link)
     expect(adresse.pathname).toBe('/hof-test')
-    expect(beitragKennungSchema.parse(adresse.searchParams.get('beitrag'))).toBe(PROPS.postId)
+    expect(leseBeitragKennung(adresse.searchParams.get('beitrag'))).toBe(PROPS.postId)
     expect(teilenKanalAus(adresse.searchParams.get('k'))).toBe('WHATSAPP')
     expect(link.endsWith(`?beitrag=${PROPS.postId}&k=wa`)).toBe(true)
   })

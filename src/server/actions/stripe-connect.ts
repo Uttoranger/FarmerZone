@@ -11,6 +11,7 @@ import { STRIPE_LAND, alsLand } from '@/lib/laender'
 import { APP_URL } from '@/lib/umgebung-server'
 import { onlineZahlungEinschaltenSchema } from '@/schemas/online-zahlung'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
+import { HOF_KONTAKT_FELDER, hofKontaktEmail } from '@/lib/hof-kontakt'
 
 async function getAuthenticatedFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -21,7 +22,8 @@ async function getAuthenticatedFarm() {
       id: true,
       name: true,
       slug: true,
-      email: true,
+      // Mit der Anmelde-Adresse: ohne Hof-E-Mail bekommt Stripe sie (hofKontaktEmail, Nr. 194).
+      ...HOF_KONTAKT_FELDER,
       country: true,
       stripeAccountId: true,
       stripeAccountReady: true,
@@ -85,7 +87,7 @@ export async function createConnectAccount(): Promise<{ error?: string }> {
     type: 'express',
     // Das Land des Hofs (Nr. 152); fehlt es, gilt AT wie bisher.
     country: STRIPE_LAND[alsLand(farm.country)],
-    email: farm.email,
+    email: hofKontaktEmail(farm),
     business_type: 'individual',
     capabilities: {
       card_payments: { requested: true },

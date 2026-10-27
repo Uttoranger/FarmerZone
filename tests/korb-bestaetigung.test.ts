@@ -10,7 +10,7 @@
  * gemockt, localStorage und sessionStorage sind Maps.
  *
  * Beweist: Das erste „+“ einer Sitzung öffnet das Korb-Blatt, das zweite
- * nicht — dann steht „… ist im Korb“ mit „Rückgängig“ (role="status");
+ * nicht — dann steht „… ist im Warenkorb“ mit „Rückgängig“ (role="status");
  * Rückgängig setzt die Menge über useCart zurück (aus dem Korb bzw. auf die
  * Menge davor); die Zeile geht beim Tipp auf die Korb-Leiste; am Netz steht
  * der Satz aus N29 mit „Nochmal“, das den Griff wiederholt; ein roher
@@ -146,6 +146,8 @@ vi.mock('react', async (importOriginal) => ({
   useTransition: pruefstand.useTransition,
   useOptimistic: pruefstand.useOptimistic,
   useImperativeHandle: pruefstand.useImperativeHandle,
+  // Ohne Rahmen liefert ein Kontext seinen Vorgabewert (Preisanzeige, N38: null = Warenpreis wie bisher).
+  useContext: <T,>(kontext: import('react').Context<T>): T => (kontext as unknown as { _currentValue: T })._currentValue,
 }))
 
 const geliefert = vi.hoisted(() => ({ korb: null as Warenkorb | null }))
@@ -273,7 +275,7 @@ describe('N30: nur das erste „In den Korb“ öffnet das Blatt', () => {
     expect(sitzung.get(BLATT_MERKER)).toBe('1')
   })
 
-  it('zweites „+“: kein Blatt, sondern „… ist im Korb“ mit Rückgängig, role="status"', async () => {
+  it('zweites „+“: kein Blatt, sondern „… ist im Warenkorb“ mit Rückgängig, role="status"', async () => {
     raster()
     await tippe(EIER)
     schliesseBlatt()
@@ -282,7 +284,7 @@ describe('N30: nur das erste „In den Korb“ öffnet das Blatt', () => {
     await tippe(MEHL)
     expect(blattOffen()).toBe(false)
     expect(zeile()?.props.role).toBe('status')
-    expect(text(zeile()?.props.children as ReactNode)).toContain('Mehl ist im Korb')
+    expect(text(zeile()?.props.children as ReactNode)).toContain('Mehl ist im Warenkorb')
     expect(knopfInZeile('Rückgängig')).toBeTypeOf('function')
     expect(inhalt()).toEqual([['prod_eier', 1], ['prod_mehl', 1]])
   })
@@ -393,7 +395,7 @@ describe('Fehler an der Aktion (Register N29, Übergabe aus Nr. 175)', () => {
     await tippe(EIER)
     const satz = text(zeile()?.props.children as ReactNode)
     expect(satz).not.toContain('Serverfehler')
-    expect(satz).toContain('Wir konnten das Produkt nicht in den Korb legen.')
+    expect(satz).toContain('Wir konnten das Produkt nicht in den Warenkorb legen.')
     expect(() => knopfInZeile(NETZ_KNOPF)).toThrow()
   })
 

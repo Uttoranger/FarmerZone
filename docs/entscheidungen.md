@@ -48,9 +48,12 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Stand:** Nr. 20 (07.10.2026): Formulare „Neues Futtermittel" und „Neues Brennmaterial" legen je Größe ein Produkt mit gemeinsamer `familieId` an (`src/server/actions/produktfamilie.ts`); bearbeitet wird je Größe. Bericht 20.
 
 ### E4 · Servicegebühr 5 %, immer aufrunden (02.10.2026)
+- **Verweis:** geändert durch N38, 26.10.2026 (siehe Änderung am Ende dieses Eintrags).
 - **Entscheidung:** **5 %** und mindestens € 0,50, **immer aufgerundet** auf den nächsten Cent. Gerechnet wird nur in `berechneServicegebuehr`. Gespeicherte Beträge alter Bestellungen werden nie neu berechnet.
 - **Begründung:** Preismodell aus der Excel („Es wird aufgerundet").
 - **Dateien:** `src/lib/servicegebuehr.ts` (#167). Den Satz der aktiven Höfe regelt F5. Ausnahme für Barzahlung bis zum SEPA-Start: B1.
+- **Änderung (uttoranger, im Chat, 26.10.2026):** „Ab dem Stichtag aus N38 gilt für neue Bestellungen N38 (6 %, je Stück aufgerundet, keine Mindestgebühr, Mindestbestellwert 10 €). Bestellungen davor behalten ihre gespeicherten Beträge (E4 bisher).“
+- **Umsetzung (Änderung 26.10.2026):** Nr. 197 und Nr. 198 (freigabe.md §30); Felder in Nr. 188.
 
 ### E5 · Keine „Karte bei Abholung" für neue Bestellungen (02.10.2026)
 - **Entscheidung:** Neue Bestellungen kennen nur online und bar bei Abholung. Der Wert `ONSITE_CARD` bleibt im Enum, bis keine offene Bestellung ihn mehr nutzt (Expand/Contract).
@@ -308,6 +311,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Stand:** umgesetzt in 17d.
 
 ### K2 · Gründungs-Enddatum je Hof (12.10.2026)
+- **Verweis:** ergänzt durch N38, 26.10.2026 (siehe Ergänzung am Ende dieses Eintrags).
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 10):** Gründungshöfe gelten als Hofladen ohne Grundgebühr bis zu einem Enddatum; Standard 31.12.2027, je Hof im Admin änderbar, auch für die bestehenden Testhöfe. Danach gilt die normale Regel (E6-Ergänzung). Vor einer Änderung des Standards werden bestehende Zusagen je Hof festgeschrieben (eigene Migration mit Freigabe). Der Satz „danach dauerhaft 3 %" verschwindet aus jeder Anzeige.
 - **Verhältnis zu anderen Einträgen:** entscheidet O7 (Variante b); ergänzt E6 und K1.
 - **Migration (freigegeben, Wortlaut):** „Nr. 62 darf eine Expand-Migration anlegen: neue Spalte Farm.gruendungBis vom Typ DATE, nullable, ohne Default, ohne Backfill und ohne andere Schema-Änderung. Erzeugt mit prisma migrate diff; Produktion bekommt sie nur über vercel-build beim Merge."
@@ -320,6 +324,8 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Änderung Aktion „100 Gründungshöfe“ (uttoranger, im Chat, 19.10.2026; Nr. 116):** „Es gibt 100 Gründungsplätze. Gründungshöfe bekommen den Hofladen 24 Monate ohne Grundgebühr (Wert 456 € inkl. USt.), gerechnet ab dem späteren Tag von Tarifstart (1. Februar 2027) und Freischaltung; das Ende steht je Hof fest. Ein Platz zählt erst mit der Freischaltung, und die verlangt jetzt neben bestätigter E-Mail und fertigem Stripe mindestens ein Produkt im Shop. Platz und Ende werden bei der Freischaltung festgeschrieben (Nummer = kleinste freie); Stilllegen und Wieder-Aktivieren ändern nichts daran, so verliert nie ein anderer Hof seine Zusage. Die Aktion endet am Stichtag ‚Aktion bis‘ (31. März 2027); danach werden keine Plätze mehr vergeben. Den Stichtag kann der Admin nur vorziehen, nie nach hinten schieben; die Monate nur erhöhen. Ob Plätze vergeben werden, entscheiden nur Festschreiben, Stichtag und freie Plätze – der Schalter ‚Anzeige‘ steuert nur die Sätze der Werbung. Der Zähler ‚Noch n von 100‘ erscheint erst ab 10 vergebenen Plätzen; davor steht der Satz ohne Zahl. Bestehende Zusagen werden einmal per Admin-Aktion festgeschrieben, nie kürzer als bisher (K1) – auch für stillgelegte, freigeschaltete Höfe. Freigabe entziehen und erneut freigeben ändern Platz und Ende nicht. Gründungshöfe tragen das Abzeichen ‚Gründungshof‘ – ein Etikett direkt über dem Hofnamen auf Hofseite, Höfe-Liste, den Hofkarten der Startseite und im Teilen-Bild, ohne Nummer, kein Prüfsiegel –, für immer; der Hof kann es unter Konditionen und Tarif ausblenden (Standard: an). Ausgenommene Höfe (Testhöfe) bekommen kein Abzeichen.“
 - **Ergänzung Heute-Karte (uttoranger, im Chat, 19.10.2026):** „Die Heute-Karte nach der Freischaltung (Baustein 5 der Gründungs-Mockups) entfällt; die Gründungs-Nachricht im Postfach nennt Nummer und Ende.“
 - **Verhältnis zu N21 (19.10.2026):** Ein Testhof ist immer auch ausgenommen; ‚ausgenommen‘ heißt ab N21 nur noch: zählt nicht für die Gründungsplätze (ein ausgenommener echter Hof ist normal sichtbar und wird indexiert).
+- **Ergänzung (uttoranger, im Chat, 26.10.2026):** „Gründungshöfe zahlen die Bargebühr aus N38 erst nach ihrer Laufzeit; bis dahin brauchen sie für Barbestellungen kein Mandat. Die Zusage ‚Hofladen ohne Grundgebühr‘ bleibt unverändert.“
+- **Umsetzung (Ergänzung 26.10.2026):** Nr. 197 und Nr. 198 (freigabe.md §30); `einzugAb` je Hof aus Nr. 188.
 
 ### K3 · Unterhaltungen zwischen Höfen (13.10.2026)
 - **Stand:** beschlossen 13.10.2026, **Bau nach Signal**, nicht in Lauf 13.
@@ -331,6 +337,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 ## B – Bezahlung und Gebühren
 
 ### B1 · Keine Servicegebühr bei Barzahlung bis zum SEPA-Start (06.10.2026)
+- **Verweis:** ergänzt durch N38, 26.10.2026 (siehe Ergänzung am Ende dieses Eintrags).
 - **Entscheidung (uttoranger):**
   - Bis zum Start der SEPA-Monatsabrechnung fällt bei Barzahlung keine Servicegebühr an.
   - Online-Zahlungen behalten die Gebühr, weil Stripe sie direkt einbehält.
@@ -343,6 +350,8 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
   - Beantwortet die offene Frage aus 17d (#186): Gebühren aus Barbestellungen vor dem Stichtag werden nicht eingezogen.
 - **Dateien:** `src/lib/servicegebuehr.ts` (`berechneServicegebuehr` bekommt die Zahlungsart), `src/lib/konditionen.ts` (Konstante neben `TARIFE_AB`), Checkout-Server, Kasse/Warenkorb, Artikel fehlt, Admin-Finanzen, Mail „Vor-Ort-Bestellung bestätigt", `/konditionen`, `/fuer-hoefe`, Startseiten-Beispiel. Umsetzung 19a (freigabe.md §9).
 - **Stand:** umgesetzt in 19a (06.10.2026); maßgeblich ist der Bestellzeitpunkt, Annahmen im Bericht 19a.
+- **Ergänzung (uttoranger, im Chat, 26.10.2026):** „B1 gilt nur bis zum Stichtag aus N38. Danach gibt es keine Barzahlung ohne Gebühr mehr; bis zum Einzugsbeginn des Hofs ist die Bargebühr ‚erlassen‘ (sie bleibt beim Hof).“
+- **Umsetzung (Ergänzung 26.10.2026):** Nr. 197 und Nr. 198 (freigabe.md §30); `barOhneServicegebuehr` und `BAR_SERVICEGEBUEHR_AB` bleiben für Bestellungen im bisherigen Modell.
 
 Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert (Freigabe Lauf 6, „ältere offene Punkte").
 
@@ -603,6 +612,8 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Bestätigt (uttoranger, Freigabe Lauf 13, 13.10.2026):** Entscheidungen des Dirigenten aus Lauf 12 (Morgenbericht 12 §7): Nr. 81 – zwei Sollte zu Blockern hochgestuft; das Kundendetail nutzt `whatsAppLink` aus Nr. 75 (gestapelt), ohne die Datei zu ändern. Nr. 78 – in Dateien anderer Nummern nur die genannten Zeilen (Tipp-Liste Z. 124, `product-grid.tsx` Z. 420/442).
 - **Ergänzung (uttoranger, Freigabe Lauf 13, 13.10.2026):** Land DE: führende 0 bleibt +43 (Standard Österreich), keine +49-Vermutung. „Neuigkeiten" (Mehrzahl, Name der Anmeldung), „Hof-Seite", „Dashboard" in Mails, „Plattformgebühr", „Abholfenster" bleiben offen; keine Änderung in diesem Lauf. Quelle: Morgenbericht 12 §10, zu Nr. 77, 78 und 81; Umsetzung Nr. 85.
 - **Ergänzung (uttoranger, im Chat, 24.10.2026):** Für die Wege einer Mail in Admin › Betrieb › E-Mails: **Wichtig**, **Kann warten** und **Sofort**. Auf Admin-Seiten: **Jetzt schicken** (die Mail ging noch nie hinaus) und **Nochmal schicken** (die Mail ging schon hinaus; nie „erneut senden“, „erneut versuchen“ oder „Resend“); **Abgelehnt** (nicht: Bounce); **Spam gemeldet** (nicht: Beschwerde). Quelle: freigabe.md §28 (N26, N27).
+- **Ergänzung (uttoranger, im Chat, 26.10.2026):** „Am Knopf heißt es ‚In den Korb‘, sonst überall ‚Warenkorb‘. Admin: ‚Heute‘, ‚Braucht dich‘, ‚Akte‘, ‚Notbremse‘, ‚Bestellungen anhalten‘, ‚Außerhalb erstattet‘, ‚Notfall-Storno‘, ‚Konto schließen‘ (Entscheidung 9, Morgenbericht 25). Ab N38: ‚Plattformgebühr‘ (nicht ‚Servicegebühr‘) für die Gebühr im Hofpreis, ‚inkl. Plattformgebühr‘, ‚Lastschrift‘, ‚Monatsabrechnung‘, ‚erlassen‘. Im Code bleibt `platformFee*` die Provision des Hofs; die Gebühr heißt dort weiter `serviceFee*`.“
+- **Umsetzung (Ergänzung 26.10.2026):** Nr. 195 Punkt 5 (Wortliste) und Nr. 197 (Wörter zur Plattformgebühr) (freigabe.md §30); keine Migration.
 
 ### N9 · Leerzustände (13.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 12):** Jeder Leerzustand einer Liste oder Karte entsteht aus EmptyState (Symbol, ein Satz, nächste Aktion); kleine Zeilen in Karten („Alles erledigt.") sind erlaubt, wenn sie eine einzelne Zeile bleiben und keine Aktion brauchen. Text je Seite aus einer Quelle in src/lib; kein Zustand hat zwei Fassungen.
@@ -676,6 +687,12 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Umsetzung:** Nr. 103 (freigabe.md §20; Admin › Betrieb, Messen, Herzschlag, Warn-Mail; eine Migration, Expand: drei neue Tabellen) und Nr. 104 (Aufräumen, Bilder ohne Verwendung; keine Migration). Mockups `admin-betrieb`, `mobil-admin-betrieb`, `email-betrieb-warnung` (docs/mockups/README.md).
 - **Ergänzung (uttoranger, im Chat, 24.10.2026):** „Der Monat der E-Mails ist der Abrechnungszeitraum von Resend (ab dem 17. jedes Monats, 0 Uhr UTC), nicht der Kalendermonat. Die Warn-Mail kennt dazu: eine wichtige Mail wartet länger als 5 Minuten, die Warteschlange hängt länger als 15 Minuten, Bounce-Quote über 2 % oder Beschwerde-Quote über 0,05 % in 7 Tagen (ab 50 Mails). Warn-Mails des Betriebs gehen direkt, nicht über die Warteschlange. Supabase läuft seit 24.10.2026 im Tarif Pro.“
 - **Umsetzung (Ergänzung 24.10.2026):** Nr. 162 (Abrechnungszeitraum, Tarife) und Nr. 161 (Warnungen; Admin › Betrieb › E-Mails), freigabe.md §28.
+- **Ergänzung (uttoranger, im Chat, 26.10.2026):**
+  - „Die Seite selbst prüft ein externer Uptime-Dienst über `/api/gesund` (nur ‚ok‘ oder 503); jeder Aufruf hinterlässt höchstens einmal je Minute einen Herzschlag. Fehlt er länger als 30 Minuten, steht eine Aufgabe in Heute.
+  - Das Lebenszeichen über GitHub läuft alle 15 Minuten.
+  - Bekannte Zustände (Testmodus, fehlendes Connect-Secret) gehen höchstens einmal je Tag und Deploy an Sentry.
+  - Welche Signale wie kommen, steht in der Alarm-Matrix (ARCHITECTURE, Admin › Betrieb).“
+- **Umsetzung (Ergänzung 26.10.2026):** Nr. 184 (freigabe.md §30); keine Migration.
 
 ### N19 · Entdecken statisch (19.10.2026)
 - **Entscheidung (uttoranger, im Chat, 19.10.2026):** „/hoefe wird statisch mit Neubau alle fünf Minuten, wie die Startseite. Die Filter liest der Browser aus der Adresse. Ein geteilter Filter-Link zeigt kurz die ungefilterte Liste und dann die gefilterte. Filter-Links auf /hoefe tragen nofollow, robots.txt sperrt /hoefe mit Parametern und die privaten Bereiche, die Seite nennt /hoefe als Canonical.“
@@ -764,6 +781,8 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
   - Geht das Netz im Browser verloren, zeigen die Shells unter dem Kopf eine Zeile, bis es zurück ist.
   - Ein Service Worker mit Cache gehört nicht dazu (eigener Sprint). Kasse und HTML werden nie zwischengespeichert.“
 - **Umsetzung:** Nr. 175 (Zustand und Zeile in den Shells), Nr. 174 (Hof-Formulare) und Nr. 183 (Editor) (freigabe.md §29); keine Migration, kein Paket.
+- **Ergänzung (uttoranger, im Chat, 26.10.2026):** „Bei Aktionen, die der Server schon ausgeführt haben kann (Storno, Statuswechsel einer Bestellung, Bezahlen), sagt der Netzsatz: ‚Wir wissen nicht, ob es geklappt hat – lade die Seite neu, bevor du es nochmal tust.‘ (Entscheidung 1, Morgenbericht 25).“
+- **Umsetzung (Ergänzung 26.10.2026):** Nr. 195 Punkt 1 (`NETZ_SATZ_UNSICHER`) und Nr. 186 (Storno im Admin) (freigabe.md §30); keine Migration.
 
 ### N30 · Korb ohne Blatt-Pingpong (25.10.2026)
 - **Entscheidung (uttoranger, im Chat, 25.10.2026):** „Auf der Hofseite öffnet nur das erste ‚In den Korb‘ einer Sitzung das Korb-Blatt. Jedes weitere bestätigt mit einer kurzen Zeile (‚… ist im Korb‘, ‚Rückgängig‘), und die Korb-Leiste zählt hoch. Weicht bewusst von mobil-k2-produkte ab; Board SterneHofseiteOrientierung.“
@@ -776,6 +795,82 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
   - sonst → /
   Das Manifest bleibt eines für beide Welten.“
 - **Umsetzung:** Nr. 172 (freigabe.md §29); keine Migration.
+
+### N32 · Admin im Regelbetrieb (26.10.2026)
+- **Entscheidung (uttoranger, im Chat, 26.10.2026):** „Der Admin-Bereich beginnt mit ‚Heute‘. Heute zeigt eine einzige Liste ‚Braucht dich‘ aus allen Quellen: Höfe warten, Erstattung offen, Mail gescheitert oder hängt, neue Meldung, Warnung des Betriebs, Abweichung beim Geld, Notbremse aktiv, Uptime-Dienst still. Dazu kommt je Eintrag eine Frist und ein ‚Was tun‘.
+  - Die Liste hat keinen eigenen Zustand; erledigt verschwindet von selbst.
+  - Die Reiter heißen Heute · Höfe · Bestellungen · Postfach · Startseite · Geld · Betrieb · Einstellungen; am Handy Heute · Höfe · Bestellungen · Postfach · Mehr als Leiste unten.
+  - Das Postfach enthält nur Gespräche; Aufgaben stehen in Heute; die Zustellung zieht nach Einstellungen › Benachrichtigungen.
+  - ‚Finanzen‘ heißt ‚Geld‘.
+  - Jeder Hof hat eine Akte; jede Bestellung ist im Admin auffindbar (Nummer oder genaue Adresse).
+  - Mockups ‚ADMIN · Regelbetrieb‘.“
+- **Umsetzung:** Nr. 185 (Heute), Nr. 186 (Bestellungen), Nr. 187 (Höfe und Akte), Nr. 192 (Handbuch), Nr. 193 (Navigation, Postfach nur Gespräche) und Nr. 184 (Betrieb: Alarm-Matrix) (freigabe.md §30); keine Migration außer der in Nr. 188.
+
+### N33 · Admin-Protokoll (26.10.2026)
+- **Entscheidung (uttoranger, im Chat, 26.10.2026):** „Jede Admin-Aktion, jedes Ansehen einer vollen Kundenadresse und jedes Ereignis, das Geld oder den Zustand eines Hofs ändert, steht im Protokoll.
+  - Inhalt: wer (oder System), Art, Bezug als Kennung, Grund, ob mit Passkey bestätigt.
+  - Nie Adresse, Name, Inhalt oder Token.
+  - Einträge sind nicht änderbar; das Aufräumen löscht sie nach 5 Jahren.
+  - Zweck und Frist gehören in die Datenschutzerklärung.“
+- **Umsetzung:** Nr. 188 (Tabelle, `protokolliere`, Aufräumen nach 5 Jahren) und Nr. 193 (Ansicht in Admin › Betrieb) (freigabe.md §30); die Migration steht in Nr. 188 (Expand). Zweck und Frist in der Datenschutzerklärung: eigener Auftrag nach Rückmeldung der Anwältin.
+
+### N34 · Eingriffe des Admins (26.10.2026)
+- **Entscheidung (uttoranger, im Chat, 26.10.2026):**
+  - „**Hof sperren:** Der Admin kann einen Hof vorübergehend sperren, mit Grund. Das stoppt neue Bestellungen mit einem neutralen Satz für die Kundschaft und sagt es dem Hof im Postfach. Anders als die Pause kann der Hof die Sperre nicht selbst aufheben.
+  - **Notfall-Storno:** Der Admin kann eine Bestellung im Namen des Hofs stornieren, nur vor der Abholung, mit Grund; der Hof bekommt eine Nachricht. Es gilt derselbe Weg wie beim Storno durch den Hof (Erstattung, Bestand, Mail).
+  - **Notbremse:** Der Admin kann neue Bestellungen auf allen Höfen anhalten, mit Grund, Satz für die Kundschaft und spätestem Ende. Laufende Bestellungen bleiben.
+  - Alles mit Passkey (frische Bestätigung) und im Protokoll.“
+- **Umsetzung:** Nr. 187 (Hof sperren), Nr. 186 (Notfall-Storno), Nr. 189 (Notbremse) und Nr. 188 (Felder, Rechte) (freigabe.md §30); die Migration steht in Nr. 188 (Expand).
+
+### N35 · Rechte je Person (26.10.2026)
+- **Entscheidung (uttoranger, im Chat, 26.10.2026):** „Im Admin-Bereich hat jede Person einzeln einstellbare Rechte.
+  - **Immer:** ‚ansehen‘ (Heute, Höfe, Bestellungen, Postfach).
+  - **Einstellbar:** Mails nochmal schicken · volle Adresse anzeigen · Hof sperren und Notfall-Storno · Höfe freischalten, Gründung, Testhof und Servicegebühr · Geld und Monatsabschluss · Notbremse · Startseite veröffentlichen · Benachrichtigungen.
+  - **Nur Inhaber, nie weitergebbar:** Team, Rechte und Admin-Rechte vergeben; Notfallzugang.
+  - Eingeladen werden nur bestehende Konten; Passkey-Pflicht und 24-Stunden-Fenster wie N20.
+  - Bestehende Admins werden beim Umstieg Inhaber.
+  - Den letzten Inhaber kann niemand entfernen.
+  - Jede Änderung mit Passkey, Mail an die Person und Eintrag im Protokoll.“
+- **Umsetzung:** Nr. 188 (Rechte, Wache, Umstieg der bestehenden Admins) und Nr. 190 (Team, Einladen, Notfallzugang) (freigabe.md §30); die Migration steht in Nr. 188 (Expand).
+
+### N36 · Konto-Anfragen (26.10.2026)
+- **Entscheidung (uttoranger, im Chat, 26.10.2026):**
+  - „**Anmelde-E-Mail ändern:** Der Admin ändert sie über einen Bestätigungslink an die neue Adresse (24 Stunden). Die alte Adresse bekommt eine Sicherheitsmail; danach sind alle Geräte abgemeldet.
+  - **Auskunft:** als Export (JSON) für einen Hof oder eine Adresse der Kundschaft.
+  - **Hofkonto schließen**, in zwei Stufen:
+    - Sofort, 30 Tage umkehrbar: Hofseite offline, Anmelden gesperrt, Abos beendet.
+    - Danach endgültig: Kontakt, Fotos und Texte des Hofs löschen bzw. unkenntlich machen; Bestellungen und Beträge bleiben, solange die Aufbewahrungspflicht gilt.
+    - Schließen geht nur ohne offene Bestellung oder Erstattung.
+    - Die Liste der endgültig gelöschten Felder gibt die Projektleitung nach Rückmeldung der Anwältin frei; vorher läuft Stufe 2 nicht.“
+- **Umsetzung:** Nr. 190 (E-Mail ändern, Auskunft, Konto schließen; Stufe 2 nur hinter `ENDGUELTIG_FREIGEGEBEN`, heute `false`) und Nr. 188 (Felder) (freigabe.md §30); die Migration steht in Nr. 188 (Expand).
+
+### N37 · Geld-Abgleich (26.10.2026)
+- **Entscheidung (uttoranger, im Chat, 26.10.2026):** „Ein täglicher Ablauf liest Zahlungen, Erstattungen und Gebühren der letzten 48 Stunden bei Stripe (nur lesend) und vergleicht sie mit den Bestellungen; eine Abweichung ist eine Aufgabe in Heute.
+  - Die Stripe-Gebühren trägt die Plattform (Destination Charges) und stehen in Geld als Kosten neben der Servicegebühr.
+  - Ein Monat lässt sich abschließen, wenn der Abgleich keine ungeklärte Abweichung zeigt, keine Erstattung offen ist und die CSV geladen wurde; danach sind Kosten des Monats nur mit Grund änderbar.“
+- **Umsetzung:** Nr. 191 (freigabe.md §30); keine Migration, kein Paket.
+
+### N38 · Plattformgebühr im Hofpreis, bar per SEPA-Monatsabrechnung (26.10.2026)
+- **Entscheidung (uttoranger, im Chat, 26.10.2026; Option 1 aus claude/plattformgebuehr-optionen-2026-10-26.md):**
+  - „**Grundsatz:** Die Plattformgebühr ist Teil des Preises, den der Hof der Kundin verrechnet, online und bar gleich hoch. Agrilo verrechnet sie dem Hof als Entgelt für die Nutzung der Software. Unterm Strich zahlt der Hof nichts, er reicht nur weiter, was die Kundin gezahlt hat.
+  - **Satz:** 6 % vom Warenpreis, ohne Mindestgebühr, je Stück auf den Cent aufgerundet. Je Hof im Admin änderbar, gilt nur für neue Bestellungen. Mindestbestellwert 10 € Warenwert je Bestellung.
+  - **Preisanzeige:** Hofseite, Produktseite, Karten, Korb und Mails zeigen den Endpreis inklusive Gebühr („inkl. Plattformgebühr“), auch beim Grundpreis je kg bzw. Liter. Die Kasse schlüsselt auf: Ware · Plattformgebühr (6 %) · Gesamt.
+  - **Online:** Bei jeder Zahlung gilt `on_behalf_of` = Stripe-Konto des Hofs; der Hof ist Händler. Stripe behält die Gebühr als `application_fee_amount` ein, der Hof bekommt 100 % des Warenpreises. Die Stripe-Gebühren trägt weiter Agrilo.
+  - **Bar:** Die Kundin zahlt beim Hof den Endpreis. Fällig wird die Gebühr erst mit ‚Abgeholt‘; bei ‚Nicht abgeholt‘ oder Storno ist nichts fällig. Agrilo nimmt nie Bargeld.
+  - **Monatsabrechnung:** Je Hof und Monat zwei Rechnungen über Stripe:
+    - die online schon einbehaltenen Gebühren, als bezahlt
+    - die bar kassierten Gebühren je Bestellnummer, per SEPA-Lastschrift eingezogen
+  - **Mandat:** Für Barbestellungen braucht der Hof ein SEPA-Lastschriftmandat (Formular von Stripe in der App); ohne Mandat bietet die Kasse bei diesem Hof nur online an.
+  - **Einzug scheitert:** Stripe versucht es erneut, der Hof bekommt eine Nachricht im Postfach. Ist der Betrag 14 Tage offen oder wurde er zurückgebucht, nimmt der Hof keine Barbestellungen mehr an; nach der Zahlung ist er automatisch wieder frei. Laufende Bestellungen bleiben.
+  - **Einstellbar je Hof im Admin** (Recht ‚Geld‘, mit Passkey und Protokoll): Satz, Mandat Pflicht für bar (Vorgabe ja; ohne Pflicht und ohne Mandat geht die Bar-Rechnung zur Überweisung), Tage bis zur Sperre (Vorgabe 14), Abrechnungstag (Vorgabe der 3., 1–28), Einzug ab.
+  - **Start:**
+    - Das Modell gilt ab dem Stichtag ‚Hofpreis-Modell ab‘ (Admin-Einstellung; Vorgabe `BAR_SERVICEGEBUEHR_AB` = 1. Februar 2027). Vorher bleibt alles wie heute (E4, B1).
+    - Der Einzug beginnt für Höfe ohne Gründungsplatz am Stichtag; für Gründungshöfe erst nach ihrer Laufzeit (Tag nach `gruendungBis`), je Hof im Admin änderbar.
+    - Bis zum Einzug zeigt auch ein Gründungshof den Endpreis inklusive Gebühr: Online behält Stripe sie ein; bar behält der Hof sie, Agrilo verzichtet (‚erlassen‘), ein Mandat ist nicht nötig. So zahlt die Kundin online und bar immer dasselbe.
+    - Jeder Hof bekommt 4 Wochen vor seinem Einzugsbeginn eine Nachricht im Postfach und eine Mail.
+  - **Rechtstexte** (Hof-AGB, Ankündigung, Datenschutz) kommen nach Rückmeldung der Anwältin. Vor dem Stichtag müssen sie stehen.
+  - Keine Rechtsberatung.“
+- **Umsetzung:** Nr. 188 (Felder, Expand-Migration), Nr. 197 (Preis, Anzeige, Zahlung), Nr. 198 (Mandat, Monatsabrechnung, Sperre) (freigabe.md §30). Rechtstexte (Hof-AGB, Ankündigung, Datenschutz) folgen als eigener Auftrag nach Rückmeldung der Anwältin und müssen vor dem Stichtag stehen.
 
 ---
 
@@ -844,3 +939,5 @@ Stand Lauf 23 (uttoranger, 23.10.2026): S17 (Härtung aus der Seitenkarte) und d
 Stand Lauf 24 (uttoranger, 24.10.2026): N26 (Mails über die Warteschlange) und die Ergänzungen zu N18 (Abrechnungszeitraum, Warnungen, Supabase Pro), N19 (seltener erneuern, Größe messen), N24 (Prüfkette im Warenkorb), S17 (Link-Geheimnis, Bar-Token nur als Hash) und N16 (‚live bis‘) sowie N27 (Mails nochmal schicken) sind entschieden und in Nr. 158–167 eingeplant (freigabe.md §28). Lauf 24 hat eine Migration (158, Expand), kein neues Paket und zwei optionale Variablen (`RESEND_WEBHOOK_SECRET`, `LINK_SECRET`). Nicht in diesem Lauf: Resend Pro (Projektleitung), Hofliste aufteilen (Entscheidung nach 163), Obergrenze je Warenkorb-Sitzung, Widerrufsfunktion, Datenschutzerklärung, CSP scharf, Servicegebühr, toter Code, Nochmal schicken an eine andere Adresse.
 
 Stand Lauf 25 (uttoranger, 25.10.2026): Die Ergänzungen zu N26 (Mail-Auftrag hält keine Bestellung auf, Beträge in Cent, betreiber-bestaetigung Sofort), N27 (Nochmal schicken nicht bei gesperrt oder verworfen) und N16 (eigene Vorschau-Route) sowie N28 (Warenkorb ehrlich), N29 (kein Netz als Zustand), N30 (Korb ohne Blatt-Pingpong), N31 (App-Start nach Sitzung), die E7-Ergänzung (Passkey für Höfe) und S18 (Sitzungsdauer) sind entschieden und in Nr. 168–183 eingeplant (freigabe.md §29); dazu die Regelvorschläge aus Morgenbericht 24. Lauf 25 hat keine Migration, kein neues Paket und keine neue Variable. Nicht in diesem Lauf: Servicegebühr bei Barzahlung ab 1.2.2027 (Entscheidung offen, bis Dezember), Tarifwahl und SEPA, Rücktritt und Widerruf, Datenschutzerklärung über Fakten hinaus, CSP scharf, Service Worker, Paketänderungen, Obergrenze je Warenkorb-Sitzung, Hofliste aufteilen, Rückruf, eine gemeinsame Checkliste.
+
+Stand Lauf 26 (uttoranger, 26.10.2026): N32 (Admin im Regelbetrieb), N33 (Admin-Protokoll, 5 Jahre), N34 (Hof sperren, Notfall-Storno, Notbremse), N35 (Rechte je Person), N36 (Konto-Anfragen; Stufe 2 erst nach Freigabe der Liste), N37 (Geld-Abgleich), N38 (Plattformgebühr im Hofpreis, bar per SEPA-Monatsabrechnung; 6 %, Mindestbestellwert 10 €, Stichtag 1.2.2027, Gründungshöfe nach ihrer Laufzeit, Einstellungen je Hof), die Änderung von E4, die Ergänzungen zu B1 und K2 und die Ergänzungen zu N18 (Uptime, 15 Minuten, bekannte Zustände), N29 (Netzsatz bei nicht wiederholbaren Aktionen) und N8 (Wortliste) sind entschieden und in Nr. 184–198 eingeplant (freigabe.md §30); dazu die Entscheidungen 2, 4, 5, 6, 10 aus Morgenbericht 25 (Hof-E-Mail fällt auf die Anmelde-Adresse zurück; Enter springt in der Kasse weiter; Zurück-Knopf im Titelbild; 11 px in der Hof-Unterleiste unter 360 px; Kicker ‚Aus der Region‘ entfällt). Lauf 26 hat eine Migration (188), kein neues Paket und keine neue Variable. Nicht in diesem Lauf: Stufe 2 scharf, Uptime-Dienst einrichten (Projektleitung), Rücktritt und Widerruf, CSP scharf, Tarife und Grundgebühr, Rechtstexte zur Plattformgebühr, Rückfrage-Mail nach dem Abholtermin, Paketänderungen.

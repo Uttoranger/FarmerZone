@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/nextjs'
 import { ladeAktivenBeitrag, getActiveStatusPosts, type ActiveStatusPost } from '@/server/queries/status-posts'
 import { HOFSEITE_BEITRAEGE_MAX } from '@/lib/hofseite-kunde'
 import type { Suchparameter } from '@/lib/ansichts-modus'
-import { BEITRAG_PARAMETER, beitragKennungSchema } from '@/schemas/hofseite-reiter'
+import { BEITRAG_PARAMETER, leseBeitragKennung } from '@/schemas/hofseite-reiter'
 
 export type HofseiteBeitraege = { beitraege: ActiveStatusPost[]; fehler: boolean }
 
@@ -39,5 +39,5 @@ export const ladeBeitraege = cache(async (farmId: string, kennung: string | null
 
 /** `?beitrag=` ist eine Systemgrenze: Was nicht passt, wird verworfen (Zod). */
 export function beitragKennungAus(suche: Suchparameter): string | null {
-  return beitragKennungSchema.parse(suche[BEITRAG_PARAMETER])
+  return leseBeitragKennung(suche[BEITRAG_PARAMETER])
 }

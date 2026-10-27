@@ -112,6 +112,15 @@ describe('FEHLER_TEXTE', () => {
     expect(fehlerText('toString').grund).toBe('Unbekannter Fehler (Code toString)')
   })
 
+  it('Nr. 195: die Verwerf-Codes des Workers (zurückgenommen, nicht mehr bereit, Bestellung fehlt) sind bekannt und erlauben nie „Jetzt schicken“; Gegenprobe ein unbekannter Code erlaubt es', () => {
+    for (const code of ['zurueckgenommen', 'nicht_mehr_bereit', 'bestellung_fehlt']) {
+      expect(fehlerText(code).grund, code).not.toMatch(/Unbekannter Fehler/)
+      expect(fehlerText(code).jetztSchicken, code).toBe(false)
+      expect(CODES_OHNE_JETZT_SCHICKEN).toContain(code)
+    }
+    expect(fehlerText('etwas_neues').jetztSchicken).toBe(true)
+  })
+
   it('jeder Eintrag hat Grund, Kurzform und „Was tun“ — ohne die Wörter, die die Wortliste meidet', () => {
     for (const [code, t] of Object.entries(FEHLER_TEXTE)) {
       expect(t.grund.length, code).toBeGreaterThan(5)

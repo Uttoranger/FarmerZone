@@ -62,13 +62,26 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
+// Die Zahl der Betriebsleiste (Nr. 185) prüft tests/admin-heute.test.ts; hier nur, dass sie ohne Passkey nicht geladen wird.
+vi.mock('@/server/queries/admin-heute', () => ({ ladeAdminAufgaben: vi.fn(async () => []) }))
+
 import { ladeAdminbereich } from '@/server/adminbereich'
+import { ladeAdminAufgaben } from '@/server/queries/admin-heute'
 import { NextRequest } from 'next/server'
 import { GET as meldungenUmleitung } from '@/app/admin/meldungen/route'
 import { GET as meldungUmleitung } from '@/app/admin/meldungen/[id]/route'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { adminSitzung } from './admin-sitzung'
+import { ADMIN_REITER } from '@/lib/admin-navigation'
+import { ADMIN_BENACHRICHTIGUNGEN_HREF, alteReiterAdresse } from '@/lib/postfach'
+import { einstellungenGruppeHref } from '@/lib/plattform-einstellung'
+import { alteHoefeAdresse } from '@/lib/admin-aufgaben'
+import { vonFinanzenNachGeld } from '@/app/admin/geld/texte'
+import { alteAufgabeAdresse } from '@/app/admin/postfach/alte-wege'
+
+/** Ein Inhaber sieht alle Reiter (N35, sichtbareReiter). */
+const ALLE_REITER = ADMIN_REITER.map((r) => r.id)
 
 const WURZEL = process.cwd()
 const ADMIN = join(WURZEL, 'src/app/admin')
@@ -112,7 +125,20 @@ function importiertAls(datei: ts.SourceFile, modul: string, exportName: string):
   return null
 }
 
-/** Ob die erste Anweisung `await <name>()` ohne Argument ist — allein oder als Initialisierer. */
+/**
+ * Erlaubt ist als einziges Argument `{ recht: '<recht>' }` (Rechte je Person,
+ * Register N35, Nr. 188) — es verschärft nur. Alles andere (etwa
+ * `ohnePasskey`) lockert die Wache und fällt auf.
+ */
+function nurRecht(argumente: ts.NodeArray<ts.Expression>): boolean {
+  if (argumente.length === 0) return true
+  if (argumente.length !== 1 || !ts.isObjectLiteralExpression(argumente[0])) return false
+  return argumente[0].properties.every(
+    (e) => ts.isPropertyAssignment(e) && ts.isIdentifier(e.name) && e.name.text === 'recht' && ts.isStringLiteral(e.initializer)
+  )
+}
+
+/** Ob die erste Anweisung `await <name>()` ohne Argument (oder nur mit `{ recht }`) ist — allein oder als Initialisierer. */
 function ersteIstAwait(fn: ts.FunctionDeclaration, name: string): boolean {
   const erste = fn.body?.statements[0]
   if (!erste) return false
@@ -124,7 +150,7 @@ function ersteIstAwait(fn: ts.FunctionDeclaration, name: string): boolean {
   if (!ausdruck || !ts.isAwaitExpression(ausdruck)) return false
   const aufruf = ausdruck.expression
   if (!ts.isCallExpression(aufruf) || !ts.isIdentifier(aufruf.expression) || aufruf.expression.text !== name) return false
-  return aufruf.arguments.length === 0
+  return nurRecht(aufruf.arguments)
 }
 
 /** Was an der Wache fehlt — leer heißt gedeckt. */
@@ -151,14 +177,18 @@ const SEITEN = [...seiten(ADMIN)]
 const PFLICHTSEITE = join(ADMIN, 'einrichten', 'page.tsx')
 
 describe('jede Seite unter /admin', () => {
-  it('es gibt die neun Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 93 die Einstellungen, seit Nr. 94 die Startseite, seit Nr. 103 Betrieb, seit Nr. 115 Bestätigen, Einrichten und Einstellungen › Anmeldung; /admin/meldungen leitet seit Nr. 101 als Route Handler um und prüft trotzdem)', () => {
+  it('es gibt die dreizehn Seiten — sonst bewiese der Rest nichts (seit Nr. 87 das Postfach, seit Nr. 93 die Einstellungen, seit Nr. 94 die Startseite, seit Nr. 103 Betrieb, seit Nr. 115 Bestätigen, Einrichten und Einstellungen › Anmeldung, seit Nr. 185 Höfe unter /admin/hoefe und Heute unter /admin, seit Nr. 186 Bestellungen, seit Nr. 187 die Akte unter /admin/hoefe/[id], seit Nr. 191 Geld unter /admin/geld — /admin/finanzen leitet dorthin weiter und prüft trotzdem; /admin/meldungen leitet seit Nr. 101 als Route Handler um und prüft trotzdem)', () => {
     expect(SEITEN.map((p) => relative(ADMIN, p).split(sep).join('/')).sort()).toEqual([
       'bestaetigen/page.tsx',
+      'bestellungen/page.tsx',
       'betrieb/page.tsx',
       'einrichten/page.tsx',
       'einstellungen/anmeldung/page.tsx',
       'einstellungen/page.tsx',
       'finanzen/page.tsx',
+      'geld/page.tsx',
+      'hoefe/[id]/page.tsx',
+      'hoefe/page.tsx',
       'page.tsx',
       'postfach/page.tsx',
       'startseite/page.tsx',
@@ -184,6 +214,9 @@ describe('jede Seite unter /admin', () => {
     expect(wachenMaengel(`${kopf}export default async function S() { await verlangeEinrichtenSeite({ ohnePasskey: true })\n return null }`, EINRICHTEN)).toHaveLength(1)
     expect(wachenMaengel(`${kopf}export default async function S() { const j = new Date()\n await verlangeEinrichtenSeite()\n return j }`, EINRICHTEN)).toHaveLength(1)
     expect(wachenMaengel(`${kopf}export default async function S() { const { pflicht } = await verlangeEinrichtenSeite()\n return pflicht }`, EINRICHTEN)).toEqual([])
+    // Nr. 188: nur `{ recht }` verschärft und geht durch; zusammen mit ohnePasskey fällt es auf.
+    expect(wachenMaengel(`${kopf}export default async function S() { await verlangeAdminSeite({ recht: 'geld' })\n return null }`, SEITE)).toEqual([])
+    expect(wachenMaengel(`${kopf}export default async function S() { await verlangeAdminSeite({ recht: 'geld', ohnePasskey: true })\n return null }`, SEITE)).toHaveLength(1)
   })
 
   it('die Umleitungen /admin/meldungen und /admin/meldungen/[id] (Route Handler, Nr. 101) prüfen als erste Anweisung im GET', () => {
@@ -258,6 +291,7 @@ describe('jede Route unter /admin (route.ts)', () => {
     expect(ROUTEN.sort()).toEqual([
       'betrieb/bilder-export/route.ts',
       'betrieb/export/route.ts',
+      'betrieb/protokoll/export/route.ts',
       'finanzen/export/route.ts',
       'meldungen/[id]/route.ts',
       'meldungen/route.ts',
@@ -394,15 +428,16 @@ describe('ladeAdminbereich — Verhalten', () => {
   it('Admin ohne Hof: Name und Zähler — wartende Höfe; am Postfach „Offen" im Eingang (N14), kein Weg zum Hof', async () => {
     getSession.mockResolvedValue(adminSitzung('u1') as never)
     userFindUnique
-      .mockResolvedValueOnce({ isAdmin: true } as never)
+      .mockResolvedValueOnce({ isAdmin: true, adminInhaber: true } as never)
       // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
       .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
     // Meldungen 3 + ungelesene Antworten 4 + wartende Höfe 2 + offene Erstattung 1.
     // betrieb: null — Punkt und Hinweis von Admin › Betrieb nur in der Produktion (N15/N18, Nr. 103; tests/betrieb-seite.test.ts).
-    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, zahlen: { hoefe: 2, briefkasten: 3 + 4 + 2 + 1 }, betrieb: null })
+    // Seit Nr. 193 (N32): das Postfach zählt nur Gespräche (Meldungen 3 + Antworten 4); Höfe und Erstattungen zählt Heute.
+    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, zahlen: { heute: 0, hoefe: 2, postfach: 3 + 4 }, reiter: ALLE_REITER, betrieb: null, aufgaben: null })
     expect(farmCount).toHaveBeenCalledWith({ where: { approvedAt: null } })
-    expect(farmCount).toHaveBeenCalledWith({ where: { approvedAt: null, archivedAt: null } })
+    expect(farmCount).toHaveBeenCalledWith({ where: { approvedAt: null, archivedAt: null, geschlossenAm: null } })
     expect(meldungCount).toHaveBeenCalledWith({ where: { status: { in: ['NEU', 'GEPRUEFT'] } } })
     expect(orderCount).toHaveBeenCalledWith({ where: { erstattungOffenSeit: { not: null } } })
   })
@@ -411,11 +446,12 @@ describe('ladeAdminbereich — Verhalten', () => {
     getSession.mockResolvedValue(adminSitzung('u1') as never)
     passkeyAggregate.mockResolvedValue({ _count: { _all: 0 }, _max: { createdAt: null } } as never)
     userFindUnique
-      .mockResolvedValueOnce({ isAdmin: true } as never)
+      .mockResolvedValueOnce({ isAdmin: true, adminInhaber: true } as never)
       // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
       .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
-    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, betrieb: null })
+    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, reiter: ALLE_REITER, betrieb: null, aufgaben: null })
+    expect(ladeAdminAufgaben).not.toHaveBeenCalled()
     expect(farmCount).not.toHaveBeenCalled()
     expect(meldungCount).not.toHaveBeenCalled()
     expect(orderCount).not.toHaveBeenCalled()
@@ -425,11 +461,12 @@ describe('ladeAdminbereich — Verhalten', () => {
   it('Sitzung ohne Passkey (das Konto hat einen, N20): die Shell ohne Zähler — die Seite leitet zur Admin-Anmeldung um', async () => {
     getSession.mockResolvedValue({ user: { id: 'u1' }, session: { id: 'sitzung-u1', createdAt: new Date(), passkeyAm: null } } as never)
     userFindUnique
-      .mockResolvedValueOnce({ isAdmin: true } as never)
+      .mockResolvedValueOnce({ isAdmin: true, adminInhaber: true } as never)
       // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
       .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
-    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, betrieb: null })
+    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, reiter: ALLE_REITER, betrieb: null, aufgaben: null })
+    expect(ladeAdminAufgaben).not.toHaveBeenCalled()
     expect(farmCount).not.toHaveBeenCalled()
     expect(meldungCount).not.toHaveBeenCalled()
     expect(ungelesenTeam).not.toHaveBeenCalled()
@@ -440,7 +477,7 @@ describe('ladeAdminbereich — Verhalten', () => {
   it('Admin mit eigenem Hof (Rolle FARMER): hatHof — gelesen werden nur Name, Rolle und die Hof-Kennung', async () => {
     getSession.mockResolvedValue(adminSitzung('u1') as never)
     userFindUnique
-      .mockResolvedValueOnce({ isAdmin: true } as never)
+      .mockResolvedValueOnce({ isAdmin: true, adminInhaber: true } as never)
       // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
       .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'FARMER', farm: { id: 'f1' } } as never)
@@ -454,7 +491,7 @@ describe('ladeAdminbereich — Verhalten', () => {
   it('Rolle FARMER ohne Hof: kein Weg zum Hof (der Hofbereich führte erst nach /onboarding)', async () => {
     getSession.mockResolvedValue(adminSitzung('u1') as never)
     userFindUnique
-      .mockResolvedValueOnce({ isAdmin: true } as never)
+      .mockResolvedValueOnce({ isAdmin: true, adminInhaber: true } as never)
       // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
       .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'FARMER', farm: null } as never)
@@ -474,7 +511,7 @@ describe('/admin/meldungen — Umleitung in den Reiter „Meldungen" (echter 308
   })
 
   it('Admin: 308 auf den Reiter — die alten Filter gibt es dort nicht', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     for (const antwort of [await umleiten('?status=NEU&art=FEHLER'), await umleiten()]) {
       expect(antwort.status).toBe(308)
       expect(antwort.headers.get('location')).toBe('http://localhost/admin/postfach?reiter=meldungen')
@@ -499,7 +536,7 @@ describe('/admin/meldungen/[id] — Umleitung in die Spalte „Meldung entscheid
   })
 
   it('Admin: 308 auf /admin/postfach?art=meldung&meldung=<id> — auch mit der Kurznummer', async () => {
-    userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     const voll = await umleiten('ckmeldung00000000000000000')
     expect(voll.status).toBe(308)
     expect(voll.headers.get('location')).toBe('http://localhost/admin/postfach?art=meldung&meldung=ckmeldung00000000000000000')
@@ -509,5 +546,39 @@ describe('/admin/meldungen/[id] — Umleitung in die Spalte „Meldung entscheid
   it('Gegenprobe: ohne Recht 404 — die Umleitung verrät das Ziel nicht', async () => {
     userFindUnique.mockResolvedValue({ isAdmin: false } as never)
     await expect(umleiten('ab12cd34')).rejects.toThrow('NOT_FOUND')
+  })
+})
+
+describe('Alte Wege leiten mit 308 um (Nr. 193, N32)', () => {
+  it('/admin/postfach?reiter=zustellung → Einstellungen › Benachrichtigungen (dieselben Teile)', () => {
+    expect(alteReiterAdresse('zustellung', undefined)).toBe('/admin/einstellungen?gruppe=benachrichtigungen')
+    expect(ADMIN_BENACHRICHTIGUNGEN_HREF).toBe(einstellungenGruppeHref('benachrichtigungen'))
+    // Gegenprobe: die Reiter, die es gibt, sind keine alten Wege.
+    expect(alteReiterAdresse('meldungen', undefined)).toBeNull()
+    expect(alteReiterAdresse(undefined, undefined)).toBeNull()
+  })
+
+  it('ein alter Link auf eine Aufgabe des Eingangs → Akte bzw. Bestellungen; Antworten und Meldungen bleiben im Postfach', () => {
+    expect(alteAufgabeAdresse({ art: 'hof', id: 'hof1' })).toBe('/admin/hoefe/hof1')
+    expect(alteAufgabeAdresse({ art: 'erstattung', id: 'bestellung1' })).toBe('/admin/bestellungen?bestellung=bestellung1')
+    expect(alteAufgabeAdresse({ art: 'antwort', id: 'faden1' })).toBeNull()
+    expect(alteAufgabeAdresse(null)).toBeNull()
+  })
+
+  it('/admin?… → /admin/hoefe?… und /admin/finanzen?… → /admin/geld?… mit denselben Parametern', () => {
+    expect(alteHoefeAdresse({ filter: 'pausiert', suche: 'lind' })).toBe('/admin/hoefe?filter=pausiert&suche=lind')
+    expect(alteHoefeAdresse({})).toBeNull()
+    expect(vonFinanzenNachGeld({ monat: '2026-09' })).toBe('/admin/geld?monat=2026-09')
+  })
+
+  it.each([
+    ['postfach/page.tsx', 'alteReiterAdresse'],
+    ['page.tsx', 'alteHoefeAdresse'],
+    ['finanzen/page.tsx', 'vonFinanzenNachGeld'],
+  ])('%s leitet nach der Wache mit permanentRedirect (308) über %s um', (datei, funktion) => {
+    const quelle = readFileSync(join(ADMIN, datei), 'utf8')
+    expect(quelle).toContain('permanentRedirect(')
+    expect(quelle).toContain(funktion)
+    expect(quelle.indexOf('verlangeAdminSeite(')).toBeLessThan(quelle.indexOf(funktion + '('))
   })
 })

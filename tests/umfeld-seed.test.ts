@@ -66,6 +66,10 @@ function passt(hof: HofZeile, where: Record<string, unknown>): boolean {
       case 'archivedAt':
         if (bedingung !== null) throw new Error('archivedAt: nur null erwartet')
         return hof.archivedAt === null
+      // Konto geschlossen (Nr. 190, HOF_SICHTBAR_WO): kein Seed-Hof ist geschlossen.
+      case 'geschlossenAm':
+        if (bedingung !== null) throw new Error('geschlossenAm: nur null erwartet')
+        return true
       case 'approvedAt':
         if (JSON.stringify(bedingung) !== '{"not":null}') throw new Error('approvedAt: nur { not: null } erwartet')
         return hof.approvedAt !== null

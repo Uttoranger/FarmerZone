@@ -18,7 +18,8 @@ import { kontrast, leseOklch, oklchZuHex } from '@/lib/farbraum'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 
 const css = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8')
-const ansicht = readFileSync(join(process.cwd(), 'src/components/admin/hoefe-ansicht.tsx'), 'utf8')
+// Seit Nr. 187 steht „Ablehnen“ in der Akte des Hofs (vorher in der Liste).
+const ansicht = readFileSync(join(process.cwd(), 'src/components/admin/hof-akte-ansicht.tsx'), 'utf8')
 
 function block(selektor: string): string {
   const start = css.indexOf(`${selektor} {`)
@@ -36,7 +37,7 @@ function farbe(selektor: string, variable: string): string {
 
 /** Die Klassen-Angabe des Knopfs, der genau diesen Text trägt (`className={…}` oder `className="…"`). */
 function klassenDesKnopfs(quelle: string, text: string): string {
-  const ende = quelle.indexOf(`>\n          ${text}\n`)
+  const ende = quelle.search(new RegExp(`>\\n\\s*${text}\\n`))
   expect(ende, `Knopf „${text}" fehlt`).toBeGreaterThan(-1)
   const anfang = quelle.lastIndexOf('<button', ende)
   const klassen = quelle.slice(anfang, ende).match(/className=\{([^}]+)\}|className="([^"]+)"/)

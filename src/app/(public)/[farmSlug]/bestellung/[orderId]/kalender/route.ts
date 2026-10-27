@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { bestellLinkGilt } from '@/lib/bestell-link'
 import { kalenderTerminGilt } from '@/lib/bestaetigung'
 import { erzeugeIcs, wienKalendertag } from '@/lib/kalender'
+import { hofSichtbar } from '@/lib/hof-sichtbar'
 
 // Die ICS-Datei zum Abholtermin — derselbe signierte Zugang wie die
 // Bestellseite darüber. Jede Ablehnung antwortet IDENTISCH (Text + 404),
@@ -36,12 +37,12 @@ export async function GET(
       pickupTimeStart: true,
       pickupTimeEnd: true,
       farm: {
-        select: { slug: true, name: true, address: true, postalCode: true, city: true, archivedAt: true },
+        select: { slug: true, name: true, address: true, postalCode: true, city: true, archivedAt: true, geschlossenAm: true },
       },
     },
   })
 
-  if (!order || order.farm.slug !== farmSlug || order.farm.archivedAt) return abgelehnt()
+  if (!order || order.farm.slug !== farmSlug || !hofSichtbar(order.farm)) return abgelehnt()
   // Termin nur, solange die Bestellung steht und die Abholung aussteht —
   // dieselbe Regel wie der Knopf (kalenderTerminGilt): offen (vor der Frist
   // unbestätigt, danach verfallen), storniert, abgeholt → kein Termin.

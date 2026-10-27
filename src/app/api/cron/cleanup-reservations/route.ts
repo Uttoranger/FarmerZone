@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
+import { env } from '@/lib/env'
 import { cronBerechtigt } from '@/lib/geheimnis'
 import { raeumeBremsZaehlerAuf } from '@/server/bremse-datenbank'
 import { mitHerzschlag } from '@/server/betrieb'
@@ -17,7 +18,7 @@ import { raeumeAltesAuf, type AufraeumErgebnis } from '@/server/aufraeumen'
 export async function GET(request: NextRequest) {
   // Fail-closed und in konstanter Zeit: ohne konfiguriertes Secret bleibt der
   // Endpoint gesperrt, und die Laufzeit verrät nichts über das Secret.
-  if (!cronBerechtigt(request.headers.get('authorization'), process.env.CRON_SECRET)) {
+  if (!cronBerechtigt(request.headers.get('authorization'), env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

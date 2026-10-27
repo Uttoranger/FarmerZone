@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { emailSchema } from '@/schemas/email'
 import { bestellnummerSchema } from '@/schemas/bestellnummer'
 import { mailArtSchema } from '@/schemas/mail-auftrag'
+import { ADMIN_AKTIONEN, type AdminAktionArt } from '@/schemas/admin-aktion'
 
 /*
  * Die Adresse von Admin › Betrieb (Register N26, N18-Ergänzung; Nr. 161):
@@ -10,7 +11,8 @@ import { mailArtSchema } from '@/schemas/mail-auftrag'
  * Fehler, sondern der Standard — ein alter Link zeigt die Seite.
  */
 
-export const BETRIEB_REITER = ['ueberblick', 'mails'] as const
+/** Seit Nr. 193 (N32): Überblick · E-Mails · Protokoll · Version. */
+export const BETRIEB_REITER = ['ueberblick', 'mails', 'protokoll', 'version'] as const
 export type BetriebReiter = (typeof BETRIEB_REITER)[number]
 
 export const betriebReiterSchema = z.enum(BETRIEB_REITER).catch('ueberblick')
@@ -137,3 +139,54 @@ export function alleMailsAus(p: Record<string, string | string[] | undefined>): 
 export const mailEinzelnSchema = z.object({ id: mailKennungSchema }).strict()
 /** „Alle nochmal schicken“ in „Braucht dich“: alle gescheiterten einer Art. */
 export const mailArtEingabeSchema = z.object({ art: mailArtSchema }).strict()
+
+// ─── Protokoll (Nr. 193, N33) ────────────────────────────────────────────────
+
+/** Zeiträume des Protokolls in Tagen — Standard 30 (Mockup admin-protokoll). */
+export const PROTOKOLL_TAGE = [7, 30, 90, 365] as const
+export type ProtokollTage = (typeof PROTOKOLL_TAGE)[number]
+
+/** Wer: alle · System (Abläufe) · du · das übrige Team — nie eine einzelne Person mit Namen. */
+export const PROTOKOLL_WER = ['alle', 'system', 'ich', 'team'] as const
+export type ProtokollWer = (typeof PROTOKOLL_WER)[number]
+
+export type ProtokollFilter = {
+  wer: ProtokollWer
+  /** Eine Art aus ADMIN_AKTIONEN oder alle. */
+  art: AdminAktionArt | 'alle'
+  tage: ProtokollTage
+  nurPasskey: boolean
+  /** Eine Kennung oder Bestellnummer, genau — keine Teilsuche; leer = alle. */
+  bezug: string
+}
+
+const PROTOKOLL_BEZUG_MAX = 200
+
+/**
+ * Der Filter des Protokolls aus der Adresse — Fremddaten: Unbekanntes ist der
+ * Standard, nie ein Fehler. Der Bezug ist nur eine Kennung (dieselben Zeichen
+ * wie `bezugId`) oder eine Bestellnummer; alles andere sucht nichts.
+ */
+export function protokollFilterAus(p: Record<string, string | string[] | undefined>): ProtokollFilter {
+  const erst = (w: string | string[] | undefined): string | undefined => (Array.isArray(w) ? w[0] : w)
+  const tage = z.coerce.number().pipe(z.literal(PROTOKOLL_TAGE)).catch(30).parse(erst(p.tage))
+  const bezugRoh = (erst(p.bezug) ?? '').trim().slice(0, PROTOKOLL_BEZUG_MAX)
+  return {
+    wer: z.enum(PROTOKOLL_WER).catch('alle').parse(erst(p.wer)),
+    art: z.enum(['alle', ...ADMIN_AKTIONEN]).catch('alle').parse(erst(p.art)),
+    tage,
+    nurPasskey: erst(p.passkey) === '1',
+    bezug: /^[\w.:-]{1,200}$/.test(bezugRoh) ? bezugRoh : '',
+  }
+}
+
+/** Die Adresse des Protokolls bzw. seiner CSV mit dem Filter — nur, was vom Standard abweicht. */
+export function protokollFilterSuche(f: ProtokollFilter): URLSearchParams {
+  const q = new URLSearchParams()
+  if (f.wer !== 'alle') q.set('wer', f.wer)
+  if (f.art !== 'alle') q.set('art', f.art)
+  if (f.tage !== 30) q.set('tage', String(f.tage))
+  if (f.nurPasskey) q.set('passkey', '1')
+  if (f.bezug) q.set('bezug', f.bezug)
+  return q
+}

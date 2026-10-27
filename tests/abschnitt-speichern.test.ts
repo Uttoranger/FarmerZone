@@ -24,7 +24,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ABSCHNITT_SPEICHERN_TEXT } from '@/lib/abschnitt-stand'
-import { NETZ_SATZ } from '@/lib/netz'
+import { NETZ_SATZ, NETZ_SATZ_UNSICHER } from '@/lib/netz'
 
 const aktion = vi.hoisted(() => ({
   saveAppearanceAction: vi.fn(),
@@ -200,6 +200,18 @@ describe('Fehler im Formular statt Fehlerseite (speichernOhneWurf)', () => {
     await expect(aktionOhneWurf(async () => ({ ok: true as const, zahl: 3 }))).resolves.toEqual({ ok: true, zahl: 3 })
     await expect(aktionOhneWurf(() => Promise.reject(new TypeError('Load failed')))).resolves.toEqual({ error: NETZ_SATZ, netz: true })
     await expect(aktionOhneWurf(() => Promise.reject(new Error('kaputt')))).resolves.toEqual({ error: ABSCHNITT_SPEICHERN_TEXT.gingNicht })
+  })
+
+  it('aktionOhneWurf mit unsicher: am Netz der Satz ohne Nochmal, sonst wie sonst (Ergänzung N29)', async () => {
+    const { aktionOhneWurf } = await speicherweg()
+    await expect(aktionOhneWurf(() => Promise.reject(new TypeError('Load failed')), { unsicher: true })).resolves.toEqual({
+      error: NETZ_SATZ_UNSICHER,
+      unsicher: true,
+    })
+    // Gegenproben: ohne die Option bleibt der alte Satz mit Nochmal; ein Programmierfehler ist kein Funkloch; Erfolg kommt durch.
+    await expect(aktionOhneWurf(() => Promise.reject(new TypeError('Load failed')))).resolves.toEqual({ error: NETZ_SATZ, netz: true })
+    await expect(aktionOhneWurf(() => Promise.reject(new Error('kaputt')), { unsicher: true })).resolves.toEqual({ error: ABSCHNITT_SPEICHERN_TEXT.gingNicht })
+    await expect(aktionOhneWurf(async () => ({ ok: true as const }), { unsicher: true })).resolves.toEqual({ ok: true })
   })
 
   it('der Satz der Aktion bleibt, wie er ist; ohne Fehler null', async () => {

@@ -850,7 +850,8 @@ export const FINANZEN_JAHR_TEXT = {
 export function finanzenJahrAdresse(ansicht: { jahr: number; reiter: FinanzenReiterId }): string {
   const parameter = new URLSearchParams({ zeitraum: 'jahr', jahr: String(ansicht.jahr) })
   if (ansicht.reiter !== FINANZEN_REITER_STANDARD) parameter.set('reiter', ansicht.reiter)
-  return `/admin/finanzen?${parameter.toString()}`
+  // Seit Nr. 193 direkt auf Geld (N32) — /admin/finanzen leitet nur noch um.
+  return `/admin/geld?${parameter.toString()}`
 }
 
 /** Die Adresse der CSV — eine Route, kein Seitenaufruf. */
@@ -1034,4 +1035,136 @@ export function jahrAlsCsv(rechnung: JahrRechnung): string {
   }
   zeilen.push([summe, '', '', '', csvBetrag(rechnung.kostenCents)])
   return `\uFEFF${zeilen.map((z) => z.join(';')).join('\r\n')}\r\n`
+}
+
+// ─── Geld: Abgleich, Stripe-Gebühren, Monatsabschluss (Register N37, Nr. 191) ─
+
+/**
+ * Die Stripe-Gebühren eines Monats in Cent: die Summe der Tageszeilen
+ * (BetriebMessung `stripeGebuehrCents`, je UTC-Tag), deren Tag im Monat liegt.
+ * Der Monat zählt hier nach dem UTC-Kalendertag der Buchung, nicht nach
+ * Wiener Mitternacht — eine Buchung zwischen 0 und 2 Uhr Wien am Monatsersten
+ * steht im Vormonat. Für eine Kostenzeile ist das genau genug; gerechnet wird
+ * nichts daraus.
+ */
+export function stripeGebuehrenImMonat(tage: readonly { tag: string; cents: number }[], monat: Monatsschluessel): number {
+  return tage.reduce((summe, t) => (t.tag.slice(0, 7) === monat ? summe + Math.max(0, Math.round(t.cents)) : summe), 0)
+}
+
+/** Die Kosten des Monats auf der Seite Geld: Stripe-Gebühren (trägt die Plattform, N37) und Betrieb (die Kostenposten). */
+export type GeldKosten = { stripeCents: number; betriebCents: number; cents: number }
+
+export function geldKosten(stripeCents: number, betriebCents: number): GeldKosten {
+  return { stripeCents, betriebCents, cents: stripeCents + betriebCents }
+}
+
+/** Ergebnis des Monats: was die Servicegebühr gebracht hat (eingezogen + geschuldet) minus alle Kosten. */
+export function geldErgebnisCents(gezaehltCents: number, kosten: GeldKosten): number {
+  return gezaehltCents - kosten.cents
+}
+
+/** Eine Online-Bestellung des Monats, so weit die Erstattungen sie brauchen (Erwartung laut Datenbank wie im Abgleich). */
+export type BestellungFuerErstattung = { erstattetCents: number; erstattungOffen: boolean }
+
+export type ErstattungenMonat = { cents: number; anzahl: number; offen: number }
+
+/**
+ * Die Erstattungen eines Monats: Summe und Zahl der Bestellungen, bei denen
+ * etwas zurückging (`erstattetCents` aus `erwartetLautDatenbank`,
+ * src/lib/geld-abgleich.ts — dieselbe Regel wie der Abgleich), und wie viele
+ * noch offen sind (`erstattungOffenSeit`).
+ */
+export function erstattungenImMonat(bestellungen: readonly BestellungFuerErstattung[]): ErstattungenMonat {
+  return bestellungen.reduce<ErstattungenMonat>(
+    (e, b) => ({
+      cents: e.cents + Math.max(0, b.erstattetCents),
+      anzahl: e.anzahl + (b.erstattetCents > 0 || b.erstattungOffen ? 1 : 0),
+      offen: e.offen + (b.erstattungOffen ? 1 : 0),
+    }),
+    { cents: 0, anzahl: 0, offen: 0 }
+  )
+}
+
+export const MONATSABSCHLUSS_PUNKTE = ['abgleich', 'erstattung', 'kosten', 'csv'] as const
+export type MonatsabschlussPunktId = (typeof MONATSABSCHLUSS_PUNKTE)[number]
+
+export type MonatsabschlussPunkt = { id: MonatsabschlussPunktId; text: string; erledigt: boolean; offen: string }
+
+export type MonatsabschlussEingabe = {
+  /** Ein erfolgreicher Lauf des Abgleichs NACH dem Monatsende — sonst ist „ohne Abweichung“ nur nicht geprüft. */
+  abgleichNachMonatsende: boolean
+  /** Offene Abweichungen zu Bestellungen dieses Monats. */
+  abweichungen: number
+  /** Offene Erstattungen zu Bestellungen dieses Monats. */
+  erstattungenOffen: number
+  /** Kostenposten, die im Monat zählen. */
+  kostenPosten: number
+  /** Die CSV des Jahres wurde nach dem Monatsende geladen (Protokoll `finanzen_export`). */
+  csvGeladen: boolean
+}
+
+/** Die Prüfliste des Monatsabschlusses (N37, Mockup admin-geld) — je Punkt, ob erledigt, und sonst warum nicht. */
+export function monatsabschlussPruefliste(e: MonatsabschlussEingabe): MonatsabschlussPunkt[] {
+  return [
+    {
+      id: 'abgleich',
+      text: 'Abgleich mit Stripe ohne ungeklärte Abweichung',
+      erledigt: e.abgleichNachMonatsende && e.abweichungen === 0,
+      offen: !e.abgleichNachMonatsende
+        ? 'der Abgleich ist nach dem Monatsende noch nicht gelaufen'
+        : `${mitAnzahl(e.abweichungen, 'Abweichung', 'Abweichungen')} ungeklärt`,
+    },
+    {
+      id: 'erstattung',
+      text: 'Keine Erstattung offen',
+      erledigt: e.erstattungenOffen === 0,
+      offen: `${mitAnzahl(e.erstattungenOffen, 'Erstattung', 'Erstattungen')} offen`,
+    },
+    { id: 'kosten', text: 'Kosten des Monats erfasst', erledigt: e.kostenPosten > 0, offen: 'noch keine Kosten eingetragen' },
+    { id: 'csv', text: 'CSV für die Buchhaltung geladen', erledigt: e.csvGeladen, offen: 'die CSV ist nach dem Monatsende noch nicht geladen' },
+  ]
+}
+
+/** Ob der Monat abgeschlossen werden kann — sonst der Grund, ein Satz aus den offenen Punkten. */
+export function monatsabschlussMoeglich(punkte: readonly MonatsabschlussPunkt[]): { moeglich: true } | { moeglich: false; grund: string } {
+  const offen = punkte.filter((p) => !p.erledigt)
+  if (offen.length === 0) return { moeglich: true }
+  const liste = offen.map((p) => p.offen)
+  return { moeglich: false, grund: `Geht erst, wenn alles erledigt ist: ${liste.join(', ')}.` }
+}
+
+/** „2 von 4 erledigt“. */
+export function monatsabschlussZeile(punkte: readonly MonatsabschlussPunkt[]): string {
+  return `${punkte.filter((p) => p.erledigt).length} von ${punkte.length} erledigt`
+}
+
+/**
+ * Welche abgeschlossenen Monate eine Änderung an Kosten berührt: alle in
+ * [von, bis] (bis null = ohne Ende). Nach dem Abschluss verlangen die
+ * Kostenposten-Actions für diese Monate einen Grund (N37).
+ */
+export function abgeschlosseneMonateBetroffen(
+  abgeschlossen: readonly Monatsschluessel[],
+  von: Monatsschluessel,
+  bis: Monatsschluessel | null
+): Monatsschluessel[] {
+  return abgeschlossen.filter((m) => monatsAbstand(von, m) >= 0 && (bis === null || monatsAbstand(m, bis) >= 0)).sort()
+}
+
+/**
+ * Die Monate, die sich ändern, wenn ein Posten statt bis `alt` künftig bis
+ * `neu` läuft (null = ohne Ende): genau die zwischen beiden Enden — vor dem
+ * früheren Ende bleibt alles, wie es war.
+ */
+export function monateZwischenEnden(alt: Monatsschluessel | null, neu: Monatsschluessel | null): { von: Monatsschluessel; bis: Monatsschluessel | null } | null {
+  if (alt === neu) return null
+  if (alt === null) return neu === null ? null : { von: monatVerschoben(neu, 1), bis: null }
+  if (neu === null) return { von: monatVerschoben(alt, 1), bis: null }
+  return monatsAbstand(alt, neu) > 0 ? { von: monatVerschoben(alt, 1), bis: neu } : { von: monatVerschoben(neu, 1), bis: alt }
+}
+
+/** Der Satz, wenn ein abgeschlossener Monat betroffen ist und der Grund fehlt. */
+export function kostenGrundFehlt(monate: readonly Monatsschluessel[]): string {
+  const namen = monate.map((m) => monatsgrenzenWienFuer(m).bezeichnung)
+  return `${namen.length === 1 ? `${namen[0]} ist` : `${namen.join(', ')} sind`} abgeschlossen. Schreib dazu, warum du die Kosten änderst.`
 }

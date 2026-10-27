@@ -267,7 +267,7 @@ async function erstelleKonto(admin: { adminSeit?: Date | null } | null): Promise
   await auth.api.signUpEmail({ body: { email, password: PASSWORT, name: 'Max Mustermann' } })
   const konto = await prisma.user.update({
     where: { email },
-    data: admin ? { isAdmin: true, adminSeit: admin.adminSeit === undefined ? new Date() : admin.adminSeit } : {},
+    data: admin ? { isAdmin: true, adminInhaber: true, adminSeit: admin.adminSeit === undefined ? new Date() : admin.adminSeit } : {},
     select: { id: true },
   })
   adressen.push(email)
@@ -639,7 +639,7 @@ describe('Wache: 12 Stunden, Pflicht, frische Bestätigung', () => {
     alsBrowser(await mitPasswort(konto.email))
 
     expect(await verlangeAdminAktion()).toEqual({ error: ADMIN_AKTION_FEHLER.pflicht })
-    expect(await verlangeAdminAktion({ ohnePasskey: true })).toEqual({ ok: true, userId: konto.id })
+    expect(await verlangeAdminAktion({ ohnePasskey: true })).toMatchObject({ ok: true, userId: konto.id, mitPasskey: false })
     const bereich = await ladeAdminbereich()
     expect(bereich.zahlen).toBeUndefined()
     expect(bereich.betrieb).toBeNull()
@@ -671,7 +671,7 @@ describe('Wache: 12 Stunden, Pflicht, frische Bestätigung', () => {
 
     // Gegenprobe: die Sitzung, in der der Passkey eingerichtet wurde (passkeyAm gesetzt).
     alsBrowser(geraetA)
-    expect(await verlangeAdminAktion()).toEqual({ ok: true, userId: konto.id })
+    expect(await verlangeAdminAktion()).toMatchObject({ ok: true, userId: konto.id, mitPasskey: true })
     expect(await verlangeAdminSeite()).toBe(konto.id)
     expect((await ladeAdminbereich()).zahlen).toBeDefined()
     expect(await einrichtenAnsicht()).toMatchObject({ zustand: 'eingerichtet', mitErsatzcode: false })
@@ -833,7 +833,7 @@ describe('Passkey für Höfe (E7-Ergänzung, Nr. 179)', () => {
     const hof = await hofMitPasskey()
     // Der Hof-Passkey entstand vor dem Recht.
     await prisma.passkey.updateMany({ where: { userId: hof.id }, data: { createdAt: new Date(Date.now() - 10 * MINUTE) } })
-    await prisma.user.update({ where: { id: hof.id }, data: { isAdmin: true, adminSeit: new Date(Date.now() - MINUTE) } })
+    await prisma.user.update({ where: { id: hof.id }, data: { isAdmin: true, adminInhaber: true, adminSeit: new Date(Date.now() - MINUTE) } })
 
     const dose: Dose = new Map()
     const antwort = await meldeMitPasskeyAn(dose, hof.geraet)
@@ -859,7 +859,7 @@ describe('Passkey für Höfe (E7-Ergänzung, Nr. 179)', () => {
   it('Admin mit Hof-Passkey von vorher: den kann er entfernen, den letzten Admin-Passkey nicht', async () => {
     const hof = await hofMitPasskey()
     await prisma.passkey.updateMany({ where: { userId: hof.id }, data: { createdAt: new Date(Date.now() - 10 * MINUTE) } })
-    await prisma.user.update({ where: { id: hof.id }, data: { isAdmin: true, adminSeit: new Date(Date.now() - MINUTE) } })
+    await prisma.user.update({ where: { id: hof.id }, data: { isAdmin: true, adminInhaber: true, adminSeit: new Date(Date.now() - MINUTE) } })
     const hofKey = await prisma.passkey.findFirstOrThrow({ where: { userId: hof.id } })
     const mitPw = await mitPasswort(hof.email)
     await codeBestaetigt(hof.id, String((await sitzungVon(mitPw))?.id))

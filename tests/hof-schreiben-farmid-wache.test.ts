@@ -27,6 +27,8 @@ import { describe, expect, it } from 'vitest'
 
 const WURZEL = process.cwd()
 const ORDNER = join(WURZEL, 'src/server/actions')
+/** Innere Funktionen der Actions ohne 'use server', die mitgeprüft werden: der Storno aus orders.ts (Nr. 186). */
+const WEITERE = ['src/server/stornieren.ts']
 
 type Stelle = { datei: string; funktion: string; aufruf: string }
 type Eintrag = Stelle & { anzahl: number; grund: string }
@@ -40,6 +42,7 @@ const FARMID_BESTAND: readonly Eintrag[] = [
   { datei: 'admin.ts', funktion: 'triageMeldungAction', aufruf: 'meldung.updateMany', anzahl: 1, grund: ADMIN },
   { datei: 'admin.ts', funktion: 'setzeBuendelStandAction', aufruf: 'meldung.updateMany', anzahl: 3, grund: ADMIN },
   { datei: 'admin.ts', funktion: 'legeMeldungAbAction', aufruf: 'meldung.updateMany', anzahl: 1, grund: ADMIN },
+  { datei: 'admin-bestellung.ts', funktion: 'markiereErstattungErledigt', aufruf: 'order.updateMany', anzahl: 1, grund: ADMIN },
   { datei: 'bar-bestaetigung.ts', funktion: 'bestaetigeBarBestellung', aufruf: 'order.updateMany', anzahl: 1, grund: TOKEN },
   { datei: 'bar-bestaetigung.ts', funktion: 'sendeBarLinkErneut', aufruf: 'order.updateMany', anzahl: 1, grund: TOKEN },
   { datei: 'betrieb.ts', funktion: 'schickeMailJetztAction', aufruf: 'mailAuftrag.updateMany', anzahl: 1, grund: ADMIN },
@@ -49,14 +52,12 @@ const FARMID_BESTAND: readonly Eintrag[] = [
   { datei: 'farm-photos.ts', funktion: 'deleteFarmPhotoAction', aufruf: 'farmPhoto.delete', anzahl: 1, grund: VORAB },
   { datei: 'farm-photos.ts', funktion: 'deleteFarmPhotoAction', aufruf: 'farmPhoto.update', anzahl: 1, grund: 'Neu nummerieren: die Kennungen kommen aus findMany mit farmId des eigenen Hofs' },
   { datei: 'farm-photos.ts', funktion: 'reorderPhotosAction', aufruf: 'farmPhoto.update', anzahl: 1, grund: 'Die Liste ist vorher als genau die Fotos des eigenen Hofs geprüft (Transaktion); farmId in die WHERE nachziehen' },
-  { datei: 'orders.ts', funktion: 'storniere', aufruf: 'product.update', anzahl: 1, grund: 'Bestand zurückbuchen: die Produkte kommen aus der Bestellung, die mit farmId des Hofs gelesen und bedingt storniert wurde' },
-  { datei: 'orders.ts', funktion: 'storniere', aufruf: 'order.updateMany', anzahl: 2, grund: 'Nach dem bedingten Storno mit farmId: dieselbe Bestellung, nur Erstattungsfelder' },
-  { datei: 'orders.ts', funktion: 'storniere', aufruf: 'order.update', anzahl: 1, grund: 'Nach dem bedingten Storno mit farmId: dieselbe Bestellung, nur Erstattungsfelder' },
+  { datei: 'stornieren.ts', funktion: 'storniere', aufruf: 'product.update', anzahl: 1, grund: 'Bestand zurückbuchen: die Produkte kommen aus der Bestellung, die mit farmId des Hofs gelesen und bedingt storniert wurde' },
+  { datei: 'stornieren.ts', funktion: 'storniere', aufruf: 'order.updateMany', anzahl: 2, grund: 'Nach dem bedingten Storno mit farmId: dieselbe Bestellung, nur Erstattungsfelder' },
+  { datei: 'stornieren.ts', funktion: 'storniere', aufruf: 'order.update', anzahl: 1, grund: 'Nach dem bedingten Storno mit farmId: dieselbe Bestellung, nur Erstattungsfelder' },
   { datei: 'orders.ts', funktion: 'lasseServicegebuehrEntfallen', aufruf: 'order.update', anzahl: 1, grund: VORAB },
   { datei: 'postfach.ts', funktion: 'antworteAlsTeam', aufruf: 'unterhaltung.updateMany', anzahl: 2, grund: ADMIN },
-  { datei: 'postfach.ts', funktion: 'markiereErstattungErledigt', aufruf: 'order.updateMany', anzahl: 1, grund: ADMIN },
   { datei: 'products.ts', funktion: 'updateProductImageAction', aufruf: 'product.update', anzahl: 1, grund: VORAB },
-  { datei: 'products.ts', funktion: 'deleteProduct', aufruf: 'product.delete', anzahl: 1, grund: VORAB },
   { datei: 'products.ts', funktion: 'reorderProductsAction', aufruf: 'product.update', anzahl: 1, grund: 'Die Liste ist vorher als genau die Produkte des eigenen Hofs geprüft; farmId in die WHERE nachziehen' },
   { datei: 'subscriptions.ts', funktion: 'deleteCustomerAccount', aufruf: 'customerFarmSubscription.deleteMany', anzahl: 1, grund: 'Kundin löscht ihr Konto: alle Abos ihrer bestätigten Adresse, über alle Höfe' },
 ]
@@ -124,8 +125,14 @@ const schluessel = (s: Stelle): string => `${s.datei}:${s.funktion}:${s.aufruf}`
 /** Anzahl je Stelle in den Actions. */
 function gezaehlt(): Map<string, number> {
   const zaehler = new Map<string, number>()
-  for (const datei of readdirSync(ORDNER).filter((d) => d.endsWith('.ts'))) {
-    for (const stelle of stellenOhneFarmId(readFileSync(join(ORDNER, datei), 'utf8'), MODELLE, datei)) {
+  const dateien = [
+    ...readdirSync(ORDNER)
+      .filter((d) => d.endsWith('.ts'))
+      .map((d) => ({ name: d, pfad: join(ORDNER, d) })),
+    ...WEITERE.map((w) => ({ name: w.split('/').pop() ?? w, pfad: join(WURZEL, w) })),
+  ]
+  for (const { name, pfad } of dateien) {
+    for (const stelle of stellenOhneFarmId(readFileSync(pfad, 'utf8'), MODELLE, name)) {
       zaehler.set(schluessel(stelle), (zaehler.get(schluessel(stelle)) ?? 0) + 1)
     }
   }

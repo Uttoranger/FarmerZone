@@ -27,6 +27,7 @@
 import type { Tarif } from '@prisma/client'
 import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
+import { MARKE } from '@/lib/marke'
 
 /**
  * Die Tarif-Kennung ist das Prisma-Enum `Tarif` — nur als Typ eingebunden,
@@ -188,6 +189,102 @@ export const BAR_OHNE_GEBUEHR_ZAHLART = `Ohne Servicegebühr bis ${BAR_OHNE_GEBU
 
 /** Derselbe Inhalt als Satz für Höfe — /konditionen, /fuer-hoefe und die Mail „Vor-Ort-Bestellung bestätigt". */
 export const BAR_OHNE_GEBUEHR_SATZ = `Bei Barzahlung fällt bis ${BAR_OHNE_GEBUEHR_BIS_TEXT} keine Servicegebühr an.`
+
+// ─── Plattformgebühr im Hofpreis (Register N38, Nr. 197) ───────────────────
+
+/**
+ * Der Satz der Plattformgebühr im Hofpreis-Modell (N38): 6 % vom Warenpreis,
+ * je Stück auf den Cent aufgerundet, ohne Mindestgebühr. Je Hof im Admin
+ * änderbar (`Farm.plattformgebuehrProzent`, null = dieser Satz). Gerechnet
+ * wird nur in src/lib/plattformgebuehr.ts.
+ */
+export const PLATTFORMGEBUEHR_PROZENT = 6
+
+/** Mindestbestellwert je Bestellung im Hofpreis-Modell, Warenwert in Cent (N38). */
+export const MINDESTBESTELLWERT_CENTS = 1000
+
+/** Das Wort der Wortliste (N8) für die Gebühr im Hofpreis. */
+export const PLATTFORMGEBUEHR_BEZEICHNUNG = 'Plattformgebühr'
+
+/** Der Zusatz am Endpreis — Hofseite, Produktseite, Karten, Korb und Mails (N38). */
+export const INKL_PLATTFORMGEBUEHR = 'inkl. Plattformgebühr'
+
+/** Der Satz unter Korb und Positionen der Kasse im Hofpreis-Modell. */
+export const PREISE_INKL_PLATTFORMGEBUEHR = `Preise ${INKL_PLATTFORMGEBUEHR}`
+
+/** Der Satz in der Kasse unter der Aufschlüsselung (Freigabe Lauf 26, Nr. 197, wörtlich). */
+export const PLATTFORMGEBUEHR_SATZ = `Die Plattformgebühr ist Teil des Preises. Der Hof zahlt damit die Bestellplattform ${MARKE}.`
+
+/**
+ * Der Satz unter den Beträgen der Kunden-Mails im Hofpreis-Modell: Die
+ * Gebühr steht nicht als eigene Zeile da, sie steckt in den Endpreisen.
+ */
+export function inklPlattformgebuehrSatz(betrag: string): string {
+  return `Alle Preise ${INKL_PLATTFORMGEBUEHR} (darin ${betrag}). ${PLATTFORMGEBUEHR_SATZ}`
+}
+
+/** Der Grund am ausgeschalteten Bestellknopf und die Meldung von /api/checkout (400). */
+export const MINDESTBESTELLWERT_SATZ = `Mindestbestellwert ${formatZahl(centsAlsEuro(MINDESTBESTELLWERT_CENTS))} € bei diesem Hof`
+
+/**
+ * Neutral, wenn bar bei diesem Hof gerade nicht geht (kein Mandat, N38) —
+ * /api/checkout antwortet damit (409), die Kasse bietet dann nur online an.
+ * Sagt nichts über den Grund: Das Mandat ist Sache zwischen Hof und Plattform.
+ */
+export const BAR_NICHT_MOEGLICH_SATZ = 'Bei diesem Hof geht gerade nur Online-Bezahlen. Bitte wähl „Online bezahlen“.'
+
+// ─── Lastschrift und Monatsabrechnung (N38, Nr. 198) ─────────────────────────
+
+/** Wohin „Lastschrift einrichten“ führt: der Abschnitt „Barzahlung“ in Deine Konditionen. */
+export const LASTSCHRIFT_HREF = '/settings/konditionen#barzahlung'
+
+/** Die Sätze rund um Lastschrift und Monatsabrechnung — Konditionen, Heute, Postfach und Mails nehmen sie von hier. */
+export const LASTSCHRIFT_TEXT = {
+  titel: 'Barzahlung',
+  einrichten: 'Lastschrift einrichten',
+  aendern: 'Lastschrift ändern',
+  mandatDa: (bank: string | null, letzte4: string | null): string =>
+    `Lastschrift eingerichtet${bank || letzte4 ? ` · ${[bank, letzte4 ? `IBAN endet auf ${letzte4}` : null].filter(Boolean).join(' · ')}` : ''}`,
+  mandatFehlt: 'Lastschrift nicht eingerichtet.',
+  mandatPflicht: 'Ohne Lastschrift bieten wir bei dir ab dem Einzug nur Online-Bezahlen an.',
+  mandatFrei: 'Eine Lastschrift ist bei dir nicht Pflicht – ohne sie schicken wir die Rechnung zur Überweisung.',
+  einzugAb: (datum: string): string => `Einzug ab ${datum}`,
+  erlassen: (datum: string): string => `Bis ${datum} behältst du die Plattformgebühr aus Barbestellungen – wir verzichten darauf.`,
+  satz: (satz: string): string => `Plattformgebühr ${satz} % vom Warenpreis`,
+  wartet: 'Die Bank bestätigt die Lastschrift – das dauert meist nur einen Moment. Lade die Seite gleich neu.',
+  fehler: 'Wir konnten die Lastschrift gerade nicht starten. Versuch es bitte gleich noch einmal.',
+  abrechnungen: 'Monatsabrechnungen',
+  abrechnungenLeer: 'Noch keine Monatsabrechnung',
+  abrechnungenLeerSatz: 'Die erste kommt nach dem ersten Monat mit Plattformgebühr.',
+  spalten: { monat: 'Monat', bar: 'bar', online: 'online', stand: 'Stand' },
+  rechnung: 'Rechnung (PDF)',
+  bezahlen: 'Jetzt bezahlen',
+  rechnungFehlt: 'Die Rechnung lässt sich gerade nicht öffnen. Versuch es bitte gleich noch einmal.',
+  heuteTitel: 'Barzahlung ist pausiert',
+  heuteSatz: (monat: string): string =>
+    `Die Plattformgebühr für ${monat} ist noch offen. Bis sie bezahlt ist, nehmen wir bei dir keine Barbestellungen an – laufende Bestellungen bleiben.`,
+  /** Nach einer Rückbuchung ist die Rechnung bezahlt — es gibt nichts zu bezahlen, das Team klärt es. */
+  zurueckgebuchtSatz: (monat: string): string => `Die Lastschrift für ${monat} wurde zurückgebucht. Barzahlung ist pausiert – das Team meldet sich bei dir.`,
+  zumPostfach: 'Zum Postfach',
+} as const
+
+/** Die Postfach-Nachricht vier Wochen vor dem Einzugsbeginn (N38, „Start“). */
+export function ankuendigungText(d: { datum: string; satz: string; mandatNoetig: boolean }): string {
+  return (
+    `Ab ${d.datum} ziehen wir die Plattformgebühr (${d.satz} % vom Warenpreis) aus deinen Barbestellungen einmal im Monat ein. ` +
+    'Bei Online-Zahlungen behält Stripe sie schon beim Bezahlen ein. ' +
+    (d.mandatNoetig ? `Dafür brauchst du eine Lastschrift. ${LASTSCHRIFT_TEXT.mandatPflicht}` : LASTSCHRIFT_TEXT.mandatFrei)
+  )
+}
+
+/** Die Postfach-Nachricht nach einer gescheiterten Lastschrift (N38, „Einzug scheitert“). */
+export function lastschriftGescheitertText(d: { monat: string; tage: number }): string {
+  return (
+    `Die Lastschrift für ${d.monat} hat nicht geklappt. Stripe versucht es erneut. ` +
+    'Bitte sorg für Deckung auf deinem Konto oder bezahl die Rechnung direkt. ' +
+    `Bleibt der Betrag ${d.tage} Tage offen, nehmen wir bei dir keine Barbestellungen mehr an – laufende Bestellungen bleiben.`
+  )
+}
 
 // ─── Online-Zahlung gehört zum Start (Register Z1) ───────────────────────────
 

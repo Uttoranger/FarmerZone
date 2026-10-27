@@ -62,7 +62,7 @@ const GUELTIG = {
 beforeEach(() => {
   vi.clearAllMocks()
   getSession.mockResolvedValue(adminSitzung('admin_1') as never)
-  userFindUnique.mockResolvedValue({ isAdmin: true } as never)
+  userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
   meldungFindUnique.mockResolvedValue({ id: ID } as never)
   meldungFindFirst.mockResolvedValue(null)
   meldungUpdate.mockResolvedValue({ count: 1 })

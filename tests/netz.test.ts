@@ -6,7 +6,7 @@
  * Funkloch, eine gelungene Antwort kommt unverändert durch.
  */
 import { describe, expect, it } from 'vitest'
-import { NETZ_KNOPF, NETZ_SATZ, istNetzFehler, mitNetzSchutz } from '@/lib/netz'
+import { NETZ_KNOPF, NETZ_SATZ, NETZ_SATZ_UNSICHER, istNetzFehler, mitNetzSchutz } from '@/lib/netz'
 import { istNetzfehler } from '@/lib/upload-diagnose'
 
 describe('istNetzFehler', () => {
@@ -33,6 +33,11 @@ describe('Wortlaut (N29)', () => {
   it('Satz und Knopf stehen wie im Register', () => {
     expect(NETZ_SATZ).toBe('Keine Verbindung – nichts gespeichert. Versuch es gleich noch einmal.')
     expect(NETZ_KNOPF).toBe('Nochmal')
+  })
+
+  it('der unsichere Satz steht wie im Register und verspricht keinen zweiten Versuch', () => {
+    expect(NETZ_SATZ_UNSICHER).toBe('Wir wissen nicht, ob es geklappt hat – lade die Seite neu, bevor du es nochmal tust.')
+    expect(NETZ_SATZ_UNSICHER).not.toBe(NETZ_SATZ)
   })
 })
 

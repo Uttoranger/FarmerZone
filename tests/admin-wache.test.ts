@@ -42,6 +42,7 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
+import { ADMIN_RECHT_FEHLER } from '@/lib/admin-rechte'
 import { frischOderBestaetigen, verlangeAdminAktion, verlangeAdminSeite, verlangeEinrichtenSeite, verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -63,9 +64,9 @@ const MINUTE = 60_000
 function melde(
   id: string | null,
   istAdmin: boolean | null,
-  stand: { angemeldetVor?: number; passkeyVor?: number | null; passkeys?: number; ersatzcodeVor?: number | null } = {}
+  stand: { angemeldetVor?: number; passkeyVor?: number | null; passkeys?: number; ersatzcodeVor?: number | null; inhaber?: boolean; rechte?: string[] } = {}
 ) {
-  const { angemeldetVor = 0, passkeyVor = 0, passkeys = 1, ersatzcodeVor = null } = stand
+  const { angemeldetVor = 0, passkeyVor = 0, passkeys = 1, ersatzcodeVor = null, inhaber = true, rechte = [] } = stand
   getSession.mockResolvedValue(
     (id === null
       ? null
@@ -78,7 +79,7 @@ function melde(
           },
         }) as never
   )
-  userFindUnique.mockResolvedValue((istAdmin === null ? null : { isAdmin: istAdmin }) as never)
+  userFindUnique.mockResolvedValue((istAdmin === null ? null : { isAdmin: istAdmin, adminInhaber: inhaber, adminRechte: rechte }) as never)
   passkeyAggregate.mockResolvedValue({ _count: { _all: passkeys }, _max: { createdAt: passkeys > 0 ? new Date(JETZT.getTime() - 60 * MINUTE) : null } } as never)
   ersatzcodeAggregate.mockResolvedValue({ _max: { benutztAm: ersatzcodeVor === null ? null : new Date(JETZT.getTime() - ersatzcodeVor) } } as never)
 }
@@ -136,7 +137,7 @@ describe('verlangeAdminAktion', () => {
 
   it('gibt dem Admin die Nutzer-ID mit', async () => {
     melde('user_admin', true)
-    expect(await verlangeAdminAktion()).toEqual({ ok: true, userId: 'user_admin' })
+    expect(await verlangeAdminAktion()).toEqual({ ok: true, userId: 'user_admin', sitzungId: 'sitzung-user_admin', mitPasskey: true })
   })
 
   it('fragt das Recht frisch aus der Datenbank ab — genau einmal je Aufruf', async () => {
@@ -144,9 +145,10 @@ describe('verlangeAdminAktion', () => {
     await verlangeAdminAktion()
     // Das Recht genau einmal; dazu liest die Pflicht `adminSeit` (Nr. 179: nur Passkeys ab dem Recht zählen).
     expect(userFindUnique.mock.calls.filter(([frage]) => frage?.select && 'isAdmin' in frage.select)).toHaveLength(1)
+    // Admin-Recht und Rechte je Person (N35, Nr. 188) in EINER Abfrage.
     expect(userFindUnique).toHaveBeenCalledWith({
       where: { id: 'user_admin' },
-      select: { isAdmin: true },
+      select: { isAdmin: true, adminInhaber: true, adminRechte: true },
     })
     expect(userFindUnique).toHaveBeenCalledWith({ where: { id: 'user_admin' }, select: { adminSeit: true } })
   })
@@ -185,7 +187,7 @@ describe('Admin nur mit Passkey (Register N20) — Pflicht in der Wache', () => 
   it('Aktionen antworten im Pflicht-Zustand mit dem Satz — die Actions der Pflichtseite (ohnePasskey) gehen', async () => {
     melde('user_admin', true, { passkeys: 0 })
     expect(await verlangeAdminAktion()).toEqual({ error: 'Richte zuerst deinen Passkey ein.' })
-    expect(await verlangeAdminAktion({ ohnePasskey: true })).toEqual({ ok: true, userId: 'user_admin' })
+    expect(await verlangeAdminAktion({ ohnePasskey: true })).toEqual({ ok: true, userId: 'user_admin', sitzungId: 'sitzung-user_admin', mitPasskey: true })
   })
 
   it('ohne Recht kommt die Pflicht gar nicht erst zur Sprache (404, nichts gelesen)', async () => {
@@ -209,7 +211,7 @@ describe('Admin nur mit Passkey (Register N20) — Sitzung ohne Passkey', () => 
     const satz = { error: 'Melde dich für den Admin-Bereich mit deinem Passkey an.' }
     expect(await verlangeAdminAktion()).toEqual(satz)
     expect(await verlangeFrischeBestaetigung()).toEqual(satz)
-    expect(await verlangeAdminAktion({ ohnePasskey: true })).toEqual({ ok: true, userId: 'user_admin' })
+    expect(await verlangeAdminAktion({ ohnePasskey: true })).toEqual({ ok: true, userId: 'user_admin', sitzungId: 'sitzung-user_admin', mitPasskey: false })
   })
 
   it('ohne Passkey am Konto gilt zuerst die Pflicht (Einrichten), nicht die Anmeldung', async () => {
@@ -252,7 +254,7 @@ describe('Admin nur mit Passkey (Register N20) — die Pflichtseite (verlangeEin
 describe('Admin nur mit Passkey (Register N20) — frische Bestätigung', () => {
   it('5 Minuten nach der Bestätigung mit Passkey: frisch; 6 Minuten oder nie: „frisch" verlangt', async () => {
     melde('user_admin', true, { passkeyVor: 5 * MINUTE })
-    expect(await verlangeFrischeBestaetigung()).toEqual({ ok: true, userId: 'user_admin', sitzungId: 'sitzung-user_admin' })
+    expect(await verlangeFrischeBestaetigung()).toEqual({ ok: true, userId: 'user_admin', sitzungId: 'sitzung-user_admin', mitPasskey: true })
     melde('user_admin', true, { passkeyVor: 6 * MINUTE })
     expect(await verlangeFrischeBestaetigung()).toEqual({ error: 'frisch' })
     melde('user_admin', true, { passkeyVor: null })
@@ -273,5 +275,41 @@ describe('Admin nur mit Passkey (Register N20) — frische Bestätigung', () => 
     expect(antwort?.status).toBe(303)
     expect(antwort?.headers.get('location')).toBe('/admin/bestaetigen?weiter=%2Fadmin%2Ffinanzen%2Fexport%3Fjahr%3D2026')
     expect((await frischOderBestaetigen('https://fremd.example.com/admin'))?.headers.get('location')).toBe('/admin/bestaetigen?weiter=%2Fadmin')
+  })
+})
+
+describe('Rechte je Person (Register N35, Nr. 188)', () => {
+  it('ohne Recht: die Aktion antwortet mit dem Satz, die Seite leitet nach /admin', async () => {
+    melde('user_team', true, { inhaber: false, rechte: ['geld'] })
+    expect(await verlangeAdminAktion({ recht: 'notbremse' })).toEqual({ error: ADMIN_RECHT_FEHLER })
+    expect(await verlangeFrischeBestaetigung({ recht: 'startseite_veroeffentlichen' })).toEqual({ error: ADMIN_RECHT_FEHLER })
+    expect(await frischOderBestaetigen('/admin/finanzen/export', { recht: 'notbremse' })).toMatchObject({ status: 403 })
+    await expect(verlangeAdminSeite({ recht: 'notbremse' })).rejects.toThrow(/^REDIRECT:\/admin$/)
+  })
+
+  it('Gegenprobe: mit dem Recht, mit „ansehen“ und ohne recht geht es; die Inhaberin darf alles', async () => {
+    melde('user_team', true, { inhaber: false, rechte: ['geld'] })
+    expect(await verlangeAdminAktion({ recht: 'geld' })).toMatchObject({ ok: true, userId: 'user_team' })
+    expect(await verlangeAdminAktion({ recht: 'ansehen' })).toMatchObject({ ok: true })
+    expect(await verlangeAdminAktion()).toMatchObject({ ok: true })
+    await expect(verlangeAdminSeite({ recht: 'geld' })).resolves.toBe('user_team')
+    // Inhaber-Rechte gibt es nie über die Liste — auch wenn sie dort stünden.
+    melde('user_team', true, { inhaber: false, rechte: ['team', 'notfallzugang'] })
+    expect(await verlangeAdminAktion({ recht: 'notfallzugang' })).toEqual({ error: ADMIN_RECHT_FEHLER })
+    melde('user_admin', true, { inhaber: true })
+    expect(await verlangeAdminAktion({ recht: 'notfallzugang' })).toMatchObject({ ok: true })
+  })
+
+  it('das Recht zählt erst nach Passkey und Sitzung: ohne Passkey bleibt es beim Satz der Anmeldung', async () => {
+    melde('user_team', true, { inhaber: false, rechte: [], passkeyVor: null })
+    expect(await verlangeAdminAktion({ recht: 'geld' })).toEqual({ error: 'Melde dich für den Admin-Bereich mit deinem Passkey an.' })
+  })
+
+  it('`frisch: true` an verlangeAdminAktion ist dieselbe Prüfung wie verlangeFrischeBestaetigung', async () => {
+    melde('user_admin', true, { passkeyVor: 6 * MINUTE })
+    expect(await verlangeAdminAktion({ frisch: true, recht: 'geld' })).toEqual({ error: 'frisch' })
+    expect(await verlangeAdminAktion({ recht: 'geld' })).toEqual({ ok: true, userId: 'user_admin', sitzungId: 'sitzung-user_admin', mitPasskey: false })
+    melde('user_admin', true, { passkeyVor: MINUTE })
+    expect(await verlangeAdminAktion({ frisch: true, recht: 'geld' })).toEqual({ ok: true, userId: 'user_admin', sitzungId: 'sitzung-user_admin', mitPasskey: true })
   })
 })

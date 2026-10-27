@@ -30,6 +30,11 @@ vi.mock('@/server/abholfenster', async (original) => ({
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    // Keine Notbremse (Nr. 189): die Zeile trägt keine Felder der Notbremse.
+    // N38 (Nr. 197): Diese Datei prüft das Modell `bisher` (Servicegebühr, E4/B1) auch
+    // nach BAR_SERVICEGEBUEHR_AB — der Stichtag „Hofpreis-Modell ab“ liegt hier
+    // weit danach (Admin hat ihn verschoben). Das Hofpreis-Modell: plattformgebuehr-checkout.test.ts.
+    plattformEinstellung: { findUnique: vi.fn() },
     farm: { findUnique: vi.fn() },
     product: { findUnique: vi.fn(), update: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     stockReservation: { aggregate: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },
@@ -50,6 +55,7 @@ import { BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendOnsiteConfirmation } from '@/lib/email'
+import { einstellungsZeile } from './fabrik/plattform-einstellung'
 
 /**
  * Seit dem Checkout-Sprint prüft POST /api/checkout die Reservierungsfrist und
@@ -175,6 +181,7 @@ beforeEach(() => {
   einzelpreis = 10
   warenkorbBereit()
   vi.clearAllMocks()
+  vi.mocked(prisma.plattformEinstellung.findUnique).mockResolvedValue(einstellungsZeile(new Date('2099-01-01T00:00:00.000Z')) as never)
   farmFindUnique.mockResolvedValue(HOF as never)
   productFindUnique.mockResolvedValue({
     id: 'prod_1', stock: 10, isAvailable: true, name: 'Wels', unit: 'KG', unitSize: null,

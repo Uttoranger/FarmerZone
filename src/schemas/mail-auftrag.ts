@@ -29,6 +29,10 @@ export const MAIL_ARTEN = [
   'betrieb-warnung',
   'testmail',
   'betreiber-bestaetigung',
+  // Konto-Anfragen und Team (Nr. 190): Einmal-Link bzw. Sicherheitsmail — direkt.
+  'email-aendern-link',
+  'email-geaendert-hinweis',
+  'team-recht-geaendert',
   // Wichtig: Bestellungen, Höfe und Betreiber.
   'bestellung-bestaetigung',
   'bestellung-bezahlt-hof',
@@ -48,6 +52,9 @@ export const MAIL_ARTEN = [
   'antwort-an-team',
   'betreiber-testmail',
   'abo-bestaetigung',
+  // Plattformgebühr (N38, Nr. 198): Ankündigung des Einzugs und gescheiterte Lastschrift an den Hof.
+  'plattformgebuehr-ankuendigung',
+  'lastschrift-gescheitert',
   // Kann warten: Beiträge, Rundschreiben, Bescheide.
   'beitrag',
   'rundschreiben',
@@ -86,6 +93,9 @@ export const MAIL_WEG = {
   'betrieb-warnung': 'sofort',
   testmail: 'sofort',
   'betreiber-bestaetigung': 'sofort',
+  'email-aendern-link': 'sofort',
+  'email-geaendert-hinweis': 'sofort',
+  'team-recht-geaendert': 'sofort',
   'bestellung-bestaetigung': 'wichtig',
   'bestellung-bezahlt-hof': 'wichtig',
   'bar-bestaetigt-hof': 'wichtig',
@@ -104,6 +114,8 @@ export const MAIL_WEG = {
   'antwort-an-team': 'wichtig',
   'betreiber-testmail': 'wichtig',
   'abo-bestaetigung': 'wichtig',
+  'plattformgebuehr-ankuendigung': 'wichtig',
+  'lastschrift-gescheitert': 'wichtig',
   beitrag: 'kannWarten',
   rundschreiben: 'kannWarten',
   bescheid: 'kannWarten',
@@ -201,6 +213,8 @@ export const erstattungOffenBezugSchema = z
   .strict()
 export const hofBetreiberBezugSchema = z.object({ farmId: kennung, empfaengerId: kennung }).strict()
 export const hofBezugSchema = z.object({ farmId: kennung }).strict()
+/** Gescheiterte Lastschrift (Nr. 198): nur die Kennung der Monatsabrechnung — Monat und Hof lädt der Renderer. */
+export const abrechnungBezugSchema = z.object({ monatsabrechnungId: kennung }).strict()
 export const meldungBetreiberBezugSchema = z.object({ meldungId: kennung, empfaengerId: kennung }).strict()
 /** Wochenbericht: wie viele Meldungen der Lauf eben gelöscht hat — die übrigen Zahlen zählt der Renderer frisch. */
 export const wochenberichtBezugSchema = z.object({ empfaengerId: kennung, geloeschtAnzahl: ganzzahl }).strict()
@@ -225,6 +239,8 @@ const BEZUG_JE_ART: Partial<Record<MailArt, z.ZodType<Record<string, string>>>> 
   'erstattung-offen': erstattungOffenBezugSchema,
   'neuer-hof': hofBetreiberBezugSchema,
   freischaltung: hofBezugSchema,
+  'plattformgebuehr-ankuendigung': hofBezugSchema,
+  'lastschrift-gescheitert': abrechnungBezugSchema,
   meldung: meldungBetreiberBezugSchema,
   wochenbericht: wochenberichtBezugSchema,
   postfach: nachrichtBezugSchema,

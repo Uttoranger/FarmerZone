@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ArrowUpDown, MoreHorizontal } from 'lucide-react'
 import { fasseZusammenAction, legeMeldungAbAction, trenneDuplikatAction, triageMeldungAction } from '@/server/actions/admin'
+import { useFrischBestaetigt } from '@/components/admin/frisch-bestaetigen'
 import {
   ERLEDIGT_OEFFENTLICH,
   MELDUNGEN_TEXT,
@@ -232,6 +233,8 @@ function ZusammenfassenDialog({ start, kandidaten, onZu }: { start: { duplikat: 
 function AblegenDialog({ meldung, onZu }: { meldung: SuchMeldung; onZu: () => void }): React.JSX.Element {
   const [antwort, setAntwort] = useState(meldung.stand.antwortAnMelder ?? '')
   const { laeuft, fehler, setFehler, schreibe } = useSchreiben()
+  // Ablegen schreibt dem Hof eine Antwort und schließt die Meldung (Audit D10; Nr. 188): frisch mit Passkey bestätigt.
+  const frischAblegen = useFrischBestaetigt(legeMeldungAbAction)
   const text = MELDUNG_KLICK_TEXT
   return (
     <BestellDialog
@@ -246,7 +249,7 @@ function AblegenDialog({ meldung, onZu }: { meldung: SuchMeldung; onZu: () => vo
         onClick: () => {
           // Die Antwort ist Pflicht (Freigabe Nr. 101) — der Hof soll lesen, warum. Der Server prüft es noch einmal (ablegenSchema).
           if (antwort.trim() === '') return setFehler(text.ablegenPflicht)
-          schreibe(() => legeMeldungAbAction({ meldungId: meldung.id, antwort, vorherStatus: meldung.stand.status }), text.abgelegt, onZu)
+          schreibe(() => frischAblegen.ausfuehren({ meldungId: meldung.id, antwort, vorherStatus: meldung.stand.status }), text.abgelegt, onZu)
         },
       }}
     >
@@ -258,6 +261,7 @@ function AblegenDialog({ meldung, onZu }: { meldung: SuchMeldung; onZu: () => vo
         <textarea id="ablegen-antwort" value={antwort} onChange={(e) => setAntwort(e.target.value)} rows={4} aria-required="true" className={cn(FELD, 'resize-y')} />
       </div>
       <DialogFehler text={fehler} />
+      {frischAblegen.dialog}
     </BestellDialog>
   )
 }

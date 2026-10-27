@@ -80,7 +80,7 @@ const BESTELLUNG = {
     phone: '+43 660 0000000',
     slug: 'hof-test',
   },
-  items: [{ productName: 'Bergkäse', quantity: 2, unitPrice: 12.5, totalPrice: 25, product: null }],
+  items: [{ productName: 'Bergkäse', quantity: 2, unitPrice: 12.5, totalPrice: 25, gebuehrCents: 0, product: null }],
 }
 
 /** Alle Links der zuletzt verschickten Mail, die zu einer Bestellung dieses Hofs führen. */

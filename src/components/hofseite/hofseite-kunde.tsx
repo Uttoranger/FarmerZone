@@ -30,14 +30,14 @@ import {
   type HofReiterId,
 } from '@/lib/hofseite-kunde'
 import { korbErlaubt } from '@/lib/hofseite-vorschau'
-import { HOFZEILE_ZURUECK, KLEBE_BLOCK, KLEBE_BLOCK_VAR, hofZeileUnterzeile } from '@/lib/hofseite-orientierung'
+import { HOFZEILE_ZURUECK, KLEBE_BLOCK, KLEBE_BLOCK_VAR, TITELBILD_ZURUECK, hofZeileUnterzeile } from '@/lib/hofseite-orientierung'
 import { produktLink } from '@/lib/produktdetail'
 import { rueckweg, type KundenSeite } from '@/lib/kunden-kopf'
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
 import { titelbildAusschnitt } from '@/lib/titelbild'
 import { bildStil } from '@/lib/bild-ausschnitt'
 import { anzeigeBereichVon } from '@/lib/taxonomie'
-import { BEITRAG_PARAMETER, REITER_PARAMETER, beitragKennungSchema } from '@/schemas/hofseite-reiter'
+import { BEITRAG_PARAMETER, REITER_PARAMETER, leseBeitragKennung } from '@/schemas/hofseite-reiter'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -50,8 +50,10 @@ import { AktuellVomHof } from '@/components/hofseite/aktuell-vom-hof'
 import { VorschauImRahmen } from '@/components/farm/vorschau-im-rahmen'
 import { HofseiteSeitenspalte } from '@/components/hofseite/hofseite-seitenspalte'
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
+import { useBestellstopp } from '@/components/notbremse-band'
 import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
 import { Titelbild } from '@/components/hofseite/titelbild'
+import { useHofzeileKlebt } from '@/components/hofseite/use-hofzeile-klebt'
 import { Abzeichen, AbzeichenKnopf } from '@/components/ui/abzeichen'
 import { TESTHOF_HINWEIS } from '@/lib/gruendungshof'
 
@@ -157,6 +159,9 @@ export function HofseiteKunde({
   const pfad = usePathname()
   const bereichWunsch = useBereichWunsch()
   const produkte = useMemo(() => farm.products.filter((p) => p.isAvailable), [farm.products])
+  // Notbremse (Register N34, Nr. 189): Zustand der Hofzeile, „Bestellen“ und „+“ lesen sie wie die
+  // Kaufknöpfe des Produktrasters; den Grund sagt das Band unter dem Kopf. Die Sperre bleibt die des Hofs.
+  const bestellstopp = useBestellstopp() !== null
 
   function sichtbar(key: string): boolean {
     const s = farm.sectionsConfig.find((x) => x.key === key)
@@ -182,7 +187,7 @@ export function HofseiteKunde({
   // ist eine Systemgrenze — dieselbe Prüfung wie in page.tsx, die den Beitrag lädt.
   const { anordnung, nichtMehrAktuell } = ordneBeitraege(
     gezeigteBeitraege,
-    beitragKennungSchema.parse(suche.get(BEITRAG_PARAMETER)),
+    leseBeitragKennung(suche.get(BEITRAG_PARAMETER)),
     beitraegeFehler
   )
   const mitAktuell = offen === 'uebersicht' && anordnung !== null
@@ -226,6 +231,11 @@ export function HofseiteKunde({
   // Server-HTML in voller Höhe — das Portal kommt erst nach dem Laden, und
   // der Inhalt darunter soll dann nicht springen.
   const chipsKleben = offen === 'produkte' && kategorieAbschnitte(produkte).length > 1
+
+  // Klebt der Block schon, hat die Hofzeile ihr eigenes Zurück — dann geht der
+  // Knopf im Titelbild weg (Entscheidung 5). Gelesen wird die Lage im Fenster;
+  // auf dem Server und vor der Messung gilt „klebt noch nicht", der Knopf steht da.
+  const klebt = useHofzeileKlebt(klebeBlock)
 
   // Die echte Höhe des Blocks an der Wurzel: scroll-padding in globals.css
   // rechnet damit, auch wenn größere Schrift die Reiter umbricht. Die festen
@@ -298,7 +308,7 @@ export function HofseiteKunde({
         <span className="truncate font-heading text-[17px] leading-[1.15] font-semibold text-foreground" title={farm.name}>
           {farm.name}
         </span>
-        <span className="truncate text-[12px] text-muted-foreground">{hofZeileUnterzeile(farm.city, sperre)}</span>
+        <span className="truncate text-[12px] text-muted-foreground">{hofZeileUnterzeile(farm.city, sperre, bestellstopp)}</span>
       </div>
       <button
         type="button"
@@ -354,7 +364,7 @@ export function HofseiteKunde({
   const ueberUns = sichtbar('about') ? (ueberUnsText(farm) ?? '') : ''
   const werte = sichtbar('values') ? farm.farmValues.slice(0, 6) : []
   const verfuegbar = verfuegbarText(produkte, sperre)
-  const kannBestellen = produkte.length > 0 && sperre === null
+  const kannBestellen = produkte.length > 0 && sperre === null && !bestellstopp
 
   const zeigeUeberUns = offen === 'uebersicht' && Boolean(ueberUns || werte.length > 0 || farm.foundedYear)
   // Ab lg mit Schaufenster ein Raster aus zwei Zeilen: Über uns oben links,
@@ -425,7 +435,7 @@ export function HofseiteKunde({
           anordnung={anordnung}
           jetzt={jetzt}
           produkte={produkte}
-          mitPlus={mitKorb && sperre === null}
+          mitPlus={mitKorb && sperre === null && !bestellstopp}
           onInDenKorb={(p) => korbWeg.current?.(p)}
           produktLink={(id) => produktLink(farm.slug, id, ansicht.art === 'vorschau')}
           neuesterHref={adresseOhneBeitrag(pfad, suche.toString())}
@@ -451,6 +461,18 @@ export function HofseiteKunde({
 
       {/* ── Titelbild, Name, Aktionen ── */}
       <div className="relative">
+        {/* Am Handy: Zurück oben links im Titelbild, solange die klebende Hofzeile (mit ihrem eigenen Zurück) nicht steht. Theme-fest dunkel wie jedes Bild-Overlay. */}
+        {!klebt && (
+          <Link
+            href={zurueck.href}
+            onClick={beimZurueck}
+            aria-label={TITELBILD_ZURUECK}
+            data-titelbild-zurueck=""
+            className={cn('absolute top-2 left-2 z-10 flex size-11 items-center justify-center rounded-full bg-primary-foreground/65 text-accent-foreground md:hidden print:hidden', FOKUS_RAHMEN)}
+          >
+            <ChevronLeft className="size-[22px]" strokeWidth={1.9} aria-hidden="true" />
+          </Link>
+        )}
         {/* Hochformat ab md ganz statt beschnitten (Register N6, Nr. 72): entscheidet titelbild.tsx. */}
         {/* „Teilen" steht am Handy fest in der Hofzeile (Nr. 177), nicht mehr auf dem Titelbild. */}
         <Titelbild foto={foto} verlauf={titelbildVerlauf(farm.bannerValue)} ausschnitt={titelbildAusschnitt(farm.bannerAusschnitt, farm.bannerFocusY)} hofName={farm.name} />

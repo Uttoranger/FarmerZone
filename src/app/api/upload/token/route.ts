@@ -12,7 +12,7 @@ import {
 } from '@/lib/upload-pfade'
 import { UPLOAD_GESPERRT_TEXT } from '@/lib/email-bestaetigung'
 import { emailBestaetigungOffen } from '@/server/email-bestaetigung'
-import { isAdminUser } from '@/server/queries/admin'
+import { verlangeAdminAktion } from '@/server/admin-wache'
 
 /**
  * Ausgabestelle für signierte Upload-Token.
@@ -52,12 +52,15 @@ async function hofDerSitzung(): Promise<{ id: string } | 'email-offen' | null> {
 /**
  * Zweck 'startseite' (Register N16, Nr. 96): Bilder der Startseite lädt der
  * Admin hoch — die EINE Stelle, an der statt der Hof-Sitzung die Admin-
- * Sitzung zählt, frisch aus der Datenbank (isAdminUser, wie verlangeAdminSeite).
- * Alle anderen Zwecke gehen unverändert über hofDerSitzung.
+ * Sitzung zählt. Seit Nr. 188 (Audit A2/B1) über die Admin-Wache selbst:
+ * Admin-Recht frisch aus der Datenbank, 12 Stunden, Passkey der Sitzung und
+ * das Recht „Startseite veröffentlichen“ (N35) — vorher genügte `isAdmin`,
+ * auch in einer Sitzung ohne Passkey. Alle anderen Zwecke gehen unverändert
+ * über hofDerSitzung.
  */
 async function adminDerSitzung(): Promise<boolean> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  return !!session?.user && (await isAdminUser(session.user.id))
+  const wache = await verlangeAdminAktion({ recht: 'startseite_veroeffentlichen' })
+  return 'ok' in wache
 }
 
 /** Satz für den Bauern und Code für unseren Client (image-upload.tsx). */

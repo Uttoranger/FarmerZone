@@ -20,6 +20,7 @@ import { MARKE } from '@/lib/marke'
 import { VORSCHAU_LEISTE_HINWEIS, VORSCHAU_LEISTE_HINWEIS_MS } from '@/lib/hofseite-vorschau'
 import { useImVorschauRahmen } from '@/components/farm/vorschau-im-rahmen'
 import { NetzHinweis } from '@/components/ui/netz-hinweis'
+import { NotbremseBand } from '@/components/notbremse-band'
 
 /*
  * Die Shell der Kundenseiten im neuen Design (Gate 2): Kopfzeile im Browser,
@@ -72,7 +73,7 @@ function WarenkorbKopf({ anzahl, href }: { anzahl: number; href: string }) {
       className={cn('relative flex size-11 items-center justify-center rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN)}
     >
       <ShoppingBasket className="size-5" strokeWidth={1.7} aria-hidden="true" />
-      <Zaehler anzahl={anzahl} wofuer="Artikel im Korb" ton="gruen" className="absolute top-0.5 right-0 h-4 min-w-4 px-1 text-[9.5px]" />
+      <Zaehler anzahl={anzahl} wofuer="Artikel im Warenkorb" ton="gruen" className="absolute top-0.5 right-0 h-4 min-w-4 px-1 text-[9.5px]" />
     </Link>
   )
 }
@@ -239,6 +240,8 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, children }: Kun
       </header>
       {/* Kein Netz (Register N29): die Zeile unter dem Kopf, bis das Netz zurück ist. */}
       <NetzHinweis />
+      {/* Notbremse (Register N34, Nr. 189): das Band unter dem Kopf, solange neue Bestellungen angehalten sind. */}
+      <NotbremseBand />
 
       <main id={INHALT_ID} tabIndex={-1} className="outline-none">
         {children}
@@ -266,7 +269,7 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, children }: Kun
                       {korb && (
                         <Zaehler
                           anzahl={korb.anzahl}
-                          wofuer="Artikel im Korb"
+                          wofuer="Artikel im Warenkorb"
                           ton="orange"
                           className="absolute -top-1 -right-1 ring-2 ring-card"
                         />
@@ -350,6 +353,8 @@ export function KundeFokusShell({ titel, zurueck, rechts, aktion, children }: Ku
       </header>
       {/* Kein Netz (Register N29): die Zeile unter dem Kopf, bis das Netz zurück ist. */}
       <NetzHinweis />
+      {/* Notbremse (Register N34, Nr. 189): das Band unter dem Kopf, solange neue Bestellungen angehalten sind. */}
+      <NotbremseBand />
 
       <main id={INHALT_ID} tabIndex={-1} className={cn('outline-none', aktion && 'pb-28 md:pb-0')}>
         {children}

@@ -40,6 +40,7 @@ import { monatsgrenzenWien } from '@/lib/servicegebuehr'
 import { DEFAULT_SECTIONS, type SectionConfig } from '@/server/queries/appearance'
 import { ladeHoefeFuerGruendung, leseGruendungEinstellung } from '@/server/queries/admin'
 import { getMeldungenFuerAdmin } from '@/server/queries/meldung'
+import { HOF_SICHTBAR_WO } from '@/lib/hof-sichtbar'
 
 /*
  * Lesen rund um das Postfach (Register N12, Nachtlauf Nr. 87). Regeln
@@ -318,7 +319,7 @@ export async function zaehleRundschreibenImMonat(jetzt: Date): Promise<number> {
  */
 export async function ladeEmpfaengerHoefe(): Promise<EmpfaengerHof[]> {
   const hoefe = await prisma.farm.findMany({
-    where: { archivedAt: null },
+    where: { ...HOF_SICHTBAR_WO },
     orderBy: { name: 'asc' },
     select: {
       id: true,
@@ -348,7 +349,7 @@ export async function ladeEmpfaengerHoefe(): Promise<EmpfaengerHof[]> {
  * Gründungsplätze auf den Seiten, gruendungFuerSeiten) — ein stillgelegter Hof
  * kommt nie dran und ist keine Aufgabe.
  */
-const WARTENDER_HOF = { approvedAt: null, archivedAt: null } as const
+const WARTENDER_HOF = { approvedAt: null, ...HOF_SICHTBAR_WO } as const
 
 /**
  * Was im Eingang offen ist, gezählt — die EINE Zählung für die Zahl am Reiter
@@ -513,19 +514,16 @@ async function ladeMeldungenEingang(filter: EingangFilter): Promise<EingangMeldu
 /**
  * Die Rohdaten des Eingangs je Filter — gemischt und sortiert wird rein in
  * src/lib/postfach.ts (eingangEintraege). Was ein Filter nicht zeigt, wird
- * nicht geladen.
+ * nicht geladen. Seit Nr. 193 (N32) nur Gespräche: Aufgaben lädt Heute.
  */
-export async function ladeEingang(filter: EingangFilter, jetzt: Date): Promise<EingangRoh> {
+export async function ladeEingang(filter: EingangFilter): Promise<EingangRoh> {
   const mitAntworten = filter === 'offen' || filter === 'antwort' || filter === 'alle'
   const mitMeldungen = filter === 'offen' || filter === 'meldung' || filter === 'alle'
-  const mitAufgaben = filter === 'offen' || filter === 'aufgabe' || filter === 'alle'
-  const [antworten, meldungen, hoefe, erstattungen] = await Promise.all([
+  const [antworten, meldungen] = await Promise.all([
     mitAntworten ? ladeUnterhaltungenAdmin() : Promise.resolve([]),
     mitMeldungen ? ladeMeldungenEingang(filter) : Promise.resolve([]),
-    mitAufgaben ? ladeHofAufgaben(jetzt) : Promise.resolve([]),
-    mitAufgaben ? ladeErstattungAufgaben() : Promise.resolve([]),
   ])
-  return { antworten, meldungen, hoefe, erstattungen }
+  return { antworten, meldungen }
 }
 
 // ─── Zustellung (Register N14, Nr. 95) ───────────────────────────────────────

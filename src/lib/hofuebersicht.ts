@@ -333,7 +333,10 @@ export function filtereHoefe<H extends { kategorien: ProductCategoryValue[] }>(
 export type VorschauProdukt = {
   id: string
   name: string
+  /** Im Hofpreis-Modell (N38, Nr. 197) schon der Endpreis — dann ist `inklPlattformgebuehr` gesetzt. */
   price: number
+  /** N38: Der Preis enthält die Plattformgebühr — die Zeilen sagen es einmal darunter. */
+  inklPlattformgebuehr?: boolean
   unit: string
   unitSize: number | null
   imageUrl: string | null

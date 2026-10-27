@@ -13,16 +13,15 @@ export const PROFIL_MELDUNG = {
   phoneKurz: 'Die Telefonnummer ist zu kurz – bitte mit Vorwahl, damit Kundinnen dich erreichen.',
   /** Die Hof-E-Mail ist freiwillig: ungültig heißt „korrigieren oder leer lassen". Derselbe Satz beim Anlegen. */
   email: 'Bitte gib eine gültige Hof-E-Mail an — oder lass das Feld leer.',
-  /** Ein Hof mit gespeicherter Hof-E-Mail darf sie nicht leeren: Bestellmails gehen dorthin. */
-  emailPflicht: 'Bitte lass die Hof-E-Mail stehen – an sie gehen deine Bestellmeldungen.',
 } as const
 
 /**
- * Die Hilfe unter der Hof-E-Mail: nur, wo sie steht. Keine Zusage zu einem
- * Rückfall auf die Anmelde-Adresse – die Leser der Bestellmails haben keinen
- * (src/lib/email.ts liest Farm.email allein).
+ * Die Hilfe unter der Hof-E-Mail: wo sie steht und was ohne sie gilt. Der
+ * Rückfall auf die Anmelde-Adresse steckt in hofKontaktEmail
+ * (src/lib/hof-kontakt.ts, Nr. 194) — für alle, die den Hof anschreiben.
  */
-export const HOF_EMAIL_HILFE = 'Sie steht für Kundinnen auf der Bestellseite, damit sie dich erreichen.'
+export const HOF_EMAIL_HILFE =
+  'Sie steht für Kundinnen auf der Bestellseite. Lässt du sie leer, schicken wir deine Bestellmeldungen an deine Anmelde-Adresse.'
 
 /** Der Zusatz an einem freiwilligen Feld – statt „*" an jedem Pflichtfeld (wie in der Kasse). */
 export const FREIWILLIG = '(freiwillig)'

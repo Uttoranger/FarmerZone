@@ -127,7 +127,7 @@ function neuGebaut(slug: string): void {
 beforeEach(() => {
   vi.clearAllMocks()
   getSession.mockResolvedValue(adminSitzung('admin_1') as never)
-  db.user.findUnique.mockResolvedValue({ isAdmin: true })
+  db.user.findUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true })
   db.farm.updateMany.mockResolvedValue({ count: 1 })
   db.farm.findUniqueOrThrow.mockResolvedValue({ slug: 'testhof-b' })
   einstellung(12)

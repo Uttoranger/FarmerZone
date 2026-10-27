@@ -23,6 +23,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { adminSitzung } from './admin-sitzung'
 
 // draftMode ist eine Attrappe, die nie „an" ist: Die Vorschau darf ihn nicht brauchen.
 vi.mock('next/headers', () => ({
@@ -30,7 +31,8 @@ vi.mock('next/headers', () => ({
   draftMode: vi.fn(async () => ({ isEnabled: false, enable: vi.fn() })),
 }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
-vi.mock('@/lib/prisma', () => ({ prisma: { user: { findUnique: vi.fn() } } }))
+// Seit Nr. 188 prüft die Vorschau über die echte Admin-Wache (Passkey der Sitzung, Recht „Startseite“) — Sitzung aus tests/admin-sitzung.ts.
+vi.mock('@/lib/prisma', async () => ({ prisma: { user: { findUnique: vi.fn() }, session: { deleteMany: vi.fn() }, ...(await import('./admin-sitzung')).passkeyAttrappen() } }))
 // Für die Seite: Shell und Inhalt als Marken, die Zeilen als Attrappe.
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
@@ -143,8 +145,8 @@ describe('leseStartseitenVorschau — die Lese-Funktion der Vorschau-Seite (Nr. 
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'admin-1' } } as never)
-    vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true } as never)
+    vi.mocked(auth.api.getSession).mockResolvedValue(adminSitzung('admin-1') as never)
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
   })
 
   it('liefert mit gültigem Link und Admin-Sitzung den Inhalt — ohne Draft Mode', async () => {
@@ -152,7 +154,19 @@ describe('leseStartseitenVorschau — die Lese-Funktion der Vorschau-Seite (Nr. 
     expect(draftMode).not.toHaveBeenCalled()
     // Die Sitzung kommt aus den Headern dieser Anfrage, frisch geprüft.
     expect(headers).toHaveBeenCalledTimes(1)
-    expect(prisma.user.findUnique).toHaveBeenCalledTimes(1)
+    // Das Recht genau einmal frisch aus der Datenbank (dazu liest die Wache `adminSeit` für die Passkey-Pflicht).
+    expect(vi.mocked(prisma.user.findUnique).mock.calls.filter(([frage]) => frage?.select && 'adminRechte' in frage.select)).toHaveLength(1)
+  })
+
+  it('gibt mit Admin-Sitzung ohne Passkey oder ohne das Recht „Startseite veröffentlichen“ null (Nr. 188, Audit A2/B1)', async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'admin-1' }, session: { id: 's', createdAt: new Date(), passkeyAm: null } } as never)
+    expect(await leseStartseitenVorschau(link(), JETZT)).toBeNull()
+    vi.mocked(auth.api.getSession).mockResolvedValue(adminSitzung('admin-1') as never)
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true, adminInhaber: false, adminRechte: ['geld'] } as never)
+    expect(await leseStartseitenVorschau(link(), JETZT)).toBeNull()
+    // Gegenprobe: mit dem Recht wieder der Inhalt.
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true, adminInhaber: false, adminRechte: ['startseite_veroeffentlichen'] } as never)
+    expect(await leseStartseitenVorschau(link(), JETZT)).not.toBeNull()
   })
 
   it('gibt ohne Sitzung null', async () => {
@@ -185,8 +199,8 @@ describe('Seite /startseite-vorschau (Nr. 182)', () => {
     vi.clearAllMocks()
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(JETZT)
-    vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'admin-1' } } as never)
-    vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true } as never)
+    vi.mocked(auth.api.getSession).mockResolvedValue(adminSitzung('admin-1') as never)
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
     return () => vi.useRealTimers()
   })
 

@@ -1,3 +1,4 @@
+import { hofSichtbar } from '@/lib/hof-sichtbar'
 import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
 import * as Sentry from '@sentry/nextjs'
@@ -7,11 +8,13 @@ import { bremseCheckout } from '@/server/bremse-datenbank'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
+import { HOF_GESPERRT_SATZ } from '@/lib/bereiche-anzeige'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendOnsiteConfirmation } from '@/lib/email'
 import { checkoutRequestSchema } from '@/schemas/checkout'
 import {
+  alsCents,
   calcLineTotal,
   calcTotalAmount,
   calcPlatformFeeAmount,
@@ -19,7 +22,10 @@ import {
   preisAbweichungen,
 } from '@/lib/order-totals'
 import { berechneServicegebuehr } from '@/lib/servicegebuehr'
-import { pruefeSitzungsWarenkorb } from '@/server/warenkorb'
+import { GEBUEHR_MODELL_HOFPREIS, bestellGebuehr, einzugFuer, istHofpreisBestellung, mindestbestellwertErreicht, type GebuehrEinzug } from '@/lib/plattformgebuehr'
+import { BAR_NICHT_MOEGLICH_SATZ, MINDESTBESTELLWERT_SATZ } from '@/lib/konditionen'
+import { ladeGebuehrLage } from '@/server/queries/plattform-einstellung'
+import { BESTELLSTOPP_CODE, pruefeBestellstopp, pruefeSitzungsWarenkorb } from '@/server/warenkorb'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { bestellPositionsName } from '@/lib/eingabegrenzen'
@@ -37,7 +43,13 @@ import {
   zahlungNichtMoeglichText,
 } from '@/lib/stripe-konto'
 import { vermerkeUnbekanntesHofKonto } from '@/server/hofkonto-unbekannt'
-import { CODE_ZAHLART_NICHT_ANGEBOTEN, ZAHLART_NICHT_ANGEBOTEN, zahlartFuerNeueBestellung } from '@/lib/kasse'
+import {
+  CODE_BAR_NICHT_MOEGLICH,
+  CODE_MINDESTBESTELLWERT,
+  CODE_ZAHLART_NICHT_ANGEBOTEN,
+  ZAHLART_NICHT_ANGEBOTEN,
+  zahlartFuerNeueBestellung,
+} from '@/lib/kasse'
 import { neuerBarToken } from '@/lib/bar-bestaetigung'
 import {
   pruefeBetriebsnachweis,
@@ -105,6 +117,11 @@ async function gibBestandZurueck(gebucht: Array<{ productId: string; quantity: n
   }
 }
 
+/** 600 Hundertstel → „6.00“ — der Satz für `serviceFeePercentApplied` (Decimal) ohne Gleitkomma. */
+function hundertstelAlsDezimal(hundertstel: number): string {
+  return `${Math.floor(hundertstel / 100)}.${String(hundertstel % 100).padStart(2, '0')}`
+}
+
 const CODE_BESTELLUNG_IN_ARBEIT = 'BESTELLUNG_IN_ARBEIT'
 const CODE_BESTELLUNG_BEENDET = 'BESTELLUNG_BEENDET'
 
@@ -145,18 +162,28 @@ function istStripeKonflikt(err: unknown): boolean {
  * Bestellung, damit die Wiederholung mit `pi-<id>` exakt dieselben schickt
  * (Stripe lehnt einen Schlüssel mit anderen Parametern ab).
  *
- * LADUNGSTYP: destination charge (transfer_data.destination) OHNE
- * on_behalf_of — die Zahlung entsteht auf dem PLATTFORMKONTO, Stripe zieht
- * seine Gebühren dort ab. Überwiesen wird dem Hof der VOLLE Betrag (kein
+ * ZWEI LADUNGSTYPEN, je nach dem gespeicherten `Order.gebuehrModell`:
+ *
+ * Modell `bisher` (null, Servicegebühr, E4/B1): destination charge
+ * (transfer_data.destination) OHNE on_behalf_of — die Zahlung entsteht auf
+ * dem PLATTFORMKONTO, die Plattform ist Händler, Stripe zieht seine Gebühren
+ * dort ab. Überwiesen wird dem Hof der VOLLE Betrag (kein
  * transfer_data.amount); die application_fee_amount geht danach vom Hof an
  * die Plattform — netto bleibt ihm amount − application_fee_amount.
- * Deshalb: amount = Warenpreis + Servicegebühr und
- * application_fee_amount = Servicegebühr (+ Plattformgebühr, im Pilot 0)
- * → dem Hof fließt exakt der Warenpreis zu, die Plattform trägt die
- * Stripe-Kosten aus der Servicegebühr. Der Storno holt das spiegelbildlich
- * zurück — reverse_transfer UND refund_application_fee (cancelOrder). Wer
- * den Ladungstyp hier ändert, ändert ihn dort mit
- * (tests/storno-erstattung.test.ts, Ladungstyp-Wache).
+ *
+ * Modell `hofpreis` (Register N38, Nr. 197): dieselbe destination charge
+ * MIT on_behalf_of = Stripe-Konto des Hofs — der Hof ist Händler, die
+ * Plattformgebühr ist Teil seines Preises. Stripe-Gebühren trägt weiter die
+ * Plattform (Destination Charges, N37).
+ *
+ * In BEIDEN Modellen: amount = Warenpreis + Gebühr (`serviceFeeCents`) und
+ * application_fee_amount = Gebühr (+ Provision `platformFeeAmount`, im Pilot
+ * 0) → dem Hof fließt exakt der Warenpreis zu (100 %). Der Storno holt das
+ * spiegelbildlich zurück — reverse_transfer UND refund_application_fee
+ * (cancelOrder); on_behalf_of ändert daran nichts. Wer den Ladungstyp hier
+ * ändert, ändert ihn dort mit (tests/storno-erstattung.test.ts,
+ * Ladungstyp-Wache). Bestellungen im Modell `bisher` bekommen exakt die
+ * Parameter wie vor Nr. 197 — auch die Wiederholung mit `pi-<id>`.
  */
 function intentParameter(
   bestellung: {
@@ -166,6 +193,7 @@ function intentParameter(
     totalAmount: Prisma.Decimal
     platformFeeAmount: Prisma.Decimal
     serviceFeeCents: number
+    gebuehrModell: string | null
   },
   hofKonto: string
 ): Stripe.PaymentIntentCreateParams {
@@ -177,6 +205,8 @@ function intentParameter(
     metadata: { orderId: bestellung.id, orderNumber: bestellung.orderNumber, farmId: bestellung.farmId },
     transfer_data: { destination: hofKonto },
     ...(feeAmountCents > 0 ? { application_fee_amount: feeAmountCents } : {}),
+    // Nur im Hofpreis-Modell ist der Hof Händler (N38) — `bisher` bleibt Zeichen für Zeichen wie vorher.
+    ...(istHofpreisBestellung(bestellung) ? { on_behalf_of: hofKonto } : {}),
   }
 }
 
@@ -270,6 +300,7 @@ async function antwortFuerBestehendeBestellung(
       totalAmount: true,
       platformFeeAmount: true,
       serviceFeeCents: true,
+      gebuehrModell: true,
       farm: { select: { slug: true, stripeAccountId: true, acceptsOnsite: true } },
     },
   })
@@ -418,6 +449,16 @@ export async function POST(request: NextRequest) {
   const wiederholung = await antwortFuerBestehendeBestellung(data.idempotencyKey, data.sessionId)
   if (wiederholung) return wiederholung
 
+  // 0b. NOTBREMSE (Register N34, Nr. 189) — vor dem Hof und vor allem, was
+  //     schreibt: Der Admin hat neue Bestellungen auf allen Höfen angehalten.
+  //     Dieselbe Prüfung wie die Kette von /api/reserve (pruefeBestellstopp),
+  //     frisch gelesen, Ende beim Lesen. Nach Schritt 0: Eine schon angelegte
+  //     Bestellung (gleicher Schlüssel) bekommt weiter ihre Antwort.
+  const stopp = await pruefeBestellstopp(new Date())
+  if (stopp) {
+    return konflikt(data.idempotencyKey, data.sessionId, { error: stopp.text, code: BESTELLSTOPP_CODE })
+  }
+
   // 1. Load farm
   const farm = await prisma.farm.findUnique({
     where: { id: data.farmId },
@@ -430,7 +471,8 @@ export async function POST(request: NextRequest) {
   // 1b. Stilllegung — fail-closed und VOR der Pause geprüft: der dauerhafte
   // Zustand sticht den vorübergehenden, damit ein stillgelegter Hof nie die
   // Pausen-Meldung ausgibt ("bald wieder da" wäre eine falsche Zusage).
-  if (farm.archivedAt) {
+  // Ein geschlossenes Konto (N36, Nr. 190) gilt hier wie stillgelegt (hofSichtbar).
+  if (!hofSichtbar(farm)) {
     return konflikt(data.idempotencyKey, data.sessionId, { error: FARM_ARCHIVED_MESSAGE })
   }
 
@@ -439,6 +481,13 @@ export async function POST(request: NextRequest) {
   // war nie offen (siehe src/lib/farm-approval.ts).
   if (!farm.approvedAt) {
     return konflikt(data.idempotencyKey, data.sessionId, { error: FARM_NOT_APPROVED_MESSAGE })
+  }
+
+  // 1b³. Sperre durch das Team (Register N34, Nr. 187) — dieselbe Stelle der
+  // Prüfkette wie in pruefeKaufbarkeitHoefe (nach der Freischaltung, vor der
+  // Pause), mit dem neutralen Satz; der Grund bleibt im Admin.
+  if (farm.adminGesperrtAm) {
+    return konflikt(data.idempotencyKey, data.sessionId, { error: HOF_GESPERRT_SATZ })
   }
 
   // 1c. Shop-Pause — fail-closed VOR jeder Bestell- und Zahlungslogik:
@@ -599,7 +648,58 @@ export async function POST(request: NextRequest) {
   //     Mit der Zahlungsart (Register B1): bar vor dem SEPA-Start 0 Cent, nach
   //     der Server-Uhr dieses Requests — nie nach dem, was der Browser zeigte.
   const warenpreisCents = decimalZuCents(totalAmount)
-  const servicegebuehr = berechneServicegebuehr(warenpreisCents, farm, now, data.paymentMethod)
+
+  // 5c. PLATTFORMGEBÜHR IM HOFPREIS (Register N38, Nr. 197) — ab dem Stichtag
+  //     „Hofpreis-Modell ab“ nach der Server-Uhr dieses Requests. Vorher (und
+  //     für jede Bestellung im Modell `bisher`) gilt 5b unverändert.
+  //     Die Gebühr ist die Summe aus Menge × Gebühr je Stück (aufgerundet),
+  //     für online und bar dieselbe; jede Summe kommt aus plattformgebuehr.ts.
+  const lage = await ladeGebuehrLage(farm, now)
+  let gebuehr: {
+    gebuehrCents: number
+    /** Der Satz für `serviceFeePercentApplied`: Decimal-Text im Hofpreis-Modell, sonst wie bisher. */
+    prozent: number | string | null
+    mindestCents: number | null
+    modell: string | null
+    einzug: GebuehrEinzug | null
+    jePosition: number[] | null
+  }
+  if (lage.modell === 'hofpreis') {
+    // Mindestbestellwert (N38): 10 € WARENWERT je Bestellung — vor jeder Buchung.
+    if (!mindestbestellwertErreicht(warenpreisCents)) {
+      return NextResponse.json({ error: MINDESTBESTELLWERT_SATZ, code: CODE_MINDESTBESTELLWERT }, { status: 400 })
+    }
+    // Bar nur, wenn die Gebühr einen Weg zur Plattform hat (barMoeglich, N38);
+    // sonst 409 mit neutralem Satz, die Kasse bietet dann nur online an.
+    // Zahlart ist hier ONLINE oder ONSITE_CASH (2a).
+    const einzug = einzugFuer(lage, data.paymentMethod as 'ONLINE' | 'ONSITE_CASH', now)
+    if (einzug === null) {
+      return NextResponse.json({ error: BAR_NICHT_MOEGLICH_SATZ, code: CODE_BAR_NICHT_MOEGLICH, barAus: true }, { status: 409 })
+    }
+    const summe = bestellGebuehr(
+      positionen.map((p) => ({ preisCents: alsCents(p.unitPrice), menge: p.quantity })),
+      lage.hundertstel
+    )
+    gebuehr = {
+      gebuehrCents: summe.gebuehrCents,
+      // Hundertstel-Prozent als Decimal-Text (600 → „6.00“) — kein Float auf dem Weg in die Spalte.
+      prozent: hundertstelAlsDezimal(lage.hundertstel),
+      mindestCents: 0,
+      modell: GEBUEHR_MODELL_HOFPREIS,
+      einzug,
+      jePosition: summe.jePosition,
+    }
+  } else {
+    const servicegebuehr = berechneServicegebuehr(warenpreisCents, farm, now, data.paymentMethod)
+    gebuehr = {
+      gebuehrCents: servicegebuehr.gebuehrCents,
+      prozent: servicegebuehr.prozentAngewendet,
+      mindestCents: servicegebuehr.prozentAngewendet === null ? null : farm.serviceFeeMinCents,
+      modell: null,
+      einzug: null,
+      jePosition: null,
+    }
+  }
 
   // 6. Order number (retry on collision — astronomically unlikely)
   let orderNumber = generateOrderNumber(data.farmSlug)
@@ -646,6 +746,7 @@ export async function POST(request: NextRequest) {
     totalAmount: Prisma.Decimal
     platformFeeAmount: Prisma.Decimal
     serviceFeeCents: number
+    gebuehrModell: string | null
   }
   try {
     // Bei einem Fenster mit Höchstzahl: zählen und anlegen in EINER
@@ -669,17 +770,21 @@ export async function POST(request: NextRequest) {
         platformFeeAmount,
         // Snapshot der Servicegebühr — spätere Änderungen der Hofeinstellung
         // lassen diese Bestellung unverändert (prisma/schema.prisma, Order).
-        serviceFeeCents: servicegebuehr.gebuehrCents,
-        serviceFeePercentApplied: servicegebuehr.prozentAngewendet,
+        serviceFeeCents: gebuehr.gebuehrCents,
+        serviceFeePercentApplied: gebuehr.prozent,
         // Snapshot der Mindestgebühr (E14, Nr. 19): „Artikel fehlt" rechnet die
         // Gebühr auf den Rest mit genau dieser Regel neu, nie mit der heutigen
         // Hofeinstellung. null, wenn keine Gebühr gilt — wie der Prozentsatz,
         // also auch bar vor dem SEPA-Start (B1): Gebühr 0 bleibt dort 0.
-        serviceFeeMinCentsApplied: servicegebuehr.prozentAngewendet === null ? null : farm.serviceFeeMinCents,
+        // Im Hofpreis-Modell 0 (N38: keine Mindestgebühr).
+        serviceFeeMinCentsApplied: gebuehr.mindestCents,
+        // N38: Modell und Einzugsweg im Snapshot — null im Modell `bisher`.
+        gebuehrModell: gebuehr.modell,
+        gebuehrEinzug: gebuehr.einzug,
         kaeuferArt: data.kaeuferArt,
         betriebsnummer: betriebsnummerFuerBestellung(data.kaeuferArt, data.betriebsnummer),
         items: {
-          create: positionen.map((i) => ({
+          create: positionen.map((i, index) => ({
             productId: i.productId,
             productName: i.name,
             unitPrice: i.unitPrice,
@@ -690,6 +795,8 @@ export async function POST(request: NextRequest) {
             // rückwirkend ändern (Invariante ARCHITECTURE.md §5). Die Map ist
             // oben vollständig geprüft (3b).
             vatRate: produktJeId.get(i.productId)!.vatRate,
+            // N38: die Gebühr dieser Position (Menge × Gebühr je Stück) — „Artikel fehlt“ zieht genau sie ab.
+            gebuehrCents: gebuehr.jePosition?.[index] ?? 0,
           })),
         },
       },
@@ -701,6 +808,7 @@ export async function POST(request: NextRequest) {
         totalAmount: true,
         platformFeeAmount: true,
         serviceFeeCents: true,
+        gebuehrModell: true,
       },
     }))
   } catch (e) {
@@ -842,7 +950,8 @@ export async function POST(request: NextRequest) {
           customerEmail: data.customerEmail,
           customerPhone: data.customerPhone,
           totalAmount,
-          serviceFeeCents: servicegebuehr.gebuehrCents,
+          serviceFeeCents: gebuehr.gebuehrCents,
+          gebuehrModell: gebuehr.modell,
           // Nur für die Frist im Mailtext (fristVon) — dieselbe Zeit, ab der die Bestellung verfällt.
           createdAt: order.createdAt,
           pickupDate,
@@ -860,11 +969,12 @@ export async function POST(request: NextRequest) {
             city: farm.city,
             phone: farm.phone,
           },
-          items: positionen.map((i) => ({
+          items: positionen.map((i, index) => ({
             productName: i.name,
             quantity: i.quantity,
             unitPrice: i.unitPrice,
             totalPrice: calcLineTotal(i.unitPrice, i.quantity),
+            gebuehrCents: gebuehr.jePosition?.[index] ?? 0,
             product: einheit.get(i.productId) ?? null,
           })),
         },

@@ -4,8 +4,9 @@ import { Clock, Download, Info } from 'lucide-react'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { ladeGroessteTabellen, ladeLaeufe, ladeMessungenFuerSeite, ladeWarnungen, letzteMessungAm } from '@/server/queries/betrieb'
 import { zaehleProbleme } from '@/server/queries/mails'
-import { alleArtenAus, alleMailsAus, betriebReiterAus, mailSucheAus } from '@/schemas/betrieb-mails'
-import { STRIPE_MARKE, UMGEBUNG } from '@/lib/umgebung-server'
+import { alleArtenAus, alleMailsAus, betriebReiterAus, mailSucheAus, protokollFilterAus } from '@/schemas/betrieb-mails'
+import { STRIPE_MARKE, TESTBETRIEB, UMGEBUNG } from '@/lib/umgebung-server'
+import { env } from '@/lib/env'
 import {
   ABLAEUFE,
   ADMIN_BETRIEB_HREF,
@@ -16,6 +17,7 @@ import {
   betriebKacheln,
   betriebVerlauf,
   gemessenText,
+  istMailWarnArt,
   ohneVerwendungKarte,
   OHNE_VERWENDUNG_ANKER,
   speicherText,
@@ -30,15 +32,24 @@ import { formatZahl } from '@/lib/format'
 import { MARKE } from '@/lib/marke'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { LEISE } from '@/components/hof-bestellungen/stil'
+import { KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
+import { ADMIN_HEUTE_HREF } from '@/lib/admin-aufgaben'
 import { ADMIN_RAHMEN, AdminFehler } from '@/components/admin/admin-teile'
 import { Seitenkopf } from '@/components/admin/seitenkopf'
 import { JetztMessen } from './jetzt-messen'
+import { DIENSTE_TEXT, dienstZeilen, versionZeilen } from './dienste'
+import { ladeLetzteMigration, messeAntwort } from './version'
 import { MailsAnsicht } from './mails-ansicht'
 import { MailsAlle } from './mails-alle'
+import { ProtokollAnsicht } from './protokoll-ansicht'
+import Link from 'next/link'
 import {
   AblaeufeListe,
+  AlarmMatrixListe,
+  AlarmMatrixTabelle,
   BetriebUnterreiter,
+  DiensteInhalt,
+  VersionInhalt,
   AblaeufeRegel,
   AblaeufeTabelle,
   BilderOhneVerwendung,
@@ -90,13 +101,14 @@ async function zaehleProblemeSicher(jetzt: Date): Promise<number | null> {
 }
 
 async function ladeDaten(jetzt: Date) {
-  const [messungen, warnungen, laeufe, letzte, tabellen, mailsOffen] = await Promise.all([
+  const [messungen, warnungen, laeufe, letzte, tabellen, mailsOffen, antwortMs] = await Promise.all([
     ladeMessungenFuerSeite(jetzt),
     ladeWarnungen(),
     ladeLaeufe(),
     letzteMessungAm(),
     ladeTabellenSicher(),
     zaehleProblemeSicher(jetzt),
+    messeAntwort(),
   ])
   const produktion = UMGEBUNG.vercelProduktion
   const kacheln = betriebKacheln(messungen, jetzt)
@@ -107,6 +119,22 @@ async function ladeDaten(jetzt: Date) {
   const ohneVerwendungBytes = ohneVerwendung && ohneVerwendung.bytes > 0 ? ohneVerwendung.bytes : null
   const eintraege = warnEintraege(warnungen, kacheln, zeilen, messungen, jetzt, produktion, ohneVerwendungBytes)
   const puenktlich = zeilen.filter((z) => z.stand === 'puenktlich').length
+  // Karten „Dienste“ und „Version“ (Nr. 184): der Uptime-Dienst hat seine eigene Zeile, „Abläufe“ zählt nur die Crons.
+  const crons = zeilen.filter((z) => z.name !== 'von-aussen')
+  const datenbank = kacheln.find((k) => k.id === 'datenbank')
+  const vonAussen = laeufe.get('von-aussen') ?? null
+  const dienste = dienstZeilen(
+    {
+      stripe: STRIPE_MARKE,
+      testbetrieb: TESTBETRIEB,
+      mailWarnungOffen: warnungen.some((w) => w.stufe > 0 && istMailWarnArt(w.art)),
+      datenbank: datenbank?.wert ? `${datenbank.wert} ${datenbank.von}` : null,
+      antwortMs,
+      ablaeufe: { puenktlich: crons.filter((z) => z.stand === 'puenktlich').length, von: crons.length, ausgefallen: crons.some((z) => z.stand === 'ueberfaellig' || z.stand === 'fehler') },
+      vonAussen: { stand: zeilen.find((z) => z.name === 'von-aussen')?.stand ?? 'nochKeinLauf', gestartetAm: vonAussen?.gestartetAm ?? null },
+    },
+    jetzt
+  )
   const sonstGruen = kacheln.filter((k) => k.warnt).length <= eintraege.length && zeilen.every((z) => z.stand === 'puenktlich' || z.stand === 'nochKeinLauf')
   return {
     produktion,
@@ -124,6 +152,7 @@ async function ladeDaten(jetzt: Date) {
     tabellen: tabellen?.zeilen ?? null,
     tabellenZusammen: tabellen === null ? null : BETRIEB_TEXT.tabellenZusammen(speicherText(tabellen.bytes)),
     mailsOffen,
+    dienste,
   }
 }
 
@@ -147,17 +176,26 @@ async function ladeDaten(jetzt: Date) {
  * Seit Nr. 161 zwei Unterreiter: „Überblick“ (diese Seite) und „E-Mails“
  * (`?reiter=mails`, MailsAnsicht in mails-ansicht.tsx). Seit Nr. 167 darin
  * „Alle Mails“ (`?reiter=mails&liste=alle`, MailsAlle in mails-alle.tsx).
+ * Seit Nr. 184 im Überblick die Karten „Dienste“ (je mit Prüfweg),
+ * „Version“ und „Alarm-Matrix“ (Board admin-betrieb-neu; dienste.ts).
+ * Seit Nr. 193 (Register N32/N33) die Unterreiter Überblick · E-Mails ·
+ * Protokoll (`?reiter=protokoll`, ProtokollAnsicht) · Version
+ * (`?reiter=version`, die Karte „Version“ aus dem Überblick); die Warnkarte
+ * im Überblick verweist auf Heute, wo jede Aufgabe mit Frist steht.
  */
 export default async function AdminBetriebPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }): Promise<React.JSX.Element> {
-  await verlangeAdminSeite()
+  const ich = await verlangeAdminSeite()
 
   const jetzt = new Date()
   const parameter = await searchParams
-  if (betriebReiterAus(parameter.reiter) === 'mails') {
+  const reiter = betriebReiterAus(parameter.reiter)
+  if (reiter === 'protokoll') return <ProtokollAnsicht f={protokollFilterAus(parameter)} ich={ich} jetzt={jetzt} mailsOffen={await zaehleProblemeSicher(jetzt)} />
+  if (reiter === 'version') return <VersionAnsicht jetzt={jetzt} />
+  if (reiter === 'mails') {
     const suche = typeof parameter.suche === 'string' ? parameter.suche : ''
     // Seit Nr. 167: „Alle Mails“ (`&liste=alle`) mit Filter, Detail und Nochmal schicken.
     const alle = alleMailsAus(parameter)
@@ -211,9 +249,32 @@ export default async function AdminBetriebPage({
           </p>
         )}
 
-        {daten.eintraege.length > 0 && <Warnkarte eintraege={daten.eintraege} gruen={daten.gruen} ohneVerwendung={daten.warnungBilder} />}
+        {daten.eintraege.length > 0 && (
+          <Warnkarte
+            eintraege={daten.eintraege}
+            gruen={daten.gruen}
+            ohneVerwendung={daten.warnungBilder}
+            aktionen={
+              <Link href={ADMIN_HEUTE_HREF} className={cn(KNOPF_RAHMEN, 'font-semibold')}>
+                {BETRIEB_TEXT.warnungInHeute}
+              </Link>
+            }
+          />
+        )}
 
         <Kacheln kacheln={daten.kacheln} ohneVerwendung={daten.davonOhneVerwendung} />
+
+        {/* Nr. 184 (Board admin-betrieb-neu): ab 1024 px links Dienste und Version, rechts die Alarm-Matrix. */}
+        <div className="hidden gap-[18px] lg:grid lg:grid-cols-2 lg:items-start">
+          <div className="flex min-w-0 flex-col gap-[18px]">
+            <Karte titel={DIENSTE_TEXT.titel} zusatz={DIENSTE_TEXT.zusatz}>
+              <DiensteInhalt zeilen={daten.dienste} />
+            </Karte>
+          </div>
+          <Karte titel={DIENSTE_TEXT.matrixTitel} zusatz={DIENSTE_TEXT.matrixZusatz}>
+            <AlarmMatrixTabelle />
+          </Karte>
+        </div>
 
         {/* Ab 1024 px: links Verlauf, Abläufe, Tabellen; rechts Tarife und Dashboard (Mockup admin-betrieb). */}
         <div className="hidden gap-[18px] lg:grid lg:grid-cols-[minmax(0,1fr)_468px] lg:items-start">
@@ -251,6 +312,12 @@ export default async function AdminBetriebPage({
         {/* Am Handy (Mockup mobil-admin-betrieb): Abläufe offen, der Rest zugeklappt. */}
         <div className="flex flex-col gap-3 lg:hidden">
           <AblaeufeListe zeilen={daten.zeilen} puenktlich={daten.puenktlich} />
+          <Klappkarte titel={DIENSTE_TEXT.titel} zeile={DIENSTE_TEXT.zusatz}>
+            <DiensteInhalt zeilen={daten.dienste} />
+          </Klappkarte>
+          <Klappkarte titel={DIENSTE_TEXT.matrixTitel} zeile={DIENSTE_TEXT.matrixZusatz}>
+            <AlarmMatrixListe />
+          </Klappkarte>
           <BilderOhneVerwendung karte={daten.ohneVerwendung} produktion={daten.produktion} anker={OHNE_VERWENDUNG_ANKER.handy} />
           <Klappkarte titel={BETRIEB_TEXT.verlaufTitel} zeile={verlaufKurz(daten.verlauf.linien)}>
             <VerlaufLegende linien={daten.verlauf.linien} />
@@ -278,6 +345,28 @@ export default async function AdminBetriebPage({
           </a>
           <span>{BETRIEB_TEXT.csvSatz}</span>
         </p>
+      </BetriebUnterreiter>
+    </div>
+  )
+}
+
+/**
+ * Unterreiter „Version“ (Nr. 193, N32): Stand, Migration und Nachtlauf — die
+ * Karte, die bis dahin im Überblick stand (Nr. 184, dienste.ts). Scheitert das
+ * Lesen der Migration, steht dort „nicht lesbar“ (ladeLetzteMigration).
+ */
+async function VersionAnsicht({ jetzt }: { jetzt: Date }): Promise<React.JSX.Element> {
+  const [migration, mailsOffen] = await Promise.all([ladeLetzteMigration(), zaehleProblemeSicher(jetzt)])
+  const version = versionZeilen(env.VERCEL_GIT_COMMIT_SHA ?? null, UMGEBUNG.branch, migration, jetzt)
+  return (
+    <div className={cn(ADMIN_RAHMEN, 'flex flex-col gap-4 lg:gap-[18px]')}>
+      <Seitenkopf titel={BETRIEB_TEXT.titel} satz={BETRIEB_TEXT.satz} />
+      <BetriebUnterreiter aktiv="version" offen={mailsOffen}>
+        <div className="max-w-[720px]">
+          <Karte titel={DIENSTE_TEXT.versionTitel} zusatz={DIENSTE_TEXT.versionZusatz}>
+            <VersionInhalt zeilen={version} />
+          </Karte>
+        </div>
       </BetriebUnterreiter>
     </div>
   )

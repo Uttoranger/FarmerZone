@@ -19,6 +19,7 @@ import {
 } from '@/lib/gruendungshof'
 import { PLATTFORM_EINSTELLUNG_ID, PLATTFORM_EINSTELLUNG_SELECT, gruendungEinstellungAus, plattformEinstellungAus } from '@/lib/plattform-einstellung'
 import { IM_SHOP_WHERE } from '@/server/queries/einstellungen'
+import { AKTIVITAET_TAGE } from '@/lib/admin-hoefe-liste'
 
 /**
  * Die Monatsspalten je Hof (Sprint servicegebuehr, E-3) — das Fundament der
@@ -108,6 +109,16 @@ export type AdminFarmRow = {
   abholzeitAktiv: boolean
   /** Was der Freischalt-Dialog zur Gründung sagt (nur wartende Höfe), mit den Plätzen der Einstellung. */
   freischaltHinweis: FreischaltHinweis | null
+  /** Regelbetrieb (Nr. 187): Konto geschlossen (N36) und Sperre durch das Team (N34) — nur die Zeitpunkte. */
+  geschlossenAm: Date | null
+  adminGesperrtAm: Date | null
+  /** Der Ort des Hofs (Farm.city) — für Liste und Suche, nie die Straße. */
+  ort: string
+  /** Bestellungen der letzten 30 Tage ohne stornierte und ohne Testzahlungen; die jüngste Bestellung überhaupt. */
+  bestellungen30: number
+  letzteBestellungAm: Date | null
+  /** Jüngste Sitzung des Inhabers (Session.updatedAt) — „zuletzt aktiv“. */
+  zuletztAktivAm: Date | null
 }
 
 /**
@@ -179,6 +190,24 @@ async function monatsSpaltenJeHof(von: Date, bis: Date, stripeLiveAb: Date | nul
 }
 
 /**
+ * Bestellungen der letzten 30 Tage und die jüngste Bestellung je Hof (Nr. 187,
+ * Liste und Signal „lange ohne Bestellung“) — EINE gruppierte Abfrage für alle
+ * Höfe, ohne Testzahlungen (`ohneTestzahlungenSql`).
+ */
+async function aktivitaetJeHof(seit: Date, stripeLiveAb: Date | null): Promise<Map<string, { bestellungen30: number; letzteBestellungAm: Date | null }>> {
+  const zeilen = await prisma.$queryRaw<Array<{ farmId: string; bestellungen30: number; letzte: Date | null }>>(Prisma.sql`
+    SELECT
+      "farmId",
+      COUNT(*) FILTER (WHERE "createdAt" >= ${seit} AND "status" <> 'CANCELLED')::int AS "bestellungen30",
+      MAX("createdAt") AS "letzte"
+    FROM "Order"
+    WHERE ${ohneTestzahlungenSql(Prisma.sql, stripeLiveAb)}
+    GROUP BY "farmId"
+  `)
+  return new Map(zeilen.map((z) => [z.farmId, { bestellungen30: Number(z.bestellungen30), letzteBestellungAm: z.letzte }]))
+}
+
+/**
  * Alle Höfe für den Admin-Bereich — wartende zuerst, dann die jüngsten.
  *
  * Die Zählwerte kommen per `_count` aus DERSELBEN Abfrage. Ein `findMany` je
@@ -201,7 +230,7 @@ export async function getAdminFarms(
 ): Promise<AdminFarmRow[]> {
   const monat = monatsgrenzenWien(jetzt)
 
-  const [farms, spalten, einstellung] = await Promise.all([
+  const [farms, spalten, einstellung, aktiv] = await Promise.all([
     prisma.farm.findMany({
       select: {
         id: true,
@@ -238,7 +267,19 @@ export async function getAdminFarms(
         istTesthof: true,
         latitude: true,
         longitude: true,
-        owner: { select: { email: true, emailVerified: true, createdAt: true } },
+        // Regelbetrieb (Nr. 187): Zustand der Liste und Ort für die Suche — nie Straße oder Telefon.
+        geschlossenAm: true,
+        adminGesperrtAm: true,
+        city: true,
+        owner: {
+          select: {
+            email: true,
+            emailVerified: true,
+            createdAt: true,
+            // „zuletzt aktiv“: nur der Zeitpunkt der jüngsten Sitzung, nie Gerät oder Adresse.
+            sessions: { orderBy: { updatedAt: 'desc' }, take: 1, select: { updatedAt: true } },
+          },
+        },
         _count: { select: { products: true, farmPhotos: true, pickupSlots: true } },
         products: { where: IM_SHOP_WHERE, select: { id: true }, take: 1 },
         // Z1, Ergänzung 21.10.2026: ob es eine aktive Abholzeit gibt — nur ob, nie welche (wie in Hofliste und Kasse).
@@ -248,6 +289,7 @@ export async function getAdminFarms(
     }),
     monatsSpaltenJeHof(monat.von, monat.bis, stripeLiveAb),
     leseGruendungEinstellung(prisma),
+    aktivitaetJeHof(new Date(jetzt.getTime() - AKTIVITAET_TAGE * 86_400_000), stripeLiveAb),
   ])
   const fest = einstellung.festAm !== null
 
@@ -301,6 +343,12 @@ export async function getAdminFarms(
     produktImShop: f.products.length > 0,
     abholzeitAktiv: f.pickupSlots.length > 0,
     freischaltHinweis: f.approvedAt === null ? freischaltHinweis(f, platzListe, einstellung, jetzt) : null,
+    geschlossenAm: f.geschlossenAm,
+    adminGesperrtAm: f.adminGesperrtAm,
+    ort: f.city,
+    bestellungen30: aktiv.get(f.id)?.bestellungen30 ?? 0,
+    letzteBestellungAm: aktiv.get(f.id)?.letzteBestellungAm ?? null,
+    zuletztAktivAm: f.owner.sessions[0]?.updatedAt ?? null,
   }))
 
   // Wartende zuerst — das ist die einzige Liste, in der der Betreiber

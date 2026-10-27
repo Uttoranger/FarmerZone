@@ -7730,3 +7730,924 @@ Wie Lauf 24, dazu:
   - Länge von `BETTER_AUTH_SECRET` in Vercel prüfen (für den späteren min(32))
   - Stufe 3 der Sterne: drei Höfe, drei Aufgaben (Vorrat ändern, Woche pausieren, Logo finden) – Zeit und Fehltipps notieren
   - Erinnerung: die Entscheidung zur Servicegebühr bei Barzahlung ab 1.2.2027 bis Dezember
+
+## 30. Lauf 26 (uttoranger, im Chat erteilt, 26.10.2026)
+
+Nachtlauf 26 – Freigabe (uttoranger, im Chat 26.10.2026) · Admin im Regelbetrieb
+
+Geschrieben auf main 7f073ae (26.10.2026 19:50, #402 Sammel-PR Lauf 25). Im Chat nachgeprüft am 26.10.2026 um 19:53, nur lesend:
+- Production READY (dpl_4GzZU2FH…).
+- Keine offene Migration, die letzte ist `20261024100000_mail_auftrag`.
+- Die Abläufe laufen, letzter Herzschlag 18:52 UTC.
+
+Grundlage:
+- Projekt-Doc claude/regelbetrieb-vorschlag-2026-10-26.md mit Bewertung, Zielkonflikten und den Entscheidungen E1–E6 vom 26.10.2026.
+- Die 15 Mockups auf main (Abschnitt „ADMIN · Regelbetrieb“, s. Doku-PR):
+  - docs/mockups/admin-umbau-karte.html
+  - docs/mockups/admin-heute.html, mobil-admin-heute.html, mobil-admin-mehr.html, mobil-admin-notbremse.html
+  - docs/mockups/admin-hoefe-neu.html, admin-hof-akte.html, admin-konto-anfrage.html, admin-konto-schliessen.html
+  - docs/mockups/admin-bestellungen.html
+  - docs/mockups/admin-postfach-gespraeche.html
+  - docs/mockups/admin-geld.html
+  - docs/mockups/admin-betrieb-neu.html, admin-protokoll.html
+  - docs/mockups/admin-einstellungen-team.html
+- Morgenbericht 25: Entscheidungen 1, 2, 4, 5, 6, 9, 10, „Vorschläge für eigene Nummern“, Regelvorschläge, Nacharbeit 180.
+- Audit vom 25.10.2026 (claude/audit-2026-10-25.md): A2/B1 (Upload ohne Admin-Wache), A4 (Rückgängig nach „abholbereit“), A5 (Produkt mit Bestellungen löschen), A7 (manueller Verkauf ohne Neuladen), A10/D10 (Admin-Actions ohne frische Bestätigung), D11/D12 (Env).
+- Projekt-Doc claude/plattformgebuehr-optionen-2026-10-26.md, Option 1 (SEPA-Modell), entschieden im Chat am 26.10.2026 um 20:03 (Satz, Start, Einstellungen je Hof, Preisanzeige). Umgesetzt in 197 und 198.
+
+Befunde, die dieser Lauf behebt (vor dem Bau am Code bestätigen):
+- **Kein Lagebild.** `/admin` ist die Liste der Höfe. Was den Betreiber braucht, liegt an fünf Stellen: Höfe, Postfach › Eingang („Aufgabe“), Betrieb (Warnkarte), Betrieb › E-Mails („Braucht dich“) und Startseite.
+- **Keine Bestellansicht im Admin.** `orderNumber` kommt unter src/app/admin nur in `betrieb/mails-alle.tsx` vor. Erstattungen werden nur über Stripe bzw. `markiereErstattungErledigt` (src/server/actions/postfach.ts ~327) abgeschlossen.
+- **Konto-Anfragen nur per `mailto:`:** E-Mail ändern und Konto löschen (src/app/(hof)/settings/account/page.tsx ~47–53). Admin-Rechte werden per SQL vergeben. In der Produktion gibt es 2 Konten mit `isAdmin`, eines davon ohne `adminSeit`.
+- **Kein Admin-Protokoll.** Mehrere Actions, die live wirken, haben keine frische Bestätigung (Audit D10).
+- **Sentry voller bekannter Zustände.** JAVASCRIPT-NEXTJS-7 „Umgebung widersprüchlich …“ hat 1.519 Ereignisse (src/lib/umgebung-server.ts). Das Lebenszeichen läuft nur einmal am Tag (.github/workflows/lebenszeichen.yml).
+- **Kein plattformweiter Bestellstopp, keine Admin-Sperre für Höfe** (Farm kennt `isPaused`, `archivedAt`, `approvedAt`, `istTesthof`).
+- **Kein Abgleich mit Stripe.** Die Stripe-Gebühren trägt bei Destination Charges die Plattform; Admin › Finanzen zeigt sie nicht.
+- **Gebühr nur online, bar ohne Gebühr (B1).**
+  - Sobald Stripe live ist, ist das ein Entgelt für ein bestimmtes Zahlungsmittel. Das verbietet § 56 Abs. 3 ZaDiG 2018.
+  - Der Checkout setzt `on_behalf_of` bewusst nicht (src/app/api/checkout/route.ts, Kommentar bei `intentParameter`). Die Hofkonten fordern `card_payments` schon an (src/server/actions/stripe-connect.ts ~90).
+  - Die Tabelle `Monatsabrechnung` gibt es, im Code wird sie nicht benutzt. Der Einrichten-Schritt „SEPA-Mandat für die Monatsabrechnung“ (src/lib/einrichten.ts ~188) ist nur ein Platzhalter.
+
+Stand der Produktion:
+- Stripe im Testmodus, CSP nur beobachtend (G8).
+- Resend Free, Supabase Pro, Vercel Pro.
+- Testhöfe markiert nur die Projektleitung (N21).
+- Der Text der Datenschutzerklärung (181) ist mit #402 live; Änderungen nach Rückmeldung der Anwältin sind ein eigener Auftrag.
+
+Arbeite als Dirigent nach docs/nachtlauf.md: §2 Regeln, §4 Ablauf je Gate, 4a Tempo, §5 Stoppen, §6 Morgenbericht. Dieser Text ist die Freigabe.
+- Die Nummern 184–198 sind neu. 102 bleibt für die Sammelbestellung reserviert.
+- Es gelten G10, die G10-Ergänzung und §0 wie in Lauf 22 (freigabe.md §26), mit der Zuordnung unten. Der Dirigent führt ein Zeitbuch (docs/nachtlauf/berichte/zeitbuch-lauf26.md).
+- **Tests** nach docs/ai/TESTING_GUIDELINES.md:
+  - Umgebung `node`, kein DOM.
+  - Hooks über den Prüfstand.
+  - Seiten mit `renderToStaticMarkup`.
+  - Fachregeln als reine Funktionen in src/lib/.
+- **Genau eine Migration (Nr. 188, nur Expand).** Kein neues Paket, keine neue Variable. Braucht eine Nummer mehr: STOPP für die Nummer, Vorschlag in den Bericht.
+- **Mockups:** Die 15 Boards oben sind das Zielbild. Was dort nicht steht, folgt docs/ai/DESIGN_SYSTEM.md. Jede Abweichung gehört mit Grund in den PR. Die Zahlen in den Mockups sind erfunden.
+- **Umfang:** 15 Nummern. Reicht das Budget nicht, gilt die Priorität unten; der Rest ist im Morgenbericht „nicht begonnen“ und läuft im nächsten Lauf mit demselben Text.
+
+## Zuerst der Doku-PR (Branch docs/lauf26 von main, model: sonnet)
+
+**Freigabe:**
+- diesen Text wörtlich als „## 30. Lauf 26 (uttoranger, im Chat erteilt, 26.10.2026)“ in docs/nachtlauf/freigabe.md
+- in docs/nachtlauf.md §3 die Zeilen 184–198 und „Sammel 26“
+- den Absatz „Reihenfolge in Lauf 26“: eine Migration (188), kein Paket, keine Variable; Wellen und Priorität wie unten
+
+**docs/nachtlauf/status.md:**
+- die Zeilen 168–183 und „Sammel 25“ tragen „gemergt (#402)“; 180 „teilweise – Rest in 196“
+- neu die Zeilen 184–198 und „Sammel 26“, Status „offen“
+
+**docs/entscheidungen.md:**
+- die Einträge unter „Entscheidungen“ wörtlich, dazu die Zeile „Stand Lauf 26“
+- vorher prüfen, ob N32–N38 frei sind; sonst die nächste freie Kennung nehmen und im PR nennen
+- bei E4, B1 und K2 je einen Verweis auf N38 („geändert bzw. ergänzt durch N38, 26.10.2026“); der alte Wortlaut bleibt stehen
+
+**Regelvorschläge aus Morgenbericht 25, hiermit freigegeben** (je mit Herkunft „Regelvorschlag …, Morgenbericht 25, freigegeben 26.10.2026“):
+- docs/ai/TESTING_GUIDELINES.md: „Eine Laufzeitprüfung in einem Unit-Test hat mindestens doppelten Abstand zur gemessenen Zeit oder läuft nur allein; der Dirigent wiederholt einmal.“
+- docs/nachtlauf.md 4a Punkt 1: „Nummern mit einer Wache, die eine Bestandsliste führt, nennen die Nummern, die Einträge daraus beheben.“ und „Eine neue Route auf oberster Ebene nennt src/lib/slug.ts und `KEINE_HOFSEITE` in der Grenze.“
+- docs/ai/CODING_STANDARDS.md: „Stripe.js nur über `@stripe/stripe-js/pure` (Wache in 196).“
+- docs/nachtlauf.md, Checkliste je PR: „Ein Fehler, der nur beim Hoster auftritt, wird vor dem Fix an einer Vorschau-Adresse nachgestellt; `next start` lokal beweist nichts.“
+
+**docs/mockups/README.md:**
+- neuer Abschnitt „ADMIN · Regelbetrieb (26.10.2026)“ mit je einer Zeile für die 15 Dateien oben: Route, „neu (Nr. …)“, Breite
+- bei admin-betrieb-mails*.html der Vermerk „Detail; das Dringende steht ab Nr. 185 in Heute“
+
+**docs/betrieb/handbuch.md:** nur das Gerüst mit den Überschriften aus 192, damit 192 parallel füllen kann.
+
+**Commit- und PR-Texte** immer über eine Datei (Write, dann `git commit -F` bzw. `gh pr create --body-file`), Präfixe nach CLAUDE.md §5. Das gilt für den ganzen Lauf.
+
+## Stand – vor dem Start prüfen, sonst STOPP und melden
+
+- main enthält #402 (7f073ae oder später).
+- `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint` (0 Fehler) und `pnpm test` sind grün.
+- Die 15 Mockups liegen auf main.
+- Stripe im Testmodus in Vorschau und Produktion.
+
+**Priorität, falls das Budget nicht reicht:**
+188 → 184 → 185 → 186 → 187 → 189 → 197 → 191 → 198 → 190 → 193 → 192 → 194 → 195 → 196
+
+197 und 198 gehören zusammen. Ist 197 nicht grün, entfällt 198 mit Bericht. Ist 198 nicht fertig, bleibt 197 trotzdem im Sammel-PR: Bis zum Einzug gilt dann „erlassen“ (N38), nichts wird eingezogen.
+
+## Nicht in diesem Lauf
+
+- **Stufe 2 von „Konto schließen“ scharf schalten:** Gebaut wird sie (190), sie läuft aber erst, wenn die Projektleitung die Liste aus `ENDGUELTIG_LOESCHEN` nach Rückmeldung der Anwältin freigibt. Bis dahin ist `ENDGUELTIG_FREIGEGEBEN = false`.
+- **Uptime-Dienst einrichten:** macht die Projektleitung (Konto, Monitor, Push). Der Lauf baut nur `/api/gesund` und die Eigenkontrolle (184).
+- Rücktritt und Widerruf (§ 13a FAGG), Datenschutztext über die Fakten aus 181 hinaus (O4).
+- CSP scharf (G8).
+- Tarifwahl und Grundgebühr Hofladen. Die Monatsabrechnung aus 198 nimmt sie später als weitere Zeile auf; in diesem Lauf ist `grundgebuehrCents` immer 0.
+- Texte mit Rechtswirkung zur Plattformgebühr:
+  - Klausel in den Hof-AGB (Entgelt, Mandat, Rückbuchung, Sperre)
+  - Ankündigung der AGB-Änderung an bestehende Höfe
+  - AGB für die Kundschaft
+  - Datenschutzerklärung (IBAN bei Stripe)
+  Der Lauf baut nur Fakten-Sätze aus konditionen.ts; die Rechtstexte kommen nach Rückmeldung der Anwältin als eigener Auftrag.
+- Rückfrage-Mail an die Kundin nach dem Abholtermin („Hast du abgeholt?“): Datenschutz und Einwilligung erst klären. In diesem Lauf nur Kennzahl und Aufgabe (198).
+- Stripe live schalten; Rechnungsangaben von Agrilo (Firma, UID, Steuer) in den Stripe-Einstellungen. Beides macht die Projektleitung, nichts davon steht im Repo.
+- Paketänderungen (axe, Speed Insights, Entfernen von recharts, @tanstack/react-query, date-fns): nur als Vorschlag.
+- Hofliste aufteilen (ab etwa 100 Höfen).
+- Obergrenze der reservierten Menge je Warenkorb-Sitzung.
+- Web Push.
+
+## Entscheidungen (uttoranger, im Chat 26.10.2026 – mit diesem Start freigegeben; wörtlich ins Register)
+
+- „N32 · Admin im Regelbetrieb (26.10.2026): Der Admin-Bereich beginnt mit ‚Heute‘. Heute zeigt eine einzige Liste ‚Braucht dich‘ aus allen Quellen: Höfe warten, Erstattung offen, Mail gescheitert oder hängt, neue Meldung, Warnung des Betriebs, Abweichung beim Geld, Notbremse aktiv, Uptime-Dienst still. Dazu kommt je Eintrag eine Frist und ein ‚Was tun‘.
+  - Die Liste hat keinen eigenen Zustand; erledigt verschwindet von selbst.
+  - Die Reiter heißen Heute · Höfe · Bestellungen · Postfach · Startseite · Geld · Betrieb · Einstellungen; am Handy Heute · Höfe · Bestellungen · Postfach · Mehr als Leiste unten.
+  - Das Postfach enthält nur Gespräche; Aufgaben stehen in Heute; die Zustellung zieht nach Einstellungen › Benachrichtigungen.
+  - ‚Finanzen‘ heißt ‚Geld‘.
+  - Jeder Hof hat eine Akte; jede Bestellung ist im Admin auffindbar (Nummer oder genaue Adresse).
+  - Mockups ‚ADMIN · Regelbetrieb‘.“
+- „N33 · Admin-Protokoll (26.10.2026): Jede Admin-Aktion, jedes Ansehen einer vollen Kundenadresse und jedes Ereignis, das Geld oder den Zustand eines Hofs ändert, steht im Protokoll.
+  - Inhalt: wer (oder System), Art, Bezug als Kennung, Grund, ob mit Passkey bestätigt.
+  - Nie Adresse, Name, Inhalt oder Token.
+  - Einträge sind nicht änderbar; das Aufräumen löscht sie nach 5 Jahren.
+  - Zweck und Frist gehören in die Datenschutzerklärung.“
+- „N34 · Eingriffe des Admins (26.10.2026):
+  - **Hof sperren:** Der Admin kann einen Hof vorübergehend sperren, mit Grund. Das stoppt neue Bestellungen mit einem neutralen Satz für die Kundschaft und sagt es dem Hof im Postfach. Anders als die Pause kann der Hof die Sperre nicht selbst aufheben.
+  - **Notfall-Storno:** Der Admin kann eine Bestellung im Namen des Hofs stornieren, nur vor der Abholung, mit Grund; der Hof bekommt eine Nachricht. Es gilt derselbe Weg wie beim Storno durch den Hof (Erstattung, Bestand, Mail).
+  - **Notbremse:** Der Admin kann neue Bestellungen auf allen Höfen anhalten, mit Grund, Satz für die Kundschaft und spätestem Ende. Laufende Bestellungen bleiben.
+  - Alles mit Passkey (frische Bestätigung) und im Protokoll.“
+- „N35 · Rechte je Person (26.10.2026): Im Admin-Bereich hat jede Person einzeln einstellbare Rechte.
+  - **Immer:** ‚ansehen‘ (Heute, Höfe, Bestellungen, Postfach).
+  - **Einstellbar:** Mails nochmal schicken · volle Adresse anzeigen · Hof sperren und Notfall-Storno · Höfe freischalten, Gründung, Testhof und Servicegebühr · Geld und Monatsabschluss · Notbremse · Startseite veröffentlichen · Benachrichtigungen.
+  - **Nur Inhaber, nie weitergebbar:** Team, Rechte und Admin-Rechte vergeben; Notfallzugang.
+  - Eingeladen werden nur bestehende Konten; Passkey-Pflicht und 24-Stunden-Fenster wie N20.
+  - Bestehende Admins werden beim Umstieg Inhaber.
+  - Den letzten Inhaber kann niemand entfernen.
+  - Jede Änderung mit Passkey, Mail an die Person und Eintrag im Protokoll.“
+- „N36 · Konto-Anfragen (26.10.2026):
+  - **Anmelde-E-Mail ändern:** Der Admin ändert sie über einen Bestätigungslink an die neue Adresse (24 Stunden). Die alte Adresse bekommt eine Sicherheitsmail; danach sind alle Geräte abgemeldet.
+  - **Auskunft:** als Export (JSON) für einen Hof oder eine Adresse der Kundschaft.
+  - **Hofkonto schließen**, in zwei Stufen:
+    - Sofort, 30 Tage umkehrbar: Hofseite offline, Anmelden gesperrt, Abos beendet.
+    - Danach endgültig: Kontakt, Fotos und Texte des Hofs löschen bzw. unkenntlich machen; Bestellungen und Beträge bleiben, solange die Aufbewahrungspflicht gilt.
+    - Schließen geht nur ohne offene Bestellung oder Erstattung.
+    - Die Liste der endgültig gelöschten Felder gibt die Projektleitung nach Rückmeldung der Anwältin frei; vorher läuft Stufe 2 nicht.“
+- „N37 · Geld-Abgleich (26.10.2026): Ein täglicher Ablauf liest Zahlungen, Erstattungen und Gebühren der letzten 48 Stunden bei Stripe (nur lesend) und vergleicht sie mit den Bestellungen; eine Abweichung ist eine Aufgabe in Heute.
+  - Die Stripe-Gebühren trägt die Plattform (Destination Charges) und stehen in Geld als Kosten neben der Servicegebühr.
+  - Ein Monat lässt sich abschließen, wenn der Abgleich keine ungeklärte Abweichung zeigt, keine Erstattung offen ist und die CSV geladen wurde; danach sind Kosten des Monats nur mit Grund änderbar.“
+- „N38 · Plattformgebühr im Hofpreis, bar per SEPA-Monatsabrechnung (26.10.2026; Option 1 aus claude/plattformgebuehr-optionen-2026-10-26.md):
+  - **Grundsatz:** Die Plattformgebühr ist Teil des Preises, den der Hof der Kundin verrechnet, online und bar gleich hoch. Agrilo verrechnet sie dem Hof als Entgelt für die Nutzung der Software. Unterm Strich zahlt der Hof nichts, er reicht nur weiter, was die Kundin gezahlt hat.
+  - **Satz:** 6 % vom Warenpreis, ohne Mindestgebühr, je Stück auf den Cent aufgerundet. Je Hof im Admin änderbar, gilt nur für neue Bestellungen. Mindestbestellwert 10 € Warenwert je Bestellung.
+  - **Preisanzeige:** Hofseite, Produktseite, Karten, Korb und Mails zeigen den Endpreis inklusive Gebühr („inkl. Plattformgebühr“), auch beim Grundpreis je kg bzw. Liter. Die Kasse schlüsselt auf: Ware · Plattformgebühr (6 %) · Gesamt.
+  - **Online:** Bei jeder Zahlung gilt `on_behalf_of` = Stripe-Konto des Hofs; der Hof ist Händler. Stripe behält die Gebühr als `application_fee_amount` ein, der Hof bekommt 100 % des Warenpreises. Die Stripe-Gebühren trägt weiter Agrilo.
+  - **Bar:** Die Kundin zahlt beim Hof den Endpreis. Fällig wird die Gebühr erst mit ‚Abgeholt‘; bei ‚Nicht abgeholt‘ oder Storno ist nichts fällig. Agrilo nimmt nie Bargeld.
+  - **Monatsabrechnung:** Je Hof und Monat zwei Rechnungen über Stripe:
+    - die online schon einbehaltenen Gebühren, als bezahlt
+    - die bar kassierten Gebühren je Bestellnummer, per SEPA-Lastschrift eingezogen
+  - **Mandat:** Für Barbestellungen braucht der Hof ein SEPA-Lastschriftmandat (Formular von Stripe in der App); ohne Mandat bietet die Kasse bei diesem Hof nur online an.
+  - **Einzug scheitert:** Stripe versucht es erneut, der Hof bekommt eine Nachricht im Postfach. Ist der Betrag 14 Tage offen oder wurde er zurückgebucht, nimmt der Hof keine Barbestellungen mehr an; nach der Zahlung ist er automatisch wieder frei. Laufende Bestellungen bleiben.
+  - **Einstellbar je Hof im Admin** (Recht ‚Geld‘, mit Passkey und Protokoll): Satz, Mandat Pflicht für bar (Vorgabe ja; ohne Pflicht und ohne Mandat geht die Bar-Rechnung zur Überweisung), Tage bis zur Sperre (Vorgabe 14), Abrechnungstag (Vorgabe der 3., 1–28), Einzug ab.
+  - **Start:**
+    - Das Modell gilt ab dem Stichtag ‚Hofpreis-Modell ab‘ (Admin-Einstellung; Vorgabe `BAR_SERVICEGEBUEHR_AB` = 1. Februar 2027). Vorher bleibt alles wie heute (E4, B1).
+    - Der Einzug beginnt für Höfe ohne Gründungsplatz am Stichtag; für Gründungshöfe erst nach ihrer Laufzeit (Tag nach `gruendungBis`), je Hof im Admin änderbar.
+    - Bis zum Einzug zeigt auch ein Gründungshof den Endpreis inklusive Gebühr: Online behält Stripe sie ein; bar behält der Hof sie, Agrilo verzichtet (‚erlassen‘), ein Mandat ist nicht nötig. So zahlt die Kundin online und bar immer dasselbe.
+    - Jeder Hof bekommt 4 Wochen vor seinem Einzugsbeginn eine Nachricht im Postfach und eine Mail.
+  - **Rechtstexte** (Hof-AGB, Ankündigung, Datenschutz) kommen nach Rückmeldung der Anwältin. Vor dem Stichtag müssen sie stehen.
+  - Keine Rechtsberatung.“
+- „E4 · Änderung (26.10.2026): Ab dem Stichtag aus N38 gilt für neue Bestellungen N38 (6 %, je Stück aufgerundet, keine Mindestgebühr, Mindestbestellwert 10 €). Bestellungen davor behalten ihre gespeicherten Beträge (E4 bisher).“
+- „B1 · Ergänzung (26.10.2026): B1 gilt nur bis zum Stichtag aus N38. Danach gibt es keine Barzahlung ohne Gebühr mehr; bis zum Einzugsbeginn des Hofs ist die Bargebühr ‚erlassen‘ (sie bleibt beim Hof).“
+- „K2 · Ergänzung (26.10.2026): Gründungshöfe zahlen die Bargebühr aus N38 erst nach ihrer Laufzeit; bis dahin brauchen sie für Barbestellungen kein Mandat. Die Zusage ‚Hofladen ohne Grundgebühr‘ bleibt unverändert.“
+- „N18 · Ergänzung (26.10.2026):
+  - Die Seite selbst prüft ein externer Uptime-Dienst über `/api/gesund` (nur ‚ok‘ oder 503); jeder Aufruf hinterlässt höchstens einmal je Minute einen Herzschlag. Fehlt er länger als 30 Minuten, steht eine Aufgabe in Heute.
+  - Das Lebenszeichen über GitHub läuft alle 15 Minuten.
+  - Bekannte Zustände (Testmodus, fehlendes Connect-Secret) gehen höchstens einmal je Tag und Deploy an Sentry.
+  - Welche Signale wie kommen, steht in der Alarm-Matrix (ARCHITECTURE, Admin › Betrieb).“
+- „N29 · Ergänzung (26.10.2026): Bei Aktionen, die der Server schon ausgeführt haben kann (Storno, Statuswechsel einer Bestellung, Bezahlen), sagt der Netzsatz: ‚Wir wissen nicht, ob es geklappt hat – lade die Seite neu, bevor du es nochmal tust.‘ (Entscheidung 1, Morgenbericht 25).“
+- „N8 · Ergänzung (26.10.2026): Am Knopf heißt es ‚In den Korb‘, sonst überall ‚Warenkorb‘. Admin: ‚Heute‘, ‚Braucht dich‘, ‚Akte‘, ‚Notbremse‘, ‚Bestellungen anhalten‘, ‚Außerhalb erstattet‘, ‚Notfall-Storno‘, ‚Konto schließen‘ (Entscheidung 9, Morgenbericht 25). Ab N38: ‚Plattformgebühr‘ (nicht ‚Servicegebühr‘) für die Gebühr im Hofpreis, ‚inkl. Plattformgebühr‘, ‚Lastschrift‘, ‚Monatsabrechnung‘, ‚erlassen‘. Im Code bleibt `platformFee*` die Provision des Hofs; die Gebühr heißt dort weiter `serviceFee*`.“
+- Stand-Zeile: „Stand Lauf 26 (uttoranger, 26.10.2026): N32 (Admin im Regelbetrieb), N33 (Admin-Protokoll, 5 Jahre), N34 (Hof sperren, Notfall-Storno, Notbremse), N35 (Rechte je Person), N36 (Konto-Anfragen; Stufe 2 erst nach Freigabe der Liste), N37 (Geld-Abgleich), N38 (Plattformgebühr im Hofpreis, bar per SEPA-Monatsabrechnung; 6 %, Mindestbestellwert 10 €, Stichtag 1.2.2027, Gründungshöfe nach ihrer Laufzeit, Einstellungen je Hof), die Änderung von E4, die Ergänzungen zu B1 und K2 und die Ergänzungen zu N18 (Uptime, 15 Minuten, bekannte Zustände), N29 (Netzsatz bei nicht wiederholbaren Aktionen) und N8 (Wortliste) sind entschieden und in Nr. 184–198 eingeplant (freigabe.md §30); dazu die Entscheidungen 2, 4, 5, 6, 10 aus Morgenbericht 25 (Hof-E-Mail fällt auf die Anmelde-Adresse zurück; Enter springt in der Kasse weiter; Zurück-Knopf im Titelbild; 11 px in der Hof-Unterleiste unter 360 px; Kicker ‚Aus der Region‘ entfällt). Lauf 26 hat eine Migration (188), kein neues Paket und keine neue Variable. Nicht in diesem Lauf: Stufe 2 scharf, Uptime-Dienst einrichten (Projektleitung), Rücktritt und Widerruf, CSP scharf, Tarife und Grundgebühr, Rechtstexte zur Plattformgebühr, Rückfrage-Mail nach dem Abholtermin, Paketänderungen.“
+
+## §0 Zuordnung für diesen Lauf
+
+**Modell:**
+- Doku-PR, 192 und 195 mit Sonnet.
+- Alle übrigen mit Opus.
+- tester und sichter mit Sonnet, pruefer immer mit Opus, höchstens 22 Schritte je Aufruf.
+
+**Prüfdurchgänge:**
+- ein voller Durchgang für 184, 185, 186, 187, 188, 189, 190, 191, 193, 194, 197, 198
+- 197 und 198 sind Geld-Nummern: Der pruefer prüft zusätzlich jede Summe von Hand an drei Körben aus dem Test (Bericht)
+- gezielt für 192, 195, 196: jede Änderung an Verhalten oder Text hat einen Test mit Gegenprobe
+
+**pnpm test:integration:**
+- GANZ: 186, 188, 189, 190, 191, 197 und 198 (Geld, Bestellungen, Rechte, Löschen)
+- sonst jede Datei, die sich ändert
+- im Sammel-PR ganz
+
+**Bilder:**
+- Admin-Seiten macht die Projektleitung in der Vorschau; kein Blocker.
+- 189: das Band der Notbremse auf einer Hofseite (390 hell und dunkel).
+- 195: Hofseite am Handy vor dem Scrollen mit Zurück-Knopf; Hof-Unterleiste bei 320 px.
+- 197: Hofseite und Kasse mit Endpreis und Aufschlüsselung (390 und 1440, hell und dunkel), mit Stichtag in der Vergangenheit (Test-Einstellung).
+- 198: Hof › Deine Konditionen mit Lastschrift und Monatsabrechnungen (390).
+
+**Lesemappe** je Nummer wie 4a Punkt 1, mit den Einträgen, die etwas ausschließen:
+- alle: N20 (Admin-Wache), N32, N33, das Mockup der Nummer, DESIGN_SYSTEM „Aufbau jeder Admin-Seite“
+- 186, 187, 189: N24 (Prüfkette), CLAUDE.md §2 „Geld und Bestellungen“, ARCHITECTURE §5
+- 190: E7, S17, S18, N35, N36
+- 191: N37, CODING_STANDARDS §2 (Geld)
+- 184: N18, N26
+- 197 und 198: N38, E4, F5, B1, E6, K1, K2, N24, CODING_STANDARDS §2 (Geld), der Kommentar bei `intentParameter` (src/app/api/checkout/route.ts), tests/storno-erstattung.test.ts (Ladungstyp-Wache), src/lib/servicegebuehr.ts, src/lib/konditionen.ts, src/lib/gruendungshof.ts, src/lib/artikel-fehlt.ts
+
+## §1 Warteschlange (fest)
+
+- Doku-PR
+- **Welle 1**, alle von docs/lauf26: 188 ∥ 184 ∥ 192 ∥ 194 ∥ 195 ∥ 196
+- **Welle 2**, je vom Zwischenstand integration/lauf26, sobald 188 hineingemergt und der volle lokale Lauf grün ist: 185 ∥ 186 ∥ 187 ∥ 189 ∥ 191 ∥ 197
+  - 197 startet erst, wenn 195 und 196 im Zwischenstand sind (Kasse und Hofseite).
+- **Welle 3**, vom Zwischenstand:
+  - 190 nach 187 und 188
+  - 198 nach 185, 187, 191 und 197
+  - 193 nach 185, 186, 187, 190, 191 und 198 (Navigation und Umzüge zuletzt)
+- Dann der Sammel-PR (Haltepunkt). Branches nacht/<datum>/<nr>-<kurz>.
+- Ist eine Vorgängerin Entwurf oder entfallen, startet die Nachfolgerin vom letzten grünen Zwischenstand und nennt das im Bericht; Teile, die die Vorgängerin brauchen, entfallen mit Bericht.
+
+**Dateigrenzen.** Jede Nummer nennt ihre Dateien. Gestapelt:
+- 188 → 185, 186, 187, 189, 190, 191 (Schema, `protokolliere`, `verlangeAdminAktion({ recht })`)
+- 187 → 190 (Akte, Konto-Knöpfe)
+- 185, 186, 187, 190, 191, 198 → 193 (src/lib/admin-navigation.ts, Umzüge)
+- 188 → 197 → 198 (Felder, `src/lib/plattformgebuehr.ts`, `barMoeglich`)
+- 187 → 198 (Abschnitt „Plattformgebühr“ in der Akte); 191 → 198 (Geld); 185 → 198 (Aufgabenquellen)
+
+Geteilt in getrennten Zeilen (der Dirigent löst Konflikte beim Hineinmergen):
+- src/server/warenkorb.ts `pruefeKaufbarkeitHof`: 187 (Admin-Sperre, nach der Freischaltung) und 189 (Notbremse, als erste Prüfung)
+- src/lib/betrieb.ts `ABLAEUFE`: 184 (Herzschlag „von außen“), 191 (Ablauf „geld-abgleich“) und 198 (Ablauf „monatsabrechnung“)
+- vercel.json: 191 und 198 (je ein neuer Cron)
+- src/app/api/checkout/route.ts: 189 (über die Prüfkette, ohne eigene Zeile) und 197 (Preis, `on_behalf_of`, Mindestbestellwert, `barMoeglich`)
+- src/lib/kasse.ts und die Kasse: 195 (Netzsatz, Wortliste), 196 (Zod raus) und 197 (Aufschlüsselung)
+- src/app/api/stripe/webhook/route.ts: nur 198
+- src/lib/einrichten.ts: nur 198 (Mandat-Schritt)
+- src/server/aufraeumen.ts: 188 (Protokoll nach 5 Jahren) und 190 (Stufe 2, nur hinter der Freigabe)
+- src/lib/mail-arten bzw. `MAIL_ARTEN` und `NOCHMAL_*`: 187 (sperre-hof), 190 (email-aendern-link, email-geaendert-hinweis, team-recht-geaendert), 198 (plattformgebuehr-ankuendigung, lastschrift-gescheitert)
+- DEVELOPMENT.md je ein Eintrag; docs/ai/ARCHITECTURE.md je eigener Abschnitt; docs/ai/BAUSTEINE.md nur über `pnpm bausteine`
+
+## Die Nummern
+
+### 188 Schema für den Regelbetrieb und Admin-Protokoll (N33, N34, N35, N36) – Opus, voller Durchgang, EINE Migration (Expand), von docs/lauf26
+
+Eine Migration nach Regel 3, nur Expand:
+- **Tabelle `AdminAktion`:**
+  - Felder: `id`, `wann` (default now), `wer` (`userId`, optional; null = System), `art` (Text, Zod-Enum `ADMIN_AKTIONEN` in src/schemas/admin-aktion.ts), `bezugArt` (`hof`, `bestellung`, `mail`, `person`, `plattform`, `monat`), `bezugId` (Text), `grund` (Text, optional, höchstens 300 Zeichen), `mitPasskey` (Boolean)
+  - Indizes (`wann`), (`bezugArt`, `bezugId`, `wann`), (`wer`, `wann`)
+  - kein Fremdschlüssel
+- **`Farm`:** `adminGesperrtAm DateTime?`, `adminSperrGrund String?`, `adminGesperrtVonUserId String?`, `geschlossenAm DateTime?`, `endgueltigAm DateTime?`
+- **`PlattformEinstellung`:** `bestellstoppAb DateTime?`, `bestellstoppBis DateTime?`, `bestellstoppGrund String?`, `bestellstoppSatz String?`
+- **`User`:** `adminInhaber Boolean @default(false)`, `adminRechte String[] @default([])`
+- **Für N38 (197, 198):**
+  - **`Farm`:**
+    - `plattformgebuehrProzent Decimal? @db.Decimal(5, 2)` (null = Vorgabe 6)
+    - `einzugAb DateTime?` (null = abgeleitet, s. 197)
+    - `barMandatPflicht Boolean @default(true)`
+    - `barSperreNachTagen Int @default(14)`
+    - `abrechnungsTag Int @default(3)`
+    - `stripeKundeId String? @unique`
+    - `sepaZahlungsmittelId String?`
+    - `sepaMandatAm DateTime?`
+    - `gebuehrHinweisAm DateTime?`
+  - **`PlattformEinstellung`:** `hofpreisModellAb DateTime?` (null = `BAR_SERVICEGEBUEHR_AB`)
+  - **`Order`:** `gebuehrModell String?` (null = bisher, `hofpreis`), `gebuehrEinzug String?` (`stripe`, `sepa`, `ueberweisung`, `erlassen`)
+  - **`OrderItem`:** `gebuehrCents Int @default(0)` (Gebühr der Position = Menge × Gebühr je Stück)
+  - **`Monatsabrechnung`:** `stand String @default("entwurf")`, `rechnungBarId String?`, `rechnungOnlineId String?`, `offenSeit DateTime?`, `zurueckgebuchtAm DateTime?`, Index (`stand`)
+  - Keine Daten ändern. Keine IBAN und keine Mandatsdaten in der Datenbank, nur Kennungen von Stripe.
+- **Daten in derselben Migration** (nur dieser Schritt): `UPDATE "User" SET "adminInhaber" = true WHERE "isAdmin"` (N35: bestehende Admins werden Inhaber; nichts geht verloren).
+
+Code:
+1. `protokolliere(eintrag, db = prisma)` in neuer src/server/admin-protokoll.ts.
+   - Zod-geprüft, wirft nie (fail-open mit Sentry, CLAUDE.md §2), in einer Transaktion über `db`.
+   - Text bei `grund`: Wache gegen Adressen (Zod-Refine: kein `@`, keine Ziffernfolge ≥ 7).
+2. **Rechte:**
+   - `ADMIN_RECHTE` (8 einstellbar) und `INHABER_RECHTE` (2) als Konstanten in src/lib/admin-rechte.ts
+   - reine Funktion `darf(person, recht)`: Inhaber darf alles; sonst `ansehen` immer, Rest aus `adminRechte`
+   - `verlangeAdminAktion` (src/server/admin-wache.ts ~209) bekommt `recht?: AdminRecht` und gibt `{ userId, mitPasskey }` zurück; ohne `recht` gilt nur `ansehen`
+   - `verlangeAdminSeite` ebenso (Seiten, die ein Recht brauchen: Geld, Einstellungen › Team)
+3. **Bestehende Admin-Actions** (Tabelle „Wache je Admin-Action“ im Audit 3.3, auf main nachzählen) bekommen ihr Recht und schreiben ins Protokoll:
+   - approveFarm, revoke, reject, setServiceFee, setzeGruendungBis, Gründung und Testhof → `hoefe_freischalten`
+   - Mails nochmal und jetzt schicken, verwerfen → `mails_nochmal`
+   - veroeffentlicheStartseite, zieheFassungZurueck, uebernehmeFassungAlsEntwurf → `startseite_veroeffentlichen`
+   - Kostenposten, Finanzen-Export und ab 198 die Plattformgebühr-Einstellungen je Hof → `geld`
+   - Zustellung, Empfänger, Testmail → `benachrichtigungen`
+   - Passkey und Ersatzcodes → Inhaber
+   - Meldungen triagieren, zusammenfassen, trennen, ablegen und Team-Antwort → `ansehen` (mit Protokoll)
+4. **Frische Bestätigung einheitlich** (Audit D10): Jede Action, die live wirkt oder löscht, ruft `verlangeAdminAktion({ frisch: true, recht })`. Genau zu nennen im Bericht: zieheFassungZurueck, legeMeldungAb, Kostenposten (anlegen, ändern, beenden, löschen), speichereGruendungEinstellung.
+5. **Upload-Wege der Startseite** (Audit A2/B1): `src/app/api/upload/token/route.ts` (~58–61), `src/app/api/upload/verarbeiten/route.ts` (~152–155) und `src/server/startseite-vorschau.ts` prüfen über die Admin-Wache mit Recht `startseite_veroeffentlichen` statt `isAdminUser`.
+6. **Aufräumen:** `raeumeAltesAuf` löscht `AdminAktion` älter als 5 Jahre (Konstante neben den anderen Fristen).
+7. **Wachen** (je mit Gegenprobe):
+   - Jede exportierte Action unter src/server/actions mit `verlangeAdminAktion` nennt ein `recht` oder steht mit Grund in einer Liste „nur ansehen“.
+   - Jede solche Action ruft `protokolliere`.
+   - Kein Lesezugriff auf `adminRechte` außerhalb von src/lib/admin-rechte.ts und admin-wache.ts.
+8. **Doku:** ARCHITECTURE Abschnitt „Admin-Rechte und Protokoll“, DEVELOPMENT.md.
+
+Dateien:
+- prisma/schema.prisma und die Migration, src/schemas/admin-aktion.ts
+- src/server/admin-protokoll.ts, src/lib/admin-rechte.ts, src/server/admin-wache.ts
+- die Admin-Actions in src/server/actions/* (NUR Wache und Protokoll)
+- die zwei Upload-Routen und src/server/startseite-vorschau.ts (NUR die Prüfung)
+- src/server/aufraeumen.ts (NUR das Protokoll)
+- Tests, Doku
+
+Tests:
+- `darf` für alle Rechte, Inhaber und Nicht-Inhaber
+- Action ohne Recht → 403 und kein Schreibzugriff (Gegenprobe mit Recht)
+- `protokolliere` scheitert → die Action gilt trotzdem, Sentry einmal
+- Migration auf frischer DB plus `migrate diff --exit-code`
+- bestehende Admins sind nach der Migration Inhaber (Integrationstest mit Seed)
+- Upload-Weg ohne Passkey-Sitzung → 403
+
+`pnpm test:integration` ganz.
+
+Fertig, wenn: grün. Der Bericht enthält die Tabelle „Action → Recht → frisch ja/nein → Protokoll-Art“.
+
+### 184 Signal statt Lärm, `/api/gesund` und Lebenszeichen alle 15 Minuten (N18-Ergänzung) – Opus, voller Durchgang, keine Migration, von docs/lauf26
+
+1. **Bekannte Zustände:** src/lib/umgebung-server.ts (Meldung „Umgebung widersprüchlich …“; Fundstelle des Aufrufs suchen). Die Meldung geht höchstens einmal je Tag und Deploy an Sentry, gemerkt über eine `BetriebMessung`-Art oder einen Speicher-Merker je Instanz plus Datum.
+   - Ursache von JAVASCRIPT-NEXTJS-7 im Bericht: wo und wie oft gerufen.
+   - Die Betriebsleiste und Admin › Betrieb zeigen den Zustand weiter.
+2. **`GET /api/gesund`:**
+   - öffentlich, `dynamic`, Antwort `ok` (200) oder `gestoert` (503), Text ohne Details, `Cache-Control: no-store`
+   - prüft Datenbank (`SELECT 1`, Zeitlimit 1 s) und den Herzschlag des Ablaufs `mails` (≤ 10 Minuten)
+   - Ergebnis 30 s im Speicher der Instanz
+   - Bremse wie /api/lebenszeichen ohne Token (je IP)
+   - In `KEINE_HOFSEITE` bzw. Slug-Prüfung nur, falls nötig (Route liegt unter /api).
+3. **Eigenkontrolle:**
+   - Jeder Aufruf schreibt höchstens einmal je Minute den Herzschlag `von-aussen` (bestehende `AblaufLauf`-Logik, `mitHerzschlag` bzw. dieselbe Funktion; Eintrag in `ABLAEUFE` mit Rhythmus „alle 5 Minuten“, überfällig nach 30 Minuten).
+   - Überfällig → Warnung nach dem Muster von `pruefeGrenzen` (BetriebWarnung). Sie wird in 185 eine Aufgabe in Heute. Solange der Uptime-Dienst nie aufgerufen hat, steht der Ablauf als „noch nicht eingerichtet“ (keine Warnung).
+4. **Lebenszeichen:** .github/workflows/lebenszeichen.yml läuft alle 15 Minuten (`*/15 * * * *`), sonst unverändert.
+5. **Alarm-Matrix** als Konstante in src/lib/betrieb.ts (eine Quelle für Admin › Betrieb und ARCHITECTURE): Signal, Weg, Reaktion (Board admin-betrieb-neu).
+6. **Admin › Betrieb › Überblick:**
+   - Karte „Dienste“ mit Prüfweg je Dienst: Stripe, Resend, Datenbank, Abläufe, Fehler (Sentry), Uptime-Dienst, Lebenszeichen
+   - Karte „Version“: Commit und Zeit aus `VERCEL_GIT_COMMIT_SHA`/Build-Zeit, letzte Migration lesend aus `_prisma_migrations`, „Zurück: Vercel › Deployments › Instant Rollback“
+   - nach Board admin-betrieb-neu
+
+Dateien:
+- src/lib/umgebung-server.ts bzw. die Aufrufstelle
+- src/app/api/gesund/route.ts (neu)
+- src/lib/betrieb.ts (NUR `ABLAEUFE`-Eintrag, Alarm-Matrix)
+- src/server/betrieb.ts (NUR die Warnung „von außen“)
+- .github/workflows/lebenszeichen.yml
+- src/app/admin/betrieb/* (NUR Überblick: Dienste, Version, Alarm-Matrix)
+- Tests, ARCHITECTURE (Alarm-Matrix), DEVELOPMENT.md
+
+Tests:
+- `/api/gesund`: ok, DB-Fehler → 503, Mail-Herzschlag alt → 503, kein Detail im Text
+- Herzschlag höchstens einmal je Minute
+- bekannte Zustände einmal je Tag (Gegenprobe zweiter Tag)
+
+Fertig, wenn: grün. Für die Projektleitung im Bericht: Schritte für UptimeRobot (oder Better Stack) mit beiden Adressen und Push.
+
+### 185 Admin › Heute (N32) – Opus, voller Durchgang, keine Migration, vom Zwischenstand nach 188
+
+Mockups admin-heute.html (1440) und mobil-admin-heute.html (390).
+
+1. **Aufgaben-Register** `ADMIN_AUFGABEN` in src/lib/admin-aufgaben.ts: je Quelle eine reine Funktion `(stand, jetzt) → Aufgabe[]`.
+   - Felder: `quelle`, `titel`, `bezug` (Kennung und Text ohne Personendaten), `frist` (Ziel und „überfällig“), `wasTun` (aus einer Liste), `ziel` (Link).
+   - Quellen:
+     - Höfe warten (Ziel 48 h)
+     - Erstattung offen (Ziel 24 h)
+     - Mail gescheitert oder wichtige Mail hängt (aus `FEHLER_TEXTE`)
+     - neue Meldung
+     - BetriebWarnung
+     - Abweichung beim Geld (ab 191)
+     - Notbremse aktiv (ab 189)
+     - Uptime still (184)
+     - Hof ohne Abholzeit nächste Woche / seit 14 Tagen ohne Bestellung (Signal, Ziel 7 Tage)
+   - Sortiert nach Frist.
+   - Kein eigener Zustand: Ist die Quelle erledigt, verschwindet der Eintrag.
+   - Die Abfragen nutzen bestehende Queries (Postfach-Eingang, `ladeAeltesteWichtige`, Betrieb); keine zweite Logik (BAUSTEINE.md prüfen).
+2. **Seite `/admin`** wird Heute:
+   - Lage-Kacheln (Bestellungen heute, Geld Woche, Dienste, Höfe) mit Zustandswort
+   - „Braucht dich“
+   - „Läuft von selbst“ (`ABLAEUFE`)
+   - „Kommt“ (geplante Startseiten-Fassung, Gründung festschreiben, eigene Termine aus einer Konstante)
+   - Montags-Routine (Checkliste aus docs/betrieb/handbuch.md als Konstante, Haken im localStorage mit try/catch je Woche)
+   - „Zuletzt im Protokoll“ (3 Einträge)
+   - Knopf „Bestellungen anhalten …“ (ab 189; vorher ausgeblendet)
+3. **Höfe ziehen nach `/admin/hoefe`**; `/admin?…` alter Filter → 308 auf `/admin/hoefe?…`. Die Liste selbst baut 187.
+4. **Betriebsleiste:** „n offen · m überfällig – ansehen“ statt Einzelwarnung; die Zahl kommt aus derselben Quelle.
+5. **Handy:** Reihenfolge wie das Mockup, Klappkarten, Notbremse unten.
+
+Dateien:
+- src/lib/admin-aufgaben.ts (neu), src/server/queries/admin-heute.ts (neu)
+- src/app/admin/page.tsx, src/app/admin/hoefe/page.tsx (neu, verschiebt den heutigen Inhalt unverändert)
+- src/components/admin/heute-*.tsx (neu)
+- src/components/shells/admin-shell.tsx bzw. die Betriebsleiste (NUR Text und Zahl)
+- Tests, DESIGN_SYSTEM (Admin › Heute), DEVELOPMENT.md
+
+Tests:
+- je Quelle: Aufgabe da, erledigt → weg
+- Sortierung nach Frist
+- „überfällig“ als Wort
+- keine Adresse im HTML (erfundene Adresse im Bestand)
+- `/admin?x` → `/admin/hoefe?x`
+- Wache: jede Quelle hat Frist und Ziel
+
+### 186 Admin › Bestellungen (N32, N34) – Opus, voller Durchgang, keine Migration, vom Zwischenstand nach 188
+
+Mockup admin-bestellungen.html.
+
+1. **Route `/admin/bestellungen`** mit Suche (dasselbe Feld und dieselbe Abfrage wie die Mail-Suche aus 161/167; eine Quelle) und Filtern (Stand, Hof, Zeitraum 90 Tage, „nur mit offener Erstattung“). Liste links, Detail rechts (`?bestellung=`), am Handy als Blatt.
+2. **Detail:**
+   - Hof (Link zur Akte), Kundin gekürzt (`maskiereAdresse`), Abholung, Zahlung, Positionen
+   - Verlauf aus Bestellung, `WebhookEvent` und Protokoll
+   - „Was tun“ aus einer Liste je Fall (`BESTELL_FAELLE` in src/lib/admin-bestellung.ts, z. B. „Erstattung gescheitert · Karte abgelaufen“)
+   - Mails zur Bestellung (Teile aus 167), Link „In Stripe ansehen“ (Dashboard-URL aus der PaymentIntent-ID; Test oder Live nach Modus)
+3. **Aktionen** (je mit Recht, frischer Bestätigung und Protokoll):
+   - „Außerhalb erstattet …“ (Recht `geld`): zieht `markiereErstattungErledigt` aus src/server/actions/postfach.ts hierher; Grund Pflicht; der Postfach-Knopf entfällt in 193
+   - „Kundin schreiben …“ (Recht `adresse_anzeigen`): zeigt die volle Adresse nach Grund, Protokoll-Art `adresse_angezeigt`
+   - „Hof schreiben“: öffnet einen Postfach-Faden
+   - **„Notfall-Storno …“** (Recht `hof_sperren_storno`):
+     - nur in Ständen vor der Abholung (Liste aus derselben Quelle wie der Hof, `orders.ts`), Grund Pflicht
+     - ruft `storniere` (src/server/actions/orders.ts ~430) über eine Server-Funktion mit Akteur „Admin“, ohne die Hof-Wache zu umgehen: eigene Action in src/server/actions/admin-bestellung.ts, die den Hof aus der Bestellung lädt und dieselbe innere Funktion nutzt
+     - der Hof bekommt eine Postfach-Nachricht (Faden „Bestellung … vom Team storniert“)
+     - die Kundin bekommt die normale Storno-Mail
+     - sonst ist der Knopf gesperrt mit Grund (`aria-describedby`)
+4. **Netzsatz:** N29-Ergänzung (175 hat `NETZ_SATZ`) für Storno.
+
+Dateien:
+- src/app/admin/bestellungen/* (neu), src/server/queries/admin-bestellungen.ts (neu), src/lib/admin-bestellung.ts (neu)
+- src/server/actions/admin-bestellung.ts (neu)
+- src/server/actions/orders.ts (NUR das Herausziehen der inneren Storno-Funktion, Verhalten gleich)
+- src/server/actions/postfach.ts (NUR Umzug von `markiereErstattungErledigt`)
+- Tests, ARCHITECTURE (Abschnitt Bestellungen im Admin), DEVELOPMENT.md
+
+Tests (mit Gegenprobe):
+- Suche nach Nummer und Adresse; Teiladresse → nichts
+- Notfall-Storno: nur vor der Abholung; Erstattung, Bestand und Mail wie beim Hof-Storno (Integration); Hof-Nachricht da; ohne Recht → 403; ohne Grund → 400
+- „Außerhalb erstattet“ setzt nur den Stand, kein Stripe-Aufruf
+- volle Adresse nur nach Grund, Protokoll-Eintrag
+
+`pnpm test:integration` ganz.
+
+### 187 Höfe-Liste, Hof-Akte und Admin-Sperre (N32, N34) – Opus, voller Durchgang, keine Migration, vom Zwischenstand nach 188
+
+Mockups admin-hoefe-neu.html und admin-hof-akte.html.
+
+1. **`/admin/hoefe`:**
+   - Filter „Braucht Blick“ (Standard), Wartet, Verkauft, Pausiert, Gesperrt, Geschlossen, Testhöfe, Alle; Suche
+   - echte Tabelle mit Zustand (Wort), Signal, Bestellungen 30 Tage, zuletzt aktiv
+   - Aktion „Prüfen“ bei wartenden Höfen, sonst „Akte“ (Linktext mit Hofname für Screenreader)
+   - Die Signale kommen aus derselben Funktion wie die Aufgaben in 185 (src/lib/admin-aufgaben.ts).
+   - Der Kasten „Neue Meldungen“ und die Kachel „Höfe in Zahlen“ entfallen (stehen in Heute).
+2. **Akte `/admin/hoefe/[id]`:**
+   - Kontakt (Telefon, Anmelde-E-Mail gekürzt, Ort, Betriebsnummer „laut Angabe des Hofs“)
+   - Aktivität (Bestellungen und Umsatz 30 Tage, Storno, zuletzt angemeldet aus `Session`, Antwortzeit Postfach)
+   - Zustand (Abholzeiten, Produkte, Pause, Online-Zahlung, offene Fragen)
+   - Akte aus dem Protokoll
+   - Freischalten, Gründung, Testhof und Servicegebühr ziehen aus `hoefe-ansicht.tsx` hierher (dieselben Actions und Dialoge).
+3. **Admin-Sperre** (Recht `hof_sperren_storno`):
+   - „Vorübergehend sperren …“ mit Grund und Satz für die Kundschaft (Vorgabe neutral: „Bestellen ist bei diesem Hof gerade nicht möglich.“); „Sperre aufheben“
+   - `pruefeKaufbarkeitHof` (src/server/warenkorb.ts ~116) prüft die Sperre direkt nach der Freischaltung, mit eigenem Grund; Hofseite, Korb und Kasse zeigen den Satz.
+   - Der Hof bekommt eine Postfach-Nachricht und in seinem Heute eine Karte „Dein Hof ist vom Team gesperrt: <Grund>. Antworte im Postfach.“
+   - Die Pause des Hofs bleibt unabhängig.
+4. Die Knöpfe „Anmelde-E-Mail ändern …“, „Auskunft exportieren“ und „Konto schließen …“ stehen schon da; sie bleiben ausgeblendet, bis 190 sie füllt.
+
+Dateien:
+- src/app/admin/hoefe/* (Liste und `[id]`), src/components/admin/hoefe-ansicht.tsx (Umbau), src/components/admin/hof-akte-*.tsx (neu)
+- src/server/queries/admin.ts bzw. admin-hof.ts (neu)
+- src/server/actions/admin-hof.ts (neu: sperren, aufheben)
+- src/server/warenkorb.ts (NUR die Prüfung der Sperre)
+- die Texte in src/lib/bereiche-anzeige.ts (NUR der Satz)
+- Hof-Heute: die Karte (Fundstelle `src/components/heute/*`)
+- Tests, DESIGN_SYSTEM (Admin › Höfe), DEVELOPMENT.md
+
+Tests:
+- Filter „Braucht Blick“ zeigt nur Höfe mit Signal
+- Sperre → /api/reserve, /api/warenkorb/pruefen und /api/checkout lehnen mit dem Satz ab (Integration); Aufheben → wieder kaufbar
+- Hof kann die Sperre nicht aufheben (Action des Hofs ändert sie nicht)
+- Protokoll-Einträge
+
+### 189 Notbremse „Bestellungen anhalten“ (N34) – Opus, voller Durchgang, keine Migration, vom Zwischenstand nach 188
+
+Mockup mobil-admin-notbremse.html.
+
+1. **Action `halteBestellungenAn`** (Recht `notbremse`, frisch, Protokoll):
+   - Grund (Liste: Zahlungen gestört, Fehler in der Kasse, Wartung, Sonstiges), Satz für die Kundschaft (Vorgabe aus einer Konstante), „bis“ (Pflicht, höchstens 72 h)
+   - `gibBestellungenFrei` hebt sie auf.
+   - Nach „bis“ endet sie von selbst; geprüft beim Lesen, kein Cron nötig.
+2. **Prüfkette:** `pruefeKaufbarkeitHof` prüft die Notbremse als ERSTE Bedingung (eine Quelle für /api/reserve, /api/warenkorb/pruefen, /api/checkout). Gelesen über `lesePlattformEinstellung` mit Cache-Tag; Setzen und Aufheben machen `updateTag`.
+3. **Band** auf allen Kundenseiten (KundeShell und KundeFokusShell, unter dem Kopf):
+   - `role="status"`, Satz plus „bis …“
+   - „In den Korb“ ist aus, mit Grund (Hofseite, Produktseite, Korb-Blatt)
+4. **In Heute:** eine Aufgabe ganz oben, solange die Notbremse aktiv ist, mit „Freigeben“. Am Handy ein Blatt nach dem Mockup.
+5. Laufende Bestellungen, Abholung, Status und Storno durch den Hof bleiben unberührt (Test).
+
+Dateien:
+- src/server/actions/notbremse.ts (neu)
+- src/server/queries/plattform-einstellung.ts (NUR Lesen der Felder)
+- src/server/warenkorb.ts (NUR die erste Prüfung)
+- src/components/shells/kunde-shell.tsx (NUR das Band), src/components/notbremse-band.tsx (neu)
+- src/components/farm/product-grid.tsx, src/components/produktdetail/produktdetail-kunde.tsx, src/components/farm/cart-sheet.tsx (NUR „aus“ mit Grund)
+- src/components/admin/heute-*.tsx (NUR Knopf und Blatt, falls 185 schon im Zwischenstand; sonst Bericht)
+- Tests, ARCHITECTURE (Prüfkette), DEVELOPMENT.md
+
+Tests:
+- aktiv → alle drei Routen 409 mit dem Satz; abgelaufen → wieder offen; aufgehoben → offen
+- Hof-Aktionen an laufenden Bestellungen gehen weiter
+- ohne Recht → 403
+- „bis“ > 72 h → 400
+
+`pnpm test:integration` ganz.
+
+### 190 Konto-Anfragen und Team mit Rechten je Person (N35, N36) – Opus, voller Durchgang, keine Migration, vom Zwischenstand nach 187 und 188
+
+Mockups admin-konto-anfrage.html, admin-konto-schliessen.html und admin-einstellungen-team.html.
+
+1. **Anmelde-E-Mail ändern** (Recht: Inhaber oder `hoefe_freischalten`; frisch; Protokoll):
+   - Dialog mit neuer Adresse und Grund
+   - `EinmalLink` mit Zweck `email-aendern:<neueAdresseHash>` (Muster src/lib/geraete.ts `bezugAusZweck`), 24 Stunden
+   - Mail-Art `email-aendern-link` (Sofort, NOCHMAL_NIE) an die neue Adresse
+   - Bestätigungsseite `/konto/email-bestaetigen?t=` (signiert wie die übrigen Einmal-Links, noindex, no-referrer):
+     - setzt `User.email` und `emailVerified`
+     - meldet alle Sitzungen ab
+     - Sicherheitsmail `email-geaendert-hinweis` (Sofort) an die alte Adresse mit „Das war ich nicht“ (`/sicherheit/nicht-ich`)
+   - Die neue Adresse darf kein anderes Konto haben (gleiche Antwort ohne Verrat, ob es eins gibt: „Diese Adresse kann nicht verwendet werden.“).
+   - Pfad in `KEINE_HOFSEITE`/slug.ts falls nötig (Regel aus Morgenbericht 25).
+2. **Auskunft exportieren** (Recht `adresse_anzeigen`; frisch; Protokoll):
+   - Für einen Hof: Konto, Hof, Produkte, Abholzeiten, Beiträge, Postfach-Fäden, eigene Meldungen, Bestellungen als Verkäufer ohne Daten der Kundschaft.
+   - Für eine Adresse der Kundschaft (Suche wie 186): Bestellungen, Abos, Sitzungen ohne IP.
+   - JSON-Download aus einer reinen Funktion je Art; Liste der Felder in docs/ai/ARCHITECTURE.md.
+3. **Konto schließen** (Recht `hoefe_freischalten`; Inhaber bestätigt mit Hofnamen; frisch; Protokoll):
+   - **Stufe 1:**
+     - `Farm.geschlossenAm`, Hofseite offline (wie `archivedAt` in allen Lesern; eine Quelle `hofSichtbar`)
+     - Anmelden gesperrt: Better-Auth-Hook vor dem Sign-in prüft `geschlossenAm`, gleiche Antwort wie falsches Passwort
+     - Sitzungen gelöscht, Abos des Hofs beendet (`optInEmail` aus, kein Versand)
+     - „Wieder öffnen“ 30 Tage lang
+   - **Gesperrt** bei offener Bestellung (nicht abgeholt, nicht storniert) oder offener Erstattung, mit Grund.
+   - **Stufe 2:**
+     - Funktion `schliesseEndgueltig(farmId)` mit der Liste `ENDGUELTIG_LOESCHEN` (Felder und Blob-Pfade) in src/lib/konto-schliessen.ts
+     - Aufruf aus dem Aufräumen für Höfe mit `geschlossenAm` älter als 30 Tage, NUR wenn `ENDGUELTIG_FREIGEGEBEN === true` (Konstante, heute `false`, Kommentar „Freigabe der Liste durch die Projektleitung nach Rückmeldung der Anwältin“)
+     - Bestellungen, OrderItems und Beträge bleiben.
+     - Integrationstest mit `true` per Test-Einstellung, ohne den Code-Wert zu ändern.
+4. **Team und Rechte** (`/admin/einstellungen?gruppe=team`, nur Inhaber):
+   - Personen mit Rechten als Schalter (`role="switch"`, 44 px); Vorlagen „Nur helfen“ (ansehen, mails_nochmal, adresse_anzeigen) und „Wie Inhaber, ohne Team“ (alle 8)
+   - **„Person einladen …“:**
+     - nur ein bestehendes Konto per genauer Adresse (Antwort ohne Verrat)
+     - setzt `isAdmin`, `adminSeit = jetzt`, `adminRechte = []`
+     - Sicherheitsmail `team-recht-geaendert`
+     - die Person richtet ihren Passkey wie bisher in 24 Stunden über /admin/einrichten ein (N20)
+   - Rechte ändern, Inhaber machen bzw. entziehen, Person entfernen (`isAdmin = false`): je frisch, Mail, Protokoll.
+   - Den letzten Inhaber kann niemand entfernen.
+   - **Notfallzugang:** Ersatzcodes für eine Vertrauensperson (bestehende Ersatzcode-Logik, Zweck „notfall“), Einlösen mit Sicherheitsmail an alle Inhaber.
+
+Dateien:
+- src/server/actions/konto-anfragen.ts, src/server/actions/team.ts (neu)
+- src/lib/konto-schliessen.ts, src/lib/auskunft.ts (neu)
+- src/app/konto/email-bestaetigen/* (neu)
+- src/lib/auth.ts (NUR der Hook zur Schließung)
+- die Leser der Sichtbarkeit (NUR auf `hofSichtbar` umstellen; Liste im Bericht)
+- src/server/aufraeumen.ts (NUR Stufe 2 hinter der Freigabe)
+- Mail-Arten, Vorlagen, `NOCHMAL_NIE`
+- src/app/admin/einstellungen/* (Team), src/components/admin/hof-akte-*.tsx (NUR die drei Knöpfe)
+- Tests, ARCHITECTURE (Konto-Anfragen, Rechte), DEVELOPMENT.md
+
+Tests (mit Gegenprobe):
+- E-Mail ändern: Link gilt 24 h, einmal; alte Sitzungen weg; alte Adresse bekommt Hinweis; Adresse eines anderen Kontos → gleiche Antwort
+- Auskunft: keine Daten anderer Personen im Export (erfundene zweite Kundin)
+- Schließen: Hofseite 404, Anmelden scheitert gleich wie falsches Passwort, Abos aus; Wieder öffnen; offene Bestellung → gesperrt
+- Stufe 2 läuft nicht mit `false` (Wache am Quelltext und Test)
+- Rechte: Nicht-Inhaber ändert Team → 403; letzter Inhaber nicht entfernbar; Einladen setzt `adminSeit`
+
+`pnpm test:integration` ganz.
+
+### 191 Geld: Abgleich mit Stripe, Stripe-Gebühren, Monatsabschluss (N37) – Opus, voller Durchgang, keine Migration, vom Zwischenstand nach 188
+
+Mockup admin-geld.html.
+
+1. **Ablauf `geld-abgleich`:**
+   - täglich 06:30 UTC, neuer Eintrag in vercel.json und `ABLAEUFE`; `cronBerechtigt`, `mitHerzschlag`
+   - liest bei Stripe nur lesend: PaymentIntents, Refunds und Balance Transactions der letzten 48 Stunden (Plattform-Konto; mit `expand` statt Schleifen; Seiten folgen)
+   - vergleicht je Bestellung Betrag, Servicegebühr (`application_fee_amount`) und Erstattung in Cent (Int) mit der Datenbank
+   - Abweichungen → `BetriebMessung` (Art `geldAbweichung`, nur Kennungen und Cent) und Aufgabe in Heute
+   - Stripe-Gebühren je Tag als `BetriebMessung` (`stripeGebuehrCents`)
+   - Fehler bei Stripe → Warnung, kein Abbruch der anderen Abläufe
+2. **Seite `/admin/geld`** (Recht `geld`; `/admin/finanzen` → 308):
+   - Monat mit Kacheln (Umsatz der Höfe, Servicegebühr, Erstattungen, Kosten = Stripe-Gebühren + Betrieb, Ergebnis)
+   - Abgleich, Monatsabschluss, Kosten, Jahr und CSV wie bisher (bestehende Teile von Admin › Finanzen weiterverwenden)
+3. **Monatsabschluss:**
+   - Prüfliste (Abgleich ohne ungeklärte Abweichung, keine Erstattung offen, Kosten erfasst, CSV geladen)
+   - „<Monat> abschließen …“ nur, wenn alles erledigt ist (sonst gesperrt mit Grund)
+   - Abschluss = Protokoll-Eintrag `monat-abgeschlossen`
+   - Danach verlangen die Kostenposten-Actions für diesen Monat einen Grund.
+4. **Geld rechnet nie selbst:** Beträge in Cent (Int), Summen aus Funktionen in src/lib/finanzen.ts; kein Float (CODING_STANDARDS §2).
+
+Dateien:
+- src/app/api/cron/geld-abgleich/route.ts (neu), src/server/geld-abgleich.ts (neu), src/lib/geld-abgleich.ts (neu, reine Vergleichsfunktion)
+- vercel.json, src/lib/betrieb.ts (NUR `ABLAEUFE`)
+- src/app/admin/geld/* (neu, nutzt die Teile aus finanzen), src/app/admin/finanzen/page.tsx (308)
+- src/server/actions/finanzen.ts (NUR die Sperre nach Abschluss)
+- Tests, ARCHITECTURE (Geld-Abgleich), DEVELOPMENT.md
+
+Tests:
+- Vergleich: gleich, Betrag anders, Gebühr anders, Erstattung fehlt, Bestellung ohne Zahlung bei Stripe; in Cent
+- Stripe-Fehler → Warnung
+- Abschluss gesperrt bei offenem Punkt; nach Abschluss Kosten nur mit Grund
+- Stripe als Attrappe; kein Live-Aufruf in Tests
+
+`pnpm test:integration` ganz.
+
+### 192 Betriebshandbuch und Wochenlage (N32) – Sonnet, gezielt, keine Migration, von docs/lauf26
+
+1. **docs/betrieb/handbuch.md:**
+   - Routinen: täglich 2 Minuten (Heute), Montag 10 Minuten (die fünf Punkte aus dem Mockup), Monatsende (Geld)
+   - Notfälle, je mit „Erkennen · Sofort · Danach“ und Verweis auf die Alarm-Matrix:
+     1. Seite nicht erreichbar
+     2. Stripe gestört (Notbremse)
+     3. Resend gestört
+     4. Fehlerhafter Deploy (Instant Rollback)
+     5. Supabase gestört
+     6. Datenpanne (72 Stunden, Meldung an die Datenschutzbehörde; nur Ablauf und Fristen, keine Rechtsauskunft)
+     7. Passkey verloren (Ersatzcodes)
+     8. Falsche Abbuchung bei einer Kundin
+     9. Vertretung und Notfallzugang
+     10. Hof missbraucht die Plattform (Sperre)
+   - Restore-Probe vierteljährlich mit Schritten für Supabase Pro (tägliche Sicherung)
+   - Uptime-Dienst einrichten (UptimeRobot oder Better Stack; Schritte ohne Kontodaten)
+2. **Wochenlage per Mail** am Montag ersetzt den Wochenbericht (Mail-Art `wochenbericht`, Renderer erweitert):
+   - Bestellungen, Umsatz, Servicegebühr, Stripe-Gebühren (sobald 191 da ist, sonst ohne)
+   - neue Höfe, offene und überfällige Aufgaben, Fehler der Woche, Kosten
+   - nur Zahlen, keine Personendaten
+
+Dateien: docs/betrieb/handbuch.md, src/server/mail-arten/betreiber.ts und die Vorlage (NUR Wochenlage), Tests, DEVELOPMENT.md.
+
+### 193 Aufräumen: Navigation, Umzüge, Postfach nur Gespräche (N32) – Opus, voller Durchgang, keine Migration, vom Zwischenstand nach 185, 186, 187, 190, 191
+
+Mockups admin-umbau-karte.html, mobil-admin-mehr.html, admin-postfach-gespraeche.html.
+
+1. **`ADMIN_REITER`** (src/lib/admin-navigation.ts): Heute · Höfe · Bestellungen · Postfach · Startseite · Geld · Betrieb · Einstellungen. Zahlen aus Heute (offen), Höfe (warten), Postfach (ungelesen).
+   - Am Handy eine Leiste unten (Heute, Höfe, Bestellungen, Postfach, Mehr) nach Muster `BottomNav`; „Mehr“ als Blatt (Startseite, Geld, Betrieb, Einstellungen, Handbuch, Zu meinem Hof, Konto und Sicherheit, Abmelden).
+   - Reiter ohne Recht werden nicht gezeigt.
+2. **Postfach:**
+   - Der Filter „Aufgabe“ (src/lib/postfach.ts `EINGANG_LEER` u. a.) entfällt.
+   - Der Reiter „Zustellung“ zieht nach `/admin/einstellungen?gruppe=benachrichtigungen` (dieselben Teile; alter Link 308).
+   - Die Knöpfe „Erstattung erledigt“ entfallen (sind in 186).
+   - In einem Faden steht ein Hinweis aus der Akte, wenn der Hof ein Signal hat.
+3. **Betrieb:** Unterreiter Überblick · E-Mails · Protokoll · Version.
+   - Protokoll nach admin-protokoll.html: Filter, Tabelle, CSV mit frischer Bestätigung, Recht `ansehen`.
+   - Die Warnkarte im Überblick verweist auf Heute.
+4. **Startseite:** Eine geplante Fassung geht pünktlich live. Der Mail-Cron ruft jede Minute eine billige Prüfung auf „Fassung fällig seit < 2 Minuten“ und macht dann `revalidatePath('/')` (Notiz aus Vormerkung 24.10. und Bericht 183).
+5. **Alte Wege:** `/admin/finanzen`, `/admin?…`, `/admin/postfach?reiter=zustellung` leiten mit 308 um; tests/admin-seiten-wache.test.ts zieht mit.
+
+Dateien:
+- src/lib/admin-navigation.ts, src/components/shells/admin-shell.tsx
+- src/app/admin/postfach/* (NUR Filter, Reiter, Knöpfe), src/lib/postfach.ts (NUR Filter)
+- src/app/admin/einstellungen/* (Benachrichtigungen)
+- src/app/admin/betrieb/* (Protokoll, Version-Reiter), src/server/queries/admin-protokoll.ts (neu)
+- src/app/api/cron/mails/route.ts (NUR die Startseiten-Prüfung)
+- Tests, DESIGN_SYSTEM (Admin-Navigation), DEVELOPMENT.md
+
+Tests:
+- Reiter je Recht
+- alte Wege 308
+- Postfach ohne „Aufgabe“
+- Protokoll ohne Adresse im HTML
+- geplante Fassung: Revalidierung genau einmal
+
+### 194 Hof-E-Mail fällt auf die Anmelde-Adresse zurück (Entscheidung 2, Morgenbericht 25) – Opus, voller Durchgang, keine Migration, von docs/lauf26
+
+1. **Eine Funktion** `hofKontaktEmail(farm)` in src/lib/ (Hof-E-Mail, sonst `owner.email`).
+   - Alle Leser nutzen sie: src/lib/email.ts (Bestellmails an den Hof), src/server/queries/mails.ts, src/server/actions/stripe-connect.ts; weitere per `git grep` auf das Feld finden, Liste in den Bericht.
+2. **Die Pflicht der Hof-E-Mail entfällt** im Profil-Schema (src/schemas/hofprofil.ts); leer heißt Anmelde-Adresse, mit Hinweis am Feld.
+3. **Wache:** kein direkter Zugriff auf das Feld außerhalb der Funktion (Bestandsliste, die nur schrumpft).
+
+Tests: leer → Anmelde-Adresse, gesetzt → Hof-E-Mail, je Leser; Profil mit leerer Hof-E-Mail speicherbar.
+
+### 195 Nacharbeit Lauf 25 (Entscheidungen 1, 4, 5, 6, 9, 10; Lint) – Sonnet, gezielt, keine Migration, von docs/lauf26
+
+Jeder Punkt ist klein und für sich. Ist einer größer als beschrieben: STOPP für den Punkt, Bericht, die anderen laufen weiter.
+
+1. **Netzsatz** (N29-Ergänzung) in src/lib/netz.ts als `NETZ_SATZ_UNSICHER`; genutzt bei Storno und Statuswechseln im Hofbereich (Fundstellen aus Bericht 175) und beim Bezahlen in der Kasse.
+2. **Enter in der Kasse** (`weiterBeiEnter`, 176) bleibt; Kommentar mit Verweis auf die Entscheidung.
+3. **Zurück-Knopf im Titelbild der Hofseite am Handy** (44 px, oben links, Name für den Screenreader „Zu allen Höfen“), nur unter md, nur solange die klebende Hofzeile nicht steht (src/components/hofseite/hofseite-kunde.tsx).
+4. **Hof-Unterleiste:** 11 px nur im Hofbereich und nur unter 360 px Breite (`bottom-nav.tsx`, Prop oder Media-Query); tests/kunde-shell-masse.test.ts bleibt.
+5. **Wortliste:** „In den Korb“ an Knöpfen, sonst „Warenkorb“; Fundstellen umstellen, Wache über die Texte in src/lib (Bestandsliste).
+6. **Kicker „Aus der Region“** über „Höfe aus der Region“ entfällt (src/components/startseite/hoefe-in-der-naehe.tsx).
+7. **Die 12 Lint-Warnungen** aus Bericht 25 beheben (ungenutzte Namen, überflüssige eslint-Ausnahme).
+8. **Aus dem Audit:**
+   - A4: „Rückgängig“ nach „Gepackt“ verwirft den offenen Auftrag `abholbereit` oder läuft über `revertReady(…, true)`; der Worker prüft vor dem Senden `status === 'READY'`.
+   - A5: Ein Produkt mit Bestellungen wird archiviert statt gelöscht (`isAvailable = false`, Text im Dialog), ohne Migration; sonst STOPP für den Punkt.
+   - A7: Manueller Verkauf ruft `revalidiereProdukte`.
+   - D11/D12: `env.CRON_SECRET` in cleanup-reservations; `RESEND_API_KEY`, `BLOB_READ_WRITE_TOKEN`, `EMAIL_FROM`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` ins Env-Schema, optional wie heute (keine neue Variable).
+
+Tests: je Punkt mit Gegenprobe; Punkte 2 und 6 ohne.
+
+### 196 Leistung, Rest aus 180 – Opus, gezielt, keine Migration, von docs/lauf26
+
+1. Zod aus den Client-Dateien der Routen /, /hoefe, Hofseite und Kasse (Fundstellen aus Bericht 180); Werte über kleine reine Funktionen prüfen. Wache wie in 180, erweitert.
+2. Das Teilen-Bild baut aus `getPublicFarm` statt aus einer eigenen Abfrage.
+3. Stripe.js nur über `@stripe/stripe-js/pure`, mit Wache (Regelvorschlag).
+4. Bündel messen: `next build`-Ausgabe der vier Routen vorher und nachher in den Bericht; ein Bündel-Budget als Vorschlag (kein Paket).
+
+Tests: Wachen mit Gegenprobe; Teilen-Bild unverändert (Snapshot der Daten, nicht des Bildes).
+
+### 197 Plattformgebühr im Hofpreis: Preis, Anzeige, Zahlung (N38, Schritt 1) – Opus, voller Durchgang, keine eigene Migration (Felder aus 188), vom Zwischenstand nach 188, 195, 196
+
+1. **Eine Quelle:** neue src/lib/plattformgebuehr.ts mit reinen Funktionen; servicegebuehr.ts bleibt für Bestellungen im bisherigen Modell.
+   - `hofpreisModellAb(einstellung)`: Admin-Einstellung, sonst `BAR_SERVICEGEBUEHR_AB`.
+   - `gebuehrModellFuer(hof, einstellung, jetzt)` → `bisher` | `hofpreis`.
+   - `einzugAbFuer(hof, einstellung, gruendung)`:
+     - `Farm.einzugAb`, falls gesetzt
+     - sonst bei einem Gründungshof (src/lib/gruendungshof.ts, nicht ausgenommen) der spätere Tag von Stichtag und Tag nach `gruendungBis`
+     - sonst der Stichtag
+   - `gebuehrJeStueckCents(preisCents, prozent)`: aufgerundet auf den Cent; `endpreisJeStueckCents`.
+   - `bestellGebuehr(positionen)`: Summe aus Menge × Gebühr je Stück, alles Int in Cent.
+   - `einzugFuer(hof, zahlart, jetzt)` → `stripe` (online) | `erlassen` (bar vor `einzugAb`) | `sepa` (bar mit Mandat) | `ueberweisung` (bar, Mandat nicht Pflicht und keins da).
+   - `barMoeglich(hof, jetzt)`: im Modell `hofpreis` falsch, wenn der Einzug fällig ist, das Mandat Pflicht ist und keins da ist. Die Sperre nach offener Rechnung ergänzt 198 in derselben Funktion.
+   - Satz: `Farm.plattformgebuehrProzent` oder die Vorgabe `PLATTFORMGEBUEHR_PROZENT = 6`; `MINDESTBESTELLWERT_CENTS = 1000` in konditionen.ts.
+2. **Anzeige im Modell `hofpreis`** (je Hof nach `gebuehrModellFuer`):
+   - Endpreis je Stück mit „inkl. Plattformgebühr“ auf Hofseite, Produktseite, Produktkarten, Startseite und Entdecken, Teilen-Bild, Korb und Kunden-Mails; der Grundpreis je kg bzw. Liter aus dem Endpreis.
+   - Kasse: „Ware 40,00 € · Plattformgebühr (6 %) 2,40 € · Gesamt 42,40 €“ und der Satz aus konditionen.ts („Die Plattformgebühr ist Teil des Preises. Der Hof zahlt damit die Bestellplattform Agrilo.“).
+   - Hof-Ansichten (Bestellung, Produkt bearbeiten): „Du bekommst 4,00 € · die Kundin zahlt 4,24 €“.
+   - Unter 10 € Warenwert ist „Bestellen“ aus, mit Grund („Mindestbestellwert 10 € bei diesem Hof“).
+   - Alle Fundstellen von Preisen in Kundenansichten listen (`git grep` nach Preis-Formatierern) und im Bericht nennen.
+3. **Bestellen im Modell `hofpreis`** (src/app/api/checkout/route.ts):
+   - Snapshot: `OrderItem.gebuehrCents`, `serviceFeeCents` = Summe, `serviceFeePercentApplied`, `serviceFeeMinCentsApplied = 0`, `gebuehrModell = 'hofpreis'`, `gebuehrEinzug` aus `einzugFuer`.
+   - Mindestbestellwert prüfen (400 mit dem Satz).
+   - Bar nur bei `barMoeglich`, sonst 409 mit neutralem Satz; die Kasse bietet dann nur online an.
+   - Online: `amount` = Warenpreis + Gebühr, `application_fee_amount` = Gebühr (+ Provision wie heute), `transfer_data.destination` wie heute, NEU `on_behalf_of` = Hofkonto.
+   - Der Kommentar bei `intentParameter` beschreibt beide Ladungstypen. Bestellungen im Modell `bisher` laufen unverändert (gleiche Parameter für die Wiederholung mit `pi-<id>`).
+4. **Storno und Teilstorno** spiegelbildlich:
+   - cancelOrder (`reverse_transfer` und `refund_application_fee`) unverändert prüfen, auch mit `on_behalf_of`.
+   - artikel-fehlt.ts zieht die Gebühr der Position (`OrderItem.gebuehrCents`) ab statt neu zu rechnen.
+   - Die Ladungstyp-Wache in tests/storno-erstattung.test.ts deckt beide Modelle.
+5. **Vor dem Stichtag** bleibt alles wie heute (E4, B1). `barOhneServicegebuehr` und `BAR_SERVICEGEBUEHR_AB` bleiben für das Modell `bisher`. Die Zahl steht nur in konditionen.ts.
+6. **Admin:** Der Stichtag „Hofpreis-Modell ab“ steht in Admin › Einstellungen (Recht `geld`, frisch, Protokoll). Er darf nur in der Zukunft liegen und nur geändert werden, solange er noch nicht erreicht ist.
+7. **Wachen** (mit Gegenprobe):
+   - Für denselben Korb sind online und bar die Gesamtsumme gleich (Eigenschaftstest über zufällige Körbe).
+   - `on_behalf_of` nur mit `gebuehrModell = 'hofpreis'`.
+   - Im Modell `hofpreis` zeigt keine Kundenansicht einen Preis ohne Endpreis-Funktion (Bestandsliste).
+   - Kein Float in plattformgebuehr.ts.
+
+Dateien:
+- src/lib/plattformgebuehr.ts (neu), src/lib/konditionen.ts (NUR Konstanten und Sätze)
+- src/app/api/checkout/route.ts, src/server/actions/orders.ts (NUR Storno-Prüfung), src/lib/artikel-fehlt.ts
+- die Preis-Anzeigen (Liste im Bericht), src/lib/kasse.ts und die Kasse, Mails
+- src/app/admin/einstellungen/* (NUR der Stichtag)
+- Tests, ARCHITECTURE (Abschnitt „Plattformgebühr im Hofpreis“, Ladungstypen), DEVELOPMENT.md
+
+Tests (mit Stripe-Attrappe):
+- gleicher Korb online und bar, derselbe Gesamtbetrag
+- online: Überweisung an den Hof minus `application_fee_amount` = Warenpreis (100 %)
+- Rundung je Stück: 3 × 4,00 € → Gebühr 3 × 24 Cent
+- Mindestbestellwert: 9,99 € → 400; 10,00 € → ok
+- Gründungshof vor `einzugAb`: bar ohne Mandat möglich, `gebuehrEinzug = 'erlassen'`
+- normaler Hof nach dem Stichtag ohne Mandat: bar → 409, die Kasse zeigt nur online; mit `barMandatPflicht = false` → `ueberweisung`
+- Bestellung im Modell `bisher`: Beträge und Intent-Parameter unverändert
+- Teilstorno zieht genau die Gebühr der Position ab
+
+`pnpm test:integration` ganz.
+
+Fertig, wenn: grün, und in der Vorschau (Stichtag per Admin in die Vergangenheit gelegt, Testmodus) eine Online- und eine Barbestellung mit demselben Korb denselben Gesamtbetrag zeigen. Den Stichtag danach zurückstellen und das im Bericht nennen.
+
+### 198 SEPA-Monatsabrechnung der Plattformgebühr (N38, Schritt 2) – Opus, voller Durchgang, keine eigene Migration (Felder aus 188), vom Zwischenstand nach 185, 187, 191, 197
+
+1. **Mandat** (Hof › Deine Konditionen › „Barzahlung“ und der Einrichten-Schritt in src/lib/einrichten.ts ~188):
+   - „Lastschrift einrichten“: Der Server legt den Hof als Stripe-Kunden der Plattform an oder lädt ihn (`stripeKundeId`, Idempotenzschlüssel je Hof). Dann erstellt er einen SetupIntent mit `payment_method_types: ['sepa_debit']`, `usage: 'off_session'`; das Payment Element läuft über `@stripe/stripe-js/pure`.
+   - Gültig wird das Mandat nur über den Webhook `setup_intent.succeeded`: setzt `sepaZahlungsmittelId` und `sepaMandatAm`, nie über die Rückmeldung des Browsers.
+   - `mandate.updated` mit Stand „inactive“ setzt `sepaMandatAm` auf null; ist das Mandat Pflicht, ist Bar damit aus.
+   - Anzeige: nur Bank und letzte 4 Stellen der IBAN, live von Stripe; nichts davon wird gespeichert.
+   - „Lastschrift ändern“ legt einen neuen SetupIntent an.
+2. **Ankündigung:** Täglich im bestehenden Betriebs-Ablauf: Liegt `einzugAbFuer` in höchstens 28 Tagen und ist `gebuehrHinweisAm` leer, bekommt der Hof genau einmal eine Postfach-Nachricht (SYSTEM) und die Mail `plattformgebuehr-ankuendigung` (Sofort, NOCHMAL_ERLAUBT). Inhalt: ab wann, Satz, Mandat nötig ja/nein, Link „Lastschrift einrichten“.
+3. **Ablauf `monatsabrechnung`** (täglich 05:30 UTC; vercel.json, `ABLAEUFE`, `cronBerechtigt`, `mitHerzschlag`). Für jeden Hof, dessen `abrechnungsTag` heute ist (Wiener Datum), für den Vormonat:
+   - **Bar:** Bestellungen mit `gebuehrModell = 'hofpreis'`, Zahlart bar, Stand PICKED_UP, `pickedUpAt` im Vormonat, `gebuehrEinzug` `sepa` oder `ueberweisung`; je Bestellnummer eine Zeile. Erlassene zählen nur als Information mit.
+   - **Online:** Bestellungen mit `gebuehrModell = 'hofpreis'`, `paidAt` im Vormonat, abzüglich erstatteter Gebühren.
+   - `Monatsabrechnung` per Upsert (`farmId`, `monat`): Cent-Felder, `barBestellungen`, `nichtAbgeholtBestellungen`, `tarif` wie gespeichert, `grundgebuehrCents = 0`.
+   - **Rechnung online:** Stripe-Rechnung mit Positionen, finalisieren, `pay({ paid_out_of_band: true })`.
+   - **Rechnung bar:**
+     - mit Mandat: `collection_method: 'charge_automatically'` mit dem SEPA-Zahlungsmittel
+     - ohne Mandat (nur bei Pflicht aus): `send_invoice`, `days_until_due` = `barSperreNachTagen`
+   - Ein Betrag von 0 € bekommt keine Rechnung (Stand `nichts`).
+   - Idempotent: eine Abrechnung je Hof und Monat; Stripe-Idempotenzschlüssel `abr-<farmId>-<yyyy-mm>-bar|online`; ein zweiter Lauf am selben Tag erzeugt nichts Neues.
+   - Rechnungsangaben (Firma, UID, Steuer, Fußtext) kommen aus den Einstellungen im Stripe-Dashboard, nicht aus dem Repo. Fehlen sie, gibt es eine Warnung und keinen Abbruch.
+   - Fehler bei einem Hof → Warnung, die anderen laufen weiter.
+4. **Webhooks** (src/app/api/stripe/webhook/route.ts, Plattform-Endpunkt, idempotent über `WebhookEvent` wie heute):
+   - `invoice.paid` → Stand `bezahlt`, `eingezogenAm`, `offenSeit` null
+   - `invoice.payment_failed` → Stand `gescheitert`, `offenSeit` (falls leer); Postfach-Nachricht an den Hof und Mail `lastschrift-gescheitert` (Sofort, NOCHMAL_ERLAUBT): „Die Lastschrift für <Monat> hat nicht geklappt. Stripe versucht es erneut. …“
+   - `charge.dispute.created` zu einer Rechnungszahlung → Stand `zurueckgebucht`, `zurueckgebuchtAm`
+   - `setup_intent.succeeded`, `mandate.updated` (Punkt 1)
+   - Unbekannte Rechnungen (nicht in `Monatsabrechnung`) nur protokollieren, nichts ändern.
+5. **Sperre** in `barMoeglich` (eine Quelle für Kasse und Checkout): falsch, wenn eine Abrechnung des Hofs `zurueckgebucht` ist oder länger als `barSperreNachTagen` offen bzw. gescheitert. Nach `invoice.paid` ist der Hof automatisch wieder frei; es gibt kein eigenes Feld.
+   - Die Kasse zeigt neutral nur online.
+   - Der Hof sieht in seinem Heute eine Karte mit „Jetzt bezahlen“ (gehostete Rechnung von Stripe).
+   - Laufende Bestellungen bleiben.
+6. **Ansichten:**
+   - **Hof › Deine Konditionen:** Barzahlung (Mandat, Einzug ab, Satz) und „Monatsabrechnungen“: Monat, bar, online, Stand als Wort. Die Rechnung als PDF lädt der Server erst beim Klick bei Stripe.
+   - **Admin › Hof-Akte (187), Abschnitt „Plattformgebühr“:**
+     - Mandat ja/nein, Stand der letzten Abrechnungen
+     - Kennzahl „nicht abgeholt bei bar, 90 Tage“
+     - Einstellungen je Hof: Satz, Mandat Pflicht, Tage bis zur Sperre, Abrechnungstag 1–28, Einzug ab mit Vorgabe und „zurücksetzen“
+     - Recht `geld`, frisch, Protokoll; Satz und Einzug gelten nur für neue Bestellungen
+   - **Admin › Geld (191):** Plattformgebühr bar und online je Monat, offene und gescheiterte Einzüge, Rückbuchungen.
+   - **Admin › Heute (185), neue Quellen:**
+     - Einzug gescheitert (Ziel 3 Tage)
+     - Rückbuchung (sofort)
+     - Rechnungsangaben fehlen
+     - Quote „nicht abgeholt“ auffällig: ab 10 Barbestellungen in 90 Tagen und über 20 %
+
+Dateien:
+- src/server/plattformgebuehr-abrechnung.ts (neu), src/app/api/cron/monatsabrechnung/route.ts (neu), src/lib/plattformgebuehr.ts (NUR Sperre und Summen)
+- src/server/actions/lastschrift.ts (neu), src/app/api/stripe/webhook/route.ts (NUR die neuen Ereignisse)
+- vercel.json, src/lib/betrieb.ts (NUR `ABLAEUFE`), src/lib/einrichten.ts (NUR der Mandat-Schritt)
+- Hof: Deine Konditionen und die Heute-Karte
+- Admin: Akte, Geld und die Aufgabenquellen (NUR die Teile oben)
+- Mail-Arten und Vorlagen
+- Tests, ARCHITECTURE (Monatsabrechnung, Webhooks), DEVELOPMENT.md
+
+Tests (Stripe als Attrappe; kein Live-Aufruf):
+- eine abgeholte Barbestellung steht auf der Rechnung bar; nicht abgeholt, storniert und erlassen nicht
+- online als „bezahlt außerhalb“
+- 0 € → keine Rechnung
+- zweiter Lauf am selben Tag → nichts Neues
+- `invoice.payment_failed` → Postfach-Nachricht; nach `barSperreNachTagen` → `barMoeglich` falsch, /api/checkout bar → 409; `invoice.paid` → wieder frei
+- Rückbuchung → sofort gesperrt
+- Mandat nur über den Webhook gültig
+- Abrechnungstag je Hof; Einstellungen ohne Recht → 403
+
+`pnpm test:integration` ganz.
+
+Fertig, wenn: grün, und in der Vorschau (Testmodus) mit den Test-IBANs aus der Stripe-Doku:
+- Ein Mandat lässt sich einrichten.
+- Eine abgeholte Barbestellung steht auf der Monatsrechnung, und der Testeinzug wird bezahlt.
+- Ein gescheiterter Testeinzug sperrt bar und gibt nach der Zahlung wieder frei.
+
+Den Ablauf dafür per Hand auslösen (Admin › Betrieb, „jetzt ausführen“, falls vorhanden; sonst Aufruf mit `CRON_SECRET` nur in der Vorschau). Ergebnisse in den Bericht. Braucht das Webhook-Ereignisse, die in Stripe noch nicht eingeschaltet sind: STOPP für diesen Teil, die Liste der Ereignisse in „Für dich zu tun“.
+
+## §2 Regeln für alle Nummern
+
+- Es gelten die Regeln aus Lauf 22 (freigabe.md §26, §2) bis Lauf 25 (§29, §2), mit dieser Abweichung: eine Migration (188).
+- **Geld und Bestellungen:**
+  - Kein Betrag wird neu gerechnet; Cent als Int an jeder Grenze zu Stripe.
+  - Notfall-Storno (186) nutzt dieselbe innere Funktion wie der Hof.
+  - „Außerhalb erstattet“ ruft Stripe nie auf.
+  - 191 liest Stripe nur.
+  - Ändert sich durch eine Nummer ein Betrag: Geld-Fund, STOPP, Bericht zuerst. Ausnahme sind die gewollten Beträge des Modells `hofpreis` aus 197; Bestellungen im Modell `bisher` ändern sich nie.
+  - 197 und 198: Jede Summe kommt aus src/lib/plattformgebuehr.ts, in Cent (Int).
+  - Stripe schreibend nur im Testmodus (Vorschau), nie live.
+  - Keine IBAN und kein Mandatstext in Datenbank, Logs, Protokoll oder Bericht.
+- **Sicherheit:**
+  - Jede neue Admin-Aktion: `verlangeAdminAktion({ frisch: true, recht })` und `protokolliere`.
+  - Keine Nummer lockert eine Prüfung.
+  - Einladen, Rechte, E-Mail ändern und Schließen verraten nie, ob ein Konto existiert.
+  - Die Notbremse und die Sperre stoppen nur neue Bestellungen.
+  - Berichte beschreiben Funde als Ursache, Auswirkung und Fix.
+- **Daten:**
+  - Stufe 2 von „Konto schließen“ läuft in diesem Lauf nie (`ENDGUELTIG_FREIGEGEBEN = false`).
+  - Kein Schritt löscht Bestellungen oder Beträge.
+  - Die Migration aus 188 setzt nur `adminInhaber` für bestehende Admins.
+- **Personendaten:**
+  - Protokoll, Aufgaben, Export-Dateinamen und Logs ohne Adresse, Name oder Token.
+  - Volle Adresse nur nach Grund und mit Eintrag.
+  - Beispieldaten erfunden.
+- **Design:** jede UI-Änderung in beiden Modi, 390 und 1440 px; Touch-Ziele ≥ 44 px; Text ≥ 4,5:1; Felder 16 px; keine Hexwerte in Komponenten; Zustandswort nie nur als Farbe.
+- **Mails:** Kein Test verschickt echte Mails. Die Post-Sperre Z3 bleibt. Neue Mail-Arten stehen im selben Commit in genau einer Liste `NOCHMAL_ERLAUBT`/`NOCHMAL_NIE`.
+
+## §3 Checkliste je PR
+
+Wie Lauf 22 (§26, §3), mit „Migration: nur 188 (Expand) · Paket: nein · Variable: nein“. „Alle Einstiege geprüft“ gilt für:
+
+| Nummer | alle Einstiege |
+|---|---|
+| 184 | alle Aufrufer der Umgebungsprüfung; alle Abläufe in `ABLAEUFE` |
+| 185 | alle Quellen der Aufgaben |
+| 186 | alle Wege, die eine Bestellung stornieren oder eine Erstattung abschließen |
+| 187 und 189 | alle Wege, die Halte anlegen oder bestellen (Prüfkette) |
+| 188 | alle exportierten Admin-Actions (Zahl im Bericht) |
+| 190 | alle Leser der Sichtbarkeit eines Hofs; alle Wege, die `isAdmin` oder `adminRechte` schreiben |
+| 191 | alle Summen in src/lib/finanzen.ts |
+| 193 | alle Links auf die umgezogenen Seiten |
+| 194 | alle Leser der Hof-E-Mail |
+| 197 | alle Preis-Anzeigen in Kundenansichten und Mails; alle Wege, die einen PaymentIntent anlegen, stornieren oder eine Position entfernen |
+| 198 | alle Wege, die Bar anbieten oder annehmen (`barMoeglich`); alle Stripe-Ereignisse zur Rechnung |
+
+## §4 Morgenbericht (morgenbericht-<datum>-lauf26.md)
+
+Wie Lauf 25, dazu:
+- **Ganz oben:** je Nummer, ob die Ausgangslage am Code bestätigt war; Migration angewandt (Regel 3); nicht begonnene Nummern.
+- **188:** Tabelle Action → Recht → frisch → Protokoll-Art.
+- **184:** Ursache von JAVASCRIPT-NEXTJS-7; Schritte für den Uptime-Dienst.
+- **185:** Liste der Aufgabenquellen mit Frist.
+- **186:** Liste der Stände, in denen der Notfall-Storno geht.
+- **190:** Liste `ENDGUELTIG_LOESCHEN` als Tabelle für die Anwältin (Feld · warum · bleibt/weg).
+- **191:** erste Abgleichszahlen aus der Vorschau (Testmodus) und die Stripe-Gebühren je Monat.
+- **194:** Liste der Leser.
+- **196:** Bündelgrößen vorher/nachher.
+- **197:**
+  - Liste der Preis-Anzeigen
+  - drei Beispielkörbe mit Ware, Gebühr und Gesamt (online = bar)
+  - Ergebnis der Vorschau-Bestellungen
+- **198:**
+  - Ablauf eines Monats mit Testzahlen
+  - Ergebnis von Testeinzug, Fehlschlag und Freigabe
+  - Liste der Stripe-Ereignisse, die am Webhook eingeschaltet sein müssen
+  - die Stripe-Kosten je Rechnung laut aktueller Preisliste (zum Nachprüfen, nicht geschätzt)
+- **Sterne:** Die Tabelle „Admin im Regelbetrieb“ (16 Kriterien aus claude/regelbetrieb-vorschlag-2026-10-26.md, Abschnitt 9) mit Spalte „nach Lauf 26“ und Beleg; ehrlich, nur Gebautes zählt.
+- **„Für dich zu tun“:**
+  - Abnahmen in der Vorschau: Heute, Bestellungen mit Notfall-Storno, Akte mit Sperre, Notbremse auf einer Hofseite, Team einladen, E-Mail ändern, Konto schließen und wieder öffnen, Geld
+  - Admin-Bilder
+  - Uptime-Dienst einrichten
+  - Liste `ENDGUELTIG_LOESCHEN` an die Anwältin
+  - Plattformgebühr:
+    - in Stripe (Test und später Live) am Webhook die Ereignisse `invoice.paid`, `invoice.payment_failed`, `charge.dispute.created`, `setup_intent.succeeded` und `mandate.updated` einschalten
+    - Rechnungsangaben von Agrilo im Stripe-Dashboard hinterlegen
+    - Hof-AGB-Klausel, Ankündigung an die Höfe und Kundentexte mit der Anwältin klären (vor dem Stichtag 1.2.2027)
+    - Steuerfrage für Agrilo (UID, Kleinunternehmer) mit der Steuerberatung klären
+  - nach dem Merge in Admin › Einstellungen › Team prüfen, wer Inhaber ist (2 Admin-Konten in Produktion)
+  - Merge per Merge-Commit; danach eine Testbestellung, in Heute und Bestellungen nachsehen

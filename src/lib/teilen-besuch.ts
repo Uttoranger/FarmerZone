@@ -9,8 +9,8 @@
  * Danach findet ein Neuladen, ein zweiter Effekt (Strict Mode) oder ein
  * Zurück nichts mehr (tests/teilen-zaehlung.test.ts).
  */
-import { TEILEN_PARAMETER, type TeilenKanalCode } from '@/lib/teilen-kanal'
-import { teilenKanalCodeSchema } from '@/schemas/teilen'
+// Ohne Zod (Nr. 196): Die Hofseite lädt diese Regel im Browser (tests/leistung-196.test.ts).
+import { TEILEN_PARAMETER, istKanalCode, type TeilenKanalCode } from '@/lib/teilen-kanal'
 
 export type BesuchAusAdresse = {
   /** Das gültige Kürzel — nur dann wird ein Besuch gemeldet. */
@@ -33,7 +33,7 @@ export function teilenBesuchAusAdresse(href: string): BesuchAusAdresse {
     return { kanal: null, ohne: null }
   }
   if (!url.searchParams.has(TEILEN_PARAMETER)) return { kanal: null, ohne: null }
-  const gelesen = teilenKanalCodeSchema.safeParse(url.searchParams.get(TEILEN_PARAMETER))
+  const gelesen = url.searchParams.get(TEILEN_PARAMETER)
   url.searchParams.delete(TEILEN_PARAMETER)
-  return { kanal: gelesen.success ? gelesen.data : null, ohne: `${url.pathname}${url.search}${url.hash}` }
+  return { kanal: istKanalCode(gelesen) ? gelesen : null, ohne: `${url.pathname}${url.search}${url.hash}` }
 }

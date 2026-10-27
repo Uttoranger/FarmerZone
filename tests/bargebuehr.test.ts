@@ -195,7 +195,7 @@ describe('Kasse (Client-Vorschau) — derselbe Weg, mit der Zahlungsart', () => 
     const formular = lies('src/components/checkout/checkout-form.tsx')
     expect(formular).toMatch(/kassenBetraege\(cart, farm, jetzt, paymentMethod\)/)
     // Seit Nr. 42 (Register Z2) kommen Testbetrieb und onlineAus als drittes Argument dazu.
-    expect(formular).toMatch(/kassenZahlarten\(farm, barGuenstiger\(farm, jetzt\)(, \{ testbetrieb, onlineAus \})?\)/)
+    expect(formular).toMatch(/kassenZahlarten\(farm, barGuenstiger\(farm, jetzt\)(, \{ testbetrieb, onlineAus(, barAus)? \})?\)/)
     // Gegenprobe: die alte Form ohne Zahlungsart fiele auf.
     expect('kassenBetraege(cart, farm, jetzt)').not.toMatch(/kassenBetraege\(cart, farm, jetzt, paymentMethod\)/)
   })
@@ -216,7 +216,7 @@ describe('Hofseite, Produktseite, Mini-Warenkorb: der Gebührenhinweis vor dem B
   it('online und bar vor dem Stichtag: Satz wie bisher plus Bar-Ausnahme, im Korb „bei Online-Zahlung"', () => {
     const h = gebuehrHinweisFuerHof(ALLES, LANGE_VORHER)
     expect(h?.kurz).toBe(`${GRUND} – im Warenkorb einzeln ausgewiesen. Der Hof bekommt den vollen Preis. ${BAR_OHNE_GEBUEHR_HINWEIS}`)
-    expect(h?.produkte).toBe(`${GRUND} – einmal pro Bestellung, egal wie viel du in den Korb legst. ${BAR_OHNE_GEBUEHR_HINWEIS}`)
+    expect(h?.produkte).toBe(`${GRUND} – einmal pro Bestellung, egal wie viel du in den Warenkorb legst. ${BAR_OHNE_GEBUEHR_HINWEIS}`)
     expect(h?.korb).toBe(GEBUEHR_KORB_NUR_ONLINE)
   })
 
@@ -264,8 +264,8 @@ describe('„Artikel fehlt" (E14) bei Barzahlung', () => {
       erstattetCents: 0,
       bestelltAm: LANGE_VORHER,
       positionen: [
-        { id: 'eier', betragCents: 450, fehlt: false },
-        { id: 'brot', betragCents: 580, fehlt: false },
+        { id: 'eier', betragCents: 450, fehlt: false, gebuehrCents: 0 },
+        { id: 'brot', betragCents: 580, fehlt: false, gebuehrCents: 0 },
       ],
       ...abweichend,
     }
@@ -297,9 +297,9 @@ describe('„Artikel fehlt" (E14) bei Barzahlung', () => {
     const drei = barOhneGebuehr({
       warenpreisCents: 1530,
       positionen: [
-        { id: 'eier', betragCents: 450, fehlt: false },
-        { id: 'brot', betragCents: 580, fehlt: false },
-        { id: 'honig', betragCents: 500, fehlt: false },
+        { id: 'eier', betragCents: 450, fehlt: false, gebuehrCents: 0 },
+        { id: 'brot', betragCents: 580, fehlt: false, gebuehrCents: 0 },
+        { id: 'honig', betragCents: 500, fehlt: false, gebuehrCents: 0 },
       ],
     })
     const erst = artikelFehltRechnung(drei, 'brot')
@@ -360,7 +360,7 @@ describe('gebuehrFuerMonatsabrechnung — die Frage hinter jedem Hof-Satz zur Mo
     expect(lies('src/components/hof-bestellungen/bestell-detail.tsx')).toMatch(
       /betrag\.gebuehrFuerAbrechnung \? ' – die Gebühr holt die Monatsabrechnung\.'/
     )
-    expect(lies('src/server/queries/orders.ts')).toMatch(/gebuehrFuerAbrechnung: gebuehrFuerMonatsabrechnung\(\{/)
+    expect(lies('src/server/queries/orders.ts')).toMatch(/gebuehrFuerAbrechnung: gebuehrFuerMonatsabrechnung(JeModell)?\(\{/)
     // Gegenprobe: die alte Bedingung (jede Gebühr > 0, auch bar vor dem Stichtag) ist weg.
     expect(lies('src/components/hof-bestellungen/bestell-detail.tsx')).not.toContain(
       "betrag.gebuehrCents > 0 ? ' – die Gebühr holt"
@@ -383,7 +383,8 @@ describe('Storno und „nicht abgeholt" mit 0 Cent', () => {
 
   it('Storno und „nicht abgeholt" setzen den Vermerk nur bei einer Gebühr über 0 — keine negative Rechnung', () => {
     const orders = lies('src/server/actions/orders.ts')
-    expect(orders).toMatch(/order\.serviceFeeCents > 0 && !order\.serviceFeeRefundedAt/)
+    // Der Storno liegt seit Nr. 186 in src/server/stornieren.ts (dieselbe innere Funktion für Hof und Team).
+    expect(lies('src/server/stornieren.ts')).toMatch(/order\.serviceFeeCents > 0 && !order\.serviceFeeRefundedAt/)
     expect(orders).toMatch(/if \(order\.serviceFeeCents <= 0 \|\| order\.serviceFeeRefundedAt\) return \{ offen: false \}/)
   })
 })

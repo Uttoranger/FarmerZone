@@ -18,6 +18,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
+// Die Plattformgebühr auf Geld (Nr. 198) hat eigene Tests (tests/plattformgebuehr-abrechnung.test.ts).
+vi.mock('@/server/queries/plattformgebuehr', () => ({ ladePlattformgebuehrGeld: async () => null }))
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode } & Record<string, unknown>) => {
     const attribute = Object.fromEntries(Object.entries(rest).filter(([k]) => k !== 'onNavigate' && k !== 'prefetch'))
@@ -36,6 +38,22 @@ vi.mock('@/server/actions/finanzen', () => ({
   kostenpostenAendern: vi.fn(),
   kostenpostenBeenden: vi.fn(),
   kostenpostenLoeschen: vi.fn(),
+  monatAbschliessen: vi.fn(),
+}))
+// Seit Nr. 191 trägt /admin/geld das Jahr; der Monat dort braucht den Abgleich — hier ohne Lauf.
+vi.mock('@/server/queries/geld', () => ({
+  ladeAbgeschlosseneMonate: vi.fn(async () => new Map()),
+  ladeGeldMonat: vi.fn(async () => ({
+    umsatz: { cents: 0, anzahl: 0, bar: 0 },
+    erstattungen: { cents: 0, anzahl: 0, offen: 0 },
+    stripeGebuehrCents: 0,
+    abweichungen: [],
+    abweichungenGesamt: 0,
+    lauf: null,
+    abgeschlossenAm: null,
+    abgleichNachMonatsende: false,
+    csvGeladen: false,
+  })),
 }))
 vi.mock('@/server/queries/admin', () => ({ ladeHoefeFuerGruendung: vi.fn(async () => []) }))
 vi.mock('@/lib/prisma', async () => ({ prisma: (await import('./finanzen-jahr-daten')).prismaAttrappe }))
@@ -45,7 +63,7 @@ vi.mock('@/lib/umgebung-server', async (importOriginal) => ({
   STRIPE_LIVE_AB: new Date('2025-06-01T00:00:00Z'),
 }))
 
-import AdminFinanzenPage from '@/app/admin/finanzen/page'
+import AdminFinanzenPage from '@/app/admin/geld/page'
 import { ZeitraumUmschalter } from '@/app/admin/finanzen/zeitraum-wahl'
 import { getFinanzenJahr } from '@/server/queries/finanzen'
 import { FINANZEN_JAHR_TEXT, ergebnisText, finanzenJahrAdresse } from '@/lib/finanzen'
@@ -90,23 +108,23 @@ describe('die Adresse (Zod)', () => {
   })
 
   it('die Adresse des Jahres trägt Zeitraum und Jahr, den Reiter nur wenn er nicht der Standard ist', () => {
-    expect(finanzenJahrAdresse({ jahr: 2026, reiter: 'monat' })).toBe('/admin/finanzen?zeitraum=jahr&jahr=2026')
-    expect(finanzenJahrAdresse({ jahr: 2026, reiter: 'kosten' })).toBe('/admin/finanzen?zeitraum=jahr&jahr=2026&reiter=kosten')
+    expect(finanzenJahrAdresse({ jahr: 2026, reiter: 'monat' })).toBe('/admin/geld?zeitraum=jahr&jahr=2026')
+    expect(finanzenJahrAdresse({ jahr: 2026, reiter: 'kosten' })).toBe('/admin/geld?zeitraum=jahr&jahr=2026&reiter=kosten')
   })
 })
 
 describe('der Umschalter Monat | Jahr', () => {
   const umschalter = (aktiv: 'monat' | 'jahr') =>
     renderToStaticMarkup(
-      createElement(ZeitraumUmschalter, { aktiv, monatHref: '/admin/finanzen?monat=2026-10', jahrHref: '/admin/finanzen?zeitraum=jahr&jahr=2026' })
+      createElement(ZeitraumUmschalter, { aktiv, monatHref: '/admin/geld?monat=2026-10', jahrHref: '/admin/geld?zeitraum=jahr&jahr=2026' })
     )
 
   it('zwei Links; der gewählte trägt aria-current, der andere nicht', () => {
     for (const aktiv of ['monat', 'jahr'] as const) {
       const html = umschalter(aktiv)
-      expect(links(html)).toEqual(['/admin/finanzen?monat=2026-10', '/admin/finanzen?zeitraum=jahr&jahr=2026'])
+      expect(links(html)).toEqual(['/admin/geld?monat=2026-10', '/admin/geld?zeitraum=jahr&jahr=2026'])
       expect(html.match(/aria-current="page"/g)).toHaveLength(1)
-      const gewaehlt = linkMit(html, aktiv === 'monat' ? '/admin/finanzen?monat=2026-10' : '/admin/finanzen?zeitraum=jahr&jahr=2026')
+      const gewaehlt = linkMit(html, aktiv === 'monat' ? '/admin/geld?monat=2026-10' : '/admin/geld?zeitraum=jahr&jahr=2026')
       expect(gewaehlt).toContain('aria-current="page"')
     }
   })
@@ -117,16 +135,16 @@ describe('der Umschalter Monat | Jahr', () => {
 })
 
 describe('ohne zeitraum bleibt es der Monat', () => {
-  it('Monatsansicht wie bisher, mit dem Umschalter im Kopf (Monat gewählt)', async () => {
+  it('Monatsansicht von Geld (Nr. 191), mit dem Umschalter im Kopf (Monat gewählt)', async () => {
     const html = await seite({})
-    expect(html).toContain('Wann trägt sich die Plattform?')
+    expect(html).toContain('Abgleich mit Stripe')
     expect(html).not.toContain('nach Monaten')
-    expect(linkMit(html, '/admin/finanzen?monat=2026-10')).toContain('aria-current="page"')
-    expect(links(html)).toContain('/admin/finanzen?zeitraum=jahr&jahr=2026')
+    expect(linkMit(html, '/admin/geld?monat=2026-10')).toContain('aria-current="page"')
+    expect(links(html)).toContain('/admin/geld?zeitraum=jahr&jahr=2026')
   })
 
   it('Unsinn im Zeitraum ist ebenfalls der Monat', async () => {
-    expect(await seite({ zeitraum: 'quartal' })).toContain('Wann trägt sich die Plattform?')
+    expect(await seite({ zeitraum: 'quartal' })).toContain('Abgleich mit Stripe')
   })
 })
 
@@ -155,10 +173,10 @@ describe('die Seite im Jahr (2026, laufend)', () => {
 
   it('der Kopf: Umschalter (Jahr gewählt), Blättern (zurück ja, vor nein), CSV-Knopf', async () => {
     const html = await seite({ zeitraum: 'jahr', jahr: '2026' })
-    expect(linkMit(html, '/admin/finanzen?zeitraum=jahr&jahr=2026')).toContain('aria-current="page"')
+    expect(linkMit(html, '/admin/geld?zeitraum=jahr&jahr=2026')).toContain('aria-current="page"')
     // Zurück in den Monat: im laufenden Jahr der heutige.
-    expect(links(html)).toContain('/admin/finanzen?monat=2026-10')
-    expect(linkMit(html, '/admin/finanzen?zeitraum=jahr&jahr=2025')).toContain('aria-label="Voriges Jahr"')
+    expect(links(html)).toContain('/admin/geld?monat=2026-10')
+    expect(linkMit(html, '/admin/geld?zeitraum=jahr&jahr=2025')).toContain('aria-label="Voriges Jahr"')
     expect(html).not.toContain('Nächstes Jahr')
     expect(html).toContain('aria-label="Jahr wählen"')
     expect(linkMit(html, '/admin/finanzen/export?jahr=2026')).toContain('download')
@@ -178,7 +196,7 @@ describe('die Seite im Jahr (2026, laufend)', () => {
     expect(tabelle.indexOf('Feb 2026')).toBeLessThan(tabelle.indexOf('Jän 2026'))
     // Gezählt sind zehn Monate; November und Dezember stehen nur als „offen“ im Diagramm.
     expect(tabelle).not.toContain('Nov 2026')
-    for (const nummer of ['01', '05', '10']) expect(links(html)).toContain(`/admin/finanzen?monat=2026-${nummer}`)
+    for (const nummer of ['01', '05', '10']) expect(links(html)).toContain(`/admin/geld?monat=2026-${nummer}`)
     expect(html.match(/offen/g)?.length).toBeGreaterThanOrEqual(2)
   })
 
@@ -193,16 +211,16 @@ describe('die Seite im Jahr (2026, laufend)', () => {
   it('Unterreiter: Übersicht · Kosten (mit der Zahl der Posten) · Auszahlungen · Entfallene Gebühren', async () => {
     const html = await seite({ zeitraum: 'jahr', jahr: '2026' })
     for (const ziel of [
-      '/admin/finanzen?zeitraum=jahr&jahr=2026',
-      '/admin/finanzen?zeitraum=jahr&jahr=2026&reiter=kosten',
-      '/admin/finanzen?zeitraum=jahr&jahr=2026&reiter=auszahlungen',
-      '/admin/finanzen?zeitraum=jahr&jahr=2026&reiter=entfallen',
+      '/admin/geld?zeitraum=jahr&jahr=2026',
+      '/admin/geld?zeitraum=jahr&jahr=2026&reiter=kosten',
+      '/admin/geld?zeitraum=jahr&jahr=2026&reiter=auszahlungen',
+      '/admin/geld?zeitraum=jahr&jahr=2026&reiter=entfallen',
     ]) {
       expect(links(html), ziel).toContain(ziel)
     }
     expect(html).toContain('Übersicht')
     expect(html).toContain('Entfallene Gebühren')
-    expect(linkMit(html, '/admin/finanzen?zeitraum=jahr&jahr=2026&reiter=kosten')).not.toContain('aria-current')
+    expect(linkMit(html, '/admin/geld?zeitraum=jahr&jahr=2026&reiter=kosten')).not.toContain('aria-current')
     expect(html).toContain(FINANZEN_JAHR_TEXT.regel)
   })
 
@@ -222,9 +240,9 @@ describe('das vergangene und das erste Jahr (2025)', () => {
     expect(html).toContain('Jän–Dez')
     expect(html).toContain('im ganzen Jahr')
     expect(html).not.toContain('Voriges Jahr')
-    expect(linkMit(html, '/admin/finanzen?zeitraum=jahr&jahr=2026')).toContain('aria-label="Nächstes Jahr"')
+    expect(linkMit(html, '/admin/geld?zeitraum=jahr&jahr=2026')).toContain('aria-label="Nächstes Jahr"')
     // Zurück in den Monat: bei einem vergangenen Jahr der Dezember.
-    expect(links(html)).toContain('/admin/finanzen?monat=2025-12')
+    expect(links(html)).toContain('/admin/geld?monat=2025-12')
     // Vergleich: kein Vorjahr, also aus — mit dem Grund daneben.
     expect(html).toContain('mit 2024 vergleichen · ab 2026')
     expect(html).toMatch(/role="switch"[^>]*aria-disabled="true"/)

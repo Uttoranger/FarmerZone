@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { notFound, unstable_rethrow } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import * as Sentry from '@sentry/nextjs'
 import { beitragKennungAus, ladeBeitraege } from '@/server/hofseite-beitraege'
@@ -15,7 +15,8 @@ import { kaufSperre } from '@/lib/bereiche-anzeige'
 import { KATEGORIE_LABEL, PRODUCT_CATEGORY_VALUES } from '@/lib/taxonomie'
 import { teilenVorschauText } from '@/lib/teilen-bild'
 import { entferneKontaktdaten, ueberUnsText } from '@/lib/hofseite-kunde'
-import { ladeTeilenVorschau } from '@/server/queries/teilen-bild'
+import { teilenVorschauAus } from '@/server/queries/teilen-bild'
+import type { OeffentlicherHof } from '@/server/queries/farm'
 import type { Suchparameter } from '@/lib/ansichts-modus'
 import type { PublicFarm } from '@/server/queries/farm'
 import { nachbestellToken } from '@/schemas/nachbestellung'
@@ -76,13 +77,11 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   // Seite und fragten sonst für jede Adresse die Datenbank.
   const seo = await pruefeHofseiteGeteilt(farmSlug, suche)
   if (!seo) return HOF_NICHT_GEFUNDEN
-  // Hof und Teilen-Bild hängen nicht voneinander ab (das Bild fragt nur den Slug): gleichzeitig,
-  // nicht nacheinander (Nr. 180). Das Bild scheitert nie laut (ladeTeilenVorschauOhneRisiko).
-  const [{ farm, ansicht }, vorschau] = await Promise.all([
-    ladeHofseiteGeteilt(farmSlug, suche, vorab(suche)),
-    ladeTeilenVorschauOhneRisiko(farmSlug),
-  ])
+  // Das Teilen-Bild baut aus dem Hof, den die Seite ohnehin lädt (Nr. 196) — keine eigene Abfrage
+  // mehr. Es scheitert nie laut (teilenVorschauOhneRisiko).
+  const { farm, ansicht, teilen } = await ladeHofseiteGeteilt(farmSlug, suche, vorab(suche))
   if (!farm) return HOF_NICHT_GEFUNDEN
+  const vorschau = teilen ? teilenVorschauOhneRisiko(teilen) : null
   // Die Vorschau-Adresse bleibt ganz fern; ein Hof ohne Produkt im Shop und ein
   // Testhof (Register N21) nur aus dem Index — seinen Links folgen Suchmaschinen weiter.
   const robots = ansicht.noindex ? { robots: { index: false, follow: false } } : !seo.indexieren ? { robots: { index: false, follow: true } } : {}
@@ -113,11 +112,10 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 }
 
 /** Das Teilen-Bild für die Metadaten; scheitert es, fehlt nur das Bild (gemeldet), nie die Seite. */
-async function ladeTeilenVorschauOhneRisiko(slug: string): Promise<Awaited<ReturnType<typeof ladeTeilenVorschau>>> {
+function teilenVorschauOhneRisiko(teilen: OeffentlicherHof): ReturnType<typeof teilenVorschauAus> | null {
   try {
-    return await ladeTeilenVorschau(slug, new Date())
+    return teilenVorschauAus(teilen, new Date())
   } catch (err) {
-    unstable_rethrow(err)
     Sentry.captureException(err, { tags: { bereich: 'hofseite-teilen-bild' } })
     return null
   }

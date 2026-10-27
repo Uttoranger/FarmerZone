@@ -11,13 +11,25 @@ export interface BriefkastenZusammenfassungProps {
   /** „Offen im Eingang: 2 Antworten · 1 Meldung · 2 Aufgaben" — dieselbe Zählung wie im Eingang (offenSatz). */
   offenZeile: string
   adminUrl: string
+  /** Die Wochenlage (Nr. 192): Wort und Zahl je Zeile, nur Zahlen, nie Personendaten. */
+  lage?: Array<{ label: string; wert: string }>
 }
 
-/** Wochen-Zusammenfassung an den Betreiber — nur, wenn im Eingang etwas offen ist (Register N14). */
+/** Wochenlage an den Betreiber (Register N32, Nr. 192): die Zahlen der Woche, darunter der Stand des Postfachs (Register N14). */
 export function BriefkastenZusammenfassungEmail(p: BriefkastenZusammenfassungProps) {
   return (
     <EmailLayout previewText={p.offenZeile}>
-      <Text style={h1}>Postfach — Wochenstand</Text>
+      <Text style={h1}>{p.lage ? 'Wochenlage' : 'Postfach — Wochenstand'}</Text>
+      {p.lage && (
+        <div style={highlightBox}>
+          <Text style={highlightLabel}>Die letzten 7 Tage</Text>
+          {p.lage.map((z) => (
+            <Text key={z.label} style={{ ...highlightValue, fontSize: '14px' }}>
+              {z.label}: <strong>{z.wert}</strong>
+            </Text>
+          ))}
+        </div>
+      )}
       <Text style={bodyText}>
         <strong>{p.offenZeile}</strong>
       </Text>

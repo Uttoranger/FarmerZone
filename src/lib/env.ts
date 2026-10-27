@@ -30,6 +30,15 @@ const serverEnvSchema = z.object({
   // aufruft (Authorization: Bearer …). Fehlt es, bleiben die Routen
   // fail-closed gesperrt (401) — ein Deploy scheitert daran nicht.
   CRON_SECRET: optional(),
+  // OPTIONAL, wie bisher (Nr. 195, Audit D11/D12): Diese vier standen nur als
+  // process.env im Code. Im Schema sind sie dokumentiert, sonst nichts — keine
+  // wird Pflicht, ein Deploy scheitert an keiner. Resend und EMAIL_FROM:
+  // src/lib/email.ts (ohne Schlüssel gehen keine Mails hinaus); Blob: Bilder;
+  // der öffentliche Stripe-Schlüssel: die Kasse im Browser (src/lib/stripe-client.ts).
+  RESEND_API_KEY: optional(),
+  EMAIL_FROM: optional(),
+  BLOB_READ_WRITE_TOKEN: optional(),
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: optional(),
   // OPTIONAL: Die NUR-LESE-Verbindung des Triage-CLI (scripts/briefkasten.ts).
   // Bewusst getrennt von DATABASE_URL: Das Skript verbindet sich AUSSCHLIESSLICH
   // hierüber und fällt nie auf die Schreibverbindung zurück — ein Agent, der
@@ -99,13 +108,16 @@ const serverEnvSchema = z.object({
   // Liste baut leseTestEmpfaenger (src/lib/testumgebung.ts).
   TEST_EMPFAENGER: optional(),
   // OPTIONAL, von Vercel selbst gesetzt („Automatically expose System
-  // Environment Variables"): Umgebung, Deploy-Adresse, Branch-Adresse, Branch.
+  // Environment Variables"): Umgebung, Deploy-Adresse, Branch-Adresse, Branch
+  // und (seit Nr. 184) der Commit des Deploys — für die Karte „Version“ und
+  // „einmal je Tag und Deploy“ bei bekannten Zuständen (umgebung-server.ts).
   // Lokal fehlen sie alle — dann gilt die Umgebung als lokal oder Produktion,
   // nie als Preview.
   VERCEL_ENV: optional(),
   VERCEL_URL: optional(),
   VERCEL_BRANCH_URL: optional(),
   VERCEL_GIT_COMMIT_REF: optional(),
+  VERCEL_GIT_COMMIT_SHA: optional(),
 })
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>
