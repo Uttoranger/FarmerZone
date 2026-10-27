@@ -391,7 +391,7 @@ async function regelnFuer(umgebung: Record<string, string>): Promise<Regel[]> {
   }
 }
 
-/** Je Seite mit `no-referrer` ein Beispiel — der Test prüft, dass es genau diese zehn Regeln trifft. */
+/** Je Seite mit `no-referrer` ein Beispiel — der Test prüft, dass es genau diese Regeln trifft. */
 const OHNE_REFERRER_BEISPIELE = [
   '/hof-test/confirm/bestellungA',
   '/hof-test/bestaetigen/TokenAbcDef',
@@ -405,6 +405,8 @@ const OHNE_REFERRER_BEISPIELE = [
   '/api/orders/confirm/TokenAbcDef',
   // Nr. 182: die Vorschau der Startseite trägt den signierten Link.
   '/startseite-vorschau',
+  // Nr. 190: „Neue Anmelde-Adresse bestätigen“ trägt den Einmal-Token.
+  '/konto/email-bestaetigen',
 ]
 const WEITERE_NIE_MELDEN = ['/hof-test/bestellung/bestellungA', '/hof-test/bestellung/bestellungA/kalender', '/admin/postfach/zustellung/bestaetigen', '/api/csp-bericht', '/api/checkout']
 const HEIKLE_WERTE = ['s', 'sig', 'token', 't', 'code', 'vorschau', 'reorder']
@@ -441,7 +443,7 @@ describe('CSP zum Beobachten (G8)', () => {
     }
   })
 
-  it('genau elf Seiten mit no-referrer — und jede davon meldet nie', () => {
+  it('genau zwölf Seiten mit no-referrer — und jede davon meldet nie', () => {
     const ohneReferrer = produktion.filter((r) => r.headers.some((h) => h.key === 'Referrer-Policy' && h.value === 'no-referrer'))
     expect(ohneReferrer).toHaveLength(OHNE_REFERRER_BEISPIELE.length)
     for (const regel of ohneReferrer) {

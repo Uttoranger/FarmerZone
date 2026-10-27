@@ -29,6 +29,10 @@ export const MAIL_ARTEN = [
   'betrieb-warnung',
   'testmail',
   'betreiber-bestaetigung',
+  // Konto-Anfragen und Team (Nr. 190): Einmal-Link bzw. Sicherheitsmail — direkt.
+  'email-aendern-link',
+  'email-geaendert-hinweis',
+  'team-recht-geaendert',
   // Wichtig: Bestellungen, Höfe und Betreiber.
   'bestellung-bestaetigung',
   'bestellung-bezahlt-hof',
@@ -86,6 +90,9 @@ export const MAIL_WEG = {
   'betrieb-warnung': 'sofort',
   testmail: 'sofort',
   'betreiber-bestaetigung': 'sofort',
+  'email-aendern-link': 'sofort',
+  'email-geaendert-hinweis': 'sofort',
+  'team-recht-geaendert': 'sofort',
   'bestellung-bestaetigung': 'wichtig',
   'bestellung-bezahlt-hof': 'wichtig',
   'bar-bestaetigt-hof': 'wichtig',

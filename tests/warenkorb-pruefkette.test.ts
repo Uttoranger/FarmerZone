@@ -56,6 +56,7 @@ type Hof = {
   name: string
   isPaused: boolean
   archivedAt: Date | null
+  geschlossenAm: Date | null
   approvedAt: Date | null
   adminGesperrtAm: Date | null
   pickupSlots: (typeof MITTWOCH)[]
@@ -69,6 +70,7 @@ function hof(id: string, abweichung: Abweichung = {}): Hof {
     name: `Testhof ${id}`,
     isPaused: false,
     archivedAt: null,
+    geschlossenAm: null,
     approvedAt: new Date('2026-01-01T00:00:00.000Z'),
     adminGesperrtAm: null,
     ...abweichung,
@@ -161,6 +163,8 @@ describe('pruefeKaufbarkeitHof — EINE Prüfkette für Reservieren und Warenkor
 
   it.each([
     ['stillgelegt', { archivedAt: new Date('2026-09-01T00:00:00.000Z') }, FARM_ARCHIVED_MESSAGE],
+    // Konto geschlossen (N36, Nr. 190): offline wie stillgelegt (hofSichtbar).
+    ['stillgelegt', { geschlossenAm: new Date('2026-10-01T00:00:00.000Z') }, FARM_ARCHIVED_MESSAGE],
     ['nicht-freigeschaltet', { approvedAt: null }, FARM_NOT_APPROVED_MESSAGE],
     ['admin-gesperrt', { adminGesperrtAm: new Date('2026-10-18T00:00:00.000Z') }, HOF_GESPERRT_SATZ],
     ['pause', { isPaused: true }, SHOP_PAUSED_MESSAGE],

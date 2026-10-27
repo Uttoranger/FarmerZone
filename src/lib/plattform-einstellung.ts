@@ -207,7 +207,8 @@ export function pruefeGruendungEingabe(eingabe: GruendungEingabe, bisher: Gruend
  * Betrieb, `?gruppe=betrieb` leitet dorthin um (src/app/admin/einstellungen/page.tsx).
  */
 // „Anmeldung" (Register N20, Nr. 115) ist eine eigene Seite: /admin/einstellungen/anmeldung.
-export const EINSTELLUNGEN_GRUPPEN = ['gruendung', 'plattform', 'anmeldung'] as const
+// „Team“ (Register N35, Nr. 190) nur für Inhaber — die Seite blendet die Gruppe sonst aus.
+export const EINSTELLUNGEN_GRUPPEN = ['gruendung', 'team', 'plattform', 'anmeldung'] as const
 export type EinstellungenGruppe = (typeof EINSTELLUNGEN_GRUPPEN)[number]
 
 export const ADMIN_EINSTELLUNGEN_HREF = '/admin/einstellungen'
@@ -227,6 +228,7 @@ export const EINSTELLUNGEN_TEXT = {
   ladefehler: 'Wir konnten die Einstellungen gerade nicht laden.',
   gruppe: {
     gruendung: { titel: 'Gründungshöfe', zeile: 'Plätze, Monate, Aktion, Anzeige' },
+    team: { titel: 'Team und Rechte', zeile: 'Personen, Rechte, Notfallzugang' },
     plattform: { titel: 'Plattform', zeile: 'Name und Adresse' },
     anmeldung: { titel: 'Anmeldung', zeile: 'Passkeys, Ersatzcodes, Geräte', satz: 'Deine Passkeys, Ersatzcodes und angemeldeten Geräte.', link: 'Anmeldung öffnen' },
   },

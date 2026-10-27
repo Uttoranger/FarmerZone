@@ -10,6 +10,7 @@ import { NEUIGKEITEN_PRO_MINUTE, NEUIGKEITEN_TEXT } from '@/lib/abo-bestaetigung
 import { neuigkeitenAnmeldenSchema } from '@/schemas/abo'
 import { EMAIL_ABO_STAND, meldeEmailAboAn } from '@/server/abo-anmeldung'
 import { neuigkeitenGebremst } from '@/server/bremse-datenbank'
+import { hofSichtbar } from '@/lib/hof-sichtbar'
 
 /*
  * „Neuigkeiten vom Hof per E-Mail" auf der Bestätigungsseite (Register N2,
@@ -73,7 +74,7 @@ export async function meldeNeuigkeitenAn(eingabe: unknown): Promise<NeuigkeitenE
       select: {
         customerEmail: true,
         farmId: true,
-        farm: { select: { archivedAt: true } },
+        farm: { select: { archivedAt: true, geschlossenAm: true } },
         // Was neuigkeitenErlaubt liest: Status, Zahlung und Frist.
         status: true,
         paymentMethod: true,
@@ -85,7 +86,7 @@ export async function meldeNeuigkeitenAn(eingabe: unknown): Promise<NeuigkeitenE
       },
     })
     // Stillgelegter Hof: wie die Seite selbst (notFound) — keine Anmeldung.
-    if (!bestellung || bestellung.farm.archivedAt) return { error: NEUIGKEITEN_TEXT.linkUngueltig }
+    if (!bestellung || !hofSichtbar(bestellung.farm)) return { error: NEUIGKEITEN_TEXT.linkUngueltig }
     // Nicht (mehr) laufend oder gebremst: nichts tun, dieselbe Antwort wie sonst.
     // Gezählt wird erst hier — nach Signatur und Status, sonst brauchte ein
     // Fremder die Grenze einer Bestellung auf.

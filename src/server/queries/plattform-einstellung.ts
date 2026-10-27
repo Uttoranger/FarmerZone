@@ -30,6 +30,7 @@ import { barMoeglich, gebuehrLageFuer, gebuehrModellFuer, type GebuehrLage, type
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { bestellstoppAus, type BestellstoppStand } from '@/lib/notbremse'
 import { ladeHoefeFuerFestschreiben, ladeHoefeFuerGruendung } from '@/server/queries/admin'
+import { HOF_SICHTBAR_WO } from '@/lib/hof-sichtbar'
 
 /*
  * Die Plattform-Einstellungen lesen (Register K2-Ergänzung, N15; Nr. 93).
@@ -111,7 +112,7 @@ async function zaehleGruendungSeiten(jetzt: Date): Promise<GruendungSeiten> {
     ladeHoefeFuerGruendung(),
     // Wartend wie in der Admin-Liste (approvedAt null), stillgelegte nicht — sie kommen nie dran.
     // Ein Testhof (nach zurückgenommener Freigabe) zählt nie mit (Register N21).
-    prisma.farm.count({ where: { approvedAt: null, archivedAt: null, istTesthof: false } }),
+    prisma.farm.count({ where: { approvedAt: null, ...HOF_SICHTBAR_WO, istTesthof: false } }),
   ])
   return gruendungSeitenDaten(gruendungEinstellungAus(einstellung), hoefe, wartend, jetzt)
 }

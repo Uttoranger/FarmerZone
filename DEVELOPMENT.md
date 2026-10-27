@@ -6063,6 +6063,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Anzeige-Fehler:** Kann eine öffentliche Seite die Einstellung nicht laden, zeigt sie die Preise nach der Vorgabe (Sentry `hofpreis-anzeige`); verbindlich bleibt der Betrag von `/api/checkout`.
 - **Offen für 198:** Sperre nach offener Rechnung in `barMoeglich`, Mandat-Schritt, Monatsabrechnung; Rechtstexte nach der Anwältin.
 
+## Konto-Anfragen und Team mit Rechten je Person (Register N35, N36; Nr. 190, Lauf 26, 27.10.2026)
+
+- **Team:** Einstellungen › Team und Rechte nur für Inhaber. Einladen, Rechte, Inhaber, Entfernen je mit Passkey, Mail an die Person und Protokoll; alles unter einer Datenbank-Sperre, damit sich zwei Inhaber nicht gleichzeitig gegenseitig das Recht nehmen. Der letzte Inhaber bleibt.
+- **Warum die neue Adresse nicht im Link steht:** Eine Adresse in der URL landet in Logs und Verläufen; die Datenbank kennt nur ihren HMAC im Zweck des Einmal-Links. Darum tippt die Person sie auf der Bestätigungsseite noch einmal.
+- **Schließen:** Stufe 1 nimmt die Hofseite offline wie die Stilllegung — die Leser fragen jetzt alle `hofSichtbar` statt `archivedAt` allein. Stufe 2 ist gebaut, läuft aber erst, wenn die Projektleitung die Liste nach Rückmeldung der Anwältin freigibt (`ENDGUELTIG_FREIGEGEBEN`).
+- **Notfallzugang:** nicht gebaut. Ersatzcodes für eine Vertrauensperson mit Zweck „notfall“ brauchen entweder ein Feld am Ersatzcode oder eine Änderung am Ersatzcode-Endpunkt in `src/lib/auth.ts` (Sicherheitsmail an alle Inhaber beim Einlösen); beides lag außerhalb der Freigabe (Bericht 190).
+
 ## Nützliche Befehle
 
 ```bash

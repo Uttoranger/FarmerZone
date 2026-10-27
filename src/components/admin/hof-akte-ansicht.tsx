@@ -25,6 +25,8 @@ import { GruendungBisDialog, type GruendungsHof } from './gruendung-bis-dialog'
 import { GruendungAusnehmenDialog, type GruendungAusnehmenHof } from './gruendung-ausnehmen-dialog'
 import { TesthofDialog, type TesthofHof } from './testhof-dialog'
 import { HofSperreDialog, type HofSperreWahl } from './hof-akte-sperre-dialog'
+import { HofAkteKonto, type HofKontoDaten } from './hof-akte-konto'
+import { KONTO_ANFRAGE_TEXT } from '@/lib/konto-anfragen'
 
 /**
  * Die Akte eines Hofs (Register N32, N33, N34; Nachtlauf Nr. 187; Mockup
@@ -32,10 +34,21 @@ import { HofSperreDialog, type HofSperreWahl } from './hof-akte-sperre-dialog'
  * („was Kundinnen erleben“), Eingreifen und die Akte aus dem Protokoll.
  * Freischalten, Gründung, Testhof und Servicegebühr sind aus der Liste
  * hierher gezogen — dieselben Actions und Dialoge. Neu: „Vorübergehend
- * sperren …“ / „Sperre aufheben“. Die Konto-Anfragen (Anmelde-E-Mail ändern,
- * Auskunft, Konto schließen) bleiben ausgeblendet, bis Nr. 190 sie füllt.
+ * sperren …“ / „Sperre aufheben“. Darunter die Konto-Anfragen (Anmelde-E-Mail
+ * ändern, Auskunft, Konto schließen; Nr. 190, hof-akte-konto.tsx).
  */
-export function HofAkteAnsicht({ hof, zustand, akte }: { hof: AdminHof; zustand: HofZustand; akte: AkteDaten }): React.JSX.Element {
+export function HofAkteAnsicht({
+  hof,
+  zustand,
+  akte,
+  konto,
+}: {
+  hof: AdminHof
+  zustand: HofZustand
+  akte: AkteDaten
+  /** Die Konto-Knöpfe (Nr. 190); ohne = ausgeblendet (etwa wenn der Stand nicht lesbar war). */
+  konto?: HofKontoDaten | null
+}): React.JSX.Element {
   const [aktion, setAktion] = useState<HofAktion | null>(null)
   const [gebuehr, setGebuehr] = useState(false)
   const [gruendungHof, setGruendungHof] = useState<GruendungsHof | null>(null)
@@ -208,6 +221,12 @@ export function HofAkteAnsicht({ hof, zustand, akte }: { hof: AdminHof; zustand:
           {hof.sperre && wartet && <p className="text-[13px] font-medium text-status-offen">{hof.sperre}</p>}
           {hof.gruendungZuletzt && <p className={cn('text-[12px]', LEISE)}>{hof.gruendungZuletzt}</p>}
         </Abschnitt>
+
+        {konto && (
+          <Abschnitt titel={KONTO_ANFRAGE_TEXT.titel} satz={KONTO_ANFRAGE_TEXT.satz}>
+            <HofAkteKonto konto={konto} />
+          </Abschnitt>
+        )}
       </div>
 
       <Abschnitt titel="Akte" satz="Einträge aus dem Protokoll – Team und System">

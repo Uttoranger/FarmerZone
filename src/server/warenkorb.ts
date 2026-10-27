@@ -1,3 +1,4 @@
+import { hofSichtbar } from '@/lib/hof-sichtbar'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { istGebindeGesperrt } from '@/lib/futter-registrierung'
@@ -54,6 +55,7 @@ export const HOF_KAUFBARKEIT_AUSWAHL = {
   name: true,
   isPaused: true,
   archivedAt: true,
+  geschlossenAm: true,
   approvedAt: true,
   // Sperre durch das Team (Register N34, Nr. 187) — nur ob, nie der Grund.
   adminGesperrtAm: true,
@@ -122,7 +124,7 @@ export async function pruefeKaufbarkeitHoefe(
   for (const hof of hoefe) {
     if (gesehen.has(hof.id)) continue
     gesehen.add(hof.id)
-    if (hof.archivedAt) sperren.set(hof.id, { grund: 'stillgelegt', text: FARM_ARCHIVED_MESSAGE })
+    if (!hofSichtbar(hof)) sperren.set(hof.id, { grund: 'stillgelegt', text: FARM_ARCHIVED_MESSAGE })
     else if (!hof.approvedAt) sperren.set(hof.id, { grund: 'nicht-freigeschaltet', text: FARM_NOT_APPROVED_MESSAGE })
     else if (hof.adminGesperrtAm) sperren.set(hof.id, { grund: 'admin-gesperrt', text: HOF_GESPERRT_SATZ })
     else if (hof.isPaused) sperren.set(hof.id, { grund: 'pause', text: SHOP_PAUSED_MESSAGE })

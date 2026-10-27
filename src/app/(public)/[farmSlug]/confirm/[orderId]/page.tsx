@@ -35,6 +35,7 @@ import { barLinkErneutMoeglich } from '@/lib/bar-bestaetigung'
 import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { LAUFENDE_STATUS } from '@/lib/bestellungen-finden'
+import { hofSichtbar } from '@/lib/hof-sichtbar'
 
 interface Props {
   params: Promise<{ farmSlug: string; orderId: string }>
@@ -120,6 +121,7 @@ async function getOrder(orderId: string) {
           phone: true,
           email: true,
           archivedAt: true,
+          geschlossenAm: true,
         },
       },
       items: {
@@ -169,7 +171,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
   // Farm. Die Stilllegung setzt voraus, dass keine offene Bestellung mehr
   // existiert (Guard in src/server/actions/farm-archive.ts), hier hängt also
   // kein laufender Bestätigungs-Ablauf dran.
-  if (!order || order.farm.slug !== farmSlug || order.farm.archivedAt) notFound()
+  if (!order || order.farm.slug !== farmSlug || !hofSichtbar(order.farm)) notFound()
 
   // Erst nach gibVerwaisteFreiOhneRisiko: Eine verfallene Barbestellung ist
   // dann schon storniert und bekommt keine Adresse mehr.

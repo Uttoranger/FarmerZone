@@ -27,6 +27,6 @@ describe('zaehleGruendungSeiten — wartende Höfe ohne Testhof', () => {
     await gruendungFuerSeiten(new Date('2026-10-01T08:00:00.000Z'))
     expect(Sentry.captureException).not.toHaveBeenCalled()
     expect(prisma.farm.count).toHaveBeenCalledTimes(1)
-    expect(prisma.farm.count).toHaveBeenCalledWith({ where: { approvedAt: null, archivedAt: null, istTesthof: false } })
+    expect(prisma.farm.count).toHaveBeenCalledWith({ where: { approvedAt: null, archivedAt: null, geschlossenAm: null, istTesthof: false } })
   })
 })

@@ -90,6 +90,7 @@ async function leseBestellung(where: Prisma.OrderWhereInput) {
           address: true, postalCode: true, city: true, phone: true,
           // Für „Erneut senden": ein stillgelegter Hof bekommt keine Mail mehr.
           archivedAt: true,
+          geschlossenAm: true,
         },
       },
       items: {

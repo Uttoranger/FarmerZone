@@ -453,7 +453,7 @@ const NOCHMAL_BESTELLUNG_FELDER = {
   pickupTimeStart: true,
   customerEmail: true,
   // Mit der Anmelde-Adresse: ohne Hof-E-Mail ginge die Hof-Mail dorthin (hofKontaktEmail, Nr. 194).
-  farm: { select: { name: true, archivedAt: true, ...HOF_KONTAKT_FELDER } },
+  farm: { select: { name: true, archivedAt: true, geschlossenAm: true, ...HOF_KONTAKT_FELDER } },
 } as const satisfies Prisma.OrderSelect
 
 export type NochmalBezugStand = NochmalStand & {
@@ -465,12 +465,12 @@ export type NochmalBezugStand = NochmalStand & {
 
 type NochmalQuelle = 'bestellung' | 'hof' | 'hofInhaber' | null
 type NochmalBestellung = Prisma.OrderGetPayload<{ select: typeof NOCHMAL_BESTELLUNG_FELDER }>
-const NOCHMAL_HOF_FELDER = { id: true, name: true, approvedAt: true, archivedAt: true, owner: { select: { email: true } } } as const satisfies Prisma.FarmSelect
+const NOCHMAL_HOF_FELDER = { id: true, name: true, approvedAt: true, archivedAt: true, geschlossenAm: true, owner: { select: { email: true } } } as const satisfies Prisma.FarmSelect
 type NochmalHof = Prisma.FarmGetPayload<{ select: typeof NOCHMAL_HOF_FELDER }>
 
 /** Der Stand aus dem Hof — Freischaltung an die Inhaberin. */
 function standAusHof(hof: NochmalHof | null): NochmalBezugStand {
-  return { bestellung: null, hof: hof ? { approvedAt: hof.approvedAt, archivedAt: hof.archivedAt } : null, adresse: hof?.owner.email ?? null, hofName: hof?.name ?? null }
+  return { bestellung: null, hof: hof ? { approvedAt: hof.approvedAt, archivedAt: hof.archivedAt, geschlossenAm: hof.geschlossenAm } : null, adresse: hof?.owner.email ?? null, hofName: hof?.name ?? null }
 }
 
 /** Der Stand aus der Bestellung — Kundin aus der Bestellung, Hof aus dem Hof der Bestellung. */

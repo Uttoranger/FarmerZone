@@ -15,6 +15,7 @@ import { ohneTestzahlungenWhere } from '@/lib/testzahlung'
 import { gruendungEinstellungAus } from '@/lib/plattform-einstellung'
 import type { AblaufLaufDaten } from '@/lib/betrieb'
 import { sammleAufgaben, LEERER_STAND, type Aufgabe, type AufgabeHof, type AufgabenStand, type HeuteWoche, type ProtokollRoh } from '@/lib/admin-aufgaben'
+import { HOF_SICHTBAR_WO } from '@/lib/hof-sichtbar'
 
 /*
  * Die Daten von Admin › Heute (Register N32, Nr. 185). Die Aufgaben kommen
@@ -36,7 +37,7 @@ function meldungVon(m: { hofName: string | null; customerEmail: string | null })
 /** Verkaufende Höfe: freigeschaltet, nicht stillgelegt, nicht pausiert, kein Testhof — je Hof nur, ob es eine Abholzeit gibt, und die letzte Bestellung. */
 async function ladeHoefeAktiv(): Promise<AufgabeHof[]> {
   const hoefe = await prisma.farm.findMany({
-    where: { approvedAt: { not: null }, archivedAt: null, isPaused: false, istTesthof: false },
+    where: { approvedAt: { not: null }, ...HOF_SICHTBAR_WO, isPaused: false, istTesthof: false },
     select: {
       id: true,
       name: true,
@@ -169,7 +170,7 @@ export async function ladeHeute(jetzt: Date, optionen: { mitBetrieb: boolean }, 
     ladeAufgabenStand(jetzt, optionen),
     ladeBestellungenHeute(jetzt, stripeLiveAb),
     ladeWoche(jetzt, stripeLiveAb),
-    prisma.farm.count({ where: { approvedAt: { not: null }, archivedAt: null, isPaused: false, istTesthof: false } }),
+    prisma.farm.count({ where: { approvedAt: { not: null }, ...HOF_SICHTBAR_WO, isPaused: false, istTesthof: false } }),
     naechsterTermin(jetzt),
     lesePlattformEinstellung(),
     prisma.adminAktion.findMany({ orderBy: { wann: 'desc' }, take: 3, select: { wann: true, wer: true, art: true } }),

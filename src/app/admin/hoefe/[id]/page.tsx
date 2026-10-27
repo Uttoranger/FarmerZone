@@ -10,6 +10,11 @@ import { LAND_LABEL, alsLand } from '@/lib/laender'
 import { HofAkteAnsicht } from '@/components/admin/hof-akte-ansicht'
 import { ADMIN_RAHMEN, AdminFehler } from '@/components/admin/admin-teile'
 import { MARKE } from '@/lib/marke'
+import { ladeKontoStand } from '@/lib/konto-schliessen'
+import { schliessenSperre, wiederOeffnenBis, wiederOeffnenMoeglich } from '@/lib/konto-anfragen'
+import { formatTagKurz } from '@/lib/format'
+import { kalendertagInWien } from '@/lib/wiener-tag'
+import type { HofKontoDaten } from '@/components/admin/hof-akte-konto'
 
 export const metadata: Metadata = { title: `Akte — Admin — ${MARKE}` }
 export const dynamic = 'force-dynamic'
@@ -42,6 +47,7 @@ export default async function HofAktePage({ params }: { params: Promise<{ id: st
           // Die Anmelde-E-Mail verlässt den Server nur gekürzt (Freigabe 187, Punkt 2) — auch in den Daten der Dialoge.
           hof={{ ...geladen.hof, ownerEmail: maskiereAdresse(geladen.hof.ownerEmail) }}
           zustand={geladen.zustand}
+          konto={kontoDaten(geladen, jetzt)}
           akte={hofAkteAnsicht(
             { ...geladen.akte, hof: { ...geladen.akte.hof, landText: LAND_LABEL[alsLand(geladen.akte.hof.country)] } },
             {
@@ -62,9 +68,25 @@ export default async function HofAktePage({ params }: { params: Promise<{ id: st
 }
 
 async function laden(id: string, jetzt: Date) {
-  const [{ rows, hoefe }, akte] = await Promise.all([ladeAdminHoefe(jetzt), ladeHofAkte(id, jetzt)])
+  const [{ rows, hoefe }, akte, kontoStand] = await Promise.all([ladeAdminHoefe(jetzt), ladeHofAkte(id, jetzt), ladeKontoStand(id)])
   const hof = hoefe.find((h) => h.id === id)
   const row = rows.find((r) => r.id === id)
   if (!hof || !row || !akte) return 'fehlt' as const
-  return { hof, zustand: hofZustand(row), akte }
+  return { hof, zustand: hofZustand(row), akte, kontoStand }
+}
+
+/** Die Konto-Knöpfe (Nr. 190): Zustand als Text, nie als Date; die Adresse nur gekürzt. */
+function kontoDaten(geladen: Exclude<Awaited<ReturnType<typeof laden>>, 'fehlt'>, jetzt: Date): HofKontoDaten | null {
+  const stand = geladen.kontoStand
+  if (!stand) return null
+  const bis = wiederOeffnenBis(stand.geschlossenAm)
+  return {
+    farmId: geladen.hof.id,
+    name: geladen.hof.name,
+    anmeldungGekuerzt: maskiereAdresse(geladen.akte.hof.owner.email),
+    geschlossen: stand.geschlossenAm
+      ? { bis: bis ? formatTagKurz(kalendertagInWien(bis)) : null, wiederOeffnen: wiederOeffnenMoeglich(stand, jetzt), endgueltig: stand.endgueltigAm !== null }
+      : null,
+    schliessenSperre: schliessenSperre(stand.offen),
+  }
 }

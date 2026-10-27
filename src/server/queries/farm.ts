@@ -40,6 +40,7 @@ import {
 } from '@/lib/hofuebersicht'
 import { AKTIVER_BEITRAG, NEUESTER_BEITRAG_ZUERST } from './status-posts'
 import { alsAbholFenster, ausgebuchteTage, type AusgebuchteTage } from '@/server/abholfenster'
+import { HOF_SICHTBAR_WO } from '@/lib/hof-sichtbar'
 
 export type PublicProduct = {
   id: string
@@ -257,13 +258,14 @@ function alsOeffentlichesFoto({ ausschnitt, ...foto }: { id: string; url: string
 /**
  * DIE öffentliche Sichtbarkeits-Bedingung — eine Quelle für Einzelseite UND
  * Übersicht, damit die beiden nie auseinanderlaufen können:
- * archivedAt: null — ein stillgelegter Hof ist öffentlich nicht auffindbar;
+ * HOF_SICHTBAR_WO — ein stillgelegter (archivedAt) oder geschlossener Hof
+ * (geschlossenAm, Konto schließen N36) ist öffentlich nicht auffindbar;
  * approvedAt: { not: null } — dasselbe für einen noch nicht vom Betreiber
  * freigeschalteten Hof (src/lib/farm-approval.ts).
  */
 export const OEFFENTLICH_SICHTBAR = {
   isActive: true,
-  archivedAt: null,
+  ...HOF_SICHTBAR_WO,
   approvedAt: { not: null },
 } as const
 
