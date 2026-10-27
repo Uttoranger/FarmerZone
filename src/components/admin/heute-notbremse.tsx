@@ -31,7 +31,7 @@ import { cn } from '@/lib/utils'
  * Frische, Grund, Satz und „bis“ entscheidet der Server.
  */
 
-/** Zerstörend: Orange-Umriss und orange Schrift (Mockup; Register O1: kein Fehler-Token) — nie Grün. */
+/** Zerstörend: Orange-Umriss und orange Schrift (DESIGN_SYSTEM „Zerstörendes als Orange-Umriss“; das Mockup zeigt Rot, Abweichung im Bericht 189) — nie Grün. */
 const KNOPF_ANHALTEN = cn(KNOPF_RAHMEN, 'border-primary/60 font-semibold text-status-offen')
 
 type FormularProps = {

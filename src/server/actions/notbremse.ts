@@ -114,10 +114,11 @@ export async function gibBestellungenFrei(): Promise<{ ok: true } | { error: str
     return { error: NOTBREMSE_FEHLER.speichern }
   }
 
-  // Nichts geändert (schon frei, zwei Admins zugleich): kein Eintrag, und der Cache bleibt, wie er ist.
+  // Nichts geändert (schon frei, zwei Admins zugleich): kein Eintrag. Der Cache wird trotzdem geleert —
+  // ein zweites „Freigeben“ räumt so auch einen veralteten Eintrag des Bands ab.
   if (geaendert > 0) {
     await protokolliere({ wer: wache.userId, art: 'bestellungen_freigegeben', bezugArt: 'plattform', bezugId: PLATTFORM_BEZUG, mitPasskey: wache.mitPasskey })
-    updateTag(PLATTFORM_EINSTELLUNG_TAG)
   }
+  updateTag(PLATTFORM_EINSTELLUNG_TAG)
   return { ok: true }
 }

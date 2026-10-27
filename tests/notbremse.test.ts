@@ -162,15 +162,15 @@ describe('Actions: Recht notbremse, frisch, Protokoll', () => {
     expect(executeRaw).not.toHaveBeenCalled()
   })
 
-  it('Freigeben ohne gesetzte Notbremse: kein Eintrag; mit: ein Eintrag', async () => {
+  it('Freigeben ohne gesetzte Notbremse: kein Eintrag, Cache trotzdem geleert; mit: ein Eintrag', async () => {
     wache.mockResolvedValue({ userId: 'admin-1', mitPasskey: true } as never)
     executeRaw.mockResolvedValueOnce(0 as never).mockResolvedValueOnce(1 as never)
     await gibBestellungenFrei()
     expect(protokolliere).not.toHaveBeenCalled()
-    expect(updateTag).not.toHaveBeenCalled()
+    expect(updateTag).toHaveBeenCalledTimes(1)
     await gibBestellungenFrei()
     expect(vi.mocked(protokolliere).mock.calls[0]?.[0]).toMatchObject({ art: 'bestellungen_freigegeben', bezugArt: 'plattform', wer: 'admin-1' })
-    expect(updateTag).toHaveBeenCalledTimes(1)
+    expect(updateTag).toHaveBeenCalledTimes(2)
   })
 })
 
